@@ -27,6 +27,19 @@ cd client
 npm test
 ```
 
+## 部署到 GitHub Pages
+
+```bash
+cd client
+npm run build
+npm run deploy
+```
+
+執行後會自動將 `dist/` 推送至 `gh-pages` branch。  
+GitHub repo 需在 Settings → Pages 設定 Source 為 `gh-pages` branch。
+
+線上網址：https://vanceliu.github.io/MayanaIdle/
+
 ## 專案結構
 
 ```
