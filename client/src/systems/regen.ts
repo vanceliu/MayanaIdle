@@ -1,0 +1,28 @@
+import type { Character } from '../models/character';
+import type { EquipmentInstance } from '../models/equipment';
+import { getTotalAttributes, getEffectiveVIT, getEffectiveSPI } from '../models/character';
+
+export function getHpRegen(char: Character, inCombat: boolean, gear: (EquipmentInstance | null)[] = []): number {
+  const attrs = getTotalAttributes(char);
+  const effVIT = getEffectiveVIT(attrs.VIT);
+  const base = Math.floor(effVIT / 2);
+  const equipBonus = gear.reduce((sum, g) => sum + (g?.hpRegen ?? 0), 0);
+  const total = base + equipBonus;
+  if (total <= 0) return 0;
+  if (inCombat) return Math.max(1, Math.floor(total / 2));
+  return total;
+}
+
+export function getMpRegen(char: Character, inCombat: boolean, gear: (EquipmentInstance | null)[] = []): number {
+  const attrs = getTotalAttributes(char);
+  const effSPI = getEffectiveSPI(attrs.SPI);
+  const base = Math.floor(effSPI / 2);
+  const equipBonus = gear.reduce((sum, g) => sum + (g?.mpRegen ?? 0), 0);
+  const total = base + equipBonus;
+  if (total <= 0) return 0;
+  if (inCombat) return Math.max(1, Math.floor(total / 2));
+  return total;
+}
+
+export const HP_REGEN_INTERVAL_MS = 5000;
+export const MP_REGEN_INTERVAL_MS = 6000;

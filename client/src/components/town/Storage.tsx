@@ -1,0 +1,225 @@
+import { useState } from 'react';
+import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
+import type { EquipmentInstance } from '../../models/equipment';
+import type { BagItem } from '../../stores/gameStore';
+import { EquipmentDetail } from '../EquipmentInfo';
+import { getItemWeight } from '../../models/items';
+
+export function Storage() {
+  const inventory = useGameStore(s => s.inventory);
+  const bagItems = useGameStore(s => s.bagItems);
+  const storedEquipment = useGameStore(s => s.storedEquipment);
+  const storedMaterials = useGameStore(s => s.storedMaterials);
+  const character = useGameStore(s => s.character);
+  const warehouseGold = useGameStore(s => s.warehouseGold);
+  const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
+  const [goldAmount, setGoldAmount] = useState('');
+
+  function depositEquip(item: EquipmentInstance) {
+    const inv = useGameStore.getState().inventory;
+    const stored = useGameStore.getState().storedEquipment;
+    useGameStore.setState({
+      inventory: inv.filter(i => i.id !== item.id),
+      storedEquipment: [...stored, item],
+    });
+    useGameStore.getState().saveState();
+  }
+
+  function withdrawEquip(item: EquipmentInstance) {
+    const inv = useGameStore.getState().inventory;
+    const bag = useGameStore.getState().bagItems;
+    if (getBagUsedSlots(bag, inv) >= BAG_MAX_SLOTS) return;
+    const stored = useGameStore.getState().storedEquipment;
+    useGameStore.setState({
+      storedEquipment: stored.filter(i => i.id !== item.id),
+      inventory: [...inv, item],
+    });
+    useGameStore.getState().saveState();
+  }
+
+  function depositMaterial(item: BagItem, amount: number) {
+    const bag = useGameStore.getState().bagItems;
+    const stored = useGameStore.getState().storedMaterials;
+    const actual = Math.min(amount, item.amount);
+    if (actual <= 0) return;
+
+    const newBag = bag.map(b =>
+      b.name === item.name ? { ...b, amount: b.amount - actual } : b
+    ).filter(b => b.amount > 0);
+
+    const existing = stored.find(s => s.name === item.name);
+    const newStored = existing
+      ? stored.map(s => s.name === item.name ? { ...s, amount: s.amount + actual } : s)
+      : [...stored, { ...item, amount: actual }];
+
+    useGameStore.setState({ bagItems: newBag, storedMaterials: newStored });
+    useGameStore.getState().saveState();
+  }
+
+  function withdrawMaterial(item: BagItem, amount: number) {
+    const bag = useGameStore.getState().bagItems;
+    const inv = useGameStore.getState().inventory;
+    const stored = useGameStore.getState().storedMaterials;
+    const actual = Math.min(amount, item.amount);
+    if (actual <= 0) return;
+
+    const existing = bag.find(b => b.name === item.name);
+    if (!existing && getBagUsedSlots(bag, inv) >= BAG_MAX_SLOTS) return;
+
+    const newStored = stored.map(s =>
+      s.name === item.name ? { ...s, amount: s.amount - actual } : s
+    ).filter(s => s.amount > 0);
+
+    const newBag = existing
+      ? bag.map(b => b.name === item.name ? { ...b, amount: b.amount + actual } : b)
+      : [...bag, { ...item, amount: actual }];
+
+    useGameStore.setState({ bagItems: newBag, storedMaterials: newStored });
+    useGameStore.getState().saveState();
+  }
+
+  function depositGold() {
+    const amount = parseInt(goldAmount, 10);
+    if (!amount || amount <= 0 || !character) return;
+    const available = character.gold;
+    const actual = Math.min(amount, available);
+    if (actual <= 0) return;
+
+    useGameStore.setState({
+      character: { ...character, gold: character.gold - actual },
+      warehouseGold: useGameStore.getState().warehouseGold + actual,
+    });
+    useGameStore.getState().saveState();
+    setGoldAmount('');
+  }
+
+  function withdrawGold() {
+    const amount = parseInt(goldAmount, 10);
+    if (!amount || amount <= 0 || !character) return;
+    const available = useGameStore.getState().warehouseGold;
+    const actual = Math.min(amount, available);
+    if (actual <= 0) return;
+
+    useGameStore.setState({
+      character: { ...character, gold: character.gold + actual },
+      warehouseGold: useGameStore.getState().warehouseGold - actual,
+    });
+    useGameStore.getState().saveState();
+    setGoldAmount('');
+  }
+
+  const potionItems = bagItems.filter(b => b.type === 'potion');
+  const nonPotionItems = bagItems.filter(b => b.type !== 'potion');
+  const storedPotions = storedMaterials.filter(s => s.type === 'potion');
+  const storedNonPotions = storedMaterials.filter(s => s.type !== 'potion');
+
+  return (
+    <div className="storage-panel">
+      <p className="shop-greeting">「需要存放東西嗎？」</p>
+
+      <div className="storage-gold-section">
+        <span className="storage-gold-label">倉庫金幣：{warehouseGold} G</span>
+        <span className="storage-gold-label">身上金幣：{character?.gold ?? 0} G</span>
+        <div className="storage-gold-controls">
+          <input
+            type="number"
+            min="1"
+            value={goldAmount}
+            onChange={e => setGoldAmount(e.target.value)}
+            placeholder="金額"
+            className="gold-input"
+          />
+          <button onClick={depositGold} disabled={!character || character.gold <= 0}>存入</button>
+          <button onClick={withdrawGold} disabled={warehouseGold <= 0}>取出</button>
+        </div>
+      </div>
+
+      <div className="storage-tabs">
+        <button className={tab === 'deposit' ? 'active' : ''} onClick={() => setTab('deposit')}>存入物品</button>
+        <button className={tab === 'withdraw' ? 'active' : ''} onClick={() => setTab('withdraw')}>取出物品</button>
+      </div>
+
+      {tab === 'deposit' && (
+        <div className="storage-content">
+          <h4>背包裝備 ({inventory.length})</h4>
+          {inventory.length === 0 && <p className="empty-text">無裝備可存入</p>}
+          {inventory.map(item => (
+            <div key={item.id} className="storage-item">
+              <EquipmentDetail item={item} />
+              <div className="storage-item-actions">
+                <button onClick={() => depositEquip(item)}>存入</button>
+              </div>
+            </div>
+          ))}
+
+          <h4>背包藥水</h4>
+          {potionItems.length === 0 && <p className="empty-text">無藥水可存入</p>}
+          {potionItems.map(item => (
+            <div key={item.name} className="storage-item">
+              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <div className="storage-item-actions">
+                <button onClick={() => depositMaterial(item, 1)}>存1</button>
+                <button onClick={() => depositMaterial(item, 10)}>存10</button>
+                <button onClick={() => depositMaterial(item, item.amount)}>全部</button>
+              </div>
+            </div>
+          ))}
+
+          <h4>背包材料</h4>
+          {nonPotionItems.length === 0 && <p className="empty-text">無材料可存入</p>}
+          {nonPotionItems.map(item => (
+            <div key={item.name} className="storage-item">
+              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <div className="storage-item-actions">
+                <button onClick={() => depositMaterial(item, 1)}>存1</button>
+                <button onClick={() => depositMaterial(item, 10)}>存10</button>
+                <button onClick={() => depositMaterial(item, item.amount)}>全部</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'withdraw' && (
+        <div className="storage-content">
+          <h4>倉庫裝備 ({storedEquipment.length})</h4>
+          {storedEquipment.length === 0 && <p className="empty-text">倉庫空空如也</p>}
+          {storedEquipment.map(item => (
+            <div key={item.id} className="storage-item">
+              <EquipmentDetail item={item} />
+              <div className="storage-item-actions">
+                <button onClick={() => withdrawEquip(item)}>取出</button>
+              </div>
+            </div>
+          ))}
+
+          <h4>倉庫藥水</h4>
+          {storedPotions.length === 0 && <p className="empty-text">無藥水</p>}
+          {storedPotions.map(item => (
+            <div key={item.name} className="storage-item">
+              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <div className="storage-item-actions">
+                <button onClick={() => withdrawMaterial(item, 1)}>取1</button>
+                <button onClick={() => withdrawMaterial(item, 10)}>取10</button>
+                <button onClick={() => withdrawMaterial(item, item.amount)}>全部</button>
+              </div>
+            </div>
+          ))}
+
+          <h4>倉庫材料</h4>
+          {storedNonPotions.length === 0 && <p className="empty-text">無材料</p>}
+          {storedNonPotions.map(item => (
+            <div key={item.name} className="storage-item">
+              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <div className="storage-item-actions">
+                <button onClick={() => withdrawMaterial(item, 1)}>取1</button>
+                <button onClick={() => withdrawMaterial(item, 10)}>取10</button>
+                <button onClick={() => withdrawMaterial(item, item.amount)}>全部</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

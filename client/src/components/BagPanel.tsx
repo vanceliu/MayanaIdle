@@ -1,0 +1,292 @@
+import { useState, useRef, useMemo } from 'react';
+import { useGameStore } from '../stores/gameStore';
+import { POTION_CONFIG, type PotionType, getPotionCount, BAG_MAX_SLOTS } from '../stores/gameStore';
+import type { EquipmentInstance } from '../models/equipment';
+import { GameIcon } from './GameIcon';
+import { getItemIcon, getEquipIcon } from '../models/iconMap';
+import { EquipmentDetail } from './EquipmentInfo';
+import { getItemWeight } from '../models/items';
+
+const BAG_COLUMNS = 5;
+
+interface BagGridItem {
+  id: string;
+  type: 'potion' | 'material' | 'scroll' | 'equipment' | 'spellbook';
+  name: string;
+  count?: number;
+  potionType?: PotionType;
+  equipment?: EquipmentInstance;
+  color?: string;
+}
+
+const POTION_COLORS: Record<PotionType, string> = {
+  red: '#DC2626',
+  orange: '#F59E0B',
+  white: '#E2E8F0',
+};
+
+function getShortName(name: string): string {
+  if (name.length <= 4) return name;
+  return name.slice(0, 4);
+}
+
+function getItemIconKey(name: string, type: string): string {
+  if (type === 'scroll') return 'scroll';
+  if (type === 'spellbook') return 'spellbook';
+  if (name.includes('磨刀石')) return 'whetstone';
+  if (name.includes('石')) return 'stone';
+  return 'material';
+}
+
+const TYPE_SORT_ORDER: Record<string, number> = {
+  potion: 0,
+  scroll: 1,
+  material: 2,
+  equipment: 3,
+};
+
+export function BagPanel() {
+  const [sorted, setSorted] = useState(false);
+  const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const character = useGameStore(s => s.character);
+  const inventory = useGameStore(s => s.inventory);
+  const bagItems = useGameStore(s => s.bagItems);
+  const equipItem = useGameStore(s => s.equipItem);
+  const usePotionByType = useGameStore(s => s.usePotionByType);
+  const useTownScroll = useGameStore(s => s.useTownScroll);
+  const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
+  const quickSlots = useGameStore(s => s.quickSlots);
+
+  const gridItems: BagGridItem[] = [];
+
+  const redCount = getPotionCount(bagItems, 'red');
+  const orangeCount = getPotionCount(bagItems, 'orange');
+  const whiteCount = getPotionCount(bagItems, 'white');
+
+  if (redCount > 0) {
+    gridItems.push({ id: 'potion-red', type: 'potion', name: '紅色藥水', count: redCount, potionType: 'red', color: POTION_COLORS.red });
+  }
+  if (orangeCount > 0) {
+    gridItems.push({ id: 'potion-orange', type: 'potion', name: '橙色藥水', count: orangeCount, potionType: 'orange', color: POTION_COLORS.orange });
+  }
+  if (whiteCount > 0) {
+    gridItems.push({ id: 'potion-white', type: 'potion', name: '白色藥水', count: whiteCount, potionType: 'white', color: POTION_COLORS.white });
+  }
+
+  for (const item of bagItems) {
+    if (item.type === 'potion') continue;
+    gridItems.push({ id: `bag-${item.name}`, type: item.type, name: item.name, count: item.amount });
+  }
+
+  for (const item of inventory) {
+    gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item });
+  }
+
+  const usedSlots = gridItems.length;
+
+  const displayItems = useMemo(() => {
+    if (!sorted) return gridItems;
+    return [...gridItems].sort((a, b) => {
+      const orderA = TYPE_SORT_ORDER[a.type] ?? 99;
+      const orderB = TYPE_SORT_ORDER[b.type] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+  }, [gridItems, sorted]);
+
+  function handleMouseEnter(e: React.MouseEvent, item: BagGridItem) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const tooltipWidth = 220;
+    let x = rect.left;
+    if (x + tooltipWidth > window.innerWidth) {
+      x = rect.right - tooltipWidth;
+    }
+    if (x < 0) x = 4;
+
+    const y = rect.bottom + 8;
+    setTooltip({ item, x, y, above: false });
+  }
+
+  function handleMouseLeave() {
+    setTooltip(null);
+  }
+
+  function handleContextMenu(e: React.MouseEvent, item: BagGridItem) {
+    e.preventDefault();
+    setContextMenu({ item, x: e.clientX, y: e.clientY });
+  }
+
+  function handleAssignSlot(slotIdx: number) {
+    if (contextMenu && contextMenu.item.potionType) {
+      assignQuickSlot(slotIdx, contextMenu.item.potionType);
+      setContextMenu(null);
+    }
+  }
+
+  function handleDiscard() {
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    if (item.equipment) {
+      useGameStore.getState().discardInventoryItem(item.equipment.id!);
+    } else {
+      useGameStore.getState().discardBagItem(item.name);
+    }
+    setContextMenu(null);
+  }
+
+  function handleClick(item: BagGridItem) {
+    if (item.potionType) {
+      usePotionByType(item.potionType);
+    } else if (item.equipment) {
+      equipItem(item.equipment);
+    } else if (item.type === 'scroll' && item.name.includes('回城卷軸')) {
+      useTownScroll(item.name);
+    }
+  }
+
+  function renderTooltipContent(item: BagGridItem) {
+    if (item.potionType) {
+      const config = POTION_CONFIG[item.potionType];
+      const unitWeight = getItemWeight(item.name);
+      const totalWeight = unitWeight * (item.count ?? 1);
+      return (
+        <div className="bag-tooltip-content">
+          <div className="tooltip-name">{item.name}</div>
+          <div className="tooltip-stat">回復 {config.healMin}~{config.healMax} HP</div>
+          <div className="tooltip-stat">冷卻 {config.cooldown}ms</div>
+          <div className="tooltip-stat">重量: {totalWeight}</div>
+          <div className="tooltip-count">數量: {item.count}</div>
+          <div className="tooltip-hint">點擊使用 / 右鍵設為快捷鍵</div>
+        </div>
+      );
+    }
+
+    if (item.equipment) {
+      const eq = item.equipment;
+      return (
+        <div className="bag-tooltip-content">
+          <EquipmentDetail item={eq} />
+          <div className="tooltip-hint">點擊裝備</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bag-tooltip-content">
+        <div className="tooltip-name">{item.name}</div>
+        <div className="tooltip-stat">重量: {getItemWeight(item.name) * (item.count ?? 1)}</div>
+        {item.count && <div className="tooltip-count">數量: {item.count}</div>}
+        {item.type === 'scroll' && item.name.includes('回城卷軸') && (
+          <div className="tooltip-hint">點擊使用傳送至城鎮</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bag-panel" ref={panelRef}>
+      <div className="bag-panel-header">
+        <span className="bag-panel-title">背包</span>
+        <span className="bag-panel-meta">
+          <button
+            className={`bag-sort-toggle ${sorted ? 'active' : ''}`}
+            onClick={() => setSorted(!sorted)}
+          >
+            整理
+          </button>
+          <span className={`bag-slots-count${usedSlots >= BAG_MAX_SLOTS ? ' danger' : usedSlots >= 90 ? ' warning' : ''}`}>
+            {usedSlots}/{BAG_MAX_SLOTS}
+          </span>
+        </span>
+      </div>
+      <div className="bag-gold-row">
+        <span className="bag-gold-label">金幣</span>
+        <span className="bag-gold-value">{character?.gold ?? 0}</span>
+      </div>
+      <div className="bag-grid-container">
+        <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
+          {Array.from({ length: BAG_MAX_SLOTS }).map((_, idx) => {
+            const item = displayItems[idx];
+            if (!item) {
+              return <div key={`empty-${idx}`} className="bag-cell empty" />;
+            }
+            return (
+              <div
+                key={item.id}
+                className={`bag-cell ${item.type}`}
+                onMouseEnter={(e) => handleMouseEnter(e, item)}
+                onMouseLeave={handleMouseLeave}
+                onContextMenu={(e) => handleContextMenu(e, item)}
+                onClick={() => handleClick(item)}
+              >
+                {item.potionType && (
+                  <GameIcon name={getItemIcon(`${item.potionType}-potion`)} size={24} color={item.color} />
+                )}
+                {item.type === 'equipment' && (
+                  <GameIcon
+                    name={getEquipIcon(item.equipment?.smallMonsterDamage ? 'sword' : 'chest')}
+                    size={24}
+                  />
+                )}
+                {!item.potionType && item.type !== 'equipment' && (
+                  <GameIcon
+                    name={getItemIcon(getItemIconKey(item.name, item.type))}
+                    size={24}
+                  />
+                )}
+                <span className="bag-cell-name">{getShortName(item.name)}</span>
+                {item.count != null && item.count > 1 && (
+                  <span className="bag-cell-count">×{item.count}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {tooltip && (
+        <div
+          className={`bag-tooltip ${tooltip.above ? 'above' : 'below'}`}
+          style={{ left: tooltip.x, top: tooltip.y }}
+        >
+          {renderTooltipContent(tooltip.item)}
+        </div>
+      )}
+
+      {contextMenu && (
+        <>
+          <div className="context-menu-overlay" onClick={() => setContextMenu(null)} />
+          <div
+            className="bag-context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            {contextMenu.item.potionType && (
+              <>
+                <div className="context-menu-title">設為快捷鍵</div>
+                {[0, 1, 2, 3, 4].map(idx => (
+                  <button
+                    key={idx}
+                    className="context-menu-item"
+                    onClick={() => handleAssignSlot(idx)}
+                  >
+                    快捷鍵 {idx + 1}
+                    {quickSlots[idx] === contextMenu.item.potionType && (
+                      <span className="context-menu-active">●</span>
+                    )}
+                  </button>
+                ))}
+                <div className="context-menu-divider" />
+              </>
+            )}
+            <button className="context-menu-item context-menu-danger" onClick={handleDiscard}>
+              丟棄{contextMenu.item.count && contextMenu.item.count > 1 ? ' ×1' : ''}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

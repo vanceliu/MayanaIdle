@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>MayanaIdle - 練等 CP 值分析（每 5 級最佳區域）</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  h1 { text-align: center; color: #e94560; }
+  .subtitle { text-align: center; color: #aaa; margin-bottom: 2rem; }
+  .assumptions { background: #16213e; padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #e94560; }
+  .assumptions h3 { color: #e94560; margin-top: 0; }
+  .assumptions ul { margin: 0; padding-left: 1.2rem; }
+  .assumptions li { margin: 0.3rem 0; color: #ccc; }
+  table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 14px; }
+  th, td { border: 1px solid #333; padding: 6px 10px; text-align: center; }
+  th { background: #0f3460; color: #fff; position: sticky; top: 0; }
+  tr:nth-child(even) { background: #16213e; }
+  tr:hover { background: #1a3a5e; }
+  .best { color: #4ade80; font-weight: bold; }
+  .boss { color: #fbbf24; }
+  .section-title { color: #e94560; margin-top: 2rem; border-bottom: 1px solid #333; padding-bottom: 0.5rem; }
+  .note { color: #888; font-size: 13px; margin-top: 0.5rem; }
+  .legend { display: flex; gap: 2rem; margin: 1rem 0; font-size: 13px; }
+  .legend span { display: flex; align-items: center; gap: 0.4rem; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  canvas { background: #16213e; border-radius: 8px; margin-top: 1rem; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h1>MayanaIdle 練等 CP 值分析</h1>
+<p class="subtitle">以騎士（雙手劍路線）為基準，升級屬性以 STR 為主，裝備在安定值內</p>
+
+<div class="assumptions">
+  <h3>前提假設</h3>
+  <ul>
+    <li><strong>職業</strong>：騎士，STR 優先配點（初始 STR 14，Lv51+ 每級 +1 STR 直到 35）</li>
+    <li><strong>攻擊間隔</strong>：1200ms（無加速）/ 900ms（有綠色藥水）</li>
+    <li><strong>遇敵</strong>：每秒 10% 機率 → 平均 10 秒搜尋一次怪物</li>
+    <li><strong>武器路線</strong>：短劍(4) → 鐵劍(7) → 巨劍(10) → 鋼鐵巨劍(17) → 騎士大劍(20) → 屠魔巨劍(23) → 王者之劍(28)</li>
+    <li><strong>裝備安定值內</strong>：不含強化加成，僅基礎武器傷害</li>
+    <li><strong>命中率</strong>：基礎 80% + AGI/3 + 等級差修正，取 min(95%, max(5%, 計算值))</li>
+    <li><strong>怪物數量</strong>：簡化為平均每次遇到 1~2 隻（低 Pressure）</li>
+    <li><strong>爆擊</strong>：5% 基礎爆擊率 × 2.0 倍率（無爆擊詞綴）</li>
+    <li><strong>CP 值公式</strong>：EXP/秒 = (怪物經驗 × 命中率 × 每場殺怪效率) / (搜尋時間 + 戰鬥時間)</li>
+  </ul>
+</div>
+
+<div class="legend">
+  <span><span class="dot" style="background:#4ade80"></span> CP 最高（推薦）</span>
+  <span><span class="dot" style="background:#fbbf24"></span> Boss 路線（高風險高報酬）</span>
+</div>
+
+<canvas id="cpChart" height="100"></canvas>
+
+<h2 class="section-title">每 5 級區間最佳練等區域</h2>
+<table id="mainTable">
+  <thead>
+    <tr>
+      <th>角色等級</th>
+      <th>武器（傷害）</th>
+      <th>STR</th>
+      <th>有效攻擊力</th>
+      <th>推薦區域</th>
+      <th>目標怪物</th>
+      <th>怪物HP/防禦/經驗</th>
+      <th>命中率</th>
+      <th>每殺秒數</th>
+      <th>EXP/分鐘</th>
+      <th>升級所需(分)</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h2 class="section-title">Boss 路線（有能力單殺時）</h2>
+<table id="bossTable">
+  <thead>
+    <tr>
+      <th>角色等級</th>
+      <th>Boss</th>
+      <th>Boss HP/防禦/經驗</th>
+      <th>預估擊殺秒數</th>
+      <th>EXP/分鐘（含搜尋）</th>
+      <th>對比一般怪</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<p class="note">※ Boss 出現在特定樓層，搜尋時間以 10 秒計，且假設角色有足夠 HP 存活。</p>
+<p class="note">※ 實際效率受 Pressure（怪物數量增加）、詞綴裝備、加速藥水、魔法技能影響，本表為保守估算。</p>
+
+<script>
+// === CONFIG ===
+const ATTACK_INTERVAL = 1.2; // seconds
+const SEARCH_TIME = 10; // average seconds to find a monster
+const BASE_HIT = 80;
+const BASE_CRIT_RATE = 0.05;
+const CRIT_MULTIPLIER = 2.0;
+const EVADE_MONSTER = 0; // most monsters have 0 evade in early/mid game
+
+function getExpToNext(level) {
+  return Math.floor(100 * Math.pow(1.15, level - 1));
+}
+
+// Knight STR progression: starts 14, can add 4 points (max 18 at creation)
+// At Lv51+, adds 1 STR per level until 35
+function getSTR(level) {
+  let str = 18; // assume maxed at creation
+  if (level > 50) {
+    str = Math.min(35, 18 + (level - 50));
+  }
+  return str;
+}
+
+// Weapon at each stage
+function getWeapon(level) {
+  if (level <= 10) return { name: '短劍', dmg: 4 };
+  if (level <= 20) return { name: '鐵劍', dmg: 7 };
+  if (level <= 30) return { name: '巨劍(雙手)', dmg: 10 };
+  if (level <= 40) return { name: '鋼鐵巨劍(雙手)', dmg: 17 };
+  if (level <= 55) return { name: '騎士大劍(雙手)', dmg: 20 };
+  if (level <= 70) return { name: '屠魔巨劍(雙手)', dmg: 23 };
+  return { name: '王者之劍(雙手)', dmg: 28 };
+}
+
+// Monster data per level range
+const MONSTERS = [
+  // { levelRange, name, area, monsterLv, hp, def, exp, atkMin, atkMax }
+  { range: [1,5], name: '史萊姆', area: '曙光草原', lv: 4, hp: 14, def: 1, exp: 10 },
+  { range: [6,10], name: '哥布林', area: '翠綠谷地', lv: 8, hp: 28, def: 3, exp: 24 },
+  { range: [11,15], name: '樹精靈', area: '風語林地', lv: 14, hp: 65, def: 6, exp: 80 },
+  { range: [16,20], name: '沼澤蜥蜴', area: '迷霧沼澤', lv: 20, hp: 105, def: 8, exp: 155 },
+  { range: [21,25], name: '高地獅鷲', area: '試煉高地', lv: 25, hp: 160, def: 12, exp: 280 },
+  { range: [26,30], name: '岩石巨人', area: '試煉高地', lv: 30, hp: 200, def: 14, exp: 400 },
+  { range: [31,35], name: '雪怪', area: '雪原地帶', lv: 35, hp: 290, def: 18, exp: 580 },
+  { range: [36,40], name: '巨人', area: '妖魔森林/龍之谷', lv: 38, hp: 360, def: 21, exp: 730 },
+  { range: [41,45], name: '亡魂騎士', area: '遠古戰場', lv: 45, hp: 480, def: 27, exp: 1000 },
+  { range: [46,50], name: '高等蜥蜴(3F)', area: '朦朧洞窟3F', lv: 48, hp: 560, def: 30, exp: 1200 },
+  { range: [51,55], name: '高階地靈之主', area: '百柱塔11~20F', lv: 50, hp: 620, def: 31, exp: 1320 },
+  { range: [56,60], name: '古代龍騎兵', area: '百柱塔41~50F', lv: 56, hp: 850, def: 38, exp: 1830 },
+  { range: [61,65], name: '冥界使者', area: '百柱塔51~60F', lv: 57, hp: 900, def: 39, exp: 1950 },
+  { range: [66,70], name: '冰晶元素', area: '百柱塔61~70F', lv: 58, hp: 930, def: 40, exp: 2020 },
+  { range: [71,75], name: '熔岩守衛', area: '百柱塔71~80F', lv: 59, hp: 1000, def: 42, exp: 2200 },
+  { range: [76,80], name: '殘影熔岩伊弗利特', area: '百柱塔81~90F', lv: 60, hp: 1150, def: 45, exp: 2530 },
+  { range: [81,85], name: '死之執行者', area: '百柱塔91~100F', lv: 60, hp: 1200, def: 45, exp: 2630 },
+  { range: [86,90], name: '死之執行者', area: '百柱塔91~100F', lv: 60, hp: 1200, def: 45, exp: 2630 },
+  { range: [91,95], name: '死之執行者', area: '百柱塔91~100F', lv: 60, hp: 1200, def: 45, exp: 2630 },
+  { range: [96,100], name: '死之執行者', area: '百柱塔91~100F', lv: 60, hp: 1200, def: 45, exp: 2630 },
+];
+
+// Boss data
+const BOSSES = [
+  { minLv: 40, name: '象牙塔惡魔', area: '象牙塔5F', lv: 45, hp: 3600, def: 42, exp: 9500 },
+  { minLv: 45, name: '朦朧蛇魔', area: '朦朧洞窟3F', lv: 50, hp: 4800, def: 48, exp: 12000 },
+  { minLv: 45, name: '安塔巨龍', area: '龍谷地間7F', lv: 50, hp: 5600, def: 50, exp: 14000 },
+  { minLv: 50, name: '毒之皇女', area: '百柱塔10F', lv: 80, hp: 10500, def: 64, exp: 21000 },
+  { minLv: 55, name: '哥布林之王', area: '百柱塔20F', lv: 80, hp: 11000, def: 66, exp: 22000 },
+  { minLv: 60, name: '暗影吸血鬼', area: '百柱塔30F', lv: 80, hp: 11500, def: 68, exp: 23000 },
+  { minLv: 60, name: '龍王約特勒', area: '百柱塔50F', lv: 80, hp: 13000, def: 72, exp: 26000 },
+  { minLv: 65, name: '冥王哈馬斯', area: '百柱塔60F', lv: 80, hp: 14000, def: 74, exp: 28000 },
+  { minLv: 70, name: '霜凍伊莉絲', area: '百柱塔70F', lv: 80, hp: 15000, def: 76, exp: 30000 },
+  { minLv: 75, name: '熔岩伊弗利特', area: '百柱塔80F', lv: 80, hp: 16000, def: 78, exp: 32000 },
+  { minLv: 80, name: '守護者之主', area: '百柱塔90F', lv: 80, hp: 18000, def: 82, exp: 36000 },
+  { minLv: 85, name: '百柱死神', area: '百柱塔100F', lv: 90, hp: 25000, def: 90, exp: 60000 },
+];
+
+function calcHitRate(playerLv, monsterLv, agi) {
+  const agiBonus = Math.floor(agi / 3);
+  const lvDiff = playerLv - monsterLv;
+  const hitRate = BASE_HIT + agiBonus + lvDiff - EVADE_MONSTER;
+  return Math.min(95, Math.max(5, hitRate));
+}
+
+function calcDamage(weaponDmg, str, monsterDef) {
+  const strBonus = Math.floor(str / 2);
+  const rawDmg = weaponDmg + strBonus;
+  const reduction = Math.min(monsterDef, 65);
+  const effectiveDmg = Math.max(1, Math.floor(rawDmg * (100 - reduction) / 100));
+  // Factor in crit
+  const avgDmg = effectiveDmg * (1 - BASE_CRIT_RATE) + effectiveDmg * BASE_CRIT_RATE * CRIT_MULTIPLIER;
+  return avgDmg;
+}
+
+function calcKillTime(hp, avgDmgPerHit, hitRate) {
+  const effectiveDmgPerAttack = avgDmgPerHit * (hitRate / 100);
+  const attacksNeeded = Math.ceil(hp / effectiveDmgPerAttack);
+  return attacksNeeded * ATTACK_INTERVAL;
+}
+
+// Build main table
+const tbody = document.querySelector('#mainTable tbody');
+const chartLabels = [];
+const chartExpPerMin = [];
+const chartLevelUpMin = [];
+
+for (let bracket = 0; bracket < MONSTERS.length; bracket++) {
+  const m = MONSTERS[bracket];
+  const midLv = Math.floor((m.range[0] + m.range[1]) / 2);
+  const playerLv = m.range[1]; // use upper bound of bracket as player level
+  const str = getSTR(playerLv);
+  const agi = 14; // knight AGI stays at 14
+  const weapon = getWeapon(playerLv);
+  const hitRate = calcHitRate(playerLv, m.lv, agi);
+  const avgDmg = calcDamage(weapon.dmg, str, m.def);
+  const killTime = calcKillTime(m.hp, avgDmg, hitRate);
+  const totalCycleTime = SEARCH_TIME + killTime; // seconds per kill cycle
+  const expPerSec = m.exp / totalCycleTime;
+  const expPerMin = expPerSec * 60;
+  const expNeeded = getExpToNext(playerLv);
+  const minutesToLevel = expNeeded / expPerMin;
+
+  const effectiveAtk = weapon.dmg + Math.floor(str / 2);
+
+  chartLabels.push(`Lv${m.range[0]}~${m.range[1]}`);
+  chartExpPerMin.push(Math.round(expPerMin));
+  chartLevelUpMin.push(Math.round(minutesToLevel * 10) / 10);
+
+  const row = tbody.insertRow();
+  row.innerHTML = `
+    <td>Lv.${m.range[0]}~${m.range[1]}</td>
+    <td>${weapon.name} (${weapon.dmg})</td>
+    <td>${str}</td>
+    <td>${effectiveAtk}</td>
+    <td class="best">${m.area}</td>
+    <td>${m.name} (Lv.${m.lv})</td>
+    <td>HP${m.hp} / 防${m.def} / EXP${m.exp}</td>
+    <td>${hitRate}%</td>
+    <td>${killTime.toFixed(1)}s</td>
+    <td>${Math.round(expPerMin)}</td>
+    <td>${minutesToLevel.toFixed(1)}</td>
+  `;
+}
+
+// Build boss table
+const bossTbody = document.querySelector('#bossTable tbody');
+for (const boss of BOSSES) {
+  const playerLv = boss.minLv + 5; // assume 5 levels above min
+  const str = getSTR(playerLv);
+  const agi = 14;
+  const weapon = getWeapon(playerLv);
+  const hitRate = calcHitRate(playerLv, boss.lv, agi);
+  const avgDmg = calcDamage(weapon.dmg, str, boss.def);
+  const killTime = calcKillTime(boss.hp, avgDmg, hitRate);
+  const totalCycleTime = SEARCH_TIME + killTime;
+  const expPerMin = (boss.exp / totalCycleTime) * 60;
+
+  // Compare to normal monster at same level
+  const normalMonster = MONSTERS.find(m => playerLv >= m.range[0] && playerLv <= m.range[1]) || MONSTERS[MONSTERS.length - 1];
+  const normalWeapon = getWeapon(playerLv);
+  const normalHitRate = calcHitRate(playerLv, normalMonster.lv, agi);
+  const normalDmg = calcDamage(normalWeapon.dmg, str, normalMonster.def);
+  const normalKillTime = calcKillTime(normalMonster.hp, normalDmg, normalHitRate);
+  const normalExpPerMin = (normalMonster.exp / (SEARCH_TIME + normalKillTime)) * 60;
+  const ratio = (expPerMin / normalExpPerMin * 100).toFixed(0);
+
+  const row = bossTbody.insertRow();
+  row.innerHTML = `
+    <td>Lv.${playerLv}</td>
+    <td class="boss">${boss.name}</td>
+    <td>HP${boss.hp.toLocaleString()} / 防${boss.def} / EXP${boss.exp.toLocaleString()}</td>
+    <td>${killTime.toFixed(0)}s (${(killTime/60).toFixed(1)}分)</td>
+    <td>${Math.round(expPerMin)}</td>
+    <td>${ratio}%</td>
+  `;
+}
+
+// Chart
+const ctx = document.getElementById('cpChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: chartLabels,
+    datasets: [
+      {
+        label: 'EXP/分鐘',
+        data: chartExpPerMin,
+        backgroundColor: 'rgba(78, 205, 196, 0.7)',
+        borderColor: '#4ecdc4',
+        borderWidth: 1,
+        yAxisID: 'y',
+      },
+      {
+        label: '升級所需(分鐘)',
+        data: chartLevelUpMin,
+        type: 'line',
+        borderColor: '#e94560',
+        backgroundColor: 'rgba(233, 69, 96, 0.1)',
+        tension: 0.3,
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      title: { display: true, text: '各等級段 EXP 效率 vs 升級時間', color: '#eee', font: { size: 16 } },
+      legend: { labels: { color: '#ccc' } },
+    },
+    scales: {
+      x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+      y: { type: 'linear', position: 'left', title: { display: true, text: 'EXP/分鐘', color: '#4ecdc4' }, ticks: { color: '#4ecdc4' }, grid: { color: '#333' } },
+      y1: { type: 'linear', position: 'right', title: { display: true, text: '升級所需(分鐘)', color: '#e94560' }, ticks: { color: '#e94560' }, grid: { drawOnChartArea: false } },
+    }
+  }
+});
+</script>
+</body>
+</html>

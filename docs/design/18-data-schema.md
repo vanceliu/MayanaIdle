@@ -1,0 +1,264 @@
+# 18. 資料結構設計提示
+
+以下是 AI 之後協助設計資料表時應考慮的主要 Entity。
+
+## 18.1 主要資料表方向
+
+可能需要：
+
+- users（帳號）
+- characters（角色，每帳號最多 4 個）
+- factions
+- classes
+- skills
+- character_skills
+- maps
+- monsters
+- monster_spawns
+- dungeons
+- items
+- equipment_instances
+- affixes
+- equipment_affixes
+- inventories
+- warehouses（綁定 userId，帳號共用）
+- pets
+- guilds
+- guild_messages
+- achievements
+- character_achievements
+- rankings
+- shops
+- shop_items
+
+## 18.2 裝備實例需要注意
+
+裝備不是只有 item template。
+
+需要區分：
+
+- 裝備模板
+- 玩家實際擁有的裝備實例
+
+因為每件裝備可能有：
+
+- 品質 %
+- 詞綴
+- 持有人
+- 是否裝備中
+- 是否在倉庫
+- 是否已綁定
+
+## 18.3 裝備實例應包含
+
+- id
+- itemTemplateId
+- ownerCharacterId
+- location
+- equippedSlot
+- qualityPercent
+- baseSmallMonsterDamage
+- baseLargeMonsterDamage
+- durability，若未來需要
+- createdAt
+- updatedAt
+
+## 18.4 詞綴實例應包含
+
+- equipmentInstanceId
+- affixId
+- tier
+- baseValue
+- finalValue
+- slotIndex
+
+## 18.5 品質計算注意
+
+finalValue 應由：
+
+```text
+baseValue × (1 + qualityPercent / 100)
+```
+
+計算。
+
+品質只修正詞綴 finalValue。
+
+---
+
+## 18.6 資料分層設計
+
+### 持久層（DB）
+
+儲存位置：IndexedDB（單機模式）/ PostgreSQL（線上模式）
+
+必須持久化的資料，關閉瀏覽器或斷線後不可遺失：
+
+| 資料 | 說明 |
+|---|---|
+| 角色狀態 | HP、MP、等級、經驗值、屬性點、金幣 |
+| 技能 | 已學習技能清單、技能等級 |
+| 背包內容 | 所有物品實例（藥水、卷軸、素材、裝備） |
+| 倉庫內容 | 城鎮倉庫存放的裝備與素材 |
+| 裝備實例 | 含詞綴、品質、強化等級、裝備狀態 |
+| 最後位置 | 當前所在 Zone / Region / Floor |
+| 職業/角色基本資訊 | 名稱、職業、建立時間 |
+
+### 前端記憶體（Zustand Store）
+
+僅存在於執行期，不需要持久化到後端 DB：
+
+| 資料 | 說明 |
+|---|---|
+| 戰鬥日誌 | 即時戰鬥訊息，上限 200 筆 |
+| 計時器 ID | Game Loop / Regen / Combat 各 interval ID |
+| 當前戰鬥怪物狀態 | 戰鬥中的怪物 HP、目標索引 |
+| 搜尋模式 | 自動 / 手動 |
+| UI 狀態 | 面板開關、分頁選擇 |
+
+### 前端持久化（localStorage / IndexedDB，不走後端）
+
+關閉瀏覽器後保留，但屬於玩家操作偏好，線上模式不需伺服器驗證：
+
+| 資料 | 說明 |
+|---|---|
+| 戰鬥腳本 | ScriptRule[] — 自動戰鬥的條件/動作規則 |
+| 快捷欄配置 | QuickSlot 綁定 |
+
+### 分層原則
+
+1. **會影響遊戲公平性的資料** → 必須存 DB（線上模式由 Server 驗證）
+2. **玩家操作偏好** → 前端持久化即可，不需伺服器介入
+3. **純即時/暫態資料** → 僅存 Zustand，不持久化
+
+---
+
+## 18.7 帳號與角色關係
+
+### User（帳號）
+
+- id
+- createdAt
+
+### Character（角色）
+
+- id
+- userId（外鍵，指向 User）
+- name
+- classId
+- level
+- exp
+- gold
+- 屬性點分配
+- 當前位置
+- createdAt
+
+### 關係規則
+
+- 一個 User 最多擁有 4 個 Character
+- Warehouse 綁定 userId（帳號層級共用），可存放物品與金幣
+- Inventory / Equipment / Skills / Progress 綁定 characterId（角色獨立）
+- 金幣存於 Character，各角色獨立；倉庫另有獨立金幣存放欄位供跨角色轉移
+
+---
+
+## 18.8 靜態模板資料（Single Source of Truth）
+
+所有靜態資料依類別分表管理。各系統（商店、鐵匠鋪、掉落、背包、戰鬥）引用對應表的原始資料。
+
+### 模板分表
+
+| 表名 | 說明 | 數量級 |
+|---|---|---|
+| weapon_templates | 武器模板（單手劍、匕首、斧、鈍器、法杖、弓、雙手劍/斧/杖、雙刀、鋼爪） | ~130 |
+| armor_templates | 防具模板（頭盔、胸甲、手套、鞋子、腰帶） | ~40 |
+| accessory_templates | 飾品模板（項鍊、戒指） | ~20 |
+| shield_templates | 盾牌模板 | ~6 |
+| magic_book_templates | 魔導書模板 | ~6 |
+| item_definitions | 消耗品/素材/卷軸定義 | ~30 |
+| monster_templates | 怪物素質 | ~100 |
+| skill_definitions | 魔法/技能定義 | ~80 |
+| drop_tables | 區域掉落池配置 | ~120 |
+
+### weapon_templates 欄位
+
+| 欄位 | 型態 | 說明 |
+|---|---|---|
+| id | number (PK) | 模板唯一 ID |
+| name | string | 武器名稱（唯一） |
+| type | enum | sword / dagger / axe / mace / staff / bow / twoHandSword / twoHandAxe / twoHandStaff / dualBlade / claw |
+| slot | enum | rightHand |
+| isTwoHanded | boolean | 是否雙手武器 |
+| material | enum | wood / iron / silver / mithril / dragon / orichalcum |
+| weight | number | 重量 |
+| smallMonsterDamage | number | 對小怪傷害 |
+| largeMonsterDamage | number | 對大怪傷害 |
+| attackSuccess | number | 攻擊成功（命中加成） |
+| extraAttack | number | 額外攻擊次數 |
+| hpRegen | number? | 回血量 |
+| mpRegen | number? | 回魔量 |
+| bonusHp | number? | 增加血量 |
+| bonusMp | number? | 增加魔量 |
+| bonusStats | string? | 額外屬性（如「敏捷+1」） |
+| stability | number | 安定值（預設 6，0 = 安定值 0 可強化，-1 = 不可強化） |
+| canBreak | boolean | 壞刀（強化失敗是否消失） |
+| requiredLevel | number | 需求等級 |
+| requiredClass | string[]? | 職業限制（null = 全職業） |
+| acquireType | enum | shop / craft / drop_only |
+| buyPrice | number? | 商店價格（shop 時必填） |
+| craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
+| craftGold | number? | 製作金幣（craft 時必填） |
+| craftMaterials | json? | 製作素材 `[{name, amount}]`（craft 時必填） |
+
+### armor_templates 欄位
+
+| 欄位 | 型態 | 說明 |
+|---|---|---|
+| id | number (PK) | 模板唯一 ID |
+| name | string | 防具名稱 |
+| slot | enum | helmet / chest / gloves / boots / belt |
+| material | enum | 材質 |
+| weight | number | 重量 |
+| defense | number | 防禦力 |
+| hpRegen | number? | 回血量 |
+| mpRegen | number? | 回魔量 |
+| bonusHp | number? | 增加血量 |
+| bonusMp | number? | 增加魔量 |
+| bonusStats | string? | 額外屬性 |
+| bonusWeight | number? | 增加負重（腰帶用） |
+| stability | number | 安定值（預設 4，-1 = 不可強化） |
+| requiredLevel | number | 需求等級 |
+| requiredClass | string[]? | 職業限制 |
+| acquireType | enum | shop / craft |
+| buyPrice | number? | 商店價格 |
+| craftTier | enum? | 製作等級 |
+| craftGold | number? | 製作金幣 |
+| craftMaterials | json? | 製作素材 |
+
+### shield_templates / magic_book_templates / accessory_templates
+
+各自包含該類型特有欄位（盾牌有 blockRate、魔導書有 magicAttack、飾品以效果為主），結構類似 armor_templates，獨立成表避免混雜。
+
+### 取得方式規則
+
+| acquireType | 說明 | 來源 |
+|---|---|---|
+| shop | 商店直接購買 | 武器商店 / 防具商店 |
+| craft | 鐵匠鋪製作 | 鐵匠鋪（素材 + 金幣） |
+| drop_only | 僅掉落取得 | 怪物掉落（不在商店、不在鐵匠） |
+
+### 設計原則
+
+1. **分表管理** — 武器、防具、飾品各自獨立，避免單表過大或欄位混雜
+2. **一份資料，多處引用** — 商店 = 查詢 `acquireType = 'shop'`；鐵匠鋪 = 查詢 `acquireType = 'craft'`
+3. **裝備實例引用模板** — 實例持有 `templateId`，建立時複製模板基礎值
+4. **模板為靜態資料** — 啟動時載入記憶體，運行期不查 DB
+5. **tooltip 顯示** — 從實例屬性渲染（已複製模板值 + 強化/品質修正）
+
+### CraftMaterial 結構
+
+```json
+[{ "name": "銀礦石", "amount": 4 }, { "name": "銀精華", "amount": 3 }]
+```
+
+素材對應 `item_definitions` 表中的材料物品。

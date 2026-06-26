@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>MayanaIdle - 等級經驗值曲線</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; }
+  h1 { text-align: center; color: #e94560; }
+  .info { text-align: center; margin-bottom: 1rem; color: #aaa; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  canvas { background: #16213e; border-radius: 8px; }
+  table { margin: 2rem auto; border-collapse: collapse; font-size: 14px; }
+  th, td { border: 1px solid #444; padding: 4px 12px; text-align: right; }
+  th { background: #0f3460; }
+  tr:nth-child(even) { background: #1a1a3e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>MayanaIdle 等級升級經驗值曲線</h1>
+  <p class="info">公式：expToNext = floor(100 × 1.15<sup>(level - 1)</sup>)</p>
+  <canvas id="expChart"></canvas>
+
+  <h2 style="text-align:center; margin-top:2rem;">完整經驗值表（Lv 1 ~ 100）</h2>
+  <table>
+    <tr><th>等級</th><th>該級所需 EXP</th><th>累計 EXP</th></tr>
+  </table>
+</div>
+
+<script>
+function getExpToNextLevel(level) {
+  return Math.floor(100 * Math.pow(1.15, level - 1));
+}
+
+const maxLevel = 100;
+const levels = [];
+const expPerLevel = [];
+const cumulativeExp = [];
+let cumulative = 0;
+
+for (let lv = 1; lv <= maxLevel; lv++) {
+  const exp = getExpToNextLevel(lv);
+  cumulative += exp;
+  levels.push(lv);
+  expPerLevel.push(exp);
+  cumulativeExp.push(cumulative);
+}
+
+// Chart
+const ctx = document.getElementById('expChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: levels,
+    datasets: [
+      {
+        label: '該級所需 EXP',
+        data: expPerLevel,
+        borderColor: '#e94560',
+        backgroundColor: 'rgba(233,69,96,0.1)',
+        fill: true,
+        tension: 0.3,
+        yAxisID: 'y',
+      },
+      {
+        label: '累計 EXP',
+        data: cumulativeExp,
+        borderColor: '#0f3460',
+        backgroundColor: 'rgba(15,52,96,0.1)',
+        borderDash: [5, 5],
+        fill: false,
+        tension: 0.3,
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      title: { display: true, text: 'Lv 1 ~ 100 經驗值需求', color: '#eee', font: { size: 16 } },
+      legend: { labels: { color: '#ccc' } },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString();
+          }
+        }
+      }
+    },
+    scales: {
+      x: { title: { display: true, text: '等級', color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#333' } },
+      y: { type: 'linear', position: 'left', title: { display: true, text: '該級所需 EXP', color: '#e94560' }, ticks: { color: '#e94560' }, grid: { color: '#333' } },
+      y1: { type: 'linear', position: 'right', title: { display: true, text: '累計 EXP', color: '#0f3460' }, ticks: { color: '#6fa8dc' }, grid: { drawOnChartArea: false } },
+    }
+  }
+});
+
+// Table - every level
+const table = document.querySelector('table');
+for (let lv = 1; lv <= maxLevel; lv++) {
+  const row = table.insertRow();
+  row.insertCell().textContent = lv;
+  row.insertCell().textContent = expPerLevel[lv - 1].toLocaleString();
+  row.insertCell().textContent = cumulativeExp[lv - 1].toLocaleString();
+}
+</script>
+</body>
+</html>
