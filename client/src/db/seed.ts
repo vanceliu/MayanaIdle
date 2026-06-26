@@ -3,7 +3,7 @@ import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate } from '../models/equipment';
 import type { DropTableEntry } from './database';
 
-const MONSTER_SEEDS: Omit<MonsterTemplate, 'id'>[] = [
+export const MONSTER_SEEDS: Omit<MonsterTemplate, 'id'>[] = [
   // 曙光草原 Lv.1~5
   { name: '暴牙兔', level: 2, hp: 10, attackMin: 2, attackMax: 4, defense: 1, exp: 6, race: 'normal', size: 'small', element: 'none', area: 'dawn-plains', isBoss: false },
   { name: '野牛', level: 4, hp: 12, attackMin: 2, attackMax: 4, defense: 1, exp: 7, race: 'normal', size: 'small', element: 'none', area: 'dawn-plains', isBoss: false },
@@ -247,7 +247,7 @@ const MONSTER_SEEDS: Omit<MonsterTemplate, 'id'>[] = [
   { name: '百柱死神', level: 60, hp: 3500, attackMin: 70, attackMax: 95, defense: 44, exp: 9000, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-91-100f', isBoss: true },
 ];
 
-const EQUIPMENT_SEEDS: Omit<EquipmentTemplate, 'id'>[] = [
+export const EQUIPMENT_SEEDS: Omit<EquipmentTemplate, 'id'>[] = [
   // === 單手劍（商店） ===
   { name: '短劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 4, largeMonsterDamage: 3, attackSuccess: 0, extraAttack: 0, weight: 20, material: 'iron', requiredLevel: 1, buyPrice: 5000, stability: 6, canBreak: true, acquireType: 'shop' },
   { name: '軍用長劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 6, largeMonsterDamage: 5, attackSuccess: 1, extraAttack: 0, weight: 22, material: 'iron', requiredLevel: 5, buyPrice: 30000, stability: 6, canBreak: true, acquireType: 'shop' },
@@ -491,7 +491,7 @@ const EQUIPMENT_SEEDS: Omit<EquipmentTemplate, 'id'>[] = [
   { name: '賢者戒指', type: 'armor', slot: 'ring1', isTwoHanded: false, defense: 0, bonusMp: 25, mpRegen: 1, weight: 3, material: 'mithril', requiredLevel: 35, buyPrice: 0, stability: -1, requiredClass: ['elementalist', 'priest'], acquireType: 'craft', craftTier: 'mid', craftGold: 200000, craftMaterials: [{ name: '米索利碎片', amount: 6 }, { name: '米索利礦石', amount: 5 }, { name: '龍骨碎片', amount: 5 }, { name: '龍心結晶', amount: 4 }] },
 ];
 
-const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
+export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   // 曙光草原 Lv.1~5
   { area: 'dawn-plains', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 1, maxAmount: 5 },
   { area: 'dawn-plains', itemName: '品質石', itemType: 'material', dropValue: 50 },

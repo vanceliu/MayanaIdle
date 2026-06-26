@@ -28,6 +28,8 @@ export interface DropBonuses {
   gold_rate: number;
 }
 
+export const DROP_ROLL_MAX = 1000;
+
 export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropBonuses, isBoss: boolean = false, monsterLevel?: number): Promise<DropResult> {
   const entries = await db.dropTables.where('area').equals(areaId).toArray();
   const region = getRegion(areaId);
@@ -46,8 +48,8 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       const levelProgress = Math.min(1, (monsterLevel - areaLevelMin) / levelRange);
       effectiveDropValue = Math.min(100, Math.floor(entry.dropValue * (1 + levelProgress)));
     }
-    const roll = Math.random() * 1000;
-    const boostedDropValue = Math.min(effectiveDropValue * dropRateMultiplier, 1000);
+    const roll = Math.random() * DROP_ROLL_MAX;
+    const boostedDropValue = Math.min(effectiveDropValue * dropRateMultiplier, DROP_ROLL_MAX);
     if (roll >= boostedDropValue) continue;
 
     if (entry.itemType === 'gold') {

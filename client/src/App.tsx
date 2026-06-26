@@ -17,12 +17,18 @@ import { RightPanel } from './components/RightPanel';
 import { getRegion } from './models/mapData';
 import './App.css';
 
-function LogoutButton() {
+function GameToolbar() {
   const logout = useGameStore(s => s.logout);
+
   return (
-    <button className="btn-logout" onClick={logout}>
-      登出
-    </button>
+    <div className="game-toolbar">
+      <a className="btn-wiki" href="/MayanaIdle/wiki" target="_blank" rel="noopener noreferrer">
+        Wiki
+      </a>
+      <button className="btn-logout" onClick={logout}>
+        登出
+      </button>
+    </div>
   );
 }
 
@@ -93,7 +99,7 @@ function App() {
           {isInTown ? <TownView /> : <BattleView />}
         </div>
         <QuickSlotBar />
-        <LogoutButton />
+        <GameToolbar />
       </main>
       <RightPanel />
       <AttributeUpModal />
