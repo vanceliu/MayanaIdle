@@ -123,7 +123,7 @@ describe('Integration: seed → drops flow (no duplication)', () => {
     expect(areaCounts['dawn-plains']).toBe(4);
     expect(areaCounts['green-valley']).toBe(6);
     expect(areaCounts['wind-woods']).toBe(5);
-    expect(areaCounts['misty-swamp']).toBe(5);
-    expect(areaCounts['trial-highlands']).toBe(7);
+    expect(areaCounts['misty-swamp']).toBe(6);
+    expect(areaCounts['trial-highlands']).toBe(8);
   });
 });
