@@ -69,7 +69,7 @@ function GameToolbar() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".json"
+        accept=".dat"
         style={{ display: 'none' }}
         onChange={handleImport}
       />
