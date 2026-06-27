@@ -15,7 +15,7 @@ export function useMonsterList(): MonsterSeed[] {
 }
 
 export function useMonstersByArea(area: string): MonsterSeed[] {
-  return MONSTER_SEEDS.filter(m => m.area === area);
+  return MONSTER_SEEDS.filter(m => m.area === area || m.area.startsWith(`${area}-`));
 }
 
 export function useWeaponList(): EquipmentSeed[] {

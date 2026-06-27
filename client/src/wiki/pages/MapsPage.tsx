@@ -17,6 +17,13 @@ export function MapsPage() {
     const map: Record<string, number> = {};
     for (const m of MONSTER_SEEDS) {
       map[m.area] = (map[m.area] || 0) + 1;
+
+      // Also count toward parent region for floor-based areas (e.g. misty-cave-1f → misty-cave)
+      const floorMatch = m.area.match(/^(.+)-\d+f$/);
+      if (floorMatch) {
+        const parentId = floorMatch[1];
+        map[parentId] = (map[parentId] || 0) + 1;
+      }
     }
     return map;
   }, []);
