@@ -133,6 +133,10 @@ export async function importCharacterData(
   importChar.id = currentCharacterId;
   importChar.userId = existing.userId;
 
+  if (importChar.skills) {
+    importChar.skills = importChar.skills.map(s => ({ ...s, lastUsedAt: 0 }));
+  }
+
   await db.characters.update(currentCharacterId, {
     name: importChar.name,
     className: importChar.className,
