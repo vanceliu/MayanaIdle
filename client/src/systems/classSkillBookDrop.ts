@@ -6,7 +6,7 @@ interface SkillBookEntry {
   level: number;
 }
 
-const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = [
+export const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = [
   // Knight
   { name: '盾擊技能書', className: 'knight', level: 1 },
   { name: '裂傷斬技能書', className: 'knight', level: 2 },
@@ -39,7 +39,10 @@ const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = [
   { name: '背刺技能書', className: 'thief', level: 5 },
 ];
 
-function getSkillBookLevel(areaLevel: number): number | null {
+export const SKILL_BOOK_BOSS_DROP_RATE = 0.05;
+export const SKILL_BOOK_NORMAL_DROP_RATE = 0.0005;
+
+export function getSkillBookLevel(areaLevel: number): number | null {
   if (areaLevel >= 46) return 5;
   if (areaLevel >= 43) return 4;
   if (areaLevel >= 40) return 3;
@@ -50,7 +53,7 @@ export function rollClassSkillBookDrop(areaLevel: number, isBoss: boolean): stri
   const bookLevel = getSkillBookLevel(areaLevel);
   if (bookLevel === null) return null;
 
-  const dropRate = isBoss ? 0.05 : 0.0005;
+  const dropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
   if (Math.random() >= dropRate) return null;
 
   const pool = ALL_CLASS_SKILL_BOOKS.filter(b => b.level === bookLevel);

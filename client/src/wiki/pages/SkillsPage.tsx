@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
+import { CLASS_SKILLS } from '../../models/classSkills';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -103,6 +104,54 @@ export function SkillsPage() {
           </tbody>
         </table>
       </div>
+
+      <h3 style={{ color: 'var(--text-primary)', margin: '32px 0 12px', fontFamily: 'var(--font-display)' }}>
+        職業專屬技能
+      </h3>
+      {(['knight', 'elf', 'elementalist', 'priest', 'thief'] as const).map(cls => {
+        const skills = CLASS_SKILLS.filter(s => s.className === cls);
+        return (
+          <div key={cls} style={{ marginBottom: 24 }}>
+            <h4 style={{ color: 'var(--accent-gold)', marginBottom: 8 }}>{CLASS_LABELS[cls]}</h4>
+            <div className="wiki-table-wrap">
+              <table className="wiki-table">
+                <thead>
+                  <tr>
+                    <th>名稱</th>
+                    <th>階級</th>
+                    <th>需求等級</th>
+                    <th>類型</th>
+                    <th>屬性</th>
+                    <th>威力</th>
+                    <th>治療量</th>
+                    <th>MP</th>
+                    <th>冷卻(秒)</th>
+                    <th>效果</th>
+                    <th>技能書</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {skills.map(s => (
+                    <tr key={s.id}>
+                      <td><strong>{s.name}</strong></td>
+                      <td className="cell-number">{s.classLevel}</td>
+                      <td className="cell-number">{s.requiredLevel}</td>
+                      <td>{TYPE_LABELS[s.skill.type]}</td>
+                      <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
+                      <td className="cell-number">{s.skill.power || '-'}</td>
+                      <td className="cell-number">{s.skill.healAmount || '-'}</td>
+                      <td className="cell-number">{s.skill.mpCost}</td>
+                      <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>
+                      <td>{s.skill.buffEffect || (s.skill.hits ? `${s.skill.hits}連擊` : '') || '-'}</td>
+                      <td>{s.bookName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

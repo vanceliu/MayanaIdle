@@ -10,6 +10,8 @@ const SHOP_ITEMS = [
   { name: '紅色藥水', price: 25, description: '回復 10~15 HP' },
   { name: '橙色藥水', price: 80, description: '回復 30~45 HP' },
   { name: '白色藥水', price: 200, description: '回復 60~90 HP' },
+  { name: '綠色藥水', price: 200, description: '攻速+33%（120秒）' },
+  { name: '強化綠色藥水', price: 1000, description: '攻速+33%（600秒）' },
   { name: '武器強化卷軸', price: 100000, description: '鐵匠鋪武器強化用' },
   { name: '防具強化卷軸', price: 50000, description: '鐵匠鋪防具強化用' },
   { name: '磨刀石', price: 200, description: '修復武器壞刀 1 層' },
@@ -99,7 +101,7 @@ export function GeneralStore() {
   }
 
   function getSellPrice(name: string): number {
-    const potionPrices: Record<string, number> = { '紅色藥水': 25, '橙色藥水': 80, '白色藥水': 200 };
+    const potionPrices: Record<string, number> = { '紅色藥水': 25, '橙色藥水': 80, '白色藥水': 200, '綠色藥水': 200, '強化綠色藥水': 1000 };
     if (potionPrices[name]) return potionPrices[name];
     if (name.includes('回城卷軸')) return 500;
     if (name === '武器強化卷軸') return 100000;

@@ -90,8 +90,8 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
 
   // === 其他 ===
   { name: '磨刀石', category: 'other', description: '修復武器壞刀 1 層', weight: 2, buyPrice: 200 },
-  { name: '綠色藥水', category: 'potion', description: '攻擊間隔 ×0.75（120秒）', weight: 5 },
-  { name: '強化綠色藥水', category: 'potion', description: '攻擊間隔 ×0.75（600秒）', weight: 10 },
+  { name: '綠色藥水', category: 'potion', description: '攻速+33%（120秒）', weight: 5, buyPrice: 200 },
+  { name: '強化綠色藥水', category: 'potion', description: '攻速+33%（600秒）', weight: 10, buyPrice: 1000 },
 ];
 
 const ITEM_MAP = new Map<string, ItemDefinition>(

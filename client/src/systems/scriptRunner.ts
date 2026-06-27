@@ -4,7 +4,7 @@ import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
 import type { BagItem } from '../stores/gameStore';
-import { getPotionCount } from '../stores/gameStore';
+import { getPotionCount, SPEED_POTION_CONFIG } from '../stores/gameStore';
 import { canUseSkill } from '../models/skill';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 
@@ -117,11 +117,27 @@ function checkPersistentCondition(rule: PersistentRule, ctx: PersistentScriptCon
     case 'mp_above':
       return mpPercent > (condition.value ?? 0);
     case 'buff_not_active': {
+      const skill = skills.find(s => s.id === condition.skillId);
+      const category = skill?.buffCategory;
+      if (category) {
+        const active = activeEffects.find(
+          e => e.category === category && e.type === 'buff' && e.target === 'player'
+        );
+        if (!active) return true;
+        return now - active.startTime >= active.duration;
+      }
       const active = activeEffects.find(
         e => e.sourceSkillId === condition.skillId && e.type === 'buff' && e.target === 'player'
       );
       if (!active) return true;
       return now - active.startTime >= active.duration;
+    }
+    case 'speed_not_active': {
+      const speedBuff = activeEffects.find(
+        e => e.category === 'speed' && e.type === 'buff' && e.target === 'player'
+      );
+      if (!speedBuff) return true;
+      return now - speedBuff.startTime >= speedBuff.duration;
     }
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);
@@ -140,6 +156,13 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       const { potionType } = action;
       if (!potionType) return false;
       return getPotionCount(ctx.bagItems, potionType) > 0;
+    }
+    case 'speed_potion': {
+      const { speedPotionType } = action;
+      if (!speedPotionType) return false;
+      const config = SPEED_POTION_CONFIG[speedPotionType];
+      const bagItem = ctx.bagItems.find(i => i.name === config.bagName);
+      return !!(bagItem && bagItem.amount > 0);
     }
     case 'buff_skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);

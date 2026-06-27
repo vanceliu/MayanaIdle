@@ -6,6 +6,7 @@ const CATEGORIES = [
   { path: '/wiki/armor', label: '防具', desc: '防具列表、部位、安定值、強化資訊' },
   { path: '/wiki/monsters', label: '怪物', desc: '怪物資料、屬性、等級、出沒區域、掉落物' },
   { path: '/wiki/maps', label: '地圖', desc: '區域結構、等級對應、怪物分佈' },
+  { path: '/wiki/items', label: '道具', desc: '材料、藥水、卷軸、取得方式' },
   { path: '/wiki/skills', label: '技能', desc: '職業技能列表、學習限制' },
   { path: '/wiki/crafting', label: '鐵匠鋪', desc: '製作配方、材料需求與來源' },
   { path: '/wiki/exp-table', label: '經驗表', desc: 'Lv.1~100 升級所需經驗' },

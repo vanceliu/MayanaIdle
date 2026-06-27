@@ -25,6 +25,8 @@ export const ITEM_ICON_MAP: Record<string, string> = {
   'red-potion': 'items/standing-potion',
   'orange-potion': 'items/bubbling-flask',
   'white-potion': 'items/potion-ball',
+  'green-potion': 'items/standing-potion',
+  'enhanced-green-potion': 'items/bubbling-flask',
   'scroll': 'items/scroll-unfurled',
   'town-scroll': 'items/tied-scroll',
   'spellbook': 'items/spell-book',

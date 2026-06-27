@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useWeaponList, useArmorList, useDropSourceForItem } from '../hooks/useWikiData';
+import { useWeaponList, useArmorList } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
 import '../components/WikiTable.css';
 
@@ -102,18 +102,12 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
 }
 
 function CraftMaterialLink({ name, amount }: { name: string; amount: number }) {
-  const sources = useDropSourceForItem(name);
-
-  if (sources.length > 0) {
-    return (
-      <span style={{ marginRight: 8 }}>
-        <Link className="wiki-link" to={`/wiki/drops?item=${encodeURIComponent(name)}`}>
-          {name}
-        </Link>
-        x{amount}
-      </span>
-    );
-  }
-
-  return <span style={{ marginRight: 8 }}>{name} x{amount}</span>;
+  return (
+    <span style={{ marginRight: 8 }}>
+      <Link className="wiki-link" to={`/wiki/items/${encodeURIComponent(name)}`}>
+        {name}
+      </Link>
+      x{amount}
+    </span>
+  );
 }

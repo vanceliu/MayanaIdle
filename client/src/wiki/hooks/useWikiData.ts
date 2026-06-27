@@ -31,7 +31,7 @@ export function useEquipmentByName(name: string): EquipmentSeed | undefined {
 }
 
 export function useDropTableByArea(area: string): DropSeed[] {
-  return DROP_TABLE_SEEDS.filter(d => d.area === area);
+  return DROP_TABLE_SEEDS.filter(d => d.area === area || d.area.startsWith(`${area}-`));
 }
 
 export function useDropSourceForItem(itemName: string): DropSeed[] {

@@ -1,6 +1,6 @@
 import { useGameStore } from '../stores/gameStore';
 import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, EmergencyRetreatAction } from '../models/scriptEngine';
-import type { PotionType } from '../stores/gameStore';
+import type { PotionType, SpeedPotionType } from '../stores/gameStore';
 import { ALL_TOWN_SCROLLS } from '../models/townScroll';
 
 const CONDITION_LABELS: Record<PersistentConditionType, string> = {
@@ -10,11 +10,13 @@ const CONDITION_LABELS: Record<PersistentConditionType, string> = {
   mp_below: 'MP 低於',
   mp_above: 'MP 高於',
   buff_not_active: 'Buff 未激活',
+  speed_not_active: '加速未激活',
   skill_ready: '技能就緒',
 };
 
 const ACTION_LABELS: Record<PersistentActionType, string> = {
   potion: '使用藥水',
+  speed_potion: '使用加速藥水',
   buff_skill: '施放 Buff',
   heal_skill: '施放治癒',
 };
@@ -23,6 +25,11 @@ const POTION_LABELS: Record<PotionType, string> = {
   red: '紅色藥水',
   orange: '橙色藥水',
   white: '白色藥水',
+};
+
+const SPEED_POTION_LABELS: Record<SpeedPotionType, string> = {
+  green: '綠色藥水',
+  'enhanced-green': '強化綠色藥水',
 };
 
 const RETREAT_ACTION_LABELS: Record<EmergencyRetreatAction, string> = {
@@ -152,6 +159,16 @@ export function PersistentScriptEditor() {
                     onChange={e => updateAction(idx, { potionType: e.target.value as PotionType })}
                   >
                     {Object.entries(POTION_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                )}
+                {rule.action.type === 'speed_potion' && (
+                  <select
+                    value={rule.action.speedPotionType ?? 'green'}
+                    onChange={e => updateAction(idx, { speedPotionType: e.target.value as SpeedPotionType })}
+                  >
+                    {Object.entries(SPEED_POTION_LABELS).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
                     ))}
                   </select>

@@ -1,11 +1,11 @@
 import { useState, useRef, useMemo } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { POTION_CONFIG, type PotionType, getPotionCount, BAG_MAX_SLOTS } from '../stores/gameStore';
+import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, BAG_MAX_SLOTS } from '../stores/gameStore';
 import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { getItemIcon, getEquipIcon } from '../models/iconMap';
 import { EquipmentDetail } from './EquipmentInfo';
-import { getItemWeight } from '../models/items';
+import { getItemWeight, getItemDescription } from '../models/items';
 
 const BAG_COLUMNS = 5;
 
@@ -15,6 +15,7 @@ interface BagGridItem {
   name: string;
   count?: number;
   potionType?: PotionType;
+  speedPotionType?: SpeedPotionType;
   equipment?: EquipmentInstance;
   color?: string;
 }
@@ -26,6 +27,8 @@ const POTION_COLORS: Record<PotionType, string> = {
 };
 
 function getShortName(name: string): string {
+  const floorMatch = name.match(/^(.+?)\s*(\d+F)/);
+  if (floorMatch) return `${floorMatch[1]}${floorMatch[2]}`;
   if (name.length <= 4) return name;
   return name.slice(0, 4);
 }
@@ -74,6 +77,13 @@ export function BagPanel() {
   }
   if (whiteCount > 0) {
     gridItems.push({ id: 'potion-white', type: 'potion', name: '白色藥水', count: whiteCount, potionType: 'white', color: POTION_COLORS.white });
+  }
+
+  for (const item of bagItems) {
+    if (item.type === 'potion' && !['紅色藥水', '橙色藥水', '白色藥水'].includes(item.name)) {
+      const spt: SpeedPotionType | undefined = item.name === '綠色藥水' ? 'green' : item.name === '強化綠色藥水' ? 'enhanced-green' : undefined;
+      gridItems.push({ id: `bag-${item.name}`, type: 'potion', name: item.name, count: item.amount, color: '#4ADE80', speedPotionType: spt });
+    }
   }
 
   for (const item of bagItems) {
@@ -140,6 +150,8 @@ export function BagPanel() {
   function handleClick(item: BagGridItem) {
     if (item.potionType) {
       usePotionByType(item.potionType);
+    } else if (item.speedPotionType) {
+      useGameStore.getState().useSpeedPotion(item.speedPotionType);
     } else if (item.equipment) {
       equipItem(item.equipment);
     } else if (item.type === 'scroll' && item.name.includes('回城卷軸')) {
@@ -160,6 +172,20 @@ export function BagPanel() {
           <div className="tooltip-stat">重量: {totalWeight}</div>
           <div className="tooltip-count">數量: {item.count}</div>
           <div className="tooltip-hint">點擊使用 / 右鍵設為快捷鍵</div>
+        </div>
+      );
+    }
+
+    if (item.speedPotionType) {
+      const unitWeight = getItemWeight(item.name);
+      const totalWeight = unitWeight * (item.count ?? 1);
+      return (
+        <div className="bag-tooltip-content">
+          <div className="tooltip-name">{item.name}</div>
+          <div className="tooltip-stat">{getItemDescription(item.name)}</div>
+          <div className="tooltip-stat">重量: {totalWeight}</div>
+          <div className="tooltip-count">數量: {item.count}</div>
+          <div className="tooltip-hint">點擊使用</div>
         </div>
       );
     }
@@ -225,13 +251,16 @@ export function BagPanel() {
                 {item.potionType && (
                   <GameIcon name={getItemIcon(`${item.potionType}-potion`)} size={24} color={item.color} />
                 )}
+                {item.speedPotionType && (
+                  <GameIcon name={getItemIcon(item.speedPotionType === 'enhanced-green' ? 'enhanced-green-potion' : 'green-potion')} size={24} color={item.color} />
+                )}
                 {item.type === 'equipment' && (
                   <GameIcon
                     name={getEquipIcon(item.equipment?.smallMonsterDamage ? 'sword' : 'chest')}
                     size={24}
                   />
                 )}
-                {!item.potionType && item.type !== 'equipment' && (
+                {!item.potionType && !item.speedPotionType && item.type !== 'equipment' && (
                   <GameIcon
                     name={getItemIcon(getItemIconKey(item.name, item.type))}
                     size={24}

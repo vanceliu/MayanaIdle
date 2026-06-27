@@ -14,6 +14,7 @@ import { ExpTablePage } from './wiki/pages/ExpTablePage'
 import { SkillsPage } from './wiki/pages/SkillsPage'
 import { AttributesPage } from './wiki/pages/AttributesPage'
 import { CombatPage } from './wiki/pages/CombatPage'
+import { ItemsPage } from './wiki/pages/ItemsPage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -34,6 +35,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="skills" element={<SkillsPage />} />
           <Route path="attributes" element={<AttributesPage />} />
           <Route path="combat" element={<CombatPage />} />
+          <Route path="items" element={<ItemsPage />} />
+          <Route path="items/:itemName" element={<ItemsPage />} />
         </Route>
         <Route path="/*" element={<App />} />
       </Routes>

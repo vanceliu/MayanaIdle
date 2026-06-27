@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: '/wiki/armor', label: '防具' },
   { path: '/wiki/monsters', label: '怪物' },
   { path: '/wiki/maps', label: '地圖' },
+  { path: '/wiki/items', label: '道具' },
   { path: '/wiki/skills', label: '技能' },
   { path: '/wiki/crafting', label: '鐵匠鋪' },
   { path: '/wiki/exp-table', label: '經驗表' },

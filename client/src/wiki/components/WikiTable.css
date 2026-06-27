@@ -60,7 +60,7 @@
   background: var(--bg-card);
   color: var(--text-secondary);
   font-weight: 500;
-  text-align: left;
+  text-align: center;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -84,6 +84,7 @@
   color: var(--text-primary);
   vertical-align: middle;
   white-space: nowrap;
+  text-align: center;
 }
 
 .wiki-table tr:hover td {
@@ -91,7 +92,7 @@
 }
 
 .wiki-table .cell-number {
-  text-align: right;
+  text-align: center;
   font-family: var(--font-mono);
 }
 

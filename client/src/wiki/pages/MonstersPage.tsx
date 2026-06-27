@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useMonsterList, useDropTableByArea, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
+import { useMonsterList, useDropTableByArea, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
+import { CLASS_SKILLS } from '../../models/classSkills';
+import { getSkillBookLevel, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import '../components/WikiTable.css';
 
@@ -141,7 +143,7 @@ function MonsterDetail({ name }: { name: string }) {
     return <p className="wiki-empty">找不到怪物：{name}</p>;
   }
 
-  const m = entries[0];
+  const first = entries[0];
   const allAreas = [...new Set(entries.map(e => e.area))];
 
   return (
@@ -151,30 +153,47 @@ function MonsterDetail({ name }: { name: string }) {
       </Link>
 
       <h2 className="wiki-page-title">
-        {m.name}
-        {m.isBoss && <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>★ Boss</span>}
+        {first.name}
+        {first.isBoss && <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>★ Boss</span>}
       </h2>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <StatCard label="等級" value={m.level} />
-        <StatCard label="HP" value={m.hp} />
-        <StatCard label="攻擊" value={`${m.attackMin}~${m.attackMax}`} />
-        <StatCard label="防禦" value={m.defense} />
-        <StatCard label="經驗值" value={m.exp} />
-        <StatCard label="屬性" value={ELEMENT_LABELS[m.element]} badge={`wiki-badge wiki-badge-${m.element}`} />
-        <StatCard label="種族" value={RACE_LABELS[m.race]} />
-        <StatCard label="體型" value={SIZE_LABELS[m.size]} />
-      </div>
-
-      <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
-        出沒區域
-      </h3>
-      <div style={{ marginBottom: 24 }}>
-        {allAreas.map(area => (
-          <Link key={area} className="wiki-link" to={`/wiki/maps/${area}`} style={{ marginRight: 12 }}>
-            {getAreaDisplayName(area)}
-          </Link>
-        ))}
+      <div className="wiki-table-wrap" style={{ marginBottom: 24 }}>
+        <table className="wiki-table">
+          <thead>
+            <tr>
+              <th>出沒區域</th>
+              <th>等級</th>
+              <th>HP</th>
+              <th>攻擊</th>
+              <th>防禦</th>
+              <th>經驗</th>
+              <th>屬性</th>
+              <th>種族</th>
+              <th>體型</th>
+              <th>Boss</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((m, i) => (
+              <tr key={`${m.area}-${i}`}>
+                <td>
+                  <Link className="wiki-link" to={`/wiki/maps/${m.area}`}>
+                    {getAreaDisplayName(m.area)}
+                  </Link>
+                </td>
+                <td className="cell-number">{m.level}</td>
+                <td className="cell-number">{m.hp}</td>
+                <td className="cell-number">{m.attackMin}~{m.attackMax}</td>
+                <td className="cell-number">{m.defense}</td>
+                <td className="cell-number">{m.exp}</td>
+                <td><span className={`wiki-badge wiki-badge-${m.element}`}>{ELEMENT_LABELS[m.element]}</span></td>
+                <td>{RACE_LABELS[m.race]}</td>
+                <td>{SIZE_LABELS[m.size]}</td>
+                <td className="cell-center">{m.isBoss ? '★' : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
@@ -183,6 +202,8 @@ function MonsterDetail({ name }: { name: string }) {
       {allAreas.map(area => (
         <AreaDropSection key={area} area={area} />
       ))}
+
+      <SkillBookDropInfo isBoss={first.isBoss} areas={allAreas} />
     </div>
   );
 }
@@ -232,17 +253,61 @@ function AreaDropSection({ area }: { area: string }) {
   );
 }
 
-function StatCard({ label, value, badge }: { label: string; value: string | number; badge?: string }) {
+const CLASS_LABELS_BOOK: Record<string, string> = {
+  knight: '騎士', elf: '妖精', thief: '盜賊', elementalist: '元素師', priest: '牧師',
+};
+
+function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
+  const regions = useRegions();
+  const areaLevels = areas.map(a => {
+    const region = regions.find(r => r.id === a);
+    if (region) return region.levelMax;
+    const floorMatch = a.match(/^(.+)-(\d+)f$/);
+    if (floorMatch) {
+      const parent = regions.find(r => r.id === floorMatch[1]);
+      if (parent?.floors) {
+        const floor = parent.floors.find(f => f.floor === Number(floorMatch[2]));
+        if (floor) return floor.levelMax;
+      }
+      return parent?.levelMax ?? 0;
+    }
+    return 0;
+  });
+
+  const maxAreaLevel = Math.max(...areaLevels);
+  const bookLevel = getSkillBookLevel(maxAreaLevel);
+
+  if (bookLevel === null) return null;
+
+  const dropRate = isBoss
+    ? `${(SKILL_BOOK_BOSS_DROP_RATE * 100).toFixed(0)}%`
+    : `${(SKILL_BOOK_NORMAL_DROP_RATE * 100).toFixed(2)}%`;
+  const books = CLASS_SKILLS.filter(s => s.classLevel === bookLevel);
+
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)',
-      padding: '12px 16px',
-    }}>
-      <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-xs)', marginBottom: 4 }}>{label}</div>
-      <div style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-lg)', fontFamily: 'var(--font-mono)' }}>
-        {badge ? <span className={badge}>{value}</span> : value}
+    <div style={{ marginTop: 16 }}>
+      <h4 style={{ color: 'var(--accent-info)', marginBottom: 8 }}>
+        職業技能書掉落（{isBoss ? 'Boss' : '一般怪物'} {dropRate}）
+      </h4>
+      <div className="wiki-table-wrap">
+        <table className="wiki-table">
+          <thead>
+            <tr>
+              <th>技能書</th>
+              <th>職業</th>
+              <th>階級</th>
+            </tr>
+          </thead>
+          <tbody>
+            {books.map(b => (
+              <tr key={b.id}>
+                <td>{b.bookName}</td>
+                <td>{CLASS_LABELS_BOOK[b.className]}</td>
+                <td className="cell-number">{b.classLevel}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

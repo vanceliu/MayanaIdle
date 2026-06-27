@@ -7,7 +7,7 @@ import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
-import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
+import { SKILL_WIND_BLADE, SKILL_CATALOG, canUseSkill } from '../models/skill';
 import { rollEncounter, rollEncounterCount, calculatePressure } from '../systems/pressure';
 import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear } from '../systems/combat';
 import { rollDrops } from '../systems/drops';
@@ -320,7 +320,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       character: char,
       equippedGear: equipped,
       inventory,
-      skills: char.skills ?? [],
+      skills: (char.skills ?? []).map(s => {
+        const catalog = SKILL_CATALOG.find(c => c.id === s.id);
+        return catalog ? { ...catalog, lastUsedAt: s.lastUsedAt ?? 0 } : s;
+      }),
       bagItems,
       storedMaterials,
       storedEquipment: storedEquipItems,
@@ -746,17 +749,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       duration: config.duration,
       tags: [],
       name: config.name,
-      description: '攻擊間隔 ×0.75',
+      description: '攻速+33%',
     };
-    get().addEffect(speedBuff);
+
+    const filteredEffects = state.activeEffects.filter(
+      e => !(e.type === 'buff' && e.category === 'speed' && e.target === 'player')
+    );
 
     const newBag = state.bagItems.map(i =>
       i.name === bagName ? { ...i, amount: i.amount - 1 } : i
     ).filter(i => i.amount > 0);
 
     set({
+      activeEffects: [...filteredEffects, speedBuff],
       bagItems: newBag,
-      combatLogs: addLog(state.combatLogs, { text: `使用${config.name}（攻速提升）`, type: 'system' }),
+      combatLogs: addLog(state.combatLogs, { text: `使用${config.name}（攻速+33%）`, type: 'system' }),
     });
   },
 
@@ -1003,6 +1010,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           });
           break;
         }
+        case 'speed_potion': {
+          const speedType = action.speedPotionType ?? 'green';
+          get().useSpeedPotion(speedType);
+          break;
+        }
         case 'buff_skill': {
           const skillIdx = state.skills.findIndex(s => s.id === action.skillId);
           if (skillIdx < 0) return;
@@ -1013,7 +1025,6 @@ export const useGameStore = create<GameState>((set, get) => ({
           const newSkills = [...state.skills];
           newSkills[skillIdx] = { ...skill, lastUsedAt: now };
           const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}（${skill.buffEffect}）`, type: 'player' });
-          set({ character: newChar, skills: newSkills, combatLogs: logs });
 
           if (skill.buffDuration) {
             const buffEffect: ActiveEffect = {
@@ -1030,7 +1041,13 @@ export const useGameStore = create<GameState>((set, get) => ({
               name: skill.name,
               description: skill.buffEffect ?? '',
             };
-            get().addEffect(buffEffect);
+            const currentEffects = get().activeEffects;
+            const filteredEffects = currentEffects.filter(
+              e => !(e.type === 'buff' && e.category === buffEffect.category && e.target === buffEffect.target)
+            );
+            set({ character: newChar, skills: newSkills, combatLogs: logs, activeEffects: [...filteredEffects, buffEffect] });
+          } else {
+            set({ character: newChar, skills: newSkills, combatLogs: logs });
           }
           break;
         }
@@ -1306,7 +1323,8 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
             } else if (skill.type === 'buff') {
               logs.push({ text: `施放 ${skill.name}（${skill.buffEffect}）`, type: 'player' });
               if (skill.cleanse) {
-                const cleansed = state.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
+                const currentEffects = get().activeEffects;
+                const cleansed = currentEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
                 set({ activeEffects: cleansed });
               } else if (skill.buffDuration) {
                 const buffEffect: ActiveEffect = {
@@ -1323,7 +1341,11 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                   name: skill.name,
                   description: skill.buffEffect ?? '',
                 };
-                get().addEffect(buffEffect);
+                const currentEffects = get().activeEffects;
+                const filteredEffects = currentEffects.filter(
+                  e => !(e.type === 'buff' && e.category === buffEffect.category && e.target === buffEffect.target)
+                );
+                set({ activeEffects: [...filteredEffects, buffEffect] });
               }
             }
             actionTaken = true;

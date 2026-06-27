@@ -37,9 +37,10 @@ export type PersistentConditionType =
   | 'mp_below'
   | 'mp_above'
   | 'buff_not_active'
+  | 'speed_not_active'
   | 'skill_ready';
 
-export type PersistentActionType = 'potion' | 'buff_skill' | 'heal_skill';
+export type PersistentActionType = 'potion' | 'speed_potion' | 'buff_skill' | 'heal_skill';
 
 export interface PersistentCondition {
   type: PersistentConditionType;
@@ -50,6 +51,7 @@ export interface PersistentCondition {
 export interface PersistentAction {
   type: PersistentActionType;
   potionType?: 'red' | 'orange' | 'white';
+  speedPotionType?: 'green' | 'enhanced-green';
   skillId?: string;
 }
 
