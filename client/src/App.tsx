@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from './stores/gameStore';
+import { exportCharacterData, downloadExport, importCharacterData } from './systems/characterTransfer';
 import { seedDatabase } from './db/seed';
 import { loadTemplateCache } from './systems/templateSync';
 import { CharacterCreate } from './components/CharacterCreate';
@@ -19,12 +20,59 @@ import './App.css';
 
 function GameToolbar() {
   const logout = useGameStore(s => s.logout);
+  const character = useGameStore(s => s.character);
+  const selectCharacter = useGameStore(s => s.selectCharacter);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = useCallback(async () => {
+    if (!character?.id) return;
+    try {
+      const json = await exportCharacterData(character.id);
+      downloadExport(json, character.name);
+    } catch (e) {
+      alert(`匯出失敗: ${(e as Error).message}`);
+    }
+  }, [character]);
+
+  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !character?.id) return;
+
+    const confirmed = window.confirm('匯入將覆蓋當前角色的所有資料，確定繼續？');
+    if (!confirmed) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const json = await file.text();
+      await importCharacterData(json, character.id);
+      await selectCharacter(character.id);
+      alert('匯入成功！');
+    } catch (err) {
+      alert(`匯入失敗: ${(err as Error).message}`);
+    }
+    e.target.value = '';
+  }, [character, selectCharacter]);
 
   return (
     <div className="game-toolbar">
       <a className="btn-wiki" href="/MayanaIdle/wiki" target="_blank" rel="noopener noreferrer">
         Wiki
       </a>
+      <button className="btn-transfer" onClick={handleExport} title="匯出角色">
+        匯出
+      </button>
+      <button className="btn-transfer" onClick={() => fileInputRef.current?.click()} title="匯入角色">
+        匯入
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={handleImport}
+      />
       <button className="btn-logout" onClick={logout}>
         登出
       </button>

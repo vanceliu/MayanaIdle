@@ -9,7 +9,7 @@ import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../mod
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, SKILL_CATALOG, canUseSkill } from '../models/skill';
 import { rollEncounter, rollEncounterCount, calculatePressure } from '../systems/pressure';
-import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear } from '../systems/combat';
+import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant } from '../systems/combat';
 import { rollDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -1282,7 +1282,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
 
             if (skill.hits && skill.hits > 0) {
               // Multi-hit physical skill (e.g. triple-shot): uses physical attack formula per hit
-              const hasFireEnchant = false; // TODO: check active buff state
+              const hasFireEnchant = hasActiveFireEnchant(state.activeEffects);
               for (let h = 0; h < skill.hits; h++) {
                 if (target.currentHp <= 0) break;
                 const result = calculatePhysicalSkillHit(char, weapon, target, allGear, hasFireEnchant, skill.name, state.activeEffects);

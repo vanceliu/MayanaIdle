@@ -64,6 +64,31 @@ export function getElementCounterBonus(attackElement: string | undefined, monste
   return 0;
 }
 
+export function getFireEnchantBonus(activeEffects: ActiveEffect[]): number {
+  const now = Date.now();
+  let bonus = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'buff' || effect.target !== 'player') continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (effect.category !== 'fire-enchant') continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === 'fire_damage' && !mod.isPercent) bonus += mod.value;
+    }
+  }
+  return bonus;
+}
+
+export function hasActiveFireEnchant(activeEffects: ActiveEffect[]): boolean {
+  const now = Date.now();
+  for (const effect of activeEffects) {
+    if (effect.type !== 'buff' || effect.target !== 'player') continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (effect.category === 'fire-enchant') return true;
+  }
+  return false;
+}
+
 export function getRaceHitBonus(activeEffects: ActiveEffect[], monsterRace: string): number {
   const now = Date.now();
   let bonus = 0;
@@ -179,13 +204,15 @@ export function calculatePlayerAttack(
   // Base damage (including race/element counter bonuses)
   const weaponDmg = getWeaponDamage(weapon, monster.size);
   const strBonus = Math.floor(effSTR / 2);
-  let damage = weaponDmg + strBonus + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(weapon?.element, monster.element);
+  const fireEnchantDmg = getFireEnchantBonus(activeEffects);
+  let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(weapon?.element, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
 
-  // Apply attack elemental% multiplier (only if weapon has element)
-  if (weapon?.element && weapon.element !== 'none') {
+  // Apply attack elemental% multiplier (weapon element OR fire enchant)
+  const hasElement = (weapon?.element && weapon.element !== 'none') || fireEnchantDmg > 0;
+  if (hasElement) {
     damage = Math.floor(damage * (1 + bonuses.attack_elemental / 100));
   }
 

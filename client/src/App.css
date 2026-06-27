@@ -2981,6 +2981,23 @@ button.active {
   color: var(--accent-primary);
 }
 
+.btn-transfer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-family: var(--font-display);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-transfer:hover {
+  border-color: var(--accent-info);
+  color: var(--accent-info);
+}
+
 .btn-logout {
   background: var(--bg-card);
   border: 1px solid var(--border);
