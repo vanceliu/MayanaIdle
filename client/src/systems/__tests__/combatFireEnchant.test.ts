@@ -172,15 +172,78 @@ describe('fire enchant combat', () => {
       const char = createTestCharacter();
       const monster = createTestMonster({ defense: 0 });
       const weapon = createTestWeapon();
+      const fireEffect = createFireEnchantEffect();
       const gear = [weapon];
 
-      const withEnchant = calculatePhysicalSkillHit(char, weapon, monster, gear, true, '三連射');
+      const withEnchant = calculatePhysicalSkillHit(char, weapon, monster, gear, true, '三連射', [fireEffect]);
       vi.spyOn(Math, 'random').mockReturnValue(0.1);
-      const withoutEnchant = calculatePhysicalSkillHit(char, weapon, monster, gear, false, '三連射');
+      const withoutEnchant = calculatePhysicalSkillHit(char, weapon, monster, gear, false, '三連射', []);
 
       expect(withEnchant.hit).toBe(true);
       expect(withoutEnchant.hit).toBe(true);
-      expect(withEnchant.damage).toBeGreaterThanOrEqual(withoutEnchant.damage);
+      expect(withEnchant.damage).toBeGreaterThan(withoutEnchant.damage);
+    });
+
+    it('adds fire_damage +15 to each hit of triple shot', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const char = createTestCharacter();
+      const monster = createTestMonster({ defense: 0 });
+      const weapon = createTestWeapon();
+      const gear = [weapon];
+      const fireEffect = createFireEnchantEffect();
+
+      const withEnchant = calculatePhysicalSkillHit(char, weapon, monster, gear, true, '三連射', [fireEffect]);
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const withoutEnchant = calculatePhysicalSkillHit(char, weapon, monster, gear, false, '三連射', []);
+
+      expect(withEnchant.damage - withoutEnchant.damage).toBeGreaterThanOrEqual(15);
+    });
+
+    it('triggers element counter bonus (fire vs wind) on triple shot', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const char = createTestCharacter();
+      const windMonster = createTestMonster({ defense: 0, element: 'wind' });
+      const weapon = createTestWeapon();
+      const gear = [weapon];
+      const fireEffect = createFireEnchantEffect();
+
+      const vsWind = calculatePhysicalSkillHit(char, weapon, windMonster, gear, true, '三連射', [fireEffect]);
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const normalMonster = createTestMonster({ defense: 0, element: 'none' });
+      const vsNone = calculatePhysicalSkillHit(char, weapon, normalMonster, gear, true, '三連射', [fireEffect]);
+
+      expect(vsWind.damage).toBeGreaterThan(vsNone.damage);
+    });
+  });
+
+  describe('element counter with fire enchant on normal attack', () => {
+    it('triggers fire vs wind counter even without elemental weapon', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const char = createTestCharacter();
+      const windMonster = createTestMonster({ defense: 0, element: 'wind' });
+      const weapon = createTestWeapon({ element: undefined });
+      const fireEffect = createFireEnchantEffect();
+
+      const result = calculatePlayerAttack(char, weapon, windMonster, [], [fireEffect]);
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const normalMonster = createTestMonster({ defense: 0, element: 'none' });
+      const resultNoCounter = calculatePlayerAttack(char, weapon, normalMonster, [], [fireEffect]);
+
+      expect(result.damage).toBeGreaterThan(resultNoCounter.damage);
+    });
+
+    it('does not trigger counter when fire enchant is not active', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const char = createTestCharacter();
+      const windMonster = createTestMonster({ defense: 0, element: 'wind' });
+      const weapon = createTestWeapon({ element: undefined });
+
+      const vsWind = calculatePlayerAttack(char, weapon, windMonster, [], []);
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const normalMonster = createTestMonster({ defense: 0, element: 'none' });
+      const vsNone = calculatePlayerAttack(char, weapon, normalMonster, [], []);
+
+      expect(vsWind.damage).toBe(vsNone.damage);
     });
   });
 });

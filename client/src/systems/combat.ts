@@ -205,7 +205,8 @@ export function calculatePlayerAttack(
   const weaponDmg = getWeaponDamage(weapon, monster.size);
   const strBonus = Math.floor(effSTR / 2);
   const fireEnchantDmg = getFireEnchantBonus(activeEffects);
-  let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(weapon?.element, monster.element);
+  const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (fireEnchantDmg > 0 ? 'fire' : undefined);
+  let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -267,10 +268,12 @@ export function calculatePhysicalSkillHit(
     };
   }
 
-  // Base damage (physical formula, including race/element counter bonuses)
+  // Base damage (physical formula, including race/element counter bonuses + fire enchant)
   const weaponDmg = getWeaponDamage(weapon, monster.size);
   const strBonus = Math.floor(getEffectiveSTR(attrs.STR) / 2);
-  let damage = weaponDmg + strBonus + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(weapon?.element, monster.element);
+  const fireEnchantDmg = hasFireEnchant ? getFireEnchantBonus(activeEffects) : 0;
+  const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchant ? 'fire' : undefined);
+  let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
