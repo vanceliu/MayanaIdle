@@ -29,7 +29,7 @@ export const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = [
   { name: '聖光護盾技能書', className: 'priest', level: 1 },
   { name: '高階治癒技能書', className: 'priest', level: 2 },
   { name: '群體治癒技能書', className: 'priest', level: 3 },
-  { name: '復活術技能書', className: 'priest', level: 4 },
+  { name: '聖光審判技能書', className: 'priest', level: 4 },
   { name: '神聖領域技能書', className: 'priest', level: 5 },
   // Thief
   { name: '淬毒技能書', className: 'thief', level: 1 },

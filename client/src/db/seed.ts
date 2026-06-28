@@ -1094,6 +1094,20 @@ async function performSeed(): Promise<void> {
         if ((seed as any).weight && instance.weight == null) instance.weight = (seed as any).weight;
       }
     });
+
+    // Migrate legacy 復活術 → 聖光審判
+    await db.characters.toCollection().modify((char: any) => {
+      if (char.skills) {
+        char.skills = char.skills.map((s: any) => {
+          if (s.id === 'resurrect') {
+            return { ...s, id: 'holy-judgment', name: '聖光審判', element: 'light', type: 'attack', target: 'aoe', power: 70, healAmount: undefined, mpCost: 60, cooldown: 15000, aoeMin: 4, aoeMax: 6 };
+          }
+          return s;
+        });
+      }
+    });
+    await db.characterBag.where('name').equals('復活術技能書').modify({ name: '聖光審判技能書' });
+
     return;
   }
 

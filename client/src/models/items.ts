@@ -73,7 +73,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { name: '聖光護盾技能書', category: 'spellbook', description: '牧師職業魔法 1 級：聖光護盾', weight: 5 },
   { name: '高階治癒技能書', category: 'spellbook', description: '牧師職業魔法 2 級：高階治癒', weight: 5 },
   { name: '群體治癒技能書', category: 'spellbook', description: '牧師職業魔法 3 級：群體治癒', weight: 5 },
-  { name: '復活術技能書', category: 'spellbook', description: '牧師職業魔法 4 級：復活術', weight: 5 },
+  { name: '聖光審判技能書', category: 'spellbook', description: '牧師職業魔法 4 級：聖光審判', weight: 5 },
   { name: '神聖領域技能書', category: 'spellbook', description: '牧師職業魔法 5 級：神聖領域', weight: 5 },
   { name: '淬毒技能書', category: 'spellbook', description: '盜賊職業魔法 1 級：淬毒', weight: 5 },
   { name: '致命一擊技能書', category: 'spellbook', description: '盜賊職業魔法 2 級：致命一擊', weight: 5 },

@@ -26,7 +26,7 @@ describe('classSkillBookDrop', () => {
 
   it('can drop level 4 book in Lv43~45 area', () => {
     const level4Books = [
-      '挑釁怒吼技能書', '鷹眼技能書', '連鎖詠唱技能書', '復活術技能書', '精準打擊技能書',
+      '挑釁怒吼技能書', '鷹眼技能書', '連鎖詠唱技能書', '聖光審判技能書', '精準打擊技能書',
     ];
     let dropped = false;
     for (let i = 0; i < 100000; i++) {

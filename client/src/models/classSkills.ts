@@ -51,8 +51,8 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
     skill: { id: 'high-heal', name: '高階治癒', level: 2, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 400, mpCost: 40, cooldown: 10000 } },
   { id: 'group-heal', name: '群體治癒', className: 'priest', classLevel: 3, requiredLevel: 30, bookName: '群體治癒技能書',
     skill: { id: 'group-heal', name: '群體治癒', level: 3, element: 'none', type: 'heal', target: 'aoe', power: 0, healAmount: 200, mpCost: 60, cooldown: 15000 } },
-  { id: 'resurrect', name: '復活術', className: 'priest', classLevel: 4, requiredLevel: 40, bookName: '復活術技能書',
-    skill: { id: 'resurrect', name: '復活術', level: 4, element: 'light', type: 'heal', target: 'single', power: 0, healAmount: 0, mpCost: 80, cooldown: 120000 } },
+  { id: 'holy-judgment', name: '聖光審判', className: 'priest', classLevel: 4, requiredLevel: 40, bookName: '聖光審判技能書',
+    skill: { id: 'holy-judgment', name: '聖光審判', level: 4, element: 'light', type: 'attack', target: 'aoe', power: 70, mpCost: 60, cooldown: 15000, aoeMin: 4, aoeMax: 6 } },
   { id: 'holy-domain', name: '神聖領域', className: 'priest', classLevel: 5, requiredLevel: 50, bookName: '神聖領域技能書',
     skill: { id: 'holy-domain', name: '神聖領域', level: 5, element: 'light', type: 'buff', target: 'aoe', power: 0, mpCost: 90, cooldown: 90000, buffEffect: '減傷30%+免疫負面', buffDuration: 10000, buffModifiers: [{ stat: 'damageReduction', value: 30, isPercent: true }], buffCategory: 'sanctuary' } },
 
