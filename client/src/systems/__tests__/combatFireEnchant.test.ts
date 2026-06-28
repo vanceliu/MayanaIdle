@@ -138,11 +138,11 @@ describe('fire enchant combat', () => {
   });
 
   describe('calculatePlayerAttack with fire enchant', () => {
-    it('adds fire_damage to normal attack damage', () => {
+    it('adds fire_damage to normal attack damage with bow', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.1);
       const char = createTestCharacter();
       const monster = createTestMonster({ defense: 0 });
-      const weapon = createTestWeapon();
+      const weapon = createTestWeapon({ type: 'bow' });
       const fireEffect = createFireEnchantEffect();
 
       const withEnchant = calculatePlayerAttack(char, weapon, monster, [], [fireEffect]);
@@ -153,11 +153,41 @@ describe('fire enchant combat', () => {
       expect(withEnchant.hit).toBe(true);
     });
 
-    it('fire enchant damage is included even on normal (non-elemental) weapon', () => {
+    it('does NOT add fire_damage +15 with non-bow weapon', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const char = createTestCharacter();
+      const monster = createTestMonster({ defense: 0, element: 'none' });
+      const sword = createTestWeapon({ type: 'sword', element: undefined });
+      const fireEffect = createFireEnchantEffect();
+
+      const withEnchant = calculatePlayerAttack(char, sword, monster, [], [fireEffect]);
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const withoutEnchant = calculatePlayerAttack(char, sword, monster, [], []);
+
+      // Non-bow should NOT get +15, but still gets elemental% (which is 0 without affix)
+      expect(withEnchant.damage).toBe(withoutEnchant.damage);
+    });
+
+    it('non-bow weapon still triggers element counter with fire enchant', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const char = createTestCharacter();
+      const windMonster = createTestMonster({ defense: 0, element: 'wind' });
+      const sword = createTestWeapon({ type: 'sword', element: undefined });
+      const fireEffect = createFireEnchantEffect();
+
+      const vsWind = calculatePlayerAttack(char, sword, windMonster, [], [fireEffect]);
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      const normalMonster = createTestMonster({ defense: 0, element: 'none' });
+      const vsNone = calculatePlayerAttack(char, sword, normalMonster, [], [fireEffect]);
+
+      expect(vsWind.damage).toBeGreaterThan(vsNone.damage);
+    });
+
+    it('fire enchant damage is included even on normal (non-elemental) bow', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.1);
       const char = createTestCharacter();
       const monster = createTestMonster({ defense: 0 });
-      const weapon = createTestWeapon({ element: undefined });
+      const weapon = createTestWeapon({ type: 'bow', element: undefined });
       const fireEffect = createFireEnchantEffect();
 
       const result = calculatePlayerAttack(char, weapon, monster, [], [fireEffect]);

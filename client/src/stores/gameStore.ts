@@ -1277,6 +1277,11 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
           const skillIdx = skills.findIndex(s => s.id === action.skillId);
           if (skillIdx >= 0) {
             const skill = skills[skillIdx];
+
+            if (skill.requiredWeaponType && weapon?.type !== skill.requiredWeaponType) {
+              break;
+            }
+
             char.mp -= skill.mpCost;
             skills[skillIdx] = { ...skill, lastUsedAt: now };
 

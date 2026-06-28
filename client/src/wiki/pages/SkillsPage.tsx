@@ -1,8 +1,16 @@
 import { useMemo, useState } from 'react';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
-import { CLASS_SKILLS } from '../../models/classSkills';
+import { CLASS_SKILLS, type ClassSkillDef } from '../../models/classSkills';
 import '../components/WikiTable.css';
+
+const WEAPON_TYPE_LABELS: Record<string, string> = {
+  bow: '弓',
+  sword: '劍',
+  dagger: '匕首',
+  axe: '斧',
+  staff: '杖',
+};
 
 const ELEMENT_LABELS: Record<string, string> = {
   fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
@@ -142,7 +150,7 @@ export function SkillsPage() {
                       <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>
                       <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>
-                      <td>{s.skill.buffEffect || (s.skill.hits ? `${s.skill.hits}連擊` : '') || '-'}</td>
+                      <td>{getClassSkillEffect(s)}</td>
                       <td>{s.bookName}</td>
                     </tr>
                   ))}
@@ -154,6 +162,19 @@ export function SkillsPage() {
       })}
     </div>
   );
+}
+
+function getClassSkillEffect(s: ClassSkillDef): string {
+  const parts: string[] = [];
+  if (s.skill.requiredWeaponType) {
+    parts.push(`【需${WEAPON_TYPE_LABELS[s.skill.requiredWeaponType] ?? s.skill.requiredWeaponType}】`);
+  }
+  if (s.skill.buffEffect) {
+    parts.push(s.skill.buffEffect);
+  } else if (s.skill.hits) {
+    parts.push(`${s.skill.hits}連擊`);
+  }
+  return parts.join(' ') || '-';
 }
 
 function getLearnConditionText(cls: string): string {

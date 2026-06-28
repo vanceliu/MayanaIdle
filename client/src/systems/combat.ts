@@ -204,15 +204,18 @@ export function calculatePlayerAttack(
   // Base damage (including race/element counter bonuses)
   const weaponDmg = getWeaponDamage(weapon, monster.size);
   const strBonus = Math.floor(effSTR / 2);
-  const fireEnchantDmg = getFireEnchantBonus(activeEffects);
-  const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (fireEnchantDmg > 0 ? 'fire' : undefined);
+  const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
+  const isBow = weapon?.type === 'bow';
+  const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
+  const hasFireEnchantActive = rawFireEnchantDmg > 0;
+  const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchantActive ? 'fire' : undefined);
   let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
 
   // Apply attack elemental% multiplier (weapon element OR fire enchant)
-  const hasElement = (weapon?.element && weapon.element !== 'none') || fireEnchantDmg > 0;
+  const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchantActive;
   if (hasElement) {
     damage = Math.floor(damage * (1 + bonuses.attack_elemental / 100));
   }

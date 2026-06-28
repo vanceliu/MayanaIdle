@@ -26,6 +26,7 @@ export interface Skill {
   hits?: number; // multi-hit: uses physical attack formula per hit
   hotAmount?: number; // heal over time per second
   invincible?: boolean;
+  requiredWeaponType?: string;
 }
 
 export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
