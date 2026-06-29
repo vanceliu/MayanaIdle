@@ -4,6 +4,18 @@ export type SkillTarget = 'single' | 'aoe';
 export type SkillType = 'attack' | 'heal' | 'buff' | 'move';
 export type SkillElement = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark' | 'none';
 
+export interface SkillDebuffDef {
+  category: string;
+  name: string;
+  description: string;
+  dotDamagePercent?: number;
+  dotDamage?: number;
+  dotInterval: number;
+  dotDuration: number;
+  dotElement: string;
+  tags: string[];
+}
+
 export interface Skill {
   id: string;
   name: string;
@@ -27,6 +39,8 @@ export interface Skill {
   hotAmount?: number; // heal over time per second
   invincible?: boolean;
   requiredWeaponType?: string;
+  applyDebuff?: SkillDebuffDef;
+  onHitDebuff?: SkillDebuffDef;
 }
 
 export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [

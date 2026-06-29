@@ -147,7 +147,13 @@ export function PersistentScriptEditor() {
                 <span>→</span>
                 <select
                   value={rule.action.type}
-                  onChange={e => updateAction(idx, { type: e.target.value as PersistentActionType })}
+                  onChange={e => {
+                    const newType = e.target.value as PersistentActionType;
+                    const defaults: Partial<PersistentAction> = { type: newType };
+                    if (newType === 'potion') defaults.potionType = 'red';
+                    if (newType === 'speed_potion') defaults.speedPotionType = 'green';
+                    updateAction(idx, defaults);
+                  }}
                 >
                   {Object.entries(ACTION_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>

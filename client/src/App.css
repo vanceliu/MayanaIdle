@@ -998,7 +998,8 @@ button.active {
 }
 
 .script-rule.disabled {
-  opacity: 0.35;
+  opacity: 0.6;
+  border-style: dashed;
 }
 
 .rule-header {

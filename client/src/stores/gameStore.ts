@@ -9,7 +9,7 @@ import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../mod
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, SKILL_CATALOG, canUseSkill } from '../models/skill';
 import { rollEncounter, rollEncounterCount, calculatePressure } from '../systems/pressure';
-import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant } from '../systems/combat';
+import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage } from '../systems/combat';
 import { rollDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -935,6 +935,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       const state = get();
       if (!state.character) return;
 
+      get().clearExpiredEffects();
+
       const now = Date.now();
       const char = state.character;
       const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
@@ -1317,6 +1319,30 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                 target.currentHp -= result.damage;
                 monsters[targetIdx] = target;
                 logs.push({ text: result.log.message, type: 'player' });
+
+                if (skill.applyDebuff && result.damage > 0) {
+                  let dotDmg = skill.applyDebuff.dotDamage ?? 0;
+                  if (skill.applyDebuff.dotDamagePercent) {
+                    dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * skill.applyDebuff.dotDamagePercent);
+                  }
+                  const debuffEffect: ActiveEffect = {
+                    id: `debuff-${skill.applyDebuff.category}-${targetIdx}-${now}`,
+                    sourceSkillId: skill.id,
+                    sourceSkillName: skill.name,
+                    category: skill.applyDebuff.category,
+                    type: 'debuff',
+                    target: 'monster',
+                    targetIdx,
+                    dot: { damage: dotDmg, element: skill.applyDebuff.dotElement, interval: skill.applyDebuff.dotInterval, totalDuration: skill.applyDebuff.dotDuration },
+                    startTime: now,
+                    duration: skill.applyDebuff.dotDuration,
+                    tags: skill.applyDebuff.tags,
+                    name: skill.applyDebuff.name,
+                    description: `每秒 ${dotDmg} 傷害`,
+                  };
+                  get().addEffect(debuffEffect);
+                  logs.push({ text: `${skill.name}命中！目標${skill.applyDebuff.name} ${skill.applyDebuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
+                }
               }
             } else if (skill.type === 'heal' && skill.healAmount) {
               const bonuses = getAffixBonusesFromGear(allGear);
@@ -1363,6 +1389,37 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
             target.currentHp -= result.playerDamage;
             const critText = result.isCritical ? '（爆擊！）' : '';
             logs.push({ text: `對 ${target.name} 造成 ${result.playerDamage} 傷害${critText}`, type: 'player' });
+
+            const poisonBuff = get().activeEffects.find(
+              e => e.type === 'buff' && e.target === 'player' && e.category === 'poison-enchant'
+            );
+            if (poisonBuff) {
+              const envenomSkill = state.skills.find(s => s.id === 'envenom');
+              if (envenomSkill?.onHitDebuff) {
+                const debuff = envenomSkill.onHitDebuff;
+                let dotDmg = debuff.dotDamage ?? 0;
+                if (debuff.dotDamagePercent) {
+                  dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * debuff.dotDamagePercent);
+                }
+                const poisonEffect: ActiveEffect = {
+                  id: `debuff-${debuff.category}-${targetIdx}-${now}`,
+                  sourceSkillId: 'envenom',
+                  sourceSkillName: '淬毒',
+                  category: debuff.category,
+                  type: 'debuff',
+                  target: 'monster',
+                  targetIdx,
+                  dot: { damage: dotDmg, element: debuff.dotElement, interval: debuff.dotInterval, totalDuration: debuff.dotDuration },
+                  startTime: now,
+                  duration: debuff.dotDuration,
+                  tags: debuff.tags,
+                  name: debuff.name,
+                  description: `每秒 ${dotDmg} 傷害`,
+                };
+                get().addEffect(poisonEffect);
+                logs.push({ text: `淬毒觸發！目標${debuff.name} ${debuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
+              }
+            }
           } else {
             logs.push({ text: `攻擊 ${target.name} 未命中`, type: 'player' });
           }
@@ -1390,6 +1447,15 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
       const deadIdx = monsters.indexOf(dead);
       monsters[deadIdx] = { ...dead, _processed: true };
       logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
+
+      // Clear debuffs on dead monster
+      const currentEffects = get().activeEffects;
+      const cleanedEffects = currentEffects.filter(
+        e => !(e.target === 'monster' && e.targetIdx === deadIdx)
+      );
+      if (cleanedEffects.length !== currentEffects.length) {
+        set({ activeEffects: cleanedEffects });
+      }
 
       const expGained = dead.exp * 3;
       const prevLevel = char.level;
@@ -1537,6 +1603,38 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
     combatTimerIds.push(monsterInterval);
   }, 600);
   combatTimerIds.push(monsterTimer as unknown as number);
+
+  // DOT tick timer — 1000ms, only deals damage (no death processing)
+  const dotTimer = window.setInterval(() => {
+    const state = get();
+    if (state.phase !== 'combat') {
+      clearInterval(dotTimer);
+      return;
+    }
+
+    const now = Date.now();
+    const monsters = [...state.monsters];
+    const logs = [...state.combatLogs];
+    let changed = false;
+
+    for (const effect of state.activeEffects) {
+      if (effect.type !== 'debuff' || effect.target !== 'monster' || !effect.dot) continue;
+      if (now > effect.startTime + effect.duration) continue;
+
+      const idx = effect.targetIdx;
+      if (idx == null || idx >= monsters.length) continue;
+      if (monsters[idx].currentHp <= 0) continue;
+
+      monsters[idx] = { ...monsters[idx], currentHp: monsters[idx].currentHp - effect.dot.damage };
+      logs.push({ text: `${effect.name} 對 ${monsters[idx].name} 造成 ${effect.dot.damage} 傷害`, type: 'system' });
+      changed = true;
+    }
+
+    if (changed) {
+      set({ monsters, combatLogs: logs.slice(-MAX_LOGS) });
+    }
+  }, 1000);
+  combatTimerIds.push(dotTimer);
 }
 
 let combatTimerIds: number[] = [];

@@ -170,6 +170,28 @@ export function getWeaponExtraAttack(weapon: EquipmentInstance | null): number {
   return weapon.extraAttack ?? 0;
 }
 
+export function calculateBasePhysicalDamage(
+  char: Character,
+  weapon: EquipmentInstance | null,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = []
+): number {
+  const attrs = getTotalAttributes(char);
+  const effSTR = getEffectiveSTR(attrs.STR);
+  const bonuses = getAffixBonusesFromGear(equippedGear);
+
+  const weaponDmg = weapon ? ((weapon.smallMonsterDamage ?? 0) + (weapon.largeMonsterDamage ?? 0)) / 2 : 1;
+  const strBonus = Math.floor(effSTR / 2);
+  const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
+  const isBow = weapon?.type === 'bow';
+  const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
+
+  let damage = Math.floor(weaponDmg) + strBonus + fireEnchantDmg;
+  damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
+
+  return Math.max(1, damage);
+}
+
 export function calculatePlayerAttack(
   char: Character,
   weapon: EquipmentInstance | null,
