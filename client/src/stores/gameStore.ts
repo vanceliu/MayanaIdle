@@ -8,6 +8,7 @@ import type { ActiveEffect } from '../models/effect';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, SKILL_CATALOG, canUseSkill } from '../models/skill';
+import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { rollEncounter, rollEncounterCount, calculatePressure } from '../systems/pressure';
 import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage } from '../systems/combat';
 import { rollDrops } from '../systems/drops';
@@ -321,9 +322,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       equippedGear: equipped,
       inventory,
       skills: (char.skills ?? []).map(s => {
-        const catalog = SKILL_CATALOG.find(c => c.id === s.id);
-        return catalog ? { ...catalog, lastUsedAt: s.lastUsedAt ?? 0 } : s;
-      }),
+        return instantiateFromTemplate(s.id, s.lastUsedAt ?? 0);
+      }).filter(Boolean) as Skill[],
       bagItems,
       storedMaterials,
       storedEquipment: storedEquipItems,
@@ -1023,25 +1023,27 @@ export const useGameStore = create<GameState>((set, get) => ({
           const skill = state.skills[skillIdx];
           if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return;
 
+          const template = getSkillTemplate(skill.id);
           const newChar = { ...char, mp: char.mp - skill.mpCost };
           const newSkills = [...state.skills];
           newSkills[skillIdx] = { ...skill, lastUsedAt: now };
-          const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}（${skill.buffEffect}）`, type: 'player' });
+          const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}（${template?.buffEffect ?? skill.buffEffect}）`, type: 'player' });
 
-          if (skill.buffDuration) {
+          const buffDuration = template?.buffDuration ?? skill.buffDuration;
+          if (buffDuration) {
             const buffEffect: ActiveEffect = {
               id: `buff-${skill.id}-${now}`,
               sourceSkillId: skill.id,
               sourceSkillName: skill.name,
-              category: skill.buffCategory ?? skill.id,
+              category: template?.buffCategory ?? skill.buffCategory ?? skill.id,
               type: 'buff',
               target: 'player',
-              modifiers: skill.buffModifiers ?? [],
+              modifiers: template?.buffModifiers ?? skill.buffModifiers ?? [],
               startTime: now,
-              duration: skill.buffDuration,
+              duration: buffDuration,
               tags: [],
               name: skill.name,
-              description: skill.buffEffect ?? '',
+              description: template?.buffEffect ?? skill.buffEffect ?? '',
             };
             const currentEffects = get().activeEffects;
             const filteredEffects = currentEffects.filter(
@@ -1320,28 +1322,31 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                 monsters[targetIdx] = target;
                 logs.push({ text: result.log.message, type: 'player' });
 
-                if (skill.applyDebuff && result.damage > 0) {
-                  let dotDmg = skill.applyDebuff.dotDamage ?? 0;
-                  if (skill.applyDebuff.dotDamagePercent) {
-                    dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * skill.applyDebuff.dotDamagePercent);
+                if (result.damage > 0) {
+                  const templateDebuff = getSkillTemplate(skill.id)?.applyDebuff;
+                  if (templateDebuff) {
+                    let dotDmg = templateDebuff.dotDamage ?? 0;
+                    if (templateDebuff.dotDamagePercent) {
+                      dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * templateDebuff.dotDamagePercent);
+                    }
+                    const debuffEffect: ActiveEffect = {
+                      id: `debuff-${templateDebuff.category}-${targetIdx}-${now}`,
+                      sourceSkillId: skill.id,
+                      sourceSkillName: skill.name,
+                      category: templateDebuff.category,
+                      type: 'debuff',
+                      target: 'monster',
+                      targetIdx,
+                      dot: { damage: dotDmg, element: templateDebuff.dotElement, interval: templateDebuff.dotInterval, totalDuration: templateDebuff.dotDuration },
+                      startTime: now,
+                      duration: templateDebuff.dotDuration,
+                      tags: templateDebuff.tags,
+                      name: templateDebuff.name,
+                      description: `每秒 ${dotDmg} 傷害`,
+                    };
+                    get().addEffect(debuffEffect);
+                    logs.push({ text: `${skill.name}命中！目標${templateDebuff.name} ${templateDebuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
                   }
-                  const debuffEffect: ActiveEffect = {
-                    id: `debuff-${skill.applyDebuff.category}-${targetIdx}-${now}`,
-                    sourceSkillId: skill.id,
-                    sourceSkillName: skill.name,
-                    category: skill.applyDebuff.category,
-                    type: 'debuff',
-                    target: 'monster',
-                    targetIdx,
-                    dot: { damage: dotDmg, element: skill.applyDebuff.dotElement, interval: skill.applyDebuff.dotInterval, totalDuration: skill.applyDebuff.dotDuration },
-                    startTime: now,
-                    duration: skill.applyDebuff.dotDuration,
-                    tags: skill.applyDebuff.tags,
-                    name: skill.applyDebuff.name,
-                    description: `每秒 ${dotDmg} 傷害`,
-                  };
-                  get().addEffect(debuffEffect);
-                  logs.push({ text: `${skill.name}命中！目標${skill.applyDebuff.name} ${skill.applyDebuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
                 }
               }
             } else if (skill.type === 'heal' && skill.healAmount) {
@@ -1352,25 +1357,27 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
               char.hp += healed;
               logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
             } else if (skill.type === 'buff') {
-              logs.push({ text: `施放 ${skill.name}（${skill.buffEffect}）`, type: 'player' });
-              if (skill.cleanse) {
+              const buffTemplate = getSkillTemplate(skill.id);
+              logs.push({ text: `施放 ${skill.name}（${buffTemplate?.buffEffect ?? skill.buffEffect}）`, type: 'player' });
+              if (buffTemplate?.cleanse ?? skill.cleanse) {
                 const currentEffects = get().activeEffects;
                 const cleansed = currentEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
                 set({ activeEffects: cleansed });
-              } else if (skill.buffDuration) {
+              } else if (buffTemplate?.buffDuration ?? skill.buffDuration) {
+                const bDuration = buffTemplate?.buffDuration ?? skill.buffDuration!;
                 const buffEffect: ActiveEffect = {
                   id: `buff-${skill.id}-${Date.now()}`,
                   sourceSkillId: skill.id,
                   sourceSkillName: skill.name,
-                  category: skill.buffCategory ?? skill.id,
+                  category: buffTemplate?.buffCategory ?? skill.buffCategory ?? skill.id,
                   type: 'buff',
                   target: 'player',
-                  modifiers: skill.buffModifiers ?? [],
+                  modifiers: buffTemplate?.buffModifiers ?? skill.buffModifiers ?? [],
                   startTime: Date.now(),
-                  duration: skill.buffDuration,
+                  duration: bDuration,
                   tags: [],
                   name: skill.name,
-                  description: skill.buffEffect ?? '',
+                  description: buffTemplate?.buffEffect ?? skill.buffEffect ?? '',
                 };
                 const currentEffects = get().activeEffects;
                 const filteredEffects = currentEffects.filter(
@@ -1394,9 +1401,9 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
               e => e.type === 'buff' && e.target === 'player' && e.category === 'poison-enchant'
             );
             if (poisonBuff) {
-              const envenomSkill = state.skills.find(s => s.id === 'envenom');
-              if (envenomSkill?.onHitDebuff) {
-                const debuff = envenomSkill.onHitDebuff;
+              const envenomTemplate = getSkillTemplate('envenom');
+              const debuff = envenomTemplate?.onHitDebuff;
+              if (debuff) {
                 let dotDmg = debuff.dotDamage ?? 0;
                 if (debuff.dotDamagePercent) {
                   dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * debuff.dotDamagePercent);

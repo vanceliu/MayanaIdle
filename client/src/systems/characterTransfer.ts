@@ -2,6 +2,7 @@ import { db } from '../db/database';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../stores/gameStore';
+import { instantiateFromTemplate } from '../models/skillTemplate';
 
 const ENCRYPTION_PASSPHRASE = 'MayanaIdle-v1-8f3k2m9x';
 const SALT = new Uint8Array([77, 97, 121, 97, 110, 97, 73, 100, 108, 101, 83, 97, 108, 116, 50, 48]);
@@ -134,7 +135,9 @@ export async function importCharacterData(
   importChar.userId = existing.userId;
 
   if (importChar.skills) {
-    importChar.skills = importChar.skills.map(s => ({ ...s, lastUsedAt: 0 }));
+    importChar.skills = importChar.skills
+      .map(s => instantiateFromTemplate(s.id, 0))
+      .filter(Boolean) as typeof importChar.skills;
   }
 
   await db.characters.update(currentCharacterId, {

@@ -59,8 +59,111 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 55. 背包不可做成獨立彈窗，必須固定在右側面板
 56. 所有物品進入背包的入口都必須做容量檢查（掉落/購買/製作/取出/脫裝/獎勵）
 57. 藥水冷卻為全域共用：使用任一藥水 → 所有藥水進入該藥水的冷卻時間
-58. 背包僅透過格子數量上限（100 格）限制，負重懲罰暫不實作（負重條僅資訊顯示）
+58. 背包僅透過格子數量上限（100 格）限制，負重懲罰已實作（負重條僅資訊顯示）
 59. 背包詳細限制規格見 `35-inventory-constraints.md`
+
+---
+
+## Phase 6：DOT 系統實作（裂傷斬流血 + 淬毒附魔） ✅
+
+> 設計規格：`24-buff-debuff.md` § 24.3.2
+> 開始日期：2026-06-29
+
+### 設計決策
+
+- 流血（裂傷斬）：每秒 50% 物理傷害，快照制
+- 毒（淬毒）：每秒 30% 物理傷害，快照制
+- DOT tick 只負責扣血 + log，不處理死亡判定
+- 死亡判定統一由 playerAttackTick 處理（避免掉落出錯）
+- DOT timer 1000ms interval，戰鬥開始啟動、結束清除
+
+### Step 1：資料結構擴充 ✅
+
+- [x] `models/skill.ts` — Skill interface 新增 `applyDebuff?` 欄位（含 `dotDamagePercent`）
+- [x] `models/skill.ts` — Skill interface 新增 `onHitDebuff?` 欄位（含 `dotDamagePercent`）
+- [x] `models/classSkills.ts` — 裂傷斬加入 `applyDebuff: { category: 'bleeding', dotDamagePercent: 0.5, dotInterval: 1000, dotDuration: 5000, tags: ['bleeding'] }`
+- [x] `models/classSkills.ts` — 淬毒加入 `onHitDebuff: { category: 'poisoned', dotDamagePercent: 0.3, dotInterval: 1000, dotDuration: 5000, tags: ['poisoned'] }`
+- [x] TypeScript 編譯通過
+
+### Step 2：新增 `calculateBasePhysicalDamage` 函式 ✅
+
+- [x] `systems/combat.ts` — 新增函式，計算玩家基礎物理傷害（武器 + STR/DEX + 強化 + 詞綴，不含暴擊）
+- [x] 此函式供 DOT 快照傷害使用
+
+### Step 3：DOT Tick Timer ✅
+
+- [x] `stores/gameStore.ts` — 戰鬥開始時（spawnCombat）啟動 1000ms DOT timer
+- [x] DOT timer 邏輯：遍歷 `activeEffects` 中 `target: 'monster'` 且有 `dot` 的 debuff，對怪物扣血
+- [x] DOT timer 加入 combatTimerIds（戰鬥結束自動清除）
+- [x] **DOT tick 不處理死亡** — 只扣血，`currentHp <= 0` 的怪物由 playerAttackTick 結算
+- [x] 戰鬥日誌：`「流血 對 XX 造成 N 傷害」` / `「中毒 對 XX 造成 N 傷害」`
+
+### Step 4：裂傷斬命中 Apply Debuff ✅
+
+- [x] `stores/gameStore.ts` — playerAttackTick skill 命中後，檢查 `skill.applyDebuff`
+- [x] 計算快照傷害：`Math.floor(calculateBasePhysicalDamage(...) * dotDamagePercent)`
+- [x] 建構 `ActiveEffect`（type: debuff, target: monster, targetIdx, dot.damage = 快照值）並呼叫 `addEffect`
+- [x] `addEffect` 現有 debuff 邏輯已阻擋同 category + 同 target + 同 targetIdx 重複施加
+- [x] 戰鬥日誌：`「裂傷斬命中！目標流血 5s（每秒 N）」`
+
+### Step 5：淬毒附魔觸發 ✅
+
+- [x] `stores/gameStore.ts` — 普攻命中後，檢查玩家是否有 `poison-enchant` buff
+- [x] 若存在，從模板取得淬毒的 `onHitDebuff` 定義
+- [x] 計算快照傷害：`Math.floor(calculateBasePhysicalDamage(...) * dotDamagePercent)`
+- [x] 建構毒 debuff 並 `addEffect`（同 category + 同 targetIdx 不可重複）
+- [x] 戰鬥日誌：`「淬毒觸發！目標中毒 5s（每秒 N）」`
+
+### Step 6：怪物死亡清除 Debuff ✅
+
+- [x] playerAttackTick 中怪物死亡處理時，清除該怪物 `targetIdx` 的所有 debuff
+- [x] DOT timer 中若怪物已死（currentHp <= 0），跳過傷害
+
+### Step 7：測試
+
+- [ ] 裂傷斬 unit test：命中後 apply bleeding debuff、傷害 = 50% 物理快照、5s 後消失、期間不重複
+- [ ] 淬毒 unit test：buff 存在期間普攻 apply poisoned debuff、傷害 = 30% 物理快照、buff 消失後不觸發
+- [ ] DOT tick test：每秒正確扣血、不處理死亡、怪物已死跳過
+- [ ] TypeScript + 全測試通過
+
+---
+
+## Phase 7：技能特效定義統一從模板取（解耦存檔依賴） ✅
+
+> 問題背景：職業技能（如淬毒）特效定義存在 `state.skills` 中，若存檔序列化遺漏欄位則特效失效
+> 目標：戰鬥觸發特效時統一查模板（`SKILL_CATALOG` / `CLASS_SKILLS`），存檔只記錄 `id` + `lastUsedAt`
+> 開始日期：2026-06-29
+
+### 設計原則
+
+- 基礎魔法模板來源：`SKILL_CATALOG`（`models/skill.ts`）
+- 職業魔法模板來源：`CLASS_SKILLS`（`models/classSkills.ts`）
+- 存檔只需保留：`{ id: string, lastUsedAt: number }`
+- 任何技能數值調整或新增特效，不需要玩家重新學習或重新存檔即可生效
+
+### Step 1：建立統一技能模板查詢函式 ✅
+
+- [x] 新增 `models/skillTemplate.ts`
+- [x] `getSkillTemplate(id: string)` — 先查 `SKILL_CATALOG`，查不到再查 `CLASS_SKILLS[].skill`
+- [x] `instantiateFromTemplate(id: string, lastUsedAt: number)` — 回傳完整 Skill 物件
+
+### Step 2：重構存檔載入邏輯 ✅
+
+- [x] `gameStore.ts` loadCharacter 中的 skills 還原改為 `instantiateFromTemplate`
+- [x] 若模板查無（技能已被移除），則丟棄該技能
+- [x] `characterTransfer.ts` 匯入也改用 `instantiateFromTemplate`
+
+### Step 3：重構戰鬥中特效取用邏輯 ✅
+
+- [x] 淬毒觸發：改為 `getSkillTemplate('envenom')?.onHitDebuff` 取得 debuff 定義
+- [x] 裂傷斬觸發：改為 `getSkillTemplate(skill.id)?.applyDebuff` 取得 debuff 定義
+- [x] buff_skill 施放（常駐腳本 + 戰鬥腳本）：`buffModifiers`、`buffCategory`、`buffDuration` 等從模板取
+
+### Step 4：驗證與測試 ✅
+
+- [x] 新增 `skillTemplate.test.ts`（10 個 unit test）
+- [x] 既有測試全部通過（507 tests）
+- [x] TypeScript 編譯通過
 
 ---
 
