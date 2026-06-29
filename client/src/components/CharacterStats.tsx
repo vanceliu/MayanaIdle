@@ -20,6 +20,7 @@ export function CharacterStats() {
   const weaponSmall = weapon?.smallMonsterDamage ?? 0;
   const weaponLarge = weapon?.largeMonsterDamage ?? 0;
   const weaponEnhance = weapon?.enhancement ?? 0;
+  const weaponExtraAttack = weapon?.extraAttack ?? 0;
 
   let totalDefense = 0;
   let blockRate = 0;
@@ -86,8 +87,8 @@ export function CharacterStats() {
   const strBonus = Math.floor(effectiveSTR / 2);
   const agiBonus = Math.floor(effectiveAGI / 3);
 
-  const physicalSmall = Math.floor((weaponSmall + weaponEnhance + strBonus) * (1 + attackPower / 100));
-  const physicalLarge = Math.floor((weaponLarge + weaponEnhance + strBonus) * (1 + attackPower / 100));
+  const physicalSmall = Math.floor((weaponSmall + weaponEnhance + weaponExtraAttack + strBonus) * (1 + attackPower / 100));
+  const physicalLarge = Math.floor((weaponLarge + weaponEnhance + weaponExtraAttack + strBonus) * (1 + attackPower / 100));
 
   const damageReduction = Math.min(totalDefense, 65);
   const defOverflow = Math.max(0, totalDefense - 65);

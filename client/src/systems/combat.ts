@@ -165,10 +165,6 @@ export function getWeaponAttackSuccess(weapon: EquipmentInstance | null): number
   return baseSuccess + enhanceBonus;
 }
 
-export function getWeaponExtraAttack(weapon: EquipmentInstance | null): number {
-  if (!weapon) return 0;
-  return weapon.extraAttack ?? 0;
-}
 
 export function calculateBasePhysicalDamage(
   char: Character,
@@ -186,7 +182,7 @@ export function calculateBasePhysicalDamage(
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
 
-  let damage = Math.floor(weaponDmg) + strBonus + fireEnchantDmg;
+  let damage = Math.floor(weaponDmg) + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
 
   return Math.max(1, damage);
@@ -231,7 +227,7 @@ export function calculatePlayerAttack(
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
   const hasFireEnchantActive = rawFireEnchantDmg > 0;
   const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchantActive ? 'fire' : undefined);
-  let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
+  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -298,7 +294,7 @@ export function calculatePhysicalSkillHit(
   const strBonus = Math.floor(getEffectiveSTR(attrs.STR) / 2);
   const fireEnchantDmg = hasFireEnchant ? getFireEnchantBonus(activeEffects) : 0;
   const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchant ? 'fire' : undefined);
-  let damage = weaponDmg + strBonus + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
+  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -445,30 +441,18 @@ export function processCombatRound(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = []
 ): CombatResult {
-  const extraHits = getWeaponExtraAttack(weapon);
-  const totalHits = 1 + extraHits;
-  let totalPlayerDamage = 0;
-  let anyHit = false;
-  let anyCrit = false;
-  const logs: CombatLog[] = [];
-
-  for (let i = 0; i < totalHits; i++) {
-    const playerAtk = calculatePlayerAttack(char, weapon, monster, equippedGear, activeEffects);
-    totalPlayerDamage += playerAtk.damage;
-    if (playerAtk.hit) anyHit = true;
-    if (playerAtk.isCritical) anyCrit = true;
-    logs.push(playerAtk.log);
-  }
+  const playerAtk = calculatePlayerAttack(char, weapon, monster, equippedGear, activeEffects);
+  const logs: CombatLog[] = [playerAtk.log];
 
   const monsterAtk = calculateMonsterAttack(monster, char, equippedGear, activeEffects);
   logs.push(monsterAtk.log);
 
   return {
-    playerDamage: totalPlayerDamage,
+    playerDamage: playerAtk.damage,
     monsterDamage: monsterAtk.damage,
-    playerHit: anyHit,
+    playerHit: playerAtk.hit,
     monsterHit: monsterAtk.hit,
-    isCritical: anyCrit,
+    isCritical: playerAtk.isCritical,
     playerDodged: monsterAtk.dodged,
     logs,
   };
