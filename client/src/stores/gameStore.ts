@@ -1027,7 +1027,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           const newChar = { ...char, mp: char.mp - skill.mpCost };
           const newSkills = [...state.skills];
           newSkills[skillIdx] = { ...skill, lastUsedAt: now };
-          const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}（${template?.buffEffect ?? skill.buffEffect}）`, type: 'player' });
+          const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}`, type: 'player' });
 
           const buffDuration = template?.buffDuration ?? skill.buffDuration;
           if (buffDuration) {
@@ -1358,7 +1358,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
               logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
             } else if (skill.type === 'buff') {
               const buffTemplate = getSkillTemplate(skill.id);
-              logs.push({ text: `施放 ${skill.name}（${buffTemplate?.buffEffect ?? skill.buffEffect}）`, type: 'player' });
+              logs.push({ text: `施放 ${skill.name}`, type: 'player' });
               if (buffTemplate?.cleanse ?? skill.cleanse) {
                 const currentEffects = get().activeEffects;
                 const cleansed = currentEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));

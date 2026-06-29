@@ -192,6 +192,12 @@ export function SkillPanel() {
           {tooltip.skill.type === 'attack' && (
             <div className="skill-tooltip-stat">威力: {tooltip.skill.power}</div>
           )}
+          {tooltip.skill.description && (
+            <div className="skill-tooltip-stat">效果: {tooltip.skill.description}</div>
+          )}
+          {tooltip.skill.applyDebuff && (
+            <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {tooltip.skill.applyDebuff.dotDuration / 1000}s)</div>
+          )}
           {tooltip.skill.type === 'heal' && tooltip.skill.healAmount && (
             <div className="skill-tooltip-stat">回復: {tooltip.skill.healAmount}</div>
           )}

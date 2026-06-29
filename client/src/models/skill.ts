@@ -30,6 +30,7 @@ export interface Skill {
   lastUsedAt: number;
   aoeMin?: number;
   aoeMax?: number;
+  description?: string;
   buffEffect?: string;
   buffDuration?: number; // ms
   buffModifiers?: StatModifier[];

@@ -80,7 +80,7 @@ export function SkillsPage() {
                 <td className="cell-number">{s.healAmount || '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
                 <td className="cell-number">{(s.cooldown / 1000).toFixed(1)}</td>
-                <td>{s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || '-'}</td>
+                <td>{s.description || s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || (s.applyDebuff ? `附加${s.applyDebuff.name}(${s.applyDebuff.description}, ${s.applyDebuff.dotDuration / 1000}s)` : '') || '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -130,6 +130,7 @@ export function SkillsPage() {
                     <th>需求等級</th>
                     <th>類型</th>
                     <th>屬性</th>
+                    <th>目標</th>
                     <th>威力</th>
                     <th>治療量</th>
                     <th>MP</th>
@@ -146,6 +147,7 @@ export function SkillsPage() {
                       <td className="cell-number">{s.requiredLevel}</td>
                       <td>{TYPE_LABELS[s.skill.type]}</td>
                       <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
+                      <td>{s.skill.target === 'aoe' ? `範圍(${s.skill.aoeMin ?? '?'}~${s.skill.aoeMax ?? '?'})` : '單體'}</td>
                       <td className="cell-number">{s.skill.power || '-'}</td>
                       <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>
@@ -169,10 +171,16 @@ function getClassSkillEffect(s: ClassSkillDef): string {
   if (s.skill.requiredWeaponType) {
     parts.push(`【需${WEAPON_TYPE_LABELS[s.skill.requiredWeaponType] ?? s.skill.requiredWeaponType}】`);
   }
+  if (s.skill.description) {
+    parts.push(s.skill.description);
+  }
   if (s.skill.buffEffect) {
     parts.push(s.skill.buffEffect);
   } else if (s.skill.hits) {
     parts.push(`${s.skill.hits}連擊`);
+  }
+  if (s.skill.applyDebuff) {
+    parts.push(`附加${s.skill.applyDebuff.name}(${s.skill.applyDebuff.description}, ${s.skill.applyDebuff.dotDuration / 1000}s)`);
   }
   return parts.join(' ') || '-';
 }

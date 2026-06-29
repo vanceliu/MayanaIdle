@@ -37,7 +37,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'cd-reduce', name: '冷卻縮減', className: 'elementalist', classLevel: 1, requiredLevel: 10, bookName: '冷卻縮減技能書',
     skill: { id: 'cd-reduce', name: '冷卻縮減', level: 1, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 60000, buffEffect: '冷卻-20%', buffDuration: 30000, buffModifiers: [{ stat: 'cooldown_reduction', value: 20, isPercent: true }], buffCategory: 'cd-reduction' } },
   { id: 'mana-drain', name: '魔力奪取', className: 'elementalist', classLevel: 2, requiredLevel: 20, bookName: '魔力奪取技能書',
-    skill: { id: 'mana-drain', name: '魔力奪取', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, mpCost: 0, cooldown: 12000 } },
+    skill: { id: 'mana-drain', name: '魔力奪取', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, mpCost: 0, cooldown: 12000, description: '造成傷害並吸取等量MP' } },
   { id: 'element-boost', name: '元素增幅', className: 'elementalist', classLevel: 3, requiredLevel: 30, bookName: '元素增幅技能書',
     skill: { id: 'element-boost', name: '元素增幅', level: 3, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 35, cooldown: 60000, buffEffect: '元素傷害+25%', buffDuration: 30000, buffModifiers: [{ stat: 'skill_elemental', value: 25, isPercent: true }], buffCategory: 'element-boost' } },
   { id: 'chain-cast', name: '連鎖詠唱', className: 'elementalist', classLevel: 4, requiredLevel: 40, bookName: '連鎖詠唱技能書',
@@ -57,7 +57,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
     skill: { id: 'holy-domain', name: '神聖領域', level: 5, element: 'light', type: 'buff', target: 'aoe', power: 0, mpCost: 90, cooldown: 90000, buffEffect: '減傷30%+免疫負面', buffDuration: 10000, buffModifiers: [{ stat: 'damageReduction', value: 30, isPercent: true }], buffCategory: 'sanctuary' } },
 
   { id: 'envenom', name: '淬毒', className: 'thief', classLevel: 1, requiredLevel: 10, bookName: '淬毒技能書',
-    skill: { id: 'envenom', name: '淬毒', level: 1, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 15, cooldown: 3000, buffEffect: '毒傷30%/s', buffDuration: 300000, buffCategory: 'poison-enchant', onHitDebuff: { category: 'poisoned', name: '中毒', description: '每秒 30% 物理傷害', dotDamagePercent: 0.3, dotInterval: 1000, dotDuration: 5000, dotElement: 'none', tags: ['poisoned'] } } },
+    skill: { id: 'envenom', name: '淬毒', level: 1, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 15, cooldown: 3000, buffEffect: '普攻附毒，物理傷害30%每秒持續5s', buffDuration: 300000, buffCategory: 'poison-enchant', onHitDebuff: { category: 'poisoned', name: '中毒', description: '每秒 30% 物理傷害', dotDamagePercent: 0.3, dotInterval: 1000, dotDuration: 5000, dotElement: 'none', tags: ['poisoned'] } } },
   { id: 'deadly-strike', name: '致命一擊', className: 'thief', classLevel: 2, requiredLevel: 20, bookName: '致命一擊技能書',
     skill: { id: 'deadly-strike', name: '致命一擊', level: 2, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 25, cooldown: 30000, buffEffect: '爆傷+50%', buffDuration: 15000, buffModifiers: [{ stat: 'crit_damage', value: 50, isPercent: true }], buffCategory: 'crit-buff' } },
   { id: 'smoke-bomb', name: '煙霧彈', className: 'thief', classLevel: 3, requiredLevel: 30, bookName: '煙霧彈技能書',
