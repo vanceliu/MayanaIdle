@@ -245,7 +245,7 @@ export function TownBlacksmith() {
     return true;
   }
 
-  function handleCraft() {
+  async function handleCraft() {
     if (!selectedRecipe || !char) return;
     if (!canCraftRecipe(selectedRecipe)) return;
     if (!selectedRecipe.craftMaterials || !selectedRecipe.craftGold) return;
@@ -280,7 +280,10 @@ export function TownBlacksmith() {
       equipped: false,
     };
 
-    let newEquip: EquipmentInstance = resolveEquipment({
+    const id = char.id ? await db.equipmentInstances.add(dbRecord as any) : undefined;
+
+    const newEquip: EquipmentInstance = resolveEquipment({
+      id: id as number,
       templateId: selectedRecipe.id!,
       name: selectedRecipe.name,
       type: selectedRecipe.type,
@@ -293,12 +296,6 @@ export function TownBlacksmith() {
       ownerId: char.id!,
       equipped: false,
     });
-
-    if (char.id) {
-      db.equipmentInstances.add(dbRecord as any).then(id => {
-        newEquip.id = id as number;
-      });
-    }
 
     const newInv = [...useGameStore.getState().inventory, newEquip];
     useGameStore.setState({
