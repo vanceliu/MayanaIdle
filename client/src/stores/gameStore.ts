@@ -7,7 +7,7 @@ import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
-import { SKILL_WIND_BLADE, SKILL_CATALOG, canUseSkill } from '../models/skill';
+import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { rollEncounter, rollEncounterCount, calculatePressure } from '../systems/pressure';
 import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage } from '../systems/combat';
