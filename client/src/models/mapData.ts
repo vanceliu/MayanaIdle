@@ -20,7 +20,7 @@ export const ZONES: Zone[] = [
     faction: 'neutral',
     levelMin: 30,
     levelMax: 45,
-    regions: ['snow-field', 'ivory-tower-1f', 'ivory-tower-2f', 'ivory-tower-3f', 'ivory-tower-4f', 'ivory-tower-5f'],
+    regions: ['snow-field', 'snow-field-deep', 'ivory-tower-1f', 'ivory-tower-2f', 'ivory-tower-3f', 'ivory-tower-4f', 'ivory-tower-5f'],
     connectedZones: ['newbie-neutral'],
   },
   {
@@ -133,9 +133,19 @@ const snowField: Region = {
   name: '雪原地帶',
   type: 'field',
   levelMin: 30,
+  levelMax: 33,
+  zoneId: 'ivory-tower',
+  monsters: ['凍骨哥布林', '冰霜蜘蛛', '雪狼', '冰晶蝙蝠'],
+};
+
+const snowFieldDeep: Region = {
+  id: 'snow-field-deep',
+  name: '雪原地帶深處',
+  type: 'field',
+  levelMin: 34,
   levelMax: 35,
   zoneId: 'ivory-tower',
-  monsters: ['凍骨哥布林', '冰霜蜘蛛', '雪狼', '冰晶蝙蝠', '雪人', '雪怪'],
+  monsters: ['雪人', '雪怪', '雪地之主'],
 };
 
 const ivoryTower1f: Region = {
@@ -566,6 +576,7 @@ export const REGIONS: Region[] = [
   neutralTown,
   // 象牙塔
   snowField,
+  snowFieldDeep,
   ivoryTower1f,
   ivoryTower2f,
   ivoryTower3f,

@@ -1,7 +1,7 @@
 import { db } from './database';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate } from '../models/equipment';
-import type { DropTableEntry } from './database';
+import type { DropTableEntry, BossDropTableEntry } from './database';
 
 export const MONSTER_SEEDS: Omit<MonsterTemplate, 'id'>[] = [
   // 曙光草原 Lv.1~5
@@ -24,13 +24,16 @@ export const MONSTER_SEEDS: Omit<MonsterTemplate, 'id'>[] = [
   { name: '高地獅鷲', level: 25, hp: 160, attackMin: 18, attackMax: 28, defense: 12, exp: 280, race: 'normal', size: 'large', element: 'wind', area: 'trial-highlands', isBoss: false },
   { name: '山賊', level: 27, hp: 175, attackMin: 20, attackMax: 30, defense: 13, exp: 330, race: 'normal', size: 'small', element: 'none', area: 'trial-highlands', isBoss: false },
   { name: '岩石巨人', level: 30, hp: 200, attackMin: 22, attackMax: 32, defense: 14, exp: 400, race: 'normal', size: 'large', element: 'earth', area: 'trial-highlands', isBoss: false },
-  // 雪原地帶 Lv.30~35
+  // 雪原地帶 Lv.30~33
   { name: '凍骨哥布林', level: 30, hp: 210, attackMin: 22, attackMax: 32, defense: 14, exp: 420, race: 'normal', size: 'small', element: 'ice', area: 'snow-field', isBoss: false },
   { name: '冰霜蜘蛛', level: 31, hp: 220, attackMin: 23, attackMax: 33, defense: 15, exp: 450, race: 'normal', size: 'small', element: 'ice', area: 'snow-field', isBoss: false },
   { name: '雪狼', level: 32, hp: 235, attackMin: 24, attackMax: 34, defense: 15, exp: 480, race: 'normal', size: 'small', element: 'ice', area: 'snow-field', isBoss: false },
   { name: '冰晶蝙蝠', level: 33, hp: 250, attackMin: 25, attackMax: 36, defense: 16, exp: 510, race: 'normal', size: 'small', element: 'ice', area: 'snow-field', isBoss: false },
-  { name: '雪人', level: 34, hp: 270, attackMin: 27, attackMax: 38, defense: 17, exp: 550, race: 'normal', size: 'large', element: 'ice', area: 'snow-field', isBoss: false },
-  { name: '雪怪', level: 35, hp: 290, attackMin: 28, attackMax: 40, defense: 18, exp: 580, race: 'normal', size: 'large', element: 'ice', area: 'snow-field', isBoss: false },
+
+  // 雪原地帶深處 Lv.34~35
+  { name: '雪人', level: 34, hp: 270, attackMin: 27, attackMax: 38, defense: 17, exp: 550, race: 'normal', size: 'large', element: 'ice', area: 'snow-field-deep', isBoss: false },
+  { name: '雪怪', level: 35, hp: 290, attackMin: 28, attackMax: 40, defense: 18, exp: 580, race: 'normal', size: 'large', element: 'ice', area: 'snow-field-deep', isBoss: false },
+  { name: '雪地之主', level: 35, hp: 1500, attackMin: 35, attackMax: 48, defense: 22, exp: 3000, race: 'normal', size: 'large', element: 'ice', area: 'snow-field-deep', isBoss: true },
   // 妖魔森林 Lv.30~40
   { name: '高等妖魔', level: 32, hp: 240, attackMin: 24, attackMax: 35, defense: 15, exp: 490, race: 'demon', size: 'small', element: 'dark', area: 'demon-forest', isBoss: false },
   { name: '高等妖魔鬥士', level: 35, hp: 300, attackMin: 28, attackMax: 42, defense: 18, exp: 600, race: 'demon', size: 'small', element: 'dark', area: 'demon-forest', isBoss: false },
@@ -524,7 +527,7 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'trial-highlands', itemName: '鐵盾', itemType: 'equipment', dropValue: 15 },
   { area: 'trial-highlands', itemName: '鎖子甲', itemType: 'equipment', dropValue: 10 },
   { area: 'trial-highlands', itemName: '紅色藥水', itemType: 'potion', dropValue: 100, minAmount: 1, maxAmount: 3 },
-  // 雪原地帶 Lv.30~35
+  // 雪原地帶 Lv.30~33
   { area: 'snow-field', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 150 },
   { area: 'snow-field', itemName: '品質石', itemType: 'material', dropValue: 50 },
   { area: 'snow-field', itemName: '強化石', itemType: 'material', dropValue: 50 },
@@ -532,6 +535,14 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'snow-field', itemName: '魔法書碎片', itemType: 'material', dropValue: 50 },
   { area: 'snow-field', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 10 },
   { area: 'snow-field', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 10 },
+  // 雪原地帶深處 Lv.34~35
+  { area: 'snow-field-deep', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 180 },
+  { area: 'snow-field-deep', itemName: '品質石', itemType: 'material', dropValue: 50 },
+  { area: 'snow-field-deep', itemName: '強化石', itemType: 'material', dropValue: 50 },
+  { area: 'snow-field-deep', itemName: '橙色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 2 },
+  { area: 'snow-field-deep', itemName: '魔法書碎片', itemType: 'material', dropValue: 80 },
+  { area: 'snow-field-deep', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 10 },
+  { area: 'snow-field-deep', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 10 },
   // 妖魔森林 Lv.30~40
   { area: 'demon-forest', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 200 },
   { area: 'demon-forest', itemName: '品質石', itemType: 'material', dropValue: 50 },
@@ -1010,6 +1021,153 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'ivory-tower-5f', itemName: '強化綠色藥水', itemType: 'potion', dropValue: 20, minAmount: 1, maxAmount: 1 },
 ];
 
+export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
+  // 雪地之主（雪原地帶深處，Lv.35）
+  { bossName: '雪地之主', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 300 },
+  { bossName: '雪地之主', itemName: '魔法書碎片', itemType: 'material', dropValue: 150, minAmount: 1, maxAmount: 2 },
+  { bossName: '雪地之主', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '雪地之主', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '雪地之主', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '雪地之主', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+
+  // 象牙塔惡魔（象牙塔 5F，Lv.45）
+  { bossName: '象牙塔惡魔', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '象牙塔惡魔', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '象牙塔惡魔', itemName: '魔法書材料（稀有）', itemType: 'material', dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { bossName: '象牙塔惡魔', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '象牙塔惡魔', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '象牙塔惡魔', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '象牙塔惡魔', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 朦朧蛇魔（朦朧洞窟 3F，Lv.50）
+  { bossName: '朦朧蛇魔', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '朦朧蛇魔', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '朦朧蛇魔', itemName: '銀精華', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '朦朧蛇魔', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '朦朧蛇魔', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '朦朧蛇魔', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '朦朧蛇魔', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 深海獄王（水下監獄 4F，Lv.50）
+  { bossName: '深海獄王', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '深海獄王', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '深海獄王', itemName: '銀精華', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '深海獄王', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '深海獄王', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '深海獄王', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '深海獄王', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 安塔巨龍（龍谷地間 7F，Lv.50）
+  { bossName: '安塔巨龍', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 660, maxAmount: 660 },
+  { bossName: '安塔巨龍', itemName: '龍骨碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '安塔巨龍', itemName: '龍心結晶', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
+  { bossName: '安塔巨龍', itemName: '品質石', itemType: 'material', dropValue: 60, minAmount: 1, maxAmount: 1 },
+  { bossName: '安塔巨龍', itemName: '強化石', itemType: 'material', dropValue: 60, minAmount: 1, maxAmount: 1 },
+  { bossName: '安塔巨龍', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '安塔巨龍', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+
+  // 遠古騎士（遠古地監 9F，Lv.60）
+  { bossName: '遠古騎士', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 900, maxAmount: 900 },
+  { bossName: '遠古騎士', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '遠古騎士', itemName: '米索利礦石', itemType: 'material', dropValue: 80, minAmount: 1, maxAmount: 1 },
+  { bossName: '遠古騎士', itemName: '品質石', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
+  { bossName: '遠古騎士', itemName: '強化石', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
+  { bossName: '遠古騎士', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '遠古騎士', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+
+  // 百柱塔樓層王
+  // 毒之皇女（1-10F）
+  { bossName: '毒之皇女', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '毒之皇女', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '毒之皇女', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '毒之皇女', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '毒之皇女', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '毒之皇女', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '毒之皇女', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 哥布林之王（11-20F）
+  { bossName: '哥布林之王', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '哥布林之王', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '哥布林之王', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '哥布林之王', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '哥布林之王', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '哥布林之王', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '哥布林之王', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 暗影吸血鬼（21-30F）
+  { bossName: '暗影吸血鬼', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '暗影吸血鬼', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '暗影吸血鬼', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '暗影吸血鬼', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '暗影吸血鬼', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '暗影吸血鬼', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '暗影吸血鬼', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 不死殭屍王（31-40F）
+  { bossName: '不死殭屍王', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '不死殭屍王', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '不死殭屍王', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '不死殭屍王', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '不死殭屍王', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '不死殭屍王', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '不死殭屍王', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 龍王約特勒（41-50F）
+  { bossName: '龍王約特勒', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '龍王約特勒', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '龍王約特勒', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '龍王約特勒', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '龍王約特勒', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '龍王約特勒', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '龍王約特勒', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 冥王哈馬斯（51-60F）
+  { bossName: '冥王哈馬斯', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '冥王哈馬斯', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '冥王哈馬斯', itemName: '米索利礦石', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '冥王哈馬斯', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '冥王哈馬斯', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '冥王哈馬斯', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '冥王哈馬斯', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 霜凍伊莉絲（61-70F）
+  { bossName: '霜凍伊莉絲', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '霜凍伊莉絲', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '霜凍伊莉絲', itemName: '米索利礦石', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '霜凍伊莉絲', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '霜凍伊莉絲', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '霜凍伊莉絲', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '霜凍伊莉絲', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 熔岩伊弗利特（71-80F）
+  { bossName: '熔岩伊弗利特', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '熔岩伊弗利特', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '熔岩伊弗利特', itemName: '米索利礦石', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '熔岩伊弗利特', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '熔岩伊弗利特', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '熔岩伊弗利特', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '熔岩伊弗利特', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 守護者之主（81-90F）
+  { bossName: '守護者之主', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '守護者之主', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '守護者之主', itemName: '奧里哈魯根碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '守護者之主', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '守護者之主', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '守護者之主', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '守護者之主', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // 百柱死神（91-100F）
+  { bossName: '百柱死神', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+  { bossName: '百柱死神', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '百柱死神', itemName: '奧里哈魯根碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
+  { bossName: '百柱死神', itemName: '奧里哈魯根精華', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
+  { bossName: '百柱死神', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '百柱死神', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '百柱死神', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '百柱死神', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+];
+
 let seedPromise: Promise<void> | null = null;
 
 export function seedDatabase(): Promise<void> {
@@ -1033,6 +1191,10 @@ async function performSeed(): Promise<void> {
     // Rebuild dropTables to fix legacy duplication
     await db.dropTables.clear();
     await db.dropTables.bulkAdd(DROP_TABLE_SEEDS as any);
+
+    // Rebuild bossDropTables
+    await db.bossDropTables.clear();
+    await db.bossDropTables.bulkAdd(BOSS_DROP_TABLE_SEEDS as any);
 
     // Sync equipment templates: update existing, add missing
     const existingTemplates = await db.equipmentTemplates.toArray();
@@ -1122,4 +1284,5 @@ async function performSeed(): Promise<void> {
   await db.monsterTemplates.bulkAdd(MONSTER_SEEDS as any);
   await db.equipmentTemplates.bulkAdd(EQUIPMENT_SEEDS as any);
   await db.dropTables.bulkAdd(DROP_TABLE_SEEDS as any);
+  await db.bossDropTables.bulkAdd(BOSS_DROP_TABLE_SEEDS as any);
 }

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useZones, useRegions, useMonstersByArea, useDropTableByArea, getDropRate } from '../hooks/useWikiData';
+import { useZones, useRegions, useMonstersByArea } from '../hooks/useWikiData';
 import { MONSTER_SEEDS } from '../../db/seed';
 import { Link, useParams } from 'react-router-dom';
 import type { Floor } from '../../models/area';
@@ -7,10 +7,6 @@ import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
   fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
-};
-
-const ITEM_TYPE_LABELS: Record<string, string> = {
-  gold: '金幣', equipment: '裝備', material: '材料', potion: '藥水', scroll: '卷軸', spellbook: '魔法書',
 };
 
 export function MapsPage() {
@@ -161,7 +157,6 @@ function AreaDetail({ areaId }: { areaId: string }) {
 function FloorSection({ regionId, regionName, floor }: { regionId: string; regionName: string; floor: Floor }) {
   const floorAreaId = `${regionId}-${floor.floor}f`;
   const monsters = useMonstersByArea(floorAreaId);
-  const drops = useDropTableByArea(floorAreaId);
 
   return (
     <div style={{ marginBottom: 32 }}>
@@ -173,7 +168,7 @@ function FloorSection({ regionId, regionName, floor }: { regionId: string; regio
         </span>
       </h3>
 
-      {monsters.length > 0 && (
+      {monsters.length > 0 ? (
         <div className="wiki-table-wrap" style={{ marginBottom: 12 }}>
           <table className="wiki-table">
             <thead>
@@ -208,43 +203,7 @@ function FloorSection({ regionId, regionName, floor }: { regionId: string; regio
             </tbody>
           </table>
         </div>
-      )}
-
-      {drops.length > 0 && (
-        <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead>
-              <tr>
-                <th>掉落物品</th>
-                <th>類型</th>
-                <th>掉落機率</th>
-                <th>數量</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drops.map((d, i) => {
-                const isEquip = d.itemType === 'equipment';
-                return (
-                  <tr key={`${d.itemName}-${i}`}>
-                    <td>
-                      {isEquip ? (
-                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
-                          {d.itemName}
-                        </Link>
-                      ) : d.itemName}
-                    </td>
-                    <td>{ITEM_TYPE_LABELS[d.itemType] || d.itemType}</td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
-                    <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {monsters.length === 0 && drops.length === 0 && (
+      ) : (
         <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>此樓層無資料</p>
       )}
     </div>
@@ -253,7 +212,6 @@ function FloorSection({ regionId, regionName, floor }: { regionId: string; regio
 
 function SingleAreaContent({ areaId }: { areaId: string }) {
   const monsters = useMonstersByArea(areaId);
-  const drops = useDropTableByArea(areaId);
 
   return (
     <>
@@ -299,45 +257,6 @@ function SingleAreaContent({ areaId }: { areaId: string }) {
         </>
       ) : (
         <p className="wiki-empty">此區域無怪物資料</p>
-      )}
-
-      <h3 style={{ color: 'var(--text-primary)', margin: '24px 0 8px', fontFamily: 'var(--font-display)' }}>
-        區域掉落
-      </h3>
-      {drops.length > 0 ? (
-        <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead>
-              <tr>
-                <th>物品</th>
-                <th>類型</th>
-                <th>掉落機率</th>
-                <th>數量</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drops.map((d, i) => {
-                const isEquip = d.itemType === 'equipment';
-                return (
-                  <tr key={`${d.itemName}-${i}`}>
-                    <td>
-                      {isEquip ? (
-                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
-                          {d.itemName}
-                        </Link>
-                      ) : d.itemName}
-                    </td>
-                    <td>{ITEM_TYPE_LABELS[d.itemType] || d.itemType}</td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
-                    <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="wiki-empty">無掉落資料</p>
       )}
     </>
   );

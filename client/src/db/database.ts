@@ -26,6 +26,16 @@ export interface DropTableEntry {
   maxAmount?: number;
 }
 
+export interface BossDropTableEntry {
+  id?: number;
+  bossName: string;
+  itemName: string;
+  itemType: 'gold' | 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook';
+  dropValue: number;
+  minAmount?: number;
+  maxAmount?: number;
+}
+
 export interface CharacterBagEntry {
   id?: number;
   characterId: number;
@@ -48,6 +58,7 @@ export class GameDB extends Dexie {
   equipmentTemplates!: Table<EquipmentTemplate>;
   equipmentInstances!: Table<EquipmentInstance>;
   dropTables!: Table<DropTableEntry>;
+  bossDropTables!: Table<BossDropTableEntry>;
   characterBag!: Table<CharacterBagEntry>;
   characterStorage!: Table<CharacterStorageEntry>;
   users!: Table<UserEntry>;
@@ -103,6 +114,9 @@ export class GameDB extends Dexie {
           if (instance.magicAttack == null) instance.magicAttack = tmpl.magicAttack;
         }
       });
+    });
+    this.version(6).stores({
+      bossDropTables: '++id, bossName, itemType',
     });
   }
 }

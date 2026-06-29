@@ -30,6 +30,70 @@ export interface DropBonuses {
 
 export const DROP_ROLL_MAX = 1000;
 
+export async function rollBossDrops(bossName: string, ownerId: number, areaLevel: number, bonuses?: DropBonuses): Promise<DropResult> {
+  const entries = await db.bossDropTables.where('bossName').equals(bossName).toArray();
+  let gold = 0;
+  const items: DroppedItem[] = [];
+  const dropRateMultiplier = 1 + (bonuses?.drop_rate ?? 0) / 100;
+  const goldRateMultiplier = 1 + (bonuses?.gold_rate ?? 0) / 100;
+
+  for (const entry of entries) {
+    const roll = Math.random() * DROP_ROLL_MAX;
+    const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
+    if (roll >= boostedDropValue) continue;
+
+    if (entry.itemType === 'gold') {
+      const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
+      gold += Math.floor(baseGold * goldRateMultiplier);
+    } else if (entry.itemType === 'equipment') {
+      const template = await db.equipmentTemplates.where('name').equals(entry.itemName).first();
+      if (template) {
+        const isWeapon = isWeaponSlot(template.slot);
+        const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
+        const affixes = generateAffixes(affixCategory, areaLevel, 4, true);
+        const dbRecord: Record<string, unknown> = {
+          templateId: template.id!,
+          slot: template.slot,
+          quality: 0,
+          enhancement: 0,
+          affixes,
+          ownerId,
+          equipped: false,
+        };
+        const id = await db.equipmentInstances.add(dbRecord as any);
+        const instance: EquipmentInstance = resolveEquipment({
+          id: id as number,
+          templateId: template.id!,
+          name: template.name,
+          type: template.type,
+          slot: template.slot,
+          isTwoHanded: template.isTwoHanded,
+          quality: 0,
+          enhancement: 0,
+          affixes,
+          ownerId,
+          equipped: false,
+        });
+        items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
+      }
+    } else {
+      items.push({
+        name: entry.itemName,
+        type: entry.itemType as DroppedItem['type'],
+        amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
+      });
+    }
+  }
+
+  // Class skill book drop (boss 5%)
+  const skillBookDrop = rollClassSkillBookDrop(areaLevel, true);
+  if (skillBookDrop) {
+    items.push({ name: skillBookDrop, type: 'spellbook', amount: 1 });
+  }
+
+  return { gold, items };
+}
+
 export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropBonuses, isBoss: boolean = false, monsterLevel?: number): Promise<DropResult> {
   const entries = await db.dropTables.where('area').equals(areaId).toArray();
   const region = getRegion(areaId);

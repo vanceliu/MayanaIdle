@@ -11,7 +11,7 @@ import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { rollEncounter, rollEncounterCount, calculatePressure } from '../systems/pressure';
 import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage } from '../systems/combat';
-import { rollDrops } from '../systems/drops';
+import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
@@ -1205,23 +1205,47 @@ async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) =>
   }
 
   const spawned: MonsterInstance[] = [];
+  const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
+  let bossSpawned = false;
   for (let i = 0; i < count; i++) {
     const template = areaMonsters[Math.floor(Math.random() * areaMonsters.length)];
-    spawned.push({
-      templateId: template.id!,
-      name: template.name,
-      level: template.level,
-      currentHp: template.hp,
-      maxHp: template.hp,
-      attackMin: template.attackMin,
-      attackMax: template.attackMax,
-      defense: template.defense,
-      exp: template.exp,
-      race: template.race,
-      size: template.size,
-      element: template.element,
-      isBoss: template.isBoss,
-    });
+    if (template.isBoss && bossSpawned) {
+      const fallback = nonBossMonsters.length > 0
+        ? nonBossMonsters[Math.floor(Math.random() * nonBossMonsters.length)]
+        : template;
+      spawned.push({
+        templateId: fallback.id!,
+        name: fallback.name,
+        level: fallback.level,
+        currentHp: fallback.hp,
+        maxHp: fallback.hp,
+        attackMin: fallback.attackMin,
+        attackMax: fallback.attackMax,
+        defense: fallback.defense,
+        exp: fallback.exp,
+        race: fallback.race,
+        size: fallback.size,
+        element: fallback.element,
+        isBoss: fallback.isBoss,
+      });
+    } else {
+      if (template.isBoss) bossSpawned = true;
+      spawned.push({
+        templateId: template.id!,
+        name: template.name,
+        level: template.level,
+        currentHp: template.hp,
+        maxHp: template.hp,
+        attackMin: template.attackMin,
+        attackMax: template.attackMax,
+        defense: template.defense,
+        exp: template.exp,
+        race: template.race,
+        size: template.size,
+        element: template.element,
+        isBoss: template.isBoss,
+      });
+    }
   }
 
   const existingLogs = get().combatLogs;
@@ -1485,7 +1509,10 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
         const dropAreaId = dropHasFloors && char.currentFloor != null
           ? `${char.currentRegion}-${char.currentFloor}f`
           : char.currentArea;
-        const drops = await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, monsterIsBoss, dead.level);
+        const areaLevel = dropRegion?.levelMax ?? dead.level;
+        const drops = monsterIsBoss
+          ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
+          : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);
         const state2 = get();
         if (!state2.character) return;
         let char2 = { ...state2.character };

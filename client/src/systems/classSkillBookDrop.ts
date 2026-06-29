@@ -45,7 +45,7 @@ export const SKILL_BOOK_NORMAL_DROP_RATE = 0.0005;
 export function getSkillBookLevel(areaLevel: number): number | null {
   if (areaLevel >= 46) return 5;
   if (areaLevel >= 43) return 4;
-  if (areaLevel >= 40) return 3;
+  if (areaLevel >= 35) return 3;
   return null;
 }
 

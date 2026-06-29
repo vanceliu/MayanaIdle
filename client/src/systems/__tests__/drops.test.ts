@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { rollDrops } from '../drops';
+import { rollDrops, rollBossDrops } from '../drops';
 import { REGIONS } from '../../models/mapData';
 
 vi.mock('../../db/database', () => ({
   db: {
     dropTables: {
+      where: vi.fn().mockReturnThis(),
+      equals: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([]),
+    },
+    bossDropTables: {
       where: vi.fn().mockReturnThis(),
       equals: vi.fn().mockReturnThis(),
       toArray: vi.fn().mockResolvedValue([]),
@@ -160,5 +165,111 @@ describe('drops system', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+});
+
+describe('rollBossDrops', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return empty result when no boss drop entries', async () => {
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([]),
+      }),
+    } as any);
+
+    const result = await rollBossDrops('象牙塔惡魔', 1, 45);
+
+    expect(result.gold).toBe(0);
+    expect(result.items).toHaveLength(0);
+  });
+
+  it('should drop gold from boss drop table', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { bossName: '象牙塔惡魔', itemType: 'gold', itemName: '金幣', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+        ]),
+      }),
+    } as any);
+
+    const result = await rollBossDrops('象牙塔惡魔', 1, 45);
+
+    expect(result.gold).toBe(500);
+  });
+
+  it('should apply gold_rate bonus to boss gold drops', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { bossName: '象牙塔惡魔', itemType: 'gold', itemName: '金幣', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+        ]),
+      }),
+    } as any);
+
+    const result = await rollBossDrops('象牙塔惡魔', 1, 45, { drop_rate: 0, gold_rate: 50 });
+
+    expect(result.gold).toBe(750);
+  });
+
+  it('should drop materials from boss drop table', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { bossName: '朦朧蛇魔', itemType: 'material', itemName: '銀精華', dropValue: 100, minAmount: 1, maxAmount: 1 },
+        ]),
+      }),
+    } as any);
+
+    const result = await rollBossDrops('朦朧蛇魔', 1, 50);
+
+    const materialItem = result.items.find(i => i.type === 'material');
+    expect(materialItem).toBeDefined();
+    expect(materialItem!.name).toBe('銀精華');
+  });
+
+  it('should apply drop_rate bonus to boss drops', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.08);
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { bossName: '遠古騎士', itemType: 'material', itemName: '米索利碎片', dropValue: 80, minAmount: 1, maxAmount: 1 },
+        ]),
+      }),
+    } as any);
+
+    // Without bonus: roll=80, dropValue=80 → 80 >= 80 → no drop
+    const resultNoBonus = await rollBossDrops('遠古騎士', 1, 60);
+    expect(resultNoBonus.items).toHaveLength(0);
+
+    // With bonus: dropValue boosted to 80*1.5=120 → 80 < 120 → drop
+    vi.spyOn(Math, 'random').mockReturnValue(0.08);
+    const resultWithBonus = await rollBossDrops('遠古騎士', 1, 60, { drop_rate: 50, gold_rate: 0 });
+    expect(resultWithBonus.items).toHaveLength(1);
+    expect(resultWithBonus.items[0].name).toBe('米索利碎片');
+  });
+
+  it('should not drop when roll exceeds boss drop value', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { bossName: '安塔巨龍', itemType: 'material', itemName: '龍心結晶', dropValue: 70, minAmount: 1, maxAmount: 1 },
+        ]),
+      }),
+    } as any);
+
+    const result = await rollBossDrops('安塔巨龍', 1, 50);
+
+    expect(result.items).toHaveLength(0);
   });
 });

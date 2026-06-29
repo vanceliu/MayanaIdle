@@ -338,6 +338,42 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 ---
 
+## Boss 專屬掉落池實作（Boss Drop Table）
+
+> 目標：Boss 擊殺時使用獨立的 bossDropTable，不走一般區域掉落池。
+> 設計文件：`27-drop-table.md` § 27.6
+
+### Phase 1：資料庫與資料結構
+
+- [ ] 在 `database.ts` 新增 `BossDropTableEntry` interface（bossName, itemName, itemType, dropValue, minAmount, maxAmount）
+- [ ] 在 `GameDB` 新增 `bossDropTables` table
+- [ ] 新增 DB version 6，建立 `bossDropTables` store（索引：`++id, bossName, itemType`）
+
+### Phase 2：Seed 資料
+
+- [ ] 在 `seed.ts` 新增所有 Boss 的專屬掉落表資料（依 `27-drop-table.md` § 27.6）
+- [ ] 涵蓋：象牙塔惡魔、朦朧蛇魔、深海獄王、安塔巨龍、遠古騎士、百柱塔各樓層王
+
+### Phase 3：掉落邏輯
+
+- [ ] 在 `drops.ts` 新增 `rollBossDrops(bossName, ownerId, bonuses, monsterLevel)` 函式
+- [ ] 邏輯：查詢 `bossDropTables` by bossName → 獨立 roll 每個 entry → 生成裝備/素材/金幣
+- [ ] 金幣 100% 掉落，`drop_rate` 詞綴加成生效
+- [ ] 職業技能書掉落保留（5% 機率，依區域等級分池）
+
+### Phase 4：整合 gameStore
+
+- [ ] 修改 `gameStore.ts` 中怪物死亡掉落邏輯：若 `dead.isBoss === true` → 呼叫 `rollBossDrops` 而非 `rollDrops`
+- [ ] 確保 boss 掉落結果正確合併至 combatLogs 與背包
+
+### Phase 5：驗證
+
+- [ ] TypeScript 編譯通過
+- [ ] 新增 unit test 驗證 `rollBossDrops` 邏輯
+- [ ] 確認一般怪物仍走 `rollDrops`，boss 走 `rollBossDrops`
+
+---
+
 ## 裝備模板同步機制（Template Sync）
 
 > 目標：裝備基礎素質從模板（seed）即時讀取，DB 實例只儲存差異化數據。  

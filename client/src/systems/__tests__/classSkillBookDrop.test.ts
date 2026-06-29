@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { rollClassSkillBookDrop } from '../classSkillBookDrop';
 
 describe('classSkillBookDrop', () => {
-  it('returns null for areas below level 40', () => {
+  it('returns null for areas below level 35', () => {
     for (let i = 0; i < 100; i++) {
-      expect(rollClassSkillBookDrop(39, false)).toBeNull();
+      expect(rollClassSkillBookDrop(34, false)).toBeNull();
     }
   });
 
-  it('can drop level 3 book in Lv40~42 area', () => {
+  it('can drop level 3 book in Lv35~42 area', () => {
     const level3Books = [
       '鋼鐵護盾技能書', '三連射技能書', '元素增幅技能書', '群體治癒技能書', '煙霧彈技能書',
     ];

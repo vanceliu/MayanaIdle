@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { ITEM_DEFINITIONS } from '../../models/items';
 import { useDropSourceForItem, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
-import { DROP_TABLE_SEEDS } from '../../db/seed';
+import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db/seed';
+import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevel } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import '../components/WikiTable.css';
 
@@ -86,8 +87,44 @@ function ItemList() {
 function ItemDetail({ name }: { name: string }) {
   const item = ITEM_DEFINITIONS.find(i => i.name === name);
   const dropSources = useDropSourceForItem(name);
+  const bossDropSources = useMemo(() => BOSS_DROP_TABLE_SEEDS.filter(d => d.itemName === name), [name]);
+
+  const skillBookEntry = useMemo(() => ALL_CLASS_SKILL_BOOKS.find(b => b.name === name), [name]);
 
   const regions = useRegions();
+
+  const skillBookDropSources = useMemo(() => {
+    if (!skillBookEntry) return [];
+    const bookLevel = skillBookEntry.level;
+    const sources: { label: string; area: string; rate: string }[] = [];
+    const matchedAreas = new Set<string>();
+
+    // 找出所有對應等級的區域
+    for (const region of regions) {
+      if (region.type === 'town') continue;
+      if (region.floors && region.floors.length > 0) {
+        for (const floor of region.floors) {
+          if (getSkillBookLevel(floor.levelMax) === bookLevel) {
+            const areaId = `${region.id}-${floor.floor}f`;
+            matchedAreas.add(areaId);
+            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: '0.05%' });
+          }
+        }
+      } else if (getSkillBookLevel(region.levelMax) === bookLevel) {
+        matchedAreas.add(region.id);
+        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: '0.05%' });
+      }
+    }
+
+    // 那些區域中的 Boss → 5%
+    const bossMonsters = MONSTER_SEEDS.filter(m => m.isBoss && matchedAreas.has(m.area));
+    for (const boss of bossMonsters) {
+      sources.push({ label: `${boss.name}（Boss）`, area: boss.area, rate: '5.0%' });
+    }
+
+    return sources;
+  }, [skillBookEntry, regions]);
+
   const nonTownAreas = useMemo(() => {
     const townIds = new Set(regions.filter(r => r.type === 'town').map(r => r.id));
     return new Set([...new Set(DROP_TABLE_SEEDS.map(d => d.area))].filter(a => !townIds.has(a)));
@@ -171,7 +208,66 @@ function ItemDetail({ name }: { name: string }) {
           </div>
         </>
       ) : (
-        !item.buyPrice && <p style={{ color: 'var(--text-dim)' }}>無掉落資料（可能為任務獎勵或特殊取得）</p>
+        !item.buyPrice && skillBookDropSources.length === 0 && bossDropSources.length === 0 && <p style={{ color: 'var(--text-dim)' }}>無掉落資料（可能為任務獎勵或特殊取得）</p>
+      )}
+
+      {skillBookDropSources.length > 0 && (
+        <>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>怪物掉落：</p>
+          <div className="wiki-table-wrap">
+            <table className="wiki-table">
+              <thead>
+                <tr>
+                  <th>區域</th>
+                  <th>掉落機率</th>
+                  <th>數量</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skillBookDropSources.map((s, i) => (
+                  <tr key={`skill-${i}`}>
+                    <td>
+                      <Link className="wiki-link" to={`/wiki/maps/${s.area}`}>
+                        {s.label}
+                      </Link>
+                    </td>
+                    <td className="cell-number">{s.rate}</td>
+                    <td className="cell-number">1</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-xs)', marginTop: 4 }}>
+            不區分職業，25 本共同池隨機
+          </p>
+        </>
+      )}
+
+      {bossDropSources.length > 0 && (
+        <>
+          <p style={{ color: 'var(--text-secondary)', marginTop: 12, marginBottom: 8 }}>Boss 掉落：</p>
+          <div className="wiki-table-wrap">
+            <table className="wiki-table">
+              <thead>
+                <tr>
+                  <th>Boss</th>
+                  <th>掉落機率</th>
+                  <th>數量</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bossDropSources.map((d, i) => (
+                  <tr key={`boss-${d.bossName}-${i}`}>
+                    <td>{d.bossName}</td>
+                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '1'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
