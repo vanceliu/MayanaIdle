@@ -23,7 +23,7 @@ export function isTemplateCacheReady(): boolean {
 }
 
 const TEMPLATE_FIELDS = [
-  'name', 'type', 'slot', 'isTwoHanded',
+  'name', 'type', 'isTwoHanded',
   'smallMonsterDamage', 'largeMonsterDamage', 'defense',
   'attackSuccess', 'extraAttack', 'magicAttack',
   'bonusHp', 'bonusMp', 'hpRegen', 'mpRegen',
@@ -38,6 +38,9 @@ export function resolveEquipment(instance: EquipmentInstance): EquipmentInstance
   const resolved = { ...instance };
   for (const field of TEMPLATE_FIELDS) {
     (resolved as any)[field] = (template as any)[field];
+  }
+  if (!resolved.slot) {
+    resolved.slot = template.slot;
   }
   return resolved;
 }

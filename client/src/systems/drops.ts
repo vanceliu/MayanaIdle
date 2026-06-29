@@ -63,6 +63,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
         const affixes = generateAffixes(affixCategory, areaLevel, 4, isBoss);
         const dbRecord: Record<string, unknown> = {
           templateId: template.id!,
+          slot: template.slot,
           quality: 0,
           enhancement: 0,
           affixes,

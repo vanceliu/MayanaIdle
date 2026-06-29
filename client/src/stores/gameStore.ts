@@ -429,7 +429,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     let weapon: EquipmentInstance | null = null;
     if (template) {
       const dbRecord = {
-        templateId: template.id!, quality: 0, enhancement: 0, affixes: [] as any[],
+        templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [] as any[],
         ownerId: char.id!, equipped: true,
       };
       const instId = await db.equipmentInstances.add(dbRecord as any);
@@ -445,7 +445,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     let armor: EquipmentInstance | null = null;
     if (armorTemplate) {
       const dbRecord = {
-        templateId: armorTemplate.id!, quality: 0, enhancement: 0, affixes: [] as any[],
+        templateId: armorTemplate.id!, slot: armorTemplate.slot, quality: 0, enhancement: 0, affixes: [] as any[],
         ownerId: char.id!, equipped: true,
       };
       const instId = await db.equipmentInstances.add(dbRecord as any);

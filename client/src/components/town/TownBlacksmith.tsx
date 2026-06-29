@@ -272,6 +272,7 @@ export function TownBlacksmith() {
 
     const dbRecord = {
       templateId: selectedRecipe.id!,
+      slot: selectedRecipe.slot,
       quality: 0,
       enhancement: 0,
       stability: selectedRecipe.stability ?? (isWeaponSlot(selectedRecipe.slot) ? 6 : 4),

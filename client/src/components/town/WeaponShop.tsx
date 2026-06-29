@@ -47,6 +47,7 @@ export function WeaponShop() {
 
     const dbRecord = {
       templateId: template.id!,
+      slot: template.slot,
       quality: 0,
       enhancement: 0,
       affixes: [] as any[],
@@ -75,8 +76,15 @@ export function WeaponShop() {
     useGameStore.getState().saveState();
   }
 
+  function getSellPrice(item: EquipmentInstance): number {
+    const template = templates.find(t => t.id === item.templateId);
+    if (template?.buyPrice) return Math.floor(template.buyPrice * 0.5);
+    return Math.floor((item.smallMonsterDamage ?? 0) * 500 * 0.5);
+  }
+
   function sellEquipment(item: EquipmentInstance) {
-    const sellPrice = Math.floor((item.smallMonsterDamage ?? 1) * 500 * 0.5);
+    const sellPrice = getSellPrice(item);
+    if (sellPrice <= 0) return;
     const inv = useGameStore.getState().inventory;
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: useGameStore.getState().character!.gold + sellPrice },
@@ -86,7 +94,7 @@ export function WeaponShop() {
     useGameStore.getState().saveState();
   }
 
-  const weaponsInBag = inventory.filter(i => !!i.smallMonsterDamage);
+  const weaponsInBag = inventory.filter(i => !!i.smallMonsterDamage && getSellPrice(i) > 0);
 
   return (
     <div className="shop-panel">
@@ -139,7 +147,7 @@ export function WeaponShop() {
         <div className="shop-items">
           {weaponsInBag.length === 0 && <p className="empty-text">沒有可出售的武器</p>}
           {weaponsInBag.map(item => {
-            const sellPrice = Math.floor((item.smallMonsterDamage ?? 1) * 500 * 0.5);
+            const sellPrice = getSellPrice(item);
             return (
               <div key={item.id} className="shop-item">
                 <div className="shop-item-info">

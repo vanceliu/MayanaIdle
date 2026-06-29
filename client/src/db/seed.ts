@@ -1077,9 +1077,17 @@ async function performSeed(): Promise<void> {
       }
     }
     // Patch existing equipment instances with missing fields
+    const templateMap = new Map<number, typeof EQUIPMENT_SEEDS[number]>();
+    const allTemplates = await db.equipmentTemplates.toArray();
+    for (const t of allTemplates) {
+      const seed = seedMap.get(t.name);
+      if (seed && t.id != null) templateMap.set(t.id, seed);
+    }
+
     await db.equipmentInstances.toCollection().modify((instance: any) => {
-      const seed = seedMap.get(instance.name as string);
+      const seed = seedMap.get(instance.name as string) ?? templateMap.get(instance.templateId);
       if (seed) {
+        if (instance.slot == null) instance.slot = seed.slot;
         if (instance.attackSuccess == null) instance.attackSuccess = seed.attackSuccess;
         if (instance.extraAttack == null) instance.extraAttack = seed.extraAttack;
         if ((seed as any).magicAttack && instance.magicAttack == null) instance.magicAttack = (seed as any).magicAttack;
