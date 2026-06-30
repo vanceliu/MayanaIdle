@@ -11,6 +11,7 @@ const CONDITION_LABELS: Record<ConditionType, string> = {
   mp_above: 'MP 高於',
   monster_count_gte: '怪物數量 ≥',
   monster_hp_below: '怪物 HP 低於',
+  monster_hp_above: '怪物 HP 高於',
   skill_ready: '技能就緒',
 };
 
