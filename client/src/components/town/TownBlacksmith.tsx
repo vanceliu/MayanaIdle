@@ -242,6 +242,11 @@ export function TownBlacksmith() {
       const have = bagItems.find(b => b.name === mat.name)?.amount ?? 0;
       if (have < mat.amount) return false;
     }
+    if (recipe.craftPrerequisiteWeapon) {
+      const { name, quantity } = recipe.craftPrerequisiteWeapon;
+      const owned = inventory.filter(i => i.name === name).length;
+      if (owned < quantity) return false;
+    }
     return true;
   }
 
@@ -261,6 +266,20 @@ export function TownBlacksmith() {
       newBag = newBag.map(b =>
         b.name === mat.name ? { ...b, amount: b.amount - mat.amount } : b
       ).filter(b => b.amount > 0);
+    }
+
+    let newInvAfterPrereq = [...currentInv];
+    if (selectedRecipe.craftPrerequisiteWeapon) {
+      const { name, quantity } = selectedRecipe.craftPrerequisiteWeapon;
+      let removed = 0;
+      for (const item of currentInv) {
+        if (removed >= quantity) break;
+        if (item.name === name) {
+          if (item.id) await db.equipmentInstances.delete(item.id);
+          newInvAfterPrereq = newInvAfterPrereq.filter(i => i.id !== item.id);
+          removed++;
+        }
+      }
     }
 
     const newGold = char.gold - selectedRecipe.craftGold;
@@ -298,7 +317,7 @@ export function TownBlacksmith() {
       equipped: false,
     });
 
-    const newInv = [...useGameStore.getState().inventory, newEquip];
+    const newInv = [...newInvAfterPrereq, newEquip];
     useGameStore.setState({
       character: { ...char, gold: newGold },
       bagItems: newBag,
@@ -534,6 +553,11 @@ export function TownBlacksmith() {
                     : '全職業'}
                 </span>
                 <span className="shop-item-desc">
+                  {recipe.craftPrerequisiteWeapon && (() => {
+                    const { name, quantity } = recipe.craftPrerequisiteWeapon!;
+                    const have = inventory.filter(i => i.name === name).length;
+                    return `${name} ${have}/${quantity}、`;
+                  })()}
                   {(recipe.craftMaterials ?? []).map(m => {
                     const have = bagItems.find(b => b.name === m.name)?.amount ?? 0;
                     return `${m.name} ${have}/${m.amount}`;

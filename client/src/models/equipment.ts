@@ -37,6 +37,11 @@ export interface CraftMaterial {
   amount: number;
 }
 
+export interface CraftPrerequisiteWeapon {
+  name: string;
+  quantity: number;
+}
+
 export interface EquipmentTemplate {
   id?: number;
   name: string;
@@ -67,6 +72,7 @@ export interface EquipmentTemplate {
   craftTier?: CraftTier;
   craftGold?: number;
   craftMaterials?: CraftMaterial[];
+  craftPrerequisiteWeapon?: CraftPrerequisiteWeapon;
 }
 
 export interface EquipmentInstance {

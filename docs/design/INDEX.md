@@ -53,6 +53,7 @@
 | 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文 |
 | 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
+| 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 
 ### 依限制查找
 
@@ -146,6 +147,7 @@
 | `11-guild.md` | 公會 | 公會功能 |
 | `12-pet.md` | 寵物 | 寵物定位 |
 | `14-endgame.md` | 成就/排行榜 | 長期目標 |
+| `36-quest-system.md` | 每日任務系統 | 冒險者工會、40 個任務、每日重置、獎勵機制 |
 
 ### 技術架構
 
@@ -204,4 +206,10 @@
 13-town.md（倉庫/商店/鐵匠）   16-tech-frontend-architecture.md（BagPanel）
        ↕
 34-ui-guidelines.md（顯示規範）←→ 18-data-schema.md（資料結構）
+
+36-quest-system.md ←→ 13-town.md（冒險者工會設施）
+       ↕                    ↕
+27-drop-table.md（收集任務目標）  30-items.md（獎勵藥水/卷軸）
+       ↕
+28-monster-stats.md（擊殺任務目標）←→ 09-dungeon.md（區域對應）
 ```

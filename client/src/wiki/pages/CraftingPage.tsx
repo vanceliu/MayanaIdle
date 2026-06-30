@@ -62,6 +62,7 @@ export function CraftingPage() {
               <th>階級</th>
               <th>等級需求</th>
               <th>製作費用</th>
+              <th>前置武器</th>
               <th>所需材料</th>
             </tr>
           </thead>
@@ -92,6 +93,16 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       <td>{TIER_LABELS[item.craftTier || ''] || '-'}</td>
       <td className="cell-number">{item.requiredLevel}</td>
       <td className="cell-number">{item.craftGold?.toLocaleString() || '-'} G</td>
+      <td>
+        {item.craftPrerequisiteWeapon
+          ? <span>
+              <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(item.craftPrerequisiteWeapon.name)}`}>
+                {item.craftPrerequisiteWeapon.name}
+              </Link>
+              ×{item.craftPrerequisiteWeapon.quantity}
+            </span>
+          : '-'}
+      </td>
       <td>
         {item.craftMaterials?.map(mat => (
           <CraftMaterialLink key={mat.name} name={mat.name} amount={mat.amount} />

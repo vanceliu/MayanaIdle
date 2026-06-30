@@ -586,3 +586,72 @@ function resolveEquipment(instance: EquipmentInstance): ResolvedEquipment {
 - 不做使用者登入/個人化功能
 - 不重複定義數值，所有數據來自同一份 source of truth
 - 線上化後只改 `useWikiData.ts` 內部實作，頁面元件不動
+
+---
+
+## 鐵匠鋪製作系統：前置武器規則實作
+
+> 設計文件：`06-equipment-acquire.md` § 6A.3「前置武器需求」
+> 開始日期：2026-06-30
+
+### 設計決策
+
+- 鐵匠鋪製作的中段以上武器，除素材與金幣外，需額外提供前置武器作為材料
+- 前置武器不限素質（強化值、詞綴、品質皆不影響），製作後消耗消失
+- 前置武器必須為鐵匠製作品，商店品不可作為前置
+- 入門級製作品無前置需求，可直接以素材+金幣製作
+- **製作鏈最多兩層**，禁止三層以上連環
+- 前置數量：匕首→雙刀/鋼爪為 x2，其餘 x1
+- 跨類型對應：單手劍→雙手劍、單手斧→雙手斧、法杖→雙手法杖、匕首→雙刀/鋼爪
+- 弓為獨立類型，僅同類型內升級
+- 鋼爪 #120 已改名為「月神之爪」（原暗殺者之爪）
+- 黑暗短刃 #19 新增妖精可裝備
+
+### Step 1：設計文件更新 ✅
+
+- [x] `06-equipment-weapons-claw.md` — #120 改名月神之爪
+- [x] `06-equipment-weapons-dagger.md` — #19 黑暗短刃新增妖精可用
+- [x] `06-equipment-acquire.md` § 6A.3 — 新增「前置武器需求」通則段落
+- [x] `06-equipment-acquire.md` — 單手劍製作表新增前置欄位
+- [x] `06-equipment-acquire.md` — 匕首製作表新增前置欄位
+- [x] `06-equipment-acquire.md` — 單手斧製作表新增前置欄位
+- [x] `06-equipment-acquire.md` — 單手鈍器製作表新增前置欄位
+- [x] `06-equipment-acquire.md` — 法杖製作表新增前置欄位
+- [x] `06-equipment-acquire.md` — 弓製作表新增前置欄位
+- [x] `06-equipment-acquire.md` — 雙手劍製作表新增前置單手劍欄位
+- [x] `06-equipment-acquire.md` — 雙手斧製作表新增前置單手斧欄位
+- [x] `06-equipment-acquire.md` — 雙手法杖製作表新增前置法杖欄位
+- [x] `06-equipment-acquire.md` — 雙刀製作表新增前置匕首 x2 欄位
+- [x] `06-equipment-acquire.md` — 鋼爪製作表新增前置匕首 x2 欄位
+- [x] 確認所有製作鏈不超過兩層
+
+### Step 2：資料結構擴充 ✅
+
+- [x] `models/equipment.ts` — 新增 `CraftPrerequisiteWeapon` interface（name + quantity）
+- [x] `models/equipment.ts` — `EquipmentTemplate` 新增 `craftPrerequisiteWeapon?` 欄位
+- [x] `db/seed.ts` — 所有需要前置武器的配方新增 `craftPrerequisiteWeapon`
+- [x] `db/seed.ts` — 暗殺者之爪改名為月神之爪
+- [x] TypeScript 編譯通過
+
+### Step 3：鐵匠鋪製作邏輯 ✅
+
+- [x] `TownBlacksmith.tsx` `canCraftRecipe` — 檢查玩家背包是否持有指定前置武器（數量足夠）
+- [x] 前置武器匹配規則：只比對 `name`，不檢查強化值/詞綴/品質
+- [x] `TownBlacksmith.tsx` `handleCraft` — 製作成功後消耗前置武器（從背包移除 + DB 刪除）
+- [x] 前置武器不足時製作按鈕自動 disabled
+
+### Step 4：UI 更新 ✅
+
+- [x] 鐵匠鋪製作面板顯示前置武器需求（名稱 × 數量 + 持有數）
+- [x] Wiki 鐵匠鋪製作頁新增「前置武器」欄位（含連結至武器詳情）
+- [x] TypeScript 編譯通過
+- [x] 全測試通過（513 tests）
+
+### Step 5：測試 ✅
+
+- [x] 既有 crafting test 修正（top-tier 配方需提供前置武器 + async waitFor）
+- [x] 新增 unit test：前置武器不足 → 製作按鈕 disabled
+- [x] 新增 unit test：前置武器有強化值/詞綴 → 仍可作為材料（不限素質）
+- [x] 新增 unit test：匕首 x2 → 雙刀正確消耗 2 把
+- [x] TypeScript 編譯通過
+- [x] 全測試通過（516 tests）
