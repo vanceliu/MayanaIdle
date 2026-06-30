@@ -49,7 +49,7 @@ describe('經濟平衡驗證', () => {
   }
 
   it('前期區域（Lv.1~30）素材收入提升約 20~50%', () => {
-    for (const { area, label } of EARLY_AREAS) {
+    for (const { area } of EARLY_AREAS) {
       const result = calcAreaEconomics(area);
       expect(result).not.toBeNull();
       expect(result!.boostPercent).toBeGreaterThan(15);
