@@ -1,14 +1,15 @@
-import { MONSTER_SEEDS, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS } from '../../db/seed';
+import { MONSTER_SEEDS, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../../db/seed';
 import { ZONES, REGIONS } from '../../models/mapData';
 import { DROP_ROLL_MAX } from '../../systems/drops';
 import type { MonsterTemplate } from '../../models/monster';
 import type { EquipmentTemplate } from '../../models/equipment';
-import type { DropTableEntry } from '../../db/database';
+import type { DropTableEntry, BossDropTableEntry } from '../../db/database';
 import type { Zone, Region } from '../../models/area';
 
 type MonsterSeed = Omit<MonsterTemplate, 'id'>;
 type EquipmentSeed = Omit<EquipmentTemplate, 'id'>;
 type DropSeed = Omit<DropTableEntry, 'id'>;
+type BossDropSeed = Omit<BossDropTableEntry, 'id'>;
 
 export function useMonsterList(): MonsterSeed[] {
   return MONSTER_SEEDS;
@@ -32,6 +33,10 @@ export function useEquipmentByName(name: string): EquipmentSeed | undefined {
 
 export function useDropTableByArea(area: string): DropSeed[] {
   return DROP_TABLE_SEEDS.filter(d => d.area === area || d.area.startsWith(`${area}-`));
+}
+
+export function useBossDropTableByName(bossName: string): BossDropSeed[] {
+  return BOSS_DROP_TABLE_SEEDS.filter(d => d.bossName === bossName);
 }
 
 export function useDropSourceForItem(itemName: string): DropSeed[] {

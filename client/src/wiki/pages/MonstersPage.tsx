@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useMonsterList, useDropTableByArea, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
+import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { getSkillBookLevel, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
@@ -199,11 +199,60 @@ function MonsterDetail({ name }: { name: string }) {
       <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
         掉落物品
       </h3>
-      {allAreas.map(area => (
-        <AreaDropSection key={area} area={area} />
-      ))}
+      {first.isBoss ? (
+        <BossDropSection bossName={first.name} />
+      ) : (
+        allAreas.map(area => (
+          <AreaDropSection key={area} area={area} />
+        ))
+      )}
 
       <SkillBookDropInfo isBoss={first.isBoss} areas={allAreas} />
+    </div>
+  );
+}
+
+function BossDropSection({ bossName }: { bossName: string }) {
+  const drops = useBossDropTableByName(bossName);
+
+  if (drops.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginBottom: 6 }}>
+        Boss 專屬掉落
+      </p>
+      <div className="wiki-table-wrap">
+        <table className="wiki-table">
+          <thead>
+            <tr>
+              <th>物品</th>
+              <th>類型</th>
+              <th>掉落機率</th>
+              <th>數量</th>
+            </tr>
+          </thead>
+          <tbody>
+            {drops.map((d, i) => {
+              const isEquip = d.itemType === 'equipment';
+              return (
+                <tr key={`${d.itemName}-${i}`}>
+                  <td>
+                    {isEquip ? (
+                      <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
+                        {d.itemName}
+                      </Link>
+                    ) : d.itemName}
+                  </td>
+                  <td>{d.itemType === 'gold' ? '金幣' : d.itemType === 'equipment' ? '裝備' : d.itemType === 'material' ? '材料' : d.itemType === 'potion' ? '藥水' : d.itemType === 'scroll' ? '卷軸' : '魔法書'}</td>
+                  <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                  <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
