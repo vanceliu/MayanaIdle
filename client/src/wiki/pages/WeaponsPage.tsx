@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import '../components/WikiTable.css';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -36,10 +36,19 @@ const CLASS_LABELS: Record<string, string> = {
   priest: '牧師',
 };
 
+const CRAFT_TIER_LABELS: Record<string, string> = {
+  entry: '高階入門',
+  mid: '高階中段',
+  top: '頂級',
+};
+
 export function WeaponsPage() {
   const weapons = useWeaponList();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const craftTierParam = searchParams.get('craftTier');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [materialFilter, setMaterialFilter] = useState<string>('all');
+  const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<string>('requiredLevel');
   const [sortAsc, setSortAsc] = useState(true);
@@ -51,6 +60,7 @@ export function WeaponsPage() {
     let list = weapons;
     if (typeFilter !== 'all') list = list.filter(w => w.type === typeFilter);
     if (materialFilter !== 'all') list = list.filter(w => w.material === materialFilter);
+    if (craftTierFilter !== 'all') list = list.filter(w => w.acquireType === 'craft' && w.craftTier === craftTierFilter);
     if (search) list = list.filter(w => w.name.includes(search));
     list = [...list].sort((a, b) => {
       const av = (a as any)[sortKey] ?? 0;
@@ -59,7 +69,7 @@ export function WeaponsPage() {
       return sortAsc ? av - bv : bv - av;
     });
     return list;
-  }, [weapons, typeFilter, materialFilter, search, sortKey, sortAsc]);
+  }, [weapons, typeFilter, materialFilter, craftTierFilter, search, sortKey, sortAsc]);
 
   function handleSort(key: string) {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -82,6 +92,21 @@ export function WeaponsPage() {
         <select className="wiki-filter-select" value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}>
           <option value="all">全部材質</option>
           {materials.map(m => <option key={m} value={m!}>{MATERIAL_LABELS[m!] || m}</option>)}
+        </select>
+        <select className="wiki-filter-select" value={craftTierFilter} onChange={e => {
+          const val = e.target.value;
+          setCraftTierFilter(val);
+          if (val === 'all') {
+            searchParams.delete('craftTier');
+          } else {
+            searchParams.set('craftTier', val);
+          }
+          setSearchParams(searchParams, { replace: true });
+        }}>
+          <option value="all">全部等級</option>
+          <option value="entry">{CRAFT_TIER_LABELS.entry}</option>
+          <option value="mid">{CRAFT_TIER_LABELS.mid}</option>
+          <option value="top">{CRAFT_TIER_LABELS.top}</option>
         </select>
         <input
           className="wiki-filter-input"

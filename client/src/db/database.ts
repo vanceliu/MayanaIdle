@@ -34,6 +34,7 @@ export interface BossDropTableEntry {
   dropValue: number;
   minAmount?: number;
   maxAmount?: number;
+  craftTier?: 'entry' | 'mid' | 'top';
 }
 
 export interface CharacterBagEntry {

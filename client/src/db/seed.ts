@@ -1024,6 +1024,8 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
 export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
   // 雪地之主（雪原地帶深處，Lv.35）
   { bossName: '雪地之主', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 300 },
+  { bossName: '雪地之主', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '雪地之主', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
   { bossName: '雪地之主', itemName: '魔法書碎片', itemType: 'material', dropValue: 150, minAmount: 1, maxAmount: 2 },
   { bossName: '雪地之主', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
   { bossName: '雪地之主', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
@@ -1032,7 +1034,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 象牙塔惡魔（象牙塔 5F，Lv.45）
   { bossName: '象牙塔惡魔', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '象牙塔惡魔', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '象牙塔惡魔', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '象牙塔惡魔', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
   { bossName: '象牙塔惡魔', itemName: '魔法書材料（稀有）', itemType: 'material', dropValue: 150, minAmount: 1, maxAmount: 1 },
   { bossName: '象牙塔惡魔', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '象牙塔惡魔', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1041,7 +1044,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 朦朧蛇魔（朦朧洞窟 3F，Lv.50）
   { bossName: '朦朧蛇魔', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '朦朧蛇魔', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '朦朧蛇魔', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '朦朧蛇魔', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '朦朧蛇魔', itemName: '銀精華', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '朦朧蛇魔', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '朦朧蛇魔', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1050,7 +1054,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 深海獄王（水下監獄 4F，Lv.50）
   { bossName: '深海獄王', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '深海獄王', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '深海獄王', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '深海獄王', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '深海獄王', itemName: '銀精華', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '深海獄王', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '深海獄王', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1059,6 +1064,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 安塔巨龍（龍谷地間 7F，Lv.50）
   { bossName: '安塔巨龍', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 660, maxAmount: 660 },
+  { bossName: '安塔巨龍', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '安塔巨龍', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '安塔巨龍', itemName: '龍骨碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '安塔巨龍', itemName: '龍心結晶', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
   { bossName: '安塔巨龍', itemName: '品質石', itemType: 'material', dropValue: 60, minAmount: 1, maxAmount: 1 },
@@ -1068,6 +1075,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 遠古騎士（遠古地監 9F，Lv.60）
   { bossName: '遠古騎士', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 900, maxAmount: 900 },
+  { bossName: '遠古騎士', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '遠古騎士', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '遠古騎士', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '遠古騎士', itemName: '米索利礦石', itemType: 'material', dropValue: 80, minAmount: 1, maxAmount: 1 },
   { bossName: '遠古騎士', itemName: '品質石', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
@@ -1078,7 +1087,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
   // 百柱塔樓層王
   // 毒之皇女（1-10F）
   { bossName: '毒之皇女', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '毒之皇女', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '毒之皇女', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '毒之皇女', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
   { bossName: '毒之皇女', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '毒之皇女', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '毒之皇女', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1087,7 +1097,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 哥布林之王（11-20F）
   { bossName: '哥布林之王', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '哥布林之王', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '哥布林之王', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '哥布林之王', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
   { bossName: '哥布林之王', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '哥布林之王', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '哥布林之王', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1096,7 +1107,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 暗影吸血鬼（21-30F）
   { bossName: '暗影吸血鬼', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '暗影吸血鬼', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '暗影吸血鬼', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '暗影吸血鬼', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
   { bossName: '暗影吸血鬼', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '暗影吸血鬼', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '暗影吸血鬼', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1105,7 +1117,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 不死殭屍王（31-40F）
   { bossName: '不死殭屍王', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '不死殭屍王', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '不死殭屍王', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '不死殭屍王', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '不死殭屍王', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '不死殭屍王', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '不死殭屍王', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1114,7 +1127,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 龍王約特勒（41-50F）
   { bossName: '龍王約特勒', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '龍王約特勒', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '龍王約特勒', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '龍王約特勒', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '龍王約特勒', itemName: '米索利碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '龍王約特勒', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '龍王約特勒', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1123,7 +1137,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 冥王哈馬斯（51-60F）
   { bossName: '冥王哈馬斯', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '冥王哈馬斯', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '冥王哈馬斯', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '冥王哈馬斯', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '冥王哈馬斯', itemName: '米索利礦石', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '冥王哈馬斯', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '冥王哈馬斯', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1132,7 +1147,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 霜凍伊莉絲（61-70F）
   { bossName: '霜凍伊莉絲', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '霜凍伊莉絲', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '霜凍伊莉絲', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '霜凍伊莉絲', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '霜凍伊莉絲', itemName: '米索利礦石', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '霜凍伊莉絲', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '霜凍伊莉絲', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1141,7 +1157,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 熔岩伊弗利特（71-80F）
   { bossName: '熔岩伊弗利特', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '熔岩伊弗利特', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '熔岩伊弗利特', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
+  { bossName: '熔岩伊弗利特', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'mid' },
   { bossName: '熔岩伊弗利特', itemName: '米索利礦石', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '熔岩伊弗利特', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '熔岩伊弗利特', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1150,7 +1167,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 守護者之主（81-90F）
   { bossName: '守護者之主', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '守護者之主', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '守護者之主', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'top' },
+  { bossName: '守護者之主', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'top' },
   { bossName: '守護者之主', itemName: '奧里哈魯根碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '守護者之主', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
   { bossName: '守護者之主', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -1159,7 +1177,8 @@ export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
 
   // 百柱死神（91-100F）
   { bossName: '百柱死神', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { bossName: '百柱死神', itemName: '高階裝備', itemType: 'equipment', dropValue: 100 },
+  { bossName: '百柱死神', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'top' },
+  { bossName: '百柱死神', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'top' },
   { bossName: '百柱死神', itemName: '奧里哈魯根碎片', itemType: 'material', dropValue: 100, minAmount: 1, maxAmount: 2 },
   { bossName: '百柱死神', itemName: '奧里哈魯根精華', itemType: 'material', dropValue: 70, minAmount: 1, maxAmount: 1 },
   { bossName: '百柱死神', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },

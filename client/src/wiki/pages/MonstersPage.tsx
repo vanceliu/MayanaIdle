@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
+import { EQUIPMENT_SEEDS } from '../../db/seed';
+
+const ARMOR_NAMES = new Set(EQUIPMENT_SEEDS.filter(e => e.type === 'armor').map(e => e.name));
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { getSkillBookLevel, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
@@ -235,11 +238,21 @@ function BossDropSection({ bossName }: { bossName: string }) {
           <tbody>
             {drops.map((d, i) => {
               const isEquip = d.itemType === 'equipment';
+              let equipLink = '';
+              if (isEquip) {
+                if (d.itemName === '高階武器') {
+                  equipLink = `/wiki/weapons?craftTier=${d.craftTier || 'entry'}`;
+                } else if (d.itemName === '高階防具') {
+                  equipLink = `/wiki/armor?craftTier=${d.craftTier || 'entry'}`;
+                } else {
+                  equipLink = `/wiki/weapons/${encodeURIComponent(d.itemName)}`;
+                }
+              }
               return (
                 <tr key={`${d.itemName}-${i}`}>
                   <td>
                     {isEquip ? (
-                      <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
+                      <Link className="wiki-link" to={equipLink}>
                         {d.itemName}
                       </Link>
                     ) : d.itemName}
@@ -280,11 +293,16 @@ function AreaDropSection({ area }: { area: string }) {
           <tbody>
             {drops.map((d, i) => {
               const isEquip = d.itemType === 'equipment';
+              const equipLink = isEquip
+                ? ARMOR_NAMES.has(d.itemName)
+                  ? `/wiki/armor/${encodeURIComponent(d.itemName)}`
+                  : `/wiki/weapons/${encodeURIComponent(d.itemName)}`
+                : '';
               return (
                 <tr key={`${d.itemName}-${i}`}>
                   <td>
                     {isEquip ? (
-                      <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
+                      <Link className="wiki-link" to={equipLink}>
                         {d.itemName}
                       </Link>
                     ) : d.itemName}

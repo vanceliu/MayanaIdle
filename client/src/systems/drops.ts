@@ -36,8 +36,54 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   const items: DroppedItem[] = [];
   const dropRateMultiplier = 1 + (bonuses?.drop_rate ?? 0) / 100;
   const goldRateMultiplier = 1 + (bonuses?.gold_rate ?? 0) / 100;
+  let highTierRolled = false;
 
   for (const entry of entries) {
+    // 高階武器/高階防具 is a linked pair: roll once (10%), then 50/50 weapon or armor
+    const isHighTierEquip = entry.itemName === '高階武器' || entry.itemName === '高階防具';
+    if (isHighTierEquip) {
+      if (highTierRolled) continue;
+      highTierRolled = true;
+      const roll = Math.random() * DROP_ROLL_MAX;
+      const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
+      if (roll >= boostedDropValue) continue;
+      const pickWeapon = Math.random() < 0.5;
+      const craftTier = entry.craftTier || 'entry';
+      const candidates = await db.equipmentTemplates
+        .filter(t => t.acquireType === 'craft' && t.craftTier === craftTier && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)))
+        .toArray();
+      if (candidates.length === 0) continue;
+      const template = candidates[Math.floor(Math.random() * candidates.length)];
+      const isWeapon = isWeaponSlot(template.slot);
+      const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
+      const affixes = generateAffixes(affixCategory, areaLevel, 4, true);
+      const dbRecord: Record<string, unknown> = {
+        templateId: template.id!,
+        slot: template.slot,
+        quality: 0,
+        enhancement: 0,
+        affixes,
+        ownerId,
+        equipped: false,
+      };
+      const id = await db.equipmentInstances.add(dbRecord as any);
+      const instance: EquipmentInstance = resolveEquipment({
+        id: id as number,
+        templateId: template.id!,
+        name: template.name,
+        type: template.type,
+        slot: template.slot,
+        isTwoHanded: template.isTwoHanded,
+        quality: 0,
+        enhancement: 0,
+        affixes,
+        ownerId,
+        equipped: false,
+      });
+      items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
+      continue;
+    }
+
     const roll = Math.random() * DROP_ROLL_MAX;
     const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
     if (roll >= boostedDropValue) continue;

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useArmorList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import '../components/WikiTable.css';
 
 const SLOT_LABELS: Record<string, string> = {
@@ -23,9 +23,18 @@ const CLASS_LABELS: Record<string, string> = {
   priest: '牧師',
 };
 
+const CRAFT_TIER_LABELS: Record<string, string> = {
+  entry: '高階入門',
+  mid: '高階中段',
+  top: '頂級',
+};
+
 export function ArmorPage() {
   const armors = useArmorList();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const craftTierParam = searchParams.get('craftTier');
   const [slotFilter, setSlotFilter] = useState<string>('all');
+  const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<string>('requiredLevel');
   const [sortAsc, setSortAsc] = useState(true);
@@ -35,6 +44,7 @@ export function ArmorPage() {
   const filtered = useMemo(() => {
     let list = armors;
     if (slotFilter !== 'all') list = list.filter(a => a.slot === slotFilter);
+    if (craftTierFilter !== 'all') list = list.filter(a => a.acquireType === 'craft' && a.craftTier === craftTierFilter);
     if (search) list = list.filter(a => a.name.includes(search));
     list = [...list].sort((a, b) => {
       const av = (a as any)[sortKey] ?? 0;
@@ -43,7 +53,7 @@ export function ArmorPage() {
       return sortAsc ? av - bv : bv - av;
     });
     return list;
-  }, [armors, slotFilter, search, sortKey, sortAsc]);
+  }, [armors, slotFilter, craftTierFilter, search, sortKey, sortAsc]);
 
   function handleSort(key: string) {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -62,6 +72,21 @@ export function ArmorPage() {
         <select className="wiki-filter-select" value={slotFilter} onChange={e => setSlotFilter(e.target.value)}>
           <option value="all">全部部位</option>
           {slots.map(s => <option key={s} value={s}>{SLOT_LABELS[s] || s}</option>)}
+        </select>
+        <select className="wiki-filter-select" value={craftTierFilter} onChange={e => {
+          const val = e.target.value;
+          setCraftTierFilter(val);
+          if (val === 'all') {
+            searchParams.delete('craftTier');
+          } else {
+            searchParams.set('craftTier', val);
+          }
+          setSearchParams(searchParams, { replace: true });
+        }}>
+          <option value="all">全部等級</option>
+          <option value="entry">{CRAFT_TIER_LABELS.entry}</option>
+          <option value="mid">{CRAFT_TIER_LABELS.mid}</option>
+          <option value="top">{CRAFT_TIER_LABELS.top}</option>
         </select>
         <input
           className="wiki-filter-input"
