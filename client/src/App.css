@@ -851,6 +851,7 @@ button.active {
 .log-player { color: var(--accent-mana); }
 .log-monster { color: var(--accent-danger); }
 .log-system { color: var(--accent-gold); }
+.log-dot { color: #60A5FA; }
 .log-loot { color: var(--accent-success); }
 
 /* --- Death Screen --- */

@@ -30,7 +30,7 @@ export type SearchMode = 'auto' | 'manual';
 
 export interface CombatLog {
   text: string;
-  type: 'player' | 'monster' | 'system' | 'loot';
+  type: 'player' | 'monster' | 'system' | 'loot' | 'dot';
 }
 
 export type CombatLowHpAction = 'town' | 'teleport';
@@ -1660,7 +1660,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
       if (monsters[idx].currentHp <= 0) continue;
 
       monsters[idx] = { ...monsters[idx], currentHp: monsters[idx].currentHp - effect.dot.damage };
-      logs.push({ text: `${effect.name} 對 ${monsters[idx].name} 造成 ${effect.dot.damage} 傷害`, type: 'system' });
+      logs.push({ text: `${effect.name} 對 ${monsters[idx].name} 造成 ${effect.dot.damage} 傷害`, type: 'dot' });
       changed = true;
     }
 

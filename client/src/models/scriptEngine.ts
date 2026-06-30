@@ -4,6 +4,7 @@ export type CombatConditionType =
   | 'always'
   | 'monster_count_gte'
   | 'monster_hp_below'
+  | 'monster_hp_above'
   | 'mp_above'
   | 'mp_below'
   | 'skill_ready';
@@ -115,6 +116,7 @@ export type ConditionType =
   | 'mp_above'
   | 'monster_count_gte'
   | 'monster_hp_below'
+  | 'monster_hp_above'
   | 'skill_ready';
 
 export type ActionType =

@@ -35,6 +35,8 @@ client/
 │   │   ├── affix.ts          # 詞綴定義、Tier、生成邏輯
 │   │   ├── skill.ts          # 技能目錄（50 技能 Lv1~10）、冷卻判定
 │   │   ├── skillRestrictions.ts # 職業魔法學習限制
+│   │   ├── skillTemplate.ts  # 技能模板定義
+│   │   ├── classSkills.ts    # 職業技能定義
 │   │   ├── scriptEngine.ts   # 腳本規則型別 + 預設腳本
 │   │   ├── area.ts           # Zone / Region / Floor 型別
 │   │   ├── mapData.ts        # 地圖常數（6 Zone、全面 area ID 分離）
@@ -42,6 +44,7 @@ client/
 │   │   ├── items.ts          # 道具定義（ItemCategory、重量、getItemWeight）
 │   │   ├── iconMap.ts        # Icon 映射（ITEM/EQUIP/EFFECT/SKILL_ICON_MAP）
 │   │   ├── effect.ts         # ActiveEffect 型別定義
+│   │   ├── quest.ts          # 任務型別定義
 │   │   └── townScroll.ts     # 回城卷軸
 │   ├── systems/              # 遊戲邏輯（純函數，不依賴 React）
 │   │   ├── combat.ts         # 戰鬥計算（命中/迴避/傷害）
@@ -50,7 +53,11 @@ client/
 │   │   ├── drops.ts          # 掉落判定 + 裝備生成
 │   │   ├── regen.ts          # HP/MP 自然回復
 │   │   ├── navigation.ts     # 地圖移動驗證
-│   │   └── scriptRunner.ts   # 腳本引擎（條件 → 動作）
+│   │   ├── scriptRunner.ts   # 腳本引擎（條件 → 動作）
+│   │   ├── questSystem.ts    # 任務系統邏輯
+│   │   ├── classSkillBookDrop.ts # 職業技能書掉落判定
+│   │   ├── characterTransfer.ts  # 角色轉移邏輯
+│   │   └── templateSync.ts   # 模板同步（DB 版本升級）
 │   ├── db/                   # 資料庫層
 │   │   ├── database.ts       # Dexie schema 定義
 │   │   └── seed.ts           # 初始化種子資料
@@ -71,6 +78,7 @@ client/
 │   │   ├── SkillPanel.tsx
 │   │   ├── CombatScriptEditor.tsx   # 戰鬥腳本編輯
 │   │   ├── PersistentScriptEditor.tsx # 常駐腳本編輯
+│   │   ├── ScriptEditor.tsx       # 舊版腳本編輯器（legacy）
 │   │   ├── ScriptEditorModal.tsx  # 浮動視窗（含戰鬥/常駐兩個 tab）
 │   │   ├── AttributeUpModal.tsx # Lv50+ 屬性配點浮動視窗
 │   │   ├── GameIcon.tsx      # 統一 icon 渲染元件
@@ -78,7 +86,7 @@ client/
 │   │   ├── MapNavigation.tsx
 │   │   ├── TownView.tsx
 │   │   ├── QuickSlotBar.tsx
-│   │   ├── Inventory.tsx
+│   │   ├── Inventory.tsx     # 裝備背包列表元件
 │   │   └── town/
 │   │       ├── GeneralStore.tsx
 │   │       ├── WeaponShop.tsx
@@ -88,6 +96,24 @@ client/
 │   │       ├── ClassGuild.tsx
 │   │       ├── TownBlacksmith.tsx
 │   │       └── Storage.tsx
+│   ├── wiki/                 # 遊戲內建 Wiki 系統
+│   │   ├── components/
+│   │   │   └── WikiLayout.tsx
+│   │   ├── hooks/
+│   │   │   └── useWikiData.ts
+│   │   └── pages/
+│   │       ├── WikiHome.tsx
+│   │       ├── ArmorPage.tsx
+│   │       ├── AttributesPage.tsx
+│   │       ├── CombatPage.tsx
+│   │       ├── CraftingPage.tsx
+│   │       ├── DropsPage.tsx
+│   │       ├── ExpTablePage.tsx
+│   │       ├── ItemsPage.tsx
+│   │       ├── MapsPage.tsx
+│   │       ├── MonstersPage.tsx
+│   │       ├── SkillsPage.tsx
+│   │       └── WeaponsPage.tsx
 │   └── __tests__/
 │       └── integration/
 │           └── gameFlow.test.ts
@@ -200,15 +226,17 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 類別 | 欄位 | 說明 |
 |---|---|---|
 | 核心 | `phase`, `character`, `monsters` | 遊戲階段、角色、當前怪物 |
+| 使用者 | `userId`, `characterList` | 當前使用者 ID、角色列表（多角色支援） |
 | 裝備 | `equippedGear`, `inventory` | 已裝備 / 背包裝備 |
 | 背包 | `bagItems: BagItem[]` | 統一管理所有背包物品（藥水/卷軸/素材/魔法書） |
 | 技能 | `skills` | 當前已學技能 |
 | 效果 | `activeEffects` | 角色 buff + 怪物 debuff（ActiveEffect[]） |
 | 戰鬥 | `combatLogs`, `selectedTargetIdx`, `lastDropResult` | 戰鬥日誌 / 目標 / 掉落結果 |
-| 計時器 | `gameLoopId`, `hpRegenId`, `mpRegenId` | 各 interval ID |
+| 計時器 | `gameLoopId`, `hpRegenId`, `mpRegenId`, `persistentLoopId` | 各 interval ID |
 | 腳本 | `combatRules`, `persistentRules`, `emergencyRetreat` | 戰鬥/常駐/緊急撤退 |
+| 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
 | 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold` | 戰鬥後等待閾值（HP/MP %） |
-| 搜尋 | `searchMode` | 自動 / 手動搜尋 |
+| 搜尋 | `searchMode`, `isManualSearching`, `manualSearchId` | 自動/手動搜尋模式與狀態 |
 | 快捷 | `quickSlots` | 5 格快捷鍵（藥水） |
 | 倉庫 | `storedEquipment`, `storedMaterials`, `warehouseGold` | 城鎮倉庫（帳號共用） |
 
@@ -380,7 +408,10 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 |---|---|---|
 | `always` | — | 永遠成立 |
 | `monster_count_gte` | 數量 | 怪物數量 ≥ N |
-| `monster_hp_below` | 閾值 (%) | 目標怪物 HP 低於百分比 |
+| `monster_hp_below` | 閾值 (%) | 任一存活怪物 HP 低於百分比 |
+| `monster_hp_above` | 閾值 (%) | 任一存活怪物 HP 高於百分比 |
+| `mp_above` | 閾值 (%) | 角色 MP 高於百分比 |
+| `mp_below` | 閾值 (%) | 角色 MP 低於百分比 |
 | `skill_ready` | skillId | 指定技能冷卻完畢 |
 
 ### 戰鬥腳本動作類型
@@ -399,13 +430,15 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `mp_below` | 閾值 (%) | MP 低於百分比 |
 | `mp_above` | 閾值 (%) | MP 高於百分比 |
 | `buff_not_active` | skillId | 指定 buff 未激活 |
+| `speed_not_active` | — | 加速效果未激活 |
 | `skill_ready` | skillId | 指定技能冷卻完畢 |
 
 ### 常駐腳本動作類型
 
 | 動作 | 參數 | 說明 |
 |---|---|---|
-| `potion` | potionType | 使用指定藥水 |
+| `potion` | potionType | 使用指定藥水（red/orange/white） |
+| `speed_potion` | speedPotionType | 使用加速藥水（green/enhanced-green） |
 | `heal_skill` | skillId | 施放治癒技能 |
 | `buff_skill` | skillId | 施放 buff 技能 |
 
@@ -440,8 +473,10 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
 | `BagPanel` | 背包固定 100 格 grid（無收合），GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
+| `Inventory` | 裝備背包列表元件 |
 | `CombatScriptEditor` | 戰鬥腳本規則 CRUD（僅攻擊技能/普攻） |
-| `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/回城/buff/治癒） |
+| `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/加速藥水/buff/治癒） |
+| `ScriptEditor` | 舊版腳本編輯器（legacy，供遷移保留） |
 | `ScriptEditorModal` | 浮動視窗，含常駐/戰鬥兩個 tab，按鈕觸發 overlay |
 | `AttributeUpModal` | Lv50+ 屬性配點浮動視窗，有未分配點數時自動顯示 |
 | `GameIcon` | 統一 SVG icon 渲染（name, size, color），支援 Game-icons.net + Lucide |
@@ -466,6 +501,26 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `Storage` | 裝備與素材倉庫（帳號共用） |
 
 所有城鎮組件在 setState 後統一呼叫 `useGameStore.getState().saveState()` 確保持久化。
+
+### Wiki 系統組件
+
+| 組件 | 職責 |
+|---|---|
+| `WikiLayout` | Wiki 頁面共用版面（側邊導航 + 內容區） |
+| `WikiHome` | Wiki 首頁（功能總覽） |
+| `ArmorPage` | 防具資料查詢 |
+| `AttributesPage` | 屬性說明 |
+| `CombatPage` | 戰鬥系統說明 |
+| `CraftingPage` | 製作系統資料 |
+| `DropsPage` | 掉落表查詢 |
+| `ExpTablePage` | 經驗值表 |
+| `ItemsPage` | 道具資料查詢 |
+| `MapsPage` | 地圖資料查詢 |
+| `MonstersPage` | 怪物資料查詢 |
+| `SkillsPage` | 技能資料查詢 |
+| `WeaponsPage` | 武器資料查詢 |
+
+Hook：`useWikiData` — 從 DB 讀取模板資料供 Wiki 頁面使用。
 
 **MagicAcademy 魔法書製作配方：**
 
@@ -525,17 +580,16 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 
 | Table | Primary Key | 索引 | 用途 |
 |---|---|---|---|
-| `characters` | `++id` | `name, className, createdAt` | 角色存檔 |
+| `users` | `++id` | `createdAt` | 使用者帳號 |
+| `characters` | `++id` | `name, className, createdAt, userId` | 角色存檔 |
 | `monsterTemplates` | `++id` | `name, area, level` | 怪物模板 |
-| `weaponTemplates` | `++id` | `name, type, slot` | 武器模板 |
-| `armorTemplates` | `++id` | `name, slot, material` | 防具模板 |
-| `shieldTemplates` | `++id` | `name, material` | 盾牌模板 |
-| `magicBookTemplates` | `++id` | `name, material` | 魔導書模板 |
-| `accessoryTemplates` | `++id` | `name, slot` | 飾品模板 |
+| `equipmentTemplates` | `++id` | `name, type, slot` | 裝備模板（武器+防具+盾+飾品統一） |
 | `equipmentInstances` | `++id` | `templateId, ownerId, equipped` | 裝備實例 |
 | `dropTables` | `++id` | `area, itemType` | 掉落表（按 area ID 分離） |
-| `characterBag` | `++id` | `characterId` | 背包物品（BagItem 持久化） |
-| `warehouses` | `++id` | `userId` | 帳號共用倉庫（素材 + 金幣） |
+| `bossDropTables` | `++id` | `bossName, itemType` | Boss 專屬掉落表 |
+| `characterBag` | `++id` | `characterId, name, type` | 背包物品（BagItem 持久化） |
+| `characterStorage` | `++id` | `characterId, name, type` | 角色個人倉庫 |
+| `warehouses` | `++id` | `userId, name, type` | 帳號共用倉庫（素材 + 金幣） |
 
 初始化：`seedDatabase()` 在 App mount 時執行，若 DB 空則寫入種子資料。
 

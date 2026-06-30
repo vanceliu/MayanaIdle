@@ -5,6 +5,7 @@ const CONDITION_LABELS: Record<CombatConditionType, string> = {
   always: '永遠',
   monster_count_gte: '怪物數量 ≥',
   monster_hp_below: '怪物 HP 低於',
+  monster_hp_above: '怪物 HP 高於',
   mp_above: 'MP 高於',
   mp_below: 'MP 低於',
   skill_ready: '技能就緒',
@@ -64,7 +65,7 @@ export function CombatScriptEditor() {
   }
 
   const needsValue = (type: CombatConditionType) =>
-    ['monster_count_gte', 'monster_hp_below', 'mp_above', 'mp_below'].includes(type);
+    ['monster_count_gte', 'monster_hp_below', 'monster_hp_above', 'mp_above', 'mp_below'].includes(type);
 
   return (
     <div className="script-editor-content">

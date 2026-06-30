@@ -44,6 +44,10 @@ function checkCombatCondition(rule: CombatRule, ctx: CombatScriptContext): boole
       const alive = monsters.filter(m => m.currentHp > 0);
       return alive.some(m => (m.currentHp / m.maxHp) * 100 < (condition.value ?? 50));
     }
+    case 'monster_hp_above': {
+      const alive = monsters.filter(m => m.currentHp > 0);
+      return alive.some(m => (m.currentHp / m.maxHp) * 100 > (condition.value ?? 50));
+    }
     case 'mp_above':
       return mpPercent > (condition.value ?? 0);
     case 'mp_below':
@@ -255,6 +259,10 @@ function checkLegacyCondition(rule: ScriptRule, ctx: ScriptContext): boolean {
     case 'monster_hp_below': {
       const alive = monsters.filter(m => m.currentHp > 0);
       return alive.some(m => (m.currentHp / m.maxHp) * 100 < (condition.value ?? 50));
+    }
+    case 'monster_hp_above': {
+      const alive = monsters.filter(m => m.currentHp > 0);
+      return alive.some(m => (m.currentHp / m.maxHp) * 100 > (condition.value ?? 50));
     }
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);

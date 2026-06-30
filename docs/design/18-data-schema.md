@@ -170,38 +170,47 @@ baseValue × (1 + qualityPercent / 100)
 
 | 表名 | 說明 | 數量級 |
 |---|---|---|
-| weapon_templates | 武器模板（單手劍、匕首、斧、鈍器、法杖、弓、雙手劍/斧/杖、雙刀、鋼爪） | ~130 |
-| armor_templates | 防具模板（頭盔、胸甲、手套、鞋子、腰帶） | ~40 |
-| accessory_templates | 飾品模板（項鍊、戒指） | ~20 |
-| shield_templates | 盾牌模板 | ~6 |
-| magic_book_templates | 魔導書模板 | ~6 |
+| equipment_templates | 統一裝備模板（武器、防具、盾牌、魔導書、飾品） | ~200 |
 | item_definitions | 消耗品/素材/卷軸定義 | ~30 |
 | monster_templates | 怪物素質 | ~100 |
 | skill_definitions | 魔法/技能定義 | ~80 |
 | drop_tables | 區域掉落池配置 | ~120 |
+| boss_drop_tables | Boss 專屬掉落池 | ~50 |
 
-### weapon_templates 欄位
+### 設計理由（統一表 vs 分表）
+
+早期設計曾規劃將武器、防具、盾牌、魔導書、飾品拆為 5 張獨立模板表。實作後改為統一 `equipment_templates` 表，理由：
+
+1. 全遊戲裝備約 200 件，資料量不需要分表
+2. 商店、鐵匠鋪、掉落系統都需跨類型操作，統一表減少 JOIN/UNION
+3. 以 `type` + `slot` 欄位區分類型，nullable 欄位處理各類型差異
+4. 線上化時維持同樣設計，Prisma 單一 model + enum 比 polymorphic relation 好維護
+
+### equipment_templates 欄位
 
 | 欄位 | 型態 | 說明 |
 |---|---|---|
 | id | number (PK) | 模板唯一 ID |
-| name | string | 武器名稱（唯一） |
-| type | enum | sword / dagger / axe / mace / staff / bow / twoHandSword / twoHandAxe / twoHandStaff / dualBlade / claw |
-| slot | enum | rightHand |
+| name | string | 裝備名稱（唯一） |
+| type | enum | sword / dagger / axe / mace / staff / bow / twoHandSword / twoHandAxe / twoHandStaff / dualBlade / claw / armor / shield / magicBook / accessory |
+| slot | enum | rightHand / leftHand / helmet / chest / gloves / boots / belt / necklace / ring |
 | isTwoHanded | boolean | 是否雙手武器 |
 | material | enum | wood / iron / silver / mithril / dragon / orichalcum |
 | weight | number | 重量 |
-| smallMonsterDamage | number | 對小怪傷害 |
-| largeMonsterDamage | number | 對大怪傷害 |
-| attackSuccess | number | 攻擊成功（命中加成） |
-| extraAttack | number | 額外攻擊次數 |
+| smallMonsterDamage | number? | 對小怪傷害（武器用） |
+| largeMonsterDamage | number? | 對大怪傷害（武器用） |
+| defense | number? | 防禦力（防具/盾牌用） |
+| magicAttack | number? | 魔法攻擊（法杖/魔導書用） |
+| attackSuccess | number? | 攻擊成功（命中加成） |
+| extraAttack | number? | 額外攻擊力 |
 | hpRegen | number? | 回血量 |
 | mpRegen | number? | 回魔量 |
 | bonusHp | number? | 增加血量 |
 | bonusMp | number? | 增加魔量 |
+| bonusWeight | number? | 增加負重（腰帶用） |
 | bonusStats | string? | 額外屬性（如「敏捷+1」） |
-| stability | number | 安定值（預設 6，0 = 安定值 0 可強化，-1 = 不可強化） |
-| canBreak | boolean | 壞刀（強化失敗是否消失） |
+| stability | number | 安定值（武器預設 6、防具預設 4、-1 = 不可強化） |
+| canBreak | boolean? | 是否受壞刀機制影響（武器用） |
 | requiredLevel | number | 需求等級 |
 | requiredClass | string[]? | 職業限制（null = 全職業） |
 | acquireType | enum | shop / craft / drop_only |
@@ -209,35 +218,7 @@ baseValue × (1 + qualityPercent / 100)
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
 | craftGold | number? | 製作金幣（craft 時必填） |
 | craftMaterials | json? | 製作素材 `[{name, amount}]`（craft 時必填） |
-
-### armor_templates 欄位
-
-| 欄位 | 型態 | 說明 |
-|---|---|---|
-| id | number (PK) | 模板唯一 ID |
-| name | string | 防具名稱 |
-| slot | enum | helmet / chest / gloves / boots / belt |
-| material | enum | 材質 |
-| weight | number | 重量 |
-| defense | number | 防禦力 |
-| hpRegen | number? | 回血量 |
-| mpRegen | number? | 回魔量 |
-| bonusHp | number? | 增加血量 |
-| bonusMp | number? | 增加魔量 |
-| bonusStats | string? | 額外屬性 |
-| bonusWeight | number? | 增加負重（腰帶用） |
-| stability | number | 安定值（預設 4，-1 = 不可強化） |
-| requiredLevel | number | 需求等級 |
-| requiredClass | string[]? | 職業限制 |
-| acquireType | enum | shop / craft |
-| buyPrice | number? | 商店價格 |
-| craftTier | enum? | 製作等級 |
-| craftGold | number? | 製作金幣 |
-| craftMaterials | json? | 製作素材 |
-
-### shield_templates / magic_book_templates / accessory_templates
-
-各自包含該類型特有欄位（盾牌有 blockRate、魔導書有 magicAttack、飾品以效果為主），結構類似 armor_templates，獨立成表避免混雜。
+| craftPrerequisiteWeapon | json? | 前置武器需求 `{name, quantity}`（中段以上製作品） |
 
 ### 取得方式規則
 
