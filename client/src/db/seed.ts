@@ -806,8 +806,8 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'dragon-valley-7f', itemName: '強化石', itemType: 'material', dropValue: 60 },
   { area: 'dragon-valley-7f', itemName: '龍骨碎片', itemType: 'material', dropValue: 100 },
   { area: 'dragon-valley-7f', itemName: '龍心結晶', itemType: 'material', dropValue: 70 },
-  { area: 'dragon-valley-7f', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 1000 },
-  { area: 'dragon-valley-7f', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 1000 },
+  { area: 'dragon-valley-7f', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 10 },
+  { area: 'dragon-valley-7f', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 10 },
   { area: 'dragon-valley-7f', itemName: '鋼鐵巨劍', itemType: 'equipment', dropValue: 50 },
   { area: 'dragon-valley-7f', itemName: '騎士盾', itemType: 'equipment', dropValue: 40 },
   // 遠古地監 1~3F Lv.45~50
@@ -892,8 +892,8 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'ancient-dungeon-9f', itemName: '強化石', itemType: 'material', dropValue: 70 },
   { area: 'ancient-dungeon-9f', itemName: '米索利碎片', itemType: 'material', dropValue: 100 },
   { area: 'ancient-dungeon-9f', itemName: '米索利礦石', itemType: 'material', dropValue: 80 },
-  { area: 'ancient-dungeon-9f', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 1000 },
-  { area: 'ancient-dungeon-9f', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 1000 },
+  { area: 'ancient-dungeon-9f', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 10 },
+  { area: 'ancient-dungeon-9f', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 10 },
   // 百柱塔 1~10F Lv.45~52
   { area: 'hundred-pillar-1-10f', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 200, maxAmount: 350 },
   { area: 'hundred-pillar-1-10f', itemName: '米索利碎片', itemType: 'material', dropValue: 80 },
