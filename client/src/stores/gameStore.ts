@@ -1253,6 +1253,120 @@ async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) =>
   runAutoCombat(get, set);
 }
 
+/**
+ * 單隻怪物死亡處理：任何傷害來源（普攻、技能、AOE、DOT）導致怪物 HP <= 0 時，
+ * 對該隻怪物呼叫此函式。每隻怪物死亡各呼叫一次。
+ * 負責：擊敗日誌、清除 debuff、經驗值、掉落 roll、任務進度更新。
+ * 回傳更新後的 character 與 logs。
+ */
+export function processMonsterDeath(
+  get: () => GameState,
+  set: (s: Partial<GameState>) => void,
+  monsters: MonsterInstance[],
+  deadIdx: number,
+  char: CharacterState,
+  logs: CombatLog[],
+  allGear: EquipmentInstance[]
+): { char: CharacterState; logs: CombatLog[] } {
+  const dead = monsters[deadIdx];
+  monsters[deadIdx] = { ...dead, _processed: true };
+  logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
+
+  // 清除死亡怪物身上的 debuff
+  const currentEffects = get().activeEffects;
+  const cleanedEffects = currentEffects.filter(
+    e => !(e.target === 'monster' && e.targetIdx === deadIdx)
+  );
+  if (cleanedEffects.length !== currentEffects.length) {
+    set({ activeEffects: cleanedEffects });
+  }
+
+  const expGained = dead.exp * 3;
+  const prevLevel = char.level;
+  char = addExp(char, expGained);
+  logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
+  if (char.level > prevLevel) {
+    logs.push({ text: `升級！等級 ${prevLevel} → ${char.level}`, type: 'system' });
+    const equippedGear = get().equippedGear;
+    char.hp = getEffectiveMaxHp(char, equippedGear);
+    char.mp = getEffectiveMaxMp(char, equippedGear);
+  }
+
+  // 掉落處理（排隊避免 race condition）
+  const dropBonuses = getAffixBonusesFromGear(allGear);
+  const defeatedMonsterName = dead.name;
+  const monsterIsBoss = dead.isBoss;
+  dropQueue = dropQueue.then(async () => {
+    const dropRegion = getRegion(char.currentRegion);
+    const dropHasFloors = dropRegion?.floors && dropRegion.floors.length > 0;
+    const dropAreaId = dropHasFloors && char.currentFloor != null
+      ? `${char.currentRegion}-${char.currentFloor}f`
+      : char.currentArea;
+    const areaLevel = dropRegion?.levelMax ?? dead.level;
+    const drops = monsterIsBoss
+      ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
+      : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);
+    const state2 = get();
+    if (!state2.character) return;
+    let char2 = { ...state2.character };
+    const logs2 = [...state2.combatLogs];
+    let newBag = state2.bagItems.map(b => ({ ...b }));
+    const newEquipInv = [...state2.inventory];
+
+    char2.gold += drops.gold;
+    if (drops.gold > 0) {
+      logs2.push({ text: `獲得 ${drops.gold} 金幣`, type: 'loot' });
+    }
+    for (const item of drops.items) {
+      if (item.equipmentInstance) {
+        if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
+          logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
+        } else {
+          newEquipInv.push(item.equipmentInstance);
+          logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
+        }
+      } else if (item.type === 'potion' || item.type === 'material' || item.type === 'scroll' || item.type === 'spellbook') {
+        const existing = newBag.find(b => b.name === item.name && b.type === item.type);
+        if (existing) {
+          existing.amount += item.amount;
+          logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
+        } else if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
+          logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
+        } else {
+          newBag.push({ name: item.name, type: item.type, amount: item.amount });
+          logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
+        }
+      }
+    }
+
+    // 任務進度：跑腿（擊殺數）
+    char2 = updateErrandProgress(char2, char2.currentArea, 1);
+
+    // 任務進度：收集（素材掉落）
+    if (rollQuestMaterialDrop(char2, defeatedMonsterName)) {
+      const matExisting = newBag.find(b => b.name === QUEST_MATERIAL_NAME && b.type === 'material');
+      if (matExisting) {
+        matExisting.amount += 1;
+      } else if (getBagUsedSlots(newBag, newEquipInv) < BAG_MAX_SLOTS) {
+        newBag.push({ name: QUEST_MATERIAL_NAME, type: 'material', amount: 1 });
+      }
+      char2 = updateCollectProgress(char2, 1);
+      logs2.push({ text: `獲得 ${QUEST_MATERIAL_NAME}`, type: 'loot' });
+    }
+
+    newBag = newBag.filter(b => b.amount > 0);
+
+    set({
+      character: char2,
+      combatLogs: logs2.slice(-MAX_LOGS),
+      inventory: newEquipInv,
+      bagItems: newBag,
+    });
+  });
+
+  return { char, logs };
+}
+
 function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => void) {
   // Player attack timer — dynamic interval based on attack_speed affix
   function schedulePlayerAttack() {
@@ -1271,7 +1385,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
 
     let char = { ...state.character };
     const monsters = [...state.monsters];
-    const logs = [...state.combatLogs];
+    let logs = [...state.combatLogs];
     const weapon = state.equippedGear.rightHand ?? null;
     const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
     const skills = [...state.skills];
@@ -1472,105 +1586,12 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
       monsters[targetIdx] = target;
     }
 
-    // Check ALL monsters that just died this tick (handles AOE kills)
-    const deadMonsters = monsters.filter((m, _idx) => m.currentHp <= 0 && !m._processed);
-    for (const dead of deadMonsters) {
-      const deadIdx = monsters.indexOf(dead);
-      monsters[deadIdx] = { ...dead, _processed: true };
-      logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
-
-      // Clear debuffs on dead monster
-      const currentEffects = get().activeEffects;
-      const cleanedEffects = currentEffects.filter(
-        e => !(e.target === 'monster' && e.targetIdx === deadIdx)
-      );
-      if (cleanedEffects.length !== currentEffects.length) {
-        set({ activeEffects: cleanedEffects });
-      }
-
-      const expGained = dead.exp * 3;
-      const prevLevel = char.level;
-      char = addExp(char, expGained);
-      logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
-      if (char.level > prevLevel) {
-        logs.push({ text: `升級！等級 ${prevLevel} → ${char.level}`, type: 'system' });
-        const equippedGear = get().equippedGear;
-        char.hp = getEffectiveMaxHp(char, equippedGear);
-        char.mp = getEffectiveMaxMp(char, equippedGear);
-      }
-
-      // Roll drops for this monster (queued to prevent race conditions)
-      const dropBonuses = getAffixBonusesFromGear(allGear);
-      const defeatedMonsterName = dead.name;
-      const monsterIsBoss = dead.isBoss;
-      dropQueue = dropQueue.then(async () => {
-        const dropRegion = getRegion(char.currentRegion);
-        const dropHasFloors = dropRegion?.floors && dropRegion.floors.length > 0;
-        const dropAreaId = dropHasFloors && char.currentFloor != null
-          ? `${char.currentRegion}-${char.currentFloor}f`
-          : char.currentArea;
-        const areaLevel = dropRegion?.levelMax ?? dead.level;
-        const drops = monsterIsBoss
-          ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
-          : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);
-        const state2 = get();
-        if (!state2.character) return;
-        let char2 = { ...state2.character };
-        const logs2 = [...state2.combatLogs];
-        let newBag = state2.bagItems.map(b => ({ ...b }));
-        const newEquipInv = [...state2.inventory];
-
-        char2.gold += drops.gold;
-        if (drops.gold > 0) {
-          logs2.push({ text: `獲得 ${drops.gold} 金幣`, type: 'loot' });
-        }
-        for (const item of drops.items) {
-          if (item.equipmentInstance) {
-            if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
-              logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
-            } else {
-              newEquipInv.push(item.equipmentInstance);
-              logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
-            }
-          } else if (item.type === 'potion' || item.type === 'material' || item.type === 'scroll' || item.type === 'spellbook') {
-            const existing = newBag.find(b => b.name === item.name && b.type === item.type);
-            if (existing) {
-              existing.amount += item.amount;
-              logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
-            } else if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
-              logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
-            } else {
-              newBag.push({ name: item.name, type: item.type, amount: item.amount });
-              logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
-            }
-          }
-        }
-
-        // Quest progress: errand (kill count)
-        char2 = updateErrandProgress(char2, char2.currentArea, 1);
-
-        // Quest progress: collect (material drop)
-        if (rollQuestMaterialDrop(char2, defeatedMonsterName)) {
-          const matExisting = newBag.find(b => b.name === QUEST_MATERIAL_NAME && b.type === 'material');
-          if (matExisting) {
-            matExisting.amount += 1;
-          } else if (getBagUsedSlots(newBag, newEquipInv) < BAG_MAX_SLOTS) {
-            newBag.push({ name: QUEST_MATERIAL_NAME, type: 'material', amount: 1 });
-          }
-          char2 = updateCollectProgress(char2, 1);
-          logs2.push({ text: `獲得 ${QUEST_MATERIAL_NAME}`, type: 'loot' });
-        }
-
-        // Filter out zero-amount items
-        newBag = newBag.filter(b => b.amount > 0);
-
-        set({
-          character: char2,
-          combatLogs: logs2.slice(-MAX_LOGS),
-          inventory: newEquipInv,
-          bagItems: newBag,
-        });
-      });
+    // 逐隻處理本 tick 死亡的怪物（普攻、技能、AOE 皆走此路徑）
+    const deadIndices = monsters
+      .map((m, idx) => (m.currentHp <= 0 && !m._processed) ? idx : -1)
+      .filter(idx => idx !== -1);
+    for (const deadIdx of deadIndices) {
+      ({ char, logs } = processMonsterDeath(get, set, monsters, deadIdx, char, logs, allGear));
     }
 
     // Check if all dead — end combat
@@ -1638,17 +1659,19 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
   }, 600);
   combatTimerIds.push(monsterTimer as unknown as number);
 
-  // DOT tick timer — 1000ms, only deals damage (no death processing)
+  // DOT tick timer — 1000ms，結算 DOT 傷害並處理怪物死亡/掉落
   const dotTimer = window.setInterval(() => {
     const state = get();
-    if (state.phase !== 'combat') {
+    if (state.phase !== 'combat' || !state.character) {
       clearInterval(dotTimer);
       return;
     }
 
     const now = Date.now();
     const monsters = [...state.monsters];
-    const logs = [...state.combatLogs];
+    let logs = [...state.combatLogs];
+    let char = { ...state.character };
+    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
     let changed = false;
 
     for (const effect of state.activeEffects) {
@@ -1665,7 +1688,23 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
     }
 
     if (changed) {
-      set({ monsters, combatLogs: logs.slice(-MAX_LOGS) });
+      // DOT 致死判定：逐隻處理死亡怪物的經驗/掉落/任務進度
+      const deadIndices = monsters
+        .map((m, idx) => (m.currentHp <= 0 && !m._processed) ? idx : -1)
+        .filter(idx => idx !== -1);
+      for (const deadIdx of deadIndices) {
+        ({ char, logs } = processMonsterDeath(get, set, monsters, deadIdx, char, logs, allGear));
+      }
+
+      // 全部怪物死亡 → 結束戰鬥
+      if (!monsters.some(m => m.currentHp > 0)) {
+        clearCombatTimers();
+        set({ character: char, monsters, combatLogs: logs.slice(-MAX_LOGS) });
+        dropQueue.then(() => handleVictory(get, set, monsters));
+        return;
+      }
+
+      set({ character: char, monsters, combatLogs: logs.slice(-MAX_LOGS) });
     }
   }, 1000);
   combatTimerIds.push(dotTimer);
