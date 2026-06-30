@@ -46,7 +46,7 @@ describe('rollDrops', () => {
     await seedDatabase();
 
     const entries = await db.dropTables.where('area').equals('dawn-plains').toArray();
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(7);
 
     const result = await rollDrops('dawn-plains', 1);
     const itemNames = result.items.map(i => i.name);
@@ -90,7 +90,7 @@ describe('Integration: seed → drops flow (no duplication)', () => {
     await seedDatabase();
 
     const entries = await db.dropTables.where('area').equals('dawn-plains').toArray();
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(7);
 
     const result = await rollDrops('dawn-plains', 1);
     const itemNames = result.items.map(i => i.name);
@@ -102,7 +102,7 @@ describe('Integration: seed → drops flow (no duplication)', () => {
     await Promise.all([seedDatabase(), seedDatabase()]);
 
     const entries = await db.dropTables.where('area').equals('dawn-plains').toArray();
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(7);
 
     const result = await rollDrops('dawn-plains', 1);
     const itemNames = result.items.map(i => i.name);
@@ -120,10 +120,10 @@ describe('Integration: seed → drops flow (no duplication)', () => {
     }
 
     // Verify known areas
-    expect(areaCounts['dawn-plains']).toBe(4);
-    expect(areaCounts['green-valley']).toBe(6);
-    expect(areaCounts['wind-woods']).toBe(5);
-    expect(areaCounts['misty-swamp']).toBe(6);
-    expect(areaCounts['trial-highlands']).toBe(8);
+    expect(areaCounts['dawn-plains']).toBe(7);
+    expect(areaCounts['green-valley']).toBe(9);
+    expect(areaCounts['wind-woods']).toBe(8);
+    expect(areaCounts['misty-swamp']).toBe(9);
+    expect(areaCounts['trial-highlands']).toBe(11);
   });
 });

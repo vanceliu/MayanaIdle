@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
-import { getItemWeight } from '../../models/items';
+import { getItemWeight, getItemDefinition } from '../../models/items';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -101,13 +101,10 @@ export function GeneralStore() {
   }
 
   function getSellPrice(name: string): number {
-    const potionPrices: Record<string, number> = { '紅色藥水': 25, '橙色藥水': 80, '白色藥水': 200, '綠色藥水': 200, '強化綠色藥水': 1000 };
-    if (potionPrices[name]) return potionPrices[name];
-    if (name.includes('回城卷軸')) return 500;
-    if (name === '武器強化卷軸') return 100000;
-    if (name === '防具強化卷軸') return 50000;
-    if (name === '磨刀石') return 200;
-    return 100;
+    const def = getItemDefinition(name);
+    if (def?.sellPrice) return def.sellPrice;
+    if (def?.buyPrice) return def.buyPrice;
+    return 0;
   }
 
   function sellBagItem(name: string, sellPrice: number, amount: number) {

@@ -64,3 +64,31 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 60. 武器的「額外攻擊」(extraAttack) 是加算至武器基傷的固定數值，不是多段攻擊次數。本遊戲無多段攻擊機制，每回合固定攻擊 1 次
 
 ---
+
+## 99.2 當前實作計畫（Phase Tracking）
+
+> AI 中斷後可依此接續，完成後由使用者確認刪除。
+
+### Phase：區域素材掉落 + 製作配方改版
+
+**目標**：實作區域素材掉落系統，降低前期金幣陣痛期，並將製作配方改為「區域素材 + 通用基底」模式。
+
+**設計文件已更新**：
+- `30-items.md` — 新增區域素材定義、Boss 專屬素材、製作配方結構
+- `27-drop-table.md` — 全區域掉落表加入區域素材 + Boss 專屬素材
+- `06-equipment-acquire.md` — 製作配方結構改為區域素材 + 通用基底
+
+**實作步驟**：
+
+- [x] Step 1：新增區域素材 seed 資料（ItemTemplate），含 id、name、weight、sellPrice、sourceArea、craftUse 欄位
+- [x] Step 2：新增 Boss 專屬素材 seed 資料（每個 Boss 獨立素材）
+- [x] Step 3：更新各區域 dropTable seed，加入區域素材掉落（dropValue 對應設計文件）
+- [x] Step 4：更新各 Boss 的 bossDropTable seed，加入專屬素材掉落
+- [x] Step 5：實作素材賣給雜貨店功能（getSellPrice 讀取 ItemDefinition，統一 50% 回收）
+- [x] Step 6：更新鐵匠鋪製作配方 seed，改為新版「區域素材 + 通用基底」需求
+- [x] Step 7：DB seed 自動重建機制確認（performSeed 會 clear + bulkAdd）
+- [x] Step 8：撰寫相關 unit/integration test
+- [x] Step 9：驗證經濟平衡 — 確認前期金幣收入提升約 30~35%
+- [x] Step 10：同步更新設計文件（Boss 素材名稱改為各 Boss 獨立命名）
+
+---

@@ -194,6 +194,8 @@
 25-monster-system.md ←→ 26-spawn-pressure.md ←→ 28-monster-stats.md
                                                         ↕
                                                   27-drop-table.md ←→ 30-items.md
+                                                        ↕
+                                                  06-equipment-acquire.md（區域素材→製作配方）
 
 19-account-character.md ←→ 04-character.md（職業/初始配置）
        ↕

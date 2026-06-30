@@ -47,9 +47,9 @@ describe('TownBlacksmith - Crafting', () => {
       equippedGear: {},
       inventory: [],
       bagItems: [
+        { name: '山賊鐵塊', type: 'material', amount: 10 },
+        { name: '凍骨碎片', type: 'material', amount: 10 },
         { name: '銀礦石', type: 'material', amount: 10 },
-        { name: '銀精華', type: 'material', amount: 10 },
-        { name: '品質石', type: 'material', amount: 10 },
       ],
     });
   });
@@ -84,9 +84,9 @@ describe('TownBlacksmith - Crafting', () => {
     const state = useGameStore.getState();
     expect(state.character!.gold).toBe(500000 - 150000);
     expect(state.inventory.some(i => i.name === '精鋼劍')).toBe(true);
-    expect(state.bagItems.find(b => b.name === '銀礦石')?.amount).toBe(10 - 4);
-    expect(state.bagItems.find(b => b.name === '銀精華')?.amount).toBe(10 - 3);
-    expect(state.bagItems.find(b => b.name === '品質石')?.amount).toBe(10 - 3);
+    expect(state.bagItems.find(b => b.name === '山賊鐵塊')?.amount).toBe(10 - 4);
+    expect(state.bagItems.find(b => b.name === '凍骨碎片')?.amount).toBe(10 - 3);
+    expect(state.bagItems.find(b => b.name === '銀礦石')?.amount).toBe(10 - 2);
   });
 
   it('crafted item has correct stats', async () => {
@@ -125,9 +125,9 @@ describe('TownBlacksmith - Crafting', () => {
   it('disables craft button when not enough materials', async () => {
     useGameStore.setState({
       bagItems: [
+        { name: '山賊鐵塊', type: 'material', amount: 1 },
+        { name: '凍骨碎片', type: 'material', amount: 1 },
         { name: '銀礦石', type: 'material', amount: 1 },
-        { name: '銀精華', type: 'material', amount: 1 },
-        { name: '品質石', type: 'material', amount: 1 },
       ],
     });
     render(<TownBlacksmith />);
@@ -154,11 +154,11 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
+        { name: '霜凍結晶', type: 'material', amount: 20 },
+        { name: '不死骨髓', type: 'material', amount: 20 },
+        { name: '洞窟菌絲', type: 'material', amount: 20 },
+        { name: '遠古騎士紋章', type: 'material', amount: 20 },
         { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
-        { name: '奧里哈魯根精華', type: 'material', amount: 20 },
-        { name: '龍心結晶', type: 'material', amount: 20 },
-        { name: '米索利礦石', type: 'material', amount: 20 },
-        { name: '品質石', type: 'material', amount: 20 },
       ],
       inventory: [
         { id: 9001, templateId: 0, name: '銀騎士之劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
@@ -182,11 +182,11 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
+        { name: '霜凍結晶', type: 'material', amount: 20 },
+        { name: '不死骨髓', type: 'material', amount: 20 },
+        { name: '洞窟菌絲', type: 'material', amount: 20 },
+        { name: '遠古騎士紋章', type: 'material', amount: 20 },
         { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
-        { name: '奧里哈魯根精華', type: 'material', amount: 20 },
-        { name: '龍心結晶', type: 'material', amount: 20 },
-        { name: '米索利礦石', type: 'material', amount: 20 },
-        { name: '品質石', type: 'material', amount: 20 },
       ],
       inventory: [],
     });
@@ -202,11 +202,11 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
+        { name: '霜凍結晶', type: 'material', amount: 20 },
+        { name: '不死骨髓', type: 'material', amount: 20 },
+        { name: '洞窟菌絲', type: 'material', amount: 20 },
+        { name: '遠古騎士紋章', type: 'material', amount: 20 },
         { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
-        { name: '奧里哈魯根精華', type: 'material', amount: 20 },
-        { name: '龍心結晶', type: 'material', amount: 20 },
-        { name: '米索利礦石', type: 'material', amount: 20 },
-        { name: '品質石', type: 'material', amount: 20 },
       ],
       inventory: [
         { id: 9002, templateId: 0, name: '銀騎士之劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 15, enhancement: 6, stability: 6, affixes: [{ id: 'atk1', tier: 2, value: 5 }], ownerId: 1, equipped: false } as any,
@@ -231,9 +231,9 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 500000, className: 'thief' },
       bagItems: [
+        { name: '石像碎片', type: 'material', amount: 10 },
+        { name: '冰霜蛛絲', type: 'material', amount: 10 },
         { name: '銀礦石', type: 'material', amount: 10 },
-        { name: '銀精華', type: 'material', amount: 10 },
-        { name: '品質石', type: 'material', amount: 10 },
       ],
       inventory: [
         { id: 9003, templateId: 0, name: '黑暗短刃', type: 'dagger', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
