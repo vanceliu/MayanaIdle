@@ -231,9 +231,10 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 500000, className: 'thief' },
       bagItems: [
-        { name: '石像碎片', type: 'material', amount: 10 },
-        { name: '冰霜蛛絲', type: 'material', amount: 10 },
-        { name: '銀礦石', type: 'material', amount: 10 },
+        { name: '飛龍鱗片', type: 'material', amount: 10 },
+        { name: '剝皮蛛牙', type: 'material', amount: 10 },
+        { name: '死亡靈魂殘片', type: 'material', amount: 10 },
+        { name: '米索利碎片', type: 'material', amount: 10 },
       ],
       inventory: [
         { id: 9003, templateId: 0, name: '黑暗短刃', type: 'dagger', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useArmorList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import '../components/WikiTable.css';
@@ -26,18 +26,23 @@ const CLASS_LABELS: Record<string, string> = {
 };
 
 const CRAFT_TIER_LABELS: Record<string, string> = {
-  entry: '高階入門',
-  mid: '高階中段',
+  entry: '高級入門',
+  mid: '高級進階',
   top: '頂級',
 };
 
 export function ArmorPage() {
+  const { name } = useParams();
+  return <ArmorList initialSearch={name ? decodeURIComponent(name) : undefined} />;
+}
+
+function ArmorList({ initialSearch }: { initialSearch?: string }) {
   const armors = useArmorList();
   const [searchParams, setSearchParams] = useSearchParams();
   const craftTierParam = searchParams.get('craftTier');
   const [slotFilter, setSlotFilter] = useState<string>('all');
   const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch || '');
   const [sortKey, setSortKey] = useState<string>('name');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -140,7 +145,7 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
     <tr>
       <td>
         <Link className="wiki-link" to={`/wiki/armor/${encodeURIComponent(a.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <GameIcon name={getEquipIcon(a.slot)} size={16} />
+          <GameIcon name={getEquipIcon(a.slot)} size={16} color="#FFFFFF" />
           {a.name}
         </Link>
       </td>

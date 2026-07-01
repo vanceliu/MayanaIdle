@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import '../components/WikiTable.css';
 
 const TIER_LABELS: Record<string, string> = {
-  entry: '初階',
-  mid: '中階',
-  top: '高階',
+  entry: '高級入門',
+  mid: '高級進階',
+  top: '頂級',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -42,9 +42,9 @@ export function CraftingPage() {
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
           <option value="all">全部階級</option>
-          <option value="entry">初階</option>
-          <option value="mid">中階</option>
-          <option value="top">高階</option>
+          <option value="entry">高級入門</option>
+          <option value="mid">高級進階</option>
+          <option value="top">頂級</option>
         </select>
         <input
           className="wiki-filter-input"

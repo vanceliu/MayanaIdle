@@ -11,7 +11,7 @@ export interface CraftPrerequisiteWeapon {
 }
 
 export const CRAFT_TIER_NAMES: Record<CraftTier, string> = {
-  entry: '高階入門',
-  mid: '高階中段',
+  entry: '高級入門',
+  mid: '高級進階',
   top: '頂級',
 };

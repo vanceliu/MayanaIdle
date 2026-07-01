@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import '../components/WikiTable.css';
@@ -39,19 +39,24 @@ const CLASS_LABELS: Record<string, string> = {
 };
 
 const CRAFT_TIER_LABELS: Record<string, string> = {
-  entry: '高階入門',
-  mid: '高階中段',
+  entry: '高級入門',
+  mid: '高級進階',
   top: '頂級',
 };
 
 export function WeaponsPage() {
+  const { name } = useParams();
+  return <WeaponList initialSearch={name ? decodeURIComponent(name) : undefined} />;
+}
+
+function WeaponList({ initialSearch }: { initialSearch?: string }) {
   const weapons = useWeaponList();
   const [searchParams, setSearchParams] = useSearchParams();
   const craftTierParam = searchParams.get('craftTier');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [materialFilter, setMaterialFilter] = useState<string>('all');
   const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch || '');
   const [sortKey, setSortKey] = useState<string>('name');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -155,7 +160,7 @@ function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[num
     <tr>
       <td>
         <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(w.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <GameIcon name={getEquipIcon(w.type)} size={16} />
+          <GameIcon name={getEquipIcon(w.type)} size={16} color="#FFFFFF" />
           {w.name}
         </Link>
       </td>
@@ -185,3 +190,4 @@ function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[num
     </tr>
   );
 }
+

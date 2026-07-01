@@ -49,11 +49,16 @@ export function useDropSourceForItem(itemName: string): DropTableEntry[] {
   return DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === item.id);
 }
 
-export function getDropItemName(drop: { itemTemplateId?: number; equipmentTemplateId?: number; itemType: string }): string {
+export function getDropItemName(drop: { itemTemplateId?: number; equipmentTemplateId?: number; equipmentPool?: string; craftTier?: string; itemType: string }): string {
   if (drop.itemType === 'gold') return '金幣';
   if (drop.itemType === 'equipment' && drop.equipmentTemplateId) {
     const equip = EQUIPMENT_SEEDS.find(e => e.id === drop.equipmentTemplateId);
     return equip?.name ?? '未知裝備';
+  }
+  if (drop.itemType === 'equipment' && drop.equipmentPool) {
+    const tierLabel = drop.craftTier === 'top' ? '頂級' : drop.craftTier === 'mid' ? '高級進階' : '高級入門';
+    const poolLabel = drop.equipmentPool === 'weapon' ? '武器' : '防具';
+    return `${tierLabel}${poolLabel}（隨機）`;
   }
   if (drop.itemTemplateId) {
     return getItemById(drop.itemTemplateId)?.name ?? '未知道具';

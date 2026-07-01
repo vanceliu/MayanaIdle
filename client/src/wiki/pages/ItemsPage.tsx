@@ -17,7 +17,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: '其他',
 };
 
-function getWikiItemIcon(item: typeof ITEM_DEFINITIONS[number]): { icon: string; color?: string } {
+function getWikiItemIcon(item: typeof ITEM_DEFINITIONS[number]): { icon: string; color: string } {
   if (item.iconType) {
     return { icon: getMaterialIcon(item.iconType), color: getMaterialColor(item.iconTier) };
   }
@@ -27,12 +27,12 @@ function getWikiItemIcon(item: typeof ITEM_DEFINITIONS[number]): { icon: string;
     if (item.name.includes('白')) return { icon: getItemIcon('white-potion'), color: '#E2E8F0' };
     if (item.name.includes('強化綠')) return { icon: getItemIcon('enhanced-green-potion'), color: '#4ADE80' };
     if (item.name.includes('綠')) return { icon: getItemIcon('green-potion'), color: '#4ADE80' };
-    return { icon: getItemIcon('red-potion') };
+    return { icon: getItemIcon('red-potion'), color: '#FFFFFF' };
   }
-  if (item.category === 'scroll') return { icon: getItemIcon('scroll') };
-  if (item.category === 'spellbook') return { icon: getItemIcon('spellbook') };
-  if (item.category === 'dungeon') return { icon: getItemIcon('key') };
-  return { icon: getItemIcon('material') };
+  if (item.category === 'scroll') return { icon: getItemIcon('scroll'), color: '#FFFFFF' };
+  if (item.category === 'spellbook') return { icon: getItemIcon('spellbook'), color: '#FFFFFF' };
+  if (item.category === 'dungeon') return { icon: getItemIcon('key'), color: '#FFFFFF' };
+  return { icon: getItemIcon('material'), color: '#FFFFFF' };
 }
 
 export function ItemsPage() {
@@ -59,6 +59,14 @@ function ItemList() {
   return (
     <div>
       <h2 className="wiki-page-title">道具總表</h2>
+      <div style={{ marginBottom: 16, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+        <span style={{ marginRight: 12 }}>素材顏色：</span>
+        <span style={{ color: '#FFFFFF', marginRight: 12 }}>● 無製作用途</span>
+        <span style={{ color: '#60A5FA', marginRight: 12 }}>● 入門製作</span>
+        <span style={{ color: '#4ADE80', marginRight: 12 }}>● 高級進階製作</span>
+        <span style={{ color: '#FACC15', marginRight: 12 }}>● 頂級製作</span>
+        <span style={{ color: '#FB923C', marginRight: 12 }}>● Boss 素材</span>
+      </div>
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
           <option value="all">全部類型</option>

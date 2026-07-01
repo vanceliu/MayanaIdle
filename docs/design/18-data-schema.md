@@ -218,7 +218,7 @@ baseValue × (1 + qualityPercent / 100)
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
 | craftGold | number? | 製作金幣（craft 時必填） |
 | craftMaterials | json? | 製作素材 `[{name, amount}]`（craft 時必填） |
-| craftPrerequisiteWeapon | json? | 前置武器需求 `{name, quantity}`（中段以上製作品） |
+| craftPrerequisiteWeapon | json? | 前置武器需求 `{name, quantity}`（高級進階以上製作品） |
 
 ### 取得方式規則
 

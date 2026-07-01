@@ -63,8 +63,8 @@ export function getMaterialIcon(iconType?: MaterialIconType): string {
   return iconType ? MATERIAL_ICON_MAP[iconType] : ITEM_ICON_MAP['material'];
 }
 
-export function getMaterialColor(iconTier?: number): string | undefined {
-  return iconTier ? MATERIAL_TIER_COLORS[iconTier] : undefined;
+export function getMaterialColor(iconTier?: number): string {
+  return iconTier ? MATERIAL_TIER_COLORS[iconTier] : '#FFFFFF';
 }
 
 export const EQUIP_ICON_MAP: Record<string, string> = {
