@@ -501,7 +501,7 @@ export const EQUIPMENT_SEEDS: Omit<EquipmentTemplate, 'id'>[] = [
   { name: '新手鐵鎚', type: 'mace', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 3, largeMonsterDamage: 5, attackSuccess: 0, extraAttack: 0, weight: 12, material: 'iron', requiredLevel: 1, buyPrice: 0, stability: 6, canBreak: true, requiredClass: ['priest'], acquireType: 'starter' },
   // 副手
   { name: '新手盾', type: 'shield', slot: 'leftHand', isTwoHanded: false, defense: 4, blockRate: 4, weight: 15, requiredLevel: 1, buyPrice: 0, stability: 4, requiredClass: ['knight', 'priest'], acquireType: 'starter' },
-  { name: '新手魔導書', type: 'magicBook', slot: 'leftHand', isTwoHanded: false, defense: 0, magicAttack: 1, weight: 8, requiredLevel: 1, buyPrice: 0, stability: -1, requiredClass: ['elementalist'], acquireType: 'starter' },
+  { name: '新手魔導書', type: 'magicBook', slot: 'leftHand', isTwoHanded: false, defense: 0, magicAttack: 1, weight: 8, requiredLevel: 1, buyPrice: 0, stability: 6, requiredClass: ['elementalist'], acquireType: 'starter' },
   // 頭盔
   { name: '新手鐵盔', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 1, weight: 12, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['knight'], acquireType: 'starter' },
   { name: '新手皮帽', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 1, weight: 10, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elf'], acquireType: 'starter' },

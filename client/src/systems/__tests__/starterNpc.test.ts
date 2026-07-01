@@ -159,7 +159,7 @@ describe('starterNpc', () => {
 
     it('returns false for items with stability -1 (cannot enhance)', () => {
       const item: EquipmentInstance = {
-        id: 1, templateId: 1, name: '新手魔導書', type: 'magicBook', slot: 'leftHand',
+        id: 1, templateId: 1, name: '測試飾品', type: 'armor', slot: 'belt',
         isTwoHanded: false, quality: 0, enhancement: 0, affixes: [],
         ownerId: 1, equipped: true, stability: -1, isStarterGear: true,
       };
