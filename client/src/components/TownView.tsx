@@ -9,8 +9,9 @@ import { Storage } from './town/Storage';
 import { MagicAcademy } from './town/MagicAcademy';
 import { ClassGuild } from './town/ClassGuild';
 import { TownBlacksmith } from './town/TownBlacksmith';
+import { StarterNpc } from './town/StarterNpc';
 
-export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild';
+export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc';
 
 interface FacilityInfo {
   id: TownFacility;
@@ -29,6 +30,8 @@ const FACILITIES: FacilityInfo[] = [
   { id: 'class-guild', name: '職業工會', icon: '⚜️' },
 ];
 
+const STARTER_NPC_FACILITY: FacilityInfo = { id: 'starter-npc', name: '新手指導員', icon: '🧭' };
+
 function FacilityContent({ facility }: { facility: TownFacility }) {
   switch (facility) {
     case 'general-store': return <GeneralStore />;
@@ -39,6 +42,7 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
     case 'storage': return <Storage />;
     case 'magic-academy': return <MagicAcademy />;
     case 'class-guild': return <ClassGuild />;
+    case 'starter-npc': return <StarterNpc />;
     default: return null;
   }
 }
@@ -52,6 +56,8 @@ export function TownView() {
 
   const region = getRegion(char.currentRegion);
   const townName = region?.name ?? '城鎮';
+  const isNeutralTown = char.currentRegion === 'neutral-town';
+  const visibleFacilities = isNeutralTown ? [...FACILITIES, STARTER_NPC_FACILITY] : FACILITIES;
 
   return (
     <div className="town-view">
@@ -61,7 +67,7 @@ export function TownView() {
       </div>
 
       <div className="town-npc-bar">
-        {FACILITIES.map(f => (
+        {visibleFacilities.map(f => (
           <button
             key={f.id}
             className={`town-npc-btn ${facility === f.id ? 'active' : ''}`}
@@ -78,7 +84,7 @@ export function TownView() {
         <div className="town-modal-overlay" onClick={() => setFacility('list')}>
           <div className="town-modal" onClick={e => e.stopPropagation()}>
             <div className="town-modal-header">
-              <span>{FACILITIES.find(f => f.id === facility)?.name}</span>
+              <span>{[...FACILITIES, STARTER_NPC_FACILITY].find(f => f.id === facility)?.name}</span>
               <button className="town-modal-close" onClick={() => setFacility('list')}>✕</button>
             </div>
             <div className="town-modal-body">

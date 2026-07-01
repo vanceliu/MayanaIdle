@@ -14,6 +14,8 @@ export interface WarehouseEntry {
   name: string;
   type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook' | 'gold';
   amount: number;
+  storageType: 'personal' | 'shared';
+  characterId?: number;
 }
 
 export interface DropTableEntry {
@@ -118,6 +120,24 @@ export class GameDB extends Dexie {
     });
     this.version(6).stores({
       bossDropTables: '++id, bossName, itemType',
+    });
+    this.version(7).stores({
+      equipmentInstances: '++id, templateId, ownerId, equipped, inStorage, storageType',
+      warehouses: '++id, userId, name, type, storageType, characterId',
+    }).upgrade(async tx => {
+      await tx.table('equipmentInstances').toCollection().modify((item: Record<string, unknown>) => {
+        if (item.inStorage && !item.storageType) {
+          item.storageType = 'shared';
+        }
+      });
+      await tx.table('warehouses').toCollection().modify((item: Record<string, unknown>) => {
+        if (!item.storageType) {
+          item.storageType = 'shared';
+        }
+      });
+    });
+    this.version(8).stores({
+      equipmentTemplates: '++id, name, type, slot, acquireType',
     });
   }
 }

@@ -132,6 +132,8 @@ interface GameState {
   storedEquipment: EquipmentInstance[];
   storedMaterials: BagItem[];
   warehouseGold: number;
+  personalStoredEquipment: EquipmentInstance[];
+  personalStoredMaterials: BagItem[];
   activeEffects: ActiveEffect[];
 
   setPhase: (phase: GamePhase) => void;
@@ -230,6 +232,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   storedEquipment: [],
   storedMaterials: [],
   warehouseGold: 0,
+  personalStoredEquipment: [],
+  personalStoredMaterials: [],
   activeEffects: [],
 
   setPhase: (phase) => set({ phase }),
@@ -264,17 +268,25 @@ export const useGameStore = create<GameState>((set, get) => ({
     const items = await db.equipmentInstances.where('ownerId').equals(char.id!).toArray();
     const equipped: EquippedGear = {};
     const inventory: EquipmentInstance[] = [];
-    const storedEquipItems: EquipmentInstance[] = [];
+    const personalStoredEquipItems: EquipmentInstance[] = [];
     for (const item of items) {
       const resolved = resolveEquipment(item);
       if (resolved.equipped) {
         equipped[resolved.slot] = resolved;
-      } else if (resolved.inStorage) {
-        storedEquipItems.push(resolved);
-      } else {
+      } else if (resolved.inStorage && resolved.storageType === 'personal') {
+        personalStoredEquipItems.push(resolved);
+      } else if (!resolved.inStorage) {
         inventory.push(resolved);
       }
     }
+
+    // Load shared warehouse equipment (ownerId = userId)
+    const userId = get().userId!;
+    const sharedEquipItems = await db.equipmentInstances
+      .where('ownerId').equals(userId)
+      .filter(item => item.inStorage === true && item.storageType === 'shared')
+      .toArray();
+    const storedEquipItems: EquipmentInstance[] = sharedEquipItems.map(resolveEquipment);
 
     const bagRows = await db.characterBag.where('characterId').equals(char.id!).toArray();
     const bagItems: BagItem[] = [];
@@ -282,9 +294,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       bagItems.push({ name: row.name, type: row.type, amount: row.amount });
     }
 
-    // Load warehouse (account-level storage)
-    const userId = get().userId!;
-    const warehouseRows = await db.warehouses.where('userId').equals(userId).toArray();
+    // Load warehouse materials (account-level shared storage)
+    const warehouseRows = await db.warehouses.where('userId').equals(userId)
+      .filter(row => !row.storageType || row.storageType === 'shared')
+      .toArray();
     const storedMaterials: BagItem[] = [];
     let warehouseGold = 0;
     for (const row of warehouseRows) {
@@ -292,6 +305,18 @@ export const useGameStore = create<GameState>((set, get) => ({
         warehouseGold = row.amount;
       } else if (row.type !== 'equipment') {
         storedMaterials.push({ name: row.name, type: row.type as BagItem['type'], amount: row.amount });
+      }
+    }
+
+    // Load personal warehouse materials (character-level storage)
+    const personalWarehouseRows = await db.warehouses
+      .where('characterId').equals(char.id!)
+      .filter(row => row.storageType === 'personal')
+      .toArray();
+    const personalStoredMaterials: BagItem[] = [];
+    for (const row of personalWarehouseRows) {
+      if (row.type !== 'equipment' && row.type !== 'gold') {
+        personalStoredMaterials.push({ name: row.name, type: row.type as BagItem['type'], amount: row.amount });
       }
     }
 
@@ -328,6 +353,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       storedMaterials,
       storedEquipment: storedEquipItems,
       warehouseGold,
+      personalStoredEquipment: personalStoredEquipItems,
+      personalStoredMaterials,
       scriptRules,
       combatRules,
       persistentRules,
@@ -346,8 +373,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   deleteCharacter: async (characterId) => {
-    await db.equipmentInstances.where('ownerId').equals(characterId).delete();
+    await db.equipmentInstances.where('ownerId').equals(characterId)
+      .filter(item => item.storageType !== 'shared')
+      .delete();
     await db.characterBag.where('characterId').equals(characterId).delete();
+    await db.warehouses.where('characterId').equals(characterId)
+      .filter(row => row.storageType === 'personal')
+      .delete();
     await db.characters.delete(characterId);
     localStorage.removeItem(`mayana_prefs_${characterId}`);
     await get().loadCharacterList();
@@ -368,6 +400,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       monsters: [],
       combatLogs: [],
       storedEquipment: [],
+      personalStoredEquipment: [],
+      personalStoredMaterials: [],
       activeEffects: [],
       scriptRules: DEFAULT_SCRIPT,
       combatRules: DEFAULT_COMBAT_SCRIPT,
@@ -1771,21 +1805,39 @@ async function saveGame(state: GameState) {
     await db.characterBag.bulkAdd(bagEntries);
   }
 
-  // Save warehouse (account-level storage)
+  // Save shared warehouse (account-level storage)
   const userId = state.userId;
   if (userId) {
-    await db.warehouses.where('userId').equals(userId).delete();
+    await db.warehouses.where('userId').equals(userId)
+      .filter(row => !row.storageType || row.storageType === 'shared')
+      .delete();
     const warehouseEntries: WarehouseEntry[] = [];
     for (const item of state.storedMaterials) {
       if (item.amount > 0) {
-        warehouseEntries.push({ userId, name: item.name, type: item.type, amount: item.amount });
+        warehouseEntries.push({ userId, name: item.name, type: item.type, amount: item.amount, storageType: 'shared' });
       }
     }
     if (state.warehouseGold > 0) {
-      warehouseEntries.push({ userId, name: 'gold', type: 'gold', amount: state.warehouseGold });
+      warehouseEntries.push({ userId, name: 'gold', type: 'gold', amount: state.warehouseGold, storageType: 'shared' });
     }
     if (warehouseEntries.length > 0) {
       await db.warehouses.bulkAdd(warehouseEntries);
+    }
+  }
+
+  // Save personal warehouse (character-level storage)
+  if (userId) {
+    await db.warehouses.where('characterId').equals(char.id)
+      .filter(row => row.storageType === 'personal')
+      .delete();
+    const personalEntries: WarehouseEntry[] = [];
+    for (const item of state.personalStoredMaterials) {
+      if (item.amount > 0) {
+        personalEntries.push({ userId, name: item.name, type: item.type, amount: item.amount, storageType: 'personal', characterId: char.id });
+      }
+    }
+    if (personalEntries.length > 0) {
+      await db.warehouses.bulkAdd(personalEntries);
     }
   }
 

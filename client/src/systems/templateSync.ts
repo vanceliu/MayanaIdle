@@ -50,6 +50,6 @@ export function resolveEquipmentList(instances: EquipmentInstance[]): EquipmentI
 }
 
 export function toStorableInstance(instance: EquipmentInstance): Record<string, unknown> {
-  const { id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage } = instance;
-  return { id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage };
+  const { id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage, isStarterGear } = instance;
+  return { id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage, ...(isStarterGear ? { isStarterGear } : {}) };
 }

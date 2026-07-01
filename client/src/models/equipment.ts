@@ -29,7 +29,7 @@ export type WeaponType =
 
 export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' | 'orichalcum';
 
-export type AcquireType = 'shop' | 'craft' | 'drop_only';
+export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
 export type CraftTier = 'entry' | 'mid' | 'top';
 
 export interface CraftMaterial {
@@ -106,6 +106,8 @@ export interface EquipmentInstance {
   ownerId: number;
   equipped: boolean;
   inStorage?: boolean;
+  storageType?: 'personal' | 'shared';
+  isStarterGear?: boolean;
 }
 
 export function isHandSlot(slot: EquipSlot): boolean {

@@ -51,8 +51,11 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 47. 死亡後傳送至最近城鎮，HP 恢復 50%，停留在城鎮內不自動回去探索
 48. 鐵匠鋪必須能看到玩家身上裝備與背包裝備
 49. 每個帳號最多可建立 4 個角色（暫定），不可超出此上限
-50. 個人倉庫綁定帳號（User），同帳號所有角色共用同一個倉庫
-51. 倉庫可存放物品與金幣，角色身上金幣各自獨立
+50. 倉庫系統分為「個人倉庫」與「共用倉庫」兩種
+51. 個人倉庫綁定角色（Character），僅該角色可存取，匯出角色時一起帶走
+52. 共用倉庫綁定帳號（User），同帳號所有角色可存取，匯出角色時不帶走
+53. 跨角色轉移裝備必須透過共用倉庫中轉（A 存入共用倉庫 → B 取出）
+54. 金幣各角色獨立，共用倉庫提供存放金幣功能供跨角色轉移
 52. 登出功能為返回角色選擇畫面，不是關閉遊戲
 53. 背包固定 100 格，不可擴充、不可新增背包擴充系統
 54. 背包不可新增拖拽（Drag & Drop）、物品篩選/搜尋、多頁分頁功能
@@ -69,26 +72,49 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 > AI 中斷後可依此接續，完成後由使用者確認刪除。
 
-### Phase：區域素材掉落 + 製作配方改版
+### Phase：倉庫系統重構（個人倉庫 + 共用倉庫）
 
-**目標**：實作區域素材掉落系統，降低前期金幣陣痛期，並將製作配方改為「區域素材 + 通用基底」模式。
+**目標**：將現有單一倉庫拆分為「個人倉庫（角色層級）」與「共用倉庫（帳號層級）」，修正跨角色看不到裝備的 bug，並確保匯出/匯入邊界正確。
 
 **設計文件已更新**：
-- `30-items.md` — 新增區域素材定義、Boss 專屬素材、製作配方結構
-- `27-drop-table.md` — 全區域掉落表加入區域素材 + Boss 專屬素材
-- `06-equipment-acquire.md` — 製作配方結構改為區域素材 + 通用基底
+- `99-ai-constraints.md` — 第 50-54 條改為雙倉庫規則
+- `19-account-character.md` — § 19.7 改為雙倉庫設計
+- `13-town.md` — § 13.8 拆分個人/共用倉庫說明
+- `35-inventory-constraints.md` — § 35.12 更新倉庫互動規則
 
 **實作步驟**：
 
-- [x] Step 1：新增區域素材 seed 資料（ItemTemplate），含 id、name、weight、sellPrice、sourceArea、craftUse 欄位
-- [x] Step 2：新增 Boss 專屬素材 seed 資料（每個 Boss 獨立素材）
-- [x] Step 3：更新各區域 dropTable seed，加入區域素材掉落（dropValue 對應設計文件）
-- [x] Step 4：更新各 Boss 的 bossDropTable seed，加入專屬素材掉落
-- [x] Step 5：實作素材賣給雜貨店功能（getSellPrice 讀取 ItemDefinition，統一 50% 回收）
-- [x] Step 6：更新鐵匠鋪製作配方 seed，改為新版「區域素材 + 通用基底」需求
-- [x] Step 7：DB seed 自動重建機制確認（performSeed 會 clear + bulkAdd）
-- [x] Step 8：撰寫相關 unit/integration test
-- [x] Step 9：驗證經濟平衡 — 確認前期金幣收入提升約 30~35%
-- [x] Step 10：同步更新設計文件（Boss 素材名稱改為各 Boss 獨立命名）
+- [ ] Step 1：DB schema 更新 — `equipmentInstances` 加 `storageType: 'personal' | 'shared'` 欄位；`warehouses` 表加 `storageType` 欄位
+- [ ] Step 2：`Storage.tsx` UI 拆分為兩個 tab（個人倉庫 / 共用倉庫）
+- [ ] Step 3：`depositEquip` / `withdrawEquip` 修正 — 存入共用倉庫時 `ownerId` 改為 userId，個人倉庫保持 characterId
+- [ ] Step 4：`selectCharacter` 載入邏輯修正 — 個人倉庫查 `ownerId = characterId + inStorage`，共用倉庫查 `ownerId = userId + inStorage`
+- [ ] Step 5：`saveGame` 確認材料/金幣的倉庫存取也區分個人/共用
+- [ ] Step 6：`characterTransfer.ts` 修正 — 匯出包含個人倉庫裝備，排除共用倉庫裝備；匯入時過濾 `storageType: 'shared'`
+- [ ] Step 7：DB migration / seed 更新（既有倉庫資料預設遷移為共用倉庫）
+- [ ] Step 8：撰寫相關 unit/integration test
+- [ ] Step 9：驗證跨角色共用倉庫存取正常、匯出匯入邊界正確
+
+---
+
+### Phase：新手 NPC 與新手裝備系統
+
+**目標**：在薄暮村新增新手 NPC，提供職業對應的新手裝備（不可存倉庫、不可販售），並提供專屬低價強化服務。
+
+**設計文件已更新**：
+- `13-town.md` — § 13.11 新手 NPC 完整規格
+
+**實作步驟**：
+
+- [ ] Step 1：`equipment.ts` model 更新 — `EquipmentInstance` 新增 `isStarterGear?: boolean` 欄位
+- [ ] Step 2：`seed.ts` 新增新手裝備模板（5 職業共 22 件，`acquireType: 'starter'`）
+- [ ] Step 3：`database.ts` 新增 `acquireType: 'starter'` 類型；DB migrate 支援新欄位
+- [ ] Step 4：`gameStore.ts` 新增新手 NPC 相關邏輯：
+  - `claimStarterGear(characterClass)` — 領取新手裝備（檢查等級 ≤ 30、補領缺少的）
+  - `enhanceStarterGear(equipId)` — 新手裝備強化（消耗 500G、上限為安定值）
+- [ ] Step 5：`gameStore.ts` 修正既有邏輯 — 倉庫存入/販售時檢查 `isStarterGear` 阻擋
+- [ ] Step 6：新增 `StarterNpc.tsx` 組件 — NPC 對話、領取裝備列表、強化介面
+- [ ] Step 7：`TownView.tsx` 新增新手 NPC 設施入口（僅薄暮村顯示）
+- [ ] Step 8：撰寫 unit test — 領取限制（等級 > 30 不可領）、補領邏輯、強化上限、倉庫/販售阻擋
+- [ ] Step 9：整合測試 — 完整流程驗證（建角→領取→強化→丟棄→補領）
 
 ---

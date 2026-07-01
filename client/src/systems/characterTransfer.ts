@@ -2,17 +2,19 @@ import { db } from '../db/database';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../stores/gameStore';
+import type { WarehouseEntry } from '../db/database';
 import { instantiateFromTemplate } from '../models/skillTemplate';
 
 const ENCRYPTION_PASSPHRASE = 'MayanaIdle-v1-8f3k2m9x';
 const SALT = new Uint8Array([77, 97, 121, 97, 110, 97, 73, 100, 108, 101, 83, 97, 108, 116, 50, 48]);
 
 interface CharacterExportData {
-  version: 1;
+  version: 2;
   exportedAt: number;
   character: Character;
   equipmentInstances: EquipmentInstance[];
   bagItems: BagItem[];
+  personalWarehouseItems: BagItem[];
   localPreferences: Record<string, unknown> | null;
 }
 
@@ -69,6 +71,7 @@ export async function exportCharacterData(characterId: number): Promise<string> 
   const equipmentInstances = await db.equipmentInstances
     .where('ownerId')
     .equals(characterId)
+    .filter(item => item.storageType !== 'shared')
     .toArray();
 
   const bagRows = await db.characterBag
@@ -81,15 +84,25 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     amount: r.amount,
   }));
 
+  const personalWarehouseRows = await db.warehouses
+    .where('characterId')
+    .equals(characterId)
+    .filter(row => row.storageType === 'personal')
+    .toArray();
+  const personalWarehouseItems: BagItem[] = personalWarehouseRows
+    .filter(r => r.type !== 'equipment' && r.type !== 'gold')
+    .map(r => ({ name: r.name, type: r.type as BagItem['type'], amount: r.amount }));
+
   const prefsRaw = localStorage.getItem(`mayana_prefs_${characterId}`);
   const localPreferences = prefsRaw ? JSON.parse(prefsRaw) : null;
 
   const data: CharacterExportData = {
-    version: 1,
+    version: 2,
     exportedAt: Date.now(),
     character,
     equipmentInstances,
     bagItems,
+    personalWarehouseItems,
     localPreferences,
   };
 
@@ -118,9 +131,9 @@ export async function importCharacterData(
     throw new Error('檔案解密失敗，可能已被竄改');
   }
 
-  const data: CharacterExportData = JSON.parse(json);
+  const data = JSON.parse(json) as CharacterExportData & { version: number };
 
-  if (data.version !== 1) {
+  if (data.version !== 1 && data.version !== 2) {
     throw new Error('不支援的匯出版本');
   }
   if (!data.character || !data.equipmentInstances) {
@@ -163,13 +176,16 @@ export async function importCharacterData(
     areaEnteredAt: Date.now(),
   });
 
+  // Delete character-owned equipment (exclude shared warehouse items)
   await db.equipmentInstances.where('ownerId').equals(currentCharacterId).delete();
   if (data.equipmentInstances.length > 0) {
-    const instances = data.equipmentInstances.map(ei => ({
-      ...ei,
-      id: undefined,
-      ownerId: currentCharacterId,
-    }));
+    const instances = data.equipmentInstances
+      .filter(ei => ei.storageType !== 'shared')
+      .map(ei => ({
+        ...ei,
+        id: undefined,
+        ownerId: currentCharacterId,
+      }));
     await db.equipmentInstances.bulkAdd(instances);
   }
 
@@ -182,6 +198,23 @@ export async function importCharacterData(
       amount: item.amount,
     }));
     await db.characterBag.bulkAdd(bagEntries);
+  }
+
+  // Restore personal warehouse materials (version 2+)
+  if (data.version === 2 && data.personalWarehouseItems && data.personalWarehouseItems.length > 0) {
+    await db.warehouses
+      .where('characterId').equals(currentCharacterId)
+      .filter(row => row.storageType === 'personal')
+      .delete();
+    const personalEntries: WarehouseEntry[] = data.personalWarehouseItems.map(item => ({
+      userId: existing.userId,
+      name: item.name,
+      type: item.type,
+      amount: item.amount,
+      storageType: 'personal' as const,
+      characterId: currentCharacterId,
+    }));
+    await db.warehouses.bulkAdd(personalEntries);
   }
 
   if (data.localPreferences) {

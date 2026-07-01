@@ -83,6 +83,7 @@ export function WeaponShop() {
   }
 
   function sellEquipment(item: EquipmentInstance) {
+    if (item.isStarterGear) return;
     const sellPrice = getSellPrice(item);
     if (sellPrice <= 0) return;
     const inv = useGameStore.getState().inventory;
@@ -94,7 +95,7 @@ export function WeaponShop() {
     useGameStore.getState().saveState();
   }
 
-  const weaponsInBag = inventory.filter(i => !!i.smallMonsterDamage && getSellPrice(i) > 0);
+  const weaponsInBag = inventory.filter(i => !!i.smallMonsterDamage && getSellPrice(i) > 0 && !i.isStarterGear);
 
   return (
     <div className="shop-panel">

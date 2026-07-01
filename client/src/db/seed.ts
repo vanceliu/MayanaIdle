@@ -492,6 +492,36 @@ export const EQUIPMENT_SEEDS: Omit<EquipmentTemplate, 'id'>[] = [
   { name: '暗影戒指', type: 'armor', slot: 'ring1', isTwoHanded: false, defense: 0, bonusStats: '魅力+1', weight: 3, material: 'silver', requiredLevel: 25, buyPrice: 0, stability: -1, requiredClass: ['thief'], acquireType: 'craft', craftTier: 'entry', craftGold: 100000, craftMaterials: [{ name: '山賊鐵塊', amount: 3 }, { name: '凍骨碎片', amount: 4 }, { name: '銀礦石', amount: 3 }] },
   { name: '龍血戒指', type: 'armor', slot: 'ring1', isTwoHanded: false, defense: 0, bonusHp: 30, hpRegen: 1, weight: 5, material: 'dragon', requiredLevel: 35, buyPrice: 0, stability: -1, requiredClass: ['knight', 'elf'], acquireType: 'craft', craftTier: 'mid', craftGold: 200000, craftMaterials: [{ name: '鏡面碎片', amount: 6 }, { name: '亡靈碎骨', amount: 5 }, { name: '骷髏兵箭簇', amount: 4 }, { name: '米索利碎片', amount: 3 }] },
   { name: '賢者戒指', type: 'armor', slot: 'ring1', isTwoHanded: false, defense: 0, bonusMp: 25, mpRegen: 1, weight: 3, material: 'mithril', requiredLevel: 35, buyPrice: 0, stability: -1, requiredClass: ['elementalist', 'priest'], acquireType: 'craft', craftTier: 'mid', craftGold: 200000, craftMaterials: [{ name: '飛龍鱗片', amount: 6 }, { name: '剝皮蛛牙', amount: 5 }, { name: '亡魂騎士碎甲', amount: 4 }, { name: '米索利碎片', amount: 3 }] },
+  // === 新手裝備（NPC 發放） ===
+  // 武器
+  { name: '新手劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 4, largeMonsterDamage: 3, attackSuccess: 0, extraAttack: 0, weight: 15, material: 'iron', requiredLevel: 1, buyPrice: 0, stability: 6, canBreak: true, requiredClass: ['knight'], acquireType: 'starter' },
+  { name: '新手匕首', type: 'dagger', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 3, largeMonsterDamage: 2, attackSuccess: 1, extraAttack: 1, weight: 6, material: 'iron', requiredLevel: 1, buyPrice: 0, stability: 6, canBreak: true, requiredClass: ['thief'], acquireType: 'starter' },
+  { name: '新手弓', type: 'bow', slot: 'rightHand', isTwoHanded: true, smallMonsterDamage: 4, largeMonsterDamage: 3, attackSuccess: 1, extraAttack: 0, weight: 12, material: 'wood', requiredLevel: 1, buyPrice: 0, stability: 6, canBreak: true, requiredClass: ['elf'], acquireType: 'starter' },
+  { name: '新手法杖', type: 'staff', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 2, largeMonsterDamage: 2, attackSuccess: 0, extraAttack: 0, weight: 8, material: 'wood', requiredLevel: 1, buyPrice: 0, stability: 6, canBreak: true, requiredClass: ['elementalist'], acquireType: 'starter' },
+  { name: '新手鐵鎚', type: 'mace', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 3, largeMonsterDamage: 5, attackSuccess: 0, extraAttack: 0, weight: 12, material: 'iron', requiredLevel: 1, buyPrice: 0, stability: 6, canBreak: true, requiredClass: ['priest'], acquireType: 'starter' },
+  // 副手
+  { name: '新手盾', type: 'shield', slot: 'leftHand', isTwoHanded: false, defense: 4, blockRate: 4, weight: 15, requiredLevel: 1, buyPrice: 0, stability: 4, requiredClass: ['knight', 'priest'], acquireType: 'starter' },
+  { name: '新手魔導書', type: 'magicBook', slot: 'leftHand', isTwoHanded: false, defense: 0, magicAttack: 1, weight: 8, requiredLevel: 1, buyPrice: 0, stability: -1, requiredClass: ['elementalist'], acquireType: 'starter' },
+  // 頭盔
+  { name: '新手鐵盔', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 1, weight: 12, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['knight'], acquireType: 'starter' },
+  { name: '新手皮帽', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 1, weight: 10, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elf'], acquireType: 'starter' },
+  { name: '新手法師頭巾', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 1, weight: 8, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elementalist', 'priest'], acquireType: 'starter' },
+  { name: '新手面罩', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 1, weight: 8, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['thief'], acquireType: 'starter' },
+  // 胸甲
+  { name: '新手鎖甲', type: 'armor', slot: 'chest', isTwoHanded: false, defense: 3, weight: 25, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['knight'], acquireType: 'starter' },
+  { name: '新手皮甲', type: 'armor', slot: 'chest', isTwoHanded: false, defense: 2, weight: 20, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elf'], acquireType: 'starter' },
+  { name: '新手法師長袍', type: 'armor', slot: 'chest', isTwoHanded: false, defense: 1, weight: 12, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elementalist', 'priest'], acquireType: 'starter' },
+  { name: '新手盜賊皮衣', type: 'armor', slot: 'chest', isTwoHanded: false, defense: 2, weight: 18, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['thief'], acquireType: 'starter' },
+  // 手套
+  { name: '新手鐵手甲', type: 'armor', slot: 'gloves', isTwoHanded: false, defense: 1, weight: 10, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['knight'], acquireType: 'starter' },
+  { name: '新手皮手套', type: 'armor', slot: 'gloves', isTwoHanded: false, defense: 1, weight: 8, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elf'], acquireType: 'starter' },
+  { name: '新手法師手套', type: 'armor', slot: 'gloves', isTwoHanded: false, defense: 1, weight: 6, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elementalist', 'priest'], acquireType: 'starter' },
+  { name: '新手護腕', type: 'armor', slot: 'gloves', isTwoHanded: false, defense: 1, weight: 6, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['thief'], acquireType: 'starter' },
+  // 靴子
+  { name: '新手鐵靴', type: 'armor', slot: 'boots', isTwoHanded: false, defense: 1, weight: 12, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['knight'], acquireType: 'starter' },
+  { name: '新手皮靴', type: 'armor', slot: 'boots', isTwoHanded: false, defense: 1, weight: 10, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elf'], acquireType: 'starter' },
+  { name: '新手布鞋', type: 'armor', slot: 'boots', isTwoHanded: false, defense: 1, weight: 8, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['elementalist', 'priest'], acquireType: 'starter' },
+  { name: '新手疾風靴', type: 'armor', slot: 'boots', isTwoHanded: false, defense: 1, weight: 8, stability: 4, requiredLevel: 1, buyPrice: 0, requiredClass: ['thief'], acquireType: 'starter' },
 ];
 
 export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
