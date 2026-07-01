@@ -47,7 +47,7 @@ describe('seedDatabase', () => {
     // dawn-plains should have exactly 7 entries
     expect(areaCounts['dawn-plains']).toBe(7);
     // Total should match seed data
-    expect(dropCount).toBe(607);
+    expect(dropCount).toBe(618);
   });
 
   it('should fix legacy duplicated dropTables', async () => {
@@ -70,7 +70,7 @@ describe('seedDatabase', () => {
     await seedDatabase();
 
     const afterCount = await db.dropTables.count();
-    expect(afterCount).toBe(607); // correct seed count
+    expect(afterCount).toBe(618); // correct seed count
 
     // dawn-plains should have exactly 7 entries
     const dawnEntries = await db.dropTables.where('area').equals('dawn-plains').toArray();

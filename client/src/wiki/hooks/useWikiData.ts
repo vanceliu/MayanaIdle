@@ -32,7 +32,7 @@ export function useEquipmentByName(name: string): EquipmentSeed | undefined {
 }
 
 export function useDropTableByArea(area: string): DropSeed[] {
-  return DROP_TABLE_SEEDS.filter(d => d.area === area || d.area.startsWith(`${area}-`));
+  return DROP_TABLE_SEEDS.filter(d => d.area === area || d.area.match(new RegExp(`^${area}-\\d+f$`)));
 }
 
 export function useBossDropTableByName(bossName: string): BossDropSeed[] {

@@ -610,14 +610,16 @@ Key: `mayana_prefs_${characterId}`
 
 ## 32.10a 副本地圖結構（mapData.ts）
 
-所有副本全面拆分為獨立 area ID，每層/段為一個獨立 Region，掉落表按 area ID 查詢。
+多層副本使用 Region + `floors[]` 結構，seed area 以 `${regionId}-${floor}f` 格式對應各層。百柱塔維持獨立 Region。
 
-| 副本 | 結構 | Area ID 格式 |
-|---|---|---|
-| 象牙塔 | 5 層 | `ivory-tower-1f` ~ `ivory-tower-5f` |
-| 龍之谷 | 7 層 | `dragon-valley-1f` ~ `dragon-valley-7f` |
-| 古代地下城 | 9 層 | `ancient-dungeon-1f` ~ `ancient-dungeon-9f` |
-| 百柱塔 | 10 段（每 10 層一段） | `hundred-pillar-1-10f` ~ `hundred-pillar-91-100f` |
+| 副本 | 結構 | Region ID | Seed Area 格式 |
+|---|---|---|---|
+| 象牙塔 | 5 層 | `ivory-tower` | `ivory-tower-1f` ~ `ivory-tower-5f` |
+| 龍谷地間 | 7 層 | `dragon-valley` | `dragon-valley-1f` ~ `dragon-valley-7f` |
+| 遠古地監 | 9 層 | `ancient-dungeon` | `ancient-dungeon-1f` ~ `ancient-dungeon-9f` |
+| 朦朧洞窟 | 3 層 | `misty-cave` | `misty-cave-1f` ~ `misty-cave-3f` |
+| 水下監獄 | 4 層 | `underwater-prison` | `underwater-prison-1f` ~ `underwater-prison-4f` |
+| 百柱塔 | 10 段（每 10 層一段） | 獨立 Region | `hundred-pillar-1-10f` ~ `hundred-pillar-91-100f` |
 
 **掉落表分離原則：**
 - 每個 area ID 有獨立的 dropTable 記錄

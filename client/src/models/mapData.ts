@@ -11,16 +11,16 @@ export const ZONES: Zone[] = [
     faction: 'neutral',
     levelMin: 1,
     levelMax: 30,
-    regions: ['dawn-plains', 'green-valley', 'wind-woods', 'misty-swamp', 'trial-highlands', 'neutral-town'],
-    connectedZones: ['ivory-tower', 'grey-ridge'],
+    regions: ['dawn-plains', 'green-valley', 'wind-woods', 'misty-swamp', 'trial-highlands', 'trial-highlands-top', 'neutral-town'],
+    connectedZones: ['ivory-tower-zone', 'grey-ridge'],
   },
   {
-    id: 'ivory-tower',
+    id: 'ivory-tower-zone',
     name: '象牙塔',
     faction: 'neutral',
     levelMin: 30,
     levelMax: 45,
-    regions: ['snow-field', 'snow-field-deep', 'ivory-tower-1f', 'ivory-tower-2f', 'ivory-tower-3f', 'ivory-tower-4f', 'ivory-tower-5f'],
+    regions: ['snow-field', 'snow-field-deep', 'ivory-tower'],
     connectedZones: ['newbie-neutral'],
   },
   {
@@ -42,12 +42,12 @@ export const ZONES: Zone[] = [
     connectedZones: ['grey-ridge'],
   },
   {
-    id: 'dragon-valley',
+    id: 'dragon-valley-zone',
     name: '龍之谷',
     faction: 'neutral',
     levelMin: 30,
     levelMax: 50,
-    regions: ['dragon-valley-surface', 'dragon-valley-1f', 'dragon-valley-2f', 'dragon-valley-3f', 'dragon-valley-4f', 'dragon-valley-5f', 'dragon-valley-6f', 'dragon-valley-7f'],
+    regions: ['dragon-valley-surface', 'dragon-valley'],
     connectedZones: ['grey-ridge'],
   },
   {
@@ -56,8 +56,8 @@ export const ZONES: Zone[] = [
     faction: 'neutral',
     levelMin: 40,
     levelMax: 100,
-    regions: ['ancient-battlefield', 'hundred-pillar-1-10f', 'hundred-pillar-11-20f', 'hundred-pillar-21-30f', 'hundred-pillar-31-40f', 'hundred-pillar-41-50f', 'hundred-pillar-51-60f', 'hundred-pillar-61-70f', 'hundred-pillar-71-80f', 'hundred-pillar-81-90f', 'hundred-pillar-91-100f', 'ancient-dungeon-1f', 'ancient-dungeon-2f', 'ancient-dungeon-3f', 'ancient-dungeon-4f', 'ancient-dungeon-5f', 'ancient-dungeon-6f', 'ancient-dungeon-7f', 'ancient-dungeon-8f', 'ancient-dungeon-9f'],
-    connectedZones: ['newbie-neutral', 'elsarth', 'varden', 'dragon-valley'],
+    regions: ['ancient-battlefield', 'hundred-pillar-1-10f', 'hundred-pillar-11-20f', 'hundred-pillar-21-30f', 'hundred-pillar-31-40f', 'hundred-pillar-41-50f', 'hundred-pillar-51-60f', 'hundred-pillar-61-70f', 'hundred-pillar-71-80f', 'hundred-pillar-81-90f', 'hundred-pillar-91-100f', 'ancient-dungeon'],
+    connectedZones: ['newbie-neutral', 'elsarth', 'varden', 'dragon-valley-zone'],
   },
 ];
 
@@ -112,9 +112,19 @@ const trialHighlands: Region = {
   name: '試煉高地',
   type: 'field',
   levelMin: 21,
+  levelMax: 25,
+  zoneId: 'newbie-neutral',
+  monsters: ['石像鬼', '高地狼人', '風蝎', '高地獅鷲'],
+};
+
+const trialHighlandsTop: Region = {
+  id: 'trial-highlands-top',
+  name: '試煉高地頂部',
+  type: 'field',
+  levelMin: 26,
   levelMax: 30,
   zoneId: 'newbie-neutral',
-  monsters: ['石像鬼', '高地獅鷲', '山賊', '岩石巨人'],
+  monsters: ['暴風鷹', '山賊', '山賊頭目', '岩石巨人', '試煉飛龍'],
 };
 
 const neutralTown: Region = {
@@ -134,7 +144,7 @@ const snowField: Region = {
   type: 'field',
   levelMin: 30,
   levelMax: 33,
-  zoneId: 'ivory-tower',
+  zoneId: 'ivory-tower-zone',
   monsters: ['凍骨哥布林', '冰霜蜘蛛', '雪狼', '冰晶蝙蝠'],
 };
 
@@ -144,58 +154,24 @@ const snowFieldDeep: Region = {
   type: 'field',
   levelMin: 34,
   levelMax: 35,
-  zoneId: 'ivory-tower',
+  zoneId: 'ivory-tower-zone',
   monsters: ['雪人', '雪怪', '雪地之主'],
 };
 
-const ivoryTower1f: Region = {
-  id: 'ivory-tower-1f',
-  name: '象牙塔 1F',
+const ivoryTowerDungeon: Region = {
+  id: 'ivory-tower',
+  name: '象牙塔',
   type: 'dungeon',
   levelMin: 33,
-  levelMax: 36,
-  zoneId: 'ivory-tower',
-  monsters: ['冰霜蜘蛛', '象牙巫師', '冰晶蝙蝠'],
-};
-
-const ivoryTower2f: Region = {
-  id: 'ivory-tower-2f',
-  name: '象牙塔 2F',
-  type: 'dungeon',
-  levelMin: 36,
-  levelMax: 38,
-  zoneId: 'ivory-tower',
-  monsters: ['象牙巫師', '冰晶蝙蝠', '霜甲戰士'],
-};
-
-const ivoryTower3f: Region = {
-  id: 'ivory-tower-3f',
-  name: '象牙塔 3F',
-  type: 'dungeon',
-  levelMin: 38,
-  levelMax: 40,
-  zoneId: 'ivory-tower',
-  monsters: ['霜甲戰士', '冰霜元素', '象牙魔導師'],
-};
-
-const ivoryTower4f: Region = {
-  id: 'ivory-tower-4f',
-  name: '象牙塔 4F',
-  type: 'dungeon',
-  levelMin: 40,
-  levelMax: 42,
-  zoneId: 'ivory-tower',
-  monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士'],
-};
-
-const ivoryTower5f: Region = {
-  id: 'ivory-tower-5f',
-  name: '象牙塔 5F',
-  type: 'dungeon',
-  levelMin: 42,
   levelMax: 45,
-  zoneId: 'ivory-tower',
-  monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士', '象牙塔惡魔'],
+  zoneId: 'ivory-tower-zone',
+  floors: [
+    { floor: 1, levelMin: 33, levelMax: 36, monsters: ['冰霜蜘蛛', '象牙巫師', '冰晶蝙蝠'], isBossFloor: false },
+    { floor: 2, levelMin: 36, levelMax: 38, monsters: ['象牙巫師', '冰晶蝙蝠', '霜甲戰士'], isBossFloor: false },
+    { floor: 3, levelMin: 38, levelMax: 40, monsters: ['霜甲戰士', '冰霜元素', '象牙魔導師'], isBossFloor: false },
+    { floor: 4, levelMin: 40, levelMax: 42, monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士'], isBossFloor: false },
+    { floor: 5, levelMin: 42, levelMax: 45, monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士', '象牙塔惡魔'], isBossFloor: true, bossName: '象牙塔惡魔' },
+  ],
 };
 
 // --- 艾爾薩斯領地 ---
@@ -277,78 +253,26 @@ const dragonValleySurface: Region = {
   type: 'field',
   levelMin: 30,
   levelMax: 40,
-  zoneId: 'dragon-valley',
+  zoneId: 'dragon-valley-zone',
   monsters: ['飛龍', '高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '亞利安', '巨人'],
 };
 
-const dragonValleyDungeon1f: Region = {
-  id: 'dragon-valley-1f',
-  name: '龍谷地間 1F',
+const dragonValleyDungeon: Region = {
+  id: 'dragon-valley',
+  name: '龍谷地間',
   type: 'dungeon',
   levelMin: 40,
-  levelMax: 43,
-  zoneId: 'dragon-valley',
-  monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛'],
-};
-
-const dragonValleyDungeon2f: Region = {
-  id: 'dragon-valley-2f',
-  name: '龍谷地間 2F',
-  type: 'dungeon',
-  levelMin: 40,
-  levelMax: 43,
-  zoneId: 'dragon-valley',
-  monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛'],
-};
-
-const dragonValleyDungeon3f: Region = {
-  id: 'dragon-valley-3f',
-  name: '龍谷地間 3F',
-  type: 'dungeon',
-  levelMin: 43,
-  levelMax: 46,
-  zoneId: 'dragon-valley',
-  monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛'],
-};
-
-const dragonValleyDungeon4f: Region = {
-  id: 'dragon-valley-4f',
-  name: '龍谷地間 4F',
-  type: 'dungeon',
-  levelMin: 43,
-  levelMax: 46,
-  zoneId: 'dragon-valley',
-  monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛'],
-};
-
-const dragonValleyDungeon5f: Region = {
-  id: 'dragon-valley-5f',
-  name: '龍谷地間 5F',
-  type: 'dungeon',
-  levelMin: 46,
-  levelMax: 49,
-  zoneId: 'dragon-valley',
-  monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士'],
-};
-
-const dragonValleyDungeon6f: Region = {
-  id: 'dragon-valley-6f',
-  name: '龍谷地間 6F',
-  type: 'dungeon',
-  levelMin: 46,
-  levelMax: 49,
-  zoneId: 'dragon-valley',
-  monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士'],
-};
-
-const dragonValleyDungeon7f: Region = {
-  id: 'dragon-valley-7f',
-  name: '龍谷地間 7F',
-  type: 'dungeon',
-  levelMin: 49,
   levelMax: 50,
-  zoneId: 'dragon-valley',
-  monsters: ['大莫蜘蛛', '死亡靈魂', '死亡靈魂守衛', '安塔巨龍'],
+  zoneId: 'dragon-valley-zone',
+  floors: [
+    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛'], isBossFloor: false },
+    { floor: 2, levelMin: 40, levelMax: 43, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛'], isBossFloor: false },
+    { floor: 3, levelMin: 43, levelMax: 46, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛'], isBossFloor: false },
+    { floor: 4, levelMin: 43, levelMax: 46, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛'], isBossFloor: false },
+    { floor: 5, levelMin: 46, levelMax: 49, monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士'], isBossFloor: false },
+    { floor: 6, levelMin: 46, levelMax: 49, monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士'], isBossFloor: false },
+    { floor: 7, levelMin: 49, levelMax: 50, monsters: ['大莫蜘蛛', '死亡靈魂', '死亡靈魂守衛', '安塔巨龍'], isBossFloor: true, bossName: '安塔巨龍' },
+  ],
 };
 
 // --- 灰脊山脈 ---
@@ -472,94 +396,24 @@ const hundredPillar91_100: Region = {
   monsters: ['精靈王衛兵', '死之信徒', '精靈王射手', '精靈王魔導士', '死之執行者', '百柱死神'],
 };
 
-const ancientDungeon1f: Region = {
-  id: 'ancient-dungeon-1f',
-  name: '遠古地監 1F',
+const ancientDungeon: Region = {
+  id: 'ancient-dungeon',
+  name: '遠古地監',
   type: 'dungeon',
   levelMin: 45,
-  levelMax: 50,
-  zoneId: 'grey-ridge',
-  monsters: ['遠古囚犯', '遠古弓箭手'],
-};
-
-const ancientDungeon2f: Region = {
-  id: 'ancient-dungeon-2f',
-  name: '遠古地監 2F',
-  type: 'dungeon',
-  levelMin: 45,
-  levelMax: 50,
-  zoneId: 'grey-ridge',
-  monsters: ['遠古囚犯', '遠古弓箭手'],
-};
-
-const ancientDungeon3f: Region = {
-  id: 'ancient-dungeon-3f',
-  name: '遠古地監 3F',
-  type: 'dungeon',
-  levelMin: 45,
-  levelMax: 50,
-  zoneId: 'grey-ridge',
-  monsters: ['遠古囚犯', '遠古弓箭手'],
-};
-
-const ancientDungeon4f: Region = {
-  id: 'ancient-dungeon-4f',
-  name: '遠古地監 4F',
-  type: 'dungeon',
-  levelMin: 50,
-  levelMax: 55,
-  zoneId: 'grey-ridge',
-  monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'],
-};
-
-const ancientDungeon5f: Region = {
-  id: 'ancient-dungeon-5f',
-  name: '遠古地監 5F',
-  type: 'dungeon',
-  levelMin: 50,
-  levelMax: 55,
-  zoneId: 'grey-ridge',
-  monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'],
-};
-
-const ancientDungeon6f: Region = {
-  id: 'ancient-dungeon-6f',
-  name: '遠古地監 6F',
-  type: 'dungeon',
-  levelMin: 50,
-  levelMax: 55,
-  zoneId: 'grey-ridge',
-  monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'],
-};
-
-const ancientDungeon7f: Region = {
-  id: 'ancient-dungeon-7f',
-  name: '遠古地監 7F',
-  type: 'dungeon',
-  levelMin: 55,
   levelMax: 60,
   zoneId: 'grey-ridge',
-  monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精'],
-};
-
-const ancientDungeon8f: Region = {
-  id: 'ancient-dungeon-8f',
-  name: '遠古地監 8F',
-  type: 'dungeon',
-  levelMin: 55,
-  levelMax: 60,
-  zoneId: 'grey-ridge',
-  monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精'],
-};
-
-const ancientDungeon9f: Region = {
-  id: 'ancient-dungeon-9f',
-  name: '遠古地監 9F',
-  type: 'dungeon',
-  levelMin: 55,
-  levelMax: 60,
-  zoneId: 'grey-ridge',
-  monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精', '遠古騎士'],
+  floors: [
+    { floor: 1, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手'], isBossFloor: false },
+    { floor: 2, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手'], isBossFloor: false },
+    { floor: 3, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手'], isBossFloor: false },
+    { floor: 4, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'], isBossFloor: false },
+    { floor: 5, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'], isBossFloor: false },
+    { floor: 6, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'], isBossFloor: false },
+    { floor: 7, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精'], isBossFloor: false },
+    { floor: 8, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精'], isBossFloor: false },
+    { floor: 9, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精', '遠古騎士'], isBossFloor: true, bossName: '遠古騎士' },
+  ],
 };
 
 // ============================================================
@@ -573,15 +427,12 @@ export const REGIONS: Region[] = [
   windWoods,
   mistySwamp,
   trialHighlands,
+  trialHighlandsTop,
   neutralTown,
   // 象牙塔
   snowField,
   snowFieldDeep,
-  ivoryTower1f,
-  ivoryTower2f,
-  ivoryTower3f,
-  ivoryTower4f,
-  ivoryTower5f,
+  ivoryTowerDungeon,
   // 艾爾薩斯
   demonForest,
   mistyCave,
@@ -592,13 +443,7 @@ export const REGIONS: Region[] = [
   vardenTown,
   // 龍之谷
   dragonValleySurface,
-  dragonValleyDungeon1f,
-  dragonValleyDungeon2f,
-  dragonValleyDungeon3f,
-  dragonValleyDungeon4f,
-  dragonValleyDungeon5f,
-  dragonValleyDungeon6f,
-  dragonValleyDungeon7f,
+  dragonValleyDungeon,
   // 灰脊山脈
   ancientBattlefield,
   hundredPillar1_10,
@@ -611,15 +456,7 @@ export const REGIONS: Region[] = [
   hundredPillar71_80,
   hundredPillar81_90,
   hundredPillar91_100,
-  ancientDungeon1f,
-  ancientDungeon2f,
-  ancientDungeon3f,
-  ancientDungeon4f,
-  ancientDungeon5f,
-  ancientDungeon6f,
-  ancientDungeon7f,
-  ancientDungeon8f,
-  ancientDungeon9f,
+  ancientDungeon,
 ];
 
 // ============================================================

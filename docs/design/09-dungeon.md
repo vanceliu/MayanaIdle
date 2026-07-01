@@ -47,12 +47,14 @@ Mayana 大陸以灰脊山脈為中心，東西兩側分屬瓦爾登聯邦與艾�
 
 ### 副本架構
 
-所有副本（象牙塔、龍谷地間、遠古地監、百柱塔）的每層/段皆為獨立 area ID，各自擁有獨立掉落表和怪物分佈。不使用共用 floors 結構。
+多層副本使用 Region + `floors[]` 結構，seed 的 area 欄位以 `${regionId}-${floor}f` 格式對應各層。百柱塔因每段有獨立通行卷軸機制，維持獨立 Region。
 
-- 象牙塔：`ivory-tower-1f` ~ `ivory-tower-5f`（5 層）
-- 龍谷地間：`dragon-valley-1f` ~ `dragon-valley-7f`（7 層）
-- 遠古地監：`ancient-dungeon-1f` ~ `ancient-dungeon-9f`（9 層）
-- 百柱塔：`hundred-pillar-1-10f` ~ `hundred-pillar-91-100f`（10 段，每段 10 層）
+- 象牙塔：Region ID `ivory-tower`，seed area `ivory-tower-1f` ~ `ivory-tower-5f`（5 層）
+- 龍谷地間：Region ID `dragon-valley`，seed area `dragon-valley-1f` ~ `dragon-valley-7f`（7 層）
+- 遠古地監：Region ID `ancient-dungeon`，seed area `ancient-dungeon-1f` ~ `ancient-dungeon-9f`（9 層）
+- 朦朧洞窟：Region ID `misty-cave`，seed area `misty-cave-1f` ~ `misty-cave-3f`（3 層）
+- 水下監獄：Region ID `underwater-prison`，seed area `underwater-prison-1f` ~ `underwater-prison-4f`（4 層）
+- 百柱塔：獨立 Region `hundred-pillar-1-10f` ~ `hundred-pillar-91-100f`（10 段，每段 10 層）
 
 ## 9.3 新手中立區（Lv.1~30）
 
@@ -66,7 +68,8 @@ Mayana 大陸以灰脊山脈為中心，東西兩側分屬瓦爾登聯邦與艾�
 | 翠綠谷地 | 6~10 | 初階狩獵區，開始接觸多樣怪物 |
 | 風語林地 | 11~15 | 中低階狩獵區，學習基礎魔法的場所 |
 | 迷霧沼澤 | 16~20 | 中階狩獵區，元素屬性怪物開始出現 |
-| 試煉高地 | 21~30 | 職業魔法學習區，接近陣營選擇的過渡地帶 |
+| 試煉高地 | 21~25 | 中高階狩獵區，多元怪物類型 |
+| 試煉高地頂部 | 26~30 | 職業魔法學習區，接近陣營選擇的過渡地帶 |
 
 ### 怪物分佈
 
@@ -76,7 +79,8 @@ Mayana 大陸以灰脊山脈為中心，東西兩側分屬瓦爾登聯邦與艾�
 | 翠綠谷地 | 野狼、妖魔、哥布林 |
 | 風語林地 | 森林蜘蛛、樹精靈 |
 | 迷霧沼澤 | 毒蛇、風之鷹、沼澤蜥蜴 |
-| 試煉高地 | 石像鬼、高地獅鷲、山賊、岩石巨人 |
+| 試煉高地 | 石像鬼、高地狼人、風蝎、高地獅鷲 |
+| 試煉高地頂部 | 暴風鷹、山賊、山賊頭目、岩石巨人、試煉飛龍 |
 
 ### 功能
 
@@ -91,7 +95,7 @@ Mayana 大陸以灰脊山脈為中心，東西兩側分屬瓦爾登聯邦與艾�
 
 ### 雪原地帶
 
-- 等級範圍：30~35
+- 等級範圍：30~33
 - 主題：象牙塔周圍的開放雪地區域
 - 開放式狩獵區域
 
@@ -99,7 +103,18 @@ Mayana 大陸以灰脊山脈為中心，東西兩側分屬瓦爾登聯邦與艾�
 
 | 怪物 |
 |---|
-| 凍骨哥布林、冰霜蜘蛛、雪狼、冰晶蝙蝠、雪人、雪怪 |
+| 凍骨哥布林、冰霜蜘蛛、雪狼、冰晶蝙蝠 |
+
+### 雪原地帶深處
+
+- 等級範圍：34~35
+- 主題：雪原深處，更強大的雪地生物棲息地
+
+#### 怪物分佈
+
+| 怪物 |
+|---|
+| 雪人、雪怪、雪地之主 |
 
 ### 象牙塔（5 層）
 

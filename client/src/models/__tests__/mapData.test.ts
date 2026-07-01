@@ -111,12 +111,13 @@ describe('mapData', () => {
 
     it('getRegionsByZone returns all regions for a zone', () => {
       const regions = getRegionsByZone('newbie-neutral');
-      expect(regions).toHaveLength(6);
+      expect(regions).toHaveLength(7);
       expect(regions.map(r => r.id)).toContain('dawn-plains');
       expect(regions.map(r => r.id)).toContain('green-valley');
       expect(regions.map(r => r.id)).toContain('wind-woods');
       expect(regions.map(r => r.id)).toContain('misty-swamp');
       expect(regions.map(r => r.id)).toContain('trial-highlands');
+      expect(regions.map(r => r.id)).toContain('trial-highlands-top');
       expect(regions.map(r => r.id)).toContain('neutral-town');
     });
 
@@ -127,18 +128,18 @@ describe('mapData', () => {
     });
 
     it('getMonstersAtLocation returns monsters for ivory tower floors', () => {
-      const monsters = getMonstersAtLocation('ivory-tower-1f', null);
+      const monsters = getMonstersAtLocation('ivory-tower', 1);
       expect(monsters).toContain('冰霜蜘蛛');
       expect(monsters).toContain('象牙巫師');
     });
 
     it('getMonstersAtLocation returns monsters for dragon valley floors', () => {
-      const monsters = getMonstersAtLocation('dragon-valley-3f', null);
+      const monsters = getMonstersAtLocation('dragon-valley', 3);
       expect(monsters).toContain('大莫蜘蛛');
     });
 
     it('getRequiredScrollName returns null for non-scroll regions', () => {
-      expect(getRequiredScrollName('ivory-tower-1f', 1)).toBeNull();
+      expect(getRequiredScrollName('ivory-tower', 1)).toBeNull();
     });
   });
 

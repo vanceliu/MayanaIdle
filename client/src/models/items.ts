@@ -113,6 +113,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { name: '遠古戰士碎甲', category: 'material', description: '遠古戰士的碎甲', weight: 7, sellPrice: 760 },
 
   // === Boss 專屬素材 ===
+  { name: '試煉飛龍之鱗', category: 'material', description: '試煉飛龍的鱗片', weight: 5, sellPrice: 200 },
   { name: '雪地之主的凍心', category: 'material', description: '雪地之主的冰凍心臟', weight: 5, sellPrice: 500 },
   { name: '惡魔之瞳', category: 'material', description: '象牙塔惡魔的眼瞳', weight: 5, sellPrice: 800 },
   { name: '蛇魔毒囊', category: 'material', description: '朦朧蛇魔的毒囊', weight: 5, sellPrice: 800 },

@@ -30,7 +30,7 @@ describe('navigation system', () => {
 
     it('allows navigation to ivory tower floor', () => {
       const result = canNavigateTo(
-        { zoneId: 'ivory-tower', regionId: 'ivory-tower-5f', floor: null },
+        { zoneId: 'ivory-tower-zone', regionId: 'ivory-tower', floor: 5 },
         [],
       );
       expect(result.success).toBe(true);
@@ -38,7 +38,7 @@ describe('navigation system', () => {
 
     it('allows navigation to dragon valley floor', () => {
       const result = canNavigateTo(
-        { zoneId: 'dragon-valley', regionId: 'dragon-valley-3f', floor: null },
+        { zoneId: 'dragon-valley-zone', regionId: 'dragon-valley', floor: 3 },
         [],
       );
       expect(result.success).toBe(true);
@@ -46,7 +46,7 @@ describe('navigation system', () => {
 
     it('allows navigation to ancient dungeon floor', () => {
       const result = canNavigateTo(
-        { zoneId: 'grey-ridge', regionId: 'ancient-dungeon-9f', floor: null },
+        { zoneId: 'grey-ridge', regionId: 'ancient-dungeon', floor: 9 },
         [],
       );
       expect(result.success).toBe(true);

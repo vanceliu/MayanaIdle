@@ -19,11 +19,17 @@ export const MONSTER_SEEDS: Omit<MonsterTemplate, 'id'>[] = [
   { name: '毒蛇', level: 16, hp: 75, attackMin: 10, attackMax: 15, defense: 6, exp: 100, race: 'normal', size: 'small', element: 'none', area: 'misty-swamp', isBoss: false },
   { name: '風之鷹', level: 18, hp: 90, attackMin: 12, attackMax: 16, defense: 7, exp: 130, race: 'normal', size: 'small', element: 'wind', area: 'misty-swamp', isBoss: false },
   { name: '沼澤蜥蜴', level: 20, hp: 105, attackMin: 13, attackMax: 18, defense: 8, exp: 155, race: 'normal', size: 'small', element: 'earth', area: 'misty-swamp', isBoss: false },
-  // 試煉高地 Lv.21~30
+  // 試煉高地 Lv.21~25
   { name: '石像鬼', level: 22, hp: 130, attackMin: 15, attackMax: 22, defense: 10, exp: 200, race: 'demon', size: 'large', element: 'earth', area: 'trial-highlands', isBoss: false },
+  { name: '高地狼人', level: 23, hp: 140, attackMin: 16, attackMax: 24, defense: 11, exp: 230, race: 'normal', size: 'small', element: 'none', area: 'trial-highlands', isBoss: false },
+  { name: '風蝎', level: 24, hp: 150, attackMin: 17, attackMax: 26, defense: 11, exp: 255, race: 'normal', size: 'small', element: 'wind', area: 'trial-highlands', isBoss: false },
   { name: '高地獅鷲', level: 25, hp: 160, attackMin: 18, attackMax: 28, defense: 12, exp: 280, race: 'normal', size: 'large', element: 'wind', area: 'trial-highlands', isBoss: false },
-  { name: '山賊', level: 27, hp: 175, attackMin: 20, attackMax: 30, defense: 13, exp: 330, race: 'normal', size: 'small', element: 'none', area: 'trial-highlands', isBoss: false },
-  { name: '岩石巨人', level: 30, hp: 200, attackMin: 22, attackMax: 32, defense: 14, exp: 400, race: 'normal', size: 'large', element: 'earth', area: 'trial-highlands', isBoss: false },
+  // 試煉高地頂部 Lv.26~30
+  { name: '暴風鷹', level: 26, hp: 165, attackMin: 19, attackMax: 28, defense: 12, exp: 300, race: 'normal', size: 'small', element: 'wind', area: 'trial-highlands-top', isBoss: false },
+  { name: '山賊', level: 27, hp: 175, attackMin: 20, attackMax: 30, defense: 13, exp: 330, race: 'normal', size: 'small', element: 'none', area: 'trial-highlands-top', isBoss: false },
+  { name: '山賊頭目', level: 28, hp: 185, attackMin: 21, attackMax: 30, defense: 13, exp: 360, race: 'normal', size: 'small', element: 'none', area: 'trial-highlands-top', isBoss: false },
+  { name: '岩石巨人', level: 30, hp: 200, attackMin: 22, attackMax: 32, defense: 14, exp: 400, race: 'normal', size: 'large', element: 'earth', area: 'trial-highlands-top', isBoss: false },
+  { name: '試煉飛龍', level: 30, hp: 1200, attackMin: 25, attackMax: 36, defense: 16, exp: 2500, race: 'dragon', size: 'large', element: 'wind', area: 'trial-highlands-top', isBoss: true },
   // 雪原地帶 Lv.30~33
   { name: '凍骨哥布林', level: 30, hp: 210, attackMin: 22, attackMax: 32, defense: 14, exp: 420, race: 'normal', size: 'small', element: 'ice', area: 'snow-field', isBoss: false },
   { name: '冰霜蜘蛛', level: 31, hp: 220, attackMin: 23, attackMax: 33, defense: 15, exp: 450, race: 'normal', size: 'small', element: 'ice', area: 'snow-field', isBoss: false },
@@ -561,8 +567,8 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'misty-swamp', itemName: '強化石', itemType: 'material', dropValue: 50 },
   { area: 'misty-swamp', itemName: '長弓', itemType: 'equipment', dropValue: 20 },
   { area: 'misty-swamp', itemName: '紅色藥水', itemType: 'potion', dropValue: 80, minAmount: 1, maxAmount: 1 },
-  // 試煉高地 Lv.21~30
-  { area: 'trial-highlands', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 30, maxAmount: 80 },
+  // 試煉高地 Lv.21~25
+  { area: 'trial-highlands', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 30, maxAmount: 70 },
   { area: 'trial-highlands', itemName: '石像碎片', itemType: 'material', dropValue: 120 },
   { area: 'trial-highlands', itemName: '獅鷲羽毛', itemType: 'material', dropValue: 120 },
   { area: 'trial-highlands', itemName: '山賊鐵塊', itemType: 'material', dropValue: 100 },
@@ -572,6 +578,17 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   { area: 'trial-highlands', itemName: '鐵盾', itemType: 'equipment', dropValue: 15 },
   { area: 'trial-highlands', itemName: '鎖子甲', itemType: 'equipment', dropValue: 10 },
   { area: 'trial-highlands', itemName: '紅色藥水', itemType: 'potion', dropValue: 100, minAmount: 1, maxAmount: 3 },
+  // 試煉高地頂部 Lv.26~30
+  { area: 'trial-highlands-top', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 50, maxAmount: 80 },
+  { area: 'trial-highlands-top', itemName: '石像碎片', itemType: 'material', dropValue: 120 },
+  { area: 'trial-highlands-top', itemName: '獅鷲羽毛', itemType: 'material', dropValue: 120 },
+  { area: 'trial-highlands-top', itemName: '山賊鐵塊', itemType: 'material', dropValue: 100 },
+  { area: 'trial-highlands-top', itemName: '品質石', itemType: 'material', dropValue: 50 },
+  { area: 'trial-highlands-top', itemName: '強化石', itemType: 'material', dropValue: 50 },
+  { area: 'trial-highlands-top', itemName: '巨劍', itemType: 'equipment', dropValue: 10 },
+  { area: 'trial-highlands-top', itemName: '鐵盾', itemType: 'equipment', dropValue: 15 },
+  { area: 'trial-highlands-top', itemName: '鎖子甲', itemType: 'equipment', dropValue: 10 },
+  { area: 'trial-highlands-top', itemName: '紅色藥水', itemType: 'potion', dropValue: 100, minAmount: 1, maxAmount: 3 },
   // 雪原地帶 Lv.30~33
   { area: 'snow-field', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 150 },
   { area: 'snow-field', itemName: '凍骨碎片', itemType: 'material', dropValue: 120 },
@@ -1138,6 +1155,7 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
   // === 綠色藥水掉落 5% ===
   { area: 'misty-swamp', itemName: '綠色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 1 },
   { area: 'trial-highlands', itemName: '綠色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { area: 'trial-highlands-top', itemName: '綠色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 1 },
   { area: 'snow-field', itemName: '綠色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 1 },
   { area: 'demon-forest', itemName: '綠色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 1 },
   { area: 'mirror-forest', itemName: '綠色藥水', itemType: 'potion', dropValue: 50, minAmount: 1, maxAmount: 1 },
@@ -1179,6 +1197,16 @@ export const DROP_TABLE_SEEDS: Omit<DropTableEntry, 'id'>[] = [
 ];
 
 export const BOSS_DROP_TABLE_SEEDS: Omit<BossDropTableEntry, 'id'>[] = [
+  // 試煉飛龍（試煉高地頂部，Lv.30）
+  { bossName: '試煉飛龍', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 240, maxAmount: 240 },
+  { bossName: '試煉飛龍', itemName: '試煉飛龍之鱗', itemType: 'material', dropValue: 300, minAmount: 1, maxAmount: 1 },
+  { bossName: '試煉飛龍', itemName: '高階武器', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '試煉飛龍', itemName: '高階防具', itemType: 'equipment', dropValue: 100, craftTier: 'entry' },
+  { bossName: '試煉飛龍', itemName: '品質石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '試煉飛龍', itemName: '強化石', itemType: 'material', dropValue: 50, minAmount: 1, maxAmount: 1 },
+  { bossName: '試煉飛龍', itemName: '武器強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+  { bossName: '試煉飛龍', itemName: '防具強化卷軸', itemType: 'scroll', dropValue: 100, minAmount: 1, maxAmount: 1 },
+
   // 雪地之主（雪原地帶深處，Lv.35）
   { bossName: '雪地之主', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 300 },
   { bossName: '雪地之主', itemName: '雪地之主的凍心', itemType: 'material', dropValue: 300, minAmount: 1, maxAmount: 1 },
