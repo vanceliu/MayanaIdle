@@ -125,13 +125,16 @@ export function PersistentScriptEditor() {
                   ))}
                 </select>
                 {needsValue(rule.condition.type) && (
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={rule.condition.value ?? 0}
-                    onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
-                  />
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={rule.condition.value ?? 0}
+                      onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
+                    />
+                    <span className="unit-label">%</span>
+                  </>
                 )}
                 {needsSkill(rule.condition.type) && (
                   <select

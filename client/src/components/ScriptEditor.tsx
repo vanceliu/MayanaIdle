@@ -80,6 +80,9 @@ export function ScriptEditor() {
   const needsValue = (type: ConditionType) =>
     ['hp_below', 'hp_above', 'mp_below', 'mp_above', 'monster_count_gte', 'monster_hp_below'].includes(type);
 
+  const isPercentCondition = (type: ConditionType) =>
+    ['hp_below', 'hp_above', 'mp_below', 'mp_above', 'monster_hp_below'].includes(type);
+
   return (
     <div className="script-editor-content">
       <p className="script-hint">由上往下判定，第一個符合條件的規則會被執行</p>
@@ -110,13 +113,16 @@ export function ScriptEditor() {
                   ))}
                 </select>
                 {needsValue(rule.condition.type) && (
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={rule.condition.value ?? 0}
-                    onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
-                  />
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={rule.condition.value ?? 0}
+                      onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
+                    />
+                    {isPercentCondition(rule.condition.type) && <span className="unit-label">%</span>}
+                  </>
                 )}
                 {rule.condition.type === 'skill_ready' && (
                   <select
