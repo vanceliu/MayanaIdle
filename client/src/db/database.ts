@@ -3,7 +3,7 @@ import type { Character } from '../models/character';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
-import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from './seed/dropSeeds';
+
 
 export interface UserEntry {
   id?: number;
@@ -151,12 +151,7 @@ export class GameDB extends Dexie {
     this.version(9).stores({
       itemTemplates: 'id, name, category',
     });
-    this.version(10).stores({}).upgrade(async tx => {
-      await tx.table('dropTables').clear();
-      await tx.table('dropTables').bulkAdd(DROP_TABLE_SEEDS as any);
-      await tx.table('bossDropTables').clear();
-      await tx.table('bossDropTables').bulkAdd(BOSS_DROP_TABLE_SEEDS as any);
-    });
+    this.version(10).stores({});
   }
 }
 
