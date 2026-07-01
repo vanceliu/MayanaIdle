@@ -5,6 +5,8 @@ import { isWeaponSlot } from '../../models/equipment';
 import { AFFIX_DEFINITIONS, AFFIX_TIERS, rollAffixValue, getAffixPoolForSlot, type AffixCategory, type Affix } from '../../models/affix';
 import { CRAFT_TIER_NAMES } from '../../models/crafting';
 import { EquipmentDetail } from '../EquipmentInfo';
+import { GameIcon } from '../GameIcon';
+import { getEquipIcon } from '../../models/iconMap';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
 import { resolveEquipment } from '../../systems/templateSync';
@@ -525,7 +527,10 @@ export function TownBlacksmith() {
               onClick={() => { setSelectedRecipe(recipe); setResultMsg(null); }}
             >
               <div className="shop-item-info">
-                <span className="shop-item-name">{recipe.name}</span>
+                <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <GameIcon name={getEquipIcon(recipe.type === 'armor' ? recipe.slot : recipe.type)} size={16} color="#FFFFFF" />
+                  {recipe.name}
+                </span>
                 <span className="shop-item-desc">
                   {recipe.smallMonsterDamage ? `攻擊: ${recipe.smallMonsterDamage}/${recipe.largeMonsterDamage}` : ''}
                   {recipe.defense ? `防禦: ${recipe.defense}` : ''}

@@ -1,6 +1,8 @@
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
 import { AFFIX_DEFINITIONS, getEffectiveAffixValue } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
+import { GameIcon } from './GameIcon';
+import { getEquipIcon } from '../models/iconMap';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',
@@ -50,7 +52,8 @@ export function EquipmentDetail({ item, hint, compact }: EquipmentDetailProps) {
 
   return (
     <div className="equip-detail">
-      <div className="equip-detail-name">
+      <div className="equip-detail-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color="#FFFFFF" />
         {item.name} {enhancement > 0 ? `+${enhancement}` : ''}
       </div>
       {!compact && <div className="equip-detail-slot">{SLOT_NAMES[item.slot]}{item.isTwoHanded ? '（雙手）' : ''}</div>}
@@ -135,7 +138,10 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
 
   return (
     <div className="equip-detail">
-      <div className="equip-detail-name">{template.name}</div>
+      <div className="equip-detail-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <GameIcon name={getEquipIcon(template.type === 'armor' ? template.slot : template.type)} size={16} color="#FFFFFF" />
+        {template.name}
+      </div>
       <div className="equip-detail-slot">{SLOT_NAMES[template.slot]}{template.isTwoHanded ? '（雙手）' : ''}</div>
       {isWeapon && (
         <div className="equip-detail-stat">攻擊: {template.smallMonsterDamage}/{template.largeMonsterDamage}</div>

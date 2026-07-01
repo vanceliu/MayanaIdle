@@ -3,6 +3,8 @@ import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameS
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
 import { getItemWeight, getItemDefinition } from '../../models/items';
+import { GameIcon } from '../GameIcon';
+import { getItemIcon, getMaterialIcon, getMaterialColor } from '../../models/iconMap';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -79,6 +81,18 @@ export function GeneralStore() {
     return 'material';
   }
 
+  function getShopItemIcon(name: string): { icon: string; color: string } {
+    const def = getItemDefinition(name);
+    if (def?.iconType) return { icon: getMaterialIcon(def.iconType), color: getMaterialColor(def.iconTier) };
+    if (name.includes('紅')) return { icon: getItemIcon('red-potion'), color: '#DC2626' };
+    if (name.includes('橙')) return { icon: getItemIcon('orange-potion'), color: '#F59E0B' };
+    if (name.includes('白')) return { icon: getItemIcon('white-potion'), color: '#E2E8F0' };
+    if (name.includes('強化綠')) return { icon: getItemIcon('enhanced-green-potion'), color: '#4ADE80' };
+    if (name.includes('綠')) return { icon: getItemIcon('green-potion'), color: '#4ADE80' };
+    if (name.includes('卷軸')) return { icon: getItemIcon('scroll'), color: '#FFFFFF' };
+    return { icon: getItemIcon('material'), color: '#FFFFFF' };
+  }
+
   function buyScroll(amount: number) {
     if (!char || !scrollConfig || char.gold < scrollConfig.price * amount) return;
     if (!canAddToBag(scrollConfig.name)) return;
@@ -138,10 +152,15 @@ export function GeneralStore() {
 
       {tab === 'buy' && (
         <div className="shop-items">
-          {SHOP_ITEMS.map(item => (
+          {SHOP_ITEMS.map(item => {
+            const { icon, color } = getShopItemIcon(item.name);
+            return (
             <div key={item.name} className="shop-item">
               <div className="shop-item-info">
-                <span className="shop-item-name">{item.name}</span>
+                <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <GameIcon name={icon} size={16} color={color} />
+                  {item.name}
+                </span>
                 <span className="shop-item-desc">{item.description} | 重量: {getItemWeight(item.name)}</span>
                 <span className="shop-item-price">{item.price.toLocaleString()}G</span>
               </div>
@@ -160,11 +179,15 @@ export function GeneralStore() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
           {scrollConfig && (
             <div className="shop-item">
               <div className="shop-item-info">
-                <span className="shop-item-name">{scrollConfig.name}</span>
+                <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <GameIcon name={getItemIcon('town-scroll')} size={16} color="#FFFFFF" />
+                  {scrollConfig.name}
+                </span>
                 <span className="shop-item-desc">使用後傳送至{scrollConfig.townName} | 重量: {getItemWeight(scrollConfig.name)}</span>
                 <span className="shop-item-price">{scrollConfig.price}G</span>
               </div>
@@ -196,7 +219,10 @@ export function GeneralStore() {
             return (
               <div key={item.name} className="shop-item">
                 <div className="shop-item-info">
-                  <span className="shop-item-name">{item.name} ×{item.amount}</span>
+                  <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {(() => { const { icon, color } = getShopItemIcon(item.name); return <GameIcon name={icon} size={16} color={color} />; })()}
+                    {item.name} ×{item.amount}
+                  </span>
                   <span className="shop-item-price sell-price">+{sellPrice}G/個</span>
                 </div>
                 <div className="shop-item-actions">

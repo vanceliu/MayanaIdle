@@ -3,7 +3,9 @@ import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameS
 import type { EquipmentInstance } from '../../models/equipment';
 import type { BagItem } from '../../stores/gameStore';
 import { EquipmentDetail } from '../EquipmentInfo';
-import { getItemWeight } from '../../models/items';
+import { GameIcon } from '../GameIcon';
+import { getMaterialIcon, getMaterialColor, getItemIcon } from '../../models/iconMap';
+import { getItemWeight, getItemDefinition } from '../../models/items';
 import { db } from '../../db/database';
 
 type StorageTab = 'personal' | 'shared';
@@ -257,7 +259,7 @@ export function Storage() {
           {potionItems.length === 0 && <p className="empty-text">無藥水可存入</p>}
           {potionItems.map(item => (
             <div key={item.name} className="storage-item">
-              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const def = getItemDefinition(item.name); const icon = def?.iconType ? getMaterialIcon(def.iconType) : (item.name.includes('藥水') ? getItemIcon('red-potion') : getItemIcon('scroll')); const color = def?.iconType ? getMaterialColor(def.iconTier) : '#FFFFFF'; return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
                 <button onClick={() => depositMaterial(item, 1)}>存1</button>
                 <button onClick={() => depositMaterial(item, 10)}>存10</button>
@@ -270,7 +272,7 @@ export function Storage() {
           {nonPotionItems.length === 0 && <p className="empty-text">無材料可存入</p>}
           {nonPotionItems.map(item => (
             <div key={item.name} className="storage-item">
-              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const def = getItemDefinition(item.name); const icon = def?.iconType ? getMaterialIcon(def.iconType) : (item.name.includes('藥水') ? getItemIcon('red-potion') : getItemIcon('scroll')); const color = def?.iconType ? getMaterialColor(def.iconTier) : '#FFFFFF'; return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
                 <button onClick={() => depositMaterial(item, 1)}>存1</button>
                 <button onClick={() => depositMaterial(item, 10)}>存10</button>
@@ -298,7 +300,7 @@ export function Storage() {
           {storedPotions.length === 0 && <p className="empty-text">無藥水</p>}
           {storedPotions.map(item => (
             <div key={item.name} className="storage-item">
-              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const def = getItemDefinition(item.name); const icon = def?.iconType ? getMaterialIcon(def.iconType) : (item.name.includes('藥水') ? getItemIcon('red-potion') : getItemIcon('scroll')); const color = def?.iconType ? getMaterialColor(def.iconTier) : '#FFFFFF'; return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
                 <button onClick={() => withdrawMaterial(item, 1)}>取1</button>
                 <button onClick={() => withdrawMaterial(item, 10)}>取10</button>
@@ -311,7 +313,7 @@ export function Storage() {
           {storedNonPotions.length === 0 && <p className="empty-text">無材料</p>}
           {storedNonPotions.map(item => (
             <div key={item.name} className="storage-item">
-              <span>{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const def = getItemDefinition(item.name); const icon = def?.iconType ? getMaterialIcon(def.iconType) : (item.name.includes('藥水') ? getItemIcon('red-potion') : getItemIcon('scroll')); const color = def?.iconType ? getMaterialColor(def.iconTier) : '#FFFFFF'; return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
                 <button onClick={() => withdrawMaterial(item, 1)}>取1</button>
                 <button onClick={() => withdrawMaterial(item, 10)}>取10</button>

@@ -256,7 +256,7 @@ export function BagPanel() {
                 )}
                 {item.type === 'equipment' && (
                   <GameIcon
-                    name={getEquipIcon(item.equipment?.smallMonsterDamage ? 'sword' : 'chest')}
+                    name={getEquipIcon(item.equipment?.type === 'armor' ? (item.equipment?.slot || 'chest') : (item.equipment?.type || 'sword'))}
                     size={24}
                   />
                 )}
