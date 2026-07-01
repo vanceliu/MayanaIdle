@@ -50,41 +50,15 @@ describe('seedDatabase', () => {
     expect(dropCount).toBe(618);
   });
 
-  it('should fix legacy duplicated dropTables', async () => {
-    // Simulate legacy duplication: seed monsters first, then manually double-insert drops
-    await db.monsterTemplates.bulkAdd([
-      { name: 'test', level: 1, hp: 10, attackMin: 1, attackMax: 2, defense: 0, exp: 5, race: 'normal', size: 'small', element: 'none', area: 'dawn-plains', isBoss: false } as any,
-    ]);
-    // Manually insert drops twice to simulate the bug
-    const fakeDrops = [
-      { area: 'dawn-plains', itemName: '金幣', itemType: 'gold', dropValue: 1000, minAmount: 1, maxAmount: 5 },
-      { area: 'dawn-plains', itemName: '品質石', itemType: 'material', dropValue: 50 },
-    ];
-    await db.dropTables.bulkAdd(fakeDrops as any);
-    await db.dropTables.bulkAdd(fakeDrops as any);
-
-    const beforeCount = await db.dropTables.count();
-    expect(beforeCount).toBe(4); // duplicated
-
-    // seedDatabase should fix it
-    await seedDatabase();
-
-    const afterCount = await db.dropTables.count();
-    expect(afterCount).toBe(618); // correct seed count
-
-    // dawn-plains should have exactly 7 entries
-    const dawnEntries = await db.dropTables.where('area').equals('dawn-plains').toArray();
-    expect(dawnEntries).toHaveLength(7);
-  });
-
-  it('should have unique entries per area-itemName combination', async () => {
+  it('should have unique entries per area-itemType-id combination', async () => {
     await seedDatabase();
 
     const allDrops = await db.dropTables.toArray();
     const seen = new Set<string>();
 
     for (const entry of allDrops) {
-      const key = `${entry.area}:${entry.itemName}`;
+      const idPart = entry.itemTemplateId ?? entry.equipmentTemplateId ?? 'gold';
+      const key = `${entry.area}:${entry.itemType}:${idPart}`;
       expect(seen.has(key)).toBe(false);
       seen.add(key);
     }

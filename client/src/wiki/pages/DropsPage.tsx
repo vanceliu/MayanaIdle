@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { getAreaDisplayName } from '../hooks/useWikiData';
+import { getAreaDisplayName, getDropItemName } from '../hooks/useWikiData';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../../db/seed';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../components/WikiTable.css';
@@ -7,10 +7,7 @@ import '../components/WikiTable.css';
 const ITEM_TYPE_LABELS: Record<string, string> = {
   gold: '金幣',
   equipment: '裝備',
-  material: '材料',
-  potion: '藥水',
-  scroll: '卷軸',
-  spellbook: '魔法書',
+  item: '道具',
 };
 
 export function DropsPage() {
@@ -31,7 +28,7 @@ export function DropsPage() {
     let list = [...DROP_TABLE_SEEDS];
     if (areaFilter !== 'all') list = list.filter(d => d.area === areaFilter);
     if (typeFilter !== 'all') list = list.filter(d => d.itemType === typeFilter);
-    if (search) list = list.filter(d => d.itemName.includes(search));
+    if (search) list = list.filter(d => getDropItemName(d).includes(search));
     return list;
   }, [areaFilter, typeFilter, search]);
 
@@ -39,7 +36,7 @@ export function DropsPage() {
     let list = [...BOSS_DROP_TABLE_SEEDS];
     if (bossFilter !== 'all') list = list.filter(d => d.bossName === bossFilter);
     if (typeFilter !== 'all') list = list.filter(d => d.itemType === typeFilter);
-    if (search) list = list.filter(d => d.itemName.includes(search));
+    if (search) list = list.filter(d => getDropItemName(d).includes(search));
     return list;
   }, [bossFilter, typeFilter, search]);
 
@@ -108,9 +105,10 @@ export function DropsPage() {
             </thead>
             <tbody>
               {filtered.map((d, i) => {
+                const name = getDropItemName(d);
                 const isEquip = d.itemType === 'equipment';
                 return (
-                  <tr key={`${d.area}-${d.itemName}-${i}`}>
+                  <tr key={`${d.area}-${d.itemType}-${i}`}>
                     <td>
                       <Link className="wiki-link" to={`/wiki/maps/${d.area}`}>
                         {getAreaDisplayName(d.area)}
@@ -118,10 +116,10 @@ export function DropsPage() {
                     </td>
                     <td>
                       {isEquip ? (
-                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
-                          {d.itemName}
+                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(name)}`}>
+                          {name}
                         </Link>
-                      ) : d.itemName}
+                      ) : name}
                     </td>
                     <td>{ITEM_TYPE_LABELS[d.itemType] || d.itemType}</td>
                     <td className="cell-number">{d.dropValue}</td>
@@ -157,16 +155,17 @@ export function DropsPage() {
             </thead>
             <tbody>
               {filteredBoss.map((d, i) => {
+                const name = getDropItemName(d);
                 const isEquip = d.itemType === 'equipment';
                 return (
-                  <tr key={`${d.bossName}-${d.itemName}-${i}`}>
+                  <tr key={`${d.bossName}-${d.itemType}-${i}`}>
                     <td>{d.bossName}</td>
                     <td>
                       {isEquip ? (
-                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(d.itemName)}`}>
-                          {d.itemName}
+                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(name)}`}>
+                          {name}
                         </Link>
-                      ) : d.itemName}
+                      ) : name}
                     </td>
                     <td>{ITEM_TYPE_LABELS[d.itemType] || d.itemType}</td>
                     <td className="cell-number">{d.dropValue}</td>

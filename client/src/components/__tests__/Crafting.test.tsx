@@ -156,7 +156,7 @@ describe('TownBlacksmith - Crafting', () => {
       bagItems: [
         { name: '霜凍結晶', type: 'material', amount: 20 },
         { name: '不死骨髓', type: 'material', amount: 20 },
-        { name: '洞窟菌絲', type: 'material', amount: 20 },
+        { name: '百柱蛛絲', type: 'material', amount: 20 },
         { name: '遠古騎士紋章', type: 'material', amount: 20 },
         { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
       ],
@@ -184,7 +184,7 @@ describe('TownBlacksmith - Crafting', () => {
       bagItems: [
         { name: '霜凍結晶', type: 'material', amount: 20 },
         { name: '不死骨髓', type: 'material', amount: 20 },
-        { name: '洞窟菌絲', type: 'material', amount: 20 },
+        { name: '百柱蛛絲', type: 'material', amount: 20 },
         { name: '遠古騎士紋章', type: 'material', amount: 20 },
         { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
       ],
@@ -204,7 +204,7 @@ describe('TownBlacksmith - Crafting', () => {
       bagItems: [
         { name: '霜凍結晶', type: 'material', amount: 20 },
         { name: '不死骨髓', type: 'material', amount: 20 },
-        { name: '洞窟菌絲', type: 'material', amount: 20 },
+        { name: '百柱蛛絲', type: 'material', amount: 20 },
         { name: '遠古騎士紋章', type: 'material', amount: 20 },
         { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
       ],

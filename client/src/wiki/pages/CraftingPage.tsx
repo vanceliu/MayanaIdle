@@ -32,7 +32,7 @@ export function CraftingPage() {
       const ta = tierOrder[a.craftTier as keyof typeof tierOrder] ?? 0;
       const tb = tierOrder[b.craftTier as keyof typeof tierOrder] ?? 0;
       if (ta !== tb) return ta - tb;
-      return a.requiredLevel - b.requiredLevel;
+      return (a.name > b.name) ? 1 : -1;
     });
   }, [weapons, armors, tierFilter, search]);
 
@@ -60,7 +60,6 @@ export function CraftingPage() {
               <th>成品</th>
               <th>類型</th>
               <th>階級</th>
-              <th>等級需求</th>
               <th>製作費用</th>
               <th>前置武器</th>
               <th>所需材料</th>
@@ -91,7 +90,6 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       </td>
       <td>{TYPE_LABELS[item.type] || item.type}</td>
       <td>{TIER_LABELS[item.craftTier || ''] || '-'}</td>
-      <td className="cell-number">{item.requiredLevel}</td>
       <td className="cell-number">{item.craftGold?.toLocaleString() || '-'} G</td>
       <td>
         {item.craftPrerequisiteWeapon

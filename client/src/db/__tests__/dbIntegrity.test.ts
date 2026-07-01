@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../database';
 import { seedDatabase, resetSeedState, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../seed';
 import { loadTemplateCache, resolveEquipment } from '../../systems/templateSync';
+import { getItemById } from '../../models/items';
 
 /**
  * 深入驗證：DB seed 後角色裝備、掉落表、製作配方全部能正確對應
@@ -72,14 +73,14 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
     });
 
     it('所有掉落的裝備都有對應 equipmentTemplate', async () => {
-      const equipDrops = DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment');
+      const equipDrops = DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment' && d.equipmentTemplateId);
       const dbTemplates = await db.equipmentTemplates.toArray();
-      const templateNames = new Set(dbTemplates.map(t => t.name));
+      const templateIds = new Set(dbTemplates.map(t => t.id));
 
-      const missing: string[] = [];
+      const missing: number[] = [];
       for (const drop of equipDrops) {
-        if (!templateNames.has(drop.itemName)) {
-          missing.push(`${drop.itemName} (area: ${drop.area})`);
+        if (!templateIds.has(drop.equipmentTemplateId!)) {
+          missing.push(drop.equipmentTemplateId!);
         }
       }
       expect(missing).toEqual([]);
@@ -87,15 +88,15 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
 
     it('所有 Boss 掉落的裝備都有對應 equipmentTemplate（排除動態掉落）', async () => {
       const equipDrops = BOSS_DROP_TABLE_SEEDS.filter(
-        d => d.itemType === 'equipment' && !d.itemName.startsWith('高階')
+        d => d.itemType === 'equipment' && d.equipmentTemplateId && !d.equipmentPool
       );
       const dbTemplates = await db.equipmentTemplates.toArray();
-      const templateNames = new Set(dbTemplates.map(t => t.name));
+      const templateIds = new Set(dbTemplates.map(t => t.id));
 
-      const missing: string[] = [];
+      const missing: number[] = [];
       for (const drop of equipDrops) {
-        if (!templateNames.has(drop.itemName)) {
-          missing.push(`${drop.itemName} (boss: ${drop.bossName})`);
+        if (!templateIds.has(drop.equipmentTemplateId!)) {
+          missing.push(drop.equipmentTemplateId!);
         }
       }
       expect(missing).toEqual([]);
@@ -145,7 +146,10 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
       // 品質石、強化石用於鐵匠鋪品質提升/詞綴強化，不在 craftMaterials 中但仍有明確用途
       const systemMaterials = ['品質石', '強化石'];
       for (const mat of systemMaterials) {
-        const drops = DROP_TABLE_SEEDS.filter(d => d.itemName === mat);
+        const drops = DROP_TABLE_SEEDS.filter(d => {
+          if (d.itemType !== 'item' || !d.itemTemplateId) return false;
+          return getItemById(d.itemTemplateId)?.name === mat;
+        });
         expect(drops.length, `${mat} 未在任何掉落表中`).toBeGreaterThan(0);
       }
     });

@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { ITEM_DEFINITIONS } from '../../models/items';
+import { ITEM_DEFINITIONS } from '../../db/seed';
 import { useDropSourceForItem, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db/seed';
 import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevel } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
+import { GameIcon } from '../../components/GameIcon';
+import { getItemIcon, getMaterialIcon, getMaterialColor } from '../../models/iconMap';
 import '../components/WikiTable.css';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -14,6 +16,24 @@ const CATEGORY_LABELS: Record<string, string> = {
   spellbook: '魔法書',
   other: '其他',
 };
+
+function getWikiItemIcon(item: typeof ITEM_DEFINITIONS[number]): { icon: string; color?: string } {
+  if (item.iconType) {
+    return { icon: getMaterialIcon(item.iconType), color: getMaterialColor(item.iconTier) };
+  }
+  if (item.category === 'potion') {
+    if (item.name.includes('紅')) return { icon: getItemIcon('red-potion'), color: '#DC2626' };
+    if (item.name.includes('橙')) return { icon: getItemIcon('orange-potion'), color: '#F59E0B' };
+    if (item.name.includes('白')) return { icon: getItemIcon('white-potion'), color: '#E2E8F0' };
+    if (item.name.includes('強化綠')) return { icon: getItemIcon('enhanced-green-potion'), color: '#4ADE80' };
+    if (item.name.includes('綠')) return { icon: getItemIcon('green-potion'), color: '#4ADE80' };
+    return { icon: getItemIcon('red-potion') };
+  }
+  if (item.category === 'scroll') return { icon: getItemIcon('scroll') };
+  if (item.category === 'spellbook') return { icon: getItemIcon('spellbook') };
+  if (item.category === 'dungeon') return { icon: getItemIcon('key') };
+  return { icon: getItemIcon('material') };
+}
 
 export function ItemsPage() {
   const { itemName } = useParams();
@@ -63,10 +83,13 @@ function ItemList() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(item => (
+            {filtered.map(item => {
+              const { icon, color } = getWikiItemIcon(item);
+              return (
               <tr key={item.name}>
                 <td>
-                  <Link className="wiki-link" to={`/wiki/items/${encodeURIComponent(item.name)}`}>
+                  <Link className="wiki-link" to={`/wiki/items/${encodeURIComponent(item.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <GameIcon name={icon} size={16} color={color} />
                     {item.name}
                   </Link>
                 </td>
@@ -75,7 +98,8 @@ function ItemList() {
                 <td className="cell-number">{item.weight}</td>
                 <td className="cell-number">{item.buyPrice ? `${item.buyPrice.toLocaleString()} G` : '-'}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         {filtered.length === 0 && <p className="wiki-empty">無符合條件的道具</p>}
@@ -87,7 +111,11 @@ function ItemList() {
 function ItemDetail({ name }: { name: string }) {
   const item = ITEM_DEFINITIONS.find(i => i.name === name);
   const dropSources = useDropSourceForItem(name);
-  const bossDropSources = useMemo(() => BOSS_DROP_TABLE_SEEDS.filter(d => d.itemName === name), [name]);
+  const bossDropSources = useMemo(() => {
+    const itemDef = ITEM_DEFINITIONS.find(i => i.name === name);
+    if (!itemDef) return [];
+    return BOSS_DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === itemDef.id);
+  }, [name]);
 
   const skillBookEntry = useMemo(() => ALL_CLASS_SKILL_BOOKS.find(b => b.name === name), [name]);
 

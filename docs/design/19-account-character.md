@@ -110,3 +110,35 @@
 | 進度（位置/等級/經驗） | Character | 各角色獨立 |
 | 戰鬥腳本 | Character | 各角色獨立 |
 | 快捷欄配置 | Character | 各角色獨立 |
+
+---
+
+## 19.9 資料版本控制
+
+每個角色帶有 `dataVersion` 欄位，用於標記該角色的資料結構版本。
+
+### 版本規則
+
+- 新建角色自動帶 `dataVersion = CURRENT_DATA_VERSION`（定義於 `config.ts`）
+- 載入角色時，若 `dataVersion` 不存在或低於 `CURRENT_DATA_VERSION`，該角色及其所有關聯資料（裝備、背包）將被自動刪除
+- 版本升級時只需調高 `config.ts` 的 `CURRENT_DATA_VERSION`，舊角色會在下次登入時自動清除
+
+### 匯出/匯入規則
+
+| 規則 | 說明 |
+|---|---|
+| 匯出格式版本 | `version: 2`（加密格式版本） |
+| 資料版本 | 匯出時帶上角色的 `dataVersion` |
+| 匯入驗證 | 若 `dataVersion` 不存在或低於 `CURRENT_DATA_VERSION`，拒絕匯入 |
+| 匯入錯誤提示 | 「匯入資料版本過舊，無法匯入。請使用新版角色匯出檔案。」 |
+| 跨環境相容 | 所有 template 使用固定 ID，匯入時自動做 name-based ID 重新對應 |
+
+### 全域倍率（`config.ts`）
+
+| 設定 | 預設 | 說明 |
+|---|---|---|
+| `CURRENT_DATA_VERSION` | 2 | 資料結構版本號 |
+| `GOLD_RATE_MULTIPLIER` | 1.0 | 全域金幣掉落倍率 |
+| `DROP_RATE_MULTIPLIER` | 1.0 | 全域道具掉落倍率 |
+
+掉落計算公式：`最終倍率 = (1 + 角色裝備加成%) × 全域倍率`

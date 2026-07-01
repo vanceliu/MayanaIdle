@@ -3,9 +3,9 @@ import { useGameStore } from '../stores/gameStore';
 import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, BAG_MAX_SLOTS } from '../stores/gameStore';
 import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
-import { getItemIcon, getEquipIcon } from '../models/iconMap';
+import { getItemIcon, getEquipIcon, getMaterialIcon, getMaterialColor } from '../models/iconMap';
 import { EquipmentDetail } from './EquipmentInfo';
-import { getItemWeight, getItemDescription } from '../models/items';
+import { getItemWeight, getItemDescription, getItemDefinition } from '../models/items';
 
 const BAG_COLUMNS = 5;
 
@@ -261,10 +261,12 @@ export function BagPanel() {
                   />
                 )}
                 {!item.potionType && !item.speedPotionType && item.type !== 'equipment' && (
-                  <GameIcon
-                    name={getItemIcon(getItemIconKey(item.name, item.type))}
-                    size={24}
-                  />
+                  (() => {
+                    const def = getItemDefinition(item.name);
+                    const icon = def?.iconType ? getMaterialIcon(def.iconType) : getItemIcon(getItemIconKey(item.name, item.type));
+                    const color = def?.iconTier ? getMaterialColor(def.iconTier) : undefined;
+                    return <GameIcon name={icon} size={24} color={color} />;
+                  })()
                 )}
                 <span className="bag-cell-name">{getShortName(item.name)}</span>
                 {item.count != null && item.count > 1 && (

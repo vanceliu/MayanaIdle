@@ -1,46 +1,64 @@
-import { MONSTER_SEEDS, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../../db/seed';
+import { MONSTER_SEEDS, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, ITEM_DEFINITIONS } from '../../db/seed';
 import { ZONES, REGIONS } from '../../models/mapData';
 import { DROP_ROLL_MAX } from '../../systems/drops';
 import type { MonsterTemplate } from '../../models/monster';
 import type { EquipmentTemplate } from '../../models/equipment';
 import type { DropTableEntry, BossDropTableEntry } from '../../db/database';
 import type { Zone, Region } from '../../models/area';
+import { getItemById } from '../../models/items';
 
-type MonsterSeed = Omit<MonsterTemplate, 'id'>;
-type EquipmentSeed = Omit<EquipmentTemplate, 'id'>;
-type DropSeed = Omit<DropTableEntry, 'id'>;
-type BossDropSeed = Omit<BossDropTableEntry, 'id'>;
-
-export function useMonsterList(): MonsterSeed[] {
+export function useMonsterList(): MonsterTemplate[] {
   return MONSTER_SEEDS;
 }
 
-export function useMonstersByArea(area: string): MonsterSeed[] {
+export function useMonstersByArea(area: string): MonsterTemplate[] {
   return MONSTER_SEEDS.filter(m => m.area === area || m.area.match(new RegExp(`^${area}-\\d`)));
 }
 
-export function useWeaponList(): EquipmentSeed[] {
+export function useWeaponList(): EquipmentTemplate[] {
   return EQUIPMENT_SEEDS.filter(e => e.type !== 'armor');
 }
 
-export function useArmorList(): EquipmentSeed[] {
+export function useArmorList(): EquipmentTemplate[] {
   return EQUIPMENT_SEEDS.filter(e => e.type === 'armor');
 }
 
-export function useEquipmentByName(name: string): EquipmentSeed | undefined {
+export function useEquipmentByName(name: string): EquipmentTemplate | undefined {
   return EQUIPMENT_SEEDS.find(e => e.name === name);
 }
 
-export function useDropTableByArea(area: string): DropSeed[] {
+export function useEquipmentById(id: number): EquipmentTemplate | undefined {
+  return EQUIPMENT_SEEDS.find(e => e.id === id);
+}
+
+export function useDropTableByArea(area: string): DropTableEntry[] {
   return DROP_TABLE_SEEDS.filter(d => d.area === area || d.area.match(new RegExp(`^${area}-\\d+f$`)));
 }
 
-export function useBossDropTableByName(bossName: string): BossDropSeed[] {
+export function useBossDropTableByName(bossName: string): BossDropTableEntry[] {
   return BOSS_DROP_TABLE_SEEDS.filter(d => d.bossName === bossName);
 }
 
-export function useDropSourceForItem(itemName: string): DropSeed[] {
-  return DROP_TABLE_SEEDS.filter(d => d.itemName === itemName);
+export function useDropSourceForItemId(itemTemplateId: number): DropTableEntry[] {
+  return DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === itemTemplateId);
+}
+
+export function useDropSourceForItem(itemName: string): DropTableEntry[] {
+  const item = ITEM_DEFINITIONS.find(i => i.name === itemName);
+  if (!item) return [];
+  return DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === item.id);
+}
+
+export function getDropItemName(drop: { itemTemplateId?: number; equipmentTemplateId?: number; itemType: string }): string {
+  if (drop.itemType === 'gold') return '金幣';
+  if (drop.itemType === 'equipment' && drop.equipmentTemplateId) {
+    const equip = EQUIPMENT_SEEDS.find(e => e.id === drop.equipmentTemplateId);
+    return equip?.name ?? '未知裝備';
+  }
+  if (drop.itemTemplateId) {
+    return getItemById(drop.itemTemplateId)?.name ?? '未知道具';
+  }
+  return '未知';
 }
 
 export function useZones(): Zone[] {

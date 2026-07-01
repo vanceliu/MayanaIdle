@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { Character } from '../models/character';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
+import type { ItemDefinition } from '../models/items';
 
 export interface UserEntry {
   id?: number;
@@ -13,6 +14,7 @@ export interface WarehouseEntry {
   userId: number;
   name: string;
   type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook' | 'gold';
+  itemTemplateId?: number;
   amount: number;
   storageType: 'personal' | 'shared';
   characterId?: number;
@@ -21,8 +23,9 @@ export interface WarehouseEntry {
 export interface DropTableEntry {
   id?: number;
   area: string;
-  itemName: string;
-  itemType: 'gold' | 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook';
+  itemType: 'gold' | 'equipment' | 'item';
+  equipmentTemplateId?: number;
+  itemTemplateId?: number;
   dropValue: number;
   minAmount?: number;
   maxAmount?: number;
@@ -31,8 +34,10 @@ export interface DropTableEntry {
 export interface BossDropTableEntry {
   id?: number;
   bossName: string;
-  itemName: string;
-  itemType: 'gold' | 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook';
+  itemType: 'gold' | 'equipment' | 'item';
+  equipmentTemplateId?: number;
+  equipmentPool?: 'weapon' | 'armor';
+  itemTemplateId?: number;
   dropValue: number;
   minAmount?: number;
   maxAmount?: number;
@@ -44,6 +49,7 @@ export interface CharacterBagEntry {
   characterId: number;
   name: string;
   type: 'material' | 'potion' | 'scroll' | 'spellbook';
+  itemTemplateId?: number;
   amount: number;
 }
 
@@ -52,6 +58,7 @@ export interface CharacterStorageEntry {
   characterId: number;
   name: string;
   type: 'material' | 'potion' | 'scroll' | 'spellbook';
+  itemTemplateId?: number;
   amount: number;
 }
 
@@ -62,6 +69,7 @@ export class GameDB extends Dexie {
   equipmentInstances!: Table<EquipmentInstance>;
   dropTables!: Table<DropTableEntry>;
   bossDropTables!: Table<BossDropTableEntry>;
+  itemTemplates!: Table<ItemDefinition>;
   characterBag!: Table<CharacterBagEntry>;
   characterStorage!: Table<CharacterStorageEntry>;
   users!: Table<UserEntry>;
@@ -138,6 +146,9 @@ export class GameDB extends Dexie {
     });
     this.version(8).stores({
       equipmentTemplates: '++id, name, type, slot, acquireType',
+    });
+    this.version(9).stores({
+      itemTemplates: 'id, name, category',
     });
   }
 }

@@ -4,12 +4,14 @@ import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../stores/gameStore';
 import type { WarehouseEntry } from '../db/database';
 import { instantiateFromTemplate } from '../models/skillTemplate';
+import { CURRENT_DATA_VERSION } from '../config';
 
 const ENCRYPTION_PASSPHRASE = 'MayanaIdle-v1-8f3k2m9x';
 const SALT = new Uint8Array([77, 97, 121, 97, 110, 97, 73, 100, 108, 101, 83, 97, 108, 116, 50, 48]);
 
 interface CharacterExportData {
   version: 2;
+  dataVersion: number;
   exportedAt: number;
   character: Character;
   equipmentInstances: EquipmentInstance[];
@@ -98,6 +100,7 @@ export async function exportCharacterData(characterId: number): Promise<string> 
 
   const data: CharacterExportData = {
     version: 2,
+    dataVersion: character.dataVersion ?? 1,
     exportedAt: Date.now(),
     character,
     equipmentInstances,
@@ -131,10 +134,13 @@ export async function importCharacterData(
     throw new Error('檔案解密失敗，可能已被竄改');
   }
 
-  const data = JSON.parse(json) as CharacterExportData & { version: number };
+  const data = JSON.parse(json) as Omit<CharacterExportData, 'version'> & { version: number };
 
   if (data.version !== 1 && data.version !== 2) {
     throw new Error('不支援的匯出版本');
+  }
+  if (!data.dataVersion || data.dataVersion < CURRENT_DATA_VERSION) {
+    throw new Error('匯入資料版本過舊，無法匯入。請使用新版角色匯出檔案。');
   }
   if (!data.character || !data.equipmentInstances) {
     throw new Error('檔案格式錯誤');
@@ -179,22 +185,41 @@ export async function importCharacterData(
   // Delete character-owned equipment (exclude shared warehouse items)
   await db.equipmentInstances.where('ownerId').equals(currentCharacterId).delete();
   if (data.equipmentInstances.length > 0) {
+    // Build name→id map for templateId remapping across environments
+    const allTemplates = await db.equipmentTemplates.toArray();
+    const templateNameToId = new Map<string, number>();
+    for (const t of allTemplates) {
+      if (t.id != null) templateNameToId.set(t.name, t.id);
+    }
+
     const instances = data.equipmentInstances
       .filter(ei => ei.storageType !== 'shared')
-      .map(ei => ({
-        ...ei,
-        id: undefined,
-        ownerId: currentCharacterId,
-      }));
+      .map(ei => {
+        const resolvedTemplateId = templateNameToId.get(ei.name) ?? ei.templateId;
+        return {
+          ...ei,
+          id: undefined,
+          ownerId: currentCharacterId,
+          templateId: resolvedTemplateId,
+        };
+      });
     await db.equipmentInstances.bulkAdd(instances);
   }
 
   await db.characterBag.where('characterId').equals(currentCharacterId).delete();
   if (data.bagItems.length > 0) {
+    // Build name→id map for item template remapping
+    const allItems = await db.itemTemplates.toArray();
+    const itemNameToId = new Map<string, number>();
+    for (const item of allItems) {
+      if (item.id != null) itemNameToId.set(item.name, item.id);
+    }
+
     const bagEntries = data.bagItems.map(item => ({
       characterId: currentCharacterId,
       name: item.name,
       type: item.type,
+      itemTemplateId: itemNameToId.get(item.name) ?? item.itemTemplateId,
       amount: item.amount,
     }));
     await db.characterBag.bulkAdd(bagEntries);
@@ -206,10 +231,18 @@ export async function importCharacterData(
       .where('characterId').equals(currentCharacterId)
       .filter(row => row.storageType === 'personal')
       .delete();
+
+    const allItems = await db.itemTemplates.toArray();
+    const itemNameToId = new Map<string, number>();
+    for (const item of allItems) {
+      if (item.id != null) itemNameToId.set(item.name, item.id);
+    }
+
     const personalEntries: WarehouseEntry[] = data.personalWarehouseItems.map(item => ({
       userId: existing.userId,
       name: item.name,
       type: item.type,
+      itemTemplateId: itemNameToId.get(item.name) ?? item.itemTemplateId,
       amount: item.amount,
       storageType: 'personal' as const,
       characterId: currentCharacterId,

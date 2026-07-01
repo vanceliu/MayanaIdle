@@ -6,6 +6,8 @@ import { generateAffixes } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
 import { getRegion } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
+import { getItemById } from '../models/items';
+import { GOLD_RATE_MULTIPLIER, DROP_RATE_MULTIPLIER } from '../config';
 
 export interface DropResult {
   gold: number;
@@ -14,7 +16,8 @@ export interface DropResult {
 
 export interface DroppedItem {
   name: string;
-  type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook';
+  type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook' | 'dungeon' | 'other';
+  itemTemplateId?: number;
   amount: number;
   equipmentInstance?: EquipmentInstance;
 }
@@ -34,14 +37,13 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   const entries = await db.bossDropTables.where('bossName').equals(bossName).toArray();
   let gold = 0;
   const items: DroppedItem[] = [];
-  const dropRateMultiplier = 1 + (bonuses?.drop_rate ?? 0) / 100;
-  const goldRateMultiplier = 1 + (bonuses?.gold_rate ?? 0) / 100;
+  const dropRateMultiplier = (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
+  const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
   let highTierRolled = false;
 
   for (const entry of entries) {
-    // 高階武器/高階防具 is a linked pair: roll once (10%), then 50/50 weapon or armor
-    const isHighTierEquip = entry.itemName === '高階武器' || entry.itemName === '高階防具';
-    if (isHighTierEquip) {
+    // equipmentPool entries: roll once (10%), then 50/50 weapon or armor
+    if (entry.equipmentPool) {
       if (highTierRolled) continue;
       highTierRolled = true;
       const roll = Math.random() * DROP_ROLL_MAX;
@@ -92,7 +94,9 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
       gold += Math.floor(baseGold * goldRateMultiplier);
     } else if (entry.itemType === 'equipment') {
-      const template = await db.equipmentTemplates.where('name').equals(entry.itemName).first();
+      const template = entry.equipmentTemplateId
+        ? await db.equipmentTemplates.get(entry.equipmentTemplateId)
+        : undefined;
       if (template) {
         const isWeapon = isWeaponSlot(template.slot);
         const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
@@ -123,11 +127,15 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
       }
     } else {
-      items.push({
-        name: entry.itemName,
-        type: entry.itemType as DroppedItem['type'],
-        amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
-      });
+      const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
+      if (itemDef) {
+        items.push({
+          name: itemDef.name,
+          type: itemDef.category as DroppedItem['type'],
+          itemTemplateId: entry.itemTemplateId,
+          amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
+        });
+      }
     }
   }
 
@@ -148,15 +156,19 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   const areaLevelMax = region?.levelMax ?? 1;
   let gold = 0;
   const items: DroppedItem[] = [];
-  const dropRateMultiplier = 1 + (bonuses?.drop_rate ?? 0) / 100;
-  const goldRateMultiplier = 1 + (bonuses?.gold_rate ?? 0) / 100;
+  const dropRateMultiplier = (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
+  const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
 
   for (const entry of entries) {
     let effectiveDropValue = entry.dropValue;
-    if (monsterLevel && entry.itemType === 'scroll' && entry.itemName.includes('通行卷軸')) {
-      const levelRange = Math.max(1, areaLevelMax - areaLevelMin);
-      const levelProgress = Math.min(1, (monsterLevel - areaLevelMin) / levelRange);
-      effectiveDropValue = Math.min(100, Math.floor(entry.dropValue * (1 + levelProgress)));
+    // Dungeon scroll level-based drop rate boost
+    if (monsterLevel && entry.itemType === 'item' && entry.itemTemplateId) {
+      const itemDef = getItemById(entry.itemTemplateId);
+      if (itemDef?.category === 'dungeon') {
+        const levelRange = Math.max(1, areaLevelMax - areaLevelMin);
+        const levelProgress = Math.min(1, (monsterLevel - areaLevelMin) / levelRange);
+        effectiveDropValue = Math.min(100, Math.floor(entry.dropValue * (1 + levelProgress)));
+      }
     }
     const roll = Math.random() * DROP_ROLL_MAX;
     const boostedDropValue = Math.min(effectiveDropValue * dropRateMultiplier, DROP_ROLL_MAX);
@@ -166,7 +178,9 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
       gold += Math.floor(baseGold * goldRateMultiplier);
     } else if (entry.itemType === 'equipment') {
-      const template = await db.equipmentTemplates.where('name').equals(entry.itemName).first();
+      const template = entry.equipmentTemplateId
+        ? await db.equipmentTemplates.get(entry.equipmentTemplateId)
+        : undefined;
       if (template) {
         const isWeapon = isWeaponSlot(template.slot);
         const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
@@ -197,11 +211,15 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
         items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
       }
     } else {
-      items.push({
-        name: entry.itemName,
-        type: entry.itemType as DroppedItem['type'],
-        amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
-      });
+      const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
+      if (itemDef) {
+        items.push({
+          name: itemDef.name,
+          type: itemDef.category as DroppedItem['type'],
+          itemTemplateId: entry.itemTemplateId,
+          amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
+        });
+      }
     }
   }
 

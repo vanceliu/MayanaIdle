@@ -118,3 +118,58 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 - [ ] Step 9：整合測試 — 完整流程驗證（建角→領取→強化→丟棄→補領）
 
 ---
+
+## 分階段計畫：建立 itemTemplates 正規化（已完成 ✓）
+
+**目標**：將非裝備道具（藥水、卷軸、素材、技能書等）從純 runtime 常數提升為 DB 層的 `itemTemplates` table，所有關聯改用固定 `id` 而非 `itemName` 字串，確保跨環境資料一致性。
+
+**前提**：角色全面重練，不需要考慮 migration 或向下相容。
+
+**Phase 1 — 資料層**
+
+- [x] Step 1：`items.ts` — `ItemDefinition` interface 加上 `id: number`（必填）
+- [x] Step 2：`ITEM_DEFINITIONS` 搬至 `db/seed/itemSeeds.ts`，每筆加固定 id（1~143）
+- [x] Step 3：`database.ts` — schema 新增 `itemTemplates: 'id, name, category'`（version 9）
+- [x] Step 4：`seed.ts` — 移除所有 legacy migration 邏輯，`performSeed()` 只做乾淨的首次寫入
+- [x] Step 5：`seed.ts` — 新增 `itemTemplates` 的 seed 邏輯
+- [x] 額外：`seed.ts` 拆分為 `db/seed/` 資料夾（monsterSeeds, equipmentSeeds, dropSeeds, itemSeeds, index）
+
+**Phase 2 — 關聯改造**
+
+- [x] Step 5-6：`DROP_TABLE_SEEDS` / `BOSS_DROP_TABLE_SEEDS` 加 `itemTemplateId` + `equipmentTemplateId`
+- [x] Step 7：`DropTableEntry` / `BossDropTableEntry` 移除 `itemName`，`itemType` 簡化為 `'gold' | 'equipment' | 'item'`
+- [x] Step 8：`CharacterBagEntry` / `CharacterStorageEntry` / `WarehouseEntry` 加 `itemTemplateId`
+- [x] Step 9：Boss 動態裝備掉落改用 `equipmentPool: 'weapon' | 'armor'`
+
+**Phase 3 — 邏輯層**
+
+- [x] Step 10：掉落系統 — 改用 `itemTemplateId` / `equipmentTemplateId` 查詢
+- [x] Step 11：商店系統 — 買入時帶 `itemTemplateId`
+- [x] Step 12：背包/倉庫 — 載入/存入帶 `itemTemplateId`
+- [x] Step 13：新增 `getItemById(id)` helper
+- [x] Step 14：`characterTransfer.ts` — 匯入時 name-based 重新對應 templateId
+- [x] Step 15-17：`wiki/hooks/useWikiData.ts` + wiki pages 改用 id-based 查詢，移除 `Omit` type alias
+
+**Phase 4 — 驗證**
+
+- [x] Step 18：TypeScript 編譯通過
+- [x] Step 19：既有 unit test 全部通過（573 tests）
+- [x] Step 20：新增 itemTemplates 相關 test（9 tests：seed 正確性、id 唯一性、lookup 正確性）
+- [x] Step 21：完整流程驗證通過
+
+---
+
+## 資料版本控制（已完成 ✓）
+
+**機制**：
+- `config.ts` 定義 `CURRENT_DATA_VERSION`（目前為 2）
+- 新建角色自動帶 `dataVersion: CURRENT_DATA_VERSION`
+- 選擇角色時偵測：若 `dataVersion` 不存在或低於 `CURRENT_DATA_VERSION`，自動刪除角色及其資料
+- 角色匯出時帶上 `dataVersion`
+- 角色匯入時檢查：若 `dataVersion` 不存在或低於 `CURRENT_DATA_VERSION`，拒絕匯入並提示版本過舊
+
+**全域倍率**：
+- `config.ts` 同時管理 `GOLD_RATE_MULTIPLIER`、`DROP_RATE_MULTIPLIER`（預設 1.0）
+- 掉落計算公式：`最終倍率 = (1 + 角色裝備加成%) × 全域倍率`
+
+---

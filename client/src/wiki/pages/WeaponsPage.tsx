@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
 import { Link, useSearchParams } from 'react-router-dom';
+import { GameIcon } from '../../components/GameIcon';
+import { getEquipIcon } from '../../models/iconMap';
 import '../components/WikiTable.css';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -50,7 +52,7 @@ export function WeaponsPage() {
   const [materialFilter, setMaterialFilter] = useState<string>('all');
   const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<string>('requiredLevel');
+  const [sortKey, setSortKey] = useState<string>('name');
   const [sortAsc, setSortAsc] = useState(true);
 
   const types = useMemo(() => [...new Set(weapons.map(w => w.type))], [weapons]);
@@ -121,7 +123,6 @@ export function WeaponsPage() {
             <tr>
               <th className="sortable" onClick={() => handleSort('name')}>名稱{sortIndicator('name')}</th>
               <th className="sortable" onClick={() => handleSort('type')}>類型{sortIndicator('type')}</th>
-              <th className="sortable" onClick={() => handleSort('requiredLevel')}>等級{sortIndicator('requiredLevel')}</th>
               <th className="sortable" onClick={() => handleSort('smallMonsterDamage')}>對小怪{sortIndicator('smallMonsterDamage')}</th>
               <th className="sortable" onClick={() => handleSort('largeMonsterDamage')}>對大怪{sortIndicator('largeMonsterDamage')}</th>
               <th>命中</th>
@@ -153,12 +154,12 @@ function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[num
   return (
     <tr>
       <td>
-        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(w.name)}`}>
+        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(w.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <GameIcon name={getEquipIcon(w.type)} size={16} />
           {w.name}
         </Link>
       </td>
       <td>{TYPE_LABELS[w.type] || w.type}</td>
-      <td className="cell-number">{w.requiredLevel}</td>
       <td className="cell-number">{w.smallMonsterDamage ?? '-'}</td>
       <td className="cell-number">{w.largeMonsterDamage ?? '-'}</td>
       <td className="cell-number">{w.attackSuccess ?? 0}</td>

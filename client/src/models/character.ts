@@ -36,6 +36,7 @@ export interface Character {
   quests: Quest[];
   areaEnteredAt: number;
   createdAt: number;
+  dataVersion?: number;
 }
 
 export const CLASS_BASE_ATTRIBUTES: Record<ClassName, Attributes> = {

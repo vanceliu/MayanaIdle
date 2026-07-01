@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
+import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate, getDropItemName } from '../hooks/useWikiData';
 import { EQUIPMENT_SEEDS } from '../../db/seed';
 
 const ARMOR_NAMES = new Set(EQUIPMENT_SEEDS.filter(e => e.type === 'armor').map(e => e.name));
@@ -238,26 +238,29 @@ function BossDropSection({ bossName }: { bossName: string }) {
           <tbody>
             {drops.map((d, i) => {
               const isEquip = d.itemType === 'equipment';
+              const name = getDropItemName(d);
               let equipLink = '';
               if (isEquip) {
-                if (d.itemName === '高階武器') {
+                if (d.equipmentPool === 'weapon') {
                   equipLink = `/wiki/weapons?craftTier=${d.craftTier || 'entry'}`;
-                } else if (d.itemName === '高階防具') {
+                } else if (d.equipmentPool === 'armor') {
                   equipLink = `/wiki/armor?craftTier=${d.craftTier || 'entry'}`;
                 } else {
-                  equipLink = `/wiki/weapons/${encodeURIComponent(d.itemName)}`;
+                  equipLink = ARMOR_NAMES.has(name)
+                    ? `/wiki/armor/${encodeURIComponent(name)}`
+                    : `/wiki/weapons/${encodeURIComponent(name)}`;
                 }
               }
               return (
-                <tr key={`${d.itemName}-${i}`}>
+                <tr key={`${d.itemType}-${i}`}>
                   <td>
                     {isEquip ? (
                       <Link className="wiki-link" to={equipLink}>
-                        {d.itemName}
+                        {name}
                       </Link>
-                    ) : d.itemName}
+                    ) : name}
                   </td>
-                  <td>{d.itemType === 'gold' ? '金幣' : d.itemType === 'equipment' ? '裝備' : d.itemType === 'material' ? '材料' : d.itemType === 'potion' ? '藥水' : d.itemType === 'scroll' ? '卷軸' : '魔法書'}</td>
+                  <td>{d.itemType === 'gold' ? '金幣' : d.itemType === 'equipment' ? '裝備' : '道具'}</td>
                   <td className="cell-number">{getDropRate(d.dropValue)}</td>
                   <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
                 </tr>
@@ -293,21 +296,22 @@ function AreaDropSection({ area }: { area: string }) {
           <tbody>
             {drops.map((d, i) => {
               const isEquip = d.itemType === 'equipment';
+              const name = getDropItemName(d);
               const equipLink = isEquip
-                ? ARMOR_NAMES.has(d.itemName)
-                  ? `/wiki/armor/${encodeURIComponent(d.itemName)}`
-                  : `/wiki/weapons/${encodeURIComponent(d.itemName)}`
+                ? ARMOR_NAMES.has(name)
+                  ? `/wiki/armor/${encodeURIComponent(name)}`
+                  : `/wiki/weapons/${encodeURIComponent(name)}`
                 : '';
               return (
-                <tr key={`${d.itemName}-${i}`}>
+                <tr key={`${d.itemType}-${i}`}>
                   <td>
                     {isEquip ? (
                       <Link className="wiki-link" to={equipLink}>
-                        {d.itemName}
+                        {name}
                       </Link>
-                    ) : d.itemName}
+                    ) : name}
                   </td>
-                  <td>{d.itemType === 'gold' ? '金幣' : d.itemType === 'equipment' ? '裝備' : d.itemType === 'material' ? '材料' : d.itemType === 'potion' ? '藥水' : d.itemType === 'scroll' ? '卷軸' : '魔法書'}</td>
+                  <td>{d.itemType === 'gold' ? '金幣' : d.itemType === 'equipment' ? '裝備' : '道具'}</td>
                   <td className="cell-number">{getDropRate(d.dropValue)}</td>
                   <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
                 </tr>

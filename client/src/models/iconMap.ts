@@ -36,6 +36,37 @@ export const ITEM_ICON_MAP: Record<string, string> = {
   'key': 'items/three-keys',
 };
 
+import type { MaterialIconType } from './items';
+
+export const MATERIAL_ICON_MAP: Record<MaterialIconType, string> = {
+  'ore': 'items/cut-diamond',
+  'fabric': 'items/sewing-string',
+  'bone': 'items/crossed-bones',
+  'crystal': 'items/crystal-cluster',
+  'misc': 'items/swap-bag',
+  'spellbook-mat': 'items/spell-book',
+  'stone': 'items/cut-diamond',
+  'whetstone': 'items/clay-brick',
+};
+
+export const MATERIAL_TIER_COLORS: Record<number, string> = {
+  1: '#FFFFFF',
+  2: '#60A5FA',
+  3: '#4ADE80',
+  4: '#FACC15',
+  5: '#FB923C',
+  6: '#EF4444',
+  7: '#A855F7',
+};
+
+export function getMaterialIcon(iconType?: MaterialIconType): string {
+  return iconType ? MATERIAL_ICON_MAP[iconType] : ITEM_ICON_MAP['material'];
+}
+
+export function getMaterialColor(iconTier?: number): string | undefined {
+  return iconTier ? MATERIAL_TIER_COLORS[iconTier] : undefined;
+}
+
 export const EQUIP_ICON_MAP: Record<string, string> = {
   'sword': 'equipment/spinning-sword',
   'dagger': 'equipment/plain-dagger',

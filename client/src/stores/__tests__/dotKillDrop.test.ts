@@ -72,8 +72,8 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       attackMax: 2,
       defense: 0,
       exp: 100,
-      race: 'beast' as const,
-      size: 'medium' as const,
+      race: 'normal' as const,
+      size: 'small' as const,
       element: 'none' as const,
       isBoss: false,
       _processed: false,
@@ -125,8 +125,8 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       attackMax: 10,
       defense: 3,
       exp: 200,
-      race: 'beast' as const,
-      size: 'medium' as const,
+      race: 'normal' as const,
+      size: 'small' as const,
       element: 'none' as const,
       isBoss: false,
       _processed: false,
@@ -171,25 +171,24 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
     await useGameStore.getState().createCharacter('AoeTest', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
 
     const char = useGameStore.getState().character!;
-    const initialExp = char.exp;
 
     const monster1 = {
       templateId: 1, name: '怪物A', level: 5, currentHp: -3, maxHp: 50,
       attackMin: 1, attackMax: 2, defense: 0, exp: 50,
-      race: 'beast' as const, size: 'small' as const, element: 'none' as const,
+      race: 'normal' as const, size: 'small' as const, element: 'none' as const,
       isBoss: false, _processed: false,
     };
     const monster2 = {
       templateId: 2, name: '怪物B', level: 5, currentHp: -1, maxHp: 80,
       attackMin: 2, attackMax: 4, defense: 1, exp: 80,
-      race: 'beast' as const, size: 'medium' as const, element: 'none' as const,
+      race: 'normal' as const, size: 'small' as const, element: 'none' as const,
       isBoss: false, _processed: false,
     };
     // 第三隻還活著
     const monster3 = {
       templateId: 3, name: '怪物C', level: 5, currentHp: 50, maxHp: 80,
       attackMin: 2, attackMax: 4, defense: 1, exp: 80,
-      race: 'beast' as const, size: 'medium' as const, element: 'none' as const,
+      race: 'normal' as const, size: 'small' as const, element: 'none' as const,
       isBoss: false, _processed: false,
     };
 

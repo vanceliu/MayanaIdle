@@ -2,7 +2,7 @@
   "hash": "ecae73ed",
   "configHash": "3e55a58c",
   "lockfileHash": "eb8309de",
-  "browserHash": "1f505331",
+  "browserHash": "d802f666",
   "optimized": {
     "dexie": {
       "src": "../../node_modules/dexie/import-wrapper.mjs",

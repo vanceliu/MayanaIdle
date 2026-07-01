@@ -179,7 +179,6 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
       {(template.weight ?? 0) > 0 && (
         <div className="equip-detail-stat">重量: {template.weight}</div>
       )}
-      <div className="equip-detail-stat">需求等級: Lv.{template.requiredLevel}</div>
       <div className="equip-detail-class">可用職業: {getClassDisplay(template.requiredClass)}</div>
       {hint && <div className="equip-detail-hint">{hint}</div>}
     </div>

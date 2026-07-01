@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useArmorList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
 import { Link, useSearchParams } from 'react-router-dom';
+import { GameIcon } from '../../components/GameIcon';
+import { getEquipIcon } from '../../models/iconMap';
 import '../components/WikiTable.css';
 
 const SLOT_LABELS: Record<string, string> = {
@@ -36,7 +38,7 @@ export function ArmorPage() {
   const [slotFilter, setSlotFilter] = useState<string>('all');
   const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<string>('requiredLevel');
+  const [sortKey, setSortKey] = useState<string>('name');
   const [sortAsc, setSortAsc] = useState(true);
 
   const slots = useMemo(() => [...new Set(armors.map(a => a.slot))], [armors]);
@@ -101,7 +103,6 @@ export function ArmorPage() {
             <tr>
               <th className="sortable" onClick={() => handleSort('name')}>名稱{sortIndicator('name')}</th>
               <th className="sortable" onClick={() => handleSort('slot')}>部位{sortIndicator('slot')}</th>
-              <th className="sortable" onClick={() => handleSort('requiredLevel')}>等級{sortIndicator('requiredLevel')}</th>
               <th className="sortable" onClick={() => handleSort('defense')}>防禦{sortIndicator('defense')}</th>
               <th>格擋</th>
               <th>安定值</th>
@@ -138,12 +139,12 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
   return (
     <tr>
       <td>
-        <Link className="wiki-link" to={`/wiki/armor/${encodeURIComponent(a.name)}`}>
+        <Link className="wiki-link" to={`/wiki/armor/${encodeURIComponent(a.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <GameIcon name={getEquipIcon(a.slot)} size={16} />
           {a.name}
         </Link>
       </td>
       <td>{SLOT_LABELS[a.slot] || a.slot}</td>
-      <td className="cell-number">{a.requiredLevel}</td>
       <td className="cell-number">{a.defense ?? '-'}</td>
       <td className="cell-number">{a.blockRate ? `${a.blockRate}%` : '-'}</td>
       <td className="cell-number">{a.stability ?? '-'}</td>

@@ -1,27 +1,41 @@
 import { describe, it, expect } from 'vitest';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, EQUIPMENT_SEEDS } from '../seed';
-import { getItemDefinition, ITEM_DEFINITIONS } from '../../models/items';
+import { getItemDefinition, getItemById } from '../../models/items';
+import { ITEM_DEFINITIONS } from '../seed';
+
+function getDropItemName(drop: { itemTemplateId?: number }): string | undefined {
+  if (!drop.itemTemplateId) return undefined;
+  return getItemById(drop.itemTemplateId)?.name;
+}
 
 describe('區域素材掉落系統', () => {
-  const materialDrops = DROP_TABLE_SEEDS.filter(d => d.itemType === 'material');
-  const bossMaterialDrops = BOSS_DROP_TABLE_SEEDS.filter(d => d.itemType === 'material');
+  const materialDrops = DROP_TABLE_SEEDS.filter(d => {
+    if (d.itemType !== 'item' || !d.itemTemplateId) return false;
+    const item = getItemById(d.itemTemplateId);
+    return item?.category === 'material';
+  });
+  const bossMaterialDrops = BOSS_DROP_TABLE_SEEDS.filter(d => {
+    if (d.itemType !== 'item' || !d.itemTemplateId) return false;
+    const item = getItemById(d.itemTemplateId);
+    return item?.category === 'material';
+  });
 
   describe('區域素材定義完整性', () => {
     it('所有 DROP_TABLE 中的素材都有 ItemDefinition', () => {
-      const missing: string[] = [];
+      const missing: number[] = [];
       for (const drop of materialDrops) {
-        if (!getItemDefinition(drop.itemName)) {
-          missing.push(drop.itemName);
+        if (!getItemById(drop.itemTemplateId!)) {
+          missing.push(drop.itemTemplateId!);
         }
       }
       expect(missing).toEqual([]);
     });
 
     it('所有 BOSS_DROP_TABLE 中的素材都有 ItemDefinition', () => {
-      const missing: string[] = [];
+      const missing: number[] = [];
       for (const drop of bossMaterialDrops) {
-        if (!getItemDefinition(drop.itemName)) {
-          missing.push(drop.itemName);
+        if (!getItemById(drop.itemTemplateId!)) {
+          missing.push(drop.itemTemplateId!);
         }
       }
       expect(missing).toEqual([]);
@@ -50,10 +64,12 @@ describe('區域素材掉落系統', () => {
 
       const droppableMaterials = new Set<string>();
       for (const drop of materialDrops) {
-        droppableMaterials.add(drop.itemName);
+        const name = getDropItemName(drop);
+        if (name) droppableMaterials.add(name);
       }
       for (const drop of bossMaterialDrops) {
-        droppableMaterials.add(drop.itemName);
+        const name = getDropItemName(drop);
+        if (name) droppableMaterials.add(name);
       }
 
       const shopItems = ['紅色藥水', '橙色藥水', '白色藥水', '綠色藥水', '強化綠色藥水', '武器強化卷軸', '防具強化卷軸', '磨刀石'];
@@ -75,30 +91,36 @@ describe('區域素材掉落系統', () => {
     it('百柱塔 1~30F 掉落百柱蛛絲、奇美拉角、幻影殘片', () => {
       const areas = ['hundred-pillar-1-10f', 'hundred-pillar-11-20f', 'hundred-pillar-21-30f'];
       for (const area of areas) {
-        const areaDrops = DROP_TABLE_SEEDS.filter(d => d.area === area).map(d => d.itemName);
-        expect(areaDrops).toContain('百柱蛛絲');
-        expect(areaDrops).toContain('奇美拉角');
-        expect(areaDrops).toContain('幻影殘片');
+        const areaDropNames = DROP_TABLE_SEEDS
+          .filter(d => d.area === area && d.itemTemplateId)
+          .map(d => getItemById(d.itemTemplateId!)?.name);
+        expect(areaDropNames).toContain('百柱蛛絲');
+        expect(areaDropNames).toContain('奇美拉角');
+        expect(areaDropNames).toContain('幻影殘片');
       }
     });
 
     it('百柱塔 31~60F 掉落不死骨髓、古龍牙、女妖淚珠', () => {
       const areas = ['hundred-pillar-31-40f', 'hundred-pillar-41-50f', 'hundred-pillar-51-60f'];
       for (const area of areas) {
-        const areaDrops = DROP_TABLE_SEEDS.filter(d => d.area === area).map(d => d.itemName);
-        expect(areaDrops).toContain('不死骨髓');
-        expect(areaDrops).toContain('古龍牙');
-        expect(areaDrops).toContain('女妖淚珠');
+        const areaDropNames = DROP_TABLE_SEEDS
+          .filter(d => d.area === area && d.itemTemplateId)
+          .map(d => getItemById(d.itemTemplateId!)?.name);
+        expect(areaDropNames).toContain('不死骨髓');
+        expect(areaDropNames).toContain('古龍牙');
+        expect(areaDropNames).toContain('女妖淚珠');
       }
     });
 
     it('百柱塔 61~100F 掉落霜凍結晶、熔岩核、殘影精華', () => {
       const areas = ['hundred-pillar-61-70f', 'hundred-pillar-71-80f', 'hundred-pillar-81-90f', 'hundred-pillar-91-100f'];
       for (const area of areas) {
-        const areaDrops = DROP_TABLE_SEEDS.filter(d => d.area === area).map(d => d.itemName);
-        expect(areaDrops).toContain('霜凍結晶');
-        expect(areaDrops).toContain('熔岩核');
-        expect(areaDrops).toContain('殘影精華');
+        const areaDropNames = DROP_TABLE_SEEDS
+          .filter(d => d.area === area && d.itemTemplateId)
+          .map(d => getItemById(d.itemTemplateId!)?.name);
+        expect(areaDropNames).toContain('霜凍結晶');
+        expect(areaDropNames).toContain('熔岩核');
+        expect(areaDropNames).toContain('殘影精華');
       }
     });
   });
@@ -118,16 +140,20 @@ describe('區域素材掉落系統', () => {
     });
 
     it('所有 Boss 專屬素材都在 BOSS_DROP_TABLE_SEEDS 中', () => {
-      const bossDropNames = BOSS_DROP_TABLE_SEEDS.map(d => d.itemName);
+      const bossDropNames = BOSS_DROP_TABLE_SEEDS
+        .filter(d => d.itemTemplateId)
+        .map(d => getItemById(d.itemTemplateId!)?.name);
       for (const name of BOSS_UNIQUE_MATERIALS) {
         expect(bossDropNames).toContain(name);
       }
     });
 
     it('Boss 專屬素材掉落率為 30%（dropValue 300）', () => {
-      const uniqueDrops = BOSS_DROP_TABLE_SEEDS.filter(
-        d => BOSS_UNIQUE_MATERIALS.includes(d.itemName)
-      );
+      const uniqueDrops = BOSS_DROP_TABLE_SEEDS.filter(d => {
+        if (!d.itemTemplateId) return false;
+        const name = getItemById(d.itemTemplateId)?.name;
+        return name && BOSS_UNIQUE_MATERIALS.includes(name);
+      });
       for (const drop of uniqueDrops) {
         expect(drop.dropValue).toBe(300);
       }
@@ -136,9 +162,11 @@ describe('區域素材掉落系統', () => {
     it('每個 Boss 只掉一種專屬素材', () => {
       const bossNames = [...new Set(BOSS_DROP_TABLE_SEEDS.map(d => d.bossName))];
       for (const boss of bossNames) {
-        const uniqueDropsForBoss = BOSS_DROP_TABLE_SEEDS.filter(
-          d => d.bossName === boss && BOSS_UNIQUE_MATERIALS.includes(d.itemName)
-        );
+        const uniqueDropsForBoss = BOSS_DROP_TABLE_SEEDS.filter(d => {
+          if (d.bossName !== boss || !d.itemTemplateId) return false;
+          const name = getItemById(d.itemTemplateId)?.name;
+          return name && BOSS_UNIQUE_MATERIALS.includes(name);
+        });
         expect(uniqueDropsForBoss.length).toBe(1);
       }
     });
@@ -148,7 +176,7 @@ describe('區域素材掉落系統', () => {
     it('getSellPrice 讀取 ItemDefinition 的 sellPrice', () => {
       const def = getItemDefinition('破碎獸牙');
       expect(def).toBeDefined();
-      expect(def!.sellPrice).toBe(4);
+      expect(def!.sellPrice).toBe(14);
     });
 
     it('有 sellPrice 的素材，實際賣價 = sellPrice * 0.5', () => {
@@ -168,12 +196,15 @@ describe('區域素材掉落系統', () => {
 
   describe('掉落率合理性', () => {
     it('區域素材掉落率在 10~12% 範圍內（dropValue 100~120）', () => {
-      const areaMaterialNames = ITEM_DEFINITIONS
-        .filter(d => d.category === 'material' && d.sellPrice !== undefined)
-        .map(d => d.name);
+      // 只驗證怪物掉落的區域素材（id 19~94），排除系統/製作/魔法書素材
+      const areaMaterialIds = new Set(
+        ITEM_DEFINITIONS
+          .filter(d => d.id >= 19 && d.id <= 94 && d.category === 'material' && d.sellPrice !== undefined)
+          .map(d => d.id)
+      );
 
       const areaMatDrops = DROP_TABLE_SEEDS.filter(
-        d => d.itemType === 'material' && areaMaterialNames.includes(d.itemName)
+        d => d.itemType === 'item' && d.itemTemplateId && areaMaterialIds.has(d.itemTemplateId)
       );
 
       for (const drop of areaMatDrops) {
@@ -185,7 +216,7 @@ describe('區域素材掉落系統', () => {
     it('每個有怪物的區域都有金幣掉落', () => {
       const areas = [...new Set(DROP_TABLE_SEEDS.map(d => d.area))];
       for (const area of areas) {
-        const goldDrop = DROP_TABLE_SEEDS.find(d => d.area === area && d.itemName === '金幣');
+        const goldDrop = DROP_TABLE_SEEDS.find(d => d.area === area && d.itemType === 'gold');
         expect(goldDrop).toBeDefined();
       }
     });

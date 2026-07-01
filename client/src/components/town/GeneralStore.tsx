@@ -58,6 +58,7 @@ export function GeneralStore() {
     const existing = currentBag.find(b => b.name === name);
     if (!existing && getBagUsedSlots(currentBag, inventory) >= BAG_MAX_SLOTS) return;
     const itemType = getItemType(name);
+    const def = getItemDefinition(name);
     if (existing) {
       set({
         bagItems: currentBag.map(b =>
@@ -66,7 +67,7 @@ export function GeneralStore() {
       });
     } else {
       set({
-        bagItems: [...currentBag, { name, type: itemType, amount }],
+        bagItems: [...currentBag, { name, type: itemType, itemTemplateId: def?.id, amount }],
       });
     }
     useGameStore.getState().saveState();

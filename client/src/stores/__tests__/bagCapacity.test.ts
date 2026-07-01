@@ -28,7 +28,7 @@ describe('Potion helpers', () => {
   it('addPotionToBag creates new entry when none exists', () => {
     const result = addPotionToBag([], 'red', 10);
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ name: '紅色藥水', type: 'potion', amount: 10 });
+    expect(result[0]).toEqual({ name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 });
   });
 
   it('addPotionToBag stacks onto existing entry', () => {

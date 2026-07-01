@@ -18,6 +18,7 @@ vi.mock('../../db/database', () => ({
       where: vi.fn().mockReturnThis(),
       equals: vi.fn().mockReturnThis(),
       first: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue(null),
     },
     equipmentInstances: {
       add: vi.fn().mockResolvedValue(1),
@@ -45,11 +46,11 @@ describe('drops system', () => {
     });
 
     it('should drop gold at face value (no multiplier)', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0); // Always drop
+      vi.spyOn(Math, 'random').mockReturnValue(0);
       vi.mocked(db.dropTables.where).mockReturnValue({
         equals: vi.fn().mockReturnValue({
           toArray: vi.fn().mockResolvedValue([
-            { area: 'dawn-plains', itemType: 'gold', itemName: 'gold', dropValue: 100, minAmount: 10, maxAmount: 10 },
+            { area: 'dawn-plains', itemType: 'gold', dropValue: 100, minAmount: 10, maxAmount: 10 },
           ]),
         }),
       } as any);
@@ -64,25 +65,21 @@ describe('drops system', () => {
       vi.mocked(db.dropTables.where).mockReturnValue({
         equals: vi.fn().mockReturnValue({
           toArray: vi.fn().mockResolvedValue([
-            { area: 'green-valley', itemType: 'equipment', itemName: '木劍', dropValue: 100, minAmount: 1, maxAmount: 1 },
+            { area: 'green-valley', itemType: 'equipment', equipmentTemplateId: 1, dropValue: 100 },
           ]),
         }),
       } as any);
-      vi.mocked(db.equipmentTemplates.where).mockReturnValue({
-        equals: vi.fn().mockReturnValue({
-          first: vi.fn().mockResolvedValue({
-            id: 1,
-            name: '木劍',
-            type: 'sword',
-            slot: 'rightHand',
-            isTwoHanded: false,
-            smallMonsterDamage: 8,
-            largeMonsterDamage: 6,
-            defense: undefined,
-            requiredLevel: 1,
-            buyPrice: 100,
-          }),
-        }),
+      vi.mocked(db.equipmentTemplates.get).mockResolvedValue({
+        id: 1,
+        name: '木劍',
+        type: 'sword',
+        slot: 'rightHand',
+        isTwoHanded: false,
+        smallMonsterDamage: 8,
+        largeMonsterDamage: 6,
+        defense: undefined,
+        requiredLevel: 1,
+        buyPrice: 100,
       } as any);
 
       const result = await rollDrops('green-valley', 1);
@@ -99,7 +96,7 @@ describe('drops system', () => {
       vi.mocked(db.dropTables.where).mockReturnValue({
         equals: vi.fn().mockReturnValue({
           toArray: vi.fn().mockResolvedValue([
-            { area: 'dawn-plains', itemType: 'potion', itemName: '紅色藥水', dropValue: 200, minAmount: 1, maxAmount: 3 },
+            { area: 'dawn-plains', itemType: 'item', itemTemplateId: 1, dropValue: 200, minAmount: 1, maxAmount: 3 },
           ]),
         }),
       } as any);
@@ -113,11 +110,11 @@ describe('drops system', () => {
     });
 
     it('should not drop when roll exceeds boosted drop value', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.99); // 990/1000 > most boosted values
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
       vi.mocked(db.dropTables.where).mockReturnValue({
         equals: vi.fn().mockReturnValue({
           toArray: vi.fn().mockResolvedValue([
-            { area: 'dawn-plains', itemType: 'gold', itemName: 'gold', dropValue: 5, minAmount: 10, maxAmount: 10 },
+            { area: 'dawn-plains', itemType: 'gold', dropValue: 5, minAmount: 10, maxAmount: 10 },
           ]),
         }),
       } as any);
@@ -132,7 +129,7 @@ describe('drops system', () => {
       vi.mocked(db.dropTables.where).mockReturnValue({
         equals: vi.fn().mockReturnValue({
           toArray: vi.fn().mockResolvedValue([
-            { area: 'dawn-plains', itemType: 'material', itemName: '品質石', dropValue: 50, minAmount: 1, maxAmount: 1 },
+            { area: 'dawn-plains', itemType: 'item', itemTemplateId: 9, dropValue: 50, minAmount: 1, maxAmount: 1 },
           ]),
         }),
       } as any);
@@ -195,7 +192,7 @@ describe('rollBossDrops', () => {
     vi.mocked(db.bossDropTables.where).mockReturnValue({
       equals: vi.fn().mockReturnValue({
         toArray: vi.fn().mockResolvedValue([
-          { bossName: '象牙塔惡魔', itemType: 'gold', itemName: '金幣', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+          { bossName: '象牙塔惡魔', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
         ]),
       }),
     } as any);
@@ -210,7 +207,7 @@ describe('rollBossDrops', () => {
     vi.mocked(db.bossDropTables.where).mockReturnValue({
       equals: vi.fn().mockReturnValue({
         toArray: vi.fn().mockResolvedValue([
-          { bossName: '象牙塔惡魔', itemType: 'gold', itemName: '金幣', dropValue: 1000, minAmount: 500, maxAmount: 500 },
+          { bossName: '象牙塔惡魔', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
         ]),
       }),
     } as any);
@@ -225,7 +222,7 @@ describe('rollBossDrops', () => {
     vi.mocked(db.bossDropTables.where).mockReturnValue({
       equals: vi.fn().mockReturnValue({
         toArray: vi.fn().mockResolvedValue([
-          { bossName: '朦朧蛇魔', itemType: 'material', itemName: '銀精華', dropValue: 100, minAmount: 1, maxAmount: 1 },
+          { bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 12, dropValue: 100, minAmount: 1, maxAmount: 1 },
         ]),
       }),
     } as any);
@@ -242,7 +239,7 @@ describe('rollBossDrops', () => {
     vi.mocked(db.bossDropTables.where).mockReturnValue({
       equals: vi.fn().mockReturnValue({
         toArray: vi.fn().mockResolvedValue([
-          { bossName: '遠古騎士', itemType: 'material', itemName: '米索利碎片', dropValue: 80, minAmount: 1, maxAmount: 1 },
+          { bossName: '遠古騎士', itemType: 'item', itemTemplateId: 13, dropValue: 80, minAmount: 1, maxAmount: 1 },
         ]),
       }),
     } as any);
@@ -263,7 +260,7 @@ describe('rollBossDrops', () => {
     vi.mocked(db.bossDropTables.where).mockReturnValue({
       equals: vi.fn().mockReturnValue({
         toArray: vi.fn().mockResolvedValue([
-          { bossName: '安塔巨龍', itemType: 'material', itemName: '龍心結晶', dropValue: 70, minAmount: 1, maxAmount: 1 },
+          { bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 16, dropValue: 70, minAmount: 1, maxAmount: 1 },
         ]),
       }),
     } as any);

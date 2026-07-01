@@ -63,7 +63,6 @@ export interface EquipmentTemplate {
   blockRate?: number;
   weight?: number;
   material?: WeaponMaterial;
-  requiredLevel: number;
   requiredClass?: string[];
   buyPrice: number;
   stability?: number;

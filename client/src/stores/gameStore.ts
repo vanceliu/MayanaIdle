@@ -3,6 +3,7 @@ import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, EquippedGear } from '../models/equipment';
 import type { Skill } from '../models/skill';
+import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
@@ -65,7 +66,8 @@ export function addPotionToBag(bagItems: BagItem[], type: PotionType, amount: nu
   if (existing) {
     existing.amount += amount;
   } else {
-    newBag.push({ name, type: 'potion', amount });
+    const potionIds: Record<PotionType, number> = { red: 1, orange: 2, white: 3 };
+    newBag.push({ name, type: 'potion', itemTemplateId: potionIds[type], amount });
   }
   return newBag;
 }
@@ -90,6 +92,7 @@ export function isBagFull(bagItems: BagItem[], inventory: EquipmentInstance[]): 
 export interface BagItem {
   name: string;
   type: 'material' | 'potion' | 'scroll' | 'spellbook';
+  itemTemplateId?: number;
   amount: number;
 }
 
@@ -265,6 +268,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     const char = await db.characters.get(characterId);
     if (!char) return;
 
+    if (!char.dataVersion || char.dataVersion < CURRENT_DATA_VERSION) {
+      await db.equipmentInstances.where('ownerId').equals(char.id!).delete();
+      await db.characterBag.where('characterId').equals(char.id!).delete();
+      await db.characters.delete(char.id!);
+      await get().loadCharacterList();
+      return;
+    }
+
     const items = await db.equipmentInstances.where('ownerId').equals(char.id!).toArray();
     const equipped: EquippedGear = {};
     const inventory: EquipmentInstance[] = [];
@@ -291,7 +302,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const bagRows = await db.characterBag.where('characterId').equals(char.id!).toArray();
     const bagItems: BagItem[] = [];
     for (const row of bagRows) {
-      bagItems.push({ name: row.name, type: row.type, amount: row.amount });
+      bagItems.push({ name: row.name, type: row.type, itemTemplateId: row.itemTemplateId, amount: row.amount });
     }
 
     // Load warehouse materials (account-level shared storage)
@@ -304,7 +315,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (row.type === 'gold') {
         warehouseGold = row.amount;
       } else if (row.type !== 'equipment') {
-        storedMaterials.push({ name: row.name, type: row.type as BagItem['type'], amount: row.amount });
+        storedMaterials.push({ name: row.name, type: row.type as BagItem['type'], itemTemplateId: row.itemTemplateId, amount: row.amount });
       }
     }
 
@@ -316,7 +327,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const personalStoredMaterials: BagItem[] = [];
     for (const row of personalWarehouseRows) {
       if (row.type !== 'equipment' && row.type !== 'gold') {
-        personalStoredMaterials.push({ name: row.name, type: row.type as BagItem['type'], amount: row.amount });
+        personalStoredMaterials.push({ name: row.name, type: row.type as BagItem['type'], itemTemplateId: row.itemTemplateId, amount: row.amount });
       }
     }
 
@@ -451,6 +462,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       quests: [],
       areaEnteredAt: Date.now(),
       createdAt: Date.now(),
+      dataVersion: CURRENT_DATA_VERSION,
     };
     const id = await db.characters.add(char);
     char.id = id as number;
@@ -496,7 +508,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Save initial bag items to DB
     await db.characterBag.bulkAdd([
-      { characterId: char.id!, name: '紅色藥水', type: 'potion', amount: 10 },
+      { characterId: char.id!, name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 },
     ]);
 
     set({
@@ -504,7 +516,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       equippedGear,
       inventory: [],
       skills: startingSkills,
-      bagItems: [{ name: '紅色藥水', type: 'potion', amount: 10 }],
+      bagItems: [{ name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 }],
       phase: 'explore',
     });
     get().startRegen();
@@ -1298,10 +1310,10 @@ export function processMonsterDeath(
   set: (s: Partial<GameState>) => void,
   monsters: MonsterInstance[],
   deadIdx: number,
-  char: CharacterState,
+  char: Character,
   logs: CombatLog[],
   allGear: EquipmentInstance[]
-): { char: CharacterState; logs: CombatLog[] } {
+): { char: Character; logs: CombatLog[] } {
   const dead = monsters[deadIdx];
   monsters[deadIdx] = { ...dead, _processed: true };
   logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
@@ -1367,7 +1379,7 @@ export function processMonsterDeath(
         } else if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
-          newBag.push({ name: item.name, type: item.type, amount: item.amount });
+          newBag.push({ name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount });
           logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
         }
       }
@@ -1798,7 +1810,7 @@ async function saveGame(state: GameState) {
   const bagEntries: CharacterBagEntry[] = [];
   for (const item of state.bagItems) {
     if (item.amount > 0) {
-      bagEntries.push({ characterId: char.id, name: item.name, type: item.type, amount: item.amount });
+      bagEntries.push({ characterId: char.id, name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount });
     }
   }
   if (bagEntries.length > 0) {
@@ -1814,7 +1826,7 @@ async function saveGame(state: GameState) {
     const warehouseEntries: WarehouseEntry[] = [];
     for (const item of state.storedMaterials) {
       if (item.amount > 0) {
-        warehouseEntries.push({ userId, name: item.name, type: item.type, amount: item.amount, storageType: 'shared' });
+        warehouseEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount, storageType: 'shared' });
       }
     }
     if (state.warehouseGold > 0) {
@@ -1833,7 +1845,7 @@ async function saveGame(state: GameState) {
     const personalEntries: WarehouseEntry[] = [];
     for (const item of state.personalStoredMaterials) {
       if (item.amount > 0) {
-        personalEntries.push({ userId, name: item.name, type: item.type, amount: item.amount, storageType: 'personal', characterId: char.id });
+        personalEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount, storageType: 'personal', characterId: char.id });
       }
     }
     if (personalEntries.length > 0) {
