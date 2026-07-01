@@ -95,6 +95,7 @@ export function StarterNpc() {
     const enhanceable = starterGearOnHand.filter(e => canEnhanceStarterGear(e));
     const maxed = starterGearOnHand.filter(e => !canEnhanceStarterGear(e) && e.isStarterGear);
     const cost = getStarterEnhanceCost();
+    const gold = char!.gold;
 
     return (
       <div className="starter-enhance-list">
@@ -106,7 +107,7 @@ export function StarterNpc() {
             </span>
             <button
               onClick={() => handleEnhance(item)}
-              disabled={char.gold < cost}
+              disabled={gold < cost}
             >
               強化 ({cost}G)
             </button>
