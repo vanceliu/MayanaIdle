@@ -5,8 +5,8 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 1, name: '紅色藥水', category: 'potion', description: '回復 10~15 HP', weight: 2, buyPrice: 25, healMin: 10, healMax: 15, cooldown: 600 },
   { id: 2, name: '橙色藥水', category: 'potion', description: '回復 30~45 HP', weight: 5, buyPrice: 80, healMin: 30, healMax: 45, cooldown: 900 },
   { id: 3, name: '白色藥水', category: 'potion', description: '回復 60~90 HP', weight: 10, buyPrice: 200, healMin: 60, healMax: 90, cooldown: 1500 },
-  { id: 133, name: '綠色藥水', category: 'potion', description: '攻速+33%（120秒）', weight: 5, buyPrice: 200 },
-  { id: 134, name: '強化綠色藥水', category: 'potion', description: '攻速+33%（600秒）', weight: 10, buyPrice: 1000 },
+  { id: 133, name: '綠色藥水', category: 'potion', description: '攻速+33%（180秒）', weight: 5, buyPrice: 200 },
+  { id: 134, name: '強化綠色藥水', category: 'potion', description: '攻速+33%（900秒）', weight: 10, buyPrice: 1000 },
   
   // === 回城卷軸 ===
   { id: 4, name: '薄暮村回城卷軸', category: 'scroll', description: '使用後傳送至薄暮村', weight: 1, buyPrice: 500 },

@@ -49,8 +49,8 @@ export const POTION_CONFIG: Record<PotionType, { healMin: number; healMax: numbe
 };
 
 export const SPEED_POTION_CONFIG: Record<SpeedPotionType, { duration: number; name: string; bagName: string }> = {
-  green: { duration: 120000, name: '綠色藥水', bagName: '綠色藥水' },
-  'enhanced-green': { duration: 600000, name: '強化綠色藥水', bagName: '強化綠色藥水' },
+  green: { duration: 180000, name: '綠色藥水', bagName: '綠色藥水' },
+  'enhanced-green': { duration: 900000, name: '強化綠色藥水', bagName: '強化綠色藥水' },
 };
 
 export function getPotionName(type: PotionType): string {
