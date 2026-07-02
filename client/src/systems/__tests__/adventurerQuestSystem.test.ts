@@ -9,7 +9,7 @@ import {
   completeQuest,
   getPointsToNextRank,
 } from '../adventurerQuestSystem';
-import { getRankForPoints, GUILD_RANK_THRESHOLDS } from '../../models/adventurerQuest';
+import { getRankForPoints } from '../../models/adventurerQuest';
 
 function makeQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest {
   return {

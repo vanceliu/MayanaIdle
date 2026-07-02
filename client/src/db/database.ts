@@ -41,7 +41,9 @@ export interface BossDropTableEntry {
   bossName: string;
   itemType: 'gold' | 'equipment' | 'item';
   equipmentTemplateId?: number;
-  equipmentPool?: 'weapon' | 'armor';
+  equipmentPool?: 'weapon' | 'armor' | 'all';
+  acquireType?: 'shop' | 'craft';
+  shopTier?: 'low' | 'mid' | 'high';
   itemTemplateId?: number;
   dropValue: number;
   minAmount?: number;

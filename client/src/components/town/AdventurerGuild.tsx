@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import type { AdventurerQuest, AdventurerQuestDifficulty } from '../../models/adventurerQuest';
-import { GUILD_RANK_THRESHOLDS, GUILD_RANK_ORDER, getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS } from '../../models/adventurerQuest';
+import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS } from '../../models/adventurerQuest';
 import { getPointsToNextRank } from '../../systems/adventurerQuestSystem';
 
 const DIFFICULTIES: AdventurerQuestDifficulty[] = ['D', 'C', 'B', 'A', 'S'];
