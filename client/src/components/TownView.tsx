@@ -10,8 +10,9 @@ import { MagicAcademy } from './town/MagicAcademy';
 import { ClassGuild } from './town/ClassGuild';
 import { TownBlacksmith } from './town/TownBlacksmith';
 import { StarterNpc } from './town/StarterNpc';
+import { AdventurerGuild } from './town/AdventurerGuild';
 
-export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc';
+export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc' | 'adventurer-guild';
 
 interface FacilityInfo {
   id: TownFacility;
@@ -28,6 +29,7 @@ const FACILITIES: FacilityInfo[] = [
   { id: 'storage', name: '倉庫', icon: '📦' },
   { id: 'magic-academy', name: '魔法學院', icon: '📖' },
   { id: 'class-guild', name: '職業工會', icon: '⚜️' },
+  { id: 'adventurer-guild', name: '冒險者工會', icon: '🏛️' },
 ];
 
 const STARTER_NPC_FACILITY: FacilityInfo = { id: 'starter-npc', name: '新手指導員', icon: '🧭' };
@@ -42,6 +44,7 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
     case 'storage': return <Storage />;
     case 'magic-academy': return <MagicAcademy />;
     case 'class-guild': return <ClassGuild />;
+    case 'adventurer-guild': return <AdventurerGuild />;
     case 'starter-npc': return <StarterNpc />;
     default: return null;
   }

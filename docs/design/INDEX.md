@@ -55,6 +55,7 @@
 | 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
+| 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 
 ### 依限制查找
 
@@ -149,6 +150,7 @@
 | `12-pet.md` | 寵物 | 寵物定位 |
 | `14-endgame.md` | 成就/排行榜 | 長期目標 |
 | `36-quest-system.md` | 每日任務系統 | 冒險者工會、40 個任務、每日重置、獎勵機制 |
+| `37-statistics.md` | 角色統計數據 | 殺敵數、BOSS討伐、死亡、強化、任務完成、金幣獲得 |
 
 ### 技術架構
 

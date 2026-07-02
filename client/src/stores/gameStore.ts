@@ -15,6 +15,10 @@ import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, 
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
+import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty } from '../models/adventurerQuest';
+import { generateQuestList, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
+import type { CharacterStatistics } from '../models/statistics';
+import { createDefaultStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
 import { evaluateCombatScript, evaluatePersistentScript, evaluateEmergencyRetreat, type CombatScriptContext, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
@@ -138,6 +142,10 @@ interface GameState {
   personalStoredEquipment: EquipmentInstance[];
   personalStoredMaterials: BagItem[];
   activeEffects: ActiveEffect[];
+  adventurerQuests: AdventurerQuest[];
+  adventurerQuestBoard: Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
+  guildProgress: GuildProgress;
+  statistics: CharacterStatistics;
 
   setPhase: (phase: GamePhase) => void;
   initUser: () => Promise<void>;
@@ -179,6 +187,11 @@ interface GameState {
   spendAttributePoint: (attr: keyof Attributes) => void;
   acceptQuest: (questId: string) => void;
   completeQuest: (questId: string) => void;
+  acceptAdventurerQuest: (quest: AdventurerQuest) => void;
+  abandonAdventurerQuest: (questId: string) => void;
+  completeAdventurerQuest: (questId: string) => void;
+  refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
+  initQuestBoard: () => void;
   saveState: () => void;
 }
 
@@ -238,6 +251,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   personalStoredEquipment: [],
   personalStoredMaterials: [],
   activeEffects: [],
+  adventurerQuests: [],
+  adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+  guildProgress: { rank: 'F', points: 0 },
+  statistics: createDefaultStatistics(),
 
   setPhase: (phase) => set({ phase }),
 
@@ -339,6 +356,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const quickSlots = prefs?.quickSlots ?? [null, null, null, null, null];
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
     const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
+    const adventurerQuests = prefs?.adventurerQuests ?? [];
+    const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
+    const statistics = prefs?.statistics ?? createDefaultStatistics();
 
     // Reset areaEnteredAt so pressure doesn't accumulate during character select
     char.areaEnteredAt = Date.now();
@@ -373,10 +393,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       quickSlots,
       afterCombatHpThreshold,
       afterCombatMpThreshold,
+      adventurerQuests,
+      guildProgress,
+      statistics,
       phase: 'explore',
     });
     get().startRegen();
     get().startPersistentLoop();
+    get().initQuestBoard();
     const region = getRegion(char.currentRegion);
     if (region?.type !== 'town') {
       get().startExploring();
@@ -1223,8 +1247,81 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Remove quest materials from bag
     newBag = newBag.filter(b => b.name !== QUEST_MATERIAL_NAME || b.amount <= 0);
 
-    set({ character: updated, bagItems: newBag });
+    const questStats = { ...get().statistics, questsCompleted: get().statistics.questsCompleted + 1 };
+    set({ character: updated, bagItems: newBag, statistics: questStats });
     saveGame(get());
+  },
+
+  acceptAdventurerQuest: (quest) => {
+    const state = get();
+    const result = acceptAdvQuest(state.adventurerQuests, quest);
+    if (!result) return;
+    set({ adventurerQuests: result });
+    saveGame(get());
+  },
+
+  abandonAdventurerQuest: (questId) => {
+    const state = get();
+    const { activeQuests, guildProgress } = abandonAdvQuest(
+      state.adventurerQuests, questId, state.guildProgress
+    );
+    set({ adventurerQuests: activeQuests, guildProgress });
+    saveGame(get());
+  },
+
+  completeAdventurerQuest: (questId) => {
+    const state = get();
+    const { activeQuests, guildProgress, reward } = completeAdvQuest(
+      state.adventurerQuests, questId, state.guildProgress
+    );
+    if (!reward) return;
+
+    let newBag = state.bagItems.map(b => ({ ...b }));
+    let newChar = state.character;
+
+    if (reward.type === 'gold' && newChar) {
+      newChar = { ...newChar, gold: newChar.gold + reward.amount };
+    } else if (reward.itemName) {
+      const itemType = reward.type === 'potion' ? 'potion' as const : 'material' as const;
+      const bagType = (reward.type === 'weapon-scroll' || reward.type === 'armor-scroll') ? 'scroll' as const : itemType;
+      const existingItem = newBag.find(b => b.name === reward.itemName && b.type === bagType);
+      if (existingItem) {
+        existingItem.amount += reward.amount;
+      } else if (getBagUsedSlots(newBag, state.inventory) < BAG_MAX_SLOTS) {
+        newBag.push({ name: reward.itemName!, type: bagType, itemTemplateId: reward.itemId, amount: reward.amount });
+      } else {
+        return;
+      }
+    }
+
+    const advQuestStats = { ...state.statistics, questsCompleted: state.statistics.questsCompleted + 1 };
+    if (reward.type === 'gold') advQuestStats.totalGoldEarned += reward.amount;
+
+    set({
+      adventurerQuests: activeQuests,
+      guildProgress,
+      character: newChar,
+      bagItems: newBag,
+      statistics: advQuestStats,
+    });
+    saveGame(get());
+  },
+
+  refreshQuestBoard: (difficulty) => {
+    const state = get();
+    const board = { ...state.adventurerQuestBoard };
+    board[difficulty] = generateQuestList(difficulty, state.guildProgress.rank);
+    set({ adventurerQuestBoard: board });
+  },
+
+  initQuestBoard: () => {
+    const state = get();
+    const difficulties: AdventurerQuestDifficulty[] = ['D', 'C', 'B', 'A', 'S'];
+    const board = {} as Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
+    for (const d of difficulties) {
+      board[d] = generateQuestList(d, state.guildProgress.rank);
+    }
+    set({ adventurerQuestBoard: board });
   },
 
   saveState: () => {
@@ -1400,6 +1497,18 @@ export function processMonsterDeath(
       logs2.push({ text: `獲得 ${QUEST_MATERIAL_NAME}`, type: 'loot' });
     }
 
+    // 冒險者工會任務進度
+    let advQuests = updateAdvQuestProgress(state2.adventurerQuests, char2.currentArea, defeatedMonsterName, 1);
+    if (rollAdvCollectDrop(state2.adventurerQuests, defeatedMonsterName)) {
+      advQuests = updateAdvQuestProgress(advQuests, char2.currentArea, defeatedMonsterName, 1);
+    }
+
+    // 統計計數
+    const stats = { ...state2.statistics };
+    stats.monstersKilled += 1;
+    if (monsterIsBoss) stats.bossesKilled += 1;
+    if (drops.gold > 0) stats.totalGoldEarned += drops.gold;
+
     newBag = newBag.filter(b => b.amount > 0);
 
     set({
@@ -1407,6 +1516,8 @@ export function processMonsterDeath(
       combatLogs: logs2.slice(-MAX_LOGS),
       inventory: newEquipInv,
       bagItems: newBag,
+      adventurerQuests: advQuests,
+      statistics: stats,
     });
   });
 
@@ -1694,7 +1805,8 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
         char.currentZone = nearestTown.zoneId;
         char.areaEnteredAt = Date.now();
         logs.push({ text: `你倒下了...傳送至${nearestTown.name}`, type: 'system' });
-        set({ character: char, monsters, combatLogs: logs, phase: 'explore' });
+        const deathStats = { ...get().statistics, deathCount: get().statistics.deathCount + 1 };
+        set({ character: char, monsters, combatLogs: logs, phase: 'explore', statistics: deathStats });
         saveGame(useGameStore.getState());
         return;
       }
@@ -1867,6 +1979,9 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     quickSlots: state.quickSlots,
     afterCombatHpThreshold: state.afterCombatHpThreshold,
     afterCombatMpThreshold: state.afterCombatMpThreshold,
+    adventurerQuests: state.adventurerQuests,
+    guildProgress: state.guildProgress,
+    statistics: state.statistics,
   };
   localStorage.setItem(key, JSON.stringify(data));
 }
@@ -1879,6 +1994,9 @@ interface LoadedPreferences {
   quickSlots: (PotionType | null)[];
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
+  adventurerQuests: AdventurerQuest[];
+  guildProgress: GuildProgress;
+  statistics: CharacterStatistics;
 }
 
 function loadLocalPreferences(characterId: number): LoadedPreferences | null {
@@ -1898,6 +2016,9 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         quickSlots: data.quickSlots ?? [null, null, null, null, null],
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
+        adventurerQuests: data.adventurerQuests ?? [],
+        guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
+        statistics: data.statistics ?? createDefaultStatistics(),
       };
     }
     // Migration: old format only has scriptRules
@@ -1929,6 +2050,9 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         quickSlots: data.quickSlots ?? [null, null, null, null, null],
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 0,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 0,
+        adventurerQuests: data.adventurerQuests ?? [],
+        guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
+        statistics: data.statistics ?? createDefaultStatistics(),
       };
     }
     return null;

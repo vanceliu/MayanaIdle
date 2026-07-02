@@ -35,11 +35,21 @@ export function ClassGuild() {
     return `${quest.materialCount ?? 0} / ${COLLECT_MATERIAL_TARGET} 個`;
   }
 
-  function renderQuestDescription(quest: Quest): string {
+  function renderQuestDescription(quest: Quest) {
     if (quest.type === 'errand') {
-      return `前往 ${getAreaName(quest.targetArea!)} 擊殺 ${ERRAND_KILL_TARGET} 隻怪物`;
+      const areaName = getAreaName(quest.targetArea!);
+      return (
+        <span className="shop-item-desc">
+          工會師傅要求你前往 <strong className="quest-highlight">{areaName}</strong> 進行實戰訓練。請擊殺任意怪物 <strong className="quest-highlight">{ERRAND_KILL_TARGET} 隻</strong> 以證明你的實力。
+        </span>
+      );
     }
-    return `擊殺 ${quest.targetMonster} 收集 ${COLLECT_MATERIAL_TARGET} 個任務素材`;
+    const areaName = getAreaName(quest.targetArea!);
+    return (
+      <span className="shop-item-desc">
+        為了製作技能書的特殊墨水，工會需要特定素材。請擊殺 <strong className="quest-highlight">{areaName}</strong> 的 <strong className="quest-highlight">{quest.targetMonster}</strong> 收集素材 <strong className="quest-highlight">{COLLECT_MATERIAL_TARGET} 個</strong>。
+      </span>
+    );
   }
 
   function learnSkill(def: ClassSkillDef) {
@@ -81,7 +91,7 @@ export function ClassGuild() {
             <div key={quest.id} className="shop-item">
               <div className="shop-item-info">
                 <span className="shop-item-name">
-                  {quest.type === 'errand' ? '跑腿任務' : '素材收集任務'}（{template?.skillLevel}級技能書）
+                  {quest.type === 'errand' ? '職業試煉 — 實戰訓練' : '職業試煉 — 稀有材料'}（{template?.skillLevel}級技能書）
                 </span>
                 <span className="shop-item-desc">Lv.{quest.requiredLevel} 解鎖</span>
               </div>
@@ -95,10 +105,11 @@ export function ClassGuild() {
           <div key={quest.id} className={`shop-item ${quest.status === 'completable' ? 'completable' : ''}`}>
             <div className="shop-item-info">
               <span className="shop-item-name">
-                {quest.type === 'errand' ? '跑腿任務' : '素材收集任務'}
+                {quest.type === 'errand' ? '職業試煉 — 實戰訓練' : '職業試煉 — 稀有材料'}
               </span>
-              <span className="shop-item-desc">
-                {renderQuestDescription(quest)} — {renderQuestProgress(quest)}
+              {renderQuestDescription(quest)}
+              <span className="quest-progress">
+                進度：<strong>{renderQuestProgress(quest)}</strong>
               </span>
             </div>
             <div className="shop-item-actions">

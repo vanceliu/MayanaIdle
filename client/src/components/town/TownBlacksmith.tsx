@@ -168,6 +168,15 @@ export function TownBlacksmith() {
       }
       setResultMsg(`強化失敗！${item.name} 已損毀...`);
     }
+    const stats = { ...useGameStore.getState().statistics };
+    if (itemIsWeapon) {
+      stats.weaponEnhanceAttempts += 1;
+      if (!success) stats.weaponsBroken += 1;
+    } else {
+      stats.armorEnhanceAttempts += 1;
+      if (!success) stats.armorsBroken += 1;
+    }
+    useGameStore.setState({ statistics: stats });
     useGameStore.getState().saveState();
   }
 
@@ -327,6 +336,8 @@ export function TownBlacksmith() {
     });
 
     setResultMsg(`製作成功！獲得 ${selectedRecipe.name}`);
+    const craftStats = { ...useGameStore.getState().statistics, equipmentCrafted: useGameStore.getState().statistics.equipmentCrafted + 1 };
+    useGameStore.setState({ statistics: craftStats });
     useGameStore.getState().saveState();
   }
 

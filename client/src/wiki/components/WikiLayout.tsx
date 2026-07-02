@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { path: '/wiki/exp-table', label: '經驗表' },
   { path: '/wiki/attributes', label: '屬性公式' },
   { path: '/wiki/combat', label: '戰鬥計算' },
+  { path: '/wiki/quests', label: '任務系統' },
 ];
 
 export function WikiLayout() {

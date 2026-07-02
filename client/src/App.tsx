@@ -14,6 +14,7 @@ import { BattleView } from './components/BattleView';
 import { MapNavigation } from './components/MapNavigation';
 import { TownView } from './components/TownView';
 import { QuickSlotBar } from './components/QuickSlotBar';
+import { QuestTracker } from './components/QuestTracker';
 import { RightPanel } from './components/RightPanel';
 import { getRegion } from './models/mapData';
 import './App.css';
@@ -146,7 +147,10 @@ function App() {
         <div className="center-content">
           {isInTown ? <TownView /> : <BattleView />}
         </div>
-        <QuickSlotBar />
+        <div className="quick-slot-row">
+          <QuickSlotBar />
+          <QuestTracker />
+        </div>
         <GameToolbar />
       </main>
       <RightPanel />
