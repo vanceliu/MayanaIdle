@@ -51,7 +51,14 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
   const filtered = useMemo(() => {
     let list = armors;
     if (slotFilter !== 'all') list = list.filter(a => a.slot === slotFilter);
-    if (craftTierFilter !== 'all') list = list.filter(a => a.acquireType === 'craft' && a.craftTier === craftTierFilter);
+    if (craftTierFilter !== 'all') {
+      if (craftTierFilter.startsWith('shop-')) {
+        const shopTier = craftTierFilter.replace('shop-', '');
+        list = list.filter(a => a.acquireType === 'shop' && a.shopTier === shopTier);
+      } else {
+        list = list.filter(a => a.acquireType === 'craft' && a.craftTier === craftTierFilter);
+      }
+    }
     if (search) list = list.filter(a => a.name.includes(search));
     list = [...list].sort((a, b) => {
       const av = (a as any)[sortKey] ?? 0;
@@ -91,6 +98,9 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
           setSearchParams(searchParams, { replace: true });
         }}>
           <option value="all">全部等級</option>
+          <option value="shop-low">商店低階</option>
+          <option value="shop-mid">商店中階</option>
+          <option value="shop-high">商店高階</option>
           <option value="entry">{CRAFT_TIER_LABELS.entry}</option>
           <option value="mid">{CRAFT_TIER_LABELS.mid}</option>
           <option value="top">{CRAFT_TIER_LABELS.top}</option>

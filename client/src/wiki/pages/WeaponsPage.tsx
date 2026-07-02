@@ -67,7 +67,14 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
     let list = weapons;
     if (typeFilter !== 'all') list = list.filter(w => w.type === typeFilter);
     if (materialFilter !== 'all') list = list.filter(w => w.material === materialFilter);
-    if (craftTierFilter !== 'all') list = list.filter(w => w.acquireType === 'craft' && w.craftTier === craftTierFilter);
+    if (craftTierFilter !== 'all') {
+      if (craftTierFilter.startsWith('shop-')) {
+        const shopTier = craftTierFilter.replace('shop-', '');
+        list = list.filter(w => w.acquireType === 'shop' && w.shopTier === shopTier);
+      } else {
+        list = list.filter(w => w.acquireType === 'craft' && w.craftTier === craftTierFilter);
+      }
+    }
     if (search) list = list.filter(w => w.name.includes(search));
     list = [...list].sort((a, b) => {
       const av = (a as any)[sortKey] ?? 0;
@@ -111,6 +118,9 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
           setSearchParams(searchParams, { replace: true });
         }}>
           <option value="all">全部等級</option>
+          <option value="shop-low">商店低階</option>
+          <option value="shop-mid">商店中階</option>
+          <option value="shop-high">商店高階</option>
           <option value="entry">{CRAFT_TIER_LABELS.entry}</option>
           <option value="mid">{CRAFT_TIER_LABELS.mid}</option>
           <option value="top">{CRAFT_TIER_LABELS.top}</option>

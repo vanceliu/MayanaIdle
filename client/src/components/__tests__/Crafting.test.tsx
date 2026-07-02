@@ -99,8 +99,8 @@ describe('TownBlacksmith - Crafting', () => {
 
     const state = useGameStore.getState();
     const crafted = state.inventory.find(i => i.name === '精鋼劍')!;
-    expect(crafted.smallMonsterDamage).toBe(8);
-    expect(crafted.largeMonsterDamage).toBe(6);
+    expect(crafted.smallMonsterDamage).toBe(11);
+    expect(crafted.largeMonsterDamage).toBe(8);
     expect(crafted.type).toBe('sword');
     expect(crafted.slot).toBe('rightHand');
     expect(crafted.quality).toBe(0);

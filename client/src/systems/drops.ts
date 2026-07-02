@@ -178,9 +178,27 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
       gold += Math.floor(baseGold * goldRateMultiplier);
     } else if (entry.itemType === 'equipment') {
-      const template = entry.equipmentTemplateId
-        ? await db.equipmentTemplates.get(entry.equipmentTemplateId)
-        : undefined;
+      let template;
+      if (entry.equipmentPool) {
+        const pool = entry.equipmentPool;
+        const candidates = await db.equipmentTemplates
+          .filter(t => {
+            if (entry.acquireType === 'shop' && entry.shopTier) {
+              if (t.acquireType !== 'shop' || t.shopTier !== entry.shopTier) return false;
+            } else if (entry.acquireType === 'craft' && entry.craftTier) {
+              if (t.acquireType !== 'craft' || t.craftTier !== entry.craftTier) return false;
+            }
+            if (pool === 'weapon') return isWeaponSlot(t.slot);
+            if (pool === 'armor') return !isWeaponSlot(t.slot);
+            return true;
+          })
+          .toArray();
+        if (candidates.length > 0) {
+          template = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+      } else if (entry.equipmentTemplateId) {
+        template = await db.equipmentTemplates.get(entry.equipmentTemplateId);
+      }
       if (template) {
         const isWeapon = isWeaponSlot(template.slot);
         const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';

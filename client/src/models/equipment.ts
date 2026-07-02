@@ -31,6 +31,7 @@ export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' |
 
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
 export type CraftTier = 'entry' | 'mid' | 'top';
+export type ShopTier = 'low' | 'mid' | 'high';
 
 export interface CraftMaterial {
   name: string;
@@ -68,6 +69,7 @@ export interface EquipmentTemplate {
   stability?: number;
   canBreak?: boolean;
   acquireType?: AcquireType;
+  shopTier?: ShopTier;
   craftTier?: CraftTier;
   craftGold?: number;
   craftMaterials?: CraftMaterial[];

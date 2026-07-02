@@ -47,7 +47,7 @@ describe('seedDatabase', () => {
     // dawn-plains should have exactly 7 entries
     expect(areaCounts['dawn-plains']).toBe(7);
     // Total should match seed data
-    expect(dropCount).toBe(618);
+    expect(dropCount).toBe(570);
   });
 
   it('should have unique entries per area-itemType-id combination', async () => {

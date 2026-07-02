@@ -236,22 +236,52 @@ function BossDropSection({ bossName }: { bossName: string }) {
             </tr>
           </thead>
           <tbody>
-            {drops.map((d, i) => {
+            {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
+              if (isEquip && d.equipmentPool === 'all') {
+                const tierParam = d.acquireType === 'shop' && d.shopTier
+                  ? `shop-${d.shopTier}`
+                  : (d.craftTier || 'entry');
+                const tierLabel = d.acquireType === 'shop' && d.shopTier
+                  ? (d.shopTier === 'high' ? '高階' : d.shopTier === 'mid' ? '中階' : '低階')
+                  : (d.craftTier === 'top' ? '頂級' : d.craftTier === 'mid' ? '高級進階' : '高級入門');
+                return [
+                  <tr key={`${d.itemType}-${i}-weapon`}>
+                    <td><Link className="wiki-link" to={`/wiki/weapons?craftTier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
+                    <td>裝備</td>
+                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">-</td>
+                  </tr>,
+                  <tr key={`${d.itemType}-${i}-armor`}>
+                    <td><Link className="wiki-link" to={`/wiki/armor?craftTier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
+                    <td>裝備</td>
+                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">-</td>
+                  </tr>
+                ];
+              }
               const name = getDropItemName(d);
               let equipLink = '';
               if (isEquip) {
-                if (d.equipmentPool === 'weapon') {
-                  equipLink = `/wiki/weapons?craftTier=${d.craftTier || 'entry'}`;
-                } else if (d.equipmentPool === 'armor') {
-                  equipLink = `/wiki/armor?craftTier=${d.craftTier || 'entry'}`;
-                } else {
+                if (d.equipmentPool) {
+                  if (d.equipmentPool === 'weapon') {
+                    const tierParam = d.acquireType === 'shop' && d.shopTier
+                      ? `shop-${d.shopTier}`
+                      : (d.craftTier || 'entry');
+                    equipLink = `/wiki/weapons?craftTier=${tierParam}`;
+                  } else if (d.equipmentPool === 'armor') {
+                    const tierParam = d.acquireType === 'shop' && d.shopTier
+                      ? `shop-${d.shopTier}`
+                      : (d.craftTier || 'entry');
+                    equipLink = `/wiki/armor?craftTier=${tierParam}`;
+                  }
+                } else if (d.equipmentTemplateId) {
                   equipLink = ARMOR_NAMES.has(name)
                     ? `/wiki/armor/${encodeURIComponent(name)}`
                     : `/wiki/weapons/${encodeURIComponent(name)}`;
                 }
               }
-              return (
+              return [(
                 <tr key={`${d.itemType}-${i}`}>
                   <td>
                     {isEquip ? (
@@ -264,7 +294,7 @@ function BossDropSection({ bossName }: { bossName: string }) {
                   <td className="cell-number">{getDropRate(d.dropValue)}</td>
                   <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
                 </tr>
-              );
+              )];
             })}
           </tbody>
         </table>
@@ -294,15 +324,52 @@ function AreaDropSection({ area }: { area: string }) {
             </tr>
           </thead>
           <tbody>
-            {drops.map((d, i) => {
+            {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
+              if (isEquip && d.equipmentPool === 'all') {
+                const tierParam = d.acquireType === 'shop' && d.shopTier
+                  ? `shop-${d.shopTier}`
+                  : (d.craftTier || 'entry');
+                const tierLabel = d.acquireType === 'shop' && d.shopTier
+                  ? (d.shopTier === 'high' ? '高階' : d.shopTier === 'mid' ? '中階' : '低階')
+                  : (d.craftTier === 'top' ? '頂級' : d.craftTier === 'mid' ? '高級進階' : '高級入門');
+                return [
+                  <tr key={`${d.itemType}-${i}-weapon`}>
+                    <td><Link className="wiki-link" to={`/wiki/weapons?craftTier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
+                    <td>裝備</td>
+                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">-</td>
+                  </tr>,
+                  <tr key={`${d.itemType}-${i}-armor`}>
+                    <td><Link className="wiki-link" to={`/wiki/armor?craftTier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
+                    <td>裝備</td>
+                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">-</td>
+                  </tr>
+                ];
+              }
               const name = getDropItemName(d);
-              const equipLink = isEquip
-                ? ARMOR_NAMES.has(name)
-                  ? `/wiki/armor/${encodeURIComponent(name)}`
-                  : `/wiki/weapons/${encodeURIComponent(name)}`
-                : '';
-              return (
+              let equipLink = '';
+              if (isEquip) {
+                if (d.equipmentPool) {
+                  if (d.equipmentPool === 'weapon') {
+                    const tierParam = d.acquireType === 'shop' && d.shopTier
+                      ? `shop-${d.shopTier}`
+                      : (d.craftTier || 'entry');
+                    equipLink = `/wiki/weapons?craftTier=${tierParam}`;
+                  } else if (d.equipmentPool === 'armor') {
+                    const tierParam = d.acquireType === 'shop' && d.shopTier
+                      ? `shop-${d.shopTier}`
+                      : (d.craftTier || 'entry');
+                    equipLink = `/wiki/armor?craftTier=${tierParam}`;
+                  }
+                } else if (d.equipmentTemplateId) {
+                  equipLink = ARMOR_NAMES.has(name)
+                    ? `/wiki/armor/${encodeURIComponent(name)}`
+                    : `/wiki/weapons/${encodeURIComponent(name)}`;
+                }
+              }
+              return [(
                 <tr key={`${d.itemType}-${i}`}>
                   <td>
                     {isEquip ? (
@@ -315,7 +382,7 @@ function AreaDropSection({ area }: { area: string }) {
                   <td className="cell-number">{getDropRate(d.dropValue)}</td>
                   <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
                 </tr>
-              );
+              )];
             })}
           </tbody>
         </table>

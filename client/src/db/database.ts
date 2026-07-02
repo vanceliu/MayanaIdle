@@ -26,6 +26,10 @@ export interface DropTableEntry {
   area: string;
   itemType: 'gold' | 'equipment' | 'item';
   equipmentTemplateId?: number;
+  equipmentPool?: 'weapon' | 'armor' | 'all';
+  acquireType?: 'shop' | 'craft';
+  shopTier?: 'low' | 'mid' | 'high';
+  craftTier?: 'entry' | 'mid' | 'top';
   itemTemplateId?: number;
   dropValue: number;
   minAmount?: number;
