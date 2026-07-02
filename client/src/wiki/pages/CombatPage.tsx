@@ -50,13 +50,27 @@ export function CombatPage() {
 
       <section style={{ marginBottom: 32 }}>
         <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
+          玩家防禦減傷
+        </h3>
+        <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
+          <p style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
+            最終防禦 = floor(裝備防禦合計 × (1 + 防禦力%/100))<br />
+            減傷率 = min(最終防禦, 75)%<br />
+            實際傷害 = floor(怪物傷害 × (100 - 減傷率) / 100)<br />
+            減傷上限：75%
+          </p>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
           迴避率
         </h3>
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             基礎迴避 = 盜賊 10% / 其他職業 5%<br />
             AGI迴避 = 有效AGI / 3<br />
-            防禦溢出迴避 = (總防禦 - 65) / 5　※ 總防禦 &gt; 65 時<br />
+            防禦溢出迴避 = (總防禦 - 75) / 5　※ 總防禦 &gt; 75 時<br />
             迴避率 = 基礎迴避 + AGI迴避 + 防禦溢出迴避<br />
             迴避率上限：35%
           </p>

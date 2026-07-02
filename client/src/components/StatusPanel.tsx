@@ -6,15 +6,16 @@ import { getItemWeight } from '../models/items';
 import { getEffectiveAffixValue } from '../models/affix';
 
 function getTotalDefense(gear: (EquipmentInstance | null)[], activeEffects: { type: string; target: string; startTime: number; duration: number; modifiers?: { stat: string; value: number }[] }[]): number {
-  let total = 0;
+  let rawTotal = 0;
+  let defensePercent = 0;
   for (const g of gear) {
     if (!g) continue;
-    if (g.defense) total += g.defense;
-    if (g.enhancement && g.defense) total += g.enhancement;
+    if (g.defense) rawTotal += g.defense;
+    if (g.enhancement && g.defense) rawTotal += g.enhancement;
     if (g.affixes) {
       for (const affix of g.affixes) {
         if (affix.type === 'defense') {
-          total += getEffectiveAffixValue(affix, g.quality);
+          defensePercent += getEffectiveAffixValue(affix, g.quality);
         }
       }
     }
@@ -25,10 +26,10 @@ function getTotalDefense(gear: (EquipmentInstance | null)[], activeEffects: { ty
     if (now - effect.startTime >= effect.duration) continue;
     if (!effect.modifiers) continue;
     for (const mod of effect.modifiers) {
-      if (mod.stat === 'defense') total += mod.value;
+      if (mod.stat === 'defense') rawTotal += mod.value;
     }
   }
-  return total;
+  return Math.floor(rawTotal * (1 + defensePercent / 100));
 }
 
 function getCurrentWeight(gear: (EquipmentInstance | null)[]): number {

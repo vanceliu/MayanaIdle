@@ -110,7 +110,12 @@ function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 
 }
 
 function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): number {
-  return equippedGear.reduce((sum, g) => sum + (g?.defense ?? 0), 0);
+  return equippedGear.reduce((sum, g) => {
+    if (!g) return sum;
+    const base = g.defense ?? 0;
+    const enhance = base > 0 ? (g.enhancement ?? 0) : 0;
+    return sum + base + enhance;
+  }, 0);
 }
 
 export function getAffixBonusesFromGear(equippedGear: (EquipmentInstance | null)[]): AffixBonuses {
@@ -393,7 +398,7 @@ export function calculateMonsterAttack(
   const agiDodge = Math.floor(effAGI / 3);
   const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
   const finalDefense = Math.floor(rawDefense * (1 + bonuses.defense / 100));
-  const defOverflowDodge = finalDefense > 65 ? Math.floor((finalDefense - 65) / 5) : 0;
+  const defOverflowDodge = finalDefense > 75 ? Math.floor((finalDefense - 75) / 5) : 0;
   const dodgeRate = Math.min(35, baseDodge + agiDodge + defOverflowDodge);
 
   const dodged = Math.random() * 100 < dodgeRate;
@@ -410,7 +415,7 @@ export function calculateMonsterAttack(
   const rawDamage = randomInt(monster.attackMin, monster.attackMax);
 
   // Player defense reduction (with affix bonus)
-  const playerDefense = Math.min(finalDefense, 65);
+  const playerDefense = Math.min(finalDefense, 75);
   let finalDamage = Math.max(1, Math.floor(rawDamage * (100 - playerDefense) / 100));
 
   // Block check (only with shield equipped, after defense reduction)

@@ -984,6 +984,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setPersistentRules: (rules) => {
     set({ persistentRules: rules });
+    get().startPersistentLoop();
     const char = get().character;
     if (char?.id) {
       saveLocalPreferences(char.id, get());
@@ -1020,6 +1021,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         now,
         activeEffects: state.activeEffects,
         cooldownReduction,
+        effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
+        effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear),
       };
 
       const action = evaluatePersistentScript(state.persistentRules, ctx);

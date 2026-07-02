@@ -426,7 +426,7 @@ describe('combat system', () => {
       expect(result2.dodged).toBe(false);
     });
 
-    it('should cap player defense reduction at 65%', () => {
+    it('should cap player defense reduction at 75%', () => {
       let callCount = 0;
       vi.spyOn(Math, 'random').mockImplementation(() => {
         callCount++;
@@ -441,8 +441,8 @@ describe('combat system', () => {
 
       const result = calculateMonsterAttack(monster, char, gear);
 
-      // defense capped at 65, so: 100 * (100-65)/100 = 35
-      expect(result.damage).toBe(35);
+      // defense capped at 75, so: 100 * (100-75)/100 = 25
+      expect(result.damage).toBe(25);
     });
 
     it('should deal minimum 1 damage', () => {

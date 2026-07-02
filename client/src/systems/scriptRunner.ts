@@ -89,6 +89,8 @@ export interface PersistentScriptContext {
   activeEffects: ActiveEffect[];
   cooldownReduction?: number;
   phase?: string;
+  effectiveMaxHp?: number;
+  effectiveMaxMp?: number;
 }
 
 export function evaluatePersistentScript(rules: PersistentRule[], ctx: PersistentScriptContext): PersistentAction | null {
@@ -106,8 +108,10 @@ export function evaluatePersistentScript(rules: PersistentRule[], ctx: Persisten
 function checkPersistentCondition(rule: PersistentRule, ctx: PersistentScriptContext): boolean {
   const { condition } = rule;
   const { character, skills, now, activeEffects } = ctx;
-  const hpPercent = (character.hp / character.maxHp) * 100;
-  const mpPercent = character.maxMp > 0 ? (character.mp / character.maxMp) * 100 : 100;
+  const maxHp = ctx.effectiveMaxHp ?? character.maxHp;
+  const maxMp = ctx.effectiveMaxMp ?? character.maxMp;
+  const hpPercent = (character.hp / maxHp) * 100;
+  const mpPercent = maxMp > 0 ? (character.mp / maxMp) * 100 : 100;
 
   switch (condition.type) {
     case 'always':
