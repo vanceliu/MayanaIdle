@@ -3,6 +3,7 @@ import { useGameStore } from '../stores/gameStore';
 import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
 import { getRegion } from '../models/mapData';
+import { AREA_POOLS } from '../models/adventurerQuest';
 
 export function QuestTracker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,7 +19,12 @@ export function QuestTracker() {
 
   function getAreaName(areaId: string): string {
     const region = getRegion(areaId);
-    return region?.name ?? areaId;
+    if (region) return region.name;
+    for (const pools of Object.values(AREA_POOLS)) {
+      const entry = pools.find(a => a.areaId === areaId);
+      if (entry) return entry.areaName;
+    }
+    return areaId;
   }
 
   return (
