@@ -192,6 +192,7 @@ interface GameState {
   completeAdventurerQuest: (questId: string) => void;
   refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
+  triggerMapCombat: (monsterCount: number) => void;
   saveState: () => void;
 }
 
@@ -1330,6 +1331,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   saveState: () => {
     saveGame(get());
   },
+
+  triggerMapCombat: (monsterCount: number) => {
+    const state = get();
+    if (state.phase !== 'explore' || !state.character) return;
+    spawnMapCombat(get, set, monsterCount);
+  },
 }));
 
 async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) => void) {
@@ -1396,6 +1403,71 @@ async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) =>
 
   const existingLogs = get().combatLogs;
   set({ monsters: spawned, selectedTargetIdx: 0, phase: 'combat', combatLogs: addLog(existingLogs, { text: `遭遇 ${spawned.map(m => m.name).join(', ')}！`, type: 'system' }) });
+  runAutoCombat(get, set);
+}
+
+async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>) => void, count: number) {
+  const state = get();
+  const char = state.character!;
+
+  const region = getRegion(char.currentRegion);
+  const hasFloors = region?.floors && region.floors.length > 0;
+  const monsterAreaId = hasFloors && char.currentFloor != null
+    ? `${char.currentRegion}-${char.currentFloor}f`
+    : char.currentRegion;
+  let areaMonsters = await db.monsterTemplates.where('area').equals(monsterAreaId).toArray();
+
+  if (areaMonsters.length === 0) {
+    console.error(`[spawnMapCombat] No monster templates found for area: ${monsterAreaId}`);
+    return;
+  }
+
+  const spawned: MonsterInstance[] = [];
+  const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
+  let bossSpawned = false;
+  for (let i = 0; i < count; i++) {
+    const template = areaMonsters[Math.floor(Math.random() * areaMonsters.length)];
+    if (template.isBoss && bossSpawned) {
+      const fallback = nonBossMonsters.length > 0
+        ? nonBossMonsters[Math.floor(Math.random() * nonBossMonsters.length)]
+        : template;
+      spawned.push({
+        templateId: fallback.id!,
+        name: fallback.name,
+        level: fallback.level,
+        currentHp: fallback.hp,
+        maxHp: fallback.hp,
+        attackMin: fallback.attackMin,
+        attackMax: fallback.attackMax,
+        defense: fallback.defense,
+        exp: fallback.exp,
+        race: fallback.race,
+        size: fallback.size,
+        element: fallback.element,
+        isBoss: fallback.isBoss,
+      });
+    } else {
+      if (template.isBoss) bossSpawned = true;
+      spawned.push({
+        templateId: template.id!,
+        name: template.name,
+        level: template.level,
+        currentHp: template.hp,
+        maxHp: template.hp,
+        attackMin: template.attackMin,
+        attackMax: template.attackMax,
+        defense: template.defense,
+        exp: template.exp,
+        race: template.race,
+        size: template.size,
+        element: template.element,
+        isBoss: template.isBoss,
+      });
+    }
+  }
+
+  const existingLogs2 = get().combatLogs;
+  set({ monsters: spawned, selectedTargetIdx: 0, phase: 'combat', combatLogs: addLog(existingLogs2, { text: `遭遇 ${spawned.map(m => m.name).join(', ')}！`, type: 'system' }) });
   runAutoCombat(get, set);
 }
 

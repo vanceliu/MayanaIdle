@@ -1,8 +1,11 @@
 import { useRef, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { useMapControlStore } from '../stores/mapControlStore';
+import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { GameIcon } from './GameIcon';
 import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
+import { MapCanvas } from './MapCanvas';
 
 function formatTime(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -26,7 +29,35 @@ export function BattleView() {
   const searchMode = useGameStore(s => s.searchMode);
   const setSearchMode = useGameStore(s => s.setSearchMode);
   const activeEffects = useGameStore(s => s.activeEffects);
+  const character = useGameStore(s => s.character);
   const logRef = useRef<HTMLDivElement>(null);
+
+  const currentMap = useMapControlStore(s => s.currentMap);
+  const loadMap = useMapControlStore(s => s.loadMap);
+  const setAutoMove = useMapControlStore(s => s.setAutoMove);
+
+  // Load map when character region changes
+  useEffect(() => {
+    if (character) {
+      loadMap(character.currentRegion, character.currentFloor);
+    }
+  }, [character?.currentRegion, character?.currentFloor, loadMap]);
+
+  // Sync search mode with auto move
+  useEffect(() => {
+    if (searchMode === 'auto' && phase === 'explore') {
+      setAutoMove(true);
+    } else {
+      setAutoMove(false);
+    }
+  }, [searchMode, phase, setAutoMove]);
+
+  // Unpause monsters when returning to explore
+  useEffect(() => {
+    if (phase === 'explore') {
+      useMapMonsterStore.getState().setPaused(false);
+    }
+  }, [phase]);
 
   useEffect(() => {
     if (logRef.current) {
@@ -113,7 +144,11 @@ export function BattleView() {
         )}
       </div>
 
-      <div className="combat-log" ref={logRef}>
+      {currentMap && phase !== 'combat' && (
+        <MapCanvas />
+      )}
+
+      <div className={`combat-log ${currentMap && phase !== 'combat' ? 'compact' : ''}`} ref={logRef}>
         {combatLogs.map((log, i) => (
           <div key={i} className={`log-entry log-${log.type}`}>{log.text}</div>
         ))}
