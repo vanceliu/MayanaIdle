@@ -252,7 +252,7 @@ export function MapCanvas() {
 
       // Add monsters
       const { monsters } = useMapMonsterStore.getState();
-      const monsterRadius = TILE_H * 0.38;
+      const monsterRadius = TILE_H * 0.45;
       for (const monster of monsters) {
         const { sx, sy } = worldToScreen(monster.position.x, monster.position.y, TILE_W, TILE_H);
         const mDrawX = sx + camOffsetX;
@@ -263,31 +263,28 @@ export function MapCanvas() {
         renderList.push({
           depth: monster.position.x + monster.position.y + 0.5,
           draw: () => {
-            const cy = mDrawY - monsterRadius * 0.3;
             ctx.beginPath();
-            ctx.arc(mDrawX, cy, monsterRadius + 2, 0, Math.PI * 2);
+            ctx.arc(mDrawX, mDrawY, monsterRadius + 2, 0, Math.PI * 2);
             ctx.fillStyle = isBoss ? 'rgba(200, 0, 200, 0.4)' : COLORS.monsterGlow;
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(mDrawX, cy, monsterRadius, 0, Math.PI * 2);
+            ctx.arc(mDrawX, mDrawY, monsterRadius, 0, Math.PI * 2);
             ctx.fillStyle = isBoss ? '#cc00cc' : COLORS.monster;
             ctx.fill();
             if (isBoss) {
               const hornH = monsterRadius * 1.1;
               const hornW = monsterRadius * 1.5;
               ctx.fillStyle = '#880088';
-              // Left horn
               ctx.beginPath();
-              ctx.moveTo(mDrawX - monsterRadius * 0.45, cy - monsterRadius * 0.5);
-              ctx.lineTo(mDrawX - monsterRadius * 0.7, cy - monsterRadius * 0.5 - hornH);
-              ctx.lineTo(mDrawX - monsterRadius * 0.45 + hornW, cy - monsterRadius * 0.5);
+              ctx.moveTo(mDrawX - monsterRadius * 0.45, mDrawY - monsterRadius * 0.5);
+              ctx.lineTo(mDrawX - monsterRadius * 0.7, mDrawY - monsterRadius * 0.5 - hornH);
+              ctx.lineTo(mDrawX - monsterRadius * 0.45 + hornW, mDrawY - monsterRadius * 0.5);
               ctx.closePath();
               ctx.fill();
-              // Right horn
               ctx.beginPath();
-              ctx.moveTo(mDrawX + monsterRadius * 0.45, cy - monsterRadius * 0.5);
-              ctx.lineTo(mDrawX + monsterRadius * 0.7, cy - monsterRadius * 0.5 - hornH);
-              ctx.lineTo(mDrawX + monsterRadius * 0.45 - hornW, cy - monsterRadius * 0.5);
+              ctx.moveTo(mDrawX + monsterRadius * 0.45, mDrawY - monsterRadius * 0.5);
+              ctx.lineTo(mDrawX + monsterRadius * 0.7, mDrawY - monsterRadius * 0.5 - hornH);
+              ctx.lineTo(mDrawX + monsterRadius * 0.45 - hornW, mDrawY - monsterRadius * 0.5);
               ctx.closePath();
               ctx.fill();
             }
@@ -296,19 +293,18 @@ export function MapCanvas() {
       }
 
       // Add player
-      const playerDepth = playerPosition.x + playerPosition.y + 0.5;
       const playerDrawX = canvasW / 2;
       const playerDrawY = canvasH / 2;
       const radius = TILE_H * 0.45;
       renderList.push({
-        depth: playerDepth,
+        depth: playerPosition.x + playerPosition.y + 0.5,
         draw: () => {
           ctx.beginPath();
-          ctx.arc(playerDrawX, playerDrawY - radius * 0.3, radius + 3, 0, Math.PI * 2);
+          ctx.arc(playerDrawX, playerDrawY, radius + 3, 0, Math.PI * 2);
           ctx.fillStyle = COLORS.playerGlow;
           ctx.fill();
           ctx.beginPath();
-          ctx.arc(playerDrawX, playerDrawY - radius * 0.3, radius, 0, Math.PI * 2);
+          ctx.arc(playerDrawX, playerDrawY, radius, 0, Math.PI * 2);
           ctx.fillStyle = COLORS.player;
           ctx.fill();
         },

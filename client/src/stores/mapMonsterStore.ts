@@ -10,6 +10,7 @@ export interface MapMonster {
   path: Position[];
   pathIndex: number;
   pathRecalcTimer: number;
+  moveTimer: number;
   lastPathPlayerPos: Position;
   isBoss: boolean;
 }
@@ -100,6 +101,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
           path: [],
           pathIndex: 0,
           pathRecalcTimer: 0,
+          moveTimer: 0,
           lastPathPlayerPos: { ...playerPos },
           isBoss,
         };
@@ -126,16 +128,18 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
         continue;
       }
 
-      const distToPlayer = distance(monster.position, playerPos);
-      let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos } = monster;
+      let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos, moveTimer } = monster;
       pathRecalcTimer += deltaMs;
+
+      const distToPlayer = distance(monster.position, playerPos);
 
       if (distToPlayer <= ASTAR_DISTANCE) {
         // Near player: use A* pathfinding
         const playerMoved = distance(playerPos, lastPathPlayerPos) >= PLAYER_MOVE_THRESHOLD;
         const timerExpired = pathRecalcTimer >= PATH_RECALC_INTERVAL;
+        const needsRecalc = playerMoved || timerExpired || path.length === 0 || pathIndex >= path.length;
 
-        if (playerMoved || timerExpired || path.length === 0) {
+        if (needsRecalc) {
           const monsterSnapped = { x: Math.round(monster.position.x), y: Math.round(monster.position.y) };
           const newPath = findPath(map, monsterSnapped, playerSnapped);
           if (newPath && newPath.length > 0) {
@@ -148,7 +152,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
         // Move along A* path
         if (path.length === 0 || pathIndex >= path.length) {
-          updated.push({ ...monster, path, pathIndex, pathRecalcTimer, lastPathPlayerPos });
+          updated.push({ ...monster, path, pathIndex, pathRecalcTimer, lastPathPlayerPos, moveTimer });
           continue;
         }
 
@@ -174,32 +178,69 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
           }
         }
 
-        updated.push({ ...monster, position: pos, path, pathIndex: idx, pathRecalcTimer, lastPathPlayerPos });
+        updated.push({ ...monster, position: pos, path, pathIndex: idx, pathRecalcTimer, lastPathPlayerPos, moveTimer });
       } else {
-        // Far from player: simple direct movement toward player (no A*)
-        const moveDistance = (monster.speed * deltaMs) / 1000;
-        const dx = playerPos.x - monster.position.x;
-        const dy = playerPos.y - monster.position.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Far from player: greedy one-step with smooth interpolation (no A*)
+        // Build a one-node path toward player if we don't have one
+        if (path.length === 0 || pathIndex >= path.length) {
+          const mx = Math.round(monster.position.x);
+          const my = Math.round(monster.position.y);
+          let bestX = mx;
+          let bestY = my;
+          let bestDist = distance({ x: mx, y: my }, playerPos);
 
-        if (dist > 0) {
-          const ratio = Math.min(moveDistance / dist, 1);
-          const newX = monster.position.x + dx * ratio;
-          const newY = monster.position.y + dy * ratio;
-          const tileX = Math.round(newX);
-          const tileY = Math.round(newY);
-
-          // Only move if target tile is walkable
-          if (tileX >= 0 && tileX < map.width && tileY >= 0 && tileY < map.height &&
-              map.tiles[tileY][tileX] !== 1) {
-            updated.push({ ...monster, position: { x: newX, y: newY }, path: [], pathIndex: 0, pathRecalcTimer, lastPathPlayerPos });
-          } else {
-            // Stuck — clear path so A* kicks in when close enough
-            updated.push({ ...monster, path: [], pathIndex: 0, pathRecalcTimer, lastPathPlayerPos });
+          for (const dir of [
+            { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 },
+            { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
+          ]) {
+            const nx = mx + dir.x;
+            const ny = my + dir.y;
+            if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
+            if (map.tiles[ny][nx] === 1) continue;
+            if (dir.x !== 0 && dir.y !== 0) {
+              if (map.tiles[my][mx + dir.x] === 1 || map.tiles[my + dir.y][mx] === 1) continue;
+            }
+            const d = distance({ x: nx, y: ny }, playerPos);
+            if (d < bestDist) {
+              bestDist = d;
+              bestX = nx;
+              bestY = ny;
+            }
           }
-        } else {
-          updated.push({ ...monster, pathRecalcTimer, lastPathPlayerPos });
+
+          if (bestX !== mx || bestY !== my) {
+            path = [{ x: bestX, y: bestY }];
+            pathIndex = 0;
+          } else {
+            updated.push({ ...monster, path: [], pathIndex: 0, pathRecalcTimer, lastPathPlayerPos, moveTimer });
+            continue;
+          }
         }
+
+        // Smooth interpolation to next grid center
+        const moveDistance = (monster.speed * deltaMs) / 1000;
+        let remaining = moveDistance;
+        let pos = { ...monster.position };
+        let idx = pathIndex;
+
+        while (remaining > 0 && idx < path.length) {
+          const next = path[idx];
+          const dx = next.x - pos.x;
+          const dy = next.y - pos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist <= remaining) {
+            pos = { x: next.x, y: next.y };
+            remaining -= dist;
+            idx++;
+          } else {
+            const ratio = remaining / dist;
+            pos = { x: pos.x + dx * ratio, y: pos.y + dy * ratio };
+            remaining = 0;
+          }
+        }
+
+        updated.push({ ...monster, position: pos, path, pathIndex: idx, pathRecalcTimer, lastPathPlayerPos, moveTimer });
       }
     }
 
