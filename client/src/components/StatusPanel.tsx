@@ -60,7 +60,7 @@ export function StatusPanel() {
   const floorText = char.currentFloor != null ? ` ${char.currentFloor}F` : '';
 
   const allGear = Object.values(gear).filter(Boolean) as EquipmentInstance[];
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const effSTR = getEffectiveSTR(attrs.STR);
   const effVIT = getEffectiveVIT(attrs.VIT);
 

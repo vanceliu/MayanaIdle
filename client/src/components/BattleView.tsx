@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { useGameStore } from '../stores/gameStore';
+import { useRef, useEffect, useState } from 'react';
+import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { GameIcon } from './GameIcon';
@@ -31,6 +31,7 @@ export function BattleView() {
   const activeEffects = useGameStore(s => s.activeEffects);
   const character = useGameStore(s => s.character);
   const logRef = useRef<HTMLDivElement>(null);
+  const [logSize, setLogSize] = useState<0 | 1 | 2>(0); // 0=compact, 1=medium, 2=large
 
   const currentMap = useMapControlStore(s => s.currentMap);
   const loadMap = useMapControlStore(s => s.loadMap);
@@ -39,15 +40,21 @@ export function BattleView() {
   // Load map when character region changes
   useEffect(() => {
     if (character) {
-      loadMap(character.currentRegion, character.currentFloor);
+      const savedPos = (character.mapPositionX != null && character.mapPositionY != null)
+        ? { x: character.mapPositionX, y: character.mapPositionY }
+        : null;
+      loadMap(character.currentRegion, character.currentFloor, savedPos);
     }
   }, [character?.currentRegion, character?.currentFloor, loadMap]);
 
   // Sync search mode with auto move
   useEffect(() => {
     if (searchMode === 'auto' && phase === 'explore') {
-      setAutoMove(true);
-    } else {
+      const map = useMapControlStore.getState().currentMap;
+      if (map) {
+        setAutoMove(true);
+      }
+    } else if (phase !== 'combat') {
       setAutoMove(false);
     }
   }, [searchMode, phase, setAutoMove]);
@@ -55,6 +62,7 @@ export function BattleView() {
   // Unpause monsters when returning to explore
   useEffect(() => {
     if (phase === 'explore') {
+      useMapMonsterStore.getState().clearCombatMonsters();
       useMapMonsterStore.getState().setPaused(false);
     }
   }, [phase]);
@@ -87,20 +95,20 @@ export function BattleView() {
           )}
         </div>
 
-        {phase === 'combat' && monsters.some(m => m.currentHp > 0) && (
-          <div className="monster-list">
-            {monsters.map((m, i) => {
-              const hpPercent = Math.max(0, Math.floor((m.currentHp / m.maxHp) * 100));
-              const isSelected = i === selectedTargetIdx;
-              const monsterDebuffs = activeEffects.filter(
-                e => e.type === 'debuff' && e.target === 'monster' && e.targetIdx === i
-              );
-              const now = Date.now();
+        <div className="monster-list">
+          {phase === 'combat' && monsters.filter(m => m.currentHp > 0).map((m, i) => {
+            const hpPercent = Math.max(0, Math.floor((m.currentHp / m.maxHp) * 100));
+            const actualIdx = monsters.indexOf(m);
+            const isSelected = actualIdx === selectedTargetIdx;
+            const monsterDebuffs = activeEffects.filter(
+              e => e.type === 'debuff' && e.target === 'monster' && e.targetIdx === actualIdx
+            );
+            const now = Date.now();
               return (
                 <div
-                  key={i}
-                  className={`monster-card ${m.currentHp <= 0 ? 'dead' : ''} ${isSelected ? 'selected' : ''}`}
-                  onClick={() => m.currentHp > 0 && selectTarget(i)}
+                  key={actualIdx}
+                  className={`monster-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => selectTarget(actualIdx)}
                 >
                   <div className="monster-name">{m.name} Lv.{m.level}</div>
                   <div className="bar monster-hp-bar">
@@ -137,22 +145,41 @@ export function BattleView() {
               );
             })}
           </div>
-        )}
 
         {phase === 'dead' && (
           <div className="death-banner">你倒下了 — 已傳送至最近城鎮</div>
         )}
       </div>
 
-      {currentMap && phase !== 'combat' && (
+      {currentMap && (
         <MapCanvas />
       )}
 
-      <div className={`combat-log ${currentMap && phase !== 'combat' ? 'compact' : ''}`} ref={logRef}>
+      <div className="combat-log compact" ref={logRef}>
         {combatLogs.map((log, i) => (
           <div key={i} className={`log-entry log-${log.type}`}>{log.text}</div>
         ))}
       </div>
+
+      {currentMap && logSize > 0 && (
+        <div className={`combat-log-overlay log-size-${logSize}`}>
+          <div className="combat-log" ref={logRef}>
+            {combatLogs.map((log, i) => (
+              <div key={i} className={`log-entry log-${log.type}`}>{log.text}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {currentMap && (
+        <button
+          className="log-resize-btn"
+          onClick={() => setLogSize(s => ((s + 1) % 3) as 0 | 1 | 2)}
+          title="調整 Log 大小"
+        >
+          {logSize === 0 ? '▲' : logSize === 1 ? '▲▲' : '▼'}
+        </button>
+      )}
     </div>
   );
 }

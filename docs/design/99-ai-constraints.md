@@ -161,49 +161,50 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 ### Phase：地圖控制系統（Map Control）
 
-**目標**：將現有「探索中...」純文字狀態視覺化為俯瞰視角 2D 地圖，玩家藍點可點擊移動或自動走動，怪物紅點自動生成並靠近玩家觸發戰鬥。
+**目標**：將現有「探索中...」純文字狀態視覺化為 Isometric 45° 俯瞰視角地圖，玩家藍點可點擊移動或自動走動，怪物紅點自動生成並靠近玩家觸發戰鬥。
 
 **設計文件**：`38-map-control.md`
 
-**Phase 1 — 基礎地圖渲染與移動**
+**Phase 1 — 基礎地圖渲染與移動（已完成 ✓）**
 
-- [ ] Step 1：建立地圖資料結構 — `MapData` interface、`Position` type、tile 地形定義
-- [ ] Step 2：建立測試地圖資料 — 開闊型（曙光草原）+ 迷宮型（象牙塔 1F），20×15 格
-- [ ] Step 3：Canvas 地圖渲染組件 — 繪製地板/牆壁 tile，自適應尺寸
-- [ ] Step 4：玩家藍點顯示與渲染
-- [ ] Step 5：A* 尋路演算法實作
-- [ ] Step 6：點擊移動 — 點擊地圖格子，計算路徑，角色平滑移動
-- [ ] Step 7：自動隨機移動 — 隨機選目標格，自動尋路移動，到達後重新選目標
-- [ ] Step 8：UI 佈局調整 — 地圖佔中間主區域，log 縮至下方
-- [ ] Step 9：撰寫 unit test — 尋路正確性、地形碰撞、移動邏輯
+- [x] Step 1：建立地圖資料結構 — `MapData` interface、`Position` type、`TileType` enum
+- [x] Step 2：建立測試地圖資料 — 開闊型（曙光草原）+ 迷宮型（象牙塔 1F），20×15 格
+- [x] Step 3：Canvas Isometric 地圖渲染組件 — 菱形 tile、3D 牆壁、depth sorting
+- [x] Step 4：玩家藍點顯示（depth sorted，被牆壁正確遮擋）
+- [x] Step 5：A* 八方向尋路演算法（防切牆角、octile heuristic）
+- [x] Step 6：點擊移動 — Isometric 座標反算、即時改變目的地
+- [x] Step 7：自動隨機移動 — 隨機選目標格，到達後重新選目標
+- [x] Step 8：Camera follow — 玩家永遠在畫面中心，tile 固定大小
+- [x] Step 9：UI 佈局調整 — 地圖佔中間主區域，log 縮至下方（可調 3 段大小 overlay）
+- [x] Step 10：撰寫 unit test — pathfinding 11 tests + mapData 8 tests
 
-**Phase 2 — 怪物系統（紅點）**
+**Phase 2 — 怪物系統（紅點）（已完成 ✓）**
 
-- [ ] Step 1：紅點生成邏輯 — 定時判定、生成在距離玩家 ≥5 格的可通行格
-- [ ] Step 2：紅點朝玩家移動 — 簡化尋路、1 格/秒速度
-- [ ] Step 3：碰撞偵測 — 紅點與玩家距離 ≤1 格觸發戰鬥
-- [ ] Step 4：戰鬥觸發整合 — 收集觸發範圍內紅點、切換 combat phase、戰鬥結束清除紅點
-- [ ] Step 5：怪物種類決定 — 觸發時依區域怪物池 roll 種類（沿用現有 rollEncounter）
-- [ ] Step 6：紅點上限控制 — 同時存在上限 3 隻（基礎值）
-- [ ] Step 7：紅點消失規則 — 距離超過 15 格消失
-- [ ] Step 8：撰寫 unit test — 生成位置合法性、移動碰撞、觸發邏輯
+- [x] Step 1：紅點生成邏輯 — 每秒 15% 機率、生成在距離玩家 ≥5 格的可通行格
+- [x] Step 2：紅點移動 — A* 尋路（每 3 秒重算路徑）、平滑插值、1 格/秒
+- [x] Step 3：碰撞偵測 — 紅點與玩家距離 ≤1.2 格觸發戰鬥
+- [x] Step 4：戰鬥觸發整合 — 紅點保留至戰鬥結束才消失、切換 combat phase
+- [x] Step 5：怪物種類決定 — 觸發時依區域怪物池 roll（沿用 spawnMapCombat）
+- [x] Step 6：紅點上限控制 — 同時存在上限 3 隻（基礎值）
+- [x] Step 7：紅點消失規則 — 距離超過 15 格消失
+- [x] Step 8：Depth sorting — 紅點被牆壁正確遮擋
+- [x] Step 9：戰鬥後等待 — HP/MP 持續檢查，低於門檻暫停生成但紅點仍移動
+- [x] Step 10：禁用舊 rollEncounter 系統 — 遇敵全由紅點碰撞觸發
+- [x] Step 11：戰鬥中地圖持續顯示、怪物 HP 列表水平排列固定一行
 
 **Phase 3 — Pressure 整合與狀態管理**
 
 - [ ] Step 1：Pressure 影響紅點上限 — `同時上限 = 3 + Pressure`
 - [ ] Step 2：Pressure 影響生成頻率 — `頻率倍率 = 1 + Pressure × 0.2`
-- [ ] Step 3：戰鬥後等待 — HP/MP 低於門檻時角色停止移動，紅點仍靠近
-- [ ] Step 4：回城/死亡 — 清除所有紅點、重置地圖狀態
-- [ ] Step 5：地圖切換 — 進入不同區域/樓層載入對應地圖
-- [ ] Step 6：搜尋模式整合 — 自動搜尋=自動移動、手動搜尋=手動移動
-- [ ] Step 7：撰寫 integration test — Pressure 連動、狀態切換完整流程
+- [ ] Step 3：回城/死亡 — 清除所有紅點、重置地圖狀態
+- [ ] Step 4：地圖切換 — 進入不同區域/樓層載入對應地圖
+- [ ] Step 5：撰寫 integration test — Pressure 連動、狀態切換完整流程
 
 **Phase 4 — 各區域地圖與視覺打磨**
 
 - [ ] Step 1：為各區域設計對應固定地圖
-- [ ] Step 2：視覺動畫 — 移動平滑插值、紅點生成淡入/消失淡出、戰鬥觸發閃爍
-- [ ] Step 3：移動路徑顯示 — 點擊移動時顯示半透明路徑
-- [ ] Step 4：整體 UI 打磨 — 配色、格子邊框、地形紋理
+- [ ] Step 2：視覺動畫 — 紅點生成淡入/消失淡出、戰鬥觸發閃爍
+- [ ] Step 3：整體 UI 打磨 — 配色、地形紋理
 
 ---
 

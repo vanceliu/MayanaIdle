@@ -177,7 +177,7 @@ export function calculateBasePhysicalDamage(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = []
 ): number {
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const effSTR = getEffectiveSTR(attrs.STR);
   const bonuses = getAffixBonusesFromGear(equippedGear);
 
@@ -200,7 +200,7 @@ export function calculatePlayerAttack(
   equippedGear: (EquipmentInstance | null)[] = [],
   activeEffects: ActiveEffect[] = []
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const effSTR = getEffectiveSTR(attrs.STR);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getAffixBonusesFromGear(equippedGear);
@@ -271,7 +271,7 @@ export function calculatePhysicalSkillHit(
   skillName: string,
   activeEffects: ActiveEffect[] = []
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getAffixBonusesFromGear(equippedGear);
 
@@ -335,9 +335,10 @@ export function calculateSkillAttack(
   skillElement: string,
   monster: MonsterInstance,
   equippedGear: (EquipmentInstance | null)[] = [],
-  skillName: string = '技能'
+  skillName: string = '技能',
+  activeEffects: ActiveEffect[] = []
 ): { damage: number; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const bonuses = getAffixBonusesFromGear(equippedGear);
 
   // Base magic damage (including element counter bonus)
@@ -389,7 +390,7 @@ export function calculateMonsterAttack(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = []
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getAffixBonusesFromGear(equippedGear);
 

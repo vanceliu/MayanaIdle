@@ -12,9 +12,9 @@ export interface MapControlState {
   pathIndex: number;
   isMoving: boolean;
   autoMove: boolean;
-  moveSpeed: number; // tiles per second
+  moveSpeed: number;
 
-  loadMap: (regionId: string, floor?: number | null) => void;
+  loadMap: (regionId: string, floor?: number | null, savedPosition?: Position | null) => void;
   setPlayerPosition: (pos: Position) => void;
   moveToTarget: (target: Position) => void;
   setAutoMove: (auto: boolean) => void;
@@ -34,12 +34,19 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
   autoMove: false,
   moveSpeed: 2,
 
-  loadMap: (regionId, floor) => {
+  loadMap: (regionId, floor, savedPosition) => {
     const map = getMapForRegion(regionId, floor);
     if (!map) return;
+    const { currentMap } = get();
+    if (currentMap && currentMap.id === map.id) return;
+
+    const startPos = savedPosition && savedPosition.x >= 0 && savedPosition.y >= 0
+      ? savedPosition
+      : map.spawnPoint;
+
     set({
       currentMap: map,
-      playerPosition: { ...map.spawnPoint },
+      playerPosition: { ...startPos },
       targetPosition: null,
       currentPath: [],
       pathIndex: 0,
@@ -96,14 +103,16 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
   pickRandomTarget: () => {
     const { currentMap, playerPosition } = get();
     if (!currentMap) return;
-    const target = getRandomWalkablePosition(currentMap, playerPosition);
+    const snappedPos = { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) };
+    const target = getRandomWalkablePosition(currentMap, snappedPos);
     if (!target) return;
-    const path = findPath(currentMap, playerPosition, target);
+    const path = findPath(currentMap, snappedPos, target);
     if (!path || path.length === 0) {
       setTimeout(() => get().pickRandomTarget(), 100);
       return;
     }
     set({
+      playerPosition: snappedPos,
       targetPosition: target,
       currentPath: path,
       pathIndex: 0,

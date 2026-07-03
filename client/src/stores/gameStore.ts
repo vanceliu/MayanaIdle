@@ -560,32 +560,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const existing = get().gameLoopId;
     if (existing) clearInterval(existing);
 
-    // Only auto-search in auto mode
-    if (get().searchMode !== 'auto') {
-      set({ gameLoopId: null });
-      return;
-    }
-
-    const id = window.setInterval(() => {
-      const state = get();
-      if (state.phase !== 'explore' || !state.character) return;
-
-      // Auto-script: check HP/MP threshold (after combat / during explore)
-      const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
-      const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear);
-      const hpPercent = (state.character.hp / effMaxHp) * 100;
-      const mpPercent = effMaxMp > 0 ? (state.character.mp / effMaxMp) * 100 : 100;
-      if (hpPercent <= state.afterCombatHpThreshold || mpPercent <= state.afterCombatMpThreshold) {
-        // Wait for regen before exploring further
-        return;
-      }
-
-      if (rollEncounter()) {
-        get().stopExploring();
-        spawnCombat(get, set);
-      }
-    }, 1000);
-    set({ gameLoopId: id });
+    // Map control system handles encounter via red dot collision
+    // Only keep the HP/MP regen wait check for the old non-map flow
+    set({ gameLoopId: null });
   },
 
   stopExploring: () => {
@@ -595,28 +572,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   manualSearch: () => {
-    const state = get();
-    if (state.phase !== 'explore' || !state.character || state.isManualSearching) return;
-
-    set({
-      isManualSearching: true,
-      combatLogs: addLog(state.combatLogs, { text: '搜索中...', type: 'system' }),
-    });
-
-    const id = window.setInterval(() => {
-      const current = get();
-      if (current.phase !== 'explore') {
-        get().cancelManualSearch();
-        return;
-      }
-
-      if (rollEncounter()) {
-        get().cancelManualSearch();
-        spawnCombat(get, set);
-      }
-    }, 1000);
-
-    set({ manualSearchId: id });
+    // Map control system handles encounter via red dot collision
+    // Manual search is now just "manual movement" on the map (player clicks to move)
   },
 
   cancelManualSearch: () => {
@@ -646,7 +603,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (state.character.hp >= effMaxHp) return;
       const inCombat = state.phase === 'combat';
       const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-      const regen = getHpRegen(state.character, inCombat, allGear);
+      const regen = getHpRegen(state.character, inCombat, allGear, state.activeEffects);
       if (regen <= 0) return;
       const newHp = Math.min(effMaxHp, state.character.hp + regen);
       set({ character: { ...state.character, hp: newHp } });
@@ -659,7 +616,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (state.character.mp >= effMaxMp) return;
       const inCombat = state.phase === 'combat';
       const allGearMp = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-      const regen = getMpRegen(state.character, inCombat, allGearMp);
+      const regen = getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
       if (regen <= 0) return;
       const newMp = Math.min(effMaxMp, state.character.mp + regen);
       set({ character: { ...state.character, mp: newMp } });
@@ -1679,7 +1636,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                 const targets = shuffled.slice(0, hitCount);
                 for (const m of targets) {
                   const mIdx = monsters.indexOf(m);
-                  const result = calculateSkillAttack(char, skill.power, skill.element, m, allGear, skill.name);
+                  const result = calculateSkillAttack(char, skill.power, skill.element, m, allGear, skill.name, state.activeEffects);
                   monsters[mIdx] = { ...m, currentHp: m.currentHp - result.damage };
                   logs.push({ text: result.log.message, type: 'player' });
                   if (mIdx === targetIdx) {
@@ -1687,7 +1644,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                   }
                 }
               } else {
-                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name);
+                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name, state.activeEffects);
                 target.currentHp -= result.damage;
                 monsters[targetIdx] = target;
                 logs.push({ text: result.log.message, type: 'player' });
@@ -1972,6 +1929,9 @@ async function saveGame(state: GameState) {
   const char = state.character;
   if (!char || !char.id) return;
 
+  const { useMapControlStore } = await import('./mapControlStore');
+  const mapPos = useMapControlStore.getState().playerPosition;
+
   await db.characters.update(char.id, {
     level: char.level,
     exp: char.exp,
@@ -1990,6 +1950,8 @@ async function saveGame(state: GameState) {
     currentRegion: char.currentRegion,
     currentFloor: char.currentFloor,
     areaEnteredAt: char.areaEnteredAt,
+    mapPositionX: Math.round(mapPos.x),
+    mapPositionY: Math.round(mapPos.y),
   });
 
   // Save bag items (all items including potions)

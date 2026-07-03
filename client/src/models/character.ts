@@ -1,5 +1,6 @@
 import type { Skill } from './skill';
 import type { Quest } from './quest';
+import type { ActiveEffect } from './effect';
 
 export type ClassName = 'knight' | 'elf' | 'elementalist' | 'priest' | 'thief';
 
@@ -37,6 +38,8 @@ export interface Character {
   areaEnteredAt: number;
   createdAt: number;
   dataVersion?: number;
+  mapPositionX?: number;
+  mapPositionY?: number;
 }
 
 export const CLASS_BASE_ATTRIBUTES: Record<ClassName, Attributes> = {
@@ -65,10 +68,10 @@ export function getAvailablePoints(className: ClassName): number {
   return CLASS_TOTAL_POINTS - total;
 }
 
-export function getTotalAttributes(char: Character): Attributes {
+export function getTotalAttributes(char: Character, activeEffects?: ActiveEffect[]): Attributes {
   const base = char.baseAttributes;
   const bonus = char.bonusAttributes;
-  return {
+  const attrs: Attributes = {
     STR: base.STR + bonus.STR,
     AGI: base.AGI + bonus.AGI,
     VIT: base.VIT + bonus.VIT,
@@ -76,6 +79,27 @@ export function getTotalAttributes(char: Character): Attributes {
     INT: base.INT + bonus.INT,
     CHA: base.CHA + bonus.CHA,
   };
+
+  if (activeEffects) {
+    const now = Date.now();
+    for (const effect of activeEffects) {
+      if (effect.type !== 'buff' || effect.target !== 'player') continue;
+      if (now - effect.startTime >= effect.duration) continue;
+      if (!effect.modifiers) continue;
+      for (const mod of effect.modifiers) {
+        switch (mod.stat) {
+          case 'str': attrs.STR += mod.value; break;
+          case 'agility': attrs.AGI += mod.value; break;
+          case 'vit': attrs.VIT += mod.value; break;
+          case 'spi': attrs.SPI += mod.value; break;
+          case 'int': attrs.INT += mod.value; break;
+          case 'cha': attrs.CHA += mod.value; break;
+        }
+      }
+    }
+  }
+
+  return attrs;
 }
 
 export function getEffectiveSTR(str: number): number {

@@ -9,7 +9,7 @@ export function CharacterStats() {
 
   if (!char) return null;
 
-  const attrs = getTotalAttributes(char);
+  const attrs = getTotalAttributes(char, activeEffects);
   const effectiveSTR = Math.floor(attrs.STR / 2) * 2;
   const effectiveAGI = Math.floor(attrs.AGI / 2) * 2;
   const effectiveVIT = Math.floor(attrs.VIT / 2) * 2;
@@ -23,6 +23,7 @@ export function CharacterStats() {
   const weaponExtraAttack = weapon?.extraAttack ?? 0;
 
   let totalDefense = 0;
+  let defensePercent = 0;
   let blockRate = 0;
   let critRate = 5;
   let critDamage = 200;
@@ -53,7 +54,7 @@ export function CharacterStats() {
           case 'crit_damage': critDamage += val; break;
           case 'attack_speed': attackSpeed += val; break;
           case 'cooldown_reduction': cooldownReduction += val; break;
-          case 'defense': totalDefense += val; break;
+          case 'defense': defensePercent += val; break;
           case 'max_hp': maxHpBonus += val; break;
           case 'max_mp': maxMpBonus += val; break;
           case 'heal_effect': healEffect += val; break;
@@ -84,14 +85,16 @@ export function CharacterStats() {
     }
   }
 
+  totalDefense = Math.floor(totalDefense * (1 + defensePercent / 100));
+
   const strBonus = Math.floor(effectiveSTR / 2);
   const agiBonus = Math.floor(effectiveAGI / 3);
 
   const physicalSmall = Math.floor((weaponSmall + weaponEnhance + weaponExtraAttack + strBonus) * (1 + attackPower / 100));
   const physicalLarge = Math.floor((weaponLarge + weaponEnhance + weaponExtraAttack + strBonus) * (1 + attackPower / 100));
 
-  const damageReduction = Math.min(totalDefense, 65);
-  const defOverflow = Math.max(0, totalDefense - 65);
+  const damageReduction = Math.min(totalDefense, 75);
+  const defOverflow = Math.max(0, totalDefense - 75);
   const dodgeFromDef = Math.floor(defOverflow / 5);
   const baseDodge = char.className === 'thief' ? 10 : 5;
   const totalDodge = Math.min(35, baseDodge + agiBonus + dodgeFromDef);
