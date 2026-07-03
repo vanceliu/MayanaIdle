@@ -78,7 +78,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       useMapMonsterStore.setState({
         maxMonsters: 1,
         monsters: [
-          { id: 'm1', position: { x: 8, y: 8 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
+          { id: 'm1', position: { x: 8, y: 8 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
         ],
       });
 
@@ -117,8 +117,8 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
     it('clearAll removes all monsters and resets timer', () => {
       useMapMonsterStore.setState({
         monsters: [
-          { id: 'm1', position: { x: 3, y: 3 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
-          { id: 'm2', position: { x: 7, y: 7 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: true },
+          { id: 'm1', position: { x: 3, y: 3 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
+          { id: 'm2', position: { x: 7, y: 7 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: true },
         ],
         spawnTimer: 500,
       });
@@ -135,7 +135,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
     it('paused stops spawning but not movement', () => {
       useMapMonsterStore.setState({
         monsters: [
-          { id: 'm1', position: { x: 8, y: 8 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [{ x: 7, y: 7 }], pathIndex: 0, pathRecalcTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
+          { id: 'm1', position: { x: 8, y: 8 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [{ x: 7, y: 7 }], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
         ],
         paused: true,
         maxMonsters: 5,
@@ -193,7 +193,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
         hasBossInPool: true,
         maxMonsters: 10,
         monsters: [
-          { id: 'm_boss', position: { x: 3, y: 3 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: true },
+          { id: 'm_boss', position: { x: 3, y: 3 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: true },
         ],
       });
 
