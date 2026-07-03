@@ -5,6 +5,7 @@ import {
   acceptQuest,
   abandonQuest,
   updateQuestProgress,
+  updateCollectQuestProgress,
   rollCollectMaterialDrop,
   completeQuest,
   getPointsToNextRank,
@@ -63,7 +64,8 @@ describe('adventurerQuestSystem', () => {
       const collectQuests = quests.filter(q => q.type === 'collect');
       for (const q of collectQuests) {
         expect(q.targetMonster).toBeDefined();
-        expect(q.targetCount).toBe(5);
+        expect(q.targetCount).toBeGreaterThanOrEqual(1);
+        expect(q.targetCount).toBeLessThanOrEqual(5);
       }
     });
   });
@@ -149,7 +151,7 @@ describe('adventurerQuestSystem', () => {
       const quests: AdventurerQuest[] = [
         makeQuest({ id: 'q1', status: 'active', type: 'collect', targetMonster: '毒蛇', targetArea: 'misty-swamp', currentCount: 2, targetCount: 5 }),
       ];
-      const updated = updateQuestProgress(quests, 'misty-swamp', '毒蛇', 1);
+      const updated = updateCollectQuestProgress(quests, '毒蛇', 1);
       expect(updated[0].currentCount).toBe(3);
     });
 

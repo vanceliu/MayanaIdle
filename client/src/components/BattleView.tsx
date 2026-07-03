@@ -6,6 +6,8 @@ import { GameIcon } from './GameIcon';
 import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
 import { MapCanvas } from './MapCanvas';
+import { getRegion, getFloor } from '../models/mapData';
+import { db } from '../db/database';
 
 function formatTime(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -39,13 +41,34 @@ export function BattleView() {
 
   // Load map when character region changes
   useEffect(() => {
-    if (character) {
-      const savedPos = (character.mapPositionX != null && character.mapPositionY != null)
-        ? { x: character.mapPositionX, y: character.mapPositionY }
-        : null;
-      loadMap(character.currentRegion, character.currentFloor, savedPos);
-    }
-  }, [character?.currentRegion, character?.currentFloor, loadMap]);
+    if (!character) return;
+    const savedPos = (character.mapPositionX != null && character.mapPositionY != null)
+      ? { x: character.mapPositionX, y: character.mapPositionY }
+      : null;
+    loadMap(character.currentRegion, character.currentFloor, savedPos).then(() => {
+      // Determine if boss exists in current area's monster pool
+      const region = getRegion(character.currentRegion);
+      if (region?.floors && character.currentFloor != null) {
+        const floor = getFloor(character.currentRegion, character.currentFloor);
+        useMapMonsterStore.getState().setHasBossInPool(floor?.isBossFloor ?? false);
+      } else {
+        const hasFloors = region?.floors && region.floors.length > 0;
+        const areaId = hasFloors && character.currentFloor != null
+          ? `${character.currentRegion}-${character.currentFloor}f`
+          : character.currentRegion;
+        db.monsterTemplates.where('area').equals(areaId).toArray().then(monsters => {
+          useMapMonsterStore.getState().setHasBossInPool(monsters.some(m => m.isBoss));
+        });
+      }
+
+      // If auto search is active, start moving after map loads
+      const currentSearchMode = useGameStore.getState().searchMode;
+      const currentPhase = useGameStore.getState().phase;
+      if (currentSearchMode === 'auto' && currentPhase === 'explore') {
+        useMapControlStore.getState().setAutoMove(true);
+      }
+    });
+  }, [character?.currentRegion, character?.currentFloor]);
 
   // Sync search mode with auto move
   useEffect(() => {

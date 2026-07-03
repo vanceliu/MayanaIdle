@@ -3,6 +3,7 @@ import type { Position, MapData } from '../models/mapControl';
 import { TileType } from '../models/mapControl';
 import { getMapForRegion } from '../models/mapDataControl';
 import { findPath, findNearestWalkable, getRandomWalkablePosition } from '../systems/pathfinding';
+import { useMapMonsterStore } from './mapMonsterStore';
 
 export interface MapControlState {
   currentMap: MapData | null;
@@ -14,7 +15,7 @@ export interface MapControlState {
   autoMove: boolean;
   moveSpeed: number;
 
-  loadMap: (regionId: string, floor?: number | null, savedPosition?: Position | null) => void;
+  loadMap: (regionId: string, floor?: number | null, savedPosition?: Position | null) => Promise<void>;
   setPlayerPosition: (pos: Position) => void;
   moveToTarget: (target: Position) => void;
   setAutoMove: (auto: boolean) => void;
@@ -34,8 +35,8 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
   autoMove: false,
   moveSpeed: 2,
 
-  loadMap: (regionId, floor, savedPosition) => {
-    const map = getMapForRegion(regionId, floor);
+  loadMap: async (regionId, floor, savedPosition) => {
+    const map = await getMapForRegion(regionId, floor);
     if (!map) return;
     const { currentMap } = get();
     if (currentMap && currentMap.id === map.id) return;
@@ -104,6 +105,40 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     const { currentMap, playerPosition } = get();
     if (!currentMap) return;
     const snappedPos = { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) };
+
+    // Check if there are monsters on the map — move toward the nearest one
+    const monsterState = useMapMonsterStore.getState();
+    const activeMonsters = monsterState.monsters.filter(
+      m => !monsterState.combatMonsterIds.includes(m.id)
+    );
+
+    if (activeMonsters.length > 0) {
+      let nearest = activeMonsters[0];
+      let nearestDist = Infinity;
+      for (const m of activeMonsters) {
+        const dx = m.position.x - snappedPos.x;
+        const dy = m.position.y - snappedPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = m;
+        }
+      }
+      const monsterTarget = { x: Math.round(nearest.position.x), y: Math.round(nearest.position.y) };
+      const path = findPath(currentMap, snappedPos, monsterTarget);
+      if (path && path.length > 0) {
+        set({
+          playerPosition: snappedPos,
+          targetPosition: monsterTarget,
+          currentPath: path,
+          pathIndex: 0,
+          isMoving: true,
+        });
+        return;
+      }
+    }
+
+    // No monsters or no path to monster — random walk
     const target = getRandomWalkablePosition(currentMap, snappedPos);
     if (!target) return;
     const path = findPath(currentMap, snappedPos, target);

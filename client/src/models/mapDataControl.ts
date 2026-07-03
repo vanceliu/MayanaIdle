@@ -1,67 +1,40 @@
 import type { MapData } from './mapControl';
 
-// 開闊型測試地圖 — 對應曙光草原
-export const MAP_DAWN_PRAIRIE: MapData = {
-  id: 'dawn-prairie',
-  name: '曙光草原',
-  width: 20,
-  height: 15,
-  spawnPoint: { x: 10, y: 7 },
-  tiles: [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
-    [1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-};
+const mapModules = import.meta.glob<MapData>('../data/maps/*.json', { eager: false, import: 'default' });
 
-// 迷宮型測試地圖 — 對應象牙塔 1F
-export const MAP_IVORY_TOWER_1F: MapData = {
-  id: 'ivory-tower-1f',
-  name: '象牙塔 1F',
-  width: 20,
-  height: 15,
-  spawnPoint: { x: 1, y: 13 },
-  tiles: [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1],
-    [1,0,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1],
-    [1,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
-    [1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1],
-    [1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1],
-    [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1],
-    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
-    [1,0,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,1],
-    [1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  ],
-};
+const mapCache = new Map<string, MapData>();
 
-export const TEST_MAPS: Record<string, MapData> = {
-  'dawn-prairie': MAP_DAWN_PRAIRIE,
-  'ivory-tower-1f': MAP_IVORY_TOWER_1F,
-};
-
-export function getMapForRegion(regionId: string, floor?: number | null): MapData | null {
-  if (floor != null) {
-    const key = `${regionId}-${floor}f`;
-    if (TEST_MAPS[key]) return TEST_MAPS[key];
+function getMapKey(id: string): string | null {
+  const suffix = `/${id}.json`;
+  for (const path of Object.keys(mapModules)) {
+    if (path.endsWith(suffix)) return path;
   }
-  if (TEST_MAPS[regionId]) return TEST_MAPS[regionId];
-  return TEST_MAPS['dawn-prairie'];
+  return null;
+}
+
+export async function getMapForRegion(regionId: string, floor?: number | null): Promise<MapData | null> {
+  const id = floor != null ? `${regionId}-${floor}f` : regionId;
+
+  if (mapCache.has(id)) return mapCache.get(id)!;
+
+  let key = getMapKey(id);
+  if (!key && floor != null) {
+    key = getMapKey(regionId);
+  }
+  if (!key) {
+    key = getMapKey('dawn-plains');
+  }
+  if (!key) return null;
+
+  const data = await mapModules[key]() as MapData;
+  mapCache.set(data.id, data);
+  return data;
+}
+
+export function getMapFromCache(id: string): MapData | null {
+  return mapCache.get(id) ?? null;
+}
+
+export function clearMapCache(): void {
+  mapCache.clear();
 }

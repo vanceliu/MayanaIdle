@@ -33,6 +33,10 @@ describe('drops system', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('rollDrops', () => {
     it('should return empty result when no drop table entries', async () => {
       vi.mocked(db.dropTables.where('area').equals).mockReturnValue({

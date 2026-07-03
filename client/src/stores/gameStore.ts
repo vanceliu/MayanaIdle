@@ -16,7 +16,7 @@ import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty } from '../models/adventurerQuest';
-import { generateQuestList, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
+import { generateQuestList, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
@@ -192,7 +192,8 @@ interface GameState {
   completeAdventurerQuest: (questId: string) => void;
   refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
-  triggerMapCombat: (monsterCount: number) => void;
+  triggerMapCombat: (monsterCount: number, bossCount: number) => void;
+  joinMapCombat: (monsterCount: number, bossCount: number) => void;
   saveState: () => void;
 }
 
@@ -831,6 +832,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     char.currentArea = scrollInfo.townId;
     char.currentRegion = scrollInfo.townId;
     char.currentFloor = null;
+    char.mapPositionX = undefined;
+    char.mapPositionY = undefined;
     const townZone = ZONES.find(z => z.regions.includes(scrollInfo.townId));
     if (townZone) char.currentZone = townZone.id;
     char.areaEnteredAt = Date.now();
@@ -870,6 +873,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentRegion: areaId,
       currentFloor: region?.type === 'dungeon' ? (region.floors?.[0]?.floor ?? 1) : null,
       areaEnteredAt: Date.now(),
+      mapPositionX: undefined,
+      mapPositionY: undefined,
     };
     const areaName = region?.name ?? areaId;
     set({
@@ -904,6 +909,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentRegion: location.regionId,
       currentFloor: location.floor,
       areaEnteredAt: Date.now(),
+      mapPositionX: undefined,
+      mapPositionY: undefined,
     };
 
     const floorText = location.floor != null ? ` ${location.floor}F` : '';
@@ -1289,10 +1296,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     saveGame(get());
   },
 
-  triggerMapCombat: (monsterCount: number) => {
+  triggerMapCombat: (monsterCount: number, bossCount: number) => {
     const state = get();
     if (state.phase !== 'explore' || !state.character) return;
-    spawnMapCombat(get, set, monsterCount);
+    spawnMapCombat(get, set, monsterCount, bossCount);
+  },
+
+  joinMapCombat: (monsterCount: number, bossCount: number) => {
+    const state = get();
+    if (state.phase !== 'combat' || !state.character) return;
+    addToMapCombat(get, set, monsterCount, bossCount);
   },
 }));
 
@@ -1363,7 +1376,7 @@ async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) =>
   runAutoCombat(get, set);
 }
 
-async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>) => void, count: number) {
+async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>) => void, count: number, bossCount: number) {
   const state = get();
   const char = state.character!;
 
@@ -1381,51 +1394,118 @@ async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>)
 
   const spawned: MonsterInstance[] = [];
   const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
-  let bossSpawned = false;
-  for (let i = 0; i < count; i++) {
-    const template = areaMonsters[Math.floor(Math.random() * areaMonsters.length)];
-    if (template.isBoss && bossSpawned) {
-      const fallback = nonBossMonsters.length > 0
-        ? nonBossMonsters[Math.floor(Math.random() * nonBossMonsters.length)]
-        : template;
-      spawned.push({
-        templateId: fallback.id!,
-        name: fallback.name,
-        level: fallback.level,
-        currentHp: fallback.hp,
-        maxHp: fallback.hp,
-        attackMin: fallback.attackMin,
-        attackMax: fallback.attackMax,
-        defense: fallback.defense,
-        exp: fallback.exp,
-        race: fallback.race,
-        size: fallback.size,
-        element: fallback.element,
-        isBoss: fallback.isBoss,
-      });
-    } else {
-      if (template.isBoss) bossSpawned = true;
-      spawned.push({
-        templateId: template.id!,
-        name: template.name,
-        level: template.level,
-        currentHp: template.hp,
-        maxHp: template.hp,
-        attackMin: template.attackMin,
-        attackMax: template.attackMax,
-        defense: template.defense,
-        exp: template.exp,
-        race: template.race,
-        size: template.size,
-        element: template.element,
-        isBoss: template.isBoss,
-      });
-    }
+  const bossMonsters = areaMonsters.filter(m => m.isBoss);
+  const normalCount = count - bossCount;
+
+  for (let i = 0; i < bossCount; i++) {
+    const pool = bossMonsters.length > 0 ? bossMonsters : areaMonsters;
+    const template = pool[Math.floor(Math.random() * pool.length)];
+    spawned.push({
+      templateId: template.id!,
+      name: template.name,
+      level: template.level,
+      currentHp: template.hp,
+      maxHp: template.hp,
+      attackMin: template.attackMin,
+      attackMax: template.attackMax,
+      defense: template.defense,
+      exp: template.exp,
+      race: template.race,
+      size: template.size,
+      element: template.element,
+      isBoss: template.isBoss,
+    });
+  }
+
+  for (let i = 0; i < normalCount; i++) {
+    const pool = nonBossMonsters.length > 0 ? nonBossMonsters : areaMonsters;
+    const template = pool[Math.floor(Math.random() * pool.length)];
+    spawned.push({
+      templateId: template.id!,
+      name: template.name,
+      level: template.level,
+      currentHp: template.hp,
+      maxHp: template.hp,
+      attackMin: template.attackMin,
+      attackMax: template.attackMax,
+      defense: template.defense,
+      exp: template.exp,
+      race: template.race,
+      size: template.size,
+      element: template.element,
+      isBoss: template.isBoss,
+    });
   }
 
   const existingLogs2 = get().combatLogs;
   set({ monsters: spawned, selectedTargetIdx: 0, phase: 'combat', combatLogs: addLog(existingLogs2, { text: `遭遇 ${spawned.map(m => m.name).join(', ')}！`, type: 'system' }) });
   runAutoCombat(get, set);
+}
+
+async function addToMapCombat(get: () => GameState, set: (s: Partial<GameState>) => void, count: number, bossCount: number) {
+  const state = get();
+  const char = state.character!;
+
+  const region = getRegion(char.currentRegion);
+  const hasFloors = region?.floors && region.floors.length > 0;
+  const monsterAreaId = hasFloors && char.currentFloor != null
+    ? `${char.currentRegion}-${char.currentFloor}f`
+    : char.currentRegion;
+  let areaMonsters = await db.monsterTemplates.where('area').equals(monsterAreaId).toArray();
+
+  if (areaMonsters.length === 0) return;
+
+  const spawned: MonsterInstance[] = [];
+  const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
+  const bossMonsters = areaMonsters.filter(m => m.isBoss);
+  const normalCount = count - bossCount;
+
+  for (let i = 0; i < bossCount; i++) {
+    const pool = bossMonsters.length > 0 ? bossMonsters : areaMonsters;
+    const template = pool[Math.floor(Math.random() * pool.length)];
+    spawned.push({
+      templateId: template.id!,
+      name: template.name,
+      level: template.level,
+      currentHp: template.hp,
+      maxHp: template.hp,
+      attackMin: template.attackMin,
+      attackMax: template.attackMax,
+      defense: template.defense,
+      exp: template.exp,
+      race: template.race,
+      size: template.size,
+      element: template.element,
+      isBoss: template.isBoss,
+    });
+  }
+
+  for (let i = 0; i < normalCount; i++) {
+    const pool = nonBossMonsters.length > 0 ? nonBossMonsters : areaMonsters;
+    const template = pool[Math.floor(Math.random() * pool.length)];
+    spawned.push({
+      templateId: template.id!,
+      name: template.name,
+      level: template.level,
+      currentHp: template.hp,
+      maxHp: template.hp,
+      attackMin: template.attackMin,
+      attackMax: template.attackMax,
+      defense: template.defense,
+      exp: template.exp,
+      race: template.race,
+      size: template.size,
+      element: template.element,
+      isBoss: template.isBoss,
+    });
+  }
+
+  const existingMonsters = get().monsters;
+  const existingLogs = get().combatLogs;
+  set({
+    monsters: [...existingMonsters, ...spawned],
+    combatLogs: addLog(existingLogs, { text: `${spawned.map(m => m.name).join(', ')} 加入戰鬥！`, type: 'system' }),
+  });
 }
 
 /**
@@ -1532,7 +1612,7 @@ export function processMonsterDeath(
     // 冒險者工會任務進度
     let advQuests = updateAdvQuestProgress(state2.adventurerQuests, char2.currentArea, defeatedMonsterName, 1);
     if (rollAdvCollectDrop(state2.adventurerQuests, defeatedMonsterName)) {
-      advQuests = updateAdvQuestProgress(advQuests, char2.currentArea, defeatedMonsterName, 1);
+      advQuests = updateAdvCollectProgress(advQuests, defeatedMonsterName, 1);
     }
 
     // 統計計數

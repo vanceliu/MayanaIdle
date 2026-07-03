@@ -1,66 +1,91 @@
-import { describe, it, expect } from 'vitest';
-import { MAP_DAWN_PRAIRIE, MAP_IVORY_TOWER_1F, getMapForRegion } from '../../models/mapDataControl';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { getMapForRegion, clearMapCache } from '../../models/mapDataControl';
 import { TileType } from '../../models/mapControl';
 
+beforeEach(() => {
+  clearMapCache();
+});
+
 describe('mapDataControl - map integrity', () => {
-  it('dawn prairie has correct dimensions', () => {
-    expect(MAP_DAWN_PRAIRIE.width).toBe(20);
-    expect(MAP_DAWN_PRAIRIE.height).toBe(15);
-    expect(MAP_DAWN_PRAIRIE.tiles.length).toBe(15);
-    expect(MAP_DAWN_PRAIRIE.tiles[0].length).toBe(20);
+  it('dawn plains has correct dimensions', async () => {
+    const map = await getMapForRegion('dawn-plains');
+    expect(map).not.toBeNull();
+    expect(map!.width).toBe(20);
+    expect(map!.height).toBe(15);
+    expect(map!.tiles.length).toBe(15);
+    expect(map!.tiles[0].length).toBe(20);
   });
 
-  it('ivory tower 1F has correct dimensions', () => {
-    expect(MAP_IVORY_TOWER_1F.width).toBe(20);
-    expect(MAP_IVORY_TOWER_1F.height).toBe(15);
-    expect(MAP_IVORY_TOWER_1F.tiles.length).toBe(15);
-    expect(MAP_IVORY_TOWER_1F.tiles[0].length).toBe(20);
+  it('ivory tower 1F has correct dimensions', async () => {
+    const map = await getMapForRegion('ivory-tower', 1);
+    expect(map).not.toBeNull();
+    expect(map!.width).toBe(40);
+    expect(map!.height).toBe(30);
+    expect(map!.tiles.length).toBe(30);
+    expect(map!.tiles[0].length).toBe(40);
   });
 
-  it('spawn points are on walkable tiles', () => {
-    const sp1 = MAP_DAWN_PRAIRIE.spawnPoint;
-    expect(MAP_DAWN_PRAIRIE.tiles[sp1.y][sp1.x]).not.toBe(TileType.Wall);
+  it('spawn points are on walkable tiles', async () => {
+    const prairie = await getMapForRegion('dawn-plains');
+    expect(prairie).not.toBeNull();
+    const sp1 = prairie!.spawnPoint;
+    expect(prairie!.tiles[sp1.y][sp1.x]).not.toBe(TileType.Wall);
 
-    const sp2 = MAP_IVORY_TOWER_1F.spawnPoint;
-    expect(MAP_IVORY_TOWER_1F.tiles[sp2.y][sp2.x]).not.toBe(TileType.Wall);
+    const tower = await getMapForRegion('ivory-tower', 1);
+    expect(tower).not.toBeNull();
+    const sp2 = tower!.spawnPoint;
+    expect(tower!.tiles[sp2.y][sp2.x]).not.toBe(TileType.Wall);
   });
 
-  it('maps are bordered by walls', () => {
-    for (let x = 0; x < 20; x++) {
-      expect(MAP_DAWN_PRAIRIE.tiles[0][x]).toBe(TileType.Wall);
-      expect(MAP_DAWN_PRAIRIE.tiles[14][x]).toBe(TileType.Wall);
+  it('maps are bordered by walls', async () => {
+    const prairie = await getMapForRegion('dawn-plains');
+    expect(prairie).not.toBeNull();
+    for (let x = 0; x < prairie!.width; x++) {
+      expect(prairie!.tiles[0][x]).toBe(TileType.Wall);
+      expect(prairie!.tiles[prairie!.height - 1][x]).toBe(TileType.Wall);
     }
-    for (let y = 0; y < 15; y++) {
-      expect(MAP_DAWN_PRAIRIE.tiles[y][0]).toBe(TileType.Wall);
-      expect(MAP_DAWN_PRAIRIE.tiles[y][19]).toBe(TileType.Wall);
+    for (let y = 0; y < prairie!.height; y++) {
+      expect(prairie!.tiles[y][0]).toBe(TileType.Wall);
+      expect(prairie!.tiles[y][prairie!.width - 1]).toBe(TileType.Wall);
     }
   });
 
-  it('ivory tower has more walls than dawn prairie (maze vs open)', () => {
+  it('ivory tower has more walls than dawn plains (maze vs open)', async () => {
+    const prairie = await getMapForRegion('dawn-plains');
+    const tower = await getMapForRegion('ivory-tower', 1);
+    expect(prairie).not.toBeNull();
+    expect(tower).not.toBeNull();
+
     const countWalls = (tiles: number[][]) =>
       tiles.flat().filter(t => t === TileType.Wall).length;
-    expect(countWalls(MAP_IVORY_TOWER_1F.tiles)).toBeGreaterThan(
-      countWalls(MAP_DAWN_PRAIRIE.tiles)
+    expect(countWalls(tower!.tiles)).toBeGreaterThan(
+      countWalls(prairie!.tiles)
     );
   });
 });
 
 describe('mapDataControl - getMapForRegion', () => {
-  it('returns matching map by region id', () => {
-    const map = getMapForRegion('dawn-prairie');
+  it('returns matching map by region id', async () => {
+    const map = await getMapForRegion('dawn-plains');
     expect(map).not.toBeNull();
-    expect(map!.id).toBe('dawn-prairie');
+    expect(map!.id).toBe('dawn-plains');
   });
 
-  it('returns matching map by region + floor', () => {
-    const map = getMapForRegion('ivory-tower', 1);
+  it('returns matching map by region + floor', async () => {
+    const map = await getMapForRegion('ivory-tower', 1);
     expect(map).not.toBeNull();
     expect(map!.id).toBe('ivory-tower-1f');
   });
 
-  it('falls back to dawn prairie for unknown region', () => {
-    const map = getMapForRegion('unknown-region');
+  it('falls back to dawn plains for unknown region', async () => {
+    const map = await getMapForRegion('unknown-region');
     expect(map).not.toBeNull();
-    expect(map!.id).toBe('dawn-prairie');
+    expect(map!.id).toBe('dawn-plains');
+  });
+
+  it('caches maps after first load', async () => {
+    const map1 = await getMapForRegion('dawn-plains');
+    const map2 = await getMapForRegion('dawn-plains');
+    expect(map1).toBe(map2);
   });
 });

@@ -78,7 +78,8 @@ export const ENDURANCE_COUNT_RANGE: Record<AdventurerQuestDifficulty, { min: num
   S: { min: 80, max: 100 },
 };
 
-export const COLLECT_TARGET_COUNT = 5;
+export const COLLECT_TARGET_COUNT_RANGE = { min: 1, max: 5 };
+export const COLLECT_DROP_RATE = 0.4;
 export const BOSS_KILL_COUNT_RANGE = { min: 1, max: 3 };
 export const BOSS_COLLECT_TARGET_COUNT = 3;
 export const BOSS_COLLECT_DROP_RATE = 0.3;
@@ -184,8 +185,8 @@ const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: Advent
   'ancient-dungeon-9f': { questArea: 'ancient-dungeon-7-9f', difficulty: 'S' },
 };
 
-function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; area: string }[]> {
-  const pools: Record<AdventurerQuestDifficulty, Map<string, { name: string; area: string }>> = {
+function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]> {
+  const pools: Record<AdventurerQuestDifficulty, Map<string, { name: string; area: string; questArea: string }>> = {
     D: new Map(), C: new Map(), B: new Map(), A: new Map(), S: new Map(),
   };
 
@@ -193,9 +194,9 @@ function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; 
     if (monster.isBoss) continue;
     const mapping = QUEST_AREA_MAPPING[monster.area];
     if (!mapping) continue;
-    const key = `${monster.name}|${mapping.questArea}`;
+    const key = `${monster.name}|${monster.area}`;
     if (!pools[mapping.difficulty].has(key)) {
-      pools[mapping.difficulty].set(key, { name: monster.name, area: mapping.questArea });
+      pools[mapping.difficulty].set(key, { name: monster.name, area: monster.area, questArea: mapping.questArea });
     }
   }
 
@@ -208,7 +209,7 @@ function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; 
   };
 }
 
-export const MONSTER_POOLS: Record<AdventurerQuestDifficulty, { name: string; area: string }[]> = buildMonsterPools();
+export const MONSTER_POOLS: Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]> = buildMonsterPools();
 
 export interface BossPoolEntry {
   name: string;

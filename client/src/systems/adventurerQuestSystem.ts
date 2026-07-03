@@ -14,7 +14,8 @@ import {
   QUEST_TYPE_WEIGHTS_BOSS,
   KILL_COUNT_RANGE,
   ENDURANCE_COUNT_RANGE,
-  COLLECT_TARGET_COUNT,
+  COLLECT_TARGET_COUNT_RANGE,
+  COLLECT_DROP_RATE,
   BOSS_KILL_COUNT_RANGE,
   BOSS_COLLECT_TARGET_COUNT,
   BOSS_COLLECT_DROP_RATE,
@@ -30,6 +31,7 @@ import {
   getRankIndex,
 } from '../models/adventurerQuest';
 import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
+import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
 
 function getItem(id: number) {
   return ITEM_DEFINITIONS.find(i => i.id === id)!;
@@ -316,9 +318,9 @@ function generateSingleQuest(
     const monsterEntry = pickRandom(MONSTER_POOLS[difficulty]);
     targetMonster = monsterEntry.name;
     targetArea = monsterEntry.area;
-    areaName = AREA_POOLS[difficulty].find(a => a.areaId === monsterEntry.area)?.areaName ?? monsterEntry.area;
-    avgGold = AREA_POOLS[difficulty].find(a => a.areaId === monsterEntry.area)?.avgGold ?? 50;
-    targetCount = COLLECT_TARGET_COUNT;
+    areaName = getAreaDisplayName(monsterEntry.area);
+    avgGold = AREA_POOLS[difficulty].find(a => a.areaId === monsterEntry.questArea)?.avgGold ?? 50;
+    targetCount = randomInt(COLLECT_TARGET_COUNT_RANGE.min, COLLECT_TARGET_COUNT_RANGE.max);
   } else if (type === 'errandboss' || type === 'collectboss') {
     const bossDifficulty = difficulty as 'B' | 'A' | 'S';
     const bossEntry = pickRandom(BOSS_POOLS[bossDifficulty]);
@@ -428,15 +430,7 @@ export function updateQuestProgress(
       if (quest.targetArea === currentArea) {
         shouldUpdate = true;
       }
-    } else if (quest.type === 'collect') {
-      if (quest.targetMonster === monsterName) {
-        shouldUpdate = true;
-      }
     } else if (quest.type === 'errandboss') {
-      if (quest.targetMonster === monsterName) {
-        shouldUpdate = true;
-      }
-    } else if (quest.type === 'collectboss') {
       if (quest.targetMonster === monsterName) {
         shouldUpdate = true;
       }
@@ -445,6 +439,22 @@ export function updateQuestProgress(
     if (!shouldUpdate) return quest;
 
     const newCount = Math.min(quest.currentCount + killCount, quest.targetCount);
+    const newStatus = newCount >= quest.targetCount ? 'completable' as const : 'active' as const;
+    return { ...quest, currentCount: newCount, status: newStatus };
+  });
+}
+
+export function updateCollectQuestProgress(
+  activeQuests: AdventurerQuest[],
+  monsterName: string,
+  amount: number,
+): AdventurerQuest[] {
+  return activeQuests.map(quest => {
+    if (quest.status !== 'active') return quest;
+    if (quest.type !== 'collect' && quest.type !== 'collectboss') return quest;
+    if (quest.targetMonster !== monsterName) return quest;
+
+    const newCount = Math.min(quest.currentCount + amount, quest.targetCount);
     const newStatus = newCount >= quest.targetCount ? 'completable' as const : 'active' as const;
     return { ...quest, currentCount: newCount, status: newStatus };
   });
@@ -463,7 +473,7 @@ export function rollCollectMaterialDrop(
     q => q.type === 'collect' && q.status === 'active' && q.targetMonster === monsterName
   );
   if (!hasActiveCollect) return false;
-  return Math.random() < 0.1;
+  return Math.random() < COLLECT_DROP_RATE;
 }
 
 export function completeQuest(

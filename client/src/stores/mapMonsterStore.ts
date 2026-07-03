@@ -10,6 +10,7 @@ export interface MapMonster {
   path: Position[];
   pathIndex: number;
   pathRecalcTimer: number;
+  isBoss: boolean;
 }
 
 const SPAWN_INTERVAL_MS = 1000;
@@ -36,6 +37,7 @@ export interface MapMonsterState {
   spawnTimer: number;
   paused: boolean;
   combatMonsterIds: string[];
+  hasBossInPool: boolean;
 
   spawnTick: (deltaMs: number, map: MapData, playerPos: Position) => void;
   moveMonsters: (deltaMs: number, map: MapData, playerPos: Position) => void;
@@ -46,6 +48,7 @@ export interface MapMonsterState {
   clearAll: () => void;
   setMaxMonsters: (max: number) => void;
   setPaused: (paused: boolean) => void;
+  setHasBossInPool: (has: boolean) => void;
 }
 
 export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
@@ -54,6 +57,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
   spawnTimer: 0,
   paused: false,
   combatMonsterIds: [],
+  hasBossInPool: false,
 
   spawnTick: (deltaMs, map, playerPos) => {
     const state = get();
@@ -70,6 +74,13 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
     if (Math.random() > BASE_SPAWN_CHANCE) return;
 
+    // Determine if this spawn is a boss
+    const bossAlreadyOnMap = state.monsters.some(m => m.isBoss);
+    let isBoss = false;
+    if (state.hasBossInPool && !bossAlreadyOnMap) {
+      isBoss = Math.random() < 0.1;
+    }
+
     // Find a spawn position at least MIN_SPAWN_DISTANCE from player
     let attempts = 0;
     while (attempts < 20) {
@@ -85,6 +96,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
           path: [],
           pathIndex: 0,
           pathRecalcTimer: 0,
+          isBoss,
         };
         set({ monsters: [...state.monsters, monster] });
         return;
@@ -201,5 +213,9 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
   setPaused: (paused) => {
     set({ paused });
+  },
+
+  setHasBossInPool: (has) => {
+    set({ hasBossInPool: has });
   },
 }));

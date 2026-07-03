@@ -91,12 +91,12 @@ export function MapCanvas() {
       }
 
       // Monster spawn and movement
-      if (gamePhase !== 'combat' && currentMap) {
+      if (currentMap) {
         const gameState = useGameStore.getState();
         const currentPlayerPos = useMapControlStore.getState().playerPosition;
 
-        // Continuous HP/MP threshold check
-        if (gameState.character) {
+        // Continuous HP/MP threshold check (only during explore)
+        if (gamePhase !== 'combat' && gameState.character) {
           const char = gameState.character;
           const effMaxHp = getEffectiveMaxHp(char, gameState.equippedGear);
           const effMaxMp = getEffectiveMaxMp(char, gameState.equippedGear);
@@ -107,23 +107,38 @@ export function MapCanvas() {
           if (belowThreshold && !monsterStore.paused) {
             monsterStore.setPaused(true);
             useMapControlStore.getState().setAutoMove(false);
+            const gs = useGameStore.getState();
+            useGameStore.setState({ combatLogs: [...gs.combatLogs.slice(-199), { text: 'HP/MP 低於門檻，等待恢復中...', type: 'system' }] });
           } else if (!belowThreshold && monsterStore.paused) {
             monsterStore.setPaused(false);
             useMapControlStore.getState().setAutoMove(true);
+            const gs = useGameStore.getState();
+            useGameStore.setState({ combatLogs: [...gs.combatLogs.slice(-199), { text: '恢復完畢，繼續探索', type: 'system' }] });
           }
         }
 
-        if (!monsterStore.paused) {
+        // Spawn only when not in combat
+        if (gamePhase !== 'combat' && !monsterStore.paused) {
           monsterStore.spawnTick(delta, currentMap, currentPlayerPos);
         }
+
+        // Monsters always move (non-combat ones chase player)
         monsterStore.moveMonsters(delta, currentMap, currentPlayerPos);
 
-        // Collision detection (always check)
+        // Collision detection
         const collided = monsterStore.checkCollisions(currentPlayerPos);
         if (collided.length > 0) {
-          monsterStore.setCombatMonsters(collided.map(m => m.id));
-          monsterStore.setPaused(true);
-          useGameStore.getState().triggerMapCombat(collided.length);
+          const collidedIds = collided.map(m => m.id);
+          const bossCount = collided.filter(m => m.isBoss).length;
+          const existingCombatIds = monsterStore.combatMonsterIds;
+          monsterStore.setCombatMonsters([...existingCombatIds, ...collidedIds]);
+
+          if (gamePhase === 'combat') {
+            useGameStore.getState().joinMapCombat(collided.length, bossCount);
+          } else {
+            monsterStore.setPaused(true);
+            useGameStore.getState().triggerMapCombat(collided.length, bossCount);
+          }
         }
       }
 
@@ -237,17 +252,38 @@ export function MapCanvas() {
         const mDrawY = sy + camOffsetY;
         if (mDrawX < -TILE_W || mDrawX > canvasW + TILE_W ||
             mDrawY < -TILE_H * 2 || mDrawY > canvasH + TILE_H) continue;
+        const isBoss = monster.isBoss;
         renderList.push({
           depth: monster.position.x + monster.position.y + 0.5,
           draw: () => {
+            const cy = mDrawY - monsterRadius * 0.3;
             ctx.beginPath();
-            ctx.arc(mDrawX, mDrawY - monsterRadius * 0.3, monsterRadius + 2, 0, Math.PI * 2);
-            ctx.fillStyle = COLORS.monsterGlow;
+            ctx.arc(mDrawX, cy, monsterRadius + 2, 0, Math.PI * 2);
+            ctx.fillStyle = isBoss ? 'rgba(200, 0, 200, 0.4)' : COLORS.monsterGlow;
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(mDrawX, mDrawY - monsterRadius * 0.3, monsterRadius, 0, Math.PI * 2);
-            ctx.fillStyle = COLORS.monster;
+            ctx.arc(mDrawX, cy, monsterRadius, 0, Math.PI * 2);
+            ctx.fillStyle = isBoss ? '#cc00cc' : COLORS.monster;
             ctx.fill();
+            if (isBoss) {
+              const hornH = monsterRadius * 1.1;
+              const hornW = monsterRadius * 1.5;
+              ctx.fillStyle = '#880088';
+              // Left horn
+              ctx.beginPath();
+              ctx.moveTo(mDrawX - monsterRadius * 0.45, cy - monsterRadius * 0.5);
+              ctx.lineTo(mDrawX - monsterRadius * 0.7, cy - monsterRadius * 0.5 - hornH);
+              ctx.lineTo(mDrawX - monsterRadius * 0.45 + hornW, cy - monsterRadius * 0.5);
+              ctx.closePath();
+              ctx.fill();
+              // Right horn
+              ctx.beginPath();
+              ctx.moveTo(mDrawX + monsterRadius * 0.45, cy - monsterRadius * 0.5);
+              ctx.lineTo(mDrawX + monsterRadius * 0.7, cy - monsterRadius * 0.5 - hornH);
+              ctx.lineTo(mDrawX + monsterRadius * 0.45 - hornW, cy - monsterRadius * 0.5);
+              ctx.closePath();
+              ctx.fill();
+            }
           },
         });
       }
