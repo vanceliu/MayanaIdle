@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { calculatePressure, rollEncounterCount, rollEncounter } from '../pressure';
+import { calculatePressure, rollEncounterCount } from '../pressure';
 
 describe('pressure system', () => {
   describe('calculatePressure', () => {
@@ -75,7 +75,6 @@ describe('pressure system', () => {
     it('should return between partySize and partySize*2+pressure', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       const count = rollEncounterCount(1, 0);
-      // min=1, max=2+0=2, range=2, floor(0.5*2)+1 = 2
       expect(count).toBeGreaterThanOrEqual(1);
       expect(count).toBeLessThanOrEqual(2);
     });
@@ -83,7 +82,6 @@ describe('pressure system', () => {
     it('should increase range with pressure', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
       const count = rollEncounterCount(1, 5);
-      // min=1, max=2+5=7
       expect(count).toBeLessThanOrEqual(7);
       expect(count).toBeGreaterThanOrEqual(1);
     });
@@ -97,32 +95,7 @@ describe('pressure system', () => {
     it('should return max for high roll', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
       const count = rollEncounterCount(1, 3);
-      // max = 1*2 + 3 = 5
       expect(count).toBe(5);
-    });
-  });
-
-  describe('rollEncounter', () => {
-    it('should return true when roll < 0.10', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.05);
-      expect(rollEncounter()).toBe(true);
-    });
-
-    it('should return false when roll >= 0.10', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-      expect(rollEncounter()).toBe(false);
-    });
-
-    it('should have roughly 10% encounter rate', () => {
-      vi.restoreAllMocks();
-      let encounters = 0;
-      const trials = 10000;
-      for (let i = 0; i < trials; i++) {
-        if (rollEncounter()) encounters++;
-      }
-      const rate = encounters / trials;
-      expect(rate).toBeGreaterThan(0.07);
-      expect(rate).toBeLessThan(0.13);
     });
   });
 

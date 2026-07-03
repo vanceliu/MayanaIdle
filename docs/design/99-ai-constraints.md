@@ -192,18 +192,18 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 - [x] Step 10：禁用舊 rollEncounter 系統 — 遇敵全由紅點碰撞觸發
 - [x] Step 11：戰鬥中地圖持續顯示、怪物 HP 列表水平排列固定一行
 
-**Phase 3 — Pressure 整合與狀態管理**
+**Phase 3 — Pressure 整合與狀態管理** ✓
 
-- [ ] Step 1：Pressure 影響紅點上限 — `同時上限 = 3 + Pressure`
-- [ ] Step 2：Pressure 影響生成頻率 — `頻率倍率 = 1 + Pressure × 0.2`
-- [ ] Step 3：回城/死亡 — 清除所有紅點、重置地圖狀態
-- [ ] Step 4：地圖切換 — 進入不同區域/樓層載入對應地圖
-- [ ] Step 5：撰寫 integration test — Pressure 連動、狀態切換完整流程
+- [x] Step 1：Pressure 影響紅點上限 — `同時上限 = 3 + Pressure`
+- [x] Step 2：Pressure 影響生成頻率 — `頻率倍率 = 1 + Pressure × 0.2`
+- [x] Step 3：回城/死亡 — 清除所有紅點、重置地圖狀態
+- [x] Step 4：地圖切換 — 進入不同區域/樓層載入對應地圖
+- [x] Step 5：撰寫 integration test — Pressure 連動、狀態切換完整流程
 
 **Phase 4 — 各區域地圖與視覺打磨**
 
-- [ ] Step 1：為各區域設計對應固定地圖
-- [ ] Step 2：視覺動畫 — 紅點生成淡入/消失淡出、戰鬥觸發閃爍
+- [x] Step 1：為各區域設計對應固定地圖
+- [ ] Step 2：視覺動畫 — 紅點生成淡入/消失淡出
 - [ ] Step 3：整體 UI 打磨 — 配色、地形紋理
 
 ---

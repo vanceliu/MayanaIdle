@@ -138,7 +138,7 @@ interface Position {
 沿用現有 Pressure 公式（`26-spawn-pressure.md`），但影響方式改為：
 
 ```
-地圖同時存在怪物上限 = 3 + Pressure
+地圖同時存在怪物上限 = min(10, 3 + Pressure)
 生成頻率倍率 = 1 + (Pressure × 0.2)
 ```
 

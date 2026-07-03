@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
+import { useGameStore } from '../stores/gameStore';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { GameIcon } from './GameIcon';
@@ -119,7 +119,7 @@ export function BattleView() {
         </div>
 
         <div className="monster-list">
-          {phase === 'combat' && monsters.filter(m => m.currentHp > 0).map((m, i) => {
+          {phase === 'combat' && monsters.filter(m => m.currentHp > 0).map((m) => {
             const hpPercent = Math.max(0, Math.floor((m.currentHp / m.maxHp) * 100));
             const actualIdx = monsters.indexOf(m);
             const isSelected = actualIdx === selectedTargetIdx;

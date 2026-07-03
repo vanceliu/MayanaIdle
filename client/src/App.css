@@ -3357,3 +3357,242 @@ button.active {
 .quest-tracker-item.completable {
   border-color: var(--accent-gold);
 }
+
+/* Statistics Center */
+.statistics-center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.stats-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
+}
+
+.stats-tab {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+}
+
+.stats-tab:hover {
+  background: var(--bg-card-hover);
+}
+
+.stats-tab.active {
+  background: var(--accent-primary);
+  color: var(--bg-base);
+  border-color: var(--accent-primary);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stats-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.stats-card:hover {
+  border-color: var(--accent-primary);
+}
+
+.stats-card-title {
+  font-size: var(--fs-xs);
+  color: var(--accent-primary);
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.stats-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-card-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  padding: 8px 0;
+}
+
+.stats-card-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.stats-card-row.my-row {
+  background: rgba(var(--accent-primary-rgb, 100, 200, 255), 0.15);
+}
+
+.stats-card-rank {
+  width: 16px;
+  text-align: center;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.stats-card-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.stats-card-value {
+  flex-shrink: 0;
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.stats-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stats-expanded-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-back-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--fs-xs);
+}
+
+.stats-back-btn:hover {
+  background: var(--bg-card-hover);
+}
+
+.stats-expanded-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.stats-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-table-header {
+  display: flex;
+  padding: 6px 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.stats-table-row {
+  display: flex;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.stats-table-row:hover {
+  background: var(--bg-card-hover);
+}
+
+.stats-table-row.my-row {
+  background: rgba(var(--accent-primary-rgb, 100, 200, 255), 0.1);
+  border: 1px solid var(--accent-primary);
+}
+
+.stats-col-rank {
+  width: 36px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.stats-col-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-col-value {
+  width: 80px;
+  text-align: right;
+  flex-shrink: 0;
+  color: var(--accent-gold);
+}
+
+.stats-loading,
+.stats-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.stats-my-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.stats-my-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.stats-my-label {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.stats-my-value {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--accent-gold);
+}
+
+.stats-message {
+  margin-top: 8px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--accent-primary);
+}
+
+.stats-class-tag {
+  margin-left: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}

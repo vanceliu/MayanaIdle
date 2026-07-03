@@ -3,6 +3,7 @@ import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { TileType } from '../models/mapControl';
+import { calculatePressure } from '../systems/pressure';
 
 const COLORS = {
   floor: '#2a2a3e',
@@ -119,7 +120,13 @@ export function MapCanvas() {
 
         // Spawn only when not in combat
         if (gamePhase !== 'combat' && !monsterStore.paused) {
-          monsterStore.spawnTick(delta, currentMap, currentPlayerPos);
+          if (gameState.character) {
+            const { pressure } = calculatePressure(gameState.character.areaEnteredAt, Date.now());
+            monsterStore.setMaxMonsters(Math.min(10, 3 + pressure));
+            monsterStore.spawnTick(delta, currentMap, currentPlayerPos, pressure);
+          } else {
+            monsterStore.spawnTick(delta, currentMap, currentPlayerPos, 0);
+          }
         }
 
         // Monsters always move (non-combat ones chase player)

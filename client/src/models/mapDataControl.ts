@@ -31,10 +31,6 @@ export async function getMapForRegion(regionId: string, floor?: number | null): 
   return data;
 }
 
-export function getMapFromCache(id: string): MapData | null {
-  return mapCache.get(id) ?? null;
-}
-
 export function clearMapCache(): void {
   mapCache.clear();
 }

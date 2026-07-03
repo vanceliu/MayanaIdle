@@ -18,7 +18,3 @@ export function rollEncounterCount(partySize: number, pressure: number): number 
   const baseMax = partySize * 2 + pressure;
   return Math.floor(Math.random() * (baseMax - baseMin + 1)) + baseMin;
 }
-
-export function rollEncounter(): boolean {
-  return Math.random() < 0.10; // 10% per tick (see 26-spawn-pressure.md §26.1)
-}

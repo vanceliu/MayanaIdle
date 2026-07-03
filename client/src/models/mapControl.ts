@@ -3,11 +3,13 @@ export interface Position {
   y: number;
 }
 
-export enum TileType {
-  Floor = 0,
-  Wall = 1,
-  Spawn = 2,
-}
+export const TileType = {
+  Floor: 0,
+  Wall: 1,
+  Spawn: 2,
+} as const;
+
+export type TileType = (typeof TileType)[keyof typeof TileType];
 
 export interface MapData {
   id: string;
@@ -16,10 +18,4 @@ export interface MapData {
   height: number;
   tiles: number[][];
   spawnPoint: Position;
-}
-
-export interface MapEntity {
-  id: string;
-  position: Position;
-  type: 'player' | 'monster';
 }

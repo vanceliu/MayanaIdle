@@ -16,13 +16,11 @@ export interface MapControlState {
   moveSpeed: number;
 
   loadMap: (regionId: string, floor?: number | null, savedPosition?: Position | null) => Promise<void>;
-  setPlayerPosition: (pos: Position) => void;
   moveToTarget: (target: Position) => void;
   setAutoMove: (auto: boolean) => void;
   tick: (deltaMs: number) => void;
   pickRandomTarget: () => void;
   stopMoving: () => void;
-  reset: () => void;
 }
 
 export const useMapControlStore = create<MapControlState>((set, get) => ({
@@ -45,6 +43,8 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       ? savedPosition
       : map.spawnPoint;
 
+    useMapMonsterStore.getState().clearAll();
+
     set({
       currentMap: map,
       playerPosition: { ...startPos },
@@ -54,8 +54,6 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       isMoving: false,
     });
   },
-
-  setPlayerPosition: (pos) => set({ playerPosition: pos }),
 
   moveToTarget: (target) => {
     const { currentMap, playerPosition, isMoving } = get();
@@ -205,18 +203,6 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       pathIndex: 0,
       targetPosition: null,
       playerPosition: { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) },
-    });
-  },
-
-  reset: () => {
-    set({
-      currentMap: null,
-      playerPosition: { x: 0, y: 0 },
-      targetPosition: null,
-      currentPath: [],
-      pathIndex: 0,
-      isMoving: false,
-      autoMove: false,
     });
   },
 }));
