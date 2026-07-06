@@ -5,7 +5,7 @@ import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipmen
 import { resolveEquipment } from '../../systems/templateSync';
 import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
-import { getEquipmentInstanceTierLevel, getEquipmentInstanceTierColor, EQUIPMENT_TIER_COLORS, EQUIPMENT_TIER_NAMES, type EquipmentTierLevel } from '../../models/equipmentTier';
+import { getEquipmentInstanceTierLevel, getEquipmentInstanceTierColor, type EquipmentTierLevel } from '../../models/equipmentTier';
 
 type ShopTab = 'buy' | 'sell';
 
