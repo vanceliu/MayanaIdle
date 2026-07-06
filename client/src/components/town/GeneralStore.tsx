@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
 import { getItemWeight, getItemDefinition } from '../../models/items';
 import { GameIcon } from '../GameIcon';
 import { getItemIcon, getMaterialIcon, getMaterialColor } from '../../models/iconMap';
+import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -24,6 +25,7 @@ export function GeneralStore() {
   const bagItems = useGameStore(s => s.bagItems);
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
+  const [batchTier, setBatchTier] = useState<number | null>(null);
 
   if (!char) return null;
 
@@ -140,6 +142,58 @@ export function GeneralStore() {
     useGameStore.getState().saveState();
   }
 
+  const TIER_OPTIONS = [
+    { tier: 1, label: 'Tier 1（白色素材）' },
+    { tier: 2, label: 'Tier 2 以下' },
+    { tier: 3, label: 'Tier 3 以下' },
+    { tier: 4, label: 'Tier 4 以下' },
+    { tier: 5, label: 'Tier 5 以下' },
+    { tier: 6, label: 'Tier 6 以下' },
+    { tier: 7, label: 'Tier 7 以下（全部）' },
+  ];
+
+  const batchSellItems = useMemo(() => {
+    if (batchTier === null) return [];
+    return bagItems.filter(item => {
+      if (item.type !== 'material') return false;
+      const def = getItemDefinition(item.name);
+      if (!def || !def.iconTier) return false;
+      const sellPrice = Math.floor((def.sellPrice ?? def.buyPrice ?? 0) * 0.5);
+      if (sellPrice <= 0) return false;
+      return def.iconTier <= batchTier;
+    });
+  }, [bagItems, batchTier]);
+
+  const batchSellTotal = useMemo(() => {
+    return batchSellItems.reduce((sum, item) => {
+      const def = getItemDefinition(item.name);
+      const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
+      return sum + sellPrice * item.amount;
+    }, 0);
+  }, [batchSellItems]);
+
+  function executeBatchSell() {
+    if (!char || batchSellItems.length === 0) return;
+    const currentBag = useGameStore.getState().bagItems;
+    let totalGold = 0;
+    const namesToSell = new Set(batchSellItems.map(i => i.name));
+
+    for (const item of currentBag) {
+      if (!namesToSell.has(item.name)) continue;
+      const def = getItemDefinition(item.name);
+      const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
+      totalGold += sellPrice * item.amount;
+    }
+
+    const newBag = currentBag.filter(b => !namesToSell.has(b.name));
+    set({
+      character: { ...useGameStore.getState().character!, gold: useGameStore.getState().character!.gold + totalGold },
+      bagItems: newBag,
+    });
+    useGameStore.getState().saveState();
+    setBatchTier(null);
+  }
+
   return (
     <div className="shop-panel">
       <p className="shop-greeting">「歡迎光臨！需要什麼嗎？」</p>
@@ -212,6 +266,52 @@ export function GeneralStore() {
 
       {tab === 'sell' && (
         <div className="shop-items">
+          <div className="batch-sell-controls">
+            <div className="batch-sell-selector">
+              <span className="batch-sell-label">批量販售等級：</span>
+              <select
+                value={batchTier ?? ''}
+                onChange={e => setBatchTier(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">-- 選擇等級 --</option>
+                {TIER_OPTIONS.map(opt => (
+                  <option key={opt.tier} value={opt.tier}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            {batchTier !== null && (
+              <div className="batch-sell-preview">
+                {batchSellItems.length === 0 ? (
+                  <p className="empty-text">沒有符合條件的素材</p>
+                ) : (
+                  <>
+                    <div className="batch-sell-list">
+                      {batchSellItems.map(item => {
+                        const def = getItemDefinition(item.name);
+                        const color = def?.iconTier ? MATERIAL_TIER_COLORS[def.iconTier] : '#FFFFFF';
+                        const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
+                        return (
+                          <div key={item.name} className="batch-sell-item">
+                            <span style={{ color }}>{item.name} ×{item.amount}</span>
+                            <span className="shop-item-price sell-price">+{(sellPrice * item.amount).toLocaleString()}G</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button
+                      className="batch-sell-btn"
+                      onClick={executeBatchSell}
+                    >
+                      一鍵販售 ({batchSellItems.length} 種) — 獲得 {batchSellTotal.toLocaleString()}G
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <hr className="batch-sell-divider" />
+
           {bagItems.length === 0 && <p className="empty-text">沒有可出售的物品</p>}
           {bagItems.map(item => {
             const sellPrice = Math.floor(getSellPrice(item.name) * 0.5);

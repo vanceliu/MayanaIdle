@@ -6,6 +6,8 @@ import { GameIcon } from './GameIcon';
 import { getItemIcon, getEquipIcon, getMaterialIcon, getMaterialColor } from '../models/iconMap';
 import { EquipmentDetail } from './EquipmentInfo';
 import { getItemWeight, getItemDescription, getItemDefinition } from '../models/items';
+import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
+import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 
 const BAG_COLUMNS = 5;
 
@@ -62,6 +64,7 @@ export function BagPanel() {
   const useTownScroll = useGameStore(s => s.useTownScroll);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const quickSlots = useGameStore(s => s.quickSlots);
+  const templates = useEquipmentTemplates();
 
   const gridItems: BagGridItem[] = [];
 
@@ -194,7 +197,7 @@ export function BagPanel() {
       const eq = item.equipment;
       return (
         <div className="bag-tooltip-content">
-          <EquipmentDetail item={eq} />
+          <EquipmentDetail item={eq} templates={templates} />
           <div className="tooltip-hint">點擊裝備</div>
         </div>
       );
@@ -258,6 +261,7 @@ export function BagPanel() {
                   <GameIcon
                     name={getEquipIcon(item.equipment?.type === 'armor' ? (item.equipment?.slot || 'chest') : (item.equipment?.type || 'sword'))}
                     size={24}
+                    color={item.equipment ? getEquipmentInstanceTierColor(item.equipment, templates) : undefined}
                   />
                 )}
                 {!item.potionType && !item.speedPotionType && item.type !== 'equipment' && (

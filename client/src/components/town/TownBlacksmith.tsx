@@ -10,6 +10,7 @@ import { getEquipIcon } from '../../models/iconMap';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
 import { resolveEquipment } from '../../systems/templateSync';
+import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',
@@ -75,6 +76,7 @@ export function TownBlacksmith() {
   const [craftTemplates, setCraftTemplates] = useState<EquipmentTemplate[]>([]);
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const allTemplates = useEquipmentTemplates();
 
   useEffect(() => {
     db.equipmentTemplates
@@ -472,7 +474,7 @@ export function TownBlacksmith() {
                 {entry.source === 'equipped' && entry.slot && (
                   <span className="bs-slot-tag">[{SLOT_NAMES[entry.slot]}]</span>
                 )}
-                <EquipmentDetail item={entry.item} />
+                <EquipmentDetail item={entry.item} templates={allTemplates} />
               </div>
               {tab === 'enhance' && renderEnhanceActions(entry)}
               {tab === 'quality' && renderQualityActions(entry)}

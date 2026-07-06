@@ -57,6 +57,7 @@
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 地圖控制系統（俯瞰視角/移動/紅點遇敵） | `38-map-control.md` | 全文 |
+| 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 
 ### 依限制查找
 
@@ -153,6 +154,7 @@
 | `36-quest-system.md` | 每日任務系統 | 冒險者工會、40 個任務、每日重置、獎勵機制 |
 | `37-statistics.md` | 角色統計數據 | 殺敵數、BOSS討伐、死亡、強化、任務完成、金幣獲得 |
 | `38-map-control.md` | 地圖控制系統 | 俯瞰視角地圖、點擊移動、紅點怪物、Pressure 視覺化 |
+| `39-batch-sell.md` | 批量販售系統 | 依等級分類批量販售、裝備顏色等級、素材 Tier 篩選 |
 
 ### 技術架構
 
@@ -223,4 +225,10 @@
 38-map-control.md ←→ 03-combat.md（戰鬥觸發流程）
        ↕                    ↕
 26-spawn-pressure.md（Pressure 影響紅點生成）  09-dungeon.md（區域地圖對應）
+
+39-batch-sell.md ←→ 06-equipment-acquire.md（shopTier / craftTier 定義）
+       ↕
+13-town.md（雜貨店/武器店/防具店販售功能）
+       ↕
+30-items.md（素材 iconTier / sellPrice）←→ 34-ui-guidelines.md（面板統一樣式）
 ```

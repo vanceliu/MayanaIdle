@@ -3,6 +3,7 @@ import type { EquipSlot } from '../models/equipment';
 import { EquipmentDetail } from './EquipmentInfo';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
+import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',
@@ -35,6 +36,7 @@ const SLOT_ICON_MAP: Record<EquipSlot, string> = {
 export function EquipmentPanel() {
   const equippedGear = useGameStore(s => s.equippedGear);
   const unequipItem = useGameStore(s => s.unequipItem);
+  const templates = useEquipmentTemplates();
 
   return (
     <div className="equipment-panel-content">
@@ -49,7 +51,7 @@ export function EquipmentPanel() {
               <span className="slot-name">{SLOT_NAMES[slot]}</span>
               {item ? (
                 <div className="equipped-item" onClick={() => unequipItem(slot)}>
-                  <EquipmentDetail item={item} compact />
+                  <EquipmentDetail item={item} compact templates={templates} />
                 </div>
               ) : (
                 <span className="empty-slot">-- 空 --</span>

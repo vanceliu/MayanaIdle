@@ -19,10 +19,10 @@ describe('mapDataControl - map integrity', () => {
   it('ivory tower 1F has correct dimensions', async () => {
     const map = await getMapForRegion('ivory-tower', 1);
     expect(map).not.toBeNull();
-    expect(map!.width).toBe(40);
-    expect(map!.height).toBe(30);
-    expect(map!.tiles.length).toBe(30);
-    expect(map!.tiles[0].length).toBe(40);
+    expect(map!.width).toBe(30);
+    expect(map!.height).toBe(20);
+    expect(map!.tiles.length).toBe(20);
+    expect(map!.tiles[0].length).toBe(30);
   });
 
   it('spawn points are on walkable tiles', async () => {

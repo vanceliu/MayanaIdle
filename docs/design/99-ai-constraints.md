@@ -208,6 +208,44 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 ---
 
+### Phase：批量販售系統（依等級分類）
+
+**目標**：各商店（雜貨店、武器店、防具店）新增依等級篩選的一鍵批量販售功能，並為裝備名稱加上等級顏色顯示。
+
+**設計文件**：`39-batch-sell.md`
+
+**Phase 1 — 裝備等級模型與顏色系統**
+
+- [x] Step 1：新增 `client/src/models/equipmentTier.ts` — 等級常數、顏色 map、`getEquipmentTierColor()`、`getEquipmentTierLevel()`
+- [x] Step 2：所有裝備名稱顯示加上顏色 — `EquipmentDetail.tsx`、`EquipmentTemplateDetail.tsx`
+- [x] Step 3：背包裝備名稱顏色 — `BagPanel.tsx`
+- [x] Step 4：倉庫裝備名稱顏色 — `Storage.tsx`
+- [x] Step 5：鐵匠鋪裝備名稱顏色 — `Blacksmith.tsx`
+- [ ] Step 6：掉落訊息裝備名稱顏色 — 戰鬥/探索獲得裝備的文字提示（需擴充 log 系統支援 color，後續處理）
+
+**Phase 2 — 雜貨店批量販售（素材）**
+
+- [x] Step 7：`GeneralStore.tsx` 販售分頁新增批量販售 UI — iconTier 等級選擇器
+- [x] Step 8：預覽區 — 即時顯示符合條件的素材清單與總售價
+- [x] Step 9：一鍵販售按鈕 — 批量執行販售並顯示結算訊息
+
+**Phase 3 — 武器店批量販售（武器）**
+
+- [x] Step 10：`WeaponShop.tsx` 販售分頁新增批量販售 UI — 裝備等級選擇器
+- [x] Step 11：預覽區 + 一鍵販售（排除已裝備、starter、drop_only）
+
+**Phase 4 — 防具店批量販售（防具）**
+
+- [x] Step 12：`ArmorShop.tsx` 販售分頁新增批量販售 UI — 裝備等級選擇器
+- [x] Step 13：預覽區 + 一鍵販售（排除已裝備、starter、drop_only）
+
+**Phase 5 — 測試與驗證**
+
+- [x] Step 14：撰寫 unit test — 等級判定、顏色對應（16 tests 通過）
+- [x] Step 15：整合測試 — 全部 649 tests 通過，TypeScript 編譯無錯誤
+
+---
+
 ## 資料版本控制（已完成 ✓）
 
 **機制**：

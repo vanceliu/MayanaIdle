@@ -3,6 +3,7 @@ import { useArmorList, useDropSourceForItem, getAreaDisplayName } from '../hooks
 import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
+import { getEquipmentTierColor } from '../../models/equipmentTier';
 import '../components/WikiTable.css';
 
 const SLOT_LABELS: Record<string, string> = {
@@ -142,6 +143,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
 function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number] }) {
   const dropSources = useDropSourceForItem(a.name);
   const acquireLabel = a.acquireType === 'shop' ? '商店' : a.acquireType === 'craft' ? '製作' : '掉落';
+  const tierColor = getEquipmentTierColor(a as any);
 
   const extras: string[] = [];
   if (a.bonusHp) extras.push(`HP+${a.bonusHp}`);
@@ -154,8 +156,8 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
   return (
     <tr>
       <td>
-        <Link className="wiki-link" to={`/wiki/armor/${encodeURIComponent(a.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <GameIcon name={getEquipIcon(a.slot)} size={16} color="#FFFFFF" />
+        <Link className="wiki-link" to={`/wiki/armor/${encodeURIComponent(a.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: tierColor }}>
+          <GameIcon name={getEquipIcon(a.slot)} size={16} color={tierColor} />
           {a.name}
         </Link>
       </td>

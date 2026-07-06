@@ -9,6 +9,10 @@ vi.mock('../GameIcon', () => ({
   ),
 }));
 
+vi.mock('../../hooks/useEquipmentTemplates', () => ({
+  useEquipmentTemplates: () => [],
+}));
+
 describe('EquipmentPanel', () => {
   beforeEach(() => {
     useGameStore.setState({ equippedGear: {} });

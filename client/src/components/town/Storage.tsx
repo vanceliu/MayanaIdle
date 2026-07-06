@@ -7,6 +7,7 @@ import { GameIcon } from '../GameIcon';
 import { getMaterialIcon, getMaterialColor, getItemIcon } from '../../models/iconMap';
 import { getItemWeight, getItemDefinition } from '../../models/items';
 import { db } from '../../db/database';
+import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
 type StorageTab = 'personal' | 'shared';
 type ActionTab = 'deposit' | 'withdraw';
@@ -24,6 +25,7 @@ export function Storage() {
   const [storageTab, setStorageTab] = useState<StorageTab>('shared');
   const [actionTab, setActionTab] = useState<ActionTab>('deposit');
   const [goldAmount, setGoldAmount] = useState('');
+  const templates = useEquipmentTemplates();
 
   // --- Shared warehouse equipment ---
   function depositEquipShared(item: EquipmentInstance) {
@@ -248,7 +250,7 @@ export function Storage() {
           {inventory.filter(i => !i.isStarterGear).length === 0 && <p className="empty-text">無裝備可存入</p>}
           {inventory.filter(i => !i.isStarterGear).map(item => (
             <div key={item.id} className="storage-item">
-              <EquipmentDetail item={item} />
+              <EquipmentDetail item={item} templates={templates} />
               <div className="storage-item-actions">
                 <button onClick={() => depositEquip(item)}>存入</button>
               </div>
@@ -289,7 +291,7 @@ export function Storage() {
           {currentEquipStored.length === 0 && <p className="empty-text">倉庫空空如也</p>}
           {currentEquipStored.map(item => (
             <div key={item.id} className="storage-item">
-              <EquipmentDetail item={item} />
+              <EquipmentDetail item={item} templates={templates} />
               <div className="storage-item-actions">
                 <button onClick={() => withdrawEquip(item)}>取出</button>
               </div>

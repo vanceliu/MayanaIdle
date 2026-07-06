@@ -3,6 +3,7 @@ import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hook
 import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
+import { getEquipmentTierColor } from '../../models/equipmentTier';
 import '../components/WikiTable.css';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -165,12 +166,13 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
 function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[number] }) {
   const dropSources = useDropSourceForItem(w.name);
   const acquireLabel = w.acquireType === 'shop' ? '商店' : w.acquireType === 'craft' ? '製作' : '掉落';
+  const tierColor = getEquipmentTierColor(w as any);
 
   return (
     <tr>
       <td>
-        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(w.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <GameIcon name={getEquipIcon(w.type)} size={16} color="#FFFFFF" />
+        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(w.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: tierColor }}>
+          <GameIcon name={getEquipIcon(w.type)} size={16} color={tierColor} />
           {w.name}
         </Link>
       </td>

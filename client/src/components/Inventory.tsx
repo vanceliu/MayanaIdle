@@ -1,6 +1,7 @@
 import { useGameStore } from '../stores/gameStore';
 import type { EquipSlot } from '../models/equipment';
 import { EquipmentDetail } from './EquipmentInfo';
+import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',
@@ -24,6 +25,7 @@ export function Inventory() {
   const bagItems = useGameStore(s => s.bagItems);
   const equipItem = useGameStore(s => s.equipItem);
   const unequipItem = useGameStore(s => s.unequipItem);
+  const templates = useEquipmentTemplates();
 
   return (
     <div className="inventory-panel">
@@ -36,7 +38,7 @@ export function Inventory() {
               <span className="slot-name">{SLOT_NAMES[slot]}</span>
               {item ? (
                 <div className="equipped-item" onClick={() => unequipItem(slot)}>
-                  <EquipmentDetail item={item} />
+                  <EquipmentDetail item={item} templates={templates} />
                 </div>
               ) : (
                 <span className="empty-slot">-- 空 --</span>
@@ -63,7 +65,7 @@ export function Inventory() {
         )}
         {inventory.map(item => (
           <div key={item.id} className="inventory-item" onClick={() => equipItem(item)}>
-            <EquipmentDetail item={item} />
+            <EquipmentDetail item={item} templates={templates} />
             <button className="btn-equip">裝備</button>
           </div>
         ))}

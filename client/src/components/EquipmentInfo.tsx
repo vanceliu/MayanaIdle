@@ -3,6 +3,7 @@ import { AFFIX_DEFINITIONS, getEffectiveAffixValue } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
+import { getEquipmentTierColor, getEquipmentInstanceTierColor } from '../models/equipmentTier';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',
@@ -39,9 +40,10 @@ interface EquipmentDetailProps {
   item: EquipmentInstance;
   hint?: string;
   compact?: boolean;
+  templates?: EquipmentTemplate[];
 }
 
-export function EquipmentDetail({ item, hint, compact }: EquipmentDetailProps) {
+export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDetailProps) {
   const isWeapon = !!(item.smallMonsterDamage || item.largeMonsterDamage);
   const enhancement = item.enhancement ?? 0;
   const enhanceAttackSuccess = Math.floor(enhancement / 2);
@@ -49,11 +51,12 @@ export function EquipmentDetail({ item, hint, compact }: EquipmentDetailProps) {
   const baseAttackSuccess = item.attackSuccess ?? 0;
   const baseExtraAttack = item.extraAttack ?? 0;
   const totalAttackSuccess = baseAttackSuccess + enhanceAttackSuccess;
+  const tierColor = templates ? getEquipmentInstanceTierColor(item, templates) : '#FFFFFF';
 
   return (
     <div className="equip-detail">
-      <div className="equip-detail-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color="#FFFFFF" />
+      <div className="equip-detail-name" style={{ display: 'flex', alignItems: 'center', gap: 4, color: tierColor }}>
+        <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color={tierColor} />
         {item.name} {enhancement > 0 ? `+${enhancement}` : ''}
       </div>
       {!compact && <div className="equip-detail-slot">{SLOT_NAMES[item.slot]}{item.isTwoHanded ? '（雙手）' : ''}</div>}
@@ -135,11 +138,12 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
   const isWeapon = !!(template.smallMonsterDamage || template.largeMonsterDamage);
   const baseAttackSuccess = template.attackSuccess ?? 0;
   const baseExtraAttack = template.extraAttack ?? 0;
+  const tierColor = getEquipmentTierColor(template);
 
   return (
     <div className="equip-detail">
-      <div className="equip-detail-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <GameIcon name={getEquipIcon(template.type === 'armor' ? template.slot : template.type)} size={16} color="#FFFFFF" />
+      <div className="equip-detail-name" style={{ display: 'flex', alignItems: 'center', gap: 4, color: tierColor }}>
+        <GameIcon name={getEquipIcon(template.type === 'armor' ? template.slot : template.type)} size={16} color={tierColor} />
         {template.name}
       </div>
       <div className="equip-detail-slot">{SLOT_NAMES[template.slot]}{template.isTwoHanded ? '（雙手）' : ''}</div>
