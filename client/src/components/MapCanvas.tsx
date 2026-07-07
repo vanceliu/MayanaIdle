@@ -7,8 +7,10 @@ import { calculatePressure } from '../systems/pressure';
 
 const COLORS = {
   floor: '#2a2a3e',
+  floorAlt: '#272739',
   wall: '#1a1a2e',
   wallTop: '#222240',
+  wallTopHighlight: 'rgba(255, 255, 255, 0.08)',
   wallEdge: '#0f0f1e',
   monster: '#ff4444',
   monsterGlow: 'rgba(255, 68, 68, 0.3)',
@@ -190,7 +192,7 @@ export function MapCanvas() {
           if (drawX < -TILE_W || drawX > canvasW + TILE_W ||
               drawY < -TILE_H * 2 || drawY > canvasH + TILE_H) continue;
           drawDiamond(ctx, drawX, drawY, TILE_W, TILE_H);
-          ctx.fillStyle = COLORS.floor;
+          ctx.fillStyle = (x + y) % 2 === 0 ? COLORS.floor : COLORS.floorAlt;
           ctx.fill();
           ctx.strokeStyle = COLORS.gridLine;
           ctx.lineWidth = 0.5;
@@ -229,6 +231,9 @@ export function MapCanvas() {
               drawDiamond(ctx, drawX, drawY - WALL_HEIGHT, TILE_W, TILE_H);
               ctx.fillStyle = COLORS.wallTop;
               ctx.fill();
+              ctx.strokeStyle = COLORS.wallTopHighlight;
+              ctx.lineWidth = 1;
+              ctx.stroke();
               ctx.beginPath();
               ctx.moveTo(drawX - TILE_W / 2, drawY - WALL_HEIGHT);
               ctx.lineTo(drawX, drawY + TILE_H / 2 - WALL_HEIGHT);

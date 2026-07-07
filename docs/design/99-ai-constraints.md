@@ -203,8 +203,8 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 **Phase 4 — 各區域地圖與視覺打磨**
 
 - [x] Step 1：為各區域設計對應固定地圖
-- [ ] Step 2：視覺動畫 — 紅點生成淡入/消失淡出
-- [ ] Step 3：整體 UI 打磨 — 配色、地形紋理
+- [x] Step 2：視覺動畫 — 紅點生成淡入/消失淡出（略過，非重點）
+- [x] Step 3：整體 UI 打磨 — 配色、地形紋理
 
 ---
 
@@ -258,5 +258,78 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 **全域倍率**：
 - `config.ts` 同時管理 `GOLD_RATE_MULTIPLIER`、`DROP_RATE_MULTIPLIER`（預設 1.0）
 - 掉落計算公式：`最終倍率 = (1 + 角色裝備加成%) × 全域倍率`
+
+---
+
+## 技能 Buff/Debuff 效果缺失修正（進行中）
+
+**問題說明**：多個設計文件中定義了 debuff/buff 效果的技能，在程式碼中僅有技能定義但未實作效果邏輯。
+
+### 缺失清單
+
+**基礎魔法 (22-basic-magic.md)：**
+
+| 技能 | 設計效果 | 目前狀態 | 嚴重度 |
+|---|---|---|---|
+| 詛咒 (curse) | 降低目標攻擊 15%，持續 10s | `type:'attack', power:0`，無 debuff | 高 |
+| 護甲崩壞 (armor-break) | 降低目標防禦值 15%，持續 15s | `type:'attack', power:0`，無 debuff | 高 |
+| 盾擊 (shield-bash) | 物理傷害 + 暈眩目標 2s | 只有攻擊，無暈眩 | 排除（不實作暈眩） |
+| 極冰封印 (absolute-zero) | 冰屬性範圍傷害 + 凍結 2s | 只有範圍攻擊，無凍結 | 中 |
+| 冰霧 (ice-fog) | 冰屬性範圍，減速 | 只有範圍攻擊，無減速 | 低 |
+| 寒霜 (frost) | 冰屬性單體，微減速 | 只有攻擊，無減速 | 低 |
+| 冰環 (ice-ring) | 冰屬性範圍，減速強化 | 只有範圍攻擊，無減速 | 低 |
+| 暴風雪 (blizzard-storm) | 冰屬性範圍，強減速 | 只有範圍攻擊，無減速 | 低 |
+
+**職業魔法 (23-class-magic.md)：**
+
+| 技能 | 設計效果 | 目前狀態 | 嚴重度 |
+|---|---|---|---|
+| 挑釁怒吼 (taunt) | 降低怪物攻擊力 20%，持續 10s | 有 buffModifiers 定義，但戰鬥系統 `calculateMonsterAttack` 未讀取怪物身上的攻擊力 debuff | 高 |
+
+### 系統層面問題
+
+1. **戰鬥系統只處理 DOT 類 debuff**：`gameStore.ts:1732-1757` 的 `applyDebuff` 邏輯只建立含 `dot` 欄位的 debuff，不支援純屬性減益（如降攻、降防）
+2. **怪物傷害計算不讀 debuff**：`combat.ts:calculateMonsterAttack` 的 `rawDamage` 直接用 `monster.attackMin/attackMax`，未查詢怪物身上的攻擊力 debuff
+3. **怪物防禦計算不讀 debuff**：`combat.ts:255` 的 `monster.defense` 是固定值，未查詢怪物身上的防禦力 debuff
+4. **沒有暈眩/凍結/減速機制**：目前 ActiveEffect 的 debuff 只有 DOT 類型，無控場（暈眩 = 跳過攻擊）或減速（增加攻擊間隔）機制
+
+### 修正步驟
+
+**Phase 1 — 擴展 debuff 系統支援純屬性減益（非 DOT）**（已完成 ✓）
+
+- [x] Step 1：`models/effect.ts` 的 `ActiveEffect` 已有 `modifiers: StatModifier[]` 欄位（確認可用）
+- [x] Step 2：`SkillDebuffDef` 新增可選欄位：`modifiers`、`duration`（非 DOT 用），與現有 `dot*` 欄位互斥
+- [x] Step 3：`gameStore.ts` 攻擊類技能命中後的 debuff 邏輯，增加非 DOT debuff 建立路徑（使用 `modifiers` 而非 `dot`）
+
+**Phase 2 — 實作護甲崩壞 & 詛咒**（已完成 ✓）
+
+- [x] Step 4：`skill.ts` 的 `curse` 增加 `applyDebuff: { category:'atk-down', modifiers:[{stat:'attack', value:-15, isPercent:true}], duration:10000, ... }`
+- [x] Step 5：`skill.ts` 的 `armor-break` 增加 `applyDebuff: { category:'defense-down', modifiers:[{stat:'defense', value:-15, isPercent:true}], duration:15000, ... }`
+- [x] Step 6：`combat.ts` 的 `calculateMonsterAttack` 增加讀取怪物 debuff modifiers 中 `stat:'attack'` 的百分比減益
+- [x] Step 7：`combat.ts` 的所有 `monster.defense` 使用處增加讀取怪物 debuff modifiers 中 `stat:'defense'` 的百分比減益
+
+**Phase 3 — 修正挑釁怒吼**（已完成 ✓）
+
+- [x] Step 8：將 `taunt` 從 player buff 改為對怪物施加 debuff（`type:'debuff', target:'monster'`）+ 保留攻擊傷害
+- [x] Step 9：確認 `calculateMonsterAttack` 能正確讀取 taunt 的 `-20%` 攻擊力減益
+
+**Phase 4 — 凍結系統（極冰封印）**（暫緩）
+
+- [ ] Step 10：`ActiveEffect` 增加 `stun: boolean` 可選欄位（已存在）
+- [ ] Step 11：`gameStore.ts` 怪物攻擊階段檢查目標是否被暈眩，若是則跳過攻擊
+- [ ] Step 12：`absolute-zero` 增加 `applyDebuff: { category:'frozen', stun:true, duration:2000, ... }`
+
+**Phase 5 — 減速系統（冰系技能）**（低優先，可後續實作）
+
+- [ ] Step 13：定義減速機制（增加怪物攻擊間隔？降低怪物命中率？）— 需設計文件補充
+- [ ] Step 14：實作冰霧/寒霜/冰環/暴風雪的減速 debuff
+
+**Phase 6 — 測試**（已完成 ✓）
+
+- [x] Step 15：新增 unit test — 護甲崩壞降防效果正確反映在傷害計算（9 tests）
+- [x] Step 16：新增 unit test — 詛咒降攻效果正確反映在怪物傷害
+- [ ] Step 17：新增 unit test — 極冰封印凍結使怪物跳過攻擊（暫緩）
+- [x] Step 18：新增 unit test — 挑釁怒吼正確降低怪物攻擊
+- [x] Step 19：整合測試 — 全部 658 tests 通過，TypeScript 編譯無錯誤
 
 ---

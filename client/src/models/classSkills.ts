@@ -19,7 +19,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'iron-shield', name: '鋼鐵護盾', className: 'knight', classLevel: 3, requiredLevel: 30, bookName: '鋼鐵護盾技能書',
     skill: { id: 'iron-shield', name: '鋼鐵護盾', level: 3, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 30, cooldown: 30000, buffEffect: '減傷20%', buffDuration: 15000, buffModifiers: [{ stat: 'damageReduction', value: 20, isPercent: true }], buffCategory: 'defense-buff' } },
   { id: 'taunt', name: '挑釁怒吼', className: 'knight', classLevel: 4, requiredLevel: 40, bookName: '挑釁怒吼技能書',
-    skill: { id: 'taunt', name: '挑釁怒吼', level: 4, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 25, cooldown: 20000, buffEffect: '怪物攻擊力-20%', buffDuration: 10000, buffModifiers: [{ stat: 'attack', value: -20, isPercent: true }], buffCategory: 'atk-debuff' } },
+    skill: { id: 'taunt', name: '挑釁怒吼', level: 4, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 25, cooldown: 20000, applyDebuff: { category: 'atk-down', name: '挑釁', description: '攻擊力降低20%', duration: 10000, modifiers: [{ stat: 'attack', value: -20, isPercent: true }], tags: ['taunt'] } } },
   { id: 'vengeance', name: '復仇之刃', className: 'knight', classLevel: 5, requiredLevel: 50, bookName: '復仇之刃技能書',
     skill: { id: 'vengeance', name: '復仇之刃', level: 5, element: 'none', type: 'attack', target: 'single', power: 80, mpCost: 50, cooldown: 25000 } },
 

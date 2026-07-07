@@ -20,6 +20,11 @@ export function QuestTracker() {
   function getAreaName(areaId: string): string {
     const region = getRegion(areaId);
     if (region) return region.name;
+    const floorMatch = areaId.match(/^(.+)-(\d+)f$/);
+    if (floorMatch) {
+      const baseRegion = getRegion(floorMatch[1]);
+      if (baseRegion) return `${baseRegion.name}${floorMatch[2]}樓`;
+    }
     for (const pools of Object.values(AREA_POOLS)) {
       const entry = pools.find(a => a.areaId === areaId);
       if (entry) return entry.areaName;

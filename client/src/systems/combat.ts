@@ -103,6 +103,21 @@ export function getRaceHitBonus(activeEffects: ActiveEffect[], monsterRace: stri
   return bonus;
 }
 
+export function getMonsterDebuffModifier(activeEffects: ActiveEffect[], targetIdx: number, stat: string): number {
+  const now = Date.now();
+  let percentMod = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'debuff' || effect.target !== 'monster') continue;
+    if (effect.targetIdx !== targetIdx) continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === stat && mod.isPercent) percentMod += mod.value;
+    }
+  }
+  return percentMod;
+}
+
 function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
   if (!gear) return 1;
   if (monsterSize === 'small') return gear.smallMonsterDamage ?? 1;
@@ -198,7 +213,8 @@ export function calculatePlayerAttack(
   weapon: EquipmentInstance | null,
   monster: MonsterInstance,
   equippedGear: (EquipmentInstance | null)[] = [],
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  targetIdx: number = 0
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
   const effSTR = getEffectiveSTR(attrs.STR);
@@ -251,8 +267,10 @@ export function calculatePlayerAttack(
     damage = Math.floor(damage * critMultiplier);
   }
 
-  // Monster defense reduction (last)
-  const monsterReduction = Math.min(monster.defense, 65);
+  // Monster defense reduction (last, with debuff)
+  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
+  const monsterReduction = Math.min(effectiveMonsterDef, 65);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -269,7 +287,8 @@ export function calculatePhysicalSkillHit(
   equippedGear: (EquipmentInstance | null)[],
   hasFireEnchant: boolean,
   skillName: string,
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  targetIdx: number = 0
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
   const effAGI = getEffectiveAGI(attrs.AGI);
@@ -318,8 +337,10 @@ export function calculatePhysicalSkillHit(
     damage = Math.floor(damage * critMultiplier);
   }
 
-  // Monster defense reduction (last)
-  const monsterReduction = Math.min(monster.defense, 65);
+  // Monster defense reduction (last, with debuff)
+  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const effectiveMonsterDef2 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
+  const monsterReduction = Math.min(effectiveMonsterDef2, 65);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -336,7 +357,8 @@ export function calculateSkillAttack(
   monster: MonsterInstance,
   equippedGear: (EquipmentInstance | null)[] = [],
   skillName: string = '技能',
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  targetIdx: number = 0
 ): { damage: number; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
   const bonuses = getAffixBonusesFromGear(equippedGear);
@@ -359,8 +381,10 @@ export function calculateSkillAttack(
     damage = Math.floor(damage * critMultiplier);
   }
 
-  // Monster defense reduction (last)
-  const monsterReduction = Math.min(monster.defense, 65);
+  // Monster defense reduction (last, with debuff)
+  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const effectiveMonsterDef3 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
+  const monsterReduction = Math.min(effectiveMonsterDef3, 65);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -388,7 +412,8 @@ export function calculateMonsterAttack(
   monster: MonsterInstance,
   char: Character,
   equippedGear: (EquipmentInstance | null)[],
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  monsterIdx: number = 0
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
   const effAGI = getEffectiveAGI(attrs.AGI);
@@ -412,8 +437,12 @@ export function calculateMonsterAttack(
     };
   }
 
-  // Monster damage
-  const rawDamage = randomInt(monster.attackMin, monster.attackMax);
+  // Monster damage (apply attack debuffs)
+  let rawDamage = randomInt(monster.attackMin, monster.attackMax);
+  const atkDebuffPercent = getMonsterDebuffModifier(activeEffects, monsterIdx, 'attack');
+  if (atkDebuffPercent !== 0) {
+    rawDamage = Math.max(1, Math.floor(rawDamage * (100 + atkDebuffPercent) / 100));
+  }
 
   // Player defense reduction (with affix bonus)
   const playerDefense = Math.min(finalDefense, 75);
@@ -445,12 +474,13 @@ export function processCombatRound(
   monster: MonsterInstance,
   weapon: EquipmentInstance | null,
   equippedGear: (EquipmentInstance | null)[],
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  targetIdx: number = 0
 ): CombatResult {
-  const playerAtk = calculatePlayerAttack(char, weapon, monster, equippedGear, activeEffects);
+  const playerAtk = calculatePlayerAttack(char, weapon, monster, equippedGear, activeEffects, targetIdx);
   const logs: CombatLog[] = [playerAtk.log];
 
-  const monsterAtk = calculateMonsterAttack(monster, char, equippedGear, activeEffects);
+  const monsterAtk = calculateMonsterAttack(monster, char, equippedGear, activeEffects, targetIdx);
   logs.push(monsterAtk.log);
 
   return {

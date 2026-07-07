@@ -1701,7 +1701,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
               const hasFireEnchant = hasActiveFireEnchant(state.activeEffects);
               for (let h = 0; h < skill.hits; h++) {
                 if (target.currentHp <= 0) break;
-                const result = calculatePhysicalSkillHit(char, weapon, target, allGear, hasFireEnchant, skill.name, state.activeEffects);
+                const result = calculatePhysicalSkillHit(char, weapon, target, allGear, hasFireEnchant, skill.name, state.activeEffects, targetIdx);
                 if (result.hit) {
                   target.currentHp -= result.damage;
                 }
@@ -1716,7 +1716,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                 const targets = shuffled.slice(0, hitCount);
                 for (const m of targets) {
                   const mIdx = monsters.indexOf(m);
-                  const result = calculateSkillAttack(char, skill.power, skill.element, m, allGear, skill.name, state.activeEffects);
+                  const result = calculateSkillAttack(char, skill.power, skill.element, m, allGear, skill.name, state.activeEffects, mIdx);
                   monsters[mIdx] = { ...m, currentHp: m.currentHp - result.damage };
                   logs.push({ text: result.log.message, type: 'player' });
                   if (mIdx === targetIdx) {
@@ -1724,18 +1724,37 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                   }
                 }
               } else {
-                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name, state.activeEffects);
-                target.currentHp -= result.damage;
+                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name, state.activeEffects, targetIdx);                target.currentHp -= result.damage;
                 monsters[targetIdx] = target;
                 logs.push({ text: result.log.message, type: 'player' });
 
-                if (result.damage > 0) {
-                  const templateDebuff = getSkillTemplate(skill.id)?.applyDebuff;
-                  if (templateDebuff) {
-                    let dotDmg = templateDebuff.dotDamage ?? 0;
-                    if (templateDebuff.dotDamagePercent) {
-                      dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * templateDebuff.dotDamagePercent);
+                const templateDebuff = getSkillTemplate(skill.id)?.applyDebuff;
+                if (templateDebuff) {
+                  if (templateDebuff.dotDuration && templateDebuff.dotInterval && templateDebuff.dotElement) {
+                    if (result.damage > 0) {
+                      let dotDmg = templateDebuff.dotDamage ?? 0;
+                      if (templateDebuff.dotDamagePercent) {
+                        dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * templateDebuff.dotDamagePercent);
+                      }
+                      const debuffEffect: ActiveEffect = {
+                        id: `debuff-${templateDebuff.category}-${targetIdx}-${now}`,
+                        sourceSkillId: skill.id,
+                        sourceSkillName: skill.name,
+                        category: templateDebuff.category,
+                        type: 'debuff',
+                        target: 'monster',
+                        targetIdx,
+                        dot: { damage: dotDmg, element: templateDebuff.dotElement, interval: templateDebuff.dotInterval, totalDuration: templateDebuff.dotDuration },
+                        startTime: now,
+                        duration: templateDebuff.dotDuration,
+                        tags: templateDebuff.tags,
+                        name: templateDebuff.name,
+                        description: `每秒 ${dotDmg} 傷害`,
+                      };
+                      get().addEffect(debuffEffect);
+                      logs.push({ text: `${skill.name}命中！目標${templateDebuff.name} ${templateDebuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
                     }
+                  } else if (templateDebuff.modifiers && templateDebuff.duration) {
                     const debuffEffect: ActiveEffect = {
                       id: `debuff-${templateDebuff.category}-${targetIdx}-${now}`,
                       sourceSkillId: skill.id,
@@ -1744,15 +1763,15 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                       type: 'debuff',
                       target: 'monster',
                       targetIdx,
-                      dot: { damage: dotDmg, element: templateDebuff.dotElement, interval: templateDebuff.dotInterval, totalDuration: templateDebuff.dotDuration },
+                      modifiers: templateDebuff.modifiers,
                       startTime: now,
-                      duration: templateDebuff.dotDuration,
+                      duration: templateDebuff.duration,
                       tags: templateDebuff.tags,
                       name: templateDebuff.name,
-                      description: `每秒 ${dotDmg} 傷害`,
+                      description: templateDebuff.description,
                     };
                     get().addEffect(debuffEffect);
-                    logs.push({ text: `${skill.name}命中！目標${templateDebuff.name} ${templateDebuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
+                    logs.push({ text: `${skill.name}命中！目標${templateDebuff.name} ${templateDebuff.duration / 1000}s`, type: 'player' });
                   }
                 }
               }
@@ -1798,7 +1817,7 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
           break;
         }
         case 'normal_attack': {
-          const result = processCombatRound(char, target, weapon, allGear, state.activeEffects);
+          const result = processCombatRound(char, target, weapon, allGear, state.activeEffects, targetIdx);
           if (result.playerHit) {
             target.currentHp -= result.playerDamage;
             const critText = result.isCritical ? '（爆擊！）' : '';
@@ -1897,7 +1916,8 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
 
       // Pick one monster to attack this tick (round-robin feel)
       const attacker = aliveMonsters[Math.floor(Math.random() * aliveMonsters.length)];
-      const monsterAtk = calculateMonsterAttack(attacker, char, allGear, state.activeEffects);
+      const attackerIdx = monsters.indexOf(attacker);
+      const monsterAtk = calculateMonsterAttack(attacker, char, allGear, state.activeEffects, attackerIdx);
       if (monsterAtk.dodged) {
         logs.push({ text: `閃避了 ${attacker.name} 的攻擊`, type: 'monster' });
       } else if (monsterAtk.hit) {

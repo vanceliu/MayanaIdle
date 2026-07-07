@@ -19,6 +19,7 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'bleeding': 'debuffs/bleeding-wound',
   'poisoned': 'debuffs/poison-gas',
   'defense-down': 'debuffs/broken-shield',
+  'atk-down': 'debuffs/stoned-skull',
 };
 
 export const ITEM_ICON_MAP: Record<string, string> = {

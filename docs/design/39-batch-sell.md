@@ -126,13 +126,13 @@
 **武器店（武器）：**
 ```
 售價 = Math.floor(template.buyPrice * 0.5)
-若 buyPrice 為 0（製作品）：Math.floor(smallMonsterDamage * 500 * 0.5)
+若 buyPrice 為 0（製作品）：Math.floor(template.craftGold * 0.5)
 ```
 
 **防具店（防具）：**
 ```
 售價 = Math.floor(template.buyPrice * 0.5)
-若 buyPrice 為 0（製作品）：Math.floor(defense * 500 * 0.5)
+若 buyPrice 為 0（製作品）：Math.floor(template.craftGold * 0.5)
 ```
 
 ---

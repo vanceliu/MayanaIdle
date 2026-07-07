@@ -146,6 +146,7 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
               <th>材質</th>
               <th>安定值</th>
               <th>雙手</th>
+              <th>附加效果</th>
               <th>職業限制</th>
               <th>取得方式</th>
               <th>掉落來源</th>
@@ -161,6 +162,18 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
       </div>
     </div>
   );
+}
+
+function WeaponEffects({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[number] }) {
+  const effects: string[] = [];
+  if (w.bonusHp) effects.push(`HP+${w.bonusHp}`);
+  if (w.bonusMp) effects.push(`MP+${w.bonusMp}`);
+  if (w.hpRegen) effects.push(`回血+${w.hpRegen}`);
+  if (w.mpRegen) effects.push(`回魔+${w.mpRegen}`);
+  if (w.magicAttack) effects.push(`魔攻+${w.magicAttack}`);
+  if (w.bonusStats) effects.push(w.bonusStats);
+  if (!effects.length) return <span>-</span>;
+  return <span style={{ color: '#fff' }}>{effects.join(', ')}</span>;
 }
 
 function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[number] }) {
@@ -184,6 +197,9 @@ function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[num
       <td>{w.material ? MATERIAL_LABELS[w.material] || w.material : '-'}</td>
       <td className="cell-number">{w.stability ?? '-'}</td>
       <td className="cell-center">{w.isTwoHanded ? '✓' : ''}</td>
+      <td>
+        <WeaponEffects weapon={w} />
+      </td>
       <td>
         {w.requiredClass
           ? w.requiredClass.map(c => <span key={c} className="wiki-tag">{CLASS_LABELS[c] || c}</span>)

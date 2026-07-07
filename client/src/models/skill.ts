@@ -10,9 +10,12 @@ export interface SkillDebuffDef {
   description: string;
   dotDamagePercent?: number;
   dotDamage?: number;
-  dotInterval: number;
-  dotDuration: number;
-  dotElement: string;
+  dotInterval?: number;
+  dotDuration?: number;
+  dotElement?: string;
+  duration?: number;
+  modifiers?: { stat: string; value: number; isPercent: boolean }[];
+  stun?: boolean;
   tags: string[];
 }
 
@@ -80,12 +83,12 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   { id: 'flame-pillar', name: '炎柱', level: 6, element: 'fire', type: 'attack', target: 'single', power: 55, mpCost: 35, cooldown: 6000 },
   { id: 'earth-rend', name: '地裂術', level: 6, element: 'earth', type: 'attack', target: 'single', power: 50, mpCost: 35, cooldown: 6000 },
   { id: 'haste', name: '加速術', level: 6, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 30000, buffEffect: '攻速+33%', buffDuration: 600000, buffModifiers: [{ stat: 'attack_speed', value: 33, isPercent: true }], buffCategory: 'speed' },
-  { id: 'curse', name: '詛咒', level: 6, element: 'dark', type: 'attack', target: 'single', power: 0, mpCost: 35, cooldown: 30000 },
+  { id: 'curse', name: '詛咒', level: 6, element: 'dark', type: 'attack', target: 'single', power: 0, mpCost: 35, cooldown: 30000, applyDebuff: { category: 'atk-down', name: '詛咒', description: '攻擊力降低15%', duration: 10000, modifiers: [{ stat: 'attack', value: -15, isPercent: true }], tags: ['curse'] } },
   // Level 7
   { id: 'tornado', name: '龍捲風', level: 7, element: 'wind', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, aoeMin: 4, aoeMax: 6 },
   { id: 'meteor-shot', name: '隕石彈', level: 7, element: 'fire', type: 'attack', target: 'aoe', power: 60, mpCost: 50, cooldown: 10000, aoeMin: 4, aoeMax: 6 },
   { id: 'recovery', name: '體力回復術', level: 7, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 300, mpCost: 60, cooldown: 12000 },
-  { id: 'armor-break', name: '護甲崩壞', level: 7, element: 'earth', type: 'attack', target: 'single', power: 0, mpCost: 40, cooldown: 20000 },
+  { id: 'armor-break', name: '護甲崩壞', level: 7, element: 'earth', type: 'attack', target: 'single', power: 0, mpCost: 40, cooldown: 20000, applyDebuff: { category: 'defense-down', name: '護甲崩壞', description: '防禦值降低15%', duration: 15000, modifiers: [{ stat: 'defense', value: -15, isPercent: true }], tags: ['armor-break'] } },
   { id: 'shadow-burst', name: '暗影爆發', level: 7, element: 'dark', type: 'attack', target: 'aoe', power: 60, mpCost: 50, cooldown: 10000, aoeMin: 4, aoeMax: 6 },
   // Level 8
   { id: 'chain-lightning', name: '閃電鎖鏈', level: 8, element: 'wind', type: 'attack', target: 'aoe', power: 50, mpCost: 55, cooldown: 10000, aoeMin: 5, aoeMax: 7 },

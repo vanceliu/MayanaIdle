@@ -84,7 +84,8 @@ export function WeaponShop() {
   function getSellPrice(item: EquipmentInstance): number {
     const template = allTemplates.find(t => t.id === item.templateId);
     if (template?.buyPrice) return Math.floor(template.buyPrice * 0.5);
-    return Math.floor((item.smallMonsterDamage ?? 0) * 500 * 0.5);
+    if (template?.craftGold) return Math.floor(template.craftGold * 0.5);
+    return 0;
   }
 
   function sellEquipment(item: EquipmentInstance) {
