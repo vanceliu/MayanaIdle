@@ -80,7 +80,7 @@ export function SkillsPage() {
                 <td className="cell-number">{s.healAmount || '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
                 <td className="cell-number">{(s.cooldown / 1000).toFixed(1)}</td>
-                <td>{s.description || s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || (s.applyDebuff ? `附加${s.applyDebuff.name}(${s.applyDebuff.description}, ${s.applyDebuff.dotDuration / 1000}s)` : '') || '-'}</td>
+                <td>{s.description || s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || (s.applyDebuff ? `附加${s.applyDebuff.name}(${s.applyDebuff.description}, ${(s.applyDebuff.dotDuration ?? s.applyDebuff.duration ?? 0) / 1000}s)` : '') || '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -180,7 +180,7 @@ function getClassSkillEffect(s: ClassSkillDef): string {
     parts.push(`${s.skill.hits}連擊`);
   }
   if (s.skill.applyDebuff) {
-    parts.push(`附加${s.skill.applyDebuff.name}(${s.skill.applyDebuff.description}, ${s.skill.applyDebuff.dotDuration / 1000}s)`);
+    parts.push(`附加${s.skill.applyDebuff.name}(${s.skill.applyDebuff.description}, ${(s.skill.applyDebuff.dotDuration ?? s.skill.applyDebuff.duration ?? 0) / 1000}s)`);
   }
   return parts.join(' ') || '-';
 }

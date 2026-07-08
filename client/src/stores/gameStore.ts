@@ -1842,15 +1842,15 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                   type: 'debuff',
                   target: 'monster',
                   targetIdx,
-                  dot: { damage: dotDmg, element: debuff.dotElement, interval: debuff.dotInterval, totalDuration: debuff.dotDuration },
+                  dot: { damage: dotDmg, element: debuff.dotElement!, interval: debuff.dotInterval!, totalDuration: debuff.dotDuration! },
                   startTime: now,
-                  duration: debuff.dotDuration,
+                  duration: debuff.dotDuration!,
                   tags: debuff.tags,
                   name: debuff.name,
                   description: `每秒 ${dotDmg} 傷害`,
                 };
                 get().addEffect(poisonEffect);
-                logs.push({ text: `淬毒觸發！目標${debuff.name} ${debuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
+                logs.push({ text: `淬毒觸發！目標${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
               }
             }
           } else {

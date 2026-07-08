@@ -196,7 +196,7 @@ export function SkillPanel() {
             <div className="skill-tooltip-stat">效果: {tooltip.skill.description}</div>
           )}
           {tooltip.skill.applyDebuff && (
-            <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {tooltip.skill.applyDebuff.dotDuration / 1000}s)</div>
+            <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {(tooltip.skill.applyDebuff.dotDuration ?? tooltip.skill.applyDebuff.duration ?? 0) / 1000}s)</div>
           )}
           {tooltip.skill.type === 'heal' && tooltip.skill.healAmount && (
             <div className="skill-tooltip-stat">回復: {tooltip.skill.healAmount}</div>
