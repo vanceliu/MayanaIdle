@@ -48,7 +48,7 @@ client/
 │   │   └── townScroll.ts     # 回城卷軸
 │   ├── systems/              # 遊戲邏輯（純函數，不依賴 React）
 │   │   ├── combat.ts         # 戰鬥計算（命中/迴避/傷害）
-│   │   ├── pressure.ts       # Pressure 遇敵機制
+│   │   ├── pressure.ts       # Pressure 怪物生成機制
 │   │   ├── levelUp.ts        # 經驗值 / 升級
 │   │   ├── drops.ts          # 掉落判定 + 裝備生成
 │   │   ├── regen.ts          # HP/MP 自然回復
@@ -371,7 +371,7 @@ interface BagItem {
 
 | 計時器 | 間隔 | 觸發條件 | 職責 |
 |---|---|---|---|
-| Game Loop | 1000ms | `explore` phase + auto 模式 | 遇敵判定 |
+| Game Loop | 每幀（PixiJS Ticker） | 地圖載入 + explore phase | 怪物生成、移動、FSM tick、戰鬥計算 |
 | HP Regen | 5000ms | 角色存活時 | VIT 基礎回血（戰鬥中減半） |
 | MP Regen | 6000ms | 角色存活時 | SPI 基礎回魔（戰鬥中減半） |
 | Player Attack | 1200ms | `combat` phase | 玩家攻擊（腳本驅動） |
