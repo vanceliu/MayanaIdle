@@ -45,6 +45,8 @@ export function PersistentScriptEditor() {
   const setEmergencyRetreat = useGameStore(s => s.setEmergencyRetreat);
   const afterCombatHpThreshold = useGameStore(s => s.afterCombatHpThreshold);
   const afterCombatMpThreshold = useGameStore(s => s.afterCombatMpThreshold);
+  const afterCombatHpResumeThreshold = useGameStore(s => s.afterCombatHpResumeThreshold);
+  const afterCombatMpResumeThreshold = useGameStore(s => s.afterCombatMpResumeThreshold);
 
   const buffSkills = skills.filter(s => s.type === 'buff');
   const healSkills = skills.filter(s => s.type === 'heal');
@@ -273,6 +275,28 @@ export function PersistentScriptEditor() {
             onChange={e => { useGameStore.setState({ afterCombatMpThreshold: Number(e.target.value) }); useGameStore.getState().saveState(); }}
           />
           <span>%</span>
+        </div>
+        <div className="script-row">
+          <label>HP ≥</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={afterCombatHpResumeThreshold}
+            onChange={e => { useGameStore.setState({ afterCombatHpResumeThreshold: Number(e.target.value) }); useGameStore.getState().saveState(); }}
+          />
+          <span>% 時恢復行動</span>
+        </div>
+        <div className="script-row">
+          <label>MP ≥</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={afterCombatMpResumeThreshold}
+            onChange={e => { useGameStore.setState({ afterCombatMpResumeThreshold: Number(e.target.value) }); useGameStore.getState().saveState(); }}
+          />
+          <span>% 時恢復行動</span>
         </div>
       </div>
     </div>

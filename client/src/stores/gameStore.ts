@@ -137,6 +137,8 @@ interface GameState {
   manualSearchId: number | null;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
+  afterCombatHpResumeThreshold: number;
+  afterCombatMpResumeThreshold: number;
   quickSlots: (PotionType | null)[];
   storedEquipment: EquipmentInstance[];
   storedMaterials: BagItem[];
@@ -259,6 +261,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   manualSearchId: null,
   afterCombatHpThreshold: 30,
   afterCombatMpThreshold: 20,
+  afterCombatHpResumeThreshold: 60,
+  afterCombatMpResumeThreshold: 60,
   quickSlots: [null, null, null, null, null],
   storedEquipment: [],
   storedMaterials: [],
@@ -371,6 +375,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const quickSlots = prefs?.quickSlots ?? [null, null, null, null, null];
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
     const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
+    const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? 60;
+    const afterCombatMpResumeThreshold = prefs?.afterCombatMpResumeThreshold ?? 60;
     const adventurerQuests = prefs?.adventurerQuests ?? [];
     const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
     const statistics = prefs?.statistics ?? createDefaultStatistics();
@@ -408,6 +414,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       quickSlots,
       afterCombatHpThreshold,
       afterCombatMpThreshold,
+      afterCombatHpResumeThreshold,
+      afterCombatMpResumeThreshold,
       adventurerQuests,
       guildProgress,
       statistics,
@@ -2153,6 +2161,8 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     quickSlots: state.quickSlots,
     afterCombatHpThreshold: state.afterCombatHpThreshold,
     afterCombatMpThreshold: state.afterCombatMpThreshold,
+    afterCombatHpResumeThreshold: state.afterCombatHpResumeThreshold,
+    afterCombatMpResumeThreshold: state.afterCombatMpResumeThreshold,
     adventurerQuests: state.adventurerQuests,
     guildProgress: state.guildProgress,
     statistics: state.statistics,

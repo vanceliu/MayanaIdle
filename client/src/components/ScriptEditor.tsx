@@ -35,6 +35,8 @@ export function ScriptEditor() {
   const setScriptRules = useGameStore(s => s.setScriptRules);
   const afterCombatHpThreshold = useGameStore(s => s.afterCombatHpThreshold);
   const afterCombatMpThreshold = useGameStore(s => s.afterCombatMpThreshold);
+  const afterCombatHpResumeThreshold = useGameStore(s => s.afterCombatHpResumeThreshold);
+  const afterCombatMpResumeThreshold = useGameStore(s => s.afterCombatMpResumeThreshold);
 
   function updateRule(idx: number, updates: Partial<ScriptRule>) {
     const rules = [...scriptRules];
@@ -193,7 +195,7 @@ export function ScriptEditor() {
             value={afterCombatHpThreshold}
             onChange={e => useGameStore.setState({ afterCombatHpThreshold: Number(e.target.value) })}
           />
-          <span>%</span>
+          <span>% 時等待</span>
         </div>
         <div className="script-row">
           <label>MP ≤</label>
@@ -204,7 +206,29 @@ export function ScriptEditor() {
             value={afterCombatMpThreshold}
             onChange={e => useGameStore.setState({ afterCombatMpThreshold: Number(e.target.value) })}
           />
-          <span>%</span>
+          <span>% 時等待</span>
+        </div>
+        <div className="script-row">
+          <label>HP ≥</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={afterCombatHpResumeThreshold}
+            onChange={e => useGameStore.setState({ afterCombatHpResumeThreshold: Number(e.target.value) })}
+          />
+          <span>% 時恢復行動</span>
+        </div>
+        <div className="script-row">
+          <label>MP ≥</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={afterCombatMpResumeThreshold}
+            onChange={e => useGameStore.setState({ afterCombatMpResumeThreshold: Number(e.target.value) })}
+          />
+          <span>% 時恢復行動</span>
         </div>
       </div>
     </div>

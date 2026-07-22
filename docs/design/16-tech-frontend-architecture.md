@@ -235,7 +235,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 計時器 | `gameLoopId`, `hpRegenId`, `mpRegenId`, `persistentLoopId` | 各 interval ID |
 | 腳本 | `combatRules`, `persistentRules`, `emergencyRetreat` | 戰鬥/常駐/緊急撤退 |
 | 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
-| 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold` | 戰鬥後等待閾值（HP/MP %） |
+| 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold`, `afterCombatHpResumeThreshold`, `afterCombatMpResumeThreshold` | 戰鬥後等待/恢復閾值（HP/MP %） |
 | 搜尋 | `searchMode`, `isManualSearching`, `manualSearchId` | 自動/手動搜尋模式與狀態 |
 | 快捷 | `quickSlots` | 5 格快捷鍵（藥水） |
 | 倉庫 | `storedEquipment`, `storedMaterials`, `warehouseGold` | 城鎮倉庫（帳號共用） |
@@ -450,8 +450,10 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 
 ### 戰鬥後等待
 
-- `afterCombatHpThreshold`（HP ≤ N% 時等待回復）
-- `afterCombatMpThreshold`（MP ≤ N% 時等待回復）
+- `afterCombatHpThreshold`（HP ≤ N% 時暫停行動）
+- `afterCombatMpThreshold`（MP ≤ N% 時暫停行動）
+- `afterCombatHpResumeThreshold`（HP ≥ N% 時恢復行動）
+- `afterCombatMpResumeThreshold`（MP ≥ N% 時恢復行動）
 - 設定值持久化至 localStorage
 
 ---
@@ -605,6 +607,8 @@ Key: `mayana_prefs_${characterId}`
 | `quickSlots` | 快捷鍵配置 |
 | `afterCombatHpThreshold` | 戰鬥後等待 HP 閾值 |
 | `afterCombatMpThreshold` | 戰鬥後等待 MP 閾值 |
+| `afterCombatHpResumeThreshold` | 戰鬥後恢復行動 HP 閾值 |
+| `afterCombatMpResumeThreshold` | 戰鬥後恢復行動 MP 閾值 |
 
 ---
 
@@ -863,6 +867,6 @@ interface TooltipProps {
 - 內容區（`.script-editor-content`）高度 100% 填滿 modal-body，無固定上限
 - 右上角 × 關閉按鈕
 - 內容為兩個 tab：常駐腳本 + 戰鬥腳本
-- 常駐腳本含：規則 CRUD、排序、緊急撤退設定、戰鬥後等待閾值（HP/MP %）
+- 常駐腳本含：規則 CRUD、排序、緊急撤退設定、戰鬥後等待/恢復閾值（HP/MP %）
 - 戰鬥後等待閾值修改後自動 saveState 持久化
 - 關閉後狀態保留（state 存在 Zustand，不隨 Modal unmount 消失）

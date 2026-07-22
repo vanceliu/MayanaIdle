@@ -1,15 +1,16 @@
-# 41 - ARPG 化戰鬥系統設計
+# 41 - ARPG 戰鬥系統架構
 
 ## 1. 概述
 
-將戰鬥系統從「phase 切換 + timer-based 數值模擬」改為「地圖上即時 ARPG 戰鬥」。
+戰鬥系統為「地圖上即時 ARPG 戰鬥」，角色與怪物在同一張地圖上進行即時攻擊與移動，無場景切換。
 
-核心改變：
-- 取消 `phase: 'combat'` 場景切換，戰鬥直接在探索地圖上發生
+核心架構：
+- 戰鬥直接在探索地圖上發生，不存在獨立的 `phase: 'combat'` 場景
 - 角色和怪物在地圖上有實際的攻擊動作和位移
-- 攻擊分為近戰/遠程兩種類型
-- AOE 技能可同時命中範圍內多隻怪
-- 自動模式下由戰鬥腳本決定目標與技能
+- 攻擊分為近戰/遠程兩種類型，由武器決定基礎射程
+- AOE 技能可同時命中範圍內多隻怪（自身中心/目標中心兩種模式）
+- 自動模式下由戰鬥腳本（scriptRunner）決定目標與技能
+- 玩家有效攻擊範圍 = max(武器射程, 當前可用技能中最大的 range)
 
 ## 2. 設計原則
 
@@ -26,7 +27,14 @@
 | 類型 | 距離 | 行為 |
 |------|------|------|
 | 近戰 | 1.5 格內 | 角色走到目標旁邊才能攻擊 |
-| 遠程 | 20 格內 | 只要視線無阻擋即可攻擊，產生投射物 |
+| 遠程 | 由技能 `range` 欄位決定 | 只要視線無阻擋即可攻擊，產生投射物 |
+| 自身 | 0（對自己） | 治癒/Buff 類技能，無需目標距離判定 |
+
+**射程規則：**
+- 普通攻擊射程由武器決定（近戰 1.5、弓 15）
+- 技能射程由每個技能的 `range` 欄位定義
+- `range: 0` 表示對自身施放，不需要距離/視線判定
+- 玩家的有效攻擊範圍 = max(武器射程, 當前可用技能中最大的 range)
 
 ### 3.2 攻擊流程
 
@@ -104,8 +112,7 @@ interface AoeProps {
 
 ```typescript
 interface SkillCombatProps {
-  attackType: 'melee' | 'ranged';
-  range: number;            // 攻擊距離（格數）
+  range: number;            // 施放距離（格數）。0 = 對自身施放（buff/heal），>0 = 需目標在範圍內
   aoeRadius?: number;       // AOE 搜索半徑（格數），undefined = 單體
   maxTargets?: number;      // AOE 最大目標數（含主目標），undefined = 1
   projectileSpeed?: number; // 投射物速度（格/秒），僅遠程
@@ -113,8 +120,8 @@ interface SkillCombatProps {
 ```
 
 普通攻擊的類型由武器決定：
-- 劍/斧/錘/匕首/爪/雙刀 → 近戰
-- 杖/弓 → 遠程
+- 劍/斧/錘/匕首/爪/雙刀/杖 → 近戰（range: 1.5）
+- 弓 → 遠程（range: 15）
 
 ## 4. 角色行為（自動模式）
 
@@ -143,7 +150,7 @@ interface SkillCombatProps {
 ### 4.3 自動追蹤移動
 
 - 近戰：尋路到目標相鄰格（距離 ≤ 1.5）
-- 遠程：找到距離 ≤ 20 且有視線的位置（優先當前位置）
+- 遠程：找到距離 ≤ 技能 range 且有視線的位置（優先當前位置）
 - 使用現有 A* pathfinding
 
 ## 5. 怪物行為
@@ -175,21 +182,18 @@ ROAMING（脫離回到巡邏）
 
 - 近戰怪物：追到玩家旁邊才打
 - 遠程怪物：保持射程內、有視線就打，不需貼身
+- 暈眩檢查：每次 tick 前檢查 activeEffects 是否有 stun debuff，有則跳過行動
 
 ### 5.3 怪物死亡
 
 - 直接從地圖上消失（目前為紅圈，暫不做死亡動畫）
 - 觸發原有的 `processMonsterDeath()`：經驗、掉落、任務
 
-## 6. 取消 Phase 切換
+## 6. Phase 管理
 
-### 6.1 現有流程（移除）
+戰鬥與探索在同一個 phase 中進行，不再有獨立的 combat phase 切換。
 
-```
-explore → collision → combat（timer 戰鬥） → victory → explore
-```
-
-### 6.2 新流程
+### 6.1 當前架構
 
 ```
 explore（含戰鬥）：
@@ -200,35 +204,59 @@ explore（含戰鬥）：
 - 無目標 → 繼續自動探索
 ```
 
-### 6.3 受影響的系統
+### 6.2 HP/MP 門檻暫停
 
-| 系統 | 改動 |
+- 閒置時（周圍無近戰範圍內怪物）低於門檻 → 停止自動移動/生怪
+- 被打時自動反擊不受暫停影響
+- 恢復至 resume 門檻才解除暫停，繼續自動探索
+- 詳見 `03-combat.md` § 戰鬥後等待
+
+### 6.3 已移除的系統
+
+| 舊系統 | 處理 |
 |------|------|
-| `gameStore.phase` | 移除 `'combat'`，或保留但改為「是否有敵對目標」的 flag |
-| `runAutoCombat()` | 移除整套 timer-based 戰鬥 |
-| `combatTimerIds` | 移除 |
-| BattleView 的怪物 HP 條 UI | 改為顯示「當前目標」或地圖上跟隨怪物的血條 |
-| HP/MP threshold 暫停 | 保留，低於門檻時角色停止攻擊/移動 |
-| 戰鬥腳本 | 保留邏輯，但觸發方式改為每次攻擊間隔到時呼叫 |
+| `phase: 'combat'` 場景切換 | 已移除，explore 涵蓋戰鬥 |
+| `runAutoCombat()` timer-based 戰鬥 | 已移除，改為即時 FSM |
+| `combatTimerIds` | 已移除 |
+| 碰撞觸發戰鬥的邏輯 | 改為進入仇恨範圍觸發 |
 
-## 7. 資料流（新）
+## 7. 資料流
 
 ```
-PixiJS Ticker（每幀）
+PixiJS Ticker（每幀 60fps）
   ↓
-角色狀態機 update：
-  - IDLE：腳本選目標
-  - CHASING：pathfinding 移動
-  - ATTACKING：檢查 CD → 執行攻擊 → combat.ts 計算
+gameLoop.gameLoopTick(deltaMs)
+  ├─ OccupationManager 重建佔位表
+  ├─ HP/MP 門檻暫停判定
+  ├─ 怪物生成（pressure-based，最多 10 隻）
+  ├─ 怪物移動（A* 8 格內 + greedy step，path 每 5s 重算）
+  └─ 玩家移動（沿路徑移動，遇怪停止）
   ↓
-怪物狀態機 update（每隻）：
-  - ROAMING/CHASING：追蹤玩家
-  - ATTACKING：檢查 CD → 攻擊玩家 → combat.ts 計算
+arpgEngine.tickArpgEngine(engine, input)
+  ├─ syncMonsterContexts：同步怪物戰鬥上下文（新增/移除/更新）
+  ├─ 決定武器類型 → getWeaponAttackConfig（bow=15, others=1.5）
+  ├─ 預評估戰鬥腳本：若下一動是遠程技能，動態擴展攻擊範圍
+  ├─ tickPlayerCombat（玩家 FSM）：
+  │     idle → 選最近活著的怪
+  │     chasing → 返回 move_to 事件
+  │     attacking → CD 到達時返回 attack 事件
+  ├─ 處理 attack 結果：
+  │     evaluateCombatScript → 決定 action
+  │     resolveTargets → 單體/AOE 目標解析
+  └─ tickMonsterCombat（每隻怪物 FSM）：
+        檢查 stun → roaming/chasing/attacking
   ↓
-更新 Zustand state（HP、位置、死亡）
+ArpgEvent[] 輸出（player_attack / monster_attack / move_to）
+  ↓
+上層處理事件 → combat.ts 計算傷害 → 更新 Zustand state
   ↓
 PixiJS 渲染（sprite 位置、動畫、特效）
 ```
+
+### 7.1 DoT 與 Effect 管理
+
+- DoT tick timer：每 1000ms 觸發一次
+- Effect 過期清理：每幀檢查 `startTime + duration`，移除已過期效果
 
 ## 8. 投射物系統
 
@@ -250,61 +278,75 @@ interface Projectile {
 - 投射物到達目標 → 觸發 combat.ts 計算
 - AOE 投射物到達後 → 對半徑內所有敵人計算
 
-## 9. 實作步驟
+## 9. 實作狀態
 
-### Phase A：狀態機基礎
+### 已完成
 
-1. 建立角色戰鬥狀態機（IDLE/CHASING/ATTACKING）
-2. 建立怪物戰鬥狀態機（ROAMING/CHASING/ATTACKING）
-3. 實作視線判定（Line of Sight）
-4. 修改怪物模板增加攻擊屬性
+| 模組 | 檔案 | 內容 |
+|------|------|------|
+| ARPG Engine | `arpgEngine.ts` | 核心協調器：每幀 tick、怪物上下文同步、武器判定、腳本預評估、目標解析 |
+| 玩家 FSM | `playerCombatFSM.ts` | idle/chasing/attacking 三態、最近目標選擇、射程+視線判定 |
+| 怪物 FSM | `monsterCombatFSM.ts` | roaming/chasing/attacking 三態、stun 檢查 |
+| 視線判定 | `lineOfSight.ts` | LoS 計算、距離函式、半徑目標搜索 |
+| Game Loop | `gameLoop.ts` | OccupationManager、HP/MP 門檻暫停、pressure 生怪、A* 尋路、DoT timer |
+| AOE 解析 | `arpgEngine.ts` resolveTargets | self-centered（無上限）與 target-centered（maxTargets） |
+| 攻擊範圍動態擴展 | `arpgEngine.ts` / `gameLoop.ts` | 預評估腳本可用技能，取最大 range |
 
-### Phase B：攻擊執行
+### 待實作
 
-1. 角色攻擊流程：距離檢查 → combat.ts 計算 → 傷害應用
-2. 怪物攻擊流程：距離檢查 → combat.ts 計算 → 傷害應用
-3. 攻擊間隔系統（取代 timer）
-4. 整合 scriptRunner（攻擊時呼叫腳本決定技能）
-
-### Phase C：移除舊戰鬥系統
-
-1. 移除 `phase: 'combat'` 切換
-2. 移除 `runAutoCombat()` 及 combatTimerIds
-3. 移除碰撞觸發戰鬥的邏輯（改為進入仇恨範圍）
-4. 調整 BattleView UI（移除怪物列表切換為地圖上血條）
-
-### Phase D：投射物與 AOE
-
-1. 建立投射物系統
-2. 遠程攻擊產生投射物 → 到達時計算傷害
-3. AOE 技能命中時對範圍內所有目標計算
-4. PixiJS 投射物渲染
-
-### Phase E：視覺回饋
-
-1. 傷害數字飄動
-2. 怪物受擊閃爍
-3. 投射物 sprite（先用簡單圓點）
-4. AOE 範圍指示（半透明圓）
+| 功能 | 說明 |
+|------|------|
+| 投射物系統 | 遠程攻擊產生投射物 sprite、飛行過程、到達判定。目前遠程攻擊為即時命中。 |
+| 視覺回饋 | 傷害數字飄動、怪物受擊閃爍、AOE 範圍指示 |
 
 ## 10. 技能系統對照表
 
 以現有技能為例，定義攻擊屬性：
 
-| 技能 | 攻擊類型 | 射程 | AOE 半徑 | 最大目標 | 備註 |
-|------|----------|------|----------|----------|------|
+| 技能 | 類型 | 射程(range) | AOE 半徑 | 最大目標 | 備註 |
+|------|------|-------------|----------|----------|------|
 | 普通攻擊（劍） | melee | 1.5 | - | 1 | 依武器 |
-| 普通攻擊（杖） | ranged | 20 | - | 1 | 依武器 |
-| 火球術 | ranged | 20 | 3 | 3 | 投射物，命中主目標後擴散 |
-| 龍捲風 | ranged | 20 | 4 | 6 | 投射物，命中主目標後擴散 |
-| 冰霜新星 | melee | 1.5 | 5 | 8 | 以自身為中心 |
-| 多重射擊 | ranged | 20 | - | 1 | 連擊多次（multi-hit，非 AOE） |
+| 普通攻擊（弓） | ranged | 15 | - | 1 | 依武器 |
+| 普通攻擊（杖） | melee | 1.5 | - | 1 | 依武器，杖為近戰 |
+| 風刃 | ranged | 10 | - | 1 | Lv1 基礎遠程 |
+| 冰彈 | ranged | 10 | - | 1 | Lv1 基礎遠程 |
+| 火焰箭 | ranged | 12 | - | 1 | Lv2 |
+| 火球術 | ranged | 12 | 3 | 3 | 投射物，命中主目標後擴散 |
+| 龍捲風 | ranged | 10 | 4 | 6 | 投射物，命中主目標後擴散 |
+| 流星雨 | ranged | 15 | 6 | 8 | 高階大範圍 |
+| 冰暴 | ranged | 12 | 4 | 6 | |
+| 天雷 | ranged | 15 | - | 10 | Lv10 |
+| 末日烈焰 | ranged | 15 | - | 10 | Lv10 |
+| 治癒 | self | 0 | - | 1 | 對自身施放 |
+| 大治癒 | self | 0 | - | 1 | 對自身施放 |
+| 加速術 | self | 0 | - | 1 | 對自身施放 |
+| 魔法盔甲 | self | 0 | - | 1 | 對自身施放 |
+| 聖光術 | self | 0 | - | 1 | 淨化，對自身 |
+| 絕對屏障 | self | 0 | - | 1 | 對自身施放 |
+| 盾擊 | melee | 1.5 | - | 1 | 騎士近戰技 |
+| 裂傷斬 | melee | 1.5 | - | 1 | 騎士近戰技 |
+| 背刺 | melee | 1.5 | - | 1 | 盜賊近戰技 |
+| 三連射 | ranged | 15 | - | 1 | 精靈弓技，multi-hit |
+| 穿透箭雨 | ranged | 15 | - | 6 | 精靈弓 AOE |
+| 聖光審判 | ranged | 10 | - | 6 | 牧師遠程 AOE |
+| 元素風暴 | ranged | 12 | - | 10 | 元素師 AOE |
+| 魔力奪取 | ranged | 8 | - | 1 | 短射程 |
+| 詛咒 | ranged | 10 | - | 1 | debuff |
+| 護甲崩壞 | ranged | 10 | - | 1 | debuff |
+| 挑釁怒吼 | melee | 3 | - | 1 | 短程挑釁 |
+
+**射程設計原則：**
+- `range: 0`：buff/heal/move 類，對自身施放
+- `range: 1.5`：近戰物理技能（劍/匕首類）
+- `range: 3`：短程近戰控場（挑釁）
+- `range: 8~10`：中程魔法（基礎攻擊魔法、debuff）
+- `range: 12~15`：長程魔法/弓箭技能（高階攻擊魔法、弓技）
 
 ## 11. 風險與限制
 
 | 風險 | 對策 |
 |------|------|
-| 大量怪物同時計算 AI 效能 | 限制同時活動怪物數量（maxMonsters），遠處怪物降低 AI 頻率 |
+| 大量怪物同時計算 AI 效能 | 限制同時活動怪物數量（maxMonsters = 10），遠處怪物降低 AI 頻率 |
 | 投射物過多時渲染壓力 | 用 object pool 管理投射物 sprite |
 | 舊存檔相容性 | phase 欄位向下相容，讀到 'combat' 自動轉為 'explore' |
 | 腳本系統相容 | scriptRunner 介面保留，只改觸發時機 |

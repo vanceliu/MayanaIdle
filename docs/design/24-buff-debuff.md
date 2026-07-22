@@ -129,13 +129,13 @@ interface DotEffect {
 
 ## 24.6 戰鬥迴圈整合
 
-每個戰鬥 tick 的處理順序：
+每幀（frame-based）的處理順序：
 
-1. **清除過期效果** — 移除 `startTime + duration < now` 的效果
-2. **計算 DoT 傷害** — 對有 dot 效果的目標結算傷害
-3. **玩家行動** — 正常攻擊/技能判定
-4. **怪物行動前檢查** — 若怪物身上有 `stun: true` 的效果 → 跳過攻擊
-5. **怪物攻擊** — 無控場則正常攻擊
+1. **清除過期效果** — 移除超過 duration 的效果（每幀檢查）
+2. **DoT 傷害計時** — 累積 deltaMs，每 1000ms 結算一次 DoT 傷害
+3. **玩家 FSM tick** — 狀態機更新（idle/chasing/attacking），攻擊時執行腳本決定技能
+4. **怪物 FSM tick** — 每隻怪物獨立更新，檢查 stun debuff，暈眩中跳過攻擊
+5. **事件處理** — 收集 ArpgEvent（player_attack, monster_attack, move_to）更新狀態
 
 ---
 
@@ -162,7 +162,7 @@ interface DotEffect {
 
 ### 24.7.2 怪物 Debuff 顯示
 
-- **位置**：`BattleView` 內 monster-card 血量條下方
+- **位置**：地圖上怪物 sprite 血量條下方
 - **顯示方式**：小 icon 列（24×24）
 - 每個 debuff 顯示：
   - 效果 icon（暈眩=星星、流血=紅滴、毒=綠骷髏）

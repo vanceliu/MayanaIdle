@@ -112,8 +112,8 @@ export function tickArpgEngine(
     const nextAction = evaluateCombatScript(combatRules, scriptCtx);
     if (nextAction?.type === 'skill' && nextAction.skillId) {
       const skill = skills.find(s => s.id === nextAction.skillId);
-      if (skill && skill.type === 'attack') {
-        attackConfig.range = Math.max(attackConfig.range, 20);
+      if (skill && skill.type === 'attack' && skill.range && skill.range > attackConfig.range) {
+        attackConfig.range = skill.range;
         attackConfig.attackType = 'ranged';
       }
     }

@@ -34,7 +34,7 @@ export interface AttackConfig {
 export function getWeaponAttackConfig(weaponType: string | undefined): AttackConfig {
   switch (weaponType) {
     case 'bow':
-      return { attackType: 'ranged', range: 20 };
+      return { attackType: 'ranged', range: 15 };
     default:
       return { attackType: 'melee', range: 1.5 };
   }

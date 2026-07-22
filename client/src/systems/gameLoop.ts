@@ -12,7 +12,6 @@ import { getSkillCooldownReduction } from './combat';
 import { canUseSkill } from '../models/skill';
 
 const ATTACK_RANGE_MELEE = 1.5;
-const ATTACK_RANGE_RANGED = 20;
 const DOT_TICK_INTERVAL = 1000;
 
 export const occupation = new OccupationManager();
@@ -24,17 +23,15 @@ let combatInterruptLogShown = false;
 function getPlayerAttackRange(gameState: ReturnType<typeof useGameStore.getState>): number {
   const weapon = Object.values(gameState.equippedGear).find(g => g && (g as any).slot === 'rightHand') as any;
   const weaponType = weapon?.baseType;
-  let range = weaponType === 'bow' ? ATTACK_RANGE_RANGED : ATTACK_RANGE_MELEE;
+  let range = weaponType === 'bow' ? 15 : ATTACK_RANGE_MELEE;
 
-  // Check if a ranged skill is ready — if so, use its range
   if (gameState.character && gameState.skills.length > 0) {
     const allGear = Object.values(gameState.equippedGear).filter(Boolean) as any[];
     const cdr = getSkillCooldownReduction(allGear);
     const now = Date.now();
     for (const skill of gameState.skills) {
-      if (skill.type === 'attack' && canUseSkill(skill, gameState.character.mp, now, cdr)) {
-        range = Math.max(range, ATTACK_RANGE_RANGED);
-        break;
+      if (skill.type === 'attack' && skill.range && canUseSkill(skill, gameState.character.mp, now, cdr)) {
+        range = Math.max(range, skill.range);
       }
     }
   }
@@ -74,6 +71,7 @@ export function gameLoopTick(deltaMs: number) {
   const hpPct = (ch.hp / effMaxHp) * 100;
   const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
   const belowThreshold = hpPct <= gameState.afterCombatHpThreshold || mpPct <= gameState.afterCombatMpThreshold;
+  const aboveResume = hpPct >= gameState.afterCombatHpResumeThreshold && mpPct >= gameState.afterCombatMpResumeThreshold;
 
   // Only trigger pause in idle state (no nearby monsters in attack range)
   const hasNearbyMonster = monsterStore.monsters.some(m => {
@@ -98,7 +96,7 @@ export function gameLoopTick(deltaMs: number) {
       combatLogs: [...existing.slice(-199), { text: 'HP/MP 低於門檻，等待恢復中...', type: 'system' }],
     });
     pauseLogShown = true;
-  } else if (!belowThreshold && monsterStore.paused) {
+  } else if (aboveResume && monsterStore.paused) {
     monsterStore.setPaused(false);
     if (gameState.searchMode === 'auto') {
       useMapControlStore.getState().setAutoMove(true);
