@@ -19,6 +19,7 @@ export interface ActiveEffect {
   type: 'buff' | 'debuff';
   target: 'player' | 'monster';
   targetIdx?: number;
+  targetMonsterId?: string;
 
   modifiers?: StatModifier[];
   dot?: DotEffect;

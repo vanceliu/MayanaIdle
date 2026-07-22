@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
+import { useMapMonsterStore } from './mapMonsterStore';
+import { useMapControlStore } from './mapControlStore';
 import type { EquipmentInstance, EquippedGear } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
@@ -216,6 +218,17 @@ export function getEffectiveMaxMp(char: Character, gear: EquippedGear): number {
   const bonuses = getAffixBonusesFromGear(allGear);
   const flatMp = allGear.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0);
   return Math.floor((char.maxMp + flatMp) * (1 + bonuses.max_mp / 100));
+}
+
+function isInArpgCombat(): boolean {
+  const monsters = useMapMonsterStore.getState().monsters;
+  if (monsters.length === 0) return false;
+  const playerPos = useMapControlStore.getState().playerPosition;
+  return monsters.some((m: any) => {
+    const dx = m.position.x - playerPos.x;
+    const dy = m.position.y - playerPos.y;
+    return Math.sqrt(dx * dx + dy * dy) <= 8;
+  });
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -602,7 +615,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (!state.character || state.character.hp <= 0) return;
       const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
       if (state.character.hp >= effMaxHp) return;
-      const inCombat = state.phase === 'combat';
+      const inCombat = state.phase === 'combat' || isInArpgCombat();
       const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
       const regen = getHpRegen(state.character, inCombat, allGear, state.activeEffects);
       if (regen <= 0) return;
@@ -615,7 +628,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (!state.character || state.character.hp <= 0) return;
       const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear);
       if (state.character.mp >= effMaxMp) return;
-      const inCombat = state.phase === 'combat';
+      const inCombat = state.phase === 'combat' || isInArpgCombat();
       const allGearMp = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
       const regen = getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
       if (regen <= 0) return;

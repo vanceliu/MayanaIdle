@@ -12,19 +12,24 @@ export function hasLineOfSight(
 
   if (dist === 0) return true;
 
-  const steps = Math.ceil(dist * 2);
+  // Check every 0.25 tiles along the line for better accuracy
+  const steps = Math.max(1, Math.ceil(dist * 4));
   const stepX = dx / steps;
   const stepY = dy / steps;
 
   for (let i = 1; i < steps; i++) {
-    const checkX = Math.floor(from.x + stepX * i);
-    const checkY = Math.floor(from.y + stepY * i);
+    const px = from.x + stepX * i;
+    const py = from.y + stepY * i;
 
-    if (checkX < 0 || checkX >= map.width || checkY < 0 || checkY >= map.height) {
+    // Check both floor and round to catch edge cases
+    const tileX = Math.round(px);
+    const tileY = Math.round(py);
+
+    if (tileX < 0 || tileX >= map.width || tileY < 0 || tileY >= map.height) {
       return false;
     }
 
-    if (map.tiles[checkY][checkX] === TileType.Wall) {
+    if (map.tiles[tileY][tileX] === TileType.Wall) {
       return false;
     }
   }

@@ -27,7 +27,7 @@ export async function getMapForRegion(regionId: string, floor?: number | null): 
   if (!key) return null;
 
   const data = await mapModules[key]() as MapData;
-  mapCache.set(data.id, data);
+  mapCache.set(id, data);
   return data;
 }
 

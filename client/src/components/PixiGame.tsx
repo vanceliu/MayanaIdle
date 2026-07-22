@@ -2,15 +2,17 @@ import { useRef, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
+import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity } from '../pixi/entities/PlayerEntity';
 import { MonsterEntity } from '../pixi/entities/MonsterEntity';
 import { worldToScreen, screenToWorld } from '../pixi/utils/isometric';
-import { gameLoopTick, occupation } from '../systems/gameLoop';
+import { gameLoopTick, occupation, consumeDotTick } from '../systems/gameLoop';
 import { findAdjacentWalkable } from '../systems/pathfinding';
 import { addExp } from '../systems/levelUp';
 import { db } from '../db/database';
+import { processMonsterDeath } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
 import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../systems/arpgEngine';
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
@@ -76,11 +78,15 @@ export function PixiGame() {
         const map = useMapControlStore.getState().currentMap;
         if (!map) return;
 
-        // 1. Movement & collision (unified)
-        gameLoopTick(delta);
+        try {
+          // 1. Movement & collision (unified)
+          gameLoopTick(delta);
 
-        // 2. ARPG combat
-        tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta);
+          // 2. ARPG combat
+          tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta);
+        } catch (e) {
+          console.error('[GameLoop] Error:', e);
+        }
 
         // 3. Render sync
         const playerPos = useMapControlStore.getState().playerPosition;
@@ -119,31 +125,44 @@ export function PixiGame() {
 
   // React to map changes
   useEffect(() => {
-    const unsubscribe = useMapControlStore.subscribe(
-      (state) => state.currentMap,
-      (currentMap) => {
-        if (!currentMap || !sceneRef.current) return;
-        sceneRef.current.loadMap(currentMap);
-        monsterMapRef.current.forEach(m => {
-          sceneRef.current?.entityLayer.container.removeChild(m.container);
-          m.destroy();
-        });
-        monsterMapRef.current.clear();
-        arpgEngineRef.current = createArpgEngine();
-        monsterInstancesRef.current.clear();
+    let prevMapRef: any = null;
+    const unsubscribe = useMapControlStore.subscribe((state) => {
+      const currentMap = state.currentMap;
+      if (currentMap === prevMapRef) return;
+      prevMapRef = currentMap;
 
-        // Load monster templates for this area
-        const char = useGameStore.getState().character;
-        if (char) {
-          const areaId = char.currentFloor != null
-            ? `${char.currentRegion}-${char.currentFloor}f`
-            : char.currentRegion;
-          db.monsterTemplates.where('area').equals(areaId).toArray().then(templates => {
-            areaTemplatesRef.current = templates;
-          });
-        }
+      if (!currentMap || !sceneRef.current) return;
+      sceneRef.current.loadMap(currentMap);
+      monsterMapRef.current.forEach(m => {
+        sceneRef.current?.entityLayer.container.removeChild(m.container);
+        m.destroy();
+      });
+      monsterMapRef.current.clear();
+      arpgEngineRef.current = createArpgEngine();
+      monsterInstancesRef.current.clear();
+
+      // Reset camera to new player position
+      const pos = state.playerPosition;
+      if (playerEntityRef.current) {
+        playerEntityRef.current.updatePosition(pos);
       }
-    );
+      if (pixiAppRef.current) {
+        const { sx, sy } = worldToScreen(pos.x, pos.y);
+        pixiAppRef.current.camera.setTarget(sx, sy);
+        pixiAppRef.current.camera.update(true);
+      }
+
+      // Load monster templates for this area
+      const char = useGameStore.getState().character;
+      if (char) {
+        const areaId = char.currentFloor != null
+          ? `${char.currentRegion}-${char.currentFloor}f`
+          : char.currentRegion;
+        db.monsterTemplates.where('area').equals(areaId).toArray().then(templates => {
+          areaTemplatesRef.current = templates;
+        });
+      }
+    });
     return unsubscribe;
   }, []);
 
@@ -230,8 +249,8 @@ function tickArpgCombatLoop(
     deltaMs,
   });
 
-  // If player FSM is idle and autoMove, find next target
-  if (engine.playerCtx.state === 'idle' && mapStore.autoMove && !mapStore.isMoving) {
+  // If player FSM is idle and autoMove (not paused), find next target
+  if (engine.playerCtx.state === 'idle' && mapStore.autoMove && !mapStore.isMoving && !monsterStore.paused) {
     useMapControlStore.getState().pickRandomTarget();
   }
 
@@ -240,8 +259,6 @@ function tickArpgCombatLoop(
   for (const event of events) {
     switch (event.type) {
       case 'player_attack': {
-        // Don't attack when paused (recovering HP/MP)
-        if (monsterStore.paused) break;
         const result = processPlayerAttack(event, {
           character: gameState.character,
           equippedGear: allGear,
@@ -255,7 +272,8 @@ function tickArpgCombatLoop(
         for (const dmg of result.damages) {
           if (dmg.killed) {
             const inst = monsterInstances.get(dmg.targetId);
-            if (inst) handleMonsterDeath(inst);
+            const monsterIdx = monsterStore.monsters.findIndex(m => m.id === dmg.targetId);
+            if (inst) handleMonsterDeath(inst, monsterIdx, dmg.targetId);
             monsterInstances.delete(dmg.targetId);
             const currentMonsters = useMapMonsterStore.getState().monsters;
             useMapMonsterStore.setState({
@@ -300,11 +318,62 @@ function tickArpgCombatLoop(
             const adj = findAdjacentWalkable(map, targetTile, mapCtrl.playerPosition);
             if (adj) {
               useMapControlStore.getState().moveToTarget(adj);
+            } else {
+              // Can't reach target — reset FSM to pick a different target
+              engine.playerCtx.targetMonsterId = null;
+              engine.playerCtx.state = 'idle';
             }
           }
         }
         break;
       }
+    }
+  }
+
+  if (logs.length > 0) {
+    const existing = useGameStore.getState().combatLogs;
+    useGameStore.setState({
+      combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
+    });
+  }
+
+  // === DoT tick (every 1000ms) ===
+  if (consumeDotTick()) {
+    processDotTick(monsterInstances);
+  }
+}
+
+function processDotTick(monsterInstances: Map<string, MonsterInstance>) {
+  const gs = useGameStore.getState();
+  const now = Date.now();
+  const dotEffects = gs.activeEffects.filter(
+    e => e.type === 'debuff' && e.target === 'monster' && e.dot && now < e.startTime + e.duration
+  );
+
+  if (dotEffects.length === 0) return;
+
+  const logs: { text: string; type: string }[] = [];
+  const monsterStore = useMapMonsterStore.getState();
+
+  for (const effect of dotEffects) {
+    if (!effect.dot) continue;
+    // Use targetMonsterId for reliable lookup
+    const monsterId = effect.targetMonsterId;
+    if (!monsterId) continue;
+
+    const inst = monsterInstances.get(monsterId);
+    if (!inst || inst.currentHp <= 0) continue;
+
+    inst.currentHp = Math.max(0, inst.currentHp - effect.dot.damage);
+    logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'dot' });
+
+    if (inst.currentHp <= 0) {
+      const monsterIdx = monsterStore.monsters.findIndex(m => m.id === monsterId);
+      handleMonsterDeath(inst, monsterIdx, monsterId);
+      monsterInstances.delete(monsterId);
+      useMapMonsterStore.setState({
+        monsters: monsterStore.monsters.filter(m => m.id !== monsterId),
+      });
     }
   }
 
@@ -368,24 +437,35 @@ function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemplate[])
   };
 }
 
-function handleMonsterDeath(monster: MonsterInstance) {
-  const gs = useGameStore.getState();
-  const char = gs.character;
-  if (!char) return;
+function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monsterId?: string) {
+  const get = useGameStore.getState;
+  const set = (s: any) => useGameStore.setState(s);
+  const gs = get();
+  if (!gs.character) return;
 
-  const gold = Math.floor(Math.random() * monster.level * 5) + 1;
-  const updatedChar = addExp({ ...char, gold: (char.gold ?? 0) + gold }, monster.exp);
+  const allGear = Object.values(gs.equippedGear).filter(Boolean) as any[];
+  const monsters = [monster];
 
-  useGameStore.setState({ character: updatedChar });
+  const result = processMonsterDeath(get, set, monsters, 0, { ...gs.character }, [...gs.combatLogs], allGear);
 
-  const existing = useGameStore.getState().combatLogs;
-  useGameStore.setState({
-    combatLogs: [
-      ...existing.slice(-198),
-      { text: `獲得 ${monster.exp} 經驗值`, type: 'reward' },
-      { text: `獲得 ${gold} 金幣`, type: 'reward' },
-    ],
+  set({
+    character: result.char,
+    combatLogs: result.logs.slice(-200),
   });
+
+  // Clear debuffs on this monster (use ID if available, fallback to index)
+  const effects = get().activeEffects;
+  const cleaned = effects.filter(e => {
+    if (e.target !== 'monster') return true;
+    if (monsterId && e.targetMonsterId) return e.targetMonsterId !== monsterId;
+    return e.targetIdx !== monsterIdx;
+  });
+  if (cleaned.length !== effects.length) {
+    set({ activeEffects: cleaned });
+  }
+
+  // Auto-save after kill
+  useGameStore.getState().saveState();
 }
 
 function handlePlayerDeath() {
@@ -393,16 +473,33 @@ function handlePlayerDeath() {
   const char = gs.character;
   if (!char) return;
 
+  const nearestTown = getNearestTown(char.currentRegion);
+
+  const updatedChar = {
+    ...char,
+    hp: Math.floor(char.maxHp * 0.5),
+    currentArea: nearestTown.id,
+    currentRegion: nearestTown.id,
+    currentFloor: null,
+    currentZone: nearestTown.zoneId,
+    areaEnteredAt: Date.now(),
+    mapPositionX: undefined,
+    mapPositionY: undefined,
+  };
+
+  const stats = { ...gs.statistics, deathCount: gs.statistics.deathCount + 1 };
+
   useGameStore.setState({
-    character: { ...char, hp: Math.floor(char.maxHp * 0.3) },
+    character: updatedChar,
     combatLogs: [
       ...gs.combatLogs.slice(-199),
-      { text: '你倒下了 — 已傳送至最近城鎮', type: 'system' },
+      { text: `你倒下了...傳送至${nearestTown.name}`, type: 'system' },
     ],
+    statistics: stats,
   });
 
   useMapMonsterStore.getState().clearAll();
-  useMapMonsterStore.getState().setPaused(true);
+  useGameStore.getState().saveState();
 }
 
 // === Sprite Sync ===

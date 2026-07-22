@@ -11,8 +11,12 @@ import {
   calculateSkillAttack,
   calculatePhysicalSkillHit,
   calculateMonsterAttack,
+  calculateBasePhysicalDamage,
   hasActiveFireEnchant,
+  getAffixBonusesFromGear,
 } from './combat';
+import { useGameStore, getEffectiveMaxHp } from '../stores/gameStore';
+import { getSkillTemplate } from '../models/skillTemplate';
 
 export interface ArpgEventContext {
   character: Character;
@@ -55,6 +59,67 @@ export function processPlayerAttack(
   const weapon = equippedGear[0] ?? null;
 
   const skill = event.skill;
+
+  // Handle buff/heal skills — these target the player, not monsters
+  if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
+    const now = Date.now();
+    const gs = useGameStore.getState();
+    const skillIdx = gs.skills.findIndex(s => s.id === skill.id);
+
+    if (skill.type === 'buff') {
+      const template = getSkillTemplate(skill.id);
+      const buffDuration = template?.buffDuration ?? skill.buffDuration;
+      const newChar = { ...character, mp: character.mp - skill.mpCost };
+      const newSkills = [...gs.skills];
+      if (skillIdx >= 0) newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
+
+      if (buffDuration) {
+        const buffEffect: ActiveEffect = {
+          id: `buff-${skill.id}-${now}`,
+          sourceSkillId: skill.id,
+          sourceSkillName: skill.name,
+          category: template?.buffCategory ?? skill.buffCategory ?? skill.id,
+          type: 'buff',
+          target: 'player',
+          modifiers: template?.buffModifiers ?? skill.buffModifiers ?? [],
+          startTime: now,
+          duration: buffDuration,
+          tags: [],
+          name: skill.name,
+          description: template?.buffEffect ?? skill.buffEffect ?? '',
+        };
+
+        if (skill.cleanse) {
+          const cleansed = gs.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
+          useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: cleansed });
+        } else {
+          const filtered = gs.activeEffects.filter(
+            e => !(e.type === 'buff' && e.category === buffEffect.category && e.target === 'player')
+          );
+          useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: [...filtered, buffEffect] });
+        }
+      } else {
+        useGameStore.setState({ character: newChar, skills: newSkills });
+      }
+
+      logs.push({ text: `施放 ${skill.name}`, type: 'player' });
+    } else if (skill.type === 'heal' && skill.healAmount) {
+      const allGear = Object.values(gs.equippedGear).filter(Boolean) as EquipmentInstance[];
+      const healBonuses = getAffixBonusesFromGear(allGear);
+      const effMaxHp = getEffectiveMaxHp(character, gs.equippedGear);
+      const effectiveHeal = Math.floor(skill.healAmount * (1 + healBonuses.heal_effect / 100));
+      const healed = Math.min(effMaxHp - character.hp, effectiveHeal);
+
+      const newChar = { ...character, hp: character.hp + healed, mp: character.mp - skill.mpCost };
+      const newSkills = [...gs.skills];
+      if (skillIdx >= 0) newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
+
+      useGameStore.setState({ character: newChar, skills: newSkills });
+      logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
+    }
+
+    return { damages: [], logs, skillUsed: skill };
+  }
 
   for (const targetId of event.targetMonsterIds) {
     const monster = ctx.monsterInstances.get(targetId);
@@ -122,6 +187,48 @@ export function processPlayerAttack(
 
     const killed = monster.currentHp <= 0;
 
+    // On-hit poison trigger (normal attack + Envenom buff active)
+    if (event.action.type === 'normal_attack' && !isMiss && !killed) {
+      const poisonBuff = activeEffects.find(
+        e => e.type === 'buff' && e.target === 'player' && e.category === 'poison-enchant'
+      );
+      if (poisonBuff) {
+        const now = Date.now();
+        const gs = useGameStore.getState();
+        const alreadyPoisoned = gs.activeEffects.some(
+          e => e.type === 'debuff' && e.category === 'poison' && e.target === 'monster' && e.targetMonsterId === targetId
+        );
+        if (!alreadyPoisoned) {
+          const envenomTemplate = getSkillTemplate('envenom');
+          const debuff = envenomTemplate?.onHitDebuff;
+          if (debuff) {
+            let dotDmg = debuff.dotDamage ?? 0;
+            if (debuff.dotDamagePercent) {
+              dotDmg = Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuff.dotDamagePercent);
+            }
+            const poisonEffect: ActiveEffect = {
+              id: `debuff-${debuff.category}-${targetId}-${now}`,
+              sourceSkillId: 'envenom',
+              sourceSkillName: '淬毒',
+              category: debuff.category,
+              type: 'debuff',
+              target: 'monster',
+              targetIdx,
+              targetMonsterId: targetId,
+              dot: { damage: dotDmg, element: debuff.dotElement!, interval: debuff.dotInterval!, totalDuration: debuff.dotDuration! },
+              startTime: now,
+              duration: debuff.dotDuration!,
+              tags: debuff.tags,
+              name: debuff.name,
+              description: `每秒 ${dotDmg} 傷害`,
+            };
+            gs.addEffect(poisonEffect);
+            logs.push({ text: `淬毒觸發！${monster.name} ${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
+          }
+        }
+      }
+    }
+
     damages.push({ targetId, damage, isCrit, isMiss, killed });
 
     // Build log
@@ -130,16 +237,84 @@ export function processPlayerAttack(
       logs.push({ text: `${actionName} ${monster.name} MISS！`, type: 'miss' });
     } else {
       const critText = isCrit ? '（暴擊）' : '';
-      logs.push({ text: `對 ${monster.name} 造成 ${damage} 傷害${critText}`, type: 'player' });
+      logs.push({ text: `${actionName} 對 ${monster.name} 造成 ${damage} 傷害${critText}`, type: 'player' });
       if (killed) {
         logs.push({ text: `${monster.name} 被擊敗！`, type: 'system' });
+      }
+
+      // Apply skill debuff on hit (DoT or stat modifier)
+      if (!killed && skill?.applyDebuff) {
+        const debuffDef = skill.applyDebuff;
+        const now = Date.now();
+        const gs = useGameStore.getState();
+
+        // Check if same category debuff already active on this target
+        const alreadyActive = gs.activeEffects.some(
+          e => e.type === 'debuff' && e.category === debuffDef.category && e.target === 'monster' && e.targetMonsterId === targetId
+        );
+
+        if (!alreadyActive) {
+          if (debuffDef.dotDamage || debuffDef.dotDamagePercent) {
+            // DoT debuff (snapshot damage at cast time)
+            const baseDmg = debuffDef.dotDamagePercent
+              ? Math.floor(damage * debuffDef.dotDamagePercent / 100)
+              : debuffDef.dotDamage ?? 0;
+
+            const debuffEffect: ActiveEffect = {
+              id: `debuff-${debuffDef.category}-${targetId}-${now}`,
+              sourceSkillId: skill.id,
+              sourceSkillName: skill.name,
+              category: debuffDef.category,
+              type: 'debuff',
+              target: 'monster',
+              targetIdx,
+              targetMonsterId: targetId,
+              dot: { damage: baseDmg, element: debuffDef.dotElement, interval: debuffDef.dotInterval ?? 1000, totalDuration: debuffDef.dotDuration ?? 5000 },
+              startTime: now,
+              duration: debuffDef.dotDuration ?? 5000,
+              tags: debuffDef.tags,
+              name: debuffDef.name,
+              description: `每秒 ${baseDmg} 傷害`,
+            };
+            gs.addEffect(debuffEffect);
+            logs.push({ text: `${monster.name} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'player' });
+          } else if (debuffDef.modifiers && debuffDef.duration) {
+            // Stat modifier debuff
+            const debuffEffect: ActiveEffect = {
+              id: `debuff-${debuffDef.category}-${targetId}-${now}`,
+              sourceSkillId: skill.id,
+              sourceSkillName: skill.name,
+              category: debuffDef.category,
+              type: 'debuff',
+              target: 'monster',
+              targetIdx,
+              targetMonsterId: targetId,
+              modifiers: debuffDef.modifiers,
+              startTime: now,
+              duration: debuffDef.duration,
+              tags: debuffDef.tags,
+              name: debuffDef.name,
+              description: debuffDef.description,
+            };
+            gs.addEffect(debuffEffect);
+            logs.push({ text: `${monster.name} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'player' });
+          }
+        }
       }
     }
   }
 
-  // Update skill cooldown
+  // Update skill cooldown in store
   if (skill) {
-    skill.lastUsedAt = Date.now();
+    const now = Date.now();
+    const gs = useGameStore.getState();
+    const skillIdx = gs.skills.findIndex(s => s.id === skill.id);
+    if (skillIdx >= 0) {
+      const newSkills = [...gs.skills];
+      newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
+      const newChar = { ...gs.character!, mp: gs.character!.mp - skill.mpCost };
+      useGameStore.setState({ skills: newSkills, character: newChar });
+    }
   }
 
   return { damages, logs, skillUsed: skill };

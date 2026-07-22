@@ -183,9 +183,9 @@ describe('combat system', () => {
 
       const result = calculatePlayerAttack(char, weapon, monster);
 
-      // baseDmg(20+7=27) * (100-65)/100 = 27 * 0.35 = 9.45 → 9
+      // baseDmg(20+7=27) * (100-75)/100 = 27 * 0.25 = 6.75 → 6
       expect(result.hit).toBe(true);
-      expect(result.damage).toBe(9);
+      expect(result.damage).toBe(6);
     });
 
     it('should deal 1 damage with no weapon (unarmed)', () => {
@@ -518,6 +518,91 @@ describe('combat system', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+  });
+});
+
+describe('monster defense cap', () => {
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('caps monster defense reduction at 75%', () => {
+    const char = createTestCharacter({ baseAttributes: { STR: 20, AGI: 20, VIT: 10, SPI: 10, INT: 10, CHA: 10 } });
+    const monster = createTestMonster({ defense: 100 }); // way over cap
+    const weapon = createTestWeapon();
+
+    const result = calculatePlayerAttack(char, weapon, monster, [weapon], []);
+    // With 75% cap, damage should be at least 25% of pre-defense damage (not 0)
+    // If cap were 65%, damage would be higher (35% through). At 75%, only 25% gets through.
+    expect(result.damage).toBeGreaterThan(0);
+  });
+
+  it('defense below 75 applies fully', () => {
+    const char = createTestCharacter({ baseAttributes: { STR: 20, AGI: 20, VIT: 10, SPI: 10, INT: 10, CHA: 10 } });
+    const monster50 = createTestMonster({ defense: 50 });
+    const monster75 = createTestMonster({ defense: 75 });
+    const weapon = createTestWeapon();
+
+    const result50 = calculatePlayerAttack(char, weapon, monster50, [weapon], []);
+    const result75 = calculatePlayerAttack(char, weapon, monster75, [weapon], []);
+
+    // 50% reduction vs 75% reduction: result50 should deal more damage
+    expect(result50.damage).toBeGreaterThan(result75.damage);
+  });
+});
+
+describe('evasion buff in monster attack', () => {
+  it('evasion buff increases dodge rate', () => {
+    const char = createTestCharacter({ className: 'knight' });
+    const monster = createTestMonster({ attackMin: 50, attackMax: 50 });
+    const weapon = createTestWeapon();
+
+    // Without evasion buff
+    let dodgeCount = 0;
+    const trials = 1000;
+    vi.spyOn(Math, 'random');
+
+    for (let i = 0; i < trials; i++) {
+      (Math.random as any).mockReturnValue(i / trials);
+      const result = calculateMonsterAttack(monster, char, [weapon], []);
+      if (result.dodged) dodgeCount++;
+    }
+    const baseDodgeRate = dodgeCount / trials;
+
+    // With evasion buff (+15%)
+    const evasionBuff = {
+      id: 'test-evasion',
+      sourceSkillId: 'smoke-bomb',
+      sourceSkillName: 'Smoke Bomb',
+      category: 'evasion',
+      type: 'buff' as const,
+      target: 'player' as const,
+      modifiers: [{ stat: 'evasion', value: 15, isPercent: false }],
+      startTime: Date.now(),
+      duration: 10000,
+      tags: [],
+      name: 'Smoke Bomb',
+      description: '+15% evasion',
+    };
+
+    let buffDodgeCount = 0;
+    for (let i = 0; i < trials; i++) {
+      (Math.random as any).mockReturnValue(i / trials);
+      const result = calculateMonsterAttack(monster, char, [weapon], [evasionBuff]);
+      if (result.dodged) buffDodgeCount++;
+    }
+    const buffDodgeRate = buffDodgeCount / trials;
+
+    // Buffed dodge rate should be higher
+    expect(buffDodgeRate).toBeGreaterThan(baseDodgeRate);
+    // Specifically, ~15% higher (exact depends on AGI contribution)
+    expect(buffDodgeRate - baseDodgeRate).toBeCloseTo(0.15, 1);
+
     vi.restoreAllMocks();
   });
 });

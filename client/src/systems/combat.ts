@@ -270,7 +270,7 @@ export function calculatePlayerAttack(
   // Monster defense reduction (last, with debuff)
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
-  const monsterReduction = Math.min(effectiveMonsterDef, 65);
+  const monsterReduction = Math.min(effectiveMonsterDef, 75);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -340,7 +340,7 @@ export function calculatePhysicalSkillHit(
   // Monster defense reduction (last, with debuff)
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef2 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
-  const monsterReduction = Math.min(effectiveMonsterDef2, 65);
+  const monsterReduction = Math.min(effectiveMonsterDef2, 75);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -384,7 +384,7 @@ export function calculateSkillAttack(
   // Monster defense reduction (last, with debuff)
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef3 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
-  const monsterReduction = Math.min(effectiveMonsterDef3, 65);
+  const monsterReduction = Math.min(effectiveMonsterDef3, 75);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -425,7 +425,18 @@ export function calculateMonsterAttack(
   const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
   const finalDefense = Math.floor(rawDefense * (1 + bonuses.defense / 100));
   const defOverflowDodge = finalDefense > 75 ? Math.floor((finalDefense - 75) / 5) : 0;
-  const dodgeRate = Math.min(35, baseDodge + agiDodge + defOverflowDodge);
+  // Evasion buff bonus (e.g. Smoke Bomb +15%)
+  let evasionBuffBonus = 0;
+  for (const effect of activeEffects) {
+    if (effect.type === 'buff' && effect.target === 'player' && effect.modifiers) {
+      for (const mod of effect.modifiers) {
+        if (mod.stat === 'evasion') {
+          evasionBuffBonus += mod.isPercent ? mod.value : mod.value;
+        }
+      }
+    }
+  }
+  const dodgeRate = Math.min(35, baseDodge + agiDodge + defOverflowDodge + evasionBuffBonus);
 
   const dodged = Math.random() * 100 < dodgeRate;
   if (dodged) {

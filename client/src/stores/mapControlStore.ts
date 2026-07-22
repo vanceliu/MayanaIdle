@@ -36,8 +36,6 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
   loadMap: async (regionId, floor, savedPosition) => {
     const map = await getMapForRegion(regionId, floor);
     if (!map) return;
-    const { currentMap } = get();
-    if (currentMap && currentMap.id === map.id) return;
 
     const startPos = savedPosition && savedPosition.x >= 0 && savedPosition.y >= 0
       ? savedPosition
@@ -46,7 +44,7 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     useMapMonsterStore.getState().clearAll();
 
     set({
-      currentMap: map,
+      currentMap: { ...map },
       playerPosition: { ...startPos },
       targetPosition: null,
       currentPath: [],

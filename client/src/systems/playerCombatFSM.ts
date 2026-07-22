@@ -5,7 +5,7 @@ export type PlayerCombatState = 'idle' | 'chasing' | 'attacking';
 
 export interface PlayerCombatContext {
   state: PlayerCombatState;
-  targetMonsterIdx: number | null;
+  targetMonsterId: string | null;
   attackCooldown: number;
   attackTimer: number;
 }
@@ -13,13 +13,14 @@ export interface PlayerCombatContext {
 export function createPlayerCombatContext(): PlayerCombatContext {
   return {
     state: 'idle',
-    targetMonsterIdx: null,
+    targetMonsterId: null,
     attackCooldown: 1200,
     attackTimer: 0,
   };
 }
 
 export interface MonsterInfo {
+  id: string;
   index: number;
   position: Position;
   alive: boolean;
@@ -58,22 +59,26 @@ export function tickPlayerCombat(
   // No enemies → idle
   if (aliveMonsters.length === 0) {
     ctx.state = 'idle';
-    ctx.targetMonsterIdx = null;
+    ctx.targetMonsterId = null;
     return { action: 'none' };
   }
 
   // Select target if none or current target dead
-  if (ctx.targetMonsterIdx === null || !monsters[ctx.targetMonsterIdx]?.alive) {
+  const currentTarget = ctx.targetMonsterId
+    ? monsters.find(m => m.id === ctx.targetMonsterId)
+    : null;
+
+  if (!currentTarget || !currentTarget.alive) {
     const nearest = findNearestMonster(playerPos, aliveMonsters);
     if (!nearest) {
       ctx.state = 'idle';
-      ctx.targetMonsterIdx = null;
+      ctx.targetMonsterId = null;
       return { action: 'none' };
     }
-    ctx.targetMonsterIdx = nearest.index;
+    ctx.targetMonsterId = nearest.id;
   }
 
-  const target = monsters[ctx.targetMonsterIdx];
+  const target = monsters.find(m => m.id === ctx.targetMonsterId)!;
   const dist = getDistance(playerPos, target.position);
   const inRange = dist <= attackConfig.range;
   const hasLos = hasLineOfSight(playerPos, target.position, map);
@@ -85,7 +90,7 @@ export function tickPlayerCombat(
 
     if (ctx.attackTimer >= ctx.attackCooldown) {
       ctx.attackTimer = 0;
-      return { action: 'attack', attackTargetIdx: ctx.targetMonsterIdx };
+      return { action: 'attack', attackTargetIdx: target.index };
     }
     return { action: 'none' };
   }

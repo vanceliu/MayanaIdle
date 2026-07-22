@@ -43,8 +43,14 @@ export function tickMonsterCombat(
   config: MonsterAttackConfig,
   map: MapData,
   deltaMs: number,
+  isStunned: boolean = false,
 ): MonsterTickResult {
   const dist = getDistance(monsterPos, playerPos);
+
+  // Stunned: can't move or attack
+  if (isStunned) {
+    return { action: 'none' };
+  }
 
   switch (ctx.state) {
     case 'roaming': {

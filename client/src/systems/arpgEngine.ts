@@ -95,6 +95,30 @@ export function tickArpgEngine(
   const weaponType = weapon?.baseType;
   const attackConfig = getWeaponAttackConfig(weaponType);
 
+  // Pre-evaluate script to determine effective attack range
+  // If script would use a ranged skill, extend the range
+  const aliveForScript = Array.from(engine.monsters.values())
+    .filter(m => m.instance.currentHp > 0)
+    .map(m => m.instance);
+
+  if (aliveForScript.length > 0) {
+    const scriptCtx: CombatScriptContext = {
+      character,
+      monsters: aliveForScript,
+      skills,
+      now: Date.now(),
+      cooldownReduction: getSkillCooldownReduction(equippedGear),
+    };
+    const nextAction = evaluateCombatScript(combatRules, scriptCtx);
+    if (nextAction?.type === 'skill' && nextAction.skillId) {
+      const skill = skills.find(s => s.id === nextAction.skillId);
+      if (skill && skill.type === 'attack') {
+        attackConfig.range = Math.max(attackConfig.range, 20);
+        attackConfig.attackType = 'ranged';
+      }
+    }
+  }
+
   // Update player attack cooldown from gear
   engine.playerCtx.attackCooldown = getPlayerAttackInterval(equippedGear, activeEffects);
 
@@ -102,6 +126,7 @@ export function tickArpgEngine(
   const monsterInfos: MonsterInfo[] = [];
   for (const [id, arpgMonster] of engine.monsters) {
     monsterInfos.push({
+      id,
       index: monsterInfos.length,
       position: arpgMonster.mapMonster.position,
       alive: arpgMonster.instance.currentHp > 0,
@@ -123,7 +148,7 @@ export function tickArpgEngine(
   }
 
   if (playerResult.action === 'attack') {
-    // Use script to decide skill
+    // Use combat script to decide attack action
     const aliveMonsters = Array.from(engine.monsters.values())
       .filter(m => m.instance.currentHp > 0)
       .map(m => m.instance);
@@ -139,26 +164,46 @@ export function tickArpgEngine(
     const scriptAction = evaluateCombatScript(combatRules, scriptCtx);
     const action: CombatAction = scriptAction ?? { type: 'normal_attack' };
 
-    // Determine targets
-    const targetIds = resolveTargets(engine, action, skills, playerPos, input);
-
-    if (targetIds.length > 0) {
-      const skill = action.type === 'skill'
-        ? skills.find(s => s.id === action.skillId)
-        : undefined;
-
-      events.push({
-        type: 'player_attack',
-        action,
-        targetMonsterIds: targetIds,
-        skill,
-      });
+    if (action.type === 'skill' && action.skillId) {
+      const skill = skills.find(s => s.id === action.skillId);
+      if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
+        events.push({
+          type: 'player_attack',
+          action,
+          targetMonsterIds: [],
+          skill,
+        });
+      } else {
+        const targetIds = resolveTargets(engine, action, skills, playerPos, input);
+        if (targetIds.length > 0) {
+          events.push({
+            type: 'player_attack',
+            action,
+            targetMonsterIds: targetIds,
+            skill,
+          });
+        }
+      }
+    } else {
+      const targetIds = resolveTargets(engine, action, skills, playerPos, input);
+      if (targetIds.length > 0) {
+        events.push({
+          type: 'player_attack',
+          action,
+          targetMonsterIds: targetIds,
+        });
+      }
     }
   }
 
   // Tick each monster FSM
   for (const [id, arpgMonster] of engine.monsters) {
     if (arpgMonster.instance.currentHp <= 0) continue;
+
+    // Check if this monster is stunned
+    const isStunned = activeEffects.some(
+      e => e.type === 'debuff' && e.target === 'monster' && e.stun && e.targetMonsterId === id
+    );
 
     const result = tickMonsterCombat(
       arpgMonster.combatCtx,
@@ -167,6 +212,7 @@ export function tickArpgEngine(
       arpgMonster.attackConfig,
       map,
       deltaMs,
+      isStunned,
     );
 
     if (result.action === 'attack') {
@@ -230,13 +276,13 @@ function resolveTargets(
   if (aliveMonsters.length === 0) return [];
 
   // Find primary target (nearest or FSM selected)
-  const targetIdx = engine.playerCtx.targetMonsterIdx;
+  const targetMonsterId = engine.playerCtx.targetMonsterId;
   let primaryId: string | null = null;
 
-  if (targetIdx !== null) {
-    const monsterEntries = Array.from(engine.monsters.entries());
-    if (targetIdx < monsterEntries.length) {
-      primaryId = monsterEntries[targetIdx][0];
+  if (targetMonsterId && engine.monsters.has(targetMonsterId)) {
+    const m = engine.monsters.get(targetMonsterId)!;
+    if (m.instance.currentHp > 0) {
+      primaryId = targetMonsterId;
     }
   }
 
@@ -273,36 +319,38 @@ function resolveTargets(
       const aoeRadius = skill.aoeMax ?? 3;
       const maxTargets = skill.aoeMax ?? 3;
 
-      // Determine center
-      const primaryMonster = engine.monsters.get(primaryId);
-      if (!primaryMonster) return [primaryId];
+      // Determine AOE center mode:
+      // self-centered: melee-range AOE skills (e.g. ice nova, war cry)
+      // target-centered: ranged AOE skills (e.g. fireball, tornado)
+      const isSelfCentered = skill.aoeMin !== undefined && skill.aoeMin <= 1;
 
-      // Check if this is self-centered (melee AOE like ice nova)
-      // Heuristic: if skill has no projectile concept and is short range, it's self-centered
-      const isSelfCentered = skill.element !== 'none' && !skill.power; // Will refine later
-      // For now: use target-centered for all AOE skills
-      const center = primaryMonster.mapMonster.position;
+      if (isSelfCentered) {
+        // Self-centered: find all alive monsters within aoeRadius of player (no max limit)
+        const allInRange = aliveMonsters
+          .filter(([, m]) => getDistance(playerPos, m.mapMonster.position) <= aoeRadius)
+          .map(([id]) => id);
+        return allInRange;
+      } else {
+        // Target-centered: primary target + nearby within aoeRadius, up to maxTargets
+        const primaryMonster = engine.monsters.get(primaryId);
+        if (!primaryMonster) return [primaryId];
 
-      const candidates = aliveMonsters
-        .filter(([id]) => id !== primaryId)
-        .map(([id, m], idx) => ({
-          position: m.mapMonster.position,
-          index: idx,
-          id,
-        }));
+        const center = primaryMonster.mapMonster.position;
+        const candidates = aliveMonsters
+          .filter(([id]) => id !== primaryId)
+          .map(([id, m]) => ({
+            position: m.mapMonster.position,
+            id,
+          }));
 
-      const nearbyIndices = findTargetsInRadius(
-        center,
-        aoeRadius,
-        candidates.map((c, i) => ({ position: c.position, index: i })),
-        maxTargets - 1, // -1 because primary is already included
-      );
+        const nearby = candidates
+          .filter(c => getDistance(center, c.position) <= aoeRadius)
+          .sort((a, b) => getDistance(center, a.position) - getDistance(center, b.position))
+          .slice(0, maxTargets - 1)
+          .map(c => c.id);
 
-      const targetIds = [primaryId];
-      for (const idx of nearbyIndices) {
-        targetIds.push(candidates[idx].id);
+        return [primaryId, ...nearby];
       }
-      return targetIds;
     }
   }
 

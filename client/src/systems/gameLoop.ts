@@ -7,19 +7,39 @@ import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/ga
 import { calculatePressure } from './pressure';
 import { findPath, findAdjacentWalkable } from './pathfinding';
 import { TileType } from '../models/mapControl';
+import { evaluateCombatScript } from './scriptRunner';
+import { getSkillCooldownReduction } from './combat';
+import { canUseSkill } from '../models/skill';
 
 const ATTACK_RANGE_MELEE = 1.5;
 const ATTACK_RANGE_RANGED = 20;
+const DOT_TICK_INTERVAL = 1000;
 
 export const occupation = new OccupationManager();
+
+let dotTickTimer = 0;
+let pauseLogShown = false;
+let combatInterruptLogShown = false;
 
 function getPlayerAttackRange(gameState: ReturnType<typeof useGameStore.getState>): number {
   const weapon = Object.values(gameState.equippedGear).find(g => g && (g as any).slot === 'rightHand') as any;
   const weaponType = weapon?.baseType;
-  if (weaponType === 'bow') {
-    return ATTACK_RANGE_RANGED;
+  let range = weaponType === 'bow' ? ATTACK_RANGE_RANGED : ATTACK_RANGE_MELEE;
+
+  // Check if a ranged skill is ready — if so, use its range
+  if (gameState.character && gameState.skills.length > 0) {
+    const allGear = Object.values(gameState.equippedGear).filter(Boolean) as any[];
+    const cdr = getSkillCooldownReduction(allGear);
+    const now = Date.now();
+    for (const skill of gameState.skills) {
+      if (skill.type === 'attack' && canUseSkill(skill, gameState.character.mp, now, cdr)) {
+        range = Math.max(range, ATTACK_RANGE_RANGED);
+        break;
+      }
+    }
   }
-  return ATTACK_RANGE_MELEE;
+
+  return range;
 }
 
 export function gameLoopTick(deltaMs: number) {
@@ -55,12 +75,52 @@ export function gameLoopTick(deltaMs: number) {
   const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
   const belowThreshold = hpPct <= gameState.afterCombatHpThreshold || mpPct <= gameState.afterCombatMpThreshold;
 
-  if (belowThreshold && !monsterStore.paused) {
+  // Only trigger pause in idle state (no nearby monsters in attack range)
+  const hasNearbyMonster = monsterStore.monsters.some(m => {
+    const dx = m.position.x - playerPos.x;
+    const dy = m.position.y - playerPos.y;
+    return Math.sqrt(dx * dx + dy * dy) <= ATTACK_RANGE_MELEE;
+  });
+  const isIdle = !hasNearbyMonster;
+
+  if (belowThreshold && !monsterStore.paused && isIdle) {
     monsterStore.setPaused(true);
     useMapControlStore.getState().setAutoMove(false);
+    const existing = useGameStore.getState().combatLogs;
+    useGameStore.setState({
+      combatLogs: [...existing.slice(-199), { text: 'HP/MP 低於門檻，等待恢復中...', type: 'system' }],
+    });
+    pauseLogShown = true;
+  } else if (belowThreshold && monsterStore.paused && !pauseLogShown) {
+    // Already paused on load — show log once
+    const existing = useGameStore.getState().combatLogs;
+    useGameStore.setState({
+      combatLogs: [...existing.slice(-199), { text: 'HP/MP 低於門檻，等待恢復中...', type: 'system' }],
+    });
+    pauseLogShown = true;
   } else if (!belowThreshold && monsterStore.paused) {
     monsterStore.setPaused(false);
-    useMapControlStore.getState().setAutoMove(true);
+    if (gameState.searchMode === 'auto') {
+      useMapControlStore.getState().setAutoMove(true);
+    }
+    const existing = useGameStore.getState().combatLogs;
+    useGameStore.setState({
+      combatLogs: [...existing.slice(-199), { text: '恢復完畢，繼續探索', type: 'system' }],
+    });
+    pauseLogShown = false;
+  }
+
+  // Pause interrupted by monster approaching
+  if (monsterStore.paused && hasNearbyMonster && !combatInterruptLogShown) {
+    const existing = useGameStore.getState().combatLogs;
+    useGameStore.setState({
+      combatLogs: [...existing.slice(-199), { text: '等待被打斷，進入戰鬥中', type: 'system' }],
+    });
+    combatInterruptLogShown = true;
+  } else if (monsterStore.paused && !hasNearbyMonster) {
+    combatInterruptLogShown = false;
+  } else if (!monsterStore.paused) {
+    combatInterruptLogShown = false;
   }
 
   // === Spawn monsters (only if player is not in recovery) ===
@@ -73,10 +133,39 @@ export function gameLoopTick(deltaMs: number) {
   // === Move monsters (always, not affected by player pause) ===
   moveMonstersSafe(deltaMs, map, playerPos, monsterStore);
 
-  // === Move player (only if not paused) ===
-  if (!monsterStore.paused) {
-    movePlayerSafe(deltaMs, map);
+  // === Move player (always allow movement for manual click) ===
+  movePlayerSafe(deltaMs, map);
+
+  // === DoT tick + effect expiration ===
+  tickDotsAndEffects(deltaMs);
+}
+
+function tickDotsAndEffects(deltaMs: number) {
+  const now = Date.now();
+  const gs = useGameStore.getState();
+
+  // Clear expired effects
+  const activeEffects = gs.activeEffects;
+  const stillActive = activeEffects.filter(e => now < e.startTime + e.duration);
+  if (stillActive.length !== activeEffects.length) {
+    useGameStore.setState({ activeEffects: stillActive });
   }
+
+  // DoT timer accumulation (actual DoT damage is processed in tickArpgCombatLoop)
+  dotTickTimer += deltaMs;
+  if (dotTickTimer >= DOT_TICK_INTERVAL) {
+    dotTickTimer = 0;
+    dotTickReady = true;
+  }
+}
+
+export let dotTickReady = false;
+export function consumeDotTick(): boolean {
+  if (dotTickReady) {
+    dotTickReady = false;
+    return true;
+  }
+  return false;
 }
 
 function movePlayerSafe(deltaMs: number, map: MapData) {
