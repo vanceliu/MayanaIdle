@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Position, MapData } from '../models/mapControl';
 import { TileType } from '../models/mapControl';
 import { getMapForRegion } from '../models/mapDataControl';
-import { findPath, findNearestWalkable, getRandomWalkablePosition } from '../systems/pathfinding';
+import { findPath, findNearestWalkable, findAdjacentWalkable, getRandomWalkablePosition } from '../systems/pathfinding';
 import { useMapMonsterStore } from './mapMonsterStore';
 
 export interface MapControlState {
@@ -59,10 +59,9 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     const { currentMap, playerPosition, isMoving } = get();
     if (!currentMap) return;
 
-    let startPos = playerPosition;
-    if (isMoving) {
-      startPos = { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) };
-    }
+    const startTile = isMoving
+      ? { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) }
+      : playerPosition;
 
     let finalTarget = target;
     if (currentMap.tiles[target.y]?.[target.x] === TileType.Wall) {
@@ -71,11 +70,10 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       finalTarget = nearest;
     }
 
-    const path = findPath(currentMap, startPos, finalTarget);
+    const path = findPath(currentMap, startTile, finalTarget);
     if (!path || path.length === 0) return;
 
     set({
-      playerPosition: startPos,
       targetPosition: finalTarget,
       currentPath: path,
       pathIndex: 0,
@@ -122,17 +120,21 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
           nearest = m;
         }
       }
-      const monsterTarget = { x: Math.round(nearest.position.x), y: Math.round(nearest.position.y) };
-      const path = findPath(currentMap, snappedPos, monsterTarget);
-      if (path && path.length > 0) {
-        set({
-          playerPosition: snappedPos,
-          targetPosition: monsterTarget,
-          currentPath: path,
-          pathIndex: 0,
-          isMoving: true,
-        });
-        return;
+      const monsterTile = { x: Math.round(nearest.position.x), y: Math.round(nearest.position.y) };
+      // Move to adjacent tile of monster, not the monster's tile
+      const adjTarget = findAdjacentWalkable(currentMap, monsterTile, snappedPos);
+      if (adjTarget) {
+        const path = findPath(currentMap, snappedPos, adjTarget);
+        if (path && path.length > 0) {
+          set({
+            playerPosition: snappedPos,
+            targetPosition: adjTarget,
+            currentPath: path,
+            pathIndex: 0,
+            isMoving: true,
+          });
+          return;
+        }
       }
     }
 

@@ -1,6 +1,7 @@
 export type MonsterSize = 'small' | 'large';
 export type ElementType = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark' | 'none';
 export type MonsterRace = 'normal' | 'undead' | 'demon' | 'dragon';
+export type MonsterAttackType = 'melee' | 'ranged';
 
 export interface MonsterTemplate {
   id?: number;
@@ -16,6 +17,10 @@ export interface MonsterTemplate {
   element: ElementType;
   area: string;
   isBoss: boolean;
+  attackType?: MonsterAttackType;
+  attackRange?: number;
+  attackInterval?: number;
+  projectileSpeed?: number;
 }
 
 export interface MonsterInstance {
@@ -32,5 +37,9 @@ export interface MonsterInstance {
   size: MonsterSize;
   element: ElementType;
   isBoss: boolean;
+  attackType: MonsterAttackType;
+  attackRange: number;
+  attackInterval: number;
+  projectileSpeed?: number;
   _processed?: boolean;
 }

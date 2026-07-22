@@ -118,6 +118,13 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
     const updated: MapMonster[] = [];
     const playerSnapped = { x: Math.round(playerPos.x), y: Math.round(playerPos.y) };
 
+    // Build occupation map: tiles occupied by monsters or player
+    const occupied = new Set<string>();
+    occupied.add(`${playerSnapped.x},${playerSnapped.y}`);
+    for (const m of state.monsters) {
+      occupied.add(`${Math.round(m.position.x)},${Math.round(m.position.y)}`);
+    }
+
     for (const monster of state.monsters) {
       if (state.combatMonsterIds.includes(monster.id)) {
         updated.push(monster);
@@ -127,6 +134,17 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       if (distance(monster.position, playerPos) > MAX_TRACK_DISTANCE) {
         continue;
       }
+
+      // Stop moving if already within melee attack range of player
+      if (distance(monster.position, playerPos) <= TRIGGER_DISTANCE) {
+        occupied.add(`${Math.round(monster.position.x)},${Math.round(monster.position.y)}`);
+        updated.push(monster);
+        continue;
+      }
+
+      // Remove self from occupied for pathfinding purposes
+      const selfTile = `${Math.round(monster.position.x)},${Math.round(monster.position.y)}`;
+      occupied.delete(selfTile);
 
       let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos, moveTimer } = monster;
       pathRecalcTimer += deltaMs;
@@ -141,7 +159,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
         if (needsRecalc) {
           const monsterSnapped = { x: Math.round(monster.position.x), y: Math.round(monster.position.y) };
-          const newPath = findPath(map, monsterSnapped, playerSnapped);
+          const newPath = findPath(map, monsterSnapped, playerSnapped, occupied);
           if (newPath && newPath.length > 0) {
             path = newPath;
             pathIndex = 0;
@@ -152,6 +170,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
         // Move along A* path
         if (path.length === 0 || pathIndex >= path.length) {
+          occupied.add(selfTile);
           updated.push({ ...monster, path, pathIndex, pathRecalcTimer, lastPathPlayerPos, moveTimer });
           continue;
         }
@@ -163,6 +182,11 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
         while (remaining > 0 && idx < path.length) {
           const next = path[idx];
+          // Check if next tile is occupied
+          const nextKey = `${Math.round(next.x)},${Math.round(next.y)}`;
+          if (occupied.has(nextKey)) {
+            break; // Stop, tile is taken
+          }
           const dx = next.x - pos.x;
           const dy = next.y - pos.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -178,6 +202,8 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
           }
         }
 
+        // Re-add to occupied with new position
+        occupied.add(`${Math.round(pos.x)},${Math.round(pos.y)}`);
         updated.push({ ...monster, position: pos, path, pathIndex: idx, pathRecalcTimer, lastPathPlayerPos, moveTimer });
       } else {
         // Far from player: greedy one-step with smooth interpolation (no A*)
@@ -197,6 +223,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
             const ny = my + dir.y;
             if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
             if (map.tiles[ny][nx] === 1) continue;
+            if (occupied.has(`${nx},${ny}`)) continue;
             if (dir.x !== 0 && dir.y !== 0) {
               if (map.tiles[my][mx + dir.x] === 1 || map.tiles[my + dir.y][mx] === 1) continue;
             }
@@ -212,6 +239,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
             path = [{ x: bestX, y: bestY }];
             pathIndex = 0;
           } else {
+            occupied.add(selfTile);
             updated.push({ ...monster, path: [], pathIndex: 0, pathRecalcTimer, lastPathPlayerPos, moveTimer });
             continue;
           }
@@ -225,6 +253,10 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
         while (remaining > 0 && idx < path.length) {
           const next = path[idx];
+          const nextKey = `${Math.round(next.x)},${Math.round(next.y)}`;
+          if (occupied.has(nextKey)) {
+            break;
+          }
           const dx = next.x - pos.x;
           const dy = next.y - pos.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -240,6 +272,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
           }
         }
 
+        occupied.add(`${Math.round(pos.x)},${Math.round(pos.y)}`);
         updated.push({ ...monster, position: pos, path, pathIndex: idx, pathRecalcTimer, lastPathPlayerPos, moveTimer });
       }
     }

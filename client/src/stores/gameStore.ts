@@ -1350,6 +1350,10 @@ export async function spawnCombat(get: () => GameState, set: (s: Partial<GameSta
         size: fallback.size,
         element: fallback.element,
         isBoss: fallback.isBoss,
+        attackType: fallback.attackType ?? 'melee',
+        attackRange: fallback.attackRange ?? 1.5,
+        attackInterval: fallback.attackInterval ?? 1200,
+        projectileSpeed: fallback.projectileSpeed,
       });
     } else {
       if (template.isBoss) bossSpawned = true;
@@ -1367,6 +1371,10 @@ export async function spawnCombat(get: () => GameState, set: (s: Partial<GameSta
         size: template.size,
         element: template.element,
         isBoss: template.isBoss,
+        attackType: template.attackType ?? 'melee',
+        attackRange: template.attackRange ?? 1.5,
+        attackInterval: template.attackInterval ?? 1200,
+        projectileSpeed: template.projectileSpeed,
       });
     }
   }
@@ -1414,6 +1422,10 @@ async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>)
       size: template.size,
       element: template.element,
       isBoss: template.isBoss,
+      attackType: template.attackType ?? 'melee',
+      attackRange: template.attackRange ?? 1.5,
+      attackInterval: template.attackInterval ?? 1200,
+      projectileSpeed: template.projectileSpeed,
     });
   }
 
@@ -1434,6 +1446,10 @@ async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>)
       size: template.size,
       element: template.element,
       isBoss: template.isBoss,
+      attackType: template.attackType ?? 'melee',
+      attackRange: template.attackRange ?? 1.5,
+      attackInterval: template.attackInterval ?? 1200,
+      projectileSpeed: template.projectileSpeed,
     });
   }
 
@@ -1477,6 +1493,10 @@ async function addToMapCombat(get: () => GameState, set: (s: Partial<GameState>)
       size: template.size,
       element: template.element,
       isBoss: template.isBoss,
+      attackType: template.attackType ?? 'melee',
+      attackRange: template.attackRange ?? 1.5,
+      attackInterval: template.attackInterval ?? 1200,
+      projectileSpeed: template.projectileSpeed,
     });
   }
 
@@ -1497,6 +1517,10 @@ async function addToMapCombat(get: () => GameState, set: (s: Partial<GameState>)
       size: template.size,
       element: template.element,
       isBoss: template.isBoss,
+      attackType: template.attackType ?? 'melee',
+      attackRange: template.attackRange ?? 1.5,
+      attackInterval: template.attackInterval ?? 1200,
+      projectileSpeed: template.projectileSpeed,
     });
   }
 

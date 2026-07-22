@@ -5,7 +5,7 @@ import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { GameIcon } from './GameIcon';
 import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
-import { MapCanvas } from './MapCanvas';
+import { PixiGame } from './PixiGame';
 import { getRegion, getFloor } from '../models/mapData';
 import { db } from '../db/database';
 
@@ -201,7 +201,7 @@ export function BattleView() {
       </div>
 
       {currentMap && (
-        <MapCanvas />
+        <PixiGame />
       )}
 
       <div className="combat-log compact" ref={logRef}>

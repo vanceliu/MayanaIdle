@@ -33,7 +33,7 @@ const DIRECTIONS: Position[] = [
   { x: -1, y: -1 },
 ];
 
-export function findPath(map: MapData, start: Position, end: Position): Position[] | null {
+export function findPath(map: MapData, start: Position, end: Position, occupied?: Set<string>): Position[] | null {
   if (!isWalkable(map, end.x, end.y)) return null;
   if (start.x === end.x && start.y === end.y) return [];
 
@@ -77,6 +77,8 @@ export function findPath(map: MapData, start: Position, end: Position): Position
       const nKey = `${nx},${ny}`;
 
       if (!isWalkable(map, nx, ny) || closedSet.has(nKey)) continue;
+      // Treat occupied tiles as blocked (except the final destination — movement will stop at adjacent)
+      if (occupied && occupied.has(nKey) && !(nx === end.x && ny === end.y)) continue;
 
       const isDiagonal = dir.x !== 0 && dir.y !== 0;
       if (isDiagonal) {
@@ -102,6 +104,23 @@ export function findPath(map: MapData, start: Position, end: Position): Position
   }
 
   return null;
+}
+
+export function findAdjacentWalkable(map: MapData, target: Position, from: Position): Position | null {
+  let best: Position | null = null;
+  let bestDist = Infinity;
+
+  for (const dir of DIRECTIONS) {
+    const nx = target.x + dir.x;
+    const ny = target.y + dir.y;
+    if (!isWalkable(map, nx, ny)) continue;
+    const d = Math.sqrt((nx - from.x) ** 2 + (ny - from.y) ** 2);
+    if (d < bestDist) {
+      bestDist = d;
+      best = { x: nx, y: ny };
+    }
+  }
+  return best;
 }
 
 export function findNearestWalkable(map: MapData, target: Position): Position | null {
