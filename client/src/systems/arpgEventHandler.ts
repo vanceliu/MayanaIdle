@@ -39,6 +39,7 @@ export interface PlayerAttackResult {
   damages: DamageResult[];
   logs: CombatLog[];
   skillUsed?: Skill;
+  healAmount?: number;
 }
 
 export interface MonsterAttackResult {
@@ -116,6 +117,7 @@ export function processPlayerAttack(
 
       useGameStore.setState({ character: newChar, skills: newSkills });
       logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
+      return { damages: [], logs, skillUsed: skill, healAmount: healed };
     }
 
     return { damages: [], logs, skillUsed: skill };

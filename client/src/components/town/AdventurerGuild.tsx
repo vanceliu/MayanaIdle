@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import type { AdventurerQuest, AdventurerQuestDifficulty } from '../../models/adventurerQuest';
 import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS } from '../../models/adventurerQuest';
@@ -51,6 +51,15 @@ export function AdventurerGuild() {
   const acceptAdventurerQuest = useGameStore(s => s.acceptAdventurerQuest);
   const abandonAdventurerQuest = useGameStore(s => s.abandonAdventurerQuest);
   const completeAdventurerQuest = useGameStore(s => s.completeAdventurerQuest);
+  const initQuestBoard = useGameStore(s => s.initQuestBoard);
+
+  useEffect(() => {
+    const board = useGameStore.getState().adventurerQuestBoard;
+    const isEmpty = Object.values(board).every(quests => quests.length === 0);
+    if (isEmpty) {
+      initQuestBoard();
+    }
+  }, [initQuestBoard]);
 
   const currentBoard = questBoard[activeDifficulty] ?? [];
   const activeCount = activeQuests.length;

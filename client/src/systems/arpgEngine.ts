@@ -63,11 +63,14 @@ export interface PlayerAttackEvent {
   action: CombatAction;
   targetMonsterIds: string[];
   skill?: Skill;
+  attackType?: 'melee' | 'ranged';
 }
 
 export interface MonsterAttackEvent {
   type: 'monster_attack';
   monsterId: string;
+  attackType?: 'melee' | 'ranged';
+  projectileSpeed?: number;
 }
 
 export interface MoveToEvent {
@@ -91,8 +94,8 @@ export function tickArpgEngine(
   syncMonsterContexts(engine, mapMonsters, monsterInstances);
 
   // Determine weapon type for attack config
-  const weapon = equippedGear[0];
-  const weaponType = weapon?.baseType;
+  const weapon = equippedGear.find(g => g && (g.slot === 'rightHand' || g.slot === 'leftHand'));
+  const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const attackConfig = getWeaponAttackConfig(weaponType);
 
   // Pre-evaluate script to determine effective attack range
@@ -172,6 +175,7 @@ export function tickArpgEngine(
           action,
           targetMonsterIds: [],
           skill,
+          attackType: attackConfig.attackType,
         });
       } else {
         const targetIds = resolveTargets(engine, action, skills, playerPos, input);
@@ -181,6 +185,7 @@ export function tickArpgEngine(
             action,
             targetMonsterIds: targetIds,
             skill,
+            attackType: attackConfig.attackType,
           });
         }
       }
@@ -191,6 +196,7 @@ export function tickArpgEngine(
           type: 'player_attack',
           action,
           targetMonsterIds: targetIds,
+          attackType: attackConfig.attackType,
         });
       }
     }
@@ -216,7 +222,12 @@ export function tickArpgEngine(
     );
 
     if (result.action === 'attack') {
-      events.push({ type: 'monster_attack', monsterId: id });
+      events.push({
+        type: 'monster_attack',
+        monsterId: id,
+        attackType: arpgMonster.attackConfig.attackType,
+        projectileSpeed: arpgMonster.instance.projectileSpeed,
+      });
     }
   }
 

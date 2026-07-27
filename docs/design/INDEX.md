@@ -33,6 +33,7 @@
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
 | 戰鬥腳本（自動戰鬥 AI） | `31-battle-script.md` | 全文 |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
+| 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
@@ -129,10 +130,11 @@
 
 | 檔案 | 主題 | 關鍵內容 |
 |---|---|---|
-| `25-monster-system.md` | 怪物系統 | 種族、體型、元素克制 |
+| `25-monster-system.md` | 怪物系統 | 種族、體型（元素已移至 42） |
 | `26-spawn-pressure.md` | 怪物生成 | Pressure 公式、生成數量 |
 | `27-drop-table.md` | 掉落表 | 區域掉落池、Boss 掉落 |
 | `28-monster-stats.md` | 怪物素質 | HP/攻/防/經驗值 |
+| `42-element-system.md` | 元素系統 | 元素類型、克制關係、傷害顏色規則 |
 
 ### 世界與城鎮
 
@@ -199,6 +201,8 @@
                                         27-drop-table.md ←→ 13-town.md（職業工會任務）
 
 25-monster-system.md ←→ 26-spawn-pressure.md ←→ 28-monster-stats.md
+                ↕
+42-element-system.md ←→ 05-skill.md / 22-basic-magic.md / 23-class-magic.md / 40-pixijs-migration.md
                                                         ↕
                                                   27-drop-table.md ←→ 30-items.md
                                                         ↕

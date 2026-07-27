@@ -1,6 +1,7 @@
 import { Graphics, Container } from 'pixi.js';
 import { worldToScreen, getEntityDepth, TILE_H } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
+import { HealthBar } from '../ui/HealthBar';
 
 const MONSTER_COLOR = 0xff6b6b;
 const BOSS_COLOR = 0xcc00cc;
@@ -14,6 +15,7 @@ export class MonsterEntity {
   private glow: Graphics;
   private body: Graphics;
   private isBoss: boolean;
+  private healthBar: HealthBar;
 
   constructor(id: string, isBoss = false) {
     this.id = id;
@@ -35,6 +37,9 @@ export class MonsterEntity {
     if (isBoss) {
       this.drawBossHorns();
     }
+
+    this.healthBar = new HealthBar(isBoss);
+    this.container.addChild(this.healthBar.container);
   }
 
   private drawBossHorns(): void {
@@ -54,7 +59,12 @@ export class MonsterEntity {
     this.container.zIndex = getEntityDepth(pos);
   }
 
+  updateHp(current: number, max: number): void {
+    this.healthBar.update(current, max);
+  }
+
   destroy(): void {
+    this.healthBar.destroy();
     this.container.destroy({ children: true });
   }
 }

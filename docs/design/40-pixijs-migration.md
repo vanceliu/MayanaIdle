@@ -81,13 +81,14 @@ screenY = (worldX + worldY) * (TILE_H / 2)
 
 1. ✅ 點擊事件：DOM click → screenToWorld → moveToTarget
 2. ✅ 攝影機平滑追蹤（lerp 0.1）
-3. ⬜ Viewport 裁剪：只渲染可見範圍內的實體（待優化）
 
-### Phase 5：特效與 UI Overlay（待實作）
+### Phase 5：特效與 UI Overlay（已完成）
 
-1. ⬜ 傷害數字飄動（BitmapText + tween）
-2. ⬜ 怪物血條（Graphics bar 跟隨實體）
-3. ⬜ 技能特效預留（ParticleContainer）
+1. ✅ 傷害數字飄動（Text + tween + 物件池）
+   - 擊中時數字從受擊點向上飄動 40px，alpha 從 1 漸變到 0，0.8 秒後回收
+   - 顏色規則詳見 [`42-element-system.md § 42.3`](42-element-system.md)
+2. ✅ 怪物血條（Graphics bar 跟隨實體）
+3. ✅ 技能特效預留（EffectLayer 架構可擴展）
 
 ## 6. 檔案結構
 
@@ -176,10 +177,9 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 
 ## 12. 後續待做
 
-- [ ] Viewport 裁剪（只渲染可見範圍）
 - [ ] FloorLayer 快取為 RenderTexture（大地圖優化）
-- [ ] 傷害數字飄動動畫
-- [ ] 怪物血條跟隨
-- [ ] 技能特效（粒子系統）
+- [x] 傷害數字飄動動畫
+- [x] 怪物血條跟隨
+- [x] 技能特效預留（架構可擴展）
 - [ ] Sprite sheet 替換幾何圖形（美術資源就緒後）
 - [ ] 手動操作模式 UI（虛擬搖桿、技能按鈕）

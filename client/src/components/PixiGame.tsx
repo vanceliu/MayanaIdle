@@ -18,6 +18,13 @@ import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../syste
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance } from '../models/monster';
+import type { DamageType } from '../pixi/ui/CombatVisualEvent';
+import type { EffectLayer } from '../pixi/layers/EffectLayer';
+
+const PLAYER_PROJECTILE_SPEED = 512;
+const PLAYER_PROJECTILE_COLOR = 0xffffff;
+const MONSTER_PROJECTILE_COLOR = 0xff6b6b;
+const DEFAULT_MONSTER_PROJECTILE_SPEED = 384;
 
 export function PixiGame() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,7 +90,7 @@ export function PixiGame() {
           gameLoopTick(delta);
 
           // 2. ARPG combat
-          tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta);
+          tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta, scene!.effectLayer);
         } catch (e) {
           console.error('[GameLoop] Error:', e);
         }
@@ -98,7 +105,10 @@ export function PixiGame() {
         pixiApp.camera.setTarget(sx, sy);
         pixiApp.camera.update();
 
-        syncMonsters(useMapMonsterStore.getState().monsters, scene!, monsterMapRef.current);
+        syncMonsters(useMapMonsterStore.getState().monsters, scene!, monsterMapRef.current, monsterInstancesRef.current);
+
+        // 4. Effect layer update
+        scene!.effectLayer.update(delta);
 
         const path = useMapControlStore.getState().currentPath;
         const pathIndex = useMapControlStore.getState().pathIndex;
@@ -215,6 +225,7 @@ function tickArpgCombatLoop(
   monsterInstances: Map<string, MonsterInstance>,
   areaTemplates: MonsterTemplate[],
   deltaMs: number,
+  effectLayer?: EffectLayer,
 ) {
   const gameState = useGameStore.getState();
   const mapStore = useMapControlStore.getState();
@@ -269,7 +280,36 @@ function tickArpgCombatLoop(
         });
         logs.push(...result.logs);
 
+        // Emit heal visual event
+        if (result.healAmount && result.healAmount > 0 && effectLayer) {
+          const pPos = useMapControlStore.getState().playerPosition;
+          const { sx, sy } = worldToScreen(pPos.x, pPos.y);
+          effectLayer.spawnDamageNumber(sx, sy - 20, result.healAmount, 'heal');
+        }
+
         for (const dmg of result.damages) {
+          if (effectLayer) {
+            const targetMonster = monsterStore.monsters.find(m => m.id === dmg.targetId);
+            if (targetMonster) {
+              const { sx: mx, sy: my } = worldToScreen(targetMonster.position.x, targetMonster.position.y);
+              let damageType: DamageType = 'normal';
+              if (dmg.isMiss) damageType = 'miss';
+              else if (dmg.isCrit) damageType = 'crit';
+              else if (result.skillUsed && result.skillUsed.element && result.skillUsed.element !== 'none') damageType = 'element';
+              else if (result.skillUsed) damageType = 'skill';
+
+              if (event.attackType === 'ranged') {
+                const pPos = useMapControlStore.getState().playerPosition;
+                const { sx: px, sy: py } = worldToScreen(pPos.x, pPos.y);
+                effectLayer.spawnProjectile(px, py - 20, mx, my - 20, PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_COLOR, () => {
+                  effectLayer.spawnDamageNumber(mx, my - 20, dmg.damage, damageType);
+                });
+              } else {
+                effectLayer.spawnDamageNumber(mx, my - 20, dmg.damage, damageType);
+              }
+            }
+          }
+
           if (dmg.killed) {
             const inst = monsterInstances.get(dmg.targetId);
             const monsterIdx = monsterStore.monsters.findIndex(m => m.id === dmg.targetId);
@@ -295,6 +335,27 @@ function tickArpgCombatLoop(
         });
         if (result) {
           logs.push(result.log);
+
+          if (effectLayer) {
+            const pPos = useMapControlStore.getState().playerPosition;
+            const { sx, sy } = worldToScreen(pPos.x, pPos.y);
+            const dmgType: DamageType = result.isDodged ? 'miss' : 'normal';
+            const dmgValue = result.isDodged ? 0 : result.damage;
+
+            if (event.attackType === 'ranged') {
+              const monster = monsterStore.monsters.find(m => m.id === event.monsterId);
+              if (monster) {
+                const { sx: mx, sy: my } = worldToScreen(monster.position.x, monster.position.y);
+                const speed = event.projectileSpeed ?? DEFAULT_MONSTER_PROJECTILE_SPEED;
+                effectLayer.spawnProjectile(mx, my - 20, sx, sy - 20, speed, MONSTER_PROJECTILE_COLOR, () => {
+                  effectLayer.spawnDamageNumber(sx, sy - 20, dmgValue, dmgType);
+                });
+              }
+            } else {
+              effectLayer.spawnDamageNumber(sx, sy - 20, dmgValue, dmgType);
+            }
+          }
+
           const updatedChar = useGameStore.getState().character;
           if (updatedChar && updatedChar.hp <= 0) {
             handlePlayerDeath();
@@ -339,11 +400,11 @@ function tickArpgCombatLoop(
 
   // === DoT tick (every 1000ms) ===
   if (consumeDotTick()) {
-    processDotTick(monsterInstances);
+    processDotTick(monsterInstances, effectLayer);
   }
 }
 
-function processDotTick(monsterInstances: Map<string, MonsterInstance>) {
+function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLayer?: EffectLayer) {
   const gs = useGameStore.getState();
   const now = Date.now();
   const dotEffects = gs.activeEffects.filter(
@@ -366,6 +427,14 @@ function processDotTick(monsterInstances: Map<string, MonsterInstance>) {
 
     inst.currentHp = Math.max(0, inst.currentHp - effect.dot.damage);
     logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'dot' });
+
+    if (effectLayer) {
+      const targetMonster = monsterStore.monsters.find(m => m.id === monsterId);
+      if (targetMonster) {
+        const { sx, sy } = worldToScreen(targetMonster.position.x, targetMonster.position.y);
+        effectLayer.spawnDamageNumber(sx, sy - 20, effect.dot.damage, 'dot');
+      }
+    }
 
     if (inst.currentHp <= 0) {
       const monsterIdx = monsterStore.monsters.findIndex(m => m.id === monsterId);
@@ -507,7 +576,8 @@ function handlePlayerDeath() {
 function syncMonsters(
   monsters: MapMonster[],
   scene: GameScene,
-  existingMap: Map<string, MonsterEntity>
+  existingMap: Map<string, MonsterEntity>,
+  monsterInstances: Map<string, MonsterInstance>,
 ) {
   const currentIds = new Set(monsters.map(m => m.id));
 
@@ -527,5 +597,10 @@ function syncMonsters(
       scene.entityLayer.container.addChild(entity.container);
     }
     entity.updatePosition(monster.position);
+
+    const inst = monsterInstances.get(monster.id);
+    if (inst) {
+      entity.updateHp(inst.currentHp, inst.maxHp);
+    }
   }
 }

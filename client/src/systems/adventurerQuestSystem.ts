@@ -302,7 +302,7 @@ function calculateReward(
   }
 }
 
-function generateSingleQuest(
+export function generateSingleQuest(
   difficulty: AdventurerQuestDifficulty,
   guildRank: GuildRank,
   index: number,

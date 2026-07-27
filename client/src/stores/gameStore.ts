@@ -18,7 +18,7 @@ import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty } from '../models/adventurerQuest';
-import { generateQuestList, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
+import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
@@ -466,6 +466,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       persistentRules: DEFAULT_PERSISTENT_SCRIPT,
       emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
       quickSlots: [null, null, null, null, null],
+      adventurerQuests: [],
+      adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+      guildProgress: { rank: 'F', points: 0 },
     });
     await get().loadCharacterList();
   },
@@ -564,9 +567,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       inventory: [],
       skills: startingSkills,
       bagItems: [{ name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 }],
+      adventurerQuests: [],
+      adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+      guildProgress: { rank: 'F', points: 0 },
       phase: 'explore',
     });
     get().startRegen();
+    get().initQuestBoard();
   },
 
   loadCharacter: async () => {
@@ -1251,15 +1258,29 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   abandonAdventurerQuest: (questId) => {
     const state = get();
+    const quest = state.adventurerQuests.find(q => q.id === questId);
     const { activeQuests, guildProgress } = abandonAdvQuest(
       state.adventurerQuests, questId, state.guildProgress
     );
-    set({ adventurerQuests: activeQuests, guildProgress });
+
+    const board = { ...state.adventurerQuestBoard };
+    if (quest) {
+      const diff = quest.difficulty;
+      const oldList = board[diff];
+      const idx = oldList.findIndex(q => q.id === questId);
+      if (idx !== -1) {
+        const newQuest = generateAdvSingleQuest(diff, guildProgress.rank, idx);
+        board[diff] = [...oldList.slice(0, idx), newQuest, ...oldList.slice(idx + 1)];
+      }
+    }
+
+    set({ adventurerQuests: activeQuests, guildProgress, adventurerQuestBoard: board });
     saveGame(get());
   },
 
   completeAdventurerQuest: (questId) => {
     const state = get();
+    const quest = state.adventurerQuests.find(q => q.id === questId);
     const { activeQuests, guildProgress, reward } = completeAdvQuest(
       state.adventurerQuests, questId, state.guildProgress
     );
@@ -1283,6 +1304,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    const board = { ...state.adventurerQuestBoard };
+    if (quest) {
+      const diff = quest.difficulty;
+      const oldList = board[diff];
+      const idx = oldList.findIndex(q => q.id === questId);
+      if (idx !== -1) {
+        const newQuest = generateAdvSingleQuest(diff, guildProgress.rank, idx);
+        board[diff] = [...oldList.slice(0, idx), newQuest, ...oldList.slice(idx + 1)];
+      }
+    }
+
     const advQuestStats = { ...state.statistics, questsCompleted: state.statistics.questsCompleted + 1 };
     if (reward.type === 'gold') advQuestStats.totalGoldEarned += reward.amount;
 
@@ -1292,6 +1324,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       character: newChar,
       bagItems: newBag,
       statistics: advQuestStats,
+      adventurerQuestBoard: board,
     });
     saveGame(get());
   },
