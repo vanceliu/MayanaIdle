@@ -1,4 +1,9 @@
 import type { ClassName } from './character';
+import { MONSTER_SEEDS } from '../db/seed';
+
+function getMonstersByArea(areaId: string): string[] {
+  return MONSTER_SEEDS.filter(m => m.area === areaId && !m.isBoss).map(m => m.name);
+}
 
 export type QuestType = 'errand' | 'collect';
 export type QuestStatus = 'available' | 'active' | 'completable' | 'completed';
@@ -55,12 +60,16 @@ export const QUEST_TEMPLATES: QuestTemplate[] = CLASS_NAMES.flatMap(className =>
 ]);
 
 export const ERRAND_AREA_POOL = ['green-valley', 'wind-woods'];
-export const COLLECT_AREA_POOL = ['misty-swamp', 'trial-highlands'];
+export const COLLECT_AREA_POOL = ['misty-swamp', 'trial-highlands', 'trial-highlands-top'];
 
-export const COLLECT_MONSTER_POOL: Record<string, string[]> = {
-  'misty-swamp': ['毒蛇', '風之鷹', '沼澤蜥蜴'],
-  'trial-highlands': ['石像鬼', '高地獅鷲', '山賊', '岩石巨人'],
-};
+export function pickRandomCollectMonster(): { area: string; monster: string } {
+  const areaIdx = Math.floor(Math.random() * COLLECT_AREA_POOL.length);
+  const area = COLLECT_AREA_POOL[areaIdx];
+  const monsters = getMonstersByArea(area);
+  if (monsters.length === 0) return pickRandomCollectMonster();
+  const monsterIdx = Math.floor(Math.random() * monsters.length);
+  return { area, monster: monsters[monsterIdx] };
+}
 
 export const ERRAND_KILL_TARGET = 20;
 export const COLLECT_MATERIAL_TARGET = 2;
@@ -89,12 +98,4 @@ export function isQuestCompletable(quest: Quest): boolean {
 export function pickRandomErrandArea(): string {
   const idx = Math.floor(Math.random() * ERRAND_AREA_POOL.length);
   return ERRAND_AREA_POOL[idx];
-}
-
-export function pickRandomCollectMonster(): { area: string; monster: string } {
-  const areaIdx = Math.floor(Math.random() * COLLECT_AREA_POOL.length);
-  const area = COLLECT_AREA_POOL[areaIdx];
-  const monsters = COLLECT_MONSTER_POOL[area];
-  const monsterIdx = Math.floor(Math.random() * monsters.length);
-  return { area, monster: monsters[monsterIdx] };
 }

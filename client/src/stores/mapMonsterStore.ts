@@ -26,6 +26,26 @@ const PATH_RECALC_INTERVAL = 5000;
 const ASTAR_DISTANCE = 8;
 const PLAYER_MOVE_THRESHOLD = 2;
 
+function rollSpawnCount(elapsedMinutes: number): number {
+  const roll = Math.random();
+  if (elapsedMinutes < 5) {
+    // 1隻(80%), 2隻(15%), 3隻(5%)
+    if (roll < 0.80) return 1;
+    if (roll < 0.95) return 2;
+    return 3;
+  } else if (elapsedMinutes < 20) {
+    // 1隻(60%), 2隻(30%), 3隻(10%)
+    if (roll < 0.60) return 1;
+    if (roll < 0.90) return 2;
+    return 3;
+  } else {
+    // 20分鐘以上 (含30+): 1隻(50%), 2隻(25%), 3隻(25%)
+    if (roll < 0.50) return 1;
+    if (roll < 0.75) return 2;
+    return 3;
+  }
+}
+
 let monsterIdCounter = 0;
 function nextMonsterId(): string {
   return `m_${++monsterIdCounter}`;
@@ -43,7 +63,7 @@ export interface MapMonsterState {
   combatMonsterIds: string[];
   hasBossInPool: boolean;
 
-  spawnTick: (deltaMs: number, map: MapData, playerPos: Position, pressure: number) => void;
+  spawnTick: (deltaMs: number, map: MapData, playerPos: Position, pressure: number, elapsedMinutes?: number) => void;
   moveMonsters: (deltaMs: number, map: MapData, playerPos: Position) => void;
   checkCollisions: (playerPos: Position) => MapMonster[];
   setCombatMonsters: (ids: string[]) => void;
@@ -62,7 +82,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
   combatMonsterIds: [],
   hasBossInPool: false,
 
-  spawnTick: (deltaMs, map, playerPos, pressure) => {
+  spawnTick: (deltaMs, map, playerPos, pressure, elapsedMinutes = 0) => {
     const state = get();
     if (state.paused) return;
     if (state.monsters.length >= state.maxMonsters) return;
@@ -79,34 +99,42 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
     if (Math.random() > BASE_SPAWN_CHANCE) return;
 
-    // Determine if this spawn is a boss
-    const bossAlreadyOnMap = state.monsters.some(m => m.isBoss);
-    let isBoss = false;
-    if (state.hasBossInPool && !bossAlreadyOnMap) {
-      isBoss = Math.random() < 0.1;
-    }
+    // Determine spawn count based on elapsed time (partySize=1 baseline)
+    const spawnCount = rollSpawnCount(elapsedMinutes);
 
-    // Find a spawn position at least MIN_SPAWN_DISTANCE from player
-    let attempts = 0;
-    while (attempts < 20) {
-      attempts++;
-      const pos = getRandomWalkablePosition(map, playerPos);
-      if (!pos) continue;
-      if (distance(pos, playerPos) >= MIN_SPAWN_DISTANCE) {
-        const monster: MapMonster = {
-          id: nextMonsterId(),
-          position: { ...pos },
-          targetPosition: { ...playerPos },
-          speed: MONSTER_SPEED,
-          path: [],
-          pathIndex: 0,
-          pathRecalcTimer: 0,
-          moveTimer: 0,
-          lastPathPlayerPos: { ...playerPos },
-          isBoss,
-        };
-        set({ monsters: [...state.monsters, monster] });
-        return;
+    for (let i = 0; i < spawnCount; i++) {
+      const currentMonsters = get().monsters;
+      if (currentMonsters.length >= get().maxMonsters) break;
+
+      // Determine if this spawn is a boss
+      const bossAlreadyOnMap = currentMonsters.some(m => m.isBoss);
+      let isBoss = false;
+      if (state.hasBossInPool && !bossAlreadyOnMap && elapsedMinutes >= 10) {
+        isBoss = Math.random() < 0.1;
+      }
+
+      // Find a spawn position at least MIN_SPAWN_DISTANCE from player
+      let attempts = 0;
+      while (attempts < 20) {
+        attempts++;
+        const pos = getRandomWalkablePosition(map, playerPos);
+        if (!pos) continue;
+        if (distance(pos, playerPos) >= MIN_SPAWN_DISTANCE) {
+          const monster: MapMonster = {
+            id: nextMonsterId(),
+            position: { ...pos },
+            targetPosition: { ...playerPos },
+            speed: MONSTER_SPEED,
+            path: [],
+            pathIndex: 0,
+            pathRecalcTimer: 0,
+            moveTimer: 0,
+            lastPathPlayerPos: { ...playerPos },
+            isBoss,
+          };
+          set({ monsters: [...get().monsters, monster] });
+          break;
+        }
       }
     }
   },

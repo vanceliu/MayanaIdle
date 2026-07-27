@@ -1,6 +1,6 @@
 import { Container } from 'pixi.js';
 import { DamageNumberManager } from '../ui/DamageNumber';
-import { ProjectileManager } from '../ui/Projectile';
+import { ProjectileManager, type ProjectileSpawnOpts } from '../ui/Projectile';
 import type { DamageType } from '../ui/CombatVisualEvent';
 
 export class EffectLayer {
@@ -20,14 +20,8 @@ export class EffectLayer {
     this.damageNumbers.spawn(screenX, screenY, value, damageType);
   }
 
-  spawnProjectile(
-    fromX: number, fromY: number,
-    toX: number, toY: number,
-    speed: number,
-    color: number,
-    onArrive: () => void,
-  ): void {
-    this.projectiles.spawn(fromX, fromY, toX, toY, speed, color, onArrive);
+  spawnProjectile(opts: ProjectileSpawnOpts): void {
+    this.projectiles.spawn(opts);
   }
 
   update(deltaMS: number): void {

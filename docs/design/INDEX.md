@@ -167,6 +167,7 @@
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
 | `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則 |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
+| `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
 
 ### 專案管理與限制
 

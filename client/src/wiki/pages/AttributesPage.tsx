@@ -80,16 +80,16 @@ export function AttributesPage() {
               </tr>
             </thead>
             <tbody>
-              <tr><td>騎士</td><td className="cell-number">16</td><td className="cell-number">12</td><td className="cell-number">14</td><td className="cell-number">10</td><td className="cell-number">8</td><td className="cell-number">8</td><td className="cell-number">12</td></tr>
-              <tr><td>妖精</td><td className="cell-number">12</td><td className="cell-number">15</td><td className="cell-number">10</td><td className="cell-number">13</td><td className="cell-number">14</td><td className="cell-number">10</td><td className="cell-number">6</td></tr>
-              <tr><td>盜賊</td><td className="cell-number">14</td><td className="cell-number">16</td><td className="cell-number">11</td><td className="cell-number">9</td><td className="cell-number">8</td><td className="cell-number">10</td><td className="cell-number">12</td></tr>
-              <tr><td>元素師</td><td className="cell-number">8</td><td className="cell-number">10</td><td className="cell-number">8</td><td className="cell-number">16</td><td className="cell-number">18</td><td className="cell-number">8</td><td className="cell-number">12</td></tr>
-              <tr><td>牧師</td><td className="cell-number">10</td><td className="cell-number">10</td><td className="cell-number">12</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">12</td><td className="cell-number">6</td></tr>
+              <tr><td>騎士</td><td className="cell-number">14</td><td className="cell-number">14</td><td className="cell-number">16</td><td className="cell-number">10</td><td className="cell-number">10</td><td className="cell-number">12</td><td className="cell-number">4</td></tr>
+              <tr><td>妖精</td><td className="cell-number">14</td><td className="cell-number">14</td><td className="cell-number">14</td><td className="cell-number">12</td><td className="cell-number">10</td><td className="cell-number">10</td><td className="cell-number">6</td></tr>
+              <tr><td>盜賊</td><td className="cell-number">12</td><td className="cell-number">14</td><td className="cell-number">10</td><td className="cell-number">10</td><td className="cell-number">12</td><td className="cell-number">10</td><td className="cell-number">12</td></tr>
+              <tr><td>元素師</td><td className="cell-number">8</td><td className="cell-number">8</td><td className="cell-number">10</td><td className="cell-number">14</td><td className="cell-number">14</td><td className="cell-number">12</td><td className="cell-number">14</td></tr>
+              <tr><td>牧師</td><td className="cell-number">6</td><td className="cell-number">8</td><td className="cell-number">10</td><td className="cell-number">12</td><td className="cell-number">18</td><td className="cell-number">15</td><td className="cell-number">11</td></tr>
             </tbody>
           </table>
         </div>
         <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: 'var(--fs-sm)' }}>
-          屬性上限：35 | 總配點上限：80 | Lv.51+ 每級 +1 自由屬性點
+          建角屬性上限：18 | 總配點上限：80 | Lv.51+ 每級 +1 自由屬性點，屬性上限提升至 35
         </p>
       </section>
 

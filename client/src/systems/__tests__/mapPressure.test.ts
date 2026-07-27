@@ -161,7 +161,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       useMapMonsterStore.setState({ hasBossInPool: false, maxMonsters: 10 });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0);
+      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 15);
       const monsters = useMapMonsterStore.getState().monsters;
       if (monsters.length > 0) {
         expect(monsters[0].isBoss).toBe(false);
@@ -173,12 +173,13 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
     it('can spawn boss when hasBossInPool is true and none on map', () => {
       vi.spyOn(Math, 'random')
         .mockReturnValueOnce(0) // spawn chance pass
+        .mockReturnValueOnce(0.5) // rollSpawnCount → 1 monster
         .mockReturnValueOnce(0.05) // boss roll = true (< 0.1)
         .mockReturnValue(0.5); // position finding
 
       useMapMonsterStore.setState({ hasBossInPool: true, maxMonsters: 10 });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0);
+      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 15);
       const monsters = useMapMonsterStore.getState().monsters;
       if (monsters.length > 0) {
         expect(monsters[0].isBoss).toBe(true);
@@ -197,10 +198,23 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
         ],
       });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0);
+      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 15);
       const monsters = useMapMonsterStore.getState().monsters;
       const bossCount = monsters.filter(m => m.isBoss).length;
       expect(bossCount).toBe(1);
+
+      vi.restoreAllMocks();
+    });
+
+    it('does not spawn boss before 10 minutes', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      useMapMonsterStore.setState({ hasBossInPool: true, maxMonsters: 10 });
+
+      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 5);
+      const monsters = useMapMonsterStore.getState().monsters;
+      if (monsters.length > 0) {
+        expect(monsters[0].isBoss).toBe(false);
+      }
 
       vi.restoreAllMocks();
     });

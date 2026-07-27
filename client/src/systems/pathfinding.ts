@@ -34,15 +34,20 @@ const DIRECTIONS: Position[] = [
 ];
 
 export function findPath(map: MapData, start: Position, end: Position, occupied?: Set<string>): Position[] | null {
-  if (!isWalkable(map, end.x, end.y)) return null;
-  if (start.x === end.x && start.y === end.y) return [];
+  const sx = Math.round(start.x);
+  const sy = Math.round(start.y);
+  const ex = Math.round(end.x);
+  const ey = Math.round(end.y);
+
+  if (!isWalkable(map, ex, ey)) return null;
+  if (sx === ex && sy === ey) return [];
 
   const openList: AStarNode[] = [];
   const closedSet = new Set<string>();
 
   const startNode: AStarNode = {
-    x: start.x,
-    y: start.y,
+    x: sx,
+    y: sy,
     g: 0,
     h: heuristic(start, end),
     f: heuristic(start, end),

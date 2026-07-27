@@ -123,11 +123,13 @@ export function MapCanvas() {
         // Spawn only when not in combat
         if (gamePhase !== 'combat' && !monsterStore.paused) {
           if (gameState.character) {
-            const { pressure } = calculatePressure(gameState.character.areaEnteredAt, Date.now());
-            monsterStore.setMaxMonsters(Math.min(10, 3 + pressure));
-            monsterStore.spawnTick(delta, currentMap, currentPlayerPos, pressure);
+            const now = Date.now();
+            const { pressure, maxMonsters } = calculatePressure(gameState.character.areaEnteredAt, now);
+            const elapsedMinutes = (now - gameState.character.areaEnteredAt) / (1000 * 60);
+            monsterStore.setMaxMonsters(maxMonsters);
+            monsterStore.spawnTick(delta, currentMap, currentPlayerPos, pressure, elapsedMinutes);
           } else {
-            monsterStore.spawnTick(delta, currentMap, currentPlayerPos, 0);
+            monsterStore.spawnTick(delta, currentMap, currentPlayerPos, 0, 0);
           }
         }
 

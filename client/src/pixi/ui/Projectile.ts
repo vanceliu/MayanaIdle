@@ -1,8 +1,21 @@
 import { Graphics, Container } from 'pixi.js';
 
-const PROJECTILE_RADIUS = 3;
 const MIN_DURATION = 100;
 const MAX_DURATION = 1500;
+
+export type ProjectileShape = 'circle' | 'arrow';
+
+export interface ProjectileSpawnOpts {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  speed: number;
+  color: number;
+  onArrive: () => void;
+  shape?: ProjectileShape;
+  size?: number; // radius for circle, length for arrow
+}
 
 interface FlyingProjectile {
   graphics: Graphics;
@@ -20,19 +33,15 @@ export class ProjectileManager {
   private active: FlyingProjectile[] = [];
   readonly container = new Container();
 
-  spawn(
-    fromX: number, fromY: number,
-    toX: number, toY: number,
-    speed: number,
-    color: number,
-    onArrive: () => void,
-  ): void {
+  spawn(opts: ProjectileSpawnOpts): void {
+    const { fromX, fromY, toX, toY, speed, color, onArrive, shape = 'circle', size } = opts;
     const dx = toX - fromX;
     const dy = toY - fromY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const duration = Math.max(MIN_DURATION, Math.min(MAX_DURATION, (dist / speed) * 1000));
 
-    const g = this.acquire(color);
+    const angle = Math.atan2(dy, dx);
+    const g = this.acquire(color, shape, size, angle);
     g.x = fromX;
     g.y = fromY;
     g.alpha = 1;
@@ -81,14 +90,33 @@ export class ProjectileManager {
     this.container.destroy({ children: true });
   }
 
-  private acquire(color: number): Graphics {
+  private acquire(color: number, shape: ProjectileShape, size: number | undefined, angle: number): Graphics {
     let g = this.pool.pop();
     if (!g) {
       g = new Graphics();
       this.container.addChild(g);
     }
     g.clear();
-    g.circle(0, 0, PROJECTILE_RADIUS).fill(color);
+    g.rotation = 0;
+
+    if (shape === 'arrow') {
+      const len = size ?? 12;
+      const headW = len * 0.35;
+      // Arrowhead
+      g.poly([
+        { x: len, y: 0 },
+        { x: len * 0.4, y: -headW },
+        { x: len * 0.5, y: 0 },
+        { x: len * 0.4, y: headW },
+      ]).fill(color);
+      // Long shaft
+      g.rect(-len * 0.9, -headW * 0.15, len * 1.4, headW * 0.3).fill(color);
+      g.rotation = angle;
+    } else {
+      const r = size ?? 3;
+      g.circle(0, 0, r).fill(color);
+    }
+
     return g;
   }
 

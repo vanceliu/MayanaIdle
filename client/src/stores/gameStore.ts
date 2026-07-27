@@ -12,7 +12,7 @@ import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../mod
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
-import { rollEncounterCount, calculatePressure } from '../systems/pressure';
+import { calculatePressure } from '../systems/pressure';
 import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage } from '../systems/combat';
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
@@ -1366,8 +1366,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 export async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) => void) {
   const state = get();
   const char = state.character!;
-  const pressure = calculatePressure(char.areaEnteredAt, Date.now());
-  const count = rollEncounterCount(1, pressure.pressure);
+  const { maxMonsters } = calculatePressure(char.areaEnteredAt, Date.now());
+  const count = Math.min(maxMonsters, 3);
 
   const region = getRegion(char.currentRegion);
   const hasFloors = region?.floors && region.floors.length > 0;

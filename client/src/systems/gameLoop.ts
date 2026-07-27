@@ -123,9 +123,11 @@ export function gameLoopTick(deltaMs: number) {
 
   // === Spawn monsters (only if player is not in recovery) ===
   if (!monsterStore.paused) {
-    const { pressure } = calculatePressure(gameState.character.areaEnteredAt, Date.now());
-    monsterStore.setMaxMonsters(Math.min(10, 3 + pressure));
-    monsterStore.spawnTick(deltaMs, map, playerPos, pressure);
+    const now = Date.now();
+    const { pressure, maxMonsters } = calculatePressure(gameState.character.areaEnteredAt, now);
+    const elapsedMinutes = (now - gameState.character.areaEnteredAt) / (1000 * 60);
+    monsterStore.setMaxMonsters(maxMonsters);
+    monsterStore.spawnTick(deltaMs, map, playerPos, pressure, elapsedMinutes);
   }
 
   // === Move monsters (always, not affected by player pause) ===

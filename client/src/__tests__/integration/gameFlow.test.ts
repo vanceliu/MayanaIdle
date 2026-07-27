@@ -3,7 +3,7 @@ import { evaluateScript } from '../../systems/scriptRunner';
 import { calculatePlayerAttack } from '../../systems/combat';
 import { addExp, getExpToNextLevel } from '../../systems/levelUp';
 import { getHpRegen, getMpRegen } from '../../systems/regen';
-import { calculatePressure, rollEncounterCount } from '../../systems/pressure';
+import { calculatePressure } from '../../systems/pressure';
 import { generateAffixes, getEffectiveAffixValue } from '../../models/affix';
 import { getTotalAttributes, getAvailablePoints, CLASS_BASE_ATTRIBUTES } from '../../models/character';
 import { INITIAL_HP, INITIAL_MP } from '../../systems/levelUp';
@@ -106,14 +106,14 @@ describe('Integration: Character Creation Flow', () => {
 });
 
 describe('Integration: Exploration and Pressure', () => {
-  it('should start with low encounter count then scale up', () => {
+  it('should start with low monster cap then scale up', () => {
     const now = Date.now();
 
     const early = calculatePressure(now - 30 * 1000, now);
-    expect(early.maxEncounterCount).toBe(2); // base only
+    expect(early.maxMonsters).toBe(3);
 
     const later = calculatePressure(now - 50 * 60 * 1000, now); // 50 min → pressure 2
-    expect(later.maxEncounterCount).toBeGreaterThan(early.maxEncounterCount);
+    expect(later.maxMonsters).toBe(5);
   });
 
   it('should reset pressure on area change', () => {
@@ -125,12 +125,10 @@ describe('Integration: Exploration and Pressure', () => {
     expect(newAreaPressure.pressure).toBe(0);
   });
 
-  it('should generate encounter counts within pressure bounds', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const count = rollEncounterCount(1, 3);
-    expect(count).toBeGreaterThanOrEqual(1);
-    expect(count).toBeLessThanOrEqual(5); // 1*2 + 3
-    vi.restoreAllMocks();
+  it('should cap maxMonsters at 10', () => {
+    const now = Date.now();
+    const result = calculatePressure(now - 150 * 60 * 1000, now); // 150 min → pressure 12
+    expect(result.maxMonsters).toBe(10);
   });
 });
 

@@ -1,20 +1,16 @@
 export interface PressureState {
   areaEnteredAt: number;
   pressure: number;
-  maxEncounterCount: number;
+  maxMonsters: number;
 }
 
-export function calculatePressure(enteredAt: number, now: number, partySize: number = 1): PressureState {
+const BASE_MAX_MONSTERS = 3;
+const MAX_MONSTERS_CAP = 10;
+
+export function calculatePressure(enteredAt: number, now: number): PressureState {
   const elapsedMinutes = (now - enteredAt) / (1000 * 60);
   const pressure = Math.max(0, Math.floor((elapsedMinutes - 30) / 10));
-  const baseMax = partySize * 2;
-  const maxEncounterCount = baseMax + pressure;
+  const maxMonsters = Math.min(MAX_MONSTERS_CAP, BASE_MAX_MONSTERS + pressure);
 
-  return { areaEnteredAt: enteredAt, pressure, maxEncounterCount };
-}
-
-export function rollEncounterCount(partySize: number, pressure: number): number {
-  const baseMin = partySize;
-  const baseMax = partySize * 2 + pressure;
-  return Math.floor(Math.random() * (baseMax - baseMin + 1)) + baseMin;
+  return { areaEnteredAt: enteredAt, pressure, maxMonsters };
 }

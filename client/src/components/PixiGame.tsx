@@ -20,11 +20,22 @@ import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance } from '../models/monster';
 import type { DamageType } from '../pixi/ui/CombatVisualEvent';
 import type { EffectLayer } from '../pixi/layers/EffectLayer';
+import type { ProjectileShape } from '../pixi/ui/Projectile';
 
 const PLAYER_PROJECTILE_SPEED = 512;
 const PLAYER_PROJECTILE_COLOR = 0xffffff;
 const MONSTER_PROJECTILE_COLOR = 0xff6b6b;
 const DEFAULT_MONSTER_PROJECTILE_SPEED = 384;
+
+const ELEMENT_COLORS: Record<string, number> = {
+  fire: 0xff6600,
+  ice: 0x66ccff,
+  wind: 0x66ff66,
+  earth: 0xcc9933,
+  light: 0xffffaa,
+  dark: 0x9933ff,
+  none: 0xffffff,
+};
 
 export function PixiGame() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -270,6 +281,19 @@ function tickArpgCombatLoop(
   for (const event of events) {
     switch (event.type) {
       case 'player_attack': {
+        // Stop after reaching the current tile waypoint
+        const mapCtrl2 = useMapControlStore.getState();
+        if (mapCtrl2.isMoving && mapCtrl2.currentPath.length > 0) {
+          const nextIdx = mapCtrl2.pathIndex;
+          // Keep only the next waypoint so player finishes stepping onto it, then stops
+          if (nextIdx < mapCtrl2.currentPath.length) {
+            useMapControlStore.setState({
+              currentPath: mapCtrl2.currentPath.slice(0, nextIdx + 1),
+            });
+          } else {
+            useMapControlStore.setState({ isMoving: false, currentPath: [], pathIndex: 0 });
+          }
+        }
         const result = processPlayerAttack(event, {
           character: gameState.character,
           equippedGear: allGear,
@@ -301,9 +325,39 @@ function tickArpgCombatLoop(
               if (event.attackType === 'ranged') {
                 const pPos = useMapControlStore.getState().playerPosition;
                 const { sx: px, sy: py } = worldToScreen(pPos.x, pPos.y);
-                effectLayer.spawnProjectile(px, py - 20, mx, my - 20, PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_COLOR, () => {
-                  effectLayer.spawnDamageNumber(mx, my - 20, dmg.damage, damageType);
-                });
+                const isSkill = !!result.skillUsed;
+                const element = result.skillUsed?.element ?? 'none';
+                const enchantBuff = !isSkill
+                  ? gameState.activeEffects.find(e => e.type === 'buff' && e.element && e.element !== 'none')
+                  : undefined;
+                const isBowSkill = isSkill && result.skillUsed?.requiredWeaponType === 'bow';
+                const color = isSkill
+                  ? (isBowSkill && enchantBuff ? (ELEMENT_COLORS[enchantBuff.element!] ?? PLAYER_PROJECTILE_COLOR)
+                    : (ELEMENT_COLORS[element] ?? PLAYER_PROJECTILE_COLOR))
+                  : (enchantBuff ? (ELEMENT_COLORS[enchantBuff.element!] ?? PLAYER_PROJECTILE_COLOR) : PLAYER_PROJECTILE_COLOR);
+                const shape: ProjectileShape = (!isSkill || isBowSkill) ? 'arrow' : 'circle';
+                const size = isSkill && !isBowSkill && result.skillUsed?.target === 'aoe' ? 5 : undefined;
+
+                const hits = (isBowSkill && result.skillUsed?.hits) ? result.skillUsed.hits : 1;
+                const MULTI_HIT_DELAY = 100;
+                for (let h = 0; h < hits; h++) {
+                  const isLast = h === hits - 1;
+                  const spawnFn = () => {
+                    const spread = hits > 1 ? (h - (hits - 1) / 2) * 4 : 0;
+                    effectLayer.spawnProjectile({
+                      fromX: px, fromY: py - 20 + spread,
+                      toX: mx, toY: my - 20,
+                      speed: PLAYER_PROJECTILE_SPEED,
+                      color,
+                      onArrive: isLast
+                        ? () => { effectLayer.spawnDamageNumber(mx, my - 20, dmg.damage, damageType); }
+                        : () => {},
+                      shape, size,
+                    });
+                  };
+                  if (h === 0) spawnFn();
+                  else setTimeout(spawnFn, h * MULTI_HIT_DELAY);
+                }
               } else {
                 effectLayer.spawnDamageNumber(mx, my - 20, dmg.damage, damageType);
               }
@@ -347,8 +401,13 @@ function tickArpgCombatLoop(
               if (monster) {
                 const { sx: mx, sy: my } = worldToScreen(monster.position.x, monster.position.y);
                 const speed = event.projectileSpeed ?? DEFAULT_MONSTER_PROJECTILE_SPEED;
-                effectLayer.spawnProjectile(mx, my - 20, sx, sy - 20, speed, MONSTER_PROJECTILE_COLOR, () => {
-                  effectLayer.spawnDamageNumber(sx, sy - 20, dmgValue, dmgType);
+                effectLayer.spawnProjectile({
+                  fromX: mx, fromY: my - 20,
+                  toX: sx, toY: sy - 20,
+                  speed, color: MONSTER_PROJECTILE_COLOR,
+                  onArrive: () => {
+                    effectLayer.spawnDamageNumber(sx, sy - 20, dmgValue, dmgType);
+                  },
                 });
               }
             } else {
@@ -368,19 +427,27 @@ function tickArpgCombatLoop(
         // FSM wants player to chase a target
         if (monsterStore.paused) break;
         const mapCtrl = useMapControlStore.getState();
-        if (!mapCtrl.isMoving && mapCtrl.autoMove) {
+        if (mapCtrl.autoMove) {
           const targetTile = {
             x: Math.round(event.target.x),
             y: Math.round(event.target.y),
           };
-          // Move to adjacent tile of target
           const map = mapCtrl.currentMap;
           if (map) {
-            const adj = findAdjacentWalkable(map, targetTile, mapCtrl.playerPosition);
+            const playerTile = {
+              x: Math.round(mapCtrl.playerPosition.x),
+              y: Math.round(mapCtrl.playerPosition.y),
+            };
+            const adj = findAdjacentWalkable(map, targetTile, playerTile);
             if (adj) {
-              useMapControlStore.getState().moveToTarget(adj);
+              // Repath if not moving, or if current destination differs from desired
+              const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
+              const needsRepath = !mapCtrl.isMoving ||
+                !currentDest || currentDest.x !== adj.x || currentDest.y !== adj.y;
+              if (needsRepath) {
+                useMapControlStore.getState().moveToTarget(adj);
+              }
             } else {
-              // Can't reach target — reset FSM to pick a different target
               engine.playerCtx.targetMonsterId = null;
               engine.playerCtx.state = 'idle';
             }
