@@ -13,7 +13,7 @@ import { getExpToNextLevel, addExp } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { calculatePressure } from '../systems/pressure';
-import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage } from '../systems/combat';
+import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage, calculateMpRestored } from '../systems/combat';
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -37,7 +37,7 @@ export type SearchMode = 'auto' | 'manual';
 
 export interface CombatLog {
   text: string;
-  type: 'player' | 'monster' | 'system' | 'loot' | 'dot';
+  type: 'player' | 'monster' | 'system' | 'loot' | 'dot' | 'miss';
 }
 
 export type CombatLowHpAction = 'town' | 'teleport';
@@ -1673,7 +1673,7 @@ export function processMonsterDeath(
     }
 
     // 任務進度：跑腿（擊殺數）
-    char2 = updateErrandProgress(char2, char2.currentArea, 1);
+    char2 = updateErrandProgress(char2, dropAreaId, 1);
 
     // 任務進度：收集（素材掉落）
     if (rollQuestMaterialDrop(char2, defeatedMonsterName)) {
@@ -1688,7 +1688,7 @@ export function processMonsterDeath(
     }
 
     // 冒險者工會任務進度
-    let advQuests = updateAdvQuestProgress(state2.adventurerQuests, char2.currentArea, defeatedMonsterName, 1);
+    let advQuests = updateAdvQuestProgress(state2.adventurerQuests, dropAreaId, defeatedMonsterName, 1);
     if (rollAdvCollectDrop(state2.adventurerQuests, defeatedMonsterName)) {
       advQuests = updateAdvCollectProgress(advQuests, defeatedMonsterName, 1);
     }
@@ -1802,9 +1802,20 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
                   }
                 }
               } else {
-                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name, state.activeEffects, targetIdx);                target.currentHp -= result.damage;
+                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name, state.activeEffects, targetIdx);
+                target.currentHp -= result.damage;
                 monsters[targetIdx] = target;
                 logs.push({ text: result.log.message, type: 'player' });
+                const mpRestored = calculateMpRestored(
+                  result.damage,
+                  skill.mpDrainRatio,
+                  char.mp,
+                  getEffectiveMaxMp(char, state.equippedGear),
+                );
+                if (mpRestored > 0) {
+                  char.mp += mpRestored;
+                  logs.push({ text: `${skill.name} 回復 ${mpRestored} MP`, type: 'player' });
+                }
 
                 const templateDebuff = getSkillTemplate(skill.id)?.applyDebuff;
                 if (templateDebuff) {
@@ -2081,6 +2092,10 @@ function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => voi
 let combatTimerIds: number[] = [];
 let dropQueue: Promise<void> = Promise.resolve();
 
+export function waitForPendingDrops(): Promise<void> {
+  return dropQueue;
+}
+
 function clearCombatTimers() {
   for (const id of combatTimerIds) {
     clearInterval(id);
@@ -2211,6 +2226,8 @@ interface LoadedPreferences {
   quickSlots: (PotionType | null)[];
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
+  afterCombatHpResumeThreshold: number;
+  afterCombatMpResumeThreshold: number;
   adventurerQuests: AdventurerQuest[];
   guildProgress: GuildProgress;
   statistics: CharacterStatistics;
@@ -2233,6 +2250,8 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         quickSlots: data.quickSlots ?? [null, null, null, null, null],
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
+        afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
+        afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
         adventurerQuests: data.adventurerQuests ?? [],
         guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
         statistics: data.statistics ?? createDefaultStatistics(),
@@ -2267,6 +2286,8 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         quickSlots: data.quickSlots ?? [null, null, null, null, null],
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 0,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 0,
+        afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
+        afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
         adventurerQuests: data.adventurerQuests ?? [],
         guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
         statistics: data.statistics ?? createDefaultStatistics(),

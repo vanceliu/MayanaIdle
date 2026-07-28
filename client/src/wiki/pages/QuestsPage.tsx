@@ -68,9 +68,9 @@ export function QuestsPage() {
             <tbody>
               <tr><td>D 級</td><td>曙光草原、翠綠谷地</td><td className="cell-number">15~20</td><td className="cell-number">50~60</td><td className="cell-number">—</td></tr>
               <tr><td>C 級</td><td>風語林地、迷霧沼澤、試煉高地</td><td className="cell-number">15~20</td><td className="cell-number">55~70</td><td className="cell-number">—</td></tr>
-              <tr><td>B 級</td><td>試煉高地頂部、雪原、象牙塔 1-3F</td><td className="cell-number">20~25</td><td className="cell-number">60~80</td><td className="cell-number">1~3</td></tr>
-              <tr><td>A 級</td><td>妖魔森林、明鏡森林、龍之谷、遠古戰場、象牙塔 4-5F、朦朧洞窟、水下監獄、龍谷地間、百柱塔 1-30F、遠古地監 1-6F</td><td className="cell-number">20~30</td><td className="cell-number">70~90</td><td className="cell-number">1~3</td></tr>
-              <tr><td>S 級</td><td>百柱塔 31-100F、遠古地監 7-9F</td><td className="cell-number">25~30</td><td className="cell-number">80~100</td><td className="cell-number">1~3</td></tr>
+              <tr><td>B 級</td><td>試煉高地頂部、雪原、象牙塔 1F／2F／3F</td><td className="cell-number">20~25</td><td className="cell-number">60~80</td><td className="cell-number">1~3</td></tr>
+              <tr><td>A 級</td><td>妖魔森林、明鏡森林、龍之谷、遠古戰場、象牙塔 4F／5F、朦朧洞窟／水下監獄／龍谷地間各樓層、百柱塔 1-30F、遠古地監 1F～6F</td><td className="cell-number">20~30</td><td className="cell-number">70~90</td><td className="cell-number">1~3</td></tr>
+              <tr><td>S 級</td><td>百柱塔 31-100F、遠古地監 7F／8F／9F</td><td className="cell-number">25~30</td><td className="cell-number">80~100</td><td className="cell-number">1~3</td></tr>
             </tbody>
           </table>
         </div>
@@ -88,10 +88,10 @@ export function QuestsPage() {
             <tbody>
               <tr><td>B 級</td><td>試煉飛龍 (Lv.30)</td><td>試煉高地頂部</td></tr>
               <tr><td>B 級</td><td>雪地之主 (Lv.35)</td><td>雪原地帶深處</td></tr>
-              <tr><td>A 級</td><td>象牙塔惡魔 (Lv.45)</td><td>象牙塔 4-5F</td></tr>
-              <tr><td>A 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟</td></tr>
-              <tr><td>A 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄</td></tr>
-              <tr><td>A 級</td><td>安塔巨龍 (Lv.50)</td><td>龍谷地間</td></tr>
+              <tr><td>A 級</td><td>象牙塔惡魔 (Lv.45)</td><td>象牙塔 5F</td></tr>
+              <tr><td>A 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟 3F</td></tr>
+              <tr><td>A 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄 4F</td></tr>
+              <tr><td>A 級</td><td>安塔巨龍 (Lv.50)</td><td>龍谷地間 7F</td></tr>
               <tr><td>A 級</td><td>毒之皇女 (Lv.52)</td><td>百柱塔 1-10F</td></tr>
               <tr><td>A 級</td><td>哥布林之王 (Lv.52)</td><td>百柱塔 11-20F</td></tr>
               <tr><td>A 級</td><td>暗影吸血鬼 (Lv.52)</td><td>百柱塔 21-30F</td></tr>
@@ -102,7 +102,7 @@ export function QuestsPage() {
               <tr><td>S 級</td><td>熔岩伊弗利特 (Lv.60)</td><td>百柱塔 71-80F</td></tr>
               <tr><td>S 級</td><td>守護者之主 (Lv.60)</td><td>百柱塔 81-90F</td></tr>
               <tr><td>S 級</td><td>百柱死神 (Lv.60)</td><td>百柱塔 91-100F</td></tr>
-              <tr><td>S 級</td><td>遠古騎士 (Lv.60)</td><td>遠古地監 7-9F</td></tr>
+              <tr><td>S 級</td><td>遠古騎士 (Lv.60)</td><td>遠古地監 9F</td></tr>
             </tbody>
           </table>
         </div>

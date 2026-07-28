@@ -88,9 +88,9 @@ function generateQuestDescription(
 ): string {
   const templates = QUEST_DESCRIPTION_TEMPLATES[type];
   const opening = pickRandom(templates.openings)
-    .replace('{area}', `**${areaName}**`);
+    .replace('{area}', areaName);
   const task = pickRandom(templates.tasks)
-    .replace('{area}', `**${areaName}**`)
+    .replace('{area}', areaName)
     .replace('{monster}', monsterName ?? '')
     .replace('{count}', String(count));
   return opening + task;
@@ -151,7 +151,7 @@ export function generateSingleQuest(
     const bossEntry = pickRandom(BOSS_POOLS[bossDifficulty]);
     targetMonster = bossEntry.name;
     targetArea = bossEntry.area;
-    areaName = bossEntry.areaName;
+    areaName = getAreaDisplayName(targetArea);
     avgGold = bossEntry.avgGold;
 
     if (type === 'errandboss') {
@@ -162,7 +162,7 @@ export function generateSingleQuest(
   } else {
     const areaEntry = pickRandom(AREA_POOLS[difficulty]);
     targetArea = areaEntry.areaId;
-    areaName = areaEntry.areaName;
+    areaName = getAreaDisplayName(targetArea);
     avgGold = areaEntry.avgGold;
 
     if (type === 'errand') {

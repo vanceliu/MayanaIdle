@@ -28,6 +28,7 @@ export interface Skill {
   target: SkillTarget;
   power: number;
   healAmount?: number;
+  mpDrainRatio?: number; // Restore MP from final damage dealt (1 = 100%)
   mpCost: number;
   cooldown: number; // ms
   lastUsedAt: number;

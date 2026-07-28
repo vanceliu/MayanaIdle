@@ -1,16 +1,15 @@
 import { useRef, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
-import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
+import { useGameStore, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity } from '../pixi/entities/PlayerEntity';
 import { MonsterEntity } from '../pixi/entities/MonsterEntity';
 import { worldToScreen, screenToWorld } from '../pixi/utils/isometric';
-import { gameLoopTick, occupation, consumeDotTick } from '../systems/gameLoop';
+import { gameLoopTick, consumeDotTick } from '../systems/gameLoop';
 import { findAdjacentWalkable } from '../systems/pathfinding';
-import { addExp } from '../systems/levelUp';
 import { db } from '../db/database';
 import { processMonsterDeath } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
@@ -21,6 +20,7 @@ import type { MonsterInstance } from '../models/monster';
 import type { DamageType } from '../pixi/ui/CombatVisualEvent';
 import type { EffectLayer } from '../pixi/layers/EffectLayer';
 import type { ProjectileShape } from '../pixi/ui/Projectile';
+import { getSkillTemplate } from '../models/skillTemplate';
 
 const PLAYER_PROJECTILE_SPEED = 512;
 const PLAYER_PROJECTILE_COLOR = 0xffffff;
@@ -276,7 +276,7 @@ function tickArpgCombatLoop(
     useMapControlStore.getState().pickRandomTarget();
   }
 
-  const logs: { text: string; type: string }[] = [];
+  const logs: CombatLog[] = [];
 
   for (const event of events) {
     switch (event.type) {
@@ -328,13 +328,16 @@ function tickArpgCombatLoop(
                 const isSkill = !!result.skillUsed;
                 const element = result.skillUsed?.element ?? 'none';
                 const enchantBuff = !isSkill
-                  ? gameState.activeEffects.find(e => e.type === 'buff' && e.element && e.element !== 'none')
+                  ? gameState.activeEffects.find(e => e.type === 'buff' && e.category.endsWith('-enchant'))
+                  : undefined;
+                const enchantElement = enchantBuff
+                  ? getSkillTemplate(enchantBuff.sourceSkillId)?.element
                   : undefined;
                 const isBowSkill = isSkill && result.skillUsed?.requiredWeaponType === 'bow';
                 const color = isSkill
-                  ? (isBowSkill && enchantBuff ? (ELEMENT_COLORS[enchantBuff.element!] ?? PLAYER_PROJECTILE_COLOR)
+                  ? (isBowSkill && enchantElement ? (ELEMENT_COLORS[enchantElement] ?? PLAYER_PROJECTILE_COLOR)
                     : (ELEMENT_COLORS[element] ?? PLAYER_PROJECTILE_COLOR))
-                  : (enchantBuff ? (ELEMENT_COLORS[enchantBuff.element!] ?? PLAYER_PROJECTILE_COLOR) : PLAYER_PROJECTILE_COLOR);
+                  : (enchantElement ? (ELEMENT_COLORS[enchantElement] ?? PLAYER_PROJECTILE_COLOR) : PLAYER_PROJECTILE_COLOR);
                 const shape: ProjectileShape = (!isSkill || isBowSkill) ? 'arrow' : 'circle';
                 const size = isSkill && !isBowSkill && result.skillUsed?.target === 'aoe' ? 5 : undefined;
 
@@ -480,7 +483,7 @@ function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLa
 
   if (dotEffects.length === 0) return;
 
-  const logs: { text: string; type: string }[] = [];
+  const logs: CombatLog[] = [];
   const monsterStore = useMapMonsterStore.getState();
 
   for (const effect of dotEffects) {

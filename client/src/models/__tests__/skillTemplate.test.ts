@@ -37,6 +37,12 @@ describe('getSkillTemplate', () => {
     expect(template!.buffModifiers!.length).toBeGreaterThan(0);
   });
 
+  it('returns mana drain with final-damage MP restoration', () => {
+    const template = getSkillTemplate('mana-drain');
+    expect(template).not.toBeNull();
+    expect(template!.mpDrainRatio).toBe(1);
+  });
+
   it('returns null for nonexistent skill', () => {
     const template = getSkillTemplate('nonexistent-skill');
     expect(template).toBeNull();

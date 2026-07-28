@@ -394,6 +394,17 @@ export function calculateSkillAttack(
   return { damage, isCritical, log };
 }
 
+export function calculateMpRestored(
+  damage: number,
+  mpDrainRatio: number | undefined,
+  currentMp: number,
+  maxMp: number,
+): number {
+  if (!mpDrainRatio || damage <= 0 || currentMp >= maxMp) return 0;
+  const requested = Math.floor(damage * mpDrainRatio);
+  return Math.max(0, Math.min(requested, maxMp - currentMp));
+}
+
 export function getBuffDefenseBonus(activeEffects: ActiveEffect[]): number {
   const now = Date.now();
   let bonus = 0;

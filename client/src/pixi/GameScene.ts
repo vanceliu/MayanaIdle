@@ -1,4 +1,3 @@
-import { Container } from 'pixi.js';
 import { PixiApp } from './PixiApp';
 import { FloorLayer } from './layers/FloorLayer';
 import { WallLayer } from './layers/WallLayer';
@@ -8,7 +7,6 @@ import { EffectLayer } from './layers/EffectLayer';
 import type { MapData } from '../models/mapControl';
 
 export class GameScene {
-  private pixiApp: PixiApp;
   public floorLayer: FloorLayer;
   public wallLayer: WallLayer;
   public pathLayer: PathLayer;
@@ -16,7 +14,6 @@ export class GameScene {
   public effectLayer: EffectLayer;
 
   constructor(pixiApp: PixiApp) {
-    this.pixiApp = pixiApp;
     const world = pixiApp.worldContainer;
 
     this.floorLayer = new FloorLayer();

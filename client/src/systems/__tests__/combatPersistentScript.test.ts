@@ -26,7 +26,7 @@ function createMonster(overrides: Partial<MonsterInstance> = {}): MonsterInstanc
   return {
     templateId: 1, name: '暴牙兔', level: 3, currentHp: 30, maxHp: 30,
     attackMin: 5, attackMax: 10, defense: 5, exp: 20, race: 'normal', size: 'small', element: 'none',
-    isBoss: false,
+    isBoss: false, attackType: 'melee', attackRange: 1.5, attackInterval: 1000,
     ...overrides,
   };
 }

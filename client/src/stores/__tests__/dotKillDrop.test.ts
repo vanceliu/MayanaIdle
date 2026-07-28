@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
-import { useGameStore, processMonsterDeath } from '../gameStore';
+import { useGameStore, processMonsterDeath, waitForPendingDrops } from '../gameStore';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -55,6 +55,10 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
     await useGameStore.getState().initUser();
   });
 
+  afterEach(async () => {
+    await waitForPendingDrops();
+  });
+
   it('should mark monster as _processed and award EXP on death', async () => {
     await useGameStore.getState().createCharacter('DotTest', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
 
@@ -76,6 +80,9 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       size: 'small' as const,
       element: 'none' as const,
       isBoss: false,
+      attackType: 'melee' as const,
+      attackRange: 1.5,
+      attackInterval: 1000,
       _processed: false,
     };
 
@@ -129,6 +136,9 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       size: 'small' as const,
       element: 'none' as const,
       isBoss: false,
+      attackType: 'melee' as const,
+      attackRange: 1.5,
+      attackInterval: 1000,
       _processed: false,
     };
 
@@ -176,20 +186,20 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       templateId: 1, name: '怪物A', level: 5, currentHp: -3, maxHp: 50,
       attackMin: 1, attackMax: 2, defense: 0, exp: 50,
       race: 'normal' as const, size: 'small' as const, element: 'none' as const,
-      isBoss: false, _processed: false,
+      isBoss: false, attackType: 'melee' as const, attackRange: 1.5, attackInterval: 1000, _processed: false,
     };
     const monster2 = {
       templateId: 2, name: '怪物B', level: 5, currentHp: -1, maxHp: 80,
       attackMin: 2, attackMax: 4, defense: 1, exp: 80,
       race: 'normal' as const, size: 'small' as const, element: 'none' as const,
-      isBoss: false, _processed: false,
+      isBoss: false, attackType: 'melee' as const, attackRange: 1.5, attackInterval: 1000, _processed: false,
     };
     // 第三隻還活著
     const monster3 = {
       templateId: 3, name: '怪物C', level: 5, currentHp: 50, maxHp: 80,
       attackMin: 2, attackMax: 4, defense: 1, exp: 80,
       race: 'normal' as const, size: 'small' as const, element: 'none' as const,
-      isBoss: false, _processed: false,
+      isBoss: false, attackType: 'melee' as const, attackRange: 1.5, attackInterval: 1000, _processed: false,
     };
 
     const monsters = [monster1, monster2, monster3];
@@ -227,5 +237,79 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
     // 日誌中兩次「被擊敗」
     const defeatLogs = logs.filter(l => l.text.includes('被擊敗'));
     expect(defeatLogs.length).toBe(2);
+  });
+
+  it('should update an adventurer quest using the concrete dungeon floor id', async () => {
+    await useGameStore.getState().createCharacter('FloorQuestTest', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+
+    const char = {
+      ...useGameStore.getState().character!,
+      currentArea: 'ivory-tower',
+      currentRegion: 'ivory-tower',
+      currentFloor: 1,
+    };
+    const deadMonster = {
+      templateId: 68,
+      name: '冰霜蜘蛛',
+      level: 33,
+      currentHp: 0,
+      maxHp: 250,
+      attackMin: 25,
+      attackMax: 36,
+      defense: 16,
+      exp: 510,
+      race: 'normal' as const,
+      size: 'small' as const,
+      element: 'ice' as const,
+      isBoss: false,
+      attackType: 'melee' as const,
+      attackRange: 1.5,
+      attackInterval: 1000,
+      _processed: false,
+    };
+
+    useGameStore.setState({
+      phase: 'combat',
+      character: char,
+      activeEffects: [],
+      adventurerQuests: [
+        {
+          id: 'floor-1-quest',
+          type: 'errand',
+          difficulty: 'B',
+          status: 'active',
+          title: '區域清掃',
+          description: '象牙塔 1F',
+          targetArea: 'ivory-tower-1f',
+          targetCount: 20,
+          currentCount: 0,
+          reward: { type: 'gold', amount: 1000 },
+          contributionPoints: 47,
+        },
+        {
+          id: 'floor-2-quest',
+          type: 'errand',
+          difficulty: 'B',
+          status: 'active',
+          title: '其他樓層',
+          description: '象牙塔 2F',
+          targetArea: 'ivory-tower-2f',
+          targetCount: 20,
+          currentCount: 0,
+          reward: { type: 'gold', amount: 1000 },
+          contributionPoints: 47,
+        },
+      ],
+    });
+
+    const get = () => useGameStore.getState();
+    const set = (s: any) => useGameStore.setState(s);
+    processMonsterDeath(get, set, [deadMonster], 0, char, [], []);
+
+    await waitForPendingDrops();
+
+    const quests = useGameStore.getState().adventurerQuests;
+    expect(quests.find(q => q.id === 'floor-1-quest')?.currentCount).toBe(1);
+    expect(quests.find(q => q.id === 'floor-2-quest')?.currentCount).toBe(0);
   });
 });

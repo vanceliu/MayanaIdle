@@ -90,6 +90,19 @@ export interface AreaPoolEntry {
   avgGold: number;
 }
 
+function createFloorAreaEntries(
+  baseId: string,
+  baseName: string,
+  floors: number[],
+  avgGold: number,
+): AreaPoolEntry[] {
+  return floors.map(floor => ({
+    areaId: `${baseId}-${floor}f`,
+    areaName: `${baseName}${floor}樓`,
+    avgGold,
+  }));
+}
+
 export const AREA_POOLS: Record<AdventurerQuestDifficulty, AreaPoolEntry[]> = {
   D: [
     { areaId: 'dawn-plains', areaName: '曙光草原', avgGold: 30 },
@@ -104,21 +117,21 @@ export const AREA_POOLS: Record<AdventurerQuestDifficulty, AreaPoolEntry[]> = {
     { areaId: 'trial-highlands-top', areaName: '試煉高地頂部', avgGold: 115 },
     { areaId: 'snow-field', areaName: '雪原地帶', avgGold: 140 },
     { areaId: 'snow-field-deep', areaName: '雪原地帶深處', avgGold: 160 },
-    { areaId: 'ivory-tower-1-3f', areaName: '象牙塔 1-3F', avgGold: 170 },
+    ...createFloorAreaEntries('ivory-tower', '象牙塔', [1, 2, 3], 170),
   ],
   A: [
     { areaId: 'demon-forest', areaName: '妖魔森林', avgGold: 160 },
     { areaId: 'mirror-forest', areaName: '明鏡森林', avgGold: 160 },
     { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
     { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
-    { areaId: 'ivory-tower-4-5f', areaName: '象牙塔 4-5F', avgGold: 200 },
-    { areaId: 'misty-cave', areaName: '朦朧洞窟', avgGold: 250 },
-    { areaId: 'underwater-prison', areaName: '水下監獄', avgGold: 250 },
-    { areaId: 'dragon-valley', areaName: '龍谷地間', avgGold: 250 },
+    ...createFloorAreaEntries('ivory-tower', '象牙塔', [4, 5], 200),
+    ...createFloorAreaEntries('misty-cave', '朦朧洞窟', [1, 2, 3], 250),
+    ...createFloorAreaEntries('underwater-prison', '水下監獄', [1, 2, 3, 4], 250),
+    ...createFloorAreaEntries('dragon-valley', '龍谷地間', [1, 2, 3, 4, 5, 6, 7], 250),
     { areaId: 'hundred-pillar-1-10f', areaName: '百柱塔 1-10F', avgGold: 275 },
     { areaId: 'hundred-pillar-11-20f', areaName: '百柱塔 11-20F', avgGold: 290 },
     { areaId: 'hundred-pillar-21-30f', areaName: '百柱塔 21-30F', avgGold: 300 },
-    { areaId: 'ancient-dungeon-1-6f', areaName: '遠古地監 1-6F', avgGold: 280 },
+    ...createFloorAreaEntries('ancient-dungeon', '遠古地監', [1, 2, 3, 4, 5, 6], 280),
   ],
   S: [
     { areaId: 'hundred-pillar-31-40f', areaName: '百柱塔 31-40F', avgGold: 350 },
@@ -128,7 +141,7 @@ export const AREA_POOLS: Record<AdventurerQuestDifficulty, AreaPoolEntry[]> = {
     { areaId: 'hundred-pillar-71-80f', areaName: '百柱塔 71-80F', avgGold: 430 },
     { areaId: 'hundred-pillar-81-90f', areaName: '百柱塔 81-90F', avgGold: 440 },
     { areaId: 'hundred-pillar-91-100f', areaName: '百柱塔 91-100F', avgGold: 450 },
-    { areaId: 'ancient-dungeon-7-9f', areaName: '遠古地監 7-9F', avgGold: 400 },
+    ...createFloorAreaEntries('ancient-dungeon', '遠古地監', [7, 8, 9], 400),
   ],
 };
 
@@ -141,38 +154,38 @@ const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: Advent
   'trial-highlands-top': { questArea: 'trial-highlands-top', difficulty: 'B' },
   'snow-field': { questArea: 'snow-field', difficulty: 'B' },
   'snow-field-deep': { questArea: 'snow-field-deep', difficulty: 'B' },
-  'ivory-tower-1f': { questArea: 'ivory-tower-1-3f', difficulty: 'B' },
-  'ivory-tower-2f': { questArea: 'ivory-tower-1-3f', difficulty: 'B' },
-  'ivory-tower-3f': { questArea: 'ivory-tower-1-3f', difficulty: 'B' },
-  'ivory-tower-4f': { questArea: 'ivory-tower-4-5f', difficulty: 'A' },
-  'ivory-tower-5f': { questArea: 'ivory-tower-4-5f', difficulty: 'A' },
+  'ivory-tower-1f': { questArea: 'ivory-tower-1f', difficulty: 'B' },
+  'ivory-tower-2f': { questArea: 'ivory-tower-2f', difficulty: 'B' },
+  'ivory-tower-3f': { questArea: 'ivory-tower-3f', difficulty: 'B' },
+  'ivory-tower-4f': { questArea: 'ivory-tower-4f', difficulty: 'A' },
+  'ivory-tower-5f': { questArea: 'ivory-tower-5f', difficulty: 'A' },
   'demon-forest': { questArea: 'demon-forest', difficulty: 'A' },
   'mirror-forest': { questArea: 'mirror-forest', difficulty: 'A' },
   'dragon-valley-surface': { questArea: 'dragon-valley-surface', difficulty: 'A' },
   'ancient-battlefield': { questArea: 'ancient-battlefield', difficulty: 'A' },
-  'misty-cave-1f': { questArea: 'misty-cave', difficulty: 'A' },
-  'misty-cave-2f': { questArea: 'misty-cave', difficulty: 'A' },
-  'misty-cave-3f': { questArea: 'misty-cave', difficulty: 'A' },
-  'underwater-prison-1f': { questArea: 'underwater-prison', difficulty: 'A' },
-  'underwater-prison-2f': { questArea: 'underwater-prison', difficulty: 'A' },
-  'underwater-prison-3f': { questArea: 'underwater-prison', difficulty: 'A' },
-  'underwater-prison-4f': { questArea: 'underwater-prison', difficulty: 'A' },
-  'dragon-valley-1f': { questArea: 'dragon-valley', difficulty: 'A' },
-  'dragon-valley-2f': { questArea: 'dragon-valley', difficulty: 'A' },
-  'dragon-valley-3f': { questArea: 'dragon-valley', difficulty: 'A' },
-  'dragon-valley-4f': { questArea: 'dragon-valley', difficulty: 'A' },
-  'dragon-valley-5f': { questArea: 'dragon-valley', difficulty: 'A' },
-  'dragon-valley-6f': { questArea: 'dragon-valley', difficulty: 'A' },
-  'dragon-valley-7f': { questArea: 'dragon-valley', difficulty: 'A' },
+  'misty-cave-1f': { questArea: 'misty-cave-1f', difficulty: 'A' },
+  'misty-cave-2f': { questArea: 'misty-cave-2f', difficulty: 'A' },
+  'misty-cave-3f': { questArea: 'misty-cave-3f', difficulty: 'A' },
+  'underwater-prison-1f': { questArea: 'underwater-prison-1f', difficulty: 'A' },
+  'underwater-prison-2f': { questArea: 'underwater-prison-2f', difficulty: 'A' },
+  'underwater-prison-3f': { questArea: 'underwater-prison-3f', difficulty: 'A' },
+  'underwater-prison-4f': { questArea: 'underwater-prison-4f', difficulty: 'A' },
+  'dragon-valley-1f': { questArea: 'dragon-valley-1f', difficulty: 'A' },
+  'dragon-valley-2f': { questArea: 'dragon-valley-2f', difficulty: 'A' },
+  'dragon-valley-3f': { questArea: 'dragon-valley-3f', difficulty: 'A' },
+  'dragon-valley-4f': { questArea: 'dragon-valley-4f', difficulty: 'A' },
+  'dragon-valley-5f': { questArea: 'dragon-valley-5f', difficulty: 'A' },
+  'dragon-valley-6f': { questArea: 'dragon-valley-6f', difficulty: 'A' },
+  'dragon-valley-7f': { questArea: 'dragon-valley-7f', difficulty: 'A' },
   'hundred-pillar-1-10f': { questArea: 'hundred-pillar-1-10f', difficulty: 'A' },
   'hundred-pillar-11-20f': { questArea: 'hundred-pillar-11-20f', difficulty: 'A' },
   'hundred-pillar-21-30f': { questArea: 'hundred-pillar-21-30f', difficulty: 'A' },
-  'ancient-dungeon-1f': { questArea: 'ancient-dungeon-1-6f', difficulty: 'A' },
-  'ancient-dungeon-2f': { questArea: 'ancient-dungeon-1-6f', difficulty: 'A' },
-  'ancient-dungeon-3f': { questArea: 'ancient-dungeon-1-6f', difficulty: 'A' },
-  'ancient-dungeon-4f': { questArea: 'ancient-dungeon-1-6f', difficulty: 'A' },
-  'ancient-dungeon-5f': { questArea: 'ancient-dungeon-1-6f', difficulty: 'A' },
-  'ancient-dungeon-6f': { questArea: 'ancient-dungeon-1-6f', difficulty: 'A' },
+  'ancient-dungeon-1f': { questArea: 'ancient-dungeon-1f', difficulty: 'A' },
+  'ancient-dungeon-2f': { questArea: 'ancient-dungeon-2f', difficulty: 'A' },
+  'ancient-dungeon-3f': { questArea: 'ancient-dungeon-3f', difficulty: 'A' },
+  'ancient-dungeon-4f': { questArea: 'ancient-dungeon-4f', difficulty: 'A' },
+  'ancient-dungeon-5f': { questArea: 'ancient-dungeon-5f', difficulty: 'A' },
+  'ancient-dungeon-6f': { questArea: 'ancient-dungeon-6f', difficulty: 'A' },
   'hundred-pillar-31-40f': { questArea: 'hundred-pillar-31-40f', difficulty: 'S' },
   'hundred-pillar-41-50f': { questArea: 'hundred-pillar-41-50f', difficulty: 'S' },
   'hundred-pillar-51-60f': { questArea: 'hundred-pillar-51-60f', difficulty: 'S' },
@@ -180,9 +193,9 @@ const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: Advent
   'hundred-pillar-71-80f': { questArea: 'hundred-pillar-71-80f', difficulty: 'S' },
   'hundred-pillar-81-90f': { questArea: 'hundred-pillar-81-90f', difficulty: 'S' },
   'hundred-pillar-91-100f': { questArea: 'hundred-pillar-91-100f', difficulty: 'S' },
-  'ancient-dungeon-7f': { questArea: 'ancient-dungeon-7-9f', difficulty: 'S' },
-  'ancient-dungeon-8f': { questArea: 'ancient-dungeon-7-9f', difficulty: 'S' },
-  'ancient-dungeon-9f': { questArea: 'ancient-dungeon-7-9f', difficulty: 'S' },
+  'ancient-dungeon-7f': { questArea: 'ancient-dungeon-7f', difficulty: 'S' },
+  'ancient-dungeon-8f': { questArea: 'ancient-dungeon-8f', difficulty: 'S' },
+  'ancient-dungeon-9f': { questArea: 'ancient-dungeon-9f', difficulty: 'S' },
 };
 
 function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]> {
@@ -215,35 +228,33 @@ export interface BossPoolEntry {
   name: string;
   area: string;
   avgGold: number;
-  areaName: string;
 }
 
 interface BossQuestConfig {
   monsterName: string;
   difficulty: 'B' | 'A' | 'S';
   questArea: string;
-  areaName: string;
   avgGold: number;
 }
 
 const BOSS_QUEST_CONFIG: BossQuestConfig[] = [
-  { monsterName: '試煉飛龍', difficulty: 'B', questArea: 'trial-highlands-top', areaName: '試煉高地頂部', avgGold: 2500 },
-  { monsterName: '雪地之主', difficulty: 'B', questArea: 'snow-field-deep', areaName: '雪原地帶深處', avgGold: 3000 },
-  { monsterName: '象牙塔惡魔', difficulty: 'A', questArea: 'ivory-tower-4-5f', areaName: '象牙塔 4-5F', avgGold: 4000 },
-  { monsterName: '朦朧蛇魔', difficulty: 'A', questArea: 'misty-cave', areaName: '朦朧洞窟', avgGold: 5000 },
-  { monsterName: '深海獄王', difficulty: 'A', questArea: 'underwater-prison', areaName: '水下監獄', avgGold: 5000 },
-  { monsterName: '安塔巨龍', difficulty: 'A', questArea: 'dragon-valley', areaName: '龍谷地間', avgGold: 5000 },
-  { monsterName: '毒之皇女', difficulty: 'A', questArea: 'hundred-pillar-1-10f', areaName: '百柱塔 1-10F', avgGold: 4500 },
-  { monsterName: '哥布林之王', difficulty: 'A', questArea: 'hundred-pillar-11-20f', areaName: '百柱塔 11-20F', avgGold: 4500 },
-  { monsterName: '暗影吸血鬼', difficulty: 'A', questArea: 'hundred-pillar-21-30f', areaName: '百柱塔 21-30F', avgGold: 4500 },
-  { monsterName: '不死殭屍王', difficulty: 'S', questArea: 'hundred-pillar-31-40f', areaName: '百柱塔 31-40F', avgGold: 7000 },
-  { monsterName: '龍王約特勒', difficulty: 'S', questArea: 'hundred-pillar-41-50f', areaName: '百柱塔 41-50F', avgGold: 7000 },
-  { monsterName: '冥王哈馬斯', difficulty: 'S', questArea: 'hundred-pillar-51-60f', areaName: '百柱塔 51-60F', avgGold: 7000 },
-  { monsterName: '霜凍伊莉絲', difficulty: 'S', questArea: 'hundred-pillar-61-70f', areaName: '百柱塔 61-70F', avgGold: 8000 },
-  { monsterName: '熔岩伊弗利特', difficulty: 'S', questArea: 'hundred-pillar-71-80f', areaName: '百柱塔 71-80F', avgGold: 8000 },
-  { monsterName: '守護者之主', difficulty: 'S', questArea: 'hundred-pillar-81-90f', areaName: '百柱塔 81-90F', avgGold: 8500 },
-  { monsterName: '百柱死神', difficulty: 'S', questArea: 'hundred-pillar-91-100f', areaName: '百柱塔 91-100F', avgGold: 9000 },
-  { monsterName: '遠古騎士', difficulty: 'S', questArea: 'ancient-dungeon-7-9f', areaName: '遠古地監 7-9F', avgGold: 7500 },
+  { monsterName: '試煉飛龍', difficulty: 'B', questArea: 'trial-highlands-top', avgGold: 2500 },
+  { monsterName: '雪地之主', difficulty: 'B', questArea: 'snow-field-deep', avgGold: 3000 },
+  { monsterName: '象牙塔惡魔', difficulty: 'A', questArea: 'ivory-tower-5f', avgGold: 4000 },
+  { monsterName: '朦朧蛇魔', difficulty: 'A', questArea: 'misty-cave-3f', avgGold: 5000 },
+  { monsterName: '深海獄王', difficulty: 'A', questArea: 'underwater-prison-4f', avgGold: 5000 },
+  { monsterName: '安塔巨龍', difficulty: 'A', questArea: 'dragon-valley-7f', avgGold: 5000 },
+  { monsterName: '毒之皇女', difficulty: 'A', questArea: 'hundred-pillar-1-10f', avgGold: 4500 },
+  { monsterName: '哥布林之王', difficulty: 'A', questArea: 'hundred-pillar-11-20f', avgGold: 4500 },
+  { monsterName: '暗影吸血鬼', difficulty: 'A', questArea: 'hundred-pillar-21-30f', avgGold: 4500 },
+  { monsterName: '不死殭屍王', difficulty: 'S', questArea: 'hundred-pillar-31-40f', avgGold: 7000 },
+  { monsterName: '龍王約特勒', difficulty: 'S', questArea: 'hundred-pillar-41-50f', avgGold: 7000 },
+  { monsterName: '冥王哈馬斯', difficulty: 'S', questArea: 'hundred-pillar-51-60f', avgGold: 7000 },
+  { monsterName: '霜凍伊莉絲', difficulty: 'S', questArea: 'hundred-pillar-61-70f', avgGold: 8000 },
+  { monsterName: '熔岩伊弗利特', difficulty: 'S', questArea: 'hundred-pillar-71-80f', avgGold: 8000 },
+  { monsterName: '守護者之主', difficulty: 'S', questArea: 'hundred-pillar-81-90f', avgGold: 8500 },
+  { monsterName: '百柱死神', difficulty: 'S', questArea: 'hundred-pillar-91-100f', avgGold: 9000 },
+  { monsterName: '遠古騎士', difficulty: 'S', questArea: 'ancient-dungeon-9f', avgGold: 7500 },
 ];
 
 function buildBossPools(): Record<'B' | 'A' | 'S', BossPoolEntry[]> {
@@ -257,7 +268,6 @@ function buildBossPools(): Record<'B' | 'A' | 'S', BossPoolEntry[]> {
       name: seed.name,
       area: config.questArea,
       avgGold: config.avgGold,
-      areaName: config.areaName,
     });
   }
 

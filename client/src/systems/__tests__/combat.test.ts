@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { calculatePlayerAttack, calculateMonsterAttack, calculateSkillAttack, processCombatRound } from '../combat';
+import { calculatePlayerAttack, calculateMonsterAttack, calculateSkillAttack, calculateMpRestored, processCombatRound } from '../combat';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { EquipmentInstance } from '../../models/equipment';
@@ -47,6 +47,9 @@ function createTestMonster(overrides: Partial<MonsterInstance> = {}): MonsterIns
     size: 'small',
     element: 'none',
     isBoss: false,
+    attackType: 'melee',
+    attackRange: 1.5,
+    attackInterval: 1000,
     ...overrides,
   };
 }
@@ -368,6 +371,21 @@ describe('combat system', () => {
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
       expect(result.log.message).toBe('火球術 對 火蜥蜴 造成 19 點傷害');
+    });
+  });
+
+  describe('calculateMpRestored', () => {
+    it('should restore MP from the final damage dealt', () => {
+      expect(calculateMpRestored(57, 1, 10, 100)).toBe(57);
+    });
+
+    it('should cap restored MP at effective max MP', () => {
+      expect(calculateMpRestored(57, 1, 80, 100)).toBe(20);
+    });
+
+    it('should not restore MP without a drain effect or damage', () => {
+      expect(calculateMpRestored(57, undefined, 10, 100)).toBe(0);
+      expect(calculateMpRestored(0, 1, 10, 100)).toBe(0);
     });
   });
 

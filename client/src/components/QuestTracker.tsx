@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
-import { getRegion } from '../models/mapData';
-import { AREA_POOLS } from '../models/adventurerQuest';
+import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
 
 export function QuestTracker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,21 +15,6 @@ export function QuestTracker() {
     (q: Quest) => q.status === 'active' || q.status === 'completable'
   );
   const totalQuests = classQuests.length + adventurerQuests.length;
-
-  function getAreaName(areaId: string): string {
-    const region = getRegion(areaId);
-    if (region) return region.name;
-    const floorMatch = areaId.match(/^(.+)-(\d+)f$/);
-    if (floorMatch) {
-      const baseRegion = getRegion(floorMatch[1]);
-      if (baseRegion) return `${baseRegion.name}${floorMatch[2]}樓`;
-    }
-    for (const pools of Object.values(AREA_POOLS)) {
-      const entry = pools.find(a => a.areaId === areaId);
-      if (entry) return entry.areaName;
-    }
-    return areaId;
-  }
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -56,7 +40,7 @@ export function QuestTracker() {
                 {quest.type === 'errand' ? '職業試煉 — 實戰訓練' : '職業試煉 — 稀有材料'}
               </div>
               <div className="tracker-area">
-                {quest.targetArea && getAreaName(quest.targetArea)}
+                {quest.targetArea && getAreaDisplayName(quest.targetArea)}
                 {quest.targetMonster && ` — ${quest.targetMonster}`}
               </div>
               <div className="tracker-progress">
@@ -77,7 +61,7 @@ export function QuestTracker() {
                 {quest.title}
               </div>
               <div className="tracker-area">
-                {getAreaName(quest.targetArea)}
+                {getAreaDisplayName(quest.targetArea)}
                 {quest.targetMonster && ` — ${quest.targetMonster}`}
               </div>
               <div className="tracker-progress">

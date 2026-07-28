@@ -179,6 +179,7 @@ describe('rollBossDrops', () => {
   });
 
   it('should return empty result when no boss drop entries', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     vi.mocked(db.bossDropTables.where).mockReturnValue({
       equals: vi.fn().mockReturnValue({
         toArray: vi.fn().mockResolvedValue([]),

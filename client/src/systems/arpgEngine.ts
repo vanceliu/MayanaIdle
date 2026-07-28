@@ -18,9 +18,8 @@ import {
   type MonsterCombatContext,
   createMonsterCombatContext,
   tickMonsterCombat,
-  DEFAULT_MONSTER_ATTACK_CONFIG,
 } from './monsterCombatFSM';
-import { getDistance, findTargetsInRadius } from './lineOfSight';
+import { getDistance } from './lineOfSight';
 import { evaluateCombatScript, type CombatScriptContext } from './scriptRunner';
 import { getPlayerAttackInterval, getSkillCooldownReduction } from './combat';
 
@@ -178,7 +177,7 @@ export function tickArpgEngine(
           attackType: attackConfig.attackType,
         });
       } else {
-        const targetIds = resolveTargets(engine, action, skills, playerPos, input);
+        const targetIds = resolveTargets(engine, action, skills, playerPos);
         if (targetIds.length > 0) {
           events.push({
             type: 'player_attack',
@@ -190,7 +189,7 @@ export function tickArpgEngine(
         }
       }
     } else {
-      const targetIds = resolveTargets(engine, action, skills, playerPos, input);
+      const targetIds = resolveTargets(engine, action, skills, playerPos);
       if (targetIds.length > 0) {
         events.push({
           type: 'player_attack',
@@ -279,7 +278,6 @@ function resolveTargets(
   action: CombatAction,
   skills: Skill[],
   playerPos: Position,
-  input: ArpgTickInput,
 ): string[] {
   const aliveMonsters = Array.from(engine.monsters.entries())
     .filter(([, m]) => m.instance.currentHp > 0);

@@ -7,9 +7,6 @@ import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/ga
 import { calculatePressure } from './pressure';
 import { findPath, findAdjacentWalkable } from './pathfinding';
 import { TileType } from '../models/mapControl';
-import { evaluateCombatScript } from './scriptRunner';
-import { getSkillCooldownReduction } from './combat';
-import { canUseSkill } from '../models/skill';
 
 const ATTACK_RANGE_MELEE = 1.5;
 const DOT_TICK_INTERVAL = 1000;
@@ -19,25 +16,6 @@ export const occupation = new OccupationManager();
 let dotTickTimer = 0;
 let pauseLogShown = false;
 let combatInterruptLogShown = false;
-
-function getPlayerAttackRange(gameState: ReturnType<typeof useGameStore.getState>): number {
-  const weapon = Object.values(gameState.equippedGear).find(g => g && (g as any).slot === 'rightHand') as any;
-  const weaponType = weapon?.baseType;
-  let range = weaponType === 'bow' ? 15 : ATTACK_RANGE_MELEE;
-
-  if (gameState.character && gameState.skills.length > 0) {
-    const allGear = Object.values(gameState.equippedGear).filter(Boolean) as any[];
-    const cdr = getSkillCooldownReduction(allGear);
-    const now = Date.now();
-    for (const skill of gameState.skills) {
-      if (skill.type === 'attack' && skill.range && canUseSkill(skill, gameState.character.mp, now, cdr)) {
-        range = Math.max(range, skill.range);
-      }
-    }
-  }
-
-  return range;
-}
 
 export function gameLoopTick(deltaMs: number) {
   const mapStore = useMapControlStore.getState();
@@ -134,7 +112,7 @@ export function gameLoopTick(deltaMs: number) {
   moveMonstersSafe(deltaMs, map, playerPos, monsterStore);
 
   // === Move player (always allow movement for manual click) ===
-  movePlayerSafe(deltaMs, map);
+  movePlayerSafe(deltaMs);
 
   // === DoT tick + effect expiration ===
   tickDotsAndEffects(deltaMs);
@@ -168,7 +146,7 @@ export function consumeDotTick(): boolean {
   return false;
 }
 
-function movePlayerSafe(deltaMs: number, map: MapData) {
+function movePlayerSafe(deltaMs: number) {
   const store = useMapControlStore.getState();
 
   if (!store.isMoving) {

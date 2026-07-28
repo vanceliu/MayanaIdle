@@ -63,6 +63,9 @@ function createMonster(overrides: Partial<MonsterInstance> = {}): MonsterInstanc
     element: 'none',
     race: 'normal',
     isBoss: false,
+    attackType: 'melee',
+    attackRange: 1.5,
+    attackInterval: 1000,
     ...overrides,
   };
 }

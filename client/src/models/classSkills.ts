@@ -37,7 +37,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'cd-reduce', name: '冷卻縮減', className: 'elementalist', classLevel: 1, requiredLevel: 10, bookName: '冷卻縮減技能書',
     skill: { id: 'cd-reduce', name: '冷卻縮減', level: 1, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 60000, range: 0, buffEffect: '冷卻-20%', buffDuration: 30000, buffModifiers: [{ stat: 'cooldown_reduction', value: 20, isPercent: true }], buffCategory: 'cd-reduction' } },
   { id: 'mana-drain', name: '魔力奪取', className: 'elementalist', classLevel: 2, requiredLevel: 20, bookName: '魔力奪取技能書',
-    skill: { id: 'mana-drain', name: '魔力奪取', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, mpCost: 0, cooldown: 12000, range: 8, description: '造成傷害並吸取等量MP' } },
+    skill: { id: 'mana-drain', name: '魔力奪取', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, mpDrainRatio: 1, mpCost: 0, cooldown: 12000, range: 8, description: '造成傷害，並回復等同最終傷害的MP' } },
   { id: 'element-boost', name: '元素增幅', className: 'elementalist', classLevel: 3, requiredLevel: 30, bookName: '元素增幅技能書',
     skill: { id: 'element-boost', name: '元素增幅', level: 3, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 35, cooldown: 60000, range: 0, buffEffect: '元素傷害+25%', buffDuration: 30000, buffModifiers: [{ stat: 'skill_elemental', value: 25, isPercent: true }], buffCategory: 'element-boost' } },
   { id: 'chain-cast', name: '連鎖詠唱', className: 'elementalist', classLevel: 4, requiredLevel: 40, bookName: '連鎖詠唱技能書',

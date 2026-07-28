@@ -48,6 +48,9 @@ function createTestMonster(overrides: Partial<MonsterInstance> = {}): MonsterIns
     size: 'small',
     element: 'none',
     isBoss: false,
+    attackType: 'melee',
+    attackRange: 1.5,
+    attackInterval: 1000,
     ...overrides,
   };
 }

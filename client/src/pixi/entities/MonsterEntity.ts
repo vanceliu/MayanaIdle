@@ -14,12 +14,10 @@ export class MonsterEntity {
   public id: string;
   private glow: Graphics;
   private body: Graphics;
-  private isBoss: boolean;
   private healthBar: HealthBar;
 
   constructor(id: string, isBoss = false) {
     this.id = id;
-    this.isBoss = isBoss;
     this.container = new Container();
 
     const glowColor = isBoss ? BOSS_GLOW_COLOR : GLOW_COLOR;

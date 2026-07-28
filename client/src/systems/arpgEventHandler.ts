@@ -1,11 +1,10 @@
-import type { ArpgEvent, PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
+import type { PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
 import type { EquipmentInstance } from '../models/equipment';
 import type { MapMonster } from '../stores/mapMonsterStore';
-import type { CombatLog } from './combat';
 import {
   calculatePlayerAttack,
   calculateSkillAttack,
@@ -14,8 +13,9 @@ import {
   calculateBasePhysicalDamage,
   hasActiveFireEnchant,
   getAffixBonusesFromGear,
+  calculateMpRestored,
 } from './combat';
-import { useGameStore, getEffectiveMaxHp } from '../stores/gameStore';
+import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { getSkillTemplate } from '../models/skillTemplate';
 
 export interface ArpgEventContext {
@@ -40,6 +40,7 @@ export interface PlayerAttackResult {
   logs: CombatLog[];
   skillUsed?: Skill;
   healAmount?: number;
+  mpRestored?: number;
 }
 
 export interface MonsterAttackResult {
@@ -58,6 +59,7 @@ export function processPlayerAttack(
   const damages: DamageResult[] = [];
   const logs: CombatLog[] = [];
   const weapon = equippedGear[0] ?? null;
+  let drainDamage = 0;
 
   const skill = event.skill;
 
@@ -185,6 +187,7 @@ export function processPlayerAttack(
     // Apply damage
     if (!isMiss && damage > 0) {
       monster.currentHp = Math.max(0, monster.currentHp - damage);
+      if (skill?.mpDrainRatio) drainDamage += damage;
     }
 
     const killed = monster.currentHp <= 0;
@@ -271,7 +274,7 @@ export function processPlayerAttack(
               target: 'monster',
               targetIdx,
               targetMonsterId: targetId,
-              dot: { damage: baseDmg, element: debuffDef.dotElement, interval: debuffDef.dotInterval ?? 1000, totalDuration: debuffDef.dotDuration ?? 5000 },
+              dot: { damage: baseDmg, element: debuffDef.dotElement ?? skill.element, interval: debuffDef.dotInterval ?? 1000, totalDuration: debuffDef.dotDuration ?? 5000 },
               startTime: now,
               duration: debuffDef.dotDuration ?? 5000,
               tags: debuffDef.tags,
@@ -314,8 +317,19 @@ export function processPlayerAttack(
     if (skillIdx >= 0) {
       const newSkills = [...gs.skills];
       newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
-      const newChar = { ...gs.character!, mp: gs.character!.mp - skill.mpCost };
+      const mpAfterCost = gs.character!.mp - skill.mpCost;
+      const mpRestored = calculateMpRestored(
+        drainDamage,
+        skill.mpDrainRatio,
+        mpAfterCost,
+        getEffectiveMaxMp(gs.character!, gs.equippedGear),
+      );
+      const newChar = { ...gs.character!, mp: mpAfterCost + mpRestored };
       useGameStore.setState({ skills: newSkills, character: newChar });
+      if (mpRestored > 0) {
+        logs.push({ text: `${skill.name} 回復 ${mpRestored} MP`, type: 'player' });
+      }
+      return { damages, logs, skillUsed: skill, mpRestored };
     }
   }
 

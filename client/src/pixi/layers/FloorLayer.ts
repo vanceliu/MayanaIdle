@@ -8,7 +8,6 @@ const GRID_COLOR = 0x1a3d2a;
 
 export class FloorLayer {
   public container: Container;
-  private _built = false;
 
   constructor() {
     this.container = new Container();
@@ -40,11 +39,9 @@ export class FloorLayer {
     }
 
     this.container.addChild(graphics);
-    this._built = true;
   }
 
   destroy(): void {
     this.container.removeChildren();
-    this._built = false;
   }
 }

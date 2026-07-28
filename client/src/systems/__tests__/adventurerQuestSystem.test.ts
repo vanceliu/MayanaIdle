@@ -10,7 +10,13 @@ import {
   completeQuest,
   getPointsToNextRank,
 } from '../adventurerQuestSystem';
-import { getRankForPoints } from '../../models/adventurerQuest';
+import {
+  AREA_POOLS,
+  BOSS_POOLS,
+  MONSTER_POOLS,
+  getRankForPoints,
+} from '../../models/adventurerQuest';
+import { getAreaDisplayName } from '../../wiki/hooks/useWikiData';
 
 function makeQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest {
   return {
@@ -68,6 +74,61 @@ describe('adventurerQuestSystem', () => {
         expect(q.targetCount).toBeLessThanOrEqual(5);
       }
     });
+  });
+
+  describe('quest area configuration', () => {
+    it('uses concrete map ids for every multi-floor quest area', () => {
+      const allAreaIds = Object.values(AREA_POOLS).flat().map(area => area.areaId);
+      const aggregateAliases = [
+        'ivory-tower-1-3f',
+        'ivory-tower-4-5f',
+        'misty-cave',
+        'underwater-prison',
+        'dragon-valley',
+        'ancient-dungeon-1-6f',
+        'ancient-dungeon-7-9f',
+      ];
+
+      expect(allAreaIds).toEqual(expect.arrayContaining([
+        'ivory-tower-1f',
+        'ivory-tower-2f',
+        'ivory-tower-3f',
+        'ivory-tower-4f',
+        'ivory-tower-5f',
+        'misty-cave-1f',
+        'underwater-prison-4f',
+        'dragon-valley-7f',
+        'ancient-dungeon-1f',
+        'ancient-dungeon-9f',
+      ]));
+      for (const alias of aggregateAliases) {
+        expect(allAreaIds).not.toContain(alias);
+      }
+    });
+
+    it('keeps collect quest areas scoped to the monster map id', () => {
+      for (const monster of Object.values(MONSTER_POOLS).flat()) {
+        expect(monster.questArea).toBe(monster.area);
+      }
+    });
+
+    it('keeps boss quests scoped to the boss floor', () => {
+      expect(BOSS_POOLS.A).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: '象牙塔惡魔', area: 'ivory-tower-5f' }),
+        expect.objectContaining({ name: '朦朧蛇魔', area: 'misty-cave-3f' }),
+        expect.objectContaining({ name: '深海獄王', area: 'underwater-prison-4f' }),
+        expect.objectContaining({ name: '安塔巨龍', area: 'dragon-valley-7f' }),
+      ]));
+      expect(BOSS_POOLS.S).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: '遠古騎士', area: 'ancient-dungeon-9f' }),
+      ]));
+    });
+
+    it('derives a floor display name from the selected map id', () => {
+      expect(getAreaDisplayName('ivory-tower-1f')).toBe('象牙塔 1F');
+      expect(getAreaDisplayName('ivory-tower-3f')).toBe('象牙塔 3F');
+    });
+
   });
 
   describe('acceptQuest', () => {
@@ -136,6 +197,18 @@ describe('adventurerQuestSystem', () => {
       ];
       const updated = updateQuestProgress(quests, 'green-valley', '野狼', 1);
       expect(updated[0].currentCount).toBe(5);
+    });
+
+    it('only updates a multi-floor quest on its selected floor', () => {
+      const quests: AdventurerQuest[] = [
+        makeQuest({ id: 'q1', status: 'active', type: 'errand', targetArea: 'ivory-tower-2f', currentCount: 5, targetCount: 20 }),
+      ];
+
+      const wrongFloor = updateQuestProgress(quests, 'ivory-tower-1f', '象牙巫師', 1);
+      expect(wrongFloor[0].currentCount).toBe(5);
+
+      const selectedFloor = updateQuestProgress(quests, 'ivory-tower-2f', '象牙巫師', 1);
+      expect(selectedFloor[0].currentCount).toBe(6);
     });
 
     it('marks quest as completable when target reached', () => {
