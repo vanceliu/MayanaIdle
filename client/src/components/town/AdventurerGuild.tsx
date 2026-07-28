@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
-import type { AdventurerQuest, AdventurerQuestDifficulty } from '../../models/adventurerQuest';
-import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS } from '../../models/adventurerQuest';
+import type { AdventurerQuest, AdventurerQuestDifficulty, QuestTownId } from '../../models/adventurerQuest';
+import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties } from '../../models/adventurerQuest';
 import { getPointsToNextRank } from '../../systems/adventurerQuestSystem';
-
-const DIFFICULTIES: AdventurerQuestDifficulty[] = ['D', 'C', 'B', 'A', 'S'];
 
 function QuestDescription({ description }: { description: string }) {
   const parts = description.split(/(\*\*[^*]+\*\*)/g);
@@ -35,6 +33,8 @@ function RewardPreview({ quest }: { quest: AdventurerQuest }) {
       return <span className="quest-reward">📜 武器強化卷軸 ×{reward.amount}</span>;
     case 'armor-scroll':
       return <span className="quest-reward">📜 防具強化卷軸 ×{reward.amount}</span>;
+    case 'crafting-material':
+      return <span className="quest-reward">🔧 {reward.itemName} ×{reward.amount}</span>;
   }
 }
 
@@ -43,23 +43,37 @@ function QuestTypeTag({ type }: { type: AdventurerQuest['type'] }) {
   return <span className="quest-type-tag">[{labels[type]}]</span>;
 }
 
+const TOWN_NAMES: Record<QuestTownId, string> = {
+  'neutral-town': '薄暮村',
+  'elsarth-town': '艾爾薩斯',
+  'varden-town': '瓦爾登',
+};
+
 export function AdventurerGuild() {
-  const [activeDifficulty, setActiveDifficulty] = useState<AdventurerQuestDifficulty>('D');
+  const currentArea = useGameStore(s => s.character?.currentArea) as QuestTownId | undefined;
+  const townId: QuestTownId = currentArea && (currentArea in TOWN_NAMES) ? currentArea : 'neutral-town';
+  const availableDifficulties = useMemo(() => getTownDifficulties(townId), [townId]);
+  const [activeDifficulty, setActiveDifficulty] = useState<AdventurerQuestDifficulty>(availableDifficulties[0]);
   const questBoard = useGameStore(s => s.adventurerQuestBoard);
   const activeQuests = useGameStore(s => s.adventurerQuests);
   const guildProgress = useGameStore(s => s.guildProgress);
   const acceptAdventurerQuest = useGameStore(s => s.acceptAdventurerQuest);
   const abandonAdventurerQuest = useGameStore(s => s.abandonAdventurerQuest);
   const completeAdventurerQuest = useGameStore(s => s.completeAdventurerQuest);
+  const questBoardTownId = useGameStore(s => s.questBoardTownId);
   const initQuestBoard = useGameStore(s => s.initQuestBoard);
 
   useEffect(() => {
-    const board = useGameStore.getState().adventurerQuestBoard;
-    const isEmpty = Object.values(board).every(quests => quests.length === 0);
-    if (isEmpty) {
+    if (questBoardTownId !== townId) {
       initQuestBoard();
     }
-  }, [initQuestBoard]);
+  }, [initQuestBoard, townId, questBoardTownId]);
+
+  useEffect(() => {
+    if (!availableDifficulties.includes(activeDifficulty)) {
+      setActiveDifficulty(availableDifficulties[0]);
+    }
+  }, [availableDifficulties, activeDifficulty]);
 
   const currentBoard = questBoard[activeDifficulty] ?? [];
   const activeCount = activeQuests.length;
@@ -112,7 +126,8 @@ export function AdventurerGuild() {
       )}
 
       <div className="shop-tabs">
-        {DIFFICULTIES.map(d => (
+        <span className="quest-town-label">{TOWN_NAMES[townId]}分部</span>
+        {availableDifficulties.map(d => (
           <button
             key={d}
             className={activeDifficulty === d ? 'active' : ''}

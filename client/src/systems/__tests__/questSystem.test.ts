@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { Character } from '../../models/character';
 import {
   acceptQuest,
@@ -39,6 +39,10 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 }
 
 describe('questSystem', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('getAvailableQuests', () => {
     it('returns level 1 quest when character is Lv10+', () => {
       const char = makeCharacter({ level: 10 });
@@ -241,7 +245,7 @@ describe('questSystem', () => {
       expect(rollQuestMaterialDrop(char, '野狼')).toBe(false);
     });
 
-    it('has 10% chance to drop when monster matches', () => {
+    it('uses the fixed 10% quest drop rate', () => {
       const char = makeCharacter({
         quests: [{
           id: 'knight-skill-2',
@@ -256,14 +260,11 @@ describe('questSystem', () => {
         }],
       });
 
-      let drops = 0;
-      const iterations = 10000;
-      for (let i = 0; i < iterations; i++) {
-        if (rollQuestMaterialDrop(char, '毒蛇')) drops++;
-      }
-      const rate = drops / iterations;
-      expect(rate).toBeGreaterThan(0.07);
-      expect(rate).toBeLessThan(0.13);
+      vi.spyOn(Math, 'random').mockReturnValue(0.0999);
+      expect(rollQuestMaterialDrop(char, '毒蛇')).toBe(true);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.1);
+      expect(rollQuestMaterialDrop(char, '毒蛇')).toBe(false);
     });
   });
 

@@ -49,11 +49,12 @@ export function getSkillBookLevel(areaLevel: number): number | null {
   return null;
 }
 
-export function rollClassSkillBookDrop(areaLevel: number, isBoss: boolean): string | null {
+export function rollClassSkillBookDrop(areaLevel: number, isBoss: boolean, dropRateMultiplier: number = 1): string | null {
   const bookLevel = getSkillBookLevel(areaLevel);
   if (bookLevel === null) return null;
 
-  const dropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
+  const baseDropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
+  const dropRate = Math.min(baseDropRate * dropRateMultiplier, 1);
   if (Math.random() >= dropRate) return null;
 
   const pool = ALL_CLASS_SKILL_BOOKS.filter(b => b.level === bookLevel);

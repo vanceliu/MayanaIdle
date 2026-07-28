@@ -425,8 +425,11 @@ function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[]
   return (
     <div style={{ marginTop: 16 }}>
       <h4 style={{ color: 'var(--accent-info)', marginBottom: 8 }}>
-        職業技能書掉落（{isBoss ? 'Boss' : '一般怪物'} {dropRate}）
+        職業技能書掉落（{isBoss ? 'Boss' : '一般怪物'} 基礎 {dropRate}）
       </h4>
+      <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+        實際掉落率受角色掉寶率與全域倍率影響。
+      </p>
       <div className="wiki-table-wrap">
         <table className="wiki-table">
           <thead>

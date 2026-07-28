@@ -143,19 +143,19 @@ function ItemDetail({ name }: { name: string }) {
           if (getSkillBookLevel(floor.levelMax) === bookLevel) {
             const areaId = `${region.id}-${floor.floor}f`;
             matchedAreas.add(areaId);
-            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: '0.05%' });
+            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: '基礎 0.05%' });
           }
         }
       } else if (getSkillBookLevel(region.levelMax) === bookLevel) {
         matchedAreas.add(region.id);
-        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: '0.05%' });
+        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: '基礎 0.05%' });
       }
     }
 
     // 那些區域中的 Boss → 5%
     const bossMonsters = MONSTER_SEEDS.filter(m => m.isBoss && matchedAreas.has(m.area));
     for (const boss of bossMonsters) {
-      sources.push({ label: `${boss.name}（Boss）`, area: boss.area, rate: '5.0%' });
+      sources.push({ label: `${boss.name}（Boss）`, area: boss.area, rate: '基礎 5.0%' });
     }
 
     return sources;

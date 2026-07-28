@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
@@ -57,6 +57,7 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
 
   afterEach(async () => {
     await waitForPendingDrops();
+    vi.restoreAllMocks();
   });
 
   it('should mark monster as _processed and award EXP on death', async () => {
@@ -311,5 +312,81 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
     const quests = useGameStore.getState().adventurerQuests;
     expect(quests.find(q => q.id === 'floor-1-quest')?.currentCount).toBe(1);
     expect(quests.find(q => q.id === 'floor-2-quest')?.currentCount).toBe(0);
+  });
+
+  it('should add a dropped dungeon scroll to the bag as a scroll', async () => {
+    await useGameStore.getState().createCharacter('TowerScrollTest', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+    await db.dropTables.where('area').equals('hundred-pillar-1-10f').delete();
+    await db.dropTables.add({
+      area: 'hundred-pillar-1-10f',
+      itemType: 'item',
+      itemTemplateId: 135,
+      dropValue: 1000,
+      minAmount: 1,
+      maxAmount: 1,
+    });
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const char = {
+      ...useGameStore.getState().character!,
+      currentArea: 'hundred-pillar-1-10f',
+      currentRegion: 'hundred-pillar-1-10f',
+      currentFloor: null,
+    };
+    const deadMonster = {
+      templateId: 1, name: '百柱蜘蛛', level: 45, currentHp: 0, maxHp: 100,
+      attackMin: 1, attackMax: 2, defense: 0, exp: 1,
+      race: 'normal' as const, size: 'small' as const, element: 'none' as const,
+      isBoss: false, attackType: 'melee' as const, attackRange: 1.5, attackInterval: 1000, _processed: false,
+    };
+
+    useGameStore.setState({ phase: 'combat', character: char, activeEffects: [] });
+    processMonsterDeath(() => useGameStore.getState(), s => useGameStore.setState(s), [deadMonster], 0, char, [], []);
+    await waitForPendingDrops();
+
+    expect(useGameStore.getState().bagItems).toContainEqual({
+      name: '百柱塔 11F 通行卷軸',
+      type: 'scroll',
+      itemTemplateId: 135,
+      amount: 1,
+    });
+  });
+
+  it('should add an other-category drop to the bag as material', async () => {
+    await useGameStore.getState().createCharacter('OtherDropTest', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+    await db.dropTables.where('area').equals('dawn-plains').delete();
+    await db.dropTables.add({
+      area: 'dawn-plains',
+      itemType: 'item',
+      itemTemplateId: 132,
+      dropValue: 1000,
+      minAmount: 1,
+      maxAmount: 1,
+    });
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const char = {
+      ...useGameStore.getState().character!,
+      currentArea: 'dawn-plains',
+      currentRegion: 'dawn-plains',
+      currentFloor: null,
+    };
+    const deadMonster = {
+      templateId: 1, name: '暴牙兔', level: 1, currentHp: 0, maxHp: 20,
+      attackMin: 1, attackMax: 2, defense: 0, exp: 1,
+      race: 'normal' as const, size: 'small' as const, element: 'none' as const,
+      isBoss: false, attackType: 'melee' as const, attackRange: 1.5, attackInterval: 1000, _processed: false,
+    };
+
+    useGameStore.setState({ phase: 'combat', character: char, activeEffects: [] });
+    processMonsterDeath(() => useGameStore.getState(), s => useGameStore.setState(s), [deadMonster], 0, char, [], []);
+    await waitForPendingDrops();
+
+    expect(useGameStore.getState().bagItems).toContainEqual({
+      name: '磨刀石',
+      type: 'material',
+      itemTemplateId: 132,
+      amount: 1,
+    });
   });
 });

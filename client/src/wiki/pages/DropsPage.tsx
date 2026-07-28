@@ -90,7 +90,7 @@ export function DropsPage() {
         <div className="wiki-table-wrap">
           <div style={{ background: 'var(--bg-card)', padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 12, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
             <p style={{ margin: 0 }}>
-              ※ Lv40+ 區域一般小怪額外判定職業技能書掉落（0.05%）：Lv40~43 掉 3 級書、Lv43~46 掉 4 級書、Lv46+ 掉 5 級書。不區分職業，25 本共同池隨機。
+              ※ Lv40+ 區域一般小怪額外判定職業技能書掉落（基礎 0.05%）：Lv40~43 掉 3 級書、Lv43~46 掉 4 級書、Lv46+ 掉 5 級書。不區分職業，25 本共同池隨機；實際掉率受角色掉寶率與全域倍率影響。
             </p>
           </div>
           <table className="wiki-table">
@@ -140,7 +140,7 @@ export function DropsPage() {
           <div style={{ background: 'var(--bg-card)', padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 12, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
             <p style={{ margin: 0 }}>
               ※ Boss 擊殺時只從專屬掉落池掉落，不使用一般區域掉落表。<br />
-              ※ Boss 額外判定職業技能書掉落（5%）：Lv40~43 區域掉 3 級書、Lv43~46 掉 4 級書、Lv46+ 掉 5 級書。不區分職業，25 本共同池隨機。
+              ※ Boss 額外判定職業技能書掉落（基礎 5%）：Lv40~43 區域掉 3 級書、Lv43~46 掉 4 級書、Lv46+ 掉 5 級書。不區分職業，25 本共同池隨機；實際掉率受角色掉寶率與全域倍率影響。
             </p>
           </div>
           <table className="wiki-table">

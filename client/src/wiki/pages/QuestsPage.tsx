@@ -12,10 +12,28 @@ export function QuestsPage() {
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             冒險者工會提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
-            三個城鎮皆設有冒險者工會。<br />
+            三個城鎮皆設有冒險者工會分部，各分部僅顯示與該城鎮相關區域的任務。<br />
             每個難度等級顯示 5~8 個隨機任務，最多同時接取 3 個。<br />
             任務列表每次登入時重新生成，已接取任務可隨時免費退出（扣除等量貢獻點數）。
           </p>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
+          城鎮分部
+        </h3>
+        <div className="wiki-table-wrap">
+          <table className="wiki-table">
+            <thead>
+              <tr><th>城鎮</th><th>可用難度</th><th>區域範圍</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>薄暮村</td><td>D / C / B / A</td><td>曙光草原 ~ 象牙塔 5F</td></tr>
+              <tr><td>艾爾薩斯</td><td>A / S</td><td>妖魔森林、龍之谷、朦朧洞窟、龍谷地間、百柱塔、遠古地監等</td></tr>
+              <tr><td>瓦爾登</td><td>A / S</td><td>明鏡森林、龍之谷、水下監獄、龍谷地間、百柱塔、遠古地監等</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -138,6 +156,7 @@ export function QuestsPage() {
               <tr><td>強化石</td><td>基準值 ÷ 100（個）</td></tr>
               <tr><td>武器強化卷軸</td><td>1 張</td></tr>
               <tr><td>防具強化卷軸</td><td>1 張</td></tr>
+              <tr><td>製作素材（B 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
             </tbody>
           </table>
         </div>
@@ -155,9 +174,9 @@ export function QuestsPage() {
             <tbody>
               <tr><td>F ~ D</td><td>金幣、藥水、品質石、強化石</td></tr>
               <tr><td>C</td><td>同上（品質石/強化石權重提升）</td></tr>
-              <tr><td>B</td><td>+ 防具強化卷軸</td></tr>
-              <tr><td>A</td><td>+ 武器強化卷軸</td></tr>
-              <tr><td>S ~ SS</td><td>卷軸出現權重提高</td></tr>
+              <tr><td>B</td><td>+ 防具強化卷軸、製作素材（銀礦石、銀精華）</td></tr>
+              <tr><td>A</td><td>+ 武器強化卷軸、製作素材升級（米索利碎片、米索利礦石）</td></tr>
+              <tr><td>S ~ SS</td><td>卷軸權重提高、製作素材升級（龍骨、奧里哈魯根）</td></tr>
               <tr><td>US</td><td>所有獎勵 ×10</td></tr>
             </tbody>
           </table>
@@ -171,14 +190,14 @@ export function QuestsPage() {
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>等階</th><th>金幣</th><th>藥水</th><th>品質石</th><th>強化石</th><th>防具卷軸</th><th>武器卷軸</th></tr>
+              <tr><th>等階</th><th>金幣</th><th>藥水</th><th>品質石</th><th>強化石</th><th>防具卷軸</th><th>武器卷軸</th><th>製作素材</th></tr>
             </thead>
             <tbody>
-              <tr><td>F ~ D</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>C</td><td className="cell-number">35</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">20</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B</td><td className="cell-number">30</td><td className="cell-number">25</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td></tr>
-              <tr><td>A</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">10</td></tr>
-              <tr><td>S ~ SS</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">17</td><td className="cell-number">18</td></tr>
+              <tr><td>F ~ D</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>C</td><td className="cell-number">35</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">20</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">10</td></tr>
+              <tr><td>A</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">13</td><td className="cell-number">10</td><td className="cell-number">12</td></tr>
+              <tr><td>S ~ SS</td><td className="cell-number">17</td><td className="cell-number">13</td><td className="cell-number">13</td><td className="cell-number">13</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">14</td></tr>
             </tbody>
           </table>
         </div>

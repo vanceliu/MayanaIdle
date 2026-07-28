@@ -6,6 +6,7 @@ import type {
   GuildRank,
   QuestReward,
   RewardType,
+  QuestTownId,
 } from '../models/adventurerQuest';
 import {
   MAX_ACTIVE_ADVENTURER_QUESTS,
@@ -20,10 +21,14 @@ import {
   BOSS_COLLECT_TARGET_COUNT,
   BOSS_COLLECT_DROP_RATE,
   AREA_POOLS,
+  TOWN_AREA_POOLS,
   MONSTER_POOLS,
+  TOWN_MONSTER_POOLS,
   BOSS_POOLS,
+  TOWN_BOSS_POOLS,
   REWARD_WEIGHTS,
   POTION_REWARDS,
+  CRAFTING_MATERIAL_REWARDS,
   GUILD_RANK_THRESHOLDS,
   GUILD_RANK_ORDER,
   getRankForPoints,
@@ -99,6 +104,7 @@ function generateQuestDescription(
 function calculateReward(
   type: RewardType,
   baseValue: number,
+  difficulty: AdventurerQuestDifficulty = 'D',
 ): QuestReward {
   switch (type) {
     case 'gold':
@@ -124,6 +130,13 @@ function calculateReward(
       const item = getItem(8);
       return { type: 'armor-scroll', itemId: item.id, itemName: item.name, amount: 1 };
     }
+    case 'crafting-material': {
+      const materialIds = CRAFTING_MATERIAL_REWARDS[difficulty] ?? CRAFTING_MATERIAL_REWARDS.B!;
+      const itemId = pickRandom(materialIds);
+      const item = getItem(itemId);
+      const amount = Math.max(1, Math.floor(baseValue / (item.sellPrice! * 3)));
+      return { type: 'crafting-material', itemId: item.id, itemName: item.name, amount };
+    }
   }
 }
 
@@ -131,6 +144,7 @@ export function generateSingleQuest(
   difficulty: AdventurerQuestDifficulty,
   guildRank: GuildRank,
   index: number,
+  townId?: QuestTownId,
 ): AdventurerQuest {
   const type = pickQuestType(difficulty);
   let targetArea: string;
@@ -139,16 +153,37 @@ export function generateSingleQuest(
   let targetCount: number;
   let avgGold: number;
 
+  const areaPool = (townId ? TOWN_AREA_POOLS[townId][difficulty] : undefined) ?? AREA_POOLS[difficulty];
+  const monsterPool = (townId ? TOWN_MONSTER_POOLS[townId]?.[difficulty] : undefined) ?? MONSTER_POOLS[difficulty];
+  const bossPool = (townId && (difficulty === 'B' || difficulty === 'A' || difficulty === 'S'))
+    ? (TOWN_BOSS_POOLS[townId]?.[difficulty as 'B' | 'A' | 'S'] ?? BOSS_POOLS[difficulty as 'B' | 'A' | 'S'])
+    : (difficulty === 'B' || difficulty === 'A' || difficulty === 'S') ? BOSS_POOLS[difficulty as 'B' | 'A' | 'S'] : [];
+
   if (type === 'collect') {
-    const monsterEntry = pickRandom(MONSTER_POOLS[difficulty]);
+    if (monsterPool.length === 0) {
+      const areaEntry = pickRandom(areaPool);
+      targetArea = areaEntry.areaId;
+      areaName = getAreaDisplayName(targetArea);
+      avgGold = areaEntry.avgGold;
+      targetCount = randomInt(KILL_COUNT_RANGE[difficulty].min, KILL_COUNT_RANGE[difficulty].max);
+      return buildQuest('errand', difficulty, targetArea, areaName, undefined, targetCount, avgGold, guildRank, index);
+    }
+    const monsterEntry = pickRandom(monsterPool);
     targetMonster = monsterEntry.name;
     targetArea = monsterEntry.area;
     areaName = getAreaDisplayName(monsterEntry.area);
-    avgGold = AREA_POOLS[difficulty].find(a => a.areaId === monsterEntry.questArea)?.avgGold ?? 50;
+    avgGold = areaPool.find(a => a.areaId === monsterEntry.questArea)?.avgGold ?? 50;
     targetCount = randomInt(COLLECT_TARGET_COUNT_RANGE.min, COLLECT_TARGET_COUNT_RANGE.max);
   } else if (type === 'errandboss' || type === 'collectboss') {
-    const bossDifficulty = difficulty as 'B' | 'A' | 'S';
-    const bossEntry = pickRandom(BOSS_POOLS[bossDifficulty]);
+    if (bossPool.length === 0) {
+      const areaEntry = pickRandom(areaPool);
+      targetArea = areaEntry.areaId;
+      areaName = getAreaDisplayName(targetArea);
+      avgGold = areaEntry.avgGold;
+      targetCount = randomInt(KILL_COUNT_RANGE[difficulty].min, KILL_COUNT_RANGE[difficulty].max);
+      return buildQuest('errand', difficulty, targetArea, areaName, undefined, targetCount, avgGold, guildRank, index);
+    }
+    const bossEntry = pickRandom(bossPool);
     targetMonster = bossEntry.name;
     targetArea = bossEntry.area;
     areaName = getAreaDisplayName(targetArea);
@@ -160,7 +195,7 @@ export function generateSingleQuest(
       targetCount = randomInt(1, BOSS_COLLECT_TARGET_COUNT);
     }
   } else {
-    const areaEntry = pickRandom(AREA_POOLS[difficulty]);
+    const areaEntry = pickRandom(areaPool);
     targetArea = areaEntry.areaId;
     areaName = getAreaDisplayName(targetArea);
     avgGold = areaEntry.avgGold;
@@ -174,12 +209,26 @@ export function generateSingleQuest(
     }
   }
 
+  return buildQuest(type, difficulty, targetArea, areaName, targetMonster, targetCount, avgGold, guildRank, index);
+}
+
+function buildQuest(
+  type: AdventurerQuestType,
+  difficulty: AdventurerQuestDifficulty,
+  targetArea: string,
+  areaName: string,
+  targetMonster: string | undefined,
+  targetCount: number,
+  avgGold: number,
+  guildRank: GuildRank,
+  index: number,
+): AdventurerQuest {
   const isBossQuest = type === 'errandboss' || type === 'collectboss';
   const baseValue = isBossQuest ? avgGold * targetCount * 3 : avgGold * targetCount;
   const rewardWeights = REWARD_WEIGHTS[guildRank];
   const rewardType = weightedPick(rewardWeights).type;
   const rewardMultiplier = guildRank === 'US' ? 10 : (isBossQuest ? 2 : 1);
-  const reward = calculateReward(rewardType, baseValue * rewardMultiplier);
+  const reward = calculateReward(rewardType, baseValue * rewardMultiplier, difficulty);
   const baseContribution = CONTRIBUTION_POINTS[difficulty][type];
   const areaBonus = Math.floor(avgGold / 10);
   const contributionPoints = baseContribution + areaBonus;
@@ -205,11 +254,12 @@ export function generateSingleQuest(
 export function generateQuestList(
   difficulty: AdventurerQuestDifficulty,
   guildRank: GuildRank,
+  townId?: QuestTownId,
 ): AdventurerQuest[] {
   const count = randomInt(5, 8);
   const quests: AdventurerQuest[] = [];
   for (let i = 0; i < count; i++) {
-    quests.push(generateSingleQuest(difficulty, guildRank, i));
+    quests.push(generateSingleQuest(difficulty, guildRank, i, townId));
   }
   return quests;
 }

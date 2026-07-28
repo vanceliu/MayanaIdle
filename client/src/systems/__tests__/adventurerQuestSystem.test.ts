@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { AdventurerQuest, GuildProgress } from '../../models/adventurerQuest';
 import {
   generateQuestList,
@@ -14,6 +14,11 @@ import {
   AREA_POOLS,
   BOSS_POOLS,
   MONSTER_POOLS,
+  TOWN_AREA_POOLS,
+  TOWN_BOSS_POOLS,
+  TOWN_MONSTER_POOLS,
+  CRAFTING_MATERIAL_REWARDS,
+  getTownDifficulties,
   getRankForPoints,
 } from '../../models/adventurerQuest';
 import { getAreaDisplayName } from '../../wiki/hooks/useWikiData';
@@ -36,6 +41,10 @@ function makeQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest {
 }
 
 describe('adventurerQuestSystem', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('generateQuestList', () => {
     it('generates 5-8 quests for a given difficulty', () => {
       const quests = generateQuestList('D', 'F');
@@ -297,6 +306,122 @@ describe('adventurerQuestSystem', () => {
         makeQuest({ id: 'q1', status: 'active', type: 'collect', targetMonster: '毒蛇' }),
       ];
       expect(rollCollectMaterialDrop(quests, '野狼')).toBe(false);
+    });
+
+    it('uses the fixed 40% normal collect drop rate', () => {
+      const quests: AdventurerQuest[] = [
+        makeQuest({ id: 'q1', status: 'active', type: 'collect', targetMonster: '毒蛇' }),
+      ];
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.3999);
+      expect(rollCollectMaterialDrop(quests, '毒蛇')).toBe(true);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.4);
+      expect(rollCollectMaterialDrop(quests, '毒蛇')).toBe(false);
+    });
+
+    it('uses the fixed 30% boss collect drop rate', () => {
+      const quests: AdventurerQuest[] = [
+        makeQuest({ id: 'q1', status: 'active', type: 'collectboss', targetMonster: '象牙塔惡魔' }),
+      ];
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.2999);
+      expect(rollCollectMaterialDrop(quests, '象牙塔惡魔')).toBe(true);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.3);
+      expect(rollCollectMaterialDrop(quests, '象牙塔惡魔')).toBe(false);
+    });
+  });
+
+  describe('town-specific quest generation', () => {
+    it('getTownDifficulties returns correct difficulties per town', () => {
+      expect(getTownDifficulties('neutral-town')).toEqual(['D', 'C', 'B', 'A']);
+      expect(getTownDifficulties('elsarth-town')).toEqual(['A', 'S']);
+      expect(getTownDifficulties('varden-town')).toEqual(['A', 'S']);
+    });
+
+    it('neutral-town quests only target neutral/snow/ivory areas', () => {
+      const neutralAreaIds = new Set(
+        Object.values(TOWN_AREA_POOLS['neutral-town']).flat().map(a => a.areaId)
+      );
+      for (let i = 0; i < 50; i++) {
+        const quests = generateQuestList('D', 'F', 'neutral-town');
+        for (const q of quests) {
+          expect(neutralAreaIds.has(q.targetArea)).toBe(true);
+        }
+      }
+    });
+
+    it('elsarth-town A quests target elsarth-related areas', () => {
+      const elsarthAreaIds = new Set(
+        (TOWN_AREA_POOLS['elsarth-town'].A ?? []).map(a => a.areaId)
+      );
+      for (let i = 0; i < 50; i++) {
+        const quests = generateQuestList('A', 'F', 'elsarth-town');
+        for (const q of quests) {
+          if (q.type === 'errand' || q.type === 'endurance') {
+            expect(elsarthAreaIds.has(q.targetArea)).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('varden-town A quests target varden-related areas', () => {
+      const vardenAreaIds = new Set(
+        (TOWN_AREA_POOLS['varden-town'].A ?? []).map(a => a.areaId)
+      );
+      for (let i = 0; i < 50; i++) {
+        const quests = generateQuestList('A', 'F', 'varden-town');
+        for (const q of quests) {
+          if (q.type === 'errand' || q.type === 'endurance') {
+            expect(vardenAreaIds.has(q.targetArea)).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('elsarth-town does not produce D/C/B quests', () => {
+      const quests = generateQuestList('D', 'F', 'elsarth-town');
+      expect(quests.every(q => q.difficulty === 'D')).toBe(true);
+      // Should still work as fallback (uses global pool)
+    });
+  });
+
+  describe('crafting material rewards', () => {
+    it('CRAFTING_MATERIAL_REWARDS has correct item IDs per difficulty', () => {
+      expect(CRAFTING_MATERIAL_REWARDS.B).toEqual([11, 12]);
+      expect(CRAFTING_MATERIAL_REWARDS.A).toEqual([13, 14]);
+      expect(CRAFTING_MATERIAL_REWARDS.S).toEqual([15, 16, 17, 18]);
+      expect(CRAFTING_MATERIAL_REWARDS.D).toBeUndefined();
+      expect(CRAFTING_MATERIAL_REWARDS.C).toBeUndefined();
+    });
+
+    it('B+ rank quests can produce crafting-material rewards', () => {
+      let found = false;
+      for (let i = 0; i < 200; i++) {
+        const quests = generateQuestList('B', 'B');
+        if (quests.some(q => q.reward.type === 'crafting-material')) {
+          found = true;
+          break;
+        }
+      }
+      expect(found).toBe(true);
+    });
+
+    it('crafting-material reward has valid item info and amount >= 1', () => {
+      for (let i = 0; i < 200; i++) {
+        const quests = generateQuestList('A', 'A');
+        for (const q of quests) {
+          if (q.reward.type === 'crafting-material') {
+            expect(q.reward.itemId).toBeDefined();
+            expect(q.reward.itemName).toBeDefined();
+            expect(q.reward.amount).toBeGreaterThanOrEqual(1);
+            expect([13, 14]).toContain(q.reward.itemId);
+            return;
+          }
+        }
+      }
+      throw new Error('No crafting-material reward found after 200 iterations');
     });
   });
 });

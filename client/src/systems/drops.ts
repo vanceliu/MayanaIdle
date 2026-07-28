@@ -6,7 +6,8 @@ import { generateAffixes } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
 import { getRegion } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
-import { getItemById } from '../models/items';
+import { getItemById, getItemDefinition } from '../models/items';
+import type { ItemCategory } from '../models/items';
 import { GOLD_RATE_MULTIPLIER, DROP_RATE_MULTIPLIER } from '../config';
 
 export interface DropResult {
@@ -14,12 +15,25 @@ export interface DropResult {
   items: DroppedItem[];
 }
 
+type InventoryItemType = 'material' | 'potion' | 'scroll' | 'spellbook';
+
 export interface DroppedItem {
   name: string;
-  type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook' | 'dungeon' | 'other';
+  type: 'equipment' | InventoryItemType;
   itemTemplateId?: number;
   amount: number;
   equipmentInstance?: EquipmentInstance;
+}
+
+export function mapItemCategoryToInventoryType(category: ItemCategory): InventoryItemType {
+  switch (category) {
+    case 'dungeon':
+      return 'scroll';
+    case 'other':
+      return 'material';
+    default:
+      return category;
+  }
 }
 
 function randomInt(min: number, max: number): number {
@@ -33,11 +47,15 @@ export interface DropBonuses {
 
 export const DROP_ROLL_MAX = 1000;
 
+function getDropRateMultiplier(bonuses?: DropBonuses): number {
+  return (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
+}
+
 export async function rollBossDrops(bossName: string, ownerId: number, areaLevel: number, bonuses?: DropBonuses): Promise<DropResult> {
   const entries = await db.bossDropTables.where('bossName').equals(bossName).toArray();
   let gold = 0;
   const items: DroppedItem[] = [];
-  const dropRateMultiplier = (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
+  const dropRateMultiplier = getDropRateMultiplier(bonuses);
   const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
   let highTierRolled = false;
 
@@ -131,7 +149,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       if (itemDef) {
         items.push({
           name: itemDef.name,
-          type: itemDef.category as DroppedItem['type'],
+          type: mapItemCategoryToInventoryType(itemDef.category),
           itemTemplateId: entry.itemTemplateId,
           amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
         });
@@ -140,9 +158,14 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   }
 
   // Class skill book drop (boss 5%)
-  const skillBookDrop = rollClassSkillBookDrop(areaLevel, true);
+  const skillBookDrop = rollClassSkillBookDrop(areaLevel, true, dropRateMultiplier);
   if (skillBookDrop) {
-    items.push({ name: skillBookDrop, type: 'spellbook', amount: 1 });
+    items.push({
+      name: skillBookDrop,
+      type: 'spellbook',
+      itemTemplateId: getItemDefinition(skillBookDrop)?.id,
+      amount: 1,
+    });
   }
 
   return { gold, items };
@@ -156,7 +179,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   const areaLevelMax = region?.levelMax ?? 1;
   let gold = 0;
   const items: DroppedItem[] = [];
-  const dropRateMultiplier = (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
+  const dropRateMultiplier = getDropRateMultiplier(bonuses);
   const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
 
   for (const entry of entries) {
@@ -233,7 +256,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       if (itemDef) {
         items.push({
           name: itemDef.name,
-          type: itemDef.category as DroppedItem['type'],
+          type: mapItemCategoryToInventoryType(itemDef.category),
           itemTemplateId: entry.itemTemplateId,
           amount: randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1),
         });
@@ -242,9 +265,14 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   }
 
   // Class skill book drop (dynamic, based on area level)
-  const skillBookDrop = rollClassSkillBookDrop(areaLevel, isBoss);
+  const skillBookDrop = rollClassSkillBookDrop(areaLevel, isBoss, dropRateMultiplier);
   if (skillBookDrop) {
-    items.push({ name: skillBookDrop, type: 'spellbook', amount: 1 });
+    items.push({
+      name: skillBookDrop,
+      type: 'spellbook',
+      itemTemplateId: getItemDefinition(skillBookDrop)?.id,
+      amount: 1,
+    });
   }
 
   return { gold, items };

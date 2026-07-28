@@ -17,8 +17,9 @@ import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, 
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
-import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty } from '../models/adventurerQuest';
+import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
+import { getTownDifficulties } from '../models/adventurerQuest';
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
@@ -148,6 +149,7 @@ interface GameState {
   activeEffects: ActiveEffect[];
   adventurerQuests: AdventurerQuest[];
   adventurerQuestBoard: Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
+  questBoardTownId: QuestTownId | null;
   guildProgress: GuildProgress;
   statistics: CharacterStatistics;
 
@@ -272,6 +274,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeEffects: [],
   adventurerQuests: [],
   adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+  questBoardTownId: null,
   guildProgress: { rank: 'F', points: 0 },
   statistics: createDefaultStatistics(),
 
@@ -468,6 +471,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       quickSlots: [null, null, null, null, null],
       adventurerQuests: [],
       adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+  questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
     });
     await get().loadCharacterList();
@@ -569,6 +573,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       bagItems: [{ name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 }],
       adventurerQuests: [],
       adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+  questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
       phase: 'explore',
     });
@@ -1263,13 +1268,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       state.adventurerQuests, questId, state.guildProgress
     );
 
+    const townId = state.character?.currentArea as QuestTownId | undefined;
     const board = { ...state.adventurerQuestBoard };
     if (quest) {
       const diff = quest.difficulty;
       const oldList = board[diff];
       const idx = oldList.findIndex(q => q.id === questId);
       if (idx !== -1) {
-        const newQuest = generateAdvSingleQuest(diff, guildProgress.rank, idx);
+        const newQuest = generateAdvSingleQuest(diff, guildProgress.rank, idx, townId);
         board[diff] = [...oldList.slice(0, idx), newQuest, ...oldList.slice(idx + 1)];
       }
     }
@@ -1304,13 +1310,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    const townId2 = state.character?.currentArea as QuestTownId | undefined;
     const board = { ...state.adventurerQuestBoard };
     if (quest) {
       const diff = quest.difficulty;
       const oldList = board[diff];
       const idx = oldList.findIndex(q => q.id === questId);
       if (idx !== -1) {
-        const newQuest = generateAdvSingleQuest(diff, guildProgress.rank, idx);
+        const newQuest = generateAdvSingleQuest(diff, guildProgress.rank, idx, townId2);
         board[diff] = [...oldList.slice(0, idx), newQuest, ...oldList.slice(idx + 1)];
       }
     }
@@ -1331,19 +1338,21 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   refreshQuestBoard: (difficulty) => {
     const state = get();
+    const townId = state.character?.currentArea as QuestTownId | undefined;
     const board = { ...state.adventurerQuestBoard };
-    board[difficulty] = generateQuestList(difficulty, state.guildProgress.rank);
+    board[difficulty] = generateQuestList(difficulty, state.guildProgress.rank, townId);
     set({ adventurerQuestBoard: board });
   },
 
   initQuestBoard: () => {
     const state = get();
-    const difficulties: AdventurerQuestDifficulty[] = ['D', 'C', 'B', 'A', 'S'];
-    const board = {} as Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
+    const townId = state.character?.currentArea as QuestTownId | undefined;
+    const difficulties = townId ? getTownDifficulties(townId) : (['D', 'C', 'B', 'A', 'S'] as AdventurerQuestDifficulty[]);
+    const board = { D: [], C: [], B: [], A: [], S: [] } as Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
     for (const d of difficulties) {
-      board[d] = generateQuestList(d, state.guildProgress.rank);
+      board[d] = generateQuestList(d, state.guildProgress.rank, townId);
     }
-    set({ adventurerQuestBoard: board });
+    set({ adventurerQuestBoard: board, questBoardTownId: townId ?? null });
   },
 
   saveState: () => {
@@ -1669,6 +1678,8 @@ export function processMonsterDeath(
           newBag.push({ name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount });
           logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
         }
+      } else {
+        logs2.push({ text: `無法處理掉落物 ${item.name}（未知類型：${item.type}）`, type: 'system' });
       }
     }
 

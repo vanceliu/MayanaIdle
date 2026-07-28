@@ -72,6 +72,8 @@
 | 魔法書 | `spellbook` | ✅ | 1 格 | 魔法書碎片 ×3 佔 1 格 |
 | 裝備 | `equipment` | ❌ | 1 格/件 | 每件獨立實例各佔 1 格 |
 
+物品模板可使用特殊語意分類，但進入背包前必須正規化：`dungeon → scroll`、`other → material`。背包與持久化資料不可儲存 `dungeon` 或 `other` type。
+
 ---
 
 ## 35.5 物品互動方式
@@ -430,9 +432,12 @@
 interface BagItem {
   name: string;        // 物品名稱（對應 item_definitions）
   type: 'material' | 'potion' | 'scroll' | 'spellbook';
+  itemTemplateId?: number;
   amount: number;      // 堆疊數量
 }
 ```
+
+`ItemDefinition.category` 的 `dungeon`／`other` 僅供模板與特殊規則使用，建立 `BagItem` 前必須分別轉換為 `scroll`／`material`。
 
 ### 35.19.2 EquipmentInstance（背包中的裝備）
 

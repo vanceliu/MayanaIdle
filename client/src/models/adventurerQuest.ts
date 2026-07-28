@@ -5,8 +5,9 @@ export type AdventurerQuestType = 'errand' | 'collect' | 'endurance' | 'errandbo
 export type AdventurerQuestDifficulty = 'D' | 'C' | 'B' | 'A' | 'S';
 export type AdventurerQuestStatus = 'available' | 'active' | 'completable';
 export type GuildRank = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'US';
+export type QuestTownId = 'neutral-town' | 'elsarth-town' | 'varden-town';
 
-export type RewardType = 'gold' | 'potion' | 'quality-stone' | 'enhancement-stone' | 'weapon-scroll' | 'armor-scroll';
+export type RewardType = 'gold' | 'potion' | 'quality-stone' | 'enhancement-stone' | 'weapon-scroll' | 'armor-scroll' | 'crafting-material';
 
 export interface QuestReward {
   type: RewardType;
@@ -145,6 +146,45 @@ export const AREA_POOLS: Record<AdventurerQuestDifficulty, AreaPoolEntry[]> = {
   ],
 };
 
+export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<AdventurerQuestDifficulty, AreaPoolEntry[]>>> = {
+  'neutral-town': {
+    D: AREA_POOLS.D,
+    C: AREA_POOLS.C,
+    B: AREA_POOLS.B,
+    A: [
+      ...createFloorAreaEntries('ivory-tower', '象牙塔', [4, 5], 200),
+    ],
+  },
+  'elsarth-town': {
+    A: [
+      { areaId: 'demon-forest', areaName: '妖魔森林', avgGold: 160 },
+      { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
+      { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
+      ...createFloorAreaEntries('misty-cave', '朦朧洞窟', [1, 2, 3], 250),
+      ...createFloorAreaEntries('dragon-valley', '龍谷地間', [1, 2, 3, 4, 5, 6, 7], 250),
+      { areaId: 'hundred-pillar-1-10f', areaName: '百柱塔 1-10F', avgGold: 275 },
+      { areaId: 'hundred-pillar-11-20f', areaName: '百柱塔 11-20F', avgGold: 290 },
+      { areaId: 'hundred-pillar-21-30f', areaName: '百柱塔 21-30F', avgGold: 300 },
+      ...createFloorAreaEntries('ancient-dungeon', '遠古地監', [1, 2, 3, 4, 5, 6], 280),
+    ],
+    S: AREA_POOLS.S,
+  },
+  'varden-town': {
+    A: [
+      { areaId: 'mirror-forest', areaName: '明鏡森林', avgGold: 160 },
+      { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
+      { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
+      ...createFloorAreaEntries('underwater-prison', '水下監獄', [1, 2, 3, 4], 250),
+      ...createFloorAreaEntries('dragon-valley', '龍谷地間', [1, 2, 3, 4, 5, 6, 7], 250),
+      { areaId: 'hundred-pillar-1-10f', areaName: '百柱塔 1-10F', avgGold: 275 },
+      { areaId: 'hundred-pillar-11-20f', areaName: '百柱塔 11-20F', avgGold: 290 },
+      { areaId: 'hundred-pillar-21-30f', areaName: '百柱塔 21-30F', avgGold: 300 },
+      ...createFloorAreaEntries('ancient-dungeon', '遠古地監', [1, 2, 3, 4, 5, 6], 280),
+    ],
+    S: AREA_POOLS.S,
+  },
+};
+
 const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: AdventurerQuestDifficulty }> = {
   'dawn-plains': { questArea: 'dawn-plains', difficulty: 'D' },
   'green-valley': { questArea: 'green-valley', difficulty: 'D' },
@@ -276,6 +316,60 @@ function buildBossPools(): Record<'B' | 'A' | 'S', BossPoolEntry[]> {
 
 export const BOSS_POOLS: Record<'B' | 'A' | 'S', BossPoolEntry[]> = buildBossPools();
 
+function getTownAreaIds(townId: QuestTownId): Set<string> {
+  const pools = TOWN_AREA_POOLS[townId];
+  const ids = new Set<string>();
+  for (const entries of Object.values(pools)) {
+    if (entries) for (const e of entries) ids.add(e.areaId);
+  }
+  return ids;
+}
+
+function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]>>> {
+  const result: Record<QuestTownId, Partial<Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]>>> = {
+    'neutral-town': {},
+    'elsarth-town': {},
+    'varden-town': {},
+  };
+  const towns: QuestTownId[] = ['neutral-town', 'elsarth-town', 'varden-town'];
+  for (const town of towns) {
+    const areaIds = getTownAreaIds(town);
+    const difficulties = Object.keys(TOWN_AREA_POOLS[town]) as AdventurerQuestDifficulty[];
+    for (const diff of difficulties) {
+      const filtered = MONSTER_POOLS[diff].filter(m => areaIds.has(m.area));
+      if (filtered.length > 0) result[town][diff] = filtered;
+    }
+  }
+  return result;
+}
+
+export const TOWN_MONSTER_POOLS = buildTownMonsterPools();
+
+function buildTownBossPools(): Record<QuestTownId, Partial<Record<'B' | 'A' | 'S', BossPoolEntry[]>>> {
+  const result: Record<QuestTownId, Partial<Record<'B' | 'A' | 'S', BossPoolEntry[]>>> = {
+    'neutral-town': {},
+    'elsarth-town': {},
+    'varden-town': {},
+  };
+  const towns: QuestTownId[] = ['neutral-town', 'elsarth-town', 'varden-town'];
+  for (const town of towns) {
+    const areaIds = getTownAreaIds(town);
+    const difficulties: ('B' | 'A' | 'S')[] = ['B', 'A', 'S'];
+    for (const diff of difficulties) {
+      if (!TOWN_AREA_POOLS[town][diff]) continue;
+      const filtered = BOSS_POOLS[diff].filter(b => areaIds.has(b.area));
+      if (filtered.length > 0) result[town][diff] = filtered;
+    }
+  }
+  return result;
+}
+
+export const TOWN_BOSS_POOLS = buildTownBossPools();
+
+export function getTownDifficulties(townId: QuestTownId): AdventurerQuestDifficulty[] {
+  return (['D', 'C', 'B', 'A', 'S'] as AdventurerQuestDifficulty[]).filter(d => !!TOWN_AREA_POOLS[townId][d]);
+}
+
 export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: number }[]> = {
   F: [
     { type: 'gold', weight: 40 },
@@ -302,44 +396,55 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
     { type: 'enhancement-stone', weight: 20 },
   ],
   B: [
-    { type: 'gold', weight: 30 },
-    { type: 'potion', weight: 25 },
-    { type: 'quality-stone', weight: 15 },
-    { type: 'enhancement-stone', weight: 15 },
-    { type: 'armor-scroll', weight: 15 },
-  ],
-  A: [
     { type: 'gold', weight: 25 },
     { type: 'potion', weight: 20 },
     { type: 'quality-stone', weight: 15 },
     { type: 'enhancement-stone', weight: 15 },
     { type: 'armor-scroll', weight: 15 },
+    { type: 'crafting-material', weight: 10 },
+  ],
+  A: [
+    { type: 'gold', weight: 20 },
+    { type: 'potion', weight: 15 },
+    { type: 'quality-stone', weight: 15 },
+    { type: 'enhancement-stone', weight: 15 },
+    { type: 'armor-scroll', weight: 13 },
     { type: 'weapon-scroll', weight: 10 },
+    { type: 'crafting-material', weight: 12 },
   ],
   S: [
-    { type: 'gold', weight: 20 },
-    { type: 'potion', weight: 15 },
-    { type: 'quality-stone', weight: 15 },
-    { type: 'enhancement-stone', weight: 15 },
-    { type: 'armor-scroll', weight: 17 },
-    { type: 'weapon-scroll', weight: 18 },
+    { type: 'gold', weight: 17 },
+    { type: 'potion', weight: 13 },
+    { type: 'quality-stone', weight: 13 },
+    { type: 'enhancement-stone', weight: 13 },
+    { type: 'armor-scroll', weight: 15 },
+    { type: 'weapon-scroll', weight: 15 },
+    { type: 'crafting-material', weight: 14 },
   ],
   SS: [
-    { type: 'gold', weight: 20 },
-    { type: 'potion', weight: 15 },
-    { type: 'quality-stone', weight: 15 },
-    { type: 'enhancement-stone', weight: 15 },
-    { type: 'armor-scroll', weight: 17 },
-    { type: 'weapon-scroll', weight: 18 },
+    { type: 'gold', weight: 17 },
+    { type: 'potion', weight: 13 },
+    { type: 'quality-stone', weight: 13 },
+    { type: 'enhancement-stone', weight: 13 },
+    { type: 'armor-scroll', weight: 15 },
+    { type: 'weapon-scroll', weight: 15 },
+    { type: 'crafting-material', weight: 14 },
   ],
   US: [
-    { type: 'gold', weight: 20 },
-    { type: 'potion', weight: 15 },
-    { type: 'quality-stone', weight: 15 },
-    { type: 'enhancement-stone', weight: 15 },
-    { type: 'armor-scroll', weight: 17 },
-    { type: 'weapon-scroll', weight: 18 },
+    { type: 'gold', weight: 17 },
+    { type: 'potion', weight: 13 },
+    { type: 'quality-stone', weight: 13 },
+    { type: 'enhancement-stone', weight: 13 },
+    { type: 'armor-scroll', weight: 15 },
+    { type: 'weapon-scroll', weight: 15 },
+    { type: 'crafting-material', weight: 14 },
   ],
+};
+
+export const CRAFTING_MATERIAL_REWARDS: Partial<Record<AdventurerQuestDifficulty, number[]>> = {
+  B: [11, 12],
+  A: [13, 14],
+  S: [15, 16, 17, 18],
 };
 
 const POTION_REWARD_IDS = [1, 2, 3, 133, 134];

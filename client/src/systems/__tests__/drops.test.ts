@@ -144,6 +144,86 @@ describe('drops system', () => {
       expect(result.items[0].type).toBe('material');
       expect(result.items[0].name).toBe('品質石');
     });
+
+    it('should apply drop_rate bonus to normal monster drops', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.08);
+      vi.mocked(db.dropTables.where).mockReturnValue({
+        equals: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([
+            { area: 'dawn-plains', itemType: 'item', itemTemplateId: 9, dropValue: 80, minAmount: 1, maxAmount: 1 },
+          ]),
+        }),
+      } as any);
+
+      const resultNoBonus = await rollDrops('dawn-plains', 1);
+      expect(resultNoBonus.items).toHaveLength(0);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.08);
+      const resultWithBonus = await rollDrops('dawn-plains', 1, { drop_rate: 50, gold_rate: 0 });
+      expect(resultWithBonus.items).toHaveLength(1);
+      expect(resultWithBonus.items[0].name).toBe('品質石');
+    });
+
+    it('should map dungeon items to scrolls after applying the level-based boost', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.075);
+      vi.mocked(db.dropTables.where).mockReturnValue({
+        equals: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([
+            { area: 'hundred-pillar-1-10f', itemType: 'item', itemTemplateId: 135, dropValue: 50, minAmount: 1, maxAmount: 1 },
+          ]),
+        }),
+      } as any);
+
+      const result = await rollDrops('hundred-pillar-1-10f', 1, undefined, false, 52);
+      const scroll = result.items.find(item => item.itemTemplateId === 135);
+
+      expect(scroll).toMatchObject({
+        name: '百柱塔 11F 通行卷軸',
+        type: 'scroll',
+        itemTemplateId: 135,
+        amount: 1,
+      });
+    });
+
+    it('should map other item templates to materials', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      vi.mocked(db.dropTables.where).mockReturnValue({
+        equals: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([
+            { area: 'dawn-plains', itemType: 'item', itemTemplateId: 132, dropValue: 1000, minAmount: 1, maxAmount: 1 },
+          ]),
+        }),
+      } as any);
+
+      const result = await rollDrops('dawn-plains', 1);
+
+      expect(result.items[0]).toMatchObject({
+        name: '磨刀石',
+        type: 'material',
+        itemTemplateId: 132,
+        amount: 1,
+      });
+    });
+
+    it('should apply drop_rate bonus to normal monster skill books', async () => {
+      vi.mocked(db.dropTables.where).mockReturnValue({
+        equals: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([]),
+        }),
+      } as any);
+      vi.spyOn(Math, 'random').mockReturnValue(0.00075);
+
+      const resultNoBonus = await rollDrops('hundred-pillar-1-10f', 1);
+      expect(resultNoBonus.items).toHaveLength(0);
+
+      vi.spyOn(Math, 'random')
+        .mockReturnValueOnce(0.00075)
+        .mockReturnValueOnce(0);
+      const resultWithBonus = await rollDrops('hundred-pillar-1-10f', 1, { drop_rate: 100, gold_rate: 0 });
+      expect(resultWithBonus.items).toEqual([
+        expect.objectContaining({ type: 'spellbook', itemTemplateId: expect.any(Number), amount: 1 }),
+      ]);
+    });
   });
 
   describe('drop table area coverage', () => {
@@ -258,6 +338,45 @@ describe('rollBossDrops', () => {
     const resultWithBonus = await rollBossDrops('遠古騎士', 1, 60, { drop_rate: 50, gold_rate: 0 });
     expect(resultWithBonus.items).toHaveLength(1);
     expect(resultWithBonus.items[0].name).toBe('米索利碎片');
+  });
+
+  it('should apply drop_rate bonus to boss skill books', async () => {
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([]),
+      }),
+    } as any);
+    vi.spyOn(Math, 'random').mockReturnValue(0.06);
+
+    const resultNoBonus = await rollBossDrops('測試 Boss', 1, 44);
+    expect(resultNoBonus.items).toHaveLength(0);
+
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.06)
+      .mockReturnValueOnce(0);
+    const resultWithBonus = await rollBossDrops('測試 Boss', 1, 44, { drop_rate: 50, gold_rate: 0 });
+    expect(resultWithBonus.items).toEqual([
+      expect.objectContaining({ type: 'spellbook', amount: 1 }),
+    ]);
+  });
+
+  it('should apply the same special category mapping to boss drops', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    vi.mocked(db.bossDropTables.where).mockReturnValue({
+      equals: vi.fn().mockReturnValue({
+        toArray: vi.fn().mockResolvedValue([
+          { bossName: '測試 Boss', itemType: 'item', itemTemplateId: 135, dropValue: 1000, minAmount: 1, maxAmount: 1 },
+          { bossName: '測試 Boss', itemType: 'item', itemTemplateId: 132, dropValue: 1000, minAmount: 1, maxAmount: 1 },
+        ]),
+      }),
+    } as any);
+
+    const result = await rollBossDrops('測試 Boss', 1, 30);
+
+    expect(result.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemTemplateId: 135, type: 'scroll' }),
+      expect.objectContaining({ itemTemplateId: 132, type: 'material' }),
+    ]));
   });
 
   it('should not drop when roll exceeds boss drop value', async () => {

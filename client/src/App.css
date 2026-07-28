@@ -1515,6 +1515,14 @@ button.active {
   display: flex;
   gap: 4px;
   margin-bottom: 10px;
+  align-items: center;
+}
+
+.quest-town-label {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  margin-right: 8px;
+  white-space: nowrap;
 }
 
 .shop-tabs button {
