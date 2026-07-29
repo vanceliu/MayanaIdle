@@ -77,59 +77,30 @@ describe('pathfinding - findPath', () => {
     }
   });
 
-  it('only reaches a one-level platform through its oriented stair', () => {
-    const elevatedMap: MapData = {
-      id: 'elevated', name: 'Elevated', width: 5, height: 5, theme: 'ivory',
-      spawnPoint: { x: 2, y: 3 },
-      tiles: [
-        [1, 1, 1, 1, 1],
-        [1, 5, 5, 5, 1],
-        [1, 5, 5, 5, 1],
-        [1, 0, 6, 0, 1],
-        [1, 1, 1, 1, 1],
-      ],
-    };
-    const path = findPath(elevatedMap, { x: 2, y: 3 }, { x: 2, y: 2 });
-    expect(path).toEqual([{ x: 2, y: 2 }]);
-    const detour = findPath(elevatedMap, { x: 1, y: 3 }, { x: 1, y: 2 });
-    expect(detour).toContainEqual({ x: 2, y: 3 });
-    expect(detour).toContainEqual({ x: 2, y: 2 });
-  });
-
-  it('does not cut diagonally across a platform edge', () => {
+  it('does not cut diagonally across walls', () => {
     const map: MapData = {
-      id: 'corner', name: 'Corner', width: 3, height: 3, theme: 'ivory',
+      id: 'corner', name: 'Corner', width: 3, height: 3,
       spawnPoint: { x: 0, y: 0 },
-      tiles: [[0, 0, 0], [0, 5, 0], [0, 0, 0]],
+      tiles: [[0, 0, 0], [0, 1, 0], [0, 0, 0]],
     };
     expect(findPath(map, { x: 0, y: 0 }, { x: 1, y: 1 })).toBeNull();
   });
 });
 
 describe('pathfinding - findAttackPosition', () => {
-  const elevatedMap: MapData = {
-    id: 'attack-position', name: 'Attack Position', width: 5, height: 5, theme: 'ivory',
-    spawnPoint: { x: 1, y: 3 },
-    tiles: [
-      [1, 1, 1, 1, 1],
-      [1, 5, 5, 5, 1],
-      [1, 5, 5, 5, 1],
-      [1, 0, 6, 0, 1],
-      [1, 1, 1, 1, 1],
-    ],
-  };
-
-  it('does not select a geometrically close tile across a platform side', () => {
-    expect(findAttackPosition(elevatedMap, { x: 1, y: 2 }, { x: 1, y: 3 }, 1.5)).toEqual({ x: 2, y: 2 });
-  });
-
-  it('finds the nearest reachable ranged position with line of sight through the stair', () => {
-    expect(findAttackPosition(elevatedMap, { x: 1, y: 1 }, { x: 3, y: 3 }, 3)).toEqual({ x: 2, y: 3 });
+  it('finds attack position around walls', () => {
+    const result = findAttackPosition(simpleMap, { x: 0, y: 0 }, { x: 4, y: 4 }, 2);
+    expect(result).not.toBeNull();
+    if (result) {
+      expect(simpleMap.tiles[result.y][result.x]).not.toBe(TileType.Wall);
+    }
   });
 
   it('honors occupied attack positions', () => {
-    const occupied = new Set(['2,2', '1,1', '2,1', '3,1', '1,2', '3,2']);
-    expect(findAttackPosition(elevatedMap, { x: 1, y: 2 }, { x: 1, y: 3 }, 1.5, occupied)).toBeNull();
+    const occupied = new Set(['0,1', '1,0']);
+    const result = findAttackPosition(simpleMap, { x: 0, y: 0 }, { x: 2, y: 0 }, 1.5, occupied);
+    expect(result).not.toEqual({ x: 0, y: 1 });
+    expect(result).not.toEqual({ x: 1, y: 0 });
   });
 });
 

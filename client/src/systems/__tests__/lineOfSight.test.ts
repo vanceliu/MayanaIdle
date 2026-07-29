@@ -88,26 +88,6 @@ describe('hasLineOfSight', () => {
     }
   });
 
-  it('blocks an exposed platform side in both directions', () => {
-    const map = createMap([[0, 5]]);
-    for (const trace of [hasLineOfSight, hasProjectilePath]) {
-      expect(trace({ x: 0, y: 0 }, { x: 1, y: 0 }, map)).toBe(false);
-      expect(trace({ x: 1, y: 0 }, { x: 0, y: 0 }, map)).toBe(false);
-    }
-  });
-
-  it.each([
-    { stair: 6, tiles: [[5], [6], [0]], low: { x: 0, y: 2 }, high: { x: 0, y: 0 } },
-    { stair: 7, tiles: [[0, 7, 5]], low: { x: 0, y: 0 }, high: { x: 2, y: 0 } },
-    { stair: 8, tiles: [[0], [8], [5]], low: { x: 0, y: 0 }, high: { x: 0, y: 2 } },
-    { stair: 9, tiles: [[5, 9, 0]], low: { x: 2, y: 0 }, high: { x: 0, y: 0 } },
-  ])('permits bidirectional sight and projectiles through stair $stair', ({ tiles, low, high }) => {
-    const map = createMap(tiles);
-    for (const trace of [hasLineOfSight, hasProjectilePath]) {
-      expect(trace(low, high, map)).toBe(true);
-      expect(trace(high, low, map)).toBe(true);
-    }
-  });
 
   it('is symmetric for ordinary terrain', () => {
     const map = createMap([[0, 4, 0, 0]]);

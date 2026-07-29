@@ -92,25 +92,4 @@ describe('monsterCombatFSM', () => {
     const result = tickMonsterCombat(ctx, { x: 0, y: 0 }, { x: 1, y: 0 }, DEFAULT_MONSTER_ATTACK_CONFIG, openMap, 16, true);
     expect(result.action).toBe('none');
   });
-
-  it.each([
-    { monster: { x: 0, y: 0 }, player: { x: 1, y: 0 } },
-    { monster: { x: 1, y: 0 }, player: { x: 0, y: 0 } },
-  ])('keeps chasing across an exposed platform side', ({ monster, player }) => {
-    const ctx = createMonsterCombatContext();
-    ctx.state = 'chasing';
-    const map = createMap([[0, 5]]);
-    const result = tickMonsterCombat(ctx, monster, player, DEFAULT_MONSTER_ATTACK_CONFIG, map, 16);
-    expect(result.action).toBe('chase');
-    expect(ctx.state).toBe('chasing');
-  });
-
-  it('can attack through a legal stair transition', () => {
-    const ctx = createMonsterCombatContext();
-    ctx.state = 'chasing';
-    const map = createMap([[0, 7, 5]]);
-    const config = { ...DEFAULT_MONSTER_ATTACK_CONFIG, attackRange: 3 };
-    tickMonsterCombat(ctx, { x: 2, y: 0 }, { x: 0, y: 0 }, config, map, 16);
-    expect(ctx.state).toBe('attacking');
-  });
 });

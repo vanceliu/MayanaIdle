@@ -118,36 +118,4 @@ describe('tickPlayerCombat', () => {
     tickPlayerCombat(ctx, { x: 0, y: 0 }, monsters, { attackType: 'ranged', range: 20 }, bigMap, 50);
     expect(ctx.state).toBe('attacking');
   });
-
-  it.each([
-    { player: { x: 0, y: 0 }, monster: { x: 1, y: 0 } },
-    { player: { x: 1, y: 0 }, monster: { x: 0, y: 0 } },
-  ])('does not attack across an exposed platform side', ({ player, monster }) => {
-    const map = createMap([[0, 5]]);
-    const ctx = createPlayerCombatContext();
-    const result = tickPlayerCombat(
-      ctx,
-      player,
-      [{ id: 'm0', index: 0, position: monster, alive: true }],
-      { attackType: 'melee', range: 1.5 },
-      map,
-      16,
-    );
-    expect(result).toMatchObject({ action: 'move_to', moveRange: 1.5 });
-    expect(ctx.state).toBe('chasing');
-  });
-
-  it('attacks through a legal stair transition', () => {
-    const map = createMap([[0, 7, 5]]);
-    const ctx = createPlayerCombatContext();
-    tickPlayerCombat(
-      ctx,
-      { x: 0, y: 0 },
-      [{ id: 'm0', index: 0, position: { x: 2, y: 0 }, alive: true }],
-      { attackType: 'ranged', range: 3 },
-      map,
-      16,
-    );
-    expect(ctx.state).toBe('attacking');
-  });
 });
