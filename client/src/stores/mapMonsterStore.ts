@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Position, MapData } from '../models/mapControl';
-import { findPath, getRandomWalkablePosition } from '../systems/pathfinding';
+import { findPath, getRandomWalkablePosition, canMoveBetween } from '../systems/pathfinding';
 
 export interface MapMonster {
   id: string;
@@ -174,7 +174,8 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       const selfTile = `${Math.round(monster.position.x)},${Math.round(monster.position.y)}`;
       occupied.delete(selfTile);
 
-      let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos, moveTimer } = monster;
+      let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos } = monster;
+      const { moveTimer } = monster;
       pathRecalcTimer += deltaMs;
 
       const distToPlayer = distance(monster.position, playerPos);
@@ -249,12 +250,8 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
           ]) {
             const nx = mx + dir.x;
             const ny = my + dir.y;
-            if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
-            if (map.tiles[ny][nx] === 1) continue;
+            if (!canMoveBetween(map, { x: mx, y: my }, { x: nx, y: ny })) continue;
             if (occupied.has(`${nx},${ny}`)) continue;
-            if (dir.x !== 0 && dir.y !== 0) {
-              if (map.tiles[my][mx + dir.x] === 1 || map.tiles[my + dir.y][mx] === 1) continue;
-            }
             const d = distance({ x: nx, y: ny }, playerPos);
             if (d < bestDist) {
               bestDist = d;

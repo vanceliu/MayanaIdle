@@ -57,7 +57,7 @@
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
-| 地圖控制系統（俯瞰視角/移動/即時戰鬥） | `38-map-control.md` | 全文 |
+| 地圖控制系統（俯瞰視角/移動/即時戰鬥/環境主題/高台樓梯） | `38-map-control.md` | 全文，環境 tile catalog 見 § 38.16 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 
 ### 依限制查找
@@ -227,9 +227,11 @@
        ↕
 28-monster-stats.md（擊殺任務目標）←→ 09-dungeon.md（區域對應）
 
-38-map-control.md ←→ 03-combat.md（戰鬥觸發流程）
+38-map-control.md ←→ 03-combat.md / 41-arpg-combat.md（即時戰鬥、LOS、投射物）
        ↕                    ↕
-26-spawn-pressure.md（Pressure 影響紅點生成）  09-dungeon.md（區域地圖對應）
+26-spawn-pressure.md（合法生成地格）  09-dungeon.md（區域與 theme 對應）
+       ↕                    ↕
+40-pixijs-migration.md（主題/高低差渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
 
 39-batch-sell.md ←→ 06-equipment-acquire.md（shopTier / craftTier 定義）
        ↕

@@ -5,8 +5,8 @@ import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { calculatePressure } from './pressure';
-import { findPath, findAdjacentWalkable } from './pathfinding';
-import { TileType } from '../models/mapControl';
+import { findPath, findAttackPosition, canMoveBetween } from './pathfinding';
+import { hasLineOfSight } from './lineOfSight';
 
 const ATTACK_RANGE_MELEE = 1.5;
 const DOT_TICK_INTERVAL = 1000;
@@ -227,13 +227,14 @@ function moveMonstersSafe(
       continue;
     }
 
-    // Already in attack range — don't move
-    if (dist <= TRIGGER_DISTANCE) {
+    // Stop only at a position that can actually attack the player.
+    if (dist <= TRIGGER_DISTANCE && hasLineOfSight(monster.position, playerPos, map)) {
       updated.push(monster);
       continue;
     }
 
-    let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos, moveTimer } = monster;
+    let { path, pathIndex, pathRecalcTimer, lastPathPlayerPos } = monster;
+    const { moveTimer } = monster;
     pathRecalcTimer += deltaMs;
 
     // Pathfinding
@@ -247,13 +248,22 @@ function moveMonstersSafe(
 
       if (needsRecalc) {
         const monsterSnapped = { x: Math.round(monster.position.x), y: Math.round(monster.position.y) };
-        // Find path to adjacent tile of player, not player's tile
-        const adjTarget = findAdjacentWalkable(map, playerSnapped, monsterSnapped);
-        const target = adjTarget ?? playerSnapped;
         const occupiedSet = occupation.getOccupiedSet(monster.id);
-        const newPath = findPath(map, monsterSnapped, target, occupiedSet);
+        const attackPosition = findAttackPosition(
+          map,
+          playerSnapped,
+          monsterSnapped,
+          TRIGGER_DISTANCE,
+          occupiedSet,
+        );
+        const newPath = attackPosition
+          ? findPath(map, monsterSnapped, attackPosition, occupiedSet)
+          : null;
         if (newPath && newPath.length > 0) {
           path = newPath;
+          pathIndex = 0;
+        } else if (!attackPosition) {
+          path = [];
           pathIndex = 0;
         }
         pathRecalcTimer = 0;
@@ -276,12 +286,8 @@ function moveMonstersSafe(
         for (const dir of dirs) {
           const nx = mx + dir.x;
           const ny = my + dir.y;
-          if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
-          if (map.tiles[ny][nx] === TileType.Wall) continue;
+          if (!canMoveBetween(map, { x: mx, y: my }, { x: nx, y: ny })) continue;
           if (!occupation.canMoveTo({ x: nx, y: ny }, monster.id)) continue;
-          if (dir.x !== 0 && dir.y !== 0) {
-            if (map.tiles[my][mx + dir.x] === TileType.Wall || map.tiles[my + dir.y][mx] === TileType.Wall) continue;
-          }
           const d = Math.sqrt((nx - playerPos.x) ** 2 + (ny - playerPos.y) ** 2);
           if (d < bestDist) {
             bestDist = d;

@@ -15,8 +15,6 @@ import {
   BOSS_POOLS,
   MONSTER_POOLS,
   TOWN_AREA_POOLS,
-  TOWN_BOSS_POOLS,
-  TOWN_MONSTER_POOLS,
   CRAFTING_MATERIAL_REWARDS,
   getTownDifficulties,
   getRankForPoints,

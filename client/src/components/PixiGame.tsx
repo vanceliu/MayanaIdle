@@ -7,9 +7,11 @@ import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity } from '../pixi/entities/PlayerEntity';
 import { MonsterEntity } from '../pixi/entities/MonsterEntity';
-import { worldToScreen, screenToWorld } from '../pixi/utils/isometric';
+import { mapPositionToScreen, screenToMapTile } from '../pixi/utils/isometric';
+import { getRenderedElevation, type MapData } from '../models/mapControl';
+import { hasProjectilePath } from '../systems/lineOfSight';
 import { gameLoopTick, consumeDotTick } from '../systems/gameLoop';
-import { findAdjacentWalkable } from '../systems/pathfinding';
+import { findAttackPosition } from '../systems/pathfinding';
 import { db } from '../db/database';
 import { processMonsterDeath } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
@@ -73,8 +75,8 @@ export function PixiGame() {
       if (currentMap) {
         scene.loadMap(currentMap);
         const pos = useMapControlStore.getState().playerPosition;
-        player.updatePosition(pos);
-        const { sx, sy } = worldToScreen(pos.x, pos.y);
+        player.updatePosition(pos, getRenderedElevation(currentMap, pos));
+        const { sx, sy } = mapPositionToScreen(currentMap, pos);
         pixiApp.camera.setTarget(sx, sy);
         pixiApp.camera.update(true);
 
@@ -109,14 +111,14 @@ export function PixiGame() {
         // 3. Render sync
         const playerPos = useMapControlStore.getState().playerPosition;
         if (playerEntityRef.current) {
-          playerEntityRef.current.updatePosition(playerPos);
+          playerEntityRef.current.updatePosition(playerPos, getRenderedElevation(map, playerPos));
         }
 
-        const { sx, sy } = worldToScreen(playerPos.x, playerPos.y);
+        const { sx, sy } = mapPositionToScreen(map, playerPos);
         pixiApp.camera.setTarget(sx, sy);
         pixiApp.camera.update();
 
-        syncMonsters(useMapMonsterStore.getState().monsters, scene!, monsterMapRef.current, monsterInstancesRef.current);
+        syncMonsters(useMapMonsterStore.getState().monsters, map, scene!, monsterMapRef.current, monsterInstancesRef.current);
 
         // 4. Effect layer update
         scene!.effectLayer.update(delta);
@@ -124,7 +126,7 @@ export function PixiGame() {
         const path = useMapControlStore.getState().currentPath;
         const pathIndex = useMapControlStore.getState().pathIndex;
         if (path.length > 0) {
-          scene!.pathLayer.updatePath(path, pathIndex);
+          scene!.pathLayer.updatePath(path, pathIndex, map, scene!.entityLayer.container);
         } else {
           scene!.pathLayer.clear();
         }
@@ -146,7 +148,7 @@ export function PixiGame() {
 
   // React to map changes
   useEffect(() => {
-    let prevMapRef: any = null;
+    let prevMapRef: MapData | null = null;
     const unsubscribe = useMapControlStore.subscribe((state) => {
       const currentMap = state.currentMap;
       if (currentMap === prevMapRef) return;
@@ -165,10 +167,10 @@ export function PixiGame() {
       // Reset camera to new player position
       const pos = state.playerPosition;
       if (playerEntityRef.current) {
-        playerEntityRef.current.updatePosition(pos);
+        playerEntityRef.current.updatePosition(pos, getRenderedElevation(currentMap, pos));
       }
       if (pixiAppRef.current) {
-        const { sx, sy } = worldToScreen(pos.x, pos.y);
+        const { sx, sy } = mapPositionToScreen(currentMap, pos);
         pixiAppRef.current.camera.setTarget(sx, sy);
         pixiAppRef.current.camera.update(true);
       }
@@ -204,16 +206,12 @@ export function PixiGame() {
       const worldScreenX = clickX - camOffset.x;
       const worldScreenY = clickY - camOffset.y;
 
-      const { x, y } = screenToWorld(worldScreenX, worldScreenY);
-      const tileX = Math.floor(x);
-      const tileY = Math.floor(y);
-
       const map = useMapControlStore.getState().currentMap;
       if (!map) return;
-      if (tileX < 0 || tileX >= map.width || tileY < 0 || tileY >= map.height) return;
-      if (map.tiles[tileY][tileX] === 1) return;
+      const tile = screenToMapTile(map, worldScreenX, worldScreenY);
+      if (!tile) return;
 
-      useMapControlStore.getState().moveToTarget({ x: tileX, y: tileY });
+      useMapControlStore.getState().moveToTarget(tile);
     };
 
     container.addEventListener('click', handleClick);
@@ -245,6 +243,7 @@ function tickArpgCombatLoop(
   if (!gameState.character || !mapStore.currentMap) return;
 
   const playerPos = mapStore.playerPosition;
+  const currentMap = mapStore.currentMap;
   const allGear = Object.values(gameState.equippedGear).filter(Boolean) as any[];
 
   // Ensure monster instances exist
@@ -294,7 +293,17 @@ function tickArpgCombatLoop(
             useMapControlStore.setState({ isMoving: false, currentPath: [], pathIndex: 0 });
           }
         }
-        const result = processPlayerAttack(event, {
+        const attackEvent = event.attackType === 'ranged'
+          ? {
+              ...event,
+              targetMonsterIds: event.targetMonsterIds.filter(targetId => {
+                const target = monsterStore.monsters.find(monster => monster.id === targetId);
+                return target && hasProjectilePath(playerPos, target.position, currentMap);
+              }),
+            }
+          : event;
+        if (event.attackType === 'ranged' && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
+        const result = processPlayerAttack(attackEvent, {
           character: gameState.character,
           equippedGear: allGear,
           activeEffects: gameState.activeEffects,
@@ -307,7 +316,7 @@ function tickArpgCombatLoop(
         // Emit heal visual event
         if (result.healAmount && result.healAmount > 0 && effectLayer) {
           const pPos = useMapControlStore.getState().playerPosition;
-          const { sx, sy } = worldToScreen(pPos.x, pPos.y);
+          const { sx, sy } = mapPositionToScreen(currentMap, pPos);
           effectLayer.spawnDamageNumber(sx, sy - 20, result.healAmount, 'heal');
         }
 
@@ -315,16 +324,16 @@ function tickArpgCombatLoop(
           if (effectLayer) {
             const targetMonster = monsterStore.monsters.find(m => m.id === dmg.targetId);
             if (targetMonster) {
-              const { sx: mx, sy: my } = worldToScreen(targetMonster.position.x, targetMonster.position.y);
+              const { sx: mx, sy: my } = mapPositionToScreen(currentMap, targetMonster.position);
               let damageType: DamageType = 'normal';
               if (dmg.isMiss) damageType = 'miss';
               else if (dmg.isCrit) damageType = 'crit';
               else if (result.skillUsed && result.skillUsed.element && result.skillUsed.element !== 'none') damageType = 'element';
               else if (result.skillUsed) damageType = 'skill';
 
-              if (event.attackType === 'ranged') {
+              if (event.attackType === 'ranged' && hasProjectilePath(playerPos, targetMonster.position, mapStore.currentMap)) {
                 const pPos = useMapControlStore.getState().playerPosition;
-                const { sx: px, sy: py } = worldToScreen(pPos.x, pPos.y);
+                const { sx: px, sy: py } = mapPositionToScreen(currentMap, pPos);
                 const isSkill = !!result.skillUsed;
                 const element = result.skillUsed?.element ?? 'none';
                 const enchantBuff = !isSkill
@@ -382,6 +391,10 @@ function tickArpgCombatLoop(
       }
 
       case 'monster_attack': {
+        if (event.attackType === 'ranged') {
+          const attacker = monsterStore.monsters.find(monster => monster.id === event.monsterId);
+          if (!attacker || !hasProjectilePath(attacker.position, playerPos, mapStore.currentMap)) break;
+        }
         const result = processMonsterAttack(event, {
           character: gameState.character,
           equippedGear: allGear,
@@ -395,14 +408,14 @@ function tickArpgCombatLoop(
 
           if (effectLayer) {
             const pPos = useMapControlStore.getState().playerPosition;
-            const { sx, sy } = worldToScreen(pPos.x, pPos.y);
+            const { sx, sy } = mapPositionToScreen(currentMap, pPos);
             const dmgType: DamageType = result.isDodged ? 'miss' : 'normal';
             const dmgValue = result.isDodged ? 0 : result.damage;
 
             if (event.attackType === 'ranged') {
               const monster = monsterStore.monsters.find(m => m.id === event.monsterId);
-              if (monster) {
-                const { sx: mx, sy: my } = worldToScreen(monster.position.x, monster.position.y);
+              if (monster && hasProjectilePath(monster.position, playerPos, currentMap)) {
+                const { sx: mx, sy: my } = mapPositionToScreen(currentMap, monster.position);
                 const speed = event.projectileSpeed ?? DEFAULT_MONSTER_PROJECTILE_SPEED;
                 effectLayer.spawnProjectile({
                   fromX: mx, fromY: my - 20,
@@ -441,14 +454,14 @@ function tickArpgCombatLoop(
               x: Math.round(mapCtrl.playerPosition.x),
               y: Math.round(mapCtrl.playerPosition.y),
             };
-            const adj = findAdjacentWalkable(map, targetTile, playerTile);
-            if (adj) {
+            const attackPosition = findAttackPosition(map, targetTile, playerTile, event.range);
+            if (attackPosition) {
               // Repath if not moving, or if current destination differs from desired
               const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
               const needsRepath = !mapCtrl.isMoving ||
-                !currentDest || currentDest.x !== adj.x || currentDest.y !== adj.y;
+                !currentDest || currentDest.x !== attackPosition.x || currentDest.y !== attackPosition.y;
               if (needsRepath) {
-                useMapControlStore.getState().moveToTarget(adj);
+                useMapControlStore.getState().moveToTarget(attackPosition);
               }
             } else {
               engine.playerCtx.targetMonsterId = null;
@@ -500,8 +513,9 @@ function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLa
 
     if (effectLayer) {
       const targetMonster = monsterStore.monsters.find(m => m.id === monsterId);
-      if (targetMonster) {
-        const { sx, sy } = worldToScreen(targetMonster.position.x, targetMonster.position.y);
+      const map = useMapControlStore.getState().currentMap;
+      if (targetMonster && map) {
+        const { sx, sy } = mapPositionToScreen(map, targetMonster.position);
         effectLayer.spawnDamageNumber(sx, sy - 20, effect.dot.damage, 'dot');
       }
     }
@@ -645,6 +659,7 @@ function handlePlayerDeath() {
 
 function syncMonsters(
   monsters: MapMonster[],
+  map: import('../models/mapControl').MapData,
   scene: GameScene,
   existingMap: Map<string, MonsterEntity>,
   monsterInstances: Map<string, MonsterInstance>,
@@ -666,7 +681,7 @@ function syncMonsters(
       existingMap.set(monster.id, entity);
       scene.entityLayer.container.addChild(entity.container);
     }
-    entity.updatePosition(monster.position);
+    entity.updatePosition(monster.position, getRenderedElevation(map, monster.position));
 
     const inst = monsterInstances.get(monster.id);
     if (inst) {

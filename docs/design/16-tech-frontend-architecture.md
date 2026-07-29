@@ -870,3 +870,11 @@ interface TooltipProps {
 - 常駐腳本含：規則 CRUD、排序、緊急撤退設定、戰鬥後等待/恢復閾值（HP/MP %）
 - 戰鬥後等待閾值修改後自動 saveState 持久化
 - 關閉後狀態保留（state 存在 Zustand，不隨 Modal unmount 消失）
+
+## 32.15 環境地圖模組邊界
+
+- `models/mapControl.ts`：MapData、theme、tile catalog、通行/生成/高度 contract。
+- `models/mapDataControl.ts`：靜態 JSON lazy load、runtime validation、cache；未知 ID 不 fallback。
+- `systems/pathfinding.ts` / `lineOfSight.ts`：只依賴上述純資料 contract，不依賴 React、Zustand 或 Pixi。
+- `pixi/mapRenderPlan.ts`：將 MapData 轉成純 draw plan；`mapThemes.ts` 管理視覺色盤。
+- JSON 保持靜態內容與單一 numeric tiles grid，便於未來 server/CDN 發佈且避免 gameplay 與 renderer 各自維護 elevation。

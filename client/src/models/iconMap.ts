@@ -81,7 +81,7 @@ export const EQUIP_ICON_MAP: Record<string, string> = {
   'bow': 'equipment/pocket-bow',
   'staff': 'equipment/wizard-staff',
   'shield': 'equipment/edged-shield',
-  'magicBook': 'equipment/wizard-staff',
+  'magicBook': 'equipment/book-cover',
   'helmet': 'equipment/visored-helm',
   'chest': 'equipment/breastplate',
   'belt': 'equipment/armor-vest',

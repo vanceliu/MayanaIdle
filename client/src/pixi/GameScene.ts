@@ -30,7 +30,7 @@ export class GameScene {
   }
 
   loadMap(mapData: MapData): void {
-    this.floorLayer.buildFromMap(mapData);
+    this.floorLayer.buildFromMap(mapData, this.entityLayer.container);
     this.wallLayer.buildInto(this.entityLayer.container, mapData);
     this.pathLayer.clear();
     this.effectLayer.clear();

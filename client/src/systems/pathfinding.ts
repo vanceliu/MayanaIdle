@@ -1,6 +1,6 @@
-import type { Position } from '../models/mapControl';
-import { TileType } from '../models/mapControl';
-import type { MapData } from '../models/mapControl';
+import type { Position, MapData } from '../models/mapControl';
+import { canTransition, isInBounds, isSpawnableTile, isWalkableTile } from '../models/mapControl';
+import { getDistance, hasLineOfSight } from './lineOfSight';
 
 interface AStarNode {
   x: number;
@@ -17,89 +17,61 @@ function heuristic(a: Position, b: Position): number {
   return dx + dy + (Math.SQRT2 - 2) * Math.min(dx, dy);
 }
 
-function isWalkable(map: MapData, x: number, y: number): boolean {
-  if (x < 0 || x >= map.width || y < 0 || y >= map.height) return false;
-  return map.tiles[y][x] !== TileType.Wall;
-}
-
-const DIRECTIONS: Position[] = [
-  { x: 0, y: -1 },
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-  { x: 1, y: -1 },
-  { x: 1, y: 1 },
-  { x: -1, y: 1 },
-  { x: -1, y: -1 },
+export const DIRECTIONS: readonly Position[] = [
+  { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 },
+  { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
 ];
 
+export function canMoveBetween(map: MapData, from: Position, to: Position): boolean {
+  if (!canTransition(map, from, to)) return false;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (dx === 0 || dy === 0) return true;
+
+  const horizontal = { x: from.x + dx, y: from.y };
+  const vertical = { x: from.x, y: from.y + dy };
+  return canTransition(map, from, horizontal) && canTransition(map, horizontal, to)
+    && canTransition(map, from, vertical) && canTransition(map, vertical, to);
+}
+
 export function findPath(map: MapData, start: Position, end: Position, occupied?: Set<string>): Position[] | null {
-  const sx = Math.round(start.x);
-  const sy = Math.round(start.y);
-  const ex = Math.round(end.x);
-  const ey = Math.round(end.y);
+  const startPos = { x: Math.round(start.x), y: Math.round(start.y) };
+  const endPos = { x: Math.round(end.x), y: Math.round(end.y) };
+  if (!isWalkableTile(map, startPos) || !isWalkableTile(map, endPos)) return null;
+  if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
-  if (!isWalkable(map, ex, ey)) return null;
-  if (sx === ex && sy === ey) return [];
-
-  const openList: AStarNode[] = [];
+  const openList: AStarNode[] = [{
+    ...startPos, g: 0, h: heuristic(startPos, endPos), f: heuristic(startPos, endPos), parent: null,
+  }];
   const closedSet = new Set<string>();
-
-  const startNode: AStarNode = {
-    x: sx,
-    y: sy,
-    g: 0,
-    h: heuristic(start, end),
-    f: heuristic(start, end),
-    parent: null,
-  };
-  openList.push(startNode);
 
   while (openList.length > 0) {
     let lowestIdx = 0;
-    for (let i = 1; i < openList.length; i++) {
-      if (openList[i].f < openList[lowestIdx].f) lowestIdx = i;
-    }
-    const current = openList[lowestIdx];
+    for (let i = 1; i < openList.length; i++) if (openList[i].f < openList[lowestIdx].f) lowestIdx = i;
+    const current = openList.splice(lowestIdx, 1)[0];
 
-    if (current.x === end.x && current.y === end.y) {
+    if (current.x === endPos.x && current.y === endPos.y) {
       const path: Position[] = [];
       let node: AStarNode | null = current;
-      while (node && (node.x !== start.x || node.y !== start.y)) {
+      while (node && (node.x !== startPos.x || node.y !== startPos.y)) {
         path.unshift({ x: node.x, y: node.y });
         node = node.parent;
       }
       return path;
     }
 
-    openList.splice(lowestIdx, 1);
-    const key = `${current.x},${current.y}`;
-    closedSet.add(key);
+    closedSet.add(`${current.x},${current.y}`);
+    for (const direction of DIRECTIONS) {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const key = `${next.x},${next.y}`;
+      if (closedSet.has(key) || !canMoveBetween(map, current, next)) continue;
+      if (occupied?.has(key) && (next.x !== endPos.x || next.y !== endPos.y)) continue;
 
-    for (const dir of DIRECTIONS) {
-      const nx = current.x + dir.x;
-      const ny = current.y + dir.y;
-      const nKey = `${nx},${ny}`;
-
-      if (!isWalkable(map, nx, ny) || closedSet.has(nKey)) continue;
-      // Treat occupied tiles as blocked (except the final destination — movement will stop at adjacent)
-      if (occupied && occupied.has(nKey) && !(nx === end.x && ny === end.y)) continue;
-
-      const isDiagonal = dir.x !== 0 && dir.y !== 0;
-      if (isDiagonal) {
-        if (!isWalkable(map, current.x + dir.x, current.y) ||
-            !isWalkable(map, current.x, current.y + dir.y)) {
-          continue;
-        }
-      }
-
-      const cost = isDiagonal ? Math.SQRT2 : 1;
-      const g = current.g + cost;
-      const existing = openList.find(n => n.x === nx && n.y === ny);
-
+      const g = current.g + (direction.x !== 0 && direction.y !== 0 ? Math.SQRT2 : 1);
+      const existing = openList.find(node => node.x === next.x && node.y === next.y);
       if (!existing) {
-        const h = heuristic({ x: nx, y: ny }, end);
-        openList.push({ x: nx, y: ny, g, h, f: g + h, parent: current });
+        const h = heuristic(next, endPos);
+        openList.push({ ...next, g, h, f: g + h, parent: current });
       } else if (g < existing.g) {
         existing.g = g;
         existing.f = g + existing.h;
@@ -107,59 +79,88 @@ export function findPath(map: MapData, start: Position, end: Position, occupied?
       }
     }
   }
+  return null;
+}
+
+export function findAttackPosition(
+  map: MapData,
+  target: Position,
+  from: Position,
+  range: number,
+  occupied?: Set<string>,
+): Position | null {
+  const start = { x: Math.round(from.x), y: Math.round(from.y) };
+  const targetPosition = { x: Math.round(target.x), y: Math.round(target.y) };
+  if (!isWalkableTile(map, start)) return null;
+
+  const open: { position: Position; cost: number }[] = [{ position: start, cost: 0 }];
+  const bestCosts = new Map<string, number>([[`${start.x},${start.y}`, 0]]);
+
+  while (open.length > 0) {
+    open.sort((a, b) => a.cost - b.cost
+      || getDistance(a.position, target) - getDistance(b.position, target)
+      || a.position.y - b.position.y
+      || a.position.x - b.position.x);
+    const current = open.shift()!;
+    const currentKey = `${current.position.x},${current.position.y}`;
+    if (current.cost !== bestCosts.get(currentKey)) continue;
+
+    const isTarget = current.position.x === targetPosition.x && current.position.y === targetPosition.y;
+    if (!isTarget
+      && getDistance(current.position, target) <= range
+      && hasLineOfSight(current.position, target, map)) {
+      return current.position;
+    }
+
+    for (const direction of DIRECTIONS) {
+      const next = { x: current.position.x + direction.x, y: current.position.y + direction.y };
+      const key = `${next.x},${next.y}`;
+      if (next.x === targetPosition.x && next.y === targetPosition.y) continue;
+      if (occupied?.has(key) || !canMoveBetween(map, current.position, next)) continue;
+      const cost = current.cost + (direction.x !== 0 && direction.y !== 0 ? Math.SQRT2 : 1);
+      if (cost >= (bestCosts.get(key) ?? Infinity)) continue;
+      bestCosts.set(key, cost);
+      open.push({ position: next, cost });
+    }
+  }
 
   return null;
 }
 
 export function findAdjacentWalkable(map: MapData, target: Position, from: Position): Position | null {
-  let best: Position | null = null;
-  let bestDist = Infinity;
-
-  for (const dir of DIRECTIONS) {
-    const nx = target.x + dir.x;
-    const ny = target.y + dir.y;
-    if (!isWalkable(map, nx, ny)) continue;
-    const d = Math.sqrt((nx - from.x) ** 2 + (ny - from.y) ** 2);
-    if (d < bestDist) {
-      bestDist = d;
-      best = { x: nx, y: ny };
-    }
-  }
-  return best;
+  return findAttackPosition(map, target, from, Math.SQRT2);
 }
 
-export function findNearestWalkable(map: MapData, target: Position): Position | null {
-  if (isWalkable(map, target.x, target.y)) return target;
-
+export function findNearestWalkable(map: MapData, target: Position, from?: Position): Position | null {
+  const rounded = { x: Math.round(target.x), y: Math.round(target.y) };
+  const origin = from ? { x: Math.round(from.x), y: Math.round(from.y) } : undefined;
   const visited = new Set<string>();
-  const queue: Position[] = [target];
-  visited.add(`${target.x},${target.y}`);
+  const queue: Position[] = [rounded];
+  visited.add(`${rounded.x},${rounded.y}`);
 
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const dir of DIRECTIONS) {
-      const nx = current.x + dir.x;
-      const ny = current.y + dir.y;
-      const key = `${nx},${ny}`;
-      if (visited.has(key)) continue;
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    if (isWalkableTile(map, current) && (!origin || findPath(map, origin, current) !== null)) return current;
+    for (const direction of DIRECTIONS) {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const key = `${next.x},${next.y}`;
+      if (visited.has(key) || !isInBounds(map, next)) continue;
       visited.add(key);
-      if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
-      if (isWalkable(map, nx, ny)) return { x: nx, y: ny };
-      queue.push({ x: nx, y: ny });
+      queue.push(next);
     }
   }
   return null;
 }
 
 export function getRandomWalkablePosition(map: MapData, exclude?: Position): Position {
-  const walkable: Position[] = [];
+  const candidates: Position[] = [];
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
-      if (isWalkable(map, x, y)) {
-        if (exclude && exclude.x === x && exclude.y === y) continue;
-        walkable.push({ x, y });
-      }
+      const position = { x, y };
+      if (!isSpawnableTile(map, position)) continue;
+      if (exclude && Math.round(exclude.x) === x && Math.round(exclude.y) === y) continue;
+      candidates.push(position);
     }
   }
-  return walkable[Math.floor(Math.random() * walkable.length)];
+  return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : { ...map.spawnPoint };
 }

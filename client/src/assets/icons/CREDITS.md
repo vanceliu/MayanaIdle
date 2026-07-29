@@ -53,6 +53,7 @@
 |---|---|---|
 | armor-vest.svg | Lorc | https://game-icons.net/1x1/lorc/armor-vest.html |
 | battle-axe.svg | Lorc | https://game-icons.net/1x1/lorc/battle-axe.html |
+| book-cover.svg | Lorc | https://game-icons.net/1x1/lorc/book-cover.html |
 | boots.svg | Lorc | https://game-icons.net/1x1/lorc/boots.html |
 | breastplate.svg | Lorc | https://game-icons.net/1x1/lorc/breastplate.html |
 | broad-dagger.svg | Lorc | https://game-icons.net/1x1/lorc/broad-dagger.html |

@@ -41,6 +41,7 @@ export interface PlayerAttackResult {
   skillUsed?: Skill;
   healAmount?: number;
   mpRestored?: number;
+  hpRestored?: number;
 }
 
 export interface MonsterAttackResult {
@@ -324,12 +325,25 @@ export function processPlayerAttack(
         mpAfterCost,
         getEffectiveMaxMp(gs.character!, gs.equippedGear),
       );
-      const newChar = { ...gs.character!, mp: mpAfterCost + mpRestored };
+
+      // Lifesteal: restore HP from damage dealt
+      let hpRestored = 0;
+      if (skill.lifestealPercent) {
+        const totalDamage = damages.filter(d => !d.isMiss).reduce((sum, d) => sum + d.damage, 0);
+        const lifestealAmount = Math.floor(totalDamage * skill.lifestealPercent / 100);
+        const effMaxHp = getEffectiveMaxHp(gs.character!, gs.equippedGear);
+        hpRestored = Math.min(effMaxHp - gs.character!.hp, lifestealAmount);
+      }
+
+      const newChar = { ...gs.character!, mp: mpAfterCost + mpRestored, hp: gs.character!.hp + hpRestored };
       useGameStore.setState({ skills: newSkills, character: newChar });
       if (mpRestored > 0) {
         logs.push({ text: `${skill.name} 回復 ${mpRestored} MP`, type: 'player' });
       }
-      return { damages, logs, skillUsed: skill, mpRestored };
+      if (hpRestored > 0) {
+        logs.push({ text: `${skill.name} 吸血回復 ${hpRestored} HP`, type: 'player' });
+      }
+      return { damages, logs, skillUsed: skill, mpRestored, hpRestored };
     }
   }
 

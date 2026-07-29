@@ -43,6 +43,7 @@ export function getWeaponAttackConfig(weaponType: string | undefined): AttackCon
 export interface PlayerTickResult {
   action: 'none' | 'move_to' | 'attack';
   moveTarget?: Position;
+  moveRange?: number;
   attackTargetIdx?: number;
 }
 
@@ -98,7 +99,7 @@ export function tickPlayerCombat(
   // Need to get closer
   ctx.state = 'chasing';
   ctx.attackTimer = 0;
-  return { action: 'move_to', moveTarget: target.position };
+  return { action: 'move_to', moveTarget: target.position, moveRange: attackConfig.range };
 }
 
 function findNearestMonster(

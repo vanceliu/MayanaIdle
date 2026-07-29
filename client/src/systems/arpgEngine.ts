@@ -75,6 +75,7 @@ export interface MonsterAttackEvent {
 export interface MoveToEvent {
   type: 'move_to';
   target: Position;
+  range: number;
 }
 
 export type ArpgEvent = PlayerAttackEvent | MonsterAttackEvent | MoveToEvent;
@@ -145,8 +146,8 @@ export function tickArpgEngine(
     deltaMs,
   );
 
-  if (playerResult.action === 'move_to' && playerResult.moveTarget) {
-    events.push({ type: 'move_to', target: playerResult.moveTarget });
+  if (playerResult.action === 'move_to' && playerResult.moveTarget && playerResult.moveRange !== undefined) {
+    events.push({ type: 'move_to', target: playerResult.moveTarget, range: playerResult.moveRange });
   }
 
   if (playerResult.action === 'attack') {

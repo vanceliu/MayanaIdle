@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
-import { TileType } from '../models/mapControl';
+import { getTileDefinition } from '../models/mapControl';
 import { calculatePressure } from '../systems/pressure';
 
 const COLORS = {
@@ -187,7 +187,7 @@ export function MapCanvas() {
       for (let y = 0; y < currentMap.height; y++) {
         for (let x = 0; x < currentMap.width; x++) {
           const tile = currentMap.tiles[y][x];
-          if (tile === TileType.Wall) continue;
+          if (getTileDefinition(tile)?.walkable !== true) continue;
           const { sx, sy } = worldToScreen(x, y, TILE_W, TILE_H);
           const drawX = sx + camOffsetX;
           const drawY = sy + camOffsetY;
@@ -221,7 +221,8 @@ export function MapCanvas() {
       // Add walls
       for (let y = 0; y < currentMap.height; y++) {
         for (let x = 0; x < currentMap.width; x++) {
-          if (currentMap.tiles[y][x] !== TileType.Wall) continue;
+          const role = getTileDefinition(currentMap.tiles[y][x])?.role;
+          if (!role || !['boundary', 'wall', 'tree', 'rock', 'pillar'].includes(role)) continue;
           const { sx, sy } = worldToScreen(x, y, TILE_W, TILE_H);
           const drawX = sx + camOffsetX;
           const drawY = sy + camOffsetY;

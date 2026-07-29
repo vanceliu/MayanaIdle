@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Position, MapData } from '../models/mapControl';
-import { TileType } from '../models/mapControl';
+import { isWalkableTile } from '../models/mapControl';
 import { getMapForRegion } from '../models/mapDataControl';
 import { findPath, findNearestWalkable, findAdjacentWalkable, getRandomWalkablePosition } from '../systems/pathfinding';
 import { useMapMonsterStore } from './mapMonsterStore';
@@ -37,8 +37,11 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     const map = await getMapForRegion(regionId, floor);
     if (!map) return;
 
-    const startPos = savedPosition && savedPosition.x >= 0 && savedPosition.y >= 0
-      ? savedPosition
+    const savedTile = savedPosition
+      ? { x: Math.round(savedPosition.x), y: Math.round(savedPosition.y) }
+      : null;
+    const startPos = savedTile && isWalkableTile(map, savedTile)
+      ? savedTile
       : map.spawnPoint;
 
     useMapMonsterStore.getState().clearAll();
@@ -62,8 +65,8 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       : playerPosition;
 
     let finalTarget = target;
-    if (currentMap.tiles[target.y]?.[target.x] === TileType.Wall) {
-      const nearest = findNearestWalkable(currentMap, target);
+    if (!isWalkableTile(currentMap, target)) {
+      const nearest = findNearestWalkable(currentMap, target, startTile);
       if (!nearest) return;
       finalTarget = nearest;
     }

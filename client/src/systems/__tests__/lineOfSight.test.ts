@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasLineOfSight, getDistance, findTargetsInRadius } from '../lineOfSight';
+import { hasLineOfSight, hasProjectilePath, getDistance, findTargetsInRadius } from '../lineOfSight';
 import type { MapData } from '../../models/mapControl';
 
 function createMap(tiles: number[][]): MapData {
@@ -72,6 +72,47 @@ describe('hasLineOfSight', () => {
       [0, 0],
     ]);
     expect(hasLineOfSight({ x: 0, y: 0 }, { x: 5, y: 5 }, map)).toBe(false);
+  });
+
+  it('allows rays through non-blocking decoration', () => {
+    const map = createMap([[0, 4, 0]]);
+    expect(hasLineOfSight({ x: 0, y: 0 }, { x: 2, y: 0 }, map)).toBe(true);
+    expect(hasProjectilePath({ x: 0, y: 0 }, { x: 2, y: 0 }, map)).toBe(true);
+  });
+
+  it('blocks both sight and projectiles at explicit obstacles and boundaries', () => {
+    for (const blocker of [1, 3]) {
+      const map = createMap([[0, blocker, 0]]);
+      expect(hasLineOfSight({ x: 0, y: 0 }, { x: 2, y: 0 }, map)).toBe(false);
+      expect(hasProjectilePath({ x: 0, y: 0 }, { x: 2, y: 0 }, map)).toBe(false);
+    }
+  });
+
+  it('blocks an exposed platform side in both directions', () => {
+    const map = createMap([[0, 5]]);
+    for (const trace of [hasLineOfSight, hasProjectilePath]) {
+      expect(trace({ x: 0, y: 0 }, { x: 1, y: 0 }, map)).toBe(false);
+      expect(trace({ x: 1, y: 0 }, { x: 0, y: 0 }, map)).toBe(false);
+    }
+  });
+
+  it.each([
+    { stair: 6, tiles: [[5], [6], [0]], low: { x: 0, y: 2 }, high: { x: 0, y: 0 } },
+    { stair: 7, tiles: [[0, 7, 5]], low: { x: 0, y: 0 }, high: { x: 2, y: 0 } },
+    { stair: 8, tiles: [[0], [8], [5]], low: { x: 0, y: 0 }, high: { x: 0, y: 2 } },
+    { stair: 9, tiles: [[5, 9, 0]], low: { x: 2, y: 0 }, high: { x: 0, y: 0 } },
+  ])('permits bidirectional sight and projectiles through stair $stair', ({ tiles, low, high }) => {
+    const map = createMap(tiles);
+    for (const trace of [hasLineOfSight, hasProjectilePath]) {
+      expect(trace(low, high, map)).toBe(true);
+      expect(trace(high, low, map)).toBe(true);
+    }
+  });
+
+  it('is symmetric for ordinary terrain', () => {
+    const map = createMap([[0, 4, 0, 0]]);
+    expect(hasLineOfSight({ x: 0, y: 0 }, { x: 3, y: 0 }, map))
+      .toBe(hasLineOfSight({ x: 3, y: 0 }, { x: 0, y: 0 }, map));
   });
 });
 

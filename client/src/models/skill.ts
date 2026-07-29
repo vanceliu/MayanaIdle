@@ -28,6 +28,7 @@ export interface Skill {
   target: SkillTarget;
   power: number;
   healAmount?: number;
+  lifestealPercent?: number; // Restore HP from final damage dealt (100 = 100%)
   mpDrainRatio?: number; // Restore MP from final damage dealt (1 = 100%)
   mpCost: number;
   cooldown: number; // ms
@@ -73,7 +74,7 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   { id: 'inferno', name: '炎爆', level: 4, element: 'fire', type: 'attack', target: 'aoe', power: 30, mpCost: 22, cooldown: 7000, range: 12, aoeMin: 3, aoeMax: 4 },
   { id: 'ice-lance', name: '冰槍', level: 4, element: 'ice', type: 'attack', target: 'single', power: 38, mpCost: 20, cooldown: 5000, range: 12 },
   { id: 'agility-boost', name: '敏捷提升', level: 4, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 30, cooldown: 3000, range: 0, buffEffect: '敏捷+5', buffDuration: 600000, buffModifiers: [{ stat: 'agility', value: 5, isPercent: false }] },
-  { id: 'vampire-kiss', name: '吸血鬼之吻', level: 4, element: 'none', type: 'attack', target: 'single', power: 30, mpCost: 20, cooldown: 3000, range: 1.5, healAmount: 30 },
+  { id: 'vampire-kiss', name: '吸血鬼之吻', level: 4, element: 'dark', type: 'attack', target: 'single', power: 30, mpCost: 20, cooldown: 3000, range: 1.5, lifestealPercent: 100 },
   // Level 5
   { id: 'gale-storm', name: '狂風暴', level: 5, element: 'wind', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },
   { id: 'hellfire', name: '業火', level: 5, element: 'fire', type: 'attack', target: 'aoe', power: 40, mpCost: 35, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },

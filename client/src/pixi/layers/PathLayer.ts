@@ -1,29 +1,32 @@
 import { Container, Graphics } from 'pixi.js';
-import type { Position } from '../../models/mapControl';
-import { worldToScreen, TILE_W, TILE_H } from '../utils/isometric';
+import type { MapData, Position } from '../../models/mapControl';
+import { getRenderedElevation } from '../../models/mapControl';
+import { getDepth, worldToScreen, TILE_W, TILE_H } from '../utils/isometric';
 
 const PATH_COLOR = 0x4488ff;
 const PATH_ALPHA = 0.4;
+const PATH_DEPTH_OFFSET = 0.25;
 
 export class PathLayer {
-  public container: Container;
-  private graphics: Graphics;
+  public container = new Container();
+  private markers: Graphics[] = [];
+  private markerOwner: Container | null = null;
+  private renderKey = '';
 
-  constructor() {
-    this.container = new Container();
-    this.graphics = new Graphics();
-    this.container.addChild(this.graphics);
-  }
-
-  updatePath(path: Position[], fromIndex: number): void {
-    this.graphics.clear();
+  updatePath(path: Position[], fromIndex: number, map: MapData, sortedContainer: Container): void {
+    const renderKey = `${fromIndex}:${path.map(point => `${point.x},${point.y}`).join('|')}`;
+    if (renderKey === this.renderKey && sortedContainer === this.markerOwner) return;
+    this.clear();
+    this.renderKey = renderKey;
+    this.markerOwner = sortedContainer;
 
     const hw = TILE_W / 4;
     const hh = TILE_H / 4;
 
     for (let i = fromIndex; i < path.length; i++) {
-      const { sx, sy } = worldToScreen(path[i].x, path[i].y);
-      this.graphics
+      const elevation = getRenderedElevation(map, path[i]);
+      const { sx, sy } = worldToScreen(path[i].x, path[i].y, elevation);
+      const marker = new Graphics()
         .poly([
           sx, sy - hh,
           sx + hw, sy,
@@ -31,14 +34,24 @@ export class PathLayer {
           sx - hw, sy,
         ])
         .fill({ color: PATH_COLOR, alpha: PATH_ALPHA });
+      marker.zIndex = getDepth(path[i], elevation) + PATH_DEPTH_OFFSET;
+      this.markers.push(marker);
+      sortedContainer.addChild(marker);
     }
   }
 
   clear(): void {
-    this.graphics.clear();
+    for (const marker of this.markers) {
+      this.markerOwner?.removeChild(marker);
+      marker.destroy();
+    }
+    this.markers = [];
+    this.markerOwner = null;
+    this.renderKey = '';
   }
 
   destroy(): void {
+    this.clear();
     this.container.removeChildren();
   }
 }

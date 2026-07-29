@@ -24,11 +24,11 @@ export class PlayerEntity {
     this.container.addChild(this.body);
   }
 
-  updatePosition(pos: Position): void {
-    const { sx, sy } = worldToScreen(pos.x, pos.y);
+  updatePosition(pos: Position, elevation = 0): void {
+    const { sx, sy } = worldToScreen(pos.x, pos.y, elevation);
     this.container.x = sx;
     this.container.y = sy;
-    this.container.zIndex = getEntityDepth(pos);
+    this.container.zIndex = getEntityDepth(pos, elevation);
   }
 
   destroy(): void {
