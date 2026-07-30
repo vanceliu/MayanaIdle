@@ -111,3 +111,64 @@ describe('BuffBar', () => {
     expect(screen.getByText('30s')).toBeTruthy();
   });
 });
+
+describe('BuffBar — 角色 Debuff（§ 24.8.2）', () => {
+  beforeEach(() => {
+    useGameStore.setState({ activeEffects: [] });
+  });
+
+  function createPlayerDebuff(category: string, name: string, duration = 8000): ActiveEffect {
+    return createBuff({
+      id: `pd-${category}`,
+      type: 'debuff',
+      target: 'player',
+      category,
+      name,
+      sourceSkillName: '毒蛇',
+      description: '測試用 debuff',
+      duration,
+      tags: [],
+    });
+  }
+
+  it('顯示角色 debuff 並套用紅框樣式', () => {
+    useGameStore.setState({ activeEffects: [createPlayerDebuff('curse', '詛咒')] });
+
+    const { container } = render(<BuffBar />);
+    expect(container.querySelector('.buff-icon.is-debuff')).toBeTruthy();
+    expect(container.querySelector('.buff-icon.is-buff')).toBeNull();
+  });
+
+  it('buff 與 debuff 同排顯示但框色不同', () => {
+    useGameStore.setState({
+      activeEffects: [createBuff({ id: 'b1' }), createPlayerDebuff('slow', '減速', 6000)],
+    });
+
+    const { container } = render(<BuffBar />);
+    expect(container.querySelectorAll('.buff-icon.is-buff')).toHaveLength(1);
+    expect(container.querySelectorAll('.buff-icon.is-debuff')).toHaveLength(1);
+  });
+
+  it('六種 debuff 各自對應到 icon', () => {
+    const cases: [string, string][] = [
+      ['dot-poison', 'icon-debuffs/poison-gas'],
+      ['dot-bleed', 'icon-debuffs/bleeding-wound'],
+      ['curse', 'icon-debuffs/skull-crossed-bones'],
+      ['weaken', 'icon-debuffs/weaken-arrow'],
+      ['slow', 'icon-debuffs/snail-slow'],
+      ['stun', 'icon-debuffs/stoned-skull'],
+    ];
+    for (const [category, iconTestId] of cases) {
+      useGameStore.setState({ activeEffects: [createPlayerDebuff(category, category)] });
+      const { unmount } = render(<BuffBar />);
+      expect(screen.getByTestId(iconTestId), category).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it('debuff tooltip 標記為紅色名稱', () => {
+    useGameStore.setState({ activeEffects: [createPlayerDebuff('weaken', '虛弱')] });
+    const { container } = render(<BuffBar />);
+    expect(container.querySelector('[data-testid="player-debuff-icon"]')).toBeTruthy();
+  });
+});

@@ -54,7 +54,11 @@ export function tickPlayerCombat(
   attackConfig: AttackConfig,
   map: MapData,
   deltaMs: number,
+  isStunned: boolean = false,
 ): PlayerTickResult {
+  // 暈眩：攻擊計時器暫停、無法行動（§ 24.5.1）
+  if (isStunned) return { action: 'none' };
+
   const aliveMonsters = monsters.filter(m => m.alive);
 
   // No enemies → idle

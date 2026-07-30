@@ -432,6 +432,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `buff_not_active` | skillId | 指定 buff 未激活 |
 | `speed_not_active` | — | 加速效果未激活 |
 | `skill_ready` | skillId | 指定技能冷卻完畢 |
+| `debuff_active` | debuffType | 指定狀態生效中（poison / bleed / curse_weaken / slow） |
 
 ### 常駐腳本動作類型
 
@@ -441,6 +442,9 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `speed_potion` | speedPotionType | 使用加速藥水（green/enhanced-green） |
 | `heal_skill` | skillId | 施放治癒技能 |
 | `buff_skill` | skillId | 施放 buff 技能 |
+| `cure_item` | cureItemName | 使用狀態解除道具（解毒藥水/止血繃帶/淨化藥水） |
+
+> 減速無解除道具，以 `speed_potion` 對沖（見 `24-buff-debuff.md` § 24.4.6）
 
 ### 緊急撤退
 

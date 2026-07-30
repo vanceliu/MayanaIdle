@@ -40,7 +40,6 @@ describe('Dual Warehouse System (personal + shared)', () => {
       inventory: [],
       bagItems: [],
       skills: [],
-      monsters: [],
       storedEquipment: [],
       storedMaterials: [],
       warehouseGold: 0,

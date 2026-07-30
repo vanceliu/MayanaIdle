@@ -42,7 +42,6 @@ describe('Game persistence', () => {
       inventory: [],
       bagItems: [],
       skills: [],
-      monsters: [],
       storedEquipment: [],
       storedMaterials: [],
       warehouseGold: 0,

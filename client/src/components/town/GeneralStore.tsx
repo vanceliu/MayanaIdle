@@ -3,8 +3,9 @@ import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameS
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
 import { getItemWeight, getItemDefinition } from '../../models/items';
+import { isCureItem } from '../../models/cureItem';
 import { GameIcon } from '../GameIcon';
-import { getItemIcon, getMaterialIcon, getMaterialColor } from '../../models/iconMap';
+import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
 
 type ShopTab = 'buy' | 'sell';
@@ -15,6 +16,9 @@ const SHOP_ITEMS = [
   { name: '白色藥水', price: 200, description: '回復 60~90 HP' },
   { name: '綠色藥水', price: 200, description: '攻速+33%（120秒）' },
   { name: '強化綠色藥水', price: 1000, description: '攻速+33%（600秒）' },
+  { name: '解毒藥水', price: 50, description: '立即解除中毒' },
+  { name: '止血繃帶', price: 50, description: '立即解除流血' },
+  { name: '淨化藥水', price: 500, description: '解除詛咒/虛弱（全解）' },
   { name: '武器強化卷軸', price: 100000, description: '鐵匠鋪武器強化用' },
   { name: '防具強化卷軸', price: 50000, description: '鐵匠鋪防具強化用' },
   { name: '磨刀石', price: 200, description: '修復武器壞刀 1 層' },
@@ -80,19 +84,14 @@ export function GeneralStore() {
   function getItemType(name: string): 'scroll' | 'material' | 'potion' {
     if (name.includes('卷軸')) return 'scroll';
     if (name.includes('藥水')) return 'potion';
+    // 狀態解除道具（含止血繃帶）一律歸為 potion，背包才會顯示為可使用道具
+    if (isCureItem(name)) return 'potion';
     return 'material';
   }
 
-  function getShopItemIcon(name: string): { icon: string; color: string } {
-    const def = getItemDefinition(name);
-    if (def?.iconType) return { icon: getMaterialIcon(def.iconType), color: getMaterialColor(def.iconTier) };
-    if (name.includes('紅')) return { icon: getItemIcon('red-potion'), color: '#DC2626' };
-    if (name.includes('橙')) return { icon: getItemIcon('orange-potion'), color: '#F59E0B' };
-    if (name.includes('白')) return { icon: getItemIcon('white-potion'), color: '#E2E8F0' };
-    if (name.includes('強化綠')) return { icon: getItemIcon('enhanced-green-potion'), color: '#4ADE80' };
-    if (name.includes('綠')) return { icon: getItemIcon('green-potion'), color: '#4ADE80' };
-    if (name.includes('卷軸')) return { icon: getItemIcon('scroll'), color: '#FFFFFF' };
-    return { icon: getItemIcon('material'), color: '#FFFFFF' };
+  function getShopItemIcon(name: string): { icon: string; color?: string } {
+    // 顯示方式一律以 item 定義為準，與背包共用同一份資料
+    return resolveItemIcon(getItemDefinition(name), name.includes('卷軸') ? 'scroll' : 'material');
   }
 
   function buyScroll(amount: number) {
@@ -239,7 +238,10 @@ export function GeneralStore() {
             <div className="shop-item">
               <div className="shop-item-info">
                 <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <GameIcon name={getItemIcon('town-scroll')} size={16} color="#FFFFFF" />
+                  {(() => {
+                    const { icon, color } = getShopItemIcon(scrollConfig.name);
+                    return <GameIcon name={icon} size={16} color={color} />;
+                  })()}
                   {scrollConfig.name}
                 </span>
                 <span className="shop-item-desc">使用後傳送至{scrollConfig.townName} | 重量: {getItemWeight(scrollConfig.name)}</span>

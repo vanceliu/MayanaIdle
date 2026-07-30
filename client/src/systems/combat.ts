@@ -118,6 +118,53 @@ export function getMonsterDebuffModifier(activeEffects: ActiveEffect[], targetId
   return percentMod;
 }
 
+/**
+ * 角色身上 debuff 的百分比修正合計（詛咒 defense / 虛弱 attack / 減速 attack_speed）
+ * 設計來源：docs/design/24-buff-debuff.md § 24.4.1
+ */
+export function getPlayerDebuffModifier(activeEffects: ActiveEffect[], stat: string): number {
+  const now = Date.now();
+  let percentMod = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'debuff' || effect.target !== 'player') continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === stat && mod.isPercent) percentMod += mod.value;
+    }
+  }
+  return percentMod;
+}
+
+function applyWeaken(damage: number, activeEffects: ActiveEffect[]): number {
+  const weakenPercent = getPlayerDebuffModifier(activeEffects, 'attack');
+  if (weakenPercent === 0) return damage;
+  return Math.max(1, Math.floor(damage * (100 + weakenPercent) / 100));
+}
+
+/**
+ * 以 monsterId 查詢怪物身上的 debuff 百分比修正。
+ * targetIdx 會隨怪物死亡/生成而位移，需要跨 tick 穩定對應時使用此版本。
+ */
+export function getMonsterDebuffModifierById(
+  activeEffects: ActiveEffect[],
+  monsterId: string,
+  stat: string,
+): number {
+  const now = Date.now();
+  let percentMod = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'debuff' || effect.target !== 'monster') continue;
+    if (effect.targetMonsterId !== monsterId) continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === stat && mod.isPercent) percentMod += mod.value;
+    }
+  }
+  return percentMod;
+}
+
 function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
   if (!gear) return 1;
   if (monsterSize === 'small') return gear.smallMonsterDamage ?? 1;
@@ -169,7 +216,9 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
       }
     }
   }
-  const interval = Math.floor(BASE_ATTACK_INTERVAL_MS / (1 + attackSpeedPercent / 100));
+  // 減速 debuff（攻擊速度 -30%）
+  attackSpeedPercent += getPlayerDebuffModifier(activeEffects, 'attack_speed');
+  const interval = Math.floor(BASE_ATTACK_INTERVAL_MS / Math.max(0.1, 1 + attackSpeedPercent / 100));
   return Math.max(MIN_ATTACK_INTERVAL_MS, interval);
 }
 
@@ -204,6 +253,7 @@ export function calculateBasePhysicalDamage(
 
   let damage = Math.floor(weaponDmg) + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
+  damage = applyWeaken(damage, activeEffects);
 
   return Math.max(1, damage);
 }
@@ -252,6 +302,8 @@ export function calculatePlayerAttack(
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
+  // 虛弱 debuff（攻擊力 -20%）
+  damage = applyWeaken(damage, activeEffects);
 
   // Apply attack elemental% multiplier (weapon element OR fire enchant)
   const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchantActive;
@@ -322,6 +374,8 @@ export function calculatePhysicalSkillHit(
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
+  // 虛弱 debuff（攻擊力 -20%）
+  damage = applyWeaken(damage, activeEffects);
 
   // Apply attack elemental% multiplier (weapon element OR fire enchant)
   const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchant;
@@ -434,7 +488,9 @@ export function calculateMonsterAttack(
   const baseDodge = char.className === 'thief' ? 10 : 5;
   const agiDodge = Math.floor(effAGI / 3);
   const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
-  const finalDefense = Math.floor(rawDefense * (1 + bonuses.defense / 100));
+  // 詛咒 debuff（防禦力 -20%）
+  const curseDefPercent = getPlayerDebuffModifier(activeEffects, 'defense');
+  const finalDefense = Math.max(0, Math.floor(rawDefense * (1 + bonuses.defense / 100) * (100 + curseDefPercent) / 100));
   const defOverflowDodge = finalDefense > 75 ? Math.floor((finalDefense - 75) / 5) : 0;
   // Evasion buff bonus (e.g. Smoke Bomb +15%)
   let evasionBuffBonus = 0;

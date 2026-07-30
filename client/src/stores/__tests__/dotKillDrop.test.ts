@@ -40,7 +40,6 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       inventory: [],
       bagItems: [],
       skills: [],
-      monsters: [],
       storedEquipment: [],
       storedMaterials: [],
       warehouseGold: 0,

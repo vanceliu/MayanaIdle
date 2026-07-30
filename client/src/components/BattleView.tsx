@@ -2,35 +2,18 @@ import { useRef, useEffect, useState } from 'react';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
-import { GameIcon } from './GameIcon';
-import { Tooltip } from './Tooltip';
-import { getEffectIcon } from '../models/iconMap';
 import { PixiGame } from './PixiGame';
 import { getRegion, getFloor } from '../models/mapData';
 import { db } from '../db/database';
 
-function formatTime(ms: number): string {
-  const seconds = Math.max(0, Math.ceil(ms / 1000));
-  if (seconds >= 60) {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  }
-  return `${seconds}s`;
-}
-
 export function BattleView() {
   const phase = useGameStore(s => s.phase);
-  const monsters = useGameStore(s => s.monsters);
-  const selectedTargetIdx = useGameStore(s => s.selectedTargetIdx);
   const combatLogs = useGameStore(s => s.combatLogs);
-  const selectTarget = useGameStore(s => s.selectTarget);
   const manualSearch = useGameStore(s => s.manualSearch);
   const cancelManualSearch = useGameStore(s => s.cancelManualSearch);
   const isManualSearching = useGameStore(s => s.isManualSearching);
   const searchMode = useGameStore(s => s.searchMode);
   const setSearchMode = useGameStore(s => s.setSearchMode);
-  const activeEffects = useGameStore(s => s.activeEffects);
   const character = useGameStore(s => s.character);
   const logRef = useRef<HTMLDivElement>(null);
   const [logSize, setLogSize] = useState<0 | 1 | 2>(0); // 0=compact, 1=medium, 2=large
@@ -143,57 +126,6 @@ export function BattleView() {
             <span className="explore-indicator combat-indicator">戰鬥中</span>
           )}
         </div>
-
-        <div className="monster-list">
-          {phase === 'combat' && monsters.filter(m => m.currentHp > 0).map((m) => {
-            const hpPercent = Math.max(0, Math.floor((m.currentHp / m.maxHp) * 100));
-            const actualIdx = monsters.indexOf(m);
-            const isSelected = actualIdx === selectedTargetIdx;
-            const monsterDebuffs = activeEffects.filter(
-              e => e.type === 'debuff' && e.target === 'monster' && e.targetIdx === actualIdx
-            );
-            const now = Date.now();
-              return (
-                <div
-                  key={actualIdx}
-                  className={`monster-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => selectTarget(actualIdx)}
-                >
-                  <div className="monster-name">{m.name} Lv.{m.level}</div>
-                  <div className="bar monster-hp-bar">
-                    <div className="bar-fill" style={{ width: `${hpPercent}%` }} />
-                    <span>{Math.max(0, m.currentHp)}/{m.maxHp}</span>
-                  </div>
-                  {monsterDebuffs.length > 0 && (
-                    <div className="monster-debuffs">
-                      {monsterDebuffs.map(debuff => {
-                        const remaining = debuff.startTime + debuff.duration - now;
-                        const iconName = getEffectIcon(debuff.category);
-                        return (
-                          <Tooltip
-                            key={debuff.id}
-                            position="bottom"
-                            content={
-                              <div className="buff-tooltip-content">
-                                <div className="buff-tooltip-name">{debuff.name}</div>
-                                <div className="buff-tooltip-desc">{debuff.description}</div>
-                                <div className="buff-tooltip-time">剩餘: {formatTime(remaining)}</div>
-                              </div>
-                            }
-                          >
-                            <div className="debuff-icon">
-                              <GameIcon name={iconName} size={20} />
-                              <span className="debuff-timer">{formatTime(remaining)}</span>
-                            </div>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
 
         {phase === 'dead' && (
           <div className="death-banner">你倒下了 — 已傳送至最近城鎮</div>

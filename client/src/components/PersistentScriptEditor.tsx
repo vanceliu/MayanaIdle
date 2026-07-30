@@ -1,5 +1,7 @@
 import { useGameStore } from '../stores/gameStore';
-import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, EmergencyRetreatAction } from '../models/scriptEngine';
+import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, EmergencyRetreatAction, ScriptDebuffCondition } from '../models/scriptEngine';
+import { SCRIPT_DEBUFF_LABELS } from '../models/scriptEngine';
+import { CURE_ITEMS } from '../models/cureItem';
 import type { PotionType, SpeedPotionType } from '../stores/gameStore';
 import { ALL_TOWN_SCROLLS } from '../models/townScroll';
 
@@ -12,6 +14,7 @@ const CONDITION_LABELS: Record<PersistentConditionType, string> = {
   buff_not_active: 'Buff 未激活',
   speed_not_active: '加速未激活',
   skill_ready: '技能就緒',
+  debuff_active: '狀態異常',
 };
 
 const ACTION_LABELS: Record<PersistentActionType, string> = {
@@ -19,6 +22,7 @@ const ACTION_LABELS: Record<PersistentActionType, string> = {
   speed_potion: '使用加速藥水',
   buff_skill: '施放 Buff',
   heal_skill: '施放治癒',
+  cure_item: '使用解除道具',
 };
 
 const POTION_LABELS: Record<PotionType, string> = {
@@ -31,6 +35,8 @@ const SPEED_POTION_LABELS: Record<SpeedPotionType, string> = {
   green: '綠色藥水',
   'enhanced-green': '強化綠色藥水',
 };
+
+const SCRIPT_DEBUFF_CONDITIONS: ScriptDebuffCondition[] = ['poison', 'bleed', 'curse_weaken', 'slow'];
 
 const RETREAT_ACTION_LABELS: Record<EmergencyRetreatAction, string> = {
   flee_town: '回城',
@@ -120,7 +126,14 @@ export function PersistentScriptEditor() {
                 <span>如果</span>
                 <select
                   value={rule.condition.type}
-                  onChange={e => updateCondition(idx, { type: e.target.value as PersistentConditionType })}
+                  onChange={e => {
+                    const newType = e.target.value as PersistentConditionType;
+                    const updates: Partial<PersistentCondition> = { type: newType };
+                    if (newType === 'debuff_active' && !rule.condition.debuffType) {
+                      updates.debuffType = SCRIPT_DEBUFF_CONDITIONS[0];
+                    }
+                    updateCondition(idx, updates);
+                  }}
                 >
                   {Object.entries(CONDITION_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
@@ -147,6 +160,16 @@ export function PersistentScriptEditor() {
                     {buffSkills.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 )}
+                {rule.condition.type === 'debuff_active' && (
+                  <select
+                    value={rule.condition.debuffType ?? 'poison'}
+                    onChange={e => updateCondition(idx, { debuffType: e.target.value as ScriptDebuffCondition })}
+                  >
+                    {SCRIPT_DEBUFF_CONDITIONS.map(t => (
+                      <option key={t} value={t}>{SCRIPT_DEBUFF_LABELS[t]}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="rule-action">
                 <span>→</span>
@@ -157,6 +180,7 @@ export function PersistentScriptEditor() {
                     const defaults: Partial<PersistentAction> = { type: newType };
                     if (newType === 'potion') defaults.potionType = 'red';
                     if (newType === 'speed_potion') defaults.speedPotionType = 'green';
+                    if (newType === 'cure_item') defaults.cureItemName = CURE_ITEMS[0].name;
                     updateAction(idx, defaults);
                   }}
                 >
@@ -181,6 +205,16 @@ export function PersistentScriptEditor() {
                   >
                     {Object.entries(SPEED_POTION_LABELS).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                )}
+                {rule.action.type === 'cure_item' && (
+                  <select
+                    value={rule.action.cureItemName ?? CURE_ITEMS[0].name}
+                    onChange={e => updateAction(idx, { cureItemName: e.target.value })}
+                  >
+                    {CURE_ITEMS.map(c => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
                     ))}
                   </select>
                 )}

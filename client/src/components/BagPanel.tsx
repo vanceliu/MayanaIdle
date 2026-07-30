@@ -3,9 +3,10 @@ import { useGameStore } from '../stores/gameStore';
 import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, BAG_MAX_SLOTS } from '../stores/gameStore';
 import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
-import { getItemIcon, getEquipIcon, getMaterialIcon, getMaterialColor } from '../models/iconMap';
+import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
 import { EquipmentDetail } from './EquipmentInfo';
 import { getItemWeight, getItemDescription, getItemDefinition } from '../models/items';
+import { isCureItem, getCureItem, hasCurableDebuff } from '../models/cureItem';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 
@@ -18,15 +19,9 @@ interface BagGridItem {
   count?: number;
   potionType?: PotionType;
   speedPotionType?: SpeedPotionType;
+  cureItemName?: string;
   equipment?: EquipmentInstance;
-  color?: string;
 }
-
-const POTION_COLORS: Record<PotionType, string> = {
-  red: '#DC2626',
-  orange: '#F59E0B',
-  white: '#E2E8F0',
-};
 
 function getShortName(name: string): string {
   const floorMatch = name.match(/^(.+?)\s*(\d+F)/);
@@ -62,8 +57,10 @@ export function BagPanel() {
   const equipItem = useGameStore(s => s.equipItem);
   const usePotionByType = useGameStore(s => s.usePotionByType);
   const useTownScroll = useGameStore(s => s.useTownScroll);
+  const useCureItem = useGameStore(s => s.useCureItem);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const quickSlots = useGameStore(s => s.quickSlots);
+  const activeEffects = useGameStore(s => s.activeEffects);
   const templates = useEquipmentTemplates();
 
   const gridItems: BagGridItem[] = [];
@@ -73,19 +70,27 @@ export function BagPanel() {
   const whiteCount = getPotionCount(bagItems, 'white');
 
   if (redCount > 0) {
-    gridItems.push({ id: 'potion-red', type: 'potion', name: '紅色藥水', count: redCount, potionType: 'red', color: POTION_COLORS.red });
+    gridItems.push({ id: 'potion-red', type: 'potion', name: '紅色藥水', count: redCount, potionType: 'red' });
   }
   if (orangeCount > 0) {
-    gridItems.push({ id: 'potion-orange', type: 'potion', name: '橙色藥水', count: orangeCount, potionType: 'orange', color: POTION_COLORS.orange });
+    gridItems.push({ id: 'potion-orange', type: 'potion', name: '橙色藥水', count: orangeCount, potionType: 'orange' });
   }
   if (whiteCount > 0) {
-    gridItems.push({ id: 'potion-white', type: 'potion', name: '白色藥水', count: whiteCount, potionType: 'white', color: POTION_COLORS.white });
+    gridItems.push({ id: 'potion-white', type: 'potion', name: '白色藥水', count: whiteCount, potionType: 'white' });
   }
 
   for (const item of bagItems) {
     if (item.type === 'potion' && !['紅色藥水', '橙色藥水', '白色藥水'].includes(item.name)) {
       const spt: SpeedPotionType | undefined = item.name === '綠色藥水' ? 'green' : item.name === '強化綠色藥水' ? 'enhanced-green' : undefined;
-      gridItems.push({ id: `bag-${item.name}`, type: 'potion', name: item.name, count: item.amount, color: '#4ADE80', speedPotionType: spt });
+      const cure = isCureItem(item.name) ? item.name : undefined;
+      gridItems.push({
+        id: `bag-${item.name}`,
+        type: 'potion',
+        name: item.name,
+        count: item.amount,
+        speedPotionType: spt,
+        cureItemName: cure,
+      });
     }
   }
 
@@ -153,6 +158,8 @@ export function BagPanel() {
   function handleClick(item: BagGridItem) {
     if (item.potionType) {
       usePotionByType(item.potionType);
+    } else if (item.cureItemName) {
+      useCureItem(item.cureItemName);
     } else if (item.speedPotionType) {
       useGameStore.getState().useSpeedPotion(item.speedPotionType);
     } else if (item.equipment) {
@@ -175,6 +182,24 @@ export function BagPanel() {
           <div className="tooltip-stat">重量: {totalWeight}</div>
           <div className="tooltip-count">數量: {item.count}</div>
           <div className="tooltip-hint">點擊使用 / 右鍵設為快捷鍵</div>
+        </div>
+      );
+    }
+
+    if (item.cureItemName) {
+      const def = getCureItem(item.cureItemName);
+      const unitWeight = getItemWeight(item.name);
+      const totalWeight = unitWeight * (item.count ?? 1);
+      const curable = def ? hasCurableDebuff(def, activeEffects) : false;
+      return (
+        <div className="bag-tooltip-content">
+          <div className="tooltip-name">{item.name}</div>
+          <div className="tooltip-stat">{def?.description ?? getItemDescription(item.name)}</div>
+          <div className="tooltip-stat">重量: {totalWeight}</div>
+          <div className="tooltip-count">數量: {item.count}</div>
+          <div className="tooltip-hint">
+            {curable ? '點擊使用' : '沒有需要解除的狀態'}
+          </div>
         </div>
       );
     }
@@ -251,24 +276,19 @@ export function BagPanel() {
                 onContextMenu={(e) => handleContextMenu(e, item)}
                 onClick={() => handleClick(item)}
               >
-                {item.potionType && (
-                  <GameIcon name={getItemIcon(`${item.potionType}-potion`)} size={24} color={item.color} />
-                )}
-                {item.speedPotionType && (
-                  <GameIcon name={getItemIcon(item.speedPotionType === 'enhanced-green' ? 'enhanced-green-potion' : 'green-potion')} size={24} color={item.color} />
-                )}
-                {item.type === 'equipment' && (
+                {item.type === 'equipment' ? (
                   <GameIcon
                     name={getEquipIcon(item.equipment?.type === 'armor' ? (item.equipment?.slot || 'chest') : (item.equipment?.type || 'sword'))}
                     size={24}
                     color={item.equipment ? getEquipmentInstanceTierColor(item.equipment, templates) : undefined}
                   />
-                )}
-                {!item.potionType && !item.speedPotionType && item.type !== 'equipment' && (
+                ) : (
                   (() => {
-                    const def = getItemDefinition(item.name);
-                    const icon = def?.iconType ? getMaterialIcon(def.iconType) : getItemIcon(getItemIconKey(item.name, item.type));
-                    const color = def?.iconTier ? getMaterialColor(def.iconTier) : undefined;
+                    // 顯示方式一律以 item 定義為準（icon / iconColor / iconType / iconTier）
+                    const { icon, color } = resolveItemIcon(
+                      getItemDefinition(item.name),
+                      getItemIconKey(item.name, item.type),
+                    );
                     return <GameIcon name={icon} size={24} color={color} />;
                   })()
                 )}

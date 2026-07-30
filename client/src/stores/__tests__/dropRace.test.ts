@@ -41,7 +41,6 @@ describe('Multi-monster drop race condition', () => {
       inventory: [],
       bagItems: [],
       skills: [],
-      monsters: [],
       storedEquipment: [],
       storedMaterials: [],
       warehouseGold: 0,

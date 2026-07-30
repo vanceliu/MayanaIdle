@@ -40,7 +40,6 @@ describe('Warehouse (account-level storage)', () => {
       inventory: [],
       bagItems: [],
       skills: [],
-      monsters: [],
       storedEquipment: [],
       storedMaterials: [],
       warehouseGold: 0,

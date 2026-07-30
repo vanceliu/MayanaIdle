@@ -13,7 +13,15 @@ export interface ItemDefinition {
   healMin?: number;
   healMax?: number;
   cooldown?: number;
+
+  // === 顯示方式 ===
+  /** icon 路徑（相對於 assets/icons，不含副檔名）。非素材類道具以此為準。 */
+  icon?: string;
+  /** icon 著色 */
+  iconColor?: string;
+  /** 素材類專用：以材質分類決定 icon */
   iconType?: MaterialIconType;
+  /** 素材類專用：以稀有度決定顏色 */
   iconTier?: number;
 }
 

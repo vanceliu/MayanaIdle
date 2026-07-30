@@ -8,12 +8,13 @@ import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
+import { getCureItem, hasCurableDebuff } from '../models/cureItem';
+import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { getExpToNextLevel, addExp } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
-import { calculatePressure } from '../systems/pressure';
-import { processCombatRound, calculateMonsterAttack, calculatePhysicalSkillHit, calculateSkillAttack, getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFromGear, hasActiveFireEnchant, calculateBasePhysicalDamage, calculateMpRestored } from '../systems/combat';
+import { getSkillCooldownReduction, getAffixBonusesFromGear } from '../systems/combat';
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -23,11 +24,11 @@ import { getTownDifficulties } from '../models/adventurerQuest';
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
-import { evaluateCombatScript, evaluatePersistentScript, evaluateEmergencyRetreat, type CombatScriptContext, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
+import { evaluatePersistentScript, evaluateEmergencyRetreat, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
 import { DEFAULT_SCRIPT, DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT, DEFAULT_EMERGENCY_RETREAT } from '../models/scriptEngine';
 import type { MapLocation } from '../models/area';
-import { getRegion, ZONES, getNearestTown } from '../models/mapData';
+import { getRegion, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment } from '../systems/templateSync';
 import { findScrollInBag, consumeTownScroll, TOWN_SCROLL_CONFIG } from '../models/townScroll';
@@ -38,7 +39,11 @@ export type SearchMode = 'auto' | 'manual';
 
 export interface CombatLog {
   text: string;
-  type: 'player' | 'monster' | 'system' | 'loot' | 'dot' | 'miss';
+  /**
+   * debuff-self  = 我方身上的 debuff（施加、DoT 傷害、解除）→ 粉紅
+   * debuff-enemy = 敵方身上的 debuff（施加、DoT 傷害、免疫）→ 淺藍
+   */
+  type: 'player' | 'monster' | 'system' | 'loot' | 'miss' | 'debuff-self' | 'debuff-enemy';
 }
 
 export type CombatLowHpAction = 'town' | 'teleport';
@@ -119,8 +124,6 @@ interface GameState {
   inventory: EquipmentInstance[];
   bagItems: BagItem[];
   skills: Skill[];
-  monsters: MonsterInstance[];
-  selectedTargetIdx: number;
   combatLogs: CombatLog[];
   lastDropResult: DropResult | null;
   gameLoopId: number | null;
@@ -176,9 +179,9 @@ interface GameState {
   assignQuickSlot: (slotIdx: number, type: PotionType | null) => void;
   useQuickSlot: (slotIdx: number) => void;
   useTownScroll: (scrollName: string) => void;
+  useCureItem: (itemName: string) => void;
   changeArea: (areaId: string) => void;
   navigateTo: (location: MapLocation) => void;
-  selectTarget: (idx: number) => void;
   setScriptRules: (rules: ScriptRule[]) => void;
   setCombatRules: (rules: CombatRule[]) => void;
   setPersistentRules: (rules: PersistentRule[]) => void;
@@ -198,12 +201,23 @@ interface GameState {
   completeAdventurerQuest: (questId: string) => void;
   refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
-  triggerMapCombat: (monsterCount: number, bossCount: number) => void;
-  joinMapCombat: (monsterCount: number, bossCount: number) => void;
   saveState: () => void;
 }
 
 const MAX_LOGS = 200;
+
+/**
+ * § 24.5.1 / § 24.10.1：暈眩狀態下無法使用任何道具
+ * 回傳 true 表示本次使用被暈眩阻擋。
+ */
+function blockedByStun(
+  state: { activeEffects: ActiveEffect[]; combatLogs: CombatLog[] },
+  set: (partial: Partial<GameState>) => void,
+): boolean {
+  if (!isPlayerStunned(state.activeEffects)) return false;
+  set({ combatLogs: addLog(state.combatLogs, { text: '暈眩中，無法使用道具', type: 'system' }) });
+  return true;
+}
 
 function addLog(logs: CombatLog[], entry: CombatLog): CombatLog[] {
   const next = [...logs, entry];
@@ -244,8 +258,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   inventory: [],
   bagItems: [],
   skills: [],
-  monsters: [],
-  selectedTargetIdx: 0,
   combatLogs: [],
   lastDropResult: null,
   gameLoopId: null,
@@ -458,7 +470,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       inventory: [],
       bagItems: [],
       skills: [],
-      monsters: [],
       combatLogs: [],
       storedEquipment: [],
       personalStoredEquipment: [],
@@ -739,6 +750,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   usePotion: () => {
     const state = get();
     if (!state.character) return;
+    if (blockedByStun(state, set)) return;
     const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
     const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
     if (state.character.hp >= effMaxHp) {
@@ -766,6 +778,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   usePotionByType: (type) => {
     const state = get();
     if (!state.character) return;
+    if (blockedByStun(state, set)) return;
     const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
     if (state.character.hp >= effMaxHp) {
       set({ combatLogs: addLog(state.combatLogs, { text: 'HP 已滿，無法使用藥水', type: 'system' }) });
@@ -794,6 +807,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   useSpeedPotion: (type) => {
     const state = get();
     if (!state.character) return;
+    if (blockedByStun(state, set)) return;
     const config = SPEED_POTION_CONFIG[type];
     const bagName = config.bagName;
     const bagItem = state.bagItems.find(i => i.name === bagName);
@@ -814,18 +828,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       description: '攻速+33%',
     };
 
-    const filteredEffects = state.activeEffects.filter(
-      e => !(e.type === 'buff' && e.category === 'speed' && e.target === 'player')
-    );
+    // 減速與加速互相抵銷（§ 24.4.6）
+    const applied = applySpeedBuff(state.activeEffects, speedBuff);
 
     const newBag = state.bagItems.map(i =>
       i.name === bagName ? { ...i, amount: i.amount - 1 } : i
     ).filter(i => i.amount > 0);
 
     set({
-      activeEffects: [...filteredEffects, speedBuff],
+      activeEffects: applied.effects,
       bagItems: newBag,
-      combatLogs: addLog(state.combatLogs, { text: `使用${config.name}（攻速+33%）`, type: 'system' }),
+      combatLogs: addLog(state.combatLogs, applied.cancelledSlow
+        ? { text: `使用${config.name}，解除減速`, type: 'debuff-self' }
+        : { text: `使用${config.name}（攻速+33%）`, type: 'system' }),
     });
   },
 
@@ -846,19 +861,54 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().usePotionByType(type);
   },
 
+  useCureItem: (itemName) => {
+    const state = get();
+    if (!state.character) return;
+    if (blockedByStun(state, set)) return;
+
+    const def = getCureItem(itemName);
+    if (!def) return;
+
+    const bagItem = state.bagItems.find(b => b.name === itemName && b.amount > 0);
+    if (!bagItem) return;
+
+    // § 24.10.1：無對應 debuff 時不可使用
+    if (!hasCurableDebuff(def, state.activeEffects)) {
+      set({ combatLogs: addLog(state.combatLogs, { text: '沒有需要解除的狀態', type: 'system' }) });
+      return;
+    }
+
+    const now = Date.now();
+    const cleared = state.activeEffects.filter(
+      e => e.type === 'debuff' && e.target === 'player'
+        && def.cures.includes(e.category)
+        && now < e.startTime + e.duration
+    );
+    const remaining = state.activeEffects.filter(e => !cleared.includes(e));
+    const newBag = state.bagItems
+      .map(b => (b.name === itemName ? { ...b, amount: b.amount - 1 } : b))
+      .filter(b => b.amount > 0);
+
+    set({
+      activeEffects: remaining,
+      bagItems: newBag,
+      combatLogs: addLog(state.combatLogs, {
+        text: `使用${itemName}，解除 ${cleared.map(e => e.name).join('、')}`,
+        type: 'debuff-self',
+      }),
+    });
+  },
+
   useTownScroll: (scrollName) => {
     const state = get();
     if (!state.character) return;
+    if (blockedByStun(state, set)) return;
 
     const scrollInfo = Object.values(TOWN_SCROLL_CONFIG).find(s => s.name === scrollName);
     if (!scrollInfo) return;
 
     const scrollItem = state.bagItems.find(b => b.name === scrollName && b.amount > 0);
     if (!scrollItem) return;
-
-    if (state.phase === 'combat') {
-      clearCombatTimers();
-    }
 
     const newBag = consumeTownScroll(state.bagItems, scrollName);
     const char = { ...state.character };
@@ -960,10 +1010,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  selectTarget: (idx) => {
-    set({ selectedTargetIdx: idx });
-  },
-
   setScriptRules: (rules) => {
     set({ scriptRules: rules });
     const char = get().character;
@@ -1039,7 +1085,6 @@ export const useGameStore = create<GameState>((set, get) => ({
             if (!scroll) return;
             const scrollItem = state.bagItems.find(b => b.name === scroll!.name);
             if (!scrollItem || scrollItem.amount <= 0) return;
-            clearCombatTimers();
             const newBag = consumeTownScroll(state.bagItems, scroll.name);
             const newChar = { ...char };
             newChar.currentArea = scroll.townId;
@@ -1051,7 +1096,6 @@ export const useGameStore = create<GameState>((set, get) => ({
             const logs = addLog(state.combatLogs, { text: `使用${scroll.name}，傳送至${scroll.townName}`, type: 'system' });
             set({ character: newChar, combatLogs: logs, phase: 'explore', bagItems: newBag });
           } else {
-            clearCombatTimers();
             const newChar = { ...char, areaEnteredAt: Date.now() };
             const logs = addLog(state.combatLogs, { text: '血量過低，瞬移脫離戰鬥', type: 'system' });
             set({ character: newChar, combatLogs: logs, phase: 'explore' });
@@ -1088,6 +1132,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           get().useSpeedPotion(speedType);
           break;
         }
+        case 'cure_item': {
+          if (!action.cureItemName) return;
+          get().useCureItem(action.cureItemName);
+          break;
+        }
         case 'buff_skill': {
           const skillIdx = state.skills.findIndex(s => s.id === action.skillId);
           if (skillIdx < 0) return;
@@ -1116,11 +1165,11 @@ export const useGameStore = create<GameState>((set, get) => ({
               name: skill.name,
               description: template?.buffEffect ?? skill.buffEffect ?? '',
             };
-            const currentEffects = get().activeEffects;
-            const filteredEffects = currentEffects.filter(
-              e => !(e.type === 'buff' && e.category === buffEffect.category && e.target === buffEffect.target)
-            );
-            set({ character: newChar, skills: newSkills, combatLogs: logs, activeEffects: [...filteredEffects, buffEffect] });
+            const applied = applyPlayerBuff(get().activeEffects, buffEffect);
+            const buffLogs = applied.cancelledSlow
+              ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })
+              : logs;
+            set({ character: newChar, skills: newSkills, combatLogs: buffLogs, activeEffects: applied.effects });
           } else {
             set({ character: newChar, skills: newSkills, combatLogs: logs });
           }
@@ -1359,241 +1408,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     saveGame(get());
   },
 
-  triggerMapCombat: (monsterCount: number, bossCount: number) => {
-    const state = get();
-    if (state.phase !== 'explore' || !state.character) return;
-    spawnMapCombat(get, set, monsterCount, bossCount);
-  },
-
-  joinMapCombat: (monsterCount: number, bossCount: number) => {
-    const state = get();
-    if (state.phase !== 'combat' || !state.character) return;
-    addToMapCombat(get, set, monsterCount, bossCount);
-  },
 }));
-
-export async function spawnCombat(get: () => GameState, set: (s: Partial<GameState>) => void) {
-  const state = get();
-  const char = state.character!;
-  const { maxMonsters } = calculatePressure(char.areaEnteredAt, Date.now());
-  const count = Math.min(maxMonsters, 3);
-
-  const region = getRegion(char.currentRegion);
-  const hasFloors = region?.floors && region.floors.length > 0;
-  const monsterAreaId = hasFloors && char.currentFloor != null
-    ? `${char.currentRegion}-${char.currentFloor}f`
-    : char.currentRegion;
-  let areaMonsters = await db.monsterTemplates.where('area').equals(monsterAreaId).toArray();
-
-  if (areaMonsters.length === 0) {
-    console.error(`[spawnCombat] No monster templates found for area: ${monsterAreaId}`);
-    return;
-  }
-
-  const spawned: MonsterInstance[] = [];
-  const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
-  let bossSpawned = false;
-  for (let i = 0; i < count; i++) {
-    const template = areaMonsters[Math.floor(Math.random() * areaMonsters.length)];
-    if (template.isBoss && bossSpawned) {
-      const fallback = nonBossMonsters.length > 0
-        ? nonBossMonsters[Math.floor(Math.random() * nonBossMonsters.length)]
-        : template;
-      spawned.push({
-        templateId: fallback.id!,
-        name: fallback.name,
-        level: fallback.level,
-        currentHp: fallback.hp,
-        maxHp: fallback.hp,
-        attackMin: fallback.attackMin,
-        attackMax: fallback.attackMax,
-        defense: fallback.defense,
-        exp: fallback.exp,
-        race: fallback.race,
-        size: fallback.size,
-        element: fallback.element,
-        isBoss: fallback.isBoss,
-        attackType: fallback.attackType ?? 'melee',
-        attackRange: fallback.attackRange ?? 1.5,
-        attackInterval: fallback.attackInterval ?? 1200,
-        projectileSpeed: fallback.projectileSpeed,
-      });
-    } else {
-      if (template.isBoss) bossSpawned = true;
-      spawned.push({
-        templateId: template.id!,
-        name: template.name,
-        level: template.level,
-        currentHp: template.hp,
-        maxHp: template.hp,
-        attackMin: template.attackMin,
-        attackMax: template.attackMax,
-        defense: template.defense,
-        exp: template.exp,
-        race: template.race,
-        size: template.size,
-        element: template.element,
-        isBoss: template.isBoss,
-        attackType: template.attackType ?? 'melee',
-        attackRange: template.attackRange ?? 1.5,
-        attackInterval: template.attackInterval ?? 1200,
-        projectileSpeed: template.projectileSpeed,
-      });
-    }
-  }
-
-  const existingLogs = get().combatLogs;
-  set({ monsters: spawned, selectedTargetIdx: 0, phase: 'combat', combatLogs: addLog(existingLogs, { text: `遭遇 ${spawned.map(m => m.name).join(', ')}！`, type: 'system' }) });
-  runAutoCombat(get, set);
-}
-
-async function spawnMapCombat(get: () => GameState, set: (s: Partial<GameState>) => void, count: number, bossCount: number) {
-  const state = get();
-  const char = state.character!;
-
-  const region = getRegion(char.currentRegion);
-  const hasFloors = region?.floors && region.floors.length > 0;
-  const monsterAreaId = hasFloors && char.currentFloor != null
-    ? `${char.currentRegion}-${char.currentFloor}f`
-    : char.currentRegion;
-  let areaMonsters = await db.monsterTemplates.where('area').equals(monsterAreaId).toArray();
-
-  if (areaMonsters.length === 0) {
-    console.error(`[spawnMapCombat] No monster templates found for area: ${monsterAreaId}`);
-    return;
-  }
-
-  const spawned: MonsterInstance[] = [];
-  const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
-  const bossMonsters = areaMonsters.filter(m => m.isBoss);
-  const normalCount = count - bossCount;
-
-  for (let i = 0; i < bossCount; i++) {
-    const pool = bossMonsters.length > 0 ? bossMonsters : areaMonsters;
-    const template = pool[Math.floor(Math.random() * pool.length)];
-    spawned.push({
-      templateId: template.id!,
-      name: template.name,
-      level: template.level,
-      currentHp: template.hp,
-      maxHp: template.hp,
-      attackMin: template.attackMin,
-      attackMax: template.attackMax,
-      defense: template.defense,
-      exp: template.exp,
-      race: template.race,
-      size: template.size,
-      element: template.element,
-      isBoss: template.isBoss,
-      attackType: template.attackType ?? 'melee',
-      attackRange: template.attackRange ?? 1.5,
-      attackInterval: template.attackInterval ?? 1200,
-      projectileSpeed: template.projectileSpeed,
-    });
-  }
-
-  for (let i = 0; i < normalCount; i++) {
-    const pool = nonBossMonsters.length > 0 ? nonBossMonsters : areaMonsters;
-    const template = pool[Math.floor(Math.random() * pool.length)];
-    spawned.push({
-      templateId: template.id!,
-      name: template.name,
-      level: template.level,
-      currentHp: template.hp,
-      maxHp: template.hp,
-      attackMin: template.attackMin,
-      attackMax: template.attackMax,
-      defense: template.defense,
-      exp: template.exp,
-      race: template.race,
-      size: template.size,
-      element: template.element,
-      isBoss: template.isBoss,
-      attackType: template.attackType ?? 'melee',
-      attackRange: template.attackRange ?? 1.5,
-      attackInterval: template.attackInterval ?? 1200,
-      projectileSpeed: template.projectileSpeed,
-    });
-  }
-
-  const existingLogs2 = get().combatLogs;
-  set({ monsters: spawned, selectedTargetIdx: 0, phase: 'combat', combatLogs: addLog(existingLogs2, { text: `遭遇 ${spawned.map(m => m.name).join(', ')}！`, type: 'system' }) });
-  runAutoCombat(get, set);
-}
-
-async function addToMapCombat(get: () => GameState, set: (s: Partial<GameState>) => void, count: number, bossCount: number) {
-  const state = get();
-  const char = state.character!;
-
-  const region = getRegion(char.currentRegion);
-  const hasFloors = region?.floors && region.floors.length > 0;
-  const monsterAreaId = hasFloors && char.currentFloor != null
-    ? `${char.currentRegion}-${char.currentFloor}f`
-    : char.currentRegion;
-  let areaMonsters = await db.monsterTemplates.where('area').equals(monsterAreaId).toArray();
-
-  if (areaMonsters.length === 0) return;
-
-  const spawned: MonsterInstance[] = [];
-  const nonBossMonsters = areaMonsters.filter(m => !m.isBoss);
-  const bossMonsters = areaMonsters.filter(m => m.isBoss);
-  const normalCount = count - bossCount;
-
-  for (let i = 0; i < bossCount; i++) {
-    const pool = bossMonsters.length > 0 ? bossMonsters : areaMonsters;
-    const template = pool[Math.floor(Math.random() * pool.length)];
-    spawned.push({
-      templateId: template.id!,
-      name: template.name,
-      level: template.level,
-      currentHp: template.hp,
-      maxHp: template.hp,
-      attackMin: template.attackMin,
-      attackMax: template.attackMax,
-      defense: template.defense,
-      exp: template.exp,
-      race: template.race,
-      size: template.size,
-      element: template.element,
-      isBoss: template.isBoss,
-      attackType: template.attackType ?? 'melee',
-      attackRange: template.attackRange ?? 1.5,
-      attackInterval: template.attackInterval ?? 1200,
-      projectileSpeed: template.projectileSpeed,
-    });
-  }
-
-  for (let i = 0; i < normalCount; i++) {
-    const pool = nonBossMonsters.length > 0 ? nonBossMonsters : areaMonsters;
-    const template = pool[Math.floor(Math.random() * pool.length)];
-    spawned.push({
-      templateId: template.id!,
-      name: template.name,
-      level: template.level,
-      currentHp: template.hp,
-      maxHp: template.hp,
-      attackMin: template.attackMin,
-      attackMax: template.attackMax,
-      defense: template.defense,
-      exp: template.exp,
-      race: template.race,
-      size: template.size,
-      element: template.element,
-      isBoss: template.isBoss,
-      attackType: template.attackType ?? 'melee',
-      attackRange: template.attackRange ?? 1.5,
-      attackInterval: template.attackInterval ?? 1200,
-      projectileSpeed: template.projectileSpeed,
-    });
-  }
-
-  const existingMonsters = get().monsters;
-  const existingLogs = get().combatLogs;
-  set({
-    monsters: [...existingMonsters, ...spawned],
-    combatLogs: addLog(existingLogs, { text: `${spawned.map(m => m.name).join(', ')} 加入戰鬥！`, type: 'system' }),
-  });
-}
 
 /**
  * 單隻怪物死亡處理：任何傷害來源（普攻、技能、AOE、DOT）導致怪物 HP <= 0 時，
@@ -1725,408 +1540,10 @@ export function processMonsterDeath(
   return { char, logs };
 }
 
-function runAutoCombat(get: () => GameState, set: (s: Partial<GameState>) => void) {
-  // Player attack timer — dynamic interval based on attack_speed affix
-  function schedulePlayerAttack() {
-    const state = get();
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-    const interval = getPlayerAttackInterval(allGear, state.activeEffects);
-    const playerTimer = window.setTimeout(playerAttackTick, interval);
-    combatTimerIds.push(playerTimer);
-  }
-
-  function playerAttackTick() {
-    const state = get();
-    if (state.phase !== 'combat' || !state.character) {
-      return;
-    }
-
-    let char = { ...state.character };
-    const monsters = [...state.monsters];
-    let logs = [...state.combatLogs];
-    const weapon = state.equippedGear.rightHand ?? null;
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-    const skills = [...state.skills];
-    const now = Date.now();
-
-    // Find target
-    let targetIdx = state.selectedTargetIdx;
-    if (targetIdx >= monsters.length || monsters[targetIdx].currentHp <= 0) {
-      targetIdx = monsters.findIndex(m => m.currentHp > 0);
-    }
-    if (targetIdx === -1) {
-      clearCombatTimers();
-      dropQueue.then(() => handleVictory(get, set, monsters));
-      return;
-    }
-
-    const target = { ...monsters[targetIdx] };
-
-    // Script engine decides: skill or normal attack
-    const cooldownReduction = getSkillCooldownReduction(allGear);
-    const combatCtx: CombatScriptContext = {
-      character: char, monsters, skills, now, cooldownReduction,
-    };
-    const action = evaluateCombatScript(state.combatRules, combatCtx);
-
-    let actionTaken = false;
-    let aoeHandledTarget = false;
-    if (action) {
-      switch (action.type) {
-        case 'skill': {
-          const skillIdx = skills.findIndex(s => s.id === action.skillId);
-          if (skillIdx >= 0) {
-            const skill = skills[skillIdx];
-
-            if (skill.requiredWeaponType && weapon?.type !== skill.requiredWeaponType) {
-              break;
-            }
-
-            char.mp -= skill.mpCost;
-            skills[skillIdx] = { ...skill, lastUsedAt: now };
-
-            if (skill.hits && skill.hits > 0) {
-              // Multi-hit physical skill (e.g. triple-shot): uses physical attack formula per hit
-              const hasFireEnchant = hasActiveFireEnchant(state.activeEffects);
-              for (let h = 0; h < skill.hits; h++) {
-                if (target.currentHp <= 0) break;
-                const result = calculatePhysicalSkillHit(char, weapon, target, allGear, hasFireEnchant, skill.name, state.activeEffects, targetIdx);
-                if (result.hit) {
-                  target.currentHp -= result.damage;
-                }
-                logs.push({ text: result.log.message, type: 'player' });
-              }
-              monsters[targetIdx] = target;
-            } else if (skill.type === 'attack') {
-              if (skill.target === 'aoe') {
-                const alive = monsters.filter(m => m.currentHp > 0);
-                const hitCount = Math.min(alive.length, Math.floor(Math.random() * ((skill.aoeMax ?? 3) - (skill.aoeMin ?? 2) + 1)) + (skill.aoeMin ?? 2));
-                const shuffled = [...alive].sort(() => Math.random() - 0.5);
-                const targets = shuffled.slice(0, hitCount);
-                for (const m of targets) {
-                  const mIdx = monsters.indexOf(m);
-                  const result = calculateSkillAttack(char, skill.power, skill.element, m, allGear, skill.name, state.activeEffects, mIdx);
-                  monsters[mIdx] = { ...m, currentHp: m.currentHp - result.damage };
-                  logs.push({ text: result.log.message, type: 'player' });
-                  if (mIdx === targetIdx) {
-                    aoeHandledTarget = true;
-                  }
-                }
-              } else {
-                const result = calculateSkillAttack(char, skill.power, skill.element, target, allGear, skill.name, state.activeEffects, targetIdx);
-                target.currentHp -= result.damage;
-                monsters[targetIdx] = target;
-                logs.push({ text: result.log.message, type: 'player' });
-                const mpRestored = calculateMpRestored(
-                  result.damage,
-                  skill.mpDrainRatio,
-                  char.mp,
-                  getEffectiveMaxMp(char, state.equippedGear),
-                );
-                if (mpRestored > 0) {
-                  char.mp += mpRestored;
-                  logs.push({ text: `${skill.name} 回復 ${mpRestored} MP`, type: 'player' });
-                }
-
-                const templateDebuff = getSkillTemplate(skill.id)?.applyDebuff;
-                if (templateDebuff) {
-                  if (templateDebuff.dotDuration && templateDebuff.dotInterval && templateDebuff.dotElement) {
-                    if (result.damage > 0) {
-                      let dotDmg = templateDebuff.dotDamage ?? 0;
-                      if (templateDebuff.dotDamagePercent) {
-                        dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * templateDebuff.dotDamagePercent);
-                      }
-                      const debuffEffect: ActiveEffect = {
-                        id: `debuff-${templateDebuff.category}-${targetIdx}-${now}`,
-                        sourceSkillId: skill.id,
-                        sourceSkillName: skill.name,
-                        category: templateDebuff.category,
-                        type: 'debuff',
-                        target: 'monster',
-                        targetIdx,
-                        dot: { damage: dotDmg, element: templateDebuff.dotElement, interval: templateDebuff.dotInterval, totalDuration: templateDebuff.dotDuration },
-                        startTime: now,
-                        duration: templateDebuff.dotDuration,
-                        tags: templateDebuff.tags,
-                        name: templateDebuff.name,
-                        description: `每秒 ${dotDmg} 傷害`,
-                      };
-                      get().addEffect(debuffEffect);
-                      logs.push({ text: `${skill.name}命中！目標${templateDebuff.name} ${templateDebuff.dotDuration / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
-                    }
-                  } else if (templateDebuff.modifiers && templateDebuff.duration) {
-                    const debuffEffect: ActiveEffect = {
-                      id: `debuff-${templateDebuff.category}-${targetIdx}-${now}`,
-                      sourceSkillId: skill.id,
-                      sourceSkillName: skill.name,
-                      category: templateDebuff.category,
-                      type: 'debuff',
-                      target: 'monster',
-                      targetIdx,
-                      modifiers: templateDebuff.modifiers,
-                      startTime: now,
-                      duration: templateDebuff.duration,
-                      tags: templateDebuff.tags,
-                      name: templateDebuff.name,
-                      description: templateDebuff.description,
-                    };
-                    get().addEffect(debuffEffect);
-                    logs.push({ text: `${skill.name}命中！目標${templateDebuff.name} ${templateDebuff.duration / 1000}s`, type: 'player' });
-                  }
-                }
-              }
-            } else if (skill.type === 'heal' && skill.healAmount) {
-              const bonuses = getAffixBonusesFromGear(allGear);
-              const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
-              const effectiveHeal = Math.floor(skill.healAmount * (1 + bonuses.heal_effect / 100));
-              const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
-              char.hp += healed;
-              logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
-            } else if (skill.type === 'buff') {
-              const buffTemplate = getSkillTemplate(skill.id);
-              logs.push({ text: `施放 ${skill.name}`, type: 'player' });
-              if (buffTemplate?.cleanse ?? skill.cleanse) {
-                const currentEffects = get().activeEffects;
-                const cleansed = currentEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
-                set({ activeEffects: cleansed });
-              } else if (buffTemplate?.buffDuration ?? skill.buffDuration) {
-                const bDuration = buffTemplate?.buffDuration ?? skill.buffDuration!;
-                const buffEffect: ActiveEffect = {
-                  id: `buff-${skill.id}-${Date.now()}`,
-                  sourceSkillId: skill.id,
-                  sourceSkillName: skill.name,
-                  category: buffTemplate?.buffCategory ?? skill.buffCategory ?? skill.id,
-                  type: 'buff',
-                  target: 'player',
-                  modifiers: buffTemplate?.buffModifiers ?? skill.buffModifiers ?? [],
-                  startTime: Date.now(),
-                  duration: bDuration,
-                  tags: [],
-                  name: skill.name,
-                  description: buffTemplate?.buffEffect ?? skill.buffEffect ?? '',
-                };
-                const currentEffects = get().activeEffects;
-                const filteredEffects = currentEffects.filter(
-                  e => !(e.type === 'buff' && e.category === buffEffect.category && e.target === buffEffect.target)
-                );
-                set({ activeEffects: [...filteredEffects, buffEffect] });
-              }
-            }
-            actionTaken = true;
-          }
-          break;
-        }
-        case 'normal_attack': {
-          const result = processCombatRound(char, target, weapon, allGear, state.activeEffects, targetIdx);
-          if (result.playerHit) {
-            target.currentHp -= result.playerDamage;
-            const critText = result.isCritical ? '（爆擊！）' : '';
-            logs.push({ text: `對 ${target.name} 造成 ${result.playerDamage} 傷害${critText}`, type: 'player' });
-
-            const poisonBuff = get().activeEffects.find(
-              e => e.type === 'buff' && e.target === 'player' && e.category === 'poison-enchant'
-            );
-            if (poisonBuff) {
-              const envenomTemplate = getSkillTemplate('envenom');
-              const debuff = envenomTemplate?.onHitDebuff;
-              if (debuff) {
-                let dotDmg = debuff.dotDamage ?? 0;
-                if (debuff.dotDamagePercent) {
-                  dotDmg = Math.floor(calculateBasePhysicalDamage(char, weapon, allGear, state.activeEffects) * debuff.dotDamagePercent);
-                }
-                const poisonEffect: ActiveEffect = {
-                  id: `debuff-${debuff.category}-${targetIdx}-${now}`,
-                  sourceSkillId: 'envenom',
-                  sourceSkillName: '淬毒',
-                  category: debuff.category,
-                  type: 'debuff',
-                  target: 'monster',
-                  targetIdx,
-                  dot: { damage: dotDmg, element: debuff.dotElement!, interval: debuff.dotInterval!, totalDuration: debuff.dotDuration! },
-                  startTime: now,
-                  duration: debuff.dotDuration!,
-                  tags: debuff.tags,
-                  name: debuff.name,
-                  description: `每秒 ${dotDmg} 傷害`,
-                };
-                get().addEffect(poisonEffect);
-                logs.push({ text: `淬毒觸發！目標${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
-              }
-            }
-          } else {
-            logs.push({ text: `攻擊 ${target.name} 未命中`, type: 'player' });
-          }
-          actionTaken = true;
-          break;
-        }
-        case 'wait':
-          actionTaken = true;
-          break;
-      }
-    }
-
-    // No rule matched: character idles (does nothing this tick)
-    if (!actionTaken) {
-      // Do nothing — skip this tick
-    }
-
-    if (!aoeHandledTarget) {
-      monsters[targetIdx] = target;
-    }
-
-    // 逐隻處理本 tick 死亡的怪物（普攻、技能、AOE 皆走此路徑）
-    const deadIndices = monsters
-      .map((m, idx) => (m.currentHp <= 0 && !m._processed) ? idx : -1)
-      .filter(idx => idx !== -1);
-    for (const deadIdx of deadIndices) {
-      ({ char, logs } = processMonsterDeath(get, set, monsters, deadIdx, char, logs, allGear));
-    }
-
-    // Check if all dead — end combat
-    if (!monsters.some(m => m.currentHp > 0)) {
-      clearCombatTimers();
-      set({ character: char, monsters, combatLogs: logs.slice(-MAX_LOGS), skills });
-      dropQueue.then(() => handleVictory(get, set, monsters));
-      return;
-    }
-
-    set({ character: char, monsters, combatLogs: logs.slice(-MAX_LOGS), skills });
-    schedulePlayerAttack();
-  }
-
-  schedulePlayerAttack();
-
-  // Monster attack timer — 1200ms (offset by 600ms so they don't sync)
-  const monsterTimer = window.setTimeout(() => {
-    const monsterInterval = window.setInterval(() => {
-      const state = get();
-      if (state.phase !== 'combat' || !state.character) {
-        clearInterval(monsterInterval);
-        return;
-      }
-
-      let char = { ...state.character };
-      const monsters = [...state.monsters];
-      const logs = [...state.combatLogs];
-      const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-
-      // All alive monsters attack
-      const aliveMonsters = monsters.filter(m => m.currentHp > 0);
-      if (aliveMonsters.length === 0) return;
-
-      // Pick one monster to attack this tick (round-robin feel)
-      const attacker = aliveMonsters[Math.floor(Math.random() * aliveMonsters.length)];
-      const attackerIdx = monsters.indexOf(attacker);
-      const monsterAtk = calculateMonsterAttack(attacker, char, allGear, state.activeEffects, attackerIdx);
-      if (monsterAtk.dodged) {
-        logs.push({ text: `閃避了 ${attacker.name} 的攻擊`, type: 'monster' });
-      } else if (monsterAtk.hit) {
-        char.hp -= monsterAtk.damage;
-        logs.push({ text: `${attacker.name} 造成 ${monsterAtk.damage} 傷害`, type: 'monster' });
-      }
-
-      // Player dead
-      if (char.hp <= 0) {
-        char.hp = 0;
-        clearCombatTimers();
-        const nearestTown = getNearestTown(char.currentRegion);
-        char.hp = Math.floor(char.maxHp * 0.5);
-        char.currentArea = nearestTown.id;
-        char.currentRegion = nearestTown.id;
-        char.currentFloor = null;
-        char.currentZone = nearestTown.zoneId;
-        char.areaEnteredAt = Date.now();
-        logs.push({ text: `你倒下了...傳送至${nearestTown.name}`, type: 'system' });
-        const deathStats = { ...get().statistics, deathCount: get().statistics.deathCount + 1 };
-        set({ character: char, monsters, combatLogs: logs, phase: 'explore', statistics: deathStats });
-        saveGame(useGameStore.getState());
-        return;
-      }
-
-      set({ character: char, combatLogs: logs.slice(-MAX_LOGS) });
-    }, 1200);
-    combatTimerIds.push(monsterInterval);
-  }, 600);
-  combatTimerIds.push(monsterTimer as unknown as number);
-
-  // DOT tick timer — 1000ms，結算 DOT 傷害並處理怪物死亡/掉落
-  const dotTimer = window.setInterval(() => {
-    const state = get();
-    if (state.phase !== 'combat' || !state.character) {
-      clearInterval(dotTimer);
-      return;
-    }
-
-    const now = Date.now();
-    const monsters = [...state.monsters];
-    let logs = [...state.combatLogs];
-    let char = { ...state.character };
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-    let changed = false;
-
-    for (const effect of state.activeEffects) {
-      if (effect.type !== 'debuff' || effect.target !== 'monster' || !effect.dot) continue;
-      if (now > effect.startTime + effect.duration) continue;
-
-      const idx = effect.targetIdx;
-      if (idx == null || idx >= monsters.length) continue;
-      if (monsters[idx].currentHp <= 0) continue;
-
-      monsters[idx] = { ...monsters[idx], currentHp: monsters[idx].currentHp - effect.dot.damage };
-      logs.push({ text: `${effect.name} 對 ${monsters[idx].name} 造成 ${effect.dot.damage} 傷害`, type: 'dot' });
-      changed = true;
-    }
-
-    if (changed) {
-      // DOT 致死判定：逐隻處理死亡怪物的經驗/掉落/任務進度
-      const deadIndices = monsters
-        .map((m, idx) => (m.currentHp <= 0 && !m._processed) ? idx : -1)
-        .filter(idx => idx !== -1);
-      for (const deadIdx of deadIndices) {
-        ({ char, logs } = processMonsterDeath(get, set, monsters, deadIdx, char, logs, allGear));
-      }
-
-      // 全部怪物死亡 → 結束戰鬥
-      if (!monsters.some(m => m.currentHp > 0)) {
-        clearCombatTimers();
-        set({ character: char, monsters, combatLogs: logs.slice(-MAX_LOGS) });
-        dropQueue.then(() => handleVictory(get, set, monsters));
-        return;
-      }
-
-      set({ character: char, monsters, combatLogs: logs.slice(-MAX_LOGS) });
-    }
-  }, 1000);
-  combatTimerIds.push(dotTimer);
-}
-
-let combatTimerIds: number[] = [];
 let dropQueue: Promise<void> = Promise.resolve();
 
 export function waitForPendingDrops(): Promise<void> {
   return dropQueue;
-}
-
-function clearCombatTimers() {
-  for (const id of combatTimerIds) {
-    clearInterval(id);
-    clearTimeout(id);
-  }
-  combatTimerIds = [];
-}
-
-async function handleVictory(get: () => GameState, set: (s: Partial<GameState>) => void, _monsters: MonsterInstance[]) {
-  const state = get();
-
-  await saveGame(state);
-
-  set({
-    lastDropResult: null,
-    phase: 'explore',
-  });
-
-  // Resume exploring
-  useGameStore.getState().startExploring();
 }
 
 async function saveGame(state: GameState) {

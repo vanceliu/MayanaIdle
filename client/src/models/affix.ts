@@ -17,6 +17,61 @@ export type AffixType =
   | 'gold_rate'
   | 'block_rate';
 
+/**
+ * 特殊詞綴（免疫詞綴）— docs/design/07-affix.md § 7.10
+ * 無 Tier 分級、不可強化、佔用一般詞綴欄位、同件裝備不可重複
+ */
+export type SpecialAffixType =
+  | 'immune_poison'
+  | 'immune_bleed'
+  | 'immune_curse'
+  | 'immune_weaken'
+  | 'immune_slow'
+  | 'resist_stun';
+
+export type AnyAffixType = AffixType | SpecialAffixType;
+
+export interface SpecialAffixDefinition {
+  type: SpecialAffixType;
+  name: string;
+  description: string;
+  category: AffixCategory[];
+  /** 最低可掉落區域等級（§ 7.10.1） */
+  minAreaLevel: number;
+}
+
+export const SPECIAL_AFFIX_DEFINITIONS: SpecialAffixDefinition[] = [
+  { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
+  { type: 'immune_bleed', name: '流血免疫', description: '免疫流血（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
+  { type: 'immune_curse', name: '詛咒免疫', description: '免疫詛咒（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
+  { type: 'immune_weaken', name: '虛弱免疫', description: '免疫虛弱（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
+  { type: 'immune_slow', name: '減速免疫', description: '免疫減速（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
+  { type: 'resist_stun', name: '暈眩抵抗', description: '暈眩時間 -50%', category: ['armor', 'shield'], minAreaLevel: 41 },
+];
+
+const SPECIAL_AFFIX_TYPE_SET = new Set<string>(SPECIAL_AFFIX_DEFINITIONS.map(d => d.type));
+
+export function isSpecialAffixType(type: AnyAffixType): type is SpecialAffixType {
+  return SPECIAL_AFFIX_TYPE_SET.has(type);
+}
+
+export function getSpecialAffixDefinition(type: AnyAffixType): SpecialAffixDefinition | undefined {
+  return SPECIAL_AFFIX_DEFINITIONS.find(d => d.type === type);
+}
+
+export function getSpecialAffixPoolForSlot(category: AffixCategory, areaLevel: number): SpecialAffixDefinition[] {
+  return SPECIAL_AFFIX_DEFINITIONS.filter(d => d.category.includes(category) && areaLevel >= d.minAreaLevel);
+}
+
+/** § 7.10.3 特殊詞綴出現機率（每個詞綴欄位），Boss ×2 */
+export function getSpecialAffixChance(areaLevel: number, isBoss: boolean = false): number {
+  let chance = 0;
+  if (areaLevel >= 51) chance = 8;
+  else if (areaLevel >= 41) chance = 5;
+  else if (areaLevel >= 31) chance = 3;
+  return isBoss ? chance * 2 : chance;
+}
+
 export interface AffixTier {
   tier: number; // 1~7
   min: number;  // percentage
@@ -61,7 +116,8 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
 ];
 
 export interface Affix {
-  type: AffixType;
+  type: AnyAffixType;
+  /** 一般詞綴 1~7；特殊詞綴固定 0（無 Tier 分級） */
   tier: number;
   value: number; // rolled percentage value
 }
@@ -106,10 +162,19 @@ export function rollAffixValue(tier: number): number {
 export function generateAffixes(category: AffixCategory, areaLevel: number, slotCount: number = 4, isBoss: boolean = false): Affix[] {
   const pool = getAffixPoolForSlot(category);
   const available = [...pool];
+  const specialAvailable = getSpecialAffixPoolForSlot(category, areaLevel);
+  const specialChance = getSpecialAffixChance(areaLevel, isBoss);
   const affixes: Affix[] = [];
 
   const actualSlots = Math.min(slotCount, available.length);
   for (let i = 0; i < actualSlots; i++) {
+    // § 7.10.3 特殊詞綴取代一個一般詞綴位置
+    if (specialAvailable.length > 0 && Math.random() * 100 < specialChance) {
+      const sIdx = Math.floor(Math.random() * specialAvailable.length);
+      const sDef = specialAvailable.splice(sIdx, 1)[0];
+      affixes.push({ type: sDef.type, tier: 0, value: 0 });
+      continue;
+    }
     const idx = Math.floor(Math.random() * available.length);
     const def = available.splice(idx, 1)[0];
     const tier = rollAffixTier(areaLevel, isBoss);
@@ -165,9 +230,23 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
     if (!item.affixes) continue;
     const quality = item.quality ?? 0;
     for (const affix of item.affixes) {
+      // 特殊詞綴為固定效果，不參與數值加總（見 getSpecialAffixTypes）
+      if (isSpecialAffixType(affix.type)) continue;
       bonuses[affix.type] += getEffectiveAffixValue(affix, quality);
     }
   }
 
   return bonuses;
+}
+
+/** 收集裝備上所有特殊詞綴類型（多件不疊加，以 Set 表示） */
+export function collectSpecialAffixTypes(gear: { affixes?: Affix[] }[]): Set<SpecialAffixType> {
+  const types = new Set<SpecialAffixType>();
+  for (const item of gear) {
+    if (!item.affixes) continue;
+    for (const affix of item.affixes) {
+      if (isSpecialAffixType(affix.type)) types.add(affix.type);
+    }
+  }
+  return types;
 }

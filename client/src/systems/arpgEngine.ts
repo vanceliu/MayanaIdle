@@ -21,7 +21,8 @@ import {
 } from './monsterCombatFSM';
 import { getDistance } from './lineOfSight';
 import { evaluateCombatScript, type CombatScriptContext } from './scriptRunner';
-import { getPlayerAttackInterval, getSkillCooldownReduction } from './combat';
+import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById } from './combat';
+import { isPlayerStunned } from './playerDebuffSystem';
 
 export interface ArpgMonster {
   instance: MonsterInstance;
@@ -136,7 +137,8 @@ export function tickArpgEngine(
     });
   }
 
-  // Tick player combat FSM
+  // Tick player combat FSM（暈眩中暫停攻擊計時器）
+  const playerStunned = isPlayerStunned(activeEffects);
   const playerResult = tickPlayerCombat(
     engine.playerCtx,
     playerPos,
@@ -144,6 +146,7 @@ export function tickArpgEngine(
     attackConfig,
     map,
     deltaMs,
+    playerStunned,
   );
 
   if (playerResult.action === 'move_to' && playerResult.moveTarget && playerResult.moveRange !== undefined) {
@@ -211,11 +214,22 @@ export function tickArpgEngine(
       e => e.type === 'debuff' && e.target === 'monster' && e.stun && e.targetMonsterId === id
     );
 
+    // 減速 debuff：攻速百分比換算為攻擊間隔（冰系魔法）
+    const slowPercent = getMonsterDebuffModifierById(activeEffects, id, 'attack_speed');
+    const attackConfigForTick = slowPercent !== 0
+      ? {
+          ...arpgMonster.attackConfig,
+          attackInterval: Math.floor(
+            arpgMonster.attackConfig.attackInterval / Math.max(0.1, 1 + slowPercent / 100)
+          ),
+        }
+      : arpgMonster.attackConfig;
+
     const result = tickMonsterCombat(
       arpgMonster.combatCtx,
       arpgMonster.mapMonster.position,
       playerPos,
-      arpgMonster.attackConfig,
+      attackConfigForTick,
       map,
       deltaMs,
       isStunned,

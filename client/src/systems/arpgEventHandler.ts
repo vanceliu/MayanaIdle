@@ -17,6 +17,10 @@ import {
 } from './combat';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { getSkillTemplate } from '../models/skillTemplate';
+import { rollMonsterDebuff, applyPlayerDebuff, applyPlayerBuff } from './playerDebuffSystem';
+
+/** § 24.6 Boss 控場免疫冷卻 */
+export const BOSS_CC_IMMUNE_MS = 10_000;
 
 export interface ArpgEventContext {
   character: Character;
@@ -50,6 +54,7 @@ export interface MonsterAttackResult {
   isDodged: boolean;
   isBlocked: boolean;
   log: CombatLog;
+  debuffLog?: CombatLog;
 }
 
 export function processPlayerAttack(
@@ -97,10 +102,9 @@ export function processPlayerAttack(
           const cleansed = gs.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
           useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: cleansed });
         } else {
-          const filtered = gs.activeEffects.filter(
-            e => !(e.type === 'buff' && e.category === buffEffect.category && e.target === 'player')
-          );
-          useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: [...filtered, buffEffect] });
+          const applied = applyPlayerBuff(gs.activeEffects, buffEffect);
+          useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: applied.effects });
+          if (applied.cancelledSlow) logs.push({ text: `${skill.name} 解除了減速`, type: 'debuff-self' });
         }
       } else {
         useGameStore.setState({ character: newChar, skills: newSkills });
@@ -201,12 +205,15 @@ export function processPlayerAttack(
       if (poisonBuff) {
         const now = Date.now();
         const gs = useGameStore.getState();
-        const alreadyPoisoned = gs.activeEffects.some(
-          e => e.type === 'debuff' && e.category === 'poison' && e.target === 'monster' && e.targetMonsterId === targetId
+        const envenomTemplate = getSkillTemplate('envenom');
+        const debuff = envenomTemplate?.onHitDebuff;
+        // § 24.3.2 DoT 不可刷新：中毒存續期間不重複施加，也不重複輸出日誌
+        const alreadyPoisoned = !!debuff && gs.activeEffects.some(
+          e => e.type === 'debuff' && e.category === debuff.category
+            && e.target === 'monster' && e.targetMonsterId === targetId
+            && now < e.startTime + e.duration
         );
         if (!alreadyPoisoned) {
-          const envenomTemplate = getSkillTemplate('envenom');
-          const debuff = envenomTemplate?.onHitDebuff;
           if (debuff) {
             let dotDmg = debuff.dotDamage ?? 0;
             if (debuff.dotDamagePercent) {
@@ -229,7 +236,7 @@ export function processPlayerAttack(
               description: `每秒 ${dotDmg} 傷害`,
             };
             gs.addEffect(poisonEffect);
-            logs.push({ text: `淬毒觸發！${monster.name} ${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'player' });
+            logs.push({ text: `淬毒觸發！${monster.name} ${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'debuff-enemy' });
           }
         }
       }
@@ -256,10 +263,23 @@ export function processPlayerAttack(
 
         // Check if same category debuff already active on this target
         const alreadyActive = gs.activeEffects.some(
-          e => e.type === 'debuff' && e.category === debuffDef.category && e.target === 'monster' && e.targetMonsterId === targetId
+          e => e.type === 'debuff' && e.category === debuffDef.category
+            && e.target === 'monster' && e.targetMonsterId === targetId
+            && now < e.startTime + e.duration
         );
 
-        if (!alreadyActive) {
+        // § 24.3.1：純數值修正的 debuff 同 category 由後施放覆蓋前者（刷新時間）
+        // DoT（§ 24.3.2）與控場（§ 24.3.3）維持「存續期間不可重新施加」
+        const isRefreshable = !debuffDef.dotDamage && !debuffDef.dotDamagePercent && !debuffDef.stun;
+        if (alreadyActive && isRefreshable) {
+          useGameStore.setState({
+            activeEffects: gs.activeEffects.filter(
+              e => !(e.type === 'debuff' && e.category === debuffDef.category && e.target === 'monster' && e.targetMonsterId === targetId)
+            ),
+          });
+        }
+
+        if (!alreadyActive || isRefreshable) {
           if (debuffDef.dotDamage || debuffDef.dotDamagePercent) {
             // DoT debuff (snapshot damage at cast time)
             const baseDmg = debuffDef.dotDamagePercent
@@ -283,7 +303,34 @@ export function processPlayerAttack(
               description: `每秒 ${baseDmg} 傷害`,
             };
             gs.addEffect(debuffEffect);
-            logs.push({ text: `${monster.name} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'player' });
+            if (!alreadyActive) logs.push({ text: `${monster.name} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'debuff-enemy' });
+          } else if (debuffDef.stun && debuffDef.duration) {
+            // 控場 debuff（§ 24.5.1）
+            // § 24.6：Boss 被控場後 30 秒內免疫任何控場效果
+            if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
+              logs.push({ text: `${monster.name} 免疫控場！`, type: 'debuff-enemy' });
+            } else {
+              const stunEffect: ActiveEffect = {
+                id: `debuff-${debuffDef.category}-${targetId}-${now}`,
+                sourceSkillId: skill.id,
+                sourceSkillName: skill.name,
+                category: debuffDef.category,
+                type: 'debuff',
+                target: 'monster',
+                targetIdx,
+                targetMonsterId: targetId,
+                stun: true,
+                modifiers: debuffDef.modifiers,
+                startTime: now,
+                duration: debuffDef.duration,
+                tags: debuffDef.tags,
+                name: debuffDef.name,
+                description: debuffDef.description,
+              };
+              gs.addEffect(stunEffect);
+              if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
+              if (!alreadyActive) logs.push({ text: `${skill.name} 命中！${monster.name} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'debuff-enemy' });
+            }
           } else if (debuffDef.modifiers && debuffDef.duration) {
             // Stat modifier debuff
             const debuffEffect: ActiveEffect = {
@@ -303,7 +350,7 @@ export function processPlayerAttack(
               description: debuffDef.description,
             };
             gs.addEffect(debuffEffect);
-            logs.push({ text: `${monster.name} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'player' });
+            if (!alreadyActive) logs.push({ text: `${monster.name} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'debuff-enemy' });
           }
         }
       }
@@ -380,11 +427,26 @@ export function processMonsterAttack(
     logText = `${monster.name} 造成 ${result.damage} 傷害`;
   }
 
+  // 命中後判定角色 debuff（§ 24.4.2 / § 25.9.2）
+  let debuffLog: CombatLog | undefined;
+  if (!result.dodged) {
+    const gs = useGameStore.getState();
+    const roll = rollMonsterDebuff(monster, equippedGear, gs.activeEffects);
+    if (roll.effect) {
+      const applied = applyPlayerDebuff(gs.activeEffects, roll.effect);
+      useGameStore.setState({ activeEffects: applied.effects });
+      debuffLog = applied.cancelledSpeedBuff
+        ? { text: `${monster.name} 的減速抵銷了你的加速效果`, type: 'debuff-self' }
+        : { text: `${monster.name} 使你 ${roll.effect.name} ${roll.effect.duration / 1000}s`, type: 'debuff-self' };
+    }
+  }
+
   return {
     monsterId: event.monsterId,
     damage: result.damage,
     isDodged: result.dodged,
     isBlocked: false,
     log: { text: logText, type: 'monster' },
+    debuffLog,
   };
 }

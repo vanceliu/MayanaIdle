@@ -60,13 +60,13 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   // Level 2
   { id: 'thunder-strike', name: '風雷擊', level: 2, element: 'wind', type: 'attack', target: 'single', power: 18, mpCost: 9, cooldown: 4000, range: 10 },
   { id: 'flame-arrow', name: '火焰箭', level: 2, element: 'fire', type: 'attack', target: 'single', power: 20, mpCost: 10, cooldown: 4000, range: 12 },
-  { id: 'frost', name: '寒霜', level: 2, element: 'ice', type: 'attack', target: 'single', power: 18, mpCost: 9, cooldown: 4000, range: 10 },
+  { id: 'frost', name: '寒霜', level: 2, element: 'ice', type: 'attack', target: 'single', power: 18, mpCost: 9, cooldown: 4000, range: 10, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'shadow-ball', name: '暗影球', level: 2, element: 'dark', type: 'attack', target: 'single', power: 20, mpCost: 10, cooldown: 4000, range: 10 },
   { id: 'holy-bolt', name: '聖光彈', level: 2, element: 'light', type: 'attack', target: 'single', power: 20, mpCost: 10, cooldown: 4000, range: 10 },
   // Level 3
   { id: 'rock-fall', name: '落石', level: 3, element: 'earth', type: 'attack', target: 'single', power: 25, mpCost: 15, cooldown: 6000, range: 12 },
   { id: 'fireball', name: '火球', level: 3, element: 'fire', type: 'attack', target: 'aoe', power: 25, mpCost: 15, cooldown: 6000, range: 12, aoeMin: 2, aoeMax: 3 },
-  { id: 'ice-fog', name: '冰霧', level: 3, element: 'ice', type: 'attack', target: 'aoe', power: 15, mpCost: 14, cooldown: 6000, range: 12, aoeMin: 2, aoeMax: 3 },
+  { id: 'ice-fog', name: '冰霧', level: 3, element: 'ice', type: 'attack', target: 'aoe', power: 15, mpCost: 14, cooldown: 6000, range: 12, aoeMin: 2, aoeMax: 3, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'mid-heal', name: '中治癒', level: 3, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 70, mpCost: 25, cooldown: 8000, range: 0 },
   { id: 'magic-armor', name: '魔法盔甲', level: 3, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 3000, range: 0, buffEffect: '防禦+5', buffDuration: 600000, buffModifiers: [{ stat: 'defense', value: 5, isPercent: false }] },
   // Level 4
@@ -78,7 +78,7 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   // Level 5
   { id: 'gale-storm', name: '狂風暴', level: 5, element: 'wind', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },
   { id: 'hellfire', name: '業火', level: 5, element: 'fire', type: 'attack', target: 'aoe', power: 40, mpCost: 35, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },
-  { id: 'ice-ring', name: '冰環', level: 5, element: 'ice', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },
+  { id: 'ice-ring', name: '冰環', level: 5, element: 'ice', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'great-heal', name: '大治癒', level: 5, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 150, mpCost: 40, cooldown: 10000, range: 0 },
   { id: 'holy-light', name: '聖光術', level: 5, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 3000, range: 0, buffEffect: '淨化負面狀態', buffDuration: 0, cleanse: true },
   // Level 6
@@ -96,13 +96,13 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   // Level 8
   { id: 'chain-lightning', name: '閃電鎖鏈', level: 8, element: 'wind', type: 'attack', target: 'aoe', power: 50, mpCost: 55, cooldown: 10000, range: 12, aoeMin: 5, aoeMax: 7 },
   { id: 'purgatory', name: '煉獄火', level: 8, element: 'fire', type: 'attack', target: 'aoe', power: 70, mpCost: 60, cooldown: 12000, range: 12, aoeMin: 5, aoeMax: 7 },
-  { id: 'blizzard', name: '冰暴', level: 8, element: 'ice', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, range: 12, aoeMin: 4, aoeMax: 6 },
+  { id: 'blizzard', name: '冰暴', level: 8, element: 'ice', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, range: 12, aoeMin: 4, aoeMax: 6, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'full-heal', name: '完全治癒', level: 8, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 500, mpCost: 80, cooldown: 15000, range: 0 },
   { id: 'greater-haste', name: '強化加速術', level: 8, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 60, cooldown: 100000, range: 0, buffEffect: '攻速+40%', buffDuration: 600000, buffModifiers: [{ stat: 'attack_speed', value: 40, isPercent: true }], buffCategory: 'speed' },
   // Level 9
   { id: 'mass-teleport', name: '集體傳送術', level: 9, element: 'none', type: 'move', target: 'single', power: 0, mpCost: 70, cooldown: 12000, range: 0 },
   { id: 'meteor-shower', name: '流星雨', level: 9, element: 'fire', type: 'attack', target: 'aoe', power: 85, mpCost: 75, cooldown: 14000, range: 15, aoeMin: 6, aoeMax: 8 },
-  { id: 'blizzard-storm', name: '暴風雪', level: 9, element: 'ice', type: 'attack', target: 'aoe', power: 80, mpCost: 70, cooldown: 12000, range: 12, aoeMin: 6, aoeMax: 8 },
+  { id: 'blizzard-storm', name: '暴風雪', level: 9, element: 'ice', type: 'attack', target: 'aoe', power: 80, mpCost: 70, cooldown: 12000, range: 12, aoeMin: 6, aoeMax: 8, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'sanctuary', name: '聖域', level: 9, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 90, cooldown: 90000, range: 0, buffEffect: '減傷25%+每秒回血20', buffDuration: 10000, buffModifiers: [{ stat: 'defense', value: 25, isPercent: true }], buffCategory: 'sanctuary', hotAmount: 20 },
   { id: 'earth-shatter', name: '震裂術', level: 9, element: 'earth', type: 'attack', target: 'aoe', power: 85, mpCost: 75, cooldown: 14000, range: 15, aoeMin: 6, aoeMax: 8 },
   // Level 10

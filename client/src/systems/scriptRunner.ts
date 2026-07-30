@@ -1,4 +1,5 @@
 import type { ScriptRule, ScriptAction, CombatRule, CombatAction, PersistentRule, PersistentAction, EmergencyRetreat } from '../models/scriptEngine';
+import { SCRIPT_DEBUFF_TYPES } from '../models/scriptEngine';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
@@ -7,6 +8,9 @@ import type { BagItem } from '../stores/gameStore';
 import { getPotionCount, SPEED_POTION_CONFIG } from '../stores/gameStore';
 import { canUseSkill } from '../models/skill';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
+import { PLAYER_DEBUFF_DEFS } from '../models/playerDebuff';
+import { getCureItem, hasCurableDebuff } from '../models/cureItem';
+import { hasActivePlayerDebuff, isPlayerStunned } from './playerDebuffSystem';
 
 // === Combat Script ===
 
@@ -152,6 +156,13 @@ function checkPersistentCondition(rule: PersistentRule, ctx: PersistentScriptCon
       if (!skill) return false;
       return canUseSkill(skill, character.mp, now, ctx.cooldownReduction ?? 0);
     }
+    case 'debuff_active': {
+      if (!condition.debuffType) return false;
+      // 合併條件（如「詛咒或虛弱」）只要其中一項成立即可
+      return SCRIPT_DEBUFF_TYPES[condition.debuffType].some(
+        t => hasActivePlayerDebuff(activeEffects, PLAYER_DEBUFF_DEFS[t].category, now)
+      );
+    }
     default:
       return false;
   }
@@ -182,6 +193,16 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (!skill) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+    }
+    case 'cure_item': {
+      // 暈眩中無法使用任何道具（§ 24.10.1）
+      if (isPlayerStunned(ctx.activeEffects, ctx.now)) return false;
+      const def = action.cureItemName ? getCureItem(action.cureItemName) : undefined;
+      if (!def) return false;
+      const bagItem = ctx.bagItems.find(i => i.name === def.name);
+      if (!bagItem || bagItem.amount <= 0) return false;
+      // 無對應 debuff 時不可使用（§ 24.10.1）
+      return hasCurableDebuff(def, ctx.activeEffects, ctx.now);
     }
     default:
       return false;

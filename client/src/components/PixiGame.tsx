@@ -405,6 +405,7 @@ function tickArpgCombatLoop(
         });
         if (result) {
           logs.push(result.log);
+          if (result.debuffLog) logs.push(result.debuffLog);
 
           if (effectLayer) {
             const pPos = useMapControlStore.getState().playerPosition;
@@ -484,7 +485,51 @@ function tickArpgCombatLoop(
   // === DoT tick (every 1000ms) ===
   if (consumeDotTick()) {
     processDotTick(monsterInstances, effectLayer);
+    processPlayerDotTick(effectLayer);
   }
+}
+
+/**
+ * 角色 DoT 結算（中毒 / 流血）
+ * § 24.4.4：無視防禦、不觸發爆擊、可致死
+ */
+function processPlayerDotTick(effectLayer?: EffectLayer) {
+  const gs = useGameStore.getState();
+  const now = Date.now();
+  const dotEffects = gs.activeEffects.filter(
+    e => e.type === 'debuff' && e.target === 'player' && e.dot && now < e.startTime + e.duration
+  );
+  if (dotEffects.length === 0) return;
+
+  const char = gs.character;
+  if (!char || char.hp <= 0) return;
+
+  const logs: CombatLog[] = [];
+  let hp = char.hp;
+  for (const effect of dotEffects) {
+    if (!effect.dot) continue;
+    const dmg = effect.dot.damage;
+    hp = Math.max(0, hp - dmg);
+    logs.push({ text: `${effect.name} 造成 ${dmg} 傷害`, type: 'debuff-self' });
+
+    if (effectLayer) {
+      const map = useMapControlStore.getState().currentMap;
+      if (map) {
+        const pPos = useMapControlStore.getState().playerPosition;
+        const { sx, sy } = mapPositionToScreen(map, pPos);
+        effectLayer.spawnDamageNumber(sx, sy - 20, dmg, 'dot');
+      }
+    }
+    if (hp <= 0) break;
+  }
+
+  const existing = useGameStore.getState().combatLogs;
+  useGameStore.setState({
+    character: { ...useGameStore.getState().character!, hp },
+    combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
+  });
+
+  if (hp <= 0) handlePlayerDeath();
 }
 
 function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLayer?: EffectLayer) {
@@ -509,7 +554,7 @@ function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLa
     if (!inst || inst.currentHp <= 0) continue;
 
     inst.currentHp = Math.max(0, inst.currentHp - effect.dot.damage);
-    logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'dot' });
+    logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'debuff-enemy' });
 
     if (effectLayer) {
       const targetMonster = monsterStore.monsters.find(m => m.id === monsterId);
@@ -587,6 +632,7 @@ function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemplate[])
     attackRange: template.attackRange ?? 1.5,
     attackInterval: template.attackInterval ?? 1200,
     projectileSpeed: template.projectileSpeed,
+    debuffs: template.debuffs,
   };
 }
 

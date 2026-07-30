@@ -11,6 +11,17 @@ import { loadTemplateCache } from '../../systems/templateSync';
  * @vitest-environment jsdom
  */
 
+/**
+ * 配方名稱在畫面上可能出現兩次：配方標題，以及其他配方的「前置武器」需求。
+ * 這裡只取配方標題。
+ */
+async function findRecipeTitle(name: string): Promise<HTMLElement> {
+  const matches = await screen.findAllByText(name);
+  const title = matches.find(el => el.closest('.shop-item-name'));
+  if (!title) throw new Error(`找不到配方標題: ${name}`);
+  return title;
+}
+
 describe('TownBlacksmith - Crafting', () => {
   beforeEach(async () => {
     await db.delete();
@@ -62,21 +73,21 @@ describe('TownBlacksmith - Crafting', () => {
   it('shows recipe list when craft tab selected', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    expect(await screen.findByText('精鋼劍')).toBeDefined();
-    expect(screen.getByText('銀騎士之劍')).toBeDefined();
+    expect(await findRecipeTitle('精鋼劍')).toBeDefined();
+    expect(await findRecipeTitle('銀騎士之劍')).toBeDefined();
   });
 
   it('shows recipe detail when selected', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('精鋼劍'));
+    fireEvent.click(await findRecipeTitle('精鋼劍'));
     expect(screen.getAllByText(/150.*G/).length).toBeGreaterThan(0);
   });
 
   it('crafts item successfully when materials and gold available', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('精鋼劍'));
+    fireEvent.click(await findRecipeTitle('精鋼劍'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -92,7 +103,7 @@ describe('TownBlacksmith - Crafting', () => {
   it('crafted item has correct stats', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('精鋼劍'));
+    fireEvent.click(await findRecipeTitle('精鋼劍'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -115,8 +126,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    await screen.findByText('精鋼劍');
-    fireEvent.click(screen.getByText('精鋼劍'));
+    fireEvent.click(await findRecipeTitle('精鋼劍'));
 
     const craftBtns = screen.getAllByText('製作');
     expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
@@ -132,8 +142,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    await screen.findByText('精鋼劍');
-    fireEvent.click(screen.getByText('精鋼劍'));
+    fireEvent.click(await findRecipeTitle('精鋼劍'));
 
     const craftBtns = screen.getAllByText('製作');
     expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
@@ -142,7 +151,7 @@ describe('TownBlacksmith - Crafting', () => {
   it('shows success message after crafting', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('精鋼劍'));
+    fireEvent.click(await findRecipeTitle('精鋼劍'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);

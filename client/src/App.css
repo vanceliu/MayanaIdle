@@ -860,7 +860,9 @@ button.active {
 .log-player { color: var(--accent-mana); }
 .log-monster { color: var(--accent-danger); }
 .log-system { color: var(--accent-gold); }
-.log-dot { color: #60A5FA; }
+/* Debuff 日誌：我方粉紅、敵方淺藍 */
+.log-debuff-self { color: #F472B6; }
+.log-debuff-enemy { color: #7DD3FC; }
 .log-loot { color: var(--accent-success); }
 
 /* --- Map Canvas --- */
@@ -1279,6 +1281,7 @@ button.active {
 .affix-tag.tier-5 { color: #FB923C; border-color: rgba(251,146,60,0.2); }
 .affix-tag.tier-6 { color: #EF4444; border-color: rgba(239,68,68,0.2); }
 .affix-tag.tier-7 { color: #A855F7; border-color: rgba(168,85,247,0.2); text-shadow: 0 0 6px rgba(168,85,247,0.3); }
+.affix-tag.special { color: #FFD700; border-color: rgba(255,215,0,0.3); text-shadow: 0 0 6px rgba(255,215,0,0.3); }
 
 .equipped-item {
   display: flex;
@@ -1724,6 +1727,8 @@ button.active {
 .equip-detail-affix.tier-5 { color: #FB923C; }
 .equip-detail-affix.tier-6 { color: #EF4444; }
 .equip-detail-affix.tier-7 { color: #A855F7; text-shadow: 0 0 6px rgba(168,85,247,0.3); }
+/* § 7.10.5 特殊詞綴（免疫詞綴）金色顯示 */
+.equip-detail-affix.special { color: #FFD700; text-shadow: 0 0 6px rgba(255,215,0,0.3); }
 
 .equip-detail-class {
   color: var(--accent-info);
@@ -1993,6 +1998,30 @@ button.active {
 
 .bs-shop-item.disabled-look {
   opacity: 0.5;
+}
+
+/* 製作配方的素材需求：icon + 稀有度顏色，不足時標紅 */
+.bs-craft-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.bs-craft-mat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.bs-craft-mat-count {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.bs-craft-mat.lacking .bs-craft-mat-name,
+.bs-craft-mat.lacking .bs-craft-mat-count {
+  color: var(--accent-danger);
 }
 
 .bs-slot-tag {
@@ -2908,6 +2937,27 @@ button.active {
 
 .buff-icon .game-icon {
   color: var(--accent-gold);
+}
+
+/* § 24.8.2 Buff/Debuff 框色區分 */
+.buff-icon.is-buff .game-icon,
+.buff-icon.is-debuff .game-icon {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  box-sizing: content-box;
+}
+
+.buff-icon.is-buff .game-icon {
+  border-color: #3B82F6;
+}
+
+.buff-icon.is-debuff .game-icon {
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
+.buff-tooltip-name.debuff {
+  color: #EF4444;
 }
 
 .buff-timer {

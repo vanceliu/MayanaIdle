@@ -13,7 +13,7 @@ export interface ClassSkillDef {
 
 export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'shield-bash', name: '盾擊', className: 'knight', classLevel: 1, requiredLevel: 10, bookName: '盾擊技能書',
-    skill: { id: 'shield-bash', name: '盾擊', level: 1, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 15, cooldown: 10000, range: 1.5 } },
+    skill: { id: 'shield-bash', name: '盾擊', level: 1, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 15, cooldown: 10000, range: 1.5, applyDebuff: { category: 'stun', name: '暈眩', description: '無法行動，攻擊計時器暫停', duration: 2000, stun: true, tags: ['stunned'] } } },
   { id: 'rend', name: '裂傷斬', className: 'knight', classLevel: 2, requiredLevel: 20, bookName: '裂傷斬技能書',
     skill: { id: 'rend', name: '裂傷斬', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, mpCost: 20, cooldown: 8000, range: 1.5, applyDebuff: { category: 'bleeding', name: '流血', description: '每秒 50% 物理傷害', dotDamagePercent: 0.5, dotInterval: 1000, dotDuration: 5000, dotElement: 'none', tags: ['bleeding'] } } },
   { id: 'iron-shield', name: '鋼鐵護盾', className: 'knight', classLevel: 3, requiredLevel: 30, bookName: '鋼鐵護盾技能書',

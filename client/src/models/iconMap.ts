@@ -20,6 +20,13 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'poisoned': 'debuffs/poison-gas',
   'defense-down': 'debuffs/broken-shield',
   'atk-down': 'debuffs/stoned-skull',
+
+  // 角色 debuff（category → icon path，見 24-buff-debuff.md § 24.8.2）
+  'dot-poison': 'debuffs/poison-gas',
+  'dot-bleed': 'debuffs/bleeding-wound',
+  'curse': 'debuffs/skull-crossed-bones',
+  'weaken': 'debuffs/weaken-arrow',
+  'slow': 'debuffs/snail-slow',
 };
 
 export const ITEM_ICON_MAP: Record<string, string> = {
@@ -110,6 +117,20 @@ export function getEffectIcon(category: string): string {
 
 export function getItemIcon(itemType: string): string {
   return ITEM_ICON_MAP[itemType] || 'items/gem-pendant';
+}
+
+/**
+ * 道具顯示的單一來源：優先讀 ItemDefinition 上的 icon / iconColor，
+ * 其次是素材的 iconType / iconTier，最後才用名稱猜測。
+ * 背包與商店共用此函式，避免兩邊各自實作而顯示不一致。
+ */
+export function resolveItemIcon(
+  def: { icon?: string; iconColor?: string; iconType?: MaterialIconType; iconTier?: number } | undefined,
+  fallbackKey: string,
+): { icon: string; color?: string } {
+  if (def?.icon) return { icon: def.icon, color: def.iconColor };
+  if (def?.iconType) return { icon: getMaterialIcon(def.iconType), color: getMaterialColor(def.iconTier) };
+  return { icon: getItemIcon(fallbackKey), color: undefined };
 }
 
 export function getEquipIcon(equipType: string): string {

@@ -25,35 +25,42 @@ export function BuffBar() {
     return () => clearInterval(id);
   }, []);
 
-  const playerBuffs = activeEffects.filter(e => e.type === 'buff' && e.target === 'player');
+  // § 24.8.2：Buff 與 Debuff 同排顯示，以框色區分（buff 藍框 / debuff 紅框）
+  const playerEffects = activeEffects.filter(
+    e => e.target === 'player' && (e.type === 'buff' || e.type === 'debuff')
+  );
 
-  if (playerBuffs.length === 0) return null;
+  if (playerEffects.length === 0) return null;
 
   const now = Date.now();
-  const visible = playerBuffs.slice(0, MAX_VISIBLE);
-  const overflow = playerBuffs.length - MAX_VISIBLE;
+  const visible = playerEffects.slice(0, MAX_VISIBLE);
+  const overflow = playerEffects.length - MAX_VISIBLE;
 
   return (
     <div className="buff-bar">
-      {visible.map(buff => {
-        const remaining = buff.startTime + buff.duration - now;
+      {visible.map(effect => {
+        const remaining = effect.startTime + effect.duration - now;
         const isExpiring = remaining > 0 && remaining < 5000;
-        const iconName = getEffectIcon(buff.category);
+        const iconName = getEffectIcon(effect.category);
+        const isDebuff = effect.type === 'debuff';
 
         return (
           <Tooltip
-            key={buff.id}
+            key={effect.id}
             position="bottom"
             content={
               <div className="buff-tooltip-content">
-                <div className="buff-tooltip-name">{buff.name}</div>
-                <div className="buff-tooltip-desc">{buff.description}</div>
+                <div className={`buff-tooltip-name${isDebuff ? ' debuff' : ''}`}>{effect.name}</div>
+                <div className="buff-tooltip-desc">{effect.description}</div>
                 <div className="buff-tooltip-time">剩餘: {formatTime(remaining)}</div>
-                <div className="buff-tooltip-source">來源: {buff.sourceSkillName}</div>
+                <div className="buff-tooltip-source">來源: {effect.sourceSkillName}</div>
               </div>
             }
           >
-            <div className={`buff-icon ${isExpiring ? 'expiring' : ''}`}>
+            <div
+              className={`buff-icon ${isDebuff ? 'is-debuff' : 'is-buff'} ${isExpiring ? 'expiring' : ''}`}
+              data-testid={isDebuff ? 'player-debuff-icon' : 'player-buff-icon'}
+            >
               <GameIcon name={iconName} size={28} />
               <span className="buff-timer">{formatTime(remaining)}</span>
             </div>

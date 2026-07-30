@@ -31,6 +31,11 @@
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
 | 職業魔法（5 職業各 5 級） | `23-class-magic.md` | 全文 |
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
+| 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩） | `24-buff-debuff.md` | § 24.4, § 24.10 |
+| Debuff 解除手段（道具/免疫詞綴） | `24-buff-debuff.md` | § 24.10 |
+| 怪物 Debuff 能力（已併入怪物屬性表） | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
+| 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
+| 狀態解除道具（解毒/止血/淨化） | `30-items.md` | § 狀態解除道具 |
 | 戰鬥腳本（自動戰鬥 AI） | `31-battle-script.md` | 全文 |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
@@ -195,8 +200,10 @@
        ↕                                    ↕
 21-combat-formula.md                 22-basic-magic.md / 23-class-magic.md
        ↕                                                        ↕
-24-buff-debuff.md ←→ 25-monster-system.md（怪物 debuff / Boss 控場免疫）
+24-buff-debuff.md ←→ 25-monster-system.md（怪物 debuff / Boss 控場免疫 / 怪物 debuff 能力表）
        ↕                                                        ↕
+07-affix.md（免疫詞綴 § 7.10）←→ 30-items.md（狀態解除道具）←→ 13-town.md（雜貨店商品清單）
+       ↕
 16-tech-frontend-architecture.md（Icon 系統 / BuffBar / 左側面板 / Tooltip）
                                                                 ↕
                                         27-drop-table.md ←→ 13-town.md（職業工會任務）

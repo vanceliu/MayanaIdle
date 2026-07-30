@@ -20,8 +20,13 @@ export function Inn() {
 
   function restFull() {
     if (!char || char.gold < INN_PRICES.full) return;
+    // § 24.10.4：休息同時解除所有角色 debuff
+    const remainingEffects = useGameStore.getState().activeEffects.filter(
+      e => !(e.type === 'debuff' && e.target === 'player')
+    );
     set({
       character: { ...char, hp: effMaxHp, mp: effMaxMp, gold: char.gold - INN_PRICES.full },
+      activeEffects: remainingEffects,
     });
     useGameStore.getState().saveState();
   }

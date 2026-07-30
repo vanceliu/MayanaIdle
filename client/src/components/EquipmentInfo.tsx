@@ -1,5 +1,5 @@
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
-import { AFFIX_DEFINITIONS, getEffectiveAffixValue } from '../models/affix';
+import { AFFIX_DEFINITIONS, getEffectiveAffixValue, isSpecialAffixType, getSpecialAffixDefinition } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
@@ -113,6 +113,15 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {item.affixes && item.affixes.length > 0 && (
         <div className="equip-detail-affixes">
           {item.affixes.map((affix, i) => {
+            // § 7.10.5 特殊詞綴：金色顯示、標記 [特殊]、無 Tier
+            if (isSpecialAffixType(affix.type)) {
+              const sDef = getSpecialAffixDefinition(affix.type);
+              return (
+                <div key={i} className="equip-detail-affix special" title="特殊詞綴，無法強化">
+                  [特殊] {sDef?.name}
+                </div>
+              );
+            }
             const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
             const effectiveValue = getEffectiveAffixValue(affix, item.quality);
             return (

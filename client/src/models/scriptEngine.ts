@@ -1,3 +1,27 @@
+import type { PlayerDebuffType } from './playerDebuff';
+
+/**
+ * 常駐腳本「狀態異常」條件的選項。
+ * 詛咒與虛弱共用淨化藥水，因此合併為一項，避免腳本過長。
+ * 暈眩不列入：無解除道具，且暈眩中無法使用任何道具。
+ */
+export type ScriptDebuffCondition = 'poison' | 'bleed' | 'curse_weaken' | 'slow';
+
+/** 每個條件對應到的實際 debuff 類型 */
+export const SCRIPT_DEBUFF_TYPES: Record<ScriptDebuffCondition, PlayerDebuffType[]> = {
+  poison: ['poison'],
+  bleed: ['bleed'],
+  curse_weaken: ['curse', 'weaken'],
+  slow: ['slow'],
+};
+
+export const SCRIPT_DEBUFF_LABELS: Record<ScriptDebuffCondition, string> = {
+  poison: '中毒',
+  bleed: '流血',
+  curse_weaken: '詛咒或虛弱',
+  slow: '減速',
+};
+
 // === Combat Script Types ===
 
 export type CombatConditionType =
@@ -39,14 +63,17 @@ export type PersistentConditionType =
   | 'mp_above'
   | 'buff_not_active'
   | 'speed_not_active'
-  | 'skill_ready';
+  | 'skill_ready'
+  | 'debuff_active';
 
-export type PersistentActionType = 'potion' | 'speed_potion' | 'buff_skill' | 'heal_skill';
+export type PersistentActionType = 'potion' | 'speed_potion' | 'buff_skill' | 'heal_skill' | 'cure_item';
 
 export interface PersistentCondition {
   type: PersistentConditionType;
   value?: number;
   skillId?: string;
+  /** debuff_active 用：指定狀態異常條件 */
+  debuffType?: ScriptDebuffCondition;
 }
 
 export interface PersistentAction {
@@ -54,6 +81,8 @@ export interface PersistentAction {
   potionType?: 'red' | 'orange' | 'white';
   speedPotionType?: 'green' | 'enhanced-green';
   skillId?: string;
+  /** cure_item 用：狀態解除道具名稱 */
+  cureItemName?: string;
 }
 
 export interface PersistentRule {

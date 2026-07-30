@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, AFFIX_TIERS, rollAffixValue, getAffixPoolForSlot, type AffixCategory, type Affix } from '../../models/affix';
+import { AFFIX_DEFINITIONS, AFFIX_TIERS, rollAffixValue, getAffixPoolForSlot, isSpecialAffixType, getSpecialAffixDefinition, type AffixCategory, type Affix } from '../../models/affix';
 import { CRAFT_TIER_NAMES } from '../../models/crafting';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
-import { getEquipIcon } from '../../models/iconMap';
+import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
+import { getItemDefinition } from '../../models/items';
+import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
 import { resolveEquipment } from '../../systems/templateSync';
@@ -218,6 +220,8 @@ export function TownBlacksmith() {
     if (!item.affixes || !item.affixes[affixIdx]) return;
 
     const affix = item.affixes[affixIdx];
+    // § 7.10.2 特殊詞綴不可強化
+    if (isSpecialAffixType(affix.type)) return;
     if (affix.tier >= 5) return;
 
     const newTier = affix.tier + 1;
@@ -415,6 +419,16 @@ export function TownBlacksmith() {
       <div className="shop-item-actions bs-actions">
         <div className="bs-affix-list">
           {affixes.map((affix, i) => {
+            // § 7.10.2 特殊詞綴無 Tier、不可強化
+            if (isSpecialAffixType(affix.type)) {
+              const sDef = getSpecialAffixDefinition(affix.type);
+              return (
+                <div key={i} className="bs-affix-row">
+                  <span className="affix-tag special">[特殊] {sDef?.name}</span>
+                  <button className="bs-affix-btn" disabled>不可強化</button>
+                </div>
+              );
+            }
             const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
             const canEnhance = affix.tier < 5 && enhanceStones > 0;
             return (
@@ -541,7 +555,7 @@ export function TownBlacksmith() {
             >
               <div className="shop-item-info">
                 <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <GameIcon name={getEquipIcon(recipe.type === 'armor' ? recipe.slot : recipe.type)} size={16} color="#FFFFFF" />
+                  <GameIcon name={getEquipIcon(recipe.type === 'armor' ? recipe.slot : recipe.type)} size={16} color={getEquipmentTierColor(recipe)} />
                   {recipe.name}
                 </span>
                 <span className="shop-item-desc">
@@ -570,16 +584,33 @@ export function TownBlacksmith() {
                     ? recipe.requiredClass.map(c => CLASS_NAMES_ZH[c as keyof typeof CLASS_NAMES_ZH] ?? c).join('、')
                     : '全職業'}
                 </span>
-                <span className="shop-item-desc">
+                <span className="shop-item-desc bs-craft-materials">
                   {recipe.craftPrerequisiteWeapon && (() => {
                     const { name, quantity } = recipe.craftPrerequisiteWeapon!;
                     const have = inventory.filter(i => i.name === name).length;
-                    return `${name} ${have}/${quantity}、`;
+                    const enough = have >= quantity;
+                    const tmpl = allTemplates.find(t => t.name === name);
+                    const color = tmpl ? getEquipmentTierColor(tmpl) : undefined;
+                    return (
+                      <span className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
+                        <GameIcon name={getEquipIcon(tmpl?.type === 'armor' ? (tmpl.slot ?? 'chest') : (tmpl?.type ?? 'sword'))} size={14} color={color} />
+                        <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{name}</span>
+                        <span className="bs-craft-mat-count">{have}/{quantity}</span>
+                      </span>
+                    );
                   })()}
                   {(recipe.craftMaterials ?? []).map(m => {
                     const have = bagItems.find(b => b.name === m.name)?.amount ?? 0;
-                    return `${m.name} ${have}/${m.amount}`;
-                  }).join('、')}
+                    const enough = have >= m.amount;
+                    const { icon, color } = resolveItemIcon(getItemDefinition(m.name), 'material');
+                    return (
+                      <span key={m.name} className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
+                        <GameIcon name={icon} size={14} color={color} />
+                        <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{m.name}</span>
+                        <span className="bs-craft-mat-count">{have}/{m.amount}</span>
+                      </span>
+                    );
+                  })}
                 </span>
                 <span className="shop-item-price">{(recipe.craftGold ?? 0).toLocaleString()}G</span>
               </div>
