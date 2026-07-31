@@ -353,7 +353,8 @@ interface Projectile {
 
 ## 12. 地形、LOS 與投射物語意
 
-- LOS 與投射物 raycast 共用 tile catalog，但分別讀取 `blocksSight` / `blocksProjectiles`。邊界及實體障礙阻擋兩者；裝飾與樓梯不阻擋。
-- 高台外露側面阻擋跨層射線，且由高往低、由低往高的判定必須一致；通過合法定向樓梯的射線則允許上下樓兩個方向跨越一層高低差。距離公式仍為二維格距，不因視覺高度改變。
+- LOS 與投射物 raycast 共用 tile catalog，但分別讀取 `blocksSight` / `blocksProjectiles`（見 `38-map-control.md` § 38.4）。
+- 邊界與實體障礙（牆壁/樹木/岩石/柱子）阻擋兩者；低窪障礙（水池/岩漿/深淵）與裝飾地面兩者皆不阻擋 —— 因此低窪障礙形成「近戰過不去、遠程打得到」的對射位。
+- 距離公式為二維格距。目前所有 tile 高度皆為 0，跨層射線判定尚未實作（見 `38-map-control.md` § 38.15）。
 - 現階段 combat.ts 的傷害、死亡、掉落與任務結算時機維持既有即時計算；Pixi projectile 是結果視覺化，不是權威傷害 state。產生視覺投射物前仍需通過地形 projectile raycast，地圖切換時 EffectLayer 清除所有飛行物。
 - 此約束避免地圖重構同時改變攻擊 tick、掉落 exactly-once 與多段攻擊語意；若未來改為抵達時計算，必須將 projectile state 移至 gameplay loop 並另行設計。

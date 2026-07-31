@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { SKILL_CATALOG, type Skill } from '../models/skill';
+import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill } from '../models/skill';
 import type { ClassName } from '../models/character';
 
 const GRID_COLUMNS = 5;
@@ -27,7 +27,7 @@ const CLASS_SKILLS_MAP: Record<ClassName, Array<{ id: string; name: string; leve
     { id: 'cd-reduce', name: '冷卻縮減', level: 1 },
     { id: 'mana-drain', name: '魔力奪取', level: 2 },
     { id: 'element-boost', name: '元素增幅', level: 3 },
-    { id: 'chain-cast', name: '連鎖詠唱', level: 4 },
+    { id: 'greater-cd-reduce', name: '強化冷卻縮減', level: 4 },
     { id: 'element-storm', name: '元素風暴', level: 5 },
   ],
   priest: [
@@ -189,8 +189,16 @@ export function SkillPanel() {
         >
           <div className="skill-tooltip-name">{tooltip.name}</div>
           <div className="skill-tooltip-level">等級 {tooltip.level}</div>
+          {tooltip.skill.requiredWeaponType && (
+            <div className="skill-tooltip-stat skill-tooltip-req">
+              【需{WEAPON_TYPE_LABELS[tooltip.skill.requiredWeaponType] ?? tooltip.skill.requiredWeaponType}】
+            </div>
+          )}
           {tooltip.skill.type === 'attack' && (
             <div className="skill-tooltip-stat">威力: {tooltip.skill.power}</div>
+          )}
+          {tooltip.skill.hits && (
+            <div className="skill-tooltip-stat">{tooltip.skill.hits} 連擊（每擊獨立判定）</div>
           )}
           {tooltip.skill.description && (
             <div className="skill-tooltip-stat">效果: {tooltip.skill.description}</div>

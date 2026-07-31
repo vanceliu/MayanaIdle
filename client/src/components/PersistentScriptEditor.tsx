@@ -1,5 +1,5 @@
 import { useGameStore } from '../stores/gameStore';
-import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, EmergencyRetreatAction, ScriptDebuffCondition } from '../models/scriptEngine';
+import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, ScriptDebuffCondition } from '../models/scriptEngine';
 import { SCRIPT_DEBUFF_LABELS } from '../models/scriptEngine';
 import { CURE_ITEMS } from '../models/cureItem';
 import type { PotionType, SpeedPotionType } from '../stores/gameStore';
@@ -37,11 +37,6 @@ const SPEED_POTION_LABELS: Record<SpeedPotionType, string> = {
 };
 
 const SCRIPT_DEBUFF_CONDITIONS: ScriptDebuffCondition[] = ['poison', 'bleed', 'curse_weaken', 'slow'];
-
-const RETREAT_ACTION_LABELS: Record<EmergencyRetreatAction, string> = {
-  flee_town: '回城',
-  flee_teleport: '瞬移逃跑',
-};
 
 export function PersistentScriptEditor() {
   const persistentRules = useGameStore(s => s.persistentRules);
@@ -264,14 +259,7 @@ export function PersistentScriptEditor() {
         </div>
         <div className="script-row">
           <label>動作</label>
-          <select
-            value={emergencyRetreat.action}
-            onChange={e => setEmergencyRetreat({ ...emergencyRetreat, action: e.target.value as EmergencyRetreatAction, scrollTownId: undefined })}
-          >
-            {Object.entries(RETREAT_ACTION_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
+          <span className="retreat-action-fixed">回城</span>
           {emergencyRetreat.action === 'flee_town' && (
             <select
               value={emergencyRetreat.scrollTownId ?? ''}

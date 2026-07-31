@@ -14,6 +14,7 @@ import {
   hasActiveFireEnchant,
   getAffixBonusesFromGear,
   calculateMpRestored,
+  absorbWithShield,
 } from './combat';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { getSkillTemplate } from '../models/skillTemplate';
@@ -55,6 +56,7 @@ export interface MonsterAttackResult {
   isBlocked: boolean;
   log: CombatLog;
   debuffLog?: CombatLog;
+  shieldLog?: CombatLog;
 }
 
 export function processPlayerAttack(
@@ -97,6 +99,11 @@ export function processPlayerAttack(
           name: skill.name,
           description: template?.buffEffect ?? skill.buffEffect ?? '',
         };
+        const hotAmount = template?.hotAmount ?? skill.hotAmount;
+        if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
+        if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
+        const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
+        if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
 
         if (skill.cleanse) {
           const cleansed = gs.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
@@ -166,6 +173,7 @@ export function processPlayerAttack(
             skill.name,
             activeEffects,
             targetIdx,
+            skill.ignoreDefensePercent ?? 0,
           );
           damage += hitResult.damage;
           if (hitResult.isCritical) isCrit = true;
@@ -182,6 +190,7 @@ export function processPlayerAttack(
           skill.name,
           activeEffects,
           targetIdx,
+          skill.ignoreDefensePercent ?? 0,
         );
         damage = result.damage;
         isCrit = result.isCritical;
@@ -217,7 +226,8 @@ export function processPlayerAttack(
           if (debuff) {
             let dotDmg = debuff.dotDamage ?? 0;
             if (debuff.dotDamagePercent) {
-              dotDmg = Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuff.dotDamagePercent);
+              // § 24.4.5：DoT 傷害於施加當下快照，最低 1 點
+              dotDmg = Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuff.dotDamagePercent));
             }
             const poisonEffect: ActiveEffect = {
               id: `debuff-${debuff.category}-${targetId}-${now}`,
@@ -282,8 +292,10 @@ export function processPlayerAttack(
         if (!alreadyActive || isRefreshable) {
           if (debuffDef.dotDamage || debuffDef.dotDamagePercent) {
             // DoT debuff (snapshot damage at cast time)
+            // § 23.3 裂傷斬：每秒 50% 物理傷害（快照制）— 基準為角色物理傷害，與 § 23.7 淬毒一致
+            // § 24.4.5：DoT 傷害於施加當下快照，最低 1 點
             const baseDmg = debuffDef.dotDamagePercent
-              ? Math.floor(damage * debuffDef.dotDamagePercent / 100)
+              ? Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuffDef.dotDamagePercent))
               : debuffDef.dotDamage ?? 0;
 
             const debuffEffect: ActiveEffect = {
@@ -415,16 +427,31 @@ export function processMonsterAttack(
     monsterIdx,
   );
 
-  // Apply damage to player
+  // 護盾吸收（§ 24.4.9）：在所有減傷之後、實際扣血之前
+  let actualDamage = result.damage;
+  let shieldLog: CombatLog | undefined;
   if (!result.dodged && result.damage > 0) {
-    character.hp = Math.max(0, character.hp - result.damage);
+    const gsForShield = useGameStore.getState();
+    const shield = absorbWithShield(result.damage, gsForShield.activeEffects);
+    if (shield.absorbed > 0) {
+      actualDamage = shield.damage;
+      useGameStore.setState({ activeEffects: shield.effects });
+      shieldLog = shield.broken
+        ? { text: `聖光護盾吸收 ${shield.absorbed} 傷害後破裂`, type: 'system' }
+        : { text: `聖光護盾吸收 ${shield.absorbed} 傷害`, type: 'system' };
+    }
+  }
+
+  // Apply damage to player
+  if (!result.dodged && actualDamage > 0) {
+    character.hp = Math.max(0, character.hp - actualDamage);
   }
 
   let logText: string;
   if (result.dodged) {
     logText = `${monster.name} 的攻擊被閃避！`;
   } else {
-    logText = `${monster.name} 造成 ${result.damage} 傷害`;
+    logText = `${monster.name} 造成 ${actualDamage} 傷害`;
   }
 
   // 命中後判定角色 debuff（§ 24.4.2 / § 25.9.2）
@@ -443,10 +470,11 @@ export function processMonsterAttack(
 
   return {
     monsterId: event.monsterId,
-    damage: result.damage,
+    damage: actualDamage,
     isDodged: result.dodged,
     isBlocked: false,
     log: { text: logText, type: 'monster' },
     debuffLog,
+    shieldLog,
   };
 }

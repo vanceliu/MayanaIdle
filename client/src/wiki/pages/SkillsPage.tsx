@@ -3,14 +3,8 @@ import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_SKILLS, type ClassSkillDef } from '../../models/classSkills';
 import '../components/WikiTable.css';
+import { WEAPON_TYPE_LABELS } from '../../models/skill';
 
-const WEAPON_TYPE_LABELS: Record<string, string> = {
-  bow: '弓',
-  sword: '劍',
-  dagger: '匕首',
-  axe: '斧',
-  staff: '杖',
-};
 
 const ELEMENT_LABELS: Record<string, string> = {
   fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',

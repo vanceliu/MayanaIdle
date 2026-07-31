@@ -60,7 +60,12 @@ export const QUEST_TEMPLATES: QuestTemplate[] = CLASS_NAMES.flatMap(className =>
 ]);
 
 export const ERRAND_AREA_POOL = ['green-valley', 'wind-woods'];
-export const COLLECT_AREA_POOL = ['misty-swamp', 'trial-highlands', 'trial-highlands-top'];
+/**
+ * 二級試煉（素材收集）的指定區域池。
+ * 任務需求等級 20，故僅取 Lv.16~25 的區域；
+ * 試煉高地頂部（Lv.26~30）已排除 —— 對剛滿 20 級的角色難度過高。
+ */
+export const COLLECT_AREA_POOL = ['misty-swamp', 'trial-highlands'];
 
 export function pickRandomCollectMonster(): { area: string; monster: string } {
   const areaIdx = Math.floor(Math.random() * COLLECT_AREA_POOL.length);

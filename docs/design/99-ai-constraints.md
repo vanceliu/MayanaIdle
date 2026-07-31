@@ -68,77 +68,113 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 ---
 
-## 99.2 待實作：角色 Debuff 系統（Phase 2）
-
-文件已完成（24-buff-debuff.md、25-monster-system.md、07-affix.md、30-items.md、13-town.md），程式實作步驟如下：
-
-### Step 1：擴展 ActiveEffect 支援角色 debuff
-- [x] 修改 `ActiveEffect` interface，確保 `target: 'player'` 的 debuff 可正常運作
-- [x] 新增 debuff category：`dot-poison`、`dot-bleed`、`curse`、`weaken`、`slow`、`stun`
-- [x] 實作角色 debuff 的 tags 標記：`poisoned`、`bleeding`、`cursed`、`weakened`、`slowed`、`stunned`
-
-### Step 2：怪物攻擊觸發 debuff 判定
-- [x] 在怪物攻擊命中後，依據怪物 debuff 能力表判定觸發
-- [x] 觸發公式：`最終觸發率 = 怪物基礎觸發率 × (1 - 角色免疫率)`
-- [x] 多 debuff 怪物依序判定，命中即停
-- [x] 暈眩僅 Boss、殘影系列、巨獸類可施加（巨獸類固定 10%，見 `25-monster-system.md` § 25.9.2 規則 5）
-
-### Step 3：角色 debuff 效果實作
-- [x] 中毒 DoT：每秒 `怪物攻擊力 × 5%`，持續 10 秒
-- [x] 流血 DoT：每秒 `怪物攻擊力 × 8%`，持續 10 秒
-- [x] 詛咒：防禦力 -20%，持續 8 秒
-- [x] 虛弱：攻擊力 -20%，持續 8 秒
-- [x] 減速：攻擊速度 -30%，持續 6 秒
-- [x] 暈眩：攻擊計時器暫停，無法使用道具，持續 1.5 秒
-
-### Step 4：BuffBar UI 更新
-- [x] 區分正面效果（藍框 `#3B82F6`）與負面效果（紅框 `#EF4444`）
-- [x] 新增 debuff icon：中毒（綠骷髏）、流血（紅血滴）、詛咒（紫符號）、虛弱（下降箭頭）、減速（蝸牛）、暈眩（星星）
-- [x] Tooltip 顯示效果名稱、剩餘時間、傷害/減益數值
-
-### Step 5：狀態解除道具實作
-- [x] 新增道具模板：解毒藥水（50G）、止血繃帶（50G）、淨化藥水（500G）
-- [x] 解毒藥水：解除中毒
-- [x] 止血繃帶：解除流血
-- [x] 淨化藥水：一次全解詛咒/虛弱（減速改由加速效果對沖，見 § 24.4.6）
-- [x] 暈眩狀態下無法使用任何道具
-- [x] 無對應 debuff 時不可使用，顯示提示
-
-### Step 6：免疫詞綴實作
-- [x] 新增特殊詞綴類型（無 Tier 分級）
-- [x] 毒免疫、流血免疫、詛咒免疫、虛弱免疫、減速免疫（Lv.31+ 掉落）
-- [x] 暈眩抵抗：暈眩時間 -50%（Lv.41+ 掉落）
-- [x] 特殊詞綴顯示金色 `#FFD700`，標記「[特殊]」
-- [x] 掉落權重：Lv.31~40 3%、Lv.41~50 5%、Lv.51+ 8%，Boss ×2
-
-### Step 7：雜貨店商品更新
-- [x] 各城鎮雜貨店新增：解毒藥水、止血繃帶、淨化藥水
-
-### Step 8：怪物 Debuff 能力表整合（文件補充）
-- [x] 將 § 25.9 的 Debuff 能力表整合進 § 25.8 怪物屬性表（新增 Debuff 欄位）
-- [x] 刪除原 § 25.9.2 重複表格，§ 25.9 僅保留分配原則與觸發規則（原 25.9.3 → 25.9.2）
-- [x] 同步更新 `INDEX.md` 快速查找表指向 § 25.8
-
-### Step 9：技能側控場與減速（附帶完成）
-- [x] 盾擊（騎士 Lv.1）補上暈眩 2s（`23-class-magic.md` § 騎士技能）
-- [x] `applyDebuff` 施加路徑補上 stun 分支（原本只處理 DoT 與數值修正）
-- [x] Boss 控場免疫（§ 24.6），免疫冷卻 10 秒
-- [x] 冰系基礎魔法減速：寒霜、冰霧、冰環、冰暴、暴風雪，統一攻速 -30% / 6s（`22-basic-magic.md`）
-- [x] 引擎支援怪物攻速 debuff（`arpgEngine.ts` 每 tick 依 debuff 換算 attackInterval）
-- [x] 數值修正類 debuff 改為同 category 後施放覆蓋前者（符合 § 24.3.1；DoT 與控場維持不可刷新）
-
-### Step 10：補齊 § 25.8 缺漏怪物（文件補充）
-- [x] 新增 6 隻原本只存在於 `monsterSeeds.ts` 的怪物：高地狼人、風蝎、暴風鷹、山賊頭目、試煉飛龍（王）、雪地之主（王）
-- [x] 拆分「試煉高地」為 Lv.21~25 / Lv.26~30 兩節，「雪原地帶」為 Lv.30~33 / Lv.34~35 兩節，對齊 `mapData.ts` 的 region 劃分
-- [x] Debuff 依 § 25.9.1 分配原則與同區怪物基準指派
-
-### 待辦：Pixi 地圖的怪物顯示（優先度較低，暫緩）
+## 99.2 待辦：Pixi 地圖的怪物顯示（優先度較低，暫緩）
 
 舊的回合制戰鬥系統（`runAutoCombat`、`MapCanvas`、`BattleView` 的怪物清單）已於清理時刪除。
 其中包含 § 24.8.3「怪物 Debuff 顯示」的唯一實作，且該實作在切換到 PixiJS 之後就已不再渲染。
 
 - [ ] 在 Pixi 的 `MonsterEntity` 上加入怪物顯示圖（sprite）
 - [ ] 在怪物血量條下方加入 debuff icon 列（§ 24.8.3：24×24 icon + 剩餘秒數 + tooltip）
+
+---
+
+## 99.3 進行中：地圖多元化（Phase 4）
+
+**背景**：50 張靜態地圖中只有 `dawn-plains`（樹木/岩石）與 `ivory-tower-1f`（柱子）用到特殊地形，
+其餘 48 張只用 `0` 地面 / `1` 邊界 / `3` 牆壁 / `4` 裝飾。tile catalog 已定義的水池(13)、岩漿(14)、
+深淵(15)、草叢(16)、沙地(17)、地毯(18) 全專案零使用，但 renderer 與 14 套 theme palette 都已支援。
+
+`38-map-control.md` 已重寫完成，§ 38.11 環境主題地形配方與 § 38.12 佈局原型與設計約束
+即為以下所有步驟的規格依據。
+
+### 使用者已確認的決策（不可再自行更動）
+
+1. **產出方式**：重點手工 + 其餘離線腳本生成
+2. **高台/樓梯**：從既有規格移除，改列 `38-map-control.md` § 38.15 未來擴充
+3. **可通行率**：照 § 38.12「佈局原型基準 + 密度偏移」計算，不整體上調
+4. **地圖之間必須有落差**：不可平均分配地形。每張地圖有指定的主導地形與密度分級
+   （§ 38.11.1、§ 38.11.2），例如 `demon-forest` 是極密樹林、`dawn-plains` 近乎純平原；
+   地牢各層空曠與曲折交錯，不採「越高層越密」的單調遞增
+5. **低窪障礙定位**：確認採用「近戰過不去、遠程打得到」，且**遠程技能攻擊同樣適用**
+6. **怪物遠程攻擊**：目前所有怪物皆為近戰（seed 未定義 `attackType`，引擎預設 melee）。
+   未來會補上遠程怪物，但**本次不做任何相關修正**；地圖設計不得預設怪物能隔水攻擊
+
+### Step 1：地圖設計規則模組 ✅ 完成
+
+`client/src/models/mapDesignRules.ts` — § 38.12 的硬性約束實作為純函式，
+無 PixiJS / Zustand 相依，Node 環境可直接執行。
+
+- [x] `getTerrainStats` / `getTargetWalkableRatio`（原型基準 + 密度偏移）
+- [x] `checkSpawnableRatio`、`checkWalkableRatio`（含 45% 絕對下限）
+- [x] `checkThemePalette`、`checkThemeTerrain`（空曠豁免）
+- [x] `checkDominantTerrain`（主導 ≥50%、點綴 ≤20%、裝飾地面 ≤35% 可通行格）
+- [x] `checkClustering`（僅密集/極密，柱廳型豁免）、`checkOpenAreas`、`countDisjointOpenSquares`
+- [x] `checkCorridorWidth`、`checkSpawnClearance`（歐幾里得，與 `MIN_SPAWN_DISTANCE` 一致）
+- [x] `checkDeadEnds`、`checkDetourDistance`、`checkLowObstacleBypass`
+- [x] `validateMapDesign` 彙整 + `formatViolations`
+- [x] `MAP_DESIGN_PROFILES` 50 筆、`THEME_TERRAIN_PALETTES` 14 套
+- [x] `mapDesignRules.test.ts` 49 項測試（人工構造小地圖，未對既有 50 張斷言）
+
+實作過程修正的規格問題（已同步 § 38.11、§ 38.12）：
+
+1. `misty-cave-3f`、`dragon-valley-7f` 是 Boss 層（`mapData.ts` 的 `isBossFloor`），
+   原指派為密集/標準，違反「Boss 層一律空曠」→ 改為空曠
+2. `ancient-dungeon-3f/8f`、`ivory-tower-3f` 與同主題他層的「密度 + 主導地形」重複，
+   違反「同主題不可同質」→ 分別改為 空曠/牆壁、極密/柱子、空曠/裝飾
+3. 叢聚規則補上適用範圍：只套用在密集/極密，且柱廳型全面豁免
+   （柱陣本質是單格規則排列，強制成叢會毀掉視覺語彙）
+
+### Step 2：離線生成腳本
+
+新增 `client/scripts/generateMaps.ts`，以 `npx vite-node client/scripts/generateMaps.ts` 執行。
+
+- [ ] deterministic PRNG（seed 由 map id 字串 hash 產生），**禁止使用 `Math.random()`**
+- [ ] 實作 § 38.12 的五種佈局骨架產生器：開闊型／半開闊型／柱廳型／房間走廊型／洞窟型
+- [ ] 實作 § 38.11 的 14 套主題地形配方（決定「可用哪些地形」）
+- [ ] **叢聚放置器**：障礙以 3~12 格為一叢生長，叢間保留 ≥ 2 格通道（§ 38.12）。
+      這是密集/極密地圖能成立的關鍵，**不可用逐格均勻隨機散佈**
+- [ ] 依 `MAP_DESIGN_PROFILES` 的密度分級換算目標可通行率（原型基準 + 偏移），並依主導地形
+      分配特色地形比例（主導 ≥ 50%）
+- [ ] 每張地圖挖出所需數量的開闊空地，`spawnPoint` 放在其中一塊
+- [ ] Boss 層中央保留 ≥ 8×8 開闊空地
+- [ ] 產出後立即跑 `validateMapData` + `validateMapDesign`，不通過則換 seed 重試（上限 50 次後報錯）
+- [ ] 腳本只在開發期手動執行，**不加入 build/test 流程**，產物為靜態 JSON
+- [ ] 保留既有 `id` / `name` / `width` / `height` / `theme`，只重寫 `tiles` 與必要時的 `spawnPoint`
+
+### Step 3：手工設計指標地圖
+
+以下地圖不使用腳本，逐張手寫 tile 陣列（可先用腳本產草稿再手動修）：
+
+- [ ] `ivory-tower-1f` ~ `ivory-tower-5f`（柱廳型，1F 保留現有柱陣骨架再加地毯主廊）
+- [ ] `hundred-pillar-1-10f`、`hundred-pillar-61-70f`、`hundred-pillar-71-80f`、`hundred-pillar-91-100f`
+- [ ] `dragon-valley-surface`、`dragon-valley-7f`（熔岩河與繞行通道）
+- [ ] `ancient-dungeon-9f`（最終層，中央 ≥ 8×8 開闊空地）
+- [ ] 每張完成後單獨跑 `validateMapDesign` 確認
+
+### Step 4：腳本生成其餘地圖
+
+- [ ] 執行腳本產出 Step 3 以外的全部地圖
+- [ ] 逐主題檢視產出（草原/森林/沼澤/雪原/高地/戰場/洞窟/水牢/遺跡/龍谷/塔）
+- [ ] 同主題多層之間確實有可辨識的差異，不是同一張圖換色
+- [ ] **落差抽查**：`demon-forest` 要讀得出是密林、`dawn-plains` 要接近純平原、
+      `ancient-dungeon` 的空曠層與密集層要一眼分得出來。做不到就回頭調 Step 2 的參數，
+      不可為了通過檢查而讓所有地圖趨於平均
+
+### Step 5：全體驗證與收尾
+
+- [ ] 啟用全地圖合規測試 `mapDesignConstraints.test.ts`：50 張全數通過
+      `validateMapData` + `validateMapDesign`
+- [ ] `npm run test` 全綠（既有測試不得因地圖改動而失敗，特別是引用 `dawn-plains` 的測試）
+- [ ] `npm run build` 通過
+- [ ] 實機確認：每個主題至少進一張地圖，確認地形渲染正確、無視覺破圖
+- [ ] 確認怪物生成不會因可生成格減少而明顯變慢（觀察各主題代表地圖）
+
+### 完成後須同步
+
+- `38-map-control.md` § 38.10 地圖清單（若尺寸或主題有調整）
+- `09-dungeon.md` § 9.11 區域環境主題對應
+- `INDEX.md` 地圖控制系統列的章節指向
+- 若生成腳本成為長期工具，於 `16-tech-frontend-architecture.md` 補上 `client/scripts/` 目錄說明
 
 ---
 

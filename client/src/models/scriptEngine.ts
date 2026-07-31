@@ -94,7 +94,8 @@ export interface PersistentRule {
 
 // === Emergency Retreat ===
 
-export type EmergencyRetreatAction = 'flee_town' | 'flee_teleport';
+/** § 3.13：瞬移逃跑已移除，緊急撤退僅保留回城 */
+export type EmergencyRetreatAction = 'flee_town';
 
 export interface EmergencyRetreat {
   enabled: boolean;

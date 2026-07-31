@@ -11,6 +11,12 @@ export interface DotEffect {
   totalDuration: number;
 }
 
+/** 持續回復（heal over time），與 DotEffect 對稱 */
+export interface HotEffect {
+  amount: number;
+  interval: number;
+}
+
 export interface ActiveEffect {
   id: string;
   sourceSkillId: string;
@@ -23,7 +29,12 @@ export interface ActiveEffect {
 
   modifiers?: StatModifier[];
   dot?: DotEffect;
+  hot?: HotEffect;
   stun?: boolean;
+  /** 無敵：完全免疫傷害（絕對屏障） */
+  invincible?: boolean;
+  /** 護盾剩餘可吸收量（會隨受擊遞減，歸零時效果消失） */
+  shieldRemaining?: number;
   special?: string;
 
   startTime: number;

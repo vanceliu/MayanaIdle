@@ -1055,7 +1055,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const now = Date.now();
       const char = state.character;
       const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-      const cooldownReduction = getSkillCooldownReduction(allGear);
+      const cooldownReduction = getSkillCooldownReduction(allGear, state.activeEffects);
 
       const ctx: PersistentScriptContext = {
         character: char,
@@ -1074,33 +1074,17 @@ export const useGameStore = create<GameState>((set, get) => ({
         const retreatCtx: EmergencyRetreatContext = {
           character: char,
           bagItems: state.bagItems,
-          phase: state.phase,
+          inCombat: isInArpgCombat(),
+          effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
         };
         const retreat = evaluateEmergencyRetreat(state.emergencyRetreat, retreatCtx);
         if (retreat) {
-          if (retreat.action === 'flee_town') {
-            let scroll = retreat.scrollTownId
-              ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
-              : findScrollInBag(state.bagItems);
-            if (!scroll) return;
-            const scrollItem = state.bagItems.find(b => b.name === scroll!.name);
-            if (!scrollItem || scrollItem.amount <= 0) return;
-            const newBag = consumeTownScroll(state.bagItems, scroll.name);
-            const newChar = { ...char };
-            newChar.currentArea = scroll.townId;
-            newChar.currentRegion = scroll.townId;
-            newChar.currentFloor = null;
-            const townZone = ZONES.find(z => z.regions.includes(scroll!.townId));
-            if (townZone) newChar.currentZone = townZone.id;
-            newChar.areaEnteredAt = Date.now();
-            const logs = addLog(state.combatLogs, { text: `使用${scroll.name}，傳送至${scroll.townName}`, type: 'system' });
-            set({ character: newChar, combatLogs: logs, phase: 'explore', bagItems: newBag });
-          } else {
-            const newChar = { ...char, areaEnteredAt: Date.now() };
-            const logs = addLog(state.combatLogs, { text: '血量過低，瞬移脫離戰鬥', type: 'system' });
-            set({ character: newChar, combatLogs: logs, phase: 'explore' });
-            useGameStore.getState().startExploring();
-          }
+          const scroll = retreat.scrollTownId
+            ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
+            : findScrollInBag(state.bagItems);
+          if (!scroll) return;
+          // 與手動使用回城卷軸共用同一條流程（停止探索、重置地圖座標、存檔）
+          get().useTownScroll(scroll.name);
         }
         return;
       }
@@ -1165,6 +1149,11 @@ export const useGameStore = create<GameState>((set, get) => ({
               name: skill.name,
               description: template?.buffEffect ?? skill.buffEffect ?? '',
             };
+            const hotAmount = template?.hotAmount ?? skill.hotAmount;
+            if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
+            if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
+            const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
+            if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
             const applied = applyPlayerBuff(get().activeEffects, buffEffect);
             const buffLogs = applied.cancelledSlow
               ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })
@@ -1661,6 +1650,15 @@ interface LoadedPreferences {
   statistics: CharacterStatistics;
 }
 
+/** 舊存檔可能存有已移除的 flee_teleport，統一導回回城（§ 3.13） */
+function migrateEmergencyRetreat(saved: EmergencyRetreat | undefined): EmergencyRetreat {
+  if (!saved) return DEFAULT_EMERGENCY_RETREAT;
+  if (saved.action !== 'flee_town') {
+    return { ...saved, action: 'flee_town', scrollTownId: undefined };
+  }
+  return saved;
+}
+
 function loadLocalPreferences(characterId: number): LoadedPreferences | null {
   const key = `mayana_prefs_${characterId}`;
   const raw = localStorage.getItem(key);
@@ -1674,7 +1672,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
       return {
         ...data,
         persistentRules: migratedPersistent.length > 0 ? migratedPersistent : DEFAULT_PERSISTENT_SCRIPT,
-        emergencyRetreat: data.emergencyRetreat ?? DEFAULT_EMERGENCY_RETREAT,
+        emergencyRetreat: migrateEmergencyRetreat(data.emergencyRetreat),
         quickSlots: data.quickSlots ?? [null, null, null, null, null],
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,

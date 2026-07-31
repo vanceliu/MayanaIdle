@@ -23,7 +23,7 @@ export const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = [
   { name: '冷卻縮減技能書', className: 'elementalist', level: 1 },
   { name: '魔力奪取技能書', className: 'elementalist', level: 2 },
   { name: '元素增幅技能書', className: 'elementalist', level: 3 },
-  { name: '連鎖詠唱技能書', className: 'elementalist', level: 4 },
+  { name: '強化冷卻縮減技能書', className: 'elementalist', level: 4 },
   { name: '元素風暴技能書', className: 'elementalist', level: 5 },
   // Priest
   { name: '聖光護盾技能書', className: 'priest', level: 1 },

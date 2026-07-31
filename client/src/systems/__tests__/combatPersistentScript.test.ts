@@ -198,7 +198,7 @@ describe('evaluateEmergencyRetreat', () => {
     return {
       character: createChar(),
       bagItems: [],
-      phase: 'combat',
+      inCombat: true,
       ...overrides,
     };
   }
@@ -216,8 +216,25 @@ describe('evaluateEmergencyRetreat', () => {
   });
 
   it('returns null when not in combat', () => {
-    const ctx = createCtx({ character: createChar({ hp: 5, maxHp: 100 }), phase: 'explore' });
+    const ctx = createCtx({ character: createChar({ hp: 5, maxHp: 100 }), inCombat: false });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toBeNull();
+  });
+
+  it('HP 門檻以有效最大 HP 計算（含 +maxHp 詞綴）', () => {
+    // 基礎 maxHp 100、有效 200：HP 25 為 12.5%，低於 15% 門檻
+    const ctx = createCtx({
+      character: createChar({ hp: 25, maxHp: 100 }),
+      effectiveMaxHp: 200,
+      bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+    });
+    expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toEqual(defaultRetreat);
+
+    // 若誤用基礎 maxHp，25% 會高於門檻而不撤退
+    const wrong = createCtx({
+      character: createChar({ hp: 25, maxHp: 100 }),
+      bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+    });
+    expect(evaluateEmergencyRetreat(defaultRetreat, wrong)).toBeNull();
   });
 
   it('returns null when HP is above threshold', () => {
@@ -239,15 +256,6 @@ describe('evaluateEmergencyRetreat', () => {
       bagItems: [],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toBeNull();
-  });
-
-  it('returns retreat for flee_teleport regardless of scrolls', () => {
-    const retreat: EmergencyRetreat = { ...defaultRetreat, action: 'flee_teleport' };
-    const ctx = createCtx({
-      character: createChar({ hp: 10, maxHp: 100 }),
-      bagItems: [],
-    });
-    expect(evaluateEmergencyRetreat(retreat, ctx)).toEqual(retreat);
   });
 
   it('checks specific town scroll when scrollTownId is set', () => {

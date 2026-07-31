@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
-import { useGameStore, type CombatLog } from '../stores/gameStore';
+import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
@@ -17,6 +17,7 @@ import { processMonsterDeath } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
 import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../systems/arpgEngine';
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
+import { isPlayerInvincible, absorbWithShield } from '../systems/combat';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance } from '../models/monster';
 import type { DamageType } from '../pixi/ui/CombatVisualEvent';
@@ -405,6 +406,7 @@ function tickArpgCombatLoop(
         });
         if (result) {
           logs.push(result.log);
+          if (result.shieldLog) logs.push(result.shieldLog);
           if (result.debuffLog) logs.push(result.debuffLog);
 
           if (effectLayer) {
@@ -486,6 +488,46 @@ function tickArpgCombatLoop(
   if (consumeDotTick()) {
     processDotTick(monsterInstances, effectLayer);
     processPlayerDotTick(effectLayer);
+    processPlayerHotTick(effectLayer);
+  }
+}
+
+/**
+ * 角色持續回復結算（聖域每秒回血 20）
+ * 與 DoT 共用 1000ms tick；回復不超過有效最大 HP，死亡狀態不回復。
+ */
+function processPlayerHotTick(effectLayer?: EffectLayer) {
+  const gs = useGameStore.getState();
+  const now = Date.now();
+  const hotEffects = gs.activeEffects.filter(
+    e => e.type === 'buff' && e.target === 'player' && e.hot && now < e.startTime + e.duration
+  );
+  if (hotEffects.length === 0) return;
+
+  const char = gs.character;
+  if (!char || char.hp <= 0) return;
+
+  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear);
+  if (char.hp >= effMaxHp) return;
+
+  const total = hotEffects.reduce((sum, e) => sum + (e.hot?.amount ?? 0), 0);
+  const healed = Math.min(effMaxHp - char.hp, total);
+  if (healed <= 0) return;
+
+  const logs: CombatLog[] = [{ text: `${hotEffects.map(e => e.name).join('、')} 回復 ${healed} HP`, type: 'system' }];
+  const existing = useGameStore.getState().combatLogs;
+  useGameStore.setState({
+    character: { ...char, hp: char.hp + healed },
+    combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
+  });
+
+  if (effectLayer) {
+    const map = useMapControlStore.getState().currentMap;
+    if (map) {
+      const pPos = useMapControlStore.getState().playerPosition;
+      const { sx, sy } = mapPositionToScreen(map, pPos);
+      effectLayer.spawnDamageNumber(sx, sy - 20, healed, 'heal');
+    }
   }
 }
 
@@ -503,12 +545,22 @@ function processPlayerDotTick(effectLayer?: EffectLayer) {
 
   const char = gs.character;
   if (!char || char.hp <= 0) return;
+  // 無敵期間免疫所有傷害，含 DoT
+  if (isPlayerInvincible(gs.activeEffects, now)) return;
 
   const logs: CombatLog[] = [];
   let hp = char.hp;
+  let effects = gs.activeEffects;
   for (const effect of dotEffects) {
     if (!effect.dot) continue;
-    const dmg = effect.dot.damage;
+    // 護盾同樣吸收 DoT 傷害（§ 24.4.9）
+    const shield = absorbWithShield(effect.dot.damage, effects, now);
+    effects = shield.effects;
+    if (shield.absorbed > 0) {
+      logs.push({ text: `聖光護盾吸收 ${shield.absorbed} 傷害${shield.broken ? '後破裂' : ''}`, type: 'system' });
+    }
+    const dmg = shield.damage;
+    if (dmg <= 0) continue;
     hp = Math.max(0, hp - dmg);
     logs.push({ text: `${effect.name} 造成 ${dmg} 傷害`, type: 'debuff-self' });
 
@@ -526,6 +578,7 @@ function processPlayerDotTick(effectLayer?: EffectLayer) {
   const existing = useGameStore.getState().combatLogs;
   useGameStore.setState({
     character: { ...useGameStore.getState().character!, hp },
+    activeEffects: effects,
     combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
   });
 

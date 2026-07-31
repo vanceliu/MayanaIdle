@@ -214,14 +214,17 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
 export interface EmergencyRetreatContext {
   character: Character;
   bagItems: BagItem[];
-  phase: string;
+  /** § 3.13：僅在角色附近存在敵對目標時生效 */
+  inCombat: boolean;
+  effectiveMaxHp?: number;
 }
 
 export function evaluateEmergencyRetreat(retreat: EmergencyRetreat, ctx: EmergencyRetreatContext): EmergencyRetreat | null {
   if (!retreat.enabled) return null;
-  if (ctx.phase !== 'combat') return null;
+  if (!ctx.inCombat) return null;
 
-  const hpPercent = (ctx.character.hp / ctx.character.maxHp) * 100;
+  const maxHp = ctx.effectiveMaxHp ?? ctx.character.maxHp;
+  const hpPercent = (ctx.character.hp / maxHp) * 100;
   if (hpPercent >= retreat.hpThreshold) return null;
 
   if (retreat.action === 'flee_town') {

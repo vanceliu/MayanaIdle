@@ -7,7 +7,6 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'crit-buff': 'buffs/crosshair',
   'cd-reduction': 'buffs/lightning-helix',
   'element-boost': 'buffs/embrassed-energy',
-  'chain-cast': 'buffs/concentration-orb',
   'holy-shield': 'buffs/holy-symbol',
   'evasion': 'buffs/dodging',
   'poison-enchant': 'buffs/vile-fluid',

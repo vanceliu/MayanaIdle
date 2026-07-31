@@ -449,7 +449,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 ### 緊急撤退
 
 - 啟用開關 + HP 閾值（%）
-- 動作：回城（指定卷軸 or 任意卷軸）
+- 動作：回城（指定卷軸 or 任意卷軸）— 瞬移逃跑已移除
 - 僅戰鬥中生效
 
 ### 戰鬥後等待
@@ -695,7 +695,6 @@ const EFFECT_ICON_MAP: Record<string, string> = {
   'crit-buff': 'buffs/crosshair',
   'cd-reduction': 'buffs/lightning-helix',
   'element-boost': 'buffs/embrassed-energy',
-  'chain-cast': 'buffs/concentration-orb',
   'holy-shield': 'buffs/holy-symbol',
   'evasion': 'buffs/dodging',
   'poison-enchant': 'buffs/vile-fluid',

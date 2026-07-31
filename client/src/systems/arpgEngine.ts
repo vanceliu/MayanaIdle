@@ -111,7 +111,7 @@ export function tickArpgEngine(
       monsters: aliveForScript,
       skills,
       now: Date.now(),
-      cooldownReduction: getSkillCooldownReduction(equippedGear),
+      cooldownReduction: getSkillCooldownReduction(equippedGear, activeEffects),
     };
     const nextAction = evaluateCombatScript(combatRules, scriptCtx);
     if (nextAction?.type === 'skill' && nextAction.skillId) {
@@ -164,7 +164,7 @@ export function tickArpgEngine(
       monsters: aliveMonsters,
       skills,
       now: Date.now(),
-      cooldownReduction: getSkillCooldownReduction(equippedGear),
+      cooldownReduction: getSkillCooldownReduction(equippedGear, activeEffects),
     };
 
     const scriptAction = evaluateCombatScript(combatRules, scriptCtx);

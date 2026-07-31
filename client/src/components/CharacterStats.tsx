@@ -1,6 +1,15 @@
 import { useGameStore } from '../stores/gameStore';
 import { getTotalAttributes } from '../models/character';
-import { getEffectiveAffixValue } from '../models/affix';
+import type { EquipmentInstance } from '../models/equipment';
+import {
+  getCombatBonuses,
+  getEffectiveDefense,
+  getBuffFlatBonus,
+  getRangedAttackBonus,
+  getPlayerDebuffModifier,
+  getBuffDamageReduction,
+  getTotalAttackSpeedPercent,
+} from '../systems/combat';
 
 export function CharacterStats() {
   const char = useGameStore(s => s.character);
@@ -22,78 +31,49 @@ export function CharacterStats() {
   const weaponEnhance = weapon?.enhancement ?? 0;
   const weaponExtraAttack = weapon?.extraAttack ?? 0;
 
-  let totalDefense = 0;
-  let defensePercent = 0;
-  let blockRate = 0;
-  let critRate = 5;
-  let critDamage = 200;
-  let attackPower = 0;
-  let attackElemental = 0;
-  let skillElemental = 0;
-  let attackSpeed = 0;
-  let cooldownReduction = 0;
-  let maxHpBonus = 0;
-  let maxMpBonus = 0;
-  let healEffect = 0;
-  let potionEffect = 0;
+  // 一律使用戰鬥系統的聚合函式，避免面板與實際戰鬥各算一份而漂移
+  const gearList = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
+  const bonuses = getCombatBonuses(gearList, activeEffects);
 
-  for (const [, item] of Object.entries(equippedGear)) {
-    if (!item) continue;
-    if (item.defense) totalDefense += item.defense;
-    if (item.enhancement && item.defense) totalDefense += item.enhancement;
+  const critRate0 = 5 + bonuses.crit_rate;
+  const critDamage = 200 + bonuses.crit_damage;
+  const attackPower = bonuses.attack_power;
+  const attackElemental = bonuses.attack_elemental;
+  const skillElemental = bonuses.skill_elemental;
+  const cooldownReduction = Math.min(bonuses.cooldown_reduction, 50);
+  const healEffect = bonuses.heal_effect;
+  const potionEffect = bonuses.potion_effect;
+
+  let blockRate = bonuses.block_rate;
+  for (const item of gearList) {
     if (item.blockRate) blockRate += item.blockRate;
-
-    if (item.affixes) {
-      for (const affix of item.affixes) {
-        const val = getEffectiveAffixValue(affix, item.quality);
-        switch (affix.type) {
-          case 'attack_power': attackPower += val; break;
-          case 'attack_elemental': attackElemental += val; break;
-          case 'skill_elemental': skillElemental += val; break;
-          case 'crit_rate': critRate += val; break;
-          case 'crit_damage': critDamage += val; break;
-          case 'attack_speed': attackSpeed += val; break;
-          case 'cooldown_reduction': cooldownReduction += val; break;
-          case 'defense': defensePercent += val; break;
-          case 'max_hp': maxHpBonus += val; break;
-          case 'max_mp': maxMpBonus += val; break;
-          case 'heal_effect': healEffect += val; break;
-          case 'potion_effect': potionEffect += val; break;
-          case 'block_rate': blockRate += val; break;
-        }
-      }
-    }
   }
+  blockRate = Math.min(50, blockRate);
 
-  // Apply buff modifiers from active effects
-  const now = Date.now();
-  for (const effect of activeEffects) {
-    if (effect.type !== 'buff' || effect.target !== 'player') continue;
-    if (now - effect.startTime >= effect.duration) continue;
-    if (!effect.modifiers) continue;
-    for (const mod of effect.modifiers) {
-      switch (mod.stat) {
-        case 'defense': totalDefense += mod.value; break;
-        case 'attack_power': attackPower += mod.value; break;
-        case 'crit_rate': critRate += mod.value; break;
-        case 'crit_damage': critDamage += mod.value; break;
-        case 'attack_speed': attackSpeed += mod.value; break;
-        case 'cooldown_reduction': cooldownReduction += mod.value; break;
-        case 'max_hp': maxHpBonus += mod.value; break;
-        case 'max_mp': maxMpBonus += mod.value; break;
-      }
-    }
-  }
+  // 攻速：詞綴 + buff + 減速 debuff（與 getPlayerAttackInterval 同一套）
+  const attackSpeed = getTotalAttackSpeedPercent(gearList, activeEffects);
 
-  totalDefense = Math.floor(totalDefense * (1 + defensePercent / 100));
+  // 防禦：含 buff 固定防禦與詛咒 -20%
+  const totalDefense = getEffectiveDefense(gearList, activeEffects, bonuses.defense);
 
   const strBonus = Math.floor(effectiveSTR / 2);
   const agiBonus = Math.floor(effectiveAGI / 3);
 
-  const physicalSmall = Math.floor((weaponSmall + weaponEnhance + weaponExtraAttack + strBonus) * (1 + attackPower / 100));
-  const physicalLarge = Math.floor((weaponLarge + weaponEnhance + weaponExtraAttack + strBonus) * (1 + attackPower / 100));
+  // 攻擊力：含額外攻擊 buff、遠程加成，以及虛弱 debuff
+  const weakenPercent = getPlayerDebuffModifier(activeEffects, 'attack');
+  const flatAttackBuff = getBuffFlatBonus(activeEffects, 'extra_attack')
+    + getRangedAttackBonus(weapon ?? null, activeEffects);
+  const applyAtk = (base: number) => Math.max(1, Math.floor(
+    Math.floor((base + weaponEnhance + weaponExtraAttack + flatAttackBuff + strBonus) * (1 + attackPower / 100))
+    * (100 + weakenPercent) / 100
+  ));
+  const physicalSmall = applyAtk(weaponSmall);
+  const physicalLarge = applyAtk(weaponLarge);
 
-  const damageReduction = Math.min(totalDefense, 75);
+  // 減傷率：防禦減傷與 buff 減傷類間乘算（§ 21.5）
+  const defenseReduction = Math.min(totalDefense, 75);
+  const buffReduction = getBuffDamageReduction(activeEffects);
+  const damageReduction = Math.round(100 - (100 - defenseReduction) * (100 - buffReduction) / 100);
   const defOverflow = Math.max(0, totalDefense - 75);
   const dodgeFromDef = Math.floor(defOverflow / 5);
   const baseDodge = char.className === 'thief' ? 10 : 5;
@@ -110,7 +90,7 @@ export function CharacterStats() {
     if (item.mpRegen) mpRegen += item.mpRegen;
   }
 
-  critRate = Math.min(75, critRate);
+  const critRate = Math.min(75, critRate0);
 
   return (
     <div className="char-stats-content">
@@ -152,7 +132,7 @@ export function CharacterStats() {
             <span>技能元素</span><span>+{skillElemental}%</span>
           </div>
           <div className="stat-row">
-            <span>攻速加成</span><span>+{attackSpeed}%</span>
+            <span>攻速加成</span><span>{attackSpeed >= 0 ? '+' : ''}{attackSpeed}%</span>
           </div>
           <div className="stat-row">
             <span>冷卻縮減</span><span>+{cooldownReduction}%</span>

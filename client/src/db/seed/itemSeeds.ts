@@ -162,7 +162,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 112, name: '冷卻縮減技能書', category: 'spellbook', description: '元素師職業魔法 1 級：冷卻縮減', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 113, name: '魔力奪取技能書', category: 'spellbook', description: '元素師職業魔法 2 級：魔力奪取', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 114, name: '元素增幅技能書', category: 'spellbook', description: '元素師職業魔法 3 級：元素增幅', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
-  { id: 115, name: '連鎖詠唱技能書', category: 'spellbook', description: '元素師職業魔法 4 級：連鎖詠唱', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
+  { id: 115, name: '強化冷卻縮減技能書', category: 'spellbook', description: '元素師職業魔法 4 級：強化冷卻縮減', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 116, name: '元素風暴技能書', category: 'spellbook', description: '元素師職業魔法 5 級：元素風暴', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 117, name: '聖光護盾技能書', category: 'spellbook', description: '牧師職業魔法 1 級：聖光護盾', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 118, name: '高階治癒技能書', category: 'spellbook', description: '牧師職業魔法 2 級：高階治癒', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },

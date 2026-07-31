@@ -108,14 +108,15 @@ client/src/
 │   ├── entities/
 │   │   ├── PlayerEntity.ts     # 玩家 sprite（圓形，Y 偏移對齊地面）
 │   │   └── MonsterEntity.ts    # 怪物 sprite（圓形 + Boss 標記）
-│   ├── ui/                     # （待實作）
+│   ├── ui/
 │   │   ├── HealthBar.ts        # 血條
-│   │   └── DamageNumber.ts     # 傷害數字
+│   │   ├── DamageNumber.ts     # 傷害數字
+│   │   ├── Projectile.ts       # 投射物
+│   │   └── CombatVisualEvent.ts # 戰鬥視覺事件
 │   └── utils/
 │       └── isometric.ts        # 座標轉換、深度計算工具
 ├── components/
 │   ├── PixiGame.tsx            # React wrapper，mount PixiJS + game loop
-│   ├── MapCanvas.tsx           # （舊版，保留作為 fallback 參考）
 │   └── BattleView.tsx          # 已改用 PixiGame
 ```
 

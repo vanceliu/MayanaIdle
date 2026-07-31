@@ -89,6 +89,33 @@ export function hasActiveFireEnchant(activeEffects: ActiveEffect[]): boolean {
   return false;
 }
 
+/** 角色 buff 的固定值加成（非百分比），例如 命中 +3、額外攻擊 +5 */
+export function getBuffFlatBonus(activeEffects: ActiveEffect[], stat: string): number {
+  const now = Date.now();
+  let bonus = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'buff' || effect.target !== 'player') continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === stat && !mod.isPercent) bonus += mod.value;
+    }
+  }
+  return bonus;
+}
+
+/**
+ * 遠程攻擊力加成：僅在裝備遠程武器（弓）時生效。
+ * 見 21-combat-formula.md § 遠程攻擊力（普攻）
+ */
+export function getRangedAttackBonus(
+  weapon: EquipmentInstance | null,
+  activeEffects: ActiveEffect[],
+): number {
+  if (weapon?.type !== 'bow') return 0;
+  return getBuffFlatBonus(activeEffects, 'ranged_attack');
+}
+
 export function getRaceHitBonus(activeEffects: ActiveEffect[], monsterRace: string): number {
   const now = Date.now();
   let bonus = 0;
@@ -165,19 +192,71 @@ export function getMonsterDebuffModifierById(
   return percentMod;
 }
 
+/** 無視防禦：直接扣減目標的減傷率 */
+function applyIgnoreDefense(reduction: number, ignorePercent: number): number {
+  if (ignorePercent <= 0) return reduction;
+  return Math.max(0, Math.floor(reduction * (100 - Math.min(ignorePercent, 100)) / 100));
+}
+
 function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
   if (!gear) return 1;
   if (monsterSize === 'small') return gear.smallMonsterDamage ?? 1;
   return gear.largeMonsterDamage ?? 1;
 }
 
-function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): number {
+export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): number {
   return equippedGear.reduce((sum, g) => {
     if (!g) return sum;
     const base = g.defense ?? 0;
     const enhance = base > 0 ? (g.enhancement ?? 0) : 0;
     return sum + base + enhance;
   }, 0);
+}
+
+/**
+ * 可由 buff 提供的詞綴類加成。
+ * 這些 stat 原本只從裝備詞綴聚合，導致同名的技能 buff 完全失效（見 99-ai-constraints § 99.3 Step 1）。
+ */
+const BUFFABLE_AFFIX_STATS = ['crit_rate', 'crit_damage', 'skill_elemental', 'cooldown_reduction'] as const;
+
+function getBuffPercentBonus(activeEffects: ActiveEffect[], stat: string): number {
+  const now = Date.now();
+  let bonus = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'buff' || effect.target !== 'player') continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === stat && mod.isPercent) bonus += mod.value;
+    }
+  }
+  return bonus;
+}
+
+/** 裝備詞綴 + 角色 buff 的合計加成 */
+export function getCombatBonuses(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): AffixBonuses {
+  const bonuses = getAffixBonusesFromGear(equippedGear);
+  for (const stat of BUFFABLE_AFFIX_STATS) {
+    bonuses[stat] += getBuffPercentBonus(activeEffects, stat);
+  }
+  return bonuses;
+}
+
+/**
+ * 最終防禦值：裝備防禦 + buff 固定防禦，套用防禦%詞綴，再套詛咒（防禦 -20%）。
+ * 戰鬥與角色狀態面板共用，避免兩邊各算一份而漂移。
+ */
+export function getEffectiveDefense(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[],
+  defensePercent: number,
+): number {
+  const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
+  const curseDefPercent = getPlayerDebuffModifier(activeEffects, 'defense');
+  return Math.max(0, Math.floor(rawDefense * (1 + defensePercent / 100) * (100 + curseDefPercent) / 100));
 }
 
 export function getAffixBonusesFromGear(equippedGear: (EquipmentInstance | null)[]): AffixBonuses {
@@ -204,26 +283,30 @@ function getPlayerBlockRate(equippedGear: (EquipmentInstance | null)[]): number 
 const BASE_ATTACK_INTERVAL_MS = 1200;
 const MIN_ATTACK_INTERVAL_MS = 300;
 
+/**
+ * 攻速百分比合計：裝備詞綴 + 加速 buff + 減速 debuff。
+ * 戰鬥與角色狀態面板共用。
+ */
+export function getTotalAttackSpeedPercent(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  return getAffixBonusesFromGear(equippedGear).attack_speed
+    + getBuffPercentBonus(activeEffects, 'attack_speed')
+    + getPlayerDebuffModifier(activeEffects, 'attack_speed');
+}
+
 export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)[], activeEffects: ActiveEffect[] = []): number {
-  const bonuses = getAffixBonusesFromGear(equippedGear);
-  let attackSpeedPercent = bonuses.attack_speed;
-  for (const effect of activeEffects) {
-    if (effect.type === 'buff' && effect.target === 'player' && effect.modifiers) {
-      for (const mod of effect.modifiers) {
-        if (mod.stat === 'attack_speed' && mod.isPercent) {
-          attackSpeedPercent += mod.value;
-        }
-      }
-    }
-  }
-  // 減速 debuff（攻擊速度 -30%）
-  attackSpeedPercent += getPlayerDebuffModifier(activeEffects, 'attack_speed');
+  const attackSpeedPercent = getTotalAttackSpeedPercent(equippedGear, activeEffects);
   const interval = Math.floor(BASE_ATTACK_INTERVAL_MS / Math.max(0.1, 1 + attackSpeedPercent / 100));
   return Math.max(MIN_ATTACK_INTERVAL_MS, interval);
 }
 
-export function getSkillCooldownReduction(equippedGear: (EquipmentInstance | null)[]): number {
-  const bonuses = getAffixBonusesFromGear(equippedGear);
+export function getSkillCooldownReduction(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
   return Math.min(bonuses.cooldown_reduction, 50);
 }
 
@@ -243,7 +326,7 @@ export function calculateBasePhysicalDamage(
 ): number {
   const attrs = getTotalAttributes(char, activeEffects);
   const effSTR = getEffectiveSTR(attrs.STR);
-  const bonuses = getAffixBonusesFromGear(equippedGear);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   const weaponDmg = weapon ? ((weapon.smallMonsterDamage ?? 0) + (weapon.largeMonsterDamage ?? 0)) / 2 : 1;
   const strBonus = Math.floor(effSTR / 2);
@@ -251,7 +334,7 @@ export function calculateBasePhysicalDamage(
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
 
-  let damage = Math.floor(weaponDmg) + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg;
+  let damage = Math.floor(weaponDmg) + strBonus + (weapon?.extraAttack ?? 0) + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
   damage = applyWeaken(damage, activeEffects);
 
@@ -269,7 +352,7 @@ export function calculatePlayerAttack(
   const attrs = getTotalAttributes(char, activeEffects);
   const effSTR = getEffectiveSTR(attrs.STR);
   const effAGI = getEffectiveAGI(attrs.AGI);
-  const bonuses = getAffixBonusesFromGear(equippedGear);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // Hit check (with weapon attackSuccess and race hit bonus from buffs)
   const baseHit = 80;
@@ -278,7 +361,8 @@ export function calculatePlayerAttack(
   const monsterDodge = 5;
   const weaponHitBonus = getWeaponAttackSuccess(weapon);
   const raceHitBonus = getRaceHitBonus(activeEffects, monster.race);
-  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus - monsterDodge));
+  const buffHitBonus = getBuffFlatBonus(activeEffects, 'hit');
+  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus - monsterDodge));
 
   const hit = Math.random() * 100 < hitRate;
   if (!hit) {
@@ -298,7 +382,7 @@ export function calculatePlayerAttack(
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
   const hasFireEnchantActive = rawFireEnchantDmg > 0;
   const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchantActive ? 'fire' : undefined);
-  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
+  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getBuffFlatBonus(activeEffects, 'extra_attack') + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -340,11 +424,12 @@ export function calculatePhysicalSkillHit(
   hasFireEnchant: boolean,
   skillName: string,
   activeEffects: ActiveEffect[] = [],
-  targetIdx: number = 0
+  targetIdx: number = 0,
+  ignoreDefensePercent: number = 0,
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
   const effAGI = getEffectiveAGI(attrs.AGI);
-  const bonuses = getAffixBonusesFromGear(equippedGear);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // Hit check (each hit independently, with weapon attackSuccess and race hit bonus)
   const baseHit = 80;
@@ -353,7 +438,8 @@ export function calculatePhysicalSkillHit(
   const monsterDodge = 5;
   const weaponHitBonus = getWeaponAttackSuccess(weapon);
   const raceHitBonus = getRaceHitBonus(activeEffects, monster.race);
-  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus - monsterDodge));
+  const buffHitBonus = getBuffFlatBonus(activeEffects, 'hit');
+  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus - monsterDodge));
 
   const hit = Math.random() * 100 < hitRate;
   if (!hit) {
@@ -370,7 +456,7 @@ export function calculatePhysicalSkillHit(
   const strBonus = Math.floor(getEffectiveSTR(attrs.STR) / 2);
   const fireEnchantDmg = hasFireEnchant ? getFireEnchantBonus(activeEffects) : 0;
   const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchant ? 'fire' : undefined);
-  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
+  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getBuffFlatBonus(activeEffects, 'extra_attack') + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -394,7 +480,7 @@ export function calculatePhysicalSkillHit(
   // Monster defense reduction (last, with debuff)
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef2 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
-  const monsterReduction = Math.min(effectiveMonsterDef2, 75);
+  const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef2, 75), ignoreDefensePercent);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -412,10 +498,11 @@ export function calculateSkillAttack(
   equippedGear: (EquipmentInstance | null)[] = [],
   skillName: string = '技能',
   activeEffects: ActiveEffect[] = [],
-  targetIdx: number = 0
+  targetIdx: number = 0,
+  ignoreDefensePercent: number = 0,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
-  const bonuses = getAffixBonusesFromGear(equippedGear);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // Base magic damage (including element counter bonus)
   const effINT = getEffectiveINT(attrs.INT);
@@ -438,7 +525,7 @@ export function calculateSkillAttack(
   // Monster defense reduction (last, with debuff)
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef3 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
-  const monsterReduction = Math.min(effectiveMonsterDef3, 75);
+  const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef3, 75), ignoreDefensePercent);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
@@ -457,6 +544,86 @@ export function calculateMpRestored(
   if (!mpDrainRatio || damage <= 0 || currentMp >= maxMp) return 0;
   const requested = Math.floor(damage * mpDrainRatio);
   return Math.max(0, Math.min(requested, maxMp - currentMp));
+}
+
+/**
+ * 生效中 buff 提供的減傷率（%），同類加算。
+ * 與防禦減傷「類間乘算」，見 21-combat-formula.md § 21.5。
+ */
+export interface ShieldAbsorbResult {
+  /** 扣除吸收後實際造成的傷害 */
+  damage: number;
+  /** 本次被護盾吸收的量 */
+  absorbed: number;
+  /** 更新後的效果清單（護盾耗盡的效果已移除） */
+  effects: ActiveEffect[];
+  /** 是否有護盾在本次被打破 */
+  broken: boolean;
+}
+
+/**
+ * 護盾吸收：在所有減傷之後結算，優先扣除護盾池（§ 24.4.9）。
+ * 護盾剩餘量歸零時該 buff 立即消失。
+ */
+export function absorbWithShield(
+  damage: number,
+  activeEffects: ActiveEffect[],
+  now: number = Date.now(),
+): ShieldAbsorbResult {
+  if (damage <= 0) return { damage, absorbed: 0, effects: activeEffects, broken: false };
+
+  let remaining = damage;
+  let absorbed = 0;
+  let broken = false;
+  const effects: ActiveEffect[] = [];
+
+  for (const effect of activeEffects) {
+    const isActiveShield = effect.type === 'buff'
+      && effect.target === 'player'
+      && effect.shieldRemaining !== undefined
+      && effect.shieldRemaining > 0
+      && now < effect.startTime + effect.duration;
+
+    if (!isActiveShield || remaining <= 0) {
+      effects.push(effect);
+      continue;
+    }
+
+    const pool = effect.shieldRemaining!;
+    const used = Math.min(pool, remaining);
+    remaining -= used;
+    absorbed += used;
+
+    const left = pool - used;
+    if (left <= 0) {
+      broken = true; // 護盾破裂，效果移除
+    } else {
+      effects.push({ ...effect, shieldRemaining: left });
+    }
+  }
+
+  return { damage: remaining, absorbed, effects, broken };
+}
+
+/** 是否處於無敵狀態（絕對屏障）：完全免疫傷害 */
+export function isPlayerInvincible(activeEffects: ActiveEffect[], now: number = Date.now()): boolean {
+  return activeEffects.some(
+    e => e.type === 'buff' && e.target === 'player' && e.invincible && now < e.startTime + e.duration
+  );
+}
+
+export function getBuffDamageReduction(activeEffects: ActiveEffect[]): number {
+  const now = Date.now();
+  let reduction = 0;
+  for (const effect of activeEffects) {
+    if (effect.type !== 'buff' || effect.target !== 'player') continue;
+    if (now - effect.startTime >= effect.duration) continue;
+    if (!effect.modifiers) continue;
+    for (const mod of effect.modifiers) {
+      if (mod.stat === 'damageReduction' && mod.isPercent) reduction += mod.value;
+    }
+  }
+  return Math.min(reduction, 100);
 }
 
 export function getBuffDefenseBonus(activeEffects: ActiveEffect[]): number {
@@ -482,15 +649,22 @@ export function calculateMonsterAttack(
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects);
   const effAGI = getEffectiveAGI(attrs.AGI);
-  const bonuses = getAffixBonusesFromGear(equippedGear);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+
+  // 無敵：完全免疫傷害（§ 24.4.8）
+  if (isPlayerInvincible(activeEffects)) {
+    return {
+      damage: 0,
+      hit: false,
+      dodged: false,
+      log: { type: 'player_dodged', message: `無敵！完全擋下 ${monster.name} 的攻擊` },
+    };
+  }
 
   // Player dodge
   const baseDodge = char.className === 'thief' ? 10 : 5;
   const agiDodge = Math.floor(effAGI / 3);
-  const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
-  // 詛咒 debuff（防禦力 -20%）
-  const curseDefPercent = getPlayerDebuffModifier(activeEffects, 'defense');
-  const finalDefense = Math.max(0, Math.floor(rawDefense * (1 + bonuses.defense / 100) * (100 + curseDefPercent) / 100));
+  const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
   const defOverflowDodge = finalDefense > 75 ? Math.floor((finalDefense - 75) / 5) : 0;
   // Evasion buff bonus (e.g. Smoke Bomb +15%)
   let evasionBuffBonus = 0;
@@ -525,6 +699,12 @@ export function calculateMonsterAttack(
   // Player defense reduction (with affix bonus)
   const playerDefense = Math.min(finalDefense, 75);
   let finalDamage = Math.max(1, Math.floor(rawDamage * (100 - playerDefense) / 100));
+
+  // buff 減傷與防禦減傷為類間乘算（§ 21.5）
+  const buffReduction = getBuffDamageReduction(activeEffects);
+  if (buffReduction > 0) {
+    finalDamage = Math.max(1, Math.floor(finalDamage * (100 - buffReduction) / 100));
+  }
 
   // Block check (only with shield equipped, after defense reduction)
   const totalBlockRate = getPlayerBlockRate(equippedGear);

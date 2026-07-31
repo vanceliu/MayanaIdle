@@ -62,7 +62,8 @@
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
-| 地圖控制系統（俯瞰視角/移動/即時戰鬥/環境主題/高台樓梯） | `38-map-control.md` | 全文，環境 tile catalog 見 § 38.16 |
+| 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
+| 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 
 ### 依限制查找
@@ -160,7 +161,7 @@
 | `14-endgame.md` | 成就/排行榜 | 長期目標 |
 | `36-quest-system.md` | 每日任務系統 | 冒險者工會、40 個任務、每日重置、獎勵機制 |
 | `37-statistics.md` | 角色統計數據 | 殺敵數、BOSS討伐、死亡、強化、任務完成、金幣獲得 |
-| `38-map-control.md` | 地圖控制系統 | 俯瞰視角地圖、點擊移動、紅點怪物、Pressure 視覺化 |
+| `38-map-control.md` | 地圖控制系統 | 等距俯瞰地圖、地形 catalog、移動/尋路、紅點生成、環境主題地形配方 |
 | `39-batch-sell.md` | 批量販售系統 | 依等級分類批量販售、裝備顏色等級、素材 Tier 篩選 |
 
 ### 技術架構
@@ -238,7 +239,7 @@
        ↕                    ↕
 26-spawn-pressure.md（合法生成地格）  09-dungeon.md（區域與 theme 對應）
        ↕                    ↕
-40-pixijs-migration.md（主題/高低差渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
+40-pixijs-migration.md（theme palette / 分層渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
 
 39-batch-sell.md ←→ 06-equipment-acquire.md（shopTier / craftTier 定義）
        ↕
