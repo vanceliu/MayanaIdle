@@ -14,6 +14,7 @@ import { ExpTablePage } from './wiki/pages/ExpTablePage'
 import { SkillsPage } from './wiki/pages/SkillsPage'
 import { AttributesPage } from './wiki/pages/AttributesPage'
 import { CombatPage } from './wiki/pages/CombatPage'
+import { AffixesPage } from './wiki/pages/AffixesPage'
 import { ItemsPage } from './wiki/pages/ItemsPage'
 import { QuestsPage } from './wiki/pages/QuestsPage'
 import { CreditsPage } from './wiki/pages/CreditsPage'
@@ -37,6 +38,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="skills" element={<SkillsPage />} />
           <Route path="attributes" element={<AttributesPage />} />
           <Route path="combat" element={<CombatPage />} />
+          <Route path="affixes" element={<AffixesPage />} />
           <Route path="items" element={<ItemsPage />} />
           <Route path="items/:itemName" element={<ItemsPage />} />
           <Route path="quests" element={<QuestsPage />} />

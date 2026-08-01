@@ -24,6 +24,7 @@ client/src/wiki/
 │   ├── WikiHome.css
 │   ├── WeaponsPage.tsx   — 武器列表 + 單件詳細
 │   ├── ArmorPage.tsx     — 防具列表 + 單件詳細
+│   ├── AffixesPage.tsx   — 詞綴適用部位、階級數值、掉落權重
 │   ├── MonstersPage.tsx  — 怪物列表 + 單隻詳細（含掉落）
 │   ├── MapsPage.tsx      — 地圖/區域結構
 │   ├── ItemsPage.tsx     — 道具列表 + 單件詳細
@@ -43,6 +44,8 @@ client/src/wiki/
 |-----------|---------|
 | 武器 | `EQUIPMENT_SEEDS`（`type !== 'armor'`） |
 | 防具 | `EQUIPMENT_SEEDS`（`type === 'armor'`） |
+| 戰鬥計算 | `DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
+| 詞綴 | `AFFIX_DEFINITIONS`、`SPECIAL_AFFIX_DEFINITIONS`、`AFFIX_TIERS`、`AFFIX_TIER_OVERRIDES`、`getTierWeights`／`getBossTierWeights`、`getSpecialAffixChance`（`models/affix`） |
 | 怪物 | `MONSTER_SEEDS` |
 | 地圖 | `ZONES`、`REGIONS`（`models/mapData`） |
 | 道具 | `ITEM_DEFINITIONS` |
@@ -50,7 +53,6 @@ client/src/wiki/
 | 製作 | `CRAFTING_RECIPES`（`db/seed`） |
 | 經驗表 | `getExpToNextLevel()`（`systems/levelUp`）—— 公式定義見 `04-character.md` § 4.9 |
 | 屬性公式 | 硬編碼文字（對應 `systems/combat.ts` 計算） |
-| 戰鬥計算 | 硬編碼文字（對應 `systems/combat.ts`） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |
 | 任務 | `QUEST_TEMPLATES`、guild 相關 seed |
 | 素材來源 | `ASSET_CREDITS`（`wiki/data/assetCredits.ts`），與 `client/src/assets/tiles/CREDITS.md` 同步維護 |
@@ -79,6 +81,19 @@ client/src/wiki/
 - 列表模式：名稱、部位、防禦力、格擋率、安定值、附加屬性、職業限制
 - 詳細模式：`/wiki/armor/:name`
 - 篩選：部位、取得方式、關鍵字
+
+### 4.2.1 詞綴頁 (AffixesPage)
+
+- **適用部位對照表**：每個詞綴 × 武器／一般防具／盾牌／飾品 的 ✓／— 矩陣，
+  外加各分類的可選詞綴總數。玩家要判斷「這個詞綴能不能出在這件裝備上」時看這張表。
+- **分類對應部位**：說明 weapon／armor／shield／accessory 各自涵蓋哪些裝備欄位
+  （飾品的裝備類型與一般防具同為 `armor`，但詞綴池獨立）
+- **階級數值表**：通用區間 + `AFFIX_TIER_OVERRIDES` 的專屬區間（目前為魔法抗性）並列
+- **掉落階級權重**：一般怪物／Boss 兩列對照，權重換算為百分比顯示
+- **特殊詞綴**：清單、最低區域等級、各區域的出現機率（含 Boss ×2）
+
+> 全頁不另存一份資料，一律從 `models/affix.ts` 讀取並即時計算，確保與實作同步。
+> 新增或移除詞綴時本頁自動反映，無須改動頁面程式。
 
 ### 4.3 怪物頁 (MonstersPage)
 - 列表：名稱、等級、HP、攻擊、防禦、經驗、屬性、種族、體型、Boss 標記、出沒區域
@@ -110,7 +125,15 @@ client/src/wiki/
 - STR/DEX/CON/INT/WIS 各屬性效果公式文字說明
 
 ### 4.10 戰鬥計算 (CombatPage)
-- 攻擊力、命中、閃避、暴擊、防禦力等計算公式
+
+分區列出各項公式：物理攻擊、技能攻擊（魔法）、命中率、玩家防禦減傷、魔法抗性、
+迴避率、爆擊、格擋、攻擊速度、元素克制關係。
+
+- **各項上限直接 import `systems/combat.ts` 的常數**（`DAMAGE_REDUCTION_CAP`、
+  `MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP` 等），不再寫死數字
+- 物理與魔法減傷並列，明確標示裝備防禦對魔法只有一半效力（貢獻上限 37.5%）
+- 魔法抗性獨立成一節，說明「加進魔法減傷率」與「降低詛咒／虛弱／減速機率」兩個用途
+- 公式敘述本身仍為文字，變更公式時需人工同步（有測試檢查關鍵常數與區塊是否存在）
 
 ### 4.11 任務 (QuestsPage)
 - 冒險者工會等階、任務類型、獎勵
@@ -141,6 +164,7 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/weapons/:name → WeaponsPage (detail)
 /wiki/armor        → ArmorPage (list)
 /wiki/armor/:name  → ArmorPage (detail)
+/wiki/affixes      → AffixesPage
 /wiki/monsters     → MonstersPage (list)
 /wiki/monsters/:monsterName → MonstersPage (detail)
 /wiki/maps         → MapsPage (list)
@@ -171,13 +195,14 @@ Wiki 頁面直接 import seed 常數與 model 定義，**不存在複製資料**
 | 頁面 | 硬編碼內容 | 對應實作 |
 |------|-----------|---------|
 | AttributesPage | 屬性效果公式描述、初始屬性表 | `models/character.ts`、`systems/combat.ts` |
-| CombatPage | 傷害/命中/閃避/暴擊公式 | `systems/combat.ts` |
+| CombatPage | 公式敘述文字（各項上限已改為 import 常數） | `systems/combat.ts` |
 | SkillsPage | 職業學習條件文字 | `models/skillRestrictions.ts` |
 | QuestsPage | 整頁硬編碼（任務類型、Boss 列表等） | 部分為未實作的設計前瞻內容 |
 
 ### 已修正項目
 
 - AttributesPage 職業初始屬性已對齊 `models/character.ts` 的 `CLASS_BASE_ATTRIBUTES`
+- CombatPage 的「防禦上限 65」已修正為 `DAMAGE_REDUCTION_CAP`（75），並補上魔法傷害與魔法抗性
 - 屬性上限說明已修正為兩段式：建角上限 18、Lv.51+ 上限 35
 
 ## 9. 擴充指引

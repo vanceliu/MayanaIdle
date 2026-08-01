@@ -42,6 +42,8 @@ MayanaIdle 瑪雅那Idle是一款以 Web 為主要平台的放置型 ARPG（Idle
 - 狀態管理：Zustand
 - CSS：純 CSS + 自定義設計 token（無 Tailwind）
 - 測試：Vitest + Testing Library
+- 型別檢查：**一律用 `npx tsc -b`**（根 `tsconfig.json` 是 `{"files": [], "references": [...]}`，
+  `tsc --noEmit` 不會檢查任何檔案，是空跑）
 - 資料庫：IndexedDB (Dexie) — 目前為離線 client-only
 - 未來後端：Node.js / PostgreSQL / Prisma / Socket.IO
 

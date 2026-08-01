@@ -65,9 +65,9 @@ describe('affix model', () => {
       }
     });
 
-    it('should have T1 range 5-7 and T7 range 21-23', () => {
-      expect(AFFIX_TIERS[0]).toEqual({ tier: 1, min: 5, max: 7 });
-      expect(AFFIX_TIERS[6]).toEqual({ tier: 7, min: 21, max: 23 });
+    it('should have T1 range 3-5 and T7 range 19-20', () => {
+      expect(AFFIX_TIERS[0]).toEqual({ tier: 1, min: 3, max: 5 });
+      expect(AFFIX_TIERS[6]).toEqual({ tier: 7, min: 19, max: 20 });
     });
   });
 

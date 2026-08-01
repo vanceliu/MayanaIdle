@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { path: '/wiki', label: '首頁', end: true },
   { path: '/wiki/weapons', label: '武器' },
   { path: '/wiki/armor', label: '防具' },
+  { path: '/wiki/affixes', label: '詞綴' },
   { path: '/wiki/monsters', label: '怪物' },
   { path: '/wiki/maps', label: '地圖' },
   { path: '/wiki/items', label: '道具' },

@@ -10,13 +10,16 @@ import { collectSpecialAffixTypes, type SpecialAffixType } from '../models/affix
  * 設計來源：docs/design/24-buff-debuff.md § 24.4、docs/design/25-monster-system.md § 25.9.2
  */
 
-/** debuff 類型 → 對應免疫詞綴（暈眩無免疫詞綴，僅有抵抗） */
+/**
+ * debuff 類型 → 對應免疫詞綴。
+ * 詛咒／虛弱／減速改由魔法抗性抵抗（§ 24.4.2），已無免疫詞綴；暈眩僅有抵抗詞綴。
+ */
 export const IMMUNITY_AFFIX_BY_DEBUFF: Record<PlayerDebuffType, SpecialAffixType | null> = {
   poison: 'immune_poison',
   bleed: 'immune_bleed',
-  curse: 'immune_curse',
-  weaken: 'immune_weaken',
-  slow: 'immune_slow',
+  curse: null,
+  weaken: null,
+  slow: null,
   stun: null,
 };
 

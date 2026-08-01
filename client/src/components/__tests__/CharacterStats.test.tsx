@@ -53,6 +53,22 @@ describe('CharacterStats', () => {
     expect(critRow?.textContent).toContain('5%');
   });
 
+  it('每個欄位的標籤都有 tooltip 觸發器（§ 34 詳細狀態面板）', () => {
+    const { container } = render(<CharacterStats />);
+    const rows = container.querySelectorAll('.stat-row');
+    expect(rows.length).toBeGreaterThan(15);
+    for (const row of rows) {
+      expect(row.querySelector('.tooltip-trigger .stat-label'), row.textContent ?? '').not.toBeNull();
+      expect(row.querySelector('.stat-value'), row.textContent ?? '').not.toBeNull();
+    }
+  });
+
+  it('魔法抗性與魔法減傷率是兩個獨立欄位', () => {
+    render(<CharacterStats />);
+    expect(screen.getByText('魔法抗性')).toBeDefined();
+    expect(screen.getByText('魔法減傷率')).toBeDefined();
+  });
+
   it('returns null when no character', () => {
     useGameStore.setState({ character: null });
     const { container } = render(<CharacterStats />);

@@ -144,12 +144,47 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 
 | 區塊 | 顯示項目 |
 |---|---|
-| 防禦 | 防禦值、減傷率、迴避率、命中率、格擋率 |
+| 基礎屬性 | STR、AGI、VIT、SPI、INT、CHA |
+| 攻擊 | 物理(小怪)、物理(大怪)、普攻元素、技能元素、攻速加成、冷卻縮減 |
+| 防禦 | 防禦值、減傷率、**魔法減傷率**、**魔法抗性**、迴避率、命中率、格擋率 |
 | 爆擊 | 爆擊率、爆擊傷害 |
 | 回復 | 每次回血、每次回魔、補血效果、藥水效果 |
 
 - 格擋率 = 盾牌基礎格擋率 + 格擋率詞綴加總（上限 50%）
 - 未裝備盾牌時格擋率為 0%
+
+### 欄位 Tooltip（必要）
+
+**每一個欄位的標籤都必須有 tooltip**，hover 後說明該欄位的意義。缺少 tooltip 視為缺陷。
+
+結構（`StatRow` 元件）：
+
+```
+.stat-row
+├── .tooltip-trigger      — Tooltip 包裹層（position="right"）
+│   └── .stat-label       — 欄位名稱，虛線底線 + cursor: help
+└── .stat-value           — 數值
+```
+
+Tooltip 內容分三段，`formula` 與 `note` 可省略：
+
+| 區塊 | class | 內容 |
+|---|---|---|
+| 標題 | `.stat-tip-title` | 欄位名稱 |
+| 說明 | `.stat-tip-desc` | 這個欄位「是什麼」，用玩家看得懂的話 |
+| 公式 | `.stat-tip-formula` | 怎麼算出來的（等寬字、深色底） |
+| 補充 | `.stat-tip-note` | 上限、生效條件、與其他欄位的關係 |
+
+**撰寫原則**：
+
+- 「來源」與「結果」的欄位必須互相指涉。例如**魔法抗性**是來源之一，
+  **魔法減傷率**是最終結果 —— 兩者的 tooltip 都要說明彼此關係，否則玩家看到兩個相似名稱會混淆
+- 若欄位目前無效果（例如 CHA），要在 note 明說「尚未實作」
+- 顯示值若已含上限（爆擊率 75%、迴避 35%、格擋 50%、冷卻縮減 50%），要在 note 標明
+
+> **實作注意**：`.stat-label` 外層有 Tooltip 產生的 `.tooltip-trigger`，
+> 因此 CSS 與測試都**不可使用位置選擇器**（`span:first-child` / `parentElement` + 索引），
+> 一律用 `.stat-label` / `.stat-value` 明確 class。
 
 ### 重量顯示規則
 

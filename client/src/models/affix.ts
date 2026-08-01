@@ -30,9 +30,6 @@ export type AffixType =
 export type SpecialAffixType =
   | 'immune_poison'
   | 'immune_bleed'
-  | 'immune_curse'
-  | 'immune_weaken'
-  | 'immune_slow'
   | 'resist_stun';
 
 export type AnyAffixType = AffixType | SpecialAffixType;
@@ -46,12 +43,14 @@ export interface SpecialAffixDefinition {
   minAreaLevel: number;
 }
 
+/**
+ * § 7.10.1 特殊詞綴清單。
+ * 只涵蓋**魔法抗性擋不住**的 debuff：中毒／流血（物理 DoT）與暈眩。
+ * 詛咒／虛弱／減速改由魔抗機率抵抗（§ 24.4.2），刻意不設免疫詞綴。
+ */
 export const SPECIAL_AFFIX_DEFINITIONS: SpecialAffixDefinition[] = [
   { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
   { type: 'immune_bleed', name: '流血免疫', description: '免疫流血（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
-  { type: 'immune_curse', name: '詛咒免疫', description: '免疫詛咒（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
-  { type: 'immune_weaken', name: '虛弱免疫', description: '免疫虛弱（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
-  { type: 'immune_slow', name: '減速免疫', description: '免疫減速（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
   { type: 'resist_stun', name: '暈眩抵抗', description: '暈眩時間 -50%', category: ['armor', 'shield', 'accessory'], minAreaLevel: 41 },
 ];
 
@@ -85,13 +84,13 @@ export interface AffixTier {
 }
 
 export const AFFIX_TIERS: AffixTier[] = [
-  { tier: 1, min: 5, max: 7 },
-  { tier: 2, min: 8, max: 10 },
-  { tier: 3, min: 11, max: 12 },
-  { tier: 4, min: 13, max: 15 },
-  { tier: 5, min: 16, max: 18 },
-  { tier: 6, min: 19, max: 20 },
-  { tier: 7, min: 21, max: 23 },
+  { tier: 1, min: 3, max: 5 },
+  { tier: 2, min: 6, max: 8 },
+  { tier: 3, min: 9, max: 11 },
+  { tier: 4, min: 12, max: 13 },
+  { tier: 5, min: 14, max: 15 },
+  { tier: 6, min: 16, max: 18 },
+  { tier: 7, min: 19, max: 20 },
 ];
 
 export interface AffixDefinition {
@@ -160,7 +159,8 @@ export function rollAffixTier(areaLevel: number, isBoss: boolean = false): numbe
   return 1;
 }
 
-function getTierWeights(level: number): number[] {
+/** § 7.7 一般怪物掉落的 Tier 權重（wiki 直接引用，避免另抄一份） */
+export function getTierWeights(level: number): number[] {
   if (level <= 10) return [50, 30, 15, 4, 1, 0, 0];
   if (level <= 20) return [30, 35, 20, 10, 5, 0, 0];
   if (level <= 30) return [10, 25, 30, 20, 15, 0, 0];
@@ -169,7 +169,8 @@ function getTierWeights(level: number): number[] {
   return [2, 5, 10, 20, 35, 28, 0];
 }
 
-function getBossTierWeights(level: number): number[] {
+/** § 7.7 Boss 掉落的 Tier 權重 */
+export function getBossTierWeights(level: number): number[] {
   if (level <= 20) return [10, 25, 30, 20, 15, 0, 0];
   if (level <= 30) return [5, 10, 20, 30, 25, 10, 0];
   if (level <= 40) return [3, 5, 15, 25, 30, 17, 5];
@@ -179,17 +180,19 @@ function getBossTierWeights(level: number): number[] {
 
 /**
  * 特定詞綴的專屬階級表（§ 7.3.1）。未列出者一律套用通用 `AFFIX_TIERS`。
- * 魔法抗性為單一值（min === max），不在階級內隨機。
+ *
+ * 魔法抗性的區間明顯低於通用表：它可同時出現在項鍊／戒指 ×2／盾牌
+ * 共 4 個部位，套用通用表會過快頂到 75% 減傷上限。
  */
 export const AFFIX_TIER_OVERRIDES: Partial<Record<AffixType, AffixTier[]>> = {
   magic_resist: [
-    { tier: 1, min: 2, max: 2 },
-    { tier: 2, min: 4, max: 4 },
-    { tier: 3, min: 6, max: 6 },
-    { tier: 4, min: 8, max: 8 },
-    { tier: 5, min: 10, max: 10 },
-    { tier: 6, min: 15, max: 15 },
-    { tier: 7, min: 20, max: 20 },
+    { tier: 1, min: 1, max: 2 },
+    { tier: 2, min: 3, max: 4 },
+    { tier: 3, min: 5, max: 6 },
+    { tier: 4, min: 7, max: 8 },
+    { tier: 5, min: 9, max: 10 },
+    { tier: 6, min: 11, max: 15 },
+    { tier: 7, min: 16, max: 20 },
   ],
 };
 

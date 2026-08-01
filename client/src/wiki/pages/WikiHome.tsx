@@ -4,6 +4,7 @@ import './WikiHome.css';
 const CATEGORIES = [
   { path: '/wiki/weapons', label: '武器', desc: '所有武器模板、材質、安定值、強化資訊' },
   { path: '/wiki/armor', label: '防具', desc: '防具列表、部位、安定值、強化資訊' },
+  { path: '/wiki/affixes', label: '詞綴', desc: '各部位可帶的詞綴、階級數值、掉落權重' },
   { path: '/wiki/monsters', label: '怪物', desc: '怪物資料、屬性、等級、出沒區域、掉落物' },
   { path: '/wiki/maps', label: '地圖', desc: '區域結構、等級對應、怪物分佈' },
   { path: '/wiki/items', label: '道具', desc: '材料、藥水、卷軸、取得方式' },

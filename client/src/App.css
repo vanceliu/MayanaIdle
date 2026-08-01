@@ -1880,13 +1880,49 @@ button.active {
   padding: 1px 0;
 }
 
-.stat-row span:first-child {
+/* 標籤與數值改用明確 class：標籤外層包了 Tooltip 的 .tooltip-trigger，
+   位置選擇器（:first-child / :last-child）會誤判 */
+.stat-label {
   color: var(--text-secondary);
+  border-bottom: 1px dotted var(--border);
+  cursor: help;
 }
 
-.stat-row span:last-child {
+.stat-value {
   color: var(--text-primary);
   font-family: var(--font-display);
+}
+
+/* --- 詳細狀態 tooltip --- */
+.stat-tip-title {
+  color: var(--accent-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  margin-bottom: 4px;
+}
+
+.stat-tip-desc {
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.stat-tip-formula {
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: var(--bg-deep, rgba(0, 0, 0, 0.25));
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.stat-tip-note {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
 }
 
 /* --- Auto Script Panel (legacy) --- */

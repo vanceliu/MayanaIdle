@@ -48,10 +48,18 @@ describe('飾品詞綴分類（§ 7.6）', () => {
 });
 
 describe('魔抗詞綴專屬階級表（§ 7.3.1）', () => {
-  it('T1~T7 為 2/4/6/8/10/15/20 且為單一值', () => {
+  it('T1~T7 為 1~2 / 3~4 / 5~6 / 7~8 / 9~10 / 11~15 / 16~20', () => {
     const table = getAffixTierTable('magic_resist');
-    expect(table.map(t => t.min)).toEqual([2, 4, 6, 8, 10, 15, 20]);
-    for (const t of table) expect(t.min).toBe(t.max);
+    expect(table.map(t => [t.min, t.max])).toEqual([
+      [1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 15], [16, 20],
+    ]);
+  });
+
+  it('每一階都低於通用表，避免 4 個部位堆滿就頂到 75% 上限', () => {
+    const table = getAffixTierTable('magic_resist');
+    for (let i = 0; i < table.length; i++) {
+      expect(table[i].max, `T${i + 1}`).toBeLessThanOrEqual(AFFIX_TIERS[i].max);
+    }
   });
 
   it('其他詞綴仍套用通用區間', () => {
@@ -59,10 +67,15 @@ describe('魔抗詞綴專屬階級表（§ 7.3.1）', () => {
     expect(getAffixTierTable(undefined)).toBe(AFFIX_TIERS);
   });
 
-  it('rollAffixValue 依詞綴類型查表', () => {
+  it('rollAffixValue 依詞綴類型查表，落在該階級區間內', () => {
+    const table = getAffixTierTable('magic_resist');
     for (let tier = 1; tier <= 7; tier++) {
-      const v = rollAffixValue(tier, 'magic_resist');
-      expect(v).toBe(getAffixTierTable('magic_resist')[tier - 1].min);
+      const { min, max } = table[tier - 1];
+      for (let i = 0; i < 30; i++) {
+        const v = rollAffixValue(tier, 'magic_resist');
+        expect(v, `T${tier}`).toBeGreaterThanOrEqual(min);
+        expect(v, `T${tier}`).toBeLessThanOrEqual(max);
+      }
     }
   });
 });

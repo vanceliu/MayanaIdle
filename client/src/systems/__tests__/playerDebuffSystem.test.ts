@@ -187,23 +187,29 @@ describe('createPlayerDebuffEffect — 效果內容', () => {
 
 describe('免疫率與特殊詞綴收集', () => {
   it('裝備免疫詞綴時免疫率為 1，否則為 0', () => {
-    expect(getDebuffImmunityRate('curse', new Set(['immune_curse']))).toBe(1);
-    expect(getDebuffImmunityRate('curse', new Set())).toBe(0);
+    expect(getDebuffImmunityRate('poison', new Set(['immune_poison']))).toBe(1);
+    expect(getDebuffImmunityRate('poison', new Set())).toBe(0);
   });
 
   it('暈眩無免疫詞綴，免疫率恆為 0', () => {
     expect(getDebuffImmunityRate('stun', new Set(['resist_stun']))).toBe(0);
   });
 
+  it('詛咒／虛弱／減速已無免疫詞綴，免疫率恆為 0（改由魔抗抵抗）', () => {
+    for (const type of ['curse', 'weaken', 'slow'] as const) {
+      expect(getDebuffImmunityRate(type, new Set(['immune_poison', 'immune_bleed', 'resist_stun']))).toBe(0);
+    }
+  });
+
   it('多件裝備的免疫效果不疊加（以 Set 收集）', () => {
     const specials = getEquippedSpecialAffixes([
       armor(['immune_poison']),
-      armor(['immune_poison', 'immune_slow']),
+      armor(['immune_poison', 'immune_bleed']),
       null,
     ]);
     expect(specials.size).toBe(2);
     expect(specials.has('immune_poison')).toBe(true);
-    expect(specials.has('immune_slow')).toBe(true);
+    expect(specials.has('immune_bleed')).toBe(true);
   });
 });
 

@@ -160,6 +160,16 @@ export class GameDB extends Dexie {
       itemTemplates: 'id, name, category',
     });
     this.version(10).stores({});
+    // 詛咒／虛弱／減速改由魔法抗性抵抗（§ 24.4.2），對應的免疫詞綴已移除。
+    // 舊實例若殘留這些詞綴，isSpecialAffixType 會回 false 而顯示成一般詞綴，故一併剔除。
+    this.version(11).stores({}).upgrade(async tx => {
+      const REMOVED = new Set(['immune_curse', 'immune_weaken', 'immune_slow']);
+      await tx.table('equipmentInstances').toCollection().modify((item: Record<string, unknown>) => {
+        const affixes = item.affixes as { type: string }[] | undefined;
+        if (!affixes?.some(a => REMOVED.has(a.type))) return;
+        item.affixes = affixes.filter(a => !REMOVED.has(a.type));
+      });
+    });
   }
 }
 

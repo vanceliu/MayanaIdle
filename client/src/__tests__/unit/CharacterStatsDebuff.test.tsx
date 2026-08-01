@@ -57,8 +57,9 @@ function setup(debuffs: PlayerDebuffType[]) {
 }
 
 function statValue(label: string): string {
-  const el = screen.getByText(label).parentElement!;
-  return el.querySelectorAll('span')[1].textContent ?? '';
+  // 標籤外層包了 Tooltip 的 .tooltip-trigger，不能用 parentElement + 位置索引
+  const row = screen.getByText(label).closest('.stat-row');
+  return row?.querySelector('.stat-value')?.textContent ?? '';
 }
 
 beforeEach(() => {

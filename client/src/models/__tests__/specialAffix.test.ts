@@ -15,8 +15,9 @@ afterEach(() => {
 });
 
 describe('特殊詞綴定義（§ 7.10.1）', () => {
-  it('共 6 個免疫/抵抗詞綴，全部僅限防具、盾牌與飾品（不含武器）', () => {
-    expect(SPECIAL_AFFIX_DEFINITIONS).toHaveLength(6);
+  it('共 3 個免疫/抵抗詞綴，全部僅限防具、盾牌與飾品（不含武器）', () => {
+    // 詛咒／虛弱／減速改由魔抗抵抗（§ 24.4.2），對應免疫詞綴已移除
+    expect(SPECIAL_AFFIX_DEFINITIONS).toHaveLength(3);
     for (const def of SPECIAL_AFFIX_DEFINITIONS) {
       // 飾品拆出 `accessory` 分類後一併納入，維持「飾品可帶免疫詞綴」的既有行為
       expect(def.category).toEqual(['armor', 'shield', 'accessory']);
@@ -24,9 +25,9 @@ describe('特殊詞綴定義（§ 7.10.1）', () => {
     }
   });
 
-  it('五種免疫詞綴 Lv.31+、暈眩抵抗 Lv.41+', () => {
+  it('兩種免疫詞綴 Lv.31+、暈眩抵抗 Lv.41+', () => {
     const immunities = SPECIAL_AFFIX_DEFINITIONS.filter(d => d.type.startsWith('immune_'));
-    expect(immunities).toHaveLength(5);
+    expect(immunities.map(d => d.type)).toEqual(['immune_poison', 'immune_bleed']);
     for (const def of immunities) expect(def.minAreaLevel).toBe(31);
     expect(SPECIAL_AFFIX_DEFINITIONS.find(d => d.type === 'resist_stun')?.minAreaLevel).toBe(41);
   });
@@ -56,8 +57,8 @@ describe('特殊詞綴掉落權重（§ 7.10.3）', () => {
 
   it('Lv.31 以下的區域無特殊詞綴可掉', () => {
     expect(getSpecialAffixPoolForSlot('armor', 30)).toHaveLength(0);
-    expect(getSpecialAffixPoolForSlot('armor', 31)).toHaveLength(5);
-    expect(getSpecialAffixPoolForSlot('armor', 41)).toHaveLength(6);
+    expect(getSpecialAffixPoolForSlot('armor', 31)).toHaveLength(2);
+    expect(getSpecialAffixPoolForSlot('armor', 41)).toHaveLength(3);
   });
 
   it('武器不會出現特殊詞綴', () => {
@@ -77,8 +78,10 @@ describe('generateAffixes 產出特殊詞綴', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const affixes = generateAffixes('armor', 51, 4);
     expect(affixes).toHaveLength(4);
-    expect(affixes.every(a => isSpecialAffixType(a.type))).toBe(true);
-    expect(affixes.every(a => a.tier === 0 && a.value === 0)).toBe(true);
+    // 特殊詞綴池只剩 3 種且不可重複，第 4 格必然退回一般詞綴
+    const specials = affixes.filter(a => isSpecialAffixType(a.type));
+    expect(specials).toHaveLength(3);
+    expect(specials.every(a => a.tier === 0 && a.value === 0)).toBe(true);
   });
 
   it('同一件裝備不會出現重複的特殊詞綴（§ 7.10.2）', () => {

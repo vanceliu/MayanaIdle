@@ -768,7 +768,7 @@ export function calculateMonsterAttack(
   }
 
   // Player defense reduction（§ 21.5 物理／§ 21.16 魔法）
-  // 魔法：裝備防禦的貢獻上限 50%，不足部分由魔法抗性補，總上限同樣 75%
+  // 魔法：裝備防禦只有一半效力（貢獻上限 37.5%），不足部分由魔法抗性補，總上限同樣 75%
   const reductionRate = monster.attackType === 'magic'
     ? Math.min(
         getMagicDefenseContribution(finalDefense)
