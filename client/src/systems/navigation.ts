@@ -1,6 +1,7 @@
 import type { MapLocation } from '../models/area';
 import type { BagItem } from '../stores/gameStore';
 import { getRegion, getRequiredScrollName } from '../models/mapData';
+import { isRegionUnlockEnabled } from './devFlags';
 
 export interface NavigationResult {
   success: boolean;
@@ -21,7 +22,7 @@ export function canNavigateTo(
     return { success: true };
   }
 
-  if (region.entryScrollName) {
+  if (region.entryScrollName && !isRegionUnlockEnabled()) {
     const hasScroll = bagItems.some(b => b.name === region.entryScrollName && b.amount > 0);
     if (!hasScroll) {
       return { success: false, error: `需要「${region.entryScrollName}」才能前往` };

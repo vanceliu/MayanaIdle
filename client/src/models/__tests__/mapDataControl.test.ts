@@ -102,12 +102,15 @@ describe('mapDataControl - getMapForRegion', () => {
     }
   });
 
-  it('showcase maps contain obstacles and decoration', async () => {
+  it('showcase maps contain obstacles and theme terrain', async () => {
+    // 各主題可用的地形由 38-map-control.md § 38.11 的色盤決定，
+    // 草原沒有「裝飾」而是用草叢/樹木/岩石/水池，因此這裡只斷言「有障礙且有特色地形」。
     for (const map of [await getMapForRegion('dawn-plains'), await getMapForRegion('ivory-tower', 1)]) {
       expect(map).not.toBeNull();
       const tiles = new Set(map!.tiles.flat());
       expect([TileType.Wall, TileType.Tree, TileType.Rock, TileType.Pillar].some(tile => tiles.has(tile))).toBe(true);
-      expect(tiles.has(TileType.Decoration)).toBe(true);
+      const featureTiles = [...tiles].filter(tile => tile !== TileType.Ground && tile !== TileType.Boundary);
+      expect(featureTiles.length).toBeGreaterThanOrEqual(2);
     }
   });
 

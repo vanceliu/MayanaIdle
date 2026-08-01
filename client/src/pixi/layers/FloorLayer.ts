@@ -4,6 +4,13 @@ import { createMapRenderPlan, type TerrainDrawItem } from '../mapRenderPlan';
 import { MAP_THEME_PALETTES } from '../mapThemes';
 import { LEVEL_HEIGHT, TILE_H, TILE_W, worldToScreen } from '../utils/isometric';
 
+/**
+ * 地板以主題色盤程式繪製。
+ *
+ * 原本接的等距地形圖集已整批移除（見 `38-map-control.md` § 38.9）——
+ * 素材混了 Stone Soup／DCSS／LPC 三套來源，畫風與尺寸都對不齊，
+ * 待找到一致的（最好是同作者的）整套素材再一次接上。
+ */
 export class FloorLayer {
   public container = new Container();
   private terrainGraphics: Graphics[] = [];
@@ -12,15 +19,15 @@ export class FloorLayer {
     this.container.removeChildren().forEach(child => child.destroy());
     this.removeTerrainGraphics(worldContainer);
     const baseGraphics = new Graphics();
-    const palette = MAP_THEME_PALETTES[mapData.theme ?? 'grassland'];
+    const theme = mapData.theme ?? 'grassland';
+    const palette = MAP_THEME_PALETTES[theme];
 
     for (const item of createMapRenderPlan(mapData)) {
       if (item.role === 'boundary' || item.role === 'wall') continue;
-
       this.drawSurface(baseGraphics, item, palette);
       this.drawVerticalFaces(baseGraphics, item, palette);
     }
-    this.container.addChild(baseGraphics);
+    this.container.addChildAt(baseGraphics, 0);
   }
 
   private drawSurface(

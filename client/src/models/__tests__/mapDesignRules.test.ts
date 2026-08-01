@@ -9,6 +9,9 @@ import {
   THEME_TERRAIN_PALETTES,
   type MapDesignProfile,
   checkClustering,
+  checkPillarSpacing,
+  checkPillarDensity,
+  getFallenPillarAxis,
   checkCorridorWidth,
   checkDeadEnds,
   checkDetourDistance,
@@ -219,17 +222,26 @@ describe('checkThemePalette', () => {
 });
 
 describe('checkThemeTerrain', () => {
-  it('標準密度需要至少 2 種特色地形', () => {
-    const map = blankMap(10, 8);
+  // § 38.11.1：標準以上密度要求「色盤裡每一種地形都出現，且各佔特色地形總量 ≥ 10%」
+  it('標準密度下，色盤中佔比不足 10% 的地形逐一回報', () => {
+    const map = blankMap(10, 8); // grassland 色盤 4 種：Tree / Grass / Rock / Water
     map.tiles[2][2] = TileType.Tree;
-    expect(checkThemeTerrain(map, profile({ density: 'standard' })).map(v => v.rule))
-      .toEqual(['theme-terrain']);
+    const rules = checkThemeTerrain(map, profile({ density: 'standard' })).map(v => v.rule);
+    // 只有 Tree，其餘 3 種佔 0%
+    expect(rules).toEqual(['terrain-variety', 'terrain-variety', 'terrain-variety']);
   });
 
-  it('空曠密度豁免', () => {
-    const map = blankMap(10, 8);
-    map.tiles[2][2] = TileType.Tree;
-    expect(checkThemeTerrain(map, profile({ density: 'sparse' }))).toEqual([]);
+  // § 38.11.1：「空曠」豁免的是「每種 ≥ 10%」，不是「至少 2 種」
+  it('空曠密度豁免每種 ≥ 10% 的限制，但仍需至少 2 種特色地形', () => {
+    const onlyOne = blankMap(10, 8);
+    onlyOne.tiles[2][2] = TileType.Tree;
+    expect(checkThemeTerrain(onlyOne, profile({ density: 'sparse' })).map(v => v.rule))
+      .toEqual(['theme-terrain']);
+
+    const two = blankMap(10, 8);
+    two.tiles[2][2] = TileType.Tree;
+    two.tiles[3][3] = TileType.Rock; // 兩種各 50%，但另兩種仍是 0% —— 空曠不追究
+    expect(checkThemeTerrain(two, profile({ density: 'sparse' }))).toEqual([]);
   });
 
   it('完全沒有特色地形時，連空曠也不通過', () => {
@@ -239,7 +251,7 @@ describe('checkThemeTerrain', () => {
 });
 
 describe('checkDominantTerrain', () => {
-  it('主導地形達標且點綴未超標時通過', () => {
+  it('主導地形達標時通過', () => {
     const map = blankMap(12, 10);
     fillRect(map, 2, 2, 5, 3, TileType.Tree); // 8 格樹
     map.tiles[6][6] = TileType.Rock;          // 1 格岩石 = 11%
@@ -254,12 +266,12 @@ describe('checkDominantTerrain', () => {
       .toContain('dominant-terrain');
   });
 
-  it('點綴地形超過 20% 時不通過', () => {
+  // § 38.11.1：「沒有『點綴上限』。壓低其他地形反而是造成單調的原因」
+  it('非主導地形佔比再高也不違規（設計上沒有點綴上限）', () => {
     const map = blankMap(12, 10);
-    fillRect(map, 2, 2, 6, 2, TileType.Tree); // 5 格樹 = 55.6%
+    fillRect(map, 2, 2, 6, 2, TileType.Tree); // 5 格樹 = 55.6%，仍為最大宗
     fillRect(map, 2, 5, 5, 5, TileType.Rock); // 4 格岩石 = 44.4%
-    expect(checkDominantTerrain(map, profile({ dominantTerrain: TileType.Tree })).map(v => v.rule))
-      .toContain('accent-terrain');
+    expect(checkDominantTerrain(map, profile({ dominantTerrain: TileType.Tree }))).toEqual([]);
   });
 
   it('裝飾地面當主導時另受可通行格 35% 上限約束', () => {
@@ -365,6 +377,69 @@ describe('checkDeadEnds', () => {
   });
 });
 
+describe('checkPillarSpacing', () => {
+  // § 38.12：石柱是人造結構，一根一根立著，相鄰會糊成石塊
+  it('石柱之間隔 1 格以上時通過', () => {
+    const map = blankMap(10, 8);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[3][5] = TileType.Pillar;
+    map.tiles[5][3] = TileType.Pillar;
+    expect(checkPillarSpacing(map)).toEqual([]);
+  });
+
+  // 唯一的例外：倒塌石柱橫躺在地，柱身本來就跨兩格
+  it('正交成對視為倒塌石柱，通過', () => {
+    const map = blankMap(10, 8);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[3][4] = TileType.Pillar;
+    expect(checkPillarSpacing(map)).toEqual([]);
+    expect(getFallenPillarAxis(map, 3, 3)).toBe('horizontal');
+    expect(getFallenPillarAxis(map, 4, 3)).toBe('horizontal');
+  });
+
+  it('三根以上連成一串不是倒柱，是石堆，不通過', () => {
+    const map = blankMap(10, 8);
+    for (const x of [3, 4, 5]) map.tiles[3][x] = TileType.Pillar;
+    expect(checkPillarSpacing(map).map(v => v.rule)).toEqual(['pillar-spacing']);
+    expect(getFallenPillarAxis(map, 4, 3)).toBeNull();
+  });
+
+  it('成對但旁邊還有斜向石柱時不算倒柱', () => {
+    const map = blankMap(10, 8);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[3][4] = TileType.Pillar;
+    map.tiles[4][5] = TileType.Pillar;
+    expect(getFallenPillarAxis(map, 3, 3)).toBeNull();
+    expect(checkPillarSpacing(map).map(v => v.rule)).toEqual(['pillar-spacing']);
+  });
+
+  it('單根直立石柱不是倒柱', () => {
+    const map = blankMap(10, 8);
+    map.tiles[3][3] = TileType.Pillar;
+    expect(getFallenPillarAxis(map, 3, 3)).toBeNull();
+  });
+
+  it('斜向相鄰的石柱同樣不通過', () => {
+    const map = blankMap(10, 8);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[4][4] = TileType.Pillar;
+    expect(checkPillarSpacing(map).map(v => v.rule)).toEqual(['pillar-spacing']);
+  });
+
+  it('同一對只回報一次，不重複計數', () => {
+    const map = blankMap(10, 8);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[4][4] = TileType.Pillar;      // 斜向，不是倒柱
+    const violations = checkPillarSpacing(map);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].positions).toHaveLength(1);
+  });
+
+  it('沒有石柱的地圖直接通過', () => {
+    expect(checkPillarSpacing(blankMap(10, 8))).toEqual([]);
+  });
+});
+
 describe('checkClustering', () => {
   const denseProfile = profile({ archetype: 'semi-open', density: 'dense', dominantTerrain: TileType.Rock });
 
@@ -411,15 +486,16 @@ describe('checkClustering', () => {
     expect(checkClustering(map, denseProfile).map(v => v.rule)).toContain('cluster-size');
   });
 
-  it('自然地貌的障礙叢超過 24 格不通過', () => {
+  // § 38.12：「沒有叢大小上限。一片大森林、一道長岩壁本來就該是大的」
+  it('大片障礙叢合法（設計上沒有叢大小上限）', () => {
     const map = blankMap(20, 15);
-    fillRect(map, 2, 2, 7, 6, TileType.Rock); // 30 格
-    expect(checkClustering(map, denseProfile).map(v => v.rule)).toContain('cluster-size');
+    fillRect(map, 2, 2, 9, 7, TileType.Rock); // 48 格
+    expect(checkClustering(map, denseProfile)).toEqual([]);
   });
 
-  it('24 格以內的障礙叢通過', () => {
+  it('中等大小的障礙叢通過', () => {
     const map = blankMap(20, 15);
-    fillRect(map, 2, 2, 6, 5, TileType.Rock); // 20 格
+    fillRect(map, 2, 2, 8, 6, TileType.Rock); // 35 格
     expect(checkClustering(map, denseProfile)).toEqual([]);
   });
 
@@ -560,5 +636,70 @@ describe('MAP_DESIGN_PROFILES', () => {
       });
       expect(new Set(signatures).size, `${theme} 的地圖個性完全同質`).toBe(signatures.length);
     }
+  });
+});
+
+describe('checkPillarDensity', () => {
+  it('4x4 內兩根以內通過', () => {
+    const map = blankMap(12, 10);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[5][6] = TileType.Pillar;
+    expect(checkPillarDensity(map)).toEqual([]);
+  });
+
+  it('4x4 內三根以上回報違規（石柱是支撐結構，過密會變成柱林）', () => {
+    const map = blankMap(12, 10);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[3][5] = TileType.Pillar;
+    map.tiles[5][3] = TileType.Pillar;
+    const violations = checkPillarDensity(map);
+    expect(violations.map(v => v.rule)).toEqual(['pillar-density']);
+    expect(violations[0].positions?.length).toBeGreaterThan(0);
+  });
+
+  it('柱距 2 格的滿版柱陣必然違規', () => {
+    const map = blankMap(14, 12);
+    for (let y = 2; y <= 9; y += 2) {
+      for (let x = 2; x <= 11; x += 2) map.tiles[y][x] = TileType.Pillar;
+    }
+    expect(checkPillarDensity(map).map(v => v.rule)).toEqual(['pillar-density']);
+  });
+
+  it('沒有石柱時通過', () => {
+    expect(checkPillarDensity(blankMap(10, 8))).toEqual([]);
+  });
+});
+
+describe('直立與倒塌石柱的分工', () => {
+  // 分開談的是「間距」：倒柱可以相鄰；密度上兩者一視同仁
+  it('倒塌石柱跨兩格但只算一根', () => {
+    const map = blankMap(12, 10);
+    map.tiles[5][3] = TileType.Pillar;      // 倒柱的一半
+    map.tiles[5][4] = TileType.Pillar;      // 倒柱的另一半
+    expect(getFallenPillarAxis(map, 3, 5)).toBe('horizontal');
+    expect(checkPillarSpacing(map)).toEqual([]);        // 間距：倒柱允許相鄰
+
+    map.tiles[3][3] = TileType.Pillar;                  // 同一個 4x4 再加一根直立 → 共 2 根
+    expect(checkPillarDensity(map)).toEqual([]);
+
+    map.tiles[3][6] = TileType.Pillar;                  // 第 3 根
+    expect(checkPillarDensity(map).map(v => v.rule)).toEqual(['pillar-density']);
+  });
+
+  it('兩根倒柱加一根直立就超過（倒柱各算一根）', () => {
+    const map = blankMap(12, 10);
+    map.tiles[3][3] = TileType.Pillar; map.tiles[3][4] = TileType.Pillar;   // 倒柱 A
+    map.tiles[5][3] = TileType.Pillar; map.tiles[5][4] = TileType.Pillar;   // 倒柱 B
+    expect(checkPillarDensity(map)).toEqual([]);                            // 2 根
+    map.tiles[4][6] = TileType.Pillar;                                      // 第 3 根
+    expect(checkPillarDensity(map).map(v => v.rule)).toEqual(['pillar-density']);
+  });
+
+  it('三根直立石柱擠在 4x4 內仍然違規', () => {
+    const map = blankMap(12, 10);
+    map.tiles[3][3] = TileType.Pillar;
+    map.tiles[3][5] = TileType.Pillar;
+    map.tiles[5][5] = TileType.Pillar;
+    expect(checkPillarDensity(map).map(v => v.rule)).toEqual(['pillar-density']);
   });
 });

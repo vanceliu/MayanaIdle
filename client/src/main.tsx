@@ -16,6 +16,7 @@ import { AttributesPage } from './wiki/pages/AttributesPage'
 import { CombatPage } from './wiki/pages/CombatPage'
 import { ItemsPage } from './wiki/pages/ItemsPage'
 import { QuestsPage } from './wiki/pages/QuestsPage'
+import { CreditsPage } from './wiki/pages/CreditsPage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="items" element={<ItemsPage />} />
           <Route path="items/:itemName" element={<ItemsPage />} />
           <Route path="quests" element={<QuestsPage />} />
+          <Route path="credits" element={<CreditsPage />} />
         </Route>
         <Route path="/*" element={<App />} />
       </Routes>

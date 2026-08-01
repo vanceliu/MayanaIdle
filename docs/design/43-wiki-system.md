@@ -15,6 +15,8 @@ client/src/wiki/
 │   ├── WikiLayout.tsx    — 整體版面（header + sidebar nav + <Outlet>）
 │   ├── WikiLayout.css
 │   └── WikiTable.css     — 共用表格樣式
+├── data/
+│   └── assetCredits.ts   — 第三方素材標注資料（非遊戲資料，故不放 hooks）
 ├── hooks/
 │   └── useWikiData.ts    — 資料存取 hook（直接 import seed/model）
 ├── pages/
@@ -31,7 +33,8 @@ client/src/wiki/
 │   ├── AttributesPage.tsx— 屬性公式說明
 │   ├── CombatPage.tsx    — 戰鬥計算公式
 │   ├── QuestsPage.tsx    — 任務系統
-│   └── DropsPage.tsx     — 掉落總覽
+│   ├── DropsPage.tsx     — 掉落總覽
+│   └── CreditsPage.tsx   — 第三方素材來源與授權
 ```
 
 ## 3. 資料來源
@@ -50,6 +53,7 @@ client/src/wiki/
 | 戰鬥計算 | 硬編碼文字（對應 `systems/combat.ts`） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |
 | 任務 | `QUEST_TEMPLATES`、guild 相關 seed |
+| 素材來源 | `ASSET_CREDITS`（`wiki/data/assetCredits.ts`），與 `client/src/assets/tiles/CREDITS.md` 同步維護 |
 
 ### useWikiData.ts 提供的 hook
 
@@ -114,6 +118,13 @@ client/src/wiki/
 ### 4.12 掉落 (DropsPage)
 - 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）
 
+### 4.13 素材來源 (CreditsPage)
+- 列出版庫中收錄的**第三方素材**：用途、素材名稱、作者、授權、來源 URL、版庫路徑
+- 授權與來源皆為可點擊外部連結（`target="_blank"` + `rel="noopener noreferrer"`）
+- 呈現 CC BY 3.0 要求的標注文字原文
+- 資料來源為 `wiki/data/assetCredits.ts` 的 `ASSET_CREDITS`；**新增第三方素材時必須同步更新**此常數與對應的 `CREDITS.md`
+- 資料與元件分檔的原因：同一檔案同時匯出元件與常數會違反 `react-refresh/only-export-components`
+
 ## 5. 共用元件與樣式
 
 - **WikiLayout** — 左側 sidebar 導覽列（NavLink），右側 `<Outlet>` 內容區
@@ -143,6 +154,7 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/combat       → CombatPage
 /wiki/quests       → QuestsPage
 /wiki/drops        → DropsPage
+/wiki/credits      → CreditsPage
 ```
 
 ## 7. 資料正確性保證

@@ -124,50 +124,62 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 3. 叢聚規則補上適用範圍：只套用在密集/極密，且柱廳型全面豁免
    （柱陣本質是單格規則排列，強制成叢會毀掉視覺語彙）
 
-### Step 2：離線生成腳本
+### Step 2：等距地形素材（已回退，待重選）
 
-新增 `client/scripts/generateMaps.ts`，以 `npx vite-node client/scripts/generateMaps.ts` 執行。
+接過一輪圖集（Stone Soup 地板＋DCSS 物件＋LPC 岩石灌木＋Kenney 水岸磚），
+因三套來源畫風與尺寸對不齊而**整批移除**，地圖回到程式繪製的色塊。
 
-- [ ] deterministic PRNG（seed 由 map id 字串 hash 產生），**禁止使用 `Math.random()`**
-- [ ] 實作 § 38.12 的五種佈局骨架產生器：開闊型／半開闊型／柱廳型／房間走廊型／洞窟型
-- [ ] 實作 § 38.11 的 14 套主題地形配方（決定「可用哪些地形」）
-- [ ] **叢聚放置器**：障礙以 3~12 格為一叢生長，叢間保留 ≥ 2 格通道（§ 38.12）。
-      這是密集/極密地圖能成立的關鍵，**不可用逐格均勻隨機散佈**
-- [ ] 依 `MAP_DESIGN_PROFILES` 的密度分級換算目標可通行率（原型基準 + 偏移），並依主導地形
-      分配特色地形比例（主導 ≥ 50%）
-- [ ] 每張地圖挖出所需數量的開闊空地，`spawnPoint` 放在其中一塊
-- [ ] Boss 層中央保留 ≥ 8×8 開闊空地
-- [ ] 產出後立即跑 `validateMapData` + `validateMapDesign`，不通過則換 seed 重試（上限 50 次後報錯）
-- [ ] 腳本只在開發期手動執行，**不加入 build/test 流程**，產物為靜態 JSON
-- [ ] 保留既有 `id` / `name` / `width` / `height` / `theme`，只重寫 `tiles` 與必要時的 `spawnPoint`
+- [x] 打包腳本 `client/scripts/packTiles.mjs`（含交界過渡磚合成）保留，可直接餵新素材
+- [x] 選型需求整理進 `38-map-control.md` § 38.9「為什麼移除，以及下一套素材的選型需求」
+- [x] 候選名單與授權研究保留於 `client/src/assets/CREDITS.md`
+- [ ] 找到一致性高、最好是同一位作者的整套等距素材
+- [ ] 一次全部換上，逐條核對 § 38.9 的選型需求表
+- [ ] 重接後回頭確認 14 個主題的實機畫面
 
-### Step 3：手工設計指標地圖
+### Step 3：逐張手繪全部 50 張地圖 ✅ 完成
 
-以下地圖不使用腳本，逐張手寫 tile 陣列（可先用腳本產草稿再手動修）：
+**不使用地圖生成器。** 生成器即使 profile 完全吻合，實際分佈仍是散亂的
+（樹排成果園格線、石頭全擠成一大塊），已於此階段移除 `scripts/generateMaps.ts`。
 
-- [ ] `ivory-tower-1f` ~ `ivory-tower-5f`（柱廳型，1F 保留現有柱陣骨架再加地毯主廊）
-- [ ] `hundred-pillar-1-10f`、`hundred-pillar-61-70f`、`hundred-pillar-71-80f`、`hundred-pillar-91-100f`
-- [ ] `dragon-valley-surface`、`dragon-valley-7f`（熔岩河與繞行通道）
-- [ ] `ancient-dungeon-9f`（最終層，中央 ≥ 8×8 開闊空地）
-- [ ] 每張完成後單獨跑 `validateMapDesign` 確認
+- [x] 50 張全部手繪，**載入驗證與安全檢查全數通過**
+- [x] 13 種地形全部有在使用（岩漿先前 0 格，現為 649 格）
+- [x] 色盤擴充：`prison`／`ancient`／`tower`／`frost-tower`／`lava-tower` 加入岩石與裝飾
 
-### Step 4：腳本生成其餘地圖
+作法：以 ASCII 稿或有機筆刷繪製 → `npx vite-node scripts/inspectMap.mts <mapId>`
+逐格定位違規 → 修正 → 重跑。擺放守則見 `38-map-control.md` § 38.12。
 
-- [ ] 執行腳本產出 Step 3 以外的全部地圖
-- [ ] 逐主題檢視產出（草原/森林/沼澤/雪原/高地/戰場/洞窟/水牢/遺跡/龍谷/塔）
-- [ ] 同主題多層之間確實有可辨識的差異，不是同一張圖換色
-- [ ] **落差抽查**：`demon-forest` 要讀得出是密林、`dawn-plains` 要接近純平原、
-      `ancient-dungeon` 的空曠層與密集層要一眼分得出來。做不到就回頭調 Step 2 的參數，
-      不可為了通過檢查而讓所有地圖趨於平均
+工具（`client/scripts/`，全部可重複使用）：
 
-### Step 5：全體驗證與收尾
+| 工具 | 用途 |
+|---|---|
+| `inspectMap.mts <mapId>` | 載入驗證 + 安全檢查 + 設計指引，違規逐格標回 ASCII |
+| `repairDetours.mts <mapId>...` | 自動打通「兩格之隔要繞十幾格」的牆 |
+| `makeFallenPillars.mts <mapId> <n>` | 做出倒塌石柱，每補一格就重驗、退步就撤回 |
+| `surveyMaps.mts` | 全庫盤點 |
 
-- [ ] 啟用全地圖合規測試 `mapDesignConstraints.test.ts`：50 張全數通過
-      `validateMapData` + `validateMapDesign`
-- [ ] `npm run test` 全綠（既有測試不得因地圖改動而失敗，特別是引用 `dawn-plains` 的測試）
-- [ ] `npm run build` 通過
-- [ ] 實機確認：每個主題至少進一張地圖，確認地形渲染正確、無視覺破圖
-- [ ] 確認怪物生成不會因可生成格減少而明顯變慢（觀察各主題代表地圖）
+**載入驗證必須先看**：`spawnPoint` 除了可通行還必須是**可生成格**（只有裸地面），
+鋪成地毯或裝飾會讓整張圖無法載入，而安全檢查與設計指引都不會抓到這一項。
+
+反覆踩到的坑（成因都是低窪障礙擋近戰）：
+
+- 水池／熔岩／冰面／深淵連成一大片就繞不過去，要切成多塊、彼此留得出走道
+- 流體的端點碰到地圖邊界會把外側走道整段封死，端點要離邊界 ≥3 格
+- 30×20 只有 504 格，寬 2 的流很快互相連通把地圖切碎，小圖用寬 1
+
+### Step 4：全體驗證與收尾 ✅ 完成
+
+- [x] 50 張載入驗證 + 安全檢查全數通過
+- [x] `npm run test` 全綠、`npm run build` 通過
+- [x] 實機巡過各主題（使用者確認）
+- [x] 怪物生成速率驗證：`npx vite-node scripts/checkSpawnRate.mts`
+
+      引擎生成時隨機挑可生成格、要求距玩家 ≥5 格、最多試 20 次，全失敗就放棄本次生成。
+      裝飾與地毯可走但**不可生怪**，鋪太多會讓這個機率下降。
+      實測 50 張的最壞情況（玩家站在最不利位置）失敗率都 < 0.0001%，
+      最緊的是 `wind-woods`（附近佔比 36.5%）。無需調整。
+
+- [x] 設計指引項維持現狀（使用者決定）——那些是比例類建議，
+      規則模組本身即註明「不再當成必須命中的目標」
 
 ### 完成後須同步
 
