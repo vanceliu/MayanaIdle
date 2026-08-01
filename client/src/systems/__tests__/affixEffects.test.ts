@@ -3,6 +3,20 @@ import { getPlayerAttackInterval, getSkillCooldownReduction, getAffixBonusesFrom
 import { canUseSkill, isSkillReady } from '../../models/skill';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { Skill } from '../../models/skill';
+import type { Character } from '../../models/character';
+
+/** INT 每 2 點 +1% 冷卻縮減（§ 20.6），因此測詞綴時預設用 INT 0 隔離變因 */
+function charWithInt(int: number): Character {
+  return {
+    name: 'T', className: 'knight', level: 50, exp: 0, expToNext: 100,
+    hp: 100, maxHp: 100, mp: 100, maxMp: 100,
+    baseAttributes: { STR: 10, AGI: 10, VIT: 10, SPI: 10, INT: int, CHA: 10 },
+    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+    gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
+    currentRegion: 'dawn-plains', currentFloor: null, skills: [],
+    unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+  };
+}
 
 function createTestArmor(overrides: Partial<EquipmentInstance> = {}): EquipmentInstance {
   return {
@@ -85,7 +99,7 @@ describe('affix effects integration', () => {
   describe('cooldown_reduction', () => {
     it('should return 0 with no cooldown_reduction affix', () => {
       const gear = [createTestWeapon()];
-      const cdr = getSkillCooldownReduction(gear);
+      const cdr = getSkillCooldownReduction(charWithInt(0), gear);
       expect(cdr).toBe(0);
     });
 
@@ -93,7 +107,7 @@ describe('affix effects integration', () => {
       const weapon = createTestWeapon({
         affixes: [{ type: 'cooldown_reduction', tier: 3, value: 12 }],
       });
-      const cdr = getSkillCooldownReduction([weapon]);
+      const cdr = getSkillCooldownReduction(charWithInt(0), [weapon]);
       expect(cdr).toBe(12);
     });
 
@@ -101,8 +115,26 @@ describe('affix effects integration', () => {
       const weapon = createTestWeapon({
         affixes: [{ type: 'cooldown_reduction', tier: 7, value: 60 }],
       });
-      const cdr = getSkillCooldownReduction([weapon]);
+      const cdr = getSkillCooldownReduction(charWithInt(0), [weapon]);
       expect(cdr).toBe(50);
+    });
+
+    it('智力每 2 點提供 1% 冷卻縮減，與詞綴加算', () => {
+      const weapon = createTestWeapon({
+        affixes: [{ type: 'cooldown_reduction', tier: 3, value: 12 }],
+      });
+      // INT 21 → 有效 20 → 20 / 2 × 1% = 10%
+      expect(getSkillCooldownReduction(charWithInt(21), [weapon])).toBe(22);
+      // 沒有詞綴時也生效
+      expect(getSkillCooldownReduction(charWithInt(21), [createTestWeapon()])).toBe(10);
+    });
+
+    it('智力提供的冷卻縮減同樣受 50% 上限', () => {
+      const weapon = createTestWeapon({
+        affixes: [{ type: 'cooldown_reduction', tier: 7, value: 40 }],
+      });
+      // 40 + (40 / 2 × 1) = 60 → clamp 50
+      expect(getSkillCooldownReduction(charWithInt(40), [weapon])).toBe(50);
     });
 
     it('should reduce effective skill cooldown in isSkillReady', () => {

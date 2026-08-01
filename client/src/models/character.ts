@@ -1,6 +1,7 @@
 import type { Skill } from './skill';
 import type { Quest } from './quest';
 import type { ActiveEffect } from './effect';
+import type { EquipmentInstance } from './equipment';
 
 export type ClassName = 'knight' | 'elf' | 'elementalist' | 'priest' | 'thief';
 
@@ -11,6 +12,23 @@ export interface Attributes {
   SPI: number;
   INT: number;
   CHA: number;
+}
+
+export const ATTRIBUTE_KEYS: (keyof Attributes)[] = ['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'];
+
+/**
+ * 已裝備部位提供的單一屬性加總（`06-equipment.md` § 6.8「增加額外屬性」）。
+ * 資料來源為模板的 `bonusAttributes`；`bonusStats` 只是顯示字串，不參與計算。
+ */
+export function getGearAttributeBonus(
+  equippedGear: (EquipmentInstance | null)[],
+  attr: keyof Attributes,
+): number {
+  let total = 0;
+  for (const item of equippedGear) {
+    total += item?.bonusAttributes?.[attr] ?? 0;
+  }
+  return total;
 }
 
 export interface Character {
@@ -68,7 +86,19 @@ export function getAvailablePoints(className: ClassName): number {
   return CLASS_TOTAL_POINTS - total;
 }
 
-export function getTotalAttributes(char: Character, activeEffects?: ActiveEffect[]): Attributes {
+/**
+ * 角色總屬性 = 建角基礎 + 配點 + **裝備額外屬性** + buff。
+ *
+ * `equippedGear` 為選填：
+ * - **要傳**：戰鬥、回復、狀態面板 —— 裝備額外屬性必須生效
+ * - **不要傳**：配點上限檢查（`ATTRIBUTE_CAP` 只約束 base + bonus，見 `20-attributes.md` § 20.9）
+ *   與升級 HP/MP 成長（避免升級前換 +VIT 裝的刷血漏洞，見 § 20.10）
+ */
+export function getTotalAttributes(
+  char: Character,
+  activeEffects?: ActiveEffect[],
+  equippedGear?: (EquipmentInstance | null)[],
+): Attributes {
   const base = char.baseAttributes;
   const bonus = char.bonusAttributes;
   const attrs: Attributes = {
@@ -79,6 +109,12 @@ export function getTotalAttributes(char: Character, activeEffects?: ActiveEffect
     INT: base.INT + bonus.INT,
     CHA: base.CHA + bonus.CHA,
   };
+
+  if (equippedGear) {
+    for (const key of ATTRIBUTE_KEYS) {
+      attrs[key] += getGearAttributeBonus(equippedGear, key);
+    }
+  }
 
   if (activeEffects) {
     const now = Date.now();

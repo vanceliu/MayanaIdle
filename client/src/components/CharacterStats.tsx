@@ -15,6 +15,7 @@ import {
   DAMAGE_REDUCTION_CAP,
   getMagicDefenseContribution,
   getGearMagicResist,
+  getSkillCooldownReduction,
 } from '../systems/combat';
 
 interface StatTip {
@@ -54,7 +55,10 @@ export function CharacterStats() {
 
   if (!char) return null;
 
-  const attrs = getTotalAttributes(char, activeEffects);
+  // 一律使用戰鬥系統的聚合函式，避免面板與實際戰鬥各算一份而漂移
+  const gearList = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
+
+  const attrs = getTotalAttributes(char, activeEffects, gearList);
   const effectiveSTR = Math.floor(attrs.STR / 2) * 2;
   // 敏捷每 3 點生效（§ 20.2），其餘每 2 點
   const effectiveAGI = Math.floor(attrs.AGI / 3) * 3;
@@ -68,8 +72,6 @@ export function CharacterStats() {
   const weaponEnhance = weapon?.enhancement ?? 0;
   const weaponExtraAttack = weapon?.extraAttack ?? 0;
 
-  // 一律使用戰鬥系統的聚合函式，避免面板與實際戰鬥各算一份而漂移
-  const gearList = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
   const bonuses = getCombatBonuses(gearList, activeEffects);
 
   const critRate0 = 5 + bonuses.crit_rate;
@@ -77,7 +79,7 @@ export function CharacterStats() {
   const attackPower = bonuses.attack_power;
   const attackElemental = bonuses.attack_elemental;
   const skillElemental = bonuses.skill_elemental;
-  const cooldownReduction = Math.min(bonuses.cooldown_reduction, 50);
+  const cooldownReduction = getSkillCooldownReduction(char, gearList, activeEffects);
   const healEffect = bonuses.heal_effect;
   const potionEffect = bonuses.potion_effect;
 
@@ -149,7 +151,7 @@ export function CharacterStats() {
           <StatRow label="AGI" value={attrs.AGI} tip={{ desc: '敏捷。影響命中率與迴避率。', formula: '命中 +1、迴避 +1 / 每 3 點', note: '每 3 點才生效一次（AGI 8 以 6 計算）' }} />
           <StatRow label="VIT" value={attrs.VIT} tip={{ desc: '體質。影響升級 HP 成長、每次回血與負重上限。', formula: '升級 HP +random(VIT-6, VIT-3)；回血 +1 / 每 2 點', note: '升級成長使用原始值，回血使用每 2 點生效的有效值' }} />
           <StatRow label="SPI" value={attrs.SPI} tip={{ desc: '精神。影響升級 MP 成長、每次回魔與魔法抗性。', formula: '升級 MP +random(SPI-6, SPI-3)；回魔 +1、魔法抗性 +1% / 每 2 點', note: '魔法抗性是抵擋怪物魔法傷害的來源之一' }} />
-          <StatRow label="INT" value={attrs.INT} tip={{ desc: '智力。提升魔法技能的傷害。', formula: '技能傷害 +10% / 每 2 點', note: '只影響走技能公式的傷害，不影響普攻' }} />
+          <StatRow label="INT" value={attrs.INT} tip={{ desc: '智力。提升魔法技能的傷害與冷卻縮減。', formula: '技能傷害 +5%、冷卻縮減 +1% / 每 2 點', note: '傷害只影響走技能公式的招式，不影響普攻；冷卻縮減與詞綴加總後上限 50%' }} />
           <StatRow label="CHA" value={attrs.CHA} tip={{ desc: '魅力。規劃用於寵物攜帶數量。', note: '寵物系統尚未實作，目前此屬性沒有任何效果' }} />
         </div>
 
@@ -160,7 +162,7 @@ export function CharacterStats() {
           <StatRow label="普攻元素" value={<>+{attackElemental}%</>} tip={{ desc: '普通攻擊的元素傷害加成，來自裝備詞綴。', formula: '所有「普攻元素傷害」詞綴加總', note: '只在武器帶元素屬性（或火矢附魔生效）時才計入，無屬性武器吃不到' }} />
           <StatRow label="技能元素" value={<>+{skillElemental}%</>} tip={{ desc: '元素技能的傷害加成，來自裝備詞綴與 buff。', formula: '「技能元素傷害」詞綴 + 元素增幅等 buff', note: '只對有元素屬性的技能生效，無屬性技能吃不到' }} />
           <StatRow label="攻速加成" value={<>{attackSpeed >= 0 ? '+' : ''}{attackSpeed}%</>} tip={{ desc: '縮短普攻間隔。負值代表被減速。', formula: '攻擊間隔 = 1200ms / (1 + 攻速%)', note: '加速 buff 與減速 debuff 的百分比先相加再換算' }} />
-          <StatRow label="冷卻縮減" value={<>+{cooldownReduction}%</>} tip={{ desc: '縮短所有技能的冷卻時間。', formula: '「減少冷卻時間」詞綴 + 冷卻縮減類 buff', note: '上限 50%，已包含在顯示值內' }} />
+          <StatRow label="冷卻縮減" value={<>+{cooldownReduction}%</>} tip={{ desc: '縮短所有技能的冷卻時間。', formula: '「減少冷卻時間」詞綴 + 冷卻縮減類 buff + 智力（每 2 點 +1%）', note: '上限 50%，已包含在顯示值內' }} />
         </div>
 
         <div className="stat-group">

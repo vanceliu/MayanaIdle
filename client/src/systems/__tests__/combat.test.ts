@@ -305,9 +305,10 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
-      // INT bonus = floor(10 * (18/2 * 10) / 100) = floor(10 * 90 / 100) = floor(9) = 9
-      // baseDamage = 10 + 9 = 19
-      expect(result.damage).toBe(19);
+      // § 20.6：INT 每 2 點 +5% 技能威力
+      // INT bonus = floor(10 * (18/2 * 5) / 100) = floor(10 * 45 / 100) = floor(4.5) = 4
+      // baseDamage = 10 + 4 = 14
+      expect(result.damage).toBe(14);
     });
 
     it('should apply skill_elemental affix for elemental skill', () => {
@@ -320,8 +321,8 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [weapon], '火球術');
 
-      // baseDamage = 10 + 9 = 19, skill_elem: floor(19 * 1.10) = floor(20.9) = 20
-      expect(result.damage).toBe(20);
+      // baseDamage = 10 + 4 = 14, skill_elem: floor(14 * 1.10) = floor(15.4) = 15
+      expect(result.damage).toBe(15);
       expect(result.log.type).toBe('skill_hit');
     });
 
@@ -335,8 +336,8 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'none', monster, [weapon], '衝撞');
 
-      // baseDamage = 10 + 9 = 19, no element → stays 19
-      expect(result.damage).toBe(19);
+      // baseDamage = 10 + 4 = 14, no element → stays 14
+      expect(result.damage).toBe(14);
     });
 
     it('should apply crit on skill attack', () => {
@@ -347,8 +348,8 @@ describe('combat system', () => {
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
       expect(result.isCritical).toBe(true);
-      // baseDamage = 19, crit = floor(19 * 2.0) = 38
-      expect(result.damage).toBe(38);
+      // baseDamage = 14, crit = floor(14 * 2.0) = 28
+      expect(result.damage).toBe(28);
       expect(result.log.type).toBe('skill_crit');
     });
 
@@ -359,8 +360,8 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
-      // baseDamage = 19, defense 50%: floor(19 * 50 / 100) = 9
-      expect(result.damage).toBe(9);
+      // baseDamage = 14, defense 50%: floor(14 * 50 / 100) = 7
+      expect(result.damage).toBe(7);
     });
 
     it('should generate correct log message', () => {
@@ -370,7 +371,7 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
-      expect(result.log.message).toBe('火球術 對 火蜥蜴 造成 19 點傷害');
+      expect(result.log.message).toBe('火球術 對 火蜥蜴 造成 14 點傷害');
     });
   });
 

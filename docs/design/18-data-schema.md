@@ -208,7 +208,8 @@ baseValue × (1 + qualityPercent / 100)
 | bonusHp | number? | 增加血量 |
 | bonusMp | number? | 增加魔量 |
 | bonusWeight | number? | 增加負重（腰帶用） |
-| bonusStats | string? | 額外屬性（如「敏捷+1」） |
+| bonusStats | string? | 額外屬性的**顯示字串**（如「敏捷+1」），不參與計算 |
+| bonusAttributes | Partial\<Attributes\>? | 額外屬性的**實際數值**（如 `{ AGI: 1 }`），生效來源。見 `06-equipment.md` § 6.8 |
 | stability | number | 安定值（武器預設 6、防具預設 4、-1 = 不可強化） |
 | canBreak | boolean? | 是否受壞刀機制影響（武器用） |
 | requiredLevel | number | 需求等級 |

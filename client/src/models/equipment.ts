@@ -1,4 +1,5 @@
 import type { Affix } from './affix';
+import type { Attributes } from './character';
 
 export type EquipSlot =
   | 'rightHand'
@@ -67,7 +68,14 @@ export interface EquipmentTemplate {
   hpRegen?: number;
   mpRegen?: number;
   bonusWeight?: number;
+  /** 顯示用文字（如「力量+2」）。實際生效的數值一律讀 `bonusAttributes`。 */
   bonusStats?: string;
+  /**
+   * 額外屬性（`06-equipment.md` § 6.8）。單一屬性、最多 +2（`99-ai-constraints.md` 第 35 條）。
+   * 疊加於 `baseAttributes + bonusAttributes` 之上，**不受 35 點上限限制**，
+   * 也**不影響升級時的 HP/MP 成長**（見 `20-attributes.md` § 20.10）。
+   */
+  bonusAttributes?: Partial<Attributes>;
   blockRate?: number;
   weight?: number;
   material?: WeaponMaterial;
@@ -101,7 +109,14 @@ export interface EquipmentInstance {
   hpRegen?: number;
   mpRegen?: number;
   bonusWeight?: number;
+  /** 顯示用文字（如「力量+2」）。實際生效的數值一律讀 `bonusAttributes`。 */
   bonusStats?: string;
+  /**
+   * 額外屬性（`06-equipment.md` § 6.8）。單一屬性、最多 +2（`99-ai-constraints.md` 第 35 條）。
+   * 疊加於 `baseAttributes + bonusAttributes` 之上，**不受 35 點上限限制**，
+   * 也**不影響升級時的 HP/MP 成長**（見 `20-attributes.md` § 20.10）。
+   */
+  bonusAttributes?: Partial<Attributes>;
   blockRate?: number;
   weight?: number;
   material?: WeaponMaterial;

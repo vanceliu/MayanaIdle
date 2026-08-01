@@ -239,7 +239,7 @@ export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): num
 
 /**
  * 可由 buff 提供的詞綴類加成。
- * 這些 stat 原本只從裝備詞綴聚合，導致同名的技能 buff 完全失效（見 99-ai-constraints § 99.3 Step 1）。
+ * 這些 stat 原本只從裝備詞綴聚合，導致同名的技能 buff 完全失效。
  */
 const BUFFABLE_AFFIX_STATS = ['attack_power', 'crit_rate', 'crit_damage', 'skill_elemental', 'cooldown_reduction'] as const;
 
@@ -339,7 +339,7 @@ export function getTotalMagicResist(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
 ): number {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   return getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear);
 }
 
@@ -365,12 +365,34 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
   return Math.max(MIN_ATTACK_INTERVAL_MS, interval);
 }
 
+/** § 20.6：INT 每 2 點提供的技能威力% */
+export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 5;
+/** § 20.6：INT 每 2 點提供的冷卻縮減% */
+export const INT_COOLDOWN_PERCENT_PER_2 = 1;
+/** § 21.4：冷卻縮減總上限 */
+export const COOLDOWN_REDUCTION_CAP = 50;
+
+/** INT 提供的冷卻縮減%（未套上限）：`有效INT / 2 × 1%` */
+export function getIntCooldownReduction(
+  char: Character,
+  activeEffects: ActiveEffect[] = [],
+  equippedGear: (EquipmentInstance | null)[] = [],
+): number {
+  const effINT = getEffectiveINT(getTotalAttributes(char, activeEffects, equippedGear).INT);
+  return (effINT / 2) * INT_COOLDOWN_PERCENT_PER_2;
+}
+
+/**
+ * 技能冷卻縮減總量：「減少冷卻時間」詞綴 + 冷卻縮減 buff + INT，加總後受 50% 上限。
+ */
 export function getSkillCooldownReduction(
+  char: Character,
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
 ): number {
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
-  return Math.min(bonuses.cooldown_reduction, 50);
+  const total = bonuses.cooldown_reduction + getIntCooldownReduction(char, activeEffects, equippedGear);
+  return Math.min(total, COOLDOWN_REDUCTION_CAP);
 }
 
 export function getWeaponAttackSuccess(weapon: EquipmentInstance | null): number {
@@ -387,7 +409,7 @@ export function calculateBasePhysicalDamage(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = []
 ): number {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effSTR = getEffectiveSTR(attrs.STR);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
@@ -416,7 +438,7 @@ export function calculatePlayerAttack(
   activeEffects: ActiveEffect[] = [],
   targetIdx: number = 0
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effSTR = getEffectiveSTR(attrs.STR);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
@@ -495,7 +517,7 @@ export function calculatePhysicalSkillHit(
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
@@ -570,13 +592,13 @@ export function calculateSkillAttack(
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // Base magic damage (including element counter bonus)
   // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻（固定值加算，不進 INT 倍率）
   const effINT = getEffectiveINT(attrs.INT);
-  const intBonus = Math.floor(skillPower * (effINT / 2 * 10) / 100);
+  const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
   const gearMagicAttack = getTotalMagicAttack(equippedGear);
   let damage = skillPower + intBonus + gearMagicAttack + getElementCounterBonus(skillElement, monster.element);
 
@@ -718,7 +740,7 @@ export function calculateMonsterAttack(
   activeEffects: ActiveEffect[] = [],
   monsterIdx: number = 0
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 

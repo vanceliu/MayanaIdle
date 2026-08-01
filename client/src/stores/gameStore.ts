@@ -1055,7 +1055,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const now = Date.now();
       const char = state.character;
       const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-      const cooldownReduction = getSkillCooldownReduction(allGear, state.activeEffects);
+      const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
 
       const ctx: PersistentScriptContext = {
         character: char,

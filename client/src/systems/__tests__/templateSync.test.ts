@@ -112,4 +112,26 @@ describe('templateSync - resolveEquipment slot handling', () => {
     const resolved = resolveEquipment(instance);
     expect(resolved.slot).toBe('chest');
   });
+
+  // 舊存檔的 instance 沒有 bonusAttributes 欄位，靠 TEMPLATE_FIELDS 從模板補齊，
+  // 因此不需要 DB migration。
+  it('resolves bonusAttributes from template even when the instance lacks it', async () => {
+    const template = await db.equipmentTemplates.where('name').equals('屠龍者').first();
+    expect(template).toBeDefined();
+    expect(template!.bonusAttributes).toEqual({ STR: 2 });
+
+    const instance = {
+      id: 201,
+      templateId: template!.id!,
+      quality: 0,
+      enhancement: 0,
+      affixes: [],
+      ownerId: 1,
+      equipped: true,
+    } as unknown as EquipmentInstance;
+
+    const resolved = resolveEquipment(instance);
+    expect(resolved.bonusAttributes).toEqual({ STR: 2 });
+    expect(resolved.bonusStats).toBe('力量+2');
+  });
 });

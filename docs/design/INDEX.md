@@ -64,6 +64,7 @@
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
+| DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文 |
 
 ### 依限制查找
 
@@ -128,6 +129,7 @@
 | `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
 | `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
 | `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
+| `44-dps-prediction.md` | DPS 預測報告 | Lv.75 滿裝 vs 百柱死神：屬性分配、BiS、擊殺時間、職業落差 |
 
 ### 怪物系統
 
@@ -179,7 +181,7 @@
 | `15-excluded.md` | 排除系統 | 不做的功能 |
 | `17-mvp-priority.md` | MVP 順序 | 五階段優先順序 |
 | `98-online-architecture.md` | 線上化架構設計 | 統一 tick、事件驅動、資料分層、Buffer 策略、Auto-scaling |
-| `99-ai-constraints.md` | AI 限制 | 59 條限制 + 待補規格 |
+| `99-ai-constraints.md` | AI 限制 | 65 條限制 + 待補規格 |
 
 ---
 
@@ -241,6 +243,11 @@
 26-spawn-pressure.md（合法生成地格）  09-dungeon.md（區域與 theme 對應）
        ↕                    ↕
 40-pixijs-migration.md（theme palette / 分層渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
+
+44-dps-prediction.md（唯讀報告，被以下任一文件的數值變更所影響，需重跑驗算腳本）
+  ← 21-combat-formula.md / 20-attributes.md / 04-character.md
+  ← 07-affix.md / 08-quality.md / 06-equipment.md
+  ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 41-arpg-combat.md
 
 39-batch-sell.md ←→ 06-equipment-acquire.md（shopTier / craftTier 定義）
        ↕

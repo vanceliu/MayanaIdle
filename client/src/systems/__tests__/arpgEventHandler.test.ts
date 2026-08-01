@@ -107,9 +107,10 @@ describe('processPlayerAttack', () => {
       },
     );
 
-    expect(result.damages[0].damage).toBe(47);
-    expect(result.mpRestored).toBe(47);
-    expect(useGameStore.getState().character!.mp).toBe(57);
-    expect(result.logs).toContainEqual({ text: '魔力奪取 回復 47 MP', type: 'player' });
+    // 魔力奪取威力 17（§ 23.5）+ INT 加成 floor(17 × (18/2 × 5%)) = 7 → 24
+    expect(result.damages[0].damage).toBe(24);
+    expect(result.mpRestored).toBe(24);
+    expect(useGameStore.getState().character!.mp).toBe(34);
+    expect(result.logs).toContainEqual({ text: '魔力奪取 回復 24 MP', type: 'player' });
   });
 });

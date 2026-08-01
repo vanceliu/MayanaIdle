@@ -138,7 +138,9 @@ export function getAffixCategoryForSlot(
   type: string,
 ): AffixCategory {
   if (type === 'shield') return 'shield';
-  // 手部欄位一律走武器池（魔導書維持既有行為，本次不更動其詞綴池）
+  // 魔導書是副手裝備，不是武器：走防具池，避免元素師／牧師拿到兩份武器詞綴
+  // （8 格攻擊詞綴 vs 其他職業 4 格，見 `44-dps-prediction.md` § 44.10）
+  if (type === 'magicBook') return 'armor';
   if (slot === 'rightHand' || slot === 'leftHand') return 'weapon';
   if (slot === 'necklace' || slot === 'ring1' || slot === 'ring2') return 'accessory';
   return 'armor';

@@ -4,7 +4,7 @@ import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveVIT, getEffectiveSPI } from '../models/character';
 
 export function getHpRegen(char: Character, inCombat: boolean, gear: (EquipmentInstance | null)[] = [], activeEffects: ActiveEffect[] = []): number {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, gear);
   const effVIT = getEffectiveVIT(attrs.VIT);
   const base = Math.floor(effVIT / 2);
   const equipBonus = gear.reduce((sum, g) => sum + (g?.hpRegen ?? 0), 0);
@@ -15,7 +15,7 @@ export function getHpRegen(char: Character, inCombat: boolean, gear: (EquipmentI
 }
 
 export function getMpRegen(char: Character, inCombat: boolean, gear: (EquipmentInstance | null)[] = [], activeEffects: ActiveEffect[] = []): number {
-  const attrs = getTotalAttributes(char, activeEffects);
+  const attrs = getTotalAttributes(char, activeEffects, gear);
   const effSPI = getEffectiveSPI(attrs.SPI);
   const base = Math.floor(effSPI / 2);
   const equipBonus = gear.reduce((sum, g) => sum + (g?.mpRegen ?? 0), 0);

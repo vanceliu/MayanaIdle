@@ -78,12 +78,13 @@ describe('§ 21.3 詞綴與 buff 合流', () => {
     expect(getCombatBonuses(gear, [buffFrom('element-boost')]).skill_elemental).toBe(30);
   });
 
-  it('冷卻縮減：詞綴 + 冷卻縮減 buff 加總，上限仍為 50%', () => {
+  it('冷卻縮減：詞綴 + 冷卻縮減 buff + 智力加總，上限仍為 50%', () => {
+    // character() 的 INT 20 → 有效 20 → 20 / 2 × 1% = 10%（§ 20.6）
     const gear = [gearWith([{ type: 'cooldown_reduction', tier: 4, value: 15 }])];
-    expect(getSkillCooldownReduction(gear, [buffFrom('cd-reduce')])).toBe(35);
+    expect(getSkillCooldownReduction(character(), gear, [buffFrom('cd-reduce')])).toBe(45);
 
     const heavy = [gearWith([{ type: 'cooldown_reduction', tier: 7, value: 40 }])];
-    expect(getSkillCooldownReduction(heavy, [buffFrom('cd-reduce')])).toBe(50);
+    expect(getSkillCooldownReduction(character(), heavy, [buffFrom('cd-reduce')])).toBe(50);
   });
 
   it('過期的 buff 不計入', () => {
@@ -149,10 +150,11 @@ describe('強化冷卻縮減（元素師 4，取代連鎖詠唱）', () => {
   });
 
   it('冷卻縮減效果生效且受 50% 上限', () => {
+    // character() 的 INT 20 貢獻 10%（§ 20.6）
     const gear = [gearWith([])];
-    expect(getSkillCooldownReduction(gear, [buffFrom('greater-cd-reduce')])).toBe(40);
+    expect(getSkillCooldownReduction(character(), gear, [buffFrom('greater-cd-reduce')])).toBe(50);
 
     const withAffix = [gearWith([{ type: 'cooldown_reduction', tier: 4, value: 15 }])];
-    expect(getSkillCooldownReduction(withAffix, [buffFrom('greater-cd-reduce')])).toBe(50);
+    expect(getSkillCooldownReduction(character(), withAffix, [buffFrom('greater-cd-reduce')])).toBe(50);
   });
 });

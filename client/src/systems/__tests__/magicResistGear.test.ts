@@ -30,6 +30,8 @@ describe('飾品詞綴分類（§ 7.6）', () => {
     expect(getAffixCategoryForSlot('belt', 'armor')).toBe('armor');
     expect(getAffixCategoryForSlot('leftHand', 'shield')).toBe('shield');
     expect(getAffixCategoryForSlot('rightHand', 'sword')).toBe('weapon');
+    // 魔導書是副手裝備，走防具池（§ 7.6）
+    expect(getAffixCategoryForSlot('leftHand', 'magicBook')).toBe('armor');
   });
 
   it('魔抗詞綴只出現在飾品與盾牌', () => {
