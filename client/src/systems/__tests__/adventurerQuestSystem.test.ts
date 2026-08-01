@@ -422,4 +422,40 @@ describe('adventurerQuestSystem', () => {
       throw new Error('No crafting-material reward found after 200 iterations');
     });
   });
+
+  describe('獎勵倍率（§ 36.3 / § 36.9 步驟 2f）', () => {
+    // 等階只影響獎勵「種類」的權重（§ 36.5.2），不得影響數量倍率。
+    // 迴歸：原實作對 US 等階額外乘 10，且與 BOSS ×2 互斥，兩者皆無文件依據。
+    function goldAmounts(rank: GuildProgress['rank'], bossOnly: boolean): number[] {
+      const out: number[] = [];
+      for (let i = 0; i < 400; i++) {
+        for (const q of generateQuestList('S', rank)) {
+          const isBoss = q.type === 'errandboss' || q.type === 'collectboss';
+          if (q.reward.type === 'gold' && isBoss === bossOnly) {
+            // 還原基準值：金幣獎勵 = 基準值 × 2
+            out.push(q.reward.amount / (2 * (isBoss ? 2 : 1)));
+          }
+        }
+      }
+      return out;
+    }
+
+    it('US 等階的一般任務金幣與 S 等階同區間（無額外倍率）', () => {
+      const s = goldAmounts('S', false);
+      const us = goldAmounts('US', false);
+      expect(s.length).toBeGreaterThan(0);
+      expect(us.length).toBeGreaterThan(0);
+      expect(Math.max(...us)).toBeLessThanOrEqual(Math.max(...s) * 1.05);
+    });
+
+    it('US 等階的 BOSS 任務仍享有且僅有 ×2', () => {
+      const us = goldAmounts('US', true);
+      expect(us.length).toBeGreaterThan(0);
+      // 還原後應等於 avgGold × count × 3，S 級 BOSS avgGold 7000~9000、count 1~3
+      for (const base of us) {
+        expect(base).toBeGreaterThanOrEqual(7000 * 1 * 3);
+        expect(base).toBeLessThanOrEqual(9000 * 3 * 3);
+      }
+    });
+  });
 });

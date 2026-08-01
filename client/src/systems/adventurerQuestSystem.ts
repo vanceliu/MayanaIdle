@@ -227,7 +227,8 @@ function buildQuest(
   const baseValue = isBossQuest ? avgGold * targetCount * 3 : avgGold * targetCount;
   const rewardWeights = REWARD_WEIGHTS[guildRank];
   const rewardType = weightedPick(rewardWeights).type;
-  const rewardMultiplier = guildRank === 'US' ? 10 : (isBossQuest ? 2 : 1);
+  // § 36.9 步驟 2f：BOSS 任務獎勵 ×2。等階只影響獎勵「種類」的權重（§ 36.5.2），不影響數量倍率。
+  const rewardMultiplier = isBossQuest ? 2 : 1;
   const reward = calculateReward(rewardType, baseValue * rewardMultiplier, difficulty);
   const baseContribution = CONTRIBUTION_POINTS[difficulty][type];
   const areaBonus = Math.floor(avgGold / 10);
