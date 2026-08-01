@@ -62,7 +62,7 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 55. 背包不可做成獨立彈窗，必須固定在右側面板
 56. 所有物品進入背包的入口都必須做容量檢查（掉落/購買/製作/取出/脫裝/獎勵）
 57. 藥水冷卻為全域共用：使用任一藥水 → 所有藥水進入該藥水的冷卻時間
-58. 背包僅透過格子數量上限（100 格）限制，負重懲罰已實作（負重條僅資訊顯示）
+58. 背包僅透過格子數量上限（100 格）限制，負重懲罰**未實作**（負重條僅資訊顯示，見 `35-inventory-constraints.md` § 35.2）
 59. 背包詳細限制規格見 `35-inventory-constraints.md`
 60. 武器的「額外攻擊」(extraAttack) 是加算至武器基傷的固定數值，不是多段攻擊次數。本遊戲無多段攻擊機制，每個攻擊 tick 固定攻擊 1 次
 
@@ -187,6 +187,48 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 - `09-dungeon.md` § 9.11 區域環境主題對應
 - `INDEX.md` 地圖控制系統列的章節指向
 - 若生成腳本成為長期工具，於 `16-tech-frontend-architecture.md` 補上 `client/scripts/` 目錄說明
+
+---
+
+## 99.4 進行中：設計文件 vs 實作稽核（階段 1 修補）
+
+稽核報告見 `AUDIT-REPORT.md`。本區塊只涵蓋**階段 1（角色 Status / 屬性）**已確認的修補項。
+
+### 使用者已確認的決策（不可再自行更動）
+
+1. **處理原則**：只修「讓文件記錄既有實作」或「讓程式對齊既有文件」的項目，不自創任何新數值
+2. **P1-10 魔法抗性**：不補怪物魔法攻擊，改在 `20-attributes.md` § 20.3 標註「待實作」
+3. **P1-11 CHA 寵物**：維持現狀，文件本身已標「待定」，不動
+4. **P1-04 既有角色**：已累積的 `unspentAttributePoints` **保留不清零**，只停止繼續發放
+
+### Step 1：程式修正 ✅ 完成
+
+- [x] P1-04 `systems/levelUp.ts`：六屬（base+bonus）全達 `ATTRIBUTE_CAP` 時不再發放配點
+- [x] P1-03 `stores/gameStore.ts`：`createCharacter` 改用 `INITIAL_HP` / `INITIAL_MP` 常數，消除寫死的 30/10
+- [x] `systems/__tests__/levelUp.test.ts` 補測試（全滿不發點、未滿仍發點、初始常數）
+
+### Step 2：文件修補 ✅ 完成
+
+- [x] P1-02 `04-character.md` 新增 § 4.9 等級與經驗（補上既有公式 `floor(100 × 1.15^(Lv-1))`）
+- [x] P1-03 `04-character.md` § 4.3 補初始 HP 30 / MP 10
+- [x] P1-01 `20-attributes.md` § 20.7、`29-regen.md` § 29.1/29.2/29.3、`34-ui-guidelines.md`
+      加註「暫停用，見 `35-inventory-constraints.md` § 35.2」
+- [x] P1-01 本文件第 58 條原寫「負重懲罰已實作」與括號內「僅資訊顯示」自相矛盾，改為「未實作」
+- [x] P1-09 `20-attributes.md` § 20.3 負重欄對齊 § 20.7（依有效值）
+- [x] P1-10 `20-attributes.md` § 20.3 魔法抗性標註「待實作」
+- [x] P1-05 `29-regen.md` 補裝備 `hpRegen`/`mpRegen` 加成與「戰鬥減半作用於含裝備總量」
+- [x] P1-06 `29-regen.md` 補 buff 影響回復量
+- [x] P1-07 `20-attributes.md` § 20.4/20.5 補升級回滿 HP/MP
+- [x] P1-08 `20-attributes.md` § 20.4/20.5 補低屬性保底 clamp
+- [x] P1-12 `20-attributes.md` § 20.2 補「HP/MP 成長使用原始值，不套用門檻規則」
+- [x] `INDEX.md` 補經驗曲線連動關係
+
+### Step 3：驗證 ✅ 完成
+
+- [x] `npm run test` 全綠
+- [x] `AUDIT-REPORT.md` 階段 1 各項標記為已處理
+
+**階段 2~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
 
 ---
 

@@ -217,6 +217,10 @@
                                                         ↕
                                                   06-equipment-acquire.md（區域素材→製作配方）
 
+04-character.md § 4.9（經驗曲線）←→ 28-monster-stats.md（怪物經驗值全表依此推算）
+       ↕
+09-dungeon.md（等級分佈）←→ 99-ai-constraints.md 第 26 條
+
 19-account-character.md ←→ 04-character.md（職業/初始配置）
        ↕
 18-data-schema.md（User/Character 關係）←→ 13-town.md（個人倉庫共用）

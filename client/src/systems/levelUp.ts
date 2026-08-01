@@ -1,5 +1,12 @@
-import type { Character } from '../models/character';
-import { getTotalAttributes, LEVELUP_ATTRIBUTE_START_LEVEL } from '../models/character';
+import type { Attributes, Character } from '../models/character';
+import { ATTRIBUTE_CAP, getTotalAttributes, LEVELUP_ATTRIBUTE_START_LEVEL } from '../models/character';
+
+const ATTR_KEYS: (keyof Attributes)[] = ['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'];
+
+/** 六項屬性是否全數達上限（§ 20.9：全滿後升級不再獲得配點） */
+function isAllAttributesCapped(attrs: Attributes): boolean {
+  return ATTR_KEYS.every(key => attrs[key] >= ATTRIBUTE_CAP);
+}
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -32,8 +39,8 @@ export function tryLevelUp(char: Character): Character {
   updated.maxMp += mpGain;
   updated.mp = updated.maxMp; // Full restore on level up
 
-  // Attribute point at level 51+
-  if (updated.level > LEVELUP_ATTRIBUTE_START_LEVEL) {
+  // Attribute point at level 51+ (§ 20.9: stop once all six attributes are capped)
+  if (updated.level > LEVELUP_ATTRIBUTE_START_LEVEL && !isAllAttributesCapped(attrs)) {
     updated.unspentAttributePoints = (updated.unspentAttributePoints ?? 0) + 1;
   }
 

@@ -113,6 +113,62 @@ describe('levelUp system', () => {
       expect(result.maxMp).toBeGreaterThan(char.maxMp);
     });
 
+    it('should grant 1 attribute point per level above 50', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const char = createTestCharacter({ level: 50, exp: 999999999, expToNext: 1, unspentAttributePoints: 0 });
+      const result = tryLevelUp(char);
+
+      expect(result.level).toBeGreaterThan(50);
+      expect(result.unspentAttributePoints).toBe(result.level - 50);
+    });
+
+    it('should stop granting attribute points once all six attributes are capped (§ 20.9)', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const capped = { STR: 35, AGI: 35, VIT: 35, SPI: 35, INT: 35, CHA: 35 };
+      const char = createTestCharacter({
+        level: 51,
+        exp: 999999999,
+        expToNext: 1,
+        unspentAttributePoints: 0,
+        baseAttributes: capped,
+      });
+      const result = tryLevelUp(char);
+
+      expect(result.level).toBeGreaterThan(51);
+      expect(result.unspentAttributePoints).toBe(0);
+    });
+
+    it('should still grant points when caps are reached via bonusAttributes but one attribute is short', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const char = createTestCharacter({
+        level: 51,
+        exp: 999999999,
+        expToNext: 1,
+        unspentAttributePoints: 0,
+        baseAttributes: { STR: 30, AGI: 35, VIT: 35, SPI: 35, INT: 35, CHA: 34 },
+        bonusAttributes: { STR: 5, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+      });
+      const result = tryLevelUp(char);
+
+      // CHA is 34 (< 35), so points keep coming
+      expect(result.unspentAttributePoints).toBe(result.level - 51);
+    });
+
+    it('should preserve already-accumulated points when all attributes are capped', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const capped = { STR: 35, AGI: 35, VIT: 35, SPI: 35, INT: 35, CHA: 35 };
+      const char = createTestCharacter({
+        level: 51,
+        exp: 999999999,
+        expToNext: 1,
+        unspentAttributePoints: 7,
+        baseAttributes: capped,
+      });
+      const result = tryLevelUp(char);
+
+      expect(result.unspentAttributePoints).toBe(7);
+    });
+
     it('should handle multi-level ups recursively', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       // Give enough exp for 2 levels: 100 + 115 = 215

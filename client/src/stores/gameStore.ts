@@ -11,7 +11,7 @@ import type { ActiveEffect } from '../models/effect';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
 import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
-import { getExpToNextLevel, addExp } from '../systems/levelUp';
+import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { getSkillCooldownReduction, getAffixBonusesFromGear } from '../systems/combat';
@@ -511,10 +511,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       level: 1,
       exp: 0,
       expToNext: getExpToNextLevel(1),
-      hp: 30,
-      maxHp: 30,
-      mp: 10,
-      maxMp: 10,
+      hp: INITIAL_HP,
+      maxHp: INITIAL_HP,
+      mp: INITIAL_MP,
+      maxMp: INITIAL_MP,
       baseAttributes: { ...base },
       bonusAttributes: bonusAttrs,
       unspentAttributePoints: 0,

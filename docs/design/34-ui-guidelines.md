@@ -135,7 +135,7 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 - 當前負重 = 所有身上裝備 weight + 背包裝備 weight + 背包道具（重量×數量）+ 藥水（重量×數量）
 - 顯示格式：`{current}/{max} ({percent}%)`
 - 正常：灰色漸層 `#6B7280 → #9CA3AF`
-- 超重：紅色漸層（同 HP bar），表示角色不可攻擊/回復
+- 超重：紅色漸層（同 HP bar）——**僅視覺提示，無遊戲懲罰**（見 `35-inventory-constraints.md` § 35.2）
 - 防禦值顯示在負重條右側，使用 `var(--accent-info)` 藍綠色
 
 ### 詳細狀態面板（CharacterStats）
