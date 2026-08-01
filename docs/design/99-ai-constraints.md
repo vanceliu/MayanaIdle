@@ -228,7 +228,39 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 - [x] `npm run test` 全綠
 - [x] `AUDIT-REPORT.md` 階段 1 各項標記為已處理
 
-**階段 2~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
+---
+
+## 99.5 進行中：設計文件 vs 實作稽核（階段 2-1 武器修補）
+
+### 使用者已確認的決策（不可再自行更動）
+
+1. **以實作為準**：`44c8f34`「武器nerf」只改了文件、seed 從未套用。使用者決定**撤銷文件的 nerf**，
+   把 12 份武器文件的數值回寫成 `equipmentSeeds.ts` 的實際值。不得再把 nerf 值改回文件。
+2. **`33-class-weapon-cp.md` 已刪除**：三條分析前提全錯（AGI/3、65% 減傷、800ms）、
+   傷害數字停在 nerf 前、且 § 189 對「額外攻擊」的定義違反第 60 條。整份過時，不重寫。
+
+### Step 1：武器文件回寫 ✅ 完成
+
+- [x] 12 份 `06-equipment-weapons-*.md` 共 133 列，依 seed 回寫全部數值欄位
+- [x] 保留文件獨有的「#」與「備註」欄；依各檔標示的排序依據（小怪／大怪／防禦力）重排
+- [x] `06-equipment-acquire.md` 雙刀 5 列 + 鋼爪 5 列的小怪傷害與傷害差修正為 seed 值
+- [x] 驗證：133 把武器逐欄與 seed 完全一致
+
+### Step 2：實作面資料補齊 ✅ 完成
+
+- [x] `equipmentSeeds.ts` 木盾／鐵盾／騎士盾 補上缺漏的 `material`（wood/iron/iron）
+      —— 文件本來就有值、seed 漏填，製作盾（龍鱗盾等）都有；`bulkPut` + `resolveEquipment` 會自動生效，無需 DB migration
+
+### Step 3：刪除過時文件 ✅ 完成
+
+- [x] 刪除 `docs/design/33-class-weapon-cp.md`
+- [x] `INDEX.md` 移除 2 處清單引用，連動關係圖改指向 `28-monster-stats.md`
+
+### Step 4：驗證 ✅ 完成
+
+- [x] `npm run test` 全綠、`npx tsc --noEmit` 無錯誤
+
+**階段 2-2~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
 
 ---
 

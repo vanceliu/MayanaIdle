@@ -23,7 +23,6 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
-| 各職業武器 CP 值分析 | `33-class-weapon-cp.md` | 全文 |
 | 戰鬥公式（攻擊/防禦/命中/迴避） | `21-combat-formula.md` | 全文 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
@@ -121,7 +120,6 @@
 | `06-equipment-armor.md` | 防具模板 | 全防具清單、屬性 |
 | `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
 | `08-quality.md` | 品質系統 | 0%~20%、品質石、影響範圍 |
-| `33-class-weapon-cp.md` | 職業武器 CP 值 | 各職業武器選擇分析、性價比排行 |
 
 ### 戰鬥系統
 
@@ -195,7 +193,7 @@
        ↕                                                    ↕
 06-equipment-acquire.md                              30-items.md（材料/卷軸）
        ↕
-06-equipment-weapons.md / 06-equipment-armor.md ←→ 33-class-weapon-cp.md
+06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md（武器強度 vs 怪物防禦）
 
 03-combat.md ←→ 04-character.md ←→ 05-skill.md ←→ 20-attributes.md
        ↕                                    ↕
