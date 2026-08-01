@@ -41,11 +41,14 @@ describe('skill model', () => {
       });
     });
 
-    it('aoe skills should have aoeMin and aoeMax', () => {
+    it('aoe skills should have aoeCenter and aoeRadius', () => {
       const aoeSkills = SKILL_CATALOG.filter(s => s.target === 'aoe');
       aoeSkills.forEach(skill => {
-        expect(skill.aoeMin).toBeGreaterThan(0);
-        expect(skill.aoeMax).toBeGreaterThanOrEqual(skill.aoeMin!);
+        expect(skill.aoeCenter === 'self' || skill.aoeCenter === 'target').toBe(true);
+        expect(skill.aoeRadius).toBeGreaterThan(0);
+        // target 模式必須有目標上限；self 模式無上限（§ 3.4）
+        if (skill.aoeCenter === 'target') expect(skill.maxTargets).toBeGreaterThan(0);
+        else expect(skill.maxTargets).toBeUndefined();
       });
     });
 

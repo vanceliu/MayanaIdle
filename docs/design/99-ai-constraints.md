@@ -297,7 +297,64 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 - [x] `npm run test` 全綠、`npx tsc --noEmit` 無錯誤
 
-**階段 3~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
+---
+
+## 99.7 進行中：設計文件 vs 實作稽核（階段 3 技能修補）
+
+### 使用者已確認的決策（不可再自行更動）
+
+1. **P4-01 復仇之刃改為 buff 形式**：施放時依**當前已損失血量**計算加成
+   `加成% = min(50, (1 - hp/maxHp) × 100)`，施加持續 **10 秒**的攻擊力增益。取代原「從戰鬥開始累計受傷、上限 +100%」。
+2. **P4-02 背刺改為 buff 形式**：取消「目標正在攻擊其他對象則 ×2」的條件判定，
+   改為施放後給自己持續 **5 秒**的「攻擊力 ×1.5」（+50%）buff。
+3. **P4-06 元素增幅以實作為準**：維持「所有元素傷害 +25%」，文件的「指定一種元素」改掉。
+4. **P4-07 AOE 以 `41-arpg-combat.md` 為準**：實作改用 `aoeCenter` / `aoeRadius` / `maxTargets`，
+   `22-basic-magic.md` 的「命中 N~M 體」改寫為 41 的語彙。
+5. **P4-03 / P4-04 依文件補上**：極冰封印補防禦 -20%（10s）debuff；神聖領域補免疫負面狀態。
+6. **P4-05 / P4-08 以實作為準改文件**：元素風暴維持火屬性；挑釁怒吼維持 `atk-down`（與詛咒同 category）。
+
+### Step 1：AOE 欄位重構（P4-07） ✅ 完成
+
+- [x] `Skill` 介面移除 `aoeMin` / `aoeMax`，改為 `aoeCenter` / `aoeRadius` / `maxTargets`
+- [x] 21 個 AOE 技能定義轉換（`aoeRadius = 原 aoeMax`、`maxTargets = 原 aoeMax`、`aoeMin<=1 → aoeCenter:'self'`）
+- [x] 龍捲風依 § 3.4 範例表改為 `aoeRadius 4 / maxTargets 6`（唯一行為變更）
+- [x] `arpgEngine.ts` 目標選取改讀新欄位
+- [x] `SkillPanel.tsx` / `wiki/SkillsPage.tsx` 顯示改為「半徑 N 格 / 最多 M 隻」
+- [x] 既有測試同步
+
+### Step 2：技能效果補實作（P4-01~P4-04） ✅ 完成
+
+- [x] `Skill` 新增 `selfBuff`（攻擊技能可附帶自身 buff），支援 `scaleByMissingHp`
+- [x] 復仇之刃 / 背刺 套用 selfBuff，於傷害結算**前**施加
+- [x] `combat.ts` 的 `BUFFABLE_AFFIX_STATS` 加入 `attack_power`（原本 buff 來源的攻擊力% 完全失效）
+- [x] 極冰封印補 `applyDebuff`（defense -20%、10s）
+- [x] 神聖領域補免疫負面：`getDebuffImmunityRate` 加入 buff 來源判定
+- [x] 補測試
+
+### Step 3：文件修補 ✅ 完成
+
+- [x] `23-class-magic.md` 復仇之刃 / 背刺 / 元素增幅 / 元素風暴 依實作改寫
+- [x] `22-basic-magic.md` 全部 AOE 技能改為 41 的語彙；補冰霧／冰環數值（P4-09）
+- [x] `24-buff-debuff.md` § 24.3.1 補 category（P4-08、P4-10）
+- [x] `42-element-system.md` § 42.3 補 miss 色與屬性傷害定義（P4-14）
+- [x] `models/monster.ts` 註解 30 秒 → 10 秒（P4-13）
+- [x] § 23.2 / § 23.8 移除不存在的「嘲諷」「復活他人」（P4-15）
+
+### Step 4：驗證 ✅ 完成
+
+- [x] `npm run test` 全綠、`npx tsc --noEmit` 無錯誤
+
+7. **P4-16 職業技能的「物理傷害」是傷害類型，不是公式**：盾擊、裂傷斬、挑釁怒吼、復仇之刃、背刺
+   一律走技能公式（吃 INT），**不得改為物理公式**。「物理」僅代表無元素屬性、顯示淺灰色。
+   唯一走物理普攻公式的技能是三連射（`hits` 標記）。定義見 `23-class-magic.md` § 23.1.1。
+
+### Step 5：P4-16 文件釐清 ✅ 完成
+
+- [x] `23-class-magic.md` 新增 § 23.1.1「物理傷害」的定義
+- [x] `21-combat-formula.md` § 21.4 註明適用範圍
+- [x] `24-buff-debuff.md` § 24.4.5 虛弱作用範圍改為「依物理公式計算的傷害」，並釐清裂傷斬 DoT 的例外
+
+**階段 4~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
 
 ---
 

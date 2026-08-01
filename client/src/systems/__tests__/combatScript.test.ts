@@ -67,8 +67,9 @@ function createFireball(): Skill {
     power: 25,
     mpCost: 15,
     cooldown: 6000,
-    aoeMin: 2,
-    aoeMax: 3,
+    aoeCenter: 'target',
+    aoeRadius: 3,
+    maxTargets: 3,
     lastUsedAt: 0,
   };
 }

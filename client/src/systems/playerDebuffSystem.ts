@@ -34,10 +34,25 @@ export function getEquippedSpecialAffixes(equippedGear: (EquipmentInstance | nul
 export function getDebuffImmunityRate(
   type: PlayerDebuffType,
   specials: Set<SpecialAffixType>,
+  activeEffects: ActiveEffect[] = [],
+  now: number = Date.now(),
 ): number {
+  // 生效中的「免疫負面狀態」buff（神聖領域，§ 23.6）對所有 debuff 類型提供 100% 免疫
+  if (hasDebuffImmunityBuff(activeEffects, now)) return 1;
   const affix = IMMUNITY_AFFIX_BY_DEBUFF[type];
   if (!affix) return 0;
   return specials.has(affix) ? 1 : 0;
+}
+
+/** buff 來源的全類型 debuff 免疫（`immuneDebuff` 標記），目前唯一來源為神聖領域 */
+export function hasDebuffImmunityBuff(
+  activeEffects: ActiveEffect[],
+  now: number = Date.now(),
+): boolean {
+  return activeEffects.some(
+    e => e.type === 'buff' && e.target === 'player' && e.immuneDebuff === true
+      && now < e.startTime + e.duration
+  );
 }
 
 export function hasStunResist(specials: Set<SpecialAffixType>): boolean {
@@ -146,7 +161,7 @@ export function rollMonsterDebuff(
     const def = PLAYER_DEBUFF_DEFS[ability.type];
     if (!def) continue;
 
-    const immunity = getDebuffImmunityRate(ability.type, specials);
+    const immunity = getDebuffImmunityRate(ability.type, specials, activeEffects, now);
     const finalChance = ability.chance * (1 - immunity);
     if (finalChance <= 0) continue;
 

@@ -239,7 +239,7 @@ export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): num
  * 可由 buff 提供的詞綴類加成。
  * 這些 stat 原本只從裝備詞綴聚合，導致同名的技能 buff 完全失效（見 99-ai-constraints § 99.3 Step 1）。
  */
-const BUFFABLE_AFFIX_STATS = ['crit_rate', 'crit_damage', 'skill_elemental', 'cooldown_reduction'] as const;
+const BUFFABLE_AFFIX_STATS = ['attack_power', 'crit_rate', 'crit_damage', 'skill_elemental', 'cooldown_reduction'] as const;
 
 function getBuffPercentBonus(activeEffects: ActiveEffect[], stat: string): number {
   const now = Date.now();

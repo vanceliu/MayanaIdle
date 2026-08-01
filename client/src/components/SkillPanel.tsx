@@ -215,7 +215,7 @@ export function SkillPanel() {
           <div className="skill-tooltip-stat">MP: {tooltip.skill.mpCost}</div>
           <div className="skill-tooltip-stat">冷卻: {tooltip.skill.cooldown / 1000}s</div>
           {tooltip.skill.target === 'aoe' && (
-            <div className="skill-tooltip-stat">範圍: {tooltip.skill.aoeMin}~{tooltip.skill.aoeMax} 目標</div>
+            <div className="skill-tooltip-stat">範圍: 半徑 {tooltip.skill.aoeRadius} 格{tooltip.skill.maxTargets ? ` / 最多 ${tooltip.skill.maxTargets} 隻` : '（無上限）'}</div>
           )}
           <div className={`skill-tooltip-status ${tooltip.learned ? 'learned' : 'locked'}`}>
             {tooltip.learned ? '已習得' : '未習得'}

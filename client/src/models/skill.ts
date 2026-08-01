@@ -19,6 +19,25 @@ export interface SkillDebuffDef {
   tags: string[];
 }
 
+/**
+ * 攻擊技能附帶的「對自身 buff」。
+ * 於傷害結算前施加，因此本次攻擊也吃得到加成。
+ */
+export interface SkillSelfBuff {
+  category: string;
+  name: string;
+  description: string;
+  /** 持續時間（ms） */
+  duration: number;
+  /** 固定加成 */
+  modifiers?: StatModifier[];
+  /**
+   * 依施放當下的「已損失血量比率」動態決定加成（§ 23.3 復仇之刃）。
+   * 加成% = min(maxPercent, (1 - hp/maxHp) × 100)
+   */
+  scaleByMissingHp?: { stat: string; maxPercent: number };
+}
+
 export interface Skill {
   id: string;
   name: string;
@@ -34,8 +53,12 @@ export interface Skill {
   cooldown: number; // ms
   lastUsedAt: number;
   range?: number; // 施放距離（格數）。0=對自身、1.5=近戰、>1.5=遠程
-  aoeMin?: number;
-  aoeMax?: number;
+  /** AOE 圓心模式（41-arpg-combat.md § 3.4）。target=以主目標為圓心，self=以角色為圓心 */
+  aoeCenter?: 'target' | 'self';
+  /** AOE 搜索半徑（格數）。undefined = 單體 */
+  aoeRadius?: number;
+  /** AOE 最大目標數（含主目標）。self 模式無上限，此欄留空 */
+  maxTargets?: number;
   description?: string;
   buffEffect?: string;
   buffDuration?: number; // ms
@@ -46,9 +69,12 @@ export interface Skill {
   hotAmount?: number; // heal over time per second
   ignoreDefensePercent?: number; // 無視目標防禦的百分比（0~100）
   invincible?: boolean;
+  /** buff 生效期間免疫所有負面狀態（§ 23.6 神聖領域） */
+  immuneDebuff?: boolean;
   requiredWeaponType?: string;
   applyDebuff?: SkillDebuffDef;
   onHitDebuff?: SkillDebuffDef;
+  selfBuff?: SkillSelfBuff;
 }
 
 export const WEAPON_TYPE_LABELS: Record<string, string> = {
@@ -74,20 +100,20 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   { id: 'holy-bolt', name: '聖光彈', level: 2, element: 'light', type: 'attack', target: 'single', power: 20, mpCost: 10, cooldown: 4000, range: 10 },
   // Level 3
   { id: 'rock-fall', name: '落石', level: 3, element: 'earth', type: 'attack', target: 'single', power: 25, mpCost: 15, cooldown: 6000, range: 12 },
-  { id: 'fireball', name: '火球', level: 3, element: 'fire', type: 'attack', target: 'aoe', power: 25, mpCost: 15, cooldown: 6000, range: 12, aoeMin: 2, aoeMax: 3 },
-  { id: 'ice-fog', name: '冰霧', level: 3, element: 'ice', type: 'attack', target: 'aoe', power: 15, mpCost: 14, cooldown: 6000, range: 12, aoeMin: 2, aoeMax: 3, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
+  { id: 'fireball', name: '火球', level: 3, element: 'fire', type: 'attack', target: 'aoe', power: 25, mpCost: 15, cooldown: 6000, range: 12, aoeCenter: 'target', aoeRadius: 3, maxTargets: 3 },
+  { id: 'ice-fog', name: '冰霧', level: 3, element: 'ice', type: 'attack', target: 'aoe', power: 15, mpCost: 14, cooldown: 6000, range: 12, aoeCenter: 'target', aoeRadius: 3, maxTargets: 3, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'mid-heal', name: '中治癒', level: 3, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 70, mpCost: 25, cooldown: 8000, range: 0 },
   { id: 'magic-armor', name: '魔法盔甲', level: 3, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 3000, range: 0, buffEffect: '防禦+5', buffDuration: 600000, buffModifiers: [{ stat: 'defense', value: 5, isPercent: false }], buffCategory: 'defense-buff' },
   // Level 4
-  { id: 'storm', name: '風暴', level: 4, element: 'wind', type: 'attack', target: 'aoe', power: 35, mpCost: 20, cooldown: 5000, range: 12, aoeMin: 3, aoeMax: 4 },
-  { id: 'inferno', name: '炎爆', level: 4, element: 'fire', type: 'attack', target: 'aoe', power: 30, mpCost: 22, cooldown: 7000, range: 12, aoeMin: 3, aoeMax: 4 },
+  { id: 'storm', name: '風暴', level: 4, element: 'wind', type: 'attack', target: 'aoe', power: 35, mpCost: 20, cooldown: 5000, range: 12, aoeCenter: 'target', aoeRadius: 4, maxTargets: 4 },
+  { id: 'inferno', name: '炎爆', level: 4, element: 'fire', type: 'attack', target: 'aoe', power: 30, mpCost: 22, cooldown: 7000, range: 12, aoeCenter: 'target', aoeRadius: 4, maxTargets: 4 },
   { id: 'ice-lance', name: '冰槍', level: 4, element: 'ice', type: 'attack', target: 'single', power: 38, mpCost: 20, cooldown: 5000, range: 12 },
   { id: 'agility-boost', name: '敏捷提升', level: 4, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 30, cooldown: 3000, range: 0, buffEffect: '敏捷+5', buffDuration: 600000, buffModifiers: [{ stat: 'agility', value: 5, isPercent: false }] },
   { id: 'vampire-kiss', name: '吸血鬼之吻', level: 4, element: 'dark', type: 'attack', target: 'single', power: 30, mpCost: 20, cooldown: 3000, range: 1.5, lifestealPercent: 100, description: '造成傷害，並回復等同最終傷害的HP' },
   // Level 5
-  { id: 'gale-storm', name: '狂風暴', level: 5, element: 'wind', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },
-  { id: 'hellfire', name: '業火', level: 5, element: 'fire', type: 'attack', target: 'aoe', power: 40, mpCost: 35, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5 },
-  { id: 'ice-ring', name: '冰環', level: 5, element: 'ice', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeMin: 3, aoeMax: 5, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
+  { id: 'gale-storm', name: '狂風暴', level: 5, element: 'wind', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeCenter: 'target', aoeRadius: 5, maxTargets: 5 },
+  { id: 'hellfire', name: '業火', level: 5, element: 'fire', type: 'attack', target: 'aoe', power: 40, mpCost: 35, cooldown: 8000, range: 12, aoeCenter: 'target', aoeRadius: 5, maxTargets: 5 },
+  { id: 'ice-ring', name: '冰環', level: 5, element: 'ice', type: 'attack', target: 'aoe', power: 35, mpCost: 30, cooldown: 8000, range: 12, aoeCenter: 'target', aoeRadius: 5, maxTargets: 5, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'great-heal', name: '大治癒', level: 5, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 150, mpCost: 40, cooldown: 10000, range: 0 },
   { id: 'holy-light', name: '聖光術', level: 5, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 3000, range: 0, buffEffect: '淨化負面狀態', buffDuration: 0, cleanse: true },
   // Level 6
@@ -97,27 +123,27 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   { id: 'haste', name: '加速術', level: 6, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 30000, range: 0, buffEffect: '攻速+33%', buffDuration: 600000, buffModifiers: [{ stat: 'attack_speed', value: 33, isPercent: true }], buffCategory: 'speed' },
   { id: 'bless-magic-weapon', name: '祝福魔法武器', level: 6, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 40, cooldown: 12000, range: 0, buffEffect: '命中+10，額外攻擊+5', buffDuration: 600000, buffModifiers: [{ stat: 'hit', value: 10, isPercent: false }, { stat: 'extra_attack', value: 5, isPercent: false }], buffCategory: 'weapon-bless' },
   // Level 7
-  { id: 'tornado', name: '龍捲風', level: 7, element: 'wind', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, range: 12, aoeMin: 4, aoeMax: 6 },
-  { id: 'meteor-shot', name: '隕石彈', level: 7, element: 'fire', type: 'attack', target: 'aoe', power: 60, mpCost: 50, cooldown: 10000, range: 12, aoeMin: 4, aoeMax: 6 },
+  { id: 'tornado', name: '龍捲風', level: 7, element: 'wind', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 4, maxTargets: 6 },
+  { id: 'meteor-shot', name: '隕石彈', level: 7, element: 'fire', type: 'attack', target: 'aoe', power: 60, mpCost: 50, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6 },
   { id: 'curse', name: '詛咒', level: 7, element: 'dark', type: 'attack', target: 'single', power: 0, mpCost: 35, cooldown: 30000, range: 10, applyDebuff: { category: 'atk-down', name: '詛咒', description: '攻擊力降低20%', duration: 10000, modifiers: [{ stat: 'attack', value: -20, isPercent: true }], tags: ['curse'] } },
   { id: 'armor-break', name: '護甲崩壞', level: 7, element: 'earth', type: 'attack', target: 'single', power: 0, mpCost: 40, cooldown: 20000, range: 10, applyDebuff: { category: 'defense-down', name: '護甲崩壞', description: '防禦值降低15%', duration: 15000, modifiers: [{ stat: 'defense', value: -15, isPercent: true }], tags: ['armor-break'] } },
-  { id: 'shadow-burst', name: '暗影爆發', level: 7, element: 'dark', type: 'attack', target: 'aoe', power: 60, mpCost: 50, cooldown: 10000, range: 12, aoeMin: 4, aoeMax: 6 },
+  { id: 'shadow-burst', name: '暗影爆發', level: 7, element: 'dark', type: 'attack', target: 'aoe', power: 60, mpCost: 50, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6 },
   // Level 8
-  { id: 'chain-lightning', name: '閃電鎖鏈', level: 8, element: 'wind', type: 'attack', target: 'aoe', power: 50, mpCost: 55, cooldown: 10000, range: 12, aoeMin: 5, aoeMax: 7 },
-  { id: 'purgatory', name: '煉獄火', level: 8, element: 'fire', type: 'attack', target: 'aoe', power: 70, mpCost: 60, cooldown: 12000, range: 12, aoeMin: 5, aoeMax: 7 },
-  { id: 'blizzard', name: '冰暴', level: 8, element: 'ice', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, range: 12, aoeMin: 4, aoeMax: 6, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
+  { id: 'chain-lightning', name: '閃電鎖鏈', level: 8, element: 'wind', type: 'attack', target: 'aoe', power: 50, mpCost: 55, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 7, maxTargets: 7 },
+  { id: 'purgatory', name: '煉獄火', level: 8, element: 'fire', type: 'attack', target: 'aoe', power: 70, mpCost: 60, cooldown: 12000, range: 12, aoeCenter: 'target', aoeRadius: 7, maxTargets: 7 },
+  { id: 'blizzard', name: '冰暴', level: 8, element: 'ice', type: 'attack', target: 'aoe', power: 55, mpCost: 45, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'full-heal', name: '完全治癒', level: 8, element: 'none', type: 'heal', target: 'single', power: 0, healAmount: 500, mpCost: 80, cooldown: 15000, range: 0 },
   { id: 'greater-haste', name: '強化加速術', level: 8, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 60, cooldown: 100000, range: 0, buffEffect: '攻速+40%', buffDuration: 600000, buffModifiers: [{ stat: 'attack_speed', value: 40, isPercent: true }], buffCategory: 'speed' },
   // Level 9
   { id: 'greater-magic-armor', name: '高級魔法盔甲', level: 9, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 70, cooldown: 12000, range: 0, buffEffect: '防禦+10', buffDuration: 600000, buffModifiers: [{ stat: 'defense', value: 10, isPercent: false }], buffCategory: 'defense-buff' },
-  { id: 'meteor-shower', name: '流星雨', level: 9, element: 'fire', type: 'attack', target: 'aoe', power: 85, mpCost: 75, cooldown: 14000, range: 15, aoeMin: 6, aoeMax: 8 },
-  { id: 'blizzard-storm', name: '暴風雪', level: 9, element: 'ice', type: 'attack', target: 'aoe', power: 80, mpCost: 70, cooldown: 12000, range: 12, aoeMin: 6, aoeMax: 8, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
+  { id: 'meteor-shower', name: '流星雨', level: 9, element: 'fire', type: 'attack', target: 'aoe', power: 85, mpCost: 75, cooldown: 14000, range: 15, aoeCenter: 'target', aoeRadius: 8, maxTargets: 8 },
+  { id: 'blizzard-storm', name: '暴風雪', level: 9, element: 'ice', type: 'attack', target: 'aoe', power: 80, mpCost: 70, cooldown: 12000, range: 12, aoeCenter: 'target', aoeRadius: 8, maxTargets: 8, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
   { id: 'sanctuary', name: '聖域', level: 9, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 90, cooldown: 90000, range: 0, buffEffect: '減傷25%+每秒回血20', buffDuration: 10000, buffModifiers: [{ stat: 'damageReduction', value: 25, isPercent: true }], buffCategory: 'sanctuary', hotAmount: 20 },
-  { id: 'earth-shatter', name: '震裂術', level: 9, element: 'earth', type: 'attack', target: 'aoe', power: 85, mpCost: 75, cooldown: 14000, range: 15, aoeMin: 6, aoeMax: 8 },
+  { id: 'earth-shatter', name: '震裂術', level: 9, element: 'earth', type: 'attack', target: 'aoe', power: 85, mpCost: 75, cooldown: 14000, range: 15, aoeCenter: 'target', aoeRadius: 8, maxTargets: 8 },
   // Level 10
-  { id: 'divine-thunder', name: '天雷', level: 10, element: 'wind', type: 'attack', target: 'aoe', power: 100, mpCost: 90, cooldown: 15000, range: 15, aoeMin: 1, aoeMax: 10 },
-  { id: 'apocalypse-flame', name: '末日烈焰', level: 10, element: 'fire', type: 'attack', target: 'aoe', power: 100, mpCost: 90, cooldown: 15000, range: 15, aoeMin: 1, aoeMax: 10 },
-  { id: 'absolute-zero', name: '極冰封印', level: 10, element: 'ice', type: 'attack', target: 'aoe', power: 70, mpCost: 85, cooldown: 45000, range: 15, aoeMin: 6, aoeMax: 10 },
+  { id: 'divine-thunder', name: '天雷', level: 10, element: 'wind', type: 'attack', target: 'aoe', power: 100, mpCost: 90, cooldown: 15000, range: 15, aoeCenter: 'self', aoeRadius: 10 },
+  { id: 'apocalypse-flame', name: '末日烈焰', level: 10, element: 'fire', type: 'attack', target: 'aoe', power: 100, mpCost: 90, cooldown: 15000, range: 15, aoeCenter: 'self', aoeRadius: 10 },
+  { id: 'absolute-zero', name: '極冰封印', level: 10, element: 'ice', type: 'attack', target: 'aoe', power: 70, mpCost: 85, cooldown: 45000, range: 15, aoeCenter: 'target', aoeRadius: 10, maxTargets: 10, applyDebuff: { category: 'defense-down', name: '防禦下降', description: '防禦力降低20%', duration: 10000, modifiers: [{ stat: 'defense', value: -20, isPercent: true }], tags: ['defense-down'] } },
   { id: 'ultimate-ray', name: '究極光裂術', level: 10, element: 'none', type: 'attack', target: 'single', power: 110, mpCost: 100, cooldown: 10000, range: 15 },
   { id: 'absolute-barrier', name: '絕對屏障', level: 10, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 100, cooldown: 120000, range: 0, buffEffect: '無敵10s', buffDuration: 10000, buffModifiers: [], buffCategory: 'invincible', invincible: true },
 ];

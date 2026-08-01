@@ -174,7 +174,7 @@ describe('Game persistence', () => {
     expect(useGameStore.getState().skills[0].id).toBe('wind-blade');
 
     // Simulate learning a new skill
-    const newSkill = { id: 'fireball', name: '火球', level: 3, element: 'fire' as const, type: 'attack' as const, target: 'aoe' as const, power: 25, mpCost: 15, cooldown: 6000, lastUsedAt: 0, aoeMin: 2, aoeMax: 3 };
+    const newSkill = { id: 'fireball', name: '火球', level: 3, element: 'fire' as const, type: 'attack' as const, target: 'aoe' as const, power: 25, mpCost: 15, cooldown: 6000, lastUsedAt: 0, aoeCenter: 'target' as const, aoeRadius: 3, maxTargets: 3 };
     const currentSkills = useGameStore.getState().skills;
     const updatedSkills = [...currentSkills, newSkill];
     const char = useGameStore.getState().character!;

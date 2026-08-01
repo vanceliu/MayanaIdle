@@ -23,6 +23,60 @@ import { rollMonsterDebuff, applyPlayerDebuff, applyPlayerBuff } from './playerD
 /** § 24.6 Boss 控場免疫冷卻 */
 export const BOSS_CC_IMMUNE_MS = 10_000;
 
+export interface SelfBuffApplyResult {
+  effects: ActiveEffect[];
+  description: string;
+}
+
+/**
+ * 施加攻擊技能附帶的自身 buff（§ 23.3 復仇之刃、§ 23.7 背刺）。
+ * `scaleByMissingHp` 依施放當下的已損失血量比率決定加成，加成為 0 時不施加。
+ */
+export function applySkillSelfBuff(
+  skill: Skill,
+  character: Character,
+  activeEffects: ActiveEffect[],
+  now: number = Date.now(),
+): SelfBuffApplyResult | null {
+  const def = skill.selfBuff;
+  if (!def) return null;
+
+  const modifiers = [...(def.modifiers ?? [])];
+  let description = def.description;
+
+  if (def.scaleByMissingHp) {
+    const maxHp = getEffectiveMaxHp(character, useGameStore.getState().equippedGear);
+    const missingPercent = maxHp > 0 ? (1 - character.hp / maxHp) * 100 : 0;
+    const bonus = Math.floor(Math.min(def.scaleByMissingHp.maxPercent, Math.max(0, missingPercent)));
+    if (bonus <= 0) return null;
+    modifiers.push({ stat: def.scaleByMissingHp.stat, value: bonus, isPercent: true });
+    description = `${def.description}（本次 +${bonus}%）`;
+  }
+
+  if (modifiers.length === 0) return null;
+
+  const effect: ActiveEffect = {
+    id: `self-buff-${def.category}-${now}`,
+    sourceSkillId: skill.id,
+    sourceSkillName: skill.name,
+    category: def.category,
+    type: 'buff',
+    target: 'player',
+    modifiers,
+    startTime: now,
+    duration: def.duration,
+    tags: [],
+    name: def.name,
+    description,
+  };
+
+  // 同 category 互蓋（§ 24.3.1）
+  const filtered = activeEffects.filter(
+    e => !(e.type === 'buff' && e.target === 'player' && e.category === def.category)
+  );
+  return { effects: [...filtered, effect], description };
+}
+
 export interface ArpgEventContext {
   character: Character;
   equippedGear: (EquipmentInstance | null)[];
@@ -102,6 +156,7 @@ export function processPlayerAttack(
         const hotAmount = template?.hotAmount ?? skill.hotAmount;
         if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
         if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
+        if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
         const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
         if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
 
@@ -137,6 +192,18 @@ export function processPlayerAttack(
     return { damages: [], logs, skillUsed: skill };
   }
 
+  // 攻擊技能附帶的自身 buff（復仇之刃、背刺）——
+  // 於傷害結算「前」施加，本次攻擊也吃得到加成。
+  let effectsForDamage = activeEffects;
+  if (skill?.selfBuff) {
+    const applied = applySkillSelfBuff(skill, character, useGameStore.getState().activeEffects);
+    if (applied) {
+      useGameStore.setState({ activeEffects: applied.effects });
+      effectsForDamage = applied.effects;
+      logs.push({ text: `${skill.name}：${applied.description}`, type: 'player' });
+    }
+  }
+
   for (const targetId of event.targetMonsterIds) {
     const monster = ctx.monsterInstances.get(targetId);
     if (!monster || monster.currentHp <= 0) continue;
@@ -153,7 +220,7 @@ export function processPlayerAttack(
         weapon,
         monster,
         equippedGear,
-        activeEffects,
+        effectsForDamage,
         targetIdx,
       );
       damage = result.damage;
@@ -162,7 +229,7 @@ export function processPlayerAttack(
     } else if (skill) {
       if (skill.hits) {
         // Multi-hit physical skill
-        const fireEnchant = hasActiveFireEnchant(activeEffects);
+        const fireEnchant = hasActiveFireEnchant(effectsForDamage);
         for (let h = 0; h < skill.hits; h++) {
           const hitResult = calculatePhysicalSkillHit(
             character,
@@ -171,7 +238,7 @@ export function processPlayerAttack(
             equippedGear,
             fireEnchant,
             skill.name,
-            activeEffects,
+            effectsForDamage,
             targetIdx,
             skill.ignoreDefensePercent ?? 0,
           );
@@ -188,7 +255,7 @@ export function processPlayerAttack(
           monster,
           equippedGear,
           skill.name,
-          activeEffects,
+          effectsForDamage,
           targetIdx,
           skill.ignoreDefensePercent ?? 0,
         );

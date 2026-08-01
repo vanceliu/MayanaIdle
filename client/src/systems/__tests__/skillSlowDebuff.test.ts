@@ -78,10 +78,18 @@ describe('冰系基礎魔法減速（22-basic-magic.md）', () => {
     }
   });
 
-  it('冰彈、冰槍、極冰封印無減速效果', () => {
-    for (const id of ['ice-bolt', 'ice-lance', 'absolute-zero']) {
+  it('冰彈、冰槍無減速效果', () => {
+    for (const id of ['ice-bolt', 'ice-lance']) {
       expect(getSkillTemplate(id)!.applyDebuff, id).toBeUndefined();
     }
+  });
+
+  it('極冰封印為防禦下降而非減速（§ 22.3 10 級）', () => {
+    expect(getSkillTemplate('absolute-zero')!.applyDebuff).toMatchObject({
+      category: 'defense-down',
+      duration: 10000,
+      modifiers: [{ stat: 'defense', value: -20, isPercent: true }],
+    });
   });
 
   it('命中後對怪物施加減速 debuff', () => {

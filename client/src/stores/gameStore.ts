@@ -1152,6 +1152,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             const hotAmount = template?.hotAmount ?? skill.hotAmount;
             if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
             if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
+        if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
             const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
             if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
             const applied = applyPlayerBuff(get().activeEffects, buffEffect);

@@ -54,7 +54,7 @@ export interface MonsterInstance {
   attackInterval: number;
   projectileSpeed?: number;
   debuffs?: MonsterDebuffAbility[];
-  /** § 24.6 Boss 控場免疫：被控場後 30 秒內免疫任何控場效果（時間戳 ms） */
+  /** § 24.6 Boss 控場免疫：被控場後 10 秒內免疫任何控場效果（時間戳 ms） */
   ccImmuneUntil?: number;
   _processed?: boolean;
 }

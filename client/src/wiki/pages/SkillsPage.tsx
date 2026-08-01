@@ -69,7 +69,7 @@ export function SkillsPage() {
                 <td className="cell-number">{s.level}</td>
                 <td>{TYPE_LABELS[s.type]}</td>
                 <td><span className={`wiki-badge wiki-badge-${s.element}`}>{ELEMENT_LABELS[s.element]}</span></td>
-                <td>{s.target === 'aoe' ? `範圍(${s.aoeMin ?? '?'}~${s.aoeMax ?? '?'})` : '單體'}</td>
+                <td>{s.target === 'aoe' ? `範圍(半徑${s.aoeRadius ?? '?'}格/${s.maxTargets ? `最多${s.maxTargets}隻` : '無上限'})` : '單體'}</td>
                 <td className="cell-number">{s.power || '-'}</td>
                 <td className="cell-number">{s.healAmount || '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
@@ -141,7 +141,7 @@ export function SkillsPage() {
                       <td className="cell-number">{s.requiredLevel}</td>
                       <td>{TYPE_LABELS[s.skill.type]}</td>
                       <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
-                      <td>{s.skill.target === 'aoe' ? `範圍(${s.skill.aoeMin ?? '?'}~${s.skill.aoeMax ?? '?'})` : '單體'}</td>
+                      <td>{s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius ?? '?'}格/${s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
                       <td className="cell-number">{s.skill.power || '-'}</td>
                       <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>

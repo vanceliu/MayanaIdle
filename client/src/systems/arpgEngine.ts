@@ -340,13 +340,13 @@ function resolveTargets(
 
     // AOE skill
     if (skill.target === 'aoe') {
-      const aoeRadius = skill.aoeMax ?? 3;
-      const maxTargets = skill.aoeMax ?? 3;
+      // 41-arpg-combat.md § 3.4/3.5：半徑、目標上限、圓心模式為三個獨立欄位
+      const aoeRadius = skill.aoeRadius ?? 3;
+      const maxTargets = skill.maxTargets ?? 1;
 
-      // Determine AOE center mode:
-      // self-centered: melee-range AOE skills (e.g. ice nova, war cry)
-      // target-centered: ranged AOE skills (e.g. fireball, tornado)
-      const isSelfCentered = skill.aoeMin !== undefined && skill.aoeMin <= 1;
+      // self 模式：以角色為圓心、範圍內全打（無數量上限）
+      // target 模式：以主目標為圓心，依距離取最近的 maxTargets 隻
+      const isSelfCentered = skill.aoeCenter === 'self';
 
       if (isSelfCentered) {
         // Self-centered: find all alive monsters within aoeRadius of player (no max limit)

@@ -71,8 +71,9 @@ function createFireball(): Skill {
     power: 25,
     mpCost: 15,
     cooldown: 6000,
-    aoeMin: 2,
-    aoeMax: 3,
+    aoeCenter: 'target',
+    aoeRadius: 3,
+    maxTargets: 3,
     lastUsedAt: 0,
   };
 }
@@ -100,7 +101,7 @@ function simulateAoeCombatTick(
 
   if (skill.target === 'aoe') {
     const alive = monsters.filter(m => m.currentHp > 0);
-    const hitCount = Math.min(alive.length, skill.aoeMin ?? 2);
+    const hitCount = Math.min(alive.length, skill.maxTargets ?? 1);
     for (let i = 0; i < hitCount; i++) {
       const m = alive[i];
       const mIdx = monsters.indexOf(m);
