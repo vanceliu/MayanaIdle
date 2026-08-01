@@ -1,5 +1,6 @@
 import type { Position, MapData } from '../models/mapControl';
 import { hasLineOfSight, getDistance } from './lineOfSight';
+import type { MonsterAttackType } from '../models/monster';
 
 export type MonsterCombatState = 'roaming' | 'chasing' | 'attacking';
 
@@ -11,7 +12,7 @@ export interface MonsterCombatContext {
 }
 
 export interface MonsterAttackConfig {
-  attackType: 'melee' | 'ranged';
+  attackType: MonsterAttackType;
   attackRange: number;
   attackInterval: number;
 }

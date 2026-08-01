@@ -17,6 +17,7 @@ import { processMonsterDeath } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
 import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../systems/arpgEngine';
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
+import { isRangedAttackType } from '../models/monster';
 import { isPlayerInvincible, absorbWithShield } from '../systems/combat';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance } from '../models/monster';
@@ -294,7 +295,7 @@ function tickArpgCombatLoop(
             useMapControlStore.setState({ isMoving: false, currentPath: [], pathIndex: 0 });
           }
         }
-        const attackEvent = event.attackType === 'ranged'
+        const attackEvent = isRangedAttackType(event.attackType)
           ? {
               ...event,
               targetMonsterIds: event.targetMonsterIds.filter(targetId => {
@@ -303,7 +304,7 @@ function tickArpgCombatLoop(
               }),
             }
           : event;
-        if (event.attackType === 'ranged' && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
+        if (isRangedAttackType(event.attackType) && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
         const result = processPlayerAttack(attackEvent, {
           character: gameState.character,
           equippedGear: allGear,
@@ -332,7 +333,7 @@ function tickArpgCombatLoop(
               else if (result.skillUsed && result.skillUsed.element && result.skillUsed.element !== 'none') damageType = 'element';
               else if (result.skillUsed) damageType = 'skill';
 
-              if (event.attackType === 'ranged' && hasProjectilePath(playerPos, targetMonster.position, mapStore.currentMap)) {
+              if (isRangedAttackType(event.attackType) && hasProjectilePath(playerPos, targetMonster.position, mapStore.currentMap)) {
                 const pPos = useMapControlStore.getState().playerPosition;
                 const { sx: px, sy: py } = mapPositionToScreen(currentMap, pPos);
                 const isSkill = !!result.skillUsed;
@@ -392,7 +393,7 @@ function tickArpgCombatLoop(
       }
 
       case 'monster_attack': {
-        if (event.attackType === 'ranged') {
+        if (isRangedAttackType(event.attackType)) {
           const attacker = monsterStore.monsters.find(monster => monster.id === event.monsterId);
           if (!attacker || !hasProjectilePath(attacker.position, playerPos, mapStore.currentMap)) break;
         }
@@ -415,7 +416,7 @@ function tickArpgCombatLoop(
             const dmgType: DamageType = result.isDodged ? 'miss' : 'normal';
             const dmgValue = result.isDodged ? 0 : result.damage;
 
-            if (event.attackType === 'ranged') {
+            if (isRangedAttackType(event.attackType)) {
               const monster = monsterStore.monsters.find(m => m.id === event.monsterId);
               if (monster && hasProjectilePath(monster.position, playerPos, currentMap)) {
                 const { sx: mx, sy: my } = mapPositionToScreen(currentMap, monster.position);
@@ -727,9 +728,12 @@ function handlePlayerDeath() {
 
   const nearestTown = getNearestTown(char.currentRegion);
 
+  // § 13.8：HP 恢復至「有效最大 HP」的 50%（含裝備 bonusHp 與最大HP%詞綴）
+  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear);
+
   const updatedChar = {
     ...char,
-    hp: Math.floor(char.maxHp * 0.5),
+    hp: Math.floor(effMaxHp * 0.5),
     currentArea: nearestTown.id,
     currentRegion: nearestTown.id,
     currentFloor: null,

@@ -32,6 +32,8 @@ export interface DropTableEntry {
   craftTier?: 'entry' | 'mid' | 'top';
   itemTemplateId?: number;
   dropValue: number;
+  /** 區域內依怪物等級線性遞增的掉落值上限（§ 27.3 以「50~100」標示者）。省略 = 固定值 */
+  dropValueMax?: number;
   minAmount?: number;
   maxAmount?: number;
 }

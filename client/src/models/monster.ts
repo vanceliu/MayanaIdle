@@ -3,7 +3,18 @@ import type { PlayerDebuffType } from './playerDebuff';
 export type MonsterSize = 'small' | 'large';
 export type ElementType = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark' | 'none';
 export type MonsterRace = 'normal' | 'undead' | 'demon' | 'dragon';
-export type MonsterAttackType = 'melee' | 'ranged';
+/**
+ * 怪物攻擊型別（21-combat-formula.md § 21.16）
+ * - melee：近戰物理
+ * - ranged：遠程物理（投射物）
+ * - magic：遠程魔法（投射物），減傷改走魔法公式（裝備防禦上限 50% + 魔法抗性）
+ */
+export type MonsterAttackType = 'melee' | 'ranged' | 'magic';
+
+/** 需要射程與視線判定的攻擊型別（遠程物理與遠程魔法） */
+export function isRangedAttackType(type: MonsterAttackType | undefined): boolean {
+  return type === 'ranged' || type === 'magic';
+}
 
 /**
  * 怪物 debuff 能力（docs/design/25-monster-system.md § 25.8）

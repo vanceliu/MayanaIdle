@@ -497,7 +497,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 
 | 組件 | 職責 |
 |---|---|
-| `GeneralStore` | 購買/販售藥水、卷軸、磨刀石、強化卷軸（買1/買10） |
+| `GeneralStore` | 購買/販售藥水、回城卷軸、強化卷軸（買1/買10）。磨刀石已下架，見 `06-equipment.md` § 壞刀機制 |
 | `WeaponShop` | 按武器類型分類購買武器（含類型篩選 tab） |
 | `ArmorShop` | 按部位購買防具 |
 | `Inn` | 休息回復 HP/MP（完全休息/HP/MP 三種選項） |

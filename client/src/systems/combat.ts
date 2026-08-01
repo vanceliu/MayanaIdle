@@ -1,8 +1,10 @@
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
+import { isAccessorySlot } from '../models/equipment';
+import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
-import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT } from '../models/character';
+import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
 import { collectAffixBonuses, getEffectiveAffixValue, type AffixBonuses } from '../models/affix';
 
 export type CombatLogType =
@@ -302,6 +304,45 @@ function getPlayerBlockRate(equippedGear: (EquipmentInstance | null)[]): number 
   return Math.min(50, blockRate);
 }
 
+/** § 21.5：防禦減傷（含魔法）的總上限 */
+export const DAMAGE_REDUCTION_CAP = 75;
+/** § 21.16：裝備防禦對魔法傷害只有一半效力 */
+export const MAGIC_DEFENSE_EFFECTIVENESS = 0.5;
+/** § 21.16：因此裝備防禦對魔法的減傷貢獻上限為物理上限的一半（75 × 0.5 = 37.5%） */
+export const MAGIC_DEFENSE_CONTRIBUTION_CAP = DAMAGE_REDUCTION_CAP * MAGIC_DEFENSE_EFFECTIVENESS;
+
+/**
+ * 裝備防禦對魔法傷害的減傷貢獻（§ 21.16）：先套物理上限，再取一半。
+ * 等價於 `min(最終防禦 / 2, 37.5)`。
+ */
+export function getMagicDefenseContribution(finalDefense: number): number {
+  return Math.min(finalDefense, DAMAGE_REDUCTION_CAP) * MAGIC_DEFENSE_EFFECTIVENESS;
+}
+
+/**
+ * 裝備提供的魔法抗性（%）：詞綴（受品質放大）+ 飾品強化（每 +1 給 2%）。
+ * 見 `21-combat-formula.md` § 21.16。
+ */
+export function getGearMagicResist(equippedGear: (EquipmentInstance | null)[]): number {
+  const affixResist = getAffixBonusesFromGear(equippedGear).magic_resist;
+  let enhanceResist = 0;
+  for (const g of equippedGear) {
+    if (!g || !isAccessorySlot(g.slot)) continue;
+    enhanceResist += getAccessoryMagicResist(g.enhancement ?? 0);
+  }
+  return affixResist + enhanceResist;
+}
+
+/** 角色的魔法抗性總值：SPI + 裝備（詞綴與飾品強化） */
+export function getTotalMagicResist(
+  char: Character,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  const attrs = getTotalAttributes(char, activeEffects);
+  return getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear);
+}
+
 const BASE_ATTACK_INTERVAL_MS = 1200;
 const MIN_ATTACK_INTERVAL_MS = 300;
 
@@ -361,6 +402,7 @@ export function calculateBasePhysicalDamage(
 
   let damage = Math.floor(weaponDmg) + strBonus + (weapon?.extraAttack ?? 0) + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
+  // 虛弱作用於最終傷害（§ 21.3）——此函式不含防禦減傷，最末端即為最終值
   damage = applyWeaken(damage, activeEffects);
 
   return Math.max(1, damage);
@@ -411,8 +453,6 @@ export function calculatePlayerAttack(
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
-  // 虛弱 debuff（攻擊力 -20%）
-  damage = applyWeaken(damage, activeEffects);
 
   // Apply attack elemental% multiplier (weapon element OR fire enchant)
   const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchantActive;
@@ -433,6 +473,9 @@ export function calculatePlayerAttack(
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = Math.min(effectiveMonsterDef, 75);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
+
+  // 虛弱 debuff（攻擊力 -20%）作用於最終傷害（§ 21.3）
+  damage = applyWeaken(damage, activeEffects);
 
   const log: CombatLog = isCritical
     ? { type: 'player_crit', message: `暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
@@ -485,8 +528,6 @@ export function calculatePhysicalSkillHit(
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
-  // 虛弱 debuff（攻擊力 -20%）
-  damage = applyWeaken(damage, activeEffects);
 
   // Apply attack elemental% multiplier (weapon element OR fire enchant)
   const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchant;
@@ -507,6 +548,9 @@ export function calculatePhysicalSkillHit(
   const effectiveMonsterDef2 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef2, 75), ignoreDefensePercent);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
+
+  // 虛弱 debuff（攻擊力 -20%）作用於最終傷害（§ 21.3）
+  damage = applyWeaken(damage, activeEffects);
 
   const log: CombatLog = isCritical
     ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
@@ -723,9 +767,16 @@ export function calculateMonsterAttack(
     rawDamage = Math.max(1, Math.floor(rawDamage * (100 + atkDebuffPercent) / 100));
   }
 
-  // Player defense reduction (with affix bonus)
-  const playerDefense = Math.min(finalDefense, 75);
-  let finalDamage = Math.max(1, Math.floor(rawDamage * (100 - playerDefense) / 100));
+  // Player defense reduction（§ 21.5 物理／§ 21.16 魔法）
+  // 魔法：裝備防禦的貢獻上限 50%，不足部分由魔法抗性補，總上限同樣 75%
+  const reductionRate = monster.attackType === 'magic'
+    ? Math.min(
+        getMagicDefenseContribution(finalDefense)
+          + getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear),
+        DAMAGE_REDUCTION_CAP,
+      )
+    : Math.min(finalDefense, DAMAGE_REDUCTION_CAP);
+  let finalDamage = Math.max(1, Math.floor(rawDamage * (100 - reductionRate) / 100));
 
   // buff 減傷與防禦減傷為類間乘算（§ 21.5）
   const buffReduction = getBuffDamageReduction(activeEffects);

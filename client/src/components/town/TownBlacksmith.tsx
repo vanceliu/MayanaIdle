@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, AFFIX_TIERS, rollAffixValue, getAffixPoolForSlot, isSpecialAffixType, getSpecialAffixDefinition, type AffixCategory, type Affix } from '../../models/affix';
+import { AFFIX_DEFINITIONS, getAffixTierTable, rollAffixValue, getAffixPoolForSlot, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, type AffixCategory, type Affix } from '../../models/affix';
 import { CRAFT_TIER_NAMES } from '../../models/crafting';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
@@ -52,7 +52,7 @@ function generateCraftAffixes(category: AffixCategory): Affix[] {
     const idx = Math.floor(Math.random() * available.length);
     const def = available.splice(idx, 1)[0];
     const tier = Math.floor(Math.random() * 5) + 1;
-    const value = rollAffixValue(tier);
+    const value = rollAffixValue(tier, def.type);
     affixes.push({ type: def.type, tier, value });
   }
   return affixes;
@@ -218,7 +218,7 @@ export function TownBlacksmith() {
     const newTier = affix.tier + 1;
     const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
 
-    const tierDef = AFFIX_TIERS.find(t => t.tier === newTier);
+    const tierDef = getAffixTierTable(affix.type as any).find(t => t.tier === newTier);
     if (!tierDef) return;
     const newValue = Math.floor(Math.random() * (tierDef.max - tierDef.min + 1)) + tierDef.min;
 
@@ -293,8 +293,7 @@ export function TownBlacksmith() {
     const newGold = char.gold - selectedRecipe.craftGold;
     if (char.id) db.characters.update(char.id, { gold: newGold });
 
-    const affixCategory: AffixCategory = selectedRecipe.type === 'shield' ? 'shield'
-      : isWeaponSlot(selectedRecipe.slot) ? 'weapon' : 'armor';
+    const affixCategory: AffixCategory = getAffixCategoryForSlot(selectedRecipe.slot, selectedRecipe.type);
     const craftedAffixes = generateCraftAffixes(affixCategory);
 
     const dbRecord = {

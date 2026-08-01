@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
+import { getExpToNextLevel } from '../../systems/levelUp';
 import '../components/WikiTable.css';
-
-function getExpToNextLevel(level: number): number {
-  return Math.floor(100 * Math.pow(1.15, level - 1));
-}
 
 export function ExpTablePage() {
   const tableData = useMemo(() => {

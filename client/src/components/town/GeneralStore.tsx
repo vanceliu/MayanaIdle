@@ -21,7 +21,7 @@ const SHOP_ITEMS = [
   { name: '淨化藥水', price: 500, description: '解除詛咒/虛弱（全解）' },
   { name: '武器強化卷軸', price: 100000, description: '鐵匠鋪武器強化用' },
   { name: '防具強化卷軸', price: 50000, description: '鐵匠鋪防具強化用' },
-  { name: '磨刀石', price: 200, description: '修復武器壞刀 1 層' },
+  // 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（06-equipment.md § 壞刀機制）
 ];
 
 export function GeneralStore() {

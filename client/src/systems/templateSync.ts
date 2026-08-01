@@ -1,5 +1,10 @@
 import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
 import { db } from '../db/database';
+import { isAccessorySlot } from '../models/equipment';
+import { getAccessoryStatMultiplier } from './enhancement';
+
+/** 飾品強化倍率作用的欄位（§ 6.10.1）——不含額外屬性 */
+const ACCESSORY_SCALED_FIELDS = ['bonusHp', 'bonusMp', 'hpRegen', 'mpRegen'] as const;
 
 let templateCache: Map<number, EquipmentTemplate> = new Map();
 let templateByNameCache: Map<string, EquipmentTemplate> = new Map();
@@ -42,6 +47,21 @@ export function resolveEquipment(instance: EquipmentInstance): EquipmentInstance
   if (!resolved.slot) {
     resolved.slot = template.slot;
   }
+
+  // 飾品強化的數值倍率（§ 6.10.1）在此統一套用，
+  // 避免各消費端（最大HP/MP、回復、面板）各算一份而漂移。
+  if (isAccessorySlot(resolved.slot) && (resolved.enhancement ?? 0) > 0) {
+    const mult = getAccessoryStatMultiplier(resolved.enhancement ?? 0);
+    if (mult > 1) {
+      for (const field of ACCESSORY_SCALED_FIELDS) {
+        const base = (resolved as any)[field];
+        if (typeof base === 'number' && base > 0) {
+          (resolved as any)[field] = Math.floor(base * mult);
+        }
+      }
+    }
+  }
+
   return resolved;
 }
 

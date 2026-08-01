@@ -47,7 +47,10 @@ describe('CharacterStats', () => {
     render(<CharacterStats />);
     expect(screen.getByText('物理(小怪)')).toBeDefined();
     expect(screen.getByText('物理(大怪)')).toBeDefined();
-    expect(screen.getByText('5%')).toBeDefined();
+    // 基礎爆擊率 5%（§ 21.8）。「5%」可能同時出現在其他列（例如魔法減傷率），
+    // 因此鎖定爆擊率所在的那一列比對，而非全頁搜尋。
+    const critRow = screen.getByText('爆擊率').closest('.stat-row');
+    expect(critRow?.textContent).toContain('5%');
   });
 
   it('returns null when no character', () => {

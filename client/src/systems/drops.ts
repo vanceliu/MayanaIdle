@@ -2,7 +2,7 @@ import { db } from '../db/database';
 import type { EquipmentInstance } from '../models/equipment';
 import { resolveEquipment } from './templateSync';
 import { isWeaponSlot } from '../models/equipment';
-import { generateAffixes } from '../models/affix';
+import { generateAffixes, getAffixCategoryForSlot } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
 import { getRegion } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
@@ -51,6 +51,37 @@ function getDropRateMultiplier(bonuses?: DropBonuses): number {
   return (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
 }
 
+/**
+ * `equipmentPool: 'all'` 的類別抽取（27-drop-table.md § 27.3）。
+ * 先以 1/2 決定武器或防具，再於該類別內均勻抽 —— 若直接對混合池均勻抽，
+ * 各池武器/防具數量懸殊會讓結果嚴重偏斜（例：shop/high 有 16 武器 vs 1 防具 → 94% 掉武器）。
+ * 單邊為空時退回另一邊，避免抽不到東西。
+ */
+export function pickEquipmentCategory<T extends { slot: string }>(candidates: T[]): T[] {
+  const weapons = candidates.filter(t => isWeaponSlot(t.slot as any));
+  const armors = candidates.filter(t => !isWeaponSlot(t.slot as any));
+  if (weapons.length === 0) return armors;
+  if (armors.length === 0) return weapons;
+  return Math.random() < 0.5 ? weapons : armors;
+}
+
+/**
+ * 區域內依怪物等級線性遞增的掉落值（`dropValueMax` 存在時生效）。
+ * 用於文件以「50~100」這類範圍標示的掉落物，目前為百柱塔卷軸類與橙色藥水。
+ */
+export function scaleDropValue(
+  base: number,
+  max: number | undefined,
+  monsterLevel: number,
+  areaLevelMin: number,
+  areaLevelMax: number,
+): number {
+  if (max === undefined || max <= base) return base;
+  const levelRange = Math.max(1, areaLevelMax - areaLevelMin);
+  const progress = Math.min(1, Math.max(0, (monsterLevel - areaLevelMin) / levelRange));
+  return Math.min(max, Math.floor(base + (max - base) * progress));
+}
+
 export async function rollBossDrops(bossName: string, ownerId: number, areaLevel: number, bonuses?: DropBonuses): Promise<DropResult> {
   const entries = await db.bossDropTables.where('bossName').equals(bossName).toArray();
   let gold = 0;
@@ -74,8 +105,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         .toArray();
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(Math.random() * candidates.length)];
-      const isWeapon = isWeaponSlot(template.slot);
-      const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
+      const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
       const affixes = generateAffixes(affixCategory, areaLevel, 4, true);
       const dbRecord: Record<string, unknown> = {
         templateId: template.id!,
@@ -116,8 +146,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         ? await db.equipmentTemplates.get(entry.equipmentTemplateId)
         : undefined;
       if (template) {
-        const isWeapon = isWeaponSlot(template.slot);
-        const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
+        const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
         const affixes = generateAffixes(affixCategory, areaLevel, 4, true);
         const dbRecord: Record<string, unknown> = {
           templateId: template.id!,
@@ -184,13 +213,18 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
 
   for (const entry of entries) {
     let effectiveDropValue = entry.dropValue;
-    // Dungeon scroll level-based drop rate boost
     if (monsterLevel && entry.itemType === 'item' && entry.itemTemplateId) {
       const itemDef = getItemById(entry.itemTemplateId);
       if (itemDef?.category === 'dungeon') {
+        // 百柱塔卷軸：越高層機率越高（§ 27.1）
         const levelRange = Math.max(1, areaLevelMax - areaLevelMin);
         const levelProgress = Math.min(1, (monsterLevel - areaLevelMin) / levelRange);
         effectiveDropValue = Math.min(100, Math.floor(entry.dropValue * (1 + levelProgress)));
+      } else {
+        // 文件以「50~100」標示範圍者，依 dropValueMax 線性遞增（§ 27.3）
+        effectiveDropValue = scaleDropValue(
+          entry.dropValue, entry.dropValueMax, monsterLevel, areaLevelMin, areaLevelMax,
+        );
       }
     }
     const roll = Math.random() * DROP_ROLL_MAX;
@@ -216,15 +250,15 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
             return true;
           })
           .toArray();
-        if (candidates.length > 0) {
-          template = candidates[Math.floor(Math.random() * candidates.length)];
+        const finalists = pool === 'all' ? pickEquipmentCategory(candidates) : candidates;
+        if (finalists.length > 0) {
+          template = finalists[Math.floor(Math.random() * finalists.length)];
         }
       } else if (entry.equipmentTemplateId) {
         template = await db.equipmentTemplates.get(entry.equipmentTemplateId);
       }
       if (template) {
-        const isWeapon = isWeaponSlot(template.slot);
-        const affixCategory: AffixCategory = template.type === 'shield' ? 'shield' : isWeapon ? 'weapon' : 'armor';
+        const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
         const affixes = generateAffixes(affixCategory, areaLevel, 4, isBoss);
         const dbRecord: Record<string, unknown> = {
           templateId: template.id!,

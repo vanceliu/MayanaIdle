@@ -28,3 +28,29 @@ export function getArmorEnhanceRate(targetLevel: number, stability: number): num
   if (targetLevel <= ARMOR_ENHANCE_FLAT_RATE_MAX_LEVEL) return 1 / 2;
   return 1 / (targetLevel - 1);
 }
+
+// === 飾品強化（項鍊／戒指，`06-equipment.md` § 6.10.1）===
+
+/** 飾品強化每級提供的魔法抗性（%） */
+export const ACCESSORY_MAGIC_RESIST_PER_LEVEL = 2;
+/** 數值倍率的起始強化等級 */
+export const ACCESSORY_MULTIPLIER_START_LEVEL = 4;
+/** 數值倍率上限 */
+export const ACCESSORY_MULTIPLIER_CAP = 1.5;
+
+/**
+ * 飾品強化提供的魔法抗性（%）：每 +1 給 2%。
+ */
+export function getAccessoryMagicResist(enhancement: number): number {
+  return Math.max(0, enhancement) * ACCESSORY_MAGIC_RESIST_PER_LEVEL;
+}
+
+/**
+ * 飾品強化的數值倍率：+3 以下無倍率，+4 起每級 +0.1，上限 ×1.5（+8 達成）。
+ * 只作用於 `bonusHp` / `bonusMp` / `hpRegen` / `mpRegen`，不含額外屬性。
+ */
+export function getAccessoryStatMultiplier(enhancement: number): number {
+  if (enhancement < ACCESSORY_MULTIPLIER_START_LEVEL) return 1;
+  const raw = 1 + (enhancement - (ACCESSORY_MULTIPLIER_START_LEVEL - 1)) * 0.1;
+  return Math.min(ACCESSORY_MULTIPLIER_CAP, Number(raw.toFixed(2)));
+}

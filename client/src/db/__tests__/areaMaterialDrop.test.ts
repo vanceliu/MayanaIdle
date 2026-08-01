@@ -72,7 +72,7 @@ describe('區域素材掉落系統', () => {
         if (name) droppableMaterials.add(name);
       }
 
-      const shopItems = ['紅色藥水', '橙色藥水', '白色藥水', '綠色藥水', '強化綠色藥水', '武器強化卷軸', '防具強化卷軸', '磨刀石'];
+      const shopItems = ['紅色藥水', '橙色藥水', '白色藥水', '綠色藥水', '強化綠色藥水', '武器強化卷軸', '防具強化卷軸'];
       for (const item of shopItems) {
         droppableMaterials.add(item);
       }

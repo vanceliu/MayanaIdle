@@ -39,14 +39,16 @@ describe('affix model', () => {
       });
     });
 
-    it('should return armor + block_rate for shield', () => {
+    it('should return armor + block_rate + magic_resist for shield', () => {
+      // 盾牌可選 9 種：防具 7 + 格擋率（盾牌專屬）+ 魔法抗性（飾品／盾牌專屬，§ 7.6）
       const pool = getAffixPoolForSlot('shield');
-      expect(pool.length).toBe(8);
+      expect(pool.length).toBe(9);
       pool.forEach(def => {
         expect(def.category).toContain('shield');
       });
       const types = pool.map(d => d.type);
       expect(types).toContain('block_rate');
+      expect(types).toContain('magic_resist');
       expect(types).toContain('defense');
     });
   });

@@ -20,6 +20,7 @@ import {
   tickMonsterCombat,
 } from './monsterCombatFSM';
 import { getDistance } from './lineOfSight';
+import type { MonsterAttackType } from '../models/monster';
 import { evaluateCombatScript, type CombatScriptContext } from './scriptRunner';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById } from './combat';
 import { isPlayerStunned } from './playerDebuffSystem';
@@ -63,13 +64,13 @@ export interface PlayerAttackEvent {
   action: CombatAction;
   targetMonsterIds: string[];
   skill?: Skill;
-  attackType?: 'melee' | 'ranged';
+  attackType?: MonsterAttackType;
 }
 
 export interface MonsterAttackEvent {
   type: 'monster_attack';
   monsterId: string;
-  attackType?: 'melee' | 'ranged';
+  attackType?: MonsterAttackType;
   projectileSpeed?: number;
 }
 

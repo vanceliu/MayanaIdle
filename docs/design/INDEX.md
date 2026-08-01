@@ -35,7 +35,7 @@
 | 怪物 Debuff 能力（已併入怪物屬性表） | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
 | 狀態解除道具（解毒/止血/淨化） | `30-items.md` | § 狀態解除道具 |
-| 戰鬥腳本（自動戰鬥 AI） | `31-battle-script.md` | 全文 |
+| 戰鬥腳本 / 常駐腳本（自動戰鬥 AI） | `03-combat.md` | § 3.12（戰鬥腳本）、§ 3.13（常駐腳本＋緊急撤退） |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
@@ -128,7 +128,6 @@
 | `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
 | `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
 | `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
-| `31-battle-script.md` | 戰鬥腳本 | 自動戰鬥 AI 規則、條件/動作、判定邏輯 |
 
 ### 怪物系統
 

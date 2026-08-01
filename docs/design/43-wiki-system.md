@@ -48,7 +48,7 @@ client/src/wiki/
 | 道具 | `ITEM_DEFINITIONS` |
 | 技能 | `SKILL_CATALOG`、`CLASS_SKILLS`、`CLASS_MAGIC_RESTRICTIONS` |
 | 製作 | `CRAFTING_RECIPES`（`db/seed`） |
-| 經驗表 | `EXP_TABLE`（`models/expTable`） |
+| 經驗表 | `getExpToNextLevel()`（`systems/levelUp`）—— 公式定義見 `04-character.md` § 4.9 |
 | 屬性公式 | 硬編碼文字（對應 `systems/combat.ts` 計算） |
 | 戰鬥計算 | 硬編碼文字（對應 `systems/combat.ts`） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |

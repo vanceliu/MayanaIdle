@@ -20,6 +20,16 @@ export const IMMUNITY_AFFIX_BY_DEBUFF: Record<PlayerDebuffType, SpecialAffixType
   stun: null,
 };
 
+/**
+ * 受魔法抗性影響的 debuff 類型（§ 24.4.2）。
+ * 中毒／流血（物理 DoT）與暈眩不受魔抗影響，仍只能靠免疫詞綴。
+ */
+export const MAGIC_RESIST_DEBUFF_TYPES: PlayerDebuffType[] = ['curse', 'weaken', 'slow'];
+
+export function isMagicResistibleDebuff(type: PlayerDebuffType): boolean {
+  return MAGIC_RESIST_DEBUFF_TYPES.includes(type);
+}
+
 /** 暈眩抵抗提供的時間減免（§ 7.10.4：50% 時間減免，不是免疫） */
 export const STUN_RESIST_DURATION_MULTIPLIER = 0.5;
 
@@ -140,6 +150,8 @@ export interface DebuffRollResult {
   /** 是否有任一 debuff 判定命中（命中即停，無論是否成功施加） */
   triggered: boolean;
   type: PlayerDebuffType | null;
+  /** true = 命中後被魔法抗性擋下（§ 24.4.2） */
+  resisted?: boolean;
 }
 
 /**
@@ -151,6 +163,7 @@ export function rollMonsterDebuff(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[],
   now: number = Date.now(),
+  magicResist: number = 0,
 ): DebuffRollResult {
   const none: DebuffRollResult = { effect: null, triggered: false, type: null };
   if (!monster.debuffs || monster.debuffs.length === 0) return none;
@@ -166,6 +179,15 @@ export function rollMonsterDebuff(
     if (finalChance <= 0) continue;
 
     if (Math.random() * 100 >= finalChance) continue;
+
+    // § 24.4.2：詛咒／虛弱／減速 命中後，再以魔法抗性判定是否被擋下。
+    // 擋下仍消耗本次判定（§ 25.9.2 命中即停），與「免疫詞綴讓觸發率歸零、直接換下一種」不同。
+    if (isMagicResistibleDebuff(ability.type) && magicResist > 0) {
+      const resistChance = Math.min(magicResist, 100);
+      if (Math.random() * 100 < resistChance) {
+        return { effect: null, triggered: true, type: ability.type, resisted: true };
+      }
+    }
 
     // 命中：不可刷新的 debuff 若仍在存續期間則不重複施加，但仍消耗本次判定
     if (!def.refreshable && hasActivePlayerDebuff(activeEffects, def.category, now)) {

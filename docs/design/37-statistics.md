@@ -38,9 +38,11 @@ interface CharacterStatistics {
   armorsBroken: number;
   questsCompleted: number;
   totalGoldEarned: number;
-  contribution: number;
 }
 ```
+
+> **`contribution` 不在此介面內**：貢獻度存於 `guildProgress.points`（見 `36-quest-system.md` § 36.4），
+> 上傳排行榜時才與統計欄位合併送出。§ 37.1 之所以列出它，是因為它同樣是排行榜欄位。
 
 ---
 

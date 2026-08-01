@@ -27,6 +27,13 @@ export type WeaponType =
   | 'shield'
   | 'magicBook';
 
+/** 飾品部位（項鍊／戒指）——詞綴分類與強化規則與一般防具不同 */
+export const ACCESSORY_SLOTS: EquipSlot[] = ['necklace', 'ring1', 'ring2'];
+
+export function isAccessorySlot(slot: EquipSlot): boolean {
+  return ACCESSORY_SLOTS.includes(slot);
+}
+
 export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' | 'orichalcum';
 
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';

@@ -1,4 +1,9 @@
-export type AffixCategory = 'weapon' | 'armor' | 'shield';
+/**
+ * 詞綴適用分類。
+ * `accessory` = 項鍊／戒指 —— 它們的 `type` 同為 `'armor'`，
+ * 需要獨立分類才能限定「魔法抗性」這種飾品專屬詞綴（§ 7.6）。
+ */
+export type AffixCategory = 'weapon' | 'armor' | 'shield' | 'accessory';
 
 export type AffixType =
   | 'attack_power'
@@ -15,7 +20,8 @@ export type AffixType =
   | 'potion_effect'
   | 'drop_rate'
   | 'gold_rate'
-  | 'block_rate';
+  | 'block_rate'
+  | 'magic_resist';
 
 /**
  * 特殊詞綴（免疫詞綴）— docs/design/07-affix.md § 7.10
@@ -41,12 +47,12 @@ export interface SpecialAffixDefinition {
 }
 
 export const SPECIAL_AFFIX_DEFINITIONS: SpecialAffixDefinition[] = [
-  { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
-  { type: 'immune_bleed', name: '流血免疫', description: '免疫流血（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
-  { type: 'immune_curse', name: '詛咒免疫', description: '免疫詛咒（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
-  { type: 'immune_weaken', name: '虛弱免疫', description: '免疫虛弱（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
-  { type: 'immune_slow', name: '減速免疫', description: '免疫減速（100%）', category: ['armor', 'shield'], minAreaLevel: 31 },
-  { type: 'resist_stun', name: '暈眩抵抗', description: '暈眩時間 -50%', category: ['armor', 'shield'], minAreaLevel: 41 },
+  { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
+  { type: 'immune_bleed', name: '流血免疫', description: '免疫流血（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
+  { type: 'immune_curse', name: '詛咒免疫', description: '免疫詛咒（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
+  { type: 'immune_weaken', name: '虛弱免疫', description: '免疫虛弱（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
+  { type: 'immune_slow', name: '減速免疫', description: '免疫減速（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
+  { type: 'resist_stun', name: '暈眩抵抗', description: '暈眩時間 -50%', category: ['armor', 'shield', 'accessory'], minAreaLevel: 41 },
 ];
 
 const SPECIAL_AFFIX_TYPE_SET = new Set<string>(SPECIAL_AFFIX_DEFINITIONS.map(d => d.type));
@@ -103,16 +109,18 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'crit_damage', name: '爆擊傷害', category: ['weapon'] },
   { type: 'attack_speed', name: '攻擊速度', category: ['weapon'] },
   { type: 'cooldown_reduction', name: '減少冷卻時間', category: ['weapon'] },
-  // Armor affixes (7)
-  { type: 'defense', name: '防禦力', category: ['armor', 'shield'] },
-  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield'] },
-  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield'] },
-  { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield'] },
-  { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield'] },
-  { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield'] },
-  { type: 'gold_rate', name: '金幣獲得率', category: ['armor', 'shield'] },
+  // Armor affixes (7) —— 一般防具、盾牌、飾品皆可出現
+  { type: 'defense', name: '防禦力', category: ['armor', 'shield', 'accessory'] },
+  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'] },
+  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'] },
+  { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield', 'accessory'] },
+  { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield', 'accessory'] },
+  { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield', 'accessory'] },
+  { type: 'gold_rate', name: '金幣獲得率', category: ['armor', 'shield', 'accessory'] },
   // Shield exclusive (1)
   { type: 'block_rate', name: '格擋率', category: ['shield'] },
+  // Accessory + shield exclusive (1)
+  { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'] },
 ];
 
 export interface Affix {
@@ -120,6 +128,21 @@ export interface Affix {
   /** 一般詞綴 1~7；特殊詞綴固定 0（無 Tier 分級） */
   tier: number;
   value: number; // rolled percentage value
+}
+
+/**
+ * 依裝備部位與類型決定詞綴分類（§ 7.6）。
+ * 飾品（項鍊／戒指）雖然 `type` 為 `'armor'`，但擁有獨立的詞綴池。
+ */
+export function getAffixCategoryForSlot(
+  slot: string,
+  type: string,
+): AffixCategory {
+  if (type === 'shield') return 'shield';
+  // 手部欄位一律走武器池（魔導書維持既有行為，本次不更動其詞綴池）
+  if (slot === 'rightHand' || slot === 'leftHand') return 'weapon';
+  if (slot === 'necklace' || slot === 'ring1' || slot === 'ring2') return 'accessory';
+  return 'armor';
 }
 
 export function getAffixPoolForSlot(category: AffixCategory): AffixDefinition[] {
@@ -154,8 +177,28 @@ function getBossTierWeights(level: number): number[] {
   return [1, 2, 5, 15, 30, 32, 15];
 }
 
-export function rollAffixValue(tier: number): number {
-  const t = AFFIX_TIERS[tier - 1];
+/**
+ * 特定詞綴的專屬階級表（§ 7.3.1）。未列出者一律套用通用 `AFFIX_TIERS`。
+ * 魔法抗性為單一值（min === max），不在階級內隨機。
+ */
+export const AFFIX_TIER_OVERRIDES: Partial<Record<AffixType, AffixTier[]>> = {
+  magic_resist: [
+    { tier: 1, min: 2, max: 2 },
+    { tier: 2, min: 4, max: 4 },
+    { tier: 3, min: 6, max: 6 },
+    { tier: 4, min: 8, max: 8 },
+    { tier: 5, min: 10, max: 10 },
+    { tier: 6, min: 15, max: 15 },
+    { tier: 7, min: 20, max: 20 },
+  ],
+};
+
+export function getAffixTierTable(type?: AffixType): AffixTier[] {
+  return (type && AFFIX_TIER_OVERRIDES[type]) || AFFIX_TIERS;
+}
+
+export function rollAffixValue(tier: number, type?: AffixType): number {
+  const t = getAffixTierTable(type)[tier - 1];
   return Math.floor(Math.random() * (t.max - t.min + 1)) + t.min;
 }
 
@@ -178,7 +221,7 @@ export function generateAffixes(category: AffixCategory, areaLevel: number, slot
     const idx = Math.floor(Math.random() * available.length);
     const def = available.splice(idx, 1)[0];
     const tier = rollAffixTier(areaLevel, isBoss);
-    const value = rollAffixValue(tier);
+    const value = rollAffixValue(tier, def.type);
     affixes.push({ type: def.type, tier, value });
   }
 
@@ -205,6 +248,7 @@ export interface AffixBonuses {
   drop_rate: number;
   gold_rate: number;
   block_rate: number;
+  magic_resist: number;
 }
 
 export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number }[]): AffixBonuses {
@@ -224,6 +268,7 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
     drop_rate: 0,
     gold_rate: 0,
     block_rate: 0,
+    magic_resist: 0,
   };
 
   for (const item of gear) {

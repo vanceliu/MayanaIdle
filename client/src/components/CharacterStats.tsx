@@ -1,5 +1,5 @@
 import { useGameStore } from '../stores/gameStore';
-import { getTotalAttributes } from '../models/character';
+import { getTotalAttributes, getMagicResist } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import {
   getCombatBonuses,
@@ -10,6 +10,9 @@ import {
   getBuffDamageReduction,
   getTotalAttackSpeedPercent,
   getWeaponAttackSuccess,
+  DAMAGE_REDUCTION_CAP,
+  getMagicDefenseContribution,
+  getGearMagicResist,
 } from '../systems/combat';
 
 export function CharacterStats() {
@@ -76,6 +79,16 @@ export function CharacterStats() {
   const defenseReduction = Math.min(totalDefense, 75);
   const buffReduction = getBuffDamageReduction(activeEffects);
   const damageReduction = Math.round(100 - (100 - defenseReduction) * (100 - buffReduction) / 100);
+  // 魔法減傷（§ 21.16）：裝備防禦貢獻上限 50%，其餘靠魔法抗性，總上限 75%
+  const magicResist = getMagicResist(attrs.SPI) + getGearMagicResist(gearList);
+  const magicDefenseReduction = Math.min(
+    getMagicDefenseContribution(totalDefense) + magicResist,
+    DAMAGE_REDUCTION_CAP,
+  );
+  const magicDamageReduction = Math.round(
+    100 - (100 - magicDefenseReduction) * (100 - buffReduction) / 100
+  );
+
   const defOverflow = Math.max(0, totalDefense - 75);
   const dodgeFromDef = Math.floor(defOverflow / 5);
   const baseDodge = char.className === 'thief' ? 10 : 5;
@@ -149,6 +162,12 @@ export function CharacterStats() {
           </div>
           <div className="stat-row">
             <span>減傷率</span><span>{damageReduction}%</span>
+          </div>
+          <div className="stat-row">
+            <span>魔法減傷率</span><span>{magicDamageReduction}%</span>
+          </div>
+          <div className="stat-row">
+            <span>魔法抗性</span><span>{magicResist}%</span>
           </div>
           <div className="stat-row">
             <span>迴避率</span><span>{totalDodge}%</span>

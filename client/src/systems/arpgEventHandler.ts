@@ -15,6 +15,7 @@ import {
   getAffixBonusesFromGear,
   calculateMpRestored,
   absorbWithShield,
+  getTotalMagicResist,
 } from './combat';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { getSkillTemplate } from '../models/skillTemplate';
@@ -525,8 +526,11 @@ export function processMonsterAttack(
   let debuffLog: CombatLog | undefined;
   if (!result.dodged) {
     const gs = useGameStore.getState();
-    const roll = rollMonsterDebuff(monster, equippedGear, gs.activeEffects);
-    if (roll.effect) {
+    const magicResist = getTotalMagicResist(character, equippedGear, gs.activeEffects);
+    const roll = rollMonsterDebuff(monster, equippedGear, gs.activeEffects, Date.now(), magicResist);
+    if (roll.resisted) {
+      debuffLog = { text: `魔法抗性擋下了 ${monster.name} 的負面效果`, type: 'debuff-self' };
+    } else if (roll.effect) {
       const applied = applyPlayerDebuff(gs.activeEffects, roll.effect);
       useGameStore.setState({ activeEffects: applied.effects });
       debuffLog = applied.cancelledSpeedBuff

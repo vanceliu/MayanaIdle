@@ -121,3 +121,11 @@ export function getEffectiveSPI(spi: number): number {
 export function getEffectiveINT(int: number): number {
   return Math.floor(int / 2) * 2;
 }
+
+/**
+ * 魔法抗性（`20-attributes.md` § 20.3：精神每 2 點 +1）。
+ * 用於怪物魔法攻擊的減傷計算，見 `21-combat-formula.md` § 21.16。
+ */
+export function getMagicResist(spi: number): number {
+  return Math.floor(getEffectiveSPI(spi) / 2);
+}

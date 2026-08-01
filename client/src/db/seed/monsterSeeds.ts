@@ -90,23 +90,23 @@ export const MONSTER_SEEDS: MonsterTemplate[] = [
   { id: 67, name: '深海獄王', level: 50, hp: 2000, attackMin: 55, attackMax: 75, defense: 35, exp: 5000, race: 'demon', size: 'large', element: 'ice', area: 'underwater-prison-4f', isBoss: true, debuffs: [{ type: 'curse', chance: 15 }, { type: 'stun', chance: 15 }] },
   // 象牙塔 1F Lv.33~36
   { id: 68, name: '冰霜蜘蛛', level: 33, hp: 250, attackMin: 25, attackMax: 36, defense: 16, exp: 510, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-1f', isBoss: false, debuffs: [{ type: 'poison', chance: 12 }] },
-  { id: 69, name: '象牙巫師', level: 34, hp: 260, attackMin: 26, attackMax: 37, defense: 16, exp: 540, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-1f', isBoss: false, debuffs: [{ type: 'weaken', chance: 12 }] },
+  { id: 69, name: '象牙巫師', level: 34, hp: 260, attackMin: 26, attackMax: 37, defense: 16, exp: 540, race: 'normal', size: 'small', element: 'ice', attackType: 'magic', attackRange: 8, area: 'ivory-tower-1f', isBoss: false, debuffs: [{ type: 'weaken', chance: 12 }] },
   { id: 70, name: '冰晶蝙蝠', level: 35, hp: 270, attackMin: 27, attackMax: 38, defense: 17, exp: 560, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-1f', isBoss: false },
   // 象牙塔 2F Lv.36~38
-  { id: 71, name: '象牙巫師', level: 36, hp: 290, attackMin: 28, attackMax: 40, defense: 18, exp: 600, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-2f', isBoss: false, debuffs: [{ type: 'weaken', chance: 12 }] },
+  { id: 71, name: '象牙巫師', level: 36, hp: 290, attackMin: 28, attackMax: 40, defense: 18, exp: 600, race: 'normal', size: 'small', element: 'ice', attackType: 'magic', attackRange: 8, area: 'ivory-tower-2f', isBoss: false, debuffs: [{ type: 'weaken', chance: 12 }] },
   { id: 72, name: '冰晶蝙蝠', level: 37, hp: 300, attackMin: 29, attackMax: 41, defense: 18, exp: 620, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-2f', isBoss: false },
   { id: 73, name: '霜甲戰士', level: 38, hp: 340, attackMin: 32, attackMax: 44, defense: 20, exp: 680, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-2f', isBoss: false },
   // 象牙塔 3F Lv.38~40
   { id: 74, name: '霜甲戰士', level: 39, hp: 350, attackMin: 33, attackMax: 45, defense: 21, exp: 710, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-3f', isBoss: false },
   { id: 75, name: '冰霜元素', level: 39, hp: 360, attackMin: 34, attackMax: 46, defense: 21, exp: 720, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-3f', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
-  { id: 76, name: '象牙魔導師', level: 40, hp: 340, attackMin: 34, attackMax: 47, defense: 20, exp: 750, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-3f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
+  { id: 76, name: '象牙魔導師', level: 40, hp: 340, attackMin: 34, attackMax: 47, defense: 20, exp: 750, race: 'normal', size: 'small', element: 'ice', attackType: 'magic', attackRange: 8, area: 'ivory-tower-3f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
   // 象牙塔 4F Lv.40~42
   { id: 77, name: '冰霜元素', level: 41, hp: 390, attackMin: 36, attackMax: 49, defense: 23, exp: 800, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-4f', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
-  { id: 78, name: '象牙魔導師', level: 41, hp: 370, attackMin: 36, attackMax: 49, defense: 22, exp: 790, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-4f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
+  { id: 78, name: '象牙魔導師', level: 41, hp: 370, attackMin: 36, attackMax: 49, defense: 22, exp: 790, race: 'normal', size: 'small', element: 'ice', attackType: 'magic', attackRange: 8, area: 'ivory-tower-4f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
   { id: 79, name: '霜甲戰士', level: 42, hp: 410, attackMin: 37, attackMax: 51, defense: 24, exp: 840, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-4f', isBoss: false },
   // 象牙塔 5F Lv.42~45 (Boss)
   { id: 80, name: '冰霜元素', level: 43, hp: 420, attackMin: 38, attackMax: 52, defense: 24, exp: 870, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-5f', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
-  { id: 81, name: '象牙魔導師', level: 43, hp: 400, attackMin: 38, attackMax: 52, defense: 23, exp: 860, race: 'normal', size: 'small', element: 'ice', area: 'ivory-tower-5f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
+  { id: 81, name: '象牙魔導師', level: 43, hp: 400, attackMin: 38, attackMax: 52, defense: 23, exp: 860, race: 'normal', size: 'small', element: 'ice', attackType: 'magic', attackRange: 8, area: 'ivory-tower-5f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
   { id: 82, name: '霜甲戰士', level: 44, hp: 440, attackMin: 39, attackMax: 54, defense: 25, exp: 900, race: 'normal', size: 'large', element: 'ice', area: 'ivory-tower-5f', isBoss: false },
   { id: 83, name: '象牙塔惡魔', level: 45, hp: 1800, attackMin: 50, attackMax: 68, defense: 30, exp: 4500, race: 'demon', size: 'large', element: 'dark', area: 'ivory-tower-5f', isBoss: true, debuffs: [{ type: 'curse', chance: 15 }, { type: 'stun', chance: 15 }] },
   // 龍谷地間 1F Lv.40~43
@@ -199,7 +199,7 @@ export const MONSTER_SEEDS: MonsterTemplate[] = [
   { id: 152, name: '暗影潛伏者', level: 47, hp: 470, attackMin: 42, attackMax: 57, defense: 26, exp: 970, race: 'normal', size: 'small', element: 'dark', area: 'hundred-pillar-21-30f', isBoss: false },
   { id: 153, name: '暗影蝙蝠', level: 48, hp: 460, attackMin: 42, attackMax: 57, defense: 25, exp: 960, race: 'normal', size: 'small', element: 'dark', area: 'hundred-pillar-21-30f', isBoss: false },
   { id: 154, name: '暗影刺客', level: 49, hp: 500, attackMin: 44, attackMax: 60, defense: 27, exp: 1040, race: 'normal', size: 'small', element: 'dark', area: 'hundred-pillar-21-30f', isBoss: false, debuffs: [{ type: 'bleed', chance: 18 }] },
-  { id: 155, name: '暗影巫師', level: 49, hp: 480, attackMin: 43, attackMax: 59, defense: 26, exp: 1010, race: 'normal', size: 'small', element: 'dark', area: 'hundred-pillar-21-30f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
+  { id: 155, name: '暗影巫師', level: 49, hp: 480, attackMin: 43, attackMax: 59, defense: 26, exp: 1010, race: 'normal', size: 'small', element: 'dark', attackType: 'magic', attackRange: 8, area: 'hundred-pillar-21-30f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
   { id: 156, name: '暗影獵犬', level: 50, hp: 560, attackMin: 47, attackMax: 63, defense: 30, exp: 1100, race: 'normal', size: 'large', element: 'dark', area: 'hundred-pillar-21-30f', isBoss: false, debuffs: [{ type: 'bleed', chance: 18 }] },
   { id: 157, name: '暗影吸血鬼', level: 52, hp: 2200, attackMin: 58, attackMax: 78, defense: 34, exp: 5500, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-21-30f', isBoss: true, debuffs: [{ type: 'bleed', chance: 15 }, { type: 'curse', chance: 15 }, { type: 'stun', chance: 15 }] },
   // 百柱塔 31~40F Lv.52~57
@@ -207,7 +207,7 @@ export const MONSTER_SEEDS: MonsterTemplate[] = [
   { id: 159, name: '不死腐屍', level: 53, hp: 620, attackMin: 50, attackMax: 68, defense: 32, exp: 1200, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-31-40f', isBoss: false, debuffs: [{ type: 'curse', chance: 18 }] },
   { id: 160, name: '不死幽魂', level: 54, hp: 580, attackMin: 49, attackMax: 66, defense: 30, exp: 1180, race: 'undead', size: 'small', element: 'dark', area: 'hundred-pillar-31-40f', isBoss: false, debuffs: [{ type: 'curse', chance: 15 }] },
   { id: 161, name: '不死死靈騎士', level: 55, hp: 660, attackMin: 53, attackMax: 72, defense: 34, exp: 1300, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-31-40f', isBoss: false, debuffs: [{ type: 'curse', chance: 18 }] },
-  { id: 162, name: '不死巫妖', level: 56, hp: 600, attackMin: 51, attackMax: 69, defense: 32, exp: 1240, race: 'undead', size: 'small', element: 'dark', area: 'hundred-pillar-31-40f', isBoss: false, debuffs: [{ type: 'curse', chance: 15 }, { type: 'weaken', chance: 15 }] },
+  { id: 162, name: '不死巫妖', level: 56, hp: 600, attackMin: 51, attackMax: 69, defense: 32, exp: 1240, race: 'undead', size: 'small', element: 'dark', attackType: 'magic', attackRange: 8, area: 'hundred-pillar-31-40f', isBoss: false, debuffs: [{ type: 'curse', chance: 15 }, { type: 'weaken', chance: 15 }] },
   { id: 163, name: '不死殭屍王', level: 57, hp: 2600, attackMin: 63, attackMax: 85, defense: 38, exp: 6500, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-31-40f', isBoss: true, debuffs: [{ type: 'curse', chance: 18 }, { type: 'weaken', chance: 18 }, { type: 'stun', chance: 18 }] },
   // 百柱塔 41~50F Lv.52~57
   { id: 164, name: '古代幼龍', level: 53, hp: 560, attackMin: 49, attackMax: 66, defense: 30, exp: 1160, race: 'dragon', size: 'small', element: 'fire', area: 'hundred-pillar-41-50f', isBoss: false, debuffs: [{ type: 'bleed', chance: 15 }] },
@@ -226,7 +226,7 @@ export const MONSTER_SEEDS: MonsterTemplate[] = [
   { id: 175, name: '霜凍巨人', level: 57, hp: 680, attackMin: 54, attackMax: 73, defense: 35, exp: 1350, race: 'normal', size: 'large', element: 'ice', area: 'hundred-pillar-61-70f', isBoss: false, debuffs: [{ type: 'stun', chance: 10 }] },
   { id: 176, name: '霜凍狼', level: 58, hp: 620, attackMin: 53, attackMax: 71, defense: 33, exp: 1280, race: 'normal', size: 'small', element: 'ice', area: 'hundred-pillar-61-70f', isBoss: false, debuffs: [{ type: 'bleed', chance: 15 }] },
   { id: 177, name: '冰晶元素', level: 58, hp: 670, attackMin: 55, attackMax: 74, defense: 35, exp: 1340, race: 'normal', size: 'large', element: 'ice', area: 'hundred-pillar-61-70f', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
-  { id: 178, name: '霜凍女巫', level: 59, hp: 640, attackMin: 54, attackMax: 73, defense: 34, exp: 1310, race: 'normal', size: 'small', element: 'ice', area: 'hundred-pillar-61-70f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
+  { id: 178, name: '霜凍女巫', level: 59, hp: 640, attackMin: 54, attackMax: 73, defense: 34, exp: 1310, race: 'normal', size: 'small', element: 'ice', attackType: 'magic', attackRange: 8, area: 'hundred-pillar-61-70f', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
   { id: 179, name: '霜凍伊莉絲', level: 60, hp: 2800, attackMin: 65, attackMax: 88, defense: 40, exp: 7000, race: 'normal', size: 'large', element: 'ice', area: 'hundred-pillar-61-70f', isBoss: true, debuffs: [{ type: 'weaken', chance: 18 }, { type: 'stun', chance: 18 }] },
   // 百柱塔 71~80F Lv.57~60
   { id: 180, name: '熔岩巨獸', level: 57, hp: 700, attackMin: 55, attackMax: 75, defense: 36, exp: 1380, race: 'normal', size: 'large', element: 'fire', area: 'hundred-pillar-71-80f', isBoss: false, debuffs: [{ type: 'stun', chance: 10 }] },
@@ -248,7 +248,7 @@ export const MONSTER_SEEDS: MonsterTemplate[] = [
   { id: 194, name: '精靈王衛兵', level: 60, hp: 740, attackMin: 58, attackMax: 79, defense: 38, exp: 1470, race: 'normal', size: 'large', element: 'light', area: 'hundred-pillar-91-100f', isBoss: false },
   { id: 195, name: '死之信徒', level: 60, hp: 680, attackMin: 56, attackMax: 76, defense: 36, exp: 1380, race: 'undead', size: 'small', element: 'dark', area: 'hundred-pillar-91-100f', isBoss: false, debuffs: [{ type: 'curse', chance: 18 }] },
   { id: 196, name: '精靈王射手', level: 60, hp: 660, attackMin: 55, attackMax: 75, defense: 35, exp: 1350, race: 'normal', size: 'small', element: 'light', area: 'hundred-pillar-91-100f', isBoss: false },
-  { id: 197, name: '精靈王魔導士', level: 60, hp: 650, attackMin: 55, attackMax: 74, defense: 35, exp: 1340, race: 'normal', size: 'small', element: 'light', area: 'hundred-pillar-91-100f', isBoss: false, debuffs: [{ type: 'weaken', chance: 18 }] },
+  { id: 197, name: '精靈王魔導士', level: 60, hp: 650, attackMin: 55, attackMax: 74, defense: 35, exp: 1340, race: 'normal', size: 'small', element: 'light', attackType: 'magic', attackRange: 8, area: 'hundred-pillar-91-100f', isBoss: false, debuffs: [{ type: 'weaken', chance: 18 }] },
   { id: 198, name: '死之執行者', level: 60, hp: 750, attackMin: 59, attackMax: 80, defense: 39, exp: 1500, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-91-100f', isBoss: false, debuffs: [{ type: 'curse', chance: 20 }] },
   { id: 199, name: '百柱死神', level: 60, hp: 3500, attackMin: 70, attackMax: 95, defense: 44, exp: 9000, race: 'undead', size: 'large', element: 'dark', area: 'hundred-pillar-91-100f', isBoss: true, debuffs: [{ type: 'curse', chance: 22 }, { type: 'weaken', chance: 22 }, { type: 'stun', chance: 22 }] },
 ];

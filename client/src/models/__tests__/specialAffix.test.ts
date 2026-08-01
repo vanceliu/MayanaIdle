@@ -15,10 +15,12 @@ afterEach(() => {
 });
 
 describe('特殊詞綴定義（§ 7.10.1）', () => {
-  it('共 6 個免疫/抵抗詞綴，全部僅限防具與盾', () => {
+  it('共 6 個免疫/抵抗詞綴，全部僅限防具、盾牌與飾品（不含武器）', () => {
     expect(SPECIAL_AFFIX_DEFINITIONS).toHaveLength(6);
     for (const def of SPECIAL_AFFIX_DEFINITIONS) {
-      expect(def.category).toEqual(['armor', 'shield']);
+      // 飾品拆出 `accessory` 分類後一併納入，維持「飾品可帶免疫詞綴」的既有行為
+      expect(def.category).toEqual(['armor', 'shield', 'accessory']);
+      expect(def.category).not.toContain('weapon');
     }
   });
 
