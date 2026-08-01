@@ -9,6 +9,7 @@ import {
   getPlayerDebuffModifier,
   getBuffDamageReduction,
   getTotalAttackSpeedPercent,
+  getWeaponAttackSuccess,
 } from '../systems/combat';
 
 export function CharacterStats() {
@@ -20,7 +21,8 @@ export function CharacterStats() {
 
   const attrs = getTotalAttributes(char, activeEffects);
   const effectiveSTR = Math.floor(attrs.STR / 2) * 2;
-  const effectiveAGI = Math.floor(attrs.AGI / 2) * 2;
+  // 敏捷每 3 點生效（§ 20.2），其餘每 2 點
+  const effectiveAGI = Math.floor(attrs.AGI / 3) * 3;
   const effectiveVIT = Math.floor(attrs.VIT / 2) * 2;
   const effectiveSPI = Math.floor(attrs.SPI / 2) * 2;
   // const effectiveINT = Math.floor(attrs.INT / 2) * 2;
@@ -79,7 +81,8 @@ export function CharacterStats() {
   const baseDodge = char.className === 'thief' ? 10 : 5;
   const totalDodge = Math.min(35, baseDodge + agiBonus + dodgeFromDef);
 
-  const hitRate = 75 + agiBonus + Math.floor(weaponEnhance / 2);
+  // 與 systems/combat.ts 的命中判定同一套：基礎命中 80 + AGI加成 + 武器攻擊成功（含強化 /2）
+  const hitRate = 80 + agiBonus + getWeaponAttackSuccess(weapon ?? null);
 
   let hpRegen = Math.floor(effectiveVIT / 2);
   let mpRegen = Math.floor(effectiveSPI / 2);

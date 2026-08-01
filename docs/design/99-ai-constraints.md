@@ -260,7 +260,44 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 - [x] `npm run test` 全綠、`npx tsc --noEmit` 無錯誤
 
-**階段 2-2~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
+---
+
+## 99.6 進行中：設計文件 vs 實作稽核（階段 2-2 防具／詞綴／品質修補）
+
+### 使用者已確認的決策（不可再自行更動）
+
+1. **P3-04 裝備魔法攻擊採固定值加算**：`基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻`，
+   不進 INT 倍率、不受攻擊力%詞綴影響。須同步 `21-combat-formula.md` § 21.4。
+2. **強化魔攻適用「法杖與魔導書」**：`06-equipment.md` § 6.9 原文「僅魔杖系列」改為法杖（staff）、
+   雙手法杖（twoHandStaff）、魔導書（magicBook）三類，每 +2 強化 → 魔攻 +1。法杖基底魔攻為 0，靠強化累積。
+3. **P3-05 以實作為準**：`06-equipment-armor.md` 23 件回寫成 seed 值（同階段 2-1 的處理原則），
+   不補 seed 的額外屬性／回血量／魔導書回魔。
+4. **實作缺失要補、bug 要修**：P3-01、P3-03、P3-04 屬必補；P3-02、P3-08 面板一律對齊 `systems/combat.ts`。
+
+### Step 1：程式修正 ✅ 完成
+
+- [x] P3-01 `combat.ts` `getWeaponDamage` 與 `calculateBasePhysicalDamage` 加入 `enhancement`（§ 6.9 每 +1 → 基傷 +1）
+- [x] P3-03 `TownBlacksmith.tsx` `getArmorEnhanceRate` 改為完全重現 § 6.10 表格：
+      `targetLevel <= stability → 1.0`；`targetLevel <= 4 → 1/2`；否則 `1/(targetLevel-1)`
+- [x] P3-04 `combat.ts` 新增 `getTotalMagicAttack`，計入 `calculateSkillDamage`
+- [x] P3-08 `CharacterStats.tsx` 有效敏捷改 `/3*3`、基礎命中 75→80、命中計入武器攻擊成功
+- [x] P3-02 隨 P3-01 自動一致（面板本來就有算 `weaponEnhance`）
+- [x] 補測試
+
+### Step 2：文件修補 ✅ 完成
+
+- [x] `21-combat-formula.md` § 21.4 公式加入「裝備魔攻」項
+- [x] `06-equipment.md` § 6.9「僅魔杖系列」→「法杖、雙手法杖、魔導書」
+- [x] `06-equipment-armor.md` 23 件回寫為 seed 值
+- [x] `08-quality.md` § 8.7 範例重寫（原兩個範例互相矛盾且無法從實作重現）
+- [x] `06-equipment.md` § 6.9 補安定值 0 武器的強化成功率（P3-06）
+- [x] `06-equipment-acquire.md` 補鐵匠鋪製作品的詞綴生成規則（P3-07）
+
+### Step 3：驗證 ✅ 完成
+
+- [x] `npm run test` 全綠、`npx tsc --noEmit` 無錯誤
+
+**階段 3~6 尚未執行**，見 `AUDIT-REPORT.md` 階段進度表。
 
 ---
 

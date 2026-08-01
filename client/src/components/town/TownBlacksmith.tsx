@@ -12,6 +12,7 @@ import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
 import { resolveEquipment } from '../../systems/templateSync';
+import { getWeaponEnhanceRate, getArmorEnhanceRate } from '../../systems/enhancement';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
@@ -31,16 +32,6 @@ const QUALITY_COST = 50000;
 const QUALITY_MAX = 20;
 
 type Tab = 'enhance' | 'quality' | 'affix' | 'craft';
-
-function getWeaponEnhanceRate(targetLevel: number, stability: number): number {
-  if (targetLevel <= stability) return 1.0;
-  return 1 / 3;
-}
-
-function getArmorEnhanceRate(targetLevel: number, stability: number): number {
-  if (targetLevel <= stability) return 1.0;
-  return 1 / (targetLevel - 1);
-}
 
 function isWeapon(item: EquipmentInstance): boolean {
   return !!item.smallMonsterDamage;

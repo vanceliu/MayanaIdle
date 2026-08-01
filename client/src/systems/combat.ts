@@ -198,10 +198,32 @@ function applyIgnoreDefense(reduction: number, ignorePercent: number): number {
   return Math.max(0, Math.floor(reduction * (100 - Math.min(ignorePercent, 100)) / 100));
 }
 
+/** 強化可提升魔法攻擊的武器類型（§ 6.9：每 +2 強化 → 魔攻 +1） */
+const MAGIC_ATTACK_WEAPON_TYPES = new Set(['staff', 'twoHandStaff', 'magicBook']);
+
 function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
   if (!gear) return 1;
-  if (monsterSize === 'small') return gear.smallMonsterDamage ?? 1;
-  return gear.largeMonsterDamage ?? 1;
+  const base = monsterSize === 'small' ? gear.smallMonsterDamage : gear.largeMonsterDamage;
+  if (base == null) return 1;
+  // § 6.9：每 +1 強化 → smallMonsterDamage / largeMonsterDamage 各 +1
+  return base + (gear.enhancement ?? 0);
+}
+
+/**
+ * 裝備提供的魔法攻擊固定值。
+ * 基底 `magicAttack` + 法杖／雙手法杖／魔導書的強化加成（§ 6.9 每 +2 強化 → 魔攻 +1）。
+ * 依 `21-combat-formula.md` § 21.4 以固定值加算進基礎魔攻，不受 INT 倍率與攻擊力%詞綴影響。
+ */
+export function getTotalMagicAttack(equippedGear: (EquipmentInstance | null)[]): number {
+  let total = 0;
+  for (const g of equippedGear) {
+    if (!g) continue;
+    total += g.magicAttack ?? 0;
+    if (MAGIC_ATTACK_WEAPON_TYPES.has(g.type)) {
+      total += Math.floor((g.enhancement ?? 0) / 2);
+    }
+  }
+  return total;
 }
 
 export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): number {
@@ -328,7 +350,10 @@ export function calculateBasePhysicalDamage(
   const effSTR = getEffectiveSTR(attrs.STR);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
-  const weaponDmg = weapon ? ((weapon.smallMonsterDamage ?? 0) + (weapon.largeMonsterDamage ?? 0)) / 2 : 1;
+  // § 6.9：強化同時提升小怪／大怪基傷，取平均後等同直接加上強化等級
+  const weaponDmg = weapon
+    ? ((weapon.smallMonsterDamage ?? 0) + (weapon.largeMonsterDamage ?? 0)) / 2 + (weapon.enhancement ?? 0)
+    : 1;
   const strBonus = Math.floor(effSTR / 2);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
   const isBow = weapon?.type === 'bow';
@@ -505,9 +530,11 @@ export function calculateSkillAttack(
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // Base magic damage (including element counter bonus)
+  // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻（固定值加算，不進 INT 倍率）
   const effINT = getEffectiveINT(attrs.INT);
   const intBonus = Math.floor(skillPower * (effINT / 2 * 10) / 100);
-  let damage = skillPower + intBonus + getElementCounterBonus(skillElement, monster.element);
+  const gearMagicAttack = getTotalMagicAttack(equippedGear);
+  let damage = skillPower + intBonus + gearMagicAttack + getElementCounterBonus(skillElement, monster.element);
 
   // Apply skill elemental% multiplier (only if skill has element)
   if (skillElement && skillElement !== 'none') {
