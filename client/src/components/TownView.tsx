@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { CombatLogPanel } from './CombatLogPanel';
 import { getRegion } from '../models/mapData';
 import { GeneralStore } from './town/GeneralStore';
 import { Inn } from './town/Inn';
@@ -55,7 +56,6 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
 
 export function TownView() {
   const char = useGameStore(s => s.character);
-  const combatLogs = useGameStore(s => s.combatLogs);
   const [facility, setFacility] = useState<TownFacility>('list');
 
   if (!char) return null;
@@ -100,12 +100,7 @@ export function TownView() {
         </div>
       )}
 
-      <div className="combat-log town-log">
-        {combatLogs.length === 0 && <div className="log-entry log-system">目前沒有戰鬥紀錄</div>}
-        {combatLogs.map((log, i) => (
-          <div key={i} className={`log-entry log-${log.type}`}>{log.text}</div>
-        ))}
-      </div>
+      <CombatLogPanel className="town-log" emptyText="目前沒有戰鬥紀錄" />
     </div>
   );
 }

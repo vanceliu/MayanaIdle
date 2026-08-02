@@ -1,5 +1,6 @@
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
+import { CombatLogPanel } from './CombatLogPanel';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { PixiGame } from './PixiGame';
@@ -8,10 +9,8 @@ import { db } from '../db/database';
 
 export function BattleView() {
   const phase = useGameStore(s => s.phase);
-  const combatLogs = useGameStore(s => s.combatLogs);
   const searchMode = useGameStore(s => s.searchMode);
   const character = useGameStore(s => s.character);
-  const logRef = useRef<HTMLDivElement>(null);
   const [logSize, setLogSize] = useState<0 | 1 | 2>(0); // 0=compact, 1=medium, 2=large
 
   const currentMap = useMapControlStore(s => s.currentMap);
@@ -97,31 +96,17 @@ export function BattleView() {
     }
   }, [phase]);
 
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [combatLogs.length]);
-
   return (
     <div className="battle-view">
       {currentMap && (
         <PixiGame />
       )}
 
-      <div className="combat-log compact" ref={logRef}>
-        {combatLogs.map((log, i) => (
-          <div key={i} className={`log-entry log-${log.type}`}>{log.text}</div>
-        ))}
-      </div>
+      <CombatLogPanel className="compact" />
 
       {currentMap && logSize > 0 && (
         <div className={`combat-log-overlay log-size-${logSize}`}>
-          <div className="combat-log" ref={logRef}>
-            {combatLogs.map((log, i) => (
-              <div key={i} className={`log-entry log-${log.type}`}>{log.text}</div>
-            ))}
-          </div>
+          <CombatLogPanel />
         </div>
       )}
 
