@@ -31,12 +31,43 @@ describe('validateCharacterName（§ 19.4）', () => {
     expect(validateCharacterName('He ro')).toBe('invalid_char');
   });
 
-  it('拒絕符號與 emoji', () => {
+  it('接受 - _ ~ = . 這些符號', () => {
+    expect(validateCharacterName('Dark-Knight')).toBeNull();
+    expect(validateCharacterName('He_ro')).toBeNull();
+    expect(validateCharacterName('勇~者')).toBeNull();
+    expect(validateCharacterName('A=B')).toBeNull();
+    expect(validateCharacterName('Mr.X')).toBeNull();
+    expect(validateCharacterName('a-_~=.b')).toBeNull();
+  });
+
+  it('符號可放在開頭與結尾', () => {
+    expect(validateCharacterName('_勇者')).toBeNull();
+    expect(validateCharacterName('勇者~')).toBeNull();
+    expect(validateCharacterName('-Hero-')).toBeNull();
+    expect(validateCharacterName('.a')).toBeNull();
+    expect(validateCharacterName('~=勇者=~')).toBeNull();
+  });
+
+  it('拒絕純符號名稱', () => {
+    expect(validateCharacterName('---')).toBe('all_symbols');
+    expect(validateCharacterName('__')).toBe('all_symbols');
+    expect(validateCharacterName('-_~=.')).toBe('all_symbols');
+  });
+
+  it('拒絕未開放的符號與 emoji', () => {
     expect(validateCharacterName('勇者!')).toBe('invalid_char');
-    expect(validateCharacterName('He_ro')).toBe('invalid_char');
     expect(validateCharacterName('勇者★')).toBe('invalid_char');
     expect(validateCharacterName('勇者😀')).toBe('invalid_char');
     expect(validateCharacterName('<script>')).toBe('invalid_char');
+    expect(validateCharacterName('a|b')).toBe('invalid_char');
+    expect(validateCharacterName('a/b')).toBe('invalid_char');
+    expect(validateCharacterName('a+b')).toBe('invalid_char');
+    expect(validateCharacterName('a%b')).toBe('invalid_char');
+  });
+
+  it('含符號時長度上限仍為 12', () => {
+    expect(validateCharacterName('a-b-c-d-e-fg')).toBeNull();
+    expect(validateCharacterName('a-b-c-d-e-fgh')).toBe('too_long');
   });
 });
 

@@ -9,6 +9,16 @@
  *   POST /api/stats              更新既有角色統計（需 Turnstile），未註冊回 404
  */
 
+/**
+ * 現行資料版本，必須與客戶端 `client/src/config.ts` 的 CURRENT_DATA_VERSION 一致。
+ *
+ * 這個常數是「清理舊角色」的唯一機制（見 docs/design/45-legacy-archive.md § 45.4）：
+ * 提高版本並部署後，所有舊版本的資料立即失效 —— 不出現在排行榜、不佔用名稱、不接受更新。
+ * 刻意不讓客戶端指定要刪哪筆資料：character_id 在 snapshot 中是公開的，
+ * 若接受客戶端的刪除請求，任何人都能刪除他人的排行榜紀錄。
+ */
+const CURRENT_DATA_VERSION = 3;
+
 /** 12 個可排行的欄位。此陣列是唯一會被拼進 SQL 的來源，不接受任何外部輸入。 */
 const RANK_FIELDS = [
   'character_level', 'monstersKilled', 'bossesKilled', 'deathCount',
@@ -23,8 +33,12 @@ const SNAPSHOT_COLUMNS = ['character_id', 'character_name', 'class_name', ...RAN
 /** 除 character_level 外的統計欄位（POST /api/stats 更新用） */
 const STAT_FIELDS = RANK_FIELDS.filter(f => f !== 'character_level');
 
-/** § 19.4 角色名稱規則：中英數，2~12 字，禁止符號與空白 */
-const NAME_PATTERN = /^[A-Za-z0-9一-龥]{2,12}$/;
+/**
+ * § 19.4 角色名稱規則：中英數 + `- _ ~ = .`，2~12 字，至少含一個中英數，禁止空白。
+ * 符號可置於任意位置（含開頭與結尾）。
+ * 必須與客戶端 `models/characterIdentity.ts` 的 CHARACTER_NAME_PATTERN 一致。
+ */
+const NAME_PATTERN = /^(?=.*[A-Za-z0-9一-龥])[A-Za-z0-9一-龥\-_~=.]{2,12}$/;
 
 const DEFAULT_TOP = 20;
 const MAX_TOP = 100;
@@ -110,8 +124,10 @@ async function handleSnapshot(url, env) {
   const columns = SNAPSHOT_COLUMNS.join(', ');
   const statements = RANK_FIELDS.map(field =>
     env.MayanaidleD1.prepare(
-      `SELECT ${columns} FROM character_stats ORDER BY ${field} DESC, character_id ASC LIMIT ?`
-    ).bind(top)
+      `SELECT ${columns} FROM character_stats
+       WHERE data_version = ?
+       ORDER BY ${field} DESC, character_id ASC LIMIT ?`
+    ).bind(CURRENT_DATA_VERSION, top)
   );
 
   const results = await env.MayanaidleD1.batch(statements);
@@ -137,9 +153,10 @@ async function handleNameCheck(url, env) {
   const invalid = validateName(name);
   if (invalid) return jsonResponse({ available: false, reason: invalid });
 
+  // 已淘汰版本的資料不佔用名稱：玩家提高資料版本後，仍拿得回自己原本的名字
   const row = await env.MayanaidleD1
-    .prepare('SELECT character_id FROM character_stats WHERE name_key = ?')
-    .bind(toNameKey(name))
+    .prepare('SELECT character_id FROM character_stats WHERE name_key = ? AND data_version = ?')
+    .bind(toNameKey(name), CURRENT_DATA_VERSION)
     .first();
 
   return jsonResponse(
@@ -169,13 +186,25 @@ async function handleRegister(request, env) {
     return jsonResponse({ error: 'class_name_required' }, 400);
   }
 
+  if (toCount(body.data_version) !== CURRENT_DATA_VERSION) {
+    // 舊版客戶端（快取到舊 bundle）：其資料已被新版淘汰，不可再寫入
+    return jsonResponse({ error: 'outdated_client', current: CURRENT_DATA_VERSION }, 409);
+  }
+
   const name = character_name.normalize('NFC');
+  const nameKey = toNameKey(name);
+
+  // 回收已淘汰版本佔用的名稱與 id，讓玩家能沿用原本的角色名（§ 45.4）
+  await env.MayanaidleD1
+    .prepare('DELETE FROM character_stats WHERE (name_key = ? OR character_id = ?) AND data_version < ?')
+    .bind(nameKey, character_id, CURRENT_DATA_VERSION)
+    .run();
 
   try {
     await env.MayanaidleD1.prepare(`
-      INSERT INTO character_stats (character_id, character_name, name_key, character_level, class_name)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(character_id, name, toNameKey(name), toCount(body.character_level) || 1, class_name).run();
+      INSERT INTO character_stats (character_id, character_name, name_key, character_level, class_name, data_version)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(character_id, name, nameKey, toCount(body.character_level) || 1, class_name, CURRENT_DATA_VERSION).run();
   } catch (err) {
     const message = String(err?.message ?? '');
     if (message.includes('name_key')) {
@@ -187,7 +216,7 @@ async function handleRegister(request, env) {
         .prepare('SELECT name_key FROM character_stats WHERE character_id = ?')
         .bind(character_id)
         .first();
-      if (existing && existing.name_key === toNameKey(name)) {
+      if (existing && existing.name_key === nameKey) {
         return jsonResponse({ success: true, already_registered: true });
       }
       return jsonResponse({ error: 'character_id_taken' }, 409);
@@ -217,20 +246,25 @@ async function handleUpdateStats(request, env) {
     return jsonResponse({ error: 'class_name_required' }, 400);
   }
 
+  if (toCount(body.data_version) !== CURRENT_DATA_VERSION) {
+    return jsonResponse({ error: 'outdated_client', current: CURRENT_DATA_VERSION }, 409);
+  }
+
   const assignments = STAT_FIELDS.map(field => `${field} = ?`).join(', ');
   const result = await env.MayanaidleD1.prepare(`
     UPDATE character_stats
     SET character_level = ?, class_name = ?, ${assignments}, updated_at = datetime('now')
-    WHERE character_id = ?
+    WHERE character_id = ? AND data_version = ?
   `).bind(
     toCount(body.character_level),
     body.class_name,
     ...STAT_FIELDS.map(field => toCount(body[field])),
-    character_id
+    character_id,
+    CURRENT_DATA_VERSION
   ).run();
 
   if (!result.meta.changes) {
-    // 尚未註冊（或 D1 已清空重建）→ 客戶端應改走 /api/character/register
+    // 尚未註冊、或該筆資料屬於已淘汰的版本 → 客戶端改走 /api/character/register
     return jsonResponse({ error: 'not_registered' }, 404);
   }
 

@@ -1,6 +1,8 @@
 # MayanaIdle 設計文件索引
 
 > **AI 必讀**：實作任何功能前，必須先查閱此索引找到對應文件，閱讀完整規格後再動手。不可憑記憶或假設實作。
+>
+> **要改版本號或部署前**，先讀 `docs/RELEASE.md`（操作手冊：三種版本的差異、部署順序、會遇到的問題）。
 
 ---
 
@@ -65,6 +67,8 @@
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文 |
+| 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
+| 資料版本淘汰（CURRENT_DATA_VERSION） | `19-account-character.md` | § 19.9 |
 
 ### 依限制查找
 
@@ -225,6 +229,8 @@
 18-data-schema.md（User/Character 關係、character uuid）←→ 13-town.md（個人倉庫共用）
        ↕
 37-statistics.md（角色名稱唯一性／註冊 API／排行榜以 uuid 為 key）
+       ↕
+45-legacy-archive.md（資料版本淘汰 → 快照封存；統計欄位語意不可變更）
 
 35-inventory-constraints.md ←→ 20-attributes.md（負重公式）
        ↕                              ↕

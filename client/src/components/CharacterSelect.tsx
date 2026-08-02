@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../models/character';
+import { listArchives } from '../systems/legacyArchive';
 
 const MAX_CHARACTERS = 4;
 
@@ -8,6 +10,14 @@ export function CharacterSelect() {
   const selectCharacter = useGameStore(s => s.selectCharacter);
   const deleteCharacter = useGameStore(s => s.deleteCharacter);
   const setPhase = useGameStore(s => s.setPhase);
+  const userId = useGameStore(s => s.userId);
+  const [hasLegacy, setHasLegacy] = useState(false);
+
+  // 遺產入口只在有封存紀錄時出現（§ 45.3）
+  useEffect(() => {
+    if (!userId) return;
+    listArchives(userId).then(rows => setHasLegacy(rows.length > 0));
+  }, [userId]);
 
   const emptySlots = MAX_CHARACTERS - characterList.length;
 
@@ -42,6 +52,12 @@ export function CharacterSelect() {
           </div>
         ))}
       </div>
+
+      {hasLegacy && (
+        <button className="btn-secondary btn-legacy" onClick={() => setPhase('legacy')}>
+          📜 遺產
+        </button>
+      )}
     </div>
   );
 }

@@ -98,6 +98,11 @@ export function StatisticsCenter() {
       markStatsUploaded(myUuid, payload);
       return;
     } catch (err) {
+      if (err instanceof LeaderboardError && err.code === 'outdated_client') {
+        // 部署期間的版本落差，或瀏覽器快取到舊 bundle
+        setMessage('遊戲已更新，請重新整理頁面以繼續上傳統計');
+        return;
+      }
       if (!(err instanceof LeaderboardError) || err.code !== 'not_registered') {
         // 上傳失敗不擋排行榜瀏覽
         return;

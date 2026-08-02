@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS character_stats (
   name_key       TEXT NOT NULL UNIQUE,
   character_level INTEGER DEFAULT 0,
   class_name TEXT NOT NULL,
+  -- 客戶端的 CURRENT_DATA_VERSION（config.ts）。低於 Worker 內建版本的資料視為已淘汰：
+  -- 不出現在排行榜、不佔用名稱、不接受更新。見 docs/design/45-legacy-archive.md § 45.4
+  data_version INTEGER NOT NULL DEFAULT 0,
   monstersKilled INTEGER DEFAULT 0,
   bossesKilled INTEGER DEFAULT 0,
   deathCount INTEGER DEFAULT 0,
@@ -31,6 +34,8 @@ CREATE TABLE IF NOT EXISTS character_stats (
 
 -- 12 個排行欄位皆須建 index：/api/snapshot 對每個欄位各跑一次
 -- ORDER BY <field> DESC LIMIT N，沒有 index 會退化成全表排序。
+-- snapshot 的每個查詢都帶 WHERE data_version = ?，故排行欄位的 index 以 data_version 開頭
+CREATE INDEX IF NOT EXISTS idx_data_version ON character_stats(data_version);
 CREATE INDEX IF NOT EXISTS idx_level ON character_stats(character_level DESC);
 CREATE INDEX IF NOT EXISTS idx_monsters_killed ON character_stats(monstersKilled DESC);
 CREATE INDEX IF NOT EXISTS idx_bosses_killed ON character_stats(bossesKilled DESC);

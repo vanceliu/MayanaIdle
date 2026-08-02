@@ -72,8 +72,26 @@ export interface CharacterStorageEntry {
   amount: number;
 }
 
+/**
+ * 遺產封存（§ 45.2）。`payload` 必須是 JSON **字串**，不可存成物件 ——
+ * 存物件等於把當時的型別結構寫進 DB，日後型別改動會讓舊紀錄變成無法解讀的殘骸。
+ */
+export interface LegacyArchiveEntry {
+  id?: number;
+  userId: number;
+  type: 'character' | 'sharedWarehouse';
+  /** 列表用摘要，不需解析 payload 即可顯示 */
+  label: string;
+  className?: string;
+  level?: number;
+  dataVersion: number;
+  archivedAt: number;
+  payload: string;
+}
+
 export class GameDB extends Dexie {
   characters!: Table<Character>;
+  legacyArchives!: Table<LegacyArchiveEntry>;
   monsterTemplates!: Table<MonsterTemplate>;
   equipmentTemplates!: Table<EquipmentTemplate>;
   equipmentInstances!: Table<EquipmentInstance>;
@@ -179,6 +197,13 @@ export class GameDB extends Dexie {
       await tx.table('characters').toCollection().modify((char: Record<string, unknown>) => {
         if (!char.uuid) char.uuid = generateCharacterUuid();
       });
+    });
+    // 遺產封存（§ 45）：被 dataVersion 淘汰的角色在刪除前寫入這裡。
+    // 註：「清空所有舊角色」不在 Dexie 版本裡做，而是由 `config.ts` 的 CURRENT_DATA_VERSION
+    // 搭配 `systems/dataVersionPurge.ts` 處理。Dexie 的版本是給結構遷移用的，
+    // 資料淘汰走 dataVersion 這條線，兩者互相獨立。
+    this.version(13).stores({
+      legacyArchives: '++id, userId, type, archivedAt',
     });
   }
 }

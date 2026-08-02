@@ -4,6 +4,7 @@ import { CharacterCreate } from '../CharacterCreate';
 import { useGameStore } from '../../stores/gameStore';
 import { LeaderboardError } from '../../services/leaderboardService';
 import type { Attributes, ClassName } from '../../models/character';
+import { CHARACTER_NAME_ERROR_MESSAGES } from '../../models/characterIdentity';
 
 /**
  * @vitest-environment jsdom
@@ -52,7 +53,7 @@ describe('CharacterCreate 名稱驗證與註冊', () => {
     typeName('勇 者');
 
     await waitFor(() => {
-      expect(screen.getByText('名稱只能使用中文、英文或數字，不可有符號或空白')).toBeDefined();
+      expect(screen.getByText(CHARACTER_NAME_ERROR_MESSAGES.invalid_char)).toBeDefined();
     });
 
     fireEvent.click(screen.getByText('開始冒險'));

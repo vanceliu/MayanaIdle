@@ -83,6 +83,7 @@ CREATE TABLE character_stats (
   name_key       TEXT NOT NULL UNIQUE,   -- NFC + 小寫，名稱唯一性以此判定
   character_level INTEGER DEFAULT 0,
   class_name TEXT NOT NULL,
+  data_version INTEGER NOT NULL DEFAULT 0,  -- 見 § 37.4.8
   monstersKilled INTEGER DEFAULT 0,
   bossesKilled INTEGER DEFAULT 0,
   deathCount INTEGER DEFAULT 0,
@@ -112,6 +113,8 @@ CREATE TABLE character_stats (
 | GET | `/api/name-check?name=` | 否 | 角色名稱可用性預檢（UX 用） |
 | POST | `/api/character/register` | 是 | 建立角色時註冊名稱，重複回 409 `name_taken` |
 | POST | `/api/stats` | 是 | 更新既有角色統計，**UPDATE-only**，未註冊回 404 `not_registered` |
+
+兩個寫入端點都必須帶 `data_version`，與伺服端不符時回 409 `outdated_client`（見 § 37.4.8）。
 
 `/api/stats` 刻意不做 upsert：若允許 INSERT，未經 register 的角色就能繞過名稱唯一性檢查。
 該端點亦不更新 `character_name` —— 名稱在註冊時固定，避免改名頂替他人。
@@ -166,6 +169,25 @@ CREATE TABLE character_stats (
 ### 37.4.7 排行榜欄位
 
 所有 § 37.1 統計欄位皆可作為排行依據。「我的統計」分頁一律讀本地資料，不打 API。
+
+### 37.4.8 資料版本與舊角色清理
+
+`character_stats` 帶有 `data_version` 欄位，Worker 內建一份 `CURRENT_DATA_VERSION`
+常數（必須與客戶端 `config.ts` 一致，跟著 `wrangler deploy` 上線）。
+
+| 端點 | 對舊版本資料的行為 |
+|---|---|
+| `GET /api/snapshot` | 只回傳現行版本 → 被淘汰的角色自動從排行榜消失 |
+| `GET /api/name-check` | 舊版本資料**不佔用名稱** → 玩家拿得回自己原本的角色名 |
+| `POST /api/character/register` | 註冊前刪除同名或同 id 的舊版本資料；客戶端版本不符回 409 `outdated_client` |
+| `POST /api/stats` | 只更新現行版本的資料；版本不符回 409 |
+
+> **不可讓客戶端指定要刪除哪一筆排行榜資料**：`character_id` 在 snapshot 中是公開的，
+> 若接受以 uuid 為憑證的刪除請求，任何人都能刪除他人的紀錄。
+> 清理必須是「版本本身的效果」，由伺服端自行判定。
+
+舊版客戶端（快取到舊 bundle）會收到 409，無法再寫入 —— 這是刻意的，
+提高資料版本即代表舊資料已失效。
 
 ---
 

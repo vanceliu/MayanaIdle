@@ -784,6 +784,232 @@ button.active {
   inset: 0;
 }
 
+/* 開機失敗畫面：取代靜默卡住的標題頁（見 docs/RELEASE.md § 7.3） */
+.init-error-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
+.init-error-screen h2 {
+  font-family: var(--font-display);
+  color: var(--accent-danger);
+  font-size: var(--fs-title);
+}
+
+.init-error-detail {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  max-width: 460px;
+  line-height: 1.6;
+}
+
+/* --- 遺產頁（§ 45.3）：唯讀，僅有返回角色選擇一個出口 --- */
+.btn-legacy {
+  margin-top: 20px;
+}
+
+.legacy-screen {
+  background: var(--bg-panel);
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-panel);
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.legacy-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+}
+
+.legacy-header h2 {
+  font-family: var(--font-display);
+  color: var(--accent-primary);
+  font-size: var(--fs-title);
+}
+
+.legacy-body {
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+  flex: 1;
+}
+
+.legacy-list {
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legacy-list-item {
+  position: relative;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.legacy-list-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.legacy-list-item.active {
+  border-color: var(--accent-primary);
+}
+
+.legacy-list-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.legacy-list-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.legacy-list-sub {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+
+.legacy-list-meta {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.legacy-list-item .btn-delete-char {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.legacy-content {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.legacy-section {
+  margin-bottom: 18px;
+}
+
+.legacy-section h4 {
+  font-family: var(--font-display);
+  color: var(--accent-primary);
+  font-size: var(--fs-sm);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.legacy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.legacy-grid > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.legacy-grid span {
+  color: var(--text-secondary);
+}
+
+.legacy-grid strong {
+  color: var(--text-primary);
+}
+
+.legacy-item-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legacy-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.legacy-item-suffix {
+  color: var(--accent-gold);
+}
+
+.legacy-item-affixes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.legacy-affix {
+  color: var(--accent-info);
+  font-size: var(--fs-xs);
+}
+
+.legacy-item-amount {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.legacy-empty {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  padding: 8px;
+}
+
+/* 建置版本標示：固定於左下角，不可攔截點擊 */
+.build-label {
+  position: fixed;
+  left: 6px;
+  bottom: 4px;
+  z-index: 50;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.5;
+  user-select: none;
+  cursor: default;
+}
+
+.build-label:hover {
+  opacity: 1;
+}
+
 /* Pixi 初始化失敗時的提示，取代靜默的空白畫布 */
 .map-init-error {
   position: absolute;

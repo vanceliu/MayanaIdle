@@ -8,6 +8,7 @@
 
 import { getTurnstileToken } from './turnstile';
 import { validateCharacterName } from '../models/characterIdentity';
+import { CURRENT_DATA_VERSION } from '../config';
 
 const LEADERBOARD_API = 'https://leaderboard-api.westwind3122.workers.dev';
 
@@ -96,6 +97,8 @@ export type LeaderboardErrorCode =
   | 'name_taken'
   | 'invalid_name'
   | 'not_registered'
+  /** 客戶端資料版本落後（多半是快取到舊 bundle），伺服端拒絕寫入 */
+  | 'outdated_client'
   | 'turnstile'
   | 'server';
 
@@ -276,7 +279,7 @@ export async function registerCharacter(input: {
     res = await fetch(`${LEADERBOARD_API}/api/character/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...input, turnstile_token }),
+      body: JSON.stringify({ ...input, data_version: CURRENT_DATA_VERSION, turnstile_token }),
     });
   } catch {
     throw new LeaderboardError('network');
@@ -285,6 +288,7 @@ export async function registerCharacter(input: {
   if (res.ok) return;
 
   const body = await res.json().catch(() => ({}) as { error?: string });
+  if (res.status === 409 && body.error === 'outdated_client') throw new LeaderboardError('outdated_client');
   if (res.status === 409 && body.error === 'name_taken') throw new LeaderboardError('name_taken');
   if (res.status === 400 && body.error === 'invalid_name') throw new LeaderboardError('invalid_name');
   if (res.status === 403) throw new LeaderboardError('turnstile');
@@ -380,7 +384,7 @@ export async function uploadStats(payload: CharacterStatsPayload): Promise<void>
     res = await fetch(`${LEADERBOARD_API}/api/stats`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, turnstile_token }),
+      body: JSON.stringify({ ...payload, data_version: CURRENT_DATA_VERSION, turnstile_token }),
     });
   } catch {
     throw new LeaderboardError('network');
@@ -388,6 +392,7 @@ export async function uploadStats(payload: CharacterStatsPayload): Promise<void>
 
   if (res.ok) return;
   if (res.status === 404) throw new LeaderboardError('not_registered');
+  if (res.status === 409) throw new LeaderboardError('outdated_client');
   if (res.status === 403) throw new LeaderboardError('turnstile');
   throw new LeaderboardError('server', `stats ${res.status}`);
 }

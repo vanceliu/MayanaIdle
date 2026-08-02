@@ -8,6 +8,7 @@ import {
   type Attributes,
 } from '../models/character';
 import {
+  CHARACTER_NAME_ALLOWED_SYMBOLS,
   CHARACTER_NAME_ERROR_MESSAGES,
   CHARACTER_NAME_MAX_LENGTH,
   generateCharacterUuid,
@@ -128,6 +129,11 @@ export function CharacterCreate() {
           setSubmitError('無法連線到伺服器，角色名稱需連線驗證，請稍後再試');
           return;
         }
+        if (err.code === 'outdated_client') {
+          // 部署期間的版本落差，或瀏覽器快取到舊 bundle
+          setSubmitError('遊戲已更新，請重新整理頁面後再建立角色');
+          return;
+        }
         if (err.code === 'turnstile') {
           setSubmitError('人機驗證失敗，請重新整理後再試');
           return;
@@ -154,7 +160,12 @@ export function CharacterCreate() {
       case 'check_failed':
         return <span className="name-hint error">無法連線檢查名稱，建立時會再確認一次</span>;
       default:
-        return <span className="name-hint">中文、英文或數字，2~{CHARACTER_NAME_MAX_LENGTH} 個字</span>;
+        return (
+          <span className="name-hint">
+            中文、英文、數字，2~{CHARACTER_NAME_MAX_LENGTH} 個字；
+            可使用符號 {CHARACTER_NAME_ALLOWED_SYMBOLS}，不可有空白
+          </span>
+        );
     }
   }
 

@@ -20,6 +20,7 @@ import {
 import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
+import { purgeOutdatedData } from '../systems/dataVersionPurge';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
@@ -43,7 +44,8 @@ import { resolveEquipment } from '../systems/templateSync';
 import { findScrollInBag, consumeTownScroll, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database';
 
-export type GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'result' | 'dead';
+/** `legacy` 為遺產頁（§ 45.3）：唯讀，只能返回 characterSelect，不可進入任何遊玩畫面 */
+export type GamePhase = 'title' | 'characterSelect' | 'create' | 'legacy' | 'explore' | 'combat' | 'result' | 'dead';
 export type SearchMode = 'auto' | 'manual';
 
 export interface CombatLog {
@@ -382,10 +384,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const char = await db.characters.get(characterId);
     if (!char) return;
 
+    // 開機時已掃過一次，這裡是保險：匯入還原的角色也可能帶著過期的 dataVersion。
+    // 一律走同一個清除流程，避免兩處邏輯不一致而留下孤兒資料。
     if (!char.dataVersion || char.dataVersion < CURRENT_DATA_VERSION) {
-      await db.equipmentInstances.where('ownerId').equals(char.id!).delete();
-      await db.characterBag.where('characterId').equals(char.id!).delete();
-      await db.characters.delete(char.id!);
+      await purgeOutdatedData();
       await get().loadCharacterList();
       return;
     }
