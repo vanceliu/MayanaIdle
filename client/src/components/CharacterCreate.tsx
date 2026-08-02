@@ -53,6 +53,10 @@ export function CharacterCreate() {
 
   // 名稱可用性預檢（UX 用）。真正的唯一性由建立時的註冊 API 保證。
   useEffect(() => {
+    // 每次輸入變動都要遞增：否則本機驗證失敗而提前 return 時，
+    // 仍在路上的舊請求回來後會通過新舊比對，把錯誤提示蓋成「此名稱可以使用」
+    const seq = ++requestSeqRef.current;
+
     if (!trimmedName) {
       setNameStatus({ kind: 'idle' });
       return;
@@ -64,7 +68,6 @@ export function CharacterCreate() {
     }
 
     setNameStatus({ kind: 'checking' });
-    const seq = ++requestSeqRef.current;
     const timer = setTimeout(async () => {
       try {
         const result = await checkNameAvailable(trimmedName);

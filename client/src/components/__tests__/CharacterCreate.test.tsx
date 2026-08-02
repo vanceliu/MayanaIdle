@@ -131,6 +131,32 @@ describe('CharacterCreate 名稱驗證與註冊', () => {
     expect(createCharacter).not.toHaveBeenCalled();
   });
 
+  it('遲到的名稱檢查結果不可覆蓋當前的錯誤提示', async () => {
+    // 第一個名稱的請求刻意延遲，模擬網路較慢時使用者已經改了輸入
+    let resolveSlow: (value: { available: boolean; reason: null }) => void = () => {};
+    checkNameAvailable.mockImplementationOnce(
+      () => new Promise(resolve => { resolveSlow = resolve; }),
+    );
+
+    render(<CharacterCreate />);
+    allocateAllPoints();
+    typeName('勇者');
+    await waitFor(() => expect(checkNameAvailable).toHaveBeenCalled());
+
+    // 使用者改成含空白的名稱（本機驗證即失敗）
+    typeName('勇 者');
+    await waitFor(() => {
+      expect(screen.getByText(CHARACTER_NAME_ERROR_MESSAGES.invalid_char)).toBeDefined();
+    });
+
+    // 此時第一個請求才回來，不可把錯誤提示蓋掉
+    resolveSlow({ available: true, reason: null });
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(screen.getByText(CHARACTER_NAME_ERROR_MESSAGES.invalid_char)).toBeDefined();
+    expect(screen.queryByText('此名稱可以使用')).toBeNull();
+  });
+
   it('屬性點未分配完時不可建立', () => {
     render(<CharacterCreate />);
     typeName('勇者');
