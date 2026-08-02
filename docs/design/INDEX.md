@@ -23,6 +23,12 @@
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
 | 武器傷害（小怪/大怪） | `06-equipment.md` | § 6.11 |
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
+| 裝備數量分配（各類型各階梯幾把） | `06-equipment-acquire.md` | § 6A.8.1~6A.8.3 |
+| 武器/防具素質曲線（TTK 校準） | `06-equipment-acquire.md` | § 6A.8.4 |
+| 職業效率反向補償（武器數值） | `06-equipment-acquire.md` | § 6A.8.5 |
+| 武器走向（均衡/高攻擊/命中/屬性型） | `06-equipment-acquire.md` | § 6A.8.4a |
+| T7 招牌武器（每職業 3 把） | `06-equipment-acquire.md` | § 6A.8.2b |
+| 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
 | 戰鬥公式（攻擊/防禦/命中/迴避） | `21-combat-formula.md` | 全文 |
@@ -109,19 +115,8 @@
 |---|---|---|
 | `06-equipment.md` | 裝備核心系統 | 部位、武器類型、**強化規則**、壞刀 |
 | `06-equipment-acquire.md` | 裝備取得 | 商店購買/鐵匠製作、價格表 |
-| `06-equipment-weapons.md` | 武器模板索引 | 各武器類型子文件連結 |
-| `06-equipment-weapons-onesword.md` | 單手劍（25） | 屬性、職業限制 |
-| `06-equipment-weapons-dagger.md` | 匕首（12） | 屬性、職業限制 |
-| `06-equipment-weapons-oneaxe.md` | 單手斧（8） | 屬性、職業限制 |
-| `06-equipment-weapons-mace.md` | 單手鈍器（8） | 屬性、職業限制 |
-| `06-equipment-weapons-staff.md` | 法杖（14） | 屬性、職業限制 |
-| `06-equipment-weapons-twosword.md` | 雙手劍（11） | 屬性、職業限制 |
-| `06-equipment-weapons-twoaxe.md` | 雙手斧（10） | 屬性、職業限制 |
-| `06-equipment-weapons-bow.md` | 弓（17） | 屬性、職業限制 |
-| `06-equipment-weapons-twostaff.md` | 雙手法杖（8） | 屬性、職業限制 |
-| `06-equipment-weapons-dualblade.md` | 雙刀（7） | 屬性、職業限制 |
-| `06-equipment-weapons-claw.md` | 鋼爪（7） | 屬性、職業限制 |
-| `06-equipment-weapons-shield.md` | 盾牌（6） | 防禦力、格擋率 |
+| `06-equipment-weapons.md` | 武器模板索引 | ⚠️ **逐把清單已由產生器取代**，見 `06-equipment-acquire.md` § 6A.4 |
+| `06-equipment-weapons-*.md` | 各類型武器子文件（12 份） | ⚠️ 同上，數量與素質以 `equipmentSeeds.ts` 為準 |
 | `06-equipment-armor.md` | 防具模板 | 全防具清單、屬性 |
 | `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
 | `08-quality.md` | 品質系統 | 0%~20%、品質石、影響範圍 |
@@ -185,7 +180,7 @@
 | `15-excluded.md` | 排除系統 | 不做的功能 |
 | `17-mvp-priority.md` | MVP 順序 | 五階段優先順序 |
 | `98-online-architecture.md` | 線上化架構設計 | 統一 tick、事件驅動、資料分層、Buffer 策略、Auto-scaling |
-| `99-ai-constraints.md` | AI 限制 | 67 條限制 + 待補規格 |
+| `99-ai-constraints.md` | AI 限制 | 78 條限制 + 進行中的分階段計畫 |
 
 ---
 
@@ -195,10 +190,17 @@
 
 ```
 06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 13-town.md（鐵匠鋪）
-       ↕                                                    ↕
-06-equipment-acquire.md                              30-items.md（材料/卷軸）
+       ↕                    ↕                              ↕
+06-equipment-acquire.md ────┘（§ 6A.6 各管道詞綴 Tier 上限 ←→ § 7.2 取得方式）
+       ↕                                              30-items.md（材料/卷軸）
        ↕
 06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md（武器強度 vs 怪物防禦）
+       ↕
+06-equipment-acquire.md § 6A.8（數量分配＋素質曲線）
+  → client/scripts/generateWeaponSeeds.mts（依 § 6A.8 三張表產生武器 seed）
+  ← 由 client/scripts/calibrateTTK.mts 反推；改動下列任一者需重跑校準：
+    21-combat-formula.md / 20-attributes.md / 04-character.md / 05-skill.md
+    22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 07-affix.md
 
 03-combat.md ←→ 04-character.md ←→ 05-skill.md ←→ 20-attributes.md
        ↕                                    ↕

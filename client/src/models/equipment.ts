@@ -38,7 +38,39 @@ export function isAccessorySlot(slot: EquipSlot): boolean {
 export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' | 'orichalcum';
 
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
+
+/**
+ * 裝備階級（`06-equipment-acquire.md` § 6A.8）。單一刻度取代舊的 shopTier／craftTier。
+ *
+ * | 分組 | Tier | 取得 | 詞綴上限 |
+ * |---|---|---|---|
+ * | 低階 | 1~3 | 商店可買 | T3 |
+ * | 中階 | 4~5 | 鐵匠製作 | T5 |
+ * | 高階 | 6 | 僅一般怪物掉落 | T7 |
+ * | 高階 | 7 | 僅 Boss 掉落 | T7 |
+ *
+ * 與詞綴 Tier 規則對稱：T1~T5 靠買／做／強化，T6 靠打怪，T7 靠打 Boss。
+ *
+ * 不變式：tier N+1 的素質天花板必須嚴格大於 tier N。
+ * 與「詞綴 Tier」同為 1~7 但意義不同，UI 顯示需標明「裝備Tier」。
+ */
+export type EquipmentTier = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** 商店可販售的最高裝備階級（低階 = T1~T3） */
+export const MAX_SHOP_TIER = 3;
+
+/** 鐵匠可製作的最高裝備階級（中階 = T4~T5）。T6/T7 為掉落限定 */
+export const MAX_CRAFT_TIER = 5;
+
+/** 僅一般怪物掉落的階級 */
+export const MONSTER_DROP_ONLY_TIER = 6;
+
+/** 僅 Boss 掉落的階級 */
+export const BOSS_DROP_ONLY_TIER = 7;
+
+/** @deprecated 由 `tier` 取代，僅供舊資料遷移期間讀取 */
 export type CraftTier = 'entry' | 'mid' | 'top';
+/** @deprecated 由 `tier` 取代，僅供舊資料遷移期間讀取 */
 export type ShopTier = 'low' | 'mid' | 'high';
 
 export interface CraftMaterial {
@@ -86,7 +118,11 @@ export interface EquipmentTemplate {
   stability?: number;
   canBreak?: boolean;
   acquireType?: AcquireType;
+  /** 裝備階級 1~7（§ 6A.8）。取代 shopTier / craftTier。 */
+  tier?: EquipmentTier;
+  /** @deprecated 由 `tier` 取代 */
   shopTier?: ShopTier;
+  /** @deprecated 由 `tier` 取代 */
   craftTier?: CraftTier;
   craftGold?: number;
   craftMaterials?: CraftMaterial[];
@@ -95,6 +131,12 @@ export interface EquipmentTemplate {
 
 export interface EquipmentInstance {
   id?: number;
+  /**
+   * 該實例的詞綴 Tier 硬上限（`06-equipment-acquire.md` § 6A.6）。
+   * 商店購買時寫入 3；掉落與製作品為 `undefined`，走預設上限 5。
+   * 屬於實例而非模板 —— 同一模板由怪物掉落取得時不受限。
+   */
+  maxAffixTier?: number;
   templateId: number;
   name: string;
   type: WeaponType | 'armor';

@@ -6,6 +6,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { db } from '../../db/database';
 import { loadTemplateCache } from '../../systems/templateSync';
+import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 
 /**
  * @vitest-environment jsdom
@@ -110,8 +111,12 @@ describe('TownBlacksmith - Crafting', () => {
 
     const state = useGameStore.getState();
     const crafted = state.inventory.find(i => i.name === '精鋼劍')!;
-    expect(crafted.smallMonsterDamage).toBe(11);
-    expect(crafted.largeMonsterDamage).toBe(8);
+    // 素質對照 seed 而非寫死數字 —— 寫死會讓每次數值調整都要改測試，
+    // 而這個測試要驗的是「製作出來的實例有正確繼承模板」，不是特定數值
+    const template = EQUIPMENT_SEEDS.find(t => t.name === '精鋼劍')!;
+    expect(crafted.smallMonsterDamage).toBe(template.smallMonsterDamage);
+    expect(crafted.largeMonsterDamage).toBe(template.largeMonsterDamage);
+    expect(crafted.extraAttack).toBe(template.extraAttack);
     expect(crafted.type).toBe('sword');
     expect(crafted.slot).toBe('rightHand');
     expect(crafted.quality).toBe(0);
@@ -163,26 +168,25 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
-        { name: '霜凍結晶', type: 'material', amount: 20 },
-        { name: '不死骨髓', type: 'material', amount: 20 },
-        { name: '百柱蛛絲', type: 'material', amount: 20 },
-        { name: '遠古騎士紋章', type: 'material', amount: 20 },
-        { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
+        { name: '妖魔鬥士護符', type: 'material', amount: 30 },
+        { name: '幻獸水晶', type: 'material', amount: 30 },
+        { name: '巨人指骨', type: 'material', amount: 30 },
+        { name: '米索利碎片', type: 'material', amount: 30 },
       ],
       inventory: [
-        { id: 9001, templateId: 0, name: '銀騎士之劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
+        { id: 9001, templateId: 0, name: '暗影彎刀', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
       ],
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('屠龍者'));
+    fireEvent.click(await screen.findByText('巴風特之刃'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
 
     await waitFor(() => {
       const state = useGameStore.getState();
-      const crafted = state.inventory.find(i => i.name === '屠龍者')!;
+      const crafted = state.inventory.find(i => i.name === '巴風特之刃')!;
       expect(crafted.stability).toBe(0);
     });
   });
@@ -191,17 +195,16 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
-        { name: '霜凍結晶', type: 'material', amount: 20 },
-        { name: '不死骨髓', type: 'material', amount: 20 },
-        { name: '百柱蛛絲', type: 'material', amount: 20 },
-        { name: '遠古騎士紋章', type: 'material', amount: 20 },
-        { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
+        { name: '妖魔鬥士護符', type: 'material', amount: 30 },
+        { name: '幻獸水晶', type: 'material', amount: 30 },
+        { name: '巨人指骨', type: 'material', amount: 30 },
+        { name: '米索利碎片', type: 'material', amount: 30 },
       ],
       inventory: [],
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('屠龍者'));
+    fireEvent.click(await screen.findByText('巴風特之刃'));
 
     const craftBtns = screen.getAllByText('製作');
     expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
@@ -211,26 +214,25 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
-        { name: '霜凍結晶', type: 'material', amount: 20 },
-        { name: '不死骨髓', type: 'material', amount: 20 },
-        { name: '百柱蛛絲', type: 'material', amount: 20 },
-        { name: '遠古騎士紋章', type: 'material', amount: 20 },
-        { name: '奧里哈魯根碎片', type: 'material', amount: 20 },
+        { name: '妖魔鬥士護符', type: 'material', amount: 30 },
+        { name: '幻獸水晶', type: 'material', amount: 30 },
+        { name: '巨人指骨', type: 'material', amount: 30 },
+        { name: '米索利碎片', type: 'material', amount: 30 },
       ],
       inventory: [
-        { id: 9002, templateId: 0, name: '銀騎士之劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 15, enhancement: 6, stability: 6, affixes: [{ id: 'atk1', tier: 2, value: 5 }], ownerId: 1, equipped: false } as any,
+        { id: 9002, templateId: 0, name: '暗影彎刀', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 15, enhancement: 6, stability: 6, affixes: [{ id: 'atk1', tier: 2, value: 5 }], ownerId: 1, equipped: false } as any,
       ],
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
-    fireEvent.click(await screen.findByText('屠龍者'));
+    fireEvent.click(await screen.findByText('巴風特之刃'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
 
     await waitFor(() => {
       const state = useGameStore.getState();
-      const crafted = state.inventory.find(i => i.name === '屠龍者');
+      const crafted = state.inventory.find(i => i.name === '巴風特之刃');
       expect(crafted).toBeDefined();
       expect(state.inventory.find(i => i.name === '銀騎士之劍')).toBeUndefined();
     });

@@ -207,10 +207,38 @@ export function rollAffixValue(tier: number, type?: AffixType): number {
   return Math.floor(Math.random() * (t.max - t.min + 1)) + t.min;
 }
 
-export function generateAffixes(category: AffixCategory, areaLevel: number, slotCount: number = 4, isBoss: boolean = false): Affix[] {
+/**
+ * 商店購買的裝備：詞綴 Tier 硬上限（`06-equipment-acquire.md` § 6A.6）。
+ * 生成時只會滾到 T3，且鐵匠鋪的詞綴強化也升不過 T3。
+ */
+export const SHOP_MAX_AFFIX_TIER = 3;
+
+/** 一般裝備的詞綴強化上限（`07-affix.md` § 7.2）。T6/T7 只能靠掉落原生取得。 */
+export const DEFAULT_MAX_AFFIX_TIER = 5;
+
+export interface GenerateAffixOptions {
+  /** Tier 硬上限。商店裝傳 `SHOP_MAX_AFFIX_TIER`；掉落／製作不傳。 */
+  maxTier?: number;
+  /** 均等隨機 Tier（不查區域權重表）。商店與製作品用，掉落品不用。 */
+  uniformTier?: boolean;
+  /**
+   * 禁止特殊詞綴（免疫類）。§ 6A.6：商店品與製作品都不會出現特殊詞綴，
+   * 只有掉落品依 § 7.10.3 的機率生成。
+   */
+  noSpecialAffix?: boolean;
+}
+
+export function generateAffixes(
+  category: AffixCategory,
+  areaLevel: number,
+  slotCount: number = 4,
+  isBoss: boolean = false,
+  options: GenerateAffixOptions = {},
+): Affix[] {
   const pool = getAffixPoolForSlot(category);
   const available = [...pool];
-  const specialAvailable = getSpecialAffixPoolForSlot(category, areaLevel);
+  // § 6A.6：商店品與製作品不會出現特殊詞綴，只有掉落品會
+  const specialAvailable = options.noSpecialAffix ? [] : getSpecialAffixPoolForSlot(category, areaLevel);
   const specialChance = getSpecialAffixChance(areaLevel, isBoss);
   const affixes: Affix[] = [];
 
@@ -225,7 +253,10 @@ export function generateAffixes(category: AffixCategory, areaLevel: number, slot
     }
     const idx = Math.floor(Math.random() * available.length);
     const def = available.splice(idx, 1)[0];
-    const tier = rollAffixTier(areaLevel, isBoss);
+    const cap = options.maxTier ?? 7;
+    const tier = options.uniformTier
+      ? 1 + Math.floor(Math.random() * cap)
+      : Math.min(cap, rollAffixTier(areaLevel, isBoss));
     const value = rollAffixValue(tier, def.type);
     affixes.push({ type: def.type, tier, value });
   }

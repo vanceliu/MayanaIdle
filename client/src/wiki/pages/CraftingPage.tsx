@@ -3,10 +3,12 @@ import { useWeaponList, useArmorList } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
 import '../components/WikiTable.css';
 
-const TIER_LABELS: Record<string, string> = {
-  entry: '高級入門',
-  mid: '高級進階',
-  top: '頂級',
+// § 6A.8：製作品階級為 T4~T7（中階 T4~T5 / 高階 T6~T7）
+const TIER_LABELS: Record<number, string> = {
+  4: '裝備Tier 4（中階）',
+  5: '裝備Tier 5（中階）',
+  6: '裝備Tier 6（高階）',
+  7: '裝備Tier 7（高階）',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -25,12 +27,11 @@ export function CraftingPage() {
   const craftItems = useMemo(() => {
     const all = [...weapons, ...armors].filter(e => e.acquireType === 'craft');
     let list = all;
-    if (tierFilter !== 'all') list = list.filter(e => e.craftTier === tierFilter);
+    if (tierFilter !== 'all') list = list.filter(e => e.tier === Number(tierFilter));
     if (search) list = list.filter(e => e.name.includes(search));
     return list.sort((a, b) => {
-      const tierOrder = { entry: 0, mid: 1, top: 2 };
-      const ta = tierOrder[a.craftTier as keyof typeof tierOrder] ?? 0;
-      const tb = tierOrder[b.craftTier as keyof typeof tierOrder] ?? 0;
+      const ta = a.tier ?? 0;
+      const tb = b.tier ?? 0;
       if (ta !== tb) return ta - tb;
       return (a.name > b.name) ? 1 : -1;
     });
@@ -42,9 +43,10 @@ export function CraftingPage() {
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
           <option value="all">全部階級</option>
-          <option value="entry">高級入門</option>
-          <option value="mid">高級進階</option>
-          <option value="top">頂級</option>
+          <option value="4">裝備Tier 4（中階）</option>
+          <option value="5">裝備Tier 5（中階）</option>
+          <option value="6">裝備Tier 6（高階）</option>
+          <option value="7">裝備Tier 7（高階）</option>
         </select>
         <input
           className="wiki-filter-input"
@@ -89,7 +91,7 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
         <Link className="wiki-link" to={detailPath}>{item.name}</Link>
       </td>
       <td>{TYPE_LABELS[item.type] || item.type}</td>
-      <td>{TIER_LABELS[item.craftTier || ''] || '-'}</td>
+      <td>{item.tier != null ? TIER_LABELS[item.tier] ?? `裝備Tier ${item.tier}` : '-'}</td>
       <td className="cell-number">{item.craftGold?.toLocaleString() || '-'} G</td>
       <td>
         {item.craftPrerequisiteWeapon

@@ -1,28 +1,50 @@
-import type { EquipmentTemplate, EquipmentInstance } from './equipment';
+import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from './equipment';
 
-export type EquipmentTierLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+/**
+ * 顯示用階級：0 = 新手裝，1~7 = `EquipmentTier`（`06-equipment-acquire.md` § 6A.8）。
+ * 新手裝不屬於 tier 刻度，另外給 0 讓批量販售能排除它。
+ */
+export type EquipmentTierLevel = 0 | EquipmentTier;
 
+/**
+ * 裝備階級顏色 —— **與詞綴 Tier 用同一組色階**（`07-affix.md` § 7.3、`App.css` .affix-tag.tier-N），
+ * 讓「T5 是橙色」在詞綴與裝備上是同一件事，玩家只需記一套。
+ * 新手裝不在 tier 刻度上，用更暗的灰與 T1 區隔。
+ */
 export const EQUIPMENT_TIER_COLORS: Record<EquipmentTierLevel, string> = {
-  0: '#9CA3AF',  // starter - 灰色
-  1: '#FFFFFF',  // shop-low - 白色
-  2: '#60A5FA',  // shop-mid - 藍色
-  3: '#4ADE80',  // shop-high - 綠色
-  4: '#FACC15',  // craft-entry - 金色
-  5: '#FB923C',  // craft-mid - 橙色
-  6: '#EF4444',  // craft-top - 紅色
+  0: '#4B5563',  // 新手 - 暗灰
+  1: '#6B7280',  // 低階 - 灰
+  2: '#9CA3AF',  // 低階 - 亮灰
+  3: '#4ADE80',  // 低階 - 綠
+  4: '#FACC15',  // 中階 - 黃
+  5: '#FB923C',  // 中階 - 橙
+  6: '#EF4444',  // 高階 - 紅
+  7: '#A855F7',  // 高階 - 紫（帶光暈）
 };
 
 export const EQUIPMENT_TIER_NAMES: Record<EquipmentTierLevel, string> = {
   0: '新手',
-  1: '商店低階',
-  2: '商店中階',
-  3: '商店高階',
-  4: '製作入門',
-  5: '製作進階',
-  6: '製作頂級',
+  1: '低階 T1',
+  2: '低階 T2',
+  3: '低階 T3',
+  4: '中階 T4',
+  5: '中階 T5',
+  6: '高階 T6',
+  7: '高階 T7',
 };
 
-export function getEquipmentTierLevel(template: EquipmentTemplate): EquipmentTierLevel {
+/** 階級分組（§ 6A.8）：低階可在商店買到，中／高階只能鐵匠製作 */
+export function getTierGroup(tier: EquipmentTier): '低階' | '中階' | '高階' {
+  if (tier <= 3) return '低階';
+  if (tier <= 5) return '中階';
+  return '高階';
+}
+
+/**
+ * 舊資料相容：`tier` 未填時由 acquireType + shopTier/craftTier 推導。
+ * seed 全面補上 `tier` 後可移除。
+ */
+function deriveLegacyTier(template: EquipmentTemplate): EquipmentTierLevel {
   if (template.acquireType === 'starter') return 0;
   if (template.acquireType === 'shop') {
     switch (template.shopTier) {
@@ -39,6 +61,11 @@ export function getEquipmentTierLevel(template: EquipmentTemplate): EquipmentTie
     }
   }
   return 1;
+}
+
+export function getEquipmentTierLevel(template: EquipmentTemplate): EquipmentTierLevel {
+  if (template.acquireType === 'starter') return 0;
+  return template.tier ?? deriveLegacyTier(template);
 }
 
 export function getEquipmentTierColor(template: EquipmentTemplate): string {

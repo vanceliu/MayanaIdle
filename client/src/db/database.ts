@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { Character } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
 import type { MonsterTemplate } from '../models/monster';
-import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
+import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
 
 
@@ -29,8 +29,8 @@ export interface DropTableEntry {
   equipmentTemplateId?: number;
   equipmentPool?: 'weapon' | 'armor' | 'all';
   acquireType?: 'shop' | 'craft';
-  shopTier?: 'low' | 'mid' | 'high';
-  craftTier?: 'entry' | 'mid' | 'top';
+  /** 掉落池的裝備階級（§ 6A.8）。取代舊的 shopTier / craftTier。 */
+  tier?: EquipmentTier;
   itemTemplateId?: number;
   dropValue: number;
   /** 區域內依怪物等級線性遞增的掉落值上限（§ 27.3 以「50~100」標示者）。省略 = 固定值 */
@@ -46,12 +46,12 @@ export interface BossDropTableEntry {
   equipmentTemplateId?: number;
   equipmentPool?: 'weapon' | 'armor' | 'all';
   acquireType?: 'shop' | 'craft';
-  shopTier?: 'low' | 'mid' | 'high';
+  /** 掉落池的裝備階級（§ 6A.8）。取代舊的 shopTier / craftTier。 */
+  tier?: EquipmentTier;
   itemTemplateId?: number;
   dropValue: number;
   minAmount?: number;
   maxAmount?: number;
-  craftTier?: 'entry' | 'mid' | 'top';
 }
 
 export interface CharacterBagEntry {

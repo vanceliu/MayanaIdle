@@ -3,7 +3,7 @@ import { AFFIX_DEFINITIONS, getEffectiveAffixValue, isSpecialAffixType, getSpeci
 import { CLASS_NAMES_ZH } from '../models/character';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
-import { getEquipmentTierColor, getEquipmentInstanceTierColor } from '../models/equipmentTier';
+import { getEquipmentTierColor, getEquipmentInstanceTierColor, getEquipmentTierLevel, getEquipmentInstanceTierLevel } from '../models/equipmentTier';
 
 const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',
@@ -52,6 +52,8 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const baseExtraAttack = item.extraAttack ?? 0;
   const totalAttackSuccess = baseAttackSuccess + enhanceAttackSuccess;
   const tierColor = templates ? getEquipmentInstanceTierColor(item, templates) : '#FFFFFF';
+  // 「裝備Tier」與「詞綴 Tier」同為 1~7 但意義不同，標籤必須寫清楚（§ 6A.8）
+  const tierLevel = templates ? getEquipmentInstanceTierLevel(item, templates) : 0;
 
   return (
     <div className="equip-detail">
@@ -60,6 +62,9 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         {item.name} {enhancement > 0 ? `+${enhancement}` : ''}
       </div>
       {!compact && <div className="equip-detail-slot">{SLOT_NAMES[item.slot]}{item.isTwoHanded ? '（雙手）' : ''}</div>}
+      {!compact && tierLevel > 0 && (
+        <div className="equip-detail-tier" style={{ color: tierColor }}>裝備Tier: {tierLevel}</div>
+      )}
       {isWeapon && (
         <div className="equip-detail-stat">
           攻擊: {item.smallMonsterDamage}{enhancement > 0 ? `+${enhancement}` : ''}/{item.largeMonsterDamage}{enhancement > 0 ? `+${enhancement}` : ''}
@@ -148,6 +153,7 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
   const baseAttackSuccess = template.attackSuccess ?? 0;
   const baseExtraAttack = template.extraAttack ?? 0;
   const tierColor = getEquipmentTierColor(template);
+  const templateTier = getEquipmentTierLevel(template);
 
   return (
     <div className="equip-detail">
@@ -156,6 +162,9 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
         {template.name}
       </div>
       <div className="equip-detail-slot">{SLOT_NAMES[template.slot]}{template.isTwoHanded ? '（雙手）' : ''}</div>
+      {templateTier > 0 && (
+        <div className="equip-detail-tier" style={{ color: tierColor }}>裝備Tier: {templateTier}</div>
+      )}
       {isWeapon && (
         <div className="equip-detail-stat">攻擊: {template.smallMonsterDamage}/{template.largeMonsterDamage}</div>
       )}

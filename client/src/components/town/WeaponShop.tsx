@@ -6,6 +6,7 @@ import { resolveEquipment } from '../../systems/templateSync';
 import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierLevel, getEquipmentInstanceTierColor, type EquipmentTierLevel } from '../../models/equipmentTier';
+import { generateAffixes, getAffixCategoryForSlot, SHOP_MAX_AFFIX_TIER } from '../../models/affix';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -50,12 +51,22 @@ export function WeaponShop() {
     const currentBag = useGameStore.getState().bagItems;
     if (getBagUsedSlots(currentBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
 
+    // § 6A.6：商店裝在購買當下隨機生成 4 個詞綴，Tier 均等落在 T1~T3，
+    // 並記錄 maxAffixTier 讓鐵匠鋪的詞綴強化也升不過 T3。
+    const affixes = generateAffixes(
+      getAffixCategoryForSlot(template.slot, template.type),
+      char!.level,
+      4,
+      false,
+      { maxTier: SHOP_MAX_AFFIX_TIER, uniformTier: true, noSpecialAffix: true },
+    );
     const dbRecord = {
       templateId: template.id!,
       slot: template.slot,
       quality: 0,
       enhancement: 0,
-      affixes: [] as any[],
+      affixes,
+      maxAffixTier: SHOP_MAX_AFFIX_TIER,
       ownerId: char!.id!,
       equipped: false,
     };
@@ -69,7 +80,8 @@ export function WeaponShop() {
       isTwoHanded: template.isTwoHanded,
       quality: 0,
       enhancement: 0,
-      affixes: [],
+      affixes,
+      maxAffixTier: SHOP_MAX_AFFIX_TIER,
       ownerId: char!.id!,
       equipped: false,
     });

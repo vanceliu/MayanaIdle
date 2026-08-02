@@ -6,6 +6,7 @@ import {
   getEquipmentInstanceTierColor,
   EQUIPMENT_TIER_COLORS,
   EQUIPMENT_TIER_NAMES,
+  getTierGroup,
 } from '../equipmentTier';
 import type { EquipmentTemplate, EquipmentInstance } from '../equipment';
 
@@ -82,14 +83,15 @@ describe('equipmentTier', () => {
   });
 
   describe('getEquipmentTierColor', () => {
-    it('returns correct color for each tier', () => {
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'starter' }))).toBe('#9CA3AF');
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'shop', shopTier: 'low' }))).toBe('#FFFFFF');
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'shop', shopTier: 'mid' }))).toBe('#60A5FA');
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'shop', shopTier: 'high' }))).toBe('#4ADE80');
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'craft', craftTier: 'entry' }))).toBe('#FACC15');
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'craft', craftTier: 'mid' }))).toBe('#FB923C');
-      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'craft', craftTier: 'top' }))).toBe('#EF4444');
+    it('每個 tier 對應正確顏色（色階同詞綴 Tier）', () => {
+      expect(getEquipmentTierColor(makeTemplate({ acquireType: 'starter' }))).toBe('#4B5563');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 1, acquireType: 'shop' }))).toBe('#6B7280');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 2, acquireType: 'shop' }))).toBe('#9CA3AF');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 3, acquireType: 'shop' }))).toBe('#4ADE80');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 4, acquireType: 'craft' }))).toBe('#FACC15');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 5, acquireType: 'craft' }))).toBe('#FB923C');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 6, acquireType: 'craft' }))).toBe('#EF4444');
+      expect(getEquipmentTierColor(makeTemplate({ tier: 7, acquireType: 'craft' }))).toBe('#A855F7');
     });
   });
 
@@ -128,17 +130,64 @@ describe('equipmentTier', () => {
 
     it('returns starter color for starter gear', () => {
       const inst = makeInstance({ isStarterGear: true, templateId: 1 });
-      expect(getEquipmentInstanceTierColor(inst, templates)).toBe('#9CA3AF');
+      expect(getEquipmentInstanceTierColor(inst, templates)).toBe('#4B5563');
     });
   });
 
   describe('constants', () => {
-    it('EQUIPMENT_TIER_COLORS has 7 entries', () => {
-      expect(Object.keys(EQUIPMENT_TIER_COLORS).length).toBe(7);
+    it('EQUIPMENT_TIER_COLORS 涵蓋 0（新手）+ T1~T7', () => {
+      expect(Object.keys(EQUIPMENT_TIER_COLORS).length).toBe(8);
     });
 
-    it('EQUIPMENT_TIER_NAMES has 7 entries', () => {
-      expect(Object.keys(EQUIPMENT_TIER_NAMES).length).toBe(7);
+    it('EQUIPMENT_TIER_NAMES 涵蓋 0（新手）+ T1~T7', () => {
+      expect(Object.keys(EQUIPMENT_TIER_NAMES).length).toBe(8);
+    });
+
+    // § 6A.8：裝備階級與詞綴 Tier 共用同一組色階（App.css .affix-tag.tier-N）
+    it('T1~T7 的顏色與詞綴 Tier 色階一致', () => {
+      expect(EQUIPMENT_TIER_COLORS[1]).toBe('#6B7280');
+      expect(EQUIPMENT_TIER_COLORS[2]).toBe('#9CA3AF');
+      expect(EQUIPMENT_TIER_COLORS[3]).toBe('#4ADE80');
+      expect(EQUIPMENT_TIER_COLORS[4]).toBe('#FACC15');
+      expect(EQUIPMENT_TIER_COLORS[5]).toBe('#FB923C');
+      expect(EQUIPMENT_TIER_COLORS[6]).toBe('#EF4444');
+      expect(EQUIPMENT_TIER_COLORS[7]).toBe('#A855F7');
+    });
+
+    it('新手裝的顏色與 T1/T2 可區分', () => {
+      expect(EQUIPMENT_TIER_COLORS[0]).not.toBe(EQUIPMENT_TIER_COLORS[1]);
+      expect(EQUIPMENT_TIER_COLORS[0]).not.toBe(EQUIPMENT_TIER_COLORS[2]);
+    });
+  });
+
+  describe('tier 欄位優先於舊的 shopTier/craftTier 推導', () => {
+    it('有 tier 時直接採用', () => {
+      expect(getEquipmentTierLevel(makeTemplate({ tier: 7, acquireType: 'craft', craftTier: 'entry' }))).toBe(7);
+    });
+
+    it('沒有 tier 時退回舊推導（遷移期相容）', () => {
+      expect(getEquipmentTierLevel(makeTemplate({ acquireType: 'craft', craftTier: 'entry' }))).toBe(4);
+    });
+
+    it('新手裝一律為 0，即使填了 tier', () => {
+      expect(getEquipmentTierLevel(makeTemplate({ tier: 5, acquireType: 'starter' }))).toBe(0);
+    });
+  });
+
+  describe('getTierGroup', () => {
+    it('T1~T3 為低階（商店可買）', () => {
+      expect(getTierGroup(1)).toBe('低階');
+      expect(getTierGroup(3)).toBe('低階');
+    });
+
+    it('T4~T5 為中階', () => {
+      expect(getTierGroup(4)).toBe('中階');
+      expect(getTierGroup(5)).toBe('中階');
+    });
+
+    it('T6~T7 為高階', () => {
+      expect(getTierGroup(6)).toBe('高階');
+      expect(getTierGroup(7)).toBe('高階');
     });
   });
 });

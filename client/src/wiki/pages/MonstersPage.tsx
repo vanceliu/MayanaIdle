@@ -239,21 +239,18 @@ function BossDropSection({ bossName }: { bossName: string }) {
             {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
               if (isEquip && d.equipmentPool === 'all') {
-                const tierParam = d.acquireType === 'shop' && d.shopTier
-                  ? `shop-${d.shopTier}`
-                  : (d.craftTier || 'entry');
-                const tierLabel = d.acquireType === 'shop' && d.shopTier
-                  ? (d.shopTier === 'high' ? '高階' : d.shopTier === 'mid' ? '中階' : '低階')
-                  : (d.craftTier === 'top' ? '頂級' : d.craftTier === 'mid' ? '高級進階' : '高級入門');
+                // § 6A.8：掉落池以裝備階級 tier 表示
+                const tierParam = String(d.tier ?? '');
+                const tierLabel = d.tier != null ? `裝備Tier ${d.tier}` : '';
                 return [
                   <tr key={`${d.itemType}-${i}-weapon`}>
-                    <td><Link className="wiki-link" to={`/wiki/weapons?craftTier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
+                    <td><Link className="wiki-link" to={`/wiki/weapons?tier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
                     <td>裝備</td>
                     <td className="cell-number">{getDropRate(d.dropValue)}</td>
                     <td className="cell-number">-</td>
                   </tr>,
                   <tr key={`${d.itemType}-${i}-armor`}>
-                    <td><Link className="wiki-link" to={`/wiki/armor?craftTier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
+                    <td><Link className="wiki-link" to={`/wiki/armor?tier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
                     <td>裝備</td>
                     <td className="cell-number">{getDropRate(d.dropValue)}</td>
                     <td className="cell-number">-</td>
@@ -265,15 +262,11 @@ function BossDropSection({ bossName }: { bossName: string }) {
               if (isEquip) {
                 if (d.equipmentPool) {
                   if (d.equipmentPool === 'weapon') {
-                    const tierParam = d.acquireType === 'shop' && d.shopTier
-                      ? `shop-${d.shopTier}`
-                      : (d.craftTier || 'entry');
-                    equipLink = `/wiki/weapons?craftTier=${tierParam}`;
+                    const tierParam = String(d.tier ?? '');
+                    equipLink = `/wiki/weapons?tier=${tierParam}`;
                   } else if (d.equipmentPool === 'armor') {
-                    const tierParam = d.acquireType === 'shop' && d.shopTier
-                      ? `shop-${d.shopTier}`
-                      : (d.craftTier || 'entry');
-                    equipLink = `/wiki/armor?craftTier=${tierParam}`;
+                    const tierParam = String(d.tier ?? '');
+                    equipLink = `/wiki/armor?tier=${tierParam}`;
                   }
                 } else if (d.equipmentTemplateId) {
                   equipLink = ARMOR_NAMES.has(name)
@@ -327,21 +320,18 @@ function AreaDropSection({ area }: { area: string }) {
             {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
               if (isEquip && d.equipmentPool === 'all') {
-                const tierParam = d.acquireType === 'shop' && d.shopTier
-                  ? `shop-${d.shopTier}`
-                  : (d.craftTier || 'entry');
-                const tierLabel = d.acquireType === 'shop' && d.shopTier
-                  ? (d.shopTier === 'high' ? '高階' : d.shopTier === 'mid' ? '中階' : '低階')
-                  : (d.craftTier === 'top' ? '頂級' : d.craftTier === 'mid' ? '高級進階' : '高級入門');
+                // § 6A.8：掉落池以裝備階級 tier 表示
+                const tierParam = String(d.tier ?? '');
+                const tierLabel = d.tier != null ? `裝備Tier ${d.tier}` : '';
                 return [
                   <tr key={`${d.itemType}-${i}-weapon`}>
-                    <td><Link className="wiki-link" to={`/wiki/weapons?craftTier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
+                    <td><Link className="wiki-link" to={`/wiki/weapons?tier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
                     <td>裝備</td>
                     <td className="cell-number">{getDropRate(d.dropValue)}</td>
                     <td className="cell-number">-</td>
                   </tr>,
                   <tr key={`${d.itemType}-${i}-armor`}>
-                    <td><Link className="wiki-link" to={`/wiki/armor?craftTier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
+                    <td><Link className="wiki-link" to={`/wiki/armor?tier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
                     <td>裝備</td>
                     <td className="cell-number">{getDropRate(d.dropValue)}</td>
                     <td className="cell-number">-</td>
@@ -353,15 +343,11 @@ function AreaDropSection({ area }: { area: string }) {
               if (isEquip) {
                 if (d.equipmentPool) {
                   if (d.equipmentPool === 'weapon') {
-                    const tierParam = d.acquireType === 'shop' && d.shopTier
-                      ? `shop-${d.shopTier}`
-                      : (d.craftTier || 'entry');
-                    equipLink = `/wiki/weapons?craftTier=${tierParam}`;
+                    const tierParam = String(d.tier ?? '');
+                    equipLink = `/wiki/weapons?tier=${tierParam}`;
                   } else if (d.equipmentPool === 'armor') {
-                    const tierParam = d.acquireType === 'shop' && d.shopTier
-                      ? `shop-${d.shopTier}`
-                      : (d.craftTier || 'entry');
-                    equipLink = `/wiki/armor?craftTier=${tierParam}`;
+                    const tierParam = String(d.tier ?? '');
+                    equipLink = `/wiki/armor?tier=${tierParam}`;
                   }
                 } else if (d.equipmentTemplateId) {
                   equipLink = ARMOR_NAMES.has(name)

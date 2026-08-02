@@ -49,21 +49,20 @@ export function useDropSourceForItem(itemName: string): DropTableEntry[] {
   return DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === item.id);
 }
 
-export function getDropItemName(drop: { itemTemplateId?: number; equipmentTemplateId?: number; equipmentPool?: string; craftTier?: string; acquireType?: string; shopTier?: string; itemType: string }): string {
+/** 掉落池的裝備池標籤（§ 6A.8：階級以「裝備Tier N」表示） */
+export function getDropPoolLabel(tier: number | undefined, pool: string | undefined): string {
+  const poolLabel = pool === 'weapon' ? '武器' : pool === 'armor' ? '防具' : '裝備';
+  return tier == null ? `${poolLabel}（隨機）` : `裝備Tier ${tier} ${poolLabel}（隨機）`;
+}
+
+export function getDropItemName(drop: { itemTemplateId?: number; equipmentTemplateId?: number; equipmentPool?: string; tier?: number; acquireType?: string; itemType: string }): string {
   if (drop.itemType === 'gold') return '金幣';
   if (drop.itemType === 'equipment' && drop.equipmentTemplateId) {
     const equip = EQUIPMENT_SEEDS.find(e => e.id === drop.equipmentTemplateId);
     return equip?.name ?? '未知裝備';
   }
   if (drop.itemType === 'equipment' && drop.equipmentPool) {
-    if (drop.acquireType === 'shop' && drop.shopTier) {
-      const tierLabel = drop.shopTier === 'high' ? '高階' : drop.shopTier === 'mid' ? '中階' : '低階';
-      const poolLabel = drop.equipmentPool === 'weapon' ? '武器' : drop.equipmentPool === 'armor' ? '防具' : '裝備';
-      return `${tierLabel}${poolLabel}（隨機）`;
-    }
-    const tierLabel = drop.craftTier === 'top' ? '頂級' : drop.craftTier === 'mid' ? '高級進階' : '高級入門';
-    const poolLabel = drop.equipmentPool === 'weapon' ? '武器' : '防具';
-    return `${tierLabel}${poolLabel}（隨機）`;
+    return getDropPoolLabel(drop.tier, drop.equipmentPool);
   }
   if (drop.itemTemplateId) {
     return getItemById(drop.itemTemplateId)?.name ?? '未知道具';

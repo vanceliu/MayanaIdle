@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, getAffixTierTable, rollAffixValue, getAffixPoolForSlot, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, type AffixCategory, type Affix } from '../../models/affix';
-import { CRAFT_TIER_NAMES } from '../../models/crafting';
+import { AFFIX_DEFINITIONS, getAffixTierTable, rollAffixValue, getAffixPoolForSlot, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
+import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
@@ -213,7 +213,8 @@ export function TownBlacksmith() {
     const affix = item.affixes[affixIdx];
     // § 7.10.2 特殊詞綴不可強化
     if (isSpecialAffixType(affix.type)) return;
-    if (affix.tier >= 5) return;
+    // § 6A.6：商店購買的裝備硬上限 T3，其餘走預設 T5
+    if (affix.tier >= (item.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER)) return;
 
     const newTier = affix.tier + 1;
     const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
@@ -569,7 +570,7 @@ export function TownBlacksmith() {
                   {` | ${recipe.canBreak === false ? '不壞刀' : '會壞刀'}`}
                 </span>
                 <span className="shop-item-desc">
-                  {recipe.craftTier ? `${CRAFT_TIER_NAMES[recipe.craftTier]} | ` : ''}
+                  {recipe.tier != null ? `${EQUIPMENT_TIER_NAMES[recipe.tier]} | ` : ''}
                   {recipe.requiredClass && recipe.requiredClass.length > 0
                     ? recipe.requiredClass.map(c => CLASS_NAMES_ZH[c as keyof typeof CLASS_NAMES_ZH] ?? c).join('、')
                     : '全職業'}

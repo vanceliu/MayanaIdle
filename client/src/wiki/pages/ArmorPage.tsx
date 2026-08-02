@@ -26,12 +26,6 @@ const CLASS_LABELS: Record<string, string> = {
   priest: '牧師',
 };
 
-const CRAFT_TIER_LABELS: Record<string, string> = {
-  entry: '高級入門',
-  mid: '高級進階',
-  top: '頂級',
-};
-
 export function ArmorPage() {
   const { name } = useParams();
   return <ArmorList initialSearch={name ? decodeURIComponent(name) : undefined} />;
@@ -40,7 +34,7 @@ export function ArmorPage() {
 function ArmorList({ initialSearch }: { initialSearch?: string }) {
   const armors = useArmorList();
   const [searchParams, setSearchParams] = useSearchParams();
-  const craftTierParam = searchParams.get('craftTier');
+  const craftTierParam = searchParams.get('tier');
   const [slotFilter, setSlotFilter] = useState<string>('all');
   const [craftTierFilter, setCraftTierFilter] = useState<string>(craftTierParam || 'all');
   const [search, setSearch] = useState(initialSearch || '');
@@ -52,13 +46,10 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
   const filtered = useMemo(() => {
     let list = armors;
     if (slotFilter !== 'all') list = list.filter(a => a.slot === slotFilter);
+    // § 6A.8：以裝備階級 tier 篩選
     if (craftTierFilter !== 'all') {
-      if (craftTierFilter.startsWith('shop-')) {
-        const shopTier = craftTierFilter.replace('shop-', '');
-        list = list.filter(a => a.acquireType === 'shop' && a.shopTier === shopTier);
-      } else {
-        list = list.filter(a => a.acquireType === 'craft' && a.craftTier === craftTierFilter);
-      }
+      const wanted = Number(craftTierFilter);
+      list = list.filter(a => a.tier === wanted);
     }
     if (search) list = list.filter(a => a.name.includes(search));
     list = [...list].sort((a, b) => {
@@ -92,19 +83,20 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
           const val = e.target.value;
           setCraftTierFilter(val);
           if (val === 'all') {
-            searchParams.delete('craftTier');
+            searchParams.delete('tier');
           } else {
-            searchParams.set('craftTier', val);
+            searchParams.set('tier', val);
           }
           setSearchParams(searchParams, { replace: true });
         }}>
-          <option value="all">全部等級</option>
-          <option value="shop-low">商店低階</option>
-          <option value="shop-mid">商店中階</option>
-          <option value="shop-high">商店高階</option>
-          <option value="entry">{CRAFT_TIER_LABELS.entry}</option>
-          <option value="mid">{CRAFT_TIER_LABELS.mid}</option>
-          <option value="top">{CRAFT_TIER_LABELS.top}</option>
+          <option value="all">全部階級</option>
+          <option value="1">裝備Tier 1（低階）</option>
+          <option value="2">裝備Tier 2（低階）</option>
+          <option value="3">裝備Tier 3（低階）</option>
+          <option value="4">裝備Tier 4（中階）</option>
+          <option value="5">裝備Tier 5（中階）</option>
+          <option value="6">裝備Tier 6（高階）</option>
+          <option value="7">裝備Tier 7（高階）</option>
         </select>
         <input
           className="wiki-filter-input"

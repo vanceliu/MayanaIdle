@@ -38,8 +38,9 @@ describe('裝備掉落的類別抽取（§ 27.3）', () => {
     expect(pickEquipmentCategory(onlyArmors)).toHaveLength(2);
   });
 
-  it('迴歸：shop/high 池武器 16 vs 防具 1，混合均勻抽會有 94% 偏斜', () => {
-    const pool = EQUIPMENT_SEEDS.filter(t => t.acquireType === 'shop' && t.shopTier === 'high');
+  it('迴歸：裝備Tier 3 池武器遠多於防具，混合均勻抽會嚴重偏斜', () => {
+    // § 6A.8：階級改以 tier 表示，T3 = 舊的 shop/high
+    const pool = EQUIPMENT_SEEDS.filter(t => t.tier === 3);
     const weapons = pool.filter(t => isWeaponSlot(t.slot)).length;
     const armors = pool.length - weapons;
     expect(weapons).toBeGreaterThan(armors * 5);   // 確認偏斜確實存在

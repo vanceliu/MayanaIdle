@@ -4,6 +4,7 @@ import { db } from '../database';
 import { seedDatabase, resetSeedState, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../seed';
 import { loadTemplateCache, resolveEquipment } from '../../systems/templateSync';
 import { getItemById } from '../../models/items';
+import { ITEM_DEFINITIONS } from '../seed/itemSeeds';
 
 /**
  * 深入驗證：DB seed 後角色裝備、掉落表、製作配方全部能正確對應
@@ -135,12 +136,22 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
     });
 
     it('既有角色背包素材名稱在新配方或系統中仍有效', async () => {
-      const craftMaterials = ['銀礦石', '米索利碎片', '奧里哈魯根碎片'];
+      // 鐵匠製作止於 T5（T6/T7 為掉落限定，§ 6A.8.0），因此配方只用到銀與米索利兩種基底。
+      // 奧里哈魯根碎片等頂級素材在頂級配方移除後**暫時只剩賣店價值**，
+      // 這是已知的待補缺口（見 `99-ai-constraints.md` § 99.4「孤兒素材」）。
+      const craftMaterials = ['銀礦石', '米索利碎片'];
       const craftSeeds = EQUIPMENT_SEEDS.filter(s => s.craftMaterials && s.craftMaterials.length > 0);
 
       for (const mat of craftMaterials) {
         const usedIn = craftSeeds.filter(s => s.craftMaterials!.some(m => m.name === mat));
         expect(usedIn.length, `${mat} 未在任何配方中使用`).toBeGreaterThan(0);
+      }
+
+      // 頂級素材目前無配方用途，但必須保有賣店價值，否則玩家打 Boss 的掉落等於全廢
+      for (const mat of ['奧里哈魯根碎片', '遠古騎士紋章', '巨龍逆鱗']) {
+        const def = ITEM_DEFINITIONS.find(i => i.name === mat);
+        expect(def, `${mat} 不存在於道具定義`).toBeDefined();
+        expect(def!.sellPrice ?? 0, `${mat} 沒有賣店價值`).toBeGreaterThan(0);
       }
 
       // 品質石、強化石用於鐵匠鋪品質提升/詞綴強化，不在 craftMaterials 中但仍有明確用途

@@ -99,9 +99,10 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
       if (roll >= boostedDropValue) continue;
       const pickWeapon = Math.random() < 0.5;
-      const craftTier = entry.craftTier || 'entry';
+      // § 6A.8：掉落池以裝備階級 tier 比對（取代舊的 craftTier）
+      const tier = entry.tier ?? 4;
       const candidates = await db.equipmentTemplates
-        .filter(t => t.acquireType === 'craft' && t.craftTier === craftTier && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)))
+        .filter(t => t.tier === tier && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)))
         .toArray();
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(Math.random() * candidates.length)];
@@ -240,11 +241,9 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
         const pool = entry.equipmentPool;
         const candidates = await db.equipmentTemplates
           .filter(t => {
-            if (entry.acquireType === 'shop' && entry.shopTier) {
-              if (t.acquireType !== 'shop' || t.shopTier !== entry.shopTier) return false;
-            } else if (entry.acquireType === 'craft' && entry.craftTier) {
-              if (t.acquireType !== 'craft' || t.craftTier !== entry.craftTier) return false;
-            }
+            // § 6A.8：掉落池以裝備階級 tier 比對。tier 已隱含取得管道
+            // （T1~T3 = 商店可買、T4~T7 = 鐵匠製作），不需再比 acquireType。
+            if (entry.tier != null && t.tier !== entry.tier) return false;
             if (pool === 'weapon') return isWeaponSlot(t.slot);
             if (pool === 'armor') return !isWeaponSlot(t.slot);
             return true;
