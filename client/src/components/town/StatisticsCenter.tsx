@@ -1,166 +1,140 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import type { ClassName } from '../../models/character';
 import {
-  fetchLeaderboard,
+  fetchSnapshot,
+  readCachedSnapshot,
+  buildBoard,
   uploadStats,
+  registerCharacter,
+  shouldUploadStats,
+  markStatsUploaded,
+  LeaderboardError,
+  LEADERBOARD_FIELDS,
   LEADERBOARD_LABELS,
   type LeaderboardField,
-  type LeaderboardEntry,
+  type LeaderboardSnapshot,
 } from '../../services/leaderboardService';
 
-const FIELDS: LeaderboardField[] = [
-  'character_level', 'monstersKilled', 'bossesKilled', 'deathCount',
-  'equipmentCrafted', 'weaponEnhanceAttempts', 'armorEnhanceAttempts',
-  'weaponsBroken', 'armorsBroken', 'questsCompleted',
-  'totalGoldEarned', 'contribution',
-];
-
-const STALE_THRESHOLD_MS = 10 * 60 * 1000;
-
-interface FieldBoard {
-  field: LeaderboardField;
-  entries: LeaderboardEntry[];
-}
-
-interface BoardCache {
-  boards: FieldBoard[];
-  fetchedAt: number;
-}
-
-let boardsCache: BoardCache | null = null;
-let expandCache: Map<LeaderboardField, { entries: LeaderboardEntry[]; fetchedAt: number }> = new Map();
+/** 九宮格每個榜單顯示的名次數 */
+const CARD_LIMIT = 5;
+/** 展開檢視顯示的名次數（等同伺服端 snapshot 的 top） */
+const EXPANDED_LIMIT = 20;
 
 export function StatisticsCenter() {
   const character = useGameStore(s => s.character);
   const statistics = useGameStore(s => s.statistics);
   const guildProgress = useGameStore(s => s.guildProgress);
-  const [boards, setBoards] = useState<FieldBoard[]>(boardsCache?.boards ?? []);
+
+  const [snapshot, setSnapshot] = useState<LeaderboardSnapshot | null>(() => readCachedSnapshot());
   const [loading, setLoading] = useState(false);
   const [expandedField, setExpandedField] = useState<LeaderboardField | null>(null);
-  const [expandedEntries, setExpandedEntries] = useState<LeaderboardEntry[]>([]);
-  const [expandLoading, setExpandLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [tab, setTab] = useState<'leaderboard' | 'my-stats'>('leaderboard');
-  const uploadingRef = useRef(false);
+  const syncingRef = useRef(false);
+
+  const myUuid = character?.uuid ?? null;
 
   useEffect(() => {
-    if (tab === 'leaderboard') {
-      const now = Date.now();
-      if (boardsCache && now - boardsCache.fetchedAt < STALE_THRESHOLD_MS) {
-        setBoards(boardsCache.boards);
-      } else {
-        loadAllBoards();
-      }
+    if (tab !== 'leaderboard') return;
+
+    // 快取仍在 10 分鐘內 → 完全不打 API（§ 37.4.4）
+    const cached = readCachedSnapshot();
+    if (cached) {
+      setSnapshot(cached);
+      return;
     }
+    void sync();
+    // sync 只依賴 ref 與 store 快照，不需列入依賴
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  async function doUpload() {
-    if (!character || !statistics || uploadingRef.current) return;
-    uploadingRef.current = true;
-    try {
-      await uploadStats({
-        character_id: String(character.id),
-        character_name: character.name,
-        character_level: character.level,
-        class_name: character.className,
-        monstersKilled: statistics.monstersKilled,
-        bossesKilled: statistics.bossesKilled,
-        deathCount: statistics.deathCount,
-        equipmentCrafted: statistics.equipmentCrafted,
-        weaponEnhanceAttempts: statistics.weaponEnhanceAttempts,
-        armorEnhanceAttempts: statistics.armorEnhanceAttempts,
-        weaponsBroken: statistics.weaponsBroken,
-        armorsBroken: statistics.armorsBroken,
-        questsCompleted: statistics.questsCompleted,
-        totalGoldEarned: statistics.totalGoldEarned,
-        contribution: guildProgress.points,
-      });
-    } catch {
-      // silent fail
-    } finally {
-      uploadingRef.current = false;
-    }
-  }
-
-  async function loadAllBoards() {
+  /** 上傳自己的統計（必要時補註冊），再抓一次 snapshot。整趟最多 1 次 GET。 */
+  async function sync() {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setLoading(true);
     setMessage('');
     try {
-      const results = await Promise.all(
-        FIELDS.map(async field => {
-          const data = await fetchLeaderboard(field, 5);
-          return { field, entries: data.leaderboard };
-        })
-      );
-
-      if (character) {
-        const myId = String(character.id);
-        const firstBoard = results[0];
-        const myEntry = firstBoard?.entries.find(e => e.character_id === myId);
-        const now = Date.now();
-
-        if (!myEntry) {
-          await doUpload();
-          const refreshed = await Promise.all(
-            FIELDS.map(async field => {
-              const data = await fetchLeaderboard(field, 5);
-              return { field, entries: data.leaderboard };
-            })
-          );
-          setBoards(refreshed);
-          boardsCache = { boards: refreshed, fetchedAt: Date.now() };
-        } else {
-          const updatedAt = new Date(myEntry.updated_at + 'Z').getTime();
-          if (now - updatedAt > STALE_THRESHOLD_MS) {
-            await doUpload();
-            const refreshed = await Promise.all(
-              FIELDS.map(async field => {
-                const data = await fetchLeaderboard(field, 5);
-                return { field, entries: data.leaderboard };
-              })
-            );
-            setBoards(refreshed);
-            boardsCache = { boards: refreshed, fetchedAt: Date.now() };
-          } else {
-            setBoards(results);
-            boardsCache = { boards: results, fetchedAt: Date.now() };
-          }
-        }
-      } else {
-        setBoards(results);
-        boardsCache = { boards: results, fetchedAt: Date.now() };
-      }
-    } catch {
-      setBoards([]);
-      setMessage('無法載入排行榜');
+      await uploadOwnStats();
+      const fresh = await fetchSnapshot({ force: true });
+      setSnapshot(fresh);
+    } catch (err) {
+      if (!snapshot) setMessage(err instanceof LeaderboardError && err.code === 'network'
+        ? '無法連線到排行榜伺服器'
+        : '無法載入排行榜');
     } finally {
       setLoading(false);
+      syncingRef.current = false;
     }
   }
 
-  async function handleExpand(field: LeaderboardField) {
-    setExpandedField(field);
+  async function uploadOwnStats() {
+    if (!character || !statistics || !myUuid) return;
+    if (!shouldUploadStats(myUuid)) return;
 
-    const cached = expandCache.get(field);
-    const now = Date.now();
-    if (cached && now - cached.fetchedAt < STALE_THRESHOLD_MS) {
-      setExpandedEntries(cached.entries);
-      return;
-    }
+    const payload = {
+      character_id: myUuid,
+      class_name: character.className,
+      character_level: character.level,
+      monstersKilled: statistics.monstersKilled,
+      bossesKilled: statistics.bossesKilled,
+      deathCount: statistics.deathCount,
+      equipmentCrafted: statistics.equipmentCrafted,
+      weaponEnhanceAttempts: statistics.weaponEnhanceAttempts,
+      armorEnhanceAttempts: statistics.armorEnhanceAttempts,
+      weaponsBroken: statistics.weaponsBroken,
+      armorsBroken: statistics.armorsBroken,
+      questsCompleted: statistics.questsCompleted,
+      totalGoldEarned: statistics.totalGoldEarned,
+      contribution: guildProgress.points,
+    };
 
-    setExpandLoading(true);
     try {
-      const data = await fetchLeaderboard(field, 20);
-      setExpandedEntries(data.leaderboard);
-      expandCache.set(field, { entries: data.leaderboard, fetchedAt: Date.now() });
-    } catch {
-      setExpandedEntries([]);
-    } finally {
-      setExpandLoading(false);
+      await uploadStats(payload);
+      markStatsUploaded(myUuid);
+      return;
+    } catch (err) {
+      if (!(err instanceof LeaderboardError) || err.code !== 'not_registered') {
+        // 上傳失敗不擋排行榜瀏覽
+        return;
+      }
+    }
+
+    // 尚未註冊：v12 之前建立的舊角色，或伺服端資料曾被清空 → 補註冊後重送
+    try {
+      await registerCharacter({
+        character_id: myUuid,
+        character_name: character.name,
+        class_name: character.className,
+        character_level: character.level,
+      });
+      await uploadStats(payload);
+      markStatsUploaded(myUuid);
+    } catch (err) {
+      if (err instanceof LeaderboardError && err.code === 'name_taken') {
+        setMessage('角色名稱已被其他玩家使用，此角色無法登上排行榜');
+      } else if (err instanceof LeaderboardError && err.code === 'invalid_name') {
+        setMessage('角色名稱不符合現行規則，此角色無法登上排行榜');
+      }
     }
   }
+
+  // 12 個榜單全部由同一份 snapshot 在本地切出，不再各打一支 API
+  const boards = useMemo(
+    () => (snapshot
+      ? LEADERBOARD_FIELDS.map(field => ({ field, entries: buildBoard(snapshot, field, CARD_LIMIT) }))
+      : []),
+    [snapshot],
+  );
+
+  const expandedEntries = useMemo(
+    () => (snapshot && expandedField ? buildBoard(snapshot, expandedField, EXPANDED_LIMIT) : []),
+    [snapshot, expandedField],
+  );
+
+  const isMine = (characterId: string) => !!myUuid && myUuid === characterId;
 
   return (
     <div className="statistics-center">
@@ -191,7 +165,7 @@ export function StatisticsCenter() {
                 <div
                   key={board.field}
                   className="stats-card"
-                  onClick={() => handleExpand(board.field)}
+                  onClick={() => setExpandedField(board.field)}
                 >
                   <div className="stats-card-title">{LEADERBOARD_LABELS[board.field]}</div>
                   <div className="stats-card-list">
@@ -201,7 +175,7 @@ export function StatisticsCenter() {
                       board.entries.map(entry => (
                         <div
                           key={entry.character_id}
-                          className={`stats-card-row ${character && String(character.id) === entry.character_id ? 'my-row' : ''}`}
+                          className={`stats-card-row ${isMine(entry.character_id) ? 'my-row' : ''}`}
                         >
                           <span className="stats-card-rank">{entry.rank}</span>
                           <span className="stats-card-name">
@@ -233,15 +207,13 @@ export function StatisticsCenter() {
               <span className="stats-col-name">角色名稱</span>
               <span className="stats-col-value">{LEADERBOARD_LABELS[expandedField]}</span>
             </div>
-            {expandLoading ? (
-              <div className="stats-loading">載入中...</div>
-            ) : expandedEntries.length === 0 ? (
+            {expandedEntries.length === 0 ? (
               <div className="stats-empty">暫無資料</div>
             ) : (
               expandedEntries.map(entry => (
                 <div
                   key={entry.character_id}
-                  className={`stats-table-row ${character && String(character.id) === entry.character_id ? 'my-row' : ''}`}
+                  className={`stats-table-row ${isMine(entry.character_id) ? 'my-row' : ''}`}
                 >
                   <span className="stats-col-rank">{entry.rank}</span>
                   <span className="stats-col-name">
@@ -259,7 +231,7 @@ export function StatisticsCenter() {
       {tab === 'my-stats' && statistics && (
         <div className="stats-my">
           <div className="stats-my-grid">
-            {FIELDS.map(f => {
+            {LEADERBOARD_FIELDS.map(f => {
               let value = 0;
               if (f === 'character_level') {
                 value = character?.level ?? 0;

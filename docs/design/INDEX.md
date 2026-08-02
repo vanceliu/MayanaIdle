@@ -222,7 +222,9 @@
 
 19-account-character.md ←→ 04-character.md（職業/初始配置）
        ↕
-18-data-schema.md（User/Character 關係）←→ 13-town.md（個人倉庫共用）
+18-data-schema.md（User/Character 關係、character uuid）←→ 13-town.md（個人倉庫共用）
+       ↕
+37-statistics.md（角色名稱唯一性／註冊 API／排行榜以 uuid 為 key）
 
 35-inventory-constraints.md ←→ 20-attributes.md（負重公式）
        ↕                              ↕

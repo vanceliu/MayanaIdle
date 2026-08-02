@@ -33,6 +33,13 @@ export function getGearAttributeBonus(
 
 export interface Character {
   id?: number;
+  /**
+   * 全球唯一識別碼（crypto.randomUUID()），排行榜以此為 key。
+   * 不可改用 `id` —— 那是 IndexedDB 自增值，每個玩家的第一隻角色都是 1，
+   * 上傳後會在 D1 互相覆蓋（見 `docs/design/37-statistics.md` § 37.4.2）。
+   * 選填是為了相容 DB v12 以前建立的舊角色，v12 upgrade 會補發。
+   */
+  uuid?: string;
   userId: number;
   name: string;
   className: ClassName;

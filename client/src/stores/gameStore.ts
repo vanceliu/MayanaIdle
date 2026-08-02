@@ -19,6 +19,7 @@ import {
 } from '../models/quickSlot';
 import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
+import { generateCharacterUuid } from '../models/characterIdentity';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
@@ -218,7 +219,8 @@ interface GameState {
   selectCharacter: (characterId: number) => Promise<void>;
   deleteCharacter: (characterId: number) => Promise<void>;
   logout: () => Promise<void>;
-  createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes) => Promise<void>;
+  /** `uuid` 由建立畫面先產生並向排行榜註冊，註冊成功後才傳入（§ 19.4）；省略時自行產生。 */
+  createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes, uuid?: string) => Promise<void>;
   loadCharacter: () => Promise<boolean>;
   startExploring: () => void;
   stopExploring: () => void;
@@ -549,7 +551,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     await get().loadCharacterList();
   },
 
-  createCharacter: async (name, className, bonusAttrs) => {
+  createCharacter: async (name, className, bonusAttrs, uuid) => {
     const userId = get().userId;
     if (!userId) return;
 
@@ -566,6 +568,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const char: Character = {
+      uuid: uuid ?? generateCharacterUuid(),
       userId,
       name,
       className,

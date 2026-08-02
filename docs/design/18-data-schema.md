@@ -31,6 +31,18 @@
 - shops
 - shop_items
 
+### characters 的識別欄位
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id | number (PK) | 本機 IndexedDB 自增值，**僅本機有效** |
+| uuid | string | 全球唯一識別碼（`crypto.randomUUID()`），跨裝置／跨玩家的唯一 key |
+| name | string | 角色名稱，全球唯一（見 `19-account-character.md` § 19.4） |
+
+> **不可用 `id` 當作對外識別**：`id` 是每個瀏覽器各自的自增值，所有玩家的第一隻角色都是 `1`。
+> 任何送往伺服端的角色識別（排行榜、未來的線上化）一律使用 `uuid`。
+> `uuid` 於 DB version 12 導入，既有角色在 upgrade 時補發。
+
 ## 18.2 裝備實例需要注意
 
 裝備不是只有 item template。

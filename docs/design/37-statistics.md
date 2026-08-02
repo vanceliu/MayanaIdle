@@ -69,15 +69,20 @@ interface CharacterStatistics {
 ### 37.4.1 架構
 
 - **後端**：Cloudflare Worker + D1（SQLite）
-- **防偽造**：Cloudflare Turnstile（非互動式驗證）
-- **前端快取**：記憶體快取，10 分鐘內不重複請求
+- **防偽造**：Cloudflare Turnstile（非互動式驗證），僅寫入端點需要
+- **前端快取**：localStorage 快取 snapshot，10 分鐘內不重複請求
+- **核心原則**：整個統計中心**只打一支 GET `/api/snapshot`**，12 個榜單全部由同一份 snapshot
+  在客戶端排序切片。展開 Top 20、切換榜單皆不再發請求。
 
 ### 37.4.2 D1 資料表
 
 ```sql
 CREATE TABLE character_stats (
-  character_id TEXT PRIMARY KEY,
+  character_id   TEXT PRIMARY KEY,       -- 客戶端 crypto.randomUUID()
   character_name TEXT NOT NULL,
+  name_key       TEXT NOT NULL UNIQUE,   -- NFC + 小寫，名稱唯一性以此判定
+  character_level INTEGER DEFAULT 0,
+  class_name TEXT NOT NULL,
   monstersKilled INTEGER DEFAULT 0,
   bossesKilled INTEGER DEFAULT 0,
   deathCount INTEGER DEFAULT 0,
@@ -89,27 +94,63 @@ CREATE TABLE character_stats (
   questsCompleted INTEGER DEFAULT 0,
   totalGoldEarned INTEGER DEFAULT 0,
   contribution INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 ```
 
+> **`character_id` 必須是 uuid**：IndexedDB 的自增 `id` 在每個瀏覽器各自從 1 開始，
+> 用它當 PK 會讓所有玩家的第一隻角色互相覆蓋。見 `18-data-schema.md`。
+>
+> **12 個排行欄位皆須建 index**：snapshot 對每個欄位各跑一次 `ORDER BY <field> DESC LIMIT N`。
+
 ### 37.4.3 API 端點
 
-| 方法 | 路徑 | 說明 |
-|------|------|------|
-| POST | `/api/stats` | Upsert 角色統計（需 Turnstile token） |
-| GET | `/api/leaderboard/:field?limit=N` | 取得指定欄位排行榜（最大 100） |
-| GET | `/api/stats/:characterId` | 查詢單一角色統計 |
+| 方法 | 路徑 | Turnstile | 說明 |
+|------|------|-----------|------|
+| GET | `/api/snapshot?top=N` | 否 | 12 欄位各 top-N 的聯集（去重），columnar 格式。N 預設 20、上限 100 |
+| GET | `/api/name-check?name=` | 否 | 角色名稱可用性預檢（UX 用） |
+| POST | `/api/character/register` | 是 | 建立角色時註冊名稱，重複回 409 `name_taken` |
+| POST | `/api/stats` | 是 | 更新既有角色統計，**UPDATE-only**，未註冊回 404 `not_registered` |
 
-### 37.4.4 上傳時機
+`/api/stats` 刻意不做 upsert：若允許 INSERT，未經 register 的角色就能繞過名稱唯一性檢查。
+該端點亦不更新 `character_name` —— 名稱在註冊時固定，避免改名頂替他人。
 
-- 進入排行榜時，若自己不在榜上 → 自動上傳
-- 進入排行榜時，若在榜上但 `updated_at` 超過 10 分鐘 → 自動重新上傳
-- 10 分鐘內重複進入 → 使用本地快取，不打 API
+### 37.4.4 snapshot 格式與排名正確性
 
-### 37.4.5 排行榜欄位
+```json
+{ "top": 20, "count": 137,
+  "fields": ["character_id", "character_name", "class_name", "character_level", …, "updated_at"],
+  "rows": [["uuid-…", "勇者", "knight", 52, …], …] }
+```
 
-所有 § 37.1 統計欄位皆可作為排行依據。
+每個角色在 `rows` 中只出現一次（12 個 top-N 查詢結果去重）。
+
+**為何客戶端切出的名次等同全球真實名次**：設回傳集合為 S，對任一欄位 f，S ⊇ f 的真實 top-N。
+客戶端把 S 依 f 排序取前 N 時，S 中不屬於真實 top-N 的 row，其 f 值必定 ≤ 第 N 名，
+只會落在 N 名之後。因此結果與總玩家數無關，**不會因為玩家變多而失準**。
+
+> **不可改成「取全表前 X 筆」**：任何單一順序的截斷都會讓其他 11 個榜單漏掉真正的前段班
+> （例如久未上線但「武器爆掉數」第一的玩家）。
+
+**同分序必須決定性**：伺服端 `ORDER BY <field> DESC, character_id ASC`，
+客戶端 `buildBoard` 使用相同比較子，否則邊界名次會在兩端之間跳動。
+
+### 37.4.5 上傳與快取時機
+
+| 時機 | 行為 |
+|------|------|
+| 開啟統計中心，snapshot 快取未滿 10 分鐘 | **完全不打 API**，直接用快取切榜單 |
+| 開啟統計中心，快取已過期 | 先上傳自己的統計（同樣 10 分鐘節流，各角色獨立），再抓 1 次 snapshot |
+| 上傳時收到 404 `not_registered` | 自動補註冊後重送（DB v12 之前建立的舊角色走此路徑） |
+| 補註冊收到 409 `name_taken` / 400 `invalid_name` | 顯示提示，該角色不上榜；排行榜仍可正常瀏覽 |
+| 展開 Top 20、切換榜單 | 從同一份 snapshot 切片，不發請求 |
+
+快取鍵：`mayana_leaderboard_snapshot`（snapshot 本體）、`mayana_stats_upload_<uuid>`（上傳時間戳）。
+
+### 37.4.6 排行榜欄位
+
+所有 § 37.1 統計欄位皆可作為排行依據。「我的統計」分頁一律讀本地資料，不打 API。
 
 ---
 

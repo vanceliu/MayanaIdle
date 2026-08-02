@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { Character } from '../models/character';
+import { generateCharacterUuid } from '../models/characterIdentity';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
@@ -168,6 +169,15 @@ export class GameDB extends Dexie {
         const affixes = item.affixes as { type: string }[] | undefined;
         if (!affixes?.some(a => REMOVED.has(a.type))) return;
         item.affixes = affixes.filter(a => !REMOVED.has(a.type));
+      });
+    });
+    // 排行榜改以全球唯一的 uuid 為 key（§ 37.4.2）。
+    // 舊角色只有 IndexedDB 自增 id，每個玩家的第一隻角色都是 1，上傳後會互相覆蓋，故補發 uuid。
+    this.version(12).stores({
+      characters: '++id, name, className, createdAt, userId, uuid',
+    }).upgrade(async tx => {
+      await tx.table('characters').toCollection().modify((char: Record<string, unknown>) => {
+        if (!char.uuid) char.uuid = generateCharacterUuid();
       });
     });
   }

@@ -1034,6 +1034,32 @@ button.active {
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
 }
 
+/* 角色名稱即時驗證提示（§ 19.4） */
+.name-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.name-hint.ok {
+  color: var(--accent-success);
+}
+
+.name-hint.error {
+  color: var(--accent-danger);
+}
+
+.create-error {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent-danger);
+  border-radius: var(--radius-md);
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--accent-danger);
+  font-size: var(--fs-sm);
+}
+
 .class-buttons {
   display: flex;
   gap: 6px;
