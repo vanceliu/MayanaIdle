@@ -147,9 +147,9 @@ export function CharacterStats() {
       <div className="char-stats-grid">
         <div className="stat-group">
           <div className="stat-group-title">基礎屬性</div>
-          <StatRow label="STR" value={attrs.STR} tip={{ desc: '力量。影響近戰攻擊力與負重上限。', formula: '近戰攻擊 +1 / 每 2 點；負重 +200 / 每 2 點', note: '每 2 點才生效一次，奇數無效（STR 13 以 12 計算）' }} />
+          <StatRow label="STR" value={attrs.STR} tip={{ desc: '力量。提升近戰攻擊力。', formula: '近戰攻擊 +1 / 每 2 點', note: '每 2 點才生效一次，奇數無效（STR 13 以 12 計算）' }} />
           <StatRow label="AGI" value={attrs.AGI} tip={{ desc: '敏捷。影響命中率與迴避率。', formula: '命中 +1、迴避 +1 / 每 3 點', note: '每 3 點才生效一次（AGI 8 以 6 計算）' }} />
-          <StatRow label="VIT" value={attrs.VIT} tip={{ desc: '體質。影響升級 HP 成長、每次回血與負重上限。', formula: '升級 HP +random(VIT-6, VIT-3)；回血 +1 / 每 2 點', note: '升級成長使用原始值，回血使用每 2 點生效的有效值' }} />
+          <StatRow label="VIT" value={attrs.VIT} tip={{ desc: '體質。影響升級 HP 成長與每次回血量。', formula: '升級 HP +random(VIT-6, VIT-3)；回血 +1 / 每 2 點', note: '升級成長使用原始值，回血使用每 2 點生效的有效值' }} />
           <StatRow label="SPI" value={attrs.SPI} tip={{ desc: '精神。影響升級 MP 成長、每次回魔與魔法抗性。', formula: '升級 MP +random(SPI-6, SPI-3)；回魔 +1、魔法抗性 +1% / 每 2 點', note: '魔法抗性是抵擋怪物魔法傷害的來源之一' }} />
           <StatRow label="INT" value={attrs.INT} tip={{ desc: '智力。提升魔法技能的傷害與冷卻縮減。', formula: '技能傷害 +5%、冷卻縮減 +1% / 每 2 點', note: '傷害只影響走技能公式的招式，不影響普攻；冷卻縮減與詞綴加總後上限 50%' }} />
           <StatRow label="CHA" value={attrs.CHA} tip={{ desc: '魅力。規劃用於寵物攜帶數量。', note: '寵物系統尚未實作，目前此屬性沒有任何效果' }} />

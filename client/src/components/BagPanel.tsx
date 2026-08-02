@@ -1,6 +1,8 @@
 import { useState, useRef, useMemo } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, BAG_MAX_SLOTS } from '../stores/gameStore';
+import { buildBagLayout, moveBagSlot, encodeBagDrag, BAG_DRAG_MIME, type BagSlotMap } from '../models/bagLayout';
+import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
+import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
 import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
@@ -47,6 +49,10 @@ const TYPE_SORT_ORDER: Record<string, number> = {
 
 export function BagPanel() {
   const [sorted, setSorted] = useState(false);
+  /** § 35.1.3：手動拖放的位置。只存在於當下 session，不持久化 */
+  const [slotMap, setSlotMap] = useState<BagSlotMap>({});
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -54,6 +60,7 @@ export function BagPanel() {
   const character = useGameStore(s => s.character);
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
+  const equippedGear = useGameStore(s => s.equippedGear);
   const equipItem = useGameStore(s => s.equipItem);
   const usePotionByType = useGameStore(s => s.usePotionByType);
   const useTownScroll = useGameStore(s => s.useTownScroll);
@@ -104,6 +111,8 @@ export function BagPanel() {
   }
 
   const usedSlots = gridItems.length;
+  // § 35.1：背包格數 = 基礎 50 + 腰帶的 bonusBagSlots
+  const maxSlots = getBagMaxSlots(equippedGear);
 
   const displayItems = useMemo(() => {
     if (!sorted) return gridItems;
@@ -114,6 +123,22 @@ export function BagPanel() {
       return a.name.localeCompare(b.name);
     });
   }, [gridItems, sorted]);
+
+  // 手動位置優先，其餘依預設順序流入剩餘空格
+  const layout = buildBagLayout(displayItems, slotMap, maxSlots);
+
+  function handleDrop(toIndex: number) {
+    if (dragIndex == null) return;
+    setSlotMap(prev => moveBagSlot(layout, prev, dragIndex, toIndex));
+    setDragIndex(null);
+    setDragOverIndex(null);
+  }
+
+  function handleSortToggle() {
+    // 「整理」同時清掉手動擺放，回到排序後的預設排列
+    setSorted(!sorted);
+    setSlotMap({});
+  }
 
   function handleMouseEnter(e: React.MouseEvent, item: BagGridItem) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -138,10 +163,16 @@ export function BagPanel() {
   }
 
   function handleAssignSlot(slotIdx: number) {
-    if (contextMenu && contextMenu.item.potionType) {
-      assignQuickSlot(slotIdx, contextMenu.item.potionType);
-      setContextMenu(null);
-    }
+    if (!contextMenu) return;
+    const item = contextMenu.item;
+    const entry = toQuickSlotEntry(
+      item.equipment ? 'equipment' : 'bag',
+      item.name,
+      item.equipment?.id,
+    );
+    if (!entry) return;
+    assignQuickSlot(slotIdx, entry);
+    setContextMenu(null);
   }
 
   function handleDiscard() {
@@ -247,12 +278,12 @@ export function BagPanel() {
         <span className="bag-panel-meta">
           <button
             className={`bag-sort-toggle ${sorted ? 'active' : ''}`}
-            onClick={() => setSorted(!sorted)}
+            onClick={handleSortToggle}
           >
             整理
           </button>
-          <span className={`bag-slots-count${usedSlots >= BAG_MAX_SLOTS ? ' danger' : usedSlots >= 90 ? ' warning' : ''}`}>
-            {usedSlots}/{BAG_MAX_SLOTS}
+          <span className={`bag-slots-count${usedSlots >= maxSlots ? ' danger' : usedSlots >= maxSlots * 0.9 ? ' warning' : ''}`}>
+            {usedSlots}/{maxSlots}
           </span>
         </span>
       </div>
@@ -262,15 +293,36 @@ export function BagPanel() {
       </div>
       <div className="bag-grid-container">
         <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
-          {Array.from({ length: BAG_MAX_SLOTS }).map((_, idx) => {
-            const item = displayItems[idx];
+          {layout.map((item, idx) => {
+            const dropProps = {
+              onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverIndex(idx); },
+              onDragLeave: () => setDragOverIndex(prev => (prev === idx ? null : prev)),
+              onDrop: (e: React.DragEvent) => { e.preventDefault(); handleDrop(idx); },
+            };
+            const overClass = dragOverIndex === idx ? ' drag-over' : '';
             if (!item) {
-              return <div key={`empty-${idx}`} className="bag-cell empty" />;
+              return <div key={`empty-${idx}`} className={`bag-cell empty${overClass}`} {...dropProps} />;
             }
             return (
               <div
                 key={item.id}
-                className={`bag-cell ${item.type}`}
+                className={`bag-cell ${item.type}${overClass}${dragIndex === idx ? ' dragging' : ''}`}
+                draggable
+                onDragStart={(e) => {
+                  setDragIndex(idx);
+                  setTooltip(null);
+                  // § 35.5.3：帶著描述出去，讓地圖可以判定為「丟棄」
+                  e.dataTransfer.setData(BAG_DRAG_MIME, encodeBagDrag(
+                    item.equipment
+                      ? { kind: 'equipment', name: item.name, amount: 1, equipmentId: item.equipment.id }
+                      : { kind: 'bag', name: item.name, amount: item.count ?? 1 },
+                  ));
+                  // 必須是 copyMove：快捷鍵綁定是 copy（物品留在背包）、丟到地圖是 move。
+                  // 若只給 'move'，快捷鍵的 dropEffect='copy' 會不相容，瀏覽器會直接取消放置。
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                }}
+                onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                {...dropProps}
                 onMouseEnter={(e) => handleMouseEnter(e, item)}
                 onMouseLeave={handleMouseLeave}
                 onContextMenu={(e) => handleContextMenu(e, item)}
@@ -318,19 +370,28 @@ export function BagPanel() {
             className="bag-context-menu"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
-            {contextMenu.item.potionType && (
+            {toQuickSlotEntry(
+              contextMenu.item.equipment ? 'equipment' : 'bag',
+              contextMenu.item.name,
+              contextMenu.item.equipment?.id,
+            ) && (
               <>
                 <div className="context-menu-title">設為快捷鍵</div>
-                {[0, 1, 2, 3, 4].map(idx => (
+                {Array.from({ length: QUICK_SLOT_COUNT }, (_, idx) => idx).map(idx => (
                   <button
                     key={idx}
                     className="context-menu-item"
                     onClick={() => handleAssignSlot(idx)}
                   >
-                    快捷鍵 {idx + 1}
-                    {quickSlots[idx] === contextMenu.item.potionType && (
-                      <span className="context-menu-active">●</span>
-                    )}
+                    快捷鍵 {quickSlotLabel(idx)}
+                    {isSameQuickSlotEntry(
+                      quickSlots[idx],
+                      toQuickSlotEntry(
+                        contextMenu.item.equipment ? 'equipment' : 'bag',
+                        contextMenu.item.name,
+                        contextMenu.item.equipment?.id,
+                      ),
+                    ) && <span className="context-menu-active">●</span>}
                   </button>
                 ))}
                 <div className="context-menu-divider" />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
+import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { db } from '../../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { resolveEquipment } from '../../systems/templateSync';
@@ -48,7 +48,7 @@ export function WeaponShop() {
     if (!template.buyPrice || char!.gold < template.buyPrice) return;
     const currentInv = useGameStore.getState().inventory;
     const currentBag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(currentBag, currentInv) >= BAG_MAX_SLOTS) return;
+    if (getBagUsedSlots(currentBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
 
     const dbRecord = {
       templateId: template.id!,

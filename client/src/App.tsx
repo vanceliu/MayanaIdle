@@ -6,6 +6,7 @@ import { loadTemplateCache } from './systems/templateSync';
 import { CharacterCreate } from './components/CharacterCreate';
 import { CharacterSelect } from './components/CharacterSelect';
 import { StatusPanel } from './components/StatusPanel';
+import { DiscardConfirmModal } from './components/DiscardConfirmModal';
 import { BuffBar } from './components/BuffBar';
 import { LeftPanelTabs } from './components/LeftPanelTabs';
 import { ScriptEditorModal } from './components/ScriptEditorModal';
@@ -155,6 +156,7 @@ function App() {
       </main>
       <RightPanel />
       <AttributeUpModal />
+      <DiscardConfirmModal />
     </div>
   );
 }

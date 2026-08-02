@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
+import { emptyQuickSlots } from '../../models/quickSlot';
 
 // Mock localStorage for node environment
 const localStorageMock = (() => {
@@ -46,7 +47,7 @@ describe('Game persistence', () => {
       storedMaterials: [],
       warehouseGold: 0,
       scriptRules: [],
-      quickSlots: [null, null, null, null, null],
+      quickSlots: emptyQuickSlots(),
       combatLogs: [],
       gameLoopId: null,
       hpRegenId: null,
@@ -144,26 +145,29 @@ describe('Game persistence', () => {
     localStorage.setItem(`mayana_prefs_${charId}`, JSON.stringify({ scriptRules: customRules, quickSlots: ['red', null, null, null, null] }));
 
     // Reset and reload
-    useGameStore.setState({ character: null, scriptRules: [], quickSlots: [null, null, null, null, null], phase: 'title' });
+    useGameStore.setState({ character: null, scriptRules: [], quickSlots: emptyQuickSlots(), phase: 'title' });
     await useGameStore.getState().loadCharacter();
 
     expect(useGameStore.getState().scriptRules).toHaveLength(1);
     expect(useGameStore.getState().scriptRules[0].condition.type).toBe('hp_below');
-    expect(useGameStore.getState().quickSlots[0]).toBe('red');
+    // § 35.7：舊格式 'red' 會被 normalizeQuickSlots 轉成結構化內容
+    expect(useGameStore.getState().quickSlots[0]).toEqual({ kind: 'potion', potionType: 'red' });
   });
 
   it('should persist quick slot assignments to localStorage', async () => {
     await useGameStore.getState().createCharacter('QuickSlot', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
     const charId = useGameStore.getState().character!.id!;
 
-    useGameStore.getState().assignQuickSlot(0, 'red');
-    useGameStore.getState().assignQuickSlot(2, 'orange');
+    useGameStore.getState().assignQuickSlot(0, { kind: 'potion', potionType: 'red' });
+    useGameStore.getState().assignQuickSlot(2, { kind: 'potion', potionType: 'orange' });
 
     const raw = localStorage.getItem(`mayana_prefs_${charId}`);
     const prefs = JSON.parse(raw!);
-    expect(prefs.quickSlots[0]).toBe('red');
-    expect(prefs.quickSlots[2]).toBe('orange');
+    expect(prefs.quickSlots[0]).toEqual({ kind: 'potion', potionType: 'red' });
+    expect(prefs.quickSlots[2]).toEqual({ kind: 'potion', potionType: 'orange' });
     expect(prefs.quickSlots[1]).toBeNull();
+    // § 35.7：10 格
+    expect(prefs.quickSlots).toHaveLength(10);
   });
 
   it('should persist learned skills to DB and load them back', async () => {

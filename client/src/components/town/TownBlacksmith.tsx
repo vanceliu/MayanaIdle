@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
+import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
 import { AFFIX_DEFINITIONS, getAffixTierTable, rollAffixValue, getAffixPoolForSlot, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, type AffixCategory, type Affix } from '../../models/affix';
@@ -264,7 +264,7 @@ export function TownBlacksmith() {
     if (!selectedRecipe.craftMaterials || !selectedRecipe.craftGold) return;
     const currentInv = useGameStore.getState().inventory;
     const currentBag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(currentBag, currentInv) >= BAG_MAX_SLOTS) return;
+    if (getBagUsedSlots(currentBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
 
     let newBag = [...useGameStore.getState().bagItems];
     for (const mat of selectedRecipe.craftMaterials) {
@@ -559,7 +559,7 @@ export function TownBlacksmith() {
                   {recipe.mpRegen ? ` | 回魔+${recipe.mpRegen}` : ''}
                   {recipe.bonusHp ? ` | HP+${recipe.bonusHp}` : ''}
                   {recipe.bonusMp ? ` | MP+${recipe.bonusMp}` : ''}
-                  {recipe.bonusWeight ? ` | 負重+${recipe.bonusWeight}` : ''}
+                  {recipe.bonusBagSlots ? ` | 背包格子+${recipe.bonusBagSlots}` : ''}
                 </span>
                 <span className="shop-item-desc">
                   {recipe.bonusStats ? `${recipe.bonusStats} | ` : ''}

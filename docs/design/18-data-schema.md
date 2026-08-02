@@ -207,7 +207,8 @@ baseValue × (1 + qualityPercent / 100)
 | mpRegen | number? | 回魔量 |
 | bonusHp | number? | 增加血量 |
 | bonusMp | number? | 增加魔量 |
-| bonusWeight | number? | 增加負重（腰帶用） |
+| bonusWeight | number? | 增加負重（腰帶用；負重系統目前停用，資料保留） |
+| bonusBagSlots | number? | 擴充背包格數（腰帶用，見 `35-inventory-constraints.md` § 35.1） |
 | bonusStats | string? | 額外屬性的**顯示字串**（如「敏捷+1」），不參與計算 |
 | bonusAttributes | Partial\<Attributes\>? | 額外屬性的**實際數值**（如 `{ AGI: 1 }`），生效來源。見 `06-equipment.md` § 6.8 |
 | stability | number | 安定值（武器預設 6、防具預設 4、-1 = 不可強化） |

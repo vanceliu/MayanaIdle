@@ -187,7 +187,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 
 ### 背包面板（BagPanel）
 
-固定 5 欄 × 100 格的 grid。無收合功能，由右側面板統一捲動。
+固定 5 欄的 grid，格數依腰帶動態變動（基礎 50，最高 65）。可拖放自由擺放，位置只存在於當下 session（見 `35-inventory-constraints.md` § 35.1.3）。無收合功能，由右側面板統一捲動。
 - 有物品的格子顯示圖標 + 名稱 + 數量（badge 位於右上角）
 - 空格保留邊框（與技能面板風格一致）
 - 頂部顯示金幣資訊
@@ -254,7 +254,7 @@ interface BagItem {
 
 ### 背包容量
 
-- `BAG_MAX_SLOTS = 100`（每個 BagItem 佔 1 格，裝備實例各佔 1 格）
+- `BAG_BASE_SLOTS = 50` + `getBagMaxSlots(equippedGear)`（每個 BagItem 佔 1 格，裝備實例各佔 1 格；腰帶擴充見 `35-inventory-constraints.md` § 35.1）
 - 掉落時背包已滿且無法堆疊 → 丟棄並顯示戰鬥日誌「背包已滿」
 - Helpers：`getBagUsedSlots()`, `isBagFull()`, `getPotionCount()`, `addPotionToBag()`, `consumePotionFromBag()`
 - **所有物品進入背包的入口都必須做容量檢查**：
@@ -478,7 +478,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `BattleView` | 探索控制（自動/手動）、怪物卡片（含 debuff icon 列）、戰鬥日誌、死亡橫幅 |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
-| `BagPanel` | 背包固定 100 格 grid（無收合），GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
+| `BagPanel` | 背包 grid（無收合），格數 = 50 + 腰帶擴充，支援拖放自由擺放（不持久化），GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
 | `Inventory` | 裝備背包列表元件 |
 | `CombatScriptEditor` | 戰鬥腳本規則 CRUD（僅攻擊技能/普攻） |
 | `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/加速藥水/buff/治癒） |

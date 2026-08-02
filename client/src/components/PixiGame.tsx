@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
+import { BAG_DRAG_MIME, decodeBagDrag } from '../models/bagLayout';
 import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
@@ -220,11 +221,33 @@ export function PixiGame() {
     return () => container.removeEventListener('click', handleClick);
   }, []);
 
+  // § 35.5.3：從背包拖到地圖上＝丟棄（需確認）。
+  // 只有帶 BAG_DRAG_MIME 的拖曳才 preventDefault，因此丟到其他 UI 一律無效果。
+  function handleDragOver(e: React.DragEvent) {
+    if (!Array.from(e.dataTransfer.types).includes(BAG_DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    const payload = decodeBagDrag(e.dataTransfer.getData(BAG_DRAG_MIME));
+    if (!payload) return;
+    e.preventDefault();
+    useGameStore.getState().requestDiscard({
+      kind: payload.kind,
+      name: payload.name,
+      maxAmount: payload.kind === 'equipment' ? 1 : payload.amount,
+      equipmentId: payload.equipmentId,
+    });
+  }
+
   return (
     <div
       ref={containerRef}
       className="map-canvas-container"
       style={{ width: '100%', height: '100%', position: 'relative' }}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     />
   );
 }

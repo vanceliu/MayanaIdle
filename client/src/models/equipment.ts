@@ -68,6 +68,8 @@ export interface EquipmentTemplate {
   hpRegen?: number;
   mpRegen?: number;
   bonusWeight?: number;
+  /** 腰帶專屬：擴充背包格數（`35-inventory-constraints.md` § 35.1） */
+  bonusBagSlots?: number;
   /** 顯示用文字（如「力量+2」）。實際生效的數值一律讀 `bonusAttributes`。 */
   bonusStats?: string;
   /**
@@ -109,6 +111,8 @@ export interface EquipmentInstance {
   hpRegen?: number;
   mpRegen?: number;
   bonusWeight?: number;
+  /** 腰帶專屬：擴充背包格數（`35-inventory-constraints.md` § 35.1） */
+  bonusBagSlots?: number;
   /** 顯示用文字（如「力量+2」）。實際生效的數值一律讀 `bonusAttributes`。 */
   bonusStats?: string;
   /**

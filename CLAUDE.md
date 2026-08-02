@@ -19,7 +19,7 @@ MayanaIdle 瑪雅那Idle是一款以 Web 為主要平台的放置型 ARPG（Idle
 所有設計規格存放於 `docs/design/`。
 
 - **索引文件**：`docs/design/INDEX.md` — 依功能/依限制快速查找表
-- **AI 限制**：`docs/design/99-ai-constraints.md` — 65 條硬性限制
+- **AI 限制**：`docs/design/99-ai-constraints.md` — 67 條硬性限制
 - **MVP 順序**：`docs/design/17-mvp-priority.md` — 五階段優先順序，Phase 3 已完成
 - **排除系統**：`docs/design/15-excluded.md` — 不做的功能
 

@@ -181,7 +181,7 @@
 | `15-excluded.md` | 排除系統 | 不做的功能 |
 | `17-mvp-priority.md` | MVP 順序 | 五階段優先順序 |
 | `98-online-architecture.md` | 線上化架構設計 | 統一 tick、事件驅動、資料分層、Buffer 策略、Auto-scaling |
-| `99-ai-constraints.md` | AI 限制 | 65 條限制 + 待補規格 |
+| `99-ai-constraints.md` | AI 限制 | 67 條限制 + 待補規格 |
 
 ---
 

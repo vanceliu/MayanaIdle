@@ -95,8 +95,8 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {(item.mpRegen ?? 0) > 0 && (
         <div className="equip-detail-stat">回魔+{item.mpRegen}</div>
       )}
-      {(item.bonusWeight ?? 0) > 0 && (
-        <div className="equip-detail-stat">負重+{item.bonusWeight}</div>
+      {(item.bonusBagSlots ?? 0) > 0 && (
+        <div className="equip-detail-stat">背包格子+{item.bonusBagSlots}</div>
       )}
       {item.bonusStats && (
         <div className="equip-detail-stat">{item.bonusStats}</div>
@@ -186,8 +186,8 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
       {(template.mpRegen ?? 0) > 0 && (
         <div className="equip-detail-stat">回魔+{template.mpRegen}</div>
       )}
-      {(template.bonusWeight ?? 0) > 0 && (
-        <div className="equip-detail-stat">負重+{template.bonusWeight}</div>
+      {(template.bonusBagSlots ?? 0) > 0 && (
+        <div className="equip-detail-stat">背包格子+{template.bonusBagSlots}</div>
       )}
       {template.bonusStats && (
         <div className="equip-detail-stat">{template.bonusStats}</div>

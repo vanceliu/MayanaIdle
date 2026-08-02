@@ -4,6 +4,7 @@ import {
   getAffixPoolForSlot,
   getAffixTierTable,
   rollAffixValue,
+  generateAffixes,
   AFFIX_TIERS,
 } from '../../models/affix';
 import {
@@ -23,6 +24,31 @@ describe('飾品詞綴分類（§ 7.6）', () => {
     expect(getAffixCategoryForSlot('necklace', 'armor')).toBe('accessory');
     expect(getAffixCategoryForSlot('ring1', 'armor')).toBe('accessory');
     expect(getAffixCategoryForSlot('ring2', 'armor')).toBe('accessory');
+  });
+
+  it('魔導書的詞綴池不含任何攻擊詞綴（§ 7.6）', () => {
+    const OFFENSIVE = [
+      'attack_power', 'attack_elemental', 'skill_elemental',
+      'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction',
+    ];
+    const category = getAffixCategoryForSlot('leftHand', 'magicBook');
+    const pool = getAffixPoolForSlot(category).map(d => d.type);
+    expect(pool.filter(t => OFFENSIVE.includes(t))).toEqual([]);
+
+    // 實際生成 200 件也不該出現攻擊詞綴（Lv.60 Boss 掉落，Tier 權重最高的情境）
+    for (let i = 0; i < 200; i++) {
+      for (const affix of generateAffixes(category, 60, 4, true)) {
+        expect(OFFENSIVE).not.toContain(affix.type);
+      }
+    }
+  });
+
+  it('所有 magicBook 模板都解析成防具池', () => {
+    const books = EQUIPMENT_SEEDS.filter(t => t.type === 'magicBook');
+    expect(books.length).toBeGreaterThan(0);
+    for (const b of books) {
+      expect(getAffixCategoryForSlot(b.slot, b.type), b.name).toBe('armor');
+    }
   });
 
   it('一般防具走 armor、盾牌走 shield、手部走 weapon', () => {

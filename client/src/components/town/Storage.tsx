@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
+import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { BagItem } from '../../stores/gameStore';
 import { EquipmentDetail } from '../EquipmentInfo';
@@ -15,6 +15,7 @@ type ActionTab = 'deposit' | 'withdraw';
 export function Storage() {
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
+  const equippedGear = useGameStore(s => s.equippedGear);
   const storedEquipment = useGameStore(s => s.storedEquipment);
   const storedMaterials = useGameStore(s => s.storedMaterials);
   const personalStoredEquipment = useGameStore(s => s.personalStoredEquipment);
@@ -45,7 +46,7 @@ export function Storage() {
     if (!character) return;
     const inv = useGameStore.getState().inventory;
     const bag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(bag, inv) >= BAG_MAX_SLOTS) return;
+    if (getBagUsedSlots(bag, inv) >= getBagMaxSlots(equippedGear)) return;
     const stored = useGameStore.getState().storedEquipment;
     useGameStore.setState({
       storedEquipment: stored.filter(i => i.id !== item.id),
@@ -73,7 +74,7 @@ export function Storage() {
     if (!character) return;
     const inv = useGameStore.getState().inventory;
     const bag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(bag, inv) >= BAG_MAX_SLOTS) return;
+    if (getBagUsedSlots(bag, inv) >= getBagMaxSlots(equippedGear)) return;
     const stored = useGameStore.getState().personalStoredEquipment;
     useGameStore.setState({
       personalStoredEquipment: stored.filter(i => i.id !== item.id),
@@ -111,7 +112,7 @@ export function Storage() {
     if (actual <= 0) return;
 
     const existing = bag.find(b => b.name === item.name);
-    if (!existing && getBagUsedSlots(bag, inv) >= BAG_MAX_SLOTS) return;
+    if (!existing && getBagUsedSlots(bag, inv) >= getBagMaxSlots(equippedGear)) return;
 
     const newStored = stored.map(s =>
       s.name === item.name ? { ...s, amount: s.amount - actual } : s
@@ -153,7 +154,7 @@ export function Storage() {
     if (actual <= 0) return;
 
     const existing = bag.find(b => b.name === item.name);
-    if (!existing && getBagUsedSlots(bag, inv) >= BAG_MAX_SLOTS) return;
+    if (!existing && getBagUsedSlots(bag, inv) >= getBagMaxSlots(equippedGear)) return;
 
     const newStored = stored.map(s =>
       s.name === item.name ? { ...s, amount: s.amount - actual } : s

@@ -5,7 +5,7 @@ import type { Skill } from '../../models/skill';
 import { canLearnBasicMagic, getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import type { BagItem } from '../../stores/gameStore';
-import { getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
+import { getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 
 const LEARN_PRICES: Record<number, number> = {
   1: 100,
@@ -48,6 +48,7 @@ export function MagicAcademy() {
   const char = useGameStore(s => s.character);
   const skills = useGameStore(s => s.skills);
   const bagItems = useGameStore(s => s.bagItems);
+  const equippedGear = useGameStore(s => s.equippedGear);
   const set = useGameStore.setState;
   const [tab, setTab] = useState<AcademyTab>('learn');
 
@@ -126,7 +127,7 @@ export function MagicAcademy() {
     if (existingBook) {
       newBag = newBag.map(b => b.name === recipe.name ? { ...b, amount: b.amount + 1 } : b);
     } else {
-      if (getBagUsedSlots(newBag, currentInv) >= BAG_MAX_SLOTS) return;
+      if (getBagUsedSlots(newBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
       newBag = [...newBag, { name: recipe.name, type: 'spellbook' as const, amount: 1 }];
     }
 

@@ -32,7 +32,7 @@ const TEMPLATE_FIELDS = [
   'smallMonsterDamage', 'largeMonsterDamage', 'defense',
   'attackSuccess', 'extraAttack', 'magicAttack',
   'bonusHp', 'bonusMp', 'hpRegen', 'mpRegen',
-  'bonusWeight', 'bonusStats', 'bonusAttributes', 'blockRate', 'weight',
+  'bonusWeight', 'bonusBagSlots', 'bonusStats', 'bonusAttributes', 'blockRate', 'weight',
   'material', 'stability', 'requiredClass',
 ] as const;
 

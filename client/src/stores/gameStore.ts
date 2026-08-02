@@ -9,6 +9,14 @@ import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
+import {
+  QUICK_SLOT_COUNT,
+  emptyQuickSlots,
+  normalizeQuickSlots,
+  resolveQuickSlotAction,
+  type QuickSlotEntry,
+  type QuickSlots,
+} from '../models/quickSlot';
 import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
@@ -91,14 +99,62 @@ export function consumePotionFromBag(bagItems: BagItem[], type: PotionType): Bag
     .filter(b => b.amount > 0);
 }
 
-export const BAG_MAX_SLOTS = 100;
+/** § 35.1：背包基礎格數。腰帶可再擴充，見 `getBagMaxSlots()` */
+export const BAG_BASE_SLOTS = 50;
+
+/**
+ * 背包實際格數 = 基礎 50 + 腰帶的 `bonusBagSlots`（§ 35.1）。
+ * 腰帶最高 +15，因此上限為 65 格。
+ */
+export function getBagMaxSlots(gear: EquippedGear): number {
+  const bonus = Object.values(gear).reduce(
+    (sum, item) => sum + (item?.bonusBagSlots ?? 0),
+    0,
+  );
+  return BAG_BASE_SLOTS + bonus;
+}
 
 export function getBagUsedSlots(bagItems: BagItem[], inventory: EquipmentInstance[]): number {
   return bagItems.length + inventory.length;
 }
 
-export function isBagFull(bagItems: BagItem[], inventory: EquipmentInstance[]): boolean {
-  return getBagUsedSlots(bagItems, inventory) >= BAG_MAX_SLOTS;
+export function isBagFull(
+  bagItems: BagItem[],
+  inventory: EquipmentInstance[],
+  gear: EquippedGear,
+): boolean {
+  return getBagUsedSlots(bagItems, inventory) >= getBagMaxSlots(gear);
+}
+
+/**
+ * 換裝後背包是否會超出上限（§ 35.1）。
+ *
+ * 卸下腰帶會**同時**造成兩件事：多佔一格（腰帶進背包）＋上限下降（`bonusBagSlots` 消失），
+ * 因此必須用「換裝後的裝備狀態」與「換裝後的佔格數」一起判定，不能只看目前是否已滿。
+ *
+ * @param gearAfter  換裝後的裝備狀態
+ * @param slotDelta  換裝造成的佔格變化（卸下 +1、單純穿上 -1、替換 0）
+ */
+export function wouldOverflowBag(
+  bagItems: BagItem[],
+  inventory: EquipmentInstance[],
+  gearAfter: EquippedGear,
+  slotDelta: number,
+): boolean {
+  return getBagUsedSlots(bagItems, inventory) + slotDelta > getBagMaxSlots(gearAfter);
+}
+
+/**
+ * § 35.5.3：從背包拖到地圖上、等待玩家確認的丟棄請求。
+ * 堆疊物品會在確認視窗讓玩家選擇數量。
+ */
+export interface PendingDiscard {
+  kind: 'bag' | 'equipment';
+  name: string;
+  /** 可丟棄的最大數量（裝備恆為 1） */
+  maxAmount: number;
+  /** kind === 'equipment' 時的實例 id */
+  equipmentId?: number;
 }
 
 export interface BagItem {
@@ -143,7 +199,7 @@ interface GameState {
   afterCombatMpThreshold: number;
   afterCombatHpResumeThreshold: number;
   afterCombatMpResumeThreshold: number;
-  quickSlots: (PotionType | null)[];
+  quickSlots: QuickSlots;
   storedEquipment: EquipmentInstance[];
   storedMaterials: BagItem[];
   warehouseGold: number;
@@ -176,7 +232,7 @@ interface GameState {
   usePotion: () => void;
   usePotionByType: (type: PotionType) => void;
   useSpeedPotion: (type: SpeedPotionType) => void;
-  assignQuickSlot: (slotIdx: number, type: PotionType | null) => void;
+  assignQuickSlot: (slotIdx: number, entry: QuickSlotEntry | null) => void;
   useQuickSlot: (slotIdx: number) => void;
   useTownScroll: (scrollName: string) => void;
   useCureItem: (itemName: string) => void;
@@ -191,8 +247,13 @@ interface GameState {
   addEffect: (effect: ActiveEffect) => void;
   removeEffect: (id: string) => void;
   clearExpiredEffects: () => void;
-  discardBagItem: (name: string) => void;
+  discardBagItem: (name: string, amount?: number) => void;
   discardInventoryItem: (id: number) => void;
+  /** § 35.5.3：拖出背包後等待確認的丟棄請求 */
+  pendingDiscard: PendingDiscard | null;
+  requestDiscard: (req: PendingDiscard) => void;
+  cancelDiscard: () => void;
+  confirmDiscard: (amount: number) => void;
   spendAttributePoint: (attr: keyof Attributes) => void;
   acceptQuest: (questId: string) => void;
   completeQuest: (questId: string) => void;
@@ -277,7 +338,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   afterCombatMpThreshold: 20,
   afterCombatHpResumeThreshold: 60,
   afterCombatMpResumeThreshold: 60,
-  quickSlots: [null, null, null, null, null],
+  quickSlots: emptyQuickSlots(),
   storedEquipment: [],
   storedMaterials: [],
   warehouseGold: 0,
@@ -387,7 +448,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const combatRules = prefs?.combatRules ?? DEFAULT_COMBAT_SCRIPT;
     const persistentRules = prefs?.persistentRules ?? DEFAULT_PERSISTENT_SCRIPT;
     const emergencyRetreat = prefs?.emergencyRetreat ?? DEFAULT_EMERGENCY_RETREAT;
-    const quickSlots = prefs?.quickSlots ?? [null, null, null, null, null];
+    const quickSlots = normalizeQuickSlots(prefs?.quickSlots);
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
     const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
     const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? 60;
@@ -479,7 +540,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       combatRules: DEFAULT_COMBAT_SCRIPT,
       persistentRules: DEFAULT_PERSISTENT_SCRIPT,
       emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
-      quickSlots: [null, null, null, null, null],
+      quickSlots: emptyQuickSlots(),
       adventurerQuests: [],
       adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
   questBoardTownId: null,
@@ -710,6 +771,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    // § 35.1：換成格數較少的腰帶同樣可能溢出（替換時佔格不變，但上限會降）
+    const existingInSlot = gear[targetSlot];
+    const gearAfterEquip: EquippedGear = { ...gear, [targetSlot]: item };
+    const slotDelta = existingInSlot ? 0 : -1;
+    if (wouldOverflowBag(state.bagItems, state.inventory, gearAfterEquip, slotDelta)) {
+      const lostSlots = (existingInSlot?.bonusBagSlots ?? 0) - (item.bonusBagSlots ?? 0);
+      set({
+        combatLogs: addLog(state.combatLogs, {
+          text: `背包空間不足，換上${item.name}會少 ${lostSlots} 格`,
+          type: 'system',
+        }),
+      });
+      return;
+    }
+
     // Unequip existing item in slot
     const existing = gear[targetSlot];
     if (existing) {
@@ -733,8 +809,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     const gear = { ...state.equippedGear };
     const item = gear[slot];
     if (!item) return;
-    if (isBagFull(state.bagItems, state.inventory)) {
-      set({ combatLogs: addLog(state.combatLogs, { text: '背包已滿，無法卸除裝備', type: 'system' }) });
+
+    // § 35.1：卸下腰帶會同時多佔一格並降低上限，必須以卸下後的狀態判定
+    const gearAfter: EquippedGear = { ...state.equippedGear, [slot]: null };
+    if (wouldOverflowBag(state.bagItems, state.inventory, gearAfter, 1)) {
+      const lostSlots = item.bonusBagSlots ?? 0;
+      set({
+        combatLogs: addLog(state.combatLogs, {
+          text: lostSlots > 0
+            ? `背包空間不足，卸下${item.name}會少 ${lostSlots} 格`
+            : '背包已滿，無法卸除裝備',
+          type: 'system',
+        }),
+      });
       return;
     }
 
@@ -844,9 +931,23 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  assignQuickSlot: (slotIdx, type) => {
+  assignQuickSlot: (slotIdx, entry) => {
+    if (slotIdx < 0 || slotIdx >= QUICK_SLOT_COUNT) return;
     const slots = [...get().quickSlots];
-    slots[slotIdx] = type;
+    // 同一個物品已在別格時先移除，避免重複佔格
+    if (entry) {
+      for (let i = 0; i < slots.length; i++) {
+        const s = slots[i];
+        if (!s) continue;
+        if (s.kind === entry.kind
+          && ((s.kind === 'potion' && entry.kind === 'potion' && s.potionType === entry.potionType)
+            || (s.kind === 'bagItem' && entry.kind === 'bagItem' && s.name === entry.name)
+            || (s.kind === 'equipment' && entry.kind === 'equipment' && s.equipmentId === entry.equipmentId))) {
+          slots[i] = null;
+        }
+      }
+    }
+    slots[slotIdx] = entry;
     set({ quickSlots: slots });
     const char = get().character;
     if (char?.id) {
@@ -856,9 +957,43 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   useQuickSlot: (slotIdx) => {
     const state = get();
-    const type = state.quickSlots[slotIdx];
-    if (!type) return;
-    get().usePotionByType(type);
+    const action = resolveQuickSlotAction(state.quickSlots[slotIdx] ?? null);
+    if (!action) return;
+
+    switch (action.type) {
+      case 'potion':
+        get().usePotionByType(action.potionType);
+        return;
+      case 'speedPotion':
+        get().useSpeedPotion(action.speedType);
+        return;
+      case 'cure':
+        get().useCureItem(action.name);
+        return;
+      case 'townScroll':
+        get().useTownScroll(action.name);
+        return;
+      case 'travel': {
+        // § 35.7：通行卷軸直飛。changeArea 會做卷軸檢查與消耗
+        if (state.character?.currentRegion === action.regionId) {
+          set({ combatLogs: addLog(state.combatLogs, { text: '已經在這個區域了', type: 'system' }) });
+          return;
+        }
+        get().changeArea(action.regionId);
+        return;
+      }
+      case 'equip': {
+        const item = state.inventory.find(i => i.id === action.equipmentId);
+        if (!item) {
+          // 裝備已被賣掉／丟棄／穿上 → 該格失效，直接清空
+          get().assignQuickSlot(slotIdx, null);
+          return;
+        }
+        get().equipItem(item);
+        get().assignQuickSlot(slotIdx, null);
+        return;
+      }
+    }
   },
 
   useCureItem: (itemName) => {
@@ -1224,16 +1359,41 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ activeEffects: get().activeEffects.filter(e => e.startTime + e.duration > now) });
   },
 
-  discardBagItem: (name) => {
+  discardBagItem: (name, amount = 1) => {
     const bag = get().bagItems;
     const existing = bag.find(b => b.name === name);
     if (!existing) return;
-    if (existing.amount > 1) {
-      set({ bagItems: bag.map(b => b.name === name ? { ...b, amount: b.amount - 1 } : b) });
+    const drop = Math.max(1, Math.min(amount, existing.amount));
+    if (existing.amount > drop) {
+      set({ bagItems: bag.map(b => b.name === name ? { ...b, amount: b.amount - drop } : b) });
     } else {
       set({ bagItems: bag.filter(b => b.name !== name) });
     }
     saveGame(get());
+  },
+
+  pendingDiscard: null,
+
+  requestDiscard: (req) => set({ pendingDiscard: req }),
+
+  cancelDiscard: () => set({ pendingDiscard: null }),
+
+  confirmDiscard: (amount) => {
+    const req = get().pendingDiscard;
+    if (!req) return;
+    if (req.kind === 'equipment') {
+      if (req.equipmentId != null) get().discardInventoryItem(req.equipmentId);
+    } else {
+      get().discardBagItem(req.name, amount);
+    }
+    const dropped = req.kind === 'equipment' ? 1 : Math.max(1, Math.min(amount, req.maxAmount));
+    set({
+      pendingDiscard: null,
+      combatLogs: addLog(get().combatLogs, {
+        text: `丟棄了 ${req.name}${dropped > 1 ? ` ×${dropped}` : ''}`,
+        type: 'system',
+      }),
+    });
   },
 
   discardInventoryItem: (id) => {
@@ -1278,7 +1438,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const existing = newBag.find(b => b.name === rewardItem && b.type === 'spellbook');
     if (existing) {
       existing.amount += 1;
-    } else if (getBagUsedSlots(newBag, state.inventory) < BAG_MAX_SLOTS) {
+    } else if (getBagUsedSlots(newBag, state.inventory) < getBagMaxSlots(state.equippedGear)) {
       newBag.push({ name: rewardItem, type: 'spellbook', amount: 1 });
     } else {
       return;
@@ -1342,7 +1502,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const existingItem = newBag.find(b => b.name === reward.itemName && b.type === bagType);
       if (existingItem) {
         existingItem.amount += reward.amount;
-      } else if (getBagUsedSlots(newBag, state.inventory) < BAG_MAX_SLOTS) {
+      } else if (getBagUsedSlots(newBag, state.inventory) < getBagMaxSlots(state.equippedGear)) {
         newBag.push({ name: reward.itemName!, type: bagType, itemTemplateId: reward.itemId, amount: reward.amount });
       } else {
         return;
@@ -1466,7 +1626,7 @@ export function processMonsterDeath(
     }
     for (const item of drops.items) {
       if (item.equipmentInstance) {
-        if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
+        if (getBagUsedSlots(newBag, newEquipInv) >= getBagMaxSlots(state2.equippedGear)) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
           newEquipInv.push(item.equipmentInstance);
@@ -1477,7 +1637,7 @@ export function processMonsterDeath(
         if (existing) {
           existing.amount += item.amount;
           logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
-        } else if (getBagUsedSlots(newBag, newEquipInv) >= BAG_MAX_SLOTS) {
+        } else if (getBagUsedSlots(newBag, newEquipInv) >= getBagMaxSlots(state2.equippedGear)) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
           newBag.push({ name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount });
@@ -1496,7 +1656,7 @@ export function processMonsterDeath(
       const matExisting = newBag.find(b => b.name === QUEST_MATERIAL_NAME && b.type === 'material');
       if (matExisting) {
         matExisting.amount += 1;
-      } else if (getBagUsedSlots(newBag, newEquipInv) < BAG_MAX_SLOTS) {
+      } else if (getBagUsedSlots(newBag, newEquipInv) < getBagMaxSlots(state2.equippedGear)) {
         newBag.push({ name: QUEST_MATERIAL_NAME, type: 'material', amount: 1 });
       }
       char2 = updateCollectProgress(char2, 1);
@@ -1641,7 +1801,7 @@ interface LoadedPreferences {
   combatRules: CombatRule[];
   persistentRules: PersistentRule[];
   emergencyRetreat: EmergencyRetreat;
-  quickSlots: (PotionType | null)[];
+  quickSlots: QuickSlots;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
   afterCombatHpResumeThreshold: number;
@@ -1674,7 +1834,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         ...data,
         persistentRules: migratedPersistent.length > 0 ? migratedPersistent : DEFAULT_PERSISTENT_SCRIPT,
         emergencyRetreat: migrateEmergencyRetreat(data.emergencyRetreat),
-        quickSlots: data.quickSlots ?? [null, null, null, null, null],
+        quickSlots: normalizeQuickSlots(data.quickSlots),
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
         afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
@@ -1710,7 +1870,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         combatRules: combat.length > 0 ? combat : DEFAULT_COMBAT_SCRIPT,
         persistentRules: persistent.length > 0 ? persistent : DEFAULT_PERSISTENT_SCRIPT,
         emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
-        quickSlots: data.quickSlots ?? [null, null, null, null, null],
+        quickSlots: normalizeQuickSlots(data.quickSlots),
         afterCombatHpThreshold: data.afterCombatHpThreshold ?? 0,
         afterCombatMpThreshold: data.afterCombatMpThreshold ?? 0,
         afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,

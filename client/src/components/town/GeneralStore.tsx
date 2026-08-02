@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useGameStore, getBagUsedSlots, BAG_MAX_SLOTS } from '../../stores/gameStore';
+import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
 import { getItemWeight, getItemDefinition } from '../../models/items';
@@ -27,6 +27,7 @@ const SHOP_ITEMS = [
 export function GeneralStore() {
   const char = useGameStore(s => s.character);
   const bagItems = useGameStore(s => s.bagItems);
+  const equippedGear = useGameStore(s => s.equippedGear);
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [batchTier, setBatchTier] = useState<number | null>(null);
@@ -41,7 +42,7 @@ export function GeneralStore() {
     const inventory = useGameStore.getState().inventory;
     const existing = currentBag.find(b => b.name === name);
     if (existing) return true;
-    return getBagUsedSlots(currentBag, inventory) < BAG_MAX_SLOTS;
+    return getBagUsedSlots(currentBag, inventory) < getBagMaxSlots(equippedGear);
   }
 
   function buyPotion(name: string, price: number) {
@@ -64,7 +65,7 @@ export function GeneralStore() {
     const currentBag = useGameStore.getState().bagItems;
     const inventory = useGameStore.getState().inventory;
     const existing = currentBag.find(b => b.name === name);
-    if (!existing && getBagUsedSlots(currentBag, inventory) >= BAG_MAX_SLOTS) return;
+    if (!existing && getBagUsedSlots(currentBag, inventory) >= getBagMaxSlots(equippedGear)) return;
     const itemType = getItemType(name);
     const def = getItemDefinition(name);
     if (existing) {
