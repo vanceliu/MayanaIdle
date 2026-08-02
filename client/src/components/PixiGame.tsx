@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
+import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
+import { MonsterListOverlay } from './MonsterListOverlay';
 import { BAG_DRAG_MIME, decodeBagDrag } from '../models/bagLayout';
 import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
@@ -28,6 +30,8 @@ import type { ProjectileShape } from '../pixi/ui/Projectile';
 import { getSkillTemplate } from '../models/skillTemplate';
 
 const PLAYER_PROJECTILE_SPEED = 512;
+/** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
+const HUD_PUBLISH_INTERVAL = 100;
 const PLAYER_PROJECTILE_COLOR = 0xffffff;
 const MONSTER_PROJECTILE_COLOR = 0xff6b6b;
 const DEFAULT_MONSTER_PROJECTILE_SPEED = 384;
@@ -51,6 +55,7 @@ export function PixiGame() {
   const arpgEngineRef = useRef<ArpgEngineState>(createArpgEngine());
   const monsterInstancesRef = useRef<Map<string, MonsterInstance>>(new Map());
   const areaTemplatesRef = useRef<MonsterTemplate[]>([]);
+  const hudPublishTimerRef = useRef(0);
 
   // Initialize PixiJS
   useEffect(() => {
@@ -123,6 +128,17 @@ export function PixiGame() {
 
         syncMonsters(useMapMonsterStore.getState().monsters, map, scene!, monsterMapRef.current, monsterInstancesRef.current);
 
+        // 3b. 怪物列表 HUD 快照（§ 24.8.3）
+        hudPublishTimerRef.current += delta;
+        if (hudPublishTimerRef.current >= HUD_PUBLISH_INTERVAL) {
+          hudPublishTimerRef.current = 0;
+          publishMonsterHud(
+            useMapMonsterStore.getState().monsters,
+            monsterInstancesRef.current,
+            arpgEngineRef.current.playerCtx.targetMonsterId,
+          );
+        }
+
         // 4. Effect layer update
         scene!.effectLayer.update(delta);
 
@@ -140,6 +156,7 @@ export function PixiGame() {
       destroyed = true;
       monsterMapRef.current.forEach(m => m.destroy());
       monsterMapRef.current.clear();
+      useMonsterHudStore.getState().clear();
       playerEntityRef.current = null;
       sceneRef.current = null;
       if (pixiAppRef.current) {
@@ -166,6 +183,7 @@ export function PixiGame() {
       monsterMapRef.current.clear();
       arpgEngineRef.current = createArpgEngine();
       monsterInstancesRef.current.clear();
+      useMonsterHudStore.getState().clear();
 
       // Reset camera to new player position
       const pos = state.playerPosition;
@@ -243,13 +261,36 @@ export function PixiGame() {
 
   return (
     <div
-      ref={containerRef}
       className="map-canvas-container"
       style={{ width: '100%', height: '100%', position: 'relative' }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-    />
+    >
+      {/* Pixi canvas 以 appendChild 掛入，需與 React 管理的節點分離 */}
+      <div ref={containerRef} className="map-canvas-stage" />
+      <MonsterListOverlay />
+    </div>
   );
+}
+
+function publishMonsterHud(
+  monsters: MapMonster[],
+  monsterInstances: Map<string, MonsterInstance>,
+  targetId: string | null,
+) {
+  const entries: MonsterHudEntry[] = [];
+  for (const mm of monsters) {
+    const inst = monsterInstances.get(mm.id);
+    if (!inst) continue;
+    entries.push({
+      id: mm.id,
+      name: inst.name,
+      currentHp: inst.currentHp,
+      maxHp: inst.maxHp,
+      isBoss: inst.isBoss,
+    });
+  }
+  useMonsterHudStore.getState().publish(entries, targetId);
 }
 
 // === ARPG Combat ===

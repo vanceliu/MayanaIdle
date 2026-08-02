@@ -347,14 +347,27 @@ interface PlayerDotEffect {
   - 暈眩：旋轉星星
 - **Tooltip**：顯示效果名稱、剩餘時間、傷害/減益數值
 
-### 24.8.3 怪物 Debuff 顯示
+### 24.8.3 怪物列表與怪物 Debuff 顯示
 
-- **位置**：地圖上怪物 sprite 血量條下方
-- **顯示方式**：小 icon 列（24×24）
-- 每個 debuff 顯示：
-  - 效果 icon（暈眩=星星、流血=紅滴、毒=綠骷髏）
-  - 剩餘秒數
-- **Tooltip**：同角色 buff，hover 顯示效果細節
+怪物 debuff 顯示在**地圖 canvas 上方置中的浮動怪物列表**內，不畫在 Pixi sprite 上。
+（原規格為「地圖上怪物 sprite 血量條下方」，因 sprite 尺寸過小無法容納 icon 與秒數而改置於此列表。）
+
+- **位置**：地圖 canvas 內、上方置中浮動（`.monster-list-overlay`）
+- **組件**：`<MonsterListOverlay>`
+- **顯示範圍**：地圖上現存的怪全部顯示，一隻一張卡片（同時存在上限 10 隻，見 `99-ai-constraints.md` 第 34 條），順序依生成順序
+- **卡片內容**（僅這三項，不顯示等級與 HP 數值）：
+  - 怪物名稱
+  - HP 條（百分比長度）
+  - Debuff icon 列
+- **Boss 卡片**：使用特殊底色（紫色系）與紫色外框區分
+- **攻擊目標**：玩家目前鎖定攻擊的怪（`PlayerCombatContext.targetMonsterId`）卡片加金色外框＋光暈高亮；無目標時不高亮任何卡片
+- **Debuff icon 列**：
+  - 24×24 icon（紅框，同 § 24.8.2 debuff 框色）＋下方剩餘秒數
+  - 同時顯示上限 4 個，超過顯示 `+N`
+  - 剩餘 <5 秒時閃爍（同 § 24.8.1）
+  - **Tooltip**：hover 顯示效果名稱、描述、剩餘時間、來源技能名稱
+- **資料流**：怪物實體數值由 Pixi ticker 持有，每 100ms 節流發佈唯讀快照至 `monsterHudStore`（`entries` + `targetId`）供 UI 訂閱；內容未變則不寫入 store
+- **滑鼠事件**：列表本身不吃滑鼠事件（不擋地圖點擊移動），僅 debuff icon 區域開啟 hover
 
 ### 24.8.4 Icon 資源
 

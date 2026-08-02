@@ -27,7 +27,10 @@ client/
 │   ├── App.css               # 全域樣式（Design Token + 所有組件樣式）
 │   ├── index.css             # 最小 reset
 │   ├── stores/
-│   │   └── gameStore.ts      # Zustand 全域 Store
+│   │   ├── gameStore.ts      # Zustand 全域 Store
+│   │   ├── mapControlStore.ts # 地圖/玩家位置/移動
+│   │   ├── mapMonsterStore.ts # 地圖怪物生成與移動
+│   │   └── monsterHudStore.ts # 怪物列表 HUD 唯讀快照（§ 24.8.3）
 │   ├── models/               # 資料模型 + 常數 + 純函數
 │   │   ├── character.ts      # 角色、職業、屬性
 │   │   ├── monster.ts        # 怪物模板 / 實例型別
@@ -68,6 +71,7 @@ client/
 │   │   ├── CharacterSelect.tsx  # 角色選擇畫面
 │   │   ├── StatusPanel.tsx
 │   │   ├── BuffBar.tsx       # 角色 Buff icon 列
+│   │   ├── MonsterListOverlay.tsx # 地圖上方浮動怪物列表（含 debuff icon 列）
 │   │   ├── LeftPanelTabs.tsx # 分頁容器（詳細狀態 / 裝備欄）
 │   │   ├── CharacterStats.tsx
 │   │   ├── BattleView.tsx
@@ -475,7 +479,8 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `BuffBar` | 角色 buff icon 列，每秒刷新倒數，hover tooltip |
 | `LeftPanelTabs` | 分頁容器，切換 CharacterStats / EquipmentPanel |
 | `CharacterStats` | 六大屬性詳細數值、戰鬥數據（含詞綴 + buff + 裝備 regen 加成） |
-| `BattleView` | 探索控制（自動/手動）、怪物卡片（含 debuff icon 列）、戰鬥日誌、死亡橫幅 |
+| `BattleView` | 探索控制（自動/手動）、Pixi 地圖容器、戰鬥日誌、死亡橫幅 |
+| `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
 | `BagPanel` | 背包 grid（無收合），格數 = 50 + 腰帶擴充，支援拖放自由擺放（不持久化），GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
@@ -833,6 +838,30 @@ interface TooltipProps {
 | `addEffect(effect)` | 新增效果，同 category buff 互蓋 |
 | `removeEffect(id)` | 移除指定效果 |
 | `clearExpiredEffects()` | 清除所有已過期效果（戰鬥 tick 呼叫） |
+
+---
+
+## 32.14a MonsterListOverlay 元件
+
+### 位置
+
+地圖 canvas 內、上方置中浮動（`.map-canvas-container` 的絕對定位子節點，與 Pixi canvas 為 sibling）。
+
+完整顯示規格見 `24-buff-debuff.md` § 24.8.3。
+
+### 資料流
+
+怪物實體數值（`MonsterInstance`）由 `PixiGame` 的 ticker 以 ref 持有，React 層讀不到，
+因此由 ticker 每 100ms 節流發佈唯讀快照到 `monsterHudStore`：
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `entries` | `MonsterHudEntry[]` | id / name / currentHp / maxHp / isBoss，順序同生成順序 |
+| `targetId` | `string \| null` | `PlayerCombatContext.targetMonsterId` |
+
+- `publish(entries, targetId)` 內做淺層比對，內容未變則不寫入 store（避免無謂 re-render）
+- 換地圖與組件卸載時呼叫 `clear()`
+- Debuff 直接讀 `gameStore.activeEffects`（`type === 'debuff' && target === 'monster' && targetMonsterId === id`）
 
 ---
 

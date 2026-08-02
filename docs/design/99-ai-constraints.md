@@ -78,4 +78,5 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 其中包含 § 24.8.3「怪物 Debuff 顯示」的唯一實作，且該實作在切換到 PixiJS 之後就已不再渲染。
 
 - [ ] 在 Pixi 的 `MonsterEntity` 上加入怪物顯示圖（sprite）
-- [ ] 在怪物血量條下方加入 debuff icon 列（§ 24.8.3：24×24 icon + 剩餘秒數 + tooltip）
+- [x] 怪物 debuff icon 列 —— 改以 canvas 上方浮動怪物列表 `<MonsterListOverlay>` 呈現
+      （§ 24.8.3 已同步更新：不畫在 sprite 血量條下方，改為列表卡片內的 24×24 icon 列）

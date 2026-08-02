@@ -424,7 +424,6 @@ button.active {
 .hp-bar .bar-fill { background: var(--hp-bar); }
 .mp-bar .bar-fill { background: var(--mp-bar); }
 .exp-bar .bar-fill { background: var(--exp-bar); }
-.monster-hp-bar .bar-fill { background: var(--monster-hp); }
 
 .defense-row {
   display: flex;
@@ -755,68 +754,6 @@ button.active {
   50% { opacity: 0.5; text-shadow: 0 0 20px rgba(124, 58, 237, 0.8); }
 }
 
-/* --- Monster Cards --- */
-.monster-list {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
-  height: 60px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  align-items: center;
-  padding: 4px 0;
-}
-
-.monster-card {
-  background: var(--bg-card);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  min-width: 150px;
-  max-width: 180px;
-  cursor: pointer;
-  border: 2px solid var(--border);
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.monster-card:hover:not(.dead) {
-  border-color: var(--accent-danger);
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
-}
-
-.monster-card.selected {
-  border-color: var(--accent-danger);
-  box-shadow: 0 0 16px rgba(244, 63, 94, 0.35);
-  background: rgba(244, 63, 94, 0.06);
-}
-
-.monster-card.dead {
-  opacity: 0.25;
-  cursor: default;
-  filter: grayscale(0.5);
-}
-
-.monster-name {
-  font-family: var(--font-display);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  margin-bottom: 4px;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.monster-hp-bar {
-  height: 14px;
-  border: none;
-}
-
-.monster-hp-bar span {
-  font-size: var(--fs-xs);
-}
-
 /* --- Combat Actions --- */
 .combat-actions {
   display: flex;
@@ -865,11 +802,127 @@ button.active {
   border: 1px solid var(--border-subtle);
 }
 
+.map-canvas-stage {
+  position: absolute;
+  inset: 0;
+}
+
 .map-canvas {
   width: 100%;
   height: 100%;
   display: block;
   cursor: pointer;
+}
+
+/* --- 怪物列表 HUD（24-buff-debuff.md § 24.8.3） --- */
+.monster-list-overlay {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 92%;
+  /* 預設不吃滑鼠事件，避免擋住地圖點擊移動 */
+  pointer-events: none;
+}
+
+.monster-card {
+  width: 116px;
+  padding: 4px 6px 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(18, 18, 43, 0.82);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(2px);
+}
+
+/* Boss 特殊底色 */
+.monster-card.is-boss {
+  background: rgba(76, 20, 76, 0.85);
+  border-color: #cc00cc;
+}
+
+/* 玩家目前攻擊中的目標 */
+.monster-card.is-target {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.monster-card-name {
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monster-card.is-boss .monster-card-name {
+  color: #f0a6f0;
+  font-weight: 600;
+}
+
+.monster-card-hp {
+  margin-top: 3px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+
+.monster-card-hp-fill {
+  height: 100%;
+  background: var(--monster-hp);
+  transition: width 0.15s linear;
+}
+
+.monster-card-debuffs {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  /* debuff icon 需要 hover tooltip，僅此區域開啟滑鼠事件 */
+  pointer-events: auto;
+}
+
+.monster-debuff-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+  cursor: default;
+}
+
+.monster-debuff-icon .game-icon {
+  border: 1px solid #EF4444;
+  border-radius: var(--radius-sm);
+  box-sizing: content-box;
+  color: #EF4444;
+}
+
+.monster-debuff-icon.expiring {
+  animation: blink 0.5s infinite;
+}
+
+.monster-debuff-timer {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.monster-card-debuff-overflow {
+  font-size: 10px;
+  color: var(--text-dim);
+  align-self: center;
 }
 
 .combat-log-area {
@@ -2639,20 +2692,21 @@ button.active {
 }
 
 .skill-grid-with-labels {
+  --skill-cols: 5;
+  --skill-label-width: 28px;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
 .skill-grid-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--skill-label-width) repeat(var(--skill-cols), minmax(0, 1fr));
   gap: 3px;
   align-items: stretch;
 }
 
 .skill-row-label {
-  width: 28px;
-  min-width: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2674,7 +2728,7 @@ button.active {
   background: var(--bg-inset);
   cursor: default;
   min-height: 42px;
-  flex: 1;
+  min-width: 0;
   transition: border-color 0.15s;
 }
 
@@ -3078,32 +3132,6 @@ button.active {
 .buff-tooltip-source {
   color: var(--text-dim);
   font-size: var(--fs-xs);
-}
-
-/* --- Monster Debuffs --- */
-.monster-debuffs {
-  display: flex;
-  gap: 3px;
-  margin-top: 3px;
-  flex-wrap: wrap;
-}
-
-.debuff-icon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: default;
-}
-
-.debuff-icon .game-icon {
-  color: var(--accent-danger);
-}
-
-.debuff-timer {
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-  font-family: var(--font-mono);
-  line-height: 1;
 }
 
 /* --- Equipment Slot Icon --- */

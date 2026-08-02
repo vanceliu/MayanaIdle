@@ -8,6 +8,11 @@ const BASIC_MAGIC_ROWS = 10;
 const BASIC_MAGIC_SLOTS = GRID_COLUMNS * BASIC_MAGIC_ROWS;
 const CLASS_MAGIC_SLOTS = GRID_COLUMNS;
 
+/** 讓 CSS grid 的欄數跟著 TSX 的常數走，避免兩處不同步 */
+function gridColumnsStyle(columns: number) {
+  return { '--skill-cols': columns } as React.CSSProperties;
+}
+
 const CLASS_SKILLS_MAP: Record<ClassName, Array<{ id: string; name: string; level: number }>> = {
   knight: [
     { id: 'shield-bash', name: '盾擊', level: 1 },
@@ -112,7 +117,7 @@ export function SkillPanel() {
             {learnedBasicSkills.length}/{BASIC_MAGIC_SLOTS}
           </span>
         </div>
-        <div className="skill-grid-with-labels">
+        <div className="skill-grid-with-labels" style={gridColumnsStyle(GRID_COLUMNS)}>
           {Array.from({ length: BASIC_MAGIC_ROWS }).map((_, rowIdx) => {
             const level = rowIdx + 1;
             const catalogForLevel = SKILL_CATALOG.filter(c => c.level === level);
@@ -158,7 +163,7 @@ export function SkillPanel() {
             {learnedClassSkills.length}/{CLASS_MAGIC_SLOTS}
           </span>
         </div>
-        <div className="skill-grid-with-labels">
+        <div className="skill-grid-with-labels" style={gridColumnsStyle(CLASS_MAGIC_SLOTS)}>
           <div className="skill-grid-row">
             <span className="skill-row-label"></span>
             {Array.from({ length: CLASS_MAGIC_SLOTS }).map((_, idx) => {
