@@ -370,7 +370,7 @@ Tooltip 會依狀態顯示「點一次選取」或「再點一次使用」。
 |---|---|
 | 基礎藥水 | `getItemIcon('{type}-potion')` + 固定顏色（紅 `#DC2626`／橙 `#F59E0B`／白 `#E2E8F0`） |
 | 其他背包物品 | `resolveItemIcon(getItemDefinition(name))` |
-| 裝備 | `getEquipIcon()`，依 type／slot |
+| 裝備 | `getEquipIcon()` 依 type／slot，**顏色用 `getEquipmentInstanceTierColor()`（與背包同一套品階配色）** |
 
 - 消耗品顯示剩餘數量 badge；**裝備不顯示數量**
 - 拖曳停留時該格虛線高亮（`.quick-slot.drag-over`）

@@ -4,6 +4,8 @@ import { getPotionCount } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, getItemIcon, resolveItemIcon } from '../models/iconMap';
 import { getItemDefinition } from '../models/items';
+import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
+import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { BAG_DRAG_MIME, decodeBagDrag } from '../models/bagLayout';
 import {
   QUICK_SLOT_COUNT,
@@ -28,6 +30,7 @@ export function QuickSlotBar() {
   const inventory = useGameStore(s => s.inventory);
   const useQuickSlot = useGameStore(s => s.useQuickSlot);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
+  const templates = useEquipmentTemplates();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   /**
    * § 35.7.5：滑鼠操作採兩段確認 —— 第一次點擊只選取（顯示外框），再點同一格才執行。
@@ -71,7 +74,14 @@ export function QuickSlotBar() {
       const iconKey = item
         ? getEquipIcon(item.type === 'armor' ? (item.slot || 'chest') : item.type)
         : getEquipIcon('sword');
-      return <GameIcon name={iconKey} size={24} />;
+      // 與背包一致，依裝備品階著色（`equipmentTier.ts`）
+      return (
+        <GameIcon
+          name={iconKey}
+          size={24}
+          color={item ? getEquipmentInstanceTierColor(item, templates) : undefined}
+        />
+      );
     }
     const { icon, color } = resolveItemIcon(getItemDefinition(entry.name), 'scroll');
     return <GameIcon name={icon} size={24} color={color} />;

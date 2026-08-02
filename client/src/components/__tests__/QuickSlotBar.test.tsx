@@ -1,9 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { EQUIPMENT_TIER_COLORS, getEquipmentInstanceTierLevel } from '../../models/equipmentTier';
+import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { QuickSlotBar } from '../QuickSlotBar';
 import { useGameStore } from '../../stores/gameStore';
 import { BAG_DRAG_MIME, encodeBagDrag, type BagDragPayload } from '../../models/bagLayout';
 import { QUICK_SLOT_COUNT, emptyQuickSlots } from '../../models/quickSlot';
+import type { EquipmentInstance } from '../../models/equipment';
+
+vi.mock('../../hooks/useEquipmentTemplates', () => ({
+  useEquipmentTemplates: () => EQUIPMENT_SEEDS,
+}));
+
+// GameIcon 的 SVG 是非同步載入的，載入前會回傳沒有顏色的佔位 span。
+// 這裡改成把 props 攤平成 data-*，直接驗證「傳給圖示的顏色」而不是渲染結果。
+vi.mock('../GameIcon', () => ({
+  GameIcon: ({ name, color }: { name: string; color?: string }) =>
+    <span data-testid="icon" data-name={name} data-color={color ?? ''} />,
+}));
 
 /**
  * @vitest-environment jsdom
@@ -202,5 +216,45 @@ describe('滑鼠兩段確認（§ 35.7.5）', () => {
     fireEvent.contextMenu(slots()[0]);
     expect(slots()[0].className).not.toContain('selected');
     expect(useGameStore.getState().quickSlots[0]).toBeNull();
+  });
+});
+
+describe('裝備快捷鍵的品階著色', () => {
+  /** 用 seed 造一個指定名稱的裝備實例 */
+  function equipOf(name: string, id: number): EquipmentInstance {
+    const tpl = EQUIPMENT_SEEDS.find(t => t.name === name);
+    if (!tpl) throw new Error(`找不到裝備：${name}`);
+    return { ...tpl, templateId: tpl.id!, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: false, id } as EquipmentInstance;
+  }
+
+  /** 渲染後取第 0 格傳給 GameIcon 的顏色 */
+  function iconColorFor(item: EquipmentInstance): string {
+    useGameStore.setState({
+      quickSlots: emptyQuickSlots().map((_, i) =>
+        i === 0 ? { kind: 'equipment' as const, equipmentId: item.id!, name: item.name } : null),
+      inventory: [item],
+      bagItems: [],
+    });
+    const view = render(<QuickSlotBar />);
+    const icon = document.querySelectorAll('.quick-slot')[0].querySelector('[data-testid="icon"]');
+    const color = icon?.getAttribute('data-color') ?? '';
+    view.unmount();
+    return color;
+  }
+
+  it('依裝備品階著色，而不是一律同一個顏色', () => {
+    // 王者之劍＝製作頂級（紅）、短劍＝商店低階（白）
+    const topColor = iconColorFor(equipOf('王者之劍', 101));
+    const lowColor = iconColorFor(equipOf('短劍', 102));
+
+    expect(topColor).not.toBe('');
+    expect(lowColor).not.toBe('');
+    expect(topColor).not.toBe(lowColor);
+  });
+
+  it('品階顏色與 equipmentTier 的定義一致', () => {
+    const item = equipOf('王者之劍', 103);
+    const expected = EQUIPMENT_TIER_COLORS[getEquipmentInstanceTierLevel(item, EQUIPMENT_SEEDS)];
+    expect(iconColorFor(item)).toBe(expected);
   });
 });
