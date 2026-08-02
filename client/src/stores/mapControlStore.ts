@@ -85,6 +85,10 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
   setAutoMove: (auto) => {
     if (auto) {
       set({ autoMove: true });
+      // 恢復等待中（HP/MP 低於門檻）時只記旗標，不排路徑。
+      // movePlayerSafe 不檢查 paused，這裡若排了路徑角色會硬走完一趟。
+      // 恢復完成時由 gameLoopTick 的 aboveResume 分支重新呼叫本函式接手。
+      if (useMapMonsterStore.getState().paused) return;
       get().pickRandomTarget();
     } else {
       const { playerPosition } = get();

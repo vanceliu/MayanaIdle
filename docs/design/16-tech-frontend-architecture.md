@@ -30,7 +30,8 @@ client/
 │   │   ├── gameStore.ts      # Zustand 全域 Store
 │   │   ├── mapControlStore.ts # 地圖/玩家位置/移動
 │   │   ├── mapMonsterStore.ts # 地圖怪物生成與移動
-│   │   └── monsterHudStore.ts # 怪物列表 HUD 唯讀快照（§ 24.8.3）
+│   │   ├── monsterHudStore.ts # 怪物列表 HUD 唯讀快照（§ 24.8.3）
+│   │   └── panelWindowStore.ts # 浮動面板視窗開關 / 位置 / z 順序（§ 32.15）
 │   ├── models/               # 資料模型 + 常數 + 純函數
 │   │   ├── character.ts      # 角色、職業、屬性
 │   │   ├── monster.ts        # 怪物模板 / 實例型別
@@ -72,13 +73,16 @@ client/
 │   │   ├── StatusPanel.tsx
 │   │   ├── BuffBar.tsx       # 角色 Buff icon 列
 │   │   ├── MonsterListOverlay.tsx # 地圖上方浮動怪物列表（含 debuff icon 列）
-│   │   ├── LeftPanelTabs.tsx # 分頁容器（詳細狀態 / 裝備欄）
+│   │   ├── FloatingWindow.tsx # 通用可拖曳浮動視窗（§ 32.15）
+│   │   ├── PanelDock.tsx     # 底部面板按鈕列（§ 32.15）
+│   │   ├── PanelWindows.tsx  # 浮動視窗容器（五個面板，§ 32.15）
+│   │   ├── QuestTracker.tsx  # 任務按鈕（PanelDock）+ 任務內容（浮動視窗，§ 36.10.3）
 │   │   ├── CharacterStats.tsx
 │   │   ├── BattleView.tsx
+│   │   ├── ExploreBar.tsx    # 探索控制列（自動/手動搜尋、探索/戰鬥指示）
 │   │   ├── EquipmentPanel.tsx
 │   │   ├── EquipmentInfo.tsx    # 統一裝備資訊顯示元件
 │   │   ├── BagPanel.tsx
-│   │   ├── RightPanel.tsx
 │   │   ├── SkillPanel.tsx
 │   │   ├── CombatScriptEditor.tsx   # 戰鬥腳本編輯
 │   │   ├── PersistentScriptEditor.tsx # 常駐腳本編輯
@@ -140,58 +144,61 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | `title` | 標題畫面 |
 | `characterSelect` | 角色選擇畫面（最多 4 格位） |
 | `create` | 角色建立（職業選擇 + 屬性配點） |
-| `explore` / `combat` / `dead` | 三欄遊戲主畫面 |
+| `explore` / `combat` / `dead` | 單欄全寬遊戲主畫面 |
 
-### 三欄版面
+### 單欄全寬版面
+
+左右側常駐面板已取消，stage（地圖 canvas / 城鎮）左右滿版延伸：
 
 ```
-┌──────────────────┬──────────────────────┬────────────────┐
-│    左側面板       │      中央面板         │    右側面板     │
-│   (330px)        │     (flex: 1)        │    (400px)      │
-├─────────────────┼──────────────────────┼──────────────────┤
-│ StatusPanel     │ MapNavigation (下拉)  │ [背包] [技能]    │
-│ BuffBar         │ BattleView           │ ─────────────── │
-│ LeftPanelTabs   │   或 TownView        │ BagPanel         │
-│  ├ 詳細狀態     │ QuickSlotBar         │   或 SkillPanel  │
-│  └ 裝備欄       │                      │                  │
-│ [自動腳本] btn  │                      │                  │
-└─────────────────┴──────────────────────┴──────────────────┘
-
-浮動視窗（overlay）：
-┌─────────────────────────────┐
-│       ScriptEditorModal     │
-│  （點擊「自動腳本」按鈕觸發）  │
-│  [常駐腳本] [戰鬥腳本] tab   │
-└─────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ .top-hud                                                       │
+│ ┌── StatusPanel (480px) ──┐ ┌── .top-hud-nav (flex:1) ───────┐ │
+│ │ 名稱 職業 Lv.   防禦: N │ │ MapNavigation「目前: 區域 ▼」  │ │
+│ │ ▓HP▓  ▓MP▓  ▓EXP▓       │ │ ExploreBar [自動][手動] 探索中 │ │
+│ └─────────────────────────┘ └───────────────────────────────┘ │
+├────────────────────────────────────────────────────────────────┤
+│ .stage-area（position: relative，探索與城鎮共用）               │
+│ ┌ BuffBar（絕對定位左上，垂直往下長）                            │
+│ │ [⚡]                                                          │
+│ │ [🛡]     BattleView（canvas + 戰鬥日誌）                       │
+│ │ [☠]        或 TownView（設施列，左側讓出 52px）                │
+├────────────────────────────────────────────────────────────────┤
+│ .bottom-bar                                                    │
+│ QuickSlotBar(10格) │ PanelDock                                 │
+│              [📋 任務 N][詳細狀態][裝備欄][背包][技能][自動腳本 N]│
+└────────────────────────────────────────────────────────────────┘
+        ↓ PanelDock 按鈕開關 → 可拖曳、可多開、無遮罩的浮動視窗
+┌──────────────┐  ┌──────────────┐
+│ 裝備欄     ✕ │  │ 背包       ✕ │   ScriptEditorModal 仍為
+│ ...          │  │ ...          │   置中 overlay modal（§ 32.16）
+└──────────────┘  └──────────────┘
 ```
 
-**左側面板結構：**
-1. `StatusPanel` — 角色名/職業/等級 + HP/MP bar + 負重bar+防禦值 + EXP bar + 區域
-2. `BuffBar` — 角色 buff icon 列（見 § 32.12）
-3. `LeftPanelTabs` — 分頁切換「詳細狀態」(CharacterStats) 和「裝備欄」(EquipmentPanel)
-4. 「自動腳本」按鈕 — 點擊彈出 `ScriptEditorModal` 浮動視窗（含常駐/戰鬥兩個 tab）
+**頂部 HUD（`.top-hud`）：** 左為 `StatusPanel`（compact 兩列），右為 `MapNavigation`
+（「目前: 區域名 ▼」下拉，展開 Zone → Region → Floor）+ `ExploreBar`，兩側等高。
+`StatusPanel` 不再顯示「目前區域」，避免與地圖選擇器重複。
 
-中央面板最上方為 `MapNavigation` 地圖選擇器，以「目前: 區域名 ▼」的下拉面板呈現，
-點擊展開 Zone → Region → Floor 階層導航。
+> **城鎮與野外的 UI 位置必須一致。** 城鎮沒有探索控制，但 `ExploreBar` 仍包在
+> `.explore-bar-slot` 內以 `visibility: hidden` 保留該排高度（`.is-hidden`），
+> 否則 `.top-hud` 會從 93px 縮成 62px，導致進出城鎮時整個版面上下跳動。
+> 不可改用「城鎮不渲染 ExploreBar」的寫法。
 
-中央面板主內容根據 `region.type` 判斷：
-- `town` → 顯示 `TownView`（城鎮設施）
-- `field` / `dungeon` → 顯示 `BattleView`（戰鬥 / 探索）
+**Stage（`.stage-area`）：** 探索與城鎮共用的定位基準，兩個 HUD 以絕對定位固定其上，
+因此探索/城鎮位置完全一致：
+- `BuffBar` — 左上角，垂直往下長
+- `QuestTrackerPanel` — 右上角，半透明任務內容（開關由底部「任務」按鈕控制，§ 36.10.3）
 
-### 右側面板分頁系統
+主內容根據 `region.type` 判斷：
+- `town` → `TownView`（城鎮設施；不做 canvas，左側 padding 讓出 BuffBar 欄位）
+- `field` / `dungeon` → `BattleView`（Pixi canvas + 戰鬥日誌）
 
-右側面板使用 `RightPanel` 容器管理分頁切換：
-
-| 分頁 | 組件 | 說明 |
-|---|---|---|
-| 背包 | `BagPanel` | 藥水/素材/卷軸/魔法書/裝備格子 |
-| 技能 | `SkillPanel` | 基礎魔法 + 職業魔法列表 |
-
-分頁 UI 使用 pill-style segmented control（與城鎮設施內部分頁一致）。
+**底部列（`.bottom-bar`）：** `QuickSlotBar`（10 格）+ `PanelDock`。
+`PanelDock` 內含「任務」按鈕，與其他四個面板按鈕同排同樣式。
 
 ### 背包面板（BagPanel）
 
-固定 5 欄的 grid，格數依腰帶動態變動（基礎 50，最高 65）。可拖放自由擺放，位置只存在於當下 session（見 `35-inventory-constraints.md` § 35.1.3）。無收合功能，由右側面板統一捲動。
+固定 5 欄的 grid，格數依腰帶動態變動（基礎 50，最高 65）。可拖放自由擺放，位置只存在於當下 session（見 `35-inventory-constraints.md` § 35.1.3）。無收合功能，由浮動視窗 body 統一捲動。
 - 有物品的格子顯示圖標 + 名稱 + 數量（badge 位於右上角）
 - 空格保留邊框（與技能面板風格一致）
 - 頂部顯示金幣資訊
@@ -241,7 +248,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
 | 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold`, `afterCombatHpResumeThreshold`, `afterCombatMpResumeThreshold` | 戰鬥後等待/恢復閾值（HP/MP %） |
 | 搜尋 | `searchMode`, `isManualSearching`, `manualSearchId` | 自動/手動搜尋模式與狀態 |
-| 快捷 | `quickSlots` | 5 格快捷鍵（藥水） |
+| 快捷 | `quickSlots` | 10 格快捷鍵（鍵盤 1~9 與 0；藥水／狀態解除道具／卷軸／裝備，見 `35-inventory-constraints.md` § 35.7） |
 | 倉庫 | `storedEquipment`, `storedMaterials`, `warehouseGold` | 城鎮倉庫（帳號共用） |
 
 ### BagItem 型別
@@ -475,11 +482,15 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `App` | DB 初始化、角色讀取、Phase 路由、版面結構 |
 | `CharacterSelect` | 角色選擇畫面（最多 4 格位、建立/刪除/選擇） |
 | `CharacterCreate` | 職業選擇、屬性配點、角色命名 |
-| `StatusPanel` | 角色名/職業/等級、HP/MP 進度條、負重條+防禦值、EXP 進度條、區域 |
-| `BuffBar` | 角色 buff icon 列，每秒刷新倒數，hover tooltip |
-| `LeftPanelTabs` | 分頁容器，切換 CharacterStats / EquipmentPanel |
+| `StatusPanel` | 頂部 HUD 左側 compact：角色名/職業/等級/防禦值一列，HP/MP/EXP 三條並排一列 |
+| `BuffBar` | 角色 buff/debuff icon 垂直欄，浮於 `.stage-area` 左上，每秒刷新倒數，hover tooltip |
+| `FloatingWindow` | 通用可拖曳浮動視窗（標題列拖曳、點擊置頂、✕ 關閉、無遮罩） |
+| `PanelDock` | 底部面板按鈕列（詳細狀態/裝備欄/背包/技能 + 自動腳本觸發鈕） |
+| `PanelWindows` | 依 `panelWindowStore` 渲染五個面板的浮動視窗 |
+| `QuestTracker` | `QuestTrackerButton`（PanelDock 內，帶任務數量 badge）+ `QuestTrackerContent`（浮動視窗內容） |
 | `CharacterStats` | 六大屬性詳細數值、戰鬥數據（含詞綴 + buff + 裝備 regen 加成） |
-| `BattleView` | 探索控制（自動/手動）、Pixi 地圖容器、戰鬥日誌、死亡橫幅 |
+| `BattleView` | Pixi 地圖容器、戰鬥日誌（含 log 大小切換） |
+| `ExploreBar` | 探索控制（自動/手動搜尋）、探索/戰鬥指示、死亡橫幅；位於頂部 HUD |
 | `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
@@ -492,10 +503,9 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `AttributeUpModal` | Lv50+ 屬性配點浮動視窗，有未分配點數時自動顯示 |
 | `GameIcon` | 統一 SVG icon 渲染（name, size, color），支援 Game-icons.net + Lucide |
 | `Tooltip` | 通用 hover tooltip，用於 buff/裝備/物品/技能 |
-| `MapNavigation` | 中央面板頂部下拉式地圖選擇器（Zone → Region → Floor） |
+| `MapNavigation` | 頂部 HUD 下拉式地圖選擇器（Zone → Region → Floor） |
 | `TownView` | 城鎮 NPC 列表 + 設施 Modal |
-| `QuickSlotBar` | 5 格快捷藥水按鈕，GameIcon + 藥水顏色 + 數量顯示 |
-| `RightPanel` | 右側面板分頁容器（背包/技能切換） |
+| `QuickSlotBar` | 10 格快捷按鈕，GameIcon + 藥水顏色 + 數量顯示（見 `35-inventory-constraints.md` § 35.7） |
 | `SkillPanel` | 技能面板：列首標示等級，5×10 基礎魔法（固定位置對應 SKILL_CATALOG）+ 5×1 職業魔法 |
 
 ### 城鎮設施組件
@@ -805,7 +815,9 @@ interface TooltipProps {
 
 ### 位置
 
-左側面板 `StatusPanel` 正下方、`LeftPanelTabs` 之上。
+`.stage-area` 左上角絕對定位，垂直往下延伸（見 `24-buff-debuff.md` § 24.8.1）。
+探索與城鎮共用同一容器，因此兩種情境下 buff 位置一致。
+容器 `pointer-events: none` 不擋地圖點擊，icon 自身開啟 hover tooltip。
 
 ### 行為
 
@@ -865,22 +877,64 @@ interface TooltipProps {
 
 ---
 
-## 32.15 左側面板分頁（LeftPanelTabs）
+## 32.15 浮動面板視窗系統（PanelDock / FloatingWindow）
 
-### 行為
+原本的左側分頁（詳細狀態 / 裝備欄）與右側分頁（背包 / 技能）已取消，
+四個面板改為底部 `PanelDock` 按鈕觸發的可拖曳浮動視窗，讓 stage 左右滿版。
 
-- 兩個分頁：「詳細狀態」、「裝備欄」
-- 預設顯示「裝備欄」分頁
-- 分頁 header 使用與 RightPanel 相同的 pill-style segmented control
-- CharacterStats 和 EquipmentPanel 移除各自的 collapsible 行為，改為分頁內全展開
+### 面板清單
+
+| PanelKey | 標題 | 內容組件 | 預設寬度 |
+|---|---|---|---|
+| `stats` | 詳細狀態 | `CharacterStats` | 340px |
+| `equipment` | 裝備欄 | `EquipmentPanel` | 360px |
+| `bag` | 背包 | `BagPanel` | 420px |
+| `skill` | 技能 | `SkillPanel` | 420px |
+| `quest` | 進行中的任務 | `QuestTrackerContent` | 320px |
+
+內容組件本身不變（拖放、右鍵選單、tooltip 行為完全沿用）。
+
+`quest` 與其他四個共用同一套視窗機制（可拖曳、可多開、點擊置頂），差別只有兩點：
+- 視窗加 `.is-translucent` 半透明修飾，預設位置在 stage 右上角（§ 36.10.3）
+- 按鈕由 `QuestTrackerButton` 自行渲染（需顯示任務數量 badge），
+  因此 `quest` 不在 `DOCK_PANEL_KEYS` 內，不走 PanelDock 的泛用按鈕迴圈
+
+### 視窗行為
+
+- **可多開**：四個面板彼此獨立，無互斥
+- **無遮罩**：不擋住 idle 進行中的畫面，也不擋「背包拖到地圖上＝丟棄」（§ 35.5.3）
+- **可拖曳**：僅標題列可拖，位置夾制在 viewport 內；開啟時先把預設座標夾回可視範圍
+- **點擊置頂**：z-index 由 `panelWindowStore.order` 決定（`PANEL_Z_BASE = 300`，末端最上層）
+- **關閉**：標題列右上 ✕。標題列的 pointer capture 會讓 ✕ 的 `pointerup` 改派到標題列，
+  因此 `handleDragStart` 必須在 target 位於 `.floating-window-close` 內時直接 return，否則 click 不觸發
+- **不持久化**：開關狀態與位置只存在於當下 session（與背包格子順序一致）
+
+### 狀態（`stores/panelWindowStore.ts`）
+
+| 欄位 / Action | 說明 |
+|---|---|
+| `open: Record<PanelKey, boolean>` | 各面板開關 |
+| `positions: Record<PanelKey, {x,y}>` | 各面板左上角座標 |
+| `order: PanelKey[]` | z 順序，末端為最上層 |
+| `toggle(key)` | 開 ↔ 關；開啟時同時置頂 |
+| `openPanel(key)` / `closePanel(key)` | 明確開 / 關（關閉保留位置） |
+| `focusPanel(key)` | 置頂，不改開關狀態 |
+| `setPosition(key, pos)` | 更新座標（夾制由 `FloatingWindow` 負責） |
+| `closeAll()` | 全部關閉 |
 
 ### 結構
 
 ```tsx
-<LeftPanelTabs>
-  ├ Tab "詳細狀態" → <CharacterStats />
-  └ Tab "裝備欄"   → <EquipmentPanel />
-</LeftPanelTabs>
+<PanelDock>              // 底部按鈕列（與 QuickSlotBar 同排）
+  <QuestTrackerButton /> + [詳細狀態][裝備欄][背包][技能] + <ScriptEditorModal /> 觸發鈕
+</PanelDock>
+
+<PanelWindows>           // 依 store.open 渲染
+  <FloatingWindow panelKey="stats">     <CharacterStats /></FloatingWindow>
+  <FloatingWindow panelKey="equipment"> <EquipmentPanel /></FloatingWindow>
+  <FloatingWindow panelKey="bag">       <BagPanel /></FloatingWindow>
+  <FloatingWindow panelKey="skill">     <SkillPanel /></FloatingWindow>
+</PanelWindows>
 ```
 
 ---
@@ -889,8 +943,8 @@ interface TooltipProps {
 
 ### 觸發
 
-- 左側面板底部顯示「自動腳本」按鈕（含規則數量 badge）
-- 點擊按鈕彈出居中 overlay modal
+- 底部 `PanelDock` 最右側顯示「自動腳本」按鈕（含規則數量 badge，沿用 `.panel-dock-btn` 樣式）
+- 點擊按鈕彈出居中 overlay modal（腳本編輯為設定用途，維持 modal 形式，非 `FloatingWindow`）
 
 ### 行為
 

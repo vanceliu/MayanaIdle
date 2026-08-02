@@ -61,7 +61,7 @@
 
 | 場景 | 組件 | compact | 說明 |
 |---|---|---|---|
-| 左側裝備欄（EquipmentPanel） | `EquipmentDetail` | `compact` | 資訊精簡，不顯示重量/部位/材質/職業 |
+| 裝備欄浮動視窗（EquipmentPanel） | `EquipmentDetail` | `compact` | 資訊精簡，不顯示重量/部位/材質/職業 |
 | 背包 tooltip（BagPanel） | `EquipmentDetail` | — | 完整顯示 |
 | 背包列表（Inventory） | `EquipmentDetail` | — | 完整顯示 |
 | 武器店/防具店 | `EquipmentDetail` / `EquipmentTemplateDetail` | — | 完整顯示 |
@@ -112,22 +112,24 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 
 ### Bar 結構
 
-位於左側面板最上方，顯示角色核心狀態：
+位於**頂部 HUD 左側**（`.top-hud`），與右側的地圖選擇器 + 探索控制列等高（見
+`16-tech-frontend-architecture.md` § 32.3）。compact 兩列版面：
 
 ```
 .status-panel
-├── .char-header          — 角色名 + 職業 + 等級
-├── .bars
-│   ├── .bar.hp-bar       — HP 血量條（紅色漸層）
-│   ├── .bar.mp-bar       — MP 魔力條（藍色漸層）
-│   ├── .weight-defense-row — 負重條 + 防禦值（同行）
-│   │   ├── .bar.weight-bar   — 負重條（灰色漸層，超重時紅色）
-│   │   └── .defense-value    — 防禦數值（藍綠色）
-│   └── .bar.exp-bar      — EXP 經驗條（黃色漸層）
-└── .area-info            — 目前區域
+├── .char-header          — 角色名 + 職業 + 等級 + 防禦值（防禦靠右）
+└── .bars                 — 三條並排（flex row）
+    ├── .bar.hp-bar       — HP 血量條（紅色漸層）
+    ├── .bar.mp-bar       — MP 魔力條（藍色漸層）
+    └── .bar.exp-bar      — EXP 經驗條（黃色漸層）
 ```
 
-順序：HP → MP → 負重+防禦 → EXP
+順序：第一列 名稱/職業/等級 …… 防禦；第二列 HP → MP → EXP（等寬並排）
+
+**不顯示「目前區域」**：已由頂部地圖選擇器「目前: 區域名 ▼」呈現，避免重複。
+
+**負重條未實作**：負重懲罰與負重 UI 皆未實作（見 `99-ai-constraints.md` 第 61 條、
+`35-inventory-constraints.md` § 35.2），故 `.bars` 內無 `.weight-bar`。
 
 ### 負重計算
 
@@ -136,11 +138,11 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 - 顯示格式：`{current}/{max} ({percent}%)`
 - 正常：灰色漸層 `#6B7280 → #9CA3AF`
 - 超重：紅色漸層（同 HP bar）——**僅視覺提示，無遊戲懲罰**（見 `35-inventory-constraints.md` § 35.2）
-- 防禦值顯示在負重條右側，使用 `var(--accent-info)` 藍綠色
+- 防禦值顯示在 `.char-header` 最右側，使用 `var(--accent-info)` 藍綠色（負重條未實作）
 
 ### 詳細狀態面板（CharacterStats）
 
-左側面板「詳細狀態」頁籤，分區顯示角色戰鬥相關數值：
+「詳細狀態」浮動視窗（由底部 PanelDock 開啟），分區顯示角色戰鬥相關數值：
 
 | 區塊 | 顯示項目 |
 |---|---|
@@ -198,7 +200,7 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 | 鐵匠鋪（強化/品質/詞綴） | ✗ |
 | 背包（BagPanel tooltip） | ✓ |
 | 背包列表（Inventory） | ✓ |
-| 左側裝備欄（EquipmentPanel） | ✗（compact 模式） |
+| 裝備欄浮動視窗（EquipmentPanel） | ✗（compact 模式） |
 
 ## 34.4 結果訊息
 

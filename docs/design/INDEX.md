@@ -204,7 +204,7 @@
        ↕                                                        ↕
 07-affix.md（免疫詞綴 § 7.10）←→ 30-items.md（狀態解除道具）←→ 13-town.md（雜貨店商品清單）
        ↕
-16-tech-frontend-architecture.md（Icon 系統 / BuffBar / 左側面板 / Tooltip）
+16-tech-frontend-architecture.md（Icon 系統 / BuffBar / 浮動面板視窗 / Tooltip）
                                                                 ↕
                                         27-drop-table.md ←→ 13-town.md（職業工會任務）
 

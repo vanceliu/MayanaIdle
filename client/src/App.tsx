@@ -8,15 +8,14 @@ import { CharacterSelect } from './components/CharacterSelect';
 import { StatusPanel } from './components/StatusPanel';
 import { DiscardConfirmModal } from './components/DiscardConfirmModal';
 import { BuffBar } from './components/BuffBar';
-import { LeftPanelTabs } from './components/LeftPanelTabs';
-import { ScriptEditorModal } from './components/ScriptEditorModal';
 import { AttributeUpModal } from './components/AttributeUpModal';
 import { BattleView } from './components/BattleView';
+import { ExploreBar } from './components/ExploreBar';
 import { MapNavigation } from './components/MapNavigation';
 import { TownView } from './components/TownView';
 import { QuickSlotBar } from './components/QuickSlotBar';
-import { QuestTracker } from './components/QuestTracker';
-import { RightPanel } from './components/RightPanel';
+import { PanelDock } from './components/PanelDock';
+import { PanelWindows } from './components/PanelWindows';
 import { getRegion } from './models/mapData';
 import './App.css';
 
@@ -137,24 +136,30 @@ function App() {
 
   return (
     <div className="app game-layout">
-      <aside className="left-panel">
+      <div className="top-hud">
         <StatusPanel />
+        <div className="top-hud-nav">
+          <MapNavigation />
+          {/* 城鎮沒有探索控制，但仍保留這一排的位置，讓城鎮與野外的 UI 高度一致 */}
+          <div className={`explore-bar-slot ${isInTown ? 'is-hidden' : ''}`}>
+            <ExploreBar />
+          </div>
+        </div>
+      </div>
+
+      {/* 探索與城鎮共用的 stage 容器，BuffBar 固定浮在左上（§ 24.8.1） */}
+      <div className="stage-area">
         <BuffBar />
-        <LeftPanelTabs />
-        <ScriptEditorModal />
-      </aside>
-      <main className="center-panel">
-        <MapNavigation />
-        <div className="center-content">
-          {isInTown ? <TownView /> : <BattleView />}
-        </div>
-        <div className="quick-slot-row">
-          <QuickSlotBar />
-          <QuestTracker />
-        </div>
-        <GameToolbar />
-      </main>
-      <RightPanel />
+        {isInTown ? <TownView /> : <BattleView />}
+      </div>
+
+      <div className="bottom-bar">
+        <QuickSlotBar />
+        <PanelDock />
+      </div>
+
+      <GameToolbar />
+      <PanelWindows />
       <AttributeUpModal />
       <DiscardConfirmModal />
     </div>

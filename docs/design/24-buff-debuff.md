@@ -314,9 +314,12 @@ interface PlayerDotEffect {
 
 ### 24.8.1 角色 Buff 顯示
 
-- **位置**：左側面板 `StatusPanel`（HP/MP/EXP bar）正下方，`LeftPanelTabs` 之上
+- **位置**：stage 區域（`.stage-area`）左上角浮動，往下垂直延伸。
+  探索時疊在地圖 canvas 上，城鎮時疊在城鎮設施列左側，兩者位置一致
+  （城鎮不另做 canvas，`.town-view` 左側讓出欄位寬度）
 - **組件**：`<BuffBar>`
-- **顯示方式**：水平 icon bar（單排）
+- **滑鼠事件**：容器 `pointer-events: none`（不擋地圖點擊移動），icon 自身開啟 hover
+- **顯示方式**：垂直 icon 欄（單列往下長）
   - 每個 buff 以 32×32 icon 呈現
   - icon 右下角覆蓋剩餘秒數（≥60s 顯示 `M:SS` 格式，<60s 顯示秒數）
   - 同時顯示上限 8 個，超過顯示 `+N` 提示
@@ -333,7 +336,7 @@ interface PlayerDotEffect {
 
 ### 24.8.2 角色 Debuff 顯示
 
-- **位置**：BuffBar 內，與 Buff 同排但以不同框色區分
+- **位置**：BuffBar 內，與 Buff 同一垂直欄但以不同框色區分
 - **框色規則**：
   - Buff（正面效果）：藍色外框 `#3B82F6`
   - Debuff（負面效果）：紅色外框 `#EF4444`

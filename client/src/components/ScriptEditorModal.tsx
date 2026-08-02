@@ -15,7 +15,10 @@ export function ScriptEditorModal() {
 
   return (
     <>
-      <button className="script-modal-trigger" onClick={() => setIsOpen(true)}>
+      <button
+        className={`panel-dock-btn script-modal-trigger ${isOpen ? 'active' : ''}`}
+        onClick={() => setIsOpen(true)}
+      >
         <span>自動腳本</span>
         <span className="script-badge">{totalRules}</span>
       </button>

@@ -1,0 +1,118 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  usePanelWindowStore,
+  getPanelZIndex,
+  PANEL_KEYS,
+  PANEL_Z_BASE,
+  type PanelKey,
+} from '../panelWindowStore';
+
+function reset() {
+  usePanelWindowStore.setState({
+    open: { stats: false, equipment: false, bag: false, skill: false, quest: false },
+    positions: {
+      stats: { x: 24, y: 120 },
+      equipment: { x: 396, y: 120 },
+      bag: { x: 780, y: 120 },
+      skill: { x: 1224, y: 120 },
+      quest: { x: 1576, y: 128 },
+    },
+    order: [...PANEL_KEYS],
+  });
+}
+
+describe('panelWindowStore', () => {
+  beforeEach(reset);
+
+  it('五個面板（含任務）預設皆為關閉', () => {
+    const { open } = usePanelWindowStore.getState();
+    expect(Object.values(open).every(v => v === false)).toBe(true);
+  });
+
+  it('toggle 開啟後再 toggle 會關閉', () => {
+    const { toggle } = usePanelWindowStore.getState();
+
+    toggle('bag');
+    expect(usePanelWindowStore.getState().open.bag).toBe(true);
+
+    toggle('bag');
+    expect(usePanelWindowStore.getState().open.bag).toBe(false);
+  });
+
+  it('可同時開啟多個面板（多開，無互斥）', () => {
+    const { toggle } = usePanelWindowStore.getState();
+
+    toggle('bag');
+    toggle('equipment');
+    toggle('stats');
+
+    const { open } = usePanelWindowStore.getState();
+    expect(open.bag).toBe(true);
+    expect(open.equipment).toBe(true);
+    expect(open.stats).toBe(true);
+    expect(open.skill).toBe(false);
+  });
+
+  it('開啟時移到 z 順序最上層', () => {
+    const { toggle } = usePanelWindowStore.getState();
+
+    toggle('stats');
+    toggle('bag');
+
+    const { order } = usePanelWindowStore.getState();
+    expect(order[order.length - 1]).toBe('bag');
+  });
+
+  it('focusPanel 把指定面板移到最上層且不改變開關狀態', () => {
+    const { openPanel, focusPanel } = usePanelWindowStore.getState();
+
+    openPanel('stats');
+    openPanel('bag');
+    focusPanel('stats');
+
+    const state = usePanelWindowStore.getState();
+    expect(state.order[state.order.length - 1]).toBe('stats');
+    expect(state.open.stats).toBe(true);
+    expect(state.open.bag).toBe(true);
+  });
+
+  it('closePanel 只關閉指定面板，位置保留', () => {
+    const { openPanel, setPosition, closePanel } = usePanelWindowStore.getState();
+
+    openPanel('skill');
+    setPosition('skill', { x: 200, y: 300 });
+    closePanel('skill');
+
+    const state = usePanelWindowStore.getState();
+    expect(state.open.skill).toBe(false);
+    expect(state.positions.skill).toEqual({ x: 200, y: 300 });
+  });
+
+  it('setPosition 只影響指定面板', () => {
+    const before = usePanelWindowStore.getState().positions.bag;
+    usePanelWindowStore.getState().setPosition('stats', { x: 10, y: 20 });
+
+    const after = usePanelWindowStore.getState().positions;
+    expect(after.stats).toEqual({ x: 10, y: 20 });
+    expect(after.bag).toEqual(before);
+  });
+
+  it('closeAll 關閉全部面板', () => {
+    const { openPanel, closeAll } = usePanelWindowStore.getState();
+    openPanel('bag');
+    openPanel('skill');
+
+    closeAll();
+
+    const { open } = usePanelWindowStore.getState();
+    expect(Object.values(open).every(v => v === false)).toBe(true);
+  });
+
+  it('getPanelZIndex 依 order 位置遞增，最上層 z 最大', () => {
+    const order: PanelKey[] = ['stats', 'equipment', 'skill', 'bag'];
+
+    expect(getPanelZIndex(order, 'stats')).toBe(PANEL_Z_BASE);
+    expect(getPanelZIndex(order, 'bag')).toBe(PANEL_Z_BASE + 3);
+    expect(getPanelZIndex(order, 'bag')).toBeGreaterThan(getPanelZIndex(order, 'skill'));
+  });
+});

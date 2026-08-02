@@ -9,11 +9,7 @@ import { db } from '../db/database';
 export function BattleView() {
   const phase = useGameStore(s => s.phase);
   const combatLogs = useGameStore(s => s.combatLogs);
-  const manualSearch = useGameStore(s => s.manualSearch);
-  const cancelManualSearch = useGameStore(s => s.cancelManualSearch);
-  const isManualSearching = useGameStore(s => s.isManualSearching);
   const searchMode = useGameStore(s => s.searchMode);
-  const setSearchMode = useGameStore(s => s.setSearchMode);
   const character = useGameStore(s => s.character);
   const logRef = useRef<HTMLDivElement>(null);
   const [logSize, setLogSize] = useState<0 | 1 | 2>(0); // 0=compact, 1=medium, 2=large
@@ -77,11 +73,13 @@ export function BattleView() {
           const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear);
           const hpPct = (ch.hp / effMaxHp) * 100;
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
-          if (hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
+          // 已在恢復等待中就維持暫停：此時 HP/MP 可能已高於暫停門檻但未達恢復門檻，
+          // 不可因為「沒低於門檻」就重新起步（由 gameLoopTick 的 aboveResume 分支解除）。
+          const alreadyPaused = useMapMonsterStore.getState().paused;
+          if (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
             useMapMonsterStore.getState().setPaused(true);
-          } else {
-            setAutoMove(true);
           }
+          setAutoMove(true);
         } else {
           setAutoMove(true);
         }
@@ -107,31 +105,6 @@ export function BattleView() {
 
   return (
     <div className="battle-view">
-      <div className="battle-top-bar">
-        <div className="explore-bar">
-          <div className="search-mode-toggle">
-            <button className={searchMode === 'auto' ? 'active' : ''} onClick={() => setSearchMode('auto')}>自動搜尋</button>
-            <button className={searchMode === 'manual' ? 'active' : ''} onClick={() => setSearchMode('manual')}>手動搜尋</button>
-          </div>
-          {searchMode === 'manual' && phase === 'explore' && !isManualSearching && (
-            <button className="btn-search" onClick={manualSearch}>搜尋</button>
-          )}
-          {searchMode === 'manual' && phase === 'explore' && isManualSearching && (
-            <button className="btn-search searching" onClick={cancelManualSearch}>取消搜尋</button>
-          )}
-          {searchMode === 'auto' && phase === 'explore' && (
-            <span className="explore-indicator">探索中...</span>
-          )}
-          {phase === 'combat' && (
-            <span className="explore-indicator combat-indicator">戰鬥中</span>
-          )}
-        </div>
-
-        {phase === 'dead' && (
-          <div className="death-banner">你倒下了 — 已傳送至最近城鎮</div>
-        )}
-      </div>
-
       {currentMap && (
         <PixiGame />
       )}
