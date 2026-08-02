@@ -72,7 +72,6 @@ export function StatisticsCenter() {
 
   async function uploadOwnStats() {
     if (!character || !statistics || !myUuid) return;
-    if (!shouldUploadStats(myUuid)) return;
 
     const payload = {
       character_id: myUuid,
@@ -91,9 +90,12 @@ export function StatisticsCenter() {
       contribution: guildProgress.points,
     };
 
+    // 節流 + 數值未變則完全不送出（見 leaderboardService.shouldUploadStats）
+    if (!shouldUploadStats(myUuid, payload)) return;
+
     try {
       await uploadStats(payload);
-      markStatsUploaded(myUuid);
+      markStatsUploaded(myUuid, payload);
       return;
     } catch (err) {
       if (!(err instanceof LeaderboardError) || err.code !== 'not_registered') {
@@ -111,7 +113,7 @@ export function StatisticsCenter() {
         character_level: character.level,
       });
       await uploadStats(payload);
-      markStatsUploaded(myUuid);
+      markStatsUploaded(myUuid, payload);
     } catch (err) {
       if (err instanceof LeaderboardError && err.code === 'name_taken') {
         setMessage('角色名稱已被其他玩家使用，此角色無法登上排行榜');

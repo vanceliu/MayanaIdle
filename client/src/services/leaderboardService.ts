@@ -295,17 +295,75 @@ export async function registerCharacter(input: {
 // 統計上傳
 // ---------------------------------------------------------------------------
 
-/** 上傳節流：與 snapshot 相同的 10 分鐘週期，各角色獨立計時 */
-export function shouldUploadStats(characterUuid: string, now = Date.now()): boolean {
-  const raw = readStorage(`${UPLOAD_STAMP_PREFIX}${characterUuid}`);
-  if (!raw) return true;
-  const stamp = Number(raw);
-  if (!Number.isFinite(stamp)) return true;
-  return now - stamp >= SNAPSHOT_TTL_MS;
+/**
+ * 即使數值完全沒變，仍每 24 小時強制上傳一次。
+ * 純粹靠「數值有變才上傳」會有一個死角：若伺服端資料遺失（清庫、重建），
+ * 客戶端會誤以為早就同步過而永遠不再送出，該角色就此從排行榜消失。
+ */
+const FORCE_UPLOAD_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+interface UploadStamp {
+  at: number;
+  /** 上次成功上傳的數值指紋 */
+  sig: string;
 }
 
-export function markStatsUploaded(characterUuid: string, now = Date.now()): void {
-  writeStorage(`${UPLOAD_STAMP_PREFIX}${characterUuid}`, String(now));
+/** 數值指紋：排除 character_id（不會變），其餘欄位依固定順序串接 */
+function statsSignature(payload: CharacterStatsPayload): string {
+  return [
+    payload.class_name,
+    payload.character_level,
+    ...STAT_FIELD_ORDER.map(f => payload[f]),
+  ].join('|');
+}
+
+const STAT_FIELD_ORDER = [
+  'monstersKilled', 'bossesKilled', 'deathCount', 'equipmentCrafted',
+  'weaponEnhanceAttempts', 'armorEnhanceAttempts', 'weaponsBroken',
+  'armorsBroken', 'questsCompleted', 'totalGoldEarned', 'contribution',
+] as const satisfies readonly (keyof CharacterStatsPayload)[];
+
+function readUploadStamp(characterUuid: string): UploadStamp | null {
+  const raw = readStorage(`${UPLOAD_STAMP_PREFIX}${characterUuid}`);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as UploadStamp;
+    if (typeof parsed?.at !== 'number' || typeof parsed?.sig !== 'string') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 是否需要上傳統計。三個條件依序判定：
+ * 1. 從未上傳過 → 要
+ * 2. 距離上次上傳未滿 10 分鐘 → 不要（與 snapshot 同一個節流週期）
+ * 3. 數值與上次上傳完全相同且未滿 24 小時 → 不要
+ *
+ * 條件 3 是放置型遊戲的主要省流量來源：掛在城鎮、只是來看榜的玩家不會產生任何寫入。
+ */
+export function shouldUploadStats(
+  characterUuid: string,
+  payload: CharacterStatsPayload,
+  now = Date.now(),
+): boolean {
+  const stamp = readUploadStamp(characterUuid);
+  if (!stamp) return true;
+  if (now - stamp.at < SNAPSHOT_TTL_MS) return false;
+  if (stamp.sig !== statsSignature(payload)) return true;
+  return now - stamp.at >= FORCE_UPLOAD_INTERVAL_MS;
+}
+
+export function markStatsUploaded(
+  characterUuid: string,
+  payload: CharacterStatsPayload,
+  now = Date.now(),
+): void {
+  writeStorage(
+    `${UPLOAD_STAMP_PREFIX}${characterUuid}`,
+    JSON.stringify({ at: now, sig: statsSignature(payload) } satisfies UploadStamp),
+  );
 }
 
 /**

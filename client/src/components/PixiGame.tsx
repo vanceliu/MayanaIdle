@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
@@ -47,6 +47,7 @@ const ELEMENT_COLORS: Record<string, number> = {
 };
 
 export function PixiGame() {
+  const [initError, setInitError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pixiAppRef = useRef<PixiApp | null>(null);
   const sceneRef = useRef<GameScene | null>(null);
@@ -150,6 +151,11 @@ export function PixiGame() {
           scene!.pathLayer.clear();
         }
       });
+    }).catch((err: unknown) => {
+      // 不可靜默失敗：初始化中斷會讓 canvas 不掛載、地圖不繪製、ticker 不啟動，
+      // 畫面只剩一個空的黑框且完全沒有線索，玩家只能自己猜要重新整理。
+      console.error('[PixiGame] PixiJS 初始化失敗', err);
+      if (!destroyed) setInitError(err instanceof Error ? err.message : String(err));
     });
 
     return () => {
@@ -172,9 +178,13 @@ export function PixiGame() {
     const unsubscribe = useMapControlStore.subscribe((state) => {
       const currentMap = state.currentMap;
       if (currentMap === prevMapRef) return;
+
+      // 場景尚未建好（init 仍在進行）時不可記錄 prevMapRef，
+      // 否則這張地圖會被永久跳過 —— 之後同一個 map 物件不會再觸發通知。
+      // 這種情況由 init 完成後讀取 store 當下的 currentMap 補畫。
+      if (!currentMap || !sceneRef.current) return;
       prevMapRef = currentMap;
 
-      if (!currentMap || !sceneRef.current) return;
       sceneRef.current.loadMap(currentMap);
       monsterMapRef.current.forEach(m => {
         sceneRef.current?.entityLayer.container.removeChild(m.container);
@@ -268,6 +278,13 @@ export function PixiGame() {
     >
       {/* Pixi canvas 以 appendChild 掛入，需與 React 管理的節點分離 */}
       <div ref={containerRef} className="map-canvas-stage" />
+      {initError && (
+        <div className="map-init-error">
+          <div className="map-init-error-title">地圖初始化失敗</div>
+          <div className="map-init-error-detail">{initError}</div>
+          <button className="btn-primary" onClick={() => window.location.reload()}>重新整理</button>
+        </div>
+      )}
       <MonsterListOverlay />
     </div>
   );

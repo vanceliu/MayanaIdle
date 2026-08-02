@@ -185,21 +185,56 @@ describe('snapshot 快取', () => {
 });
 
 describe('統計上傳節流', () => {
+  const basePayload = {
+    character_id: 'uuid-1', class_name: 'knight', character_level: 10,
+    monstersKilled: 100, bossesKilled: 0, deathCount: 0, equipmentCrafted: 0,
+    weaponEnhanceAttempts: 0, armorEnhanceAttempts: 0, weaponsBroken: 0,
+    armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0, contribution: 0,
+  };
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
   beforeEach(() => localStorage.clear());
 
   it('從未上傳過時應上傳', () => {
-    expect(shouldUploadStats('uuid-1', 1_000)).toBe(true);
+    expect(shouldUploadStats('uuid-1', basePayload, 1_000)).toBe(true);
   });
 
   it('10 分鐘內不重複上傳', () => {
-    markStatsUploaded('uuid-1', 1_000);
-    expect(shouldUploadStats('uuid-1', 1_000 + SNAPSHOT_TTL_MS - 1)).toBe(false);
-    expect(shouldUploadStats('uuid-1', 1_000 + SNAPSHOT_TTL_MS)).toBe(true);
+    markStatsUploaded('uuid-1', basePayload, 1_000);
+    expect(shouldUploadStats('uuid-1', basePayload, 1_000 + SNAPSHOT_TTL_MS - 1)).toBe(false);
+  });
+
+  it('超過 10 分鐘且數值有變才上傳', () => {
+    markStatsUploaded('uuid-1', basePayload, 1_000);
+    const changed = { ...basePayload, monstersKilled: 101 };
+    expect(shouldUploadStats('uuid-1', changed, 1_000 + SNAPSHOT_TTL_MS)).toBe(true);
+  });
+
+  it('數值完全沒變時不上傳（掛在城鎮只看榜的玩家不產生寫入）', () => {
+    markStatsUploaded('uuid-1', basePayload, 1_000);
+    expect(shouldUploadStats('uuid-1', basePayload, 1_000 + SNAPSHOT_TTL_MS)).toBe(false);
+    expect(shouldUploadStats('uuid-1', basePayload, 1_000 + DAY_MS - 1)).toBe(false);
+  });
+
+  it('數值沒變但超過 24 小時仍強制上傳一次（避免伺服端資料遺失後永不重送）', () => {
+    markStatsUploaded('uuid-1', basePayload, 1_000);
+    expect(shouldUploadStats('uuid-1', basePayload, 1_000 + DAY_MS)).toBe(true);
+  });
+
+  it('等級或職業變動也算數值有變', () => {
+    markStatsUploaded('uuid-1', basePayload, 1_000);
+    const levelUp = { ...basePayload, character_level: 11 };
+    expect(shouldUploadStats('uuid-1', levelUp, 1_000 + SNAPSHOT_TTL_MS)).toBe(true);
   });
 
   it('各角色獨立計時', () => {
-    markStatsUploaded('uuid-1', 1_000);
-    expect(shouldUploadStats('uuid-2', 1_000)).toBe(true);
+    markStatsUploaded('uuid-1', basePayload, 1_000);
+    expect(shouldUploadStats('uuid-2', basePayload, 1_000)).toBe(true);
+  });
+
+  it('舊格式（純時間戳）的殘留資料視為需要上傳', () => {
+    localStorage.setItem('mayana_stats_upload_uuid-1', '1000');
+    expect(shouldUploadStats('uuid-1', basePayload, 1_000 + SNAPSHOT_TTL_MS)).toBe(true);
   });
 });
 
