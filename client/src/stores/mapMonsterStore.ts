@@ -25,6 +25,10 @@ const MONSTER_SPEED = 1;
 const PATH_RECALC_INTERVAL = 5000;
 const ASTAR_DISTANCE = 8;
 const PLAYER_MOVE_THRESHOLD = 2;
+/** Boss 生成門檻：本次進區停留分鐘數（見 `26-spawn-pressure.md` § 26.4） */
+export const BOSS_SPAWN_MIN_MINUTES = 5;
+/** 滿足門檻後每次生成判定產生 Boss 的機率 */
+export const BOSS_SPAWN_CHANCE = 0.1;
 
 function rollSpawnCount(elapsedMinutes: number): number {
   const roll = Math.random();
@@ -109,8 +113,8 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       // Determine if this spawn is a boss
       const bossAlreadyOnMap = currentMonsters.some(m => m.isBoss);
       let isBoss = false;
-      if (state.hasBossInPool && !bossAlreadyOnMap && elapsedMinutes >= 10) {
-        isBoss = Math.random() < 0.1;
+      if (state.hasBossInPool && !bossAlreadyOnMap && elapsedMinutes >= BOSS_SPAWN_MIN_MINUTES) {
+        isBoss = Math.random() < BOSS_SPAWN_CHANCE;
       }
 
       // Find a spawn position at least MIN_SPAWN_DISTANCE from player

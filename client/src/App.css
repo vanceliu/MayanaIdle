@@ -1774,6 +1774,64 @@ button.active {
   white-space: nowrap;
 }
 
+/* 數量步進器（商店買賣 / 倉庫存取共用）：[−10] [−] [輸入] [+] [+10] */
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.qty-stepper .qty-btn {
+  padding: 3px 7px;
+  min-width: 24px;
+  font-size: var(--fs-xs);
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.qty-stepper .qty-btn:hover:not(:disabled) {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.qty-stepper .qty-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.qty-stepper .qty-btn-wide {
+  min-width: 32px;
+}
+
+.qty-input {
+  width: 46px;
+  padding: 3px 4px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+}
+
+.qty-input:focus {
+  outline: none;
+  border-color: var(--accent-info);
+}
+
+.shop-item-actions .shop-action-btn, .storage-item-actions .shop-action-btn {
+  min-width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- Inn --- */
 .inn-status {
   display: flex;
@@ -1839,7 +1897,51 @@ button.active {
 .storage-item-actions {
   display: flex;
   gap: 4px;
+  align-items: center;
   flex-shrink: 0;
+}
+
+/* 倉庫名稱搜尋列 */
+.storage-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.storage-search-input {
+  flex: 1;
+  padding: 5px 26px 5px 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+}
+
+.storage-search-input:focus {
+  outline: none;
+  border-color: var(--accent-info);
+}
+
+.storage-search-clear {
+  position: absolute;
+  right: 4px;
+  padding: 2px 5px;
+  font-size: var(--fs-xs);
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.storage-search-clear:hover {
+  color: var(--text-primary);
+}
+
+/* 倉庫列的步進器按鈕不吃 .storage-item button 的內距，維持與商店一致 */
+.storage-item .qty-stepper .qty-btn {
+  padding: 3px 7px;
 }
 
 /* --- Magic Academy / Guild --- */

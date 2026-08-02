@@ -195,7 +195,7 @@ Pressure 公式、上限表與生成數量分布一律以 `26-spawn-pressure.md`
 
 - 該區域怪物池含 Boss（`hasBossInPool`）
 - 地圖上尚無 Boss 存在
-- 本次進區停留時間 ≥ **10 分鐘**
+- 本次進區停留時間 ≥ **5 分鐘**
 
 Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 

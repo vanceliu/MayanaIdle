@@ -7,6 +7,7 @@ import { isCureItem } from '../../models/cureItem';
 import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
+import { QtyStepper, parseQty } from '../common/QtyStepper';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -31,8 +32,17 @@ export function GeneralStore() {
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [batchTier, setBatchTier] = useState<number | null>(null);
+  // 各商品獨立的數量輸入，key = 商品名稱；未輸入過的商品預設為 1
+  const [buyQty, setBuyQty] = useState<Record<string, string>>({});
+  const [sellQty, setSellQty] = useState<Record<string, string>>({});
 
   if (!char) return null;
+
+  const gold = char.gold;
+
+  function qtyOf(map: Record<string, string>, name: string): string {
+    return map[name] ?? '1';
+  }
 
   const region = getRegion(char.currentRegion);
   const scrollConfig = region ? TOWN_SCROLL_CONFIG[region.id] : null;
@@ -45,16 +55,8 @@ export function GeneralStore() {
     return getBagUsedSlots(currentBag, inventory) < getBagMaxSlots(equippedGear);
   }
 
-  function buyPotion(name: string, price: number) {
-    if (!char || char.gold < price) return;
-    if (!canAddToBag(name)) return;
-    const updated = { ...char, gold: char.gold - price };
-    set({ character: updated });
-    buyBagItem(name, 1);
-  }
-
   function buyBulk(name: string, price: number, amount: number) {
-    if (!char || char.gold < price * amount) return;
+    if (!char || amount < 1 || char.gold < price * amount) return;
     if (!canAddToBag(name)) return;
     const updated = { ...char, gold: char.gold - price * amount };
     set({ character: updated });
@@ -96,7 +98,7 @@ export function GeneralStore() {
   }
 
   function buyScroll(amount: number) {
-    if (!char || !scrollConfig || char.gold < scrollConfig.price * amount) return;
+    if (!char || !scrollConfig || amount < 1 || char.gold < scrollConfig.price * amount) return;
     if (!canAddToBag(scrollConfig.name)) return;
     const updated = { ...char, gold: char.gold - scrollConfig.price * amount };
     set({ character: updated });
@@ -208,6 +210,10 @@ export function GeneralStore() {
         <div className="shop-items">
           {SHOP_ITEMS.map(item => {
             const { icon, color } = getShopItemIcon(item.name);
+            const raw = qtyOf(buyQty, item.name);
+            const affordable = Math.floor(gold / item.price);
+            const qty = parseQty(raw, affordable);
+            const total = item.price * qty;
             return (
             <div key={item.name} className="shop-item">
               <div className="shop-item-info">
@@ -219,23 +225,29 @@ export function GeneralStore() {
                 <span className="shop-item-price">{item.price.toLocaleString()}G</span>
               </div>
               <div className="shop-item-actions">
+                <QtyStepper
+                  label={item.name}
+                  value={raw}
+                  max={affordable}
+                  onChange={next => setBuyQty(q => ({ ...q, [item.name]: next }))}
+                />
                 <button
-                  onClick={() => buyPotion(item.name, item.price)}
-                  disabled={char.gold < item.price}
+                  className="shop-action-btn"
+                  onClick={() => buyBulk(item.name, item.price, qty)}
+                  disabled={gold < total}
                 >
-                  買1
-                </button>
-                <button
-                  onClick={() => buyBulk(item.name, item.price, 10)}
-                  disabled={char.gold < item.price * 10}
-                >
-                  買10
+                  購買 {total.toLocaleString()}G
                 </button>
               </div>
             </div>
             );
           })}
-          {scrollConfig && (
+          {scrollConfig && (() => {
+            const raw = qtyOf(buyQty, scrollConfig.name);
+            const affordable = Math.floor(gold / scrollConfig.price);
+            const qty = parseQty(raw, affordable);
+            const total = scrollConfig.price * qty;
+            return (
             <div className="shop-item">
               <div className="shop-item-info">
                 <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -249,21 +261,23 @@ export function GeneralStore() {
                 <span className="shop-item-price">{scrollConfig.price}G</span>
               </div>
               <div className="shop-item-actions">
+                <QtyStepper
+                  label={scrollConfig.name}
+                  value={raw}
+                  max={affordable}
+                  onChange={next => setBuyQty(q => ({ ...q, [scrollConfig.name]: next }))}
+                />
                 <button
-                  onClick={() => buyScroll(1)}
-                  disabled={char.gold < scrollConfig.price}
+                  className="shop-action-btn"
+                  onClick={() => buyScroll(qty)}
+                  disabled={gold < total}
                 >
-                  買1
-                </button>
-                <button
-                  onClick={() => buyScroll(10)}
-                  disabled={char.gold < scrollConfig.price * 10}
-                >
-                  買10
+                  購買 {total.toLocaleString()}G
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -319,6 +333,9 @@ export function GeneralStore() {
           {bagItems.map(item => {
             const sellPrice = Math.floor(getSellPrice(item.name) * 0.5);
             if (sellPrice <= 0) return null;
+            const raw = qtyOf(sellQty, item.name);
+            const qty = parseQty(raw, item.amount);
+            const total = sellPrice * qty;
             return (
               <div key={item.name} className="shop-item">
                 <div className="shop-item-info">
@@ -329,8 +346,18 @@ export function GeneralStore() {
                   <span className="shop-item-price sell-price">+{sellPrice}G/個</span>
                 </div>
                 <div className="shop-item-actions">
-                  <button onClick={() => sellBagItem(item.name, sellPrice, 1)}>賣1</button>
-                  <button onClick={() => sellBagItem(item.name, sellPrice, 10)}>賣10</button>
+                  <QtyStepper
+                    label={item.name}
+                    value={raw}
+                    max={item.amount}
+                    onChange={next => setSellQty(q => ({ ...q, [item.name]: next }))}
+                  />
+                  <button
+                    className="shop-action-btn"
+                    onClick={() => sellBagItem(item.name, sellPrice, qty)}
+                  >
+                    賣出 +{total.toLocaleString()}G
+                  </button>
                   <button onClick={() => sellBagItem(item.name, sellPrice, item.amount)}>全部</button>
                 </div>
               </div>

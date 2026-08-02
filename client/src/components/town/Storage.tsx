@@ -8,6 +8,7 @@ import { resolveItemIcon } from '../../models/iconMap';
 import { getItemWeight, getItemDefinition } from '../../models/items';
 import { db } from '../../db/database';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
+import { QtyStepper, parseQty } from '../common/QtyStepper';
 
 type StorageTab = 'personal' | 'shared';
 type ActionTab = 'deposit' | 'withdraw';
@@ -26,6 +27,10 @@ export function Storage() {
   const [storageTab, setStorageTab] = useState<StorageTab>('shared');
   const [actionTab, setActionTab] = useState<ActionTab>('deposit');
   const [goldAmount, setGoldAmount] = useState('');
+  // 各物品獨立的存入 / 取出數量，key = 物品名稱；未輸入過的預設為 1
+  const [depositQty, setDepositQty] = useState<Record<string, string>>({});
+  const [withdrawQty, setWithdrawQty] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
   const templates = useEquipmentTemplates();
 
   // --- Shared warehouse equipment ---
@@ -207,10 +212,20 @@ export function Storage() {
   const depositMaterial = isShared ? depositMaterialShared : depositMaterialPersonal;
   const withdrawMaterial = isShared ? withdrawMaterialShared : withdrawMaterialPersonal;
 
-  const potionItems = bagItems.filter(b => b.type === 'potion');
-  const nonPotionItems = bagItems.filter(b => b.type !== 'potion');
-  const storedPotions = currentMaterialStored.filter(s => s.type === 'potion');
-  const storedNonPotions = currentMaterialStored.filter(s => s.type !== 'potion');
+  // 名稱搜尋：不分大小寫、去除前後空白，空字串代表不過濾
+  const query = search.trim().toLowerCase();
+  const isFiltering = query.length > 0;
+  const matchesQuery = (name: string) => !isFiltering || name.toLowerCase().includes(query);
+
+  const bagEquipment = inventory.filter(i => !i.isStarterGear && matchesQuery(i.name));
+  const potionItems = bagItems.filter(b => b.type === 'potion' && matchesQuery(b.name));
+  const nonPotionItems = bagItems.filter(b => b.type !== 'potion' && matchesQuery(b.name));
+  const storedEquipList = currentEquipStored.filter(i => matchesQuery(i.name));
+  const storedPotions = currentMaterialStored.filter(s => s.type === 'potion' && matchesQuery(s.name));
+  const storedNonPotions = currentMaterialStored.filter(s => s.type !== 'potion' && matchesQuery(s.name));
+
+  /** 過濾中時所有分區共用同一句提示，避免誤以為東西不見了 */
+  const emptyText = (fallback: string) => (isFiltering ? `沒有符合「${search.trim()}」的項目` : fallback);
 
   return (
     <div className="storage-panel">
@@ -245,11 +260,32 @@ export function Storage() {
         <button className={actionTab === 'withdraw' ? 'active' : ''} onClick={() => setActionTab('withdraw')}>取出物品</button>
       </div>
 
+      <div className="storage-search">
+        <input
+          type="text"
+          className="storage-search-input"
+          aria-label="搜尋物品名稱"
+          placeholder="搜尋物品名稱…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {isFiltering && (
+          <button
+            type="button"
+            className="storage-search-clear"
+            aria-label="清除搜尋"
+            onClick={() => setSearch('')}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {actionTab === 'deposit' && (
         <div className="storage-content">
-          <h4>背包裝備 ({inventory.filter(i => !i.isStarterGear).length})</h4>
-          {inventory.filter(i => !i.isStarterGear).length === 0 && <p className="empty-text">無裝備可存入</p>}
-          {inventory.filter(i => !i.isStarterGear).map(item => (
+          <h4>背包裝備 ({bagEquipment.length})</h4>
+          {bagEquipment.length === 0 && <p className="empty-text">{emptyText('無裝備可存入')}</p>}
+          {bagEquipment.map(item => (
             <div key={item.id} className="storage-item">
               <EquipmentDetail item={item} templates={templates} />
               <div className="storage-item-actions">
@@ -259,26 +295,38 @@ export function Storage() {
           ))}
 
           <h4>背包藥水</h4>
-          {potionItems.length === 0 && <p className="empty-text">無藥水可存入</p>}
+          {potionItems.length === 0 && <p className="empty-text">{emptyText('無藥水可存入')}</p>}
           {potionItems.map(item => (
             <div key={item.name} className="storage-item">
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const { icon, color } = resolveItemIcon(getItemDefinition(item.name), item.name.includes('卷軸') ? 'scroll' : 'material'); return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
-                <button onClick={() => depositMaterial(item, 1)}>存1</button>
-                <button onClick={() => depositMaterial(item, 10)}>存10</button>
+                <QtyStepper
+                  label={item.name}
+                  value={depositQty[item.name] ?? '1'}
+                  max={item.amount}
+                  hardCap={Infinity}
+                  onChange={next => setDepositQty(q => ({ ...q, [item.name]: next }))}
+                />
+                <button onClick={() => depositMaterial(item, parseQty(depositQty[item.name] ?? '1', item.amount, Infinity))}>存入</button>
                 <button onClick={() => depositMaterial(item, item.amount)}>全部</button>
               </div>
             </div>
           ))}
 
           <h4>背包材料</h4>
-          {nonPotionItems.length === 0 && <p className="empty-text">無材料可存入</p>}
+          {nonPotionItems.length === 0 && <p className="empty-text">{emptyText('無材料可存入')}</p>}
           {nonPotionItems.map(item => (
             <div key={item.name} className="storage-item">
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const { icon, color } = resolveItemIcon(getItemDefinition(item.name), item.name.includes('卷軸') ? 'scroll' : 'material'); return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
-                <button onClick={() => depositMaterial(item, 1)}>存1</button>
-                <button onClick={() => depositMaterial(item, 10)}>存10</button>
+                <QtyStepper
+                  label={item.name}
+                  value={depositQty[item.name] ?? '1'}
+                  max={item.amount}
+                  hardCap={Infinity}
+                  onChange={next => setDepositQty(q => ({ ...q, [item.name]: next }))}
+                />
+                <button onClick={() => depositMaterial(item, parseQty(depositQty[item.name] ?? '1', item.amount, Infinity))}>存入</button>
                 <button onClick={() => depositMaterial(item, item.amount)}>全部</button>
               </div>
             </div>
@@ -288,9 +336,9 @@ export function Storage() {
 
       {actionTab === 'withdraw' && (
         <div className="storage-content">
-          <h4>倉庫裝備 ({currentEquipStored.length})</h4>
-          {currentEquipStored.length === 0 && <p className="empty-text">倉庫空空如也</p>}
-          {currentEquipStored.map(item => (
+          <h4>倉庫裝備 ({storedEquipList.length})</h4>
+          {storedEquipList.length === 0 && <p className="empty-text">{emptyText('倉庫空空如也')}</p>}
+          {storedEquipList.map(item => (
             <div key={item.id} className="storage-item">
               <EquipmentDetail item={item} templates={templates} />
               <div className="storage-item-actions">
@@ -300,26 +348,38 @@ export function Storage() {
           ))}
 
           <h4>倉庫藥水</h4>
-          {storedPotions.length === 0 && <p className="empty-text">無藥水</p>}
+          {storedPotions.length === 0 && <p className="empty-text">{emptyText('無藥水')}</p>}
           {storedPotions.map(item => (
             <div key={item.name} className="storage-item">
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const { icon, color } = resolveItemIcon(getItemDefinition(item.name), item.name.includes('卷軸') ? 'scroll' : 'material'); return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
-                <button onClick={() => withdrawMaterial(item, 1)}>取1</button>
-                <button onClick={() => withdrawMaterial(item, 10)}>取10</button>
+                <QtyStepper
+                  label={item.name}
+                  value={withdrawQty[item.name] ?? '1'}
+                  max={item.amount}
+                  hardCap={Infinity}
+                  onChange={next => setWithdrawQty(q => ({ ...q, [item.name]: next }))}
+                />
+                <button onClick={() => withdrawMaterial(item, parseQty(withdrawQty[item.name] ?? '1', item.amount, Infinity))}>取出</button>
                 <button onClick={() => withdrawMaterial(item, item.amount)}>全部</button>
               </div>
             </div>
           ))}
 
           <h4>倉庫材料</h4>
-          {storedNonPotions.length === 0 && <p className="empty-text">無材料</p>}
+          {storedNonPotions.length === 0 && <p className="empty-text">{emptyText('無材料')}</p>}
           {storedNonPotions.map(item => (
             <div key={item.name} className="storage-item">
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{(() => { const { icon, color } = resolveItemIcon(getItemDefinition(item.name), item.name.includes('卷軸') ? 'scroll' : 'material'); return <GameIcon name={icon} size={16} color={color} />; })()}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})</span>
               <div className="storage-item-actions">
-                <button onClick={() => withdrawMaterial(item, 1)}>取1</button>
-                <button onClick={() => withdrawMaterial(item, 10)}>取10</button>
+                <QtyStepper
+                  label={item.name}
+                  value={withdrawQty[item.name] ?? '1'}
+                  max={item.amount}
+                  hardCap={Infinity}
+                  onChange={next => setWithdrawQty(q => ({ ...q, [item.name]: next }))}
+                />
+                <button onClick={() => withdrawMaterial(item, parseQty(withdrawQty[item.name] ?? '1', item.amount, Infinity))}>取出</button>
                 <button onClick={() => withdrawMaterial(item, item.amount)}>全部</button>
               </div>
             </div>

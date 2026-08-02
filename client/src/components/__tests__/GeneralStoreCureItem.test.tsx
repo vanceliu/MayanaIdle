@@ -45,7 +45,8 @@ beforeEach(() => {
 
 function buyOne(itemName: string) {
   const row = screen.getByText(itemName).closest('.shop-item') as HTMLElement;
-  fireEvent.click(within(row).getByText('買1'));
+  // 數量步進器預設為 1，直接按購買即為買 1 個
+  fireEvent.click(within(row).getByRole('button', { name: /購買/ }));
 }
 
 describe('雜貨店 — 狀態解除道具', () => {
