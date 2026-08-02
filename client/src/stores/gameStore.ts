@@ -1703,7 +1703,6 @@ async function saveGame(state: GameState) {
   const char = state.character;
   if (!char || !char.id) return;
 
-  const { useMapControlStore } = await import('./mapControlStore');
   const mapPos = useMapControlStore.getState().playerPosition;
 
   await db.characters.update(char.id, {
