@@ -4,8 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PanelDock } from '../../components/PanelDock';
 import { usePanelWindowStore, PANEL_KEYS, DOCK_PANEL_KEYS } from '../../stores/panelWindowStore';
 
-vi.mock('../../components/ScriptEditorModal', () => ({
-  ScriptEditorModal: () => <button className="panel-dock-btn script-modal-trigger">自動腳本</button>,
+vi.mock('../../components/ScriptEditorPanel', () => ({
+  ScriptEditorButton: () => <button className="panel-dock-btn script-panel-trigger">自動腳本</button>,
 }));
 
 vi.mock('../../components/QuestTracker', () => ({
@@ -13,10 +13,8 @@ vi.mock('../../components/QuestTracker', () => ({
 }));
 
 function reset() {
-  usePanelWindowStore.setState({
-    open: { stats: false, equipment: false, bag: false, skill: false, quest: false },
-    order: [...PANEL_KEYS],
-  });
+  usePanelWindowStore.getState().closeAll();
+  usePanelWindowStore.setState({ order: [...PANEL_KEYS] });
 }
 
 describe('PanelDock', () => {
@@ -29,9 +27,11 @@ describe('PanelDock', () => {
     }
   });
 
-  it('任務不在泛用按鈕清單內（按鈕由 QuestTrackerButton 自行渲染以帶 badge）', () => {
-    expect(DOCK_PANEL_KEYS).not.toContain('quest');
-    expect(PANEL_KEYS).toContain('quest');
+  it('任務與自動腳本不在泛用按鈕清單內（按鈕由各自組件渲染以帶 badge）', () => {
+    for (const key of ['quest', 'script'] as const) {
+      expect(DOCK_PANEL_KEYS, key).not.toContain(key);
+      expect(PANEL_KEYS, key).toContain(key);
+    }
   });
 
   it('點擊按鈕開啟對應面板', () => {

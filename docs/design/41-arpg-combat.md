@@ -161,12 +161,18 @@ interface SkillCombatProps {
 
 ```typescript
 interface MonsterCombatProps {
-  attackType: 'melee' | 'ranged';
-  attackRange: number;      // 近戰通常 1.5，遠程可能 8-15
+  attackType: 'melee' | 'ranged' | 'magic';
+  attackRange: number;      // melee 1.5、ranged 10、magic 8
   attackInterval: number;   // 攻擊間隔 ms
   projectileSpeed?: number; // 遠程投射物速度
 }
 ```
+
+`ranged`（弓箭手系）與 `magic`（巫師／魔導系）都需通過射程與視線判定並產生投射物
+（判定共用 `isRangedAttackType()`），差別只在減傷公式與投射物外型：
+`ranged` 走物理減傷、畫白色箭矢；`magic` 走魔法減傷、畫依怪物元素上色的彈丸
+（顏色規則見 `42-element-system.md` § 42.4）。
+各型別的適用怪物見 `25-monster-system.md` § 25.8。
 
 ### 5.2 怪物狀態機
 
@@ -181,7 +187,9 @@ ROAMING（脫離回到巡邏）
 ```
 
 - 近戰怪物：追到玩家旁邊才打
-- 遠程怪物：保持射程內、有視線就打，不需貼身
+- 遠程怪物（弓箭手／巫師）：保持射程內、有視線就打，不需貼身
+- 仇恨範圍固定 8 格、脫離 15 格，對所有攻擊型別一致；
+  因此弓箭手的 10 格射程只在「被激活後玩家拉開距離」時才吃得到全射程
 - 暈眩檢查：每次 tick 前檢查 activeEffects 是否有 stun debuff，有則跳過行動
 
 ### 5.3 怪物死亡

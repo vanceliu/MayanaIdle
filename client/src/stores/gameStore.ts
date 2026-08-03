@@ -4,6 +4,7 @@ import type { MonsterInstance } from '../models/monster';
 import { useMapMonsterStore } from './mapMonsterStore';
 import { useMapControlStore } from './mapControlStore';
 import type { EquipmentInstance, EquippedGear } from '../models/equipment';
+import { BOSS_DROP_ONLY_TIER, isWeaponEquipment } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
@@ -40,7 +41,7 @@ import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTo
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
 import { getTownDifficulties } from '../models/adventurerQuest';
 import type { CharacterStatistics } from '../models/statistics';
-import { createDefaultStatistics } from '../models/statistics';
+import { createDefaultStatistics, normalizeStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
 import { evaluatePersistentScript, evaluateEmergencyRetreat, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
@@ -484,7 +485,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const afterCombatMpResumeThreshold = prefs?.afterCombatMpResumeThreshold ?? 60;
     const adventurerQuests = prefs?.adventurerQuests ?? [];
     const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
-    const statistics = prefs?.statistics ?? createDefaultStatistics();
+    // 舊存檔缺少後來新增的統計欄位，補上預設值（否則 `+= 1` 會變成 NaN）
+    const statistics = normalizeStatistics(prefs?.statistics);
 
     // Reset areaEnteredAt so pressure doesn't accumulate during character select
     char.areaEnteredAt = Date.now();
@@ -569,6 +571,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       armorsBroken: statistics.armorsBroken,
       questsCompleted: statistics.questsCompleted,
       totalGoldEarned: statistics.totalGoldEarned,
+      tier7WeaponsLooted: statistics.tier7WeaponsLooted,
+      tier7ArmorsLooted: statistics.tier7ArmorsLooted,
       contribution: guildProgress.points,
     };
 
@@ -1743,6 +1747,14 @@ export function processMonsterDeath(
     stats.monstersKilled += 1;
     if (monsterIsBoss) stats.bossesKilled += 1;
     if (drops.gold > 0) stats.totalGoldEarned += drops.gold;
+    // T7 掉落計數（`37-statistics.md` § 37.3）：以「掉出來」為準，
+    // 背包滿而被丟棄的那件仍然計入 —— 記錄的是運氣，不是持有數。
+    for (const item of drops.items) {
+      if (item.equipmentTier !== BOSS_DROP_ONLY_TIER || !item.equipmentInstance) continue;
+      const inst = item.equipmentInstance;
+      if (isWeaponEquipment(inst.slot, inst.type)) stats.tier7WeaponsLooted += 1;
+      else stats.tier7ArmorsLooted += 1;
+    }
 
     newBag = newBag.filter(b => b.amount > 0);
 
@@ -1909,7 +1921,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
         adventurerQuests: data.adventurerQuests ?? [],
         guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
-        statistics: data.statistics ?? createDefaultStatistics(),
+        statistics: normalizeStatistics(data.statistics),
       };
     }
     // Migration: old format only has scriptRules
@@ -1945,7 +1957,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
         adventurerQuests: data.adventurerQuests ?? [],
         guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
-        statistics: data.statistics ?? createDefaultStatistics(),
+        statistics: normalizeStatistics(data.statistics),
       };
     }
     return null;

@@ -3546,8 +3546,32 @@ button.active {
   padding: 10px 12px;
 }
 
-/* --- ScriptEditorModal 觸發鈕（沿用 dock 按鈕樣式，僅加上規則數 badge） --- */
-.script-modal-trigger {
+/*
+ * 自動腳本浮動視窗（§ 32.16）。固定高度讓 tab 列釘在頂端、只有規則清單捲動 ——
+ * body 若沿用預設的 auto 高度 + overflow-y，捲動會發生在 body 上而把 tab 一起帶走。
+ */
+.floating-window.is-script {
+  height: 82vh;
+}
+
+.floating-window.is-script .floating-window-body {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.floating-window.is-script .script-tabs {
+  flex: 0 0 auto;
+}
+
+.floating-window.is-script .script-editor-content {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- 自動腳本觸發鈕（沿用 dock 按鈕樣式，僅加上規則數 badge） --- */
+.script-panel-trigger {
   gap: 8px;
 }
 

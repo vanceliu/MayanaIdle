@@ -30,24 +30,16 @@ import type { MonsterInstance } from '../models/monster';
 import type { DamageType } from '../pixi/ui/CombatVisualEvent';
 import type { EffectLayer } from '../pixi/layers/EffectLayer';
 import type { ProjectileShape } from '../pixi/ui/Projectile';
+import {
+  getElementProjectileColor,
+  getMonsterProjectileStyle,
+} from '../pixi/ui/projectileStyle';
 import { getSkillTemplate } from '../models/skillTemplate';
 
 const PLAYER_PROJECTILE_SPEED = 512;
 /** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
 const HUD_PUBLISH_INTERVAL = 100;
-const PLAYER_PROJECTILE_COLOR = 0xffffff;
-const MONSTER_PROJECTILE_COLOR = 0xff6b6b;
 const DEFAULT_MONSTER_PROJECTILE_SPEED = 384;
-
-const ELEMENT_COLORS: Record<string, number> = {
-  fire: 0xff6600,
-  ice: 0x66ccff,
-  wind: 0x66ff66,
-  earth: 0xcc9933,
-  light: 0xffffaa,
-  dark: 0x9933ff,
-  none: 0xffffff,
-};
 
 export function PixiGame() {
   const [initError, setInitError] = useState<string | null>(null);
@@ -277,7 +269,7 @@ export function PixiGame() {
       if (!map) return;
 
       /*
-       * 城鎮 NPC 判定（§ 99.6）。三個順序上的地雷：
+       * 城鎮 NPC 判定（§ 13.2.1）。三個順序上的地雷：
        * 1. 必須在 screenToMapTile 之前 —— NPC 站的格子不可通行（他有實體），
        *    而 screenToMapTile 對不可通行格回傳 null，先取格子會把「點正中 NPC」早退掉。
        * 2. 必須跟地圖移動走同一個 DOM handler —— 用 Pixi 的 pointertap 會與這裡各自
@@ -286,7 +278,7 @@ export function PixiGame() {
        */
       const npc = findNpcAtScreen(map, worldScreenX, worldScreenY);
       if (npc) {
-        // 點得到就開，不看距離（§ 99.6）
+        // 點得到就開，不看距離（§ 13.2.1）
         useTownStore.getState().openFacility(npc.facility as TownFacility);
         return;
       }
@@ -523,10 +515,11 @@ function tickArpgCombatLoop(
                   ? getSkillTemplate(enchantBuff.sourceSkillId)?.element
                   : undefined;
                 const isBowSkill = isSkill && result.skillUsed?.requiredWeaponType === 'bow';
-                const color = isSkill
-                  ? (isBowSkill && enchantElement ? (ELEMENT_COLORS[enchantElement] ?? PLAYER_PROJECTILE_COLOR)
-                    : (ELEMENT_COLORS[element] ?? PLAYER_PROJECTILE_COLOR))
-                  : (enchantElement ? (ELEMENT_COLORS[enchantElement] ?? PLAYER_PROJECTILE_COLOR) : PLAYER_PROJECTILE_COLOR);
+                // 顏色只看攻擊元素（§ 42.4）：弓技吃附魔元素、其他技能吃技能元素、
+                // 普攻吃附魔元素；沒有元素就是白色（物理）
+                const color = getElementProjectileColor(
+                  isSkill ? (isBowSkill && enchantElement ? enchantElement : element) : enchantElement,
+                );
                 const shape: ProjectileShape = (!isSkill || isBowSkill) ? 'arrow' : 'circle';
                 const size = isSkill && !isBowSkill && result.skillUsed?.target === 'aoe' ? 5 : undefined;
 
@@ -599,13 +592,19 @@ function tickArpgCombatLoop(
               if (monster && hasProjectilePath(monster.position, playerPos, currentMap)) {
                 const { sx: mx, sy: my } = mapPositionToScreen(currentMap, monster.position);
                 const speed = event.projectileSpeed ?? DEFAULT_MONSTER_PROJECTILE_SPEED;
+                // 外型與顏色見 § 42.4：物理＝白箭矢、魔法＝依該怪元素上色的彈丸
+                const { shape, color } = getMonsterProjectileStyle(
+                  event.attackType,
+                  monsterInstances.get(event.monsterId)?.element,
+                );
                 effectLayer.spawnProjectile({
                   fromX: mx, fromY: my - 20,
                   toX: sx, toY: sy - 20,
-                  speed, color: MONSTER_PROJECTILE_COLOR,
+                  speed, color,
                   onArrive: () => {
                     effectLayer.spawnDamageNumber(sx, sy - 20, dmgValue, dmgType);
                   },
+                  shape,
                 });
               }
             } else {
@@ -972,7 +971,7 @@ function syncMonsters(
 }
 
 /**
- * 城鎮 NPC 圖層（§ 99.6）。地圖切換時整批重建 —— NPC 是靜態資料，不需要逐格 diff。
+ * 城鎮 NPC 圖層（§ 13.2.1）。地圖切換時整批重建 —— NPC 是靜態資料，不需要逐格 diff。
  * 點 NPC 只負責「記下目標 + 走過去」，開面板由主迴圈在走到相鄰格時處理。
  */
 function syncNpcs(map: MapData, scene: GameScene, entities: NpcEntity[]): void {
@@ -991,7 +990,7 @@ function syncNpcs(map: MapData, scene: GameScene, entities: NpcEntity[]): void {
 }
 
 /**
- * 點擊是否打中某個 NPC（§ 99.6）。
+ * 點擊是否打中某個 NPC（§ 13.2.1）。
  *
  * NPC 的圓點畫在格子中心的正上方（偏移 `NPC_BODY_OFFSET`），所以先把點擊座標
  * 往下補回同樣的偏移，再換算成格子 —— 這樣「看起來點在圓點上」就會對到他站的格子。
@@ -1021,7 +1020,7 @@ export interface EntityHover {
 }
 
 /**
- * 找出滑鼠指到的實體（§ 99.6）。
+ * 找出滑鼠指到的實體（§ 13.2.1）。
  *
  * 玩家／怪物／NPC 都是畫在格子中心正上方的圓點（偏移 `NPC_BODY_OFFSET`，三者相同），
  * 所以用同一套螢幕距離判定：NPC → 怪物 → 玩家，先找到的先贏。

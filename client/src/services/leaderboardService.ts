@@ -2,7 +2,7 @@
  * 排行榜服務
  * 規格見 `docs/design/37-statistics.md` § 37.4
  *
- * 核心設計：整個統計中心只打一支 GET /api/snapshot，12 個榜單全部在本地由同一份
+ * 核心設計：整個統計中心只打一支 GET /api/snapshot，14 個榜單全部在本地由同一份
  * snapshot 排序切片；snapshot 以 localStorage 快取 10 分鐘，期間內完全不打 API。
  */
 
@@ -31,13 +31,15 @@ export type LeaderboardField =
   | 'armorsBroken'
   | 'questsCompleted'
   | 'totalGoldEarned'
+  | 'tier7WeaponsLooted'
+  | 'tier7ArmorsLooted'
   | 'contribution';
 
 export const LEADERBOARD_FIELDS: LeaderboardField[] = [
   'character_level', 'monstersKilled', 'bossesKilled', 'deathCount',
   'equipmentCrafted', 'weaponEnhanceAttempts', 'armorEnhanceAttempts',
   'weaponsBroken', 'armorsBroken', 'questsCompleted',
-  'totalGoldEarned', 'contribution',
+  'totalGoldEarned', 'tier7WeaponsLooted', 'tier7ArmorsLooted', 'contribution',
 ];
 
 export const LEADERBOARD_LABELS: Record<LeaderboardField, string> = {
@@ -52,6 +54,8 @@ export const LEADERBOARD_LABELS: Record<LeaderboardField, string> = {
   armorsBroken: '防具爆掉',
   questsCompleted: '任務完成',
   totalGoldEarned: '金幣總量',
+  tier7WeaponsLooted: 'T7 武器掉落',
+  tier7ArmorsLooted: 'T7 防具掉落',
   contribution: '任務貢獻度',
 };
 
@@ -103,6 +107,8 @@ export interface CharacterStatsPayload {
   armorsBroken: number;
   questsCompleted: number;
   totalGoldEarned: number;
+  tier7WeaponsLooted: number;
+  tier7ArmorsLooted: number;
   contribution: number;
 }
 
@@ -285,7 +291,8 @@ function statsSignature(payload: CharacterStatsPayload): string {
 const STAT_FIELD_ORDER = [
   'monstersKilled', 'bossesKilled', 'deathCount', 'equipmentCrafted',
   'weaponEnhanceAttempts', 'armorEnhanceAttempts', 'weaponsBroken',
-  'armorsBroken', 'questsCompleted', 'totalGoldEarned', 'contribution',
+  'armorsBroken', 'questsCompleted', 'totalGoldEarned',
+  'tier7WeaponsLooted', 'tier7ArmorsLooted', 'contribution',
 ] as const satisfies readonly (keyof CharacterStatsPayload)[];
 
 function readUploadStamp(characterUuid: string): UploadStamp | null {

@@ -5,14 +5,16 @@ import { FloatingWindow } from '../../components/FloatingWindow';
 import { usePanelWindowStore, PANEL_KEYS } from '../../stores/panelWindowStore';
 
 function reset() {
+  usePanelWindowStore.getState().closeAll();
+  usePanelWindowStore.getState().openPanel('bag');
   usePanelWindowStore.setState({
-    open: { stats: false, equipment: false, bag: true, skill: false, quest: false },
     positions: {
       stats: { x: 24, y: 120 },
       equipment: { x: 40, y: 120 },
       bag: { x: 100, y: 80 },
       skill: { x: 60, y: 120 },
       quest: { x: 80, y: 120 },
+      script: { x: 120, y: 120 },
     },
     order: [...PANEL_KEYS],
   });

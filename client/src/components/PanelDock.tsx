@@ -1,11 +1,11 @@
-import { ScriptEditorModal } from './ScriptEditorModal';
+import { ScriptEditorButton } from './ScriptEditorPanel';
 import { QuestTrackerButton } from './QuestTracker';
 import { usePanelWindowStore, DOCK_PANEL_KEYS, PANEL_TITLES } from '../stores/panelWindowStore';
 
 /**
  * 底部面板按鈕列（16-tech-frontend-architecture.md § 32.15）
- * 與快捷鍵列同排。任務 → stage 內浮動面板；四個面板 → 可拖曳浮動視窗；
- * 最右側為「自動腳本」modal 觸發鈕。
+ * 與快捷鍵列同排。六個面板一律開成可拖曳浮動視窗；
+ * 任務與自動腳本要顯示數量 badge，因此按鈕由各自的組件渲染。
  */
 export function PanelDock() {
   const open = usePanelWindowStore(s => s.open);
@@ -24,7 +24,7 @@ export function PanelDock() {
           {PANEL_TITLES[key]}
         </button>
       ))}
-      <ScriptEditorModal />
+      <ScriptEditorButton />
     </div>
   );
 }

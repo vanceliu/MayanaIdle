@@ -4,8 +4,9 @@
 -- 重要：character_id 為客戶端產生的 UUID（crypto.randomUUID()），
 -- 不可使用本機 IndexedDB 的自增 id —— 那會讓所有玩家的第一隻角色都是 "1" 而互相覆蓋。
 --
--- 本表無 migration 路徑（測試階段），套用前先執行：
+-- 本檔是「全新資料庫」的建表語句，套用前先執行：
 --   DROP TABLE IF EXISTS character_stats;
+-- 已上線的表**不要**重跑本檔（等於清空排行榜）；新增欄位請走 migrations/ 下的 ALTER 腳本。
 --
 -- 名稱唯一性（name_key UNIQUE）與註冊／註銷端點已於「身分簡化」時移除：
 -- 身分改為 uuid + 角色密鑰，名稱不再唯一，全服只剩 POST /api/stats 一個寫入端點。
@@ -36,12 +37,15 @@ CREATE TABLE IF NOT EXISTS character_stats (
   armorsBroken INTEGER DEFAULT 0,
   questsCompleted INTEGER DEFAULT 0,
   totalGoldEarned INTEGER DEFAULT 0,
+  -- T7 掉落統計（37-statistics.md § 37.1）。盾牌／魔導書／臂甲計入防具
+  tier7WeaponsLooted INTEGER DEFAULT 0,
+  tier7ArmorsLooted INTEGER DEFAULT 0,
   contribution INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- 12 個排行欄位皆須建 index：/api/snapshot 對每個欄位各跑一次
+-- 14 個排行欄位皆須建 index：/api/snapshot 對每個欄位各跑一次
 -- ORDER BY <field> DESC LIMIT N，沒有 index 會退化成全表排序。
 -- snapshot 的每個查詢都帶 WHERE data_version = ?，故排行欄位的 index 以 data_version 開頭
 CREATE INDEX IF NOT EXISTS idx_data_version ON character_stats(data_version);
@@ -56,4 +60,6 @@ CREATE INDEX IF NOT EXISTS idx_weapons_broken ON character_stats(weaponsBroken D
 CREATE INDEX IF NOT EXISTS idx_armors_broken ON character_stats(armorsBroken DESC);
 CREATE INDEX IF NOT EXISTS idx_quests_completed ON character_stats(questsCompleted DESC);
 CREATE INDEX IF NOT EXISTS idx_total_gold ON character_stats(totalGoldEarned DESC);
+CREATE INDEX IF NOT EXISTS idx_t7_weapons ON character_stats(tier7WeaponsLooted DESC);
+CREATE INDEX IF NOT EXISTS idx_t7_armors ON character_stats(tier7ArmorsLooted DESC);
 CREATE INDEX IF NOT EXISTS idx_contribution ON character_stats(contribution DESC);

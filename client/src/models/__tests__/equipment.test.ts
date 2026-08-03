@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isWeaponSlot } from '../equipment';
+import { isWeaponSlot, isWeaponEquipment, isOffhandDefenseType } from '../equipment';
 import type { EquipmentInstance, EquipSlot } from '../equipment';
 
 describe('equipment model', () => {
@@ -17,6 +17,26 @@ describe('equipment model', () => {
       armorSlots.forEach(slot => {
         expect(isWeaponSlot(slot)).toBe(false);
       });
+    });
+  });
+
+  // 統計的武器／防具分界（`37-statistics.md` § 37.1）：依裝備類型，不依欄位
+  describe('isWeaponEquipment', () => {
+    it('手部欄位的攻擊型裝備算武器', () => {
+      expect(isWeaponEquipment('rightHand', 'twoHandSword')).toBe(true);
+      expect(isWeaponEquipment('leftHand', 'dagger')).toBe(true);
+    });
+
+    it('盾牌／魔導書／臂甲雖佔手部欄位，算防具', () => {
+      expect(isOffhandDefenseType('shield')).toBe(true);
+      expect(isWeaponEquipment('leftHand', 'shield')).toBe(false);
+      expect(isWeaponEquipment('leftHand', 'magicBook')).toBe(false);
+      expect(isWeaponEquipment('leftHand', 'armGuard')).toBe(false);
+    });
+
+    it('非手部欄位一律不是武器', () => {
+      expect(isWeaponEquipment('chest', 'armor')).toBe(false);
+      expect(isWeaponEquipment('ring1', 'armor')).toBe(false);
     });
   });
 

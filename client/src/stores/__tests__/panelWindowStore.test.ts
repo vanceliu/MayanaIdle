@@ -8,14 +8,15 @@ import {
 } from '../panelWindowStore';
 
 function reset() {
+  usePanelWindowStore.getState().closeAll();
   usePanelWindowStore.setState({
-    open: { stats: false, equipment: false, bag: false, skill: false, quest: false },
     positions: {
       stats: { x: 24, y: 120 },
       equipment: { x: 396, y: 120 },
       bag: { x: 780, y: 120 },
       skill: { x: 1224, y: 120 },
       quest: { x: 1576, y: 128 },
+      script: { x: 700, y: 72 },
     },
     order: [...PANEL_KEYS],
   });

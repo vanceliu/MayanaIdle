@@ -7,10 +7,8 @@ import { usePanelWindowStore, PANEL_KEYS } from '../../stores/panelWindowStore';
 
 describe('QuestTracker（按鈕在 PanelDock、內容走可拖曳浮動視窗，§ 36.10.3）', () => {
   beforeEach(() => {
-    usePanelWindowStore.setState({
-      open: { stats: false, equipment: false, bag: false, skill: false, quest: false },
-      order: [...PANEL_KEYS],
-    });
+    usePanelWindowStore.getState().closeAll();
+    usePanelWindowStore.setState({ order: [...PANEL_KEYS] });
     useGameStore.setState({
       character: {
         name: 'TestHero',

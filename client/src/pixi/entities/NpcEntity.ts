@@ -2,7 +2,7 @@ import { Graphics, Container, Text } from 'pixi.js';
 import { worldToScreen, getEntityDepth, TILE_H } from '../utils/isometric';
 import type { MapNpc } from '../../models/mapControl';
 
-/** 綠色＝可互動的友方，跟怪物的紅色區分（§ 99.6 決策 5） */
+/** 綠色＝可互動的友方，跟怪物的紅色區分（§ 13.2.1） */
 const NPC_COLOR = 0x4ade80;
 const GLOW_COLOR = 0x86efac;
 const RADIUS = TILE_H * 0.45;

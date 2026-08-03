@@ -3,7 +3,7 @@
  * 規格見 docs/design/37-statistics.md § 37.4
  *
  * 端點：
- *   GET  /api/snapshot?top=N       一次取回所有排行榜所需資料（12 欄位各 top-N 的聯集，去重）
+ *   GET  /api/snapshot?top=N       一次取回所有排行榜所需資料（14 欄位各 top-N 的聯集，去重）
  *   POST /api/stats              upsert 自己的統計（需 Turnstile + auth_token）
  *
  * **只有一個寫入端點。** 建立與刪除角色都是純本機行為，不碰 D1 ——
@@ -27,12 +27,12 @@
  */
 const CURRENT_DATA_VERSION = 3;
 
-/** 12 個可排行的欄位。此陣列是唯一會被拼進 SQL 的來源，不接受任何外部輸入。 */
+/** 14 個可排行的欄位。此陣列是唯一會被拼進 SQL 的來源，不接受任何外部輸入。 */
 const RANK_FIELDS = [
   'character_level', 'monstersKilled', 'bossesKilled', 'deathCount',
   'equipmentCrafted', 'weaponEnhanceAttempts', 'armorEnhanceAttempts',
   'weaponsBroken', 'armorsBroken', 'questsCompleted',
-  'totalGoldEarned', 'contribution',
+  'totalGoldEarned', 'tier7WeaponsLooted', 'tier7ArmorsLooted', 'contribution',
 ];
 
 /** snapshot 的欄位順序（columnar 格式的 header）。character_level 已含在 RANK_FIELDS 內。 */
@@ -120,7 +120,7 @@ async function requireTurnstile(request, token, env) {
 }
 
 /**
- * 12 個欄位各取 top-N，聯集去重後以 columnar 格式回傳。
+ * 14 個欄位各取 top-N，聯集去重後以 columnar 格式回傳。
  *
  * 正確性：設回傳集合為 S，對任一欄位 f，S ⊇ f 的真實 top-N。
  * 客戶端把 S 依 f 排序取前 N 時，S 中不屬於真實 top-N 的 row 其 f 值必 ≤ 第 N 名，

@@ -23,7 +23,7 @@ describe('全地圖設計規範合規', () => {
   beforeAll(async () => {
     clearMapCache();
     allMaps = await loadAllMaps();
-    // 城鎮是安全區，§ 38.12 的密度／叢聚／生怪規範是為野外戰鬥訂的，不適用（§ 99.6）
+    // 城鎮是安全區，§ 38.12 的密度／叢聚／生怪規範是為野外戰鬥訂的，不適用（§ 13.2.1）
     townMaps = allMaps.filter(map => map.theme === 'town');
     maps = allMaps.filter(map => map.theme !== 'town');
   });

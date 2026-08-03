@@ -230,7 +230,7 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
     <div className="app game-layout">
       {/*
        * 底層：遊戲畫面鋪滿整個視窗，所有 HUD 都疊在它上面。
-       * 城鎮現在也是一張地圖（§ 99.6），所以兩邊都走 BattleView；
+       * 城鎮現在也是一張地圖（§ 13.2.1），所以兩邊都走 BattleView；
        * TownView 只剩「設施快捷列 + 設施面板」疊在地圖上。
        */}
       <div className="stage-area">

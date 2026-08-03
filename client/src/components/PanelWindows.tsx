@@ -4,6 +4,7 @@ import { EquipmentPanel } from './EquipmentPanel';
 import { BagPanel } from './BagPanel';
 import { SkillPanel } from './SkillPanel';
 import { QuestTrackerContent } from './QuestTracker';
+import { ScriptEditorContent } from './ScriptEditorPanel';
 import {
   usePanelWindowStore,
   PANEL_TITLES,
@@ -11,7 +12,7 @@ import {
 } from '../stores/panelWindowStore';
 
 /**
- * 四個面板的浮動視窗容器（16-tech-frontend-architecture.md § 32.15）
+ * 六個面板的浮動視窗容器（16-tech-frontend-architecture.md § 32.15）
  * 內容直接沿用原本的面板組件，行為（拖放 / 右鍵選單 / tooltip）不變。
  */
 export function PanelWindows() {
@@ -47,6 +48,16 @@ export function PanelWindows() {
           className="is-translucent"
         >
           <QuestTrackerContent />
+        </FloatingWindow>
+      )}
+      {open.script && (
+        <FloatingWindow
+          panelKey="script"
+          title={PANEL_TITLES.script}
+          width={PANEL_WIDTHS.script}
+          className="is-script"
+        >
+          <ScriptEditorContent />
         </FloatingWindow>
       )}
     </>

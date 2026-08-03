@@ -1,5 +1,5 @@
 /**
- * TTK（擊殺時間）校準工具 —— `99-ai-constraints.md` § 99.4 Phase 0。
+ * TTK（擊殺時間）校準工具 —— `06-equipment-balance.md` § 6A.8.12。
  *
  * 目的：在「合適等級 × 合適裝備」下量測各職業對一般怪與 Boss 的擊殺秒數，
  * 用來反推武器傷害帶、防具防禦帶與怪物素質縮放係數。
@@ -82,7 +82,7 @@ function argOf(name: string): string | undefined {
 
 const RUNS = Number(argOf('runs') ?? 300);
 /**
- * 校準 profile（§ 99.4 決策 5a）：
+ * 校準 profile（§ 6A.8.12）：
  *  - `god`（預設）：**神裝** —— +9 強化、該階梯詞綴上限、滿 buff（含加速），打**弱怪**。
  *    2~5 秒的農法手感只在這個條件下成立。
  *  - `base`：+0 強化、無加速 buff、打同級怪。用來觀察「裝備不夠力」時的手感，
@@ -129,7 +129,7 @@ interface Stage {
   acquire: 'shop' | 'craft';
   /** 裝備階級（§ 6A.8）。T1~T3 商店、T4~T7 鐵匠 */
   tier: number;
-  /** 該階梯裝備的詞綴 Tier 上限（商店 T3 為 § 99.4 決策 1） */
+  /** 該階梯裝備的詞綴 Tier 上限（商店 T3 為 § 6A.8.0） */
   affixTier: number;
   /** 同級一般怪的等級帶（`--profile=base` 用） */
   monsterLevel: [number, number];
@@ -140,11 +140,11 @@ interface Stage {
   weakMonsterLevel: [number, number];
   /**
    * 對照用的 Boss 名稱。`null` = 該等級帶依設計就沒有 Boss。
-   * 新手區（Lv.1~29）不設 Boss 是既有設計（§ 99.4 決策 8），不是缺口。
+   * 新手區（Lv.1~29）不設 Boss 是既有設計（§ 6A.8.12），不是缺口。
    */
   bossName: string | null;
   /**
-   * 新手期（§ 99.4 決策 8）：前期不應有難度，因此只設上限、不設下限 ——
+   * 新手期（§ 6A.8.12）：前期不應有難度，因此只設上限、不設下限 ——
    * 打得比 2 秒更快是可接受的，不算偏離。
    */
   newbie?: boolean;
@@ -154,7 +154,7 @@ interface Stage {
  * 等級與區域的對應見 `09-dungeon.md`；Boss 對應見 `28-monster-stats.md`。
  * 商店三階對應 Lv.1~30 的新手中立區，製作三階對應 Lv.30~60。
  *
- * **Boss 選擇原則**（§ 99.4 決策 5）：Boss 不是可以一直刷的等級，
+ * **Boss 選擇原則**（§ 6A.8.12）：Boss 不是可以一直刷的等級，
  * 因此一律挑「高於該階梯農怪等級帶」的挑戰目標，而不是同級 Boss。
  * 目前 Boss 等級上限為 Lv.60，故 craft-top 只能取同級中最硬的百柱死神。
  */

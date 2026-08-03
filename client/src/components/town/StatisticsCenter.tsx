@@ -85,7 +85,7 @@ export function StatisticsCenter() {
     }
   }
 
-  // 12 個榜單全部由同一份 snapshot 在本地切出，不再各打一支 API
+  // 14 個榜單全部由同一份 snapshot 在本地切出，不再各打一支 API
   const boards = useMemo(
     () => (snapshot
       ? LEADERBOARD_FIELDS.map(field => ({ field, entries: buildBoard(snapshot, field, CARD_LIMIT) }))

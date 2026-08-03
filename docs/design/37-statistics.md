@@ -20,7 +20,19 @@
 | armorsBroken | 防具爆掉次數 | 防具強化失敗導致消失的次數 |
 | questsCompleted | 任務完成數 | 累計完成任務次數（職業工會 + 冒險者工會） |
 | totalGoldEarned | 金幣獲得總量 | 累計從掉落/任務獎勵獲得的金幣（不含商店賣出） |
+| tier7WeaponsLooted | T7 武器掉落數 | 累計掉落取得的 T7 武器數 |
+| tier7ArmorsLooted | T7 防具掉落數 | 累計掉落取得的 T7 防具數（含盾牌／魔導書／臂甲） |
 | contribution | 貢獻度 | 冒險者工會當前貢獻點數（含任務獲得與退出扣除的淨值） |
+
+> **T7 只在 BOSS 掉落**（`06-equipment-balance.md` § 6A.8.0：T7 維持純 Boss 掉落，不可製作），
+> 因此這兩個欄位等同「BOSS 極品運氣」的累計紀錄，製作與購買永遠不會使它們增加。
+>
+> **武器／防具的分界依裝備類型，不依欄位**：盾牌／魔導書／臂甲雖佔手部欄位，
+> 但性質是防禦裝備，計入 `tier7ArmorsLooted`。這與詞綴系統的分界一致
+> （`07-affix.md` § 7.6：這三種走防具池），玩家只需記一套規則。
+>
+> 掉落池的 `equipmentPool: 'weapon'` 是**取得管道**的分類（依手部欄位），
+> 與此處的分類刻意不同：從武器池掉出的 T7 盾牌仍計入防具。
 
 ---
 
@@ -38,6 +50,8 @@ interface CharacterStatistics {
   armorsBroken: number;
   questsCompleted: number;
   totalGoldEarned: number;
+  tier7WeaponsLooted: number;
+  tier7ArmorsLooted: number;
 }
 ```
 
@@ -60,7 +74,13 @@ interface CharacterStatistics {
 | armorsBroken | 防具強化：失敗且防具消失時 +1 |
 | questsCompleted | 任務交付：完成任何任務時 +1 |
 | totalGoldEarned | 掉落系統：獲得金幣時累加；任務獎勵：金幣獎勵時累加 |
+| tier7WeaponsLooted | 掉落系統：掉出 tier 7 武器時 +1 |
+| tier7ArmorsLooted | 掉落系統：掉出 tier 7 防具（含副手）時 +1 |
 | contribution | 任務系統：完成任務時加上該任務貢獻點數；退出任務時扣除等量貢獻點數 |
+
+> **背包已滿被丟棄的 T7 仍然計數**：這兩個欄位記錄的是「BOSS 掉出過幾件」，
+> 不是「現在身上有幾件」。背包容量是玩家自己的管理問題，
+> 若因背包滿而不計，同樣的運氣會因無關的狀態而消失。
 
 ---
 
@@ -71,7 +91,7 @@ interface CharacterStatistics {
 - **後端**：Cloudflare Worker + D1（SQLite）
 - **防偽造**：Cloudflare Turnstile（非互動式驗證），僅寫入端點需要
 - **前端快取**：localStorage 快取 snapshot，10 分鐘內不重複請求
-- **核心原則**：整個統計中心**只打一支 GET `/api/snapshot`**，12 個榜單全部由同一份 snapshot
+- **核心原則**：整個統計中心**只打一支 GET `/api/snapshot`**，14 個榜單全部由同一份 snapshot
   在客戶端排序切片。展開 Top 20、切換榜單皆不再發請求。
 
 ### 37.4.2 D1 資料表
@@ -94,22 +114,29 @@ CREATE TABLE character_stats (
   armorsBroken INTEGER DEFAULT 0,
   questsCompleted INTEGER DEFAULT 0,
   totalGoldEarned INTEGER DEFAULT 0,
+  tier7WeaponsLooted INTEGER DEFAULT 0,
+  tier7ArmorsLooted INTEGER DEFAULT 0,
   contribution INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 ```
 
+> **新增統計欄位不必提高 `data_version`**：舊資料列的新欄位預設 0，舊客戶端不送這兩個值
+> 也只會寫入 0 —— 兩者都不會產生錯誤的數字。跳號反而會觸發客戶端的
+> `dataVersionPurge` 清掉所有現有角色（見 § 37.4.8 與限制 73），代價遠大於收益。
+> 對既有的 D1 表以 `ALTER TABLE ... ADD COLUMN` 補欄位並補建 index 即可。
+
 > **`character_id` 必須是 uuid**：IndexedDB 的自增 `id` 在每個瀏覽器各自從 1 開始，
 > 用它當 PK 會讓所有玩家的第一隻角色互相覆蓋。見 `18-data-schema.md`。
 >
-> **12 個排行欄位皆須建 index**：snapshot 對每個欄位各跑一次 `ORDER BY <field> DESC LIMIT N`。
+> **14 個排行欄位皆須建 index**：snapshot 對每個欄位各跑一次 `ORDER BY <field> DESC LIMIT N`。
 
 ### 37.4.3 API 端點
 
 | 方法 | 路徑 | Turnstile | 說明 |
 |------|------|-----------|------|
-| GET | `/api/snapshot?top=N` | 否 | 12 欄位各 top-N 的聯集（去重），columnar 格式。N 預設 20、上限 100 |
+| GET | `/api/snapshot?top=N` | 否 | 14 欄位各 top-N 的聯集（去重），columnar 格式。N 預設 20、上限 100 |
 | POST | `/api/stats` | 是 | **upsert** 自己的統計，需 `auth_token` |
 
 **全服只有這一個寫入端點。** 它必須帶 `data_version`，與伺服端不符時回 409 `outdated_client`（見 § 37.4.8）。
@@ -151,13 +178,13 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
   "rows": [["uuid-…", "勇者", "knight", 52, …], …] }
 ```
 
-每個角色在 `rows` 中只出現一次（12 個 top-N 查詢結果去重）。
+每個角色在 `rows` 中只出現一次（14 個 top-N 查詢結果去重）。
 
 **為何客戶端切出的名次等同全球真實名次**：設回傳集合為 S，對任一欄位 f，S ⊇ f 的真實 top-N。
 客戶端把 S 依 f 排序取前 N 時，S 中不屬於真實 top-N 的 row，其 f 值必定 ≤ 第 N 名，
 只會落在 N 名之後。因此結果與總玩家數無關，**不會因為玩家變多而失準**。
 
-> **不可改成「取全表前 X 筆」**：任何單一順序的截斷都會讓其他 11 個榜單漏掉真正的前段班
+> **不可改成「取全表前 X 筆」**：任何單一順序的截斷都會讓其他 13 個榜單漏掉真正的前段班
 > （例如久未上線但「武器爆掉數」第一的玩家）。
 
 **同分序必須決定性**：伺服端 `ORDER BY <field> DESC, character_id ASC`，
@@ -182,9 +209,9 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 
 ### 37.4.6 規模與成本
 
-讀取端**不隨玩家數成長**：snapshot 回傳筆數的硬上限為 12 欄位 × top-N，
-`top=20` 時最多 240 筆（約 34 KB，gzip 後約 8~10 KB），實際因去重通常只有一半。
-加上 60 秒 edge cache 與客戶端 10 分鐘快取，D1 每次未命中只讀 240 rows 且全走 index。
+讀取端**不隨玩家數成長**：snapshot 回傳筆數的硬上限為 14 欄位 × top-N，
+`top=20` 時最多 280 筆（約 40 KB，gzip 後約 8~10 KB），實際因去重通常只有一半。
+加上 60 秒 edge cache 與客戶端 10 分鐘快取，D1 每次未命中只讀 280 rows 且全走 index。
 
 寫入端則與活躍玩家數成線性關係，是先觸頂的一側：
 每位玩家每 10 分鐘最多 1 次寫入 → 每日上限 144 次。
@@ -245,7 +272,8 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 - **位置**：所有城鎮皆有（與其他設施相同）
 - **圖示**：📊
 - **功能**：
-  - 排行榜 tab：九宮格顯示各欄位 Top 5，點擊可展開查看 Top 20
+  - 排行榜 tab：卡片格狀排列，每張顯示該欄位 Top 5，點擊可展開查看 Top 20
+    （欄位數會隨統計新增而增加，版面自動換行，不是固定的九宮格）
   - 我的統計 tab：顯示當前角色的所有統計數據
 
 ---

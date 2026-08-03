@@ -95,6 +95,32 @@ describe('drops system', () => {
       expect(result.items[0].equipmentInstance!.quality).toBe(0);
     });
 
+    // `37-statistics.md` § 37.3：T7 計數靠這個欄位，掉落端不帶就得再查一次 DB
+    it('should tag dropped equipment with its tier', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      vi.mocked(db.dropTables.where).mockReturnValue({
+        equals: vi.fn().mockReturnValue({
+          toArray: vi.fn().mockResolvedValue([
+            { area: 'ancient-ruins', itemType: 'equipment', equipmentTemplateId: 232, dropValue: 100 },
+          ]),
+        }),
+      } as any);
+      vi.mocked(db.equipmentTemplates.get).mockResolvedValue({
+        id: 232,
+        name: '終焉巨劍',
+        type: 'twoHandSword',
+        slot: 'rightHand',
+        isTwoHanded: true,
+        acquireType: 'drop_only',
+        tier: 7,
+        buyPrice: 0,
+      } as any);
+
+      const result = await rollDrops('ancient-ruins', 1);
+
+      expect(result.items[0].equipmentTier).toBe(7);
+    });
+
     it('should drop potions', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       vi.mocked(db.dropTables.where).mockReturnValue({

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useTownStore } from '../townStore';
 
-describe('townStore（設施面板的兩個入口，§ 99.6）', () => {
+describe('townStore（設施面板的兩個入口，§ 13.2.1）', () => {
   beforeEach(() => {
     useTownStore.setState({ facility: 'list' });
   });

@@ -2,6 +2,8 @@ import { db } from '../db/database';
 import type { EquipmentInstance } from '../models/equipment';
 import { resolveEquipment } from './templateSync';
 import { isWeaponSlot } from '../models/equipment';
+import { getEquipmentTierLevel } from '../models/equipmentTier';
+import type { EquipmentTierLevel } from '../models/equipmentTier';
 import { generateAffixes, getAffixCategoryForSlot } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
 import { getRegion } from '../models/mapData';
@@ -23,6 +25,11 @@ export interface DroppedItem {
   itemTemplateId?: number;
   amount: number;
   equipmentInstance?: EquipmentInstance;
+  /**
+   * 掉落物的裝備階級（`37-statistics.md` § 37.3 的 T7 計數用）。
+   * 在此帶出是因為模板此刻就在手上；交給呼叫端事後查表得再打一次 DB。
+   */
+  equipmentTier?: EquipmentTierLevel;
 }
 
 export function mapItemCategoryToInventoryType(category: ItemCategory): InventoryItemType {
@@ -132,7 +139,13 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         ownerId,
         equipped: false,
       });
-      items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
+      items.push({
+        name: template.name,
+        type: 'equipment',
+        amount: 1,
+        equipmentInstance: instance,
+        equipmentTier: getEquipmentTierLevel(template),
+      });
       continue;
     }
 
@@ -173,7 +186,13 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           ownerId,
           equipped: false,
         });
-        items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
+        items.push({
+          name: template.name,
+          type: 'equipment',
+          amount: 1,
+          equipmentInstance: instance,
+          equipmentTier: getEquipmentTierLevel(template),
+        });
       }
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
@@ -283,7 +302,13 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
           ownerId,
           equipped: false,
         });
-        items.push({ name: template.name, type: 'equipment', amount: 1, equipmentInstance: instance });
+        items.push({
+          name: template.name,
+          type: 'equipment',
+          amount: 1,
+          equipmentInstance: instance,
+          equipmentTier: getEquipmentTierLevel(template),
+        });
       }
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;

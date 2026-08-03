@@ -3,16 +3,17 @@ import { create } from 'zustand';
 /**
  * 浮動面板視窗狀態（16-tech-frontend-architecture.md § 32.15）
  *
- * 四個面板（詳細狀態 / 裝備欄 / 背包 / 技能）改為可拖曳浮動視窗：
+ * 六個面板（詳細狀態 / 裝備欄 / 背包 / 技能 / 任務 / 自動腳本）改為可拖曳浮動視窗：
  * 可同時開啟多個、無遮罩、點擊置頂。位置與開關狀態只存在於當下 session。
  */
-export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest';
+export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest' | 'script';
 
-export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest'];
+export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest', 'script'];
 
 /**
  * PanelDock 以泛用按鈕渲染的面板。
- * `quest` 不在此列 —— 它的按鈕要顯示任務數量 badge，由 `QuestTrackerButton` 自行渲染。
+ * `quest` 與 `script` 不在此列 —— 兩者的按鈕要顯示數量 badge，
+ * 由 `QuestTrackerButton` / `ScriptEditorButton` 自行渲染。
  */
 export const DOCK_PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill'];
 
@@ -22,6 +23,7 @@ export const PANEL_TITLES: Record<PanelKey, string> = {
   bag: '背包',
   skill: '技能',
   quest: '進行中的任務',
+  script: '自動腳本',
 };
 
 export const PANEL_WIDTHS: Record<PanelKey, number> = {
@@ -30,6 +32,7 @@ export const PANEL_WIDTHS: Record<PanelKey, number> = {
   bag: 420,
   skill: 420,
   quest: 320,
+  script: 480,
 };
 
 /** 浮動視窗 z-index 基準：高於地圖 HUD，低於 modal overlay（.modal-overlay = 1000） */
@@ -40,7 +43,7 @@ export interface PanelPosition {
   y: number;
 }
 
-/** 首次開啟時的停靠位置，四個面板錯開避免完全重疊 */
+/** 首次開啟時的停靠位置，各面板錯開避免完全重疊 */
 const DEFAULT_POSITIONS: Record<PanelKey, PanelPosition> = {
   stats: { x: 24, y: 120 },
   equipment: { x: 396, y: 120 },
@@ -48,7 +51,14 @@ const DEFAULT_POSITIONS: Record<PanelKey, PanelPosition> = {
   skill: { x: 1224, y: 120 },
   // 任務預設落在 stage 右上角（小螢幕會被 FloatingWindow 夾回可視範圍）
   quest: { x: 1576, y: 128 },
+  // 自動腳本較高（82vh），預設靠上避免下緣被夾動
+  script: { x: 700, y: 72 },
 };
+
+/** 全部面板的統一開關狀態（新增 PanelKey 時不必逐處補值） */
+function allClosed(): Record<PanelKey, boolean> {
+  return Object.fromEntries(PANEL_KEYS.map(k => [k, false])) as Record<PanelKey, boolean>;
+}
 
 interface PanelWindowState {
   open: Record<PanelKey, boolean>;
@@ -68,7 +78,7 @@ function moveToTop(order: PanelKey[], key: PanelKey): PanelKey[] {
 }
 
 export const usePanelWindowStore = create<PanelWindowState>((set) => ({
-  open: { stats: false, equipment: false, bag: false, skill: false, quest: false },
+  open: allClosed(),
   positions: { ...DEFAULT_POSITIONS },
   order: [...PANEL_KEYS],
 
@@ -89,7 +99,7 @@ export const usePanelWindowStore = create<PanelWindowState>((set) => ({
 
   setPosition: (key, pos) => set(s => ({ positions: { ...s.positions, [key]: pos } })),
 
-  closeAll: () => set({ open: { stats: false, equipment: false, bag: false, skill: false, quest: false } }),
+  closeAll: () => set({ open: allClosed() }),
 }));
 
 /** 取得指定面板的 z-index（order 越後面越上層） */

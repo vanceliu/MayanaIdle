@@ -12,7 +12,7 @@ const KNOWN_FACILITIES = new Set([
   'magic-academy', 'class-guild', 'starter-npc', 'adventurer-guild', 'statistics-center',
 ]);
 
-describe('城鎮地圖（§ 99.6）', () => {
+describe('城鎮地圖（§ 13.2.1）', () => {
   let towns: MapData[];
 
   beforeAll(async () => {
@@ -41,7 +41,7 @@ describe('城鎮地圖（§ 99.6）', () => {
     for (const map of towns) {
       expect(map.npcs?.length, map.id).toBeGreaterThan(0);
       for (const npc of map.npcs!) {
-        // 尋路要繞過 NPC，所以他站的格子必須擋路（§ 99.6）
+        // 尋路要繞過 NPC，所以他站的格子必須擋路（§ 13.2.1）
         expect(isWalkableTile(map, npc), `${map.id} 的 ${npc.name}`).toBe(false);
         expect(KNOWN_FACILITIES.has(npc.facility), `${map.id} 的 ${npc.facility}`).toBe(true);
         expect(npc.icon.length, `${map.id} 的 ${npc.name} 沒有 icon`).toBeGreaterThan(0);

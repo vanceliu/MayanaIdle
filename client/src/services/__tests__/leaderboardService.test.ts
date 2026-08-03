@@ -188,7 +188,8 @@ describe('統計上傳節流', () => {
     class_name: 'knight', character_level: 10,
     monstersKilled: 100, bossesKilled: 0, deathCount: 0, equipmentCrafted: 0,
     weaponEnhanceAttempts: 0, armorEnhanceAttempts: 0, weaponsBroken: 0,
-    armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0, contribution: 0,
+    armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0,
+    tier7WeaponsLooted: 0, tier7ArmorsLooted: 0, contribution: 0,
   };
   const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -260,7 +261,8 @@ describe('uploadStats', () => {
     class_name: 'knight', character_level: 10,
     monstersKilled: 1, bossesKilled: 0, deathCount: 0, equipmentCrafted: 0,
     weaponEnhanceAttempts: 0, armorEnhanceAttempts: 0, weaponsBroken: 0,
-    armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0, contribution: 0,
+    armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0,
+    tier7WeaponsLooted: 0, tier7ArmorsLooted: 0, contribution: 0,
   };
 
   beforeEach(() => {

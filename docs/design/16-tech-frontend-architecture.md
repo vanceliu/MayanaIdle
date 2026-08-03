@@ -87,7 +87,7 @@ client/
 │   │   ├── CombatScriptEditor.tsx   # 戰鬥腳本編輯
 │   │   ├── PersistentScriptEditor.tsx # 常駐腳本編輯
 │   │   ├── ScriptEditor.tsx       # 舊版腳本編輯器（legacy）
-│   │   ├── ScriptEditorModal.tsx  # 浮動視窗（含戰鬥/常駐兩個 tab）
+│   │   ├── ScriptEditorPanel.tsx  # 自動腳本按鈕（PanelDock）+ 內容（浮動視窗，§ 32.16）
 │   │   ├── AttributeUpModal.tsx # Lv50+ 屬性配點浮動視窗
 │   │   ├── GameIcon.tsx      # 統一 icon 渲染元件
 │   │   ├── Tooltip.tsx       # 通用 Tooltip 元件
@@ -174,10 +174,10 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 │                                          │ v0.0.1 Wiki 匯出 登出│ │
 └──────────────────────────────────────────┴──────────────────────┴─┘
         ↓ PanelDock 按鈕開關 → 可拖曳、可多開、無遮罩的浮動視窗
-┌──────────────┐  ┌──────────────┐
-│ 裝備欄     ✕ │  │ 背包       ✕ │   ScriptEditorModal 仍為
-│ ...          │  │ ...          │   置中 overlay modal（§ 32.16）
-└──────────────┘  └──────────────┘
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ 裝備欄     ✕ │  │ 背包       ✕ │  │ 自動腳本   ✕ │  六個面板一律
+│ ...          │  │ ...          │  │ ...          │  走同一套機制
+└──────────────┘  └──────────────┘  └──────────────┘  （§ 32.16）
 ```
 
 **HUD 島（`.hud`）：** 全部 `position: absolute` + `z-index: 20`，貼在四角：
@@ -519,7 +519,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `BuffBar` | 角色 buff/debuff icon 垂直欄，浮於 `.stage-area` 左上，每秒刷新倒數，hover tooltip |
 | `FloatingWindow` | 通用可拖曳浮動視窗（標題列拖曳、點擊置頂、✕ 關閉、無遮罩） |
 | `PanelDock` | 底部面板按鈕列（詳細狀態/裝備欄/背包/技能 + 自動腳本觸發鈕） |
-| `PanelWindows` | 依 `panelWindowStore` 渲染五個面板的浮動視窗 |
+| `PanelWindows` | 依 `panelWindowStore` 渲染六個面板的浮動視窗 |
 | `QuestTracker` | `QuestTrackerButton`（PanelDock 內，帶任務數量 badge）+ `QuestTrackerContent`（浮動視窗內容） |
 | `CharacterStats` | 六大屬性詳細數值、戰鬥數據（含詞綴 + buff + 裝備 regen 加成） |
 | `BattleView` | Pixi 地圖容器、戰鬥日誌（含 log 大小切換） |
@@ -532,7 +532,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `CombatScriptEditor` | 戰鬥腳本規則 CRUD（僅攻擊技能/普攻） |
 | `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/加速藥水/buff/治癒） |
 | `ScriptEditor` | 舊版腳本編輯器（legacy，供遷移保留） |
-| `ScriptEditorModal` | 浮動視窗，含常駐/戰鬥兩個 tab，按鈕觸發 overlay |
+| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶規則數量 badge）+ `ScriptEditorContent`（浮動視窗內容，含常駐/戰鬥兩個 tab，§ 32.16） |
 | `AttributeUpModal` | Lv50+ 屬性配點浮動視窗，有未分配點數時自動顯示 |
 | `GameIcon` | 統一 SVG icon 渲染（name, size, color），支援 Game-icons.net + Lucide |
 | `Tooltip` | 通用 hover tooltip，用於 buff/裝備/物品/技能 |
@@ -924,13 +924,15 @@ interface TooltipProps {
 | `bag` | 背包 | `BagPanel` | 420px |
 | `skill` | 技能 | `SkillPanel` | 420px |
 | `quest` | 進行中的任務 | `QuestTrackerContent` | 320px |
+| `script` | 自動腳本 | `ScriptEditorContent` | 480px |
 
 內容組件本身不變（拖放、右鍵選單、tooltip 行為完全沿用）。
 
-`quest` 與其他四個共用同一套視窗機制（可拖曳、可多開、點擊置頂），差別只有兩點：
-- 視窗加 `.is-translucent` 半透明修飾，預設位置在 stage 右上角（§ 36.10.3）
-- 按鈕由 `QuestTrackerButton` 自行渲染（需顯示任務數量 badge），
-  因此 `quest` 不在 `DOCK_PANEL_KEYS` 內，不走 PanelDock 的泛用按鈕迴圈
+`quest` 與 `script` 與其他四個共用同一套視窗機制（可拖曳、可多開、點擊置頂），差別在：
+- 兩者的按鈕要顯示數量 badge，由 `QuestTrackerButton` / `ScriptEditorButton` 自行渲染，
+  因此不在 `DOCK_PANEL_KEYS` 內，不走 PanelDock 的泛用按鈕迴圈
+- `quest` 視窗加 `.is-translucent` 半透明修飾，預設位置在 stage 右上角（§ 36.10.3）
+- `script` 視窗加 `.is-script` 固定高度修飾（§ 32.16）
 
 ### 視窗行為
 
@@ -959,7 +961,7 @@ interface TooltipProps {
 
 ```tsx
 <PanelDock>              // 底部按鈕列（與 QuickSlotBar 同排）
-  <QuestTrackerButton /> + [詳細狀態][裝備欄][背包][技能] + <ScriptEditorModal /> 觸發鈕
+  <QuestTrackerButton /> + [詳細狀態][裝備欄][背包][技能] + <ScriptEditorButton />
 </PanelDock>
 
 <PanelWindows>           // 依 store.open 渲染
@@ -967,28 +969,43 @@ interface TooltipProps {
   <FloatingWindow panelKey="equipment"> <EquipmentPanel /></FloatingWindow>
   <FloatingWindow panelKey="bag">       <BagPanel /></FloatingWindow>
   <FloatingWindow panelKey="skill">     <SkillPanel /></FloatingWindow>
+  <FloatingWindow panelKey="quest"  className="is-translucent"><QuestTrackerContent /></FloatingWindow>
+  <FloatingWindow panelKey="script" className="is-script">    <ScriptEditorContent /></FloatingWindow>
 </PanelWindows>
 ```
 
 ---
 
-## 32.16 ScriptEditor 浮動視窗（ScriptEditorModal）
+## 32.16 自動腳本浮動視窗（ScriptEditorPanel）
+
+> **設計變更（使用者要求）**：原本明定「腳本編輯為設定用途，維持置中 overlay modal、
+> 非 `FloatingWindow`」。因 modal 無法移動、且會遮住 idle 進行中的畫面，
+> 已改為與其他面板一致的可拖曳浮動視窗。**不可再改回 modal 形式。**
 
 ### 觸發
 
 - 底部 `PanelDock` 最右側顯示「自動腳本」按鈕（含規則數量 badge，沿用 `.panel-dock-btn` 樣式）
-- 點擊按鈕彈出居中 overlay modal（腳本編輯為設定用途，維持 modal 形式，非 `FloatingWindow`）
+- 點擊按鈕開關 `PanelKey = 'script'` 浮動視窗；`script` 與 `quest` 同理不在 `DOCK_PANEL_KEYS`
+  內（按鈕要帶 badge，由 `ScriptEditorButton` 自行渲染）
 
 ### 行為
 
-- Modal 背景半透明遮罩（`rgba(0,0,0,0.6)`），點擊遮罩關閉
-- Modal 內容區固定寬度 480px，高度 85vh，內部可捲動
-- 內容區（`.script-editor-content`）高度 100% 填滿 modal-body，無固定上限
-- 右上角 × 關閉按鈕
-- 內容為兩個 tab：常駐腳本 + 戰鬥腳本
+- 完全沿用 § 32.15 的視窗行為：標題列拖曳（位置夾制在 viewport 內）、可多開、
+  點擊置頂、右上角 ✕ 關閉、**無遮罩**、開關與位置不持久化
+- 視窗寬 480px、高 `82vh`（`.floating-window.is-script`）。
+  固定高度是為了讓 tab 列釘在頂端、只有規則清單捲動 ——
+  若沿用 `.floating-window-body` 預設的 auto 高度 + `overflow-y`，捲動會發生在 body 上而把 tab 一起帶走
+- 內容為兩個 tab：常駐腳本 + 戰鬥腳本，預設為常駐腳本（tab 選擇為視窗內 local state，關閉即重置）
 - 常駐腳本含：規則 CRUD、排序、緊急撤退設定、戰鬥後等待/恢復閾值（HP/MP %）
 - 戰鬥後等待閾值修改後自動 saveState 持久化
-- 關閉後狀態保留（state 存在 Zustand，不隨 Modal unmount 消失）
+- 關閉後腳本規則保留（state 存在 Zustand，不隨視窗 unmount 消失）
+
+### 組件
+
+| 匯出 | 說明 |
+|---|---|
+| `ScriptEditorButton` | PanelDock 內的觸發鈕（帶規則數量 badge） |
+| `ScriptEditorContent` | 視窗內容（tab 列 + `PersistentScriptEditor` / `CombatScriptEditor`），由 `PanelWindows` 包在 `FloatingWindow` 內渲染 |
 
 ## 32.15 環境地圖模組邊界
 

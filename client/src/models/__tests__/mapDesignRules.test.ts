@@ -587,7 +587,7 @@ describe('MAP_DESIGN_PROFILES', () => {
 
   it('每張正式地圖都有 profile，且主導地形在該 theme 的色盤內', async () => {
     clearMapCache();
-    // 城鎮地圖（§ 99.6）是安全區，不進 profile、不套設計規範
+    // 城鎮地圖（§ 13.2.1）是安全區，不進 profile、不套設計規範
     const maps = (await loadAllMaps()).filter(map => map.theme !== 'town');
     expect(maps).toHaveLength(50);
 

@@ -83,7 +83,7 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
   },
 
   setAutoMove: (auto) => {
-    // 城鎮不自動移動（§ 99.6 決策 4）：角色會自己亂走，玩家完全沒下過指令。
+    // 城鎮不自動移動（§ 13.2.1）：角色會自己亂走，玩家完全沒下過指令。
     // 擋在這裡而不是各呼叫端，避免哪天又有人忘了判斷。
     if (auto && get().currentMap?.theme === 'town') {
       set({ autoMove: false });

@@ -138,7 +138,7 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
     it('既有角色背包素材名稱在新配方或系統中仍有效', async () => {
       // 鐵匠製作止於 T5（T6/T7 為掉落限定，§ 6A.8.0），因此配方只用到銀與米索利兩種基底。
       // 奧里哈魯根碎片等頂級素材在頂級配方移除後**暫時只剩賣店價值**，
-      // 這是已知的待補缺口（見 `99-ai-constraints.md` § 99.4「孤兒素材」）。
+      // 這是已知的待補缺口（見 `06-equipment-balance.md` § 6A.8.6「孤兒素材」）。
       const craftMaterials = ['銀礦石', '米索利碎片'];
       const craftSeeds = EQUIPMENT_SEEDS.filter(s => s.craftMaterials && s.craftMaterials.length > 0);
 

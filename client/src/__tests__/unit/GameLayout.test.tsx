@@ -61,7 +61,7 @@ beforeEach(() => {
  * 因此測的是「哪個 HUD 島裝了什麼」，而不是流式排版的先後順序。
  */
 describe('GameLayout 版面（§ 32.3）', () => {
-  it('stage 是滿版底層；城鎮也走地圖，TownView 只是疊在上面的設施列（§ 99.6）', () => {
+  it('stage 是滿版底層；城鎮也走地圖，TownView 只是疊在上面的設施列（§ 13.2.1）', () => {
     const field = render(<GameLayout isInTown={false} />);
     expect(field.container.querySelector('.game-layout > .stage-area > .battle-view')).toBeTruthy();
     expect(field.container.querySelector('.town-view')).toBeNull();

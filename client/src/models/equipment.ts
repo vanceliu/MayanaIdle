@@ -190,4 +190,23 @@ export function isHandSlot(slot: EquipSlot): boolean {
 /** @deprecated Use isHandSlot */
 export const isWeaponSlot = isHandSlot;
 
+/**
+ * 副手防禦裝備：佔手部欄位，但性質是防具。
+ * 與詞綴系統同一條分界（`07-affix.md` § 7.6：這三種走防具池／盾牌池，不吃武器詞綴）。
+ */
+export const OFFHAND_DEFENSE_TYPES: WeaponType[] = ['shield', 'magicBook', 'armGuard'];
+
+export function isOffhandDefenseType(type: string): boolean {
+  return (OFFHAND_DEFENSE_TYPES as string[]).includes(type);
+}
+
+/**
+ * 武器／防具的語意分類（統計用，見 `37-statistics.md` § 37.1）。
+ * **不可改用 `isHandSlot`**：那是掉落池的「取得管道」分界，
+ * 會把盾牌／魔導書／臂甲算成武器。
+ */
+export function isWeaponEquipment(slot: EquipSlot, type: string): boolean {
+  return isHandSlot(slot) && !isOffhandDefenseType(type);
+}
+
 export type EquippedGear = Partial<Record<EquipSlot, EquipmentInstance | null>>;
