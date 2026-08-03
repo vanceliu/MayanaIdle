@@ -16,7 +16,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 11, area: 'green-valley', itemType: 'item', itemTemplateId: 24, dropValue: 100 },
   { id: 12, area: 'green-valley', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 13, area: 'green-valley', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 14, area: 'green-valley', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 1, dropValue: 15 },
+  { id: 14, area: 'green-valley', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 1, dropValue: 5.0 },
   { id: 16, area: 'green-valley', itemType: 'item', itemTemplateId: 1, dropValue: 30, minAmount: 1, maxAmount: 1 },
   // 風語林地 Lv.11~15
   { id: 17, area: 'wind-woods', itemType: 'gold', dropValue: 1000, minAmount: 18, maxAmount: 120 },
@@ -25,7 +25,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 20, area: 'wind-woods', itemType: 'item', itemTemplateId: 27, dropValue: 100 },
   { id: 21, area: 'wind-woods', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 22, area: 'wind-woods', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 23, area: 'wind-woods', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 1, dropValue: 15 },
+  { id: 23, area: 'wind-woods', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 1, dropValue: 10.0 },
   { id: 24, area: 'wind-woods', itemType: 'item', itemTemplateId: 1, dropValue: 50, minAmount: 1, maxAmount: 1 },
   // 迷霧沼澤 Lv.16~20
   { id: 25, area: 'misty-swamp', itemType: 'gold', dropValue: 1000, minAmount: 20, maxAmount: 135 },
@@ -34,7 +34,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 28, area: 'misty-swamp', itemType: 'item', itemTemplateId: 30, dropValue: 100 },
   { id: 29, area: 'misty-swamp', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 30, area: 'misty-swamp', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 31, area: 'misty-swamp', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 2, dropValue: 15 },
+  { id: 31, area: 'misty-swamp', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 2, dropValue: 0.5 },
   { id: 32, area: 'misty-swamp', itemType: 'item', itemTemplateId: 1, dropValue: 80, minAmount: 1, maxAmount: 1 },
   // 試煉高地 Lv.21~25
   { id: 33, area: 'trial-highlands', itemType: 'gold', dropValue: 1000, minAmount: 30, maxAmount: 150 },
@@ -43,7 +43,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 36, area: 'trial-highlands', itemType: 'item', itemTemplateId: 33, dropValue: 100 },
   { id: 37, area: 'trial-highlands', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 38, area: 'trial-highlands', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 39, area: 'trial-highlands', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 2, dropValue: 10 },
+  { id: 39, area: 'trial-highlands', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 2, dropValue: 1.0 },
   { id: 42, area: 'trial-highlands', itemType: 'item', itemTemplateId: 1, dropValue: 100, minAmount: 1, maxAmount: 3 },
   // 試煉高地頂部 Lv.26~30
   { id: 43, area: 'trial-highlands-top', itemType: 'gold', dropValue: 1000, minAmount: 50, maxAmount: 180 },
@@ -52,7 +52,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 46, area: 'trial-highlands-top', itemType: 'item', itemTemplateId: 33, dropValue: 100 },
   { id: 47, area: 'trial-highlands-top', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 48, area: 'trial-highlands-top', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 49, area: 'trial-highlands-top', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 3, dropValue: 10 },
+  { id: 49, area: 'trial-highlands-top', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 3, dropValue: 0.1 },
   { id: 52, area: 'trial-highlands-top', itemType: 'item', itemTemplateId: 1, dropValue: 100, minAmount: 1, maxAmount: 3 },
   // 雪原地帶 Lv.30~33
   { id: 53, area: 'snow-field', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 200 },
@@ -65,7 +65,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 60, area: 'snow-field', itemType: 'item', itemTemplateId: 127, dropValue: 50 },
   { id: 61, area: 'snow-field', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 62, area: 'snow-field', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 800, area: 'snow-field', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 800, area: 'snow-field', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.5 },
   // 雪原地帶深處 Lv.34~35
   { id: 63, area: 'snow-field-deep', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 220 },
   { id: 64, area: 'snow-field-deep', itemType: 'item', itemTemplateId: 34, dropValue: 120 },
@@ -77,7 +77,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 70, area: 'snow-field-deep', itemType: 'item', itemTemplateId: 127, dropValue: 80 },
   { id: 71, area: 'snow-field-deep', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 72, area: 'snow-field-deep', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 801, area: 'snow-field-deep', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 801, area: 'snow-field-deep', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.5455 },
   // 妖魔森林 Lv.30~40
   { id: 73, area: 'demon-forest', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 240 },
   { id: 74, area: 'demon-forest', itemType: 'item', itemTemplateId: 40, dropValue: 120 },
@@ -89,7 +89,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 80, area: 'demon-forest', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 81, area: 'demon-forest', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 82, area: 'demon-forest', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 83, area: 'demon-forest', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 83, area: 'demon-forest', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.5909 },
   // 明鏡森林 Lv.30~40
   { id: 87, area: 'mirror-forest', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 240 },
   { id: 88, area: 'mirror-forest', itemType: 'item', itemTemplateId: 46, dropValue: 120 },
@@ -101,7 +101,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 94, area: 'mirror-forest', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 95, area: 'mirror-forest', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 96, area: 'mirror-forest', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 97, area: 'mirror-forest', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 97, area: 'mirror-forest', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.6364 },
   // 象牙塔 1F Lv.33~36
   { id: 101, area: 'ivory-tower-1f', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 260 },
   { id: 102, area: 'ivory-tower-1f', itemType: 'item', itemTemplateId: 37, dropValue: 120 },
@@ -114,7 +114,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 109, area: 'ivory-tower-1f', itemType: 'item', itemTemplateId: 128, dropValue: 100 },
   { id: 110, area: 'ivory-tower-1f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 111, area: 'ivory-tower-1f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 112, area: 'ivory-tower-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 112, area: 'ivory-tower-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.6818 },
   // 象牙塔 2F Lv.36~38
   { id: 115, area: 'ivory-tower-2f', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 280 },
   { id: 116, area: 'ivory-tower-2f', itemType: 'item', itemTemplateId: 37, dropValue: 120 },
@@ -128,7 +128,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 124, area: 'ivory-tower-2f', itemType: 'item', itemTemplateId: 130, dropValue: 50 },
   { id: 125, area: 'ivory-tower-2f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 126, area: 'ivory-tower-2f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 127, area: 'ivory-tower-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 127, area: 'ivory-tower-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.7273 },
   // 象牙塔 3F Lv.38~40
   { id: 130, area: 'ivory-tower-3f', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 280 },
   { id: 131, area: 'ivory-tower-3f', itemType: 'item', itemTemplateId: 37, dropValue: 120 },
@@ -142,7 +142,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 139, area: 'ivory-tower-3f', itemType: 'item', itemTemplateId: 130, dropValue: 50 },
   { id: 140, area: 'ivory-tower-3f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 141, area: 'ivory-tower-3f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 142, area: 'ivory-tower-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 142, area: 'ivory-tower-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.7727 },
   // 象牙塔 4F Lv.40~42
   { id: 145, area: 'ivory-tower-4f', itemType: 'gold', dropValue: 1000, minAmount: 150, maxAmount: 300 },
   { id: 146, area: 'ivory-tower-4f', itemType: 'item', itemTemplateId: 37, dropValue: 120 },
@@ -155,7 +155,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 153, area: 'ivory-tower-4f', itemType: 'item', itemTemplateId: 131, dropValue: 50 },
   { id: 154, area: 'ivory-tower-4f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 155, area: 'ivory-tower-4f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 156, area: 'ivory-tower-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 156, area: 'ivory-tower-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.8182 },
   // 象牙塔 5F Lv.42~45 (Boss floor)
   { id: 159, area: 'ivory-tower-5f', itemType: 'gold', dropValue: 1000, minAmount: 150, maxAmount: 350 },
   { id: 160, area: 'ivory-tower-5f', itemType: 'item', itemTemplateId: 37, dropValue: 120 },
@@ -168,7 +168,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 167, area: 'ivory-tower-5f', itemType: 'item', itemTemplateId: 131, dropValue: 50 },
   { id: 168, area: 'ivory-tower-5f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 169, area: 'ivory-tower-5f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 170, area: 'ivory-tower-5f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 170, area: 'ivory-tower-5f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.8636 },
   // 龍之谷（地表）Lv.30~40
   { id: 173, area: 'dragon-valley-surface', itemType: 'gold', dropValue: 1000, minAmount: 80, maxAmount: 240 },
   { id: 174, area: 'dragon-valley-surface', itemType: 'item', itemTemplateId: 52, dropValue: 120 },
@@ -180,7 +180,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 180, area: 'dragon-valley-surface', itemType: 'item', itemTemplateId: 15, dropValue: 60 },
   { id: 181, area: 'dragon-valley-surface', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 182, area: 'dragon-valley-surface', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 183, area: 'dragon-valley-surface', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 183, area: 'dragon-valley-surface', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.9091 },
   // 遠古戰場 Lv.40~45
   { id: 186, area: 'ancient-battlefield', itemType: 'gold', dropValue: 1000, minAmount: 200, maxAmount: 350 },
   { id: 187, area: 'ancient-battlefield', itemType: 'item', itemTemplateId: 60, dropValue: 120 },
@@ -192,7 +192,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 193, area: 'ancient-battlefield', itemType: 'item', itemTemplateId: 13, dropValue: 60 },
   { id: 194, area: 'ancient-battlefield', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 195, area: 'ancient-battlefield', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 196, area: 'ancient-battlefield', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 196, area: 'ancient-battlefield', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 0.9545 },
   // 朦朧洞窟 1F Lv.40~43
   { id: 199, area: 'misty-cave-1f', itemType: 'gold', dropValue: 1000, minAmount: 200, maxAmount: 350 },
   { id: 200, area: 'misty-cave-1f', itemType: 'item', itemTemplateId: 43, dropValue: 120 },
@@ -202,7 +202,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 204, area: 'misty-cave-1f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 205, area: 'misty-cave-1f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 206, area: 'misty-cave-1f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 207, area: 'misty-cave-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 207, area: 'misty-cave-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.1 },
   { id: 211, area: 'misty-cave-1f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 212, area: 'misty-cave-1f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 朦朧洞窟 2F Lv.43~46
@@ -214,7 +214,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 218, area: 'misty-cave-2f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 219, area: 'misty-cave-2f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 220, area: 'misty-cave-2f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 221, area: 'misty-cave-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 221, area: 'misty-cave-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.15 },
   { id: 225, area: 'misty-cave-2f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 226, area: 'misty-cave-2f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 朦朧洞窟 3F Lv.46~50 (Boss)
@@ -226,7 +226,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 232, area: 'misty-cave-3f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 233, area: 'misty-cave-3f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 234, area: 'misty-cave-3f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 235, area: 'misty-cave-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 235, area: 'misty-cave-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.2 },
   { id: 239, area: 'misty-cave-3f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 240, area: 'misty-cave-3f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 水下監獄 1F Lv.40~43
@@ -238,7 +238,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 246, area: 'underwater-prison-1f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 247, area: 'underwater-prison-1f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 248, area: 'underwater-prison-1f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 249, area: 'underwater-prison-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 249, area: 'underwater-prison-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.25 },
   { id: 253, area: 'underwater-prison-1f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 254, area: 'underwater-prison-1f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 水下監獄 2F Lv.43~45
@@ -250,7 +250,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 260, area: 'underwater-prison-2f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 261, area: 'underwater-prison-2f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 262, area: 'underwater-prison-2f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 263, area: 'underwater-prison-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 263, area: 'underwater-prison-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.3 },
   { id: 267, area: 'underwater-prison-2f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 268, area: 'underwater-prison-2f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 水下監獄 3F Lv.45~48
@@ -262,7 +262,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 274, area: 'underwater-prison-3f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 275, area: 'underwater-prison-3f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 276, area: 'underwater-prison-3f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 277, area: 'underwater-prison-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 277, area: 'underwater-prison-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.35 },
   { id: 281, area: 'underwater-prison-3f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 282, area: 'underwater-prison-3f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 水下監獄 4F Lv.48~50 (Boss)
@@ -274,7 +274,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 288, area: 'underwater-prison-4f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 289, area: 'underwater-prison-4f', itemType: 'item', itemTemplateId: 11, dropValue: 80 },
   { id: 290, area: 'underwater-prison-4f', itemType: 'item', itemTemplateId: 12, dropValue: 70 },
-  { id: 291, area: 'underwater-prison-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 291, area: 'underwater-prison-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.4 },
   { id: 295, area: 'underwater-prison-4f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 296, area: 'underwater-prison-4f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
   // 龍谷地間 1~2F Lv.40~43
@@ -288,7 +288,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 304, area: 'dragon-valley-1f', itemType: 'item', itemTemplateId: 15, dropValue: 60 },
   { id: 305, area: 'dragon-valley-1f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 306, area: 'dragon-valley-1f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 307, area: 'dragon-valley-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 307, area: 'dragon-valley-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.45 },
   { id: 310, area: 'dragon-valley-2f', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 240 },
   { id: 311, area: 'dragon-valley-2f', itemType: 'item', itemTemplateId: 55, dropValue: 120 },
   { id: 312, area: 'dragon-valley-2f', itemType: 'item', itemTemplateId: 56, dropValue: 120 },
@@ -299,7 +299,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 317, area: 'dragon-valley-2f', itemType: 'item', itemTemplateId: 15, dropValue: 60 },
   { id: 318, area: 'dragon-valley-2f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 319, area: 'dragon-valley-2f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 320, area: 'dragon-valley-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 320, area: 'dragon-valley-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.5 },
   // 龍谷地間 3~4F Lv.43~46
   { id: 323, area: 'dragon-valley-3f', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 240 },
   { id: 324, area: 'dragon-valley-3f', itemType: 'item', itemTemplateId: 55, dropValue: 120 },
@@ -312,7 +312,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 331, area: 'dragon-valley-3f', itemType: 'item', itemTemplateId: 16, dropValue: 40 },
   { id: 332, area: 'dragon-valley-3f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 333, area: 'dragon-valley-3f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 334, area: 'dragon-valley-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 334, area: 'dragon-valley-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.55 },
   { id: 337, area: 'dragon-valley-4f', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 240 },
   { id: 338, area: 'dragon-valley-4f', itemType: 'item', itemTemplateId: 55, dropValue: 120 },
   { id: 339, area: 'dragon-valley-4f', itemType: 'item', itemTemplateId: 56, dropValue: 120 },
@@ -324,7 +324,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 345, area: 'dragon-valley-4f', itemType: 'item', itemTemplateId: 16, dropValue: 40 },
   { id: 346, area: 'dragon-valley-4f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 347, area: 'dragon-valley-4f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 348, area: 'dragon-valley-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 348, area: 'dragon-valley-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.6 },
   // 龍谷地間 5~6F Lv.46~49
   { id: 351, area: 'dragon-valley-5f', itemType: 'gold', dropValue: 1000, minAmount: 120, maxAmount: 260 },
   { id: 352, area: 'dragon-valley-5f', itemType: 'item', itemTemplateId: 58, dropValue: 120 },
@@ -336,7 +336,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 358, area: 'dragon-valley-5f', itemType: 'item', itemTemplateId: 16, dropValue: 50 },
   { id: 359, area: 'dragon-valley-5f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 360, area: 'dragon-valley-5f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 802, area: 'dragon-valley-5f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 802, area: 'dragon-valley-5f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.65 },
   { id: 361, area: 'dragon-valley-6f', itemType: 'gold', dropValue: 1000, minAmount: 120, maxAmount: 260 },
   { id: 362, area: 'dragon-valley-6f', itemType: 'item', itemTemplateId: 58, dropValue: 120 },
   { id: 363, area: 'dragon-valley-6f', itemType: 'item', itemTemplateId: 59, dropValue: 100 },
@@ -347,7 +347,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 368, area: 'dragon-valley-6f', itemType: 'item', itemTemplateId: 16, dropValue: 50 },
   { id: 369, area: 'dragon-valley-6f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 370, area: 'dragon-valley-6f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 803, area: 'dragon-valley-6f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 803, area: 'dragon-valley-6f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.7 },
   // 龍谷地間 7F Boss Lv.49~50
   { id: 371, area: 'dragon-valley-7f', itemType: 'gold', dropValue: 1000, minAmount: 660, maxAmount: 660 },
   { id: 372, area: 'dragon-valley-7f', itemType: 'item', itemTemplateId: 9, dropValue: 60 },
@@ -356,7 +356,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 375, area: 'dragon-valley-7f', itemType: 'item', itemTemplateId: 16, dropValue: 70 },
   { id: 376, area: 'dragon-valley-7f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 377, area: 'dragon-valley-7f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 378, area: 'dragon-valley-7f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 378, area: 'dragon-valley-7f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.75 },
   // 遠古地監 1~3F Lv.45~50
   { id: 380, area: 'ancient-dungeon-1f', itemType: 'gold', dropValue: 1000, minAmount: 120, maxAmount: 250 },
   { id: 381, area: 'ancient-dungeon-1f', itemType: 'item', itemTemplateId: 72, dropValue: 120 },
@@ -367,7 +367,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 386, area: 'ancient-dungeon-1f', itemType: 'item', itemTemplateId: 13, dropValue: 60 },
   { id: 387, area: 'ancient-dungeon-1f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 388, area: 'ancient-dungeon-1f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 389, area: 'ancient-dungeon-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 389, area: 'ancient-dungeon-1f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.05 },
   { id: 392, area: 'ancient-dungeon-2f', itemType: 'gold', dropValue: 1000, minAmount: 120, maxAmount: 250 },
   { id: 393, area: 'ancient-dungeon-2f', itemType: 'item', itemTemplateId: 72, dropValue: 120 },
   { id: 394, area: 'ancient-dungeon-2f', itemType: 'item', itemTemplateId: 73, dropValue: 120 },
@@ -377,7 +377,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 398, area: 'ancient-dungeon-2f', itemType: 'item', itemTemplateId: 13, dropValue: 60 },
   { id: 399, area: 'ancient-dungeon-2f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 400, area: 'ancient-dungeon-2f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 401, area: 'ancient-dungeon-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 401, area: 'ancient-dungeon-2f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0545 },
   { id: 404, area: 'ancient-dungeon-3f', itemType: 'gold', dropValue: 1000, minAmount: 120, maxAmount: 250 },
   { id: 405, area: 'ancient-dungeon-3f', itemType: 'item', itemTemplateId: 72, dropValue: 120 },
   { id: 406, area: 'ancient-dungeon-3f', itemType: 'item', itemTemplateId: 73, dropValue: 120 },
@@ -387,7 +387,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 410, area: 'ancient-dungeon-3f', itemType: 'item', itemTemplateId: 13, dropValue: 60 },
   { id: 411, area: 'ancient-dungeon-3f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 412, area: 'ancient-dungeon-3f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 413, area: 'ancient-dungeon-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 413, area: 'ancient-dungeon-3f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0591 },
   // 遠古地監 4~6F Lv.50~55
   { id: 416, area: 'ancient-dungeon-4f', itemType: 'gold', dropValue: 1000, minAmount: 140, maxAmount: 280 },
   { id: 417, area: 'ancient-dungeon-4f', itemType: 'item', itemTemplateId: 74, dropValue: 120 },
@@ -399,7 +399,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 423, area: 'ancient-dungeon-4f', itemType: 'item', itemTemplateId: 14, dropValue: 50 },
   { id: 424, area: 'ancient-dungeon-4f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 425, area: 'ancient-dungeon-4f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 426, area: 'ancient-dungeon-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 426, area: 'ancient-dungeon-4f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0636 },
   { id: 428, area: 'ancient-dungeon-5f', itemType: 'gold', dropValue: 1000, minAmount: 140, maxAmount: 280 },
   { id: 429, area: 'ancient-dungeon-5f', itemType: 'item', itemTemplateId: 74, dropValue: 120 },
   { id: 430, area: 'ancient-dungeon-5f', itemType: 'item', itemTemplateId: 75, dropValue: 120 },
@@ -410,7 +410,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 435, area: 'ancient-dungeon-5f', itemType: 'item', itemTemplateId: 14, dropValue: 50 },
   { id: 436, area: 'ancient-dungeon-5f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 437, area: 'ancient-dungeon-5f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 438, area: 'ancient-dungeon-5f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 438, area: 'ancient-dungeon-5f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0682 },
   { id: 440, area: 'ancient-dungeon-6f', itemType: 'gold', dropValue: 1000, minAmount: 140, maxAmount: 280 },
   { id: 441, area: 'ancient-dungeon-6f', itemType: 'item', itemTemplateId: 74, dropValue: 120 },
   { id: 442, area: 'ancient-dungeon-6f', itemType: 'item', itemTemplateId: 75, dropValue: 120 },
@@ -421,7 +421,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 447, area: 'ancient-dungeon-6f', itemType: 'item', itemTemplateId: 14, dropValue: 50 },
   { id: 448, area: 'ancient-dungeon-6f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 449, area: 'ancient-dungeon-6f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 450, area: 'ancient-dungeon-6f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 450, area: 'ancient-dungeon-6f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0727 },
   // 遠古地監 7~9F Lv.55~60 (9F Boss)
   { id: 452, area: 'ancient-dungeon-7f', itemType: 'gold', dropValue: 1000, minAmount: 160, maxAmount: 300 },
   { id: 453, area: 'ancient-dungeon-7f', itemType: 'item', itemTemplateId: 76, dropValue: 120 },
@@ -432,7 +432,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 458, area: 'ancient-dungeon-7f', itemType: 'item', itemTemplateId: 14, dropValue: 60 },
   { id: 459, area: 'ancient-dungeon-7f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 460, area: 'ancient-dungeon-7f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 820, area: 'ancient-dungeon-7f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 820, area: 'ancient-dungeon-7f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0773 },
   { id: 461, area: 'ancient-dungeon-8f', itemType: 'gold', dropValue: 1000, minAmount: 160, maxAmount: 300 },
   { id: 462, area: 'ancient-dungeon-8f', itemType: 'item', itemTemplateId: 76, dropValue: 120 },
   { id: 463, area: 'ancient-dungeon-8f', itemType: 'item', itemTemplateId: 77, dropValue: 100 },
@@ -442,7 +442,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 467, area: 'ancient-dungeon-8f', itemType: 'item', itemTemplateId: 14, dropValue: 60 },
   { id: 468, area: 'ancient-dungeon-8f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 469, area: 'ancient-dungeon-8f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 821, area: 'ancient-dungeon-8f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 821, area: 'ancient-dungeon-8f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0818 },
   { id: 470, area: 'ancient-dungeon-9f', itemType: 'gold', dropValue: 1000, minAmount: 900, maxAmount: 900 },
   { id: 471, area: 'ancient-dungeon-9f', itemType: 'item', itemTemplateId: 9, dropValue: 70 },
   { id: 472, area: 'ancient-dungeon-9f', itemType: 'item', itemTemplateId: 10, dropValue: 70 },
@@ -461,7 +461,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 484, area: 'hundred-pillar-1-10f', itemType: 'item', itemTemplateId: 135, dropValue: 50 },
   { id: 485, area: 'hundred-pillar-1-10f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 486, area: 'hundred-pillar-1-10f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 810, area: 'hundred-pillar-1-10f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 15 },
+  { id: 810, area: 'hundred-pillar-1-10f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 4, dropValue: 1.0 },
   // 百柱塔 11~20F Lv.45~52
   { id: 487, area: 'hundred-pillar-11-20f', itemType: 'gold', dropValue: 1000, minAmount: 250, maxAmount: 400 },
   { id: 488, area: 'hundred-pillar-11-20f', itemType: 'item', itemTemplateId: 63, dropValue: 120 },
@@ -473,7 +473,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 494, area: 'hundred-pillar-11-20f', itemType: 'item', itemTemplateId: 136, dropValue: 50 },
   { id: 495, area: 'hundred-pillar-11-20f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 496, area: 'hundred-pillar-11-20f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 811, area: 'hundred-pillar-11-20f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 811, area: 'hundred-pillar-11-20f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.8 },
   // 百柱塔 21~30F Lv.45~52
   { id: 497, area: 'hundred-pillar-21-30f', itemType: 'gold', dropValue: 1000, minAmount: 250, maxAmount: 400 },
   { id: 498, area: 'hundred-pillar-21-30f', itemType: 'item', itemTemplateId: 63, dropValue: 120 },
@@ -485,7 +485,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 504, area: 'hundred-pillar-21-30f', itemType: 'item', itemTemplateId: 137, dropValue: 60 },
   { id: 505, area: 'hundred-pillar-21-30f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 506, area: 'hundred-pillar-21-30f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 812, area: 'hundred-pillar-21-30f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 812, area: 'hundred-pillar-21-30f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.85 },
   // 百柱塔 31~40F Lv.52~57
   { id: 507, area: 'hundred-pillar-31-40f', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 450 },
   { id: 508, area: 'hundred-pillar-31-40f', itemType: 'item', itemTemplateId: 66, dropValue: 120 },
@@ -497,7 +497,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 514, area: 'hundred-pillar-31-40f', itemType: 'item', itemTemplateId: 138, dropValue: 60 },
   { id: 515, area: 'hundred-pillar-31-40f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 516, area: 'hundred-pillar-31-40f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 813, area: 'hundred-pillar-31-40f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 813, area: 'hundred-pillar-31-40f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.9 },
   // 百柱塔 41~50F Lv.52~57
   { id: 517, area: 'hundred-pillar-41-50f', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 450 },
   { id: 518, area: 'hundred-pillar-41-50f', itemType: 'item', itemTemplateId: 66, dropValue: 120 },
@@ -509,7 +509,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 524, area: 'hundred-pillar-41-50f', itemType: 'item', itemTemplateId: 139, dropValue: 60 },
   { id: 525, area: 'hundred-pillar-41-50f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 526, area: 'hundred-pillar-41-50f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 814, area: 'hundred-pillar-41-50f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 814, area: 'hundred-pillar-41-50f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 0.95 },
   // 百柱塔 51~60F Lv.52~57
   { id: 527, area: 'hundred-pillar-51-60f', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 450 },
   { id: 528, area: 'hundred-pillar-51-60f', itemType: 'item', itemTemplateId: 66, dropValue: 120 },
@@ -522,7 +522,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 535, area: 'hundred-pillar-51-60f', itemType: 'item', itemTemplateId: 140, dropValue: 70 },
   { id: 536, area: 'hundred-pillar-51-60f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 537, area: 'hundred-pillar-51-60f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 815, area: 'hundred-pillar-51-60f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 15 },
+  { id: 815, area: 'hundred-pillar-51-60f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 5, dropValue: 1.0 },
   // 百柱塔 61~70F Lv.57~60
   { id: 538, area: 'hundred-pillar-61-70f', itemType: 'gold', dropValue: 1000, minAmount: 350, maxAmount: 500 },
   { id: 539, area: 'hundred-pillar-61-70f', itemType: 'item', itemTemplateId: 69, dropValue: 120 },
@@ -534,7 +534,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 545, area: 'hundred-pillar-61-70f', itemType: 'item', itemTemplateId: 141, dropValue: 70 },
   { id: 546, area: 'hundred-pillar-61-70f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 547, area: 'hundred-pillar-61-70f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 816, area: 'hundred-pillar-61-70f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 816, area: 'hundred-pillar-61-70f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0864 },
   // 百柱塔 71~80F Lv.57~60
   { id: 548, area: 'hundred-pillar-71-80f', itemType: 'gold', dropValue: 1000, minAmount: 350, maxAmount: 500 },
   { id: 549, area: 'hundred-pillar-71-80f', itemType: 'item', itemTemplateId: 69, dropValue: 120 },
@@ -546,7 +546,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 555, area: 'hundred-pillar-71-80f', itemType: 'item', itemTemplateId: 142, dropValue: 80 },
   { id: 556, area: 'hundred-pillar-71-80f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 557, area: 'hundred-pillar-71-80f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 817, area: 'hundred-pillar-71-80f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 817, area: 'hundred-pillar-71-80f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0909 },
   // 百柱塔 81~90F Lv.57~60
   { id: 558, area: 'hundred-pillar-81-90f', itemType: 'gold', dropValue: 1000, minAmount: 400, maxAmount: 500 },
   { id: 559, area: 'hundred-pillar-81-90f', itemType: 'item', itemTemplateId: 69, dropValue: 120 },
@@ -559,7 +559,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 566, area: 'hundred-pillar-81-90f', itemType: 'item', itemTemplateId: 143, dropValue: 100 },
   { id: 567, area: 'hundred-pillar-81-90f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 568, area: 'hundred-pillar-81-90f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 818, area: 'hundred-pillar-81-90f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 818, area: 'hundred-pillar-81-90f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.0955 },
   // 百柱塔 91~100F Lv.60
   { id: 569, area: 'hundred-pillar-91-100f', itemType: 'gold', dropValue: 1000, minAmount: 400, maxAmount: 500 },
   { id: 570, area: 'hundred-pillar-91-100f', itemType: 'item', itemTemplateId: 69, dropValue: 120 },
@@ -572,7 +572,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 577, area: 'hundred-pillar-91-100f', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
   { id: 578, area: 'hundred-pillar-91-100f', itemType: 'item', itemTemplateId: 7, dropValue: 10 },
   { id: 579, area: 'hundred-pillar-91-100f', itemType: 'item', itemTemplateId: 8, dropValue: 10 },
-  { id: 819, area: 'hundred-pillar-91-100f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 15 },
+  { id: 819, area: 'hundred-pillar-91-100f', itemType: 'equipment', equipmentPool: 'all', acquireType: 'craft', tier: 6, dropValue: 0.1 },
 
   // === 綠色藥水掉落 5% ===
   { id: 580, area: 'misty-swamp', itemType: 'item', itemTemplateId: 133, dropValue: 50, minAmount: 1, maxAmount: 1 },
@@ -616,14 +616,20 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 616, area: 'ivory-tower-3f', itemType: 'item', itemTemplateId: 134, dropValue: 20, minAmount: 1, maxAmount: 1 },
   { id: 617, area: 'ivory-tower-4f', itemType: 'item', itemTemplateId: 134, dropValue: 20, minAmount: 1, maxAmount: 1 },
   { id: 618, area: 'ivory-tower-5f', itemType: 'item', itemTemplateId: 134, dropValue: 20, minAmount: 1, maxAmount: 1 },
+
+
+
+  // T3 補充掉落：象牙塔區域的雪原地帶（Lv.30~35）。同階級的掉率隨怪物等級遞增
+  { id: 838, area: 'snow-field', itemType: 'equipment', equipmentPool: 'all', dropValue: 0.55, tier: 3 },
+  { id: 839, area: 'snow-field-deep', itemType: 'equipment', equipmentPool: 'all', dropValue: 1.0, tier: 3 },
 ];
 
 export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 試煉飛龍（試煉高地頂部，Lv.30）
   { id: 1, bossName: '試煉飛龍', itemType: 'gold', dropValue: 1000, minAmount: 240, maxAmount: 240 },
   { id: 2, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 78, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 3, bossName: '試煉飛龍', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 4 },
-  { id: 4, bossName: '試煉飛龍', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 4 },
+  { id: 3, bossName: '試煉飛龍', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 4 },
+  { id: 4, bossName: '試煉飛龍', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 4 },
   { id: 5, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 9, dropValue: 50, minAmount: 1, maxAmount: 1 },
   { id: 6, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 10, dropValue: 50, minAmount: 1, maxAmount: 1 },
   { id: 7, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -632,8 +638,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 雪地之主（雪原地帶深處，Lv.35）
   { id: 9, bossName: '雪地之主', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 300 },
   { id: 10, bossName: '雪地之主', itemType: 'item', itemTemplateId: 79, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 11, bossName: '雪地之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 4 },
-  { id: 12, bossName: '雪地之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 4 },
+  { id: 11, bossName: '雪地之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 4 },
+  { id: 12, bossName: '雪地之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 4 },
   { id: 13, bossName: '雪地之主', itemType: 'item', itemTemplateId: 127, dropValue: 150, minAmount: 1, maxAmount: 2 },
   { id: 14, bossName: '雪地之主', itemType: 'item', itemTemplateId: 9, dropValue: 50, minAmount: 1, maxAmount: 1 },
   { id: 15, bossName: '雪地之主', itemType: 'item', itemTemplateId: 10, dropValue: 50, minAmount: 1, maxAmount: 1 },
@@ -643,8 +649,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 象牙塔惡魔（象牙塔 5F，Lv.45）
   { id: 18, bossName: '象牙塔惡魔', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 19, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 80, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 20, bossName: '象牙塔惡魔', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 4 },
-  { id: 21, bossName: '象牙塔惡魔', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 4 },
+  { id: 20, bossName: '象牙塔惡魔', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 4 },
+  { id: 21, bossName: '象牙塔惡魔', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 4 },
   { id: 22, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 131, dropValue: 150, minAmount: 1, maxAmount: 1 },
   { id: 23, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 24, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -654,8 +660,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 朦朧蛇魔（朦朧洞窟 3F，Lv.50）
   { id: 27, bossName: '朦朧蛇魔', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 28, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 81, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 29, bossName: '朦朧蛇魔', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 30, bossName: '朦朧蛇魔', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 29, bossName: '朦朧蛇魔', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 30, bossName: '朦朧蛇魔', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 31, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 12, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 32, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 33, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -665,8 +671,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 深海獄王（水下監獄 4F，Lv.50）
   { id: 36, bossName: '深海獄王', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 37, bossName: '深海獄王', itemType: 'item', itemTemplateId: 82, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 38, bossName: '深海獄王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 39, bossName: '深海獄王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 38, bossName: '深海獄王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 39, bossName: '深海獄王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 40, bossName: '深海獄王', itemType: 'item', itemTemplateId: 12, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 41, bossName: '深海獄王', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 42, bossName: '深海獄王', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -676,8 +682,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 安塔巨龍（龍谷地間 7F，Lv.50）
   { id: 45, bossName: '安塔巨龍', itemType: 'gold', dropValue: 1000, minAmount: 660, maxAmount: 660 },
   { id: 46, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 83, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 47, bossName: '安塔巨龍', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 48, bossName: '安塔巨龍', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 47, bossName: '安塔巨龍', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 48, bossName: '安塔巨龍', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 49, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 15, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 50, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 16, dropValue: 70, minAmount: 1, maxAmount: 1 },
   { id: 51, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 9, dropValue: 60, minAmount: 1, maxAmount: 1 },
@@ -688,8 +694,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 遠古騎士（遠古地監 9F，Lv.60）
   { id: 55, bossName: '遠古騎士', itemType: 'gold', dropValue: 1000, minAmount: 900, maxAmount: 900 },
   { id: 56, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 84, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 57, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 58, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 57, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 58, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 59, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 13, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 60, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 14, dropValue: 80, minAmount: 1, maxAmount: 1 },
   { id: 61, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 9, dropValue: 70, minAmount: 1, maxAmount: 1 },
@@ -701,8 +707,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 毒之皇女（1-10F）
   { id: 65, bossName: '毒之皇女', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 66, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 85, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 67, bossName: '毒之皇女', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 4 },
-  { id: 68, bossName: '毒之皇女', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 4 },
+  { id: 67, bossName: '毒之皇女', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 4 },
+  { id: 68, bossName: '毒之皇女', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 4 },
   { id: 69, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 13, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 70, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 71, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -712,8 +718,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 哥布林之王（11-20F）
   { id: 74, bossName: '哥布林之王', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 75, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 86, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 76, bossName: '哥布林之王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 4 },
-  { id: 77, bossName: '哥布林之王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 4 },
+  { id: 76, bossName: '哥布林之王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 4 },
+  { id: 77, bossName: '哥布林之王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 4 },
   { id: 78, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 13, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 79, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 80, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -723,8 +729,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 暗影吸血鬼（21-30F）
   { id: 83, bossName: '暗影吸血鬼', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 84, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 87, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 85, bossName: '暗影吸血鬼', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 4 },
-  { id: 86, bossName: '暗影吸血鬼', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 4 },
+  { id: 85, bossName: '暗影吸血鬼', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 4 },
+  { id: 86, bossName: '暗影吸血鬼', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 4 },
   { id: 87, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 13, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 88, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 89, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -734,8 +740,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 不死殭屍王（31-40F）
   { id: 92, bossName: '不死殭屍王', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 93, bossName: '不死殭屍王', itemType: 'item', itemTemplateId: 88, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 94, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 95, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 94, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 95, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 96, bossName: '不死殭屍王', itemType: 'item', itemTemplateId: 13, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 97, bossName: '不死殭屍王', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 98, bossName: '不死殭屍王', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -745,8 +751,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 龍王約特勒（41-50F）
   { id: 101, bossName: '龍王約特勒', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 102, bossName: '龍王約特勒', itemType: 'item', itemTemplateId: 89, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 103, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 104, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 103, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 104, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 105, bossName: '龍王約特勒', itemType: 'item', itemTemplateId: 13, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 106, bossName: '龍王約特勒', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 107, bossName: '龍王約特勒', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -756,8 +762,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 冥王哈馬斯（51-60F）
   { id: 110, bossName: '冥王哈馬斯', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 111, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 90, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 112, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 113, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 112, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 113, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 114, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 14, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 115, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 116, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -767,8 +773,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 霜凍伊莉絲（61-70F）
   { id: 119, bossName: '霜凍伊莉絲', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 120, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 91, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 121, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 122, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 121, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 122, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 123, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 14, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 124, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 125, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -778,8 +784,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 熔岩伊弗利特（71-80F）
   { id: 128, bossName: '熔岩伊弗利特', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 129, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 92, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 130, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 5 },
-  { id: 131, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 5 },
+  { id: 130, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 10, tier: 5 },
+  { id: 131, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'armor', dropValue: 10, tier: 5 },
   { id: 132, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 14, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 133, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 134, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -789,8 +795,8 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 守護者之主（81-90F）
   { id: 137, bossName: '守護者之主', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 138, bossName: '守護者之主', itemType: 'item', itemTemplateId: 93, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 139, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 6 },
-  { id: 140, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 6 },
+  { id: 139, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
+  { id: 140, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 141, bossName: '守護者之主', itemType: 'item', itemTemplateId: 17, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 142, bossName: '守護者之主', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 143, bossName: '守護者之主', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
@@ -800,12 +806,30 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 百柱死神（91-100F）
   { id: 146, bossName: '百柱死神', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
   { id: 147, bossName: '百柱死神', itemType: 'item', itemTemplateId: 94, dropValue: 300, minAmount: 1, maxAmount: 1 },
-  { id: 148, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 100, tier: 6 },
-  { id: 149, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'armor', dropValue: 100, tier: 6 },
+  { id: 148, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
+  { id: 149, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 150, bossName: '百柱死神', itemType: 'item', itemTemplateId: 17, dropValue: 100, minAmount: 1, maxAmount: 2 },
   { id: 151, bossName: '百柱死神', itemType: 'item', itemTemplateId: 18, dropValue: 70, minAmount: 1, maxAmount: 1 },
   { id: 152, bossName: '百柱死神', itemType: 'item', itemTemplateId: 7, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 153, bossName: '百柱死神', itemType: 'item', itemTemplateId: 8, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 154, bossName: '百柱死神', itemType: 'item', itemTemplateId: 9, dropValue: 50, minAmount: 1, maxAmount: 1 },
   { id: 155, bossName: '百柱死神', itemType: 'item', itemTemplateId: 10, dropValue: 50, minAmount: 1, maxAmount: 1 },
+
+  // T7 裝備：僅 Lv.57 以上的高階 Boss 掉落，武器與防具各 0.01%（§ 6A.8.0）
+  { id: 822, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 823, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 824, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 825, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 826, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 827, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 828, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 829, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 830, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 831, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 832, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 833, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 834, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 835, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
+  { id: 836, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
+  { id: 837, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
 ];

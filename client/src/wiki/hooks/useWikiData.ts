@@ -86,7 +86,9 @@ export function getDropRate(dropValue: number): string {
   const percent = (dropValue / DROP_ROLL_MAX) * 100;
   if (percent >= 100) return '100%';
   if (percent >= 1) return `${percent.toFixed(1)}%`;
-  return `${percent.toFixed(2)}%`;
+  // 極稀有掉落（T6 一般怪 0.001%、T7 Boss 0.001%）用 toFixed(2) 會顯示成 0.00%
+  if (percent >= 0.01) return `${percent.toFixed(2)}%`;
+  return `${percent.toFixed(3)}%`;
 }
 
 export function getAreaDisplayName(areaId: string): string {
