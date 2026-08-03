@@ -1,7 +1,7 @@
 /**
  * 武器 seed 產生器 —— `99-ai-constraints.md` § 99.4 Phase 4b。
  *
- * 依 `06-equipment-acquire.md` § 6A.8 的三張表產生 243 筆武器：
+ * 依 `06-equipment-balance.md` § 6A.8 的三張表產生 243 筆武器：
  *  - § 6A.8.2  數量矩陣（類型 × tier）
  *  - § 6A.8.2a `requiredClass` 逐件指派（讓各職業可用總數拉平）
  *  - § 6A.8.4  素質曲線 + § 6A.8.5 職業效率反向補償

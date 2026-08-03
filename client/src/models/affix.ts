@@ -141,6 +141,8 @@ export function getAffixCategoryForSlot(
   // 魔導書是副手裝備，不是武器：走防具池，避免元素師／牧師拿到兩份武器詞綴
   // （8 格攻擊詞綴 vs 其他職業 4 格，見 `44-dps-prediction.md` § 44.10）
   if (type === 'magicBook') return 'armor';
+  // 臂甲是盜賊的左手防具（雙刀／鋼爪佔雙手時無法裝備），同樣走防具池
+  if (type === 'armGuard') return 'armor';
   if (slot === 'rightHand' || slot === 'leftHand') return 'weapon';
   if (slot === 'necklace' || slot === 'ring1' || slot === 'ring2') return 'accessory';
   return 'armor';
@@ -215,6 +217,8 @@ export const SHOP_MAX_AFFIX_TIER = 3;
 
 /** 一般裝備的詞綴強化上限（`07-affix.md` § 7.2）。T6/T7 只能靠掉落原生取得。 */
 export const DEFAULT_MAX_AFFIX_TIER = 5;
+/** 鐵匠製作品的詞綴 Tier 上限（§ 6A.6）。T6/T7 只能靠掉落原生 */
+export const CRAFT_MAX_AFFIX_TIER = 5;
 
 export interface GenerateAffixOptions {
   /** Tier 硬上限。商店裝傳 `SHOP_MAX_AFFIX_TIER`；掉落／製作不傳。 */

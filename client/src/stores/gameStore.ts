@@ -9,6 +9,7 @@ import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
+import { getStarterGearNames } from '../systems/starterNpc';
 import {
   QUICK_SLOT_COUNT,
   emptyQuickSlots,
@@ -598,44 +599,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     const id = await db.characters.add(char);
     char.id = id as number;
 
-    // Give starter weapon based on class
-    const starterWeapons: Record<ClassName, string> = {
-      knight: '短劍', elf: '木弓', elementalist: '木製法杖', priest: '木製法杖', thief: '匕首',
-    };
-    const template = await db.equipmentTemplates.where('name').equals(starterWeapons[className]).first();
-    let weapon: EquipmentInstance | null = null;
-    if (template) {
-      const dbRecord = {
-        templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [] as any[],
-        ownerId: char.id!, equipped: true,
-      };
-      const instId = await db.equipmentInstances.add(dbRecord as any);
-      weapon = resolveEquipment({
-        id: instId as number, templateId: template.id!, name: template.name, type: template.type,
-        slot: template.slot, isTwoHanded: template.isTwoHanded,
-        quality: 0, enhancement: 0, affixes: [], ownerId: char.id!, equipped: true,
-      });
-    }
-
-    // Give starter armor (皮甲)
-    const armorTemplate = await db.equipmentTemplates.where('name').equals('皮甲').first();
-    let armor: EquipmentInstance | null = null;
-    if (armorTemplate) {
-      const dbRecord = {
-        templateId: armorTemplate.id!, slot: armorTemplate.slot, quality: 0, enhancement: 0, affixes: [] as any[],
-        ownerId: char.id!, equipped: true,
-      };
-      const instId = await db.equipmentInstances.add(dbRecord as any);
-      armor = resolveEquipment({
-        id: instId as number, templateId: armorTemplate.id!, name: armorTemplate.name, type: armorTemplate.type,
-        slot: armorTemplate.slot, isTwoHanded: armorTemplate.isTwoHanded,
-        quality: 0, enhancement: 0, affixes: [], ownerId: char.id!, equipped: true,
-      });
-    }
+    // 創角直接穿上整套新手裝（裝備Tier 1）。清單與新手指導員共用
+    // `STARTER_GEAR_MAP`，不要在這裡另外推導一份。
+    // 舊版寫死「短劍／木弓…＋皮甲」，發的其實是商店貨而不是新手裝，
+    // 而且只有武器與胸甲兩件。
+    const starterNames = new Set(getStarterGearNames(className));
+    const starterTemplates = (await db.equipmentTemplates.toArray())
+      .filter(t => starterNames.has(t.name));
 
     const equippedGear: EquippedGear = {};
-    if (weapon) equippedGear.rightHand = weapon;
-    if (armor) equippedGear.chest = armor;
+    for (const template of starterTemplates) {
+      const dbRecord = {
+        templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [] as any[],
+        ownerId: char.id!, equipped: true, isStarterGear: true,
+      };
+      const instId = await db.equipmentInstances.add(dbRecord as any);
+      equippedGear[template.slot as keyof EquippedGear] = resolveEquipment({
+        id: instId as number, templateId: template.id!, name: template.name, type: template.type,
+        slot: template.slot, isTwoHanded: template.isTwoHanded,
+        quality: 0, enhancement: 0, affixes: [], ownerId: char.id!, equipped: true, isStarterGear: true,
+      });
+    }
 
     // Save initial bag items to DB
     await db.characterBag.bulkAdd([

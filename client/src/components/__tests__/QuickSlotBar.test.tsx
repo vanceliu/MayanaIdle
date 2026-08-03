@@ -243,9 +243,9 @@ describe('裝備快捷鍵的品階著色', () => {
   }
 
   it('依裝備品階著色，而不是一律同一個顏色', () => {
-    // 王者之劍＝製作頂級（紅）、短劍＝商店低階（白）
+    // 王者之劍＝製作頂級（紅）、新手劍＝新手裝（白）
     const topColor = iconColorFor(equipOf('王者之劍', 101));
-    const lowColor = iconColorFor(equipOf('短劍', 102));
+    const lowColor = iconColorFor(equipOf('新手劍', 102));
 
     expect(topColor).not.toBe('');
     expect(lowColor).not.toBe('');

@@ -2,7 +2,7 @@ import { useGameStore } from '../stores/gameStore';
 
 /**
  * 探索控制列（自動/手動搜尋、探索/戰鬥指示、死亡橫幅）
- * 位於頂部 HUD，與 StatusPanel 同排（16-tech-frontend-architecture.md § 32.3）。
+ * 位於頂部 HUD，與地圖選擇器同一列（16-tech-frontend-architecture.md § 32.3）。
  */
 export function ExploreBar() {
   const phase = useGameStore(s => s.phase);

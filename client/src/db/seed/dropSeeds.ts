@@ -16,7 +16,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 11, area: 'green-valley', itemType: 'item', itemTemplateId: 24, dropValue: 100 },
   { id: 12, area: 'green-valley', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 13, area: 'green-valley', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 14, area: 'green-valley', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 1, dropValue: 5.0 },
+  { id: 14, area: 'green-valley', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 2, dropValue: 5.0 },
   { id: 16, area: 'green-valley', itemType: 'item', itemTemplateId: 1, dropValue: 30, minAmount: 1, maxAmount: 1 },
   // 風語林地 Lv.11~15
   { id: 17, area: 'wind-woods', itemType: 'gold', dropValue: 1000, minAmount: 18, maxAmount: 120 },
@@ -25,7 +25,7 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 20, area: 'wind-woods', itemType: 'item', itemTemplateId: 27, dropValue: 100 },
   { id: 21, area: 'wind-woods', itemType: 'item', itemTemplateId: 9, dropValue: 50 },
   { id: 22, area: 'wind-woods', itemType: 'item', itemTemplateId: 10, dropValue: 50 },
-  { id: 23, area: 'wind-woods', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 1, dropValue: 10.0 },
+  { id: 23, area: 'wind-woods', itemType: 'equipment', equipmentPool: 'all', acquireType: 'shop', tier: 2, dropValue: 10.0 },
   { id: 24, area: 'wind-woods', itemType: 'item', itemTemplateId: 1, dropValue: 50, minAmount: 1, maxAmount: 1 },
   // 迷霧沼澤 Lv.16~20
   { id: 25, area: 'misty-swamp', itemType: 'gold', dropValue: 1000, minAmount: 20, maxAmount: 135 },

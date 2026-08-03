@@ -587,7 +587,8 @@ describe('MAP_DESIGN_PROFILES', () => {
 
   it('每張正式地圖都有 profile，且主導地形在該 theme 的色盤內', async () => {
     clearMapCache();
-    const maps = await loadAllMaps();
+    // 城鎮地圖（§ 99.6）是安全區，不進 profile、不套設計規範
+    const maps = (await loadAllMaps()).filter(map => map.theme !== 'town');
     expect(maps).toHaveLength(50);
 
     for (const map of maps) {
@@ -620,7 +621,7 @@ describe('MAP_DESIGN_PROFILES', () => {
 
   it('同主題的地圖不會在主導地形與密度上完全同質', async () => {
     clearMapCache();
-    const maps = await loadAllMaps();
+    const maps = (await loadAllMaps()).filter(map => map.theme !== 'town');
     const byTheme = new Map<MapTheme, string[]>();
     for (const map of maps) {
       const list = byTheme.get(map.theme!) ?? [];

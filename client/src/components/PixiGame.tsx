@@ -10,8 +10,11 @@ import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity } from '../pixi/entities/PlayerEntity';
 import { MonsterEntity } from '../pixi/entities/MonsterEntity';
+import { NpcEntity } from '../pixi/entities/NpcEntity';
+import { useTownStore, resolveNpcArrival, findNpcNearTile, pickNpcApproachTile } from '../stores/townStore';
+import type { TownFacility } from './TownView';
 import { mapPositionToScreen, screenToMapTile } from '../pixi/utils/isometric';
-import { getRenderedElevation, type MapData } from '../models/mapControl';
+import { getRenderedElevation, isWalkableTile, type MapData } from '../models/mapControl';
 import { hasProjectilePath } from '../systems/lineOfSight';
 import { gameLoopTick, consumeDotTick } from '../systems/gameLoop';
 import { findAttackPosition } from '../systems/pathfinding';
@@ -53,6 +56,7 @@ export function PixiGame() {
   const sceneRef = useRef<GameScene | null>(null);
   const playerEntityRef = useRef<PlayerEntity | null>(null);
   const monsterMapRef = useRef<Map<string, MonsterEntity>>(new Map());
+  const npcEntitiesRef = useRef<NpcEntity[]>([]);
   const arpgEngineRef = useRef<ArpgEngineState>(createArpgEngine());
   const monsterInstancesRef = useRef<Map<string, MonsterInstance>>(new Map());
   const areaTemplatesRef = useRef<MonsterTemplate[]>([]);
@@ -83,6 +87,9 @@ export function PixiGame() {
       const currentMap = useMapControlStore.getState().currentMap;
       if (currentMap) {
         scene.loadMap(currentMap);
+        // 地圖已經載好才掛載（重新整理／回到同一張圖）時，地圖變更的訂閱不會觸發，
+        // NPC 必須在這裡補畫，否則城鎮上一個 NPC 都看不到。
+        syncNpcs(currentMap, scene, npcEntitiesRef.current);
         const pos = useMapControlStore.getState().playerPosition;
         player.updatePosition(pos, getRenderedElevation(currentMap, pos));
         const { sx, sy } = mapPositionToScreen(currentMap, pos);
@@ -140,6 +147,17 @@ export function PixiGame() {
           );
         }
 
+        // 3c. 城鎮 NPC：走到相鄰格就開設施面板（§ 99.6 決策 3）
+        const pendingNpc = useTownStore.getState().pendingNpc;
+        if (pendingNpc) {
+          const result = resolveNpcArrival(playerPos, pendingNpc, useMapControlStore.getState().isMoving);
+          if (result === 'open') {
+            useTownStore.getState().openFacility(pendingNpc.facility as TownFacility);
+          } else if (result === 'give-up') {
+            useTownStore.getState().clearPendingNpc();
+          }
+        }
+
         // 4. Effect layer update
         scene!.effectLayer.update(delta);
 
@@ -162,6 +180,8 @@ export function PixiGame() {
       destroyed = true;
       monsterMapRef.current.forEach(m => m.destroy());
       monsterMapRef.current.clear();
+      npcEntitiesRef.current.forEach(n => n.destroy());
+      npcEntitiesRef.current.length = 0;
       useMonsterHudStore.getState().clear();
       playerEntityRef.current = null;
       sceneRef.current = null;
@@ -191,6 +211,7 @@ export function PixiGame() {
         m.destroy();
       });
       monsterMapRef.current.clear();
+      syncNpcs(currentMap, sceneRef.current, npcEntitiesRef.current);
       arpgEngineRef.current = createArpgEngine();
       monsterInstancesRef.current.clear();
       useMonsterHudStore.getState().clear();
@@ -242,6 +263,21 @@ export function PixiGame() {
       const tile = screenToMapTile(map, worldScreenX, worldScreenY);
       if (!tile) return;
 
+      // 城鎮：點到 NPC 站的那一格＝找他，走到旁邊自動開設施面板（§ 99.6）。
+      // 這段必須跟地圖點擊走同一條路徑 —— 地圖移動是掛在 DOM 的 click 上，
+      // 若 NPC 改用 Pixi 的 pointertap，兩個 handler 會各自 moveToTarget，
+      // 後跑的 DOM click 會覆蓋掉 NPC 的目標。
+      const npc = findNpcNearTile(map.npcs, tile);
+      if (npc) {
+        // NPC 有實體，停在他旁邊而不是站到他身上
+        useTownStore.getState().requestNpc(npc);
+        const from = useMapControlStore.getState().playerPosition;
+        const approach = pickNpcApproachTile(npc, from, t => isWalkableTile(map, t));
+        useMapControlStore.getState().moveToTarget(approach);
+        return;
+      }
+
+      useTownStore.getState().clearPendingNpc();
       useMapControlStore.getState().moveToTarget(tile);
     };
 
@@ -350,6 +386,7 @@ function tickArpgCombatLoop(
     mapMonsters: monsterStore.monsters,
     monsterInstances,
     map: mapStore.currentMap,
+    bagItems: gameState.bagItems,
     deltaMs,
   });
 
@@ -362,6 +399,11 @@ function tickArpgCombatLoop(
 
   for (const event of events) {
     switch (event.type) {
+      case 'overweight_blocked': {
+        // 每次出手判定都顯示一次（§ 20.7），玩家才知道自己為什麼打不出去
+        logs.push({ text: event.message, type: 'system' });
+        break;
+      }
       case 'player_attack': {
         // Stop after reaching the current tile waypoint
         const mapCtrl2 = useMapControlStore.getState();
@@ -871,5 +913,24 @@ function syncMonsters(
     if (inst) {
       entity.updateHp(inst.currentHp, inst.maxHp);
     }
+  }
+}
+
+/**
+ * 城鎮 NPC 圖層（§ 99.6）。地圖切換時整批重建 —— NPC 是靜態資料，不需要逐格 diff。
+ * 點 NPC 只負責「記下目標 + 走過去」，開面板由主迴圈在走到相鄰格時處理。
+ */
+function syncNpcs(map: MapData, scene: GameScene, entities: NpcEntity[]): void {
+  for (const entity of entities) {
+    scene.entityLayer.container.removeChild(entity.container);
+    entity.destroy();
+  }
+  entities.length = 0;
+
+  for (const npc of map.npcs ?? []) {
+    // 點擊由 DOM 的 handleClick 依格子判斷，NPC 實體只負責顯示
+    const entity = new NpcEntity(npc);
+    scene.entityLayer.container.addChild(entity.container);
+    entities.push(entity);
   }
 }

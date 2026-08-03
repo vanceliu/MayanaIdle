@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { EQUIPMENT_SEEDS } from '../seed/equipmentSeeds';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../seed/dropSeeds';
-import { MAX_SHOP_TIER, MAX_CRAFT_TIER, MONSTER_DROP_ONLY_TIER, BOSS_DROP_ONLY_TIER } from '../../models/equipment';
+import { MIN_SHOP_TIER, MAX_SHOP_TIER, MONSTER_DROP_ONLY_TIER, BOSS_DROP_ONLY_TIER } from '../../models/equipment';
 import { getTierGroup } from '../../models/equipmentTier';
 import type { EquipmentTemplate } from '../../models/equipment';
 
 /**
- * 裝備階級 tier 1~7 的結構性不變式（`06-equipment-acquire.md` § 6A.8）。
+ * 裝備階級 tier 1~7 的結構性不變式（`06-equipment-balance.md` § 6A.8）。
  *
  * 這些測試取代舊的「人工檢查製作品是否強過商店天花板」——
  * 只要 tier 遞增即代表素質遞增，違反時直接失敗。
@@ -16,7 +16,8 @@ const REAL = EQUIPMENT_SEEDS.filter(t => t.acquireType !== 'starter');
 
 /** 該裝備的主要素質指標。鈍器／雙手斧以大怪傷害為準（§ 6A.4） */
 function powerOf(t: EquipmentTemplate): number {
-  if (t.type === 'shield') return t.defense ?? 0;
+  // 左手裝備的防禦刻意封頂在 4（§ 6A.8.7），成長曲線改由格擋率／魔法攻擊承擔
+  if (t.type === 'shield' || t.type === 'armGuard') return t.blockRate ?? 0;
   if (t.type === 'magicBook') return t.magicAttack ?? 0;
   if (t.type === 'armor') return t.defense ?? 0;
   if (t.type === 'mace' || t.type === 'twoHandAxe') return t.largeMonsterDamage ?? 0;
@@ -34,11 +35,12 @@ describe('裝備階級 tier 的基本規則', () => {
     expect(bad).toEqual([]);
   });
 
-  it('商店只賣 T1~T3', () => {
-    const shopTooHigh = REAL
-      .filter(t => t.acquireType === 'shop' && t.tier! > MAX_SHOP_TIER)
+  it('商店只賣 T2~T3（T1 是新手裝專屬階級）', () => {
+    const outOfRange = REAL
+      .filter(t => t.acquireType === 'shop'
+        && (t.tier! > MAX_SHOP_TIER || (t.tier! < MIN_SHOP_TIER && t.type !== 'armor')))
       .map(t => `${t.name}(T${t.tier})`);
-    expect(shopTooHigh).toEqual([]);
+    expect(outOfRange).toEqual([]);
   });
 
   it('製作品不會低於 T4', () => {
@@ -77,12 +79,13 @@ describe('掉落池的 tier 標記', () => {
     }
   });
 
-  it('掉落池不會抽到新手裝', () => {
-    const starterTiers = EQUIPMENT_SEEDS
-      .filter(t => t.acquireType === 'starter')
-      .map(t => t.tier)
-      .filter(v => v != null);
-    expect(starterTiers).toEqual([]);
+  it('新手裝一律是 Tier 1', () => {
+    // 新手裝就是裝備Tier 1（沒有 Tier 0），創角直接穿上整套。
+    // 因為它跟掉落池共用 tier 比對，`drops.ts` 必須另外以 acquireType 排除。
+    const wrong = EQUIPMENT_SEEDS
+      .filter(t => t.acquireType === 'starter' && t.tier !== 1)
+      .map(t => `${t.name}(T${t.tier ?? '—'})`);
+    expect(wrong).toEqual([]);
   });
 });
 
@@ -101,17 +104,40 @@ describe('掉落池的 tier 標記', () => {
  *
  */
 describe('T6/T7 掉落限定', () => {
-  it('鐵匠製作止於 T5', () => {
+  it('鐵匠製作止於 T6', () => {
+    // T6 開放了一半可製作（§ 6A.8.0），讓 Lv.57 以上的頂級材料有出口；
+    // 掉落池以 tier 比對，所以那些 T6 仍然照掉。T7 維持純 Boss 掉落。
     const tooHigh = REAL
-      .filter(t => t.acquireType === 'craft' && t.tier! > MAX_CRAFT_TIER)
+      .filter(t => t.acquireType === 'craft' && t.tier! > MONSTER_DROP_ONLY_TIER)
       .map(t => `${t.name}(T${t.tier})`);
     expect(tooHigh).toEqual([]);
   });
 
-  it('T6/T7 一律為 drop_only', () => {
+  it('T6 的腰帶／項鍊／戒指不可製作', () => {
+    const ACCESSORY = ['belt', 'necklace', 'ring1', 'ring2'];
     const bad = REAL
-      .filter(t => t.tier! >= MONSTER_DROP_ONLY_TIER && t.acquireType !== 'drop_only')
-      .map(t => `${t.name}(T${t.tier}/${t.acquireType})`);
+      .filter(t => t.tier === MONSTER_DROP_ONLY_TIER && ACCESSORY.includes(t.slot)
+        && t.acquireType !== 'drop_only')
+      .map(t => `${t.name}(${t.acquireType})`);
+    expect(bad).toEqual([]);
+  });
+
+  it('T6/T7 都不販售，T7 一律 drop_only', () => {
+    const sold = REAL
+      .filter(t => t.tier! >= MONSTER_DROP_ONLY_TIER && t.acquireType === 'shop')
+      .map(t => `${t.name}(T${t.tier})`);
+    expect(sold).toEqual([]);
+    const t7 = REAL
+      .filter(t => t.tier === BOSS_DROP_ONLY_TIER && t.acquireType !== 'drop_only')
+      .map(t => `${t.name}(${t.acquireType})`);
+    expect(t7).toEqual([]);
+  });
+
+  it('可製作的 T6 都有製作費與材料', () => {
+    const bad = REAL
+      .filter(t => t.tier === MONSTER_DROP_ONLY_TIER && t.acquireType === 'craft')
+      .filter(t => !t.craftGold || !t.craftMaterials?.length)
+      .map(t => t.name);
     expect(bad).toEqual([]);
   });
 

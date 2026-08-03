@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 import { TownBlacksmith } from '../town/TownBlacksmith';
+import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { useGameStore } from '../../stores/gameStore';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { db } from '../../db/database';
 import { loadTemplateCache } from '../../systems/templateSync';
-import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 
 /**
  * @vitest-environment jsdom
@@ -22,6 +22,14 @@ async function findRecipeTitle(name: string): Promise<HTMLElement> {
   if (!title) throw new Error(`找不到配方標題: ${name}`);
   return title;
 }
+
+/** 精鋼劍的配方是測試的固定對象；材料由 seed 決定，不寫死在測試裡（§ 6A.3 會重新分配） */
+const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '精鋼劍')!;
+const recipeBagFor = (name: string, amount: number) =>
+  EQUIPMENT_SEEDS.find(t => t.name === name)!.craftMaterials!
+    .map(m => ({ name: m.name, type: 'material' as const, amount }));
+const recipeBag = (amount: number) =>
+  RECIPE.craftMaterials!.map(m => ({ name: m.name, type: 'material' as const, amount }));
 
 describe('TownBlacksmith - Crafting', () => {
   beforeEach(async () => {
@@ -58,11 +66,7 @@ describe('TownBlacksmith - Crafting', () => {
       },
       equippedGear: {},
       inventory: [],
-      bagItems: [
-        { name: '山賊鐵塊', type: 'material', amount: 10 },
-        { name: '凍骨碎片', type: 'material', amount: 10 },
-        { name: '銀礦石', type: 'material', amount: 10 },
-      ],
+      bagItems: recipeBag(10),
     });
   });
 
@@ -82,7 +86,10 @@ describe('TownBlacksmith - Crafting', () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('精鋼劍'));
-    expect(screen.getAllByText(/150.*G/).length).toBeGreaterThan(0);
+    // 製作費由 § 6A.3 的階級表決定（T4 5 萬、T5 10 萬），不寫死在測試裡
+    const recipe = EQUIPMENT_SEEDS.find(t => t.name === '精鋼劍')!;
+    const priceText = new RegExp(recipe.craftGold!.toLocaleString().replace(/,/g, '.?'));
+    expect(screen.getAllByText(priceText).length).toBeGreaterThan(0);
   });
 
   it('crafts item successfully when materials and gold available', async () => {
@@ -94,11 +101,12 @@ describe('TownBlacksmith - Crafting', () => {
     fireEvent.click(enabledBtn);
 
     const state = useGameStore.getState();
-    expect(state.character!.gold).toBe(500000 - 150000);
+    const cost = EQUIPMENT_SEEDS.find(t => t.name === '精鋼劍')!.craftGold!;
+    expect(state.character!.gold).toBe(500000 - cost);
     expect(state.inventory.some(i => i.name === '精鋼劍')).toBe(true);
-    expect(state.bagItems.find(b => b.name === '山賊鐵塊')?.amount).toBe(10 - 4);
-    expect(state.bagItems.find(b => b.name === '凍骨碎片')?.amount).toBe(10 - 3);
-    expect(state.bagItems.find(b => b.name === '銀礦石')?.amount).toBe(10 - 2);
+    for (const m of RECIPE.craftMaterials!) {
+      expect(state.bagItems.find(b => b.name === m.name)?.amount, m.name).toBe(10 - m.amount);
+    }
   });
 
   it('crafted item has correct stats', async () => {
@@ -139,11 +147,7 @@ describe('TownBlacksmith - Crafting', () => {
 
   it('disables craft button when not enough materials', async () => {
     useGameStore.setState({
-      bagItems: [
-        { name: '山賊鐵塊', type: 'material', amount: 1 },
-        { name: '凍骨碎片', type: 'material', amount: 1 },
-        { name: '銀礦石', type: 'material', amount: 1 },
-      ],
+      bagItems: recipeBag(1),
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
@@ -164,14 +168,11 @@ describe('TownBlacksmith - Crafting', () => {
     expect(screen.getByText('製作成功！獲得 精鋼劍')).toBeDefined();
   });
 
-  it('top-tier recipe has stability 0', async () => {
+  it('製作品的安定值繼承自模板', async () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
-        { name: '妖魔鬥士護符', type: 'material', amount: 30 },
-        { name: '幻獸水晶', type: 'material', amount: 30 },
-        { name: '巨人指骨', type: 'material', amount: 30 },
-        { name: '米索利碎片', type: 'material', amount: 30 },
+        ...recipeBagFor('巴風特之刃', 30),
       ],
       inventory: [
         { id: 9001, templateId: 0, name: '暗影彎刀', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
@@ -187,7 +188,9 @@ describe('TownBlacksmith - Crafting', () => {
     await waitFor(() => {
       const state = useGameStore.getState();
       const crafted = state.inventory.find(i => i.name === '巴風特之刃')!;
-      expect(crafted.stability).toBe(0);
+      // 安定值已統一（武器 6／副手 4），不再有頂級 = 0 的特例；對照模板而非寫死
+      const template = EQUIPMENT_SEEDS.find(t => t.name === '巴風特之刃')!;
+      expect(crafted.stability).toBe(template.stability);
     });
   });
 
@@ -195,10 +198,7 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
-        { name: '妖魔鬥士護符', type: 'material', amount: 30 },
-        { name: '幻獸水晶', type: 'material', amount: 30 },
-        { name: '巨人指骨', type: 'material', amount: 30 },
-        { name: '米索利碎片', type: 'material', amount: 30 },
+        ...recipeBagFor('巴風特之刃', 30),
       ],
       inventory: [],
     });
@@ -214,10 +214,7 @@ describe('TownBlacksmith - Crafting', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 2000000 },
       bagItems: [
-        { name: '妖魔鬥士護符', type: 'material', amount: 30 },
-        { name: '幻獸水晶', type: 'material', amount: 30 },
-        { name: '巨人指骨', type: 'material', amount: 30 },
-        { name: '米索利碎片', type: 'material', amount: 30 },
+        ...recipeBagFor('巴風特之刃', 30),
       ],
       inventory: [
         { id: 9002, templateId: 0, name: '暗影彎刀', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 15, enhancement: 6, stability: 6, affixes: [{ id: 'atk1', tier: 2, value: 5 }], ownerId: 1, equipped: false } as any,
@@ -241,12 +238,7 @@ describe('TownBlacksmith - Crafting', () => {
   it('dual blade craft consumes 2 prerequisite daggers', async () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 500000, className: 'thief' },
-      bagItems: [
-        { name: '飛龍鱗片', type: 'material', amount: 10 },
-        { name: '剝皮蛛牙', type: 'material', amount: 10 },
-        { name: '死亡靈魂殘片', type: 'material', amount: 10 },
-        { name: '米索利碎片', type: 'material', amount: 10 },
-      ],
+      bagItems: recipeBagFor('月牙雙刀', 10),
       inventory: [
         { id: 9003, templateId: 0, name: '黑暗短刃', type: 'dagger', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
         { id: 9004, templateId: 0, name: '黑暗短刃', type: 'dagger', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,

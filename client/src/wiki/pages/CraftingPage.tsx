@@ -15,7 +15,7 @@ const TYPE_LABELS: Record<string, string> = {
   sword: '單手劍', dagger: '匕首', axe: '單手斧', mace: '鈍器',
   staff: '法杖', bow: '弓', twoHandSword: '雙手劍', twoHandAxe: '雙手斧',
   twoHandStaff: '雙手法杖', dualBlade: '雙刀', claw: '爪',
-  shield: '盾牌', magicBook: '魔法書', armor: '防具',
+  shield: '盾牌', magicBook: '魔法書', armGuard: '臂甲', armor: '防具',
 };
 
 export function CraftingPage() {

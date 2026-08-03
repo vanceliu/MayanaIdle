@@ -152,21 +152,26 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ .top-hud                                                       │
-│ ┌── StatusPanel (480px) ──┐ ┌── .top-hud-nav (flex:1) ───────┐ │
-│ │ 名稱 職業 Lv.   防禦: N │ │ MapNavigation「目前: 區域 ▼」  │ │
-│ │ ▓HP▓  ▓MP▓  ▓EXP▓       │ │ ExploreBar [自動][手動] 探索中 │ │
-│ └─────────────────────────┘ └───────────────────────────────┘ │
+│ .top-hud（單列，約 46px）                                       │
+│ ┌── .top-hud-nav (flex:1) ─────────────┐ ┌─── GameToolbar ───┐ │
+│ │「目前: 區域 ▼」[自動][手動] 探索中... │ │ Wiki 匯出 匯入 登出│ │
+│ └──────────────────────────────────────┘ └───────────────────┘ │
 ├────────────────────────────────────────────────────────────────┤
 │ .stage-area（position: relative，探索與城鎮共用）               │
 │ ┌ BuffBar（絕對定位左上，垂直往下長）                            │
 │ │ [⚡]                                                          │
-│ │ [🛡]     BattleView（canvas + 戰鬥日誌）                       │
+│ │ [🛡]     BattleView（純 Pixi canvas）                          │
 │ │ [☠]        或 TownView（設施列，左側讓出 52px）                │
+│ │        放大的戰鬥日誌 overlay 浮在這一層                        │
 ├────────────────────────────────────────────────────────────────┤
-│ .bottom-bar                                                    │
-│ QuickSlotBar(10格) │ PanelDock                                 │
-│              [📋 任務 N][詳細狀態][裝備欄][背包][技能][自動腳本 N]│
+│ .bottom-bar（flex，固定 184px 高）                              │
+│ ┌─ StatusPanel(480) ───┐ ┌─ .bottom-main (flex:1) ───────────┐ │
+│ │ 名稱 職業 Lv.        │ │ 攻擊 對 野牛 造成 9 傷害           │ │
+│ │ ▓▓▓▓▓ HP ▓▓▓▓▓▓▓▓▓▓ │ │ 野牛 被擊敗！                      │ │
+│ │ ▓▓▓▓▓ MP ▓▓▓▓▓▓▓▓▓▓ │ │ 獲得 21 經驗值               [▲]  │ │
+│ │ ▓▓▓▓ EXP ▓▓▓▓▓▓▓▓▓▓ │ ├───────────────────────────────────┤ │
+│ │ ▓▓ 負重 ▓▓  防禦: N  │ │[1][2]...[0]  │[📋任務][背包][技能]│ │
+│ └──────────────────────┘ └───────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────┘
         ↓ PanelDock 按鈕開關 → 可拖曳、可多開、無遮罩的浮動視窗
 ┌──────────────┐  ┌──────────────┐
@@ -175,13 +180,16 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 └──────────────┘  └──────────────┘
 ```
 
-**頂部 HUD（`.top-hud`）：** 左為 `StatusPanel`（compact 兩列），右為 `MapNavigation`
-（「目前: 區域名 ▼」下拉，展開 Zone → Region → Floor）+ `ExploreBar`，兩側等高。
-`StatusPanel` 不再顯示「目前區域」，避免與地圖選擇器重複。
+**頂部 HUD（`.top-hud`）：** 單列的「區域列」，只回答「我在哪、在做什麼」。
+左為 `MapNavigation`（「目前: 區域名 ▼」下拉，展開 Zone → Region → Floor；
+觸發鈕固定 260px，下拉選單另設 `min-width: 340px`）+ `ExploreBar`；
+右為 `GameToolbar`（Wiki／匯出／匯入／登出，已不再 `position: fixed` 釘在右下角）。
+生存資源全部移到底部列，這一排維持約 46px，多出來的高度歸 `.stage-area`。
+`StatusPanel` 不顯示「目前區域」，避免與地圖選擇器重複。
 
 > **城鎮與野外的 UI 位置必須一致。** 城鎮沒有探索控制，但 `ExploreBar` 仍包在
-> `.explore-bar-slot` 內以 `visibility: hidden` 保留該排高度（`.is-hidden`），
-> 否則 `.top-hud` 會從 93px 縮成 62px，導致進出城鎮時整個版面上下跳動。
+> `.explore-bar-slot` 內以 `visibility: hidden` 保留該格的寬度與高度（`.is-hidden`），
+> 否則 `.top-hud` 會縮短、右側 `GameToolbar` 也會跟著位移，進出城鎮時版面跳動。
 > 不可改用「城鎮不渲染 ExploreBar」的寫法。
 
 **Stage（`.stage-area`）：** 探索與城鎮共用的定位基準，兩個 HUD 以絕對定位固定其上，
@@ -189,12 +197,33 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 - `BuffBar` — 左上角，垂直往下長
 - `QuestTrackerPanel` — 右上角，半透明任務內容（開關由底部「任務」按鈕控制，§ 36.10.3）
 
-主內容根據 `region.type` 判斷：
+主內容根據 `region.type` 判斷（兩者都**不含戰鬥日誌**，日誌在底部）：
 - `town` → `TownView`（城鎮設施；不做 canvas，左側 padding 讓出 BuffBar 欄位）
-- `field` / `dungeon` → `BattleView`（Pixi canvas + 戰鬥日誌）
+- `field` / `dungeon` → `BattleView`（純 Pixi canvas）
 
-**底部列（`.bottom-bar`）：** `QuickSlotBar`（10 格）+ `PanelDock`。
-`PanelDock` 內含「任務」按鈕，與其他四個面板按鈕同排同樣式。
+**底部（`.bottom-bar`，固定 184px 高）：** 左 `StatusPanel`（480px），
+右 `.bottom-main` 上下切兩塊 —— 上為戰鬥日誌、下為 `QuickSlotBar`（10 格一排）
+＋ `PanelDock`。
+
+- **高度必須寫死**：日誌是往內捲動的，讓它決定高度會被內容撐爆。
+- `.bottom-log-wrap` 的 `flex-basis` 必須是 **0**（`flex: 1 1 0`）——
+  用 `auto` 會拿日誌的全部內容高度當基準，把下面那排快捷格擠出畫面。
+
+**戰鬥日誌（`CombatLogPanel`）：** 常駐的那份在底部列，城鎮與野外共用同一份
+（`TownView`／`BattleView` 都不再自己渲染日誌）。右下角 `▲` 按鈕循環三段大小：
+
+- 放大時 `.combat-log-overlay` 錨在 `.bottom-log-wrap` 上（`bottom: 0`，高度 40vh／70vh），
+  **從日誌原位往上長、蓋到 canvas 上**；左右維持日誌自己的寬度，
+  **不可拉成跨越整個畫面的橫幅**，也不可延伸到狀態面板那一側。
+- overlay 的背景必須不透明：底下就是同一份日誌，半透明會透出重影。
+- `.log-resize-btn` 的 `z-index` 要高於 overlay（31 > 30），否則放大後按鈕會被自己蓋掉。
+
+**版本標示（`.build-label`）：** 遊戲畫面的左下角已被狀態面板佔用，
+`BuildLabel` 改掛在 `.top-hud` 內、`GameToolbar` 左邊（`.top-hud .build-label`
+把 `position` 覆寫成 `static`）；其他畫面（標題／角色選擇／建立）仍是左下角固定定位。
+
+> **`.log-resize-btn` 的 rule 內原本有兩個 `z-index`**（28px 那段後面又寫了一次 11），
+> 後寫的會蓋掉前面的。改這個按鈕的層級時要確認整條 rule，不要只加不刪。
 
 ### 背包面板（BagPanel）
 
@@ -482,7 +511,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `App` | DB 初始化、角色讀取、Phase 路由、版面結構 |
 | `CharacterSelect` | 角色選擇畫面（最多 4 格位、建立/刪除/選擇） |
 | `CharacterCreate` | 職業選擇、屬性配點、角色命名 |
-| `StatusPanel` | 頂部 HUD 左側 compact：角色名/職業/等級/防禦值一列，HP/MP/EXP 三條並排一列 |
+| `StatusPanel` | 底部列左側 compact：角色名/職業/等級/防禦值一列，HP/MP/負重/EXP 四條由上往下堆疊 |
 | `BuffBar` | 角色 buff/debuff icon 垂直欄，浮於 `.stage-area` 左上，每秒刷新倒數，hover tooltip |
 | `FloatingWindow` | 通用可拖曳浮動視窗（標題列拖曳、點擊置頂、✕ 關閉、無遮罩） |
 | `PanelDock` | 底部面板按鈕列（詳細狀態/裝備欄/背包/技能 + 自動腳本觸發鈕） |

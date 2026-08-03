@@ -88,6 +88,8 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
   spawnTick: (deltaMs, map, playerPos, pressure, elapsedMinutes = 0) => {
     const state = get();
+    // 城鎮是安全區，永遠不生怪（§ 13.1、§ 99.6）。擋在最前面而不是靠呼叫端記得不要呼叫。
+    if (map.theme === 'town') return;
     if (state.paused) return;
     if (state.monsters.length >= state.maxMonsters) return;
 

@@ -127,18 +127,20 @@ describe('腰帶擴充背包格數（§ 35.1）', () => {
     expect(getBagMaxSlots({})).toBe(50);
   });
 
-  it('七條腰帶各自提供正確的格數', () => {
+  it('每條腰帶各自提供正確的格數（§ 35.1，依裝備Tier 遞增）', () => {
     const expected: Record<string, number> = {
-      皮腰帶: 5, 鐵扣腰帶: 7, 戰士腰帶: 10, 龍皮腰帶: 12,
-      力之腰帶: 15, 暗殺者腰帶: 15, 賢者腰帶: 15,
+      皮腰帶: 5, 鐵扣腰帶: 6, 龍皮腰帶: 8, 銀扣腰帶: 10,
+      力之腰帶: 15, 暗殺者腰帶: 15, 賢者腰帶: 15, 祈禱者腰帶: 15,
+      守護者腰帶: 18,
+      天龍腰帶: 20, 星辰腰帶: 20, 幻影腰帶: 20,
     };
     for (const [name, slots] of Object.entries(expected)) {
       expect(getBagMaxSlots(gearWithBelt(name)), name).toBe(BAG_BASE_SLOTS + slots);
     }
   });
 
-  it('滿裝上限為 65 格', () => {
-    expect(getBagMaxSlots(gearWithBelt('力之腰帶'))).toBe(65);
+  it('滿裝上限為 70 格', () => {
+    expect(getBagMaxSlots(gearWithBelt('天龍腰帶'))).toBe(70);
   });
 
   it('腰帶保留原有的負重加成（負重系統仍存在，只是沒有 UI）', () => {

@@ -1,7 +1,7 @@
 import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from './equipment';
 
 /**
- * 顯示用階級：0 = 新手裝，1~7 = `EquipmentTier`（`06-equipment-acquire.md` § 6A.8）。
+ * 顯示用階級：0 = 新手裝，1~7 = `EquipmentTier`（`06-equipment-balance.md` § 6A.8）。
  * 新手裝不屬於 tier 刻度，另外給 0 讓批量販售能排除它。
  */
 export type EquipmentTierLevel = 0 | EquipmentTier;
@@ -64,7 +64,6 @@ function deriveLegacyTier(template: EquipmentTemplate): EquipmentTierLevel {
 }
 
 export function getEquipmentTierLevel(template: EquipmentTemplate): EquipmentTierLevel {
-  if (template.acquireType === 'starter') return 0;
   return template.tier ?? deriveLegacyTier(template);
 }
 

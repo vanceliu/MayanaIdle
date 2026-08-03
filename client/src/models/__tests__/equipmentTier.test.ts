@@ -169,8 +169,8 @@ describe('equipmentTier', () => {
       expect(getEquipmentTierLevel(makeTemplate({ acquireType: 'craft', craftTier: 'entry' }))).toBe(4);
     });
 
-    it('新手裝一律為 0，即使填了 tier', () => {
-      expect(getEquipmentTierLevel(makeTemplate({ tier: 5, acquireType: 'starter' }))).toBe(0);
+    it('新手裝讀自己的 tier —— 它就是裝備Tier 1，沒有 Tier 0', () => {
+      expect(getEquipmentTierLevel(makeTemplate({ tier: 1, acquireType: 'starter' }))).toBe(1);
     });
   });
 

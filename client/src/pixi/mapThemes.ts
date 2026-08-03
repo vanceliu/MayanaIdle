@@ -32,4 +32,6 @@ export const MAP_THEME_PALETTES: Record<MapTheme, MapThemePalette> = {
   tower: { ground: 0x3e3d52, groundAlt: 0x353449, grid: 0x201f2d, boundaryTop: 0x64637a, boundaryLeft: 0x434254, boundaryRight: 0x302f40, obstacle: 0x77758b, decoration: 0x9b85c7, water: 0x6a5acd, lava: 0xff6347, chasm: 0x483d8b, grass: 0x9370db, sand: 0xdda0dd, carpet: 0x8a2be2 },
   'frost-tower': { ground: 0x456070, groundAlt: 0x3b5362, grid: 0x22323c, boundaryTop: 0x7791a0, boundaryLeft: 0x4f6875, boundaryRight: 0x384d58, obstacle: 0x7d98a7, decoration: 0x8de1ef, water: 0x00ced1, lava: 0xff7f50, chasm: 0x2f4f4f, grass: 0x87ceeb, sand: 0xf0f8ff, carpet: 0x4682b4 },
   'lava-tower': { ground: 0x5b332d, groundAlt: 0x4c2926, grid: 0x2d1715, boundaryTop: 0x7a4840, boundaryLeft: 0x54302c, boundaryRight: 0x3c211f, obstacle: 0x815044, decoration: 0xff7b32, water: 0x8b0000, lava: 0xff4500, chasm: 0x800000, grass: 0x654321, sand: 0xdaa520, carpet: 0xb22222 },
+  // 城鎮：石板路（ground）＋ 房舍（wall/obstacle）＋ 綠地與水井，色調比野外亮，一眼看得出是安全區
+  town: { ground: 0x6b6152, groundAlt: 0x5e5548, grid: 0x3a342c, boundaryTop: 0x8a7d67, boundaryLeft: 0x5f5648, boundaryRight: 0x453e34, obstacle: 0x9a8b74, decoration: 0xc9a227, water: 0x3f7fb5, lava: 0xff6b35, chasm: 0x1a1a1a, grass: 0x4f7a44, sand: 0xd9c39a, carpet: 0x8d5a3b },
 };

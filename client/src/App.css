@@ -29,6 +29,11 @@
   --hp-bar: linear-gradient(90deg, #DC2626, #F43F5E);
   --mp-bar: linear-gradient(90deg, #1D4ED8, #3B82F6);
   --exp-bar: linear-gradient(90deg, #D97706, #F59E0B);
+  /* 負重條依比例變色：條快滿了＝該回村了（`20-attributes.md` § 20.7） */
+  --weight-bar: linear-gradient(90deg, #475569, #94A3B8);
+  --weight-bar-warning: linear-gradient(90deg, #A16207, #EAB308);
+  --weight-bar-critical: linear-gradient(90deg, #C2410C, #F97316);
+  --weight-bar-over: linear-gradient(90deg, #B91C1C, #EF4444);
   --monster-hp: linear-gradient(90deg, #991B1B, #DC2626);
 
   --radius-sm: 4px;
@@ -120,65 +125,77 @@ body {
   margin-bottom: 2.5rem;
 }
 
-/* --- Game Layout（單欄：頂部 HUD / stage / 底部列，§ 32.3） --- */
+/* --- Game Layout（滿版遊戲畫面 + 浮動 HUD，§ 32.3） --- */
 .game-layout {
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
+  display: block;
+  position: relative;
   width: 100%;
   height: 100vh;
-  padding: 10px;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* HUD 島：全部絕對定位貼在四角，互不影響版面 */
+.hud {
+  position: absolute;
+  z-index: 20;
+  display: flex;
   gap: 8px;
 }
 
-/* 頂部 HUD：左為 StatusPanel，右為地圖選擇器 + 探索控制列（兩者等高） */
-.top-hud {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.top-hud .status-panel {
-  width: 480px;
-  flex-shrink: 0;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel);
-  padding: 8px 12px;
-  display: flex;
+.hud-topleft {
+  top: 12px;
+  left: 12px;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
+  align-items: flex-start;
 }
 
-.top-hud-nav {
-  flex: 1;
-  min-width: 0;
-  display: flex;
+.hud-topright {
+  top: 12px;
+  right: 12px;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
+  align-items: flex-end;
 }
 
-/* 城鎮沿用同一個 slot（僅隱藏內容），確保 top-hud 高度與野外一致 */
+.hud-bottomleft {
+  bottom: 12px;
+  left: 12px;
+}
+
+.hud-bottomcenter {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  align-items: center;
+}
+
+.hud-bottomright {
+  bottom: 12px;
+  right: 12px;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* 城鎮沒有探索控制，但仍保留這一格的位置，讓快捷格不會上下位移 */
 .explore-bar-slot.is-hidden {
   visibility: hidden;
 }
 
-/* stage：探索（canvas）與城鎮共用的定位基準，BuffBar 浮在其左上角 */
+/* 版本標示排在 Wiki 左邊，不再固定在畫面左下角 */
+.game-toolbar .build-label {
+  position: static;
+  align-self: center;
+}
+
+/* stage：鋪滿整個視窗的底層，HUD 疊在上面 */
 .stage-area {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel);
-  padding: 10px;
   overflow: hidden;
 }
 
@@ -188,18 +205,199 @@ body {
   min-height: 0;
 }
 
-/* 城鎮沒有 canvas，左側讓出 BuffBar 的欄位寬度，讓 buff 位置與探索時一致 */
-.stage-area > .town-view {
-  padding-left: 52px;
+/* 城鎮現在是一張地圖：TownView 只剩浮在地圖上的設施快捷列與設施面板。
+   容器本身不可吃滑鼠事件 —— 它有寬度也有高度，會變成一塊透明板子壓在地圖上，
+   玩家就再也點不到地圖與 NPC。只有裡面的按鈕與面板收滑鼠。 */
+.town-view {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
 }
 
-.bottom-bar {
+.town-view > * {
+  pointer-events: auto;
+}
+
+/* --- HUD 島的內容樣式 --- */
+
+/* 左上角色卡 */
+.hud-topleft .status-panel {
+  width: 340px;
+  background: rgba(18, 18, 30, 0.82);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(6px);
+  padding: 8px 12px;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 右上：地圖選擇器。寬度必須跟下拉選單一致（340px），
+   否則兩者接縫對不齊，選單還會頂出視窗右緣。 */
+.hud-topright .map-selector {
+  width: 340px;
+}
+
+/* --- 戰鬥日誌視窗：預設左下角，可拖曳，背景透明度可調 --- */
+.combat-log-window {
+  bottom: 12px;
+  left: 12px;
+  flex-direction: column;
+  gap: 0;
+  --log-alpha: 0.8;
+}
+
+/* 拖過之後改用 left/top（inline style），要把預設的 bottom 收掉 */
+.combat-log-window.is-moved {
+  bottom: auto;
+}
+
+.combat-log-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  background: rgba(18, 18, 30, calc(var(--log-alpha) + 0.1));
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+/* 視窗設定：標題列只放一顆 ⚙，選項全部收在下拉選單裡 */
+.log-menu-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.log-menu-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.log-menu-btn:hover,
+.log-menu-btn.open {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.log-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.log-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.log-menu-value {
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.log-opacity-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.log-menu-action {
+  padding: 4px 8px;
+  font-size: var(--fs-xs);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.log-menu-action:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.bottom-log-wrap {
+  position: relative;
+  width: 420px;
+  height: 160px;
+  display: flex;
+}
+
+/* 三段大小：視窗釘在左下角，長高就是往上長，蓋在遊戲畫面上 */
+.bottom-log-wrap.log-size-1 {
+  height: 40vh;
+}
+
+.bottom-log-wrap.log-size-2 {
+  height: 70vh;
+}
+
+.combat-log.bottom-log {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: rgba(18, 18, 30, var(--log-alpha));
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  backdrop-filter: blur(4px);
+}
+
+/* 底部中央：探索控制在快捷格上方 */
+.hud-bottomcenter .explore-bar {
+  background: rgba(18, 18, 30, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.hud-bottomcenter .quick-slot-bar {
+  background: rgba(18, 18, 30, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+/* 右下面板按鈕：排成 3×2，跟參考圖一樣是方格區塊 */
+.hud-bottomright .panel-dock {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: rgba(18, 18, 30, 0.82);
+  backdrop-filter: blur(4px);
 }
 
 /* --- Collapsible Sections --- */
@@ -344,7 +542,7 @@ button.active {
   align-items: baseline;
 }
 
-/* 防禦值靠右，與名稱/職業/等級同一列 */
+/* 被動數值靠右，與名稱/職業/等級同一列 */
 .char-header .defense-value {
   margin-left: auto;
 }
@@ -367,15 +565,29 @@ button.active {
   color: var(--accent-gold);
 }
 
-/* --- Resource Bars（HP / MP / EXP 三條並排） --- */
+/* --- Resource Bars（HP → MP → EXP → 負重，四列由上往下堆疊，§ 34.3） --- */
 .bars {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* 負重那一列右邊接防禦值：防禦是被動數值，不值得自己佔一列 */
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar-row .bar {
+  flex: 1 1 auto;
 }
 
 .bar {
   position: relative;
-  flex: 1;
+  /* 直向堆疊時不可用 flex: 1：flex-basis 0 會讓四條在自動高度的容器裡塌掉 */
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
   height: 20px;
   background: var(--bg-inset);
@@ -419,6 +631,14 @@ button.active {
 .hp-bar .bar-fill { background: var(--hp-bar); }
 .mp-bar .bar-fill { background: var(--mp-bar); }
 .exp-bar .bar-fill { background: var(--exp-bar); }
+
+/* 負重：70% 起轉黃、90% 起轉橘、超過上限轉紅並停止攻擊與施法 */
+.weight-bar.is-normal .bar-fill { background: var(--weight-bar); }
+.weight-bar.is-warning .bar-fill { background: var(--weight-bar-warning); }
+.weight-bar.is-critical .bar-fill { background: var(--weight-bar-critical); }
+.weight-bar.is-over .bar-fill { background: var(--weight-bar-over); }
+.weight-bar.is-over span { color: #FCA5A5; font-weight: 700; }
+
 
 .defense-value {
   font-size: var(--fs-xs);
@@ -498,6 +718,7 @@ button.active {
   top: 100%;
   left: 0;
   right: 0;
+  /* 寬度由觸發鈕決定（left/right 撐開），不可另設 min-width —— 那會讓選單比鈕寬、接縫錯開 */
   z-index: 100;
   background: var(--bg-panel);
   border: 1px solid var(--accent-primary);
@@ -769,14 +990,13 @@ button.active {
 .log-loot { color: var(--accent-success); }
 
 /* --- Map Canvas --- */
+/* 滿版底層：不再是有邊框的方塊 */
 .map-canvas-container {
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
   position: relative;
-  border-radius: var(--radius-md);
   overflow: hidden;
   background: #1a1a2e;
-  border: 1px solid var(--border-subtle);
 }
 
 .map-canvas-stage {
@@ -1048,23 +1268,24 @@ button.active {
 /* --- 怪物列表 HUD（24-buff-debuff.md § 24.8.3） --- */
 .monster-list-overlay {
   position: absolute;
-  top: 8px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 92%;
   /* 預設不吃滑鼠事件，避免擋住地圖點擊移動 */
   pointer-events: none;
 }
 
+/* 滿版畫面下 116px 太小了，放大一階（§ 34.x） */
 .monster-card {
-  width: 116px;
-  padding: 4px 6px 5px;
-  border-radius: var(--radius-sm);
+  width: 168px;
+  padding: 6px 10px 8px;
+  border-radius: var(--radius-md);
   background: rgba(18, 18, 43, 0.82);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
@@ -1084,9 +1305,9 @@ button.active {
 }
 
 .monster-card-name {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-base);
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.3;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -1099,9 +1320,9 @@ button.active {
 }
 
 .monster-card-hp {
-  margin-top: 3px;
-  height: 5px;
-  border-radius: 3px;
+  margin-top: 5px;
+  height: 8px;
+  border-radius: 4px;
   background: var(--bg-inset);
   overflow: hidden;
 }
@@ -1160,30 +1381,29 @@ button.active {
   display: none;
 }
 
-.combat-log.compact {
-  flex: 0 0 120px;
-  max-height: 120px;
-}
 
+/* 放大的日誌：錨在底部日誌自己的位置往上長，蓋到 canvas 上。
+   左右維持日誌本來的寬度，不可拉成整條橫幅。 */
 .combat-log-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 10;
+  z-index: 30;
 }
 
 .combat-log-overlay.log-size-1 {
-  height: 45%;
+  height: 40vh;
 }
 
 .combat-log-overlay.log-size-2 {
-  height: 75%;
+  height: 70vh;
 }
 
 .combat-log-overlay .combat-log {
   overflow-y: auto;
-  background: rgba(18, 18, 30, 0.95);
+  /* 不透明：底下就是同一份日誌，半透明會透出重影 */
+  background: #12121e;
   border-radius: var(--radius-md);
   padding: 10px 12px;
   font-family: var(--font-mono);
@@ -1196,6 +1416,8 @@ button.active {
   position: absolute;
   bottom: 6px;
   right: 6px;
+  /* 放大時要留在最上層，不然自己會被放大的日誌蓋掉 */
+  z-index: 31;
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
@@ -1207,8 +1429,7 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 11;
-  opacity: 0.7;
+  opacity: 0.85;
   transition: opacity var(--transition-fast);
 }
 
@@ -1617,10 +1838,10 @@ button.active {
 .town-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
 }
 
 .town-name {
@@ -1639,6 +1860,7 @@ button.active {
 .town-npc-bar {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 4px;
   margin-bottom: 10px;
 }
@@ -1705,6 +1927,7 @@ button.active {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
+
 .town-modal-header {
   display: flex;
   justify-content: space-between;
@@ -1736,16 +1959,6 @@ button.active {
   padding: 12px 16px;
   overflow-y: auto;
   flex: 1;
-}
-
-.town-log {
-  flex: 1;
-  overflow-y: auto;
-  margin-top: 8px;
-  padding: 8px;
-  background: var(--bg-inset);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
 }
 
 /* --- Shop Panels --- */
@@ -3424,11 +3637,8 @@ button.active {
 }
 
 /* --- BuffBar：stage 左上垂直往下長（§ 24.8.1 / § 24.8.2） --- */
+/* 接在左上角色卡下面（HUD 島自己負責定位，這裡不再絕對定位） */
 .buff-bar {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 6;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3667,14 +3877,11 @@ button.active {
   color: var(--text-primary);
 }
 
-/* --- Game Toolbar (Wiki + Logout) --- */
+/* --- Game Toolbar (Wiki + Logout)：頂部 HUD 右側，與地圖選擇器同一列（§ 32.3） --- */
 .game-toolbar {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
   display: flex;
   gap: 8px;
-  z-index: 100;
+  flex-shrink: 0;
 }
 
 .btn-wiki {
@@ -4298,4 +4505,10 @@ button.active {
   font-size: 11px;
   opacity: 0.85;
   margin-top: 1px;
+}
+
+/* 超重時的負重數值（`20-attributes.md` § 20.7）——超重會擋下攻擊與魔法，要顯眼 */
+.stat-overweight {
+  color: #EF4444;
+  font-weight: 700;
 }

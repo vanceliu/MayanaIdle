@@ -26,7 +26,8 @@ export type WeaponType =
   | 'dualBlade'
   | 'claw'
   | 'shield'
-  | 'magicBook';
+  | 'magicBook'
+  | 'armGuard';
 
 /** 飾品部位（項鍊／戒指）——詞綴分類與強化規則與一般防具不同 */
 export const ACCESSORY_SLOTS: EquipSlot[] = ['necklace', 'ring1', 'ring2'];
@@ -40,11 +41,12 @@ export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' |
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
 
 /**
- * 裝備階級（`06-equipment-acquire.md` § 6A.8）。單一刻度取代舊的 shopTier／craftTier。
+ * 裝備階級（`06-equipment-balance.md` § 6A.8）。單一刻度取代舊的 shopTier／craftTier。
  *
  * | 分組 | Tier | 取得 | 詞綴上限 |
  * |---|---|---|---|
- * | 低階 | 1~3 | 商店可買 | T3 |
+ * | 低階 | 1 | 新手裝（創角直接穿上，不販售） | T3 |
+ * | 低階 | 2~3 | 商店可買 | T3 |
  * | 中階 | 4~5 | 鐵匠製作 | T5 |
  * | 高階 | 6 | 僅一般怪物掉落 | T7 |
  * | 高階 | 7 | 僅 Boss 掉落 | T7 |
@@ -56,11 +58,13 @@ export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
  */
 export type EquipmentTier = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-/** 商店可販售的最高裝備階級（低階 = T1~T3） */
+/** 商店販售的階級範圍。T1 是新手裝專屬階級，商店從 T2 開始賣 */
+export const MIN_SHOP_TIER = 2;
 export const MAX_SHOP_TIER = 3;
 
 /** 鐵匠可製作的最高裝備階級（中階 = T4~T5）。T6/T7 為掉落限定 */
-export const MAX_CRAFT_TIER = 5;
+/** 鐵匠可製作的最高階級。T6 有一半開放製作（仍照掉），T7 僅 Boss 掉落 */
+export const MAX_CRAFT_TIER = 6;
 
 /** 僅一般怪物掉落的階級 */
 export const MONSTER_DROP_ONLY_TIER = 6;

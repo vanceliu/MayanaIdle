@@ -45,7 +45,8 @@ describe('starterNpc', () => {
       expect(names).toContain('新手鎖甲');
       expect(names).toContain('新手鐵手甲');
       expect(names).toContain('新手鐵靴');
-      expect(names).toHaveLength(6);
+      expect(names).toContain('皮腰帶');
+      expect(names).toHaveLength(7);
     });
 
     it('returns correct gear for elf', () => {
@@ -55,7 +56,8 @@ describe('starterNpc', () => {
       expect(names).toContain('新手皮甲');
       expect(names).toContain('新手皮手套');
       expect(names).toContain('新手皮靴');
-      expect(names).toHaveLength(5);
+      expect(names).toContain('皮腰帶');
+      expect(names).toHaveLength(6);
     });
 
     it('returns correct gear for elementalist', () => {
@@ -66,7 +68,8 @@ describe('starterNpc', () => {
       expect(names).toContain('新手法師長袍');
       expect(names).toContain('新手法師手套');
       expect(names).toContain('新手布鞋');
-      expect(names).toHaveLength(6);
+      expect(names).toContain('皮腰帶');
+      expect(names).toHaveLength(7);
     });
 
     it('returns correct gear for priest', () => {
@@ -77,7 +80,8 @@ describe('starterNpc', () => {
       expect(names).toContain('新手法師長袍');
       expect(names).toContain('新手法師手套');
       expect(names).toContain('新手布鞋');
-      expect(names).toHaveLength(6);
+      expect(names).toContain('皮腰帶');
+      expect(names).toHaveLength(7);
     });
 
     it('returns correct gear for thief', () => {
@@ -87,14 +91,15 @@ describe('starterNpc', () => {
       expect(names).toContain('新手盜賊皮衣');
       expect(names).toContain('新手護腕');
       expect(names).toContain('新手疾風靴');
-      expect(names).toHaveLength(5);
+      expect(names).toContain('皮腰帶');
+      expect(names).toHaveLength(6);
     });
   });
 
   describe('claimStarterGear', () => {
     it('claims full set when character has none', async () => {
       const result = await claimStarterGear(1, 'knight', 5, []);
-      expect(result.claimed).toHaveLength(6);
+      expect(result.claimed).toHaveLength(7);
       expect(result.alreadyOwned).toHaveLength(0);
       expect(result.claimed.every(e => e.isStarterGear)).toBe(true);
     });
@@ -103,7 +108,7 @@ describe('starterNpc', () => {
       const firstClaim = await claimStarterGear(1, 'knight', 5, []);
       const ownedSome = firstClaim.claimed.slice(0, 3);
       const result = await claimStarterGear(1, 'knight', 5, ownedSome);
-      expect(result.claimed).toHaveLength(3);
+      expect(result.claimed).toHaveLength(4);
       expect(result.alreadyOwned).toHaveLength(3);
     });
 
@@ -116,7 +121,7 @@ describe('starterNpc', () => {
       const firstClaim = await claimStarterGear(1, 'knight', 5, []);
       const result = await claimStarterGear(1, 'knight', 5, firstClaim.claimed);
       expect(result.claimed).toHaveLength(0);
-      expect(result.alreadyOwned).toHaveLength(6);
+      expect(result.alreadyOwned).toHaveLength(7);
     });
   });
 

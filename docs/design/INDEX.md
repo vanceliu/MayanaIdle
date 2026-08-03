@@ -13,6 +13,7 @@
 | 要實作的功能 | 必讀文件 | 章節 |
 |---|---|---|
 | 背包系統限制（容量/負重/互動/顯示） | `35-inventory-constraints.md` | 全文 |
+| **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
 | 裝備品質提升 | `08-quality.md` | 全文 |
@@ -25,6 +26,17 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | 裝備數量分配（各類型各階梯幾把） | `06-equipment-acquire.md` | § 6A.8.1~6A.8.3 |
 | 武器/防具素質曲線（TTK 校準） | `06-equipment-acquire.md` | § 6A.8.4 |
+| **防具防禦目標（全套 +4 的總防禦）** | `06-equipment-acquire.md` | § 6A.8.7 |
+| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-acquire.md` | § 6A.8.7 |
+| **三件的定位（防禦/續戰/屬性型）** | `06-equipment-acquire.md` | § 6A.8.8 |
+| **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
+| **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-balance.md` § 6A.8.10、`35-inventory-constraints.md` § 35.1 | — |
+| **製作材料分配規則** | `06-equipment-acquire.md` | § 6A.3 |
+| 製作費（T4 5萬/T5 10萬/T6 20萬） | `06-equipment-acquire.md` | § 6A.3 |
+| **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-acquire.md` | § 6A.8.11 |
+| 新手裝（T1，創角直接穿上） | `06-equipment-balance.md` § 6A.8.0、`systems/starterNpc.ts` | — |
+| 回血/回魔/HP/MP 的部位上限 | `06-equipment-acquire.md` | § 6A.8.8 |
+| 額外屬性走向（各路線各部位） | `06-equipment-acquire.md` | § 6A.8.8 |
 | 職業效率反向補償（武器數值） | `06-equipment-acquire.md` | § 6A.8.5 |
 | 武器走向（均衡/高攻擊/命中/屬性型） | `06-equipment-acquire.md` | § 6A.8.4a |
 | T7 招牌武器（每職業 3 把） | `06-equipment-acquire.md` | § 6A.8.2b |
@@ -115,9 +127,10 @@
 |---|---|---|
 | `06-equipment.md` | 裝備核心系統 | 部位、武器類型、**強化規則**、壞刀 |
 | `06-equipment-acquire.md` | 裝備取得 | 商店購買/鐵匠製作、價格表 |
+| `06-equipment-balance.md` | 裝備數量與素質設計 | 數量分配、防禦目標、定位、腰帶/飾品階梯（§ 6A.8.x）|
 | `06-equipment-weapons.md` | 武器模板索引 | ⚠️ **逐把清單已由產生器取代**，見 `06-equipment-acquire.md` § 6A.4 |
-| `06-equipment-weapons-*.md` | 各類型武器子文件（12 份） | ⚠️ 同上，數量與素質以 `equipmentSeeds.ts` 為準 |
-| `06-equipment-armor.md` | 防具模板 | 全防具清單、屬性 |
+| `06-equipment-weapons-*.md` | 各類型武器子文件（14 份，含盾牌/魔導書/臂甲） | ⚠️ 同上，數量與素質以 `equipmentSeeds.ts` 為準 |
+| `06-equipment-armor.md` | 防具模板 | ⚠️ **由 `generateArmorDocs.mts` 從 seed 產生**，勿手改 |
 | `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
 | `08-quality.md` | 品質系統 | 0%~20%、品質石、影響範圍 |
 
@@ -196,7 +209,7 @@
        ↕
 06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md（武器強度 vs 怪物防禦）
        ↕
-06-equipment-acquire.md § 6A.8（數量分配＋素質曲線）
+06-equipment-balance.md` § 6A.8（數量分配＋素質曲線）
   → client/scripts/generateWeaponSeeds.mts（依 § 6A.8 三張表產生武器 seed）
   ← 由 client/scripts/calibrateTTK.mts 反推；改動下列任一者需重跑校準：
     21-combat-formula.md / 20-attributes.md / 04-character.md / 05-skill.md

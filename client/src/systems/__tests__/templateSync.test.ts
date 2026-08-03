@@ -16,14 +16,14 @@ describe('templateSync - resolveEquipment slot handling', () => {
   });
 
   it('preserves ring2 slot and does not overwrite with template slot', async () => {
-    const ringTemplate = await db.equipmentTemplates.where('name').equals('銅戒指').first();
+    const ringTemplate = await db.equipmentTemplates.where('name').equals('生命戒指').first();
     expect(ringTemplate).toBeDefined();
     expect(ringTemplate!.slot).toBe('ring1');
 
     const instance: EquipmentInstance = {
       id: 999,
       templateId: ringTemplate!.id!,
-      name: '銅戒指',
+      name: '生命戒指',
       type: 'armor',
       slot: 'ring2',
       isTwoHanded: false,
@@ -39,7 +39,7 @@ describe('templateSync - resolveEquipment slot handling', () => {
   });
 
   it('falls back to template slot when instance has no slot', async () => {
-    const ringTemplate = await db.equipmentTemplates.where('name').equals('銅戒指').first();
+    const ringTemplate = await db.equipmentTemplates.where('name').equals('生命戒指').first();
     expect(ringTemplate).toBeDefined();
 
     const instance = {
@@ -57,13 +57,13 @@ describe('templateSync - resolveEquipment slot handling', () => {
   });
 
   it('two rings with different slots both resolve correctly', async () => {
-    const ringTemplate = await db.equipmentTemplates.where('name').equals('銅戒指').first();
+    const ringTemplate = await db.equipmentTemplates.where('name').equals('生命戒指').first();
     expect(ringTemplate).toBeDefined();
 
     const ring1: EquipmentInstance = {
       id: 100,
       templateId: ringTemplate!.id!,
-      name: '銅戒指',
+      name: '生命戒指',
       type: 'armor',
       slot: 'ring1',
       isTwoHanded: false,
@@ -77,7 +77,7 @@ describe('templateSync - resolveEquipment slot handling', () => {
     const ring2: EquipmentInstance = {
       id: 101,
       templateId: ringTemplate!.id!,
-      name: '銅戒指',
+      name: '生命戒指',
       type: 'armor',
       slot: 'ring2',
       isTwoHanded: false,
@@ -96,7 +96,7 @@ describe('templateSync - resolveEquipment slot handling', () => {
   });
 
   it('non-ring equipment resolves slot from template when missing', async () => {
-    const armorTemplate = await db.equipmentTemplates.where('name').equals('皮甲').first();
+    const armorTemplate = await db.equipmentTemplates.where('name').equals('新手皮甲').first();
     expect(armorTemplate).toBeDefined();
 
     const instance = {

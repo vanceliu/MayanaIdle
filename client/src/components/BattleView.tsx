@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
-import { CombatLogPanel } from './CombatLogPanel';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { PixiGame } from './PixiGame';
@@ -11,7 +10,6 @@ export function BattleView() {
   const phase = useGameStore(s => s.phase);
   const searchMode = useGameStore(s => s.searchMode);
   const character = useGameStore(s => s.character);
-  const [logSize, setLogSize] = useState<0 | 1 | 2>(0); // 0=compact, 1=medium, 2=large
 
   const currentMap = useMapControlStore(s => s.currentMap);
   const loadMap = useMapControlStore(s => s.loadMap);
@@ -102,23 +100,7 @@ export function BattleView() {
         <PixiGame />
       )}
 
-      <CombatLogPanel className="compact" />
-
-      {currentMap && logSize > 0 && (
-        <div className={`combat-log-overlay log-size-${logSize}`}>
-          <CombatLogPanel />
-        </div>
-      )}
-
-      {currentMap && (
-        <button
-          className="log-resize-btn"
-          onClick={() => setLogSize(s => ((s + 1) % 3) as 0 | 1 | 2)}
-          title="調整 Log 大小"
-        >
-          {logSize === 0 ? '▲' : logSize === 1 ? '▲▲' : '▼'}
-        </button>
-      )}
+      {/* 日誌與它的放大按鈕都在底部列（§ 32.3），這裡只剩地圖 */}
     </div>
   );
 }

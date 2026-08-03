@@ -104,12 +104,22 @@ interface MapData {
   theme: MapTheme;       // 環境主題，決定配色（必填）
   tiles: number[][];     // 2D 陣列 [y][x]，每格對應地形代碼
   spawnPoint: Position;  // 玩家首次進入地圖時的起始位置
+  npcs?: MapNpc[];       // 只有城鎮地圖會有
+}
+
+/** 城鎮 NPC：站在可通行格上，玩家走到相鄰格才互動 */
+interface MapNpc {
+  facility: string;      // 對應 TownView 的設施 ID
+  name: string;
+  icon: string;          // 沿用設施列的 emoji
+  x: number;
+  y: number;
 }
 
 type MapTheme =
   | 'grassland' | 'highland' | 'snow' | 'ivory' | 'forest' | 'swamp' | 'cave'
   | 'prison' | 'battlefield' | 'ancient' | 'dragon'
-  | 'tower' | 'frost-tower' | 'lava-tower';
+  | 'tower' | 'frost-tower' | 'lava-tower' | 'town';
 
 interface Position { x: number; y: number; }
 ```
@@ -130,6 +140,8 @@ interface Position { x: number; y: number; }
 6. `spawnPoint` 在範圍內、可通行、且必須是**可生成格**
 7. **所有可通行格都必須能從 `spawnPoint` 走到**（八方向、含防切牆角判定）
 8. 至少存在一個可生成格
+9. `npcs`（若有）：每個 NPC 的 `facility`／`name`／`icon` 非空、座標在範圍內、
+   站在**可通行且走得到**的格子上，且不可兩個 NPC 站同一格
 
 存檔座標（`mapPositionX` / `mapPositionY`）載入時同樣重新驗證範圍與可通行性，失效則回到 `spawnPoint`。
 
@@ -367,7 +379,8 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 
 ## 38.10 地圖清單與尺寸規範
 
-目前共 **50** 張靜態地圖，覆蓋 `09-dungeon.md` 定義的全部區域與樓層。
+目前共 **53** 張靜態地圖：50 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
+＋ **3 張城鎮**（`neutral-town`／`elsarth-town`／`varden-town`，皆 30×20，主題 `town`）。
 
 | 主題 | 地圖 | 尺寸 |
 |---|---|---|
@@ -704,9 +717,20 @@ Boss 層一律使用「空曠」密度，中央保留 **≥ 8×8 開闊空地**�
   遇到衝突時放寬可通行率，不要犧牲安全檢查
 
 
+### 城鎮地圖的例外
+
+城鎮是安全區（`13-town.md` § 13.1），本節（§ 38.12）與 § 38.11 的密度／叢聚／主導地形／
+生怪比例規範**一律不適用** —— 那整套是為了怪物生成與戰鬥走位而訂的。城鎮地圖：
+
+- 仍必須通過 § 38.4 的**載入驗證**（外圍邊界、連通性、`spawnPoint`、NPC 檢查）
+- 不進 `MAP_DESIGN_PROFILES`，`validateMapSafety` 不檢查它們
+- 佈局用固定街區（中央十字大街 + 兩排房舍 + NPC 站門口），由
+  `client/scripts/makeTownMaps.mts` 產生；**改座標請改腳本後重跑**，不要手改 JSON
+- `mapMonsterStore.spawnTick` 在 `theme === 'town'` 時直接返回，永遠不生怪
+
 ### 產出方式
 
-**全部地圖逐張手繪**。地形分佈的好壞是視覺判斷，
+**野外與副本地圖逐張手繪**（城鎮見上方例外）。地形分佈的好壞是視覺判斷，
 即使 profile 完全吻合，生成器產出的分佈實際看起來仍是散亂的
 （樹排成果園格線、石頭全擠成一大塊），因此**不使用地圖生成器**。
 

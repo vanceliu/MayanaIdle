@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, getAffixTierTable, rollAffixValue, getAffixPoolForSlot, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
+import { AFFIX_DEFINITIONS, getAffixTierTable, generateAffixes, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
@@ -43,19 +43,21 @@ function getStability(item: EquipmentInstance): number {
   return 4;
 }
 
+/**
+ * 製作品的詞綴（§ 6A.6）：4 個、Tier **T1~T5 均等隨機**、不出特殊詞綴。
+ *
+ * 這裡走與商店／掉落同一支 `generateAffixes`，只是帶不同選項。
+ * 改版前這裡是另一份複製的實作，規則一樣但程式碼分開，很容易單邊改動就走鐘。
+ *
+ * **這也是「製作版 T6」與「掉落版 T6」的差別所在**：模板素質相同，
+ * 但掉落版可以帶 T6/T7 詞綴與特殊詞綴，製作版最高只有 T5、且不會有特殊詞綴。
+ */
 function generateCraftAffixes(category: AffixCategory): Affix[] {
-  const pool = getAffixPoolForSlot(category);
-  const available = [...pool];
-  const affixes: Affix[] = [];
-  const slotCount = Math.min(4, available.length);
-  for (let i = 0; i < slotCount; i++) {
-    const idx = Math.floor(Math.random() * available.length);
-    const def = available.splice(idx, 1)[0];
-    const tier = Math.floor(Math.random() * 5) + 1;
-    const value = rollAffixValue(tier, def.type);
-    affixes.push({ type: def.type, tier, value });
-  }
-  return affixes;
+  return generateAffixes(category, 1, 4, false, {
+    maxTier: CRAFT_MAX_AFFIX_TIER,
+    uniformTier: true,
+    noSpecialAffix: true,
+  });
 }
 
 export function TownBlacksmith() {
@@ -506,6 +508,7 @@ export function TownBlacksmith() {
               { key: 'claw', label: '鋼爪' },
               { key: 'shield', label: '盾牌' },
               { key: 'magicBook', label: '魔導書' },
+              { key: 'armGuard', label: '臂甲' },
               { key: 'armor-helmet', label: '頭盔' },
               { key: 'armor-chest', label: '胸甲' },
               { key: 'armor-gloves', label: '手套' },

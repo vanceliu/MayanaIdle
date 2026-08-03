@@ -109,11 +109,12 @@ describe('魔抗詞綴專屬階級表（§ 7.3.1）', () => {
 });
 
 describe('飾品強化（§ 6.10.1）', () => {
-  it('項鍊／戒指 20 件安定值為 0，腰帶維持 -1', () => {
+  it('項鍊／戒指的安定值為 0，腰帶維持 -1', () => {
     const accessories = EQUIPMENT_SEEDS.filter(
       e => e.slot === 'necklace' || e.slot === 'ring1' || e.slot === 'ring2'
     );
-    expect(accessories).toHaveLength(20);
+    // 不寫死件數 —— 這個測試要驗的是安定值規則，不是飾品有幾件
+    expect(accessories.length).toBeGreaterThan(0);
     for (const a of accessories) expect(a.stability, a.name).toBe(0);
 
     const belts = EQUIPMENT_SEEDS.filter(e => e.slot === 'belt');

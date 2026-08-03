@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { CombatLogPanel } from './CombatLogPanel';
+import { useTownStore } from '../stores/townStore';
 import { getRegion } from '../models/mapData';
 import { GeneralStore } from './town/GeneralStore';
 import { Inn } from './town/Inn';
@@ -56,7 +55,9 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
 
 export function TownView() {
   const char = useGameStore(s => s.character);
-  const [facility, setFacility] = useState<TownFacility>('list');
+  const facility = useTownStore(s => s.facility);
+  const openFacility = useTownStore(s => s.openFacility);
+  const closeFacility = useTownStore(s => s.closeFacility);
 
   if (!char) return null;
 
@@ -77,7 +78,7 @@ export function TownView() {
           <button
             key={f.id}
             className={`town-npc-btn ${facility === f.id ? 'active' : ''}`}
-            onClick={() => setFacility(facility === f.id ? 'list' : f.id)}
+            onClick={() => (facility === f.id ? closeFacility() : openFacility(f.id))}
             title={f.name}
           >
             <span className="npc-icon">{f.icon}</span>
@@ -87,11 +88,11 @@ export function TownView() {
       </div>
 
       {facility !== 'list' && (
-        <div className="town-modal-overlay" onClick={() => setFacility('list')}>
+        <div className="town-modal-overlay" onClick={closeFacility}>
           <div className="town-modal" onClick={e => e.stopPropagation()}>
             <div className="town-modal-header">
               <span>{[...FACILITIES, STARTER_NPC_FACILITY].find(f => f.id === facility)?.name}</span>
-              <button className="town-modal-close" onClick={() => setFacility('list')}>✕</button>
+              <button className="town-modal-close" onClick={closeFacility}>✕</button>
             </div>
             <div className="town-modal-body">
               <FacilityContent facility={facility} />
@@ -99,8 +100,6 @@ export function TownView() {
           </div>
         </div>
       )}
-
-      <CombatLogPanel className="town-log" emptyText="目前沒有戰鬥紀錄" />
     </div>
   );
 }

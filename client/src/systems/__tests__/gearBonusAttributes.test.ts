@@ -66,22 +66,32 @@ describe('裝備額外屬性 seed 資料一致性', () => {
   it('bonusAttributes 與 bonusStats 顯示字串完全對應', () => {
     const bad: string[] = [];
     for (const t of withEither) {
-      const m = /^(.+?)\+(\d+)$/.exec(t.bonusStats!);
-      if (!m) { bad.push(`${t.name}：無法解析 ${t.bonusStats}`); continue; }
-      const key = ZH_TO_KEY[m[1]];
-      if (!key) { bad.push(`${t.name}：未知屬性 ${m[1]}`); continue; }
-      const expected = { [key]: Number(m[2]) };
-      expect(t.bonusAttributes, t.name).toEqual(expected);
+      // 格式為「力量+2」或「力量+2、敏捷-1」（一正一負，見 § 99.1 第 35 條）
+      const expected: Record<string, number> = {};
+      for (const part of t.bonusStats!.split('、')) {
+        const m = /^(.+?)([+-]\d+)$/.exec(part);
+        if (!m) { bad.push(`${t.name}：無法解析 ${part}`); break; }
+        const key = ZH_TO_KEY[m[1]];
+        if (!key) { bad.push(`${t.name}：未知屬性 ${m[1]}`); break; }
+        expected[key] = Number(m[2]);
+      }
+      if (Object.keys(expected).length) expect(t.bonusAttributes, t.name).toEqual(expected);
     }
     expect(bad).toEqual([]);
   });
 
-  it('遵守 99-ai-constraints 第 35 條：單一屬性、最多 +2', () => {
+  it('遵守 99-ai-constraints 第 35 條：一正一負、正 ≤ +2、負 ≥ −2', () => {
     for (const t of withEither) {
-      const entries = Object.entries(t.bonusAttributes!);
-      expect(entries.length, `${t.name} 不可複合屬性`).toBe(1);
-      expect(entries[0][1], `${t.name} 額外屬性上限 +2`).toBeLessThanOrEqual(2);
-      expect(entries[0][1], `${t.name} 額外屬性必須為正`).toBeGreaterThan(0);
+      const values = Object.values(t.bonusAttributes!) as number[];
+      const positives = values.filter(v => v > 0);
+      const negatives = values.filter(v => v < 0);
+      expect(values.length, `${t.name} 最多兩個屬性`).toBeLessThanOrEqual(2);
+      expect(positives.length, `${t.name} 必須恰有一個正屬性`).toBe(1);
+      expect(negatives.length, `${t.name} 最多一個負屬性`).toBeLessThanOrEqual(1);
+      expect(positives[0], `${t.name} 正屬性上限 +2`).toBeLessThanOrEqual(2);
+      if (negatives.length) {
+        expect(negatives[0], `${t.name} 負屬性下限 −2`).toBeGreaterThanOrEqual(-2);
+      }
     }
   });
 });

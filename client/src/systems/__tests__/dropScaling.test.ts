@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { pickEquipmentCategory, scaleDropValue } from '../drops';
 import { DROP_TABLE_SEEDS } from '../../db/seed/dropSeeds';
-import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { isWeaponSlot } from '../../models/equipment';
 
 describe('裝備掉落的類別抽取（§ 27.3）', () => {
@@ -38,15 +37,18 @@ describe('裝備掉落的類別抽取（§ 27.3）', () => {
     expect(pickEquipmentCategory(onlyArmors)).toHaveLength(2);
   });
 
-  it('迴歸：裝備Tier 3 池武器遠多於防具，混合均勻抽會嚴重偏斜', () => {
-    // § 6A.8：階級改以 tier 表示，T3 = 舊的 shop/high
-    const pool = EQUIPMENT_SEEDS.filter(t => t.tier === 3);
-    const weapons = pool.filter(t => isWeaponSlot(t.slot)).length;
-    const armors = pool.length - weapons;
-    expect(weapons).toBeGreaterThan(armors * 5);   // 確認偏斜確實存在
-    // 類別抽取後兩側機率相等，與數量無關
+  it('類別抽取後兩側機率相等，與武器/防具數量比無關', () => {
+    // 這條原本綁在「T3 池武器 16 vs 防具 1」的偏斜上，但防具補齊後偏斜已消失。
+    // 真正要保護的是 pickEquipmentCategory 的行為：不論數量比為何，
+    // 都先 1/2 決定武器或防具，再於該類別內均勻抽 —— 直接對混合池均勻抽會嚴重偏斜。
+    const skewed = [
+      ...Array.from({ length: 50 }, (_, i) => ({ slot: 'rightHand', name: `w${i}` })),
+      { slot: 'chest', name: 'a0' },
+    ];
     vi.spyOn(Math, 'random').mockReturnValue(0.8);
-    expect(pickEquipmentCategory(pool).every(t => !isWeaponSlot(t.slot))).toBe(true);
+    expect(pickEquipmentCategory(skewed).every(t => !isWeaponSlot(t.slot as any))).toBe(true);
+    vi.spyOn(Math, 'random').mockReturnValue(0.2);
+    expect(pickEquipmentCategory(skewed).every(t => isWeaponSlot(t.slot as any))).toBe(true);
   });
 });
 

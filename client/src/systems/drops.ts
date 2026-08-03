@@ -102,7 +102,8 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       // § 6A.8：掉落池以裝備階級 tier 比對（取代舊的 craftTier）
       const tier = entry.tier ?? 4;
       const candidates = await db.equipmentTemplates
-        .filter(t => t.tier === tier && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)))
+        .filter(t => t.tier === tier && t.acquireType !== 'starter'
+          && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)))
         .toArray();
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(Math.random() * candidates.length)];

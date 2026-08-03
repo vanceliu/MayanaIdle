@@ -21,6 +21,7 @@ const ARMOR_CATEGORIES = [
   { key: 'ring1', label: '戒指' },
   { key: 'shield', label: '盾牌' },
   { key: 'magicBook', label: '魔導書' },
+  { key: 'armGuard', label: '臂甲' },
 ];
 
 export function ArmorShop() {
@@ -93,6 +94,9 @@ export function ArmorShop() {
 
   function getSellPrice(item: EquipmentInstance): number {
     const template = allTemplates.find(t => t.id === item.templateId);
+    // 新手裝不能賣。`isStarterGear` 是實例旗標（只有從新手指導員領取時才會標），
+    // 創角直接穿上的那套沒有旗標，所以改從模板的 acquireType 判斷。
+    if (template?.acquireType === 'starter') return 0;
     if (template?.buyPrice) return Math.floor(template.buyPrice * 0.5);
     if (template?.craftGold) return Math.floor(template.craftGold * 0.5);
     return 0;
@@ -180,6 +184,7 @@ export function ArmorShop() {
               if (cat.key !== 'all' && !templates.some(t => {
                 if (cat.key === 'shield') return t.type === 'shield';
                 if (cat.key === 'magicBook') return t.type === 'magicBook';
+                if (cat.key === 'armGuard') return t.type === 'armGuard';
                 return t.slot === cat.key;
               })) return null;
               return (
@@ -198,6 +203,7 @@ export function ArmorShop() {
               if (category === 'all') return true;
               if (category === 'shield') return t.type === 'shield';
               if (category === 'magicBook') return t.type === 'magicBook';
+              if (category === 'armGuard') return t.type === 'armGuard';
               return t.slot === category;
             })
             .map(t => (

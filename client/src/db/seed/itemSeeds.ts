@@ -139,7 +139,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 143, name: '百柱塔 91F 通行卷軸', category: 'dungeon', description: '進入百柱塔 91F 所需', weight: 1, icon: 'items/tied-scroll', iconColor: '#A78BFA' },
 
   // === 任務素材 ===
-  { id: 96, name: '任務素材', category: 'material', description: '職業工會素材收集任務用', weight: 1, iconType: 'misc', iconTier: 2 },
+  { id: 96, name: '任務素材', category: 'material', noSell: true, description: '職業工會素材收集任務用', weight: 1, iconType: 'misc', iconTier: 2 },
 
   // === 魔法書 ===
   { id: 97, name: '基礎魔法書', category: 'spellbook', description: '學習 4~5 級魔法', weight: 10, icon: 'items/spell-book', iconColor: '#C4B5FD' },
@@ -176,11 +176,11 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 126, name: '背刺技能書', category: 'spellbook', description: '盜賊職業魔法 5 級：背刺', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
 
   // === 魔法書素材 ===
-  { id: 127, name: '魔法書碎片', category: 'material', description: '合成魔法書用', weight: 5, iconType: 'spellbook-mat', iconTier: 2 },
-  { id: 128, name: '魔法書材料（基礎）', category: 'material', description: '合成基礎魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 2 },
-  { id: 129, name: '魔法書材料（中階）', category: 'material', description: '合成中階魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 3 },
-  { id: 130, name: '魔法書材料（高階）', category: 'material', description: '合成高階魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 4 },
-  { id: 131, name: '魔法書材料（稀有）', category: 'material', description: '合成稀有魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 5 },
+  { id: 127, name: '魔法書碎片', category: 'material', noSell: true, description: '合成魔法書用', weight: 5, iconType: 'spellbook-mat', iconTier: 2 },
+  { id: 128, name: '魔法書材料（基礎）', category: 'material', noSell: true, description: '合成基礎魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 2 },
+  { id: 129, name: '魔法書材料（中階）', category: 'material', noSell: true, description: '合成中階魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 3 },
+  { id: 130, name: '魔法書材料（高階）', category: 'material', noSell: true, description: '合成高階魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 4 },
+  { id: 131, name: '魔法書材料（稀有）', category: 'material', noSell: true, description: '合成稀有魔法書', weight: 5, iconType: 'spellbook-mat', iconTier: 5 },
 
   // === 其他 ===
   { id: 132, name: '磨刀石', category: 'other', description: '修復武器壞刀 1 層', weight: 2, buyPrice: 200 },

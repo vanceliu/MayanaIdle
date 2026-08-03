@@ -8,6 +8,7 @@ import { CharacterCreate } from './components/CharacterCreate';
 import { CharacterSelect } from './components/CharacterSelect';
 import { LegacyArchiveView } from './components/LegacyArchiveView';
 import { StatusPanel } from './components/StatusPanel';
+import { CombatLogWindow } from './components/CombatLogWindow';
 import { DiscardConfirmModal } from './components/DiscardConfirmModal';
 import { BuffBar } from './components/BuffBar';
 import { AttributeUpModal } from './components/AttributeUpModal';
@@ -61,6 +62,8 @@ function GameToolbar() {
 
   return (
     <div className="game-toolbar">
+      {/* 版本號貼在 Wiki 旁邊：回報問題時兩個資訊會一起被截到 */}
+      <BuildLabel />
       <a className="btn-wiki" href="/MayanaIdle/wiki" target="_blank" rel="noopener noreferrer">
         Wiki
       </a>
@@ -192,35 +195,59 @@ function App() {
     );
   }
 
+  return <GameLayout isInTown={isInTown} />;
+}
+
+/**
+ * 遊戲主畫面框架（§ 32.3）。
+ *
+ * 三段式：頂部（地圖選擇 + 探索控制 + 面板按鈕 + 系統按鈕）／stage（純地圖或城鎮）／
+ * 底部（戰鬥日誌 + 狀態面板 + 快捷格）。獨立成元件是為了讓版面測試不必經過 DB 開機流程。
+ */
+export function GameLayout({ isInTown }: { isInTown: boolean }) {
   return (
     <div className="app game-layout">
-      <div className="top-hud">
-        <StatusPanel />
-        <div className="top-hud-nav">
-          <MapNavigation />
-          {/* 城鎮沒有探索控制，但仍保留這一排的位置，讓城鎮與野外的 UI 高度一致 */}
-          <div className={`explore-bar-slot ${isInTown ? 'is-hidden' : ''}`}>
-            <ExploreBar />
-          </div>
-        </div>
-      </div>
-
-      {/* 探索與城鎮共用的 stage 容器，BuffBar 固定浮在左上（§ 24.8.1） */}
+      {/*
+       * 底層：遊戲畫面鋪滿整個視窗，所有 HUD 都疊在它上面。
+       * 城鎮現在也是一張地圖（§ 99.6），所以兩邊都走 BattleView；
+       * TownView 只剩「設施快捷列 + 設施面板」疊在地圖上。
+       */}
       <div className="stage-area">
+        <BattleView />
+      </div>
+      {isInTown && <TownView />}
+
+      {/* 左上：角色狀態卡，buff 接在它下面 */}
+      <div className="hud hud-topleft">
+        <StatusPanel />
         <BuffBar />
-        {isInTown ? <TownView /> : <BattleView />}
       </div>
 
-      <div className="bottom-bar">
+      {/* 右上：只放地圖選擇器（系統按鈕與版本標示都在右下角） */}
+      <div className="hud hud-topright">
+        <MapNavigation />
+      </div>
+
+      {/* 戰鬥日誌：可拖曳的視窗，預設停在左下角 */}
+      <CombatLogWindow />
+
+      {/* 底部中央：探索控制 + 快捷格。城鎮沒有探索控制，但保留位置讓快捷格不位移 */}
+      <div className="hud hud-bottomcenter">
+        <div className={`explore-bar-slot ${isInTown ? 'is-hidden' : ''}`}>
+          <ExploreBar />
+        </div>
         <QuickSlotBar />
-        <PanelDock />
       </div>
 
-      <GameToolbar />
+      {/* 右下：面板按鈕 + 系統按鈕（Wiki／匯出／匯入／登出） */}
+      <div className="hud hud-bottomright">
+        <PanelDock />
+        <GameToolbar />
+      </div>
+
       <PanelWindows />
       <AttributeUpModal />
       <DiscardConfirmModal />
-      <BuildLabel />
     </div>
   );
 }

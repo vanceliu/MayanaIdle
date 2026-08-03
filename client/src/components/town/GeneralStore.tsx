@@ -121,6 +121,8 @@ export function GeneralStore() {
 
   function getSellPrice(name: string): number {
     const def = getItemDefinition(name);
+    // 專用材料（魔法書材料）明確不可販售，不靠「沒填價格」來擋
+    if (def?.noSell) return 0;
     if (def?.sellPrice) return def.sellPrice;
     if (def?.buyPrice) return def.buyPrice;
     return 0;
@@ -159,7 +161,7 @@ export function GeneralStore() {
     return bagItems.filter(item => {
       if (item.type !== 'material') return false;
       const def = getItemDefinition(item.name);
-      if (!def || !def.iconTier) return false;
+      if (!def || !def.iconTier || def.noSell) return false;
       const sellPrice = Math.floor((def.sellPrice ?? def.buyPrice ?? 0) * 0.5);
       if (sellPrice <= 0) return false;
       return def.iconTier <= batchTier;

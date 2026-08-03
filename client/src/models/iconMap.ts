@@ -88,6 +88,7 @@ export const EQUIP_ICON_MAP: Record<string, string> = {
   'staff': 'equipment/wizard-staff',
   'shield': 'equipment/edged-shield',
   'magicBook': 'equipment/book-cover',
+  'armGuard': 'equipment/gloves', // TODO: 缺專屬臂甲圖示，暫用手套
   'helmet': 'equipment/visored-helm',
   'chest': 'equipment/breastplate',
   'belt': 'equipment/armor-vest',

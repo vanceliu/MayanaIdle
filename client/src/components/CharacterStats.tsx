@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { getWeightStatus } from '../systems/weight';
 import { useGameStore } from '../stores/gameStore';
 import { Tooltip } from './Tooltip';
 import { getTotalAttributes, getMagicResist } from '../models/character';
@@ -52,6 +53,7 @@ export function CharacterStats() {
   const char = useGameStore(s => s.character);
   const equippedGear = useGameStore(s => s.equippedGear);
   const activeEffects = useGameStore(s => s.activeEffects);
+  const bagItems = useGameStore(s => s.bagItems);
 
   if (!char) return null;
 
@@ -91,6 +93,9 @@ export function CharacterStats() {
 
   // 攻速：詞綴 + buff + 減速 debuff（與 getPlayerAttackInterval 同一套）
   const attackSpeed = getTotalAttackSpeedPercent(gearList, activeEffects);
+
+  // 負重（§ 20.7）。超重會擋下攻擊與魔法，所以要看得到自己差多少
+  const weight = getWeightStatus(char, gearList, bagItems);
 
   // 防禦：含 buff 固定防禦與詛咒 -20%
   const totalDefense = getEffectiveDefense(gearList, activeEffects, bonuses.defense);
@@ -173,7 +178,7 @@ export function CharacterStats() {
           <StatRow label="魔法抗性" value={<>{magicResist}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速」的機率' }} />
           <StatRow label="迴避率" value={<>{totalDodge}%</>} tip={{ desc: '完全閃避怪物攻擊的機率（傷害歸零）。物理與魔法皆可迴避。', formula: '基礎(一般 5%／盜賊 10%) + AGI每3點+1 + 防禦溢出((防禦-75)/5)', note: '上限 35%，已包含在顯示值內' }} />
           <StatRow label="命中率" value={<>{hitRate}%</>} tip={{ desc: '普通攻擊命中怪物的基準機率。', formula: '80 + AGI每3點+1 + 武器攻擊成功(含強化/2)', note: '實戰另計「等級差」與「怪物迴避率」，最終限縮在 5%~95%。技能必定命中' }} />
-          <StatRow label="格擋率" value={<>{blockRate}%</>} tip={{ desc: '以盾牌擋下攻擊的機率，成功時傷害減半。', formula: '盾牌基礎格擋率 + 格擋率詞綴', note: '未裝備盾牌時為 0。上限 50%。在防禦減傷之後才判定' }} />
+          <StatRow label="格擋率" value={<>{blockRate}%</>} tip={{ desc: '以盾牌或臂甲擋下攻擊的機率，成功時傷害減半。', formula: '副手基礎格擋率 + 格擋率詞綴', note: '未裝備盾牌／臂甲時為 0。上限 50%。在防禦減傷之後才判定' }} />
         </div>
 
         <div className="stat-group">
@@ -188,6 +193,24 @@ export function CharacterStats() {
           <StatRow label="每次回魔" value={mpRegen} tip={{ desc: '每 6 秒自動回復的 MP 量。', formula: 'floor(有效SPI / 2) + 裝備回魔量加總', note: '戰鬥中減半（最低 1）。本遊戲沒有補魔藥水，MP 主要靠此回復' }} />
           <StatRow label="補血效果" value={<>+{healEffect}%</>} tip={{ desc: '提升「治癒類技能」的回復量。', formula: '所有「補血效果」詞綴加總', note: '不影響藥水，也不影響自然回血與聖域的每秒回血' }} />
           <StatRow label="藥水效果" value={<>+{potionEffect}%</>} tip={{ desc: '提升「藥水」的回復量。', formula: '所有「藥水效果」詞綴加總', note: '不影響治癒技能' }} />
+        </div>
+
+        <div className="stat-group">
+          <div className="stat-group-title">負重</div>
+          <StatRow
+            label="負重"
+            value={(
+              <span className={weight.overweight ? 'stat-overweight' : undefined}>
+                {weight.carried} / {weight.capacity}
+                {weight.overweight && ' ⚠'}
+              </span>
+            )}
+            tip={{
+              desc: '身上裝備與背包物品的總重量。超過上限就無法攻擊、無法施放魔法。',
+              formula: '上限 = (有效力量 + 有效體質) × 100 + 腰帶負重加成',
+              note: '超重時仍可移動與回血回魔；每次出手都會在戰鬥記錄顯示一次',
+            }}
+          />
         </div>
       </div>
     </div>

@@ -1,0 +1,70 @@
+import type { Character } from '../models/character';
+import type { EquipmentInstance } from '../models/equipment';
+import { getTotalAttributes } from '../models/character';
+import { getItemDefinition } from '../models/items';
+
+/**
+ * 負重系統（`20-attributes.md` § 20.7）。
+ *
+ * 負重上限 = (有效力量 + 有效體質) × 100 + 腰帶的負重加成
+ *
+ * **超重懲罰：無法攻擊、無法施放魔法**（可以移動、可以回血回魔）。
+ * 判定發生在每次出手時，戰鬥記錄會逐次顯示，讓玩家知道自己為什麼打不出去。
+ */
+
+/** 每點力量／體質提供的負重 */
+const WEIGHT_PER_ATTRIBUTE = 100;
+
+export interface BagItemLike {
+  name: string;
+  amount: number;
+}
+
+/** 負重上限 = (有效力量 + 有效體質) × 100 + 裝備的負重加成 */
+export function getCarryCapacity(
+  character: Character,
+  equippedGear: (EquipmentInstance | null | undefined)[],
+): number {
+  const attrs = getTotalAttributes(character, undefined, equippedGear as (EquipmentInstance | null)[]);
+  const base = (attrs.STR + attrs.VIT) * WEIGHT_PER_ATTRIBUTE;
+  const bonus = equippedGear.reduce((sum, item) => sum + (item?.bonusWeight ?? 0), 0);
+  return base + bonus;
+}
+
+/**
+ * 目前負重 = 裝備重量 + 背包物品重量 × 數量。
+ *
+ * 裝備在身上的東西一樣計重 —— 否則「全部穿起來」就能繞過上限。
+ */
+export function getCarriedWeight(
+  equippedGear: (EquipmentInstance | null | undefined)[],
+  bagItems: BagItemLike[],
+): number {
+  const gear = equippedGear.reduce((sum, item) => sum + (item?.weight ?? 0), 0);
+  const bag = bagItems.reduce(
+    (sum, item) => sum + (getItemDefinition(item.name)?.weight ?? 0) * item.amount,
+    0,
+  );
+  return gear + bag;
+}
+
+export interface WeightStatus {
+  carried: number;
+  capacity: number;
+  overweight: boolean;
+}
+
+export function getWeightStatus(
+  character: Character,
+  equippedGear: (EquipmentInstance | null | undefined)[],
+  bagItems: BagItemLike[],
+): WeightStatus {
+  const carried = getCarriedWeight(equippedGear, bagItems);
+  const capacity = getCarryCapacity(character, equippedGear);
+  return { carried, capacity, overweight: carried > capacity };
+}
+
+/** 超重時顯示在戰鬥記錄的訊息。每次出手判定都會顯示一次。 */
+export function getOverweightMessage(status: WeightStatus): string {
+  return `負重超過上限（${status.carried} / ${status.capacity}），無法攻擊或施放魔法`;
+}

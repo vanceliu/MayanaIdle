@@ -7,6 +7,7 @@ const mapCache = new Map<string, MapData>();
 export const MAP_THEMES: readonly MapTheme[] = [
   'grassland', 'highland', 'snow', 'ivory', 'forest', 'swamp', 'cave', 'prison',
   'battlefield', 'ancient', 'dragon', 'tower', 'frost-tower', 'lava-tower',
+  'town',
 ];
 
 function getMapKey(id: string): string | null {
@@ -55,6 +56,24 @@ export function validateMapData(data: MapData, expectedId = data.id): MapData {
     }
   }
   assert(spawnableCount > 0, expectedId, 'at least one spawnable tile is required');
+
+  // NPC（只有城鎮地圖會有）：站在可通行格上，且必須走得到，否則玩家永遠互動不到
+  if (data.npcs !== undefined) {
+    assert(Array.isArray(data.npcs), expectedId, 'npcs must be an array');
+    const seen = new Set<string>();
+    for (const npc of data.npcs) {
+      const at = `${npc?.x},${npc?.y}`;
+      assert(typeof npc?.facility === 'string' && npc.facility.length > 0, expectedId, `npc at ${at} needs a facility id`);
+      assert(typeof npc?.name === 'string' && npc.name.length > 0, expectedId, `npc "${npc?.facility}" needs a name`);
+      assert(typeof npc?.icon === 'string' && npc.icon.length > 0, expectedId, `npc "${npc?.facility}" needs an icon`);
+      assert(isInBounds(data, npc), expectedId, `npc "${npc.facility}" is outside map bounds`);
+      assert(isWalkableTile(data, npc), expectedId, `npc "${npc.facility}" must stand on a walkable tile`);
+      assert(reachable.has(at), expectedId, `npc "${npc.facility}" at ${at} is unreachable from spawn`);
+      assert(!seen.has(at), expectedId, `two npcs share tile ${at}`);
+      seen.add(at);
+    }
+  }
+
   return data;
 }
 

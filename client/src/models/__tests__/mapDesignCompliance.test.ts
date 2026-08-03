@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import type { MapData } from '../mapControl';
+import { TILE_DEFINITIONS, type MapData } from '../mapControl';
 import { loadAllMaps, clearMapCache } from '../mapDataControl';
 import {
   MAP_DESIGN_PROFILES,
@@ -16,15 +16,34 @@ import {
  * 逐格定位違規用 `npx vite-node scripts/inspectMap.mts <mapId>`。
  */
 describe('全地圖設計規範合規', () => {
+  let allMaps: MapData[];
   let maps: MapData[];
+  let townMaps: MapData[];
 
   beforeAll(async () => {
     clearMapCache();
-    maps = await loadAllMaps();
+    allMaps = await loadAllMaps();
+    // 城鎮是安全區，§ 38.12 的密度／叢聚／生怪規範是為野外戰鬥訂的，不適用（§ 99.6）
+    townMaps = allMaps.filter(map => map.theme === 'town');
+    maps = allMaps.filter(map => map.theme !== 'town');
   });
 
-  it('地圖數量與 profile 指派一致', () => {
+  it('地圖數量與 profile 指派一致（城鎮地圖不進 profile）', () => {
     expect(maps).toHaveLength(Object.keys(MAP_DESIGN_PROFILES).length);
+    for (const town of townMaps) {
+      expect(MAP_DESIGN_PROFILES[town.id as keyof typeof MAP_DESIGN_PROFILES]).toBeUndefined();
+    }
+  });
+
+  it('城鎮地圖：每個 NPC 都站在可通行格上（載入驗證已擋，這裡再守一次）', () => {
+    expect(townMaps.length).toBeGreaterThan(0);
+    for (const town of townMaps) {
+      expect(town.npcs?.length, `${town.id} 必須有 NPC`).toBeGreaterThan(0);
+      for (const npc of town.npcs!) {
+        const tile = town.tiles[npc.y][npc.x];
+        expect(TILE_DEFINITIONS[tile as keyof typeof TILE_DEFINITIONS].walkable, `${town.id} 的 ${npc.name}`).toBe(true);
+      }
+    }
   });
 
   // checkDetourDistance 對每張圖做 all-pairs BFS，50 張跑下來單獨約 4 秒、

@@ -20,10 +20,11 @@ const DOCS = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design
 const TYPE_ZH: Record<string, string> = {
   sword: '單手劍', dagger: '匕首', axe: '單手斧', mace: '單手鈍器', staff: '法杖',
   bow: '弓', twoHandSword: '雙手劍', twoHandAxe: '雙手斧', twoHandStaff: '雙手法杖',
-  dualBlade: '雙刀', claw: '鋼爪', shield: '盾牌', magicBook: '魔導書',
+  dualBlade: '雙刀', claw: '鋼爪', shield: '盾牌', magicBook: '魔導書', armGuard: '臂甲',
 };
 /** 檔名對應現有的 `06-equipment-weapons-*.md` 命名 */
 const TYPE_FILE: Record<string, string> = {
+  armGuard: 'armguard',
   sword: 'onesword', dagger: 'dagger', axe: 'oneaxe', mace: 'mace', staff: 'staff',
   bow: 'bow', twoHandSword: 'twosword', twoHandAxe: 'twoaxe', twoHandStaff: 'twostaff',
   dualBlade: 'dualblade', claw: 'claw', shield: 'shield', magicBook: 'magicbook',
@@ -38,7 +39,7 @@ const MATERIAL_ZH: Record<string, string> = {
 const LARGE_FIRST = new Set(['mace', 'twoHandAxe']);
 
 const acquireOf = (tier: EquipmentTier) =>
-  tier <= 3 ? '商店' : tier <= 5 ? '鐵匠製作' : tier === 6 ? '怪物掉落' : 'Boss 掉落';
+  tier === 1 ? '新手裝' : tier <= 3 ? '商店' : tier <= 5 ? '鐵匠製作' : tier === 6 ? '怪物掉落' : 'Boss 掉落';
 
 const classesOf = (t: EquipmentTemplate) =>
   t.requiredClass?.length ? t.requiredClass.map(c => CLASS_ZH[c] ?? c).join('／') : '**共用**';
@@ -71,7 +72,7 @@ function renderType(type: WeaponType, items: EquipmentTemplate[]): string {
   out.push(`# ${zh}（${items.length} 把）`);
   out.push('');
   out.push('> **本檔案由 `client/scripts/generateWeaponDocs.mts` 從 `equipmentSeeds.ts` 產生，請勿手改。**');
-  out.push('> 要調整數值請改 seed 後重跑腳本；設計規則見 `06-equipment-acquire.md` § 6A.8。');
+  out.push('> 要調整數值請改 seed 後重跑腳本；設計規則見 `06-equipment-balance.md` § 6A.8。');
   out.push('');
   if (largeFirst) out.push(`${zh}的大怪傷害高於小怪傷害，以大怪傷害為排序主軸。`, '');
 
@@ -88,31 +89,31 @@ function renderType(type: WeaponType, items: EquipmentTemplate[]): string {
     out.push(`## 裝備Tier ${tier}（${group}・${tier >= 1 ? acquireOf(tier as EquipmentTier) : '新手裝'}）`);
     out.push('');
 
-    if (type === 'shield') {
-      out.push('| 武器名稱 | 防禦 | 格擋率 | 適用職業 | 材質 | 重量 | 附加 | 價格／製作 |');
-      out.push('|---|---|---|---|---|---|---|---|');
+    if (type === 'shield' || type === 'armGuard') {
+      out.push('| 武器名稱 | 防禦 | 格擋率 | 安定值 | 適用職業 | 材質 | 重量 | 附加 | 價格／製作 |');
+      out.push('|---|---|---|---|---|---|---|---|---|');
       for (const t of list) {
-        out.push(`| ${t.name} | ${t.defense ?? 0} | ${t.blockRate ?? 0}% | ${classesOf(t)} | `
+        out.push(`| ${t.name} | ${t.defense ?? 0} | ${t.blockRate ?? 0}% | ${t.stability ?? 0} | ${classesOf(t)} | `
           + `${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${t.weight ?? 0} | ${bonusOf(t)} | `
           + `${t.buyPrice ? `${t.buyPrice.toLocaleString()}G` : craftOf(t)} |`);
       }
     } else if (type === 'magicBook') {
-      out.push('| 武器名稱 | 魔法攻擊 | 適用職業 | 重量 | 附加 | 價格／製作 |');
-      out.push('|---|---|---|---|---|---|');
+      out.push('| 武器名稱 | 魔法攻擊 | 安定值 | 適用職業 | 重量 | 附加 | 價格／製作 |');
+      out.push('|---|---|---|---|---|---|---|');
       for (const t of list) {
-        out.push(`| ${t.name} | +${t.magicAttack ?? 0} | ${classesOf(t)} | ${t.weight ?? 0} | `
+        out.push(`| ${t.name} | +${t.magicAttack ?? 0} | ${t.stability ?? 0} | ${classesOf(t)} | ${t.weight ?? 0} | `
           + `${bonusOf(t)} | ${t.buyPrice ? `${t.buyPrice.toLocaleString()}G` : craftOf(t)} |`);
       }
     } else {
       const d1 = largeFirst ? '大怪傷害' : '小怪傷害';
       const d2 = largeFirst ? '小怪傷害' : '大怪傷害';
-      out.push(`| 武器名稱 | ${d1} | ${d2} | 攻擊成功 | 額外攻擊 | 適用職業 | 材質 | 重量 | 附加 | 價格／製作 |`);
-      out.push('|---|---|---|---|---|---|---|---|---|---|');
+      out.push(`| 武器名稱 | ${d1} | ${d2} | 攻擊成功 | 額外攻擊 | 安定值 | 適用職業 | 材質 | 重量 | 附加 | 價格／製作 |`);
+      out.push('|---|---|---|---|---|---|---|---|---|---|---|');
       for (const t of list) {
         const a = largeFirst ? t.largeMonsterDamage : t.smallMonsterDamage;
         const b = largeFirst ? t.smallMonsterDamage : t.largeMonsterDamage;
         out.push(`| ${t.name} | ${a ?? 0} | ${b ?? 0} | ${t.attackSuccess ?? 0} | ${t.extraAttack ?? 0} | `
-          + `${classesOf(t)} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${t.weight ?? 0} | ${bonusOf(t)} | `
+          + `${t.stability ?? 0} | ${classesOf(t)} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${t.weight ?? 0} | ${bonusOf(t)} | `
           + `${t.buyPrice ? `${t.buyPrice.toLocaleString()}G` : craftOf(t)} |`);
       }
     }
@@ -152,7 +153,7 @@ const index = [
   '',
   '> **本檔案由 `client/scripts/generateWeaponDocs.mts` 從 `equipmentSeeds.ts` 產生，請勿手改。**',
   '> seed 是唯一真實來源：改 seed → 重跑腳本 → 讀文件檢查。',
-  '> 設計規則（數量分配、素質曲線、走向）見 `06-equipment-acquire.md` § 6A.8。',
+  '> 設計規則（數量分配、素質曲線、走向）見 `06-equipment-balance.md` § 6A.8。',
   '',
   `全部 ${weapons.length} 把，依裝備Tier 由低到高排列。`,
   '',

@@ -20,6 +20,7 @@ const TYPE_LABELS: Record<string, string> = {
   claw: '爪',
   shield: '盾牌',
   magicBook: '魔法書',
+  armGuard: '臂甲',
 };
 
 const MATERIAL_LABELS: Record<string, string> = {

@@ -95,6 +95,9 @@ export function WeaponShop() {
 
   function getSellPrice(item: EquipmentInstance): number {
     const template = allTemplates.find(t => t.id === item.templateId);
+    // 新手裝不能賣。`isStarterGear` 是實例旗標（只有從新手指導員領取時才會標），
+    // 創角直接穿上的那套沒有旗標，所以改從模板的 acquireType 判斷。
+    if (template?.acquireType === 'starter') return 0;
     if (template?.buyPrice) return Math.floor(template.buyPrice * 0.5);
     if (template?.craftGold) return Math.floor(template.craftGold * 0.5);
     return 0;
@@ -132,8 +135,9 @@ export function WeaponShop() {
     if (batchTier === null) return [];
     return weaponsInBag.filter(item => {
       const tierLevel = getEquipmentInstanceTierLevel(item, allTemplates);
-      if (tierLevel === 0) return false; // starter excluded
       const template = allTemplates.find(t => t.id === item.templateId);
+      // 新手裝現在也是 Tier 1，要靠 acquireType 排除而不是靠 tier === 0
+      if (template?.acquireType === 'starter') return false;
       if (template?.acquireType === 'drop_only') return false;
       return tierLevel <= batchTier;
     });

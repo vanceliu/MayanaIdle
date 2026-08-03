@@ -34,7 +34,8 @@ export type MapTheme =
   | 'dragon'
   | 'tower'
   | 'frost-tower'
-  | 'lava-tower';
+  | 'lava-tower'
+  | 'town';
 
 export type TileVisualRole = 'ground' | 'boundary' | 'wall' | 'tree' | 'rock' | 'pillar' | 'decoration' | 'water' | 'lava' | 'chasm' | 'grass' | 'sand' | 'carpet';
 
@@ -64,6 +65,18 @@ export const TILE_DEFINITIONS: Readonly<Record<TileType, TileDefinition>> = {
   [TileType.Carpet]: { id: TileType.Carpet, role: 'carpet', walkable: true, spawnable: false, blocksSight: false, blocksProjectiles: false, elevation: 0 },
 };
 
+/**
+ * 城鎮地圖上的 NPC（§ 38.4）。玩家點 NPC 會自動走到相鄰格，走到才開設施面板。
+ * `facility` 對應 `TownView` 的設施 ID，icon 沿用設施列同一組 emoji。
+ */
+export interface MapNpc {
+  facility: string;
+  name: string;
+  icon: string;
+  x: number;
+  y: number;
+}
+
 export interface MapData {
   id: string;
   name: string;
@@ -72,6 +85,8 @@ export interface MapData {
   theme?: MapTheme;
   tiles: number[][];
   spawnPoint: Position;
+  /** 只有城鎮地圖會有；NPC 站在可通行格上，玩家走到相鄰格互動 */
+  npcs?: MapNpc[];
 }
 
 export function isInBounds(map: MapData, position: Position): boolean {

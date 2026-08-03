@@ -8,6 +8,7 @@ import type { EquipmentInstance } from '../models/equipment';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInfo } from './playerCombatFSM';
 import type { MonsterAttackConfig } from './monsterCombatFSM';
+import { getWeightStatus, getOverweightMessage, type BagItemLike } from './weight';
 import {
   type PlayerCombatContext,
   createPlayerCombatContext,
@@ -57,6 +58,8 @@ export interface ArpgTickInput {
   monsterInstances: Map<string, MonsterInstance>;
   map: MapData;
   deltaMs: number;
+  /** 背包內容，用於負重判定（§ 20.7）。未提供時視為不超重 */
+  bagItems?: BagItemLike[];
 }
 
 export interface PlayerAttackEvent {
@@ -80,7 +83,16 @@ export interface MoveToEvent {
   range: number;
 }
 
-export type ArpgEvent = PlayerAttackEvent | MonsterAttackEvent | MoveToEvent;
+/**
+ * 超重擋下了這次出手（§ 20.7）。
+ * 每次出手判定都會發一次，讓玩家知道自己為什麼打不出去。
+ */
+export interface OverweightBlockedEvent {
+  type: 'overweight_blocked';
+  message: string;
+}
+
+export type ArpgEvent = PlayerAttackEvent | MonsterAttackEvent | MoveToEvent | OverweightBlockedEvent;
 
 export function tickArpgEngine(
   engine: ArpgEngineState,
@@ -171,7 +183,12 @@ export function tickArpgEngine(
     const scriptAction = evaluateCombatScript(combatRules, scriptCtx);
     const action: CombatAction = scriptAction ?? { type: 'normal_attack' };
 
-    if (action.type === 'skill' && action.skillId) {
+    // 超重時無法攻擊也無法施放魔法（§ 20.7）。攻擊冷卻照樣走完才判定，
+    // 所以訊息的頻率等同出手頻率，不會每個 frame 洗版。
+    const weight = getWeightStatus(character, equippedGear, input.bagItems ?? []);
+    if (weight.overweight) {
+      events.push({ type: 'overweight_blocked', message: getOverweightMessage(weight) });
+    } else if (action.type === 'skill' && action.skillId) {
       const skill = skills.find(s => s.id === action.skillId);
       if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
         events.push({

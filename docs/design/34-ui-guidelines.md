@@ -112,24 +112,29 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 
 ### Bar 結構
 
-位於**頂部 HUD 左側**（`.top-hud`），與右側的地圖選擇器 + 探索控制列等高（見
-`16-tech-frontend-architecture.md` § 32.3）。compact 兩列版面：
+位於**底部左側**（`.bottom-bar` 的第一塊，固定 480px 寬），右邊是戰鬥日誌與快捷格
+（見 `16-tech-frontend-architecture.md` § 32.3）。四條**由上往下堆疊**：
 
 ```
 .status-panel
-├── .char-header          — 角色名 + 職業 + 等級 + 防禦值（防禦靠右）
-└── .bars                 — 三條並排（flex row）
+├── .char-header          — 角色名 + 職業 + 等級
+└── .bars                 — flex column，四列
     ├── .bar.hp-bar       — HP 血量條（紅色漸層）
     ├── .bar.mp-bar       — MP 魔力條（藍色漸層）
-    └── .bar.exp-bar      — EXP 經驗條（黃色漸層）
+    ├── .bar.exp-bar      — EXP 經驗條（黃色漸層）
+    └── .bar-row          — 負重條 + 防禦值同一列
+        ├── .bar.weight-bar  — 負重（依比例變色，超重轉紅並顯示 ⚠ 無法攻擊）
+        └── .defense-value   — 防禦: N（靠右）
 ```
 
-順序：第一列 名稱/職業/等級 …… 防禦；第二列 HP → MP → EXP（等寬並排）
+順序（由上往下）：名稱/職業/等級 → HP → MP → EXP → 負重＋防禦。
+
+- **防禦不獨立成一列**：它是被動數值，跟負重共用一行就夠。
+- `.bars` 是 `flex-direction: column`；`.bar` 必須是 `flex: 0 0 auto`，
+  **不可用 `flex: 1`** —— 直向堆疊時 `flex-basis: 0` 會讓四條在自動高度的容器裡塌掉
+  （`.bar-row` 內的負重條例外，要 `flex: 1 1 auto` 才會把防禦值推到右邊）。
 
 **不顯示「目前區域」**：已由頂部地圖選擇器「目前: 區域名 ▼」呈現，避免重複。
-
-**負重條未實作**：負重懲罰與負重 UI 皆未實作（見 `99-ai-constraints.md` 第 61 條、
-`35-inventory-constraints.md` § 35.2），故 `.bars` 內無 `.weight-bar`。
 
 ### 負重計算
 
