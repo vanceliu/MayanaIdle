@@ -3,19 +3,27 @@
  * 規格見 docs/design/37-statistics.md § 37.4
  *
  * 端點：
- *   GET  /api/snapshot?top=N     一次取回所有排行榜所需資料（12 欄位各 top-N 的聯集，去重）
- *   GET  /api/name-check?name=   角色名稱可用性預檢（UX 用，真正的唯一性由 name_key UNIQUE 保證）
- *   POST /api/character/register 建立角色時註冊名稱（需 Turnstile），名稱重複回 409
- *   POST /api/stats              更新既有角色統計（需 Turnstile），未註冊回 404
+ *   GET  /api/snapshot?top=N       一次取回所有排行榜所需資料（12 欄位各 top-N 的聯集，去重）
+ *   POST /api/stats              upsert 自己的統計（需 Turnstile + auth_token）
+ *
+ * **只有一個寫入端點。** 建立與刪除角色都是純本機行為，不碰 D1 ——
+ * 沒有 register 就沒有要註冊的東西，也就沒有要註銷的東西。
+ *
+ * 角色名稱**不要求唯一**（見 19-account-character.md § 19.4）：
+ * 「知道自己排名在哪」只需要客戶端比對 uuid，伺服端不必保證任何唯一性。
+ * 因此不再有 /api/name-check 與 /api/character/register ——
+ * 名稱唯一機制的唯一效果是擋搶名字，代價卻是一整條複雜度鏈，且擋不住
+ * 真正的問題（見 handleUpsertStats 的密鑰驗證）。
  */
 
 /**
  * 現行資料版本，必須與客戶端 `client/src/config.ts` 的 CURRENT_DATA_VERSION 一致。
  *
- * 這個常數是「清理舊角色」的唯一機制（見 docs/design/45-legacy-archive.md § 45.4）：
- * 提高版本並部署後，所有舊版本的資料立即失效 —— 不出現在排行榜、不佔用名稱、不接受更新。
- * 刻意不讓客戶端指定要刪哪筆資料：character_id 在 snapshot 中是公開的，
- * 若接受客戶端的刪除請求，任何人都能刪除他人的排行榜紀錄。
+ * 這是「批次清理舊角色」的機制（見 docs/design/45-legacy-archive.md § 45.4）：
+ * 提高版本並部署後，所有舊版本的資料立即失效 —— 不出現在排行榜、不接受更新。
+ *
+ * 玩家刪除角色時不會通知伺服端（刪除是純本機行為），因此榜上會留下
+ * 不再更新的資料列，直到版本跳號才清掉。名稱不唯一，所以這不影響任何人取名。
  */
 const CURRENT_DATA_VERSION = 3;
 
@@ -55,12 +63,11 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
   return Response.json(data, { status, headers: { ...corsHeaders, ...extraHeaders } });
 }
 
-/** 名稱正規化：NFC 後小寫，作為唯一性判定的 key（避免 Abc / abc 併存） */
-function toNameKey(name) {
-  return name.normalize('NFC').toLowerCase();
-}
-
-/** 回傳錯誤原因字串，通過則回傳 null */
+/**
+ * 回傳錯誤原因字串，通過則回傳 null。
+ * 名稱不唯一，但格式仍必須在伺服端驗 —— 客戶端的即時提示只是 UX，
+ * 擋不住直接打 API 的人塞入超長字串或控制字元把榜單版面弄壞。
+ */
 function validateName(name) {
   if (typeof name !== 'string') return 'invalid_name';
   const normalized = name.normalize('NFC');
@@ -74,6 +81,11 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 function validateCharacterId(id) {
   return typeof id === 'string' && UUID_PATTERN.test(id);
+}
+
+async function sha256Hex(input) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** 統計數值一律轉為非負整數，擋掉 NaN / 負數 / 浮點 / 超大值 */
@@ -148,37 +160,32 @@ async function handleSnapshot(url, env) {
   );
 }
 
-async function handleNameCheck(url, env) {
-  const name = url.searchParams.get('name') ?? '';
-  const invalid = validateName(name);
-  if (invalid) return jsonResponse({ available: false, reason: invalid });
-
-  // 已淘汰版本的資料不佔用名稱：玩家提高資料版本後，仍拿得回自己原本的名字
-  const row = await env.MayanaidleD1
-    .prepare('SELECT character_id FROM character_stats WHERE name_key = ? AND data_version = ?')
-    .bind(toNameKey(name), CURRENT_DATA_VERSION)
-    .first();
-
-  return jsonResponse(
-    { available: !row, reason: row ? 'name_taken' : null },
-    200,
-    { 'Cache-Control': 'no-store' }
-  );
-}
-
 /**
- * 角色建立時註冊名稱。唯一性由 name_key 的 UNIQUE constraint 在 INSERT 當下保證，
- * /api/name-check 只是預檢 —— 兩人同時查同一個名字都會過，但只有一人 INSERT 得進去。
+ * upsert 自己的統計（docs/design/37-statistics.md § 37.4.3）。
+ *
+ * **密鑰驗證是這個端點的重點**：character_id 在 /api/snapshot 中公開回傳，
+ * 若 upsert 不驗證所有權，任何人都能抄一個 uuid 把他人的統計覆寫成任意值。
+ * 舊版的「UPDATE-only + Turnstile」擋不住這件事 —— 名稱唯一機制只擋得住搶名字。
+ *
+ * 綁定採 TOFU：首次寫入時把 sha256(auth_token) 存下來，之後必須相符。
+ * 整件事用單一 UPSERT 完成，ON CONFLICT 的 WHERE 就是所有權判定，
+ * 因此不存在「先查再寫」的競態，也不需要交易。
+ *
+ * 這裡刻意不做定值時間比較：存的是 hash，就算靠時間差問出 hash 也無法反推 token
+ * （需要 SHA-256 preimage）。
  */
-async function handleRegister(request, env) {
+async function handleUpsertStats(request, env) {
   const body = await request.json();
-  const { character_id, character_name, class_name, turnstile_token } = body;
+  const { character_id, character_name, class_name, auth_token, turnstile_token } = body;
 
   const turnstileError = await requireTurnstile(request, turnstile_token, env);
   if (turnstileError) return turnstileError;
 
   if (!validateCharacterId(character_id)) {
     return jsonResponse({ error: 'invalid_character_id' }, 400);
+  }
+  if (typeof auth_token !== 'string' || auth_token.length === 0) {
+    return jsonResponse({ error: 'auth_token_required' }, 400);
   }
   const invalidName = validateName(character_name);
   if (invalidName) return jsonResponse({ error: invalidName }, 400);
@@ -191,81 +198,35 @@ async function handleRegister(request, env) {
     return jsonResponse({ error: 'outdated_client', current: CURRENT_DATA_VERSION }, 409);
   }
 
-  const name = character_name.normalize('NFC');
-  const nameKey = toNameKey(name);
-
-  // 回收已淘汰版本佔用的名稱與 id，讓玩家能沿用原本的角色名（§ 45.4）
-  await env.MayanaidleD1
-    .prepare('DELETE FROM character_stats WHERE (name_key = ? OR character_id = ?) AND data_version < ?')
-    .bind(nameKey, character_id, CURRENT_DATA_VERSION)
-    .run();
-
-  try {
-    await env.MayanaidleD1.prepare(`
-      INSERT INTO character_stats (character_id, character_name, name_key, character_level, class_name, data_version)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(character_id, name, nameKey, toCount(body.character_level) || 1, class_name, CURRENT_DATA_VERSION).run();
-  } catch (err) {
-    const message = String(err?.message ?? '');
-    if (message.includes('name_key')) {
-      return jsonResponse({ error: 'name_taken' }, 409);
-    }
-    if (message.includes('UNIQUE') || message.includes('PRIMARY KEY')) {
-      // 同一個 character_id 重送：名稱一致視為冪等成功（斷線重試 / 舊角色補註冊）
-      const existing = await env.MayanaidleD1
-        .prepare('SELECT name_key FROM character_stats WHERE character_id = ?')
-        .bind(character_id)
-        .first();
-      if (existing && existing.name_key === nameKey) {
-        return jsonResponse({ success: true, already_registered: true });
-      }
-      return jsonResponse({ error: 'character_id_taken' }, 409);
-    }
-    throw err;
-  }
-
-  return jsonResponse({ success: true, already_registered: false });
-}
-
-/**
- * 更新既有角色統計。刻意只做 UPDATE 不做 INSERT：
- * 若允許 upsert，未經 register 的角色就能繞過名稱唯一性檢查建立資料。
- * character_name 於此不更新 —— 名稱在註冊時固定，避免改名頂替他人。
- */
-async function handleUpdateStats(request, env) {
-  const body = await request.json();
-  const { character_id, turnstile_token } = body;
-
-  const turnstileError = await requireTurnstile(request, turnstile_token, env);
-  if (turnstileError) return turnstileError;
-
-  if (!validateCharacterId(character_id)) {
-    return jsonResponse({ error: 'invalid_character_id' }, 400);
-  }
-  if (!body.class_name) {
-    return jsonResponse({ error: 'class_name_required' }, 400);
-  }
-
-  if (toCount(body.data_version) !== CURRENT_DATA_VERSION) {
-    return jsonResponse({ error: 'outdated_client', current: CURRENT_DATA_VERSION }, 409);
-  }
-
-  const assignments = STAT_FIELDS.map(field => `${field} = ?`).join(', ');
-  const result = await env.MayanaidleD1.prepare(`
-    UPDATE character_stats
-    SET character_level = ?, class_name = ?, ${assignments}, updated_at = datetime('now')
-    WHERE character_id = ? AND data_version = ?
-  `).bind(
+  const columns = ['character_level', 'class_name', ...STAT_FIELDS];
+  const values = [
     toCount(body.character_level),
-    body.class_name,
+    class_name,
     ...STAT_FIELDS.map(field => toCount(body[field])),
+  ];
+  const updates = columns.map(col => `${col} = excluded.${col}`).join(', ');
+
+  const result = await env.MayanaidleD1.prepare(`
+    INSERT INTO character_stats
+      (character_id, character_name, auth_token_hash, data_version, ${columns.join(', ')})
+    VALUES (?, ?, ?, ?, ${columns.map(() => '?').join(', ')})
+    ON CONFLICT(character_id) DO UPDATE SET
+      character_name = excluded.character_name,
+      data_version = excluded.data_version,
+      ${updates},
+      updated_at = datetime('now')
+    WHERE character_stats.auth_token_hash = excluded.auth_token_hash
+  `).bind(
     character_id,
-    CURRENT_DATA_VERSION
+    character_name.normalize('NFC'),
+    await sha256Hex(auth_token),
+    CURRENT_DATA_VERSION,
+    ...values,
   ).run();
 
   if (!result.meta.changes) {
-    // 尚未註冊、或該筆資料屬於已淘汰的版本 → 客戶端改走 /api/character/register
-    return jsonResponse({ error: 'not_registered' }, 404);
+    // 該 character_id 已存在但密鑰不符 —— 有人拿公開的 uuid 想覆寫他人資料
+    return jsonResponse({ error: 'invalid_auth_token' }, 403);
   }
 
   return jsonResponse({ success: true });
@@ -292,16 +253,8 @@ export default {
         return response;
       }
 
-      if (path === '/api/name-check' && request.method === 'GET') {
-        return await handleNameCheck(url, env);
-      }
-
-      if (path === '/api/character/register' && request.method === 'POST') {
-        return await handleRegister(request, env);
-      }
-
       if (path === '/api/stats' && request.method === 'POST') {
-        return await handleUpdateStats(request, env);
+        return await handleUpsertStats(request, env);
       }
 
       return jsonResponse({ error: 'not_found' }, 404);

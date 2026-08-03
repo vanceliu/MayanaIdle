@@ -989,6 +989,26 @@ button.active {
 .log-debuff-enemy { color: #7DD3FC; }
 .log-loot { color: var(--accent-success); }
 
+/* 滑鼠懸停在實體（玩家／怪物／NPC）上時跟著游標的名稱標籤（§ 99.6） */
+.entity-hover-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* 位置由 ticker 每幀寫 transform（走合成層，不觸發 layout）；
+     名稱釘在實體頭上並跟著他移動，不跟游標跑 */
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform;
+  z-index: 15;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(18, 18, 30, 0.9);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* --- Map Canvas --- */
 /* 滿版底層：不再是有邊框的方塊 */
 .map-canvas-container {
@@ -1909,22 +1929,29 @@ button.active {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  /* 不加暗底：其他浮動視窗（裝備欄/背包，§ 32.15）都是無遮罩的，
+     滿版地圖被壓暗一大片也很突兀。這層只負責接住「點外面關閉」。 */
+  background: transparent;
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 直接留出上下兩條 HUD 的帶寬（上：設施列，下：快捷格），
+     視窗只在中間這塊裡長高，就不會有「差幾 px 壓到快捷格」的問題 */
+  padding: 150px 12px 100px;
 }
 
+/* 沒有暗底就得靠視窗自己撐出層次：加深陰影、邊框提亮、底色微透讓地圖透出一點 */
 .town-modal {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
+  background: rgba(18, 18, 30, 0.94);
+  border: 1px solid var(--accent-primary);
   border-radius: var(--radius-lg);
   width: min(600px, 90vw);
-  height: calc(100vh - 120px);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(3px);
 }
 
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { CharacterSelect } from '../CharacterSelect';
 import { useGameStore } from '../../stores/gameStore';
 
@@ -13,6 +13,11 @@ describe('CharacterSelect', () => {
       characterList: [],
       phase: 'characterSelect',
     });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
   });
 
   it('should show 4 empty slots when no characters exist', () => {
@@ -57,5 +62,43 @@ describe('CharacterSelect', () => {
     render(<CharacterSelect />);
     const deleteBtn = screen.getByText('刪除');
     expect(deleteBtn).toBeDefined();
+  });
+
+  /** 刪除是純本機行為：名稱不唯一，沒有線上資源要回收（§ 37.4.3） */
+  describe('刪除角色', () => {
+    function setupOneCharacter() {
+      const deleteCharacter = vi.fn().mockResolvedValue(undefined);
+      useGameStore.setState({
+        characterList: [{ id: 1, name: 'Hero', className: 'knight', level: 1 }],
+        deleteCharacter,
+      } as never);
+      return deleteCharacter;
+    }
+
+    it('確認後刪除，只問一次、也不打任何 API', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const deleteCharacter = setupOneCharacter();
+      render(<CharacterSelect />);
+
+      fireEvent.click(screen.getByText('刪除'));
+
+      await waitFor(() => expect(deleteCharacter).toHaveBeenCalledWith(1));
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      vi.unstubAllGlobals();
+    });
+
+    it('取消確認時不刪除', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const deleteCharacter = setupOneCharacter();
+      render(<CharacterSelect />);
+
+      fireEvent.click(screen.getByText('刪除'));
+
+      expect(deleteCharacter).not.toHaveBeenCalled();
+    });
   });
 });

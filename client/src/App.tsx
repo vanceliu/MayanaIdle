@@ -23,27 +23,48 @@ import { getRegion } from './models/mapData';
 import { formatBuildLabel, formatBuildTime } from './buildInfo';
 import './App.css';
 
-function GameToolbar() {
+export function GameToolbar() {
   const logout = useGameStore(s => s.logout);
   const character = useGameStore(s => s.character);
   const selectCharacter = useGameStore(s => s.selectCharacter);
+  const uploadOwnStats = useGameStore(s => s.uploadOwnStats);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = useCallback(async () => {
     if (!character?.id) return;
+
+    // § 19.9：匯出檔含該角色的排行榜寫入密鑰，而檔案的加密金鑰就寫在前端原始碼裡，
+    // 等同明文。外流＝對方能覆寫你的排行榜資料，所以這件事必須講在下載之前。
+    const confirmed = window.confirm(
+      '匯出檔含有這個角色的身分憑證，等同密碼。\n\n' +
+      '取得檔案的人可以覆寫你在排行榜上的紀錄，請勿分享或上傳到雲端硬碟、聊天室等地方。\n\n' +
+      '確定要匯出嗎？'
+    );
+    if (!confirmed) return;
+
     try {
+      // 先把統計推一次，讓密鑰在伺服端綁定好再讓檔案出門（§ 37.4.3）。
+      // **刻意不檢查結果**：密鑰已經寫進本機與匯出檔，兩台裝置拿到的是同一把，
+      // 誰先上傳誰綁定、另一台照樣相符。拿連線當匯出的門檻只會讓玩家在
+      // 最需要備份的時候備份不了。
+      await uploadOwnStats({ force: true });
+
       const json = await exportCharacterData(character.id);
       downloadExport(json, character.name);
     } catch (e) {
       alert(`匯出失敗: ${(e as Error).message}`);
     }
-  }, [character]);
+  }, [character, uploadOwnStats]);
 
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !character?.id) return;
 
-    const confirmed = window.confirm('匯入將覆蓋當前角色的所有資料，確定繼續？');
+    // § 19.9：匯入是「還原完整身分」，名稱與 uuid 都會被檔案取代
+    const confirmed = window.confirm(
+      '匯入將覆蓋當前角色的所有資料，包含名稱與排行榜身分。\n\n' +
+      '這一格原本的角色會從排行榜上停止更新。確定繼續？'
+    );
     if (!confirmed) {
       e.target.value = '';
       return;

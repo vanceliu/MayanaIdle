@@ -21,6 +21,13 @@ import {
 import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
+import { ensureCharacterAuthToken } from '../systems/authToken';
+import {
+  uploadStats,
+  shouldUploadStats,
+  markStatsUploaded,
+  LeaderboardError,
+} from '../services/leaderboardService';
 import { purgeOutdatedData } from '../systems/dataVersionPurge';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
@@ -48,6 +55,15 @@ import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database'
 /** `legacy` 為遺產頁（§ 45.3）：唯讀，只能返回 characterSelect，不可進入任何遊玩畫面 */
 export type GamePhase = 'title' | 'characterSelect' | 'create' | 'legacy' | 'explore' | 'combat' | 'result' | 'dead';
 export type SearchMode = 'auto' | 'manual';
+
+/** 統計上傳結果（§ 37.4.5）。`skipped` = 節流或數值未變，不算失敗。 */
+export type StatsUploadResult =
+  | 'skipped'
+  | 'uploaded'
+  | 'invalid_auth_token'
+  | 'outdated_client'
+  | 'invalid_name'
+  | 'failed';
 
 export interface CombatLog {
   text: string;
@@ -220,10 +236,18 @@ interface GameState {
   initUser: () => Promise<void>;
   loadCharacterList: () => Promise<void>;
   selectCharacter: (characterId: number) => Promise<void>;
+  /** 純本機刪除。刪角不通知伺服端（§ 37.4.3），榜上舊列靠版本跳號清掉。 */
   deleteCharacter: (characterId: number) => Promise<void>;
   logout: () => Promise<void>;
-  /** `uuid` 由建立畫面先產生並向排行榜註冊，註冊成功後才傳入（§ 19.4）；省略時自行產生。 */
-  createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes, uuid?: string) => Promise<void>;
+  /** `uuid` 與 `authToken` 皆於此產生，建立角色是純本機行為、不需要連線（§ 19.4）。 */
+  createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes) => Promise<void>;
+  /** 取得目前角色的排行榜寫入密鑰；此機制上線前建立的角色在此補產生（TOFU，§ 37.4.3）。 */
+  ensureAuthToken: () => Promise<string | null>;
+  /**
+   * 上傳目前角色的統計（§ 37.4.5）。`force` 略過 10 分鐘節流與「數值未變」判定，
+   * 匯出前要用它把密鑰在伺服端綁定好。回傳結果碼供 UI 決定提示文字。
+   */
+  uploadOwnStats: (options?: { force?: boolean }) => Promise<StatsUploadResult>;
   loadCharacter: () => Promise<boolean>;
   startExploring: () => void;
   stopExploring: () => void;
@@ -511,6 +535,60 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
+  ensureAuthToken: async () => {
+    const char = get().character;
+    if (!char?.id) return null;
+
+    const authToken = await ensureCharacterAuthToken(char.id);
+    if (authToken && authToken !== char.authToken) {
+      set({ character: { ...char, authToken } });
+    }
+    return authToken;
+  },
+
+  uploadOwnStats: async (options = {}) => {
+    const { character, statistics, guildProgress } = get();
+    if (!character?.uuid || !statistics) return 'skipped';
+
+    const authToken = await get().ensureAuthToken();
+    if (!authToken) return 'skipped';
+
+    const payload = {
+      character_id: character.uuid,
+      character_name: character.name,
+      auth_token: authToken,
+      class_name: character.className,
+      character_level: character.level,
+      monstersKilled: statistics.monstersKilled,
+      bossesKilled: statistics.bossesKilled,
+      deathCount: statistics.deathCount,
+      equipmentCrafted: statistics.equipmentCrafted,
+      weaponEnhanceAttempts: statistics.weaponEnhanceAttempts,
+      armorEnhanceAttempts: statistics.armorEnhanceAttempts,
+      weaponsBroken: statistics.weaponsBroken,
+      armorsBroken: statistics.armorsBroken,
+      questsCompleted: statistics.questsCompleted,
+      totalGoldEarned: statistics.totalGoldEarned,
+      contribution: guildProgress.points,
+    };
+
+    // 節流 + 數值未變則完全不送出（見 leaderboardService.shouldUploadStats）
+    if (!options.force && !shouldUploadStats(character.uuid, payload)) return 'skipped';
+
+    try {
+      // upsert：首次上傳直接建列並綁定密鑰，不需要事先註冊
+      await uploadStats(payload);
+      markStatsUploaded(character.uuid, payload);
+      return 'uploaded';
+    } catch (err) {
+      if (!(err instanceof LeaderboardError)) return 'failed';
+      if (err.code === 'invalid_auth_token') return 'invalid_auth_token';
+      if (err.code === 'outdated_client') return 'outdated_client';
+      if (err.code === 'invalid_name') return 'invalid_name';
+      return 'failed';
+    }
+  },
+
   deleteCharacter: async (characterId) => {
     await db.equipmentInstances.where('ownerId').equals(characterId)
       .filter(item => item.storageType !== 'shared')
@@ -554,7 +632,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     await get().loadCharacterList();
   },
 
-  createCharacter: async (name, className, bonusAttrs, uuid) => {
+  createCharacter: async (name, className, bonusAttrs) => {
     const userId = get().userId;
     if (!userId) return;
 
@@ -571,7 +649,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const char: Character = {
-      uuid: uuid ?? generateCharacterUuid(),
+      uuid: generateCharacterUuid(),
+      // 密鑰只存在本機與匯出檔，伺服端只拿得到 SHA-256（§ 37.4.3）
+      authToken: generateCharacterUuid(),
       userId,
       name,
       className,

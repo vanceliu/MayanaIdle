@@ -5,6 +5,10 @@ import { useGameStore } from '../../stores/gameStore';
 import { createDefaultStatistics } from '../../models/statistics';
 import type { Character } from '../../models/character';
 
+// 上傳邏輯本身在 gameStore 測（含密鑰補發），這裡只驗統計中心的呼叫與提示。
+// 真實實作會碰 IndexedDB，而本檔刻意不起 fake-indexeddb。
+const uploadOwnStats = vi.fn<(options?: { force?: boolean }) => Promise<string>>(async () => 'uploaded');
+
 /**
  * @vitest-environment jsdom
  *
@@ -45,10 +49,14 @@ function snapshotCalls() {
 
 function setCharacter(uuid: string | undefined = 'uuid-mine') {
   useGameStore.setState({
-    character: { id: 1, uuid, userId: 1, name: '我方', className: 'knight', level: 20 } as Character,
+    // 帶著密鑰，ensureAuthToken 就不會去碰 IndexedDB（本檔不起 fake-indexeddb）
+    character: {
+      id: 1, uuid, authToken: 'tok-mine', userId: 1, name: '我方', className: 'knight', level: 20,
+    } as Character,
     statistics: createDefaultStatistics(),
     guildProgress: { rank: 'F', points: 0 },
-  });
+    uploadOwnStats,
+  } as never);
 }
 
 describe('StatisticsCenter', () => {
@@ -62,6 +70,7 @@ describe('StatisticsCenter', () => {
       return { ok: true, status: 200, json: async () => ({ success: true }) };
     });
     vi.stubGlobal('fetch', fetchMock);
+    uploadOwnStats.mockReset().mockResolvedValue('uploaded');
     setCharacter();
   });
 
@@ -108,44 +117,43 @@ describe('StatisticsCenter', () => {
     expect(killCard?.querySelectorAll('.stats-card-name')[0].textContent).toContain('我方');
   });
 
-  it('舊角色未註冊時（stats 回 404）自動補註冊後重送', async () => {
-    const seen: string[] = [];
-    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      const u = String(url);
-      seen.push(u);
-      if (u.includes('/api/snapshot')) return { ok: true, status: 200, json: async () => SNAPSHOT };
-      if (u.includes('/api/character/register')) return { ok: true, status: 200, json: async () => ({ success: true }) };
-      // 第一次 /api/stats 回 404，補註冊後的第二次成功
-      const statsCalls = seen.filter(s => s.endsWith('/api/stats')).length;
-      void init;
-      return statsCalls === 1
-        ? { ok: false, status: 404, json: async () => ({ error: 'not_registered' }) }
-        : { ok: true, status: 200, json: async () => ({ success: true }) };
-    });
-
+  it('開啟時先上傳一次自己的統計，再抓 snapshot', async () => {
     render(<StatisticsCenter />);
     await waitFor(() => expect(snapshotCalls()).toHaveLength(1));
 
-    expect(seen.filter(u => u.includes('/api/character/register'))).toHaveLength(1);
-    expect(seen.filter(u => u.endsWith('/api/stats'))).toHaveLength(2);
+    expect(uploadOwnStats).toHaveBeenCalledTimes(1);
+    // 統計中心不強制上傳：節流與「數值未變」的判定留給 store
+    expect(uploadOwnStats.mock.calls[0][0]).toBeUndefined();
   });
 
-  it('補註冊遇到名稱重複時提示無法上榜，但排行榜仍可瀏覽', async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      const u = String(url);
-      if (u.includes('/api/snapshot')) return { ok: true, status: 200, json: async () => SNAPSHOT };
-      if (u.includes('/api/character/register')) {
-        return { ok: false, status: 409, json: async () => ({ error: 'name_taken' }) };
-      }
-      return { ok: false, status: 404, json: async () => ({ error: 'not_registered' }) };
-    });
+  it('密鑰不符時提示無法上榜，但排行榜仍可瀏覽', async () => {
+    uploadOwnStats.mockResolvedValue('invalid_auth_token');
 
     render(<StatisticsCenter />);
 
     await waitFor(() => {
-      expect(screen.getByText('角色名稱已被其他玩家使用，此角色無法登上排行榜')).toBeDefined();
+      expect(screen.getByText('此角色的排行榜紀錄由另一份存檔持有，統計無法上傳')).toBeDefined();
     });
     expect(screen.getAllByText('殺敵數').length).toBeGreaterThan(0);
+  });
+
+  it('版本落後時提示重新整理', async () => {
+    uploadOwnStats.mockResolvedValue('outdated_client');
+
+    render(<StatisticsCenter />);
+
+    await waitFor(() => {
+      expect(screen.getByText('遊戲已更新，請重新整理頁面以繼續上傳統計')).toBeDefined();
+    });
+  });
+
+  it('上傳失敗（network）不擋排行榜瀏覽，也不顯示訊息', async () => {
+    uploadOwnStats.mockResolvedValue('failed');
+
+    render(<StatisticsCenter />);
+
+    await waitFor(() => expect(screen.getAllByText('殺敵數').length).toBeGreaterThan(0));
+    expect(document.querySelector('.stats-message')).toBeNull();
   });
 
   it('伺服器連不上時顯示錯誤訊息', async () => {

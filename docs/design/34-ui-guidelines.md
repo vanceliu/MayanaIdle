@@ -112,8 +112,8 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 
 ### Bar 結構
 
-位於**底部左側**（`.bottom-bar` 的第一塊，固定 480px 寬），右邊是戰鬥日誌與快捷格
-（見 `16-tech-frontend-architecture.md` § 32.3）。四條**由上往下堆疊**：
+位於**畫面左上角的浮動 HUD**（`.hud-topleft`，見 `16-tech-frontend-architecture.md`
+§ 32.3），`BuffBar` 接在卡片下方。四條**由上往下堆疊**：
 
 ```
 .status-panel
@@ -143,7 +143,7 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 - 顯示格式：`{current}/{max} ({percent}%)`
 - 正常：灰色漸層 `#6B7280 → #9CA3AF`
 - 超重：紅色漸層（同 HP bar）——**僅視覺提示，無遊戲懲罰**（見 `35-inventory-constraints.md` § 35.2）
-- 防禦值顯示在 `.char-header` 最右側，使用 `var(--accent-info)` 藍綠色（負重條未實作）
+- 防禦值顯示在**負重條那一列的右側**，使用 `var(--accent-info)` 藍綠色
 
 ### 詳細狀態面板（CharacterStats）
 

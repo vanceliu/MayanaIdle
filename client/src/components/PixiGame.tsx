@@ -10,11 +10,11 @@ import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity } from '../pixi/entities/PlayerEntity';
 import { MonsterEntity } from '../pixi/entities/MonsterEntity';
-import { NpcEntity } from '../pixi/entities/NpcEntity';
-import { useTownStore, resolveNpcArrival, findNpcNearTile, pickNpcApproachTile } from '../stores/townStore';
+import { NpcEntity, NPC_BODY_OFFSET } from '../pixi/entities/NpcEntity';
+import { useTownStore } from '../stores/townStore';
 import type { TownFacility } from './TownView';
-import { mapPositionToScreen, screenToMapTile } from '../pixi/utils/isometric';
-import { getRenderedElevation, isWalkableTile, type MapData } from '../models/mapControl';
+import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } from '../pixi/utils/isometric';
+import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
 import { hasProjectilePath } from '../systems/lineOfSight';
 import { gameLoopTick, consumeDotTick } from '../systems/gameLoop';
 import { findAttackPosition } from '../systems/pathfinding';
@@ -51,6 +51,14 @@ const ELEMENT_COLORS: Record<string, number> = {
 
 export function PixiGame() {
   const [initError, setInitError] = useState<string | null>(null);
+  /**
+   * 滑鼠懸停在實體上時顯示的名稱（玩家／怪物／NPC 共用）。
+   * 只有文字進 React state；位置每幀由 ticker 直接寫進 DOM ——
+   * 名稱要跟著球體跑（怪物會動、鏡頭也會動），用 state 更新等於每幀 re-render。
+   */
+  const [hoverText, setHoverText] = useState<string | null>(null);
+  const hoverTargetRef = useRef<{ kind: 'npc' | 'monster' | 'player'; id?: string; pos?: Position } | null>(null);
+  const hoverLabelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pixiAppRef = useRef<PixiApp | null>(null);
   const sceneRef = useRef<GameScene | null>(null);
@@ -147,14 +155,21 @@ export function PixiGame() {
           );
         }
 
-        // 3c. 城鎮 NPC：走到相鄰格就開設施面板（§ 99.6 決策 3）
-        const pendingNpc = useTownStore.getState().pendingNpc;
-        if (pendingNpc) {
-          const result = resolveNpcArrival(playerPos, pendingNpc, useMapControlStore.getState().isMoving);
-          if (result === 'open') {
-            useTownStore.getState().openFacility(pendingNpc.facility as TownFacility);
-          } else if (result === 'give-up') {
-            useTownStore.getState().clearPendingNpc();
+        // 3c. 懸停名稱跟著球體跑（怪物會移動、鏡頭也會移動）
+        const hoverTarget = hoverTargetRef.current;
+        const hoverEl = hoverLabelRef.current;
+        if (hoverTarget && hoverEl) {
+          const pos = hoverTarget.kind === 'player'
+            ? useMapControlStore.getState().playerPosition
+            : hoverTarget.kind === 'monster'
+              ? useMapMonsterStore.getState().monsters.find(m => m.id === hoverTarget.id)?.position
+              : hoverTarget.pos;
+          if (pos) {
+            const anchor = entityScreenPos(map, pos);
+            const offset = pixiApp.camera.getOffset();
+            // 用 transform 而不是 left/top：後者每幀都會觸發 layout，transform 走合成層
+            hoverEl.style.transform =
+              `translate3d(${anchor.sx + offset.x}px, ${anchor.sy - NPC_BODY_OFFSET + offset.y}px, 0) translate(-50%, -160%)`;
           }
         }
 
@@ -260,29 +275,66 @@ export function PixiGame() {
 
       const map = useMapControlStore.getState().currentMap;
       if (!map) return;
-      const tile = screenToMapTile(map, worldScreenX, worldScreenY);
-      if (!tile) return;
 
-      // 城鎮：點到 NPC 站的那一格＝找他，走到旁邊自動開設施面板（§ 99.6）。
-      // 這段必須跟地圖點擊走同一條路徑 —— 地圖移動是掛在 DOM 的 click 上，
-      // 若 NPC 改用 Pixi 的 pointertap，兩個 handler 會各自 moveToTarget，
-      // 後跑的 DOM click 會覆蓋掉 NPC 的目標。
-      const npc = findNpcNearTile(map.npcs, tile);
+      /*
+       * 城鎮 NPC 判定（§ 99.6）。三個順序上的地雷：
+       * 1. 必須在 screenToMapTile 之前 —— NPC 站的格子不可通行（他有實體），
+       *    而 screenToMapTile 對不可通行格回傳 null，先取格子會把「點正中 NPC」早退掉。
+       * 2. 必須跟地圖移動走同一個 DOM handler —— 用 Pixi 的 pointertap 會與這裡各自
+       *    派路徑，後跑的覆蓋先跑的。
+       * 3. 用圖示的螢幕範圍判定，不用格子距離 —— 否則點旁邊空地想走過去也被當成互動。
+       */
+      const npc = findNpcAtScreen(map, worldScreenX, worldScreenY);
       if (npc) {
-        // NPC 有實體，停在他旁邊而不是站到他身上
-        useTownStore.getState().requestNpc(npc);
-        const from = useMapControlStore.getState().playerPosition;
-        const approach = pickNpcApproachTile(npc, from, t => isWalkableTile(map, t));
-        useMapControlStore.getState().moveToTarget(approach);
+        // 點得到就開，不看距離（§ 99.6）
+        useTownStore.getState().openFacility(npc.facility as TownFacility);
         return;
       }
 
-      useTownStore.getState().clearPendingNpc();
+      const tile = screenToMapTile(map, worldScreenX, worldScreenY);
+      if (!tile) return;
+
+      // 點地圖＝離開互動：關掉開著的設施面板，也取消還沒走到的 NPC
+      useTownStore.getState().closeFacility();
       useMapControlStore.getState().moveToTarget(tile);
     };
 
+    // 滑鼠移到任何實體球體上就顯示名稱（玩家／怪物／NPC）
+    const handleMove = (e: MouseEvent) => {
+      const pixiApp = pixiAppRef.current;
+      if (!pixiApp || !pixiApp.initialized) return;
+
+      const rect = container.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      const camOffset = pixiApp.camera.getOffset();
+      const map = useMapControlStore.getState().currentMap;
+      if (!map) return;
+
+      const hit = findEntityAtScreen(
+        map,
+        localX - camOffset.x,
+        localY - camOffset.y,
+        useMapControlStore.getState().playerPosition,
+        useGameStore.getState().character?.name ?? '',
+        useMapMonsterStore.getState().monsters,
+        monsterInstancesRef.current,
+      );
+
+      hoverTargetRef.current = hit ? hit.target : null;
+      setHoverText(hit?.text ?? null);
+    };
+
     container.addEventListener('click', handleClick);
-    return () => container.removeEventListener('click', handleClick);
+    container.addEventListener('mousemove', handleMove);
+    container.addEventListener('mouseleave', () => {
+      hoverTargetRef.current = null;
+      setHoverText(null);
+    });
+    return () => {
+      container.removeEventListener('click', handleClick);
+      container.removeEventListener('mousemove', handleMove);
+    };
   }, []);
 
   // § 35.5.3：從背包拖到地圖上＝丟棄（需確認）。
@@ -314,6 +366,9 @@ export function PixiGame() {
     >
       {/* Pixi canvas 以 appendChild 掛入，需與 React 管理的節點分離 */}
       <div ref={containerRef} className="map-canvas-stage" />
+      {hoverText && (
+        <div ref={hoverLabelRef} className="entity-hover-label">{hoverText}</div>
+      )}
       {initError && (
         <div className="map-init-error">
           <div className="map-init-error-title">地圖初始化失敗</div>
@@ -933,4 +988,71 @@ function syncNpcs(map: MapData, scene: GameScene, entities: NpcEntity[]): void {
     scene.entityLayer.container.addChild(entity.container);
     entities.push(entity);
   }
+}
+
+/**
+ * 點擊是否打中某個 NPC（§ 99.6）。
+ *
+ * NPC 的圓點畫在格子中心的正上方（偏移 `NPC_BODY_OFFSET`），所以先把點擊座標
+ * 往下補回同樣的偏移，再換算成格子 —— 這樣「看起來點在圓點上」就會對到他站的格子。
+ *
+ * 不能借用 `screenToMapTile`：那支對不可通行格回傳 null，而 NPC 站的格子正是不可通行的。
+ */
+function findNpcAtScreen(map: MapData, screenX: number, screenY: number): MapNpc | null {
+  if (!map.npcs?.length) return null;
+  const world = screenToWorld(screenX, screenY + NPC_BODY_OFFSET, 0);
+  const tile = { x: Math.round(world.x), y: Math.round(world.y) };
+  return map.npcs.find(npc => npc.x === tile.x && npc.y === tile.y) ?? null;
+}
+
+/** 實體球體的命中半徑（螢幕像素）；比實際圓點略大，滑過去就抓得到 */
+const ENTITY_HOVER_RADIUS = 24;
+
+/** 實體球體在 world screen 上的位置（沿用渲染時的小數座標） */
+function entityScreenPos(map: MapData, pos: Position): { sx: number; sy: number } {
+  const elevation = getRenderedElevation(map, { x: Math.round(pos.x), y: Math.round(pos.y) });
+  return worldToScreen(pos.x, pos.y, elevation);
+}
+
+export interface EntityHover {
+  text: string;
+  /** 指到的是誰 —— 標籤要每幀跟著他的目前位置，不是停在懸停當下的座標 */
+  target: { kind: 'npc' | 'monster' | 'player'; id?: string; pos?: Position };
+}
+
+/**
+ * 找出滑鼠指到的實體（§ 99.6）。
+ *
+ * 玩家／怪物／NPC 都是畫在格子中心正上方的圓點（偏移 `NPC_BODY_OFFSET`，三者相同），
+ * 所以用同一套螢幕距離判定：NPC → 怪物 → 玩家，先找到的先贏。
+ * 回傳實體本身的位置，讓名稱固定釘在他頭上 —— 跟著游標跑會很難讀。
+ */
+function findEntityAtScreen(
+  map: MapData,
+  screenX: number,
+  screenY: number,
+  playerPos: Position,
+  playerName: string,
+  monsters: MapMonster[],
+  monsterInstances: Map<string, MonsterInstance>,
+): EntityHover | null {
+  const hits = (pos: Position): boolean => {
+    // 用「原始小數座標」而不是取整到格子：玩家與怪物移動中畫在格子之間，
+    // 取整會讓錨點跟畫面上的球體差到半格（32px），怎麼滑都碰不到。
+    const { sx, sy } = entityScreenPos(map, pos);
+    const dx = screenX - sx;
+    const dy = screenY - (sy - NPC_BODY_OFFSET);
+    return dx * dx + dy * dy <= ENTITY_HOVER_RADIUS * ENTITY_HOVER_RADIUS;
+  };
+
+  for (const npc of map.npcs ?? []) {
+    if (hits(npc)) return { text: npc.name, target: { kind: 'npc', pos: { x: npc.x, y: npc.y } } };
+  }
+  for (const monster of monsters) {
+    if (hits(monster.position)) {
+      const name = monsterInstances.get(monster.id)?.name ?? (monster.isBoss ? 'Boss' : '怪物');
+      return { text: name, target: { kind: 'monster', id: monster.id } };
+    }
+  }
+  return playerName && hits(playerPos) ? { text: playerName, target: { kind: 'player' } } : null;
 }

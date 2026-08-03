@@ -4,6 +4,7 @@ import { db } from '../../db/database';
 import { CURRENT_DATA_VERSION } from '../../config';
 import { purgeOutdatedData } from '../dataVersionPurge';
 import { listArchives, parseCharacterPayload, parseSharedWarehousePayload, deleteArchive } from '../legacyArchive';
+import { loadTemplateCache } from '../templateSync';
 
 /**
  * 遺產封存（§ 45）：被 dataVersion 淘汰的角色必須先轉成純文字快照才刪除。
@@ -77,6 +78,34 @@ describe('遺產封存', () => {
     expect(payload.personalStorageItems).toEqual([{ name: '鐵礦', type: 'material', amount: 3 }]);
     expect(payload.statistics?.monstersKilled).toBe(8888);
     expect(payload.contribution).toBe(350);
+  });
+
+  it('裝備快照帶著詞綴的中文顯示文字（封存當下算好，不依賴日後的詞綴定義）', async () => {
+    const charId = await addOutdatedCharacter();
+    const templateId = await db.equipmentTemplates.add({
+      name: '鋼劍', type: 'sword', slot: 'rightHand', isTwoHanded: false,
+      smallMonsterDamage: 20, largeMonsterDamage: 25, price: 1000,
+    } as unknown as Parameters<typeof db.equipmentTemplates.add>[0]) as number;
+    await loadTemplateCache();
+    await db.equipmentInstances.add({
+      templateId, ownerId: charId, equipped: true, quality: 10, enhancement: 7,
+      affixes: [
+        { type: 'attack_power', tier: 4, value: 12 },
+        { type: 'immune_poison', tier: 0, value: 0 },
+      ],
+    } as unknown as Parameters<typeof db.equipmentInstances.add>[0]);
+
+    await purgeOutdatedData();
+
+    const payload = parseCharacterPayload((await listArchives(1))[0])!;
+    expect(payload.equipped).toHaveLength(1);
+    const [weapon] = payload.equipped;
+    expect(weapon.name).toBe('鋼劍');
+    // 品質 10% 讓 12 變成 13（getEffectiveAffixValue）
+    expect(weapon.affixes[0].display).toBe('攻擊力 +13% (T4)');
+    expect(weapon.affixes[1].display).toBe('[特殊] 毒免疫');
+    // type/tier/value 仍保留，日後要重新計算也有原始資料
+    expect(weapon.affixes[0]).toMatchObject({ type: 'attack_power', tier: 4, value: 12 });
   });
 
   it('沒有 prefs 時統計為 null，讓遺產頁顯示「—」而不是 0', async () => {

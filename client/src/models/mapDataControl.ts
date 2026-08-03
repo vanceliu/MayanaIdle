@@ -67,8 +67,16 @@ export function validateMapData(data: MapData, expectedId = data.id): MapData {
       assert(typeof npc?.name === 'string' && npc.name.length > 0, expectedId, `npc "${npc?.facility}" needs a name`);
       assert(typeof npc?.icon === 'string' && npc.icon.length > 0, expectedId, `npc "${npc?.facility}" needs an icon`);
       assert(isInBounds(data, npc), expectedId, `npc "${npc.facility}" is outside map bounds`);
-      assert(isWalkableTile(data, npc), expectedId, `npc "${npc.facility}" must stand on a walkable tile`);
-      assert(reachable.has(at), expectedId, `npc "${npc.facility}" at ${at} is unreachable from spawn`);
+      // NPC 有實體：自己站的格子不可通行（尋路要繞過他），
+      // 但必須至少有一個走得到的相鄰格，否則玩家永遠靠不過去。
+      assert(!isWalkableTile(data, npc), expectedId, `npc "${npc.facility}" must stand on a blocking tile`);
+      const hasApproach = CARDINAL_AND_DIAGONAL.some(offset => {
+        const neighbour = { x: npc.x + offset.x, y: npc.y + offset.y };
+        return isInBounds(data, neighbour)
+          && isWalkableTile(data, neighbour)
+          && reachable.has(`${neighbour.x},${neighbour.y}`);
+      });
+      assert(hasApproach, expectedId, `npc "${npc.facility}" at ${at} has no reachable adjacent tile`);
       assert(!seen.has(at), expectedId, `two npcs share tile ${at}`);
       seen.add(at);
     }

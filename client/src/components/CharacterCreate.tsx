@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import {
   CLASS_BASE_ATTRIBUTES,
@@ -11,10 +11,8 @@ import {
   CHARACTER_NAME_ALLOWED_SYMBOLS,
   CHARACTER_NAME_ERROR_MESSAGES,
   CHARACTER_NAME_MAX_LENGTH,
-  generateCharacterUuid,
   validateCharacterName,
 } from '../models/characterIdentity';
-import { checkNameAvailable, registerCharacter, LeaderboardError } from '../services/leaderboardService';
 
 const CLASSES: ClassName[] = ['knight', 'elf', 'elementalist', 'priest', 'thief'];
 const ATTR_KEYS: (keyof Attributes)[] = ['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'];
@@ -22,16 +20,9 @@ const ATTR_NAMES: Record<keyof Attributes, string> = {
   STR: '力量', AGI: '敏捷', VIT: '體質', SPI: '精神', INT: '智力', CHA: '魅力',
 };
 
-/** 名稱預檢的 debounce 間隔 */
-const NAME_CHECK_DEBOUNCE_MS = 500;
-
 type NameStatus =
   | { kind: 'idle' }
-  | { kind: 'invalid'; message: string }
-  | { kind: 'checking' }
-  | { kind: 'available' }
-  | { kind: 'taken' }
-  | { kind: 'check_failed' };
+  | { kind: 'invalid'; message: string };
 
 export function CharacterCreate() {
   const createCharacter = useGameStore(s => s.createCharacter);
@@ -39,10 +30,8 @@ export function CharacterCreate() {
   const [name, setName] = useState('');
   const [selectedClass, setSelectedClass] = useState<ClassName>('knight');
   const [bonus, setBonus] = useState<Attributes>({ STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 });
-  const [nameStatus, setNameStatus] = useState<NameStatus>({ kind: 'idle' });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const requestSeqRef = useRef(0);
 
   const baseAttrs = CLASS_BASE_ATTRIBUTES[selectedClass];
   const maxPoints = getAvailablePoints(selectedClass);
@@ -50,37 +39,10 @@ export function CharacterCreate() {
   const remaining = maxPoints - usedPoints;
   const trimmedName = name.trim();
   const localNameError = trimmedName ? validateCharacterName(trimmedName) : null;
-
-  // 名稱可用性預檢（UX 用）。真正的唯一性由建立時的註冊 API 保證。
-  useEffect(() => {
-    // 每次輸入變動都要遞增：否則本機驗證失敗而提前 return 時，
-    // 仍在路上的舊請求回來後會通過新舊比對，把錯誤提示蓋成「此名稱可以使用」
-    const seq = ++requestSeqRef.current;
-
-    if (!trimmedName) {
-      setNameStatus({ kind: 'idle' });
-      return;
-    }
-    const invalid = validateCharacterName(trimmedName);
-    if (invalid) {
-      setNameStatus({ kind: 'invalid', message: CHARACTER_NAME_ERROR_MESSAGES[invalid] });
-      return;
-    }
-
-    setNameStatus({ kind: 'checking' });
-    const timer = setTimeout(async () => {
-      try {
-        const result = await checkNameAvailable(trimmedName);
-        if (seq !== requestSeqRef.current) return; // 已有更新的輸入，丟棄過期結果
-        setNameStatus(result.available ? { kind: 'available' } : { kind: 'taken' });
-      } catch {
-        if (seq !== requestSeqRef.current) return;
-        setNameStatus({ kind: 'check_failed' });
-      }
-    }, NAME_CHECK_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [trimmedName]);
+  // 名稱不要求唯一（§ 19.4），沒有東西要跟伺服器問 —— 只剩本機格式驗證
+  const nameStatus: NameStatus = localNameError
+    ? { kind: 'invalid', message: CHARACTER_NAME_ERROR_MESSAGES[localNameError] }
+    : { kind: 'idle' };
 
   function handleClassChange(cls: ClassName) {
     setSelectedClass(cls);
@@ -99,69 +61,27 @@ export function CharacterCreate() {
   }
 
   /**
-   * § 19.4：名稱必須全球唯一，**註冊成功才建立角色**。
-   * 註冊失敗（重複／離線／驗證失敗）一律阻擋，不可退回只建本機角色，
-   * 否則本機會存在一個永遠上不了排行榜的角色。
+   * 建立角色是**純本機行為**（§ 19.4）：名稱不要求唯一，也沒有要註冊的東西，
+   * 因此離線也建得起來。uuid 與寫入密鑰都在 store 內產生。
    */
   async function handleCreate() {
     if (!trimmedName || localNameError || submitting) return;
 
     setSubmitting(true);
     setSubmitError('');
-    const uuid = generateCharacterUuid();
     try {
-      await registerCharacter({
-        character_id: uuid,
-        character_name: trimmedName,
-        class_name: selectedClass,
-        character_level: 1,
-      });
-    } catch (err) {
-      setSubmitting(false);
-      if (err instanceof LeaderboardError) {
-        if (err.code === 'name_taken') {
-          setNameStatus({ kind: 'taken' });
-          setSubmitError('這個名稱已經被使用，請換一個');
-          return;
-        }
-        if (err.code === 'invalid_name') {
-          setSubmitError(CHARACTER_NAME_ERROR_MESSAGES.invalid_char);
-          return;
-        }
-        if (err.code === 'network') {
-          setSubmitError('無法連線到伺服器，角色名稱需連線驗證，請稍後再試');
-          return;
-        }
-        if (err.code === 'outdated_client') {
-          // 部署期間的版本落差，或瀏覽器快取到舊 bundle
-          setSubmitError('遊戲已更新，請重新整理頁面後再建立角色');
-          return;
-        }
-        if (err.code === 'turnstile') {
-          setSubmitError('人機驗證失敗，請重新整理後再試');
-          return;
-        }
-      }
+      await createCharacter(trimmedName, selectedClass, bonus);
+    } catch {
       setSubmitError('建立失敗，請稍後再試');
-      return;
+    } finally {
+      setSubmitting(false);
     }
-
-    await createCharacter(trimmedName, selectedClass, bonus, uuid);
-    setSubmitting(false);
   }
 
   function renderNameHint() {
     switch (nameStatus.kind) {
       case 'invalid':
         return <span className="name-hint error">{nameStatus.message}</span>;
-      case 'checking':
-        return <span className="name-hint">檢查名稱中...</span>;
-      case 'available':
-        return <span className="name-hint ok">此名稱可以使用</span>;
-      case 'taken':
-        return <span className="name-hint error">此名稱已被使用</span>;
-      case 'check_failed':
-        return <span className="name-hint error">無法連線檢查名稱，建立時會再確認一次</span>;
       default:
         return (
           <span className="name-hint">
@@ -172,7 +92,7 @@ export function CharacterCreate() {
     }
   }
 
-  const canSubmit = !!trimmedName && !localNameError && remaining === 0 && nameStatus.kind !== 'taken' && !submitting;
+  const canSubmit = !!trimmedName && !localNameError && remaining === 0 && !submitting;
 
   return (
     <div className="create-screen">

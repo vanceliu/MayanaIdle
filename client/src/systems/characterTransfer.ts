@@ -5,6 +5,7 @@ import type { BagItem } from '../stores/gameStore';
 import type { WarehouseEntry } from '../db/database';
 import { instantiateFromTemplate } from '../models/skillTemplate';
 import { CURRENT_DATA_VERSION } from '../config';
+import { ensureCharacterAuthToken } from './authToken';
 
 const ENCRYPTION_PASSPHRASE = 'MayanaIdle-v1-8f3k2m9x';
 const SALT = new Uint8Array([77, 97, 121, 97, 110, 97, 73, 100, 108, 101, 83, 97, 108, 116, 50, 48]);
@@ -38,7 +39,8 @@ async function deriveKey(): Promise<CryptoKey> {
   );
 }
 
-async function encrypt(plaintext: string): Promise<string> {
+/** 與 `decryptExport` 對稱。export 出來是為了讓測試能組出舊格式的匯出檔。 */
+export async function encryptExport(plaintext: string): Promise<string> {
   const key = await deriveKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
@@ -53,7 +55,11 @@ async function encrypt(plaintext: string): Promise<string> {
   return btoa(String.fromCharCode(...combined));
 }
 
-async function decrypt(encoded: string): Promise<string> {
+/**
+ * 解開匯出檔。金鑰由寫死的通關語推導（見上），所以這**不是**保密機制，
+ * 只是避免玩家直接用文字編輯器改數值；匯出成 export 是為了讓測試能檢查檔案內容。
+ */
+export async function decryptExport(encoded: string): Promise<string> {
   const key = await deriveKey();
   const raw = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
   const iv = raw.slice(0, 12);
@@ -67,6 +73,11 @@ async function decrypt(encoded: string): Promise<string> {
 }
 
 export async function exportCharacterData(characterId: number): Promise<string> {
+  // 密鑰必須在**讀取角色之前**補發：舊角色若從未上傳過統計就還沒有密鑰，
+  // 匯出檔少了它，還原到另一台裝置後那台會自己產一把不同的，
+  // 兩台就再也不能同時更新同一筆排行榜資料（§ 37.4.3）。
+  await ensureCharacterAuthToken(characterId);
+
   const character = await db.characters.get(characterId);
   if (!character) throw new Error('角色不存在');
 
@@ -110,7 +121,7 @@ export async function exportCharacterData(characterId: number): Promise<string> 
   };
 
   const json = JSON.stringify(data);
-  return encrypt(json);
+  return encryptExport(json);
 }
 
 export function downloadExport(encrypted: string, characterName: string) {
@@ -129,7 +140,7 @@ export async function importCharacterData(
 ): Promise<void> {
   let json: string;
   try {
-    json = await decrypt(encrypted.trim());
+    json = await decryptExport(encrypted.trim());
   } catch {
     throw new Error('檔案解密失敗，可能已被竄改');
   }
@@ -153,6 +164,14 @@ export async function importCharacterData(
   importChar.id = currentCharacterId;
   importChar.userId = existing.userId;
 
+  // 匯入＝**還原完整身分**（§ 19.9）：name / uuid / authToken 都跟著檔案走。
+  // 名稱不再唯一、/api/stats 是 upsert，所以榜上的名稱會跟著下次上傳更新，
+  // 本機與排行榜不會分岔。舊角色沒有 authToken 時保留該格原本的（可能也沒有），
+  // 首次上傳時再以 TOFU 補發。
+  //
+  // 副作用：同一份檔案在兩台裝置還原後共用同一筆排行榜紀錄，
+  // 統計上傳互相覆蓋。這是備份／還原，不是多裝置同步。
+
   if (importChar.skills) {
     importChar.skills = importChar.skills
       .map(s => instantiateFromTemplate(s.id, 0))
@@ -161,6 +180,8 @@ export async function importCharacterData(
 
   await db.characters.update(currentCharacterId, {
     name: importChar.name,
+    ...(importChar.uuid ? { uuid: importChar.uuid } : {}),
+    ...(importChar.authToken ? { authToken: importChar.authToken } : {}),
     className: importChar.className,
     level: importChar.level,
     exp: importChar.exp,

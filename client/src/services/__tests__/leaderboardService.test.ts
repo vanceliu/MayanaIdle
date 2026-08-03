@@ -6,10 +6,8 @@ import {
   clearSnapshotCache,
   shouldUploadStats,
   markStatsUploaded,
-  registerCharacter,
   uploadStats,
-  checkNameAvailable,
-  LeaderboardError,
+  toDisplayName,
   SNAPSHOT_TTL_MS,
   type LeaderboardSnapshot,
 } from '../leaderboardService';
@@ -186,7 +184,8 @@ describe('snapshot 快取', () => {
 
 describe('統計上傳節流', () => {
   const basePayload = {
-    character_id: 'uuid-1', class_name: 'knight', character_level: 10,
+    character_id: 'uuid-1', character_name: '勇者', auth_token: 'tok-1',
+    class_name: 'knight', character_level: 10,
     monstersKilled: 100, bossesKilled: 0, deathCount: 0, equipmentCrafted: 0,
     weaponEnhanceAttempts: 0, armorEnhanceAttempts: 0, weaponsBroken: 0,
     armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0, contribution: 0,
@@ -238,49 +237,27 @@ describe('統計上傳節流', () => {
   });
 });
 
-describe('名稱檢查與註冊', () => {
-  const fetchMock = vi.fn();
-
-  beforeEach(() => {
-    localStorage.clear();
-    fetchMock.mockReset();
-    vi.stubGlobal('fetch', fetchMock);
+describe('榜上顯示名稱', () => {
+  it('一律加上 uuid 前 4 碼的後綴', () => {
+    expect(toDisplayName('勇者', 'a3f21b9c-1234-4567-89ab-cdef01234567')).toBe('勇者#a3f2');
   });
 
-  afterEach(() => vi.unstubAllGlobals());
-
-  it('本機驗證不通過時不打 API', async () => {
-    const result = await checkNameAvailable('壞 名字');
-    expect(result.available).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+  it('同名角色靠後綴區分', () => {
+    const a = toDisplayName('勇者', 'a3f21b9c-1234-4567-89ab-cdef01234567');
+    const b = toDisplayName('勇者', '7c19aaaa-1234-4567-89ab-cdef01234567');
+    expect(a).not.toBe(b);
   });
 
-  it('註冊成功不拋錯', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ success: true }));
-    await expect(registerCharacter({
-      character_id: 'uuid', character_name: '勇者', class_name: 'knight', character_level: 1,
-    })).resolves.toBeUndefined();
-  });
-
-  it('名稱重複時拋出 name_taken', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'name_taken' }, 409));
-    await expect(registerCharacter({
-      character_id: 'uuid', character_name: '勇者', class_name: 'knight', character_level: 1,
-    })).rejects.toMatchObject({ code: 'name_taken' });
-  });
-
-  it('離線時拋出 network', async () => {
-    fetchMock.mockRejectedValue(new Error('offline'));
-    await expect(registerCharacter({
-      character_id: 'uuid', character_name: '勇者', class_name: 'knight', character_level: 1,
-    })).rejects.toBeInstanceOf(LeaderboardError);
+  it('沒有 uuid 時退回純名稱，不產生孤零零的 #', () => {
+    expect(toDisplayName('勇者', '')).toBe('勇者');
   });
 });
 
 describe('uploadStats', () => {
   const fetchMock = vi.fn();
   const payload = {
-    character_id: 'uuid-1', class_name: 'knight', character_level: 10,
+    character_id: 'uuid-1', character_name: '勇者', auth_token: 'tok-1',
+    class_name: 'knight', character_level: 10,
     monstersKilled: 1, bossesKilled: 0, deathCount: 0, equipmentCrafted: 0,
     weaponEnhanceAttempts: 0, armorEnhanceAttempts: 0, weaponsBroken: 0,
     armorsBroken: 0, questsCompleted: 0, totalGoldEarned: 0, contribution: 0,
@@ -293,13 +270,28 @@ describe('uploadStats', () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it('未註冊的角色回 404 時拋出 not_registered，供呼叫端補註冊', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'not_registered' }, 404));
-    await expect(uploadStats(payload)).rejects.toMatchObject({ code: 'not_registered' });
+  it('密鑰不符時拋出 invalid_auth_token', async () => {
+    // 有人拿 snapshot 裡公開的 character_id 想覆寫他人統計
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_auth_token' }, 403));
+    await expect(uploadStats(payload)).rejects.toMatchObject({ code: 'invalid_auth_token' });
   });
 
-  it('成功時不拋錯', async () => {
+  it('Turnstile 失敗（同樣是 403）不會被誤判成密鑰錯誤', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'turnstile_failed' }, 403));
+    await expect(uploadStats(payload)).rejects.toMatchObject({ code: 'turnstile' });
+  });
+
+  it('版本落後時拋出 outdated_client', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'outdated_client' }, 409));
+    await expect(uploadStats(payload)).rejects.toMatchObject({ code: 'outdated_client' });
+  });
+
+  it('成功時不拋錯，且送出密鑰與名稱', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ success: true }));
     await expect(uploadStats(payload)).resolves.toBeUndefined();
+
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.auth_token).toBe('tok-1');
+    expect(sent.character_name).toBe('勇者');
   });
 });

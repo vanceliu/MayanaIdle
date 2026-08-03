@@ -40,6 +40,14 @@ export interface Character {
    * 選填是為了相容 DB v12 以前建立的舊角色，v12 upgrade 會補發。
    */
   uuid?: string;
+  /**
+   * 排行榜的寫入密鑰，建立角色時於本機產生（見 `37-statistics.md` § 37.4.3）。
+   * 伺服端只存 SHA-256，首次上傳統計時綁定；之後不符即拒絕，
+   * 這是「任何人都能抄公開的 uuid 覆寫他人統計」的唯一防線。
+   *
+   * 選填：此機制上線前建立的角色沒有密鑰，首次上傳時補產生即可（TOFU）。
+   */
+  authToken?: string;
   userId: number;
   name: string;
   className: ClassName;

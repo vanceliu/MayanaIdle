@@ -1,5 +1,6 @@
 import { db, type LegacyArchiveEntry } from '../db/database';
 import { resolveEquipment } from './templateSync';
+import { formatAffixDisplay } from '../models/affix';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 
@@ -72,6 +73,7 @@ export interface LegacySharedWarehousePayload {
 function toLegacyEquipment(instance: EquipmentInstance): LegacyEquipment {
   // 先套模板解析，讓快照帶著當時的名稱與部位，日後模板改動也不影響已封存紀錄
   const resolved = resolveEquipment(instance);
+  const quality = resolved.quality ?? 0;
   return {
     name: resolved.name ?? '未知裝備',
     type: resolved.type,
@@ -81,10 +83,12 @@ function toLegacyEquipment(instance: EquipmentInstance): LegacyEquipment {
     element: resolved.element,
     isTwoHanded: resolved.isTwoHanded,
     affixes: (resolved.affixes ?? []).map(affix => ({
-      type: (affix as { type?: string }).type,
-      tier: (affix as { tier?: number }).tier,
-      value: (affix as { value?: number }).value,
-      display: (affix as { display?: string }).display,
+      type: affix.type,
+      tier: affix.tier,
+      value: affix.value,
+      // 顯示文字在封存當下算好寫死：日後 AFFIX_DEFINITIONS 改名或刪詞綴，
+      // 舊遺產仍顯示封存當時的正確名稱（§ 45.1 快照與型別脫鉤）
+      display: formatAffixDisplay(affix, quality),
     })),
   };
 }

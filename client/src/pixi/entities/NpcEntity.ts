@@ -7,6 +7,10 @@ const NPC_COLOR = 0x4ade80;
 const GLOW_COLOR = 0x86efac;
 const RADIUS = TILE_H * 0.45;
 
+/** 圓點的圓心相對格子中心往上偏移；點擊命中測試要用同一個值 */
+export const NPC_BODY_OFFSET = RADIUS;
+
+
 /**
  * 城鎮 NPC：綠色圓點 + 設施 icon 疊在圓點上，下方掛設施名稱。
  * 只負責顯示 —— 點擊由 PixiGame 的 DOM click handler 依格子判斷，

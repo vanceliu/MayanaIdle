@@ -35,13 +35,13 @@ describe('全地圖設計規範合規', () => {
     }
   });
 
-  it('城鎮地圖：每個 NPC 都站在可通行格上（載入驗證已擋，這裡再守一次）', () => {
+  it('城鎮地圖：NPC 有實體，站的格子擋路（載入驗證已擋，這裡再守一次）', () => {
     expect(townMaps.length).toBeGreaterThan(0);
     for (const town of townMaps) {
       expect(town.npcs?.length, `${town.id} 必須有 NPC`).toBeGreaterThan(0);
       for (const npc of town.npcs!) {
         const tile = town.tiles[npc.y][npc.x];
-        expect(TILE_DEFINITIONS[tile as keyof typeof TILE_DEFINITIONS].walkable, `${town.id} 的 ${npc.name}`).toBe(true);
+        expect(TILE_DEFINITIONS[tile as keyof typeof TILE_DEFINITIONS].walkable, `${town.id} 的 ${npc.name}`).toBe(false);
       }
     }
   });

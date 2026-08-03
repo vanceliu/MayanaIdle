@@ -272,6 +272,22 @@ export function getEffectiveAffixValue(affix: Affix, quality: number): number {
   return Math.floor(affix.value * (1 + quality / 100));
 }
 
+/**
+ * 詞綴的顯示文字（一般：`攻擊力 +12% (T4)`；特殊：`[特殊] 毒免疫`，見 § 7.10.5）。
+ *
+ * `Affix` 只存 `{ type, tier, value }`，文字是衍生資料，不進 DB。
+ * 遺產快照是唯一例外：封存當下就把這段文字寫死，日後 `AFFIX_DEFINITIONS`
+ * 改名或刪詞綴時，舊紀錄仍顯示封存當時的正確名稱（§ 45.1）。
+ */
+export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
+  if (isSpecialAffixType(affix.type)) {
+    const def = getSpecialAffixDefinition(affix.type);
+    return `[特殊] ${def?.name ?? affix.type}`;
+  }
+  const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
+  return `${def?.name ?? affix.type} +${getEffectiveAffixValue(affix, quality)}% (T${affix.tier})`;
+}
+
 export interface AffixBonuses {
   attack_power: number;
   attack_elemental: number;

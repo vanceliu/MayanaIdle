@@ -23,7 +23,10 @@ function makePayload(): LegacyCharacterPayload {
     },
     skills: [{ id: 'wind_blade', name: '風刃', level: 3 }],
     quests: [],
-    equipped: [{ name: '鋼劍', enhancement: 7, quality: 15, affixes: [{ display: '力量 +3' }] }],
+    equipped: [{
+      name: '鋼劍', enhancement: 7, quality: 15, isTwoHanded: false,
+      affixes: [{ type: 'attack_power', tier: 4, value: 12, display: '攻擊力 +13% (T4)' }],
+    }],
     inventory: [],
     bagItems: [{ name: '紅藥水', type: 'potion', amount: 7 }],
     personalStorageItems: [],
@@ -62,10 +65,50 @@ describe('LegacyArchiveView', () => {
     await waitFor(() => expect(screen.getByText('風刃')).toBeDefined());
     expect(screen.getAllByText('老兵').length).toBeGreaterThan(0);
     expect(screen.getByText('鋼劍')).toBeDefined();
-    expect(screen.getByText('力量 +3')).toBeDefined();
+    expect(screen.getByText('攻擊力 +13% (T4)')).toBeDefined();
     expect(screen.getByText('8,888')).toBeDefined();   // 殺敵數
     expect(screen.getByText('350')).toBeDefined();     // 貢獻度
     expect(screen.getByText('12,345')).toBeDefined();  // 金幣
+  });
+
+  it('舊快照沒有 display 時用 type/tier/value 重建詞綴文字，不顯示英文 enum', async () => {
+    await seedArchive({
+      equipped: [{
+        name: '鋼劍', quality: 10,
+        affixes: [
+          { type: 'attack_power', tier: 4, value: 12 },
+          { type: 'immune_poison', tier: 0, value: 0 },
+        ],
+      }],
+    });
+    render(<LegacyArchiveView />);
+
+    await waitFor(() => expect(screen.getByText('鋼劍')).toBeDefined());
+    expect(screen.getByText('攻擊力 +13% (T4)')).toBeDefined();
+    expect(screen.getByText('[特殊] 毒免疫')).toBeDefined();
+    expect(screen.queryByText('attack_power')).toBeNull();
+  });
+
+  it('詞綴種類已不存在時顯示「—」而不是英文 enum', async () => {
+    await seedArchive({
+      equipped: [{ name: '古劍', affixes: [{ type: 'removed_affix', tier: 3, value: 5 }] }],
+    });
+    render(<LegacyArchiveView />);
+
+    await waitFor(() => expect(screen.getByText('古劍')).toBeDefined());
+    expect(screen.queryByText('removed_affix')).toBeNull();
+    const affixes = [...document.querySelectorAll('.legacy-affix')].map(n => n.textContent);
+    expect(affixes).toEqual(['—']);
+  });
+
+  it('雙手武器顯示雙手佔用狀態（§ 45.2）', async () => {
+    await seedArchive({
+      equipped: [{ name: '巨劍', enhancement: 3, isTwoHanded: true, affixes: [] }],
+    });
+    render(<LegacyArchiveView />);
+
+    await waitFor(() => expect(screen.getByText('巨劍')).toBeDefined());
+    expect(screen.getByText(/\（雙手\）/)).toBeDefined();
   });
 
   it('快照缺少的統計欄位顯示「—」而不是 0', async () => {

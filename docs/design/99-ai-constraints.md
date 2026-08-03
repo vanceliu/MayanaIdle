@@ -69,17 +69,21 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 65. 智力有兩個作用：技能威力每 2 點 +5%、冷卻縮減每 2 點 +1%（見 `20-attributes.md` § 20.6）；冷卻縮減與詞綴／buff 加總後上限 50%
 66. 腰帶有兩個效果：增加負重（目前停用）與擴充背包格數（`bonusBagSlots`，實際生效）
 67. 快捷鍵固定 10 格（鍵盤 1~9 與 0），可放藥水類／狀態解除道具／回城卷軸／百柱塔通行卷軸／裝備；通行卷軸點擊＝直飛並消耗（見 `35-inventory-constraints.md` § 35.7）
-68. 角色名稱**全球唯一**，2~12 字，允許中英數與符號 `- _ ~ = .`（符號位置不限），禁止空白與純符號名稱；註冊成功才可建立角色（見 `19-account-character.md` § 19.4）
+68. 角色名稱 2~12 字，允許中英數與符號 `- _ ~ = .`（符號位置不限），禁止空白與純符號名稱；**不要求全球唯一**，榜上一律以 `名稱#uuid前4碼` 區分同名（見 `19-account-character.md` § 19.4）
+68a. 建立角色是**純本機行為**，不可再要求連線或註冊才准建立
 69. 送往伺服端的角色識別一律使用 `uuid`，**不可使用 IndexedDB 的自增 `id`**（各瀏覽器都從 1 開始，會互相覆蓋）
 70. 統計中心只打一支 `GET /api/snapshot`，12 個榜單一律在客戶端由同一份 snapshot 切出；不可退回「每個欄位各打一支 API」（見 `37-statistics.md` § 37.4）
 71. snapshot 必須是「各欄位 top-N 的聯集」，不可改成「取全表前 X 筆」—— 任何單一順序的截斷都會讓其他榜單漏掉真正的前段班
-72. `POST /api/stats` 只做 UPDATE 不做 INSERT，且不更新 `character_name`；註冊是寫入排行榜的唯一入口
+72. `POST /api/stats` 是 upsert，**必須驗證角色密鑰 `auth_token`**（伺服端只存 SHA-256，首次寫入即綁定）；沒有這道驗證，任何人都能抄 snapshot 裡公開的 `character_id` 覆寫他人統計
 73. 提高 `CURRENT_DATA_VERSION` 是淘汰舊角色的唯一開關，**不可改用 Dexie schema 版本**做資料淘汰（那是給結構遷移用的）
 74. 淘汰角色前必須先封存為遺產快照（見 `45-legacy-archive.md`），封存成功才刪除原資料
 75. 遺產頁唯讀：不可取出物品、不可復活角色，且頁面內不可有任何前往遊玩畫面的入口
 76. 遺產快照的 `payload` 必須存成 JSON **字串**，不可存成物件（存物件會讓舊紀錄隨型別改動而無法解讀）
 77. 統計欄位只能新增，**不可改變既有欄位的語意**，否則所有遺產快照的數字會變成錯誤資訊
-78. 排行榜的舊資料清理由伺服端依 `data_version` 判定，**不可接受客戶端指定刪除哪一筆**（`character_id` 是公開的）
+78. 排行榜的**批次**清理由伺服端依 `data_version` 判定，客戶端不可指定要清掉哪一批
+78a. **全服只有 `POST /api/stats` 一個寫入端點**。建立與刪除角色都是純本機行為，不碰 D1；刪除的角色在榜上留下的資料列靠版本跳號清掉，不可為此再加回刪除端點
+78b. 角色密鑰**不補發**（可補發即代表任何人都要得到）；遺失就是無法再更新該角色的排行榜資料，不可設計任何救回管道
+78c. 匯出檔含角色密鑰，等同該角色的密碼（加密金鑰寫在前端原始碼裡）；UI 必須明示，且不可把匯出檔上傳到任何第三方
 79. 副手（盾牌／魔導書／臂甲）的防禦**封頂 8 點**（約 T7 全身的 11%），不可讓單一左手欄位再度提供全套等級的防禦；成長曲線由格擋率／魔法攻擊承擔（見 `06-equipment-balance.md` § 6A.8.7）
 82. **裝備Tier 1 是新手裝專屬階級，沒有 Tier 0**：創角直接穿上整套（含皮腰帶），**不販售、不掉落、也不能賣給商店**（`drops.ts` 與兩間商店的 `getSellPrice` 皆以 `acquireType` 排除）。商店從 **T2** 開始賣
 83. 商店售價依同階同類的素質在區間內內插（§ 6A.2），**不可手寫個別價格**；改區間後重跑 `client/scripts/repriceShopGear.mts`
@@ -93,6 +97,67 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 ---
 
+## 99.7 進行中：身分簡化 — 取消名稱全球唯一，改為 uuid + 角色密鑰（分階段計畫）
+
+> 完成並經使用者確認後刪除本節。中斷時可依未打勾項目接續。
+
+### 為什麼要改
+
+「知道自己排名在哪」只需要本機比對 uuid（`isMine = myUuid === characterId`），
+**不需要名稱唯一**。名稱唯一買到的只有「榜上不出現同名」這個顯示效果，
+卻長出一整條複雜度鏈：
+
+```
+名稱唯一 → name-check API → register 佔位 → 刪角要釋放名稱
+        → delete token → 匯出不能帶 token → 匯入不能換名稱
+```
+
+且它擋不住真正的漏洞：`POST /api/stats` 只驗 Turnstile，
+任何人都能抄 snapshot 裡公開的 `character_id` 覆寫他人統計。
+
+### 已確認決策
+
+1. 身分＝客戶端產生的 uuid，**永不釋放、永不回收**，因此沒有重複問題
+2. 每個角色一把密鑰（客戶端產生），伺服端只存 SHA-256；**首次寫入即綁定**（TOFU）
+3. 名稱**不再全球唯一**，格式規則（2~12 字、中英數 + `- _ ~ = .`、禁空白）**完全保留**
+4. 榜上**一律**顯示 `名稱#xxxx`（uuid 前 4 碼），不做「衝突才加後綴」
+5. 創角**不再需要連線**
+6. D1 現有資料為測試資料，直接 DROP 重建
+
+7. **`CURRENT_DATA_VERSION` 不跳號**（維持 3）：密鑰採 TOFU，D1 重建後既有角色的
+   下一次上傳會自動建列並綁定密鑰，不需要把現有角色淘汰成遺產
+8. **只有 `POST /api/stats` 需要保護**。建立角色與刪除角色都是**純本機行為**，
+   不碰 D1 —— 因此 `/api/character/unregister` 一併移除，全服只剩一個寫入端點。
+   代價：刪除的角色會在榜上留下不再更新的資料列，直到資料版本跳號才清掉。
+   名稱不唯一之後這只是美觀問題，不影響任何人取名或上榜
+
+### 階段
+
+- [x] **Phase 1** 文件：本節 + § 19.4／§ 19.9、`37-statistics.md` § 37.4、
+      `45-legacy-archive.md` § 45.4.1、`18-data-schema.md`、`INDEX.md`、99.1 條目增修
+- [x] **Phase 2** Worker + D1：schema 去掉 `name_key`、加 `auth_token_hash`；
+      刪除 `/api/name-check`、`/api/character/register`、`/api/character/unregister`；
+      `/api/stats` 改 upsert 並在單一 UPSERT 內驗證密鑰
+- [x] **Phase 3** 客戶端服務層：移除 `checkNameAvailable`／`registerCharacter`／
+      `unregisterCharacter`，`uploadStats` 帶密鑰與名稱
+- [x] **Phase 4** 創角與角色資料：`Character.authToken`（取代 `deleteToken`）、
+      創角改為純本機、`CharacterCreate` 移除名稱預檢與註冊阻擋、
+      `ensureAuthToken` 為舊角色補發
+- [x] **Phase 5** 顯示與匯出匯入：榜單顯示 `名稱#xxxx`；
+      匯入改為「還原完整身分」（name／uuid／authToken 都跟著檔案走）
+- [x] **Phase 6** 測試與 `npx tsc -b` 驗證（133 檔 / 1566 測試通過）
+
+**尚未執行（線上動作，交由使用者）**：D1 套用新 schema、`wrangler deploy`
+
+### 不可違反
+
+- 密鑰**不可**用 `character_id` 代替：它在 `/api/snapshot` 公開回傳
+- `/api/stats` 的 upsert **必須**驗證密鑰，否則等於回到「任何人可覆寫他人統計」
+- 名稱格式驗證仍要留在伺服端，客戶端驗證只是 UX
+- 全服只剩 `POST /api/stats` 一個寫入端點，不可為了「清掉殭屍列」再加回刪除端點
+
+---
+
 ## 99.6 進行中：城鎮地圖化（分階段計畫）
 
 > 完成並經使用者確認後刪除本節。中斷時可依未打勾項目接續。
@@ -101,74 +166,93 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 1. **城鎮改成可走的地圖**，NPC 全部放在地圖上（薄暮村／艾爾薩斯城鎮／瓦爾登城鎮）。
 2. 地圖尺寸 **30×20**（§ 38.10 允許的三種之一）。
-3. **互動方式**：點 NPC → 自動走過去 → 走到相鄰格自動開啟該設施面板。
+3. **互動方式**：點 NPC 直接開設施面板，**不看距離** —— 畫面上點得到就算。
+   （最初訂為「走過去才開」、後改為 5 格內，最終定案為不限距離；
+   「走過去才開」那套狀態機已整個移除。）
 4. 城鎮**不做自動移動**（自動搜尋在安全區沒有意義）。
-5. NPC 外觀：**綠色圓點 + 設施 icon 疊在圓點上**（怪物是紅點，顏色區分敵我）。
-6. 現有的設施 icon 快捷列**維持不動**（不想走路的人照樣能直接點）。
-
-### 待使用者確認（我先照這個做，不對再改）
-
-- 城鎮地圖**不套用野外的設計規範**（`validateMapSafety` 的密度／叢聚／主導地形／
-  生怪比例），因為那整套是為了生怪與戰鬥走位而訂的；但**仍必須通過
-  `validateMapData` 的載入驗證**（外圍邊界、連通性、`spawnPoint` 合法）。
+5. NPC 外觀：**綠色圓點 + 設施 icon**（怪物是紅點，顏色區分敵我）。
+6. 現有的設施 icon 快捷列**維持不動**。
+7. **NPC 有實體**：站的格子不可通行（新地形 `NpcStand` = 19，外觀同門口地磚），
+   尋路會繞過他。
+8. 滑鼠移到任何實體球體（玩家／怪物／NPC）顯示名稱，**釘在球體上跟著移動**。
 
 ### 不可違反
 
-- 城鎮是安全區：載入城鎮地圖時**不可生成任何怪物**，`mapMonsterStore` 必須維持清空。
-- 設施面板維持現有的**浮動 modal**（`99` 第 44 條：城鎮設施不可放進浮動面板視窗系統；
-  這裡指的是不可變成 PanelDock 的第六個視窗，原本的 `town-modal` 不變）。
-- 城鎮與野外的 HUD 位置必須一致（§ 32.3）。
+- 城鎮是安全區：`spawnTick` 在 `theme === 'town'` 直接返回，永遠不生怪；
+  `setAutoMove` 在城鎮強制 false。兩者都擋在 store 層，不靠呼叫端記得。
+- 城鎮地圖**不套用** `validateMapSafety` 的密度／叢聚／生怪規範（那是為野外戰鬥訂的），
+  但仍必須通過 `validateMapData` 的載入驗證。
+- 城鎮設施面板維持浮動 modal（第 44 條），**不可**變成 PanelDock 的第六個視窗。
+- 地圖點擊的 NPC 判定**必須在 `screenToMapTile` 之前**：NPC 站的格子不可通行，
+  而 `screenToMapTile` 對不可通行格回傳 null，先取格子會把「點正中 NPC」早退掉。
+- HUD 容器一律 `pointer-events: none`（見 § 32.3）。
 
 ### 階段
 
-- [ ] 階段 1：資料模型 —— `MapTheme` 加 `'town'`、`MapData` 加 `npcs`、NPC 型別與驗證
-- [ ] 階段 2：`town` 主題色盤（`mapThemes.ts` + § 38.11）
-- [ ] 階段 3：三張城鎮地圖 JSON（30×20，含 NPC 座標）
-- [ ] 階段 4：Pixi 繪製 NPC（綠點 + icon）與點擊互動；走到相鄰格開面板
-- [ ] 階段 5：城鎮停用生怪與自動移動；`TownView` / `BattleView` 分流調整
-- [ ] 階段 6：測試（NPC 驗證、互動、城鎮不生怪）
-- [ ] 階段 7：文件連動 —— `13-town.md`、`38-map-control.md`（§38.10 地圖數 50→53、§38.11 色盤、§38.12 城鎮例外）、`16-tech §32.3`
+- [x] 階段 1：資料模型 —— `MapTheme` 加 `'town'`、`MapData` 加 `npcs`、NPC 型別與驗證
+- [x] 階段 2：`town` 主題色盤（`mapThemes.ts` + § 38.11）
+- [x] 階段 3：三張城鎮地圖 JSON（`scripts/makeTownMaps.mts` 產生，含 NPC 座標）
+- [x] 階段 4：Pixi 繪製 NPC（綠點 + icon）與點擊互動
+- [x] 階段 5：城鎮停用生怪與自動移動；`TownView` 改成疊在地圖上的設施列 + 面板
+- [x] 階段 6：測試（城鎮地圖、NPC 驗證、townStore、城鎮不生怪）
+- [x] 階段 7：文件連動 —— `13-town.md` § 13.2.1、`38-map-control.md`
+      （§38.4 npcs／§38.10 地圖數 53／§38.12 城鎮例外）、`16-tech §32.3`、`34-ui-guidelines §34.3`
 - [ ] 階段 8：使用者確認後刪除本節
+
+### 實作過程踩到、已修掉的坑（避免重犯）
+
+1. `syncNpcs` 只綁在「地圖變更」的訂閱上，重新整理時地圖已載好、訂閱不觸發 ——
+   NPC 一個都不會畫。初始化路徑也要補畫。
+2. NPC 點擊一度用 Pixi 的 `pointertap` + `stopPropagation`，但地圖移動是掛在 DOM 的
+   `click` 上，兩者各自派路徑、後跑的覆蓋先跑的。**必須走同一個 handler。**
+3. `.town-view` 保留了舊的 `height: 100%` 又改成絕對定位，變成透明板擋住整張地圖。
+4. 驗證點擊時用 `dispatchEvent` 直接對 canvas 派事件會**繞過命中測試**，
+   測不出第 3 點；要用 `document.elementFromPoint()` 確認真滑鼠會打到誰。
+5. 懸停命中判定取整到格子，移動中的實體會差半格（32px），永遠碰不到 ——
+   必須用渲染時的小數座標。
 
 ---
 
-## 99.5 進行中：HUD 版面調整 — 狀態面板下移（分階段計畫）
+## 99.5 進行中：HUD 版面重做 — 滿版遊戲畫面 + 浮動 HUD（分階段計畫）
 
 > 完成並經使用者確認後刪除本節。中斷時可依未打勾項目接續。
 
-### 使用者已確認的決策
+### 最終定案的版面（§ 32.3）
 
-- 版面改成：**stage 只有地圖**；底部左為 `StatusPanel`（480px）、右為上日誌下快捷格。
-- `StatusPanel` 四條**由上往下堆疊**（HP → MP → EXP → 負重），防禦值放在負重那一列。
-- 戰鬥日誌從 `.stage-area` 搬到底部，城鎮與野外共用同一份；放大時從日誌原位往上長。
-- `QuickSlotBar` 維持 10 格一排，右邊接 `PanelDock`。
-- **試過但否決：** ①把 StatusPanel 做成浮在 stage 左下角的半透明 HUD（Diablo/PoE 式）
-  —— 那個位置底下是日誌不是地圖；②把日誌往右推或往上頂去讓出空間 —— 不可壓縮日誌。
-- 地圖選擇器（`MapNavigation`）+ 探索控制列（`ExploreBar`）**留在頂部**，由原本的兩列
-  壓成**同一列**，頂部 HUD 高度從 93px 降到約 46px，多出的高度歸 `.stage-area`。
-- `GameToolbar`（Wiki／匯出／匯入／登出）從 `position: fixed` 右下角移到**頂部 HUD 右側**，
-  讓右下角只剩 `PanelDock`。
-- 底部列改為三欄：左 `StatusPanel`／中 `QuickSlotBar`／右 `PanelDock`。
+遊戲畫面鋪滿整個視窗，HUD 全部絕對定位疊在四角：
+
+- **左上**：`StatusPanel`（四條堆疊 HP → MP → EXP → 負重＋防禦）＋ `BuffBar`
+- **右上**：`MapNavigation`
+- **左下**：`CombatLogWindow`（可拖曳、⚙ 選單可調背景透明度、▲ 三段大小）
+- **底部中央**：`ExploreBar` ＋ `QuickSlotBar`（10 格一排）
+- **右下**：`PanelDock`（3×2）＋ `GameToolbar`（版本號在 Wiki 左邊）
+
+### 過程中試過但被否決的方向（不要重提）
+
+1. 三段式版面（頂部列／stage／底部列）—— 地圖被兩條實心列夾住，空間永遠不夠分。
+2. 把 `StatusPanel` 疊在 stage 左下角 —— 當時 stage 下緣是戰鬥日誌不是地圖，
+   為了不蓋住日誌反而要壓縮日誌。**滿版之後才成立**。
+3. 為了塞 UI 去改戰鬥日誌的 padding／margin（往右推或往上頂）——
+   日誌是玩家真正在讀的東西，要讓位的是新元件。
+4. 把城鎮設施內容從 modal 改成內嵌 —— 使用者要保留浮動視窗。
 
 ### 不可違反
 
-- **城鎮與野外的頂部 HUD 尺寸必須一致**：城鎮沒有探索控制，`ExploreBar` 仍以
-  `.explore-bar-slot.is-hidden`（`visibility: hidden`）保留該格**寬度與高度**，
+- HUD 容器一律 `pointer-events: none`，只有裡面的按鈕／面板收滑鼠。
+- 城鎮沒有探索控制，但 `ExploreBar` 仍以 `.explore-bar-slot.is-hidden` 保留位置，
   不可改成「城鎮不渲染 ExploreBar」。
-- **不可為了塞 UI 去改戰鬥日誌的 padding／margin**（往右推或往上頂都不行）。
-  日誌是玩家真正在讀的東西，要讓位的是新元件，不是日誌。
-- 底部列在窄螢幕先讓 `QuickSlotBar` 換行（§ 35.7），< 1200px 才降級成兩排
-  （狀態面板獨佔一排）——換行只長一排格子的高度，比整個面板另起一排省。
-- `.bars` 是 flex column，`.bar` 必須 `flex: 0 0 auto`；用 `flex: 1` 會讓四條塌掉。
+- 地圖選擇器的觸發鈕與下拉選單必須同寬，否則貼在右上角會頂出視窗。
+- 設施 modal 無暗底遮罩，且上下要留出 HUD 的帶寬（`padding: 150px 12px 100px`）。
 
 ### 階段
 
-- [x] 階段 1：`App.tsx` 版面重組（StatusPanel 移入 `.bottom-bar`、GameToolbar 移入 `.top-hud`）
-- [x] 階段 2：`App.css` — `.top-hud` 單列化、`.bottom-bar` 三欄 grid + 窄螢幕 media query、
-      `.game-toolbar` 取消 fixed
-- [x] 階段 3：新增版面測試（`GameLayout.test.tsx`）
-- [x] 階段 4：同步 `16-tech-frontend-architecture.md` § 32.3 與 `34-ui-guidelines.md` § 34.3
-- [ ] 階段 5：使用者確認畫面後刪除本節
+- [x] 階段 1：`.stage-area` 改成滿版底層，HUD 島絕對定位
+- [x] 階段 2：`StatusPanel` 四條堆疊、防禦併入負重列
+- [x] 階段 3：戰鬥日誌獨立成可拖曳視窗（含透明度設定）
+- [x] 階段 4：怪物卡放大、實體懸停顯示名稱
+- [x] 階段 5：測試（`GameLayout.test.tsx`、`CombatLogWindow.test.tsx`）
+- [x] 階段 6：文件連動（`16-tech §32.3`、`34-ui-guidelines §34.3`）
+- [ ] 階段 7：使用者確認後刪除本節
 
 ---
 
@@ -377,26 +461,6 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 - 新增 seed 欄位（`maxAffixTier`）時必須同步檢查 `database.ts` 的 DB modify 區塊
 - 本次改動會使既有角色的裝備數值全面失效；測試階段不做 migration，重建角色即可
   （比照 `44-dps-prediction.md` § 44.10 對魔導書詞綴池的處理）
-
----
-
-## 99.3 進行中：遺產系統 + 伺服端資料版本清理（分階段計畫）
-
-> 完成並經使用者確認後刪除本節。中斷時可依未打勾項目接續。
-
-- [ ] **Phase 1** 新增 `45-legacy-archive.md`，更新 `INDEX.md`（查找表＋連動圖）、
-      `19-account-character.md` § 19.9、`37-statistics.md` § 37.4、本文件 99.1
-- [ ] **Phase 2** Worker + D1：`character_stats` 新增 `data_version`，Worker 內建
-      `CURRENT_DATA_VERSION` 常數；snapshot 只回現行版本、過期資料不佔用名稱、
-      stats 只更新現行版本
-- [ ] **Phase 3** 本地遺產快照：新表 `legacyArchives`（純文字快照），
-      `dataVersionPurge` 改為「先寫快照再刪除」，共用倉庫以帳號層級另存
-- [ ] **Phase 4** 遺產頁 UI：角色選擇畫面入口，唯讀，僅有「返回角色選擇」
-- [ ] **Phase 5** 測試與 `npx tsc -b` 驗證
-
-**已確認決策**：快照為純文字、寫完即刪原資料；快照含角色完整狀態（含技能）；
-排行榜清理由伺服端資料版本自動處理，不給客戶端刪除權限；
-遺產永久保留、不佔角色格、可手動刪除單筆。
 
 ---
 

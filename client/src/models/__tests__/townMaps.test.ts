@@ -37,13 +37,24 @@ describe('城鎮地圖（§ 99.6）', () => {
     }
   });
 
-  it('NPC 都站在可通行格上，且 facility 是 TownView 認得的', () => {
+  it('NPC 有實體（自己的格子不可通行），且 facility 是 TownView 認得的', () => {
     for (const map of towns) {
       expect(map.npcs?.length, map.id).toBeGreaterThan(0);
       for (const npc of map.npcs!) {
-        expect(isWalkableTile(map, npc), `${map.id} 的 ${npc.name}`).toBe(true);
+        // 尋路要繞過 NPC，所以他站的格子必須擋路（§ 99.6）
+        expect(isWalkableTile(map, npc), `${map.id} 的 ${npc.name}`).toBe(false);
         expect(KNOWN_FACILITIES.has(npc.facility), `${map.id} 的 ${npc.facility}`).toBe(true);
         expect(npc.icon.length, `${map.id} 的 ${npc.name} 沒有 icon`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('每個 NPC 至少有一個可通行的相鄰格，玩家靠得過去', () => {
+    const offsets = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    for (const map of towns) {
+      for (const npc of map.npcs!) {
+        const reachable = offsets.some(([dx, dy]) => isWalkableTile(map, { x: npc.x + dx, y: npc.y + dy }));
+        expect(reachable, `${map.id} 的 ${npc.name} 四周都是牆`).toBe(true);
       }
     }
   });

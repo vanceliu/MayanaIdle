@@ -6,10 +6,6 @@ import {
   fetchSnapshot,
   readCachedSnapshot,
   buildBoard,
-  uploadStats,
-  registerCharacter,
-  shouldUploadStats,
-  markStatsUploaded,
   LeaderboardError,
   LEADERBOARD_FIELDS,
   LEADERBOARD_LABELS,
@@ -26,6 +22,7 @@ export function StatisticsCenter() {
   const character = useGameStore(s => s.character);
   const statistics = useGameStore(s => s.statistics);
   const guildProgress = useGameStore(s => s.guildProgress);
+  const uploadOwnStats = useGameStore(s => s.uploadOwnStats);
 
   const [snapshot, setSnapshot] = useState<LeaderboardSnapshot | null>(() => readCachedSnapshot());
   const [loading, setLoading] = useState(false);
@@ -57,7 +54,7 @@ export function StatisticsCenter() {
     setLoading(true);
     setMessage('');
     try {
-      await uploadOwnStats();
+      await uploadAndReport();
       const fresh = await fetchSnapshot({ force: true });
       setSnapshot(fresh);
     } catch (err) {
@@ -70,61 +67,21 @@ export function StatisticsCenter() {
     }
   }
 
-  async function uploadOwnStats() {
-    if (!character || !statistics || !myUuid) return;
-
-    const payload = {
-      character_id: myUuid,
-      class_name: character.className,
-      character_level: character.level,
-      monstersKilled: statistics.monstersKilled,
-      bossesKilled: statistics.bossesKilled,
-      deathCount: statistics.deathCount,
-      equipmentCrafted: statistics.equipmentCrafted,
-      weaponEnhanceAttempts: statistics.weaponEnhanceAttempts,
-      armorEnhanceAttempts: statistics.armorEnhanceAttempts,
-      weaponsBroken: statistics.weaponsBroken,
-      armorsBroken: statistics.armorsBroken,
-      questsCompleted: statistics.questsCompleted,
-      totalGoldEarned: statistics.totalGoldEarned,
-      contribution: guildProgress.points,
-    };
-
-    // 節流 + 數值未變則完全不送出（見 leaderboardService.shouldUploadStats）
-    if (!shouldUploadStats(myUuid, payload)) return;
-
-    try {
-      await uploadStats(payload);
-      markStatsUploaded(myUuid, payload);
-      return;
-    } catch (err) {
-      if (err instanceof LeaderboardError && err.code === 'outdated_client') {
+  /** 上傳邏輯在 store（匯出時也要用同一份），這裡只負責把結果碼翻成提示文字 */
+  async function uploadAndReport() {
+    switch (await uploadOwnStats()) {
+      case 'outdated_client':
         // 部署期間的版本落差，或瀏覽器快取到舊 bundle
         setMessage('遊戲已更新，請重新整理頁面以繼續上傳統計');
-        return;
-      }
-      if (!(err instanceof LeaderboardError) || err.code !== 'not_registered') {
-        // 上傳失敗不擋排行榜瀏覽
-        return;
-      }
-    }
-
-    // 尚未註冊：v12 之前建立的舊角色，或伺服端資料曾被清空 → 補註冊後重送
-    try {
-      await registerCharacter({
-        character_id: myUuid,
-        character_name: character.name,
-        class_name: character.className,
-        character_level: character.level,
-      });
-      await uploadStats(payload);
-      markStatsUploaded(myUuid, payload);
-    } catch (err) {
-      if (err instanceof LeaderboardError && err.code === 'name_taken') {
-        setMessage('角色名稱已被其他玩家使用，此角色無法登上排行榜');
-      } else if (err instanceof LeaderboardError && err.code === 'invalid_name') {
+        break;
+      case 'invalid_auth_token':
+        // 該 uuid 已被別的密鑰綁定：多半是同一份匯出檔在兩台裝置各自產生過密鑰
+        setMessage('此角色的排行榜紀錄由另一份存檔持有，統計無法上傳');
+        break;
+      case 'invalid_name':
         setMessage('角色名稱不符合現行規則，此角色無法登上排行榜');
-      }
+        break;
+      // 其餘（含上傳失敗）不擋排行榜瀏覽
     }
   }
 
@@ -186,7 +143,7 @@ export function StatisticsCenter() {
                         >
                           <span className="stats-card-rank">{entry.rank}</span>
                           <span className="stats-card-name">
-                            {entry.character_name}
+                            {entry.display_name}
                             {board.field === 'character_level' && <span className="stats-class-tag">{CLASS_NAMES_ZH[entry.class_name as ClassName] ?? entry.class_name}</span>}
                           </span>
                           <span className="stats-card-value">{entry.value.toLocaleString()}</span>
@@ -224,7 +181,7 @@ export function StatisticsCenter() {
                 >
                   <span className="stats-col-rank">{entry.rank}</span>
                   <span className="stats-col-name">
-                    {entry.character_name}
+                    {entry.display_name}
                     {expandedField === 'character_level' && <span className="stats-class-tag">{CLASS_NAMES_ZH[entry.class_name as ClassName] ?? entry.class_name}</span>}
                   </span>
                   <span className="stats-col-value">{entry.value.toLocaleString()}</span>

@@ -78,9 +78,9 @@ interface CharacterStatistics {
 
 ```sql
 CREATE TABLE character_stats (
-  character_id   TEXT PRIMARY KEY,       -- 客戶端 crypto.randomUUID()
-  character_name TEXT NOT NULL,
-  name_key       TEXT NOT NULL UNIQUE,   -- NFC + 小寫，名稱唯一性以此判定
+  character_id    TEXT PRIMARY KEY,      -- 客戶端 crypto.randomUUID()，公開
+  character_name  TEXT NOT NULL,         -- 不要求唯一，每次上傳都更新
+  auth_token_hash TEXT NOT NULL,         -- 角色密鑰的 SHA-256，首次寫入時綁定
   character_level INTEGER DEFAULT 0,
   class_name TEXT NOT NULL,
   data_version INTEGER NOT NULL DEFAULT 0,  -- 見 § 37.4.8
@@ -110,14 +110,38 @@ CREATE TABLE character_stats (
 | 方法 | 路徑 | Turnstile | 說明 |
 |------|------|-----------|------|
 | GET | `/api/snapshot?top=N` | 否 | 12 欄位各 top-N 的聯集（去重），columnar 格式。N 預設 20、上限 100 |
-| GET | `/api/name-check?name=` | 否 | 角色名稱可用性預檢（UX 用） |
-| POST | `/api/character/register` | 是 | 建立角色時註冊名稱，重複回 409 `name_taken` |
-| POST | `/api/stats` | 是 | 更新既有角色統計，**UPDATE-only**，未註冊回 404 `not_registered` |
+| POST | `/api/stats` | 是 | **upsert** 自己的統計，需 `auth_token` |
 
-兩個寫入端點都必須帶 `data_version`，與伺服端不符時回 409 `outdated_client`（見 § 37.4.8）。
+**全服只有這一個寫入端點。** 它必須帶 `data_version`，與伺服端不符時回 409 `outdated_client`（見 § 37.4.8）。
 
-`/api/stats` 刻意不做 upsert：若允許 INSERT，未經 register 的角色就能繞過名稱唯一性檢查。
-該端點亦不更新 `character_name` —— 名稱在註冊時固定，避免改名頂替他人。
+#### 密鑰模型（TOFU）
+
+`/api/stats` 是 upsert，且**必須驗證 `auth_token`**：
+
+| 情況 | 行為 |
+|---|---|
+| `character_id` 尚無資料 | INSERT，並存下 `sha256(auth_token)` —— 首次寫入即綁定 |
+| 已有資料，hash 相符 | UPDATE（含 `character_name`） |
+| 已有資料，hash 不符 | 403 `invalid_auth_token` |
+
+密鑰由客戶端在建立角色時產生，**不提供補發**。
+
+驗證在**單一 UPSERT 內**完成（`ON CONFLICT(character_id) DO UPDATE ... WHERE
+character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
+「先查再寫」的競態，`changes = 0` 即代表密鑰不符。
+刻意不做定值時間比較：存的是 hash，就算靠時間差問出 hash 也無法反推 token
+（需要 SHA-256 preimage）。
+
+> **為何非得驗密鑰不可**：`character_id` 在 `/api/snapshot` 中公開回傳。
+> 若 upsert 不驗證所有權，任何人都能抄一個 uuid 把他人的統計覆寫成任意值。
+> 這正是舊版「UPDATE-only + Turnstile」擋不住的漏洞 ——
+> 舊版的名稱唯一機制只擋得住搶名字，擋不住這個。
+
+> **不再有 `/api/name-check` 與 `/api/character/register`**：名稱不要求唯一之後
+> 兩者都沒有存在意義，且 `name-check` 是唯一無 Turnstile 又直接查 D1 的端點。
+
+`character_name` 每次上傳都更新（名稱非唯一，不存在改名頂替問題），
+但**必須在伺服端重新驗證格式**（規則見 `19-account-character.md` § 19.4）。
 
 ### 37.4.4 snapshot 格式與排名正確性
 
@@ -148,8 +172,9 @@ CREATE TABLE character_stats (
 | 距離上次上傳未滿 10 分鐘 | 不上傳 |
 | 統計數值與上次上傳完全相同 | **不上傳**（掛在城鎮、只是來看榜的玩家不產生任何寫入） |
 | 數值相同但已超過 24 小時 | 強制上傳一次，避免伺服端資料遺失後客戶端永不重送 |
-| 上傳時收到 404 `not_registered` | 自動補註冊後重送（DB v12 之前建立的舊角色走此路徑） |
-| 補註冊收到 409 `name_taken` / 400 `invalid_name` | 顯示提示，該角色不上榜；排行榜仍可正常瀏覽 |
+| 首次上傳 | upsert 直接建立資料列並綁定密鑰，**不需要事先註冊** |
+| 上傳收到 403 `invalid_auth_token` | 顯示提示，該角色不上榜；排行榜仍可正常瀏覽 |
+| 上傳收到 400 `invalid_name` | 同上（伺服端仍會驗名稱格式） |
 | 展開 Top 20、切換榜單 | 從同一份 snapshot 切片，不發請求 |
 
 快取鍵：`mayana_leaderboard_snapshot`（snapshot 本體）、
@@ -166,9 +191,22 @@ CREATE TABLE character_stats (
 「數值未變不上傳」即為此而設 —— 放置型遊戲有大量只看榜不變動的情況。
 若日後仍逼近 D1 寫入額度，下一步是拉長最小上傳間隔（10 → 30 分鐘）。
 
-### 37.4.7 排行榜欄位
+### 37.4.7 排行榜欄位與顯示名稱
 
 所有 § 37.1 統計欄位皆可作為排行依據。「我的統計」分頁一律讀本地資料，不打 API。
+
+**顯示名稱一律為 `名稱#xxxx`**，`xxxx` 是 `character_id` 的前 4 碼（小寫 hex）：
+
+```
+1. 勇者#a3f2      Lv.62
+2. 勇者#7c19      Lv.58
+3. 小白#0e4b      Lv.55
+```
+
+- **一律顯示**，不做「只有衝突才加後綴」—— 那會讓同一個人的顯示名隨著別人進榜而變動。
+- 玩家可用這串確認榜上哪一列是自己（本機 `isMine` 也是比對同一個 uuid）。
+- 後綴取 4 碼是顯示長度與辨識度的折衷，不是唯一性保證；
+  真正的唯一性由完整的 `character_id` 提供。
 
 ### 37.4.8 資料版本與舊角色清理
 
@@ -178,13 +216,24 @@ CREATE TABLE character_stats (
 | 端點 | 對舊版本資料的行為 |
 |---|---|
 | `GET /api/snapshot` | 只回傳現行版本 → 被淘汰的角色自動從排行榜消失 |
-| `GET /api/name-check` | 舊版本資料**不佔用名稱** → 玩家拿得回自己原本的角色名 |
-| `POST /api/character/register` | 註冊前刪除同名或同 id 的舊版本資料；客戶端版本不符回 409 `outdated_client` |
-| `POST /api/stats` | 只更新現行版本的資料；版本不符回 409 |
+| `POST /api/stats` | 只寫入現行版本；客戶端版本不符回 409 `outdated_client` |
 
-> **不可讓客戶端指定要刪除哪一筆排行榜資料**：`character_id` 在 snapshot 中是公開的，
-> 若接受以 uuid 為憑證的刪除請求，任何人都能刪除他人的紀錄。
-> 清理必須是「版本本身的效果」，由伺服端自行判定。
+> **清理只有「版本本身的效果」這一種**，由伺服端依 `data_version` 自行判定，
+> 客戶端不能指定要清掉哪一批，也沒有單筆刪除的端點（見 § 37.4.9）。
+
+名稱不再唯一之後，版本淘汰**不需要處理名稱回收** —— 名稱從來沒有被佔住。
+
+### 37.4.9 刪除角色不通知伺服端
+
+玩家刪除角色是**純本機行為**：沒有 register 就沒有要註銷的東西，
+因此沒有對應的刪除端點，全服只有 `POST /api/stats` 一個寫入端點。
+
+代價是榜上會留下不再更新的資料列，直到 `CURRENT_DATA_VERSION` 跳號才清掉。
+名稱不唯一，所以這**不影響任何人取名或上榜**，純粹是顯示上的殘留。
+
+> **不可為了清掉這些殘留而加回刪除端點。** 憑 `character_id` 刪除等於任何人
+> 都能刪別人的角色（它在 snapshot 中公開）；而憑密鑰刪除又得多一個寫入端點，
+> 換來的只有美觀。
 
 舊版客戶端（快取到舊 bundle）會收到 409，無法再寫入 —— 這是刻意的，
 提高資料版本即代表舊資料已失效。

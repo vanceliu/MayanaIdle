@@ -37,7 +37,8 @@
 |---|---|---|
 | id | number (PK) | 本機 IndexedDB 自增值，**僅本機有效** |
 | uuid | string | 全球唯一識別碼（`crypto.randomUUID()`），跨裝置／跨玩家的唯一 key |
-| name | string | 角色名稱，全球唯一（見 `19-account-character.md` § 19.4） |
+| name | string | 角色名稱，**不要求唯一**（格式規則見 `19-account-character.md` § 19.4） |
+| authToken | string | 該角色的排行榜寫入密鑰（`crypto.randomUUID()`），**機密**，伺服端只存 SHA-256 |
 
 > **不可用 `id` 當作對外識別**：`id` 是每個瀏覽器各自的自增值，所有玩家的第一隻角色都是 `1`。
 > 任何送往伺服端的角色識別（排行榜、未來的線上化）一律使用 `uuid`。

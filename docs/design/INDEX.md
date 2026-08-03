@@ -86,6 +86,8 @@
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
+| 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4，API 見 `37-statistics.md` § 37.4.3 |
+| 刪除角色 / 清除線上紀錄 | `37-statistics.md` | § 37.4.9，另見 `45-legacy-archive.md` § 45.4.1 |
 | 資料版本淘汰（CURRENT_DATA_VERSION） | `19-account-character.md` | § 19.9 |
 
 ### 依限制查找
@@ -243,9 +245,9 @@
        ↕
 18-data-schema.md（User/Character 關係、character uuid）←→ 13-town.md（個人倉庫共用）
        ↕
-37-statistics.md（角色名稱唯一性／註冊 API／排行榜以 uuid 為 key）
+37-statistics.md（排行榜以 uuid 為 key／角色密鑰驗證寫入／名稱不唯一以 #uuid 區分）
        ↕
-45-legacy-archive.md（資料版本淘汰 → 快照封存；統計欄位語意不可變更）
+45-legacy-archive.md（資料版本淘汰 → 快照封存；統計欄位語意不可變更；手動刪角清線上紀錄）
 
 35-inventory-constraints.md ←→ 20-attributes.md（負重公式）
        ↕                              ↕

@@ -147,6 +147,51 @@ describe('Multi-character system', () => {
     });
   });
 
+  /** § 37.4.3：排行榜寫入密鑰。建角時本機產生，舊角色首次上傳時補發（TOFU） */
+  describe('authToken', () => {
+    it('建立角色時就產生密鑰，不需要連線', async () => {
+      await useGameStore.getState().createCharacter('Keyed', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      const char = (await db.characters.get(charId))!;
+      expect(char.authToken).toBeTruthy();
+      // 與 uuid 是兩個不同的值：uuid 公開、密鑰機密
+      expect(char.authToken).not.toBe(char.uuid);
+    });
+
+    it('每個角色的密鑰各自獨立', async () => {
+      const attrs = { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 };
+      await useGameStore.getState().createCharacter('A', 'knight', attrs);
+      const a = (await db.characters.get(useGameStore.getState().character!.id!))!;
+      await useGameStore.getState().createCharacter('B', 'knight', attrs);
+      const b = (await db.characters.get(useGameStore.getState().character!.id!))!;
+
+      expect(a.authToken).not.toBe(b.authToken);
+    });
+
+    it('ensureAuthToken 對已有密鑰的角色回傳原本那把', async () => {
+      await useGameStore.getState().createCharacter('Keyed', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+      const original = (await db.characters.get(charId))!.authToken;
+
+      expect(await useGameStore.getState().ensureAuthToken()).toBe(original);
+    });
+
+    it('舊角色沒有密鑰時補發並寫回 DB（TOFU）', async () => {
+      await useGameStore.getState().createCharacter('Legacy', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+      // 模擬此機制上線前建立的角色
+      await db.characters.update(charId, { authToken: undefined });
+      useGameStore.setState({ character: { ...useGameStore.getState().character!, authToken: undefined } });
+
+      const issued = await useGameStore.getState().ensureAuthToken();
+
+      expect(issued).toBeTruthy();
+      expect((await db.characters.get(charId))!.authToken).toBe(issued);
+      expect(useGameStore.getState().character!.authToken).toBe(issued);
+    });
+  });
+
   describe('logout', () => {
     it('should save state and return to character select', async () => {
       await useGameStore.getState().createCharacter('LogoutTest', 'elf', { STR: 0, AGI: 2, VIT: 0, SPI: 0, INT: 0, CHA: 2 });

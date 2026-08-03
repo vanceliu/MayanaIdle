@@ -179,7 +179,7 @@ export const THEME_TERRAIN_PALETTES: Readonly<Record<MapTheme, readonly TileType
   'lava-tower': [TileType.Lava, TileType.Pillar, TileType.Carpet, TileType.Wall, TileType.Rock, TileType.Decoration],
   // 城鎮：房舍（牆）＋ 門口地磚 ＋ 綠地 ＋ 水井。
   // 城鎮地圖不套用 § 38.12 的密度／叢聚規範（安全區不生怪），色盤仍在這裡登記。
-  'town': [TileType.Wall, TileType.Decoration, TileType.Grass, TileType.Water],
+  'town': [TileType.Wall, TileType.NpcStand, TileType.Grass, TileType.Water],
 };
 
 /**

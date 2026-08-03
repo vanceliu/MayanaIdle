@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../models/character';
 import type { ClassName } from '../models/character';
+import { AFFIX_DEFINITIONS, formatAffixDisplay, isSpecialAffixType } from '../models/affix';
+import type { AnyAffixType } from '../models/affix';
 import { LEADERBOARD_LABELS, type LeaderboardField } from '../services/leaderboardService';
 import {
   listArchives,
@@ -33,10 +35,26 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
+/**
+ * 詞綴文字。`display` 由封存流程寫死（§ 45.1），舊快照沒有這個欄位時，
+ * 就用快照留下的 `type/tier/value` 就地重建；連詞綴種類都認不得才顯示 `—`
+ * （§ 45.3 規定顯示 `—`，不可顯示 0 或猜測值 —— 更不可把英文 enum 丟給玩家看）。
+ */
+function affixText(affix: LegacyEquipment['affixes'][number], quality: number): string {
+  if (affix.display) return affix.display;
+  const type = affix.type as AnyAffixType | undefined;
+  if (!type) return '—';
+  const known = isSpecialAffixType(type) || AFFIX_DEFINITIONS.some(d => d.type === type);
+  if (!known) return '—';
+  return formatAffixDisplay({ type, tier: affix.tier ?? 0, value: affix.value ?? 0 }, quality);
+}
+
 function EquipmentRow({ item }: { item: LegacyEquipment }) {
   const suffix = [
     item.enhancement ? `+${item.enhancement}` : null,
     item.quality ? `品質 ${item.quality}%` : null,
+    // § 45.2：裝備欄需含雙手佔用狀態
+    item.isTwoHanded ? '（雙手）' : null,
   ].filter(Boolean).join(' ');
 
   return (
@@ -45,7 +63,7 @@ function EquipmentRow({ item }: { item: LegacyEquipment }) {
       {item.affixes.length > 0 && (
         <span className="legacy-item-affixes">
           {item.affixes.map((affix, i) => (
-            <span key={i} className="legacy-affix">{affix.display ?? affix.type ?? '?'}</span>
+            <span key={i} className="legacy-affix">{affixText(affix, item.quality ?? 0)}</span>
           ))}
         </span>
       )}

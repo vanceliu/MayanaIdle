@@ -21,9 +21,9 @@ const HEIGHT = 20;
 const GROUND = 0;
 const BOUNDARY = 1;
 const WALL = 3;
-const DECORATION = 4;
 const WATER = 13;
 const GRASS = 16;
+const NPC_STAND = 19;
 
 interface NpcSpec {
   facility: string;
@@ -95,12 +95,12 @@ function buildTown(id: string, name: string, withStarterNpc: boolean) {
     // 站在房子上方會被自己的房子蓋掉名牌。
     const npcY = b.y + b.h;
     const npcX = b.x + 1;
-    tiles[npcY][npcX] = DECORATION; // 門口地磚，可走但不生怪
+    tiles[npcY][npcX] = NPC_STAND; // 門口地磚外觀，但不可通行（NPC 有實體）
     npcs.push({ facility: b.facility, name: b.name, icon: b.icon, x: npcX, y: npcY });
   }
 
   if (withStarterNpc) {
-    tiles[STARTER_NPC.y][STARTER_NPC.x] = DECORATION;
+    tiles[STARTER_NPC.y][STARTER_NPC.x] = NPC_STAND;
     npcs.push({ ...STARTER_NPC });
   }
 

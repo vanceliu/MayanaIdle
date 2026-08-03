@@ -7,7 +7,6 @@
  */
 
 import { getTurnstileToken } from './turnstile';
-import { validateCharacterName } from '../models/characterIdentity';
 import { CURRENT_DATA_VERSION } from '../config';
 
 const LEADERBOARD_API = 'https://leaderboard-api.westwind3122.workers.dev';
@@ -70,13 +69,28 @@ export interface LeaderboardEntry {
   rank: number;
   character_id: string;
   character_name: string;
+  /** 榜上顯示用：`名稱#xxxx`（§ 37.4.7）。名稱不唯一，同名靠這串區分 */
+  display_name: string;
   class_name: string;
   value: number;
   updated_at: string;
 }
 
+/**
+ * 榜上顯示名稱（§ 37.4.7）。**一律**加後綴，不做「只有衝突才加」——
+ * 那會讓同一個人的顯示名隨著別人進榜而變動。
+ */
+export function toDisplayName(characterName: string, characterId: string): string {
+  const suffix = characterId.replace(/-/g, '').slice(0, 4).toLowerCase();
+  return suffix ? `${characterName}#${suffix}` : characterName;
+}
+
 export interface CharacterStatsPayload {
   character_id: string;
+  /** 名稱不唯一，每次上傳都更新（伺服端仍驗格式） */
+  character_name: string;
+  /** 該角色的寫入密鑰。伺服端只存 SHA-256，首次寫入即綁定（§ 37.4.3） */
+  auth_token: string;
   class_name: string;
   character_level: number;
   monstersKilled: number;
@@ -94,12 +108,12 @@ export interface CharacterStatsPayload {
 
 export type LeaderboardErrorCode =
   | 'network'
-  | 'name_taken'
   | 'invalid_name'
-  | 'not_registered'
   /** 客戶端資料版本落後（多半是快取到舊 bundle），伺服端拒絕寫入 */
   | 'outdated_client'
   | 'turnstile'
+  /** 密鑰錯誤或缺漏 —— 該角色無法寫入或刪除自己的線上紀錄 */
+  | 'invalid_auth_token'
   | 'server';
 
 export class LeaderboardError extends Error {
@@ -221,78 +235,21 @@ export function buildBoard(
   if (idIdx < 0 || valueIdx < 0) return [];
 
   return snapshot.rows
-    .map(row => ({
-      character_id: String(row[idIdx] ?? ''),
-      character_name: String(row[nameIdx] ?? ''),
-      class_name: String(row[classIdx] ?? ''),
-      updated_at: String(row[updatedIdx] ?? ''),
-      value: toNumber(row[valueIdx]),
-    }))
+    .map(row => {
+      const character_id = String(row[idIdx] ?? '');
+      const character_name = String(row[nameIdx] ?? '');
+      return {
+        character_id,
+        character_name,
+        display_name: toDisplayName(character_name, character_id),
+        class_name: String(row[classIdx] ?? ''),
+        updated_at: String(row[updatedIdx] ?? ''),
+        value: toNumber(row[valueIdx]),
+      };
+    })
     .sort((a, b) => (b.value - a.value) || a.character_id.localeCompare(b.character_id))
     .slice(0, limit)
     .map((entry, i) => ({ rank: i + 1, ...entry }));
-}
-
-// ---------------------------------------------------------------------------
-// 名稱檢查與註冊
-// ---------------------------------------------------------------------------
-
-export interface NameCheckResult {
-  available: boolean;
-  reason: string | null;
-}
-
-/**
- * 名稱可用性預檢（UX 用）。真正的唯一性由註冊時的 UNIQUE constraint 保證 ——
- * 兩人同時查同一個名字都會通過，但只有一人註冊得成功。
- */
-export async function checkNameAvailable(name: string): Promise<NameCheckResult> {
-  const invalid = validateCharacterName(name);
-  if (invalid) return { available: false, reason: invalid };
-
-  let res: Response;
-  try {
-    res = await fetch(`${LEADERBOARD_API}/api/name-check?name=${encodeURIComponent(name)}`);
-  } catch {
-    throw new LeaderboardError('network');
-  }
-  if (!res.ok) throw new LeaderboardError('server', `name-check ${res.status}`);
-  return res.json();
-}
-
-/**
- * 建立角色時註冊名稱。§ 19.4：註冊成功才可建立角色，失敗一律阻擋。
- * 名稱重複拋出 code 為 `name_taken` 的 LeaderboardError。
- */
-export async function registerCharacter(input: {
-  character_id: string;
-  character_name: string;
-  class_name: string;
-  character_level: number;
-}): Promise<void> {
-  const turnstile_token = await getTurnstileToken().catch(() => {
-    throw new LeaderboardError('turnstile');
-  });
-
-  let res: Response;
-  try {
-    res = await fetch(`${LEADERBOARD_API}/api/character/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...input, data_version: CURRENT_DATA_VERSION, turnstile_token }),
-    });
-  } catch {
-    throw new LeaderboardError('network');
-  }
-
-  if (res.ok) return;
-
-  const body = await res.json().catch(() => ({}) as { error?: string });
-  if (res.status === 409 && body.error === 'outdated_client') throw new LeaderboardError('outdated_client');
-  if (res.status === 409 && body.error === 'name_taken') throw new LeaderboardError('name_taken');
-  if (res.status === 400 && body.error === 'invalid_name') throw new LeaderboardError('invalid_name');
-  if (res.status === 403) throw new LeaderboardError('turnstile');
-  throw new LeaderboardError('server', body.error ?? `register ${res.status}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,9 +269,13 @@ interface UploadStamp {
   sig: string;
 }
 
-/** 數值指紋：排除 character_id（不會變），其餘欄位依固定順序串接 */
+/**
+ * 數值指紋：排除 character_id（不會變）與 auth_token（機密且不變），
+ * 其餘欄位依固定順序串接。名稱納入指紋 —— 匯入還原可能改名，改了就要重送。
+ */
 function statsSignature(payload: CharacterStatsPayload): string {
   return [
+    payload.character_name,
     payload.class_name,
     payload.character_level,
     ...STAT_FIELD_ORDER.map(f => payload[f]),
@@ -371,8 +332,8 @@ export function markStatsUploaded(
 }
 
 /**
- * 更新既有角色的統計。角色若尚未註冊（D1 清空重建、或 v12 之前建立的舊角色），
- * 伺服端回 404，此處拋出 `not_registered` 交由呼叫端決定是否補註冊。
+ * upsert 自己的統計（§ 37.4.3）。首次上傳直接建列並綁定 `auth_token` 的 SHA-256（TOFU），
+ * 之後密鑰不符即 403 —— 這是「別人不能覆寫你的排行榜資料」的唯一防線。
  */
 export async function uploadStats(payload: CharacterStatsPayload): Promise<void> {
   const turnstile_token = await getTurnstileToken().catch(() => {
@@ -391,8 +352,14 @@ export async function uploadStats(payload: CharacterStatsPayload): Promise<void>
   }
 
   if (res.ok) return;
-  if (res.status === 404) throw new LeaderboardError('not_registered');
+
+  const body = await res.json().catch(() => ({}) as { error?: string });
   if (res.status === 409) throw new LeaderboardError('outdated_client');
+  // 403 有兩種：Turnstile 沒過，或密鑰不符（有人拿公開的 uuid 想覆寫他人資料）
+  if (body.error === 'invalid_auth_token' || body.error === 'auth_token_required') {
+    throw new LeaderboardError('invalid_auth_token');
+  }
+  if (res.status === 400 && body.error === 'invalid_name') throw new LeaderboardError('invalid_name');
   if (res.status === 403) throw new LeaderboardError('turnstile');
-  throw new LeaderboardError('server', `stats ${res.status}`);
+  throw new LeaderboardError('server', body.error ?? `stats ${res.status}`);
 }

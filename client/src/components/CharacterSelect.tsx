@@ -35,8 +35,9 @@ export function CharacterSelect() {
             <button
               className="btn-delete-char"
               onClick={() => {
+                // 純本機刪除：名稱不唯一，沒有線上資源要回收（§ 37.4.3）
                 if (window.confirm(`確定要刪除角色「${char.name}」嗎？此操作無法復原。`)) {
-                  deleteCharacter(char.id);
+                  void deleteCharacter(char.id);
                 }
               }}
             >

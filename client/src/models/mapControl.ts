@@ -17,6 +17,8 @@ export const TileType = {
   Grass: 16,
   Sand: 17,
   Carpet: 18,
+  /** NPC 站位：看起來是門口地磚，但不可通行 —— NPC 有實體，尋路要繞過他 */
+  NpcStand: 19,
 } as const;
 
 export type TileType = (typeof TileType)[keyof typeof TileType];
@@ -63,6 +65,8 @@ export const TILE_DEFINITIONS: Readonly<Record<TileType, TileDefinition>> = {
   [TileType.Grass]: { id: TileType.Grass, role: 'grass', walkable: true, spawnable: false, blocksSight: false, blocksProjectiles: false, elevation: 0 },
   [TileType.Sand]: { id: TileType.Sand, role: 'sand', walkable: true, spawnable: false, blocksSight: false, blocksProjectiles: false, elevation: 0 },
   [TileType.Carpet]: { id: TileType.Carpet, role: 'carpet', walkable: true, spawnable: false, blocksSight: false, blocksProjectiles: false, elevation: 0 },
+  // 視覺同裝飾地磚，但不可通行；不擋視線／投射物（城鎮沒有戰鬥，純粹擋路）
+  [TileType.NpcStand]: { id: TileType.NpcStand, role: 'decoration', walkable: false, spawnable: false, blocksSight: false, blocksProjectiles: false, elevation: 0 },
 };
 
 /**
