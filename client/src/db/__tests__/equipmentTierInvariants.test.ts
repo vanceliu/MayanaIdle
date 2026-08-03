@@ -93,19 +93,14 @@ describe('掉落池的 tier 標記', () => {
  *  1. 「製作入門不如商店天花板」（舊資料：商店 17 傷 vs 製作入門 11 傷）
  *  2. tier 倒置（舊資料：妖精進階 25 > 頂級 22、盜賊進階 19 > 頂級 17）
  *
- * 素質重算（§ 99.4 Phase 4b/5）完成前，此測試預期為紅燈，
- * 因此暫時標記為 `todo`，重算後改回 `it` 即可作為迴歸保護。
  */
 /**
  * T6/T7 為掉落限定（§ 6A.8.0）：
  *  - T6 僅一般怪物掉落，T7 僅 Boss 掉落
  *  - 鐵匠的製作階梯止於 T5
  *
- * 現況：35 件 T6 仍標記為 `craft`（舊的「頂級製作品」），且完全沒有 T7。
- * 這批要在 Phase 4b 重新分配 —— 現有頂級製作品下修為 T5（保留其製作配方與前置鏈），
- * T6/T7 另立為全新的掉落限定裝備。重分配完成後把此區塊由 `todo` 改回 `describe`。
  */
-describe.todo('T6/T7 掉落限定（待 Phase 4b 重分配後啟用）', () => {
+describe('T6/T7 掉落限定', () => {
   it('鐵匠製作止於 T5', () => {
     const tooHigh = REAL
       .filter(t => t.acquireType === 'craft' && t.tier! > MAX_CRAFT_TIER)
@@ -133,7 +128,7 @@ describe.todo('T6/T7 掉落限定（待 Phase 4b 重分配後啟用）', () => {
   });
 });
 
-describe.todo('tier 素質單調遞增（待 Phase 4b/5 素質重算後啟用）', () => {
+describe('tier 素質單調遞增', () => {
   it('每個武器類型內，tier N+1 的天花板 > tier N', () => {
     const types = [...new Set(REAL.filter(t => t.type !== 'armor').map(t => t.type))];
     const violations: string[] = [];
