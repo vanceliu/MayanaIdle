@@ -41,7 +41,29 @@
 
 ## 3. 流程 A：一般部署（不動任何版本）
 
-最常見的情況。
+最常見的情況。**直接跑腳本即可**：
+
+```bash
+./scripts/deploy.sh              # 完整流程
+./scripts/deploy.sh --dry-run    # 只跑檢查與建置，不推上 gh-pages
+```
+
+腳本把 § 8 的檢查清單寫成程式，任一項失敗就中止：
+
+| 檢查 | 對應的坑 |
+|---|---|
+| 工作區必須乾淨 | § 7.5 未提交就 build，版本標示會指向上一個 commit |
+| client 與 Worker 的 `CURRENT_DATA_VERSION` 相同 | § 7.1 版本落差 → 所有寫入回 409 |
+| 最近一次 commit 動過 `config.ts` 就要求確認 | 那多半是流程 C，Worker 必須先部署（§ 5.3） |
+| `tsc -b`（不是 `--noEmit`） | 根 tsconfig 是 references 形式，`--noEmit` 是空跑 |
+| `vitest run` 全過 | — |
+| 產物內嵌的 SHA 等於 HEAD | 建置用到快取或取不到 git 資訊時會靜默出錯 |
+| 線上 bundle 的 SHA 等於 HEAD | § 7.2 確認真的發佈成功 |
+
+線上驗證刻意**不比對 `index.html`** —— 它有 `max-age=600`，
+CDN 邊緣節點可能還握著舊副本，那不代表部署失敗。
+
+以下是腳本實際做的事，手動執行時照這個順序：
 
 ```bash
 # 1. 先 commit（建置版本標示取的是最後一個 commit 的 SHA，未提交的改動會讓標示指錯）
@@ -234,7 +256,7 @@ npx wrangler d1 execute mayanaidle --remote --command \
 
 ## 8. 快速檢查清單
 
-一般部署：
+一般部署：**跑 `./scripts/deploy.sh` 即可，以下每項都由腳本自動檢查。**
 
 - [ ] 已 commit
 - [ ] `npx tsc -b` 無錯

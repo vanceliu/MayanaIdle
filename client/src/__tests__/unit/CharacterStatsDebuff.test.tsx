@@ -1,3 +1,4 @@
+import { BASE_CHARACTER_DEFENSE } from '../../systems/combat';
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -32,10 +33,15 @@ function sourceMonster(): MonsterInstance {
   };
 }
 
+/**
+ * 產生「有效防禦剛好是 `defense`」的裝備。
+ * 角色初始防禦是 -10（`21-combat-formula.md` § 21.5），裝備要多帶 10 點填坑。
+ */
 function armor(defense: number): EquipmentInstance {
   return {
     templateId: 50, name: '鎧甲', type: 'armor', slot: 'chest', isTwoHanded: false,
-    smallMonsterDamage: 0, largeMonsterDamage: 0, defense, quality: 0, enhancement: 0,
+    smallMonsterDamage: 0, largeMonsterDamage: 0,
+    defense: defense - BASE_CHARACTER_DEFENSE, quality: 0, enhancement: 0,
     affixes: [], ownerId: 1, equipped: true,
   } as EquipmentInstance;
 }
@@ -81,8 +87,11 @@ describe('角色狀態面板反映 debuff', () => {
     render(<CharacterStats />);
     const cursed = statValue('防禦值');
 
+    // 詛咒作用於裝備防禦，初始防禦最後才減：
+    //   無詛咒 60 → 60 + (-10) = 50
+    //   詛咒   floor(60 × 0.8) = 48 → 48 + (-10) = 38
     expect(Number(base)).toBe(50);
-    expect(Number(cursed)).toBe(40);
+    expect(Number(cursed)).toBe(38);
   });
 
   it('詛咒同時使減傷率下降', () => {

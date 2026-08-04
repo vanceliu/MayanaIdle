@@ -1,3 +1,4 @@
+import { BASE_CHARACTER_DEFENSE } from '../combat';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getBuffDamageReduction, calculateMonsterAttack } from '../combat';
 import { getSkillTemplate } from '../../models/skillTemplate';
@@ -29,10 +30,18 @@ function monster(): MonsterInstance {
   };
 }
 
+/**
+ * 產生「有效防禦剛好是 `defense`」的裝備。
+ *
+ * 角色初始防禦是 -10（`21-combat-formula.md` § 21.5），裝備要多帶這 10 點填坑，
+ * 最終防禦才等於參數值 —— 這樣底下每條斷言仍可直接以「N 防禦 → N% 減傷」閱讀。
+ */
 function armor(defense: number): EquipmentInstance {
   return {
     templateId: 50, name: '鎧甲', type: 'armor', slot: 'chest', isTwoHanded: false,
-    smallMonsterDamage: 0, largeMonsterDamage: 0, defense, quality: 0, enhancement: 0,
+    smallMonsterDamage: 0, largeMonsterDamage: 0,
+    defense: defense - BASE_CHARACTER_DEFENSE,
+    quality: 0, enhancement: 0,
     affixes: [], ownerId: 1, equipped: true,
   } as EquipmentInstance;
 }

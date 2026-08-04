@@ -454,8 +454,9 @@ describe('combat system', () => {
       });
       const char = createTestCharacter();
       const monster = createTestMonster({ attackMin: 100, attackMax: 100 });
+      // 初始防禦 -10，裝備要多帶 10 點才仍然超過 75% 上限
       const gear: EquipmentInstance[] = [
-        createTestArmor({ defense: 80 }),
+        createTestArmor({ defense: 90 }),
       ];
 
       const result = calculateMonsterAttack(monster, char, gear);
@@ -497,9 +498,12 @@ describe('combat system', () => {
 
       const result = calculateMonsterAttack(monster, char, [armor]);
 
-      // rawDefense = 40, finalDefense = floor(40 * 1.10) = 44
-      // reduction = 44%, damage = floor(100 * 56 / 100) = 56
-      expect(result.damage).toBe(56);
+      // 防禦%詞綴只放大「裝備防禦」，不放大角色初始防禦（`21-combat-formula.md` § 21.5）：
+      //   裝備 40 → floor(40 × 1.10) = 44 → 44 + (-10) = 34
+      //   減傷 34%，傷害 = floor(100 × 66 / 100) = 66
+      // 若初始防禦是併進括號算的（(40-10) × 1.1 = 33 → 傷害 67），這條會失敗 ——
+      // 這正是用來鎖住「最後才減」這個設計決定的斷言
+      expect(result.damage).toBe(66);
     });
 
     it('should generate correct log messages', () => {

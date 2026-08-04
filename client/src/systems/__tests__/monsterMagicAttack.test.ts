@@ -4,6 +4,7 @@ import {
   getMagicDefenseContribution,
   DAMAGE_REDUCTION_CAP,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
+  BASE_CHARACTER_DEFENSE,
 } from '../combat';
 import { getMagicResist } from '../../models/character';
 import { isRangedAttackType } from '../../models/monster';
@@ -37,10 +38,17 @@ function monster(attackType: 'melee' | 'magic', atk: number): MonsterInstance {
 }
 
 /** 防禦 N 的胸甲，且不帶格擋（避免格擋 roll 干擾） */
+/**
+ * 產生「有效防禦剛好是 `defense`」的裝備。
+ *
+ * 角色初始防禦是 -10（`21-combat-formula.md` § 21.5），裝備要多帶這 10 點填坑，
+ * 最終防禦才等於參數值 —— 這樣底下每條斷言仍可直接以「N 防禦 → N% 減傷」閱讀。
+ */
 function armor(defense: number): EquipmentInstance {
   return {
     templateId: 2, name: '測試甲', type: 'armor', slot: 'chest', isTwoHanded: false,
-    defense, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
+    defense: defense - BASE_CHARACTER_DEFENSE,
+    quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
   };
 }
 

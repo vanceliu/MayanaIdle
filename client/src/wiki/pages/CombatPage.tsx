@@ -1,4 +1,5 @@
 import {
+  BASE_CHARACTER_DEFENSE,
   DAMAGE_REDUCTION_CAP,
   MAGIC_DEFENSE_EFFECTIVENESS,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
@@ -135,7 +136,8 @@ export function CombatPage() {
         title="玩家防禦減傷"
         formula={
           <>
-            最終防禦 = floor(裝備防禦合計 × (1 + 防禦力%/100))　※ 詛咒中則再 -20%
+            最終防禦 = max(0, floor(裝備防禦合計 × (1 + 防禦力%/100)) + {BASE_CHARACTER_DEFENSE})
+            　※ 詛咒中則再 -20%
             <br />
             <br />
             物理減傷率 = min(最終防禦, {DAMAGE_REDUCTION_CAP})
@@ -155,6 +157,10 @@ export function CombatPage() {
             不足的部分要靠魔法抗性補。物理與魔法的總減傷上限相同，都是 {DAMAGE_REDUCTION_CAP}%。
             <br />
             怪物目前沒有魔法抗性，減傷來源仍只有防禦。
+            <br />
+            <strong>角色初始防禦為 {BASE_CHARACTER_DEFENSE}</strong>，前 {Math.abs(BASE_CHARACTER_DEFENSE)} 點裝備防禦形同填坑。
+            它在百分比加成之後才扣，所以防禦力%詞綴不會放大這個負值；最終防禦夾底於 0，
+            裸裝也不會承受超過 100% 的傷害。
           </>
         }
       />

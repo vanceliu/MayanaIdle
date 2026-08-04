@@ -1,35 +1,10 @@
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
-import { getEffectiveAffixValue } from '../models/affix';
+import { getEffectiveDefense, getCombatBonuses } from '../systems/combat';
+import type { ActiveEffect } from '../models/effect';
 import { getWeightStatus } from '../systems/weight';
 
-function getTotalDefense(gear: (EquipmentInstance | null)[], activeEffects: { type: string; target: string; startTime: number; duration: number; modifiers?: { stat: string; value: number }[] }[]): number {
-  let rawTotal = 0;
-  let defensePercent = 0;
-  for (const g of gear) {
-    if (!g) continue;
-    if (g.defense) rawTotal += g.defense;
-    if (g.enhancement && g.defense) rawTotal += g.enhancement;
-    if (g.affixes) {
-      for (const affix of g.affixes) {
-        if (affix.type === 'defense') {
-          defensePercent += getEffectiveAffixValue(affix, g.quality);
-        }
-      }
-    }
-  }
-  const now = Date.now();
-  for (const effect of activeEffects) {
-    if (effect.type !== 'buff' || effect.target !== 'player') continue;
-    if (now - effect.startTime >= effect.duration) continue;
-    if (!effect.modifiers) continue;
-    for (const mod of effect.modifiers) {
-      if (mod.stat === 'defense') rawTotal += mod.value;
-    }
-  }
-  return Math.floor(rawTotal * (1 + defensePercent / 100));
-}
 
 export function StatusPanel() {
   const char = useGameStore(s => s.character);
@@ -47,7 +22,10 @@ export function StatusPanel() {
 
   const allGear = Object.values(gear).filter(Boolean) as EquipmentInstance[];
 
-  const totalDef = getTotalDefense(allGear, activeEffects);
+  // 防禦一律走 systems/combat 的 getEffectiveDefense —— 這裡原本自己算一份，
+  // 漏掉詛咒的 -20%，與戰鬥實際採用的值不一致（`21-combat-formula.md` § 21.5）
+  const defenseBonuses = getCombatBonuses(allGear, activeEffects as ActiveEffect[]);
+  const totalDef = getEffectiveDefense(allGear, activeEffects as ActiveEffect[], defenseBonuses.defense);
   /**
    * 負重（`20-attributes.md` § 20.7）。超重會擋下攻擊與魔法，所以要常駐可見。
    *

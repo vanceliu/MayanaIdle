@@ -270,7 +270,21 @@ export function getCombatBonuses(
 }
 
 /**
- * 最終防禦值：裝備防禦 + buff 固定防禦，套用防禦%詞綴，再套詛咒（防禦 -20%）。
+ * 角色初始防禦（`21-combat-formula.md` § 21.5）。
+ *
+ * 防禦值**直接等於減傷百分比**，所以這個負值等於全體減傷少 10 個百分點。
+ * 前 10 點裝備防禦形同填坑，前期生存壓力明顯，高階裝早已頂到 75% 上限故無感。
+ */
+export const BASE_CHARACTER_DEFENSE = -10;
+
+/**
+ * 最終防禦值：裝備防禦 + buff 固定防禦，套用防禦%詞綴與詛咒（防禦 -20%），
+ * **最後**才加上角色初始防禦，再夾底於 0。
+ *
+ * 初始防禦放在最後而不是併進括號，是為了不讓防禦%詞綴放大這個負值 ——
+ * 否則穿越多防禦詞綴，懲罰反而越重（`21-combat-formula.md` § 21.5）。
+ * 夾底於 0：裸裝時是 0% 減傷，不會出現承受超過 100% 傷害的情況。
+ *
  * 戰鬥與角色狀態面板共用，避免兩邊各算一份而漂移。
  */
 export function getEffectiveDefense(
@@ -280,7 +294,8 @@ export function getEffectiveDefense(
 ): number {
   const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
   const curseDefPercent = getPlayerDebuffModifier(activeEffects, 'defense');
-  return Math.max(0, Math.floor(rawDefense * (1 + defensePercent / 100) * (100 + curseDefPercent) / 100));
+  const geared = Math.floor(rawDefense * (1 + defensePercent / 100) * (100 + curseDefPercent) / 100);
+  return Math.max(0, geared + BASE_CHARACTER_DEFENSE);
 }
 
 export function getAffixBonusesFromGear(equippedGear: (EquipmentInstance | null)[]): AffixBonuses {

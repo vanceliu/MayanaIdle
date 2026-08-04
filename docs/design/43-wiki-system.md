@@ -44,7 +44,7 @@ client/src/wiki/
 |-----------|---------|
 | 武器 | `EQUIPMENT_SEEDS`（`type !== 'armor'`） |
 | 防具 | `EQUIPMENT_SEEDS`（`type === 'armor'`） |
-| 戰鬥計算 | `DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
+| 戰鬥計算 | `BASE_CHARACTER_DEFENSE`、`DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
 | 詞綴 | `AFFIX_DEFINITIONS`、`SPECIAL_AFFIX_DEFINITIONS`、`AFFIX_TIERS`、`AFFIX_TIER_OVERRIDES`、`getTierWeights`／`getBossTierWeights`、`getSpecialAffixChance`（`models/affix`） |
 | 怪物 | `MONSTER_SEEDS` |
 | 地圖 | `ZONES`、`REGIONS`（`models/mapData`） |
