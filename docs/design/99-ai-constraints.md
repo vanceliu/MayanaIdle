@@ -67,7 +67,7 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 63. 武器的「額外攻擊」(extraAttack) 是加算至武器基傷的固定數值，不是多段攻擊次數。本遊戲無多段攻擊機制，每個攻擊 tick 固定攻擊 1 次
 64. 裝備的額外屬性以 `bonusAttributes` 欄位生效（`bonusStats` 僅為顯示字串）；不受 35 點屬性上限限制，且不影響升級 HP/MP 成長（見 `20-attributes.md` § 20.10）
 65. 智力有兩個作用：技能威力每 2 點 +5%、冷卻縮減每 2 點 +1%（見 `20-attributes.md` § 20.6）；冷卻縮減與詞綴／buff 加總後上限 50%
-66. 腰帶有兩個效果：增加負重（目前停用）與擴充背包格數（`bonusBagSlots`，實際生效）
+66. 腰帶有兩個效果，兩個都生效：增加負重上限（`bonusWeight`，T1 +1,700 → T7 +10,000）與擴充背包格數（`bonusBagSlots`）；見 `35-inventory-constraints.md` § 35.1／§ 35.2.1
 67. 快捷鍵固定 10 格（鍵盤 1~9 與 0），可放藥水類／狀態解除道具／回城卷軸／百柱塔通行卷軸／裝備；通行卷軸點擊＝直飛並消耗（見 `35-inventory-constraints.md` § 35.7）
 68. 角色名稱 2~12 字，允許中英數與符號 `- _ ~ = .`（符號位置不限），禁止空白與純符號名稱；**不要求全球唯一**，榜上一律以 `名稱#uuid前4碼` 區分同名（見 `19-account-character.md` § 19.4）
 68a. 建立角色是**純本機行為**，不可再要求連線或註冊才准建立
@@ -96,3 +96,5 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 81. 臂甲（`armGuard`）是盜賊專屬左手防具，詞綴走**防具池**；不可讓其他職業可裝備，也不可給它武器素質
 89. 怪物攻擊型別有三種且**不可合併**：`melee`（1.5 格）／`ranged` 遠程物理（弓箭手系 7 種、射程 10 格）／`magic` 遠程魔法（巫師／魔導系 6 種、射程 8 格）。**弓箭手走物理減傷，不可標成 `magic`**（魔抗擋不到箭矢）；名單見 `25-monster-system.md` § 25.8
 90. 自動腳本 UI 是**可拖曳浮動視窗**（`PanelKey = 'script'`，走 `FloatingWindow`，無遮罩），與詳細狀態／裝備欄／背包／技能／任務同一套機制；**不可改回置中 overlay modal**（拖不動、且會遮住 idle 進行中的畫面，見 `16-tech-frontend-architecture.md` § 32.16）
+91. 裝備模板一律**用 id 查表，不可用名字查**（禁用 `db.equipmentTemplates.where('name')`）。seed 換過 id 的品項會在玩家 IndexedDB 留下同名舊列，名字查表會撈到舊數值（皮腰帶 id 70 `bonusWeight: 1000` vs id 593 `1700`）；孤兒模板由 `client/src/db/seed/purgeStaleTemplates.ts` 在每次 seed 後清除 —— 實例改指同名現行 id，seed 已無同名品項則連實例一起刪
+92. 新手裝名單**只有 seed 一個來源**：`acquireType: 'starter'` + `requiredClass`（無 `requiredClass` = 全職業共用，如皮腰帶）。不可在程式碼另立硬編名單（見 `client/src/systems/starterNpc.ts`）

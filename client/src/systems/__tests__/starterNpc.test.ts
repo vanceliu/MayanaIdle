@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
+import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { loadTemplateCache } from '../templateSync';
 import {
   canClaimStarterGear,
@@ -115,6 +116,22 @@ describe('starterNpc', () => {
     it('returns empty if level > 30', async () => {
       const result = await claimStarterGear(1, 'knight', 31, []);
       expect(result.claimed).toHaveLength(0);
+    });
+
+    it('領到的是現行 seed 的模板 id，不是同名的舊模板', async () => {
+      // 皮腰帶換過 id（舊 70 = bonusWeight 1000）。以名字查表會撈到主鍵小的那筆，
+      // 所以領取一律走 id（`purgeStaleTemplates.ts`）。
+      await db.equipmentTemplates.put({
+        id: 70, name: '皮腰帶', type: 'armor', slot: 'belt', isTwoHanded: false,
+        defense: 0, bonusWeight: 1000, buyPrice: 5000, stability: -1,
+      } as any);
+
+      const belt = EQUIPMENT_SEEDS.find(t => t.name === '皮腰帶')!;
+      const result = await claimStarterGear(1, 'knight', 5, []);
+      const claimedBelt = result.claimed.find(e => e.name === '皮腰帶')!;
+
+      expect(claimedBelt.templateId).toBe(belt.id);
+      expect(claimedBelt.bonusWeight).toBe(belt.bonusWeight);
     });
 
     it('returns empty if all gear already owned', async () => {

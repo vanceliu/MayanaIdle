@@ -1831,6 +1831,12 @@ button.active {
   overflow: hidden;
 }
 
+/* 裝備欄的 hover tooltip 包了一層 .tooltip-trigger，要讓它撐滿剩餘寬度才不會壓縮欄位排版 */
+.equip-slot .tooltip-trigger {
+  flex: 1;
+  min-width: 0;
+}
+
 .item-stats {
   color: var(--text-dim);
   font-size: var(--fs-xs);

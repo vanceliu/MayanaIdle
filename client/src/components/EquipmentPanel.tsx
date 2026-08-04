@@ -1,6 +1,7 @@
 import { useGameStore } from '../stores/gameStore';
 import type { EquipSlot } from '../models/equipment';
 import { EquipmentDetail } from './EquipmentInfo';
+import { Tooltip } from './Tooltip';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
@@ -50,9 +51,15 @@ export function EquipmentPanel() {
               </span>
               <span className="slot-name">{SLOT_NAMES[slot]}</span>
               {item ? (
-                <div className="equipped-item" onClick={() => unequipItem(slot)}>
-                  <EquipmentDetail item={item} compact templates={templates} />
-                </div>
+                // 欄位本身只放 compact 摘要；hover 才出完整內容（部位／Tier／材質／重量／職業／詞綴）
+                <Tooltip
+                  position="right"
+                  content={<EquipmentDetail item={item} hint="點擊卸下" templates={templates} />}
+                >
+                  <div className="equipped-item" onClick={() => unequipItem(slot)}>
+                    <EquipmentDetail item={item} compact templates={templates} />
+                  </div>
+                </Tooltip>
               ) : (
                 <span className="empty-slot">-- 空 --</span>
               )}

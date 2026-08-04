@@ -53,6 +53,7 @@
 |---|---|---|
 | armor-vest.svg | Lorc | https://game-icons.net/1x1/lorc/armor-vest.html |
 | battle-axe.svg | Lorc | https://game-icons.net/1x1/lorc/battle-axe.html |
+| belt-armor.svg | Delapouite | https://game-icons.net/1x1/delapouite/belt-armor.html |
 | book-cover.svg | Lorc | https://game-icons.net/1x1/lorc/book-cover.html |
 | boots.svg | Lorc | https://game-icons.net/1x1/lorc/boots.html |
 | breastplate.svg | Lorc | https://game-icons.net/1x1/lorc/breastplate.html |

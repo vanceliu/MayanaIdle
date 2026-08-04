@@ -1,42 +1,27 @@
-import type { EquipmentInstance, EquipSlot } from '../models/equipment';
+import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
 import type { ClassName } from '../models/character';
 import { db } from '../db/database';
+import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 import { resolveEquipment } from './templateSync';
 
 const STARTER_MAX_LEVEL = 30;
 const STARTER_ENHANCE_COST = 500;
 
-interface StarterGearSet {
-  weapons: string[];
-  armor: string[];
+/**
+ * 新手裝名單**只有一個來源**：seed 的 `acquireType: 'starter'`（`99-ai-constraints.md` 第 82 條）。
+ * 不另外維護硬編名單 —— 以前用中文名字查表，同名的舊模板殘留在 IndexedDB 時會撈到舊資料。
+ * 沒有 `requiredClass` 的（皮腰帶）視為全職業共用。
+ */
+const STARTER_TEMPLATES: EquipmentTemplate[] = EQUIPMENT_SEEDS.filter(
+  t => t.acquireType === 'starter',
+) as EquipmentTemplate[];
+
+export function getStarterTemplates(className: ClassName): EquipmentTemplate[] {
+  return STARTER_TEMPLATES.filter(t => !t.requiredClass || t.requiredClass.includes(className));
 }
 
-const STARTER_GEAR_MAP: Record<ClassName, StarterGearSet> = {
-  knight: {
-    weapons: ['新手劍', '新手盾'],
-    armor: ['新手鐵盔', '新手鎖甲', '新手鐵手甲', '新手鐵靴', '皮腰帶'],
-  },
-  elf: {
-    weapons: ['新手弓'],
-    armor: ['新手皮帽', '新手皮甲', '新手皮手套', '新手皮靴', '皮腰帶'],
-  },
-  elementalist: {
-    weapons: ['新手法杖', '新手魔導書'],
-    armor: ['新手法師頭巾', '新手法師長袍', '新手法師手套', '新手布鞋', '皮腰帶'],
-  },
-  priest: {
-    weapons: ['新手鐵鎚', '新手盾'],
-    armor: ['新手法師頭巾', '新手法師長袍', '新手法師手套', '新手布鞋', '皮腰帶'],
-  },
-  thief: {
-    weapons: ['新手匕首'],
-    armor: ['新手面罩', '新手盜賊皮衣', '新手護腕', '新手疾風靴', '皮腰帶'],
-  },
-};
-
 export function getStarterGearNames(className: ClassName): string[] {
-  const set = STARTER_GEAR_MAP[className];
-  return [...set.weapons, ...set.armor];
+  return getStarterTemplates(className).map(t => t.name);
 }
 
 export function canClaimStarterGear(level: number): boolean {
@@ -79,18 +64,21 @@ export async function claimStarterGear(
     return { claimed: [], alreadyOwned: [] };
   }
 
-  const allNames = getStarterGearNames(className);
+  const starterTemplates = getStarterTemplates(className);
   const ownedStarterNames = ownedEquipment
     .filter(e => e.isStarterGear)
     .map(e => e.name);
 
-  const missingNames = allNames.filter(n => !ownedStarterNames.includes(n));
-  const alreadyOwned = allNames.filter(n => ownedStarterNames.includes(n));
+  const missing = starterTemplates.filter(t => !ownedStarterNames.includes(t.name));
+  const alreadyOwned = starterTemplates
+    .filter(t => ownedStarterNames.includes(t.name))
+    .map(t => t.name);
 
   const claimed: EquipmentInstance[] = [];
 
-  for (const name of missingNames) {
-    const template = await db.equipmentTemplates.where('name').equals(name).first();
+  for (const seed of missing) {
+    // 一律用 id 取模板：名字可能重複，id 不會（見 `db/seed/purgeStaleTemplates.ts`）
+    const template = await db.equipmentTemplates.get(seed.id!);
     if (!template) continue;
 
     const dbRecord = {

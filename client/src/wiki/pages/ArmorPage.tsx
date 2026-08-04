@@ -143,6 +143,7 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
   if (a.hpRegen) extras.push(`回血+${a.hpRegen}`);
   if (a.mpRegen) extras.push(`回魔+${a.mpRegen}`);
   if (a.bonusBagSlots) extras.push(`背包格子+${a.bonusBagSlots}`);
+  if (a.bonusWeight) extras.push(`負重+${a.bonusWeight}`);
   if (a.bonusStats) extras.push(a.bonusStats);
 
   return (

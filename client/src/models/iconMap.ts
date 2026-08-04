@@ -91,7 +91,7 @@ export const EQUIP_ICON_MAP: Record<string, string> = {
   'armGuard': 'equipment/gloves', // TODO: 缺專屬臂甲圖示，暫用手套
   'helmet': 'equipment/visored-helm',
   'chest': 'equipment/breastplate',
-  'belt': 'equipment/armor-vest',
+  'belt': 'equipment/belt-armor',
   'gloves': 'equipment/gloves',
   'boots': 'equipment/boots',
   'necklace': 'items/gem-pendant',

@@ -103,6 +103,10 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {(item.bonusBagSlots ?? 0) > 0 && (
         <div className="equip-detail-stat">背包格子+{item.bonusBagSlots}</div>
       )}
+      {/* 腰帶的負重加成（`35-inventory-constraints.md` § 35.2.1），拉高負重上限而非物品重量 */}
+      {(item.bonusWeight ?? 0) > 0 && (
+        <div className="equip-detail-stat">負重+{item.bonusWeight}</div>
+      )}
       {item.bonusStats && (
         <div className="equip-detail-stat">{item.bonusStats}</div>
       )}
@@ -191,6 +195,10 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
       )}
       {(template.bonusBagSlots ?? 0) > 0 && (
         <div className="equip-detail-stat">背包格子+{template.bonusBagSlots}</div>
+      )}
+      {/* 腰帶的負重加成（`35-inventory-constraints.md` § 35.2.1），拉高負重上限而非物品重量 */}
+      {(template.bonusWeight ?? 0) > 0 && (
+        <div className="equip-detail-stat">負重+{template.bonusWeight}</div>
       )}
       {template.bonusStats && (
         <div className="equip-detail-stat">{template.bonusStats}</div>

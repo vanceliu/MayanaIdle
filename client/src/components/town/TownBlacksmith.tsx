@@ -564,6 +564,7 @@ export function TownBlacksmith() {
                   {recipe.bonusHp ? ` | HP+${recipe.bonusHp}` : ''}
                   {recipe.bonusMp ? ` | MP+${recipe.bonusMp}` : ''}
                   {recipe.bonusBagSlots ? ` | 背包格子+${recipe.bonusBagSlots}` : ''}
+                  {recipe.bonusWeight ? ` | 負重+${recipe.bonusWeight}` : ''}
                 </span>
                 <span className="shop-item-desc">
                   {recipe.bonusStats ? `${recipe.bonusStats} | ` : ''}
