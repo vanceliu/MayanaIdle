@@ -13,6 +13,21 @@ export type EquipSlot =
   | 'ring1'
   | 'ring2';
 
+
+/** 裝備部位的顯示名稱。裝備欄、新手 NPC 等多處共用，不可各自複製一份。 */
+export const SLOT_NAMES: Record<EquipSlot, string> = {
+  rightHand: '右手',
+  leftHand: '左手',
+  helmet: '頭盔',
+  chest: '胸甲',
+  belt: '腰帶',
+  gloves: '手套',
+  boots: '鞋子',
+  necklace: '項鍊',
+  ring1: '戒指1',
+  ring2: '戒指2',
+};
+
 export type WeaponType =
   | 'sword'
   | 'dagger'

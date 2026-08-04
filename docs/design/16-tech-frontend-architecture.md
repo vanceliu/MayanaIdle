@@ -942,7 +942,27 @@ interface TooltipProps {
 - **點擊置頂**：z-index 由 `panelWindowStore.order` 決定（`PANEL_Z_BASE = 300`，末端最上層）
 - **關閉**：標題列右上 ✕。標題列的 pointer capture 會讓 ✕ 的 `pointerup` 改派到標題列，
   因此 `handleDragStart` 必須在 target 位於 `.floating-window-close` 內時直接 return，否則 click 不觸發
-- **不持久化**：開關狀態與位置只存在於當下 session（與背包格子順序一致）
+- **位置持久化**：拖曳後的座標存 localStorage（`mayana_panel_positions`），全域 key、與角色無關 ——
+  那是「這台機器上的使用習慣」而不是角色資料。**開關狀態與 z 順序仍不持久化**
+  （每次進遊戲從乾淨畫面開始，與背包格子順序一致）
+
+#### 位置持久化的三個必要細節
+
+| 問題 | 作法 |
+|---|---|
+| 拖曳時每個 `pointermove` 都呼叫 `setPosition` | 寫入 **debounce 300ms**；另外掛 `pagehide` 立即 flush，關分頁不掉最後一筆 |
+| 換到不同大小的瀏覽器視窗 | 存檔一併記下**當時的視窗尺寸**，載入時 `scalePositions()` 等比例換算。<br>只換算左上角，超出邊界交給 `FloatingWindow` 掛載時的 clamp 收尾 |
+| 存檔壞掉／新增 PanelKey 後缺格 | `restoreLayout()` **逐面板**驗證，壞的那一格退回預設值，<br>不整份丟掉 —— 舊存檔缺新面板是正常升級路徑 |
+
+存檔格式：
+
+```json
+{ "viewport": { "w": 1920, "h": 1080 },
+  "positions": { "stats": { "x": 24, "y": 120 }, "...": {} } }
+```
+
+沒有 `viewport` 欄位（舊格式）或當下取不到視窗尺寸時，維持絕對座標不換算。
+逃生門：顯示設定的「重設視窗位置」→ `resetPositions()`，清存檔並回到預設停靠位置。
 
 ### 狀態（`stores/panelWindowStore.ts`）
 
@@ -956,6 +976,7 @@ interface TooltipProps {
 | `focusPanel(key)` | 置頂，不改開關狀態 |
 | `setPosition(key, pos)` | 更新座標（夾制由 `FloatingWindow` 負責） |
 | `closeAll()` | 全部關閉 |
+| `resetPositions()` | 回到預設停靠位置並清掉 localStorage 存檔 |
 
 ### 結構
 
@@ -973,6 +994,24 @@ interface TooltipProps {
   <FloatingWindow panelKey="script" className="is-script">    <ScriptEditorContent /></FloatingWindow>
 </PanelWindows>
 ```
+
+---
+
+### 32.15.1 視窗層級（windowLayerStore）
+
+畫面上會互相重疊的「視窗」不只浮動面板，還有**戰鬥日誌、城鎮設施視窗、地圖選擇器**。
+四者共用 `stores/windowLayerStore.ts` 的同一個堆疊順序：**點到誰誰就到最上層**。
+
+| 層 | z-index | 說明 |
+|---|---|---|
+| 地圖／角色卡等一般 HUD | 20 | 不參與堆疊 |
+| 視窗帶狀區間 | 500 + 順序 | 浮動面板、戰鬥日誌、城鎮設施視窗、地圖選擇器 |
+| 常駐 HUD 控制 | 800 | 快捷格、面板按鈕列 —— **永遠壓在視窗之上**，否則開了設施視窗就點不到 |
+
+- 各視窗根元素以 inline `style={{ zIndex }}` 讀取，`onPointerDown` 呼叫 `focusWindow(key)`。
+- **不可再靠 CSS 寫死 z-index 決勝負**：`.town-view` 與 `.hud` 都是 20 時只能比 DOM 順序，
+  結果戰鬥日誌永遠蓋住城鎮設施視窗（點武器店也蓋不過去）。
+- `focusWindow` 對已在頂端的視窗不寫入狀態，避免每次 pointerdown 觸發整批視窗重繪。
 
 ---
 

@@ -48,13 +48,18 @@
   --font-body: 'Noto Sans TC', sans-serif;
   --font-mono: 'Fira Code', monospace;
 
-  --fs-xs: 12px;
-  --fs-sm: 13px;
-  --fs-base: 16px;
-  --fs-md: 17px;
-  --fs-lg: 19px;
-  --fs-title: 22px;
-  --fs-display: 34px;
+  /* 顯示設定（`34-ui-guidelines.md` § 34.6）。兩個倍率由 settingsStore 寫入，
+     預設 1；`--ui-scale` 只縮放 HUD／面板／視窗，遊戲地圖不受影響。 */
+  --ui-scale: 1;
+  --font-scale: 1;
+
+  --fs-xs: calc(12px * var(--font-scale));
+  --fs-sm: calc(13px * var(--font-scale));
+  --fs-base: calc(16px * var(--font-scale));
+  --fs-md: calc(17px * var(--font-scale));
+  --fs-lg: calc(19px * var(--font-scale));
+  --fs-title: calc(22px * var(--font-scale));
+  --fs-display: calc(34px * var(--font-scale));
 
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
@@ -143,6 +148,46 @@ body {
   gap: 8px;
 }
 
+/*
+ * 介面縮放（`34-ui-guidelines.md` § 34.6）。
+ *
+ * 套在「內容盒」而不是定位用的外層（`.hud` 自己）—— 縮放定位層會連 top/left/bottom
+ * 的貼邊距離一起放大，HUD 島就會離角落愈來愈遠。內容盒縮放則錨點不動、只有大小變。
+ * `.stage-area`（Pixi 地圖）刻意不在名單內：縮放它等於改變可視範圍，不是「介面大小」。
+ */
+.hud > *,
+.town-npc-bar,
+.town-modal,
+.floating-window,
+.combat-log-window,
+.modal-overlay > * {
+  zoom: var(--ui-scale);
+
+  /*
+   * 介面大小與文字大小**互不影響**：`zoom` 會連字一起放大，所以在縮放層裡把字級
+   * 先除回去，經過 zoom 之後淨值仍是「基準 × --font-scale」。
+   * 想要「介面小、字大」或反過來都做得到。
+   *
+   * 必須在這裡重新宣告而不是寫進 `:root`：自訂屬性的 `var()` 在**宣告的元素**上就
+   * 完成代換，寫在 `:root` 會把當下的 `--ui-scale` 烤死，子層再縮放也不會重算。
+   */
+  /*
+   * 修正過的 viewport 單位。`zoom` 不會改變 vh/vw 的計算值，但會把渲染結果乘上倍率 ——
+   * 縮放層裡寫 `82vh` 實際畫出來是 `82vh × --ui-scale`，1.5 倍時視窗直接爆出畫面。
+   * 縮放層內一律用 `calc(N * var(--vh-unit))`，不可直接寫 vh/vw。
+   */
+  --vh-unit: calc(1vh / var(--ui-scale));
+  --vw-unit: calc(1vw / var(--ui-scale));
+
+  --fs-xs: calc(12px * var(--font-scale) / var(--ui-scale));
+  --fs-sm: calc(13px * var(--font-scale) / var(--ui-scale));
+  --fs-base: calc(16px * var(--font-scale) / var(--ui-scale));
+  --fs-md: calc(17px * var(--font-scale) / var(--ui-scale));
+  --fs-lg: calc(19px * var(--font-scale) / var(--ui-scale));
+  --fs-title: calc(22px * var(--font-scale) / var(--ui-scale));
+  --fs-display: calc(34px * var(--font-scale) / var(--ui-scale));
+}
+
 .hud-topleft {
   top: 12px;
   left: 12px;
@@ -162,7 +207,12 @@ body {
   left: 12px;
 }
 
+/*
+ * 快捷格與面板按鈕是常駐操作，必須永遠壓在所有視窗之上（視窗帶狀區間是 500 起算，
+ * 見 `stores/windowLayerStore.ts`）。否則城鎮設施視窗一開，快捷格就點不到。
+ */
 .hud-bottomcenter {
+  z-index: 800;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
@@ -171,6 +221,7 @@ body {
 }
 
 .hud-bottomright {
+  z-index: 800;
   bottom: 12px;
   right: 12px;
   flex-direction: column;
@@ -365,11 +416,11 @@ body {
 
 /* 三段大小：視窗釘在左下角，長高就是往上長，蓋在遊戲畫面上 */
 .bottom-log-wrap.log-size-1 {
-  height: 40vh;
+  height: calc(40 * var(--vh-unit, 1vh));
 }
 
 .bottom-log-wrap.log-size-2 {
-  height: 70vh;
+  height: calc(70 * var(--vh-unit, 1vh));
 }
 
 .combat-log.bottom-log {
@@ -1831,6 +1882,15 @@ button.active {
   overflow: hidden;
 }
 
+/* 裝備欄的兩段式卸下：選取後給金色底線與底色，跟背包的已選取一致 */
+.equipped-item.is-selected {
+  background: var(--bg-card-hover);
+  box-shadow: inset 2px 0 0 var(--accent-gold);
+  border-radius: var(--radius-sm);
+  padding-left: 6px;
+  margin-left: -6px;
+}
+
 /* 裝備欄的 hover tooltip 包了一層 .tooltip-trigger，要讓它撐滿剩餘寬度才不會壓縮欄位排版 */
 .equip-slot .tooltip-trigger {
   flex: 1;
@@ -1952,8 +2012,9 @@ button.active {
   background: rgba(18, 18, 30, 0.94);
   border: 1px solid var(--accent-primary);
   border-radius: var(--radius-lg);
-  width: min(600px, 90vw);
-  height: 100%;
+  width: min(600px, calc(90 * var(--vw-unit, 1vw)));
+  /* 外層 overlay 沒有縮放，這裡的 100% 是未縮放的高度，渲染時會再乘上倍率 */
+  height: calc(100% / var(--ui-scale));
   display: flex;
   flex-direction: column;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.75);
@@ -2086,6 +2147,185 @@ button.active {
   background: rgba(6, 182, 212, 0.08);
   color: var(--text-secondary);
   font-size: var(--fs-xs);
+}
+
+/* --- 新手指導員：領取／強化清單（沿用 § 34.1 的 .shop-item 卡片行） --- */
+
+/* 費用與規則說明。做成資訊卡才不會跟下面的裝備清單糊成同一片文字 */
+.starter-info-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-info);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.starter-info-card p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+}
+
+.starter-info-card strong {
+  color: var(--accent-gold);
+}
+
+.starter-info-card .starter-note {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+
+.starter-info-card .starter-note strong {
+  color: var(--accent-success);
+}
+
+.starter-row .shop-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.starter-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+}
+
+.starter-row-note {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.starter-row-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.starter-row-level {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+}
+
+/* 強化進度格：格數 = 安定值，一眼看得出武器(6)與防具(4)上限不同 */
+.starter-track {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.starter-track-cell {
+  width: 10px;
+  height: 8px;
+  border: 1px solid var(--border);
+  border-radius: 1px;
+  background: var(--bg-inset);
+}
+
+.starter-track-cell.filled {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.starter-row.is-maxed .starter-track-cell.filled {
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+}
+
+/* 已滿與不可強化不該再吸引注意力，壓低整列存在感 */
+.starter-row.is-maxed,
+.starter-row.is-unsupported,
+.starter-row.is-owned {
+  opacity: 0.72;
+}
+
+.starter-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.starter-badge.is-done {
+  color: var(--accent-success);
+  border: 1px solid var(--accent-success);
+}
+
+.starter-badge.is-missing {
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+}
+
+.starter-badge.is-muted {
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+.starter-claim-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: var(--accent-primary-dim);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.starter-claim-btn:hover:not(:disabled) {
+  background: var(--accent-primary);
+}
+
+.starter-claim-btn:disabled {
+  background: var(--bg-card);
+  border-color: var(--border-subtle);
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.starter-msg {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--accent-gold);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--accent-gold);
+  font-size: var(--fs-sm);
+}
+
+.starter-warning {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--accent-danger);
+  background: rgba(244, 63, 94, 0.08);
+  color: var(--accent-danger);
+  font-size: var(--fs-sm);
+}
+
+/* 對話分頁的 NPC 對白。依 § 34.1：問候語＝ accent-info + 斜體 + 左邊框 */
+.starter-dialogue {
+  border-left: 3px solid var(--accent-info);
+  padding: 6px 0 6px 12px;
+  margin-bottom: 4px;
+}
+
+.starter-dialogue p {
+  margin: 0 0 6px;
+  color: var(--accent-info);
+  font-size: var(--fs-sm);
+  font-style: italic;
+  line-height: 1.65;
+}
+
+.starter-dialogue p:last-child {
+  margin-bottom: 0;
 }
 
 /* --- 新手指導員：前期知識條列 --- */
@@ -3157,13 +3397,37 @@ button.active {
 }
 
 .bag-grid-container {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+/*
+ * 背包視窗：視窗本體不捲動，捲軸交給格子區（與城鎮面板的 `.panel-scroll` 同一套規則，
+ * 見 `34-ui-guidelines.md` § 34.1）。少了這段，格數多或字級調大時整個 body 一起捲，
+ * 標題、格數與金幣列會被推出畫面。
+ */
+.floating-window.is-bag .floating-window-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.floating-window.is-bag .bag-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 .bag-grid {
   display: grid;
   gap: 3px;
+  /*
+   * 每一列固定高度：不加這行時列高由內容決定，有東西的格子（圖示＋名稱）會比空格高，
+   * 整個背包看起來上下兩截。高度跟著 `--fs-xs` 走，字級調大時名稱才不會被切掉。
+   * 24px 圖示 + 2px gap + 名稱行 + 8px padding + 2px 邊框 ≈ 36px + 1.2 行高
+   */
+  grid-auto-rows: calc(36px + 1.2 * var(--fs-xs));
 }
 
 .bag-cell {
@@ -3172,7 +3436,8 @@ button.active {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
+  /* 高度交給 grid-auto-rows 統一，這裡不可再給 min-height，否則空格會被撐成另一個高度 */
+  min-height: 0;
   background: var(--bg-inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -3212,6 +3477,17 @@ button.active {
 .bag-cell.equipment:hover {
   border-color: var(--accent-info);
   box-shadow: 0 0 8px rgba(6, 182, 212, 0.2);
+}
+
+/*
+ * 兩段式點擊的「已選取」狀態：第一次點選取、第二次才使用／裝備。
+ * 要比 hover 更明顯（實心邊框 + 光暈），否則玩家分不出「滑過」與「選到了」。
+ */
+.bag-cell.is-selected,
+.bag-cell.equipment.is-selected {
+  border-color: var(--accent-gold);
+  background: var(--bg-card-hover);
+  box-shadow: 0 0 0 1px var(--accent-gold), 0 0 10px rgba(245, 158, 11, 0.35);
 }
 
 .bag-cell-icon {
@@ -3654,7 +3930,7 @@ button.active {
   position: fixed;
   display: flex;
   flex-direction: column;
-  max-height: 82vh;
+  max-height: calc(82 * var(--vh-unit, 1vh));
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -3713,7 +3989,7 @@ button.active {
  * body 若沿用預設的 auto 高度 + overflow-y，捲動會發生在 body 上而把 tab 一起帶走。
  */
 .floating-window.is-script {
-  height: 82vh;
+  height: calc(82 * var(--vh-unit, 1vh));
 }
 
 .floating-window.is-script .floating-window-body {
@@ -3765,9 +4041,9 @@ button.active {
   box-shadow: var(--shadow-panel);
   display: flex;
   flex-direction: column;
-  height: 85vh;
+  height: calc(85 * var(--vh-unit, 1vh));
   width: 480px;
-  max-width: 90vw;
+  max-width: calc(90 * var(--vw-unit, 1vw));
 }
 
 .modal-header {
@@ -4150,10 +4426,103 @@ button.active {
   color: var(--accent-danger);
 }
 
+/* --- 顯示設定（§ 34.6） --- */
+.btn-settings {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+  line-height: 1;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-settings:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* 設定視窗刻意不吃 height: 85vh —— 內容只有兩條滑桿，撐滿整個畫面很突兀 */
+.settings-modal {
+  width: 420px;
+  height: auto;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px;
+}
+
+.settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-row > label {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.settings-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-control input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+/* 數值欄固定寬度，拖動時左右不會抖 */
+.settings-value {
+  width: 48px;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  color: var(--accent-primary);
+}
+
+.settings-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.settings-link input[type='checkbox'] {
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.settings-hint,
+.settings-note {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
 /* --- Attribute Up Modal --- */
 .attribute-up-modal {
   width: 360px;
-  max-width: 90vw;
+  max-width: calc(90 * var(--vw-unit, 1vw));
 }
 
 .attribute-up-hint {

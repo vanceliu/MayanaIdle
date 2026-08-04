@@ -61,7 +61,10 @@ describe('EquipmentPanel', () => {
       quality: 0,
       enhancement: 0,
       stability: -1,
-      affixes: [],
+      affixes: [
+        { type: 'max_hp', tier: 3, value: 25 },
+        { type: 'defense', tier: 2, value: 4 },
+      ],
       ownerId: 1,
       equipped: true,
     };
@@ -75,6 +78,12 @@ describe('EquipmentPanel', () => {
       vi.useRealTimers();
     });
 
+    /** 一次完整的滑鼠點擊：按下與放開落在同一點 */
+    function tap(el: Element, x = 10, y = 10) {
+      fireEvent.pointerDown(el, { button: 0, clientX: x, clientY: y });
+      fireEvent.pointerUp(el, { clientX: x, clientY: y });
+    }
+
     it('欄位本身只顯示 compact 摘要，不含部位與職業', () => {
       const { container } = render(<EquipmentPanel />);
       expect(container.querySelector('.equipped-item')).not.toBeNull();
@@ -82,11 +91,17 @@ describe('EquipmentPanel', () => {
       expect(screen.queryByText(/可用職業/)).toBeNull();
     });
 
+    it('裝備欄不列詞綴，避免十個欄位各印四條把面板灌爆', () => {
+      const { container } = render(<EquipmentPanel />);
+      expect(container.querySelector('.equip-detail-affixes')).toBeNull();
+      expect(container.querySelector('.equip-detail-affix')).toBeNull();
+    });
+
     it('hover 後才出現完整內容（含負重加成與卸下提示）', () => {
       const { container } = render(<EquipmentPanel />);
       const trigger = container.querySelector('.tooltip-trigger')!;
 
-      expect(screen.queryByText('點擊卸下')).toBeNull();
+      expect(screen.queryByText('點擊選取')).toBeNull();
 
       fireEvent.mouseEnter(trigger);
       act(() => {
@@ -100,7 +115,66 @@ describe('EquipmentPanel', () => {
       expect(within(popup).getByText('背包格子+5')).toBeDefined();
       expect(within(popup).getByText(/可用職業/)).toBeDefined();
       expect(within(popup).getByText('腰帶')).toBeDefined();
-      expect(within(popup).getByText('點擊卸下')).toBeDefined();
+      expect(within(popup).getByText('點擊選取')).toBeDefined();
+      // 詞綴只在 tooltip 裡出現
+      expect(popup.querySelectorAll('.equip-detail-affix')).toHaveLength(2);
+    });
+
+    it('點一次只選取，點第二次才卸下', () => {
+      const unequipItem = vi.fn();
+      useGameStore.setState({ unequipItem });
+      const { container } = render(<EquipmentPanel />);
+      const equipped = container.querySelector('.equipped-item')!;
+
+      tap(equipped);
+      expect(unequipItem).not.toHaveBeenCalled();
+      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+
+      tap(container.querySelector('.equipped-item')!);
+      expect(unequipItem).toHaveBeenCalledWith('belt');
+    });
+
+    it('點空欄位或面板留白會取消選取', () => {
+      const unequipItem = vi.fn();
+      useGameStore.setState({ unequipItem });
+      const { container } = render(<EquipmentPanel />);
+
+      tap(container.querySelector('.equipped-item')!);
+      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+
+      const empty = container.querySelector('.empty-slot')!;
+      fireEvent.pointerDown(empty, { button: 0 });
+      fireEvent.pointerUp(empty);
+      expect(container.querySelector('.equipped-item.is-selected')).toBeNull();
+
+      // 取消後再點只是重新選取，不會直接卸下
+      tap(container.querySelector('.equipped-item')!);
+      expect(unequipItem).not.toHaveBeenCalled();
+    });
+
+    it('按在裝備上、放開漂到欄位外時，選取不可被清掉', () => {
+      const { container } = render(<EquipmentPanel />);
+      const equipped = container.querySelector('.equipped-item')!;
+
+      tap(equipped);
+      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+
+      // click 被改派到共同祖先時不能誤判成點在空白處
+      fireEvent.click(container.querySelector('.equipped-list')!);
+      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+    });
+
+    it('選取後 tooltip 提示改成「再點一次卸下」', () => {
+      const { container } = render(<EquipmentPanel />);
+      tap(container.querySelector('.equipped-item')!);
+
+      fireEvent.mouseEnter(container.querySelector('.tooltip-trigger')!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      const popup = document.querySelector('.tooltip-popup') as HTMLElement;
+      expect(within(popup).getByText('再點一次卸下')).toBeDefined();
     });
 
     it('移開滑鼠後 tooltip 消失', () => {

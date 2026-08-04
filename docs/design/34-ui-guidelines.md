@@ -52,6 +52,7 @@
 | 鐵匠鋪 | `.shop-panel .blacksmith-panel` | `.bs-shop-item` | 資源列、操作按鈕含消耗/成功率 |
 | 旅館 | `.shop-panel .inn-panel` | — | — |
 | 倉庫 | `.shop-panel .storage-panel` | — | 存取操作 |
+| 新手 NPC | `.starter-npc-panel` | `.starter-row` | 強化進度格、已擁有／未擁有 badge |
 
 ### 頁籤樣式
 
@@ -66,14 +67,14 @@
 **所有顯示裝備詳情的地方必須統一使用共用組件，禁止自行渲染裝備屬性。**
 
 - `<EquipmentDetail item={...} />` — 裝備實例（含強化、品質、詞綴）
-- `<EquipmentDetail item={...} compact />` — 精簡模式（隱藏重量、部位、材質、可用職業）
+- `<EquipmentDetail item={...} compact />` — 精簡模式（隱藏重量、部位、材質、可用職業、**詞綴**）
 - `<EquipmentTemplateDetail template={...} />` — 裝備模板（商店購買用）
 
 ### 使用場景
 
 | 場景 | 組件 | compact | 說明 |
 |---|---|---|---|
-| 裝備欄浮動視窗（EquipmentPanel） | `EquipmentDetail` | `compact` | 資訊精簡，不顯示重量/部位/材質/職業 |
+| 裝備欄浮動視窗（EquipmentPanel） | `EquipmentDetail` | `compact` | 資訊精簡，不顯示重量/部位/材質/職業/詞綴；完整內容走 hover tooltip |
 | 背包 tooltip（BagPanel） | `EquipmentDetail` | — | 完整顯示 |
 | 背包列表（Inventory） | `EquipmentDetail` | — | 完整顯示 |
 | 武器店/防具店 | `EquipmentDetail` / `EquipmentTemplateDetail` | — | 完整顯示 |
@@ -101,7 +102,7 @@
 15. **材質**（武器）— compact 隱藏
 16. **重量** — compact 隱藏
 17. **品質%**（強化過的裝備）
-18. **詞綴列表**（Tier 色階顯示）
+18. **詞綴列表**（Tier 色階顯示）— compact 隱藏（十個欄位各印四條會把裝備欄灌爆，改由 tooltip 呈現）
 19. **可用職業** — compact 隱藏
 
 ### 詞綴 Tier 顏色
@@ -231,3 +232,46 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 ## 34.5 空狀態
 
 列表無內容時顯示 `<p className="empty-text">` 提示文字。
+
+## 34.6 顯示設定（介面大小 / 文字大小）
+
+入口在右下系統列的 ⚙ 按鈕（`GameToolbar`），開啟 `SettingsModal`。
+**不是浮動視窗** —— 設定是偶爾開一次的東西，不需要一邊玩一邊開著，
+所以不佔用 `PanelKey`（`99-ai-constraints.md` 第 44 條）。
+
+### 兩個倍率
+
+| 設定 | CSS 變數 | 作用範圍 | 範圍 |
+|---|---|---|---|
+| 介面大小 | `--ui-scale` | HUD 內容、城鎮設施列與視窗、浮動視窗、戰鬥日誌、置中彈窗 | 80%~150%，每 5% 一級 |
+| 文字大小 | `--font-scale` | 所有 `--fs-*` token | 同上 |
+
+- **遊戲畫面（Pixi 地圖）不縮放**：縮放它等於改變可視範圍，是另一種功能。
+- **兩者預設互不影響**：`zoom` 會連字一起放大，所以縮放層裡把 `--fs-*` 先除以
+  `--ui-scale`，經過 `zoom` 之後淨值仍是「基準 × `--font-scale`」。
+  「介面小、字大」或反過來都做得到。
+- 勾選**「介面與文字一起縮放」**（`linkScales`）後兩條滑桿同步，拉任一條兩邊一起變；
+  勾選當下以介面大小為準把文字拉齊。
+
+### 實作限制
+
+- `zoom` 一律套在**內容盒**，不可套在 `.hud` 這種定位層 ——
+  縮放定位層會連 `top/left/bottom` 的貼邊距離一起放大，HUD 島會離角落愈來愈遠。
+- `--fs-*` 的縮放補償**必須在縮放層重新宣告**，不可只寫在 `:root`：
+  自訂屬性的 `var()` 在宣告的元素上就完成代換，寫在 `:root` 會把當下的 `--ui-scale` 烤死。
+- 縮放層裡的彈窗要 `createPortal` 到 `body`，否則會吃到兩次縮放，
+  且 `position: fixed` 的遮罩範圍會算錯。
+- **縮放層內不可直接寫 `vh` / `vw`**：`zoom` 不改變 viewport 單位的計算值，卻會把渲染結果
+  乘上倍率 —— `max-height: 82vh` 在 1.5 倍時實際畫成 123vh，視窗直接爆出畫面。
+  一律用 `calc(N * var(--vh-unit, 1vh))`（`--vh-unit` / `--vw-unit` 在縮放層宣告為
+  `calc(1vh / var(--ui-scale))`）。同理，縮放層讀未縮放外層的 `100%` 時要除以 `--ui-scale`。
+- 拖曳座標（`FloatingWindow`／`CombatLogWindow`）必須用 `getElementScale()` 換算：
+  指標事件是視窗座標（含縮放），`left/top` 是版面座標，不換算會愈拖愈偏。
+- 設定存 localStorage 全域 key（`mayana_ui_scale`／`mayana_font_scale`／`mayana_scale_linked`），
+  與角色無關，換角色不必重設。
+
+### 浮動視窗位置
+
+設定視窗另有「重設視窗位置」——浮動面板的座標會自動記住
+（`16-tech-frontend-architecture.md` § 32.15），換到不同大小的瀏覽器視窗時按比例還原。
+版面亂掉時用這顆按鈕回到預設停靠位置。

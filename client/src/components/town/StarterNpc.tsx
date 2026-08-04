@@ -5,17 +5,27 @@ import type { ClassName } from '../../models/character';
 import {
   claimStarterGear,
   canClaimStarterGear,
-  canEnhanceStarterGear,
   enhanceStarterGear,
   persistStarterEnhance,
   getStarterEnhanceCost,
   getStarterEnhanceMax,
-  getStarterGearNames,
+  getStarterEnhanceState,
+  getStarterTemplates,
 } from '../../systems/starterNpc';
+import { SLOT_NAMES, type EquipSlot } from '../../models/equipment';
+import { CLASS_NAMES_ZH } from '../../models/character';
+import { GameIcon } from '../GameIcon';
+import { getEquipIcon } from '../../models/iconMap';
 import { STARTER_TIPS } from '../../systems/starterTips';
 import { db } from '../../db/database';
 
 type NpcTab = 'talk' | 'claim' | 'enhance';
+
+/** 防具用部位圖示、武器用類型圖示 —— 與背包／裝備欄同一套判定 */
+function equipIcon(type: string, slot: EquipSlot): string {
+  return getEquipIcon(type === 'armor' ? slot : type);
+}
+
 
 export function StarterNpc() {
   const char = useGameStore(s => s.character);
@@ -38,9 +48,10 @@ export function StarterNpc() {
 
   const starterGearOnHand = allOwned.filter(e => e.isStarterGear);
   const canClaim = canClaimStarterGear(char.level);
-  const allGearNames = getStarterGearNames(char.className as ClassName);
+  // 用 template 而非只有名稱：領取清單要畫部位圖示，資料一律來自 seed
+  const starterTemplates = getStarterTemplates(char.className as ClassName);
   const ownedNames = starterGearOnHand.map(e => e.name);
-  const missingCount = allGearNames.filter(n => !ownedNames.includes(n)).length;
+  const missingCount = starterTemplates.filter(t => !ownedNames.includes(t.name)).length;
 
   async function handleClaim() {
     if (!char) return;
@@ -67,8 +78,9 @@ export function StarterNpc() {
       setMsg('金幣不足！');
       return;
     }
-    if (!canEnhanceStarterGear(item)) {
-      setMsg('此裝備已達強化上限。');
+    const state = getStarterEnhanceState(item);
+    if (state !== 'enhanceable') {
+      setMsg(state === 'unsupported' ? '此部位不適用強化系統。' : '此裝備已達強化上限。');
       return;
     }
 
@@ -97,38 +109,68 @@ export function StarterNpc() {
     setMsg(`${enhanced.name} 強化成功！(+${enhanced.enhancement})`);
   }
 
-  function renderEnhanceList() {
-    const enhanceable = starterGearOnHand.filter(e => canEnhanceStarterGear(e));
-    const maxed = starterGearOnHand.filter(e => !canEnhanceStarterGear(e) && e.isStarterGear);
+  /** 強化進度格：填滿的格數 = 目前強化等級，總格數 = 安定值 */
+  function renderEnhanceTrack(current: number, max: number) {
+    return (
+      <span className="starter-track" aria-label={`強化 ${current} / ${max}`}>
+        {Array.from({ length: max }, (_, i) => (
+          <span key={i} className={`starter-track-cell${i < current ? ' filled' : ''}`} />
+        ))}
+      </span>
+    );
+  }
+
+  function renderEnhanceRow(item: EquipmentInstance) {
+    const state = getStarterEnhanceState(item);
+    const max = getStarterEnhanceMax(item);
     const cost = getStarterEnhanceCost();
-    const gold = char!.gold;
+    const affordable = char!.gold >= cost;
 
     return (
-      <div className="starter-enhance-list">
-        {starterGearOnHand.length === 0 && <p className="empty-text">你沒有任何新手裝備。</p>}
-        {enhanceable.map(item => (
-          <div key={item.id} className="starter-item-row">
-            <span className="starter-item-name">
-              {item.name} +{item.enhancement}/{getStarterEnhanceMax(item)}
+      <div key={item.id} className={`shop-item starter-row is-${state}`}>
+        <div className="shop-item-info">
+          <span className="starter-row-name">
+            <GameIcon name={equipIcon(item.type, item.slot)} size={18} />
+            {item.name}
+          </span>
+          {/* 腰帶沒有強化軌道可畫（安定值 -1），只留說明 */}
+          {state === 'unsupported' ? (
+            <span className="starter-row-note">此部位不適用強化系統</span>
+          ) : (
+            <span className="starter-row-progress">
+              {renderEnhanceTrack(item.enhancement, max)}
+              <span className="starter-row-level">+{item.enhancement} / +{max}</span>
             </span>
+          )}
+        </div>
+        <div className="shop-item-actions">
+          {state === 'enhanceable' && (
             <button
+              className="shop-action-btn"
               onClick={() => handleEnhance(item)}
-              disabled={gold < cost}
+              disabled={!affordable}
+              title={affordable ? undefined : '金幣不足'}
             >
-              強化 ({cost}G)
+              強化 {cost.toLocaleString()}G
             </button>
-          </div>
-        ))}
-        {maxed.map(item => (
-          <div key={item.id} className="starter-item-row maxed">
-            <span className="starter-item-name">
-              {item.name} +{item.enhancement}/{getStarterEnhanceMax(item)}
-            </span>
-            <span className="starter-maxed-label">已滿</span>
-          </div>
-        ))}
+          )}
+          {state === 'maxed' && <span className="starter-badge is-done">已滿</span>}
+          {state === 'unsupported' && <span className="starter-badge is-muted">不可強化</span>}
+        </div>
       </div>
     );
+  }
+
+  function renderEnhanceList() {
+    if (starterGearOnHand.length === 0) {
+      return <p className="empty-text">你沒有任何新手裝備。</p>;
+    }
+    // 可強化的排在前面，玩家一開面板就看到還能動的目標
+    const order: Record<string, number> = { enhanceable: 0, maxed: 1, unsupported: 2 };
+    const sorted = [...starterGearOnHand].sort(
+      (a, b) => order[getStarterEnhanceState(a)] - order[getStarterEnhanceState(b)],
+    );
+    return <div className="shop-items">{sorted.map(renderEnhanceRow)}</div>;
   }
 
   return (
@@ -148,9 +190,12 @@ export function StarterNpc() {
       <div className="panel-scroll">
       {tab === 'talk' && (
         <div className="starter-talk">
-          <p>「身為一名{char.className === 'knight' ? '騎士' : char.className === 'elf' ? '妖精' : char.className === 'elementalist' ? '元素師' : char.className === 'priest' ? '牧師' : '盜賊'}，你需要合適的裝備才能踏上冒險之路。」</p>
-          <p>「我可以提供你一套新手裝備，還能幫你強化它們。」</p>
-          <p>「不過要注意，這些裝備是特製的，不能存入倉庫或販售，只能穿在身上或丟棄。」</p>
+          {/* 三句是同一段對白，收成一張說話卡，不要各自浮在頁面上 */}
+          <div className="starter-dialogue">
+            <p>「身為一名{CLASS_NAMES_ZH[char.className as ClassName]}，你需要合適的裝備才能踏上冒險之路。」</p>
+            <p>「我可以提供你一套新手裝備，還能幫你強化它們。」</p>
+            <p>「不過要注意，這些裝備是特製的，不能存入倉庫或販售，只能穿在身上或丟棄。」</p>
+          </div>
           {!canClaim && <p className="starter-warning">「你的等級已超過 30，無法再領取新手裝備了。」</p>}
 
           {/* 前期知識：條列說明，預設收合，玩家自行點開需要的主題 */}
@@ -186,16 +231,29 @@ export function StarterNpc() {
             <p className="starter-warning">等級超過 30，無法領取新手裝備。</p>
           ) : (
             <>
-              <p>可領取裝備（{char.className === 'knight' ? '騎士' : char.className === 'elf' ? '妖精' : char.className === 'elementalist' ? '元素師' : char.className === 'priest' ? '牧師' : '盜賊'}套裝）：</p>
-              <div className="starter-gear-list">
-                {allGearNames.map(name => {
-                  const owned = ownedNames.includes(name);
+              <div className="starter-info-card">
+                <p>可領取裝備（{CLASS_NAMES_ZH[char.className as ClassName]}套裝）</p>
+                <p className="starter-note">
+                  {missingCount === 0 ? '這一套你都拿齊了。' : `尚缺 ${missingCount} 件。`}
+                </p>
+              </div>
+              <div className="shop-items">
+                {starterTemplates.map(tpl => {
+                  const owned = ownedNames.includes(tpl.name);
                   return (
-                    <div key={name} className={`starter-item-row ${owned ? 'owned' : ''}`}>
-                      <span className="starter-item-name">{name}</span>
-                      <span className={owned ? 'starter-owned-label' : 'starter-missing-label'}>
-                        {owned ? '已擁有' : '未擁有'}
-                      </span>
+                    <div key={tpl.name} className={`shop-item starter-row ${owned ? 'is-owned' : ''}`}>
+                      <div className="shop-item-info">
+                        <span className="starter-row-name">
+                          <GameIcon name={equipIcon(tpl.type, tpl.slot)} size={18} />
+                          {tpl.name}
+                        </span>
+                        <span className="starter-row-note">{SLOT_NAMES[tpl.slot]}</span>
+                      </div>
+                      <div className="shop-item-actions">
+                        <span className={`starter-badge ${owned ? 'is-done' : 'is-missing'}`}>
+                          {owned ? '已擁有' : '未擁有'}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -205,7 +263,7 @@ export function StarterNpc() {
                 onClick={handleClaim}
                 disabled={missingCount === 0}
               >
-                {missingCount === 0 ? '已全部擁有' : `領取缺少的裝備 (${missingCount}件)`}
+                {missingCount === 0 ? '已全部擁有' : `領取缺少的裝備（${missingCount} 件）`}
               </button>
             </>
           )}
@@ -214,8 +272,12 @@ export function StarterNpc() {
 
       {tab === 'enhance' && (
         <div className="starter-enhance">
-          <p>強化費用：每次 {getStarterEnhanceCost()}G（不需要卷軸）</p>
-          <p className="starter-note">強化上限為安定值（武器+6 / 防具+4），安定值內必定成功。</p>
+          <div className="starter-info-card">
+            <p><strong>{getStarterEnhanceCost().toLocaleString()}G</strong> / 次，不需要卷軸</p>
+            <p className="starter-note">
+              上限為安定值（武器 +6、防具 +4），安定值內<strong>必定成功</strong>，不會失敗消失。
+            </p>
+          </div>
           {renderEnhanceList()}
         </div>
       )}

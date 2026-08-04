@@ -112,3 +112,6 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 96. `30-items.md` 的賣價、重量、`iconTier` 對照表與 `itemSeeds.ts` **必須一致**，
     由 `client/src/db/seed/__tests__/itemSeedDocSync.test.ts` 驗證。
     數值以 seed 為準（seed 是實際運作值），文件跟著 seed 走
+
+97. 顯示設定（介面大小／文字大小）的入口是右下系統列的 ⚙ + 置中彈窗，**不是浮動視窗**，不佔 `PanelKey`（見 `34-ui-guidelines.md` § 34.6）
+98. 介面縮放一律用 `--ui-scale` 套在**內容盒**（不可套定位層），且**遊戲畫面（Pixi 地圖）永遠不縮放**；介面大小與文字大小預設互不影響，要一起變是靠「介面與文字一起縮放」勾選，不可改成單一倍率

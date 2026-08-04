@@ -3,8 +3,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FloatingWindow } from '../../components/FloatingWindow';
 import { usePanelWindowStore, PANEL_KEYS } from '../../stores/panelWindowStore';
+import { useWindowLayerStore, getWindowZIndex } from '../../stores/windowLayerStore';
 
 function reset() {
+  useWindowLayerStore.setState({ order: [] });
   usePanelWindowStore.getState().closeAll();
   usePanelWindowStore.getState().openPanel('bag');
   usePanelWindowStore.setState({
@@ -73,6 +75,22 @@ describe('FloatingWindow', () => {
     expect(usePanelWindowStore.getState().open.bag).toBe(false);
   });
 
+  it('點到視窗會提到最上層（與戰鬥日誌／城鎮視窗共用堆疊，§ 32.15）', () => {
+    renderBag();
+    const win = screen.getByTestId('floating-window-bag') as HTMLElement;
+
+    // 先讓城鎮視窗在上面
+    useWindowLayerStore.getState().focusWindow('town');
+    const townZ = getWindowZIndex(useWindowLayerStore.getState().order, 'town');
+    expect(Number(win.style.zIndex)).toBeLessThan(townZ);
+
+    fireEvent.pointerDown(win, { button: 0, pointerId: 1 });
+
+    const raised = getWindowZIndex(useWindowLayerStore.getState().order, 'panel:bag');
+    expect(raised).toBeGreaterThan(townZ);
+    expect(Number(win.style.zIndex)).toBe(raised);
+  });
+
   it('拖曳標題列會更新位置', () => {
     renderBag();
     const header = screen.getByTestId('floating-window-header-bag');
@@ -83,6 +101,27 @@ describe('FloatingWindow', () => {
 
     // 起始 offset = (150-100, 100-80) = (50, 20) → 新位置 = (200-50, 160-20)
     expect(usePanelWindowStore.getState().positions.bag).toEqual({ x: 150, y: 140 });
+  });
+
+  it('介面縮放時拖曳位置換算回版面座標（§ 34.6）', () => {
+    renderBag();
+    const win = screen.getByTestId('floating-window-bag') as HTMLElement;
+    const header = screen.getByTestId('floating-window-header-bag');
+
+    // 模擬 zoom 1.25：版面寬 400，畫面上量到 500
+    Object.defineProperty(win, 'offsetWidth', { value: 400, configurable: true });
+    Object.defineProperty(win, 'offsetHeight', { value: 300, configurable: true });
+    win.getBoundingClientRect = () => ({
+      width: 500, height: 375, top: 100, left: 125, right: 625, bottom: 475, x: 125, y: 100,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(header, { button: 0, clientX: 250, clientY: 200, pointerId: 1 });
+    fireEvent.pointerMove(header, { clientX: 375, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(header, { clientX: 375, clientY: 300, pointerId: 1 });
+
+    // 指標移動 (125, 100) 視窗座標 = (100, 80) 版面座標 → 起點 (100, 80) 移到 (200, 160)
+    expect(usePanelWindowStore.getState().positions.bag).toEqual({ x: 200, y: 160 });
   });
 
   it('放開後再移動滑鼠不會繼續拖曳', () => {

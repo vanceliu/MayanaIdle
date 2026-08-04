@@ -1,4 +1,5 @@
 import { useGameStore } from '../stores/gameStore';
+import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
 import { useTownStore } from '../stores/townStore';
 import { getRegion } from '../models/mapData';
 import { GeneralStore } from './town/GeneralStore';
@@ -58,6 +59,9 @@ export function TownView() {
   const facility = useTownStore(s => s.facility);
   const openFacility = useTownStore(s => s.openFacility);
   const closeFacility = useTownStore(s => s.closeFacility);
+  // 設施列與設施視窗一起提到最上層（§ 32.15）
+  const zIndex = useWindowZIndex('town');
+  const focusWindow = useWindowLayerStore(s => s.focusWindow);
 
   if (!char) return null;
 
@@ -67,7 +71,7 @@ export function TownView() {
   const visibleFacilities = isNeutralTown ? [...FACILITIES, STARTER_NPC_FACILITY] : FACILITIES;
 
   return (
-    <div className="town-view">
+    <div className="town-view" style={{ zIndex }} onPointerDown={() => focusWindow('town')}>
       <div className="town-header">
         <span className="town-name">{townName}</span>
         <span className="town-subtitle">安全區域</span>

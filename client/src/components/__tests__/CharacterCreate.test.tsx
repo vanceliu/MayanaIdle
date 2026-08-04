@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CharacterCreate } from '../CharacterCreate';
 import { useGameStore } from '../../stores/gameStore';
+import { useTownStore } from '../../stores/townStore';
 import type { Attributes, ClassName } from '../../models/character';
 import { CHARACTER_NAME_ERROR_MESSAGES } from '../../models/characterIdentity';
 
@@ -29,6 +30,7 @@ describe('CharacterCreate', () => {
   beforeEach(() => {
     createCharacter.mockReset().mockResolvedValue(undefined);
     useGameStore.setState({ createCharacter, phase: 'create' });
+    useTownStore.getState().closeFacility();
   });
 
   it('名稱含空白時顯示錯誤且不可建立', async () => {
@@ -85,6 +87,32 @@ describe('CharacterCreate', () => {
 
     // 沒有任何「此名稱已被使用」的路徑可以擋住第二個同名角色
     expect(screen.queryByText('此名稱已被使用')).toBeNull();
+  });
+
+  it('建立成功後直接開啟新手指導員視窗', async () => {
+    render(<CharacterCreate />);
+    allocateAllPoints();
+    typeName('新來的');
+
+    fireEvent.click(screen.getByText('開始冒險'));
+
+    await waitFor(() => {
+      expect(useTownStore.getState().facility).toBe('starter-npc');
+    });
+  });
+
+  it('建立失敗時不開新手指導員', async () => {
+    createCharacter.mockRejectedValueOnce(new Error('boom'));
+    render(<CharacterCreate />);
+    allocateAllPoints();
+    typeName('倒楣鬼');
+
+    fireEvent.click(screen.getByText('開始冒險'));
+
+    await waitFor(() => {
+      expect(screen.getByText('建立失敗，請稍後再試')).toBeDefined();
+    });
+    expect(useTownStore.getState().facility).toBe('list');
   });
 
   it('屬性點未分配完時不可建立', () => {

@@ -19,12 +19,15 @@ import { TownView } from './components/TownView';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
 import { PanelWindows } from './components/PanelWindows';
+import { useWindowLayerStore, useWindowZIndex } from './stores/windowLayerStore';
+import { SettingsModal } from './components/SettingsModal';
 import { getRegion } from './models/mapData';
 import { formatBuildLabel, formatBuildTime } from './buildInfo';
 import './App.css';
 
 export function GameToolbar() {
   const logout = useGameStore(s => s.logout);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const character = useGameStore(s => s.character);
   const selectCharacter = useGameStore(s => s.selectCharacter);
   const uploadOwnStats = useGameStore(s => s.uploadOwnStats);
@@ -101,9 +104,18 @@ export function GameToolbar() {
         style={{ display: 'none' }}
         onChange={handleImport}
       />
+      <button
+        className="btn-settings"
+        onClick={() => setSettingsOpen(true)}
+        title="顯示設定"
+        aria-label="顯示設定"
+      >
+        ⚙
+      </button>
       <button className="btn-logout" onClick={logout}>
         登出
       </button>
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
@@ -226,6 +238,10 @@ function App() {
  * 底部（戰鬥日誌 + 狀態面板 + 快捷格）。獨立成元件是為了讓版面測試不必經過 DB 開機流程。
  */
 export function GameLayout({ isInTown }: { isInTown: boolean }) {
+  // 地圖選擇器展開時會蓋到城鎮視窗，所以它也要能被提到最上層（§ 32.15）
+  const mapNavZIndex = useWindowZIndex('map-nav');
+  const focusWindow = useWindowLayerStore(s => s.focusWindow);
+
   return (
     <div className="app game-layout">
       {/*
@@ -245,7 +261,11 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
       </div>
 
       {/* 右上：只放地圖選擇器（系統按鈕與版本標示都在右下角） */}
-      <div className="hud hud-topright">
+      <div
+        className="hud hud-topright"
+        style={{ zIndex: mapNavZIndex }}
+        onPointerDown={() => focusWindow('map-nav')}
+      >
         <MapNavigation />
       </div>
 

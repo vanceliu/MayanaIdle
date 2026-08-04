@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CombatLogPanel } from './CombatLogPanel';
+import { getElementScale } from '../stores/settingsStore';
+import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
 
 const POSITION_KEY = 'mayana.combatLogPos';
 const OPACITY_KEY = 'mayana.combatLogOpacity';
@@ -60,6 +62,9 @@ export function CombatLogWindow() {
   const [opacity, setOpacity] = useState(80);
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // 點到就提到最上層（§ 32.15）：日誌與城鎮設施視窗、浮動面板共用同一個堆疊順序
+  const zIndex = useWindowZIndex('combat-log');
+  const focusWindow = useWindowLayerStore(s => s.focusWindow);
   const menuRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
 
@@ -87,7 +92,9 @@ export function CombatLogWindow() {
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const box = ref.current?.getBoundingClientRect();
     if (!box) return;
-    dragOffset.current = { x: e.clientX - box.left, y: e.clientY - box.top };
+    // 介面縮放時指標座標是視窗座標、left/top 是版面座標，統一換算到版面座標再算（§ 34.6）
+    const scale = getElementScale(ref.current);
+    dragOffset.current = { x: (e.clientX - box.left) / scale, y: (e.clientY - box.top) / scale };
     e.currentTarget.setPointerCapture(e.pointerId);
   }, []);
 
@@ -95,10 +102,11 @@ export function CombatLogWindow() {
     const offset = dragOffset.current;
     const box = ref.current?.getBoundingClientRect();
     if (!offset || !box) return;
+    const scale = getElementScale(ref.current);
     const next = clampLogPosition(
-      { left: e.clientX - offset.x, top: e.clientY - offset.y },
-      { width: box.width, height: box.height },
-      { width: window.innerWidth, height: window.innerHeight },
+      { left: e.clientX / scale - offset.x, top: e.clientY / scale - offset.y },
+      { width: box.width / scale, height: box.height / scale },
+      { width: window.innerWidth / scale, height: window.innerHeight / scale },
     );
     setPos(next);
   }, []);
@@ -122,7 +130,9 @@ export function CombatLogWindow() {
     <div
       ref={ref}
       className={`hud combat-log-window ${pos ? 'is-moved' : ''}`}
+      onPointerDown={() => focusWindow('combat-log')}
       style={{
+        zIndex,
         ...(pos ? { left: pos.left, top: pos.top } : {}),
         ['--log-alpha' as string]: String(opacityToAlpha(opacity)),
       }}

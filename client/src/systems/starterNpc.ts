@@ -37,10 +37,23 @@ export function getStarterEnhanceMax(item: EquipmentInstance): number {
 }
 
 export function canEnhanceStarterGear(item: EquipmentInstance): boolean {
-  if (!item.isStarterGear) return false;
+  return getStarterEnhanceState(item) === 'enhanceable';
+}
+
+/**
+ * 新手裝的強化狀態。
+ *
+ * `unsupported` 必須與 `maxed` 分開 —— 腰帶的安定值是 **-1**
+ * （`06-equipment.md` § 6.8：腰帶不適用強化系統），把它當成「已滿」會印出
+ * 「皮腰帶 +0/-1 已滿」這種讀不懂的字。
+ */
+export type StarterEnhanceState = 'enhanceable' | 'maxed' | 'unsupported';
+
+export function getStarterEnhanceState(item: EquipmentInstance): StarterEnhanceState {
+  if (!item.isStarterGear) return 'unsupported';
   const max = getStarterEnhanceMax(item);
-  if (max <= 0) return false;
-  return item.enhancement < max;
+  if (max <= 0) return 'unsupported';
+  return item.enhancement < max ? 'enhanceable' : 'maxed';
 }
 
 export function enhanceStarterGear(item: EquipmentInstance): EquipmentInstance {

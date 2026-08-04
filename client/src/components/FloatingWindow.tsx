@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { getElementScale } from '../stores/settingsStore';
+import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
 import {
   usePanelWindowStore,
-  getPanelZIndex,
   type PanelKey,
   type PanelPosition,
 } from '../stores/panelWindowStore';
@@ -24,7 +25,9 @@ interface FloatingWindowProps {
  */
 export function FloatingWindow({ panelKey, title, width, className = '', children }: FloatingWindowProps) {
   const position = usePanelWindowStore(s => s.positions[panelKey]);
-  const zIndex = usePanelWindowStore(s => getPanelZIndex(s.order, panelKey));
+  // z 順序與戰鬥日誌／城鎮視窗／地圖選擇器共用同一個堆疊（§ 32.15）
+  const zIndex = useWindowZIndex(`panel:${panelKey}`);
+  const focusWindow = useWindowLayerStore(s => s.focusWindow);
   const setPosition = usePanelWindowStore(s => s.setPosition);
   const closePanel = usePanelWindowStore(s => s.closePanel);
   const focusPanel = usePanelWindowStore(s => s.focusPanel);
@@ -36,13 +39,21 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
     const el = winRef.current;
     const w = el?.offsetWidth || width;
     const h = el?.offsetHeight || 0;
-    const maxX = Math.max(0, window.innerWidth - w);
-    const maxY = Math.max(0, window.innerHeight - h);
+    // 介面縮放時 left/top 是版面座標，視窗邊界要換算回同一個單位（§ 34.6）
+    const scale = getElementScale(el);
+    const maxX = Math.max(0, window.innerWidth / scale - w);
+    const maxY = Math.max(0, window.innerHeight / scale - h);
     return {
       x: Math.min(Math.max(0, x), maxX),
       y: Math.min(Math.max(0, y), maxY),
     };
   }, [width]);
+
+  /** 指標的視窗座標 → 視窗自己的版面座標（未縮放時就是原值） */
+  function toLayoutCoords(e: React.PointerEvent): { x: number; y: number } {
+    const scale = getElementScale(winRef.current);
+    return { x: e.clientX / scale, y: e.clientY / scale };
+  }
 
   // 開啟時把預設位置夾回可視範圍（小螢幕時預設座標可能超出畫面）
   useEffect(() => {
@@ -60,14 +71,17 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
     // 使按鈕收不到完整的 down→up 而不觸發 click。
     if ((e.target as HTMLElement).closest?.('.floating-window-close')) return;
     focusPanel(panelKey);
-    dragRef.current = { dx: e.clientX - position.x, dy: e.clientY - position.y };
+    focusWindow(`panel:${panelKey}`);
+    const pointer = toLayoutCoords(e);
+    dragRef.current = { dx: pointer.x - position.x, dy: pointer.y - position.y };
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   }
 
   function handleDragMove(e: React.PointerEvent) {
     const drag = dragRef.current;
     if (!drag) return;
-    setPosition(panelKey, clamp(e.clientX - drag.dx, e.clientY - drag.dy));
+    const pointer = toLayoutCoords(e);
+    setPosition(panelKey, clamp(pointer.x - drag.dx, pointer.y - drag.dy));
   }
 
   function handleDragEnd(e: React.PointerEvent) {
@@ -82,7 +96,7 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
       className={`floating-window ${className}`.trim()}
       data-testid={`floating-window-${panelKey}`}
       style={{ left: position.x, top: position.y, width, zIndex }}
-      onPointerDown={() => focusPanel(panelKey)}
+      onPointerDown={() => { focusPanel(panelKey); focusWindow(`panel:${panelKey}`); }}
     >
       <div
         className="floating-window-header"

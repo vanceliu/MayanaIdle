@@ -30,8 +30,9 @@ export function PanelWindows() {
           <EquipmentPanel />
         </FloatingWindow>
       )}
+      {/* is-bag：標題／格數／金幣列固定，只有格子區捲動 */}
       {open.bag && (
-        <FloatingWindow panelKey="bag" title={PANEL_TITLES.bag} width={PANEL_WIDTHS.bag}>
+        <FloatingWindow panelKey="bag" title={PANEL_TITLES.bag} width={PANEL_WIDTHS.bag} className="is-bag">
           <BagPanel />
         </FloatingWindow>
       )}

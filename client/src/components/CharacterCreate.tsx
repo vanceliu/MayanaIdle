@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { useTownStore } from '../stores/townStore';
 import {
   CLASS_BASE_ATTRIBUTES,
   CLASS_NAMES_ZH,
@@ -71,6 +72,9 @@ export function CharacterCreate() {
     setSubmitError('');
     try {
       await createCharacter(trimmedName, selectedClass, bonus);
+      // 新角色一律出生在薄暮村（中立城鎮），直接把新手指導員開起來 ——
+      // 領裝備與強化都在他那裡，不主動指路的話新玩家不會知道要點哪個 NPC
+      useTownStore.getState().openFacility('starter-npc');
     } catch {
       setSubmitError('建立失敗，請稍後再試');
     } finally {

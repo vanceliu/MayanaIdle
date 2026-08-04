@@ -119,7 +119,8 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {item.quality > 0 && (
         <div className="equip-detail-stat">品質: {item.quality}%</div>
       )}
-      {item.affixes && item.affixes.length > 0 && (
+      {/* 詞綴只在完整模式顯示：裝備欄十個欄位各印四條詞綴會把面板灌爆，改由 hover tooltip 呈現 */}
+      {!compact && item.affixes && item.affixes.length > 0 && (
         <div className="equip-detail-affixes">
           {item.affixes.map((affix, i) => (
             // § 7.10.5 特殊詞綴：金色顯示、標記 [特殊]、無 Tier，且不吃品質加成
