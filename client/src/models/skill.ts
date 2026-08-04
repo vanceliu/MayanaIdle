@@ -170,6 +170,27 @@ export function formatSkillRange(skill: Pick<Skill, 'type' | 'range'>): string {
   return range <= 1.5 ? '近身' : `${range} 格`;
 }
 
+/**
+ * Buff 持續時間的顯示字串。只有 `type: 'buff'` 且真的有持續時間才回值。
+ *
+ * - `heal` 沒有持續時間
+ * - 聖光術是 `buffDuration: 0` + `cleanse: true`（瞬發淨化），不是漏填，故不顯示
+ * - 60 秒以上改用分鐘：現有值是 300s／600s，寫「5 分鐘」比「300 秒」好判斷
+ *
+ * 攻擊技能附加的 debuff 早就有顯示持續時間，buff 自己的卻沒有 ——
+ * 同一份 tooltip 看得到自己造成的減速幾秒、看不到自己身上的增益幾秒，說不過去。
+ */
+export function formatBuffDuration(
+  skill: Pick<Skill, 'type' | 'buffDuration'>,
+): string {
+  if (skill.type !== 'buff') return '';
+  const ms = skill.buffDuration;
+  if (!ms || ms <= 0) return '';
+  const seconds = ms / 1000;
+  if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60} 分鐘`;
+  return `${seconds} 秒`;
+}
+
 export function isSkillReady(skill: Skill, now: number, cooldownReductionPercent: number = 0): boolean {
   const effectiveCooldown = Math.floor(skill.cooldown * (1 - Math.min(cooldownReductionPercent, 50) / 100));
   return now - skill.lastUsedAt >= effectiveCooldown;

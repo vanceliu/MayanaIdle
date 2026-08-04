@@ -1,4 +1,4 @@
-import { formatSkillRange } from '../../models/skill';
+import { formatSkillRange, formatBuffDuration } from '../../models/skill';
 import { useMemo, useState } from 'react';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
@@ -61,6 +61,7 @@ export function SkillsPage() {
               <th>治療量</th>
               <th>MP 消耗</th>
               <th>冷卻(秒)</th>
+              <th>持續</th>
               <th>效果</th>
             </tr>
           </thead>
@@ -77,6 +78,7 @@ export function SkillsPage() {
                 <td className="cell-number">{s.healAmount || '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
                 <td className="cell-number">{(s.cooldown / 1000).toFixed(1)}</td>
+                <td>{formatBuffDuration(s) || '-'}</td>
                 <td>{s.description || s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || (s.applyDebuff ? `附加${s.applyDebuff.name}(${s.applyDebuff.description}, ${(s.applyDebuff.dotDuration ?? s.applyDebuff.duration ?? 0) / 1000}s)` : '') || '-'}</td>
               </tr>
             ))}
@@ -133,6 +135,7 @@ export function SkillsPage() {
                     <th>治療量</th>
                     <th>MP</th>
                     <th>冷卻(秒)</th>
+                    <th>持續</th>
                     <th>效果</th>
                     <th>技能書</th>
                   </tr>
@@ -151,6 +154,7 @@ export function SkillsPage() {
                       <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>
                       <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>
+                      <td>{formatBuffDuration(s.skill) || '-'}</td>
                       <td>{getClassSkillEffect(s)}</td>
                       <td>{s.bookName}</td>
                     </tr>

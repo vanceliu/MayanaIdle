@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange } from '../models/skill';
+import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration } from '../models/skill';
 import type { ClassName } from '../models/character';
 
 const GRID_COLUMNS = 5;
@@ -219,6 +219,9 @@ export function SkillPanel() {
           )}
           {tooltip.skill.buffEffect && (
             <div className="skill-tooltip-stat">效果: {tooltip.skill.buffEffect}</div>
+          )}
+          {formatBuffDuration(tooltip.skill) && (
+            <div className="skill-tooltip-stat">持續: {formatBuffDuration(tooltip.skill)}</div>
           )}
           <div className="skill-tooltip-stat">MP: {tooltip.skill.mpCost}</div>
           <div className="skill-tooltip-stat">冷卻: {tooltip.skill.cooldown / 1000}s</div>
