@@ -1,49 +1,27 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
-import { WikiLayout } from './wiki/components/WikiLayout'
-import { WikiHome } from './wiki/pages/WikiHome'
-import { WeaponsPage } from './wiki/pages/WeaponsPage'
-import { ArmorPage } from './wiki/pages/ArmorPage'
-import { MonstersPage } from './wiki/pages/MonstersPage'
-import { MapsPage } from './wiki/pages/MapsPage'
-import { CraftingPage } from './wiki/pages/CraftingPage'
-import { ExpTablePage } from './wiki/pages/ExpTablePage'
-import { SkillsPage } from './wiki/pages/SkillsPage'
-import { AttributesPage } from './wiki/pages/AttributesPage'
-import { CombatPage } from './wiki/pages/CombatPage'
-import { AffixesPage } from './wiki/pages/AffixesPage'
-import { ItemsPage } from './wiki/pages/ItemsPage'
-import { QuestsPage } from './wiki/pages/QuestsPage'
-import { CreditsPage } from './wiki/pages/CreditsPage'
+
+/**
+ * Wiki 動態載入：多數玩家不會開 Wiki，沒必要讓它進主 bundle。
+ * `/wiki/*` 比 `/*` 更具體，React Router 依具體度排序，不受宣告順序影響。
+ */
+const WikiRoutes = lazy(() => import('./wiki/WikiRoutes'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter basename="/MayanaIdle">
       <Routes>
-        <Route path="/wiki" element={<WikiLayout />}>
-          <Route index element={<WikiHome />} />
-          <Route path="weapons" element={<WeaponsPage />} />
-          <Route path="weapons/:name" element={<WeaponsPage />} />
-          <Route path="armor" element={<ArmorPage />} />
-          <Route path="armor/:name" element={<ArmorPage />} />
-          <Route path="monsters" element={<MonstersPage />} />
-          <Route path="monsters/:monsterName" element={<MonstersPage />} />
-          <Route path="maps" element={<MapsPage />} />
-          <Route path="maps/:areaId" element={<MapsPage />} />
-          <Route path="crafting" element={<CraftingPage />} />
-          <Route path="exp-table" element={<ExpTablePage />} />
-          <Route path="skills" element={<SkillsPage />} />
-          <Route path="attributes" element={<AttributesPage />} />
-          <Route path="combat" element={<CombatPage />} />
-          <Route path="affixes" element={<AffixesPage />} />
-          <Route path="items" element={<ItemsPage />} />
-          <Route path="items/:itemName" element={<ItemsPage />} />
-          <Route path="quests" element={<QuestsPage />} />
-          <Route path="credits" element={<CreditsPage />} />
-        </Route>
+        <Route
+          path="/wiki/*"
+          element={
+            <Suspense fallback={<div className="wiki-loading">載入中…</div>}>
+              <WikiRoutes />
+            </Suspense>
+          }
+        />
         <Route path="/*" element={<App />} />
       </Routes>
     </BrowserRouter>

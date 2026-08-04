@@ -8,3 +8,11 @@ html, body, #root {
   height: 100%;
   width: 100%;
 }
+
+/* Wiki 動態載入時的過場（見 main.tsx 的 Suspense fallback） */
+.wiki-loading {
+  padding: 32px;
+  text-align: center;
+  color: #94A3B8;
+  font-size: 14px;
+}
