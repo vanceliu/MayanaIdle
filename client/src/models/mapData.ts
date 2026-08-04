@@ -298,6 +298,7 @@ const hundredPillar1_10: Region = {
   levelMin: 45,
   levelMax: 52,
   zoneId: 'grey-ridge',
+  entryScrollName: '百柱塔 1F 通行卷軸',
   monsters: ['百柱蜘蛛', '百柱祕密', '百柱妖女', '百柱奇美拉', '百柱幻影', '毒之皇女'],
 };
 

@@ -95,6 +95,8 @@ export function AdventurerGuild() {
         <span>已接取：{activeCount}/{MAX_ACTIVE_ADVENTURER_QUESTS}</span>
       </div>
 
+      {/* 只有任務清單會捲動，等階／貢獻狀態固定在上方 */}
+      <div className="panel-scroll">
       {activeQuests.length > 0 && (
         <>
           <h4>進行中的任務</h4>
@@ -125,7 +127,8 @@ export function AdventurerGuild() {
         </>
       )}
 
-      <div className="shop-tabs">
+      {/* 難度分級釘在捲動區頂端：不隨任務清單捲走，又能保持在「進行中的任務」之後 */}
+      <div className="shop-tabs panel-sticky">
         <span className="quest-town-label">{TOWN_NAMES[townId]}分部</span>
         {availableDifficulties.map(d => (
           <button
@@ -176,6 +179,7 @@ export function AdventurerGuild() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
 import { QtyStepper, parseQty } from '../common/QtyStepper';
+import { CraftUsageBadge } from '../common/CraftUsageBadge';
+import { hasMaterialUsage } from '../../systems/craftMaterialUsage';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -22,6 +24,7 @@ const SHOP_ITEMS = [
   { name: '淨化藥水', price: 500, description: '解除詛咒/虛弱（全解）' },
   { name: '武器強化卷軸', price: 100000, description: '鐵匠鋪武器強化用' },
   { name: '防具強化卷軸', price: 50000, description: '鐵匠鋪防具強化用' },
+  { name: '百柱塔 1F 通行卷軸', price: 2000, description: '進入百柱塔 1~10F 所需' },
   // 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（06-equipment.md § 壞刀機制）
 ];
 
@@ -32,6 +35,8 @@ export function GeneralStore() {
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [batchTier, setBatchTier] = useState<number | null>(null);
+  // 預設保護有用途的素材（配方材料 + 強化石／品質石）：批量販售的本意是清掉純販售素材
+  const [skipCraftMaterials, setSkipCraftMaterials] = useState(true);
   // 各商品獨立的數量輸入，key = 商品名稱；未輸入過的商品預設為 1
   const [buyQty, setBuyQty] = useState<Record<string, string>>({});
   const [sellQty, setSellQty] = useState<Record<string, string>>({});
@@ -162,11 +167,23 @@ export function GeneralStore() {
       if (item.type !== 'material') return false;
       const def = getItemDefinition(item.name);
       if (!def || !def.iconTier || def.noSell) return false;
+      // 顏色只表達稀有度，「Tier N 以下」會連進得了配方的素材一起掃掉，故預設保護
+      if (skipCraftMaterials && hasMaterialUsage(item.name)) return false;
       const sellPrice = Math.floor((def.sellPrice ?? def.buyPrice ?? 0) * 0.5);
       if (sellPrice <= 0) return false;
       return def.iconTier <= batchTier;
     });
-  }, [bagItems, batchTier]);
+  }, [bagItems, batchTier, skipCraftMaterials]);
+
+  /** 被保護規則擋下來的素材，讓玩家知道少賣了什麼，而不是靜默漏掉 */
+  const protectedItems = useMemo(() => {
+    if (batchTier === null || !skipCraftMaterials) return [];
+    return bagItems.filter(item => {
+      if (item.type !== 'material' || !hasMaterialUsage(item.name)) return false;
+      const def = getItemDefinition(item.name);
+      return !!def?.iconTier && !def.noSell && def.iconTier <= batchTier;
+    });
+  }, [bagItems, batchTier, skipCraftMaterials]);
 
   const batchSellTotal = useMemo(() => {
     return batchSellItems.reduce((sum, item) => {
@@ -208,6 +225,8 @@ export function GeneralStore() {
         <button className={tab === 'sell' ? 'active' : ''} onClick={() => setTab('sell')}>出售</button>
       </div>
 
+      {/* 只有商品清單會捲動，持有金幣與購買／出售分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab === 'buy' && (
         <div className="shop-items">
           {SHOP_ITEMS.map(item => {
@@ -297,9 +316,23 @@ export function GeneralStore() {
                   <option key={opt.tier} value={opt.tier}>{opt.label}</option>
                 ))}
               </select>
+              <label className="batch-sell-skip-craft">
+                <input
+                  type="checkbox"
+                  checked={skipCraftMaterials}
+                  onChange={e => setSkipCraftMaterials(e.target.checked)}
+                />
+                跳過有用途的素材
+              </label>
             </div>
             {batchTier !== null && (
               <div className="batch-sell-preview">
+                {protectedItems.length > 0 && (
+                  <p className="batch-sell-protected">
+                    已保留 {protectedItems.length} 種有用途的素材：
+                    {protectedItems.map(i => i.name).join('、')}
+                  </p>
+                )}
                 {batchSellItems.length === 0 ? (
                   <p className="empty-text">沒有符合條件的素材</p>
                 ) : (
@@ -311,7 +344,7 @@ export function GeneralStore() {
                         const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
                         return (
                           <div key={item.name} className="batch-sell-item">
-                            <span style={{ color }}>{item.name} ×{item.amount}</span>
+                            <span style={{ color }}>{item.name} ×{item.amount}<CraftUsageBadge name={item.name} compact /></span>
                             <span className="shop-item-price sell-price">+{(sellPrice * item.amount).toLocaleString()}G</span>
                           </div>
                         );
@@ -344,6 +377,7 @@ export function GeneralStore() {
                   <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     {(() => { const { icon, color } = getShopItemIcon(item.name); return <GameIcon name={icon} size={16} color={color} />; })()}
                     {item.name} ×{item.amount}
+                    <CraftUsageBadge name={item.name} />
                   </span>
                   <span className="shop-item-price sell-price">+{sellPrice}G/個</span>
                 </div>
@@ -367,6 +401,7 @@ export function GeneralStore() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

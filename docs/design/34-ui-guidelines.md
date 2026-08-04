@@ -7,15 +7,27 @@
 ### 面板結構
 
 ```
-.shop-panel
-├── .shop-greeting        — NPC 問候語（斜體、左邊框）
-├── .shop-gold / .bs-resources — 資源顯示列
-├── .shop-tabs            — 頁籤列（購買/出售 或 功能分頁）
-└── .shop-items           — 物品列表容器
-    └── .shop-item        — 單個物品卡片行
-        ├── .shop-item-info    — 左側：物品資訊
-        └── .shop-item-actions — 右側：操作按鈕
+.shop-panel                   — 撐滿視窗高度的 flex column
+├── .shop-greeting            — NPC 問候語（斜體、左邊框）      ┐
+├── .shop-gold / .bs-resources — 資源顯示列                     │ 固定表頭
+├── .shop-tabs                — 頁籤列（購買/出售 或 功能分頁） │ 不捲動
+├── .bs-craft-categories      — 分類篩選列（武器店／防具店／鐵匠製作）┘
+└── .panel-scroll             — **唯一的捲動區**
+    └── .shop-items           — 物品列表容器
+        └── .shop-item        — 單個物品卡片行
+            ├── .shop-item-info    — 左側：物品資訊
+            └── .shop-item-actions — 右側：操作按鈕
 ```
+
+### 捲動規則（必守）
+
+- **視窗本體不捲動**：`.town-modal-body` 為 `overflow: hidden`，捲軸一律由面板內的 `.panel-scroll` 提供。
+  這樣持有金幣、頁籤、分類篩選才會固定在最上面，不會被清單推走。
+- **表頭 = 狀態與篩選器**：資源列、頁籤、分類篩選都屬於表頭，**不可放進 `.panel-scroll`**。
+- **排版順序不允許為了固定而重排**：若篩選列必須留在清單中段（如冒險者工會的難度分級落在
+  「進行中的任務」之後），改用 `.panel-sticky` 釘在捲動區頂端，不要把它搬到表頭。
+- 每個城鎮設施面板都必須有 `.panel-scroll`；結構由
+  `client/src/components/__tests__/TownPanelScroll.test.tsx` 把關。
 
 ### 設計原則
 

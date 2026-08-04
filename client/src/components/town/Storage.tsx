@@ -281,6 +281,8 @@ export function Storage() {
         )}
       </div>
 
+      {/* 只有物品清單會捲動，分頁／金幣／搜尋固定在上方 */}
+      <div className="panel-scroll">
       {actionTab === 'deposit' && (
         <div className="storage-content">
           <h4>背包裝備 ({bagEquipment.length})</h4>
@@ -386,6 +388,7 @@ export function Storage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

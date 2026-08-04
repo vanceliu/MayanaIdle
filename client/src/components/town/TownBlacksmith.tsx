@@ -472,6 +472,53 @@ export function TownBlacksmith() {
 
       {resultMsg && <p className="bs-result">{resultMsg}</p>}
 
+      {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨配方清單捲動 */}
+      {tab === 'craft' && (
+        <div className="bs-craft-categories">
+          {[
+            { key: 'sword', label: '單手劍' },
+            { key: 'dagger', label: '匕首' },
+            { key: 'axe', label: '單手斧' },
+            { key: 'mace', label: '鈍器' },
+            { key: 'staff', label: '法杖' },
+            { key: 'bow', label: '弓' },
+            { key: 'twoHandSword', label: '雙手劍' },
+            { key: 'twoHandAxe', label: '雙手斧' },
+            { key: 'twoHandStaff', label: '雙手法杖' },
+            { key: 'dualBlade', label: '雙刀' },
+            { key: 'claw', label: '鋼爪' },
+            { key: 'shield', label: '盾牌' },
+            { key: 'magicBook', label: '魔導書' },
+            { key: 'armGuard', label: '臂甲' },
+            { key: 'armor-helmet', label: '頭盔' },
+            { key: 'armor-chest', label: '胸甲' },
+            { key: 'armor-gloves', label: '手套' },
+            { key: 'armor-boots', label: '鞋子' },
+            { key: 'armor-necklace', label: '項鍊' },
+            { key: 'armor-ring1', label: '戒指' },
+          ].map(cat => {
+            const hasItems = craftTemplates.some(t => {
+              if (cat.key.startsWith('armor-')) {
+                return t.type === 'armor' && t.slot === cat.key.replace('armor-', '');
+              }
+              return t.type === cat.key;
+            });
+            if (!hasItems) return null;
+            return (
+              <button
+                key={cat.key}
+                className={craftCategory === cat.key ? 'active' : ''}
+                onClick={() => { setCraftCategory(cat.key); setSelectedRecipe(null); }}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 只有裝備／配方清單會捲動，資源列與分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab !== 'craft' && (
         <div className="shop-items">
           {allItems.length === 0 && <p className="empty-text">沒有裝備</p>}
@@ -493,47 +540,6 @@ export function TownBlacksmith() {
 
       {tab === 'craft' && (
         <div className="shop-items">
-          <div className="bs-craft-categories">
-            {[
-              { key: 'sword', label: '單手劍' },
-              { key: 'dagger', label: '匕首' },
-              { key: 'axe', label: '單手斧' },
-              { key: 'mace', label: '鈍器' },
-              { key: 'staff', label: '法杖' },
-              { key: 'bow', label: '弓' },
-              { key: 'twoHandSword', label: '雙手劍' },
-              { key: 'twoHandAxe', label: '雙手斧' },
-              { key: 'twoHandStaff', label: '雙手法杖' },
-              { key: 'dualBlade', label: '雙刀' },
-              { key: 'claw', label: '鋼爪' },
-              { key: 'shield', label: '盾牌' },
-              { key: 'magicBook', label: '魔導書' },
-              { key: 'armGuard', label: '臂甲' },
-              { key: 'armor-helmet', label: '頭盔' },
-              { key: 'armor-chest', label: '胸甲' },
-              { key: 'armor-gloves', label: '手套' },
-              { key: 'armor-boots', label: '鞋子' },
-              { key: 'armor-necklace', label: '項鍊' },
-              { key: 'armor-ring1', label: '戒指' },
-            ].map(cat => {
-              const hasItems = craftTemplates.some(t => {
-                if (cat.key.startsWith('armor-')) {
-                  return t.type === 'armor' && t.slot === cat.key.replace('armor-', '');
-                }
-                return t.type === cat.key;
-              });
-              if (!hasItems) return null;
-              return (
-                <button
-                  key={cat.key}
-                  className={craftCategory === cat.key ? 'active' : ''}
-                  onClick={() => { setCraftCategory(cat.key); setSelectedRecipe(null); }}
-                >
-                  {cat.label}
-                </button>
-              );
-            })}
-          </div>
           {craftTemplates
             .filter(recipe => {
               if (craftCategory.startsWith('armor-')) {
@@ -621,6 +627,7 @@ export function TownBlacksmith() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

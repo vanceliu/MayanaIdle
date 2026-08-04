@@ -36,6 +36,7 @@ describe('區域導覽分組', () => {
     const second = REGIONS.find(r => r.id === 'hundred-pillar-11-20f');
     expect(second?.entryScrollName).toBe('百柱塔 11F 通行卷軸');
     const first = REGIONS.find(r => r.id === 'hundred-pillar-1-10f');
-    expect(first?.entryScrollName).toBeUndefined();   // 第一段不需卷軸
+    // 第一段改為需要雜貨店販售的入場券，不再免費進入
+    expect(first?.entryScrollName).toBe('百柱塔 1F 通行卷軸');
   });
 });

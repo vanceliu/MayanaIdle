@@ -23,7 +23,7 @@ describe('navigation system', () => {
     it('allows navigation to dungeon region', () => {
       const result = canNavigateTo(
         { zoneId: 'grey-ridge', regionId: 'hundred-pillar-1-10f', floor: null },
-        [],
+        [{ name: '百柱塔 1F 通行卷軸', type: 'scroll', amount: 1 }],
       );
       expect(result.success).toBe(true);
     });
@@ -91,13 +91,23 @@ describe('navigation system', () => {
       expect(result.error).toBe('需要「百柱塔 91F 通行卷軸」才能前往');
     });
 
-    it('allows hundred-pillar 1-10f without any scroll', () => {
+    // 1~10F 原本免卷軸，改為需要雜貨店販售的入場券（`09-dungeon.md` § 百柱塔）
+    it('blocks hundred-pillar 1-10f without the entry scroll', () => {
       const result = canNavigateTo(
         { zoneId: 'grey-ridge', regionId: 'hundred-pillar-1-10f', floor: null },
         [],
       );
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('需要「百柱塔 1F 通行卷軸」才能前往');
+    });
+
+    it('allows hundred-pillar 1-10f with the entry scroll, consuming it', () => {
+      const result = canNavigateTo(
+        { zoneId: 'grey-ridge', regionId: 'hundred-pillar-1-10f', floor: null },
+        [{ name: '百柱塔 1F 通行卷軸', type: 'scroll', amount: 1 }],
+      );
       expect(result.success).toBe(true);
-      expect(result.scrollConsumed).toBeUndefined();
+      expect(result.scrollConsumed).toBe('百柱塔 1F 通行卷軸');
     });
   });
 

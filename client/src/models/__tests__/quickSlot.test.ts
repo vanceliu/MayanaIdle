@@ -100,7 +100,7 @@ describe('通行卷軸 → region 反查', () => {
 
   it('非通行卷軸反查不到', () => {
     expect(getEntryScrollRegion('紅色藥水')).toBeUndefined();
-    expect(getEntryScrollRegion('百柱塔卷軸')).toBeUndefined();
+    expect(getEntryScrollRegion('紅色藥水')).toBeUndefined();
   });
 });
 

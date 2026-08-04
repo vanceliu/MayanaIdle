@@ -5,7 +5,9 @@ import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db
 import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevel } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
-import { getItemIcon, getMaterialIcon, getMaterialColor } from '../../models/iconMap';
+import { resolveItemIcon, MATERIAL_TIER_COLORS } from '../../models/iconMap';
+import type { ItemDefinition } from '../../models/items';
+import { formatMaterialUsage, hasMaterialUsage, getCraftUsage } from '../../systems/craftMaterialUsage';
 import '../components/WikiTable.css';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -17,22 +19,43 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: '其他',
 };
 
-function getWikiItemIcon(item: typeof ITEM_DEFINITIONS[number]): { icon: string; color: string } {
-  if (item.iconType) {
-    return { icon: getMaterialIcon(item.iconType), color: getMaterialColor(item.iconTier) };
-  }
-  if (item.category === 'potion') {
-    if (item.name.includes('紅')) return { icon: getItemIcon('red-potion'), color: '#DC2626' };
-    if (item.name.includes('橙')) return { icon: getItemIcon('orange-potion'), color: '#F59E0B' };
-    if (item.name.includes('白')) return { icon: getItemIcon('white-potion'), color: '#E2E8F0' };
-    if (item.name.includes('強化綠')) return { icon: getItemIcon('enhanced-green-potion'), color: '#4ADE80' };
-    if (item.name.includes('綠')) return { icon: getItemIcon('green-potion'), color: '#4ADE80' };
-    return { icon: getItemIcon('red-potion'), color: '#FFFFFF' };
-  }
-  if (item.category === 'scroll') return { icon: getItemIcon('scroll'), color: '#FFFFFF' };
-  if (item.category === 'spellbook') return { icon: getItemIcon('spellbook'), color: '#FFFFFF' };
-  if (item.category === 'dungeon') return { icon: getItemIcon('key'), color: '#FFFFFF' };
-  return { icon: getItemIcon('material'), color: '#FFFFFF' };
+/** 素材顏色圖例，語意依 `39-batch-sell.md` § 39.3，色碼取自 MATERIAL_TIER_COLORS。 */
+const MATERIAL_TIER_LEGEND = [
+  { tier: 1, label: '純販售素材（新手區域）' },
+  { tier: 2, label: '入門區域素材' },
+  { tier: 3, label: '中等區域素材' },
+  { tier: 4, label: '進階區域素材' },
+  { tier: 5, label: '高階區域素材' },
+  { tier: 6, label: 'Boss 素材' },
+  { tier: 7, label: '最終 Boss 素材' },
+].map(t => ({ ...t, color: MATERIAL_TIER_COLORS[t.tier] }));
+
+/** seed 沒填 icon 時的類別預設值。素材走 iconType/iconTier，不會用到這裡。 */
+const CATEGORY_FALLBACK_ICON: Record<string, string> = {
+  potion: 'red-potion',
+  scroll: 'scroll',
+  spellbook: 'spellbook',
+  dungeon: 'key',
+  material: 'material',
+  other: 'material',
+};
+
+/**
+ * 圖示與顏色一律取自 seed（`resolveItemIcon` 為背包／商店／Wiki 共用的單一來源），
+ * 不可在 Wiki 端用名稱猜測 —— 否則同一道具在遊戲內與 Wiki 會顯示成兩種樣子。
+ */
+function getWikiItemIcon(item: ItemDefinition): { icon: string; color?: string } {
+  return resolveItemIcon(item, CATEGORY_FALLBACK_ICON[item.category] ?? 'material');
+}
+
+/** 售價欄：明確標記不可販售，與「沒填價格」區分開。 */
+function formatSellPrice(item: ItemDefinition): string {
+  if (item.noSell) return '不可販售';
+  return item.sellPrice ? `${item.sellPrice.toLocaleString()} G` : '—';
+}
+
+function formatBuyPrice(item: ItemDefinition): string {
+  return item.buyPrice ? `${item.buyPrice.toLocaleString()} G` : '—';
 }
 
 export function ItemsPage() {
@@ -47,30 +70,41 @@ export function ItemsPage() {
 
 function ItemList() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [craftFilter, setCraftFilter] = useState<'all' | 'craft' | 'nocraft'>('all');
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
     let list = ITEM_DEFINITIONS;
     if (categoryFilter !== 'all') list = list.filter(i => i.category === categoryFilter);
+    if (craftFilter === 'craft') list = list.filter(i => hasMaterialUsage(i.name));
+    if (craftFilter === 'nocraft') list = list.filter(i => !hasMaterialUsage(i.name));
     if (search) list = list.filter(i => i.name.includes(search));
     return list;
-  }, [categoryFilter, search]);
+  }, [categoryFilter, craftFilter, search]);
 
   return (
     <div>
       <h2 className="wiki-page-title">道具總表</h2>
       <div style={{ marginBottom: 16, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
-        <span style={{ marginRight: 12 }}>素材顏色：</span>
-        <span style={{ color: '#FFFFFF', marginRight: 12 }}>● 無製作用途</span>
-        <span style={{ color: '#60A5FA', marginRight: 12 }}>● 入門製作</span>
-        <span style={{ color: '#4ADE80', marginRight: 12 }}>● 高級進階製作</span>
-        <span style={{ color: '#FACC15', marginRight: 12 }}>● 頂級製作</span>
-        <span style={{ color: '#FB923C', marginRight: 12 }}>● Boss 素材</span>
+        <span style={{ marginRight: 12 }}>素材顏色（iconTier）：</span>
+        {MATERIAL_TIER_LEGEND.map(t => (
+          <span key={t.tier} style={{ color: t.color, marginRight: 12 }}>● T{t.tier} {t.label}</span>
+        ))}
       </div>
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
           <option value="all">全部類型</option>
           {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select
+          className="wiki-filter-select"
+          aria-label="用途篩選"
+          value={craftFilter}
+          onChange={e => setCraftFilter(e.target.value as typeof craftFilter)}
+        >
+          <option value="all">全部用途</option>
+          <option value="craft">僅有用途素材</option>
+          <option value="nocraft">僅純販售素材</option>
         </select>
         <input
           className="wiki-filter-input"
@@ -86,8 +120,10 @@ function ItemList() {
               <th>名稱</th>
               <th>類型</th>
               <th>說明</th>
+              <th>用途</th>
               <th>重量</th>
               <th>購買價格</th>
+              <th>售價</th>
             </tr>
           </thead>
           <tbody>
@@ -103,8 +139,10 @@ function ItemList() {
                 </td>
                 <td>{CATEGORY_LABELS[item.category]}</td>
                 <td>{item.description}</td>
+                <td>{formatMaterialUsage(item.name) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
                 <td className="cell-number">{item.weight}</td>
-                <td className="cell-number">{item.buyPrice ? `${item.buyPrice.toLocaleString()} G` : '-'}</td>
+                <td className="cell-number">{formatBuyPrice(item)}</td>
+                <td className="cell-number">{formatSellPrice(item)}</td>
               </tr>
               );
             })}
@@ -118,6 +156,7 @@ function ItemList() {
 
 function ItemDetail({ name }: { name: string }) {
   const item = ITEM_DEFINITIONS.find(i => i.name === name);
+  const craftUsage = getCraftUsage(name);
   const dropSources = useDropSourceForItem(name);
   const bossDropSources = useMemo(() => {
     const itemDef = ITEM_DEFINITIONS.find(i => i.name === name);
@@ -178,7 +217,13 @@ function ItemDetail({ name }: { name: string }) {
         ← 返回道具總表
       </Link>
 
-      <h2 className="wiki-page-title">{item.name}</h2>
+      <h2 className="wiki-page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {(() => {
+          const { icon, color } = getWikiItemIcon(item);
+          return <GameIcon name={icon} size={24} color={color} />;
+        })()}
+        {item.name}
+      </h2>
 
       <div className="wiki-table-wrap" style={{ marginBottom: 24 }}>
         <table className="wiki-table">
@@ -186,20 +231,48 @@ function ItemDetail({ name }: { name: string }) {
             <tr>
               <th>類型</th>
               <th>說明</th>
+              <th>用途</th>
               <th>重量</th>
               <th>購買價格</th>
+              <th>售價</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>{CATEGORY_LABELS[item.category]}</td>
               <td>{item.description}</td>
+              <td>{formatMaterialUsage(item.name) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
               <td className="cell-number">{item.weight}</td>
-              <td className="cell-number">{item.buyPrice ? `${item.buyPrice.toLocaleString()} G` : '-'}</td>
+              <td className="cell-number">{formatBuyPrice(item)}</td>
+              <td className="cell-number">{formatSellPrice(item)}</td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      {formatMaterialUsage(item.name) && (
+        <>
+          <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
+            用途（{formatMaterialUsage(item.name)}）
+          </h3>
+          {/* 強化石／品質石有用途但不進裝備配方，故裝備清單是選擇性的 */}
+          {craftUsage && (
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
+            此素材用於以下 {craftUsage.equipment.length} 件裝備的鐵匠鋪配方：
+          </p>)}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginBottom: 12 }}>
+            {craftUsage?.equipment.map(equip => (
+              <Link
+                key={equip.name}
+                className="wiki-link"
+                to={`/wiki/${equip.isArmor ? 'armor' : 'weapons'}/${encodeURIComponent(equip.name)}`}
+              >
+                {equip.name}
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
         取得方式

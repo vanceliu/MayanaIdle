@@ -281,4 +281,13 @@
 13-town.md（雜貨店/武器店/防具店販售功能）
        ↕
 30-items.md（素材 iconTier / sellPrice）←→ 34-ui-guidelines.md（面板統一樣式）
+
+13-town.md § 13.11（新手 NPC 對話分頁的前期知識條列 STARTER_TIPS，唯讀複述）
+  ← 02-core-loop.md / 03-combat.md / 41-arpg-combat.md（戰鬥與探索）
+  ← 13-town.md § 13.7~13.8 / 99-ai-constraints.md 第 47 條（死亡、回城、旅館）
+  ← 30-items.md § 30.1~30.2（藥水價格/冷卻/狀態解除）
+  ← 06-equipment.md § 6.1 / § 6.8~6.10（左右手、安定值、強化失敗消失）
+  ← 35-inventory-constraints.md § 35.2 / 20-attributes.md § 20.7（格數與負重、超重懲罰）
+  ← 13-town.md § 13.9~13.10 / 36-quest-system.md / 43-wiki-system.md（技能與任務）
+  上列任一數值變動時，必須同步修改 client/src/systems/starterTips.ts
 ```

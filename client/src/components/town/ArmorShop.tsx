@@ -177,27 +177,33 @@ export function ArmorShop() {
         <button className={tab === 'sell' ? 'active' : ''} onClick={() => setTab('sell')}>出售</button>
       </div>
 
+      {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨商品清單捲動 */}
+      {tab === 'buy' && (
+        <div className="bs-craft-categories">
+          {ARMOR_CATEGORIES.map(cat => {
+            if (cat.key !== 'all' && !templates.some(t => {
+              if (cat.key === 'shield') return t.type === 'shield';
+              if (cat.key === 'magicBook') return t.type === 'magicBook';
+              if (cat.key === 'armGuard') return t.type === 'armGuard';
+              return t.slot === cat.key;
+            })) return null;
+            return (
+              <button
+                key={cat.key}
+                className={category === cat.key ? 'active' : ''}
+                onClick={() => setCategory(cat.key)}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 只有商品清單會捲動，持有金幣與購買／出售分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab === 'buy' && (
         <div className="shop-items">
-          <div className="bs-craft-categories">
-            {ARMOR_CATEGORIES.map(cat => {
-              if (cat.key !== 'all' && !templates.some(t => {
-                if (cat.key === 'shield') return t.type === 'shield';
-                if (cat.key === 'magicBook') return t.type === 'magicBook';
-                if (cat.key === 'armGuard') return t.type === 'armGuard';
-                return t.slot === cat.key;
-              })) return null;
-              return (
-                <button
-                  key={cat.key}
-                  className={category === cat.key ? 'active' : ''}
-                  onClick={() => setCategory(cat.key)}
-                >
-                  {cat.label}
-                </button>
-              );
-            })}
-          </div>
           {templates
             .filter(t => {
               if (category === 'all') return true;
@@ -289,6 +295,7 @@ export function ArmorShop() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

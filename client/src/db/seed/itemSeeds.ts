@@ -28,13 +28,13 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
 
   // === 製作用素材 ===
   { id: 11, name: '銀礦石', category: 'material', description: '銀材質裝備製作素材', weight: 5, sellPrice: 50, iconType: 'ore', iconTier: 2 },
-  { id: 12, name: '銀精華', category: 'material', description: '銀材質高級配方素材', weight: 5, sellPrice: 50, iconType: 'crystal', iconTier: 1 },
+  { id: 12, name: '銀精華', category: 'material', description: '銀材質高級配方素材', weight: 5, sellPrice: 50, iconType: 'crystal', iconTier: 3 },
   { id: 13, name: '米索利碎片', category: 'material', description: '米索利裝備製作素材', weight: 7, sellPrice: 150, iconType: 'ore', iconTier: 3 },
-  { id: 14, name: '米索利礦石', category: 'material', description: '米索利高級配方素材', weight: 7, sellPrice: 150, iconType: 'ore', iconTier: 1 },
-  { id: 15, name: '龍骨碎片', category: 'material', description: '龍材質裝備製作素材', weight: 7, sellPrice: 250, iconType: 'bone', iconTier: 1 },
-  { id: 16, name: '龍心結晶', category: 'material', description: '龍材質高級配方素材', weight: 7, sellPrice: 250, iconType: 'crystal', iconTier: 1 },
-  { id: 17, name: '奧里哈魯根碎片', category: 'material', description: '奧里哈魯根裝備製作素材', weight: 10, sellPrice: 550, iconType: 'ore', iconTier: 6 },
-  { id: 18, name: '奧里哈魯根精華', category: 'material', description: '奧里哈魯根高級配方素材', weight: 10, sellPrice: 550, iconType: 'crystal', iconTier: 1 },
+  { id: 14, name: '米索利礦石', category: 'material', description: '米索利高級配方素材', weight: 7, sellPrice: 150, iconType: 'ore', iconTier: 4 },
+  { id: 15, name: '龍骨碎片', category: 'material', description: '龍材質裝備製作素材', weight: 7, sellPrice: 250, iconType: 'bone', iconTier: 3 },
+  { id: 16, name: '龍心結晶', category: 'material', description: '龍材質高級配方素材', weight: 7, sellPrice: 250, iconType: 'crystal', iconTier: 4 },
+  { id: 17, name: '奧里哈魯根碎片', category: 'material', description: '奧里哈魯根裝備製作素材', weight: 10, sellPrice: 550, iconType: 'ore', iconTier: 4 },
+  { id: 18, name: '奧里哈魯根精華', category: 'material', description: '奧里哈魯根高級配方素材', weight: 10, sellPrice: 550, iconType: 'crystal', iconTier: 5 },
 
   // === 區域素材（曙光平原/綠谷/翡翠森林/迷霧沼地/風嘯高原/山賊據點）===
   { id: 19, name: '破碎獸牙', category: 'material', description: '暴牙兔的碎牙', weight: 1, sellPrice: 14, iconType: 'bone', iconTier: 1 },
@@ -57,9 +57,9 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 34, name: '凍骨碎片', category: 'material', description: '凍骨哥布林的骨片', weight: 3, sellPrice: 160, iconType: 'bone', iconTier: 2 },
   { id: 35, name: '冰霜蛛絲', category: 'material', description: '冰霜蜘蛛的絲線', weight: 3, sellPrice: 200, iconType: 'fabric', iconTier: 2 },
   { id: 36, name: '雪狼毛皮', category: 'material', description: '雪狼的毛皮', weight: 3, sellPrice: 260, iconType: 'fabric', iconTier: 2 },
-  { id: 37, name: '巫師布片', category: 'material', description: '象牙巫師的布料', weight: 4, sellPrice: 200, iconType: 'fabric', iconTier: 1 },
-  { id: 38, name: '霜甲碎片', category: 'material', description: '霜甲戰士的碎甲', weight: 4, sellPrice: 280, iconType: 'ore', iconTier: 1 },
-  { id: 39, name: '冰晶核心', category: 'material', description: '冰霜元素的核心', weight: 4, sellPrice: 360, iconType: 'crystal', iconTier: 1 },
+  { id: 37, name: '巫師布片', category: 'material', description: '象牙巫師的布料', weight: 4, sellPrice: 200, iconType: 'fabric', iconTier: 3 },
+  { id: 38, name: '霜甲碎片', category: 'material', description: '霜甲戰士的碎甲', weight: 4, sellPrice: 280, iconType: 'ore', iconTier: 3 },
+  { id: 39, name: '冰晶核心', category: 'material', description: '冰霜元素的核心', weight: 4, sellPrice: 360, iconType: 'crystal', iconTier: 3 },
 
   // === 區域素材（艾爾薩斯領地）===
   { id: 40, name: '高等妖魔角', category: 'material', description: '高等妖魔的巨角', weight: 4, sellPrice: 200, iconType: 'bone', iconTier: 3 },
@@ -84,8 +84,8 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 55, name: '剝皮蛛牙', category: 'material', description: '剝皮蜘蛛的牙齒', weight: 5, sellPrice: 400, iconType: 'bone', iconTier: 3 },
   { id: 56, name: '死亡靈魂殘片', category: 'material', description: '死亡靈魂的殘片', weight: 5, sellPrice: 520, iconType: 'crystal', iconTier: 3 },
   { id: 57, name: '大莫蛛眼', category: 'material', description: '大莫蜘蛛的眼球', weight: 5, sellPrice: 640, iconType: 'misc', iconTier: 3 },
-  { id: 58, name: '深層龍鱗', category: 'material', description: '深層龍族的鱗片', weight: 6, sellPrice: 600, iconType: 'fabric', iconTier: 1 },
-  { id: 59, name: '死亡靈魂精華', category: 'material', description: '死亡靈魂的精華', weight: 6, sellPrice: 700, iconType: 'crystal', iconTier: 1 },
+  { id: 58, name: '深層龍鱗', category: 'material', description: '深層龍族的鱗片', weight: 6, sellPrice: 600, iconType: 'fabric', iconTier: 4 },
+  { id: 59, name: '死亡靈魂精華', category: 'material', description: '死亡靈魂的精華', weight: 6, sellPrice: 700, iconType: 'crystal', iconTier: 4 },
 
   // === 區域素材（灰脊山脈）===
   { id: 60, name: '殭屍碎骨', category: 'material', description: '戰場殭屍的碎骨', weight: 5, sellPrice: 360, iconType: 'bone', iconTier: 4 },
@@ -127,7 +127,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 94, name: '死神碎魂', category: 'material', description: '百柱死神的碎魂', weight: 10, sellPrice: 1000, iconType: 'crystal', iconTier: 7 },
 
   // === 副本用素材 ===
-  { id: 95, name: '百柱塔卷軸', category: 'dungeon', description: '進入百柱塔對應區段所需', weight: 1, icon: 'items/tied-scroll', iconColor: '#A78BFA' },
+  { id: 95, name: '百柱塔 1F 通行卷軸', category: 'dungeon', description: '進入百柱塔 1~10F 所需', weight: 1, buyPrice: 2000, icon: 'items/tied-scroll', iconColor: '#A78BFA' },
   { id: 135, name: '百柱塔 11F 通行卷軸', category: 'dungeon', description: '進入百柱塔 11F 所需', weight: 1, icon: 'items/tied-scroll', iconColor: '#A78BFA' },
   { id: 136, name: '百柱塔 21F 通行卷軸', category: 'dungeon', description: '進入百柱塔 21F 所需', weight: 1, icon: 'items/tied-scroll', iconColor: '#A78BFA' },
   { id: 137, name: '百柱塔 31F 通行卷軸', category: 'dungeon', description: '進入百柱塔 31F 所需', weight: 1, icon: 'items/tied-scroll', iconColor: '#A78BFA' },

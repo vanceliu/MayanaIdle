@@ -106,9 +106,22 @@ client/src/wiki/
 - 詳細頁：`/wiki/maps/:areaId`，含怪物分佈、掉落總覽、樓層資訊
 
 ### 4.5 道具頁 (ItemsPage)
-- 列表：名稱、分類（藥水/卷軸/材料/副本道具/魔法書）、效果、取得來源
-- 詳細頁：`/wiki/items/:name`
-- 圖示：根據 `iconType`/`iconTier` 顯示材料圖示，或根據分類顯示預設圖示
+- 列表欄位：名稱、類型（藥水/卷軸/材料/副本道具/魔法書）、說明、**用途**、重量、**購買價格**、**售價**
+- 篩選：類型、用途（全部／僅有用途素材／僅純販售素材）、名稱關鍵字
+- 詳細頁：`/wiki/items/:name`，同樣列出購買價格與售價，並附取得方式（商店/掉落/Boss/技能書池）
+- 價格一律取自 `ITEM_DEFINITIONS`：
+  - 購買價格 = `buyPrice`，無值顯示 `—`
+  - 售價 = `sellPrice`；`noSell: true` 顯示「不可販售」，與「沒填價格」明確區分
+  - **素材只有 `sellPrice` 沒有 `buyPrice`**，故售價欄不可省略，否則整批素材價格全空
+- 圖示與顏色一律經由 `resolveItemIcon()`（`models/iconMap.ts`）取自 seed：
+  `icon` / `iconColor` → `iconType` / `iconTier` → 類別預設值。
+  **不可在 Wiki 端用道具名稱猜測圖示** —— 該作法會讓同一道具在背包與 Wiki 顯示成兩種樣子
+  （曾導致解毒藥水／止血繃帶／淨化藥水在 Wiki 全部顯示為紅藥水圖）。
+- 素材顏色圖例語意依 `39-batch-sell.md` § 39.3 的 iconTier 1~7 定義，色碼取自 `MATERIAL_TIER_COLORS`
+- 「用途」欄取自 `systems/craftMaterialUsage.ts` 的 `formatMaterialUsage()`
+  （`30-items.md` § 製作用途標記）。這是與顏色**互相獨立**的維度：
+  顏色講稀有度、用途講進不進得了配方，不可合併成同一個欄位
+- 詳細頁在有用途時列出「用途」區塊，並把配方素材連到對應的武器／防具詳細頁
 
 ### 4.6 技能頁 (SkillsPage)
 - 通用魔法列表：等級、類型、屬性、目標、威力、MP、冷卻

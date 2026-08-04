@@ -6,6 +6,7 @@ import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, g
 import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
+import { formatMaterialUsage, hasMaterialUsage } from '../systems/craftMaterialUsage';
 import { EquipmentDetail } from './EquipmentInfo';
 import { getItemWeight, getItemDescription, getItemDefinition } from '../models/items';
 import { isCureItem, getCureItem, hasCurableDebuff } from '../models/cureItem';
@@ -259,11 +260,14 @@ export function BagPanel() {
       );
     }
 
+    const craftUsage = formatMaterialUsage(item.name);
     return (
       <div className="bag-tooltip-content">
         <div className="tooltip-name">{item.name}</div>
         <div className="tooltip-stat">重量: {getItemWeight(item.name) * (item.count ?? 1)}</div>
         {item.count && <div className="tooltip-count">數量: {item.count}</div>}
+        {/* 顏色只表達稀有度，用途另外講明，免得玩家把配方材料賣掉 */}
+        {craftUsage && <div className="tooltip-craft-usage">⚒ 用途：{craftUsage}</div>}
         {item.type === 'scroll' && item.name.includes('回城卷軸') && (
           <div className="tooltip-hint">點擊使用傳送至城鎮</div>
         )}
@@ -347,6 +351,9 @@ export function BagPanel() {
                 <span className="bag-cell-name">{getShortName(item.name)}</span>
                 {item.count != null && item.count > 1 && (
                   <span className="bag-cell-count">×{item.count}</span>
+                )}
+                {hasMaterialUsage(item.name) && (
+                  <span className="bag-cell-craft" title="有用途的素材" aria-label="有用途的素材">⚒</span>
                 )}
               </div>
             );

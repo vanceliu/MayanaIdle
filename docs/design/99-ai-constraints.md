@@ -98,3 +98,17 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 90. 自動腳本 UI 是**可拖曳浮動視窗**（`PanelKey = 'script'`，走 `FloatingWindow`，無遮罩），與詳細狀態／裝備欄／背包／技能／任務同一套機制；**不可改回置中 overlay modal**（拖不動、且會遮住 idle 進行中的畫面，見 `16-tech-frontend-architecture.md` § 32.16）
 91. 裝備模板一律**用 id 查表，不可用名字查**（禁用 `db.equipmentTemplates.where('name')`）。seed 換過 id 的品項會在玩家 IndexedDB 留下同名舊列，名字查表會撈到舊數值（皮腰帶 id 70 `bonusWeight: 1000` vs id 593 `1700`）；孤兒模板由 `client/src/db/seed/purgeStaleTemplates.ts` 在每次 seed 後清除 —— 實例改指同名現行 id，seed 已無同名品項則連實例一起刪
 92. 新手裝名單**只有 seed 一個來源**：`acquireType: 'starter'` + `requiredClass`（無 `requiredClass` = 全職業共用，如皮腰帶）。不可在程式碼另立硬編名單（見 `client/src/systems/starterNpc.ts`）
+93. 道具的圖示、顏色、價格**一律取自 seed**（`ITEM_DEFINITIONS`），一律經 `resolveItemIcon()`
+    解析。**不可在任何 UI 端用道具名稱猜測圖示** —— Wiki 曾自寫名稱比對，導致解毒藥水／
+    止血繃帶／淨化藥水全部顯示成紅藥水。素材只有 `sellPrice` 沒有 `buyPrice`，
+    只顯示購買價格會讓整批素材價格空白
+94. 素材的 `iconTier`（顏色）**只表達稀有度／區域階層**（`39-batch-sell.md` § 39.3），
+    **不表達有無製作用途**。用途是獨立維度，由 `EQUIPMENT_SEEDS.craftMaterials` 反查
+    （`systems/craftMaterialUsage.ts`，唯一來源）。兩者不可合併成同一個通道 ——
+    一個視覺通道塞兩種語意必然互相犧牲。強化石／品質石不進配方但算「有用途」，
+    列為明確例外，判定一律用 `hasMaterialUsage()` 而非 `hasCraftUsage()`
+95. 批量販售依 `iconTier` 篩選時**預設保護有用途的素材**，且被保護的項目必須明確列出，
+    不可靜默漏掉（否則玩家以為「Tier N 以下」全賣了）
+96. `30-items.md` 的賣價、重量、`iconTier` 對照表與 `itemSeeds.ts` **必須一致**，
+    由 `client/src/db/seed/__tests__/itemSeedDocSync.test.ts` 驗證。
+    數值以 seed 為準（seed 是實際運作值），文件跟著 seed 走

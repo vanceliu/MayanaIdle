@@ -12,6 +12,7 @@ import {
   getStarterEnhanceMax,
   getStarterGearNames,
 } from '../../systems/starterNpc';
+import { STARTER_TIPS } from '../../systems/starterTips';
 import { db } from '../../db/database';
 
 type NpcTab = 'talk' | 'claim' | 'enhance';
@@ -22,6 +23,11 @@ export function StarterNpc() {
   const inventory = useGameStore(s => s.inventory);
   const [tab, setTab] = useState<NpcTab>('talk');
   const [msg, setMsg] = useState<string | null>(null);
+  const [openTips, setOpenTips] = useState<string[]>([]);
+
+  function toggleTip(id: string) {
+    setOpenTips(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+  }
 
   if (!char) return null;
 
@@ -138,12 +144,39 @@ export function StarterNpc() {
 
       {msg && <p className="starter-msg">{msg}</p>}
 
+      {/* 只有分頁內容會捲動，金幣與分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab === 'talk' && (
         <div className="starter-talk">
           <p>「身為一名{char.className === 'knight' ? '騎士' : char.className === 'elf' ? '妖精' : char.className === 'elementalist' ? '元素師' : char.className === 'priest' ? '牧師' : '盜賊'}，你需要合適的裝備才能踏上冒險之路。」</p>
           <p>「我可以提供你一套新手裝備，還能幫你強化它們。」</p>
           <p>「不過要注意，這些裝備是特製的，不能存入倉庫或販售，只能穿在身上或丟棄。」</p>
           {!canClaim && <p className="starter-warning">「你的等級已超過 30，無法再領取新手裝備了。」</p>}
+
+          {/* 前期知識：條列說明，預設收合，玩家自行點開需要的主題 */}
+          <div className="starter-tips">
+            <h4 className="starter-tips-title">冒險前的基本知識</h4>
+            {STARTER_TIPS.map(section => {
+              const open = openTips.includes(section.id);
+              return (
+                <div key={section.id} className={`starter-tip-section ${open ? 'open' : ''}`}>
+                  <button
+                    className="starter-tip-header"
+                    aria-expanded={open}
+                    onClick={() => toggleTip(section.id)}
+                  >
+                    <span className="starter-tip-arrow" aria-hidden="true">{open ? '▼' : '▶'}</span>
+                    {section.title}
+                  </button>
+                  {open && (
+                    <ul className="starter-tip-list">
+                      {section.tips.map(tip => <li key={tip}>{tip}</li>)}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -186,6 +219,7 @@ export function StarterNpc() {
           {renderEnhanceList()}
         </div>
       )}
+      </div>
     </div>
   );
 }

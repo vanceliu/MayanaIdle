@@ -179,22 +179,28 @@ export function WeaponShop() {
         <button className={tab === 'sell' ? 'active' : ''} onClick={() => setTab('sell')}>出售</button>
       </div>
 
+      {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨商品清單捲動 */}
+      {tab === 'buy' && (
+        <div className="bs-craft-categories">
+          {WEAPON_CATEGORIES.map(cat => {
+            if (cat.key !== 'all' && !templates.some(t => t.type === cat.key)) return null;
+            return (
+              <button
+                key={cat.key}
+                className={category === cat.key ? 'active' : ''}
+                onClick={() => setCategory(cat.key)}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 只有商品清單會捲動，持有金幣與購買／出售分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab === 'buy' && (
         <div className="shop-items">
-          <div className="bs-craft-categories">
-            {WEAPON_CATEGORIES.map(cat => {
-              if (cat.key !== 'all' && !templates.some(t => t.type === cat.key)) return null;
-              return (
-                <button
-                  key={cat.key}
-                  className={category === cat.key ? 'active' : ''}
-                  onClick={() => setCategory(cat.key)}
-                >
-                  {cat.label}
-                </button>
-              );
-            })}
-          </div>
           {templates
             .filter(t => category === 'all' || t.type === category)
             .map(t => (
@@ -280,6 +286,7 @@ export function WeaponShop() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

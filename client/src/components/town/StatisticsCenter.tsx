@@ -117,6 +117,8 @@ export function StatisticsCenter() {
         </button>
       </div>
 
+      {/* 只有榜單內容會捲動，分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab === 'leaderboard' && !expandedField && (
         <div className="stats-leaderboard">
           {loading ? (
@@ -214,6 +216,7 @@ export function StatisticsCenter() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

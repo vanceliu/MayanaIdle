@@ -80,6 +80,8 @@ export function ClassGuild() {
     <div className="guild-panel">
       <p className="shop-greeting">「歡迎來到職業工會。帶來技能書了嗎？」</p>
 
+      {/* 只有清單會捲動，問候語固定在上方 */}
+      <div className="panel-scroll">
       <h4>任務</h4>
       <div className="guild-quest-list">
         {availableQuests.length === 0 && activeQuests.length === 0 && (
@@ -172,6 +174,7 @@ export function ClassGuild() {
           ))
         );
       })()}
+      </div>
     </div>
   );
 }

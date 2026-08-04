@@ -159,6 +159,8 @@ export function MagicAcademy() {
         <button className={tab === 'craft' ? 'active' : ''} onClick={() => setTab('craft')}>製作魔法書</button>
       </div>
 
+      {/* 只有分頁內容會捲動，金幣與分頁固定在上方 */}
+      <div className="panel-scroll">
       {tab === 'learn' && (
         <div className="academy-learn-content">
           <h4>金幣學習（1~3 級）</h4>
@@ -241,6 +243,7 @@ export function MagicAcademy() {
           <span className="skill-meta">MP:{skill.mpCost} / {skill.type}</span>
         </div>
       ))}
+      </div>
     </div>
   );
 }

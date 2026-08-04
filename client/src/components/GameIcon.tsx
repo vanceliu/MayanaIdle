@@ -29,13 +29,24 @@ export function GameIcon({ name, size = 32, color, className = '' }: GameIconPro
     }
   }, [name]);
 
+  // data-icon / data-icon-color：SVG 是非同步載入且以 innerHTML 注入，
+  // 測試無法從 DOM 反推「這裡該顯示哪個圖示」，故以屬性外露圖示身分。
   if (!svgContent) {
-    return <span className={`game-icon game-icon--empty ${className}`} style={{ width: size, height: size }} />;
+    return (
+      <span
+        className={`game-icon game-icon--empty ${className}`}
+        data-icon={name}
+        data-icon-color={color}
+        style={{ width: size, height: size }}
+      />
+    );
   }
 
   return (
     <span
       className={`game-icon ${className}`}
+      data-icon={name}
+      data-icon-color={color}
       style={{ width: size, height: size, color }}
       dangerouslySetInnerHTML={{ __html: svgContent }}
     />
