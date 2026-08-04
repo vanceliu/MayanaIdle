@@ -136,6 +136,13 @@ export function tickPlayerCombat(
     ctx.state = 'attacking';
     ctx.attackTimer += deltaMs;
 
+    // 腳本此刻沒有可執行動作 → **不出手**（玩家關掉普通攻擊就代表不打算平A）。
+    // 計時器夾在上限而不是歸零，冷卻一結束就能立刻出手，不必再等一個完整攻擊間隔。
+    if (!hasExecutableAction) {
+      if (ctx.attackTimer >= ctx.attackCooldown) ctx.attackTimer = ctx.attackCooldown;
+      return { action: 'none' };
+    }
+
     if (ctx.attackTimer >= ctx.attackCooldown) {
       ctx.attackTimer = 0;
       return { action: 'attack', attackTargetIdx: target.index };

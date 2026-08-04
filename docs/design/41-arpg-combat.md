@@ -91,9 +91,21 @@
 >
 > 反過來也不能只用 `chaseRange` 當出手判定 —— 那會讓普通攻擊從 12 格外打得到。
 
-沒有可執行動作且已在 `chaseRange` 內時，角色**原地待命**（state 維持 `attacking`），
+沒有可執行動作時，角色**原地待命**（state 維持 `attacking`），
 攻擊計時器繼續累積並夾在攻擊間隔上限，冷卻一結束就能立刻出手，
 不必再等一個完整攻擊間隔。
+
+> **「沒有可執行動作」包含怪已經貼到臉上的情況 —— 不可退回普通攻擊。**
+> 引擎曾經寫死 `scriptAction ?? { type: 'normal_attack' }`，結果是關掉普通攻擊規則的玩家
+> 只要怪走進武器射程就被迫平A，設定形同無效。判定分兩層，兩層都必須看
+> `hasExecutableAction`：
+> - `playerCombatFSM`：射程內也不發 `attack` 事件（只發事件不做事會把計時器歸零，
+>   反而讓下一次出手多等一個攻擊間隔）
+> - `arpgEngine`：腳本回 `null` 就不產生任何 `player_attack` 事件
+>
+> 代價是「一條啟用的攻擊規則都沒有」時角色會完全不動手，因此腳本面板必須顯示警告
+> （`CombatScriptEditor` 的 `.script-warning`）。新角色的 `DEFAULT_COMBAT_SCRIPT`
+> 本來就內建一條啟用的普通攻擊，不會一開局就卡住。
 
 ### 3.2 攻擊流程
 

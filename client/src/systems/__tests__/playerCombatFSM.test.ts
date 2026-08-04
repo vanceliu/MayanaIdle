@@ -119,3 +119,41 @@ describe('tickPlayerCombat', () => {
     expect(ctx.state).toBe('attacking');
   });
 });
+
+describe('腳本沒有可執行動作時不出手（§ 41）', () => {
+  const adjacent = [{ id: 'm0', index: 0, position: { x: 1, y: 0 }, alive: true }];
+  const melee = { attackType: 'melee' as const, range: 1.5 };
+
+  it('怪貼到身上、攻擊冷卻也走完了，仍然不出手', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.attackCooldown = 1000;
+
+    // hasExecutableAction = false：玩家關掉普通攻擊、技能又都在冷卻
+    const result = tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 2000, false, false);
+
+    expect(result.action).toBe('none');
+    expect(ctx.state).toBe('attacking');
+  });
+
+  it('計時器夾在上限而非歸零，冷卻一結束就能立刻出手', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.attackCooldown = 1000;
+
+    tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 2000, false, false);
+    expect(ctx.attackTimer).toBe(1000);
+
+    // 技能一轉好（hasExecutableAction 變 true）就該立刻出手，不必再等一個攻擊間隔
+    const next = tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 16, false, true);
+    expect(next.action).toBe('attack');
+  });
+
+  it('有可執行動作時行為不變，照常出手', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.attackCooldown = 1000;
+
+    const result = tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 2000, false, true);
+
+    expect(result.action).toBe('attack');
+    expect(ctx.attackTimer).toBe(0);
+  });
+});

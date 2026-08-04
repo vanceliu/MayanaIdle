@@ -1659,6 +1659,18 @@ button.active {
   margin-bottom: 10px;
 }
 
+/* 沒有啟用的攻擊規則＝角色不會出手，必須明顯到不會被當成 bug（§ 41） */
+.script-warning {
+  font-size: var(--fs-xs);
+  color: var(--accent-danger);
+  background: rgba(244, 63, 94, 0.1);
+  border-left: 3px solid var(--accent-danger);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
 .script-rules {
   display: flex;
   flex-direction: column;

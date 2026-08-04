@@ -24,6 +24,19 @@ export function CombatScriptEditor() {
 
   const attackSkills = skills.filter(s => s.type === 'attack');
 
+  /**
+   * 沒有任何「啟用的攻擊規則」時角色會完全不出手（`41-arpg-combat.md`）。
+   * 引擎刻意不再偷偷退回普通攻擊，所以這個狀態必須讓玩家看得見，
+   * 否則會以為是遊戲壞掉。
+   */
+  const hasEnabledAttackRule = combatRules.some(rule => {
+    if (!rule.enabled) return false;
+    if (rule.action.type === 'normal_attack') return true;
+    if (rule.action.type !== 'skill' || !rule.action.skillId) return false;
+    // 技能規則要指到「已學會的攻擊技能」才算數
+    return attackSkills.some(s => s.id === rule.action.skillId);
+  });
+
   function updateRule(idx: number, updates: Partial<CombatRule>) {
     const rules = [...combatRules];
     rules[idx] = { ...rules[idx], ...updates };
@@ -73,6 +86,12 @@ export function CombatScriptEditor() {
   return (
     <div className="script-editor-content">
       <p className="script-hint">僅在戰鬥中執行。由上往下判定，第一個符合條件的規則會被執行。</p>
+
+      {!hasEnabledAttackRule && (
+        <p className="script-warning" role="alert">
+          ⚠ 沒有任何啟用的攻擊規則，角色不會出手。加一條「普通攻擊」或啟用攻擊技能規則。
+        </p>
+      )}
 
       <div className="script-rules">
         {combatRules.map((rule, idx) => (
