@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import {
   CombatLogWindow,
   clampLogPosition,
+  resizeLogPosition,
   loadLogPosition,
   loadLogOpacity,
   opacityToAlpha,
@@ -48,18 +49,56 @@ describe('CombatLogWindow（可拖曳的戰鬥日誌視窗，§ 32.3）', () => 
     const size = { width: 420, height: 160 };
     const viewport = { width: 1000, height: 800 };
 
-    it('拖出畫面右邊時至少留 40px 在畫面上', () => {
-      expect(clampLogPosition({ left: 5000, top: 10 }, size, viewport).left).toBe(960);
+    // 與背包／技能／裝備欄同語意：整個視窗都要留在畫面內。
+    // 舊版只保證露出 40px，但 .game-layout 是 overflow: hidden，
+    // 拖出去的部分是被裁掉的，等於玩家能把日誌弄丟。
+    it('拖出畫面右邊時，右緣貼齊畫面右側', () => {
+      // 畫面寬 1000、視窗寬 420 → 最右 580
+      expect(clampLogPosition({ left: 5000, top: 10 }, size, viewport).left).toBe(580);
     });
 
-    it('拖出畫面左邊時也至少留 40px', () => {
-      // 視窗寬 420，最左只能到 40 - 420 = -380
-      expect(clampLogPosition({ left: -9999, top: 10 }, size, viewport).left).toBe(-380);
+    it('拖出畫面左邊時，左緣貼齊 0（不再允許負值）', () => {
+      expect(clampLogPosition({ left: -9999, top: 10 }, size, viewport).left).toBe(0);
     });
 
-    it('上緣不可為負、下緣至少留 40px', () => {
+    it('上下同樣完全收在畫面內', () => {
       expect(clampLogPosition({ left: 0, top: -50 }, size, viewport).top).toBe(0);
-      expect(clampLogPosition({ left: 0, top: 5000 }, size, viewport).top).toBe(760);
+      // 畫面高 800、視窗高 160 → 最低 640
+      expect(clampLogPosition({ left: 0, top: 5000 }, size, viewport).top).toBe(640);
+    });
+
+    it('視窗比畫面大時貼齊左上，標題列不可被推出畫面', () => {
+      const huge = { width: 1400, height: 1200 };
+      expect(clampLogPosition({ left: 300, top: 300 }, huge, viewport)).toEqual({ left: 0, top: 0 });
+    });
+  });
+
+  describe('resizeLogPosition（調整大小時往上長，不可衝出畫面底部）', () => {
+    const viewport = { width: 1000, height: 800 };
+
+    it('放大時下緣不動 —— 也就是往上長', () => {
+      // 原本 top 600、高 160 → 下緣 760。放大到 400 後 top 應為 760 - 400 = 360
+      expect(resizeLogPosition(760, 12, { width: 420, height: 400 }, viewport))
+        .toEqual({ left: 12, top: 360 });
+    });
+
+    it('縮小時下緣同樣不動 —— 收合後不會吊在畫面中間', () => {
+      expect(resizeLogPosition(760, 12, { width: 420, height: 160 }, viewport))
+        .toEqual({ left: 12, top: 600 });
+    });
+
+    it('回歸：拖曳過之後放大不可往下衝出畫面', () => {
+      // 拖曳過的視窗改用 top 定位，改版前放大會整片超出畫面底部
+      const result = resizeLogPosition(760, 12, { width: 420, height: 560 }, viewport);
+      expect(result.top + 560).toBeLessThanOrEqual(viewport.height);
+    });
+
+    it('視窗比畫面還高時貼齊上緣，不讓標題列跑到畫面外', () => {
+      expect(resizeLogPosition(760, 12, { width: 420, height: 900 }, viewport).top).toBe(0);
+    });
+
+    it('左右位置不因調整大小而改變（合法範圍內）', () => {
+      expect(resizeLogPosition(760, 300, { width: 420, height: 400 }, viewport).left).toBe(300);
     });
   });
 
