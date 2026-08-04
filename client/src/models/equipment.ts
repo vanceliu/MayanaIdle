@@ -14,6 +14,29 @@ export type EquipSlot =
   | 'ring2';
 
 
+/**
+ * 普通攻擊的武器射程（格）。`41-arpg-combat.md` § 3.1 為權威定義。
+ *
+ * 14 種武器類型裡只有弓是遠程，其餘（含法杖、魔導書）普通攻擊都得貼身 ——
+ * 法系的輸出靠技能射程，不靠武器。
+ *
+ * 常數放在 model 層而非 FSM：介面要顯示同一個數字，
+ * 抽出來才不會 UI 自己抄一份 15 然後跟戰鬥邏輯漂移。
+ */
+export const MELEE_WEAPON_RANGE = 1.5;
+export const WEAPON_RANGE: Record<string, number> = {
+  bow: 15,
+};
+
+export function getWeaponRange(weaponType: string | undefined): number {
+  return (weaponType && WEAPON_RANGE[weaponType]) || MELEE_WEAPON_RANGE;
+}
+
+/** 是否為遠程武器。近戰是預設值，介面只在「不是預設」時才需要標出射程 */
+export function isRangedWeapon(weaponType: string | undefined): boolean {
+  return getWeaponRange(weaponType) > MELEE_WEAPON_RANGE;
+}
+
 /** 裝備部位的顯示名稱。裝備欄、新手 NPC 等多處共用，不可各自複製一份。 */
 export const SLOT_NAMES: Record<EquipSlot, string> = {
   rightHand: '右手',

@@ -1,3 +1,4 @@
+import { getWeaponRange, isRangedWeapon } from '../models/equipment';
 import type { Position, MapData } from '../models/mapControl';
 import { hasLineOfSight, getDistance } from './lineOfSight';
 
@@ -44,12 +45,10 @@ export interface AttackConfig {
 }
 
 export function getWeaponAttackConfig(weaponType: string | undefined): AttackConfig {
-  switch (weaponType) {
-    case 'bow':
-      return { attackType: 'ranged', range: 15 };
-    default:
-      return { attackType: 'melee', range: 1.5 };
-  }
+  return {
+    attackType: isRangedWeapon(weaponType) ? 'ranged' : 'melee',
+    range: getWeaponRange(weaponType),
+  };
 }
 
 /**

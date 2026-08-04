@@ -229,7 +229,7 @@ export const EQUIPMENT_SEEDS: EquipmentTemplate[] = [
 
   // ============ 裝備Tier 7（Boss 掉落限定・每職業 3 把招牌武器）============
   // 走向：攻擊（額外攻擊最高）／均衡命中（攻擊成功最高）／智力（智力+2）
-  // 招牌類型依 44-dps-prediction.md § 44.5 的實測 BiS 決定
+  // 招牌類型沿用 T6 時代的實測 BiS（44-dps-prediction.md § 44.5，該報告待重跑）
   // 額外攻擊佔基傷的比例與同類型 T6 一致（雙手重型約 3 成、輕型約 5~6 成）
   // 騎士：雙手劍
   { id: 232, name: '終焉巨劍', type: 'twoHandSword', slot: 'rightHand', isTwoHanded: true, smallMonsterDamage: 29, largeMonsterDamage: 26, attackSuccess: 2, extraAttack: 9, weight: 64, material: 'silver', requiredClass: ['knight'], buyPrice: 0, stability: 6, canBreak: false, acquireType: 'drop_only', tier: 7 },

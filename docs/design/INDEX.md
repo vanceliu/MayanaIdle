@@ -86,7 +86,7 @@
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
-| DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文 |
+| DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（**報告已作廢，目前只有重跑需求規格**） |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
 | 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4，API 見 `37-statistics.md` § 37.4.3 |
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` | § 37.4.9，另見 `45-legacy-archive.md` § 45.4.1 |
@@ -145,7 +145,7 @@
 | `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
 | `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
 | `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
-| `44-dps-prediction.md` | DPS 預測報告 | Lv.75 滿裝 vs 百柱死神：屬性分配、BiS、擊殺時間、職業落差 |
+| `44-dps-prediction.md` | DPS 預測**重跑需求規格** | Lv.75 滿裝 vs 百柱死神。T7 實裝後舊報告全數作廢並刪除，本檔只剩題目、前提、BiS 選定規則與腳本需求 |
 
 ### 怪物系統
 
@@ -271,7 +271,7 @@
        ↕                    ↕
 40-pixijs-migration.md（theme palette / 分層渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
 
-44-dps-prediction.md（唯讀報告，被以下任一文件的數值變更所影響，需重跑驗算腳本）
+44-dps-prediction.md（重跑需求規格；被以下任一文件的數值變更所影響，需重跑驗算腳本）
   ← 21-combat-formula.md / 20-attributes.md / 04-character.md
   ← 07-affix.md / 08-quality.md / 06-equipment.md
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 41-arpg-combat.md

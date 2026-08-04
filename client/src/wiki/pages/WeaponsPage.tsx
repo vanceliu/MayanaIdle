@@ -1,3 +1,4 @@
+import { getWeaponRange, isRangedWeapon } from '../../models/equipment';
 import { useState, useMemo } from 'react';
 import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
@@ -134,6 +135,7 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
               <th className="sortable" onClick={() => handleSort('type')}>類型{sortIndicator('type')}</th>
               <th className="sortable" onClick={() => handleSort('smallMonsterDamage')}>對小怪{sortIndicator('smallMonsterDamage')}</th>
               <th className="sortable" onClick={() => handleSort('largeMonsterDamage')}>對大怪{sortIndicator('largeMonsterDamage')}</th>
+              <th>射程</th>
               <th>命中</th>
               <th>額攻</th>
               <th>材質</th>
@@ -185,6 +187,7 @@ function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[num
       <td>{TYPE_LABELS[w.type] || w.type}</td>
       <td className="cell-number">{w.smallMonsterDamage ?? '-'}</td>
       <td className="cell-number">{w.largeMonsterDamage ?? '-'}</td>
+      <td>{isRangedWeapon(w.type) ? `${getWeaponRange(w.type)} 格` : '近身'}</td>
       <td className="cell-number">{w.attackSuccess ?? 0}</td>
       <td className="cell-number">{w.extraAttack ?? 0}</td>
       <td>{w.material ? MATERIAL_LABELS[w.material] || w.material : '-'}</td>

@@ -1,3 +1,4 @@
+import { formatSkillRange } from '../../models/skill';
 import { useGameStore } from '../../stores/gameStore';
 import type { Skill } from '../../models/skill';
 import { QUEST_TEMPLATES, ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../../models/quest';
@@ -139,6 +140,7 @@ export function ClassGuild() {
                 <span className="shop-item-name">{def.name}</span>
                 <span className="shop-item-desc">
                   Lv.{def.requiredLevel} | {def.skill.type} | MP {def.skill.mpCost}
+                  {formatSkillRange(def.skill) && ` | 射程 ${formatSkillRange(def.skill)}`}
                 </span>
               </div>
               <div className="shop-item-actions">
@@ -169,7 +171,7 @@ export function ClassGuild() {
           learnedClassSkills.map(skill => (
             <div key={skill.id} className="learned-skill">
               <span>{skill.name}</span>
-              <span className="skill-meta">MP:{skill.mpCost} / {skill.type}</span>
+              <span className="skill-meta">MP:{skill.mpCost} / {skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}</span>
             </div>
           ))
         );

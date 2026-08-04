@@ -1,3 +1,4 @@
+import { formatSkillRange } from '../../models/skill';
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { SKILL_CATALOG } from '../../models/skill';
@@ -172,7 +173,7 @@ export function MagicAcademy() {
               <div key={skill.id} className="shop-item">
                 <div className="shop-item-info">
                   <span className="shop-item-name">{skill.name} (Lv.{level})</span>
-                  <span className="shop-item-desc">MP:{skill.mpCost} / {skill.type === 'attack' ? `威力:${skill.power}` : skill.type}</span>
+                  <span className="shop-item-desc">MP:{skill.mpCost} / {skill.type === 'attack' ? `威力:${skill.power}` : skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}</span>
                   <span className="shop-item-price">{price}G</span>
                 </div>
                 <div className="shop-item-actions">
@@ -240,7 +241,7 @@ export function MagicAcademy() {
       {skills.map(skill => (
         <div key={skill.id} className="learned-skill">
           <span>{skill.name}</span>
-          <span className="skill-meta">MP:{skill.mpCost} / {skill.type}</span>
+          <span className="skill-meta">MP:{skill.mpCost} / {skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}</span>
         </div>
       ))}
       </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill } from '../models/skill';
+import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange } from '../models/skill';
 import type { ClassName } from '../models/character';
 
 const GRID_COLUMNS = 5;
@@ -201,6 +201,9 @@ export function SkillPanel() {
           )}
           {tooltip.skill.type === 'attack' && (
             <div className="skill-tooltip-stat">威力: {tooltip.skill.power}</div>
+          )}
+          {formatSkillRange(tooltip.skill) && (
+            <div className="skill-tooltip-stat">射程: {formatSkillRange(tooltip.skill)}</div>
           )}
           {tooltip.skill.hits && (
             <div className="skill-tooltip-stat">{tooltip.skill.hits} 連擊（每擊獨立判定）</div>

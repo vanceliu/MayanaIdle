@@ -1,3 +1,4 @@
+import { getWeaponRange, isRangedWeapon } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
 import { formatAffixDisplay, isSpecialAffixType } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
@@ -75,6 +76,10 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       )}
       {(item.blockRate ?? 0) > 0 && (
         <div className="equip-detail-stat">格擋率: {item.blockRate}%</div>
+      )}
+      {/* 只有遠程武器標射程：近戰 1.5 是預設，13/14 種武器印出來等於多一行零資訊 */}
+      {isWeapon && isRangedWeapon(item.type) && (
+        <div className="equip-detail-stat">射程: {getWeaponRange(item.type)} 格</div>
       )}
       {isWeapon && totalAttackSuccess > 0 && (
         <div className="equip-detail-stat">攻擊成功: +{totalAttackSuccess}</div>
@@ -172,6 +177,9 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
       )}
       {(template.blockRate ?? 0) > 0 && (
         <div className="equip-detail-stat">格擋率: {template.blockRate}%</div>
+      )}
+      {isWeapon && isRangedWeapon(template.type) && (
+        <div className="equip-detail-stat">射程: {getWeaponRange(template.type)} 格</div>
       )}
       {isWeapon && baseAttackSuccess > 0 && (
         <div className="equip-detail-stat">攻擊成功: +{baseAttackSuccess}</div>

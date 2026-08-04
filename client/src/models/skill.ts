@@ -153,6 +153,23 @@ export const SKILL_WIND_BLADE: Skill = {
   lastUsedAt: 0,
 };
 
+/**
+ * 技能射程的顯示字串。攻擊技能才有意義，buff／heal 一律回空字串。
+ *
+ * - `range: 0` 是「對自己施放」，不做距離判定（`41-arpg-combat.md` § 3.1）
+ * - 近身（1.5）直接寫「近身」，寫成「1.5 格」對玩家沒有資訊量
+ * - 用詞固定為**射程**：介面上的「範圍」已經被 AOE 半徑佔用，兩者不可混用
+ *
+ * 顯示位置：技能面板 tooltip、Wiki 技能表、魔法學院、職業工會 —— 共用這一個函式，
+ * 避免四個地方各寫一套而說法不一致。
+ */
+export function formatSkillRange(skill: Pick<Skill, 'type' | 'range'>): string {
+  if (skill.type !== 'attack') return '';
+  const range = skill.range;
+  if (range == null || range <= 0) return '';
+  return range <= 1.5 ? '近身' : `${range} 格`;
+}
+
 export function isSkillReady(skill: Skill, now: number, cooldownReductionPercent: number = 0): boolean {
   const effectiveCooldown = Math.floor(skill.cooldown * (1 - Math.min(cooldownReductionPercent, 50) / 100));
   return now - skill.lastUsedAt >= effectiveCooldown;

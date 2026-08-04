@@ -1,3 +1,4 @@
+import { formatSkillRange } from '../../models/skill';
 import { useMemo, useState } from 'react';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
@@ -55,6 +56,7 @@ export function SkillsPage() {
               <th>類型</th>
               <th>屬性</th>
               <th>目標</th>
+              <th>射程</th>
               <th>威力</th>
               <th>治療量</th>
               <th>MP 消耗</th>
@@ -70,6 +72,7 @@ export function SkillsPage() {
                 <td>{TYPE_LABELS[s.type]}</td>
                 <td><span className={`wiki-badge wiki-badge-${s.element}`}>{ELEMENT_LABELS[s.element]}</span></td>
                 <td>{s.target === 'aoe' ? `範圍(半徑${s.aoeRadius ?? '?'}格/${s.maxTargets ? `最多${s.maxTargets}隻` : '無上限'})` : '單體'}</td>
+                <td>{formatSkillRange(s) || '-'}</td>
                 <td className="cell-number">{s.power || '-'}</td>
                 <td className="cell-number">{s.healAmount || '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
@@ -125,6 +128,7 @@ export function SkillsPage() {
                     <th>類型</th>
                     <th>屬性</th>
                     <th>目標</th>
+                    <th>射程</th>
                     <th>威力</th>
                     <th>治療量</th>
                     <th>MP</th>
@@ -142,6 +146,7 @@ export function SkillsPage() {
                       <td>{TYPE_LABELS[s.skill.type]}</td>
                       <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
                       <td>{s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius ?? '?'}格/${s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
+                      <td>{formatSkillRange(s.skill) || '-'}</td>
                       <td className="cell-number">{s.skill.power || '-'}</td>
                       <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>
