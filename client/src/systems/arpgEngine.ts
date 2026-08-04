@@ -24,7 +24,7 @@ import {
 import { getDistance } from './lineOfSight';
 import type { MonsterAttackType } from '../models/monster';
 import { evaluateCombatScript, type CombatScriptContext } from './scriptRunner';
-import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById } from './combat';
+import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
 import { isPlayerStunned } from './playerDebuffSystem';
 
 export interface ArpgMonster {
@@ -109,7 +109,7 @@ export function tickArpgEngine(
   syncMonsterContexts(engine, mapMonsters, monsterInstances);
 
   // Determine weapon type for attack config
-  const weapon = equippedGear.find(g => g && (g.slot === 'rightHand' || g.slot === 'leftHand'));
+  const weapon = getEquippedWeapon(equippedGear);
   const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const attackConfig = getWeaponAttackConfig(weaponType);
   // attackConfig.range 之後會被技能撐開，普通攻擊的判定要用武器原值
@@ -133,6 +133,7 @@ export function tickArpgEngine(
       skills,
       now: Date.now(),
       cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
+      weaponType,
     };
     const nextAction = evaluateCombatScript(combatRules, scriptCtx);
     hasExecutableAction = nextAction !== null;
@@ -188,6 +189,7 @@ export function tickArpgEngine(
       skills,
       now: Date.now(),
       cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
+      weaponType,
     };
 
     /**

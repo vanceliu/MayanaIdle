@@ -20,6 +20,18 @@ export interface CombatScriptContext {
   skills: Skill[];
   now: number;
   cooldownReduction?: number;
+  /** 目前手持武器的 `type`（空手為 undefined），用於 `requiredWeaponType` 判定 */
+  weaponType?: string;
+}
+
+/**
+ * 技能的武器需求（`23-class-magic.md` § 23.4 的「【需裝備弓】」）。
+ * 沒有標 `requiredWeaponType` 的技能一律通過；標了就必須手持該類武器，
+ * 空手（`weaponType` 為 undefined）同樣不通過。
+ */
+function meetsWeaponRequirement(skill: Skill, ctx: CombatScriptContext): boolean {
+  if (!skill.requiredWeaponType) return true;
+  return ctx.weaponType === skill.requiredWeaponType;
 }
 
 export function evaluateCombatScript(rules: CombatRule[], ctx: CombatScriptContext): CombatAction | null {
@@ -59,6 +71,7 @@ function checkCombatCondition(rule: CombatRule, ctx: CombatScriptContext): boole
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);
       if (!skill) return false;
+      if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, now, ctx.cooldownReduction ?? 0);
     }
     default:
@@ -71,6 +84,7 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
     case 'skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (!skill) return false;
+      if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'normal_attack':

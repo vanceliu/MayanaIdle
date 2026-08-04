@@ -11,6 +11,7 @@ import {
   calculatePhysicalSkillHit,
   calculateMonsterAttack,
   calculateBasePhysicalDamage,
+  getEquippedWeapon,
   hasActiveFireEnchant,
   getAffixBonusesFromGear,
   calculateMpRestored,
@@ -121,7 +122,7 @@ export function processPlayerAttack(
   const { character, equippedGear, activeEffects } = ctx;
   const damages: DamageResult[] = [];
   const logs: CombatLog[] = [];
-  const weapon = equippedGear[0] ?? null;
+  const weapon = getEquippedWeapon(equippedGear);
   let drainDamage = 0;
 
   const skill = event.skill;

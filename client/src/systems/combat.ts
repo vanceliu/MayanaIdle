@@ -203,6 +203,23 @@ function applyIgnoreDefense(reduction: number, ignorePercent: number): number {
 /** 強化可提升魔法攻擊的武器類型（§ 6.9：每 +2 強化 → 魔攻 +1） */
 const MAGIC_ATTACK_WEAPON_TYPES = new Set(['staff', 'twoHandStaff', 'magicBook']);
 
+/**
+ * 手持武器的**唯一取用來源**：依 slot 語意取，右手優先，右手空手時才看左手。
+ *
+ * 不可改回用陣列位置（`equippedGear[0]`）—— 傳進戰鬥系統的陣列是
+ * `Object.values(equippedGear).filter(Boolean)` 拍平的，順序是 record 的 key
+ * 插入順序（＝ instance id 順序）。玩家一換掉新手武器，`rightHand` 就會排到
+ * 防具後面，第 0 格變防具：武器基傷退回保底值 1，額外攻擊／攻擊成功／材質
+ * 克制／火矢的 `isBow` 判定全部靜默失效。
+ */
+export function getEquippedWeapon(
+  equippedGear: (EquipmentInstance | null)[],
+): EquipmentInstance | null {
+  return equippedGear.find(g => g?.slot === 'rightHand')
+    ?? equippedGear.find(g => g?.slot === 'leftHand')
+    ?? null;
+}
+
 function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
   if (!gear) return 1;
   const base = monsterSize === 'small' ? gear.smallMonsterDamage : gear.largeMonsterDamage;

@@ -1,6 +1,13 @@
 # 99. AI 生成內容時的總限制
 
-AI 後續協助 MayanaIdle 時，應遵守以下限制：
+## 99.1 限制清單
+
+AI 後續協助 MayanaIdle 時，應遵守以下限制。
+
+> 編號至 100，另有 68a／78a／78b／78c 四條子項，**合計 104 條**。
+> 編號是穩定識別碼，**只增不改** —— 其他文件以「§ 99.1 第 N 條」交叉引用（現有引用見
+> `06-equipment-acquire.md`、`06-equipment-balance.md`），重新編號會讓所有引用失效。
+> 82~88 排在 80、81 之前是歷史順序，維持原樣。
 
 1. 不要設計成推關制放置 RPG
 2. 不要設計討伐魔王主線
@@ -115,3 +122,36 @@ AI 後續協助 MayanaIdle 時，應遵守以下限制：
 
 97. 顯示設定（介面大小／文字大小）的入口是右下系統列的 ⚙ + 置中彈窗，**不是浮動視窗**，不佔 `PanelKey`（見 `34-ui-guidelines.md` § 34.6）
 98. 介面縮放一律用 `--ui-scale` 套在**內容盒**（不可套定位層），且**遊戲畫面（Pixi 地圖）永遠不縮放**；介面大小與文字大小預設互不影響，要一起變是靠「介面與文字一起縮放」勾選，不可改成單一倍率
+99. 傳進戰鬥系統的 `equippedGear` 是**陣列**，順序＝ record 的 key 插入順序（instance id），
+    **不是部位順序**。取手持武器一律用 `systems/combat.ts` 的 `getEquippedWeapon()`（依 slot 語意，
+    右手優先），**禁用 `equippedGear[0]`**。玩家換掉新手武器後 `rightHand` 會排到防具之後，
+    以位置取值會拿到防具 —— 武器基傷退回保底值 1、額外攻擊／攻擊成功／材質克制／火矢的
+    `isBow` 判定全部**靜默**失效（面板顯示走 `equippedGear.rightHand` 所以看起來正常，
+    全職業普攻傷害少一截卻不會報錯）。詞綴／防禦／魔攻等「掃全陣列」的聚合函式不受影響
+100. 技能的 `requiredWeaponType`（如三連射／穿透箭雨的【需裝備弓】，`23-class-magic.md` § 23.4）
+    是**實際限制**，由 `scriptRunner.ts` 的 `meetsWeaponRequirement()` 在腳本選招時擋下，
+    不可退化成只在 tooltip／Wiki 顯示的裝飾字
+
+---
+
+## [TEMP] 進行中：修正武器取用錯誤（全職業普攻傷害異常）
+
+> 此段為實作進度追蹤，全部完成且使用者確認後刪除。
+
+**問題**：`arpgEventHandler.ts` 以 `equippedGear[0]` 取武器，但該陣列由
+`Object.values(equippedGear).filter(Boolean)` 拍平（`PixiGame.tsx`），順序是
+record 的 key 插入順序 ＝ instance id 順序。玩家換掉新手武器後，`rightHand`
+的 key 會排到防具之後，第 0 格變成防具 → 武器基傷退回保底值 1、額外攻擊／
+攻擊成功／材質克制／火矢 `isBow` 判定全部失效。**五職業皆中**。
+
+**Phase 計畫**
+
+- [x] P1 `combat.ts` 新增 `getEquippedWeapon()`：依 slot 語意取用（右手優先，右手空才看左手），成為唯一來源
+- [x] P2 `arpgEventHandler.ts:124` 改用 `getEquippedWeapon()`
+- [x] P3 `arpgEngine.ts:112` 同步改用（原本 `find` 已正確，但左右手優先序不確定，一併收斂）
+- [x] P4 `scriptRunner.ts` 補上 `requiredWeaponType` 實際擋招（目前只用於 UI 顯示，拿劍也能放三連射；設計見 `23-class-magic.md` § 23.4「【需裝備弓】」）
+- [x] P5 測試：武器排在陣列最後仍算出正確傷害（弓＋近戰各一組）、`requiredWeaponType` 擋招
+- [x] P6 `npx tsc -b` 與 vitest 全綠
+
+**驗證條件**：Lv.28 妖精（STR 14）持獵人長弓＋火矢附魔打石像鬼（大型／防禦 10）
+單下傷害為 **31**（修正前為 7）。

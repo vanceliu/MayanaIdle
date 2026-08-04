@@ -370,8 +370,9 @@ npx vite-node scripts/generateWeaponDocs.mts             # 06-equipment-weapons-
 | T6 | 1 | **不給屬性**，改給防禦 1 | 18 | +8,300 | 怪物掉落 |
 | T7 | 3 | 力量+2／智力+2／敏捷+2，並保有防禦 1 | 20 | +10,000 | Boss 掉落 |
 
-**負重加成目前只是資料**：負重懲罰與負重 UI 皆未實作（§ 99.1 第 61 條），
-數值依 § 20.7 保留備用。
+**負重加成已實際生效**（§ 99.1 第 61 條）：上限公式與超重懲罰見 `20-attributes.md` § 20.7，
+實作於 `client/src/systems/weight.ts`，超重時 `arpgEngine.ts` 發出 `overweight_blocked`
+擋下攻擊與魔法；負重 UI 在角色 HUD 與詳細狀態面板皆有顯示。
 
 背包基礎 50 格，T7 腰帶把上限推到 **70 格**（§ 35.1、§ 99.1 第 56 條）。
 腰帶安定值一律 −1，不可強化（`06-equipment.md` § 6.8）。
