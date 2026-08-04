@@ -14,6 +14,7 @@ import {
   createPlayerCombatContext,
   tickPlayerCombat,
   getWeaponAttackConfig,
+  getScriptChaseRange,
 } from './playerCombatFSM';
 import {
   type MonsterCombatContext,
@@ -111,6 +112,8 @@ export function tickArpgEngine(
   const weapon = equippedGear.find(g => g && (g.slot === 'rightHand' || g.slot === 'leftHand'));
   const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const attackConfig = getWeaponAttackConfig(weaponType);
+  // attackConfig.range 之後會被技能撐開，普通攻擊的判定要用武器原值
+  const weaponRange = attackConfig.range;
 
   // Pre-evaluate script to determine effective attack range
   // If script would use a ranged skill, extend the range
@@ -118,6 +121,11 @@ export function tickArpgEngine(
     .filter(m => m.instance.currentHp > 0)
     .map(m => m.instance);
 
+  // 追擊距離看「腳本啟用的規則會用到什麼」，與此刻剛好選中哪一招無關。
+  // 少了這一條，技能全在冷卻時射程會塌回武器射程，遠程職業就會往怪身上蹭（§ 3.1）
+  attackConfig.chaseRange = getScriptChaseRange(combatRules, skills, attackConfig.range);
+
+  let hasExecutableAction = true;
   if (aliveForScript.length > 0) {
     const scriptCtx: CombatScriptContext = {
       character,
@@ -127,6 +135,7 @@ export function tickArpgEngine(
       cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
     };
     const nextAction = evaluateCombatScript(combatRules, scriptCtx);
+    hasExecutableAction = nextAction !== null;
     if (nextAction?.type === 'skill' && nextAction.skillId) {
       const skill = skills.find(s => s.id === nextAction.skillId);
       if (skill && skill.type === 'attack' && skill.range && skill.range > attackConfig.range) {
@@ -160,6 +169,7 @@ export function tickArpgEngine(
     map,
     deltaMs,
     playerStunned,
+    hasExecutableAction,
   );
 
   if (playerResult.action === 'move_to' && playerResult.moveTarget && playerResult.moveRange !== undefined) {
@@ -199,7 +209,7 @@ export function tickArpgEngine(
           attackType: attackConfig.attackType,
         });
       } else {
-        const targetIds = resolveTargets(engine, action, skills, playerPos);
+        const targetIds = resolveTargets(engine, action, skills, playerPos, skill?.range ?? weaponRange);
         if (targetIds.length > 0) {
           events.push({
             type: 'player_attack',
@@ -211,7 +221,9 @@ export function tickArpgEngine(
         }
       }
     } else {
-      const targetIds = resolveTargets(engine, action, skills, playerPos);
+      // 腳本沒有可執行動作時會退回普通攻擊，但普通攻擊只有武器射程 ——
+      // resolveTargets 若不看距離，遠程站位下會變成「12 格外平A」
+      const targetIds = resolveTargets(engine, action, skills, playerPos, weaponRange);
       if (targetIds.length > 0) {
         events.push({
           type: 'player_attack',
@@ -311,6 +323,8 @@ function resolveTargets(
   action: CombatAction,
   skills: Skill[],
   playerPos: Position,
+  /** 這個動作自己的射程。主目標超出就不出手，不可沿用 FSM 被技能撐開的值 */
+  maxRange: number,
 ): string[] {
   const aliveMonsters = Array.from(engine.monsters.entries())
     .filter(([, m]) => m.instance.currentHp > 0);
@@ -341,6 +355,10 @@ function resolveTargets(
   }
 
   if (!primaryId) return [];
+
+  // 主目標超出這個動作的射程就不出手（FSM 的追擊距離與出手判定是兩個數字）
+  const primary = engine.monsters.get(primaryId)!;
+  if (getDistance(playerPos, primary.mapMonster.position) > maxRange) return [];
 
   // Single target or no skill
   if (action.type === 'normal_attack') {
