@@ -77,6 +77,7 @@
 | cut-diamond.svg | Lorc | https://game-icons.net/1x1/lorc/cut-diamond.html |
 | gem-pendant.svg | Lorc | https://game-icons.net/1x1/lorc/gem-pendant.html |
 | hourglass.svg | Lorc | https://game-icons.net/1x1/lorc/hourglass.html |
+| millenium-key.svg | Delapouite | https://game-icons.net/1x1/delapouite/millenium-key.html |
 | potion-ball.svg | Lorc | https://game-icons.net/1x1/lorc/potion-ball.html |
 | scroll-unfurled.svg | Lorc | https://game-icons.net/1x1/lorc/scroll-unfurled.html |
 | spell-book.svg | Delapouite | https://game-icons.net/1x1/delapouite/spell-book.html |

@@ -16,7 +16,7 @@ const REAL = EQUIPMENT_SEEDS.filter(t => t.acquireType !== 'starter');
 
 /** 該裝備的主要素質指標。鈍器／雙手斧以大怪傷害為準（§ 6A.4） */
 function powerOf(t: EquipmentTemplate): number {
-  // 左手裝備的防禦刻意壓低（封頂 8，`06-equipment.md` § 6A.8.7），成長曲線改由格擋率／魔法攻擊承擔
+  // 左手裝備的防禦刻意壓低（封頂 8），成長曲線改由格擋率／魔法攻擊承擔
   if (t.type === 'shield' || t.type === 'armGuard') return t.blockRate ?? 0;
   if (t.type === 'magicBook') return t.magicAttack ?? 0;
   if (t.type === 'armor') return t.defense ?? 0;

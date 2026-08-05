@@ -1,28 +1,66 @@
+import { useMemo, useState } from 'react';
 import {
   AFFIX_DEFINITIONS,
   SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
   AFFIX_TIER_OVERRIDES,
+  DEFAULT_MAX_AFFIX_TIER,
+  SHOP_MAX_AFFIX_TIER,
+  getAffixPoolForSlot,
   getAffixTierTable,
   getSpecialAffixChance,
   getTierWeights,
   getBossTierWeights,
   type AffixCategory,
+  type AffixGroup,
   type AffixType,
 } from '../../models/affix';
+import {
+  SIGIL_DEFINITIONS,
+  ENHANCE_SIGIL_RATES,
+  ENHANCE_SIGIL_FAIL_TIER,
+} from '../../models/sigil';
 import '../components/WikiTable.css';
 
 /**
  * 詞綴 wiki 頁。
  * 所有資料直接讀 `models/affix.ts`，不另抄一份，避免與實作 drift。
+ *
+ * 版面原則：**一條詞綴只出現一次**。
+ * 詞綴的「效果 + 適用部位 + 數值區間」全部集中在〈詞綴一覽〉，
+ * 階級與掉落機率是與詞綴種類無關的維度，各自獨立成節，不再重複列一次詞綴清單。
  */
 
 const CATEGORIES: { key: AffixCategory; label: string; slots: string }[] = [
-  { key: 'weapon', label: '武器', slots: '右手／左手武器（含魔導書）' },
-  { key: 'armor', label: '一般防具', slots: '頭盔、胸甲、手套、鞋子、腰帶' },
+  // 魔導書與臂甲雖佔左手欄位，但走防具詞綴池（§ 7.6，`getAffixCategoryForSlot`）
+  { key: 'weapon', label: '武器', slots: '右手／左手武器（不含魔導書、臂甲）' },
+  { key: 'armor', label: '一般防具', slots: '頭盔、胸甲、手套、鞋子、腰帶、魔導書、臂甲' },
   { key: 'shield', label: '盾牌', slots: '左手盾牌' },
   { key: 'accessory', label: '飾品', slots: '項鍊、戒指 ×2' },
 ];
+
+const CATEGORY_LABEL = Object.fromEntries(
+  CATEGORIES.map(c => [c.key, c.label])
+) as Record<AffixCategory, string>;
+
+/** § 7.3 各階級的取得管道 */
+const TIER_SOURCE: Record<number, string> = {
+  1: '強化',
+  2: '強化',
+  3: '強化',
+  4: '強化',
+  5: '強化（上限）',
+  6: '怪物掉落',
+  7: 'Boss 限定掉落',
+};
+
+/** § 7.4 的分類小標，依 `AFFIX_DEFINITIONS` 的出現順序取得（不另外寫死一份） */
+const AFFIX_GROUPS = AFFIX_DEFINITIONS.reduce<AffixGroup[]>(
+  (acc, d) => (acc.includes(d.group) ? acc : [...acc, d.group]),
+  []
+);
+
+const SPECIAL_GROUP_LABEL = '特殊詞綴（免疫類）';
 
 const TIER_LEVEL_BANDS = [
   { label: 'Lv.1~10', level: 10 },
@@ -46,6 +84,11 @@ const headingStyle = {
   fontFamily: 'var(--font-display)',
   marginBottom: 12,
 } as const;
+const groupHeadingStyle = {
+  color: 'var(--text-primary)',
+  fontSize: 'var(--fs-sm)',
+  margin: '18px 0 6px',
+} as const;
 const noteStyle = {
   color: 'var(--text-secondary)',
   fontSize: 'var(--fs-sm)',
@@ -53,16 +96,86 @@ const noteStyle = {
   marginTop: 10,
 } as const;
 
-function TierValue({ type, tier }: { type: AffixType; tier: number }) {
-  const t = getAffixTierTable(type)[tier - 1];
+/** 某詞綴在專屬／通用階級表下的完整數值區間（T1 下限 ~ T7 上限） */
+function tierRange(type: AffixType): string {
+  const t = getAffixTierTable(type);
+  return `${t[0].min}% ~ ${t[t.length - 1].max}%`;
+}
+
+function categoryText(categories: AffixCategory[]): string {
+  return categories.map(c => CATEGORY_LABEL[c]).join('、');
+}
+
+/** 一個 § 7.4 分類的窄表：詞綴／適用部位／效果／數值區間，四欄不會橫向捲 */
+function AffixGroupTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { key: string; name: string; categories: AffixCategory[]; description: string; range: string; special?: boolean }[];
+}) {
+  if (rows.length === 0) return null;
   return (
-    <span className={`affix-tag tier-${tier}`}>
-      {t.min === t.max ? `${t.min}%` : `${t.min}~${t.max}%`}
-    </span>
+    <>
+      <h4 style={groupHeadingStyle}>{title}</h4>
+      <div className="wiki-table-wrap">
+        <table className="wiki-table">
+          <thead>
+            <tr>
+              <th style={{ width: '16%' }}>詞綴</th>
+              <th style={{ width: '18%' }}>適用部位</th>
+              <th>效果</th>
+              <th style={{ width: '16%' }}>數值區間</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(row => (
+              <tr key={row.key}>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {row.special ? <span className="affix-tag special">{row.name}</span> : row.name}
+                </td>
+                <td style={{ color: 'var(--text-secondary)' }}>{categoryText(row.categories)}</td>
+                <td>{row.description}</td>
+                <td className="cell-number">{row.range}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
 export function AffixesPage() {
+  const [category, setCategory] = useState<AffixCategory | 'all'>('all');
+
+  const groups = useMemo(() => {
+    const match = (cats: AffixCategory[]) => category === 'all' || cats.includes(category);
+    const normal = AFFIX_GROUPS.map(group => ({
+      title: group,
+      rows: AFFIX_DEFINITIONS.filter(d => d.group === group && match(d.category)).map(d => ({
+        key: d.type,
+        name: d.name,
+        categories: d.category,
+        description: d.description,
+        range: tierRange(d.type),
+      })),
+    }));
+    const special = {
+      title: SPECIAL_GROUP_LABEL,
+      rows: SPECIAL_AFFIX_DEFINITIONS.filter(d => match(d.category)).map(d => ({
+        key: d.type,
+        name: d.name,
+        categories: d.category,
+        description: d.description,
+        range: `固定效果 · Lv.${d.minAreaLevel}+ 掉落`,
+        special: true,
+      })),
+    };
+    return [...normal, special];
+  }, [category]);
+
+  const visibleCount = groups.reduce((n, g) => n + g.rows.length, 0);
   const overriddenTypes = Object.keys(AFFIX_TIER_OVERRIDES) as AffixType[];
 
   return (
@@ -70,80 +183,57 @@ export function AffixesPage() {
       <h2 className="wiki-page-title">詞綴</h2>
 
       <section style={sectionStyle}>
-        <h3 style={headingStyle}>哪些裝備可以帶哪些詞綴</h3>
-        <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead>
-              <tr>
-                <th>詞綴</th>
-                {CATEGORIES.map(c => (
-                  <th key={c.key}>{c.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {AFFIX_DEFINITIONS.map(def => (
-                <tr key={def.type}>
-                  <td>{def.name}</td>
-                  {CATEGORIES.map(c => (
-                    <td key={c.key} className="cell-number">
-                      {def.category.includes(c.key) ? '✓' : '—'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {SPECIAL_AFFIX_DEFINITIONS.map(def => (
-                <tr key={def.type}>
-                  <td>
-                    <span className="affix-tag special">[特殊]</span> {def.name}
-                  </td>
-                  {CATEGORIES.map(c => (
-                    <td key={c.key} className="cell-number">
-                      {def.category.includes(c.key) ? '✓' : '—'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              <tr>
-                <td style={{ color: 'var(--text-secondary)' }}>可選詞綴數</td>
-                {CATEGORIES.map(c => (
-                  <td key={c.key} className="cell-number" style={{ color: 'var(--accent-info)' }}>
-                    {AFFIX_DEFINITIONS.filter(d => d.category.includes(c.key)).length} 種
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+        <h3 style={headingStyle}>基本規則</h3>
+        <ul style={{ ...noteStyle, marginTop: 0, paddingLeft: 20 }}>
+          <li>每件裝備最多 <strong>4 個詞綴插槽</strong>；同一件裝備不可插入相同種類的詞綴，不同裝備之間可以重複。</li>
+          <li>所有詞綴數值皆為百分比，並受裝備品質放大：實際效果 = floor(數值 × (1 + 品質% / 100))。</li>
+          <li>詞綴強化上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得，T7 只有 Boss 會掉。</li>
+          <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用強化石也升不過；鐵匠製作品為 T1~T{DEFAULT_MAX_AFFIX_TIER} 均等、固定 4 條、不會出特殊詞綴。</li>
+          <li>特殊詞綴（免疫類）佔用一般詞綴插槽，無階級、不可強化，只從高等級區域掉落。</li>
+        </ul>
+      </section>
+
+      <section style={sectionStyle}>
+        <h3 style={headingStyle}>詞綴一覽</h3>
+        <div className="wiki-filters">
+          <select
+            className="wiki-filter-select"
+            aria-label="適用部位篩選"
+            value={category}
+            onChange={e => setCategory(e.target.value as AffixCategory | 'all')}
+          >
+            <option value="all">全部部位</option>
+            {CATEGORIES.map(c => (
+              <option key={c.key} value={c.key}>{c.label}</option>
+            ))}
+          </select>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>
+            {category === 'all'
+              ? `共 ${AFFIX_DEFINITIONS.length} 種一般詞綴 ＋ ${SPECIAL_AFFIX_DEFINITIONS.length} 種特殊詞綴`
+              : `${CATEGORY_LABEL[category]}可選 ${getAffixPoolForSlot(category).length} 種一般詞綴`}
+          </span>
         </div>
-        <div className="wiki-table-wrap" style={{ marginTop: 12 }}>
-          <table className="wiki-table">
-            <thead>
-              <tr>
-                <th>分類</th>
-                <th>對應部位</th>
-              </tr>
-            </thead>
-            <tbody>
-              {CATEGORIES.map(c => (
-                <tr key={c.key}>
-                  <td>{c.label}</td>
-                  <td>{c.slots}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={noteStyle}>
-          每件裝備最多 4 個詞綴插槽，同一件裝備不可插入相同種類的詞綴；不同裝備之間可以重複。
+        <p style={{ ...noteStyle, marginTop: 0, marginBottom: 4 }}>
+          {CATEGORIES.map(c => `${c.label}＝${c.slots}`).join('；')}。
           <br />
-          飾品的裝備類型與一般防具同為「防具」，但詞綴池獨立，可額外帶魔法抗性。
+          飾品的裝備類型與一般防具同為「防具」，但詞綴池獨立，可額外帶魔法抗性；
+          魔導書與臂甲雖佔左手欄位，詞綴池與一般防具相同（不含任何攻擊詞綴）。
+        </p>
+        {groups.map(g => (
+          <AffixGroupTable key={g.title} title={g.title} rows={g.rows} />
+        ))}
+        {visibleCount === 0 && <p className="wiki-empty">無符合條件的詞綴</p>}
+        <p style={noteStyle}>
+          「數值區間」為 T1 下限到 T7 上限的完整範圍，各階明細見下方〈階級數值〉。
+          <br />
+          魔法抗性使用專屬階級表，每一階都低於其他詞綴（它可同時出現在項鍊、戒指 ×2、盾牌共 4 個部位）。
         </p>
       </section>
 
       <section style={sectionStyle}>
-        <h3 style={headingStyle}>各階級數值</h3>
+        <h3 style={headingStyle}>階級數值</h3>
         <div className="wiki-table-wrap">
-          <table className="wiki-table">
+          <table className="wiki-table" id="affix-tiers">
             <thead>
               <tr>
                 <th>階級</th>
@@ -153,6 +243,7 @@ export function AffixesPage() {
                     {AFFIX_DEFINITIONS.find(d => d.type === type)?.name ?? type}
                   </th>
                 ))}
+                <th>取得方式</th>
               </tr>
             </thead>
             <tbody>
@@ -164,21 +255,20 @@ export function AffixesPage() {
                   <td className="cell-number">
                     {t.min}~{t.max}%
                   </td>
-                  {overriddenTypes.map(type => (
-                    <td key={type} className="cell-number">
-                      <TierValue type={type} tier={t.tier} />
-                    </td>
-                  ))}
+                  {overriddenTypes.map(type => {
+                    const o = getAffixTierTable(type)[t.tier - 1];
+                    return (
+                      <td key={type} className="cell-number">
+                        <span className={`affix-tag tier-${t.tier}`}>{o.min}~{o.max}%</span>
+                      </td>
+                    );
+                  })}
+                  <td style={{ color: 'var(--text-secondary)' }}>{TIER_SOURCE[t.tier]}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p style={noteStyle}>
-          品質會放大詞綴數值：實際效果 = floor(數值 × (1 + 品質% / 100))。
-          <br />
-          鐵匠鋪的詞綴強化最高只能提升到 T5，T6／T7 只能靠掉落取得。
-        </p>
       </section>
 
       <section style={sectionStyle}>
@@ -226,30 +316,8 @@ export function AffixesPage() {
       </section>
 
       <section>
-        <h3 style={headingStyle}>特殊詞綴</h3>
+        <h3 style={headingStyle}>特殊詞綴出現機率</h3>
         <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead>
-              <tr>
-                <th>詞綴</th>
-                <th>效果</th>
-                <th>最低區域等級</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SPECIAL_AFFIX_DEFINITIONS.map(def => (
-                <tr key={def.type}>
-                  <td>
-                    <span className="affix-tag special">{def.name}</span>
-                  </td>
-                  <td>{def.description}</td>
-                  <td className="cell-number">Lv.{def.minAreaLevel}+</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="wiki-table-wrap" style={{ marginTop: 12 }}>
           <table className="wiki-table">
             <thead>
               <tr>
@@ -270,10 +338,44 @@ export function AffixesPage() {
           </table>
         </div>
         <p style={noteStyle}>
-          特殊詞綴無階級、不可強化，會佔用一個一般詞綴插槽，同一件裝備不會重複。
+          特殊詞綴取代一個一般詞綴的位置，同一件裝備不會重複；各詞綴的最低掉落區域等級見上方〈詞綴一覽〉。
           <br />
           特殊詞綴只涵蓋<strong>魔法抗性擋不住</strong>的負面狀態。詛咒、虛弱、減速改由魔法抗性依機率抵抗，
           因此沒有對應的免疫詞綴。
+        </p>
+      </section>
+
+      <section>
+        <h3 style={headingStyle}>印記</h3>
+        <div className="wiki-table-wrap">
+          <table className="wiki-table">
+            <thead>
+              <tr>
+                <th>印記</th>
+                <th>指定對象</th>
+                <th>作用</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SIGIL_DEFINITIONS.map(sigil => (
+                <tr key={sigil.type}>
+                  <td>{sigil.name}</td>
+                  <td>{sigil.target === 'item' ? '整件裝備' : '一條詞綴'}</td>
+                  <td>{sigil.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={noteStyle}>
+          印記在城鎮的<strong>印記師</strong>使用，只操作詞綴，不影響強化等級與品質；一次消耗印記 ×1、不花金幣。
+          <br />
+          強化印記是 T6／T7 詞綴在掉落之外的唯一來源：
+          {ENHANCE_SIGIL_RATES.map(r => `T${r.from}→T${r.from + 1} ${Math.round(r.rate * 100)}%`).join('、')}
+          ，失敗該詞綴掉回 T{ENHANCE_SIGIL_FAIL_TIER}。
+          <br />
+          混沌與刺針在城鎮使用，沒有區域等級可查，特殊詞綴改依<strong>角色等級</strong>套用上表的機率與門檻。
+          印記只在 Lv.31 以上區域的怪物與 Boss 掉落。
         </p>
       </section>
     </div>

@@ -28,8 +28,17 @@
   - 角色名稱
   - 職業
   - 等級
+  - **六項屬性**（STR / AGI / VIT / SPI / INT / CHA）
 - 空格位顯示「建立新角色」按鈕
-- 已有角色可點擊進入遊戲
+- 已有角色可點擊進入遊戲（角色卡整塊可點，含屬性列）
+
+### 屬性顯示範圍（必守）
+
+角色卡上的屬性 = **建角配點（`baseAttributes`）+ Lv.51+ 升級配點（`bonusAttributes`）**，
+**不含裝備額外屬性與 buff**（見 `20-attributes.md` § 20.10）。
+
+理由：角色卡表達的是角色本身的成長，換裝或 buff 到期不該讓這裡的數字跳動。
+實作上即 `getTotalAttributes(char)` 不傳 `equippedGear` / `activeEffects`。
 
 ---
 

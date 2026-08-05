@@ -17,13 +17,20 @@ import {
   calculateMpRestored,
   absorbWithShield,
   getTotalMagicResist,
+  getWeaponHitCount,
 } from './combat';
+import { getErosion, getOnHitRestore } from '../models/affix';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { getSkillTemplate } from '../models/skillTemplate';
 import { rollMonsterDebuff, applyPlayerDebuff, applyPlayerBuff } from './playerDebuffSystem';
 
 /** § 24.6 Boss 控場免疫冷卻 */
 export const BOSS_CC_IMMUNE_MS = 10_000;
+
+/** § 7.4 元素侵蝕的 DoT：每秒一跳、持續 5 秒、存續期間不可刷新 */
+export const EROSION_CATEGORY = 'dot-erosion';
+export const EROSION_TICK_MS = 1000;
+export const EROSION_DURATION_MS = 5000;
 
 export interface SelfBuffApplyResult {
   effects: ActiveEffect[];
@@ -113,6 +120,8 @@ export interface MonsterAttackResult {
   log: CombatLog;
   debuffLog?: CombatLog;
   shieldLog?: CombatLog;
+  /** § 7.4 受擊回復觸發的日誌 */
+  restoreLogs?: CombatLog[];
 }
 
 export function processPlayerAttack(
@@ -321,6 +330,56 @@ export function processPlayerAttack(
       }
     }
 
+    // § 7.4 元素侵蝕：命中後依觸發率上 DoT。普攻與魔法命中都判定；
+    // 雙持武器一次攻擊打兩下，因此判定兩次（同淬毒的兩次判定，§ 23.7）。
+    if (!isMiss && !killed) {
+      const erosion = getErosion(weapon?.affixes, weapon?.quality ?? 0);
+      if (erosion) {
+        const now = Date.now();
+        const gs = useGameStore.getState();
+        // § 24.3.2 DoT 不可刷新：存續期間不重複施加
+        const alreadyEroded = gs.activeEffects.some(
+          e => e.type === 'debuff' && e.category === EROSION_CATEGORY
+            && e.target === 'monster' && e.targetMonsterId === targetId
+            && now < e.startTime + e.duration
+        );
+        if (!alreadyEroded) {
+          const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
+          let triggered = false;
+          for (let r = 0; r < rolls && !triggered; r++) {
+            if (Math.random() * 100 < erosion.chance) triggered = true;
+          }
+          if (triggered) {
+            gs.addEffect({
+              id: `debuff-${EROSION_CATEGORY}-${targetId}-${now}`,
+              sourceSkillId: 'element-erosion',
+              sourceSkillName: '元素侵蝕',
+              category: EROSION_CATEGORY,
+              type: 'debuff',
+              target: 'monster',
+              targetIdx,
+              targetMonsterId: targetId,
+              dot: {
+                damage: erosion.damage,
+                element: erosion.element,
+                interval: EROSION_TICK_MS,
+                totalDuration: EROSION_DURATION_MS,
+              },
+              startTime: now,
+              duration: EROSION_DURATION_MS,
+              tags: ['eroded'],
+              name: '元素侵蝕',
+              description: `每秒 ${erosion.damage} 傷害`,
+            });
+            logs.push({
+              text: `元素侵蝕觸發！${monster.name} 受侵蝕 ${EROSION_DURATION_MS / 1000}s（每秒 ${erosion.damage}）`,
+              type: 'debuff-enemy',
+            });
+          }
+        }
+      }
+    }
+
     damages.push({ targetId, damage, isCrit, isMiss, killed });
 
     // Build log
@@ -523,6 +582,35 @@ export function processMonsterAttack(
     logText = `${monster.name} 造成 ${actualDamage} 傷害`;
   }
 
+  // § 7.4 受擊回血／受擊回魔：**受到傷害**時判定（被迴避就不算）。
+  // 同一條詞綴可以出現在多個部位，每件各自判定一次。
+  const restoreLogs: CombatLog[] = [];
+  if (!result.dodged && actualDamage > 0) {
+    const gs = useGameStore.getState();
+    const maxHp = getEffectiveMaxHp(character, gs.equippedGear);
+    const maxMp = getEffectiveMaxMp(character, gs.equippedGear);
+    let hpGain = 0;
+    for (const r of getOnHitRestore(equippedGear, 'on_hit_hp')) {
+      if (Math.random() * 100 < r.chance) hpGain += Math.max(1, Math.floor(maxHp * r.percent / 100));
+    }
+    let mpGain = 0;
+    for (const r of getOnHitRestore(equippedGear, 'on_hit_mp')) {
+      if (Math.random() * 100 < r.chance) mpGain += Math.max(1, Math.floor(maxMp * r.percent / 100));
+    }
+    if (hpGain > 0 && character.hp > 0) {
+      const before = character.hp;
+      character.hp = Math.min(maxHp, character.hp + hpGain);
+      const healed = character.hp - before;
+      if (healed > 0) restoreLogs.push({ text: `受擊回血觸發！回復 ${healed} HP`, type: 'system' });
+    }
+    if (mpGain > 0) {
+      const before = character.mp;
+      character.mp = Math.min(maxMp, character.mp + mpGain);
+      const gained = character.mp - before;
+      if (gained > 0) restoreLogs.push({ text: `受擊回魔觸發！回復 ${gained} MP`, type: 'system' });
+    }
+  }
+
   // 命中後判定角色 debuff（§ 24.4.2 / § 25.9.2）
   let debuffLog: CombatLog | undefined;
   if (!result.dodged) {
@@ -548,5 +636,6 @@ export function processMonsterAttack(
     log: { text: logText, type: 'monster' },
     debuffLog,
     shieldLog,
+    ...(restoreLogs.length ? { restoreLogs } : {}),
   };
 }

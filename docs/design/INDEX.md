@@ -18,6 +18,9 @@
 | 防具強化 | `06-equipment.md` | § 6.10 |
 | 裝備品質提升 | `08-quality.md` | 全文 |
 | 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
+| **印記（詞綴重骰／突破 T5）** | `46-sigil.md` | 全文 |
+| 印記掉落率 | `27-drop-table.md` | § 27.8 |
+| 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
 | 武器類型/職業限制 | `06-equipment.md` | § 6.6~6.7 |
@@ -26,8 +29,8 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | 裝備數量分配（各類型各階梯幾把） | `06-equipment-requirement.md` | 武器規格表 |
 | 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
-| **防具防禦目標（全套 +4 的總防禦）** | `06-equipment.md` | § 6A.8.7 |
-| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment.md` | § 6A.8.7 |
+| **防具防禦目標（全套 +4 的總防禦）** | `06-equipment-armor.md` | 逐件清單 |
+| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-armor.md` | 左手區塊 |
 | **三件的定位（防禦/續戰/屬性型）** | `06-equipment-armor.md` | 「定位」欄 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-armor.md`、`35-inventory-constraints.md` § 35.1 | — |
@@ -136,6 +139,7 @@
 | `06-equipment-weapons-*.md` | 各類型武器子文件（14 份，含盾牌/魔導書/臂甲） | ⚠️ 同上，由產生器輸出 |
 | `06-equipment-armor.md` | 防具模板 | ⚠️ **由產生器輸出**，勿手改 |
 | `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
+| `46-sigil.md` | 印記系統 | 混沌／刺針／重刻／強化印記、印記師 |
 | `08-quality.md` | 品質系統 | 0%~20%、品質石、影響範圍 |
 
 ### 戰鬥系統
@@ -206,6 +210,11 @@
 實作時修改一個系統，必須檢查連動文件：
 
 ```
+46-sigil.md（印記＝詞綴的重骰與突破）
+  ←→ 07-affix.md § 7.11（Tier 上限／特殊詞綴機率的另一個入口）
+  ←→ 27-drop-table.md § 27.8（掉落率）←→ 30-items.md（重量／賣價）
+  ←→ 13-town.md § 13.13（印記師）←→ 43-wiki-system.md（Wiki 呈現）
+
 06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 13-town.md（鐵匠鋪）
        ↕                    ↕                              ↕
 06-equipment-acquire.md ────┘（§ 6A.6 各管道詞綴 Tier 上限 ←→ § 7.2 取得方式）
@@ -244,6 +253,7 @@
 09-dungeon.md（等級分佈）←→ 04-character.md § 4.9（經驗曲線）
 
 19-account-character.md ←→ 04-character.md（職業/初始配置）
+       ↕      ←→ 20-attributes.md § 20.10（角色卡屬性＝建角＋升級配點，不含裝備／buff）
        ↕
 18-data-schema.md（User/Character 關係、character uuid）←→ 13-town.md（個人倉庫共用）
        ↕

@@ -489,6 +489,42 @@ export function getRegionsByZone(zoneId: string): Region[] {
   return REGIONS.filter(r => r.zoneId === zoneId);
 }
 
+/** `resolveArea` 的結果：area id 對應的 region、樓層與**該樓層**的等級區間 */
+export interface ResolvedArea {
+  region: Region;
+  /** 有樓層的副本才有；地表區域為 undefined */
+  floor?: Floor;
+  levelMin: number;
+  levelMax: number;
+}
+
+/**
+ * 把 **area id** 解析成 region 與等級區間。
+ *
+ * 掉落表、任務、地圖用的是 **area id**，副本樓層的 area id 是
+ * `<regionId>-<floor>f`（例：`ivory-tower-3f`），**不是 region id** ——
+ * 直接丟給 `getRegion()` 會拿到 undefined，區域等級就會退化成 1，
+ * 連帶讓該副本的詞綴階級權重（`07-affix.md` § 7.7）與特殊詞綴機率（§ 7.10.3）全部算錯。
+ *
+ * 有樓層時回傳**該樓層**的等級區間，而不是整座副本的 —— 掉落表本來就是逐層列的
+ * （`27-drop-table.md` § 27.3）。
+ */
+export function resolveArea(areaId: string): ResolvedArea | undefined {
+  const direct = getRegion(areaId);
+  if (direct) return { region: direct, levelMin: direct.levelMin, levelMax: direct.levelMax };
+
+  const floorMatch = areaId.match(/^(.+)-(\d+)f$/);
+  if (!floorMatch) return undefined;
+
+  const region = getRegion(floorMatch[1]);
+  if (!region) return undefined;
+
+  const floor = region.floors?.find(f => f.floor === Number(floorMatch[2]));
+  if (!floor) return { region, levelMin: region.levelMin, levelMax: region.levelMax };
+
+  return { region, floor, levelMin: floor.levelMin, levelMax: floor.levelMax };
+}
+
 export function getFloor(regionId: string, floorNum: number): Floor | undefined {
   const region = getRegion(regionId);
   if (!region?.floors) return undefined;

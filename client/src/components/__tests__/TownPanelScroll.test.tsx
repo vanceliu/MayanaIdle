@@ -5,6 +5,7 @@ import { GeneralStore } from '../town/GeneralStore';
 import { WeaponShop } from '../town/WeaponShop';
 import { ArmorShop } from '../town/ArmorShop';
 import { AdventurerGuild } from '../town/AdventurerGuild';
+import { Storage } from '../town/Storage';
 import { useGameStore } from '../../stores/gameStore';
 import type { Character } from '../../models/character';
 import type { EquipmentTemplate } from '../../models/equipment';
@@ -63,6 +64,14 @@ function scrollRegion(container: HTMLElement): HTMLElement {
   return region as HTMLElement;
 }
 
+/** 底部動作列固定在捲動區外面，才不會被清單捲走（§ 34.1） */
+function expectFooterOutsideScroll(container: HTMLElement) {
+  const scroll = scrollRegion(container);
+  const footer = container.querySelector('.shop-cart-footer');
+  expect(footer, '面板必須有底部動作列').not.toBeNull();
+  expect(scroll.contains(footer)).toBe(false);
+}
+
 describe('城鎮面板的捲動區', () => {
   beforeEach(() => {
     useGameStore.setState({
@@ -113,5 +122,12 @@ describe('城鎮面板的捲動區', () => {
     expect(scroll.contains(categories)).toBe(false);
     expect(scroll.contains(container.querySelector('.shop-gold'))).toBe(false);
     expect(scroll.contains(container.querySelector('.shop-items'))).toBe(true);
+  });
+
+  it('買賣面板的底部動作列都在捲動區外', () => {
+    expectFooterOutsideScroll(render(<GeneralStore />).container);
+    expectFooterOutsideScroll(render(<WeaponShop />).container);
+    expectFooterOutsideScroll(render(<ArmorShop />).container);
+    expectFooterOutsideScroll(render(<Storage />).container);
   });
 });

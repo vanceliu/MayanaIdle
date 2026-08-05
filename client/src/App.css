@@ -1810,7 +1810,10 @@ button.active {
   overflow: hidden;
 }
 
-.slot-name {
+/* 裝備欄位的部位標籤（「頭盔」「胸甲」…）。
+   必須限定在 `.equip-slot` 內：`.slot-name` 也被角色選擇畫面的角色名稱使用，
+   不限定的話 52px 會把角色名稱鎖死成三個字一行。 */
+.equip-slot .slot-name {
   width: 52px;
   color: var(--text-dim);
   flex-shrink: 0;
@@ -2093,6 +2096,56 @@ button.active {
   /* 捲軸貼齊面板右緣，內容不被壓到 */
   padding-right: 6px;
   margin-right: -6px;
+}
+
+/* 面板底部動作列（§ 34.1）：清單列上只選數量，動作與金額收成右下角唯一一顆按鈕。
+   固定在 `.panel-scroll` 外面，才不會被清單捲走。 */
+.shop-cart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-dim);
+}
+
+/* 摘要靠左、金額與按鈕靠右 */
+.shop-cart-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.shop-cart-summary {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.shop-cart-hint {
+  font-size: var(--fs-xs);
+  color: var(--accent-danger);
+}
+
+.shop-cart-amount {
+  font-size: var(--fs-sm);
+  color: var(--accent-gold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.shop-cart-btn {
+  min-width: 96px;
+  padding: 8px 20px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
 }
 
 /* 捲動區內部仍需常駐可見的篩選列（如冒險者工會的難度分級）：
@@ -4252,7 +4305,10 @@ button.active {
   background: var(--bg-panel);
   padding: 32px;
   border-radius: var(--radius-lg);
-  max-width: 720px;
+  /* 四張角色卡各要放六項屬性，且名稱上限 12 字要能單行放完（§ 19.4 名稱規則）：
+     內容寬 = 1000 − 64(padding) − 36(gap) = 900 → 每格 225px，扣掉左右內距剩 ~201px，
+     12 個全形字 @16px = 192px，剛好不斷行 */
+  max-width: 1000px;
   width: 100%;
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-panel);
@@ -4278,7 +4334,7 @@ button.active {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 20px 14px;
+  padding: 20px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4305,13 +4361,21 @@ button.active {
   cursor: pointer;
   flex: 1;
   justify-content: center;
+  /* 卡片是 align-items: center 的 flex column，不寫 100% 會被收成 shrink-to-fit，
+     屬性格線與其上方的分隔線就撐不滿卡片寬度 */
+  width: 100%;
 }
 
 .slot-name {
   font-family: var(--font-display);
-  font-size: var(--fs-md);
+  /* 比原本的 --fs-md 小一級：預設字級下 12 字（名稱上限）剛好單行放完，仍是卡片上最大的字 */
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--text-primary);
+  text-align: center;
+  line-height: 1.3;
+  /* 放大字級設定（--font-scale）下仍可能換行，斷在字元邊界而不是溢出卡片 */
+  word-break: break-word;
 }
 
 .slot-class {
@@ -4323,6 +4387,38 @@ button.active {
   font-family: var(--font-display);
   color: var(--accent-gold);
   font-size: var(--fs-sm);
+}
+
+/* 六項屬性：建角配點 + Lv.51+ 配點，不含裝備與 buff（20-attributes.md § 20.10） */
+.slot-attributes {
+  display: grid;
+  /* 欄寬跟著內容走並置中：用 1fr 會把名稱與數字推到卡片兩側，看起來像兩件無關的東西 */
+  grid-template-columns: repeat(2, auto);
+  justify-content: center;
+  gap: 2px 18px;
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.slot-attribute {
+  display: flex;
+  gap: 6px;
+  font-size: var(--fs-xs);
+}
+
+.slot-attribute-key {
+  color: var(--text-dim);
+  /* 固定寬度讓六個數字上下對齊（CHA 比 STR 寬） */
+  min-width: 26px;
+}
+
+.slot-attribute-value {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+  text-align: right;
 }
 
 .btn-create-char {

@@ -321,7 +321,7 @@ function bossOf(stage: Stage): MonsterInstance | null {
 
 // ---------------------------------------------------------------- 裝備
 
-type AffixType = 'attack_power' | 'attack_elemental' | 'skill_elemental' | 'crit_rate'
+type AffixType = 'attack_power' | 'element_brand' | 'skill_elemental' | 'crit_rate'
   | 'crit_damage' | 'attack_speed' | 'cooldown_reduction' | 'defense' | 'max_hp' | 'max_mp';
 
 /** 攻擊型詞綴（武器池）；防具／飾品／魔導書走 armor 池，沒有攻擊詞綴（`07-affix.md` § 7.6） */

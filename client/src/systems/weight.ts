@@ -45,7 +45,9 @@ export function getCarriedWeight(
     (sum, item) => sum + (getItemDefinition(item.name)?.weight ?? 0) * item.amount,
     0,
   );
-  return gear + bag;
+  // 印記的重量是 0.1（`30-items.md`），浮點累加會跑出 12.300000000000002 這種尾數，
+  // 而負重是直接顯示在狀態列的數字。統一收到小數點後一位。
+  return Math.round((gear + bag) * 10) / 10;
 }
 
 export interface WeightStatus {

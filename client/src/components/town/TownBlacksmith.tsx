@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, getAffixTierTable, generateAffixes, getAffixCategoryForSlot, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
+import { AFFIX_DEFINITIONS, getAffixTierTable, generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
@@ -52,11 +52,15 @@ function getStability(item: EquipmentInstance): number {
  * **這也是「製作版 T6」與「掉落版 T6」的差別所在**：模板素質相同，
  * 但掉落版可以帶 T6/T7 詞綴與特殊詞綴，製作版最高只有 T5、且不會有特殊詞綴。
  */
-function generateCraftAffixes(category: AffixCategory): Affix[] {
+function generateCraftAffixes(
+  category: AffixCategory,
+  tpl?: { smallMonsterDamage?: number | null; largeMonsterDamage?: number | null },
+): Affix[] {
   return generateAffixes(category, 1, 4, false, {
     maxTier: CRAFT_MAX_AFFIX_TIER,
     uniformTier: true,
     noSpecialAffix: true,
+    ...(tpl ? { weaponBaseDamage: getWeaponBaseDamage(tpl) } : {}),
   });
 }
 
@@ -297,7 +301,7 @@ export function TownBlacksmith() {
     if (char.id) db.characters.update(char.id, { gold: newGold });
 
     const affixCategory: AffixCategory = getAffixCategoryForSlot(selectedRecipe.slot, selectedRecipe.type);
-    const craftedAffixes = generateCraftAffixes(affixCategory);
+    const craftedAffixes = generateCraftAffixes(affixCategory, selectedRecipe);
 
     const dbRecord = {
       templateId: selectedRecipe.id!,

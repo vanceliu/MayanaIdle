@@ -580,6 +580,7 @@ function tickArpgCombatLoop(
           logs.push(result.log);
           if (result.shieldLog) logs.push(result.shieldLog);
           if (result.debuffLog) logs.push(result.debuffLog);
+          if (result.restoreLogs) logs.push(...result.restoreLogs);
 
           if (effectLayer) {
             const pPos = useMapControlStore.getState().playerPosition;

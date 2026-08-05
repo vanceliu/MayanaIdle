@@ -23,7 +23,7 @@ const TYPE_ZH: Record<string, string> = {
   dualBlade: '雙刀', claw: '鋼爪', shield: '盾牌', magicBook: '魔導書', armGuard: '臂甲',
 };
 /** 檔名對應現有的 `06-equipment-weapons-*.md` 命名 */
-// 盾牌／魔導書／臂甲是**左手防具**，由 `generateArmorDocs.mts` 產生（§ 6A.8.7），
+// 盾牌／魔導書／臂甲是**左手防具**，由 `generateArmorDocs.mts` 產生，
 // 不在武器文件裡。
 /** 左手三種由 `generateArmorDocs.mts` 產生，這裡靜默略過 */
 const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);

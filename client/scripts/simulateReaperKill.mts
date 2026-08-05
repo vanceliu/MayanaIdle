@@ -30,6 +30,7 @@ import {
   getWeaponAttackSuccess,
   hasActiveFireEnchant,
   getAffixBonusesFromGear,
+  getWeaponHitCount,
   COOLDOWN_REDUCTION_CAP,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
   INT_COOLDOWN_PERCENT_PER_2,
@@ -47,6 +48,7 @@ import type { ActiveEffect, StatModifier } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
 import { SKILL_CATALOG } from '../src/models/skill';
 import { CLASS_SKILLS } from '../src/models/classSkills';
+import { getErosion, getWeaponBaseDamage } from '../src/models/affix';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
 
@@ -165,6 +167,8 @@ function ruledSkillPower(
 const FRAME_MS = 1000 / 60;
 /** gameLoop.ts DOT_TICK_INTERVAL */
 const DOT_TICK_MS = 1000;
+/** § 7.4 元素侵蝕的 DoT 持續時間 */
+const EROSION_MS = 5000;
 /** 打不死就中止（避免無限迴圈） */
 const TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -313,7 +317,7 @@ function makeReaper(): MonsterInstance {
 
 // ---------------------------------------------------------------- 裝備
 
-type AffixType = 'attack_power' | 'attack_elemental' | 'skill_elemental' | 'crit_rate'
+type AffixType = 'attack_power' | 'element_brand' | 'element_erosion' | 'skill_elemental' | 'crit_rate'
   | 'crit_damage' | 'attack_speed' | 'cooldown_reduction' | 'defense' | 'max_hp' | 'max_mp';
 
 /** T7 上限 20，品質 20% → getEffectiveAffixValue = floor(20 × 1.2) = 24 */
@@ -357,11 +361,38 @@ function enhancementFor(slot: string): number {
   return 9;
 }
 
+/**
+ * 元素刻印在模擬裡一律取「克制目標的元素」（`42-element-system.md` § 42.2）——
+ * BiS 的前提是玩家挑得到最適合這場的裝備，刻印當然也挑克制的那一把。
+ * 目標是暗屬性的百柱死神，因此刻印為光。
+ */
+const BRAND_COUNTER: Record<string, string> = {
+  wind: 'fire', earth: 'wind', ice: 'earth', fire: 'ice', dark: 'light', light: 'dark',
+};
+const BIS_BRAND_ELEMENT = BRAND_COUNTER[REAPER_SEED.element] ?? 'fire';
+
+/** `--erosion=max|mean`：侵蝕每跳傷害取完美 roll 或範圍期望值 */
+const EROSION_MODE = process.argv.find(a => a.startsWith('--erosion='))?.split('=')[1] ?? 'max';
+if (!['max', 'mean', 'low'].includes(EROSION_MODE)) throw new Error(`未知的 --erosion=${EROSION_MODE}（可用：max, mean, low）`);
+function erosionRollValue(base: number): number {
+  const max = Math.max(1, Math.floor(base));
+  const min = Math.max(1, Math.floor(max / 2));
+  if (EROSION_MODE === 'max') return max;
+  if (EROSION_MODE === 'low') return min;
+  return Math.max(1, Math.round((min + max) / 2));
+}
+
 function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[]): EquipmentInstance {
   const bonusAttributes = tpl.bonusAttributes ? { ...tpl.bonusAttributes, INT: 0 } : tpl.bonusAttributes;
   return {
     ...tpl, bonusAttributes, templateId: tpl.id!, quality: QUALITY, enhancement,
-    affixes: affixTypes.map(type => ({ type, tier: 7, value: T7 })),
+    affixes: affixTypes.map(type => ({
+      type, tier: 7, value: T7,
+      ...(type === 'element_brand' || type === 'element_erosion' ? { element: BIS_BRAND_ELEMENT } : {}),
+      // 侵蝕的每跳傷害（§ 7.4）。`--erosion=max` 取完美 roll（與其他詞綴一律取 T7 上限一致）；
+      // `--erosion=mean` 取該範圍的期望值，代表實際掉落的平均水準。
+      ...(type === 'element_erosion' ? { dotDamage: erosionRollValue(getWeaponBaseDamage(tpl)) } : {}),
+    })),
     ownerId: 1, equipped: true,
   } as EquipmentInstance;
 }
@@ -733,6 +764,25 @@ function simulateOnce(
   const cooldowns: Record<string, number> = {};
   const dots: DotState[] = [];
 
+  /**
+   * § 7.4 元素侵蝕：命中後依觸發率上 DoT。普攻與魔法命中都判定，
+   * 雙持武器一次攻擊打兩下故判定兩次；存續期間不可刷新。
+   */
+  const erosion = getErosion(loadout.weapon.affixes, loadout.weapon.quality ?? 0);
+  const erosionRolls = getWeaponHitCount(loadout.weapon);
+  function tryErosion(now: number, rolls: number) {
+    if (!erosion || dots.some(d => d.category === 'eroded')) return;
+    for (let r = 0; r < rolls; r++) {
+      if (Math.random() * 100 < erosion.chance) {
+        dots.push({
+          category: 'eroded', damage: erosion.damage,
+          nextTick: now + DOT_TICK_MS, expiresAt: now + EROSION_MS,
+        });
+        return;
+      }
+    }
+  }
+
   let now = 0;
   let nextAction = 0;
   // MP：戰鬥開始時全滿；`regen.ts` 每 6 秒回一次，戰鬥中減半
@@ -829,6 +879,7 @@ function simulateOnce(
         stats.physHits++;
         if (res.isCritical) stats.crits++;
         applyDamage(res.damage);
+        tryErosion(now, erosionRolls);
         // 淬毒：普攻命中觸發毒 DoT（快照制、存續期間不刷新）
         if (char.className === 'thief' && !dots.some(d => d.category === 'poisoned')) {
           const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
@@ -862,6 +913,7 @@ function simulateOnce(
           stats.physHits++;
           if (res.isCritical) stats.crits++;
           applyDamage(res.damage);
+          tryErosion(now, 1);
         } else {
           stats.misses++;
           stats.physMisses++;
@@ -882,6 +934,7 @@ function simulateOnce(
       stats.hits++;
       if (res.isCritical) stats.crits++;
       applyDamage(res.damage);
+      tryErosion(now, 1);
       // 魔力奪取：回復等同最終傷害的 MP（combat.ts:609 calculateMpRestored）
       if (mp.enabled && entry.mpDrainRatio) {
         currentMp = Math.min(mp.maxMp, currentMp + Math.floor(res.damage * entry.mpDrainRatio));
@@ -989,7 +1042,7 @@ function runScenario(
   const attrs = getTotalAttributes(char, effects, loadout.gear);
   const derived: Record<string, number | string> = {
     攻擊力詞綴: bonuses.attack_power,
-    普攻元素: bonuses.attack_elemental,
+    元素刻印: bonuses.element_brand,
     技能元素: bonuses.skill_elemental,
     爆擊率: Math.min(75, 5 + bonuses.crit_rate),
     爆擊倍率: Number((2 + bonuses.crit_damage / 100).toFixed(2)),
@@ -1039,7 +1092,7 @@ function runScenario(
 
 /** § 7.6 武器詞綴池（7 種），4 格不重複 → C(7,4) = 35 組 */
 const WEAPON_AFFIX_POOL: AffixType[] = [
-  'attack_power', 'attack_elemental', 'skill_elemental',
+  'attack_power', 'element_brand', 'element_erosion', 'skill_elemental',
   'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction',
 ];
 /** 粗排用的取樣數（全模擬另有 RUNS） */
@@ -1104,7 +1157,18 @@ function proxyDps(className: ClassName, loadout: Loadout, seed: number): number 
       best = Math.max(best, s / PROXY_SAMPLES);
     }
   });
-  return best / getPlayerAttackInterval(loadout.gear, effects) * 1000;
+  const intervalMs = getPlayerAttackInterval(loadout.gear, effects);
+  // § 7.4 元素侵蝕：粗排也要算進去，否則它永遠進不了前 3 名。
+  // DoT 不吃防禦，穩態貢獻 = 佔用率 × 每跳傷害；佔用率 = 1 − e^(−每秒觸發次數 × 5s)
+  const erosion = getErosion(loadout.weapon.affixes, loadout.weapon.quality ?? 0);
+  let erosionDps = 0;
+  if (erosion) {
+    const rolls = getWeaponHitCount(loadout.weapon);
+    const perAttack = 1 - Math.pow(1 - erosion.chance / 100, rolls);
+    const procsPerSec = perAttack / (intervalMs / 1000);
+    erosionDps = (1 - Math.exp(-procsPerSec * (EROSION_MS / 1000))) * erosion.damage;
+  }
+  return best / intervalMs * 1000 + erosionDps;
 }
 
 /** 依 § 44.5 自動選出該職業的前 TOP_FINAL 名配置 */
@@ -1157,6 +1221,7 @@ console.log(`# Lv.75 滿裝 vs 百柱死神 — ${RUNS.toLocaleString()} 次模�
 console.log(`目標：${REAPER_SEED.name} Lv.${REAPER_SEED.level} HP ${REAPER_SEED.hp} 防禦 ${REAPER_SEED.defense}`
   + `（減傷 ${Math.min(REAPER_SEED.defense, 75)}%）${REAPER_SEED.race}/${REAPER_SEED.size}/${REAPER_SEED.element}`);
 console.log(`屬性預算：${ATTRIBUTE_CAP_NOTE}`);
+console.log(`元素侵蝕每跳傷害：**${EROSION_MODE === 'max' ? '完美 roll' : EROSION_MODE === 'low' ? '範圍下緣' : '範圍期望值'}**（--erosion=${EROSION_MODE}）`);
 console.log(`規則組：**${RULES.label}**（--rules=${RULES.name}）`
   + ` — INT 每 2 點 +${RULES.intDamagePer2}% 技能威力 / +${RULES.intCdrPer2}% 冷卻縮減；`
   + `基礎魔法威力 ×${RULES.basicPowerMult}、職業魔法威力 ×${RULES.classPowerMult}`);

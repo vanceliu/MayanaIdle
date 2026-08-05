@@ -5,7 +5,7 @@ import { isAccessorySlot } from '../models/equipment';
 import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
-import { collectAffixBonuses, getEffectiveAffixValue, type AffixBonuses } from '../models/affix';
+import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, type AffixBonuses, type BrandElement } from '../models/affix';
 
 export type CombatLogType =
   | 'player_miss'
@@ -461,6 +461,15 @@ export function getSkillCooldownReduction(
   return Math.min(total, COOLDOWN_REDUCTION_CAP);
 }
 
+/**
+ * 武器的元素（`07-affix.md` § 7.4）。
+ * **唯一來源是武器自己的「元素刻印」詞綴** —— 沒有刻印的武器就是無屬性，
+ * 不吃元素刻印的乘區、也不吃 § 21.15 的克制加成。
+ */
+export function getWeaponElement(weapon: EquipmentInstance | null): BrandElement | undefined {
+  return getBrandElement(weapon?.affixes);
+}
+
 export function getWeaponAttackSuccess(weapon: EquipmentInstance | null): number {
   if (!weapon) return 0;
   const baseSuccess = weapon.attackSuccess ?? 0;
@@ -526,8 +535,9 @@ export function calculatePlayerAttack(
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
   const hasFireEnchantActive = rawFireEnchantDmg > 0;
-  const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchantActive ? 'fire' : undefined);
-  const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchantActive;
+  const brandElement = getWeaponElement(weapon);
+  const attackElement = brandElement ?? (hasFireEnchantActive ? 'fire' : undefined);
+  const hasElement = !!brandElement || hasFireEnchantActive;
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
@@ -552,7 +562,7 @@ export function calculatePlayerAttack(
 
     // Apply attack elemental% multiplier (weapon element OR fire enchant)
     if (hasElement) {
-      damage = Math.floor(damage * (1 + bonuses.attack_elemental / 100));
+      damage = Math.floor(damage * (1 + bonuses.element_brand / 100));
     }
 
     // Critical check
@@ -619,16 +629,17 @@ export function calculatePhysicalSkillHit(
   const weaponDmg = getWeaponDamage(weapon, monster.size);
   const strBonus = Math.floor(getEffectiveSTR(attrs.STR) / 2);
   const fireEnchantDmg = hasFireEnchant ? getFireEnchantBonus(activeEffects) : 0;
-  const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchant ? 'fire' : undefined);
+  const brandElement = getWeaponElement(weapon);
+  const attackElement = brandElement ?? (hasFireEnchant ? 'fire' : undefined);
   let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getBuffFlatBonus(activeEffects, 'extra_attack') + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
 
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
 
   // Apply attack elemental% multiplier (weapon element OR fire enchant)
-  const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchant;
+  const hasElement = !!brandElement || hasFireEnchant;
   if (hasElement) {
-    damage = Math.floor(damage * (1 + bonuses.attack_elemental / 100));
+    damage = Math.floor(damage * (1 + bonuses.element_brand / 100));
   }
 
   // Critical check

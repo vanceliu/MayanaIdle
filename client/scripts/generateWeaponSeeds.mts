@@ -221,7 +221,7 @@ for (const sp of SPEC) {
         f.push(`smallMonsterDamage: ${s}`, `largeMonsterDamage: ${l}`,
                `attackSuccess: ${Math.max(0, Math.round(tier / 2) + mod.hit)}`, `extraAttack: ${x}`);
       } else if (sp.offhand) {
-        // § 6A.8.7 的固定階梯，不可內插 —— 防具全套 +4 的防禦目標由它反推
+        // 防具防禦目標的固定階梯，不可內插 —— 防具全套 +4 的防禦目標由它反推
         const OFFHAND_DEF = [0, 4, 5, 5, 6, 6, 7, 8];        // index = tier
         const MAGIC_ATTACK = [0, 1, 4, 5, 6, 7, 8, 11];
         f.push(`defense: ${OFFHAND_DEF[tier]}`);

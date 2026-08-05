@@ -7,7 +7,8 @@ export type AffixCategory = 'weapon' | 'armor' | 'shield' | 'accessory';
 
 export type AffixType =
   | 'attack_power'
-  | 'attack_elemental'
+  | 'element_brand'
+  | 'element_erosion'
   | 'skill_elemental'
   | 'crit_rate'
   | 'crit_damage'
@@ -21,7 +22,9 @@ export type AffixType =
   | 'drop_rate'
   | 'gold_rate'
   | 'block_rate'
-  | 'magic_resist';
+  | 'magic_resist'
+  | 'on_hit_hp'
+  | 'on_hit_mp';
 
 /**
  * 特殊詞綴（免疫詞綴）— docs/design/07-affix.md § 7.10
@@ -93,33 +96,44 @@ export const AFFIX_TIERS: AffixTier[] = [
   { tier: 7, min: 19, max: 20 },
 ];
 
+/** § 7.4 的詞綴分類小標。順序即 `AFFIX_DEFINITIONS` 的排列順序。 */
+export type AffixGroup = '攻擊類' | '防禦類' | '補給類' | '掉落類' | '盾牌專屬' | '飾品／盾牌專屬';
+
 export interface AffixDefinition {
   type: AffixType;
   name: string;
   category: AffixCategory[];
+  /** § 7.4 的分類小標，Wiki 用來分組與篩選 */
+  group: AffixGroup;
+  /** § 7.4 的效果敘述，X 代表詞綴滾出的數值 */
+  description: string;
 }
 
 export const AFFIX_DEFINITIONS: AffixDefinition[] = [
-  // Weapon affixes (7)
-  { type: 'attack_power', name: '攻擊力', category: ['weapon'] },
-  { type: 'attack_elemental', name: '普攻元素傷害', category: ['weapon'] },
-  { type: 'skill_elemental', name: '技能元素傷害', category: ['weapon'] },
-  { type: 'crit_rate', name: '爆擊率', category: ['weapon'] },
-  { type: 'crit_damage', name: '爆擊傷害', category: ['weapon'] },
-  { type: 'attack_speed', name: '攻擊速度', category: ['weapon'] },
-  { type: 'cooldown_reduction', name: '減少冷卻時間', category: ['weapon'] },
+  // Weapon affixes (8) —— § 7.4 攻擊類
+  { type: 'attack_power', name: '攻擊力', category: ['weapon'], group: '攻擊類', description: '攻擊力 +X%' },
+  { type: 'element_brand', name: '元素刻印', category: ['weapon'], group: '攻擊類', description: '賦予武器一個元素（火／冰／風／地／光／暗），並使普攻傷害 +X%' },
+  { type: 'element_erosion', name: '元素侵蝕', category: ['weapon'], group: '攻擊類', description: 'X% 是觸發率：命中後有 X% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒' },
+  { type: 'skill_elemental', name: '技能元素傷害', category: ['weapon'], group: '攻擊類', description: '施放技能時元素傷害（火、冰、風、地、光、暗）+X%' },
+  { type: 'crit_rate', name: '爆擊率', category: ['weapon'], group: '攻擊類', description: '爆擊率 +X%' },
+  { type: 'crit_damage', name: '爆擊傷害', category: ['weapon'], group: '攻擊類', description: '爆擊傷害 +X%' },
+  { type: 'attack_speed', name: '攻擊速度', category: ['weapon'], group: '攻擊類', description: '攻擊速度 +X%' },
+  { type: 'cooldown_reduction', name: '減少冷卻時間', category: ['weapon'], group: '攻擊類', description: '技能冷卻時間 -X%' },
   // Armor affixes (7) —— 一般防具、盾牌、飾品皆可出現
-  { type: 'defense', name: '防禦力', category: ['armor', 'shield', 'accessory'] },
-  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'] },
-  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'] },
-  { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield', 'accessory'] },
-  { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield', 'accessory'] },
-  { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield', 'accessory'] },
-  { type: 'gold_rate', name: '金幣獲得率', category: ['armor', 'shield', 'accessory'] },
+  { type: 'defense', name: '防禦力', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '防禦力 +X%' },
+  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 HP +X%' },
+  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 MP +X%' },
+  { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '技能補血效果 +X%' },
+  { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '藥水效果 +X%' },
+  { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '掉寶率 +X%（影響一般怪與 Boss 主掉落表、3~5 級職業技能書；工會任務收集物不受影響）' },
+  { type: 'gold_rate', name: '金幣獲得率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '金幣獲得率 +X%' },
   // Shield exclusive (1)
-  { type: 'block_rate', name: '格擋率', category: ['shield'] },
+  { type: 'block_rate', name: '格擋率', category: ['shield'], group: '盾牌專屬', description: '格擋率 +X%' },
   // Accessory + shield exclusive (1)
-  { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'] },
+  { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'], group: '飾品／盾牌專屬', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速的機率' },
+  // 受擊回復（2）—— X% 是觸發率，回復量另外抽（§ 7.4）
+  { type: 'on_hit_hp', name: '受擊回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '受到傷害時 X% 機率回復最大 HP 的一定比例' },
+  { type: 'on_hit_mp', name: '受擊回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '受到傷害時 X% 機率回復最大 MP 的一定比例' },
 ];
 
 export interface Affix {
@@ -127,6 +141,115 @@ export interface Affix {
   /** 一般詞綴 1~7；特殊詞綴固定 0（無 Tier 分級） */
   tier: number;
   value: number; // rolled percentage value
+  /**
+   * 元素刻印賦予武器的元素、或元素侵蝕造成的 DoT 元素（§ 7.4）。
+   * 抽到當下決定，之後不變；兩條詞綴各自獨立抽，不會互相對齊。
+   * 其他詞綴一律 undefined。
+   */
+  element?: BrandElement;
+  /**
+   * 元素侵蝕每跳的固定傷害（§ 7.4）。抽到當下由 `武器平均基傷的一半 ~ 武器平均基傷` 決定，
+   * **之後不再隨機**：同一把武器每次觸發都是這個數字。其他詞綴一律 undefined。
+   */
+  dotDamage?: number;
+  /**
+   * 受擊回血／受擊回魔每次觸發回復的**比例**（§ 7.4，單位為最大 HP／MP 的百分比）。
+   * 抽到當下決定，之後不變 —— 回血 2~4、回魔 2~5。其他詞綴一律 undefined。
+   */
+  restorePercent?: number;
+}
+
+/**
+ * 受擊回復的**回復比例**（§ 7.4）：回血 2~4%、回魔 2~5% 的最大值。
+ * 兩條分開是因為量級不同 —— 滿裝 maxHP 約 2810，2~4% 換算的等價減傷約 32%，
+ * 與其他防禦詞綴仍需取捨；maxMP 的同比例只等於一發技能，故容許到 5%。
+ *
+ * **Tier 只決定觸發率**（走通用表），回復比例與 Tier 無關，另外抽。
+ */
+export const ON_HIT_RESTORE_PERCENT: Record<'on_hit_hp' | 'on_hit_mp', [number, number]> = {
+  on_hit_hp: [2, 4],
+  on_hit_mp: [2, 5],
+};
+
+/** 受擊回復比例：抽到當下在該範圍內決定後固定不變（單位為百分比）。 */
+export function rollRestorePercent(type: 'on_hit_hp' | 'on_hit_mp'): number {
+  const [min, max] = ON_HIT_RESTORE_PERCENT[type];
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+/** 回復比例套上裝備品質後的實際值（單位仍為百分比） */
+export function restorePercentWithQuality(affix: Affix, quality: number): number {
+  return Math.max(1, Math.floor((affix.restorePercent ?? 0) * (1 + quality / 100)));
+}
+
+/**
+ * 受擊回血／回魔的觸發率與回復比例（§ 7.4）。觸發率與比例都吃裝備品質。
+ * 同一條詞綴可出現在多個部位，因此回傳陣列，由呼叫端逐條判定。
+ */
+export function getOnHitRestore(
+  gear: (({ affixes?: Affix[]; quality?: number } | null)[]) | undefined,
+  type: 'on_hit_hp' | 'on_hit_mp',
+): { chance: number; percent: number }[] {
+  const out: { chance: number; percent: number }[] = [];
+  for (const g of gear ?? []) {
+    for (const a of g?.affixes ?? []) {
+      if (a.type !== type || !a.restorePercent) continue;
+      const q = g?.quality ?? 0;
+      out.push({ chance: getEffectiveAffixValue(a, q), percent: restorePercentWithQuality(a, q) });
+    }
+  }
+  return out;
+}
+
+/** 元素刻印可賦予的六種元素（§ 42.1，不含「無」） */
+export type BrandElement = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark';
+export const BRAND_ELEMENTS: BrandElement[] = ['fire', 'ice', 'wind', 'earth', 'light', 'dark'];
+export const BRAND_ELEMENT_ZH: Record<BrandElement, string> = {
+  fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '暗',
+};
+
+/**
+ * 一件裝備的元素刻印所賦予的元素。沒有刻印時回 undefined。
+ * 武器的元素**只有這一個來源**（§ 7.4）——`EquipmentInstance.element` 已無寫入端。
+ */
+export function getBrandElement(affixes: Affix[] | undefined): BrandElement | undefined {
+  return affixes?.find(a => a.type === 'element_brand')?.element;
+}
+
+/**
+ * 元素侵蝕的觸發率與每跳傷害（§ 7.4）。沒有這條詞綴時回 undefined。
+ * **觸發率與每跳傷害都吃裝備品質**（同 `getEffectiveAffixValue` 的 `floor(值 × (1 + 品質%))`）。
+ */
+export function getErosion(
+  affixes: Affix[] | undefined,
+  quality: number = 0,
+): { chance: number; damage: number; element: BrandElement } | undefined {
+  const a = affixes?.find(x => x.type === 'element_erosion');
+  if (!a || !a.element || !a.dotDamage) return undefined;
+  return {
+    chance: getEffectiveAffixValue(a, quality),
+    damage: Math.max(1, Math.floor(a.dotDamage * (1 + quality / 100))),
+    element: a.element,
+  };
+}
+
+/**
+ * 元素侵蝕的每跳傷害（§ 7.4）：`武器平均基傷的一半 ~ 武器平均基傷` 之間隨機，
+ * 抽到當下決定，之後固定。下緣取一半而不是 1 —— 否則低 roll 等於沒抽到。
+ */
+export function rollErosionDamage(weaponBaseDamage: number): number {
+  const max = Math.max(1, Math.floor(weaponBaseDamage));
+  const min = Math.max(1, Math.floor(max / 2));
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+/** 元素侵蝕的傷害上限＝武器小怪／大怪基傷的平均（抽詞綴時強化必為 0，故不含強化） */
+export function getWeaponBaseDamage(
+  tpl: { smallMonsterDamage?: number | null; largeMonsterDamage?: number | null },
+): number {
+  const s = tpl.smallMonsterDamage ?? 0;
+  const l = tpl.largeMonsterDamage ?? 0;
+  return Math.max(1, Math.round((s + l) / 2));
 }
 
 /**
@@ -230,6 +353,11 @@ export interface GenerateAffixOptions {
    * 只有掉落品依 § 7.10.3 的機率生成。
    */
   noSpecialAffix?: boolean;
+  /**
+   * 元素侵蝕的傷害上限（§ 7.4）——武器平均基傷。生成武器詞綴時必填；
+   * 未給時侵蝕的每跳傷害會退化成 1。
+   */
+  weaponBaseDamage?: number;
 }
 
 export function generateAffixes(
@@ -262,7 +390,25 @@ export function generateAffixes(
       ? 1 + Math.floor(Math.random() * cap)
       : Math.min(cap, rollAffixTier(areaLevel, isBoss));
     const value = rollAffixValue(tier, def.type);
-    affixes.push({ type: def.type, tier, value });
+    // § 7.4 元素刻印／元素侵蝕：抽到當下才決定屬性，六種均等隨機，兩條各自獨立抽
+    const needsElement = def.type === 'element_brand' || def.type === 'element_erosion';
+    const element = needsElement
+      ? BRAND_ELEMENTS[Math.floor(Math.random() * BRAND_ELEMENTS.length)]
+      : undefined;
+    // § 7.4 元素侵蝕：每跳傷害在抽到當下由 `武器平均基傷的一半 ~ 武器平均基傷` 決定，之後固定不變
+    const dotDamage = def.type === 'element_erosion'
+      ? rollErosionDamage(options.weaponBaseDamage ?? 1)
+      : undefined;
+    // § 7.4 受擊回復：回復比例在抽到當下決定，之後固定；與 Tier 無關
+    const restorePercent = def.type === 'on_hit_hp' || def.type === 'on_hit_mp'
+      ? rollRestorePercent(def.type)
+      : undefined;
+    affixes.push({
+      type: def.type, tier, value,
+      ...(element ? { element } : {}),
+      ...(dotDamage ? { dotDamage } : {}),
+      ...(restorePercent ? { restorePercent } : {}),
+    });
   }
 
   return affixes;
@@ -285,12 +431,24 @@ export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
     return `[特殊] ${def?.name ?? affix.type}`;
   }
   const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
-  return `${def?.name ?? affix.type} +${getEffectiveAffixValue(affix, quality)}% (T${affix.tier})`;
+  const name = affix.element ? `${def?.name}（${BRAND_ELEMENT_ZH[affix.element]}）` : (def?.name ?? affix.type);
+  // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
+  if (affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') {
+    const pct = restorePercentWithQuality(affix, quality);
+    const what = affix.type === 'on_hit_hp' ? '最大HP' : '最大MP';
+    return `${name} ${getEffectiveAffixValue(affix, quality)}% 觸發／回復${what} ${pct}% (T${affix.tier})`;
+  }
+  if (affix.type === 'element_erosion') {
+    const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));
+    return `${name} ${getEffectiveAffixValue(affix, quality)}% 觸發／每秒 ${dot} (T${affix.tier})`;
+  }
+  return `${name} +${getEffectiveAffixValue(affix, quality)}% (T${affix.tier})`;
 }
 
 export interface AffixBonuses {
   attack_power: number;
-  attack_elemental: number;
+  element_brand: number;
+  element_erosion: number;
   skill_elemental: number;
   crit_rate: number;
   crit_damage: number;
@@ -305,12 +463,15 @@ export interface AffixBonuses {
   gold_rate: number;
   block_rate: number;
   magic_resist: number;
+  on_hit_hp: number;
+  on_hit_mp: number;
 }
 
 export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number }[]): AffixBonuses {
   const bonuses: AffixBonuses = {
     attack_power: 0,
-    attack_elemental: 0,
+    element_brand: 0,
+    element_erosion: 0,
     skill_elemental: 0,
     crit_rate: 0,
     crit_damage: 0,
@@ -325,6 +486,8 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
     gold_rate: 0,
     block_rate: 0,
     magic_resist: 0,
+    on_hit_hp: 0,
+    on_hit_mp: 0,
   };
 
   for (const item of gear) {

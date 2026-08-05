@@ -94,7 +94,7 @@ describe('equipment model', () => {
           { type: 'attack_power', tier: 1, value: 5 },
           { type: 'crit_rate', tier: 2, value: 8 },
           { type: 'attack_speed', tier: 1, value: 6 },
-          { type: 'attack_elemental', tier: 3, value: 11 },
+          { type: 'element_brand', tier: 3, value: 11, element: 'fire' },
         ],
         ownerId: 1,
         equipped: false,

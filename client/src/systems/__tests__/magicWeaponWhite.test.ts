@@ -108,7 +108,7 @@ describe('武器白字進入魔法傷害', () => {
     const m = dummy({ element: 'wind' });
     const plain = calculateSkillAttack(char(), 40, 'fire', m, [staff({ element: 'fire' })]).damage;
     const withAttackElem = calculateSkillAttack(char(), 40, 'fire', m, [
-      staff({ element: 'fire', affixes: [{ type: 'attack_elemental', tier: 7, value: 20 }] }),
+      staff({ affixes: [{ type: 'element_brand', tier: 7, value: 20, element: 'fire' }] }),
     ]).damage;
     expect(withAttackElem).toBe(plain);
   });

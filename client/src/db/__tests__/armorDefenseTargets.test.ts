@@ -4,7 +4,7 @@ import type { ClassName } from '../../models/character';
 import type { EquipSlot } from '../../models/equipment';
 
 /**
- * 防具防禦目標（`06-equipment.md` § 6A.8.7）。
+ * 防具防禦目標。
  *
  * 目標定義為「頭＋胸＋手＋腳＋左手五件**全部強化到 +4**」的防禦總和。
  * 防具強化每 +1 給 1 點防禦（§ 6.10），五件 +4 固定貢獻 +20，
@@ -51,7 +51,7 @@ function bestOffhand(cls: ClassName, tier: number): number {
   return Math.max(0, ...TIERS.filter(t => t <= tier).map(t => bestDefense(cls, 'leftHand', t)));
 }
 
-describe('防具防禦目標（§ 6A.8.7）', () => {
+describe('防具防禦目標', () => {
   it.each(Object.keys(TARGET) as ClassName[])('%s 每階全套 +4 的防禦命中目標', cls => {
     const actual = TIERS.map(tier =>
       ARMOR_SLOTS.reduce((sum, slot) => sum + bestDefense(cls, slot, tier), 0)

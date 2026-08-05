@@ -196,8 +196,8 @@ describe('攻擊力% 與普攻元素傷害% 對遠程同樣生效', () => {
     } as EquipmentInstance;
   }
 
-  function withAffix(w: EquipmentInstance, type: string, value: number): EquipmentInstance {
-    return { ...w, affixes: [{ type: type as never, tier: 3, value }] };
+  function withAffix(w: EquipmentInstance, type: string, value: number, element?: string): EquipmentInstance {
+    return { ...w, affixes: [{ type: type as never, tier: 3, value, ...(element ? { element: element as never } : {}) }] };
   }
 
   it('攻擊力詞綴對弓生效', () => {
@@ -211,22 +211,22 @@ describe('攻擊力% 與普攻元素傷害% 對遠程同樣生效', () => {
     expect(boosted.damage).toBeGreaterThan(base.damage);
   });
 
-  it('普攻元素傷害詞綴對有屬性的弓生效', () => {
+  it('元素刻印對弓生效', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const char = character();
-    const fireBow = [withAffix(bow('fire'), 'attack_elemental', 20)];
-    const plainFireBow = [bow('fire')];
+    const fireBow = [withAffix(bow(), 'element_brand', 20, 'fire')];
+    const plainFireBow = [bow()];
 
     const base = calculatePlayerAttack(char, plainFireBow[0], monster(), plainFireBow, [], 0);
     const boosted = calculatePlayerAttack(char, fireBow[0], monster(), fireBow, [], 0);
     expect(boosted.damage).toBeGreaterThan(base.damage);
   });
 
-  it('無屬性弓不吃普攻元素傷害詞綴', () => {
+  it('沒有元素刻印的弓拿不到元素乘區', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const char = character();
     const plain = [bow()];
-    const withElem = [withAffix(bow(), 'attack_elemental', 20)];
+    const withElem = [withAffix(bow(), 'attack_power', 0)];
 
     const base = calculatePlayerAttack(char, plain[0], monster(), plain, [], 0);
     const same = calculatePlayerAttack(char, withElem[0], monster(), withElem, [], 0);

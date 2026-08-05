@@ -4,9 +4,9 @@ import { resolveEquipment } from './templateSync';
 import { isWeaponSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
 import type { EquipmentTierLevel } from '../models/equipmentTier';
-import { generateAffixes, getAffixCategoryForSlot } from '../models/affix';
+import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
-import { getRegion } from '../models/mapData';
+import { resolveArea } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
 import { getItemById, getItemDefinition } from '../models/items';
 import type { ItemCategory } from '../models/items';
@@ -115,7 +115,9 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(Math.random() * candidates.length)];
       const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-      const affixes = generateAffixes(affixCategory, areaLevel, 4, true);
+      const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
+        weaponBaseDamage: getWeaponBaseDamage(template),
+      });
       const dbRecord: Record<string, unknown> = {
         templateId: template.id!,
         slot: template.slot,
@@ -162,7 +164,9 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         : undefined;
       if (template) {
         const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-        const affixes = generateAffixes(affixCategory, areaLevel, 4, true);
+        const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
+          weaponBaseDamage: getWeaponBaseDamage(template),
+        });
         const dbRecord: Record<string, unknown> = {
           templateId: template.id!,
           slot: template.slot,
@@ -223,10 +227,12 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
 
 export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropBonuses, isBoss: boolean = false, monsterLevel?: number): Promise<DropResult> {
   const entries = await db.dropTables.where('area').equals(areaId).toArray();
-  const region = getRegion(areaId);
-  const areaLevel = region?.levelMax ?? 1;
-  const areaLevelMin = region?.levelMin ?? 1;
-  const areaLevelMax = region?.levelMax ?? 1;
+  // 副本樓層的 area id 是 `<regionId>-<floor>f`，不是 region id ——
+  // 一律走 `resolveArea`，直接 `getRegion(areaId)` 會讓整座副本的區域等級退化成 1
+  const area = resolveArea(areaId);
+  const areaLevel = area?.levelMax ?? 1;
+  const areaLevelMin = area?.levelMin ?? 1;
+  const areaLevelMax = area?.levelMax ?? 1;
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
@@ -278,7 +284,9 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       }
       if (template) {
         const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-        const affixes = generateAffixes(affixCategory, areaLevel, 4, isBoss);
+        const affixes = generateAffixes(affixCategory, areaLevel, 4, isBoss, {
+          weaponBaseDamage: getWeaponBaseDamage(template),
+        });
         const dbRecord: Record<string, unknown> = {
           templateId: template.id!,
           slot: template.slot,

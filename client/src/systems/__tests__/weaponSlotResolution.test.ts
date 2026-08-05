@@ -136,7 +136,7 @@ describe('普攻傷害不受 equippedGear 排列影響', () => {
 
     const bow = hunterBow([
       { type: 'attack_power', tier: 3, value: 9 },
-      { type: 'attack_elemental', tier: 3, value: 9 },
+      { type: 'element_brand', tier: 3, value: 9, element: 'fire' },
     ]);
     // 武器刻意排在最後：玩家換過武器後讀檔就是這個順序
     const gear = [

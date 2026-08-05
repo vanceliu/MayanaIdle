@@ -14,7 +14,7 @@ describe('affix model', () => {
   describe('getAffixPoolForSlot', () => {
     it('should return only weapon affixes for weapons', () => {
       const pool = getAffixPoolForSlot('weapon');
-      expect(pool.length).toBe(7);
+      expect(pool.length).toBe(8);
       pool.forEach(def => {
         expect(def.category).toContain('weapon');
       });
@@ -22,7 +22,7 @@ describe('affix model', () => {
 
     it('should return only armor affixes for armor', () => {
       const pool = getAffixPoolForSlot('armor');
-      expect(pool.length).toBe(7);
+      expect(pool.length).toBe(9);
       pool.forEach(def => {
         expect(def.category).toContain('armor');
       });
@@ -40,9 +40,9 @@ describe('affix model', () => {
     });
 
     it('should return armor + block_rate + magic_resist for shield', () => {
-      // 盾牌可選 9 種：防具 7 + 格擋率（盾牌專屬）+ 魔法抗性（飾品／盾牌專屬，§ 7.6）
+      // 盾牌可選 11 種：防具 9 + 格擋率（盾牌專屬）+ 魔法抗性（飾品／盾牌專屬，§ 7.6）
       const pool = getAffixPoolForSlot('shield');
-      expect(pool.length).toBe(9);
+      expect(pool.length).toBe(11);
       pool.forEach(def => {
         expect(def.category).toContain('shield');
       });
@@ -128,9 +128,9 @@ describe('affix model', () => {
     });
 
     it('should not exceed available pool size', () => {
-      // Weapon pool has 7 types, asking for 10 should cap at 7
+      // Weapon pool has 8 types, asking for 10 should cap at 8
       const affixes = generateAffixes('weapon', 10, 10);
-      expect(affixes).toHaveLength(7);
+      expect(affixes).toHaveLength(8);
     });
 
     it('should not have duplicate affix types on same equipment', () => {
@@ -203,7 +203,7 @@ describe('affix model', () => {
     it('should return all zeros for empty gear', () => {
       const bonuses = collectAffixBonuses([]);
       expect(bonuses.attack_power).toBe(0);
-      expect(bonuses.attack_elemental).toBe(0);
+      expect(bonuses.element_brand).toBe(0);
       expect(bonuses.skill_elemental).toBe(0);
       expect(bonuses.crit_rate).toBe(0);
       expect(bonuses.crit_damage).toBe(0);
@@ -256,18 +256,18 @@ describe('affix model', () => {
       expect(bonuses.attack_power).toBe(0);
     });
 
-    it('should correctly separate attack_elemental and skill_elemental', () => {
+    it('should correctly separate element_brand and skill_elemental', () => {
       const gear = [
         {
           affixes: [
-            { type: 'attack_elemental' as const, tier: 3, value: 11 },
+            { type: 'element_brand' as const, tier: 3, value: 11, element: 'fire' as const },
             { type: 'skill_elemental' as const, tier: 2, value: 9 },
           ],
           quality: 0,
         },
       ];
       const bonuses = collectAffixBonuses(gear);
-      expect(bonuses.attack_elemental).toBe(11);
+      expect(bonuses.element_brand).toBe(11);
       expect(bonuses.skill_elemental).toBe(9);
     });
   });

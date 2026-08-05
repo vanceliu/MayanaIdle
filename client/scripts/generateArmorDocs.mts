@@ -50,14 +50,14 @@ function craftOf(t: EquipmentTemplate): string {
 }
 
 // 左手三種（盾牌／魔導書／臂甲）是防具，不是武器 —— 它們的防禦計入
-// § 6A.8.7 的「全套 +4 防禦目標」，因此列在本檔而非 06-equipment-weapons-*.md
+// 「全套 +4 防禦目標」，因此列在本檔而非 06-equipment-weapons-*.md
 const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
 const armors = EQUIPMENT_SEEDS.filter(t => t.type === 'armor' || OFFHAND_TYPES.has(String(t.type)));
 const out: string[] = [
   '# 防具與飾品列表',
   '',
   '> **本檔案由產生器輸出，請勿手改。**',
-  '> 防禦值與附加素質依 `06-equipment.md` § 6A.8.7 的防禦目標表與定位規則統一產生；',
+  '> 防禦值與附加素質依防禦目標表與定位規則統一產生；',
   '> 要調整請改目標表後重跑，不要動個別數值。',
   '',
   `全部 ${armors.length} 件。「定位」欄：防禦型打滿防禦目標、`,
@@ -91,7 +91,7 @@ for (const slot of SLOTS) {
           + `${t.weight ?? 0} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
       }
     } else if (slot === 'leftHand') {
-      // 左手三種（盾牌／魔導書／臂甲）的價值在格擋率與魔攻，防禦封頂 8（§ 6A.8.7）
+      // 左手三種（盾牌／魔導書／臂甲）的價值在格擋率與魔攻，防禦封頂 8
       out.push('| 名稱 | 類型 | 防禦 | 格擋率 | 魔法攻擊 | 額外屬性 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
       out.push('|---|---|---|---|---|---|---|---|---|---|---|');
       const OFF_ZH: Record<string, string> = { shield: '盾牌', magicBook: '魔導書', armGuard: '臂甲' };

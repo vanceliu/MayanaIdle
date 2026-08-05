@@ -1,9 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { CLASS_NAMES_ZH } from '../models/character';
+import { CLASS_NAMES_ZH, ATTRIBUTE_KEYS } from '../models/character';
+import type { Attributes } from '../models/character';
 import { listArchives } from '../systems/legacyArchive';
 
 const MAX_CHARACTERS = 4;
+
+/**
+ * 角色的六項屬性：建角配點 + Lv.51+ 升級配點，**不含裝備與 buff**
+ * （`20-attributes.md` § 20.10 —— 換裝不該讓角色卡上的數字跳動）。
+ */
+function SlotAttributes({ attributes }: { attributes: Attributes }) {
+  return (
+    <div className="slot-attributes">
+      {ATTRIBUTE_KEYS.map(key => (
+        <span key={key} className="slot-attribute">
+          <span className="slot-attribute-key">{key}</span>
+          <span className="slot-attribute-value">{attributes[key]}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function CharacterSelect() {
   const characterList = useGameStore(s => s.characterList);
@@ -31,6 +49,7 @@ export function CharacterSelect() {
               <span className="slot-name">{char.name}</span>
               <span className="slot-class">{CLASS_NAMES_ZH[char.className]}</span>
               <span className="slot-level">Lv.{char.level}</span>
+              <SlotAttributes attributes={char.attributes} />
             </div>
             <button
               className="btn-delete-char"

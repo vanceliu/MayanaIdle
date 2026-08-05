@@ -28,7 +28,7 @@ describe('飾品詞綴分類（§ 7.6）', () => {
 
   it('魔導書的詞綴池不含任何攻擊詞綴（§ 7.6）', () => {
     const OFFENSIVE = [
-      'attack_power', 'attack_elemental', 'skill_elemental',
+      'attack_power', 'element_brand', 'skill_elemental',
       'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction',
     ];
     const category = getAffixCategoryForSlot('leftHand', 'magicBook');
@@ -68,10 +68,10 @@ describe('飾品詞綴分類（§ 7.6）', () => {
     expect(has('weapon')).toBe(false);
   });
 
-  it('飾品可選 8 種、一般防具 7 種、盾牌 9 種', () => {
-    expect(getAffixPoolForSlot('accessory')).toHaveLength(8);
-    expect(getAffixPoolForSlot('armor')).toHaveLength(7);
-    expect(getAffixPoolForSlot('shield')).toHaveLength(9);
+  it('飾品可選 10 種、一般防具 9 種、盾牌 11 種', () => {
+    expect(getAffixPoolForSlot('accessory')).toHaveLength(10);
+    expect(getAffixPoolForSlot('armor')).toHaveLength(9);
+    expect(getAffixPoolForSlot('shield')).toHaveLength(11);
   });
 });
 

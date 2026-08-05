@@ -47,7 +47,7 @@ import { evaluatePersistentScript, evaluateEmergencyRetreat, type PersistentScri
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
 import { DEFAULT_SCRIPT, DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT, DEFAULT_EMERGENCY_RETREAT } from '../models/scriptEngine';
 import type { MapLocation } from '../models/area';
-import { getRegion, ZONES } from '../models/mapData';
+import { getRegion, resolveArea, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment } from '../systems/templateSync';
 import { findScrollInBag, consumeTownScroll, TOWN_SCROLL_CONFIG } from '../models/townScroll';
@@ -190,6 +190,11 @@ export interface CharacterSummary {
   name: string;
   className: ClassName;
   level: number;
+  /**
+   * 建角配點 + Lv.51+ 升級配點，**不含裝備與 buff**（`20-attributes.md` § 20.10）。
+   * 角色選擇畫面只表達角色本身的成長，換裝不該讓這裡的數字跳動。
+   */
+  attributes: Attributes;
 }
 
 interface GameState {
@@ -402,6 +407,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       name: c.name,
       className: c.className,
       level: c.level,
+      // 不傳 equippedGear / activeEffects：角色選擇畫面只算建角配點 + Lv.51+ 配點
+      attributes: getTotalAttributes(c),
     }));
     set({ characterList: list, phase: 'characterSelect' });
   },
@@ -1682,7 +1689,9 @@ export function processMonsterDeath(
     const dropAreaId = dropHasFloors && char.currentFloor != null
       ? `${char.currentRegion}-${char.currentFloor}f`
       : char.currentArea;
-    const areaLevel = dropRegion?.levelMax ?? dead.level;
+    // Boss 掉落的區域等級也走 area id 解析：副本要取**該樓層**的等級，
+    // 不是整座副本的（`27-drop-table.md` § 27.3 的掉落表本來就是逐層列的）
+    const areaLevel = resolveArea(dropAreaId)?.levelMax ?? dropRegion?.levelMax ?? dead.level;
     const drops = monsterIsBoss
       ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
       : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);

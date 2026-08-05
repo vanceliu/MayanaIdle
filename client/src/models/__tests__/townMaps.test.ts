@@ -10,6 +10,7 @@ const TOWN_IDS = ['neutral-town', 'elsarth-town', 'varden-town'];
 const KNOWN_FACILITIES = new Set([
   'general-store', 'blacksmith', 'weapon-shop', 'armor-shop', 'inn', 'storage',
   'magic-academy', 'class-guild', 'starter-npc', 'adventurer-guild', 'statistics-center',
+  'sigil-master',
 ]);
 
 describe('城鎮地圖（§ 13.2.1）', () => {

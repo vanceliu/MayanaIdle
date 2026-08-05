@@ -45,8 +45,10 @@ beforeEach(() => {
 
 function buyOne(itemName: string) {
   const row = screen.getByText(itemName).closest('.shop-item') as HTMLElement;
-  // 數量步進器預設為 1，直接按購買即為買 1 個
-  fireEvent.click(within(row).getByRole('button', { name: /購買/ }));
+  // 購物車模式：先在該列選 1 個，再按底部唯一的結帳鈕
+  fireEvent.change(within(row).getByLabelText(`${itemName} 數量`), { target: { value: '1' } });
+  const footer = document.querySelector('.shop-cart-footer') as HTMLElement;
+  fireEvent.click(within(footer).getByRole('button', { name: '購買' }));
 }
 
 describe('雜貨店 — 狀態解除道具', () => {

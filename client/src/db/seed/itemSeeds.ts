@@ -22,6 +22,14 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 7, name: '武器強化卷軸', category: 'scroll', description: '鐵匠鋪武器強化用', weight: 1, buyPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6' },
   { id: 8, name: '防具強化卷軸', category: 'scroll', description: '鐵匠鋪防具強化用', weight: 1, buyPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA' },
 
+  // === 印記（`46-sigil.md`）===
+  // 詞綴專用消耗品，只在印記師使用。歸 scroll 而非 material —— 它們不是製作原料，
+  // 也不該被雜貨店的「Tier N 以下批量販售」（只掃 material）掃掉。
+  { id: 147, name: '混沌印記', category: 'scroll', description: '全部 4 條詞綴重骰（上限 T5，商店裝 T3）', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#A855F7' },
+  { id: 148, name: '刺針印記', category: 'scroll', description: '指定一條詞綴換成同池的另一條，Tier 不變', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#2DD4BF' },
+  { id: 149, name: '重刻印記', category: 'scroll', description: '指定一條詞綴的數值重骰，種類與 Tier 不變', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#60A5FA' },
+  { id: 150, name: '強化印記', category: 'scroll', description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
+
   // === 強化用素材 ===
   { id: 9, name: '品質石', category: 'material', description: '鐵匠鋪提升裝備品質（+1%，上限 20%）', weight: 2, sellPrice: 50, iconType: 'stone', iconTier: 4 },
   { id: 10, name: '強化石', category: 'material', description: '鐵匠鋪詞綴強化（逐級提升 Tier，最高 T5）', weight: 2, sellPrice: 50, iconType: 'whetstone', iconTier: 4 },

@@ -12,6 +12,7 @@ import {
 } from '../adventurerQuestSystem';
 import {
   AREA_POOLS,
+  ENDURANCE_COUNT_RANGE,
   BOSS_POOLS,
   MONSTER_POOLS,
   TOWN_AREA_POOLS,
@@ -440,12 +441,24 @@ describe('adventurerQuestSystem', () => {
       return out;
     }
 
-    it('US 等階的一般任務金幣與 S 等階同區間（無額外倍率）', () => {
+    /**
+     * 非 BOSS 的還原基準值上界 = `max(S 級 avgGold) × max(targetCount)`。
+     * targetCount 最大的是耐力型，因此上界由 ENDURANCE_COUNT_RANGE 決定。
+     *
+     * **不拿兩組隨機樣本的最大值互比** —— 那樣要靠容差，而兩組樣本最大值的比值
+     * 散布達 ±7%，5% 容差會有 2% 的機率誤判（實測 400 次失敗 8 次）。
+     * 改判固定上界：被迴歸盯上的錯誤實作（US 額外 ×10）會超標 10 倍，判得出來且不會翻船。
+     */
+    const MAX_NORMAL_BASE =
+      Math.max(...AREA_POOLS.S.map(a => a.avgGold)) * ENDURANCE_COUNT_RANGE.S.max;
+
+    it('US 等階的一般任務金幣與 S 等階走同一條公式（無額外倍率）', () => {
       const s = goldAmounts('S', false);
       const us = goldAmounts('US', false);
       expect(s.length).toBeGreaterThan(0);
       expect(us.length).toBeGreaterThan(0);
-      expect(Math.max(...us)).toBeLessThanOrEqual(Math.max(...s) * 1.05);
+      expect(Math.max(...s)).toBeLessThanOrEqual(MAX_NORMAL_BASE);
+      expect(Math.max(...us)).toBeLessThanOrEqual(MAX_NORMAL_BASE);
     });
 
     it('US 等階的 BOSS 任務仍享有且僅有 ×2', () => {

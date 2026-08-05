@@ -54,6 +54,12 @@ describe('目前負重', () => {
   it('未知物品不計重，不會炸掉', () => {
     expect(getCarriedWeight([], [{ name: '不存在的東西', amount: 3 }])).toBe(0);
   });
+
+  it('小數重量（印記 0.1）累加後不留浮點尾數', () => {
+    // 0.1 × 3 的浮點結果是 0.30000000000000004，而負重是直接顯示在狀態列的數字
+    expect(getCarriedWeight([], [{ name: '混沌印記', amount: 3 }])).toBe(0.3);
+    expect(getCarriedWeight([gear({ weight: 12 })], [{ name: '強化印記', amount: 7 }])).toBe(12.7);
+  });
 });
 
 describe('超重判定', () => {

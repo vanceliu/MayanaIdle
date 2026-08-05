@@ -7,7 +7,8 @@ import { isCureItem } from '../../models/cureItem';
 import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
-import { QtyStepper, parseQty } from '../common/QtyStepper';
+import { QtyStepper } from '../common/QtyStepper';
+import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 import { CraftUsageBadge } from '../common/CraftUsageBadge';
 import { hasMaterialUsage } from '../../systems/craftMaterialUsage';
 
@@ -28,65 +29,42 @@ const SHOP_ITEMS = [
   // 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（06-equipment.md § 壞刀機制）
 ];
 
+/** 購買頁的一列商品（一般商品與當地回城卷軸共用同一種結構） */
+interface BuyEntry {
+  name: string;
+  price: number;
+  description: string;
+}
+
 export function GeneralStore() {
   const char = useGameStore(s => s.character);
   const bagItems = useGameStore(s => s.bagItems);
+  const inventory = useGameStore(s => s.inventory);
   const equippedGear = useGameStore(s => s.equippedGear);
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [batchTier, setBatchTier] = useState<number | null>(null);
   // 預設保護有用途的素材（配方材料 + 強化石／品質石）：批量販售的本意是清掉純販售素材
   const [skipCraftMaterials, setSkipCraftMaterials] = useState(true);
-  // 各商品獨立的數量輸入，key = 商品名稱；未輸入過的商品預設為 1
-  const [buyQty, setBuyQty] = useState<Record<string, string>>({});
-  const [sellQty, setSellQty] = useState<Record<string, string>>({});
+  // 購物車：清單只選數量，實際買賣由底部單一按鈕結帳（§ 34.1）
+  const buyCart = useShopCart();
+  const sellCart = useShopCart();
 
   if (!char) return null;
 
   const gold = char.gold;
-
-  function qtyOf(map: Record<string, string>, name: string): string {
-    return map[name] ?? '1';
-  }
+  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory);
 
   const region = getRegion(char.currentRegion);
   const scrollConfig = region ? TOWN_SCROLL_CONFIG[region.id] : null;
 
-  function canAddToBag(name: string): boolean {
-    const currentBag = useGameStore.getState().bagItems;
-    const inventory = useGameStore.getState().inventory;
-    const existing = currentBag.find(b => b.name === name);
-    if (existing) return true;
-    return getBagUsedSlots(currentBag, inventory) < getBagMaxSlots(equippedGear);
-  }
-
-  function buyBulk(name: string, price: number, amount: number) {
-    if (!char || amount < 1 || char.gold < price * amount) return;
-    if (!canAddToBag(name)) return;
-    const updated = { ...char, gold: char.gold - price * amount };
-    set({ character: updated });
-    buyBagItem(name, amount);
-  }
-
-  function buyBagItem(name: string, amount: number) {
-    const currentBag = useGameStore.getState().bagItems;
-    const inventory = useGameStore.getState().inventory;
-    const existing = currentBag.find(b => b.name === name);
-    if (!existing && getBagUsedSlots(currentBag, inventory) >= getBagMaxSlots(equippedGear)) return;
-    const itemType = getItemType(name);
-    const def = getItemDefinition(name);
-    if (existing) {
-      set({
-        bagItems: currentBag.map(b =>
-          b.name === name ? { ...b, amount: b.amount + amount } : b
-        ),
-      });
-    } else {
-      set({
-        bagItems: [...currentBag, { name, type: itemType, itemTemplateId: def?.id, amount }],
-      });
-    }
-    useGameStore.getState().saveState();
+  const buyEntries: BuyEntry[] = SHOP_ITEMS.map(i => ({ ...i }));
+  if (scrollConfig && !buyEntries.some(e => e.name === scrollConfig.name)) {
+    buyEntries.push({
+      name: scrollConfig.name,
+      price: scrollConfig.price,
+      description: `使用後傳送至${scrollConfig.townName}`,
+    });
   }
 
   function getItemType(name: string): 'scroll' | 'material' | 'potion' {
@@ -102,28 +80,6 @@ export function GeneralStore() {
     return resolveItemIcon(getItemDefinition(name), name.includes('卷軸') ? 'scroll' : 'material');
   }
 
-  function buyScroll(amount: number) {
-    if (!char || !scrollConfig || amount < 1 || char.gold < scrollConfig.price * amount) return;
-    if (!canAddToBag(scrollConfig.name)) return;
-    const updated = { ...char, gold: char.gold - scrollConfig.price * amount };
-    set({ character: updated });
-
-    const currentBag = useGameStore.getState().bagItems;
-    const existing = currentBag.find(b => b.name === scrollConfig.name);
-    if (existing) {
-      set({
-        bagItems: currentBag.map(b =>
-          b.name === scrollConfig.name ? { ...b, amount: b.amount + amount } : b
-        ),
-      });
-    } else {
-      set({
-        bagItems: [...currentBag, { name: scrollConfig.name, type: 'scroll', amount }],
-      });
-    }
-    useGameStore.getState().saveState();
-  }
-
   function getSellPrice(name: string): number {
     const def = getItemDefinition(name);
     // 專用材料（魔法書材料）明確不可販售，不靠「沒填價格」來擋
@@ -133,22 +89,78 @@ export function GeneralStore() {
     return 0;
   }
 
-  function sellBagItem(name: string, sellPrice: number, amount: number) {
-    if (!char) return;
-    const currentBag = useGameStore.getState().bagItems;
-    const item = currentBag.find(b => b.name === name);
-    if (!item || item.amount <= 0) return;
-    const actual = Math.min(amount, item.amount);
+  // --- 購買頁購物車 ---
+  const buyLines = cartLines(buyCart, buyEntries, {
+    keyOf: e => e.name,
+    maxOf: e => Math.floor(gold / e.price),
+  });
+  const buyTotal = buyLines.reduce((sum, l) => sum + l.item.price * l.qty, 0);
+  /** 尚未在背包裡的品項才需要新的欄位，多品項要一次算完才知道放不放得下 */
+  const buyNewSlots = buyLines.filter(l => !bagItems.some(b => b.name === l.item.name)).length;
+  const buyHint = buyLines.length === 0
+    ? null
+    : buyTotal > gold
+      ? '金幣不足'
+      : buyNewSlots > freeSlots
+        ? '背包欄位不足'
+        : null;
 
-    const newBag = currentBag.map(b =>
-      b.name === name ? { ...b, amount: b.amount - actual } : b
-    ).filter(b => b.amount > 0);
-
+  function checkoutBuy() {
+    if (buyLines.length === 0 || buyHint) return;
+    const state = useGameStore.getState();
+    let bag = state.bagItems;
+    for (const line of buyLines) {
+      const name = line.item.name;
+      if (bag.some(b => b.name === name)) {
+        bag = bag.map(b => (b.name === name ? { ...b, amount: b.amount + line.qty } : b));
+      } else {
+        bag = [
+          ...bag,
+          { name, type: getItemType(name), itemTemplateId: getItemDefinition(name)?.id, amount: line.qty },
+        ];
+      }
+    }
     set({
-      character: { ...char, gold: char.gold + sellPrice * actual },
-      bagItems: newBag,
+      character: { ...state.character!, gold: state.character!.gold - buyTotal },
+      bagItems: bag,
     });
-    useGameStore.getState().saveState();
+    state.saveState();
+    buyCart.clear();
+  }
+
+  // --- 出售頁購物車 ---
+  const sellableItems = bagItems.filter(item => getSellPrice(item.name) > 0);
+  /** 售價一律為買價的一半（§ 6.x 商店回收價） */
+  const unitSellPrice = (name: string) => Math.floor(getSellPrice(name) * 0.5);
+  const sellLines = cartLines(sellCart, sellableItems, {
+    keyOf: item => item.name,
+    maxOf: item => item.amount,
+    // 持有量本身就是上限，不再另外套 999，「全部」才能一次賣光超過 999 的素材
+    hardCap: Infinity,
+  });
+  const sellTotal = sellLines.reduce((sum, l) => sum + unitSellPrice(l.item.name) * l.qty, 0);
+
+  function checkoutSell() {
+    if (sellLines.length === 0) return;
+    const state = useGameStore.getState();
+    let bag = state.bagItems;
+    let gained = 0;
+    for (const line of sellLines) {
+      const held = bag.find(b => b.name === line.item.name);
+      if (!held) continue;
+      const actual = Math.min(line.qty, held.amount);
+      if (actual <= 0) continue;
+      gained += unitSellPrice(line.item.name) * actual;
+      bag = bag
+        .map(b => (b.name === line.item.name ? { ...b, amount: b.amount - actual } : b))
+        .filter(b => b.amount > 0);
+    }
+    set({
+      character: { ...state.character!, gold: state.character!.gold + gained },
+      bagItems: bag,
+    });
+    state.saveState();
+    sellCart.clear();
   }
 
   const TIER_OPTIONS = [
@@ -229,76 +241,31 @@ export function GeneralStore() {
       <div className="panel-scroll">
       {tab === 'buy' && (
         <div className="shop-items">
-          {SHOP_ITEMS.map(item => {
-            const { icon, color } = getShopItemIcon(item.name);
-            const raw = qtyOf(buyQty, item.name);
-            const affordable = Math.floor(gold / item.price);
-            const qty = parseQty(raw, affordable);
-            const total = item.price * qty;
+          {buyEntries.map(entry => {
+            const { icon, color } = getShopItemIcon(entry.name);
+            const affordable = Math.floor(gold / entry.price);
             return (
-            <div key={item.name} className="shop-item">
+            <div key={entry.name} className="shop-item">
               <div className="shop-item-info">
                 <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <GameIcon name={icon} size={16} color={color} />
-                  {item.name}
+                  {entry.name}
                 </span>
-                <span className="shop-item-desc">{item.description} | 重量: {getItemWeight(item.name)}</span>
-                <span className="shop-item-price">{item.price.toLocaleString()}G</span>
+                <span className="shop-item-desc">{entry.description} | 重量: {getItemWeight(entry.name)}</span>
+                <span className="shop-item-price">{entry.price.toLocaleString()}G</span>
               </div>
               <div className="shop-item-actions">
                 <QtyStepper
-                  label={item.name}
-                  value={raw}
+                  label={entry.name}
+                  value={buyCart.raw(entry.name)}
                   max={affordable}
-                  onChange={next => setBuyQty(q => ({ ...q, [item.name]: next }))}
+                  min={0}
+                  onChange={next => buyCart.set(entry.name, next)}
                 />
-                <button
-                  className="shop-action-btn"
-                  onClick={() => buyBulk(item.name, item.price, qty)}
-                  disabled={gold < total}
-                >
-                  購買 {total.toLocaleString()}G
-                </button>
               </div>
             </div>
             );
           })}
-          {scrollConfig && (() => {
-            const raw = qtyOf(buyQty, scrollConfig.name);
-            const affordable = Math.floor(gold / scrollConfig.price);
-            const qty = parseQty(raw, affordable);
-            const total = scrollConfig.price * qty;
-            return (
-            <div className="shop-item">
-              <div className="shop-item-info">
-                <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {(() => {
-                    const { icon, color } = getShopItemIcon(scrollConfig.name);
-                    return <GameIcon name={icon} size={16} color={color} />;
-                  })()}
-                  {scrollConfig.name}
-                </span>
-                <span className="shop-item-desc">使用後傳送至{scrollConfig.townName} | 重量: {getItemWeight(scrollConfig.name)}</span>
-                <span className="shop-item-price">{scrollConfig.price}G</span>
-              </div>
-              <div className="shop-item-actions">
-                <QtyStepper
-                  label={scrollConfig.name}
-                  value={raw}
-                  max={affordable}
-                  onChange={next => setBuyQty(q => ({ ...q, [scrollConfig.name]: next }))}
-                />
-                <button
-                  className="shop-action-btn"
-                  onClick={() => buyScroll(qty)}
-                  disabled={gold < total}
-                >
-                  購買 {total.toLocaleString()}G
-                </button>
-              </div>
-            </div>
-            );
-          })()}
         </div>
       )}
 
@@ -364,13 +331,9 @@ export function GeneralStore() {
 
           <hr className="batch-sell-divider" />
 
-          {bagItems.length === 0 && <p className="empty-text">沒有可出售的物品</p>}
-          {bagItems.map(item => {
-            const sellPrice = Math.floor(getSellPrice(item.name) * 0.5);
-            if (sellPrice <= 0) return null;
-            const raw = qtyOf(sellQty, item.name);
-            const qty = parseQty(raw, item.amount);
-            const total = sellPrice * qty;
+          {sellableItems.length === 0 && <p className="empty-text">沒有可出售的物品</p>}
+          {sellableItems.map(item => {
+            const sellPrice = unitSellPrice(item.name);
             return (
               <div key={item.name} className="shop-item">
                 <div className="shop-item-info">
@@ -384,17 +347,13 @@ export function GeneralStore() {
                 <div className="shop-item-actions">
                   <QtyStepper
                     label={item.name}
-                    value={raw}
+                    value={sellCart.raw(item.name)}
                     max={item.amount}
-                    onChange={next => setSellQty(q => ({ ...q, [item.name]: next }))}
+                    min={0}
+                    hardCap={Infinity}
+                    showMax
+                    onChange={next => sellCart.set(item.name, next)}
                   />
-                  <button
-                    className="shop-action-btn"
-                    onClick={() => sellBagItem(item.name, sellPrice, qty)}
-                  >
-                    賣出 +{total.toLocaleString()}G
-                  </button>
-                  <button onClick={() => sellBagItem(item.name, sellPrice, item.amount)}>全部</button>
                 </div>
               </div>
             );
@@ -402,6 +361,26 @@ export function GeneralStore() {
         </div>
       )}
       </div>
+
+      {/* 動作列固定在面板底部，全視窗只有這一顆結帳鈕（§ 34.1） */}
+      {tab === 'buy' ? (
+        <ShopCartFooter
+          summary={cartSummary(buyLines, '個')}
+          amount={`${buyTotal.toLocaleString()}G`}
+          actionLabel="購買"
+          hint={buyHint}
+          disabled={buyLines.length === 0 || !!buyHint}
+          onAction={checkoutBuy}
+        />
+      ) : (
+        <ShopCartFooter
+          summary={cartSummary(sellLines, '個')}
+          amount={`+${sellTotal.toLocaleString()}G`}
+          actionLabel="賣出"
+          disabled={sellLines.length === 0}
+          onAction={checkoutSell}
+        />
+      )}
     </div>
   );
 }

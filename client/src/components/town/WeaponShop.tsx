@@ -2,11 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { db } from '../../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
-import { resolveEquipment } from '../../systems/templateSync';
 import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierLevel, getEquipmentInstanceTierColor, type EquipmentTierLevel } from '../../models/equipmentTier';
-import { generateAffixes, getAffixCategoryForSlot, SHOP_MAX_AFFIX_TIER } from '../../models/affix';
+import { createShopEquipment } from '../../systems/shopEquipment';
+import { QtyStepper } from '../common/QtyStepper';
+import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -27,12 +28,16 @@ const WEAPON_CATEGORIES = [
 export function WeaponShop() {
   const char = useGameStore(s => s.character);
   const inventory = useGameStore(s => s.inventory);
+  const bagItems = useGameStore(s => s.bagItems);
   const equippedGear = useGameStore(s => s.equippedGear);
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
   const [category, setCategory] = useState('all');
   const [batchTier, setBatchTier] = useState<EquipmentTierLevel | null>(null);
+  // 購物車：清單只勾數量（唯一裝備上限 1），實際買賣由底部單一按鈕結帳（§ 34.1）
+  const buyCart = useShopCart();
+  const sellCart = useShopCart();
   const allTemplates = useEquipmentTemplates();
 
   useEffect(() => {
@@ -44,54 +49,6 @@ export function WeaponShop() {
 
   if (!char) return null;
 
-  async function buyWeapon(template: EquipmentTemplate) {
-    if (!template.buyPrice || char!.gold < template.buyPrice) return;
-    const currentInv = useGameStore.getState().inventory;
-    const currentBag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(currentBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
-
-    // § 6A.6：商店裝在購買當下隨機生成 4 個詞綴，Tier 均等落在 T1~T3，
-    // 並記錄 maxAffixTier 讓鐵匠鋪的詞綴強化也升不過 T3。
-    const affixes = generateAffixes(
-      getAffixCategoryForSlot(template.slot, template.type),
-      char!.level,
-      4,
-      false,
-      { maxTier: SHOP_MAX_AFFIX_TIER, uniformTier: true, noSpecialAffix: true },
-    );
-    const dbRecord = {
-      templateId: template.id!,
-      slot: template.slot,
-      quality: 0,
-      enhancement: 0,
-      affixes,
-      maxAffixTier: SHOP_MAX_AFFIX_TIER,
-      ownerId: char!.id!,
-      equipped: false,
-    };
-    const id = await db.equipmentInstances.add(dbRecord as any);
-    const instance: EquipmentInstance = resolveEquipment({
-      id: id as number,
-      templateId: template.id!,
-      name: template.name,
-      type: template.type,
-      slot: template.slot,
-      isTwoHanded: template.isTwoHanded,
-      quality: 0,
-      enhancement: 0,
-      affixes,
-      maxAffixTier: SHOP_MAX_AFFIX_TIER,
-      ownerId: char!.id!,
-      equipped: false,
-    });
-
-    set({
-      character: { ...char!, gold: char!.gold - template.buyPrice! },
-      inventory: [...useGameStore.getState().inventory, instance],
-    });
-    useGameStore.getState().saveState();
-  }
-
   function getSellPrice(item: EquipmentInstance): number {
     const template = allTemplates.find(t => t.id === item.templateId);
     // 新手裝不能賣。`isStarterGear` 是實例旗標（只有從新手指導員領取時才會標），
@@ -102,24 +59,54 @@ export function WeaponShop() {
     return 0;
   }
 
-  function sellEquipment(item: EquipmentInstance) {
-    if (item.isStarterGear) return;
-    const sellPrice = getSellPrice(item);
-    if (sellPrice <= 0) return;
-    const inv = useGameStore.getState().inventory;
-    useGameStore.setState({
-      character: { ...useGameStore.getState().character!, gold: useGameStore.getState().character!.gold + sellPrice },
-      inventory: inv.filter(i => i.id !== item.id),
-    });
-    db.equipmentInstances.delete(item.id!);
-    useGameStore.getState().saveState();
-  }
-
   const equippedIds = new Set(
     Object.values(equippedGear).filter(Boolean).map(e => e!.id)
   );
 
   const weaponsInBag = inventory.filter(i => !!i.smallMonsterDamage && getSellPrice(i) > 0 && !i.isStarterGear && !equippedIds.has(i.id));
+
+  // --- 購買頁購物車 ---
+  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory);
+  // 勾選狀態跨分類保留，切換分類不會靜默丟掉已勾的武器
+  const buyLines = cartLines(buyCart, templates, { keyOf: t => t.name, maxOf: () => 1 });
+  const buyTotal = buyLines.reduce((sum, l) => sum + (l.item.buyPrice ?? 0), 0);
+  const buyHint = buyLines.length === 0
+    ? null
+    : buyTotal > char.gold
+      ? '金幣不足'
+      : buyLines.length > freeSlots
+        ? '背包欄位不足'
+        : null;
+
+  async function checkoutBuy() {
+    if (buyLines.length === 0 || buyHint) return;
+    const instances = await createShopEquipment(buyLines.map(l => l.item), char!.level, char!.id!);
+    const state = useGameStore.getState();
+    set({
+      character: { ...state.character!, gold: state.character!.gold - buyTotal },
+      inventory: [...state.inventory, ...instances],
+    });
+    state.saveState();
+    buyCart.clear();
+  }
+
+  // --- 出售頁購物車 ---
+  const sellLines = cartLines(sellCart, weaponsInBag, { keyOf: i => `eq:${i.id}`, maxOf: () => 1 });
+  const sellTotal = sellLines.reduce((sum, l) => sum + getSellPrice(l.item), 0);
+
+  function checkoutSell() {
+    if (sellLines.length === 0) return;
+    const ids = sellLines.map(l => l.item.id!);
+    const idSet = new Set(ids);
+    const state = useGameStore.getState();
+    set({
+      character: { ...state.character!, gold: state.character!.gold + sellTotal },
+      inventory: state.inventory.filter(i => !idSet.has(i.id!)),
+    });
+    db.equipmentInstances.bulkDelete(ids);
+    state.saveState();
+    sellCart.clear();
+  }
 
   const EQUIP_TIER_OPTIONS: { tier: EquipmentTierLevel; label: string }[] = [
     { tier: 1, label: '商店低階（白色）' },
@@ -209,12 +196,14 @@ export function WeaponShop() {
                 <span className="shop-item-price">{t.buyPrice.toLocaleString()}G</span>
               </div>
               <div className="shop-item-actions">
-                <button
-                  onClick={() => buyWeapon(t)}
-                  disabled={char.gold < t.buyPrice}
-                >
-                  購買
-                </button>
+                {/* 裝備是唯一實例，一次只能買一件，介面仍與雜貨店一致 */}
+                <QtyStepper
+                  label={t.name}
+                  value={buyCart.raw(t.name)}
+                  max={1}
+                  min={0}
+                  onChange={next => buyCart.set(t.name, next)}
+                />
               </div>
             </div>
           ))}
@@ -278,7 +267,13 @@ export function WeaponShop() {
                   <span className="shop-item-price sell-price">+{sellPrice.toLocaleString()}G</span>
                 </div>
                 <div className="shop-item-actions">
-                  <button onClick={() => sellEquipment(item)}>出售</button>
+                  <QtyStepper
+                    label={`${item.name} #${item.id}`}
+                    value={sellCart.raw(`eq:${item.id}`)}
+                    max={1}
+                    min={0}
+                    onChange={next => sellCart.set(`eq:${item.id}`, next)}
+                  />
                 </div>
               </div>
             );
@@ -286,6 +281,26 @@ export function WeaponShop() {
         </div>
       )}
       </div>
+
+      {/* 動作列固定在面板底部，全視窗只有這一顆結帳鈕（§ 34.1） */}
+      {tab === 'buy' ? (
+        <ShopCartFooter
+          summary={cartSummary(buyLines, '件')}
+          amount={`${buyTotal.toLocaleString()}G`}
+          actionLabel="購買"
+          hint={buyHint}
+          disabled={buyLines.length === 0 || !!buyHint}
+          onAction={checkoutBuy}
+        />
+      ) : (
+        <ShopCartFooter
+          summary={cartSummary(sellLines, '件')}
+          amount={`+${sellTotal.toLocaleString()}G`}
+          actionLabel="出售"
+          disabled={sellLines.length === 0}
+          onAction={checkoutSell}
+        />
+      )}
     </div>
   );
 }

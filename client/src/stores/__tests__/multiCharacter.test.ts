@@ -83,6 +83,39 @@ describe('Multi-character system', () => {
       expect(list[0].name).toBe('Hero1');
       expect(list[1].name).toBe('Hero2');
     });
+
+    /** 角色選擇畫面要列出屬性：建角配點 + Lv.51+ 配點（§ 20.10，不含裝備／buff） */
+    it('summary 帶上建角配點與升級配點的合計', async () => {
+      await useGameStore.getState().createCharacter('Hero1', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+      const created = useGameStore.getState().character!;
+      // 模擬 Lv.51+ 配點：bonusAttributes 也要算進角色卡的數字
+      await db.characters.update(charId, {
+        bonusAttributes: { ...created.bonusAttributes, VIT: created.bonusAttributes.VIT + 3 },
+      });
+
+      await useGameStore.getState().loadCharacterList();
+      const summary = useGameStore.getState().characterList.find(c => c.id === charId)!;
+
+      expect(summary.attributes.STR).toBe(created.baseAttributes.STR + created.bonusAttributes.STR);
+      expect(summary.attributes.VIT).toBe(created.baseAttributes.VIT + created.bonusAttributes.VIT + 3);
+    });
+
+    it('summary 的屬性不含裝備加成', async () => {
+      await useGameStore.getState().createCharacter('Geared', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+      const created = useGameStore.getState().character!;
+      const ownStr = created.baseAttributes.STR + created.bonusAttributes.STR;
+
+      // 身上帶 +STR 裝備也不該讓角色卡的數字變動
+      useGameStore.setState({
+        equippedGear: { rightHand: { bonusAttributes: { STR: 5 } } },
+      } as never);
+      await useGameStore.getState().loadCharacterList();
+
+      const summary = useGameStore.getState().characterList.find(c => c.id === charId)!;
+      expect(summary.attributes.STR).toBe(ownStr);
+    });
   });
 
   describe('createCharacter', () => {

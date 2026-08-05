@@ -18,3 +18,20 @@
 6. 技能的 `requiredWeaponType`（如三連射的【需裝備弓】）是**實際限制**，
    由 `scriptRunner.ts` 的 `meetsWeaponRequirement()` 在腳本選招時擋下，
    不可退化成只在 tooltip／Wiki 顯示的裝飾字
+
+---
+
+## 99.2 進行中的分階段計畫（印記系統，完成後刪除本節）
+
+規格見 `46-sigil.md`。
+
+- [x] P1 設計文件：新增 `46-sigil.md`；連動更新 `07-affix.md`、`30-items.md`、
+      `27-drop-table.md` § 27.8、`13-town.md`（§ 13.3 設施清單 ＋ § 13.13 印記師）、
+      `43-wiki-system.md`、`INDEX.md`
+- [x] P2 資料層：`itemSeeds.ts` 加 4 種印記（id 147~150）、`dropSeeds.ts` 加 Lv.31+
+      區域與 Boss 掉落條目、印記圖示 SVG ＋ CREDITS
+- [x] P3 系統層：`models/sigil.ts` —— 四種印記的純函式與可用性判定
+- [x] P4 UI：`components/town/SigilMaster.tsx`、`TownView.tsx` 設施註冊、
+      三張城鎮地圖 JSON 的 NPC、Wiki 印記段落
+- [x] P5 測試：`models/__tests__/sigil.test.ts`、掉落 seed 覆蓋率測試、
+      `townMaps.test.ts` 的設施清單

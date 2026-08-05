@@ -79,7 +79,7 @@ export function CharacterStats() {
   const critRate0 = 5 + bonuses.crit_rate;
   const critDamage = 200 + bonuses.crit_damage;
   const attackPower = bonuses.attack_power;
-  const attackElemental = bonuses.attack_elemental;
+  const attackElemental = bonuses.element_brand;
   const skillElemental = bonuses.skill_elemental;
   const cooldownReduction = getSkillCooldownReduction(char, gearList, activeEffects);
   const healEffect = bonuses.heal_effect;

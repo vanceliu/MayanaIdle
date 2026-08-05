@@ -234,28 +234,24 @@ describe('combat system', () => {
       expect(result.damage).toBe(30);
     });
 
-    it('should apply attack_elemental affix only when weapon has element', () => {
+    it('元素刻印的乘區只在刻印帶著屬性時生效', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.1);
       const char = createTestCharacter();
       const monster = createTestMonster({ defense: 0 });
 
-      // No element — attack_elemental should NOT apply
-      const weaponNoElem = createTestWeapon({
-        smallMonsterDamage: 20,
-        affixes: [{ type: 'attack_elemental', tier: 3, value: 11 }],
-      });
-      const r1 = calculatePlayerAttack(char, weaponNoElem, monster, [weaponNoElem]);
-      // base = 20 + 7 = 27, no element → 27
+      // 沒有刻印 → 無屬性，拿不到乘區
+      const weaponNoBrand = createTestWeapon({ smallMonsterDamage: 20 });
+      const r1 = calculatePlayerAttack(char, weaponNoBrand, monster, [weaponNoBrand]);
+      // base = 20 + 7 = 27
       expect(r1.damage).toBe(27);
 
-      // With element — attack_elemental should apply
-      const weaponElem = createTestWeapon({
+      // 有刻印 → 賦予火屬性並吃到乘區
+      const weaponBrand = createTestWeapon({
         smallMonsterDamage: 20,
-        element: 'fire',
-        affixes: [{ type: 'attack_elemental', tier: 3, value: 11 }],
+        affixes: [{ type: 'element_brand', tier: 3, value: 11, element: 'fire' }],
       });
-      const r2 = calculatePlayerAttack(char, weaponElem, monster, [weaponElem]);
-      // base = 20 + 7 = 27, attack_elem: floor(27 * 1.11) = 29
+      const r2 = calculatePlayerAttack(char, weaponBrand, monster, [weaponBrand]);
+      // base = 20 + 7 = 27, 刻印乘區: floor(27 * 1.11) = 29
       expect(r2.damage).toBe(29);
     });
 

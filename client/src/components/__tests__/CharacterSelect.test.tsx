@@ -7,6 +7,9 @@ import { useGameStore } from '../../stores/gameStore';
  * @vitest-environment jsdom
  */
 
+/** 角色卡顯示的屬性 = 建角配點 + Lv.51+ 配點（不含裝備／buff，§ 20.10） */
+const ATTRS = { STR: 18, AGI: 12, VIT: 16, SPI: 10, INT: 14, CHA: 10 };
+
 describe('CharacterSelect', () => {
   beforeEach(() => {
     useGameStore.setState({
@@ -29,8 +32,8 @@ describe('CharacterSelect', () => {
   it('should show character info in filled slots', () => {
     useGameStore.setState({
       characterList: [
-        { id: 1, name: 'Knight1', className: 'knight', level: 10 },
-        { id: 2, name: 'Mage1', className: 'elementalist', level: 5 },
+        { id: 1, name: 'Knight1', className: 'knight', level: 10, attributes: ATTRS },
+        { id: 2, name: 'Mage1', className: 'elementalist', level: 5, attributes: ATTRS },
       ],
     });
     render(<CharacterSelect />);
@@ -47,6 +50,34 @@ describe('CharacterSelect', () => {
     expect(createButtons).toHaveLength(2);
   });
 
+  it('每個角色卡都列出職業、等級與六項屬性', () => {
+    useGameStore.setState({
+      characterList: [
+        { id: 1, name: '夏天好熱', className: 'elf', level: 42, attributes: ATTRS },
+      ],
+    });
+    const { container } = render(<CharacterSelect />);
+
+    expect(screen.getByText('妖精')).toBeDefined();
+    expect(screen.getByText('Lv.42')).toBeDefined();
+
+    const slot = container.querySelector('.character-slot.filled') as HTMLElement;
+    const pairs = Array.from(slot.querySelectorAll('.slot-attribute')).map(el => el.textContent);
+    expect(pairs).toEqual(['STR18', 'AGI12', 'VIT16', 'SPI10', 'INT14', 'CHA10']);
+  });
+
+  it('屬性列與角色資訊同屬可點擊的進入遊戲區塊', () => {
+    const selectCharacter = vi.fn();
+    useGameStore.setState({
+      characterList: [{ id: 7, name: 'Hero', className: 'knight', level: 1, attributes: ATTRS }],
+      selectCharacter,
+    } as never);
+    const { container } = render(<CharacterSelect />);
+
+    fireEvent.click(container.querySelector('.slot-attributes') as HTMLElement);
+    expect(selectCharacter).toHaveBeenCalledWith(7);
+  });
+
   it('should navigate to create screen on empty slot click', () => {
     render(<CharacterSelect />);
     fireEvent.click(screen.getAllByText('建立新角色')[0]);
@@ -56,7 +87,7 @@ describe('CharacterSelect', () => {
   it('should show delete button for each character', () => {
     useGameStore.setState({
       characterList: [
-        { id: 1, name: 'Hero', className: 'knight', level: 1 },
+        { id: 1, name: 'Hero', className: 'knight', level: 1, attributes: ATTRS },
       ],
     });
     render(<CharacterSelect />);
@@ -69,7 +100,7 @@ describe('CharacterSelect', () => {
     function setupOneCharacter() {
       const deleteCharacter = vi.fn().mockResolvedValue(undefined);
       useGameStore.setState({
-        characterList: [{ id: 1, name: 'Hero', className: 'knight', level: 1 }],
+        characterList: [{ id: 1, name: 'Hero', className: 'knight', level: 1, attributes: ATTRS }],
         deleteCharacter,
       } as never);
       return deleteCharacter;
