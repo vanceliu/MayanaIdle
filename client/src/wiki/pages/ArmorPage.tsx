@@ -46,7 +46,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
   const filtered = useMemo(() => {
     let list = armors;
     if (slotFilter !== 'all') list = list.filter(a => a.slot === slotFilter);
-    // § 6A.8：以裝備階級 tier 篩選
+    // `06-equipment-acquire.md` § 6A.1：以裝備階級 tier 篩選
     if (craftTierFilter !== 'all') {
       const wanted = Number(craftTierFilter);
       list = list.filter(a => a.tier === wanted);

@@ -136,9 +136,9 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
     });
 
     it('既有角色背包素材名稱在新配方或系統中仍有效', async () => {
-      // 鐵匠製作止於 T5（T6/T7 為掉落限定，§ 6A.8.0），因此配方只用到銀與米索利兩種基底。
+      // 鐵匠製作止於 T5（T6/T7 為掉落限定，`06-equipment-acquire.md` § 6A.1），因此配方只用到銀與米索利兩種基底。
       // 奧里哈魯根碎片等頂級素材在頂級配方移除後**暫時只剩賣店價值**，
-      // 這是已知的待補缺口（見 `06-equipment-balance.md` § 6A.8.6「孤兒素材」）。
+      // 這是已知的待補缺口（見 `06-equipment-acquire.md` § 6A.3「T6 的材料就是原本的孤兒素材」）。
       const craftMaterials = ['銀礦石', '米索利碎片'];
       const craftSeeds = EQUIPMENT_SEEDS.filter(s => s.craftMaterials && s.craftMaterials.length > 0);
 
@@ -166,10 +166,10 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
     });
 
     it('重新 seed 不會影響既有裝備 instance', async () => {
-      const template = await db.equipmentTemplates.where('name').equals('銀騎士之劍').first();
+      const template = await db.equipmentTemplates.where('name').equals('霜紋劍').first();
       await db.equipmentInstances.add({
         templateId: template!.id!,
-        name: '銀騎士之劍',
+        name: '霜紋劍',
         type: 'sword',
         slot: 'rightHand',
         isTwoHanded: false,
@@ -188,7 +188,7 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
       await loadTemplateCache();
 
       const instances = await db.equipmentInstances.toArray();
-      const myWeapon = instances.find(i => i.name === '銀騎士之劍');
+      const myWeapon = instances.find(i => i.name === '霜紋劍');
       expect(myWeapon).toBeDefined();
       expect((myWeapon as any).quality).toBe(15);
       expect((myWeapon as any).enhancement).toBe(5);

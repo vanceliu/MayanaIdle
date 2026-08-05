@@ -1,5 +1,5 @@
 /**
- * 項鍊與戒指重建（§ 6A.8.11）。
+ * 項鍊與戒指重建。
  *
  * 飾品跟腰帶一樣不吃「全身防禦目標」（§ 6A.8.7），它們一律不提供防禦，
  * 價值在 HP／MP、回血／回魔與額外屬性。
@@ -100,7 +100,7 @@ function fieldsFor(spec: Spec, kind: 'necklace' | 'ring'): string[] {
     // 純屬性：不帶 HP／MP，只有屬性（T6 項鍊六種屬性各一條）
     out.push(`bonusStats: '${ATTR_ZH[spec.attr!]}+1'`, `bonusAttributes: { ${spec.attr}: 1 }`);
   } else {
-    // 屬性系一律 +1（§ 6A.8.11），並帶半量的 HP／MP 讓它跨階有成長
+    // 屬性系一律 +1，並帶半量的 HP／MP 讓它跨階有成長
     out.push(`bonusHp: ${Math.round(scale(cap.hp, spec.tier) / 2)}`,
       `bonusMp: ${Math.round(scale(cap.mp, spec.tier) / 2)}`,
       `bonusStats: '${ATTR_ZH[spec.attr!]}+1'`, `bonusAttributes: { ${spec.attr}: 1 }`);
@@ -129,7 +129,7 @@ let nextId = Math.max(...EQUIPMENT_SEEDS.map(e => e.id ?? 0)) + 1;
 const lines: string[] = [
   '',
   '  // ============ 項鍊與戒指（generateAccessorySeeds.mts）============',
-  '  // 飾品不提供防禦，價值在 HP／MP、回血回魔與額外屬性（§ 6A.8.11）。從 T2 開始。',
+  '  // 飾品不提供防禦，價值在 HP／MP、回血回魔與額外屬性。從 T2 開始。',
 ];
 for (const [kind, specs, slot] of [
   ['necklace', NECKLACES, 'necklace'], ['ring', RINGS, 'ring1'],

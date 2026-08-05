@@ -4,7 +4,7 @@ import type { ClassName } from '../../models/character';
 import type { EquipSlot } from '../../models/equipment';
 
 /**
- * 防具防禦目標（`06-equipment-balance.md` § 6A.8.7）。
+ * 防具防禦目標（`06-equipment.md` § 6A.8.7）。
  *
  * 目標定義為「頭＋胸＋手＋腳＋左手五件**全部強化到 +4**」的防禦總和。
  * 防具強化每 +1 給 1 點防禦（§ 6.10），五件 +4 固定貢獻 +20，
@@ -12,15 +12,22 @@ import type { EquipSlot } from '../../models/equipment';
  */
 const ENHANCE_BONUS = 4 * 5;
 const DEFENSE_SLOTS: EquipSlot[] = ['helmet', 'chest', 'gloves', 'boots', 'leftHand'];
+/** 四件套（不含左手）—— 左手由 `06-equipment-requirement.md` 的武器規格管，走向與件數都不同 */
+const ARMOR_SLOTS: EquipSlot[] = ['helmet', 'chest', 'gloves', 'boots'];
 
 /**
  * 全套 +4 的防禦目標（T2~T7）。
- * **防具沒有 T1** —— 新手裝已經涵蓋那個量級，商店的防具從 T2 開始賣（§ 6A.8.8）。
+ * **防具沒有 T1** —— 新手裝已經涵蓋那個量級，商店的防具從 T2 開始賣。
+ *
+ * **妖精 T7 是 81**：`06-equipment-requirement.md` 規定盾牌妖精止於 T6，
+ * 妖精又不能用魔導書、臂甲是盜賊專屬，所以妖精在 T7 沒有同階的左手裝備 ——
+ * 但目標定義從來沒要求左手同階，妖精 T7 當然是繼續戴 T6 盾（防 7），
+ * 四件套 54 ＋ 盾 7 ＋ 五件 +4 的 20 = 81。
  */
 const ARMOR_MIN_TIER = 2;
 const TARGET: Record<ClassName, number[]> = {
   knight: [40, 50, 60, 70, 80, 90],
-  elf: [39, 48, 56, 65, 73, 82],
+  elf: [39, 48, 56, 65, 73, 81],
   thief: [39, 48, 56, 65, 73, 82],
   elementalist: [38, 46, 54, 62, 69, 77],
   priest: [38, 46, 54, 62, 69, 77],
@@ -36,16 +43,27 @@ function bestDefense(cls: ClassName, slot: EquipSlot, tier: number): number {
     .map(t => t.defense ?? 0));
 }
 
+/**
+ * 左手取「該階以下**穿得到**的最好一件」——副手的階梯上限依職業各自不同
+ * （`06-equipment-requirement.md`），到頂之後角色不會空手，是繼續戴上一階。
+ */
+function bestOffhand(cls: ClassName, tier: number): number {
+  return Math.max(0, ...TIERS.filter(t => t <= tier).map(t => bestDefense(cls, 'leftHand', t)));
+}
+
 describe('防具防禦目標（§ 6A.8.7）', () => {
   it.each(Object.keys(TARGET) as ClassName[])('%s 每階全套 +4 的防禦命中目標', cls => {
     const actual = TIERS.map(tier =>
-      DEFENSE_SLOTS.reduce((sum, slot) => sum + bestDefense(cls, slot, tier), 0) + ENHANCE_BONUS);
+      ARMOR_SLOTS.reduce((sum, slot) => sum + bestDefense(cls, slot, tier), 0)
+      + bestOffhand(cls, tier) + ENHANCE_BONUS);
     expect(actual).toEqual(TARGET[cls]);
   });
 
-  it('防禦最高的是騎士、最低的是布甲職業', () => {
+  // 以**四件套**比較 —— 左手的有無由武器規格決定（妖精 T7 沒有副手），
+  // 混進來會讓「重甲 > 輕甲 > 布甲」的比較失去意義。
+  it('防禦最高的是騎士、最低的是布甲職業（四件套）', () => {
     const total = (cls: ClassName, tier: number) =>
-      DEFENSE_SLOTS.reduce((sum, slot) => sum + bestDefense(cls, slot, tier), 0);
+      ARMOR_SLOTS.reduce((sum, slot) => sum + bestDefense(cls, slot, tier), 0);
     for (const tier of TIERS) {
       expect(total('knight', tier)).toBeGreaterThanOrEqual(total('elf', tier));
       expect(total('elf', tier)).toBeGreaterThanOrEqual(total('elementalist', tier));
@@ -62,13 +80,13 @@ describe('防具防禦目標（§ 6A.8.7）', () => {
   });
 
   // T1~T2 的防禦目標只有 1~3 點，三種定位的落差表達不出來，硬湊第三件只會產出
-  // 被完全支配的廢品（例：T1 頭盔「1 防、零附加」對上「1 防、+1 屬性」）。§ 6A.8.3
+  // 被完全支配的廢品（例：T1 頭盔「1 防、零附加」對上「1 防、+1 屬性」）。
   const minOptions = (tier: number) => (tier === 2 ? 1 : tier === 3 ? 2 : 3);
 
-  it('每個職業每個防禦部位每階至少有 1~3 件可選', () => {
+  it('每個職業每個防禦部位每階至少有 1~3 件可選（不含左手，§ 6A.8.8）', () => {
     const gaps: string[] = [];
     for (const cls of Object.keys(TARGET) as ClassName[]) {
-      for (const slot of DEFENSE_SLOTS) {
+      for (const slot of ARMOR_SLOTS) {
         for (const tier of TIERS) {
           const n = REAL.filter(t => t.tier === tier && t.slot === slot
             && (!t.requiredClass || (t.requiredClass as ClassName[]).includes(cls))).length;
@@ -98,12 +116,14 @@ describe('防具防禦目標（§ 6A.8.7）', () => {
     expect(over).toEqual([]);
   });
 
-  it('T4 以上每個 (職業, 部位, 階級) 三種定位都湊得齊（§ 6A.8.8）', () => {
+  // 左手（盾牌／魔導書／臂甲）改由 `06-equipment-requirement.md` 的武器規格決定走向
+  // （防禦／SPI／AGI），不套 「防禦／續戰／屬性」三定位。
+  it('T4 以上每個 (職業, 部位, 階級) 三種定位都湊得齊（§ 6A.8.8，不含左手）', () => {
     const roleOf = (t: (typeof REAL)[number]) =>
       t.bonusAttributes ? '屬性' : (t.hpRegen || t.mpRegen || t.bonusHp || t.bonusMp) ? '續戰' : '防禦';
     const missing: string[] = [];
     for (const cls of Object.keys(TARGET) as ClassName[]) {
-      for (const slot of DEFENSE_SLOTS) {
+      for (const slot of ARMOR_SLOTS) {
         for (let tier = 4; tier <= 7; tier++) {
           const roles = new Set(REAL
             .filter(t => t.tier === tier && t.slot === slot
@@ -161,7 +181,7 @@ describe('防具防禦目標（§ 6A.8.7）', () => {
     expect(worse).toEqual([]);
   });
 
-  it('商店售價落在該階區間內，且與素質同向（§ 6A.8.9）', () => {
+  it('商店售價落在該階區間內，且與素質同向（`06-equipment-acquire.md` § 6A.2）', () => {
     const RANGE: Record<string, Record<number, [number, number]>> = {
       armor: { 2: [5000, 8000], 3: [9000, 15000] },
       weapon: { 2: [5000, 7000], 3: [8000, 10000] },
@@ -187,7 +207,7 @@ describe('防具防禦目標（§ 6A.8.7）', () => {
     expect(withDefense).toEqual([]);
   });
 
-  it('腰帶：T1~T5 不給防禦，T6 起給 1 點（§ 6A.8.10）', () => {
+  it('腰帶：T1~T5 不給防禦，T6 起給 1 點（`35-inventory-constraints.md` § 35.1）', () => {
     const bad = REAL
       .filter(t => t.slot === 'belt')
       .filter(t => (t.defense ?? 0) !== (t.tier! >= 6 ? 1 : 0))

@@ -8,7 +8,7 @@ import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
  *
  * **唯一來源是 `EQUIPMENT_SEEDS.craftMaterials`**，不可另建素材→配方對照表：
  * 配方由 `client/scripts/assignCraftMaterials.mts` 產生，手維護的表必然漂移
- * （`99-ai-constraints.md` 第 86 條）。
+ * （`06-equipment-acquire.md` § 6A.3）。
  */
 export interface CraftedEquipment {
   name: string;

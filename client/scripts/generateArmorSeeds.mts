@@ -19,7 +19,7 @@ const WRITE = process.argv.includes('--write');
 /**
  * 每個 (職業, 部位, tier) 的最低可選件數。
  * T1~T2 的防禦目標只有 1~3 點，撐不出三種定位的落差，硬湊第三件只會產出
- * 被完全支配的廢品，所以降為 2 件（§ 6A.8.3）。
+ * 被完全支配的廢品，所以降為 2 件。
  */
 /** 防具沒有 T1（新手裝涵蓋該量級）；T2 一件、T3 兩件、T4 以上三件 */
 const minPerCombo = (tier: number) => (tier <= 1 ? 0 : tier === 2 ? 1 : tier === 3 ? 2 : 3);
@@ -133,7 +133,7 @@ let nextId = Math.max(...EQUIPMENT_SEEDS.map(e => e.id ?? 0)) + 1;
 const lines: string[] = [
   '',
   '  // ============ 防具補齊（generateArmorSeeds.mts）============',
-  '  // 讓「每個職業 × 每個部位 × 每個 tier」至少有 2~3 件可選（§ 6A.8.3）',
+  '  // 讓「每個職業 × 每個部位 × 每個 tier」至少有 2~3 件可選',
   '  // 三條路線：heavy（騎士）／light（妖精・盜賊）／robe（元素師・牧師）',
 ];
 for (const a of added) {

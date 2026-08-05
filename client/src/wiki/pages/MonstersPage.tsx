@@ -239,7 +239,7 @@ function BossDropSection({ bossName }: { bossName: string }) {
             {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
               if (isEquip && d.equipmentPool === 'all') {
-                // § 6A.8：掉落池以裝備階級 tier 表示
+                // `06-equipment-acquire.md` § 6A.1：掉落池以裝備階級 tier 表示
                 const tierParam = String(d.tier ?? '');
                 const tierLabel = d.tier != null ? `裝備Tier ${d.tier}` : '';
                 return [
@@ -320,7 +320,7 @@ function AreaDropSection({ area }: { area: string }) {
             {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
               if (isEquip && d.equipmentPool === 'all') {
-                // § 6A.8：掉落池以裝備階級 tier 表示
+                // `06-equipment-acquire.md` § 6A.1：掉落池以裝備階級 tier 表示
                 const tierParam = String(d.tier ?? '');
                 const tierLabel = d.tier != null ? `裝備Tier ${d.tier}` : '';
                 return [

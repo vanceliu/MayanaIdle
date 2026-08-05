@@ -66,7 +66,7 @@ describe('裝備額外屬性 seed 資料一致性', () => {
   it('bonusAttributes 與 bonusStats 顯示字串完全對應', () => {
     const bad: string[] = [];
     for (const t of withEither) {
-      // 格式為「力量+2」或「力量+2、敏捷-1」（一正一負，見 § 99.1 第 35 條）
+      // 格式為「力量+2」或「力量+2、敏捷-1」（一正一負）
       const expected: Record<string, number> = {};
       for (const part of t.bonusStats!.split('、')) {
         const m = /^(.+?)([+-]\d+)$/.exec(part);
@@ -80,7 +80,7 @@ describe('裝備額外屬性 seed 資料一致性', () => {
     expect(bad).toEqual([]);
   });
 
-  it('遵守 99-ai-constraints 第 35 條：一正一負、正 ≤ +2、負 ≥ −2', () => {
+  it('遵守 § 6A.8.8：一正一負、正 ≤ +2、負 ≥ −2', () => {
     for (const t of withEither) {
       const values = Object.values(t.bonusAttributes!) as number[];
       const positives = values.filter(v => v > 0);
@@ -183,7 +183,10 @@ describe('裝備額外屬性在戰鬥中生效', () => {
   });
 
   it('INT +2 讓技能傷害多 5% 技能威力', () => {
-    // § 20.6：每 2 點 +5% → INT 10 有效 10 → +25%；INT 12 有效 12 → +30%
+    // § 20.6：INT 每 2 點 +10%（`20-attributes.md` § 20.6）→ INT 10 → +50%；INT 12 → +60%
+    // § 21.4：技能側再 × 0.5，武器白字 (10+10)/2 × 0.2 = 2
+    //   INT 10 → floor((100 + 50) × 0.5 + 2) = 77
+    //   INT 12 → floor((100 + 60) × 0.5 + 2) = 82
     const char = createCharacter();
     const monster = createMonster();
     const plain = createItem();
@@ -194,8 +197,8 @@ describe('裝備額外屬性在戰鬥中生效', () => {
     try {
       const a = calculateSkillAttack(char, 100, 'none', monster, [plain]);
       const b = calculateSkillAttack(char, 100, 'none', monster, [buffed]);
-      expect(a.damage).toBe(125);
-      expect(b.damage).toBe(130);
+      expect(a.damage).toBe(77);
+      expect(b.damage).toBe(82);
     } finally {
       Math.random = orig;
     }
@@ -224,14 +227,15 @@ describe('§ 20.6 INT 的兩個作用', () => {
     Math.random = () => 0.99; // 不暴擊
     try {
       // 技能威力 100，INT 0 / 20 / 21（有效 20）/ 40
+      // § 20.6：每 2 點 +10%；§ 21.4：技能側 × 0.5，再加武器白字 (10+10)/2 × 0.2 = 2
       const at = (int: number) => calculateSkillAttack(
         createCharacter({ baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: int, CHA: 1 } }),
         100, 'none', monster, gear,
       ).damage;
-      expect(at(0)).toBe(100);
-      expect(at(20)).toBe(150);  // 20 / 2 × 5% = +50%
-      expect(at(21)).toBe(150);  // 有效 20，與 20 相同
-      expect(at(40)).toBe(200);  // 40 / 2 × 5% = +100%
+      expect(at(0)).toBe(52);    // (100 + 0) × 0.5 + 2
+      expect(at(20)).toBe(102);  // 20 / 2 × 10% = +100% → (100 + 100) × 0.5 + 2
+      expect(at(21)).toBe(102);  // 有效 20，與 20 相同
+      expect(at(40)).toBe(152);  // 40 / 2 × 10% = +200% → (100 + 200) × 0.5 + 2
     } finally {
       Math.random = orig;
     }
@@ -263,8 +267,9 @@ describe('§ 20.6 INT 的兩個作用', () => {
 describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
   it('基礎魔法的攻擊技能威力皆為調整後的值', () => {
     const expected: Record<string, number> = {
-      'wind-blade': 7, 'ice-bolt': 7, 'flame-arrow': 14, 'holy-bolt': 14,
-      'ice-lance': 26, 'flame-pillar': 38, 'meteor-shower': 59,
+      // 1~4 級已回復 nerf 前的原值（前期補償），5 級以上維持 ×0.7
+      'wind-blade': 10, 'ice-bolt': 10, 'flame-arrow': 20, 'holy-bolt': 20,
+      'ice-lance': 38, 'flame-pillar': 38, 'meteor-shower': 59,
       'divine-thunder': 70, 'apocalypse-flame': 70, 'ultimate-ray': 77,
     };
     for (const [id, power] of Object.entries(expected)) {

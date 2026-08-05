@@ -49,7 +49,7 @@ export function useDropSourceForItem(itemName: string): DropTableEntry[] {
   return DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === item.id);
 }
 
-/** 掉落池的裝備池標籤（§ 6A.8：階級以「裝備Tier N」表示） */
+/** 掉落池的裝備池標籤（`06-equipment-acquire.md` § 6A.1：階級以「裝備Tier N」表示） */
 export function getDropPoolLabel(tier: number | undefined, pool: string | undefined): string {
   const poolLabel = pool === 'weapon' ? '武器' : pool === 'armor' ? '防具' : '裝備';
   return tier == null ? `${poolLabel}（隨機）` : `裝備Tier ${tier} ${poolLabel}（隨機）`;

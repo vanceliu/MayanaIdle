@@ -70,7 +70,7 @@
 
 | 效果 | 公式 |
 |---|---|
-| 魔法攻擊加成 | 每 2 點 **+5%**（見 20.6） |
+| 魔法攻擊加成 | 每 2 點 **+10%**（見 20.6） |
 | 冷卻縮減 | 每 2 點 **+1%**（見 20.6，與詞綴／buff 加總後上限 50%） |
 
 ### 魅力 (CHA)
@@ -138,22 +138,20 @@
 
 智力提供魔法技能的傷害加成：
 
-公式：`魔法傷害 = 技能攻擊力 + 技能攻擊力 × (有效智力 / 2 × 5%)`
+公式：`INT加成 = floor(技能攻擊力 × (有效智力 / 2 × 10%))`
 
 有效智力為取最小偶數後的值。
 
 範例：
 
 ```text
-智力 18，風刃（攻擊力 7）：
-加成 = 18 / 2 × 5% = 45%
-魔法傷害 = 7 + floor(7 × 0.45) = 7 + 3 = 10
+智力 18，風刃（攻擊力 10）：
+加成 = 18 / 2 × 10% = 90% → floor(10 × 0.90) = 9
 ```
 
 ```text
 智力 40，天雷（攻擊力 70）：
-加成 = 40 / 2 × 5% = 100%
-魔法傷害 = 70 + 70 = 140
+加成 = 40 / 2 × 10% = 200% → 140
 ```
 
 ### 20.6.2 冷卻縮減
@@ -166,10 +164,6 @@
 ```text
 智力 40 → 20%；再加上強化冷卻縮減 buff（40%）→ 60% → clamp 至 50%
 ```
-
-> **實作對應**：`combat.ts` 的 `INT_SKILL_DAMAGE_PERCENT_PER_2 = 5`、
-> `INT_COOLDOWN_PERCENT_PER_2 = 1`、`COOLDOWN_REDUCTION_CAP = 50`，
-> 聚合函式為 `getIntCooldownReduction()` 與 `getSkillCooldownReduction()`。
 
 ## 20.7 負重系統
 
@@ -189,7 +183,7 @@
 ### 腰帶負重加成
 
 腰帶同時提供**擴充背包格數**的效果（`35-inventory-constraints.md` § 35.1），兩者並存。
-完整階梯見 `06-equipment-balance.md` § 6A.8.10。
+完整階梯見 `06-equipment-armor.md`（由 seed 產生）與 `35-inventory-constraints.md` § 35.1。
 
 | 裝備Tier | 腰帶 | 負重+ | 背包格 |
 |---|---|---|---|
@@ -224,8 +218,6 @@
   玩家才知道自己為什麼打不出去。
   訊息頻率等同出手頻率（受攻擊冷卻限制），不會每個 frame 洗版。
 - 詳細狀態面板有「負重」欄位，超重時數值轉紅並顯示 ⚠。
-- 實作：`client/src/systems/weight.ts`，戰鬥端在
-  `arpgEngine.ts` 發出 `overweight_blocked` 事件，測試見 `weight.test.ts`。
 
 ## 20.8 屬性與職業關聯
 
@@ -275,7 +267,7 @@ VIT/SPI 超過 18 後，升級 HP/MP 成長公式不變（`random(VIT-6, VIT-3)`
 
 ## 20.10 屬性的三個來源
 
-角色的**總屬性**由三個來源相加（`models/character.ts` 的 `getTotalAttributes`）：
+角色的**總屬性**由三個來源相加：
 
 ```
 總屬性 = 建角配點（baseAttributes）+ 升級配點（bonusAttributes）+ 裝備額外屬性 + buff
@@ -292,16 +284,14 @@ VIT/SPI 超過 18 後，升級 HP/MP 成長公式不變（`random(VIT-6, VIT-3)`
 
 升級 HP/MP 成長是**永久**的，而裝備與 buff 可隨時更換。
 若計入，玩家可在升級前換上高 VIT 裝備刷永久血量。
-因此 `levelUp.ts` 的 `getTotalAttributes(updated)` **刻意不傳裝備**。
+因此升級結算時**刻意不計入裝備**。
 
-### 實作對應
+### 裝備額外屬性在哪些地方生效
 
-`getTotalAttributes(char, activeEffects?, equippedGear?)` 的第三個參數為選填：
-
-| 呼叫端 | 傳 gear？ | 理由 |
+| 用途 | 計入裝備？ | 理由 |
 |---|---|---|
-| `combat.ts`（傷害／命中／迴避／魔抗） | ✅ | 裝備額外屬性必須生效 |
-| `regen.ts`（回血／回魔） | ✅ | 同上 |
-| `CharacterStats.tsx` / `StatusPanel.tsx` | ✅ | 面板要與實際戰鬥一致 |
-| `levelUp.ts`（HP/MP 成長） | ❌ | 見上方說明 |
-| `AttributeUpModal.tsx` / `gameStore.spendAttributePoint`（配點上限） | ❌ | 上限只約束建角＋升級配點 |
+| 傷害／命中／迴避／魔抗 | ✅ | 裝備額外屬性必須生效 |
+| 回血／回魔 | ✅ | 同上 |
+| 狀態面板顯示 | ✅ | 面板要與實際戰鬥一致 |
+| 升級的 HP/MP 成長 | ❌ | 見上方說明 |
+| 配點上限判定 | ❌ | 上限只約束建角＋升級配點 |

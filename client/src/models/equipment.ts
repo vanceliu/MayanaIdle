@@ -53,7 +53,6 @@ export const SLOT_NAMES: Record<EquipSlot, string> = {
 
 export type WeaponType =
   | 'sword'
-  | 'dagger'
   | 'axe'
   | 'mace'
   | 'staff'
@@ -79,7 +78,7 @@ export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' |
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
 
 /**
- * 裝備階級（`06-equipment-balance.md` § 6A.8）。單一刻度取代舊的 shopTier／craftTier。
+ * 裝備階級（`06-equipment-acquire.md` § 6A.1）。單一刻度取代舊的 shopTier／craftTier。
  *
  * | 分組 | Tier | 取得 | 詞綴上限 |
  * |---|---|---|---|
@@ -147,7 +146,7 @@ export interface EquipmentTemplate {
   /** 顯示用文字（如「力量+2」）。實際生效的數值一律讀 `bonusAttributes`。 */
   bonusStats?: string;
   /**
-   * 額外屬性（`06-equipment.md` § 6.8）。單一屬性、最多 +2（`99-ai-constraints.md` 第 35 條）。
+   * 額外屬性（`06-equipment.md` § 6.8）。單一屬性、最多 +2。
    * 疊加於 `baseAttributes + bonusAttributes` 之上，**不受 35 點上限限制**，
    * 也**不影響升級時的 HP/MP 成長**（見 `20-attributes.md` § 20.10）。
    */
@@ -160,7 +159,7 @@ export interface EquipmentTemplate {
   stability?: number;
   canBreak?: boolean;
   acquireType?: AcquireType;
-  /** 裝備階級 1~7（§ 6A.8）。取代 shopTier / craftTier。 */
+  /** 裝備階級 1~7（`06-equipment-acquire.md` § 6A.1）。取代 shopTier / craftTier。 */
   tier?: EquipmentTier;
   /** @deprecated 由 `tier` 取代 */
   shopTier?: ShopTier;
@@ -200,7 +199,7 @@ export interface EquipmentInstance {
   /** 顯示用文字（如「力量+2」）。實際生效的數值一律讀 `bonusAttributes`。 */
   bonusStats?: string;
   /**
-   * 額外屬性（`06-equipment.md` § 6.8）。單一屬性、最多 +2（`99-ai-constraints.md` 第 35 條）。
+   * 額外屬性（`06-equipment.md` § 6.8）。單一屬性、最多 +2。
    * 疊加於 `baseAttributes + bonusAttributes` 之上，**不受 35 點上限限制**，
    * 也**不影響升級時的 HP/MP 成長**（見 `20-attributes.md` § 20.10）。
    */

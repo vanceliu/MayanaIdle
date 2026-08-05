@@ -170,11 +170,11 @@ API 細節見 `37-statistics.md` § 37.4.3。
 
 ### 版本規則
 
-- 新建角色自動帶 `dataVersion = CURRENT_DATA_VERSION`（定義於 `config.ts`）
-- **開機時**掃描一次（`systems/dataVersionPurge.ts`），`dataVersion` 不存在或低於
+- 新建角色自動帶當前資料版本
+- **開機時**掃描一次，`dataVersion` 不存在或低於
   `CURRENT_DATA_VERSION` 的角色連同其全部附屬資料一併刪除。
   在角色選擇畫面出現之前完成，玩家看到的直接是空格，不是「點下去角色才消失」。
-- 版本升級時只需調高 `config.ts` 的 `CURRENT_DATA_VERSION`，這是打掉重來的唯一開關；
+- 版本升級時只需調高 `CURRENT_DATA_VERSION`，這是打掉重來的唯一開關；
   **不需要**也不應該動 Dexie 的 schema 版本（那是給結構遷移用的，兩者獨立）
 
 ### 清除範圍
@@ -228,7 +228,7 @@ API 細節見 `37-statistics.md` § 37.4.3。
 > 等同明文。**匯出檔要當成密碼保管**，外流等於把該角色的排行榜寫入權交出去。
 > UI 必須明示這一點。
 
-### 全域倍率（`config.ts`）
+### 全域倍率
 
 | 設定 | 預設 | 說明 |
 |---|---|---|

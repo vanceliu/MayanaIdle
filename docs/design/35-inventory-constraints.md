@@ -39,7 +39,7 @@
 | T7 | 星辰腰帶（智力+2、防禦 1） | Boss 掉落 | +20 | **70** |
 | T7 | 幻影腰帶（敏捷+2、防禦 1） | Boss 掉落 | +20 | **70** |
 
-腰帶的定位與其他防具不同：**不吃全身防禦目標**（`06-equipment-balance.md` § 6A.8.7），
+腰帶的定位與其他防具不同：**不吃全身防禦目標**（`06-equipment.md` § 6A.8.7），
 價值在背包格數與負重。T1~T4 純粹是格數成長，T5 才開始分屬性走向，
 T6 不給屬性改給 1 點防禦，T7 是屬性與防禦兼具。
 
@@ -66,8 +66,6 @@ T6 不給屬性改給 1 點防禦，T7 是屬性與防禦兼具。
 - **禁止換上**：力之腰帶（+15）換成皮腰帶（+5）時，若背包超過 55 格 → 阻擋
 - 玩家必須先清空背包到足夠空間才能卸下／換裝，系統**不自動丟棄任何物品**
 
-> 實作對應：`gameStore.ts` 的 `wouldOverflowBag()`，由 `unequipItem` 與 `equipItem` 共用。
-
 ---
 
 ### 35.1.3 自由放置（Drag & Drop）
@@ -89,11 +87,9 @@ T6 不給屬性改給 1 點防禦，T7 是屬性與防禦兼具。
 `slotMap: Record<itemId, slotIndex>` 只記錄被手動移動過的項目，
 其餘項目依預設順序填進剩下的空格。
 物品增減時不需要任何狀態調和，也不會有 render 期間 setState 的問題。
-
-> 實作對應：`models/bagLayout.ts` 的 `buildBagLayout()` 與 `moveBagSlot()`（純函式，可單測）；
 > `BagPanel` 只持有 `slotMap` state 與 HTML5 D&D 事件。
 
-**不做**：物品篩選／搜尋、多頁分頁（`99-ai-constraints.md` 第 57 條）、位置持久化到 DB。
+**不做**：物品篩選／搜尋、多頁分頁（本文件 § 35.1.3）、位置持久化到 DB。
 
 ---
 
@@ -119,8 +115,6 @@ T6 不給屬性改給 1 點防禦，T7 是屬性與防禦兼具。
 - tooltip 提示跟著狀態走：未選取顯示「點擊選取」，選取後顯示「再點一次使用／裝備／卸下」。
 - 快捷鍵列與拖曳不受影響，仍是單一動作。
 
-實作：`BagPanel.tsx`（`selectedId`）、`EquipmentPanel.tsx`（`selectedSlot`）。
-
 ---
 
 ## 35.2 負重系統
@@ -145,25 +139,21 @@ T6 不給屬性改給 1 點防禦，T7 是屬性與防禦兼具。
 - 判定受攻擊冷卻限制，所以訊息頻率等同出手頻率，不會每個 frame 洗版
 - 裝備在身上的東西一樣計重 —— 否則「全部穿起來」就能繞過上限
 
-實作：`client/src/systems/weight.ts`；戰鬥端由 `arpgEngine.ts` 發出
-`overweight_blocked` 事件，`PixiGame.tsx` 寫進戰鬥記錄。
-
-
 ## 35.3 背包已滿處理規則
 
 ### 35.3.1 容量檢查時機（所有入口必查）
 
 | 入口 | 已滿時行為 |
 |------|------------|
-| 怪物掉落（`gameStore.ts` dropQueue） | 丟棄掉落物，戰鬥日誌顯示「背包已滿」 |
-| 武器商店購買（`WeaponShop.tsx` `buyWeapon`） | 禁止購買，顯示提示 |
-| 防具商店購買（`ArmorShop.tsx` `buyArmor`） | 禁止購買，顯示提示 |
-| 雜貨店購買（`GeneralStore.tsx` `canAddToBag` + `buyBagItem`） | 禁止購買，顯示提示 |
-| 鐵匠鋪製作（`TownBlacksmith.tsx` `handleCraft`） | 禁止製作，顯示提示 |
-| 魔法學院製作（`MagicAcademy.tsx`） | 禁止製作，顯示提示 |
-| 倉庫取出（`Storage.tsx` `withdrawEquip` / `withdrawMaterial`） | 禁止取出，顯示提示 |
-| 脫下裝備（`gameStore.ts` `unequipItem`） | 禁止脫下，顯示提示「背包已滿，無法卸除裝備」 |
-| 職業工會任務獎勵（`gameStore.ts` `completeQuest`） | 禁止交任務，顯示提示 |
+| 怪物掉落 | 丟棄掉落物，戰鬥日誌顯示「背包已滿」 |
+| 武器商店購買 | 禁止購買，顯示提示 |
+| 防具商店購買 | 禁止購買，顯示提示 |
+| 雜貨店購買 | 禁止購買，顯示提示 |
+| 鐵匠鋪製作 | 禁止製作，顯示提示 |
+| 魔法學院製作 | 禁止製作，顯示提示 |
+| 倉庫取出 | 禁止取出，顯示提示 |
+| 脫下裝備 | 禁止脫下，顯示提示「背包已滿，無法卸除裝備」 |
+| 職業工會任務獎勵 | 禁止交任務，顯示提示 |
 
 ### 35.3.2 堆疊例外
 
@@ -260,10 +250,6 @@ T6 不給屬性改給 1 點防禦，T7 是屬性與防禦兼具。
 - 數量會夾在 `1 ~ 持有量`，輸入異常值不會產生 0 或負數
 - 確認後寫入戰鬥日誌：`丟棄了 {名稱} ×{數量}`（數量 1 時不加後綴）
 - **丟棄後無法復原**，視窗須明示
-
-> 實作對應：`gameStore` 的 `pendingDiscard` / `requestDiscard` / `cancelDiscard` / `confirmDiscard`；
-> 視窗為 `DiscardConfirmModal`；拖曳負載編解碼在 `models/bagLayout.ts`。
-
 > **與右鍵選單的差異**：右鍵「丟棄」是既有的快捷路徑，固定丟 1 個且不確認；
 > 拖到地圖則走本節的數量 + 確認流程。
 
@@ -423,8 +409,6 @@ Tooltip 會依狀態顯示「點一次選取」或「再點一次使用」。
 `quickSlots` 從 `(PotionType | null)[]`（5 格）改為結構化的 `QuickSlotEntry`（10 格）。
 `normalizeQuickSlots()` 會把舊的 `'red'` 轉成 `{ kind: 'potion', potionType: 'red' }`
 並補齊到 10 格；無法辨識的值直接丟棄。
-
-> 實作對應：`models/quickSlot.ts`（純函式，可單測）、`gameStore` 的
 > `assignQuickSlot` / `useQuickSlot`、`QuickSlotBar` 元件。
 
 ### 35.7.8 目前無背包面板快捷鍵
@@ -698,4 +682,3 @@ interface EquipmentInstance {
 - `16-tech-frontend-architecture.md`（BagPanel 元件規格）
 - `18-data-schema.md`（資料結構）
 - `34-ui-guidelines.md`（顯示規範）
-- `99-ai-constraints.md`（總限制）

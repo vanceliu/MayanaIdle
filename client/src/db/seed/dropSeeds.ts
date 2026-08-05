@@ -815,7 +815,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   { id: 154, bossName: '百柱死神', itemType: 'item', itemTemplateId: 9, dropValue: 50, minAmount: 1, maxAmount: 1 },
   { id: 155, bossName: '百柱死神', itemType: 'item', itemTemplateId: 10, dropValue: 50, minAmount: 1, maxAmount: 1 },
 
-  // T7 裝備：僅 Lv.57 以上的高階 Boss 掉落，武器與防具各 0.01%（§ 6A.8.0）
+  // T7 裝備：僅 Lv.57 以上的高階 Boss 掉落，武器與防具各 0.01%（`06-equipment-acquire.md` § 6A.1）
   { id: 822, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },
   { id: 823, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 0.1, tier: 7 },
   { id: 824, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 0.1, tier: 7 },

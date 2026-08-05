@@ -8,7 +8,7 @@ const STARTER_MAX_LEVEL = 30;
 const STARTER_ENHANCE_COST = 500;
 
 /**
- * 新手裝名單**只有一個來源**：seed 的 `acquireType: 'starter'`（`99-ai-constraints.md` 第 82 條）。
+ * 新手裝名單**只有一個來源**：seed 的 `acquireType: 'starter'`（`99-ai-constraints.md` 第 4 條）。
  * 不另外維護硬編名單 —— 以前用中文名字查表，同名的舊模板殘留在 IndexedDB 時會撈到舊資料。
  * 沒有 `requiredClass` 的（皮腰帶）視為全職業共用。
  */

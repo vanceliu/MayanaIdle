@@ -1,6 +1,6 @@
 # 28. 怪物素質表
 
-> 本表由 `client/src/db/seed/monsterSeeds.ts` 產生，**以該檔為準**。
+> 本表由 seed 資料產生。
 > 怪物的種族／體型／元素／debuff 見 `25-monster-system.md` § 25.8。
 
 ## 28.1 數值成長曲線

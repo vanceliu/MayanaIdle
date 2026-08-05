@@ -24,16 +24,6 @@
 | tier7ArmorsLooted | T7 防具掉落數 | 累計掉落取得的 T7 防具數（含盾牌／魔導書／臂甲） |
 | contribution | 貢獻度 | 冒險者工會當前貢獻點數（含任務獲得與退出扣除的淨值） |
 
-> **T7 只在 BOSS 掉落**（`06-equipment-balance.md` § 6A.8.0：T7 維持純 Boss 掉落，不可製作），
-> 因此這兩個欄位等同「BOSS 極品運氣」的累計紀錄，製作與購買永遠不會使它們增加。
->
-> **武器／防具的分界依裝備類型，不依欄位**：盾牌／魔導書／臂甲雖佔手部欄位，
-> 但性質是防禦裝備，計入 `tier7ArmorsLooted`。這與詞綴系統的分界一致
-> （`07-affix.md` § 7.6：這三種走防具池），玩家只需記一套規則。
->
-> 掉落池的 `equipmentPool: 'weapon'` 是**取得管道**的分類（依手部欄位），
-> 與此處的分類刻意不同：從武器池掉出的 T7 盾牌仍計入防具。
-
 ---
 
 ## 37.2 資料結構
@@ -55,9 +45,6 @@ interface CharacterStatistics {
 }
 ```
 
-> **`contribution` 不在此介面內**：貢獻度存於 `guildProgress.points`（見 `36-quest-system.md` § 36.4），
-> 上傳排行榜時才與統計欄位合併送出。§ 37.1 之所以列出它，是因為它同樣是排行榜欄位。
-
 ---
 
 ## 37.3 計數時機
@@ -77,10 +64,6 @@ interface CharacterStatistics {
 | tier7WeaponsLooted | 掉落系統：掉出 tier 7 武器時 +1 |
 | tier7ArmorsLooted | 掉落系統：掉出 tier 7 防具（含副手）時 +1 |
 | contribution | 任務系統：完成任務時加上該任務貢獻點數；退出任務時扣除等量貢獻點數 |
-
-> **背包已滿被丟棄的 T7 仍然計數**：這兩個欄位記錄的是「BOSS 掉出過幾件」，
-> 不是「現在身上有幾件」。背包容量是玩家自己的管理問題，
-> 若因背包滿而不計，同樣的運氣會因無關的狀態而消失。
 
 ---
 
@@ -122,16 +105,6 @@ CREATE TABLE character_stats (
 );
 ```
 
-> **新增統計欄位不必提高 `data_version`**：舊資料列的新欄位預設 0，舊客戶端不送這兩個值
-> 也只會寫入 0 —— 兩者都不會產生錯誤的數字。跳號反而會觸發客戶端的
-> `dataVersionPurge` 清掉所有現有角色（見 § 37.4.8 與限制 73），代價遠大於收益。
-> 對既有的 D1 表以 `ALTER TABLE ... ADD COLUMN` 補欄位並補建 index 即可。
-
-> **`character_id` 必須是 uuid**：IndexedDB 的自增 `id` 在每個瀏覽器各自從 1 開始，
-> 用它當 PK 會讓所有玩家的第一隻角色互相覆蓋。見 `18-data-schema.md`。
->
-> **14 個排行欄位皆須建 index**：snapshot 對每個欄位各跑一次 `ORDER BY <field> DESC LIMIT N`。
-
 ### 37.4.3 API 端點
 
 | 方法 | 路徑 | Turnstile | 說明 |
@@ -159,14 +132,6 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 刻意不做定值時間比較：存的是 hash，就算靠時間差問出 hash 也無法反推 token
 （需要 SHA-256 preimage）。
 
-> **為何非得驗密鑰不可**：`character_id` 在 `/api/snapshot` 中公開回傳。
-> 若 upsert 不驗證所有權，任何人都能抄一個 uuid 把他人的統計覆寫成任意值。
-> 這正是舊版「UPDATE-only + Turnstile」擋不住的漏洞 ——
-> 舊版的名稱唯一機制只擋得住搶名字，擋不住這個。
-
-> **不再有 `/api/name-check` 與 `/api/character/register`**：名稱不要求唯一之後
-> 兩者都沒有存在意義，且 `name-check` 是唯一無 Turnstile 又直接查 D1 的端點。
-
 `character_name` 每次上傳都更新（名稱非唯一，不存在改名頂替問題），
 但**必須在伺服端重新驗證格式**（規則見 `19-account-character.md` § 19.4）。
 
@@ -183,9 +148,6 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 **為何客戶端切出的名次等同全球真實名次**：設回傳集合為 S，對任一欄位 f，S ⊇ f 的真實 top-N。
 客戶端把 S 依 f 排序取前 N 時，S 中不屬於真實 top-N 的 row，其 f 值必定 ≤ 第 N 名，
 只會落在 N 名之後。因此結果與總玩家數無關，**不會因為玩家變多而失準**。
-
-> **不可改成「取全表前 X 筆」**：任何單一順序的截斷都會讓其他 13 個榜單漏掉真正的前段班
-> （例如久未上線但「武器爆掉數」第一的玩家）。
 
 **同分序必須決定性**：伺服端 `ORDER BY <field> DESC, character_id ASC`，
 客戶端 `buildBoard` 使用相同比較子，否則邊界名次會在兩端之間跳動。
@@ -238,15 +200,12 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 ### 37.4.8 資料版本與舊角色清理
 
 `character_stats` 帶有 `data_version` 欄位，Worker 內建一份 `CURRENT_DATA_VERSION`
-常數（必須與客戶端 `config.ts` 一致，跟著 `wrangler deploy` 上線）。
+常數（必須與客戶端一致，跟著部署上線）。
 
 | 端點 | 對舊版本資料的行為 |
 |---|---|
 | `GET /api/snapshot` | 只回傳現行版本 → 被淘汰的角色自動從排行榜消失 |
 | `POST /api/stats` | 只寫入現行版本；客戶端版本不符回 409 `outdated_client` |
-
-> **清理只有「版本本身的效果」這一種**，由伺服端依 `data_version` 自行判定，
-> 客戶端不能指定要清掉哪一批，也沒有單筆刪除的端點（見 § 37.4.9）。
 
 名稱不再唯一之後，版本淘汰**不需要處理名稱回收** —— 名稱從來沒有被佔住。
 
@@ -257,10 +216,6 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 
 代價是榜上會留下不再更新的資料列，直到 `CURRENT_DATA_VERSION` 跳號才清掉。
 名稱不唯一，所以這**不影響任何人取名或上榜**，純粹是顯示上的殘留。
-
-> **不可為了清掉這些殘留而加回刪除端點。** 憑 `character_id` 刪除等於任何人
-> 都能刪別人的角色（它在 snapshot 中公開）；而憑密鑰刪除又得多一個寫入端點，
-> 換來的只有美觀。
 
 舊版客戶端（快取到舊 bundle）會收到 409，無法再寫入 —— 這是刻意的，
 提高資料版本即代表舊資料已失效。

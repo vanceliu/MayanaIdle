@@ -1,11 +1,11 @@
 /**
- * TTK（擊殺時間）校準工具 —— `06-equipment-balance.md` § 6A.8.12。
+ * TTK（擊殺時間）校準工具 —— `44-dps-prediction.md` § 44.7。
  *
  * 目的：在「合適等級 × 合適裝備」下量測各職業對一般怪與 Boss 的擊殺秒數，
  * 用來反推武器傷害帶、防具防禦帶與怪物素質縮放係數。
  *
  * 目標區間（使用者確認）：
- *   一般怪 2~6 秒、Boss 30~50 秒
+ *   一般怪 **20 秒內**（不設下限）、Boss **25~50 秒**
  *
  * 設計原則（沿用 `simulateReaperKill.mts`）：
  *  - **直接 import `src/systems/combat.ts` 的真實函式**，不重寫任何傷害公式
@@ -82,7 +82,7 @@ function argOf(name: string): string | undefined {
 
 const RUNS = Number(argOf('runs') ?? 300);
 /**
- * 校準 profile（§ 6A.8.12）：
+ * 校準 profile（`44-dps-prediction.md` § 44.7）：
  *  - `god`（預設）：**神裝** —— +9 強化、該階梯詞綴上限、滿 buff（含加速），打**弱怪**。
  *    2~5 秒的農法手感只在這個條件下成立。
  *  - `base`：+0 強化、無加速 buff、打同級怪。用來觀察「裝備不夠力」時的手感，
@@ -98,8 +98,10 @@ const ONLY_CLASS = argOf('class') as ClassName | undefined;
  * 對法系而言武器基傷影響極小，因此改解「裝備魔攻」（技能傷害的固定值加算來源）。
  */
 const SOLVE = process.argv.includes('--solve');
+/** `--weapon-type=<type>`：強制只考慮某一種武器類型，用來比較同職業的不同流派 */
+const ONLY_WEAPON_TYPE = argOf('weapon-type');
 /** 求解的目標 TTK（秒）。一般怪取 2~6 的中位、Boss 取 30~50 的中位。 */
-const SOLVE_NORMAL_TARGET = Number(argOf('target-normal') ?? 4);
+const SOLVE_NORMAL_TARGET = Number(argOf('target-normal') ?? 15);
 const SOLVE_BOSS_TARGET = Number(argOf('target-boss') ?? 40);
 
 /** PixiJS ticker 60fps —— 行動只在幀邊界觸發 */
@@ -109,9 +111,10 @@ const DOT_TICK_MS = 1000;
 /** 打不死就中止 */
 const TIMEOUT_MS = 5 * 60 * 1000;
 
-const TTK_NORMAL_MIN = 2;
-const TTK_NORMAL_MAX = 5;
-const TTK_BOSS_MIN = 30;
+/** 目標區間（使用者確認）：一般怪 ≤20s、Boss 25~50s。一般怪不設下限 —— 打太快不是問題 */
+const TTK_NORMAL_MIN = 0;
+const TTK_NORMAL_MAX = 20;
+const TTK_BOSS_MIN = 25;
 const TTK_BOSS_MAX = 50;
 
 const CLASSES: ClassName[] = ['knight', 'elf', 'elementalist', 'priest', 'thief'];
@@ -127,9 +130,9 @@ interface Stage {
   /** 該階梯的「合適等級」—— 取區域等級帶的中位 */
   level: number;
   acquire: 'shop' | 'craft';
-  /** 裝備階級（§ 6A.8）。T1~T3 商店、T4~T7 鐵匠 */
+  /** 裝備階級（`06-equipment-acquire.md` § 6A.1）。T1~T3 商店、T4~T7 鐵匠 */
   tier: number;
-  /** 該階梯裝備的詞綴 Tier 上限（商店 T3 為 § 6A.8.0） */
+  /** 該階梯裝備的詞綴 Tier 上限（商店 T3 為 `06-equipment-acquire.md` § 6A.1） */
   affixTier: number;
   /** 同級一般怪的等級帶（`--profile=base` 用） */
   monsterLevel: [number, number];
@@ -140,11 +143,11 @@ interface Stage {
   weakMonsterLevel: [number, number];
   /**
    * 對照用的 Boss 名稱。`null` = 該等級帶依設計就沒有 Boss。
-   * 新手區（Lv.1~29）不設 Boss 是既有設計（§ 6A.8.12），不是缺口。
+   * 新手區（Lv.1~29）不設 Boss 是既有設計（`44-dps-prediction.md` § 44.7），不是缺口。
    */
   bossName: string | null;
   /**
-   * 新手期（§ 6A.8.12）：前期不應有難度，因此只設上限、不設下限 ——
+   * 新手期（`44-dps-prediction.md` § 44.7）：前期不應有難度，因此只設上限、不設下限 ——
    * 打得比 2 秒更快是可接受的，不算偏離。
    */
   newbie?: boolean;
@@ -154,7 +157,7 @@ interface Stage {
  * 等級與區域的對應見 `09-dungeon.md`；Boss 對應見 `28-monster-stats.md`。
  * 商店三階對應 Lv.1~30 的新手中立區，製作三階對應 Lv.30~60。
  *
- * **Boss 選擇原則**（§ 6A.8.12）：Boss 不是可以一直刷的等級，
+ * **Boss 選擇原則**（`44-dps-prediction.md` § 44.7）：Boss 不是可以一直刷的等級，
  * 因此一律挑「高於該階梯農怪等級帶」的挑戰目標，而不是同級 Boss。
  * 目前 Boss 等級上限為 Lv.60，故 craft-top 只能取同級中最硬的百柱死神。
  */
@@ -276,9 +279,20 @@ function toInstance(t: MonsterTemplate): MonsterInstance {
   } as MonsterInstance;
 }
 
+/**
+ * `--fixed=<等級帶>`（例：`--fixed=46-52`）：所有階梯都打**同一隻**代表怪。
+ *
+ * 預設模式的對照怪會跟著階梯一起變強，量到的是「節奏對不對」；
+ * 要看「換上下一階裝備到底變強多少」，必須固定目標 —— 這是「每階要有成長感」的量法。
+ */
+const FIXED = argOf('fixed');
+const FIXED_RANGE: [number, number] | null = FIXED
+  ? (FIXED.split('-').map(Number) as [number, number])
+  : null;
+
 /** 取該等級帶的一般怪代表值：HP／防禦取中位數，避免被單一極端怪帶偏 */
 function representativeNormal(stage: Stage): MonsterInstance {
-  const [lo, hi] = IS_GOD ? stage.weakMonsterLevel : stage.monsterLevel;
+  const [lo, hi] = FIXED_RANGE ?? (IS_GOD ? stage.weakMonsterLevel : stage.monsterLevel);
   const pool = MONSTER_SEEDS.filter(m => !m.isBoss && m.level >= lo && m.level <= hi);
   if (pool.length === 0) throw new Error(`${stage.id}: 找不到 Lv.${lo}~${hi} 的一般怪`);
   const median = <T>(arr: T[], f: (x: T) => number): number => {
@@ -348,10 +362,14 @@ function pickWeapon(className: ClassName, stage: Stage): EquipmentTemplate {
   const isCaster = className === 'elementalist' || className === 'priest';
   const usable = (t: EquipmentTemplate) =>
     t.slot === 'rightHand' && t.type !== 'armor' && canUse(t, className)
+    && (!ONLY_WEAPON_TYPE || t.type === ONLY_WEAPON_TYPE)
     && (!isCaster || CASTER_WEAPON_TYPES.has(String(t.type)));
 
   const score = (t: EquipmentTemplate): number => {
-    const dmg = ((t.smallMonsterDamage ?? 0) + (t.largeMonsterDamage ?? 0)) / 2;
+    // 雙刀與鋼爪一次攻擊打兩下（`21-combat-formula.md` § 21.4），基傷只有其他雙手武器的一半 ——
+    // 不乘上打擊次數的話，評分會誤判成「雙持比較弱」而挑到單手武器。
+    const hits = t.type === 'dualBlade' || t.type === 'claw' ? 2 : 1;
+    const dmg = (((t.smallMonsterDamage ?? 0) + (t.largeMonsterDamage ?? 0)) / 2 + (t.extraAttack ?? 0)) * hits;
     // 法系以「回魔 + 附加智力 + 基傷」排序，貼近實際選裝邏輯
     return isCaster
       ? dmg + (t.mpRegen ?? 0) * 0.5 + (t.bonusAttributes?.INT ?? 0) * 5
@@ -383,9 +401,33 @@ interface Loadout {
   missing: string[];
 }
 
-function buildLoadout(className: ClassName, stage: Stage): Loadout {
+/**
+ * 每個武器類型取一把代表（型內以素質排序是安全的 —— 同類型的技能輪替相同）。
+ * 跨類型**不可**用素質比較：三連射需裝備弓、雙刀與鋼爪打兩下，
+ * 這些都不在素質欄位裡，只能靠實測。呼叫端會逐一模擬後挑最快的。
+ */
+function weaponCandidatesByType(className: ClassName, stage: Stage): EquipmentTemplate[] {
+  const isCaster = className === 'elementalist' || className === 'priest';
+  const usable = (t: EquipmentTemplate) =>
+    t.slot === 'rightHand' && t.type !== 'armor' && canUse(t, className)
+    && (!ONLY_WEAPON_TYPE || t.type === ONLY_WEAPON_TYPE)
+    && (!isCaster || CASTER_WEAPON_TYPES.has(String(t.type)));
+  const cands = EQUIPMENT_SEEDS.filter(t => usable(t) && inStage(t, stage));
+  if (cands.length === 0) return [pickWeapon(className, stage)];
+  const best = new Map<string, EquipmentTemplate>();
+  for (const t of cands) {
+    const key = String(t.type);
+    const cur = best.get(key);
+    const val = (x: EquipmentTemplate) => ((x.smallMonsterDamage ?? 0) + (x.largeMonsterDamage ?? 0)) / 2 + (x.extraAttack ?? 0)
+      + (isCaster ? (x.mpRegen ?? 0) * 0.5 + (x.bonusAttributes?.INT ?? 0) * 5 : 0);
+    if (!cur || val(t) > val(cur)) best.set(key, t);
+  }
+  return [...best.values()];
+}
+
+function buildLoadout(className: ClassName, stage: Stage, forced?: EquipmentTemplate): Loadout {
   const missing: string[] = [];
-  const wTpl = pickWeapon(className, stage);
+  const wTpl = forced ?? pickWeapon(className, stage);
   const weapon = makeItem(wTpl, WEAPON_AFFIXES, stage.affixTier, ENHANCE);
   const gear: (EquipmentInstance | null)[] = [weapon];
 
@@ -831,12 +873,27 @@ function solvePower(
 
 function run(stage: Stage, className: ClassName): Result {
   const char = buildCharacter(className, stage.level);
-  const loadout = buildLoadout(className, stage);
   const effects = preCombatBuffs(className, stage.level);
-  const weaponType = String(loadout.weapon.type);
-  const candidates = buildRotation(className, stage.level, weaponType);
-
   const normal = representativeNormal(stage);
+
+  // 逐武器類型實測，挑真正最快的 —— 素質排序看不到三連射與雙持（見 weaponCandidatesByType）
+  const probeRuns = Math.max(20, Math.floor(RUNS / 5));
+  let loadout!: Loadout;
+  let candidates!: RotationEntry[];
+  let bestTtk = Infinity;
+  for (const tpl of weaponCandidatesByType(className, stage)) {
+    const lo = buildLoadout(className, stage, tpl);
+    const rot = buildRotation(className, stage.level, String(lo.weapon.type));
+    const mp = effectiveMaxMp(char, lo.gear);
+    const rg = getMpRegen(char, true, lo.gear, effects);
+    const t = measureTTK(char, lo, rot, effects, normal, mp, rg, 11_000 + stage.level, probeRuns, true);
+    if (Number.isFinite(t) && t < bestTtk) { bestTtk = t; loadout = lo; candidates = rot; }
+  }
+  if (!loadout) {
+    loadout = buildLoadout(className, stage);
+    candidates = buildRotation(className, stage.level, String(loadout.weapon.type));
+  }
+
   const boss = bossOf(stage);
   const maxMp = effectiveMaxMp(char, loadout.gear);
   const regen = getMpRegen(char, true, loadout.gear, effects);

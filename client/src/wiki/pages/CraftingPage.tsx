@@ -3,7 +3,7 @@ import { useWeaponList, useArmorList } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
 import '../components/WikiTable.css';
 
-// § 6A.8：製作品階級為 T4~T7（中階 T4~T5 / 高階 T6~T7）
+// `06-equipment-acquire.md` § 6A.1：製作品階級為 T4~T7（中階 T4~T5 / 高階 T6~T7）
 const TIER_LABELS: Record<number, string> = {
   4: '裝備Tier 4（中階）',
   5: '裝備Tier 5（中階）',

@@ -357,7 +357,7 @@ interface PlayerDotEffect {
 
 - **位置**：地圖 canvas 內、上方置中浮動（`.monster-list-overlay`）
 - **組件**：`<MonsterListOverlay>`
-- **顯示範圍**：地圖上現存的怪全部顯示，一隻一張卡片（同時存在上限 10 隻，見 `99-ai-constraints.md` 第 34 條），順序依生成順序
+- **顯示範圍**：地圖上現存的怪全部顯示，一隻一張卡片（同時存在上限 10 隻，見 `26-spawn-pressure.md`），順序依生成順序
 - **卡片內容**（僅這三項，不顯示等級與 HP 數值）：
   - 怪物名稱
   - HP 條（百分比長度）
@@ -376,7 +376,7 @@ interface PlayerDotEffect {
 
 - **主力素材**：[Game-icons.net](https://game-icons.net)（CC BY 3.0，4180+ 遊戲專用 SVG）
 - **UI 補充**：Lucide Icons（ISC License，通用 UI icon）
-- **整合方式**：下載 SVG 至 `client/src/assets/icons/`，透過 `<GameIcon>` 統一元件渲染
+- **整合方式**：SVG 內嵌，透過統一元件渲染
 - **顏色控制**：SVG fill 以 CSS currentColor 驅動，適配 dark fantasy 主題
 
 ### 24.8.5 戰鬥日誌整合
@@ -466,14 +466,11 @@ Buff 技能的 `buffDuration` 必須在介面上看得到 —— 現有值橫跨
 | Wiki 技能表（通用魔法 + 職業技能） | 「持續」欄，緊鄰「冷卻(秒)」 |
 | 魔法學院 / 職業工會 | 附在 MP／射程後面 |
 
-規則（`formatBuffDuration()`，`models/skill.ts` 為唯一實作）：
+規則：
 
 - 只有 `type: 'buff'` 且 `buffDuration > 0` 才顯示
 - **瞬發淨化不顯示**：聖光術是 `buffDuration: 0` + `cleanse: true`，那不是漏填
 - `heal` 沒有持續時間
 - 60 秒以上且為整分鐘改寫成分鐘（300s →「5 分鐘」），其餘用秒
 
-> 這個欄位補上之前存在一個不對稱：攻擊技能**附加的 debuff** 早就顯示持續時間
-> （「附加: 減速(…, 6s)」），buff 自己的卻沒有 —— 同一份 tooltip 看得到自己造成的
-> 減速幾秒、看不到自己身上的增益幾秒。
 

@@ -19,22 +19,15 @@ MayanaIdle 瑪雅那Idle是一款以 Web 為主要平台的放置型 ARPG（Idle
 所有設計規格存放於 `docs/design/`。
 
 - **索引文件**：`docs/design/INDEX.md` — 依功能/依限制快速查找表
-- **AI 限制**：`docs/design/99-ai-constraints.md` — 104 條硬性限制
+- **AI 限制**：`docs/design/99-ai-constraints.md` — 6 條設計文件查不到的硬性規則
 - **MVP 順序**：`docs/design/17-mvp-priority.md` — 五階段優先順序，Phase 3 已完成
 - **排除系統**：`docs/design/15-excluded.md` — 不做的功能
 
-## AI 生成內容核心限制（摘要）
+## 規則寫在哪裡
 
-完整版見 `99-ai-constraints.md`，以下為最常違反的幾條：
-
-1. 不要設計成推關制放置 RPG
-2. 不要加入離線收益、轉生系統、付費系統、被動技能
-3. 裝備必須使用左手/右手雙欄位，雙手武器佔用另一隻手
-4. 武器強化失敗 = 武器消失（見 `06-equipment.md` § 6.9）
-5. 防具強化失敗 = 防具消失（見 `06-equipment.md` § 6.10）
-6. 武器強化與防具強化是兩套獨立系統，成功率公式不同
-7. 回城必須消耗回城卷軸
-8. 死亡後傳送至最近城鎮，停留不自動回去
+**每條規則只有一個出處。** 規格一律寫在對應的設計文件，不在別處重述 ——
+重述必然與來源不同步。查規則的入口只有 `INDEX.md`，
+`99-ai-constraints.md` 只收「設計文件裡查不到」的規則。
 
 ## 技術棧
 

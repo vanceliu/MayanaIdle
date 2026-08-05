@@ -6,7 +6,7 @@ import { getTierGroup } from '../../models/equipmentTier';
 import type { EquipmentTemplate } from '../../models/equipment';
 
 /**
- * 裝備階級 tier 1~7 的結構性不變式（`06-equipment-balance.md` § 6A.8）。
+ * 裝備階級 tier 1~7 的結構性不變式（`06-equipment-acquire.md` § 6A.1）。
  *
  * 這些測試取代舊的「人工檢查製作品是否強過商店天花板」——
  * 只要 tier 遞增即代表素質遞增，違反時直接失敗。
@@ -16,7 +16,7 @@ const REAL = EQUIPMENT_SEEDS.filter(t => t.acquireType !== 'starter');
 
 /** 該裝備的主要素質指標。鈍器／雙手斧以大怪傷害為準（§ 6A.4） */
 function powerOf(t: EquipmentTemplate): number {
-  // 左手裝備的防禦刻意封頂在 4（§ 6A.8.7），成長曲線改由格擋率／魔法攻擊承擔
+  // 左手裝備的防禦刻意壓低（封頂 8，`06-equipment.md` § 6A.8.7），成長曲線改由格擋率／魔法攻擊承擔
   if (t.type === 'shield' || t.type === 'armGuard') return t.blockRate ?? 0;
   if (t.type === 'magicBook') return t.magicAttack ?? 0;
   if (t.type === 'armor') return t.defense ?? 0;
@@ -98,14 +98,14 @@ describe('掉落池的 tier 標記', () => {
  *
  */
 /**
- * T6/T7 為掉落限定（§ 6A.8.0）：
+ * T6/T7 為掉落限定（`06-equipment-acquire.md` § 6A.1）：
  *  - T6 僅一般怪物掉落，T7 僅 Boss 掉落
  *  - 鐵匠的製作階梯止於 T5
  *
  */
 describe('T6/T7 掉落限定', () => {
   it('鐵匠製作止於 T6', () => {
-    // T6 開放了一半可製作（§ 6A.8.0），讓 Lv.57 以上的頂級材料有出口；
+    // T6 開放了一半可製作（`06-equipment-acquire.md` § 6A.1），讓 Lv.57 以上的頂級材料有出口；
     // 掉落池以 tier 比對，所以那些 T6 仍然照掉。T7 維持純 Boss 掉落。
     const tooHigh = REAL
       .filter(t => t.acquireType === 'craft' && t.tier! > MONSTER_DROP_ONLY_TIER)
@@ -154,6 +154,63 @@ describe('T6/T7 掉落限定', () => {
   });
 });
 
+/**
+ * 每個武器類型 × 每個 tier **至少 2 把**，T7 例外可為 1 把。
+ *
+ * 這條規則原本只寫在文件裡，沒有任何東西在守 —— 結果 T4 一度**完全沒有雙手武器**
+ * （雙手劍／雙手斧／雙手法杖／雙刀／鋼爪五種全空），雙刀與鋼爪連 T3 也空。
+ * 玩家練到那一階時雙手流派會斷層，只能退回單手，傷害不升反降。
+ *
+ * 下面「tier 素質單調遞增」那條抓不到，因為它逐類型比相鄰階的天花板：
+ * **空格沒有資料可比，就靜默跳過**。缺格必須由本條負責。
+ */
+describe('每類型每階的件數下限', () => {
+  const WEAPON_TYPES = [...new Set(REAL.filter(t => t.smallMonsterDamage != null).map(t => t.type))];
+  /** T1 是新手裝專屬階級（`06-equipment-acquire.md` § 6A.1），不在此規則內 */
+  const TIERS = [2, 3, 4, 5, 6, 7];
+
+  it('沒有任何 (類型 × 階梯) 是空的', () => {
+    const empty: string[] = [];
+    for (const type of WEAPON_TYPES)
+      for (const tier of TIERS)
+        if (!REAL.some(t => t.type === type && t.tier === tier)) empty.push(`${type} T${tier}`);
+    expect(empty).toEqual([]);
+  });
+
+  /**
+   * **平衡不准靠新增武器解決**，因此「每類型每階至少 2 把」
+   * 只是理想值，不設測試 —— 它只能靠新增達成。硬規則只有「不得為空」（上一條）。
+   *
+   * 另一條硬規則：**沒人會用的武器不留**。同類型中若有低階武器在
+   * 小怪／大怪傷害與命中上完全壓過高階武器，該高階武器要刪掉，不是補數值。
+   */
+  it('沒有任何武器被同類型的低階武器完全壓過', () => {
+    const weapons = REAL.filter(t => t.smallMonsterDamage != null);
+    const total = (t: EquipmentTemplate) => ({
+      s: (t.smallMonsterDamage ?? 0) + (t.extraAttack ?? 0),
+      l: (t.largeMonsterDamage ?? 0) + (t.extraAttack ?? 0),
+    });
+    const classesOf = (t: EquipmentTemplate) => new Set(t.requiredClass?.length ? t.requiredClass : ['*']);
+    const shares = (a: EquipmentTemplate, b: EquipmentTemplate) => {
+      const A = classesOf(a), B = classesOf(b);
+      return A.has('*') || B.has('*') || [...A].some(x => B.has(x));
+    };
+    const dominated: string[] = [];
+    for (const hi of weapons) {
+      const H = total(hi);
+      for (const lo of weapons) {
+        if (lo.type !== hi.type || lo.tier! >= hi.tier! || !shares(hi, lo)) continue;
+        const L = total(lo);
+        if ((lo.attackSuccess ?? 0) < (hi.attackSuccess ?? 0)) continue;
+        if (L.s >= H.s && L.l >= H.l && (L.s > H.s || L.l > H.l)) {
+          dominated.push(`T${hi.tier} ${hi.name} 被 T${lo.tier} ${lo.name} 壓過`);
+        }
+      }
+    }
+    expect([...new Set(dominated)]).toEqual([]);
+  });
+});
+
 describe('tier 素質單調遞增', () => {
   it('每個武器類型內，tier N+1 的天花板 > tier N', () => {
     const types = [...new Set(REAL.filter(t => t.type !== 'armor').map(t => t.type))];
@@ -170,6 +227,42 @@ describe('tier 素質單調遞增', () => {
         const cur = byTier.get(tiers[i])!;
         if (cur <= prev) {
           violations.push(`${type}: T${tiers[i]}(${cur}) <= T${tiers[i - 1]}(${prev})`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  /**
+   * 上一條只看 `powerOf()` 的**單一**主軸（鈍器／雙手斧看大怪，其餘看小怪），
+   * 因此另一條軸的倒置會整條漏掉 —— 鋼爪 T6 死神之爪 L12 vs T7 虛空之爪 L11
+   * 就是這樣溜過去的：T7 招牌鋼爪打大怪比 T6 弱。
+   *
+   * 這裡補上「兩條軸都不得倒置」。**打平是允許的**（現有資料有 5 處次要軸打平：
+   * 匕首 T3→T4、單手鈍器 T1→T2 與 T4→T5、弓 T3→T4 與 T6→T7），
+   * 嚴格遞增仍只要求主軸，由上一條負責。
+   */
+  it('每個武器類型內，小怪與大怪傷害的天花板都不得倒置', () => {
+    const weapons = REAL.filter(t => t.smallMonsterDamage != null);
+    const types = [...new Set(weapons.map(t => t.type))];
+    const violations: string[] = [];
+
+    for (const type of types) {
+      for (const [axis, pick] of [
+        ['小怪', (t: EquipmentTemplate) => t.smallMonsterDamage ?? 0],
+        ['大怪', (t: EquipmentTemplate) => t.largeMonsterDamage ?? 0],
+      ] as const) {
+        const byTier = new Map<number, number>();
+        for (const t of weapons.filter(x => x.type === type)) {
+          byTier.set(t.tier!, Math.max(byTier.get(t.tier!) ?? 0, pick(t)));
+        }
+        const tiers = [...byTier.keys()].sort((a, b) => a - b);
+        for (let i = 1; i < tiers.length; i++) {
+          const prev = byTier.get(tiers[i - 1])!;
+          const cur = byTier.get(tiers[i])!;
+          if (cur < prev) {
+            violations.push(`${type} ${axis}: T${tiers[i]}(${cur}) < T${tiers[i - 1]}(${prev})`);
+          }
         }
       }
     }

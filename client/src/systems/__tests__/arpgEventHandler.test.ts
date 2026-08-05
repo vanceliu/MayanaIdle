@@ -107,10 +107,11 @@ describe('processPlayerAttack', () => {
       },
     );
 
-    // 魔力奪取威力 17（§ 23.5）+ INT 加成 floor(17 × (18/2 × 5%)) = 7 → 24
-    expect(result.damages[0].damage).toBe(24);
-    expect(result.mpRestored).toBe(24);
-    expect(useGameStore.getState().character!.mp).toBe(34);
-    expect(result.logs).toContainEqual({ text: '魔力奪取 回復 24 MP', type: 'player' });
+    // 魔力奪取威力 17（§ 23.5）+ INT 加成 floor(17 × (18/2 × 10%)) = 15
+    // § 21.4：技能側 (17 + 15) × 0.5 = 16，未裝備武器 → 白字 0
+    expect(result.damages[0].damage).toBe(16);
+    expect(result.mpRestored).toBe(16);
+    expect(useGameStore.getState().character!.mp).toBe(26);
+    expect(result.logs).toContainEqual({ text: '魔力奪取 回復 16 MP', type: 'player' });
   });
 });

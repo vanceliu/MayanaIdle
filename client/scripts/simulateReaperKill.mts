@@ -76,6 +76,9 @@ function withSeed<T>(seed: number, fn: () => T): T {
 
 const RUNS = 10_000;
 
+/** 回魔技（魔力奪取）的施放門檻：MP 低於上限的這個比例才放 */
+const MP_DRAIN_THRESHOLD = 0.3;
+
 /**
  * 可切換的規則組（`--rules=<name>`），用來評估數值調整的假設。
  *
@@ -317,22 +320,6 @@ type AffixType = 'attack_power' | 'attack_elemental' | 'skill_elemental' | 'crit
 const T7 = 20;
 const QUALITY = 20;
 
-function makeItem(templateName: string, enhancement: number, affixTypes: AffixType[]): EquipmentInstance {
-  const tpl = EQUIPMENT_SEEDS.find(t => t.name === templateName);
-  if (!tpl) throw new Error(`找不到裝備模板：${templateName}`);
-  const bonusAttributes = tpl.bonusAttributes ? { ...tpl.bonusAttributes, INT: 0 } : tpl.bonusAttributes;
-  return {
-    ...tpl,
-    bonusAttributes,
-    templateId: tpl.id!,
-    quality: QUALITY,
-    enhancement,
-    affixes: affixTypes.map(type => ({ type, tier: 7, value: T7 })),
-    ownerId: 1,
-    equipped: true,
-  } as EquipmentInstance;
-}
-
 /**
  * 防具／飾品／**魔導書**完全沒有攻擊詞綴（`affix.ts` § 7.6），對本戰只影響防禦與 MP 池。
  * 魔導書走 armor 池是遊戲規則，不是本腳本的假設。
@@ -346,44 +333,95 @@ interface Loadout {
   gear: (EquipmentInstance | null)[];
 }
 
+// ---------------------------------------------------------------- BiS 自動選定（§ 44.5）
+
+type Template = (typeof EQUIPMENT_SEEDS)[number];
+
+/** 缺件報告。找不到部位時累積在這裡，最後印出來 —— 不 throw（§ 44.9） */
+const MISSING: string[] = [];
+
+const ARMOR_SLOTS = ['helmet', 'chest', 'gloves', 'boots', 'belt', 'necklace', 'ring1'] as const;
+const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
+const MAIN_STAT: Record<ClassName, keyof Attributes> = {
+  knight: 'STR', elf: 'STR', thief: 'STR', elementalist: 'INT', priest: 'INT',
+};
+
+function usableBy(t: Template, cn: ClassName): boolean {
+  return !t.requiredClass || t.requiredClass.length === 0 || t.requiredClass.includes(cn);
+}
+
+/** 腰帶安定值 −1 不可強化；飾品 +8 封頂（§ 44.1）；其餘 +9 */
+function enhancementFor(slot: string): number {
+  if (slot === 'belt') return 0;
+  if (slot === 'necklace' || slot.startsWith('ring')) return 8;
+  return 9;
+}
+
+function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[]): EquipmentInstance {
+  const bonusAttributes = tpl.bonusAttributes ? { ...tpl.bonusAttributes, INT: 0 } : tpl.bonusAttributes;
+  return {
+    ...tpl, bonusAttributes, templateId: tpl.id!, quality: QUALITY, enhancement,
+    affixes: affixTypes.map(type => ({ type, tier: 7, value: T7 })),
+    ownerId: 1, equipped: true,
+  } as EquipmentInstance;
+}
+
+/**
+ * 木樁測試下，防具／飾品／副手對**輸出**的影響只有 `bonusAttributes` 與 `magicAttack`
+ * ——它們沒有攻擊詞綴（§ 7.6），防禦與格擋在不還手的目標上不生效。
+ * 各部位彼此獨立，因此逐部位取最佳即為全域最佳，不需要跨部位窮舉。
+ */
+function scoreSupportPiece(t: Template, cn: ClassName): number {
+  const main = t.bonusAttributes?.[MAIN_STAT[cn]] ?? 0;
+  return main * 1000 + (t.magicAttack ?? 0) * 100 + (t.defense ?? 0);
+}
+
+function pickSupport(cn: ClassName, pred: (t: Template) => boolean, what: string): Template | null {
+  const pool = EQUIPMENT_SEEDS.filter(t => t.acquireType !== 'starter' && usableBy(t, cn) && pred(t));
+  if (pool.length === 0) { MISSING.push(`${CLASS_NAMES_ZH[cn]} 缺 ${what}`); return null; }
+  return pool.reduce((a, b) => (scoreSupportPiece(b, cn) > scoreSupportPiece(a, cn) ? b : a));
+}
+
+/** 防具與飾品（不含手部）—— 每個職業只需算一次 */
+function buildSupportGear(cn: ClassName): EquipmentInstance[] {
+  const out: EquipmentInstance[] = [];
+  for (const slot of ARMOR_SLOTS) {
+    const tpl = pickSupport(cn, t => t.slot === slot, slot);
+    if (!tpl) continue;
+    out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES));
+    if (slot === 'ring1') out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES)); // 兩隻戒指
+  }
+  return out;
+}
+
+function bestOffhand(cn: ClassName): Template | null {
+  return pickSupport(cn, t => OFFHAND_TYPES.has(t.type as string), '副手');
+}
+
+/** 候選手部組合：雙手武器，以及「單手武器 ＋ 該職業最佳副手」 */
+function handCombos(cn: ClassName): { label: string; weapon: Template; offhand: Template | null }[] {
+  const weapons = EQUIPMENT_SEEDS.filter(t =>
+    t.acquireType !== 'starter' && usableBy(t, cn)
+    && t.smallMonsterDamage != null && !OFFHAND_TYPES.has(t.type as string));
+  if (weapons.length === 0) { MISSING.push(`${CLASS_NAMES_ZH[cn]} 缺武器`); return []; }
+  const off = bestOffhand(cn);
+  return weapons.map(w => w.isTwoHanded
+    ? { label: `${w.name}+9（雙手）`, weapon: w, offhand: null }
+    : { label: `${w.name}+9 ＋ ${off?.name ?? '空手'}`, weapon: w, offhand: off });
+}
+
 function buildLoadout(
   label: string,
-  className: ClassName,
-  weaponName: string,
+  weapon: Template,
+  offhand: Template | null,
   weaponAffixes: AffixType[],
-  offhand: { name: string; affixes: AffixType[] } | null,
+  support: EquipmentInstance[],
 ): Loadout {
-  const weapon = makeItem(weaponName, 9, weaponAffixes);
-  const gear: (EquipmentInstance | null)[] = [weapon];
-  if (offhand) gear.push(makeItem(offhand.name, 9, offhand.affixes));
-
-  const helmet: Record<ClassName, string> = {
-    knight: '龍骨頭盔', elf: '暗影兜帽', thief: '暗影兜帽',
-    elementalist: '大賢者之冠', priest: '神官祭冠',
-  };
-  const belt: Record<ClassName, string> = {
-    knight: '力之腰帶', elf: '龍皮腰帶', thief: '暗殺者腰帶',
-    elementalist: '賢者腰帶', priest: '賢者腰帶',
-  };
-  const necklace: Record<ClassName, string> = {
-    knight: '龍心項鍊', elf: '精靈之淚', thief: '暗影墜飾',
-    elementalist: '大法師之鏈', priest: '大法師之鏈',
-  };
-  const ring: Record<ClassName, string> = {
-    knight: '龍血戒指', elf: '龍血戒指', thief: '騎士戒指',
-    elementalist: '賢者戒指', priest: '賢者戒指',
-  };
-
-  gear.push(makeItem(helmet[className], 9, ARMOR_AFFIXES));
-  gear.push(makeItem('龍鱗鎧甲', 9, ARMOR_AFFIXES));
-  gear.push(makeItem('米索利護手', 9, ARMOR_AFFIXES));
-  gear.push(makeItem('龍皮戰靴', 9, ARMOR_AFFIXES));
-  gear.push(makeItem(belt[className], 0, ARMOR_AFFIXES)); // 腰帶 stability -1，不可強化
-  gear.push(makeItem(necklace[className], 8, ARMOR_AFFIXES)); // 飾品倍率 +8 封頂
-  gear.push(makeItem(ring[className], 8, ARMOR_AFFIXES));
-  gear.push(makeItem(ring[className], 8, ARMOR_AFFIXES));
-
-  return { label, weaponName, weapon, gear };
+  const w = instantiate(weapon, 9, weaponAffixes);
+  const gear: (EquipmentInstance | null)[] = [w];
+  if (offhand) gear.push(instantiate(offhand, 9, ARMOR_AFFIXES));
+  gear.push(...support);
+  return { label, weaponName: weapon.name, weapon: w, gear };
 }
 
 // ---------------------------------------------------------------- Buff
@@ -651,8 +689,13 @@ function calibrate(
 
   const scoreOf = new Map(scores.map(s => [s.name, s.avg]));
   const order = rotation
-    .filter(e => e.kind === 'self_buff' || (scoreOf.get(e.name) ?? 0) > normalAvg)
+    // 回魔技（魔力奪取）**不以單次傷害評價** —— 它的價值是續戰資源，
+    // 用傷害門檻篩會把它整個踢掉，模擬就永遠不回魔、再回報「MP 見底」。
+    // 它排在傷害技之後，且只在 MP 低於門檻時才會被選中（見 simulateOnce）。
+    .filter(e => e.kind === 'self_buff' || e.mpDrainRatio != null || (scoreOf.get(e.name) ?? 0) > normalAvg)
     .sort((a, b) => {
+      if (a.mpDrainRatio != null && b.mpDrainRatio == null) return 1;
+      if (b.mpDrainRatio != null && a.mpDrainRatio == null) return -1;
       if (a.kind === 'self_buff' && b.kind !== 'self_buff') return -1;
       if (b.kind === 'self_buff' && a.kind !== 'self_buff') return 1;
       return (scoreOf.get(b.name) ?? 0) - (scoreOf.get(a.name) ?? 0);
@@ -757,6 +800,8 @@ function simulateOnce(
       if (!ready) return false;
       // `canUseSkill`：MP 不足就跳過這招，往下找下一個負擔得起的
       if (currentMp < e.mpCost) return false;
+      // 回魔技只在 MP 低於 30% 時才放（常駐腳本的典型條件）；MP 無限的對照組永遠不放
+      if (e.mpDrainRatio != null && (!mp.enabled || currentMp >= mp.maxMp * MP_DRAIN_THRESHOLD)) return false;
       if (e.kind === 'self_buff') {
         // buff 已在身上就不重複施放
         return !effects.some(x => x.category === e.buff!.category);
@@ -990,52 +1035,117 @@ function runScenario(
   };
 }
 
-// ---------------------------------------------------------------- 各職業配置
+// ---------------------------------------------------------------- BiS 搜尋
 
-const MELEE_AFFIXES: AffixType[] = ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'];
-const CASTER_AFFIXES: AffixType[] = ['skill_elemental', 'crit_rate', 'crit_damage', 'cooldown_reduction'];
-const CASTER_AFFIXES_SPEED: AffixType[] = ['skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'];
-const ELF_AFFIXES: AffixType[] = ['attack_power', 'attack_elemental', 'crit_rate', 'crit_damage'];
-
-const SCENARIOS: { className: ClassName; loadouts: Loadout[] }[] = [
-  {
-    className: 'knight',
-    loadouts: [
-      buildLoadout('毀滅巨斧+9（2H，對大怪 30）', 'knight', '毀滅巨斧', MELEE_AFFIXES, null),
-      buildLoadout('王者之劍+9（2H，對大怪 26）', 'knight', '王者之劍', MELEE_AFFIXES, null),
-    ],
-  },
-  {
-    className: 'elf',
-    loadouts: [
-      buildLoadout('精靈王長弓+9（普攻元素配置）', 'elf', '精靈王長弓', ELF_AFFIXES, null),
-      buildLoadout('精靈王長弓+9（攻速配置）', 'elf', '精靈王長弓', MELEE_AFFIXES, null),
-    ],
-  },
-  {
-    className: 'thief',
-    loadouts: [
-      buildLoadout('死神之爪+9（2H）', 'thief', '死神之爪', MELEE_AFFIXES, null),
-      buildLoadout('死亡宣告+9（匕首，左手空置）', 'thief', '死亡宣告', MELEE_AFFIXES, null),
-    ],
-  },
-  {
-    className: 'elementalist',
-    loadouts: [
-      buildLoadout('奧術權杖+9 ＋ 古代魔導書+9（攻速配置）', 'elementalist', '奧術權杖', CASTER_AFFIXES_SPEED, { name: '古代魔導書', affixes: ARMOR_AFFIXES }),
-      buildLoadout('奧術權杖+9 ＋ 古代魔導書+9（減CD 配置）', 'elementalist', '奧術權杖', CASTER_AFFIXES, { name: '古代魔導書', affixes: ARMOR_AFFIXES }),
-      buildLoadout('大法師長杖+9（2H，無魔導書）', 'elementalist', '大法師長杖', CASTER_AFFIXES_SPEED, null),
-    ],
-  },
-  {
-    className: 'priest',
-    loadouts: [
-      buildLoadout('大魔導法杖+9 ＋ 古代魔導書+9（攻速配置）', 'priest', '大魔導法杖', CASTER_AFFIXES_SPEED, { name: '古代魔導書', affixes: ARMOR_AFFIXES }),
-      buildLoadout('大魔導法杖+9 ＋ 古代魔導書+9（減CD 配置）', 'priest', '大魔導法杖', CASTER_AFFIXES, { name: '古代魔導書', affixes: ARMOR_AFFIXES }),
-      buildLoadout('天啟法杖+9（2H，無魔導書）', 'priest', '天啟法杖', CASTER_AFFIXES_SPEED, null),
-    ],
-  },
+/** § 7.6 武器詞綴池（7 種），4 格不重複 → C(7,4) = 35 組 */
+const WEAPON_AFFIX_POOL: AffixType[] = [
+  'attack_power', 'attack_elemental', 'skill_elemental',
+  'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction',
 ];
+/** 粗排用的取樣數（全模擬另有 RUNS） */
+const PROXY_SAMPLES = 600;
+/** 粗排後進入下一階段的組合數 */
+const TOP_HANDS = 3;
+const TOP_FINAL = 3;
+
+const SEED_AFFIXES: Record<ClassName, AffixType[]> = {
+  knight: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],
+  elf: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],
+  thief: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],
+  elementalist: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage'],
+  priest: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage'],
+};
+
+function choose4<T>(arr: T[]): T[][] {
+  const out: T[][] = [];
+  for (let a = 0; a < arr.length; a++)
+    for (let b = a + 1; b < arr.length; b++)
+      for (let c = b + 1; c < arr.length; c++)
+        for (let d = c + 1; d < arr.length; d++)
+          out.push([arr[a], arr[b], arr[c], arr[d]]);
+  return out;
+}
+
+/**
+ * 粗排指標：**單次期望傷害最高的動作 ÷ 攻擊間隔**，少量取樣。
+ *
+ * 已知偏誤：「減少冷卻時間」對單次傷害沒有貢獻，只在輪替裡有價值，
+ * 因此粗排會低估帶減CD 的組合 —— 這是前 K 名仍要跑全模擬的原因。
+ */
+function proxyDps(className: ClassName, loadout: Loadout, seed: number): number {
+  const char = buildCharacter(className);
+  const effects = preCombatBuffs(className);
+  const effInt = designEffectiveInt(className, loadout.gear);
+  const monster = makeReaper();
+  const rotation = buildRotation(className);
+  let best = 0;
+  withSeed(seed, () => {
+    let sum = 0;
+    for (let i = 0; i < PROXY_SAMPLES; i++) {
+      const r = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, effects, 0);
+      sum += r.hit ? r.damage : 0;
+    }
+    best = sum / PROXY_SAMPLES;
+    for (const e of rotation) {
+      if (e.kind === 'self_buff') continue;
+      let s = 0;
+      for (let i = 0; i < PROXY_SAMPLES; i++) {
+        if (e.kind === 'physical_skill') {
+          const fire = hasActiveFireEnchant(effects);
+          for (let h = 0; h < (e.hits ?? 1); h++) {
+            const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+            s += r.hit ? r.damage : 0;
+          }
+        } else {
+          const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+          s += r.damage;
+        }
+      }
+      best = Math.max(best, s / PROXY_SAMPLES);
+    }
+  });
+  return best / getPlayerAttackInterval(loadout.gear, effects) * 1000;
+}
+
+/** 依 § 44.5 自動選出該職業的前 TOP_FINAL 名配置 */
+function searchBis(className: ClassName): { loadouts: Loadout[]; searched: number } {
+  const support = buildSupportGear(className);
+  const hands = handCombos(className);
+  const seedSet = SEED_AFFIXES[className];
+  // **所有候選共用同一顆種子**：粗排是要比武器素質，不是比運氣。
+  // 每個候選各給一顆種子時，暴擊擲骰的雜訊（±數點）會蓋過候選之間的真實差距
+  // （例：T5 星霜杖 10/10 曾因此排在 T7 星辰權杖 18/18 之前）。
+  const PROXY_SEED = 777;
+
+  const rankedHands = hands
+    .map(h => ({ h, score: proxyDps(className, buildLoadout(h.label, h.weapon, h.offhand, seedSet, support), PROXY_SEED) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, TOP_HANDS);
+
+  const affixSets = choose4(WEAPON_AFFIX_POOL);
+  const ranked = rankedHands
+    .flatMap(({ h }) => affixSets.map(set => {
+      const lo = buildLoadout(`${h.label}｜${set.join('+')}`, h.weapon, h.offhand, set, support);
+      return { lo, score: proxyDps(className, lo, PROXY_SEED) };
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return {
+    loadouts: ranked.slice(0, TOP_FINAL).map(r => r.lo),
+    searched: hands.length + rankedHands.length * affixSets.length,
+  };
+}
+
+console.log('## BiS 自動選定（§ 44.5）\n');
+const SCENARIOS: { className: ClassName; loadouts: Loadout[] }[] = [];
+for (const cn of ['knight', 'elf', 'thief', 'elementalist', 'priest'] as ClassName[]) {
+  const { loadouts, searched } = searchBis(cn);
+  console.log(`- ${CLASS_NAMES_ZH[cn]}：粗排 ${searched} 組（手部 ${handCombos(cn).length} × 詞綴 ${choose4(WEAPON_AFFIX_POOL).length}），`
+    + `取前 ${loadouts.length} 名進全模擬 → ${loadouts.map(l => l.label).join(' / ')}`);
+  SCENARIOS.push({ className: cn, loadouts });
+}
+if (MISSING.length > 0) console.log(`\n⚠️ 缺件：${[...new Set(MISSING)].join('、')}`);
+console.log('');
 
 // ---------------------------------------------------------------- 執行
 
@@ -1074,6 +1184,22 @@ for (const { unlimited: u, limited: l } of pairs) {
     + `| ${fmt(u.mean, 2)}s | ${fmt(l.mean, 2)}s | ${delta >= 0 ? '+' : ''}${fmt(delta)}% `
     + `| ${fmt(l.median, 2)}s | ${fmt(l.p10, 2)}s | ${fmt(l.p90, 2)}s | ${fmt(l.dps)} `
     + `| ${Math.round(l.mpPerKill)} | ${l.maxMp} | ${fmt(l.mpStarvedPercent)}% |`);
+}
+
+// § 44.7 表 2：各職業最佳解摘要
+const bestPerClass = new Map<ClassName, ScenarioReport>();
+for (const { limited } of pairs) {
+  const cur = bestPerClass.get(limited.className);
+  if (!cur || limited.mean < cur.mean) bestPerClass.set(limited.className, limited);
+}
+const ordered = [...bestPerClass.values()].sort((a, b) => a.mean - b.mean);
+const slowest = ordered[ordered.length - 1].mean;
+console.log('\n## 各職業最佳解摘要（計入 MP）\n');
+console.log('| 職業 | 最佳配置 | 加速 | 擊殺 | 平均 DPS | 相對最慢 | MP 見底行動% |');
+console.log('|---|---|---|---|---|---|---|');
+for (const r of ordered) {
+  console.log(`| ${CLASS_NAMES_ZH[r.className]} | ${r.label} | ${r.speedLabel} | ${fmt(r.mean, 2)}s `
+    + `| ${fmt(r.dps)} | ${fmt(slowest / r.mean, 2)}x | ${fmt(r.mpStarvedPercent)}% |`);
 }
 
 console.log('\n## 各配置衍生數值與行動分佈（計入 MP）\n');

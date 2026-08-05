@@ -53,7 +53,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const baseExtraAttack = item.extraAttack ?? 0;
   const totalAttackSuccess = baseAttackSuccess + enhanceAttackSuccess;
   const tierColor = templates ? getEquipmentInstanceTierColor(item, templates) : '#FFFFFF';
-  // 「裝備Tier」與「詞綴 Tier」同為 1~7 但意義不同，標籤必須寫清楚（§ 6A.8）
+  // 「裝備Tier」與「詞綴 Tier」同為 1~7 但意義不同，標籤必須寫清楚（`06-equipment-acquire.md` § 6A.1）
   const tierLevel = templates ? getEquipmentInstanceTierLevel(item, templates) : 0;
 
   return (

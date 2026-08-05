@@ -229,6 +229,40 @@ function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 
 }
 
 /**
+ * 一次普攻打幾下（`21-combat-formula.md` § 21.4）。
+ *
+ * 雙刀與鋼爪是**雙持**武器，一次攻擊打兩下 —— 每下獨立判定命中與爆擊，
+ * 額外攻擊、STR 加成、材質克制兩下都算（每下都是完整公式）。
+ * 它們的基傷因此只有其他雙手武器的一半（`21-combat-formula.md` § 21.4）。
+ */
+export function getWeaponHitCount(weapon: EquipmentInstance | null): number {
+  return weapon?.type === 'dualBlade' || weapon?.type === 'claw' ? 2 : 1;
+}
+
+/** § 21.4：魔法公式裡技能側（技能攻擊力＋INT加成＋裝備魔攻）的權重 */
+export const SKILL_SIDE_WEIGHT = 0.5;
+/** § 21.4：魔法公式裡武器白字的權重 */
+export const WEAPON_WHITE_WEIGHT = 0.2;
+
+/**
+ * 武器白字（`21-combat-formula.md` § 21.4）。
+ *
+ * `((小怪傷害 + 大怪傷害) / 2 + 強化 + 額外攻擊) × (1 + 攻擊力%)`
+ *
+ * 技能不分怪物體型，所以取小怪／大怪的平均。**刻意不含「普攻元素傷害%」**
+ * —— 那是普攻的乘區，與魔法傷害無關。沒有武器時為 0（不套普攻的保底值 1）。
+ */
+export function getWeaponWhiteDamage(
+  weapon: EquipmentInstance | null,
+  attackPowerPercent: number,
+): number {
+  if (!weapon || weapon.smallMonsterDamage == null || weapon.largeMonsterDamage == null) return 0;
+  const enh = weapon.enhancement ?? 0;
+  const base = (weapon.smallMonsterDamage + weapon.largeMonsterDamage) / 2 + enh + (weapon.extraAttack ?? 0);
+  return base * (1 + attackPowerPercent / 100);
+}
+
+/**
  * 裝備提供的魔法攻擊固定值。
  * 基底 `magicAttack` + 法杖／雙手法杖／魔導書的強化加成（§ 6.9 每 +2 強化 → 魔攻 +1）。
  * 依 `21-combat-formula.md` § 21.4 以固定值加算進基礎魔攻，不受 INT 倍率與攻擊力%詞綴影響。
@@ -398,7 +432,7 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
 }
 
 /** § 20.6：INT 每 2 點提供的技能威力% */
-export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 5;
+export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 10;
 /** § 20.6：INT 每 2 點提供的冷卻縮減% */
 export const INT_COOLDOWN_PERCENT_PER_2 = 1;
 /** § 21.4：冷卻縮減總上限 */
@@ -485,57 +519,65 @@ export function calculatePlayerAttack(
   const buffHitBonus = getBuffFlatBonus(activeEffects, 'hit');
   const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus - monsterDodge));
 
-  const hit = Math.random() * 100 < hitRate;
-  if (!hit) {
-    return {
-      damage: 0,
-      hit: false,
-      isCritical: false,
-      log: { type: 'player_miss', message: '攻擊未命中' },
-    };
-  }
-
-  // Base damage (including race/element counter bonuses)
-  const weaponDmg = getWeaponDamage(weapon, monster.size);
+  // `21-combat-formula.md` § 21.4：雙刀與鋼爪是雙持，一次攻擊打兩下，每下獨立判定命中與爆擊
+  const hitCount = getWeaponHitCount(weapon);
   const strBonus = Math.floor(effSTR / 2);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
   const hasFireEnchantActive = rawFireEnchantDmg > 0;
   const attackElement = weapon?.element && weapon.element !== 'none' ? weapon.element : (hasFireEnchantActive ? 'fire' : undefined);
-  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getBuffFlatBonus(activeEffects, 'extra_attack') + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race) + getElementCounterBonus(attackElement, monster.element);
-
-  // Apply attack% multiplier
-  damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
-
-  // Apply attack elemental% multiplier (weapon element OR fire enchant)
   const hasElement = (weapon?.element && weapon.element !== 'none') || hasFireEnchantActive;
-  if (hasElement) {
-    damage = Math.floor(damage * (1 + bonuses.attack_elemental / 100));
-  }
-
-  // Critical check
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const isCritical = Math.random() * 100 < critRate;
-  if (isCritical) {
-    const critMultiplier = 2.0 + bonuses.crit_damage / 100;
-    damage = Math.floor(damage * critMultiplier);
-  }
-
-  // Monster defense reduction (last, with debuff)
   const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = Math.min(effectiveMonsterDef, 75);
-  damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
-  // 虛弱 debuff（攻擊力 -20%）作用於最終傷害（§ 21.3）
-  damage = applyWeaken(damage, activeEffects);
+  let total = 0;
+  let anyHit = false;
+  let anyCrit = false;
 
-  const log: CombatLog = isCritical
-    ? { type: 'player_crit', message: `暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
-    : { type: 'player_hit', message: `對 ${monster.name} 造成 ${damage} 點傷害` };
+  for (let i = 0; i < hitCount; i++) {
+    if (!(Math.random() * 100 < hitRate)) continue;
+    anyHit = true;
 
-  return { damage, hit: true, isCritical, log };
+    // Base damage (including race/element counter bonuses)
+    let damage = getWeaponDamage(weapon, monster.size) + strBonus + (weapon?.extraAttack ?? 0)
+      + getBuffFlatBonus(activeEffects, 'extra_attack') + getRangedAttackBonus(weapon, activeEffects)
+      + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race)
+      + getElementCounterBonus(attackElement, monster.element);
+
+    // Apply attack% multiplier
+    damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
+
+    // Apply attack elemental% multiplier (weapon element OR fire enchant)
+    if (hasElement) {
+      damage = Math.floor(damage * (1 + bonuses.attack_elemental / 100));
+    }
+
+    // Critical check
+    if (Math.random() * 100 < critRate) {
+      anyCrit = true;
+      damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
+    }
+
+    // Monster defense reduction (last, with debuff)
+    damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
+
+    // 虛弱 debuff（攻擊力 -20%）作用於最終傷害（§ 21.3）
+    total += applyWeaken(damage, activeEffects);
+  }
+
+  if (!anyHit) {
+    return { damage: 0, hit: false, isCritical: false, log: { type: 'player_miss', message: '攻擊未命中' } };
+  }
+
+  const prefix = hitCount > 1 ? '雙擊！' : '';
+  const log: CombatLog = anyCrit
+    ? { type: 'player_crit', message: `${prefix}暴擊！對 ${monster.name} 造成 ${total} 點傷害` }
+    : { type: 'player_hit', message: `${prefix}對 ${monster.name} 造成 ${total} 點傷害` };
+
+  return { damage: total, hit: true, isCritical: anyCrit, log };
 }
 
 export function calculatePhysicalSkillHit(
@@ -628,11 +670,13 @@ export function calculateSkillAttack(
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // Base magic damage (including element counter bonus)
-  // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻（固定值加算，不進 INT 倍率）
+  // § 21.4：基礎魔攻 = (技能攻擊力 + INT加成 + 裝備魔攻) × 0.5 + 武器白字 × 0.2
   const effINT = getEffectiveINT(attrs.INT);
   const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
   const gearMagicAttack = getTotalMagicAttack(equippedGear);
-  let damage = skillPower + intBonus + gearMagicAttack + getElementCounterBonus(skillElement, monster.element);
+  const skillSide = (skillPower + intBonus + gearMagicAttack) * SKILL_SIDE_WEIGHT;
+  const weaponSide = getWeaponWhiteDamage(getEquippedWeapon(equippedGear), bonuses.attack_power) * WEAPON_WHITE_WEIGHT;
+  let damage = Math.floor(skillSide + weaponSide) + getElementCounterBonus(skillElement, monster.element);
 
   // Apply skill elemental% multiplier (only if skill has element)
   if (skillElement && skillElement !== 'none') {

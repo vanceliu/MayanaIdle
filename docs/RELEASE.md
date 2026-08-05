@@ -17,7 +17,7 @@
 
 **鐵則**
 
-- 資料淘汰**只能**用 `CURRENT_DATA_VERSION`，不可寫在 Dexie 的 `upgrade()` 裡（限制第 73 條）
+- 資料淘汰**只能**用 `CURRENT_DATA_VERSION`，不可寫在 Dexie 的 `upgrade()` 裡（`19-account-character.md` § 19.7）
 - Dexie 版本**只能往上加**。已經跑過 v13 的瀏覽器，你再去改 v13 的內容也不會重跑
 - 客戶端與 Worker 的 `CURRENT_DATA_VERSION` 必須**永遠相同**
 
@@ -238,7 +238,7 @@ npx wrangler d1 execute mayanaidle --remote --command \
 
 遺產快照保存了不同時期的統計數值。改變既有欄位的意義
 （例如 `totalGoldEarned` 從「不含賣出」改成「含賣出」）會讓**所有舊快照的數字變成謊言**，
-且無法回溯修正。要改語意就開新欄位（限制第 77 條）。
+且無法回溯修正。要改語意就開新欄位（`45-legacy-archive.md`）。
 
 ### 7.9 localStorage 不會因部署而清除
 

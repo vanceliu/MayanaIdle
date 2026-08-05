@@ -3,7 +3,7 @@
  *
  * 全部條目皆引自設計文件，**不可自行加入未定義的數值或規則**：
  * - 戰鬥與探索：`02-core-loop.md`、`03-combat.md` § 3.x、`41-arpg-combat.md`
- * - 死亡與復活：`13-town.md` § 13.8、`99-ai-constraints.md` 第 47 條
+ * - 死亡與復活：`13-town.md` § 13.8
  * - 回城卷軸：`13-town.md` § 13.8
  * - 藥水與狀態：`30-items.md` § 30.1~30.2
  * - 裝備配置：`06-equipment.md` § 6.1、`13-town.md` § 13.11

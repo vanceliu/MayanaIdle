@@ -76,7 +76,6 @@ export function getMaterialColor(iconTier?: number): string {
 
 export const EQUIP_ICON_MAP: Record<string, string> = {
   'sword': 'equipment/spinning-sword',
-  'dagger': 'equipment/plain-dagger',
   'axe': 'equipment/battle-axe',
   'mace': 'equipment/battle-axe',
   'twoHandSword': 'equipment/two-handed-sword',

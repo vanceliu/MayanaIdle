@@ -5094,7 +5094,7 @@ button.active {
   cursor: pointer;
 }
 
-/* 裝備階級（§ 6A.8）。色階與 .affix-tag.tier-N 一致，但標籤寫「裝備Tier」以免與詞綴 Tier 混淆 */
+/* 裝備階級（`06-equipment-acquire.md` § 6A.1）。色階與 .affix-tag.tier-N 一致，但標籤寫「裝備Tier」以免與詞綴 Tier 混淆 */
 .equip-detail-tier {
   font-size: 11px;
   opacity: 0.85;

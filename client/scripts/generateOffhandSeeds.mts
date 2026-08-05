@@ -1,5 +1,5 @@
 /**
- * 左手裝備補件 —— 讓盾牌／魔導書／臂甲各自「每個 tier 1~3 件可選」（§ 6A.8.3）。
+ * 左手裝備補件 —— 讓盾牌／魔導書／臂甲各自「每個 tier 1~3 件可選」。
  *
  * 改版前左手每階只有 1 件（魔導書 T3 甚至是空的），與四件套的「每階 3 件」規則不一致。
  * 臂甲（`armGuard`）是本次新增的盜賊專屬左手防具：盜賊的雙刀／鋼爪佔雙手時無法裝備，
@@ -17,7 +17,7 @@ import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 
 const SEED_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../src/db/seed/equipmentSeeds.ts');
 const WRITE = process.argv.includes('--write');
-/** T1~T2 一件、T3 兩件、T4 以上三件（低階從簡，§ 6A.8.8） */
+/** T1~T2 一件、T3 兩件、T4 以上三件（低階從簡） */
 const minPerTier = (tier: number) => (tier <= 1 ? 0 : tier === 2 ? 1 : tier === 3 ? 2 : 3);
 
 /**
@@ -109,7 +109,7 @@ let nextId = Math.max(...EQUIPMENT_SEEDS.map(e => e.id ?? 0)) + 1;
 const lines: string[] = [
   '',
   '  // ============ 左手裝備補件（generateOffhandSeeds.mts）============',
-  '  // 盾牌／魔導書／臂甲各自每階 1~3 件（§ 6A.8.3）；防禦值由 rebalanceArmorDefense.mts 統一套用',
+  '  // 盾牌／魔導書／臂甲各自每階 1~3 件；防禦值由 rebalanceArmorDefense.mts 統一套用',
 ];
 for (const { type, tier, count } of need) {
   const i = tier - 1;

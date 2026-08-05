@@ -24,7 +24,7 @@ describe('equipment model', () => {
   describe('isWeaponEquipment', () => {
     it('手部欄位的攻擊型裝備算武器', () => {
       expect(isWeaponEquipment('rightHand', 'twoHandSword')).toBe(true);
-      expect(isWeaponEquipment('leftHand', 'dagger')).toBe(true);
+      expect(isWeaponEquipment('leftHand', 'sword')).toBe(true);
     });
 
     it('盾牌／魔導書／臂甲雖佔手部欄位，算防具', () => {

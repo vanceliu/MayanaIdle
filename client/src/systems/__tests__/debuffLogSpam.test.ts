@@ -43,7 +43,7 @@ function target(): MonsterInstance {
 
 function dagger(): EquipmentInstance {
   return {
-    templateId: 2, name: '匕首', type: 'dagger', slot: 'rightHand', isTwoHanded: false,
+    templateId: 2, name: '匕首', type: 'sword', slot: 'rightHand', isTwoHanded: false,
     smallMonsterDamage: 20, largeMonsterDamage: 18, defense: 0, quality: 0, enhancement: 0,
     affixes: [], ownerId: 1, equipped: true,
   } as EquipmentInstance;

@@ -87,7 +87,7 @@ describe('starterNpc', () => {
 
     it('returns correct gear for thief', () => {
       const names = getStarterGearNames('thief');
-      expect(names).toContain('新手匕首');
+      expect(names).toContain('新手雙刀');
       expect(names).toContain('新手面罩');
       expect(names).toContain('新手盜賊皮衣');
       expect(names).toContain('新手護腕');

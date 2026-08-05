@@ -1,7 +1,7 @@
 import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from './equipment';
 
 /**
- * 顯示用階級：0 = 新手裝，1~7 = `EquipmentTier`（`06-equipment-balance.md` § 6A.8）。
+ * 顯示用階級：0 = 新手裝，1~7 = `EquipmentTier`（`06-equipment-acquire.md` § 6A.1）。
  * 新手裝不屬於 tier 刻度，另外給 0 讓批量販售能排除它。
  */
 export type EquipmentTierLevel = 0 | EquipmentTier;
@@ -33,7 +33,7 @@ export const EQUIPMENT_TIER_NAMES: Record<EquipmentTierLevel, string> = {
   7: '高階 T7',
 };
 
-/** 階級分組（§ 6A.8）：低階可在商店買到，中／高階只能鐵匠製作 */
+/** 階級分組（`06-equipment-acquire.md` § 6A.1）：低階可在商店買到，中／高階只能鐵匠製作 */
 export function getTierGroup(tier: EquipmentTier): '低階' | '中階' | '高階' {
   if (tier <= 3) return '低階';
   if (tier <= 5) return '中階';

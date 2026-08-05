@@ -1,5 +1,5 @@
 /**
- * 腰帶重建 —— 腰帶的定位與其他防具不同，單獨一張表（§ 6A.8.10）。
+ * 腰帶重建 —— 腰帶的定位與其他防具不同，單獨一張表（`35-inventory-constraints.md` § 35.1）。
  *
  * 腰帶不吃「全身防禦目標」（§ 6A.8.7），它的價值在**背包格數**與負重，
  * 因此不套用四件套那套配分與三種定位。
@@ -26,7 +26,7 @@ const WRITE = process.argv.includes('--write');
 
 /** 背包格數（T1~T7）。基礎背包 50 格，T7 腰帶把上限推到 70 格 */
 const BAG_SLOTS = [5, 6, 8, 10, 15, 18, 20];
-/** 負重（負重懲罰目前停用，數值保留備用，§ 99.1 第 61 條） */
+/** 負重（負重懲罰目前停用，數值保留備用，`20-attributes.md` § 20.7） */
 const WEIGHT_BONUS = [1700, 2500, 3300, 5000, 6700, 8300, 10000];
 /**
  * 材質隨機分配、與階級無關（`25-monster-system.md` § 25.5）——
@@ -86,7 +86,7 @@ let nextId = Math.max(...EQUIPMENT_SEEDS.map(e => e.id ?? 0)) + 1;
 const lines: string[] = [
   '',
   '  // ============ 腰帶（generateBeltSeeds.mts）============',
-  '  // 腰帶不吃全身防禦目標，價值在背包格數與負重（§ 6A.8.10）',
+  '  // 腰帶不吃全身防禦目標，價值在背包格數與負重（`35-inventory-constraints.md` § 35.1）',
 ];
 for (const b of BELTS) {
   const i = b.tier - 1;

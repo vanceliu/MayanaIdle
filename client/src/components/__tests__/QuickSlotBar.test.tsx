@@ -133,7 +133,7 @@ describe('滑鼠兩段確認（§ 35.7.5）', () => {
         i === 0 ? { kind: 'potion' as const, potionType: 'red' as const } : null),
       bagItems: [{ name: '紅色藥水', type: 'potion', amount: 5 }],
       inventory: [],
-      // 藥水冷卻是全域共用（第 60 條），跨測試會殘留，必須重置
+      // 藥水冷卻是全域共用（`30-items.md`），跨測試會殘留，必須重置
       lastPotionUsedAt: 0,
       character: {
         name: 'T', className: 'knight', level: 10, exp: 0, expToNext: 100,

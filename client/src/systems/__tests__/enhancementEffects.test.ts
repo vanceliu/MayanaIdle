@@ -113,7 +113,8 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const m = monster({ defense: 0 });
     const without = calculateSkillAttack(c, 20, 'none', m, []).damage;
     const withBook = calculateSkillAttack(c, 20, 'none', m, [book({ magicAttack: 6 })]).damage;
-    expect(withBook - without).toBe(6);
+    // § 21.4：裝備魔攻在技能側，權重 0.5 → 6 點魔攻 = 3 點傷害
+    expect(withBook - without).toBe(3);
   });
 
   it('裝備魔攻不進 INT 倍率（純固定值）', () => {
@@ -125,8 +126,9 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
       - calculateSkillAttack(lowInt, 20, 'none', m, []).damage;
     const deltaHigh = calculateSkillAttack(highInt, 20, 'none', m, [book({ magicAttack: 6 })]).damage
       - calculateSkillAttack(highInt, 20, 'none', m, []).damage;
-    expect(deltaLow).toBe(6);
-    expect(deltaHigh).toBe(6);
+    // 高低 INT 的增量相同 → 魔攻確實沒有進 INT 倍率（§ 21.4 的 0.5 權重對兩者一致）
+    expect(deltaLow).toBe(3);
+    expect(deltaHigh).toBe(3);
   });
 });
 

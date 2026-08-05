@@ -116,7 +116,7 @@ describe('templateSync - resolveEquipment slot handling', () => {
   // 舊存檔的 instance 沒有 bonusAttributes 欄位，靠 TEMPLATE_FIELDS 從模板補齊，
   // 因此不需要 DB migration。
   it('resolves bonusAttributes from template even when the instance lacks it', async () => {
-    const template = await db.equipmentTemplates.where('name').equals('屠龍者').first();
+    const template = await db.equipmentTemplates.where('name').equals('晨曦杖').first();
     expect(template).toBeDefined();
     expect(template!.bonusAttributes).toEqual({ STR: 2 });
 

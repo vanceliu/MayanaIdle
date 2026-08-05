@@ -13,7 +13,6 @@ type ShopTab = 'buy' | 'sell';
 const WEAPON_CATEGORIES = [
   { key: 'all', label: '全部' },
   { key: 'sword', label: '單手劍' },
-  { key: 'dagger', label: '匕首' },
   { key: 'axe', label: '單手斧' },
   { key: 'mace', label: '鈍器' },
   { key: 'staff', label: '法杖' },

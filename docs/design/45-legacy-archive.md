@@ -8,7 +8,7 @@
 
 ## 45.1 目的與觸發
 
-提高 `config.ts` 的 `CURRENT_DATA_VERSION` 會淘汰所有舊版本角色（見 `19-account-character.md` § 19.9）。
+提高 `CURRENT_DATA_VERSION` 會淘汰所有舊版本角色（見 `19-account-character.md` § 19.9）。
 直接刪除會讓玩家長期累積的成果毫無痕跡地消失，因此淘汰流程改為：
 
 ```
@@ -113,11 +113,6 @@ interface LegacyArchive {
 - 遺產頁對快照中不存在的欄位顯示 `—`
 
 違反此限制會讓所有舊快照的數字變成錯誤資訊，且無法回溯修正。
-
-> 例：`tier7WeaponsLooted` / `tier7ArmorsLooted` 是後來才加的欄位
-> （`37-statistics.md` § 37.1），在此之前封存的快照沒有這兩個鍵，遺產頁顯示 `—`。
-> **不可為了版面整齊把它們補成 0** —— 0 代表「打過 BOSS 但沒掉」，
-> 與「當時根本沒有這個統計」是兩件事。
 
 ---
 

@@ -23,11 +23,14 @@ const TYPE_ZH: Record<string, string> = {
   dualBlade: '雙刀', claw: '鋼爪', shield: '盾牌', magicBook: '魔導書', armGuard: '臂甲',
 };
 /** 檔名對應現有的 `06-equipment-weapons-*.md` 命名 */
+// 盾牌／魔導書／臂甲是**左手防具**，由 `generateArmorDocs.mts` 產生（§ 6A.8.7），
+// 不在武器文件裡。
+/** 左手三種由 `generateArmorDocs.mts` 產生，這裡靜默略過 */
+const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
 const TYPE_FILE: Record<string, string> = {
-  armGuard: 'armguard',
-  sword: 'onesword', dagger: 'dagger', axe: 'oneaxe', mace: 'mace', staff: 'staff',
+  sword: 'onesword', axe: 'oneaxe', mace: 'mace', staff: 'staff',
   bow: 'bow', twoHandSword: 'twosword', twoHandAxe: 'twoaxe', twoHandStaff: 'twostaff',
-  dualBlade: 'dualblade', claw: 'claw', shield: 'shield', magicBook: 'magicbook',
+  dualBlade: 'dualblade', claw: 'claw',
 };
 const CLASS_ZH: Record<string, string> = {
   knight: '騎士', elf: '妖精', elementalist: '元素師', priest: '牧師', thief: '盜賊',
@@ -71,8 +74,8 @@ function renderType(type: WeaponType, items: EquipmentTemplate[]): string {
 
   out.push(`# ${zh}（${items.length} 把）`);
   out.push('');
-  out.push('> **本檔案由 `client/scripts/generateWeaponDocs.mts` 從 `equipmentSeeds.ts` 產生，請勿手改。**');
-  out.push('> 要調整數值請改 seed 後重跑腳本；設計規則見 `06-equipment-balance.md` § 6A.8。');
+  out.push('> **本檔案由產生器輸出，請勿手改。**');
+  out.push('> 要調整數值請改 seed 後重跑腳本；設計規則見 `06-equipment-requirement.md`（件數／職業上限／走向）。');
   out.push('');
   if (largeFirst) out.push(`${zh}的大怪傷害高於小怪傷害，以大怪傷害為排序主軸。`, '');
 
@@ -135,6 +138,7 @@ const indexRows: string[] = [];
 for (const [type, items] of byType) {
   const file = TYPE_FILE[type];
   if (!file) {
+    if (OFFHAND_TYPES.has(type)) continue; // 左手三種在 generateArmorDocs.mts
     console.warn(`略過未知武器類型：${type}`);
     continue;
   }
@@ -151,9 +155,9 @@ for (const [type, items] of byType) {
 const index = [
   '# 武器列表',
   '',
-  '> **本檔案由 `client/scripts/generateWeaponDocs.mts` 從 `equipmentSeeds.ts` 產生，請勿手改。**',
+  '> **本檔案由產生器輸出，請勿手改。**',
   '> seed 是唯一真實來源：改 seed → 重跑腳本 → 讀文件檢查。',
-  '> 設計規則（數量分配、素質曲線、走向）見 `06-equipment-balance.md` § 6A.8。',
+  '> 設計規則（件數、職業上限、走向）見 `06-equipment-requirement.md`。',
   '',
   `全部 ${weapons.length} 把，依裝備Tier 由低到高排列。`,
   '',

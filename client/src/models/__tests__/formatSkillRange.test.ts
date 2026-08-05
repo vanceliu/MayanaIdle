@@ -68,7 +68,7 @@ describe('武器射程', () => {
     expect(getWeaponRange('bow')).toBe(15);
     expect(isRangedWeapon('bow')).toBe(true);
 
-    for (const t of ['sword', 'dagger', 'axe', 'mace', 'staff', 'magicBook',
+    for (const t of ['sword', 'sword', 'axe', 'mace', 'staff', 'magicBook',
                      'twoHandSword', 'twoHandAxe', 'twoHandStaff',
                      'dualBlade', 'claw', 'shield', 'armGuard']) {
       expect(getWeaponRange(t), `${t} 應為近戰`).toBe(MELEE_WEAPON_RANGE);

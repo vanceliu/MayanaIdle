@@ -29,7 +29,7 @@ export interface DropTableEntry {
   equipmentTemplateId?: number;
   equipmentPool?: 'weapon' | 'armor' | 'all';
   acquireType?: 'shop' | 'craft';
-  /** 掉落池的裝備階級（§ 6A.8）。取代舊的 shopTier / craftTier。 */
+  /** 掉落池的裝備階級（`06-equipment-acquire.md` § 6A.1）。取代舊的 shopTier / craftTier。 */
   tier?: EquipmentTier;
   itemTemplateId?: number;
   dropValue: number;
@@ -46,7 +46,7 @@ export interface BossDropTableEntry {
   equipmentTemplateId?: number;
   equipmentPool?: 'weapon' | 'armor' | 'all';
   acquireType?: 'shop' | 'craft';
-  /** 掉落池的裝備階級（§ 6A.8）。取代舊的 shopTier / craftTier。 */
+  /** 掉落池的裝備階級（`06-equipment-acquire.md` § 6A.1）。取代舊的 shopTier / craftTier。 */
   tier?: EquipmentTier;
   itemTemplateId?: number;
   dropValue: number;

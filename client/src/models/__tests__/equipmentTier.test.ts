@@ -143,7 +143,7 @@ describe('equipmentTier', () => {
       expect(Object.keys(EQUIPMENT_TIER_NAMES).length).toBe(8);
     });
 
-    // § 6A.8：裝備階級與詞綴 Tier 共用同一組色階（App.css .affix-tag.tier-N）
+    // `06-equipment-acquire.md` § 6A.1：裝備階級與詞綴 Tier 共用同一組色階（App.css .affix-tag.tier-N）
     it('T1~T7 的顏色與詞綴 Tier 色階一致', () => {
       expect(EQUIPMENT_TIER_COLORS[1]).toBe('#6B7280');
       expect(EQUIPMENT_TIER_COLORS[2]).toBe('#9CA3AF');

@@ -15,10 +15,10 @@ import type { EquipmentTemplate, EquipmentTier } from '../src/models/equipment';
 
 const DOC = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design/06-equipment-armor.md');
 
-const SLOTS = ['helmet', 'chest', 'gloves', 'boots', 'belt', 'necklace', 'ring1'] as const;
+const SLOTS = ['helmet', 'chest', 'gloves', 'boots', 'leftHand', 'belt', 'necklace', 'ring1'] as const;
 const SLOT_ZH: Record<string, string> = {
   helmet: '頭盔', chest: '胸甲', gloves: '手套', boots: '鞋子',
-  belt: '腰帶', necklace: '項鍊', ring1: '戒指',
+  leftHand: '左手（盾牌／魔導書／臂甲）', belt: '腰帶', necklace: '項鍊', ring1: '戒指',
 };
 const CLASS_ZH: Record<string, string> = {
   knight: '騎士', elf: '妖精', elementalist: '元素師', priest: '牧師', thief: '盜賊',
@@ -33,7 +33,7 @@ const acquireOf = (tier: EquipmentTier) =>
 const classesOf = (t: EquipmentTemplate) =>
   t.requiredClass?.length ? t.requiredClass.map(c => CLASS_ZH[c] ?? c).join('／') : '**共用**';
 
-/** 依附加素質反推定位（§ 6A.8.8），純粹為了文件可讀性 */
+/** 依附加素質反推定位，純粹為了文件可讀性 */
 function roleOf(t: EquipmentTemplate): string {
   if (t.bonusAttributes) return '屬性';
   if (t.hpRegen || t.mpRegen || t.bonusHp || t.bonusMp) return '續戰';
@@ -49,15 +49,18 @@ function craftOf(t: EquipmentTemplate): string {
   return `${t.craftGold.toLocaleString()}G<br>${mats}`;
 }
 
-const armors = EQUIPMENT_SEEDS.filter(t => t.type === 'armor');
+// 左手三種（盾牌／魔導書／臂甲）是防具，不是武器 —— 它們的防禦計入
+// § 6A.8.7 的「全套 +4 防禦目標」，因此列在本檔而非 06-equipment-weapons-*.md
+const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
+const armors = EQUIPMENT_SEEDS.filter(t => t.type === 'armor' || OFFHAND_TYPES.has(String(t.type)));
 const out: string[] = [
   '# 防具與飾品列表',
   '',
-  '> **本檔案由 `client/scripts/generateArmorDocs.mts` 從 `equipmentSeeds.ts` 產生，請勿手改。**',
-  '> 防禦值與附加素質由 `client/scripts/rebalanceArmorDefense.mts` 依 `06-equipment-balance.md`',
-  '> § 6A.8.7／§ 6A.8.8 的目標表統一產生；要調整請改目標表後重跑，不要動個別數值。',
+  '> **本檔案由產生器輸出，請勿手改。**',
+  '> 防禦值與附加素質依 `06-equipment.md` § 6A.8.7 的防禦目標表與定位規則統一產生；',
+  '> 要調整請改目標表後重跑，不要動個別數值。',
   '',
-  `全部 ${armors.length} 件。「定位」欄見 § 6A.8.8：防禦型打滿防禦目標、`,
+  `全部 ${armors.length} 件。「定位」欄：防禦型打滿防禦目標、`,
   '續戰型換回血回魔與 HP／MP、屬性型換額外屬性。',
   '',
 ];
@@ -79,13 +82,24 @@ for (const slot of SLOTS) {
     const group = tier >= 1 ? getTierGroup(tier as EquipmentTier) : '新手';
     out.push(`### 裝備Tier ${tier}（${group}・${tier >= 1 ? acquireOf(tier as EquipmentTier) : '新手裝'}）`, '');
     if (slot === 'belt') {
-      // 腰帶的價值在背包格數與負重，不是防禦（§ 6A.8.10），欄位另外排
+      // 腰帶的價值在背包格數與負重，不是防禦（`35-inventory-constraints.md` § 35.1），欄位另外排
       out.push('| 名稱 | 背包格 | 負重加成 | 額外屬性 | 防禦 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
       out.push('|---|---|---|---|---|---|---|---|---|---|');
       for (const t of list) {
         out.push(`| ${t.name} | +${t.bonusBagSlots ?? 0} | +${(t.bonusWeight ?? 0).toLocaleString()} | `
           + `${t.bonusStats ?? '—'} | ${t.defense ?? 0} | ${t.stability ?? 0} | ${classesOf(t)} | `
           + `${t.weight ?? 0} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
+      }
+    } else if (slot === 'leftHand') {
+      // 左手三種（盾牌／魔導書／臂甲）的價值在格擋率與魔攻，防禦封頂 8（§ 6A.8.7）
+      out.push('| 名稱 | 類型 | 防禦 | 格擋率 | 魔法攻擊 | 額外屬性 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
+      out.push('|---|---|---|---|---|---|---|---|---|---|---|');
+      const OFF_ZH: Record<string, string> = { shield: '盾牌', magicBook: '魔導書', armGuard: '臂甲' };
+      for (const t of list) {
+        out.push(`| ${t.name} | ${OFF_ZH[String(t.type)] ?? t.type} | ${t.defense ?? 0} | `
+          + `${t.blockRate ? `${t.blockRate}%` : '—'} | ${t.magicAttack ?? '—'} | ${t.bonusStats ?? '—'} | `
+          + `${t.stability ?? 0} | ${classesOf(t)} | ${t.weight ?? 0} | `
+          + `${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
       }
     } else if (slot === 'necklace' || slot === 'ring1') {
       out.push('| 名稱 | 回血 | 回魔 | HP | MP | 額外屬性 | 防禦 | 安定值 | 適用職業 | 重量 | 價格／製作 |');

@@ -24,22 +24,22 @@
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
 | 武器傷害（小怪/大怪） | `06-equipment.md` | § 6.11 |
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
-| 裝備數量分配（各類型各階梯幾把） | `06-equipment-acquire.md` | § 6A.8.1~6A.8.3 |
-| 武器/防具素質曲線（TTK 校準） | `06-equipment-acquire.md` | § 6A.8.4 |
-| **防具防禦目標（全套 +4 的總防禦）** | `06-equipment-acquire.md` | § 6A.8.7 |
-| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-acquire.md` | § 6A.8.7 |
-| **三件的定位（防禦/續戰/屬性型）** | `06-equipment-acquire.md` | § 6A.8.8 |
+| 裝備數量分配（各類型各階梯幾把） | `06-equipment-requirement.md` | 武器規格表 |
+| 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
+| **防具防禦目標（全套 +4 的總防禦）** | `06-equipment.md` | § 6A.8.7 |
+| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment.md` | § 6A.8.7 |
+| **三件的定位（防禦/續戰/屬性型）** | `06-equipment-armor.md` | 「定位」欄 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
-| **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-balance.md` § 6A.8.10、`35-inventory-constraints.md` § 35.1 | — |
+| **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-armor.md`、`35-inventory-constraints.md` § 35.1 | — |
 | **製作材料分配規則** | `06-equipment-acquire.md` | § 6A.3 |
 | 製作費（T4 5萬/T5 10萬/T6 20萬） | `06-equipment-acquire.md` | § 6A.3 |
-| **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-acquire.md` | § 6A.8.11 |
-| 新手裝（T1，創角直接穿上） | `06-equipment-balance.md` § 6A.8.0、`systems/starterNpc.ts` | — |
-| 回血/回魔/HP/MP 的部位上限 | `06-equipment-acquire.md` | § 6A.8.8 |
-| 額外屬性走向（各路線各部位） | `06-equipment-acquire.md` | § 6A.8.8 |
-| 職業效率反向補償（武器數值） | `06-equipment-acquire.md` | § 6A.8.5 |
-| 武器走向（均衡/高攻擊/命中/屬性型） | `06-equipment-acquire.md` | § 6A.8.4a |
-| T7 招牌武器（每職業 3 把） | `06-equipment-acquire.md` | § 6A.8.2b |
+| **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-armor.md` | — |
+| 新手裝（T1，創角直接穿上） | `04-character.md` | § 4.3 |
+| 回血/回魔/HP/MP 的部位上限 | `06-equipment-armor.md` | 逐件清單 |
+| 額外屬性走向（各路線各部位） | `06-equipment-armor.md` | 逐件清單 |
+| 職業效率反向補償（武器數值） | **已取消**（不做補償，見 `06-equipment-requirement.md` 的職業上限表） | — |
+| 武器走向（攻擊/輔助/INT/SPI/STR/AGI 型） | `06-equipment-requirement.md` | — |
+| T7 陣容（以武器類型為單位） | `06-equipment-requirement.md` | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
@@ -86,7 +86,7 @@
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
-| DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（**報告已作廢，目前只有重跑需求規格**） |
+| DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（結論見 § 44.7、§ 44.10） |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
 | 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4，API 見 `37-statistics.md` § 37.4.3 |
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` | § 37.4.9，另見 `45-legacy-archive.md` § 45.4.1 |
@@ -96,7 +96,7 @@
 
 | 需要確認的限制 | 必讀文件 |
 |---|---|
-| AI 不可做的事 | `99-ai-constraints.md` § 99.1 |
+| 設計文件查不到的硬性規則 | `99-ai-constraints.md` § 99.1 |
 | 背包系統限制（容量/負重/互動/顯示/禁止） | `35-inventory-constraints.md` |
 | 暫不考慮的系統 | `15-excluded.md` |
 | MVP 開發順序 | `17-mvp-priority.md` |
@@ -131,10 +131,10 @@
 |---|---|---|
 | `06-equipment.md` | 裝備核心系統 | 部位、武器類型、**強化規則**、壞刀 |
 | `06-equipment-acquire.md` | 裝備取得 | 商店購買/鐵匠製作、價格表 |
-| `06-equipment-balance.md` | 裝備數量與素質設計 | 數量分配、防禦目標、定位、腰帶/飾品階梯（§ 6A.8.x）|
+| `06-equipment-requirement.md` | **武器規格（唯一來源）** | 每類型每階件數、五職業階梯上限、變體走向 |
 | `06-equipment-weapons.md` | 武器模板索引 | ⚠️ **逐把清單已由產生器取代**，見 `06-equipment-acquire.md` § 6A.4 |
-| `06-equipment-weapons-*.md` | 各類型武器子文件（14 份，含盾牌/魔導書/臂甲） | ⚠️ 同上，數量與素質以 `equipmentSeeds.ts` 為準 |
-| `06-equipment-armor.md` | 防具模板 | ⚠️ **由 `generateArmorDocs.mts` 從 seed 產生**，勿手改 |
+| `06-equipment-weapons-*.md` | 各類型武器子文件（14 份，含盾牌/魔導書/臂甲） | ⚠️ 同上，由產生器輸出 |
+| `06-equipment-armor.md` | 防具模板 | ⚠️ **由產生器輸出**，勿手改 |
 | `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
 | `08-quality.md` | 品質系統 | 0%~20%、品質石、影響範圍 |
 
@@ -145,7 +145,7 @@
 | `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
 | `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
 | `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
-| `44-dps-prediction.md` | DPS 預測**重跑需求規格** | Lv.75 滿裝 vs 百柱死神。T7 實裝後舊報告全數作廢並刪除，本檔只剩題目、前提、BiS 選定規則與腳本需求 |
+| `44-dps-prediction.md` | DPS 預測 / 職業平衡健檢 | Lv.75 滿裝 vs 百柱死神。裝備由腳本自動選 BiS，五職業落差 2.22 倍 |
 
 ### 怪物系統
 
@@ -197,7 +197,7 @@
 | `15-excluded.md` | 排除系統 | 不做的功能 |
 | `17-mvp-priority.md` | MVP 順序 | 五階段優先順序 |
 | `98-online-architecture.md` | 線上化架構設計 | 統一 tick、事件驅動、資料分層、Buffer 策略、Auto-scaling |
-| `99-ai-constraints.md` | AI 限制 | 104 條限制 + 進行中的分階段計畫 |
+| `99-ai-constraints.md` | AI 限制 | 6 條設計文件查不到的規則 |
 
 ---
 
@@ -213,9 +213,9 @@
        ↕
 06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md（武器強度 vs 怪物防禦）
        ↕
-06-equipment-balance.md` § 6A.8（數量分配＋素質曲線）
-  → client/scripts/generateWeaponSeeds.mts（依 § 6A.8 三張表產生武器 seed）
-  ← 由 client/scripts/calibrateTTK.mts 反推；改動下列任一者需重跑校準：
+06-equipment-requirement.md（武器規格：件數／職業上限／走向）
+  → 依規格表產生武器數值
+  ← 由 TTK 校準反推；改動下列任一者需重跑校準：
     21-combat-formula.md / 20-attributes.md / 04-character.md / 05-skill.md
     22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 07-affix.md
 
@@ -241,7 +241,7 @@
 
 04-character.md § 4.9（經驗曲線）←→ 28-monster-stats.md（怪物經驗值全表依此推算）
        ↕
-09-dungeon.md（等級分佈）←→ 99-ai-constraints.md 第 26 條
+09-dungeon.md（等級分佈）←→ 04-character.md § 4.9（經驗曲線）
 
 19-account-character.md ←→ 04-character.md（職業/初始配置）
        ↕
@@ -271,7 +271,7 @@
        ↕                    ↕
 40-pixijs-migration.md（theme palette / 分層渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
 
-44-dps-prediction.md（重跑需求規格；被以下任一文件的數值變更所影響，需重跑驗算腳本）
+44-dps-prediction.md（被以下任一文件的數值變更所影響，需重跑驗算腳本）
   ← 21-combat-formula.md / 20-attributes.md / 04-character.md
   ← 07-affix.md / 08-quality.md / 06-equipment.md
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 41-arpg-combat.md
@@ -284,10 +284,10 @@
 
 13-town.md § 13.11（新手 NPC 對話分頁的前期知識條列 STARTER_TIPS，唯讀複述）
   ← 02-core-loop.md / 03-combat.md / 41-arpg-combat.md（戰鬥與探索）
-  ← 13-town.md § 13.7~13.8 / 99-ai-constraints.md 第 47 條（死亡、回城、旅館）
+  ← 13-town.md § 13.7~13.8（死亡、回城、旅館）
   ← 30-items.md § 30.1~30.2（藥水價格/冷卻/狀態解除）
   ← 06-equipment.md § 6.1 / § 6.8~6.10（左右手、安定值、強化失敗消失）
   ← 35-inventory-constraints.md § 35.2 / 20-attributes.md § 20.7（格數與負重、超重懲罰）
   ← 13-town.md § 13.9~13.10 / 36-quest-system.md / 43-wiki-system.md（技能與任務）
-  上列任一數值變動時，必須同步修改 client/src/systems/starterTips.ts
+  上列任一數值變動時，必須同步更新新手指引內容
 ```

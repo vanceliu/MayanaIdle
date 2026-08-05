@@ -64,7 +64,7 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
     let list = weapons;
     if (typeFilter !== 'all') list = list.filter(w => w.type === typeFilter);
     if (materialFilter !== 'all') list = list.filter(w => w.material === materialFilter);
-    // § 6A.8：以裝備階級 tier 篩選
+    // `06-equipment-acquire.md` § 6A.1：以裝備階級 tier 篩選
     if (craftTierFilter !== 'all') {
       const wanted = Number(craftTierFilter);
       list = list.filter(w => w.tier === wanted);

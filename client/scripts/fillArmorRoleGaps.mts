@@ -1,5 +1,5 @@
 /**
- * 補上「某職業在某部位某階看不到某種定位」的缺口（§ 6A.8.8）。
+ * 補上「某職業在某部位某階看不到某種定位」的缺口。
  *
  * 每個 (職業, 部位, 階級) 有 3 件可選，但其中一個名額可能被**跨路線共用的防禦型**佔走
  * （例：盜賊手套 T3 看到輕甲防禦型 ＋ 共用防禦型 ＋ 屬性型，就少了續戰型）。
@@ -69,7 +69,7 @@ for (const cls of CLASSES) {
     for (let tier = 1; tier <= 7; tier++) {
       const view = EQUIPMENT_SEEDS.filter(e => e.tier === tier && e.slot === slot && e.type === 'armor'
         && (!e.requiredClass || (e.requiredClass as ClassName[]).includes(cls)));
-      // T1~T2 只要求兩種定位（防禦目標 1~3 點撐不出三種落差，§ 6A.8.3）
+      // T1~T2 只要求兩種定位（防禦目標 1~3 點撐不出三種落差）
       const wanted = tier <= 2 ? [] : tier === 3 ? ['防禦', '屬性'] : ALL_ROLES;
       if (view.length < wanted.length) continue;
       const missing = wanted.filter(r => !view.some(e => roleOf(e) === r)).length;
@@ -96,7 +96,7 @@ const usedNames = new Set(EQUIPMENT_SEEDS.map(e => e.name));
 const lines: string[] = [
   '',
   '  // ============ 定位缺口補件（fillArmorRoleGaps.mts）============',
-  '  // 補上「某職業在某部位某階看不到某種定位」的組合（§ 6A.8.8），素質由 rebalanceArmorDefense.mts 套用',
+  '  // 補上「某職業在某部位某階看不到某種定位」的組合，素質由 rebalanceArmorDefense.mts 套用',
 ];
 for (const [key, n] of [...need].sort()) {
   const [line, slot, tierStr] = key.split('|') as [Line, string, string];
