@@ -23,7 +23,9 @@ for arg in "$@"; do
     --dry-run)    DRY_RUN=1 ;;
     --skip-tests) SKIP_TESTS=1 ;;
     -h|--help)    sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
-    *) echo "未知參數：$arg（可用 --dry-run / --skip-tests）" >&2; exit 2 ;;
+    # 變數後面緊接全形字時一律加大括號：bash 會把全形字併進變數名，
+    # 在 set -u 下變成「unbound variable」而不是印出訊息
+    *) echo "未知參數：${arg}（可用 --dry-run / --skip-tests）" >&2; exit 2 ;;
   esac
 done
 
@@ -60,8 +62,9 @@ fi
 if [[ -z "$CLIENT_VER" ]]; then
   warn "讀不到 client 的 CURRENT_DATA_VERSION，跳過比對"
 elif [[ -n "$WORKER_VER" && "$CLIENT_VER" != "$WORKER_VER" ]]; then
-  die "資料版本不一致：client=$CLIENT_VER / worker=$WORKER_VER。
-     兩邊必須成對更新，否則所有寫入會回 409（RELEASE.md § 7.1）。"
+  die "資料版本不一致：client=${CLIENT_VER} / worker=${WORKER_VER}。
+     兩邊必須成對更新，否則所有寫入會回 409（RELEASE.md § 7.1）。
+     提高版本時 Worker 必須先部署，改走 RELEASE.md § 5 流程 C。"
 else
   ok "資料版本一致（v${CLIENT_VER:-?}）"
 fi
@@ -104,7 +107,7 @@ step "驗證產物版本標示"
 if grep -rqF "$COMMIT_SHA" dist/assets/*.js; then
   ok "產物內嵌 SHA = $COMMIT_SHA"
 else
-  die "產物找不到 $COMMIT_SHA。建置可能用了快取或 git 資訊取得失敗。"
+  die "產物找不到 ${COMMIT_SHA}。建置可能用了快取或 git 資訊取得失敗。"
 fi
 
 # ── 7. 部署 ────────────────────────────────────────────────────────

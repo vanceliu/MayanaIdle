@@ -25,7 +25,7 @@
  * 玩家刪除角色時不會通知伺服端（刪除是純本機行為），因此榜上會留下
  * 不再更新的資料列，直到版本跳號才清掉。名稱不唯一，所以這不影響任何人取名。
  */
-const CURRENT_DATA_VERSION = 3;
+const CURRENT_DATA_VERSION = 4;
 
 /** 14 個可排行的欄位。此陣列是唯一會被拼進 SQL 的來源，不接受任何外部輸入。 */
 const RANK_FIELDS = [
