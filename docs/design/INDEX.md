@@ -22,6 +22,7 @@
 | 印記掉落率 | `27-drop-table.md` | § 27.8 |
 | 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
+| 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
 | 武器類型/職業限制 | `06-equipment.md` | § 6.6~6.7 |
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
@@ -268,6 +269,8 @@
 13-town.md（倉庫/商店/鐵匠）   16-tech-frontend-architecture.md（BagPanel）
        ↕
 34-ui-guidelines.md（顯示規範）←→ 18-data-schema.md（資料結構）
+       ↕
+16-tech-frontend-architecture.md § 32.15.1（視窗層級／底部 HUD 帶寬 --hud-band-bottom）
 
 36-quest-system.md ←→ 13-town.md（冒險者工會設施）
        ↕                    ↕

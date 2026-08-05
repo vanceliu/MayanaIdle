@@ -54,6 +54,11 @@
 
 > 批量販售（依 Tier 一鍵掃貨）是獨立工具，仍保留在出售頁清單內的自己的按鈕。
 
+> **動作鈕必須整顆停在底部常駐 HUD 帶之上。** 快捷格與面板按鈕列的 z-index 是 800，
+> 永遠壓在視窗之上（`16-tech-frontend-architecture.md` § 32.15.1），動作列一旦伸進去
+> 就變成看得到卻點不到。`.town-modal-overlay` 的下緣保留區讀 `--hud-band-bottom`
+> 這個量測值，**不可改回寫死的 px**。
+
 ### 設計原則
 
 1. **卡片行佈局**：每個物品/裝備為一橫列卡片（`.shop-item`），左側顯示資訊、右側顯示操作
@@ -146,6 +151,8 @@
 | T7 | 紫色 `#A855F7` + 光暈 | `.tier-7` |
 
 CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.tooltip-affix.tier-X` 三者顏色必須一致。
+
+滿值詞綴（`.max-roll`）與特殊詞綴（`.special`）加 `font-weight: 700`，規則見 `07-affix.md` § 7.3.2。
 
 ## 34.3 狀態面板（StatusPanel）
 

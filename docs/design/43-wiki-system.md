@@ -102,7 +102,8 @@ client/src/wiki/
      取代舊版的 ✓／— 矩陣表
    - 分類對應的裝備欄位以文字說明：**魔導書與臂甲雖佔左手欄位，走的是防具詞綴池**
      （§ 7.6、`getAffixCategoryForSlot`），不可寫成武器
-3. **階級數值**：T1~T7 的通用區間 + `AFFIX_TIER_OVERRIDES` 專屬區間（目前為魔法抗性）+ 取得方式
+3. **階級數值**：T1~T7 的通用區間 + `AFFIX_TIER_OVERRIDES` 專屬區間（目前為魔法抗性）+ 取得方式。
+   節末附滿值粗體顯示的說明（§ 7.3.2）：判定看未加品質的原始數值、特殊詞綴一律粗體
 4. **掉落機率**：Tier 權重（一般怪物／Boss 對照，權重換算百分比）與特殊詞綴出現機率（含 Boss ×2）
 5. **印記**：四種印記的作用與限制（`46-sigil.md`）。表格一律 import `SIGIL_DEFINITIONS`
    與 `ENHANCE_SIGIL_RATES`（`models/sigil.ts`），不在 Wiki 端重寫規則或機率。

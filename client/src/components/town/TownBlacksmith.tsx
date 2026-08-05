@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, getAffixTierTable, generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
+import { AFFIX_DEFINITIONS, getAffixTierTable, generateAffixes, isMaxRollAffix, getAffixCategoryForSlot, getWeaponBaseDamage, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
@@ -430,7 +430,10 @@ export function TownBlacksmith() {
             const canEnhance = affix.tier < 5 && enhanceStones > 0;
             return (
               <div key={i} className="bs-affix-row">
-                <span className={`affix-tag tier-${affix.tier}`}>
+                <span
+                  className={`affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
+                  title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
+                >
                   {def?.name} T{affix.tier}
                 </span>
                 <button

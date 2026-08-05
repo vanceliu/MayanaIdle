@@ -419,6 +419,19 @@ export function getEffectiveAffixValue(affix: Affix, quality: number): number {
 }
 
 /**
+ * 這條詞綴是否滾到所屬 Tier 的**上限值**（§ 7.3.2，UI 以粗體標示）。
+ *
+ * 判定用未吃品質的原始 `value` —— 品質是裝備屬性、對每條詞綴等比放大，
+ * 不影響「這次 roll 在該 Tier 內是否完美」這件事。
+ * 特殊詞綴無 Tier 也無數值，一律 false。
+ */
+export function isMaxRollAffix(affix: Affix): boolean {
+  if (isSpecialAffixType(affix.type)) return false;
+  const t = getAffixTierTable(affix.type)[affix.tier - 1];
+  return !!t && affix.value === t.max;
+}
+
+/**
  * 詞綴的顯示文字（一般：`攻擊力 +12% (T4)`；特殊：`[特殊] 毒免疫`，見 § 7.10.5）。
  *
  * `Affix` 只存 `{ type, tier, value }`，文字是衍生資料，不進 DB。

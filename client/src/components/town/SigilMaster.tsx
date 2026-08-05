@@ -7,6 +7,7 @@ import {
   getSpecialAffixDefinition,
   getWeaponBaseDamage,
   isSpecialAffixType,
+  isMaxRollAffix,
   type Affix,
 } from '../../models/affix';
 import {
@@ -194,7 +195,10 @@ export function SigilMaster() {
             return (
               <div key={i} className="bs-affix-row">
                 <span
-                  className={isSpecialAffixType(affix.type) ? 'affix-tag special' : `affix-tag tier-${affix.tier}`}
+                  className={isSpecialAffixType(affix.type)
+                    ? 'affix-tag special'
+                    : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
+                  title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
                 >
                   {affixLabel(affix)}
                 </span>

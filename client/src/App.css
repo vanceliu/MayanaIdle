@@ -149,6 +149,27 @@ body {
 }
 
 /*
+ * 島本身是透明容器（島內元素之間的空隙、`visibility: hidden` 的佔位格都算它的盒子），
+ * 不可吃滑鼠事件 —— 常駐 HUD 是 z-index 800，隔空蓋住底下視窗的按鈕就變成
+ * 「看得到、點不到」（曾經：雜貨店／武器店的購買鈕只有右邊十幾 px 點得動，
+ * 因為 `.hud-bottomcenter` 的右緣剛好切在按鈕中間）。只有島裡的實際內容收滑鼠。
+ * 驗證要用 `document.elementFromPoint()`，不能只看畫面。
+ */
+.hud-topleft,
+.hud-topright,
+.hud-bottomcenter,
+.hud-bottomright {
+  pointer-events: none;
+}
+
+.hud-topleft > *,
+.hud-topright > *,
+.hud-bottomcenter > *,
+.hud-bottomright > * {
+  pointer-events: auto;
+}
+
+/*
  * 介面縮放（`34-ui-guidelines.md` § 34.6）。
  *
  * 套在「內容盒」而不是定位用的外層（`.hud` 自己）—— 縮放定位層會連 top/left/bottom
@@ -1887,7 +1908,9 @@ button.active {
 .affix-tag.tier-5 { color: #FB923C; border-color: rgba(251,146,60,0.2); }
 .affix-tag.tier-6 { color: #EF4444; border-color: rgba(239,68,68,0.2); }
 .affix-tag.tier-7 { color: #A855F7; border-color: rgba(168,85,247,0.2); text-shadow: 0 0 6px rgba(168,85,247,0.3); }
-.affix-tag.special { color: #FFD700; border-color: rgba(255,215,0,0.3); text-shadow: 0 0 6px rgba(255,215,0,0.3); }
+.affix-tag.special { color: #FFD700; border-color: rgba(255,215,0,0.3); text-shadow: 0 0 6px rgba(255,215,0,0.3); font-weight: 700; }
+/* § 7.3.2 滾到該 Tier 上限的詞綴：粗體 */
+.affix-tag.max-roll { font-weight: 700; }
 
 .equipped-item {
   display: flex;
@@ -2017,9 +2040,15 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 直接留出上下兩條 HUD 的帶寬（上：設施列，下：快捷格），
-     視窗只在中間這塊裡長高，就不會有「差幾 px 壓到快捷格」的問題 */
-  padding: 150px 12px 100px;
+  /*
+   * 直接留出上下兩條 HUD 的帶寬（上：設施列，下：快捷格＋面板按鈕列），
+   * 視窗只在中間這塊裡長高，就不會有「差幾 px 壓到快捷格」的問題。
+   *
+   * 下緣的帶寬**不可寫死**：快捷格會隨視窗寬度換行、整條 HUD 又吃 `--ui-scale`，
+   * 實測 140~186px 都有。改由 `useHudBandBottom()` 量測後寫進 `--hud-band-bottom`
+   * （§ 32.15.1）；fallback 取量不到時的保守值。
+   */
+  padding: 150px 12px calc(var(--hud-band-bottom, 190px) + 16px);
 }
 
 /* 沒有暗底就得靠視窗自己撐出層次：加深陰影、邊框提亮、底色微透讓地圖透出一點 */
@@ -2733,8 +2762,10 @@ button.active {
 .equip-detail-affix.tier-5 { color: #FB923C; }
 .equip-detail-affix.tier-6 { color: #EF4444; }
 .equip-detail-affix.tier-7 { color: #A855F7; text-shadow: 0 0 6px rgba(168,85,247,0.3); }
-/* § 7.10.5 特殊詞綴（免疫詞綴）金色顯示 */
-.equip-detail-affix.special { color: #FFD700; text-shadow: 0 0 6px rgba(255,215,0,0.3); }
+/* § 7.3.2 滾到該 Tier 上限的詞綴：粗體 */
+.equip-detail-affix.max-roll { font-weight: 700; }
+/* § 7.10.5 特殊詞綴（免疫詞綴）金色顯示，無 Tier 之分，一律粗體 */
+.equip-detail-affix.special { color: #FFD700; text-shadow: 0 0 6px rgba(255,215,0,0.3); font-weight: 700; }
 
 .equip-detail-class {
   color: var(--accent-info);

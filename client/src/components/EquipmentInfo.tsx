@@ -1,6 +1,6 @@
 import { getWeaponRange, isRangedWeapon } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
-import { formatAffixDisplay, isSpecialAffixType } from '../models/affix';
+import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
@@ -134,7 +134,12 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
                 {formatAffixDisplay(affix)}
               </div>
             ) : (
-              <div key={i} className={`equip-detail-affix tier-${affix.tier}`}>
+              // § 7.3.2 滾到該 Tier 上限的詞綴以粗體標示
+              <div
+                key={i}
+                className={`equip-detail-affix tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
+                title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
+              >
                 {formatAffixDisplay(affix, item.quality)}
               </div>
             )

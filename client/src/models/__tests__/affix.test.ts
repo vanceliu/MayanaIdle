@@ -5,6 +5,7 @@ import {
   rollAffixTier,
   rollAffixValue,
   getEffectiveAffixValue,
+  isMaxRollAffix,
   collectAffixBonuses,
   AFFIX_TIERS,
   AFFIX_DEFINITIONS,
@@ -269,6 +270,35 @@ describe('affix model', () => {
       const bonuses = collectAffixBonuses(gear);
       expect(bonuses.element_brand).toBe(11);
       expect(bonuses.skill_elemental).toBe(9);
+    });
+  });
+
+  // § 7.3.2 滾到 Tier 上限的詞綴以粗體標示
+  describe('isMaxRollAffix', () => {
+    it('should be true only when value hits the tier max', () => {
+      // 通用表 T4 = 12~13
+      expect(isMaxRollAffix({ type: 'attack_power', tier: 4, value: 13 })).toBe(true);
+      expect(isMaxRollAffix({ type: 'attack_power', tier: 4, value: 12 })).toBe(false);
+      // T7 = 19~20
+      expect(isMaxRollAffix({ type: 'crit_damage', tier: 7, value: 20 })).toBe(true);
+      expect(isMaxRollAffix({ type: 'crit_damage', tier: 7, value: 19 })).toBe(false);
+    });
+
+    it('should use the affix-specific tier table for magic_resist', () => {
+      // § 7.3.1 魔抗 T5 = 9~10，通用表的 15 不是它的上限
+      expect(isMaxRollAffix({ type: 'magic_resist', tier: 5, value: 10 })).toBe(true);
+      expect(isMaxRollAffix({ type: 'magic_resist', tier: 5, value: 15 })).toBe(false);
+    });
+
+    it('should ignore quality (raw roll decides)', () => {
+      // 品質放大後的顯示值超過上限，仍不算滿 roll
+      const affix = { type: 'attack_power' as const, tier: 4, value: 12 };
+      expect(getEffectiveAffixValue(affix, 20)).toBe(14);
+      expect(isMaxRollAffix(affix)).toBe(false);
+    });
+
+    it('should return false for special affixes (no tier, no value)', () => {
+      expect(isMaxRollAffix({ type: 'immune_poison', tier: 0, value: 0 })).toBe(false);
     });
   });
 

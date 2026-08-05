@@ -62,6 +62,10 @@ client/
 │   │   ├── classSkillBookDrop.ts # 職業技能書掉落判定
 │   │   ├── characterTransfer.ts  # 角色轉移邏輯
 │   │   └── templateSync.ts   # 模板同步（DB 版本升級）
+│   ├── hooks/                # 跨組件共用的 React hook
+│   │   ├── useAutoScrollLog.ts   # 戰鬥日誌自動捲到底
+│   │   ├── useEquipmentTemplates.ts # 裝備模板快取
+│   │   └── useHudBand.ts     # 量測底部常駐 HUD 帶寬（§ 32.15.1）
 │   ├── db/                   # 資料庫層
 │   │   ├── database.ts       # Dexie schema 定義
 │   │   └── seed.ts           # 初始化種子資料
@@ -193,6 +197,10 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 > **HUD 容器不可吃滑鼠事件。** `.town-view` 曾因為保留舊的 `height: 100%`
 > 又改成絕對定位，變成一塊 830×滿高的透明板壓在地圖上，玩家完全點不到地圖與 NPC。
 > 容器一律 `pointer-events: none`，只有裡面的按鈕／面板 `pointer-events: auto`。
+> **四個 `.hud-*` 島同樣適用**：島的盒子包含島內元素之間的空隙，以及城鎮那格
+> `visibility: hidden` 的 `ExploreBar` 佔位，全都是看不見卻會擋點擊的區域 ——
+> `.hud-bottomcenter` 的右緣曾剛好切在商店購買鈕中間，導致按鈕只有右側十幾 px
+> 點得動。`CombatLogWindow` 雖然也掛 `.hud`，但它是實體視窗，不在此列。
 > 改完要用 `document.elementFromPoint()` 驗「真滑鼠會打到誰」——
 > 用 `dispatchEvent` 直接對 canvas 派事件會繞過命中測試，測不出這種問題。
 
@@ -1012,6 +1020,16 @@ interface TooltipProps {
 - **不可再靠 CSS 寫死 z-index 決勝負**：`.town-view` 與 `.hud` 都是 20 時只能比 DOM 順序，
   結果戰鬥日誌永遠蓋住城鎮設施視窗（點武器店也蓋不過去）。
 - `focusWindow` 對已在頂端的視窗不寫入狀態，避免每次 pointerdown 觸發整批視窗重繪。
+
+**視窗必須主動讓開底部的常駐 HUD 帶。** 常駐 HUD 是 800，永遠贏，所以城鎮設施視窗的
+底部動作列（§ 34.1）只要伸進那條帶子就變成「看得到、點不到」。帶寬**不可寫死**：
+快捷格會隨視窗寬度換行、整條 HUD 又吃 `--ui-scale`，實測 152~190px 都出現過。
+
+- `hooks/useHudBand.ts` 的 `useHudBandBottom()` 量 `.hud-bottomcenter` 與
+  `.hud-bottomright` 的**島內元素**（不是島本身，`visibility: hidden` 的佔位格跳過），
+  取最上緣算出帶寬寫進 `--hud-band-bottom`，`.town-modal-overlay` 的 padding 讀它。
+- **`zoom` 改變不會觸發 `ResizeObserver`**（版面盒沒變，只有算繪結果被乘上倍率），
+  所以 hook 另外訂閱 `settingsStore.uiScale`，靠 effect 重跑重量。
 
 ---
 

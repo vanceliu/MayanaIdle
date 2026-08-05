@@ -269,6 +269,14 @@ export function AffixesPage() {
             </tbody>
           </table>
         </div>
+        {/* § 7.3.2 滿值詞綴顯示 */}
+        <p style={noteStyle}>
+          詞綴滾到<strong>所屬階級的上限值</strong>時，裝備資訊、鐵匠鋪與印記師的詞綴清單會以
+          <strong style={{ fontWeight: 700 }}>粗體</strong>顯示（顏色仍為該階級的 Tier 色）。
+          <br />
+          判定看的是<strong>未加品質的原始數值</strong>：品質對每條詞綴等比放大，不改變這次是否滾到滿值。
+          例如品質 20% 的 T4 12%（顯示 14%）不算滿值。特殊詞綴沒有階級與數值，不參與判定，但一律以粗體顯示。
+        </p>
       </section>
 
       <section style={sectionStyle}>

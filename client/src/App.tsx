@@ -20,6 +20,7 @@ import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
 import { PanelWindows } from './components/PanelWindows';
 import { useWindowLayerStore, useWindowZIndex } from './stores/windowLayerStore';
+import { useHudBandBottom } from './hooks/useHudBand';
 import { SettingsModal } from './components/SettingsModal';
 import { getRegion } from './models/mapData';
 import { formatBuildLabel, formatBuildTime } from './buildInfo';
@@ -241,6 +242,8 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
   // 地圖選擇器展開時會蓋到城鎮視窗，所以它也要能被提到最上層（§ 32.15）
   const mapNavZIndex = useWindowZIndex('map-nav');
   const focusWindow = useWindowLayerStore(s => s.focusWindow);
+  // 底部常駐 HUD 的實際帶寬，供設施視窗讓位（§ 32.15.1）
+  useHudBandBottom();
 
   return (
     <div className="app game-layout">
