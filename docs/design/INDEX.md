@@ -89,7 +89,7 @@
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
 | 手持裝置的幀率與渲染解析度上限 | `47-mobile.md` | § 47.8 |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
-| **製作任務（鐵匠鋪登記配方需求）** | `36-quest-system.md` | § 36.13 |
+| **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
@@ -295,7 +295,7 @@
        ↕
 28-monster-stats.md（擊殺任務目標）←→ 09-dungeon.md（區域對應）
        ↕
-36-quest-system.md § 36.13（製作任務）←→ 13-town.md § 13.5（鐵匠鋪＝登記入口）
+36-quest-system.md § 36.13（製作任務）←→ 13-town.md § 13.5（鐵匠鋪＝製作追蹤入口）
        ↕                          ←→ 06-equipment-acquire.md § 6A.3（配方需求＝任務需求的唯一來源）
        ↕                          ←→ 18-data-schema.md § 18.8（craftMaterials／craftPrerequisiteWeapon 欄位）
 改動配方需求欄位或製作費時，製作任務的顯示與判定同步受影響，無須另改 § 36.13

@@ -288,7 +288,7 @@ interface GameState {
   completeAdventurerQuest: (questId: string) => void;
   refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
-  /** 登記製作任務（§ 36.13.2）。滿 3 個或已登記同配方時不做事 */
+  /** 加入製作追蹤（§ 36.13.2）。滿 3 個或已追蹤同配方時不做事 */
   acceptCraftQuest: (templateId: number) => void;
   /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
   abandonCraftQuest: (questId: string) => void;

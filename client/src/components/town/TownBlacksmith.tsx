@@ -262,7 +262,7 @@ export function TownBlacksmith() {
       character: { ...char, gold: newGold },
       bagItems: newBag,
       inventory: newInv,
-      // § 36.13.5：製作成功即移除同配方的任務。沒登記過時是 no-op
+      // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
       craftQuests: removeCraftQuestByTemplate(
         useGameStore.getState().craftQuests,
         selectedRecipe.id!,
@@ -497,7 +497,7 @@ export function TownBlacksmith() {
                     <button
                       onClick={(e) => { e.stopPropagation(); acceptCraftQuest(recipe.id!); }}
                       disabled={full}
-                      title={full ? `製作任務已滿（${MAX_ACTIVE_CRAFT_QUESTS}）` : undefined}
+                      title={full ? `製作追蹤已滿（${MAX_ACTIVE_CRAFT_QUESTS}）` : undefined}
                     >
                       製作追蹤
                     </button>

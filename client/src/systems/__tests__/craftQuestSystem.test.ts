@@ -107,7 +107,7 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
 });
 
 describe('接取與取消（§ 36.13.2 / § 36.13.5）', () => {
-  it('接取後任務只存 templateId，不存名稱', () => {
+  it('加入追蹤後任務只存 templateId，不存名稱', () => {
     const quests = acceptCraftQuest([], 9001)!;
 
     expect(quests).toHaveLength(1);
@@ -125,7 +125,7 @@ describe('接取與取消（§ 36.13.2 / § 36.13.5）', () => {
     expect(acceptCraftQuest(quests, 9999)).toBeNull();
   });
 
-  it('同一配方只能登記一張', () => {
+  it('同一配方只能追蹤一張', () => {
     const quests = acceptCraftQuest([], 9001)!;
 
     expect(acceptCraftQuest(quests, 9001)).toBeNull();
@@ -143,7 +143,7 @@ describe('接取與取消（§ 36.13.2 / § 36.13.5）', () => {
     expect(after[0].templateId).toBe(9002);
   });
 
-  it('製作成功依 templateId 移除任務；沒登記過時是 no-op', () => {
+  it('製作成功依 templateId 移除任務；沒追蹤過時是 no-op', () => {
     const quests = acceptCraftQuest([], 9001)!;
 
     expect(removeCraftQuestByTemplate(quests, 9001)).toHaveLength(0);

@@ -72,7 +72,7 @@ export function evaluateCraftRequirements(
   return { materials, gold: goldStatus, prerequisite, ready };
 }
 
-/** § 36.13.2：上限 3 個、同一配方只能登記一張。無法接取時回傳 null */
+/** § 36.13.2：上限 3 個、同一配方只能追蹤一張。無法加入時回傳 null */
 export function acceptCraftQuest(
   quests: CraftQuest[],
   templateId: number,
@@ -82,14 +82,14 @@ export function acceptCraftQuest(
   return [...quests, { id: `craft-${templateId}`, templateId }];
 }
 
-/** § 36.13.5：取消登記，無代價（不動貢獻） */
+/** § 36.13.5：取消追蹤，無代價（不動貢獻） */
 export function abandonCraftQuest(quests: CraftQuest[], questId: string): CraftQuest[] {
   return quests.filter(q => q.id !== questId);
 }
 
 /**
  * § 36.13.5 第 1 點：製作成功後移除同配方的任務。
- * 只比對 templateId —— 玩家沒登記就直接製作時，這裡是 no-op。
+ * 只比對 templateId —— 玩家沒加進追蹤就直接製作時，這裡是 no-op。
  */
 export function removeCraftQuestByTemplate(quests: CraftQuest[], templateId: number): CraftQuest[] {
   return quests.filter(q => q.templateId !== templateId);

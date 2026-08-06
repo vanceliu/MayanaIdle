@@ -340,22 +340,22 @@ describe('TownBlacksmith - Crafting', () => {
     });
   });
 
-  /** 製作任務登記（`36-quest-system.md` § 36.13） */
-  describe('製作任務登記', () => {
-    it('登記後任務只存 templateId，按鈕改為取消登記', async () => {
+  /** 製作追蹤（`36-quest-system.md` § 36.13） */
+  describe('製作追蹤', () => {
+    it('加入追蹤後任務只存 templateId，按鈕改為取消追蹤', async () => {
       render(<TownBlacksmith />);
       fireEvent.click(screen.getByText('裝備製作'));
       fireEvent.click(await findRecipeTitle('鋼心劍'));
 
-      fireEvent.click(screen.getAllByText('登記製作')[0]);
+      fireEvent.click(screen.getAllByText('製作追蹤')[0]);
 
       const quests = useGameStore.getState().craftQuests;
       expect(quests).toHaveLength(1);
       expect(quests[0].templateId).toBe(RECIPE.id);
-      expect(await screen.findByText('取消登記')).toBeTruthy();
+      expect(await screen.findByText('取消追蹤')).toBeTruthy();
     });
 
-    it('滿 3 個後登記按鈕全部 disabled（§ 36.13.2）', async () => {
+    it('滿 3 個後製作追蹤按鈕全部 disabled（§ 36.13.2）', async () => {
       useGameStore.setState({
         craftQuests: [
           { id: 'craft-1', templateId: 1 },
@@ -367,17 +367,17 @@ describe('TownBlacksmith - Crafting', () => {
       fireEvent.click(screen.getByText('裝備製作'));
       await findRecipeTitle('鋼心劍');
 
-      const btns = screen.getAllByText('登記製作');
+      const btns = screen.getAllByText('製作追蹤');
       expect(btns.every(b => (b as HTMLButtonElement).disabled)).toBe(true);
     });
 
-    it('取消登記移除任務', async () => {
+    it('取消追蹤移除任務', async () => {
       useGameStore.setState({ craftQuests: [{ id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }] });
       render(<TownBlacksmith />);
       fireEvent.click(screen.getByText('裝備製作'));
       await findRecipeTitle('鋼心劍');
 
-      fireEvent.click(screen.getByText('取消登記'));
+      fireEvent.click(screen.getByText('取消追蹤'));
 
       expect(useGameStore.getState().craftQuests).toHaveLength(0);
     });
@@ -396,7 +396,7 @@ describe('TownBlacksmith - Crafting', () => {
       expect(useGameStore.getState().craftQuests).toHaveLength(0);
     });
 
-    it('沒登記就直接製作時不影響其他任務', async () => {
+    it('沒加進追蹤就直接製作時不影響其他任務', async () => {
       useGameStore.setState({ craftQuests: [{ id: 'craft-999', templateId: 999 }] });
       render(<TownBlacksmith />);
       fireEvent.click(screen.getByText('裝備製作'));
