@@ -18,7 +18,7 @@ import { hasProjectilePath } from '../systems/lineOfSight';
 import { gameLoopTick, consumeDotTick } from '../systems/gameLoop';
 import { findAttackPosition } from '../systems/pathfinding';
 import { db } from '../db/database';
-import { processMonsterDeath } from '../stores/gameStore';
+import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
 import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../systems/arpgEngine';
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
@@ -899,8 +899,12 @@ function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monste
     set({ activeEffects: cleaned });
   }
 
-  // Auto-save after kill
-  useGameStore.getState().saveState();
+  // Auto-save after kill —— 掉落與任務進度是在 processMonsterDeath 的 async 佇列裡才寫入 store，
+  // 這裡必須等佇列結算完再存，否則存下去的永遠是「上一次擊殺」的進度，
+  // 剛打完就重整會讓這次的掉落／任務進度回滾。
+  void waitForPendingDrops().then(() => {
+    useGameStore.getState().saveState();
+  });
 }
 
 function handlePlayerDeath() {
