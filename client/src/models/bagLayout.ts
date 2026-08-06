@@ -82,10 +82,14 @@ export function moveBagSlot<T extends BagSlotItem>(
 
 // ---------------------------------------------------------------- 拖出背包
 
-/** 拖曳負載的 MIME type。只有背包格子會寫入，只有地圖會讀取 */
-export const BAG_DRAG_MIME = 'application/x-mayana-bag-item';
-
-/** 拖出背包時帶到其他元件的描述（`BagGridItem` 不可序列化，只帶必要欄位） */
+/**
+ * 拖出背包時交給落點的描述（`35-inventory-constraints.md` § 35.5.3）。
+ *
+ * `BagGridItem` 帶著 React 元素與裝備實例，不適合直接傳給落點處理；這裡只留必要欄位。
+ *
+ * 拖放走 Pointer Events（`34-ui-guidelines.md` § 34.8），負載是**在記憶體裡傳的物件**，
+ * 不再序列化 —— HTML5 拖放時代那組 MIME／`dataTransfer` 編解碼已隨機制一起移除。
+ */
 export interface BagDragPayload {
   kind: 'bag' | 'equipment';
   /** 顯示用名稱（確認視窗的文案）。實際定位一律用 `itemId`／`equipmentId` */
@@ -94,28 +98,4 @@ export interface BagDragPayload {
   itemId?: number;
   amount: number;
   equipmentId?: number;
-}
-
-export function encodeBagDrag(payload: BagDragPayload): string {
-  return JSON.stringify(payload);
-}
-
-/** 解析拖曳負載；格式不符一律回 null（例如從瀏覽器外拖進來的檔案） */
-export function decodeBagDrag(raw: string | null | undefined): BagDragPayload | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<BagDragPayload>;
-    if (parsed.kind !== 'bag' && parsed.kind !== 'equipment') return null;
-    if (typeof parsed.name !== 'string' || !parsed.name) return null;
-    const amount = typeof parsed.amount === 'number' && parsed.amount > 0 ? Math.floor(parsed.amount) : 1;
-    return {
-      kind: parsed.kind,
-      name: parsed.name,
-      itemId: typeof parsed.itemId === 'number' ? parsed.itemId : undefined,
-      amount,
-      equipmentId: typeof parsed.equipmentId === 'number' ? parsed.equipmentId : undefined,
-    };
-  } catch {
-    return null;
-  }
 }

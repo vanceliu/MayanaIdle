@@ -1064,6 +1064,46 @@ interface TooltipProps {
 | `ScriptEditorButton` | PanelDock 內的觸發鈕（帶規則數量 badge） |
 | `ScriptEditorContent` | 視窗內容（tab 列 + `PersistentScriptEditor` / `CombatScriptEditor`），由 `PanelWindows` 包在 `FloatingWindow` 內渲染 |
 
+## 32.17 行動裝置模組邊界
+
+行動裝置支援走**響應式單一版面**，規範全文見 `34-ui-guidelines.md` § 34.8。
+這裡只定模組邊界：
+
+| 模組 | 職責 | 邊界 |
+|---|---|---|
+| `hooks/useViewport.ts` | `isMobile` / `isTouch` / `orientation` 的**唯一真相來源** | 其他元件不得自己 `matchMedia` 或讀 `window.innerWidth` |
+| `hooks/useLongPress.ts` | 長按＝右鍵。右鍵路徑與長按進同一個 handler | 不碰版面，只產生一組 pointer handlers |
+| `stores/dragStore.ts` | 指標拖放的狀態與落點命中測試 | 只知道 `data-drop-kind` 這個 DOM 契約，不知道背包／快捷格的語意 |
+| `components/DragGhost.tsx` | 跟著指標跑的殘影 | 掛在 `GameLayout` 最外層，portal 到 body（來源面板會被 `zoom` 縮放） |
+| `hooks/useHudBand.ts` | `--hud-band-bottom` / `--hud-band-top` 的量測 | 帶子成形（手機）時量整條帶子，否則逐一量島內元素 |
+
+`.hud-topbar` / `.hud-bottombar` 兩個容器在桌機是 `display: contents` ——
+容器從版面樹上消失，四座島仍各自貼角，§ 32.3 的版面一個 px 都沒有改變。
+用它而不是條件渲染，是為了不讓兩種版面各長一份 JSX。
+
+## 32.18 PWA（可安裝／離線）
+
+規範見 `34-ui-guidelines.md` § 34.8，這裡只定模組邊界與硬性要求。
+
+| 檔案 | 角色 |
+|---|---|
+| `public/manifest.webmanifest` | 安裝資訊（名稱、圖示、`start_url`／`scope` 都在 `/MayanaIdle/` 底下） |
+| `public/sw.js` | Service Worker。**不經過 Vite 處理**，因此不可用 `import`／`import.meta.env` |
+| `public/icons/` | `app-icon.svg`（來源）＋ 由它產出的 192／512 PNG |
+| `src/registerServiceWorker.ts` | 註冊入口，由 `main.tsx` 在開機時呼叫 |
+
+| 要求 | 原因 |
+|---|---|
+| SW 註冊網址帶 `?v=<build commit>` | 檔名不同瀏覽器才會視為新的 worker 而自動更新；SW 直接拿這個字串當快取版本，不必為了寫死版本號另加 build plugin |
+| **開發模式不註冊，並主動解除既有註冊** | SW 會把 Vite 的模組路徑一起快取，HMR 之後畫面停在舊版，症狀看起來像「改了沒生效」 |
+| **不做 `skipWaiting()`** | 遊戲跑起來之後才換掉 SW，會讓 lazy chunk（Wiki）去要一份已被新版部署換掉的檔名而 404 |
+| 導覽請求 network-first | `index.html` 沒有 content hash，快取優先會讓玩家一直停在舊版，而舊版指向的資產早就被換掉 |
+| 其餘同源資源 cache-first | 資產檔名帶 content hash，同一個檔名的內容永遠一樣，重新驗證沒有意義 |
+| 跨網域一律不碰 | 排行榜 API 的回應快取起來只會讓玩家看到過期名次 |
+| 圖示 SVG 的註解不可有連續兩個 ASCII 連字號 | XML 註解語法限制，違反時整份 SVG 解析失敗、圖示靜默變空白 |
+
+存檔本來就在 IndexedDB，因此「程式碼與素材進得了快取」等於**離線完整可玩**。
+
 ## 32.15 環境地圖模組邊界
 
 - `models/mapControl.ts`：MapData、theme、tile catalog、通行/生成/高度 contract。

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { getElementScale } from '../stores/settingsStore';
+import { useIsMobile } from '../hooks/useViewport';
 import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
 import {
   usePanelWindowStore,
@@ -24,6 +25,14 @@ interface FloatingWindowProps {
  * - 拖曳：僅標題列可拖，位置夾制在 viewport 內
  */
 export function FloatingWindow({ panelKey, title, width, className = '', children }: FloatingWindowProps) {
+  /*
+   * 手機切「全螢幕 sheet」（`34-ui-guidelines.md` § 34.8）。
+   *
+   * 可拖曳、可多開、無遮罩的浮動視窗是**桌機**的做法：它預設玩家同時看得到
+   * 地圖與好幾個面板。手機寬度連一個 420px 的面板都放不下，多開等於互相蓋住，
+   * 拖曳更沒有意義（沒有空位可以拖過去）。
+   */
+  const isMobile = useIsMobile();
   const position = usePanelWindowStore(s => s.positions[panelKey]);
   // z 順序與戰鬥日誌／城鎮視窗／地圖選擇器共用同一個堆疊（§ 32.15）
   const zIndex = useWindowZIndex(`panel:${panelKey}`);
@@ -57,6 +66,8 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
 
   // 開啟時把預設位置夾回可視範圍（小螢幕時預設座標可能超出畫面）
   useEffect(() => {
+    // sheet 模式的座標由 CSS 決定，夾制會把存下來的桌機位置改壞
+    if (isMobile) return;
     const next = clamp(position.x, position.y);
     if (next.x !== position.x || next.y !== position.y) {
       setPosition(panelKey, next);
@@ -66,6 +77,7 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
   }, []);
 
   function handleDragStart(e: React.PointerEvent) {
+    if (isMobile) return;
     if (e.button !== 0) return;
     // 點在關閉鈕上不啟動拖曳：標題列的 pointer capture 會把 pointerup 改派到標題列，
     // 使按鈕收不到完整的 down→up 而不觸發 click。
@@ -93,9 +105,11 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
   return (
     <div
       ref={winRef}
-      className={`floating-window ${className}`.trim()}
+      className={`floating-window ${isMobile ? 'is-sheet ' : ''}${className}`.trim()}
       data-testid={`floating-window-${panelKey}`}
-      style={{ left: position.x, top: position.y, width, zIndex }}
+      /* sheet 模式的尺寸與位置全部交給 CSS：inline style 的優先度壓過 class，
+         留著 left/top/width 會讓面板停在桌機存下來的座標上 */
+      style={isMobile ? { zIndex } : { left: position.x, top: position.y, width, zIndex }}
       onPointerDown={() => { focusPanel(panelKey); focusWindow(`panel:${panelKey}`); }}
     >
       <div

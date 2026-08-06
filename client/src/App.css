@@ -63,6 +63,45 @@
 
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
+
+  /*
+   * 行動裝置斷點（`34-ui-guidelines.md` § 34.8）。
+   * 這個值同時寫在 `hooks/useViewport.ts` 的 `MOBILE_BREAKPOINT` ——
+   * CSS 的 `@media` 不吃自訂屬性，只能兩邊同步；改一邊必須改另一邊，
+   * 否則會出現「CSS 當手機、JS 當桌機」的半套版面。
+   */
+  --bp-mobile: 768px;
+
+  /*
+   * 安全區（瀏海／Home indicator／圓角）。桌機一律是 0，所以不必再包條件。
+   * HUD 島貼在四角，不吃這個值就會被系統列蓋掉。
+   */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* 觸控命中區下限（Apple HIG／Material 都是 44）。手機上任何可點元素不得小於它 */
+  --tap-target: 44px;
+
+  /*
+   * 視窗單位的基底。手機瀏覽器的網址列會滑進滑出，`vh` 量的是**列收起來時**的高度，
+   * 所以 `height: 100vh` 在網址列露出時會比可視區高一截 —— 底部的快捷格與動作鈕
+   * 剛好被切掉。`dvh` 才是「現在真的看得到多少」。
+   *
+   * 用變數繞一層是為了讓不支援 `dvh` 的舊瀏覽器仍拿得到 `vh`：
+   * 自訂屬性不會在宣告時驗證，直接寫 `calc(1dvh / ...)` 在舊瀏覽器上會等到
+   * 使用時才失效（computed-value time），整條規則靜默消失。
+   */
+  --vh-base: 1vh;
+  --vw-base: 1vw;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --vh-base: 1dvh;
+    --vw-base: 1dvw;
+  }
 }
 
 /* --- Reset & Base --- */
@@ -79,6 +118,31 @@ body {
   font-size: var(--fs-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * 手機瀏覽器的「往下拉＝重新整理」會在玩家想捲面板時觸發，
+ * 一次誤觸就是整局重載（雖然存檔在 IndexedDB，但戰鬥中斷）。
+ * 遊戲本體本來就不捲動（捲軸一律在面板內的 `.panel-scroll`），整頁鎖住沒有副作用。
+ */
+html, body {
+  overscroll-behavior: none;
+}
+
+/*
+ * iOS Safari 從 iOS 10 起**無視** `user-scalable=no`，雙擊放大仍然活著 ——
+ * 快捷格連按兩下會被判成縮放手勢而整個吞掉。`manipulation` 只關掉雙擊縮放，
+ * 捲動與雙指縮放不受影響，是官方建議的做法。
+ * `-webkit-tap-highlight-color` 拿掉 Android 點擊時的灰色方塊（我們有自己的 :active 樣式）。
+ */
+button,
+a,
+[role='button'],
+.bag-cell,
+.quick-slot,
+.skill-cell {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* --- Scrollbar --- */
@@ -102,10 +166,12 @@ body {
 /* --- App Layout --- */
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
 /* --- Title Screen --- */
@@ -136,6 +202,10 @@ body {
   position: relative;
   width: 100%;
   height: 100vh;
+  /* 手機網址列滑出時 `100vh` 會比可視區高，底部快捷格直接被切掉（見 `--vh-base`） */
+  height: 100dvh;
+  /* `.app` 的安全區 padding 在這裡歸零：滿版地圖要鋪到螢幕邊緣，
+     讓位的是貼在四角的 HUD 島（它們各自吃 `--safe-*`） */
   padding: 0;
   overflow: hidden;
 }
@@ -146,6 +216,18 @@ body {
   z-index: 20;
   display: flex;
   gap: 8px;
+}
+
+/*
+ * 上下兩條 HUD 帶的容器（`34-ui-guidelines.md` § 34.8）。
+ *
+ * 桌機是 `display: contents` —— 容器從版面樹上消失，四座島仍各自貼在角落，
+ * 排版與加這層之前**完全相同**。手機才把它變成真正的容器把島疊起來。
+ * 這樣兩種版面共用同一份 JSX，不必為手機另寫一組元件。
+ */
+.hud-topbar,
+.hud-bottombar {
+  display: contents;
 }
 
 /*
@@ -197,8 +279,8 @@ body {
    * 縮放層裡寫 `82vh` 實際畫出來是 `82vh × --ui-scale`，1.5 倍時視窗直接爆出畫面。
    * 縮放層內一律用 `calc(N * var(--vh-unit))`，不可直接寫 vh/vw。
    */
-  --vh-unit: calc(1vh / var(--ui-scale));
-  --vw-unit: calc(1vw / var(--ui-scale));
+  --vh-unit: calc(var(--vh-base) / var(--ui-scale));
+  --vw-unit: calc(var(--vw-base) / var(--ui-scale));
 
   --fs-xs: calc(12px * var(--font-scale) / var(--ui-scale));
   --fs-sm: calc(13px * var(--font-scale) / var(--ui-scale));
@@ -209,23 +291,27 @@ body {
   --fs-display: calc(34px * var(--font-scale) / var(--ui-scale));
 }
 
+/*
+ * 四角的貼邊距離一律加上安全區（`--safe-*`）。桌機上 `env()` 是 0，值不變；
+ * 手機上不加就會被瀏海、狀態列與 Home indicator 蓋掉一角。
+ */
 .hud-topleft {
-  top: 12px;
-  left: 12px;
+  top: calc(12px + var(--safe-top));
+  left: calc(12px + var(--safe-left));
   flex-direction: column;
   align-items: flex-start;
 }
 
 .hud-topright {
-  top: 12px;
-  right: 12px;
+  top: calc(12px + var(--safe-top));
+  right: calc(12px + var(--safe-right));
   flex-direction: column;
   align-items: flex-end;
 }
 
 .hud-bottomleft {
-  bottom: 12px;
-  left: 12px;
+  bottom: calc(12px + var(--safe-bottom));
+  left: calc(12px + var(--safe-left));
 }
 
 /*
@@ -234,7 +320,7 @@ body {
  */
 .hud-bottomcenter {
   z-index: 800;
-  bottom: 12px;
+  bottom: calc(12px + var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
   flex-direction: column;
@@ -243,8 +329,8 @@ body {
 
 .hud-bottomright {
   z-index: 800;
-  bottom: 12px;
-  right: 12px;
+  bottom: calc(12px + var(--safe-bottom));
+  right: calc(12px + var(--safe-right));
   flex-direction: column;
   align-items: flex-end;
 }
@@ -1133,6 +1219,7 @@ button.active {
   width: 100%;
   max-width: 1000px;
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -3564,6 +3651,80 @@ button.active {
   border-style: dashed;
 }
 
+/*
+ * § 34.8「移動」模式：觸控裝置沒有拖曳，改成選單裡選「移動」→ 點目標格。
+ * 來源格脈動、其餘格子亮起可放置提示，讓玩家知道下一下點哪裡有意義。
+ */
+.bag-cell.is-moving {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  animation: bagMovePulse 1.2s ease-in-out infinite;
+}
+
+.bag-cell.move-target {
+  border-color: var(--accent-primary-dim);
+  border-style: dashed;
+}
+
+@keyframes bagMovePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.bag-move-hint {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  background: var(--bg-inset);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: var(--radius-sm);
+  color: var(--accent-gold);
+  font-size: var(--fs-xs);
+}
+
+/*
+ * 指標拖放的殘影（§ 34.8）。HTML5 拖放時這件事瀏覽器代勞，改成 pointer 之後
+ * 沒有它畫面上完全看不出玩家抓著東西。
+ *
+ * `pointer-events: none` **不可拿掉**：落點靠 `elementFromPoint` 判定，
+ * 殘影只要吃事件就永遠擋在指標正下方，所有落點都會判成殘影自己。
+ */
+.drag-ghost {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  transform: translate(12px, 12px);
+  padding: 4px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drag-ghost.has-target {
+  border-color: var(--accent-gold);
+}
+
+.drag-ghost.is-discard {
+  border-color: var(--accent-danger);
+}
+
+.drag-ghost-hint {
+  color: var(--accent-danger);
+  font-weight: 700;
+}
+
+/* 拖曳進行中：所有快捷格亮出可放置的暗示，不必猜哪裡放得進去 */
+.quick-slot.droppable {
+  border-color: var(--accent-primary-dim);
+  border-style: dashed;
+}
+
 .bag-cell:hover {
   border-color: var(--accent-primary);
   background: var(--bg-card-hover);
@@ -5250,4 +5411,334 @@ button.active {
 .stat-overweight {
   color: #EF4444;
   font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   行動裝置（`34-ui-guidelines.md` § 34.8）
+   ═══════════════════════════════════════════════════════════
+
+   兩組條件分工明確，不可混用：
+   - `(hover: none)`  → **輸入方式**是觸控。命中區、hover 樣式屬於這一組。
+   - `(max-width: …)` → **版面尺寸**是手機。排版重排屬於這一組。
+   觸控筆電只中前者、桌機拉窄視窗只中後者，合在一起兩種機器都會壞。
+   斷點值與 `hooks/useViewport.ts` 的 `MOBILE_BREAKPOINT` 必須一致。
+   ─────────────────────────────────────────────────────────── */
+
+@media (hover: none) {
+  /*
+   * 命中區下限 44×44（`--tap-target`）。手指的接觸面約 9mm，
+   * 桌機那種 30px 高的按鈕在手機上是「點三次中一次」。
+   */
+  .panel-dock-btn,
+  .btn-transfer,
+  .btn-settings,
+  .btn-logout,
+  .btn-wiki,
+  .shop-tabs button,
+  .context-menu-item,
+  .floating-window-close {
+    min-height: var(--tap-target);
+    min-width: var(--tap-target);
+  }
+
+  .bag-grid {
+    /* 圖示與名稱的高度算式不變，只把下限拉到可點的大小 */
+    grid-auto-rows: max(var(--tap-target), calc(36px + 1.2 * var(--fs-xs)));
+  }
+
+  /*
+   * 觸控裝置沒有真正的 hover：手指按下時瀏覽器會補一次「假 hover」，
+   * 而且**放開後樣式會留著**，看起來像卡住的選取狀態。一律關掉。
+   */
+  .bag-cell:hover,
+  .quick-slot:hover:not([aria-disabled='true']),
+  .panel-dock-btn:hover {
+    background: inherit;
+    box-shadow: none;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   手機版面（斷點 768px，直向優先）
+   ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  /*
+   * 兩條 HUD 帶在桌機是 `display: contents`（容器不存在，島各自貼角），
+   * 手機才成形。這樣兩種版面共用同一份 JSX，桌機的排版一個 px 都沒動。
+   */
+  .hud-topbar {
+    position: absolute;
+    z-index: 20;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: calc(var(--safe-top) + 6px) 8px 0;
+    /* 上方帶**刻意疊在地圖上**：狀態卡本來就是半透明 HUD，
+       讓它佔版面等於再吃掉一截本來就不多的地圖高度 */
+    pointer-events: none;
+  }
+
+  .hud-topbar > .hud {
+    position: static;
+    align-items: stretch;
+  }
+
+  /* 島內元素撐滿寬度，狀態條與地圖選擇器才不會擠在左半邊 */
+  .hud-topbar .status-panel,
+  .hud-topbar .map-selector,
+  .hud-topbar .map-selector-trigger,
+  .hud-topbar .map-selector-dropdown {
+    width: 100%;
+    max-width: none;
+  }
+
+  /*
+   * 下方帶**不疊在地圖上**：快捷格與面板按鈕是手機唯一的操作入口，
+   * 半透明地蓋在會動的地圖上根本看不清楚。地圖讓出這段高度。
+   */
+  .hud-bottombar {
+    position: absolute;
+    z-index: 800;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 8px calc(6px + var(--safe-bottom));
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    pointer-events: none;
+  }
+
+  .hud-bottombar > .hud {
+    position: static;
+    transform: none;
+    align-items: stretch;
+  }
+
+  /* 地圖讓出下方帶的高度（帶寬由 `useHudBandBottom()` 量測，§ 32.15.1） */
+  .stage-area {
+    bottom: var(--hud-band-bottom, 140px);
+  }
+
+  /*
+   * 快捷格改成**單列橫捲**。原本的 `flex-wrap: wrap` 在 393px 寬會排成三列，
+   * 整條 HUD 高到把地圖壓掉三分之一。
+   */
+  .quick-slot-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    /* 橫捲時不要被垂直手勢搶走，也不要觸發整頁的橡皮筋 */
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .quick-slot-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quick-slot {
+    flex: 0 0 auto;
+    /* 44 是命中區下限（`--tap-target`），桌機的 46 在手機上純粹是多佔的 2px */
+    width: var(--tap-target);
+    height: var(--tap-target);
+  }
+
+  .quick-slot-bar,
+  .explore-bar {
+    padding: 4px 6px;
+  }
+
+  /*
+   * 面板按鈕列＝底部 tab bar：六顆一列排完。
+   * 選擇器必須帶上 `.hud-bottomright` —— 桌機的 3×2 格線寫在
+   * `.hud-bottomright .panel-dock`，特異度比單一個 `.panel-dock` 高，
+   * 不跟上就會維持兩列，白白吃掉 50px 的地圖高度。
+   */
+  .hud-bottomright .panel-dock {
+    display: flex;
+    width: 100%;
+    gap: 4px;
+    padding: 4px 6px;
+  }
+
+  .panel-dock-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 2px;
+    font-size: var(--fs-xs);
+    /* 「自動腳本」四個字在 60px 寬的格子裡會換行，斷在字元邊界而不是溢出 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 系統按鈕（Wiki／匯出／匯入／設定／登出）是低頻操作，縮成一列小鈕 */
+  .game-toolbar {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /*
+   * 面板改「全螢幕 sheet」（§ 34.8）。
+   *
+   * 尺寸一律走 `--vh-unit` / `--vw-unit`：這一層吃 `zoom: var(--ui-scale)`，
+   * 直接寫 vh/vw 會被乘上倍率而爆出畫面（§ 34.6）。
+   * 下緣停在 HUD 帶之上 —— 帶是 z-index 800，伸進去就變成看得到卻點不到。
+   */
+  .floating-window.is-sheet {
+    left: 0;
+    top: calc(var(--safe-top) / var(--ui-scale));
+    width: calc(100 * var(--vw-unit));
+    max-width: none;
+    height: calc(
+      100 * var(--vh-unit)
+      - (var(--safe-top) + var(--hud-band-bottom, 140px)) / var(--ui-scale)
+    );
+    max-height: none;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  /*
+   * **只有城鎮設施視窗**滿版：它裝的是商店清單、倉庫、製作表這類長列表，
+   * 在 393px 寬用不滿版就只剩兩三行看得到。
+   * 屬性配點、丟棄確認、顯示設定是三五行的小對話框，滿版反而失去比例感，
+   * 它們只需要寬度夾住（見下方的寬度收斂）。
+   */
+  .town-modal {
+    width: calc(100 * var(--vw-unit));
+    max-width: none;
+    height: calc(100 * var(--vh-unit) - var(--hud-band-bottom, 140px) / var(--ui-scale));
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .town-modal-overlay {
+    /* 滿版視窗不需要上方 150px 的讓位，只要留住底部 HUD 帶 */
+    padding: 0 0 var(--hud-band-bottom, 140px);
+    align-items: flex-start;
+  }
+
+  /* 小對話框仍置中，只把左右留白收到手機尺寸 */
+  .modal-overlay {
+    padding: 12px 8px calc(var(--hud-band-bottom, 140px) + 12px);
+  }
+
+  /* 城鎮的 NPC 快捷列一樣改單列橫捲，不然七八個設施會排成三列蓋住地圖 */
+  .town-npc-bar {
+    max-width: calc(100 * var(--vw-unit) - 16px);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .town-npc-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * 城鎮設施列改貼在**上方 HUD 帶下面**。桌機它停在畫面正上方 12px，
+   * 手機的狀態卡是全寬的，設施列就整條蓋在 HP／MP／EXP 上面。
+   */
+  .town-view {
+    /* 停在上方帶下面。帶高隨 buff 數量與字級變動，由 `useHudBandBottom()`
+       量測後寫進 `--hud-band-top`，不可寫死 */
+    top: calc(var(--hud-band-top, 200px) + 6px);
+    /* `height: 100%` 是這個元素的舊值（見 § 32.3 的警告），它會讓這條列
+       變成一塊滿高的板子，設施列被推到看不到的地方 */
+    height: auto;
+    left: 0;
+    right: 0;
+    transform: none;
+  }
+
+  /*
+   * 城鎮沒有探索控制，桌機靠 `visibility: hidden` 保留高度讓快捷格不位移。
+   * 但手機的 HUD 帶是**實心**的，看不見的佔位就變成一塊明顯的空白。
+   *
+   * 這裡可以直接收掉而不違反「快捷格不可位移」（§ 32.3）：帶子是靠下緣定位的，
+   * 少一項只會讓帶子的上緣往下、地圖變大，快捷格與畫面底部的距離完全不變。
+   */
+  .explore-bar-slot.is-hidden {
+    display: none;
+  }
+
+  /*
+   * 戰鬥日誌改成貼在下方 HUD 帶上的全寬抽屜（§ 34.8）。不可拖曳 ——
+   * 393px 寬沒有「挪到不擋路的地方」這種空間，能拖只會讓玩家把日誌弄丟。
+   * 放大時仍然蓋住地圖，那是刻意的設計。
+   */
+  .combat-log-window.is-drawer {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: calc(var(--hud-band-bottom, 140px) / var(--ui-scale));
+    width: calc(100 * var(--vw-unit));
+  }
+
+  .combat-log-window.is-drawer .combat-log-title {
+    cursor: default;
+  }
+
+  /* 預設高度砍半：手機的垂直空間本來就少，四五行日誌就夠看到剛剛發生什麼，
+     要看更多按 `▲` 展開（40dvh / 70dvh 兩段照舊） */
+  .combat-log-window.is-drawer .bottom-log-wrap {
+    height: 96px;
+  }
+
+  .combat-log-window.is-drawer .bottom-log-wrap.log-size-1 {
+    height: calc(40 * var(--vh-unit));
+  }
+
+  .combat-log-window.is-drawer .bottom-log-wrap.log-size-2 {
+    height: calc(70 * var(--vh-unit));
+  }
+
+  /*
+   * 寫死的面板寬度在 393px 會直接溢出畫面。一律改成
+   * 「不超過畫面、也不超過原本設計寬度」，桌機的數值仍是上限。
+   * 這一層吃 `zoom`，所以用 `--vw-unit` 而不是裸 vw（§ 34.6）。
+   */
+  .hud-topleft .status-panel,
+  .bottom-log-wrap,
+  .modal-content,
+  .settings-modal,
+  .attribute-up-modal,
+  .discard-modal {
+    width: min(100%, calc(100 * var(--vw-unit) - 16px));
+    max-width: calc(100 * var(--vw-unit) - 16px);
+  }
+
+  /*
+   * 四個角色格排成一列時，每格只剩 90px —— 「建立新角色」會被拆成三行。
+   * 改成 2×2。
+   */
+  .character-slots {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 標題／選角／建角三頁：桌機的固定寬卡片在 393px 會溢出 */
+  .title-screen h1 {
+    font-size: 2.2rem;
+  }
+
+  .character-select-screen,
+  .create-screen,
+  .legacy-screen {
+    width: 100%;
+    max-width: none;
+    padding: 16px 12px;
+  }
 }

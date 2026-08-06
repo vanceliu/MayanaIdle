@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { usePanelWindowStore } from '../stores/panelWindowStore';
+import { useIsMobile } from '../hooks/useViewport';
 import { CombatScriptEditor } from './CombatScriptEditor';
 import { PersistentScriptEditor } from './PersistentScriptEditor';
 
@@ -18,6 +19,7 @@ export function ScriptEditorButton() {
   const persistentRules = useGameStore(s => s.persistentRules);
   const isOpen = usePanelWindowStore(s => s.open.script);
   const toggle = usePanelWindowStore(s => s.toggle);
+  const isMobile = useIsMobile();
 
   const totalRules = combatRules.length + persistentRules.length;
 
@@ -25,7 +27,7 @@ export function ScriptEditorButton() {
     <button
       className={`panel-dock-btn script-panel-trigger ${isOpen ? 'active' : ''}`}
       aria-pressed={isOpen}
-      onClick={() => toggle('script')}
+      onClick={() => toggle('script', isMobile)}
     >
       <span>自動腳本</span>
       <span className="script-badge">{totalRules}</span>

@@ -355,3 +355,123 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 已習得與未習得共用同一個 tooltip，完整顯示威力／射程／MP／冷卻等數值，
 差別只在底部狀態列：已習得 `.skill-tooltip-status.learned`、未習得 `.skill-tooltip-status.locked`。
 未習得也看得到完整數值，玩家才能規劃學習路線。
+
+## 34.8 行動裝置支援
+
+**做法是「響應式單一版面」**：同一組元件用斷點切換行為，**不另開一套手機版元件**。
+兩套版面等於每加一個功能都要做兩次，遲早長歪。直向優先、橫向也要能用。
+
+### 唯一真相來源
+
+「現在算不算手機」只有一個答案，一律讀 `client/src/hooks/useViewport.ts`。
+元件**不得**自己寫 `matchMedia` 或讀 `window.innerWidth` ——
+一旦出現第二個判斷，就會有「CSS 認為是手機、JS 認為不是」的半套版面
+（浮動視窗以為自己是 sheet、CSS 卻還在畫拖曳標題列）。
+
+| 旗標 | 條件 | 決定什麼 |
+|---|---|---|
+| `isMobile` | 寬度 < 768px | **版面**走哪一套（sheet／tab bar／全寬狀態列） |
+| `isTouch` | `(hover: none)` | **互動**走哪一套（長按、tap tooltip、命中區） |
+| `orientation` | `(orientation: portrait)` | 直向／橫向 |
+
+`isMobile` 與 `isTouch` 是兩件事，**不可合併**：觸控筆電是 `isTouch` 但不是
+`isMobile`，桌機把視窗拉窄則相反。CSS 側同樣分成 `(hover: none)` 與
+`(max-width: 767px)` 兩組 media query。斷點值同時寫在
+`useViewport.ts` 的 `MOBILE_BREAKPOINT` 與 `App.css` 的 `--bp-mobile`，改一邊要改兩邊。
+
+### 觸控互動（桌機行為一律不變）
+
+| 桌機 | 手機 | 實作 |
+|---|---|---|
+| 右鍵選單 | **長按 500ms** | `hooks/useLongPress.ts`；右鍵路徑保留，兩者進同一個 handler |
+| hover tooltip | **點一下開／再點或點外面關** | `Tooltip` 依 `isTouch` 分流；背包格改成「選取時一併帶出詳情」 |
+| HTML5 拖放 | **指標拖放** | `stores/dragStore.ts`（見下） |
+| 快捷鍵 1~0 | 直接點快捷格 | 既有路徑，無需改動 |
+
+長按觸發後**必須**擋掉同一輪的主要動作（`useLongPress` 的 `didFire()`）——
+Android Chrome 長按後照樣補一發 `pointerup`，不擋就變成「開完選單順手把藥水喝掉」。
+
+### 指標拖放（取代 HTML5 drag-and-drop）
+
+`draggable` + `dragstart/drop` **在觸控裝置上完全不會觸發**，手機玩家等於失去
+背包重排、快捷格綁定與丟棄。改走 Pointer Events，滑鼠與觸控共用同一套。
+
+- **落點不靠事件冒泡**：拖曳期間指標被來源元素 capture 住（否則手指移出格子就收不到
+  move），目標元素根本收不到 `pointerover`。改用 `document.elementFromPoint()`。
+- **目標以 DOM 屬性宣告自己**：`data-drop-kind` + `data-drop-index`。
+  目前三種：`bag-slot`／`quick-slot`／`map`（丟棄，§ 35.5.3）。
+- **落點語意一律由拖曳來源執行**：快捷格綁定與丟棄都是全域 store action，
+  來源（背包）做得完，不必讓每個目標各自去解析拖曳負載。
+- **殘影（`DragGhost`）必須 `pointer-events: none`**：它只要吃事件就永遠擋在指標
+  正下方，所有落點都會判成殘影自己。
+- **觸控不走拖曳**：長按已經是次要選單的入口，再讓「按住滑動」抓起格子，
+  玩家想捲背包時每次都會誤觸。觸控的重排改走選單裡的「移動到其他格」→ 點目標格。
+
+### 版面
+
+```
+手機直向（< 768px）
+┌──────────────────────┐
+│ 手機測試 騎士 Lv.1   │ ← .hud-topbar（**疊在地圖上**）
+│ ▓▓ HP ▓▓▓▓▓▓▓▓▓▓▓▓  │   狀態卡全寬，BuffBar 接在下面
+│ ▓▓ MP ▓▓▓▓▓▓▓▓▓▓▓▓  │
+│ ▓▓ EXP ▓▓  負重 防禦 │
+│ [目前: 薄暮村     ▼] │ ← 地圖選擇器全寬
+├──────────────────────┤
+│  [城鎮設施列 →橫捲]  │ ← .town-view 停在 --hud-band-top 下面
+│                      │
+│     Pixi 地圖        │
+│                      │
+│ ┌ 戰鬥紀錄       ⚙ ┐ │ ← .combat-log-window.is-drawer
+│ └ …             ▲ ┘ │   全寬、不可拖曳、▲ 三段高度
+├──────────────────────┤
+│ [1][2][3][4]… →橫捲 │ ← .hud-bottombar（**不疊在地圖上**）
+│ 任務 狀態 裝備 背包… │   六顆一列的 tab bar
+│   Wiki 匯出 匯入 ⚙  │
+└──────────────────────┘
+```
+
+| 規則 | 說明 |
+|---|---|
+| 上下兩條帶 | `.hud-topbar` / `.hud-bottombar`。桌機是 **`display: contents`** —— 容器在版面上不存在，四座島仍各自貼角，排版與加這層之前完全相同 |
+| 上方帶疊在地圖上 | 狀態卡本來就是半透明 HUD，讓它佔版面等於再吃掉一截本來就不多的地圖高度 |
+| 下方帶不疊在地圖上 | 快捷格與 tab bar 是手機唯一的操作入口，半透明地蓋在會動的地圖上根本看不清楚。地圖讓出這段高度 |
+| 帶寬量測 | `--hud-band-bottom` / `--hud-band-top` 由 `useHudBandBottom()` 量測（§ 32.15.1）。帶子成形時量**整條帶子**，不是逐一量島內元素 —— 城鎮那格 `visibility: hidden` 的 ExploreBar 佔位在實心帶子裡照樣佔高度 |
+| 城鎮的 ExploreBar 佔位 | 手機 `display: none`。帶子靠下緣定位，少一項只會讓上緣往下、地圖變大，**快捷格與畫面底部的距離不變**，不違反 § 32.3 的「快捷格不可位移」 |
+| 快捷格 | 單列橫捲（`overflow-x: auto` + `touch-action: pan-x`）。桌機的 `flex-wrap` 在 393px 會排成三列 |
+| 面板按鈕 | 六顆一列。選擇器必須帶 `.hud-bottomright`，否則壓不過桌機的 3×2 格線 |
+| 浮動面板 | 全螢幕 sheet（`.floating-window.is-sheet`）：停用拖曳、不套用位置持久化、**一次只開一個**（`toggle(key, exclusive)`） |
+| 戰鬥日誌 | 貼在下方帶上的全寬抽屜（`.is-drawer`），不可拖曳。預設高度砍到 96px，`▲` 的 40dvh／70dvh 兩段照舊 |
+| 置中彈窗 | **只有城鎮設施視窗**滿版（長列表）。屬性配點、丟棄確認、顯示設定是三五行的小對話框，只收寬度 |
+| 角色格 | 選角頁改 2×2 —— 四格一列時每格只剩 90px，「建立新角色」會被拆成三行 |
+
+### 尺寸與單位
+
+- **視窗高度一律 `dvh`**：手機網址列會滑進滑出，`vh` 量的是列收起來時的高度，
+  `height: 100vh` 在列露出時會比可視區高一截，底部的快捷格與動作鈕剛好被切掉。
+  `--vh-base` / `--vw-base` 用 `@supports` 分流，舊瀏覽器仍拿得到 `vh`。
+- **縮放層內不可直接寫 vh / vw**（§ 34.6 既有規則），行動版的 sheet 與抽屜同樣適用，
+  一律 `calc(N * var(--vh-unit))`。
+- **安全區**：四角的貼邊距離加 `env(safe-area-inset-*)`（`--safe-*`）。桌機是 0，值不變。
+- **命中區下限 44×44**（`--tap-target`）。手指的接觸面約 9mm，桌機那種 30px 高的按鈕
+  在手機上是「點三次中一次」。只在 `(hover: none)` 生效，桌機的密度不變。
+- `viewport-fit=cover` + `user-scalable=no`；iOS 無視後者，另以
+  `touch-action: manipulation` 關掉雙擊縮放（不關的話快捷格連按兩下會被判成縮放手勢而吞掉）。
+- `overscroll-behavior: none` 擋整頁下拉刷新 —— 想捲面板時誤觸一次就是整局重載。
+
+### PWA（可安裝／離線）
+
+手機玩家多半是「裝到主畫面」而不是每次開瀏覽器打網址，所以行動版做完就補上 PWA。
+存檔本來就在 IndexedDB，只要程式碼與素材進得了快取，**離線就是完整可玩**——
+這是單機期最划算的一項。
+
+| 項目 | 內容 |
+|---|---|
+| 顯示模式 | `standalone`（隱藏網址列，多出約 60px 可視高度） |
+| 方向 | `any` —— 直向優先但橫向也要能玩，不鎖定 |
+| 底色 | `background_color` / `theme_color` 皆為 `#0A0A1A`，與 `--bg-deepest` 一致，啟動畫面與狀態列才不會閃白 |
+| 圖示 | 192／512 PNG，`purpose: "any maskable"`。**標誌只佔 60%**，因為 Android 會把 maskable 圖示裁成圓形／圓角方形，只保證中央 80% 的圓形區域不被裁掉 |
+| iOS | 不讀 manifest 的 `icons`，主畫面圖示只認 `<link rel="apple-touch-icon">` |
+| 更新時機 | 新版在**下一次完全關閉分頁**後生效，不做 `skipWaiting()` |
+
+實作上的硬性要求（為什麼要那樣寫）見 `16-tech-frontend-architecture.md` § 32.18。

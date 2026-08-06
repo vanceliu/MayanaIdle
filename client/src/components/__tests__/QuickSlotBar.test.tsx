@@ -1,15 +1,16 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { EQUIPMENT_TIER_COLORS, getEquipmentInstanceTierLevel } from '../../models/equipmentTier';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { QuickSlotBar } from '../QuickSlotBar';
+import { BagPanel } from '../BagPanel';
 import { useGameStore } from '../../stores/gameStore';
-import { BAG_DRAG_MIME, encodeBagDrag, type BagDragPayload } from '../../models/bagLayout';
+import { LONG_PRESS_MS } from '../../hooks/useLongPress';
+import { dragTo, dragStart, pointAt, restoreElementFromPoint } from '../../testing/pointerDrag';
 import { QUICK_SLOT_COUNT, emptyQuickSlots } from '../../models/quickSlot';
 import type { EquipmentInstance } from '../../models/equipment';
 import { bagItem } from '../../testing/bagFixtures';
 
-import { getItemId } from '../../models/items';
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => EQUIPMENT_SEEDS,
 }));
@@ -24,18 +25,6 @@ vi.mock('../GameIcon', () => ({
 /**
  * @vitest-environment jsdom
  */
-
-/** 模擬 HTML5 拖放的 dataTransfer */
-function dataTransferWith(payload: BagDragPayload) {
-  const store: Record<string, string> = { [BAG_DRAG_MIME]: encodeBagDrag(payload) };
-  return {
-    types: Object.keys(store),
-    getData: (type: string) => store[type] ?? '',
-    setData: (type: string, value: string) => { store[type] = value; },
-    dropEffect: '',
-    effectAllowed: '',
-  };
-}
 
 const slots = () => document.querySelectorAll('.quick-slot');
 
@@ -67,55 +56,6 @@ describe('QuickSlotBar', () => {
     }
   });
 
-  it('把背包藥水拖到空格 → 綁定該格', () => {
-    render(<QuickSlotBar />);
-    const target = slots()[3];
-    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 5 });
-
-    fireEvent.dragOver(target, { dataTransfer: dt });
-    fireEvent.drop(target, { dataTransfer: dt });
-
-    expect(useGameStore.getState().quickSlots[3]).toEqual({ kind: 'potion', potionType: 'red' });
-  });
-
-  it('拖到第 10 格（鍵盤 0）也能綁定', () => {
-    render(<QuickSlotBar />);
-    const target = slots()[QUICK_SLOT_COUNT - 1];
-    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 5 });
-
-    fireEvent.dragOver(target, { dataTransfer: dt });
-    fireEvent.drop(target, { dataTransfer: dt });
-
-    expect(useGameStore.getState().quickSlots[QUICK_SLOT_COUNT - 1])
-      .toEqual({ kind: 'potion', potionType: 'red' });
-  });
-
-  it('拖入不可放置的物品時不綁定', () => {
-    render(<QuickSlotBar />);
-    const target = slots()[0];
-    const dt = dataTransferWith({ kind: 'bag', name: '武器強化卷軸', itemId: getItemId('武器強化卷軸'), amount: 1 });
-
-    fireEvent.dragOver(target, { dataTransfer: dt });
-    fireEvent.drop(target, { dataTransfer: dt });
-
-    expect(useGameStore.getState().quickSlots[0]).toBeNull();
-  });
-
-  it('同一個物品拖到新格時，舊格自動清空', () => {
-    render(<QuickSlotBar />);
-    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 5 });
-
-    fireEvent.dragOver(slots()[1], { dataTransfer: dt });
-    fireEvent.drop(slots()[1], { dataTransfer: dt });
-    expect(useGameStore.getState().quickSlots[1]).not.toBeNull();
-
-    fireEvent.dragOver(slots()[6], { dataTransfer: dt });
-    fireEvent.drop(slots()[6], { dataTransfer: dt });
-
-    expect(useGameStore.getState().quickSlots[1]).toBeNull();
-    expect(useGameStore.getState().quickSlots[6]).toEqual({ kind: 'potion', potionType: 'red' });
-  });
-
   it('右鍵清除該格', () => {
     useGameStore.setState({
       quickSlots: emptyQuickSlots().map((_, i) =>
@@ -125,6 +65,118 @@ describe('QuickSlotBar', () => {
 
     fireEvent.contextMenu(slots()[2]);
     expect(useGameStore.getState().quickSlots[2]).toBeNull();
+  });
+
+  /**
+   * § 34.8：手機沒有右鍵，長按是唯一的清除入口。
+   * 沒有這條路徑，快捷格在手機上綁上去就再也拿不下來。
+   */
+  it('長按清除該格（觸控沒有右鍵）', async () => {
+    vi.useFakeTimers();
+    try {
+      useGameStore.setState({
+        quickSlots: emptyQuickSlots().map((_, i) =>
+          i === 2 ? { kind: 'potion' as const, potionType: 'red' as const } : null),
+      });
+      render(<QuickSlotBar />);
+
+      fireEvent.pointerDown(slots()[2], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+      await act(async () => { await vi.advanceTimersByTimeAsync(LONG_PRESS_MS + 20); });
+
+      expect(useGameStore.getState().quickSlots[2]).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('按住但手指滑開（捲動）不算長按', async () => {
+    vi.useFakeTimers();
+    try {
+      useGameStore.setState({
+        quickSlots: emptyQuickSlots().map((_, i) =>
+          i === 2 ? { kind: 'potion' as const, potionType: 'red' as const } : null),
+      });
+      render(<QuickSlotBar />);
+
+      fireEvent.pointerDown(slots()[2], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+      fireEvent.pointerMove(slots()[2], { clientX: 5, clientY: 90, pointerType: 'touch' });
+      await act(async () => { await vi.advanceTimersByTimeAsync(LONG_PRESS_MS + 20); });
+
+      expect(useGameStore.getState().quickSlots[2]).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * 快捷格綁定的落點測試（§ 34.8）。
+ *
+ * 綁定動作已經由拖曳來源（背包）執行，快捷格只宣告自己是落點，
+ * 所以測試必須把兩個元件一起渲染 —— 只渲染快捷格是測不到這條路徑的。
+ */
+describe('從背包拖曳到快捷格', () => {
+  beforeEach(() => {
+    useGameStore.setState({
+      quickSlots: emptyQuickSlots(),
+      bagItems: [bagItem('紅色藥水', 5)],
+      inventory: [],
+    });
+  });
+
+  afterEach(() => restoreElementFromPoint());
+
+  function renderBoth() {
+    render(<><BagPanel /><QuickSlotBar /></>);
+    const source = document.querySelector('.bag-cell:not(.empty)');
+    expect(source).not.toBeNull();
+    return source!;
+  }
+
+  it('把背包藥水拖到空格 → 綁定該格', () => {
+    const source = renderBoth();
+    dragTo(source, slots()[3]);
+    expect(useGameStore.getState().quickSlots[3]).toEqual({ kind: 'potion', potionType: 'red' });
+  });
+
+  it('拖到第 10 格（鍵盤 0）也能綁定', () => {
+    const source = renderBoth();
+    dragTo(source, slots()[QUICK_SLOT_COUNT - 1]);
+    expect(useGameStore.getState().quickSlots[QUICK_SLOT_COUNT - 1])
+      .toEqual({ kind: 'potion', potionType: 'red' });
+  });
+
+  it('拖入不可放置的物品時不綁定', () => {
+    useGameStore.setState({ bagItems: [bagItem('武器強化卷軸', 1)] });
+    const source = renderBoth();
+    dragTo(source, slots()[0]);
+    expect(useGameStore.getState().quickSlots[0]).toBeNull();
+  });
+
+  it('同一個物品拖到新格時，舊格自動清空', () => {
+    const source = renderBoth();
+    dragTo(source, slots()[1]);
+    expect(useGameStore.getState().quickSlots[1]).not.toBeNull();
+
+    dragTo(source, slots()[6]);
+    expect(useGameStore.getState().quickSlots[1]).toBeNull();
+    expect(useGameStore.getState().quickSlots[6]).toEqual({ kind: 'potion', potionType: 'red' });
+  });
+
+  it('拖曳中的快捷格會亮出可放置提示', () => {
+    const source = renderBoth();
+    dragStart(source);
+    expect(slots()[0].className).toContain('droppable');
+  });
+
+  it('放在沒有落點的地方＝什麼都不做', () => {
+    const source = renderBoth();
+    pointAt(document.body);
+    fireEvent.pointerDown(source, { button: 0, clientX: 0, clientY: 0, pointerType: 'mouse' });
+    fireEvent.pointerMove(source, { clientX: 40, clientY: 40, pointerType: 'mouse' });
+    fireEvent.pointerUp(source, { clientX: 40, clientY: 40, pointerType: 'mouse' });
+
+    expect(useGameStore.getState().quickSlots.every(s => s == null)).toBe(true);
   });
 });
 

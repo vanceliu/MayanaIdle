@@ -205,7 +205,11 @@ interface PanelWindowState {
   positions: Record<PanelKey, PanelPosition>;
   /** z 順序，陣列末端為最上層 */
   order: PanelKey[];
-  toggle: (key: PanelKey) => void;
+  /**
+   * @param exclusive 開啟時同時關掉其他面板。手機的 sheet 是滿版的（§ 34.8），
+   *   多開只會互相蓋住，關掉的那些玩家也看不到 —— 一次只留一個才對得上畫面。
+   */
+  toggle: (key: PanelKey, exclusive?: boolean) => void;
   openPanel: (key: PanelKey) => void;
   closePanel: (key: PanelKey) => void;
   focusPanel: (key: PanelKey) => void;
@@ -224,10 +228,13 @@ export const usePanelWindowStore = create<PanelWindowState>((set) => ({
   positions: readStoredPositions(),
   order: [...PANEL_KEYS],
 
-  toggle: (key) => set(s => (
+  toggle: (key, exclusive = false) => set(s => (
     s.open[key]
       ? { open: { ...s.open, [key]: false } }
-      : { open: { ...s.open, [key]: true }, order: moveToTop(s.order, key) }
+      : {
+        open: { ...(exclusive ? allClosed() : s.open), [key]: true },
+        order: moveToTop(s.order, key),
+      }
   )),
 
   openPanel: (key) => set(s => ({

@@ -109,6 +109,43 @@ describe('panelWindowStore', () => {
     expect(Object.values(open).every(v => v === false)).toBe(true);
   });
 
+  /**
+   * § 34.8：手機的 sheet 是滿版的，多開只會互相蓋住，被蓋掉的那些玩家也看不到。
+   * 一次只留一個面板開著，才對得上畫面上真的看得到的東西。
+   */
+  it('toggle 帶 exclusive 時，開新面板會關掉其他面板', () => {
+    const { openPanel, toggle } = usePanelWindowStore.getState();
+    openPanel('bag');
+    openPanel('skill');
+
+    toggle('stats', true);
+
+    const { open } = usePanelWindowStore.getState();
+    expect(open.stats).toBe(true);
+    expect(open.bag).toBe(false);
+    expect(open.skill).toBe(false);
+  });
+
+  it('toggle 不帶 exclusive（桌機）維持可多開', () => {
+    const { openPanel, toggle } = usePanelWindowStore.getState();
+    openPanel('bag');
+
+    toggle('stats');
+
+    const { open } = usePanelWindowStore.getState();
+    expect(open.stats).toBe(true);
+    expect(open.bag).toBe(true);
+  });
+
+  it('exclusive 關閉已開啟的面板時就只是關掉它', () => {
+    const { openPanel, toggle } = usePanelWindowStore.getState();
+    openPanel('bag');
+
+    toggle('bag', true);
+
+    expect(usePanelWindowStore.getState().open.bag).toBe(false);
+  });
+
   it('getPanelZIndex 依 order 位置遞增，最上層 z 最大', () => {
     const order: PanelKey[] = ['stats', 'equipment', 'skill', 'bag'];
 

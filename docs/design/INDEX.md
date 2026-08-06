@@ -86,6 +86,8 @@
 | 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
+| 行動裝置支援（斷點/觸控互動/指標拖放/手機版面） | `34-ui-guidelines.md` | § 34.8（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
+| PWA（可安裝/離線/Service Worker） | `34-ui-guidelines.md` | § 34.8 末段（模組邊界與硬性要求見 `16-tech-frontend-architecture.md` § 32.18） |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
@@ -192,7 +194,7 @@
 | `16-tech.md` | 技術方向 | React/Vite/TypeScript/PostgreSQL |
 | `16-tech-frontend-architecture.md` | 前端架構 | 目錄結構、狀態管理、資料流、計時器、組件職責 |
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
-| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則 |
+| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、行動裝置支援 |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
 | `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
 
@@ -272,6 +274,12 @@
 34-ui-guidelines.md（顯示規範）←→ 18-data-schema.md（資料結構）
        ↕
 16-tech-frontend-architecture.md § 32.15.1（視窗層級／底部 HUD 帶寬 --hud-band-bottom）
+       ↕
+34-ui-guidelines.md § 34.8（行動裝置：斷點／觸控互動／指標拖放／手機版面）
+  ←→ 16-tech-frontend-architecture.md § 32.17（useViewport／dragStore／HUD 帶模組邊界）
+  ←→ 16-tech-frontend-architecture.md § 32.18（PWA：manifest／Service Worker／圖示）
+  ←→ 34-ui-guidelines.md § 34.6（介面縮放：縮放層內不可寫 vh/vw，行動版同樣適用）
+  ←→ 35-inventory-constraints.md § 35.1.3／§ 35.5.3（背包重排與丟棄，兩者都由拖放承載）
 
 36-quest-system.md ←→ 13-town.md（冒險者工會設施）
        ↕                    ↕

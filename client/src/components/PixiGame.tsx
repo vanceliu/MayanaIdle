@@ -3,7 +3,6 @@ import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
 import { MonsterListOverlay } from './MonsterListOverlay';
-import { BAG_DRAG_MIME, decodeBagDrag } from '../models/bagLayout';
 import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
@@ -329,33 +328,16 @@ export function PixiGame() {
     };
   }, []);
 
-  // § 35.5.3：從背包拖到地圖上＝丟棄（需確認）。
-  // 只有帶 BAG_DRAG_MIME 的拖曳才 preventDefault，因此丟到其他 UI 一律無效果。
-  function handleDragOver(e: React.DragEvent) {
-    if (!Array.from(e.dataTransfer.types).includes(BAG_DRAG_MIME)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    const payload = decodeBagDrag(e.dataTransfer.getData(BAG_DRAG_MIME));
-    if (!payload) return;
-    e.preventDefault();
-    useGameStore.getState().requestDiscard({
-      kind: payload.kind,
-      name: payload.name,
-      itemId: payload.itemId,
-      maxAmount: payload.kind === 'equipment' ? 1 : payload.amount,
-      equipmentId: payload.equipmentId,
-    });
-  }
-
   return (
     <div
       className="map-canvas-container"
       style={{ width: '100%', height: '100%', position: 'relative' }}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      /*
+       * § 35.5.3：從背包拖到地圖上＝丟棄（需確認）。
+       * 地圖只是宣告自己是落點，實際的丟棄由拖曳來源（背包）在放開時發動 ——
+       * 指標拖放期間事件被來源 capture 住，這裡收不到任何 pointer 事件（§ 34.8）。
+       */
+      data-drop-kind="map"
     >
       {/* Pixi canvas 以 appendChild 掛入，需與 React 管理的節點分離 */}
       <div ref={containerRef} className="map-canvas-stage" />

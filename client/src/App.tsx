@@ -19,6 +19,7 @@ import { TownView } from './components/TownView';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
 import { PanelWindows } from './components/PanelWindows';
+import { DragGhost } from './components/DragGhost';
 import { useWindowLayerStore, useWindowZIndex } from './stores/windowLayerStore';
 import { useHudBandBottom } from './hooks/useHudBand';
 import { SettingsModal } from './components/SettingsModal';
@@ -257,41 +258,58 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
       </div>
       {isInTown && <TownView />}
 
-      {/* 左上：角色狀態卡，buff 接在它下面 */}
-      <div className="hud hud-topleft">
-        <StatusPanel />
-        <BuffBar />
-      </div>
+      {/*
+        * 上方 HUD 帶。桌機是 `display: contents` —— 這個容器在版面上不存在，
+        * 兩座島仍各自貼在左上／右上角，版面與過去完全相同（§ 32.3）。
+        * 手機才變成真正的容器，把兩者疊成一條全寬的狀態列（§ 34.8）。
+        * 用 `display: contents` 而不是條件渲染，是為了不讓兩種版面各長一份 JSX。
+        */}
+      <div className="hud-topbar">
+        {/* 左上：角色狀態卡，buff 接在它下面 */}
+        <div className="hud hud-topleft">
+          <StatusPanel />
+          <BuffBar />
+        </div>
 
-      {/* 右上：只放地圖選擇器（系統按鈕與版本標示都在右下角） */}
-      <div
-        className="hud hud-topright"
-        style={{ zIndex: mapNavZIndex }}
-        onPointerDown={() => focusWindow('map-nav')}
-      >
-        <MapNavigation />
+        {/* 右上：只放地圖選擇器（系統按鈕與版本標示都在右下角） */}
+        <div
+          className="hud hud-topright"
+          style={{ zIndex: mapNavZIndex }}
+          onPointerDown={() => focusWindow('map-nav')}
+        >
+          <MapNavigation />
+        </div>
       </div>
 
       {/* 戰鬥日誌：可拖曳的視窗，預設停在左下角 */}
       <CombatLogWindow />
 
-      {/* 底部中央：探索控制 + 快捷格。城鎮沒有探索控制，但保留位置讓快捷格不位移 */}
-      <div className="hud hud-bottomcenter">
-        <div className={`explore-bar-slot ${isInTown ? 'is-hidden' : ''}`}>
-          <ExploreBar />
+      {/*
+        * 下方 HUD 帶。同樣是桌機 `display: contents`、手機才成形（§ 34.8）。
+        * 手機上這條**不疊在地圖上**：快捷格與面板按鈕是唯一的觸控入口，
+        * 半透明地蓋在會動的地圖上會看不清楚，改成把地圖讓出這段高度。
+        */}
+      <div className="hud-bottombar">
+        {/* 底部中央：探索控制 + 快捷格。城鎮沒有探索控制，但保留位置讓快捷格不位移 */}
+        <div className="hud hud-bottomcenter">
+          <div className={`explore-bar-slot ${isInTown ? 'is-hidden' : ''}`}>
+            <ExploreBar />
+          </div>
+          <QuickSlotBar />
         </div>
-        <QuickSlotBar />
-      </div>
 
-      {/* 右下：面板按鈕 + 系統按鈕（Wiki／匯出／匯入／登出） */}
-      <div className="hud hud-bottomright">
-        <PanelDock />
-        <GameToolbar />
+        {/* 右下：面板按鈕 + 系統按鈕（Wiki／匯出／匯入／登出） */}
+        <div className="hud hud-bottomright">
+          <PanelDock />
+          <GameToolbar />
+        </div>
       </div>
 
       <PanelWindows />
       <AttributeUpModal />
       <DiscardConfirmModal />
+      {/* 指標拖曳的殘影（§ 34.8）。掛在最外層，任何面板拖出來的東西都畫得到 */}
+      <DragGhost />
     </div>
   );
 }

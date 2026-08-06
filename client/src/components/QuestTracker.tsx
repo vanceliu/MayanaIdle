@@ -1,5 +1,6 @@
 import { useGameStore } from '../stores/gameStore';
 import { usePanelWindowStore } from '../stores/panelWindowStore';
+import { useIsMobile } from '../hooks/useViewport';
 import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
@@ -15,6 +16,7 @@ export function QuestTrackerButton() {
   const adventurerQuests = useGameStore(s => s.adventurerQuests);
   const isOpen = usePanelWindowStore(s => s.open.quest);
   const toggle = usePanelWindowStore(s => s.toggle);
+  const isMobile = useIsMobile();
 
   if (!character) return null;
 
@@ -27,7 +29,7 @@ export function QuestTrackerButton() {
     <button
       className={`panel-dock-btn quest-tracker-btn ${isOpen ? 'active' : ''}`}
       aria-pressed={isOpen}
-      onClick={() => toggle('quest')}
+      onClick={() => toggle('quest', isMobile)}
     >
       📋 任務
       {totalQuests > 0 && (

@@ -1,6 +1,7 @@
 import { ScriptEditorButton } from './ScriptEditorPanel';
 import { QuestTrackerButton } from './QuestTracker';
 import { usePanelWindowStore, DOCK_PANEL_KEYS, PANEL_TITLES } from '../stores/panelWindowStore';
+import { useIsMobile } from '../hooks/useViewport';
 
 /**
  * 底部面板按鈕列（16-tech-frontend-architecture.md § 32.15）
@@ -10,6 +11,8 @@ import { usePanelWindowStore, DOCK_PANEL_KEYS, PANEL_TITLES } from '../stores/pa
 export function PanelDock() {
   const open = usePanelWindowStore(s => s.open);
   const toggle = usePanelWindowStore(s => s.toggle);
+  // 手機的 sheet 是滿版的，一次只留一個面板開著（§ 34.8）
+  const isMobile = useIsMobile();
 
   return (
     <div className="panel-dock">
@@ -19,7 +22,7 @@ export function PanelDock() {
           key={key}
           className={`panel-dock-btn ${open[key] ? 'active' : ''}`}
           aria-pressed={open[key]}
-          onClick={() => toggle(key)}
+          onClick={() => toggle(key, isMobile)}
         >
           {PANEL_TITLES[key]}
         </button>

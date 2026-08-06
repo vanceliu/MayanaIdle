@@ -1,11 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { BagPanel } from '../BagPanel';
+import { DragGhost } from '../DragGhost';
+import { useDragStore } from '../../stores/dragStore';
 import { useGameStore } from '../../stores/gameStore';
-import { BAG_DRAG_MIME, decodeBagDrag } from '../../models/bagLayout';
+import { LONG_PRESS_MS } from '../../hooks/useLongPress';
+import { dragTo, dragStart, pointAt, restoreElementFromPoint } from '../../testing/pointerDrag';
 import { bagItem } from '../../testing/bagFixtures';
 
-import { getItemId } from '../../models/items';
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => [],
 }));
@@ -166,11 +168,11 @@ it('shows gold row when expanded', () => {
       });
       render(<BagPanel />);
 
-      // 真的拖起來時瀏覽器只發 dragstart／dragend，不發 pointerup 也不發 click
-      fireEvent.pointerDown(cell(), { button: 0, clientX: 10, clientY: 10 });
-      fireEvent.dragStart(cell(), { dataTransfer: { setData: () => {}, effectAllowed: '' } });
+      // 拖曳起手不會有 click，選取必須在 pointerdown 當下就完成
+      dragStart(cell());
 
       expect(document.querySelector('.bag-cell.is-selected')).not.toBeNull();
+      restoreElementFromPoint();
     });
 
     it('按下到放開位移過大時算拖曳起手，不執行動作', () => {
@@ -212,37 +214,115 @@ it('shows gold row when expanded', () => {
   });
 
   /**
-   * 迴歸測試：`effectAllowed` 必須允許 copy 與 move 兩種。
-   *
-   * 快捷鍵綁定用 `dropEffect='copy'`、丟到地圖用 `'move'`；
-   * 若來源只宣告 `'move'`，瀏覽器會判定與 `'copy'` 不相容而**直接取消放置**，
-   * drop 事件根本不會觸發 —— 症狀是「拖不進快捷鍵，但丟到地圖可以」。
+   * § 34.8：拖放改成 pointer-based（HTML5 拖放在觸控裝置上完全不觸發）。
+   * 三個落點（背包格／快捷格／地圖）都由**拖曳來源**執行，這裡驗證背包格內重排。
    */
-  it('拖曳來源的 effectAllowed 同時允許 copy 與 move', () => {
-    useGameStore.setState({
-      bagItems: [bagItem('紅色藥水', 3)],
-      inventory: [],
+  describe('指標拖放（§ 34.8）', () => {
+    beforeEach(() => {
+      useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3)], inventory: [] });
     });
-    render(<BagPanel />);
+    afterEach(() => {
+      restoreElementFromPoint();
+      // dragStore 是模組層單例：上一個測試若停在拖曳中，下一個測試會看到殘留的拖曳狀態
+      useDragStore.getState().cancel();
+    });
 
-    const cell = document.querySelector('.bag-cell:not(.empty)');
-    expect(cell).not.toBeNull();
+    const cells = () => document.querySelectorAll('.bag-cell');
 
-    const store: Record<string, string> = {};
-    const dataTransfer = {
-      types: [] as string[],
-      setData: (type: string, value: string) => { store[type] = value; dataTransfer.types.push(type); },
-      getData: (type: string) => store[type] ?? '',
-      effectAllowed: '',
-      dropEffect: '',
-    };
+    it('拖到空格會換位置', () => {
+      render(<BagPanel />);
+      // 第一格是紅色藥水，第五格是空的
+      expect(cells()[0].className).not.toContain('empty');
+      dragTo(cells()[0], cells()[4]);
 
-    fireEvent.dragStart(cell!, { dataTransfer });
+      expect(cells()[0].className).toContain('empty');
+      expect(cells()[4].className).not.toContain('empty');
+    });
 
-    expect(dataTransfer.effectAllowed).toBe('copyMove');
-    // 同時確認負載有寫進去，且解得出來
-    expect(decodeBagDrag(store[BAG_DRAG_MIME])).toEqual({
-      kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 3, equipmentId: undefined,
+    it('拖曳中來源格標記 dragging，落點格標記 drag-over', () => {
+      render(<BagPanel />);
+      const source = cells()[0];
+      pointAt(cells()[4]);
+      fireEvent.pointerDown(source, { button: 0, clientX: 0, clientY: 0, pointerType: 'mouse' });
+      fireEvent.pointerMove(source, { clientX: 40, clientY: 40, pointerType: 'mouse' });
+
+      expect(document.querySelector('.bag-cell.dragging')).not.toBeNull();
+      expect(document.querySelector('.bag-cell.drag-over')).not.toBeNull();
+    });
+
+    it('拖曳中會畫出殘影，放開後消失', () => {
+      // 殘影掛在 GameLayout 最外層（App.tsx），要一起渲染才看得到
+      render(<><BagPanel /><DragGhost /></>);
+      dragStart(cells()[0]);
+      expect(screen.queryByTestId('drag-ghost')).not.toBeNull();
+
+      fireEvent.pointerUp(cells()[0], { clientX: 40, clientY: 40, pointerType: 'mouse' });
+      expect(screen.queryByTestId('drag-ghost')).toBeNull();
+    });
+
+    /**
+     * 觸控**刻意不走拖曳**：長按已經是次要選單的入口，再讓「按住滑動」抓起格子，
+     * 玩家想捲背包時每次都會誤觸。重排改走選單的「移動到其他格」。
+     */
+    it('觸控按住滑動不會啟動拖曳', () => {
+      render(<BagPanel />);
+      const source = cells()[0];
+      pointAt(cells()[4]);
+      fireEvent.pointerDown(source, { button: 0, clientX: 0, clientY: 0, pointerType: 'touch' });
+      fireEvent.pointerMove(source, { clientX: 40, clientY: 40, pointerType: 'touch' });
+
+      expect(screen.queryByTestId('drag-ghost')).toBeNull();
+      expect(document.querySelector('.bag-cell.dragging')).toBeNull();
+    });
+  });
+
+  /** § 34.8：觸控用的重排路徑 —— 長按開選單 →「移動到其他格」→ 點目標格 */
+  describe('移動模式（觸控重排）', () => {
+    beforeEach(() => {
+      useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3)], inventory: [] });
+    });
+
+    const cells = () => document.querySelectorAll('.bag-cell');
+
+    it('長按開選單 → 移動 → 點目標格完成搬移', async () => {
+      vi.useFakeTimers();
+      try {
+        render(<BagPanel />);
+        fireEvent.pointerDown(cells()[0], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+        await act(async () => { await vi.advanceTimersByTimeAsync(LONG_PRESS_MS + 20); });
+
+        const moveBtn = screen.getByText('移動到其他格');
+        fireEvent.click(moveBtn);
+        expect(screen.getByText(/選擇要移到的格子/)).toBeDefined();
+
+        fireEvent.pointerDown(cells()[6], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+
+        expect(cells()[0].className).toContain('empty');
+        expect(cells()[6].className).not.toContain('empty');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('長按開完選單，放開手指不會順手把藥水喝掉', async () => {
+      vi.useFakeTimers();
+      const usePotionByType = vi.fn();
+      try {
+        useGameStore.setState({ usePotionByType });
+        render(<BagPanel />);
+
+        // 先選起來，讓下一次點擊本來會直接使用
+        fireEvent.pointerDown(cells()[0], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+        fireEvent.pointerUp(cells()[0], { clientX: 5, clientY: 5, pointerType: 'touch' });
+
+        fireEvent.pointerDown(cells()[0], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+        await act(async () => { await vi.advanceTimersByTimeAsync(LONG_PRESS_MS + 20); });
+        fireEvent.pointerUp(cells()[0], { clientX: 5, clientY: 5, pointerType: 'touch' });
+
+        expect(usePotionByType).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

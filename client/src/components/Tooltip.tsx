@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useViewport } from '../hooks/useViewport';
 
 interface TooltipProps {
   content: ReactNode;
@@ -9,6 +10,7 @@ interface TooltipProps {
 }
 
 export function Tooltip({ content, children, position = 'top', delay = 200 }: TooltipProps) {
+  const { isTouch } = useViewport();
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const triggerRef = useRef<HTMLSpanElement>(null);
@@ -78,6 +80,31 @@ export function Tooltip({ content, children, position = 'top', delay = 200 }: To
     };
   }, []);
 
+  /*
+   * 觸控裝置沒有 hover（§ 34.8）。所有欄位說明、裝備詳情、技能數值都掛在 tooltip 上，
+   * 不補這條路徑等於這些內容在手機上完全看不到。
+   *
+   * 開著的時候點畫面任一處就收掉 —— 觸控沒有「移開」這個動作，
+   * 沒有這個關閉路徑，tooltip 會一直卡在畫面上擋住底下的東西。
+   */
+  useEffect(() => {
+    if (!visible || !isTouch) return;
+    function handleOutside(e: PointerEvent) {
+      if (triggerRef.current?.contains(e.target as Node)) return;
+      hide();
+    }
+    // capture 階段：底下的按鈕若在 bubble 前就 stopPropagation，收不到這一發
+    document.addEventListener('pointerdown', handleOutside, true);
+    return () => document.removeEventListener('pointerdown', handleOutside, true);
+  }, [visible, isTouch]);
+
+  function handleTouchToggle(e: React.PointerEvent) {
+    if (e.pointerType !== 'touch') return;
+    // 一次點擊切換開關：同一顆再點一次收起來
+    if (visible) hide();
+    else setVisible(true);
+  }
+
   return (
     <>
       <span
@@ -85,6 +112,7 @@ export function Tooltip({ content, children, position = 'top', delay = 200 }: To
         className="tooltip-trigger"
         onMouseEnter={show}
         onMouseLeave={hide}
+        onPointerUp={handleTouchToggle}
       >
         {children}
       </span>

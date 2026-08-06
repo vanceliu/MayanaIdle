@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBagLayout, moveBagSlot, encodeBagDrag, decodeBagDrag, type BagSlotMap } from '../bagLayout';
+import { buildBagLayout, moveBagSlot, type BagSlotMap } from '../bagLayout';
 
 const item = (id: string) => ({ id });
 const ids = (layout: ({ id: string } | null)[]) => layout.map(i => i?.id ?? null);
@@ -88,33 +88,5 @@ describe('moveBagSlot（§ 35.1.3）', () => {
     const next = moveBagSlot(layout, { gone: 4, a: 0 }, 0, 3);
     expect(next).toEqual({ a: 3 });
     expect(next.gone).toBeUndefined();
-  });
-});
-
-describe('拖出背包的負載編解碼（§ 35.5.3）', () => {
-  it('消耗品：帶著持有數量出去，供確認視窗顯示可丟數量', () => {
-    const payload = { kind: 'bag' as const, name: '紅色藥水', amount: 37 };
-    expect(decodeBagDrag(encodeBagDrag(payload))).toEqual(payload);
-  });
-
-  it('裝備：帶 equipmentId，數量固定 1', () => {
-    const payload = { kind: 'equipment' as const, name: '鐵劍', amount: 1, equipmentId: 42 };
-    expect(decodeBagDrag(encodeBagDrag(payload))).toEqual(payload);
-  });
-
-  it('非本系統的拖曳一律回 null（例如從桌面拖檔案進來）', () => {
-    expect(decodeBagDrag(null)).toBeNull();
-    expect(decodeBagDrag('')).toBeNull();
-    expect(decodeBagDrag('not json')).toBeNull();
-    expect(decodeBagDrag('{}')).toBeNull();
-    expect(decodeBagDrag('{"kind":"evil","name":"x"}')).toBeNull();
-    expect(decodeBagDrag('{"kind":"bag"}')).toBeNull();
-  });
-
-  it('數量異常時退回 1，不會產生 0 或負數', () => {
-    expect(decodeBagDrag('{"kind":"bag","name":"藥水","amount":0}')?.amount).toBe(1);
-    expect(decodeBagDrag('{"kind":"bag","name":"藥水","amount":-5}')?.amount).toBe(1);
-    expect(decodeBagDrag('{"kind":"bag","name":"藥水"}')?.amount).toBe(1);
-    expect(decodeBagDrag('{"kind":"bag","name":"藥水","amount":3.9}')?.amount).toBe(3);
   });
 });

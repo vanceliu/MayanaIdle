@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useEffect, useRef, useState } from 'react
 import { CombatLogPanel } from './CombatLogPanel';
 import { getElementScale } from '../stores/settingsStore';
 import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
+import { useIsMobile } from '../hooks/useViewport';
 
 const POSITION_KEY = 'mayana.combatLogPos';
 const OPACITY_KEY = 'mayana.combatLogOpacity';
@@ -85,6 +86,13 @@ export function resizeLogPosition(
  * `▲` 循環三段大小，放大時從日誌原位往上長、蓋在遊戲畫面上。
  */
 export function CombatLogWindow() {
+  /*
+   * 手機改成貼在下方 HUD 帶上的抽屜（`34-ui-guidelines.md` § 34.8）：
+   * 全寬、不可拖曳。393px 寬的畫面沒有「把視窗挪到不擋路的地方」這種空間，
+   * 拖曳只會讓玩家把日誌弄丟。`▲` 的三段高度照舊 ——
+   * 放大時蓋住地圖是刻意的設計，不因為換成手機就改掉。
+   */
+  const isMobile = useIsMobile();
   const [logSize, setLogSize] = useState<0 | 1 | 2>(0);
   const [pos, setPos] = useState<LogPosition | null>(null);
   const [opacity, setOpacity] = useState(80);
@@ -137,13 +145,14 @@ export function CombatLogWindow() {
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (isMobile) return;
     const box = ref.current?.getBoundingClientRect();
     if (!box) return;
     // 介面縮放時指標座標是視窗座標、left/top 是版面座標，統一換算到版面座標再算（§ 34.6）
     const scale = getElementScale(ref.current);
     dragOffset.current = { x: (e.clientX - box.left) / scale, y: (e.clientY - box.top) / scale };
     e.currentTarget.setPointerCapture(e.pointerId);
-  }, []);
+  }, [isMobile]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const offset = dragOffset.current;
@@ -208,11 +217,13 @@ export function CombatLogWindow() {
   return (
     <div
       ref={ref}
-      className={`hud combat-log-window ${pos ? 'is-moved' : ''}`}
+      className={`hud combat-log-window ${isMobile ? 'is-drawer' : pos ? 'is-moved' : ''}`}
       onPointerDown={() => focusWindow('combat-log')}
       style={{
         zIndex,
-        ...(pos ? { left: pos.left, top: pos.top } : {}),
+        /* 抽屜的位置由 CSS 決定：inline style 壓過 class，
+           留著桌機拖曳存下來的座標會讓抽屜停在畫面中間 */
+        ...(pos && !isMobile ? { left: pos.left, top: pos.top } : {}),
         ['--log-alpha' as string]: String(opacityToAlpha(opacity)),
       }}
     >
@@ -222,7 +233,7 @@ export function CombatLogWindow() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onDoubleClick={resetPosition}
-        title="拖曳移動；雙擊回到左下角"
+        title={isMobile ? undefined : '拖曳移動；雙擊回到左下角'}
       >
         <span>戰鬥紀錄</span>
 

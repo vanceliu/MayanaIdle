@@ -115,3 +115,41 @@ describe('GameLayout 版面（§ 32.3）', () => {
     expect(slot.querySelector('.explore-bar')).toBeTruthy();
   });
 });
+
+/**
+ * 行動版版面（§ 34.8）。
+ *
+ * 兩條 HUD 帶在桌機是 `display: contents`（容器不存在，四座島各自貼角），
+ * 手機才成形。這裡把關的是**結構**：島仍在帶子裡、島內容沒有因為換版面而搬家。
+ * 實際的排版由 CSS 的斷點負責，jsdom 不套用外部樣式表，測不到也不該在這裡測。
+ */
+describe('行動版 HUD 帶（§ 34.8）', () => {
+  it('上方帶包住左上與右上兩座島', () => {
+    const { container } = render(<GameLayout isInTown={false} />);
+    const bar = container.querySelector('.game-layout > .hud-topbar')!;
+
+    expect(bar).toBeTruthy();
+    expect(bar.querySelector(':scope > .hud-topleft .status-panel')).toBeTruthy();
+    expect(bar.querySelector(':scope > .hud-topright .map-selector')).toBeTruthy();
+  });
+
+  it('下方帶包住底部中央與右下兩座島', () => {
+    const { container } = render(<GameLayout isInTown={false} />);
+    const bar = container.querySelector('.game-layout > .hud-bottombar')!;
+
+    expect(bar).toBeTruthy();
+    expect(bar.querySelector(':scope > .hud-bottomcenter .quick-slot-bar')).toBeTruthy();
+    expect(bar.querySelector(':scope > .hud-bottomright .panel-dock')).toBeTruthy();
+  });
+
+  /**
+   * 帶子是為了手機才加的，桌機必須維持「島直接掛在 .game-layout 底下」的語意 ——
+   * `useHudBandBottom()` 的量測、`.hud > *` 的 zoom 選擇器都靠這層關係。
+   */
+  it('四座島仍是 .hud，帶子沒有搶走它們的 class', () => {
+    const { container } = render(<GameLayout isInTown={false} />);
+    for (const island of ['.hud-topleft', '.hud-topright', '.hud-bottomcenter', '.hud-bottomright']) {
+      expect(container.querySelector(`.hud${island}`), island).toBeTruthy();
+    }
+  });
+});

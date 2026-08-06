@@ -13,6 +13,10 @@ import { useSettingsStore } from '../stores/settingsStore';
 /** 底部 HUD 島（順序無意義，只是要一起量） */
 const BOTTOM_ISLANDS = ['.hud-bottomcenter', '.hud-bottomright'];
 
+/** 手機的上下 HUD 帶容器（桌機是 `display: contents`，量不到盒子） */
+const BOTTOM_BAR = '.hud-bottombar';
+const TOP_BAR = '.hud-topbar';
+
 /**
  * 從島內元素的位置算出帶寬。
  *
@@ -25,8 +29,43 @@ export function hudBandBottom(tops: number[], viewportHeight: number): number {
   return Math.max(0, Math.ceil(viewportHeight - Math.min(...tops)));
 }
 
+/**
+ * 手機把兩座島收進 `.hud-bottombar`，而那條帶子是**實心的**（有底色與上緣線，
+ * `34-ui-guidelines.md` § 34.8）—— 整條都會擋住底下的東西，量島內元素會少算：
+ * 城鎮那格 `visibility: hidden` 的 ExploreBar 佔位在帶子裡照樣佔高度，
+ * 少算的那 60 幾 px 就是地圖與日誌被帶子壓掉的部分。
+ *
+ * 桌機的帶子是 `display: contents`（沒有盒子），回 null 交還給逐元素量測。
+ */
+function solidBandTop(): number | null {
+  return barBox(BOTTOM_BAR)?.top ?? null;
+}
+
+/** 帶子成形時的盒子；桌機的 `display: contents` 沒有盒子，回 null */
+function barBox(selector: string): DOMRect | null {
+  const bar = document.querySelector(selector);
+  if (!bar) return null;
+  if (getComputedStyle(bar).display === 'contents') return null;
+  const box = bar.getBoundingClientRect();
+  return box.height > 0 ? box : null;
+}
+
+/**
+ * 上方 HUD 帶的高度（手機才有，`34-ui-guidelines.md` § 34.8）。
+ *
+ * 城鎮設施列要停在它下面 —— 手機的狀態卡是全寬的，設施列不讓位就整條蓋在
+ * HP／MP／EXP 上面。高度隨 buff 數量與字級變動，一樣不可寫死。
+ */
+export function hudBandTop(): number {
+  const box = barBox(TOP_BAR);
+  return box ? Math.max(0, Math.ceil(box.bottom)) : 0;
+}
+
 /** 島內「真的會擋住點擊」的元素上緣 */
 function visibleChildTops(): number[] {
+  const solid = solidBandTop();
+  if (solid != null) return [solid];
+
   const tops: number[] = [];
   for (const selector of BOTTOM_ISLANDS) {
     const island = document.querySelector(selector);
@@ -52,6 +91,8 @@ export function useHudBandBottom(): void {
       if (band > 0) {
         document.documentElement.style.setProperty('--hud-band-bottom', `${band}px`);
       }
+      // 上方帶只有手機才成形；桌機量到 0 就寫 0，讓城鎮設施列回到原本的貼頂位置
+      document.documentElement.style.setProperty('--hud-band-top', `${hudBandTop()}px`);
     };
 
     measure();
@@ -59,7 +100,7 @@ export function useHudBandBottom(): void {
     // 換行、快捷格增減都會改變帶寬，一律靠觀察器重量（jsdom 沒有 ResizeObserver，
     // 少了它只是不會即時重量，開機那次仍然算得出來，不該讓整個版面掛掉）
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    for (const selector of BOTTOM_ISLANDS) {
+    for (const selector of [...BOTTOM_ISLANDS, BOTTOM_BAR, TOP_BAR]) {
       const island = document.querySelector(selector);
       if (island) observer?.observe(island);
     }

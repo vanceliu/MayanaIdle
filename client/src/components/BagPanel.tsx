@@ -1,6 +1,8 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { buildBagLayout, moveBagSlot, encodeBagDrag, BAG_DRAG_MIME, type BagSlotMap } from '../models/bagLayout';
+import { buildBagLayout, moveBagSlot, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
+import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
+import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
 import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type PotionType, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
 import type { EquipmentInstance } from '../models/equipment';
@@ -72,10 +74,21 @@ export function BagPanel() {
   const [sorted, setSorted] = useState(false);
   /** § 35.1.3：手動拖放的位置。只存在於當下 session，不持久化 */
   const [slotMap, setSlotMap] = useState<BagSlotMap>({});
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
+  /**
+   * 「移動」模式選中的格子（§ 34.8）。
+   *
+   * 觸控裝置**不做拖曳** —— 長按已經被次要選單佔走，再把拖曳疊上去只會互相誤觸，
+   * 而背包格擠在一起、手指又比游標粗，拖錯格的成本比多點一下高。
+   * 改成選單裡選「移動」→ 點目標格，兩下完成，滑鼠玩家照樣可以用。
+   */
+  const [movingId, setMovingId] = useState<string | null>(null);
+
+  // 拖曳狀態由 dragStore 統一持有：落點可能在背包外（快捷格／地圖），
+  // 每個目標各自記一份 hover 狀態會對不起來
+  const dragItem = useDragStore(s => s.item);
+  const dragOver = useDragStore(s => s.over);
   /**
    * 背包一律點兩次才動作：第一次選取、第二次才使用／裝備。
    * 一格一格擠在一起，手滑就喝掉藥水或換掉整套裝備，代價比多點一下高。
@@ -83,7 +96,17 @@ export function BagPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   /** 這次按壓的起點：判斷放開時算不算「點擊」，以及是不是剛選起來的那一下 */
-  const pressRef = useRef<{ id: string; x: number; y: number; justSelected: boolean } | null>(null);
+  const pressRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    justSelected: boolean;
+    /** 按住的是哪一格（長按開選單、拖曳起手都要知道） */
+    item: BagGridItem;
+    index: number;
+    /** 觸控不走拖曳（見 `movingId`），起手判定要分流 */
+    touch: boolean;
+  } | null>(null);
 
   const character = useGameStore(s => s.character);
   const inventory = useGameStore(s => s.inventory);
@@ -168,21 +191,59 @@ export function BagPanel() {
   // 手動位置優先，其餘依預設順序流入剩餘空格
   const layout = buildBagLayout(displayItems, slotMap, maxSlots);
 
-  function handleDrop(toIndex: number) {
-    if (dragIndex == null) return;
-    setSlotMap(prev => moveBagSlot(layout, prev, dragIndex, toIndex));
-    setDragIndex(null);
-    setDragOverIndex(null);
+  /** 把格子搬到目標索引（拖放與「移動」模式共用同一條路徑） */
+  function moveTo(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    setSlotMap(prev => moveBagSlot(layout, prev, fromIndex, toIndex));
+  }
+
+  /** 這一格拖出去時要交給快捷格／地圖的描述（§ 35.5.3） */
+  function dragPayloadOf(item: BagGridItem): BagDragPayload {
+    return item.equipment
+      ? { kind: 'equipment', name: item.name, amount: 1, equipmentId: item.equipment.id }
+      : { kind: 'bag', name: item.name, itemId: item.itemId, amount: item.count ?? 1 };
+  }
+
+  /**
+   * 落點處理。三個目標的語意都不一樣，但**一律由拖曳來源決定**——
+   * 快捷格綁定與丟棄都是全域 store action，來源這裡就做得完，
+   * 不必讓每個目標各自去解析拖曳負載。
+   */
+  function applyDrop(target: DropTarget | null, item: DragItem) {
+    if (!target) return;
+    if (target.kind === 'bag-slot') {
+      moveTo(item.fromIndex, target.index);
+      return;
+    }
+    if (target.kind === 'quick-slot') {
+      const entry = toQuickSlotEntry(
+        item.payload.kind,
+        item.payload.itemId ?? -1,
+        item.payload.equipmentId,
+        item.payload.name,
+      );
+      if (entry) assignQuickSlot(target.index, entry);
+      return;
+    }
+    // § 35.5.3：丟到地圖上＝丟棄，需二次確認（DiscardConfirmModal）
+    useGameStore.getState().requestDiscard({
+      kind: item.payload.kind,
+      name: item.payload.name,
+      itemId: item.payload.itemId,
+      maxAmount: item.payload.kind === 'equipment' ? 1 : item.payload.amount,
+      equipmentId: item.payload.equipmentId,
+    });
   }
 
   function handleSortToggle() {
     // 「整理」同時清掉手動擺放，回到排序後的預設排列
     setSorted(!sorted);
     setSlotMap({});
+    setMovingId(null);
   }
 
-  function handleMouseEnter(e: React.MouseEvent, item: BagGridItem) {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  function showTooltipFor(el: HTMLElement, item: BagGridItem) {
+    const rect = el.getBoundingClientRect();
     const tooltipWidth = 220;
     let x = rect.left;
     if (x + tooltipWidth > window.innerWidth) {
@@ -194,14 +255,37 @@ export function BagPanel() {
     setTooltip({ item, x, y, above: false });
   }
 
+  function handleMouseEnter(e: React.MouseEvent, item: BagGridItem) {
+    showTooltipFor(e.currentTarget as HTMLElement, item);
+  }
+
   function handleMouseLeave() {
     setTooltip(null);
   }
 
+  function openContextMenu(item: BagGridItem, x: number, y: number) {
+    setTooltip(null);
+    setMovingId(null);
+    setContextMenu({ item, x, y });
+  }
+
   function handleContextMenu(e: React.MouseEvent, item: BagGridItem) {
     e.preventDefault();
-    setContextMenu({ item, x: e.clientX, y: e.clientY });
+    openContextMenu(item, e.clientX, e.clientY);
   }
+
+  /**
+   * 長按＝右鍵（§ 34.8）。手機沒有右鍵，不接這條路徑等於「設快捷鍵」與「丟棄」
+   * 在手機上不存在。
+   *
+   * hook 只能在元件頂層呼叫，不能在 `layout.map()` 裡每格開一個，
+   * 所以「按住的是哪一格」從 `pressRef` 讀 —— 格子的 pointerdown 一定先跑。
+   */
+  const longPress = useLongPress(point => {
+    const press = pressRef.current;
+    if (!press) return;
+    openContextMenu(press.item, point.clientX, point.clientY);
+  });
 
   function handleAssignSlot(slotIdx: number) {
     if (!contextMenu) return;
@@ -254,23 +338,71 @@ export function BagPanel() {
   function handlePanelPointerDown(e: React.PointerEvent) {
     // 只認主鍵：右鍵是快捷鍵選單，不該順手把選取清掉
     if (e.button !== 0) return;
+    // 移動模式要能點到空格，所以只有「連格子都沒點到」才取消
+    if (!(e.target as HTMLElement).closest?.('.bag-cell')) {
+      setMovingId(null);
+    }
     if (!(e.target as HTMLElement).closest?.('.bag-cell:not(.empty)')) {
       setSelectedId(null);
+      // 觸控沒有 mouseleave，詳情要跟著取消選取一起收，否則會一直卡在畫面上
+      setTooltip(null);
     }
   }
 
   /**
    * 選取在 **pointerdown** 就完成 —— 拖曳本身就帶著「按下＝選到這格」的語意。
    *
-   * 格子是 `draggable`，快速點擊只要游標動個幾 px 就會觸發 dragstart，
-   * 瀏覽器**根本不會發 click**。動作若綁在 click 上就會整個被吃掉，
-   * 症狀正是「點了沒反應」。
+   * 動作不可綁在 `click` 上：按下與放開落在不同元素時 click 會改派到共同祖先，
+   * 快速點擊漂幾 px 落到格子間隙就中，症狀正是「點了沒反應」。
    */
-  function handleCellPointerDown(e: React.PointerEvent, item: BagGridItem) {
+  function handleCellPointerDown(e: React.PointerEvent, item: BagGridItem, index: number) {
     if (e.button !== 0) return;
+    longPress.onPointerDown(e);
     const justSelected = selectedId !== item.id;
     if (justSelected) setSelectedId(item.id);
-    pressRef.current = { id: item.id, x: e.clientX, y: e.clientY, justSelected };
+    /*
+     * 觸控沒有 hover，物品詳情本來只掛在 hover tooltip 上（§ 34.8）——
+     * 手機玩家會完全看不到重量、詞綴、用途。改成「選取的同時把詳情叫出來」：
+     * 第一次點＝選取＋看詳情，第二次點＝使用，正好是既有的兩段式流程。
+     */
+    if (e.pointerType === 'touch') showTooltipFor(e.currentTarget as HTMLElement, item);
+    pressRef.current = {
+      id: item.id,
+      x: e.clientX,
+      y: e.clientY,
+      justSelected,
+      item,
+      index,
+      touch: e.pointerType === 'touch',
+    };
+  }
+
+  /**
+   * 超過容忍距離就從「點擊」轉成拖曳。
+   *
+   * **必須 `setPointerCapture`**：手指／游標一離開這一格，後續的 move 與 up 就會
+   * 派給別的元素，拖曳會在半路斷掉且永遠收不到落點。
+   *
+   * 觸控不走這條路：長按已經給了次要選單，再讓「按住滑動」變成拖曳，
+   * 玩家想捲背包時每次都會抓起一格東西。觸控改用選單裡的「移動」。
+   */
+  function handleCellPointerMove(e: React.PointerEvent) {
+    const press = pressRef.current;
+    if (!press) return;
+    longPress.onPointerMove(e);
+    if (press.touch || useDragStore.getState().item) {
+      if (useDragStore.getState().item) useDragStore.getState().move(e.clientX, e.clientY);
+      return;
+    }
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) <= CLICK_SLOP) return;
+
+    setTooltip(null);
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    useDragStore.getState().begin(
+      { fromIndex: press.index, payload: dragPayloadOf(press.item), label: press.item.name },
+      e.clientX,
+      e.clientY,
+    );
   }
 
   /**
@@ -281,6 +413,19 @@ export function BagPanel() {
   function handleCellPointerUp(e: React.PointerEvent, item: BagGridItem) {
     const press = pressRef.current;
     pressRef.current = null;
+    longPress.onPointerUp(e);
+
+    // 拖曳中：這一下是「放開」，不是點擊。落點由 dragStore 判定
+    const dragging = useDragStore.getState().item;
+    if (dragging) {
+      (e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
+      useDragStore.getState().move(e.clientX, e.clientY);
+      applyDrop(useDragStore.getState().drop(), dragging);
+      return;
+    }
+
+    // 長按已經開了選單，這一下只是手指離開螢幕，不能再算一次動作
+    if (longPress.didFire()) return;
     if (!press || press.id !== item.id) return;
     // 手一定會抖，給 8px 容忍；超過就當成拖曳的起手，不算點擊
     if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP) return;
@@ -290,6 +435,25 @@ export function BagPanel() {
     // 選的是「格子」不是「一次動作」：選起來就留著，之後每點一下都直接執行。
     // 連喝三瓶藥水＝點四下，而不是選一下用一下地來回切換。
     if (selectedId === item.id) activate(item);
+  }
+
+  function handleCellPointerCancel(e: React.PointerEvent) {
+    pressRef.current = null;
+    longPress.onPointerCancel(e);
+    useDragStore.getState().cancel();
+  }
+
+  /**
+   * 移動模式下點任何一格＝把來源搬過來（目標有東西就互換）。
+   * 回傳 true 代表這一下已經被移動模式吃掉，呼叫端不要再當成一般點擊。
+   */
+  function consumeMoveTap(toIndex: number): boolean {
+    if (movingId == null) return false;
+    const fromIndex = layout.findIndex(i => i?.id === movingId);
+    setMovingId(null);
+    if (fromIndex < 0) return true;
+    moveTo(fromIndex, toIndex);
+    return true;
   }
 
   function renderTooltipContent(item: BagGridItem) {
@@ -394,45 +558,47 @@ export function BagPanel() {
         <span className="bag-gold-label">金幣</span>
         <span className="bag-gold-value">{character?.gold ?? 0}</span>
       </div>
+      {movingId && (
+        <div className="bag-move-hint" role="status">
+          選擇要移到的格子（點空白處取消）
+        </div>
+      )}
       <div className="bag-grid-container">
         <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
           {layout.map((item, idx) => {
-            const dropProps = {
-              onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOverIndex(idx); },
-              onDragLeave: () => setDragOverIndex(prev => (prev === idx ? null : prev)),
-              onDrop: (e: React.DragEvent) => { e.preventDefault(); handleDrop(idx); },
-            };
-            const overClass = dragOverIndex === idx ? ' drag-over' : '';
+            /* 落點是靠 `elementFromPoint` 命中這兩個 data 屬性，不是靠事件冒泡 ——
+               拖曳期間指標被來源格 capture 住，目標格收不到任何 pointer 事件（§ 34.8） */
+            const dropProps = { 'data-drop-kind': 'bag-slot', 'data-drop-index': idx } as const;
+            const overClass = dragOver?.kind === 'bag-slot' && dragOver.index === idx ? ' drag-over' : '';
             if (!item) {
-              return <div key={`empty-${idx}`} className={`bag-cell empty${overClass}`} {...dropProps} />;
+              return (
+                <div
+                  key={`empty-${idx}`}
+                  className={`bag-cell empty${overClass}${movingId ? ' move-target' : ''}`}
+                  {...dropProps}
+                  onPointerDown={() => consumeMoveTap(idx)}
+                />
+              );
             }
             return (
               <div
                 key={item.id}
-                className={`bag-cell ${item.type}${overClass}${dragIndex === idx ? ' dragging' : ''}${
-                  selectedId === item.id ? ' is-selected' : ''
+                className={`bag-cell ${item.type}${overClass}${
+                  dragItem?.fromIndex === idx ? ' dragging' : ''
+                }${selectedId === item.id ? ' is-selected' : ''}${
+                  movingId === item.id ? ' is-moving' : movingId ? ' move-target' : ''
                 }`}
-                draggable
-                onDragStart={(e) => {
-                  setDragIndex(idx);
-                  setTooltip(null);
-                  // § 35.5.3：帶著描述出去，讓地圖可以判定為「丟棄」
-                  e.dataTransfer.setData(BAG_DRAG_MIME, encodeBagDrag(
-                    item.equipment
-                      ? { kind: 'equipment', name: item.name, amount: 1, equipmentId: item.equipment.id }
-                      : { kind: 'bag', name: item.name, itemId: item.itemId, amount: item.count ?? 1 },
-                  ));
-                  // 必須是 copyMove：快捷鍵綁定是 copy（物品留在背包）、丟到地圖是 move。
-                  // 若只給 'move'，快捷鍵的 dropEffect='copy' 會不相容，瀏覽器會直接取消放置。
-                  e.dataTransfer.effectAllowed = 'copyMove';
-                }}
-                onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 {...dropProps}
                 onMouseEnter={(e) => handleMouseEnter(e, item)}
                 onMouseLeave={handleMouseLeave}
                 onContextMenu={(e) => handleContextMenu(e, item)}
-                onPointerDown={(e) => handleCellPointerDown(e, item)}
+                onPointerDown={(e) => { if (!consumeMoveTap(idx)) handleCellPointerDown(e, item, idx); }}
+                onPointerMove={handleCellPointerMove}
                 onPointerUp={(e) => handleCellPointerUp(e, item)}
+                onPointerCancel={handleCellPointerCancel}
+                /* 保險絲：捕獲被系統收走（切到別的視窗、來電）時拖曳要結束，
+                   否則殘影會一直黏在指標上。正常放開時 store 已清空，這裡是 no-op */
+                onLostPointerCapture={handleCellPointerCancel}
               >
                 {item.type === 'equipment' ? (
                   <GameIcon
@@ -508,6 +674,17 @@ export function BagPanel() {
                 <div className="context-menu-divider" />
               </>
             )}
+            {/* 觸控裝置沒有拖曳（§ 34.8），重排背包只剩這條路；滑鼠玩家也可以用 */}
+            <button
+              className="context-menu-item"
+              onClick={() => {
+                setMovingId(contextMenu.item.id);
+                setContextMenu(null);
+              }}
+            >
+              移動到其他格
+            </button>
+            <div className="context-menu-divider" />
             <button className="context-menu-item context-menu-danger" onClick={handleDiscard}>
               丟棄{contextMenu.item.count && contextMenu.item.count > 1 ? ' ×1' : ''}
             </button>

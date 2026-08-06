@@ -4,9 +4,13 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { initDisplaySettings } from './stores/settingsStore'
+import { registerServiceWorker } from './registerServiceWorker'
 
 // 開機就把存下來的介面／文字倍率套進 CSS 變數，避免先用預設大小閃一下
 initDisplaySettings()
+
+// 離線可玩 + 可安裝到主畫面（§ 34.8）。開發模式會自行跳過
+registerServiceWorker()
 
 /**
  * Wiki 動態載入：多數玩家不會開 Wiki，沒必要讓它進主 bundle。

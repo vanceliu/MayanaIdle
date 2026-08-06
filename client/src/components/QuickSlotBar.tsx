@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { getPotionCount } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
@@ -7,14 +7,14 @@ import { getItemById } from '../models/items';
 import { getBagItemAmount } from '../models/bagItem';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
-import { BAG_DRAG_MIME, decodeBagDrag } from '../models/bagLayout';
+import { useDragStore } from '../stores/dragStore';
+import { useLongPress } from '../hooks/useLongPress';
 import {
   QUICK_SLOT_COUNT,
   keyToQuickSlotIndex,
   quickSlotLabel,
   getQuickSlotItemName,
   resolveQuickSlotAction,
-  toQuickSlotEntry,
   type BasicPotionType,
   type QuickSlotEntry,
 } from '../models/quickSlot';
@@ -32,7 +32,13 @@ export function QuickSlotBar() {
   const useQuickSlot = useGameStore(s => s.useQuickSlot);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const templates = useEquipmentTemplates();
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  /*
+   * 快捷格只是**放置目標**：它以 `data-drop-*` 宣告自己，實際的綁定由拖曳來源
+   * （背包）在放開時執行（§ 34.8）。這裡只讀 hover 狀態畫外框。
+   */
+  const dragOver = useDragStore(s => s.over);
+  const isDragging = useDragStore(s => s.item != null);
+  const dragOverIndex = dragOver?.kind === 'quick-slot' ? dragOver.index : null;
   /**
    * § 35.7.5：滑鼠操作採兩段確認 —— 第一次點擊只選取（顯示外框），再點同一格才執行。
    * 鍵盤快捷鍵**不受此限**，按下即執行。
@@ -88,19 +94,22 @@ export function QuickSlotBar() {
     return <GameIcon name={icon} size={24} color={color} />;
   }
 
-  function handleDrop(idx: number, e: React.DragEvent) {
-    const payload = decodeBagDrag(e.dataTransfer.getData(BAG_DRAG_MIME));
-    setDragOverIndex(null);
-    if (!payload) return;
-    e.preventDefault();
-    const entry = toQuickSlotEntry(payload.kind, payload.itemId ?? -1, payload.equipmentId, payload.name);
-    if (!entry) return;
-    setSelectedIndex(null);
-    assignQuickSlot(idx, entry);
-  }
+  /**
+   * 清除這一格。右鍵與長按共用（§ 34.8）——
+   * hook 只能在頂層呼叫，所以「按住的是第幾格」從 ref 讀，格子的 pointerdown 一定先跑。
+   */
+  const pressedIndexRef = useRef<number | null>(null);
+  const longPress = useLongPress(() => {
+    const idx = pressedIndexRef.current;
+    if (idx == null) return;
+    setSelectedIndex(prev => (prev === idx ? null : prev));
+    assignQuickSlot(idx, null);
+  });
 
   /** § 35.7.5：第一次點擊選取，再點同一格才執行 */
   function handleClick(idx: number, canUse: boolean) {
+    // 長按剛清完這一格，放開時不能再算一次點擊
+    if (longPress.didFire()) return;
     if (!canUse) {
       setSelectedIndex(null);
       return;
@@ -127,26 +136,25 @@ export function QuickSlotBar() {
             key={idx}
             className={`quick-slot ${isEmpty ? 'empty' : ''} ${isExhausted ? 'exhausted' : ''}`
               + (dragOverIndex === idx ? ' drag-over' : '')
+              + (isDragging ? ' droppable' : '')
               + (selectedIndex === idx ? ' selected' : '')}
+            /* 落點由 `elementFromPoint` 命中這兩個屬性（§ 34.8）；
+               拖曳期間指標被來源格 capture，這裡收不到任何 pointer 事件 */
+            data-drop-kind="quick-slot"
+            data-drop-index={idx}
             onClick={() => handleClick(idx, canUse)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setSelectedIndex(prev => (prev === idx ? null : prev));
-              assignQuickSlot(idx, null);
-            }}
-            onDragOver={(e) => {
-              if (!Array.from(e.dataTransfer.types).includes(BAG_DRAG_MIME)) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'copy';
-              setDragOverIndex(idx);
-            }}
-            onDragLeave={() => setDragOverIndex(prev => (prev === idx ? null : prev))}
-            onDrop={(e) => handleDrop(idx, e)}
-            /* 不能用 disabled：被 disable 的按鈕收不到 drag 事件，空格就永遠放不進去 */
+            /* 右鍵不一定先經過 pointerdown（測試會直接派 contextmenu，
+               部分環境的右鍵也是），索引要在這裡再設一次 */
+            onContextMenu={(e) => { pressedIndexRef.current = idx; longPress.onContextMenu(e); }}
+            onPointerDown={(e) => { pressedIndexRef.current = idx; longPress.onPointerDown(e); }}
+            onPointerMove={longPress.onPointerMove}
+            onPointerUp={longPress.onPointerUp}
+            onPointerCancel={longPress.onPointerCancel}
+            /* 不能用 disabled：被 disable 的按鈕收不到指標事件，空格就永遠放不進去 */
             aria-disabled={!canUse}
             title={entry
-              ? `${getQuickSlotItemName(entry)}（${selectedIndex === idx ? '再點一次使用' : '點一次選取'}，右鍵清除）`
-              : '空（從背包拖曳物品放入）'}
+              ? `${getQuickSlotItemName(entry)}（${selectedIndex === idx ? '再點一次使用' : '點一次選取'}，右鍵或長按清除）`
+              : '空（從背包拖曳或用背包選單指定）'}
           >
             <span className="quick-slot-key">{quickSlotLabel(idx)}</span>
             {entry && (
