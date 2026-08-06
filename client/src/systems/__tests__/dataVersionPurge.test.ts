@@ -65,7 +65,7 @@ describe('dataVersionPurge', () => {
   it('帳號下所有角色都被淘汰時，共用倉庫一併清除', async () => {
     await addCharacter(1, OUTDATED, 'uuid-a');
     await addCharacter(1, OUTDATED, 'uuid-b');
-    await db.warehouses.add({ userId: 1, name: 'gold', type: 'gold', amount: 9999, storageType: 'shared' });
+    await db.warehouseGold.put({ userId: 1, amount: 9999 });
     await db.equipmentInstances.add({ templateId: 1, ownerId: 1, inStorage: true, storageType: 'shared', equipped: false, quality: 0, enhancement: 0, affixes: [] } as never);
 
     await purgeOutdatedData();
@@ -77,12 +77,12 @@ describe('dataVersionPurge', () => {
   it('帳號還有未過期角色時，共用倉庫必須保留', async () => {
     await addCharacter(1, OUTDATED, 'uuid-old');
     await addCharacter(1, CURRENT_DATA_VERSION, 'uuid-keep');
-    await db.warehouses.add({ userId: 1, name: 'gold', type: 'gold', amount: 9999, storageType: 'shared' });
+    await db.warehouseGold.put({ userId: 1, amount: 9999 });
 
     await purgeOutdatedData();
 
     expect(await db.characters.count()).toBe(1);
-    expect(await db.warehouses.count()).toBe(1);
+    expect(await db.warehouseGold.count()).toBe(1);
   });
 
   it('清除該角色的 localStorage 殘留，其他鍵不動', async () => {
@@ -101,11 +101,11 @@ describe('dataVersionPurge', () => {
   it('不同帳號的資料互不影響', async () => {
     await addCharacter(1, OUTDATED, 'uuid-old');
     await addCharacter(2, CURRENT_DATA_VERSION, 'uuid-other-user');
-    await db.warehouses.add({ userId: 2, name: 'gold', type: 'gold', amount: 500, storageType: 'shared' });
+    await db.warehouseGold.put({ userId: 2, amount: 500 });
 
     await purgeOutdatedData();
 
     expect(await db.characters.count()).toBe(1);
-    expect(await db.warehouses.where('userId').equals(2).count()).toBe(1);
+    expect(await db.warehouseGold.where('userId').equals(2).count()).toBe(1);
   });
 });

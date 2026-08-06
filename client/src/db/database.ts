@@ -16,11 +16,30 @@ export interface WarehouseEntry {
   id?: number;
   userId: number;
   name: string;
-  type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook' | 'gold';
+  /**
+   * `'gold'` 已於 v16 移除 —— 金幣改存 `warehouseGold` 表（見 `WarehouseGoldEntry`）。
+   * 這裡是**物品**的分類，混入一個餘額用的假分類會讓每個走訪倉庫的迴圈
+   * 都得先記得跳過它，而漏掉的那個就會把餘額當成一疊道具。
+   */
+  type: 'equipment' | 'material' | 'potion' | 'scroll' | 'spellbook';
   itemTemplateId?: number;
   amount: number;
   storageType: 'personal' | 'shared';
   characterId?: number;
+}
+
+/**
+ * 共用倉庫的金幣餘額，一個帳號一列（`18-data-schema.md` § 18.7：
+ * 「倉庫另有獨立金幣存放欄位供跨角色轉移」）。
+ *
+ * 金幣是餘額不是物品：它沒有 `itemTemplateId`、不佔格數、不計重量，
+ * 而且線上化後需要「不可為負」的原子扣減（`98-online-architecture.md` § 4）。
+ * 與物品同表只能靠 `type` 字串區分，那三個性質一個都保證不了。
+ */
+export interface WarehouseGoldEntry {
+  /** 主鍵。共用倉庫綁帳號層級，故一個 userId 只會有一列 */
+  userId: number;
+  amount: number;
 }
 
 export interface DropTableEntry {
@@ -129,6 +148,7 @@ export class GameDB extends Dexie {
   characterStorage!: Table<CharacterStorageEntry>;
   users!: Table<UserEntry>;
   warehouses!: Table<WarehouseEntry>;
+  warehouseGold!: Table<WarehouseGoldEntry>;
 
   constructor() {
     super('MayanaIdleDB');
@@ -271,6 +291,34 @@ export class GameDB extends Dexie {
             : def.category === 'other' ? 'material'
             : def.category;
         });
+      }
+    });
+    /**
+     * 共用倉庫的金幣從 `warehouses` 搬到獨立的 `warehouseGold` 表
+     * （`18-data-schema.md` § 18.7 本來就是這樣寫的，實作沒跟上）。
+     *
+     * 舊資料理論上一個 userId 只有一列金幣，但存檔路徑是「整批刪掉再重寫」，
+     * 中途失敗就可能留下重複列。這裡**相加**而不是取第一列 ——
+     * 取第一列會在那種情況下靜默吃掉玩家的錢。
+     */
+    this.version(16).stores({
+      warehouseGold: 'userId',
+    }).upgrade(async tx => {
+      const totals = new Map<number, number>();
+      await tx.table('warehouses').toCollection().modify(function (
+        this: { value?: unknown },
+        row: Record<string, unknown>,
+      ) {
+        if (row.type !== 'gold') return;
+        const userId = row.userId as number;
+        const amount = typeof row.amount === 'number' ? row.amount : 0;
+        totals.set(userId, (totals.get(userId) ?? 0) + amount);
+        delete this.value;
+      });
+      if (totals.size > 0) {
+        await tx.table('warehouseGold').bulkPut(
+          [...totals].map(([userId, amount]) => ({ userId, amount })),
+        );
       }
     });
   }

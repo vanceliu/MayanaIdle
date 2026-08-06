@@ -195,6 +195,9 @@ baseValue × (1 + qualityPercent / 100)
 - Warehouse 綁定 userId（帳號層級共用），可存放物品與金幣
 - Inventory / Equipment / Skills / Progress 綁定 characterId（角色獨立）
 - 金幣存於 Character，各角色獨立；倉庫另有獨立金幣存放欄位供跨角色轉移
+- 共用倉庫金幣**不與物品同表**：實作為獨立的 `warehouseGold`（主鍵 `userId`，一帳號一列）。
+  金幣是餘額不是物品 —— 不佔格數、不計重量、沒有 `itemTemplateId`，
+  且線上化後需要「不可為負」的原子扣減（`98-online-architecture.md` § 4）
 
 ---
 
@@ -256,7 +259,7 @@ baseValue × (1 + qualityPercent / 100)
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
 | craftGold | number? | 製作金幣（craft 時必填） |
 | craftMaterials | json? | 製作素材 `[{name, amount}]`（craft 時必填） |
-| craftPrerequisiteWeapon | json? | 前置武器需求 `{name, quantity}`（高級進階以上製作品） |
+| craftPrerequisiteWeapon | json? | 前置武器需求 `{templateId, quantity}`（高級進階以上製作品）。**存 templateId 不存名稱**，見 `99-ai-constraints.md` § 99.1 第 3 條 |
 
 ### 取得方式規則
 

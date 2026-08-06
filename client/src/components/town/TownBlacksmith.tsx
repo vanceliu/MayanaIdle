@@ -188,8 +188,8 @@ export function TownBlacksmith() {
       if (getBagItemAmount(bagItems, mat.itemId) < mat.amount) return false;
     }
     if (recipe.craftPrerequisiteWeapon) {
-      const { name, quantity } = recipe.craftPrerequisiteWeapon;
-      const owned = inventory.filter(i => i.name === name).length;
+      const { templateId, quantity } = recipe.craftPrerequisiteWeapon;
+      const owned = inventory.filter(i => i.templateId === templateId).length;
       if (owned < quantity) return false;
     }
     return true;
@@ -212,11 +212,11 @@ export function TownBlacksmith() {
 
     let newInvAfterPrereq = [...currentInv];
     if (selectedRecipe.craftPrerequisiteWeapon) {
-      const { name, quantity } = selectedRecipe.craftPrerequisiteWeapon;
+      const { templateId, quantity } = selectedRecipe.craftPrerequisiteWeapon;
       let removed = 0;
       for (const item of currentInv) {
         if (removed >= quantity) break;
-        if (item.name === name) {
+        if (item.templateId === templateId) {
           if (item.id) await db.equipmentInstances.delete(item.id);
           newInvAfterPrereq = newInvAfterPrereq.filter(i => i.id !== item.id);
           removed++;
@@ -436,10 +436,12 @@ export function TownBlacksmith() {
                 </span>
                 <span className="shop-item-desc bs-craft-materials">
                   {recipe.craftPrerequisiteWeapon && (() => {
-                    const { name, quantity } = recipe.craftPrerequisiteWeapon!;
-                    const have = inventory.filter(i => i.name === name).length;
+                    const { templateId, quantity } = recipe.craftPrerequisiteWeapon!;
+                    const have = inventory.filter(i => i.templateId === templateId).length;
                     const enough = have >= quantity;
-                    const tmpl = allTemplates.find(t => t.name === name);
+                    // 名稱只用於顯示，一律由 id 反查（§ 99.1 第 3 條）
+                    const tmpl = allTemplates.find(t => t.id === templateId);
+                    const name = tmpl?.name ?? `#${templateId}`;
                     const color = tmpl ? getEquipmentTierColor(tmpl) : undefined;
                     return (
                       <span className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>

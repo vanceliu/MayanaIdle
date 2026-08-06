@@ -196,15 +196,17 @@ export async function buildSharedWarehouseArchive(
     .where('ownerId').equals(userId)
     .filter(item => item.inStorage === true && item.storageType === 'shared')
     .toArray();
+  // 金幣自 v16 起在獨立表（§ 18.7）
+  const gold = (await db.warehouseGold.get(userId))?.amount ?? 0;
 
-  if (rows.length === 0 && equipmentInstances.length === 0) return null;
+  if (rows.length === 0 && equipmentInstances.length === 0 && gold === 0) return null;
 
   const payload: LegacySharedWarehousePayload = {
     snapshotVersion: SNAPSHOT_VERSION,
     items: rows
-      .filter(row => row.type !== 'gold' && row.type !== 'equipment')
+      .filter(row => row.type !== 'equipment')
       .map(row => ({ name: row.name, type: row.type, amount: row.amount })),
-    gold: rows.filter(row => row.type === 'gold').reduce((sum, row) => sum + row.amount, 0),
+    gold,
     equipment: equipmentInstances.map(toLegacyEquipment),
   };
 

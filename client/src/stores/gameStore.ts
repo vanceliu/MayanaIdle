@@ -446,15 +446,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       .filter(row => !row.storageType || row.storageType === 'shared')
       .toArray();
     const storedMaterials: BagItem[] = [];
-    let warehouseGold = 0;
     for (const row of warehouseRows) {
-      if (row.type === 'gold') {
-        warehouseGold = row.amount;
-      } else if (row.type !== 'equipment') {
+      if (row.type !== 'equipment') {
         const entry = makeBagItem(row.itemTemplateId!, row.amount);
         if (entry) storedMaterials.push(entry);
       }
     }
+    // 金幣是餘額不是物品，自 v16 起存在獨立表（`18-data-schema.md` § 18.7）
+    const warehouseGold = (await db.warehouseGold.get(userId))?.amount ?? 0;
 
     // Load personal warehouse materials (character-level storage)
     const personalWarehouseRows = await db.warehouses
@@ -463,7 +462,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       .toArray();
     const personalStoredMaterials: BagItem[] = [];
     for (const row of personalWarehouseRows) {
-      if (row.type !== 'equipment' && row.type !== 'gold') {
+      if (row.type !== 'equipment') {
         const entry = makeBagItem(row.itemTemplateId!, row.amount);
         if (entry) personalStoredMaterials.push(entry);
       }
@@ -1810,12 +1809,12 @@ async function saveGame(state: GameState) {
         warehouseEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'shared' });
       }
     }
-    if (state.warehouseGold > 0) {
-      warehouseEntries.push({ userId, name: 'gold', type: 'gold', amount: state.warehouseGold, storageType: 'shared' });
-    }
     if (warehouseEntries.length > 0) {
       await db.warehouses.bulkAdd(warehouseEntries);
     }
+    // 金幣走獨立表：以 userId 為主鍵 put，不需要先刪再寫（§ 18.7）。
+    // 餘額為 0 也要寫，否則「全部領走」會退回上一次的餘額。
+    await db.warehouseGold.put({ userId, amount: state.warehouseGold });
   }
 
   // Save personal warehouse (character-level storage)

@@ -106,8 +106,7 @@ describe('Warehouse (account-level storage)', () => {
 
     // Verify warehouse still in DB
     const userId = useGameStore.getState().userId!;
-    const rows = await db.warehouses.where('userId').equals(userId).toArray();
-    const goldRow = rows.find(r => r.type === 'gold');
+    const goldRow = await db.warehouseGold.get(userId);
     expect(goldRow).toBeDefined();
     expect(goldRow!.amount).toBe(3000);
   });

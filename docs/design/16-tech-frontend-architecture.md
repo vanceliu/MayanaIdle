@@ -651,7 +651,8 @@ Hook：`useWikiData` — 從 DB 讀取模板資料供 Wiki 頁面使用。
 | `bossDropTables` | `++id` | `bossName, itemType` | Boss 專屬掉落表 |
 | `characterBag` | `++id` | `characterId, name, type` | 背包物品（BagItem 持久化） |
 | `characterStorage` | `++id` | `characterId, name, type` | 角色個人倉庫 |
-| `warehouses` | `++id` | `userId, name, type` | 帳號共用倉庫（素材 + 金幣） |
+| `warehouses` | `++id` | `userId, name, type` | 帳號共用倉庫（素材，**不含金幣**） |
+| `warehouseGold` | `userId` | — | 共用倉庫金幣餘額，一帳號一列（`18-data-schema.md` § 18.7） |
 
 初始化：`seedDatabase()` 在 App mount 時執行，若 DB 空則寫入種子資料。
 

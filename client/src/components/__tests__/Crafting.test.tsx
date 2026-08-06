@@ -32,6 +32,34 @@ const recipeBagFor = (name: string, amount: number) =>
 const recipeBag = (amount: number) =>
   RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, amount));
 
+/**
+ * 背包裡的一件裝備實例。**`templateId` 一律由 seed 反查**，不可寫死或填 0 ——
+ * 前置武器判定已改成比對 `templateId`（§ 99.1 第 3 條），填 0 的 fixture
+ * 會讓所有前置需求都不成立。名稱只是 fixture 的可讀性，不參與判定。
+ */
+function equipFixture(
+  name: string,
+  id: number,
+  extra: Partial<Record<string, unknown>> = {},
+) {
+  const tmpl = EQUIPMENT_SEEDS.find(t => t.name === name)!;
+  return {
+    id,
+    templateId: tmpl.id!,
+    name: tmpl.name,
+    type: tmpl.type,
+    slot: tmpl.slot,
+    isTwoHanded: tmpl.isTwoHanded,
+    quality: 0,
+    enhancement: 0,
+    stability: tmpl.stability,
+    affixes: [],
+    ownerId: 1,
+    equipped: false,
+    ...extra,
+  } as never;
+}
+
 describe('TownBlacksmith - Crafting', () => {
   beforeEach(async () => {
     await db.delete();
@@ -176,7 +204,7 @@ describe('TownBlacksmith - Crafting', () => {
         ...recipeBagFor('碎星劍', 30),
       ],
       inventory: [
-        { id: 9001, templateId: 0, name: '鋼心劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
+        equipFixture('鋼心劍', 9001),
       ],
     });
     render(<TownBlacksmith />);
@@ -218,7 +246,7 @@ describe('TownBlacksmith - Crafting', () => {
         ...recipeBagFor('碎星劍', 30),
       ],
       inventory: [
-        { id: 9002, templateId: 0, name: '鋼心劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, quality: 15, enhancement: 6, stability: 6, affixes: [{ id: 'atk1', tier: 2, value: 5 }], ownerId: 1, equipped: false } as any,
+        equipFixture('鋼心劍', 9002, { quality: 15, enhancement: 6, affixes: [{ id: 'atk1', tier: 2, value: 5 }] }),
       ],
     });
     render(<TownBlacksmith />);
@@ -236,13 +264,64 @@ describe('TownBlacksmith - Crafting', () => {
     });
   });
 
+  /**
+   * § 99.1 第 3 條的回歸測試：判定的依據是 `templateId` 而不是名稱。
+   * 名稱對、templateId 不對的實例（seed 換過 id 之後留在玩家 IndexedDB 的舊列）
+   * 不可以被當成前置武器 —— 一旦採信，製作流程會刪掉一件不是配方要的裝備。
+   */
+  it('名稱相符但 templateId 不符的裝備不算前置武器', async () => {
+    useGameStore.setState({
+      character: { ...useGameStore.getState().character!, gold: 2000000 },
+      bagItems: [...recipeBagFor('碎星劍', 30)],
+      inventory: [
+        // 名字是「鋼心劍」，templateId 卻指向別的模板
+        { ...equipFixture('鋼心劍', 9005) as object, templateId: 999999 } as never,
+      ],
+    });
+    render(<TownBlacksmith />);
+    fireEvent.click(screen.getByText('裝備製作'));
+    fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+
+    const craftBtns = screen.getAllByText('製作');
+    expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
+    // 那件同名裝備必須原封不動留著
+    expect(useGameStore.getState().inventory).toHaveLength(1);
+  });
+
+  /**
+   * 反向：templateId 相符時，即使實例上的名稱是舊名（裝備改名前存下的），
+   * 仍然算數。這是改用 id 換來的好處，不是副作用。
+   */
+  it('templateId 相符時，實例名稱過期仍算前置武器', async () => {
+    const prereqId = EQUIPMENT_SEEDS.find(t => t.name === '碎星劍')!.craftPrerequisiteWeapon!.templateId;
+    useGameStore.setState({
+      character: { ...useGameStore.getState().character!, gold: 2000000 },
+      bagItems: [...recipeBagFor('碎星劍', 30)],
+      inventory: [
+        { ...equipFixture('鋼心劍', 9006) as object, templateId: prereqId, name: '鋼心劍（舊名）' } as never,
+      ],
+    });
+    render(<TownBlacksmith />);
+    fireEvent.click(screen.getByText('裝備製作'));
+    fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+    const craftBtns = screen.getAllByText('製作');
+    const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
+    fireEvent.click(enabledBtn);
+
+    await waitFor(() => {
+      const state = useGameStore.getState();
+      expect(state.inventory.find(i => i.name === '碎星劍')).toBeDefined();
+      expect(state.inventory.find(i => i.name === '鋼心劍（舊名）')).toBeUndefined();
+    });
+  });
+
   it('dual blade craft consumes prerequisite T4 dual blade', async () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, gold: 500000, className: 'thief' },
       bagItems: recipeBagFor('月牙雙刀', 10),
       inventory: [
-        { id: 9003, templateId: 0, name: '烈風連刃', type: 'dualBlade', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
-        { id: 9004, templateId: 0, name: '烈風連刃', type: 'dualBlade', slot: 'rightHand', isTwoHanded: false, quality: 0, enhancement: 0, stability: 6, affixes: [], ownerId: 1, equipped: false } as any,
+        equipFixture('烈風連刃', 9003),
+        equipFixture('烈風連刃', 9004),
       ],
     });
     render(<TownBlacksmith />);

@@ -36,8 +36,16 @@ export function useEquipmentByName(name: string): EquipmentTemplate | undefined 
   return EQUIPMENT_SEEDS.find(e => e.name === name);
 }
 
-export function useEquipmentById(id: number): EquipmentTemplate | undefined {
+/**
+ * 純函式版本，供 render 中的條件分支使用 —— `useEquipmentById` 名字帶 `use`，
+ * 放在 `&&` 或三元後面會被當成條件呼叫 hook。
+ */
+export function getEquipmentById(id: number): EquipmentTemplate | undefined {
   return EQUIPMENT_SEEDS.find(e => e.id === id);
+}
+
+export function useEquipmentById(id: number): EquipmentTemplate | undefined {
+  return getEquipmentById(id);
 }
 
 export function useDropTableByArea(area: string): DropTableEntry[] {

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useWeaponList, useArmorList, getWikiEquipmentPath } from '../hooks/useWikiData';
+import { useWeaponList, useArmorList, getWikiEquipmentPath, getEquipmentById } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
 import { getItemById } from '../../models/items';
 import '../components/WikiTable.css';
@@ -93,12 +93,20 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       <td className="cell-number">{item.craftGold?.toLocaleString() || '-'} G</td>
       <td>
         {item.craftPrerequisiteWeapon
-          ? <span>
-              <Link className="wiki-link" to={getWikiEquipmentPath(item.craftPrerequisiteWeapon.name)}>
-                {item.craftPrerequisiteWeapon.name}
-              </Link>
-              ×{item.craftPrerequisiteWeapon.quantity}
-            </span>
+          ? (() => {
+              // 名稱只用於顯示，一律由 templateId 反查（§ 99.1 第 3 條）
+              const { templateId, quantity } = item.craftPrerequisiteWeapon;
+              const prereq = getEquipmentById(templateId);
+              if (!prereq) return `#${templateId} ×${quantity}`;
+              return (
+                <span>
+                  <Link className="wiki-link" to={getWikiEquipmentPath(prereq.name)}>
+                    {prereq.name}
+                  </Link>
+                  ×{quantity}
+                </span>
+              );
+            })()
           : '-'}
       </td>
       <td>

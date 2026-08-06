@@ -23,6 +23,8 @@ async function purgeSharedWarehouse(userId: number, dataVersion: number): Promis
   if (archive) await db.legacyArchives.add(archive);
 
   await db.warehouses.where('userId').equals(userId).delete();
+  // 金幣自 v16 起在獨立表（§ 18.7），不會被上面那行帶走
+  await db.warehouseGold.delete(userId);
   // 共用倉庫的裝備實例是掛在 ownerId = userId（非 characterId），需另外清除
   await db.equipmentInstances
     .where('ownerId').equals(userId)

@@ -73,7 +73,13 @@ describe('背包改以道具 id 為鍵的遷移（Dexie v15）', () => {
     expect(row.amount).toBe(4);
   });
 
-  it('倉庫的金幣列不受影響（沒有對應道具）', async () => {
+  /**
+   * v15 不碰金幣列（它沒有對應道具，不參與 id 化），v16 再把它搬到 `warehouseGold`。
+   * `db.open()` 會一路跑完所有升級，所以這裡驗的是**跑完整條鏈之後**的結果：
+   * 餘額原封不動地落在新表，而不是在 v15 被當成無 id 的舊列丟掉。
+   * v16 自身的遷移細節（多列相加等）在 `warehouseGoldMigration.test.ts`。
+   */
+  it('倉庫的金幣列不被 v15 丟棄，並由 v16 搬進 warehouseGold', async () => {
     const legacy = new Dexie(DB_NAME);
     legacy.version(14).stores({
       characterBag: '++id, characterId, name, type',
@@ -87,9 +93,8 @@ describe('背包改以道具 id 為鍵的遷移（Dexie v15）', () => {
     legacy.close();
 
     await db.open();
-    const rows = await db.warehouses.where('userId').equals(1).toArray();
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].amount).toBe(12345);
+    expect((await db.warehouseGold.get(1))?.amount).toBe(12345);
+    expect(await db.warehouses.where('userId').equals(1).count()).toBe(0);
   });
 });

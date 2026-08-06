@@ -121,7 +121,15 @@ export interface CraftMaterial {
 }
 
 export interface CraftPrerequisiteWeapon {
-  name: string;
+  /**
+   * 前置武器的 `EQUIPMENT_SEEDS` id。與 `CraftMaterial.itemId` 同理存 id 不存名稱
+   * （`99-ai-constraints.md` § 99.1 第 3、7 條）—— 名稱比對會在裝備改名後靜默失效，
+   * 而這裡的比對結果會拿去**刪除玩家的裝備實例**，失效的代價不只是判定錯誤。
+   *
+   * 比對語意不變（`06-equipment-acquire.md` § 6A.3）：只認是哪一個模板，
+   * 不限來源，強化值／詞綴／品質皆不影響。
+   */
+  templateId: number;
   quantity: number;
 }
 

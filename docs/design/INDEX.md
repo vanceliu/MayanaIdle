@@ -206,7 +206,7 @@
 | `15-excluded.md` | 排除系統 | 不做的功能 |
 | `17-mvp-priority.md` | MVP 順序 | 五階段優先順序 |
 | `98-online-architecture.md` | 線上化架構設計 | 統一 tick、事件驅動、資料分層、Buffer 策略、Auto-scaling |
-| `99-ai-constraints.md` | AI 限制 | 6 條設計文件查不到的規則 |
+| `99-ai-constraints.md` | AI 限制 | 7 條設計文件查不到的規則 |
 
 ---
 
@@ -223,6 +223,7 @@
 06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 46-sigil.md ←→ 13-town.md（鐵匠鋪／印記師）
        ↕                    ↕                              ↕
 06-equipment-acquire.md ────┘（§ 6A.6 各管道詞綴 Tier 上限 ←→ § 7.2 取得方式）
+       ↕            （§ 6A.3 前置武器以 templateId 比對 ←→ 18-data-schema.md § 18.8 欄位）
        ↕                                              30-items.md（材料/卷軸）
        ↕
 06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md（武器強度 vs 怪物防禦）
@@ -260,7 +261,11 @@
 19-account-character.md ←→ 04-character.md（職業/初始配置）
        ↕      ←→ 20-attributes.md § 20.10（角色卡屬性＝建角＋升級配點，不含裝備／buff）
        ↕
-18-data-schema.md（User/Character 關係、character uuid）←→ 13-town.md（個人倉庫共用）
+18-data-schema.md（User/Character 關係、character uuid、共用倉庫金幣獨立表）
+       ↕      ←→ 13-town.md（個人倉庫共用）
+       ↕      ←→ 35-inventory-constraints.md § 共用倉庫（金幣存取）
+       ↕      ←→ 16-tech-frontend-architecture.md（DB 表清單）
+       ↕      ←→ 45-legacy-archive.md（封存快照的 gold 來源）
        ↕
 37-statistics.md（排行榜以 uuid 為 key／角色密鑰驗證寫入／名稱不唯一以 #uuid 區分）
        ↕

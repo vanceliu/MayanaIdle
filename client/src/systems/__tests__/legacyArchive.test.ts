@@ -119,7 +119,7 @@ describe('遺產封存', () => {
 
   it('共用倉庫被清除時另存一筆帳號層級快照', async () => {
     await addOutdatedCharacter();
-    await db.warehouses.add({ userId: 1, name: 'gold', type: 'gold', amount: 50000, storageType: 'shared' });
+    await db.warehouseGold.put({ userId: 1, amount: 50000 });
     await db.warehouses.add({ userId: 1, name: '銀礦石', type: 'material', amount: 9, storageType: 'shared' });
 
     await purgeOutdatedData();
@@ -132,6 +132,7 @@ describe('遺產封存', () => {
     expect(payload.gold).toBe(50000);
     expect(payload.items).toEqual([{ name: '銀礦石', type: 'material', amount: 9 }]);
     expect(await db.warehouses.count()).toBe(0);
+    expect(await db.warehouseGold.count()).toBe(0);
   });
 
   it('帳號還有存活角色時不封存共用倉庫', async () => {
@@ -146,13 +147,13 @@ describe('遺產封存', () => {
       currentFloor: null, skills: [], quests: [], areaEnteredAt: 0, createdAt: 0,
       dataVersion: CURRENT_DATA_VERSION,
     } as Parameters<typeof db.characters.add>[0]);
-    await db.warehouses.add({ userId: 1, name: 'gold', type: 'gold', amount: 50000, storageType: 'shared' });
+    await db.warehouseGold.put({ userId: 1, amount: 50000 });
 
     await purgeOutdatedData();
 
     const archives = await listArchives(1);
     expect(archives.filter(a => a.type === 'sharedWarehouse')).toHaveLength(0);
-    expect(await db.warehouses.count()).toBe(1);
+    expect(await db.warehouseGold.count()).toBe(1);
   });
 
   it('可手動刪除單筆遺產', async () => {

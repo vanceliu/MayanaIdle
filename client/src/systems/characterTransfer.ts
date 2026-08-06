@@ -102,7 +102,8 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     .filter(row => row.storageType === 'personal')
     .toArray();
   const personalWarehouseItems: BagItem[] = personalWarehouseRows
-    .filter(r => r.type !== 'equipment' && r.type !== 'gold')
+    // 個人倉庫沒有金幣（金幣只存在帳號層級的 warehouseGold，見 § 18.7）
+    .filter(r => r.type !== 'equipment')
     .map(r => makeBagItem(r.itemTemplateId!, r.amount))
     .filter((b): b is BagItem => b !== null);
 

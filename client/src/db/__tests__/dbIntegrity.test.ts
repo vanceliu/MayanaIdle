@@ -37,6 +37,30 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
       }
     });
 
+    /**
+     * 前置武器改存 `templateId`（§ 99.1 第 3 條）後，斷掉的引用不再像名稱那樣
+     * 「找不到就等於玩家永遠做不出來」—— 它會安靜地變成一個查不到模板的數字。
+     * 這裡把 seed 的引用全掃一次，讓斷鏈在 CI 就爆掉。
+     */
+    it('所有 craftPrerequisiteWeapon.templateId 都指向存在的裝備模板', () => {
+      const byId = new Map(EQUIPMENT_SEEDS.map(s => [s.id!, s]));
+      const refs = EQUIPMENT_SEEDS.filter(s => s.craftPrerequisiteWeapon);
+      expect(refs.length).toBeGreaterThan(0);
+      for (const seed of refs) {
+        const { templateId, quantity } = seed.craftPrerequisiteWeapon!;
+        expect(byId.has(templateId), `${seed.name} 的前置武器 templateId ${templateId} 查無模板`).toBe(true);
+        expect(quantity, `${seed.name} 的前置武器數量須為正整數`).toBeGreaterThan(0);
+      }
+    });
+
+    it('DB 中的 craftPrerequisiteWeapon 與 SEEDS 一致', async () => {
+      for (const seed of EQUIPMENT_SEEDS.filter(s => s.craftPrerequisiteWeapon)) {
+        const dbTemplate = await db.equipmentTemplates.get(seed.id!);
+        expect(dbTemplate, `${seed.name} not found in DB`).toBeDefined();
+        expect(dbTemplate!.craftPrerequisiteWeapon).toEqual(seed.craftPrerequisiteWeapon);
+      }
+    });
+
     it('所有裝備 template 都能被 resolveEquipment 正確解析', async () => {
       const dbTemplates = await db.equipmentTemplates.toArray();
       for (const template of dbTemplates) {

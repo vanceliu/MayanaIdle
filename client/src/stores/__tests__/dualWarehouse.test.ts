@@ -233,7 +233,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
 
     // Verify shared warehouse data still in DB
     const warehouseRows = await db.warehouses.where('userId').equals(userId).toArray();
-    expect(warehouseRows.find(r => r.type === 'gold')?.amount).toBe(2000);
+    expect((await db.warehouseGold.get(userId))?.amount).toBe(2000);
     expect(warehouseRows.find(r => r.name === '銀礦石')?.amount).toBe(5);
 
     const sharedEquip = await db.equipmentInstances
