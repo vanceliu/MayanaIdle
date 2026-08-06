@@ -72,6 +72,8 @@ describe('dataVersionPurge', () => {
 
     expect(await db.warehouses.count()).toBe(0);
     expect(await db.equipmentInstances.count()).toBe(0);
+    // 金幣在獨立表，不會被 warehouses 那次 delete 帶走，必須各清各的
+    expect(await db.warehouseGold.count()).toBe(0);
   });
 
   it('帳號還有未過期角色時，共用倉庫必須保留', async () => {
