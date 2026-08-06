@@ -3,18 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/MayanaIdle/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/MayanaIdle/manifest.webmanifest" />
+    <!-- iOS 不讀 manifest 的 icons，主畫面圖示只認這一條 -->
+    <link rel="apple-touch-icon" href="/MayanaIdle/icons/icon-192.png" />
+    <!--
+      viewport-fit=cover：讓畫面鋪到瀏海／圓角底下，缺掉的邊由 CSS 的 env(safe-area-inset-*) 讓位。
+      maximum-scale=1, user-scalable=no：遊戲是滿版固定版面，雙指縮放只會把 HUD 推出畫面外，
+      且 iOS 上「雙擊放大」會吃掉快速連點（快捷格連按會被判成縮放手勢）。
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0A0A1A" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet" />
     <title>瑪雅那 Idle</title>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-    <script type="module" crossorigin src="/MayanaIdle/assets/index-C4reyp45.js"></script>
+    <script type="module" crossorigin src="/MayanaIdle/assets/index-Dx4chs3e.js"></script>
     <link rel="modulepreload" crossorigin href="/MayanaIdle/assets/rolldown-runtime-QTnfLwEv.js">
     <link rel="modulepreload" crossorigin href="/MayanaIdle/assets/vendor-pixi-C8YSuiAq.js">
     <link rel="modulepreload" crossorigin href="/MayanaIdle/assets/game-seed-C-aLJaUd.js">
     <link rel="modulepreload" crossorigin href="/MayanaIdle/assets/vendor-react-BP7yVzlu.js">
-    <link rel="stylesheet" crossorigin href="/MayanaIdle/assets/index-DErdlp_a.css">
+    <link rel="stylesheet" crossorigin href="/MayanaIdle/assets/index-yplIM8WO.css">
   </head>
   <body>
     <script>
