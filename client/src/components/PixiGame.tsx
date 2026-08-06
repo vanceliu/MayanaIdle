@@ -34,6 +34,27 @@ import {
   getMonsterProjectileStyle,
 } from '../pixi/ui/projectileStyle';
 import { getSkillTemplate } from '../models/skillTemplate';
+import { isHandheldDevice } from '../hooks/useViewport';
+
+/**
+ * 手持裝置的渲染上限（`47-mobile.md` § 47.8）。
+ *
+ * 這是放置遊戲，一開好幾小時。120Hz 螢幕不限速、DPR 3 不設上限，
+ * 相當於 60fps／DPR 2 的四倍多像素填充量 —— 手機會發熱耗電，
+ * 接著被系統降頻，降頻後反而比一開始就設限更卡。
+ *
+ * 判斷走**裝置**而不是版面斷點（`isHandheldDevice`）：手機轉橫向會跨過寬度斷點，
+ * 但它還是同一台靠電池的機器。
+ *
+ * 只在初始化時套用：解析度要換必須重建 renderer，不值得為了轉螢幕重來一次。
+ */
+function handheldLimits(): { maxFPS?: number; maxResolution?: number } {
+  return isHandheldDevice() ? { maxFPS: MOBILE_MAX_FPS, maxResolution: MOBILE_MAX_RESOLUTION } : {};
+}
+
+/** 手持裝置的幀率與解析度上限（`47-mobile.md` § 47.8） */
+const MOBILE_MAX_FPS = 60;
+const MOBILE_MAX_RESOLUTION = 2;
 
 const PLAYER_PROJECTILE_SPEED = 512;
 /** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
@@ -71,7 +92,7 @@ export function PixiGame() {
 
     let destroyed = false;
 
-    pixiApp.init({ resizeTo: container }).then(() => {
+    pixiApp.init({ resizeTo: container, ...handheldLimits() }).then(() => {
       if (destroyed) return;
 
       container.appendChild(pixiApp.canvas);

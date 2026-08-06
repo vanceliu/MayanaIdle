@@ -87,6 +87,7 @@
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
+| 手持裝置的幀率與渲染解析度上限 | `47-mobile.md` | § 47.8 |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |

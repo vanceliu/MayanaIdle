@@ -103,6 +103,17 @@ export function isMobileViewport(): boolean {
   return query(QUERIES.mobile);
 }
 
+/**
+ * 這台機器是不是**手持裝置**（沒有滑鼠）。
+ *
+ * 與 `isMobileViewport()` 的差別是「裝置」而不是「版面」：手機轉成橫向會跨過
+ * 寬度斷點，但它還是同一台會發熱、靠電池的機器。渲染上限（`47-mobile.md` § 47.8）
+ * 該看這個，不是看寬度。
+ */
+export function isHandheldDevice(): boolean {
+  return query(QUERIES.touch);
+}
+
 /** 測試用：清掉快取的快照，讓下一次 render 重新讀 matchMedia */
 export function resetViewportSnapshot(): void {
   snapshot = DESKTOP;

@@ -1,9 +1,28 @@
 import { Application, Container } from 'pixi.js';
 import { Camera } from './camera/Camera';
 
+/** 實際採用的渲染解析度：`devicePixelRatio` 夾在上限之內 */
+export function renderResolution(maxResolution?: number): number {
+  const dpr = (typeof window === 'undefined' ? 1 : window.devicePixelRatio) || 1;
+  return maxResolution ? Math.min(dpr, maxResolution) : dpr;
+}
+
 export interface PixiAppOptions {
   resizeTo: HTMLElement;
   backgroundColor?: number;
+  /**
+   * 每秒最多畫幾幀。省略或 0 ＝ 不限，跟隨螢幕更新率。
+   *
+   * 手持裝置要給上限（`47-mobile.md` § 47.8）：這是放置遊戲，一開好幾小時，
+   * 120Hz 螢幕不限速會發熱耗電，接著被系統降頻 —— 降頻後反而比一開始就設限更卡。
+   */
+  maxFPS?: number;
+  /**
+   * 渲染解析度上限。省略 ＝ 不限，直接用 `devicePixelRatio`。
+   *
+   * 手機的 DPR 常是 3，等於每幀畫 9 倍像素。
+   */
+  maxResolution?: number;
 }
 
 export class PixiApp {
@@ -27,6 +46,8 @@ export class PixiApp {
     await this._initPromise;
 
     this.app.stage.addChild(this.worldContainer);
+    // Pixi 的 0 代表不限速；初始化失敗重試會換掉 app，所以要在 init 之後才設
+    this.app.ticker.maxFPS = options.maxFPS ?? 0;
     this._initialized = true;
 
     this.app.renderer.on('resize', (width: number, height: number) => {
@@ -49,7 +70,7 @@ export class PixiApp {
       resizeTo: options.resizeTo,
       backgroundColor: options.backgroundColor ?? 0x1a1a2e,
       autoDensity: true,
-      resolution: window.devicePixelRatio || 1,
+      resolution: renderResolution(options.maxResolution),
     };
 
     try {
