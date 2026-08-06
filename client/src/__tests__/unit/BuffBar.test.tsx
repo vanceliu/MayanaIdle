@@ -139,14 +139,46 @@ describe('BuffBar — 角色 Debuff（§ 24.8.2）', () => {
     expect(container.querySelector('.buff-icon.is-buff')).toBeNull();
   });
 
-  it('buff 與 debuff 同排顯示但框色不同', () => {
+  it('buff 與 debuff 分成兩列，各自一列', () => {
     useGameStore.setState({
       activeEffects: [createBuff({ id: 'b1' }), createPlayerDebuff('slow', '減速', 6000)],
     });
 
     const { container } = render(<BuffBar />);
-    expect(container.querySelectorAll('.buff-icon.is-buff')).toHaveLength(1);
-    expect(container.querySelectorAll('.buff-icon.is-debuff')).toHaveLength(1);
+    const rows = container.querySelectorAll('.buff-row');
+    expect(rows).toHaveLength(2);
+    // 上排 buff、下排 debuff
+    expect(rows[0].className).toContain('is-buff');
+    expect(rows[1].className).toContain('is-debuff');
+    expect(rows[0].querySelectorAll('.buff-icon.is-buff')).toHaveLength(1);
+    expect(rows[1].querySelectorAll('.buff-icon.is-debuff')).toHaveLength(1);
+  });
+
+  it('只有其中一種時不渲染另一列（不留空行）', () => {
+    useGameStore.setState({ activeEffects: [createPlayerDebuff('curse', '詛咒')] });
+    const { container } = render(<BuffBar />);
+
+    const rows = container.querySelectorAll('.buff-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].className).toContain('is-debuff');
+  });
+
+  it('兩列的溢位各自計算（buff 9 個、debuff 9 個 → 各顯示 +1）', () => {
+    useGameStore.setState({
+      activeEffects: [
+        ...Array.from({ length: 9 }, (_, i) => createBuff({ id: `b${i}`, category: `bcat-${i}` })),
+        ...Array.from({ length: 9 }, (_, i) => createPlayerDebuff(`dcat-${i}`, `debuff${i}`)),
+      ],
+    });
+
+    const { container } = render(<BuffBar />);
+    const rows = container.querySelectorAll('.buff-row');
+    expect(rows[0].querySelectorAll('.buff-icon')).toHaveLength(8);
+    expect(rows[1].querySelectorAll('.buff-icon')).toHaveLength(8);
+    expect(container.querySelectorAll('.buff-overflow')).toHaveLength(2);
+    for (const el of container.querySelectorAll('.buff-overflow')) {
+      expect(el.textContent).toBe('+1');
+    }
   });
 
   it('六種 debuff 各自對應到 icon', () => {

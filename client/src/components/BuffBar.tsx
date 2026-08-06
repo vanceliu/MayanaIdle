@@ -3,8 +3,13 @@ import { useGameStore } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
 import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
+import type { ActiveEffect } from '../models/effect';
 
-const MAX_VISIBLE = 8;
+/** icon 邊長（§ 24.8.1）。外框由 `.buff-icon` 的寬度決定，兩者要一起改 */
+const BUFF_ICON_SIZE = 36;
+
+/** 每一列各自的顯示上限（§ 24.8.2：buff 與 debuff 分列，各自計算溢位） */
+const MAX_VISIBLE_PER_ROW = 8;
 
 function formatTime(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -25,24 +30,36 @@ export function BuffBar() {
     return () => clearInterval(id);
   }, []);
 
-  // § 24.8.2：Buff 與 Debuff 同排顯示，以框色區分（buff 藍框 / debuff 紅框）
+  // § 24.8.2：Buff 與 Debuff 分成兩列，再以框色區分（buff 藍框 / debuff 紅框）
   const playerEffects = activeEffects.filter(
     e => e.target === 'player' && (e.type === 'buff' || e.type === 'debuff')
   );
 
   if (playerEffects.length === 0) return null;
 
-  const now = Date.now();
-  const visible = playerEffects.slice(0, MAX_VISIBLE);
-  const overflow = playerEffects.length - MAX_VISIBLE;
+  const buffs = playerEffects.filter(e => e.type === 'buff');
+  const debuffs = playerEffects.filter(e => e.type === 'debuff');
 
   return (
     <div className="buff-bar">
+      {buffs.length > 0 && <EffectRow effects={buffs} kind="buff" />}
+      {debuffs.length > 0 && <EffectRow effects={debuffs} kind="debuff" />}
+    </div>
+  );
+}
+
+function EffectRow({ effects, kind }: { effects: ActiveEffect[]; kind: 'buff' | 'debuff' }) {
+  const now = Date.now();
+  const visible = effects.slice(0, MAX_VISIBLE_PER_ROW);
+  const overflow = effects.length - MAX_VISIBLE_PER_ROW;
+  const isDebuff = kind === 'debuff';
+
+  return (
+    <div className={`buff-row is-${kind}`}>
       {visible.map(effect => {
         const remaining = effect.startTime + effect.duration - now;
         const isExpiring = remaining > 0 && remaining < 5000;
         const iconName = getEffectIcon(effect.category);
-        const isDebuff = effect.type === 'debuff';
 
         return (
           <Tooltip
@@ -61,7 +78,7 @@ export function BuffBar() {
               className={`buff-icon ${isDebuff ? 'is-debuff' : 'is-buff'} ${isExpiring ? 'expiring' : ''}`}
               data-testid={isDebuff ? 'player-debuff-icon' : 'player-buff-icon'}
             >
-              <GameIcon name={iconName} size={28} />
+              <GameIcon name={iconName} size={BUFF_ICON_SIZE} />
               <span className="buff-timer">{formatTime(remaining)}</span>
             </div>
           </Tooltip>

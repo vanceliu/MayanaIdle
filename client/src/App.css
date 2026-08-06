@@ -3872,8 +3872,16 @@ button.active {
   border-color: var(--accent-primary);
 }
 
+/* 未習得：格子照樣顯示，但整體壓暗以與已習得（learned）拉開對比 */
 .skill-cell.locked {
-  opacity: 0.45;
+  opacity: 0.4;
+  border-color: var(--border-subtle);
+  background: var(--bg-inset);
+}
+
+.skill-cell.locked:hover {
+  opacity: 0.7;
+  border-color: var(--accent-primary-dim);
 }
 
 .skill-cell-dot {
@@ -4221,15 +4229,25 @@ button.active {
   animation: fadeIn 100ms ease;
 }
 
-/* --- BuffBar：stage 左上垂直往下長（§ 24.8.1 / § 24.8.2） --- */
+/* --- BuffBar：stage 左上，buff 一列、debuff 一列（§ 24.8.1 / § 24.8.2） --- */
 /* 接在左上角色卡下面（HUD 島自己負責定位，這裡不再絕對定位） */
 .buff-bar {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   /* 容器不吃滑鼠事件，避免擋住地圖點擊移動；icon 自行開啟 hover */
   pointer-events: none;
+}
+
+/* 一列裝一種：上排 buff、下排 debuff。超過角色卡寬度就換行往下疊 */
+.buff-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 340px;
 }
 
 .buff-icon {
@@ -4237,12 +4255,12 @@ button.active {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 32px;
+  width: 44px;
   cursor: default;
   pointer-events: auto;
   background: rgba(18, 18, 43, 0.72);
   border-radius: var(--radius-sm);
-  padding: 2px;
+  padding: 3px;
 }
 
 .buff-icon .game-icon {
@@ -4271,11 +4289,11 @@ button.active {
 }
 
 .buff-timer {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   line-height: 1;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .buff-icon.expiring {

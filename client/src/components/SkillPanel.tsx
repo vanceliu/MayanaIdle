@@ -1,55 +1,25 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration } from '../models/skill';
+import { CLASS_SKILLS } from '../models/classSkills';
+import { CLASS_MAGIC_RESTRICTIONS } from '../models/skillRestrictions';
 import type { ClassName } from '../models/character';
 
 const GRID_COLUMNS = 5;
-const BASIC_MAGIC_ROWS = 10;
-const BASIC_MAGIC_SLOTS = GRID_COLUMNS * BASIC_MAGIC_ROWS;
 const CLASS_MAGIC_SLOTS = GRID_COLUMNS;
+
+/** 技能格顯示用的模板（未習得的格子沒有 `lastUsedAt`） */
+type SkillTemplate = Omit<Skill, 'lastUsedAt'>;
 
 /** 讓 CSS grid 的欄數跟著 TSX 的常數走，避免兩處不同步 */
 function gridColumnsStyle(columns: number) {
   return { '--skill-cols': columns } as React.CSSProperties;
 }
 
-const CLASS_SKILLS_MAP: Record<ClassName, Array<{ id: string; name: string; level: number }>> = {
-  knight: [
-    { id: 'shield-bash', name: '盾擊', level: 1 },
-    { id: 'rend', name: '裂傷斬', level: 2 },
-    { id: 'iron-shield', name: '鋼鐵護盾', level: 3 },
-    { id: 'taunt', name: '挑釁怒吼', level: 4 },
-    { id: 'vengeance', name: '復仇之刃', level: 5 },
-  ],
-  elf: [
-    { id: 'precise-shot', name: '精準射擊', level: 1 },
-    { id: 'fire-arrow', name: '火矢附魔', level: 2 },
-    { id: 'triple-shot', name: '三連射', level: 3 },
-    { id: 'hawk-eye', name: '鷹眼', level: 4 },
-    { id: 'arrow-rain', name: '穿透箭雨', level: 5 },
-  ],
-  elementalist: [
-    { id: 'cd-reduce', name: '冷卻縮減', level: 1 },
-    { id: 'mana-drain', name: '魔力奪取', level: 2 },
-    { id: 'element-boost', name: '元素增幅', level: 3 },
-    { id: 'greater-cd-reduce', name: '強化冷卻縮減', level: 4 },
-    { id: 'element-storm', name: '元素風暴', level: 5 },
-  ],
-  priest: [
-    { id: 'holy-shield', name: '聖光護盾', level: 1 },
-    { id: 'high-heal', name: '高階治癒', level: 2 },
-    { id: 'group-heal', name: '群體治癒', level: 3 },
-    { id: 'resurrect', name: '復活術', level: 4 },
-    { id: 'holy-domain', name: '神聖領域', level: 5 },
-  ],
-  thief: [
-    { id: 'envenom', name: '淬毒', level: 1 },
-    { id: 'deadly-strike', name: '致命一擊', level: 2 },
-    { id: 'smoke-bomb', name: '煙霧彈', level: 3 },
-    { id: 'precision-strike', name: '精準打擊', level: 4 },
-    { id: 'backstab', name: '背刺', level: 5 },
-  ],
-};
+/** 職業魔法一律以 `CLASS_SKILLS` 為單一來源，依職業等級（1~5）對位到格子（§ 23.1） */
+function classSkillByLevel(className: ClassName, classLevel: number) {
+  return CLASS_SKILLS.find(d => d.className === className && d.classLevel === classLevel);
+}
 
 const ELEMENT_COLORS: Record<string, string> = {
   fire: '#EF4444',
@@ -62,7 +32,7 @@ const ELEMENT_COLORS: Record<string, string> = {
 };
 
 interface SkillTooltipData {
-  skill: Skill | null;
+  skill: SkillTemplate | null;
   name: string;
   level: number;
   learned: boolean;
@@ -79,12 +49,19 @@ export function SkillPanel() {
   if (!character) return null;
 
   const className = character.className;
-  const classSkills = CLASS_SKILLS_MAP[className] || [];
+  // 基礎魔法的可學上限依職業而異（§ 5.3）：騎士只到 1 級、盜賊 4 級、妖精 6 級，
+  // 學不到的級數不畫出來 —— 畫了也永遠是暗的，只會誤導玩家。
+  const restriction = CLASS_MAGIC_RESTRICTIONS[className];
+  const basicMagicRows = restriction.maxLevel;
+  const basicMagicSlots = restriction.maxSkills;
 
   const learnedBasicSkills = skills.filter(s => SKILL_CATALOG.some(c => c.id === s.id));
-  const learnedClassSkills = skills.filter(s => classSkills.some(c => c.id === s.id));
+  const learnedClassSkills = skills.filter(
+    s => CLASS_SKILLS.some(d => d.className === className && d.id === s.id),
+  );
 
-  function handleMouseEnter(e: React.MouseEvent, skill: Skill) {
+  /** 已習得與未習得的格子共用同一個 tooltip，差別只在 `learned` 與顯示的等級 */
+  function handleMouseEnter(e: React.MouseEvent, skill: SkillTemplate, learned: boolean) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const tooltipHeight = 150;
     const above = rect.top > tooltipHeight + 8;
@@ -97,7 +74,7 @@ export function SkillPanel() {
       skill,
       name: skill.name,
       level: skill.level,
-      learned: true,
+      learned,
       x,
       y,
       above,
@@ -114,11 +91,11 @@ export function SkillPanel() {
         <div className="skill-section-header">
           <span className="skill-section-title">基礎魔法</span>
           <span className="skill-section-meta">
-            {learnedBasicSkills.length}/{BASIC_MAGIC_SLOTS}
+            {learnedBasicSkills.length}/{basicMagicSlots}
           </span>
         </div>
         <div className="skill-grid-with-labels" style={gridColumnsStyle(GRID_COLUMNS)}>
-          {Array.from({ length: BASIC_MAGIC_ROWS }).map((_, rowIdx) => {
+          {Array.from({ length: basicMagicRows }).map((_, rowIdx) => {
             const level = rowIdx + 1;
             const catalogForLevel = SKILL_CATALOG.filter(c => c.level === level);
             return (
@@ -129,17 +106,15 @@ export function SkillPanel() {
                   if (!catalogEntry) {
                     return <div key={`basic-empty-${rowIdx}-${colIdx}`} className="skill-cell empty" />;
                   }
-                  const learned = skills.some(s => s.id === catalogEntry.id);
-                  if (!learned) {
-                    return <div key={catalogEntry.id} className="skill-cell empty" />;
-                  }
-                  const skill = skills.find(s => s.id === catalogEntry.id)!;
+                  // 格子一律全開：未習得顯示為暗色（locked），習得後才亮起（learned）
+                  const learnedSkill = skills.find(s => s.id === catalogEntry.id);
+                  const skill = learnedSkill ?? catalogEntry;
                   const element = catalogEntry.element || 'none';
                   return (
                     <div
-                      key={skill.id}
-                      className="skill-cell learned"
-                      onMouseEnter={(e) => handleMouseEnter(e, skill)}
+                      key={catalogEntry.id}
+                      className={`skill-cell ${learnedSkill ? 'learned' : 'locked'}`}
+                      onMouseEnter={(e) => handleMouseEnter(e, skill, Boolean(learnedSkill))}
                       onMouseLeave={handleMouseLeave}
                     >
                       <span
@@ -167,19 +142,22 @@ export function SkillPanel() {
           <div className="skill-grid-row">
             <span className="skill-row-label"></span>
             {Array.from({ length: CLASS_MAGIC_SLOTS }).map((_, idx) => {
-              const skill = learnedClassSkills[idx];
-              if (!skill) {
+              // 第 N 格固定對應職業魔法第 N 級，不隨已習得數量位移
+              const def = classSkillByLevel(className, idx + 1);
+              if (!def) {
                 return <div key={`class-empty-${idx}`} className="skill-cell empty" />;
               }
+              const learnedSkill = skills.find(s => s.id === def.id);
+              const skill = learnedSkill ?? def.skill;
               return (
                 <div
-                  key={skill.id}
-                  className="skill-cell learned"
-                  onMouseEnter={(e) => handleMouseEnter(e, skill)}
+                  key={def.id}
+                  className={`skill-cell ${learnedSkill ? 'learned' : 'locked'}`}
+                  onMouseEnter={(e) => handleMouseEnter(e, skill, Boolean(learnedSkill))}
                   onMouseLeave={handleMouseLeave}
                 >
                   <span className="skill-cell-dot class-skill" />
-                  <span className="skill-cell-name">{skill.name}</span>
+                  <span className="skill-cell-name">{def.name}</span>
                 </div>
               );
             })}

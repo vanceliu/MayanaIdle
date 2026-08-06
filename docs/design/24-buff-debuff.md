@@ -321,10 +321,11 @@ interface PlayerDotEffect {
   （城鎮不另做 canvas，`.town-view` 左側讓出欄位寬度）
 - **組件**：`<BuffBar>`
 - **滑鼠事件**：容器 `pointer-events: none`（不擋地圖點擊移動），icon 自身開啟 hover
-- **顯示方式**：垂直 icon 欄（單列往下長）
-  - 每個 buff 以 32×32 icon 呈現
-  - icon 右下角覆蓋剩餘秒數（≥60s 顯示 `M:SS` 格式，<60s 顯示秒數）
-  - 同時顯示上限 8 個，超過顯示 `+N` 提示
+- **顯示方式**：橫向 icon 列，**buff 一列、debuff 另一列**（§ 24.8.2）
+  - 每個 icon 36×36，外框 44px（`BUFF_ICON_SIZE` 與 `.buff-icon` 寬度要一起改）
+  - icon 下方顯示剩餘秒數（≥60s 顯示 `M:SS` 格式，<60s 顯示秒數）
+  - 每列同時顯示上限 8 個，超過顯示 `+N` 提示（**兩列各自計算**）
+  - 一列的寬度上限對齊角色卡（340px），超過就換行往下疊
   - 剩餘 <5 秒時 icon 閃爍（CSS `blink` animation）
 - **Tooltip**：hover icon 顯示浮動面板
   - 效果名稱
@@ -338,11 +339,12 @@ interface PlayerDotEffect {
 
 ### 24.8.2 角色 Debuff 顯示
 
-- **位置**：BuffBar 內，與 Buff 同一垂直欄但以不同框色區分
+- **位置**：BuffBar 內，**自成一列排在 buff 列下方**，再以框色區分
+  （只有 buff 或只有 debuff 時該列不渲染，不留空行）
 - **框色規則**：
   - Buff（正面效果）：藍色外框 `#3B82F6`
   - Debuff（負面效果）：紅色外框 `#EF4444`
-- **顯示方式**：同 Buff，32×32 icon
+- **顯示方式**：同 Buff，36×36 icon
 - **Debuff icon**：
   - 中毒：綠色骷髏 / 毒瓶
   - 流血：紅色血滴
