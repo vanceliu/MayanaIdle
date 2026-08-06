@@ -96,6 +96,7 @@ describe('TownBlacksmith - Crafting', () => {
       equippedGear: {},
       inventory: [],
       bagItems: recipeBag(10),
+      craftQuests: [],
     });
   });
 
@@ -336,6 +337,77 @@ describe('TownBlacksmith - Crafting', () => {
       const state = useGameStore.getState();
       expect(state.inventory.find(i => i.name === '月牙雙刀')).toBeDefined();
       expect(state.inventory.filter(i => i.name === '烈風連刃').length).toBe(1);
+    });
+  });
+
+  /** 製作任務登記（`36-quest-system.md` § 36.13） */
+  describe('製作任務登記', () => {
+    it('登記後任務只存 templateId，按鈕改為取消登記', async () => {
+      render(<TownBlacksmith />);
+      fireEvent.click(screen.getByText('裝備製作'));
+      fireEvent.click(await findRecipeTitle('鋼心劍'));
+
+      fireEvent.click(screen.getAllByText('登記製作')[0]);
+
+      const quests = useGameStore.getState().craftQuests;
+      expect(quests).toHaveLength(1);
+      expect(quests[0].templateId).toBe(RECIPE.id);
+      expect(await screen.findByText('取消登記')).toBeTruthy();
+    });
+
+    it('滿 3 個後登記按鈕全部 disabled（§ 36.13.2）', async () => {
+      useGameStore.setState({
+        craftQuests: [
+          { id: 'craft-1', templateId: 1 },
+          { id: 'craft-2', templateId: 2 },
+          { id: 'craft-3', templateId: 3 },
+        ],
+      });
+      render(<TownBlacksmith />);
+      fireEvent.click(screen.getByText('裝備製作'));
+      await findRecipeTitle('鋼心劍');
+
+      const btns = screen.getAllByText('登記製作');
+      expect(btns.every(b => (b as HTMLButtonElement).disabled)).toBe(true);
+    });
+
+    it('取消登記移除任務', async () => {
+      useGameStore.setState({ craftQuests: [{ id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }] });
+      render(<TownBlacksmith />);
+      fireEvent.click(screen.getByText('裝備製作'));
+      await findRecipeTitle('鋼心劍');
+
+      fireEvent.click(screen.getByText('取消登記'));
+
+      expect(useGameStore.getState().craftQuests).toHaveLength(0);
+    });
+
+    it('製作成功後自動移除同配方的任務（§ 36.13.5）', async () => {
+      useGameStore.setState({ craftQuests: [{ id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }] });
+      render(<TownBlacksmith />);
+      fireEvent.click(screen.getByText('裝備製作'));
+      fireEvent.click(await findRecipeTitle('鋼心劍'));
+      const enabledBtn = screen.getAllByText('製作').find(btn => !(btn as HTMLButtonElement).disabled)!;
+      fireEvent.click(enabledBtn);
+
+      await waitFor(() => {
+        expect(useGameStore.getState().inventory.some(i => i.name === '鋼心劍')).toBe(true);
+      });
+      expect(useGameStore.getState().craftQuests).toHaveLength(0);
+    });
+
+    it('沒登記就直接製作時不影響其他任務', async () => {
+      useGameStore.setState({ craftQuests: [{ id: 'craft-999', templateId: 999 }] });
+      render(<TownBlacksmith />);
+      fireEvent.click(screen.getByText('裝備製作'));
+      fireEvent.click(await findRecipeTitle('鋼心劍'));
+      const enabledBtn = screen.getAllByText('製作').find(btn => !(btn as HTMLButtonElement).disabled)!;
+      fireEvent.click(enabledBtn);
+
+      await waitFor(() => {
+        expect(useGameStore.getState().inventory.some(i => i.name === '鋼心劍')).toBe(true);
+      });
+      expect(useGameStore.getState().craftQuests).toEqual([{ id: 'craft-999', templateId: 999 }]);
     });
   });
 });

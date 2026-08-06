@@ -5,6 +5,10 @@ import { PanelDockFace } from './PanelDockFace';
 import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
+import type { CraftQuest } from '../models/craftQuest';
+import { evaluateCraftRequirements } from '../systems/craftQuestSystem';
+import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
+import { getItemById } from '../models/items';
 
 /**
  * 任務追蹤（§ 36.10.3）
@@ -15,6 +19,7 @@ import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
 export function QuestTrackerButton() {
   const character = useGameStore(s => s.character);
   const adventurerQuests = useGameStore(s => s.adventurerQuests);
+  const craftQuests = useGameStore(s => s.craftQuests);
   const isOpen = usePanelWindowStore(s => s.open.quest);
   const toggle = usePanelWindowStore(s => s.toggle);
   const isMobile = useIsMobile();
@@ -24,7 +29,7 @@ export function QuestTrackerButton() {
   const classQuests = character.quests.filter(
     (q: Quest) => q.status === 'active' || q.status === 'completable'
   );
-  const totalQuests = classQuests.length + adventurerQuests.length;
+  const totalQuests = classQuests.length + adventurerQuests.length + craftQuests.length;
 
   return (
     <button
@@ -42,17 +47,73 @@ export function QuestTrackerButton() {
   );
 }
 
+/**
+ * 製作任務的單張卡片（§ 36.13.4）
+ *
+ * 需求沒有累積進度，每次 render 都由當下的背包／金幣重算 ——
+ * 賣掉素材或花掉金幣，「可製作」就會即時消失。
+ */
+function CraftQuestItem({ quest }: { quest: CraftQuest }) {
+  const bagItems = useGameStore(s => s.bagItems);
+  const inventory = useGameStore(s => s.inventory);
+  const gold = useGameStore(s => s.character?.gold ?? 0);
+  const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
+  const templates = useEquipmentTemplates();
+
+  // 裝備名稱一律由 id 反查 seed，不在任務資料內固化（§ 99.1 第 3 條）
+  const recipe = templates.find(t => t.id === quest.templateId);
+  if (!recipe) return null;
+
+  const status = evaluateCraftRequirements(recipe, bagItems, inventory, gold);
+  const prereqName = status.prerequisite
+    ? templates.find(t => t.id === status.prerequisite!.templateId)?.name ?? `#${status.prerequisite.templateId}`
+    : null;
+
+  return (
+    <div className={`quest-tracker-item ${status.ready ? 'completable' : ''}`}>
+      <div className="tracker-title">
+        <span className="tracker-source">[製作]</span>
+        {recipe.name}
+      </div>
+      <div className="tracker-craft-reqs">
+        {status.prerequisite && (
+          <span className={`tracker-craft-req ${status.prerequisite.enough ? '' : 'lacking'}`}>
+            {prereqName} <strong>{status.prerequisite.have}/{status.prerequisite.need}</strong>
+          </span>
+        )}
+        {status.materials.map(mat => (
+          <span key={mat.itemId} className={`tracker-craft-req ${mat.enough ? '' : 'lacking'}`}>
+            {getItemById(mat.itemId)?.name ?? `#${mat.itemId}`} <strong>{mat.have}/{mat.need}</strong>
+          </span>
+        ))}
+        <span className={`tracker-craft-req ${status.gold.enough ? '' : 'lacking'}`}>
+          金幣 <strong>{status.gold.have.toLocaleString()}/{status.gold.need.toLocaleString()}</strong>
+        </span>
+      </div>
+      <div className="tracker-actions">
+        {status.ready && <span className="quest-highlight">可製作</span>}
+        {/* § 36.13.5：取消製作任務無代價 */}
+        <button className="btn-danger tracker-cancel" onClick={() => abandonCraftQuest(quest.id)}>
+          取消
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** 任務內容（由 `PanelWindows` 包在 FloatingWindow 內渲染） */
 export function QuestTrackerContent() {
   const character = useGameStore(s => s.character);
   const adventurerQuests = useGameStore(s => s.adventurerQuests);
+  const craftQuests = useGameStore(s => s.craftQuests);
+  const abandonAdventurerQuest = useGameStore(s => s.abandonAdventurerQuest);
 
   if (!character) return null;
 
   const classQuests = character.quests.filter(
     (q: Quest) => q.status === 'active' || q.status === 'completable'
   );
-  const totalQuests = classQuests.length + adventurerQuests.length;
+  const totalQuests = classQuests.length + adventurerQuests.length + craftQuests.length;
 
   return (
     <div className="quest-tracker-content">
@@ -95,7 +156,20 @@ export function QuestTrackerContent() {
             進度：<strong>{quest.currentCount}/{quest.targetCount}</strong>
             {quest.status === 'completable' && <span className="quest-highlight"> — 可交付</span>}
           </div>
+          <div className="tracker-actions">
+            {/* § 36.10.3：追蹤視窗直接退出，代價與冒險者工會面板相同（扣等量貢獻） */}
+            <button
+              className="btn-danger tracker-cancel"
+              onClick={() => abandonAdventurerQuest(quest.id)}
+            >
+              退出（-{quest.contributionPoints} 貢獻）
+            </button>
+          </div>
         </div>
+      ))}
+
+      {craftQuests.map(quest => (
+        <CraftQuestItem key={quest.id} quest={quest} />
       ))}
     </div>
   );

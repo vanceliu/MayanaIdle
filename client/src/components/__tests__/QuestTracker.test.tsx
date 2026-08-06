@@ -35,6 +35,9 @@ describe('QuestTracker（按鈕在 PanelDock、內容走可拖曳浮動視窗，
         userId: 1,
       },
       adventurerQuests: [],
+      craftQuests: [],
+      bagItems: [],
+      inventory: [],
     });
   });
 
@@ -92,5 +95,27 @@ describe('QuestTracker（按鈕在 PanelDock、內容走可拖曳浮動視窗，
   it('無任務時內容顯示空狀態文字', () => {
     render(<QuestTrackerContent />);
     expect(screen.getByText('目前無進行中的任務')).toBeTruthy();
+  });
+
+  it('冒險者任務可在追蹤視窗直接退出，並扣除等量貢獻（§ 36.10.3）', () => {
+    useGameStore.setState({
+      adventurerQuests: [
+        {
+          id: 'aq1', title: '討伐野狼', difficulty: 'D', type: 'errand',
+          description: '', targetArea: 'dawn-plains', targetCount: 10, currentCount: 3,
+          status: 'active', reward: { type: 'gold', amount: 100 }, contributionPoints: 13,
+        },
+      ] as never,
+      guildProgress: { rank: 'E', points: 200 },
+    });
+
+    render(<QuestTrackerContent />);
+    fireEvent.click(screen.getByText('退出（-13 貢獻）'));
+
+    const state = useGameStore.getState();
+    expect(state.adventurerQuests).toHaveLength(0);
+    expect(state.guildProgress.points).toBe(187);
+    // 貢獻掉回 E 階門檻（200）以下 → 降階
+    expect(state.guildProgress.rank).toBe('F');
   });
 });

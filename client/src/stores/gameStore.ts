@@ -43,6 +43,8 @@ import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem }
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
 import { getTownDifficulties } from '../models/adventurerQuest';
+import type { CraftQuest } from '../models/craftQuest';
+import { acceptCraftQuest as acceptCraftQuestFn, abandonCraftQuest as abandonCraftQuestFn } from '../systems/craftQuestSystem';
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics, normalizeStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
@@ -223,6 +225,8 @@ interface GameState {
   adventurerQuestBoard: Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
   questBoardTownId: QuestTownId | null;
   guildProgress: GuildProgress;
+  /** 製作任務（§ 36.13）。上限與冒險者工會分開計算 */
+  craftQuests: CraftQuest[];
   statistics: CharacterStatistics;
 
   setPhase: (phase: GamePhase) => void;
@@ -284,6 +288,10 @@ interface GameState {
   completeAdventurerQuest: (questId: string) => void;
   refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
+  /** 登記製作任務（§ 36.13.2）。滿 3 個或已登記同配方時不做事 */
+  acceptCraftQuest: (templateId: number) => void;
+  /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
+  abandonCraftQuest: (questId: string) => void;
   saveState: () => void;
 }
 
@@ -371,6 +379,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
   questBoardTownId: null,
   guildProgress: { rank: 'F', points: 0 },
+  craftQuests: [],
   statistics: createDefaultStatistics(),
 
   setPhase: (phase) => set({ phase }),
@@ -480,6 +489,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const afterCombatMpResumeThreshold = prefs?.afterCombatMpResumeThreshold ?? 60;
     const adventurerQuests = prefs?.adventurerQuests ?? [];
     const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
+    const craftQuests = prefs?.craftQuests ?? [];
     // 舊存檔缺少後來新增的統計欄位，補上預設值（否則 `+= 1` 會變成 NaN）
     const statistics = normalizeStatistics(prefs?.statistics);
 
@@ -520,6 +530,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       afterCombatMpResumeThreshold,
       adventurerQuests,
       guildProgress,
+      craftQuests,
       statistics,
       phase: 'explore',
     });
@@ -627,6 +638,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
   questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
+      craftQuests: [],
     });
     await get().loadCharacterList();
   },
@@ -716,6 +728,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
   questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
+      craftQuests: [],
       phase: 'explore',
     });
     get().startRegen();
@@ -1587,6 +1600,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     saveGame(get());
   },
 
+  acceptCraftQuest: (templateId) => {
+    const result = acceptCraftQuestFn(get().craftQuests, templateId);
+    if (!result) return;
+    set({ craftQuests: result });
+    saveGame(get());
+  },
+
+  abandonCraftQuest: (questId) => {
+    // § 36.13.5：取消製作任務不動貢獻，與冒險者工會的退出不同
+    set({ craftQuests: abandonCraftQuestFn(get().craftQuests, questId) });
+    saveGame(get());
+  },
+
   refreshQuestBoard: (difficulty) => {
     const state = get();
     const townId = state.character?.currentArea as QuestTownId | undefined;
@@ -1851,6 +1877,7 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     afterCombatMpResumeThreshold: state.afterCombatMpResumeThreshold,
     adventurerQuests: state.adventurerQuests,
     guildProgress: state.guildProgress,
+    craftQuests: state.craftQuests,
     statistics: state.statistics,
   };
   localStorage.setItem(key, JSON.stringify(data));
@@ -1868,6 +1895,7 @@ interface LoadedPreferences {
   afterCombatMpResumeThreshold: number;
   adventurerQuests: AdventurerQuest[];
   guildProgress: GuildProgress;
+  craftQuests: CraftQuest[];
   statistics: CharacterStatistics;
 }
 
@@ -1901,6 +1929,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
         adventurerQuests: data.adventurerQuests ?? [],
         guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
+        craftQuests: data.craftQuests ?? [],
         statistics: normalizeStatistics(data.statistics),
       };
     }
@@ -1937,6 +1966,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
         adventurerQuests: data.adventurerQuests ?? [],
         guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
+        craftQuests: data.craftQuests ?? [],
         statistics: normalizeStatistics(data.statistics),
       };
     }

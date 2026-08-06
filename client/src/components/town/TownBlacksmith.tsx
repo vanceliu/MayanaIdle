@@ -9,6 +9,8 @@ import { GameIcon } from '../GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
 import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
+import { evaluateCraftRequirements, hasCraftQuestFor, removeCraftQuestByTemplate } from '../../systems/craftQuestSystem';
+import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
 
 /** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱 */
 const WEAPON_ENHANCE_SCROLL_ID = 7;
@@ -71,6 +73,9 @@ export function TownBlacksmith() {
   const equippedGear = useGameStore(s => s.equippedGear);
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
+  const craftQuests = useGameStore(s => s.craftQuests);
+  const acceptCraftQuest = useGameStore(s => s.acceptCraftQuest);
+  const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
   const [tab, setTab] = useState<Tab>('enhance');
   const [_selectedItem, _setSelectedItem] = useState<{ item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot } | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<EquipmentTemplate | null>(null);
@@ -180,19 +185,13 @@ export function TownBlacksmith() {
     useGameStore.getState().saveState();
   }
 
+  /**
+   * 製作按鈕與製作任務外框走**同一支判定**（`36-quest-system.md` § 36.13.3）——
+   * 兩邊各寫一份的話，任務會顯示「可製作」但按下去做不出來。
+   */
   function canCraftRecipe(recipe: EquipmentTemplate): boolean {
     if (!char) return false;
-    if (!recipe.craftGold || char.gold < recipe.craftGold) return false;
-    if (!recipe.craftMaterials) return false;
-    for (const mat of recipe.craftMaterials) {
-      if (getBagItemAmount(bagItems, mat.itemId) < mat.amount) return false;
-    }
-    if (recipe.craftPrerequisiteWeapon) {
-      const { templateId, quantity } = recipe.craftPrerequisiteWeapon;
-      const owned = inventory.filter(i => i.templateId === templateId).length;
-      if (owned < quantity) return false;
-    }
-    return true;
+    return evaluateCraftRequirements(recipe, bagItems, inventory, char.gold).ready;
   }
 
   async function handleCraft() {
@@ -263,6 +262,11 @@ export function TownBlacksmith() {
       character: { ...char, gold: newGold },
       bagItems: newBag,
       inventory: newInv,
+      // § 36.13.5：製作成功即移除同配方的任務。沒登記過時是 no-op
+      craftQuests: removeCraftQuestByTemplate(
+        useGameStore.getState().craftQuests,
+        selectedRecipe.id!,
+      ),
     });
 
     setResultMsg(`製作成功！獲得 ${selectedRecipe.name}`);
@@ -311,6 +315,7 @@ export function TownBlacksmith() {
         <span>金幣: {char.gold.toLocaleString()}G</span>
         <span>武器卷: {weaponScrolls}</span>
         <span>防具卷: {armorScrolls}</span>
+        {tab === 'craft' && <span>製作任務: {craftQuests.length}/{MAX_ACTIVE_CRAFT_QUESTS}</span>}
       </div>
 
       <div className="shop-tabs">
@@ -474,6 +479,30 @@ export function TownBlacksmith() {
                 >
                   製作
                 </button>
+                {/* 製作追蹤（§ 36.13.2）。上限 3 個，與冒險者工會分開計算 */}
+                {(() => {
+                  const registered = hasCraftQuestFor(craftQuests, recipe.id!);
+                  if (registered) {
+                    return (
+                      <button
+                        className="btn-danger"
+                        onClick={(e) => { e.stopPropagation(); abandonCraftQuest(`craft-${recipe.id}`); }}
+                      >
+                        取消追蹤
+                      </button>
+                    );
+                  }
+                  const full = craftQuests.length >= MAX_ACTIVE_CRAFT_QUESTS;
+                  return (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); acceptCraftQuest(recipe.id!); }}
+                      disabled={full}
+                      title={full ? `製作任務已滿（${MAX_ACTIVE_CRAFT_QUESTS}）` : undefined}
+                    >
+                      製作追蹤
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           ))}
