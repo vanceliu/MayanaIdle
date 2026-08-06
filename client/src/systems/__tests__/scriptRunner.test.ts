@@ -5,6 +5,7 @@ import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { Skill } from '../../models/skill';
 import type { ScriptContext } from '../scriptRunner';
+import { bagItem } from '../../testing/bagFixtures';
 
 function createTestCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -80,9 +81,9 @@ function createContext(overrides: Partial<ScriptContext> = {}): ScriptContext {
     lastPotionUsedAt: 0,
     now: 10000,
     bagItems: [
-      { name: '紅色藥水', type: 'potion', amount: 5 },
-      { name: '橙色藥水', type: 'potion', amount: 3 },
-      { name: '白色藥水', type: 'potion', amount: 1 },
+      bagItem('紅色藥水', 5),
+      bagItem('橙色藥水', 3),
+      bagItem('白色藥水', 1),
     ],
     ...overrides,
   };
@@ -144,7 +145,7 @@ describe('scriptRunner', () => {
       ];
       const ctx = createContext({
         character: createTestCharacter({ mp: 5, maxMp: 30 }),
-        bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+        bagItems: [bagItem('薄暮村回城卷軸', 1)],
       });
       const result = evaluateScript(rules, ctx);
       expect(result).toEqual({ type: 'flee_town' });
@@ -240,8 +241,8 @@ describe('scriptRunner', () => {
       const ctx = createContext({
         character: createTestCharacter({ hp: 20, maxHp: 100 }),
         bagItems: [
-          { name: '紅色藥水', type: 'potion', amount: 5 },
-          { name: '薄暮村回城卷軸', type: 'scroll', amount: 1 },
+          bagItem('紅色藥水', 5),
+          bagItem('薄暮村回城卷軸', 1),
         ],
       });
       const result = evaluateScript(rules, ctx);
@@ -267,7 +268,7 @@ describe('scriptRunner', () => {
       ];
       const ctx = createContext({
         character: createTestCharacter({ hp: 50, maxHp: 100 }),
-        bagItems: [{ name: '橙色藥水', type: 'potion', amount: 5 }],
+        bagItems: [bagItem('橙色藥水', 5)],
       });
       expect(evaluateScript(rules, ctx)).toEqual({ type: 'potion', potionType: 'orange' });
 
@@ -276,7 +277,7 @@ describe('scriptRunner', () => {
       ];
       const ctx2 = createContext({
         character: createTestCharacter({ hp: 50, maxHp: 100 }),
-        bagItems: [{ name: '白色藥水', type: 'potion', amount: 2 }],
+        bagItems: [bagItem('白色藥水', 2)],
       });
       expect(evaluateScript(rules2, ctx2)).toEqual({ type: 'potion', potionType: 'white' });
     });
@@ -307,7 +308,7 @@ describe('scriptRunner', () => {
       ];
       const ctx = createContext({
         character: createTestCharacter({ hp: 10, maxHp: 100 }),
-        bagItems: [{ name: '艾爾薩斯回城卷軸', type: 'scroll', amount: 3 }],
+        bagItems: [bagItem('艾爾薩斯回城卷軸', 3)],
       });
       const result = evaluateScript(rules, ctx);
       expect(result).toEqual({ type: 'flee_town' });
@@ -341,7 +342,7 @@ describe('scriptRunner', () => {
       ];
       const ctx = createContext({
         character: createTestCharacter({ hp: 10 }),
-        bagItems: [{ name: '艾爾薩斯回城卷軸', type: 'scroll', amount: 2 }],
+        bagItems: [bagItem('艾爾薩斯回城卷軸', 2)],
       });
       const result = evaluateScript(rules, ctx);
       expect(result).toEqual({ type: 'flee_town', scrollTownId: 'elsarth-town' });
@@ -353,7 +354,7 @@ describe('scriptRunner', () => {
       ];
       const ctx = createContext({
         character: createTestCharacter({ hp: 10 }),
-        bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 5 }],
+        bagItems: [bagItem('薄暮村回城卷軸', 5)],
       });
       const result = evaluateScript(rules, ctx);
       expect(result).toBeNull();
@@ -365,7 +366,7 @@ describe('scriptRunner', () => {
       ];
       const ctx = createContext({
         character: createTestCharacter({ hp: 10 }),
-        bagItems: [{ name: '瓦爾登回城卷軸', type: 'scroll', amount: 1 }],
+        bagItems: [bagItem('瓦爾登回城卷軸', 1)],
       });
       const result = evaluateScript(rules, ctx);
       expect(result).toEqual({ type: 'flee_town' });

@@ -44,6 +44,29 @@
 > 任何送往伺服端的角色識別（排行榜、未來的線上化）一律使用 `uuid`。
 > `uuid` 於 DB version 12 導入，既有角色在 upgrade 時補發。
 
+### 背包／倉庫的鍵
+
+`characterBag`／`characterStorage`／`warehouses` 三張表存的是**可堆疊道具**，
+一律以 **`itemTemplateId`（道具 id）為鍵**，`name` 只是給人看的欄位。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| itemTemplateId | number | 對應 `ITEM_DEFINITIONS.id`。所有查詢、合併、扣除都用它 |
+| name | string | 顯示用快取，載入時由 id 反查 seed 重寫，**不可用來查東西** |
+| type | string | 背包分頁，同樣由 seed 的 `category` 反查決定 |
+| amount | number | 數量 |
+
+> **不可用名字查背包**（禁用 `characterBag.where({ name })`）——
+> 道具一改名，玩家 IndexedDB 裡的舊名就再也對不上，那批存量等於消失，
+> 每次改名都得補一版 Dexie 遷移（v14 就是這樣來的）。
+> 詳細規則見 `99-ai-constraints.md` § 99.1。
+>
+> Dexie v15 完成鍵的轉換：**只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填 ——
+> 為了搶救少數早期列而留一條名稱路徑，等於把問題帶進新設計。
+
+同一條分界也適用於**設定表指涉道具**：卷軸、狀態解除道具、印記、技能書、
+裝備配方材料（`craftMaterials`）、冒險者工會獎勵一律存 id，顯示名由 id 反查。
+
 ## 18.2 裝備實例需要注意
 
 裝備不是只有 item template。

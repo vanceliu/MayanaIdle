@@ -5,6 +5,7 @@ import { LegacyArchiveView } from '../LegacyArchiveView';
 import { useGameStore } from '../../stores/gameStore';
 import { db } from '../../db/database';
 import { SNAPSHOT_VERSION, type LegacyCharacterPayload } from '../../systems/legacyArchive';
+import { bagItem } from '../../testing/bagFixtures';
 
 /**
  * @vitest-environment jsdom
@@ -28,7 +29,7 @@ function makePayload(): LegacyCharacterPayload {
       affixes: [{ type: 'attack_power', tier: 4, value: 12, display: '攻擊力 +13% (T4)' }],
     }],
     inventory: [],
-    bagItems: [{ name: '紅藥水', type: 'potion', amount: 7 }],
+    bagItems: [bagItem('紅色藥水', 7)],
     personalStorageItems: [],
     personalWarehouseEquipment: [],
     statistics: { monstersKilled: 8888 },

@@ -76,8 +76,8 @@ function ItemList() {
   const filtered = useMemo(() => {
     let list = ITEM_DEFINITIONS;
     if (categoryFilter !== 'all') list = list.filter(i => i.category === categoryFilter);
-    if (craftFilter === 'craft') list = list.filter(i => hasMaterialUsage(i.name));
-    if (craftFilter === 'nocraft') list = list.filter(i => !hasMaterialUsage(i.name));
+    if (craftFilter === 'craft') list = list.filter(i => hasMaterialUsage(i.id));
+    if (craftFilter === 'nocraft') list = list.filter(i => !hasMaterialUsage(i.id));
     if (search) list = list.filter(i => i.name.includes(search));
     return list;
   }, [categoryFilter, craftFilter, search]);
@@ -139,7 +139,7 @@ function ItemList() {
                 </td>
                 <td>{CATEGORY_LABELS[item.category]}</td>
                 <td>{item.description}</td>
-                <td>{formatMaterialUsage(item.name) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
+                <td>{formatMaterialUsage(item.id) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
                 <td className="cell-number">{item.weight}</td>
                 <td className="cell-number">{formatBuyPrice(item)}</td>
                 <td className="cell-number">{formatSellPrice(item)}</td>
@@ -156,7 +156,7 @@ function ItemList() {
 
 function ItemDetail({ name }: { name: string }) {
   const item = ITEM_DEFINITIONS.find(i => i.name === name);
-  const craftUsage = getCraftUsage(name);
+  const craftUsage = item ? getCraftUsage(item.id) : undefined;
   const dropSources = useDropSourceForItem(name);
   const bossDropSources = useMemo(() => {
     const itemDef = ITEM_DEFINITIONS.find(i => i.name === name);
@@ -164,7 +164,7 @@ function ItemDetail({ name }: { name: string }) {
     return BOSS_DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === itemDef.id);
   }, [name]);
 
-  const skillBookEntry = useMemo(() => ALL_CLASS_SKILL_BOOKS.find(b => b.name === name), [name]);
+  const skillBookEntry = useMemo(() => ALL_CLASS_SKILL_BOOKS.find(b => b.itemId === item?.id), [item?.id]);
 
   const regions = useRegions();
 
@@ -241,7 +241,7 @@ function ItemDetail({ name }: { name: string }) {
             <tr>
               <td>{CATEGORY_LABELS[item.category]}</td>
               <td>{item.description}</td>
-              <td>{formatMaterialUsage(item.name) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
+              <td>{formatMaterialUsage(item.id) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
               <td className="cell-number">{item.weight}</td>
               <td className="cell-number">{formatBuyPrice(item)}</td>
               <td className="cell-number">{formatSellPrice(item)}</td>
@@ -250,12 +250,12 @@ function ItemDetail({ name }: { name: string }) {
         </table>
       </div>
 
-      {formatMaterialUsage(item.name) && (
+      {formatMaterialUsage(item.id) && (
         <>
           <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
-            用途（{formatMaterialUsage(item.name)}）
+            用途（{formatMaterialUsage(item.id)}）
           </h3>
-          {/* 強化石／品質石有用途但不進裝備配方，故裝備清單是選擇性的 */}
+          {/* 精鍊印記／工藝印記有用途但不進裝備配方，故裝備清單是選擇性的 */}
           {craftUsage && (
           <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
             此素材用於以下 {craftUsage.equipment.length} 件裝備的鐵匠鋪配方：

@@ -8,8 +8,7 @@ import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage } from '.
 import type { AffixCategory } from '../models/affix';
 import { resolveArea } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
-import { getItemById, getItemDefinition } from '../models/items';
-import type { ItemCategory } from '../models/items';
+import { getItemById } from '../models/items';
 import { GOLD_RATE_MULTIPLIER, DROP_RATE_MULTIPLIER } from '../config';
 
 export interface DropResult {
@@ -17,6 +16,7 @@ export interface DropResult {
   items: DroppedItem[];
 }
 
+import { mapItemCategoryToBagType as mapItemCategoryToInventoryType } from '../models/bagItem';
 type InventoryItemType = 'material' | 'potion' | 'scroll' | 'spellbook';
 
 export interface DroppedItem {
@@ -30,17 +30,6 @@ export interface DroppedItem {
    * 在此帶出是因為模板此刻就在手上；交給呼叫端事後查表得再打一次 DB。
    */
   equipmentTier?: EquipmentTierLevel;
-}
-
-export function mapItemCategoryToInventoryType(category: ItemCategory): InventoryItemType {
-  switch (category) {
-    case 'dungeon':
-      return 'scroll';
-    case 'other':
-      return 'material';
-    default:
-      return category;
-  }
 }
 
 function randomInt(min: number, max: number): number {
@@ -215,9 +204,9 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   const skillBookDrop = rollClassSkillBookDrop(areaLevel, true, dropRateMultiplier);
   if (skillBookDrop) {
     items.push({
-      name: skillBookDrop,
+      name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',
-      itemTemplateId: getItemDefinition(skillBookDrop)?.id,
+      itemTemplateId: skillBookDrop,
       amount: 1,
     });
   }
@@ -335,9 +324,9 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   const skillBookDrop = rollClassSkillBookDrop(areaLevel, isBoss, dropRateMultiplier);
   if (skillBookDrop) {
     items.push({
-      name: skillBookDrop,
+      name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',
-      itemTemplateId: getItemDefinition(skillBookDrop)?.id,
+      itemTemplateId: skillBookDrop,
       amount: 1,
     });
   }

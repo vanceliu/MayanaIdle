@@ -11,15 +11,21 @@ import {
   CHAOS_SIGIL_SLOTS,
   ENHANCE_SIGIL_FAIL_TIER,
   ENHANCE_SIGIL_RATES,
+  POLISH_SIGIL_GOLD_COST,
+  POLISH_SIGIL_QUALITY_MAX,
   SIGIL_DEFINITIONS,
+  SIGIL_TABS,
   STING_SPECIAL_REPLACEMENT_TIER,
   applyChaosSigil,
   applyEnhanceSigil,
+  applyPolishSigil,
   applyRecarveSigil,
   applyStingSigil,
+  applyTemperSigil,
   canUseSigil,
   getEnhanceSigilRate,
-  getSigilByItemName,
+  getSigilByItemId,
+  getUpgradeSigilFor,
   isShopGear,
   type SigilContext,
 } from '../sigil';
@@ -46,12 +52,12 @@ const shopCtx = (over: Partial<SigilContext> = {}): SigilContext =>
 
 describe('印記系統（§ 46）', () => {
   describe('定義與 seed 對應', () => {
-    it('四種印記各有唯一的道具名', () => {
-      expect(SIGIL_DEFINITIONS).toHaveLength(4);
-      const names = SIGIL_DEFINITIONS.map(d => d.itemName);
-      expect(new Set(names).size).toBe(4);
-      for (const name of names) {
-        expect(getSigilByItemName(name)?.itemName).toBe(name);
+    it('六種印記各有唯一的道具 id', () => {
+      expect(SIGIL_DEFINITIONS).toHaveLength(6);
+      const ids = SIGIL_DEFINITIONS.map(d => d.itemId);
+      expect(new Set(ids).size).toBe(6);
+      for (const itemId of ids) {
+        expect(getSigilByItemId(itemId)?.itemId).toBe(itemId);
       }
     });
 
@@ -202,7 +208,84 @@ describe('印記系統（§ 46）', () => {
     });
   });
 
-  describe('強化印記（§ 46.6）', () => {
+  // § 46.2：精鍊與突破合用一個分頁，故分頁數比印記種類少一個
+  describe('分頁（§ 46.2）', () => {
+    it('精鍊與突破共用升階分頁，其餘各自一個分頁', () => {
+      expect(SIGIL_TABS.map(t => t.tab)).toEqual(['chaos', 'sting', 'recarve', 'enhance', 'polish']);
+      const upgradeTab = SIGIL_DEFINITIONS.filter(d => d.tab === 'enhance').map(d => d.type);
+      expect(upgradeTab).toEqual(['temper', 'enhance']);
+    });
+  });
+
+  describe('精鍊印記（§ 46.6）', () => {
+    it('取得管道上限以內走精鍊，上限以上交給突破', () => {
+      const t3: Affix = { type: 'defense', tier: 3, value: 11 };
+      const t5: Affix = { type: 'defense', tier: 5, value: 15 };
+      // 掉落／製作品：上限 T5
+      expect(getUpgradeSigilFor(t3)).toEqual({ type: 'temper', rate: 1 });
+      expect(getUpgradeSigilFor(t5)).toEqual({ type: 'enhance', rate: 0.10 });
+      // 商店裝：上限 T3，T3 之後就沒有精鍊可用，且 T3 也不在突破的守備範圍
+      expect(getUpgradeSigilFor({ type: 'defense', tier: 2, value: 8 }, SHOP_MAX_AFFIX_TIER))
+        .toEqual({ type: 'temper', rate: 1 });
+      expect(getUpgradeSigilFor(t3, SHOP_MAX_AFFIX_TIER)).toBeUndefined();
+    });
+
+    it('Tier +1 必定成功，數值以新 Tier 的區間重骰', () => {
+      mockRandom([0.99]);
+      const { affixes, success } = applyTemperSigil([{ type: 'defense', tier: 3, value: 9 }], 0, {});
+      expect(success).toBe(true);
+      expect(affixes[0].tier).toBe(4);
+      const t4 = getAffixTierTable('defense').find(t => t.tier === 4)!;
+      expect(affixes[0].value).toBeGreaterThanOrEqual(t4.min);
+      expect(affixes[0].value).toBeLessThanOrEqual(t4.max);
+    });
+
+    it('推到取得管道上限後不再受理', () => {
+      const t5: Affix[] = [{ type: 'defense', tier: 5, value: 15 }];
+      expect(applyTemperSigil(t5, 0, {}).success).toBe(false);
+      expect(canUseSigil('temper', t5, 0, {}).ok).toBe(false);
+      // 商店裝 T3 就是頂
+      const t3: Affix[] = [{ type: 'defense', tier: 3, value: 11 }];
+      expect(canUseSigil('temper', t3, 0, { maxAffixTier: SHOP_MAX_AFFIX_TIER }).ok).toBe(false);
+      expect(canUseSigil('temper', t3, 0, {}).ok).toBe(true);
+    });
+
+    it('元素與每跳傷害不動', () => {
+      mockRandom([0.5]);
+      const { affixes } = applyTemperSigil(
+        [{ type: 'element_erosion', tier: 2, value: 7, element: 'fire', dotDamage: 21 }], 0, {},
+      );
+      expect(affixes[0].dotDamage).toBe(21);
+      expect(affixes[0].element).toBe('fire');
+    });
+
+    it('特殊詞綴無 Tier，不受理', () => {
+      const special: Affix[] = [{ type: 'immune_poison', tier: 0, value: 0 }];
+      expect(canUseSigil('temper', special, 0, {}).ok).toBe(false);
+      expect(applyTemperSigil(special, 0, {}).success).toBe(false);
+    });
+  });
+
+  describe('工藝印記（§ 46.8）', () => {
+    it('品質 +1%，上限 20%', () => {
+      expect(applyPolishSigil(0)).toMatchObject({ quality: 1, success: true });
+      expect(applyPolishSigil(19)).toMatchObject({ quality: 20, success: true });
+      expect(applyPolishSigil(POLISH_SIGIL_QUALITY_MAX).success).toBe(false);
+    });
+
+    it('唯一收金幣的印記，金額同 `08-quality.md` § 8.3', () => {
+      expect(POLISH_SIGIL_GOLD_COST).toBe(50000);
+    });
+
+    it('品質已滿或裝備無詞綴時不受理', () => {
+      const affixes: Affix[] = [{ type: 'defense', tier: 3, value: 11 }];
+      expect(canUseSigil('polish', affixes, undefined, { quality: 0 }).ok).toBe(true);
+      expect(canUseSigil('polish', affixes, undefined, { quality: POLISH_SIGIL_QUALITY_MAX }).ok).toBe(false);
+      expect(canUseSigil('polish', [], undefined, { quality: 0 }).ok).toBe(false);
+    });
+  });
+
+  describe('突破印記（§ 46.7）', () => {
     it('只受理 T5 與 T6', () => {
       expect(getEnhanceSigilRate(5)).toBe(0.10);
       expect(getEnhanceSigilRate(6)).toBe(0.02);
@@ -256,7 +339,7 @@ describe('印記系統（§ 46）', () => {
     });
   });
 
-  describe('共通限制（§ 46.7）', () => {
+  describe('共通限制（§ 46.9）', () => {
     const affixes: Affix[] = [{ type: 'defense', tier: 5, value: 15 }];
 
     it('新手裝一律不可使用', () => {
@@ -265,10 +348,12 @@ describe('印記系統（§ 46）', () => {
       }
     });
 
-    it('沒有詞綴時，刺針／重刻／強化不受理，混沌照常', () => {
+    it('沒有詞綴時，刺針／重刻／精鍊／突破／工藝不受理，混沌照常', () => {
       expect(canUseSigil('sting', [], undefined, {}).ok).toBe(false);
       expect(canUseSigil('recarve', undefined, undefined, {}).ok).toBe(false);
+      expect(canUseSigil('temper', [], 0, {}).ok).toBe(false);
       expect(canUseSigil('enhance', [], 0, {}).ok).toBe(false);
+      expect(canUseSigil('polish', [], undefined, {}).ok).toBe(false);
       expect(canUseSigil('chaos', [], undefined, {}).ok).toBe(true);
     });
 

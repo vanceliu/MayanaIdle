@@ -4,6 +4,8 @@ import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import { getEquipmentTierColor } from '../../models/equipmentTier';
+import { isOffhandDefenseType } from '../../models/equipment';
+import type { EquipmentTemplate } from '../../models/equipment';
 import '../components/WikiTable.css';
 
 const SLOT_LABELS: Record<string, string> = {
@@ -15,7 +17,19 @@ const SLOT_LABELS: Record<string, string> = {
   necklace: '項鍊',
   ring1: '戒指',
   ring2: '戒指',
-  leftHand: '副手',
+  // 副手三種（`06-equipment.md` § 副手裝備）分別列出，不合併成「副手」
+  shield: '盾牌',
+  magicBook: '魔導書',
+  armGuard: '臂甲',
+};
+
+const MATERIAL_LABELS: Record<string, string> = {
+  wood: '木',
+  iron: '鐵',
+  silver: '銀',
+  mithril: '秘銀',
+  dragon: '龍',
+  orichalcum: '奧利哈鋼',
 };
 
 const CLASS_LABELS: Record<string, string> = {
@@ -25,6 +39,11 @@ const CLASS_LABELS: Record<string, string> = {
   elementalist: '元素師',
   priest: '牧師',
 };
+
+/** 副手防具以武器 type 當部位分類，其餘用 slot */
+function getCategoryKey(a: Pick<EquipmentTemplate, 'slot' | 'type'>): string {
+  return isOffhandDefenseType(a.type) ? a.type : a.slot;
+}
 
 export function ArmorPage() {
   const { name } = useParams();
@@ -41,11 +60,11 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
   const [sortKey, setSortKey] = useState<string>('name');
   const [sortAsc, setSortAsc] = useState(true);
 
-  const slots = useMemo(() => [...new Set(armors.map(a => a.slot))], [armors]);
+  const slots = useMemo(() => [...new Set(armors.map(getCategoryKey))], [armors]);
 
   const filtered = useMemo(() => {
     let list = armors;
-    if (slotFilter !== 'all') list = list.filter(a => a.slot === slotFilter);
+    if (slotFilter !== 'all') list = list.filter(a => getCategoryKey(a) === slotFilter);
     // `06-equipment-acquire.md` § 6A.1：以裝備階級 tier 篩選
     if (craftTierFilter !== 'all') {
       const wanted = Number(craftTierFilter);
@@ -53,8 +72,8 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
     }
     if (search) list = list.filter(a => a.name.includes(search));
     list = [...list].sort((a, b) => {
-      const av = (a as any)[sortKey] ?? 0;
-      const bv = (b as any)[sortKey] ?? 0;
+      const av = sortKey === 'slot' ? getCategoryKey(a) : (a as any)[sortKey] ?? 0;
+      const bv = sortKey === 'slot' ? getCategoryKey(b) : (b as any)[sortKey] ?? 0;
       if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortAsc ? av - bv : bv - av;
     });
@@ -113,6 +132,8 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
               <th className="sortable" onClick={() => handleSort('slot')}>部位{sortIndicator('slot')}</th>
               <th className="sortable" onClick={() => handleSort('defense')}>防禦{sortIndicator('defense')}</th>
               <th>格擋</th>
+              <th>魔攻</th>
+              <th>材質</th>
               <th>安定值</th>
               <th>附加效果</th>
               <th>職業限制</th>
@@ -136,6 +157,7 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
   const dropSources = useDropSourceForItem(a.name);
   const acquireLabel = a.acquireType === 'shop' ? '商店' : a.acquireType === 'craft' ? '製作' : '掉落';
   const tierColor = getEquipmentTierColor(a as any);
+  const categoryKey = getCategoryKey(a);
 
   const extras: string[] = [];
   if (a.bonusHp) extras.push(`HP+${a.bonusHp}`);
@@ -150,13 +172,15 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
     <tr>
       <td>
         <Link className="wiki-link" to={`/wiki/armor/${encodeURIComponent(a.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: tierColor }}>
-          <GameIcon name={getEquipIcon(a.slot)} size={16} color={tierColor} />
+          <GameIcon name={getEquipIcon(categoryKey)} size={16} color={tierColor} />
           {a.name}
         </Link>
       </td>
-      <td>{SLOT_LABELS[a.slot] || a.slot}</td>
+      <td>{SLOT_LABELS[categoryKey] || categoryKey}</td>
       <td className="cell-number">{a.defense ?? '-'}</td>
       <td className="cell-number">{a.blockRate ? `${a.blockRate}%` : '-'}</td>
+      <td className="cell-number">{a.magicAttack ?? '-'}</td>
+      <td>{a.material ? MATERIAL_LABELS[a.material] || a.material : '-'}</td>
       <td className="cell-number">{a.stability ?? '-'}</td>
       <td>{extras.length > 0 ? extras.join(', ') : '-'}</td>
       <td>

@@ -42,8 +42,8 @@ client/src/wiki/
 
 | Wiki 頁面 | 資料來源 |
 |-----------|---------|
-| 武器 | `EQUIPMENT_SEEDS`（`type !== 'armor'`） |
-| 防具 | `EQUIPMENT_SEEDS`（`type === 'armor'`） |
+| 武器 | `EQUIPMENT_SEEDS`（`isWeaponEquipment(slot, type)`） |
+| 防具 | `EQUIPMENT_SEEDS`（`isArmorEquipment(slot, type)`，含盾牌／魔導書／臂甲） |
 | 戰鬥計算 | `BASE_CHARACTER_DEFENSE`、`DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
 | 詞綴 | `AFFIX_DEFINITIONS`、`SPECIAL_AFFIX_DEFINITIONS`、`AFFIX_TIERS`、`AFFIX_TIER_OVERRIDES`、`getTierWeights`／`getBossTierWeights`、`getSpecialAffixChance`（`models/affix`） |
 | 怪物 | `MONSTER_SEEDS` |
@@ -68,6 +68,8 @@ client/src/wiki/
 - `getDropRate(dropValue)` — 將 dropValue 換算為百分比字串
 - `getDropItemName(drop)` — 從 drop entry 取得顯示名稱
 - `getAreaDisplayName(areaId)` — 區域 ID 轉中文名
+- `getWikiEquipmentPath(name)` — 裝備名稱轉詳細頁路徑（防具走 `/wiki/armor`，武器走 `/wiki/weapons`）。
+  跨頁連到裝備詳細頁一律用這個，不可自行判斷 `type === 'armor'`（會把副手防具連錯頁）
 
 ## 4. 頁面功能
 
@@ -76,11 +78,14 @@ client/src/wiki/
 - 詳細模式：`/wiki/weapons/:name`，含完整屬性、強化資訊
 - 篩選：武器類型、材質、取得方式、關鍵字
 - 排序：攻擊力、安定值、等級
+- **不含盾牌／魔導書／臂甲**：三者分類是防具（`06-equipment.md` § 副手裝備），列在防具頁
 
 ### 4.2 防具頁 (ArmorPage)
-- 列表模式：名稱、部位、防禦力、格擋率、安定值、附加屬性、職業限制
+- 列表模式：名稱、部位、防禦力、格擋率、**魔攻**、**材質**、安定值、附加屬性、職業限制、取得方式、掉落來源
 - 詳細模式：`/wiki/armor/:name`
 - 篩選：部位、取得方式、關鍵字
+- 含左手三種副手防具；「部位」欄對副手不顯示 `leftHand`，而是分成盾牌／魔導書／臂甲三類，
+  篩選與排序同樣以此三類為單位
 
 ### 4.2.1 詞綴頁 (AffixesPage)
 
@@ -105,7 +110,7 @@ client/src/wiki/
 3. **階級數值**：T1~T7 的通用區間 + `AFFIX_TIER_OVERRIDES` 專屬區間（目前為魔法抗性）+ 取得方式。
    節末附滿值粗體顯示的說明（§ 7.3.2）：判定看未加品質的原始數值、特殊詞綴一律粗體
 4. **掉落機率**：Tier 權重（一般怪物／Boss 對照，權重換算百分比）與特殊詞綴出現機率（含 Boss ×2）
-5. **印記**：四種印記的作用與限制（`46-sigil.md`）。表格一律 import `SIGIL_DEFINITIONS`
+5. **印記**：六種印記的作用與限制（`46-sigil.md`）。表格一律 import `SIGIL_DEFINITIONS`
    與 `ENHANCE_SIGIL_RATES`（`models/sigil.ts`），不在 Wiki 端重寫規則或機率。
    印記本身的重量／賣價／掉落率走道具頁（§ 4.5）與掉落頁，不在此重列
 

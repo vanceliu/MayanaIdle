@@ -109,7 +109,8 @@
 | 背包 tooltip（BagPanel） | `EquipmentDetail` | — | 完整顯示 |
 | 背包列表（Inventory） | `EquipmentDetail` | — | 完整顯示 |
 | 武器店/防具店 | `EquipmentDetail` / `EquipmentTemplateDetail` | — | 完整顯示 |
-| 鐵匠鋪（強化/品質/詞綴） | `EquipmentDetail` | — | 完整顯示 |
+| 鐵匠鋪（武器/防具強化） | `EquipmentDetail` | — | 完整顯示 |
+| 印記師（詞綴/品質） | `EquipmentDetail` | — | 完整顯示 |
 | 鐵匠鋪（製作） | 自訂摘要 | — | 配方資訊，非裝備實例 |
 
 ### 裝備顯示欄位（EquipmentDetail）
@@ -248,7 +249,8 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 | 雜貨店 | ✓ |
 | 武器店/防具店 | ✓ |
 | 鐵匠鋪（製作） | ✓ |
-| 鐵匠鋪（強化/品質/詞綴） | ✗ |
+| 鐵匠鋪（武器/防具強化） | ✗ |
+| 印記師（詞綴/品質） | ✗ |
 | 背包（BagPanel tooltip） | ✓ |
 | 背包列表（Inventory） | ✓ |
 | 裝備欄浮動視窗（EquipmentPanel） | ✗（compact 模式） |

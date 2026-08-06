@@ -45,12 +45,10 @@ const TIER_AREAS: Record<number, string[]> = {
 const AMOUNTS: Record<number, number[]> = { 4: [4, 3, 2], 5: [6, 5, 4, 3] };
 
 /**
- * 不進配方的材料：
- * - 品質石／強化石是全區域通用的強化道具，不是製作材料
- * - 魔法書材料是魔法書系統專用（`08-magicbook.md`）
+ * 不進配方的材料：魔法書材料是魔法書系統專用（`08-magicbook.md`）。
+ * 印記已改歸 `scroll`，本來就不在 `category === 'material'` 的篩選裡，不需另外排除。
  */
-const EXCLUDED = (name: string) =>
-  name === '品質石' || name === '強化石' || name.startsWith('魔法書材料');
+const EXCLUDED = (name: string) => name.startsWith('魔法書材料');
 
 // ------------------------------------------------------------ 區域 → 材料
 
@@ -135,6 +133,7 @@ if (!WRITE) {
 
 // ------------------------------------------------------------ 寫回
 
+const nameToId = new Map((ITEM_DEFINITIONS as { id: number; name: string }[]).map(i => [i.name, i.id]));
 const byId = new Map(assignments.map(a => [a.id, a]));
 const src = readFileSync(SEED_PATH, 'utf-8').split('\n');
 let changed = 0;
@@ -143,7 +142,8 @@ const out = src.map(line => {
   if (!m) return line;
   const a = byId.get(Number(m[1]));
   if (!a) return line;
-  const mats = `[${a.mats.map(x => `{ name: '${x.name}', amount: ${x.amount} }`).join(', ')}]`;
+  // seed 存 id 不存名稱（`99-ai-constraints.md`）：名稱只在這支腳本裡當中間表示
+  const mats = `[${a.mats.map(x => `{ itemId: ${nameToId.get(x.name)}, amount: ${x.amount} }`).join(', ')}]`;
   const next = line.replace(/craftMaterials: \[[^\]]*\]/, `craftMaterials: ${mats}`);
   if (next !== line) changed++;
   return next;

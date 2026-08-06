@@ -7,6 +7,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { db } from '../../db/database';
 import { loadTemplateCache } from '../../systems/templateSync';
+import { bagItemById } from '../../testing/bagFixtures';
 
 /**
  * @vitest-environment jsdom
@@ -27,9 +28,9 @@ async function findRecipeTitle(name: string): Promise<HTMLElement> {
 const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
 const recipeBagFor = (name: string, amount: number) =>
   EQUIPMENT_SEEDS.find(t => t.name === name)!.craftMaterials!
-    .map(m => ({ name: m.name, type: 'material' as const, amount }));
+    .map(m => bagItemById(m.itemId, amount));
 const recipeBag = (amount: number) =>
-  RECIPE.craftMaterials!.map(m => ({ name: m.name, type: 'material' as const, amount }));
+  RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, amount));
 
 describe('TownBlacksmith - Crafting', () => {
   beforeEach(async () => {
@@ -105,7 +106,7 @@ describe('TownBlacksmith - Crafting', () => {
     expect(state.character!.gold).toBe(500000 - cost);
     expect(state.inventory.some(i => i.name === '鋼心劍')).toBe(true);
     for (const m of RECIPE.craftMaterials!) {
-      expect(state.bagItems.find(b => b.name === m.name)?.amount, m.name).toBe(10 - m.amount);
+      expect(state.bagItems.find(b => b.itemId === m.itemId)?.amount, String(m.itemId)).toBe(10 - m.amount);
     }
   });
 

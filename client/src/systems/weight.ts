@@ -1,7 +1,7 @@
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import { getTotalAttributes } from '../models/character';
-import { getItemDefinition } from '../models/items';
+import { getItemById } from '../models/items';
 
 /**
  * 負重系統（`20-attributes.md` § 20.7）。
@@ -16,7 +16,7 @@ import { getItemDefinition } from '../models/items';
 const WEIGHT_PER_ATTRIBUTE = 100;
 
 export interface BagItemLike {
-  name: string;
+  itemId: number;
   amount: number;
 }
 
@@ -42,7 +42,7 @@ export function getCarriedWeight(
 ): number {
   const gear = equippedGear.reduce((sum, item) => sum + (item?.weight ?? 0), 0);
   const bag = bagItems.reduce(
-    (sum, item) => sum + (getItemDefinition(item.name)?.weight ?? 0) * item.amount,
+    (sum, item) => sum + (getItemById(item.itemId)?.weight ?? 0) * item.amount,
     0,
   );
   // 印記的重量是 0.1（`30-items.md`），浮點累加會跑出 12.300000000000002 這種尾數，

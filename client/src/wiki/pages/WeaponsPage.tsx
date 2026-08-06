@@ -19,9 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
   twoHandStaff: '雙手法杖',
   dualBlade: '雙刀',
   claw: '爪',
-  shield: '盾牌',
-  magicBook: '魔法書',
-  armGuard: '臂甲',
+  // 盾牌／魔導書／臂甲屬防具（`06-equipment.md` § 副手裝備），列在防具頁
 };
 
 const MATERIAL_LABELS: Record<string, string> = {

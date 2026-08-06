@@ -7,6 +7,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { getItemDefinition } from '../../models/items';
 import { resolveItemIcon } from '../../models/iconMap';
 import type { Character } from '../../models/character';
+import { bagItem } from '../../testing/bagFixtures';
 
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => [],
@@ -132,7 +133,7 @@ describe('道具 icon 一律來自 item 定義', () => {
 
   it('背包渲染出的 icon 與 item 定義一致（不再是鑽石）', () => {
     useGameStore.setState({
-      bagItems: CURE_ITEMS.map(name => ({ name, type: 'potion' as const, amount: 1 })),
+      bagItems: CURE_ITEMS.map(name => bagItem(name, 1)),
       inventory: [],
     });
     render(<BagPanel />);

@@ -1,7 +1,8 @@
 import { db } from '../db/database';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
-import type { BagItem } from '../stores/gameStore';
+import type { BagItem } from '../models/bagItem';
+import { makeBagItem } from '../models/bagItem';
 import type { WarehouseEntry } from '../db/database';
 import { instantiateFromTemplate } from '../models/skillTemplate';
 import { CURRENT_DATA_VERSION } from '../config';
@@ -91,11 +92,9 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     .where('characterId')
     .equals(characterId)
     .toArray();
-  const bagItems: BagItem[] = bagRows.map(r => ({
-    name: r.name,
-    type: r.type,
-    amount: r.amount,
-  }));
+  const bagItems: BagItem[] = bagRows
+    .map(r => makeBagItem(r.itemTemplateId!, r.amount))
+    .filter((b): b is BagItem => b !== null);
 
   const personalWarehouseRows = await db.warehouses
     .where('characterId')
@@ -104,7 +103,8 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     .toArray();
   const personalWarehouseItems: BagItem[] = personalWarehouseRows
     .filter(r => r.type !== 'equipment' && r.type !== 'gold')
-    .map(r => ({ name: r.name, type: r.type as BagItem['type'], amount: r.amount }));
+    .map(r => makeBagItem(r.itemTemplateId!, r.amount))
+    .filter((b): b is BagItem => b !== null);
 
   const prefsRaw = localStorage.getItem(`mayana_prefs_${characterId}`);
   const localPreferences = prefsRaw ? JSON.parse(prefsRaw) : null;
@@ -230,17 +230,11 @@ export async function importCharacterData(
   await db.characterBag.where('characterId').equals(currentCharacterId).delete();
   if (data.bagItems.length > 0) {
     // Build name→id map for item template remapping
-    const allItems = await db.itemTemplates.toArray();
-    const itemNameToId = new Map<string, number>();
-    for (const item of allItems) {
-      if (item.id != null) itemNameToId.set(item.name, item.id);
-    }
-
     const bagEntries = data.bagItems.map(item => ({
       characterId: currentCharacterId,
       name: item.name,
       type: item.type,
-      itemTemplateId: itemNameToId.get(item.name) ?? item.itemTemplateId,
+      itemTemplateId: item.itemId,
       amount: item.amount,
     }));
     await db.characterBag.bulkAdd(bagEntries);
@@ -253,17 +247,11 @@ export async function importCharacterData(
       .filter(row => row.storageType === 'personal')
       .delete();
 
-    const allItems = await db.itemTemplates.toArray();
-    const itemNameToId = new Map<string, number>();
-    for (const item of allItems) {
-      if (item.id != null) itemNameToId.set(item.name, item.id);
-    }
-
     const personalEntries: WarehouseEntry[] = data.personalWarehouseItems.map(item => ({
       userId: existing.userId,
       name: item.name,
       type: item.type,
-      itemTemplateId: itemNameToId.get(item.name) ?? item.itemTemplateId,
+      itemTemplateId: item.itemId,
       amount: item.amount,
       storageType: 'personal' as const,
       characterId: currentCharacterId,

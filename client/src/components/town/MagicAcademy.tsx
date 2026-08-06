@@ -5,8 +5,9 @@ import { SKILL_CATALOG } from '../../models/skill';
 import type { Skill } from '../../models/skill';
 import { canLearnBasicMagic, getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_NAMES_ZH } from '../../models/character';
-import type { BagItem } from '../../stores/gameStore';
 import { getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
+import { getItemById } from '../../models/items';
+import { hasBagItem, addBagItem, consumeBagItem, getBagItemAmount } from '../../models/bagItem';
 
 const LEARN_PRICES: Record<number, number> = {
   1: 100,
@@ -14,33 +15,37 @@ const LEARN_PRICES: Record<number, number> = {
   3: 700,
 };
 
+/** 魔法書碎片（所有配方共用的素材） */
+const SPELLBOOK_FRAGMENT_ID = 127;
+
 interface SpellbookRecipe {
-  name: string;
+  /** 成品魔法書的 `ITEM_DEFINITIONS` id。名稱一律由 id 反查（§ 99.1） */
+  bookItemId: number;
   levels: string;
   fragments: number;
-  material: string;
+  materialItemId: number;
   materialAmount: number;
 }
 
 const SPELLBOOK_RECIPES: SpellbookRecipe[] = [
-  { name: '基礎魔法書', levels: '4~5', fragments: 3, material: '魔法書材料（基礎）', materialAmount: 5 },
-  { name: '中階魔法書', levels: '6~7', fragments: 5, material: '魔法書材料（中階）', materialAmount: 5 },
-  { name: '高階魔法書', levels: '8', fragments: 10, material: '魔法書材料（高階）', materialAmount: 10 },
-  { name: '稀有魔法書（上）', levels: '9', fragments: 20, material: '魔法書材料（稀有）', materialAmount: 20 },
-  { name: '稀有魔法書（下）', levels: '10', fragments: 40, material: '魔法書材料（稀有）', materialAmount: 40 },
+  { bookItemId: 97, levels: '4~5', fragments: 3, materialItemId: 128, materialAmount: 5 },
+  { bookItemId: 98, levels: '6~7', fragments: 5, materialItemId: 129, materialAmount: 5 },
+  { bookItemId: 99, levels: '8', fragments: 10, materialItemId: 130, materialAmount: 10 },
+  { bookItemId: 100, levels: '9', fragments: 20, materialItemId: 131, materialAmount: 20 },
+  { bookItemId: 101, levels: '10', fragments: 40, materialItemId: 131, materialAmount: 40 },
 ];
 
-function getRequiredBook(level: number): string | null {
-  if (level >= 4 && level <= 5) return '基礎魔法書';
-  if (level >= 6 && level <= 7) return '中階魔法書';
-  if (level === 8) return '高階魔法書';
-  if (level === 9) return '稀有魔法書（上）';
-  if (level === 10) return '稀有魔法書（下）';
+function getRequiredBookId(level: number): number | null {
+  if (level >= 4 && level <= 5) return 97;
+  if (level >= 6 && level <= 7) return 98;
+  if (level === 8) return 99;
+  if (level === 9) return 100;
+  if (level === 10) return 101;
   return null;
 }
 
-function getBagAmount(bagItems: BagItem[], name: string): number {
-  return bagItems.find(b => b.name === name)?.amount ?? 0;
+function itemName(itemId: number): string {
+  return getItemById(itemId)?.name ?? '未知道具';
 }
 
 type AcademyTab = 'learn' | 'craft';
@@ -91,15 +96,13 @@ export function MagicAcademy() {
     const level = skill.level ?? 1;
     if (!canLearnBasicMagic(char!.className, char!.level, level, currentSkillCount)) return;
 
-    const bookName = getRequiredBook(level);
-    if (!bookName) return;
+    const bookItemId = getRequiredBookId(level);
+    if (bookItemId == null) return;
 
-    const hasBook = getBagAmount(bagItems, bookName) > 0;
+    const hasBook = hasBagItem(bagItems, bookItemId);
     if (!hasBook) return;
 
-    const newBag = bagItems.map(b =>
-      b.name === bookName ? { ...b, amount: b.amount - 1 } : b
-    ).filter(b => b.amount > 0);
+    const newBag = consumeBagItem(bagItems, bookItemId);
 
     const updatedSkills = [...skills, { ...skill, lastUsedAt: 0 }];
     set({
@@ -113,24 +116,19 @@ export function MagicAcademy() {
   function craftBook(recipe: SpellbookRecipe) {
     const currentBag = useGameStore.getState().bagItems;
     const currentInv = useGameStore.getState().inventory;
-    const fragments = getBagAmount(currentBag, '魔法書碎片');
-    const materials = getBagAmount(currentBag, recipe.material);
+    const fragments = getBagItemAmount(currentBag, SPELLBOOK_FRAGMENT_ID);
+    const materials = getBagItemAmount(currentBag, recipe.materialItemId);
 
     if (fragments < recipe.fragments || materials < recipe.materialAmount) return;
 
-    let newBag = currentBag.map(b => {
-      if (b.name === '魔法書碎片') return { ...b, amount: b.amount - recipe.fragments };
-      if (b.name === recipe.material) return { ...b, amount: b.amount - recipe.materialAmount };
-      return b;
-    }).filter(b => b.amount > 0);
+    let newBag = consumeBagItem(currentBag, SPELLBOOK_FRAGMENT_ID, recipe.fragments);
+    newBag = consumeBagItem(newBag, recipe.materialItemId, recipe.materialAmount);
 
-    const existingBook = newBag.find(b => b.name === recipe.name);
-    if (existingBook) {
-      newBag = newBag.map(b => b.name === recipe.name ? { ...b, amount: b.amount + 1 } : b);
-    } else {
-      if (getBagUsedSlots(newBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
-      newBag = [...newBag, { name: recipe.name, type: 'spellbook' as const, amount: 1 }];
+    if (!hasBagItem(newBag, recipe.bookItemId)
+      && getBagUsedSlots(newBag, currentInv) >= getBagMaxSlots(equippedGear)) {
+      return;
     }
+    newBag = addBagItem(newBag, recipe.bookItemId, 1);
 
     set({ bagItems: newBag });
     useGameStore.getState().saveState();
@@ -187,13 +185,14 @@ export function MagicAcademy() {
           {learnableByBook.length === 0 && <p className="empty-text">沒有可學習的高階魔法</p>}
           {learnableByBook.map(skill => {
             const level = skill.level ?? 1;
-            const bookName = getRequiredBook(level)!;
-            const hasBook = getBagAmount(bagItems, bookName) > 0;
+            const bookItemId = getRequiredBookId(level)!;
+            const bookCount = getBagItemAmount(bagItems, bookItemId);
+            const hasBook = bookCount > 0;
             return (
               <div key={skill.id} className="shop-item">
                 <div className="shop-item-info">
                   <span className="shop-item-name">{skill.name} (Lv.{level})</span>
-                  <span className="shop-item-desc">需要: {bookName} (持有: {getBagAmount(bagItems, bookName)})</span>
+                  <span className="shop-item-desc">需要: {itemName(bookItemId)} (持有: {bookCount})</span>
                 </div>
                 <div className="shop-item-actions">
                   <button onClick={() => learnWithBook(skill)} disabled={!hasBook}>
@@ -210,19 +209,19 @@ export function MagicAcademy() {
         <div className="academy-craft-content">
           <h4>製作魔法書</h4>
           <div className="craft-material-info">
-            <span>持有碎片: {getBagAmount(bagItems, '魔法書碎片')}</span>
+            <span>持有碎片: {getBagItemAmount(bagItems, SPELLBOOK_FRAGMENT_ID)}</span>
           </div>
           {SPELLBOOK_RECIPES.map(recipe => {
-            const fragments = getBagAmount(bagItems, '魔法書碎片');
-            const materials = getBagAmount(bagItems, recipe.material);
+            const fragments = getBagItemAmount(bagItems, SPELLBOOK_FRAGMENT_ID);
+            const materials = getBagItemAmount(bagItems, recipe.materialItemId);
             const canCraft = fragments >= recipe.fragments && materials >= recipe.materialAmount;
             return (
-              <div key={recipe.name} className="shop-item">
+              <div key={recipe.bookItemId} className="shop-item">
                 <div className="shop-item-info">
-                  <span className="shop-item-name">{recipe.name}</span>
+                  <span className="shop-item-name">{itemName(recipe.bookItemId)}</span>
                   <span className="shop-item-desc">教學等級: {recipe.levels}</span>
                   <span className="shop-item-desc">
-                    魔法書碎片 ×{recipe.fragments} ({fragments}) + {recipe.material} ×{recipe.materialAmount} ({materials})
+                    {itemName(SPELLBOOK_FRAGMENT_ID)} ×{recipe.fragments} ({fragments}) + {itemName(recipe.materialItemId)} ×{recipe.materialAmount} ({materials})
                   </span>
                 </div>
                 <div className="shop-item-actions">

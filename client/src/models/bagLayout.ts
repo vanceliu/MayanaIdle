@@ -88,7 +88,10 @@ export const BAG_DRAG_MIME = 'application/x-mayana-bag-item';
 /** 拖出背包時帶到其他元件的描述（`BagGridItem` 不可序列化，只帶必要欄位） */
 export interface BagDragPayload {
   kind: 'bag' | 'equipment';
+  /** 顯示用名稱（確認視窗的文案）。實際定位一律用 `itemId`／`equipmentId` */
   name: string;
+  /** kind === 'bag' 時的道具 id */
+  itemId?: number;
   amount: number;
   equipmentId?: number;
 }
@@ -108,6 +111,7 @@ export function decodeBagDrag(raw: string | null | undefined): BagDragPayload | 
     return {
       kind: parsed.kind,
       name: parsed.name,
+      itemId: typeof parsed.itemId === 'number' ? parsed.itemId : undefined,
       amount,
       equipmentId: typeof parsed.equipmentId === 'number' ? parsed.equipmentId : undefined,
     };

@@ -112,30 +112,30 @@ function calculateReward(
     case 'potion': {
       const potion = pickRandom(POTION_REWARDS);
       const amount = Math.max(1, Math.floor(baseValue / potion.unitPrice));
-      return { type: 'potion', itemId: potion.itemId, itemName: potion.name, amount };
+      return { type: 'potion', itemId: potion.itemId, amount };
     }
     case 'quality-stone': {
       const item = getItem(9);
-      return { type: 'quality-stone', itemId: item.id, itemName: item.name, amount: Math.max(1, Math.floor(baseValue / 100)) };
+      return { type: 'quality-stone', itemId: item.id, amount: Math.max(1, Math.floor(baseValue / 100)) };
     }
     case 'enhancement-stone': {
       const item = getItem(10);
-      return { type: 'enhancement-stone', itemId: item.id, itemName: item.name, amount: Math.max(1, Math.floor(baseValue / 100)) };
+      return { type: 'enhancement-stone', itemId: item.id, amount: Math.max(1, Math.floor(baseValue / 100)) };
     }
     case 'weapon-scroll': {
       const item = getItem(7);
-      return { type: 'weapon-scroll', itemId: item.id, itemName: item.name, amount: 1 };
+      return { type: 'weapon-scroll', itemId: item.id, amount: 1 };
     }
     case 'armor-scroll': {
       const item = getItem(8);
-      return { type: 'armor-scroll', itemId: item.id, itemName: item.name, amount: 1 };
+      return { type: 'armor-scroll', itemId: item.id, amount: 1 };
     }
     case 'crafting-material': {
       const materialIds = CRAFTING_MATERIAL_REWARDS[difficulty] ?? CRAFTING_MATERIAL_REWARDS.B!;
       const itemId = pickRandom(materialIds);
       const item = getItem(itemId);
       const amount = Math.max(1, Math.floor(baseValue / (item.sellPrice! * 3)));
-      return { type: 'crafting-material', itemId: item.id, itemName: item.name, amount };
+      return { type: 'crafting-material', itemId: item.id, amount };
     }
   }
 }

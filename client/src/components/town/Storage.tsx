@@ -5,7 +5,8 @@ import type { BagItem } from '../../stores/gameStore';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
-import { getItemWeight, getItemDefinition } from '../../models/items';
+import { getItemById } from '../../models/items';
+import { addBagItem, consumeBagItem, hasBagItem } from '../../models/bagItem';
 import { db } from '../../db/database';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { QtyStepper } from '../common/QtyStepper';
@@ -96,18 +97,14 @@ export function Storage() {
       : { personalStoredEquipment: equip, personalStoredMaterials: materials };
   }
 
-  /** 把 amount 個 `item` 併進目標清單（同名合併） */
+  /** 把 amount 個道具併進目標清單（同 id 合併，**不是同名**） */
   function mergeMaterial(list: BagItem[], item: BagItem, amount: number): BagItem[] {
-    return list.some(s => s.name === item.name)
-      ? list.map(s => (s.name === item.name ? { ...s, amount: s.amount + amount } : s))
-      : [...list, { ...item, amount }];
+    return addBagItem(list, item.itemId, amount);
   }
 
   /** 從來源清單扣掉 amount 個，扣完就移除該列 */
-  function takeMaterial(list: BagItem[], name: string, amount: number): BagItem[] {
-    return list
-      .map(s => (s.name === name ? { ...s, amount: s.amount - amount } : s))
-      .filter(s => s.amount > 0);
+  function takeMaterial(list: BagItem[], itemId: number, amount: number): BagItem[] {
+    return consumeBagItem(list, itemId, amount);
   }
 
   // --- 名稱搜尋：不分大小寫、去除前後空白，空字串代表不過濾 ---
@@ -132,7 +129,7 @@ export function Storage() {
     maxOf: () => 1,
   });
   const depositMaterialLines = cartLines(depositCart, bagItems, {
-    keyOf: b => `mat:${b.name}`,
+    keyOf: b => `mat:${b.itemId}`,
     maxOf: b => b.amount,
     // 持有量本身就是上限，倉庫不套用 999 硬上限
     hardCap: Infinity,
@@ -161,11 +158,11 @@ export function Storage() {
     }
 
     for (const line of depositMaterialLines) {
-      const held = bag.find(b => b.name === line.item.name);
+      const held = bag.find(b => b.itemId === line.item.itemId);
       if (!held) continue;
       const actual = Math.min(line.qty, held.amount);
       if (actual <= 0) continue;
-      bag = takeMaterial(bag, line.item.name, actual);
+      bag = takeMaterial(bag, line.item.itemId, actual);
       materials = mergeMaterial(materials, line.item, actual);
     }
 
@@ -180,14 +177,14 @@ export function Storage() {
     maxOf: () => 1,
   });
   const withdrawMaterialLines = cartLines(withdrawCart, currentMaterialStored, {
-    keyOf: s => `mat:${s.name}`,
+    keyOf: s => `mat:${s.itemId}`,
     maxOf: s => s.amount,
     hardCap: Infinity,
   });
   /** 取出要占背包欄位：裝備每件一格，物品只有背包沒有的品項才需要新格子 */
   const withdrawNeedSlots =
     withdrawEquipLines.length +
-    withdrawMaterialLines.filter(l => !bagItems.some(b => b.name === l.item.name)).length;
+    withdrawMaterialLines.filter(l => !hasBagItem(bagItems, l.item.itemId)).length;
   const withdrawHint = withdrawNeedSlots > freeSlots ? '背包欄位不足' : null;
 
   function executeWithdraw() {
@@ -213,11 +210,11 @@ export function Storage() {
     }
 
     for (const line of withdrawMaterialLines) {
-      const held = materials.find(s => s.name === line.item.name);
+      const held = materials.find(s => s.itemId === line.item.itemId);
       if (!held) continue;
       const actual = Math.min(line.qty, held.amount);
       if (actual <= 0) continue;
-      materials = takeMaterial(materials, line.item.name, actual);
+      materials = takeMaterial(materials, line.item.itemId, actual);
       bag = mergeMaterial(bag, line.item, actual);
     }
 
@@ -229,27 +226,29 @@ export function Storage() {
   /** 過濾中時所有分區共用同一句提示，避免誤以為東西不見了 */
   const emptyText = (fallback: string) => (isFiltering ? `沒有符合「${search.trim()}」的項目` : fallback);
 
-  function itemIcon(name: string) {
-    const { icon, color } = resolveItemIcon(getItemDefinition(name), name.includes('卷軸') ? 'scroll' : 'material');
+  function itemIcon(itemId: number) {
+    const def = getItemById(itemId);
+    const fallback = def?.category === 'scroll' || def?.category === 'dungeon' ? 'scroll' : 'material';
+    const { icon, color } = resolveItemIcon(def, fallback);
     return <GameIcon name={icon} size={16} color={color} />;
   }
 
   /** 可堆疊物品的一列（存入／取出共用） */
   function materialRow(item: BagItem, cart: ReturnType<typeof useShopCart>) {
     return (
-      <div key={item.name} className="storage-item">
+      <div key={item.itemId} className="storage-item">
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {itemIcon(item.name)}{item.name} ×{item.amount} (重量: {getItemWeight(item.name) * item.amount})
+          {itemIcon(item.itemId)}{item.name} ×{item.amount} (重量: {(getItemById(item.itemId)?.weight ?? 0) * item.amount})
         </span>
         <div className="storage-item-actions">
           <QtyStepper
             label={item.name}
-            value={cart.raw(`mat:${item.name}`)}
+            value={cart.raw(`mat:${item.itemId}`)}
             max={item.amount}
             min={0}
             hardCap={Infinity}
             showMax
-            onChange={next => cart.set(`mat:${item.name}`, next)}
+            onChange={next => cart.set(`mat:${item.itemId}`, next)}
           />
         </div>
       </div>

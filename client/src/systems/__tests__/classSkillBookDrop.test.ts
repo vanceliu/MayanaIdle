@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rollClassSkillBookDrop } from '../classSkillBookDrop';
+import { getItemId } from '../../models/items';
 
-const LEVEL_3_BOOKS = [
+/** 掉落回傳的是道具 id；測試以名稱書寫，這裡一次換算 */
+const ids = (...names: string[]) => names.map(n => getItemId(n)!);
+
+const LEVEL_3_BOOKS = ids(
   '鋼鐵護盾技能書', '三連射技能書', '元素增幅技能書', '群體治癒技能書', '煙霧彈技能書',
-];
-const LEVEL_4_BOOKS = [
+);
+const LEVEL_4_BOOKS = ids(
   '挑釁怒吼技能書', '鷹眼技能書', '連鎖詠唱技能書', '聖光審判技能書', '精準打擊技能書',
-];
-const LEVEL_5_BOOKS = [
+);
+const LEVEL_5_BOOKS = ids(
   '復仇之刃技能書', '穿透箭雨技能書', '元素風暴技能書', '神聖領域技能書', '背刺技能書',
-];
+);
 
 describe('classSkillBookDrop', () => {
   afterEach(() => {

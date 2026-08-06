@@ -3,6 +3,7 @@ import { getCarryCapacity, getCarriedWeight, getWeightStatus, getOverweightMessa
 import type { Character } from '../../models/character';
 import type { EquipmentInstance } from '../../models/equipment';
 
+import { getItemId } from '../../models/items';
 /**
  * 負重系統（`20-attributes.md` § 20.7）。
  *
@@ -47,18 +48,18 @@ describe('目前負重', () => {
 
   it('背包物品依數量累計', () => {
     // 紅色藥水的重量取自 itemSeeds，不寫死在測試裡
-    const one = getCarriedWeight([], [{ name: '紅色藥水', amount: 1 }]);
-    expect(getCarriedWeight([], [{ name: '紅色藥水', amount: 5 }])).toBe(one * 5);
+    const one = getCarriedWeight([], [{ itemId: getItemId('紅色藥水') ?? -1, amount: 1 }]);
+    expect(getCarriedWeight([], [{ itemId: getItemId('紅色藥水') ?? -1, amount: 5 }])).toBe(one * 5);
   });
 
   it('未知物品不計重，不會炸掉', () => {
-    expect(getCarriedWeight([], [{ name: '不存在的東西', amount: 3 }])).toBe(0);
+    expect(getCarriedWeight([], [{ itemId: getItemId('不存在的東西') ?? -1, amount: 3 }])).toBe(0);
   });
 
   it('小數重量（印記 0.1）累加後不留浮點尾數', () => {
     // 0.1 × 3 的浮點結果是 0.30000000000000004，而負重是直接顯示在狀態列的數字
-    expect(getCarriedWeight([], [{ name: '混沌印記', amount: 3 }])).toBe(0.3);
-    expect(getCarriedWeight([gear({ weight: 12 })], [{ name: '強化印記', amount: 7 }])).toBe(12.7);
+    expect(getCarriedWeight([], [{ itemId: getItemId('混沌印記') ?? -1, amount: 3 }])).toBe(0.3);
+    expect(getCarriedWeight([gear({ weight: 12 })], [{ itemId: getItemId('突破印記') ?? -1, amount: 7 }])).toBe(12.7);
   });
 });
 

@@ -4,8 +4,10 @@ import { getItemById, getItemDefinition } from '../../models/items';
 import { SIGIL_DEFINITIONS } from '../../models/sigil';
 
 /**
- * 印記掉落（`27-drop-table.md` § 27.8）：Lv.31+ 的每個區域與每隻 Boss 都有四種印記，
- * Lv.30 以下一個都沒有。掉率一般怪 1%（強化 0.1%）、Boss 5%（強化 1%）。
+ * 印記掉落（`27-drop-table.md` § 27.8）：混沌／刺針／重刻／突破在 Lv.31+ 的每個區域
+ * 與每隻 Boss 都有，Lv.30 以下一個都沒有。掉率一般怪 1%（突破 0.1%）、Boss 5%（突破 1%）。
+ *
+ * 精鍊印記與工藝印記走**全區域**掉落（列在各區域掉落表內），不適用 § 27.8，故排除在外。
  */
 
 /** § 27.8 適用區域 —— 區域最高等級 ≥ 31 */
@@ -34,12 +36,18 @@ const LOW_LEVEL_AREAS = [
   'trial-highlands', 'trial-highlands-top',
 ];
 
-const SIGIL_NAMES = SIGIL_DEFINITIONS.map(d => d.itemName);
-const SIGIL_IDS = new Set(SIGIL_NAMES.map(n => getItemDefinition(n)!.id));
+/** § 27.8 只涵蓋這四種；精鍊／工藝走全區域掉落 */
+const AREA_WIDE_SIGILS = ['精鍊印記', '工藝印記'];
+const SIGIL_NAMES = SIGIL_DEFINITIONS
+  .map(d => d.name)
+  .filter(n => !AREA_WIDE_SIGILS.includes(n));
+const SIGIL_IDS = new Set(
+  SIGIL_DEFINITIONS.filter(d => !AREA_WIDE_SIGILS.includes(d.name)).map(d => d.itemId),
+);
 
-/** 強化印記比其他三種稀有一個數量級（§ 27.8） */
-const NORMAL_VALUE = (name: string) => (name === '強化印記' ? 1 : 10);
-const BOSS_VALUE = (name: string) => (name === '強化印記' ? 10 : 50);
+/** 突破印記比其他三種稀有一個數量級（§ 27.8） */
+const NORMAL_VALUE = (name: string) => (name === '突破印記' ? 1 : 10);
+const BOSS_VALUE = (name: string) => (name === '突破印記' ? 10 : 50);
 
 function sigilDropsOf(area: string) {
   return DROP_TABLE_SEEDS.filter(
@@ -54,7 +62,7 @@ function bossSigilDropsOf(boss: string) {
 }
 
 describe('印記掉落（§ 27.8）', () => {
-  it('四種印記都有 ItemDefinition，重量 0.1、賣價 500G（`30-items.md`）', () => {
+  it('§ 27.8 的四種印記都有 ItemDefinition，重量 0.1、賣價 500G（`30-items.md`）', () => {
     for (const name of SIGIL_NAMES) {
       const def = getItemDefinition(name);
       expect(def, name).toBeTruthy();
@@ -64,7 +72,7 @@ describe('印記掉落（§ 27.8）', () => {
     }
   });
 
-  it('每個 Lv.31+ 區域都有四種印記，掉落值 10／10／10／1', () => {
+  it('每個 Lv.31+ 區域都有這四種印記，掉落值 10／10／10／1', () => {
     for (const area of SIGIL_AREAS) {
       const drops = sigilDropsOf(area);
       expect(drops.map(d => getItemById(d.itemTemplateId!)!.name).sort(), area)
@@ -76,9 +84,26 @@ describe('印記掉落（§ 27.8）', () => {
     }
   });
 
-  it('Lv.30 以下區域完全不掉印記', () => {
+  it('Lv.30 以下區域完全不掉這四種印記', () => {
     for (const area of LOW_LEVEL_AREAS) {
       expect(sigilDropsOf(area), area).toEqual([]);
+    }
+  });
+
+  // § 30.2：精鍊與工藝走全區域掉落，是前期就拿得到的養成資源
+  it('精鍊與工藝印記歸 scroll，且在 Lv.30 以下區域也掉', () => {
+    for (const name of AREA_WIDE_SIGILS) {
+      const def = getItemDefinition(name);
+      expect(def, name).toBeTruthy();
+      expect(def!.category, name).toBe('scroll');
+      expect(def!.weight, name).toBe(2);
+      expect(def!.sellPrice, name).toBe(50);
+      const areas = DROP_TABLE_SEEDS
+        .filter(d => d.itemTemplateId === def!.id)
+        .map(d => d.area);
+      for (const low of LOW_LEVEL_AREAS) {
+        expect(areas, `${name} 應該掉在 ${low}`).toContain(low);
+      }
     }
   });
 
@@ -91,7 +116,7 @@ describe('印記掉落（§ 27.8）', () => {
     expect([...areas].sort()).toEqual([...SIGIL_AREAS].sort());
   });
 
-  it('Lv.30 的試煉飛龍以外的 Boss 都掉四種印記，掉落值 50／50／50／10', () => {
+  it('Lv.30 的試煉飛龍以外的 Boss 都掉這四種印記，掉落值 50／50／50／10', () => {
     const bosses = new Set(BOSS_DROP_TABLE_SEEDS.map(d => d.bossName));
     for (const boss of bosses) {
       const drops = bossSigilDropsOf(boss);

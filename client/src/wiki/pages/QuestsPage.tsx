@@ -152,8 +152,8 @@ export function QuestsPage() {
             <tbody>
               <tr><td>金幣</td><td>基準值 ×2</td></tr>
               <tr><td>藥水（紅/橙/白/綠/強化綠隨機）</td><td>基準值 ÷ 藥水單價（最少 1 個）</td></tr>
-              <tr><td>品質石</td><td>基準值 ÷ 100（個）</td></tr>
-              <tr><td>強化石</td><td>基準值 ÷ 100（個）</td></tr>
+              <tr><td>工藝印記</td><td>基準值 ÷ 100（個）</td></tr>
+              <tr><td>精鍊印記</td><td>基準值 ÷ 100（個）</td></tr>
               <tr><td>武器強化卷軸</td><td>1 張</td></tr>
               <tr><td>防具強化卷軸</td><td>1 張</td></tr>
               <tr><td>製作素材（B 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
@@ -172,8 +172,8 @@ export function QuestsPage() {
               <tr><th>等階</th><th>可出現的獎勵</th></tr>
             </thead>
             <tbody>
-              <tr><td>F ~ D</td><td>金幣、藥水、品質石、強化石</td></tr>
-              <tr><td>C</td><td>同上（品質石/強化石權重提升）</td></tr>
+              <tr><td>F ~ D</td><td>金幣、藥水、工藝印記、精鍊印記</td></tr>
+              <tr><td>C</td><td>同上（工藝印記/精鍊印記權重提升）</td></tr>
               <tr><td>B</td><td>+ 防具強化卷軸、製作素材（銀礦石、銀精華）</td></tr>
               <tr><td>A</td><td>+ 武器強化卷軸、製作素材升級（米索利碎片、米索利礦石）</td></tr>
               <tr><td>S ~ SS</td><td>卷軸權重提高、製作素材升級（龍骨、奧里哈魯根）</td></tr>
@@ -190,7 +190,7 @@ export function QuestsPage() {
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>等階</th><th>金幣</th><th>藥水</th><th>品質石</th><th>強化石</th><th>防具卷軸</th><th>武器卷軸</th><th>製作素材</th></tr>
+              <tr><th>等階</th><th>金幣</th><th>藥水</th><th>工藝印記</th><th>精鍊印記</th><th>防具卷軸</th><th>武器卷軸</th><th>製作素材</th></tr>
             </thead>
             <tbody>
               <tr><td>F ~ D</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>

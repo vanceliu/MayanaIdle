@@ -28,11 +28,10 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 147, name: '混沌印記', category: 'scroll', description: '全部 4 條詞綴重骰（上限 T5，商店裝 T3）', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#A855F7' },
   { id: 148, name: '刺針印記', category: 'scroll', description: '指定一條詞綴換成同池的另一條，Tier 不變', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#2DD4BF' },
   { id: 149, name: '重刻印記', category: 'scroll', description: '指定一條詞綴的數值重骰，種類與 Tier 不變', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#60A5FA' },
-  { id: 150, name: '強化印記', category: 'scroll', description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
-
-  // === 強化用素材 ===
-  { id: 9, name: '品質石', category: 'material', description: '鐵匠鋪提升裝備品質（+1%，上限 20%）', weight: 2, sellPrice: 50, iconType: 'stone', iconTier: 4 },
-  { id: 10, name: '強化石', category: 'material', description: '鐵匠鋪詞綴強化（逐級提升 Tier，最高 T5）', weight: 2, sellPrice: 50, iconType: 'whetstone', iconTier: 4 },
+  { id: 150, name: '突破印記', category: 'scroll', description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0.1, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
+  // 精鍊與工藝走全區域掉落（§ 30.2 印記），故重量 2／賣價 50G 與其他印記不同
+  { id: 9, name: '工藝印記', category: 'scroll', description: '整件裝備品質 +1%（上限 20%），另收 50,000G', weight: 2, sellPrice: 50, iconType: 'stone', iconTier: 4 },
+  { id: 10, name: '精鍊印記', category: 'scroll', description: '指定一條詞綴 Tier +1，必定成功，最高 T5（商店裝 T3）', weight: 2, sellPrice: 50, iconType: 'whetstone', iconTier: 4 },
 
   // === 製作用素材 ===
   { id: 11, name: '銀礦石', category: 'material', description: '銀材質裝備製作素材', weight: 5, sellPrice: 50, iconType: 'ore', iconTier: 2 },

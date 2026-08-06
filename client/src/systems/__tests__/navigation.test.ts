@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { canNavigateTo, consumeScroll } from '../navigation';
 import type { BagItem } from '../../stores/gameStore';
 
+import { getItemId } from '../../models/items';
+import { bagItem } from '../../testing/bagFixtures';
 describe('navigation system', () => {
   describe('canNavigateTo', () => {
     it('allows navigation to any field region', () => {
@@ -23,7 +25,7 @@ describe('navigation system', () => {
     it('allows navigation to dungeon region', () => {
       const result = canNavigateTo(
         { zoneId: 'grey-ridge', regionId: 'hundred-pillar-1-10f', floor: null },
-        [{ name: '百柱塔 1F 通行卷軸', type: 'scroll', amount: 1 }],
+        [bagItem('百柱塔 1F 通行卷軸', 1)],
       );
       expect(result.success).toBe(true);
     });
@@ -72,14 +74,14 @@ describe('navigation system', () => {
 
     it('allows navigation to hundred-pillar 11-20f with scroll and consumes it', () => {
       const bag: BagItem[] = [
-        { name: '百柱塔 11F 通行卷軸', type: 'scroll', amount: 2 },
+        bagItem('百柱塔 11F 通行卷軸', 2),
       ];
       const result = canNavigateTo(
         { zoneId: 'grey-ridge', regionId: 'hundred-pillar-11-20f', floor: null },
         bag,
       );
       expect(result.success).toBe(true);
-      expect(result.scrollConsumed).toBe('百柱塔 11F 通行卷軸');
+      expect(result.scrollConsumed).toBe(getItemId('百柱塔 11F 通行卷軸'));
     });
 
     it('blocks navigation to hundred-pillar 91-100f without scroll', () => {
@@ -104,32 +106,32 @@ describe('navigation system', () => {
     it('allows hundred-pillar 1-10f with the entry scroll, consuming it', () => {
       const result = canNavigateTo(
         { zoneId: 'grey-ridge', regionId: 'hundred-pillar-1-10f', floor: null },
-        [{ name: '百柱塔 1F 通行卷軸', type: 'scroll', amount: 1 }],
+        [bagItem('百柱塔 1F 通行卷軸', 1)],
       );
       expect(result.success).toBe(true);
-      expect(result.scrollConsumed).toBe('百柱塔 1F 通行卷軸');
+      expect(result.scrollConsumed).toBe(getItemId('百柱塔 1F 通行卷軸'));
     });
   });
 
   describe('consumeScroll', () => {
     it('decrements scroll amount', () => {
       const bag: BagItem[] = [
-        { name: '百柱塔 11F 通行卷軸', type: 'scroll', amount: 3 },
-        { name: '品質石', type: 'material', amount: 5 },
+        bagItem('百柱塔 11F 通行卷軸', 3),
+        bagItem('工藝印記', 5),
       ];
-      const result = consumeScroll(bag, '百柱塔 11F 通行卷軸');
+      const result = consumeScroll(bag, getItemId('百柱塔 11F 通行卷軸')!);
       expect(result).toHaveLength(2);
-      expect(result.find(b => b.name === '百柱塔 11F 通行卷軸')!.amount).toBe(2);
+      expect(result.find(b => b.itemId === getItemId('百柱塔 11F 通行卷軸'))!.amount).toBe(2);
     });
 
     it('removes item when amount reaches 0', () => {
       const bag: BagItem[] = [
-        { name: '百柱塔 11F 通行卷軸', type: 'scroll', amount: 1 },
-        { name: '品質石', type: 'material', amount: 5 },
+        bagItem('百柱塔 11F 通行卷軸', 1),
+        bagItem('工藝印記', 5),
       ];
-      const result = consumeScroll(bag, '百柱塔 11F 通行卷軸');
+      const result = consumeScroll(bag, getItemId('百柱塔 11F 通行卷軸')!);
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('品質石');
+      expect(result[0].name).toBe('工藝印記');
     });
   });
 });

@@ -1,4 +1,5 @@
 import type { Zone, Region, Floor } from './area';
+import { getItemId } from './items';
 
 // ============================================================
 // Zones
@@ -298,7 +299,7 @@ const hundredPillar1_10: Region = {
   levelMin: 45,
   levelMax: 52,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 1F 通行卷軸',
+  entryScrollItemId: 95, // 百柱塔 1F 通行卷軸
   monsters: ['百柱蜘蛛', '百柱祕密', '百柱妖女', '百柱奇美拉', '百柱幻影', '毒之皇女'],
 };
 
@@ -310,7 +311,7 @@ const hundredPillar11_20: Region = {
   levelMin: 45,
   levelMax: 52,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 11F 通行卷軸',
+  entryScrollItemId: 135, // 百柱塔 11F 通行卷軸
   monsters: ['高階夢魘', '高階哥布林', '高階地靈', '高階爬蟲', '高階哥布林弓手', '高階哥布林戰士', '高階地靈之主', '哥布林之王'],
 };
 
@@ -322,7 +323,7 @@ const hundredPillar21_30: Region = {
   levelMin: 45,
   levelMax: 52,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 21F 通行卷軸',
+  entryScrollItemId: 136, // 百柱塔 21F 通行卷軸
   monsters: ['暗影潛伏者', '暗影蝙蝠', '暗影刺客', '暗影巫師', '暗影獵犬', '暗影吸血鬼'],
 };
 
@@ -334,7 +335,7 @@ const hundredPillar31_40: Region = {
   levelMin: 52,
   levelMax: 57,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 31F 通行卷軸',
+  entryScrollItemId: 137, // 百柱塔 31F 通行卷軸
   monsters: ['不死骷髏兵', '不死腐屍', '不死幽魂', '不死死靈騎士', '不死巫妖', '不死殭屍王'],
 };
 
@@ -346,7 +347,7 @@ const hundredPillar41_50: Region = {
   levelMin: 52,
   levelMax: 57,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 41F 通行卷軸',
+  entryScrollItemId: 138, // 百柱塔 41F 通行卷軸
   monsters: ['古代幼龍', '古代小型飛龍', '古代龍人', '古代雙頭龍', '古代龍騎兵', '龍王約特勒'],
 };
 
@@ -358,7 +359,7 @@ const hundredPillar51_60: Region = {
   levelMin: 52,
   levelMax: 57,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 51F 通行卷軸',
+  entryScrollItemId: 139, // 百柱塔 51F 通行卷軸
   monsters: ['怨念幽靈', '哭嚎女妖', '鬼魂遊蕩者', '冥界使者', '冥王哈馬斯'],
 };
 
@@ -370,7 +371,7 @@ const hundredPillar61_70: Region = {
   levelMin: 57,
   levelMax: 60,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 61F 通行卷軸',
+  entryScrollItemId: 140, // 百柱塔 61F 通行卷軸
   monsters: ['霜凍巨人', '霜凍狼', '冰晶元素', '霜凍女巫', '霜凍伊莉絲'],
 };
 
@@ -382,7 +383,7 @@ const hundredPillar71_80: Region = {
   levelMin: 57,
   levelMax: 60,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 71F 通行卷軸',
+  entryScrollItemId: 141, // 百柱塔 71F 通行卷軸
   monsters: ['熔岩巨獸', '火焰蜥蜴', '岩漿元素', '熔岩守衛', '熔岩伊弗利特'],
 };
 
@@ -394,7 +395,7 @@ const hundredPillar81_90: Region = {
   levelMin: 57,
   levelMax: 60,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 81F 通行卷軸',
+  entryScrollItemId: 142, // 百柱塔 81F 通行卷軸
   monsters: ['殘影毒之皇女', '殘影哥布林之王', '殘影暗影吸血鬼', '殘影不死殭屍王', '殘影龍王約特勒', '殘影冥王哈瑪斯', '殘影霜凍伊莉絲', '殘影熔岩伊弗利特', '守護者之主'],
 };
 
@@ -406,7 +407,7 @@ const hundredPillar91_100: Region = {
   levelMin: 60,
   levelMax: 60,
   zoneId: 'grey-ridge',
-  entryScrollName: '百柱塔 91F 通行卷軸',
+  entryScrollItemId: 143, // 百柱塔 91F 通行卷軸
   monsters: ['精靈王衛兵', '死之信徒', '精靈王射手', '精靈王魔導士', '死之執行者', '百柱死神'],
 };
 
@@ -547,12 +548,19 @@ export function getScrollSegmentForFloor(floor: number, segmentSize: number): nu
   return Math.floor((floor - 1) / segmentSize) * segmentSize + 1;
 }
 
-export function getRequiredScrollName(regionId: string, targetFloor: number): string | null {
+/**
+ * 分段式副本（百柱塔）進入某層所需的通行卷軸 id。
+ *
+ * 卷軸有十張、隨樓層區段遞增，逐一寫進 region 反而更容易漏；因此這裡**唯一**
+ * 允許以名稱組出卷軸再換成 id，換算只發生在這個函式裡，其餘一律傳 id。
+ * `itemIdIntegrity.test.ts` 會掃過所有區段，確保每一張都反查得到。
+ */
+export function getRequiredScrollItemId(regionId: string, targetFloor: number): number | null {
   const region = getRegion(regionId);
   if (!region?.requiresScroll || !region.scrollSegmentSize) return null;
   if (targetFloor <= region.scrollSegmentSize) return null;
   const segment = getScrollSegmentForFloor(targetFloor, region.scrollSegmentSize);
-  return `${region.name} ${segment}F 通行卷軸`;
+  return getItemId(`${region.name} ${segment}F 通行卷軸`) ?? null;
 }
 
 export function getNearestTown(currentRegionId: string): Region {

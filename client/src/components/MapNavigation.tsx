@@ -3,6 +3,8 @@ import { useGameStore } from '../stores/gameStore';
 import { ZONES, getRegionsByZone, getRegion } from '../models/mapData';
 import { isRegionUnlockEnabled } from '../systems/devFlags';
 import type { Region } from '../models/area';
+import { hasBagItem } from '../models/bagItem';
+import { getItemById } from '../models/items';
 
 export function MapNavigation() {
   const char = useGameStore(s => s.character);
@@ -72,23 +74,24 @@ export function MapNavigation() {
     if (!char) return null;
     const isCurrent = char.currentRegion === r.id;
     const typeLabel = r.type === 'dungeon' ? '副本' : r.type === 'town' ? '城鎮' : '野外';
-    const needsScroll = !!r.entryScrollName && !isRegionUnlockEnabled();
-    const hasScroll = !needsScroll || bagItems.some(b => b.name === r.entryScrollName && b.amount > 0);
+    const needsScroll = !!r.entryScrollItemId && !isRegionUnlockEnabled();
+    const hasScroll = !needsScroll || hasBagItem(bagItems, r.entryScrollItemId!);
     const isLocked = needsScroll && !hasScroll;
+    const scrollLabel = r.entryScrollItemId ? getItemById(r.entryScrollItemId)?.name ?? '通行卷軸' : '';
     return (
       <button
         key={r.id}
         className={`map-region-btn${isCurrent ? ' active' : ''} type-${r.type}${isLocked ? ' locked' : ''}`}
         onClick={() => handleRegionClick(r)}
         disabled={isBattling || isLocked || (isCurrent && r.type !== 'dungeon')}
-        title={isLocked ? `需要「${r.entryScrollName}」` : undefined}
+        title={isLocked ? `需要「${scrollLabel}」` : undefined}
       >
         <span className="region-name">{isLocked ? '🔒 ' : ''}{r.name}</span>
         <span className="region-meta">[{typeLabel}] Lv.{r.levelMin}~{r.levelMax}</span>
         {r.type === 'dungeon' && r.floors && (
           <span className="region-floors">{r.floors.length} 層</span>
         )}
-        {isLocked && <span className="region-scroll-hint">需要: {r.entryScrollName}</span>}
+        {isLocked && <span className="region-scroll-hint">需要: {scrollLabel}</span>}
       </button>
     );
   }

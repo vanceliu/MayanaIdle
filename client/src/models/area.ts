@@ -21,8 +21,8 @@ export interface Region {
   /** 百柱塔需要卷軸才能進入下一區段 */
   requiresScroll?: boolean;
   scrollSegmentSize?: number;
-  /** 進入此區域需要消耗的卷軸名稱（獨立 region 用） */
-  entryScrollName?: string;
+  /** 進入此區域需要消耗的卷軸 `ITEM_DEFINITIONS` id（獨立 region 用）。名稱由 id 反查，不存名稱 */
+  entryScrollItemId?: number;
   /**
    * 導覽分組。同一組的 region 在地圖選單裡先收成一個入口，點進去才列出各段。
    * 這**只影響導覽層級**——region id 不變，掉落／怪物／任務／存檔一律照舊。

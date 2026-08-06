@@ -21,10 +21,13 @@ describe('經濟平衡驗證', () => {
     const expectedGoldPerKill = avgGold * goldRate;
 
     let expectedMaterialGoldPerKill = 0;
+    // 「掉了可以賣錢的東西」才算素材收入。精鍊／工藝印記歸 scroll（`46-sigil.md` § 46.2）
+    // 但仍是全區域掉落的可販售品，收入照算 —— 只看 category 會讓改歸類憑空砍掉前期收入。
     const materialDrops = areaDrops.filter(d => {
       if (d.itemType !== 'item' || !d.itemTemplateId) return false;
       const def = getItemById(d.itemTemplateId);
-      return def?.category === 'material' && def.sellPrice !== undefined && def.sellPrice > 0;
+      if (!def || def.category === 'potion') return false;
+      return def.sellPrice !== undefined && def.sellPrice > 0;
     });
 
     for (const drop of materialDrops) {

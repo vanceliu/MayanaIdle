@@ -2,14 +2,15 @@ import { useState, useRef, useMemo, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { buildBagLayout, moveBagSlot, encodeBagDrag, BAG_DRAG_MIME, type BagSlotMap } from '../models/bagLayout';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
-import { POTION_CONFIG, type PotionType, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
+import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type PotionType, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
 import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
 import { formatMaterialUsage, hasMaterialUsage } from '../systems/craftMaterialUsage';
 import { EquipmentDetail } from './EquipmentInfo';
-import { getItemWeight, getItemDescription, getItemDefinition } from '../models/items';
+import { getItemById } from '../models/items';
 import { isCureItem, getCureItem, hasCurableDebuff } from '../models/cureItem';
+import { getTownScrollByItemId } from '../models/townScroll';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 
@@ -21,11 +22,14 @@ const CLICK_SLOP = 8;
 interface BagGridItem {
   id: string;
   type: 'potion' | 'material' | 'scroll' | 'equipment' | 'spellbook';
+  /** 顯示用名稱。背包物品一律由 `itemId` 反查，不從狀態帶舊名 */
   name: string;
+  /** 背包物品的道具 id（裝備格沒有） */
+  itemId?: number;
   count?: number;
   potionType?: PotionType;
   speedPotionType?: SpeedPotionType;
-  cureItemName?: string;
+  cureItemId?: number;
   equipment?: EquipmentInstance;
 }
 
@@ -42,6 +46,19 @@ function getItemIconKey(name: string, type: string): string {
   if (name.includes('磨刀石')) return 'whetstone';
   if (name.includes('石')) return 'stone';
   return 'material';
+}
+
+function isTownScroll(itemId: number): boolean {
+  return getTownScrollByItemId(itemId) != null;
+}
+
+/** 背包格對應的道具定義。一律以 id 反查 seed（§ 99.1），不用名稱 */
+function itemDef(item: { itemId?: number }) {
+  return item.itemId != null ? getItemById(item.itemId) : undefined;
+}
+
+function itemWeight(item: { itemId?: number }): number {
+  return itemDef(item)?.weight ?? 0;
 }
 
 const TYPE_SORT_ORDER: Record<string, number> = {
@@ -87,34 +104,39 @@ export function BagPanel() {
   const orangeCount = getPotionCount(bagItems, 'orange');
   const whiteCount = getPotionCount(bagItems, 'white');
 
+  const basicPotionIds = new Set(Object.values(POTION_CONFIG).map(c => c.itemId));
+
   if (redCount > 0) {
-    gridItems.push({ id: 'potion-red', type: 'potion', name: '紅色藥水', count: redCount, potionType: 'red' });
+    gridItems.push({ id: 'potion-red', type: 'potion', name: getPotionName('red'), itemId: POTION_CONFIG.red.itemId, count: redCount, potionType: 'red' });
   }
   if (orangeCount > 0) {
-    gridItems.push({ id: 'potion-orange', type: 'potion', name: '橙色藥水', count: orangeCount, potionType: 'orange' });
+    gridItems.push({ id: 'potion-orange', type: 'potion', name: getPotionName('orange'), itemId: POTION_CONFIG.orange.itemId, count: orangeCount, potionType: 'orange' });
   }
   if (whiteCount > 0) {
-    gridItems.push({ id: 'potion-white', type: 'potion', name: '白色藥水', count: whiteCount, potionType: 'white' });
+    gridItems.push({ id: 'potion-white', type: 'potion', name: getPotionName('white'), itemId: POTION_CONFIG.white.itemId, count: whiteCount, potionType: 'white' });
   }
 
   for (const item of bagItems) {
-    if (item.type === 'potion' && !['紅色藥水', '橙色藥水', '白色藥水'].includes(item.name)) {
-      const spt: SpeedPotionType | undefined = item.name === '綠色藥水' ? 'green' : item.name === '強化綠色藥水' ? 'enhanced-green' : undefined;
-      const cure = isCureItem(item.name) ? item.name : undefined;
+    if (item.type === 'potion' && !basicPotionIds.has(item.itemId)) {
+      const spt: SpeedPotionType | undefined =
+        item.itemId === SPEED_POTION_CONFIG.green.itemId ? 'green'
+        : item.itemId === SPEED_POTION_CONFIG['enhanced-green'].itemId ? 'enhanced-green'
+        : undefined;
       gridItems.push({
-        id: `bag-${item.name}`,
+        id: `bag-${item.itemId}`,
         type: 'potion',
         name: item.name,
+        itemId: item.itemId,
         count: item.amount,
         speedPotionType: spt,
-        cureItemName: cure,
+        cureItemId: isCureItem(item.itemId) ? item.itemId : undefined,
       });
     }
   }
 
   for (const item of bagItems) {
     if (item.type === 'potion') continue;
-    gridItems.push({ id: `bag-${item.name}`, type: item.type, name: item.name, count: item.amount });
+    gridItems.push({ id: `bag-${item.itemId}`, type: item.type, name: item.name, itemId: item.itemId, count: item.amount });
   }
 
   for (const item of inventory) {
@@ -186,8 +208,9 @@ export function BagPanel() {
     const item = contextMenu.item;
     const entry = toQuickSlotEntry(
       item.equipment ? 'equipment' : 'bag',
-      item.name,
+      item.itemId ?? -1,
       item.equipment?.id,
+      item.name,
     );
     if (!entry) return;
     assignQuickSlot(slotIdx, entry);
@@ -199,8 +222,8 @@ export function BagPanel() {
     const item = contextMenu.item;
     if (item.equipment) {
       useGameStore.getState().discardInventoryItem(item.equipment.id!);
-    } else {
-      useGameStore.getState().discardBagItem(item.name);
+    } else if (item.itemId != null) {
+      useGameStore.getState().discardBagItem(item.itemId);
     }
     setContextMenu(null);
   }
@@ -209,14 +232,14 @@ export function BagPanel() {
   function activate(item: BagGridItem) {
     if (item.potionType) {
       usePotionByType(item.potionType);
-    } else if (item.cureItemName) {
-      useCureItem(item.cureItemName);
+    } else if (item.cureItemId != null) {
+      useCureItem(item.cureItemId);
     } else if (item.speedPotionType) {
       useGameStore.getState().useSpeedPotion(item.speedPotionType);
     } else if (item.equipment) {
       equipItem(item.equipment);
-    } else if (item.type === 'scroll' && item.name.includes('回城卷軸')) {
-      useTownScroll(item.name);
+    } else if (item.type === 'scroll' && item.itemId != null && isTownScroll(item.itemId)) {
+      useTownScroll(item.itemId);
     }
   }
 
@@ -272,7 +295,7 @@ export function BagPanel() {
   function renderTooltipContent(item: BagGridItem) {
     if (item.potionType) {
       const config = POTION_CONFIG[item.potionType];
-      const unitWeight = getItemWeight(item.name);
+      const unitWeight = itemWeight(item);
       const totalWeight = unitWeight * (item.count ?? 1);
       return (
         <div className="bag-tooltip-content">
@@ -288,15 +311,15 @@ export function BagPanel() {
       );
     }
 
-    if (item.cureItemName) {
-      const def = getCureItem(item.cureItemName);
-      const unitWeight = getItemWeight(item.name);
+    if (item.cureItemId != null) {
+      const def = getCureItem(item.cureItemId);
+      const unitWeight = itemWeight(item);
       const totalWeight = unitWeight * (item.count ?? 1);
       const curable = def ? hasCurableDebuff(def, activeEffects) : false;
       return (
         <div className="bag-tooltip-content">
           <div className="tooltip-name">{item.name}</div>
-          <div className="tooltip-stat">{def?.description ?? getItemDescription(item.name)}</div>
+          <div className="tooltip-stat">{def?.description ?? itemDef(item)?.description ?? ''}</div>
           <div className="tooltip-stat">重量: {totalWeight}</div>
           <div className="tooltip-count">數量: {item.count}</div>
           <div className="tooltip-hint">
@@ -307,12 +330,12 @@ export function BagPanel() {
     }
 
     if (item.speedPotionType) {
-      const unitWeight = getItemWeight(item.name);
+      const unitWeight = itemWeight(item);
       const totalWeight = unitWeight * (item.count ?? 1);
       return (
         <div className="bag-tooltip-content">
           <div className="tooltip-name">{item.name}</div>
-          <div className="tooltip-stat">{getItemDescription(item.name)}</div>
+          <div className="tooltip-stat">{itemDef(item)?.description ?? ''}</div>
           <div className="tooltip-stat">重量: {totalWeight}</div>
           <div className="tooltip-count">數量: {item.count}</div>
           <div className="tooltip-hint">
@@ -334,11 +357,11 @@ export function BagPanel() {
       );
     }
 
-    const craftUsage = formatMaterialUsage(item.name);
+    const craftUsage = item.itemId != null ? formatMaterialUsage(item.itemId) : '';
     return (
       <div className="bag-tooltip-content">
         <div className="tooltip-name">{item.name}</div>
-        <div className="tooltip-stat">重量: {getItemWeight(item.name) * (item.count ?? 1)}</div>
+        <div className="tooltip-stat">重量: {itemWeight(item) * (item.count ?? 1)}</div>
         {item.count && <div className="tooltip-count">數量: {item.count}</div>}
         {/* 顏色只表達稀有度，用途另外講明，免得玩家把配方材料賣掉 */}
         {craftUsage && <div className="tooltip-craft-usage">⚒ 用途：{craftUsage}</div>}
@@ -397,7 +420,7 @@ export function BagPanel() {
                   e.dataTransfer.setData(BAG_DRAG_MIME, encodeBagDrag(
                     item.equipment
                       ? { kind: 'equipment', name: item.name, amount: 1, equipmentId: item.equipment.id }
-                      : { kind: 'bag', name: item.name, amount: item.count ?? 1 },
+                      : { kind: 'bag', name: item.name, itemId: item.itemId, amount: item.count ?? 1 },
                   ));
                   // 必須是 copyMove：快捷鍵綁定是 copy（物品留在背包）、丟到地圖是 move。
                   // 若只給 'move'，快捷鍵的 dropEffect='copy' 會不相容，瀏覽器會直接取消放置。
@@ -421,7 +444,7 @@ export function BagPanel() {
                   (() => {
                     // 顯示方式一律以 item 定義為準（icon / iconColor / iconType / iconTier）
                     const { icon, color } = resolveItemIcon(
-                      getItemDefinition(item.name),
+                      itemDef(item),
                       getItemIconKey(item.name, item.type),
                     );
                     return <GameIcon name={icon} size={24} color={color} />;
@@ -431,7 +454,7 @@ export function BagPanel() {
                 {item.count != null && item.count > 1 && (
                   <span className="bag-cell-count">×{item.count}</span>
                 )}
-                {hasMaterialUsage(item.name) && (
+                {item.itemId != null && hasMaterialUsage(item.itemId) && (
                   <span className="bag-cell-craft" title="有用途的素材" aria-label="有用途的素材">⚒</span>
                 )}
               </div>
@@ -458,8 +481,9 @@ export function BagPanel() {
           >
             {toQuickSlotEntry(
               contextMenu.item.equipment ? 'equipment' : 'bag',
-              contextMenu.item.name,
+              contextMenu.item.itemId ?? -1,
               contextMenu.item.equipment?.id,
+              contextMenu.item.name,
             ) && (
               <>
                 <div className="context-menu-title">設為快捷鍵</div>
@@ -474,8 +498,9 @@ export function BagPanel() {
                       quickSlots[idx],
                       toQuickSlotEntry(
                         contextMenu.item.equipment ? 'equipment' : 'bag',
-                        contextMenu.item.name,
+                        contextMenu.item.itemId ?? -1,
                         contextMenu.item.equipment?.id,
+                        contextMenu.item.name,
                       ),
                     ) && <span className="context-menu-active">●</span>}
                   </button>

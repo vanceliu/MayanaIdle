@@ -7,6 +7,8 @@ import type { BagItem } from '../../stores/gameStore';
 import type { PlayerDebuffType } from '../../models/playerDebuff';
 import { createPlayerDebuffEffect } from '../playerDebuffSystem';
 
+import { getItemId } from '../../models/items';
+import { bagItem } from '../../testing/bagFixtures';
 const NOW = 80_000;
 
 function character(overrides: Partial<Character> = {}): Character {
@@ -47,12 +49,11 @@ function cureRule(debuffType: ScriptDebuffCondition, cureItemName: string, enabl
     id: `cure-${debuffType}`,
     enabled,
     condition: { type: 'debuff_active', debuffType },
-    action: { type: 'cure_item', cureItemName },
+    action: { type: 'cure_item', cureItemId: getItemId(cureItemName)! },
   };
 }
 
-const bag = (...names: string[]): BagItem[] =>
-  names.map(name => ({ name, type: 'potion' as const, amount: 1 }));
+const bag = (...names: string[]): BagItem[] => names.map(name => bagItem(name, 1));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -64,7 +65,7 @@ describe('常駐腳本 — debuff_active 條件', () => {
       [cureRule('poison', '解毒藥水')],
       ctx(['poison'], bag('解毒藥水')),
     );
-    expect(action).toEqual({ type: 'cure_item', cureItemName: '解毒藥水' });
+    expect(action).toEqual({ type: 'cure_item', cureItemId: getItemId('解毒藥水')! });
   });
 
   it('身上沒有該 debuff 時不觸發', () => {
@@ -85,7 +86,7 @@ describe('常駐腳本 — debuff_active 條件', () => {
     const rule: PersistentRule = {
       id: 'broken', enabled: true,
       condition: { type: 'debuff_active' },
-      action: { type: 'cure_item', cureItemName: '解毒藥水' },
+      action: { type: 'cure_item', cureItemId: getItemId('解毒藥水')! },
     };
     expect(evaluatePersistentScript([rule], ctx(['poison'], bag('解毒藥水')))).toBeNull();
   });
@@ -106,14 +107,14 @@ describe('常駐腳本 — cure_item 動作可執行性', () => {
       cureRule('bleed', '止血繃帶'),
     ];
     const action = evaluatePersistentScript(rules, ctx(['poison', 'bleed'], bag('止血繃帶')));
-    expect(action).toEqual({ type: 'cure_item', cureItemName: '止血繃帶' });
+    expect(action).toEqual({ type: 'cure_item', cureItemId: getItemId('止血繃帶')! });
   });
 
   it('道具與 debuff 不對應時不可執行', () => {
     const rule: PersistentRule = {
       id: 'mismatch', enabled: true,
       condition: { type: 'debuff_active', debuffType: 'poison' },
-      action: { type: 'cure_item', cureItemName: '止血繃帶' },
+      action: { type: 'cure_item', cureItemId: getItemId('止血繃帶')! },
     };
     expect(evaluatePersistentScript([rule], ctx(['poison'], bag('止血繃帶')))).toBeNull();
   });
@@ -124,7 +125,7 @@ describe('常駐腳本 — cure_item 動作可執行性', () => {
         [cureRule('curse_weaken', '淨化藥水')],
         ctx([t], bag('淨化藥水')),
       );
-      expect(action, t).toEqual({ type: 'cure_item', cureItemName: '淨化藥水' });
+      expect(action, t).toEqual({ type: 'cure_item', cureItemId: getItemId('淨化藥水')! });
     }
   });
 
@@ -164,7 +165,7 @@ describe('常駐腳本 — cure_item 動作可執行性', () => {
     const base = ctx(['poison', 'stun'], bag('解毒藥水'));
     const afterStun = { ...base, now: NOW + 1600 }; // 暈眩 1.5s 已過、中毒 10s 仍在
     expect(evaluatePersistentScript([cureRule('poison', '解毒藥水')], afterStun))
-      .toEqual({ type: 'cure_item', cureItemName: '解毒藥水' });
+      .toEqual({ type: 'cure_item', cureItemId: getItemId('解毒藥水')! });
   });
 
   it('未指定道具名稱時不可執行', () => {
@@ -185,10 +186,10 @@ describe('常駐腳本 — 規則優先序', () => {
     ];
     // 只有中毒 → 第一條條件不成立，取第二條
     expect(evaluatePersistentScript(rules, ctx(['poison'], bag('淨化藥水', '解毒藥水'))))
-      .toEqual({ type: 'cure_item', cureItemName: '解毒藥水' });
+      .toEqual({ type: 'cure_item', cureItemId: getItemId('解毒藥水')! });
 
     // 兩者都有 → 取排在前面的淨化藥水
     expect(evaluatePersistentScript(rules, ctx(['poison', 'curse'], bag('淨化藥水', '解毒藥水'))))
-      .toEqual({ type: 'cure_item', cureItemName: '淨化藥水' });
+      .toEqual({ type: 'cure_item', cureItemId: getItemId('淨化藥水')! });
   });
 });

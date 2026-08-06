@@ -3,7 +3,8 @@ import { useGameStore } from '../stores/gameStore';
 import { getPotionCount } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, getItemIcon, resolveItemIcon } from '../models/iconMap';
-import { getItemDefinition } from '../models/items';
+import { getItemById } from '../models/items';
+import { getBagItemAmount } from '../models/bagItem';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { BAG_DRAG_MIME, decodeBagDrag } from '../models/bagLayout';
@@ -62,7 +63,7 @@ export function QuickSlotBar() {
     if (entry.kind === 'equipment') {
       return inventory.some(i => i.id === entry.equipmentId) ? 1 : 0;
     }
-    return bagItems.find(b => b.name === entry.name)?.amount ?? 0;
+    return getBagItemAmount(bagItems, entry.itemId);
   }
 
   function renderIcon(entry: QuickSlotEntry) {
@@ -83,7 +84,7 @@ export function QuickSlotBar() {
         />
       );
     }
-    const { icon, color } = resolveItemIcon(getItemDefinition(entry.name), 'scroll');
+    const { icon, color } = resolveItemIcon(getItemById(entry.itemId), 'scroll');
     return <GameIcon name={icon} size={24} color={color} />;
   }
 
@@ -92,7 +93,7 @@ export function QuickSlotBar() {
     setDragOverIndex(null);
     if (!payload) return;
     e.preventDefault();
-    const entry = toQuickSlotEntry(payload.kind, payload.name, payload.equipmentId);
+    const entry = toQuickSlotEntry(payload.kind, payload.itemId ?? -1, payload.equipmentId, payload.name);
     if (!entry) return;
     setSelectedIndex(null);
     assignQuickSlot(idx, entry);

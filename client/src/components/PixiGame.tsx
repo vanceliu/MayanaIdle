@@ -344,6 +344,7 @@ export function PixiGame() {
     useGameStore.getState().requestDiscard({
       kind: payload.kind,
       name: payload.name,
+      itemId: payload.itemId,
       maxAmount: payload.kind === 'equipment' ? 1 : payload.amount,
       equipmentId: payload.equipmentId,
     });

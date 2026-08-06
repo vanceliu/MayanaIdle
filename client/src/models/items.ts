@@ -48,6 +48,14 @@ export function getItemById(id: number): ItemDefinition | undefined {
   return ITEM_ID_MAP.get(id);
 }
 
+/**
+ * 名稱 → 道具 id。**只在「把設定裡的名稱轉成 id」的邊界用**（seed／設定表→背包），
+ * 不可用來查玩家背包（§ 99.1：背包／倉庫一律用 id 查）。
+ */
+export function getItemId(name: string): number | undefined {
+  return ITEM_MAP.get(name)?.id;
+}
+
 export function getItemWeight(name: string): number {
   return ITEM_MAP.get(name)?.weight ?? 0;
 }

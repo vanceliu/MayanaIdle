@@ -81,8 +81,8 @@ export interface PersistentAction {
   potionType?: 'red' | 'orange' | 'white';
   speedPotionType?: 'green' | 'enhanced-green';
   skillId?: string;
-  /** cure_item 用：狀態解除道具名稱 */
-  cureItemName?: string;
+  /** cure_item 用：狀態解除道具的 `ITEM_DEFINITIONS` id（存 id 不存名稱，改名才不會失效） */
+  cureItemId?: number;
 }
 
 export interface PersistentRule {

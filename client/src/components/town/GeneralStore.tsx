@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
-import { getItemWeight, getItemDefinition } from '../../models/items';
-import { isCureItem } from '../../models/cureItem';
+import { getItemById } from '../../models/items';
+import { hasBagItem, addBagItem, consumeBagItem } from '../../models/bagItem';
 import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
@@ -14,23 +14,29 @@ import { hasMaterialUsage } from '../../systems/craftMaterialUsage';
 
 type ShopTab = 'buy' | 'sell';
 
-const SHOP_ITEMS = [
-  { name: '紅色藥水', price: 25, description: '回復 10~15 HP' },
-  { name: '橙色藥水', price: 80, description: '回復 30~45 HP' },
-  { name: '白色藥水', price: 200, description: '回復 60~90 HP' },
-  { name: '綠色藥水', price: 200, description: '攻速+33%（120秒）' },
-  { name: '強化綠色藥水', price: 1000, description: '攻速+33%（600秒）' },
-  { name: '解毒藥水', price: 50, description: '立即解除中毒' },
-  { name: '止血繃帶', price: 50, description: '立即解除流血' },
-  { name: '淨化藥水', price: 500, description: '解除詛咒/虛弱（全解）' },
-  { name: '武器強化卷軸', price: 100000, description: '鐵匠鋪武器強化用' },
-  { name: '防具強化卷軸', price: 50000, description: '鐵匠鋪防具強化用' },
-  { name: '百柱塔 1F 通行卷軸', price: 2000, description: '進入百柱塔 1~10F 所需' },
-  // 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（06-equipment.md § 壞刀機制）
+/**
+ * 雜貨店貨架：**只列 id**。名稱、售價、說明一律由 `ITEM_DEFINITIONS` 反查 ——
+ * 在這裡重抄一份必然與 seed drift（曾把綠色藥水的持續時間寫成 120／600 秒）。
+ *
+ * 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（`06-equipment.md` § 壞刀機制）。
+ */
+const SHOP_ITEM_IDS = [
+  1,   // 紅色藥水
+  2,   // 橙色藥水
+  3,   // 白色藥水
+  133, // 綠色藥水
+  134, // 強化綠色藥水
+  144, // 解毒藥水
+  145, // 止血繃帶
+  146, // 淨化藥水
+  7,   // 武器強化卷軸
+  8,   // 防具強化卷軸
+  95,  // 百柱塔 1F 通行卷軸
 ];
 
 /** 購買頁的一列商品（一般商品與當地回城卷軸共用同一種結構） */
 interface BuyEntry {
+  itemId: number;
   name: string;
   price: number;
   description: string;
@@ -44,7 +50,7 @@ export function GeneralStore() {
   const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [batchTier, setBatchTier] = useState<number | null>(null);
-  // 預設保護有用途的素材（配方材料 + 強化石／品質石）：批量販售的本意是清掉純販售素材
+  // 預設保護有用途的素材（配方材料）：批量販售的本意是清掉純販售素材
   const [skipCraftMaterials, setSkipCraftMaterials] = useState(true);
   // 購物車：清單只選數量，實際買賣由底部單一按鈕結帳（§ 34.1）
   const buyCart = useShopCart();
@@ -58,30 +64,33 @@ export function GeneralStore() {
   const region = getRegion(char.currentRegion);
   const scrollConfig = region ? TOWN_SCROLL_CONFIG[region.id] : null;
 
-  const buyEntries: BuyEntry[] = SHOP_ITEMS.map(i => ({ ...i }));
-  if (scrollConfig && !buyEntries.some(e => e.name === scrollConfig.name)) {
+  const buyEntries: BuyEntry[] = SHOP_ITEM_IDS
+    .map(id => getItemById(id))
+    .filter((def): def is NonNullable<typeof def> => def != null)
+    .map(def => ({
+      itemId: def.id,
+      name: def.name,
+      price: def.buyPrice ?? 0,
+      description: def.description,
+    }));
+  if (scrollConfig && !buyEntries.some(e => e.itemId === scrollConfig.itemId)) {
+    const scrollDef = getItemById(scrollConfig.itemId);
     buyEntries.push({
-      name: scrollConfig.name,
-      price: scrollConfig.price,
-      description: `使用後傳送至${scrollConfig.townName}`,
+      itemId: scrollConfig.itemId,
+      name: scrollDef?.name ?? scrollConfig.name,
+      price: scrollDef?.buyPrice ?? scrollConfig.price,
+      description: scrollDef?.description ?? `使用後傳送至${scrollConfig.townName}`,
     });
   }
 
-  function getItemType(name: string): 'scroll' | 'material' | 'potion' {
-    if (name.includes('卷軸')) return 'scroll';
-    if (name.includes('藥水')) return 'potion';
-    // 狀態解除道具（含止血繃帶）一律歸為 potion，背包才會顯示為可使用道具
-    if (isCureItem(name)) return 'potion';
-    return 'material';
-  }
-
-  function getShopItemIcon(name: string): { icon: string; color?: string } {
+  function getShopItemIcon(itemId: number): { icon: string; color?: string } {
     // 顯示方式一律以 item 定義為準，與背包共用同一份資料
-    return resolveItemIcon(getItemDefinition(name), name.includes('卷軸') ? 'scroll' : 'material');
+    const def = getItemById(itemId);
+    return resolveItemIcon(def, def?.category === 'scroll' || def?.category === 'dungeon' ? 'scroll' : 'material');
   }
 
-  function getSellPrice(name: string): number {
-    const def = getItemDefinition(name);
+  function getSellPrice(itemId: number): number {
+    const def = getItemById(itemId);
     // 專用材料（魔法書材料）明確不可販售，不靠「沒填價格」來擋
     if (def?.noSell) return 0;
     if (def?.sellPrice) return def.sellPrice;
@@ -91,12 +100,12 @@ export function GeneralStore() {
 
   // --- 購買頁購物車 ---
   const buyLines = cartLines(buyCart, buyEntries, {
-    keyOf: e => e.name,
+    keyOf: e => String(e.itemId),
     maxOf: e => Math.floor(gold / e.price),
   });
   const buyTotal = buyLines.reduce((sum, l) => sum + l.item.price * l.qty, 0);
   /** 尚未在背包裡的品項才需要新的欄位，多品項要一次算完才知道放不放得下 */
-  const buyNewSlots = buyLines.filter(l => !bagItems.some(b => b.name === l.item.name)).length;
+  const buyNewSlots = buyLines.filter(l => !hasBagItem(bagItems, l.item.itemId)).length;
   const buyHint = buyLines.length === 0
     ? null
     : buyTotal > gold
@@ -110,15 +119,7 @@ export function GeneralStore() {
     const state = useGameStore.getState();
     let bag = state.bagItems;
     for (const line of buyLines) {
-      const name = line.item.name;
-      if (bag.some(b => b.name === name)) {
-        bag = bag.map(b => (b.name === name ? { ...b, amount: b.amount + line.qty } : b));
-      } else {
-        bag = [
-          ...bag,
-          { name, type: getItemType(name), itemTemplateId: getItemDefinition(name)?.id, amount: line.qty },
-        ];
-      }
+      bag = addBagItem(bag, line.item.itemId, line.qty);
     }
     set({
       character: { ...state.character!, gold: state.character!.gold - buyTotal },
@@ -129,16 +130,16 @@ export function GeneralStore() {
   }
 
   // --- 出售頁購物車 ---
-  const sellableItems = bagItems.filter(item => getSellPrice(item.name) > 0);
+  const sellableItems = bagItems.filter(item => getSellPrice(item.itemId) > 0);
   /** 售價一律為買價的一半（§ 6.x 商店回收價） */
-  const unitSellPrice = (name: string) => Math.floor(getSellPrice(name) * 0.5);
+  const unitSellPrice = (itemId: number) => Math.floor(getSellPrice(itemId) * 0.5);
   const sellLines = cartLines(sellCart, sellableItems, {
-    keyOf: item => item.name,
+    keyOf: item => String(item.itemId),
     maxOf: item => item.amount,
     // 持有量本身就是上限，不再另外套 999，「全部」才能一次賣光超過 999 的素材
     hardCap: Infinity,
   });
-  const sellTotal = sellLines.reduce((sum, l) => sum + unitSellPrice(l.item.name) * l.qty, 0);
+  const sellTotal = sellLines.reduce((sum, l) => sum + unitSellPrice(l.item.itemId) * l.qty, 0);
 
   function checkoutSell() {
     if (sellLines.length === 0) return;
@@ -146,14 +147,12 @@ export function GeneralStore() {
     let bag = state.bagItems;
     let gained = 0;
     for (const line of sellLines) {
-      const held = bag.find(b => b.name === line.item.name);
+      const held = bag.find(b => b.itemId === line.item.itemId);
       if (!held) continue;
       const actual = Math.min(line.qty, held.amount);
       if (actual <= 0) continue;
-      gained += unitSellPrice(line.item.name) * actual;
-      bag = bag
-        .map(b => (b.name === line.item.name ? { ...b, amount: b.amount - actual } : b))
-        .filter(b => b.amount > 0);
+      gained += unitSellPrice(line.item.itemId) * actual;
+      bag = consumeBagItem(bag, line.item.itemId, actual);
     }
     set({
       character: { ...state.character!, gold: state.character!.gold + gained },
@@ -177,10 +176,10 @@ export function GeneralStore() {
     if (batchTier === null) return [];
     return bagItems.filter(item => {
       if (item.type !== 'material') return false;
-      const def = getItemDefinition(item.name);
+      const def = getItemById(item.itemId);
       if (!def || !def.iconTier || def.noSell) return false;
       // 顏色只表達稀有度，「Tier N 以下」會連進得了配方的素材一起掃掉，故預設保護
-      if (skipCraftMaterials && hasMaterialUsage(item.name)) return false;
+      if (skipCraftMaterials && hasMaterialUsage(item.itemId)) return false;
       const sellPrice = Math.floor((def.sellPrice ?? def.buyPrice ?? 0) * 0.5);
       if (sellPrice <= 0) return false;
       return def.iconTier <= batchTier;
@@ -191,15 +190,15 @@ export function GeneralStore() {
   const protectedItems = useMemo(() => {
     if (batchTier === null || !skipCraftMaterials) return [];
     return bagItems.filter(item => {
-      if (item.type !== 'material' || !hasMaterialUsage(item.name)) return false;
-      const def = getItemDefinition(item.name);
+      if (item.type !== 'material' || !hasMaterialUsage(item.itemId)) return false;
+      const def = getItemById(item.itemId);
       return !!def?.iconTier && !def.noSell && def.iconTier <= batchTier;
     });
   }, [bagItems, batchTier, skipCraftMaterials]);
 
   const batchSellTotal = useMemo(() => {
     return batchSellItems.reduce((sum, item) => {
-      const def = getItemDefinition(item.name);
+      const def = getItemById(item.itemId);
       const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
       return sum + sellPrice * item.amount;
     }, 0);
@@ -209,16 +208,16 @@ export function GeneralStore() {
     if (!char || batchSellItems.length === 0) return;
     const currentBag = useGameStore.getState().bagItems;
     let totalGold = 0;
-    const namesToSell = new Set(batchSellItems.map(i => i.name));
+    const idsToSell = new Set(batchSellItems.map(i => i.itemId));
 
     for (const item of currentBag) {
-      if (!namesToSell.has(item.name)) continue;
-      const def = getItemDefinition(item.name);
+      if (!idsToSell.has(item.itemId)) continue;
+      const def = getItemById(item.itemId);
       const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
       totalGold += sellPrice * item.amount;
     }
 
-    const newBag = currentBag.filter(b => !namesToSell.has(b.name));
+    const newBag = currentBag.filter(b => !idsToSell.has(b.itemId));
     set({
       character: { ...useGameStore.getState().character!, gold: useGameStore.getState().character!.gold + totalGold },
       bagItems: newBag,
@@ -242,25 +241,26 @@ export function GeneralStore() {
       {tab === 'buy' && (
         <div className="shop-items">
           {buyEntries.map(entry => {
-            const { icon, color } = getShopItemIcon(entry.name);
+            const { icon, color } = getShopItemIcon(entry.itemId);
             const affordable = Math.floor(gold / entry.price);
+            const cartKey = String(entry.itemId);
             return (
-            <div key={entry.name} className="shop-item">
+            <div key={entry.itemId} className="shop-item">
               <div className="shop-item-info">
                 <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <GameIcon name={icon} size={16} color={color} />
                   {entry.name}
                 </span>
-                <span className="shop-item-desc">{entry.description} | 重量: {getItemWeight(entry.name)}</span>
+                <span className="shop-item-desc">{entry.description} | 重量: {getItemById(entry.itemId)?.weight ?? 0}</span>
                 <span className="shop-item-price">{entry.price.toLocaleString()}G</span>
               </div>
               <div className="shop-item-actions">
                 <QtyStepper
                   label={entry.name}
-                  value={buyCart.raw(entry.name)}
+                  value={buyCart.raw(cartKey)}
                   max={affordable}
                   min={0}
-                  onChange={next => buyCart.set(entry.name, next)}
+                  onChange={next => buyCart.set(cartKey, next)}
                 />
               </div>
             </div>
@@ -306,12 +306,12 @@ export function GeneralStore() {
                   <>
                     <div className="batch-sell-list">
                       {batchSellItems.map(item => {
-                        const def = getItemDefinition(item.name);
+                        const def = getItemById(item.itemId);
                         const color = def?.iconTier ? MATERIAL_TIER_COLORS[def.iconTier] : '#FFFFFF';
                         const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
                         return (
-                          <div key={item.name} className="batch-sell-item">
-                            <span style={{ color }}>{item.name} ×{item.amount}<CraftUsageBadge name={item.name} compact /></span>
+                          <div key={item.itemId} className="batch-sell-item">
+                            <span style={{ color }}>{item.name} ×{item.amount}<CraftUsageBadge itemId={item.itemId} compact /></span>
                             <span className="shop-item-price sell-price">+{(sellPrice * item.amount).toLocaleString()}G</span>
                           </div>
                         );
@@ -333,26 +333,26 @@ export function GeneralStore() {
 
           {sellableItems.length === 0 && <p className="empty-text">沒有可出售的物品</p>}
           {sellableItems.map(item => {
-            const sellPrice = unitSellPrice(item.name);
+            const sellPrice = unitSellPrice(item.itemId);
             return (
-              <div key={item.name} className="shop-item">
+              <div key={item.itemId} className="shop-item">
                 <div className="shop-item-info">
                   <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {(() => { const { icon, color } = getShopItemIcon(item.name); return <GameIcon name={icon} size={16} color={color} />; })()}
+                    {(() => { const { icon, color } = getShopItemIcon(item.itemId); return <GameIcon name={icon} size={16} color={color} />; })()}
                     {item.name} ×{item.amount}
-                    <CraftUsageBadge name={item.name} />
+                    <CraftUsageBadge itemId={item.itemId} />
                   </span>
                   <span className="shop-item-price sell-price">+{sellPrice}G/個</span>
                 </div>
                 <div className="shop-item-actions">
                   <QtyStepper
                     label={item.name}
-                    value={sellCart.raw(item.name)}
+                    value={sellCart.raw(String(item.itemId))}
                     max={item.amount}
                     min={0}
                     hardCap={Infinity}
                     showMax
-                    onChange={next => sellCart.set(item.name, next)}
+                    onChange={next => sellCart.set(String(item.itemId), next)}
                   />
                 </div>
               </div>

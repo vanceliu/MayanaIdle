@@ -413,7 +413,6 @@ describe('adventurerQuestSystem', () => {
         for (const q of quests) {
           if (q.reward.type === 'crafting-material') {
             expect(q.reward.itemId).toBeDefined();
-            expect(q.reward.itemName).toBeDefined();
             expect(q.reward.amount).toBeGreaterThanOrEqual(1);
             expect([13, 14]).toContain(q.reward.itemId);
             return;

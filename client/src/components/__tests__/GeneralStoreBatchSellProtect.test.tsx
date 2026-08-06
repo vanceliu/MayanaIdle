@@ -2,20 +2,24 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GeneralStore } from '../town/GeneralStore';
 import { useGameStore } from '../../stores/gameStore';
+import { bagItem } from '../../testing/bagFixtures';
 
 /**
  * @vitest-environment jsdom
  *
  * 批量販售的用途保護（`39-batch-sell.md` § 39.4）。
- * 顏色只表達稀有度，「Tier N 以下」會連配方素材與強化石／品質石一起掃掉。
+ * 顏色只表達稀有度，「Tier N 以下」會連配方素材一起掃掉。
+ *
+ * 印記歸 `scroll`（`46-sigil.md` § 46.2），批量販售只掃 `material`，
+ * 因此它們既不會被賣掉、也不該出現在「已保留」的清單裡。
  */
 
-// 全部是 iconTier 1~4，「Tier 4 以下」會全部命中
+// 素材全是 iconTier 1~2，「Tier 4 以下」會全部命中
 const BAG = [
-  { name: '破碎獸牙', type: 'material' as const, amount: 10 },   // T1 純販售
-  { name: '石像碎片', type: 'material' as const, amount: 5 },    // T2 T4 配方
-  { name: '強化石', type: 'material' as const, amount: 3 },      // T4 鐵匠鋪用
-  { name: '品質石', type: 'material' as const, amount: 2 },      // T4 鐵匠鋪用
+  bagItem('破碎獸牙', 10),   // T1 純販售
+  bagItem('石像碎片', 5),    // T2 T4 配方
+  bagItem('精鍊印記', 3),      // 印記，不進素材販售
+  bagItem('工藝印記', 2),      // 同上
 ];
 
 function setup(gold = 1000) {
@@ -47,14 +51,14 @@ describe('雜貨店批量販售：用途保護', () => {
     expect((checkbox as HTMLInputElement).checked).toBe(true);
   });
 
-  it('預設只賣純販售素材，配方素材與強化石／品質石都被保留', () => {
+  it('預設只賣純販售素材，配方素材被保留', () => {
     const button = screen.getByRole('button', { name: /一鍵販售/ });
     expect(button.textContent).toContain('1 種');
 
-    const protectedNote = screen.getByText(/已保留 3 種有用途的素材/);
-    for (const name of ['石像碎片', '強化石', '品質石']) {
-      expect(protectedNote.textContent).toContain(name);
-    }
+    const protectedNote = screen.getByText(/已保留 1 種有用途的素材/);
+    expect(protectedNote.textContent).toContain('石像碎片');
+    // 印記不是素材，不進這份清單
+    expect(protectedNote.textContent).not.toContain('精鍊印記');
   });
 
   it('被保留的素材要明確列出，不可靜默漏掉', () => {
@@ -65,15 +69,15 @@ describe('雜貨店批量販售：用途保護', () => {
   it('取消勾選後回到純粹依 iconTier 篩選', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /跳過有用途的素材/ }));
 
-    expect(screen.getByRole('button', { name: /一鍵販售/ }).textContent).toContain('4 種');
+    expect(screen.getByRole('button', { name: /一鍵販售/ }).textContent).toContain('2 種');
     expect(screen.queryByText(/已保留/)).toBeNull();
   });
 
-  it('實際販售只結算未被保護的素材，配方素材留在背包', () => {
+  it('實際販售只結算未被保護的素材，配方素材與印記留在背包', () => {
     fireEvent.click(screen.getByRole('button', { name: /一鍵販售/ }));
 
     const remaining = useGameStore.getState().bagItems.map(b => b.name);
     expect(remaining).not.toContain('破碎獸牙');
-    expect(remaining).toEqual(expect.arrayContaining(['石像碎片', '強化石', '品質石']));
+    expect(remaining).toEqual(expect.arrayContaining(['石像碎片', '精鍊印記', '工藝印記']));
   });
 });

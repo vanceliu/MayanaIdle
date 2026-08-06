@@ -6,6 +6,8 @@ import type { Quest } from '../../models/quest';
 import { getAvailableQuests } from '../../systems/questSystem';
 import { getRegion } from '../../models/mapData';
 import { CLASS_SKILLS } from '../../models/classSkills';
+import { getItemById } from '../../models/items';
+import { hasBagItem, consumeBagItem } from '../../models/bagItem';
 import type { ClassSkillDef } from '../../models/classSkills';
 
 export function ClassGuild() {
@@ -55,14 +57,11 @@ export function ClassGuild() {
 
   function learnSkill(def: ClassSkillDef) {
     const bag = useGameStore.getState().bagItems;
-    const book = bag.find(b => b.name === def.bookName);
-    if (!book || book.amount <= 0) return;
+    if (!hasBagItem(bag, def.bookItemId)) return;
     if (char!.level < def.requiredLevel) return;
     if (learnedIds.includes(def.id)) return;
 
-    const newBag = bag.map(b =>
-      b.name === def.bookName ? { ...b, amount: b.amount - 1 } : b
-    ).filter(b => b.amount > 0);
+    const newBag = consumeBagItem(bag, def.bookItemId);
 
     const newSkill: Skill = { ...def.skill, lastUsedAt: 0 };
     const currentSkills = useGameStore.getState().skills;
@@ -130,7 +129,7 @@ export function ClassGuild() {
       <div className="guild-skill-list">
         {myClassSkills.map(def => {
           const learned = learnedIds.includes(def.id);
-          const hasBook = bagItems.some(b => b.name === def.bookName && b.amount > 0);
+          const hasBook = hasBagItem(bagItems, def.bookItemId);
           const levelOk = char.level >= def.requiredLevel;
           const canLearn = !learned && hasBook && levelOk;
 
@@ -151,7 +150,7 @@ export function ClassGuild() {
                   <button
                     onClick={() => learnSkill(def)}
                     disabled={!canLearn}
-                    title={!levelOk ? `需要等級 ${def.requiredLevel}` : !hasBook ? `需要 ${def.bookName}` : ''}
+                    title={!levelOk ? `需要等級 ${def.requiredLevel}` : !hasBook ? `需要 ${getItemById(def.bookItemId)?.name ?? '技能書'}` : ''}
                   >
                     學習
                   </button>

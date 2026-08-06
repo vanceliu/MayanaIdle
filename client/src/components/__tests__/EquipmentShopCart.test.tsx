@@ -1,3 +1,4 @@
+import type { BagItem } from '../../models/bagItem';
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
@@ -5,6 +6,7 @@ import { WeaponShop } from '../town/WeaponShop';
 import { useGameStore, BAG_BASE_SLOTS } from '../../stores/gameStore';
 import type { Character } from '../../models/character';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
+import { fillerBagItems } from '../../testing/bagFixtures';
 
 /**
  * 武器店／防具店的購物車（§ 34.1 底部動作列）：
@@ -71,7 +73,7 @@ function bagWeapon(id: number, templateId: number): EquipmentInstance {
   } as EquipmentInstance;
 }
 
-async function setup(gold: number, inventory: EquipmentInstance[] = [], bagItems: { name: string; type: 'material'; amount: number }[] = []) {
+async function setup(gold: number, inventory: EquipmentInstance[] = [], bagItems: BagItem[] = []) {
   useGameStore.setState({
     character: testCharacter(gold),
     inventory,
@@ -162,9 +164,7 @@ describe('武器店購買 — 購物車', () => {
   });
 
   it('背包欄位不足時擋下並說明原因', async () => {
-    const full = Array.from({ length: BAG_BASE_SLOTS }, (_, i) => ({
-      name: `雜物${i}`, type: 'material' as const, amount: 1,
-    }));
+    const full = fillerBagItems(BAG_BASE_SLOTS);
     await setup(100_000, [], full);
     pick('鐵劍', '鐵劍');
 

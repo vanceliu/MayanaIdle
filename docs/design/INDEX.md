@@ -16,9 +16,9 @@
 | **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
-| 裝備品質提升 | `08-quality.md` | 全文 |
+| 裝備品質提升（印記師） | `08-quality.md` | 全文 |
 | 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
-| **印記（詞綴重骰／突破 T5）** | `46-sigil.md` | 全文 |
+| **印記（詞綴升階／重骰／品質）** | `46-sigil.md` | 全文 |
 | 印記掉落率 | `27-drop-table.md` | § 27.8 |
 | 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
@@ -140,8 +140,8 @@
 | `06-equipment-weapons-*.md` | 各類型武器子文件（14 份，含盾牌/魔導書/臂甲） | ⚠️ 同上，由產生器輸出 |
 | `06-equipment-armor.md` | 防具模板 | ⚠️ **由產生器輸出**，勿手改 |
 | `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
-| `46-sigil.md` | 印記系統 | 混沌／刺針／重刻／強化印記、印記師 |
-| `08-quality.md` | 品質系統 | 0%~20%、品質石、影響範圍 |
+| `46-sigil.md` | 印記系統 | 混沌／刺針／重刻／精鍊／突破／工藝印記、印記師 |
+| `08-quality.md` | 品質系統 | 0%~20%、工藝印記、影響範圍 |
 
 ### 戰鬥系統
 
@@ -211,12 +211,12 @@
 實作時修改一個系統，必須檢查連動文件：
 
 ```
-46-sigil.md（印記＝詞綴的重骰與突破）
+46-sigil.md（印記＝詞綴的升階、重骰與品質）
   ←→ 07-affix.md § 7.11（Tier 上限／特殊詞綴機率的另一個入口）
   ←→ 27-drop-table.md § 27.8（掉落率）←→ 30-items.md（重量／賣價）
   ←→ 13-town.md § 13.13（印記師）←→ 43-wiki-system.md（Wiki 呈現）
 
-06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 13-town.md（鐵匠鋪）
+06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 46-sigil.md ←→ 13-town.md（鐵匠鋪／印記師）
        ↕                    ↕                              ↕
 06-equipment-acquire.md ────┘（§ 6A.6 各管道詞綴 Tier 上限 ←→ § 7.2 取得方式）
        ↕                                              30-items.md（材料/卷軸）

@@ -12,6 +12,7 @@ import {
 } from '../gameStore';
 import type { EquipmentInstance, EquippedGear } from '../../models/equipment';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
+import { bagItem, fillerBagItems } from '../../testing/bagFixtures';
 
 /** 只帶一條腰帶的裝備狀態 */
 function gearWithBelt(beltName: string): EquippedGear {
@@ -27,8 +28,8 @@ describe('Potion helpers', () => {
 
   it('getPotionCount returns correct amount', () => {
     const bag: BagItem[] = [
-      { name: '紅色藥水', type: 'potion', amount: 5 },
-      { name: '橙色藥水', type: 'potion', amount: 3 },
+      bagItem('紅色藥水', 5),
+      bagItem('橙色藥水', 3),
     ];
     expect(getPotionCount(bag, 'red')).toBe(5);
     expect(getPotionCount(bag, 'orange')).toBe(3);
@@ -38,32 +39,32 @@ describe('Potion helpers', () => {
   it('addPotionToBag creates new entry when none exists', () => {
     const result = addPotionToBag([], 'red', 10);
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 });
+    expect(result[0]).toEqual(bagItem('紅色藥水', 10));
   });
 
   it('addPotionToBag stacks onto existing entry', () => {
-    const bag: BagItem[] = [{ name: '紅色藥水', type: 'potion', amount: 5 }];
+    const bag: BagItem[] = [bagItem('紅色藥水', 5)];
     const result = addPotionToBag(bag, 'red', 3);
     expect(result).toHaveLength(1);
     expect(result[0].amount).toBe(8);
   });
 
   it('consumePotionFromBag decrements amount', () => {
-    const bag: BagItem[] = [{ name: '紅色藥水', type: 'potion', amount: 5 }];
+    const bag: BagItem[] = [bagItem('紅色藥水', 5)];
     const result = consumePotionFromBag(bag, 'red');
     expect(result[0].amount).toBe(4);
   });
 
   it('consumePotionFromBag removes entry when amount reaches 0', () => {
-    const bag: BagItem[] = [{ name: '白色藥水', type: 'potion', amount: 1 }];
+    const bag: BagItem[] = [bagItem('白色藥水', 1)];
     const result = consumePotionFromBag(bag, 'white');
     expect(result).toHaveLength(0);
   });
 
   it('consumePotionFromBag does not affect other items', () => {
     const bag: BagItem[] = [
-      { name: '紅色藥水', type: 'potion', amount: 3 },
-      { name: '品質石', type: 'material', amount: 10 },
+      bagItem('紅色藥水', 3),
+      bagItem('工藝印記', 10),
     ];
     const result = consumePotionFromBag(bag, 'red');
     expect(result).toHaveLength(2);
@@ -90,15 +91,15 @@ describe('Bag capacity', () => {
 
   it('getBagUsedSlots counts bagItems + inventory', () => {
     const bag: BagItem[] = [
-      { name: '紅色藥水', type: 'potion', amount: 99 },
-      { name: '品質石', type: 'material', amount: 5 },
+      bagItem('紅色藥水', 99),
+      bagItem('工藝印記', 5),
     ];
     const inv = [makeEquip(1), makeEquip(2)];
     expect(getBagUsedSlots(bag, inv)).toBe(4);
   });
 
   it('stackable items occupy 1 slot regardless of amount', () => {
-    const bag: BagItem[] = [{ name: '紅色藥水', type: 'potion', amount: 9999 }];
+    const bag: BagItem[] = [bagItem('紅色藥水', 9999)];
     expect(getBagUsedSlots(bag, [])).toBe(1);
   });
 
@@ -107,11 +108,7 @@ describe('Bag capacity', () => {
   });
 
   it('isBagFull returns true at exactly the base 50 slots', () => {
-    const bag: BagItem[] = Array.from({ length: 48 }, (_, i) => ({
-      name: `item${i}`,
-      type: 'material' as const,
-      amount: 1,
-    }));
+    const bag = fillerBagItems(48);
     const inv = [makeEquip(1), makeEquip(2)];
     expect(getBagUsedSlots(bag, inv)).toBe(50);
     expect(isBagFull(bag, inv, {})).toBe(true);
@@ -153,9 +150,7 @@ describe('腰帶擴充背包格數（§ 35.1）', () => {
   });
 
   it('容量檢查會隨腰帶放寬', () => {
-    const bag: BagItem[] = Array.from({ length: 50 }, (_, i) => ({
-      name: `item${i}`, type: 'material' as const, amount: 1,
-    }));
+    const bag = fillerBagItems(50);
     expect(isBagFull(bag, [], {})).toBe(true);                        // 50/50
     expect(isBagFull(bag, [], gearWithBelt('皮腰帶'))).toBe(false);    // 50/55
     expect(isBagFull(bag, [], gearWithBelt('力之腰帶'))).toBe(false);  // 50/65
@@ -163,8 +158,7 @@ describe('腰帶擴充背包格數（§ 35.1）', () => {
 });
 
 describe('換裝時的背包溢出保護（§ 35.1）', () => {
-  const bagOf = (n: number): BagItem[] =>
-    Array.from({ length: n }, (_, i) => ({ name: `item${i}`, type: 'material' as const, amount: 1 }));
+  const bagOf = (n: number): BagItem[] => fillerBagItems(n);
 
   it('卸下腰帶：同時計入「多佔一格」與「上限下降」', () => {
     // 力之腰帶 +15 → 上限 65。卸下後上限 50，且腰帶本身要佔 1 格

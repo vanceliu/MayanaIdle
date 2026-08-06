@@ -2,6 +2,7 @@ import { MONSTER_SEEDS, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS
 import { ZONES, REGIONS } from '../../models/mapData';
 import { DROP_ROLL_MAX } from '../../systems/drops';
 import type { MonsterTemplate } from '../../models/monster';
+import { isArmorEquipment } from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
 import type { DropTableEntry, BossDropTableEntry } from '../../db/database';
 import type { Zone, Region } from '../../models/area';
@@ -15,12 +16,20 @@ export function useMonstersByArea(area: string): MonsterTemplate[] {
   return MONSTER_SEEDS.filter(m => m.area === area || m.area.match(new RegExp(`^${area}-\\d`)));
 }
 
+/** 盾牌／魔導書／臂甲分類是防具（`06-equipment.md` § 副手裝備），列在防具頁而非武器頁 */
 export function useWeaponList(): EquipmentTemplate[] {
-  return EQUIPMENT_SEEDS.filter(e => e.type !== 'armor');
+  return EQUIPMENT_SEEDS.filter(e => !isArmorEquipment(e.slot, e.type));
 }
 
 export function useArmorList(): EquipmentTemplate[] {
-  return EQUIPMENT_SEEDS.filter(e => e.type === 'armor');
+  return EQUIPMENT_SEEDS.filter(e => isArmorEquipment(e.slot, e.type));
+}
+
+/** 依裝備名稱決定 wiki 詳細頁路徑（副手防具走防具頁） */
+export function getWikiEquipmentPath(name: string): string {
+  const equip = EQUIPMENT_SEEDS.find(e => e.name === name);
+  const base = equip && isArmorEquipment(equip.slot, equip.type) ? 'armor' : 'weapons';
+  return `/wiki/${base}/${encodeURIComponent(name)}`;
 }
 
 export function useEquipmentByName(name: string): EquipmentTemplate | undefined {

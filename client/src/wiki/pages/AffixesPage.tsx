@@ -19,6 +19,7 @@ import {
   SIGIL_DEFINITIONS,
   ENHANCE_SIGIL_RATES,
   ENHANCE_SIGIL_FAIL_TIER,
+  POLISH_SIGIL_GOLD_COST,
 } from '../../models/sigil';
 import '../components/WikiTable.css';
 
@@ -187,8 +188,8 @@ export function AffixesPage() {
         <ul style={{ ...noteStyle, marginTop: 0, paddingLeft: 20 }}>
           <li>每件裝備最多 <strong>4 個詞綴插槽</strong>；同一件裝備不可插入相同種類的詞綴，不同裝備之間可以重複。</li>
           <li>所有詞綴數值皆為百分比，並受裝備品質放大：實際效果 = floor(數值 × (1 + 品質% / 100))。</li>
-          <li>詞綴強化上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得，T7 只有 Boss 會掉。</li>
-          <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用強化石也升不過；鐵匠製作品為 T1~T{DEFAULT_MAX_AFFIX_TIER} 均等、固定 4 條、不會出特殊詞綴。</li>
+          <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得或突破印記，T7 只有 Boss 掉落與突破印記。</li>
+          <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過；鐵匠製作品為 T1~T{DEFAULT_MAX_AFFIX_TIER} 均等、固定 4 條、不會出特殊詞綴。</li>
           <li>特殊詞綴（免疫類）佔用一般詞綴插槽，無階級、不可強化，只從高等級區域掉落。</li>
         </ul>
       </section>
@@ -376,14 +377,18 @@ export function AffixesPage() {
           </table>
         </div>
         <p style={noteStyle}>
-          印記在城鎮的<strong>印記師</strong>使用，只操作詞綴，不影響強化等級與品質；一次消耗印記 ×1、不花金幣。
+          印記在城鎮的<strong>印記師</strong>使用，詞綴的升階、重骰與裝備品質都在這裡，不影響強化等級（+N）；
+          一次消耗印記 ×1，只有工藝印記另收 {POLISH_SIGIL_GOLD_COST.toLocaleString()}G。
           <br />
-          強化印記是 T6／T7 詞綴在掉落之外的唯一來源：
+          詞綴升階依當前 Tier 自動分派：取得管道上限以內用<strong>精鍊印記</strong>（必定成功），
+          上限以上用<strong>突破印記</strong>。
+          <br />
+          突破印記是 T6／T7 詞綴在掉落之外的唯一來源：
           {ENHANCE_SIGIL_RATES.map(r => `T${r.from}→T${r.from + 1} ${Math.round(r.rate * 100)}%`).join('、')}
           ，失敗該詞綴掉回 T{ENHANCE_SIGIL_FAIL_TIER}。
           <br />
           混沌與刺針在城鎮使用，沒有區域等級可查，特殊詞綴改依<strong>角色等級</strong>套用上表的機率與門檻。
-          印記只在 Lv.31 以上區域的怪物與 Boss 掉落。
+          混沌／刺針／重刻／突破只在 Lv.31 以上區域的怪物與 Boss 掉落；精鍊與工藝印記走全區域掉落。
         </p>
       </section>
     </div>

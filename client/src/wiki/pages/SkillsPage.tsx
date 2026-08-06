@@ -5,6 +5,7 @@ import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_SKILLS, type ClassSkillDef } from '../../models/classSkills';
 import '../components/WikiTable.css';
 import { WEAPON_TYPE_LABELS } from '../../models/skill';
+import { getItemById } from '../../models/items';
 
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -156,7 +157,7 @@ export function SkillsPage() {
                       <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>
                       <td>{formatBuffDuration(s.skill) || '-'}</td>
                       <td>{getClassSkillEffect(s)}</td>
-                      <td>{s.bookName}</td>
+                      <td>{getItemById(s.bookItemId)?.name ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>

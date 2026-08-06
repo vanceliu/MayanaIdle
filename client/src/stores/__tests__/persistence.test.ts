@@ -4,6 +4,7 @@ import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
 import { emptyQuickSlots } from '../../models/quickSlot';
+import { bagItem } from '../../testing/bagFixtures';
 
 // Mock localStorage for node environment
 const localStorageMock = (() => {
@@ -92,8 +93,8 @@ describe('Game persistence', () => {
     // Simulate picking up a material and using some potions
     useGameStore.setState({
       bagItems: [
-        { name: '紅色藥水', type: 'potion', amount: 8 },
-        { name: '品質石', type: 'material', amount: 3 },
+        bagItem('紅色藥水', 8),
+        bagItem('工藝印記', 3),
       ],
     });
 
@@ -115,7 +116,7 @@ describe('Game persistence', () => {
     const red = bag.find(b => b.name === '紅色藥水');
     expect(red).toBeDefined();
     expect(red!.amount).toBe(8);
-    expect(bag.find(b => b.name === '品質石')?.amount).toBe(3);
+    expect(bag.find(b => b.name === '工藝印記')?.amount).toBe(3);
   });
 
   it('should persist script rules to localStorage', async () => {

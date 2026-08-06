@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { getAreaDisplayName, getDropItemName } from '../hooks/useWikiData';
+import { getAreaDisplayName, getDropItemName, getWikiEquipmentPath } from '../hooks/useWikiData';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../../db/seed';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../components/WikiTable.css';
@@ -116,7 +116,7 @@ export function DropsPage() {
                     </td>
                     <td>
                       {isEquip ? (
-                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(name)}`}>
+                        <Link className="wiki-link" to={getWikiEquipmentPath(name)}>
                           {name}
                         </Link>
                       ) : name}
@@ -162,7 +162,7 @@ export function DropsPage() {
                     <td>{d.bossName}</td>
                     <td>
                       {isEquip ? (
-                        <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(name)}`}>
+                        <Link className="wiki-link" to={getWikiEquipmentPath(name)}>
                           {name}
                         </Link>
                       ) : name}

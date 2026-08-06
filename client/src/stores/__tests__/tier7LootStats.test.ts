@@ -25,6 +25,7 @@ vi.mock('../../systems/drops', async () => {
 });
 
 import { useGameStore, processMonsterDeath, waitForPendingDrops } from '../gameStore';
+import { fillerBagItems } from '../../testing/bagFixtures';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -209,7 +210,7 @@ describe('T7 掉落統計', () => {
   it('背包滿而被丟棄的 T7 仍然計數', async () => {
     // 基礎 50 格，塞滿 60 種素材確保容量已滿
     useGameStore.setState({
-      bagItems: Array.from({ length: 60 }, (_, i) => ({ name: `素材${i}`, type: 'material' as const, amount: 1 })),
+      bagItems: fillerBagItems(60),
     });
     rollDropsMock.mockResolvedValue({
       gold: 0,

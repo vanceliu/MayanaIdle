@@ -2,7 +2,7 @@
  * 印記系統 — `docs/design/46-sigil.md`
  *
  * 印記是**只操作詞綴**的消耗品，在印記師（`13-town.md` § 13.13）使用。
- * 與強化石的分工：強化石只把 Tier 推到 T5，印記負責重骰種類、重骰數值、突破 T5。
+ * 詞綴的升階、重骰與品質全部走這裡，鐵匠鋪只管強化等級（+N）與製作。
  *
  * 這裡的四支 `apply*` 一律走 `models/affix.ts` 的既有 roll 函式
  * （`generateAffixes` / `rollAffixValue` / `rollErosionDamage` / `rollRestorePercent`），
@@ -27,45 +27,67 @@ import {
   type AnyAffixType,
 } from './affix';
 
-export type SigilType = 'chaos' | 'sting' | 'recarve' | 'enhance';
+export type SigilType = 'chaos' | 'sting' | 'recarve' | 'temper' | 'enhance' | 'polish';
 
 export interface SigilDefinition {
   type: SigilType;
-  /** 道具名 —— seed（`db/seed/itemSeeds.ts`）與背包一律以名字為 key */
-  itemName: string;
+  /** 對應的道具 id —— 背包一律以 id 為 key（§ 99.1），名稱由 id 反查 */
+  itemId: number;
   name: string;
   /** § 46.2 的作用敘述。Wiki 直接引用，不另寫一份 */
   description: string;
-  /** `item` = 整件裝備（混沌）；`affix` = 指定一條詞綴 */
+  /** `item` = 整件裝備（混沌／工藝）；`affix` = 指定一條詞綴 */
   target: 'item' | 'affix';
+  /**
+   * 介面分頁。精鍊與突破是同一個動作（Tier +1）的兩段，共用一個分頁（§ 46.2），
+   * 由該條詞綴當前的 Tier 決定實際消耗哪一種印記。
+   */
+  tab: SigilType;
 }
 
 /** § 46.2 印記清單 */
 export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   {
-    type: 'chaos', itemName: '混沌印記', name: '混沌印記', target: 'item',
+    type: 'chaos', itemId: 147, name: '混沌印記', target: 'item', tab: 'chaos',
     description: '全部 4 條詞綴重骰（種類／Tier／數值），Tier 上限 T5，商店裝 T3 且不出特殊詞綴',
   },
   {
-    type: 'sting', itemName: '刺針印記', name: '刺針印記', target: 'affix',
+    type: 'sting', itemId: 148, name: '刺針印記', target: 'affix', tab: 'sting',
     description: '指定一條詞綴換成同部位詞綴池的另一條，Tier 不變',
   },
   {
-    type: 'recarve', itemName: '重刻印記', name: '重刻印記', target: 'affix',
+    type: 'recarve', itemId: 149, name: '重刻印記', target: 'affix', tab: 'recarve',
     description: '指定一條詞綴的隨機數值全部重骰，種類與 Tier 不變',
   },
   {
-    type: 'enhance', itemName: '強化印記', name: '強化印記', target: 'affix',
+    type: 'temper', itemId: 10, name: '精鍊印記', target: 'affix', tab: 'enhance',
+    description: '指定一條詞綴 Tier +1，必定成功，最高推到該裝備的取得管道上限（一般 T5、商店裝 T3）',
+  },
+  {
+    type: 'enhance', itemId: 150, name: '突破印記', target: 'affix', tab: 'enhance',
     description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗掉回 T1',
   },
+  {
+    type: 'polish', itemId: 9, name: '工藝印記', target: 'item', tab: 'polish',
+    description: '整件裝備品質 +1%（上限 20%），必定成功，另收 50,000G',
+  },
+];
+
+/** 印記師的分頁（§ 46.2：精鍊與突破合在同一個分頁，故不等於 `SIGIL_DEFINITIONS`） */
+export const SIGIL_TABS: { tab: SigilType; label: string }[] = [
+  { tab: 'chaos', label: '混沌印記' },
+  { tab: 'sting', label: '刺針印記' },
+  { tab: 'recarve', label: '重刻印記' },
+  { tab: 'enhance', label: '詞綴升階' },
+  { tab: 'polish', label: '品質提升' },
 ];
 
 export function getSigilDefinition(type: SigilType): SigilDefinition {
   return SIGIL_DEFINITIONS.find(d => d.type === type)!;
 }
 
-export function getSigilByItemName(itemName: string): SigilDefinition | undefined {
-  return SIGIL_DEFINITIONS.find(d => d.itemName === itemName);
+export function getSigilByItemId(itemId: number): SigilDefinition | undefined {
+  return SIGIL_DEFINITIONS.find(d => d.itemId === itemId);
 }
 
 /** § 46.3 混沌印記重骰的 Tier 上限（商店裝另受 `maxAffixTier` 夾住） */
@@ -78,14 +100,19 @@ export const CHAOS_SIGIL_SLOTS = 4;
  */
 export const STING_SPECIAL_REPLACEMENT_TIER = 5;
 
-/** § 46.6 強化印記的成功率（`from` → `from + 1`） */
+/** § 46.7 突破印記的成功率（`from` → `from + 1`） */
 export const ENHANCE_SIGIL_RATES: { from: number; rate: number }[] = [
   { from: 5, rate: 0.10 },
   { from: 6, rate: 0.02 },
 ];
 
-/** § 46.6 強化印記失敗後掉回的 Tier */
+/** § 46.7 突破印記失敗後掉回的 Tier */
 export const ENHANCE_SIGIL_FAIL_TIER = 1;
+
+/** § 46.8 工藝印記：每次品質 +1%、上限 20%、另收 50,000G（數值來源 `08-quality.md` § 8.3） */
+export const POLISH_SIGIL_QUALITY_STEP = 1;
+export const POLISH_SIGIL_QUALITY_MAX = 20;
+export const POLISH_SIGIL_GOLD_COST = 50000;
 
 export function getEnhanceSigilRate(tier: number): number | undefined {
   return ENHANCE_SIGIL_RATES.find(r => r.from === tier)?.rate;
@@ -106,6 +133,8 @@ export interface SigilContext {
   charLevel: number;
   /** 實例的詞綴 Tier 硬上限（商店裝 = 3），掉落／製作品為 undefined */
   maxAffixTier?: number;
+  /** 裝備當前品質 %（工藝印記用，§ 46.8） */
+  quality?: number;
   /** 武器平均基傷（`getWeaponBaseDamage`）—— 元素侵蝕的每跳傷害用 */
   weaponBaseDamage?: number;
   /** 新手裝（seed `acquireType: 'starter'`）—— 一律不可使用印記（§ 46.7） */
@@ -119,32 +148,62 @@ export interface SigilCheck {
 }
 
 /**
- * § 46.7 可用性判定。UI 與 apply 都走這裡，避免「按鈕擋得住但函式擋不住」。
+ * 一條詞綴的**下一階由哪一種印記受理**（§ 46.2）。
+ *
+ * 取得管道上限（商店裝 T3、其餘 T5）以內走精鍊印記、必定成功；
+ * 上限以上到 T7 走突破印記、有失敗率。回 undefined = 已到頂或不受理。
+ */
+export function getUpgradeSigilFor(
+  affix: Affix,
+  maxAffixTier?: number,
+): { type: 'temper' | 'enhance'; rate: number } | undefined {
+  if (isSpecialAffixType(affix.type)) return undefined;
+  const cap = maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
+  if (affix.tier < cap) return { type: 'temper', rate: 1 };
+  const rate = getEnhanceSigilRate(affix.tier);
+  return rate === undefined ? undefined : { type: 'enhance', rate };
+}
+
+/**
+ * § 46.9 可用性判定。UI 與 apply 都走這裡，避免「按鈕擋得住但函式擋不住」。
  */
 export function canUseSigil(
   type: SigilType,
   affixes: Affix[] | undefined,
   affixIndex: number | undefined,
-  ctx: Pick<SigilContext, 'isStarterGear'>,
+  ctx: Pick<SigilContext, 'isStarterGear' | 'maxAffixTier' | 'quality'>,
 ): SigilCheck {
   if (ctx.isStarterGear) return { ok: false, reason: '新手裝沒有詞綴，無法使用印記' };
 
   if (type === 'chaos') return { ok: true };
 
   if (!affixes || affixes.length === 0) return { ok: false, reason: '這件裝備沒有詞綴' };
+
+  // § 46.8 工藝印記的對象是整件裝備，不指定詞綴
+  if (type === 'polish') {
+    if ((ctx.quality ?? 0) >= POLISH_SIGIL_QUALITY_MAX) {
+      return { ok: false, reason: `品質已達 ${POLISH_SIGIL_QUALITY_MAX}%，無法再提升` };
+    }
+    return { ok: true };
+  }
+
   if (affixIndex == null || !affixes[affixIndex]) return { ok: false, reason: '請先指定一條詞綴' };
 
   const affix = affixes[affixIndex];
   if (isSpecialAffixType(affix.type)) {
     if (type === 'recarve') return { ok: false, reason: '特殊詞綴沒有數值，無法重刻' };
-    if (type === 'enhance') return { ok: false, reason: '特殊詞綴沒有 Tier，無法強化' };
+    if (type === 'temper' || type === 'enhance') {
+      return { ok: false, reason: '特殊詞綴沒有 Tier，無法升階' };
+    }
     return { ok: true }; // 刺針可以把特殊詞綴換掉
   }
 
-  if (type === 'enhance') {
-    if (affix.tier >= 7) return { ok: false, reason: '已是 T7，無法再強化' };
-    if (getEnhanceSigilRate(affix.tier) === undefined) {
-      return { ok: false, reason: `T${affix.tier} 請用強化石，強化印記只受理 T5／T6` };
+  if (type === 'temper' || type === 'enhance') {
+    const next = getUpgradeSigilFor(affix, ctx.maxAffixTier);
+    if (!next) return { ok: false, reason: `T${affix.tier} 已是上限，無法再升階` };
+    if (next.type !== type) {
+      const wanted = getSigilDefinition(next.type).name;
+      return { ok: false, reason: `T${affix.tier} 的下一階由${wanted}受理` };
     }
   }
 
@@ -286,7 +345,35 @@ export function applyRecarveSigil(
 }
 
 /**
- * § 46.6 強化印記：只受理 T5→T6（10%）與 T6→T7（2%）。
+ * § 46.6 精鍊印記：Tier +1，**必定成功**，推到取得管道上限為止（商店裝 T3、其餘 T5）。
+ *
+ * 升階後以新 Tier 的區間重骰百分比數值；元素、每跳傷害、回復比例與 Tier 無關，**不動**。
+ */
+export function applyTemperSigil(
+  affixes: Affix[],
+  affixIndex: number,
+  ctx: Pick<SigilContext, 'maxAffixTier'>,
+): SigilResult {
+  const old = affixes[affixIndex];
+  const cap = ctx.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
+  if (isSpecialAffixType(old.type) || old.tier >= cap) {
+    return { affixes, success: false, message: `精鍊印記只受理 T${cap} 以下的一般詞綴` };
+  }
+
+  const tier = old.tier + 1;
+  const type = old.type as AffixType;
+  const next = [...affixes];
+  next[affixIndex] = { ...old, tier, value: rollAffixValue(tier, type) };
+
+  return {
+    affixes: next,
+    success: true,
+    message: `精鍊印記：${affixName(type)} 升至 T${tier}`,
+  };
+}
+
+/**
+ * § 46.7 突破印記：只受理 T5→T6（10%）與 T6→T7（2%）。
  *
  * 失敗時該詞綴掉回 T1；成功與失敗都以新 Tier 的區間重骰百分比數值。
  * 元素侵蝕的每跳傷害與受擊回復的回復比例與 Tier 無關，**不動**。
@@ -298,7 +385,7 @@ export function applyEnhanceSigil(
   const old = affixes[affixIndex];
   const rate = getEnhanceSigilRate(old.tier);
   if (rate === undefined) {
-    return { affixes, success: false, message: '強化印記只受理 T5／T6 的詞綴' };
+    return { affixes, success: false, message: '突破印記只受理 T5／T6 的詞綴' };
   }
 
   const success = Math.random() < rate;
@@ -311,7 +398,19 @@ export function applyEnhanceSigil(
     affixes: next,
     success,
     message: success
-      ? `強化印記成功！${affixName(type)} 升至 T${tier}`
-      : `強化印記失敗… ${affixName(type)} 掉回 T${tier}`,
+      ? `突破印記成功！${affixName(type)} 升至 T${tier}`
+      : `突破印記失敗… ${affixName(type)} 掉回 T${tier}`,
   };
+}
+
+/**
+ * § 46.8 工藝印記：整件裝備品質 +1%，上限 20%，必定成功。
+ * 金幣由呼叫端扣（`POLISH_SIGIL_GOLD_COST`）—— 這裡只算品質。
+ */
+export function applyPolishSigil(quality: number): { quality: number; success: boolean; message: string } {
+  if (quality >= POLISH_SIGIL_QUALITY_MAX) {
+    return { quality, success: false, message: `品質已達 ${POLISH_SIGIL_QUALITY_MAX}%` };
+  }
+  const next = quality + POLISH_SIGIL_QUALITY_STEP;
+  return { quality: next, success: true, message: `工藝印記：品質提升至 ${next}%` };
 }

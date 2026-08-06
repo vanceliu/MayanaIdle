@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
+import { bagItem } from '../../testing/bagFixtures';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -62,7 +63,7 @@ describe('Warehouse (account-level storage)', () => {
 
     // Deposit materials and gold into warehouse, then logout (saves to DB)
     useGameStore.setState({
-      storedMaterials: [{ name: '鐵礦石', type: 'material', amount: 5 }],
+      storedMaterials: [bagItem('銀礦石', 5)],
       warehouseGold: 1000,
     });
     await useGameStore.getState().logout();
@@ -75,7 +76,7 @@ describe('Warehouse (account-level storage)', () => {
     // Select character B — warehouse should be shared (loaded from DB by userId)
     await useGameStore.getState().selectCharacter(charBId);
     expect(useGameStore.getState().warehouseGold).toBe(1000);
-    expect(useGameStore.getState().storedMaterials).toContainEqual({ name: '鐵礦石', type: 'material', amount: 5 });
+    expect(useGameStore.getState().storedMaterials).toContainEqual(bagItem('銀礦石', 5));
   });
 
   it('should persist warehouse gold through save/load', async () => {

@@ -6,6 +6,7 @@ import { loadTemplateCache, resolveEquipment } from '../../systems/templateSync'
 import { getItemById } from '../../models/items';
 import { ITEM_DEFINITIONS } from '../seed/itemSeeds';
 
+import { getItemId } from '../../models/items';
 /**
  * 深入驗證：DB seed 後角色裝備、掉落表、製作配方全部能正確對應
  */
@@ -143,7 +144,8 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
       const craftSeeds = EQUIPMENT_SEEDS.filter(s => s.craftMaterials && s.craftMaterials.length > 0);
 
       for (const mat of craftMaterials) {
-        const usedIn = craftSeeds.filter(s => s.craftMaterials!.some(m => m.name === mat));
+        const matId = getItemId(mat)!;
+        const usedIn = craftSeeds.filter(s => s.craftMaterials!.some(m => m.itemId === matId));
         expect(usedIn.length, `${mat} 未在任何配方中使用`).toBeGreaterThan(0);
       }
 
@@ -154,8 +156,8 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
         expect(def!.sellPrice ?? 0, `${mat} 沒有賣店價值`).toBeGreaterThan(0);
       }
 
-      // 品質石、強化石用於鐵匠鋪品質提升/詞綴強化，不在 craftMaterials 中但仍有明確用途
-      const systemMaterials = ['品質石', '強化石'];
+      // 工藝印記、精鍊印記用於印記師的品質提升／詞綴升階，不在 craftMaterials 中但仍有明確用途
+      const systemMaterials = ['工藝印記', '精鍊印記'];
       for (const mat of systemMaterials) {
         const drops = DROP_TABLE_SEEDS.filter(d => {
           if (d.itemType !== 'item' || !d.itemTemplateId) return false;

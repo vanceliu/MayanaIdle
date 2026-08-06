@@ -58,8 +58,8 @@ describe('遺產封存', () => {
 
   it('快照包含角色完整狀態與已學習技能', async () => {
     const charId = await addOutdatedCharacter();
-    await db.characterBag.add({ characterId: charId, name: '紅藥水', type: 'potion', amount: 7 });
-    await db.characterStorage.add({ characterId: charId, name: '鐵礦', type: 'material', amount: 3 });
+    await db.characterBag.add({ characterId: charId, name: '紅色藥水', type: 'potion', amount: 7 });
+    await db.characterStorage.add({ characterId: charId, name: '銀礦石', type: 'material', amount: 3 });
     localStorage.setItem(`mayana_prefs_${charId}`, JSON.stringify({
       statistics: { monstersKilled: 8888, bossesKilled: 12 },
       guildProgress: { points: 350 },
@@ -74,8 +74,8 @@ describe('遺產封存', () => {
     expect(payload.character.gold).toBe(12345);
     expect(payload.character.baseAttributes.STR).toBe(14);
     expect(payload.skills).toEqual([{ id: 'wind_blade', name: '風刃', level: 3 }]);
-    expect(payload.bagItems).toEqual([{ name: '紅藥水', type: 'potion', amount: 7 }]);
-    expect(payload.personalStorageItems).toEqual([{ name: '鐵礦', type: 'material', amount: 3 }]);
+    expect(payload.bagItems).toEqual([{ name: '紅色藥水', type: 'potion', amount: 7 }]);
+    expect(payload.personalStorageItems).toEqual([{ name: '銀礦石', type: 'material', amount: 3 }]);
     expect(payload.statistics?.monstersKilled).toBe(8888);
     expect(payload.contribution).toBe(350);
   });
@@ -120,7 +120,7 @@ describe('遺產封存', () => {
   it('共用倉庫被清除時另存一筆帳號層級快照', async () => {
     await addOutdatedCharacter();
     await db.warehouses.add({ userId: 1, name: 'gold', type: 'gold', amount: 50000, storageType: 'shared' });
-    await db.warehouses.add({ userId: 1, name: '鐵礦', type: 'material', amount: 9, storageType: 'shared' });
+    await db.warehouses.add({ userId: 1, name: '銀礦石', type: 'material', amount: 9, storageType: 'shared' });
 
     await purgeOutdatedData();
 
@@ -130,7 +130,7 @@ describe('遺產封存', () => {
 
     const payload = parseSharedWarehousePayload(shared!)!;
     expect(payload.gold).toBe(50000);
-    expect(payload.items).toEqual([{ name: '鐵礦', type: 'material', amount: 9 }]);
+    expect(payload.items).toEqual([{ name: '銀礦石', type: 'material', amount: 9 }]);
     expect(await db.warehouses.count()).toBe(0);
   });
 

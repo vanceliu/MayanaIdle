@@ -58,7 +58,8 @@ describe('區域素材掉落系統', () => {
       const allCraftMaterialNames = new Set<string>();
       for (const eq of craftEquipments) {
         for (const mat of eq.craftMaterials!) {
-          allCraftMaterialNames.add(mat.name);
+          const def = getItemById(mat.itemId);
+          if (def) allCraftMaterialNames.add(def.name);
         }
       }
 

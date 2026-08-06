@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
-import { AFFIX_DEFINITIONS, getAffixTierTable, generateAffixes, isMaxRollAffix, getAffixCategoryForSlot, getWeaponBaseDamage, isSpecialAffixType, getSpecialAffixDefinition, DEFAULT_MAX_AFFIX_TIER, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
+import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
-import { getItemDefinition } from '../../models/items';
+import { getItemById } from '../../models/items';
+import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
+
+/** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱 */
+const WEAPON_ENHANCE_SCROLL_ID = 7;
+const ARMOR_ENHANCE_SCROLL_ID = 8;
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
@@ -28,10 +33,7 @@ const SLOT_NAMES: Record<EquipSlot, string> = {
   ring2: '戒指2',
 };
 
-const QUALITY_COST = 50000;
-const QUALITY_MAX = 20;
-
-type Tab = 'enhance' | 'quality' | 'affix' | 'craft';
+type Tab = 'enhance' | 'craft';
 
 function isWeapon(item: EquipmentInstance): boolean {
   return !!item.smallMonsterDamage;
@@ -86,10 +88,8 @@ export function TownBlacksmith() {
 
   if (!char) return null;
 
-  const qualityStones = bagItems.find(b => b.name === '品質石')?.amount ?? 0;
-  const weaponScrolls = bagItems.find(b => b.name === '武器強化卷軸')?.amount ?? 0;
-  const armorScrolls = bagItems.find(b => b.name === '防具強化卷軸')?.amount ?? 0;
-  const enhanceStones = bagItems.find(b => b.name === '強化石')?.amount ?? 0;
+  const weaponScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_SCROLL_ID);
+  const armorScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_SCROLL_ID);
 
   const allItems: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }[] = [];
 
@@ -102,19 +102,18 @@ export function TownBlacksmith() {
     allItems.push({ item, source: 'bag' });
   }
 
-  function consumeBagItem(name: string) {
-    const currentBag = useGameStore.getState().bagItems;
-    return currentBag.map(b =>
-      b.name === name ? { ...b, amount: b.amount - 1 } : b
-    ).filter(b => b.amount > 0);
+  function consumeFromBag(itemId: number) {
+    return consumeBagItem(useGameStore.getState().bagItems, itemId);
   }
 
-  function persistBagItem(name: string, newAmount: number) {
+  /** 背包列一律以 `itemTemplateId` 定位（§ 99.1），不可用 name 查 —— 改名即失聯 */
+  function persistBagItem(itemId: number, newAmount: number) {
     if (!char?.id) return;
+    const rows = db.characterBag.where({ characterId: char.id, itemTemplateId: itemId });
     if (newAmount <= 0) {
-      db.characterBag.where({ characterId: char.id, name }).delete();
+      rows.delete();
     } else {
-      db.characterBag.where({ characterId: char.id, name }).modify({ amount: newAmount });
+      rows.modify({ amount: newAmount });
     }
   }
 
@@ -133,7 +132,7 @@ export function TownBlacksmith() {
     const nextLevel = (item.enhancement ?? 0) + 1;
 
     const itemIsWeapon = isWeapon(item);
-    const scrollName = itemIsWeapon ? '武器強化卷軸' : '防具強化卷軸';
+    const scrollItemId = itemIsWeapon ? WEAPON_ENHANCE_SCROLL_ID : ARMOR_ENHANCE_SCROLL_ID;
     const scrollCount = itemIsWeapon ? weaponScrolls : armorScrolls;
     if (scrollCount <= 0) return;
 
@@ -143,9 +142,9 @@ export function TownBlacksmith() {
       : getArmorEnhanceRate(nextLevel, stability);
 
     const success = Math.random() < rate;
-    const newBag = consumeBagItem(scrollName);
+    const newBag = consumeFromBag(scrollItemId);
     const remainingScrolls = (itemIsWeapon ? weaponScrolls : armorScrolls) - 1;
-    persistBagItem(scrollName, remainingScrolls);
+    persistBagItem(scrollItemId, remainingScrolls);
 
     if (success) {
       const updatedItem = { ...item, enhancement: nextLevel };
@@ -181,81 +180,12 @@ export function TownBlacksmith() {
     useGameStore.getState().saveState();
   }
 
-  function handleQualityUp(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
-    if (!char) return;
-    const { item, source, slot } = entry;
-    if ((item.quality ?? 0) >= QUALITY_MAX) return;
-    if (qualityStones <= 0) return;
-    if (char.gold < QUALITY_COST) return;
-
-    const newQuality = (item.quality ?? 0) + 1;
-    const newGold = char.gold - QUALITY_COST;
-    const updatedItem = { ...item, quality: newQuality };
-    const updatedChar = { ...char, gold: newGold };
-    const newBag = consumeBagItem('品質石');
-
-    persistEquipment(updatedItem);
-    persistBagItem('品質石', qualityStones - 1);
-    if (char.id) db.characters.update(char.id, { gold: newGold });
-
-    if (source === 'equipped' && slot) {
-      const gear = { ...equippedGear, [slot]: updatedItem };
-      useGameStore.setState({ character: updatedChar, equippedGear: gear, bagItems: newBag });
-    } else {
-      const newInv = inventory.map(i => i.id === item.id ? updatedItem : i);
-      useGameStore.setState({ character: updatedChar, inventory: newInv, bagItems: newBag });
-    }
-
-    setResultMsg(`品質提升！${updatedItem.name} 品質 ${newQuality}%`);
-    useGameStore.getState().saveState();
-  }
-
-  function handleAffixEnhance(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }, affixIdx: number) {
-    if (!char) return;
-    if (enhanceStones <= 0) return;
-    const { item, source, slot } = entry;
-    if (!item.affixes || !item.affixes[affixIdx]) return;
-
-    const affix = item.affixes[affixIdx];
-    // § 7.10.2 特殊詞綴不可強化
-    if (isSpecialAffixType(affix.type)) return;
-    // § 6A.6：商店購買的裝備硬上限 T3，其餘走預設 T5
-    if (affix.tier >= (item.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER)) return;
-
-    const newTier = affix.tier + 1;
-    const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
-
-    const tierDef = getAffixTierTable(affix.type as any).find(t => t.tier === newTier);
-    if (!tierDef) return;
-    const newValue = Math.floor(Math.random() * (tierDef.max - tierDef.min + 1)) + tierDef.min;
-
-    const newAffixes = [...item.affixes];
-    newAffixes[affixIdx] = { ...affix, tier: newTier, value: newValue };
-    const updatedItem = { ...item, affixes: newAffixes };
-    const newBag = consumeBagItem('強化石');
-
-    persistEquipment(updatedItem);
-    persistBagItem('強化石', enhanceStones - 1);
-
-    if (source === 'equipped' && slot) {
-      const gear = { ...equippedGear, [slot]: updatedItem };
-      useGameStore.setState({ equippedGear: gear, bagItems: newBag });
-    } else {
-      const newInv = inventory.map(i => i.id === item.id ? updatedItem : i);
-      useGameStore.setState({ inventory: newInv, bagItems: newBag });
-    }
-
-    setResultMsg(`詞綴強化成功！${def?.name} 升至 T${newTier} (+${newValue}%)`);
-    useGameStore.getState().saveState();
-  }
-
   function canCraftRecipe(recipe: EquipmentTemplate): boolean {
     if (!char) return false;
     if (!recipe.craftGold || char.gold < recipe.craftGold) return false;
     if (!recipe.craftMaterials) return false;
     for (const mat of recipe.craftMaterials) {
-      const have = bagItems.find(b => b.name === mat.name)?.amount ?? 0;
-      if (have < mat.amount) return false;
+      if (getBagItemAmount(bagItems, mat.itemId) < mat.amount) return false;
     }
     if (recipe.craftPrerequisiteWeapon) {
       const { name, quantity } = recipe.craftPrerequisiteWeapon;
@@ -275,12 +205,9 @@ export function TownBlacksmith() {
 
     let newBag = [...useGameStore.getState().bagItems];
     for (const mat of selectedRecipe.craftMaterials) {
-      const current = newBag.find(b => b.name === mat.name);
-      const newAmount = (current?.amount ?? 0) - mat.amount;
-      persistBagItem(mat.name, newAmount);
-      newBag = newBag.map(b =>
-        b.name === mat.name ? { ...b, amount: b.amount - mat.amount } : b
-      ).filter(b => b.amount > 0);
+      const newAmount = getBagItemAmount(newBag, mat.itemId) - mat.amount;
+      persistBagItem(mat.itemId, newAmount);
+      newBag = consumeBagItem(newBag, mat.itemId, mat.amount);
     }
 
     let newInvAfterPrereq = [...currentInv];
@@ -377,87 +304,11 @@ export function TownBlacksmith() {
     );
   }
 
-  function renderQualityActions(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
-    const { item } = entry;
-    const currentQuality = item.quality ?? 0;
-    if (currentQuality >= QUALITY_MAX) {
-      return (
-        <div className="shop-item-actions">
-          <span className="bs-action-cost">已滿 20%</span>
-        </div>
-      );
-    }
-    return (
-      <div className="shop-item-actions bs-actions">
-        <div className="bs-action-summary">
-          <span className="bs-action-cost">品質石×1 + 50,000G</span>
-        </div>
-        <button
-          onClick={() => handleQualityUp(entry)}
-          disabled={char!.gold < QUALITY_COST || qualityStones <= 0}
-        >
-          {currentQuality}% → {currentQuality + 1}%
-        </button>
-      </div>
-    );
-  }
-
-  function renderAffixActions(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
-    const { item } = entry;
-    const affixes = item.affixes;
-    if (!affixes || affixes.length === 0) {
-      return (
-        <div className="shop-item-actions">
-          <span className="bs-action-cost">無詞綴</span>
-        </div>
-      );
-    }
-    return (
-      <div className="shop-item-actions bs-actions">
-        <div className="bs-affix-list">
-          {affixes.map((affix, i) => {
-            // § 7.10.2 特殊詞綴無 Tier、不可強化
-            if (isSpecialAffixType(affix.type)) {
-              const sDef = getSpecialAffixDefinition(affix.type);
-              return (
-                <div key={i} className="bs-affix-row">
-                  <span className="affix-tag special">[特殊] {sDef?.name}</span>
-                  <button className="bs-affix-btn" disabled>不可強化</button>
-                </div>
-              );
-            }
-            const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
-            const canEnhance = affix.tier < 5 && enhanceStones > 0;
-            return (
-              <div key={i} className="bs-affix-row">
-                <span
-                  className={`affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
-                  title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
-                >
-                  {def?.name} T{affix.tier}
-                </span>
-                <button
-                  className="bs-affix-btn"
-                  onClick={() => handleAffixEnhance(entry, i)}
-                  disabled={!canEnhance}
-                >
-                  {affix.tier >= 5 ? '已滿' : '強化'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="shop-panel blacksmith-panel">
       <p className="shop-greeting">「想強化什麼裝備？拿來讓我瞧瞧。」</p>
       <div className="bs-resources">
         <span>金幣: {char.gold.toLocaleString()}G</span>
-        <span>品質石: {qualityStones}</span>
-        <span>強化石: {enhanceStones}</span>
         <span>武器卷: {weaponScrolls}</span>
         <span>防具卷: {armorScrolls}</span>
       </div>
@@ -465,12 +316,6 @@ export function TownBlacksmith() {
       <div className="shop-tabs">
         <button className={tab === 'enhance' ? 'active' : ''} onClick={() => { setTab('enhance'); setResultMsg(null); }}>
           裝備強化
-        </button>
-        <button className={tab === 'quality' ? 'active' : ''} onClick={() => { setTab('quality'); setResultMsg(null); }}>
-          品質提升
-        </button>
-        <button className={tab === 'affix' ? 'active' : ''} onClick={() => { setTab('affix'); setResultMsg(null); }}>
-          詞綴強化
         </button>
         <button className={tab === 'craft' ? 'active' : ''} onClick={() => { setTab('craft'); setResultMsg(null); setSelectedRecipe(null); }}>
           裝備製作
@@ -537,8 +382,6 @@ export function TownBlacksmith() {
                 <EquipmentDetail item={entry.item} templates={allTemplates} />
               </div>
               {tab === 'enhance' && renderEnhanceActions(entry)}
-              {tab === 'quality' && renderQualityActions(entry)}
-              {tab === 'affix' && renderAffixActions(entry)}
             </div>
           ))}
         </div>
@@ -607,13 +450,14 @@ export function TownBlacksmith() {
                     );
                   })()}
                   {(recipe.craftMaterials ?? []).map(m => {
-                    const have = bagItems.find(b => b.name === m.name)?.amount ?? 0;
+                    const have = getBagItemAmount(bagItems, m.itemId);
                     const enough = have >= m.amount;
-                    const { icon, color } = resolveItemIcon(getItemDefinition(m.name), 'material');
+                    const def = getItemById(m.itemId);
+                    const { icon, color } = resolveItemIcon(def, 'material');
                     return (
-                      <span key={m.name} className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
+                      <span key={m.itemId} className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
                         <GameIcon name={icon} size={14} color={color} />
-                        <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{m.name}</span>
+                        <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{def?.name ?? '未知素材'}</span>
                         <span className="bs-craft-mat-count">{have}/{m.amount}</span>
                       </span>
                     );

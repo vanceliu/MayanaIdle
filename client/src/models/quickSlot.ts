@@ -1,6 +1,7 @@
 import { CURE_ITEMS } from './cureItem';
-import { TOWN_SCROLL_CONFIG } from './townScroll';
+import { ALL_TOWN_SCROLLS } from './townScroll';
 import { REGIONS } from './mapData';
+import { getItemById, getItemId } from './items';
 
 /**
  * 快捷鍵系統（`35-inventory-constraints.md` § 35.7）。
@@ -16,12 +17,14 @@ export type BasicPotionType = 'red' | 'orange' | 'white';
 /**
  * 快捷鍵格內容。
  * - `potion`：紅／橙／白，走 `usePotionByType`
- * - `bagItem`：其餘可使用的背包物品（加速藥水、狀態解除、卷軸），依名稱分派
+ * - `bagItem`：其餘可使用的背包物品（加速藥水、狀態解除、卷軸），依**道具 id** 分派
  * - `equipment`：背包中的裝備實例，點擊等同換裝
+ *
+ * `bagItem` 存 id 不存名稱：快捷鍵是持久化設定，存名稱會在道具改名後指向不存在的東西。
  */
 export type QuickSlotEntry =
   | { kind: 'potion'; potionType: BasicPotionType }
-  | { kind: 'bagItem'; name: string }
+  | { kind: 'bagItem'; itemId: number }
   | { kind: 'equipment'; equipmentId: number; name: string };
 
 export type QuickSlots = (QuickSlotEntry | null)[];
@@ -43,39 +46,40 @@ export function emptyQuickSlots(): QuickSlots {
   return Array.from({ length: QUICK_SLOT_COUNT }, () => null);
 }
 
-const BASIC_POTIONS: Record<string, BasicPotionType> = {
-  紅色藥水: 'red',
-  橙色藥水: 'orange',
-  白色藥水: 'white',
+/** 基礎藥水 id（紅 1／橙 2／白 3）→ `PotionType`。id 與 seed 的一致性由測試把關 */
+const BASIC_POTION_IDS: Record<number, BasicPotionType> = {
+  1: 'red',
+  2: 'orange',
+  3: 'white',
 };
 
-const SPEED_POTIONS: Record<string, 'green' | 'enhanced-green'> = {
-  綠色藥水: 'green',
-  強化綠色藥水: 'enhanced-green',
+const SPEED_POTION_IDS: Record<number, 'green' | 'enhanced-green'> = {
+  [getItemId('綠色藥水')!]: 'green',
+  [getItemId('強化綠色藥水')!]: 'enhanced-green',
 };
 
-const CURE_ITEM_NAMES = new Set(CURE_ITEMS.map(c => c.name));
-const TOWN_SCROLL_NAMES = new Set(Object.values(TOWN_SCROLL_CONFIG).map(s => s.name));
+const CURE_ITEM_IDS = new Set(CURE_ITEMS.map(c => c.itemId));
+const TOWN_SCROLL_IDS = new Set(ALL_TOWN_SCROLLS.map(s => s.itemId));
 
 /**
- * 通行卷軸 → 目的地 region id。
- * 由 `REGIONS` 的 `entryScrollName` 反查，改樓層設定時自動跟上，不需維護對應表。
+ * 通行卷軸 id → 目的地 region id。
+ * 由 `REGIONS` 的 `entryScrollItemId` 反查，改樓層設定時自動跟上，不需維護對應表。
  */
-const ENTRY_SCROLL_TO_REGION = new Map<string, string>(
-  REGIONS.filter(r => r.entryScrollName).map(r => [r.entryScrollName!, r.id]),
+const ENTRY_SCROLL_TO_REGION = new Map<number, string>(
+  REGIONS.filter(r => r.entryScrollItemId).map(r => [r.entryScrollItemId!, r.id]),
 );
 
-export function getEntryScrollRegion(itemName: string): string | undefined {
-  return ENTRY_SCROLL_TO_REGION.get(itemName);
+export function getEntryScrollRegion(itemId: number): string | undefined {
+  return ENTRY_SCROLL_TO_REGION.get(itemId);
 }
 
 /** 點擊快捷鍵後要執行的行為（由 store 實際執行） */
 export type QuickSlotAction =
   | { type: 'potion'; potionType: BasicPotionType }
   | { type: 'speedPotion'; speedType: 'green' | 'enhanced-green' }
-  | { type: 'cure'; name: string }
-  | { type: 'townScroll'; name: string }
-  | { type: 'travel'; regionId: string; scrollName: string }
+  | { type: 'cure'; itemId: number }
+  | { type: 'townScroll'; itemId: number }
+  | { type: 'travel'; regionId: string; scrollItemId: number }
   | { type: 'equip'; equipmentId: number };
 
 /**
@@ -95,14 +99,14 @@ export function resolveQuickSlotAction(entry: QuickSlotEntry | null): QuickSlotA
     return { type: 'equip', equipmentId: entry.equipmentId };
   }
 
-  const name = entry.name;
-  if (BASIC_POTIONS[name]) return { type: 'potion', potionType: BASIC_POTIONS[name] };
-  if (SPEED_POTIONS[name]) return { type: 'speedPotion', speedType: SPEED_POTIONS[name] };
-  if (CURE_ITEM_NAMES.has(name)) return { type: 'cure', name };
-  if (TOWN_SCROLL_NAMES.has(name)) return { type: 'townScroll', name };
+  const { itemId } = entry;
+  if (BASIC_POTION_IDS[itemId]) return { type: 'potion', potionType: BASIC_POTION_IDS[itemId] };
+  if (SPEED_POTION_IDS[itemId]) return { type: 'speedPotion', speedType: SPEED_POTION_IDS[itemId] };
+  if (CURE_ITEM_IDS.has(itemId)) return { type: 'cure', itemId };
+  if (TOWN_SCROLL_IDS.has(itemId)) return { type: 'townScroll', itemId };
 
-  const regionId = getEntryScrollRegion(name);
-  if (regionId) return { type: 'travel', regionId, scrollName: name };
+  const regionId = getEntryScrollRegion(itemId);
+  if (regionId) return { type: 'travel', regionId, scrollItemId: itemId };
 
   return null;
 }
@@ -112,25 +116,26 @@ export function resolveQuickSlotAction(entry: QuickSlotEntry | null): QuickSlotA
  * 裝備一律可以；其餘依 `resolveQuickSlotAction` 是否解得出行為決定
  * （因此強化卷軸、素材、任務物品都放不進去）。
  */
-export function canQuickSlotItem(kind: 'bag' | 'equipment', name: string): boolean {
+export function canQuickSlotItem(kind: 'bag' | 'equipment', itemId: number): boolean {
   if (kind === 'equipment') return true;
-  return resolveQuickSlotAction({ kind: 'bagItem', name }) != null;
+  return resolveQuickSlotAction({ kind: 'bagItem', itemId }) != null;
 }
 
 /** 背包物品轉成快捷鍵格內容。不可放置時回 null */
 export function toQuickSlotEntry(
   kind: 'bag' | 'equipment',
-  name: string,
+  itemId: number,
   equipmentId?: number,
+  equipmentName?: string,
 ): QuickSlotEntry | null {
   if (kind === 'equipment') {
     if (equipmentId == null) return null;
-    return { kind: 'equipment', equipmentId, name };
+    return { kind: 'equipment', equipmentId, name: equipmentName ?? '裝備' };
   }
-  if (!canQuickSlotItem('bag', name)) return null;
-  const basic = BASIC_POTIONS[name];
+  if (!canQuickSlotItem('bag', itemId)) return null;
+  const basic = BASIC_POTION_IDS[itemId];
   if (basic) return { kind: 'potion', potionType: basic };
-  return { kind: 'bagItem', name };
+  return { kind: 'bagItem', itemId };
 }
 
 /** 兩個快捷鍵格內容是否指向同一個物品 */
@@ -140,16 +145,18 @@ export function isSameQuickSlotEntry(
 ): boolean {
   if (!a || !b || a.kind !== b.kind) return false;
   if (a.kind === 'potion' && b.kind === 'potion') return a.potionType === b.potionType;
-  if (a.kind === 'bagItem' && b.kind === 'bagItem') return a.name === b.name;
+  if (a.kind === 'bagItem' && b.kind === 'bagItem') return a.itemId === b.itemId;
   if (a.kind === 'equipment' && b.kind === 'equipment') return a.equipmentId === b.equipmentId;
   return false;
 }
 
-/** 快捷鍵格顯示用的物品名稱 */
+/** 快捷鍵格顯示用的物品名稱。道具一律由 id 反查 seed，不存名稱 */
 export function getQuickSlotItemName(entry: QuickSlotEntry): string {
   if (entry.kind === 'potion') {
-    return Object.keys(BASIC_POTIONS).find(n => BASIC_POTIONS[n] === entry.potionType) ?? '藥水';
+    const id = Number(Object.keys(BASIC_POTION_IDS).find(k => BASIC_POTION_IDS[Number(k)] === entry.potionType));
+    return getItemById(id)?.name ?? '藥水';
   }
+  if (entry.kind === 'bagItem') return getItemById(entry.itemId)?.name ?? '未知道具';
   return entry.name;
 }
 
@@ -182,8 +189,14 @@ export function normalizeQuickSlots(raw: unknown): QuickSlots {
       if (pt === 'red' || pt === 'orange' || pt === 'white') {
         out[i] = { kind: 'potion', potionType: pt };
       }
-    } else if (e.kind === 'bagItem' && typeof (e as { name?: string }).name === 'string') {
-      const entry: QuickSlotEntry = { kind: 'bagItem', name: (e as { name: string }).name };
+    } else if (e.kind === 'bagItem') {
+      // 舊格式存名稱，這裡順手換成 id（改名前存的格子會反查不到，直接剔除）
+      const raw = e as { itemId?: number; name?: string };
+      const itemId = typeof raw.itemId === 'number' ? raw.itemId
+        : typeof raw.name === 'string' ? getItemId(raw.name)
+        : undefined;
+      if (itemId == null) continue;
+      const entry: QuickSlotEntry = { kind: 'bagItem', itemId };
       // 規則改變後可能有格子指向已不可用的物品，一併剔除
       if (resolveQuickSlotAction(entry)) out[i] = entry;
     } else if (e.kind === 'equipment' && typeof (e as { equipmentId?: number }).equipmentId === 'number') {

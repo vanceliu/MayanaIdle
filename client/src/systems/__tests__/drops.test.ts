@@ -154,7 +154,7 @@ describe('drops system', () => {
       expect(result.gold).toBe(0);
     });
 
-    it('should drop materials', async () => {
+    it('should drop items with the seed category (id 9 = 工藝印記, scroll)', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       vi.mocked(db.dropTables.where).mockReturnValue({
         equals: vi.fn().mockReturnValue({
@@ -167,8 +167,8 @@ describe('drops system', () => {
       const result = await rollDrops('dawn-plains', 1);
 
       expect(result.items).toHaveLength(1);
-      expect(result.items[0].type).toBe('material');
-      expect(result.items[0].name).toBe('品質石');
+      expect(result.items[0].type).toBe('scroll');
+      expect(result.items[0].name).toBe('工藝印記');
     });
 
     it('should apply drop_rate bonus to normal monster drops', async () => {
@@ -187,7 +187,7 @@ describe('drops system', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.08);
       const resultWithBonus = await rollDrops('dawn-plains', 1, { drop_rate: 50, gold_rate: 0 });
       expect(resultWithBonus.items).toHaveLength(1);
-      expect(resultWithBonus.items[0].name).toBe('品質石');
+      expect(resultWithBonus.items[0].name).toBe('工藝印記');
     });
 
     it('should map dungeon items to scrolls after applying the level-based boost', async () => {

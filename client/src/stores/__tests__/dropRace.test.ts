@@ -4,6 +4,7 @@ import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
 import type { BagItem } from '../gameStore';
+import { bagItem, bagItemById } from '../../testing/bagFixtures';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -64,23 +65,21 @@ describe('Multi-monster drop race condition', () => {
     // Two monsters die — each produces drops that must be applied sequentially.
     interface DropResult {
       gold: number;
-      items: { name: string; type: string; amount: number }[];
+      items: { itemTemplateId?: number; name: string; type: string; amount: number }[];
     }
+
+    /** 掉落物帶的是 `itemTemplateId`（`systems/drops.ts` 的格式），不是背包格 */
+    const asDrop = (item: ReturnType<typeof bagItem>) =>
+      ({ itemTemplateId: item.itemId, name: item.name, type: item.type, amount: item.amount });
 
     const monster1Drops: DropResult = {
       gold: 1000,
-      items: [
-        { name: '品質石', type: 'material', amount: 2 },
-        { name: '紅色藥水', type: 'potion', amount: 1 },
-      ],
+      items: [asDrop(bagItem('工藝印記', 2)), asDrop(bagItem('紅色藥水', 1))],
     };
 
     const monster2Drops: DropResult = {
       gold: 2000,
-      items: [
-        { name: '品質石', type: 'material', amount: 3 },
-        { name: '強化石', type: 'material', amount: 1 },
-      ],
+      items: [asDrop(bagItem('工藝印記', 3)), asDrop(bagItem('精鍊印記', 1))],
     };
 
     function applyDrops(drops: DropResult) {
@@ -92,9 +91,9 @@ describe('Multi-monster drop race condition', () => {
       char2.gold += drops.gold;
       for (const item of drops.items) {
         if (item.type === 'potion' || item.type === 'material' || item.type === 'scroll') {
-          const existing = newBag.find(b => b.name === item.name);
+          const existing = newBag.find(b => b.itemId === item.itemTemplateId);
           if (existing) existing.amount += item.amount;
-          else newBag.push({ name: item.name, type: item.type as BagItem['type'], amount: item.amount });
+          else if (item.itemTemplateId != null) newBag.push(bagItemById(item.itemTemplateId, item.amount));
         }
       }
 
@@ -121,13 +120,13 @@ describe('Multi-monster drop race condition', () => {
     // Gold: 100 (starting) + 1000 (monster1) + 2000 (monster2) = 3100
     expect(state.character!.gold).toBe(3100);
 
-    // 品質石: 2 (monster1) + 3 (monster2) = 5
-    const qualityStone = state.bagItems.find(b => b.name === '品質石');
+    // 工藝印記: 2 (monster1) + 3 (monster2) = 5
+    const qualityStone = state.bagItems.find(b => b.name === '工藝印記');
     expect(qualityStone).toBeDefined();
     expect(qualityStone!.amount).toBe(5);
 
-    // 強化石: 1 (monster2 only)
-    const enhanceStone = state.bagItems.find(b => b.name === '強化石');
+    // 精鍊印記: 1 (monster2 only)
+    const enhanceStone = state.bagItems.find(b => b.name === '精鍊印記');
     expect(enhanceStone).toBeDefined();
     expect(enhanceStone!.amount).toBe(1);
 
@@ -145,12 +144,12 @@ describe('Multi-monster drop race condition', () => {
 
     const monster1Drops = {
       gold: 1000,
-      items: [{ name: '品質石', type: 'material', amount: 2 }],
+      items: [bagItem('工藝印記', 2)],
     };
 
     const monster2Drops = {
       gold: 2000,
-      items: [{ name: '品質石', type: 'material', amount: 3 }],
+      items: [bagItem('工藝印記', 3)],
     };
 
     // Non-queued (parallel) processing — simulates the old broken behavior
@@ -161,12 +160,12 @@ describe('Multi-monster drop race condition', () => {
     // Monster 1 applies on snapshot1
     const char1 = { ...snapshot1.character!, gold: snapshot1.character!.gold + monster1Drops.gold };
     const bag1: BagItem[] = snapshot1.bagItems.map(b => ({ ...b }));
-    bag1.push({ name: '品質石', type: 'material', amount: 2 });
+    bag1.push(bagItem('工藝印記', 2));
 
     // Monster 2 applies on snapshot2 (same stale state!)
     const char2 = { ...snapshot2.character!, gold: snapshot2.character!.gold + monster2Drops.gold };
     const bag2: BagItem[] = snapshot2.bagItems.map(b => ({ ...b }));
-    bag2.push({ name: '品質石', type: 'material', amount: 3 });
+    bag2.push(bagItem('工藝印記', 3));
 
     // Both write — second one wins, first is lost
     set({ character: char1, bagItems: bag1 });
@@ -176,6 +175,6 @@ describe('Multi-monster drop race condition', () => {
     // Bug: gold is only 2100 instead of 3100 (monster1's gold lost)
     expect(state.character!.gold).toBe(2100);
     // Bug: 品質石 is only 3 instead of 5 (monster1's drops lost)
-    expect(state.bagItems.find(b => b.name === '品質石')!.amount).toBe(3);
+    expect(state.bagItems.find(b => b.name === '工藝印記')!.amount).toBe(3);
   });
 });

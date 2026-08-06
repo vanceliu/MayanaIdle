@@ -3,7 +3,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { BagPanel } from '../BagPanel';
 import { useGameStore } from '../../stores/gameStore';
 import { BAG_DRAG_MIME, decodeBagDrag } from '../../models/bagLayout';
+import { bagItem } from '../../testing/bagFixtures';
 
+import { getItemId } from '../../models/items';
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => [],
 }));
@@ -27,7 +29,7 @@ it('shows gold row when expanded', () => {
 
   it('shows potion cells with counts', () => {
     useGameStore.setState({
-      bagItems: [{ name: '紅色藥水', type: 'potion', amount: 10 }],
+      bagItems: [bagItem('紅色藥水', 10)],
     });
     render(<BagPanel />);
     expect(screen.getByText('紅色藥水')).toBeDefined();
@@ -53,7 +55,7 @@ it('shows gold row when expanded', () => {
     it('第一次點擊只選取格子，不會用掉藥水', () => {
       const usePotionByType = vi.fn();
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
         usePotionByType,
       });
@@ -68,7 +70,7 @@ it('shows gold row when expanded', () => {
     it('選取後每點一下都直接使用，選取狀態留著', () => {
       const usePotionByType = vi.fn();
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
         usePotionByType,
       });
@@ -87,8 +89,8 @@ it('shows gold row when expanded', () => {
       const usePotionByType = vi.fn();
       useGameStore.setState({
         bagItems: [
-          { name: '紅色藥水', type: 'potion', amount: 3 },
-          { name: '橙色藥水', type: 'potion', amount: 2 },
+          bagItem('紅色藥水', 3),
+          bagItem('橙色藥水', 2),
         ],
         inventory: [],
         usePotionByType,
@@ -106,7 +108,7 @@ it('shows gold row when expanded', () => {
     it('點空白格會取消選取', () => {
       const usePotionByType = vi.fn();
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
         usePotionByType,
       });
@@ -127,7 +129,7 @@ it('shows gold row when expanded', () => {
 
     it('點面板留白處也會取消選取', () => {
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
       });
       render(<BagPanel />);
@@ -143,7 +145,7 @@ it('shows gold row when expanded', () => {
 
     it('按在格子上、放開漂到格子間隙時，選取不可被清掉', () => {
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
       });
       render(<BagPanel />);
@@ -159,7 +161,7 @@ it('shows gold row when expanded', () => {
 
     it('拖曳吃掉 click 也不影響選取：按下當下就選好了', () => {
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
       });
       render(<BagPanel />);
@@ -174,7 +176,7 @@ it('shows gold row when expanded', () => {
     it('按下到放開位移過大時算拖曳起手，不執行動作', () => {
       const usePotionByType = vi.fn();
       useGameStore.setState({
-        bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+        bagItems: [bagItem('紅色藥水', 3)],
         inventory: [],
         usePotionByType,
       });
@@ -218,7 +220,7 @@ it('shows gold row when expanded', () => {
    */
   it('拖曳來源的 effectAllowed 同時允許 copy 與 move', () => {
     useGameStore.setState({
-      bagItems: [{ name: '紅色藥水', type: 'potion', amount: 3 }],
+      bagItems: [bagItem('紅色藥水', 3)],
       inventory: [],
     });
     render(<BagPanel />);
@@ -240,7 +242,7 @@ it('shows gold row when expanded', () => {
     expect(dataTransfer.effectAllowed).toBe('copyMove');
     // 同時確認負載有寫進去，且解得出來
     expect(decodeBagDrag(store[BAG_DRAG_MIME])).toEqual({
-      kind: 'bag', name: '紅色藥水', amount: 3, equipmentId: undefined,
+      kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 3, equipmentId: undefined,
     });
   });
 });

@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
+import { bagItem } from '../../testing/bagFixtures';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -155,7 +156,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
     // Create character A, deposit shared materials
     await useGameStore.getState().createCharacter('CharA', 'knight', attrs);
     useGameStore.setState({
-      storedMaterials: [{ name: '鐵礦石', type: 'material', amount: 10 }],
+      storedMaterials: [bagItem('銀礦石', 10)],
     });
     await useGameStore.getState().logout();
 
@@ -166,7 +167,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
 
     // Select character B — should see shared materials
     await useGameStore.getState().selectCharacter(charBId);
-    expect(useGameStore.getState().storedMaterials).toContainEqual({ name: '鐵礦石', type: 'material', amount: 10 });
+    expect(useGameStore.getState().storedMaterials).toContainEqual(bagItem('銀礦石', 10));
   });
 
   it('personal warehouse materials are character-specific', async () => {
@@ -176,7 +177,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
     await useGameStore.getState().createCharacter('CharA', 'knight', attrs);
     const charAId = useGameStore.getState().character!.id!;
     useGameStore.setState({
-      personalStoredMaterials: [{ name: '狼牙', type: 'material', amount: 3 }],
+      personalStoredMaterials: [bagItem('破碎獸牙', 3)],
     });
     await useGameStore.getState().logout();
 
@@ -193,7 +194,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
 
     // Select character A — should see personal materials
     await useGameStore.getState().selectCharacter(charAId);
-    expect(useGameStore.getState().personalStoredMaterials).toContainEqual({ name: '狼牙', type: 'material', amount: 3 });
+    expect(useGameStore.getState().personalStoredMaterials).toContainEqual(bagItem('破碎獸牙', 3));
   });
 
   it('deleting character should NOT affect shared warehouse', async () => {
@@ -222,7 +223,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
     } as any);
 
     useGameStore.setState({
-      storedMaterials: [{ name: '鐵礦石', type: 'material', amount: 5 }],
+      storedMaterials: [bagItem('銀礦石', 5)],
       warehouseGold: 2000,
     });
     await useGameStore.getState().logout();
@@ -233,7 +234,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
     // Verify shared warehouse data still in DB
     const warehouseRows = await db.warehouses.where('userId').equals(userId).toArray();
     expect(warehouseRows.find(r => r.type === 'gold')?.amount).toBe(2000);
-    expect(warehouseRows.find(r => r.name === '鐵礦石')?.amount).toBe(5);
+    expect(warehouseRows.find(r => r.name === '銀礦石')?.amount).toBe(5);
 
     const sharedEquip = await db.equipmentInstances
       .where('ownerId').equals(userId)

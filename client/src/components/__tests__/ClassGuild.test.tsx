@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ClassGuild } from '../town/ClassGuild';
 import { useGameStore } from '../../stores/gameStore';
+import { bagItem } from '../../testing/bagFixtures';
 
 /**
  * @vitest-environment jsdom
@@ -35,7 +36,7 @@ describe('ClassGuild', () => {
         userId: 1,
       },
       skills: [],
-      bagItems: [{ name: '盾擊技能書', type: 'scroll', amount: 1 }],
+      bagItems: [bagItem('盾擊技能書', 1)],
     });
   });
 

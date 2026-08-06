@@ -5,6 +5,7 @@ import { Storage } from '../town/Storage';
 import { useGameStore, BAG_BASE_SLOTS } from '../../stores/gameStore';
 import { useTownStore } from '../../stores/townStore';
 import type { BagItem } from '../../stores/gameStore';
+import { bagItem, fillerBagItems } from '../../testing/bagFixtures';
 
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => [],
@@ -19,9 +20,9 @@ vi.mock('../../db/database', () => ({
 }));
 
 const BAG: BagItem[] = [
-  { name: '紅色藥水', type: 'potion', amount: 30 },
-  { name: '橙色藥水', type: 'potion', amount: 5 },
-  { name: '品質石', type: 'material', amount: 1200 },
+  bagItem('紅色藥水', 30),
+  bagItem('橙色藥水', 5),
+  bagItem('工藝印記', 1200),
 ];
 
 function setup(bagItems: BagItem[] = BAG, storedMaterials: BagItem[] = []) {
@@ -121,15 +122,15 @@ describe('倉庫存入 — 購物車與底部執行鈕', () => {
   it('多品項可一次存入', () => {
     setup();
     setQty('紅色藥水', '10');
-    setQty('品質石', '200');
+    setQty('工藝印記', '200');
     expect(footerText('.shop-cart-summary')).toBe('已選 物品 2 種 · 共 210 個');
     runCart();
 
     const state = useGameStore.getState();
     expect(state.storedMaterials.find(s => s.name === '紅色藥水')?.amount).toBe(10);
-    expect(state.storedMaterials.find(s => s.name === '品質石')?.amount).toBe(200);
+    expect(state.storedMaterials.find(s => s.name === '工藝印記')?.amount).toBe(200);
     expect(state.bagItems.find(b => b.name === '紅色藥水')?.amount).toBe(20);
-    expect(state.bagItems.find(b => b.name === '品質石')?.amount).toBe(1000);
+    expect(state.bagItems.find(b => b.name === '工藝印記')?.amount).toBe(1000);
   });
 
   it('數量上限為背包持有量', () => {
@@ -141,12 +142,12 @@ describe('倉庫存入 — 購物車與底部執行鈕', () => {
 
   it('倉庫不套用 999 硬上限，可一次存入超過 999 的素材', () => {
     setup();
-    const input = qtyInput('品質石');
+    const input = qtyInput('工藝印記');
     fireEvent.change(input, { target: { value: '1200' } });
     expect(input.value).toBe('1200');
 
     runCart();
-    expect(useGameStore.getState().storedMaterials.find(s => s.name === '品質石')?.amount).toBe(1200);
+    expect(useGameStore.getState().storedMaterials.find(s => s.name === '工藝印記')?.amount).toBe(1200);
   });
 
   it('＋10 / −10 按鈕會調整數量', () => {
@@ -181,7 +182,7 @@ describe('倉庫存入 — 購物車與底部執行鈕', () => {
 
 describe('倉庫取出 — 購物車與底部執行鈕', () => {
   it('可指定數量取出', () => {
-    setup([], [{ name: '紅色藥水', type: 'potion', amount: 20 }]);
+    setup([], [bagItem('紅色藥水', 20)]);
     openWithdrawTab();
 
     setQty('紅色藥水', '7');
@@ -194,10 +195,8 @@ describe('倉庫取出 — 購物車與底部執行鈕', () => {
   });
 
   it('背包欄位不足時擋下並說明原因', () => {
-    const full = Array.from({ length: BAG_BASE_SLOTS }, (_, i) => ({
-      name: `雜物${i}`, type: 'material' as const, amount: 1,
-    }));
-    setup(full, [{ name: '紅色藥水', type: 'potion', amount: 20 }]);
+    const full = fillerBagItems(BAG_BASE_SLOTS);
+    setup(full, [bagItem('紅色藥水', 20)]);
     openWithdrawTab();
 
     setQty('紅色藥水', '5');
@@ -216,7 +215,7 @@ describe('倉庫 — 名稱搜尋', () => {
 
     expect(hasRow('紅色藥水')).toBe(true);
     expect(hasRow('橙色藥水')).toBe(true);
-    expect(hasRow('品質石')).toBe(false);
+    expect(hasRow('工藝印記')).toBe(false);
   });
 
   it('沒有符合項目時顯示提示訊息', () => {
@@ -227,14 +226,14 @@ describe('倉庫 — 名稱搜尋', () => {
 
   it('搜尋忽略前後空白', () => {
     setup();
-    fireEvent.change(searchBox(), { target: { value: '  品質石  ' } });
-    expect(hasRow('品質石')).toBe(true);
+    fireEvent.change(searchBox(), { target: { value: '  工藝印記  ' } });
+    expect(hasRow('工藝印記')).toBe(true);
     expect(hasRow('紅色藥水')).toBe(false);
   });
 
   it('清除按鈕會還原完整清單', () => {
     setup();
-    fireEvent.change(searchBox(), { target: { value: '品質石' } });
+    fireEvent.change(searchBox(), { target: { value: '工藝印記' } });
     expect(hasRow('紅色藥水')).toBe(false);
 
     fireEvent.click(screen.getByLabelText('清除搜尋'));
@@ -244,13 +243,13 @@ describe('倉庫 — 名稱搜尋', () => {
 
   it('搜尋條件同時套用在取出頁', () => {
     setup([], [
-      { name: '紅色藥水', type: 'potion', amount: 3 },
-      { name: '品質石', type: 'material', amount: 3 },
+      bagItem('紅色藥水', 3),
+      bagItem('工藝印記', 3),
     ]);
     openWithdrawTab();
-    fireEvent.change(searchBox(), { target: { value: '品質' } });
+    fireEvent.change(searchBox(), { target: { value: '工藝' } });
 
-    expect(hasRow('品質石')).toBe(true);
+    expect(hasRow('工藝印記')).toBe(true);
     expect(hasRow('紅色藥水')).toBe(false);
   });
 });

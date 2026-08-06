@@ -37,6 +37,9 @@ import { getSkillCooldownReduction, getAffixBonusesFromGear } from '../systems/c
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
+import { getItemId, getItemById } from '../models/items';
+import type { BagItem } from '../models/bagItem';
+import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
 import { getTownDifficulties } from '../models/adventurerQuest';
@@ -50,7 +53,7 @@ import type { MapLocation } from '../models/area';
 import { getRegion, resolveArea, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment } from '../systems/templateSync';
-import { findScrollInBag, consumeTownScroll, TOWN_SCROLL_CONFIG } from '../models/townScroll';
+import { findScrollInBag, consumeTownScroll, getTownScrollByItemId, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database';
 
 /** `legacy` 為遺產頁（§ 45.3）：唯讀，只能返回 characterSelect，不可進入任何遊玩畫面 */
@@ -79,45 +82,31 @@ export type CombatLowHpAction = 'town' | 'teleport';
 export type PotionType = 'red' | 'orange' | 'white';
 export type SpeedPotionType = 'green' | 'enhanced-green';
 
-export const POTION_CONFIG: Record<PotionType, { healMin: number; healMax: number; cooldown: number; name: string }> = {
-  red: { healMin: 10, healMax: 15, cooldown: 600, name: '紅色藥水' },
-  orange: { healMin: 30, healMax: 45, cooldown: 900, name: '橙色藥水' },
-  white: { healMin: 60, healMax: 90, cooldown: 1500, name: '白色藥水' },
+export const POTION_CONFIG: Record<PotionType, { itemId: number; healMin: number; healMax: number; cooldown: number; name: string }> = {
+  red: { itemId: 1, healMin: 10, healMax: 15, cooldown: 600, name: '紅色藥水' },
+  orange: { itemId: 2, healMin: 30, healMax: 45, cooldown: 900, name: '橙色藥水' },
+  white: { itemId: 3, healMin: 60, healMax: 90, cooldown: 1500, name: '白色藥水' },
 };
 
-export const SPEED_POTION_CONFIG: Record<SpeedPotionType, { duration: number; name: string; bagName: string }> = {
-  green: { duration: 180000, name: '綠色藥水', bagName: '綠色藥水' },
-  'enhanced-green': { duration: 900000, name: '強化綠色藥水', bagName: '強化綠色藥水' },
+export const SPEED_POTION_CONFIG: Record<SpeedPotionType, { itemId: number; duration: number; name: string }> = {
+  green: { itemId: 133, duration: 180000, name: '綠色藥水' },
+  'enhanced-green': { itemId: 134, duration: 900000, name: '強化綠色藥水' },
 };
 
 export function getPotionName(type: PotionType): string {
-  return POTION_CONFIG[type].name;
+  return getItemById(POTION_CONFIG[type].itemId)?.name ?? POTION_CONFIG[type].name;
 }
 
 export function getPotionCount(bagItems: BagItem[], type: PotionType): number {
-  const name = getPotionName(type);
-  const item = bagItems.find(b => b.name === name && b.type === 'potion');
-  return item?.amount ?? 0;
+  return getBagItemAmount(bagItems, POTION_CONFIG[type].itemId);
 }
 
 export function addPotionToBag(bagItems: BagItem[], type: PotionType, amount: number): BagItem[] {
-  const name = getPotionName(type);
-  const newBag = bagItems.map(b => ({ ...b }));
-  const existing = newBag.find(b => b.name === name && b.type === 'potion');
-  if (existing) {
-    existing.amount += amount;
-  } else {
-    const potionIds: Record<PotionType, number> = { red: 1, orange: 2, white: 3 };
-    newBag.push({ name, type: 'potion', itemTemplateId: potionIds[type], amount });
-  }
-  return newBag;
+  return addBagItem(bagItems, POTION_CONFIG[type].itemId, amount);
 }
 
 export function consumePotionFromBag(bagItems: BagItem[], type: PotionType): BagItem[] {
-  const name = getPotionName(type);
-  return bagItems
-    .map(b => b.name === name && b.type === 'potion' ? { ...b, amount: b.amount - 1 } : { ...b })
-    .filter(b => b.amount > 0);
+  return consumeBagItem(bagItems, POTION_CONFIG[type].itemId);
 }
 
 /** § 35.1：背包基礎格數。腰帶可再擴充，見 `getBagMaxSlots()` */
@@ -171,19 +160,17 @@ export function wouldOverflowBag(
  */
 export interface PendingDiscard {
   kind: 'bag' | 'equipment';
+  /** 顯示用名稱。裝備用實例名，背包物品由 `itemId` 反查 */
   name: string;
+  /** kind === 'bag' 時的道具 id（丟棄一律以 id 定位） */
+  itemId?: number;
   /** 可丟棄的最大數量（裝備恆為 1） */
   maxAmount: number;
   /** kind === 'equipment' 時的實例 id */
   equipmentId?: number;
 }
 
-export interface BagItem {
-  name: string;
-  type: 'material' | 'potion' | 'scroll' | 'spellbook';
-  itemTemplateId?: number;
-  amount: number;
-}
+export type { BagItem } from '../models/bagItem';
 
 export interface CharacterSummary {
   id: number;
@@ -269,8 +256,8 @@ interface GameState {
   useSpeedPotion: (type: SpeedPotionType) => void;
   assignQuickSlot: (slotIdx: number, entry: QuickSlotEntry | null) => void;
   useQuickSlot: (slotIdx: number) => void;
-  useTownScroll: (scrollName: string) => void;
-  useCureItem: (itemName: string) => void;
+  useTownScroll: (scrollItemId: number) => void;
+  useCureItem: (itemId: number) => void;
   changeArea: (areaId: string) => void;
   navigateTo: (location: MapLocation) => void;
   setScriptRules: (rules: ScriptRule[]) => void;
@@ -282,7 +269,7 @@ interface GameState {
   addEffect: (effect: ActiveEffect) => void;
   removeEffect: (id: string) => void;
   clearExpiredEffects: () => void;
-  discardBagItem: (name: string, amount?: number) => void;
+  discardBagItem: (itemId: number, amount?: number) => void;
   discardInventoryItem: (id: number) => void;
   /** § 35.5.3：拖出背包後等待確認的丟棄請求 */
   pendingDiscard: PendingDiscard | null;
@@ -449,10 +436,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const storedEquipItems: EquipmentInstance[] = sharedEquipItems.map(resolveEquipment);
 
     const bagRows = await db.characterBag.where('characterId').equals(char.id!).toArray();
-    const bagItems: BagItem[] = [];
-    for (const row of bagRows) {
-      bagItems.push({ name: row.name, type: row.type, itemTemplateId: row.itemTemplateId, amount: row.amount });
-    }
+    // 名稱與分頁一律由 id 反查（§ 99.1），DB 列裡的舊 name 只是遷移殘留，不採用
+    const bagItems: BagItem[] = bagRows
+      .map(row => makeBagItem(row.itemTemplateId!, row.amount))
+      .filter((b): b is BagItem => b !== null);
 
     // Load warehouse materials (account-level shared storage)
     const warehouseRows = await db.warehouses.where('userId').equals(userId)
@@ -464,7 +451,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (row.type === 'gold') {
         warehouseGold = row.amount;
       } else if (row.type !== 'equipment') {
-        storedMaterials.push({ name: row.name, type: row.type as BagItem['type'], itemTemplateId: row.itemTemplateId, amount: row.amount });
+        const entry = makeBagItem(row.itemTemplateId!, row.amount);
+        if (entry) storedMaterials.push(entry);
       }
     }
 
@@ -476,7 +464,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const personalStoredMaterials: BagItem[] = [];
     for (const row of personalWarehouseRows) {
       if (row.type !== 'equipment' && row.type !== 'gold') {
-        personalStoredMaterials.push({ name: row.name, type: row.type as BagItem['type'], itemTemplateId: row.itemTemplateId, amount: row.amount });
+        const entry = makeBagItem(row.itemTemplateId!, row.amount);
+        if (entry) personalStoredMaterials.push(entry);
       }
     }
 
@@ -713,16 +702,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // Save initial bag items to DB
-    await db.characterBag.bulkAdd([
-      { characterId: char.id!, name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 },
-    ]);
+    const starterBag = addPotionToBag([], 'red', 10);
+    await db.characterBag.bulkAdd(starterBag.map(item => ({
+      characterId: char.id!, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount,
+    })));
 
     set({
       character: char,
       equippedGear,
       inventory: [],
       skills: startingSkills,
-      bagItems: [{ name: '紅色藥水', type: 'potion', itemTemplateId: 1, amount: 10 }],
+      bagItems: starterBag,
       adventurerQuests: [],
       adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
   questBoardTownId: null,
@@ -976,9 +966,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!state.character) return;
     if (blockedByStun(state, set)) return;
     const config = SPEED_POTION_CONFIG[type];
-    const bagName = config.bagName;
-    const bagItem = state.bagItems.find(i => i.name === bagName);
-    if (!bagItem || bagItem.amount <= 0) return;
+    if (!hasBagItem(state.bagItems, config.itemId)) return;
 
     const speedBuff: ActiveEffect = {
       id: `buff-speed-potion-${Date.now()}`,
@@ -998,9 +986,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 減速與加速互相抵銷（§ 24.4.6）
     const applied = applySpeedBuff(state.activeEffects, speedBuff);
 
-    const newBag = state.bagItems.map(i =>
-      i.name === bagName ? { ...i, amount: i.amount - 1 } : i
-    ).filter(i => i.amount > 0);
+    const newBag = consumeBagItem(state.bagItems, config.itemId);
 
     set({
       activeEffects: applied.effects,
@@ -1021,7 +1007,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (!s) continue;
         if (s.kind === entry.kind
           && ((s.kind === 'potion' && entry.kind === 'potion' && s.potionType === entry.potionType)
-            || (s.kind === 'bagItem' && entry.kind === 'bagItem' && s.name === entry.name)
+            || (s.kind === 'bagItem' && entry.kind === 'bagItem' && s.itemId === entry.itemId)
             || (s.kind === 'equipment' && entry.kind === 'equipment' && s.equipmentId === entry.equipmentId))) {
           slots[i] = null;
         }
@@ -1048,10 +1034,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         get().useSpeedPotion(action.speedType);
         return;
       case 'cure':
-        get().useCureItem(action.name);
+        get().useCureItem(action.itemId);
         return;
       case 'townScroll':
-        get().useTownScroll(action.name);
+        get().useTownScroll(action.itemId);
         return;
       case 'travel': {
         // § 35.7：通行卷軸直飛。changeArea 會做卷軸檢查與消耗
@@ -1076,16 +1062,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  useCureItem: (itemName) => {
+  useCureItem: (itemId) => {
     const state = get();
     if (!state.character) return;
     if (blockedByStun(state, set)) return;
 
-    const def = getCureItem(itemName);
+    const def = getCureItem(itemId);
     if (!def) return;
 
-    const bagItem = state.bagItems.find(b => b.name === itemName && b.amount > 0);
-    if (!bagItem) return;
+    if (!hasBagItem(state.bagItems, itemId)) return;
 
     // § 24.10.1：無對應 debuff 時不可使用
     if (!hasCurableDebuff(def, state.activeEffects)) {
@@ -1100,32 +1085,29 @@ export const useGameStore = create<GameState>((set, get) => ({
         && now < e.startTime + e.duration
     );
     const remaining = state.activeEffects.filter(e => !cleared.includes(e));
-    const newBag = state.bagItems
-      .map(b => (b.name === itemName ? { ...b, amount: b.amount - 1 } : b))
-      .filter(b => b.amount > 0);
+    const newBag = consumeBagItem(state.bagItems, itemId);
 
     set({
       activeEffects: remaining,
       bagItems: newBag,
       combatLogs: addLog(state.combatLogs, {
-        text: `使用${itemName}，解除 ${cleared.map(e => e.name).join('、')}`,
+        text: `使用${getItemById(itemId)?.name ?? def.name}，解除 ${cleared.map(e => e.name).join('、')}`,
         type: 'debuff-self',
       }),
     });
   },
 
-  useTownScroll: (scrollName) => {
+  useTownScroll: (scrollItemId) => {
     const state = get();
     if (!state.character) return;
     if (blockedByStun(state, set)) return;
 
-    const scrollInfo = Object.values(TOWN_SCROLL_CONFIG).find(s => s.name === scrollName);
+    const scrollInfo = getTownScrollByItemId(scrollItemId);
     if (!scrollInfo) return;
 
-    const scrollItem = state.bagItems.find(b => b.name === scrollName && b.amount > 0);
-    if (!scrollItem) return;
+    if (!hasBagItem(state.bagItems, scrollItemId)) return;
 
-    const newBag = consumeTownScroll(state.bagItems, scrollName);
+    const newBag = consumeTownScroll(state.bagItems, scrollItemId);
     const char = { ...state.character };
     char.currentArea = scrollInfo.townId;
     char.currentRegion = scrollInfo.townId;
@@ -1151,16 +1133,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!state.character) return;
     const region = getRegion(areaId);
 
-    if (region?.entryScrollName) {
-      const scrollIdx = state.bagItems.findIndex(b => b.name === region.entryScrollName && b.amount > 0);
-      if (scrollIdx === -1) {
-        set({ combatLogs: addLog(state.combatLogs, { text: `需要 ${region.entryScrollName} 才能進入！`, type: 'system' }) });
+    if (region?.entryScrollItemId) {
+      if (!hasBagItem(state.bagItems, region.entryScrollItemId)) {
+        const scrollLabel = getItemById(region.entryScrollItemId)?.name ?? '通行卷軸';
+        set({ combatLogs: addLog(state.combatLogs, { text: `需要 ${scrollLabel} 才能進入！`, type: 'system' }) });
         return;
       }
-      const newBag = state.bagItems.map((b, i) =>
-        i === scrollIdx ? { ...b, amount: b.amount - 1 } : b
-      ).filter(b => b.amount > 0);
-      set({ bagItems: newBag });
+      set({ bagItems: consumeBagItem(state.bagItems, region.entryScrollItemId) });
     }
 
     const zone = region ? ZONES.find(z => z.id === region.zoneId) : undefined;
@@ -1299,7 +1278,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             : findScrollInBag(state.bagItems);
           if (!scroll) return;
           // 與手動使用回城卷軸共用同一條流程（停止探索、重置地圖座標、存檔）
-          get().useTownScroll(scroll.name);
+          get().useTownScroll(scroll.itemId);
         }
         return;
       }
@@ -1332,8 +1311,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           break;
         }
         case 'cure_item': {
-          if (!action.cureItemName) return;
-          get().useCureItem(action.cureItemName);
+          if (action.cureItemId == null) return;
+          get().useCureItem(action.cureItemId);
           break;
         }
         case 'buff_skill': {
@@ -1439,16 +1418,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ activeEffects: get().activeEffects.filter(e => e.startTime + e.duration > now) });
   },
 
-  discardBagItem: (name, amount = 1) => {
+  discardBagItem: (itemId, amount = 1) => {
     const bag = get().bagItems;
-    const existing = bag.find(b => b.name === name);
+    const existing = bag.find(b => b.itemId === itemId);
     if (!existing) return;
     const drop = Math.max(1, Math.min(amount, existing.amount));
-    if (existing.amount > drop) {
-      set({ bagItems: bag.map(b => b.name === name ? { ...b, amount: b.amount - drop } : b) });
-    } else {
-      set({ bagItems: bag.filter(b => b.name !== name) });
-    }
+    set({ bagItems: consumeBagItem(bag, itemId, drop) });
     saveGame(get());
   },
 
@@ -1463,8 +1438,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!req) return;
     if (req.kind === 'equipment') {
       if (req.equipmentId != null) get().discardInventoryItem(req.equipmentId);
-    } else {
-      get().discardBagItem(req.name, amount);
+    } else if (req.itemId != null) {
+      get().discardBagItem(req.itemId, amount);
     }
     const dropped = req.kind === 'equipment' ? 1 : Math.max(1, Math.min(amount, req.maxAmount));
     set({
@@ -1514,18 +1489,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { character: updated, rewardItem } = completeQuestAction(char, questId);
     if (!rewardItem) return;
 
-    let newBag = state.bagItems.map(b => ({ ...b }));
-    const existing = newBag.find(b => b.name === rewardItem && b.type === 'spellbook');
-    if (existing) {
-      existing.amount += 1;
-    } else if (getBagUsedSlots(newBag, state.inventory) < getBagMaxSlots(state.equippedGear)) {
-      newBag.push({ name: rewardItem, type: 'spellbook', amount: 1 });
-    } else {
+    const rewardItemId = getItemId(rewardItem);
+    if (rewardItemId == null) return;
+
+    let newBag = state.bagItems;
+    if (!hasBagItem(newBag, rewardItemId)
+      && getBagUsedSlots(newBag, state.inventory) >= getBagMaxSlots(state.equippedGear)) {
       return;
     }
+    newBag = addBagItem(newBag, rewardItemId, 1);
 
     // Remove quest materials from bag
-    newBag = newBag.filter(b => b.name !== QUEST_MATERIAL_NAME || b.amount <= 0);
+    const questMaterialId = getItemId(QUEST_MATERIAL_NAME);
+    if (questMaterialId != null) newBag = newBag.filter(b => b.itemId !== questMaterialId);
 
     const questStats = { ...get().statistics, questsCompleted: get().statistics.questsCompleted + 1 };
     set({ character: updated, bagItems: newBag, statistics: questStats });
@@ -1571,22 +1547,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     );
     if (!reward) return;
 
-    let newBag = state.bagItems.map(b => ({ ...b }));
+    let newBag = state.bagItems;
     let newChar = state.character;
 
     if (reward.type === 'gold' && newChar) {
       newChar = { ...newChar, gold: newChar.gold + reward.amount };
-    } else if (reward.itemName) {
-      const itemType = reward.type === 'potion' ? 'potion' as const : 'material' as const;
-      const bagType = (reward.type === 'weapon-scroll' || reward.type === 'armor-scroll') ? 'scroll' as const : itemType;
-      const existingItem = newBag.find(b => b.name === reward.itemName && b.type === bagType);
-      if (existingItem) {
-        existingItem.amount += reward.amount;
-      } else if (getBagUsedSlots(newBag, state.inventory) < getBagMaxSlots(state.equippedGear)) {
-        newBag.push({ name: reward.itemName!, type: bagType, itemTemplateId: reward.itemId, amount: reward.amount });
-      } else {
+    } else if (reward.itemId != null) {
+      // 名稱與背包分頁一律由 id 反查 seed（§ 99.1）——
+      // 寫死成 material 會讓改歸 scroll 的道具（印記）在背包裡分裂成兩堆
+      if (!hasBagItem(newBag, reward.itemId)
+        && getBagUsedSlots(newBag, state.inventory) >= getBagMaxSlots(state.equippedGear)) {
         return;
       }
+      newBag = addBagItem(newBag, reward.itemId, reward.amount);
     }
 
     const townId2 = state.character?.currentArea as QuestTownId | undefined;
@@ -1715,14 +1688,13 @@ export function processMonsterDeath(
           logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
         }
       } else if (item.type === 'potion' || item.type === 'material' || item.type === 'scroll' || item.type === 'spellbook') {
-        const existing = newBag.find(b => b.name === item.name && b.type === item.type);
-        if (existing) {
-          existing.amount += item.amount;
-          logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
-        } else if (getBagUsedSlots(newBag, newEquipInv) >= getBagMaxSlots(state2.equippedGear)) {
+        if (item.itemTemplateId == null) {
+          logs2.push({ text: `無法處理掉落物 ${item.name}（缺少道具 id）`, type: 'system' });
+        } else if (!hasBagItem(newBag, item.itemTemplateId)
+          && getBagUsedSlots(newBag, newEquipInv) >= getBagMaxSlots(state2.equippedGear)) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
-          newBag.push({ name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount });
+          newBag = addBagItem(newBag, item.itemTemplateId, item.amount);
           logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
         }
       } else {
@@ -1735,11 +1707,11 @@ export function processMonsterDeath(
 
     // 任務進度：收集（素材掉落）
     if (rollQuestMaterialDrop(char2, defeatedMonsterName)) {
-      const matExisting = newBag.find(b => b.name === QUEST_MATERIAL_NAME && b.type === 'material');
-      if (matExisting) {
-        matExisting.amount += 1;
-      } else if (getBagUsedSlots(newBag, newEquipInv) < getBagMaxSlots(state2.equippedGear)) {
-        newBag.push({ name: QUEST_MATERIAL_NAME, type: 'material', amount: 1 });
+      const questMaterialId = getItemId(QUEST_MATERIAL_NAME);
+      if (questMaterialId != null
+        && (hasBagItem(newBag, questMaterialId)
+          || getBagUsedSlots(newBag, newEquipInv) < getBagMaxSlots(state2.equippedGear))) {
+        newBag = addBagItem(newBag, questMaterialId, 1);
       }
       char2 = updateCollectProgress(char2, 1);
       logs2.push({ text: `獲得 ${QUEST_MATERIAL_NAME}`, type: 'loot' });
@@ -1819,7 +1791,7 @@ async function saveGame(state: GameState) {
   const bagEntries: CharacterBagEntry[] = [];
   for (const item of state.bagItems) {
     if (item.amount > 0) {
-      bagEntries.push({ characterId: char.id, name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount });
+      bagEntries.push({ characterId: char.id, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount });
     }
   }
   if (bagEntries.length > 0) {
@@ -1835,7 +1807,7 @@ async function saveGame(state: GameState) {
     const warehouseEntries: WarehouseEntry[] = [];
     for (const item of state.storedMaterials) {
       if (item.amount > 0) {
-        warehouseEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount, storageType: 'shared' });
+        warehouseEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'shared' });
       }
     }
     if (state.warehouseGold > 0) {
@@ -1854,7 +1826,7 @@ async function saveGame(state: GameState) {
     const personalEntries: WarehouseEntry[] = [];
     for (const item of state.personalStoredMaterials) {
       if (item.amount > 0) {
-        personalEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemTemplateId, amount: item.amount, storageType: 'personal', characterId: char.id });
+        personalEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'personal', characterId: char.id });
       }
     }
     if (personalEntries.length > 0) {

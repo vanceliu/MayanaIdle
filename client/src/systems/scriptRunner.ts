@@ -4,7 +4,8 @@ import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
-import type { BagItem } from '../stores/gameStore';
+import type { BagItem } from '../models/bagItem';
+import { hasBagItem } from '../models/bagItem';
 import { getPotionCount, SPEED_POTION_CONFIG } from '../stores/gameStore';
 import { canUseSkill } from '../models/skill';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
@@ -194,8 +195,7 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       const { speedPotionType } = action;
       if (!speedPotionType) return false;
       const config = SPEED_POTION_CONFIG[speedPotionType];
-      const bagItem = ctx.bagItems.find(i => i.name === config.bagName);
-      return !!(bagItem && bagItem.amount > 0);
+      return hasBagItem(ctx.bagItems, config.itemId);
     }
     case 'buff_skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
@@ -211,10 +211,9 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
     case 'cure_item': {
       // 暈眩中無法使用任何道具（§ 24.10.1）
       if (isPlayerStunned(ctx.activeEffects, ctx.now)) return false;
-      const def = action.cureItemName ? getCureItem(action.cureItemName) : undefined;
+      const def = action.cureItemId != null ? getCureItem(action.cureItemId) : undefined;
       if (!def) return false;
-      const bagItem = ctx.bagItems.find(i => i.name === def.name);
-      if (!bagItem || bagItem.amount <= 0) return false;
+      if (!hasBagItem(ctx.bagItems, def.itemId)) return false;
       // 無對應 debuff 時不可使用（§ 24.10.1）
       return hasCurableDebuff(def, ctx.activeEffects, ctx.now);
     }
@@ -245,8 +244,7 @@ export function evaluateEmergencyRetreat(retreat: EmergencyRetreat, ctx: Emergen
     if (retreat.scrollTownId) {
       const scrollInfo = TOWN_SCROLL_CONFIG[retreat.scrollTownId];
       if (!scrollInfo) return null;
-      const item = ctx.bagItems.find(b => b.name === scrollInfo.name);
-      if (!item || item.amount <= 0) return null;
+      if (!hasBagItem(ctx.bagItems, scrollInfo.itemId)) return null;
     } else {
       if (findScrollInBag(ctx.bagItems) === null) return null;
     }
@@ -333,8 +331,7 @@ function canExecuteLegacyAction(action: ScriptAction, ctx: ScriptContext): boole
       if (action.scrollTownId) {
         const scrollInfo = TOWN_SCROLL_CONFIG[action.scrollTownId];
         if (!scrollInfo) return false;
-        const item = ctx.bagItems.find(b => b.name === scrollInfo.name);
-        return !!(item && item.amount > 0);
+        return hasBagItem(ctx.bagItems, scrollInfo.itemId);
       }
       return findScrollInBag(ctx.bagItems) !== null;
     }

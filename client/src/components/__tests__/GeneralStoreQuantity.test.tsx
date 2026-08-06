@@ -1,3 +1,4 @@
+import type { BagItem } from '../../models/bagItem';
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
@@ -5,6 +6,7 @@ import { GeneralStore } from '../town/GeneralStore';
 import { useGameStore, BAG_BASE_SLOTS } from '../../stores/gameStore';
 import { useTownStore } from '../../stores/townStore';
 import type { Character } from '../../models/character';
+import { bagItem, fillerBagItems } from '../../testing/bagFixtures';
 
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => [],
@@ -32,7 +34,7 @@ function testCharacter(gold: number): Character {
   };
 }
 
-function setup(gold: number, bagItems: { name: string; type: 'potion' | 'material'; amount: number }[] = []) {
+function setup(gold: number, bagItems: BagItem[] = []) {
   useGameStore.setState({
     character: testCharacter(gold),
     bagItems,
@@ -187,9 +189,7 @@ describe('雜貨店購買 — 購物車與底部結帳鈕', () => {
 
   it('背包欄位放不下新品項時擋下並說明原因', () => {
     // 背包塞滿不同品項，購買的新品項沒有格子可放
-    const full = Array.from({ length: BAG_BASE_SLOTS }, (_, i) => ({
-      name: `雜物${i}`, type: 'material' as const, amount: 1,
-    }));
+    const full = fillerBagItems(BAG_BASE_SLOTS);
     setup(100_000, full);
     setQty('紅色藥水', '1');
 
@@ -199,10 +199,8 @@ describe('雜貨店購買 — 購物車與底部結帳鈕', () => {
 
   it('已在背包裡的品項不佔新格子，背包滿了也能補貨', () => {
     const full = [
-      { name: '紅色藥水', type: 'potion' as const, amount: 1 },
-      ...Array.from({ length: BAG_BASE_SLOTS - 1 }, (_, i) => ({
-        name: `雜物${i}`, type: 'material' as const, amount: 1,
-      })),
+      bagItem('紅色藥水', 1),
+      ...fillerBagItems(BAG_BASE_SLOTS - 1),
     ];
     setup(100_000, full);
     setQty('紅色藥水', '3');
@@ -243,7 +241,7 @@ describe('雜貨店購買 — 購物車與底部結帳鈕', () => {
 });
 
 describe('雜貨店出售 — 購物車與底部結帳鈕', () => {
-  const BAG = [{ name: '紅色藥水', type: 'potion' as const, amount: 8 }];
+  const BAG = [bagItem('紅色藥水', 8)];
 
   it('可指定數量出售，金幣與剩餘數量正確', () => {
     setup(1_000, BAG);
@@ -283,8 +281,8 @@ describe('雜貨店出售 — 購物車與底部結帳鈕', () => {
 
   it('多品項可一次賣出', () => {
     setup(1_000, [
-      { name: '紅色藥水', type: 'potion', amount: 8 },
-      { name: '橙色藥水', type: 'potion', amount: 2 },
+      bagItem('紅色藥水', 8),
+      bagItem('橙色藥水', 2),
     ]);
     openSellTab();
     setQty('紅色藥水', '2');
@@ -301,12 +299,12 @@ describe('雜貨店出售 — 購物車與底部結帳鈕', () => {
   });
 
   it('持有量超過 999 的素材可用「全部」一次賣光', () => {
-    setup(0, [{ name: '品質石', type: 'material', amount: 1_200 }]);
+    setup(0, [bagItem('石像碎片', 1_200)]);
     openSellTab();
-    clickIn('品質石', '品質石 全部');
-    expect(qtyInput('品質石').value).toBe('1200');
+    clickIn('石像碎片', '石像碎片 全部');
+    expect(qtyInput('石像碎片').value).toBe('1200');
 
     fireEvent.click(checkoutBtn());
-    expect(useGameStore.getState().bagItems.find(b => b.name === '品質石')).toBeUndefined();
+    expect(useGameStore.getState().bagItems.find(b => b.name === '石像碎片')).toBeUndefined();
   });
 });

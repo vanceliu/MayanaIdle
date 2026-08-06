@@ -11,8 +11,8 @@ export type RewardType = 'gold' | 'potion' | 'quality-stone' | 'enhancement-ston
 
 export interface QuestReward {
   type: RewardType;
+  /** 獎勵道具的 `ITEM_DEFINITIONS` id（`gold` 沒有）。名稱一律由 id 反查（§ 99.1） */
   itemId?: number;
-  itemName?: string;
   amount: number;
 }
 

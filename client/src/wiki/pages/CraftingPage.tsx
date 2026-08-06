@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useWeaponList, useArmorList } from '../hooks/useWikiData';
+import { useWeaponList, useArmorList, getWikiEquipmentPath } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
+import { getItemById } from '../../models/items';
 import '../components/WikiTable.css';
 
 // `06-equipment-acquire.md` § 6A.1：製作品階級為 T4~T7（中階 T4~T5 / 高階 T6~T7）
@@ -80,10 +81,7 @@ export function CraftingPage() {
 }
 
 function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) {
-  const isWeapon = item.type !== 'armor';
-  const detailPath = isWeapon
-    ? `/wiki/weapons/${encodeURIComponent(item.name)}`
-    : `/wiki/armor/${encodeURIComponent(item.name)}`;
+  const detailPath = getWikiEquipmentPath(item.name);
 
   return (
     <tr>
@@ -96,7 +94,7 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       <td>
         {item.craftPrerequisiteWeapon
           ? <span>
-              <Link className="wiki-link" to={`/wiki/weapons/${encodeURIComponent(item.craftPrerequisiteWeapon.name)}`}>
+              <Link className="wiki-link" to={getWikiEquipmentPath(item.craftPrerequisiteWeapon.name)}>
                 {item.craftPrerequisiteWeapon.name}
               </Link>
               ×{item.craftPrerequisiteWeapon.quantity}
@@ -105,14 +103,16 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       </td>
       <td>
         {item.craftMaterials?.map(mat => (
-          <CraftMaterialLink key={mat.name} name={mat.name} amount={mat.amount} />
+          <CraftMaterialLink key={mat.itemId} itemId={mat.itemId} amount={mat.amount} />
         )) || '-'}
       </td>
     </tr>
   );
 }
 
-function CraftMaterialLink({ name, amount }: { name: string; amount: number }) {
+function CraftMaterialLink({ itemId, amount }: { itemId: number; amount: number }) {
+  const name = getItemById(itemId)?.name;
+  if (!name) return null;
   return (
     <span style={{ marginRight: 8 }}>
       <Link className="wiki-link" to={`/wiki/items/${encodeURIComponent(name)}`}>

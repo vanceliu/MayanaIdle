@@ -13,36 +13,40 @@ import {
   keyToQuickSlotIndex,
 } from '../quickSlot';
 import { REGIONS } from '../mapData';
+import { getItemId } from '../items';
+
+/** 測試以名稱寫比較好讀，實際傳進去的一律是 id */
+const id = (name: string) => getItemId(name)!;
 
 describe('快捷鍵可放置的物品（§ 35.7）', () => {
   it('三種基礎藥水都可放，且轉成 potion 型別', () => {
     for (const [name, pt] of [['紅色藥水', 'red'], ['橙色藥水', 'orange'], ['白色藥水', 'white']] as const) {
-      expect(canQuickSlotItem('bag', name)).toBe(true);
-      expect(toQuickSlotEntry('bag', name)).toEqual({ kind: 'potion', potionType: pt });
+      expect(canQuickSlotItem('bag', id(name))).toBe(true);
+      expect(toQuickSlotEntry('bag', id(name))).toEqual({ kind: 'potion', potionType: pt });
     }
   });
 
   it('加速藥水與狀態解除道具可放', () => {
     for (const name of ['綠色藥水', '強化綠色藥水', '解毒藥水', '止血繃帶']) {
-      expect(canQuickSlotItem('bag', name), name).toBe(true);
+      expect(canQuickSlotItem('bag', id(name)), name).toBe(true);
     }
   });
 
   it('回城卷軸與百柱塔通行卷軸可放', () => {
-    expect(canQuickSlotItem('bag', '薄暮村回城卷軸')).toBe(true);
-    expect(canQuickSlotItem('bag', '百柱塔 11F 通行卷軸')).toBe(true);
+    expect(canQuickSlotItem('bag', id('薄暮村回城卷軸'))).toBe(true);
+    expect(canQuickSlotItem('bag', id('百柱塔 11F 通行卷軸'))).toBe(true);
   });
 
   it('沒有使用行為的物品放不進去', () => {
     for (const name of ['武器強化卷軸', '防具強化卷軸', '銀礦石', '品質石', '死神碎魂']) {
-      expect(canQuickSlotItem('bag', name), name).toBe(false);
-      expect(toQuickSlotEntry('bag', name), name).toBeNull();
+      expect(canQuickSlotItem('bag', id(name)), name).toBe(false);
+      expect(toQuickSlotEntry('bag', id(name)), name).toBeNull();
     }
   });
 
   it('裝備一律可放，但缺少 id 時無效', () => {
-    expect(toQuickSlotEntry('equipment', '鐵劍', 7)).toEqual({ kind: 'equipment', equipmentId: 7, name: '鐵劍' });
-    expect(toQuickSlotEntry('equipment', '鐵劍')).toBeNull();
+    expect(toQuickSlotEntry('equipment', -1, 7, '鐵劍')).toEqual({ kind: 'equipment', equipmentId: 7, name: '鐵劍' });
+    expect(toQuickSlotEntry('equipment', -1)).toBeNull();
   });
 });
 
@@ -53,28 +57,28 @@ describe('快捷鍵點擊行為解析（§ 35.7）', () => {
   });
 
   it('加速藥水 → 走 useSpeedPotion', () => {
-    expect(resolveQuickSlotAction({ kind: 'bagItem', name: '綠色藥水' }))
+    expect(resolveQuickSlotAction({ kind: 'bagItem', itemId: id('綠色藥水') }))
       .toEqual({ type: 'speedPotion', speedType: 'green' });
-    expect(resolveQuickSlotAction({ kind: 'bagItem', name: '強化綠色藥水' }))
+    expect(resolveQuickSlotAction({ kind: 'bagItem', itemId: id('強化綠色藥水') }))
       .toEqual({ type: 'speedPotion', speedType: 'enhanced-green' });
   });
 
   it('狀態解除道具 → 走 useCureItem', () => {
-    expect(resolveQuickSlotAction({ kind: 'bagItem', name: '解毒藥水' }))
-      .toEqual({ type: 'cure', name: '解毒藥水' });
+    expect(resolveQuickSlotAction({ kind: 'bagItem', itemId: id('解毒藥水') }))
+      .toEqual({ type: 'cure', itemId: id('解毒藥水') });
   });
 
   it('回城卷軸 → 傳送回對應城鎮', () => {
-    expect(resolveQuickSlotAction({ kind: 'bagItem', name: '艾爾薩斯回城卷軸' }))
-      .toEqual({ type: 'townScroll', name: '艾爾薩斯回城卷軸' });
+    expect(resolveQuickSlotAction({ kind: 'bagItem', itemId: id('艾爾薩斯回城卷軸') }))
+      .toEqual({ type: 'townScroll', itemId: id('艾爾薩斯回城卷軸') });
   });
 
   it('百柱塔通行卷軸 → 直飛對應區段', () => {
-    const action = resolveQuickSlotAction({ kind: 'bagItem', name: '百柱塔 11F 通行卷軸' });
+    const action = resolveQuickSlotAction({ kind: 'bagItem', itemId: id('百柱塔 11F 通行卷軸') });
     expect(action).toEqual({
       type: 'travel',
       regionId: 'hundred-pillar-11-20f',
-      scrollName: '百柱塔 11F 通行卷軸',
+      scrollItemId: id('百柱塔 11F 通行卷軸'),
     });
   });
 
@@ -85,22 +89,21 @@ describe('快捷鍵點擊行為解析（§ 35.7）', () => {
 
   it('空格與無行為物品回 null', () => {
     expect(resolveQuickSlotAction(null)).toBeNull();
-    expect(resolveQuickSlotAction({ kind: 'bagItem', name: '武器強化卷軸' })).toBeNull();
+    expect(resolveQuickSlotAction({ kind: 'bagItem', itemId: id('武器強化卷軸') })).toBeNull();
   });
 });
 
 describe('通行卷軸 → region 反查', () => {
-  it('每一個設定了 entryScrollName 的區域都反查得到', () => {
-    const gated = REGIONS.filter(r => r.entryScrollName);
+  it('每一個設定了 entryScrollItemId 的區域都反查得到', () => {
+    const gated = REGIONS.filter(r => r.entryScrollItemId);
     expect(gated.length).toBeGreaterThan(0);
     for (const r of gated) {
-      expect(getEntryScrollRegion(r.entryScrollName!), r.name).toBe(r.id);
+      expect(getEntryScrollRegion(r.entryScrollItemId!), r.name).toBe(r.id);
     }
   });
 
   it('非通行卷軸反查不到', () => {
-    expect(getEntryScrollRegion('紅色藥水')).toBeUndefined();
-    expect(getEntryScrollRegion('紅色藥水')).toBeUndefined();
+    expect(getEntryScrollRegion(id('紅色藥水'))).toBeUndefined();
   });
 });
 
@@ -124,7 +127,7 @@ describe('快捷鍵設定正規化（§ 35.7）', () => {
   });
 
   it('規則改變後已不可用的物品會被剔除', () => {
-    const out = normalizeQuickSlots([{ kind: 'bagItem', name: '武器強化卷軸' }]);
+    const out = normalizeQuickSlots([{ kind: 'bagItem', itemId: id('武器強化卷軸') }]);
     expect(out[0]).toBeNull();
   });
 
@@ -138,15 +141,15 @@ describe('輔助函式', () => {
   it('isSameQuickSlotEntry 依類型比對', () => {
     expect(isSameQuickSlotEntry({ kind: 'potion', potionType: 'red' }, { kind: 'potion', potionType: 'red' })).toBe(true);
     expect(isSameQuickSlotEntry({ kind: 'potion', potionType: 'red' }, { kind: 'potion', potionType: 'white' })).toBe(false);
-    expect(isSameQuickSlotEntry({ kind: 'bagItem', name: 'A' }, { kind: 'bagItem', name: 'A' })).toBe(true);
+    expect(isSameQuickSlotEntry({ kind: 'bagItem', itemId: id('A') }, { kind: 'bagItem', itemId: id('A') })).toBe(true);
     expect(isSameQuickSlotEntry({ kind: 'equipment', equipmentId: 1, name: 'X' }, { kind: 'equipment', equipmentId: 1, name: 'Y' })).toBe(true);
-    expect(isSameQuickSlotEntry({ kind: 'equipment', equipmentId: 1, name: 'X' }, { kind: 'bagItem', name: 'X' })).toBe(false);
+    expect(isSameQuickSlotEntry({ kind: 'equipment', equipmentId: 1, name: 'X' }, { kind: 'bagItem', itemId: id('X') })).toBe(false);
     expect(isSameQuickSlotEntry(null, null)).toBe(false);
   });
 
   it('getQuickSlotItemName 回顯示名稱', () => {
     expect(getQuickSlotItemName({ kind: 'potion', potionType: 'orange' })).toBe('橙色藥水');
-    expect(getQuickSlotItemName({ kind: 'bagItem', name: '解毒藥水' })).toBe('解毒藥水');
+    expect(getQuickSlotItemName({ kind: 'bagItem', itemId: id('解毒藥水') })).toBe('解毒藥水');
     expect(getQuickSlotItemName({ kind: 'equipment', equipmentId: 1, name: '鐵劍' })).toBe('鐵劍');
   });
 });

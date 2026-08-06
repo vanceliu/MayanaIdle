@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ZONES, REGIONS, getZone, getRegion, getRegionsByZone, getMonstersAtLocation, getRequiredScrollName, getNearestTown } from '../mapData';
+import { ZONES, REGIONS, getZone, getRegion, getRegionsByZone, getMonstersAtLocation, getRequiredScrollItemId, getNearestTown } from '../mapData';
 
 describe('mapData', () => {
   describe('zones', () => {
@@ -138,8 +138,8 @@ describe('mapData', () => {
       expect(monsters).toContain('大莫蜘蛛');
     });
 
-    it('getRequiredScrollName returns null for non-scroll regions', () => {
-      expect(getRequiredScrollName('ivory-tower', 1)).toBeNull();
+    it('getRequiredScrollItemId returns null for non-scroll regions', () => {
+      expect(getRequiredScrollItemId('ivory-tower', 1)).toBeNull();
     });
   });
 

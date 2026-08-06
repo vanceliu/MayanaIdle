@@ -7,8 +7,8 @@ import { formatMaterialUsage } from '../../systems/craftMaterialUsage';
  * 必然互相犧牲，所以用途另開這個標記（`30-items.md` § 素材 iconTier 對照）。
  * 背包與雜貨店共用，避免兩邊各自實作而顯示不一致。
  */
-export function CraftUsageBadge({ name, compact = false }: { name: string; compact?: boolean }) {
-  const usage = formatMaterialUsage(name);
+export function CraftUsageBadge({ itemId, compact = false }: { itemId: number; compact?: boolean }) {
+  const usage = formatMaterialUsage(itemId);
   if (!usage) return null;
 
   return (

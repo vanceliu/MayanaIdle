@@ -4,6 +4,7 @@ import { generateCharacterUuid } from '../models/characterIdentity';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
+import { ITEM_DEFINITIONS } from './seed/itemSeeds';
 
 
 export interface UserEntry {
@@ -87,6 +88,32 @@ export interface LegacyArchiveEntry {
   dataVersion: number;
   archivedAt: number;
   payload: string;
+}
+
+/**
+ * 詞綴升階與品質提升移交印記師（`46-sigil.md` § 46.1）時三個道具一併改名，並改歸 `scroll`。
+ *
+ * 當時背包／倉庫是**用名字當 key** 的，舊名留在玩家的 IndexedDB 裡就等於這批道具
+ * 永遠找不到，所以改名必須連同存量一起遷移。v15 之後鍵已改為 `itemTemplateId`
+ * （`99-ai-constraints.md` § 99.1），往後改名不再需要這種遷移；這段留著是給
+ * 尚未升到 v14 的舊資料用的。
+ */
+export const LEGACY_ITEM_RENAMES: Record<string, string> = {
+  品質石: '工藝印記',
+  強化石: '精鍊印記',
+  強化印記: '突破印記',
+};
+
+/** 存著道具名的三張表（角色背包／角色倉庫／共用倉庫） */
+export const RENAMED_ITEM_TABLES = ['characterBag', 'characterStorage', 'warehouses'] as const;
+
+/** 就地改名並修正分類。純函式，讓遷移邏輯能單獨測試。 */
+export function renameLegacyItemRow(row: Record<string, unknown>): void {
+  const newName = LEGACY_ITEM_RENAMES[row.name as string];
+  if (!newName) return;
+  row.name = newName;
+  // 改名的同時改歸類：三者現在都是 scroll（seed 的 category 同步改過）
+  if (row.type === 'material') row.type = 'scroll';
 }
 
 export class GameDB extends Dexie {
@@ -204,6 +231,47 @@ export class GameDB extends Dexie {
     // 資料淘汰走 dataVersion 這條線，兩者互相獨立。
     this.version(13).stores({
       legacyArchives: '++id, userId, type, archivedAt',
+    });
+    this.version(14).stores({}).upgrade(async tx => {
+      for (const table of RENAMED_ITEM_TABLES) {
+        await tx.table(table).toCollection().modify(renameLegacyItemRow);
+      }
+    });
+    /**
+     * 背包／倉庫改以 `itemTemplateId` 為鍵（`99-ai-constraints.md` § 99.1）。
+     *
+     * **只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填 ——
+     * 名稱反查正是這次要拔掉的東西，為了搶救少數早期列而留一條名稱路徑，
+     * 等於把問題原封不動帶進新設計。往後只認 id。
+     *
+     * 有 id 的列順便對齊 seed：`name` 與 `type` 都由 id 反查重寫，
+     * 清掉 v14 之前存進來的舊名與錯誤分類。id 已不在 seed 的同樣廢棄。
+     */
+    this.version(15).stores({
+      characterBag: '++id, characterId, name, type, itemTemplateId',
+      characterStorage: '++id, characterId, name, type, itemTemplateId',
+      warehouses: '++id, userId, name, type, storageType, characterId, itemTemplateId',
+    }).upgrade(async tx => {
+      const byId = new Map(ITEM_DEFINITIONS.map(i => [i.id, i]));
+
+      for (const table of RENAMED_ITEM_TABLES) {
+        await tx.table(table).toCollection().modify(function (this: { value?: unknown }, row: Record<string, unknown>) {
+          // 金幣列沒有對應道具（倉庫用 name: 'gold' 存餘額），不參與遷移
+          if (row.type === 'gold' || row.type === 'equipment') return;
+
+          const def = typeof row.itemTemplateId === 'number'
+            ? byId.get(row.itemTemplateId)
+            : undefined;
+          if (!def) {
+            delete this.value;
+            return;
+          }
+          row.name = def.name;
+          row.type = def.category === 'dungeon' ? 'scroll'
+            : def.category === 'other' ? 'material'
+            : def.category;
+        });
+      }
     });
   }
 }

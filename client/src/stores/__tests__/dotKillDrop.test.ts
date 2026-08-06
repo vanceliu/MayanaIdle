@@ -344,9 +344,9 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
     await waitForPendingDrops();
 
     expect(useGameStore.getState().bagItems).toContainEqual({
+      itemId: 135,
       name: '百柱塔 11F 通行卷軸',
       type: 'scroll',
-      itemTemplateId: 135,
       amount: 1,
     });
   });
@@ -382,9 +382,9 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
     await waitForPendingDrops();
 
     expect(useGameStore.getState().bagItems).toContainEqual({
+      itemId: 132,
       name: '磨刀石',
       type: 'material',
-      itemTemplateId: 132,
       amount: 1,
     });
   });

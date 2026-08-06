@@ -7,6 +7,7 @@ import type { MonsterInstance } from '../../models/monster';
 import type { Skill } from '../../models/skill';
 import type { ActiveEffect } from '../../models/effect';
 import type { CombatScriptContext, PersistentScriptContext, EmergencyRetreatContext } from '../scriptRunner';
+import { bagItem } from '../../testing/bagFixtures';
 
 function createChar(overrides: Partial<Character> = {}): Character {
   return {
@@ -100,9 +101,9 @@ describe('evaluatePersistentScript', () => {
       lastPotionUsedAt: 0,
       now: 10000,
       bagItems: [
-        { name: '紅色藥水', type: 'potion', amount: 5 },
-        { name: '橙色藥水', type: 'potion', amount: 3 },
-        { name: '白色藥水', type: 'potion', amount: 1 },
+        bagItem('紅色藥水', 5),
+        bagItem('橙色藥水', 3),
+        bagItem('白色藥水', 1),
       ],
       activeEffects: [],
       ...overrides,
@@ -225,14 +226,14 @@ describe('evaluateEmergencyRetreat', () => {
     const ctx = createCtx({
       character: createChar({ hp: 25, maxHp: 100 }),
       effectiveMaxHp: 200,
-      bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+      bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toEqual(defaultRetreat);
 
     // 若誤用基礎 maxHp，25% 會高於門檻而不撤退
     const wrong = createCtx({
       character: createChar({ hp: 25, maxHp: 100 }),
-      bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+      bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, wrong)).toBeNull();
   });
@@ -245,7 +246,7 @@ describe('evaluateEmergencyRetreat', () => {
   it('returns retreat when HP below threshold and scroll available', () => {
     const ctx = createCtx({
       character: createChar({ hp: 10, maxHp: 100 }),
-      bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+      bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toEqual(defaultRetreat);
   });
@@ -262,7 +263,7 @@ describe('evaluateEmergencyRetreat', () => {
     const retreat: EmergencyRetreat = { ...defaultRetreat, scrollTownId: 'neutral-town' };
     const ctx = createCtx({
       character: createChar({ hp: 10, maxHp: 100 }),
-      bagItems: [{ name: '薄暮村回城卷軸', type: 'scroll', amount: 1 }],
+      bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(retreat, ctx)).toEqual(retreat);
   });
@@ -271,7 +272,7 @@ describe('evaluateEmergencyRetreat', () => {
     const retreat: EmergencyRetreat = { ...defaultRetreat, scrollTownId: 'neutral-town' };
     const ctx = createCtx({
       character: createChar({ hp: 10, maxHp: 100 }),
-      bagItems: [{ name: '艾爾薩斯回城卷軸', type: 'scroll', amount: 1 }],
+      bagItems: [bagItem('艾爾薩斯回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(retreat, ctx)).toBeNull();
   });

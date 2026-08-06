@@ -3,6 +3,7 @@ import { useGameStore } from '../../stores/gameStore';
 import type { AdventurerQuest, AdventurerQuestDifficulty, QuestTownId } from '../../models/adventurerQuest';
 import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties } from '../../models/adventurerQuest';
 import { getPointsToNextRank } from '../../systems/adventurerQuestSystem';
+import { getItemById } from '../../models/items';
 
 function QuestDescription({ description }: { description: string }) {
   const parts = description.split(/(\*\*[^*]+\*\*)/g);
@@ -18,23 +19,28 @@ function QuestDescription({ description }: { description: string }) {
   );
 }
 
+/** 獎勵道具的顯示名。一律由 id 反查 seed（§ 99.1），不在任務資料裡固化名稱 */
+function rewardItemName(reward: AdventurerQuest['reward']): string {
+  return reward.itemId != null ? getItemById(reward.itemId)?.name ?? '未知道具' : '未知道具';
+}
+
 function RewardPreview({ quest }: { quest: AdventurerQuest }) {
   const { reward } = quest;
   switch (reward.type) {
     case 'gold':
       return <span className="quest-reward">💰 {reward.amount} 金幣</span>;
     case 'potion':
-      return <span className="quest-reward">🧪 {reward.itemName} ×{reward.amount}</span>;
+      return <span className="quest-reward">🧪 {rewardItemName(reward)} ×{reward.amount}</span>;
     case 'quality-stone':
-      return <span className="quest-reward">💎 品質石 ×{reward.amount}</span>;
+      return <span className="quest-reward">💎 {rewardItemName(reward)} ×{reward.amount}</span>;
     case 'enhancement-stone':
-      return <span className="quest-reward">🔮 強化石 ×{reward.amount}</span>;
+      return <span className="quest-reward">🔮 {rewardItemName(reward)} ×{reward.amount}</span>;
     case 'weapon-scroll':
-      return <span className="quest-reward">📜 武器強化卷軸 ×{reward.amount}</span>;
+      return <span className="quest-reward">📜 {rewardItemName(reward)} ×{reward.amount}</span>;
     case 'armor-scroll':
-      return <span className="quest-reward">📜 防具強化卷軸 ×{reward.amount}</span>;
+      return <span className="quest-reward">📜 {rewardItemName(reward)} ×{reward.amount}</span>;
     case 'crafting-material':
-      return <span className="quest-reward">🔧 {reward.itemName} ×{reward.amount}</span>;
+      return <span className="quest-reward">🔧 {rewardItemName(reward)} ×{reward.amount}</span>;
   }
 }
 

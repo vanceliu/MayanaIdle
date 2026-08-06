@@ -7,7 +7,9 @@ import { useGameStore } from '../../stores/gameStore';
 import { BAG_DRAG_MIME, encodeBagDrag, type BagDragPayload } from '../../models/bagLayout';
 import { QUICK_SLOT_COUNT, emptyQuickSlots } from '../../models/quickSlot';
 import type { EquipmentInstance } from '../../models/equipment';
+import { bagItem } from '../../testing/bagFixtures';
 
+import { getItemId } from '../../models/items';
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => EQUIPMENT_SEEDS,
 }));
@@ -41,7 +43,7 @@ describe('QuickSlotBar', () => {
   beforeEach(() => {
     useGameStore.setState({
       quickSlots: emptyQuickSlots(),
-      bagItems: [{ name: '紅色藥水', type: 'potion', amount: 5 }],
+      bagItems: [bagItem('紅色藥水', 5)],
       inventory: [],
     });
   });
@@ -68,7 +70,7 @@ describe('QuickSlotBar', () => {
   it('把背包藥水拖到空格 → 綁定該格', () => {
     render(<QuickSlotBar />);
     const target = slots()[3];
-    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', amount: 5 });
+    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 5 });
 
     fireEvent.dragOver(target, { dataTransfer: dt });
     fireEvent.drop(target, { dataTransfer: dt });
@@ -79,7 +81,7 @@ describe('QuickSlotBar', () => {
   it('拖到第 10 格（鍵盤 0）也能綁定', () => {
     render(<QuickSlotBar />);
     const target = slots()[QUICK_SLOT_COUNT - 1];
-    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', amount: 5 });
+    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 5 });
 
     fireEvent.dragOver(target, { dataTransfer: dt });
     fireEvent.drop(target, { dataTransfer: dt });
@@ -91,7 +93,7 @@ describe('QuickSlotBar', () => {
   it('拖入不可放置的物品時不綁定', () => {
     render(<QuickSlotBar />);
     const target = slots()[0];
-    const dt = dataTransferWith({ kind: 'bag', name: '武器強化卷軸', amount: 1 });
+    const dt = dataTransferWith({ kind: 'bag', name: '武器強化卷軸', itemId: getItemId('武器強化卷軸'), amount: 1 });
 
     fireEvent.dragOver(target, { dataTransfer: dt });
     fireEvent.drop(target, { dataTransfer: dt });
@@ -101,7 +103,7 @@ describe('QuickSlotBar', () => {
 
   it('同一個物品拖到新格時，舊格自動清空', () => {
     render(<QuickSlotBar />);
-    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', amount: 5 });
+    const dt = dataTransferWith({ kind: 'bag', name: '紅色藥水', itemId: getItemId('紅色藥水'), amount: 5 });
 
     fireEvent.dragOver(slots()[1], { dataTransfer: dt });
     fireEvent.drop(slots()[1], { dataTransfer: dt });
@@ -131,7 +133,7 @@ describe('滑鼠兩段確認（§ 35.7.5）', () => {
     useGameStore.setState({
       quickSlots: emptyQuickSlots().map((_, i) =>
         i === 0 ? { kind: 'potion' as const, potionType: 'red' as const } : null),
-      bagItems: [{ name: '紅色藥水', type: 'potion', amount: 5 }],
+      bagItems: [bagItem('紅色藥水', 5)],
       inventory: [],
       // 藥水冷卻是全域共用（`30-items.md`），跨測試會殘留，必須重置
       lastPotionUsedAt: 0,

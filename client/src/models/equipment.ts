@@ -115,7 +115,8 @@ export type CraftTier = 'entry' | 'mid' | 'top';
 export type ShopTier = 'low' | 'mid' | 'high';
 
 export interface CraftMaterial {
-  name: string;
+  /** 材料的 `ITEM_DEFINITIONS` id。存 id 不存名稱，道具改名不必動配方 */
+  itemId: number;
   amount: number;
 }
 
@@ -244,6 +245,14 @@ export function isOffhandDefenseType(type: string): boolean {
  */
 export function isWeaponEquipment(slot: EquipSlot, type: string): boolean {
   return isHandSlot(slot) && !isOffhandDefenseType(type);
+}
+
+/**
+ * 分類是防具 —— 一般防具＋盾牌／魔導書／臂甲（`06-equipment.md` § 副手裝備）。
+ * 與 `isWeaponEquipment` 互補，Wiki 分頁與素材用途連結都用這條分界。
+ */
+export function isArmorEquipment(slot: EquipSlot, type: string): boolean {
+  return !isWeaponEquipment(slot, type);
 }
 
 export type EquippedGear = Partial<Record<EquipSlot, EquipmentInstance | null>>;

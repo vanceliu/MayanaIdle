@@ -2,6 +2,7 @@ import { useGameStore } from '../stores/gameStore';
 import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, ScriptDebuffCondition } from '../models/scriptEngine';
 import { SCRIPT_DEBUFF_LABELS } from '../models/scriptEngine';
 import { CURE_ITEMS } from '../models/cureItem';
+import { getItemById } from '../models/items';
 import type { PotionType, SpeedPotionType } from '../stores/gameStore';
 import { ALL_TOWN_SCROLLS } from '../models/townScroll';
 
@@ -175,7 +176,7 @@ export function PersistentScriptEditor() {
                     const defaults: Partial<PersistentAction> = { type: newType };
                     if (newType === 'potion') defaults.potionType = 'red';
                     if (newType === 'speed_potion') defaults.speedPotionType = 'green';
-                    if (newType === 'cure_item') defaults.cureItemName = CURE_ITEMS[0].name;
+                    if (newType === 'cure_item') defaults.cureItemId = CURE_ITEMS[0].itemId;
                     updateAction(idx, defaults);
                   }}
                 >
@@ -205,11 +206,11 @@ export function PersistentScriptEditor() {
                 )}
                 {rule.action.type === 'cure_item' && (
                   <select
-                    value={rule.action.cureItemName ?? CURE_ITEMS[0].name}
-                    onChange={e => updateAction(idx, { cureItemName: e.target.value })}
+                    value={rule.action.cureItemId ?? CURE_ITEMS[0].itemId}
+                    onChange={e => updateAction(idx, { cureItemId: Number(e.target.value) })}
                   >
                     {CURE_ITEMS.map(c => (
-                      <option key={c.name} value={c.name}>{c.name}</option>
+                      <option key={c.itemId} value={c.itemId}>{getItemById(c.itemId)?.name ?? c.name}</option>
                     ))}
                   </select>
                 )}

@@ -1,9 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate, getDropItemName } from '../hooks/useWikiData';
-import { EQUIPMENT_SEEDS } from '../../db/seed';
-
-const ARMOR_NAMES = new Set(EQUIPMENT_SEEDS.filter(e => e.type === 'armor').map(e => e.name));
+import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate, getDropItemName, getWikiEquipmentPath } from '../hooks/useWikiData';
 import { CLASS_SKILLS } from '../../models/classSkills';
+import { getItemById } from '../../models/items';
 import { getSkillBookLevel, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import '../components/WikiTable.css';
@@ -269,9 +267,7 @@ function BossDropSection({ bossName }: { bossName: string }) {
                     equipLink = `/wiki/armor?tier=${tierParam}`;
                   }
                 } else if (d.equipmentTemplateId) {
-                  equipLink = ARMOR_NAMES.has(name)
-                    ? `/wiki/armor/${encodeURIComponent(name)}`
-                    : `/wiki/weapons/${encodeURIComponent(name)}`;
+                  equipLink = getWikiEquipmentPath(name);
                 }
               }
               return [(
@@ -350,9 +346,7 @@ function AreaDropSection({ area }: { area: string }) {
                     equipLink = `/wiki/armor?tier=${tierParam}`;
                   }
                 } else if (d.equipmentTemplateId) {
-                  equipLink = ARMOR_NAMES.has(name)
-                    ? `/wiki/armor/${encodeURIComponent(name)}`
-                    : `/wiki/weapons/${encodeURIComponent(name)}`;
+                  equipLink = getWikiEquipmentPath(name);
                 }
               }
               return [(
@@ -428,7 +422,7 @@ function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[]
           <tbody>
             {books.map(b => (
               <tr key={b.id}>
-                <td>{b.bookName}</td>
+                <td>{getItemById(b.bookItemId)?.name ?? '—'}</td>
                 <td>{CLASS_LABELS_BOOK[b.className]}</td>
                 <td className="cell-number">{b.classLevel}</td>
               </tr>

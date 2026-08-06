@@ -1,12 +1,19 @@
 import type { MapLocation } from '../models/area';
-import type { BagItem } from '../stores/gameStore';
-import { getRegion, getRequiredScrollName } from '../models/mapData';
+import type { BagItem } from '../models/bagItem';
+import { hasBagItem, consumeBagItem } from '../models/bagItem';
+import { getRegion, getRequiredScrollItemId } from '../models/mapData';
+import { getItemById } from '../models/items';
 import { isRegionUnlockEnabled } from './devFlags';
 
 export interface NavigationResult {
   success: boolean;
   error?: string;
-  scrollConsumed?: string;
+  /** 要扣掉的卷軸 id（沒有就不扣） */
+  scrollConsumed?: number;
+}
+
+function scrollName(itemId: number): string {
+  return getItemById(itemId)?.name ?? '通行卷軸';
 }
 
 export function canNavigateTo(
@@ -22,12 +29,11 @@ export function canNavigateTo(
     return { success: true };
   }
 
-  if (region.entryScrollName && !isRegionUnlockEnabled()) {
-    const hasScroll = bagItems.some(b => b.name === region.entryScrollName && b.amount > 0);
-    if (!hasScroll) {
-      return { success: false, error: `需要「${region.entryScrollName}」才能前往` };
+  if (region.entryScrollItemId && !isRegionUnlockEnabled()) {
+    if (!hasBagItem(bagItems, region.entryScrollItemId)) {
+      return { success: false, error: `需要「${scrollName(region.entryScrollItemId)}」才能前往` };
     }
-    return { success: true, scrollConsumed: region.entryScrollName };
+    return { success: true, scrollConsumed: region.entryScrollItemId };
   }
 
   if (region.type === 'dungeon' && target.floor != null) {
@@ -36,13 +42,12 @@ export function canNavigateTo(
     }
 
     if (region.requiresScroll && region.scrollSegmentSize) {
-      const scrollName = getRequiredScrollName(region.id, target.floor);
-      if (scrollName) {
-        const hasScroll = bagItems.some(b => b.name === scrollName && b.amount > 0);
-        if (!hasScroll) {
-          return { success: false, error: `需要「${scrollName}」才能前往` };
+      const scrollItemId = getRequiredScrollItemId(region.id, target.floor);
+      if (scrollItemId) {
+        if (!hasBagItem(bagItems, scrollItemId)) {
+          return { success: false, error: `需要「${scrollName(scrollItemId)}」才能前往` };
         }
-        return { success: true, scrollConsumed: scrollName };
+        return { success: true, scrollConsumed: scrollItemId };
       }
     }
   }
@@ -50,11 +55,6 @@ export function canNavigateTo(
   return { success: true };
 }
 
-export function consumeScroll(bagItems: BagItem[], scrollName: string): BagItem[] {
-  return bagItems.map(item => {
-    if (item.name === scrollName) {
-      return { ...item, amount: item.amount - 1 };
-    }
-    return item;
-  }).filter(item => item.amount > 0);
+export function consumeScroll(bagItems: BagItem[], scrollItemId: number): BagItem[] {
+  return consumeBagItem(bagItems, scrollItemId);
 }

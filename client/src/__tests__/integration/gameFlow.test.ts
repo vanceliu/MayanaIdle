@@ -233,7 +233,7 @@ describe('Integration: Script Engine Automation', () => {
       skills: [],
       lastPotionUsedAt: 0,
       now: 10000,
-      bagItems: [{ name: '紅色藥水', type: 'potion', amount: 5 }],
+      bagItems: [{ itemId: 1, name: '紅色藥水', type: 'potion', amount: 5  }],
     });
 
     expect(result).toEqual({ type: 'potion', potionType: 'red' });
@@ -256,8 +256,8 @@ describe('Integration: Script Engine Automation', () => {
       lastPotionUsedAt: 0,
       now: 10000,
       bagItems: [
-        { name: '紅色藥水', type: 'potion', amount: 5 },
-        { name: '薄暮村回城卷軸', type: 'scroll', amount: 3 },
+        { itemId: 1, name: '紅色藥水', type: 'potion', amount: 5  },
+        { itemId: 4, name: '薄暮村回城卷軸', type: 'scroll', amount: 3  },
       ],
     });
 
