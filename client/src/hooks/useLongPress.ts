@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 /**
- * 長按＝右鍵（行動裝置支援，`34-ui-guidelines.md` § 34.8）。
+ * 長按＝右鍵（行動裝置支援，`47-mobile.md`）。
  *
  * 背包與快捷格的次要動作（設快捷鍵／丟棄／清除）本來只有右鍵入口，
  * 手機沒有右鍵，這些功能在觸控裝置上等於不存在。

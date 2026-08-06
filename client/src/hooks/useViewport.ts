@@ -94,6 +94,15 @@ export function useIsMobile(): boolean {
   return useViewport().isMobile;
 }
 
+/**
+ * 非 hook 版本，給 effect 裡的一次性量測用（例如 `useHudBand`）。
+ *
+ * 斷點仍然只有這一個出處 —— 呼叫端不可自己拼 media query 字串。
+ */
+export function isMobileViewport(): boolean {
+  return query(QUERIES.mobile);
+}
+
 /** 測試用：清掉快取的快照，讓下一次 render 重新讀 matchMedia */
 export function resetViewportSnapshot(): void {
   snapshot = DESKTOP;

@@ -9,7 +9,7 @@ import { registerServiceWorker } from './registerServiceWorker'
 // 開機就把存下來的介面／文字倍率套進 CSS 變數，避免先用預設大小閃一下
 initDisplaySettings()
 
-// 離線可玩 + 可安裝到主畫面（§ 34.8）。開發模式會自行跳過
+// 離線可玩 + 可安裝到主畫面（`47-mobile.md`）。開發模式會自行跳過
 registerServiceWorker()
 
 /**

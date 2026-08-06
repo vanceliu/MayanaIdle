@@ -87,16 +87,21 @@ describe('GameLayout 版面（§ 32.3）', () => {
     expect(island.querySelector('.build-label')).toBeNull();
   });
 
-  it('底部中央：探索控制 + 快捷格；右下：面板按鈕 + 系統按鈕（版本號在 Wiki 旁）', () => {
+  it('底部中央：探索控制 + 快捷格；右下：面板按鈕 + 系統設定鈕', () => {
     const { container } = render(<GameLayout isInTown={false} />);
 
     expect(container.querySelector('.hud-bottomcenter .explore-bar-slot .explore-bar')).toBeTruthy();
     expect(container.querySelector('.hud-bottomcenter .quick-slot-bar')).toBeTruthy();
     expect(container.querySelector('.hud-bottomright .panel-dock')).toBeTruthy();
 
+    /*
+     * `47-mobile.md`：Wiki／匯出／匯入／登出／版本號已搬進設定視窗的「帳號」頁，
+     * 右下只留一顆 ⚙ —— 它們一局裡按不到一次，不該佔常駐位置。
+     */
     const toolbar = container.querySelector('.hud-bottomright .game-toolbar')!;
-    expect(toolbar.firstElementChild?.className).toContain('build-label');
-    expect(toolbar.querySelector('.btn-wiki')).toBeTruthy();
+    expect(toolbar.querySelector('.btn-settings')).toBeTruthy();
+    expect(toolbar.querySelector('.btn-wiki')).toBeNull();
+    expect(toolbar.querySelector('.build-label')).toBeNull();
   });
 
   it('戰鬥日誌是獨立的可拖曳視窗，城鎮與野外都在', () => {
@@ -117,13 +122,13 @@ describe('GameLayout 版面（§ 32.3）', () => {
 });
 
 /**
- * 行動版版面（§ 34.8）。
+ * 行動版版面（`47-mobile.md`）。
  *
  * 兩條 HUD 帶在桌機是 `display: contents`（容器不存在，四座島各自貼角），
  * 手機才成形。這裡把關的是**結構**：島仍在帶子裡、島內容沒有因為換版面而搬家。
  * 實際的排版由 CSS 的斷點負責，jsdom 不套用外部樣式表，測不到也不該在這裡測。
  */
-describe('行動版 HUD 帶（§ 34.8）', () => {
+describe('行動版 HUD 帶（47-mobile）', () => {
   it('上方帶包住左上與右上兩座島', () => {
     const { container } = render(<GameLayout isInTown={false} />);
     const bar = container.querySelector('.game-layout > .hud-topbar')!;

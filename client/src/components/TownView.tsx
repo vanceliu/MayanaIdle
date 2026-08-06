@@ -2,6 +2,7 @@ import { useGameStore } from '../stores/gameStore';
 import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
 import { useTownStore } from '../stores/townStore';
 import { getRegion } from '../models/mapData';
+import { useIsMobile } from '../hooks/useViewport';
 import { GeneralStore } from './town/GeneralStore';
 import { Inn } from './town/Inn';
 import { ArmorShop } from './town/ArmorShop';
@@ -65,6 +66,14 @@ export function TownView() {
   // 設施列與設施視窗一起提到最上層（§ 32.15）
   const zIndex = useWindowZIndex('town');
   const focusWindow = useWindowLayerStore(s => s.focusWindow);
+  /**
+   * 手機把設施列改成**右側往下長的圖示直排**（`47-mobile.md`）。
+   *
+   * 橫排在 393px 寬得捲兩三次才看得完，而它整條橫在地圖上方會蓋掉那一帶的 NPC。
+   * 直排靠右只佔一條窄帶，十一個設施一次全看得到、也全點得到 ——
+   * 不必再收合，因此沒有展開狀態。
+   */
+  const isMobile = useIsMobile();
 
   if (!char) return null;
 
@@ -72,13 +81,18 @@ export function TownView() {
   const townName = region?.name ?? '城鎮';
   const isNeutralTown = char.currentRegion === 'neutral-town';
   const visibleFacilities = isNeutralTown ? [...FACILITIES, STARTER_NPC_FACILITY] : FACILITIES;
-
   return (
     <div className="town-view" style={{ zIndex }} onPointerDown={() => focusWindow('town')}>
-      <div className="town-header">
-        <span className="town-name">{townName}</span>
-        <span className="town-subtitle">安全區域</span>
-      </div>
+      {/*
+        * 標題列在手機不渲染：`目前: {城鎮名}` 已經在地圖選擇器上，
+        * 同一個資訊在半個螢幕寬的畫面裡不值得再佔一列（`47-mobile.md`）。
+        */}
+      {!isMobile && (
+        <div className="town-header">
+          <span className="town-name">{townName}</span>
+          <span className="town-subtitle">安全區域</span>
+        </div>
+      )}
 
       <div className="town-npc-bar">
         {visibleFacilities.map(f => (

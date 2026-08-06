@@ -1,6 +1,7 @@
 import { useGameStore } from '../stores/gameStore';
-import { usePanelWindowStore } from '../stores/panelWindowStore';
+import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
+import { PanelDockFace } from './PanelDockFace';
 import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
@@ -30,8 +31,10 @@ export function QuestTrackerButton() {
       className={`panel-dock-btn quest-tracker-btn ${isOpen ? 'active' : ''}`}
       aria-pressed={isOpen}
       onClick={() => toggle('quest', isMobile)}
+      {...panelButtonA11y('quest')}
     >
-      📋 任務
+      {/* 圖示與文字兩者都畫，由 CSS 決定顯示哪一個（`47-mobile.md`） */}
+      <PanelDockFace panelKey="quest" />
       {totalQuests > 0 && (
         <span className="quest-count-badge">{totalQuests}</span>
       )}

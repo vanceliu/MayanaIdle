@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { BagDragPayload } from '../models/bagLayout';
 
 /**
- * 指標拖放（`34-ui-guidelines.md` § 34.8）。
+ * 指標拖放（`47-mobile.md`）。
  *
  * 取代原本的 HTML5 drag-and-drop：`draggable` + `dragstart/drop` 這一套
  * **在觸控裝置上完全不會觸發**，手機玩家等於失去背包重排、快捷格綁定與丟棄。

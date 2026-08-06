@@ -192,7 +192,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | `.hud-topright` | `MapNavigation`（寬度必須與下拉選單一致，見下） |
 | `CombatLogWindow` | 左下角，**可拖曳**（見 § 32.3.1） |
 | `.hud-bottomcenter` | `ExploreBar` ＋ `QuickSlotBar`（10 格一排） |
-| `.hud-bottomright` | `PanelDock`（3×2）＋ `GameToolbar`（版本號在 Wiki 左邊） |
+| `.hud-bottomright` | `PanelDock`（六顆一列）＋ `GameToolbar`（只剩 ⚙），合起來是一整排（`47-mobile.md` § 47.6） |
 
 > **HUD 容器不可吃滑鼠事件。** `.town-view` 曾因為保留舊的 `height: 100%`
 > 又改成絕對定位，變成一塊 830×滿高的透明板壓在地圖上，玩家完全點不到地圖與 NPC。
@@ -860,6 +860,11 @@ interface TooltipProps {
 探索與城鎮共用同一容器，因此兩種情境下 buff 位置一致。
 容器 `pointer-events: none` 不擋地圖點擊，icon 自身開啟 hover tooltip。
 
+**icon 一律往下疊，不往右長**（`.buff-row` 是 `flex-direction: column`，桌機與手機一致）。
+橫排會沿著角色卡的寬度往右伸，效果一多就整片橫在畫面上方、把地圖的上緣整條吃掉；
+往下長則只佔左邊一條 44px 的窄帶。手機更明顯 —— 狀態卡只剩半個螢幕寬（`47-mobile.md`），
+橫排到第五顆就會伸進右半邊壓住地圖選擇器與怪物卡。
+
 ### 行為
 
 - 讀取 Zustand store 中的 `activeEffects[]`（`type === 'buff'` 且 `target === 'player'`）
@@ -954,13 +959,20 @@ interface TooltipProps {
   那是「這台機器上的使用習慣」而不是角色資料。**開關狀態與 z 順序仍不持久化**
   （每次進遊戲從乾淨畫面開始，與背包格子順序一致）
 
-#### 位置持久化的三個必要細節
+#### 位置持久化的四個必要細節
 
 | 問題 | 作法 |
 |---|---|
 | 拖曳時每個 `pointermove` 都呼叫 `setPosition` | 寫入 **debounce 300ms**；另外掛 `pagehide` 立即 flush，關分頁不掉最後一筆 |
-| 換到不同大小的瀏覽器視窗 | 存檔一併記下**當時的視窗尺寸**，載入時 `scalePositions()` 等比例換算。<br>只換算左上角，超出邊界交給 `FloatingWindow` 掛載時的 clamp 收尾 |
+| 換到不同大小的瀏覽器視窗 | 存檔一併記下**當時的視窗尺寸**，載入時 `scalePositions()` 等比例換算。<br>只換算左上角，超出邊界交給 `FloatingWindow` 的 clamp 收尾 |
 | 存檔壞掉／新增 PanelKey 後缺格 | `restoreLayout()` **逐面板**驗證，壞的那一格退回預設值，<br>不整份丟掉 —— 舊存檔缺新面板是正常升級路徑 |
+| **預設座標本身就可能在畫面外** | `DEFAULT_POSITIONS` 是以寬螢幕排出來的錯開座標（任務面板 x=1576），<br>1600 以下的機器直接用會有一半被裁掉。一律經 `clampedDefaults(viewport)`，<br>`resetPositions()` 與載入的 fallback 都走它 |
+
+**`FloatingWindow` 的 clamp 不可只在掛載時跑一次。** 位置也會被外部改掉
+（「重設視窗位置」），面板已經開著時就沒有人把關，視窗會有一半停在畫面外 ——
+而 `.game-layout` 是 `overflow: hidden`，露出去的部分是被**裁掉**而不是可以捲過去。
+改成訂閱 `position` 變化；拖曳中不介入（拖曳自己已經夾過），
+`clamp()` 是冪等的所以不會無限迴圈。
 
 存檔格式：
 
@@ -1033,6 +1045,12 @@ interface TooltipProps {
 
 ---
 
+**開啟視窗必須同時提到堆疊最上層。** 「點到誰誰就到最上層」是靠 `onPointerDown`
+維持的，但**開啟**這個動作發生在別的元件上（底部的面板按鈕），沒人通知堆疊 ——
+剛開的面板會被上一個被點過的視窗蓋住。`FloatingWindow` 因此在掛載時
+呼叫一次 `focusWindow()`。手機最明顯：面板是滿版 sheet，
+城鎮設施列卻整條浮在它上面（`47-mobile.md`）。
+
 ## 32.16 自動腳本浮動視窗（ScriptEditorPanel）
 
 > **設計變更（使用者要求）**：原本明定「腳本編輯為設定用途，維持置中 overlay modal、
@@ -1066,43 +1084,32 @@ interface TooltipProps {
 
 ## 32.17 行動裝置模組邊界
 
-行動裝置支援走**響應式單一版面**，規範全文見 `34-ui-guidelines.md` § 34.8。
-這裡只定模組邊界：
+規範見 `47-mobile.md`，這裡只定模組邊界。
 
 | 模組 | 職責 | 邊界 |
 |---|---|---|
 | `hooks/useViewport.ts` | `isMobile` / `isTouch` / `orientation` 的**唯一真相來源** | 其他元件不得自己 `matchMedia` 或讀 `window.innerWidth` |
-| `hooks/useLongPress.ts` | 長按＝右鍵。右鍵路徑與長按進同一個 handler | 不碰版面，只產生一組 pointer handlers |
+| `hooks/useLongPress.ts` | 長按＝右鍵 | 不碰版面，只產生一組 pointer handlers |
+| `hooks/useHudBand.ts` | HUD 讓位距離的量測（`47-mobile.md` § 47.5.2） | 帶子成形（手機）時量整條帶子，否則逐一量島內元素 |
 | `stores/dragStore.ts` | 指標拖放的狀態與落點命中測試 | 只知道 `data-drop-kind` 這個 DOM 契約，不知道背包／快捷格的語意 |
-| `components/DragGhost.tsx` | 跟著指標跑的殘影 | 掛在 `GameLayout` 最外層，portal 到 body（來源面板會被 `zoom` 縮放） |
-| `hooks/useHudBand.ts` | `--hud-band-bottom` / `--hud-band-top` 的量測 | 帶子成形（手機）時量整條帶子，否則逐一量島內元素 |
+| `components/DragGhost.tsx` | 拖曳殘影 | 掛在 `GameLayout` 最外層，portal 到 body（來源面板會被 `zoom` 縮放） |
+| `components/PanelDockFace.tsx` | 面板按鈕的圖示＋文字 | 三處共用；可及屬性放在 `stores/panelWindowStore.ts`，避免這個檔案同時匯出元件與純函式 |
+| `components/GameToolbar.tsx` | 右下角的 `⚙` | 只負責開設定視窗；系統動作全部在 `AccountSettings` 裡 |
+| `components/AccountSettings.tsx` | 設定視窗的「帳號」頁 | 匯出入的確認流程（`19-account-character.md` § 19.9）跟著搬過來，一字未改 |
+| `components/BuildLabel.tsx` | 建置版本標示 | 從 `App.tsx` 抽出；`App.tsx` 仍轉出同名匯出 |
+| `public/sw.js` | Service Worker | **不經過 Vite 處理**，不可用 `import`／`import.meta.env` |
+| `src/registerServiceWorker.ts` | SW 註冊入口 | 由 `main.tsx` 在開機時呼叫 |
 
-`.hud-topbar` / `.hud-bottombar` 兩個容器在桌機是 `display: contents` ——
-容器從版面樹上消失，四座島仍各自貼角，§ 32.3 的版面一個 px 都沒有改變。
+**行動版的 HUD 島一律 `position: relative`，不可用 `static`：**
+`static` 元素的 `z-index` 無效，地圖選擇器的視窗層級（§ 32.15）會失效。
+relative 會讓桌機那組貼角座標重新生效，因此 `top/right/bottom/left` 必須一併歸零。
+
+**`.hud-topbar` 不給 `z-index`：** 給了就建立堆疊脈絡，把裡面地圖選擇器的
+視窗層級關在那一層裡。
+
+**`.hud-topbar` / `.hud-bottombar` 在桌機是 `display: contents`：**
+容器從版面樹上消失，四座島仍各自貼角，§ 32.3 的版面不受影響。
 用它而不是條件渲染，是為了不讓兩種版面各長一份 JSX。
-
-## 32.18 PWA（可安裝／離線）
-
-規範見 `34-ui-guidelines.md` § 34.8，這裡只定模組邊界與硬性要求。
-
-| 檔案 | 角色 |
-|---|---|
-| `public/manifest.webmanifest` | 安裝資訊（名稱、圖示、`start_url`／`scope` 都在 `/MayanaIdle/` 底下） |
-| `public/sw.js` | Service Worker。**不經過 Vite 處理**，因此不可用 `import`／`import.meta.env` |
-| `public/icons/` | `app-icon.svg`（來源）＋ 由它產出的 192／512 PNG |
-| `src/registerServiceWorker.ts` | 註冊入口，由 `main.tsx` 在開機時呼叫 |
-
-| 要求 | 原因 |
-|---|---|
-| SW 註冊網址帶 `?v=<build commit>` | 檔名不同瀏覽器才會視為新的 worker 而自動更新；SW 直接拿這個字串當快取版本，不必為了寫死版本號另加 build plugin |
-| **開發模式不註冊，並主動解除既有註冊** | SW 會把 Vite 的模組路徑一起快取，HMR 之後畫面停在舊版，症狀看起來像「改了沒生效」 |
-| **不做 `skipWaiting()`** | 遊戲跑起來之後才換掉 SW，會讓 lazy chunk（Wiki）去要一份已被新版部署換掉的檔名而 404 |
-| 導覽請求 network-first | `index.html` 沒有 content hash，快取優先會讓玩家一直停在舊版，而舊版指向的資產早就被換掉 |
-| 其餘同源資源 cache-first | 資產檔名帶 content hash，同一個檔名的內容永遠一樣，重新驗證沒有意義 |
-| 跨網域一律不碰 | 排行榜 API 的回應快取起來只會讓玩家看到過期名次 |
-| 圖示 SVG 的註解不可有連續兩個 ASCII 連字號 | XML 註解語法限制，違反時整份 SVG 解析失敗、圖示靜默變空白 |
-
-存檔本來就在 IndexedDB，因此「程式碼與素材進得了快取」等於**離線完整可玩**。
 
 ## 32.15 環境地圖模組邊界
 

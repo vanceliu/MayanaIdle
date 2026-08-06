@@ -87,7 +87,7 @@ export function moveBagSlot<T extends BagSlotItem>(
  *
  * `BagGridItem` 帶著 React 元素與裝備實例，不適合直接傳給落點處理；這裡只留必要欄位。
  *
- * 拖放走 Pointer Events（`34-ui-guidelines.md` § 34.8），負載是**在記憶體裡傳的物件**，
+ * 拖放走 Pointer Events（`47-mobile.md`），負載是**在記憶體裡傳的物件**，
  * 不再序列化 —— HTML5 拖放時代那組 MIME／`dataTransfer` 編解碼已隨機制一起移除。
  */
 export interface BagDragPayload {

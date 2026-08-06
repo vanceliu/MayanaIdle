@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AccountSettings } from './AccountSettings';
 import {
   useSettingsStore,
   SCALE_MIN,
@@ -9,11 +11,16 @@ import {
 import { usePanelWindowStore } from '../stores/panelWindowStore';
 
 /**
- * 顯示設定（`34-ui-guidelines.md` § 34.6）
+ * 系統設定（`34-ui-guidelines.md` § 34.6 / `47-mobile.md`）
  *
- * 介面大小與文字大小分兩條滑桿：想要「介面小、字大」是常見需求，合併成一條就做不到。
- * 拉動即時生效（CSS 變數），不需要按套用；設定存在 localStorage，跨角色共用。
+ * 兩個分頁：
+ * - **顯示**：介面大小與文字大小分兩條滑桿 —— 想要「介面小、字大」是常見需求，
+ *   合併成一條就做不到。拉動即時生效（CSS 變數），設定存 localStorage 跨角色共用。
+ * - **帳號**：Wiki／匯出／匯入／登出。這些原本是右下角常駐的一整排，
+ *   但一局裡大概按不到一次，收進來右下就只剩一顆 ⚙。
  */
+
+type SettingsTab = 'display' | 'account';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -24,6 +31,7 @@ function percent(scale: number): string {
 }
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
+  const [tab, setTab] = useState<SettingsTab>('display');
   const uiScale = useSettingsStore(s => s.uiScale);
   const fontScale = useSettingsStore(s => s.fontScale);
   const setUiScale = useSettingsStore(s => s.setUiScale);
@@ -41,10 +49,31 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <span className="modal-title">顯示設定</span>
+          <span className="modal-title">系統設定</span>
           <button className="modal-close" aria-label="關閉設定" onClick={onClose}>✕</button>
         </div>
 
+        {/* 頁籤樣式與城鎮面板共用 `.shop-tabs`（§ 34.1） */}
+        <div className="shop-tabs settings-tabs">
+          <button
+            className={tab === 'display' ? 'active' : ''}
+            aria-pressed={tab === 'display'}
+            onClick={() => setTab('display')}
+          >
+            顯示
+          </button>
+          <button
+            className={tab === 'account' ? 'active' : ''}
+            aria-pressed={tab === 'account'}
+            onClick={() => setTab('account')}
+          >
+            帳號
+          </button>
+        </div>
+
+        {tab === 'account' && <AccountSettings onClose={onClose} />}
+
+        {tab === 'display' && (
         <div className="settings-body">
           <div className="settings-row">
             <label htmlFor="setting-ui-scale">介面大小</label>
@@ -108,11 +137,15 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
           <p className="settings-note">設定會立即生效並自動記住，同一台裝置的所有角色共用。</p>
         </div>
+        )}
 
         <div className="settings-actions">
-          <button className="btn-secondary" onClick={resetDisplaySettings} disabled={isDefault}>
-            重設為 100%
-          </button>
+          {/* 「重設為 100%」只對顯示設定有意義，換頁時不該還留在畫面上 */}
+          {tab === 'display' && (
+            <button className="btn-secondary" onClick={resetDisplaySettings} disabled={isDefault}>
+              重設為 100%
+            </button>
+          )}
           <button className="btn-primary" onClick={onClose}>完成</button>
         </div>
       </div>

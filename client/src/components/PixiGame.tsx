@@ -335,7 +335,7 @@ export function PixiGame() {
       /*
        * § 35.5.3：從背包拖到地圖上＝丟棄（需確認）。
        * 地圖只是宣告自己是落點，實際的丟棄由拖曳來源（背包）在放開時發動 ——
-       * 指標拖放期間事件被來源 capture 住，這裡收不到任何 pointer 事件（§ 34.8）。
+       * 指標拖放期間事件被來源 capture 住，這裡收不到任何 pointer 事件（`47-mobile.md`）。
        */
       data-drop-kind="map"
     >

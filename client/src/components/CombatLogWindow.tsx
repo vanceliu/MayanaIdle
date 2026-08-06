@@ -87,7 +87,7 @@ export function resizeLogPosition(
  */
 export function CombatLogWindow() {
   /*
-   * 手機改成貼在下方 HUD 帶上的抽屜（`34-ui-guidelines.md` § 34.8）：
+   * 手機改成貼在下方 HUD 帶上的抽屜（`47-mobile.md`）：
    * 全寬、不可拖曳。393px 寬的畫面沒有「把視窗挪到不擋路的地方」這種空間，
    * 拖曳只會讓玩家把日誌弄丟。`▲` 的三段高度照舊 ——
    * 放大時蓋住地圖是刻意的設計，不因為換成手機就改掉。

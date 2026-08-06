@@ -8,10 +8,10 @@ import { installFakeViewport, uninstallFakeViewport, VIEWPORTS } from '../../tes
  */
 
 /**
- * § 34.8：觸控裝置沒有 hover。欄位說明、裝備詳情、技能數值全掛在 tooltip 上，
+ * `47-mobile.md`：觸控裝置沒有 hover。欄位說明、裝備詳情、技能數值全掛在 tooltip 上，
  * 少了 tap 路徑，這些內容在手機上等於不存在。
  */
-describe('Tooltip 觸控路徑（§ 34.8）', () => {
+describe('Tooltip 觸控路徑（47-mobile）', () => {
   afterEach(() => uninstallFakeViewport());
 
   function renderTip() {

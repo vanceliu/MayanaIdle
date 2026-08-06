@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { usePanelWindowStore } from '../stores/panelWindowStore';
+import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
+import { PanelDockFace } from './PanelDockFace';
 import { CombatScriptEditor } from './CombatScriptEditor';
 import { PersistentScriptEditor } from './PersistentScriptEditor';
 
@@ -28,8 +29,10 @@ export function ScriptEditorButton() {
       className={`panel-dock-btn script-panel-trigger ${isOpen ? 'active' : ''}`}
       aria-pressed={isOpen}
       onClick={() => toggle('script', isMobile)}
+      {...panelButtonA11y('script')}
     >
-      <span>自動腳本</span>
+      {/* 圖示與文字兩者都畫，由 CSS 決定顯示哪一個（`47-mobile.md`） */}
+      <PanelDockFace panelKey="script" />
       <span className="script-badge">{totalRules}</span>
     </button>
   );

@@ -4,9 +4,17 @@ import { useMonsterHudStore } from '../stores/monsterHudStore';
 import { GameIcon } from './GameIcon';
 import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
+import { useIsMobile } from '../hooks/useViewport';
 import type { ActiveEffect } from '../models/effect';
 
 const MAX_VISIBLE_DEBUFFS = 4;
+
+/**
+ * debuff icon 的邊長。手機的怪物卡縮到七成（`24-buff-debuff.md` § 24.8.3），
+ * icon 要跟著縮 —— `GameIcon` 的尺寸是 inline style，CSS class 蓋不過去，
+ * 只能在這裡分流。
+ */
+const DEBUFF_ICON_SIZE = { desktop: 24, mobile: 17 } as const;
 
 function formatTime(ms: number): string {
   return `${Math.max(0, Math.ceil(ms / 1000))}s`;
@@ -74,6 +82,7 @@ export function MonsterListOverlay() {
 }
 
 function MonsterDebuffIcon({ effect, now }: { effect: ActiveEffect; now: number }) {
+  const isMobile = useIsMobile();
   const remaining = effect.startTime + effect.duration - now;
   const isExpiring = remaining > 0 && remaining < 5000;
 
@@ -93,7 +102,10 @@ function MonsterDebuffIcon({ effect, now }: { effect: ActiveEffect; now: number 
         className={`monster-debuff-icon${isExpiring ? ' expiring' : ''}`}
         data-testid="monster-debuff-icon"
       >
-        <GameIcon name={getEffectIcon(effect.category)} size={24} />
+        <GameIcon
+          name={getEffectIcon(effect.category)}
+          size={isMobile ? DEBUFF_ICON_SIZE.mobile : DEBUFF_ICON_SIZE.desktop}
+        />
         <span className="monster-debuff-timer">{formatTime(remaining)}</span>
       </div>
     </Tooltip>

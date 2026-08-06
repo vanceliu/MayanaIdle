@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { FloatingWindow } from '../FloatingWindow';
 import { usePanelWindowStore } from '../../stores/panelWindowStore';
+import { useWindowLayerStore, getWindowZIndex } from '../../stores/windowLayerStore';
 import { installFakeViewport, uninstallFakeViewport, VIEWPORTS } from '../../testing/viewport';
 
 /**
@@ -9,14 +10,15 @@ import { installFakeViewport, uninstallFakeViewport, VIEWPORTS } from '../../tes
  */
 
 /**
- * § 34.8：手機把浮動視窗切成全螢幕 sheet。
+ * `47-mobile.md`：手機把浮動視窗切成全螢幕 sheet。
  *
  * 「可拖曳、可多開、無遮罩」是桌機的做法 —— 它預設玩家同時看得到地圖與好幾個面板。
  * 393px 寬連一個 420px 的面板都放不下，多開等於互相蓋住，拖曳也沒有空位可以拖過去。
  */
-describe('FloatingWindow sheet 模式（§ 34.8）', () => {
+describe('FloatingWindow sheet 模式（47-mobile）', () => {
   beforeEach(() => {
     usePanelWindowStore.getState().resetPositions();
+    useWindowLayerStore.setState({ order: [] });
   });
   afterEach(() => uninstallFakeViewport());
 
@@ -75,6 +77,24 @@ describe('FloatingWindow sheet 模式（§ 34.8）', () => {
     fireEvent.pointerUp(header, { clientX: 200, clientY: 300 });
 
     expect(usePanelWindowStore.getState().positions.bag).not.toEqual(before);
+  });
+
+  /**
+   * 迴歸：開啟這個動作發生在**別的元件**上（底部的面板按鈕），
+   * 沒人通知視窗堆疊（§ 32.15），剛開的面板會被上一個被點過的視窗蓋住 ——
+   * 手機更明顯：面板是滿版 sheet，城鎮設施列卻整條浮在它上面。
+   */
+  it('開啟時自動提到視窗堆疊最上層', () => {
+    installFakeViewport(VIEWPORTS.phonePortrait);
+    // 先讓城鎮視窗拿到最上層
+    useWindowLayerStore.getState().focusWindow('town');
+
+    renderWindow();
+
+    const order = useWindowLayerStore.getState().order;
+    expect(order[order.length - 1]).toBe('panel:bag');
+    expect(getWindowZIndex(order, 'panel:bag'))
+      .toBeGreaterThan(getWindowZIndex(order, 'town'));
   });
 
   it('sheet 模式仍然關得掉', () => {

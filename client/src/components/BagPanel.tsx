@@ -77,7 +77,7 @@ export function BagPanel() {
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
   /**
-   * 「移動」模式選中的格子（§ 34.8）。
+   * 「移動」模式選中的格子（`47-mobile.md`）。
    *
    * 觸控裝置**不做拖曳** —— 長按已經被次要選單佔走，再把拖曳疊上去只會互相誤觸，
    * 而背包格擠在一起、手指又比游標粗，拖錯格的成本比多點一下高。
@@ -275,7 +275,7 @@ export function BagPanel() {
   }
 
   /**
-   * 長按＝右鍵（§ 34.8）。手機沒有右鍵，不接這條路徑等於「設快捷鍵」與「丟棄」
+   * 長按＝右鍵（`47-mobile.md`）。手機沒有右鍵，不接這條路徑等於「設快捷鍵」與「丟棄」
    * 在手機上不存在。
    *
    * hook 只能在元件頂層呼叫，不能在 `layout.map()` 裡每格開一個，
@@ -361,7 +361,7 @@ export function BagPanel() {
     const justSelected = selectedId !== item.id;
     if (justSelected) setSelectedId(item.id);
     /*
-     * 觸控沒有 hover，物品詳情本來只掛在 hover tooltip 上（§ 34.8）——
+     * 觸控沒有 hover，物品詳情本來只掛在 hover tooltip 上（`47-mobile.md`）——
      * 手機玩家會完全看不到重量、詞綴、用途。改成「選取的同時把詳情叫出來」：
      * 第一次點＝選取＋看詳情，第二次點＝使用，正好是既有的兩段式流程。
      */
@@ -567,7 +567,7 @@ export function BagPanel() {
         <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
           {layout.map((item, idx) => {
             /* 落點是靠 `elementFromPoint` 命中這兩個 data 屬性，不是靠事件冒泡 ——
-               拖曳期間指標被來源格 capture 住，目標格收不到任何 pointer 事件（§ 34.8） */
+               拖曳期間指標被來源格 capture 住，目標格收不到任何 pointer 事件（`47-mobile.md`） */
             const dropProps = { 'data-drop-kind': 'bag-slot', 'data-drop-index': idx } as const;
             const overClass = dragOver?.kind === 'bag-slot' && dragOver.index === idx ? ' drag-over' : '';
             if (!item) {
@@ -674,7 +674,7 @@ export function BagPanel() {
                 <div className="context-menu-divider" />
               </>
             )}
-            {/* 觸控裝置沒有拖曳（§ 34.8），重排背包只剩這條路；滑鼠玩家也可以用 */}
+            {/* 觸控裝置沒有拖曳（`47-mobile.md`），重排背包只剩這條路；滑鼠玩家也可以用 */}
             <button
               className="context-menu-item"
               onClick={() => {

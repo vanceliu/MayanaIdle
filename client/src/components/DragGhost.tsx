@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { useDragStore } from '../stores/dragStore';
 
 /**
- * 跟著指標跑的拖曳殘影（`34-ui-guidelines.md` § 34.8）。
+ * 跟著指標跑的拖曳殘影（`47-mobile.md`）。
  *
  * HTML5 拖放時這件事由瀏覽器代勞；改成 pointer 拖放之後畫面上就什麼都不會動，
  * 玩家不知道自己抓著東西。

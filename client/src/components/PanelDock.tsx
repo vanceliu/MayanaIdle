@@ -1,6 +1,7 @@
 import { ScriptEditorButton } from './ScriptEditorPanel';
 import { QuestTrackerButton } from './QuestTracker';
-import { usePanelWindowStore, DOCK_PANEL_KEYS, PANEL_TITLES } from '../stores/panelWindowStore';
+import { usePanelWindowStore, DOCK_PANEL_KEYS, panelButtonA11y } from '../stores/panelWindowStore';
+import { PanelDockFace } from './PanelDockFace';
 import { useIsMobile } from '../hooks/useViewport';
 
 /**
@@ -11,7 +12,7 @@ import { useIsMobile } from '../hooks/useViewport';
 export function PanelDock() {
   const open = usePanelWindowStore(s => s.open);
   const toggle = usePanelWindowStore(s => s.toggle);
-  // 手機的 sheet 是滿版的，一次只留一個面板開著（§ 34.8）
+  // 手機的 sheet 是滿版的，一次只留一個面板開著（`47-mobile.md`）
   const isMobile = useIsMobile();
 
   return (
@@ -23,8 +24,9 @@ export function PanelDock() {
           className={`panel-dock-btn ${open[key] ? 'active' : ''}`}
           aria-pressed={open[key]}
           onClick={() => toggle(key, isMobile)}
+          {...panelButtonA11y(key)}
         >
-          {PANEL_TITLES[key]}
+          <PanelDockFace panelKey={key} />
         </button>
       ))}
       <ScriptEditorButton />

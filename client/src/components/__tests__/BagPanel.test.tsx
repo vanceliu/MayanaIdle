@@ -214,10 +214,10 @@ it('shows gold row when expanded', () => {
   });
 
   /**
-   * § 34.8：拖放改成 pointer-based（HTML5 拖放在觸控裝置上完全不觸發）。
+   * `47-mobile.md`：拖放改成 pointer-based（HTML5 拖放在觸控裝置上完全不觸發）。
    * 三個落點（背包格／快捷格／地圖）都由**拖曳來源**執行，這裡驗證背包格內重排。
    */
-  describe('指標拖放（§ 34.8）', () => {
+  describe('指標拖放（47-mobile）', () => {
     beforeEach(() => {
       useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3)], inventory: [] });
     });
@@ -276,7 +276,7 @@ it('shows gold row when expanded', () => {
     });
   });
 
-  /** § 34.8：觸控用的重排路徑 —— 長按開選單 →「移動到其他格」→ 點目標格 */
+  /** `47-mobile.md`：觸控用的重排路徑 —— 長按開選單 →「移動到其他格」→ 點目標格 */
   describe('移動模式（觸控重排）', () => {
     beforeEach(() => {
       useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3)], inventory: [] });

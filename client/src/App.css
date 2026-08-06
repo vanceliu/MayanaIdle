@@ -219,15 +219,56 @@ a,
 }
 
 /*
- * 上下兩條 HUD 帶的容器（`34-ui-guidelines.md` § 34.8）。
- *
- * 桌機是 `display: contents` —— 容器從版面樹上消失，四座島仍各自貼在角落，
- * 排版與加這層之前**完全相同**。手機才把它變成真正的容器把島疊起來。
- * 這樣兩種版面共用同一份 JSX，不必為手機另寫一組元件。
+ * 上方 HUD 帶：桌機是 `display: contents` —— 容器從版面樹上消失，
+ * 左上與右上兩座島仍各自貼在角落，排版與加這層之前**完全相同**。
+ * 手機才把它變成真正的容器把島疊起來（§ 34.8）。
  */
-.hud-topbar,
-.hud-bottombar {
+.hud-topbar {
   display: contents;
+}
+
+/*
+ * 下方 HUD 帶：**桌機也成形**，因為快捷格與面板列必須排在同一列。
+ *
+ * 兩者原本各自絕對定位（一個置中、一個貼右），寬度一加起來超過畫面就會**重疊** ——
+ * 面板列收成一排之後它變寬，1024px 寬的視窗上會蓋掉快捷格將近一半。
+ *
+ * 三欄格線讓快捷格置中而面板列靠右。左右兩欄用**預設的 `1fr`（最小寬＝內容寬）**
+ * 而不是 `minmax(0, 1fr)` —— 後者允許欄位縮到比內容窄，面板列就會往左溢出去
+ * 蓋住快捷格，等於格線白做。空間不夠時改成右欄先取足自己的寬度、
+ * 快捷格往左讓一點，這是「稍微偏一點」與「疊在一起」之間該選的那個。
+ */
+.hud-bottombar {
+  position: absolute;
+  z-index: 800;
+  left: 0;
+  right: 0;
+  bottom: calc(12px + var(--safe-bottom));
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: end;
+  gap: 8px;
+  padding: 0 calc(12px + var(--safe-right)) 0 calc(12px + var(--safe-left));
+  /* 帶子本身是透明容器，不可吃滑鼠事件（§ 32.3） */
+  pointer-events: none;
+}
+
+.hud-bottombar > .hud {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  transform: none;
+}
+
+.hud-bottombar > .hud-bottomcenter {
+  grid-column: 2;
+}
+
+.hud-bottombar > .hud-bottomright {
+  grid-column: 3;
+  justify-self: end;
 }
 
 /*
@@ -327,12 +368,18 @@ a,
   align-items: center;
 }
 
+/*
+ * 右下角是「面板按鈕列 ＋ ⚙」一整排（`34-ui-guidelines.md` § 34.8.1）。
+ * ⚙ 是那一列的第七顆，不自成一列 —— 系統動作全在設定視窗裡，
+ * 為了一顆鈕多開一列等於白白吃掉一截地圖高度。
+ */
 .hud-bottomright {
   z-index: 800;
   bottom: calc(12px + var(--safe-bottom));
   right: calc(12px + var(--safe-right));
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
 }
 
 /* 城鎮沒有探索控制，但仍保留這一格的位置，讓快捷格不會上下位移 */
@@ -549,10 +596,9 @@ a,
   backdrop-filter: blur(4px);
 }
 
-/* 右下面板按鈕：排成 3×2，跟參考圖一樣是方格區塊 */
+/* 右下面板按鈕：六顆排成一列，接在後面的是 ⚙（§ 34.8.1） */
 .hud-bottomright .panel-dock {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 6px;
   background: rgba(18, 18, 30, 0.82);
   backdrop-filter: blur(4px);
@@ -4178,6 +4224,22 @@ button.active {
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
+/*
+ * 面板按鈕同時畫圖示與文字，由斷點決定顯示哪一個（`34-ui-guidelines.md` § 34.8）。
+ * 桌機藏圖示 —— 這一版的外觀與加這層之前完全相同。
+ */
+.panel-dock-icon {
+  display: none;
+}
+
+/*
+ * 例外：任務鈕在桌機本來就長「📋 任務」，改用共用外觀之後不可以把它弄不見 ——
+ * 桌機的樣子是已定案的設計，不因為支援手機而改掉。
+ */
+.quest-tracker-btn .panel-dock-icon {
+  display: inline;
+}
+
 .panel-dock-btn:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent-primary);
@@ -4401,14 +4463,20 @@ button.active {
   pointer-events: none;
 }
 
-/* 一列裝一種：上排 buff、下排 debuff。超過角色卡寬度就換行往下疊 */
+/*
+ * 一組一列：上組 buff、下組 debuff，**兩組都往下疊，不往右長**。
+ *
+ * 原本是橫排換行。橫排會沿著角色卡的寬度往右伸，效果一多就整片橫在畫面上方，
+ * 把地圖的上緣整條吃掉；往下長則只佔左邊一條 44px 的窄帶，
+ * 地圖中央永遠是乾淨的。手機更明顯 —— 狀態卡只剩半個螢幕寬，
+ * 橫排到第五顆就會伸進右半邊壓住地圖選擇器與怪物卡。
+ */
 .buff-row {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   align-items: flex-start;
   gap: 6px;
-  max-width: 340px;
 }
 
 .buff-icon {
@@ -4691,6 +4759,41 @@ button.active {
   flex-shrink: 0;
 }
 
+/* ⚙ 與六顆面板按鈕同一列、同一套外觀（§ 34.8） */
+.game-toolbar .btn-settings {
+  min-width: var(--tap-target);
+}
+
+/* 設定視窗的分頁列與城鎮面板共用 `.shop-tabs`，只補一點間距 */
+.settings-tabs {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+/*
+ * 加了「帳號」頁之後內容變長，視窗可能高過畫面 —— 高過去的部分是被裁掉而不是
+ * 可以捲過去的，標題列與「完成」鈕會直接消失。捲軸給內容區，表頭與頁腳固定（§ 34.1）。
+ */
+.settings-modal {
+  max-height: calc(85 * var(--vh-unit, 1vh));
+}
+
+.settings-modal .settings-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* 帳號頁的動作鈕會換行（手機寬度放不下三顆） */
+.settings-control-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-build .build-label {
+  position: static;
+}
+
 .btn-wiki {
   display: inline-block;
   background: var(--bg-card);
@@ -4832,6 +4935,12 @@ button.active {
 .settings-actions {
   display: flex;
   justify-content: flex-end;
+  /*
+   * `align-items: center` 而不是預設的 `stretch`：頁腳的按鈕數量隨分頁變動
+   * （「顯示」多一顆「重設為 100%」），stretch 會讓較高的那顆把「完成」一起撐高，
+   * 換頁時同一顆按鈕忽大忽小。
+   */
+  align-items: center;
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
@@ -5462,6 +5571,51 @@ button.active {
    手機版面（斷點 768px，直向優先）
    ─────────────────────────────────────────────────────────── */
 
+/*
+ * 面板按鈕改圖示的**真正條件是「空間不足」，不是「手機」**。
+ * 文字版的一排七顆約 550px 寬，加上置中的快捷格（約 520px）在 1200px 以下
+ * 就會互相擠壓 —— 平板橫向與小筆電都中。
+ */
+@media (max-width: 1200px) {
+  .panel-dock-icon,
+  .quest-tracker-btn .panel-dock-icon {
+    display: inline;
+  }
+
+  .panel-dock-label {
+    display: none;
+  }
+
+  .hud-bottomright .panel-dock-btn {
+    padding: 6px 10px;
+    font-size: var(--fs-lg);
+    line-height: 1;
+  }
+
+  /*
+   * 三欄格線改成**上下堆疊**。
+   *
+   * 快捷格（約 536px）與面板列（圖示模式約 425px）加上留白要 1000px 才排得下，
+   * 1200 以下就開始互相擠壓 —— 症狀是最後一顆按鈕的數量 badge 被擠到溢出去。
+   * 擠不下就換行，不要硬塞在同一列。
+   */
+  .hud-bottombar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  /* 快捷格仍置中，面板列靠右 —— 與桌機同一列時的視覺位置一致 */
+  .hud-bottombar > .hud-bottomcenter {
+    align-items: center;
+  }
+
+  .hud-bottombar > .hud-bottomright {
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 767px) {
   /*
    * 兩條 HUD 帶在桌機是 `display: contents`（容器不存在，島各自貼角），
@@ -5469,55 +5623,121 @@ button.active {
    */
   .hud-topbar {
     position: absolute;
-    z-index: 20;
+    /*
+     * **刻意不給 z-index**：給了就會建立堆疊脈絡，把裡面地圖選擇器的
+     * 視窗層級（500 起跳）關在這一層的 20 裡面，下拉選單於是被
+     * 城鎮設施列（同樣 500 起跳，但在外層）蓋住。
+     * 島各自帶 z-index，帶子本身不需要。
+     */
     top: 0;
     left: 0;
     right: 0;
+    /*
+     * 左右兩欄：左邊狀態卡（＋BuffBar），右邊地圖選擇器。
+     *
+     * 原本是上下堆疊全寬，狀態卡一條就吃掉將近 150px 的地圖高度，
+     * 而它其實只有四條進度條，橫向根本用不到整個寬度。
+     * `align-items: flex-start` 讓右欄的選擇器貼齊上緣，不被左欄的高度撐開。
+     */
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 6px;
     padding: calc(var(--safe-top) + 6px) 8px 0;
     /* 上方帶**刻意疊在地圖上**：狀態卡本來就是半透明 HUD，
        讓它佔版面等於再吃掉一截本來就不多的地圖高度 */
     pointer-events: none;
   }
 
-  .hud-topbar > .hud {
-    position: static;
-    align-items: stretch;
-  }
-
   /* 島內元素撐滿寬度，狀態條與地圖選擇器才不會擠在左半邊 */
   .hud-topbar .status-panel,
   .hud-topbar .map-selector,
-  .hud-topbar .map-selector-trigger,
-  .hud-topbar .map-selector-dropdown {
+  .hud-topbar .map-selector-trigger {
     width: 100%;
     max-width: none;
+  }
+
+  /*
+   * 下拉選單往**左**展開到滿版。
+   *
+   * §32.3 要求選單與觸發鈕同寬，理由是「選單另設寬度會比鈕寬、貼在右上角時
+   * 頂出視窗外」。這裡靠 `right: 0` 往左長，不會頂出去，而區域名加等級
+   * （「艾爾薩斯領地 Lv.30~50」）在半個手機寬度裡是讀不了的。
+   */
+  /*
+   * 下拉選單在手機是**獨立的浮層**，不是接在觸發鈕下面的延伸。
+   *
+   * 桌機兩者同寬，所以選單去掉上邊框與上圓角、與鈕接成一體（§ 32.3）。
+   * 手機的觸發鈕只剩半個螢幕寬，選單卻要滿版才讀得下區域名 ——
+   * 接縫只會有一半對得上，看起來像浮在半空。改成四邊完整的卡片、
+   * 與鈕之間留一點距離，「沒對齊」這件事就不存在了。
+   */
+  .hud-topbar .map-selector-dropdown {
+    left: auto;
+    right: 0;
+    top: calc(100% + 6px);
+    width: calc(100 * var(--vw-unit) - 16px);
+    max-width: none;
+    border-top: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+  }
+
+  /*
+   * 左右各半。
+   *
+   * 這也順帶解掉「buff 一多就把選擇器往下推、夾在一堆圖示中間」——
+   * 兩者現在在不同欄，左欄長多高都不會動到右欄的選擇器。
+   */
+  .hud-topbar > .hud-topleft,
+  .hud-topbar > .hud-topright {
+    flex: 1 1 50%;
+    min-width: 0;
+  }
+
+  /* 直排本身寫在基底（桌機也一樣往下長），手機只收緊間距 */
+  .buff-row {
+    gap: 4px;
   }
 
   /*
    * 下方帶**不疊在地圖上**：快捷格與面板按鈕是手機唯一的操作入口，
    * 半透明地蓋在會動的地圖上根本看不清楚。地圖讓出這段高度。
    */
+  /*
+   * 手機的下方帶是**實心**的（有底色與上緣線）—— 這條帶是唯一的觸控入口，
+   * 半透明地蓋在會動的地圖上根本看不清楚，所以地圖讓出這段高度（`.stage-area`
+   * 讀 `--hud-band-bottom`）。上下堆疊本身由 1200px 那條負責。
+   */
   .hud-bottombar {
-    position: absolute;
-    z-index: 800;
-    left: 0;
-    right: 0;
     bottom: 0;
-    display: flex;
-    flex-direction: column;
     gap: 4px;
     padding: 6px 8px calc(6px + var(--safe-bottom));
     background: var(--bg-panel);
     border-top: 1px solid var(--border);
-    pointer-events: none;
+  }
+
+  /* 手機的面板列要撐滿寬度（六顆等分），不是靠右 */
+  .hud-bottombar > .hud-bottomright {
+    justify-content: stretch;
+  }
+
+  /*
+   * 上方帶的島也要 `position: relative` 而不是 `static`：地圖選擇器靠 inline
+   * z-index 決定自己在視窗堆疊裡的位置（§ 32.15），而 **z-index 對 static 無效** ——
+   * 用 static 會讓下拉選單被城鎮設施列的標題蓋掉。
+   * relative 會讓桌機那組貼角座標重新生效，四個方向一律歸零。
+   */
+  .hud-topbar > .hud {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    align-items: stretch;
   }
 
   .hud-bottombar > .hud {
-    position: static;
-    transform: none;
     align-items: stretch;
   }
 
@@ -5558,9 +5778,8 @@ button.active {
 
   /*
    * 面板按鈕列＝底部 tab bar：六顆一列排完。
-   * 選擇器必須帶上 `.hud-bottomright` —— 桌機的 3×2 格線寫在
-   * `.hud-bottomright .panel-dock`，特異度比單一個 `.panel-dock` 高，
-   * 不跟上就會維持兩列，白白吃掉 50px 的地圖高度。
+   * 選擇器必須帶上 `.hud-bottomright` —— 桌機的排法寫在
+   * `.hud-bottomright .panel-dock`，特異度比單一個 `.panel-dock` 高，不跟上會被蓋掉。
    */
   .hud-bottomright .panel-dock {
     display: flex;
@@ -5569,23 +5788,43 @@ button.active {
     padding: 4px 6px;
   }
 
-  .panel-dock-btn {
+  /*
+   * 手機的六顆等分寬度撐滿（圖示模式本身由 1200px 那條負責）。
+   *
+   * 選擇器要**限定在 `.panel-dock` 之內** —— ⚙ 也掛 `.panel-dock-btn`
+   * （為了長得跟那六顆一樣），跟著吃到 `min-width: 0` 就會被壓到 33px，
+   * 低於命中區下限。它不等分，寬度由自己的內容決定。
+   */
+  .hud-bottomright .panel-dock > .panel-dock-btn {
     flex: 1 1 0;
     min-width: 0;
-    padding: 8px 2px;
-    font-size: var(--fs-xs);
-    /* 「自動腳本」四個字在 60px 寬的格子裡會換行，斷在字元邊界而不是溢出 */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 6px 2px;
   }
 
-  /* 系統按鈕（Wiki／匯出／匯入／設定／登出）是低頻操作，縮成一列小鈕 */
-  .game-toolbar {
-    width: 100%;
-    justify-content: center;
-    flex-wrap: wrap;
+  /*
+   * ⚙ 併進面板按鈕那一列（第七顆）。
+   *
+   * 系統動作全部在設定視窗裡（§ 34.8），所以這裡不再需要收合選單 ——
+   * 手機與桌機共用同一個「面板按鈕列 ＋ ⚙」結構。
+   */
+  /* 手機的按鈕列要撐滿寬度、六顆等分；桌機是靠內容決定寬度 */
+  .hud-bottomright {
     gap: 4px;
+  }
+
+  .hud-bottomright .panel-dock {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .hud-bottomright .game-toolbar {
+    flex: 0 0 auto;
+  }
+
+  .game-toolbar .btn-settings {
+    padding: 6px 10px;
+    font-size: var(--fs-lg);
+    line-height: 1;
   }
 
   /*
@@ -5635,31 +5874,32 @@ button.active {
     padding: 12px 8px calc(var(--hud-band-bottom, 140px) + 12px);
   }
 
-  /* 城鎮的 NPC 快捷列一樣改單列橫捲，不然七八個設施會排成三列蓋住地圖 */
-  .town-npc-bar {
-    max-width: calc(100 * var(--vw-unit) - 16px);
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .town-npc-bar::-webkit-scrollbar {
-    display: none;
-  }
 
   /*
    * 城鎮設施列改貼在**上方 HUD 帶下面**。桌機它停在畫面正上方 12px，
    * 手機的狀態卡是全寬的，設施列就整條蓋在 HP／MP／EXP 上面。
    */
+  /*
+   * 設施列靠右，起點在角色卡下緣（與怪物卡同一條線）。
+   * 高度給到下方 HUD 帶為止，超過就在列內捲動。
+   */
   .town-view {
-    /* 停在上方帶下面。帶高隨 buff 數量與字級變動，由 `useHudBandBottom()`
-       量測後寫進 `--hud-band-top`，不可寫死 */
-    top: calc(var(--hud-band-top, 200px) + 6px);
-    /* `height: 100%` 是這個元素的舊值（見 § 32.3 的警告），它會讓這條列
-       變成一塊滿高的板子，設施列被推到看不到的地方 */
+    top: calc(var(--hud-card-bottom, 160px) + 6px);
+    /*
+     * 下緣停在**戰鬥日誌抽屜之上**，不是 HUD 帶之上 ——
+     * 抽屜蓋在地圖上（刻意的設計），只算到帶子會有最後幾顆圖示躲在日誌底下，
+     * 看得到卻點不到。
+     *
+     * `.town-view` 是 `.game-layout` 的子節點（不是 `.stage-area` 的），
+     * 定位基準是**整個視窗**，所以 HUD 帶與日誌兩段都要自己扣。
+     */
+    bottom: calc(var(--hud-band-bottom, 140px) + var(--hud-log-height, 130px) + 6px);
+    left: auto;
+    right: 8px;
+    /* `height: 100%` 是這個元素的舊值（見 § 32.3 的警告），
+       留著會讓它變成一塊滿高的板子，把設施列推到看不到的地方 */
     height: auto;
-    left: 0;
-    right: 0;
+    align-items: flex-end;
     transform: none;
   }
 
@@ -5672,6 +5912,101 @@ button.active {
    */
   .explore-bar-slot.is-hidden {
     display: none;
+  }
+
+  /*
+   * 城鎮設施列改成**右側往下長的圖示直排**。
+   *
+   * 橫排在 393px 寬得捲兩三次才看得完，而它整條橫在地圖上方會蓋掉那一帶的 NPC。
+   * 直排靠右只佔一條窄帶，十一個設施一次全看得到、也全點得到。
+   *
+   * 起點與怪物卡同一條線（角色卡下緣）—— 城鎮沒有怪，兩者不會打架。
+   */
+  .town-npc-bar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 4px;
+    /* 設施多到超過畫面時可捲；容器本身要收事件才捲得動 */
+    max-height: 100%;
+    overflow-y: auto;
+    scrollbar-width: none;
+    pointer-events: auto;
+  }
+
+  .town-npc-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 只留圖示：名稱由 `title`／`aria-label` 承載，地圖上的 NPC 也標著同一個名字 */
+  .town-npc-bar .town-npc-btn {
+    flex: 0 0 auto;
+    min-width: var(--tap-target);
+    min-height: var(--tap-target);
+    padding: 4px;
+  }
+
+  .town-npc-bar .npc-label {
+    display: none;
+  }
+
+  /*
+   * 怪物卡改成**貼在狀態卡下方、靠右的直向列**（`24-buff-debuff.md` § 24.8.3）。
+   *
+   * 原本是「地圖上方置中、換行堆疊」：手機的上方 HUD 帶正好蓋在那裡，卡片被壓在
+   * 狀態卡底下看不到；就算讓開，168px 的卡片在 393px 寬只排得下兩張，
+   * 十隻怪就是五列、蓋掉半個地圖。
+   *
+   * 改成靠右的窄直欄之後，地圖的左半與中央永遠是乾淨的 ——
+   * 玩家真正在看的是自己那顆球與周圍的怪，那都在左中央。
+   *
+   * 排不下時往**左**長出第二欄（`flex-wrap` + `align-content: flex-end`），
+   * 而不是溢出到日誌底下 —— 所有怪都要看得到（§ 24.8.3）。
+   */
+  .monster-list-overlay {
+    /*
+     * 錨在**角色卡的下緣**（`--hud-card-bottom`）—— 這就是「放在使用者的下方」。
+     *
+     * 用右欄下緣（地圖選擇器）會貼得太上面，卡片跟選擇器擠在一起；
+     * 用整條帶下緣則會被左欄的 buff 一路往下推。角色卡的高度是固定的，
+     * 剛好是這兩者之間那個穩定的參考線。
+     */
+    top: calc(var(--hud-card-bottom, 160px) + 6px);
+    left: auto;
+    right: 8px;
+    transform: none;
+    max-width: calc(100% - 16px);
+    max-height: calc(100% - var(--hud-card-bottom, 160px) - var(--hud-log-height, 130px) - 18px);
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-content: flex-end;
+    justify-content: flex-start;
+    gap: 4px;
+  }
+
+  /* 縮到七成：卡片只是「誰、剩多少血、中了什麼」，不需要桌機那個尺寸 */
+  .monster-card {
+    width: 118px;
+    padding: 4px 7px 5px;
+    border-radius: var(--radius-sm);
+  }
+
+  .monster-card-name {
+    font-size: var(--fs-xs);
+  }
+
+  .monster-card-hp {
+    height: 6px;
+    margin-top: 3px;
+  }
+
+  .monster-debuff-icon {
+    width: 18px;
+  }
+
+  .monster-debuff-timer {
+    font-size: 9px;
   }
 
   /*
@@ -5691,10 +6026,17 @@ button.active {
     cursor: default;
   }
 
-  /* 預設高度砍半：手機的垂直空間本來就少，四五行日誌就夠看到剛剛發生什麼，
-     要看更多按 `▲` 展開（40dvh / 70dvh 兩段照舊） */
+  /*
+   * 預設高度砍半：手機的垂直空間本來就少，四五行日誌就夠看到剛剛發生什麼，
+   * 要看更多按 `▲` 展開（40dvh / 70dvh 兩段照舊）。
+   *
+   * 寬度要**跟抽屜齊**：`.bottom-log-wrap` 桌機是寫死的 420px，
+   * 抽屜是滿版的，不覆寫就會在右邊露出一條沒對齊的縫。
+   */
   .combat-log-window.is-drawer .bottom-log-wrap {
     height: 96px;
+    width: 100%;
+    max-width: none;
   }
 
   .combat-log-window.is-drawer .bottom-log-wrap.log-size-1 {
@@ -5711,7 +6053,6 @@ button.active {
    * 這一層吃 `zoom`，所以用 `--vw-unit` 而不是裸 vw（§ 34.6）。
    */
   .hud-topleft .status-panel,
-  .bottom-log-wrap,
   .modal-content,
   .settings-modal,
   .attribute-up-modal,

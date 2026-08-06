@@ -63,7 +63,7 @@ PWA 排在版面完成之後。
 
 ### Phase 3 — 文件與測試
 
-- [x] `34-ui-guidelines.md` 新增 § 34.8 行動版規範
+- [x] 新增 `47-mobile.md` 行動裝置適配（`34-ui-guidelines.md` § 34.8 只留指標）
 - [x] `16-tech-frontend-architecture.md` § 32.3 補行動版 HUD 與 `useViewport` 模組邊界
 - [x] `INDEX.md` 查表與連動關係圖同步
 - [x] 測試：`useViewport` / `useLongPress` / pointer 拖放 / sheet 模式 / 斷點版面

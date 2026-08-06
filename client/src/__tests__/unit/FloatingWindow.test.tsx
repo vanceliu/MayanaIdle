@@ -78,17 +78,36 @@ describe('FloatingWindow', () => {
   it('點到視窗會提到最上層（與戰鬥日誌／城鎮視窗共用堆疊，§ 32.15）', () => {
     renderBag();
     const win = screen.getByTestId('floating-window-bag') as HTMLElement;
+    /*
+     * 兩者的 z 一律**當下重算**，不可拿點擊前捕捉的值來比 ——
+     * 堆疊是相對順序，任何一次 focus 都會把所有人的數字往上推一格。
+     */
+    const zOf = (key: Parameters<typeof getWindowZIndex>[1]) =>
+      getWindowZIndex(useWindowLayerStore.getState().order, key);
 
-    // 先讓城鎮視窗在上面
+    // 先讓城鎮視窗在上面（視窗開啟時已自動置頂，所以這裡是把它蓋回去）
     useWindowLayerStore.getState().focusWindow('town');
-    const townZ = getWindowZIndex(useWindowLayerStore.getState().order, 'town');
-    expect(Number(win.style.zIndex)).toBeLessThan(townZ);
+    expect(Number(win.style.zIndex)).toBeLessThan(zOf('town'));
 
     fireEvent.pointerDown(win, { button: 0, pointerId: 1 });
 
-    const raised = getWindowZIndex(useWindowLayerStore.getState().order, 'panel:bag');
-    expect(raised).toBeGreaterThan(townZ);
-    expect(Number(win.style.zIndex)).toBe(raised);
+    expect(zOf('panel:bag')).toBeGreaterThan(zOf('town'));
+    expect(Number(win.style.zIndex)).toBe(zOf('panel:bag'));
+  });
+
+  /**
+   * 開啟這個動作發生在**別的元件**上（底部的面板按鈕），沒人通知堆疊 ——
+   * 剛開的面板會被上一個被點過的視窗蓋住。手機最明顯：面板是滿版 sheet，
+   * 城鎮設施列卻整條浮在它上面（`47-mobile.md`）。
+   */
+  it('開啟時就自動提到最上層，不必等玩家點一下', () => {
+    useWindowLayerStore.getState().focusWindow('town');
+    renderBag();
+
+    const order = useWindowLayerStore.getState().order;
+    expect(order[order.length - 1]).toBe('panel:bag');
+    expect(getWindowZIndex(order, 'panel:bag'))
+      .toBeGreaterThan(getWindowZIndex(order, 'town'));
   });
 
   it('拖曳標題列會更新位置', () => {

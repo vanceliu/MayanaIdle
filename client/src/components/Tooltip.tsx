@@ -81,7 +81,7 @@ export function Tooltip({ content, children, position = 'top', delay = 200 }: To
   }, []);
 
   /*
-   * 觸控裝置沒有 hover（§ 34.8）。所有欄位說明、裝備詳情、技能數值都掛在 tooltip 上，
+   * 觸控裝置沒有 hover（`47-mobile.md`）。所有欄位說明、裝備詳情、技能數值都掛在 tooltip 上，
    * 不補這條路徑等於這些內容在手機上完全看不到。
    *
    * 開著的時候點畫面任一處就收掉 —— 觸控沒有「移開」這個動作，

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { useState } from 'react';
 import { render, fireEvent, act } from '@testing-library/react';
 import { useLongPress, LONG_PRESS_MS } from '../useLongPress';
 
@@ -6,19 +7,21 @@ import { useLongPress, LONG_PRESS_MS } from '../useLongPress';
  * @vitest-environment jsdom
  */
 
-/** `didFire` 讀的是 ref，不會觸發重繪，所以測試直接抓 handlers 物件而不是看 DOM */
-let handlers: ReturnType<typeof useLongPress> | null = null;
-
 function Probe({ onTrigger, enabled = true }: {
   onTrigger: (p: { clientX: number; clientY: number }) => void;
   enabled?: boolean;
 }) {
-  const lp = useLongPress(onTrigger, enabled);
-  handlers = lp;
+  /*
+   * `didFire()` 讀的是 ref，本身不會觸發重繪，所以把它印進 DOM 之前要先逼一次重繪。
+   * 按下與觸發時各 bump 一次，`data-fired` 就永遠是當下的值。
+   */
+  const [, bump] = useState(0);
+  const lp = useLongPress(point => { bump(n => n + 1); onTrigger(point); }, enabled);
   return (
     <button
       data-testid="target"
-      onPointerDown={lp.onPointerDown}
+      data-fired={String(lp.didFire())}
+      onPointerDown={e => { bump(n => n + 1); lp.onPointerDown(e); }}
       onPointerMove={lp.onPointerMove}
       onPointerUp={lp.onPointerUp}
       onPointerCancel={lp.onPointerCancel}
@@ -30,7 +33,7 @@ function Probe({ onTrigger, enabled = true }: {
 const target = () => document.querySelector('[data-testid="target"]')!;
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
-describe('useLongPress（§ 34.8）', () => {
+describe('useLongPress（47-mobile）', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
@@ -127,10 +130,12 @@ describe('useLongPress（§ 34.8）', () => {
 
     fireEvent.pointerDown(target(), { button: 0, clientX: 10, clientY: 10 });
     await advance(LONG_PRESS_MS + 10);
-    expect(handlers!.didFire()).toBe(true);
+    expect(target().getAttribute('data-fired')).toBe('true');
 
-    fireEvent.pointerDown(target(), { button: 0, clientX: 10, clientY: 10 });
-    expect(handlers!.didFire()).toBe(false);
+    await act(async () => {
+      fireEvent.pointerDown(target(), { button: 0, clientX: 10, clientY: 10 });
+    });
+    expect(target().getAttribute('data-fired')).toBe('false');
   });
 
   it('卸載後計時器不會再觸發', async () => {

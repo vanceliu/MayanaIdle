@@ -33,6 +33,46 @@ export const PANEL_TITLES: Record<PanelKey, string> = {
   script: '自動腳本',
 };
 
+/**
+ * PanelDock 按鈕在手機上只畫圖示（`47-mobile.md`）——
+ * 六顆帶文字的按鈕在 393px 寬會擠成兩列，白白吃掉一截地圖高度。
+ *
+ * 與 `PANEL_TITLES` 放在一起：兩者一定要一一對應，分開放遲早會少一個。
+ */
+export const PANEL_ICONS: Record<PanelKey, string> = {
+  /*
+   * **不可與城鎮設施的圖示撞號**（`components/TownView.tsx` 的 `FACILITIES`）——
+   * 兩者在手機上同時出現在畫面裡（設施列靠右直排，`47-mobile.md`），
+   * 而按鈕只剩圖示，長一樣就等於兩顆都沒有名字。
+   * 已經踩過兩次：📊（統計中心）與 🛡️（防具店）。
+   */
+  stats: '💪',
+  equipment: '🧥',
+  bag: '👜',
+  skill: '✨',
+  quest: '📋',
+  script: '📜',
+};
+
+/** 按鈕上顯示的短標籤。`quest` 的完整標題是視窗抬頭，按鈕上放不下 */
+export const PANEL_BUTTON_LABELS: Record<PanelKey, string> = {
+  ...PANEL_TITLES,
+  quest: '任務',
+};
+
+/**
+ * 面板按鈕的可及屬性。手機只畫圖示，按鈕的名字全靠這兩個。
+ *
+ * - `title`：滑鼠移上去顯示原生 tooltip（把視窗拉窄的桌機玩家用得到）
+ * - `aria-label`：螢幕閱讀器與觸控裝置的名字，`title` 在觸控上永遠不會出現
+ *
+ * 兩個都要 —— 少了 `aria-label`，手機上就是六顆看不懂的方塊。
+ */
+export function panelButtonA11y(panelKey: PanelKey) {
+  const label = PANEL_BUTTON_LABELS[panelKey];
+  return { title: label, 'aria-label': label };
+}
+
 export const PANEL_WIDTHS: Record<PanelKey, number> = {
   stats: 340,
   equipment: 360,
@@ -61,6 +101,32 @@ const DEFAULT_POSITIONS: Record<PanelKey, PanelPosition> = {
   // 自動腳本較高（82vh），預設靠上避免下緣被夾動
   script: { x: 700, y: 72 },
 };
+
+/**
+ * 把預設位置夾進**目前的**視窗。
+ *
+ * `DEFAULT_POSITIONS` 是以寬螢幕排出來的錯開座標（任務面板在 x=1576），
+ * 在 1600 以下的機器上直接用會有一半在畫面外 —— 而 `.game-layout` 是
+ * `overflow: hidden`，露在外面的部分是被**裁掉**而不是可以捲過去。
+ *
+ * `FloatingWindow` 掛載時雖然也會夾一次，但那只在**開啟的當下**跑：
+ * 面板已經開著時按「重設視窗位置」，寫回去的預設值就這樣停在畫面外。
+ *
+ * 高度未知（內容決定），因此只保證標題列留在畫面上；寬度用 `PANEL_WIDTHS`，
+ * 那就是 `FloatingWindow` 實際套用的寬度。
+ */
+export function clampedDefaults(viewport: Viewport | null): Record<PanelKey, PanelPosition> {
+  if (!viewport) return { ...DEFAULT_POSITIONS };
+  return Object.fromEntries(PANEL_KEYS.map(key => {
+    const maxX = Math.max(0, viewport.w - PANEL_WIDTHS[key]);
+    const maxY = Math.max(0, viewport.h - MIN_VISIBLE_HEIGHT);
+    const pos = DEFAULT_POSITIONS[key];
+    return [key, { x: Math.min(pos.x, maxX), y: Math.min(pos.y, maxY) }];
+  })) as Record<PanelKey, PanelPosition>;
+}
+
+/** 至少要留在畫面上的高度：標題列是唯一的拖曳把手，它跑出去就再也抓不回來 */
+const MIN_VISIBLE_HEIGHT = 80;
 
 /** 全部面板的統一開關狀態（新增 PanelKey 時不必逐處補值） */
 function allClosed(): Record<PanelKey, boolean> {
@@ -134,7 +200,8 @@ export function scalePositions(
  * 舊存檔會缺那一格，那是正常升級路徑，不該讓玩家其他五個面板也一起重置。
  */
 export function restoreLayout(raw: unknown, viewport: Viewport | null): Record<PanelKey, PanelPosition> {
-  const result = { ...DEFAULT_POSITIONS };
+  // 沒存過、或某幾格壞掉時會退回預設值 —— 預設值同樣要夾進目前的視窗
+  const result = clampedDefaults(viewport);
   if (!raw || typeof raw !== 'object') return result;
 
   const stored = raw as Partial<StoredLayout>;
@@ -154,11 +221,11 @@ export function restoreLayout(raw: unknown, viewport: Viewport | null): Record<P
 function readStoredPositions(): Record<PanelKey, PanelPosition> {
   try {
     const raw = localStorage.getItem(POSITIONS_KEY);
-    if (!raw) return { ...DEFAULT_POSITIONS };
+    if (!raw) return clampedDefaults(getCurrentViewport());
     return restoreLayout(JSON.parse(raw), getCurrentViewport());
   } catch {
     // 無痕模式、壞掉的 JSON：走預設值，不可讓開機流程中斷
-    return { ...DEFAULT_POSITIONS };
+    return clampedDefaults(getCurrentViewport());
   }
 }
 
@@ -206,7 +273,7 @@ interface PanelWindowState {
   /** z 順序，陣列末端為最上層 */
   order: PanelKey[];
   /**
-   * @param exclusive 開啟時同時關掉其他面板。手機的 sheet 是滿版的（§ 34.8），
+   * @param exclusive 開啟時同時關掉其他面板。手機的 sheet 是滿版的（`47-mobile.md`），
    *   多開只會互相蓋住，關掉的那些玩家也看不到 —— 一次只留一個才對得上畫面。
    */
   toggle: (key: PanelKey, exclusive?: boolean) => void;
@@ -265,7 +332,7 @@ export const usePanelWindowStore = create<PanelWindowState>((set) => ({
     } catch {
       // 清不掉就只影響下次開啟，狀態本身已重設
     }
-    set({ positions: { ...DEFAULT_POSITIONS } });
+    set({ positions: clampedDefaults(getCurrentViewport()) });
   },
 }));
 

@@ -26,7 +26,7 @@ interface FloatingWindowProps {
  */
 export function FloatingWindow({ panelKey, title, width, className = '', children }: FloatingWindowProps) {
   /*
-   * 手機切「全螢幕 sheet」（`34-ui-guidelines.md` § 34.8）。
+   * 手機切「全螢幕 sheet」（`47-mobile.md`）。
    *
    * 可拖曳、可多開、無遮罩的浮動視窗是**桌機**的做法：它預設玩家同時看得到
    * 地圖與好幾個面板。手機寬度連一個 420px 的面板都放不下，多開等於互相蓋住，
@@ -64,17 +64,39 @@ export function FloatingWindow({ panelKey, title, width, className = '', childre
     return { x: e.clientX / scale, y: e.clientY / scale };
   }
 
-  // 開啟時把預設位置夾回可視範圍（小螢幕時預設座標可能超出畫面）
+  /**
+   * 開啟時把自己提到視窗堆疊的最上層。
+   *
+   * 「點到誰誰就到最上層」是靠 `onPointerDown` 維持的（§ 32.15），但**開啟**
+   * 這個動作發生在別的元件上（底部的面板按鈕），沒人通知堆疊 ——
+   * 於是剛開的面板會被上一個被點過的視窗蓋住。手機更明顯：面板是滿版 sheet，
+   * 城鎮設施列卻整條浮在它上面。
+   */
+  useEffect(() => {
+    focusWindow(`panel:${panelKey}`);
+    // 只在開啟（掛載）時提一次，之後由點擊決定
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * 把位置夾回可視範圍。
+   *
+   * **不可只在掛載時跑一次** —— 位置也會被外部改掉（「重設視窗位置」寫回
+   * 以寬螢幕排出來的預設座標），面板已經開著時就沒有人把關，
+   * 視窗會有一半停在畫面外。而 `.game-layout` 是 `overflow: hidden`，
+   * 露出去的部分是被裁掉，不是可以捲過去。
+   *
+   * 拖曳中不介入：拖曳自己已經夾過，這裡再寫一次只會互相打架。
+   * `clamp()` 是冪等的（min/max），夾過的值再跑一次不會變，所以不會無限迴圈。
+   */
   useEffect(() => {
     // sheet 模式的座標由 CSS 決定，夾制會把存下來的桌機位置改壞
-    if (isMobile) return;
+    if (isMobile || dragRef.current) return;
     const next = clamp(position.x, position.y);
     if (next.x !== position.x || next.y !== position.y) {
       setPosition(panelKey, next);
     }
-    // 只在掛載時校正一次，之後由拖曳決定
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isMobile, position.x, position.y, clamp, panelKey, setPosition]);
 
   function handleDragStart(e: React.PointerEvent) {
     if (isMobile) return;

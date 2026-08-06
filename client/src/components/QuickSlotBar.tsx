@@ -34,7 +34,7 @@ export function QuickSlotBar() {
   const templates = useEquipmentTemplates();
   /*
    * 快捷格只是**放置目標**：它以 `data-drop-*` 宣告自己，實際的綁定由拖曳來源
-   * （背包）在放開時執行（§ 34.8）。這裡只讀 hover 狀態畫外框。
+   * （背包）在放開時執行（`47-mobile.md`）。這裡只讀 hover 狀態畫外框。
    */
   const dragOver = useDragStore(s => s.over);
   const isDragging = useDragStore(s => s.item != null);
@@ -95,7 +95,7 @@ export function QuickSlotBar() {
   }
 
   /**
-   * 清除這一格。右鍵與長按共用（§ 34.8）——
+   * 清除這一格。右鍵與長按共用（`47-mobile.md`）——
    * hook 只能在頂層呼叫，所以「按住的是第幾格」從 ref 讀，格子的 pointerdown 一定先跑。
    */
   const pressedIndexRef = useRef<number | null>(null);
@@ -138,7 +138,7 @@ export function QuickSlotBar() {
               + (dragOverIndex === idx ? ' drag-over' : '')
               + (isDragging ? ' droppable' : '')
               + (selectedIndex === idx ? ' selected' : '')}
-            /* 落點由 `elementFromPoint` 命中這兩個屬性（§ 34.8）；
+            /* 落點由 `elementFromPoint` 命中這兩個屬性（`47-mobile.md`）；
                拖曳期間指標被來源格 capture，這裡收不到任何 pointer 事件 */
             data-drop-kind="quick-slot"
             data-drop-index={idx}

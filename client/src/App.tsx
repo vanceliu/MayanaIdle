@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from './stores/gameStore';
-import { exportCharacterData, downloadExport, importCharacterData } from './systems/characterTransfer';
 import { seedDatabase } from './db/seed';
 import { loadTemplateCache } from './systems/templateSync';
 import { purgeOutdatedData } from './systems/dataVersionPurge';
@@ -18,109 +17,14 @@ import { MapNavigation } from './components/MapNavigation';
 import { TownView } from './components/TownView';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
+import { GameToolbar } from './components/GameToolbar';
+import { BuildLabel } from './components/BuildLabel';
 import { PanelWindows } from './components/PanelWindows';
 import { DragGhost } from './components/DragGhost';
 import { useWindowLayerStore, useWindowZIndex } from './stores/windowLayerStore';
 import { useHudBandBottom } from './hooks/useHudBand';
-import { SettingsModal } from './components/SettingsModal';
 import { getRegion } from './models/mapData';
-import { formatBuildLabel, formatBuildTime } from './buildInfo';
 import './App.css';
-
-export function GameToolbar() {
-  const logout = useGameStore(s => s.logout);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const character = useGameStore(s => s.character);
-  const selectCharacter = useGameStore(s => s.selectCharacter);
-  const uploadOwnStats = useGameStore(s => s.uploadOwnStats);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleExport = useCallback(async () => {
-    if (!character?.id) return;
-
-    // § 19.9：匯出檔含該角色的排行榜寫入密鑰，而檔案的加密金鑰就寫在前端原始碼裡，
-    // 等同明文。外流＝對方能覆寫你的排行榜資料，所以這件事必須講在下載之前。
-    const confirmed = window.confirm(
-      '匯出檔含有這個角色的身分憑證，等同密碼。\n\n' +
-      '取得檔案的人可以覆寫你在排行榜上的紀錄，請勿分享或上傳到雲端硬碟、聊天室等地方。\n\n' +
-      '確定要匯出嗎？'
-    );
-    if (!confirmed) return;
-
-    try {
-      // 先把統計推一次，讓密鑰在伺服端綁定好再讓檔案出門（§ 37.4.3）。
-      // **刻意不檢查結果**：密鑰已經寫進本機與匯出檔，兩台裝置拿到的是同一把，
-      // 誰先上傳誰綁定、另一台照樣相符。拿連線當匯出的門檻只會讓玩家在
-      // 最需要備份的時候備份不了。
-      await uploadOwnStats({ force: true });
-
-      const json = await exportCharacterData(character.id);
-      downloadExport(json, character.name);
-    } catch (e) {
-      alert(`匯出失敗: ${(e as Error).message}`);
-    }
-  }, [character, uploadOwnStats]);
-
-  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !character?.id) return;
-
-    // § 19.9：匯入是「還原完整身分」，名稱與 uuid 都會被檔案取代
-    const confirmed = window.confirm(
-      '匯入將覆蓋當前角色的所有資料，包含名稱與排行榜身分。\n\n' +
-      '這一格原本的角色會從排行榜上停止更新。確定繼續？'
-    );
-    if (!confirmed) {
-      e.target.value = '';
-      return;
-    }
-
-    try {
-      const json = await file.text();
-      await importCharacterData(json, character.id);
-      await selectCharacter(character.id);
-      alert('匯入成功！');
-    } catch (err) {
-      alert(`匯入失敗: ${(err as Error).message}`);
-    }
-    e.target.value = '';
-  }, [character, selectCharacter]);
-
-  return (
-    <div className="game-toolbar">
-      {/* 版本號貼在 Wiki 旁邊：回報問題時兩個資訊會一起被截到 */}
-      <BuildLabel />
-      <a className="btn-wiki" href="/MayanaIdle/wiki" target="_blank" rel="noopener noreferrer">
-        Wiki
-      </a>
-      <button className="btn-transfer" onClick={handleExport} title="匯出角色">
-        匯出
-      </button>
-      <button className="btn-transfer" onClick={() => fileInputRef.current?.click()} title="匯入角色">
-        匯入
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".dat"
-        style={{ display: 'none' }}
-        onChange={handleImport}
-      />
-      <button
-        className="btn-settings"
-        onClick={() => setSettingsOpen(true)}
-        title="顯示設定"
-        aria-label="顯示設定"
-      >
-        ⚙
-      </button>
-      <button className="btn-logout" onClick={logout}>
-        登出
-      </button>
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
-    </div>
-  );
-}
 
 /**
  * 把開機失敗轉成玩家看得懂、且指得出下一步的訊息。
@@ -261,7 +165,7 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
       {/*
         * 上方 HUD 帶。桌機是 `display: contents` —— 這個容器在版面上不存在，
         * 兩座島仍各自貼在左上／右上角，版面與過去完全相同（§ 32.3）。
-        * 手機才變成真正的容器，把兩者疊成一條全寬的狀態列（§ 34.8）。
+        * 手機才變成真正的容器，把兩者疊成一條全寬的狀態列（`47-mobile.md`）。
         * 用 `display: contents` 而不是條件渲染，是為了不讓兩種版面各長一份 JSX。
         */}
       <div className="hud-topbar">
@@ -285,7 +189,7 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
       <CombatLogWindow />
 
       {/*
-        * 下方 HUD 帶。同樣是桌機 `display: contents`、手機才成形（§ 34.8）。
+        * 下方 HUD 帶。同樣是桌機 `display: contents`、手機才成形（`47-mobile.md`）。
         * 手機上這條**不疊在地圖上**：快捷格與面板按鈕是唯一的觸控入口，
         * 半透明地蓋在會動的地圖上會看不清楚，改成把地圖讓出這段高度。
         */}
@@ -308,19 +212,15 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
       <PanelWindows />
       <AttributeUpModal />
       <DiscardConfirmModal />
-      {/* 指標拖曳的殘影（§ 34.8）。掛在最外層，任何面板拖出來的東西都畫得到 */}
+      {/* 指標拖曳的殘影（`47-mobile.md`）。掛在最外層，任何面板拖出來的東西都畫得到 */}
       <DragGhost />
     </div>
   );
 }
 
-/** 建置版本標示，回報問題時用來確認玩家跑的是哪一版 */
-function BuildLabel() {
-  return (
-    <div className="build-label" title={formatBuildTime()}>
-      {formatBuildLabel()}
-    </div>
-  );
-}
+/**
+ * 這兩個元件已搬到 `components/`；此處保留轉出，讓既有的匯入路徑不必全部改寫。
+ */
+export { GameToolbar, BuildLabel };
 
 export default App;
