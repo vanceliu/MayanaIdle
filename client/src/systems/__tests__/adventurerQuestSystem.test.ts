@@ -2,6 +2,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { AdventurerQuest, GuildProgress } from '../../models/adventurerQuest';
 import {
   generateQuestList,
+  generateSingleQuest,
   acceptQuest,
   abandonQuest,
   updateQuestProgress,
@@ -65,6 +66,65 @@ describe('adventurerQuestSystem', () => {
       }
     });
 
+    // § 36.9 步驟 2a：一般分頁不再出現 BOSS 任務，BOSS 分頁只出現 BOSS 任務
+    it('never produces boss quests on the plain difficulty tabs', () => {
+      for (const difficulty of ['D', 'C', 'B', 'A', 'S'] as const) {
+        for (let i = 0; i < 30; i++) {
+          for (const q of generateQuestList(difficulty, 'S')) {
+            expect(['errand', 'collect', 'endurance']).toContain(q.type);
+            expect(q.difficulty).toBe(difficulty);
+          }
+        }
+      }
+    });
+
+    it('only produces boss quests on the B+/A+/S+ tabs', () => {
+      for (const difficulty of ['B+', 'A+', 'S+'] as const) {
+        for (let i = 0; i < 30; i++) {
+          const quests = generateQuestList(difficulty, 'S');
+          expect(quests.length).toBeGreaterThanOrEqual(5);
+          expect(quests.length).toBeLessThanOrEqual(8);
+          for (const q of quests) {
+            expect(['errandboss', 'collectboss']).toContain(q.type);
+            expect(q.difficulty).toBe(difficulty);
+            expect(q.targetMonster).toBeDefined();
+            expect(q.targetCount).toBeGreaterThanOrEqual(1);
+            expect(q.targetCount).toBeLessThanOrEqual(3);
+          }
+        }
+      }
+    });
+
+    // § 36.4.2：拆分後 BOSS 任務的貢獻數值與拆分前相同
+    it('keeps boss contribution values unchanged after the split', () => {
+      const quests = [
+        ...generateQuestList('B+', 'S'),
+        ...generateQuestList('A+', 'S'),
+        ...generateQuestList('S+', 'S'),
+      ];
+      const expectedBase = { 'B+': { errandboss: 80, collectboss: 100 }, 'A+': { errandboss: 150, collectboss: 200 }, 'S+': { errandboss: 200, collectboss: 250 } } as const;
+      for (const q of quests) {
+        const boss = BOSS_POOLS[q.difficulty as 'B+' | 'A+' | 'S+'].find(b => b.name === q.targetMonster)!;
+        const base = expectedBase[q.difficulty as 'B+' | 'A+' | 'S+'][q.type as 'errandboss' | 'collectboss'];
+        expect(q.contributionPoints).toBe(base + Math.floor(boss.avgGold / 10));
+      }
+    });
+
+    // § 36.9 步驟 5：無可用 BOSS 的城鎮該分頁不產生任務，也不降級成殲滅任務
+    it('returns an empty board for a boss tab with no boss in the town pool', () => {
+      expect(generateQuestList('S+', 'S', 'neutral-town')).toEqual([]);
+    });
+
+    // 在城外刷新任務板（例：追蹤視窗退出任務）時傳進來的是地圖 id，不是城鎮 id
+    it('falls back to the global pools when refreshed outside a town', () => {
+      const quests = generateQuestList('A+', 'S', 'trial-highlands-top' as never);
+      expect(quests.length).toBeGreaterThan(0);
+      for (const q of quests) {
+        expect(['errandboss', 'collectboss']).toContain(q.type);
+      }
+      expect(() => generateSingleQuest('A+', 'S', 0, 'trial-highlands-top' as never)).not.toThrow();
+    });
+
     it('quests have non-empty titles and descriptions', () => {
       const quests = generateQuestList('S', 'S');
       for (const q of quests) {
@@ -121,13 +181,13 @@ describe('adventurerQuestSystem', () => {
     });
 
     it('keeps boss quests scoped to the boss floor', () => {
-      expect(BOSS_POOLS.A).toEqual(expect.arrayContaining([
+      expect(BOSS_POOLS['A+']).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: '象牙塔惡魔', area: 'ivory-tower-5f' }),
         expect.objectContaining({ name: '朦朧蛇魔', area: 'misty-cave-3f' }),
         expect.objectContaining({ name: '深海獄王', area: 'underwater-prison-4f' }),
         expect.objectContaining({ name: '安塔巨龍', area: 'dragon-valley-7f' }),
       ]));
-      expect(BOSS_POOLS.S).toEqual(expect.arrayContaining([
+      expect(BOSS_POOLS['S+']).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: '遠古騎士', area: 'ancient-dungeon-9f' }),
       ]));
     });
@@ -258,6 +318,26 @@ describe('adventurerQuestSystem', () => {
       expect(result.activeQuests.length).toBe(0);
     });
 
+    // 相容性：拆分前接取的 BOSS 任務存的是 difficulty 'A'，不做資料遷移也要能正常交付
+    it('completes a legacy boss quest stored with the pre-split difficulty', () => {
+      const legacy: AdventurerQuest[] = [
+        makeQuest({
+          id: 'legacy-boss',
+          status: 'completable',
+          type: 'collectboss',
+          difficulty: 'A',
+          targetMonster: '象牙塔惡魔',
+          targetCount: 3,
+          currentCount: 3,
+          contributionPoints: 600,
+        }),
+      ];
+      const result = completeQuest(legacy, 'legacy-boss', { rank: 'C', points: 2000 });
+      expect(result.reward).not.toBeNull();
+      expect(result.guildProgress.points).toBe(2600);
+      expect(result.activeQuests.length).toBe(0);
+    });
+
     it('does not complete non-completable quest', () => {
       const quests: AdventurerQuest[] = [
         makeQuest({ id: 'q1', status: 'active' }),
@@ -334,9 +414,10 @@ describe('adventurerQuestSystem', () => {
 
   describe('town-specific quest generation', () => {
     it('getTownDifficulties returns correct difficulties per town', () => {
-      expect(getTownDifficulties('neutral-town')).toEqual(['D', 'C', 'B', 'A']);
-      expect(getTownDifficulties('elsarth-town')).toEqual(['A', 'S']);
-      expect(getTownDifficulties('varden-town')).toEqual(['A', 'S']);
+      // § 36.6.1：BOSS 分頁需該城鎮該難度池內至少有一隻 BOSS
+      expect(getTownDifficulties('neutral-town')).toEqual(['D', 'C', 'B', 'B+', 'A', 'A+']);
+      expect(getTownDifficulties('elsarth-town')).toEqual(['A', 'A+', 'S', 'S+']);
+      expect(getTownDifficulties('varden-town')).toEqual(['A', 'A+', 'S', 'S+']);
     });
 
     it('neutral-town quests only target neutral/snow/ivory areas', () => {
@@ -428,8 +509,9 @@ describe('adventurerQuestSystem', () => {
     // 迴歸：原實作對 US 等階額外乘 10，且與 BOSS ×2 互斥，兩者皆無文件依據。
     function goldAmounts(rank: GuildProgress['rank'], bossOnly: boolean): number[] {
       const out: number[] = [];
+      // 拆分後 BOSS 任務只出現在 S+ 分頁（§ 36.3.2）
       for (let i = 0; i < 400; i++) {
-        for (const q of generateQuestList('S', rank)) {
+        for (const q of generateQuestList(bossOnly ? 'S+' : 'S', rank)) {
           const isBoss = q.type === 'errandboss' || q.type === 'collectboss';
           if (q.reward.type === 'gold' && isBoss === bossOnly) {
             // 還原基準值：金幣獎勵 = 基準值 × 2

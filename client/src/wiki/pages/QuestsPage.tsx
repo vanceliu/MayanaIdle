@@ -13,8 +13,10 @@ export function QuestsPage() {
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             冒險者工會提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
             三個城鎮皆設有冒險者工會分部，各分部僅顯示與該城鎮相關區域的任務。<br />
+            BOSS 任務獨立於 B+ / A+ / S+ 分頁，不與一般任務混在同一頁。<br />
             每個難度等級顯示 5~8 個隨機任務，最多同時接取 3 個。<br />
-            任務列表每次登入時重新生成，已接取任務可隨時免費退出（扣除等量貢獻點數）。
+            任務列表每次登入時重新生成，已接取任務可隨時免費退出（扣除等量貢獻點數）。<br />
+            也可花 50 貢獻手動重新整理目前分頁，貢獻不足 50 時無法使用。
           </p>
         </div>
       </section>
@@ -29,9 +31,9 @@ export function QuestsPage() {
               <tr><th>城鎮</th><th>可用難度</th><th>區域範圍</th></tr>
             </thead>
             <tbody>
-              <tr><td>薄暮村</td><td>D / C / B / A</td><td>曙光草原 ~ 象牙塔 5F</td></tr>
-              <tr><td>艾爾薩斯</td><td>A / S</td><td>妖魔森林、龍之谷、朦朧洞窟、龍谷地間、百柱塔、遠古地監等</td></tr>
-              <tr><td>瓦爾登</td><td>A / S</td><td>明鏡森林、龍之谷、水下監獄、龍谷地間、百柱塔、遠古地監等</td></tr>
+              <tr><td>薄暮村</td><td>D / C / B / B+ / A / A+</td><td>曙光草原 ~ 象牙塔 5F</td></tr>
+              <tr><td>艾爾薩斯</td><td>A / A+ / S / S+</td><td>妖魔森林、龍之谷、朦朧洞窟、龍谷地間、百柱塔、遠古地監等</td></tr>
+              <tr><td>瓦爾登</td><td>A / A+ / S / S+</td><td>明鏡森林、龍之谷、水下監獄、龍谷地間、百柱塔、遠古地監等</td></tr>
             </tbody>
           </table>
         </div>
@@ -50,8 +52,8 @@ export function QuestsPage() {
               <tr><td>殲滅任務</td><td>在指定區域擊殺怪物（不限種類）</td><td className="cell-number">15~30 隻</td><td>全等級</td></tr>
               <tr><td>素材收集任務</td><td>收集指定怪物的掉落素材（10% 掉率）</td><td className="cell-number">5 個</td><td>全等級</td></tr>
               <tr><td>持續戰鬥任務</td><td>在指定區域累計擊殺大量怪物</td><td className="cell-number">50~100 隻</td><td>全等級</td></tr>
-              <tr><td>BOSS 殲滅任務</td><td>擊殺指定 BOSS</td><td className="cell-number">1~3 隻</td><td>B 級以上</td></tr>
-              <tr><td>BOSS 素材收集</td><td>收集指定 BOSS 掉落素材（30% 掉率）</td><td className="cell-number">1~3 個</td><td>B 級以上</td></tr>
+              <tr><td>BOSS 殲滅任務</td><td>擊殺指定 BOSS</td><td className="cell-number">1~3 隻</td><td>B+ 級以上</td></tr>
+              <tr><td>BOSS 素材收集</td><td>收集指定 BOSS 掉落素材（30% 掉率）</td><td className="cell-number">1~3 個</td><td>B+ 級以上</td></tr>
             </tbody>
           </table>
         </div>
@@ -67,8 +69,8 @@ export function QuestsPage() {
               <tr><th>適用等級</th><th>殲滅</th><th>素材收集</th><th>持續戰鬥</th><th>BOSS殲滅</th><th>BOSS素材</th></tr>
             </thead>
             <tbody>
-              <tr><td>D / C 級</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">30</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B / A / S 級</td><td className="cell-number">30</td><td className="cell-number">20</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td></tr>
+              <tr><td>D / C / B / A / S 級</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">30</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B+ / A+ / S+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">50</td><td className="cell-number">50</td></tr>
             </tbody>
           </table>
         </div>
@@ -86,9 +88,9 @@ export function QuestsPage() {
             <tbody>
               <tr><td>D 級</td><td>曙光草原、翠綠谷地</td><td className="cell-number">15~20</td><td className="cell-number">50~60</td><td className="cell-number">—</td></tr>
               <tr><td>C 級</td><td>風語林地、迷霧沼澤、試煉高地</td><td className="cell-number">15~20</td><td className="cell-number">55~70</td><td className="cell-number">—</td></tr>
-              <tr><td>B 級</td><td>試煉高地頂部、雪原、象牙塔 1F／2F／3F</td><td className="cell-number">20~25</td><td className="cell-number">60~80</td><td className="cell-number">1~3</td></tr>
-              <tr><td>A 級</td><td>妖魔森林、明鏡森林、龍之谷、遠古戰場、象牙塔 4F／5F、朦朧洞窟／水下監獄／龍谷地間各樓層、百柱塔 1-30F、遠古地監 1F～6F</td><td className="cell-number">20~30</td><td className="cell-number">70~90</td><td className="cell-number">1~3</td></tr>
-              <tr><td>S 級</td><td>百柱塔 31-100F、遠古地監 7F／8F／9F</td><td className="cell-number">25~30</td><td className="cell-number">80~100</td><td className="cell-number">1~3</td></tr>
+              <tr><td>B 級 / B+ 級</td><td>試煉高地頂部、雪原、象牙塔 1F／2F／3F</td><td className="cell-number">20~25</td><td className="cell-number">60~80</td><td className="cell-number">1~3</td></tr>
+              <tr><td>A 級 / A+ 級</td><td>妖魔森林、明鏡森林、龍之谷、遠古戰場、象牙塔 4F／5F、朦朧洞窟／水下監獄／龍谷地間各樓層、百柱塔 1-30F、遠古地監 1F～6F</td><td className="cell-number">20~30</td><td className="cell-number">70~90</td><td className="cell-number">1~3</td></tr>
+              <tr><td>S 級 / S+ 級</td><td>百柱塔 31-100F、遠古地監 7F／8F／9F</td><td className="cell-number">25~30</td><td className="cell-number">80~100</td><td className="cell-number">1~3</td></tr>
             </tbody>
           </table>
         </div>
@@ -104,23 +106,23 @@ export function QuestsPage() {
               <tr><th>等級</th><th>BOSS 名稱</th><th>區域</th></tr>
             </thead>
             <tbody>
-              <tr><td>B 級</td><td>試煉飛龍 (Lv.30)</td><td>試煉高地頂部</td></tr>
-              <tr><td>B 級</td><td>雪地之主 (Lv.35)</td><td>雪原地帶深處</td></tr>
-              <tr><td>A 級</td><td>象牙塔惡魔 (Lv.45)</td><td>象牙塔 5F</td></tr>
-              <tr><td>A 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟 3F</td></tr>
-              <tr><td>A 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄 4F</td></tr>
-              <tr><td>A 級</td><td>安塔巨龍 (Lv.50)</td><td>龍谷地間 7F</td></tr>
-              <tr><td>A 級</td><td>毒之皇女 (Lv.52)</td><td>百柱塔 1-10F</td></tr>
-              <tr><td>A 級</td><td>哥布林之王 (Lv.52)</td><td>百柱塔 11-20F</td></tr>
-              <tr><td>A 級</td><td>暗影吸血鬼 (Lv.52)</td><td>百柱塔 21-30F</td></tr>
-              <tr><td>S 級</td><td>不死殭屍王 (Lv.57)</td><td>百柱塔 31-40F</td></tr>
-              <tr><td>S 級</td><td>龍王約特勒 (Lv.57)</td><td>百柱塔 41-50F</td></tr>
-              <tr><td>S 級</td><td>冥王哈馬斯 (Lv.57)</td><td>百柱塔 51-60F</td></tr>
-              <tr><td>S 級</td><td>霜凍伊莉絲 (Lv.60)</td><td>百柱塔 61-70F</td></tr>
-              <tr><td>S 級</td><td>熔岩伊弗利特 (Lv.60)</td><td>百柱塔 71-80F</td></tr>
-              <tr><td>S 級</td><td>守護者之主 (Lv.60)</td><td>百柱塔 81-90F</td></tr>
-              <tr><td>S 級</td><td>百柱死神 (Lv.60)</td><td>百柱塔 91-100F</td></tr>
-              <tr><td>S 級</td><td>遠古騎士 (Lv.60)</td><td>遠古地監 9F</td></tr>
+              <tr><td>B+ 級</td><td>試煉飛龍 (Lv.30)</td><td>試煉高地頂部</td></tr>
+              <tr><td>B+ 級</td><td>雪地之主 (Lv.35)</td><td>雪原地帶深處</td></tr>
+              <tr><td>A+ 級</td><td>象牙塔惡魔 (Lv.45)</td><td>象牙塔 5F</td></tr>
+              <tr><td>A+ 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟 3F</td></tr>
+              <tr><td>A+ 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄 4F</td></tr>
+              <tr><td>A+ 級</td><td>安塔巨龍 (Lv.50)</td><td>龍谷地間 7F</td></tr>
+              <tr><td>A+ 級</td><td>毒之皇女 (Lv.52)</td><td>百柱塔 1-10F</td></tr>
+              <tr><td>A+ 級</td><td>哥布林之王 (Lv.52)</td><td>百柱塔 11-20F</td></tr>
+              <tr><td>A+ 級</td><td>暗影吸血鬼 (Lv.52)</td><td>百柱塔 21-30F</td></tr>
+              <tr><td>S+ 級</td><td>不死殭屍王 (Lv.57)</td><td>百柱塔 31-40F</td></tr>
+              <tr><td>S+ 級</td><td>龍王約特勒 (Lv.57)</td><td>百柱塔 41-50F</td></tr>
+              <tr><td>S+ 級</td><td>冥王哈馬斯 (Lv.57)</td><td>百柱塔 51-60F</td></tr>
+              <tr><td>S+ 級</td><td>霜凍伊莉絲 (Lv.60)</td><td>百柱塔 61-70F</td></tr>
+              <tr><td>S+ 級</td><td>熔岩伊弗利特 (Lv.60)</td><td>百柱塔 71-80F</td></tr>
+              <tr><td>S+ 級</td><td>守護者之主 (Lv.60)</td><td>百柱塔 81-90F</td></tr>
+              <tr><td>S+ 級</td><td>百柱死神 (Lv.60)</td><td>百柱塔 91-100F</td></tr>
+              <tr><td>S+ 級</td><td>遠古騎士 (Lv.60)</td><td>遠古地監 9F</td></tr>
             </tbody>
           </table>
         </div>
@@ -156,7 +158,7 @@ export function QuestsPage() {
               <tr><td>精鍊印記</td><td>基準值 ÷ 100（個）</td></tr>
               <tr><td>武器強化卷軸</td><td>1 張</td></tr>
               <tr><td>防具強化卷軸</td><td>1 張</td></tr>
-              <tr><td>製作素材（B 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
+              <tr><td>製作素材（B／B+ 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
             </tbody>
           </table>
         </div>
@@ -230,9 +232,12 @@ export function QuestsPage() {
             <tbody>
               <tr><td>D 級</td><td className="cell-number">10</td><td className="cell-number">20</td><td className="cell-number">30</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
               <tr><td>C 級</td><td className="cell-number">15</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B 級</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">60</td><td className="cell-number">80</td><td className="cell-number">100</td></tr>
-              <tr><td>A 級</td><td className="cell-number">80</td><td className="cell-number">100</td><td className="cell-number">120</td><td className="cell-number">150</td><td className="cell-number">200</td></tr>
-              <tr><td>S 級</td><td className="cell-number">150</td><td className="cell-number">160</td><td className="cell-number">180</td><td className="cell-number">200</td><td className="cell-number">250</td></tr>
+              <tr><td>B 級</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">60</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">80</td><td className="cell-number">100</td></tr>
+              <tr><td>A 級</td><td className="cell-number">80</td><td className="cell-number">100</td><td className="cell-number">120</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>A+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">150</td><td className="cell-number">200</td></tr>
+              <tr><td>S 級</td><td className="cell-number">150</td><td className="cell-number">160</td><td className="cell-number">180</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>S+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">200</td><td className="cell-number">250</td></tr>
             </tbody>
           </table>
         </div>

@@ -2684,6 +2684,7 @@ button.active {
 
 .shop-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 10px;
   align-items: center;
@@ -2710,6 +2711,27 @@ button.active {
   background: var(--accent-primary-dim);
   color: var(--text-bright);
   border-color: var(--accent-primary);
+}
+
+/* BOSS 任務分頁（B+/A+/S+，§ 36.6.1）以金色區隔於一般分頁 */
+.shop-tabs button.is-boss-tab {
+  color: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
+
+.shop-tabs button.is-boss-tab.active {
+  background: var(--accent-gold);
+  color: var(--bg-deepest);
+}
+
+/* 手動刷新（§ 36.6.3）推到分頁列尾端，與難度頁籤分開 */
+.shop-tabs button.quest-reroll-btn {
+  margin-left: auto;
+}
+
+.shop-tabs button.quest-reroll-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .shop-stock {

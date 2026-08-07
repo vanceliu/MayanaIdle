@@ -2,7 +2,11 @@ import { MONSTER_SEEDS } from '../db/seed/monsterSeeds';
 import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
 
 export type AdventurerQuestType = 'errand' | 'collect' | 'endurance' | 'errandboss' | 'collectboss';
-export type AdventurerQuestDifficulty = 'D' | 'C' | 'B' | 'A' | 'S';
+/** 一般任務分頁（errand／collect／endurance） */
+export type BaseQuestDifficulty = 'D' | 'C' | 'B' | 'A' | 'S';
+/** BOSS 任務分頁（errandboss／collectboss），區域池沿用同字母的一般難度（§ 36.3.2） */
+export type BossQuestDifficulty = 'B+' | 'A+' | 'S+';
+export type AdventurerQuestDifficulty = BaseQuestDifficulty | BossQuestDifficulty;
 export type AdventurerQuestStatus = 'available' | 'active' | 'completable';
 export type GuildRank = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'US';
 export type QuestTownId = 'neutral-town' | 'elsarth-town' | 'varden-town';
@@ -38,6 +42,9 @@ export interface GuildProgress {
 
 export const MAX_ACTIVE_ADVENTURER_QUESTS = 3;
 
+/** § 36.6.3：手動刷新單一分頁的貢獻代價 */
+export const QUEST_BOARD_REFRESH_COST = 50;
+
 export const GUILD_RANK_ORDER: GuildRank[] = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'US'];
 
 export const GUILD_RANK_THRESHOLDS: Record<GuildRank, number> = {
@@ -52,18 +59,52 @@ export const GUILD_RANK_THRESHOLDS: Record<GuildRank, number> = {
   US: 10000000,
 };
 
-export const CONTRIBUTION_POINTS: Record<AdventurerQuestDifficulty, Record<AdventurerQuestType, number>> = {
-  D: { errand: 10, collect: 20, endurance: 30, errandboss: 0, collectboss: 0 },
-  C: { errand: 15, collect: 30, endurance: 45, errandboss: 0, collectboss: 0 },
-  B: { errand: 30, collect: 45, endurance: 60, errandboss: 80, collectboss: 100 },
-  A: { errand: 80, collect: 100, endurance: 120, errandboss: 150, collectboss: 200 },
-  S: { errand: 150, collect: 160, endurance: 180, errandboss: 200, collectboss: 250 },
+/** § 36.4.2 基底貢獻表（一般分頁） */
+export const CONTRIBUTION_POINTS: Record<BaseQuestDifficulty, Record<'errand' | 'collect' | 'endurance', number>> = {
+  D: { errand: 10, collect: 20, endurance: 30 },
+  C: { errand: 15, collect: 30, endurance: 45 },
+  B: { errand: 30, collect: 45, endurance: 60 },
+  A: { errand: 80, collect: 100, endurance: 120 },
+  S: { errand: 150, collect: 160, endurance: 180 },
+};
+
+/** § 36.4.2 基底貢獻表（BOSS 分頁），數值與拆分前的 B/A/S 相同 */
+export const BOSS_CONTRIBUTION_POINTS: Record<BossQuestDifficulty, Record<'errandboss' | 'collectboss', number>> = {
+  'B+': { errandboss: 80, collectboss: 100 },
+  'A+': { errandboss: 150, collectboss: 200 },
+  'S+': { errandboss: 200, collectboss: 250 },
 };
 
 export const QUEST_TYPE_WEIGHTS = { errand: 40, collect: 30, endurance: 30 };
-export const QUEST_TYPE_WEIGHTS_BOSS = { errand: 30, collect: 20, endurance: 20, errandboss: 15, collectboss: 15 };
+export const QUEST_TYPE_WEIGHTS_BOSS = { errandboss: 50, collectboss: 50 };
 
-export const KILL_COUNT_RANGE: Record<AdventurerQuestDifficulty, { min: number; max: number }> = {
+/** 一般難度 → 對應的 BOSS 分頁（§ 36.3.2） */
+export const BOSS_DIFFICULTY_OF: Record<'B' | 'A' | 'S', BossQuestDifficulty> = {
+  B: 'B+',
+  A: 'A+',
+  S: 'S+',
+};
+
+/** 分頁顯示順序（§ 36.6.1） */
+export const QUEST_DIFFICULTY_ORDER: AdventurerQuestDifficulty[] = ['D', 'C', 'B', 'B+', 'A', 'A+', 'S', 'S+'];
+
+/** 空任務板：每個分頁一個欄位，難度清單只有 `QUEST_DIFFICULTY_ORDER` 一個出處 */
+export function createEmptyQuestBoard(): Record<AdventurerQuestDifficulty, AdventurerQuest[]> {
+  return Object.fromEntries(
+    QUEST_DIFFICULTY_ORDER.map(d => [d, [] as AdventurerQuest[]]),
+  ) as Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
+}
+
+export function isBossDifficulty(difficulty: AdventurerQuestDifficulty): difficulty is BossQuestDifficulty {
+  return difficulty.endsWith('+');
+}
+
+/** BOSS 分頁沒有自己的區域／怪物／數值表，一律回退到同字母的一般難度 */
+export function getBaseDifficulty(difficulty: AdventurerQuestDifficulty): BaseQuestDifficulty {
+  return (isBossDifficulty(difficulty) ? difficulty.slice(0, -1) : difficulty) as BaseQuestDifficulty;
+}
+
+export const KILL_COUNT_RANGE: Record<BaseQuestDifficulty, { min: number; max: number }> = {
   D: { min: 15, max: 20 },
   C: { min: 15, max: 20 },
   B: { min: 20, max: 25 },
@@ -71,7 +112,7 @@ export const KILL_COUNT_RANGE: Record<AdventurerQuestDifficulty, { min: number; 
   S: { min: 25, max: 30 },
 };
 
-export const ENDURANCE_COUNT_RANGE: Record<AdventurerQuestDifficulty, { min: number; max: number }> = {
+export const ENDURANCE_COUNT_RANGE: Record<BaseQuestDifficulty, { min: number; max: number }> = {
   D: { min: 50, max: 60 },
   C: { min: 55, max: 70 },
   B: { min: 60, max: 80 },
@@ -104,7 +145,7 @@ function createFloorAreaEntries(
   }));
 }
 
-export const AREA_POOLS: Record<AdventurerQuestDifficulty, AreaPoolEntry[]> = {
+export const AREA_POOLS: Record<BaseQuestDifficulty, AreaPoolEntry[]> = {
   D: [
     { areaId: 'dawn-plains', areaName: '曙光草原', avgGold: 30 },
     { areaId: 'green-valley', areaName: '翠綠谷地', avgGold: 57 },
@@ -146,7 +187,7 @@ export const AREA_POOLS: Record<AdventurerQuestDifficulty, AreaPoolEntry[]> = {
   ],
 };
 
-export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<AdventurerQuestDifficulty, AreaPoolEntry[]>>> = {
+export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<BaseQuestDifficulty, AreaPoolEntry[]>>> = {
   'neutral-town': {
     D: AREA_POOLS.D,
     C: AREA_POOLS.C,
@@ -185,7 +226,7 @@ export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<AdventurerQuest
   },
 };
 
-const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: AdventurerQuestDifficulty }> = {
+const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: BaseQuestDifficulty }> = {
   'dawn-plains': { questArea: 'dawn-plains', difficulty: 'D' },
   'green-valley': { questArea: 'green-valley', difficulty: 'D' },
   'wind-woods': { questArea: 'wind-woods', difficulty: 'C' },
@@ -238,8 +279,8 @@ const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: Advent
   'ancient-dungeon-9f': { questArea: 'ancient-dungeon-9f', difficulty: 'S' },
 };
 
-function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]> {
-  const pools: Record<AdventurerQuestDifficulty, Map<string, { name: string; area: string; questArea: string }>> = {
+function buildMonsterPools(): Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]> {
+  const pools: Record<BaseQuestDifficulty, Map<string, { name: string; area: string; questArea: string }>> = {
     D: new Map(), C: new Map(), B: new Map(), A: new Map(), S: new Map(),
   };
 
@@ -262,7 +303,7 @@ function buildMonsterPools(): Record<AdventurerQuestDifficulty, { name: string; 
   };
 }
 
-export const MONSTER_POOLS: Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]> = buildMonsterPools();
+export const MONSTER_POOLS: Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]> = buildMonsterPools();
 
 export interface BossPoolEntry {
   name: string;
@@ -272,33 +313,33 @@ export interface BossPoolEntry {
 
 interface BossQuestConfig {
   monsterName: string;
-  difficulty: 'B' | 'A' | 'S';
+  difficulty: BossQuestDifficulty;
   questArea: string;
   avgGold: number;
 }
 
 const BOSS_QUEST_CONFIG: BossQuestConfig[] = [
-  { monsterName: '試煉飛龍', difficulty: 'B', questArea: 'trial-highlands-top', avgGold: 2500 },
-  { monsterName: '雪地之主', difficulty: 'B', questArea: 'snow-field-deep', avgGold: 3000 },
-  { monsterName: '象牙塔惡魔', difficulty: 'A', questArea: 'ivory-tower-5f', avgGold: 4000 },
-  { monsterName: '朦朧蛇魔', difficulty: 'A', questArea: 'misty-cave-3f', avgGold: 5000 },
-  { monsterName: '深海獄王', difficulty: 'A', questArea: 'underwater-prison-4f', avgGold: 5000 },
-  { monsterName: '安塔巨龍', difficulty: 'A', questArea: 'dragon-valley-7f', avgGold: 5000 },
-  { monsterName: '毒之皇女', difficulty: 'A', questArea: 'hundred-pillar-1-10f', avgGold: 4500 },
-  { monsterName: '哥布林之王', difficulty: 'A', questArea: 'hundred-pillar-11-20f', avgGold: 4500 },
-  { monsterName: '暗影吸血鬼', difficulty: 'A', questArea: 'hundred-pillar-21-30f', avgGold: 4500 },
-  { monsterName: '不死殭屍王', difficulty: 'S', questArea: 'hundred-pillar-31-40f', avgGold: 7000 },
-  { monsterName: '龍王約特勒', difficulty: 'S', questArea: 'hundred-pillar-41-50f', avgGold: 7000 },
-  { monsterName: '冥王哈馬斯', difficulty: 'S', questArea: 'hundred-pillar-51-60f', avgGold: 7000 },
-  { monsterName: '霜凍伊莉絲', difficulty: 'S', questArea: 'hundred-pillar-61-70f', avgGold: 8000 },
-  { monsterName: '熔岩伊弗利特', difficulty: 'S', questArea: 'hundred-pillar-71-80f', avgGold: 8000 },
-  { monsterName: '守護者之主', difficulty: 'S', questArea: 'hundred-pillar-81-90f', avgGold: 8500 },
-  { monsterName: '百柱死神', difficulty: 'S', questArea: 'hundred-pillar-91-100f', avgGold: 9000 },
-  { monsterName: '遠古騎士', difficulty: 'S', questArea: 'ancient-dungeon-9f', avgGold: 7500 },
+  { monsterName: '試煉飛龍', difficulty: 'B+', questArea: 'trial-highlands-top', avgGold: 2500 },
+  { monsterName: '雪地之主', difficulty: 'B+', questArea: 'snow-field-deep', avgGold: 3000 },
+  { monsterName: '象牙塔惡魔', difficulty: 'A+', questArea: 'ivory-tower-5f', avgGold: 4000 },
+  { monsterName: '朦朧蛇魔', difficulty: 'A+', questArea: 'misty-cave-3f', avgGold: 5000 },
+  { monsterName: '深海獄王', difficulty: 'A+', questArea: 'underwater-prison-4f', avgGold: 5000 },
+  { monsterName: '安塔巨龍', difficulty: 'A+', questArea: 'dragon-valley-7f', avgGold: 5000 },
+  { monsterName: '毒之皇女', difficulty: 'A+', questArea: 'hundred-pillar-1-10f', avgGold: 4500 },
+  { monsterName: '哥布林之王', difficulty: 'A+', questArea: 'hundred-pillar-11-20f', avgGold: 4500 },
+  { monsterName: '暗影吸血鬼', difficulty: 'A+', questArea: 'hundred-pillar-21-30f', avgGold: 4500 },
+  { monsterName: '不死殭屍王', difficulty: 'S+', questArea: 'hundred-pillar-31-40f', avgGold: 7000 },
+  { monsterName: '龍王約特勒', difficulty: 'S+', questArea: 'hundred-pillar-41-50f', avgGold: 7000 },
+  { monsterName: '冥王哈馬斯', difficulty: 'S+', questArea: 'hundred-pillar-51-60f', avgGold: 7000 },
+  { monsterName: '霜凍伊莉絲', difficulty: 'S+', questArea: 'hundred-pillar-61-70f', avgGold: 8000 },
+  { monsterName: '熔岩伊弗利特', difficulty: 'S+', questArea: 'hundred-pillar-71-80f', avgGold: 8000 },
+  { monsterName: '守護者之主', difficulty: 'S+', questArea: 'hundred-pillar-81-90f', avgGold: 8500 },
+  { monsterName: '百柱死神', difficulty: 'S+', questArea: 'hundred-pillar-91-100f', avgGold: 9000 },
+  { monsterName: '遠古騎士', difficulty: 'S+', questArea: 'ancient-dungeon-9f', avgGold: 7500 },
 ];
 
-function buildBossPools(): Record<'B' | 'A' | 'S', BossPoolEntry[]> {
-  const pools: Record<'B' | 'A' | 'S', BossPoolEntry[]> = { B: [], A: [], S: [] };
+function buildBossPools(): Record<BossQuestDifficulty, BossPoolEntry[]> {
+  const pools: Record<BossQuestDifficulty, BossPoolEntry[]> = { 'B+': [], 'A+': [], 'S+': [] };
   const bossSeeds = MONSTER_SEEDS.filter(m => m.isBoss);
 
   for (const config of BOSS_QUEST_CONFIG) {
@@ -314,7 +355,7 @@ function buildBossPools(): Record<'B' | 'A' | 'S', BossPoolEntry[]> {
   return pools;
 }
 
-export const BOSS_POOLS: Record<'B' | 'A' | 'S', BossPoolEntry[]> = buildBossPools();
+export const BOSS_POOLS: Record<BossQuestDifficulty, BossPoolEntry[]> = buildBossPools();
 
 function getTownAreaIds(townId: QuestTownId): Set<string> {
   const pools = TOWN_AREA_POOLS[townId];
@@ -325,8 +366,8 @@ function getTownAreaIds(townId: QuestTownId): Set<string> {
   return ids;
 }
 
-function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]>>> {
-  const result: Record<QuestTownId, Partial<Record<AdventurerQuestDifficulty, { name: string; area: string; questArea: string }[]>>> = {
+function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]>>> {
+  const result: Record<QuestTownId, Partial<Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]>>> = {
     'neutral-town': {},
     'elsarth-town': {},
     'varden-town': {},
@@ -334,7 +375,7 @@ function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<AdventurerQ
   const towns: QuestTownId[] = ['neutral-town', 'elsarth-town', 'varden-town'];
   for (const town of towns) {
     const areaIds = getTownAreaIds(town);
-    const difficulties = Object.keys(TOWN_AREA_POOLS[town]) as AdventurerQuestDifficulty[];
+    const difficulties = Object.keys(TOWN_AREA_POOLS[town]) as BaseQuestDifficulty[];
     for (const diff of difficulties) {
       const filtered = MONSTER_POOLS[diff].filter(m => areaIds.has(m.area));
       if (filtered.length > 0) result[town][diff] = filtered;
@@ -345,8 +386,8 @@ function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<AdventurerQ
 
 export const TOWN_MONSTER_POOLS = buildTownMonsterPools();
 
-function buildTownBossPools(): Record<QuestTownId, Partial<Record<'B' | 'A' | 'S', BossPoolEntry[]>>> {
-  const result: Record<QuestTownId, Partial<Record<'B' | 'A' | 'S', BossPoolEntry[]>>> = {
+function buildTownBossPools(): Record<QuestTownId, Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>> {
+  const result: Record<QuestTownId, Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>> = {
     'neutral-town': {},
     'elsarth-town': {},
     'varden-town': {},
@@ -354,9 +395,10 @@ function buildTownBossPools(): Record<QuestTownId, Partial<Record<'B' | 'A' | 'S
   const towns: QuestTownId[] = ['neutral-town', 'elsarth-town', 'varden-town'];
   for (const town of towns) {
     const areaIds = getTownAreaIds(town);
-    const difficulties: ('B' | 'A' | 'S')[] = ['B', 'A', 'S'];
+    const difficulties: BossQuestDifficulty[] = ['B+', 'A+', 'S+'];
     for (const diff of difficulties) {
-      if (!TOWN_AREA_POOLS[town][diff]) continue;
+      // BOSS 分頁沿用同字母一般難度的區域池（§ 36.12.2）
+      if (!TOWN_AREA_POOLS[town][getBaseDifficulty(diff)]) continue;
       const filtered = BOSS_POOLS[diff].filter(b => areaIds.has(b.area));
       if (filtered.length > 0) result[town][diff] = filtered;
     }
@@ -366,8 +408,16 @@ function buildTownBossPools(): Record<QuestTownId, Partial<Record<'B' | 'A' | 'S
 
 export const TOWN_BOSS_POOLS = buildTownBossPools();
 
+/**
+ * § 36.6.1：一般分頁需要該城鎮有對應區域池；
+ * BOSS 分頁另需該池內至少有一隻 BOSS，否則整個分頁不顯示（不降級為殲滅任務）。
+ */
 export function getTownDifficulties(townId: QuestTownId): AdventurerQuestDifficulty[] {
-  return (['D', 'C', 'B', 'A', 'S'] as AdventurerQuestDifficulty[]).filter(d => !!TOWN_AREA_POOLS[townId][d]);
+  return QUEST_DIFFICULTY_ORDER.filter(d => (
+    isBossDifficulty(d)
+      ? (TOWN_BOSS_POOLS[townId]?.[d]?.length ?? 0) > 0
+      : !!TOWN_AREA_POOLS[townId]?.[d]
+  ));
 }
 
 export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: number }[]> = {
@@ -441,7 +491,7 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
   ],
 };
 
-export const CRAFTING_MATERIAL_REWARDS: Partial<Record<AdventurerQuestDifficulty, number[]>> = {
+export const CRAFTING_MATERIAL_REWARDS: Partial<Record<BaseQuestDifficulty, number[]>> = {
   B: [11, 12],
   A: [13, 14],
   S: [15, 16, 17, 18],
@@ -457,7 +507,7 @@ export const POTION_REWARDS = POTION_REWARD_IDS.map(id => {
 export { QUEST_TITLE_TEMPLATES } from '../db/seed/questTemplateSeeds';
 
 export function getAreaNameById(areaId: string, difficulty: AdventurerQuestDifficulty): string {
-  const pool = AREA_POOLS[difficulty];
+  const pool = AREA_POOLS[getBaseDifficulty(difficulty)];
   return pool.find(a => a.areaId === areaId)?.areaName ?? areaId;
 }
 

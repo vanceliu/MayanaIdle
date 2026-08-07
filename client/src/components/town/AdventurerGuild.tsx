@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import type { AdventurerQuest, AdventurerQuestDifficulty, QuestTownId } from '../../models/adventurerQuest';
-import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties } from '../../models/adventurerQuest';
+import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties, isBossDifficulty, QUEST_BOARD_REFRESH_COST } from '../../models/adventurerQuest';
 import { getPointsToNextRank } from '../../systems/adventurerQuestSystem';
 import { getItemById } from '../../models/items';
 
@@ -68,6 +68,7 @@ export function AdventurerGuild() {
   const completeAdventurerQuest = useGameStore(s => s.completeAdventurerQuest);
   const questBoardTownId = useGameStore(s => s.questBoardTownId);
   const initQuestBoard = useGameStore(s => s.initQuestBoard);
+  const rerollQuestBoard = useGameStore(s => s.rerollQuestBoard);
 
   useEffect(() => {
     if (questBoardTownId !== townId) {
@@ -84,6 +85,8 @@ export function AdventurerGuild() {
   const currentBoard = questBoard[activeDifficulty] ?? [];
   const activeCount = activeQuests.length;
   const canAccept = activeCount < MAX_ACTIVE_ADVENTURER_QUESTS;
+
+  const canReroll = guildProgress.points >= QUEST_BOARD_REFRESH_COST;
 
   const nextRank = getNextRank(guildProgress.rank);
   const pointsToNext = getPointsToNextRank(guildProgress);
@@ -139,12 +142,21 @@ export function AdventurerGuild() {
         {availableDifficulties.map(d => (
           <button
             key={d}
-            className={activeDifficulty === d ? 'active' : ''}
+            className={`${activeDifficulty === d ? 'active' : ''}${isBossDifficulty(d) ? ' is-boss-tab' : ''}`}
             onClick={() => setActiveDifficulty(d)}
           >
             {d} 級
           </button>
         ))}
+        {/* § 36.6.3：只刷目前分頁，貢獻不足 50 時禁用 */}
+        <button
+          className="quest-reroll-btn"
+          disabled={!canReroll}
+          onClick={() => rerollQuestBoard(activeDifficulty)}
+          title={canReroll ? undefined : `貢獻不足 ${QUEST_BOARD_REFRESH_COST}`}
+        >
+          重新整理（-{QUEST_BOARD_REFRESH_COST} 貢獻）
+        </button>
       </div>
 
       <div className="shop-items">

@@ -7,10 +7,13 @@ import type {
   QuestReward,
   RewardType,
   QuestTownId,
+  BossQuestDifficulty,
+  BossPoolEntry,
 } from '../models/adventurerQuest';
 import {
   MAX_ACTIVE_ADVENTURER_QUESTS,
   CONTRIBUTION_POINTS,
+  BOSS_CONTRIBUTION_POINTS,
   QUEST_TYPE_WEIGHTS,
   QUEST_TYPE_WEIGHTS_BOSS,
   KILL_COUNT_RANGE,
@@ -33,6 +36,9 @@ import {
   GUILD_RANK_ORDER,
   getRankForPoints,
   getRankIndex,
+  getBaseDifficulty,
+  isBossDifficulty,
+  BOSS_DIFFICULTY_OF,
 } from '../models/adventurerQuest';
 import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
 import { QUEST_TITLE_TEMPLATES, QUEST_DESCRIPTION_TEMPLATES } from '../db/seed/questTemplateSeeds';
@@ -60,13 +66,10 @@ function weightedPick<T extends { weight: number }>(items: T[]): T {
   return items[items.length - 1];
 }
 
+/** § 36.9 步驟 2a：BOSS 分頁只產 BOSS 任務，一般分頁只產一般任務 */
 function pickQuestType(difficulty: AdventurerQuestDifficulty): AdventurerQuestType {
-  const hasBoss = difficulty === 'B' || difficulty === 'A' || difficulty === 'S';
-  if (hasBoss) {
+  if (isBossDifficulty(difficulty)) {
     const items = [
-      { type: 'errand' as const, weight: QUEST_TYPE_WEIGHTS_BOSS.errand },
-      { type: 'collect' as const, weight: QUEST_TYPE_WEIGHTS_BOSS.collect },
-      { type: 'endurance' as const, weight: QUEST_TYPE_WEIGHTS_BOSS.endurance },
       { type: 'errandboss' as const, weight: QUEST_TYPE_WEIGHTS_BOSS.errandboss },
       { type: 'collectboss' as const, weight: QUEST_TYPE_WEIGHTS_BOSS.collectboss },
     ];
@@ -78,6 +81,27 @@ function pickQuestType(difficulty: AdventurerQuestDifficulty): AdventurerQuestTy
     { type: 'endurance' as const, weight: QUEST_TYPE_WEIGHTS.endurance },
   ];
   return weightedPick(items).type;
+}
+
+/**
+ * 任務板可能在城外被刷新（例：在任務追蹤視窗退出任務），此時 `currentArea` 不是城鎮 id。
+ * 非城鎮一律視為「不做城鎮過濾」，不可直接拿去索引城鎮池（會取到 undefined）。
+ */
+function asQuestTown(townId?: string): QuestTownId | undefined {
+  return townId && townId in TOWN_AREA_POOLS ? townId as QuestTownId : undefined;
+}
+
+/** § 36.12.5：城鎮 BOSS 池不回退到全域，避免出現該城鎮管不到的 BOSS */
+function getBossPool(difficulty: AdventurerQuestDifficulty, townId?: QuestTownId): BossPoolEntry[] {
+  if (!isBossDifficulty(difficulty)) return [];
+  return townId ? (TOWN_BOSS_POOLS[townId][difficulty] ?? []) : BOSS_POOLS[difficulty];
+}
+
+/** 舊存檔的 BOSS 任務存的是拆分前的 'B'|'A'|'S'，查表前先轉成對應的 + 分頁 */
+function toBossDifficulty(difficulty: AdventurerQuestDifficulty): BossQuestDifficulty {
+  return isBossDifficulty(difficulty)
+    ? difficulty
+    : BOSS_DIFFICULTY_OF[getBaseDifficulty(difficulty) as 'B' | 'A' | 'S'] ?? 'B+';
 }
 
 function generateQuestTitle(type: AdventurerQuestType): string {
@@ -131,7 +155,7 @@ function calculateReward(
       return { type: 'armor-scroll', itemId: item.id, amount: 1 };
     }
     case 'crafting-material': {
-      const materialIds = CRAFTING_MATERIAL_REWARDS[difficulty] ?? CRAFTING_MATERIAL_REWARDS.B!;
+      const materialIds = CRAFTING_MATERIAL_REWARDS[getBaseDifficulty(difficulty)] ?? CRAFTING_MATERIAL_REWARDS.B!;
       const itemId = pickRandom(materialIds);
       const item = getItem(itemId);
       const amount = Math.max(1, Math.floor(baseValue / (item.sellPrice! * 3)));
@@ -144,8 +168,9 @@ export function generateSingleQuest(
   difficulty: AdventurerQuestDifficulty,
   guildRank: GuildRank,
   index: number,
-  townId?: QuestTownId,
+  rawTownId?: QuestTownId,
 ): AdventurerQuest {
+  const townId = asQuestTown(rawTownId);
   const type = pickQuestType(difficulty);
   let targetArea: string;
   let areaName: string;
@@ -153,11 +178,11 @@ export function generateSingleQuest(
   let targetCount: number;
   let avgGold: number;
 
-  const areaPool = (townId ? TOWN_AREA_POOLS[townId][difficulty] : undefined) ?? AREA_POOLS[difficulty];
-  const monsterPool = (townId ? TOWN_MONSTER_POOLS[townId]?.[difficulty] : undefined) ?? MONSTER_POOLS[difficulty];
-  const bossPool = (townId && (difficulty === 'B' || difficulty === 'A' || difficulty === 'S'))
-    ? (TOWN_BOSS_POOLS[townId]?.[difficulty as 'B' | 'A' | 'S'] ?? BOSS_POOLS[difficulty as 'B' | 'A' | 'S'])
-    : (difficulty === 'B' || difficulty === 'A' || difficulty === 'S') ? BOSS_POOLS[difficulty as 'B' | 'A' | 'S'] : [];
+  // BOSS 分頁沿用同字母一般難度的區域／怪物池（§ 36.3.2）
+  const base = getBaseDifficulty(difficulty);
+  const areaPool = (townId ? TOWN_AREA_POOLS[townId][base] : undefined) ?? AREA_POOLS[base];
+  const monsterPool = (townId ? TOWN_MONSTER_POOLS[townId]?.[base] : undefined) ?? MONSTER_POOLS[base];
+  const bossPool = getBossPool(difficulty, townId);
 
   if (type === 'collect') {
     if (monsterPool.length === 0) {
@@ -165,7 +190,7 @@ export function generateSingleQuest(
       targetArea = areaEntry.areaId;
       areaName = getAreaDisplayName(targetArea);
       avgGold = areaEntry.avgGold;
-      targetCount = randomInt(KILL_COUNT_RANGE[difficulty].min, KILL_COUNT_RANGE[difficulty].max);
+      targetCount = randomInt(KILL_COUNT_RANGE[base].min, KILL_COUNT_RANGE[base].max);
       return buildQuest('errand', difficulty, targetArea, areaName, undefined, targetCount, avgGold, guildRank, index);
     }
     const monsterEntry = pickRandom(monsterPool);
@@ -175,15 +200,9 @@ export function generateSingleQuest(
     avgGold = areaPool.find(a => a.areaId === monsterEntry.questArea)?.avgGold ?? 50;
     targetCount = randomInt(COLLECT_TARGET_COUNT_RANGE.min, COLLECT_TARGET_COUNT_RANGE.max);
   } else if (type === 'errandboss' || type === 'collectboss') {
-    if (bossPool.length === 0) {
-      const areaEntry = pickRandom(areaPool);
-      targetArea = areaEntry.areaId;
-      areaName = getAreaDisplayName(targetArea);
-      avgGold = areaEntry.avgGold;
-      targetCount = randomInt(KILL_COUNT_RANGE[difficulty].min, KILL_COUNT_RANGE[difficulty].max);
-      return buildQuest('errand', difficulty, targetArea, areaName, undefined, targetCount, avgGold, guildRank, index);
-    }
-    const bossEntry = pickRandom(bossPool);
+    // § 36.9 步驟 5：BOSS 分頁不降級。無可用 BOSS 的城鎮該分頁根本不會生成（見 generateQuestList），
+    // 這裡退回全域 BOSS 池只是防禦，全域池必定非空。
+    const bossEntry = pickRandom(bossPool.length > 0 ? bossPool : BOSS_POOLS[difficulty as BossQuestDifficulty]);
     targetMonster = bossEntry.name;
     targetArea = bossEntry.area;
     areaName = getAreaDisplayName(targetArea);
@@ -201,10 +220,10 @@ export function generateSingleQuest(
     avgGold = areaEntry.avgGold;
 
     if (type === 'errand') {
-      const range = KILL_COUNT_RANGE[difficulty];
+      const range = KILL_COUNT_RANGE[base];
       targetCount = randomInt(range.min, range.max);
     } else {
-      const range = ENDURANCE_COUNT_RANGE[difficulty];
+      const range = ENDURANCE_COUNT_RANGE[base];
       targetCount = randomInt(range.min, range.max);
     }
   }
@@ -230,7 +249,10 @@ function buildQuest(
   // § 36.9 步驟 2f：BOSS 任務獎勵 ×2。等階只影響獎勵「種類」的權重（§ 36.5.2），不影響數量倍率。
   const rewardMultiplier = isBossQuest ? 2 : 1;
   const reward = calculateReward(rewardType, baseValue * rewardMultiplier, difficulty);
-  const baseContribution = CONTRIBUTION_POINTS[difficulty][type];
+  // § 36.4.2：BOSS 分頁與一般分頁各有一張基底貢獻表
+  const baseContribution = isBossQuest
+    ? BOSS_CONTRIBUTION_POINTS[toBossDifficulty(difficulty)][type as 'errandboss' | 'collectboss']
+    : CONTRIBUTION_POINTS[getBaseDifficulty(difficulty)][type as 'errand' | 'collect' | 'endurance'];
   const areaBonus = Math.floor(avgGold / 10);
   const contributionPoints = baseContribution + areaBonus;
   const title = generateQuestTitle(type);
@@ -255,8 +277,11 @@ function buildQuest(
 export function generateQuestList(
   difficulty: AdventurerQuestDifficulty,
   guildRank: GuildRank,
-  townId?: QuestTownId,
+  rawTownId?: QuestTownId,
 ): AdventurerQuest[] {
+  const townId = asQuestTown(rawTownId);
+  // § 36.6.1：該城鎮該難度無可用 BOSS 時整個分頁不顯示，不產生降級後的殲滅任務
+  if (isBossDifficulty(difficulty) && getBossPool(difficulty, townId).length === 0) return [];
   const count = randomInt(5, 8);
   const quests: AdventurerQuest[] = [];
   for (let i = 0; i < count; i++) {

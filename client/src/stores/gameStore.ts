@@ -42,7 +42,7 @@ import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
-import { getTownDifficulties } from '../models/adventurerQuest';
+import { getTownDifficulties, QUEST_DIFFICULTY_ORDER, createEmptyQuestBoard, QUEST_BOARD_REFRESH_COST, getRankForPoints } from '../models/adventurerQuest';
 import type { CraftQuest } from '../models/craftQuest';
 import { acceptCraftQuest as acceptCraftQuestFn, abandonCraftQuest as abandonCraftQuestFn } from '../systems/craftQuestSystem';
 import type { CharacterStatistics } from '../models/statistics';
@@ -222,6 +222,7 @@ interface GameState {
   personalStoredMaterials: BagItem[];
   activeEffects: ActiveEffect[];
   adventurerQuests: AdventurerQuest[];
+  /** 任務板：一般分頁 D/C/B/A/S 與 BOSS 分頁 B+/A+/S+（§ 36.6.1） */
   adventurerQuestBoard: Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
   questBoardTownId: QuestTownId | null;
   guildProgress: GuildProgress;
@@ -287,6 +288,8 @@ interface GameState {
   abandonAdventurerQuest: (questId: string) => void;
   completeAdventurerQuest: (questId: string) => void;
   refreshQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
+  /** § 36.6.3：花 50 貢獻重刷單一分頁 */
+  rerollQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
   /** 加入製作追蹤（§ 36.13.2）。滿 3 個或已追蹤同配方時不做事 */
   acceptCraftQuest: (templateId: number) => void;
@@ -376,7 +379,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   personalStoredMaterials: [],
   activeEffects: [],
   adventurerQuests: [],
-  adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+  adventurerQuestBoard: createEmptyQuestBoard(),
   questBoardTownId: null,
   guildProgress: { rank: 'F', points: 0 },
   craftQuests: [],
@@ -635,7 +638,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
       quickSlots: emptyQuickSlots(),
       adventurerQuests: [],
-      adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+      adventurerQuestBoard: createEmptyQuestBoard(),
   questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
       craftQuests: [],
@@ -725,7 +728,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       skills: startingSkills,
       bagItems: starterBag,
       adventurerQuests: [],
-      adventurerQuestBoard: { D: [], C: [], B: [], A: [], S: [] },
+      adventurerQuestBoard: createEmptyQuestBoard(),
   questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
       craftQuests: [],
@@ -1621,11 +1624,29 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ adventurerQuestBoard: board });
   },
 
+  /**
+   * § 36.6.3 手動刷新：只刷目前分頁，扣 50 貢獻。
+   * 貢獻不足時不做任何事（UI 也會禁用按鈕），扣完跌破門檻照常降階。
+   */
+  rerollQuestBoard: (difficulty) => {
+    const state = get();
+    if (state.guildProgress.points < QUEST_BOARD_REFRESH_COST) return;
+
+    const points = state.guildProgress.points - QUEST_BOARD_REFRESH_COST;
+    const guildProgress = { rank: getRankForPoints(points), points };
+    const townId = state.character?.currentArea as QuestTownId | undefined;
+    const board = { ...state.adventurerQuestBoard };
+    board[difficulty] = generateQuestList(difficulty, guildProgress.rank, townId);
+
+    set({ adventurerQuestBoard: board, guildProgress });
+    saveGame(get());
+  },
+
   initQuestBoard: () => {
     const state = get();
     const townId = state.character?.currentArea as QuestTownId | undefined;
-    const difficulties = townId ? getTownDifficulties(townId) : (['D', 'C', 'B', 'A', 'S'] as AdventurerQuestDifficulty[]);
-    const board = { D: [], C: [], B: [], A: [], S: [] } as Record<AdventurerQuestDifficulty, AdventurerQuest[]>;
+    const difficulties = townId ? getTownDifficulties(townId) : QUEST_DIFFICULTY_ORDER;
+    const board = createEmptyQuestBoard();
     for (const d of difficulties) {
       board[d] = generateQuestList(d, state.guildProgress.rank, townId);
     }
