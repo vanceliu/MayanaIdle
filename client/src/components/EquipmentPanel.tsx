@@ -5,6 +5,7 @@ import { EquipmentDetail } from './EquipmentInfo';
 import { Tooltip } from './Tooltip';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
+import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 
 /** 按下到放開的位移在這個範圍內都算「點擊」（px） */
@@ -80,15 +81,19 @@ export function EquipmentPanel() {
       <div className="equipped-list">
         {SLOT_ORDER.map(slot => {
           const item = equippedGear[slot];
+          const enhancement = item?.enhancement ?? 0;
           return (
-            <div key={slot} className="equip-slot">
+            // 選取狀態掛在整個格子上（金色外框），與背包格的 `.bag-cell.is-selected` 同一套語言
+            <div
+              key={slot}
+              className={`equip-slot${item ? '' : ' is-empty'}${selectedSlot === slot ? ' is-selected' : ''}`}
+            >
               <span className="slot-icon">
                 <GameIcon name={getEquipIcon(SLOT_ICON_MAP[slot])} size={20} />
               </span>
-              <span className="slot-name">{SLOT_NAMES[slot]}</span>
               {item ? (
-                // 欄位本身只放 compact 摘要（無詞綴）；hover 才出完整內容
-                // （部位／Tier／材質／重量／職業／詞綴）
+                // 格子只印部位名 + 裝備名；數值、詞綴、Tier、材質、職業一律 hover 才出。
+                // 十個欄位各印四五行數值會把面板拉到整個畫面高（見 `16-tech-frontend-architecture.md` § 32.15）
                 <Tooltip
                   position="right"
                   content={(
@@ -100,15 +105,25 @@ export function EquipmentPanel() {
                   )}
                 >
                   <div
-                    className={`equipped-item${selectedSlot === slot ? ' is-selected' : ''}`}
+                    className="equipped-item"
                     onPointerDown={(e) => handleSlotPointerDown(e, slot)}
                     onPointerUp={(e) => handleSlotPointerUp(e, slot)}
                   >
-                    <EquipmentDetail item={item} compact templates={templates} />
+                    <span className="slot-name">{SLOT_NAMES[slot]}</span>
+                    {/* Tier 色與背包格同一個來源，同一件裝備在兩邊不會是兩個顏色 */}
+                    <span
+                      className="equip-slot-item-name"
+                      style={{ color: getEquipmentInstanceTierColor(item, templates) }}
+                    >
+                      {item.name}{enhancement > 0 ? ` +${enhancement}` : ''}
+                    </span>
                   </div>
                 </Tooltip>
               ) : (
-                <span className="empty-slot">-- 空 --</span>
+                <div className="equip-slot-label">
+                  <span className="slot-name">{SLOT_NAMES[slot]}</span>
+                  <span className="empty-slot">-- 空 --</span>
+                </div>
               )}
             </div>
           );

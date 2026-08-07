@@ -75,7 +75,8 @@ export function panelButtonA11y(panelKey: PanelKey) {
 
 export const PANEL_WIDTHS: Record<PanelKey, number> = {
   stats: 340,
-  equipment: 360,
+  // 兩欄部位格，一欄放得下「腰帶／皮腰帶」這種長度；數值都在 tooltip 裡，不必留寬
+  equipment: 280,
   bag: 420,
   skill: 420,
   quest: 320,

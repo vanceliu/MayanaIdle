@@ -533,7 +533,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `BattleView` | Pixi 地圖容器、戰鬥日誌（含 log 大小切換） |
 | `ExploreBar` | 探索控制（自動/手動搜尋）、探索/戰鬥指示、死亡橫幅；位於頂部 HUD |
 | `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
-| `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作 |
+| `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作。**兩欄部位格**（2×5）：格子只印部位名 + 裝備名（Tier 色與背包同源），數值／詞綴／材質／職業一律 hover tooltip；空部位畫虛線框；選取用金色外框，與 `.bag-cell.is-selected` 同一套 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
 | `BagPanel` | 背包 grid（無收合），格數 = 50 + 腰帶擴充，支援拖放自由擺放（不持久化），GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
 | `Inventory` | 裝備背包列表元件 |
@@ -934,7 +934,7 @@ interface TooltipProps {
 | PanelKey | 標題 | 內容組件 | 預設寬度 |
 |---|---|---|---|
 | `stats` | 詳細狀態 | `CharacterStats` | 340px |
-| `equipment` | 裝備欄 | `EquipmentPanel` | 360px |
+| `equipment` | 裝備欄 | `EquipmentPanel` | 280px |
 | `bag` | 背包 | `BagPanel` | 420px |
 | `skill` | 技能 | `SkillPanel` | 420px |
 | `quest` | 進行中的任務 | `QuestTrackerContent` | 320px |

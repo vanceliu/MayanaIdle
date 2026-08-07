@@ -84,11 +84,29 @@ describe('EquipmentPanel', () => {
       fireEvent.pointerUp(el, { clientX: x, clientY: y });
     }
 
-    it('欄位本身只顯示 compact 摘要，不含部位與職業', () => {
+    it('格子只印部位名與裝備名，數值一律留給 tooltip', () => {
       const { container } = render(<EquipmentPanel />);
-      expect(container.querySelector('.equipped-item')).not.toBeNull();
-      // compact 模式不印可用職業；「腰帶」只會出現在欄位標籤，不是 tooltip 內容
+      const cell = container.querySelector('.equipped-item')!;
+      expect(cell).not.toBeNull();
+      expect(within(cell as HTMLElement).getByText('腰帶')).toBeDefined();
+      expect(within(cell as HTMLElement).getByText('皮腰帶')).toBeDefined();
+      // 十個格子各印四五行數值會把面板拉到整個畫面高，所以數值只在 hover 時出現
+      expect(container.querySelector('.equip-detail-stat')).toBeNull();
+      expect(screen.queryByText('負重+1700')).toBeNull();
       expect(screen.queryByText(/可用職業/)).toBeNull();
+    });
+
+    it('強化等級接在裝備名後面', () => {
+      useGameStore.setState({ equippedGear: { belt: { ...belt, enhancement: 4 } } });
+      const { container } = render(<EquipmentPanel />);
+      expect(within(container.querySelector('.equipped-item') as HTMLElement).getByText('皮腰帶 +4')).toBeDefined();
+    });
+
+    it('沒穿的部位標成 is-empty，缺哪個部位一眼看得到', () => {
+      const { container } = render(<EquipmentPanel />);
+      // 十個部位只穿了腰帶，其餘九格都是空的
+      expect(container.querySelectorAll('.equip-slot.is-empty')).toHaveLength(9);
+      expect(container.querySelectorAll('.equip-slot')).toHaveLength(10);
     });
 
     it('裝備欄不列詞綴，避免十個欄位各印四條把面板灌爆', () => {
@@ -108,7 +126,7 @@ describe('EquipmentPanel', () => {
         vi.advanceTimersByTime(300);
       });
 
-      // compact 摘要也印同一批數值，所以斷言要限縮在 tooltip 內，避免抓到欄位本身
+      // 斷言限縮在 tooltip 內：部位名在格子上也有一份，不限縮會抓到欄位本身
       const popup = document.querySelector('.tooltip-popup') as HTMLElement;
       expect(popup).not.toBeNull();
       expect(within(popup).getByText('負重+1700')).toBeDefined();
@@ -128,7 +146,7 @@ describe('EquipmentPanel', () => {
 
       tap(equipped);
       expect(unequipItem).not.toHaveBeenCalled();
-      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+      expect(container.querySelector('.equip-slot.is-selected')).not.toBeNull();
 
       tap(container.querySelector('.equipped-item')!);
       expect(unequipItem).toHaveBeenCalledWith('belt');
@@ -140,12 +158,12 @@ describe('EquipmentPanel', () => {
       const { container } = render(<EquipmentPanel />);
 
       tap(container.querySelector('.equipped-item')!);
-      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+      expect(container.querySelector('.equip-slot.is-selected')).not.toBeNull();
 
       const empty = container.querySelector('.empty-slot')!;
       fireEvent.pointerDown(empty, { button: 0 });
       fireEvent.pointerUp(empty);
-      expect(container.querySelector('.equipped-item.is-selected')).toBeNull();
+      expect(container.querySelector('.equip-slot.is-selected')).toBeNull();
 
       // 取消後再點只是重新選取，不會直接卸下
       tap(container.querySelector('.equipped-item')!);
@@ -157,11 +175,11 @@ describe('EquipmentPanel', () => {
       const equipped = container.querySelector('.equipped-item')!;
 
       tap(equipped);
-      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+      expect(container.querySelector('.equip-slot.is-selected')).not.toBeNull();
 
       // click 被改派到共同祖先時不能誤判成點在空白處
       fireEvent.click(container.querySelector('.equipped-list')!);
-      expect(container.querySelector('.equipped-item.is-selected')).not.toBeNull();
+      expect(container.querySelector('.equip-slot.is-selected')).not.toBeNull();
     });
 
     it('選取後 tooltip 提示改成「再點一次卸下」', () => {
