@@ -38,48 +38,34 @@ export interface SigilDefinition {
   description: string;
   /** `item` = 整件裝備（混沌／工藝）；`affix` = 指定一條詞綴 */
   target: 'item' | 'affix';
-  /**
-   * 介面分頁。精鍊與突破是同一個動作（Tier +1）的兩段，共用一個分頁（§ 46.2），
-   * 由該條詞綴當前的 Tier 決定實際消耗哪一種印記。
-   */
-  tab: SigilType;
 }
 
 /** § 46.2 印記清單 */
 export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   {
-    type: 'chaos', itemId: 147, name: '混沌印記', target: 'item', tab: 'chaos',
+    type: 'chaos', itemId: 147, name: '混沌印記', target: 'item',
     description: '全部 4 條詞綴重骰（種類／Tier／數值），Tier 上限 T5，商店裝 T3 且不出特殊詞綴',
   },
   {
-    type: 'sting', itemId: 148, name: '刺針印記', target: 'affix', tab: 'sting',
+    type: 'sting', itemId: 148, name: '刺針印記', target: 'affix',
     description: '指定一條詞綴換成同部位詞綴池的另一條，Tier 不變',
   },
   {
-    type: 'recarve', itemId: 149, name: '重刻印記', target: 'affix', tab: 'recarve',
+    type: 'recarve', itemId: 149, name: '重刻印記', target: 'affix',
     description: '指定一條詞綴的隨機數值全部重骰，種類與 Tier 不變',
   },
   {
-    type: 'temper', itemId: 10, name: '精鍊印記', target: 'affix', tab: 'enhance',
+    type: 'temper', itemId: 10, name: '精鍊印記', target: 'affix',
     description: '指定一條詞綴 Tier +1，必定成功，最高推到該裝備的取得管道上限（一般 T5、商店裝 T3）',
   },
   {
-    type: 'enhance', itemId: 150, name: '突破印記', target: 'affix', tab: 'enhance',
+    type: 'enhance', itemId: 150, name: '突破印記', target: 'affix',
     description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗掉回 T1',
   },
   {
-    type: 'polish', itemId: 9, name: '工藝印記', target: 'item', tab: 'polish',
+    type: 'polish', itemId: 9, name: '工藝印記', target: 'item',
     description: '整件裝備品質 +1%（上限 20%），必定成功，另收 50,000G',
   },
-];
-
-/** 印記師的分頁（§ 46.2：精鍊與突破合在同一個分頁，故不等於 `SIGIL_DEFINITIONS`） */
-export const SIGIL_TABS: { tab: SigilType; label: string }[] = [
-  { tab: 'chaos', label: '混沌印記' },
-  { tab: 'sting', label: '刺針印記' },
-  { tab: 'recarve', label: '重刻印記' },
-  { tab: 'enhance', label: '詞綴升階' },
-  { tab: 'polish', label: '品質提升' },
 ];
 
 export function getSigilDefinition(type: SigilType): SigilDefinition {

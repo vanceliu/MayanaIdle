@@ -29,6 +29,7 @@ export function QuickSlotBar() {
   const quickSlots = useGameStore(s => s.quickSlots);
   const bagItems = useGameStore(s => s.bagItems);
   const inventory = useGameStore(s => s.inventory);
+  const equippedGear = useGameStore(s => s.equippedGear);
   const useQuickSlot = useGameStore(s => s.useQuickSlot);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const templates = useEquipmentTemplates();
@@ -63,11 +64,21 @@ export function QuickSlotBar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [useQuickSlot]);
 
-  /** 這格還剩幾個可用；裝備回 1（存在）或 0（已不在背包） */
+  /**
+   * 這件裝備現在在哪 —— 背包裡或穿在身上都算「還在」（§ 35.7.2）。
+   * 裝備中一樣留在背包格上，點快捷格是脫下來，不能當成失效的格子。
+   */
+  function findEquipment(equipmentId: number) {
+    return inventory.find(i => i.id === equipmentId)
+      ?? Object.values(equippedGear).find(i => i?.id === equipmentId)
+      ?? undefined;
+  }
+
+  /** 這格還剩幾個可用；裝備回 1（在背包或身上）或 0（已賣掉／丟棄／存進倉庫） */
   function slotCount(entry: QuickSlotEntry): number {
     if (entry.kind === 'potion') return getPotionCount(bagItems, entry.potionType);
     if (entry.kind === 'equipment') {
-      return inventory.some(i => i.id === entry.equipmentId) ? 1 : 0;
+      return findEquipment(entry.equipmentId) ? 1 : 0;
     }
     return getBagItemAmount(bagItems, entry.itemId);
   }
@@ -77,7 +88,7 @@ export function QuickSlotBar() {
       return <GameIcon name={getItemIcon(`${entry.potionType}-potion`)} size={24} color={POTION_COLORS[entry.potionType]} />;
     }
     if (entry.kind === 'equipment') {
-      const item = inventory.find(i => i.id === entry.equipmentId);
+      const item = findEquipment(entry.equipmentId);
       const iconKey = item
         ? getEquipIcon(item.type === 'armor' ? (item.slot || 'chest') : item.type)
         : getEquipIcon('sword');

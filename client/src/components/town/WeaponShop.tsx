@@ -66,7 +66,7 @@ export function WeaponShop() {
   const weaponsInBag = inventory.filter(i => !!i.smallMonsterDamage && getSellPrice(i) > 0 && !i.isStarterGear && !equippedIds.has(i.id));
 
   // --- 購買頁購物車 ---
-  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory);
+  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory, equippedGear);
   // 勾選狀態跨分類保留，切換分類不會靜默丟掉已勾的武器
   const buyLines = cartLines(buyCart, templates, { keyOf: t => t.name, maxOf: () => 1 });
   const buyTotal = buyLines.reduce((sum, l) => sum + (l.item.buyPrice ?? 0), 0);

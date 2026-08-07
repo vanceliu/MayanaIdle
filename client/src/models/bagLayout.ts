@@ -98,4 +98,6 @@ export interface BagDragPayload {
   itemId?: number;
   amount: number;
   equipmentId?: number;
+  /** 這件裝備正穿在身上（§ 35.1）。裝備中不可丟棄，拖到地圖不觸發丟棄流程 */
+  equipped?: boolean;
 }

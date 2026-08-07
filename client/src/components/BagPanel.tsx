@@ -5,7 +5,7 @@ import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStor
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
 import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type PotionType, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
-import type { EquipmentInstance } from '../models/equipment';
+import { SLOT_NAMES, SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
 import { formatMaterialUsage, hasMaterialUsage } from '../systems/craftMaterialUsage';
@@ -33,6 +33,11 @@ interface BagGridItem {
   speedPotionType?: SpeedPotionType;
   cureItemId?: number;
   equipment?: EquipmentInstance;
+  /**
+   * 這件裝備正穿在哪個部位（§ 35.1）。
+   * 有值＝「裝備中」：一樣佔背包格，第二次點擊是卸下而不是穿上，且不可丟棄。
+   */
+  equippedSlot?: EquipSlot;
 }
 
 function getShortName(name: string): string {
@@ -113,6 +118,7 @@ export function BagPanel() {
   const bagItems = useGameStore(s => s.bagItems);
   const equippedGear = useGameStore(s => s.equippedGear);
   const equipItem = useGameStore(s => s.equipItem);
+  const unequipItem = useGameStore(s => s.unequipItem);
   const usePotionByType = useGameStore(s => s.usePotionByType);
   const useTownScroll = useGameStore(s => s.useTownScroll);
   const useCureItem = useGameStore(s => s.useCureItem);
@@ -162,6 +168,18 @@ export function BagPanel() {
     gridItems.push({ id: `bag-${item.itemId}`, type: item.type, name: item.name, itemId: item.itemId, count: item.amount });
   }
 
+  /*
+   * § 35.1：穿上不等於離開背包 —— 裝備中的裝備照樣佔一格，只是多一個「裝備中」標記。
+   * 格子 id 用裝備實例 id，因此穿脫時同一件東西的 id 不變，
+   * 手動擺放的位置與快捷鍵綁定都不會因為換裝而失效。
+   */
+  for (const slot of SLOT_ORDER) {
+    const item = equippedGear[slot];
+    if (item) {
+      gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item, equippedSlot: slot });
+    }
+  }
+
   for (const item of inventory) {
     gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item });
   }
@@ -184,6 +202,10 @@ export function BagPanel() {
       const orderA = TYPE_SORT_ORDER[a.type] ?? 99;
       const orderB = TYPE_SORT_ORDER[b.type] ?? 99;
       if (orderA !== orderB) return orderA - orderB;
+      // 裝備類內部：裝備中的排在背包裝備之前，整理完一眼看得到身上穿什麼
+      const equippedA = a.equippedSlot ? 0 : 1;
+      const equippedB = b.equippedSlot ? 0 : 1;
+      if (equippedA !== equippedB) return equippedA - equippedB;
       return a.name.localeCompare(b.name);
     });
   }, [gridItems, sorted]);
@@ -200,7 +222,7 @@ export function BagPanel() {
   /** 這一格拖出去時要交給快捷格／地圖的描述（§ 35.5.3） */
   function dragPayloadOf(item: BagGridItem): BagDragPayload {
     return item.equipment
-      ? { kind: 'equipment', name: item.name, amount: 1, equipmentId: item.equipment.id }
+      ? { kind: 'equipment', name: item.name, amount: 1, equipmentId: item.equipment.id, equipped: item.equippedSlot != null }
       : { kind: 'bag', name: item.name, itemId: item.itemId, amount: item.count ?? 1 };
   }
 
@@ -225,6 +247,8 @@ export function BagPanel() {
       if (entry) assignQuickSlot(target.index, entry);
       return;
     }
+    // § 35.9：裝備中的東西不能丟，先脫下來才算數
+    if (item.payload.equipped) return;
     // § 35.5.3：丟到地圖上＝丟棄，需二次確認（DiscardConfirmModal）
     useGameStore.getState().requestDiscard({
       kind: item.payload.kind,
@@ -304,6 +328,8 @@ export function BagPanel() {
   function handleDiscard() {
     if (!contextMenu) return;
     const item = contextMenu.item;
+    // 選單本來就不顯示這顆按鈕；這裡是第二道保險，裝備中一律不可丟
+    if (item.equippedSlot) return;
     if (item.equipment) {
       useGameStore.getState().discardInventoryItem(item.equipment.id!);
     } else if (item.itemId != null) {
@@ -320,6 +346,9 @@ export function BagPanel() {
       useCureItem(item.cureItemId);
     } else if (item.speedPotionType) {
       useGameStore.getState().useSpeedPotion(item.speedPotionType);
+    } else if (item.equippedSlot) {
+      // § 35.9.2：裝備中的格子第二下是卸下（容量／腰帶溢出保護在 store 內）
+      unequipItem(item.equippedSlot);
     } else if (item.equipment) {
       equipItem(item.equipment);
     } else if (item.type === 'scroll' && item.itemId != null && isTownScroll(item.itemId)) {
@@ -513,9 +542,14 @@ export function BagPanel() {
       const eq = item.equipment;
       return (
         <div className="bag-tooltip-content">
+          {item.equippedSlot && (
+            <div className="tooltip-equipped">裝備中（{SLOT_NAMES[item.equippedSlot]}）</div>
+          )}
           <EquipmentDetail item={eq} templates={templates} />
           <div className="tooltip-hint">
-            {selectedId === item.id ? '再點一次裝備' : '點擊選取'}
+            {selectedId === item.id
+              ? (item.equippedSlot ? '再點一次卸下' : '再點一次裝備')
+              : '點擊選取'}
           </div>
         </div>
       );
@@ -585,7 +619,7 @@ export function BagPanel() {
                 key={item.id}
                 className={`bag-cell ${item.type}${overClass}${
                   dragItem?.fromIndex === idx ? ' dragging' : ''
-                }${selectedId === item.id ? ' is-selected' : ''}${
+                }${item.equippedSlot ? ' is-equipped' : ''}${selectedId === item.id ? ' is-selected' : ''}${
                   movingId === item.id ? ' is-moving' : movingId ? ' move-target' : ''
                 }`}
                 {...dropProps}
@@ -617,6 +651,11 @@ export function BagPanel() {
                   })()
                 )}
                 <span className="bag-cell-name">{getShortName(item.name)}</span>
+                {item.equippedSlot && (
+                  <span className="bag-cell-equipped" aria-label={`裝備中：${SLOT_NAMES[item.equippedSlot]}`}>
+                    裝備中
+                  </span>
+                )}
                 {item.count != null && item.count > 1 && (
                   <span className="bag-cell-count">×{item.count}</span>
                 )}
@@ -684,10 +723,15 @@ export function BagPanel() {
             >
               移動到其他格
             </button>
-            <div className="context-menu-divider" />
-            <button className="context-menu-item context-menu-danger" onClick={handleDiscard}>
-              丟棄{contextMenu.item.count && contextMenu.item.count > 1 ? ' ×1' : ''}
-            </button>
+            {/* § 35.9：裝備中的不給丟棄，得先卸下來 */}
+            {!contextMenu.item.equippedSlot && (
+              <>
+                <div className="context-menu-divider" />
+                <button className="context-menu-item context-menu-danger" onClick={handleDiscard}>
+                  丟棄{contextMenu.item.count && contextMenu.item.count > 1 ? ' ×1' : ''}
+                </button>
+              </>
+            )}
           </div>
         </>
       )}

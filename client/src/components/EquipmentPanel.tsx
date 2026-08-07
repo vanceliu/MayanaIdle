@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { SLOT_NAMES, type EquipSlot } from '../models/equipment';
+import { SLOT_NAMES, SLOT_ORDER, type EquipSlot } from '../models/equipment';
 import { EquipmentDetail } from './EquipmentInfo';
 import { Tooltip } from './Tooltip';
 import { GameIcon } from './GameIcon';
@@ -9,8 +9,6 @@ import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 
 /** 按下到放開的位移在這個範圍內都算「點擊」（px） */
 const CLICK_SLOP = 8;
-
-const SLOT_ORDER: EquipSlot[] = ['rightHand', 'leftHand', 'helmet', 'chest', 'belt', 'gloves', 'boots', 'necklace', 'ring1', 'ring2'];
 
 const SLOT_ICON_MAP: Record<EquipSlot, string> = {
   rightHand: 'sword',

@@ -4,7 +4,7 @@ import type { MonsterInstance } from '../models/monster';
 import { useMapMonsterStore } from './mapMonsterStore';
 import { useMapControlStore } from './mapControlStore';
 import type { EquipmentInstance, EquippedGear } from '../models/equipment';
-import { BOSS_DROP_ONLY_TIER, isWeaponEquipment } from '../models/equipment';
+import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
@@ -112,11 +112,11 @@ export function consumePotionFromBag(bagItems: BagItem[], type: PotionType): Bag
 }
 
 /** § 35.1：背包基礎格數。腰帶可再擴充，見 `getBagMaxSlots()` */
-export const BAG_BASE_SLOTS = 50;
+export const BAG_BASE_SLOTS = 60;
 
 /**
- * 背包實際格數 = 基礎 50 + 腰帶的 `bonusBagSlots`（§ 35.1）。
- * 腰帶最高 +15，因此上限為 65 格。
+ * 背包實際格數 = 基礎 60 + 腰帶的 `bonusBagSlots`（§ 35.1）。
+ * 腰帶最高 +20，因此上限為 80 格。
  */
 export function getBagMaxSlots(gear: EquippedGear): number {
   const bonus = Object.values(gear).reduce(
@@ -126,8 +126,23 @@ export function getBagMaxSlots(gear: EquippedGear): number {
   return BAG_BASE_SLOTS + bonus;
 }
 
-export function getBagUsedSlots(bagItems: BagItem[], inventory: EquipmentInstance[]): number {
-  return bagItems.length + inventory.length;
+/** 身上的裝備件數。裝備中的裝備一樣留在背包格上並佔格（§ 35.1） */
+export function getEquippedCount(gear: EquippedGear): number {
+  return Object.values(gear).filter(Boolean).length;
+}
+
+/**
+ * 已用格數（§ 35.1）＝ 消耗品種類 + 背包裝備 + **身上裝備**。
+ *
+ * 裝備中的裝備沒有離開背包，只是多一個「裝備中」標記，因此一樣佔格 ——
+ * 穿脫只是同一格換個狀態，不再有佔格增減。
+ */
+export function getBagUsedSlots(
+  bagItems: BagItem[],
+  inventory: EquipmentInstance[],
+  gear: EquippedGear,
+): number {
+  return bagItems.length + inventory.length + getEquippedCount(gear);
 }
 
 export function isBagFull(
@@ -135,25 +150,25 @@ export function isBagFull(
   inventory: EquipmentInstance[],
   gear: EquippedGear,
 ): boolean {
-  return getBagUsedSlots(bagItems, inventory) >= getBagMaxSlots(gear);
+  return getBagUsedSlots(bagItems, inventory, gear) >= getBagMaxSlots(gear);
 }
 
 /**
  * 換裝後背包是否會超出上限（§ 35.1）。
  *
- * 卸下腰帶會**同時**造成兩件事：多佔一格（腰帶進背包）＋上限下降（`bonusBagSlots` 消失），
- * 因此必須用「換裝後的裝備狀態」與「換裝後的佔格數」一起判定，不能只看目前是否已滿。
+ * 裝備中一樣佔格，所以**穿脫不會改變佔格數** —— 同一件東西只是從「背包裡」
+ * 換成「裝備中」，格子沒動。唯一還會溢出的是腰帶：換掉／卸下腰帶會讓**上限下降**，
+ * 因此必須用換裝後的狀態一起判定，不能只看目前是否已滿。
  *
- * @param gearAfter  換裝後的裝備狀態
- * @param slotDelta  換裝造成的佔格變化（卸下 +1、單純穿上 -1、替換 0）
+ * @param inventoryAfter 換裝後的背包裝備清單
+ * @param gearAfter      換裝後的裝備狀態（佔格與上限都依這份算）
  */
 export function wouldOverflowBag(
   bagItems: BagItem[],
-  inventory: EquipmentInstance[],
+  inventoryAfter: EquipmentInstance[],
   gearAfter: EquippedGear,
-  slotDelta: number,
 ): boolean {
-  return getBagUsedSlots(bagItems, inventory) + slotDelta > getBagMaxSlots(gearAfter);
+  return getBagUsedSlots(bagItems, inventoryAfter, gearAfter) > getBagMaxSlots(gearAfter);
 }
 
 /**
@@ -856,11 +871,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
-    // § 35.1：換成格數較少的腰帶同樣可能溢出（替換時佔格不變，但上限會降）
+    // § 35.1：裝備中一樣佔格，所以換裝的佔格數不變；會溢出的只有「換上格數較少的腰帶」
     const existingInSlot = gear[targetSlot];
     const gearAfterEquip: EquippedGear = { ...gear, [targetSlot]: item };
-    const slotDelta = existingInSlot ? 0 : -1;
-    if (wouldOverflowBag(state.bagItems, state.inventory, gearAfterEquip, slotDelta)) {
+    const invAfterEquip = inv.filter(i => i.id !== item.id).concat(existingInSlot ? [existingInSlot] : []);
+    if (wouldOverflowBag(state.bagItems, invAfterEquip, gearAfterEquip)) {
       const lostSlots = (existingInSlot?.bonusBagSlots ?? 0) - (item.bonusBagSlots ?? 0);
       set({
         combatLogs: addLog(state.combatLogs, {
@@ -895,9 +910,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const item = gear[slot];
     if (!item) return;
 
-    // § 35.1：卸下腰帶會同時多佔一格並降低上限，必須以卸下後的狀態判定
+    // § 35.1：卸下不會多佔格（裝備中本來就佔著），但卸下腰帶會降低上限，仍須以卸下後的狀態判定
     const gearAfter: EquippedGear = { ...state.equippedGear, [slot]: null };
-    if (wouldOverflowBag(state.bagItems, state.inventory, gearAfter, 1)) {
+    if (wouldOverflowBag(state.bagItems, [...state.inventory, item], gearAfter)) {
       const lostSlots = item.bonusBagSlots ?? 0;
       set({
         combatLogs: addLog(state.combatLogs, {
@@ -1064,13 +1079,18 @@ export const useGameStore = create<GameState>((set, get) => ({
         return;
       }
       case 'equip': {
+        // § 35.7.2：裝備中的東西還在背包上，所以這一格是穿／脫的切換，不再用完就清空
         const item = state.inventory.find(i => i.id === action.equipmentId);
-        if (!item) {
-          // 裝備已被賣掉／丟棄／穿上 → 該格失效，直接清空
-          get().assignQuickSlot(slotIdx, null);
+        if (item) {
+          get().equipItem(item);
           return;
         }
-        get().equipItem(item);
+        const slot = SLOT_ORDER.find(s => state.equippedGear[s]?.id === action.equipmentId);
+        if (slot) {
+          get().unequipItem(slot);
+          return;
+        }
+        // 裝備已被賣掉／丟棄／存進倉庫 → 該格失效，直接清空
         get().assignQuickSlot(slotIdx, null);
         return;
       }
@@ -1509,7 +1529,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     let newBag = state.bagItems;
     if (!hasBagItem(newBag, rewardItemId)
-      && getBagUsedSlots(newBag, state.inventory) >= getBagMaxSlots(state.equippedGear)) {
+      && getBagUsedSlots(newBag, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) {
       return;
     }
     newBag = addBagItem(newBag, rewardItemId, 1);
@@ -1571,7 +1591,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       // 名稱與背包分頁一律由 id 反查 seed（§ 99.1）——
       // 寫死成 material 會讓改歸 scroll 的道具（印記）在背包裡分裂成兩堆
       if (!hasBagItem(newBag, reward.itemId)
-        && getBagUsedSlots(newBag, state.inventory) >= getBagMaxSlots(state.equippedGear)) {
+        && getBagUsedSlots(newBag, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) {
         return;
       }
       newBag = addBagItem(newBag, reward.itemId, reward.amount);
@@ -1727,7 +1747,7 @@ export function processMonsterDeath(
     }
     for (const item of drops.items) {
       if (item.equipmentInstance) {
-        if (getBagUsedSlots(newBag, newEquipInv) >= getBagMaxSlots(state2.equippedGear)) {
+        if (getBagUsedSlots(newBag, newEquipInv, state2.equippedGear) >= getBagMaxSlots(state2.equippedGear)) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
           newEquipInv.push(item.equipmentInstance);
@@ -1737,7 +1757,7 @@ export function processMonsterDeath(
         if (item.itemTemplateId == null) {
           logs2.push({ text: `無法處理掉落物 ${item.name}（缺少道具 id）`, type: 'system' });
         } else if (!hasBagItem(newBag, item.itemTemplateId)
-          && getBagUsedSlots(newBag, newEquipInv) >= getBagMaxSlots(state2.equippedGear)) {
+          && getBagUsedSlots(newBag, newEquipInv, state2.equippedGear) >= getBagMaxSlots(state2.equippedGear)) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
           newBag = addBagItem(newBag, item.itemTemplateId, item.amount);
@@ -1756,7 +1776,7 @@ export function processMonsterDeath(
       const questMaterialId = getItemId(QUEST_MATERIAL_NAME);
       if (questMaterialId != null
         && (hasBagItem(newBag, questMaterialId)
-          || getBagUsedSlots(newBag, newEquipInv) < getBagMaxSlots(state2.equippedGear))) {
+          || getBagUsedSlots(newBag, newEquipInv, state2.equippedGear) < getBagMaxSlots(state2.equippedGear))) {
         newBag = addBagItem(newBag, questMaterialId, 1);
       }
       char2 = updateCollectProgress(char2, 1);

@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>印記師新版面 Demo — MayanaIdle</title>
+<!--
+  印記師介面改版預覽（不接遊戲邏輯，資料寫死，純看版面與互動流程）。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/sigil-master.html
+  直接用 file:// 開會拿不到 App.css，整頁會沒有樣式。
+
+  規則來源：`46-sigil.md`（印記作用／成功率）、`13-town.md` § 13.13（印記師分工）、
+  `34-ui-guidelines.md` § 34.1（全視窗只有一顆動作鈕，固定右下角）。
+  這頁**不新增任何規則**，數字全部照設計文件抄。
+
+  下面 <style> 內「印記師區塊」的 CSS 是要原封不動搬進 App.css 的部分，
+  其餘 .demo-* 只是這頁的排版，不會進正式程式碼。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版（不會進 App.css） ═══════════ */
+body {
+  margin: 0;
+  padding: 24px;
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 20px;
+}
+.demo-bar button {
+  padding: 6px 14px; background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+  font-size: var(--fs-sm);
+}
+.demo-bar button:hover { background: var(--bg-card-hover); }
+.demo-bar button.active { border-color: var(--accent-gold); color: var(--accent-gold); }
+/* 設施視窗在遊戲裡是滿版 modal，這裡用固定框模擬；手機模式改成 393px */
+.demo-frame {
+  width: 100%; max-width: 860px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--bg-panel); overflow: hidden;
+  transition: max-width 0.2s;
+}
+.demo-frame.mobile { max-width: 393px; }
+.demo-log {
+  margin-top: 16px; font-size: var(--fs-sm); color: var(--text-dim);
+  font-family: var(--font-mono); white-space: pre-wrap; line-height: 1.7;
+}
+
+/* ═══════════ 印記師區塊：以下要搬進 App.css ═══════════ */
+
+/*
+ * 印記師（`13-town.md` § 13.13）的三段式版面：
+ *   左欄＝裝備清單、右欄＝裝備摘要＋選詞綴＋選印記、底部＝單一動作鈕。
+ *
+ * 為什麼是這個形狀：舊版把「每件裝備 × 每條詞綴」都配一顆按鈕，一個畫面上會有
+ * 數十顆動作鈕，玩家得先在清單裡找到那件裝備才知道能做什麼。改成先選對象再選動作，
+ * 動作鈕收斂成一顆（`34-ui-guidelines.md` § 34.1 同一套模式）。
+ */
+.sigil-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  /* 高度由外層設施視窗給；兩欄各自捲動，面板本身不捲 */
+  min-height: 0;
+  flex: 1;
+}
+
+.sigil-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sigil-greeting {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  margin: 0;
+  font-style: italic;
+}
+
+.sigil-gold {
+  font-family: var(--font-display);
+  color: var(--accent-gold);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+/* 兩欄。左欄固定寬，右欄吃掉剩下的空間 */
+.sigil-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.sigil-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.sigil-section-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  color: var(--accent-primary);
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── 左欄上半：裝備清單（身上與背包同一份，用分組標題分開） ────────── */
+.sigil-picker {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  overflow-y: auto;
+  /* 左欄只有這一塊，直接吃滿整欄高度自己捲動 */
+  flex: 1;
+  min-height: 120px;
+}
+
+/* 分組標題吸頂：捲到背包那一段時仍看得到自己在哪一組 */
+.sigil-picker-group {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sigil-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  font-size: var(--fs-sm);
+}
+
+.sigil-picker-row:hover { background: var(--bg-card-hover); }
+
+.sigil-picker-row.is-selected {
+  background: var(--bg-card-hover);
+  border-left-color: var(--accent-gold);
+}
+
+/* 印記全不受理的裝備（新手裝／無詞綴）在清單上就標出來，不必點進去才知道 */
+.sigil-picker-row.is-inert { opacity: 0.5; }
+
+.sigil-picker-icon { flex-shrink: 0; font-size: var(--fs-base); line-height: 1; }
+
+.sigil-picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sigil-picker-tag {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/* ── 右欄頂：選中裝備的兩行摘要 ───────────────────────────────
+ *
+ * 不放完整的 `EquipmentDetail` —— 詞綴在下面那區已經整條列出來，
+ * 詳情再列一次就是同一份資料印兩遍。這裡只留**跟印記操作有關**的欄位：
+ * 品質%（工藝印記的上限）、詞綴上限（精鍊印記推得到哪）、部位與攻防當作認人用。
+ * 材質、重量、可用職業對印記沒有作用，一律不放。
+ */
+.sigil-summary {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  padding: 6px 10px;
+}
+
+.sigil-summary-main {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sigil-summary-sub {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  margin-top: 2px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sigil-summary-slot { color: var(--text-dim); font-size: var(--fs-xs); }
+/* 品質滿 20%／詞綴到頂時轉色，玩家不必自己算還能不能用工藝或精鍊 */
+.sigil-summary-cap { color: var(--accent-gold); }
+
+/* ── 右欄上半：四條詞綴四選一 ─────────────────────────────────── */
+.sigil-affixes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sigil-affix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  cursor: pointer;
+}
+
+.sigil-affix-row:hover { background: var(--bg-card-hover); }
+
+.sigil-affix-row.is-selected {
+  border-color: var(--accent-gold);
+  box-shadow: inset 0 0 0 1px var(--accent-gold);
+}
+
+/* 這一條該印記不受理（特殊詞綴、已達上限…）：灰掉並在右側寫原因 */
+.sigil-affix-row.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sigil-affix-row.is-disabled:hover { background: var(--bg-inset); }
+
+.sigil-affix-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+
+/*
+ * 這一條為什麼不能選（特殊詞綴、不在該印記的守備範圍…）。
+ * 消耗與成功率**不寫在列上** —— 那是整次操作共通的資訊，一律收在下方的 `.sigil-cost`，
+ * 四條列各掛一份只是把同一句話印四遍。
+ */
+.sigil-affix-reason {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* 混沌／工藝的對象是整件裝備，詞綴欄整區停用（原因寫在下方的 `.sigil-cost`） */
+.sigil-affixes.is-item-target { opacity: 0.4; pointer-events: none; }
+
+/* ── 右欄下半：選印記 + 說明 ──────────────────────────────────── */
+.sigil-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+ * 每顆印記按鈕吃**該印記自己的顏色**（`--sigil-color`，由 `resolveItemIcon()` 從
+ * itemSeeds 讀出來，不在 UI 另建一份色表）。玩家在背包看到的是那個顏色的圖示，
+ * 到印記師還是同一個顏色，不必再讀字才知道自己點到哪一種。
+ * 註：精鍊與工藝在 seed 裡同為素材 tier4 黃，撞色是資料如此，不在這裡改。
+ */
+.sigil-choice {
+  --sigil-color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.sigil-choice:hover { background: var(--bg-card-hover); }
+
+.sigil-choice.is-selected {
+  border-color: var(--sigil-color);
+  color: var(--sigil-color);
+  background: var(--bg-card-hover);
+}
+
+/* 未選取時也看得到顏色，靠這顆點；選取時邊框與文字才整個換色 */
+.sigil-choice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sigil-color);
+  box-shadow: 0 0 6px var(--sigil-color);
+  flex-shrink: 0;
+}
+
+/* 持有 0 個仍可選（要讓玩家看得到說明），只是動作鈕會停用 */
+.sigil-choice.is-empty { opacity: 0.5; }
+
+.sigil-choice-count { font-size: var(--fs-xs); color: var(--text-dim); margin-left: 4px; }
+
+.sigil-desc {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  padding: 8px 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/*
+ * 消耗與成功率一律寫在這裡，動作鈕不重複 —— 按鈕上塞「×1 · 成功率 10%」會長到換行，
+ * 而玩家真正要在按下去之前讀到的就是這一行。
+ */
+.sigil-cost {
+  font-size: var(--fs-xs);
+  color: var(--accent-gold);
+  margin: 4px 0 0;
+  line-height: 1.7;
+}
+
+/* 突破印記的失敗代價不可逆，這一段要跳出來 */
+.sigil-cost .sigil-cost-warn { color: var(--accent-danger); }
+
+/* ── 底部：結果訊息 + 唯一的動作鈕（§ 34.1） ──────────────────── */
+.sigil-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  flex-wrap: wrap;
+}
+
+.sigil-footer-msg { font-size: var(--fs-sm); color: var(--text-secondary); flex: 1; min-width: 0; }
+.sigil-footer-msg.is-error { color: var(--accent-danger); }
+
+/*
+ * 動作鈕**固定一個顏色，不隨選到的印記變化**。顏色是印記選單那排在講的事，
+ * 動作鈕只回答「按下去會發生什麼」，跟著換色反而讓畫面右下角一直跳。
+ * 文字也只寫「使用{印記名}」——消耗、成功率、金幣一律在上方講完（`.sigil-cost`）。
+ */
+.sigil-apply {
+  padding: 8px 20px;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-primary-dim);
+  background: var(--accent-primary-dim);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sigil-apply:hover:not(:disabled) { background: var(--accent-primary); }
+.sigil-apply:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── 手機：左右欄疊成上下，清單再壓矮一點（`47-mobile.md`） ────── */
+@media (max-width: 480px) {
+  .sigil-body { grid-template-columns: 1fr; }
+  /* 疊成上下後清單不能再吃滿高度，否則下面的詞綴與印記整個被推出畫面 */
+  .sigil-picker { flex: none; max-height: 150px; }
+  .sigil-apply { width: 100%; }
+  .sigil-footer-msg { flex-basis: 100%; }
+}
+/* demo 用：手機切換是改容器寬度而不是視窗寬度，媒體查詢不會觸發，這裡補一份 */
+.demo-frame.mobile .sigil-body { grid-template-columns: 1fr; }
+.demo-frame.mobile .sigil-picker { flex: none; max-height: 150px; }
+.demo-frame.mobile .sigil-apply { width: 100%; }
+.demo-frame.mobile .sigil-footer-msg { flex-basis: 100%; }
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">印記師新版面 Demo</h1>
+<p class="demo-note">
+  流程：<b>選裝備 → 選詞綴 → 選印記 → 右下角一顆按鈕執行</b>。<br>
+  資料是寫死的假資料，按下「使用」只會在下方 log 印出「會做什麼」，不會真的改東西。<br>
+  規則與數值全部照 <code>46-sigil.md</code>。<b>精鍊與突破是兩個獨立選項</b>（不再合併成「升階」）——
+  合在一起時很容易順手連按，而突破失敗是把詞綴打回 T1 的不可逆代價。<br>
+  印記按鈕吃該印記自己的顏色（由 <code>itemSeeds.ts</code> 的 <code>iconColor</code>／<code>iconTier</code> 決定），
+  名稱直接讀道具名。混沌與工藝的對象是整件裝備，選到時右欄詞綴整區停用。
+</p>
+
+<div class="demo-bar">
+  <button id="btn-desktop" class="active">桌機寬度</button>
+  <button id="btn-mobile">手機寬度 393px</button>
+</div>
+
+<div class="demo-frame" id="frame">
+  <div class="sigil-panel">
+    <div class="sigil-head">
+      <p class="sigil-greeting">「詞綴不合意？印記能重新刻過 —— 但別怪我沒提醒，運氣不好會更糟。」</p>
+      <span class="sigil-gold">金幣 128,400G</span>
+    </div>
+
+    <div class="sigil-body">
+      <!-- 左欄：裝備清單 + 詳情 -->
+      <div class="sigil-col">
+        <p class="sigil-section-title">裝備</p>
+        <div class="sigil-picker" id="picker"></div>
+      </div>
+
+      <!-- 右欄：裝備摘要 + 詞綴 + 印記 -->
+      <div class="sigil-col">
+        <div class="sigil-summary" id="summary"></div>
+        <p class="sigil-section-title">選擇詞綴</p>
+        <div class="sigil-affixes" id="affixes"></div>
+
+        <p class="sigil-section-title" style="margin-top:6px">選擇印記</p>
+        <div class="sigil-choices" id="choices"></div>
+        <p class="sigil-desc" id="desc"></p>
+        <p class="sigil-cost" id="cost"></p>
+      </div>
+    </div>
+
+    <div class="sigil-footer">
+      <span class="sigil-footer-msg" id="msg"></span>
+      <button class="sigil-apply" id="apply">使用印記</button>
+    </div>
+  </div>
+</div>
+
+<div class="demo-log" id="log"></div>
+
+<script>
+/* ─────────── 假資料（照 46-sigil.md 的語意，不新增規則） ─────────── */
+
+/*
+ * 印記選單。**精鍊與突破是兩個獨立選項**，不合併 ——
+ * 合成一顆「升階」時，玩家在同一個位置連按就會從必定成功的精鍊滑進 10%／2% 的突破，
+ * 而突破失敗是把詞綴打回 T1 的不可逆代價。分開後要用突破得先刻意點它。
+ *
+ * 拆開後每個選項與一個印記道具 1:1，因此正式版**不再需要 `SIGIL_TABS` 那份 label 表**：
+ * 直接跑 `SIGIL_DEFINITIONS`，`label` 與 `color` 都由 `itemId` 反查 seed
+ * （`getItemById(d.itemId).name` 與 `resolveItemIcon()`，§ 99.1 設定表存 id、名稱只用於顯示），
+ * 道具改名或改色時介面自動跟上。這頁沒有 seed 可讀，才照抄成假資料。
+ */
+const SIGILS = [
+  { tab: 'chaos',   label: '混沌印記', target: 'item',  owned: 2, color: '#A855F7',
+    desc: '全部 4 條詞綴重骰（種類／Tier／數值），Tier 上限 T5，商店裝 T3 且不出特殊詞綴。' },
+  { tab: 'sting',   label: '刺針印記', target: 'affix', owned: 3, color: '#2DD4BF',
+    desc: '指定一條詞綴換成同部位詞綴池的另一條，Tier 不變。原本是特殊詞綴時，換出來的一般詞綴固定 T5。' },
+  { tab: 'recarve', label: '重刻印記', target: 'affix', owned: 0, color: '#60A5FA',
+    desc: '指定一條詞綴的隨機數值全部重骰，種類與 Tier 不變。特殊詞綴沒有數值，不受理。' },
+  { tab: 'temper',  label: '精鍊印記', target: 'affix', owned: 5, color: '#FACC15',
+    desc: '指定一條詞綴 Tier +1，必定成功，最高推到該裝備的取得管道上限（一般 T5、商店裝 T3）。' },
+  { tab: 'enhance', label: '突破印記', target: 'affix', owned: 1, color: '#FB923C', danger: true,
+    desc: '指定一條詞綴 T5→T6（成功率 10%）／T6→T7（2%）。失敗時該詞綴掉回 T1 並重骰數值，印記照樣消耗。使用前會再問一次。' },
+  { tab: 'polish',  label: '工藝印記', target: 'item',  owned: 4, color: '#FACC15',
+    desc: '整件裝備品質 +1%（上限 20%），必定成功。唯一要收金幣的印記：工藝印記 ×1 ＋ 50,000G。' },
+];
+
+const ITEMS = [
+  {
+    id: 1, name: '鐵劍 +7', icon: '🗡', where: 'equipped', slot: '右手',
+    stat: '攻擊 45-52', quality: 12, maxAffixTier: 5, starter: false,
+    affixes: [
+      { name: '攻擊力',   tier: 3, value: '+12%' },
+      { name: '命中',     tier: 5, value: '+22%' },
+      { name: '毒免疫',   tier: 0, value: '特殊詞綴', special: true },
+      { name: '增加血量', tier: 1, value: '+3%' },
+    ],
+  },
+  {
+    id: 2, name: '皮甲', icon: '🛡', where: 'equipped', slot: '胸甲',
+    stat: '防禦 18', quality: 20, maxAffixTier: 5, starter: false,
+    affixes: [
+      { name: '防禦力',   tier: 6, value: '+31%' },
+      { name: '魔法抗性', tier: 7, value: '+18%' },
+      { name: '增加血量', tier: 4, value: '+14%' },
+      { name: '回血量',   tier: 2, value: '+6%' },
+    ],
+  },
+  {
+    id: 3, name: '力量之戒', icon: '💍', where: 'equipped', slot: '戒指1',
+    stat: '力量 +2', quality: 0, maxAffixTier: 5, starter: false,
+    affixes: [
+      { name: '攻擊力',   tier: 5, value: '+21%' },
+      { name: '額外攻擊', tier: 5, value: '+19%' },
+      { name: '增加魔量', tier: 3, value: '+9%' },
+      { name: '回魔量',   tier: 1, value: '+2%' },
+    ],
+  },
+  {
+    id: 4, name: '龍鱗盔 +3', icon: '🪖', where: 'bag',
+    stat: '防禦 24', quality: 5, maxAffixTier: 5, starter: false,
+    affixes: [
+      { name: '防禦力',   tier: 2, value: '+8%' },
+      { name: '增加血量', tier: 3, value: '+11%' },
+      { name: '暈眩抵抗', tier: 0, value: '特殊詞綴', special: true },
+      { name: '回血量',   tier: 4, value: '+13%' },
+    ],
+  },
+  {
+    id: 5, name: '學徒之杖', icon: '🪄', where: 'bag',
+    stat: '魔法攻擊 12', quality: 0, maxAffixTier: 3, starter: false,
+    affixes: [
+      { name: '魔法攻擊', tier: 3, value: '+10%' },
+      { name: '增加魔量', tier: 3, value: '+10%' },
+      { name: '回魔量',   tier: 2, value: '+5%' },
+      { name: '智力',     tier: 1, value: '+1' },
+    ],
+  },
+  {
+    id: 6, name: '新手劍', icon: '🗡', where: 'bag',
+    stat: '攻擊 8-10', quality: 0, maxAffixTier: 5, starter: true, affixes: [],
+  },
+];
+
+/* ─────────── 狀態 ─────────── */
+
+let selectedItemId = 1;
+let selectedAffix = null;   // index
+let selectedSigil = 'sting';
+
+const $ = id => document.getElementById(id);
+const item = () => ITEMS.find(i => i.id === selectedItemId);
+const sigil = () => SIGILS.find(s => s.tab === selectedSigil);
+
+/** 這件裝備的所有印記都不受理（新手裝／無詞綴，§ 46.9） */
+function isInert(it) { return it.starter || it.affixes.length === 0; }
+
+/** § 46.7 突破印記的成功率，只受理 T5 與 T6 */
+function breakthroughRate(tier) {
+  return tier === 5 ? 0.10 : tier === 6 ? 0.02 : null;
+}
+
+/**
+ * 這條詞綴能不能被目前的印記受理，不行就回原因。
+ * 精鍊（§ 46.6）與突破（§ 46.7）是**兩個獨立選項**，守備範圍不重疊：
+ * 精鍊只吃「管道上限以下」，突破只吃 T5／T6。
+ */
+function affixCheck(it, affix) {
+  if (selectedSigil === 'recarve' && affix.special) return { ok: false, reason: '特殊詞綴無數值' };
+
+  if (selectedSigil === 'temper') {
+    if (affix.special) return { ok: false, reason: '特殊詞綴無 Tier' };
+    if (affix.tier >= it.maxAffixTier) {
+      // T7 已經是天花板；T5/T6 還有突破印記可走；其餘就是真的到頂了
+      if (affix.tier >= 7) return { ok: false, reason: 'T7 已是上限' };
+      return breakthroughRate(affix.tier) != null
+        ? { ok: false, reason: '需突破印記' }
+        : { ok: false, reason: `精鍊上限 T${it.maxAffixTier}` };
+    }
+  }
+
+  if (selectedSigil === 'enhance') {
+    if (affix.special) return { ok: false, reason: '特殊詞綴無 Tier' };
+    if (breakthroughRate(affix.tier) == null) {
+      return { ok: false, reason: affix.tier >= 7 ? 'T7 已是上限' : '只受理 T5／T6' };
+    }
+  }
+
+  return { ok: true };
+}
+
+
+/* ─────────── 渲染 ─────────── */
+
+function renderPicker() {
+  const groups = [
+    { key: 'equipped', label: '裝備中' },
+    { key: 'bag', label: '背包' },
+  ];
+  $('picker').innerHTML = groups.map(g => {
+    const rows = ITEMS.filter(i => i.where === g.key);
+    return `<div class="sigil-picker-group">── ${g.label} (${rows.length}) ──</div>`
+      + rows.map(i => `
+        <div class="sigil-picker-row${i.id === selectedItemId ? ' is-selected' : ''}${isInert(i) ? ' is-inert' : ''}"
+             data-item="${i.id}">
+          <span class="sigil-picker-icon">${i.icon}</span>
+          <span class="sigil-picker-name">${i.name}</span>
+          <span class="sigil-picker-tag">${i.starter ? '新手裝' : i.affixes.length === 0 ? '無詞綴' : (i.slot ?? '背包')}</span>
+        </div>`).join('');
+  }).join('');
+}
+
+/**
+ * 右欄頂端的兩行摘要。詞綴不在這裡列 —— 下面那區就是詞綴。
+ *
+ * 上限那格寫「精鍊上限」而不是「詞綴上限」：`maxAffixTier` 是**取得管道上限**
+ * （§ 6A.6），管的是掉落／製作／商店給的詞綴，以及精鍊印記推得到哪一階；
+ * 突破印記「不看取得管道」（§ 46.7），所以精鍊上限 T5 的裝備照樣可能帶 T6/T7。
+ * 標成「詞綴上限 T5」等於宣告了一件它管不到的事，玩家看到 T7 會以為資料壞了。
+ */
+function renderSummary() {
+  const it = item();
+  const qualityFull = it.quality >= 20;
+  $('summary').innerHTML = `
+    <div class="sigil-summary-main">
+      ${it.icon} ${it.name}
+      <span class="sigil-summary-slot">${it.where === 'equipped' ? '裝備中 · ' + it.slot : '背包'}</span>
+    </div>
+    <div class="sigil-summary-sub">
+      <span>${it.stat}</span>
+      <span class="${qualityFull ? 'sigil-summary-cap' : ''}">品質 ${it.quality}% / 20%</span>
+      <span>精鍊上限 T${it.maxAffixTier}${it.maxAffixTier < 5 ? '（商店裝）' : ''}</span>
+    </div>
+  `;
+}
+
+function renderAffixes() {
+  const it = item();
+  const itemTarget = sigil().target === 'item';
+  $('affixes').className = 'sigil-affixes' + (itemTarget ? ' is-item-target' : '');
+
+  if (it.affixes.length === 0) {
+    $('affixes').innerHTML = `<p class="sigil-desc">${it.starter ? '新手裝不可使用任何印記' : '這件裝備沒有詞綴'}</p>`;
+    return;
+  }
+
+  $('affixes').innerHTML = it.affixes.map((a, i) => {
+    const check = affixCheck(it, a);
+    return `
+      <div class="sigil-affix-row${selectedAffix === i ? ' is-selected' : ''}${check.ok ? '' : ' is-disabled'}"
+           data-affix="${i}">
+        <span class="affix-tag ${a.special ? 'special' : 'tier-' + a.tier}">${
+          a.special ? '[特殊] ' + a.name : a.name + ' T' + a.tier}</span>
+        <span class="sigil-affix-value">${a.special ? '' : a.value}</span>
+        ${check.ok ? '' : `<span class="sigil-affix-reason">${check.reason}</span>`}
+      </div>`;
+  }).join('');
+}
+
+function renderChoices() {
+  $('choices').innerHTML = SIGILS.map(s => `
+      <button class="sigil-choice${s.tab === selectedSigil ? ' is-selected' : ''}${s.owned <= 0 ? ' is-empty' : ''}"
+              style="--sigil-color: ${s.color}" data-sigil="${s.tab}">
+        <span class="sigil-choice-dot"></span>
+        ${s.danger ? '⚠ ' : ''}${s.label}<span class="sigil-choice-count">×${s.owned}</span>
+      </button>`).join('');
+  $('desc').textContent = sigil().desc;
+  renderCost();
+}
+
+/**
+ * 消耗與成功率（動作鈕不重複寫）。
+ * 突破印記的成功率跟著**目前選到的那條詞綴**走，沒選就把兩段都列出來。
+ */
+function renderCost() {
+  const it = item();
+  const s = sigil();
+  const affix = s.target === 'affix' && selectedAffix != null ? it.affixes[selectedAffix] : null;
+
+  let html = `消耗：${s.label} ×1`;
+  if (selectedSigil === 'polish') html += ' ＋ 50,000G';
+  if (s.target === 'item') html += '　對象是整件裝備，不需指定詞綴';
+  if (selectedSigil === 'temper') html += '　必定成功';
+  if (selectedSigil === 'enhance') {
+    const rate = affix ? breakthroughRate(affix.tier) : null;
+    html += rate != null
+      ? `　成功率 ${Math.round(rate * 100)}%（T${affix.tier} → T${affix.tier + 1}）`
+      : '　成功率 T5→T6 10%、T6→T7 2%';
+    html += '<span class="sigil-cost-warn">　失敗時該詞綴掉回 T1，印記照樣消耗</span>';
+  }
+  $('cost').innerHTML = html;
+}
+
+/** 動作鈕的文字、可否按、以及不能按的原因（§ 34.1：原因寫在按鈕旁） */
+function renderFooter() {
+  const it = item();
+  const s = sigil();
+  const btn = $('apply');
+  const msg = $('msg');
+  msg.className = 'sigil-footer-msg';
+
+  let reason = null;
+  if (it.starter) reason = '新手裝不可使用任何印記';
+  else if (it.affixes.length === 0) reason = '這件裝備沒有詞綴';
+  else if (s.owned <= 0) reason = `背包裡沒有${s.label}`;
+  else if (s.target === 'affix' && selectedAffix == null) reason = '請先選一條詞綴';
+  else if (s.target === 'affix' && !affixCheck(it, it.affixes[selectedAffix]).ok) {
+    reason = affixCheck(it, it.affixes[selectedAffix]).reason;
+  } else if (selectedSigil === 'polish' && it.quality >= 20) reason = '品質已達 20% 上限';
+
+  // 按鈕只寫「使用{道具名}」；消耗、成功率、金幣都在上方的 `.sigil-cost` 講完
+  btn.textContent = `使用${s.label}`;
+  btn.disabled = reason != null;
+  msg.textContent = reason ?? '';
+  if (reason) msg.classList.add('is-error');
+}
+
+function renderAll() {
+  renderPicker(); renderSummary(); renderAffixes(); renderChoices(); renderFooter();
+}
+
+/* ─────────── 互動 ─────────── */
+
+$('picker').addEventListener('click', e => {
+  const row = e.target.closest('[data-item]');
+  if (!row) return;
+  selectedItemId = Number(row.dataset.item);
+  selectedAffix = null;   // 換裝備就清掉詞綴選取
+  renderAll();
+});
+
+$('affixes').addEventListener('click', e => {
+  const row = e.target.closest('[data-affix]');
+  if (!row || row.classList.contains('is-disabled')) return;
+  selectedAffix = Number(row.dataset.affix);
+  // 成功率跟著選到的詞綴走，換一條就要重畫消耗那一行
+  renderAffixes(); renderCost(); renderFooter();
+});
+
+$('choices').addEventListener('click', e => {
+  const btn = e.target.closest('[data-sigil]');
+  if (!btn) return;
+  selectedSigil = btn.dataset.sigil;
+  // 換印記**保留**詞綴選取：不受理時按鈕會停用並寫原因，比默默清掉好懂
+  renderAll();
+});
+
+$('apply').addEventListener('click', () => {
+  const it = item();
+  const s = sigil();
+  const target = s.target === 'item'
+    ? '整件裝備'
+    : `第 ${selectedAffix + 1} 條詞綴（${it.affixes[selectedAffix].name}）`;
+  let extra = '';
+  if (selectedSigil === 'temper') extra = '　→ 消耗精鍊印記×1，Tier +1，必定成功';
+  if (selectedSigil === 'enhance') {
+    const rate = breakthroughRate(it.affixes[selectedAffix].tier);
+    extra = `　→ 消耗突破印記×1，成功率 ${Math.round(rate * 100)}%，失敗掉回 T1（正式版這裡會先跳確認視窗）`;
+  }
+  if (selectedSigil === 'polish') extra = '　→ 消耗工藝印記×1 + 50,000G，品質 +1%';
+  $('log').textContent = `[使用] ${it.name}｜${s.label}｜${target}${extra}\n` + $('log').textContent;
+});
+
+$('btn-desktop').addEventListener('click', () => {
+  $('frame').classList.remove('mobile');
+  $('btn-desktop').classList.add('active'); $('btn-mobile').classList.remove('active');
+});
+$('btn-mobile').addEventListener('click', () => {
+  $('frame').classList.add('mobile');
+  $('btn-mobile').classList.add('active'); $('btn-desktop').classList.remove('active');
+});
+
+renderAll();
+</script>
+</body>
+</html>

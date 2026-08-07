@@ -121,7 +121,7 @@ export function Storage() {
   const storedPotions = currentMaterialStored.filter(s => s.type === 'potion' && matchesQuery(s.name));
   const storedNonPotions = currentMaterialStored.filter(s => s.type !== 'potion' && matchesQuery(s.name));
 
-  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory);
+  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory, equippedGear);
 
   // --- 存入頁購物車 ---
   const depositEquipLines = cartLines(depositCart, depositableEquip, {

@@ -20,8 +20,8 @@ describe('BagPanel', () => {
   it('renders with section header and slot count', () => {
     render(<BagPanel />);
     expect(screen.getByText('背包')).toBeDefined();
-    // § 35.1：無腰帶時為基礎 50 格
-    expect(screen.getByText(/\/50/)).toBeDefined();
+    // § 35.1：無腰帶時為基礎 60 格
+    expect(screen.getByText(/\/60/)).toBeDefined();
   });
 
 it('shows gold row when expanded', () => {
@@ -210,6 +210,74 @@ it('shows gold row when expanded', () => {
 
       tap(cell());
       expect(equipItem).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /** § 35.1：穿上不等於離開背包 —— 裝備中的裝備照樣佔一格，只是多一個標記 */
+  describe('裝備中的格子（§ 35.1）', () => {
+    const sword = {
+      id: 7, templateId: 1, name: '鐵劍', type: 'sword', slot: 'rightHand',
+      isTwoHanded: false, quality: 0, enhancement: 0, affixes: [],
+      ownerId: 1, equipped: true,
+    } as any;
+
+    function tap(el: Element, x = 10, y = 10) {
+      fireEvent.pointerDown(el, { button: 0, clientX: x, clientY: y });
+      fireEvent.pointerUp(el, { clientX: x, clientY: y });
+    }
+
+    const cell = () => document.querySelector('.bag-cell:not(.empty)') as HTMLElement;
+
+    afterEach(() => {
+      useGameStore.setState({ equippedGear: {} });
+    });
+
+    it('身上的裝備會出現在背包格上並標示裝備中', () => {
+      useGameStore.setState({ bagItems: [], inventory: [], equippedGear: { rightHand: sword } });
+      render(<BagPanel />);
+
+      expect(screen.getByText('鐵劍')).toBeDefined();
+      expect(screen.getByText('裝備中')).toBeDefined();
+      expect(cell().className).toContain('is-equipped');
+    });
+
+    it('裝備中一樣計入已用格數', () => {
+      useGameStore.setState({
+        bagItems: [bagItem('紅色藥水', 3)],
+        inventory: [],
+        equippedGear: { rightHand: sword },
+      });
+      render(<BagPanel />);
+
+      expect(screen.getByText('2/60')).toBeDefined();
+    });
+
+    it('兩段式點擊第二下是卸下，不是穿上', () => {
+      const equipItem = vi.fn();
+      const unequipItem = vi.fn();
+      useGameStore.setState({
+        bagItems: [], inventory: [], equippedGear: { rightHand: sword },
+        equipItem, unequipItem,
+      });
+      render(<BagPanel />);
+
+      tap(cell());
+      expect(unequipItem).not.toHaveBeenCalled();
+
+      tap(cell());
+      expect(unequipItem).toHaveBeenCalledWith('rightHand');
+      expect(equipItem).not.toHaveBeenCalled();
+    });
+
+    it('右鍵選單不提供丟棄（要先卸下來）', () => {
+      useGameStore.setState({ bagItems: [], inventory: [], equippedGear: { rightHand: sword } });
+      render(<BagPanel />);
+
+      fireEvent.contextMenu(cell(), { clientX: 10, clientY: 10 });
+
+      expect(document.querySelector('.bag-context-menu')).toBeTruthy();
+      expect(screen.queryByText(/^丟棄/)).toBeNull();
+      expect(screen.getByText('移動到其他格')).toBeDefined();
     });
   });
 

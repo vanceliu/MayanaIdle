@@ -11,9 +11,10 @@ import { makeBagItem } from '../../models/bagItem';
 import { getItemId } from '../../models/items';
 
 /**
- * 印記師的升階分頁（`46-sigil.md` § 46.2）：同一份詞綴清單，
- * 依該條詞綴當前的 Tier 決定消耗精鍊印記（必定成功）或突破印記（有失敗率）。
- * 品質提升是另一個分頁，對象是整件裝備（§ 46.8）。
+ * 印記師的新版流程（`13-town.md` § 13.13）：選裝備 → 選詞綴 → 選印記 → 右下角一顆按鈕執行。
+ *
+ * **精鍊與突破是兩個獨立的印記選項**（`46-sigil.md` § 46.2）——
+ * 合成單一「升階」時玩家連按就會誤用突破，而突破失敗是把詞綴打回 T1 的不可逆代價。
  */
 
 vi.mock('../GameIcon', () => ({
@@ -65,44 +66,69 @@ function setup(item: EquipmentInstance, bag: { name: string; amount: number }[],
   render(<SigilMaster />);
 }
 
-const openTab = (label: string) => fireEvent.click(screen.getByRole('button', { name: label }));
+/** 選印記：選單上的名稱就是道具名（§ 99.1 名稱由 id 反查 seed） */
+const pickSigil = (name: string) =>
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^⚠?\\s*${name}`) }));
 
-describe('印記師 — 詞綴升階分頁', () => {
+/** 選詞綴：列上顯示的是「詞綴名 T{tier}」 */
+const pickAffix = (label: string) =>
+  fireEvent.click(screen.getByText(label).closest('button')!);
+
+const applyBtn = (name: string) =>
+  screen.getByRole('button', { name: `使用${name}` }) as HTMLButtonElement;
+
+/*
+ * 同一句話會同時出現在兩個區塊（印記說明 vs 消耗行、詞綴列的原因 vs 底部訊息），
+ * 所以斷言一律指名區塊，不用全域 getByText —— 否則測到的是哪一個並不確定。
+ */
+const costText = () => document.querySelector('.sigil-cost')!.textContent ?? '';
+const footerText = () => document.querySelector('.sigil-footer-msg')!.textContent ?? '';
+
+describe('印記師 — 精鍊印記（§ 46.6）', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('管道上限以內的詞綴消耗精鍊印記，必定成功', () => {
+  it('管道上限以內的詞綴必定成功，只扣精鍊印記', () => {
     setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
       { name: '精鍊印記', amount: 2 },
       { name: '突破印記', amount: 1 },
     ]);
-    openTab('詞綴升階');
+    pickSigil('精鍊印記');
+    pickAffix('攻擊力 T3');
 
-    expect(screen.getByText(/精鍊印記×1/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '升階' }));
+    expect(costText()).toContain('消耗：精鍊印記 ×1');
+    expect(costText()).toContain('必定成功');
+    fireEvent.click(applyBtn('精鍊印記'));
 
-    const affix = useGameStore.getState().inventory[0].affixes![0];
-    expect(affix.tier).toBe(4);
+    expect(useGameStore.getState().inventory[0].affixes![0].tier).toBe(4);
     const bag = useGameStore.getState().bagItems;
     expect(bag.find(b => b.name === '精鍊印記')?.amount).toBe(1);
     // 沒動到突破印記
     expect(bag.find(b => b.name === '突破印記')?.amount).toBe(1);
   });
 
-  it('T5 改由突破印記受理，並標出成功率', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.05); // < 10%，成功
+  it('精鍊不跳確認，直接升階', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
+      { name: '精鍊印記', amount: 1 },
+    ]);
+    pickSigil('精鍊印記');
+    pickAffix('攻擊力 T3');
+    fireEvent.click(applyBtn('精鍊印記'));
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(useGameStore.getState().inventory[0].affixes![0].tier).toBe(4);
+  });
+
+  it('T5 不在精鍊的守備範圍，該列停用並指向突破印記', () => {
     setup(gear([{ type: 'attack_power', tier: 5, value: 15 }]), [
       { name: '精鍊印記', amount: 2 },
       { name: '突破印記', amount: 1 },
     ]);
-    openTab('詞綴升階');
+    pickSigil('精鍊印記');
 
-    expect(screen.getByText(/突破印記×1 · 10%/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '升階' }));
-
-    expect(useGameStore.getState().inventory[0].affixes![0].tier).toBe(6);
-    const bag = useGameStore.getState().bagItems;
-    expect(bag.find(b => b.name === '突破印記')).toBeUndefined();
-    expect(bag.find(b => b.name === '精鍊印記')?.amount).toBe(2);
+    const row = screen.getByText('攻擊力 T5').closest('button')!;
+    expect(row.getAttribute('aria-disabled')).toBe('true');
+    expect(row.textContent).toContain('突破印記');
   });
 
   it('商店裝到 T3 就沒有印記可用（§ 6A.6 硬上限）', () => {
@@ -110,45 +136,173 @@ describe('印記師 — 詞綴升階分頁', () => {
       { name: '精鍊印記', amount: 5 },
       { name: '突破印記', amount: 5 },
     ]);
-    openTab('詞綴升階');
+    pickSigil('精鍊印記');
 
-    const btn = screen.getByRole('button', { name: '不可用' });
-    expect((btn as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('攻擊力 T3').closest('button')!.getAttribute('aria-disabled')).toBe('true');
+    expect(applyBtn('精鍊印記').disabled).toBe(true);
+  });
+
+  it('摘要寫「精鍊上限」而不是「詞綴上限」（突破不看取得管道，§ 46.7）', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [{ name: '精鍊印記', amount: 1 }]);
+    expect(screen.getByText(/精鍊上限 T5/)).toBeTruthy();
+    expect(screen.queryByText(/詞綴上限/)).toBeNull();
   });
 });
 
-describe('印記師 — 品質提升分頁', () => {
-  it('消耗工藝印記 ×1 + 50,000G，品質 +1%', () => {
+describe('印記師 — 突破印記（§ 46.7）', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('T5 由突破受理，成功率寫在消耗那一行', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05); // < 10%，成功
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    setup(gear([{ type: 'attack_power', tier: 5, value: 15 }]), [
+      { name: '精鍊印記', amount: 2 },
+      { name: '突破印記', amount: 1 },
+    ]);
+    pickSigil('突破印記');
+    pickAffix('攻擊力 T5');
+
+    expect(costText()).toContain('成功率 10%（T5 → T6）');
+    expect(costText()).toContain('失敗時該詞綴掉回 T1');
+    fireEvent.click(applyBtn('突破印記'));
+
+    expect(useGameStore.getState().inventory[0].affixes![0].tier).toBe(6);
+    const bag = useGameStore.getState().bagItems;
+    expect(bag.find(b => b.name === '突破印記')).toBeUndefined();
+    expect(bag.find(b => b.name === '精鍊印記')?.amount).toBe(2);
+  });
+
+  it('使用前跳出確認，訊息含詞綴、成功率與失敗代價', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(Math, 'random').mockReturnValue(0.05);
+    setup(gear([{ type: 'attack_power', tier: 5, value: 15 }]), [
+      { name: '突破印記', amount: 1 },
+    ]);
+    pickSigil('突破印記');
+    pickAffix('攻擊力 T5');
+    fireEvent.click(applyBtn('突破印記'));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    const msg = confirmSpy.mock.calls[0][0] as string;
+    expect(msg).toContain('突破印記');
+    expect(msg).toContain('10%');
+    expect(msg).toContain('T5 → T6');
+    expect(msg).toContain('掉回 T1');
+  });
+
+  it('取消確認時不扣印記也不動詞綴', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.spyOn(Math, 'random').mockReturnValue(0.05);
+    setup(gear([{ type: 'attack_power', tier: 5, value: 15 }]), [
+      { name: '突破印記', amount: 1 },
+    ]);
+    pickSigil('突破印記');
+    pickAffix('攻擊力 T5');
+    fireEvent.click(applyBtn('突破印記'));
+
+    expect(useGameStore.getState().inventory[0].affixes![0].tier).toBe(5);
+    expect(useGameStore.getState().bagItems.find(b => b.name === '突破印記')?.amount).toBe(1);
+  });
+
+  it('T1~T4 不受理，該列停用 —— 連按也不會誤用突破', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
+      { name: '突破印記', amount: 5 },
+    ]);
+    pickSigil('突破印記');
+
+    const row = screen.getByText('攻擊力 T3').closest('button')!;
+    expect(row.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(row);
+    // 點了也選不起來，動作鈕仍要求先選一條可用的詞綴
+    expect(applyBtn('突破印記').disabled).toBe(true);
+  });
+});
+
+describe('印記師 — 工藝印記（§ 46.8）', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('消耗工藝印記 ×1 + 50,000G，品質 +1%，不需指定詞綴', () => {
     setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
       { name: '工藝印記', amount: 1 },
     ], 60_000);
-    openTab('品質提升');
+    pickSigil('工藝印記');
 
-    expect(screen.getByText(new RegExp(`工藝印記×1 \\+ ${POLISH_SIGIL_GOLD_COST.toLocaleString()}G`))).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '提升品質' }));
+    expect(costText()).toContain(`消耗：工藝印記 ×1 ＋ ${POLISH_SIGIL_GOLD_COST.toLocaleString()}G`);
+    expect(costText()).toContain('對象是整件裝備');
+    fireEvent.click(applyBtn('工藝印記'));
 
     expect(useGameStore.getState().inventory[0].quality).toBe(1);
     expect(useGameStore.getState().character!.gold).toBe(10_000);
     expect(useGameStore.getState().bagItems.find(b => b.name === '工藝印記')).toBeUndefined();
   });
 
-  it('金幣不足時擋下', () => {
+  it('金幣不足時擋下並說明原因', () => {
     setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
       { name: '工藝印記', amount: 1 },
     ], 100);
-    openTab('品質提升');
+    pickSigil('工藝印記');
 
-    const btn = screen.getByRole('button', { name: '金幣不足' });
-    expect((btn as HTMLButtonElement).disabled).toBe(true);
+    expect(applyBtn('工藝印記').disabled).toBe(true);
+    expect(footerText()).toBe('金幣不足');
   });
 
   it('品質已滿 20% 不受理', () => {
     setup(gear([{ type: 'attack_power', tier: 3, value: 9 }], { quality: 20 }), [
       { name: '工藝印記', amount: 1 },
     ]);
-    openTab('品質提升');
+    pickSigil('工藝印記');
 
-    const btn = screen.getByRole('button', { name: /品質已達 20%/ });
-    expect((btn as HTMLButtonElement).disabled).toBe(true);
+    expect(applyBtn('工藝印記').disabled).toBe(true);
+    expect(footerText()).toContain('品質已達 20%');
+  });
+});
+
+describe('印記師 — 選取流程（§ 13.13）', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('沒有印記時停用並說明是哪一種不夠', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
+      { name: '精鍊印記', amount: 1 },
+    ]);
+    pickSigil('重刻印記');
+
+    expect(applyBtn('重刻印記').disabled).toBe(true);
+    expect(footerText()).toBe('背包裡沒有重刻印記');
+  });
+
+  it('指定詞綴的印記未選詞綴時停用', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
+      { name: '刺針印記', amount: 1 },
+    ]);
+    pickSigil('刺針印記');
+
+    expect(applyBtn('刺針印記').disabled).toBe(true);
+    expect(footerText()).toBe('請先選一條詞綴');
+  });
+
+  it('換裝備會清掉詞綴選取，避免對新裝備誤用', () => {
+    const other = gear([{ type: 'defense', tier: 2, value: 5 }], { id: 2, name: '鐵盾' });
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
+      { name: '刺針印記', amount: 1 },
+    ]);
+    useGameStore.setState({
+      inventory: [useGameStore.getState().inventory[0], other],
+    });
+
+    pickSigil('刺針印記');
+    pickAffix('攻擊力 T3');
+    expect(applyBtn('刺針印記').disabled).toBe(false);
+
+    fireEvent.click(screen.getByText('鐵盾').closest('button')!);
+    expect(applyBtn('刺針印記').disabled).toBe(true);
+    expect(footerText()).toBe('請先選一條詞綴');
+  });
+
+  it('新手裝在清單上就標出來，且所有印記都不受理', () => {
+    setup(gear([]), [{ name: '混沌印記', amount: 1 }]);
+    pickSigil('混沌印記');
+
+    expect(applyBtn('混沌印記').disabled).toBe(true);
+    expect(footerText()).toBe('這件裝備沒有詞綴');
   });
 });

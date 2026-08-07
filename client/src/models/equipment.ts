@@ -51,6 +51,15 @@ export const SLOT_NAMES: Record<EquipSlot, string> = {
   ring2: '戒指2',
 };
 
+/**
+ * 部位的固定排列順序。裝備欄與背包的「裝備中」格子共用同一份，
+ * 兩邊各留一份會在改順序時只改到一邊。
+ */
+export const SLOT_ORDER: EquipSlot[] = [
+  'rightHand', 'leftHand', 'helmet', 'chest', 'belt',
+  'gloves', 'boots', 'necklace', 'ring1', 'ring2',
+];
+
 export type WeaponType =
   | 'sword'
   | 'axe'

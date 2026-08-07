@@ -6,6 +6,7 @@ import {
   isSpecialAffixType,
   type Affix,
 } from '../affix';
+import { getItemById } from '../items';
 import {
   CHAOS_SIGIL_MAX_TIER,
   CHAOS_SIGIL_SLOTS,
@@ -14,7 +15,6 @@ import {
   POLISH_SIGIL_GOLD_COST,
   POLISH_SIGIL_QUALITY_MAX,
   SIGIL_DEFINITIONS,
-  SIGIL_TABS,
   STING_SPECIAL_REPLACEMENT_TIER,
   applyChaosSigil,
   applyEnhanceSigil,
@@ -208,12 +208,17 @@ describe('印記系統（§ 46）', () => {
     });
   });
 
-  // § 46.2：精鍊與突破合用一個分頁，故分頁數比印記種類少一個
-  describe('分頁（§ 46.2）', () => {
-    it('精鍊與突破共用升階分頁，其餘各自一個分頁', () => {
-      expect(SIGIL_TABS.map(t => t.tab)).toEqual(['chaos', 'sting', 'recarve', 'enhance', 'polish']);
-      const upgradeTab = SIGIL_DEFINITIONS.filter(d => d.tab === 'enhance').map(d => d.type);
-      expect(upgradeTab).toEqual(['temper', 'enhance']);
+  // § 46.2：精鍊與突破**不可合併**，介面上是六個各自獨立的印記
+  describe('印記清單（§ 46.2）', () => {
+    it('六種印記各自獨立，精鍊與突破不合併', () => {
+      expect(SIGIL_DEFINITIONS.map(d => d.type))
+        .toEqual(['chaos', 'sting', 'recarve', 'temper', 'enhance', 'polish']);
+    });
+
+    it('每種印記都對得到一個道具 id，名稱與 seed 一致（§ 99.1 存 id 不存名稱）', () => {
+      for (const d of SIGIL_DEFINITIONS) {
+        expect(getItemById(d.itemId)?.name, d.type).toBe(d.name);
+      }
     });
   });
 

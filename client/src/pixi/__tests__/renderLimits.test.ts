@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
 import { renderResolution } from '../PixiApp';
+import {
+  resolveRenderLimits,
+  MOBILE_MAX_FPS,
+  MOBILE_MAX_RESOLUTION,
+  DESKTOP_MAX_FPS,
+  DESKTOP_MAX_RESOLUTION,
+} from '../renderLimits';
 import { isHandheldDevice } from '../../hooks/useViewport';
 import { installFakeViewport, uninstallFakeViewport, VIEWPORTS } from '../../testing/viewport';
 
 /**
- * 手持裝置的渲染上限（`47-mobile.md` § 47.8）。
+ * 手持裝置的渲染上限（`34-ui-guidelines.md` § 34.9）。
  *
  * 這是放置遊戲，一開好幾小時；120Hz 螢幕不限速、DPR 3 不設上限，
  * 相當於 60fps／DPR 2 的四倍多像素填充量。
@@ -62,5 +69,31 @@ describe('手持裝置判定', () => {
   it('沒有 matchMedia（測試環境）時當桌機，不可拋錯', () => {
     uninstallFakeViewport();
     expect(isHandheldDevice()).toBe(false);
+  });
+});
+
+describe('裝置對應的渲染上限（§ 34.9）', () => {
+  afterEach(() => uninstallFakeViewport());
+
+  it('手持裝置：60fps／解析度上限 2', () => {
+    installFakeViewport(VIEWPORTS.phonePortrait);
+    expect(resolveRenderLimits()).toEqual({ maxFPS: MOBILE_MAX_FPS, maxResolution: MOBILE_MAX_RESOLUTION });
+  });
+
+  // 桌機以前兩項都不設限：DPR 2 × 120Hz 等於 1x／60fps 的 8 倍填充量
+  it('桌機：60fps／解析度上限 1.5，不再是不限', () => {
+    installFakeViewport(VIEWPORTS.desktop);
+    expect(resolveRenderLimits()).toEqual({ maxFPS: DESKTOP_MAX_FPS, maxResolution: DESKTOP_MAX_RESOLUTION });
+  });
+
+  it('上限數值與 § 34.9 的表一致', () => {
+    expect(DESKTOP_MAX_FPS).toBe(60);
+    expect(DESKTOP_MAX_RESOLUTION).toBe(1.5);
+    expect(MOBILE_MAX_FPS).toBe(60);
+    expect(MOBILE_MAX_RESOLUTION).toBe(2);
+  });
+
+  it('桌機 DPR 2 會被夾到 1.5', () => {
+    withDpr(2, () => expect(renderResolution(DESKTOP_MAX_RESOLUTION)).toBe(1.5));
   });
 });

@@ -200,7 +200,7 @@ export function TownBlacksmith() {
     if (!selectedRecipe.craftMaterials || !selectedRecipe.craftGold) return;
     const currentInv = useGameStore.getState().inventory;
     const currentBag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(currentBag, currentInv) >= getBagMaxSlots(equippedGear)) return;
+    if (getBagUsedSlots(currentBag, currentInv, equippedGear) >= getBagMaxSlots(equippedGear)) return;
 
     let newBag = [...useGameStore.getState().bagItems];
     for (const mat of selectedRecipe.craftMaterials) {

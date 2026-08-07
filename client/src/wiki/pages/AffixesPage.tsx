@@ -380,8 +380,8 @@ export function AffixesPage() {
           印記在城鎮的<strong>印記師</strong>使用，詞綴的升階、重骰與裝備品質都在這裡，不影響強化等級（+N）；
           一次消耗印記 ×1，只有工藝印記另收 {POLISH_SIGIL_GOLD_COST.toLocaleString()}G。
           <br />
-          詞綴升階依當前 Tier 自動分派：取得管道上限以內用<strong>精鍊印記</strong>（必定成功），
-          上限以上用<strong>突破印記</strong>。
+          升階的兩種印記在印記師是<strong>各自獨立的選項</strong>，守備範圍不重疊：
+          取得管道上限以內用<strong>精鍊印記</strong>（必定成功），T5／T6 才輪到<strong>突破印記</strong>。
           <br />
           突破印記是 T6／T7 詞綴在掉落之外的唯一來源：
           {ENHANCE_SIGIL_RATES.map(r => `T${r.from}→T${r.from + 1} ${Math.round(r.rate * 100)}%`).join('、')}

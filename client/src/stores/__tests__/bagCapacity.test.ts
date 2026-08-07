@@ -73,55 +73,75 @@ describe('Potion helpers', () => {
   });
 });
 
-describe('Bag capacity', () => {
-  const makeEquip = (id: number): EquipmentInstance => ({
-    id,
-    templateId: 1,
-    name: `裝備${id}`,
-    slot: 'chest',
-    equipped: false,
-    ownerId: 1,
-    defense: 10,
-    weight: 100,
-    enhancement: 0,
-    quality: 0,
-    qualityCap: 20,
-    affixes: [],
-  } as any);
+const makeEquip = (id: number): EquipmentInstance => ({
+  id,
+  templateId: 1,
+  name: `裝備${id}`,
+  slot: 'chest',
+  equipped: false,
+  ownerId: 1,
+  defense: 10,
+  weight: 100,
+  enhancement: 0,
+  quality: 0,
+  qualityCap: 20,
+  affixes: [],
+} as any);
 
+describe('Bag capacity', () => {
   it('getBagUsedSlots counts bagItems + inventory', () => {
     const bag: BagItem[] = [
       bagItem('紅色藥水', 99),
       bagItem('工藝印記', 5),
     ];
     const inv = [makeEquip(1), makeEquip(2)];
-    expect(getBagUsedSlots(bag, inv)).toBe(4);
+    expect(getBagUsedSlots(bag, inv, {})).toBe(4);
+  });
+
+  it('§ 35.1：裝備中的裝備一樣佔背包格', () => {
+    const bag: BagItem[] = [bagItem('紅色藥水', 99)];
+    const inv = [makeEquip(1)];
+    const gear: EquippedGear = { chest: makeEquip(2), helmet: makeEquip(3) };
+    expect(getBagUsedSlots(bag, inv, gear)).toBe(4);
+  });
+
+  it('§ 35.1：空欄位（null）不佔格', () => {
+    const gear: EquippedGear = { chest: makeEquip(2), helmet: null };
+    expect(getBagUsedSlots([], [], gear)).toBe(1);
   });
 
   it('stackable items occupy 1 slot regardless of amount', () => {
     const bag: BagItem[] = [bagItem('紅色藥水', 9999)];
-    expect(getBagUsedSlots(bag, [])).toBe(1);
+    expect(getBagUsedSlots(bag, [], {})).toBe(1);
   });
 
   it('isBagFull returns false when under limit', () => {
     expect(isBagFull([], [], {})).toBe(false);
   });
 
-  it('isBagFull returns true at exactly the base 50 slots', () => {
-    const bag = fillerBagItems(48);
+  it('isBagFull returns true at exactly the base 60 slots', () => {
+    const bag = fillerBagItems(58);
     const inv = [makeEquip(1), makeEquip(2)];
-    expect(getBagUsedSlots(bag, inv)).toBe(50);
+    expect(getBagUsedSlots(bag, inv, {})).toBe(60);
     expect(isBagFull(bag, inv, {})).toBe(true);
   });
 
-  it('BAG_BASE_SLOTS is 50', () => {
-    expect(BAG_BASE_SLOTS).toBe(50);
+  it('§ 35.1：滿裝的裝備欄一樣吃掉格數', () => {
+    // 58 格背包 + 身上 2 件 = 60/60
+    const bag = fillerBagItems(58);
+    const gear: EquippedGear = { chest: makeEquip(1), helmet: makeEquip(2) };
+    expect(isBagFull(bag, [], gear)).toBe(true);
+    expect(isBagFull(bag, [], {})).toBe(false); // 沒穿裝備時 58/60 還有空間
+  });
+
+  it('BAG_BASE_SLOTS is 60（10 個裝備欄改為佔格後的補償，§ 35.1）', () => {
+    expect(BAG_BASE_SLOTS).toBe(60);
   });
 });
 
 describe('腰帶擴充背包格數（§ 35.1）', () => {
-  it('無腰帶時為基礎 50 格', () => {
-    expect(getBagMaxSlots({})).toBe(50);
+  it('無腰帶時為基礎 60 格', () => {
+    expect(getBagMaxSlots({})).toBe(60);
   });
 
   it('每條腰帶各自提供正確的格數（§ 35.1，依裝備Tier 遞增）', () => {
@@ -136,8 +156,8 @@ describe('腰帶擴充背包格數（§ 35.1）', () => {
     }
   });
 
-  it('滿裝上限為 70 格', () => {
-    expect(getBagMaxSlots(gearWithBelt('天龍腰帶'))).toBe(70);
+  it('滿裝上限為 80 格', () => {
+    expect(getBagMaxSlots(gearWithBelt('天龍腰帶'))).toBe(80);
   });
 
   it('腰帶保留原有的負重加成（負重系統仍存在，只是沒有 UI）', () => {
@@ -149,50 +169,55 @@ describe('腰帶擴充背包格數（§ 35.1）', () => {
     }
   });
 
-  it('容量檢查會隨腰帶放寬', () => {
-    const bag = fillerBagItems(50);
-    expect(isBagFull(bag, [], {})).toBe(true);                        // 50/50
-    expect(isBagFull(bag, [], gearWithBelt('皮腰帶'))).toBe(false);    // 50/55
-    expect(isBagFull(bag, [], gearWithBelt('力之腰帶'))).toBe(false);  // 50/65
+  it('容量檢查會隨腰帶放寬（腰帶自己也佔 1 格）', () => {
+    const bag = fillerBagItems(60);
+    expect(isBagFull(bag, [], {})).toBe(true);                        // 60/60
+    expect(isBagFull(bag, [], gearWithBelt('皮腰帶'))).toBe(false);    // 61/65
+    expect(isBagFull(bag, [], gearWithBelt('力之腰帶'))).toBe(false);  // 61/75
   });
 });
 
 describe('換裝時的背包溢出保護（§ 35.1）', () => {
   const bagOf = (n: number): BagItem[] => fillerBagItems(n);
 
-  it('卸下腰帶：同時計入「多佔一格」與「上限下降」', () => {
-    // 力之腰帶 +15 → 上限 65。卸下後上限 50，且腰帶本身要佔 1 格
-    const belt = gearWithBelt('力之腰帶');
-    const afterUnequip = { ...belt, belt: null };
-
-    // 49 格：卸下後 50/50，剛好塞得下
-    expect(wouldOverflowBag(bagOf(49), [], afterUnequip, 1)).toBe(false);
-    // 50 格：卸下後 51/50，溢出 → 必須擋下
-    expect(wouldOverflowBag(bagOf(50), [], afterUnequip, 1)).toBe(true);
-    // 64 格（在 65 上限內合法），卸下後 65/50，明顯溢出
-    expect(wouldOverflowBag(bagOf(64), [], afterUnequip, 1)).toBe(true);
+  it('卸下非腰帶裝備：佔格不變，背包滿了照樣脫得下來', () => {
+    // 59 格背包 + 身上 1 件 = 60/60 已滿
+    const item = makeEquip(1);
+    expect(getBagUsedSlots(bagOf(59), [], { chest: item })).toBe(60);
+    // 卸下後那件從裝備欄移到背包清單，總數仍是 60 → 不擋
+    expect(wouldOverflowBag(bagOf(59), [item], { chest: null })).toBe(false);
   });
 
-  it('卸下非腰帶裝備：等同「背包已滿」判定', () => {
-    const empty = {};
-    expect(wouldOverflowBag(bagOf(49), [], empty, 1)).toBe(false); // 50/50
-    expect(wouldOverflowBag(bagOf(50), [], empty, 1)).toBe(true);  // 51/50
+  it('卸下腰帶：佔格不變，但上限下降時仍要擋', () => {
+    // 力之腰帶 +15 → 上限 75；卸下後上限回到 60
+    const belt = gearWithBelt('力之腰帶').belt!;
+    const afterUnequip = { belt: null };
+
+    // 背包 59 + 腰帶 1 = 60/60，剛好塞得下
+    expect(wouldOverflowBag(bagOf(59), [belt], afterUnequip)).toBe(false);
+    // 背包 60 + 腰帶 1 = 61/60 → 溢出，必須擋下
+    expect(wouldOverflowBag(bagOf(60), [belt], afterUnequip)).toBe(true);
+    // 背包 70（在 75 上限內合法），卸下後 71/60，明顯溢出
+    expect(wouldOverflowBag(bagOf(70), [belt], afterUnequip)).toBe(true);
   });
 
   it('換成格數較少的腰帶也會溢出（佔格不變但上限下降）', () => {
-    // 力之腰帶(+15, 上限 65) → 皮腰帶(+5, 上限 55)，替換時 slotDelta = 0
+    // 力之腰帶(+15, 上限 75) → 皮腰帶(+5, 上限 65)。舊腰帶回背包清單，總佔格不變
+    const oldBelt = gearWithBelt('力之腰帶').belt!;
     const afterSwap = gearWithBelt('皮腰帶');
-    expect(wouldOverflowBag(bagOf(55), [], afterSwap, 0)).toBe(false); // 55/55
-    expect(wouldOverflowBag(bagOf(56), [], afterSwap, 0)).toBe(true);  // 56/55
+    expect(wouldOverflowBag(bagOf(63), [oldBelt], afterSwap)).toBe(false); // 65/65
+    expect(wouldOverflowBag(bagOf(64), [oldBelt], afterSwap)).toBe(true);  // 66/65
   });
 
   it('換成格數較多的腰帶不會被擋', () => {
+    const oldBelt = gearWithBelt('皮腰帶').belt!;
     const afterSwap = gearWithBelt('力之腰帶');
-    expect(wouldOverflowBag(bagOf(60), [], afterSwap, 0)).toBe(false); // 60/65
+    expect(wouldOverflowBag(bagOf(70), [oldBelt], afterSwap)).toBe(false); // 72/75
   });
 
-  it('從空手穿上腰帶：物品離開背包，佔格 -1', () => {
+  it('從空手穿上腰帶：物品沒有離開背包，佔格不變', () => {
     const afterEquip = gearWithBelt('皮腰帶');
-    expect(wouldOverflowBag(bagOf(55), [], afterEquip, -1)).toBe(false); // 54/55
+    // 背包 64 格（其中一格是那條腰帶）→ 穿上後 64/65，不變也不擋
+    expect(wouldOverflowBag(bagOf(64), [], afterEquip)).toBe(false);
   });
 });

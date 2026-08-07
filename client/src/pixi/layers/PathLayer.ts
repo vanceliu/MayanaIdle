@@ -11,13 +11,19 @@ export class PathLayer {
   public container = new Container();
   private markers: Graphics[] = [];
   private markerOwner: Container | null = null;
-  private renderKey = '';
+  /**
+   * 以路徑**陣列本身**當快取鍵。`mapControlStore` 的 `currentPath` 一律整條換掉、
+   * 不做原地修改，所以參照比對既精確又是 O(1) ——
+   * 這支每幀都會被呼叫，逐點組字串等於每幀配置一條字串。
+   */
+  private renderedPath: Position[] | null = null;
+  private renderedFrom = -1;
 
   updatePath(path: Position[], fromIndex: number, map: MapData, sortedContainer: Container): void {
-    const renderKey = `${fromIndex}:${path.map(point => `${point.x},${point.y}`).join('|')}`;
-    if (renderKey === this.renderKey && sortedContainer === this.markerOwner) return;
+    if (path === this.renderedPath && fromIndex === this.renderedFrom && sortedContainer === this.markerOwner) return;
     this.clear();
-    this.renderKey = renderKey;
+    this.renderedPath = path;
+    this.renderedFrom = fromIndex;
     this.markerOwner = sortedContainer;
 
     const hw = TILE_W / 4;
@@ -47,7 +53,8 @@ export class PathLayer {
     }
     this.markers = [];
     this.markerOwner = null;
-    this.renderKey = '';
+    this.renderedPath = null;
+    this.renderedFrom = -1;
   }
 
   destroy(): void {

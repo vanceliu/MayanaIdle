@@ -107,7 +107,7 @@ export function isMobileViewport(): boolean {
  * 這台機器是不是**手持裝置**（沒有滑鼠）。
  *
  * 與 `isMobileViewport()` 的差別是「裝置」而不是「版面」：手機轉成橫向會跨過
- * 寬度斷點，但它還是同一台會發熱、靠電池的機器。渲染上限（`47-mobile.md` § 47.8）
+ * 寬度斷點，但它還是同一台會發熱、靠電池的機器。渲染上限（`34-ui-guidelines.md` § 34.9）
  * 該看這個，不是看寬度。
  */
 export function isHandheldDevice(): boolean {

@@ -13,6 +13,7 @@
 | 要實作的功能 | 必讀文件 | 章節 |
 |---|---|---|
 | 背包系統限制（容量/負重/互動/顯示） | `35-inventory-constraints.md` | 全文 |
+| **裝備中的裝備仍留在背包並佔格（基礎 60 格）** | `35-inventory-constraints.md` § 35.1、§ 35.9 | — |
 | **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
@@ -87,7 +88,9 @@
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
-| 手持裝置的幀率與渲染解析度上限 | `47-mobile.md` | § 47.8 |
+| 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
+| **特效（強化演出／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
+| 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
@@ -196,8 +199,9 @@
 | `16-tech.md` | 技術方向 | React/Vite/TypeScript/PostgreSQL |
 | `16-tech-frontend-architecture.md` | 前端架構 | 目錄結構、狀態管理、資料流、計時器、組件職責 |
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
-| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則 |
+| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限 |
 | `47-mobile.md` | 行動裝置適配 | 斷點、觸控互動、指標拖放、手機版面、PWA |
+| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、共通參數 |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
 | `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
 
@@ -280,12 +284,19 @@
 13-town.md（倉庫/商店/鐵匠）   16-tech-frontend-architecture.md（BagPanel）
        ↕
 34-ui-guidelines.md（顯示規範）←→ 18-data-schema.md（資料結構）
+
+48-vfx.md（特效：演出時機／長度／技術路線）
+  ←→ 34-ui-guidelines.md § 34.9（渲染上限＝特效的效能預算，數值只在該節）
+  ←→ 06-equipment.md § 6.9~6.10（強化的成功率與安定值＝演出的觸發條件，數值只在該節）
+  ←→ 40-pixijs-migration.md（EffectLayer 是戰鬥特效的掛載點）
+  特效不得改變任何規則；改動機率或安定值時本文件不需同步，反之亦然
        ↕
 16-tech-frontend-architecture.md § 32.15.1（視窗層級／底部 HUD 帶寬 --hud-band-bottom）
        ↕
 47-mobile.md（行動裝置：斷點／觸控互動／指標拖放／手機版面／PWA）
   ←→ 16-tech-frontend-architecture.md § 32.17（useViewport／dragStore／HUD 帶模組邊界）
   ←→ 34-ui-guidelines.md § 34.6（介面縮放：縮放層內不可寫 vh/vw，行動版同樣適用）
+  ←→ 34-ui-guidelines.md § 34.9（渲染上限：桌機與手持共用同一張表，§ 47.8 只留指標）
   ←→ 35-inventory-constraints.md § 35.1.3／§ 35.5.3（背包重排與丟棄，兩者都由拖放承載）
   ←→ 24-buff-debuff.md § 24.8.3（怪物列表：手機改靠右直排並縮到七成）
 

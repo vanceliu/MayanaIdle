@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
-import type { EquipmentInstance, EquipSlot } from '../../models/equipment';
+import { SLOT_NAMES, SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../../models/equipment';
 import {
   AFFIX_DEFINITIONS,
+  DEFAULT_MAX_AFFIX_TIER,
   getAffixCategoryForSlot,
   getSpecialAffixDefinition,
   getWeaponBaseDamage,
@@ -12,8 +13,8 @@ import {
 } from '../../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST,
+  POLISH_SIGIL_QUALITY_MAX,
   SIGIL_DEFINITIONS,
-  SIGIL_TABS,
   applyChaosSigil,
   applyEnhanceSigil,
   applyPolishSigil,
@@ -21,29 +22,18 @@ import {
   applyStingSigil,
   applyTemperSigil,
   canUseSigil,
+  getEnhanceSigilRate,
   getSigilDefinition,
   getUpgradeSigilFor,
   type SigilContext,
   type SigilResult,
   type SigilType,
 } from '../../models/sigil';
-import { EquipmentDetail } from '../EquipmentInfo';
 import { db } from '../../db/database';
 import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
+import { getItemById } from '../../models/items';
+import { resolveItemIcon } from '../../models/iconMap';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
-
-const SLOT_NAMES: Record<EquipSlot, string> = {
-  rightHand: '右手',
-  leftHand: '左手',
-  helmet: '頭盔',
-  chest: '胸甲',
-  belt: '腰帶',
-  gloves: '手套',
-  boots: '鞋子',
-  necklace: '項鍊',
-  ring1: '戒指1',
-  ring2: '戒指2',
-};
 
 type Entry = { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot };
 
@@ -55,14 +45,29 @@ function affixLabel(affix: Affix): string {
   return `${def?.name ?? affix.type} T${affix.tier}`;
 }
 
+/**
+ * 印記的顯示名稱與顏色一律由 `itemId` 反查 seed（§ 99.1：設定表存 id，名稱只用於顯示）。
+ * 介面不另建 label 表與色表 —— 道具改名或改色時這裡自動跟上，
+ * 玩家在背包看到的是哪個顏色的圖示，到印記師就是同一個顏色。
+ */
+function sigilDisplay(type: SigilType): { name: string; color?: string } {
+  const def = getSigilDefinition(type);
+  const item = getItemById(def.itemId);
+  return { name: item?.name ?? def.name, color: resolveItemIcon(item, 'scroll').color };
+}
+
 export function SigilMaster() {
   const char = useGameStore(s => s.character);
   const equippedGear = useGameStore(s => s.equippedGear);
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
-  const [tab, setTab] = useState<SigilType>('chaos');
-  const [resultMsg, setResultMsg] = useState<string | null>(null);
   const allTemplates = useEquipmentTemplates();
+
+  /** 選裝備 → 選詞綴 → 選印記 → 右下角一顆按鈕執行（`13-town.md` § 13.13） */
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [affixIndex, setAffixIndex] = useState<number | null>(null);
+  const [sigilType, setSigilType] = useState<SigilType>('chaos');
+  const [resultMsg, setResultMsg] = useState<string | null>(null);
 
   if (!char) return null;
 
@@ -70,36 +75,53 @@ export function SigilMaster() {
     SIGIL_DEFINITIONS.map(d => [d.type, getBagItemAmount(bagItems, d.itemId)]),
   ) as Record<SigilType, number>;
 
-  // 升階分頁掛著精鍊與突破兩種印記（§ 46.2），故一個分頁可能對應多個定義
-  const tabSigils = SIGIL_DEFINITIONS.filter(d => d.tab === tab);
+  // 身上與背包是同一份清單，只是分兩組顯示 —— 印記兩邊都能用（§ 46.9）
+  const equippedEntries: Entry[] = SLOT_ORDER
+    .map(slot => ({ slot, item: equippedGear[slot] }))
+    .filter((e): e is { slot: EquipSlot; item: EquipmentInstance } => e.item != null)
+    .map(e => ({ item: e.item, source: 'equipped' as const, slot: e.slot }));
+  const bagEntries: Entry[] = inventory.map(item => ({ item, source: 'bag' as const }));
+  const allEntries = [...equippedEntries, ...bagEntries];
 
-  const allItems: Entry[] = [];
-  for (const [slot, item] of Object.entries(equippedGear)) {
-    if (item) allItems.push({ item, source: 'equipped', slot: slot as EquipSlot });
-  }
-  for (const item of inventory) allItems.push({ item, source: 'bag' });
+  // 選中的裝備可能被別處換掉（換裝、賣掉），失效就退回第一件
+  const entry = allEntries.find(e => e.item.id === selectedItemId) ?? allEntries[0];
+  const item = entry?.item;
+
+  const def = getSigilDefinition(sigilType);
+  const display = sigilDisplay(sigilType);
+  const affixes = item?.affixes ?? [];
 
   /** 新手裝名單只有 seed 一個來源（`99-ai-constraints.md` 第 4 條） */
-  function isStarterGear(item: EquipmentInstance): boolean {
-    return allTemplates.find(t => t.id === item.templateId)?.acquireType === 'starter';
+  function isStarterGear(it: EquipmentInstance): boolean {
+    return allTemplates.find(t => t.id === it.templateId)?.acquireType === 'starter';
   }
 
-  function buildContext(item: EquipmentInstance): SigilContext {
+  /** 這件裝備所有印記都不受理，清單上直接標出來，不必點進去才知道 */
+  function inertReason(it: EquipmentInstance): string | null {
+    if (isStarterGear(it)) return '新手裝';
+    if ((it.affixes?.length ?? 0) === 0) return '無詞綴';
+    return null;
+  }
+
+  function buildContext(it: EquipmentInstance): SigilContext {
     return {
-      category: getAffixCategoryForSlot(item.slot, item.type),
+      category: getAffixCategoryForSlot(it.slot, it.type),
       charLevel: char!.level,
-      maxAffixTier: item.maxAffixTier,
-      quality: item.quality ?? 0,
-      weaponBaseDamage: getWeaponBaseDamage(item),
-      isStarterGear: isStarterGear(item),
+      maxAffixTier: it.maxAffixTier,
+      quality: it.quality ?? 0,
+      weaponBaseDamage: getWeaponBaseDamage(it),
+      isStarterGear: isStarterGear(it),
     };
   }
 
-  /** 這條詞綴的下一階由哪一種印記受理（§ 46.2），連同持有數與成功率一起回 */
-  function upgradeInfoFor(item: EquipmentInstance, affix: Affix) {
-    const next = getUpgradeSigilFor(affix, item.maxAffixTier);
-    if (!next) return undefined;
-    return { ...next, def: getSigilDefinition(next.type), owned: sigilCounts[next.type] };
+  /** 這一條詞綴能不能被目前選到的印記受理。判定只有 `canUseSigil()` 一個來源 */
+  function checkAffix(idx: number) {
+    if (!item) return { ok: false as const, reason: '沒有裝備' };
+    return canUseSigil(sigilType, affixes, idx, {
+      isStarterGear: isStarterGear(item),
+      maxAffixTier: item.maxAffixTier,
+      quality: item.quality ?? 0,
+    });
   }
 
   /** 背包列一律以 `itemTemplateId` 定位（§ 99.1），不可用 name 查 —— 改名即失聯 */
@@ -113,34 +135,24 @@ export function SigilMaster() {
     }
   }
 
-  /**
-   * 扣掉一個印記並寫回裝備。`sigilType` 由呼叫端決定 —— 升階分頁會依詞綴的
-   * Tier 消耗精鍊或突破印記，不能再從分頁反推消耗品。
-   */
-  function commit(
-    entry: Entry,
-    sigilType: SigilType,
-    message: string,
-    patch: Partial<EquipmentInstance>,
-    goldCost = 0,
-  ) {
-    const { item, source, slot } = entry;
+  /** 扣掉一個印記並寫回裝備 */
+  function commit(message: string, patch: Partial<EquipmentInstance>, goldCost = 0) {
+    if (!entry || !item) return;
     const updatedItem = { ...item, ...patch };
     if (item.id) {
       db.equipmentInstances.update(item.id, patch);
     }
 
-    const sigilItemId = getSigilDefinition(sigilType).itemId;
-    const newBag = consumeBagItem(useGameStore.getState().bagItems, sigilItemId);
-    persistBagItem(sigilItemId, sigilCounts[sigilType] - 1);
+    const newBag = consumeBagItem(useGameStore.getState().bagItems, def.itemId);
+    persistBagItem(def.itemId, sigilCounts[sigilType] - 1);
 
     const updatedChar = goldCost > 0 ? { ...char!, gold: char!.gold - goldCost } : char!;
     if (goldCost > 0 && char!.id) db.characters.update(char!.id, { gold: updatedChar.gold });
 
-    if (source === 'equipped' && slot) {
+    if (entry.source === 'equipped' && entry.slot) {
       useGameStore.setState({
         character: updatedChar,
-        equippedGear: { ...equippedGear, [slot]: updatedItem },
+        equippedGear: { ...equippedGear, [entry.slot]: updatedItem },
         bagItems: newBag,
       });
     } else {
@@ -155,32 +167,41 @@ export function SigilMaster() {
     useGameStore.getState().saveState();
   }
 
-  function handleApply(entry: Entry, affixIndex?: number) {
-    const { item } = entry;
+  /**
+   * 突破印記的確認訊息（§ 46.7）：成功率與失敗代價都寫在裡面，
+   * 成功率一律由 `getUpgradeSigilFor()` 取得，不在 UI 另寫一份數字。
+   */
+  function confirmBreakthrough(idx: number): boolean {
+    const affix = affixes[idx];
+    const rate = getUpgradeSigilFor(affix, item!.maxAffixTier)?.rate ?? 0;
+    return window.confirm(
+      `確定要對「${item!.name}」的 ${affixLabel(affix)} 使用突破印記嗎？\n\n`
+      + `成功率 ${Math.round(rate * 100)}%（T${affix.tier} → T${affix.tier + 1}）\n`
+      + `失敗時該詞綴會掉回 T1 並重骰數值，印記照樣消耗。`,
+    );
+  }
+
+  function handleApply() {
+    if (!item) return;
     const ctx = buildContext(item);
 
     // § 46.8 工藝印記：對象是整件裝備，且是唯一要收金幣的印記
-    if (tab === 'polish') {
+    if (sigilType === 'polish') {
       const check = canUseSigil('polish', item.affixes, undefined, ctx);
       if (!check.ok) return setResultMsg(check.reason ?? '無法使用');
-      if (sigilCounts.polish <= 0) return;
       if (char!.gold < POLISH_SIGIL_GOLD_COST) return setResultMsg('金幣不足');
       const polished = applyPolishSigil(item.quality ?? 0);
       if (!polished.success) return setResultMsg(polished.message);
-      commit(entry, 'polish', polished.message, { quality: polished.quality }, POLISH_SIGIL_GOLD_COST);
+      commit(polished.message, { quality: polished.quality }, POLISH_SIGIL_GOLD_COST);
       return;
     }
 
-    // 升階分頁：由詞綴的 Tier 決定這一次消耗精鍊還是突破印記
-    const sigilType: SigilType = tab === 'enhance'
-      ? (affixIndex != null && item.affixes?.[affixIndex]
-          ? upgradeInfoFor(item, item.affixes[affixIndex])?.type ?? 'temper'
-          : 'temper')
-      : tab;
-
-    const check = canUseSigil(sigilType, item.affixes, affixIndex, ctx);
+    const check = canUseSigil(sigilType, item.affixes, affixIndex ?? undefined, ctx);
     if (!check.ok) return setResultMsg(check.reason ?? '無法使用');
     if (sigilCounts[sigilType] <= 0) return;
+
+    // 突破印記失敗會把詞綴砍回 T1（§ 46.7），代價不可逆，動手前先問一次
+    if (sigilType === 'enhance' && !confirmBreakthrough(affixIndex!)) return;
 
     let result: SigilResult;
     if (sigilType === 'chaos') {
@@ -200,149 +221,205 @@ export function SigilMaster() {
       setResultMsg(result.message);
       return;
     }
-    commit(entry, sigilType, result.message, { affixes: result.affixes });
+    commit(result.message, { affixes: result.affixes });
   }
 
-  function renderItemAction(entry: Entry) {
-    const { item } = entry;
-    const starter = isStarterGear(item);
+  /**
+   * 消耗與成功率（動作鈕不重複寫，按鈕只留「使用{印記名}」）。
+   * 突破印記的成功率跟著**目前選到的那條詞綴**走，沒選就把兩段都列出來。
+   */
+  function renderCost() {
+    // 金幣接在印記後面當同一句（「工藝印記 ×1 ＋ 50,000G」），不另起一段
+    const cost = sigilType === 'polish'
+      ? `${display.name} ×1 ＋ ${POLISH_SIGIL_GOLD_COST.toLocaleString()}G`
+      : `${display.name} ×1`;
+    const parts: string[] = [`消耗：${cost}`];
+    if (def.target === 'item') parts.push('對象是整件裝備，不需指定詞綴');
+    if (sigilType === 'temper') parts.push('必定成功');
 
-    if (tab === 'chaos') {
-      const check = canUseSigil('chaos', item.affixes, undefined, { isStarterGear: starter });
-      return (
-        <div className="shop-item-actions bs-actions">
-          <div className="bs-action-summary">
-            <span className="bs-action-cost">混沌印記×1</span>
-            <span className="bs-action-warn">全部詞綴重骰</span>
-          </div>
-          <button onClick={() => handleApply(entry)} disabled={!check.ok || sigilCounts.chaos <= 0}>
-            {check.ok ? '重骰全部詞綴' : check.reason}
-          </button>
-        </div>
-      );
-    }
+    if (sigilType !== 'enhance') return <>{parts.join('　')}</>;
 
-    // § 46.8 品質提升：整件裝備 + 金幣，不指定詞綴
-    if (tab === 'polish') {
-      const check = canUseSigil('polish', item.affixes, undefined, {
-        isStarterGear: starter,
-        quality: item.quality ?? 0,
-      });
-      const poor = char!.gold < POLISH_SIGIL_GOLD_COST;
-      return (
-        <div className="shop-item-actions bs-actions">
-          <div className="bs-action-summary">
-            <span className="bs-action-cost">工藝印記×1 + {POLISH_SIGIL_GOLD_COST.toLocaleString()}G</span>
-            <span className="bs-action-rate">品質 {item.quality ?? 0}% → {(item.quality ?? 0) + 1}%</span>
-          </div>
-          <button
-            onClick={() => handleApply(entry)}
-            disabled={!check.ok || poor || sigilCounts.polish <= 0}
-          >
-            {!check.ok ? check.reason : poor ? '金幣不足' : '提升品質'}
-          </button>
-        </div>
-      );
-    }
-
-    const affixes = item.affixes ?? [];
-    if (starter || affixes.length === 0) {
-      return (
-        <div className="shop-item-actions">
-          <span className="bs-action-cost">{starter ? '新手裝不可使用' : '無詞綴'}</span>
-        </div>
-      );
-    }
-
+    const tier = affixIndex != null ? affixes[affixIndex]?.tier : undefined;
+    const rate = tier != null ? getEnhanceSigilRate(tier) : undefined;
+    parts.push(rate != null
+      ? `成功率 ${Math.round(rate * 100)}%（T${tier} → T${tier! + 1}）`
+      : '成功率 T5→T6 10%、T6→T7 2%');
     return (
-      <div className="shop-item-actions bs-actions">
-        <div className="bs-affix-list">
-          {affixes.map((affix, i) => {
-            // 升階分頁：這一條由精鍊或突破受理，成功率與消耗品跟著換
-            const upgrade = tab === 'enhance' ? upgradeInfoFor(item, affix) : undefined;
-            const sigilType: SigilType = tab === 'enhance' ? (upgrade?.type ?? 'temper') : tab;
-            const check = canUseSigil(sigilType, affixes, i, {
-              isStarterGear: starter,
-              maxAffixTier: item.maxAffixTier,
-            });
-            const rate = upgrade && upgrade.rate < 1 ? upgrade.rate : undefined;
-            const owned = sigilCounts[sigilType];
-            return (
-              <div key={i} className="bs-affix-row">
-                <span
-                  className={isSpecialAffixType(affix.type)
-                    ? 'affix-tag special'
-                    : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
-                  title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
-                >
-                  {affixLabel(affix)}
-                </span>
-                {upgrade && (
-                  <span className="bs-action-cost">
-                    {upgrade.def.name}×1{rate != null ? ` · ${Math.round(rate * 100)}%` : ''}
-                  </span>
-                )}
-                <button
-                  className="bs-affix-btn"
-                  onClick={() => handleApply(entry, i)}
-                  disabled={!check.ok || owned <= 0}
-                  title={check.reason ?? (upgrade ? `消耗${upgrade.def.name} ×1` : undefined)}
-                >
-                  {check.ok ? (upgrade ? '升階' : '使用') : '不可用'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <>
+        {parts.join('　')}
+        <span className="sigil-cost-warn">　失敗時該詞綴掉回 T1，印記照樣消耗</span>
+      </>
     );
   }
 
+  /** 動作鈕停不下來的原因。判定順序＝玩家會先撞到的先講 */
+  function blockReason(): string | null {
+    if (!item) return '沒有裝備';
+    const starter = inertReason(item);
+    if (starter) return starter === '新手裝' ? '新手裝不可使用任何印記' : '這件裝備沒有詞綴';
+    if (sigilCounts[sigilType] <= 0) return `背包裡沒有${display.name}`;
+    if (def.target === 'affix' && affixIndex == null) return '請先選一條詞綴';
+    const check = canUseSigil(sigilType, affixes, affixIndex ?? undefined, {
+      isStarterGear: false,
+      maxAffixTier: item.maxAffixTier,
+      quality: item.quality ?? 0,
+    });
+    if (!check.ok) return check.reason ?? '無法使用';
+    if (sigilType === 'polish' && char!.gold < POLISH_SIGIL_GOLD_COST) return '金幣不足';
+    return null;
+  }
+
+  function selectItem(id: number | undefined) {
+    if (id == null) return;
+    setSelectedItemId(id);
+    // 換裝備就清掉詞綴選取；印記選擇保留（玩家通常是拿同一種印記掃好幾件）
+    setAffixIndex(null);
+    setResultMsg(null);
+  }
+
+  function renderPickerGroup(label: string, rows: Entry[]) {
+    return (
+      <>
+        <div className="sigil-picker-group">── {label} ({rows.length}) ──</div>
+        {rows.map(e => {
+          const inert = inertReason(e.item);
+          return (
+            <button
+              key={e.item.id}
+              type="button"
+              className={`sigil-picker-row${e.item.id === item?.id ? ' is-selected' : ''}${inert ? ' is-inert' : ''}`}
+              onClick={() => selectItem(e.item.id)}
+            >
+              <span className="sigil-picker-name">{e.item.name}</span>
+              <span className="sigil-picker-tag">
+                {inert ?? (e.slot ? SLOT_NAMES[e.slot] : '背包')}
+              </span>
+            </button>
+          );
+        })}
+      </>
+    );
+  }
+
+  const blocked = blockReason();
+  const maxAffixTier = item?.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
+
   return (
-    <div className="shop-panel blacksmith-panel">
-      <p className="shop-greeting">「詞綴不合意？印記能重新刻過 —— 但別怪我沒提醒，運氣不好會更糟。」</p>
-      <div className="bs-resources">
-        <span>金幣: {char.gold.toLocaleString()}G</span>
-        {SIGIL_DEFINITIONS.map(d => (
-          <span key={d.type}>{d.name}: {sigilCounts[d.type]}</span>
-        ))}
+    <div className="shop-panel sigil-panel">
+      <div className="sigil-head">
+        <p className="sigil-greeting">
+          「詞綴不合意？印記能重新刻過 —— 但別怪我沒提醒，運氣不好會更糟。」
+        </p>
+        <span className="sigil-gold">金幣 {char.gold.toLocaleString()}G</span>
       </div>
 
-      <div className="shop-tabs">
-        {SIGIL_TABS.map(t => (
-          <button
-            key={t.tab}
-            className={tab === t.tab ? 'active' : ''}
-            onClick={() => { setTab(t.tab); setResultMsg(null); }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tabSigils.map(d => (
-        <p key={d.type} className="shop-item-desc">{d.name}：{d.description}</p>
-      ))}
-      {resultMsg && <p className="bs-result">{resultMsg}</p>}
-      {tabSigils.every(d => sigilCounts[d.type] <= 0) && (
-        <p className="empty-text">背包裡沒有{tabSigils.map(d => d.name).join('或')}</p>
-      )}
-
-      <div className="panel-scroll">
-        <div className="shop-items">
-          {allItems.length === 0 && <p className="empty-text">沒有裝備</p>}
-          {allItems.map(entry => (
-            <div key={entry.item.id} className="shop-item bs-shop-item">
-              <div className="shop-item-info">
-                {entry.source === 'equipped' && entry.slot && (
-                  <span className="bs-slot-tag">[{SLOT_NAMES[entry.slot]}]</span>
-                )}
-                <EquipmentDetail item={entry.item} templates={allTemplates} />
-              </div>
-              {renderItemAction(entry)}
-            </div>
-          ))}
+      <div className="sigil-body">
+        {/* 左欄：裝備清單。身上與背包同一份，用分組標題分開 */}
+        <div className="sigil-col">
+          <p className="sigil-section-title">裝備</p>
+          <div className="sigil-picker">
+            {allEntries.length === 0 && <p className="empty-text">沒有裝備</p>}
+            {equippedEntries.length > 0 && renderPickerGroup('裝備中', equippedEntries)}
+            {bagEntries.length > 0 && renderPickerGroup('背包', bagEntries)}
+          </div>
         </div>
+
+        {/* 右欄：裝備摘要 → 詞綴 → 印記 */}
+        <div className="sigil-col">
+          {item && (
+            <div className="sigil-summary">
+              <div className="sigil-summary-main">
+                {item.name}
+                <span className="sigil-summary-slot">
+                  {entry?.source === 'equipped' && entry.slot
+                    ? `裝備中 · ${SLOT_NAMES[entry.slot]}`
+                    : '背包'}
+                </span>
+              </div>
+              <div className="sigil-summary-sub">
+                <span className={(item.quality ?? 0) >= POLISH_SIGIL_QUALITY_MAX ? 'sigil-summary-cap' : ''}>
+                  品質 {item.quality ?? 0}% / {POLISH_SIGIL_QUALITY_MAX}%
+                </span>
+                {/*
+                  寫「精鍊上限」不是「詞綴上限」——`maxAffixTier` 是取得管道上限（§ 6A.6），
+                  管的是掉落／製作／商店給的詞綴與精鍊印記推得到哪一階；突破印記「不看取得管道」
+                  （§ 46.7），所以精鍊上限 T5 的裝備照樣可能帶 T6/T7。
+                */}
+                <span>
+                  精鍊上限 T{maxAffixTier}
+                  {maxAffixTier < DEFAULT_MAX_AFFIX_TIER ? '（商店裝）' : ''}
+                </span>
+                <span>詞綴 {affixes.length} 條</span>
+              </div>
+            </div>
+          )}
+
+          <p className="sigil-section-title">選擇詞綴</p>
+          <div className={`sigil-affixes${def.target === 'item' ? ' is-item-target' : ''}`}>
+            {affixes.length === 0 && (
+              <p className="empty-text">{item && inertReason(item) === '新手裝' ? '新手裝沒有詞綴' : '這件裝備沒有詞綴'}</p>
+            )}
+            {affixes.map((affix, i) => {
+              const check = checkAffix(i);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`sigil-affix-row${affixIndex === i ? ' is-selected' : ''}${check.ok ? '' : ' is-disabled'}`}
+                  aria-disabled={!check.ok}
+                  onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
+                >
+                  <span
+                    className={isSpecialAffixType(affix.type)
+                      ? 'affix-tag special'
+                      : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
+                    title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
+                  >
+                    {affixLabel(affix)}
+                  </span>
+                  <span className="sigil-affix-value">
+                    {isSpecialAffixType(affix.type) ? '' : `+${affix.value}%`}
+                  </span>
+                  {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
+                  {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="sigil-section-title">選擇印記</p>
+          <div className="sigil-choices">
+            {SIGIL_DEFINITIONS.map(d => {
+              const owned = sigilCounts[d.type];
+              const info = sigilDisplay(d.type);
+              return (
+                <button
+                  key={d.type}
+                  type="button"
+                  className={`sigil-choice${d.type === sigilType ? ' is-selected' : ''}${owned <= 0 ? ' is-empty' : ''}`}
+                  style={info.color ? ({ '--sigil-color': info.color } as React.CSSProperties) : undefined}
+                  onClick={() => { setSigilType(d.type); setResultMsg(null); }}
+                >
+                  <span className="sigil-choice-dot" />
+                  {/* 突破印記失敗不可逆（§ 46.7），選單上就先標一個記號 */}
+                  {d.type === 'enhance' ? '⚠ ' : ''}{info.name}
+                  <span className="sigil-choice-count">×{owned}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="sigil-desc">{def.description}</p>
+          <p className="sigil-cost">{renderCost()}</p>
+        </div>
+      </div>
+
+      <div className="sigil-footer">
+        <span className={`sigil-footer-msg${blocked ? ' is-error' : ''}`}>
+          {blocked ?? resultMsg ?? ''}
+        </span>
+        <button className="sigil-apply" onClick={handleApply} disabled={blocked != null}>
+          使用{display.name}
+        </button>
       </div>
     </div>
   );

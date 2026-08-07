@@ -125,7 +125,7 @@ export function MagicAcademy() {
     newBag = consumeBagItem(newBag, recipe.materialItemId, recipe.materialAmount);
 
     if (!hasBagItem(newBag, recipe.bookItemId)
-      && getBagUsedSlots(newBag, currentInv) >= getBagMaxSlots(equippedGear)) {
+      && getBagUsedSlots(newBag, currentInv, equippedGear) >= getBagMaxSlots(equippedGear)) {
       return;
     }
     newBag = addBagItem(newBag, recipe.bookItemId, 1);

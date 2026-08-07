@@ -3431,6 +3431,341 @@ button.active {
   margin-bottom: 8px;
 }
 
+/* ═══════════════ 印記師（`13-town.md` § 13.13） ═══════════════ */
+
+/*
+ * 三段式版面：左欄＝裝備清單、右欄＝裝備摘要＋選詞綴＋選印記、底部＝單一動作鈕。
+ *
+ * 為什麼是這個形狀：舊版把「每件裝備 × 每條詞綴」都配一顆按鈕，一個畫面上會有
+ * 數十顆動作鈕，玩家得先在清單裡找到那件裝備才知道能做什麼。改成先選對象再選動作，
+ * 動作鈕收斂成一顆（`34-ui-guidelines.md` § 34.1 同一套模式）。
+ */
+.sigil-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* 高度由外層設施視窗給；兩欄各自捲動，面板本身不捲 */
+  min-height: 0;
+  flex: 1;
+}
+
+.sigil-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sigil-greeting {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  margin: 0;
+  font-style: italic;
+}
+
+.sigil-gold {
+  font-family: var(--font-display);
+  color: var(--accent-gold);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+/* 兩欄。左欄固定寬，右欄吃掉剩下的空間 */
+.sigil-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.sigil-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.sigil-section-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  color: var(--accent-primary);
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── 左欄：裝備清單（身上與背包同一份，用分組標題分開） ────────── */
+.sigil-picker {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  overflow-y: auto;
+  /* 左欄只有這一塊，直接吃滿整欄高度自己捲動 */
+  flex: 1;
+  min-height: 120px;
+}
+
+/* 分組標題吸頂：捲到背包那一段時仍看得到自己在哪一組 */
+.sigil-picker-group {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* 列是 <button>：鍵盤走得到、讀得出可否點，樣式要把瀏覽器預設洗掉 */
+.sigil-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  cursor: pointer;
+  border: none;
+  border-left: 2px solid transparent;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+
+.sigil-picker-row:hover { background: var(--bg-card-hover); }
+
+.sigil-picker-row.is-selected {
+  background: var(--bg-card-hover);
+  border-left-color: var(--accent-gold);
+}
+
+/* 印記全不受理的裝備（新手裝／無詞綴）在清單上就標出來，不必點進去才知道 */
+.sigil-picker-row.is-inert { opacity: 0.5; }
+
+.sigil-picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sigil-picker-tag {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/* ── 右欄頂：選中裝備的兩行摘要 ───────────────────────────────
+ *
+ * 不放完整的 `EquipmentDetail` —— 詞綴在下面那區已經整條列出來，
+ * 詳情再列一次就是同一份資料印兩遍。這裡只留**跟印記操作有關**的欄位：
+ * 品質%（工藝印記的上限）與精鍊上限（精鍊印記推得到哪）。
+ * 材質、重量、可用職業對印記沒有作用，一律不放。
+ */
+.sigil-summary {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  padding: 6px 10px;
+}
+
+.sigil-summary-main {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sigil-summary-sub {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  margin-top: 2px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sigil-summary-slot { color: var(--text-dim); font-size: var(--fs-xs); }
+/* 品質已滿 20% 時轉色，玩家不必自己算還能不能用工藝印記 */
+.sigil-summary-cap { color: var(--accent-gold); }
+
+/* ── 右欄中段：四條詞綴四選一 ─────────────────────────────────── */
+.sigil-affixes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sigil-affix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sigil-affix-row:hover { background: var(--bg-card-hover); }
+
+.sigil-affix-row.is-selected {
+  border-color: var(--accent-gold);
+  box-shadow: inset 0 0 0 1px var(--accent-gold);
+}
+
+/*
+ * 這一條該印記不受理（特殊詞綴、不在守備範圍…）。
+ * **不可用 `disabled`**：被 disable 的按鈕連 hover 提示都收不到，
+ * 玩家只會看到一格灰掉卻不知道為什麼；改用 `aria-disabled` + 點擊時自行判斷。
+ */
+.sigil-affix-row[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sigil-affix-row[aria-disabled='true']:hover { background: var(--bg-inset); }
+
+.sigil-affix-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+
+/*
+ * 這一條為什麼不能選。消耗與成功率**不寫在列上** —— 那是整次操作共通的資訊，
+ * 一律收在下方的 `.sigil-cost`，四條列各掛一份只是把同一句話印四遍。
+ */
+.sigil-affix-reason {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* 混沌／工藝的對象是整件裝備，詞綴欄整區停用（原因寫在下方的 `.sigil-cost`） */
+.sigil-affixes.is-item-target { opacity: 0.4; pointer-events: none; }
+
+/* ── 右欄下段：選印記 + 說明 ──────────────────────────────────── */
+.sigil-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+ * 每顆印記按鈕吃**該印記自己的顏色**（`--sigil-color`，由 `resolveItemIcon()` 從
+ * itemSeeds 讀出來，不在 UI 另建一份色表）。玩家在背包看到的是那個顏色的圖示，
+ * 到印記師還是同一個顏色，不必再讀字才知道自己點到哪一種。
+ * 註：精鍊與工藝在 seed 裡同為素材 tier4 黃，撞色是資料如此，不在這裡改。
+ */
+.sigil-choice {
+  --sigil-color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.sigil-choice:hover { background: var(--bg-card-hover); }
+
+.sigil-choice.is-selected {
+  border-color: var(--sigil-color);
+  color: var(--sigil-color);
+  background: var(--bg-card-hover);
+}
+
+/* 未選取時也看得到顏色，靠這顆點；選取時邊框與文字才整個換色 */
+.sigil-choice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sigil-color);
+  box-shadow: 0 0 6px var(--sigil-color);
+  flex-shrink: 0;
+}
+
+/* 持有 0 個仍可選（要讓玩家看得到說明），只是動作鈕會停用 */
+.sigil-choice.is-empty { opacity: 0.5; }
+
+.sigil-choice-count { font-size: var(--fs-xs); color: var(--text-dim); margin-left: 4px; }
+
+.sigil-desc {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  padding: 8px 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/*
+ * 消耗與成功率一律寫在這裡，動作鈕不重複 —— 按鈕上塞「×1 · 成功率 10%」會長到換行，
+ * 而玩家真正要在按下去之前讀到的就是這一行。
+ */
+.sigil-cost {
+  font-size: var(--fs-xs);
+  color: var(--accent-gold);
+  margin: 4px 0 0;
+  line-height: 1.7;
+}
+
+/* 突破印記的失敗代價不可逆，這一段要跳出來 */
+.sigil-cost .sigil-cost-warn { color: var(--accent-danger); }
+
+/* ── 底部：結果訊息 + 唯一的動作鈕（§ 34.1） ──────────────────── */
+.sigil-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  flex-wrap: wrap;
+}
+
+.sigil-footer-msg { font-size: var(--fs-sm); color: var(--text-secondary); flex: 1; min-width: 0; }
+.sigil-footer-msg.is-error { color: var(--accent-danger); }
+
+/*
+ * 動作鈕**固定一個顏色，不隨選到的印記變化**。顏色是印記選單那排在講的事，
+ * 動作鈕只回答「按下去會發生什麼」，跟著換色反而讓畫面右下角一直跳。
+ * 文字也只寫「使用{印記名}」——消耗、成功率、金幣一律在上方講完（`.sigil-cost`）。
+ */
+.sigil-apply {
+  padding: 8px 20px;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-primary-dim);
+  background: var(--accent-primary-dim);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sigil-apply:hover:not(:disabled) { background: var(--accent-primary); }
+.sigil-apply:disabled { opacity: 0.45; cursor: not-allowed; }
+
 .bs-craft-categories {
   display: flex;
   flex-wrap: wrap;
@@ -3802,6 +4137,52 @@ button.active {
 .bag-cell.equipment:hover {
   border-color: var(--accent-info);
   box-shadow: 0 0 8px rgba(6, 182, 212, 0.2);
+}
+
+/*
+ * § 35.1「裝備中」：穿在身上的裝備一樣佔背包格，用**加粗的青色外框**跟一般背包裝備分開。
+ * 青色沿用裝備類既有的 `--accent-info`（hover 就是這個色），不另外多開一種語意色；
+ * 選取（金）、拖放（紫）、移動（金）都不會撞色。
+ *
+ * 粗框走 inset box-shadow 而不是加 border-width —— 改 border 會讓這一格的內距比鄰格少 1px，
+ * 圖示與名稱會整排對不齊。
+ */
+.bag-cell.is-equipped {
+  border-color: var(--accent-info);
+  box-shadow: inset 0 0 0 2px var(--accent-info);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.bag-cell.is-equipped:hover {
+  border-color: var(--accent-info);
+  box-shadow: inset 0 0 0 2px var(--accent-info), 0 0 8px rgba(6, 182, 212, 0.35);
+}
+
+/* 選取時金色要蓋過綠色，否則玩家看不出自己選到了哪一格 */
+.bag-cell.is-equipped.is-selected {
+  border-color: var(--accent-gold);
+  box-shadow: inset 0 0 0 2px var(--accent-gold), 0 0 10px rgba(245, 158, 11, 0.35);
+}
+
+/* 左下角的「裝備中」小標，與右上角的數量 badge 錯開 */
+.bag-cell-equipped {
+  position: absolute;
+  bottom: 1px;
+  left: 2px;
+  font-size: calc(var(--fs-xs) * 0.75);
+  color: var(--accent-info);
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0 2px;
+  border-radius: 2px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.tooltip-equipped {
+  font-size: var(--fs-xs);
+  color: var(--accent-info);
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 /*
@@ -5673,6 +6054,13 @@ button.active {
 }
 
 @media (max-width: 767px) {
+  /* 印記師：左右欄疊成上下，清單壓矮（`47-mobile.md`） */
+  .sigil-body { grid-template-columns: 1fr; }
+  /* 疊成上下後清單不能再吃滿高度，否則下面的詞綴與印記整個被推出畫面 */
+  .sigil-picker { flex: none; max-height: 150px; }
+  .sigil-apply { width: 100%; }
+  .sigil-footer-msg { flex-basis: 100%; }
+
   /*
    * 兩條 HUD 帶在桌機是 `display: contents`（容器不存在，島各自貼角），
    * 手機才成形。這樣兩種版面共用同一份 JSX，桌機的排版一個 px 都沒動。

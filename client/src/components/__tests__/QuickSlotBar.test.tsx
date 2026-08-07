@@ -311,4 +311,72 @@ describe('裝備快捷鍵的品階著色', () => {
     const expected = EQUIPMENT_TIER_COLORS[getEquipmentInstanceTierLevel(item, EQUIPMENT_SEEDS)];
     expect(iconColorFor(item)).toBe(expected);
   });
+
+  /**
+   * § 35.7.2：裝備中的裝備還留在背包格上，所以快捷格是**穿／脫的切換**，
+   * 不像以前那樣「換上後該格自動清空」。
+   */
+  describe('裝備快捷格是穿脫切換（§ 35.7.2）', () => {
+    const item = equipOf('新手劍', 200);
+
+    function bindSlot0() {
+      useGameStore.setState({
+        quickSlots: emptyQuickSlots().map((_, i) =>
+          i === 0 ? { kind: 'equipment' as const, equipmentId: item.id!, name: item.name } : null),
+        bagItems: [],
+      });
+    }
+
+    afterEach(() => {
+      useGameStore.setState({ equippedGear: {}, inventory: [] });
+    });
+
+    it('在背包裡 → 穿上，而且該格不會被清空', () => {
+      const equipItem = vi.fn();
+      bindSlot0();
+      useGameStore.setState({ inventory: [item], equippedGear: {}, equipItem });
+
+      useGameStore.getState().useQuickSlot(0);
+
+      expect(equipItem).toHaveBeenCalledTimes(1);
+      expect(useGameStore.getState().quickSlots[0]).not.toBeNull();
+    });
+
+    it('穿在身上 → 卸下', () => {
+      const unequipItem = vi.fn();
+      bindSlot0();
+      useGameStore.setState({
+        inventory: [],
+        equippedGear: { rightHand: { ...item, equipped: true } },
+        unequipItem,
+      });
+
+      useGameStore.getState().useQuickSlot(0);
+
+      expect(unequipItem).toHaveBeenCalledWith('rightHand');
+      expect(useGameStore.getState().quickSlots[0]).not.toBeNull();
+    });
+
+    it('實例真的不見了（賣掉／丟棄）才清空該格', () => {
+      bindSlot0();
+      useGameStore.setState({ inventory: [], equippedGear: {} });
+
+      useGameStore.getState().useQuickSlot(0);
+
+      expect(useGameStore.getState().quickSlots[0]).toBeNull();
+    });
+
+    it('穿在身上時該格不會變成灰階（仍可點）', () => {
+      bindSlot0();
+      useGameStore.setState({
+        inventory: [],
+        equippedGear: { rightHand: { ...item, equipped: true } },
+      });
+      const view = render(<QuickSlotBar />);
+
+      expect(slots()[0].className).not.toContain('exhausted');
+      expect(slots()[0].getAttribute('aria-disabled')).toBe('false');
+      view.unmount();
+    });
+  });
 });

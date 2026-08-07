@@ -239,7 +239,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 
 ### 背包面板（BagPanel）
 
-固定 5 欄的 grid，格數依腰帶動態變動（基礎 50，最高 65）。可拖放自由擺放，位置只存在於當下 session（見 `35-inventory-constraints.md` § 35.1.3）。無收合功能，由浮動視窗 body 統一捲動。
+固定 5 欄的 grid，格數依腰帶動態變動（基礎 60，最高 80）。**穿在身上的裝備也留在格子上**（青色粗框 +「裝備中」小標，一樣佔格，點兩下卸下，見 `35-inventory-constraints.md` § 35.1）。可拖放自由擺放，位置只存在於當下 session（見 `35-inventory-constraints.md` § 35.1.3）。無收合功能，由浮動視窗 body 統一捲動。
 - 有物品的格子顯示圖標 + 名稱 + 數量（badge 位於右上角）
 - 空格保留邊框（與技能面板風格一致）
 - 頂部顯示金幣資訊
@@ -306,7 +306,7 @@ interface BagItem {
 
 ### 背包容量
 
-- `BAG_BASE_SLOTS = 50` + `getBagMaxSlots(equippedGear)`（每個 BagItem 佔 1 格，裝備實例各佔 1 格；腰帶擴充見 `35-inventory-constraints.md` § 35.1）
+- `BAG_BASE_SLOTS = 60` + `getBagMaxSlots(equippedGear)`（每個 BagItem 佔 1 格，裝備實例各佔 1 格，**裝備中的裝備也佔 1 格**；腰帶擴充見 `35-inventory-constraints.md` § 35.1）
 - 掉落時背包已滿且無法堆疊 → 丟棄並顯示戰鬥日誌「背包已滿」
 - Helpers：`getBagUsedSlots()`, `isBagFull()`, `getPotionCount()`, `addPotionToBag()`, `consumePotionFromBag()`
 - **所有物品進入背包的入口都必須做容量檢查**：

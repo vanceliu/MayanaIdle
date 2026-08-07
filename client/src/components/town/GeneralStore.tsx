@@ -59,7 +59,7 @@ export function GeneralStore() {
   if (!char) return null;
 
   const gold = char.gold;
-  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory);
+  const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory, equippedGear);
 
   const region = getRegion(char.currentRegion);
   const scrollConfig = region ? TOWN_SCROLL_CONFIG[region.id] : null;
