@@ -51,6 +51,9 @@
 | 戰鬥公式（攻擊/防禦/命中/迴避） | `21-combat-formula.md` | 全文 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
+| **角色外觀（髮型/睫毛/膚色髮色眼色/四朝向）** | `04-character.md` | § 4.10 |
+| 創角的外觀步驟 | `19-account-character.md` | § 19.4（規格見 `04-character.md` § 4.10） |
+| 外觀存哪／匯出匯入落點 | `18-data-schema.md` | § 18.7 |
 | 技能系統規則 | `05-skill.md` | 全文 |
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
 | 職業魔法（5 職業各 5 級） | `23-class-magic.md` | 全文 |
@@ -89,7 +92,7 @@
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
 | 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
-| **特效（強化演出／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
+| **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
 | 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
@@ -201,7 +204,7 @@
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
 | `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限 |
 | `47-mobile.md` | 行動裝置適配 | 斷點、觸控互動、指標拖放、手機版面、PWA |
-| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、共通參數 |
+| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、共通參數；印記師與戰鬥特效待補 |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
 | `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
 
@@ -260,11 +263,18 @@
                                                         ↕
                                                   06-equipment-acquire.md（區域素材→製作配方）
 
+04-character.md § 4.10（角色外觀＝髮型/睫毛/色票/四朝向的唯一出處）
+  ←→ 19-account-character.md § 19.4（創角流程的外觀步驟）／§ 19.9（匯出匯入帶 appearance）
+  ←→ 18-data-schema.md § 18.7（appearance 欄位與四個落點，匯入必須逐欄位列出）
+  ←→ 40-pixijs-migration.md（玩家/NPC 用剪影並烘成 RenderTexture，怪物維持圓形）
+  ←→ 45-legacy-archive.md § 45.2（遺產快照要帶外觀）
+  色票增刪時必須重算「每個膚色至少 4 個對比 ≥2.2 的眼色」對照表
+
 04-character.md § 4.9（經驗曲線）←→ 28-monster-stats.md（怪物經驗值全表依此推算）
        ↕
 09-dungeon.md（等級分佈）←→ 04-character.md § 4.9（經驗曲線）
 
-19-account-character.md ←→ 04-character.md（職業/初始配置）
+19-account-character.md ←→ 04-character.md（職業/初始配置、§ 4.10 外觀）
        ↕      ←→ 20-attributes.md § 20.10（角色卡屬性＝建角＋升級配點，不含裝備／buff）
        ↕
 18-data-schema.md（User/Character 關係、character uuid、共用倉庫金幣獨立表）
@@ -289,6 +299,7 @@
   ←→ 34-ui-guidelines.md § 34.9（渲染上限＝特效的效能預算，數值只在該節）
   ←→ 06-equipment.md § 6.9~6.10（強化的成功率與安定值＝演出的觸發條件，數值只在該節）
   ←→ 40-pixijs-migration.md（EffectLayer 是戰鬥特效的掛載點）
+  ←→ 46-sigil.md（印記師的成功率與確認訊息＝演出的觸發條件，數值只在該文件）
   特效不得改變任何規則；改動機率或安定值時本文件不需同步，反之亦然
        ↕
 16-tech-frontend-architecture.md § 32.15.1（視窗層級／底部 HUD 帶寬 --hud-band-bottom）

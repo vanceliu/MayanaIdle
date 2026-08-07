@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
 import { isWeaponSlot } from '../../models/equipment';
@@ -36,6 +36,30 @@ const SLOT_NAMES: Record<EquipSlot, string> = {
 };
 
 type Tab = 'enhance' | 'craft';
+
+/**
+ * 強化演出的總長度（`48-vfx.md` § 48.4.3）。
+ * 最長的一段是碎裂：stagger 0.32s + 0.38s + 0.88s，取整並留一點餘裕。
+ */
+export const ENHANCE_FX_DURATION_MS = 1800;
+
+type EnhanceFxKind = 'safe' | 'success' | 'fail';
+
+interface EnhanceFx {
+  token: number;
+  kind: EnhanceFxKind;
+  itemId: number;
+  /** 成功時往上飄的 `+N` */
+  label?: string;
+  /** 失敗時的殘影快照：裝備已從清單移除，靠這份原地演完碎裂 */
+  ghost?: EquipmentInstance;
+  ghostIndex?: number;
+  ghostSlot?: EquipSlot;
+}
+
+let fxToken = 0;
+
+const SHARD_INDEXES = [1, 2, 3, 4, 5, 6];
 
 function isWeapon(item: EquipmentInstance): boolean {
   return !!item.smallMonsterDamage;
@@ -82,7 +106,11 @@ export function TownBlacksmith() {
   const [craftTemplates, setCraftTemplates] = useState<EquipmentTemplate[]>([]);
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [fx, setFx] = useState<EnhanceFx | null>(null);
   const allTemplates = useEquipmentTemplates();
+
+  /** 面板關掉時把殘影一起收掉，避免下次打開又看到上一次的碎裂 */
+  useEffect(() => () => setFx(null), []);
 
   useEffect(() => {
     db.equipmentTemplates
@@ -131,6 +159,18 @@ export function TownBlacksmith() {
     });
   }
 
+  /**
+   * 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1）——
+   * 失敗時裝備已經被移除，卡片會跟著消失，所以用 `ghost` 存一份快照原地演完碎裂。
+   */
+  function playFx(next: Omit<EnhanceFx, 'token'>) {
+    const token = ++fxToken;
+    setFx({ ...next, token });
+    window.setTimeout(() => {
+      setFx(current => (current?.token === token ? null : current));
+    }, ENHANCE_FX_DURATION_MS);
+  }
+
   function handleEnhance(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
     if (!char) return;
     const { item, source, slot } = entry;
@@ -162,6 +202,12 @@ export function TownBlacksmith() {
         useGameStore.setState({ inventory: newInv, bagItems: newBag });
       }
       setResultMsg(`強化成功！${item.name} +${nextLevel}`);
+      // § 48.4：安定值內只給白閃，超過安定值才是金色那一套
+      playFx({
+        kind: nextLevel <= stability ? 'safe' : 'success',
+        itemId: item.id!,
+        label: `+${nextLevel}`,
+      });
     } else {
       if (item.id) db.equipmentInstances.delete(item.id);
       if (source === 'equipped' && slot) {
@@ -172,6 +218,14 @@ export function TownBlacksmith() {
         useGameStore.setState({ inventory: newInv, bagItems: newBag });
       }
       setResultMsg(`強化失敗！${item.name} 已損毀...`);
+      // 裝備已經從清單移除，碎裂只能靠殘影卡片演（狀態不為了特效延後，見 `48-vfx.md` § 48.1）
+      playFx({
+        kind: 'fail',
+        itemId: item.id!,
+        ghost: item,
+        ghostIndex: allItems.findIndex(e => e.item.id === item.id),
+        ghostSlot: source === 'equipped' ? slot : undefined,
+      });
     }
     const stats = { ...useGameStore.getState().statistics };
     if (itemIsWeapon) {
@@ -184,6 +238,27 @@ export function TownBlacksmith() {
     useGameStore.setState({ statistics: stats });
     useGameStore.getState().saveState();
   }
+
+  /** 失敗時的殘影卡片：純視覺，沒有任何按鈕，演完就由 `playFx` 收掉 */
+  const ghostCard = fx?.kind === 'fail' && fx.ghost
+    ? (
+      <div
+        key={`enh-ghost-${fx.token}`}
+        className="shop-item bs-shop-item enh-shake enh-breaking"
+        data-testid="enh-fx-ghost"
+      >
+        <div className="shop-item-info">
+          {fx.ghostSlot && <span className="bs-slot-tag">[{SLOT_NAMES[fx.ghostSlot]}]</span>}
+          <EquipmentDetail item={fx.ghost} templates={allTemplates} />
+        </div>
+        <div className="enh-fx-layer">
+          <div className="enh-flash-red" />
+          <div className="enh-flash-soft" />
+          {SHARD_INDEXES.map(i => <div key={i} className={`enh-shard enh-shard--${i}`} />)}
+        </div>
+      </div>
+    )
+    : null;
 
   /**
    * 製作按鈕與製作任務外框走**同一支判定**（`36-quest-system.md` § 36.13.3）——
@@ -377,18 +452,40 @@ export function TownBlacksmith() {
       <div className="panel-scroll">
       {tab !== 'craft' && (
         <div className="shop-items">
-          {allItems.length === 0 && <p className="empty-text">沒有裝備</p>}
-          {allItems.map((entry) => (
-            <div key={entry.item.id} className="shop-item bs-shop-item">
-              <div className="shop-item-info">
-                {entry.source === 'equipped' && entry.slot && (
-                  <span className="bs-slot-tag">[{SLOT_NAMES[entry.slot]}]</span>
+          {allItems.length === 0 && !ghostCard && <p className="empty-text">沒有裝備</p>}
+          {allItems.map((entry, index) => (
+            <Fragment key={entry.item.id}>
+              {ghostCard && fx?.ghostIndex === index && ghostCard}
+              <div
+                className={`shop-item bs-shop-item${
+                  tab === 'enhance' && getStability(entry.item) >= 0 ? ' enh-standby' : ''
+                }`}
+              >
+                <div className="shop-item-info">
+                  {entry.source === 'equipped' && entry.slot && (
+                    <span className="bs-slot-tag">[{SLOT_NAMES[entry.slot]}]</span>
+                  )}
+                  <EquipmentDetail item={entry.item} templates={allTemplates} />
+                </div>
+                {tab === 'enhance' && renderEnhanceActions(entry)}
+                {fx && fx.kind !== 'fail' && fx.itemId === entry.item.id && (
+                  <div className="enh-fx-layer" data-testid="enh-fx-success">
+                    {fx.kind === 'success' && (
+                      <>
+                        <div className="enh-flash-gold" />
+                        <div className="enh-ring" />
+                        <div className="enh-ring delay" />
+                      </>
+                    )}
+                    {fx.label && <div className="enh-float">{fx.label}</div>}
+                    <div className="enh-flash-soft" />
+                  </div>
                 )}
-                <EquipmentDetail item={entry.item} templates={allTemplates} />
               </div>
-              {tab === 'enhance' && renderEnhanceActions(entry)}
-            </div>
+            </Fragment>
           ))}
+          {/* 殘影原本的位置已被別的卡片遞補，或它本來就在最後一個，補在清單尾端 */}
+          {ghostCard && (fx?.ghostIndex == null || fx.ghostIndex >= allItems.length) && ghostCard}
         </div>
       )}
 

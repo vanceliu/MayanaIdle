@@ -447,9 +447,10 @@ export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
   const name = affix.element ? `${def?.name}（${BRAND_ELEMENT_ZH[affix.element]}）` : (def?.name ?? affix.type);
   // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
   if (affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') {
+    // 名稱已含「受擊」，回復量的「最大 HP／MP 百分比」省略成「回血／回魔 X%」（§ 7.4）
     const pct = restorePercentWithQuality(affix, quality);
-    const what = affix.type === 'on_hit_hp' ? '最大HP' : '最大MP';
-    return `${name} ${getEffectiveAffixValue(affix, quality)}% 觸發／回復${what} ${pct}% (T${affix.tier})`;
+    const what = affix.type === 'on_hit_hp' ? '回血' : '回魔';
+    return `受擊 ${getEffectiveAffixValue(affix, quality)}% 觸發${what} ${pct}% (T${affix.tier})`;
   }
   if (affix.type === 'element_erosion') {
     const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));

@@ -55,7 +55,7 @@ client/src/wiki/
 | 屬性公式 | 硬編碼文字（對應 `systems/combat.ts` 計算） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |
 | 任務 | `QUEST_TEMPLATES`、guild 相關 seed |
-| 素材來源 | `ASSET_CREDITS`（`wiki/data/assetCredits.ts`），與 `client/src/assets/tiles/CREDITS.md` 同步維護 |
+| 素材來源 | `ASSET_CREDITS`（`client/src/wiki/data/assetCredits.ts`），與 `client/src/assets/CREDITS.md` 同步維護 |
 
 ### useWikiData.ts 提供的 hook
 
@@ -180,7 +180,7 @@ client/src/wiki/
 - 列出版庫中收錄的**第三方素材**：用途、素材名稱、作者、授權、來源 URL、版庫路徑
 - 授權與來源皆為可點擊外部連結（`target="_blank"` + `rel="noopener noreferrer"`）
 - 呈現 CC BY 3.0 要求的標注文字原文
-- 資料來源為 `wiki/data/assetCredits.ts` 的 `ASSET_CREDITS`；**新增第三方素材時必須同步更新**此常數與對應的 `CREDITS.md`
+- 資料來源為 `client/src/wiki/data/assetCredits.ts` 的 `ASSET_CREDITS`；**新增第三方素材時必須同步更新**此常數與對應的 `client/src/assets/CREDITS.md`
 - 資料與元件分檔的原因：同一檔案同時匯出元件與常數會違反 `react-refresh/only-export-components`
 
 ## 5. 共用元件與樣式
@@ -243,8 +243,8 @@ Wiki 頁面直接 import seed 常數與 model 定義，**不存在複製資料**
 ## 9. 擴充指引
 
 新增 Wiki 頁面步驟：
-1. 在 `wiki/pages/` 新增頁面元件
-2. 在 `wiki/components/WikiLayout.tsx` 的 `NAV_ITEMS` 加入導覽項目
-3. 在 `wiki/pages/WikiHome.tsx` 的 `CATEGORIES` 加入卡片
+1. 在 `client/src/wiki/pages/` 新增頁面元件
+2. 在 `client/src/wiki/components/WikiLayout.tsx` 的 `NAV_ITEMS` 加入導覽項目
+3. 在 `client/src/wiki/pages/WikiHome.tsx` 的 `CATEGORIES` 加入卡片
 4. 在主路由設定加入對應 route
-5. 若需新資料 hook，加入 `wiki/hooks/useWikiData.ts`
+5. 若需新資料 hook，加入 `client/src/wiki/hooks/useWikiData.ts`

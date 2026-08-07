@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>創角外觀 UI 模擬 — MayanaIdle</title>
+<!--
+  創角流程的外觀區塊模擬頁（`99-ai-constraints.md` § 99.2 第 5 階的原型）。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/character-create.html
+
+  ── 這頁在確認什麼 ──
+  真正要接進 `CharacterCreate.tsx` 的是「選髮型 → 微調 → 選色 → 即時預覽」這段互動。
+  先在這裡把版面與可調範圍定案，再寫成 React，免得在正式元件上來回改。
+
+  ── 規格（已定案）──
+  - 體型只有一種，**玩家不可調整**
+  - 每個髮型只開 4 項可調參數（下方 CREATE_TUNABLES），其餘由髮型自己決定
+  - 顏色只開膚色與髮色；衣色由裝備決定，不進外觀資料
+  - 外觀存在 `characters` 列的 `appearance` 欄位，匯出／匯入都要帶（見 § 99.2）
+
+  繪製核心與 `pawn.html` 共用 `pawn-draw.js`，這頁不重複實作任何形狀。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-note code { color: var(--text-primary, #E2E8F0); }
+
+/* ── 創角卡片：模擬真實比例的一個面板 ── */
+.create-panel {
+  display: flex; gap: 20px;
+  background: var(--bg-panel, #12122B);
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 10px; padding: 20px;
+  max-width: 860px;
+}
+.preview-col { flex: 0 0 300px; }
+.form-col { flex: 1 1 auto; min-width: 0; }
+
+canvas { display: block; width: 100%; border-radius: 8px; background: #0d0d20; }
+.dir-tabs { display: flex; gap: 6px; margin-top: 10px; }
+.dir-tabs button {
+  flex: 1; font-family: inherit; font-size: 12px; cursor: pointer; padding: 6px 0;
+  background: none; color: var(--text-dim, #64748B);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 5px;
+}
+.dir-tabs button[aria-pressed="true"] {
+  background: var(--accent-primary-dim, #7C3AED); color: #fff; border-color: transparent;
+}
+
+h3 { font-family: var(--font-display, sans-serif); font-size: 13px; color: var(--accent-primary, #A78BFA); margin: 0 0 8px; }
+section { margin-bottom: 18px; }
+
+.hair-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.hair-grid button {
+  font-family: inherit; font-size: 12px; cursor: pointer; padding: 7px 0;
+  background: none; color: var(--text-primary, #E2E8F0);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 5px;
+}
+.hair-grid button[aria-pressed="true"] {
+  background: var(--accent-primary-dim, #7C3AED); border-color: transparent; color: #fff;
+}
+
+.row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+.row > label { flex: 0 0 84px; color: var(--text-dim, #64748B); }
+.row > input[type=range] { flex: 1; min-width: 0; }
+.row > .val { flex: 0 0 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatches button {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent;
+}
+.swatches button[aria-pressed="true"] { border-color: var(--accent-primary, #A78BFA); }
+
+.hint { font-size: 11px; line-height: 1.6; margin: 8px 0 0; color: var(--text-dim, #64748B); }
+.hint.warn { color: var(--warning, #FBBF24); }
+
+.actions { display: flex; gap: 8px; margin-top: 4px; }
+button.primary {
+  font-family: inherit; font-size: 13px; cursor: pointer; padding: 9px 20px;
+  background: var(--accent-primary-dim, #7C3AED); color: #fff; border: none; border-radius: 6px;
+}
+button.ghost {
+  font-family: inherit; font-size: 13px; cursor: pointer; padding: 9px 16px;
+  background: none; border: 1px solid var(--border-subtle, #1E1E4A);
+  color: var(--text-dim, #64748B); border-radius: 6px;
+}
+
+textarea {
+  width: 100%; box-sizing: border-box; height: 150px; margin-top: 10px;
+  background: #0d0d20; color: var(--text-primary, #E2E8F0);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 6px;
+  font-family: ui-monospace, monospace; font-size: 11px; padding: 8px; line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">創角外觀 UI 模擬</h1>
+<p class="demo-note">
+  <code>99-ai-constraints.md § 99.2</code> 第 5 階的原型 —— 先在這裡把版面與可調範圍定案，再寫成 React。<br>
+  <b>體型不可調</b>（只有一種），每個髮型開 4 項參數，顏色只開膚色與髮色。<br>
+  下方「存檔內容」就是要寫進 <code>characters.appearance</code> 的資料，匯出／匯入都會帶著它。
+</p>
+
+<div class="create-panel">
+  <div class="preview-col">
+    <canvas id="preview" height="300"></canvas>
+    <div class="dir-tabs" id="dirTabs"></div>
+  </div>
+
+  <div class="form-col">
+    <section>
+      <h3>髮型</h3>
+      <div class="hair-grid" id="hairGrid"></div>
+    </section>
+
+    <section>
+      <h3>微調（每個髮型各自獨立）</h3>
+      <div id="tunables"></div>
+    </section>
+
+    <section>
+      <h3>睫毛（與髮型無關，任何髮型都能配）</h3>
+      <div class="row"><label>顯示睫毛</label><input type="checkbox" id="lashOn"></div>
+      <div id="lashTunables"></div>
+    </section>
+
+    <section>
+      <h3>膚色</h3>
+      <div class="swatches" id="skinRow"></div>
+    </section>
+
+    <section>
+      <h3>髮色</h3>
+      <div class="swatches" id="hairRow"></div>
+    </section>
+
+    <section>
+      <h3>眼睛顏色（眼珠與睫毛共用）</h3>
+      <div class="swatches" id="eyeRow"></div>
+      <p class="hint" id="eyeHint"></p>
+    </section>
+
+    <div class="actions">
+      <button class="primary" id="save">建立角色</button>
+      <button class="ghost" id="randomize">隨機</button>
+      <button class="ghost" id="reset">回到預設</button>
+    </div>
+    <textarea id="out" readonly></textarea>
+  </div>
+</div>
+
+<script src="pawn-draw.js"></script>
+<script>
+/**
+ * 創角只開這 4 項 —— 全部來自髮型自己的 capCfg，所以逐髮型獨立。
+ * 其餘（軀幹、眼睛、髮尾長寬…）由髮型與體型決定，玩家碰不到。
+ */
+const CREATE_TUNABLES = [
+  { key: 'front',   label: '瀏海長度', min: 20, max: 70 },
+  { key: 'peak',    label: '中段尖高', min: 0,  max: 70 },
+  { key: 'mDip',    label: '中間高低', min: -50, max: 50 },
+  { key: 'bangLen', label: '側瀏海',   min: 0,  max: 60 },
+];
+
+/**
+ * 睫毛的可調項 —— 與髮型微調一樣是 3～4 項，但**存在角色身上而不是髮型上**，
+ * 所以換髮型不會把睫毛換掉。
+ */
+const LASH_TUNABLES = [
+  { key: 'len',  label: '長度', min: 4,   max: 34 },
+  { key: 'curl', label: '上翹', min: -12, max: 28 },
+  { key: 'w',    label: '粗細', min: 15,  max: 90 },
+];
+
+const SKIN_TONES = ['#f2d6b8', '#e8c9a0', '#dcb894', '#c98f5e', '#a9703f', '#7c4f2c', '#5a3720'];
+const HAIR_TONES = ['#2f2a33', '#4a3728', '#5a4030', '#8a6b4a', '#c9a227', '#d9c87a',
+                    '#b03a2e', '#6b4fa0', '#3d6b8f', '#c9c2b4'];
+/**
+ * 眼色要**深淺兩端都有**。眼珠在遊戲內只有 1～2 px，靠的是與膚色的明暗差：
+ * 淺膚配深眼、深膚配亮眼。只給深色的話，深膚角色的眼睛會整顆糊進臉裡。
+ * 前排深、後排亮，配色時照膚色挑另一端。
+ */
+const EYE_TONES = [
+  /* 深 —— 給淺膚 */
+  '#0b0b16', '#3a2418', '#5a3a1c', '#2f5d3a', '#24506e', '#4a2f5e', '#6b2a2a',
+  /* 亮 —— 給深膚 */
+  '#c98a3c', '#e3c765', '#4fa3d9', '#5fbf7a', '#b98ae0', '#e58080', '#ded9cc',
+];
+
+/** sRGB 相對亮度（WCAG）—— 只用來判斷眼睛看不看得見，不做配色 */
+function luminance(hex) {
+  const v = i => {
+    const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * v(0) + 0.7152 * v(1) + 0.0722 * v(2);
+}
+
+/** 對比太低就是「這個角色沒有眼睛」，在小尺寸下看不出來，先在這裡講 */
+function eyeContrast() {
+  const a = luminance(appearance.eyeColor), b = luminance(appearance.skin);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+/** 這份物件就是要存進 `characters.appearance` 的內容 */
+const appearance = {
+  hair: 'part',
+  skin: SKIN_TONES[1],
+  hairColor: HAIR_TONES[1],
+  eyeColor: EYE_TONES[0],
+  /** 睫毛：眼珠與睫毛同色，所以這裡只有形狀，不帶顏色 */
+  lash: { ...LASH_DEFAULT },
+  /** 逐髮型的微調值；只存與預設不同的項目 */
+  tune: {},
+};
+
+let dirId = 'front';
+
+/* ── 繪製 ── */
+function capFor(hairId) {
+  const base = HAIR_STYLE_BY_ID[hairId].capCfg;
+  return { ...base, ...(appearance.tune[hairId] || {}) };
+}
+
+function drawPreview() {
+  const canvas = document.getElementById('preview');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth, h = 300;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  /* 暫時把選中髮型的 capCfg 換成微調後的值再畫，畫完還原 ——
+     繪製核心是共用的，不該為了預覽多開一條參數路徑 */
+  const style = HAIR_STYLE_BY_ID[appearance.hair];
+  const original = style.capCfg;
+  style.capCfg = capFor(appearance.hair);
+
+  const dir = DIRS.find(d => d.id === dirId);
+  const look = {
+    hair: appearance.hair, eyes: 'dots',
+    skin: appearance.skin, hairColor: appearance.hairColor, cloth: '#8fa3c4',
+    eyeColor: appearance.eyeColor, lash: appearance.lash,
+  };
+  const z = 5.2;
+  ctx.save();
+  ctx.translate(w / 2, h * 0.78);
+  ctx.scale(z, z);
+  drawTile(ctx, 0, 0, '#2c4a33', false);
+  drawPawn(ctx, 0, 0, dir, look, DEFAULT_GEOM);
+  ctx.restore();
+
+  style.capCfg = original;
+}
+
+/* ── UI ── */
+const $ = id => document.getElementById(id);
+
+function buildDirTabs() {
+  $('dirTabs').innerHTML = '';
+  for (const d of DIRS) {
+    const b = document.createElement('button');
+    b.textContent = d.label;
+    b.setAttribute('aria-pressed', String(d.id === dirId));
+    b.onclick = () => { dirId = d.id; buildDirTabs(); drawPreview(); };
+    $('dirTabs').appendChild(b);
+  }
+}
+
+function buildHairGrid() {
+  $('hairGrid').innerHTML = '';
+  for (const st of HAIR_STYLES) {
+    const b = document.createElement('button');
+    b.textContent = st.label;
+    b.setAttribute('aria-pressed', String(st.id === appearance.hair));
+    b.onclick = () => {
+      appearance.hair = st.id;
+      buildHairGrid(); buildTunables(); refresh();
+    };
+    $('hairGrid').appendChild(b);
+  }
+}
+
+/**
+ * 一組滑桿。`read` 給目前值，`write` 收下新值 ——
+ * 髮型微調寫進 appearance.tune、睫毛寫進 appearance.lash，
+ * 版面與行為完全一樣，沒有理由寫兩份。
+ */
+function buildSliders(hostId, defs, read, write) {
+  const host = $(hostId);
+  host.innerHTML = '';
+  for (const t of defs) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<label>${t.label}</label>`;
+    const input = document.createElement('input');
+    input.type = 'range'; input.min = t.min; input.max = t.max; input.step = 1;
+    input.value = read(t.key);
+    const val = document.createElement('span');
+    val.className = 'val'; val.textContent = input.value;
+    input.oninput = () => {
+      write(t.key, Number(input.value));
+      val.textContent = input.value;
+      refresh();
+    };
+    row.append(input, val);
+    host.appendChild(row);
+  }
+}
+
+function buildTunables() {
+  const cap = capFor(appearance.hair);
+  buildSliders('tunables', CREATE_TUNABLES,
+    k => cap[k],
+    (k, v) => { (appearance.tune[appearance.hair] ||= {})[k] = v; });
+}
+
+function buildLashTunables() {
+  $('lashOn').checked = !!appearance.lash.on;
+  /* 沒有睫毛時那三根滑桿調什麼都不會有反應，留在畫面上只會讓人以為壞了 */
+  $('lashTunables').hidden = !appearance.lash.on;
+  buildSliders('lashTunables', LASH_TUNABLES,
+    k => appearance.lash[k],
+    (k, v) => { appearance.lash[k] = v; });
+}
+
+function buildSwatches(rowId, tones, key) {
+  const row = $(rowId);
+  row.innerHTML = '';
+  for (const c of tones) {
+    const b = document.createElement('button');
+    b.style.background = c;
+    b.setAttribute('aria-pressed', String(appearance[key] === c));
+    b.onclick = () => { appearance[key] = c; buildSwatches(rowId, tones, key); refresh(); };
+    row.appendChild(b);
+  }
+}
+
+function refresh() {
+  drawPreview();
+
+  /* 對比在 300px 的預覽上還看得出來，縮到遊戲內的 1～2 px 就沒了，所以用算的 */
+  const c = eyeContrast();
+  const hint = $('eyeHint');
+  hint.classList.toggle('warn', c < 2.2);
+  hint.textContent = c < 2.2
+    ? `這個眼色在目前膚色上幾乎看不見（對比 ${c.toFixed(1)}）—— 深膚選亮眼、淺膚選深眼。`
+    : `與膚色的對比 ${c.toFixed(1)}，縮到遊戲內尺寸仍看得出眼睛。`;
+
+  $('out').value = JSON.stringify(appearance, null, 2);
+}
+
+$('lashOn').onchange = e => {
+  appearance.lash.on = e.target.checked ? 1 : 0;
+  buildLashTunables();   /* 勾／取消要跟著收合那三根滑桿 */
+  refresh();
+};
+
+/** 每次改動後要重畫的全部控制項 —— 隨機與回到預設共用 */
+function rebuildAll() {
+  buildHairGrid(); buildTunables(); buildLashTunables();
+  buildSwatches('skinRow', SKIN_TONES, 'skin');
+  buildSwatches('hairRow', HAIR_TONES, 'hairColor');
+  buildSwatches('eyeRow', EYE_TONES, 'eyeColor');
+  refresh();
+}
+
+$('randomize').onclick = () => {
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  appearance.hair = pick(HAIR_STYLES).id;
+  appearance.skin = pick(SKIN_TONES);
+  appearance.hairColor = pick(HAIR_TONES);
+  /* 只從「與這個膚色對比夠的」眼色裡抽 —— 否則隨機常常抽出一張沒有眼睛的臉 */
+  const skinLum = luminance(appearance.skin);
+  const usable = EYE_TONES.filter(c => {
+    const a = luminance(c);
+    return (Math.max(a, skinLum) + 0.05) / (Math.min(a, skinLum) + 0.05) >= 2.2;
+  });
+  appearance.eyeColor = pick(usable.length ? usable : EYE_TONES);
+  appearance.lash = { ...LASH_DEFAULT, on: Math.random() < 0.5 ? 1 : 0 };
+  appearance.tune = {};
+  rebuildAll();
+};
+
+/** 只還原目前髮型的微調與睫毛，不動已選好的髮型與顏色 */
+$('reset').onclick = () => {
+  appearance.tune[appearance.hair] = {};
+  appearance.lash = { ...LASH_DEFAULT, on: appearance.lash.on };
+  buildTunables(); buildLashTunables(); refresh();
+};
+
+$('save').onclick = () => {
+  $('out').value = JSON.stringify(appearance, null, 2);
+  $('out').select();
+  alert('這份 JSON 就是要寫進 characters.appearance 的內容。');
+};
+
+window.addEventListener('resize', drawPreview);
+
+buildDirTabs();
+rebuildAll();
+</script>
+
+</body>
+</html>

@@ -221,7 +221,7 @@ function getEquipmentTierLevel(template: EquipmentTemplate): number {
 - `client/src/components/town/GeneralStore.tsx` — 販售分頁加入批量販售 UI（素材）
 - `client/src/components/town/WeaponShop.tsx` — 販售分頁加入批量販售 UI（武器）
 - `client/src/components/town/ArmorShop.tsx` — 販售分頁加入批量販售 UI（防具）
-- `client/src/components/EquipmentDetail.tsx` — 裝備名稱加上顏色顯示
+- `client/src/components/EquipmentInfo.tsx` — 裝備名稱加上顏色顯示
 - `client/src/components/BagPanel.tsx` — 背包裝備名稱加上顏色顯示
 
 ### 不修改

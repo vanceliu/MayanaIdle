@@ -139,8 +139,8 @@ describe('生成', () => {
   });
 
   it('顯示文字寫出觸發率與回復比例', () => {
-    expect(formatAffixDisplay(onHitHp(20, 4))).toBe('受擊回血 20% 觸發／回復最大HP 4% (T7)');
-    expect(formatAffixDisplay(onHitMp(20, 5), 20)).toBe('受擊回魔 24% 觸發／回復最大MP 6% (T7)');
+    expect(formatAffixDisplay(onHitHp(20, 4))).toBe('受擊 20% 觸發回血 4% (T7)');
+    expect(formatAffixDisplay(onHitMp(20, 5), 20)).toBe('受擊 24% 觸發回魔 6% (T7)');
   });
 });
 

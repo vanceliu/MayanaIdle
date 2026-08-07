@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>角色剪影 Pawn Demo — MayanaIdle</title>
+<!--
+  角色剪影（RimWorld 式無腳 pawn）預覽頁 —— 只看外觀，不接遊戲邏輯。
+
+  用 Vite dev server 開：`npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/pawn.html
+  直接用 file:// 開會拿不到 App.css，控制列會沒有樣式（畫布本身仍然正常）。
+
+  ── 這頁在解決什麼 ──
+  目前 PlayerEntity / NpcEntity / MonsterEntity 都是 Graphics.circle()，
+  五個職業、十一個設施 NPC 長得一模一樣。
+
+  ── 畫法 ──
+  只有三個元件：頭、軀幹、眼睛，外加一圈粗黑描邊。沒有腳、沒有走路動畫。
+  每個造型四張圖：正面／背面／左／右，換方向是換圖不是動畫。
+  體型只有一種（不分男女）：肩寬／腰寬／臀寬三個數字決定軀幹輪廓。
+  多樣性全部由髮型、膚色、髮色、衣色承擔 —— 每個髮型各自持有一整組
+  髮際線數字，不共用全域值，所以調一個不會動到別的。
+
+  ── 為什麼是 Canvas 2D 而不是 Pixi ──
+  只用到 roundRect、bezier 路徑、fill、stroke，Pixi Graphics 全部有一對一的 API，
+  移植是機械式的。用 Canvas 2D 可以維持既有 demo 頁「單檔、無 import」的模式。
+
+  ── 這頁的產出 ──
+  下方「匯出參數」的 JSON = 正式實作要用的幾何與配色常數。
+  設計文件查不到這些數字，一律以這頁調出來的結果為準。
+
+  地圖常數與 client/src/pixi/utils/isometric.ts 同步：TILE_W=64、TILE_H=32。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版（不會進 App.css） ═══════════ */
+body {
+  margin: 0;
+  padding: 24px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-note code { color: var(--text-primary, #E2E8F0); }
+
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 300px; }
+
+.demo-card {
+  background: var(--bg-panel, #12122B);
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.demo-card h2 {
+  font-family: var(--font-display, sans-serif);
+  font-size: 15px; margin: 0 0 4px; color: var(--accent-primary, #A78BFA);
+}
+.demo-card p.hint { color: var(--text-dim, #64748B); font-size: 12px; margin: 0 0 10px; line-height: 1.7; }
+
+canvas { display: block; width: 100%; border-radius: 6px; background: #0d0d20; }
+
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.row > label { flex: 0 0 90px; color: var(--text-dim, #64748B); }
+.row > input[type=range] { flex: 1; min-width: 0; }
+.row > .val { flex: 0 0 38px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary, #E2E8F0); }
+.row > select, .row > input[type=color] { flex: 1; min-width: 0; }
+.row > input[type=color] { height: 24px; padding: 0; border: 1px solid var(--border-subtle, #1E1E4A); background: none; }
+
+fieldset {
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 6px; padding: 10px 12px; margin: 0 0 12px;
+}
+legend { font-size: 12px; color: var(--accent-primary, #A78BFA); padding: 0 6px; }
+
+.toggles { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-dim, #64748B); }
+.toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+button {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  background: var(--accent-primary-dim, #7C3AED); color: #fff;
+  border: none; border-radius: 5px; padding: 7px 14px;
+}
+button.ghost { background: none; border: 1px solid var(--border-subtle, #1E1E4A); color: var(--text-dim, #64748B); }
+
+textarea {
+  width: 100%; box-sizing: border-box; height: 190px; margin-top: 8px;
+  background: #0d0d20; color: var(--text-primary, #E2E8F0);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 5px;
+  font-family: ui-monospace, monospace; font-size: 11px; padding: 8px; line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">角色剪影 Pawn Demo</h1>
+<p class="demo-note">
+  只有三個元件：<b>頭、軀幹、眼睛</b>，外加一圈粗黑描邊。沒有腳、沒有走路動畫。<br>
+  軀幹輪廓由肩寬／腰寬／臀寬三個數字決定，<b>全部造型共用同一種體型</b>。<br>
+  四張圖：<b>正面／背面／左／右</b>，與 RimWorld 相同。等距地圖上這四個世界方向在螢幕上是斜的，但那是投影的事，角色本身只有這四種畫法。<br>
+  <b>調到滿意後按「匯出參數」，那份 JSON 就是實作要用的數字。</b>
+</p>
+
+<div class="demo-layout">
+  <div class="demo-main">
+
+    <div class="demo-card">
+      <h2>場景比例（站在真實尺寸的等距地磚上）</h2>
+      <p class="hint">
+        判斷大小的唯一依據 —— 地磚是 <code>TILE_W=64 / TILE_H=32</code>，與遊戲一致。
+        描邊在這個尺寸下很吃比例：太粗會把身體吃掉，太細在雜亂地形上會糊掉。
+      </p>
+      <canvas id="scene" height="380"></canvas>
+    </div>
+
+    <div class="demo-card">
+      <h2>四朝向放大檢視</h2>
+      <p class="hint">選中的造型放大 4 倍。正面有臉、左右是側身（窄一圈、眼睛轉過去）、背面只有輪廓。</p>
+      <canvas id="dirs" height="260"></canvas>
+    </div>
+
+    <div class="demo-card">
+      <h2>髮型一覽</h2>
+      <p class="hint">
+        馬尾正面看不到（綁在腦後被頭擋住），與參考表一致。三排分別是正面／右／背面 ——
+        馬尾要背面才看得到整條，雙馬尾兩面都在，側面只露近的那一束。
+      </p>
+      <canvas id="hairs" height="400"></canvas>
+    </div>
+
+  </div>
+
+  <div class="demo-side">
+
+    <div class="demo-card">
+      <h2>造型</h2>
+      <div class="row"><label>預設</label><select id="preset"></select></div>
+      <div class="row"><label>髮型</label><select id="hair"></select></div>
+      <div class="row"><label>眼睛</label>
+        <select id="eyes">
+          <option value="none">無</option>
+          <option value="dots">圓點</option>
+        </select>
+      </div>
+      <div class="row"><label>膚色（頭）</label><input type="color" id="cSkin"></div>
+      <div class="row"><label>髮色</label><input type="color" id="cHair"></div>
+      <div class="row"><label>眼色（含睫毛）</label><input type="color" id="cEye"></div>
+      <div class="row"><label>衣色（身）</label><input type="color" id="cCloth"></div>
+      <fieldset>
+        <legend>睫毛（造型自己的，不綁髮型）</legend>
+        <div class="row"><label>顯示</label><input type="checkbox" id="lOn"></div>
+        <div id="lashRows">
+          <div class="row"><label>長度</label><input type="range" id="lLen" min="4" max="34" step="1"><span class="val"></span></div>
+          <div class="row"><label>上翹</label><input type="range" id="lCurl" min="-12" max="28" step="1"><span class="val"></span></div>
+          <div class="row"><label>粗細</label><input type="range" id="lW" min="15" max="90" step="1"><span class="val"></span></div>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="demo-card">
+      <h2>幾何（全部造型共用）</h2>
+      <fieldset>
+        <legend>頭</legend>
+        <div class="row"><label>寬</label><input type="range" id="pHeadW" min="8" max="32" step="1"><span class="val"></span></div>
+        <div class="row"><label>高</label><input type="range" id="pHeadH" min="8" max="34" step="1"><span class="val"></span></div>
+        <div class="row"><label>圓角</label><input type="range" id="pHeadR" min="0" max="16" step="1"><span class="val"></span></div>
+        <div class="row"><label>陷入軀幹</label><input type="range" id="pHeadOverlap" min="-4" max="16" step="1"><span class="val"></span></div>
+        <div class="row"><label>朝向偏移</label><input type="range" id="pHeadOff" min="0" max="12" step="1"><span class="val"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>軀幹（全部造型共用）</legend>
+        <div class="row"><label>高</label><input type="range" id="pBodyH" min="8" max="40" step="1"><span class="val"></span></div>
+        <div class="row"><label>肩寬</label><input type="range" id="pShoulder" min="4" max="26" step="1"><span class="val"></span></div>
+        <div class="row"><label>腰寬</label><input type="range" id="pWaist" min="4" max="26" step="1"><span class="val"></span></div>
+        <div class="row"><label>臀寬</label><input type="range" id="pHip" min="4" max="26" step="1"><span class="val"></span></div>
+        <div class="row"><label>底角圓角</label><input type="range" id="pBodyR" min="0" max="14" step="1"><span class="val"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>眼睛</legend>
+        <div class="row"><label>大小</label><input type="range" id="pEyeR" min="4" max="30" step="1"><span class="val"></span></div>
+        <div class="row"><label>間距</label><input type="range" id="pEyeGap" min="10" max="80" step="1"><span class="val"></span></div>
+        <div class="row"><label>高度</label><input type="range" id="pEyeY" min="-40" max="40" step="1"><span class="val"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>側面（只影響左／右兩張，只畫一顆眼睛）</legend>
+        <div class="row"><label>軀幹收窄</label><input type="range" id="pSideNarrow" min="40" max="100" step="1"><span class="val"></span></div>
+        <div class="row"><label>眼睛側移</label><input type="range" id="pSideEyeShift" min="0" max="60" step="1"><span class="val"></span></div>
+        <div class="row"><label>前傾</label><input type="range" id="pSideLean" min="0" max="70" step="1"><span class="val"></span></div>
+        <div class="row"><label>腹側鼓出</label><input type="range" id="pSideWaistFront" min="60" max="200" step="1"><span class="val"></span></div>
+        <div class="row"><label>背側內收</label><input type="range" id="pSideWaistBack" min="30" max="140" step="1"><span class="val"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>髮際線（只作用在目前選中的髮型）</legend>
+        <div class="row"><label>正面覆蓋</label><input type="range" id="cFront" min="0" max="90" step="1"><span class="val"></span></div>
+        <div class="row"><label>背面覆蓋</label><input type="range" id="cBack" min="0" max="110" step="1"><span class="val"></span></div>
+        <div class="row"><label>中段尖高</label><input type="range" id="cPeak" min="0" max="90" step="1"><span class="val"></span></div>
+        <div class="row"><label>中間高低</label><input type="range" id="cMDip" min="-60" max="60" step="1"><span class="val"></span></div>
+        <div class="row"><label>側瀏海長</label><input type="range" id="cBangLen" min="0" max="80" step="1"><span class="val"></span></div>
+        <div class="row"><label>側瀏海寬</label><input type="range" id="cBangW" min="8" max="60" step="1"><span class="val"></span></div>
+        <div class="row"><label>側面收高</label><input type="range" id="cSideFront" min="20" max="120" step="1"><span class="val"></span></div>
+        <div class="row"><label>側面平走</label><input type="range" id="cSideHold" min="0" max="95" step="1"><span class="val"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>頭髮（全部造型共用）</legend>
+        <div class="row"><label>蓬鬆</label><input type="range" id="pHairPuff" min="0" max="40" step="1"><span class="val"></span></div>
+        <div class="row"><label>馬尾寬</label><input type="range" id="pTailW" min="15" max="110" step="1"><span class="val"></span></div>
+        <div class="row"><label>馬尾長</label><input type="range" id="pTailH" min="20" max="220" step="5"><span class="val"></span></div>
+        <div class="row"><label>馬尾角</label><input type="range" id="pTailAngle" min="-40" max="200" step="1"><span class="val"></span></div>
+        <div class="row"><label>馬尾外飄</label><input type="range" id="pTailCurl" min="-200" max="200" step="2"><span class="val"></span></div>
+        <div class="row"><label>馬尾回收</label><input type="range" id="pTailCurl2" min="-200" max="200" step="2"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾寬</label><input type="range" id="pTwinW" min="20" max="140" step="1"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾長</label><input type="range" id="pTwinH" min="20" max="220" step="5"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾角</label><input type="range" id="pTwinAngle" min="-40" max="140" step="1"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾外撇</label><input type="range" id="pTwinCurl" min="-160" max="160" step="2"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾回收</label><input type="range" id="pTwinCurl2" min="-160" max="160" step="2"><span class="val"></span></div>
+        <div class="row"><label>髮髻半徑</label><input type="range" id="pKnotR" min="8" max="60" step="1"><span class="val"></span></div>
+        <div class="row"><label>馬尾髮根</label><input type="range" id="pPonyRootPct" min="-40" max="70" step="1"><span class="val"></span></div>
+        <div class="row"><label>馬尾側面外移</label><input type="range" id="pPonySideOffPct" min="0" max="140" step="2"><span class="val"></span></div>
+        <div class="row"><label>馬尾正面偏移</label><input type="range" id="pPonyFrontPeekPct" min="-80" max="80" step="2"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾側面外移</label><input type="range" id="pTwinSideOffMul" min="0" max="160" step="2"><span class="val"></span></div>
+        <div class="row"><label>雙馬尾髮根</label><input type="range" id="pTwinRootPct" min="-50" max="50" step="1"><span class="val"></span></div>
+        <div class="row"><label>圓球外移</label><input type="range" id="pTwinOffPct" min="0" max="80" step="1"><span class="val"></span></div>
+        <div class="row"><label>長髮全長</label><input type="range" id="pLgLen" min="60" max="260" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮下襬弧</label><input type="range" id="pLgHemDip" min="-40" max="90" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮頭側寬</label><input type="range" id="pLgTopW" min="80" max="180" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮下襬寬</label><input type="range" id="pLgHemW" min="80" max="220" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮臉開口</label><input type="range" id="pLgFaceW" min="40" max="120" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮垂髮最細</label><input type="range" id="pLgLockMin" min="5" max="80" step="1"><span class="val"></span></div>
+        <div class="row"><label>長髮側面開口偏移</label><input type="range" id="pLgSideOpen" min="0" max="120" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮瀏海深</label><input type="range" id="pLgFringe" min="10" max="90" step="1"><span class="val"></span></div>
+        <div class="row"><label>長髮瀏海中垂</label><input type="range" id="pLgFringeDip" min="-40" max="80" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮側面背寬</label><input type="range" id="pLgSideBack" min="60" max="200" step="2"><span class="val"></span></div>
+        <div class="row"><label>長髮側面前寬</label><input type="range" id="pLgSideFront" min="60" max="160" step="2"><span class="val"></span></div>
+        <div class="row"><label>丸子半徑</label><input type="range" id="pBunR" min="10" max="60" step="1"><span class="val"></span></div>
+        <div class="row"><label>莫霍克高</label><input type="range" id="pMohawkH" min="15" max="110" step="1"><span class="val"></span></div>
+        <div class="row"><label>呆毛弧長</label><input type="range" id="pAhogeLen" min="40" max="300" step="5"><span class="val"></span></div>
+        <div class="row"><label>呆毛粗細</label><input type="range" id="pAhogeW" min="6" max="50" step="1"><span class="val"></span></div>
+        <div class="row"><label>呆毛起角</label><input type="range" id="pAhogeAngle" min="90" max="200" step="1"><span class="val"></span></div>
+        <div class="row"><label>呆毛拱度</label><input type="range" id="pAhogeCurl" min="30" max="300" step="5"><span class="val"></span></div>
+      </fieldset>
+      <fieldset>
+        <legend>其他</legend>
+        <div class="row"><label>整體縮放</label><input type="range" id="pScale" min="50" max="200" step="5"><span class="val"></span></div>
+        <div class="row"><label>描邊</label><input type="range" id="pOutline" min="0" max="50" step="1"><span class="val"></span></div>
+        <div class="row"><label>陰影大小</label><input type="range" id="pShadow" min="0" max="26" step="1"><span class="val"></span></div>
+        <div class="row"><label>陰影濃度</label><input type="range" id="pShadowA" min="0" max="70" step="1"><span class="val"></span></div>
+      </fieldset>
+    </div>
+
+    <div class="demo-card">
+      <h2>顯示</h2>
+      <div class="toggles" style="margin-bottom:10px">
+        <label><input type="checkbox" id="tCompare"> 並排現況圓圈</label>
+        <label><input type="checkbox" id="tGrid" checked> 地磚格線</label>
+      </div>
+      <div class="row">
+        <label>場景縮放</label>
+        <input type="range" id="pZoom" min="100" max="400" step="25"><span class="val"></span>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px">
+        <button id="export">匯出參數</button>
+        <button class="ghost" id="reset">還原預設</button>
+      </div>
+      <textarea id="out" readonly placeholder="按「匯出參數」把目前的數字倒出來"></textarea>
+    </div>
+
+  </div>
+</div>
+
+<script src="pawn-draw.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   狀態與 UI 接線
+   ═══════════════════════════════════════════════════════════ */
+const geom = { ...DEFAULT_GEOM };
+let zoom = 200;
+let selected = 0;
+
+/**
+ * 側欄的改動存成 per-preset 的差異，key 是 preset id。
+ * 這樣切換預設不會弄丟前一個調好的配色 —— 一次要定 8 套造型，
+ * 不能改 A 就把 B 洗掉。
+ */
+const overrides = {};
+
+/** 第 i 個預設套上它自己的差異後的最終造型 */
+function lookOf(i) {
+  return { ...PRESETS[i], ...(overrides[PRESETS[i].id] || {}) };
+}
+
+const GEOM_INPUTS = {
+  pHeadW: 'headW', pHeadH: 'headH', pHeadR: 'headR',
+  pHeadOverlap: 'headOverlap', pHeadOff: 'headOff',
+  pBodyH: 'bodyH', pShoulder: 'shoulder', pWaist: 'waist', pHip: 'hip', pBodyR: 'bodyR',
+  pEyeR: 'eyeR', pEyeGap: 'eyeGap', pEyeY: 'eyeY',
+  pSideNarrow: 'sideNarrow', pSideEyeShift: 'sideEyeShift', pSideLean: 'sideLean',
+  pSideWaistFront: 'sideWaistFront', pSideWaistBack: 'sideWaistBack', pHairPuff: 'hairPuff',
+  pTailW: 'tailW', pTailH: 'tailH', pTailAngle: 'tailAngle',
+  pTailCurl: 'tailCurl', pTailCurl2: 'tailCurl2',
+  pTwinW: 'twinW', pTwinH: 'twinH', pTwinAngle: 'twinAngle',
+  pTwinCurl: 'twinCurl', pTwinCurl2: 'twinCurl2',
+  pKnotR: 'knotR',
+  pPonyRootPct: 'ponyRootPct', pPonySideOffPct: 'ponySideOffPct',
+  pPonyFrontPeekPct: 'ponyFrontPeekPct', pTwinSideOffMul: 'twinSideOffMul',
+  pTwinRootPct: 'twinRootPct', pTwinOffPct: 'twinOffPct',
+  pLgLen: 'lgLen', pLgHemDip: 'lgHemDip', pLgTopW: 'lgTopW', pLgHemW: 'lgHemW', pLgFaceW: 'lgFaceW',
+  pLgLockMin: 'lgLockMin', pLgSideOpen: 'lgSideOpen',
+  pLgFringe: 'lgFringe', pLgFringeDip: 'lgFringeDip',
+  pLgSideBack: 'lgSideBack', pLgSideFront: 'lgSideFront',
+  pBunR: 'bunR', pMohawkH: 'mohawkH',
+  pAhogeLen: 'ahogeLen', pAhogeW: 'ahogeW', pAhogeAngle: 'ahogeAngle', pAhogeCurl: 'ahogeCurl',
+  pScale: 'scale', pOutline: 'outline', pShadow: 'shadow', pShadowA: 'shadowA',
+};
+
+const $ = id => document.getElementById(id);
+
+/**
+ * 髮際線的滑桿直接改**目前選中髮型自己的** capCfg —— 每個髮型各有一組，
+ * 調 A 不會動到 B。匯出時一併倒出來。
+ */
+const CAP_INPUTS = {
+  cFront: 'front', cBack: 'back', cPeak: 'peak', cMDip: 'mDip',
+  cBangLen: 'bangLen', cBangW: 'bangW', cSideFront: 'sideFront', cSideHold: 'sideHold',
+};
+
+function currentCap() {
+  return HAIR_STYLE_BY_ID[currentLook().hair].capCfg;
+}
+
+function syncCapInputs() {
+  const cap = currentCap();
+  for (const [id, key] of Object.entries(CAP_INPUTS)) {
+    const el = $(id);
+    el.value = cap[key];
+    el.parentElement.querySelector('.val').textContent = cap[key];
+  }
+}
+
+function currentLook() {
+  return lookOf(selected);
+}
+
+function syncGeomInputs() {
+  for (const [id, key] of Object.entries(GEOM_INPUTS)) {
+    const el = $(id);
+    el.value = geom[key];
+    el.parentElement.querySelector('.val').textContent = geom[key];
+  }
+  $('pZoom').value = zoom;
+  $('pZoom').parentElement.querySelector('.val').textContent = (zoom / 100) + 'x';
+}
+
+/** 睫毛滑桿 → LASH_DEFAULT 的鍵 */
+const LASH_INPUTS = { lLen: 'len', lCurl: 'curl', lW: 'w' };
+
+/** 目前造型的睫毛設定（沒設過就是預設值） */
+function currentLash() {
+  return { ...LASH_DEFAULT, ...(currentLook().lash || {}) };
+}
+
+/** 改睫毛的單一項，其餘保留 —— 直接寫整個 lash 物件會把其他三項洗掉 */
+function editLash(patch) {
+  editLook({ lash: { ...currentLash(), ...patch } });
+}
+
+function syncLookInputs() {
+  const l = currentLook();
+  $('hair').value = l.hair;
+  $('eyes').value = l.eyes;
+  $('cSkin').value = l.skin;
+  $('cHair').value = l.hairColor;
+  $('cEye').value = l.eyeColor || EYE_COLOR_DEFAULT;
+  $('cCloth').value = l.cloth;
+
+  const lash = currentLash();
+  $('lOn').checked = !!lash.on;
+  /* 沒有睫毛時那三根滑桿調什麼都不會有反應，收起來 */
+  $('lashRows').hidden = !lash.on;
+  for (const [id, key] of Object.entries(LASH_INPUTS)) {
+    $(id).value = lash[key];
+    $(id).parentElement.querySelector('.val').textContent = lash[key];
+  }
+}
+
+function editLook(patch) {
+  const id = PRESETS[selected].id;
+  overrides[id] = { ...(overrides[id] || {}), ...patch };
+  render();
+}
+
+/**
+ * CSS 高度必須另外記著，不能從 canvas 的 height 屬性讀回來 ——
+ * 設 canvas.height 會改寫該屬性，讀回來再乘一次 dpr 就會每次重繪都翻倍。
+ */
+const CANVAS_H = { scene: 380, dirs: 260, hairs: 400 };
+
+function fitCanvas(canvas) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = canvas.clientWidth;
+  const h = CANVAS_H[canvas.id];
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(h * dpr);
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssW, h };
+}
+
+function renderScene() {
+  const { ctx, w, h } = fitCanvas($('scene'));
+  ctx.clearRect(0, 0, w, h);
+
+  const z = zoom / 100;
+  const showGrid = $('tGrid').checked;
+  const compare = $('tCompare').checked;
+
+  ctx.save();
+  ctx.translate(w / 2, h * 0.62);
+  ctx.scale(z, z);
+
+  /* 角色排在 x+y = ROW 這條線上 —— 等距下它是一條水平列 */
+  const ROW = 9;
+  const SPAN = 7;
+
+  for (let d = -3; d <= 3; d++) {
+    for (let i = -SPAN; i <= SPAN; i++) {
+      const x = i, y = ROW + d - i;
+      const sx = (x - y) * (TILE_W / 2);
+      const sy = (x + y) * (TILE_H / 2) - ROW * TILE_H;
+      drawTile(ctx, sx, sy, (x + y) % 2 === 0 ? '#2c4a33' : '#28432f', showGrid);
+    }
+  }
+
+  /* 角色：全部朝 ↘（正面右），一字排開比對造型差異 */
+  const dir = DIRS[0];
+  const n = PRESETS.length;
+  for (let i = 0; i < n; i++) {
+    const x = i - Math.floor(n / 2) + 1;
+    const y = ROW - x;
+    const sx = (x - y) * (TILE_W / 2);
+    const sy = (x + y) * (TILE_H / 2) - ROW * TILE_H;
+
+    if (compare) drawCircle(ctx, sx - 16, sy);
+    drawPawn(ctx, compare ? sx + 16 : sx, sy, dir, lookOf(i), geom);
+
+    ctx.save();
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = i === selected ? '#A78BFA' : 'rgba(226,232,240,0.65)';
+    ctx.textAlign = 'center';
+    ctx.fillText(PRESETS[i].label, sx, sy + 16);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function renderDirs() {
+  const { ctx, w, h } = fitCanvas($('dirs'));
+  ctx.clearRect(0, 0, w, h);
+
+  const z = 4;
+  const look = currentLook();
+  const cellW = w / DIRS.length;
+  const baseY = h * 0.74;
+
+  DIRS.forEach((dir, i) => {
+    const cx = cellW * (i + 0.5);
+
+    ctx.save();
+    ctx.translate(cx, baseY);
+    ctx.scale(z, z);
+    drawTile(ctx, 0, 0, '#2c4a33', $('tGrid').checked);
+    drawPawn(ctx, 0, 0, dir, look, geom);
+    ctx.restore();
+
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = 'rgba(226,232,240,0.75)';
+    ctx.textAlign = 'center';
+    ctx.fillText(dir.label, cx, h - 12);
+  });
+}
+
+/** 全部髮型 × 正面／側面／背面三排 —— 馬尾要背面才看得到整條 */
+function renderHairs() {
+  const { ctx, w, h } = fitCanvas($('hairs'));
+  ctx.clearRect(0, 0, w, h);
+
+  const z = 1.8;
+  const base = currentLook();
+  const cellW = w / HAIR_STYLES.length;
+  const rows = [
+    { dir: DIRS.find(d => d.id === 'front'), y: h * 0.26, label: '正面' },
+    { dir: DIRS.find(d => d.id === 'right'), y: h * 0.53, label: '右' },
+    { dir: DIRS.find(d => d.id === 'back'),  y: h * 0.80, label: '背面' },
+  ];
+
+  rows.forEach(row => {
+    HAIR_STYLES.forEach((hair, i) => {
+      const cx = cellW * (i + 0.5);
+      ctx.save();
+      ctx.translate(cx, row.y);
+      ctx.scale(z, z);
+      drawTile(ctx, 0, 0, '#2c4a33', $('tGrid').checked);
+      drawPawn(ctx, 0, 0, row.dir, { ...base, hair: hair.id }, geom);
+      ctx.restore();
+    });
+
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = 'rgba(226,232,240,0.45)';
+    ctx.textAlign = 'left';
+    ctx.fillText(row.label, 4, row.y + 12);
+  });
+
+  HAIR_STYLES.forEach((hair, i) => {
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = hair.id === base.hair ? '#A78BFA' : 'rgba(226,232,240,0.75)';
+    ctx.textAlign = 'center';
+    ctx.fillText(hair.label, cellW * (i + 0.5), h - 8);
+  });
+}
+
+function render() {
+  renderScene();
+  renderDirs();
+  renderHairs();
+}
+
+/* ── 接線 ── */
+const presetSel = $('preset');
+PRESETS.forEach((p, i) => {
+  const opt = document.createElement('option');
+  opt.value = String(i);
+  opt.textContent = p.label;
+  presetSel.appendChild(opt);
+});
+presetSel.addEventListener('change', () => {
+  selected = Number(presetSel.value);
+  syncLookInputs();
+  render();
+});
+
+
+const hairSel = $('hair');
+HAIR_STYLES.forEach(hstyle => {
+  const opt = document.createElement('option');
+  opt.value = hstyle.id;
+  opt.textContent = hstyle.label;
+  hairSel.appendChild(opt);
+});
+hairSel.addEventListener('change', e => { editLook({ hair: e.target.value }); syncCapInputs(); });
+
+for (const [id, key] of Object.entries(GEOM_INPUTS)) {
+  $(id).addEventListener('input', e => {
+    geom[key] = Number(e.target.value);
+    e.target.parentElement.querySelector('.val').textContent = geom[key];
+    render();
+  });
+}
+$('pZoom').addEventListener('input', e => {
+  zoom = Number(e.target.value);
+  e.target.parentElement.querySelector('.val').textContent = (zoom / 100) + 'x';
+  render();
+});
+
+for (const [id, key] of Object.entries(CAP_INPUTS)) {
+  $(id).addEventListener('input', e => {
+    currentCap()[key] = Number(e.target.value);
+    e.target.parentElement.querySelector('.val').textContent = e.target.value;
+    render();
+  });
+}
+
+$('eyes').addEventListener('change', e => editLook({ eyes: e.target.value }));
+$('cSkin').addEventListener('input', e => editLook({ skin: e.target.value }));
+$('cHair').addEventListener('input', e => editLook({ hairColor: e.target.value }));
+$('cEye').addEventListener('input', e => editLook({ eyeColor: e.target.value }));
+$('cCloth').addEventListener('input', e => editLook({ cloth: e.target.value }));
+
+$('lOn').addEventListener('change', e => {
+  editLash({ on: e.target.checked ? 1 : 0 });
+  $('lashRows').hidden = !e.target.checked;
+});
+for (const [id, key] of Object.entries(LASH_INPUTS)) {
+  $(id).addEventListener('input', e => {
+    editLash({ [key]: Number(e.target.value) });
+    e.target.parentElement.querySelector('.val').textContent = e.target.value;
+  });
+}
+$('tCompare').addEventListener('change', render);
+$('tGrid').addEventListener('change', render);
+
+$('reset').addEventListener('click', () => {
+  Object.assign(geom, DEFAULT_GEOM);
+  zoom = 200;
+  for (const k of Object.keys(overrides)) delete overrides[k];
+  syncGeomInputs();
+  syncLookInputs();
+  render();
+});
+
+$('export').addEventListener('click', () => {
+  const looks = PRESETS.map((p, i) => {
+    const l = lookOf(i);
+    return {
+      id: p.id, hair: l.hair, eyes: l.eyes,
+      skin: l.skin, hairColor: l.hairColor, cloth: l.cloth,
+      eyeColor: l.eyeColor || EYE_COLOR_DEFAULT,
+      lash: { ...LASH_DEFAULT, ...(l.lash || {}) },
+    };
+  });
+  $('out').value = JSON.stringify({
+    geom,
+    hairStyles: HAIR_STYLES.map(h => ({ ...h, capCfg: HAIR_STYLE_BY_ID[h.id].capCfg })),
+    looks,
+  }, null, 2);
+  $('out').select();
+});
+
+window.addEventListener('resize', render);
+
+syncGeomInputs();
+syncLookInputs();
+syncCapInputs();
+render();
+</script>
+
+</body>
+</html>

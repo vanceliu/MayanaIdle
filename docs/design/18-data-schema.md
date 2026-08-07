@@ -187,7 +187,26 @@ baseValue × (1 + qualityPercent / 100)
 - gold
 - 屬性點分配
 - 當前位置
+- appearance（外觀，見下）
 - createdAt
+
+### appearance（角色外觀）
+
+外觀存在 **`characters` 列上的 `appearance` 欄位**，不另立資料表 ——
+匯出是整列打包，存在角色列上才會自動跟著走。
+
+內容的規格（髮型清單、可調範圍、色票）在 `04-character.md` § 4.10，這裡只講落點。
+
+| 落點 | 要做什麼 |
+|---|---|
+| `db/database.ts` migrate | 新版 `.upgrade()` 內 `modify` 補上預設外觀，既有角色才不會是空值 |
+| `systems/characterTransfer.ts` 匯出 | 整列打包，**自動帶走**，不需改 |
+| `systems/characterTransfer.ts` 匯入 | **必須手動加**：那裡是逐欄位 `db.characters.update({...})`，漏列的欄位會靜默消失 |
+| `systems/legacyArchive.ts` 快照 | `character: {...}` 只存部分欄位，遺產角色要顯示外觀就得加（見 `45-legacy-archive.md` § 45.2） |
+| 舊匯出檔 | 沒有 `appearance` 時退回預設，**不可拋錯** |
+
+> 匯入那一列是最容易漏的：匯出會自動帶走，所以測試「匯出→看檔案」會過，
+> 但「匯出→匯入→開角色」時外觀已經沒了，而且**不會有任何錯誤訊息**。
 
 ### 關係規則
 

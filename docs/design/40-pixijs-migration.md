@@ -106,8 +106,10 @@ client/src/
 │   │   ├── EntityLayer.ts      # 實體容器（sortableChildren, 含牆壁）
 │   │   └── EffectLayer.ts      # 特效/粒子（預留）
 │   ├── entities/
-│   │   ├── PlayerEntity.ts     # 玩家 sprite（圓形，Y 偏移對齊地面）
-│   │   └── MonsterEntity.ts    # 怪物 sprite（圓形 + Boss 標記）
+│   │   ├── PlayerEntity.ts     # 玩家 sprite（pawn 剪影，Y 偏移對齊地面）
+│   │   ├── NpcEntity.ts        # 城鎮 NPC sprite（pawn 剪影，依設施固定外觀）
+│   │   ├── MonsterEntity.ts    # 怪物 sprite（圓形 + Boss 標記）
+│   │   └── pawn/               # 角色剪影繪製與烘焙（每造型 × 4 朝向 → RenderTexture）
 │   ├── ui/
 │   │   ├── HealthBar.ts        # 血條
 │   │   ├── DamageNumber.ts     # 傷害數字
@@ -166,6 +168,9 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 | 點擊走 DOM event 而非 PixiJS pointer | 簡單直接，不需要 PixiJS interaction system |
 | Ticker 每幀讀 store 而非 subscribe | Game loop 需要每幀同步多個 store，subscribe 模式在此場景沒有效能優勢 |
 | 實體圓形 Y 偏移 -RADIUS | 讓圓形底部對齊 tile 中心，視覺上「站在」地面而非浮空 |
+| 角色剪影**烘成 RenderTexture**，不每幀重畫 | 一個造型是幾十條 bezier，每幀重繪等於把 CPU 花在畫同一張圖上。造型在遊戲中不會改變，建立時烘一次（每造型 × 4 朝向）之後只換 texture |
+| 朝向由**位移推算**，不另存狀態 | 朝向是移動的結果不是獨立狀態，另存一份就會有「存的朝向與實際走向不一致」的同步問題 |
+| 玩家／NPC 用剪影，**怪物維持圓形** | 怪物種類遠多於玩家造型，每種都要一套剪影是另一個量級的工作；先做玩家與 NPC，怪物之後再議 |
 
 ## 11. 風險與對策
 
@@ -183,4 +188,5 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 - [x] 怪物血條跟隨
 - [x] 技能特效預留（架構可擴展）
 - [ ] Sprite sheet 替換幾何圖形（美術資源就緒後）
+- [ ] 玩家／NPC 由圓形改為 pawn 剪影（規格見 `04-character.md` § 4.10）
 - [ ] 手動操作模式 UI（虛擬搖桿、技能按鈕）
