@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { createDefaultAppearance } from '../models/appearance';
 import type { Character } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
 import type { MonsterTemplate } from '../models/monster';
@@ -320,6 +321,14 @@ export class GameDB extends Dexie {
           [...totals].map(([userId, amount]) => ({ userId, amount })),
         );
       }
+    });
+
+    // v17：既有角色補上預設外觀（`04-character.md` § 4.10）。
+    // 不補的話舊角色的 appearance 是 undefined，畫面上就沒有角色可畫。
+    this.version(17).stores({}).upgrade(async tx => {
+      await tx.table('characters').toCollection().modify(row => {
+        if (!row.appearance) row.appearance = createDefaultAppearance();
+      });
     });
   }
 }

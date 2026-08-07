@@ -109,7 +109,11 @@ client/src/
 │   │   ├── PlayerEntity.ts     # 玩家 sprite（pawn 剪影，Y 偏移對齊地面）
 │   │   ├── NpcEntity.ts        # 城鎮 NPC sprite（pawn 剪影，依設施固定外觀）
 │   │   ├── MonsterEntity.ts    # 怪物 sprite（圓形 + Boss 標記）
-│   │   └── pawn/               # 角色剪影繪製與烘焙（每造型 × 4 朝向 → RenderTexture）
+│   │   └── pawn/               # 角色剪影
+│   │       ├── geometry.ts     # 體型/頭/眼/髮尾的繪製參數、四朝向定義
+│   │       ├── hairRender.ts   # 逐髮型的繪製設定（髮際線、髮尾、頭頂）
+│   │       ├── drawPawn.ts     # 繪製本體（Canvas 2D，client/demo 調校頁共用同一份）
+│   │       └── pawnTexture.ts  # 烘成貼圖並快取（每造型 × 4 朝向）
 │   ├── ui/
 │   │   ├── HealthBar.ts        # 血條
 │   │   ├── DamageNumber.ts     # 傷害數字
@@ -168,8 +172,9 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 | 點擊走 DOM event 而非 PixiJS pointer | 簡單直接，不需要 PixiJS interaction system |
 | Ticker 每幀讀 store 而非 subscribe | Game loop 需要每幀同步多個 store，subscribe 模式在此場景沒有效能優勢 |
 | 實體圓形 Y 偏移 -RADIUS | 讓圓形底部對齊 tile 中心，視覺上「站在」地面而非浮空 |
-| 角色剪影**烘成 RenderTexture**，不每幀重畫 | 一個造型是幾十條 bezier，每幀重繪等於把 CPU 花在畫同一張圖上。造型在遊戲中不會改變，建立時烘一次（每造型 × 4 朝向）之後只換 texture |
+| 角色剪影**烘成貼圖**，不每幀重畫 | 一個造型是幾十條 bezier，每幀重繪等於把 CPU 花在畫同一張圖上。造型在遊戲中不會改變，建立時烘一次（每造型 × 4 朝向）之後只換 texture |
 | 朝向由**位移推算**，不另存狀態 | 朝向是移動的結果不是獨立狀態，另存一份就會有「存的朝向與實際走向不一致」的同步問題 |
+| 剪影用 Canvas 2D 畫進離屏畫布再 `Texture.from()`，不用 Pixi Graphics | 反正要烘成貼圖、不每幀重畫，誰畫的沒有效能差別；而 Pixi Graphics 沒有 `miterLimit`、`roundRect` 圓角語意也不同，改寫等於把調校過的形狀重新賭一次。留在 Canvas 2D 還能與 `client/demo` 的調校頁共用同一份實作 |
 | 玩家／NPC 用剪影，**怪物維持圓形** | 怪物種類遠多於玩家造型，每種都要一套剪影是另一個量級的工作；先做玩家與 NPC，怪物之後再議 |
 
 ## 11. 風險與對策

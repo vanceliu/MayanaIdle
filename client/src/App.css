@@ -1690,7 +1690,8 @@ button.active {
   background: var(--bg-panel);
   padding: 28px;
   border-radius: var(--radius-lg);
-  max-width: 520px;
+  /* 加寬是為了左右兩欄放得下 —— 單欄時整頁會長到要捲很久才看得到建立按鈕 */
+  max-width: 960px;
   width: 100%;
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-panel);
@@ -5992,6 +5993,34 @@ button.active {
     grid-auto-rows: max(var(--tap-target), calc(36px + 1.2 * var(--fs-xs)));
   }
 
+  /* 創角外觀（`04-character.md` § 4.10）的每一顆都要按得到 */
+  .appearance-tabs button,
+  .appearance-dirs button,
+  .hair-grid button,
+  .color-targets button,
+  .appearance-actions button {
+    min-height: var(--tap-target);
+  }
+
+  .swatch-row button {
+    width: var(--tap-target);
+    height: var(--tap-target);
+  }
+
+  /*
+   * 調色盤是 10 個色相 × 6 階。手機寬度除以 10 只有 30px 左右，
+   * 塞不進 44px 的命中區 —— 硬塞只會變成點三次中一次。
+   * 所以固定 44px 並讓它**在自己這一塊裡橫向捲**，色相分欄的讀法也保住。
+   */
+  .palette {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .palette-col {
+    flex: 0 0 var(--tap-target);
+  }
+
   /*
    * 觸控裝置沒有真正的 hover：手指按下時瀏覽器會補一次「假 hover」，
    * 而且**放開後樣式會留著**，看起來像卡住的選取狀態。一律關掉。
@@ -6526,6 +6555,279 @@ button.active {
     max-width: none;
     padding: 16px 12px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   創角外觀（`04-character.md` § 4.10）
+   ═══════════════════════════════════════════════════════════ */
+
+/* 桌機左右兩欄；手機在 767px 以下堆疊（`47-mobile.md` § 47.2） */
+.create-cols {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* 左欄固定寬：名稱與屬性表本來就不需要更寬，多的寬度全留給外觀 */
+.create-cols > .create-col:first-child { flex: 0 0 340px; }
+.create-cols > .create-col:last-child { flex: 1 1 auto; min-width: 0; }
+
+.appearance-picker {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.appearance-preview { flex: 0 0 180px; }
+.appearance-form { flex: 1 1 auto; min-width: 0; }
+
+.appearance-preview canvas {
+  display: block;
+  width: 100%;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.appearance-dirs {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.appearance-dirs button {
+  flex: 1;
+  padding: 5px 0;
+  font-size: var(--fs-xs);
+  background: none;
+  color: var(--text-dim);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.appearance-dirs button.active {
+  background: var(--accent-primary-dim);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* 外觀的控制項分頁：一次只顯示一組，整頁高度被最高的那組壓住 */
+.appearance-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.appearance-tabs button {
+  flex: 1;
+  padding: 6px 0;
+  font-size: var(--fs-xs);
+  background: none;
+  color: var(--text-dim);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.appearance-tabs button.active {
+  background: var(--accent-primary-dim);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* 勾選框要與文字同一行 —— .form-group label 是 block，不改的話會各佔一行 */
+.check-label {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.check-label input { width: auto; }
+
+.hair-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.hair-grid button {
+  padding: 6px 0;
+  font-size: var(--fs-xs);
+  background: none;
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.hair-grid button.active {
+  background: var(--accent-primary-dim);
+  border-color: transparent;
+  color: #fff;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: var(--fs-xs);
+}
+
+.slider-row > span { flex: 0 0 60px; color: var(--text-dim); }
+.slider-row > input { flex: 1; min-width: 0; }
+.slider-row > em {
+  flex: 0 0 30px;
+  text-align: right;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.swatch-row button {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch-row button.active { border-color: var(--accent-primary); }
+
+/* 先選要改哪個顏色，再點調色盤 —— 三個顏色共用同一張色表 */
+.color-targets {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.color-targets button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  font-size: var(--fs-xs);
+  background: none;
+  color: var(--text-dim);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.color-targets button.active {
+  background: var(--accent-primary-dim);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* 目前那個顏色直接顯示在按鈕上，不必切過去才知道現在是什麼色 */
+.color-targets button i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+/* 一欄一個色相、由深到淺 —— 橫向排色相比縱向排好找 */
+.palette {
+  display: flex;
+  gap: 3px;
+}
+
+.palette-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.palette-col button {
+  aspect-ratio: 1;
+  width: 100%;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.palette-col button.active {
+  border-color: var(--accent-primary);
+  border-radius: 4px;
+}
+
+.appearance-hint {
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--text-dim);
+  margin: 8px 0;
+}
+
+.appearance-hint.warn { color: var(--warning); }
+
+.appearance-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.appearance-actions button {
+  padding: 6px 14px;
+  font-size: var(--fs-xs);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* 手機：全部改成上下堆疊，兩欄擠在一起誰都不好按 */
+@media (max-width: 767px) {
+  /*
+   * 改成直向之後 `align-items` 控制的是**水平**方向 ——
+   * 沿用桌機的 flex-start 會讓裡面每一塊都縮成內容寬度，
+   * 髮型格與調色盤只佔左半邊，右半邊整片空著。
+   */
+  .create-cols { flex-direction: column; gap: 0; align-items: stretch; }
+  .create-cols > .create-col:first-child,
+  .create-cols > .create-col:last-child { flex: none; width: 100%; }
+
+  .appearance-picker { flex-direction: column; align-items: stretch; }
+
+  /*
+   * 預覽不吃滿整列 —— 撐滿的話畫布變成一條很寬的空白，角色只有中間一小塊。
+   * 固定寬度置中，下面的朝向分頁跟著同寬。
+   */
+  .appearance-preview {
+    flex: none;
+    width: 100%;
+    max-width: 220px;
+    margin: 0 auto;
+  }
+
+  /* 依可用寬度自己決定幾欄 —— 寫死 3 欄在窄機上太擠、在大手機上又浪費 */
+  .hair-grid { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
+
+  /*
+   * 一項滑桿排成兩行：上行「標籤 …… 數值」，下行整條滑桿。
+   * 三者擠一行的話滑桿只剩一小段拉不動；
+   * 但三者各佔一行又會變成四項十二行，整頁又長回去。
+   */
+  .slider-row {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    margin-bottom: 10px;
+  }
+
+  .slider-row > span { flex: 1 1 auto; order: 1; }
+  .slider-row > em { flex: 0 0 auto; order: 2; }
+  .slider-row > input { flex: 1 0 100%; order: 3; }
 }
 
 /* ═══════════════════════════════════════════════════════════

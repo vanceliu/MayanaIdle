@@ -21,9 +21,10 @@
   多樣性全部由髮型、膚色、髮色、衣色承擔 —— 每個髮型各自持有一整組
   髮際線數字，不共用全域值，所以調一個不會動到別的。
 
-  ── 為什麼是 Canvas 2D 而不是 Pixi ──
-  只用到 roundRect、bezier 路徑、fill、stroke，Pixi Graphics 全部有一對一的 API，
-  移植是機械式的。用 Canvas 2D 可以維持既有 demo 頁「單檔、無 import」的模式。
+  ── 繪製本體在哪 ──
+  `client/src/pixi/entities/pawn/` —— **遊戲跑的是同一份**，這頁只是它的調校介面。
+  demo 曾經自帶一份 pawn-draw.js，兩邊各改各的必然分岔，所以已經刪掉。
+  接法見 `pawnDemo.ts`。
 
   ── 這頁的產出 ──
   下方「匯出參數」的 JSON = 正式實作要用的幾何與配色常數。
@@ -271,8 +272,13 @@ textarea {
   </div>
 </div>
 
-<script src="pawn-draw.js"></script>
-<script>
+<script type="module">
+import {
+  TILE_W, TILE_H, DEFAULT_GEOM, DEFAULT_LASH, EYE_COLOR_DEFAULT,
+  HAIR_STYLES, HAIR_STYLE_BY_ID, PRESETS, DIRS,
+  drawPawn, drawTile, drawCircle,
+} from './pawnDemo.ts';
+
 /* ═══════════════════════════════════════════════════════════
    狀態與 UI 接線
    ═══════════════════════════════════════════════════════════ */
@@ -354,12 +360,12 @@ function syncGeomInputs() {
   $('pZoom').parentElement.querySelector('.val').textContent = (zoom / 100) + 'x';
 }
 
-/** 睫毛滑桿 → LASH_DEFAULT 的鍵 */
+/** 睫毛滑桿 → DEFAULT_LASH 的鍵 */
 const LASH_INPUTS = { lLen: 'len', lCurl: 'curl', lW: 'w' };
 
 /** 目前造型的睫毛設定（沒設過就是預設值） */
 function currentLash() {
-  return { ...LASH_DEFAULT, ...(currentLook().lash || {}) };
+  return { ...DEFAULT_LASH, ...(currentLook().lash || {}) };
 }
 
 /** 改睫毛的單一項，其餘保留 —— 直接寫整個 lash 物件會把其他三項洗掉 */
@@ -609,7 +615,7 @@ $('export').addEventListener('click', () => {
       id: p.id, hair: l.hair, eyes: l.eyes,
       skin: l.skin, hairColor: l.hairColor, cloth: l.cloth,
       eyeColor: l.eyeColor || EYE_COLOR_DEFAULT,
-      lash: { ...LASH_DEFAULT, ...(l.lash || {}) },
+      lash: { ...DEFAULT_LASH, ...(l.lash || {}) },
     };
   });
   $('out').value = JSON.stringify({

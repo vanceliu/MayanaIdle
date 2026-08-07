@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
+import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -236,4 +237,72 @@ describe('Multi-character system', () => {
       expect(useGameStore.getState().characterList).toHaveLength(1);
     });
   });
+
+  /**
+   * 外觀（`04-character.md` § 4.10）跟著角色列走。
+   * 建角時沒寫進去的話，後面的匯出、封存、畫面全都拿不到 ——
+   * 而且不會有任何錯誤，只是每個人長一樣。
+   */
+  describe('角色外觀', () => {
+    it('建角時把選好的外觀寫進角色列', async () => {
+      await useGameStore.getState().initUser();
+      const appearance = {
+        ...createDefaultAppearance(),
+        hair: 'braid' as const,
+        skin: '#7c4f2c',
+        eyeColor: '#e3c765',
+        lash: { on: 1 as const, len: 22, curl: 16, w: 60 },
+        tune: { braid: { front: 40 } },
+      };
+
+      await useGameStore.getState().createCharacter(
+        '造型師', 'thief',
+        { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+        appearance,
+      );
+
+      const rows = await db.characters.toArray();
+      expect(rows.at(-1)!.appearance).toEqual(appearance);
+    });
+
+    it('沒指定外觀時給預設值，不是 undefined —— 沒有外觀就畫不出角色', async () => {
+      await useGameStore.getState().initUser();
+      await useGameStore.getState().createCharacter(
+        '路人', 'knight',
+        { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+      );
+
+      const row = (await db.characters.toArray()).at(-1)!;
+      expect(row.appearance).toEqual(createDefaultAppearance());
+    });
+
+    it('外觀壞掉時收成合法值再寫進去，不讓壞資料進 DB', async () => {
+      await useGameStore.getState().initUser();
+      await useGameStore.getState().createCharacter(
+        '怪咖', 'elf',
+        { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+        { hair: 'afro', skin: 'red', lash: { on: 1, len: 9999 } } as never,
+      );
+
+      const appearance = (await db.characters.toArray()).at(-1)!.appearance!;
+      expect(normalizeAppearance(appearance)).toEqual(appearance);
+      expect(appearance.hair).toBe(createDefaultAppearance().hair);
+      expect(appearance.lash.len).toBe(34);
+    });
+
+    it('兩隻角色的外觀互相獨立', async () => {
+      await useGameStore.getState().initUser();
+      const attrs = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
+      await useGameStore.getState().createCharacter('甲', 'knight', attrs);
+      await useGameStore.getState().createCharacter('乙', 'thief', attrs);
+
+      const rows = await db.characters.toArray();
+      const [a, b] = rows.slice(-2);
+      a.appearance!.tune.twin = { front: 60 };
+      await db.characters.put(a);
+
+      expect((await db.characters.get(b.id!))!.appearance!.tune).toEqual({});
+    });
+  });
+
 });

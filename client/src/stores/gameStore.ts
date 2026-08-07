@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { normalizeAppearance, type Appearance } from '../models/appearance';
 import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import { useMapMonsterStore } from './mapMonsterStore';
@@ -253,7 +254,7 @@ interface GameState {
   deleteCharacter: (characterId: number) => Promise<void>;
   logout: () => Promise<void>;
   /** `uuid` 與 `authToken` 皆於此產生，建立角色是純本機行為、不需要連線（§ 19.4）。 */
-  createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes) => Promise<void>;
+  createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes, appearance?: Appearance) => Promise<void>;
   /** 取得目前角色的排行榜寫入密鑰；此機制上線前建立的角色在此補產生（TOFU，§ 37.4.3）。 */
   ensureAuthToken: () => Promise<string | null>;
   /**
@@ -661,7 +662,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     await get().loadCharacterList();
   },
 
-  createCharacter: async (name, className, bonusAttrs) => {
+  createCharacter: async (name, className, bonusAttrs, appearance) => {
     const userId = get().userId;
     if (!userId) return;
 
@@ -683,6 +684,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       authToken: generateCharacterUuid(),
       userId,
       name,
+      // 沒指定就給預設外觀 —— 角色一定要有外觀才畫得出來
+      appearance: normalizeAppearance(appearance),
       className,
       level: 1,
       exp: 0,

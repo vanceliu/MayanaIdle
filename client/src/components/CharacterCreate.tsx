@@ -8,6 +8,8 @@ import {
   type ClassName,
   type Attributes,
 } from '../models/character';
+import { AppearancePicker } from './AppearancePicker';
+import { createDefaultAppearance, type Appearance } from '../models/appearance';
 import {
   CHARACTER_NAME_ALLOWED_SYMBOLS,
   CHARACTER_NAME_ERROR_MESSAGES,
@@ -31,6 +33,7 @@ export function CharacterCreate() {
   const [name, setName] = useState('');
   const [selectedClass, setSelectedClass] = useState<ClassName>('knight');
   const [bonus, setBonus] = useState<Attributes>({ STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 });
+  const [appearance, setAppearance] = useState<Appearance>(createDefaultAppearance);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -71,7 +74,7 @@ export function CharacterCreate() {
     setSubmitting(true);
     setSubmitError('');
     try {
-      await createCharacter(trimmedName, selectedClass, bonus);
+      await createCharacter(trimmedName, selectedClass, bonus, appearance);
       // 新角色一律出生在薄暮村（中立城鎮），直接把新手指導員開起來 ——
       // 領裝備與強化都在他那裡，不主動指路的話新玩家不會知道要點哪個 NPC
       useTownStore.getState().openFacility('starter-npc');
@@ -101,6 +104,10 @@ export function CharacterCreate() {
   return (
     <div className="create-screen">
       <h2>建立角色</h2>
+
+      {/* 桌機左右兩欄（左：身分與數值／右：外觀），手機堆疊 —— 斷點見 `47-mobile.md` § 47.2 */}
+      <div className="create-cols">
+        <div className="create-col">
 
       <div className="form-group">
         <label>角色名稱</label>
@@ -151,6 +158,16 @@ export function CharacterCreate() {
             ))}
           </tbody>
         </table>
+      </div>
+
+        </div>
+
+        <div className="create-col">
+          <div className="form-group">
+            <label>外觀（體型只有一種，不可調整）</label>
+            <AppearancePicker value={appearance} onChange={setAppearance} disabled={submitting} />
+          </div>
+        </div>
       </div>
 
       {submitError && <div className="create-error">{submitError}</div>}

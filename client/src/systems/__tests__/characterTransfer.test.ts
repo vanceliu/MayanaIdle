@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { CURRENT_DATA_VERSION } from '../../config';
 import { exportCharacterData, importCharacterData, decryptExport, encryptExport } from '../characterTransfer';
+import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
 
 /**
  * 角色匯出／匯入。
@@ -117,4 +118,71 @@ describe('角色匯出／匯入', () => {
 
     await expect(importCharacterData(encrypted, targetId)).rejects.toThrow('資料版本過舊');
   });
+
+  /**
+   * 外觀（`18-data-schema.md` § 18.7）。
+   *
+   * 匯出是整列打包會自動帶走，所以「匯出→看檔案」一定會過；
+   * 匯入卻是逐欄位 `db.characters.update({...})`，漏列就靜默消失。
+   * 所以這裡一律測到「匯入之後讀回來」為止，不只驗匯出檔。
+   */
+  describe('外觀', () => {
+    const CUSTOM = {
+      ...createDefaultAppearance(),
+      hair: 'twinlong' as const,
+      skin: '#7c4f2c',
+      hairColor: '#c9a227',
+      eyeColor: '#e3c765',
+      lash: { on: 1 as const, len: 20, curl: 14, w: 55 },
+      tune: { twinlong: { front: 40, peak: 50 } },
+    };
+
+    it('匯出檔帶著外觀', async () => {
+      const charId = await db.characters.add(makeCharacter({ appearance: CUSTOM })) as number;
+      const payload = JSON.parse(await decryptExport(await exportCharacterData(charId)));
+      expect(payload.character.appearance).toEqual(CUSTOM);
+    });
+
+    it('匯入之後外觀還在 —— 這行漏掉不會報錯，只會靜默消失', async () => {
+      const sourceId = await db.characters.add(makeCharacter({ appearance: CUSTOM })) as number;
+      const encrypted = await exportCharacterData(sourceId);
+
+      const targetId = await db.characters.add(makeCharacter({
+        uuid: 'uuid-target', name: '目標角色', appearance: createDefaultAppearance(),
+      })) as number;
+      await importCharacterData(encrypted, targetId);
+
+      expect((await db.characters.get(targetId))!.appearance).toEqual(CUSTOM);
+    });
+
+    it('沒有外觀的舊匯出檔退回預設，不拒絕匯入', async () => {
+      const sourceId = await db.characters.add(makeCharacter()) as number;
+      const raw = JSON.parse(await decryptExport(await exportCharacterData(sourceId)));
+      delete raw.character.appearance;
+      const encrypted = await encryptExport(JSON.stringify(raw));
+
+      const targetId = await db.characters.add(makeCharacter({
+        uuid: 'uuid-target', name: '目標角色', appearance: CUSTOM,
+      })) as number;
+      await importCharacterData(encrypted, targetId);
+
+      expect((await db.characters.get(targetId))!.appearance).toEqual(createDefaultAppearance());
+    });
+
+    it('壞掉的外觀被收成合法值而不是讓整次匯入失敗', async () => {
+      const sourceId = await db.characters.add(makeCharacter()) as number;
+      const raw = JSON.parse(await decryptExport(await exportCharacterData(sourceId)));
+      raw.character.appearance = { hair: 'afro', skin: 'red', lash: { on: 1, len: 9999 } };
+      const encrypted = await encryptExport(JSON.stringify(raw));
+
+      const targetId = await db.characters.add(makeCharacter({ uuid: 'uuid-target' })) as number;
+      await importCharacterData(encrypted, targetId);
+
+      const appearance = (await db.characters.get(targetId))!.appearance!;
+      expect(normalizeAppearance(appearance)).toEqual(appearance);
+      expect(appearance.hair).toBe(createDefaultAppearance().hair);
+      expect(appearance.lash.len).toBe(34);
+    });
+  });
+
 });

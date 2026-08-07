@@ -268,6 +268,7 @@
   ←→ 18-data-schema.md § 18.7（appearance 欄位與四個落點，匯入必須逐欄位列出）
   ←→ 40-pixijs-migration.md（玩家/NPC 用剪影並烘成 RenderTexture，怪物維持圓形）
   ←→ 45-legacy-archive.md § 45.2（遺產快照要帶外觀）
+  ←→ 13-town.md § 13.2.1（NPC 逐設施固定外觀；敵我的顏色區分改由地面標記承擔）
   色票增刪時必須重算「每個膚色至少 4 個對比 ≥2.2 的眼色」對照表
 
 04-character.md § 4.9（經驗曲線）←→ 28-monster-stats.md（怪物經驗值全表依此推算）

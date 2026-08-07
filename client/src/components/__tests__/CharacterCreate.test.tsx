@@ -5,6 +5,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { useTownStore } from '../../stores/townStore';
 import type { Attributes, ClassName } from '../../models/character';
 import { CHARACTER_NAME_ERROR_MESSAGES } from '../../models/characterIdentity';
+import { createDefaultAppearance, normalizeAppearance, type Appearance } from '../../models/appearance';
 
 /**
  * @vitest-environment jsdom
@@ -14,7 +15,7 @@ import { CHARACTER_NAME_ERROR_MESSAGES } from '../../models/characterIdentity';
  */
 
 const createCharacter =
-  vi.fn<(name: string, className: ClassName, bonus: Attributes) => Promise<void>>(async () => {});
+  vi.fn<(name: string, className: ClassName, bonus: Attributes, appearance?: Appearance) => Promise<void>>(async () => {});
 
 /** 騎士初始可分配 4 點，全加在力量上（14 → 18，剛好到上限） */
 function allocateAllPoints() {
@@ -122,4 +123,51 @@ describe('CharacterCreate', () => {
     fireEvent.click(screen.getByText('還有 4 點未分配'));
     expect(createCharacter).not.toHaveBeenCalled();
   });
+
+  /**
+   * 外觀（`04-character.md` § 4.10）。
+   *
+   * 建角時漏傳外觀不會報錯 —— 角色照樣建得起來，只是所有人長一樣。
+   * 所以測到「傳出去的那份就是畫面上選的那份」為止。
+   */
+  describe('外觀', () => {
+    it('沒動外觀時帶預設值出去', async () => {
+      render(<CharacterCreate />);
+      allocateAllPoints();
+      typeName('勇者');
+      fireEvent.click(screen.getByText('開始冒險'));
+
+      await waitFor(() => expect(createCharacter).toHaveBeenCalled());
+      expect(createCharacter.mock.calls[0][3]).toEqual(createDefaultAppearance());
+    });
+
+    it('選過的髮型與顏色會跟著建角一起送出去', async () => {
+      render(<CharacterCreate />);
+      allocateAllPoints();
+      typeName('勇者');
+
+      fireEvent.click(screen.getByText('長雙馬尾'));
+      fireEvent.click(screen.getByText('睫毛'));       // 外觀的控制項分頁
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(screen.getByText('開始冒險'));
+
+      await waitFor(() => expect(createCharacter).toHaveBeenCalled());
+      const appearance = createCharacter.mock.calls[0][3]!;
+      expect(appearance.hair).toBe('twinlong');
+      expect(appearance.lash.on).toBe(1);
+    });
+
+    it('送出去的外觀一定是合法的', async () => {
+      render(<CharacterCreate />);
+      allocateAllPoints();
+      typeName('勇者');
+      fireEvent.click(screen.getByText('隨機'));
+      fireEvent.click(screen.getByText('開始冒險'));
+
+      await waitFor(() => expect(createCharacter).toHaveBeenCalled());
+      const appearance = createCharacter.mock.calls[0][3]!;
+      expect(normalizeAppearance(appearance)).toEqual(appearance);
+    });
+  });
+
 });

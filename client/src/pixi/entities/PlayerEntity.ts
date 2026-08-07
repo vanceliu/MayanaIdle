@@ -1,27 +1,40 @@
-import { Graphics, Container } from 'pixi.js';
-import { worldToScreen, getEntityDepth, TILE_H } from '../utils/isometric';
+import { Container } from 'pixi.js';
+import { worldToScreen, getEntityDepth } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
+import type { Appearance } from '../../models/appearance';
+import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
+import { PawnSprite } from './pawn/PawnSprite';
+import { toPawnLook } from './pawn/pawnTexture';
 
-const PLAYER_COLOR = 0x4dabf7;
-const GLOW_COLOR = 0x74c0fc;
-const RADIUS = TILE_H * 0.45;
+/** 地面標記沿用原本圓點的藍 —— 剪影本身沒有敵我資訊，那個區分不能消失 */
+const PLAYER_MARKER = 0x4dabf7;
 
+/**
+ * 玩家：RimWorld 式無腳剪影（`04-character.md` § 4.10）。
+ * 朝向由位移推算，不另存狀態（`40-pixijs-migration.md` § 10）。
+ */
 export class PlayerEntity {
   public container: Container;
-  private glow: Graphics;
-  private body: Graphics;
+  private pawn: PawnSprite;
 
-  constructor() {
+  constructor(appearance: Appearance = createDefaultAppearance()) {
     this.container = new Container();
+    /* 舊角色的 appearance 可能少欄位，一律收乾淨再用 —— 缺欄位會畫成 undefined 色 */
+    this.pawn = new PawnSprite(toPawnLook(normalizeAppearance(appearance)), PLAYER_MARKER);
+    this.container.addChild(this.pawn.container);
+  }
 
-    this.glow = new Graphics();
-    this.glow.circle(0, -RADIUS, RADIUS + 2).fill({ color: GLOW_COLOR, alpha: 0.3 });
+  /** 角色換人或改外觀時呼叫。同造型不會重烘貼圖 */
+  setAppearance(appearance: Appearance): void {
+    this.pawn.setLook(toPawnLook(normalizeAppearance(appearance)));
+  }
 
-    this.body = new Graphics();
-    this.body.circle(0, -RADIUS, RADIUS).fill({ color: PLAYER_COLOR });
-
-    this.container.addChild(this.glow);
-    this.container.addChild(this.body);
+  /**
+   * 出手時轉向目標（攻擊方向與角色朝向要一致）。
+   * 這一幀稍後的 `updatePosition()` 會把它套上去，並壓過移動方向。
+   */
+  faceToward(from: Position, to: Position): void {
+    this.pawn.faceToward(from.x, from.y, to.x, to.y);
   }
 
   updatePosition(pos: Position, elevation = 0): void {
@@ -29,6 +42,7 @@ export class PlayerEntity {
     this.container.x = sx;
     this.container.y = sy;
     this.container.zIndex = getEntityDepth(pos, elevation);
+    this.pawn.updateFacingFrom(pos.x, pos.y);
   }
 
   destroy(): void {

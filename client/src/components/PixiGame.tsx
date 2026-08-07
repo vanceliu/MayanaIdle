@@ -80,7 +80,9 @@ export function PixiGame() {
       const scene = new GameScene(pixiApp);
       sceneRef.current = scene;
 
-      const player = new PlayerEntity();
+      // 玩家的外觀存在角色列上（`04-character.md` § 4.10）；
+      // 舊角色沒有這個欄位，PlayerEntity 內部會退回預設
+      const player = new PlayerEntity(useGameStore.getState().character?.appearance);
       playerEntityRef.current = player;
       scene.entityLayer.container.addChild(player.container);
 
@@ -119,7 +121,7 @@ export function PixiGame() {
           gameLoopTick(delta);
 
           // 2. ARPG combat
-          tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta, scene!.effectLayer);
+          tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta, scene!.effectLayer, playerEntityRef.current);
         } catch (e) {
           console.error('[GameLoop] Error:', e);
         }
@@ -385,6 +387,8 @@ function tickArpgCombatLoop(
   areaTemplates: MonsterTemplate[],
   deltaMs: number,
   effectLayer?: EffectLayer,
+  /** 出手時要轉向目標，所以戰鬥迴圈需要拿得到玩家實體 */
+  player?: PlayerEntity | null,
 ) {
   const gameState = useGameStore.getState();
   const mapStore = useMapControlStore.getState();
@@ -459,6 +463,16 @@ function tickArpgCombatLoop(
             }
           : event;
         if (isRangedAttackType(event.attackType) && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
+
+        // 轉向被打的那隻 —— 攻擊方向與角色朝向要一致，
+        // 否則會出現「面向右、往左射箭」。多目標時以第一個為準。
+        const facingTarget = monsterStore.monsters.find(
+          m => m.id === attackEvent.targetMonsterIds[0],
+        );
+        if (facingTarget) {
+          player?.faceToward(playerPos, facingTarget.position);
+        }
+
         const result = processPlayerAttack(attackEvent, {
           character: gameState.character,
           equippedGear: allGear,

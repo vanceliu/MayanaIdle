@@ -5,12 +5,22 @@ import { CURRENT_DATA_VERSION } from '../../config';
 import { purgeOutdatedData } from '../dataVersionPurge';
 import { listArchives, parseCharacterPayload, parseSharedWarehousePayload, deleteArchive } from '../legacyArchive';
 import { loadTemplateCache } from '../templateSync';
+import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
 
 /**
  * 遺產封存（§ 45）：被 dataVersion 淘汰的角色必須先轉成純文字快照才刪除。
  */
 
 const OUTDATED = CURRENT_DATA_VERSION - 1;
+
+/** 封存的角色帶一組看得出差異的外觀，才驗得出快照有沒有真的帶走它 */
+const LEGACY_APPEARANCE = {
+  ...createDefaultAppearance(),
+  hair: 'braid' as const,
+  skin: '#7c4f2c',
+  eyeColor: '#e3c765',
+  lash: { on: 1 as const, len: 22, curl: 16, w: 60 },
+};
 
 async function addOutdatedCharacter(userId = 1, name = '老兵') {
   return await db.characters.add({
@@ -19,6 +29,7 @@ async function addOutdatedCharacter(userId = 1, name = '老兵') {
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 4, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     unspentAttributePoints: 2, gold: 12345,
+    appearance: LEGACY_APPEARANCE,
     currentArea: 'neutral-town', currentZone: 'newbie-neutral', currentRegion: 'dawn-plains',
     currentFloor: null,
     skills: [{ id: 'wind_blade', name: '風刃', level: 3 }],
@@ -173,4 +184,30 @@ describe('遺產封存', () => {
     const [archive] = await listArchives(1);
     expect(parseCharacterPayload(archive)).toBeNull();
   });
+
+  /** § 45.2：遺產頁要畫出那隻角色，快照就得帶著外觀 */
+  describe('外觀', () => {
+    it('快照帶著角色當下的外觀', async () => {
+      await addOutdatedCharacter();
+      await purgeOutdatedData();
+
+      const payload = parseCharacterPayload((await listArchives(1))[0])!;
+      expect(payload.character.appearance).toEqual(LEGACY_APPEARANCE);
+    });
+
+    it('這個欄位加上之前封存的舊快照沒有外觀，讀取端要退回預設而不是壞掉', async () => {
+      await addOutdatedCharacter();
+      await purgeOutdatedData();
+
+      const [archive] = await listArchives(1);
+      const raw = JSON.parse(archive.payload);
+      delete raw.character.appearance;
+      await db.legacyArchives.update(archive.id!, { payload: JSON.stringify(raw) });
+
+      const payload = parseCharacterPayload((await listArchives(1))[0])!;
+      expect(payload.character.appearance).toBeUndefined();
+      expect(normalizeAppearance(payload.character.appearance)).toEqual(createDefaultAppearance());
+    });
+  });
+
 });

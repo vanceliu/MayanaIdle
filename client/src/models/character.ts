@@ -2,6 +2,7 @@ import type { Skill } from './skill';
 import type { Quest } from './quest';
 import type { ActiveEffect } from './effect';
 import type { EquipmentInstance } from './equipment';
+import type { Appearance } from './appearance';
 
 export type ClassName = 'knight' | 'elf' | 'elementalist' | 'priest' | 'thief';
 
@@ -50,6 +51,12 @@ export interface Character {
   authToken?: string;
   userId: number;
   name: string;
+  /**
+   * 角色外觀（`04-character.md` § 4.10）。
+   * 選填是為了相容 DB v17 以前建立的舊角色；讀取一律經
+   * `normalizeAppearance()`，不要直接用這個欄位 —— 舊角色是 undefined。
+   */
+  appearance?: Appearance;
   className: ClassName;
   level: number;
   exp: number;

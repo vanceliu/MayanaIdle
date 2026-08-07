@@ -1,4 +1,5 @@
 import { db } from '../db/database';
+import { normalizeAppearance } from '../models/appearance';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../models/bagItem';
@@ -181,6 +182,10 @@ export async function importCharacterData(
 
   await db.characters.update(currentCharacterId, {
     name: importChar.name,
+    // 外觀一定要列在這裡。匯出是整列打包會自動帶走，漏了這行不會報錯，
+    // 要到「匯出→匯入→開角色」才發現外觀沒了（`18-data-schema.md` § 18.7）。
+    // 舊匯出檔沒有這個欄位，normalizeAppearance 會退回預設而不是拋錯。
+    appearance: normalizeAppearance(importChar.appearance),
     ...(importChar.uuid ? { uuid: importChar.uuid } : {}),
     ...(importChar.authToken ? { authToken: importChar.authToken } : {}),
     className: importChar.className,

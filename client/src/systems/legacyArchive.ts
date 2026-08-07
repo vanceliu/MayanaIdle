@@ -1,4 +1,5 @@
 import { db, type LegacyArchiveEntry } from '../db/database';
+import { normalizeAppearance, type Appearance } from '../models/appearance';
 import { resolveEquipment } from './templateSync';
 import { formatAffixDisplay } from '../models/affix';
 import type { Character } from '../models/character';
@@ -37,6 +38,13 @@ export interface LegacyCharacterPayload {
   character: {
     name: string;
     uuid?: string;
+    /**
+     * 外觀（`45-legacy-archive.md` § 45.2）—— 遺產頁要畫出那隻角色就得帶著。
+     *
+     * 選填：payload 是**封存當下**寫入的 JSON 字串，這個欄位加上之前封存的快照
+     * 永遠不會有它。讀取端一律經 `normalizeAppearance()`，不可假設它存在。
+     */
+    appearance?: Appearance;
     className: string;
     level: number;
     exp: number;
@@ -137,6 +145,7 @@ export async function buildCharacterArchive(char: Character): Promise<LegacyArch
     character: {
       name: char.name,
       uuid: char.uuid,
+      appearance: normalizeAppearance(char.appearance),
       className: char.className,
       level: char.level,
       exp: char.exp,
