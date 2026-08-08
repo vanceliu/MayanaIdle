@@ -30,15 +30,4 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
-### 裝備欄緊湊化（兩欄部位格）
-
-裝備欄維持獨立面板，**不併入詳細狀態**（分頁會強制二選一，且詳細狀態之後只會更長）。
-欄位排法由單欄條列改成兩欄部位格，詞綴與數值收進既有的 hover tooltip。
-
-- [x] 階段 1：`EquipmentPanel.tsx` 改兩欄部位格 —— 格子只印部位名 + 裝備名（Tier 色與背包同一套 `getEquipmentInstanceTierColor`），不再印 compact 數值；點兩下卸下的語意不變
-- [x] 階段 2：`App.css` 的 `.equipped-list` / `.equip-slot` 系列改 grid 兩欄
-- [x] 階段 3：`PANEL_WIDTHS.equipment` 由 360 調成 280
-- [x] 階段 4：`EquipmentPanel.test.tsx` 更新，並補「格子不印數值」的新測試
-- [x] 階段 5：文件同步 `16-tech-frontend-architecture.md`（§ 32.15 寬度表、組件表的 `EquipmentPanel` 描述）
-- [x] 追加：選取狀態由格內金色側條改成**整格金色外框**，與 `.bag-cell.is-selected` 同一套
-      （格子本身已有邊框，再加內側條會兩條線打架）；`is-selected` 改掛在 `.equip-slot` 上
+目前沒有進行中的計畫。

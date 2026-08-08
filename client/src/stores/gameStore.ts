@@ -39,6 +39,7 @@ import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { getItemId, getItemById } from '../models/items';
+import { bagLayoutStorageKey, type BagSlotMap } from '../models/bagLayout';
 import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
@@ -231,6 +232,12 @@ interface GameState {
   afterCombatHpResumeThreshold: number;
   afterCombatMpResumeThreshold: number;
   quickSlots: QuickSlots;
+  /**
+   * 背包格子位置（`35-inventory-constraints.md` § 35.1.3、§ 35.17）。
+   * 只收錄被拖曳或整理過的項目，存在獨立的 localStorage key，
+   * **不隨角色匯出** —— 匯入會重發裝備實例 id，帶過去必然全部對不上。
+   */
+  bagSlotMap: BagSlotMap;
   storedEquipment: EquipmentInstance[];
   storedMaterials: BagItem[];
   warehouseGold: number;
@@ -276,6 +283,8 @@ interface GameState {
   usePotionByType: (type: PotionType) => void;
   useSpeedPotion: (type: SpeedPotionType) => void;
   assignQuickSlot: (slotIdx: number, entry: QuickSlotEntry | null) => void;
+  /** § 35.1.3：寫入背包格子位置（拖曳與整理共用），同時持久化到本機 */
+  setBagSlotMap: (slotMap: BagSlotMap) => void;
   useQuickSlot: (slotIdx: number) => void;
   useTownScroll: (scrollItemId: number) => void;
   useCureItem: (itemId: number) => void;
@@ -388,6 +397,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   afterCombatHpResumeThreshold: 60,
   afterCombatMpResumeThreshold: 60,
   quickSlots: emptyQuickSlots(),
+  bagSlotMap: {},
   storedEquipment: [],
   storedMaterials: [],
   warehouseGold: 0,
@@ -502,6 +512,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const persistentRules = prefs?.persistentRules ?? DEFAULT_PERSISTENT_SCRIPT;
     const emergencyRetreat = prefs?.emergencyRetreat ?? DEFAULT_EMERGENCY_RETREAT;
     const quickSlots = normalizeQuickSlots(prefs?.quickSlots);
+    // § 35.17：格子位置不在 prefs 裡，走獨立 key（不隨角色匯出）
+    const bagSlotMap = loadBagLayout(char.id!);
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
     const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
     const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? 60;
@@ -543,6 +555,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       persistentRules,
       emergencyRetreat,
       quickSlots,
+      bagSlotMap,
       afterCombatHpThreshold,
       afterCombatMpThreshold,
       afterCombatHpResumeThreshold,
@@ -628,6 +641,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       .delete();
     await db.characters.delete(characterId);
     localStorage.removeItem(`mayana_prefs_${characterId}`);
+    // characterId 會被重用，不清掉的話新角色會撿到前一個角色的背包排列（§ 35.17）
+    localStorage.removeItem(bagLayoutStorageKey(characterId));
     await get().loadCharacterList();
   },
 
@@ -653,6 +668,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       persistentRules: DEFAULT_PERSISTENT_SCRIPT,
       emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
       quickSlots: emptyQuickSlots(),
+      bagSlotMap: {},
       adventurerQuests: [],
       adventurerQuestBoard: createEmptyQuestBoard(),
   questBoardTownId: null,
@@ -1052,6 +1068,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (char?.id) {
       saveLocalPreferences(char.id, get());
     }
+  },
+
+  setBagSlotMap: (slotMap) => {
+    set({ bagSlotMap: slotMap });
+    const char = get().character;
+    if (char?.id) saveBagLayout(char.id, slotMap);
   },
 
   useQuickSlot: (slotIdx) => {
@@ -1925,6 +1947,26 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     statistics: state.statistics,
   };
   localStorage.setItem(key, JSON.stringify(data));
+}
+
+function saveBagLayout(characterId: number, slotMap: BagSlotMap) {
+  localStorage.setItem(bagLayoutStorageKey(characterId), JSON.stringify(slotMap));
+}
+
+function loadBagLayout(characterId: number): BagSlotMap {
+  const raw = localStorage.getItem(bagLayoutStorageKey(characterId));
+  if (!raw) return {};
+  try {
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    const next: BagSlotMap = {};
+    for (const [id, idx] of Object.entries(data)) {
+      if (typeof idx === 'number' && Number.isInteger(idx) && idx >= 0) next[id] = idx;
+    }
+    return next;
+  } catch {
+    return {};
+  }
 }
 
 interface LoadedPreferences {

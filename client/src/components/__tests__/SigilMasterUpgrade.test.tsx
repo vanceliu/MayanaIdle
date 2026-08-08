@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 import { SigilMaster } from '../town/SigilMaster';
 import { useGameStore } from '../../stores/gameStore';
@@ -304,5 +304,45 @@ describe('印記師 — 選取流程（§ 13.13）', () => {
 
     expect(applyBtn('混沌印記').disabled).toBe(true);
     expect(footerText()).toBe('這件裝備沒有詞綴');
+  });
+
+  /*
+   * 裝備名在左欄清單與右欄摘要各有一份，斷言一律限縮在清單內
+   * —— 全域 getByText 會同時抓到兩個。
+   */
+  const pickerName = () => within(document.querySelector('.sigil-picker')!).getByText('鋼心劍');
+
+  /** 圖示與 Tier 色與背包／裝備欄同源，同一件裝備在三個地方不會長成三種樣子 */
+  it('清單列印出裝備圖示，名稱上 Tier 色', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
+      { name: '混沌印記', amount: 1 },
+    ]);
+
+    const name = pickerName();
+    // 武器用類型圖示（劍），防具才用部位圖示
+    expect(
+      name.closest('button')!.querySelector('[data-testid="icon-equipment/spinning-sword"]'),
+    ).not.toBeNull();
+    // 查不到模板時退回 Tier 1 的灰色（`models/equipmentTier.ts`）
+    expect((name as HTMLElement).style.color).toBe('rgb(107, 114, 128)');
+  });
+
+  it('強化等級接在名稱後面，清單與摘要各一份', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }], { enhancement: 6 }), [
+      { name: '混沌印記', amount: 1 },
+    ]);
+
+    const picker = within(document.querySelector('.sigil-picker')!);
+    expect(picker.getByText('鋼心劍 +6')).toBeDefined();
+    expect(document.querySelector('.sigil-summary-main')!.textContent).toContain('鋼心劍 +6');
+  });
+
+  it('印記不受理的裝備維持灰階，名稱不上 Tier 色', () => {
+    setup(gear([]), [{ name: '混沌印記', amount: 1 }]);
+
+    const name = pickerName();
+    expect(name.closest('button')!.className).toContain('is-inert');
+    // 上了 Tier 色就跟能操作的列看起來一樣了（`13-town.md` § 13.13 灰階標示）
+    expect((name as HTMLElement).style.color).toBe('');
   });
 });

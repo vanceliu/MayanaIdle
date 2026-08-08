@@ -5,6 +5,7 @@ import { seedDatabase, resetSeedState } from '../../db/seed';
 import { useGameStore } from '../gameStore';
 import { emptyQuickSlots } from '../../models/quickSlot';
 import { bagItem } from '../../testing/bagFixtures';
+import { bagLayoutStorageKey } from '../../models/bagLayout';
 
 // Mock localStorage for node environment
 const localStorageMock = (() => {
@@ -306,5 +307,73 @@ describe('Game persistence', () => {
 
     const dbWeapon = await db.equipmentInstances.get(weaponId as number);
     expect(dbWeapon!.quality).toBe(5);
+  });
+
+  /**
+   * § 35.17：背包格子位置走**獨立的 localStorage key**，
+   * 刻意不進 `mayana_prefs_` —— prefs 會跟著角色匯出，而匯入會重發裝備實例 id。
+   */
+  describe('背包格子位置（§ 35.17）', () => {
+    it('寫入獨立 key，不進 prefs', async () => {
+      await useGameStore.getState().createCharacter('BagLayout', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      useGameStore.getState().setBagSlotMap({ 'potion-red': 3, 'equip-7': 0 });
+
+      const raw = localStorage.getItem(bagLayoutStorageKey(charId));
+      expect(JSON.parse(raw!)).toEqual({ 'potion-red': 3, 'equip-7': 0 });
+
+      // 逼出一次 prefs 存檔，確認位置沒被順手寫進會跟著角色匯出的那份
+      useGameStore.getState().assignQuickSlot(0, { kind: 'potion', potionType: 'red' });
+      const prefs = JSON.parse(localStorage.getItem(`mayana_prefs_${charId}`)!);
+      expect(prefs.bagSlotMap).toBeUndefined();
+      expect(prefs.slotMap).toBeUndefined();
+    });
+
+    it('loadCharacter 時讀回位置', async () => {
+      await useGameStore.getState().createCharacter('BagLoad', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      localStorage.setItem(bagLayoutStorageKey(charId), JSON.stringify({ 'potion-red': 5 }));
+      useGameStore.setState({ character: null, bagSlotMap: {}, phase: 'title' });
+      await useGameStore.getState().loadCharacter();
+
+      expect(useGameStore.getState().bagSlotMap).toEqual({ 'potion-red': 5 });
+    });
+
+    it('存檔內容壞掉時回到空表，不讓背包整個炸掉', async () => {
+      await useGameStore.getState().createCharacter('BagBroken', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      localStorage.setItem(bagLayoutStorageKey(charId), '{ not json');
+      useGameStore.setState({ character: null, bagSlotMap: { stale: 1 }, phase: 'title' });
+      await useGameStore.getState().loadCharacter();
+
+      expect(useGameStore.getState().bagSlotMap).toEqual({});
+    });
+
+    it('非數字或負數索引一律丟棄', async () => {
+      await useGameStore.getState().createCharacter('BagDirty', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      localStorage.setItem(bagLayoutStorageKey(charId), JSON.stringify({
+        ok: 2, bad: 'x', negative: -1, fractional: 1.5,
+      }));
+      useGameStore.setState({ character: null, bagSlotMap: {}, phase: 'title' });
+      await useGameStore.getState().loadCharacter();
+
+      expect(useGameStore.getState().bagSlotMap).toEqual({ ok: 2 });
+    });
+
+    it('刪除角色時一併清掉，characterId 重用不會撿到舊排列', async () => {
+      await useGameStore.getState().createCharacter('BagDelete', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      useGameStore.getState().setBagSlotMap({ 'potion-red': 1 });
+      expect(localStorage.getItem(bagLayoutStorageKey(charId))).not.toBeNull();
+
+      await useGameStore.getState().deleteCharacter(charId);
+      expect(localStorage.getItem(bagLayoutStorageKey(charId))).toBeNull();
+    });
   });
 });

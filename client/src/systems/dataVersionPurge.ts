@@ -1,6 +1,7 @@
 import { db } from '../db/database';
 import { CURRENT_DATA_VERSION } from '../config';
 import { buildCharacterArchive, buildSharedWarehouseArchive } from './legacyArchive';
+import { bagLayoutStorageKey } from '../models/bagLayout';
 
 /**
  * 資料版本淘汰：`CURRENT_DATA_VERSION` 提高後，清除所有低於該版本的角色與其全部附屬資料。
@@ -50,6 +51,8 @@ async function purgeCharacter(characterId: number, characterUuid?: string): Prom
   await db.characters.delete(characterId);
 
   removeLocalStorageKey(`mayana_prefs_${characterId}`);
+  // 背包格子位置走獨立 key（§ 35.17），characterId 重用時不清會被新角色撿到
+  removeLocalStorageKey(bagLayoutStorageKey(characterId));
   if (characterUuid) removeLocalStorageKey(`mayana_stats_upload_${characterUuid}`);
 }
 

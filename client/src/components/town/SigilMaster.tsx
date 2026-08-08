@@ -32,7 +32,9 @@ import {
 import { db } from '../../db/database';
 import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
 import { getItemById } from '../../models/items';
-import { resolveItemIcon } from '../../models/iconMap';
+import { resolveItemIcon, getEquipIcon } from '../../models/iconMap';
+import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
+import { GameIcon } from '../GameIcon';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
 type Entry = { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot };
@@ -283,6 +285,13 @@ export function SigilMaster() {
         <div className="sigil-picker-group">── {label} ({rows.length}) ──</div>
         {rows.map(e => {
           const inert = inertReason(e.item);
+          /*
+           * 圖示與 Tier 色與背包／裝備欄同源（防具用部位、武器用類型；色取
+           * `getEquipmentInstanceTierColor`），同一件裝備在三個地方不會長成三種樣子。
+           * 印記不受理的（新手裝／無詞綴）維持灰階不上色（`13-town.md` § 13.13）——
+           * 上了 Tier 色就跟能操作的列看起來一樣了。
+           */
+          const tierColor = inert ? undefined : getEquipmentInstanceTierColor(e.item, allTemplates);
           return (
             <button
               key={e.item.id}
@@ -290,7 +299,16 @@ export function SigilMaster() {
               className={`sigil-picker-row${e.item.id === item?.id ? ' is-selected' : ''}${inert ? ' is-inert' : ''}`}
               onClick={() => selectItem(e.item.id)}
             >
-              <span className="sigil-picker-name">{e.item.name}</span>
+              <span className="sigil-picker-icon">
+                <GameIcon
+                  name={getEquipIcon(e.item.type === 'armor' ? e.item.slot : e.item.type)}
+                  size={16}
+                  color={tierColor}
+                />
+              </span>
+              <span className="sigil-picker-name" style={tierColor ? { color: tierColor } : undefined}>
+                {e.item.name}{(e.item.enhancement ?? 0) > 0 ? ` +${e.item.enhancement}` : ''}
+              </span>
               <span className="sigil-picker-tag">
                 {inert ?? (e.slot ? SLOT_NAMES[e.slot] : '背包')}
               </span>
@@ -329,7 +347,8 @@ export function SigilMaster() {
           {item && (
             <div className="sigil-summary">
               <div className="sigil-summary-main">
-                {item.name}
+                {/* 強化等級跟著名稱走，與左欄清單、背包、裝備欄一致 */}
+                {item.name}{(item.enhancement ?? 0) > 0 ? ` +${item.enhancement}` : ''}
                 <span className="sigil-summary-slot">
                   {entry?.source === 'equipped' && entry.slot
                     ? `裝備中 · ${SLOT_NAMES[entry.slot]}`

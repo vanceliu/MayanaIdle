@@ -11,12 +11,33 @@
  * **位置不持久化**：`slotMap` 只存在於當下 session，重新載入回到預設排列。
  */
 
+import { SLOT_ORDER, type EquipSlot } from './equipment';
+
 export interface BagSlotItem {
   id: string;
 }
 
 /** itemId → 格子索引。只收錄手動移動過的項目 */
 export type BagSlotMap = Record<string, number>;
+
+/**
+ * 格子位置的 localStorage key（§ 35.17）。
+ *
+ * 刻意**不放進 `mayana_prefs_`** —— prefs 會跟著角色匯出，
+ * 而匯入時裝備實例會重新配發 id（`characterTransfer.ts` 寫入 `id: undefined`），
+ * 帶過去的 `equip-{id}` 必然全部對不上，只會留下一堆 stale entry。
+ * 這是純本機的顯示偏好，不與角色綁定。
+ */
+export function bagLayoutStorageKey(characterId: number): string {
+  return `mayana_bag_layout_${characterId}`;
+}
+
+/** 整理（§ 35.8.1）需要的欄位。裝備中的項目才有 `equippedSlot` */
+export interface BagSortItem extends BagSlotItem {
+  type: string;
+  name: string;
+  equippedSlot?: EquipSlot;
+}
 
 /**
  * 排出長度為 `maxSlots` 的版面，空格為 `null`。
@@ -77,6 +98,56 @@ export function moveBagSlot<T extends BagSlotItem>(
   const to = layout[toIndex];
   if (to) next[to.id] = fromIndex;
 
+  return next;
+}
+
+// ------------------------------------------------------------------ 整理
+
+/** § 35.8.1 的類型順位。裝備中的不看這張表，一律排在最前面 */
+const TYPE_SORT_ORDER: Record<string, number> = {
+  potion: 1,
+  scroll: 2,
+  material: 3,
+  spellbook: 4,
+  equipment: 5,
+};
+
+/**
+ * 整理（§ 35.8）：把當下的排序結果整批寫成 `slotMap`。
+ *
+ * 這是**單向動作**，不保留整理前的快照 —— 整理結果就是 slotMap 全表，
+ * 與拖曳共用同一條路徑，不引入第二套狀態。
+ * 整理過後每個項目都有明確位置，新獲得的物品因此不會再插隊到分類中間。
+ *
+ * 超出 `maxSlots` 的項目不寫入，讓它們退回自動填格（與越界處理一致）。
+ */
+export function sortBagLayout(items: BagSortItem[], maxSlots: number): BagSlotMap {
+  const slotRank = new Map<string, number>(SLOT_ORDER.map((slot, i) => [slot, i]));
+
+  const sorted = [...items].sort((a, b) => {
+    // § 35.8.1：裝備中是獨立的第一順位，不是裝備類內部的分層
+    const equippedA = a.equippedSlot ? 0 : 1;
+    const equippedB = b.equippedSlot ? 0 : 1;
+    if (equippedA !== equippedB) return equippedA - equippedB;
+
+    if (a.equippedSlot && b.equippedSlot) {
+      const rankA = slotRank.get(a.equippedSlot) ?? 99;
+      const rankB = slotRank.get(b.equippedSlot) ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name);
+    }
+
+    const typeA = TYPE_SORT_ORDER[a.type] ?? 99;
+    const typeB = TYPE_SORT_ORDER[b.type] ?? 99;
+    if (typeA !== typeB) return typeA - typeB;
+    return a.name.localeCompare(b.name);
+  });
+
+  const next: BagSlotMap = {};
+  const limit = Math.min(sorted.length, Math.max(0, maxSlots));
+  for (let i = 0; i < limit; i++) {
+    next[sorted[i].id] = i;
+  }
   return next;
 }
 

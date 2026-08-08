@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { CURRENT_DATA_VERSION } from '../../config';
 import { purgeOutdatedData } from '../dataVersionPurge';
+import { bagLayoutStorageKey } from '../../models/bagLayout';
 
 /**
  * 提高 CURRENT_DATA_VERSION 即淘汰所有舊角色（見 `config.ts`）。
@@ -90,12 +91,15 @@ describe('dataVersionPurge', () => {
   it('清除該角色的 localStorage 殘留，其他鍵不動', async () => {
     const charId = await addCharacter(1, OUTDATED, 'uuid-old');
     localStorage.setItem(`mayana_prefs_${charId}`, '{}');
+    // § 35.17：背包格子位置走獨立 key，characterId 重用時不清會被新角色撿到
+    localStorage.setItem(bagLayoutStorageKey(charId), '{"potion-red":1}');
     localStorage.setItem('mayana_stats_upload_uuid-old', '{"at":1,"sig":"x"}');
     localStorage.setItem('mayana_leaderboard_snapshot', 'keep');
 
     await purgeOutdatedData();
 
     expect(localStorage.getItem(`mayana_prefs_${charId}`)).toBeNull();
+    expect(localStorage.getItem(bagLayoutStorageKey(charId))).toBeNull();
     expect(localStorage.getItem('mayana_stats_upload_uuid-old')).toBeNull();
     expect(localStorage.getItem('mayana_leaderboard_snapshot')).toBe('keep');
   });

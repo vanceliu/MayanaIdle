@@ -17,6 +17,12 @@ vi.mock('../../hooks/useEquipmentTemplates', () => ({
  */
 
 describe('BagPanel', () => {
+  // § 35.17：格子位置改存在 store（跨 session 持久化），是模組層單例 ——
+  // 不重置的話上一個測試拖出來的位置會殘留到下一個測試
+  beforeEach(() => {
+    useGameStore.setState({ bagSlotMap: {} });
+  });
+
   it('renders with section header and slot count', () => {
     render(<BagPanel />);
     expect(screen.getByText('背包')).toBeDefined();
@@ -278,6 +284,119 @@ it('shows gold row when expanded', () => {
       expect(document.querySelector('.bag-context-menu')).toBeTruthy();
       expect(screen.queryByText(/^丟棄/)).toBeNull();
       expect(screen.getByText('移動到其他格')).toBeDefined();
+    });
+  });
+
+  /**
+   * § 35.1.3：穿脫**不改變格子位置** —— 預設順序與「是否裝備中」無關，
+   * 一律依裝備實例 id 排。分兩段推入的話，穿上 A 的同時 B 被換下來，
+   * 兩件在預設順序中的分組互換，沒有手動位置的那兩格會當場對調。
+   */
+  describe('穿脫不改變格子位置（§ 35.1.3）', () => {
+    const equip = (id: number, name: string, equipped: boolean) => ({
+      id, templateId: 1, name, type: 'sword', slot: 'rightHand',
+      isTwoHanded: false, quality: 0, enhancement: 0, affixes: [],
+      ownerId: 1, equipped,
+    }) as any;
+
+    const cellNames = () =>
+      Array.from(document.querySelectorAll('.bag-cell:not(.empty) .bag-cell-name'))
+        .map(el => el.textContent);
+
+    afterEach(() => {
+      useGameStore.setState({ equippedGear: {}, inventory: [] });
+    });
+
+    it('穿上背包裝備時，不會與原本裝備中的那件對調格子', () => {
+      // 先取得的 id=3 在前，後取得的 id=9 在後
+      const worn = equip(3, '鐵劍', true);
+      const inBag = equip(9, '鋼劍', false);
+
+      useGameStore.setState({
+        bagItems: [], inventory: [inBag], equippedGear: { rightHand: worn },
+      });
+      const first = render(<BagPanel />);
+      expect(cellNames()).toEqual(['鐵劍', '鋼劍']);
+      first.unmount();
+
+      // 換裝：鋼劍穿上、鐵劍回背包。兩件的 id 沒變，順序就不該變
+      useGameStore.setState({
+        bagItems: [], inventory: [worn], equippedGear: { rightHand: inBag },
+      });
+      render(<BagPanel />);
+      expect(cellNames()).toEqual(['鐵劍', '鋼劍']);
+    });
+
+    it('背包裝備的 id 較小時，穿上後一樣留在前面', () => {
+      const worn = equip(9, '鋼劍', true);
+      const inBag = equip(3, '鐵劍', false);
+
+      useGameStore.setState({
+        bagItems: [], inventory: [inBag], equippedGear: { rightHand: worn },
+      });
+      const first = render(<BagPanel />);
+      // 裝備中的不再自動浮到前面：id 3 在前
+      expect(cellNames()).toEqual(['鐵劍', '鋼劍']);
+      first.unmount();
+
+      useGameStore.setState({
+        bagItems: [], inventory: [worn], equippedGear: { rightHand: inBag },
+      });
+      render(<BagPanel />);
+      expect(cellNames()).toEqual(['鐵劍', '鋼劍']);
+    });
+  });
+
+  /** § 35.8：整理是一次性落位，把排序結果整批寫進 slotMap */
+  describe('整理（§ 35.8）', () => {
+    const sword = (id: number, name: string, equipped: boolean) => ({
+      id, templateId: 1, name, type: 'sword', slot: 'rightHand',
+      isTwoHanded: false, quality: 0, enhancement: 0, affixes: [],
+      ownerId: 1, equipped,
+    }) as any;
+
+    afterEach(() => {
+      useGameStore.setState({ equippedGear: {}, inventory: [] });
+    });
+
+    it('按下後把裝備中的排到最前面，並寫進 slotMap', () => {
+      useGameStore.setState({
+        bagItems: [bagItem('紅色藥水', 3)],
+        inventory: [],
+        equippedGear: { rightHand: sword(7, '鐵劍', true) },
+      });
+      render(<BagPanel />);
+
+      // 整理前：id 順序（藥水在前，裝備中的沒有特權）
+      const before = Array.from(document.querySelectorAll('.bag-cell:not(.empty) .bag-cell-name'))
+        .map(el => el.textContent);
+      expect(before).toEqual(['紅色藥水', '鐵劍']);
+
+      fireEvent.click(screen.getByText('整理'));
+
+      const after = Array.from(document.querySelectorAll('.bag-cell:not(.empty) .bag-cell-name'))
+        .map(el => el.textContent);
+      expect(after).toEqual(['鐵劍', '紅色藥水']);
+      expect(useGameStore.getState().bagSlotMap).toEqual({ 'equip-7': 0, 'potion-red': 1 });
+    });
+
+    it('是單向動作 —— 再按一次不會還原', () => {
+      useGameStore.setState({
+        bagItems: [bagItem('紅色藥水', 3)],
+        inventory: [],
+        equippedGear: { rightHand: sword(7, '鐵劍', true) },
+      });
+      render(<BagPanel />);
+
+      fireEvent.click(screen.getByText('整理'));
+      const afterFirst = useGameStore.getState().bagSlotMap;
+
+      fireEvent.click(screen.getByText('整理'));
+      expect(useGameStore.getState().bagSlotMap).toEqual(afterFirst);
+
+      const names = Array.from(document.querySelectorAll('.bag-cell:not(.empty) .bag-cell-name'))
+        .map(el => el.textContent);
+      expect(names).toEqual(['鐵劍', '紅色藥水']);
     });
   });
 

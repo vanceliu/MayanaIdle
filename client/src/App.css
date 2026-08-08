@@ -3596,6 +3596,15 @@ button.active {
 /* 印記全不受理的裝備（新手裝／無詞綴）在清單上就標出來，不必點進去才知道 */
 .sigil-picker-row.is-inert { opacity: 0.5; }
 
+/* 圖示欄固定寬：名稱長短不一時，整排的文字起點才對得齊 */
+.sigil-picker-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  width: 16px;
+  color: var(--text-dim);
+}
+
 .sigil-picker-name {
   flex: 1;
   min-width: 0;
@@ -3991,11 +4000,6 @@ button.active {
   color: var(--text-primary);
 }
 
-.bag-sort-toggle.active {
-  background: var(--accent-primary-dim);
-  border-color: var(--accent-primary);
-  color: var(--text-primary);
-}
 
 .bag-slots-count.warning {
   color: #FACC15;

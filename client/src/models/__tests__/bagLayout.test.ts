@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildBagLayout, moveBagSlot, type BagSlotMap } from '../bagLayout';
+import { buildBagLayout, moveBagSlot, sortBagLayout, type BagSlotMap } from '../bagLayout';
+import type { EquipSlot } from '../equipment';
 
 const item = (id: string) => ({ id });
 const ids = (layout: ({ id: string } | null)[]) => layout.map(i => i?.id ?? null);
@@ -88,5 +89,82 @@ describe('moveBagSlot（§ 35.1.3）', () => {
     const next = moveBagSlot(layout, { gone: 4, a: 0 }, 0, 3);
     expect(next).toEqual({ a: 3 });
     expect(next.gone).toBeUndefined();
+  });
+});
+
+describe('sortBagLayout（§ 35.8）', () => {
+  const s = (id: string, type: string, name: string, equippedSlot?: EquipSlot) =>
+    ({ id, type, name, equippedSlot });
+
+  /** 整理結果轉成「格子順序」的 id 陣列，方便斷言 */
+  const order = (map: BagSlotMap) =>
+    Object.entries(map).sort((a, b) => a[1] - b[1]).map(([id]) => id);
+
+  it('裝備中是獨立的第一順位，排在所有消耗品之前', () => {
+    const map = sortBagLayout([
+      s('potion', 'potion', '紅色藥水'),
+      s('bagSword', 'equipment', '鐵劍'),
+      s('wornHelm', 'equipment', '鐵頭盔', 'helmet'),
+    ], 10);
+
+    expect(order(map)).toEqual(['wornHelm', 'potion', 'bagSword']);
+  });
+
+  it('裝備中內部依裝備欄部位順序（SLOT_ORDER）', () => {
+    const map = sortBagLayout([
+      s('r2', 'equipment', 'A', 'ring2'),
+      s('hand', 'equipment', 'Z', 'rightHand'),
+      s('boots', 'equipment', 'M', 'boots'),
+    ], 10);
+
+    // rightHand → boots → ring2，與名稱字母無關
+    expect(order(map)).toEqual(['hand', 'boots', 'r2']);
+  });
+
+  it('消耗品依 藥水 → 卷軸 → 素材 → 魔法書 → 背包裝備', () => {
+    const map = sortBagLayout([
+      s('e', 'equipment', '鐵劍'),
+      s('sb', 'spellbook', '魔法書'),
+      s('m', 'material', '銀礦石'),
+      s('sc', 'scroll', '回城卷軸'),
+      s('p', 'potion', '紅色藥水'),
+    ], 10);
+
+    expect(order(map)).toEqual(['p', 'sc', 'm', 'sb', 'e']);
+  });
+
+  it('同類內按名稱排列', () => {
+    const map = sortBagLayout([
+      s('b', 'potion', 'B'),
+      s('a', 'potion', 'A'),
+    ], 10);
+
+    expect(order(map)).toEqual(['a', 'b']);
+  });
+
+  it('每個項目都拿到明確位置，從第 0 格連續排起', () => {
+    const map = sortBagLayout([
+      s('a', 'potion', '紅色藥水'),
+      s('b', 'material', '銀礦石'),
+    ], 10);
+
+    expect(map).toEqual({ a: 0, b: 1 });
+  });
+
+  it('超出 maxSlots 的項目不寫入，退回自動填格', () => {
+    const map = sortBagLayout([
+      s('a', 'potion', 'A'),
+      s('b', 'potion', 'B'),
+      s('c', 'potion', 'C'),
+    ], 2);
+
+    expect(map).toEqual({ a: 0, b: 1 });
+    expect(map.c).toBeUndefined();
+  });
+
+  it('整理結果覆蓋整理前的手動位置', () => {
+    const items = [s('a', 'potion', '紅色藥水'), s('b', 'material', '銀礦石')];
+    const layout = buildBagLayout(items, sortBagLayout(items, 5), 5);
+    expect(ids(layout)).toEqual(['a', 'b', null, null, null]);
   });
 });

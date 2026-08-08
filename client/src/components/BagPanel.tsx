@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { buildBagLayout, moveBagSlot, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
+import { buildBagLayout, moveBagSlot, sortBagLayout, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
@@ -68,17 +68,7 @@ function itemWeight(item: { itemId?: number }): number {
   return itemDef(item)?.weight ?? 0;
 }
 
-const TYPE_SORT_ORDER: Record<string, number> = {
-  potion: 0,
-  scroll: 1,
-  material: 2,
-  equipment: 3,
-};
-
 export function BagPanel() {
-  const [sorted, setSorted] = useState(false);
-  /** § 35.1.3：手動拖放的位置。只存在於當下 session，不持久化 */
-  const [slotMap, setSlotMap] = useState<BagSlotMap>({});
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
   /**
@@ -123,6 +113,9 @@ export function BagPanel() {
   const useTownScroll = useGameStore(s => s.useTownScroll);
   const useCureItem = useGameStore(s => s.useCureItem);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
+  /** § 35.1.3：格子位置持久化在 store，拖曳與整理共用同一條寫入路徑 */
+  const slotMap = useGameStore(s => s.bagSlotMap);
+  const setSlotMap = useGameStore(s => s.setBagSlotMap);
   const quickSlots = useGameStore(s => s.quickSlots);
   const activeEffects = useGameStore(s => s.activeEffects);
   const templates = useEquipmentTemplates();
@@ -172,16 +165,23 @@ export function BagPanel() {
    * § 35.1：穿上不等於離開背包 —— 裝備中的裝備照樣佔一格，只是多一個「裝備中」標記。
    * 格子 id 用裝備實例 id，因此穿脫時同一件東西的 id 不變，
    * 手動擺放的位置與快捷鍵綁定都不會因為換裝而失效。
+   *
+   * § 35.1.3：**裝備中與背包裝備排在同一個序列裡**，依實例 id（取得順序）排。
+   * 分兩段推入的話，穿上 A 的同時 B 被換下來，兩件在預設順序中的分組互換，
+   * 沒有手動位置的那兩格會當場對調 —— 位置只該由整理或拖曳改變。
    */
+  const allEquipment: { item: EquipmentInstance; slot?: EquipSlot }[] = [];
   for (const slot of SLOT_ORDER) {
     const item = equippedGear[slot];
-    if (item) {
-      gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item, equippedSlot: slot });
-    }
+    if (item) allEquipment.push({ item, slot });
   }
-
   for (const item of inventory) {
-    gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item });
+    allEquipment.push({ item });
+  }
+  allEquipment.sort((a, b) => (a.item.id ?? Infinity) - (b.item.id ?? Infinity));
+
+  for (const { item, slot } of allEquipment) {
+    gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item, equippedSlot: slot });
   }
 
   // 選取的東西離開背包（用掉、穿上、賣掉、丟棄）後把選取狀態收掉。
@@ -192,31 +192,33 @@ export function BagPanel() {
     }
   }, [gridItems, selectedId]);
 
+  /*
+   * § 35.17：剔除已不在版面上的位置（賣掉、存進倉庫、丟棄）。
+   * 拖曳與整理寫入的 slotMap 本來就是乾淨的，這裡處理的是
+   * 「擺好之後物品才消失」留下的殘留，避免存檔無限累積。
+   */
+  useEffect(() => {
+    const alive = new Set(gridItems.map(i => i.id));
+    const ids = Object.keys(slotMap);
+    if (!ids.some(id => !alive.has(id))) return;
+    const next: BagSlotMap = {};
+    for (const id of ids) {
+      if (alive.has(id)) next[id] = slotMap[id];
+    }
+    setSlotMap(next);
+  }, [gridItems, slotMap, setSlotMap]);
+
   const usedSlots = gridItems.length;
-  // § 35.1：背包格數 = 基礎 50 + 腰帶的 bonusBagSlots
+  // § 35.1：背包格數 = 基礎 60 + 腰帶的 bonusBagSlots
   const maxSlots = getBagMaxSlots(equippedGear);
 
-  const displayItems = useMemo(() => {
-    if (!sorted) return gridItems;
-    return [...gridItems].sort((a, b) => {
-      const orderA = TYPE_SORT_ORDER[a.type] ?? 99;
-      const orderB = TYPE_SORT_ORDER[b.type] ?? 99;
-      if (orderA !== orderB) return orderA - orderB;
-      // 裝備類內部：裝備中的排在背包裝備之前，整理完一眼看得到身上穿什麼
-      const equippedA = a.equippedSlot ? 0 : 1;
-      const equippedB = b.equippedSlot ? 0 : 1;
-      if (equippedA !== equippedB) return equippedA - equippedB;
-      return a.name.localeCompare(b.name);
-    });
-  }, [gridItems, sorted]);
-
   // 手動位置優先，其餘依預設順序流入剩餘空格
-  const layout = buildBagLayout(displayItems, slotMap, maxSlots);
+  const layout = buildBagLayout(gridItems, slotMap, maxSlots);
 
   /** 把格子搬到目標索引（拖放與「移動」模式共用同一條路徑） */
   function moveTo(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return;
-    setSlotMap(prev => moveBagSlot(layout, prev, fromIndex, toIndex));
+    setSlotMap(moveBagSlot(layout, slotMap, fromIndex, toIndex));
   }
 
   /** 這一格拖出去時要交給快捷格／地圖的描述（§ 35.5.3） */
@@ -259,10 +261,13 @@ export function BagPanel() {
     });
   }
 
-  function handleSortToggle() {
-    // 「整理」同時清掉手動擺放，回到排序後的預設排列
-    setSorted(!sorted);
-    setSlotMap({});
+  /**
+   * 整理（§ 35.8）：**一次性落位，非 toggle** ——
+   * 把當下的排序結果整批寫成位置，不保留整理前的快照。
+   * 整理過後每個項目都有明確格子，新獲得的物品因此不會再插隊到分類中間。
+   */
+  function handleSort() {
+    setSlotMap(sortBagLayout(gridItems, maxSlots));
     setMovingId(null);
   }
 
@@ -577,10 +582,7 @@ export function BagPanel() {
       <div className="bag-panel-header">
         <span className="bag-panel-title">背包</span>
         <span className="bag-panel-meta">
-          <button
-            className={`bag-sort-toggle ${sorted ? 'active' : ''}`}
-            onClick={handleSortToggle}
-          >
+          <button className="bag-sort-toggle" onClick={handleSort}>
             整理
           </button>
           <span className={`bag-slots-count${usedSlots >= maxSlots ? ' danger' : usedSlots >= maxSlots * 0.9 ? ' warning' : ''}`}>
