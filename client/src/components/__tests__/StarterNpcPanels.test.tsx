@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+// 強化會寫 IndexedDB（persistStarterEnhance / characters.update）
+import 'fake-indexeddb/auto';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { StarterNpc } from '../town/StarterNpc';
 import { useGameStore } from '../../stores/gameStore';
@@ -35,7 +37,8 @@ function setup(inventory: EquipmentInstance[], gold = 10000) {
       gold, currentArea: 'neutral-town', currentZone: 'newbie-neutral',
       currentRegion: 'neutral-town', currentFloor: null,
       skills: [], quests: [], unspentAttributePoints: 0,
-      areaEnteredAt: 0, createdAt: 0, userId: 1,
+      // 強化會 `db.characters.update(char.id)`，沒有 id 會直接拋錯
+      areaEnteredAt: 0, createdAt: 0, userId: 1, id: 1,
     },
     equippedGear: {},
     inventory,
@@ -87,6 +90,27 @@ describe('強化裝備分頁', () => {
   it('可強化的排在最前面', () => {
     const names = [...document.querySelectorAll('.starter-row-name')].map(e => e.textContent);
     expect(names[0]).toContain('新手法杖');
+  });
+
+  /**
+   * 新手裝強化必定成功（`13-town.md` § 13.10），所以只演安定值內那一段：
+   * 白閃 + `+N` 浮字，沒有金色爆閃、沒有碎裂（`48-vfx.md` § 48.4.2）。
+   */
+  it('強化成功後演白閃與 +N 浮字，不出現金色爆閃或碎裂', async () => {
+    const row = rowOf('新手法杖');
+    fireEvent.click(within(row).getByRole('button', { name: /強化 500G/ }));
+
+    const layer = await screen.findByTestId('starter-enh-fx');
+    expect(layer.querySelector('.enh-flash-soft')).not.toBeNull();
+    expect(layer.querySelector('.enh-float')?.textContent).toBe('+5');
+    expect(document.querySelector('.enh-flash-gold')).toBeNull();
+    expect(document.querySelector('.enh-shard')).toBeNull();
+  });
+
+  it('可強化的列帶待命呼吸，已滿與不可強化的不帶', () => {
+    expect(rowOf('新手法杖').className).toContain('enh-standby');
+    expect(rowOf('新手法師長袍').className).not.toContain('enh-standby');
+    expect(rowOf('皮腰帶').className).not.toContain('enh-standby');
   });
 
   it('金幣不足時強化按鈕停用', () => {

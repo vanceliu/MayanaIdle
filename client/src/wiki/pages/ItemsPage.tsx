@@ -8,16 +8,29 @@ import { GameIcon } from '../../components/GameIcon';
 import { resolveItemIcon, MATERIAL_TIER_COLORS } from '../../models/iconMap';
 import type { ItemDefinition } from '../../models/items';
 import { formatMaterialUsage, hasMaterialUsage, getCraftUsage } from '../../systems/craftMaterialUsage';
+import { isSigilItemId } from '../../models/sigil';
 import '../components/WikiTable.css';
 
+/**
+ * 類型欄與篩選的標籤。`sigil` 是**顯示用的虛擬類型** ——
+ * 印記在 seed 裡歸 `scroll`（可堆疊的消耗品、不進批量販售的素材篩選），
+ * 但玩家要查印記時不會想到去翻卷軸，而那份 category 還被背包與商店的邏輯吃著，
+ * 不能為了 Wiki 的分類去動它。
+ */
 const CATEGORY_LABELS: Record<string, string> = {
   potion: '藥水',
   scroll: '卷軸',
+  sigil: '印記',
   material: '材料',
   dungeon: '副本道具',
   spellbook: '魔法書',
   other: '其他',
 };
+
+/** 顯示用類型：印記自成一類，其餘照 seed 的 `category` */
+function displayCategory(item: ItemDefinition): string {
+  return isSigilItemId(item.id) ? 'sigil' : item.category;
+}
 
 /** 素材顏色圖例，語意依 `39-batch-sell.md` § 39.3，色碼取自 MATERIAL_TIER_COLORS。 */
 const MATERIAL_TIER_LEGEND = [
@@ -75,7 +88,8 @@ function ItemList() {
 
   const filtered = useMemo(() => {
     let list = ITEM_DEFINITIONS;
-    if (categoryFilter !== 'all') list = list.filter(i => i.category === categoryFilter);
+    // 用顯示類型過濾 —— 選「卷軸」時不該再看到印記，選「印記」時只看到那六個
+    if (categoryFilter !== 'all') list = list.filter(i => displayCategory(i) === categoryFilter);
     if (craftFilter === 'craft') list = list.filter(i => hasMaterialUsage(i.id));
     if (craftFilter === 'nocraft') list = list.filter(i => !hasMaterialUsage(i.id));
     if (search) list = list.filter(i => i.name.includes(search));
@@ -137,7 +151,7 @@ function ItemList() {
                     {item.name}
                   </Link>
                 </td>
-                <td>{CATEGORY_LABELS[item.category]}</td>
+                <td>{CATEGORY_LABELS[displayCategory(item)]}</td>
                 <td>{item.description}</td>
                 <td>{formatMaterialUsage(item.id) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
                 <td className="cell-number">{item.weight}</td>
@@ -239,7 +253,7 @@ function ItemDetail({ name }: { name: string }) {
           </thead>
           <tbody>
             <tr>
-              <td>{CATEGORY_LABELS[item.category]}</td>
+              <td>{CATEGORY_LABELS[displayCategory(item)]}</td>
               <td>{item.description}</td>
               <td>{formatMaterialUsage(item.id) || <span style={{ color: 'var(--text-dim)' }}>—</span>}</td>
               <td className="cell-number">{item.weight}</td>
@@ -255,7 +269,7 @@ function ItemDetail({ name }: { name: string }) {
           <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
             用途（{formatMaterialUsage(item.id)}）
           </h3>
-          {/* 精鍊印記／工藝印記有用途但不進裝備配方，故裝備清單是選擇性的 */}
+          {/* 六種印記都有用途但不進裝備配方（`30-items.md` § 製作用途標記），故裝備清單是選擇性的 */}
           {craftUsage && (
           <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
             此素材用於以下 {craftUsage.equipment.length} 件裝備的鐵匠鋪配方：

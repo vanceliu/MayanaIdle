@@ -62,12 +62,12 @@ function bossSigilDropsOf(boss: string) {
 }
 
 describe('印記掉落（§ 27.8）', () => {
-  it('§ 27.8 的四種印記都有 ItemDefinition，重量 0.1、賣價 500G（`30-items.md`）', () => {
+  it('§ 27.8 的四種印記都有 ItemDefinition，不計重、賣價 500G（`30-items.md`）', () => {
     for (const name of SIGIL_NAMES) {
       const def = getItemDefinition(name);
       expect(def, name).toBeTruthy();
       expect(def!.category, name).toBe('scroll');
-      expect(def!.weight, name).toBe(0.1);
+      expect(def!.weight, name).toBe(0);
       expect(def!.sellPrice, name).toBe(500);
     }
   });
@@ -96,7 +96,8 @@ describe('印記掉落（§ 27.8）', () => {
       const def = getItemDefinition(name);
       expect(def, name).toBeTruthy();
       expect(def!.category, name).toBe('scroll');
-      expect(def!.weight, name).toBe(2);
+      // § 30.2：六種印記一律不計重，全區域掉落的這兩種只有賣價不同
+      expect(def!.weight, name).toBe(0);
       expect(def!.sellPrice, name).toBe(50);
       const areas = DROP_TABLE_SEEDS
         .filter(d => d.itemTemplateId === def!.id)
@@ -130,6 +131,37 @@ describe('印記掉落（§ 27.8）', () => {
         const name = getItemById(drop.itemTemplateId!)!.name;
         expect(drop.dropValue, `${boss} 的 ${name}`).toBe(BOSS_VALUE(name));
       }
+    }
+  });
+});
+
+/**
+ * § 30.2：六種印記共用同一個圖示，只用顏色區分。
+ * 印記走 `icon` + `iconColor`，不吃素材的 `iconType`／`iconTier` 色階 ——
+ * 那套色階表達的是素材稀有度，套在印記上會讓玩家把印記讀成素材。
+ */
+describe('印記圖示（§ 30.2）', () => {
+  const ALL_SIGILS = SIGIL_DEFINITIONS.map(d => d.name);
+
+  it('六種印記共用 millenium-key，且不帶素材色階欄位', () => {
+    for (const name of ALL_SIGILS) {
+      const def = getItemDefinition(name);
+      expect(def, name).toBeTruthy();
+      expect(def!.icon, name).toBe('items/millenium-key');
+      expect(def!.iconType, name).toBeUndefined();
+      expect(def!.iconTier, name).toBeUndefined();
+    }
+  });
+
+  it('六種顏色互不重複，玩家才分得出手上是哪一種', () => {
+    const colors = ALL_SIGILS.map(name => getItemDefinition(name)!.iconColor);
+    expect(colors.every(Boolean)).toBe(true);
+    expect(new Set(colors).size).toBe(ALL_SIGILS.length);
+  });
+
+  it('六種印記重量一律 0 —— 完全不計負重（§ 30.2）', () => {
+    for (const name of ALL_SIGILS) {
+      expect(getItemDefinition(name)!.weight, name).toBe(0);
     }
   });
 });

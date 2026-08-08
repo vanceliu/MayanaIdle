@@ -135,6 +135,23 @@ describe('強化演出（§ 48.4）', () => {
     expect(container.querySelectorAll('.enh-shard--6')).toHaveLength(1);
   });
 
+  /**
+   * 連點：React 沿用同一個 DOM 節點時 CSS 動畫不會重跑，第二次強化等於沒有演出。
+   * 覆蓋層以 token 當 key 強制重新掛載。
+   */
+  it('連續強化時演出會重播，不是沿用同一個節點', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    setup(3);
+    render(<TownBlacksmith />);
+    clickEnhance();
+    const first = screen.getByTestId('enh-fx-success');
+
+    // 不等演出結束就再按一次
+    clickEnhance();
+    const second = screen.getByTestId('enh-fx-success');
+    expect(second).not.toBe(first);
+  });
+
   it('演出結束後殘影收掉，不留在畫面上', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     setup(6);

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ItemsPage } from '../ItemsPage';
 import { ITEM_DEFINITIONS } from '../../../db/seed';
 import { resolveItemIcon } from '../../../models/iconMap';
+import { SIGIL_DEFINITIONS } from '../../../models/sigil';
 
 /**
  * @vitest-environment jsdom
@@ -123,5 +124,58 @@ describe('Wiki 道具頁 — 價格取自 seed', () => {
     const def = ITEM_DEFINITIONS.find(i => i.name === '米索利碎片')!;
     renderDetail('米索利碎片');
     expect(screen.getAllByText(`${def.sellPrice!.toLocaleString()} G`).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * 印記在 seed 裡歸 `scroll`（`30-items.md` § 30.2），但 Wiki 的類型欄與篩選
+ * 把它獨立成「印記」—— 玩家要查印記時不會想到去翻卷軸。
+ * 這是**顯示層的虛擬類型**，`ItemDefinition.category` 一個字都不動。
+ */
+describe('Wiki 道具頁 — 印記自成一個顯示類型', () => {
+  const sigilNames = SIGIL_DEFINITIONS.map(d => d.name);
+
+  it('六種印記的類型欄顯示「印記」而不是「卷軸」', () => {
+    renderList();
+
+    for (const name of sigilNames) {
+      const row = getRow(name);
+      expect(within(row).getByText('印記'), name).toBeDefined();
+      expect(within(row).queryByText('卷軸'), name).toBeNull();
+    }
+  });
+
+  it('seed 的 category 沒被動到 —— 印記仍是 scroll', () => {
+    for (const d of SIGIL_DEFINITIONS) {
+      const def = ITEM_DEFINITIONS.find(i => i.id === d.itemId)!;
+      expect(def.category, d.name).toBe('scroll');
+    }
+  });
+
+  it('篩選「印記」只留下那六個', () => {
+    renderList();
+
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'sigil' } });
+
+    const links = screen.getAllByRole('link').map(el => el.textContent);
+    expect([...links].sort()).toEqual([...sigilNames].sort());
+  });
+
+  it('篩選「卷軸」不會再看到印記', () => {
+    renderList();
+
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'scroll' } });
+
+    const links = screen.getAllByRole('link').map(el => el.textContent);
+    for (const name of sigilNames) {
+      expect(links, name).not.toContain(name);
+    }
+    // 真正的卷軸還在
+    expect(links).toContain('武器強化卷軸');
+  });
+
+  it('詳細頁的類型欄一樣顯示「印記」', () => {
+    renderDetail('工藝印記');
+    expect(screen.getByText('印記')).toBeDefined();
   });
 });

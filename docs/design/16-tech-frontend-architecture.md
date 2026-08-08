@@ -245,6 +245,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 - 頂部顯示金幣資訊
 - Hover 顯示 tooltip，右鍵可設快捷鍵或丟棄
 - 「整理」按鈕：**一次性落位**（非 toggle，無還原）。順序為 裝備中 → 藥水 → 卷軸 → 素材 → 魔法書 → 背包裝備，裝備中依部位順序、其餘同類按名稱排列，空格推到後方。按下時把結果整批寫進 `slotMap`
+- **底部「印記」抽屜**：點按鈕由下往上展開、再點收合，覆蓋在背包格上方不推擠版面。印記不佔格也不計重（見 `35-inventory-constraints.md` § 35.20），抽屜內不做拖曳重排與整理。開合狀態不持久化
 - Icon 渲染邏輯：potion 走專用路徑（顏色區分）、equipment 走裝備 icon、其餘一律走 `getItemIcon(getItemIconKey(name, type))`（排除法，新增類型無需改渲染代碼）
 
 ### 技能面板（SkillPanel）
@@ -535,7 +536,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作。**兩欄部位格**（2×5）：格子只印部位名 + 裝備名（Tier 色與背包同源），數值／詞綴／材質／職業一律 hover tooltip；空部位畫虛線框；選取用金色外框，與 `.bag-cell.is-selected` 同一套 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
-| `BagPanel` | 背包 grid（無收合），格數 = 60 + 腰帶擴充，支援拖放自由擺放（位置持久化於本機，不隨角色匯出），GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
+| `BagPanel` | 背包 grid（無收合），格數 = 60 + 腰帶擴充，支援拖放自由擺放（位置持久化於本機，不隨角色匯出），底部「印記」抽屜，GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
 | `Inventory` | 裝備背包列表元件 |
 | `CombatScriptEditor` | 戰鬥腳本規則 CRUD（僅攻擊技能/普攻） |
 | `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/加速藥水/buff/治癒） |

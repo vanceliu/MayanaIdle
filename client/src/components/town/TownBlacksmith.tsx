@@ -11,6 +11,7 @@ import { getItemById } from '../../models/items';
 import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
 import { evaluateCraftRequirements, hasCraftQuestFor, removeCraftQuestByTemplate } from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
+import { useOneShotFx, FX_DURATION_MS } from './useOneShotFx';
 
 /** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱 */
 const WEAPON_ENHANCE_SCROLL_ID = 7;
@@ -39,14 +40,14 @@ type Tab = 'enhance' | 'craft';
 
 /**
  * 強化演出的總長度（`48-vfx.md` § 48.4.3）。
- * 最長的一段是碎裂：stagger 0.32s + 0.38s + 0.88s，取整並留一點餘裕。
+ * 最長的一段是成功的 `+N` 浮字：stagger 0.32s + 1.1s。
+ * 失敗（碎裂）與紅閃同一拍，stagger + 0.88s 更短。
  */
-export const ENHANCE_FX_DURATION_MS = 1800;
+export const ENHANCE_FX_DURATION_MS = FX_DURATION_MS;
 
 type EnhanceFxKind = 'safe' | 'success' | 'fail';
 
 interface EnhanceFx {
-  token: number;
   kind: EnhanceFxKind;
   itemId: number;
   /** 成功時往上飄的 `+N` */
@@ -56,8 +57,6 @@ interface EnhanceFx {
   ghostIndex?: number;
   ghostSlot?: EquipSlot;
 }
-
-let fxToken = 0;
 
 const SHARD_INDEXES = [1, 2, 3, 4, 5, 6];
 
@@ -106,11 +105,8 @@ export function TownBlacksmith() {
   const [craftTemplates, setCraftTemplates] = useState<EquipmentTemplate[]>([]);
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
-  const [fx, setFx] = useState<EnhanceFx | null>(null);
+  const { fx, play: playFx } = useOneShotFx<EnhanceFx>();
   const allTemplates = useEquipmentTemplates();
-
-  /** 面板關掉時把殘影一起收掉，避免下次打開又看到上一次的碎裂 */
-  useEffect(() => () => setFx(null), []);
 
   useEffect(() => {
     db.equipmentTemplates
@@ -159,17 +155,10 @@ export function TownBlacksmith() {
     });
   }
 
-  /**
+  /*
    * 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1）——
    * 失敗時裝備已經被移除，卡片會跟著消失，所以用 `ghost` 存一份快照原地演完碎裂。
    */
-  function playFx(next: Omit<EnhanceFx, 'token'>) {
-    const token = ++fxToken;
-    setFx({ ...next, token });
-    window.setTimeout(() => {
-      setFx(current => (current?.token === token ? null : current));
-    }, ENHANCE_FX_DURATION_MS);
-  }
 
   function handleEnhance(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
     if (!char) return;
@@ -469,7 +458,8 @@ export function TownBlacksmith() {
                 </div>
                 {tab === 'enhance' && renderEnhanceActions(entry)}
                 {fx && fx.kind !== 'fail' && fx.itemId === entry.item.id && (
-                  <div className="enh-fx-layer" data-testid="enh-fx-success">
+                  /* key 帶 token：連點時沿用同一個節點會讓 CSS 動畫不重跑 */
+                  <div key={fx.token} className="enh-fx-layer" data-testid="enh-fx-success">
                     {fx.kind === 'success' && (
                       <>
                         <div className="enh-flash-gold" />

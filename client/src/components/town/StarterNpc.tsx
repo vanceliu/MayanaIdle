@@ -18,6 +18,7 @@ import { GameIcon } from '../GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import { STARTER_TIPS } from '../../systems/starterTips';
 import { db } from '../../db/database';
+import { useOneShotFx } from './useOneShotFx';
 
 type NpcTab = 'talk' | 'claim' | 'enhance';
 
@@ -33,6 +34,8 @@ export function StarterNpc() {
   const inventory = useGameStore(s => s.inventory);
   const [tab, setTab] = useState<NpcTab>('talk');
   const [msg, setMsg] = useState<string | null>(null);
+  /** 新手裝強化的演出（`48-vfx.md` § 48.4.2）。必定成功，只有白閃那一段 */
+  const { fx, play: playFx } = useOneShotFx<{ itemId: number; label: string }>();
   const [openTips, setOpenTips] = useState<string[]>([]);
 
   function toggleTip(id: string) {
@@ -107,6 +110,11 @@ export function StarterNpc() {
     }
     useGameStore.getState().saveState();
     setMsg(`${enhanced.name} 強化成功！(+${enhanced.enhancement})`);
+    /*
+     * 新手裝強化**必定成功**（`13-town.md` § 13.10），所以只演安定值內那一段：
+     * 白閃 + `+N` 浮字，不放金色爆閃與碎裂（`48-vfx.md` § 48.4.2）。
+     */
+    playFx({ itemId: item.id!, label: `+${enhanced.enhancement}` });
   }
 
   /** 強化進度格：填滿的格數 = 目前強化等級，總格數 = 安定值 */
@@ -127,7 +135,10 @@ export function StarterNpc() {
     const affordable = char!.gold >= cost;
 
     return (
-      <div key={item.id} className={`shop-item starter-row is-${state}`}>
+      <div
+        key={item.id}
+        className={`shop-item starter-row is-${state}${state === 'enhanceable' ? ' enh-standby' : ''}`}
+      >
         <div className="shop-item-info">
           <span className="starter-row-name">
             <GameIcon name={equipIcon(item.type, item.slot)} size={18} />
@@ -157,6 +168,13 @@ export function StarterNpc() {
           {state === 'maxed' && <span className="starter-badge is-done">已滿</span>}
           {state === 'unsupported' && <span className="starter-badge is-muted">不可強化</span>}
         </div>
+        {fx && fx.itemId === item.id && (
+          /* key 帶 token：連點時沿用同一個節點，CSS 動畫不會重跑（§ 48.3.1） */
+          <div key={fx.token} className="enh-fx-layer" data-testid="starter-enh-fx">
+            <div className="enh-float">{fx.label}</div>
+            <div className="enh-flash-soft" />
+          </div>
+        )}
       </div>
     );
   }

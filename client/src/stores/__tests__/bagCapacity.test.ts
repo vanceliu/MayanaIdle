@@ -92,10 +92,30 @@ describe('Bag capacity', () => {
   it('getBagUsedSlots counts bagItems + inventory', () => {
     const bag: BagItem[] = [
       bagItem('紅色藥水', 99),
-      bagItem('工藝印記', 5),
+      bagItem('銀礦石', 5),
     ];
     const inv = [makeEquip(1), makeEquip(2)];
     expect(getBagUsedSlots(bag, inv, {})).toBe(4);
+  });
+
+  // § 35.20：印記走獨立分頁，完全不進格數計算
+  it('印記不佔格', () => {
+    const bag: BagItem[] = [
+      bagItem('紅色藥水', 99),
+      bagItem('工藝印記', 5),
+      bagItem('精鍊印記', 200),
+      bagItem('混沌印記', 3),
+    ];
+    expect(getBagUsedSlots(bag, [], {})).toBe(1);
+  });
+
+  it('背包被非印記塞滿時，印記照樣不算格數', () => {
+    const bag: BagItem[] = [
+      ...fillerBagItems(60),
+      bagItem('突破印記', 40),
+    ];
+    expect(getBagUsedSlots(bag, [], {})).toBe(60);
+    expect(isBagFull(bag, [], {})).toBe(true);
   });
 
   it('§ 35.1：裝備中的裝備一樣佔背包格', () => {

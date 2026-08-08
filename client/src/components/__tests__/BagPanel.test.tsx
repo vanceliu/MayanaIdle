@@ -513,3 +513,90 @@ it('shows gold row when expanded', () => {
     });
   });
 });
+/**
+ * § 35.20：印記收在底部抽屜，不佔格、不進 slotMap、不吃整理。
+ * 開合狀態不持久化，重開回到收合。
+ */
+describe('印記抽屜（§ 35.20）', () => {
+  beforeEach(() => {
+    useGameStore.setState({ bagSlotMap: {}, inventory: [], equippedGear: {} });
+  });
+
+  const toggle = () => screen.getByRole('button', { name: /印記/ });
+  const drawer = () => document.querySelector('.bag-sigil-drawer');
+  const gridNames = () =>
+    Array.from(document.querySelectorAll('.bag-grid-container .bag-cell:not(.empty) .bag-cell-name'))
+      .map(el => el.textContent);
+  const drawerNames = () =>
+    Array.from(document.querySelectorAll('.bag-sigil-drawer .bag-cell .bag-cell-name'))
+      .map(el => el.textContent);
+
+  it('印記不出現在背包格，也不算進格數', () => {
+    useGameStore.setState({
+      bagItems: [bagItem('紅色藥水', 3), bagItem('工藝印記', 43)],
+    });
+    render(<BagPanel />);
+
+    expect(gridNames()).toEqual(['紅色藥水']);
+    expect(screen.getByText('1/60')).toBeDefined();
+  });
+
+  it('預設收合，點一下展開、再點一次收合', () => {
+    useGameStore.setState({ bagItems: [bagItem('工藝印記', 43), bagItem('混沌印記', 2)] });
+    render(<BagPanel />);
+
+    expect(drawer()).toBeNull();
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(toggle());
+    expect(drawer()).not.toBeNull();
+    expect(drawerNames().sort()).toEqual(['工藝印記', '混沌印記']);
+
+    fireEvent.click(toggle());
+    expect(drawer()).toBeNull();
+  });
+
+  it('抽屜展開時，格數與「整理」照樣在 —— 背包格沒有讓位', () => {
+    useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3), bagItem('工藝印記', 5)] });
+    render(<BagPanel />);
+
+    fireEvent.click(toggle());
+
+    expect(screen.getByText('整理')).toBeDefined();
+    expect(screen.getByText('1/60')).toBeDefined();
+    expect(gridNames()).toEqual(['紅色藥水']);
+  });
+
+  it('沒有印記時顯示空狀態', () => {
+    useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3)] });
+    render(<BagPanel />);
+
+    fireEvent.click(toggle());
+    expect(screen.getByText('還沒有任何印記')).toBeDefined();
+  });
+
+  it('開合時把選取收掉 —— 抽屜蓋上去後那一格就看不到了', () => {
+    useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3), bagItem('工藝印記', 5)] });
+    render(<BagPanel />);
+
+    const cell = document.querySelector('.bag-grid-container .bag-cell:not(.empty)')!;
+    fireEvent.pointerDown(cell, { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(cell, { clientX: 10, clientY: 10 });
+    expect(document.querySelector('.bag-cell.is-selected')).not.toBeNull();
+
+    fireEvent.click(toggle());
+    expect(document.querySelector('.bag-cell.is-selected')).toBeNull();
+  });
+
+  it('整理不會把印記排進 slotMap', () => {
+    useGameStore.setState({
+      bagItems: [bagItem('紅色藥水', 3), bagItem('工藝印記', 43)],
+    });
+    render(<BagPanel />);
+
+    fireEvent.click(screen.getByText('整理'));
+
+    const map = useGameStore.getState().bagSlotMap;
+    expect(Object.keys(map)).toEqual(['potion-red']);
+  });
+});

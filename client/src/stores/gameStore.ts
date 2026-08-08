@@ -40,6 +40,7 @@ import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acc
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { getItemId, getItemById } from '../models/items';
 import { bagLayoutStorageKey, type BagSlotMap } from '../models/bagLayout';
+import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
@@ -134,17 +135,21 @@ export function getEquippedCount(gear: EquippedGear): number {
 }
 
 /**
- * 已用格數（§ 35.1）＝ 消耗品種類 + 背包裝備 + **身上裝備**。
+ * 已用格數（§ 35.1）＝ 消耗品種類 + 背包裝備 + **身上裝備**，**不含印記**。
  *
  * 裝備中的裝備沒有離開背包，只是多一個「裝備中」標記，因此一樣佔格 ——
  * 穿脫只是同一格換個狀態，不再有佔格增減。
+ *
+ * 印記走獨立分頁、完全不進格數體系（§ 35.20），所以在這裡就濾掉 ——
+ * 容量檢查的入口有十來個，讓每個入口各自記得排除印記必然會漏。
  */
 export function getBagUsedSlots(
   bagItems: BagItem[],
   inventory: EquipmentInstance[],
   gear: EquippedGear,
 ): number {
-  return bagItems.length + inventory.length + getEquippedCount(gear);
+  const countable = bagItems.filter(b => !isSigilItemId(b.itemId)).length;
+  return countable + inventory.length + getEquippedCount(gear);
 }
 
 export function isBagFull(
@@ -1615,7 +1620,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     } else if (reward.itemId != null) {
       // 名稱與背包分頁一律由 id 反查 seed（§ 99.1）——
       // 寫死成 material 會讓改歸 scroll 的道具（印記）在背包裡分裂成兩堆
-      if (!hasBagItem(newBag, reward.itemId)
+      // 印記不佔格（§ 35.20），背包滿了照樣交得了任務
+      if (!isSigilItemId(reward.itemId)
+        && !hasBagItem(newBag, reward.itemId)
         && getBagUsedSlots(newBag, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) {
         return;
       }
@@ -1781,8 +1788,10 @@ export function processMonsterDeath(
       } else if (item.type === 'potion' || item.type === 'material' || item.type === 'scroll' || item.type === 'spellbook') {
         if (item.itemTemplateId == null) {
           logs2.push({ text: `無法處理掉落物 ${item.name}（缺少道具 id）`, type: 'system' });
-        } else if (!hasBagItem(newBag, item.itemTemplateId)
+        } else if (!isSigilItemId(item.itemTemplateId)
+          && !hasBagItem(newBag, item.itemTemplateId)
           && getBagUsedSlots(newBag, newEquipInv, state2.equippedGear) >= getBagMaxSlots(state2.equippedGear)) {
+          // 印記不佔格（§ 35.20），背包再滿都收得下
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
           newBag = addBagItem(newBag, item.itemTemplateId, item.amount);

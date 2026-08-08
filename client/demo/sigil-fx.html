@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>印記特效 Demo — MayanaIdle</title>
+<!--
+  印記師特效預覽頁（不接遊戲邏輯，純看演出）。
+
+  用 Vite dev server 開：`npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/sigil-fx.html
+
+  版面、詞綴列與特效 CSS 全部吃 src/App.css 的正式樣式（`48-vfx.md` § 48.5），
+  <style> 內只剩 .demo-* 排版。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版（不會進 App.css） ═══════════ */
+body { margin: 0; padding: 24px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 20px; line-height: 1.8; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 24px;
+  position: sticky; top: 0; z-index: 10;
+}
+.demo-bar label { font-size: var(--fs-sm); color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
+.demo-bar button {
+  padding: 6px 14px; background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm);
+}
+.demo-bar button:hover { background: var(--bg-card-hover); }
+.demo-section { margin-bottom: 28px; max-width: 640px; }
+.demo-section > h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 4px; font-weight: 600; }
+.demo-section > p { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 10px; line-height: 1.7; }
+.demo-play { margin-top: 8px; }
+.demo-play button {
+  padding: 5px 12px; margin-right: 6px; background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm);
+}
+.demo-play button:hover { background: var(--bg-card-hover); }
+
+/* 特效本身不在這裡 —— 已經是 src/App.css 的正式樣式（`48-vfx.md` § 48.5），
+   這頁只是拿真的 CSS 來預覽。要改特效請改 App.css。 */
+
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">印記特效 Demo</h1>
+<p class="demo-note">
+  純表現層預覽，沒接遊戲邏輯。詞綴列與摘要區的樣式直接吃 <code>src/App.css</code>，跟印記師面板一致。<br>
+  規則（受理範圍、成功率、失敗代價）一律以 <code>46-sigil.md</code> 為準，這裡只決定畫面怎麼演。
+</p>
+
+<div class="demo-bar">
+  <label>速度
+    <select id="speed">
+      <option value="1">1×（正式速度）</option>
+      <option value="2">0.5×</option>
+      <option value="4">0.25×（慢動作）</option>
+    </select>
+  </label>
+  <label>強度
+    <select id="scale">
+      <option value="0.7">輕</option>
+      <option value="1" selected>標準</option>
+      <option value="1.5">重</option>
+    </select>
+  </label>
+  <label>逐格
+    <input id="scrub" type="range" min="0" max="100" value="0" step="1">
+    <span id="scrub-val" style="min-width: 3.5em; color: var(--text-dim);">播放中</span>
+  </label>
+</div>
+
+<section class="demo-section">
+  <h2>1. 必定生效（精鍊 / 重刻 / 刺針）</h2>
+  <p>
+    這三種都不會失敗（§ 46.4 ~ § 46.6），所以是<strong>單拍</strong>、不放白閃 ——
+    白閃留給「有可能失敗」的突破印記當開場，兩者要能一眼分辨。<br>
+    共用一道掃光，只有顏色與後續動作不同：精鍊走新 Tier 的顏色、重刻走中性藍、刺針走紫。
+  </p>
+  <div class="sigil-affixes" id="group-safe">
+    <div class="sigil-affix-row" data-row="temper">
+      <span class="affix-tag tier-3" data-tag>攻擊力 T3</span>
+      <span class="sigil-affix-value" data-value>+9%</span>
+    </div>
+    <div class="sigil-affix-row" data-row="recarve">
+      <span class="affix-tag tier-4" data-tag>爆擊率 T4</span>
+      <span class="sigil-affix-value" data-value>+12%</span>
+    </div>
+    <div class="sigil-affix-row" data-row="sting">
+      <span class="affix-tag tier-4" data-tag>爆擊率 T4</span>
+      <span class="sigil-affix-value" data-value>+12%</span>
+    </div>
+  </div>
+  <div class="demo-play">
+    <button data-play="temper">精鍊：T3 → T4</button>
+    <button data-play="recarve">重刻：數值重骰</button>
+    <button data-play="sting">刺針：換一條詞綴</button>
+  </div>
+</section>
+
+<section class="demo-section">
+  <h2>2. 混沌印記（四條全部重骰）</h2>
+  <p>四條逐條錯開 60ms，讀起來是「整組洗掉」而不是四條同時抖一下。走紫色。</p>
+  <div class="sigil-affixes" id="group-chaos">
+    <div class="sigil-affix-row"><span class="affix-tag tier-5" data-tag>攻擊力 T5</span><span class="sigil-affix-value" data-value>+15%</span></div>
+    <div class="sigil-affix-row"><span class="affix-tag tier-2" data-tag>爆擊率 T2</span><span class="sigil-affix-value" data-value>+5%</span></div>
+    <div class="sigil-affix-row"><span class="affix-tag tier-4" data-tag>攻擊速度 T4</span><span class="sigil-affix-value" data-value>+11%</span></div>
+    <div class="sigil-affix-row"><span class="affix-tag tier-1" data-tag>最大HP T1</span><span class="sigil-affix-value" data-value>+3%</span></div>
+  </div>
+  <div class="demo-play"><button data-play="chaos">混沌：全部重骰</button></div>
+</section>
+
+<section class="demo-section">
+  <h2>3. 工藝印記（品質 +1%）</h2>
+  <p>對象是整件裝備不是詞綴（§ 46.8），所以演在摘要區，不動詞綴列。</p>
+  <div class="sigil-summary" id="summary-card">
+    <div class="sigil-summary-main">鋼心劍 +6<span class="sigil-summary-slot">裝備中 · 右手</span></div>
+    <div class="sigil-summary-sub">
+      <span>品質 <span data-quality>7</span>% / 20%</span>
+      <span>精鍊上限 T5</span>
+      <span>詞綴 4 條</span>
+    </div>
+  </div>
+  <div class="demo-play"><button data-play="polish">工藝：品質 +1%</button></div>
+</section>
+
+<section class="demo-section">
+  <h2>4. 突破印記（兩拍，前半相同）</h2>
+  <p>
+    唯一有失敗率的印記（T5→T6 10%、T6→T7 2%）。<strong>時間軸與強化完全共用</strong> ——
+    直接套強化那一組 CSS，只把爆閃／光環／浮字的顏色換成新 Tier 的顏色。<br>
+    白閃打頭陣，退乾淨了才揭曉，前 0.32 秒成功與失敗完全相同。<br>
+    <strong>失敗不會讓裝備消失</strong> —— § 46.7 只是把該條詞綴打回 T1，
+    所以失敗演的是「標籤褪色沉下去」＋<strong>浮字往下掉</strong>
+    （與成功的浮字是同一個元件，只換方向與顏色），不是強化那套碎裂。
+  </p>
+  <div class="sigil-affixes" id="group-break">
+    <div class="sigil-affix-row" data-row="break-ok">
+      <span class="affix-tag tier-5" data-tag>攻擊力 T5</span>
+      <span class="sigil-affix-value" data-value>+15%</span>
+    </div>
+    <div class="sigil-affix-row" data-row="break-fail">
+      <span class="affix-tag tier-5" data-tag>攻擊力 T5</span>
+      <span class="sigil-affix-value" data-value>+15%</span>
+    </div>
+  </div>
+  <div class="demo-play">
+    <button data-play="break-ok">突破：成功 T5 → T6</button>
+    <button data-play="break-fail">突破：失敗，掉回 T1</button>
+  </div>
+</section>
+
+<script>
+const speedSel = document.getElementById('speed');
+const scaleSel = document.getElementById('scale');
+const scrub = document.getElementById('scrub');
+const scrubVal = document.getElementById('scrub-val');
+let scrubbing = false;
+
+/** Tier 色階與 App.css 的 .affix-tag.tier-N 同源，這裡只是切換 class */
+function setTier(tag, tier, label) {
+  tag.className = `affix-tag tier-${tier}`;
+  tag.textContent = label;
+}
+
+function applyVars() {
+  for (const el of document.querySelectorAll('.sigil-affix-row, .sigil-summary')) {
+    el.style.setProperty('--enh-fx-speed', speedSel.value);
+    el.style.setProperty('--enh-fx-scale', scaleSel.value);
+  }
+}
+speedSel.addEventListener('change', applyVars);
+scaleSel.addEventListener('change', applyVars);
+applyVars();
+
+function layer(host, html, color) {
+  const el = document.createElement('div');
+  el.className = 'sig-fx-layer';
+  if (color) {
+    el.style.setProperty('--sig-color', color);
+    el.style.setProperty('--fx-burst-color', color);
+  }
+  el.innerHTML = html;
+  host.appendChild(el);
+  return el;
+}
+
+function cleanup(host, ms) {
+  setTimeout(() => {
+    if (scrubbing) return;
+    host.querySelectorAll('.sig-fx-layer').forEach(el => el.remove());
+    host.classList.remove('sig-shake');
+    host.querySelectorAll('[data-tag], [data-value]').forEach(el => {
+      el.classList.remove('sig-tier-up', 'sig-reroll', 'sig-swap-out', 'sig-swap-in', 'sig-chaos', 'sig-tier-down', 'enh-pop');
+      el.style.removeProperty('--i');
+    });
+  }, ms);
+}
+
+const TIER_COLOR = { 1: '#6B7280', 2: '#9CA3AF', 3: '#4ADE80', 4: '#FACC15', 5: '#FB923C', 6: '#EF4444', 7: '#A855F7' };
+const speed = () => Number(speedSel.value);
+/** 白閃與後段之間的間隔，與 App.css 的 --enh-fx-stagger 同值（`48-vfx.md` § 48.3） */
+const STAGGER_MS = 320;
+const row = key => document.querySelector(`[data-row="${key}"]`);
+
+const PLAYS = {
+  // 精鍊：Tier +1，掃光走新 Tier 的顏色
+  temper(host) {
+    const tag = host.querySelector('[data-tag]');
+    setTier(tag, 3, '攻擊力 T3');
+    layer(host, '<div class="sig-sweep"></div>', TIER_COLOR[4]);
+    setTimeout(() => { if (!scrubbing) setTier(tag, 4, '攻擊力 T4'); }, 200 * speed());
+    tag.classList.add('sig-tier-up');
+    host.querySelector('[data-value]').textContent = '+12%';
+    cleanup(host, 900 * speed());
+  },
+  // 重刻：種類與 Tier 不動，只有數值糊掉再定格
+  recarve(host) {
+    layer(host, '<div class="sig-sweep"></div>', 'var(--accent-info)');
+    const value = host.querySelector('[data-value]');
+    value.classList.add('sig-reroll');
+    setTimeout(() => { if (!scrubbing) value.textContent = `+${8 + Math.floor(Math.random() * 6)}%`; }, 250 * speed());
+    cleanup(host, 900 * speed());
+  },
+  // 刺針：舊的往左退、新的從右進
+  sting(host) {
+    layer(host, '<div class="sig-sweep"></div>', 'var(--accent-primary)');
+    const tag = host.querySelector('[data-tag]');
+    tag.classList.add('sig-swap-out');
+    setTimeout(() => {
+      if (scrubbing) return;
+      setTier(tag, 4, '攻擊速度 T4');
+      tag.classList.remove('sig-swap-out');
+      tag.classList.add('sig-swap-in');
+      host.querySelector('[data-value]').textContent = '+10%';
+    }, 280 * speed());
+    cleanup(host, 1000 * speed());
+  },
+  // 混沌：四條逐條錯開
+  chaos() {
+    const group = document.getElementById('group-chaos');
+    layer(group, '<div class="sig-sweep"></div>', 'var(--accent-primary)');
+    group.querySelectorAll('.sigil-affix-row').forEach((r, i) => {
+      r.style.setProperty('--enh-fx-speed', speedSel.value);
+      r.style.setProperty('--enh-fx-scale', scaleSel.value);
+      const tag = r.querySelector('[data-tag]');
+      const value = r.querySelector('[data-value]');
+      for (const el of [tag, value]) {
+        el.style.setProperty('--i', i);
+        el.classList.add('sig-chaos');
+      }
+      setTimeout(() => {
+        if (scrubbing) return;
+        const tier = 1 + Math.floor(Math.random() * 5);
+        setTier(tag, tier, `${tag.textContent.replace(/ T\d$/, '')} T${tier}`);
+        value.textContent = `+${2 + Math.floor(Math.random() * 14)}%`;
+      }, (250 + i * 60) * speed());
+    });
+    cleanup(group, 1200 * speed());
+    group.querySelectorAll('.sigil-affix-row').forEach(r => cleanup(r, 1200 * speed()));
+  },
+  // 工藝：對象是整件裝備，演在摘要區
+  polish() {
+    const card = document.getElementById('summary-card');
+    layer(card, '<div class="sig-sweep"></div>', 'var(--accent-gold)');
+    const q = card.querySelector('[data-quality]');
+    q.classList.add('sig-quality-pop');
+    setTimeout(() => { if (!scrubbing) q.textContent = String(Number(q.textContent) + 1); }, 200 * speed());
+    setTimeout(() => { if (!scrubbing) q.classList.remove('sig-quality-pop'); }, 900 * speed());
+    cleanup(card, 900 * speed());
+  },
+  /*
+   * 突破成功：與強化的「超過安定值成功」同一組元件、同一組時間
+   * —— 白閃 → 爆閃 + 兩圈光環 + 標籤彈跳 + 浮字，只有顏色換成新 Tier 的。
+   */
+  'break-ok'(host) {
+    const tag = host.querySelector('[data-tag]');
+    setTier(tag, 5, '攻擊力 T5');
+    host.querySelector('[data-value]').textContent = '+15%';
+    layer(host,
+      '<div class="enh-flash-gold"></div>'
+      + '<div class="enh-ring"></div><div class="enh-ring delay"></div>'
+      + '<div class="enh-float">T6</div>'
+      + '<div class="enh-flash-soft"></div>',
+      TIER_COLOR[6]);
+    setTimeout(() => {
+      if (scrubbing) return;
+      setTier(tag, 6, '攻擊力 T6');
+      host.querySelector('[data-value]').textContent = '+18%';
+      tag.classList.add('enh-pop');
+    }, STAGGER_MS * speed());
+    cleanup(host, 1800 * speed());
+  },
+  /*
+   * 突破失敗：前半與成功完全相同（白閃），後半換成紅閃＋震動；
+   * 第三段的起跑點照抄強化的碎裂（stagger + 0.38s），只是這裡裝備不會消失，
+   * 演的是該條詞綴掉回 T1。
+   */
+  'break-fail'(host) {
+    const tag = host.querySelector('[data-tag]');
+    setTier(tag, 5, '攻擊力 T5');
+    host.querySelector('[data-value]').textContent = '+15%';
+    // 浮字與成功那一發同一個元件，只是往下掉、顏色換成失敗色（`48-vfx.md` § 48.5）
+    layer(host,
+      '<div class="enh-flash-red"></div>'
+      + '<div class="enh-float is-down">T1</div>'
+      + '<div class="enh-flash-soft"></div>',
+      'var(--accent-danger)');
+    host.classList.add('enh-shake');
+    tag.classList.add('sig-tier-down');
+    setTimeout(() => {
+      if (scrubbing) return;
+      setTier(tag, 1, '攻擊力 T1');
+      tag.classList.add('sig-tier-down');
+      host.querySelector('[data-value]').textContent = '+3%';
+    }, (STAGGER_MS + 260) * speed());
+    cleanup(host, 1800 * speed());
+  },
+};
+
+document.querySelectorAll('[data-play]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    scrubbing = false;
+    scrubVal.textContent = '播放中';
+    const key = btn.dataset.play;
+    const host = row(key);
+    if (host) host.querySelectorAll('.sig-fx-layer').forEach(el => el.remove());
+    PLAYS[key](host);
+  });
+});
+
+/** 逐格檢視：演出只有幾百毫秒，設計階段要能停在任一格比對 */
+scrub.addEventListener('input', () => {
+  scrubbing = true;
+  const pct = Number(scrub.value) / 100;
+  scrubVal.textContent = `${scrub.value}%`;
+  for (const anim of document.body.getAnimations({ subtree: true })) {
+    const timing = anim.effect && anim.effect.getTiming();
+    const dur = typeof timing?.duration === 'number' ? timing.duration : 0;
+    if (!dur) continue;
+    anim.pause();
+    anim.currentTime = dur * pct;
+  }
+});
+</script>
+
+</body>
+</html>

@@ -10,6 +10,8 @@ import { addBagItem, consumeBagItem, hasBagItem } from '../../models/bagItem';
 import { db } from '../../db/database';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { QtyStepper } from '../common/QtyStepper';
+import { roundWeight } from '../../systems/weight';
+import { isSigilItemId } from '../../models/sigil';
 import { useShopCart, cartLines, type CartLine, ShopCartFooter } from '../common/ShopCart';
 
 type StorageTab = 'personal' | 'shared';
@@ -181,10 +183,15 @@ export function Storage() {
     maxOf: s => s.amount,
     hardCap: Infinity,
   });
-  /** 取出要占背包欄位：裝備每件一格，物品只有背包沒有的品項才需要新格子 */
+  /**
+   * 取出要占背包欄位：裝備每件一格，物品只有背包沒有的品項才需要新格子。
+   * 印記不佔格（§ 35.20），取多少都不用算。
+   */
   const withdrawNeedSlots =
     withdrawEquipLines.length +
-    withdrawMaterialLines.filter(l => !hasBagItem(bagItems, l.item.itemId)).length;
+    withdrawMaterialLines.filter(
+      l => !isSigilItemId(l.item.itemId) && !hasBagItem(bagItems, l.item.itemId),
+    ).length;
   const withdrawHint = withdrawNeedSlots > freeSlots ? '背包欄位不足' : null;
 
   function executeWithdraw() {
@@ -238,7 +245,8 @@ export function Storage() {
     return (
       <div key={item.itemId} className="storage-item">
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {itemIcon(item.itemId)}{item.name} ×{item.amount} (重量: {(getItemById(item.itemId)?.weight ?? 0) * item.amount})
+          {/* 小數重量乘上數量會留浮點尾數並直接印出來，一律先收過 */}
+          {itemIcon(item.itemId)}{item.name} ×{item.amount} (重量: {roundWeight((getItemById(item.itemId)?.weight ?? 0) * item.amount)})
         </span>
         <div className="storage-item-actions">
           <QtyStepper

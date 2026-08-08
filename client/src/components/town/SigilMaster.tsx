@@ -15,6 +15,8 @@ import {
   POLISH_SIGIL_GOLD_COST,
   POLISH_SIGIL_QUALITY_MAX,
   SIGIL_DEFINITIONS,
+  SIGIL_PANEL_ORDER,
+  DEFAULT_PANEL_SIGIL,
   applyChaosSigil,
   applyEnhanceSigil,
   applyPolishSigil,
@@ -36,8 +38,40 @@ import { resolveItemIcon, getEquipIcon } from '../../models/iconMap';
 import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
 import { GameIcon } from '../GameIcon';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
+import { useOneShotFx, FX_DURATION_MS } from './useOneShotFx';
 
 type Entry = { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot };
+
+/**
+ * 印記演出的總長度（`48-vfx.md` § 48.5）。
+ * 最長的一段是突破的浮字：stagger 0.32s + 1.1s。
+ */
+export const SIGIL_FX_DURATION_MS = FX_DURATION_MS;
+
+/** 詞綴 Tier 色階（`34-ui-guidelines.md` § 34.2）。突破的爆閃走新 Tier 的顏色 */
+const TIER_COLOR: Record<number, string> = {
+  1: '#6B7280', 2: '#9CA3AF', 3: '#4ADE80', 4: '#FACC15', 5: '#FB923C', 6: '#EF4444', 7: '#A855F7',
+};
+
+/** 必定生效的印記各自的掃光色（§ 48.5）。突破不在此列，它走 Tier 色 */
+const SWEEP_COLOR: Partial<Record<SigilType, string>> = {
+  temper: 'var(--accent-info)',
+  recarve: 'var(--accent-info)',
+  sting: 'var(--accent-primary)',
+  chaos: 'var(--accent-primary)',
+  polish: 'var(--accent-gold)',
+};
+
+type SigilFxMode = 'sweep' | 'chaos' | 'polish' | 'break-ok' | 'break-fail';
+
+interface SigilFx {
+  mode: SigilFxMode;
+  /** 演在哪一條詞綴。`polish`／`chaos` 不指定單條 */
+  affixIndex?: number;
+  color?: string;
+  /** 突破的浮字：成功 `T6`、失敗 `T1` */
+  label?: string;
+}
 
 function affixLabel(affix: Affix): string {
   if (isSpecialAffixType(affix.type)) {
@@ -68,8 +102,9 @@ export function SigilMaster() {
   /** 選裝備 → 選詞綴 → 選印記 → 右下角一顆按鈕執行（`13-town.md` § 13.13） */
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [affixIndex, setAffixIndex] = useState<number | null>(null);
-  const [sigilType, setSigilType] = useState<SigilType>('chaos');
+  const [sigilType, setSigilType] = useState<SigilType>(DEFAULT_PANEL_SIGIL);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const { fx, play: playFx } = useOneShotFx<SigilFx>();
 
   if (!char) return null;
 
@@ -183,6 +218,8 @@ export function SigilMaster() {
     );
   }
 
+  /* 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1） */
+
   function handleApply() {
     if (!item) return;
     const ctx = buildContext(item);
@@ -195,6 +232,7 @@ export function SigilMaster() {
       const polished = applyPolishSigil(item.quality ?? 0);
       if (!polished.success) return setResultMsg(polished.message);
       commit(polished.message, { quality: polished.quality }, POLISH_SIGIL_GOLD_COST);
+      playFx({ mode: 'polish', color: SWEEP_COLOR.polish });
       return;
     }
 
@@ -224,6 +262,21 @@ export function SigilMaster() {
       return;
     }
     commit(result.message, { affixes: result.affixes });
+
+    if (sigilType === 'enhance') {
+      // 突破：兩拍，時間軸與強化共用，只有顏色與浮字換掉（§ 48.5）
+      const newTier = result.affixes[affixIndex!]?.tier ?? 1;
+      playFx({
+        mode: result.success ? 'break-ok' : 'break-fail',
+        affixIndex: affixIndex!,
+        color: result.success ? TIER_COLOR[newTier] : 'var(--accent-danger)',
+        label: `T${newTier}`,
+      });
+    } else if (sigilType === 'chaos') {
+      playFx({ mode: 'chaos', color: SWEEP_COLOR.chaos });
+    } else {
+      playFx({ mode: 'sweep', affixIndex: affixIndex!, color: SWEEP_COLOR[sigilType] });
+    }
   }
 
   /**
@@ -319,6 +372,63 @@ export function SigilMaster() {
     );
   }
 
+  /**
+   * 詞綴列的演出。
+   *
+   * 面板在 commit 之後就顯示**新的**詞綴了，所以演的一律是「新值登場」——
+   * 不做舊值退場（那需要把舊值多留一份在畫面上，代價不成比例）。
+   */
+  function fxForRow(i: number): (SigilFx & { token: number }) | null {
+    if (!fx) return null;
+    if (fx.mode === 'chaos') return fx;
+    return fx.affixIndex === i ? fx : null;
+  }
+
+  function tagFxClass(rowFx: (SigilFx & { token: number }) | null): string {
+    if (!rowFx) return '';
+    if (rowFx.mode === 'chaos') return ' sig-chaos';
+    if (rowFx.mode === 'break-ok') return ' enh-pop';
+    if (rowFx.mode === 'break-fail') return ' sig-tier-down';
+    return ' sig-tier-up';
+  }
+
+  function valueFxClass(rowFx: (SigilFx & { token: number }) | null): string {
+    if (!rowFx) return '';
+    if (rowFx.mode === 'chaos') return ' sig-chaos';
+    if (rowFx.mode === 'sweep') return ' sig-reroll';
+    return '';
+  }
+
+  function renderFxLayer(active: SigilFx & { token: number }) {
+    const style = active.color
+      ? ({ '--sig-color': active.color, '--fx-burst-color': active.color } as React.CSSProperties)
+      : undefined;
+    return (
+      /* key 帶 token：連點時若沿用同一個 DOM 節點，CSS 動畫不會重跑（演出等於沒播） */
+      <span key={active.token} className="sig-fx-layer" style={style} data-testid={`sigil-fx-${active.mode}`}>
+        {active.mode === 'break-ok' && (
+          <>
+            <span className="enh-flash-gold" />
+            <span className="enh-ring" />
+            <span className="enh-ring delay" />
+            <span className="enh-float">{active.label}</span>
+            <span className="enh-flash-soft" />
+          </>
+        )}
+        {active.mode === 'break-fail' && (
+          <>
+            <span className="enh-flash-red" />
+            <span className="enh-float is-down">{active.label}</span>
+            <span className="enh-flash-soft" />
+          </>
+        )}
+        {(active.mode === 'sweep' || active.mode === 'chaos' || active.mode === 'polish') && (
+          <span className="sig-sweep" />
+        )}
+      </span>
+    );
+  }
+
   const blocked = blockReason();
   const maxAffixTier = item?.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
 
@@ -346,6 +456,7 @@ export function SigilMaster() {
         <div className="sigil-col">
           {item && (
             <div className="sigil-summary">
+              {fx?.mode === 'polish' && renderFxLayer(fx)}
               <div className="sigil-summary-main">
                 {/* 強化等級跟著名稱走，與左欄清單、背包、裝備欄一致 */}
                 {item.name}{(item.enhancement ?? 0) > 0 ? ` +${item.enhancement}` : ''}
@@ -357,7 +468,12 @@ export function SigilMaster() {
               </div>
               <div className="sigil-summary-sub">
                 <span className={(item.quality ?? 0) >= POLISH_SIGIL_QUALITY_MAX ? 'sigil-summary-cap' : ''}>
-                  品質 {item.quality ?? 0}% / {POLISH_SIGIL_QUALITY_MAX}%
+                  品質 <span
+                    key={`quality-${fx?.mode === 'polish' ? fx.token : 0}`}
+                    className={fx?.mode === 'polish' ? 'sig-quality-pop' : undefined}
+                  >
+                    {item.quality ?? 0}
+                  </span>% / {POLISH_SIGIL_QUALITY_MAX}%
                 </span>
                 {/*
                   寫「精鍊上限」不是「詞綴上限」——`maxAffixTier` 是取得管道上限（§ 6A.6），
@@ -380,27 +496,38 @@ export function SigilMaster() {
             )}
             {affixes.map((affix, i) => {
               const check = checkAffix(i);
+              const rowFx = fxForRow(i);
               return (
                 <button
                   key={i}
                   type="button"
-                  className={`sigil-affix-row${affixIndex === i ? ' is-selected' : ''}${check.ok ? '' : ' is-disabled'}`}
+                  className={
+                    `sigil-affix-row${affixIndex === i ? ' is-selected' : ''}`
+                    + `${check.ok ? '' : ' is-disabled'}`
+                    + `${rowFx?.mode === 'break-fail' ? ' enh-shake' : ''}`
+                  }
                   aria-disabled={!check.ok}
                   onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
                 >
                   <span
-                    className={isSpecialAffixType(affix.type)
-                      ? 'affix-tag special'
-                      : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
+                    key={`tag-${rowFx?.token ?? 0}`}
+                    className={
+                      (isSpecialAffixType(affix.type)
+                        ? 'affix-tag special'
+                        : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`)
+                      + tagFxClass(rowFx)
+                    }
+                    style={fx?.mode === 'chaos' ? ({ '--i': i } as React.CSSProperties) : undefined}
                     title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
                   >
                     {affixLabel(affix)}
                   </span>
-                  <span className="sigil-affix-value">
+                  <span key={`value-${rowFx?.token ?? 0}`} className={`sigil-affix-value${valueFxClass(rowFx)}`}>
                     {isSpecialAffixType(affix.type) ? '' : `+${affix.value}%`}
                   </span>
                   {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
                   {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}
+                  {rowFx && renderFxLayer(rowFx)}
                 </button>
               );
             })}
@@ -408,7 +535,7 @@ export function SigilMaster() {
 
           <p className="sigil-section-title">選擇印記</p>
           <div className="sigil-choices">
-            {SIGIL_DEFINITIONS.map(d => {
+            {SIGIL_PANEL_ORDER.map(getSigilDefinition).map(d => {
               const owned = sigilCounts[d.type];
               const info = sigilDisplay(d.type);
               return (

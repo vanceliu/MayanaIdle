@@ -10,6 +10,7 @@ import {
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { ITEM_DEFINITIONS } from '../../db/seed/itemSeeds';
 import { isArmorEquipment, isOffhandDefenseType } from '../../models/equipment';
+import { SIGIL_DEFINITIONS, SIGIL_USAGE_LABEL } from '../../models/sigil';
 import { getItemId } from '../../models/items';
 
 /** 測試以名稱閱讀，實際傳的是 id */
@@ -87,27 +88,35 @@ describe('craftMaterialUsage 反查', () => {
 });
 
 describe('印記師用的印記是不進配方的例外', () => {
-  // 這兩個沒出現在任何 craftMaterials，只看配方會被當成純販售
-  it('精鍊印記與工藝印記不在裝備配方裡', () => {
-    expect(hasCraftUsage(id('精鍊印記'))).toBe(false);
-    expect(hasCraftUsage(id('工藝印記'))).toBe(false);
+  // 印記沒出現在任何 craftMaterials，只看配方會被當成純販售
+  it('印記不在裝備配方裡', () => {
+    for (const d of SIGIL_DEFINITIONS) {
+      expect(hasCraftUsage(d.itemId), d.name).toBe(false);
+      expect(getCraftUsage(d.itemId), d.name).toBeUndefined();
+    }
   });
 
-  it('但它們算「有用途」，Wiki 的用途欄要標出來', () => {
-    expect(hasMaterialUsage(id('精鍊印記'))).toBe(true);
-    expect(hasMaterialUsage(id('工藝印記'))).toBe(true);
-    expect(getUsefulMaterialIds()).toContain(id('精鍊印記'));
-    expect(getUsefulMaterialIds()).toContain(id('工藝印記'));
+  /*
+   * 六種都要標 —— 這張表原本是手寫 id，只列了工藝與精鍊，
+   * 另外四種在背包裡就沒有 ⚒ 記號。改成由 SIGIL_DEFINITIONS 反查後不會再漏。
+   */
+  it('六種印記都算「有用途」，背包的 ⚒ 與 Wiki 用途欄都要標', () => {
+    for (const d of SIGIL_DEFINITIONS) {
+      expect(hasMaterialUsage(d.itemId), d.name).toBe(true);
+      expect(getUsefulMaterialIds(), d.name).toContain(d.itemId);
+    }
   });
 
-  it('顯示自己的用途文字，不會被寫成「配方」', () => {
-    expect(formatMaterialUsage(id('精鍊印記'))).toBe('印記師詞綴升階');
-    expect(formatMaterialUsage(id('工藝印記'))).toBe('印記師品質提升');
+  it('每種印記顯示自己的用途文字，不會被寫成「配方」', () => {
+    for (const d of SIGIL_DEFINITIONS) {
+      expect(formatMaterialUsage(d.itemId), d.name).toBe(SIGIL_USAGE_LABEL[d.type]);
+      expect(formatMaterialUsage(d.itemId), d.name).not.toContain('配方');
+    }
   });
 
-  it('沒有裝備清單可列（不進配方）', () => {
-    expect(getCraftUsage(id('精鍊印記'))).toBeUndefined();
-    expect(getCraftUsage(id('工藝印記'))).toBeUndefined();
+  it('用途文字彼此不重複 —— 玩家看得出是哪一種加工', () => {
+    const labels = SIGIL_DEFINITIONS.map(d => SIGIL_USAGE_LABEL[d.type]);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });
 

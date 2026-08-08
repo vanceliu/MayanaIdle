@@ -36,6 +36,11 @@
   --weight-bar-over: linear-gradient(90deg, #B91C1C, #EF4444);
   --monster-hp: linear-gradient(90deg, #991B1B, #DC2626);
 
+  /* 特效共通參數（`48-vfx.md` § 48.3）。掛在 :root：強化、印記等不同宿主共用同一組旋鈕 */
+  --enh-fx-speed: 1;
+  --enh-fx-scale: 1;
+  --enh-fx-stagger: 0.32s;
+
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -4045,6 +4050,69 @@ button.active {
 }
 
 /*
+ * 印記抽屜（`35-inventory-constraints.md` § 35.20）。
+ *
+ * 抽屜與按鈕都固定在面板底部，不跟著格子區捲動 —— 按鈕是唯一入口，捲走了就找不到。
+ * 抽屜**覆蓋**在格子上方（`position: absolute`）而不是佔位：
+ * 佔位會把格子區壓短，開合時捲動位置跟著跳。
+ */
+/* dock 是抽屜的定位基準：抽屜用 `bottom: 100%` 貼在按鈕上緣，不必去猜按鈕高度 */
+.bag-sigil-dock {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.bag-sigil-toggle {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: var(--fs-xs);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.bag-sigil-toggle:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.bag-sigil-toggle.active {
+  background: var(--accent-primary-dim);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.bag-sigil-drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 4px;
+  z-index: 2;
+  /*
+   * 高度用 vh 不用 % —— 百分比的參照是 dock（只有按鈕那一行高），
+   * `50%` 會把抽屜壓成十幾 px，只露出格子上緣一條。
+   */
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+}
+
+.bag-sigil-empty {
+  padding: 8px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/*
  * 背包視窗：視窗本體不捲動，捲軸交給格子區（與城鎮面板的 `.panel-scroll` 同一套規則，
  * 見 `34-ui-guidelines.md` § 34.1）。少了這段，格數多或字級調大時整個 body 一起捲，
  * 標題、格數與金幣列會被推出畫面。
@@ -6904,9 +6972,6 @@ button.active {
  *   先白閃，退乾淨了主演出（成功＝金色、失敗＝紅閃碎裂）才起，不是兩層疊在一起
  */
 .shop-item {
-  --enh-fx-speed: 1;
-  --enh-fx-scale: 1;
-  --enh-fx-stagger: 0.32s;
   position: relative;
 }
 
@@ -6944,7 +7009,8 @@ button.active {
 /* ── 成功（超過安定值）：金色爆閃 + 外擴光環 ───────────── */
 .enh-flash-gold {
   position: absolute; inset: 0; border-radius: var(--radius-md);
-  background: radial-gradient(circle at 50% 50%, #fff 0%, var(--accent-gold) 45%, rgba(245, 158, 11, 0) 75%);
+  /* 顏色抽成變數：印記的突破要走新 Tier 的顏色，但時間軸與強化完全共用（`48-vfx.md` § 48.5） */
+  background: radial-gradient(circle at 50% 50%, #fff 0%, var(--fx-burst-color, var(--accent-gold)) 45%, transparent 75%);
   /* 延遲期間套用這裡的 opacity: 0（沒有 backwards），時間到才由動畫接手 */
   opacity: 0;
   animation: enh-flash-out calc(0.56s * var(--enh-fx-speed)) ease-out forwards;
@@ -6953,7 +7019,7 @@ button.active {
 .enh-ring {
   position: absolute; left: 50%; top: 50%;
   width: 40px; height: 40px; margin: -20px 0 0 -20px;
-  border: 2px solid var(--accent-gold); border-radius: 50%;
+  border: 2px solid var(--fx-burst-color, var(--accent-gold)); border-radius: 50%;
   opacity: 0;
   animation: enh-ring-out calc(0.75s * var(--enh-fx-speed)) cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
   animation-delay: calc(var(--enh-fx-stagger) * var(--enh-fx-speed));
@@ -6984,8 +7050,8 @@ button.active {
   transform: translateX(-50%);
   font-family: var(--font-display); font-weight: 700;
   font-size: calc(var(--fs-base) * 1.4);
-  color: var(--accent-gold);
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.9);
+  color: var(--fx-burst-color, var(--accent-gold));
+  text-shadow: 0 0 8px currentColor;
   opacity: 0;
   animation: enh-float-up calc(1.1s * var(--enh-fx-speed)) ease-out forwards;
   animation-delay: calc(var(--enh-fx-stagger) * var(--enh-fx-speed));
@@ -6994,6 +7060,21 @@ button.active {
   0%   { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
   25%  { opacity: 1; transform: translate(-50%, -4px) scale(1.1); }
   100% { opacity: 0; transform: translate(-50%, calc(-38px * var(--enh-fx-scale))) scale(1); }
+}
+/*
+ * 往下掉的版本：結果變糟時用（印記突破失敗掉回 T1，`48-vfx.md` § 48.5）。
+ * 同一個元件只換方向 —— 上飄＝變好、下沉＝變差，語意靠方向讀。
+ *
+ * 起跑點與成功的上飄相同（`--enh-fx-stagger`），也就是**與紅閃同時**：
+ * 結果在揭曉那一拍就講清楚，標籤本身褪色是後面才發生的收尾。
+ */
+.enh-float.is-down {
+  animation-name: enh-float-down;
+}
+@keyframes enh-float-down {
+  0%   { opacity: 0; transform: translate(-50%, -8px) scale(0.7); }
+  25%  { opacity: 1; transform: translate(-50%, 4px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, calc(38px * var(--enh-fx-scale))) scale(1); }
 }
 
 /* ── 失敗：紅閃 + 震動 + 碎裂 ─────────────────────────── */
@@ -7018,6 +7099,8 @@ button.active {
   animation-delay: calc(var(--enh-fx-stagger) * var(--enh-fx-speed));
 }
 /* 碎片：六片各自帶不同 clip-path 與飛散方向。
+   **與紅閃同一拍**（都是 `--enh-fx-stagger`）—— 分成兩段會讓失敗變成三拍，
+   跟成功的兩拍節奏對不上。紅閃前段的高不透明度正好蓋住碎片剛裂開的那一下。
    編號走顯式 class 而不是 :nth-child —— 同一層還有閃光元素，位置會被擠掉。
    延遲期間吃 base 的 opacity: 0（不用 backwards），所以不會提早蓋住卡片 ——
    時序全部寫在 CSS 裡，呼叫端不需要自己排計時器 */
@@ -7028,7 +7111,7 @@ button.active {
   border-radius: var(--radius-md);
   opacity: 0;
   animation: enh-shard-fly calc(0.88s * var(--enh-fx-speed)) ease-in forwards;
-  animation-delay: calc((var(--enh-fx-stagger) + 0.38s) * var(--enh-fx-speed));
+  animation-delay: calc(var(--enh-fx-stagger) * var(--enh-fx-speed));
 }
 .enh-shard--1 { clip-path: polygon(0 0, 38% 0, 22% 100%, 0 100%);      --sx: -34px; --sy: -16px; --sr: -18deg; }
 .enh-shard--2 { clip-path: polygon(38% 0, 62% 0, 58% 100%, 22% 100%);  --sx: -12px; --sy: -26px; --sr: -7deg; }
@@ -7048,7 +7131,7 @@ button.active {
 /* 碎裂時原卡片本體要一起淡掉，否則碎片是疊在完整卡片上 */
 .enh-breaking {
   animation: enh-break-fade calc(0.88s * var(--enh-fx-speed)) ease-in forwards;
-  animation-delay: calc((var(--enh-fx-stagger) + 0.38s) * var(--enh-fx-speed));
+  animation-delay: calc(var(--enh-fx-stagger) * var(--enh-fx-speed));
 }
 @keyframes enh-break-fade {
   0%   { opacity: 1; }
@@ -7064,4 +7147,132 @@ button.active {
     animation: none !important;
   }
   .enh-shard, .enh-breaking { opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   印記師演出（`48-vfx.md` § 48.5）
+   ═══════════════════════════════════════════════════════════ */
+
+
+/*
+ * 成功率、受理範圍、失敗代價一律以 `46-sigil.md` 為準，這裡只管畫面。
+ *
+ * 沿用 § 48.3 的三個變數（定義在 :root）。突破印記直接套強化那一組元件
+ * （.enh-flash-soft / .enh-flash-gold / .enh-ring / .enh-float / .enh-flash-red /
+ * .enh-shake），只用 --fx-burst-color 換色 —— 時間軸不另寫一份。
+ */
+.sigil-affix-row,
+.sigil-summary {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 覆蓋層：所有一次性演出都掛在這裡面 */
+.sig-fx-layer { position: absolute; inset: 0; pointer-events: none; }
+
+/* ── 共用：掃光（必定生效的印記都用這一道，只有顏色不同）────────
+   顏色由 --sig-color 決定，預設走該印記自己的識別色 */
+.sig-sweep {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    var(--sig-color, var(--accent-primary)) 50%,
+    transparent 70%
+  );
+  opacity: 0.55;
+  transform: translateX(-100%);
+  animation: sig-sweep calc(0.55s * var(--enh-fx-speed)) ease-out forwards;
+}
+@keyframes sig-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ── 精鍊印記：Tier +1，必定成功 ───────────────────────────────
+   掃光走新 Tier 的顏色，標籤彈一下並亮起 —— 重點是「升上去了」 */
+.sig-tier-up {
+  display: inline-block;
+  animation: sig-tier-up calc(0.5s * var(--enh-fx-speed)) cubic-bezier(0.2, 1.6, 0.4, 1);
+  animation-delay: calc(0.12s * var(--enh-fx-speed));
+}
+@keyframes sig-tier-up {
+  0%   { transform: scale(1) translateY(0); filter: brightness(1); }
+  40%  { transform: scale(calc(1 + 0.22 * var(--enh-fx-scale))) translateY(calc(-3px * var(--enh-fx-scale))); filter: brightness(1.8); }
+  100% { transform: scale(1) translateY(0); filter: brightness(1); }
+}
+
+/* ── 重刻印記：種類與 Tier 不變，只有數值重骰 ──────────────────
+   數值糊掉再定格，讀起來像「重新擲了一次」 */
+.sig-reroll {
+  display: inline-block;
+  animation: sig-reroll calc(0.5s * var(--enh-fx-speed)) ease-out;
+}
+@keyframes sig-reroll {
+  0%   { filter: blur(0); transform: translateY(0); opacity: 1; }
+  20%  { filter: blur(3px); transform: translateY(calc(-4px * var(--enh-fx-scale))); opacity: 0.5; }
+  45%  { filter: blur(3px); transform: translateY(calc(4px * var(--enh-fx-scale))); opacity: 0.5; }
+  70%  { filter: blur(2px); transform: translateY(calc(-2px * var(--enh-fx-scale))); opacity: 0.8; }
+  100% { filter: blur(0); transform: translateY(0); opacity: 1; }
+}
+
+/* ── 刺針印記：換成另一條詞綴，Tier 不變 ───────────────────────
+   舊的往左退場、新的從右進場，讀起來是「換掉」而不是「變好」 */
+.sig-swap-out { animation: sig-swap-out calc(0.28s * var(--enh-fx-speed)) ease-in forwards; }
+@keyframes sig-swap-out {
+  0%   { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(calc(-18px * var(--enh-fx-scale))); }
+}
+.sig-swap-in {
+  animation: sig-swap-in calc(0.34s * var(--enh-fx-speed)) cubic-bezier(0.2, 1.2, 0.4, 1) forwards;
+  animation-delay: calc(0.26s * var(--enh-fx-speed));
+  opacity: 0;
+}
+@keyframes sig-swap-in {
+  0%   { opacity: 0; transform: translateX(calc(18px * var(--enh-fx-scale))); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* ── 混沌印記：四條全部重骰 ────────────────────────────────────
+   逐條錯開 60ms，讀起來是「整組洗掉」而不是四條同時抖一下。
+   --i 由呼叫端給（第幾條） */
+.sig-chaos {
+  animation: sig-reroll calc(0.5s * var(--enh-fx-speed)) ease-out;
+  animation-delay: calc(0.06s * var(--i, 0) * var(--enh-fx-speed));
+}
+
+/* ── 工藝印記：整件裝備品質 +1% ────────────────────────────────
+   對象不是詞綴，演在摘要區；金色細掃 + 品質數字彈跳 */
+.sig-quality-pop {
+  display: inline-block;
+  color: var(--accent-gold);
+  animation: sig-tier-up calc(0.5s * var(--enh-fx-speed)) cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+/* ── 突破印記：時間軸與強化完全共用 ─────────────────────────────
+   直接套 .enh-flash-soft / .enh-flash-gold / .enh-ring / .enh-float / .enh-pop /
+   .enh-flash-red / .enh-shake（`48-vfx.md` § 48.4.3），這裡只覆蓋顏色：
+   --fx-burst-color 換成新 Tier 的顏色。時間不再另寫一份，避免兩套慢慢走鐘。
+
+   唯一不同的是失敗的後半：§ 46.7 的失敗只是詞綴掉回 T1，**裝備不會消失**，
+   所以強化的碎裂換成「標籤褪成 T1 的灰」，起跑點與長度照抄碎裂那一段
+   （與紅閃同一拍起跑、0.88s）—— 失敗一樣是兩拍，不能變成三拍。 */
+.sig-tier-down {
+  display: inline-block;
+  animation: sig-tier-down calc(0.88s * var(--enh-fx-speed)) ease-in forwards;
+  animation-delay: calc(var(--enh-fx-stagger) * var(--enh-fx-speed));
+}
+@keyframes sig-tier-down {
+  0%   { transform: translateY(0) scale(1); filter: saturate(1) brightness(1); }
+  35%  { transform: translateY(calc(3px * var(--enh-fx-scale))) scale(0.94); filter: saturate(0.3) brightness(0.7); }
+  100% { transform: translateY(0) scale(1); filter: saturate(0) brightness(0.75); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sig-sweep, .sig-tier-up, .sig-reroll, .sig-swap-out, .sig-swap-in,
+  .sig-chaos, .sig-quality-pop, .sig-tier-down {
+    animation: none !important;
+  }
+  .sig-sweep { opacity: 0; }
+  .sig-swap-in { opacity: 1; }
 }

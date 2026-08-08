@@ -11,6 +11,7 @@ import { QtyStepper } from '../common/QtyStepper';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 import { CraftUsageBadge } from '../common/CraftUsageBadge';
 import { hasMaterialUsage } from '../../systems/craftMaterialUsage';
+import { isSigilItemId } from '../../models/sigil';
 
 type ShopTab = 'buy' | 'sell';
 
@@ -104,8 +105,13 @@ export function GeneralStore() {
     maxOf: e => Math.floor(gold / e.price),
   });
   const buyTotal = buyLines.reduce((sum, l) => sum + l.item.price * l.qty, 0);
-  /** 尚未在背包裡的品項才需要新的欄位，多品項要一次算完才知道放不放得下 */
-  const buyNewSlots = buyLines.filter(l => !hasBagItem(bagItems, l.item.itemId)).length;
+  /**
+   * 尚未在背包裡的品項才需要新的欄位，多品項要一次算完才知道放不放得下。
+   * 印記不佔格（§ 35.20）—— 目前商店沒賣，但判定放這裡才不會在上架時漏掉。
+   */
+  const buyNewSlots = buyLines.filter(
+    l => !isSigilItemId(l.item.itemId) && !hasBagItem(bagItems, l.item.itemId),
+  ).length;
   const buyHint = buyLines.length === 0
     ? null
     : buyTotal > gold

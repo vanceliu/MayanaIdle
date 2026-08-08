@@ -68,12 +68,57 @@ export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   },
 ];
 
+/**
+ * 背包與 Wiki 的「用途」標籤（§ 46.2）。完整敘述看 `description`，這裡只要一句話。
+ *
+ * 以 `SigilType` 為 key —— 新增印記時 TypeScript 會強制補上，
+ * 不會出現「有的印記標了用途、有的沒標」。
+ */
+export const SIGIL_USAGE_LABEL: Record<SigilType, string> = {
+  chaos: '印記師詞綴重骰',
+  sting: '印記師詞綴替換',
+  recarve: '印記師數值重骰',
+  temper: '印記師詞綴升階',
+  enhance: '印記師詞綴突破',
+  polish: '印記師品質提升',
+};
+
+/**
+ * 印記師面板的排列順序（`13-town.md` § 13.13）。面板是兩欄，一列兩個：
+ * 精鍊／突破（Tier 升階，最常用的一組放第一排）、刺針／重刻（換與重骰）、
+ * 混沌／工藝（整件裝備）。
+ *
+ * 與 `SIGIL_DEFINITIONS` 的順序分開 —— 那份是規格清單（§ 46.2），
+ * 動它會連帶影響 Wiki 與掉落測試的敘述順序。
+ */
+export const SIGIL_PANEL_ORDER: SigilType[] = [
+  'temper', 'enhance',
+  'sting', 'recarve',
+  'chaos', 'polish',
+];
+
+/** 打開印記師時預設選中的印記：必定成功、最常用的精鍊 */
+export const DEFAULT_PANEL_SIGIL: SigilType = 'temper';
+
 export function getSigilDefinition(type: SigilType): SigilDefinition {
   return SIGIL_DEFINITIONS.find(d => d.type === type)!;
 }
 
 export function getSigilByItemId(itemId: number): SigilDefinition | undefined {
   return SIGIL_DEFINITIONS.find(d => d.itemId === itemId);
+}
+
+const SIGIL_ITEM_IDS = new Set(SIGIL_DEFINITIONS.map(d => d.itemId));
+
+/**
+ * 是否為印記（`35-inventory-constraints.md` § 35.20）。
+ *
+ * 印記**不佔背包格**，所以容量計算與所有「背包已滿」的入口都要先問過這裡。
+ * 判定一律以 id 查 `SIGIL_DEFINITIONS`（§ 99.1），不看名稱也不另立清單 ——
+ * 之後新增印記時，這條路徑自動跟上。
+ */
+export function isSigilItemId(itemId: number): boolean {
+  return SIGIL_ITEM_IDS.has(itemId);
 }
 
 /** § 46.3 混沌印記重骰的 Tier 上限（商店裝另受 `maxAffixTier` 夾住） */

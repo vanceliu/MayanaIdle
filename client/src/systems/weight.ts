@@ -45,9 +45,19 @@ export function getCarriedWeight(
     (sum, item) => sum + (getItemById(item.itemId)?.weight ?? 0) * item.amount,
     0,
   );
-  // 印記的重量是 0.1（`30-items.md`），浮點累加會跑出 12.300000000000002 這種尾數，
-  // 而負重是直接顯示在狀態列的數字。統一收到小數點後一位。
-  return Math.round((gear + bag) * 10) / 10;
+  return roundWeight(gear + bag);
+}
+
+/**
+ * 重量是直接印在畫面上的數字，浮點的 `0.1 × 19` 會跑出 `1.9000000000000001`，
+ * 所以**任何乘或加之後要顯示的重量都得先收過**，收到小數點後一位
+ * （seed 目前最細就是一位小數）。
+ *
+ * 現行 seed 的重量全是整數（印記歸 0 之後不再有小數，見 `30-items.md` § 30.2），
+ * 這層是給之後再出現小數重量時擋的，不是可以拿掉的死碼。
+ */
+export function roundWeight(weight: number): number {
+  return Math.round(weight * 10) / 10;
 }
 
 export interface WeightStatus {

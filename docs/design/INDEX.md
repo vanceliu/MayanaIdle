@@ -14,6 +14,7 @@
 |---|---|---|
 | 背包系統限制（容量/負重/互動/顯示） | `35-inventory-constraints.md` | 全文 |
 | **裝備中的裝備仍留在背包並佔格（基礎 60 格）** | `35-inventory-constraints.md` § 35.1、§ 35.9 | — |
+| **印記不佔格也不計重（走底部抽屜）** | `35-inventory-constraints.md` § 35.20、`30-items.md` § 30.2 | — |
 | **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
@@ -293,6 +294,8 @@
 30-items.md（物品重量）         06-equipment.md（裝備穿脫）
        ↕                              ↕
 13-town.md（倉庫/商店/鐵匠）   16-tech-frontend-architecture.md（BagPanel）
+       ↕
+46-sigil.md ←→ 35-inventory-constraints.md § 35.20（印記不佔格不計重，走底部抽屜）
        ↕
 34-ui-guidelines.md（顯示規範）←→ 18-data-schema.md（資料結構）
 

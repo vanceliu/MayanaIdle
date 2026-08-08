@@ -1,5 +1,6 @@
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 import { isArmorEquipment } from '../models/equipment';
+import { SIGIL_DEFINITIONS, SIGIL_USAGE_LABEL } from '../models/sigil';
 
 /**
  * 素材的「製作用途」——與 `iconTier`（稀有度／區域階層）互相獨立的維度。
@@ -54,15 +55,15 @@ const USAGE_MAP: Map<number, CraftUsage> = (() => {
 })();
 
 /**
- * 不進裝備配方、但仍有用途的道具（`46-sigil.md` § 46.2）。
+ * 不進裝備配方、但仍有用途的道具 —— 目前就是六種印記（`46-sigil.md` § 46.2）。
  *
- * 精鍊／工藝印記歸 `scroll`，批量販售只掃 `material`，本來就不會被賣掉；
- * 這張表留著是給 Wiki 的「用途」欄用 —— 只看配方會把它們標成純販售。
+ * 只看配方會把它們標成純販售，所以背包的 ⚒ 記號與 Wiki 的「用途」欄都要靠這張表。
+ * **由 `SIGIL_DEFINITIONS` 反查，不手寫 id** —— 之前手寫時只列了工藝與精鍊，
+ * 另外四種印記在背包裡就少了用途標記。
  */
-const SPECIAL_USE_MATERIALS: Record<number, string> = {
-  9: '印記師品質提升',   // 工藝印記
-  10: '印記師詞綴升階',  // 精鍊印記
-};
+const SPECIAL_USE_MATERIALS: Record<number, string> = Object.fromEntries(
+  SIGIL_DEFINITIONS.map(d => [d.itemId, SIGIL_USAGE_LABEL[d.type]]),
+);
 
 export function getCraftUsage(itemId: number): CraftUsage | undefined {
   return USAGE_MAP.get(itemId);

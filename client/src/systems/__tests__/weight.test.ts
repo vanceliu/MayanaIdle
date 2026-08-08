@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCarryCapacity, getCarriedWeight, getWeightStatus, getOverweightMessage } from '../weight';
+import { getCarryCapacity, getCarriedWeight, getWeightStatus, getOverweightMessage, roundWeight } from '../weight';
 import type { Character } from '../../models/character';
 import type { EquipmentInstance } from '../../models/equipment';
 
@@ -56,10 +56,10 @@ describe('目前負重', () => {
     expect(getCarriedWeight([], [{ itemId: getItemId('不存在的東西') ?? -1, amount: 3 }])).toBe(0);
   });
 
-  it('小數重量（印記 0.1）累加後不留浮點尾數', () => {
-    // 0.1 × 3 的浮點結果是 0.30000000000000004，而負重是直接顯示在狀態列的數字
-    expect(getCarriedWeight([], [{ itemId: getItemId('混沌印記') ?? -1, amount: 3 }])).toBe(0.3);
-    expect(getCarriedWeight([gear({ weight: 12 })], [{ itemId: getItemId('突破印記') ?? -1, amount: 7 }])).toBe(12.7);
+  // § 30.2：印記完全不計負重（重量 0），帶再多也不影響
+  it('印記不計重', () => {
+    expect(getCarriedWeight([], [{ itemId: getItemId('混沌印記') ?? -1, amount: 999 }])).toBe(0);
+    expect(getCarriedWeight([gear({ weight: 12 })], [{ itemId: getItemId('突破印記') ?? -1, amount: 7 }])).toBe(12);
   });
 });
 
@@ -110,5 +110,29 @@ describe('超重時擋下出手（§ 20.7）', () => {
       bagItems: [],
     });
     expect(events.some(e => e.type === 'player_attack')).toBe(false);
+  });
+});
+
+/**
+ * 重量是直接印在畫面上的數字，`0.1 × 19` 的浮點結果是 `1.9000000000000001`，
+ * 不收會整串印出去。現行 seed 的重量都是整數，這層是給之後的小數重量擋的。
+ */
+describe('roundWeight（顯示用收尾）', () => {
+  it('收掉浮點乘法的尾數', () => {
+    expect(roundWeight(0.1 * 19)).toBe(1.9);
+    expect(roundWeight(0.1 * 3)).toBe(0.3);
+    expect(roundWeight(0.1 * 43)).toBe(4.3);
+  });
+
+  it('整數與一位小數原樣保留', () => {
+    expect(roundWeight(0)).toBe(0);
+    expect(roundWeight(5)).toBe(5);
+    expect(roundWeight(0.1)).toBe(0.1);
+    expect(roundWeight(12.5)).toBe(12.5);
+  });
+
+  it('seed 最細的重量是 0.1，一位小數就夠', () => {
+    expect(roundWeight(0.14)).toBe(0.1);
+    expect(roundWeight(0.16)).toBe(0.2);
   });
 });

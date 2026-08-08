@@ -15,6 +15,8 @@ import { isCureItem, getCureItem, hasCurableDebuff } from '../models/cureItem';
 import { getTownScrollByItemId } from '../models/townScroll';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
+import { roundWeight } from '../systems/weight';
+import { isSigilItemId } from '../models/sigil';
 
 const BAG_COLUMNS = 5;
 
@@ -68,7 +70,14 @@ function itemWeight(item: { itemId?: number }): number {
   return itemDef(item)?.weight ?? 0;
 }
 
+/** 堆疊總重。小數重量乘上數量會留浮點尾數並直接印在 tooltip 上，一律先收過 */
+function totalItemWeight(item: { itemId?: number; count?: number }): number {
+  return roundWeight(itemWeight(item) * (item.count ?? 1));
+}
+
 export function BagPanel() {
+  /** § 35.20：印記抽屜的開合。不持久化，重開回到收合 */
+  const [sigilOpen, setSigilOpen] = useState(false);
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
   /**
@@ -156,9 +165,17 @@ export function BagPanel() {
     }
   }
 
+  /*
+   * § 35.20：印記收在底部抽屜，**完全不進 gridItems** ——
+   * 格數、整理、拖曳位置都不該看到它。
+   */
+  const sigilItems: BagGridItem[] = [];
+
   for (const item of bagItems) {
     if (item.type === 'potion') continue;
-    gridItems.push({ id: `bag-${item.itemId}`, type: item.type, name: item.name, itemId: item.itemId, count: item.amount });
+    const cell: BagGridItem = { id: `bag-${item.itemId}`, type: item.type, name: item.name, itemId: item.itemId, count: item.amount };
+    if (isSigilItemId(item.itemId)) sigilItems.push(cell);
+    else gridItems.push(cell);
   }
 
   /*
@@ -185,12 +202,14 @@ export function BagPanel() {
   }
 
   // 選取的東西離開背包（用掉、穿上、賣掉、丟棄）後把選取狀態收掉。
-  // gridItems 每次 render 都是新陣列，所以這裡每次都會跑，但只有真的失效才寫入狀態。
+  // 兩個分頁的格子都可能被選取，所以一起看。
+  // 每次 render 都是新陣列，這裡每次都會跑，但只有真的失效才寫入狀態。
   useEffect(() => {
-    if (selectedId != null && !gridItems.some(i => i.id === selectedId)) {
+    const alive = [...gridItems, ...sigilItems].some(i => i.id === selectedId);
+    if (selectedId != null && !alive) {
       setSelectedId(null);
     }
-  }, [gridItems, selectedId]);
+  }, [gridItems, sigilItems, selectedId]);
 
   /*
    * § 35.17：剔除已不在版面上的位置（賣掉、存進倉庫、丟棄）。
@@ -493,8 +512,7 @@ export function BagPanel() {
   function renderTooltipContent(item: BagGridItem) {
     if (item.potionType) {
       const config = POTION_CONFIG[item.potionType];
-      const unitWeight = itemWeight(item);
-      const totalWeight = unitWeight * (item.count ?? 1);
+      const totalWeight = totalItemWeight(item);
       return (
         <div className="bag-tooltip-content">
           <div className="tooltip-name">{item.name}</div>
@@ -511,8 +529,7 @@ export function BagPanel() {
 
     if (item.cureItemId != null) {
       const def = getCureItem(item.cureItemId);
-      const unitWeight = itemWeight(item);
-      const totalWeight = unitWeight * (item.count ?? 1);
+      const totalWeight = totalItemWeight(item);
       const curable = def ? hasCurableDebuff(def, activeEffects) : false;
       return (
         <div className="bag-tooltip-content">
@@ -528,8 +545,7 @@ export function BagPanel() {
     }
 
     if (item.speedPotionType) {
-      const unitWeight = itemWeight(item);
-      const totalWeight = unitWeight * (item.count ?? 1);
+      const totalWeight = totalItemWeight(item);
       return (
         <div className="bag-tooltip-content">
           <div className="tooltip-name">{item.name}</div>
@@ -564,7 +580,7 @@ export function BagPanel() {
     return (
       <div className="bag-tooltip-content">
         <div className="tooltip-name">{item.name}</div>
-        <div className="tooltip-stat">重量: {itemWeight(item) * (item.count ?? 1)}</div>
+        <div className="tooltip-stat">重量: {totalItemWeight(item)}</div>
         {item.count && <div className="tooltip-count">數量: {item.count}</div>}
         {/* 顏色只表達稀有度，用途另外講明，免得玩家把配方材料賣掉 */}
         {craftUsage && <div className="tooltip-craft-usage">⚒ 用途：{craftUsage}</div>}
@@ -574,6 +590,54 @@ export function BagPanel() {
           </div>
         )}
       </div>
+    );
+  }
+
+  /**
+   * 開合抽屜時把殘留的互動狀態收掉：選取、tooltip、右鍵選單、移動模式
+   * 都是「當前那一格」的事，抽屜一蓋上去或收起來就指向看不到的格子了。
+   */
+  function toggleSigilDrawer() {
+    setSigilOpen(open => !open);
+    setSelectedId(null);
+    setTooltip(null);
+    setContextMenu(null);
+    setMovingId(null);
+  }
+
+  /** 格子內容。一般分頁與印記分頁只差在互動，長相完全一樣 */
+  function cellVisual(item: BagGridItem) {
+    return (
+      <>
+        {item.type === 'equipment' ? (
+          <GameIcon
+            name={getEquipIcon(item.equipment?.type === 'armor' ? (item.equipment?.slot || 'chest') : (item.equipment?.type || 'sword'))}
+            size={24}
+            color={item.equipment ? getEquipmentInstanceTierColor(item.equipment, templates) : undefined}
+          />
+        ) : (
+          (() => {
+            // 顯示方式一律以 item 定義為準（icon / iconColor / iconType / iconTier）
+            const { icon, color } = resolveItemIcon(
+              itemDef(item),
+              getItemIconKey(item.name, item.type),
+            );
+            return <GameIcon name={icon} size={24} color={color} />;
+          })()
+        )}
+        <span className="bag-cell-name">{getShortName(item.name)}</span>
+        {item.equippedSlot && (
+          <span className="bag-cell-equipped" aria-label={`裝備中：${SLOT_NAMES[item.equippedSlot]}`}>
+            裝備中
+          </span>
+        )}
+        {item.count != null && item.count > 1 && (
+          <span className="bag-cell-count">×{item.count}</span>
+        )}
+        {item.itemId != null && hasMaterialUsage(item.itemId) && (
+          <span className="bag-cell-craft" title="有用途的素材" aria-label="有用途的素材">⚒</span>
+        )}
+      </>
     );
   }
 
@@ -636,38 +700,53 @@ export function BagPanel() {
                    否則殘影會一直黏在指標上。正常放開時 store 已清空，這裡是 no-op */
                 onLostPointerCapture={handleCellPointerCancel}
               >
-                {item.type === 'equipment' ? (
-                  <GameIcon
-                    name={getEquipIcon(item.equipment?.type === 'armor' ? (item.equipment?.slot || 'chest') : (item.equipment?.type || 'sword'))}
-                    size={24}
-                    color={item.equipment ? getEquipmentInstanceTierColor(item.equipment, templates) : undefined}
-                  />
-                ) : (
-                  (() => {
-                    // 顯示方式一律以 item 定義為準（icon / iconColor / iconType / iconTier）
-                    const { icon, color } = resolveItemIcon(
-                      itemDef(item),
-                      getItemIconKey(item.name, item.type),
-                    );
-                    return <GameIcon name={icon} size={24} color={color} />;
-                  })()
-                )}
-                <span className="bag-cell-name">{getShortName(item.name)}</span>
-                {item.equippedSlot && (
-                  <span className="bag-cell-equipped" aria-label={`裝備中：${SLOT_NAMES[item.equippedSlot]}`}>
-                    裝備中
-                  </span>
-                )}
-                {item.count != null && item.count > 1 && (
-                  <span className="bag-cell-count">×{item.count}</span>
-                )}
-                {item.itemId != null && hasMaterialUsage(item.itemId) && (
-                  <span className="bag-cell-craft" title="有用途的素材" aria-label="有用途的素材">⚒</span>
-                )}
+                {cellVisual(item)}
               </div>
             );
           })}
         </div>
+      </div>
+
+      {/*
+        § 35.20：印記抽屜。由下往上展開，**覆蓋**在背包格上方而不是把格子往上推 ——
+        推擠會讓格子區高度與捲動位置跟著跳。開合狀態不持久化。
+      */}
+      <div className="bag-sigil-dock">
+      {sigilOpen && (
+        <div className="bag-sigil-drawer" role="group" aria-label="印記">
+          {sigilItems.length === 0 ? (
+            <div className="bag-sigil-empty">還沒有任何印記</div>
+          ) : (
+            <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
+              {/*
+                § 35.20.3：印記格不做拖曳重排、不進 slotMap、不吃整理 ——
+                種類固定且只有六種，位置管理沒有意義。點一下只選取（沒有可執行的動作），
+                選起來是為了讓觸控裝置也看得到 tooltip（§ 35.5.4）。
+              */}
+              {sigilItems.map(item => (
+                <div
+                  key={item.id}
+                  className={`bag-cell ${item.type}${selectedId === item.id ? ' is-selected' : ''}`}
+                  onMouseEnter={(e) => handleMouseEnter(e, item)}
+                  onMouseLeave={handleMouseLeave}
+                  onContextMenu={(e) => handleContextMenu(e, item)}
+                  onPointerDown={() => setSelectedId(item.id)}
+                >
+                  {cellVisual(item)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        className={`bag-sigil-toggle${sigilOpen ? ' active' : ''}`}
+        aria-expanded={sigilOpen}
+        onClick={toggleSigilDrawer}
+      >
+        印記 {sigilOpen ? '▾' : '▴'}
+      </button>
       </div>
 
       {tooltip && (
