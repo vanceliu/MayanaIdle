@@ -155,7 +155,7 @@ export function AdventurerGuild() {
           onClick={() => rerollQuestBoard(activeDifficulty)}
           title={canReroll ? undefined : `貢獻不足 ${QUEST_BOARD_REFRESH_COST}`}
         >
-          重新整理（-{QUEST_BOARD_REFRESH_COST} 貢獻）
+          重整（-{QUEST_BOARD_REFRESH_COST} 貢獻）
         </button>
       </div>
 

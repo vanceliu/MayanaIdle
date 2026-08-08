@@ -184,6 +184,9 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 
 所有 § 37.1 統計欄位皆可作為排行依據。「我的統計」分頁一律讀本地資料，不打 API。
 
+排行榜卡片以 **2 欄** 排列（`.stats-grid`）—— 三欄時「金幣總量」這類長數字
+會在卡片內擠成兩行，整排卡片高度參差不齊。
+
 **顯示名稱一律為 `名稱#xxxx`**，`xxxx` 是 `character_id` 的前 4 碼（小寫 hex）：
 
 ```

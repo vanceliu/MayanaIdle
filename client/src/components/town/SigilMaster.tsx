@@ -522,7 +522,16 @@ export function SigilMaster() {
                   >
                     {affixLabel(affix)}
                   </span>
-                  <span key={`value-${rowFx?.token ?? 0}`} className={`sigil-affix-value${valueFxClass(rowFx)}`}>
+                  {/*
+                    * 滿值詞綴整條變粗，與背包 tooltip 一致（`34-ui-guidelines.md` § 34.2）——
+                    * 這裡把名稱與數值拆成兩個元素，只粗體標籤的話同一條詞綴會一半粗一半不粗。
+                    */}
+                  <span
+                    key={`value-${rowFx?.token ?? 0}`}
+                    className={
+                      `sigil-affix-value${isMaxRollAffix(affix) ? ' max-roll' : ''}${valueFxClass(rowFx)}`
+                    }
+                  >
                     {isSpecialAffixType(affix.type) ? '' : `+${affix.value}%`}
                   </span>
                   {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}

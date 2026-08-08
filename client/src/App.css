@@ -3702,11 +3702,25 @@ button.active {
 
 .sigil-affix-row[aria-disabled='true']:hover { background: var(--bg-inset); }
 
+/*
+ * 數值很短且長度固定，**不可用 `flex: 1; min-width: 0`** ——
+ * 那會讓它被壓到比內容還窄、文字溢出去撞到右邊的原因文字。
+ * 撐開剩餘空間的工作交給 `.sigil-affix-reason`。
+ */
 .sigil-affix-value {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
   color: var(--text-secondary);
   font-size: var(--fs-xs);
+}
+
+/*
+ * § 7.3.2 滾到該 Tier 上限：整條詞綴變粗，與背包 tooltip 一致（§ 34.2）。
+ * 印記面板把名稱（`.affix-tag`）與數值拆成兩個元素，兩邊都要加，
+ * 只粗體其中一個會變成同一條詞綴一半粗一半不粗。
+ */
+.sigil-affix-value.max-roll {
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 /*
@@ -3714,6 +3728,8 @@ button.active {
  * 一律收在下方的 `.sigil-cost`，四條列各掛一份只是把同一句話印四遍。
  */
 .sigil-affix-reason {
+  flex: 1;
+  min-width: 0;
   font-size: var(--fs-xs);
   color: var(--text-dim);
   text-align: right;
@@ -5770,7 +5786,8 @@ button.active {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* 兩欄：三欄時「金幣總量」等長數字會擠成兩行，卡片高度參差不齊 */
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
 }
 

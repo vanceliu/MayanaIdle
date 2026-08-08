@@ -49,7 +49,7 @@ describe('冒險者工會 — 手動刷新（§ 36.6.3）', () => {
     const otherTabBefore = before.C;
     const activeTabBefore = before.D;
 
-    fireEvent.click(screen.getByText(`重新整理（-${QUEST_BOARD_REFRESH_COST} 貢獻）`));
+    fireEvent.click(screen.getByText(`重整（-${QUEST_BOARD_REFRESH_COST} 貢獻）`));
 
     const after = useGameStore.getState().adventurerQuestBoard;
     expect(after.C).toBe(otherTabBefore);
@@ -61,7 +61,7 @@ describe('冒險者工會 — 手動刷新（§ 36.6.3）', () => {
   it('貢獻不足時按鈕禁用且不扣點', () => {
     setup(QUEST_BOARD_REFRESH_COST - 1);
     render(<AdventurerGuild />);
-    const btn = screen.getByText(`重新整理（-${QUEST_BOARD_REFRESH_COST} 貢獻）`) as HTMLButtonElement;
+    const btn = screen.getByText(`重整（-${QUEST_BOARD_REFRESH_COST} 貢獻）`) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
 
     useGameStore.getState().rerollQuestBoard('D');
@@ -72,7 +72,7 @@ describe('冒險者工會 — 手動刷新（§ 36.6.3）', () => {
     // C 階門檻 1800，扣 50 後 1790 落回 D 階
     setup(1800 + 40);
     render(<AdventurerGuild />);
-    fireEvent.click(screen.getByText(`重新整理（-${QUEST_BOARD_REFRESH_COST} 貢獻）`));
+    fireEvent.click(screen.getByText(`重整（-${QUEST_BOARD_REFRESH_COST} 貢獻）`));
 
     expect(useGameStore.getState().guildProgress.points).toBe(1790);
     expect(useGameStore.getState().guildProgress.rank).toBe('D');
@@ -84,7 +84,7 @@ describe('冒險者工會 — 手動刷新（§ 36.6.3）', () => {
     useGameStore.getState().acceptAdventurerQuest(target);
     expect(useGameStore.getState().adventurerQuests).toHaveLength(1);
 
-    fireEvent.click(screen.getByText(`重新整理（-${QUEST_BOARD_REFRESH_COST} 貢獻）`));
+    fireEvent.click(screen.getByText(`重整（-${QUEST_BOARD_REFRESH_COST} 貢獻）`));
 
     const active = useGameStore.getState().adventurerQuests;
     expect(active).toHaveLength(1);

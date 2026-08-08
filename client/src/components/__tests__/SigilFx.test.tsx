@@ -83,6 +83,30 @@ describe('印記選單（`13-town.md` § 13.13.1）', () => {
   });
 });
 
+describe('詞綴顯示（`34-ui-guidelines.md` § 34.2）', () => {
+  /**
+   * 滿值詞綴整條變粗，與背包 tooltip 一致。面板把名稱與數值拆成兩個元素，
+   * 只粗體其中一個會變成同一條詞綴一半粗一半不粗。
+   */
+  it('滿值詞綴的名稱與數值都掛 max-roll', () => {
+    // T3 的上限是 11（`affix.ts` AFFIX_TIERS），T5 上限 15
+    setup(
+      gear([
+        { type: 'attack_power', tier: 3, value: 11 },  // 滿值
+        { type: 'attack_power', tier: 5, value: 14 },  // 非滿值
+      ]),
+      [{ name: '精鍊印記', amount: 1 }],
+    );
+    const rows = [...document.querySelectorAll('.sigil-affix-row')];
+
+    expect(rows[0].querySelector('.affix-tag')!.className).toContain('max-roll');
+    expect(rows[0].querySelector('.sigil-affix-value')!.className).toContain('max-roll');
+
+    expect(rows[1].querySelector('.affix-tag')!.className).not.toContain('max-roll');
+    expect(rows[1].querySelector('.sigil-affix-value')!.className).not.toContain('max-roll');
+  });
+});
+
 describe('印記演出（§ 48.5）', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });

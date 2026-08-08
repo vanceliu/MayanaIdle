@@ -234,7 +234,8 @@ export function canUseSigil(
     if (!next) return { ok: false, reason: `T${affix.tier} 已是上限，無法再升階` };
     if (next.type !== type) {
       const wanted = getSigilDefinition(next.type).name;
-      return { ok: false, reason: `T${affix.tier} 的下一階由${wanted}受理` };
+      // Tier 就寫在同一列的標籤上，理由不重述（`13-town.md` § 13.13.1：列上只放不能選的原因）
+      return { ok: false, reason: `下一階由${wanted}受理` };
     }
   }
 
