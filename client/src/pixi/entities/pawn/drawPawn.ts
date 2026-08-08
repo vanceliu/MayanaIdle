@@ -62,7 +62,8 @@ export interface PawnLook {
   cap: CapCfg;
 }
 
-function paint(ctx: PawnContext, fill: string, outline: number, join: CanvasLineJoin = 'round'): void {
+/** 填色＋壓深描邊。武器剪影共用同一份（`drawWeapon.ts`），描邊色不可各寫一套 */
+export function paint(ctx: PawnContext, fill: string, outline: number, join: CanvasLineJoin = 'round'): void {
   ctx.fillStyle = fill;
   ctx.fill();
   if (outline > 0) {

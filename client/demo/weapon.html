@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>武器剪影 Weapon Demo — MayanaIdle</title>
+<!--
+  武器剪影預覽頁 —— 只看外觀與動作，不接遊戲邏輯。
+
+  用 Vite dev server 開：`npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/weapon.html
+  直接用 file:// 開會拿不到 App.css，控制列會沒有樣式（畫布本身仍然正常）。
+
+  ── 這頁在解決什麼 ──
+  角色是無腳剪影、沒有手臂，所以武器不能常駐 —— 掛在身上就是一根棒子。
+  規則是「**攻擊時才出現，0.3 秒內揮完就消失**」，
+  所以這頁要調的不只是形狀，還有那 0.3 秒怎麼走。
+
+  ── 揮擊在哪裡發生 ──
+  **揮擊整段就發生在面朝的那一格**，不是從身上伸過去。
+  武器有**八個方向**（`WEAPON_AIM_IDS`），角色只有四張圖，靠 `pawnFacingForAim()` 合併。
+  揮舞是**手自己跑一條弧線**（半徑 `WeaponGeom.swingH` / `swingV`），不是武器繞固定圓心轉 ——
+  手不動只轉武器的話，看起來是風車在原地轉。
+  弓與法杖不甩手：`swingMul` 分別是 0 與 0.25。
+  四個朝向共用同一組角度，方向由 `WEAPON_FACING_AXIS` 套上去。
+
+  ── 繪製本體在哪 ──
+  `client/src/pixi/entities/pawn/weaponGeometry.ts`（數字）與 `drawWeapon.ts`（形狀）
+  —— 接進遊戲後跑的是同一份，這頁只是它的調校介面。接法見 `weaponDemo.ts`。
+
+  ── 這頁的產出 ──
+  「匯出參數」的 JSON = 正式實作要用的常數。設計文件查不到這些數字，以這頁的結果為準。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0;
+  padding: 24px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-note code { color: var(--text-primary, #E2E8F0); }
+
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 320px; }
+
+.demo-card {
+  background: var(--bg-panel, #12122B);
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.demo-card h2 {
+  font-family: var(--font-display, sans-serif);
+  font-size: 15px; margin: 0 0 4px; color: var(--accent-primary, #A78BFA);
+}
+.demo-card p.hint { color: var(--text-dim, #64748B); font-size: 12px; margin: 0 0 10px; line-height: 1.7; }
+
+canvas { display: block; width: 100%; border-radius: 6px; background: #0d0d20; }
+
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.row > label { flex: 0 0 106px; color: var(--text-dim, #64748B); }
+.row > input[type=range] { flex: 1; min-width: 0; }
+.row > .val { flex: 0 0 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary, #E2E8F0); }
+.row > select { flex: 1; min-width: 0; }
+
+fieldset {
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 6px; padding: 10px 12px; margin: 0 0 12px;
+}
+legend { font-size: 12px; color: var(--accent-primary, #A78BFA); padding: 0 6px; }
+
+.toggles { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-dim, #64748B); }
+.toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+button {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  background: var(--accent-primary-dim, #7C3AED); color: #fff;
+  border: none; border-radius: 5px; padding: 7px 14px;
+}
+button.ghost { background: none; border: 1px solid var(--border-subtle, #1E1E4A); color: var(--text-dim, #64748B); }
+
+textarea {
+  width: 100%; box-sizing: border-box; height: 200px; margin-top: 8px;
+  background: #0d0d20; color: var(--text-primary, #E2E8F0);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 5px;
+  font-family: ui-monospace, monospace; font-size: 11px; padding: 8px; line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">武器剪影 Weapon Demo</h1>
+<p class="demo-note">
+  武器<b>只在攻擊的那 0.3 秒出現</b>，平常不畫 —— 角色沒有手臂，常駐的武器等於黏在身上的一根棒子。<br>
+  <b>手沿著弧線甩過去</b>，掃過面朝的那一格 —— 不是武器繞固定圓心轉半圈。<br>
+  <b>武器有八個方向</b>（角色只有四張圖，是貼圖成本；武器是旋轉，多四個斜角零成本）。<br>
+  演出長度會隨攻擊間隔壓縮 —— 設計時長是「常速手感」，攻速堆滿時自動變快，永遠塞得進一次攻擊間隔。<br>
+  造型只認<b>武器類型</b>（10 種），189 把的個體差異交給材質色 —— 20px 的剪影分不出一把一款。<br>
+  <b>調到滿意後按「匯出參數」，那份 JSON 就是實作要用的數字。</b>
+</p>
+
+<div class="demo-layout">
+  <div class="demo-main">
+
+    <div class="demo-card">
+      <h2>八方向演出（站在真實尺寸的等距地磚上）</h2>
+      <p class="hint">
+        地磚是 <code>TILE_W=64 / TILE_H=32</code>，與遊戲一致 —— 判斷武器大小的唯一依據。
+        <b>往上的三個方向武器畫在角色之下</b> —— 目標格在更遠處，深度上就在角色後面；
+        其餘方向的目標格比角色近，畫在上層。<br>
+        角色只有四張圖，八個方向會合併回去（<code>pawnFacingForAim</code>），
+        與 <code>facing.ts</code> 同一套規則 —— 兩邊分岔就會出現朝向與揮向對不起來。
+      </p>
+      <canvas id="scene" height="520"></canvas>
+      <div class="row" style="margin-top:10px">
+        <label>時間軸</label>
+        <input type="range" id="timeline" min="0" max="1" step="0.005"><span class="val" id="tv"></span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <button id="play">暫停</button>
+        <button class="ghost" id="once">播一次</button>
+        <label class="toggles" style="margin-left:6px"><input type="checkbox" id="tLoop" checked> 循環</label>
+        <label class="toggles"><input type="checkbox" id="tTrail"> 殘影軌跡</label>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <h2>十種武器 × 八方向</h2>
+      <p class="hint">八十格全部跟著上面那條時間軸走 —— 拖時間軸就能同時比十把武器的揮法。</p>
+      <canvas id="all" height="1700"></canvas>
+    </div>
+
+  </div>
+
+  <div class="demo-side">
+
+    <div class="demo-card">
+      <h2>選擇</h2>
+      <div class="row"><label>武器類型</label><select id="wtype"></select></div>
+      <div class="row"><label>材質</label><select id="mat"></select></div>
+      <div class="row"><label>角色造型</label><select id="preset"></select></div>
+      <div class="row"><label>播放速度</label><input type="range" id="speed" min="0.1" max="2" step="0.05"><span class="val"></span></div>
+      <div class="row"><label>攻擊間隔 ms</label><input type="range" id="interval" min="300" max="1200" step="10"><span class="val"></span></div>
+      <div class="row"><label>實際演出</label><span class="val" id="playMs" style="flex:1; text-align:left"></span></div>
+      <div class="row"><label>場景縮放</label><input type="range" id="zoom" min="100" max="450" step="25"><span class="val"></span></div>
+    </div>
+
+    <div class="demo-card">
+      <h2>形狀（只作用在選中的武器）</h2>
+      <p class="hint" id="shapeHint"></p>
+      <fieldset><legend>形狀參數</legend><div id="shapeRows"></div></fieldset>
+    </div>
+
+    <div class="demo-card">
+      <h2>動作（只作用在選中的武器）</h2>
+      <p class="hint">
+        <b>「弧線起點／終點」是這把武器自己的揮法</b>，角度相對面朝方向：
+        0 = 指向面朝方向，正負值分別是弧線的兩端。四十格共用的只有「哪個朝向轉到哪一格」。
+        <b>「揮舞半徑倍率」</b>決定手甩多遠：1 = 完整揮舞（近戰）、0 = 端在身前不甩（弓）。
+      </p>
+      <fieldset><legend>動作參數</legend><div id="motionRows"></div></fieldset>
+    </div>
+
+    <div class="demo-card">
+      <h2>握點與揮舞半徑（只作用在選中的武器）</h2>
+      <fieldset><legend>幾何</legend><div id="geomRows"></div></fieldset>
+      <div style="display:flex; gap:8px; margin-top:2px">
+        <button id="export">匯出參數</button>
+        <button class="ghost" id="reset">還原預設</button>
+      </div>
+      <textarea id="out" readonly placeholder="按「匯出參數」把目前的數字倒出來"></textarea>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { TILE_W, TILE_H, PRESETS, drawPawn, drawTile } from './pawnDemo.ts';
+import { PAWN_DIRECTION_BY_ID } from '../src/pixi/entities/pawn/geometry';
+import {
+  PAWN_WEAPON_TYPES, WEAPON_ART, WEAPON_AIM_IDS, AIM_LABELS, MATERIAL_LABELS,
+  SHAPE_PARAM_META, MOTION_PARAM_META, GEOM_PARAM_META,
+  weaponColors, weaponTotalT, weaponPlaybackMs, weaponBehindPawn, pawnFacingForAim,
+  drawWeaponAt,
+} from './weaponDemo.ts';
+
+/* ═══════════════════════════════════════════════════════════
+   狀態
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * 每種武器各留一份可編輯的副本 —— 切換武器不能把前一把調好的數字洗掉，
+ * 一次要定十把。
+ */
+const arts = structuredClone(WEAPON_ART);
+
+let type = PAWN_WEAPON_TYPES[0];
+let material = 'iron';
+let presetIdx = 0;
+let zoom = 300;
+let speed = 1;
+/**
+ * 這次出手的攻擊間隔（ms）。300 = 攻速堆到 `MIN_ATTACK_INTERVAL_MS`、
+ * 1200 = `BASE_ATTACK_INTERVAL_MS`（兩個都在 `systems/combat.ts`）。
+ */
+let interval = 1200;
+let playing = true;
+let loop = true;
+let trail = false;
+let t = 0;
+
+const art = () => arts[type];
+const colors = () => weaponColors(material);
+const look = () => PRESETS[presetIdx];
+/** 這次出手實際的演出長度（ms）—— 攻速高時會被壓縮 */
+const playMs = () => weaponPlaybackMs(art().motion, interval);
+/** 一輪＝一次攻擊間隔，換算成以 `playMs` 為 1 的比例。剩下的就是收完之後的空檔 */
+const cycleT = () => interval / playMs();
+
+const $ = (id) => document.getElementById(id);
+
+/** 角色只有四張圖，八個揮擊方向要合併回去（`pawnFacingForAim`） */
+const pawnDir = (aimId) => PAWN_DIRECTION_BY_ID[pawnFacingForAim(aimId)];
+
+/* ═══════════════════════════════════════════════════════════
+   畫布
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * 版面高度只讀一次。`canvas.height = h * dpr` 會**改寫 height 屬性**，
+ * 下一次再從屬性讀就是已經乘過 dpr 的值，每次 resize 都再乘一次 ——
+ * 畫布會一路長到幾千 px 高，內容看起來像消失了。
+ */
+const DESIGN_H = new WeakMap();
+
+function fit(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  if (!DESIGN_H.has(canvas)) DESIGN_H.set(canvas, Number(canvas.getAttribute('height')));
+  const h = DESIGN_H.get(canvas);
+  const w = canvas.clientWidth;
+
+  canvas.style.height = `${h}px`;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h, dpr };
+}
+
+/** 之後所有座標都是世界 px（地磚 64×32 那一套） */
+function world(ctx, dpr, z, cx, cy) {
+  ctx.setTransform(z * dpr, 0, 0, z * dpr, cx * dpr, cy * dpr);
+}
+
+function drawStage(ctx, dpr, z, cx, cy, aimId, tt, showTrail) {
+  world(ctx, dpr, z, cx, cy);
+  drawTile(ctx, 0, 0, '#191933', true);
+
+  /* 殘影：把揮擊過程的幾個時間點淡淡疊上去，看得出弧線走哪 */
+  if (showTrail) {
+    const total = weaponTotalT(art().motion);
+    for (let i = 1; i <= 6; i++) {
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      drawWeaponAt(ctx, 0, 0, aimId, art(), colors(), (i / 7) * total);
+      ctx.restore();
+    }
+  }
+
+  /* 往上揮時武器在角色之後 —— 目標格在更遠處，畫在上層會整支蓋過頭 */
+  const weapon = () => drawWeaponAt(ctx, 0, 0, aimId, art(), colors(), tt);
+  if (weaponBehindPawn(aimId)) weapon();
+  drawPawn(ctx, 0, 0, pawnDir(aimId), look());
+  if (!weaponBehindPawn(aimId)) weapon();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function renderScene() {
+  const c = $('scene');
+  const { ctx, w, h, dpr } = fit(c);
+  const COLS = 4;
+  const cellW = w / COLS;
+  const rowH = h / 2;
+  const z = zoom / 100;
+
+  WEAPON_AIM_IDS.forEach((aimId, i) => {
+    const cx = cellW * ((i % COLS) + 0.5);
+    const rowTop = Math.floor(i / COLS) * rowH;
+    drawStage(ctx, dpr, z, cx, rowTop + rowH * 0.74, aimId, t, trail);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#64748B';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`揮向${AIM_LABELS[aimId]}`, cx, rowTop + rowH - 6);
+  });
+}
+
+/**
+ * 一覽：10 種武器 × 4 朝向，跟著同一條時間軸動。
+ * 停在某一格看不出揮法的差別 —— 差別在整段怎麼走。
+ */
+function renderAll() {
+  const c = $('all');
+  const { ctx, w, h, dpr } = fit(c);
+  const LABEL_W = 78;
+  const HEAD_H = 22;
+  const colW = (w - LABEL_W) / WEAPON_AIM_IDS.length;
+  const rowH = (h - HEAD_H) / PAWN_WEAPON_TYPES.length;
+  /* 雙手武器揮到底時會伸出去很遠，列高與縮放都要留得下它 */
+  const z = Math.min(1.15, (colW / TILE_W) * 1.35);
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#A78BFA';
+  WEAPON_AIM_IDS.forEach((aimId, i) => {
+    ctx.fillText(AIM_LABELS[aimId], LABEL_W + colW * (i + 0.5), 15);
+  });
+
+  PAWN_WEAPON_TYPES.forEach((id, row) => {
+    const rowTop = HEAD_H + rowH * row;
+    const baseY = rowTop + rowH * 0.58;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = id === type ? '#A78BFA' : '#64748B';
+    ctx.fillText(WEAPON_ART[id].label, 8, rowTop + rowH * 0.5);
+
+    WEAPON_AIM_IDS.forEach((aimId, col) => {
+      world(ctx, dpr, z, LABEL_W + colW * (col + 0.5), baseY);
+      const weapon = () => drawWeaponAt(ctx, 0, 0, aimId, arts[id], colors(), t);
+      if (weaponBehindPawn(aimId)) weapon();
+      drawPawn(ctx, 0, 0, pawnDir(aimId), look());
+      if (!weaponBehindPawn(aimId)) weapon();
+    });
+  });
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function render() {
+  renderScene();
+  renderAll();
+  $('timeline').value = String(Math.min(t, cycleT()));
+  $('tv').textContent = t.toFixed(2);
+  const m = art().motion;
+  const ms = Math.round(playMs() * weaponTotalT(m));
+  $('playMs').textContent =
+    `${ms}ms（設計 ${Math.round(m.durationMs * weaponTotalT(m))}ms）`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   滑桿：依選中武器的形狀動態產生
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * 把一組數字接成滑桿。`obj` 直接被改寫 —— 調校頁的用途就是改那份物件，
+ * 與 pawn.html 的髮際線滑桿同一個做法。
+ */
+function buildRows(host, obj, meta, onChange) {
+  host.textContent = '';
+  for (const key of Object.keys(obj)) {
+    const m = meta[key];
+    if (!m) continue; // shape 這種非數值欄位沒有滑桿
+
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const label = document.createElement('label');
+    label.textContent = m.label;
+
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(m.min);
+    input.max = String(m.max);
+    input.step = String(m.step);
+    input.value = String(obj[key]);
+
+    const val = document.createElement('span');
+    val.className = 'val';
+    val.textContent = String(obj[key]);
+
+    input.addEventListener('input', () => {
+      obj[key] = Number(input.value);
+      val.textContent = input.value;
+      onChange();
+    });
+
+    row.append(label, input, val);
+    host.append(row);
+  }
+}
+
+const SHAPE_HINT = {
+  blade: '刀身 → 護手 → 握把 → 圓頭，依序疊上去。護手蓋住刀根，所以護手寬要大於刀身寬。',
+  axe: '斧刃是外緣鼓、內緣凹的月牙 —— 做成三角形會讀成矛頭。雙刃＝兩側各一片。',
+  mace: '球先畫、尖刺疊上去，球的描邊會從刺之間露出來，讀成「球上長了刺」。',
+  staff: '杖身是木頭（不吃材質色），寶珠與頸環吃材質色 —— 整根一起變色會看不出杖身。',
+  bow: '握點在弓的正中央，形狀往上下兩邊長（其他武器都是從握點往上）。中段握把與綁帶少了的話，弓會讀成一片彎木。',
+  claw: '爪根攤開的總寬要小於護甲寬，不然爪會長在護甲外面。',
+};
+
+function rebuildParamRows() {
+  const a = art();
+  $('shapeHint').textContent = SHAPE_HINT[a.params.shape] ?? '';
+  buildRows($('shapeRows'), a.params, SHAPE_PARAM_META, render);
+  buildRows($('geomRows'), a.geom, GEOM_PARAM_META, render);
+  buildRows($('motionRows'), a.motion, MOTION_PARAM_META, () => {
+    $('timeline').max = String(cycleT());
+    render();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UI 接線
+   ═══════════════════════════════════════════════════════════ */
+
+for (const id of PAWN_WEAPON_TYPES) {
+  const o = document.createElement('option');
+  o.value = id;
+  o.textContent = `${WEAPON_ART[id].label}（${WEAPON_ART[id].hands === 2 ? '雙持' : WEAPON_ART[id].motion.motion}）`;
+  $('wtype').append(o);
+}
+for (const m of MATERIAL_LABELS) {
+  const o = document.createElement('option');
+  o.value = m.id;
+  o.textContent = m.label;
+  $('mat').append(o);
+}
+PRESETS.forEach((p, i) => {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = p.label;
+  $('preset').append(o);
+});
+
+$('wtype').value = type;
+$('mat').value = material;
+
+$('wtype').addEventListener('change', () => {
+  type = $('wtype').value;
+  t = 0;
+  rebuildParamRows();
+  $('timeline').max = String(cycleT());
+  render();
+});
+$('mat').addEventListener('change', () => { material = $('mat').value; render(); });
+$('preset').addEventListener('change', () => { presetIdx = Number($('preset').value); render(); });
+
+/** 三個純顯示用的滑桿（不進匯出的參數） */
+function simpleSlider(id, get, set) {
+  const el = $(id);
+  const val = el.parentElement.querySelector('.val');
+  el.value = String(get());
+  val.textContent = String(get());
+  el.addEventListener('input', () => {
+    set(Number(el.value));
+    val.textContent = el.value;
+    render();
+  });
+}
+simpleSlider('speed', () => speed, (v) => { speed = v; });
+simpleSlider('interval', () => interval, (v) => { interval = v; $('timeline').max = String(cycleT()); });
+simpleSlider('zoom', () => zoom, (v) => { zoom = v; });
+
+$('timeline').addEventListener('input', () => {
+  playing = false;
+  $('play').textContent = '播放';
+  t = Number($('timeline').value);
+  render();
+});
+$('play').addEventListener('click', () => {
+  playing = !playing;
+  $('play').textContent = playing ? '暫停' : '播放';
+});
+$('once').addEventListener('click', () => {
+  t = 0;
+  playing = true;
+  loop = false;
+  $('tLoop').checked = false;
+  $('play').textContent = '暫停';
+});
+$('tLoop').addEventListener('change', () => { loop = $('tLoop').checked; });
+$('tTrail').addEventListener('change', () => { trail = $('tTrail').checked; render(); });
+
+$('export').addEventListener('click', () => {
+  $('out').value = JSON.stringify({ [type]: art() }, null, 2);
+});
+$('reset').addEventListener('click', () => {
+  Object.assign(arts, structuredClone(WEAPON_ART));
+  t = 0;
+  rebuildParamRows();
+  render();
+});
+
+rebuildParamRows();
+$('timeline').max = String(cycleT());
+
+/* ═══════════════════════════════════════════════════════════
+   播放迴圈
+   ═══════════════════════════════════════════════════════════ */
+
+let last = performance.now();
+function frame(now) {
+  const dt = now - last;
+  last = now;
+
+  if (playing) {
+    t += (dt / playMs()) * speed;
+    if (t > cycleT()) {
+      if (loop) t = 0;
+      else { t = cycleT(); playing = false; $('play').textContent = '播放'; }
+    }
+    render();
+  }
+  requestAnimationFrame(frame);
+}
+render();
+requestAnimationFrame(frame);
+
+window.addEventListener('resize', render);
+</script>
+
+</body>
+</html>
