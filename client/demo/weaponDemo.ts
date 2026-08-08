@@ -13,27 +13,37 @@
 import type { PawnContext } from '../src/pixi/entities/pawn/drawPawn';
 import { drawWeapon } from '../src/pixi/entities/pawn/drawWeapon';
 import {
-  PAWN_WEAPON_TYPES, WEAPON_ART, WEAPON_AIM_IDS,
+  PAWN_WEAPON_TYPES, WEAPON_ART,
   WEAPON_MATERIAL_COLOR, WEAPON_HANDLE_COLOR,
-  WEAPON_FACING_AXIS, weaponColors, weaponGrip, weaponPose, weaponTotalT,
+  weaponAxis, weaponColors, weaponGrip, weaponPose, weaponTotalT,
   weaponPlaybackMs, weaponAimFromDelta, pawnFacingForAim,
   type PawnWeaponType, type WeaponArt, type WeaponColors,
-  type WeaponGeom, type WeaponPose, type WeaponAimId,
+  type WeaponGeom, type WeaponPose,
 } from '../src/pixi/entities/pawn/weaponGeometry';
 
 export {
-  PAWN_WEAPON_TYPES, WEAPON_ART, WEAPON_AIM_IDS,
+  PAWN_WEAPON_TYPES, WEAPON_ART,
   WEAPON_MATERIAL_COLOR, WEAPON_HANDLE_COLOR,
-  WEAPON_FACING_AXIS, weaponColors, weaponGrip, weaponPose, weaponTotalT,
+  weaponAxis, weaponColors, weaponGrip, weaponPose, weaponTotalT,
   weaponPlaybackMs, weaponAimFromDelta, pawnFacingForAim, drawWeapon,
 };
-export type { PawnWeaponType, WeaponArt, WeaponColors, WeaponGeom, WeaponPose, WeaponAimId };
+export type { PawnWeaponType, WeaponArt, WeaponColors, WeaponGeom, WeaponPose };
 
-/** 八個揮擊方向的中文標籤（螢幕方向） */
-export const AIM_LABELS: Record<WeaponAimId, string> = {
-  down: '下', downRight: '右下', right: '右', upRight: '右上',
-  up: '上', upLeft: '左上', left: '左', downLeft: '左下',
-};
+/**
+ * 調校頁展示用的八個角度 —— **等距地圖上八個真實移動方向**換算成螢幕角度，
+ * 不是 45 度等分。世界軸的四個方向落在 ±63.4 / ±116.6，
+ * 那正是 45 度格線上沒有、而遊戲中最常出現的方向。
+ */
+export const AIM_SAMPLES: { aim: number; label: string }[] = [
+  { aim: 180, label: '下' },
+  { aim: 116.57, label: '右下' },
+  { aim: 90, label: '右' },
+  { aim: 63.43, label: '右上' },
+  { aim: 0, label: '上' },
+  { aim: -63.43, label: '左上' },
+  { aim: -90, label: '左' },
+  { aim: -116.57, label: '左下' },
+];
 
 export const MATERIAL_LABELS: { id: keyof typeof WEAPON_MATERIAL_COLOR; label: string }[] = [
   { id: 'wood', label: '木' },
@@ -44,9 +54,9 @@ export const MATERIAL_LABELS: { id: keyof typeof WEAPON_MATERIAL_COLOR; label: s
   { id: 'orichalcum', label: '山銅' },
 ];
 
-/** 這個方向的武器要畫在角色之下嗎（往上時目標格在更遠處，見 `WeaponFacingAxis.behind`） */
-export function weaponBehindPawn(aimId: WeaponAimId): boolean {
-  return WEAPON_FACING_AXIS[aimId].behind;
+/** 這個角度的武器要畫在角色之下嗎（往上時目標格在更遠處，見 `WeaponFacingAxis.behind`） */
+export function weaponBehindPawn(aim: number): boolean {
+  return weaponAxis(aim).behind;
 }
 
 /**
@@ -59,7 +69,7 @@ export function weaponBehindPawn(aimId: WeaponAimId): boolean {
 export function drawWeaponPose(
   ctx: CanvasRenderingContext2D,
   gx: number, gy: number,
-  aimId: WeaponAimId,
+  aim: number,
   art: WeaponArt,
   colors: WeaponColors,
   pose: WeaponPose,
@@ -67,7 +77,7 @@ export function drawWeaponPose(
 ): void {
   if (!pose.visible || pose.alpha <= 0) return;
 
-  const grip = weaponGrip(art.geom, aimId, hand);
+  const grip = weaponGrip(art.geom, aim, hand);
 
   ctx.save();
   ctx.globalAlpha = pose.alpha;
@@ -79,19 +89,19 @@ export function drawWeaponPose(
 
 /**
  * 演出到 t（以 durationMs 為 1）時的樣子。雙持會自動把兩把都畫出來。
- * 揮到哪個方向由 `WEAPON_FACING_AXIS` 決定（八個螢幕方向）。
+ * 揮到哪個方向由 `aim`（螢幕角度）決定 —— 連續角度，不做等分吸附。
  */
 export function drawWeaponAt(
   ctx: CanvasRenderingContext2D,
   gx: number, gy: number,
-  aimId: WeaponAimId,
+  aim: number,
   art: WeaponArt,
   colors: WeaponColors,
   t: number,
 ): void {
   for (let hand = 0; hand < art.hands; hand++) {
     const h = hand as 0 | 1;
-    drawWeaponPose(ctx, gx, gy, aimId, art, colors, weaponPose(art.motion, art.geom, t, h, aimId), h);
+    drawWeaponPose(ctx, gx, gy, aim, art, colors, weaponPose(art.motion, art.geom, t, h, aim), h);
   }
 }
 
@@ -99,14 +109,14 @@ export function drawWeaponAt(
 export function drawWeaponStill(
   ctx: CanvasRenderingContext2D,
   gx: number, gy: number,
-  aimId: WeaponAimId,
+  aim: number,
   art: WeaponArt,
   colors: WeaponColors,
 ): void {
   for (let hand = 0; hand < art.hands; hand++) {
     const h = hand as 0 | 1;
     const t = art.motion.tStrike + (h === 1 ? art.motion.handDelay : 0);
-    drawWeaponPose(ctx, gx, gy, aimId, art, colors, weaponPose(art.motion, art.geom, t, h, aimId), h);
+    drawWeaponPose(ctx, gx, gy, aim, art, colors, weaponPose(art.motion, art.geom, t, h, aim), h);
   }
 }
 

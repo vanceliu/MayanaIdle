@@ -1,4 +1,6 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
+import { WeaponSprite } from './WeaponSprite';
+import type { WeaponAttack } from './weaponGeometry';
 import {
   getPawnTexture,
   PAWN_ANCHOR_X,
@@ -10,6 +12,7 @@ import {
 import type { PawnLook } from './drawPawn';
 import type { PawnDirectionId } from './geometry';
 import { facingFromDelta } from './facing';
+import { pawnFacingForAim } from './weaponGeometry';
 
 /**
  * 一個角色剪影：地面標記 + 貼圖。玩家與 NPC 共用。
@@ -22,12 +25,23 @@ export class PawnSprite {
   readonly container: Container;
   private readonly marker: Graphics;
   private readonly sprite: Sprite;
+  /** 武器：平常不畫，只在出手的那一次演出中出現（`48-vfx.md` § 48.6） */
+  private readonly weapon: WeaponSprite;
   private look: PawnLook;
   private facing: PawnDirectionId;
   private lastX: number | null = null;
   private lastY: number | null = null;
   /** 這一幀有出手的話，朝向要以攻擊目標為準（見 updateFacingFrom） */
   private attackFacing: PawnDirectionId | null = null;
+  /**
+   * 揮擊演出期間鎖住的朝向。
+   *
+   * `attackFacing` 只撐一幀，但演出有數百毫秒（十幾幀）——
+   * 只靠它的話，邊走邊打時只有出手那一幀朝著目標，其餘幀被移動方向蓋回去，
+   * 看起來就是「往左走、卻在右邊揮刀」。
+   */
+  private attackHold: PawnDirectionId | null = null;
+  private weaponBehind = false;
 
   constructor(look: PawnLook, markerColor: number, facing: PawnDirectionId = 'front') {
     this.look = look;
@@ -43,13 +57,52 @@ export class PawnSprite {
     this.sprite.anchor.set(PAWN_ANCHOR_X / PAWN_TEX_W, PAWN_ANCHOR_Y / PAWN_TEX_H);
     this.sprite.scale.set(1 / PAWN_BAKE_SCALE);
 
-    this.container.addChild(this.marker, this.sprite);
+    this.weapon = new WeaponSprite();
+    this.container.addChild(this.marker, this.sprite, this.weapon.container);
+  }
+
+  /**
+   * 出手：轉向目標並起動武器演出。
+   *
+   * 朝向與武器揮向來自**同一個** `aim`（`pawnFacingForAim()` 把連續角度
+   * 收斂回四張角色圖），兩邊各自算的話會出現「角色面向右、武器往右下揮」。
+   */
+  attack(attack: WeaponAttack): void {
+    this.attackHold = pawnFacingForAim(attack.aim);
+    this.attackFacing = this.attackHold;
+    this.weapon.play(attack);
+    this.syncWeaponDepth();
+  }
+
+  /** 每幀推進武器演出。沒有在演出時是零成本 */
+  update(deltaMs: number): void {
+    const wasBehind = this.weaponBehind;
+    this.weapon.update(deltaMs);
+    if (this.weapon.behindPawn !== wasBehind) this.syncWeaponDepth();
+    /* 演出結束才把朝向還給移動 */
+    if (!this.weapon.playing) this.attackHold = null;
+  }
+
+  /**
+   * 往螢幕上方的三個方向，目標格在更遠處 —— 武器在深度上就在角色後面，
+   * 畫在上層會整支蓋過頭（`48-vfx.md` § 48.6.3）。
+   */
+  private syncWeaponDepth(): void {
+    this.weaponBehind = this.weapon.behindPawn;
+    const idx = this.container.getChildIndex(this.weapon.container);
+    const want = this.weaponBehind ? 1 : 2; /* 0 = 地面標記 */
+    if (idx !== want) this.container.setChildIndex(this.weapon.container, want);
   }
 
   /** 換造型（換裝改衣色、或外觀被編輯）。同造型不會重烘 */
   setLook(look: PawnLook): void {
     this.look = look;
     this.sprite.texture = getPawnTexture(look, this.facing);
+  }
+
+  /** 目前朝哪 —— 測試用來確認出手時朝向有沒有被移動方向蓋掉 */
+  get currentFacing(): PawnDirectionId {
+    return this.facing;
   }
 
   setFacing(facing: PawnDirectionId): void {
@@ -77,13 +130,17 @@ export class PawnSprite {
    *
    * **有出手就以攻擊目標為準**，位移只在沒出手時決定朝向：
    * 邊走邊打時如果讓移動贏，射擊那一瞬間會朝著走的方向而不是目標。
+   *
+   * 而且要撐**整段演出**（`attackHold`），不是只有出手那一幀 ——
+   * 只撐一幀的話，往左走時只有第一幀面向右邊的怪，之後就轉回去了。
    */
   updateFacingFrom(x: number, y: number): void {
     const moved = this.lastX !== null && this.lastY !== null
       ? facingFromDelta(x - this.lastX, y - this.lastY)
       : null;
 
-    const next = this.attackFacing ?? moved;
+    /* 出手那一幀 > 演出期間鎖住的 > 移動方向 */
+    const next = this.attackFacing ?? this.attackHold ?? moved;
     if (next) this.setFacing(next);
 
     this.attackFacing = null;
@@ -92,6 +149,7 @@ export class PawnSprite {
   }
 
   destroy(): void {
+    this.weapon.stop();
     this.container.destroy({ children: true });
   }
 }

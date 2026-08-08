@@ -35,11 +35,29 @@ describe('facingFromDelta', () => {
     if (facing === 'front') expect(sy).toBeGreaterThan(0);
     if (facing === 'back') expect(sy).toBeLessThan(0);
 
-    /* 選的一定是比較大的那個分量 */
+    /**
+     * 選的一定是**螢幕上**比較大的那個分量 —— 不換算回世界單位。
+     * 換算回去等於抵銷掉 2:1 投影，四個世界軸方向會全部平手。
+     */
     if (facing === 'right' || facing === 'left') {
-      expect(Math.abs(sx) / (64 / 2)).toBeGreaterThanOrEqual(Math.abs(sy) / (32 / 2) - 1e-9);
+      expect(Math.abs(sx)).toBeGreaterThan(Math.abs(sy));
     } else {
-      expect(Math.abs(sy) / (32 / 2)).toBeGreaterThanOrEqual(Math.abs(sx) / (64 / 2) - 1e-9);
+      expect(Math.abs(sy)).toBeGreaterThanOrEqual(Math.abs(sx));
+    }
+  });
+
+  it('世界軸的四個方向畫成側身 —— 它們在螢幕上是斜的，水平分量比較大', () => {
+    expect(facingFromDelta(1, 0)).toBe('right');   // 螢幕右下
+    expect(facingFromDelta(0, -1)).toBe('right');  // 螢幕右上
+    expect(facingFromDelta(0, 1)).toBe('left');    // 螢幕左下
+    expect(facingFromDelta(-1, 0)).toBe('left');   // 螢幕左上
+  });
+
+  it('與武器的揮向共用同一條規則，不會走路正面、出手側身', async () => {
+    const { weaponAimFromDelta, pawnFacingForAim } = await import('../weaponGeometry');
+    const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+    for (const [dx, dy] of dirs) {
+      expect(pawnFacingForAim(weaponAimFromDelta(dx, dy)!)).toBe(facingFromDelta(dx, dy));
     }
   });
 

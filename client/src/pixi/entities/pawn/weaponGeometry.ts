@@ -15,6 +15,8 @@
  */
 import type { WeaponMaterial, WeaponType } from '../../../models/equipment';
 import { OUTLINE_COLOR, type PawnDirectionId } from './geometry';
+import { TILE_H, TILE_W } from '../../utils/isometric';
+import { facingFromScreen } from './facing';
 
 /** 與角色共用同一個壓深描邊色 —— 兩套描邊會讓武器像貼上去的 */
 export const WEAPON_OUTLINE_COLOR = OUTLINE_COLOR;
@@ -179,35 +181,26 @@ export type WeaponParams =
 export type WeaponMotion = 'swing' | 'dual' | 'thrust' | 'bow';
 
 /**
- * 武器的八個揮擊方向（**以螢幕為準**，不是世界座標軸）。
+ * 武器的揮擊方向 —— **一個連續的螢幕角度**（度），不是幾個固定方向。
  *
- * 角色只有四張圖（`04-character.md` § 4.10：每個朝向一張烘好的貼圖，
- * 加到八個就是 13 髮型 × 8 = 104 張）。**武器沒有這個限制** ——
- * 它是同一個形狀被旋轉，多四個斜角只是多四列設定，零新美術。
+ * 角色只有四張圖（`04-character.md` § 4.10：每個朝向一張烘好的貼圖）。
+ * **武器沒有這個限制** —— 它是同一個形狀被旋轉，角度要多細就多細。
  *
- * 而且八個方向是必要的：尋路是八方向的（`systems/pathfinding.ts` 的鄰居含四個斜角），
- * 只有四個揮擊方向的話，往右下的怪出手時武器會揮向正下方。
- */
-export type WeaponAimId =
-  | 'down' | 'downRight' | 'right' | 'upRight'
-  | 'up' | 'upLeft' | 'left' | 'downLeft';
-
-export const WEAPON_AIM_IDS: readonly WeaponAimId[] = [
-  'down', 'downRight', 'right', 'upRight', 'up', 'upLeft', 'left', 'downLeft',
-];
-
-/**
- * 每個方向把武器**轉到哪一格**。
- *
- * 這裡只有「方向」，**沒有揮法** —— 揮法（弧線從哪掃到哪、多快、甩多遠）
- * 是每把武器自己的事，寫在 `WeaponArt.motion`。
- * 把揮法放進來就會變成十把武器共用一條基底弧，那正是要避免的。
+ * 為什麼不切成八個方向：等距地圖上八個真實移動方向的螢幕角度是
+ * 0、±63.4、±90、±116.6、180 —— **45 度等分的格線上沒有 ±63.4 與 ±116.6**，
+ * 而那四個正是最常見的世界軸移動。切八等分會把它們吸附掉 18.4 度，
+ * 看起來就是「怪在右下、武器揮向更下面」。
  *
  * 角度以螢幕為準：0 = 上、90 = 右、180 = 下、−90 = 左。
  */
+
+/** 面朝方向的螢幕單位向量（y 軸向下） */
+export function aimVector(aim: number): { x: number; y: number } {
+  const r = (aim * Math.PI) / 180;
+  return { x: Math.sin(r), y: -Math.cos(r) };
+}
+
 export interface WeaponFacingAxis {
-  /** 面朝方向的螢幕角度。武器的弧線以它為中心 */
-  aim: number;
   /**
    * 弧線的旋轉正負。決定「從哪一側舉起來」。
    *
@@ -216,11 +209,10 @@ export interface WeaponFacingAxis {
    */
   spin: 1 | -1;
   /**
-   * 握點偏向身體的哪一側：+1 = 螢幕右、−1 = 螢幕左、**0 = 不偏，走身體中線**。
+   * 握點偏向身體的哪一側：+1 = 螢幕右、−1 = 螢幕左、0 = 中線。
    *
-   * 揮舞半徑已經把武器帶往面朝方向了，這個側偏只是再讓弧線歪一點。
-   * **正上與正下都設 0**：那兩個方向的目標格就在角色正上／正下方，
-   * 弧線該對稱地掃過去，偏一側只會看起來像揮歪了。
+   * 用 `sin(aim)` 而不是三選一：正上與正下自然收到 0（那兩個方向的目標格
+   * 就在角色正上／正下方，弧線該對稱地掃過去），斜角則平滑過渡。
    *
    * 也決定法杖往哪一側傾斜（`weaponPose` 的 thrust 分支）。
    */
@@ -228,58 +220,60 @@ export interface WeaponFacingAxis {
   /**
    * 武器畫在角色**之下**還是之上。
    *
-   * 往螢幕上方的三個方向，攻擊的那一格在更遠處 —— 武器在深度上就是在角色後面，
-   * 畫在上層會整支蓋過頭。往下的那幾格比角色近，畫在上層才對。
+   * 往螢幕上方揮時，攻擊的那一格在更遠處 —— 武器在深度上就在角色後面，
+   * 畫在上層會整支蓋過頭。正左與正右同深度，畫在上層。
    */
   behind: boolean;
 }
 
-export const WEAPON_FACING_AXIS: Record<WeaponAimId, WeaponFacingAxis> = {
-  /* 正下：左 → 下 → 右（橫掃） */
-  down: { aim: 180, spin: 1, side: 0, behind: false },
-  /* 右下：上 → 外 → 下 */
-  downRight: { aim: 135, spin: -1, side: 1, behind: false },
-  right: { aim: 90, spin: -1, side: 1, behind: false },
-  upRight: { aim: 45, spin: -1, side: 1, behind: true },
-  /* 正上：右 → 上 → 左（正下的鏡射） */
-  up: { aim: 0, spin: 1, side: 0, behind: true },
-  upLeft: { aim: -45, spin: 1, side: -1, behind: true },
-  left: { aim: -90, spin: 1, side: -1, behind: false },
-  downLeft: { aim: -135, spin: 1, side: -1, behind: false },
-};
+/** 這個揮擊角度的旋轉方向、握點側邊、上下層 —— 全部由角度推出來，沒有查表 */
+export function weaponAxis(aim: number): WeaponFacingAxis {
+  const deg = normalizeAim(aim);
+  return {
+    spin: deg > 0 && deg < 180 ? -1 : 1,
+    side: Math.sin((deg * Math.PI) / 180),
+    behind: Math.abs(deg) < 90,
+  };
+}
 
-/**
- * 位移 → 揮擊方向。判斷用的是**螢幕上的方向**，與角色朝向同一套換算
- * （`facing.ts`：螢幕往下 = x+y 變大、螢幕往右 = x−y 變大）。
- */
-export function weaponAimFromDelta(dx: number, dy: number): WeaponAimId | null {
-  const down = dx + dy;
-  const right = dx - dy;
-  if (Math.abs(down) < 1e-4 && Math.abs(right) < 1e-4) return null;
-  /* 八等分：每格 45 度，從正下方（螢幕角度 180）起算 */
-  const deg = (Math.atan2(right, down) * 180) / Math.PI;
-  const idx = ((Math.round(deg / 45) % 8) + 8) % 8;
-  return WEAPON_AIM_IDS[idx];
+/** 把角度收進 (−180, 180]，比大小才有意義 */
+export function normalizeAim(aim: number): number {
+  const wrapped = ((aim + 180) % 360 + 360) % 360 - 180;
+  return wrapped === -180 ? 180 : wrapped;
 }
 
 /**
- * 這個揮擊方向配哪一張角色圖。角色只有四張，八個方向要合併回去 ——
- * 合併規則與 `facing.ts` 的 `facingFromDelta()` 一致（斜角時倒向上下），
- * 兩邊分岔的話會出現「角色面向右、武器往右下揮」對不起來的情況。
+ * 位移 → 揮擊角度（螢幕度）。
+ *
+ * 換算與角色朝向同一套（`facing.ts`：螢幕往下 = x+y 變大、螢幕往右 = x−y 變大），
+ * 但**不做任何等分吸附** —— 直接對著目標。
  */
-export function pawnFacingForAim(aimId: WeaponAimId): PawnDirectionId {
-  switch (aimId) {
-    case 'right': return 'right';
-    case 'left': return 'left';
-    case 'up': case 'upRight': case 'upLeft': return 'back';
-    default: return 'front';
-  }
+export function weaponAimFromDelta(dx: number, dy: number): number | null {
+  /* 世界位移 → 螢幕位移（`utils/isometric.ts` 的投影公式） */
+  const sx = (dx - dy) * (TILE_W / 2);
+  const sy = (dx + dy) * (TILE_H / 2);
+  if (Math.abs(sx) < 1e-4 && Math.abs(sy) < 1e-4) return null;
+
+  /**
+   * 螢幕向量 → 角度。**兩件事都不能省**：
+   *
+   * 1. `-sy`：角度是以「上」為 0 量的，而螢幕 y 軸向下。少了負號，
+   *    整個角度會沿水平軸鏡射 —— 怪在右下、武器揮向右上。
+   * 2. 先乘 `TILE_W / TILE_H`：等距地磚是 2:1，同樣的世界位移在螢幕上
+   *    水平走得比垂直遠一倍。直接拿世界分量算角度，世界軸的四個方向
+   *    會算成 ±45°／±135°，而它們在螢幕上其實是 ±63.4°／±116.6°。
+   */
+  return (Math.atan2(sx, -sy) * 180) / Math.PI;
 }
 
-/** 面朝方向的螢幕單位向量（y 軸向下） */
-export function aimVector(aim: number): { x: number; y: number } {
-  const r = (aim * Math.PI) / 180;
-  return { x: Math.sin(r), y: -Math.cos(r) };
+/**
+ * 這個揮擊角度配哪一張角色圖。角色只有四張，連續角度要收斂回去 ——
+ * 收斂規則與 `facing.ts` 的 `facingFromDelta()` 一致（斜角時倒向上下），
+ * 兩邊分岔的話會出現「角色面向右、武器往右下揮」對不起來。
+ */
+export function pawnFacingForAim(aim: number): PawnDirectionId {
+  const v = aimVector(normalizeAim(aim));
+  return facingFromScreen(v.x, v.y) ?? 'front';
 }
 
 export interface WeaponMotionCfg {
@@ -293,7 +287,7 @@ export interface WeaponMotionCfg {
    * 每把武器自己一組，不是共用一條基底弧再縮放 ——
    * 大劍的大開大闔與雙刀的短促斜劃本來就不是同一條弧。
    *
-   * 揮到**哪個方向**不寫在這裡：那是朝向的事（`WEAPON_FACING_AXIS.aim`）。
+   * 揮到**哪個方向**不寫在這裡：那是這次出手對著誰的事（`WeaponAttack.aim`）。
    */
   arcFrom: number;
   arcTo: number;
@@ -320,6 +314,19 @@ export interface WeaponMotionCfg {
   push: number;
   /** 第二把慢多久出手（0~1，dual 用）。0 = 兩把同時，看起來像一把 */
   handDelay: number;
+}
+
+/**
+ * 一次出手的完整輸入。三層（`PixiGame` → `PlayerEntity` → `PawnSprite`）傳同一包，
+ * 中間不各自拆欄位 —— 拆了就會有某一層漏傳而靜默用預設值。
+ */
+export interface WeaponAttack {
+  type: PawnWeaponType;
+  material?: WeaponMaterial | null;
+  /** 揮向哪（螢幕角度）—— 由 `weaponAimFromDelta()` 依「玩家 → 目標」的位移算出 */
+  aim: number;
+  /** 這次出手的攻擊間隔（ms），決定演出被壓縮多少（§ 48.6.4） */
+  attackIntervalMs: number;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -641,23 +648,27 @@ export interface WeaponGeom {
  * 正面／背面由武器自己決定（`WeaponGeom.faceSide`）——
  * 那兩個朝向看不出是哪一隻手，該偏哪邊是造型問題不是朝向問題。
  */
-export function weaponSideSign(g: WeaponGeom, aimId: WeaponAimId): number {
-  const axis = WEAPON_FACING_AXIS[aimId];
-  /* 正上與正下看不出是哪一隻手，交給武器自己決定 */
-  return axis.side === 0 ? g.faceSide : axis.side;
+export function weaponSideSign(g: WeaponGeom, aim: number): number {
+  const { side } = weaponAxis(aim);
+  /**
+   * 接近正上／正下時看不出是哪一隻手，交給武器自己決定。
+   * 用漸變而不是硬切：`side` 在那附近本來就趨近 0，硬切會在角度掃過去時跳一下。
+   */
+  const t = Math.min(1, Math.abs(side) / 0.35);
+  return side * t + g.faceSide * (1 - t);
 }
 
 /**
  * 這個方向要用多大的揮舞半徑。
  *
  * 三個半徑（左右／往上／往下）當成一個**橢圓的半軸**，斜角取橢圓上的那一點 ——
- * 八個方向就會平滑過渡。二選一的話，右與右下會突然差一截。
+ * 任何角度都平滑過渡。二選一的話，右與右下會突然差一截。
  *
  * 為什麼上下要分開：角色上下不對稱。往上要越過整顆頭才看得見，
  * 往下只要離開軀幹；而往上的武器是畫在角色**之下**的，卡在頭上就等於消失。
  */
-export function weaponHold(g: WeaponGeom, aimId: WeaponAimId): number {
-  const v = aimVector(WEAPON_FACING_AXIS[aimId].aim);
+export function weaponHold(g: WeaponGeom, aim: number): number {
+  const v = aimVector(aim);
   const h = Math.max(0.001, g.swingH);
   const vert = Math.max(0.001, v.y < 0 ? g.swingUp : g.swingDown);
   return 1 / Math.hypot(v.x / h, v.y / vert);
@@ -675,7 +686,7 @@ export interface WeaponGrip {
  * 這是**弧心**（肩的位置），不是武器所在的位置 ——
  * 手在揮舞過程中會沿著半徑 `swingH` / `swingV` 的圓弧離開這裡。
  *
- * 側邊由 `WEAPON_FACING_AXIS.side` 決定：
+ * 側邊由 `weaponSideSign()` 決定：
  * 面向鏡頭時在畫面右、背對時在畫面左（同一隻手繞到另一邊去了）。
  *
  * 側面兩隻手都在同一側（另一隻被身體擋住），所以第二把只往內縮、往上抬，
@@ -684,11 +695,11 @@ export interface WeaponGrip {
  * **不做鏡射。** 四個朝向全部靠旋轉到位，鏡射會把單刃斧、弓這類
  * 有正反面的形狀翻過來，跟旋轉的結果對不起來。
  */
-export function weaponGrip(g: WeaponGeom, aimId: WeaponAimId, hand: 0 | 1 = 0): WeaponGrip {
+export function weaponGrip(g: WeaponGeom, aim: number, hand: 0 | 1 = 0): WeaponGrip {
   const s = g.scale / 100;
-  const sideSign = weaponSideSign(g, aimId);
-  /* 側身時身體窄一圈，握點跟著收窄 —— 只有左右兩個方向是真的側身 */
-  const isSide = aimId === 'left' || aimId === 'right';
+  const sideSign = weaponSideSign(g, aim);
+  /* 側身時身體窄一圈，握點跟著收窄。愈接近正側面收得愈多 */
+  const isSide = pawnFacingForAim(aim) === 'left' || pawnFacingForAim(aim) === 'right';
   const baseX = g.gripX * s * (isSide ? g.sideGripMul / 100 : 1);
   const baseY = -g.gripY * s;
 
@@ -701,6 +712,42 @@ export function weaponGrip(g: WeaponGeom, aimId: WeaponAimId, hand: 0 | 1 = 0): 
     };
   }
   return { x: -sideSign * baseX, y: baseY };
+}
+
+/**
+ * 投射物從武器的哪一點出去（**武器自身座標**，握點為原點、指向正上方）。
+ *
+ * 從角色身上射出的話，畫面上會看到箭從弓的旁邊冒出來 —— 弓已經畫在
+ * 離身體一段距離的地方了，兩者對不起來。
+ */
+function weaponMuzzleLocal(params: WeaponParams): { x: number; y: number } {
+  switch (params.shape) {
+    /* 弓：握點就在弓的正中央，箭從弓背那一側離開 */
+    case 'bow': return { x: params.bendW * 0.5, y: 0 };
+    /* 法杖：從頂端的寶珠出去，不是從握著的手 */
+    case 'staff': return { x: 0, y: -(params.shaftLen * 0.88 + params.gemR * 1.4) };
+    default: return { x: 0, y: 0 };
+  }
+}
+
+/**
+ * 這次出手時，投射物該從哪裡生出來 —— 相對角色腳底（所站地磚中心）的螢幕偏移。
+ *
+ * 取**揮到底那一刻**的姿勢：遠程武器的命中判定就在那個時間點，
+ * 取別的時間點會讓箭從還沒定位的弓上射出去。
+ */
+export function weaponMuzzle(art: WeaponArt, aim: number): { x: number; y: number } {
+  const pose = weaponPose(art.motion, art.geom, art.motion.tStrike, 0, aim);
+  const grip = weaponGrip(art.geom, aim, 0);
+  const local = weaponMuzzleLocal(art.params);
+  const s = art.geom.scale / 100;
+  const r = (pose.angle * Math.PI) / 180;
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  return {
+    x: grip.x + pose.offX + (local.x * cos - local.y * sin) * s,
+    y: grip.y + pose.offY + (local.x * sin + local.y * cos) * s,
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -780,7 +827,7 @@ export function weaponPlaybackMs(cfg: WeaponMotionCfg, attackIntervalMs: number)
  *
  * ── 揮舞是「手跑一條弧線」，不是「武器繞固定圓心轉」 ──
  * 弧心在肩（`weaponGrip()` 回傳的點），手沿半徑 `swingH` / `swingV` 的圓弧
- * 甩過該朝向的弧線（`WEAPON_FACING_AXIS.from` → `to`），武器順著半徑指出去。
+ * 甩過這把武器自己的弧線（`arcFrom` → `arcTo`，以揮擊角度為中心），武器順著半徑指出去。
  * 手不動只轉武器的話，看起來是風車在原地轉，讀不出揮擊。
  *
  * 四個朝向都是同一種橫掃，只差掃在哪一格、從哪一側起手。
@@ -793,13 +840,13 @@ export function weaponPose(
   g: WeaponGeom,
   t: number,
   hand: 0 | 1 = 0,
-  aimId: WeaponAimId = 'right',
+  aim = 90,
 ): WeaponPose {
   const tt = hand === 1 && cfg.motion === 'dual' ? t - cfg.handDelay : t;
   if (tt < 0 || tt > 1) return HIDDEN;
 
-  const axis = WEAPON_FACING_AXIS[aimId];
-  const aim = aimVector(axis.aim);
+  const axis = weaponAxis(aim);
+  const aimVec = aimVector(aim);
   const { tWindup, tStrike, tRecover } = cfg;
 
   const alpha = Math.min(1, tt / FADE_IN) * (tt <= tRecover ? 1 : 1 - seg(tt, tRecover, 1));
@@ -816,12 +863,12 @@ export function weaponPose(
       : 1 - seg(tt, tStrike, tStrike + RELEASE);
     const kick = tt < tStrike ? 0 : -cfg.push * (1 - seg(tt, tStrike, 1));
     /* 弓端在身體外面，不是黏在身上；背面還要越過頭才看得見 */
-    const hold = weaponHold(g, aimId) * (g.scale / 100) * cfg.swingMul;
+    const hold = weaponHold(g, aim) * (g.scale / 100) * cfg.swingMul;
     return {
-      angle: axis.aim - 90 + cfg.tilt,
+      angle: aim - 90 + cfg.tilt,
       lead: 1,
-      offX: aim.x * (hold + kick),
-      offY: aim.y * (hold + kick),
+      offX: aimVec.x * (hold + kick),
+      offY: aimVec.y * (hold + kick),
       alpha,
       pull,
       visible: true,
@@ -837,13 +884,13 @@ export function weaponPose(
       : lerp(cfg.push, 0, easeOut(seg(tt, tStrike, 1)));
     /* 杖保持直立：角度是相對正上方的固定傾斜，往面朝側倒 */
     const s = g.scale / 100;
-    const hold = weaponHold(g, aimId) * s * cfg.swingMul;
-    const sideSign = weaponSideSign(g, aimId);
+    const hold = weaponHold(g, aim) * s * cfg.swingMul;
+    const sideSign = weaponSideSign(g, aim);
     return {
       angle: sideSign * cfg.tilt,
       lead: sideSign >= 0 ? 1 : -1,
-      offX: aim.x * (push + hold),
-      offY: aim.y * (push + hold),
+      offX: aimVec.x * (push + hold),
+      offY: aimVec.y * (push + hold),
       alpha,
       pull: 0,
       visible: true,
@@ -861,8 +908,8 @@ export function weaponPose(
 
   /* 第二把把旋轉方向反過來，兩把才交叉 */
   const spin = hand === 1 && cfg.motion === 'dual' ? -axis.spin : axis.spin;
-  /* 這把武器自己的弧線，套上該朝向的方向 */
-  const theta = axis.aim + spin * lerp(cfg.arcFrom, cfg.arcTo, f);
+  /* 這把武器自己的弧線，以這次的揮擊角度為中心 */
+  const theta = aim + spin * lerp(cfg.arcFrom, cfg.arcTo, f);
 
   /**
    * 手的位置：從弧心往 theta 方向推一個半徑。
@@ -870,7 +917,7 @@ export function weaponPose(
    */
   const s = g.scale / 100;
   const radius =
-    weaponHold(g, aimId) * s * cfg.swingMul
+    weaponHold(g, aim) * s * cfg.swingMul
     + cfg.reach * clamp01(seg(tt, tWindup, tStrike));
   const dir = aimVector(theta);
 

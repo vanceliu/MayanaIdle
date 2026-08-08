@@ -17,7 +17,7 @@
 
   ── 揮擊在哪裡發生 ──
   **揮擊整段就發生在面朝的那一格**，不是從身上伸過去。
-  武器有**八個方向**（`WEAPON_AIM_IDS`），角色只有四張圖，靠 `pawnFacingForAim()` 合併。
+  武器的揮擊角度是**連續的**（直接對著目標），角色只有四張圖，靠 `pawnFacingForAim()` 收斂。
   揮舞是**手自己跑一條弧線**（半徑 `WeaponGeom.swingH` / `swingV`），不是武器繞固定圓心轉 ——
   手不動只轉武器的話，看起來是風車在原地轉。
   弓與法杖不甩手：`swingMul` 分別是 0 與 0.25。
@@ -98,7 +98,8 @@ textarea {
 <p class="demo-note">
   武器<b>只在攻擊的那 0.3 秒出現</b>，平常不畫 —— 角色沒有手臂，常駐的武器等於黏在身上的一根棒子。<br>
   <b>手沿著弧線甩過去</b>，掃過面朝的那一格 —— 不是武器繞固定圓心轉半圈。<br>
-  <b>武器有八個方向</b>（角色只有四張圖，是貼圖成本；武器是旋轉，多四個斜角零成本）。<br>
+  <b>武器直接對著目標算角度</b>，不切方向 —— 等距地圖上世界軸的四個方向落在 ±63.4° / ±116.6°，
+  45 度格線上根本沒有那四個角度。下面八格是遊戲中真正會出現的八個方向。<br>
   演出長度會隨攻擊間隔壓縮 —— 設計時長是「常速手感」，攻速堆滿時自動變快，永遠塞得進一次攻擊間隔。<br>
   造型只認<b>武器類型</b>（10 種），189 把的個體差異交給材質色 —— 20px 的剪影分不出一把一款。<br>
   <b>調到滿意後按「匯出參數」，那份 JSON 就是實作要用的數字。</b>
@@ -108,12 +109,12 @@ textarea {
   <div class="demo-main">
 
     <div class="demo-card">
-      <h2>八方向演出（站在真實尺寸的等距地磚上）</h2>
+      <h2>八個真實方向的演出（站在真實尺寸的等距地磚上）</h2>
       <p class="hint">
         地磚是 <code>TILE_W=64 / TILE_H=32</code>，與遊戲一致 —— 判斷武器大小的唯一依據。
         <b>往上的三個方向武器畫在角色之下</b> —— 目標格在更遠處，深度上就在角色後面；
         其餘方向的目標格比角色近，畫在上層。<br>
-        角色只有四張圖，八個方向會合併回去（<code>pawnFacingForAim</code>），
+        角色只有四張圖，連續的揮擊角度會收斂回去（<code>pawnFacingForAim</code>），
         與 <code>facing.ts</code> 同一套規則 —— 兩邊分岔就會出現朝向與揮向對不起來。
       </p>
       <canvas id="scene" height="520"></canvas>
@@ -130,7 +131,7 @@ textarea {
     </div>
 
     <div class="demo-card">
-      <h2>十種武器 × 八方向</h2>
+      <h2>十種武器 × 八個真實方向</h2>
       <p class="hint">八十格全部跟著上面那條時間軸走 —— 拖時間軸就能同時比十把武器的揮法。</p>
       <canvas id="all" height="1700"></canvas>
     </div>
@@ -183,7 +184,7 @@ textarea {
 import { TILE_W, TILE_H, PRESETS, drawPawn, drawTile } from './pawnDemo.ts';
 import { PAWN_DIRECTION_BY_ID } from '../src/pixi/entities/pawn/geometry';
 import {
-  PAWN_WEAPON_TYPES, WEAPON_ART, WEAPON_AIM_IDS, AIM_LABELS, MATERIAL_LABELS,
+  PAWN_WEAPON_TYPES, WEAPON_ART, AIM_SAMPLES, MATERIAL_LABELS,
   SHAPE_PARAM_META, MOTION_PARAM_META, GEOM_PARAM_META,
   weaponColors, weaponTotalT, weaponPlaybackMs, weaponBehindPawn, pawnFacingForAim,
   drawWeaponAt,
@@ -224,8 +225,8 @@ const cycleT = () => interval / playMs();
 
 const $ = (id) => document.getElementById(id);
 
-/** 角色只有四張圖，八個揮擊方向要合併回去（`pawnFacingForAim`） */
-const pawnDir = (aimId) => PAWN_DIRECTION_BY_ID[pawnFacingForAim(aimId)];
+/** 角色只有四張圖，連續的揮擊角度要收斂回去（`pawnFacingForAim`） */
+const pawnDir = (aim) => PAWN_DIRECTION_BY_ID[pawnFacingForAim(aim)];
 
 /* ═══════════════════════════════════════════════════════════
    畫布
@@ -260,7 +261,7 @@ function world(ctx, dpr, z, cx, cy) {
   ctx.setTransform(z * dpr, 0, 0, z * dpr, cx * dpr, cy * dpr);
 }
 
-function drawStage(ctx, dpr, z, cx, cy, aimId, tt, showTrail) {
+function drawStage(ctx, dpr, z, cx, cy, aim, tt, showTrail) {
   world(ctx, dpr, z, cx, cy);
   drawTile(ctx, 0, 0, '#191933', true);
 
@@ -270,16 +271,16 @@ function drawStage(ctx, dpr, z, cx, cy, aimId, tt, showTrail) {
     for (let i = 1; i <= 6; i++) {
       ctx.save();
       ctx.globalAlpha = 0.16;
-      drawWeaponAt(ctx, 0, 0, aimId, art(), colors(), (i / 7) * total);
+      drawWeaponAt(ctx, 0, 0, aim, art(), colors(), (i / 7) * total);
       ctx.restore();
     }
   }
 
   /* 往上揮時武器在角色之後 —— 目標格在更遠處，畫在上層會整支蓋過頭 */
-  const weapon = () => drawWeaponAt(ctx, 0, 0, aimId, art(), colors(), tt);
-  if (weaponBehindPawn(aimId)) weapon();
-  drawPawn(ctx, 0, 0, pawnDir(aimId), look());
-  if (!weaponBehindPawn(aimId)) weapon();
+  const weapon = () => drawWeaponAt(ctx, 0, 0, aim, art(), colors(), tt);
+  if (weaponBehindPawn(aim)) weapon();
+  drawPawn(ctx, 0, 0, pawnDir(aim), look());
+  if (!weaponBehindPawn(aim)) weapon();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
@@ -291,16 +292,16 @@ function renderScene() {
   const rowH = h / 2;
   const z = zoom / 100;
 
-  WEAPON_AIM_IDS.forEach((aimId, i) => {
+  AIM_SAMPLES.forEach(({ aim, label }, i) => {
     const cx = cellW * ((i % COLS) + 0.5);
     const rowTop = Math.floor(i / COLS) * rowH;
-    drawStage(ctx, dpr, z, cx, rowTop + rowH * 0.74, aimId, t, trail);
+    drawStage(ctx, dpr, z, cx, rowTop + rowH * 0.74, aim, t, trail);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#64748B';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`揮向${AIM_LABELS[aimId]}`, cx, rowTop + rowH - 6);
+    ctx.fillText(`揮向${label}　${aim}°`, cx, rowTop + rowH - 6);
   });
 }
 
@@ -313,7 +314,7 @@ function renderAll() {
   const { ctx, w, h, dpr } = fit(c);
   const LABEL_W = 78;
   const HEAD_H = 22;
-  const colW = (w - LABEL_W) / WEAPON_AIM_IDS.length;
+  const colW = (w - LABEL_W) / AIM_SAMPLES.length;
   const rowH = (h - HEAD_H) / PAWN_WEAPON_TYPES.length;
   /* 雙手武器揮到底時會伸出去很遠，列高與縮放都要留得下它 */
   const z = Math.min(1.15, (colW / TILE_W) * 1.35);
@@ -322,8 +323,8 @@ function renderAll() {
   ctx.font = '12px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#A78BFA';
-  WEAPON_AIM_IDS.forEach((aimId, i) => {
-    ctx.fillText(AIM_LABELS[aimId], LABEL_W + colW * (i + 0.5), 15);
+  AIM_SAMPLES.forEach(({ label }, i) => {
+    ctx.fillText(label, LABEL_W + colW * (i + 0.5), 15);
   });
 
   PAWN_WEAPON_TYPES.forEach((id, row) => {
@@ -335,12 +336,12 @@ function renderAll() {
     ctx.fillStyle = id === type ? '#A78BFA' : '#64748B';
     ctx.fillText(WEAPON_ART[id].label, 8, rowTop + rowH * 0.5);
 
-    WEAPON_AIM_IDS.forEach((aimId, col) => {
+    AIM_SAMPLES.forEach(({ aim }, col) => {
       world(ctx, dpr, z, LABEL_W + colW * (col + 0.5), baseY);
-      const weapon = () => drawWeaponAt(ctx, 0, 0, aimId, arts[id], colors(), t);
-      if (weaponBehindPawn(aimId)) weapon();
-      drawPawn(ctx, 0, 0, pawnDir(aimId), look());
-      if (!weaponBehindPawn(aimId)) weapon();
+      const weapon = () => drawWeaponAt(ctx, 0, 0, aim, arts[id], colors(), t);
+      if (weaponBehindPawn(aim)) weapon();
+      drawPawn(ctx, 0, 0, pawnDir(aim), look());
+      if (!weaponBehindPawn(aim)) weapon();
     });
   });
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

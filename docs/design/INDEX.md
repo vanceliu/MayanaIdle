@@ -53,6 +53,7 @@
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
 | **角色外觀（髮型/睫毛/膚色髮色眼色/四朝向）** | `04-character.md` | § 4.10 |
+| **武器外觀與揮擊演出（揮擊角度/演出長度）** | `48-vfx.md` | § 48.6 |
 | 創角的外觀步驟 | `19-account-character.md` | § 19.4（規格見 `04-character.md` § 4.10） |
 | 外觀存哪／匯出匯入落點 | `18-data-schema.md` | § 18.7 |
 | 技能系統規則 | `05-skill.md` | 全文 |
@@ -205,7 +206,7 @@
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
 | `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限 |
 | `47-mobile.md` | 行動裝置適配 | 斷點、觸控互動、指標拖放、手機版面、PWA |
-| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、共通參數；印記師與戰鬥特效待補 |
+| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、印記師、**武器攻擊演出**；其餘戰鬥特效待補 |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
 | `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
 
@@ -265,6 +266,7 @@
                                                   06-equipment-acquire.md（區域素材→製作配方）
 
 04-character.md § 4.10（角色外觀＝髮型/睫毛/色票/四朝向的唯一出處）
+  ←→ 48-vfx.md § 48.6（武器外觀＝武器類型造型/揮擊角度/演出長度的唯一出處）
   ←→ 19-account-character.md § 19.4（創角流程的外觀步驟）／§ 19.9（匯出匯入帶 appearance）
   ←→ 18-data-schema.md § 18.7（appearance 欄位與四個落點，匯入必須逐欄位列出）
   ←→ 40-pixijs-migration.md（玩家/NPC 用剪影並烘成 RenderTexture，怪物維持圓形）

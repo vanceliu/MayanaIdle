@@ -85,6 +85,12 @@ export interface PlayerTickResult {
   attackTargetIdx?: number;
 }
 
+/**
+ * 追擊中最多能累積到冷卻的幾成。
+ * 1 = 走路時間全算（密集怪群下 DPS 會超過攻速面板）、0 = 全部抹掉（走路白走）。
+ */
+const CHASE_COOLDOWN_CARRY = 0.5;
+
 export function tickPlayerCombat(
   ctx: PlayerCombatContext,
   playerPos: Position,
@@ -166,7 +172,22 @@ export function tickPlayerCombat(
 
   // Need to get closer
   ctx.state = 'chasing';
-  ctx.attackTimer = 0;
+  /**
+   * 追擊中計時器**照走，但只累積到冷卻的一半**（`41-arpg-combat.md` § 3.1）。
+   *
+   * 歸零是錯的：冷卻是「距離上一次出手過了多久」，走路那段時間本來就過去了，
+   * 抹掉它等於同一件事算兩次。
+   *
+   * 但也不能整段照算：一刀一隻的密集怪群下，每次接敵都補滿冷卻，
+   * 兩次出手的間隔會被走路時間吃掉一大截，實際 DPS 高於攻速面板。
+   * 折半是兩者之間 —— 走路不白走，也不會走到就打。
+   *
+   * 已經超過一半的不倒扣：那是站定等冷卻累積來的，不該因為怪跑掉而沒收。
+   */
+  const carried = ctx.attackCooldown * CHASE_COOLDOWN_CARRY;
+  if (ctx.attackTimer < carried) {
+    ctx.attackTimer = Math.min(ctx.attackTimer + deltaMs, carried);
+  }
   return { action: 'move_to', moveTarget: target.position, moveRange };
 }
 

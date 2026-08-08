@@ -113,7 +113,10 @@ client/src/
 │   │       ├── geometry.ts     # 體型/頭/眼/髮尾的繪製參數、四朝向定義
 │   │       ├── hairRender.ts   # 逐髮型的繪製設定（髮際線、髮尾、頭頂）
 │   │       ├── drawPawn.ts     # 繪製本體（Canvas 2D，client/demo 調校頁共用同一份）
-│   │       └── pawnTexture.ts  # 烘成貼圖並快取（每造型 × 4 朝向）
+│   │       ├── pawnTexture.ts  # 烘成貼圖並快取（每造型 × 4 朝向）
+│   │       ├── weaponGeometry.ts # 武器的形狀/握點/揮法數字 + 揮擊角度推導
+│   │       ├── drawWeapon.ts     # 武器繪製本體（規格見 `48-vfx.md` § 48.6）
+│   │       └── weaponTexture.ts  # 武器烘貼圖並快取（每類型 × 材質）
 │   ├── ui/
 │   │   ├── HealthBar.ts        # 血條
 │   │   ├── DamageNumber.ts     # 傷害數字
@@ -176,6 +179,8 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 | 朝向由**位移推算**，不另存狀態 | 朝向是移動的結果不是獨立狀態，另存一份就會有「存的朝向與實際走向不一致」的同步問題 |
 | 剪影用 Canvas 2D 畫進離屏畫布再 `Texture.from()`，不用 Pixi Graphics | 反正要烘成貼圖、不每幀重畫，誰畫的沒有效能差別；而 Pixi Graphics 沒有 `miterLimit`、`roundRect` 圓角語意也不同，改寫等於把調校過的形狀重新賭一次。留在 Canvas 2D 還能與 `client/demo` 的調校頁共用同一份實作 |
 | 玩家／NPC 用剪影，**怪物維持圓形** | 怪物種類遠多於玩家造型，每種都要一套剪影是另一個量級的工作；先做玩家與 NPC，怪物之後再議 |
+| 武器**直接對著目標算角度**，角色仍四朝向 | 角色每個朝向是一張烘好的貼圖（13 髮型 × 8 = 104 張）；武器是旋轉，角度多細都零新美術。等距地圖上世界軸的四個方向落在螢幕 ±63.4°/±116.6°，切八等分會吸附掉 18.4 度（`48-vfx.md` § 48.6.3） |
+| 武器**只在出手時顯示** | 角色沒有手臂，常駐的武器等於黏在身上的一根棒子（`48-vfx.md` § 48.6.1） |
 
 ## 11. 風險與對策
 
@@ -194,4 +199,5 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 - [x] 技能特效預留（架構可擴展）
 - [ ] Sprite sheet 替換幾何圖形（美術資源就緒後）
 - [ ] 玩家／NPC 由圓形改為 pawn 剪影（規格見 `04-character.md` § 4.10）
+- [x] 武器攻擊演出接進 `PawnSprite` / `PlayerEntity` / `PixiGame`（規格見 `48-vfx.md` § 48.6）
 - [ ] 手動操作模式 UI（虛擬搖桿、技能按鈕）

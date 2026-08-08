@@ -99,6 +99,57 @@ describe('tickPlayerCombat', () => {
     expect(ctx.attackTimer).toBe(0);
   });
 
+  describe('追擊中的攻擊冷卻', () => {
+    const far = [{ id: 'm0', index: 0, position: { x: 8, y: 0 }, alive: true }];
+    const melee = { attackType: 'melee' as const, range: 1.5 };
+
+    it('計時器照走，不歸零 —— 走路的時間本來就過去了', () => {
+      const ctx = createPlayerCombatContext();
+      ctx.attackCooldown = 1000;
+
+      const r = tickPlayerCombat(ctx, { x: 0, y: 0 }, far, melee, openMap, 200);
+      expect(r.action).toBe('move_to');
+      expect(ctx.state).toBe('chasing');
+      expect(ctx.attackTimer).toBe(200);
+    });
+
+    it('最多只累積到冷卻的一半 —— 一刀一隻的密集怪群不會把冷卻走光', () => {
+      const ctx = createPlayerCombatContext();
+      ctx.attackCooldown = 1000;
+      for (let i = 0; i < 20; i++) {
+        tickPlayerCombat(ctx, { x: 0, y: 0 }, far, melee, openMap, 500);
+      }
+      expect(ctx.attackTimer).toBe(500);
+    });
+
+    it('接敵後仍要等剩下的一半才出手，不是走到就打', () => {
+      const ctx = createPlayerCombatContext();
+      ctx.attackCooldown = 1000;
+      for (let i = 0; i < 10; i++) {
+        tickPlayerCombat(ctx, { x: 0, y: 0 }, far, melee, openMap, 500);
+      }
+
+      /* 走到定位：計時器停在 500，還差 500 */
+      const adjacent = [{ id: 'm0', index: 0, position: { x: 1, y: 0 }, alive: true }];
+      expect(tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 400).action).toBe('none');
+      expect(tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 200).action).toBe('attack');
+    });
+
+    it('站定等冷卻累積到超過一半後轉追擊，不會被倒扣', () => {
+      const ctx = createPlayerCombatContext();
+      ctx.attackCooldown = 1000;
+      const adjacent = [{ id: 'm0', index: 0, position: { x: 1, y: 0 }, alive: true }];
+
+      /* 腳本沒有可執行動作 → 原地待命，計時器夾在上限 */
+      tickPlayerCombat(ctx, { x: 0, y: 0 }, adjacent, melee, openMap, 900, false, false);
+      expect(ctx.attackTimer).toBe(900);
+
+      /* 怪跑掉轉成追擊：已經等到的不該沒收 */
+      tickPlayerCombat(ctx, { x: 0, y: 0 }, far, melee, openMap, 16);
+      expect(ctx.attackTimer).toBe(900);
+    });
+  });
+
   it('switches target when current dies', () => {
     const ctx = createPlayerCombatContext();
     ctx.targetMonsterId = 'm0';

@@ -22,6 +22,10 @@ import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
 import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../systems/arpgEngine';
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
+import { getEquippedWeapon, getPlayerAttackInterval } from '../systems/combat';
+import {
+  isPawnWeaponType, weaponAimFromDelta, weaponMuzzle, WEAPON_ART,
+} from '../pixi/entities/pawn/weaponGeometry';
 import { isRangedAttackType } from '../models/monster';
 import { isPlayerInvincible, absorbWithShield } from '../systems/combat';
 import type { MapMonster } from '../stores/mapMonsterStore';
@@ -129,6 +133,8 @@ export function PixiGame() {
         // 3. Render sync
         const playerPos = useMapControlStore.getState().playerPosition;
         if (playerEntityRef.current) {
+          /* 武器演出要在位置同步之前推進：出手那一幀才會用到剛設好的朝向 */
+          playerEntityRef.current.update(delta);
           playerEntityRef.current.updatePosition(playerPos, getRenderedElevation(map, playerPos));
         }
 
@@ -469,8 +475,41 @@ function tickArpgCombatLoop(
         const facingTarget = monsterStore.monsters.find(
           m => m.id === attackEvent.targetMonsterIds[0],
         );
-        if (facingTarget) {
-          player?.faceToward(playerPos, facingTarget.position);
+        /**
+         * 投射物要從**武器上**射出，不是從角色身上（`48-vfx.md` § 48.6）——
+         * 弓畫在離身體一段距離的地方，從身上射會看到箭從弓的旁邊冒出來。
+         * 沒有武器剪影時退回舊的固定高度。
+         */
+        let muzzle: { x: number; y: number } | null = null;
+        if (facingTarget && player) {
+          /**
+           * 武器一律用 `getEquippedWeapon()` 取（`99-ai-constraints.md` § 99.1 第 5 條）——
+           * `equippedGear` 是插入順序不是部位順序，用索引會靜默取到防具。
+           *
+           * 副手（盾牌／魔導書／臂甲）與空手不畫武器：那不是攻擊動作的一部分
+           * （`48-vfx.md` § 48.6.2），此時退回只轉向。
+           */
+          const held = getEquippedWeapon(allGear);
+          const weaponType = held?.type;
+          player.playAttack(
+            playerPos,
+            facingTarget.position,
+            isPawnWeaponType(weaponType)
+              ? {
+                  type: weaponType,
+                  material: held?.material ?? null,
+                  attackIntervalMs: getPlayerAttackInterval(allGear, gameState.activeEffects),
+                }
+              : null,
+          );
+
+          const aim = weaponAimFromDelta(
+            facingTarget.position.x - playerPos.x,
+            facingTarget.position.y - playerPos.y,
+          );
+          if (isPawnWeaponType(weaponType) && aim !== null) {
+            muzzle = weaponMuzzle(WEAPON_ART[weaponType], aim);
+          }
         }
 
         const result = processPlayerAttack(attackEvent, {
@@ -504,6 +543,9 @@ function tickArpgCombatLoop(
               if (isRangedAttackType(event.attackType) && hasProjectilePath(playerPos, targetMonster.position, mapStore.currentMap)) {
                 const pPos = useMapControlStore.getState().playerPosition;
                 const { sx: px, sy: py } = mapPositionToScreen(currentMap, pPos);
+                /* 從武器射出；沒有武器剪影（空手、副手）時退回原本的固定高度 */
+                const originX = px + (muzzle?.x ?? 0);
+                const originY = py + (muzzle?.y ?? -20);
                 const isSkill = !!result.skillUsed;
                 const element = result.skillUsed?.element ?? 'none';
                 const enchantBuff = !isSkill
@@ -528,7 +570,7 @@ function tickArpgCombatLoop(
                   const spawnFn = () => {
                     const spread = hits > 1 ? (h - (hits - 1) / 2) * 4 : 0;
                     effectLayer.spawnProjectile({
-                      fromX: px, fromY: py - 20 + spread,
+                      fromX: originX, fromY: originY + spread,
                       toX: mx, toY: my - 20,
                       speed: PLAYER_PROJECTILE_SPEED,
                       color,

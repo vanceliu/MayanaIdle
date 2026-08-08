@@ -5,6 +5,7 @@ import type { Appearance } from '../../models/appearance';
 import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
 import { PawnSprite } from './pawn/PawnSprite';
 import { toPawnLook } from './pawn/pawnTexture';
+import { weaponAimFromDelta, type WeaponAttack } from './pawn/weaponGeometry';
 
 /** 地面標記沿用原本圓點的藍 —— 剪影本身沒有敵我資訊，那個區分不能消失 */
 const PLAYER_MARKER = 0x4dabf7;
@@ -35,6 +36,26 @@ export class PlayerEntity {
    */
   faceToward(from: Position, to: Position): void {
     this.pawn.faceToward(from.x, from.y, to.x, to.y);
+  }
+
+  /**
+   * 出手：轉向目標並演出武器（`48-vfx.md` § 48.6）。
+   *
+   * 沒有裝武器（或裝的是副手類）時退回只轉向 —— 空手不畫武器。
+   */
+  playAttack(from: Position, to: Position, weapon: Omit<WeaponAttack, 'aim'> | null): void {
+    const aim = weaponAimFromDelta(to.x - from.x, to.y - from.y);
+    if (aim === null) return;
+    if (!weapon) {
+      this.faceToward(from, to);
+      return;
+    }
+    this.pawn.attack({ ...weapon, aim });
+  }
+
+  /** 每幀推進武器演出 */
+  update(deltaMs: number): void {
+    this.pawn.update(deltaMs);
   }
 
   updatePosition(pos: Position, elevation = 0): void {
