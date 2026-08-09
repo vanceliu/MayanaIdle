@@ -3,7 +3,7 @@ import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
 import { MonsterListOverlay } from './MonsterListOverlay';
-import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
+import { useGameStore, getEffectiveMaxHp, selectCombatRules, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
@@ -682,7 +682,7 @@ function tickArpgCombatLoop(
     skills: gameState.skills,
     activeEffects: gameState.activeEffects,
     equippedGear: allGear,
-    combatRules: gameState.combatRules ?? [],
+    combatRules: selectCombatRules(gameState),
     mapMonsters: monsterStore.monsters,
     monsterInstances,
     map: mapStore.currentMap,

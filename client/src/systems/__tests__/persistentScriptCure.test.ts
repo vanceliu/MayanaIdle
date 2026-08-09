@@ -48,7 +48,7 @@ function cureRule(debuffType: ScriptDebuffCondition, cureItemName: string, enabl
   return {
     id: `cure-${debuffType}`,
     enabled,
-    condition: { type: 'debuff_active', debuffType },
+    conditions: [{ type: 'debuff_active', debuffType }],
     action: { type: 'cure_item', cureItemId: getItemId(cureItemName)! },
   };
 }
@@ -85,7 +85,7 @@ describe('常駐腳本 — debuff_active 條件', () => {
   it('未指定 debuffType 的規則視為不成立', () => {
     const rule: PersistentRule = {
       id: 'broken', enabled: true,
-      condition: { type: 'debuff_active' },
+      conditions: [{ type: 'debuff_active' }],
       action: { type: 'cure_item', cureItemId: getItemId('解毒藥水')! },
     };
     expect(evaluatePersistentScript([rule], ctx(['poison'], bag('解毒藥水')))).toBeNull();
@@ -113,7 +113,7 @@ describe('常駐腳本 — cure_item 動作可執行性', () => {
   it('道具與 debuff 不對應時不可執行', () => {
     const rule: PersistentRule = {
       id: 'mismatch', enabled: true,
-      condition: { type: 'debuff_active', debuffType: 'poison' },
+      conditions: [{ type: 'debuff_active', debuffType: 'poison' }],
       action: { type: 'cure_item', cureItemId: getItemId('止血繃帶')! },
     };
     expect(evaluatePersistentScript([rule], ctx(['poison'], bag('止血繃帶')))).toBeNull();
@@ -146,7 +146,7 @@ describe('常駐腳本 — cure_item 動作可執行性', () => {
   it('減速搭配加速藥水可執行（§ 24.4.6 對沖）', () => {
     const rule: PersistentRule = {
       id: 'slow-haste', enabled: true,
-      condition: { type: 'debuff_active', debuffType: 'slow' },
+      conditions: [{ type: 'debuff_active', debuffType: 'slow' }],
       action: { type: 'speed_potion', speedPotionType: 'green' },
     };
     expect(evaluatePersistentScript([rule], ctx(['slow'], bag('綠色藥水'))))
@@ -171,7 +171,7 @@ describe('常駐腳本 — cure_item 動作可執行性', () => {
   it('未指定道具名稱時不可執行', () => {
     const rule: PersistentRule = {
       id: 'no-item', enabled: true,
-      condition: { type: 'debuff_active', debuffType: 'poison' },
+      conditions: [{ type: 'debuff_active', debuffType: 'poison' }],
       action: { type: 'cure_item' },
     };
     expect(evaluatePersistentScript([rule], ctx(['poison'], bag('解毒藥水')))).toBeNull();

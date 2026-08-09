@@ -3,7 +3,7 @@ import type { MonsterInstance } from '../models/monster';
 import type { Character } from '../models/character';
 import type { Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
-import type { CombatAction } from '../models/scriptEngine';
+import type { CombatAction, CombatRule } from '../models/scriptEngine';
 import type { EquipmentInstance } from '../models/equipment';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInfo } from './playerCombatFSM';
@@ -21,9 +21,9 @@ import {
   createMonsterCombatContext,
   tickMonsterCombat,
 } from './monsterCombatFSM';
-import { getDistance } from './lineOfSight';
+import { resolveActionTargets } from './targeting';
 import type { MonsterAttackType } from '../models/monster';
-import { evaluateCombatScript, type CombatScriptContext } from './scriptRunner';
+import { evaluateCombatScript, type CombatScriptContext, type ScriptMonsterView } from './scriptRunner';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
 import { isPlayerStunned } from './playerDebuffSystem';
 
@@ -54,7 +54,7 @@ export interface ArpgTickInput {
   skills: Skill[];
   activeEffects: ActiveEffect[];
   equippedGear: (EquipmentInstance | null)[];
-  combatRules: { enabled: boolean; condition: any; action: CombatAction; id: string }[];
+  combatRules: CombatRule[];
   mapMonsters: MapMonster[];
   monsterInstances: Map<string, MonsterInstance>;
   map: MapData;
@@ -117,9 +117,7 @@ export function tickArpgEngine(
 
   // Pre-evaluate script to determine effective attack range
   // If script would use a ranged skill, extend the range
-  const aliveForScript = Array.from(engine.monsters.values())
-    .filter(m => m.instance.currentHp > 0)
-    .map(m => m.instance);
+  const aliveForScript = buildScriptMonsters(engine);
 
   // 追擊距離看「腳本啟用的規則會用到什麼」，與此刻剛好選中哪一招無關。
   // 少了這一條，技能全在冷卻時射程會塌回武器射程，遠程職業就會往怪身上蹭（§ 3.1）
@@ -134,6 +132,9 @@ export function tickArpgEngine(
       now: Date.now(),
       cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
       weaponType,
+      playerPos,
+      primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
+      weaponRange,
     };
     const nextAction = evaluateCombatScript(combatRules, scriptCtx);
     hasExecutableAction = nextAction !== null;
@@ -179,17 +180,16 @@ export function tickArpgEngine(
 
   if (playerResult.action === 'attack') {
     // Use combat script to decide attack action
-    const aliveMonsters = Array.from(engine.monsters.values())
-      .filter(m => m.instance.currentHp > 0)
-      .map(m => m.instance);
-
     const scriptCtx: CombatScriptContext = {
       character,
-      monsters: aliveMonsters,
+      monsters: buildScriptMonsters(engine),
       skills,
       now: Date.now(),
       cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
       weaponType,
+      playerPos,
+      primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
+      weaponRange,
     };
 
     /**
@@ -332,6 +332,17 @@ function syncMonsterContexts(
   }
 }
 
+/** 引擎狀態 → 戰鬥腳本看到的怪（只留活怪，帶 id 與位置） */
+function buildScriptMonsters(engine: ArpgEngineState): ScriptMonsterView[] {
+  const views: ScriptMonsterView[] = [];
+  for (const [id, m] of engine.monsters) {
+    if (m.instance.currentHp > 0) {
+      views.push({ id, instance: m.instance, position: m.mapMonster.position });
+    }
+  }
+  return views;
+}
+
 function resolveTargets(
   engine: ArpgEngineState,
   action: CombatAction,
@@ -340,93 +351,12 @@ function resolveTargets(
   /** 這個動作自己的射程。主目標超出就不出手，不可沿用 FSM 被技能撐開的值 */
   maxRange: number,
 ): string[] {
-  const aliveMonsters = Array.from(engine.monsters.entries())
-    .filter(([, m]) => m.instance.currentHp > 0);
-
-  if (aliveMonsters.length === 0) return [];
-
-  // Find primary target (nearest or FSM selected)
-  const targetMonsterId = engine.playerCtx.targetMonsterId;
-  let primaryId: string | null = null;
-
-  if (targetMonsterId && engine.monsters.has(targetMonsterId)) {
-    const m = engine.monsters.get(targetMonsterId)!;
-    if (m.instance.currentHp > 0) {
-      primaryId = targetMonsterId;
-    }
-  }
-
-  if (!primaryId) {
-    // Fallback to nearest
-    let minDist = Infinity;
-    for (const [id, m] of aliveMonsters) {
-      const d = getDistance(playerPos, m.mapMonster.position);
-      if (d < minDist) {
-        minDist = d;
-        primaryId = id;
-      }
-    }
-  }
-
-  if (!primaryId) return [];
-
-  // 主目標超出這個動作的射程就不出手（FSM 的追擊距離與出手判定是兩個數字）
-  const primary = engine.monsters.get(primaryId)!;
-  if (getDistance(playerPos, primary.mapMonster.position) > maxRange) return [];
-
-  // Single target or no skill
-  if (action.type === 'normal_attack') {
-    return [primaryId];
-  }
-
-  if (action.type === 'skill' && action.skillId) {
-    const skill = skills.find(s => s.id === action.skillId);
-    if (!skill) return [primaryId];
-
-    // Single target skill
-    if (skill.target === 'single') {
-      return [primaryId];
-    }
-
-    // AOE skill
-    if (skill.target === 'aoe') {
-      // 41-arpg-combat.md § 3.4/3.5：半徑、目標上限、圓心模式為三個獨立欄位
-      const aoeRadius = skill.aoeRadius ?? 3;
-      const maxTargets = skill.maxTargets ?? 1;
-
-      // self 模式：以角色為圓心、範圍內全打（無數量上限）
-      // target 模式：以主目標為圓心，依距離取最近的 maxTargets 隻
-      const isSelfCentered = skill.aoeCenter === 'self';
-
-      if (isSelfCentered) {
-        // Self-centered: find all alive monsters within aoeRadius of player (no max limit)
-        const allInRange = aliveMonsters
-          .filter(([, m]) => getDistance(playerPos, m.mapMonster.position) <= aoeRadius)
-          .map(([id]) => id);
-        return allInRange;
-      } else {
-        // Target-centered: primary target + nearby within aoeRadius, up to maxTargets
-        const primaryMonster = engine.monsters.get(primaryId);
-        if (!primaryMonster) return [primaryId];
-
-        const center = primaryMonster.mapMonster.position;
-        const candidates = aliveMonsters
-          .filter(([id]) => id !== primaryId)
-          .map(([id, m]) => ({
-            position: m.mapMonster.position,
-            id,
-          }));
-
-        const nearby = candidates
-          .filter(c => getDistance(center, c.position) <= aoeRadius)
-          .sort((a, b) => getDistance(center, a.position) - getDistance(center, b.position))
-          .slice(0, maxTargets - 1)
-          .map(c => c.id);
-
-        return [primaryId, ...nearby];
-      }
-    }
-  }
-
-  return [primaryId];
+  return resolveActionTargets({
+    candidates: buildScriptMonsters(engine).map(m => ({ id: m.id, position: m.position })),
+    playerPos,
+    primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
+    action,
+    skills,
+    maxRange,
+  });
 }

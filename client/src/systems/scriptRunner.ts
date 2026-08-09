@@ -1,5 +1,11 @@
-import type { ScriptRule, ScriptAction, CombatRule, CombatAction, PersistentRule, PersistentAction, EmergencyRetreat } from '../models/scriptEngine';
-import { SCRIPT_DEBUFF_TYPES } from '../models/scriptEngine';
+import type {
+  ScriptRule, ScriptAction, CombatRule, CombatCondition, CombatAction,
+  PersistentRule, PersistentCondition, PersistentAction, EmergencyRetreat,
+} from '../models/scriptEngine';
+import { SCRIPT_DEBUFF_TYPES, DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
+import type { Position } from '../models/mapControl';
+import { resolveActionTargets, resolvePrimaryTarget, type TargetCandidate } from './targeting';
+import { getDistance } from './lineOfSight';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
@@ -15,14 +21,30 @@ import { hasActivePlayerDebuff, isPlayerStunned } from './playerDebuffSystem';
 
 // === Combat Script ===
 
+/**
+ * 腳本看到的一隻怪。位置與 id 是必要的 —— 「範圍內怪數」「AoE 命中數」要算距離，
+ * 「當前目標 HP」要能認出主目標是哪一隻。
+ */
+export interface ScriptMonsterView {
+  id: string;
+  instance: MonsterInstance;
+  position: Position;
+}
+
 export interface CombatScriptContext {
   character: Character;
-  monsters: MonsterInstance[];
+  /** 只放活著的怪 */
+  monsters: ScriptMonsterView[];
   skills: Skill[];
   now: number;
   cooldownReduction?: number;
   /** 目前手持武器的 `type`（空手為 undefined），用於 `requiredWeaponType` 判定 */
   weaponType?: string;
+  playerPos: Position;
+  /** FSM 選定的主目標 id；null 時退回距離最近的一隻 */
+  primaryTargetId: string | null;
+  /** 普通攻擊射程（武器原值）。沒有技能的動作用它當「攻擊範圍」 */
+  weaponRange: number;
 }
 
 /**
@@ -38,32 +60,88 @@ function meetsWeaponRequirement(skill: Skill, ctx: CombatScriptContext): boolean
 export function evaluateCombatScript(rules: CombatRule[], ctx: CombatScriptContext): CombatAction | null {
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    if (checkCombatCondition(rule, ctx)) {
-      if (canExecuteCombatAction(rule.action, ctx)) {
-        return rule.action;
-      }
+    // AND：任何一個條件不成立這條就跳過。空陣列＝無條件
+    if (!rule.conditions.every(c => checkCombatCondition(c, rule.action, ctx))) continue;
+    if (canExecuteCombatAction(rule.action, ctx)) {
+      return rule.action;
     }
   }
   return null;
 }
 
-function checkCombatCondition(rule: CombatRule, ctx: CombatScriptContext): boolean {
-  const { condition } = rule;
-  const { monsters, skills, now } = ctx;
+/** 腳本看到的怪 → `targeting.ts` 的候選清單 */
+function toCandidates(ctx: CombatScriptContext): TargetCandidate[] {
+  return ctx.monsters.map(m => ({ id: m.id, position: m.position }));
+}
+
+/**
+ * 這個動作自己的射程：技能有 `range` 就用技能的，其餘（普攻／不動作）用武器射程。
+ * 「攻擊範圍內的怪物數」要跟著規則走 —— 同一條「範圍內 ≥ 3 隻」掛在近戰普攻與
+ * 12 碼的火球上，本來就該是兩個不同的圈。
+ */
+function getActionRange(action: CombatAction, ctx: CombatScriptContext): number {
+  if (action.type === 'skill' && action.skillId) {
+    const skill = ctx.skills.find(s => s.id === action.skillId);
+    if (skill?.range) return skill.range;
+  }
+  return ctx.weaponRange;
+}
+
+/** 當前主目標（FSM 指定的，或最近的一隻） */
+function getPrimaryTarget(ctx: CombatScriptContext): ScriptMonsterView | null {
+  const id = resolvePrimaryTarget(toCandidates(ctx), ctx.playerPos, ctx.primaryTargetId);
+  if (!id) return null;
+  return ctx.monsters.find(m => m.id === id) ?? null;
+}
+
+function countMonstersWithin(ctx: CombatScriptContext, radius: number): number {
+  return ctx.monsters.filter(m => getDistance(ctx.playerPos, m.position) <= radius).length;
+}
+
+function checkCombatCondition(
+  condition: CombatCondition,
+  action: CombatAction,
+  ctx: CombatScriptContext,
+): boolean {
+  const { skills, now } = ctx;
   const mpPercent = ctx.character.maxMp > 0 ? (ctx.character.mp / ctx.character.maxMp) * 100 : 100;
 
   switch (condition.type) {
     case 'always':
       return true;
     case 'monster_count_gte':
-      return monsters.filter(m => m.currentHp > 0).length >= (condition.value ?? 1);
+      return countMonstersWithin(ctx, getActionRange(action, ctx)) >= (condition.value ?? 1);
+    case 'monsters_near_self_gte':
+      return countMonstersWithin(ctx, condition.radius ?? DEFAULT_NEAR_SELF_RADIUS)
+        >= (condition.value ?? 1);
+    case 'aoe_hit_count_gte': {
+      /**
+       * 用真正出手時的同一份目標選取算命中數，條件說幾隻就是幾隻。
+       *
+       * `maxRange: Infinity` 是刻意的：角色還在往怪群移動的路上，主目標必然超出射程，
+       * 套了射程 gate 條件就永遠不成立 —— 連帶讓 `getScriptChaseRange` 的預評估
+       * 看不到這條範圍技，射程塌回武器射程，角色反而跑去貼身平A。
+       * 真正的射程判定由 `arpgEngine.resolveTargets` 在出手當下負責。
+       */
+      const hits = resolveActionTargets({
+        candidates: toCandidates(ctx),
+        playerPos: ctx.playerPos,
+        primaryTargetId: ctx.primaryTargetId,
+        action,
+        skills,
+        maxRange: Infinity,
+      });
+      return hits.length >= (condition.value ?? 1);
+    }
     case 'monster_hp_below': {
-      const alive = monsters.filter(m => m.currentHp > 0);
-      return alive.some(m => (m.currentHp / m.maxHp) * 100 < (condition.value ?? 50));
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      return (target.instance.currentHp / target.instance.maxHp) * 100 < (condition.value ?? 50);
     }
     case 'monster_hp_above': {
-      const alive = monsters.filter(m => m.currentHp > 0);
-      return alive.some(m => (m.currentHp / m.maxHp) * 100 > (condition.value ?? 50));
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      return (target.instance.currentHp / target.instance.maxHp) * 100 > (condition.value ?? 50);
     }
     case 'mp_above':
       return mpPercent > (condition.value ?? 0);
@@ -115,17 +193,16 @@ export interface PersistentScriptContext {
 export function evaluatePersistentScript(rules: PersistentRule[], ctx: PersistentScriptContext): PersistentAction | null {
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    if (checkPersistentCondition(rule, ctx)) {
-      if (canExecutePersistentAction(rule.action, ctx)) {
-        return rule.action;
-      }
+    // AND：任何一個條件不成立這條就跳過。空陣列＝無條件
+    if (!rule.conditions.every(c => checkPersistentCondition(c, ctx))) continue;
+    if (canExecutePersistentAction(rule.action, ctx)) {
+      return rule.action;
     }
   }
   return null;
 }
 
-function checkPersistentCondition(rule: PersistentRule, ctx: PersistentScriptContext): boolean {
-  const { condition } = rule;
+function checkPersistentCondition(condition: PersistentCondition, ctx: PersistentScriptContext): boolean {
   const { character, skills, now, activeEffects } = ctx;
   const maxHp = ctx.effectiveMaxHp ?? character.maxHp;
   const maxMp = ctx.effectiveMaxMp ?? character.maxMp;

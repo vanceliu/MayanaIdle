@@ -1,4 +1,4 @@
-import { useGameStore } from '../stores/gameStore';
+import { useGameStore, selectPersistentRules, selectEmergencyRetreat } from '../stores/gameStore';
 import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, ScriptDebuffCondition } from '../models/scriptEngine';
 import { SCRIPT_DEBUFF_LABELS } from '../models/scriptEngine';
 import { CURE_ITEMS } from '../models/cureItem';
@@ -40,10 +40,10 @@ const SPEED_POTION_LABELS: Record<SpeedPotionType, string> = {
 const SCRIPT_DEBUFF_CONDITIONS: ScriptDebuffCondition[] = ['poison', 'bleed', 'curse_weaken', 'slow'];
 
 export function PersistentScriptEditor() {
-  const persistentRules = useGameStore(s => s.persistentRules);
+  const persistentRules = useGameStore(selectPersistentRules);
   const skills = useGameStore(s => s.skills);
   const setPersistentRules = useGameStore(s => s.setPersistentRules);
-  const emergencyRetreat = useGameStore(s => s.emergencyRetreat);
+  const emergencyRetreat = useGameStore(selectEmergencyRetreat);
   const setEmergencyRetreat = useGameStore(s => s.setEmergencyRetreat);
   const afterCombatHpThreshold = useGameStore(s => s.afterCombatHpThreshold);
   const afterCombatMpThreshold = useGameStore(s => s.afterCombatMpThreshold);
@@ -59,9 +59,22 @@ export function PersistentScriptEditor() {
     setPersistentRules(rules);
   }
 
-  function updateCondition(idx: number, updates: Partial<PersistentCondition>) {
+  function updateCondition(idx: number, condIdx: number, updates: Partial<PersistentCondition>) {
     const rules = [...persistentRules];
-    rules[idx] = { ...rules[idx], condition: { ...rules[idx].condition, ...updates } };
+    const conditions = rules[idx].conditions.map((c, i) => (i === condIdx ? { ...c, ...updates } : c));
+    rules[idx] = { ...rules[idx], conditions };
+    setPersistentRules(rules);
+  }
+
+  function addCondition(idx: number) {
+    const rules = [...persistentRules];
+    rules[idx] = { ...rules[idx], conditions: [...rules[idx].conditions, { type: 'always' }] };
+    setPersistentRules(rules);
+  }
+
+  function removeCondition(idx: number, condIdx: number) {
+    const rules = [...persistentRules];
+    rules[idx] = { ...rules[idx], conditions: rules[idx].conditions.filter((_, i) => i !== condIdx) };
     setPersistentRules(rules);
   }
 
@@ -83,7 +96,7 @@ export function PersistentScriptEditor() {
     const newRule: PersistentRule = {
       id: `persistent-${Date.now()}`,
       enabled: true,
-      condition: { type: 'hp_below', value: 50 },
+      conditions: [{ type: 'hp_below', value: 50 }],
       action: { type: 'potion', potionType: 'red' },
     };
     setPersistentRules([...persistentRules, newRule]);
@@ -118,55 +131,69 @@ export function PersistentScriptEditor() {
               <button className="btn-remove" onClick={() => removeRule(idx)}>✕</button>
             </div>
             <div className="rule-body">
-              <div className="rule-condition">
-                <span>如果</span>
-                <select
-                  value={rule.condition.type}
-                  onChange={e => {
-                    const newType = e.target.value as PersistentConditionType;
-                    const updates: Partial<PersistentCondition> = { type: newType };
-                    if (newType === 'debuff_active' && !rule.condition.debuffType) {
-                      updates.debuffType = SCRIPT_DEBUFF_CONDITIONS[0];
-                    }
-                    updateCondition(idx, updates);
-                  }}
-                >
-                  {Object.entries(CONDITION_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-                {needsValue(rule.condition.type) && (
-                  <>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={rule.condition.value ?? 0}
-                      onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
-                    />
-                    <span className="unit-label">%</span>
-                  </>
-                )}
-                {needsSkill(rule.condition.type) && (
+              {rule.conditions.length === 0 && (
+                <div className="rule-condition">
+                  <span>如果</span>
+                  <span className="cond-empty">無條件（永遠成立）</span>
+                </div>
+              )}
+              {rule.conditions.map((cond, condIdx) => (
+                <div className="rule-condition" key={condIdx}>
+                  <span>{condIdx === 0 ? '如果' : '且'}</span>
                   <select
-                    value={rule.condition.skillId ?? ''}
-                    onChange={e => updateCondition(idx, { skillId: e.target.value })}
+                    value={cond.type}
+                    onChange={e => {
+                      const newType = e.target.value as PersistentConditionType;
+                      const updates: Partial<PersistentCondition> = { type: newType };
+                      if (newType === 'debuff_active' && !cond.debuffType) {
+                        updates.debuffType = SCRIPT_DEBUFF_CONDITIONS[0];
+                      }
+                      updateCondition(idx, condIdx, updates);
+                    }}
                   >
-                    <option value="">選擇技能</option>
-                    {buffSkills.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                )}
-                {rule.condition.type === 'debuff_active' && (
-                  <select
-                    value={rule.condition.debuffType ?? 'poison'}
-                    onChange={e => updateCondition(idx, { debuffType: e.target.value as ScriptDebuffCondition })}
-                  >
-                    {SCRIPT_DEBUFF_CONDITIONS.map(t => (
-                      <option key={t} value={t}>{SCRIPT_DEBUFF_LABELS[t]}</option>
+                    {Object.entries(CONDITION_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
                     ))}
                   </select>
-                )}
-              </div>
+                  {needsValue(cond.type) && (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={cond.value ?? 0}
+                        onChange={e => updateCondition(idx, condIdx, { value: Number(e.target.value) })}
+                      />
+                      <span className="unit-label">%</span>
+                    </>
+                  )}
+                  {needsSkill(cond.type) && (
+                    <select
+                      value={cond.skillId ?? ''}
+                      onChange={e => updateCondition(idx, condIdx, { skillId: e.target.value })}
+                    >
+                      <option value="">選擇技能</option>
+                      {buffSkills.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  )}
+                  {cond.type === 'debuff_active' && (
+                    <select
+                      value={cond.debuffType ?? 'poison'}
+                      onChange={e => updateCondition(idx, condIdx, { debuffType: e.target.value as ScriptDebuffCondition })}
+                    >
+                      {SCRIPT_DEBUFF_CONDITIONS.map(t => (
+                        <option key={t} value={t}>{SCRIPT_DEBUFF_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    className="btn-remove-cond"
+                    aria-label="刪除條件"
+                    onClick={() => removeCondition(idx, condIdx)}
+                  >✕</button>
+                </div>
+              ))}
+              <button className="btn-add-cond" onClick={() => addCondition(idx)}>＋ 條件</button>
               <div className="rule-action">
                 <span>→</span>
                 <select

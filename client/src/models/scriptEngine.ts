@@ -27,6 +27,8 @@ export const SCRIPT_DEBUFF_LABELS: Record<ScriptDebuffCondition, string> = {
 export type CombatConditionType =
   | 'always'
   | 'monster_count_gte'
+  | 'monsters_near_self_gte'
+  | 'aoe_hit_count_gte'
   | 'monster_hp_below'
   | 'monster_hp_above'
   | 'mp_above'
@@ -39,6 +41,8 @@ export interface CombatCondition {
   type: CombatConditionType;
   value?: number;
   skillId?: string;
+  /** `monsters_near_self_gte` 用：以角色為圓心的半徑（碼） */
+  radius?: number;
 }
 
 export interface CombatAction {
@@ -49,9 +53,13 @@ export interface CombatAction {
 export interface CombatRule {
   id: string;
   enabled: boolean;
-  condition: CombatCondition;
+  /** AND：全部成立才觸發。空陣列＝無條件（等同「永遠」） */
+  conditions: CombatCondition[];
   action: CombatAction;
 }
+
+/** `monsters_near_self_gte` 沒填半徑時的預設值（碼） */
+export const DEFAULT_NEAR_SELF_RADIUS = 3;
 
 // === Persistent Script Types ===
 
@@ -88,7 +96,8 @@ export interface PersistentAction {
 export interface PersistentRule {
   id: string;
   enabled: boolean;
-  condition: PersistentCondition;
+  /** AND：全部成立才觸發。空陣列＝無條件（等同「永遠」） */
+  conditions: PersistentCondition[];
   action: PersistentAction;
 }
 
@@ -116,13 +125,13 @@ export const DEFAULT_COMBAT_SCRIPT: CombatRule[] = [
   {
     id: 'rule-wind-blade',
     enabled: true,
-    condition: { type: 'skill_ready', skillId: 'wind-blade' },
+    conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }],
     action: { type: 'skill', skillId: 'wind-blade' },
   },
   {
     id: 'rule-normal-attack',
     enabled: true,
-    condition: { type: 'always' },
+    conditions: [{ type: 'always' }],
     action: { type: 'normal_attack' },
   },
 ];
@@ -131,10 +140,36 @@ export const DEFAULT_PERSISTENT_SCRIPT: PersistentRule[] = [
   {
     id: 'rule-heal-potion',
     enabled: true,
-    condition: { type: 'hp_below', value: 30 },
+    conditions: [{ type: 'hp_below', value: 30 }],
     action: { type: 'potion', potionType: 'red' },
   },
 ];
+
+// === 讀檔防線：形狀不對就整份重置 ===
+
+/**
+ * 舊存檔一條規則只有單一 `condition`，新格式是 `conditions` 陣列（AND）。
+ * **不做欄位轉換**：只要有一條規則不是現行形狀，整份腳本重置成預設。
+ * 玩家自訂的順序會消失，這是刻意接受的代價（越晚換痛的人越多）。
+ *
+ * 這道防線本身不可省略 —— localStorage 的舊資料不會自己過期，
+ * 少了它，`evaluateCombatScript` 會直接炸在 `rule.conditions.every`。
+ */
+function isCurrentShape(rule: unknown): boolean {
+  if (!rule || typeof rule !== 'object') return false;
+  const r = rule as { id?: unknown; action?: unknown; conditions?: unknown };
+  return typeof r.id === 'string' && !!r.action && Array.isArray(r.conditions);
+}
+
+export function normalizeCombatRules(rules: unknown): CombatRule[] {
+  if (!Array.isArray(rules) || !rules.every(isCurrentShape)) return DEFAULT_COMBAT_SCRIPT;
+  return rules as CombatRule[];
+}
+
+export function normalizePersistentRules(rules: unknown): PersistentRule[] {
+  if (!Array.isArray(rules) || !rules.every(isCurrentShape)) return DEFAULT_PERSISTENT_SCRIPT;
+  return rules as PersistentRule[];
+}
 
 // === Legacy types (for migration) ===
 

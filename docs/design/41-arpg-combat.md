@@ -319,8 +319,8 @@ arpgEngine.tickArpgEngine(engine, input)
   │     chasing → 返回 move_to 事件
   │     attacking → CD 到達時返回 attack 事件
   ├─ 處理 attack 結果：
-  │     evaluateCombatScript → 決定 action
-  │     resolveTargets → 單體/AOE 目標解析
+  │     evaluateCombatScript → 決定 action（條件可看位置：範圍內怪數、周圍怪數、本招命中數）
+  │     resolveTargets → 單體/AOE 目標解析（targeting.ts，與腳本條件共用）
   └─ tickMonsterCombat（每隻怪物 FSM）：
         檢查 stun → roaming/chasing/attacking
   ↓
@@ -367,7 +367,7 @@ interface Projectile {
 | 怪物 FSM | `monsterCombatFSM.ts` | roaming/chasing/attacking 三態、stun 檢查 |
 | 視線判定 | `lineOfSight.ts` | LoS 計算、距離函式、半徑目標搜索 |
 | Game Loop | `gameLoop.ts` | OccupationManager、HP/MP 門檻暫停、pressure 生怪、A* 尋路、DoT timer |
-| AOE 解析 | `arpgEngine.ts` resolveTargets | self-centered（無上限）與 target-centered（maxTargets） |
+| AOE 解析 | `targeting.ts` resolveActionTargets | self-centered（無上限）與 target-centered（maxTargets）。純函式，`arpgEngine.resolveTargets` 與腳本的「本招命中數」條件共用同一份，兩邊算出的命中集合保證一致 |
 | 攻擊範圍動態擴展 | `arpgEngine.ts` / `gameLoop.ts` | 預評估腳本可用技能，取最大 range |
 
 ### 待實作

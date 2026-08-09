@@ -211,13 +211,16 @@ describe('Integration: Combat AOE Targeting', () => {
 describe('Integration: Combat Script No-Action Behavior', () => {
   it('character should idle when no combat rules match', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_count_gte', value: 5 }, action: { type: 'skill', skillId: 'fireball' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 5 }], action: { type: 'skill', skillId: 'fireball' } },
     ];
     const ctx: CombatScriptContext = {
       character: createCharacter(),
-      monsters: [createMonster()],
+      monsters: [{ id: 'm1', instance: createMonster(), position: { x: 1, y: 0 } }],
       skills: [createFireball()],
       now: 10000,
+      playerPos: { x: 0, y: 0 },
+      primaryTargetId: null,
+      weaponRange: 1.5,
     };
 
     const action = evaluateCombatScript(rules, ctx);
@@ -226,14 +229,17 @@ describe('Integration: Combat Script No-Action Behavior', () => {
 
   it('character should idle when all rules are disabled', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: false, condition: { type: 'always' }, action: { type: 'normal_attack' } },
-      { id: 'r2', enabled: false, condition: { type: 'always' }, action: { type: 'skill', skillId: 'fireball' } },
+      { id: 'r1', enabled: false, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      { id: 'r2', enabled: false, conditions: [{ type: 'always' }], action: { type: 'skill', skillId: 'fireball' } },
     ];
     const ctx: CombatScriptContext = {
       character: createCharacter(),
-      monsters: [createMonster()],
+      monsters: [{ id: 'm1', instance: createMonster(), position: { x: 1, y: 0 } }],
       skills: [createFireball()],
       now: 10000,
+      playerPos: { x: 0, y: 0 },
+      primaryTargetId: null,
+      weaponRange: 1.5,
     };
 
     const action = evaluateCombatScript(rules, ctx);
@@ -242,13 +248,16 @@ describe('Integration: Combat Script No-Action Behavior', () => {
 
   it('wait action should prevent any attack when explicitly set', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'wait' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'wait' } },
     ];
     const ctx: CombatScriptContext = {
       character: createCharacter(),
-      monsters: [createMonster()],
+      monsters: [{ id: 'm1', instance: createMonster(), position: { x: 1, y: 0 } }],
       skills: [createFireball()],
       now: 10000,
+      playerPos: { x: 0, y: 0 },
+      primaryTargetId: null,
+      weaponRange: 1.5,
     };
 
     const action = evaluateCombatScript(rules, ctx);
@@ -257,13 +266,16 @@ describe('Integration: Combat Script No-Action Behavior', () => {
 
   it('disabling normal_attack rule should result in no action (null)', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: false, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: false, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     const ctx: CombatScriptContext = {
       character: createCharacter(),
-      monsters: [createMonster()],
+      monsters: [{ id: 'm1', instance: createMonster(), position: { x: 1, y: 0 } }],
       skills: [],
       now: 10000,
+      playerPos: { x: 0, y: 0 },
+      primaryTargetId: null,
+      weaponRange: 1.5,
     };
 
     const action = evaluateCombatScript(rules, ctx);

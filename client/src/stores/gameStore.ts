@@ -54,7 +54,15 @@ import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } fr
 import { evaluatePersistentScript, evaluateEmergencyRetreat, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
 import { pushSelfCastFx } from '../systems/selfCastFx';
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
-import { DEFAULT_SCRIPT, DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT, DEFAULT_EMERGENCY_RETREAT } from '../models/scriptEngine';
+import {
+  DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT,
+  normalizeCombatRules, normalizePersistentRules,
+} from '../models/scriptEngine';
+import type { ScriptTemplate } from '../models/scriptTemplate';
+import {
+  DEFAULT_TEMPLATE_ID, createDefaultTemplate, createScriptTemplate,
+  nextTemplateName, normalizeScriptTemplates, resolveActiveTemplate, isDeletableTemplate,
+} from '../models/scriptTemplate';
 import type { MapLocation } from '../models/area';
 import { getRegion, resolveArea, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
@@ -224,9 +232,14 @@ interface GameState {
   hpRegenId: number | null;
   mpRegenId: number | null;
   scriptRules: ScriptRule[];
-  combatRules: CombatRule[];
-  persistentRules: PersistentRule[];
-  emergencyRetreat: EmergencyRetreat;
+  /**
+   * 腳本 template（`03-combat.md` § 3.14）。
+   * 戰鬥／常駐／緊急撤退**唯一的真相在這裡**，不另存頂層鏡像 ——
+   * 兩份互相同步的資料必然會不同步，症狀是「面板顯示 A、實際跑 B」。
+   * 讀取一律走 `selectCombatRules` / `selectPersistentRules` / `selectEmergencyRetreat`。
+   */
+  scriptTemplates: ScriptTemplate[];
+  activeTemplateId: string;
   persistentLoopId: number | null;
   lastPotionUsedAt: number;
   lastPotionCooldown: number;
@@ -300,6 +313,15 @@ interface GameState {
   setCombatRules: (rules: CombatRule[]) => void;
   setPersistentRules: (rules: PersistentRule[]) => void;
   setEmergencyRetreat: (retreat: EmergencyRetreat) => void;
+  /** 切換使用中的 template；id 不存在時不動作 */
+  setActiveTemplate: (id: string) => void;
+  /** 新增一頁（內容為預設腳本），並立刻切過去 */
+  addScriptTemplate: () => void;
+  /** 複製指定 template，並立刻切過去 */
+  duplicateScriptTemplate: (id: string) => void;
+  renameScriptTemplate: (id: string, name: string) => void;
+  /** 刪除 template；預設 template（`DEFAULT_TEMPLATE_ID`）不可刪 */
+  removeScriptTemplate: (id: string) => void;
   startPersistentLoop: () => void;
   stopPersistentLoop: () => void;
   addEffect: (effect: ActiveEffect) => void;
@@ -374,6 +396,45 @@ function isInArpgCombat(): boolean {
   });
 }
 
+// === 腳本 template selector（唯一真相在 scriptTemplates，讀取一律走這裡）===
+
+export function selectActiveTemplate(state: GameState): ScriptTemplate {
+  return resolveActiveTemplate(state.scriptTemplates, state.activeTemplateId);
+}
+
+export function selectCombatRules(state: GameState): CombatRule[] {
+  return selectActiveTemplate(state).combatRules;
+}
+
+export function selectPersistentRules(state: GameState): PersistentRule[] {
+  return selectActiveTemplate(state).persistentRules;
+}
+
+export function selectEmergencyRetreat(state: GameState): EmergencyRetreat {
+  return selectActiveTemplate(state).emergencyRetreat;
+}
+
+type StoreSet = (partial: Partial<GameState>) => void;
+type StoreGet = () => GameState;
+
+function persistTemplates(get: StoreGet): void {
+  const char = get().character;
+  if (char?.id) saveLocalPreferences(char.id, get());
+}
+
+/** 所有腳本編輯都寫進「使用中的那一頁」，寫完立刻持久化 */
+function updateActiveTemplate(
+  set: StoreSet,
+  get: StoreGet,
+  updater: (template: ScriptTemplate) => ScriptTemplate,
+): void {
+  const activeId = selectActiveTemplate(get()).id;
+  set({
+    scriptTemplates: get().scriptTemplates.map(t => (t.id === activeId ? updater(t) : t)),
+  });
+  persistTemplates(get);
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   phase: 'title',
   userId: null,
@@ -389,9 +450,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   hpRegenId: null,
   mpRegenId: null,
   scriptRules: DEFAULT_SCRIPT,
-  combatRules: DEFAULT_COMBAT_SCRIPT,
-  persistentRules: DEFAULT_PERSISTENT_SCRIPT,
-  emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
+  scriptTemplates: [createDefaultTemplate()],
+  activeTemplateId: DEFAULT_TEMPLATE_ID,
   persistentLoopId: null,
   lastPotionUsedAt: 0,
   lastPotionCooldown: 0,
@@ -514,9 +574,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const prefs = loadLocalPreferences(char.id!);
     const scriptRules = prefs?.scriptRules ?? DEFAULT_SCRIPT;
-    const combatRules = prefs?.combatRules ?? DEFAULT_COMBAT_SCRIPT;
-    const persistentRules = prefs?.persistentRules ?? DEFAULT_PERSISTENT_SCRIPT;
-    const emergencyRetreat = prefs?.emergencyRetreat ?? DEFAULT_EMERGENCY_RETREAT;
+    const scriptTemplates = prefs?.scriptTemplates ?? [createDefaultTemplate()];
+    const activeTemplateId = prefs?.activeTemplateId ?? DEFAULT_TEMPLATE_ID;
     const quickSlots = normalizeQuickSlots(prefs?.quickSlots);
     // § 35.17：格子位置不在 prefs 裡，走獨立 key（不隨角色匯出）
     const bagSlotMap = loadBagLayout(char.id!);
@@ -557,9 +616,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       personalStoredEquipment: personalStoredEquipItems,
       personalStoredMaterials,
       scriptRules,
-      combatRules,
-      persistentRules,
-      emergencyRetreat,
+      scriptTemplates,
+      activeTemplateId,
       quickSlots,
       bagSlotMap,
       afterCombatHpThreshold,
@@ -670,9 +728,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       personalStoredMaterials: [],
       activeEffects: [],
       scriptRules: DEFAULT_SCRIPT,
-      combatRules: DEFAULT_COMBAT_SCRIPT,
-      persistentRules: DEFAULT_PERSISTENT_SCRIPT,
-      emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
+      scriptTemplates: [createDefaultTemplate()],
+      activeTemplateId: DEFAULT_TEMPLATE_ID,
       quickSlots: emptyQuickSlots(),
       bagSlotMap: {},
       adventurerQuests: [],
@@ -1284,28 +1341,66 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   setCombatRules: (rules) => {
-    set({ combatRules: rules });
-    const char = get().character;
-    if (char?.id) {
-      saveLocalPreferences(char.id, get());
-    }
+    updateActiveTemplate(set, get, t => ({ ...t, combatRules: rules }));
   },
 
   setPersistentRules: (rules) => {
-    set({ persistentRules: rules });
+    updateActiveTemplate(set, get, t => ({ ...t, persistentRules: rules }));
     get().startPersistentLoop();
-    const char = get().character;
-    if (char?.id) {
-      saveLocalPreferences(char.id, get());
-    }
   },
 
   setEmergencyRetreat: (retreat) => {
-    set({ emergencyRetreat: retreat });
-    const char = get().character;
-    if (char?.id) {
-      saveLocalPreferences(char.id, get());
-    }
+    updateActiveTemplate(set, get, t => ({ ...t, emergencyRetreat: retreat }));
+  },
+
+  setActiveTemplate: (id) => {
+    if (!get().scriptTemplates.some(t => t.id === id)) return;
+    set({ activeTemplateId: id });
+    // 常駐腳本換了一整份，計時器要重掛才不會照舊規則跑
+    get().startPersistentLoop();
+    persistTemplates(get);
+  },
+
+  addScriptTemplate: () => {
+    const templates = get().scriptTemplates;
+    const created = createScriptTemplate(`tpl-${Date.now()}`, nextTemplateName(templates));
+    set({ scriptTemplates: [...templates, created], activeTemplateId: created.id });
+    get().startPersistentLoop();
+    persistTemplates(get);
+  },
+
+  duplicateScriptTemplate: (id) => {
+    const templates = get().scriptTemplates;
+    const source = templates.find(t => t.id === id);
+    if (!source) return;
+    const copy: ScriptTemplate = {
+      ...source,
+      id: `tpl-${Date.now()}`,
+      name: nextTemplateName(templates),
+    };
+    set({ scriptTemplates: [...templates, copy], activeTemplateId: copy.id });
+    get().startPersistentLoop();
+    persistTemplates(get);
+  },
+
+  renameScriptTemplate: (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set({
+      scriptTemplates: get().scriptTemplates.map(t => (t.id === id ? { ...t, name: trimmed } : t)),
+    });
+    persistTemplates(get);
+  },
+
+  removeScriptTemplate: (id) => {
+    // 預設 template 不可刪 —— 這同時保證清單永遠不會空掉
+    if (!isDeletableTemplate(id)) return;
+    const remaining = get().scriptTemplates.filter(t => t.id !== id);
+    if (remaining.length === 0) return;
+    const activeId = get().activeTemplateId === id ? remaining[0].id : get().activeTemplateId;
+    set({ scriptTemplates: remaining, activeTemplateId: activeId });
+    get().startPersistentLoop();
+    persistTemplates(get);
   },
 
   startPersistentLoop: () => {
@@ -1334,7 +1429,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear),
       };
 
-      const action = evaluatePersistentScript(state.persistentRules, ctx);
+      const action = evaluatePersistentScript(selectPersistentRules(state), ctx);
       if (!action) {
         const retreatCtx: EmergencyRetreatContext = {
           character: char,
@@ -1342,7 +1437,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           inCombat: isInArpgCombat(),
           effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
         };
-        const retreat = evaluateEmergencyRetreat(state.emergencyRetreat, retreatCtx);
+        const retreat = evaluateEmergencyRetreat(selectEmergencyRetreat(state), retreatCtx);
         if (retreat) {
           const scroll = retreat.scrollTownId
             ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
@@ -1954,9 +2049,8 @@ function saveLocalPreferences(characterId: number, state: GameState) {
   const key = `mayana_prefs_${characterId}`;
   const data = {
     scriptRules: state.scriptRules,
-    combatRules: state.combatRules,
-    persistentRules: state.persistentRules,
-    emergencyRetreat: state.emergencyRetreat,
+    scriptTemplates: state.scriptTemplates,
+    activeTemplateId: state.activeTemplateId,
     quickSlots: state.quickSlots,
     afterCombatHpThreshold: state.afterCombatHpThreshold,
     afterCombatMpThreshold: state.afterCombatMpThreshold,
@@ -1992,9 +2086,8 @@ function loadBagLayout(characterId: number): BagSlotMap {
 
 interface LoadedPreferences {
   scriptRules: ScriptRule[];
-  combatRules: CombatRule[];
-  persistentRules: PersistentRule[];
-  emergencyRetreat: EmergencyRetreat;
+  scriptTemplates: ScriptTemplate[];
+  activeTemplateId: string;
   quickSlots: QuickSlots;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
@@ -2015,69 +2108,57 @@ function migrateEmergencyRetreat(saved: EmergencyRetreat | undefined): Emergency
   return saved;
 }
 
+/**
+ * 還沒有 template 概念的存檔：把既有那一份腳本包成名為「預設」的第一頁。
+ *
+ * 這不是格式轉換 —— 規則本身完全相容，只是多一層容器，所以照包不重置。
+ * （規則層若真的是舊格式，`normalizeScriptTemplates` 內的 normalize 仍會擋下來。）
+ */
+function wrapLegacyScriptsAsTemplate(data: any): ScriptTemplate[] {
+  const persistent = Array.isArray(data.persistentRules)
+    ? data.persistentRules.filter(
+        (r: any) => r?.action?.type !== 'flee_town' && r?.action?.type !== 'flee_teleport'
+      )
+    : data.persistentRules;
+
+  return [{
+    ...createDefaultTemplate(),
+    combatRules: normalizeCombatRules(data.combatRules),
+    persistentRules: normalizePersistentRules(persistent),
+    emergencyRetreat: migrateEmergencyRetreat(data.emergencyRetreat),
+  }];
+}
+
 function loadLocalPreferences(characterId: number): LoadedPreferences | null {
   const key = `mayana_prefs_${characterId}`;
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
     const data = JSON.parse(raw);
-    if (data.combatRules && data.persistentRules) {
-      const migratedPersistent = (data.persistentRules as any[]).filter(
-        (r: any) => r.action.type !== 'flee_town' && r.action.type !== 'flee_teleport'
-      );
-      return {
-        ...data,
-        persistentRules: migratedPersistent.length > 0 ? migratedPersistent : DEFAULT_PERSISTENT_SCRIPT,
-        emergencyRetreat: migrateEmergencyRetreat(data.emergencyRetreat),
-        quickSlots: normalizeQuickSlots(data.quickSlots),
-        afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
-        afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
-        afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
-        afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
-        adventurerQuests: data.adventurerQuests ?? [],
-        guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
-        craftQuests: data.craftQuests ?? [],
-        statistics: normalizeStatistics(data.statistics),
-      };
-    }
-    // Migration: old format only has scriptRules
-    if (data.scriptRules) {
-      const combat: CombatRule[] = [];
-      const persistent: PersistentRule[] = [];
-      for (const rule of data.scriptRules as ScriptRule[]) {
-        if (rule.action.type === 'skill' || rule.action.type === 'normal_attack') {
-          combat.push({
-            id: rule.id,
-            enabled: rule.enabled,
-            condition: { type: rule.condition.type as any, value: rule.condition.value, skillId: rule.condition.skillId },
-            action: { type: rule.action.type, skillId: rule.action.skillId },
-          });
-        } else if (rule.action.type !== 'flee_town' && rule.action.type !== 'flee_teleport') {
-          persistent.push({
-            id: rule.id,
-            enabled: rule.enabled,
-            condition: { type: rule.condition.type as any, value: rule.condition.value, skillId: rule.condition.skillId },
-            action: { type: rule.action.type as any, potionType: rule.action.potionType },
-          });
-        }
-      }
-      return {
-        scriptRules: data.scriptRules,
-        combatRules: combat.length > 0 ? combat : DEFAULT_COMBAT_SCRIPT,
-        persistentRules: persistent.length > 0 ? persistent : DEFAULT_PERSISTENT_SCRIPT,
-        emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
-        quickSlots: normalizeQuickSlots(data.quickSlots),
-        afterCombatHpThreshold: data.afterCombatHpThreshold ?? 0,
-        afterCombatMpThreshold: data.afterCombatMpThreshold ?? 0,
-        afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
-        afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
-        adventurerQuests: data.adventurerQuests ?? [],
-        guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
-        craftQuests: data.craftQuests ?? [],
-        statistics: normalizeStatistics(data.statistics),
-      };
-    }
-    return null;
+    /**
+     * 腳本一律走 normalize：認不得的舊格式**整份重置成預設**，不做欄位轉換。
+     * 腳本以外的欄位（快捷列、統計、公會、冒險者／工藝任務）照常讀回來 ——
+     * 那些是進度資料，不該被腳本格式的世代交替波及。
+     */
+    const templates = normalizeScriptTemplates(
+      data.scriptTemplates ?? wrapLegacyScriptsAsTemplate(data)
+    );
+    return {
+      ...data,
+      scriptTemplates: templates,
+      activeTemplateId: templates.some((t: ScriptTemplate) => t.id === data.activeTemplateId)
+        ? data.activeTemplateId
+        : templates[0].id,
+      quickSlots: normalizeQuickSlots(data.quickSlots),
+      afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
+      afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
+      afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
+      afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
+      adventurerQuests: data.adventurerQuests ?? [],
+      guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
+      craftQuests: data.craftQuests ?? [],
+      statistics: normalizeStatistics(data.statistics),
+    };
   } catch {
     return null;
   }

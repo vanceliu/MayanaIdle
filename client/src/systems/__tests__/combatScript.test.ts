@@ -4,7 +4,7 @@ import type { CombatRule } from '../../models/scriptEngine';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { Skill } from '../../models/skill';
-import type { CombatScriptContext } from '../scriptRunner';
+import type { CombatScriptContext, ScriptMonsterView } from '../scriptRunner';
 
 function createTestCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -56,6 +56,20 @@ function createTestMonster(overrides: Partial<MonsterInstance> = {}): MonsterIns
   };
 }
 
+/** 腳本看到的一隻怪：預設站在角色腳邊（0,0 是玩家位置） */
+let monSeq = 0;
+function mon(
+  position: { x: number; y: number } = { x: 1, y: 0 },
+  overrides: Partial<MonsterInstance> = {},
+): ScriptMonsterView {
+  monSeq += 1;
+  return {
+    id: `m${monSeq}`,
+    instance: createTestMonster(overrides),
+    position,
+  };
+}
+
 function createFireball(): Skill {
   return {
     id: 'fireball',
@@ -67,6 +81,7 @@ function createFireball(): Skill {
     power: 25,
     mpCost: 15,
     cooldown: 6000,
+    range: 12,
     aoeCenter: 'target',
     aoeRadius: 3,
     maxTargets: 3,
@@ -85,6 +100,7 @@ function createWindBlade(): Skill {
     power: 10,
     mpCost: 5,
     cooldown: 3000,
+    range: 10,
     lastUsedAt: 0,
   };
 }
@@ -92,9 +108,12 @@ function createWindBlade(): Skill {
 function createCombatContext(overrides: Partial<CombatScriptContext> = {}): CombatScriptContext {
   return {
     character: createTestCharacter(),
-    monsters: [createTestMonster()],
+    monsters: [mon()],
     skills: [createWindBlade()],
     now: 10000,
+    playerPos: { x: 0, y: 0 },
+    primaryTargetId: null,
+    weaponRange: 1.5,
     ...overrides,
   };
 }
@@ -107,7 +126,7 @@ describe('evaluateCombatScript', () => {
 
   it('should skip disabled rules', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: false, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: false, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     const result = evaluateCombatScript(rules, createCombatContext());
     expect(result).toBeNull();
@@ -115,8 +134,8 @@ describe('evaluateCombatScript', () => {
 
   it('should return null when all rules are disabled (character idles)', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: false, condition: { type: 'always' }, action: { type: 'normal_attack' } },
-      { id: 'r2', enabled: false, condition: { type: 'always' }, action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r1', enabled: false, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      { id: 'r2', enabled: false, conditions: [{ type: 'always' }], action: { type: 'skill', skillId: 'wind-blade' } },
     ];
     const result = evaluateCombatScript(rules, createCombatContext());
     expect(result).toBeNull();
@@ -124,15 +143,22 @@ describe('evaluateCombatScript', () => {
 
   it('should match "always" condition and return normal_attack', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     const result = evaluateCombatScript(rules, createCombatContext());
     expect(result).toEqual({ type: 'normal_attack' });
   });
 
+  it('should treat an empty conditions array as unconditional', () => {
+    const rules: CombatRule[] = [
+      { id: 'r1', enabled: true, conditions: [], action: { type: 'normal_attack' } },
+    ];
+    expect(evaluateCombatScript(rules, createCombatContext())).toEqual({ type: 'normal_attack' });
+  });
+
   it('should match "always" condition and return wait action', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'wait' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'wait' } },
     ];
     const result = evaluateCombatScript(rules, createCombatContext());
     expect(result).toEqual({ type: 'wait' });
@@ -140,8 +166,8 @@ describe('evaluateCombatScript', () => {
 
   it('should return skill action when skill is ready', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'skill_ready', skillId: 'wind-blade' }, action: { type: 'skill', skillId: 'wind-blade' } },
-      { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }], action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     const ctx = createCombatContext({ skills: [createWindBlade()] });
     const result = evaluateCombatScript(rules, ctx);
@@ -150,8 +176,8 @@ describe('evaluateCombatScript', () => {
 
   it('should skip skill rule when on cooldown and fall to next rule', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'skill_ready', skillId: 'wind-blade' }, action: { type: 'skill', skillId: 'wind-blade' } },
-      { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }], action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     const skill = createWindBlade();
     skill.lastUsedAt = 9000; // used 1s ago, cooldown 3s -> not ready
@@ -162,8 +188,8 @@ describe('evaluateCombatScript', () => {
 
   it('should skip skill rule when MP insufficient and fall to next rule', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'skill', skillId: 'fireball' } },
-      { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'wait' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'skill', skillId: 'fireball' } },
+      { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'wait' } },
     ];
     const ctx = createCombatContext({
       character: createTestCharacter({ mp: 5 }),
@@ -173,55 +199,188 @@ describe('evaluateCombatScript', () => {
     expect(result).toEqual({ type: 'wait' });
   });
 
-  it('should match monster_count_gte condition', () => {
-    const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_count_gte', value: 2 }, action: { type: 'skill', skillId: 'fireball' } },
-      { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
-    ];
-    const monsters = [createTestMonster(), createTestMonster()];
-    const ctx = createCombatContext({ monsters, skills: [createFireball()] });
-    const result = evaluateCombatScript(rules, ctx);
-    expect(result).toEqual({ type: 'skill', skillId: 'fireball' });
+  describe('monster_count_gte（攻擊範圍內怪數）', () => {
+    it('should count monsters within the rule skill range', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      // 火球射程 12，兩隻都在圈內
+      const monsters = [mon({ x: 3, y: 0 }), mon({ x: 8, y: 0 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'fireball' });
+    });
+
+    it('should ignore monsters outside the rule action range', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      // 第二隻在 20 碼外，超出火球的 12 碼射程 → 圈內只有 1 隻
+      const monsters = [mon({ x: 3, y: 0 }), mon({ x: 20, y: 0 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
+
+    it('should use weapon range for normal attack rules', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'normal_attack' } },
+      ];
+      // 武器射程 1.5：一隻貼身、一隻 5 碼外 → 不成立
+      const ctx = createCombatContext({ monsters: [mon({ x: 1, y: 0 }), mon({ x: 5, y: 0 })] });
+      expect(evaluateCombatScript(rules, ctx)).toBeNull();
+    });
   });
 
-  it('should not match monster_count_gte when not enough alive monsters', () => {
-    const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_count_gte', value: 3 }, action: { type: 'skill', skillId: 'fireball' } },
-      { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
-    ];
-    const monsters = [createTestMonster(), createTestMonster({ currentHp: 0 })];
-    const ctx = createCombatContext({ monsters, skills: [createFireball()] });
-    const result = evaluateCombatScript(rules, ctx);
-    expect(result).toEqual({ type: 'normal_attack' });
+  describe('monsters_near_self_gte（自身周圍怪數）', () => {
+    it('should count monsters within the given radius of the player', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monsters_near_self_gte', value: 3, radius: 5 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      const monsters = [mon({ x: 1, y: 0 }), mon({ x: 0, y: 2 }), mon({ x: 3, y: 3 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'fireball' });
+    });
+
+    it('should not count monsters outside the radius', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monsters_near_self_gte', value: 3, radius: 2 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      const monsters = [mon({ x: 1, y: 0 }), mon({ x: 0, y: 2 }), mon({ x: 9, y: 9 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
   });
 
-  it('should match monster_hp_below condition', () => {
-    const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_hp_below', value: 50 }, action: { type: 'normal_attack' } },
-    ];
-    const monsters = [createTestMonster({ currentHp: 10, maxHp: 30 })];
-    const ctx = createCombatContext({ monsters });
-    const result = evaluateCombatScript(rules, ctx);
-    expect(result).toEqual({ type: 'normal_attack' });
+  describe('aoe_hit_count_gte（本招命中數）', () => {
+    it('should cast the AoE skill when monsters are clustered around the target', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 3 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      // 火球 aoeRadius 3：三隻擠在一起
+      const monsters = [mon({ x: 5, y: 0 }), mon({ x: 6, y: 0 }), mon({ x: 5, y: 2 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'fireball' });
+    });
+
+    it('should fall through when the same three monsters are scattered', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 3 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      // 三隻活怪，但彼此距離都超過 aoeRadius 3 → 只會打到主目標
+      const monsters = [mon({ x: 5, y: 0 }), mon({ x: 5, y: 10 }), mon({ x: 11, y: 0 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
+
+    it('should not gate on range: monsters far away still count as hits', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 3 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      // 怪群在 40 碼外（遠超火球 12 碼射程）：條件仍要成立，
+      // 否則角色永遠不會為了這條規則走過去，射程也會塌回武器射程
+      const monsters = [mon({ x: 40, y: 0 }), mon({ x: 41, y: 0 }), mon({ x: 40, y: 2 })];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'fireball' });
+    });
+
+    it('should count 1 for a single-target skill no matter how many monsters', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 2 }], action: { type: 'skill', skillId: 'wind-blade' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      const monsters = [mon({ x: 1, y: 0 }), mon({ x: 1, y: 1 }), mon({ x: 2, y: 1 })];
+      const ctx = createCombatContext({ monsters });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
+
+    it('should respect the skill maxTargets cap', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 4 }], action: { type: 'skill', skillId: 'fireball' } },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      // 五隻擠在一起，但火球 maxTargets 只有 3 → 命中數永遠到不了 4
+      const monsters = [
+        mon({ x: 5, y: 0 }), mon({ x: 5, y: 1 }), mon({ x: 6, y: 0 }),
+        mon({ x: 6, y: 1 }), mon({ x: 5, y: 2 }),
+      ];
+      const ctx = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
   });
 
-  it('should not match monster_hp_below when all monsters above threshold', () => {
-    const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_hp_below', value: 50 }, action: { type: 'normal_attack' } },
-    ];
-    const monsters = [createTestMonster({ currentHp: 25, maxHp: 30 })];
-    const ctx = createCombatContext({ monsters });
-    const result = evaluateCombatScript(rules, ctx);
-    expect(result).toBeNull();
+  describe('目標 HP 條件', () => {
+    it('should match monster_hp_below on the current target', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monster_hp_below', value: 50 }], action: { type: 'normal_attack' } },
+      ];
+      const target = mon({ x: 1, y: 0 }, { currentHp: 10, maxHp: 30 });
+      const ctx = createCombatContext({ monsters: [target], primaryTargetId: target.id });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
+
+    it('should not match when the current target is above the threshold, even if another monster is hurt', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monster_hp_below', value: 50 }], action: { type: 'normal_attack' } },
+      ];
+      const target = mon({ x: 1, y: 0 }, { currentHp: 25, maxHp: 30 });
+      const other = mon({ x: 9, y: 9 }, { currentHp: 1, maxHp: 30 });
+      const ctx = createCombatContext({ monsters: [target, other], primaryTargetId: target.id });
+      expect(evaluateCombatScript(rules, ctx)).toBeNull();
+    });
+
+    it('should fall back to the nearest monster when no target is selected', () => {
+      const rules: CombatRule[] = [
+        { id: 'r1', enabled: true, conditions: [{ type: 'monster_hp_below', value: 50 }], action: { type: 'normal_attack' } },
+      ];
+      const near = mon({ x: 1, y: 0 }, { currentHp: 3, maxHp: 30 });
+      const far = mon({ x: 20, y: 0 }, { currentHp: 30, maxHp: 30 });
+      const ctx = createCombatContext({ monsters: [far, near], primaryTargetId: null });
+      expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
+    });
+  });
+
+  describe('多條件 AND', () => {
+    it('should require every condition to hold', () => {
+      const rules: CombatRule[] = [
+        {
+          id: 'r1',
+          enabled: true,
+          conditions: [
+            { type: 'aoe_hit_count_gte', value: 3 },
+            { type: 'mp_above', value: 80 },
+          ],
+          action: { type: 'skill', skillId: 'fireball' },
+        },
+        { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ];
+      const monsters = [mon({ x: 5, y: 0 }), mon({ x: 6, y: 0 }), mon({ x: 5, y: 2 })];
+      // MP 50/50 = 100% > 80 → 兩條都成立
+      const ok = createCombatContext({ monsters, skills: [createFireball()] });
+      expect(evaluateCombatScript(rules, ok)).toEqual({ type: 'skill', skillId: 'fireball' });
+
+      // 怪聚在一起但 MP 只有 60% → 整條規則不成立
+      const lowMp = createCombatContext({
+        monsters,
+        skills: [createFireball()],
+        character: createTestCharacter({ mp: 30 }),
+      });
+      expect(evaluateCombatScript(rules, lowMp)).toEqual({ type: 'normal_attack' });
+    });
   });
 
   it('should evaluate rules in priority order (first match wins)', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_count_gte', value: 2 }, action: { type: 'skill', skillId: 'fireball' } },
-      { id: 'r2', enabled: true, condition: { type: 'skill_ready', skillId: 'wind-blade' }, action: { type: 'skill', skillId: 'wind-blade' } },
-      { id: 'r3', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'skill', skillId: 'fireball' } },
+      { id: 'r2', enabled: true, conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }], action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r3', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
-    const monsters = [createTestMonster(), createTestMonster()];
+    const monsters = [mon({ x: 3, y: 0 }), mon({ x: 4, y: 0 })];
     const ctx = createCombatContext({ monsters, skills: [createFireball(), createWindBlade()] });
     const result = evaluateCombatScript(rules, ctx);
     expect(result).toEqual({ type: 'skill', skillId: 'fireball' });
@@ -229,7 +388,7 @@ describe('evaluateCombatScript', () => {
 
   it('wait action should always be executable', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'wait' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'wait' } },
     ];
     const ctx = createCombatContext({ character: createTestCharacter({ mp: 0 }) });
     const result = evaluateCombatScript(rules, ctx);
@@ -238,8 +397,8 @@ describe('evaluateCombatScript', () => {
 
   it('should respect cooldown reduction for skill_ready condition', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'skill_ready', skillId: 'wind-blade' }, action: { type: 'skill', skillId: 'wind-blade' } },
-      { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }], action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     // skill cooldown: 3000ms, used at 8000, now=10000 → 2000ms elapsed
     // without reduction: not ready (2000 < 3000)

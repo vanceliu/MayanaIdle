@@ -1934,6 +1934,29 @@ button.active {
   border-style: dashed;
 }
 
+/*
+ * 多條件（AND）：條件列可以有好幾行，刪除鈕靠右對齊才不會跟著欄位長度跳動。
+ */
+.rule-condition .btn-remove-cond {
+  margin-left: auto;
+  padding: 1px 5px;
+  font-size: var(--fs-xs);
+  line-height: 1;
+  color: var(--accent-danger);
+  flex-shrink: 0;
+}
+
+.btn-add-cond {
+  align-self: flex-start;
+  padding: 2px 8px;
+  font-size: var(--fs-xs);
+  border-style: dashed;
+}
+
+.rule-condition .cond-empty {
+  font-style: italic;
+}
+
 /* --- Inventory --- */
 /*
  * 裝備欄是**兩欄部位格**：十個部位排成 2×5，數值與詞綴收進 hover tooltip。
@@ -4946,6 +4969,94 @@ button.active {
   color: var(--text-primary);
   background: var(--accent-primary);
   border-bottom-color: var(--accent-primary);
+}
+
+/* --- 腳本 Template 分頁列（`03-combat.md` § 3.14） ---
+ *
+ * 分頁數量由玩家決定，所以分頁區自己水平捲動（`min-width: 0` + `overflow-x`）。
+ * 少了這兩行，開到第五第六個分頁就會把浮動視窗整個撐寬，手機版直接爆版。
+ */
+.template-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+}
+
+.template-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.template-tab {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.template-tab.active {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+
+.template-active-dot {
+  color: var(--accent-primary);
+}
+
+.template-add {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  background: none;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.template-rename-input {
+  flex: 0 0 auto;
+  width: 90px;
+  padding: 3px 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  font-family: var(--font-body);
+}
+
+.template-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.template-actions button {
+  padding: 2px 6px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.template-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .modal-title {

@@ -451,28 +451,68 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 ```
 
 - 規則由上而下逐條評估，第一個條件符合且動作可執行的規則被選中
+- 一條規則帶 `conditions: Condition[]`，**全部成立**才觸發（AND）；空陣列＝無條件
+- 讀檔一律經 `models/scriptEngine.ts` 的 `normalizeCombatRules()` /
+  `normalizePersistentRules()`：**不做欄位轉換**，只要有一條規則不是現行形狀
+  （沒有 `conditions` 陣列），整份腳本重置成 `DEFAULT_*`。玩家自訂的順序會消失，
+  這是刻意接受的代價 —— 不留「一半舊一半新」的混合狀態。
+  腳本以外的 prefs（快捷列、統計、公會、任務）不受影響，照常讀回來。
+  這道防線不可省略：舊 localStorage 不會過期，少了它會直接炸在 `rule.conditions.every`
 - 戰鬥腳本：player attack timer 觸發（攻擊、技能）
 - 常駐腳本：persistent loop 觸發（喝水、buff、治癒），任何狀態下生效
 - 緊急撤退：獨立判定（HP 低於閾值 → 回城）
 
+### 腳本 Template
+
+規格見 `03-combat.md` § 3.14。實作上的關鍵是**唯一真相**：
+
+```ts
+// models/scriptTemplate.ts
+interface ScriptTemplate {
+  id: string; name: string;
+  combatRules: CombatRule[]; persistentRules: PersistentRule[]; emergencyRetreat: EmergencyRetreat;
+}
+```
+
+- store 只有 `scriptTemplates` + `activeTemplateId`；
+  `combatRules` / `persistentRules` / `emergencyRetreat` **不是頂層 state**，
+  一律經 `selectCombatRules()` / `selectPersistentRules()` / `selectEmergencyRetreat()` 讀。
+  留一份頂層鏡像再同步回 template，遲早會不同步，症狀是「面板顯示 A、實際跑 B」
+- `setCombatRules()` 等 setter 一律寫進**使用中的那一頁**，寫完立刻 `saveLocalPreferences`
+- 讀檔：`normalizeScriptTemplates()`；還沒有 template 的存檔由
+  `wrapLegacyScriptsAsTemplate()` 把既有腳本包成 id 為 `default` 的第一頁
+  （規則格式相容，只是多一層容器，所以**照包不重置**）
+- `DEFAULT_TEMPLATE_ID` 那一頁不可刪（`isDeletableTemplate()`），
+  所以清單永遠非空，`resolveActiveTemplate()` 不會回 undefined
+- 測試要塞腳本一律用 `testing/scriptFixtures.ts` 的 `setActiveScripts()`，
+  直接 `setState({ combatRules })` 已經無效
+
 ### 戰鬥腳本條件類型
 
-| 條件 | 參數 | 說明 |
+語意規格見 `03-combat.md` § 3.12，這裡只列型別對應。
+
+| 條件 | 參數 | 對應 |
 |---|---|---|
 | `always` | — | 永遠成立 |
-| `monster_count_gte` | 數量 | 怪物數量 ≥ N |
-| `monster_hp_below` | 閾值 (%) | 任一存活怪物 HP 低於百分比 |
-| `monster_hp_above` | 閾值 (%) | 任一存活怪物 HP 高於百分比 |
+| `monster_count_gte` | 數量 | 攻擊範圍內怪物數 ≥ N（範圍＝該規則動作自己的射程） |
+| `monsters_near_self_gte` | 數量 + `radius` | 自身周圍 R 碼內怪物數 ≥ N |
+| `aoe_hit_count_gte` | 數量 | 本招實算命中數 ≥ N（走 `targeting.ts`，不套射程 gate） |
+| `monster_hp_below` | 閾值 (%) | 當前目標 HP 低於百分比 |
+| `monster_hp_above` | 閾值 (%) | 當前目標 HP 高於百分比 |
 | `mp_above` | 閾值 (%) | 角色 MP 高於百分比 |
 | `mp_below` | 閾值 (%) | 角色 MP 低於百分比 |
 | `skill_ready` | skillId | 指定技能冷卻完畢 |
+
+位置相關條件需要 `CombatScriptContext` 帶 `playerPos` / `primaryTargetId` / `weaponRange`
+與 `monsters: ScriptMonsterView[]`（`{ id, instance, position }`），由 `arpgEngine` 供給。
 
 ### 戰鬥腳本動作類型
 
 | 動作 | 參數 | 說明 |
 |---|---|---|
-| `skill` | skillId | 施放指定技能 |
+| `skill` | skillId | 施放指定技能（動作本身會檢查 CD／MP／`requiredWeaponType`） |
 | `normal_attack` | — | 普通攻擊 |
+| `wait` | — | 該 tick 不動作 |
 
 ### 常駐腳本條件類型
 
@@ -541,7 +581,7 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 | `CombatScriptEditor` | 戰鬥腳本規則 CRUD（僅攻擊技能/普攻） |
 | `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/加速藥水/buff/治癒） |
 | `ScriptEditor` | 舊版腳本編輯器（legacy，供遷移保留） |
-| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶規則數量 badge）+ `ScriptEditorContent`（浮動視窗內容，含常駐/戰鬥兩個 tab，§ 32.16） |
+| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶規則數量 badge）+ `ScriptEditorContent`（浮動視窗內容：上排 template 分頁、下排常駐/戰鬥兩個 tab，§ 32.16） |
 | `AttributeUpModal` | Lv50+ 屬性配點浮動視窗，有未分配點數時自動顯示 |
 | `GameIcon` | 統一 SVG icon 渲染（name, size, color），支援 Game-icons.net + Lucide |
 | `Tooltip` | 通用 hover tooltip，用於 buff/裝備/物品/技能 |

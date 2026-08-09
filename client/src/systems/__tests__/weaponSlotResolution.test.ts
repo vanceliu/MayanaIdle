@@ -178,13 +178,16 @@ describe('requiredWeaponType 實際擋招', () => {
   function ctx(weaponType: string | undefined) {
     const character = elfLv28();
     return {
-      character, monsters: [gargoyle()], skills: [tripleShot],
+      character,
+      monsters: [{ id: 'm1', instance: gargoyle(), position: { x: 1, y: 0 } }],
+      skills: [tripleShot],
       now: Date.now(), cooldownReduction: 0, weaponType,
+      playerPos: { x: 0, y: 0 }, primaryTargetId: null, weaponRange: 1.5,
     };
   }
 
   const rules = [
-    { id: 'r1', enabled: true, condition: { type: 'always' as const }, action: { type: 'skill' as const, skillId: 'triple-shot' } },
+    { id: 'r1', enabled: true, conditions: [{ type: 'always' as const }], action: { type: 'skill' as const, skillId: 'triple-shot' } },
   ];
 
   it('持弓時可施放三連射', () => {

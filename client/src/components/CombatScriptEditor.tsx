@@ -1,14 +1,24 @@
-import { useGameStore } from '../stores/gameStore';
+import { useGameStore, selectCombatRules } from '../stores/gameStore';
 import type { CombatRule, CombatConditionType, CombatActionType, CombatCondition, CombatAction } from '../models/scriptEngine';
+import { DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
 
 const CONDITION_LABELS: Record<CombatConditionType, string> = {
   always: '永遠',
-  monster_count_gte: '怪物數量 ≥',
-  monster_hp_below: '怪物 HP 低於',
-  monster_hp_above: '怪物 HP 高於',
+  monster_count_gte: '攻擊範圍內怪物數 ≥',
+  monsters_near_self_gte: '自身周圍怪物數 ≥',
+  aoe_hit_count_gte: '本招命中數 ≥',
+  monster_hp_below: '目標 HP 低於',
+  monster_hp_above: '目標 HP 高於',
   mp_above: 'MP 高於',
   mp_below: 'MP 低於',
   skill_ready: '技能就緒',
+};
+
+/** 條件的補充說明，滑鼠移上去看得到（`03-combat.md` § 3.12） */
+const CONDITION_HINTS: Partial<Record<CombatConditionType, string>> = {
+  monster_count_gte: '以這條規則自己的射程為半徑：技能用技能射程，普通攻擊用武器射程',
+  monsters_near_self_gte: '以角色為圓心、指定碼數內的活怪數，用來判斷是不是被圍住了',
+  aoe_hit_count_gte: '照這條規則要放的技能實算命中幾隻。範圍技怪沒聚在一起就不放，單體技與普攻永遠是 1',
 };
 
 const ACTION_LABELS: Record<CombatActionType, string> = {
@@ -18,7 +28,7 @@ const ACTION_LABELS: Record<CombatActionType, string> = {
 };
 
 export function CombatScriptEditor() {
-  const combatRules = useGameStore(s => s.combatRules);
+  const combatRules = useGameStore(selectCombatRules);
   const skills = useGameStore(s => s.skills);
   const setCombatRules = useGameStore(s => s.setCombatRules);
 
@@ -43,9 +53,22 @@ export function CombatScriptEditor() {
     setCombatRules(rules);
   }
 
-  function updateCondition(idx: number, updates: Partial<CombatCondition>) {
+  function updateCondition(idx: number, condIdx: number, updates: Partial<CombatCondition>) {
     const rules = [...combatRules];
-    rules[idx] = { ...rules[idx], condition: { ...rules[idx].condition, ...updates } };
+    const conditions = rules[idx].conditions.map((c, i) => (i === condIdx ? { ...c, ...updates } : c));
+    rules[idx] = { ...rules[idx], conditions };
+    setCombatRules(rules);
+  }
+
+  function addCondition(idx: number) {
+    const rules = [...combatRules];
+    rules[idx] = { ...rules[idx], conditions: [...rules[idx].conditions, { type: 'always' }] };
+    setCombatRules(rules);
+  }
+
+  function removeCondition(idx: number, condIdx: number) {
+    const rules = [...combatRules];
+    rules[idx] = { ...rules[idx], conditions: rules[idx].conditions.filter((_, i) => i !== condIdx) };
     setCombatRules(rules);
   }
 
@@ -67,7 +90,7 @@ export function CombatScriptEditor() {
     const newRule: CombatRule = {
       id: `combat-${Date.now()}`,
       enabled: true,
-      condition: { type: 'always' },
+      conditions: [{ type: 'always' }],
       action: { type: 'normal_attack' },
     };
     setCombatRules([...combatRules, newRule]);
@@ -78,10 +101,14 @@ export function CombatScriptEditor() {
   }
 
   const needsValue = (type: CombatConditionType) =>
-    ['monster_count_gte', 'monster_hp_below', 'monster_hp_above', 'mp_above', 'mp_below'].includes(type);
+    ['monster_count_gte', 'monsters_near_self_gte', 'aoe_hit_count_gte',
+     'monster_hp_below', 'monster_hp_above', 'mp_above', 'mp_below'].includes(type);
 
   const isPercentCondition = (type: CombatConditionType) =>
     ['monster_hp_below', 'monster_hp_above', 'mp_above', 'mp_below'].includes(type);
+
+  /** 只有「自身周圍怪物數」需要玩家自己指定半徑，其餘條件的圈由規則自己的射程決定 */
+  const needsRadius = (type: CombatConditionType) => type === 'monsters_near_self_gte';
 
   return (
     <div className="script-editor-content">
@@ -108,38 +135,66 @@ export function CombatScriptEditor() {
               <button className="btn-remove" onClick={() => removeRule(idx)}>✕</button>
             </div>
             <div className="rule-body">
-              <div className="rule-condition">
-                <span>如果</span>
-                <select
-                  value={rule.condition.type}
-                  onChange={e => updateCondition(idx, { type: e.target.value as CombatConditionType })}
-                >
-                  {Object.entries(CONDITION_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-                {needsValue(rule.condition.type) && (
-                  <>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={rule.condition.value ?? 0}
-                      onChange={e => updateCondition(idx, { value: Number(e.target.value) })}
-                    />
-                    {isPercentCondition(rule.condition.type) && <span className="unit-label">%</span>}
-                  </>
-                )}
-                {rule.condition.type === 'skill_ready' && (
+              {rule.conditions.length === 0 && (
+                <div className="rule-condition">
+                  <span>如果</span>
+                  <span className="cond-empty">無條件（永遠成立）</span>
+                </div>
+              )}
+              {rule.conditions.map((cond, condIdx) => (
+                <div className="rule-condition" key={condIdx}>
+                  <span>{condIdx === 0 ? '如果' : '且'}</span>
                   <select
-                    value={rule.condition.skillId ?? ''}
-                    onChange={e => updateCondition(idx, { skillId: e.target.value })}
+                    value={cond.type}
+                    title={CONDITION_HINTS[cond.type] ?? ''}
+                    onChange={e => updateCondition(idx, condIdx, { type: e.target.value as CombatConditionType })}
                   >
-                    <option value="">選擇技能</option>
-                    {attackSkills.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {Object.entries(CONDITION_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
                   </select>
-                )}
-              </div>
+                  {needsValue(cond.type) && (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={cond.value ?? 0}
+                        onChange={e => updateCondition(idx, condIdx, { value: Number(e.target.value) })}
+                      />
+                      {isPercentCondition(cond.type) && <span className="unit-label">%</span>}
+                    </>
+                  )}
+                  {needsRadius(cond.type) && (
+                    <>
+                      <span className="unit-label">隻，半徑</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={cond.radius ?? DEFAULT_NEAR_SELF_RADIUS}
+                        onChange={e => updateCondition(idx, condIdx, { radius: Number(e.target.value) })}
+                      />
+                      <span className="unit-label">碼</span>
+                    </>
+                  )}
+                  {cond.type === 'skill_ready' && (
+                    <select
+                      value={cond.skillId ?? ''}
+                      onChange={e => updateCondition(idx, condIdx, { skillId: e.target.value })}
+                    >
+                      <option value="">選擇技能</option>
+                      {attackSkills.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  )}
+                  <button
+                    className="btn-remove-cond"
+                    aria-label="刪除條件"
+                    onClick={() => removeCondition(idx, condIdx)}
+                  >✕</button>
+                </div>
+              ))}
+              <button className="btn-add-cond" onClick={() => addCondition(idx)}>＋ 條件</button>
               <div className="rule-action">
                 <span>→</span>
                 <select

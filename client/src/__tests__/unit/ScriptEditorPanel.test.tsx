@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ScriptEditorButton, ScriptEditorContent } from '../../components/ScriptEditorPanel';
 import { PanelWindows } from '../../components/PanelWindows';
-import { useGameStore } from '../../stores/gameStore';
+import { setActiveScripts } from '../../testing/scriptFixtures';
 import { usePanelWindowStore } from '../../stores/panelWindowStore';
 import { DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT } from '../../models/scriptEngine';
 
@@ -24,7 +24,7 @@ vi.mock('../../components/QuestTracker', () => ({ QuestTrackerContent: () => nul
 
 describe('ScriptEditorButton（PanelDock 觸發鈕）', () => {
   beforeEach(() => {
-    useGameStore.setState({
+    setActiveScripts({
       combatRules: DEFAULT_COMBAT_SCRIPT,
       persistentRules: DEFAULT_PERSISTENT_SCRIPT,
     });

@@ -41,12 +41,20 @@ function createSkill(overrides: Partial<Skill> = {}): Skill {
 }
 
 describe('evaluateCombatScript', () => {
+  /** 腳本看到的怪：一律貼在角色腳邊（武器射程內），這組測試只在意規則判定不在意站位 */
+  function view(idx: number, overrides: Partial<MonsterInstance> = {}) {
+    return { id: `m${idx}`, instance: createMonster(overrides), position: { x: 1, y: 0 } };
+  }
+
   function createCtx(overrides: Partial<CombatScriptContext> = {}): CombatScriptContext {
     return {
       character: createChar(),
-      monsters: [createMonster()],
+      monsters: [view(1)],
       skills: [createSkill()],
       now: 10000,
+      playerPos: { x: 0, y: 0 },
+      primaryTargetId: null,
+      weaponRange: 1.5,
       ...overrides,
     };
   }
@@ -57,21 +65,21 @@ describe('evaluateCombatScript', () => {
 
   it('matches always condition', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     expect(evaluateCombatScript(rules, createCtx())).toEqual({ type: 'normal_attack' });
   });
 
   it('matches skill_ready and returns skill action', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'skill_ready', skillId: 'wind-blade' }, action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }], action: { type: 'skill', skillId: 'wind-blade' } },
     ];
     expect(evaluateCombatScript(rules, createCtx())).toEqual({ type: 'skill', skillId: 'wind-blade' });
   });
 
   it('does not match skill_ready when on cooldown', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'skill_ready', skillId: 'wind-blade' }, action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'skill_ready', skillId: 'wind-blade' }], action: { type: 'skill', skillId: 'wind-blade' } },
     ];
     const ctx = createCtx({ skills: [createSkill({ lastUsedAt: 9000 })], now: 10000 });
     expect(evaluateCombatScript(rules, ctx)).toBeNull();
@@ -79,15 +87,15 @@ describe('evaluateCombatScript', () => {
 
   it('matches monster_count_gte', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'monster_count_gte', value: 2 }, action: { type: 'skill', skillId: 'wind-blade' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'skill', skillId: 'wind-blade' } },
     ];
-    const ctx = createCtx({ monsters: [createMonster(), createMonster()] });
+    const ctx = createCtx({ monsters: [view(1), view(2)] });
     expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'wind-blade' });
   });
 
   it('skips disabled rules', () => {
     const rules: CombatRule[] = [
-      { id: 'r1', enabled: false, condition: { type: 'always' }, action: { type: 'normal_attack' } },
+      { id: 'r1', enabled: false, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
     ];
     expect(evaluateCombatScript(rules, createCtx())).toBeNull();
   });
@@ -116,7 +124,7 @@ describe('evaluatePersistentScript', () => {
 
   it('matches hp_below and returns potion action', () => {
     const rules: PersistentRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 50 }, action: { type: 'potion', potionType: 'red' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'hp_below', value: 50 }], action: { type: 'potion', potionType: 'red' } },
     ];
     const ctx = createCtx({ character: createChar({ hp: 30, maxHp: 100 }) });
     expect(evaluatePersistentScript(rules, ctx)).toEqual({ type: 'potion', potionType: 'red' });
@@ -124,7 +132,7 @@ describe('evaluatePersistentScript', () => {
 
   it('does not match hp_below when HP is above threshold', () => {
     const rules: PersistentRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 50 }, action: { type: 'potion', potionType: 'red' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'hp_below', value: 50 }], action: { type: 'potion', potionType: 'red' } },
     ];
     const ctx = createCtx({ character: createChar({ hp: 80, maxHp: 100 }) });
     expect(evaluatePersistentScript(rules, ctx)).toBeNull();
@@ -132,7 +140,7 @@ describe('evaluatePersistentScript', () => {
 
   it('does not execute potion when HP is full', () => {
     const rules: PersistentRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'potion', potionType: 'red' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'potion', potionType: 'red' } },
     ];
     const ctx = createCtx({ character: createChar({ hp: 100, maxHp: 100 }) });
     expect(evaluatePersistentScript(rules, ctx)).toBeNull();
@@ -141,7 +149,7 @@ describe('evaluatePersistentScript', () => {
   it('matches buff_not_active when no buff exists', () => {
     const buffSkill = createSkill({ id: 'magic-armor', name: '魔法盔甲', type: 'buff', mpCost: 20, cooldown: 3000, lastUsedAt: 0 });
     const rules: PersistentRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'buff_not_active', skillId: 'magic-armor' }, action: { type: 'buff_skill', skillId: 'magic-armor' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'buff_not_active', skillId: 'magic-armor' }], action: { type: 'buff_skill', skillId: 'magic-armor' } },
     ];
     const ctx = createCtx({ skills: [buffSkill], activeEffects: [] });
     expect(evaluatePersistentScript(rules, ctx)).toEqual({ type: 'buff_skill', skillId: 'magic-armor' });
@@ -164,7 +172,7 @@ describe('evaluatePersistentScript', () => {
       description: '防禦+5',
     };
     const rules: PersistentRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'buff_not_active', skillId: 'magic-armor' }, action: { type: 'buff_skill', skillId: 'magic-armor' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'buff_not_active', skillId: 'magic-armor' }], action: { type: 'buff_skill', skillId: 'magic-armor' } },
     ];
     const ctx = createCtx({ skills: [buffSkill], activeEffects: [activeEffect], now: 10000 });
     expect(evaluatePersistentScript(rules, ctx)).toBeNull();
@@ -187,7 +195,7 @@ describe('evaluatePersistentScript', () => {
       description: '防禦+5',
     };
     const rules: PersistentRule[] = [
-      { id: 'r1', enabled: true, condition: { type: 'buff_not_active', skillId: 'magic-armor' }, action: { type: 'buff_skill', skillId: 'magic-armor' } },
+      { id: 'r1', enabled: true, conditions: [{ type: 'buff_not_active', skillId: 'magic-armor' }], action: { type: 'buff_skill', skillId: 'magic-armor' } },
     ];
     const ctx = createCtx({ skills: [buffSkill], activeEffects: [expiredEffect], now: 10000 });
     expect(evaluatePersistentScript(rules, ctx)).toEqual({ type: 'buff_skill', skillId: 'magic-armor' });

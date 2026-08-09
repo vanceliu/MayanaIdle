@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CombatScriptEditor } from '../CombatScriptEditor';
 import { useGameStore } from '../../stores/gameStore';
+import { setActiveScripts } from '../../testing/scriptFixtures';
 import { DEFAULT_COMBAT_SCRIPT } from '../../models/scriptEngine';
 import type { CombatRule } from '../../models/scriptEngine';
 import type { Skill } from '../../models/skill';
@@ -20,13 +21,15 @@ const fireball: Skill = {
 } as Skill;
 
 function setup(rules: CombatRule[], skills: Skill[] = []) {
-  useGameStore.setState({ combatRules: rules, skills });
+  setActiveScripts({ combatRules: rules });
+  useGameStore.setState({ skills });
   render(<CombatScriptEditor />);
 }
 
 describe('戰鬥腳本：沒有攻擊規則的警告', () => {
   beforeEach(() => {
-    useGameStore.setState({ combatRules: [], skills: [] });
+    setActiveScripts({ combatRules: [] });
+    useGameStore.setState({ skills: [] });
   });
 
   it('預設腳本有啟用的普通攻擊，不顯示警告', () => {
@@ -40,25 +43,25 @@ describe('戰鬥腳本：沒有攻擊規則的警告', () => {
   });
 
   it('唯一的普通攻擊規則被停用時顯示警告', () => {
-    setup([{ id: 'r1', enabled: false, condition: { type: 'always' }, action: { type: 'normal_attack' } }]);
+    setup([{ id: 'r1', enabled: false, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } }]);
     expect(screen.getByText(WARNING)).toBeDefined();
   });
 
   it('只有 buff／不動作規則時仍算沒有攻擊手段', () => {
-    setup([{ id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'wait' } }]);
+    setup([{ id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'wait' } }]);
     expect(screen.getByText(WARNING)).toBeDefined();
   });
 
   it('啟用的攻擊技能規則算數，不顯示警告', () => {
     setup(
-      [{ id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'skill', skillId: 'fireball' } }],
+      [{ id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'skill', skillId: 'fireball' } }],
       [fireball],
     );
     expect(screen.queryByText(WARNING)).toBeNull();
   });
 
   it('技能規則指到還沒學會的技能時，不能當作有攻擊手段', () => {
-    setup([{ id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'skill', skillId: 'fireball' } }], []);
+    setup([{ id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'skill', skillId: 'fireball' } }], []);
     expect(screen.getByText(WARNING)).toBeDefined();
   });
 });
