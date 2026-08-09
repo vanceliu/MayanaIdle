@@ -6,7 +6,7 @@
 //
 // v3：角色名稱改為全球唯一（§ 19.4）。舊角色的名稱可能不符新規則或已被他人註冊，
 //     會永久卡在「無法上榜」，趁玩家數尚少一次重來。
-export const CURRENT_DATA_VERSION = 4;
+export const CURRENT_DATA_VERSION = 5;
 
 // === 全域倍率 ===
 export const GOLD_RATE_MULTIPLIER = 1.0;
