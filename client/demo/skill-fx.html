@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>技能特效 Skill FX Demo — MayanaIdle</title>
+<!--
+  技能特效調校頁 —— 規格見 `docs/design/48-vfx.md` § 48.7（技能）與 § 48.8（Buff／Debuff）。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/skill-fx.html
+  直接用 file:// 開會拿不到 App.css，控制列會沒有樣式（畫布本身仍然正常）。
+
+  ── 這頁在解決什麼 ──
+  技能有 75 個，逐一設計不可能維護。演出收斂成十個原型，
+  個體差異只由**元素色**與**半徑**表達。這頁要確認的是兩件事：
+    1. 七十五個技能各自被判成哪個原型，有沒有人判錯（下面那張總表）
+    2. 每個原型的數字調到什麼程度好看（右側滑桿）
+
+  ── 跑的是同一份 ──
+  舞台上的角色剪影、武器揮擊、傷害數字、特效本體全部來自 `client/src/`，
+  這頁沒有自己的畫法。要改特效改 `src/pixi/ui/skillFx/`，重新整理即可。
+
+  ── 這頁的產出 ──
+  「匯出參數」的 JSON = 正式實作要用的常數。設計文件查不到這些數字，以這頁的結果為準。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0;
+  padding: 24px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-note code, .demo-note b { color: var(--text-primary, #E2E8F0); }
+
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+/*
+ * 三欄：舞台 ／ 技能總表 ／ 原型參數。
+ *
+ * 技能總表**必須與舞台並排** —— 疊在舞台下面的話，
+ * 每點一個技能都要往上捲才看得到演出，一次要看七十五個就是七十五次來回。
+ * 舞台再 sticky 住，捲右邊的參數時它也不會跑掉。
+ */
+.demo-main { flex: 1 1 560px; min-width: 0; position: sticky; top: 12px; }
+.demo-table { flex: 1 1 380px; min-width: 0; }
+.demo-side { flex: 0 0 330px; }
+
+/* 窄畫面擠不下三欄時，sticky 會把舞台黏在捲動的中途，反而擋路 */
+@media (max-width: 1400px) {
+  .demo-main { position: static; }
+}
+
+.demo-card {
+  background: var(--bg-panel, #12122B);
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.demo-card h2 {
+  font-family: var(--font-display, sans-serif);
+  font-size: 15px; margin: 0 0 4px; color: var(--accent-primary, #A78BFA);
+}
+.demo-card p.hint { color: var(--text-dim, #64748B); font-size: 12px; margin: 0 0 10px; line-height: 1.7; }
+.demo-card p.hint code { color: var(--text-primary, #E2E8F0); }
+
+canvas { display: block; width: 100%; border-radius: 6px; background: #0d0d20; }
+
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.row > label { flex: 0 0 118px; color: var(--text-dim, #64748B); }
+.row > input[type=range] { flex: 1; min-width: 0; }
+.row > .val { flex: 0 0 52px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary, #E2E8F0); }
+.row > select, .row > input[type=text] { flex: 1; min-width: 0; }
+
+fieldset {
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 6px; padding: 10px 12px; margin: 0 0 12px;
+}
+legend { font-size: 12px; color: var(--accent-primary, #A78BFA); padding: 0 6px; }
+
+.toggles { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-dim, #64748B); }
+.toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+button {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  background: var(--accent-primary-dim, #7C3AED); color: #fff;
+  border: none; border-radius: 5px; padding: 7px 14px;
+}
+button.ghost { background: none; border: 1px solid var(--border-subtle, #1E1E4A); color: var(--text-dim, #64748B); }
+button.ghost.on { border-color: var(--accent-primary, #A78BFA); color: var(--accent-primary, #A78BFA); }
+button.chip { padding: 5px 9px; border-radius: 999px; }
+.btn-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+
+textarea {
+  width: 100%; box-sizing: border-box; height: 190px; margin-top: 8px;
+  background: #0d0d20; color: var(--text-primary, #E2E8F0);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 5px;
+  font-family: ui-monospace, monospace; font-size: 11px; padding: 8px; line-height: 1.5;
+}
+
+/* 技能總表 */
+.skill-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.skill-table th {
+  text-align: left; padding: 5px 8px; color: var(--accent-primary, #A78BFA);
+  border-bottom: 1px solid var(--border-subtle, #1E1E4A); font-weight: 500;
+  position: sticky; top: 0; background: var(--bg-panel, #12122B);
+}
+.skill-table td { padding: 4px 8px; border-bottom: 1px solid rgba(30,30,74,0.5); }
+.skill-table tr.group td {
+  color: var(--text-dim, #64748B); background: rgba(124,58,237,0.07);
+  font-size: 11px; letter-spacing: 0.06em;
+}
+.skill-table tr.skill { cursor: pointer; }
+.skill-table tr.skill:hover td { background: rgba(124,58,237,0.16); }
+.skill-table tr.skill.on td { background: rgba(124,58,237,0.3); color: #fff; }
+.skill-table td.plan { color: var(--text-dim, #64748B); }
+.skill-table tr.skill.on td.plan { color: #ddd; }
+.elem-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+/* 高度對齊舞台那一欄 —— 兩邊差太多會有一大塊空白 */
+.table-scroll { max-height: 640px; overflow-y: auto; }
+.skill-table td { white-space: nowrap; }
+.skill-table td.plan { white-space: normal; }
+.count { color: var(--text-dim, #64748B); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">技能特效 Skill FX Demo</h1>
+<p class="demo-note">
+  技能有 <b>75 個</b>，演出收斂成 <b>十二個原型</b> —— 個體差異只由元素色與半徑表達，
+  新增技能不需要新增演出。<br>
+  <b>AoE 有兩種讀法</b>：<b>範圍爆</b>＝一顆飛到圓心炸一片；<b>齊射</b>＝每個目標各一發。
+  火球是「丟三顆」、炎爆是「炸一片」，兩者資料結構一樣，只能逐技能列名單。<br>
+  <b>元素色只有一張表</b>（<code>42-element-system.md</code> § 42.4），技能特效與投射物同色是刻意的。<br>
+  <b>近戰技能沿用武器揮擊</b>（§ 48.6），不各做一套動作 —— 差別由命中點的顏色與尺寸表達。<br>
+  <b>Buff／Debuff 的施加只有藍與紅兩色</b>，沿用 icon 列的框色，玩家不必記第二組語意 ——
+  藍紅講「好或壞」，<b>頭上的符號</b>才講「上的是哪一類」（武器祝福＝劍徽）。<br>
+  <b>調到滿意後按「匯出參數」，那份 JSON 就是實作要用的數字。</b>
+</p>
+
+<div class="demo-layout">
+  <div class="demo-main">
+
+    <div class="demo-card">
+      <h2>舞台</h2>
+      <p class="hint">
+        角色與武器揮擊、傷害數字都是 <code>src/</code> 裡遊戲在跑的那一份，這頁沒有自己的畫法。<br>
+        地面上的圈一律是 <code>2:1</code> 橢圓（對齊 <code>TILE_W=64 / TILE_H=32</code>）——
+        等距地圖上畫正圓會讀成浮在半空的球。
+      </p>
+      <canvas id="stage" height="480"></canvas>
+
+      <div class="row" style="margin-top:10px">
+        <label>時間軸 ms</label>
+        <input type="range" id="timeline" min="0" max="1000" step="1" value="0">
+        <span class="val" id="tv">0</span>
+      </div>
+      <div class="btn-wrap" style="align-items:center; margin-bottom:8px">
+        <button class="ghost" id="normalAtk">播普通攻擊</button>
+        <button class="ghost" id="normalCrit">普攻暴擊</button>
+        <button class="ghost" id="selfCheck">自我檢查</button>
+        <span class="count" id="checkOut">改完按這顆：把每個原型、每一列技能、每顆按鈕都跑一遍</span>
+      </div>
+      <div class="btn-wrap" style="align-items:center">
+        <button id="play">暫停</button>
+        <button class="ghost" id="once">重播</button>
+        <button class="ghost" id="stepBack">◀ 一格</button>
+        <button class="ghost" id="stepFwd">一格 ▶</button>
+        <label class="toggles" style="margin-left:6px"><input type="checkbox" id="tLoop" checked> 循環</label>
+        <span class="count" id="stat"></span>
+      </div>
+
+      <div class="row" style="margin-top:10px"><label>播放速度</label><input type="range" id="speed" min="0.1" max="2" step="0.05" value="1"><span class="val">1</span></div>
+      <div class="row"><label>場上怪物數</label><input type="range" id="mcount" min="1" max="10" step="1" value="6"><span class="val">6</span></div>
+      <div class="row"><label>場景縮放</label><input type="range" id="zoom" min="1" max="3" step="0.1" value="1.6"><span class="val">1.6</span></div>
+      <div class="row"><label>手上拿什麼</label><select id="wtype"></select></div>
+      <div class="row"><label class="toggles" style="flex:1">
+      </label></div>
+      <div class="row"><label class="toggles" style="flex:1">
+        <input type="checkbox" id="hitShake" checked> 命中時目標往後彈＋白閃
+      </label></div>
+      <div class="row"><label class="toggles" style="flex:1">
+        <input type="checkbox" id="deathFade"> 命中後演成倒下（死亡淡出）
+      </label></div>
+      <div class="row"><label>白閃長度 ms</label><input type="range" id="flashMs" min="20" max="400" step="5"><span class="val"></span></div>
+      <div class="row"><label>白閃強度</label><input type="range" id="flashAlpha" min="0" max="1" step="0.05"><span class="val"></span></div>
+      <div class="row"><label>淡出長度 ms</label><input type="range" id="fadeMs" min="80" max="1200" step="10"><span class="val"></span></div>
+      <div class="row"><label>淡出前先撐</label><input type="range" id="fadeHold" min="0" max="0.8" step="0.05"><span class="val"></span></div>
+      <div class="row"><label>淡出下沉 px</label><input type="range" id="fadeSink" min="0" max="40" step="1"><span class="val"></span></div>
+      <p class="hint" style="margin:4px 0 0">
+        白閃與淡出**不是原型**，它們動的是角色與怪物的 sprite，不是特效層 ——
+        所以在遊戲裡是 <code>MonsterEntity</code>／<code>PawnSprite</code> 自己做的。
+        白閃用<b>加算混色</b>不是 filter：<code>tint</code> 只能變暗，
+        而 filter 每一個都是額外的 render pass，怪物有一整群（§ 48.2）。
+        這一頁每打一下就演倒下，遊戲裡是<b>被打死才淡出</b>。
+        「淡出前先撐」那一段是留給<b>血條歸零被看見</b>的 ——
+        撐 0 的話一擊必殺會讀成「滿血的怪憑空消失」。
+      </p>
+      <div class="row"><label class="toggles" style="flex:1">
+        <input type="checkbox" id="abCompare"> 並排比較暴擊（左＝普通、右＝暴擊）
+      </label></div>
+      <p class="hint" style="margin:4px 0 0">
+        先後點兩次是比不出幾百毫秒的差別的，所以有並排模式；
+        但要記得 —— <b>如果並排才看得出來，遊戲裡就等於看不到</b>。
+        「單體技能依威力分檔」就是這樣被砍掉的：量出來終結那一邊<b>從頭到尾比較小</b>，
+        只是活得比較久，而比較小讀起來是比較弱。
+      </p>
+      <div class="row"><label>武器元素刻印</label><select id="engrave"></select></div>
+      <div class="row"><label>附魔 buff</label><select id="enchant"></select></div>
+      <p class="hint" style="margin:4px 0 0">
+        只有<b>傷害走普攻公式</b>的技能吃這兩項（目前只有三連射）——
+        刻印 → 附魔 → 技能元素，前面的蓋過後面的（<code>42-element-system.md</code> § 42.4）。<br>
+        <b>穿透箭雨同樣是弓技但不吃</b>：它走魔法公式，§ 23.4 明文「不受火矢附魔影響」。
+        顏色跟著傷害走，不跟著武器類型走。
+      </p>
+    </div>
+
+  </div>
+
+  <div class="demo-table">
+
+    <div class="demo-card">
+      <h2>七十五個技能各自演什麼</h2>
+      <p class="hint">
+        點任一列就播，左邊立刻演。<b>「演出」欄是這頁真正要確認的東西</b> ——
+        有沒有哪個技能被判到不該去的原型。
+        AoE 那幾列的鈕是<b>三段循環</b>：預設 → 齊射 → 連鎖，切了立刻重播。
+        第一段是「預設」不是「範圍爆」—— 有些技能的預設本來就不是炸一片。
+        它跟右邊的編輯器寫的是<b>同一份覆寫</b>，只是快一點 ——
+        所以<b>只要匯出那一份就好</b>。<b>連鎖的樣式由元素決定</b>：
+        風系（含雷）走電弧、其餘走火球彈跳。
+      </p>
+      <div class="row">
+        <label>篩選</label>
+        <input type="text" id="filter" placeholder="技能名稱／原型（例：齊射、範圍爆、落下、火）">
+        <span class="count" id="filterCount"></span>
+      </div>
+      <div class="table-scroll">
+        <table class="skill-table">
+          <thead>
+            <tr><th>技能</th><th>屬性</th><th>類型</th><th>演出</th><th></th></tr>
+          </thead>
+          <tbody id="skillBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="demo-side">
+
+    <div class="demo-card">
+      <h2>單獨播一個原型</h2>
+      <p class="hint">不走技能判定，直接播選中的原型 —— 調數字時不用每次都找一個對應的技能。</p>
+      <div class="btn-wrap" id="protoBtns"></div>
+      <div class="row" style="margin-top:10px"><label>元素色</label><select id="elem"></select></div>
+      <div class="row"><label>半徑 格</label><input type="range" id="radius" min="1" max="10" step="1" value="4"><span class="val">4</span></div>
+      <div class="row"><label class="toggles" style="flex:1"><input type="checkbox" id="crit"> 暴擊強調（只作用在命中點）</label></div>
+    </div>
+
+    <div class="demo-card">
+      <h2 id="editTitle">這個技能的演出</h2>
+      <p class="hint">
+        <b>逐技能自己設</b>：改了立刻重播。只開放「資料上看不出來、只能逐個決定」的欄位 ——
+        顏色、半徑、徽記、點綴都是從資料推導的，手動指定只會跟資料走鐘。<br>
+        調完按<b>匯出</b>，倒出來的表只含<b>與推導結果不同的欄位</b>，可以直接貼回
+        <code>skillFxStyle.ts</code>。
+      </p>
+      <div id="editRows"></div>
+      <div class="btn-wrap">
+        <button id="exportOv">匯出全部覆寫</button>
+        <button class="ghost" id="importOv">貼上匯入</button>
+        <button class="ghost" id="resetOne">還原這一個</button>
+        <button class="ghost" id="resetAllOv">全部還原</button>
+      </div>
+      <p class="hint" style="margin:8px 0 0">
+        <b id="ovCount"></b> ——
+        改的東西<b>自動存在瀏覽器裡</b>，重新整理、關掉分頁再回來都還在，
+        七十五個可以分好幾次慢慢調。<b>匯出是一次倒出全部</b>，調完再按一次就好。<br>
+        下面那格也可以<b>貼回去匯入</b>（JSON 或匯出的 TypeScript 都吃）——
+        換電腦或想回到某一版時用得上。
+      </p>
+      <textarea id="ovOut" style="height:150px" placeholder="按「匯出全部覆寫」倒出來；也可以把之前的表貼進來再按「貼上匯入」"></textarea>
+    </div>
+
+    <div class="demo-card">
+      <h2>參數（只作用在選中的原型）</h2>
+      <p class="hint" id="protoHint"></p>
+      <fieldset><legend id="protoLegend">參數</legend><div id="paramRows"></div></fieldset>
+      <div class="btn-wrap">
+        <button id="export">匯出參數</button>
+        <button class="ghost" id="reset">還原預設</button>
+      </div>
+      <textarea id="out" readonly placeholder="按「匯出參數」把目前的數字倒出來"></textarea>
+    </div>
+
+
+  </div>
+</div>
+
+<script type="module">
+import {
+  SkillFxStage, SKILL_ROWS, SKILL_FX_ART, SKILL_FX_PROTOTYPES, SKILL_FX_PARAM_META,
+  HIT_REACTION_ART,
+  ELEMENT_COLORS, ELEMENT_LABEL, TYPE_LABEL,
+  describePlan, describeAccent,
+  canToggleVolley, currentAoeMode, nextAoeMode, setAoeMode, AOE_MODE_LABEL,
+  applyFxContext,
+  EDITABLE_FIELDS, getOverride, setSkillOverride, resetSkillOverride,
+  resetAllOverrides, overrideCount, exportOverrides, importOverrides,
+  SKILL_ROWS as ROWS,
+} from './skillFxDemo.ts';
+import { PAWN_WEAPON_TYPES, WEAPON_ART } from '../src/pixi/entities/pawn/weaponGeometry';
+
+const $ = (id) => document.getElementById(id);
+
+/* ═══════════════════════════════════════════════════════════
+   狀態
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * 原型參數留一份可編輯的副本 —— 切換原型不能把前一個調好的數字洗掉，
+ * 一次要定十個。與 weapon.html 的 `arts` 同一個做法。
+ */
+const ART = structuredClone(SKILL_FX_ART);
+/** 把編輯過的值寫回 src 那份物件，繪製本體讀的就是它 */
+function syncArt() {
+  for (const k of Object.keys(ART)) Object.assign(SKILL_FX_ART[k], ART[k]);
+}
+
+let proto = 'cast';
+let elem = 'fire';
+let radius = 4;
+let crit = false;
+let playing = true;
+let loop = true;
+let speed = 1;
+let selectedSkill = null;
+
+const stage = new SkillFxStage();
+await stage.init($('stage'), $('stage').clientWidth, 480);
+
+const FRAME = 16;
+
+/* ═══════════════════════════════════════════════════════════
+   技能總表
+   ═══════════════════════════════════════════════════════════ */
+
+const PROTO_HINT = {
+  cast: '所有技能的起手。演到七成就接下一段 —— 等它收乾淨再射，中間會有一格空白。',
+  travel: '飛行段。頭部外型與顏色走 § 42.4；尾巴一律畫成點，一整排小箭矢讀起來是一群箭。',
+  impact: '單體命中與普攻命中。暴擊只多一圈白色衝擊環，顏色不動 —— 數字那邊已經黃了。',
+  burst: '目標中心 AoE。碎片沿地面的橢圓飛出去，往上飛的碎片讀起來是爆炸不是範圍。',
+  nova: '自身中心 AoE。只有環沒有碎片 —— 半徑 10 格的碎片會鋪滿整個畫面。',
+  drop: '落石／隕石彈／流星雨／震裂術。預示環全程都在，落下的東西還沒到就先讓玩家知道落點。',
+  heal: '治癒與吸血。光點錯開起飛時間，同時起飛會讀成一條線往上抽。',
+  crack: '地裂術飛行途中的地縫。跟著投射物一起長，一次畫完會讀成「地上本來就有一條線」。沿路要噴碎石 —— 只有一條線讀起來是畫上去的，不是裂開的。',
+  pillar: '炎柱命中後從地上竄起的柱子。竄起快、消失慢 —— 慢慢升起讀起來是電梯。下寬上窄，垂直的長方形會讀成一塊板子。',
+  bolt: '連鎖用的電弧。整條一次出現、抖一下就沒 —— 慢慢長出去讀起來是雷射。用圓形彈丸在兩隻怪之間飛則會讀成球在跳，不是電。',
+  aura: 'Buff／Debuff 施加的那一下。顏色只有藍與紅，不吃技能元素。',
+  emblem: 'Buff 徽記：頭上浮一個符號說明「上的是哪一類」。與藍環同時起跑但停久一點 —— 環只要讀出有東西上身，符號要讀得出是什麼。目前只有武器祝福（weapon-bless）有。',
+  mark: '暈眩的頭頂星星。星星繞的是橢圓 —— 正圓在等距畫面上會讀成立起來的圈。',
+  shield: '護盾／無敵掛上去的那一下。球長出來 → 停一下 → 撐大淡掉，一次性，不留常駐的球。圓外框＋2:1 赤道＋貼地底環三件一組。',
+  dotTick: 'DoT 每跳的小粒子。傷害數字一律粉紅（§ 42.3），不歸這裡管。',
+};
+
+/* 帶 debuff 的技能，命中會點綴那個 debuff 的顏色（§ 48.7.4.3） */
+function accentTag(row) {
+  const name = describeAccent(row);
+  if (!name) return '';
+  const hex = '#' + row.plan.accent.toString(16).padStart(6, '0');
+  return ` <span style="color:${hex}">＋${name}</span>`;
+}
+
+function elemDot(el) {
+  const hex = '#' + (ELEMENT_COLORS[el] ?? 0xffffff).toString(16).padStart(6, '0');
+  return `<span class="elem-dot" style="background:${hex}"></span>`;
+}
+
+function renderTable() {
+  const q = $('filter').value.trim();
+  const body = $('skillBody');
+  body.textContent = '';
+
+  let group = null;
+  let shown = 0;
+
+  for (const row of SKILL_ROWS) {
+    const desc = describePlan(row.plan);
+    const hay = `${row.skill.name} ${row.group} ${desc} ${ELEMENT_LABEL[row.skill.element]} ${TYPE_LABEL[row.skill.type]}`;
+    if (q && !hay.includes(q)) continue;
+
+    if (row.group !== group) {
+      group = row.group;
+      const tr = document.createElement('tr');
+      tr.className = 'group';
+      tr.innerHTML = `<td colspan="4">${group}</td>`;
+      body.append(tr);
+    }
+
+    const tr = document.createElement('tr');
+    tr.className = 'skill' + (row.skill.id === selectedSkill ? ' on' : '');
+    tr.dataset.id = row.skill.id;
+    tr.innerHTML = `
+      <td>${row.skill.name}</td>
+      <td>${elemDot(row.skill.element)}${ELEMENT_LABEL[row.skill.element]}</td>
+      <td>${TYPE_LABEL[row.skill.type]}</td>
+      <td class="plan">${desc}${accentTag(row)}</td>
+      <td class="toggle"></td>`;
+    tr.addEventListener('click', () => selectSkill(row.skill.id));
+
+    if (canToggleVolley(row)) {
+      /* 三段循環：範圍爆 → 齊射 → 連鎖。做三顆按鈕會把那一欄撐爆 */
+      const mode = currentAoeMode(row);
+      const b = document.createElement('button');
+      b.className = 'ghost chip' + (mode === 'base' ? '' : ' on');
+      b.textContent = AOE_MODE_LABEL[mode];
+      /* 切換鈕不要順便觸發整列的「選這個技能」—— 那會讓時間軸跳掉兩次 */
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setAoeMode(row.skill.id, nextAoeMode(currentAoeMode(row)));
+        selectSkill(row.skill.id);
+      });
+      tr.querySelector('td.toggle').append(b);
+    }
+
+    body.append(tr);
+    shown++;
+  }
+
+  $('filterCount').textContent = `${shown} / ${SKILL_ROWS.length}`;
+}
+
+function selectSkill(id) {
+  selectedSkill = id;
+  syncArt();
+  stage.playSkill(id);
+  playing = true;
+  $('play').textContent = '暫停';
+  renderTable();
+  renderEditor();
+  syncTimeline();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   逐技能的演出編輯
+   ═══════════════════════════════════════════════════════════ */
+
+/** 三種型別混在一起：布林、字串、還有「沒有」＝ null */
+function toFieldValue(v) {
+  if (v === true) return 'true';
+  if (v === false) return 'false';
+  return v ?? '';
+}
+
+function fromFieldValue(raw) {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return raw === '' ? null : raw;
+}
+
+/**
+ * 這一次重繪的編號。
+ *
+ * 舊的 `<select>` 在被移除的當下仍可能補送一次 `change`，而且那時它**還連著**
+ * —— `isConnected` 擋不住。用 token 比對「這個 handler 是哪一次畫出來的」，
+ * 不是這一次的就丟掉。與 `48-vfx.md` § 48.3.1 的連點重播同一招。
+ */
+let editorToken = 0;
+
+function renderEditor() {
+  const token = ++editorToken;
+  const host = $('editRows');
+  host.textContent = '';
+
+  const row = selectedSkill ? ROWS.find(r => r.skill.id === selectedSkill) : null;
+  $('editTitle').textContent = row ? `演出：${row.skill.name}` : '這個技能的演出';
+  $('ovCount').textContent = `${overrideCount()} / ${ROWS.length} 個技能被改過`;
+
+  if (!row) {
+    const p = document.createElement('p');
+    p.className = 'hint';
+    p.textContent = '先在中間那張表點一個技能。';
+    host.append(p);
+    return;
+  }
+
+  const ov = getOverride(row.skill.id);
+  for (const field of EDITABLE_FIELDS) {
+    const wrap = document.createElement('div');
+    wrap.className = 'row';
+
+    const label = document.createElement('label');
+    /* 被改過的欄位標一下，才看得出「這一個是我調的」 */
+    const changed = field.key in ov;
+    label.textContent = (changed ? '● ' : '') + field.label;
+    if (changed) label.style.color = 'var(--accent-primary, #A78BFA)';
+
+    const sel = document.createElement('select');
+    /*
+     * **關掉瀏覽器的表單還原。**
+     * 不關的話重新整理之後 Chrome 會把 select 復原成上一次的選項，
+     * 而且是在我們設好值之後才動 —— 那一發 change 打在已連上的元素上，
+     * `isConnected` 擋不住，結果是「開頁面就自己多出一筆覆寫」。
+     */
+    sel.autocomplete = 'off';
+    for (const o of field.options) {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      sel.append(opt);
+    }
+    sel.value = toFieldValue(row.plan[field.key]);
+    sel.addEventListener('change', () => {
+      /*
+       * **不是這一次畫出來的 select 不可以寫入。**
+       * 每次換技能都會整組重建，而瀏覽器在移除舊的 select 時仍可能補送一次
+       * change，且那時它還連著 —— 那一發會把前一個技能的值寫到現在這個上，
+       * 掃過一輪表格就會憑空多出幾筆覆寫。
+       */
+      if (token !== editorToken) return;
+      setSkillOverride(row.skill.id, { [field.key]: fromFieldValue(sel.value) });
+      selectSkill(row.skill.id);
+    });
+
+    wrap.append(label, sel);
+    host.append(wrap);
+  }
+}
+
+$('exportOv').addEventListener('click', () => { $('ovOut').value = exportOverrides(); });
+$('importOv').addEventListener('click', () => {
+  const { ok, skipped } = importOverrides($('ovOut').value);
+  renderTable();
+  if (selectedSkill) selectSkill(selectedSkill); else renderEditor();
+  $('ovCount').textContent = skipped.length
+    ? `匯入 ${ok} 筆，${skipped.length} 筆認不得：${skipped.join('、')}`
+    : `匯入 ${ok} 筆`;
+});
+$('resetOne').addEventListener('click', () => {
+  if (!selectedSkill) return;
+  resetSkillOverride(selectedSkill);
+  selectSkill(selectedSkill);
+});
+$('resetAllOv').addEventListener('click', () => {
+  resetAllOverrides();
+  renderTable();
+  if (selectedSkill) selectSkill(selectedSkill);
+  else renderEditor();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   原型
+   ═══════════════════════════════════════════════════════════ */
+
+const PROTO_LABEL = {
+  cast: '起手', travel: '投射', impact: '命中', burst: '範圍爆', nova: '自身爆',
+  drop: '落下', heal: '治癒', aura: '施加', bolt: '電弧', crack: '地裂', pillar: '火柱',
+  emblem: '徽記', mark: '暈眩',
+  shield: '護盾球', dotTick: 'DoT 跳',
+};
+
+function renderProtoButtons() {
+  const host = $('protoBtns');
+  host.textContent = '';
+  for (const p of SKILL_FX_PROTOTYPES) {
+    const b = document.createElement('button');
+    b.className = 'ghost chip' + (p === proto ? ' on' : '');
+    b.textContent = `${PROTO_LABEL[p]} ${p}`;
+    b.addEventListener('click', () => selectProto(p));
+    host.append(b);
+  }
+}
+
+function selectProto(p) {
+  proto = p;
+  selectedSkill = null;
+  renderProtoButtons();
+  renderTable();
+  buildParamRows();
+  playProto();
+}
+
+function playProto(extra = {}) {
+  syncArt();
+  stage.playPrototype({
+    prototype: proto,
+    color: ELEMENT_COLORS[elem],
+    radiusTiles: radius,
+    crit,
+    ...extra,
+  });
+  playing = true;
+  $('play').textContent = '暫停';
+  syncTimeline();
+}
+
+function buildParamRows() {
+  const meta = SKILL_FX_PARAM_META[proto];
+  const obj = ART[proto];
+  const host = $('paramRows');
+  host.textContent = '';
+  $('protoLegend').textContent = `${PROTO_LABEL[proto]}（${proto}）`;
+  $('protoHint').textContent = PROTO_HINT[proto] ?? '';
+
+  for (const key of Object.keys(obj)) {
+    const m = meta[key];
+    if (!m) continue;
+
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const label = document.createElement('label');
+    label.textContent = m.label;
+
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(m.min);
+    input.max = String(m.max);
+    input.step = String(m.step);
+    input.value = String(obj[key]);
+
+    const val = document.createElement('span');
+    val.className = 'val';
+    val.textContent = String(obj[key]);
+
+    input.addEventListener('input', () => {
+      obj[key] = Number(input.value);
+      val.textContent = input.value;
+      syncArt();
+      /* 改了數字就從頭重播，才看得出改到哪 */
+      stage.seek(0);
+      syncTimeline();
+    });
+
+    row.append(label, input, val);
+    host.append(row);
+  }
+}
+
+
+
+
+/* ═══════════════════════════════════════════════════════════
+   UI 接線
+   ═══════════════════════════════════════════════════════════ */
+
+for (const el of Object.keys(ELEMENT_LABEL)) {
+  const o = document.createElement('option');
+  o.value = el;
+  o.textContent = ELEMENT_LABEL[el];
+  $('elem').append(o);
+}
+$('elem').value = elem;
+$('elem').addEventListener('change', () => { elem = $('elem').value; playProto(); });
+
+/* 武器刻印與附魔：只改顏色，不改原型（§ 42.4） */
+function elementSelect(id, noneLabel, apply) {
+  const el = $(id);
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = noneLabel;
+  el.append(none);
+  for (const e of Object.keys(ELEMENT_LABEL)) {
+    if (e === 'none') continue;
+    const o = document.createElement('option');
+    o.value = e;
+    o.textContent = ELEMENT_LABEL[e];
+    el.append(o);
+  }
+  el.addEventListener('change', () => {
+    apply(el.value || undefined);
+    renderTable();
+    if (selectedSkill) selectSkill(selectedSkill);
+  });
+}
+elementSelect('engrave', '無刻印', v => applyFxContext({ weaponElement: v }));
+elementSelect('enchant', '無附魔', v => applyFxContext({ enchantElement: v }));
+
+for (const id of PAWN_WEAPON_TYPES) {
+  const o = document.createElement('option');
+  o.value = id;
+  o.textContent = WEAPON_ART[id].label;
+  $('wtype').append(o);
+}
+$('wtype').value = stage.weaponType;
+$('wtype').addEventListener('change', () => {
+  stage.weaponType = $('wtype').value;
+  if (selectedSkill) selectSkill(selectedSkill);
+});
+
+function simpleSlider(id, apply) {
+  const el = $(id);
+  const val = el.parentElement.querySelector('.val');
+  el.addEventListener('input', () => {
+    val.textContent = el.value;
+    apply(Number(el.value));
+  });
+}
+simpleSlider('speed', (v) => { speed = v; });
+simpleSlider('radius', (v) => { radius = v; if (!selectedSkill) playProto(); });
+simpleSlider('mcount', (v) => {
+  stage.setMonsterCount(v);
+  if (selectedSkill) selectSkill(selectedSkill);
+});
+simpleSlider('zoom', (v) => stage.setZoom(v));
+
+/*
+ * 施法舉武器 —— 這個開關只改調校頁的行為，`src/` 的 WeaponSprite 一個字都沒動。
+ * 定案之後才會進 src；在那之前空手施法仍是遊戲的行為。
+ */
+$('abCompare').addEventListener('change', () => {
+  stage.abCompare = $('abCompare').checked;
+  if (selectedSkill) selectSkill(selectedSkill);
+});
+
+/* 白閃與淡出的四個數字直接改 HIT_REACTION_ART —— 與遊戲同一份 */
+for (const [id, key] of [
+  ['flashMs', 'flashMs'], ['flashAlpha', 'flashAlpha'],
+  ['fadeMs', 'deathFadeMs'], ['fadeHold', 'deathHoldRatio'], ['fadeSink', 'deathSinkPx'],
+]) {
+  const el = $(id);
+  const out = el.nextElementSibling;
+  el.value = HIT_REACTION_ART[key];
+  out.textContent = el.value;
+  el.addEventListener('input', () => {
+    HIT_REACTION_ART[key] = Number(el.value);
+    out.textContent = el.value;
+  });
+}
+
+$('deathFade').addEventListener('change', () => {
+  stage.deathFade = $('deathFade').checked;
+  if (selectedSkill) selectSkill(selectedSkill);
+});
+
+$('hitShake').addEventListener('change', () => {
+  stage.hitShake = $('hitShake').checked;
+stage.deathFade = $('deathFade').checked;
+  if (selectedSkill) selectSkill(selectedSkill);
+});
+
+$('crit').addEventListener('change', () => {
+  crit = $('crit').checked;
+  if (!selectedSkill) playProto();
+});
+
+$('filter').addEventListener('input', renderTable);
+
+
+$('play').addEventListener('click', () => {
+  playing = !playing;
+  $('play').textContent = playing ? '暫停' : '播放';
+});
+$('once').addEventListener('click', () => {
+  stage.seek(0);
+  playing = true;
+  $('play').textContent = '暫停';
+  syncTimeline();
+});
+$('tLoop').addEventListener('change', () => { loop = $('tLoop').checked; });
+$('stepFwd').addEventListener('click', () => {
+  playing = false;
+  $('play').textContent = '播放';
+  stage.step(FRAME);
+  syncTimeline();
+});
+$('stepBack').addEventListener('click', () => {
+  playing = false;
+  $('play').textContent = '播放';
+  stage.seek(Math.max(0, stage.state.elapsedMs - FRAME));
+  syncTimeline();
+});
+$('timeline').addEventListener('input', () => {
+  playing = false;
+  $('play').textContent = '播放';
+  stage.seek(Number($('timeline').value));
+  syncTimeline();
+});
+
+
+$('export').addEventListener('click', () => {
+  $('out').value = JSON.stringify({ [proto]: ART[proto] }, null, 2);
+});
+$('reset').addEventListener('click', () => {
+  Object.assign(ART, structuredClone(SKILL_FX_ART));
+  buildParamRows();
+  stage.seek(0);
+  syncTimeline();
+});
+
+function syncTimeline() {
+  const s = stage.state;
+  $('timeline').max = String(Math.max(1, Math.round(s.durationMs)));
+  $('timeline').value = String(Math.round(s.elapsedMs));
+  $('tv').textContent = String(Math.round(s.elapsedMs));
+  $('stat').textContent = `全長 ${Math.round(s.durationMs)}ms　場上特效 ${s.activeCount} 個`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   自我檢查
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * 把整頁跑一遍。
+ *
+ * 這頁的東西是一條條加上去的（原型、齊射切換、徽記、護盾球…），
+ * **改一個很容易打斷另一個** —— 尤其是靠 id 接線的按鈕，
+ * 拼錯就是靜靜地整段 script 掛掉，畫面看起來還是好的。
+ * 所以檢查一次跑全部，不挑幾個點看。
+ */
+async function runSelfCheck() {
+  const out = $('checkOut');
+  out.textContent = '檢查中…';
+  const problems = [];
+
+  const wasPlaying = playing;
+  const wasSkill = selectedSkill;
+  const wasProto = proto;
+  const ovBefore = overrideCount();
+  playing = false;
+
+  /* 1. 接線：每個 id 都要真的存在，否則 script 會在載入時就整段掛掉 */
+  const IDS = [
+    'stage', 'timeline', 'tv', 'play', 'once', 'stepBack', 'stepFwd', 'tLoop', 'stat',
+    'speed', 'mcount', 'zoom', 'wtype', 'filter', 'filterCount',
+    'skillBody',
+    'protoBtns', 'elem', 'radius', 'crit', 'protoHint', 'protoLegend', 'paramRows',
+    'export', 'reset', 'out',
+    'hitShake', 'deathFade', 'abCompare', 'normalAtk', 'normalCrit',
+    'editTitle', 'editRows', 'exportOv', 'resetOne', 'resetAllOv', 'ovCount', 'ovOut',
+  ];
+  for (const id of IDS) if (!$(id)) problems.push(`缺少 #${id}`);
+
+  /* 2. 每個原型：有說明、有滑桿、播得出東西 */
+  if ($('protoBtns')) {
+    for (const b of [...document.querySelectorAll('#protoBtns button')]) {
+      const name = b.textContent.trim();
+      b.click();
+      if (!$('protoHint').textContent.trim()) problems.push(`${name}：沒有說明`);
+      if (!document.querySelectorAll('#paramRows .row').length) problems.push(`${name}：沒有參數滑桿`);
+      if (!(stage.state.durationMs > 1)) problems.push(`${name}：時間軸長度是 ${stage.state.durationMs}`);
+      if (!(stage.state.activeCount > 0)) problems.push(`${name}：播不出任何東西`);
+    }
+  }
+
+  /* 3. 七十五列：都有演出描述，點下去都真的演得出東西 */
+  const rows = [...document.querySelectorAll('#skillBody tr.skill')];
+  if (rows.length !== SKILL_ROWS.length) {
+    problems.push(`表格只有 ${rows.length} 列，應該是 ${SKILL_ROWS.length}（篩選沒清掉？）`);
+  }
+  for (const tr of rows) {
+    const name = tr.cells[0].textContent;
+    if (!tr.cells[3].textContent.trim()) problems.push(`${name}：演出欄空白`);
+    tr.click();
+    if (!document.querySelectorAll('#editRows select').length) {
+      problems.push(`${name}：演出編輯器沒有出現`);
+    }
+    if (!(stage.state.durationMs > 1)) problems.push(`${name}：時間軸長度是 ${stage.state.durationMs}`);
+    if (!(stage.state.activeCount > 0)) problems.push(`${name}：播不出任何東西`);
+  }
+
+  /*
+   * 4. 武器演出有沒有真的起動。
+   *
+   * 這一條是補上一次的漏洞：src 那邊把 `onMeleeSwing` 改名成 `onWeaponAction`，
+   * 這頁沒跟著改 —— demo 不進 `tsc`（`tsconfig.app.json` 只含 src），
+   * 所以是**靜靜地壞掉**：畫面照演，只是武器再也沒出現過。
+   * 光看「有沒有東西演」抓不到，得直接問「該揮的有沒有揮」。
+   */
+  for (const row of SKILL_ROWS) {
+    if (row.plan.weapon === 'none') continue;
+    const tr = document.querySelector(`#skillBody tr[data-id="${row.skill.id}"]`);
+    if (!tr) continue;
+    tr.click();
+    if (!stage.weaponActions.includes(row.plan.weapon)) {
+      problems.push(`${row.skill.name}：該 ${row.plan.weapon} 卻沒有起動武器演出`);
+    }
+  }
+
+  /* 5. 側欄按鈕：點得下去且不丟例外 */
+  const SIDE = ['exportOv'];
+  for (const id of SIDE) {
+    try { $(id)?.click(); } catch (e) { problems.push(`#${id}：${e.message}`); }
+  }
+
+  /*
+   * 6. AoE 切換：**繞完一整圈**（三段）名單要回到原樣。
+   * 之前這裡只點兩次 —— 那是二段循環時代的假設，改成三段之後就對不上了。
+   * 圈數寫死成模式數，之後再加一種模式這裡也不會再過時。
+   */
+  /*
+   * **每個技能的循環長度不一樣。**
+   * 「預設」與「齊射」對某些技能是同一格（暴風雪的基準值本來就是齊射），
+   * 所以固定點三次回不到原點 —— 改成「點到回原狀為止」，
+   * 上限用模式數擋住無限迴圈。
+   */
+  const before = exportOverrides();
+  const MODES = Object.keys(AOE_MODE_LABEL).length;
+  for (const tr of [...document.querySelectorAll('#skillBody tr.skill')]) {
+    const id = tr.dataset.id;
+    const row = SKILL_ROWS.find(r => r.skill.id === id);
+    if (!row || !canToggleVolley(row)) continue;
+
+    const startMode = currentAoeMode(row);
+    let clicks = 0;
+    do {
+      document.querySelector(`#skillBody tr[data-id="${id}"] td.toggle button`)?.click();
+      clicks++;
+    } while (currentAoeMode(row) !== startMode && clicks <= MODES);
+
+    if (currentAoeMode(row) !== startMode) {
+      problems.push(`${row.skill.name}：切了 ${clicks} 次回不到原本的模式`);
+    }
+  }
+  if (exportOverrides() !== before) problems.push('AoE 切換繞一圈之後覆寫表變了');
+
+  /* 掃完一輪不該憑空多出覆寫 —— 幽靈寫入就是這樣被抓到的 */
+  if (overrideCount() !== ovBefore) {
+    problems.push(`自我檢查跑完覆寫數變了（${ovBefore} → ${overrideCount()}）`);
+  }
+
+  /* 只有攻擊型的目標中心 AoE 該有切換鈕 —— 治癒與 buff 切了會演出壞掉的組合 */
+  for (const row of SKILL_ROWS) {
+    const has = !!document.querySelector(`#skillBody tr[data-id="${row.skill.id}"] td.toggle button`);
+    const should = canToggleVolley(row);
+    if (has !== should) {
+      problems.push(`${row.skill.name}：${should ? '應該' : '不該'}有 AoE 切換鈕`);
+    }
+  }
+
+  /* 收尾：把使用者原本看的東西放回去 */
+  if (wasSkill) selectSkill(wasSkill);
+  else selectProto(wasProto);
+  playing = wasPlaying;
+  $('play').textContent = playing ? '暫停' : '播放';
+
+  out.textContent = problems.length
+    ? `✗ ${problems.length} 個問題：${problems.slice(0, 6).join('；')}${problems.length > 6 ? '…（其餘見 console）' : ''}`
+    : `✓ ${rows.length} 個技能、${SKILL_FX_PROTOTYPES.length} 個原型、所有按鈕都正常`;
+  out.style.color = problems.length ? '#EF4444' : '#4ade80';
+  if (problems.length) console.warn('[self-check]', problems);
+}
+
+/* 普攻不是技能，不在那七十五列裡，所以另外給按鈕 */
+function playNormal(crit) {
+  selectedSkill = null;
+  renderTable();
+  renderEditor();
+  stage.playNormalAttack(crit);
+  playing = true;
+  $('play').textContent = '暫停';
+  syncTimeline();
+}
+$('normalAtk').addEventListener('click', () => playNormal(false));
+$('normalCrit').addEventListener('click', () => playNormal(true));
+
+$('selfCheck').addEventListener('click', runSelfCheck);
+
+/* 調球形罩／徽記高度時要對得上剪影 —— console 拿得到實際外框，不用目測 */
+window.pawnBounds = () => stage.pawnBounds;
+/* 並排比較時量兩邊的實際大小 —— 目測 400ms 的東西不可靠 */
+window.fxBounds = () => stage.fxBounds;
+/*
+ * 普攻停在指定毫秒，回傳爆點外框與怪物位置。
+ * 「命中回饋有沒有在該有的那一幀」用肉眼抓 400ms 不可靠，要用量的。
+ */
+window.probeNormal = (crit, ms) => {
+  playNormal(crit);
+  playing = false;
+  $('play').textContent = '播放';
+  stage.seek(ms);
+  const m = stage.monsters[0].container;
+  const bar = m.children.find(c => c.children && c.children.length === 2);
+  return {
+    fx: stage.fxBounds[4],
+    monster: { x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10 },
+    alpha: Math.round(m.alpha * 100) / 100,
+    barPx: bar ? Math.round(bar.children[1].getLocalBounds().width) : -1,
+  };
+};
+
+/* ═══════════════════════════════════════════════════════════
+   播放迴圈
+   ═══════════════════════════════════════════════════════════ */
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(now - last, 100);
+  last = now;
+
+  if (playing) {
+    stage.step(dt * speed);
+    if (stage.finished) {
+      if (loop) stage.seek(0);
+      else { playing = false; $('play').textContent = '播放'; }
+    }
+    syncTimeline();
+  }
+  requestAnimationFrame(frame);
+}
+
+renderProtoButtons();
+buildParamRows();
+renderTable();
+renderEditor();
+stage.setMonsterCount(6);
+stage.setZoom(Number($('zoom').value));
+stage.hitShake = $('hitShake').checked;
+stage.deathFade = $('deathFade').checked;
+selectSkill('fireball');
+requestAnimationFrame(frame);
+
+window.addEventListener('resize', () => {
+  stage.layout($('stage').clientWidth, 480);
+});
+</script>
+
+</body>
+</html>

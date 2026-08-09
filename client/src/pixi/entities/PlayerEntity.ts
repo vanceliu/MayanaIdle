@@ -6,6 +6,7 @@ import { createDefaultAppearance, normalizeAppearance } from '../../models/appea
 import { PawnSprite } from './pawn/PawnSprite';
 import { toPawnLook } from './pawn/pawnTexture';
 import { weaponAimFromDelta, type WeaponAttack } from './pawn/weaponGeometry';
+import { HitReaction } from './hitReaction';
 
 /** 地面標記沿用原本圓點的藍 —— 剪影本身沒有敵我資訊，那個區分不能消失 */
 const PLAYER_MARKER = 0x4dabf7;
@@ -17,6 +18,8 @@ const PLAYER_MARKER = 0x4dabf7;
 export class PlayerEntity {
   public container: Container;
   private pawn: PawnSprite;
+  /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
+  private readonly hitReaction = new HitReaction();
 
   constructor(appearance: Appearance = createDefaultAppearance()) {
     this.container = new Container();
@@ -53,15 +56,29 @@ export class PlayerEntity {
     this.pawn.attack({ ...weapon, aim });
   }
 
-  /** 每幀推進武器演出 */
+  /** Debuff 染色（§ 48.8.2）。`null` ＝ 恢復原色 */
+  setTint(tint: number | null): void {
+    this.pawn.setTint(tint);
+  }
+
+  /**
+   * 被打到（§ 48.7.6）。方向是**從攻擊者指向自己**，被打飛才是那個方向。
+   */
+  hit(dirX: number, dirY: number): void {
+    this.hitReaction.hit(dirX, dirY);
+  }
+
+  /** 每幀推進武器演出與受擊反應 */
   update(deltaMs: number): void {
     this.pawn.update(deltaMs);
+    this.hitReaction.update(deltaMs);
+    this.pawn.setFlash(this.hitReaction.flashAlpha);
   }
 
   updatePosition(pos: Position, elevation = 0): void {
     const { sx, sy } = worldToScreen(pos.x, pos.y, elevation);
-    this.container.x = sx;
-    this.container.y = sy;
+    this.container.x = sx + this.hitReaction.offsetX;
+    this.container.y = sy + this.hitReaction.offsetY;
     this.container.zIndex = getEntityDepth(pos, elevation);
     this.pawn.updateFacingFrom(pos.x, pos.y);
   }

@@ -82,10 +82,16 @@ describe('替換後的輔助魔法定義', () => {
   });
 
 
-  it('詛咒移至 7 級並強化為攻擊力 -20%', () => {
+  it('詛咒是防禦力 -20%、tag 為 cursed（§ 24.4.1）', () => {
+    /*
+     * 曾經被實作成「攻擊力 -20%、tag `curse`」，與 § 24.4.1 對不起來。
+     * 影響範圍不只數值 —— tag 是免疫詞綴（`07-affix.md` § 7.10）、
+     * 狀態解除道具、Boss 控場免疫的查表 key，錯一個字就是整條查不到。
+     */
     const s = getSkillTemplate('curse')!;
     expect(s.level).toBe(7);
-    expect(s.applyDebuff?.modifiers).toEqual([{ stat: 'attack', value: -20, isPercent: true }]);
+    expect(s.applyDebuff?.modifiers).toEqual([{ stat: 'defense', value: -20, isPercent: true }]);
+    expect(s.applyDebuff?.tags).toEqual(['cursed']);
   });
 
   it('被移除的傳送類技能已不存在', () => {

@@ -120,7 +120,7 @@ client/src/
 │   ├── ui/
 │   │   ├── HealthBar.ts        # 血條
 │   │   ├── DamageNumber.ts     # 傷害數字
-│   │   ├── Projectile.ts       # 投射物
+│   │   ├── skillFx/            # 技能特效（§ 48.7、§ 48.8）：原型、判定、播放
 │   │   └── CombatVisualEvent.ts # 戰鬥視覺事件
 │   └── utils/
 │       └── isometric.ts        # 座標轉換、深度計算工具

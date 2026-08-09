@@ -61,6 +61,8 @@
 | 職業魔法（5 職業各 5 級） | `23-class-magic.md` | 全文 |
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
 | 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩） | `24-buff-debuff.md` | § 24.4, § 24.10 |
+| **技能施加於怪物的 debuff（效果與秒數走技能表，只有 tag 共用）** | `24-buff-debuff.md` | § 24.4.1 下半 |
+| **debuff tag 一覽（免疫詞綴／解除道具／控場免疫的查表 key）** | `24-buff-debuff.md` | § 24.4.1 |
 | Debuff 解除手段（道具/免疫詞綴） | `24-buff-debuff.md` | § 24.10 |
 | 怪物 Debuff 能力（已併入怪物屬性表） | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
@@ -96,6 +98,8 @@
 | 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
 | **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
 | 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
+| **技能特效（原型／技能對應／AoE 一發／通用戰鬥特效）** | `48-vfx.md` | § 48.7（元素色見 `42-element-system.md` § 42.4） |
+| **Buff／Debuff 場上特效（施加閃光／染色／頭頂標記／DoT 粒子）** | `48-vfx.md` | § 48.8（規則與 icon 見 `24-buff-debuff.md`） |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
@@ -206,7 +210,7 @@
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
 | `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限 |
 | `47-mobile.md` | 行動裝置適配 | 斷點、觸控互動、指標拖放、手機版面、PWA |
-| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、印記師、**武器攻擊演出**；其餘戰鬥特效待補 |
+| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、印記師、**武器攻擊演出**、**技能特效**、**Buff／Debuff 場上特效** |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
 | `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
 
@@ -250,6 +254,9 @@
 21-combat-formula.md                 22-basic-magic.md / 23-class-magic.md
        ↕                                                        ↕
 24-buff-debuff.md ←→ 25-monster-system.md（怪物 debuff / Boss 控場免疫 / 怪物 debuff 能力表）
+  ※ 改任何 debuff 的 tag 必須同步 § 24.4.1 —— 免疫詞綴、狀態解除道具、
+    Boss 控場免疫、場上染色都以 tag 為查表 key，打錯一個字整條查不到且不報錯。
+    技能側與怪物側的效果、秒數各自獨立，但同一種狀態的 tag 必須同字
        ↕                                                        ↕
 07-affix.md（免疫詞綴 § 7.10）←→ 30-items.md（狀態解除道具）←→ 13-town.md（雜貨店商品清單）
        ↕
@@ -306,6 +313,11 @@
   ←→ 06-equipment.md § 6.9~6.10（強化的成功率與安定值＝演出的觸發條件，數值只在該節）
   ←→ 40-pixijs-migration.md（EffectLayer 是戰鬥特效的掛載點）
   ←→ 46-sigil.md（印記師的成功率與確認訊息＝演出的觸發條件，數值只在該文件）
+  ←→ 42-element-system.md § 42.4（技能特效的元素色＝投射物色表，§ 48.7 不另立一張）
+  ←→ 22-basic-magic.md / 23-class-magic.md（技能的 type／target／aoeCenter／range
+       ＝ § 48.7.3 推導原型的依據；新增技能不需要改 48-vfx.md，落下名單除外）
+  ←→ 24-buff-debuff.md § 24.4／§ 24.8（buff/debuff 的規則與 icon 只在該文件，
+       § 48.8 只規範場上表現；藍/紅兩色沿用 § 24.8.2 的框色）
   特效不得改變任何規則；改動機率或安定值時本文件不需同步，反之亦然
        ↕
 16-tech-frontend-architecture.md § 32.15.1（視窗層級／底部 HUD 帶寬 --hud-band-bottom）

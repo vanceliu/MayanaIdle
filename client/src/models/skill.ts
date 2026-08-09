@@ -125,7 +125,7 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   // Level 7
   { id: 'tornado', name: '龍捲風', level: 7, element: 'wind', type: 'attack', target: 'aoe', power: 38, mpCost: 45, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 4, maxTargets: 6 },
   { id: 'meteor-shot', name: '隕石彈', level: 7, element: 'fire', type: 'attack', target: 'aoe', power: 42, mpCost: 50, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6 },
-  { id: 'curse', name: '詛咒', level: 7, element: 'dark', type: 'attack', target: 'single', power: 0, mpCost: 35, cooldown: 30000, range: 10, applyDebuff: { category: 'atk-down', name: '詛咒', description: '攻擊力降低20%', duration: 10000, modifiers: [{ stat: 'attack', value: -20, isPercent: true }], tags: ['curse'] } },
+  { id: 'curse', name: '詛咒', level: 7, element: 'dark', type: 'attack', target: 'single', power: 0, mpCost: 35, cooldown: 30000, range: 10, applyDebuff: { category: 'curse', name: '詛咒', description: '防禦力降低20%', duration: 10000, modifiers: [{ stat: 'defense', value: -20, isPercent: true }], tags: ['cursed'] } },
   { id: 'armor-break', name: '護甲崩壞', level: 7, element: 'earth', type: 'attack', target: 'single', power: 0, mpCost: 40, cooldown: 20000, range: 10, applyDebuff: { category: 'defense-down', name: '護甲崩壞', description: '防禦值降低15%', duration: 15000, modifiers: [{ stat: 'defense', value: -15, isPercent: true }], tags: ['armor-break'] } },
   { id: 'shadow-burst', name: '暗影爆發', level: 7, element: 'dark', type: 'attack', target: 'aoe', power: 42, mpCost: 50, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6 },
   // Level 8

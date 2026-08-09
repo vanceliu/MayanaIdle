@@ -1,5 +1,11 @@
 import type { ElementType, MonsterAttackType } from '../../models/monster';
-import type { ProjectileShape } from './Projectile';
+
+/**
+ * 投射物的外型（§ 42.4）。
+ *
+ * `lance` 是冰槍那類的長槍 —— 同樣是飛過去的一顆東西，只是拉長了。
+ */
+export type ProjectileShape = 'circle' | 'arrow' | 'lance';
 
 /**
  * 投射物外型規則（42-element-system.md § 42.4）

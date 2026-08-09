@@ -25,6 +25,8 @@ export class PawnSprite {
   readonly container: Container;
   private readonly marker: Graphics;
   private readonly sprite: Sprite;
+  /** 受擊白閃用的加算副本 —— 貼圖與 `sprite` 同一張，換圖時要一起換 */
+  private readonly flash: Sprite;
   /** 武器：平常不畫，只在出手的那一次演出中出現（`48-vfx.md` § 48.6） */
   private readonly weapon: WeaponSprite;
   private look: PawnLook;
@@ -57,8 +59,19 @@ export class PawnSprite {
     this.sprite.anchor.set(PAWN_ANCHOR_X / PAWN_TEX_W, PAWN_ANCHOR_Y / PAWN_TEX_H);
     this.sprite.scale.set(1 / PAWN_BAKE_SCALE);
 
+    /*
+     * 受擊白閃（`48-vfx.md` § 48.7.6）：同一張貼圖用**加算混色**再疊一層。
+     * `tint` 只能變暗，做不出白閃；filter 是額外的 render pass（§ 48.2）。
+     * 加算是繪製狀態，不是 pass。
+     */
+    this.flash = new Sprite(this.sprite.texture);
+    this.flash.anchor.copyFrom(this.sprite.anchor);
+    this.flash.scale.copyFrom(this.sprite.scale);
+    this.flash.blendMode = 'add';
+    this.flash.alpha = 0;
+
     this.weapon = new WeaponSprite();
-    this.container.addChild(this.marker, this.sprite, this.weapon.container);
+    this.container.addChild(this.marker, this.sprite, this.flash, this.weapon.container);
   }
 
   /**
@@ -72,6 +85,21 @@ export class PawnSprite {
     this.attackFacing = this.attackHold;
     this.weapon.play(attack);
     this.syncWeaponDepth();
+  }
+
+  /**
+   * Debuff 染色（`48-vfx.md` § 48.8.2）。`null` ＝ 恢復原色。
+   *
+   * 只染剪影，**地面標記不染** —— 那顆標記帶的是敵我資訊（藍＝玩家），
+   * 被中毒染綠就讀不出來了。
+   */
+  setTint(tint: number | null): void {
+    this.sprite.tint = tint ?? 0xffffff;
+  }
+
+  /** 受擊白閃的強度（0–1）。0 ＝ 不疊 */
+  setFlash(alpha: number): void {
+    this.flash.alpha = alpha;
   }
 
   /** 每幀推進武器演出。沒有在演出時是零成本 */
@@ -97,7 +125,16 @@ export class PawnSprite {
   /** 換造型（換裝改衣色、或外觀被編輯）。同造型不會重烘 */
   setLook(look: PawnLook): void {
     this.look = look;
-    this.sprite.texture = getPawnTexture(look, this.facing);
+    this.setTexture(getPawnTexture(look, this.facing));
+  }
+
+  /**
+   * 換貼圖。**一律走這裡** —— 白閃那層是同一張圖的副本，
+   * 直接寫 `sprite.texture` 會讓閃光留在上一個朝向的剪影上。
+   */
+  private setTexture(texture: Sprite['texture']): void {
+    this.sprite.texture = texture;
+    this.flash.texture = texture;
   }
 
   /** 目前朝哪 —— 測試用來確認出手時朝向有沒有被移動方向蓋掉 */
@@ -108,7 +145,7 @@ export class PawnSprite {
   setFacing(facing: PawnDirectionId): void {
     if (facing === this.facing) return;
     this.facing = facing;
-    this.sprite.texture = getPawnTexture(this.look, facing);
+    this.setTexture(getPawnTexture(this.look, facing));
   }
 
   /**

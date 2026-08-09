@@ -4,6 +4,7 @@ import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { ActiveEffect } from '../../models/effect';
+import { getSkillTemplate } from '../../models/skillTemplate';
 
 function createTestCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -82,6 +83,47 @@ describe('Monster Debuff System', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('詛咒＝防禦力 -20%（24-buff-debuff.md § 24.4.1）', () => {
+    /*
+     * 詛咒曾經被實作成「攻擊力 -20%」，與 § 24.4.1 對不起來。
+     * 資料改對了還不夠 —— 這裡確認它真的走到怪物的防禦計算上，
+     * 不是掛了一個沒有人讀的 modifier。
+     */
+    const curseOn = (idx: number): ActiveEffect[] => {
+      const def = getSkillTemplate('curse')!.applyDebuff!;
+      return [{
+        id: 'debuff-curse-0-5000',
+        sourceSkillId: 'curse',
+        sourceSkillName: '詛咒',
+        category: def.category,
+        type: 'debuff',
+        target: 'monster',
+        targetIdx: idx,
+        modifiers: def.modifiers,
+        startTime: 5000,
+        duration: def.duration ?? 0,
+        tags: def.tags,
+        name: def.name,
+        description: def.description,
+      }];
+    };
+
+    it('掛在防禦上，不是攻擊上', () => {
+      expect(getMonsterDebuffModifier(curseOn(0), 0, 'defense')).toBe(-20);
+      expect(getMonsterDebuffModifier(curseOn(0), 0, 'attack')).toBe(0);
+    });
+
+    it('被詛咒的怪吃到的傷害比較高', () => {
+      const char = createTestCharacter();
+      const monster = createTestMonster({ defense: 30 });
+      const weapon = createTestWeapon();
+      const plain = calculatePlayerAttack(char, weapon, monster, [weapon], [], 0);
+      const cursed = calculatePlayerAttack(char, weapon, monster, [weapon], curseOn(0), 0);
+      expect(plain.hit).toBe(true);
+      expect(cursed.damage).toBeGreaterThan(plain.damage);
+    });
   });
 
   describe('getMonsterDebuffModifier', () => {

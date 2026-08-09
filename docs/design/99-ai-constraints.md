@@ -27,7 +27,3 @@
    共用倉庫的**金幣不是物品**，存在獨立的 `warehouseGold` 表，不混進倉庫物品表。
    唯一例外是 `getRequiredScrollItemId()` 依樓層區段組出卷軸名再換 id，
    換算只發生在該函式內，且由 `itemIdIntegrity.test.ts` 全段掃過
-
-## 99.2 進行中的分階段計畫（完成後刪除）
-
-目前沒有進行中的計畫。
