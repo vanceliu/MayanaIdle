@@ -1927,6 +1927,16 @@ button.active {
   font-family: var(--font-mono);
 }
 
+/*
+ * 金幣欄位：六七位數。沿用 44px 的通用數字格會把 1000000 截掉，
+ * 玩家看不到自己填了什麼。
+ */
+.rule-condition input.num-gold,
+.rule-action input.num-gold {
+  width: 92px;
+  text-align: right;
+}
+
 .btn-add-rule {
   width: 100%;
   padding: 6px;
@@ -1955,6 +1965,39 @@ button.active {
 
 .rule-condition .cond-empty {
   font-style: italic;
+}
+
+/* --- 村莊腳本的保留條件（`49-village-script.md`） --- */
+.village-keep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.village-keep-title {
+  width: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.village-keep-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.village-inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
 }
 
 /* --- Inventory --- */

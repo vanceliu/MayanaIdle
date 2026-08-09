@@ -6,8 +6,7 @@ import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
-import { addBagItem, consumeBagItem, hasBagItem } from '../../models/bagItem';
-import { db } from '../../db/database';
+import { hasBagItem } from '../../models/bagItem';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { QtyStepper } from '../common/QtyStepper';
 import { roundWeight } from '../../systems/weight';
@@ -40,7 +39,6 @@ export function Storage() {
   const personalStoredEquipment = useGameStore(s => s.personalStoredEquipment);
   const personalStoredMaterials = useGameStore(s => s.personalStoredMaterials);
   const character = useGameStore(s => s.character);
-  const userId = useGameStore(s => s.userId);
   const warehouseGold = useGameStore(s => s.warehouseGold);
   const [storageTab, setStorageTab] = useState<StorageTab>('shared');
   const [actionTab, setActionTab] = useState<ActionTab>('deposit');
@@ -57,32 +55,12 @@ export function Storage() {
 
   // --- Gold (shared only) ---
   function depositGold() {
-    const amount = parseInt(goldAmount, 10);
-    if (!amount || amount <= 0 || !character) return;
-    const available = character.gold;
-    const actual = Math.min(amount, available);
-    if (actual <= 0) return;
-
-    useGameStore.setState({
-      character: { ...character, gold: character.gold - actual },
-      warehouseGold: useGameStore.getState().warehouseGold + actual,
-    });
-    useGameStore.getState().saveState();
+    useGameStore.getState().depositWarehouseGold(parseInt(goldAmount, 10));
     setGoldAmount('');
   }
 
   function withdrawGold() {
-    const amount = parseInt(goldAmount, 10);
-    if (!amount || amount <= 0 || !character) return;
-    const available = useGameStore.getState().warehouseGold;
-    const actual = Math.min(amount, available);
-    if (actual <= 0) return;
-
-    useGameStore.setState({
-      character: { ...character, gold: character.gold + actual },
-      warehouseGold: useGameStore.getState().warehouseGold - actual,
-    });
-    useGameStore.getState().saveState();
+    useGameStore.getState().withdrawWarehouseGold(parseInt(goldAmount, 10));
     setGoldAmount('');
   }
 
@@ -90,23 +68,6 @@ export function Storage() {
     setStorageTab(next);
     depositCart.clear();
     withdrawCart.clear();
-  }
-
-  /** 依當前倉庫（共用／個人）決定要寫哪一組 state 欄位 */
-  function storagePatch(equip: EquipmentInstance[], materials: BagItem[]) {
-    return isShared
-      ? { storedEquipment: equip, storedMaterials: materials }
-      : { personalStoredEquipment: equip, personalStoredMaterials: materials };
-  }
-
-  /** 把 amount 個道具併進目標清單（同 id 合併，**不是同名**） */
-  function mergeMaterial(list: BagItem[], item: BagItem, amount: number): BagItem[] {
-    return addBagItem(list, item.itemId, amount);
-  }
-
-  /** 從來源清單扣掉 amount 個，扣完就移除該列 */
-  function takeMaterial(list: BagItem[], itemId: number, amount: number): BagItem[] {
-    return consumeBagItem(list, itemId, amount);
   }
 
   // --- 名稱搜尋：不分大小寫、去除前後空白，空字串代表不過濾 ---
@@ -139,37 +100,11 @@ export function Storage() {
 
   function executeDeposit() {
     if (depositEquipLines.length === 0 && depositMaterialLines.length === 0) return;
-    // 共用倉庫的裝備要記 ownerId 才知道是誰寄放的，沒有登入者就不搬裝備
-    const canMoveEquip = isShared ? !!userId : !!character;
-    const state = useGameStore.getState();
-    let inv = state.inventory;
-    let bag = state.bagItems;
-    let equip = isShared ? state.storedEquipment : state.personalStoredEquipment;
-    let materials = isShared ? state.storedMaterials : state.personalStoredMaterials;
-
-    if (canMoveEquip) {
-      for (const line of depositEquipLines) {
-        const item = line.item;
-        const changes = isShared
-          ? { inStorage: true, storageType: 'shared' as const, ownerId: userId! }
-          : { inStorage: true, storageType: 'personal' as const, ownerId: character!.id! };
-        inv = inv.filter(i => i.id !== item.id);
-        equip = [...equip, { ...item, ...changes }];
-        db.equipmentInstances.update(item.id!, changes);
-      }
-    }
-
-    for (const line of depositMaterialLines) {
-      const held = bag.find(b => b.itemId === line.item.itemId);
-      if (!held) continue;
-      const actual = Math.min(line.qty, held.amount);
-      if (actual <= 0) continue;
-      bag = takeMaterial(bag, line.item.itemId, actual);
-      materials = mergeMaterial(materials, line.item, actual);
-    }
-
-    useGameStore.setState({ inventory: inv, bagItems: bag, ...storagePatch(equip, materials) });
-    state.saveState();
+    useGameStore.getState().depositToWarehouse({
+      warehouse: storageTab,
+      equipmentIds: depositEquipLines.map(l => l.item.id!),
+      materials: depositMaterialLines.map(l => ({ itemId: l.item.itemId, amount: l.qty })),
+    });
     depositCart.clear();
   }
 
@@ -197,36 +132,11 @@ export function Storage() {
   function executeWithdraw() {
     if (withdrawEquipLines.length === 0 && withdrawMaterialLines.length === 0) return;
     if (withdrawHint) return;
-    // 取出的裝備要掛回自己名下，沒有角色就不動
-    if (!character && withdrawEquipLines.length > 0) return;
-    const state = useGameStore.getState();
-    let inv = state.inventory;
-    let bag = state.bagItems;
-    let equip = isShared ? state.storedEquipment : state.personalStoredEquipment;
-    let materials = isShared ? state.storedMaterials : state.personalStoredMaterials;
-
-    for (const line of withdrawEquipLines) {
-      const item = line.item;
-      // 共用倉庫取出時要把 ownerId 改回自己，個人倉庫本來就是自己的
-      const changes = isShared
-        ? { inStorage: false, storageType: undefined, ownerId: character!.id! }
-        : { inStorage: false, storageType: undefined };
-      equip = equip.filter(i => i.id !== item.id);
-      inv = [...inv, { ...item, ...changes }];
-      db.equipmentInstances.update(item.id!, changes);
-    }
-
-    for (const line of withdrawMaterialLines) {
-      const held = materials.find(s => s.itemId === line.item.itemId);
-      if (!held) continue;
-      const actual = Math.min(line.qty, held.amount);
-      if (actual <= 0) continue;
-      materials = takeMaterial(materials, line.item.itemId, actual);
-      bag = mergeMaterial(bag, line.item, actual);
-    }
-
-    useGameStore.setState({ inventory: inv, bagItems: bag, ...storagePatch(equip, materials) });
-    state.saveState();
+    useGameStore.getState().withdrawFromWarehouse({
+      warehouse: storageTab,
+      equipmentIds: withdrawEquipLines.map(l => l.item.id!),
+      materials: withdrawMaterialLines.map(l => ({ itemId: l.item.itemId, amount: l.qty })),
+    });
     withdrawCart.clear();
   }
 

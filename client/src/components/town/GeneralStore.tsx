@@ -3,14 +3,18 @@ import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/game
 import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
 import { getItemById } from '../../models/items';
-import { hasBagItem, addBagItem, consumeBagItem } from '../../models/bagItem';
+import { hasBagItem } from '../../models/bagItem';
 import { GameIcon } from '../GameIcon';
 import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
 import { QtyStepper } from '../common/QtyStepper';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 import { CraftUsageBadge } from '../common/CraftUsageBadge';
-import { hasMaterialUsage } from '../../systems/craftMaterialUsage';
+import {
+  getItemSellPrice, isSellableItem,
+  collectSellableMaterials, collectProtectedMaterials, getMaterialsSellTotal,
+  MATERIAL_TIER_OPTIONS,
+} from '../../systems/shop';
 import { isSigilItemId } from '../../models/sigil';
 
 type ShopTab = 'buy' | 'sell';
@@ -48,7 +52,6 @@ export function GeneralStore() {
   const bagItems = useGameStore(s => s.bagItems);
   const inventory = useGameStore(s => s.inventory);
   const equippedGear = useGameStore(s => s.equippedGear);
-  const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [batchTier, setBatchTier] = useState<number | null>(null);
   // 預設保護有用途的素材（配方材料）：批量販售的本意是清掉純販售素材
@@ -90,14 +93,6 @@ export function GeneralStore() {
     return resolveItemIcon(def, def?.category === 'scroll' || def?.category === 'dungeon' ? 'scroll' : 'material');
   }
 
-  function getSellPrice(itemId: number): number {
-    const def = getItemById(itemId);
-    // 專用材料（魔法書材料）明確不可販售，不靠「沒填價格」來擋
-    if (def?.noSell) return 0;
-    if (def?.sellPrice) return def.sellPrice;
-    if (def?.buyPrice) return def.buyPrice;
-    return 0;
-  }
 
   // --- 購買頁購物車 ---
   const buyLines = cartLines(buyCart, buyEntries, {
@@ -122,23 +117,16 @@ export function GeneralStore() {
 
   function checkoutBuy() {
     if (buyLines.length === 0 || buyHint) return;
-    const state = useGameStore.getState();
-    let bag = state.bagItems;
-    for (const line of buyLines) {
-      bag = addBagItem(bag, line.item.itemId, line.qty);
-    }
-    set({
-      character: { ...state.character!, gold: state.character!.gold - buyTotal },
-      bagItems: bag,
-    });
-    state.saveState();
+    useGameStore.getState().buyBagItems(
+      buyLines.map(l => ({ itemId: l.item.itemId, amount: l.qty, unitPrice: l.item.price }))
+    );
     buyCart.clear();
   }
 
   // --- 出售頁購物車 ---
-  const sellableItems = bagItems.filter(item => getSellPrice(item.itemId) > 0);
+  const sellableItems = bagItems.filter(item => isSellableItem(item.itemId));
   /** 售價一律為買價的一半（§ 6.x 商店回收價） */
-  const unitSellPrice = (itemId: number) => Math.floor(getSellPrice(itemId) * 0.5);
+  const unitSellPrice = getItemSellPrice;
   const sellLines = cartLines(sellCart, sellableItems, {
     keyOf: item => String(item.itemId),
     maxOf: item => item.amount,
@@ -149,86 +137,30 @@ export function GeneralStore() {
 
   function checkoutSell() {
     if (sellLines.length === 0) return;
-    const state = useGameStore.getState();
-    let bag = state.bagItems;
-    let gained = 0;
-    for (const line of sellLines) {
-      const held = bag.find(b => b.itemId === line.item.itemId);
-      if (!held) continue;
-      const actual = Math.min(line.qty, held.amount);
-      if (actual <= 0) continue;
-      gained += unitSellPrice(line.item.itemId) * actual;
-      bag = consumeBagItem(bag, line.item.itemId, actual);
-    }
-    set({
-      character: { ...state.character!, gold: state.character!.gold + gained },
-      bagItems: bag,
-    });
-    state.saveState();
+    useGameStore.getState().sellBagItems(
+      sellLines.map(l => ({ itemId: l.item.itemId, amount: l.qty }))
+    );
     sellCart.clear();
   }
 
-  const TIER_OPTIONS = [
-    { tier: 1, label: 'Tier 1（白色素材）' },
-    { tier: 2, label: 'Tier 2 以下' },
-    { tier: 3, label: 'Tier 3 以下' },
-    { tier: 4, label: 'Tier 4 以下' },
-    { tier: 5, label: 'Tier 5 以下' },
-    { tier: 6, label: 'Tier 6 以下' },
-    { tier: 7, label: 'Tier 7 以下（全部）' },
-  ];
-
-  const batchSellItems = useMemo(() => {
-    if (batchTier === null) return [];
-    return bagItems.filter(item => {
-      if (item.type !== 'material') return false;
-      const def = getItemById(item.itemId);
-      if (!def || !def.iconTier || def.noSell) return false;
-      // 顏色只表達稀有度，「Tier N 以下」會連進得了配方的素材一起掃掉，故預設保護
-      if (skipCraftMaterials && hasMaterialUsage(item.itemId)) return false;
-      const sellPrice = Math.floor((def.sellPrice ?? def.buyPrice ?? 0) * 0.5);
-      if (sellPrice <= 0) return false;
-      return def.iconTier <= batchTier;
-    });
-  }, [bagItems, batchTier, skipCraftMaterials]);
+  const batchSellItems = useMemo(
+    () => (batchTier === null ? [] : collectSellableMaterials(bagItems, batchTier, { skipCraftMaterials })),
+    [bagItems, batchTier, skipCraftMaterials],
+  );
 
   /** 被保護規則擋下來的素材，讓玩家知道少賣了什麼，而不是靜默漏掉 */
-  const protectedItems = useMemo(() => {
-    if (batchTier === null || !skipCraftMaterials) return [];
-    return bagItems.filter(item => {
-      if (item.type !== 'material' || !hasMaterialUsage(item.itemId)) return false;
-      const def = getItemById(item.itemId);
-      return !!def?.iconTier && !def.noSell && def.iconTier <= batchTier;
-    });
-  }, [bagItems, batchTier, skipCraftMaterials]);
+  const protectedItems = useMemo(
+    () => (batchTier === null || !skipCraftMaterials ? [] : collectProtectedMaterials(bagItems, batchTier)),
+    [bagItems, batchTier, skipCraftMaterials],
+  );
 
-  const batchSellTotal = useMemo(() => {
-    return batchSellItems.reduce((sum, item) => {
-      const def = getItemById(item.itemId);
-      const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
-      return sum + sellPrice * item.amount;
-    }, 0);
-  }, [batchSellItems]);
+  const batchSellTotal = useMemo(() => getMaterialsSellTotal(batchSellItems), [batchSellItems]);
 
   function executeBatchSell() {
     if (!char || batchSellItems.length === 0) return;
-    const currentBag = useGameStore.getState().bagItems;
-    let totalGold = 0;
-    const idsToSell = new Set(batchSellItems.map(i => i.itemId));
-
-    for (const item of currentBag) {
-      if (!idsToSell.has(item.itemId)) continue;
-      const def = getItemById(item.itemId);
-      const sellPrice = Math.floor((def?.sellPrice ?? def?.buyPrice ?? 0) * 0.5);
-      totalGold += sellPrice * item.amount;
-    }
-
-    const newBag = currentBag.filter(b => !idsToSell.has(b.itemId));
-    set({
-      character: { ...useGameStore.getState().character!, gold: useGameStore.getState().character!.gold + totalGold },
-      bagItems: newBag,
-    });
-    useGameStore.getState().saveState();
+    useGameStore.getState().sellBagItems(
+      batchSellItems.map(i => ({ itemId: i.itemId, amount: i.amount }))
+    );
     setBatchTier(null);
   }
 
@@ -285,7 +217,7 @@ export function GeneralStore() {
                 onChange={e => setBatchTier(e.target.value ? Number(e.target.value) : null)}
               >
                 <option value="">-- 選擇等級 --</option>
-                {TIER_OPTIONS.map(opt => (
+                {MATERIAL_TIER_OPTIONS.map(opt => (
                   <option key={opt.tier} value={opt.tier}>{opt.label}</option>
                 ))}
               </select>

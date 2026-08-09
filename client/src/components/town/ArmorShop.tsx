@@ -4,7 +4,11 @@ import { db } from '../../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
-import { getEquipmentInstanceTierLevel, getEquipmentInstanceTierColor, type EquipmentTierLevel } from '../../models/equipmentTier';
+import { getEquipmentInstanceTierColor, type EquipmentTierLevel } from '../../models/equipmentTier';
+import {
+  getEquipmentSellPrice, isSellableEquipment, isWeaponInstance,
+  collectBatchSellEquipment, getEquipmentSellTotal, EQUIPMENT_TIER_OPTIONS,
+} from '../../systems/shop';
 import { createShopEquipment } from '../../systems/shopEquipment';
 import { QtyStepper } from '../common/QtyStepper';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
@@ -49,21 +53,15 @@ export function ArmorShop() {
 
   if (!char) return null;
 
-  function getSellPrice(item: EquipmentInstance): number {
-    const template = allTemplates.find(t => t.id === item.templateId);
-    // 新手裝不能賣。`isStarterGear` 是實例旗標（只有從新手指導員領取時才會標），
-    // 創角直接穿上的那套沒有旗標，所以改從模板的 acquireType 判斷。
-    if (template?.acquireType === 'starter') return 0;
-    if (template?.buyPrice) return Math.floor(template.buyPrice * 0.5);
-    if (template?.craftGold) return Math.floor(template.craftGold * 0.5);
-    return 0;
-  }
+  const getSellPrice = (item: EquipmentInstance) => getEquipmentSellPrice(item, allTemplates);
 
   const equippedIds = new Set(
     Object.values(equippedGear).filter(Boolean).map(e => e!.id)
   );
 
-  const armorsInBag = inventory.filter(i => !i.smallMonsterDamage && getSellPrice(i) > 0 && !i.isStarterGear && !equippedIds.has(i.id));
+  const armorsInBag = inventory.filter(
+    i => !isWeaponInstance(i) && isSellableEquipment(i, allTemplates, equippedIds)
+  );
 
   // --- 購買頁購物車 ---
   const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory, equippedGear);
@@ -96,61 +94,23 @@ export function ArmorShop() {
 
   function checkoutSell() {
     if (sellLines.length === 0) return;
-    const ids = sellLines.map(l => l.item.id!);
-    const idSet = new Set(ids);
-    const state = useGameStore.getState();
-    set({
-      character: { ...state.character!, gold: state.character!.gold + sellTotal },
-      inventory: state.inventory.filter(i => !idSet.has(i.id!)),
-    });
-    db.equipmentInstances.bulkDelete(ids);
-    state.saveState();
+    useGameStore.getState().sellEquipmentInstances(sellLines.map(l => l.item.id!), allTemplates);
     sellCart.clear();
   }
 
-  const EQUIP_TIER_OPTIONS: { tier: EquipmentTierLevel; label: string }[] = [
-    { tier: 1, label: '商店低階（白色）' },
-    { tier: 2, label: '商店中階以下' },
-    { tier: 3, label: '商店高階以下' },
-    { tier: 4, label: '製作入門以下' },
-    { tier: 5, label: '製作進階以下' },
-    { tier: 6, label: '製作頂級以下' },
-  ];
+  const batchSellArmors = useMemo(
+    () => (batchTier === null ? [] : collectBatchSellEquipment(armorsInBag, allTemplates, batchTier)),
+    [armorsInBag, batchTier, allTemplates],
+  );
 
-  const batchSellArmors = useMemo(() => {
-    if (batchTier === null) return [];
-    return armorsInBag.filter(item => {
-      const tierLevel = getEquipmentInstanceTierLevel(item, allTemplates);
-      if (tierLevel === 0) return false;
-      const template = allTemplates.find(t => t.id === item.templateId);
-      if (template?.acquireType === 'drop_only') return false;
-      return tierLevel <= batchTier;
-    });
-  }, [armorsInBag, batchTier, allTemplates]);
-
-  const batchSellTotal = useMemo(() => {
-    return batchSellArmors.reduce((sum, item) => sum + getSellPrice(item), 0);
-  }, [batchSellArmors]);
+  const batchSellTotal = useMemo(
+    () => getEquipmentSellTotal(batchSellArmors, allTemplates),
+    [batchSellArmors, allTemplates],
+  );
 
   function executeBatchSell() {
     if (!char || batchSellArmors.length === 0) return;
-    let totalGold = 0;
-    const idsToSell = new Set(batchSellArmors.map(i => i.id));
-
-    for (const item of batchSellArmors) {
-      totalGold += getSellPrice(item);
-    }
-
-    const currentInv = useGameStore.getState().inventory;
-    const newInv = currentInv.filter(i => !idsToSell.has(i.id));
-    useGameStore.setState({
-      character: { ...useGameStore.getState().character!, gold: useGameStore.getState().character!.gold + totalGold },
-      inventory: newInv,
-    });
-    for (const id of idsToSell) {
-      db.equipmentInstances.delete(id!);
-    }
-    useGameStore.getState().saveState();
+    useGameStore.getState().sellEquipmentInstances(batchSellArmors.map(i => i.id!), allTemplates);
     setBatchTier(null);
   }
 
@@ -230,7 +190,7 @@ export function ArmorShop() {
                 onChange={e => setBatchTier(e.target.value ? Number(e.target.value) as EquipmentTierLevel : null)}
               >
                 <option value="">-- 選擇等級 --</option>
-                {EQUIP_TIER_OPTIONS.map(opt => (
+                {EQUIPMENT_TIER_OPTIONS.map(opt => (
                   <option key={opt.tier} value={opt.tier}>{opt.label}</option>
                 ))}
               </select>

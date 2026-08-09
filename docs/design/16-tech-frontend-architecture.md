@@ -447,6 +447,7 @@ interface BagItem {
 ```
 CombatRule[]     → evaluateCombatScript(rules, context) → CombatAction | null
 PersistentRule[] → evaluatePersistentScript(rules, context) → PersistentAction | null
+VillageRule[]    → evaluateVillageScript(rules, context) → VillageAction | null
 EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatAction | null
 ```
 
@@ -461,6 +462,12 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 - 戰鬥腳本：player attack timer 觸發（攻擊、技能）
 - 常駐腳本：persistent loop 觸發（喝水、buff、治癒），任何狀態下生效
 - 緊急撤退：獨立判定（HP 低於閾值 → 回城）
+- 村莊腳本：同一個 persistent loop 帶動，但自帶 1000ms 節流
+  （`VILLAGE_TICK_MS`）；順序在常駐腳本與緊急撤退之後，保命動作永遠優先。
+  買賣一律走 `systems/shop.ts` 的定價與 store 的 `sellBagItems` /
+  `buyBagItems` / `sellEquipmentInstances`，倉庫存取走 `depositToWarehouse` /
+  `withdrawFromWarehouse` / `depositWarehouseGold` / `withdrawWarehouseGold`，
+  與玩家在商店／倉庫面板的手動操作同一條路徑
 
 ### 腳本 Template
 
@@ -470,7 +477,9 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 // models/scriptTemplate.ts
 interface ScriptTemplate {
   id: string; name: string;
-  combatRules: CombatRule[]; persistentRules: PersistentRule[]; emergencyRetreat: EmergencyRetreat;
+  combatRules: CombatRule[]; persistentRules: PersistentRule[];
+  villageRules: VillageRule[];            // 49-village-script.md
+  emergencyRetreat: EmergencyRetreat;
 }
 ```
 

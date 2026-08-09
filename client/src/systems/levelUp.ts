@@ -15,8 +15,21 @@ function randomInt(min: number, max: number): number {
 export const INITIAL_HP = 30;
 export const INITIAL_MP = 10;
 
+/**
+ * 經驗曲線（§ 4.9）：底數固定 100 × 1.15^k，指數 k 的每級推進量分兩段。
+ * 錨點 —— Lv1 = 100、Lv65 = 3,101,988、Lv99 = 102,114,213。
+ * Lv100 以上沿用後段推進量（等級無硬上限）。
+ */
+const EXP_PIVOT_LEVEL = 65;
+const EXP_EXPONENT_AT_PIVOT = 74;
+const EXP_STEP_EARLY = EXP_EXPONENT_AT_PIVOT / (EXP_PIVOT_LEVEL - 1); // 1.15625
+const EXP_STEP_LATE = 25 / 34;                                        // 0.73529
+
 export function getExpToNextLevel(level: number): number {
-  return Math.floor(100 * Math.pow(1.15, level - 1));
+  const exponent = level <= EXP_PIVOT_LEVEL
+    ? EXP_STEP_EARLY * (level - 1)
+    : EXP_EXPONENT_AT_PIVOT + EXP_STEP_LATE * (level - EXP_PIVOT_LEVEL);
+  return Math.floor(100 * Math.pow(1.15, exponent));
 }
 
 export function tryLevelUp(char: Character): Character {

@@ -32,24 +32,50 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
 
 describe('levelUp system', () => {
   describe('getExpToNextLevel', () => {
-    it('should return 100 for level 1', () => {
+    // § 4.9：100 × 1.15^k，k 的每級推進量 Lv≤65 為 1.15625、Lv≥65 為 0.73529
+    it('should hit the three anchors exactly', () => {
       expect(getExpToNextLevel(1)).toBe(100);
+      expect(getExpToNextLevel(65)).toBe(3_101_988);
+      expect(getExpToNextLevel(99)).toBe(102_114_213);
     });
 
-    it('should return 115 for level 2', () => {
-      expect(getExpToNextLevel(2)).toBe(Math.floor(100 * Math.pow(1.15, 1)));
+    it('should keep the two anchors equal to the old curve at Lv75 and Lv100', () => {
+      // 使用者定案：Lv65 沿用舊曲線的 Lv75 值，Lv99 沿用舊曲線的 Lv100 值
+      expect(getExpToNextLevel(65)).toBe(Math.floor(100 * Math.pow(1.15, 74)));
+      expect(getExpToNextLevel(99)).toBe(Math.floor(100 * Math.pow(1.15, 99)));
     });
 
-    it('should scale exponentially', () => {
-      const lv5 = getExpToNextLevel(5);
-      const lv10 = getExpToNextLevel(10);
-      const lv20 = getExpToNextLevel(20);
+    it('should follow the early segment below the pivot', () => {
+      for (const lv of [2, 5, 20, 40, 64]) {
+        expect(getExpToNextLevel(lv)).toBe(
+          Math.floor(100 * Math.pow(1.15, (74 / 64) * (lv - 1))),
+        );
+      }
+    });
 
-      expect(lv10).toBeGreaterThan(lv5);
-      expect(lv20).toBeGreaterThan(lv10);
-      // Verify exact formula
-      expect(lv5).toBe(Math.floor(100 * Math.pow(1.15, 4)));
-      expect(lv10).toBe(Math.floor(100 * Math.pow(1.15, 9)));
+    it('should follow the late segment above the pivot', () => {
+      for (const lv of [66, 80, 99, 120]) {
+        expect(getExpToNextLevel(lv)).toBe(
+          Math.floor(100 * Math.pow(1.15, 74 + (25 / 34) * (lv - 65))),
+        );
+      }
+    });
+
+    it('should be continuous at the pivot', () => {
+      // 兩段在 Lv65 交會於同一值，段界不得跳號
+      const before = getExpToNextLevel(64);
+      const pivot = getExpToNextLevel(65);
+      const after = getExpToNextLevel(66);
+      expect(pivot).toBeGreaterThan(before);
+      expect(after).toBeGreaterThan(pivot);
+      // 後段較平緩：Lv65→66 的漲幅小於 Lv64→65
+      expect(after / pivot).toBeLessThan(pivot / before);
+    });
+
+    it('should increase monotonically through Lv200', () => {
+      for (let lv = 2; lv <= 200; lv++) {
+        expect(getExpToNextLevel(lv)).toBeGreaterThan(getExpToNextLevel(lv - 1));
+      }
     });
   });
 

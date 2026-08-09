@@ -5,9 +5,10 @@ import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
 import { CombatScriptEditor } from './CombatScriptEditor';
 import { PersistentScriptEditor } from './PersistentScriptEditor';
+import { VillageScriptEditor } from './VillageScriptEditor';
 import { isDeletableTemplate } from '../models/scriptTemplate';
 
-type ScriptTab = 'combat' | 'persistent';
+type ScriptTab = 'combat' | 'persistent' | 'village';
 
 /**
  * 自動腳本（16-tech-frontend-architecture.md § 32.16）
@@ -42,7 +43,7 @@ export function ScriptEditorButton() {
 /**
  * Template 分頁列（`03-combat.md` § 3.14）
  *
- * 一個 template ＝ 戰鬥＋常駐＋緊急撤退整包，切了立刻生效。
+ * 一個 template ＝ 戰鬥＋常駐＋村莊＋緊急撤退整包，切了立刻生效。
  * 使用中的分頁除了樣式，還帶 `aria-selected`，不能只靠顏色區分。
  */
 function ScriptTemplateTabs() {
@@ -136,8 +137,16 @@ export function ScriptEditorContent() {
         >
           戰鬥腳本
         </button>
+        <button
+          className={`script-tab ${tab === 'village' ? 'active' : ''}`}
+          onClick={() => setTab('village')}
+        >
+          村莊腳本
+        </button>
       </div>
-      {tab === 'combat' ? <CombatScriptEditor /> : <PersistentScriptEditor />}
+      {tab === 'combat' && <CombatScriptEditor />}
+      {tab === 'persistent' && <PersistentScriptEditor />}
+      {tab === 'village' && <VillageScriptEditor />}
     </>
   );
 }

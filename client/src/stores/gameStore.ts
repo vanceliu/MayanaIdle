@@ -4,7 +4,7 @@ import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import { useMapMonsterStore } from './mapMonsterStore';
 import { useMapControlStore } from './mapControlStore';
-import type { EquipmentInstance, EquippedGear } from '../models/equipment';
+import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
@@ -69,6 +69,34 @@ import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment } from '../systems/templateSync';
 import { findScrollInBag, consumeTownScroll, getTownScrollByItemId, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database';
+import { getItemSellPrice, getEquipmentSellTotal } from '../systems/shop';
+import { getItemBasePrice } from '../systems/shop';
+import { getCachedEquipmentTemplates } from '../db/equipmentTemplateCache';
+import type { HuntLocation, VillageRule } from '../models/villageScript';
+import {
+  evaluateVillageScript, findReturnScroll, getBuyAmount, getWarehouseKind,
+  collectVillageSellMaterials, collectVillageSellEquipment,
+  collectDepositMaterials, collectDepositEquipment,
+  getWithdrawAmount, getDepositGoldAmount, getWithdrawGoldAmount,
+  type VillageScriptContext,
+} from '../systems/villageScriptRunner';
+
+/** 倉庫存取的搬運單。裝備走實例 id，道具走 id＋數量 */
+export interface WarehouseMove {
+  warehouse: 'shared' | 'personal';
+  equipmentIds?: number[];
+  materials?: { itemId: number; amount: number }[];
+}
+
+/** 共用／個人倉庫是兩組獨立欄位，寫哪一組由這裡決定 */
+function warehousePatch(shared: boolean, equip: EquipmentInstance[], materials: BagItem[]) {
+  return shared
+    ? { storedEquipment: equip, storedMaterials: materials }
+    : { personalStoredEquipment: equip, personalStoredMaterials: materials };
+}
+
+/** 村莊腳本的判定間隔。它會花錢與存檔，不需要跟常駐腳本的 300ms 一樣快 */
+const VILLAGE_TICK_MS = 1000;
 
 /** `legacy` 為遺產頁（§ 45.3）：唯讀，只能返回 characterSelect，不可進入任何遊玩畫面 */
 export type GamePhase = 'title' | 'characterSelect' | 'create' | 'legacy' | 'explore' | 'combat' | 'result' | 'dead';
@@ -243,6 +271,10 @@ interface GameState {
   persistentLoopId: number | null;
   lastPotionUsedAt: number;
   lastPotionCooldown: number;
+  /** 上次掛機點（`49-village-script.md`）。回城前記下來，村莊腳本照它走回去 */
+  lastHuntLocation: HuntLocation | null;
+  /** 村莊腳本上次判定的時間戳。它會花錢與存檔，不需要跟常駐腳本一樣快 */
+  lastVillageTickAt: number;
   searchMode: SearchMode;
   isManualSearching: boolean;
   manualSearchId: number | null;
@@ -313,6 +345,7 @@ interface GameState {
   setCombatRules: (rules: CombatRule[]) => void;
   setPersistentRules: (rules: PersistentRule[]) => void;
   setEmergencyRetreat: (retreat: EmergencyRetreat) => void;
+  setVillageRules: (rules: VillageRule[]) => void;
   /** 切換使用中的 template；id 不存在時不動作 */
   setActiveTemplate: (id: string) => void;
   /** 新增一頁（內容為預設腳本），並立刻切過去 */
@@ -324,10 +357,33 @@ interface GameState {
   removeScriptTemplate: (id: string) => void;
   startPersistentLoop: () => void;
   stopPersistentLoop: () => void;
+  /** 記下現在所在的掛機點，供村莊腳本的「返回上次掛機點」使用 */
+  rememberHuntLocation: () => void;
+  /** 村莊腳本判定一輪（由常駐迴圈帶動，見 `49-village-script.md`） */
+  runVillageScriptTick: () => void;
   addEffect: (effect: ActiveEffect) => void;
   removeEffect: (id: string) => void;
   clearExpiredEffects: () => void;
   discardBagItem: (itemId: number, amount?: number) => void;
+  /** 賣掉背包道具，回傳獲得金幣（`39-batch-sell.md`；定價見 `systems/shop.ts`） */
+  sellBagItems: (lines: { itemId: number; amount: number }[]) => number;
+  /** 買進背包道具，回傳花費金幣；金幣不足時不成交回 0 */
+  buyBagItems: (lines: { itemId: number; amount: number; unitPrice: number }[]) => number;
+  /**
+   * 賣掉裝備實例，回傳獲得金幣。
+   * 模板要由呼叫端傳進來 —— 價格算不出來就等於 0 元成交，
+   * 讓依賴的模板從參數走，就不會有「快取還沒暖起來就白送」這種靜默失敗。
+   */
+  sellEquipmentInstances: (ids: number[], templates: EquipmentTemplate[]) => number;
+  /**
+   * === 倉庫存取（`13-town.md` § 13.8）===
+   * 手動存取與村莊腳本的自動存取共用這兩個 action。
+   */
+  depositToWarehouse: (params: WarehouseMove) => void;
+  withdrawFromWarehouse: (params: WarehouseMove) => void;
+  /** 共用倉庫金幣（跨角色轉移用）。回傳實際搬動的金額 */
+  depositWarehouseGold: (amount: number) => number;
+  withdrawWarehouseGold: (amount: number) => number;
   discardInventoryItem: (id: number) => void;
   /** § 35.5.3：拖出背包後等待確認的丟棄請求 */
   pendingDiscard: PendingDiscard | null;
@@ -414,6 +470,10 @@ export function selectEmergencyRetreat(state: GameState): EmergencyRetreat {
   return selectActiveTemplate(state).emergencyRetreat;
 }
 
+export function selectVillageRules(state: GameState): VillageRule[] {
+  return selectActiveTemplate(state).villageRules;
+}
+
 type StoreSet = (partial: Partial<GameState>) => void;
 type StoreGet = () => GameState;
 
@@ -455,6 +515,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   persistentLoopId: null,
   lastPotionUsedAt: 0,
   lastPotionCooldown: 0,
+  lastHuntLocation: null,
+  lastVillageTickAt: 0,
   searchMode: 'auto',
   isManualSearching: false,
   manualSearchId: null,
@@ -576,6 +638,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const scriptRules = prefs?.scriptRules ?? DEFAULT_SCRIPT;
     const scriptTemplates = prefs?.scriptTemplates ?? [createDefaultTemplate()];
     const activeTemplateId = prefs?.activeTemplateId ?? DEFAULT_TEMPLATE_ID;
+    const lastHuntLocation = prefs?.lastHuntLocation ?? null;
     const quickSlots = normalizeQuickSlots(prefs?.quickSlots);
     // § 35.17：格子位置不在 prefs 裡，走獨立 key（不隨角色匯出）
     const bagSlotMap = loadBagLayout(char.id!);
@@ -618,6 +681,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       scriptRules,
       scriptTemplates,
       activeTemplateId,
+      lastHuntLocation,
       quickSlots,
       bagSlotMap,
       afterCombatHpThreshold,
@@ -1353,6 +1417,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     updateActiveTemplate(set, get, t => ({ ...t, emergencyRetreat: retreat }));
   },
 
+  setVillageRules: (rules) => {
+    updateActiveTemplate(set, get, t => ({ ...t, villageRules: rules }));
+  },
+
   setActiveTemplate: (id) => {
     if (!get().scriptTemplates.some(t => t.id === id)) return;
     set({ activeTemplateId: id });
@@ -1443,9 +1511,14 @@ export const useGameStore = create<GameState>((set, get) => ({
             ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
             : findScrollInBag(state.bagItems);
           if (!scroll) return;
+          // 緊急撤退也算離開掛機點，記下來村莊腳本才回得去
+          get().rememberHuntLocation();
           // 與手動使用回城卷軸共用同一條流程（停止探索、重置地圖座標、存檔）
           get().useTownScroll(scroll.itemId);
+          return;
         }
+        // 保命動作都沒事做的時候才輪到村莊腳本（它會花錢、賣東西、把角色傳走）
+        get().runVillageScriptTick();
         return;
       }
 
@@ -1563,6 +1636,152 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ persistentLoopId: null });
   },
 
+  rememberHuntLocation: () => {
+    const char = get().character;
+    if (!char) return;
+    // 城鎮不是掛機點，記下去會讓「返回上次掛機點」原地打轉
+    if (getRegion(char.currentRegion)?.type === 'town') return;
+    const pos = useMapControlStore.getState().playerPosition;
+    set({
+      lastHuntLocation: {
+        zoneId: char.currentZone,
+        regionId: char.currentRegion,
+        floor: char.currentFloor,
+        x: pos.x,
+        y: pos.y,
+      },
+    });
+  },
+
+  runVillageScriptTick: () => {
+    const state = get();
+    const char = state.character;
+    if (!char) return;
+
+    const rules = selectVillageRules(state);
+    if (rules.length === 0) return;
+
+    const now = Date.now();
+    if (now - state.lastVillageTickAt < VILLAGE_TICK_MS) return;
+    set({ lastVillageTickAt: now });
+
+    const templates = getCachedEquipmentTemplates();
+    const equippedIds = new Set(
+      Object.values(state.equippedGear).filter(Boolean).map(e => e!.id)
+    );
+    const ctx: VillageScriptContext = {
+      className: char.className,
+      gold: char.gold,
+      bagItems: state.bagItems,
+      inventory: state.inventory,
+      equippedIds,
+      templates,
+      bagUsedSlots: getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear),
+      bagMaxSlots: getBagMaxSlots(state.equippedGear),
+      inTown: getRegion(char.currentRegion)?.type === 'town',
+      lastHuntLocation: state.lastHuntLocation,
+      warehouse: {
+        shared: { materials: state.storedMaterials, equipment: state.storedEquipment },
+        personal: { materials: state.personalStoredMaterials, equipment: state.personalStoredEquipment },
+        gold: state.warehouseGold,
+      },
+      bagFreeSlots: getBagMaxSlots(state.equippedGear)
+        - getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear),
+    };
+
+    const action = evaluateVillageScript(rules, ctx);
+    if (!action) return;
+
+    switch (action.type) {
+      case 'return_town': {
+        const scroll = findReturnScroll(action.scrollTownId, ctx);
+        if (!scroll) return;
+        get().rememberHuntLocation();
+        get().useTownScroll(scroll.itemId);
+        break;
+      }
+      case 'return_to_hunt': {
+        const target = state.lastHuntLocation;
+        if (!target) return;
+        get().navigateTo({ zoneId: target.zoneId, regionId: target.regionId, floor: target.floor });
+        break;
+      }
+      case 'buy_item': {
+        const amount = getBuyAmount(action, ctx);
+        if (amount <= 0 || action.itemId == null) return;
+        const spent = get().buyBagItems([
+          { itemId: action.itemId, amount, unitPrice: getItemBasePrice(action.itemId) },
+        ]);
+        if (spent > 0) {
+          const name = getItemById(action.itemId)?.name ?? '道具';
+          set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：購買${name} ×${amount}`, type: 'system' }) });
+        }
+        break;
+      }
+      case 'sell_materials': {
+        const items = collectVillageSellMaterials(action, ctx);
+        if (items.length === 0) return;
+        const gained = get().sellBagItems(items.map(i => ({ itemId: i.itemId, amount: i.amount })));
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：販售素材 ${items.length} 種，獲得 ${gained.toLocaleString()}G`, type: 'system' }) });
+        break;
+      }
+      case 'sell_equipment': {
+        const items = collectVillageSellEquipment(action, ctx);
+        if (items.length === 0) return;
+        const gained = get().sellEquipmentInstances(items.map(i => i.id!), templates);
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：販售裝備 ${items.length} 件，獲得 ${gained.toLocaleString()}G`, type: 'system' }) });
+        break;
+      }
+      case 'deposit_materials': {
+        const items = collectDepositMaterials(action, ctx);
+        if (items.length === 0) return;
+        get().depositToWarehouse({
+          warehouse: getWarehouseKind(action),
+          materials: items.map(i => ({ itemId: i.itemId, amount: i.amount })),
+        });
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：存入素材 ${items.length} 種`, type: 'system' }) });
+        break;
+      }
+      case 'deposit_equipment': {
+        const items = collectDepositEquipment(action, ctx);
+        if (items.length === 0) return;
+        get().depositToWarehouse({
+          warehouse: getWarehouseKind(action),
+          equipmentIds: items.map(i => i.id!),
+        });
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：存入裝備 ${items.length} 件`, type: 'system' }) });
+        break;
+      }
+      case 'withdraw_item': {
+        const amount = getWithdrawAmount(action, ctx);
+        if (amount <= 0 || action.itemId == null) return;
+        get().withdrawFromWarehouse({
+          warehouse: getWarehouseKind(action),
+          materials: [{ itemId: action.itemId, amount }],
+        });
+        const name = getItemById(action.itemId)?.name ?? '道具';
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：從倉庫取出${name} ×${amount}`, type: 'system' }) });
+        break;
+      }
+      case 'deposit_gold': {
+        const amount = getDepositGoldAmount(action, ctx);
+        const moved = get().depositWarehouseGold(amount);
+        if (moved > 0) {
+          set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：存入 ${moved.toLocaleString()}G`, type: 'system' }) });
+        }
+        break;
+      }
+      case 'withdraw_gold': {
+        const amount = getWithdrawGoldAmount(action, ctx);
+        const moved = get().withdrawWarehouseGold(amount);
+        if (moved > 0) {
+          set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：領出 ${moved.toLocaleString()}G`, type: 'system' }) });
+        }
+        break;
+      }
+    }
+  },
+
   addEffect: (effect) => {
     const { activeEffects } = get();
     // Same category buff overwrites (refresh duration)
@@ -1597,6 +1816,163 @@ export const useGameStore = create<GameState>((set, get) => ({
     const drop = Math.max(1, Math.min(amount, existing.amount));
     set({ bagItems: consumeBagItem(bag, itemId, drop) });
     saveGame(get());
+  },
+
+  /**
+   * === 商店買賣（`39-batch-sell.md`）===
+   *
+   * 三家商店的手動買賣、批量販售，之後的村莊腳本自動買賣，全部經過這三個 action。
+   * 定價與可賣判定在 `systems/shop.ts`，這裡只負責寫入。
+   */
+
+  sellBagItems: (lines) => {
+    let bag = get().bagItems;
+    let gained = 0;
+    for (const line of lines) {
+      const held = bag.find(b => b.itemId === line.itemId);
+      if (!held) continue;
+      const actual = Math.min(line.amount, held.amount);
+      if (actual <= 0) continue;
+      gained += getItemSellPrice(line.itemId) * actual;
+      bag = consumeBagItem(bag, line.itemId, actual);
+    }
+    if (gained === 0 && bag === get().bagItems) return 0;
+    set({
+      character: { ...get().character!, gold: get().character!.gold + gained },
+      bagItems: bag,
+    });
+    get().saveState();
+    return gained;
+  },
+
+  buyBagItems: (lines) => {
+    const cost = lines.reduce((sum, l) => sum + l.unitPrice * l.amount, 0);
+    if (cost > (get().character?.gold ?? 0)) return 0;
+    let bag = get().bagItems;
+    for (const line of lines) {
+      bag = addBagItem(bag, line.itemId, line.amount);
+    }
+    set({
+      character: { ...get().character!, gold: get().character!.gold - cost },
+      bagItems: bag,
+    });
+    get().saveState();
+    return cost;
+  },
+
+  depositToWarehouse: ({ warehouse, equipmentIds = [], materials = [] }) => {
+    const state = get();
+    const shared = warehouse === 'shared';
+    // 共用倉庫的裝備要記 ownerId 才知道是誰寄放的，沒有登入者就不搬裝備
+    const canMoveEquip = shared ? !!state.userId : !!state.character;
+
+    let inv = state.inventory;
+    let bag = state.bagItems;
+    let equip = shared ? state.storedEquipment : state.personalStoredEquipment;
+    let mats = shared ? state.storedMaterials : state.personalStoredMaterials;
+
+    if (canMoveEquip) {
+      for (const id of equipmentIds) {
+        const item = inv.find(i => i.id === id);
+        if (!item) continue;
+        const changes = shared
+          ? { inStorage: true, storageType: 'shared' as const, ownerId: state.userId! }
+          : { inStorage: true, storageType: 'personal' as const, ownerId: state.character!.id! };
+        inv = inv.filter(i => i.id !== id);
+        equip = [...equip, { ...item, ...changes }];
+        db.equipmentInstances.update(id, changes);
+      }
+    }
+
+    for (const line of materials) {
+      const held = bag.find(b => b.itemId === line.itemId);
+      if (!held) continue;
+      const actual = Math.min(line.amount, held.amount);
+      if (actual <= 0) continue;
+      bag = consumeBagItem(bag, line.itemId, actual);
+      mats = addBagItem(mats, line.itemId, actual);
+    }
+
+    set({ inventory: inv, bagItems: bag, ...warehousePatch(shared, equip, mats) });
+    get().saveState();
+  },
+
+  withdrawFromWarehouse: ({ warehouse, equipmentIds = [], materials = [] }) => {
+    const state = get();
+    const shared = warehouse === 'shared';
+    // 取出的裝備要掛回自己名下，沒有角色就不動
+    if (!state.character && equipmentIds.length > 0) return;
+
+    let inv = state.inventory;
+    let bag = state.bagItems;
+    let equip = shared ? state.storedEquipment : state.personalStoredEquipment;
+    let mats = shared ? state.storedMaterials : state.personalStoredMaterials;
+
+    for (const id of equipmentIds) {
+      const item = equip.find(i => i.id === id);
+      if (!item) continue;
+      const changes = shared
+        ? { inStorage: false, storageType: undefined, ownerId: state.character!.id! }
+        : { inStorage: false, storageType: undefined };
+      equip = equip.filter(i => i.id !== id);
+      inv = [...inv, { ...item, ...changes }];
+      db.equipmentInstances.update(id, changes);
+    }
+
+    for (const line of materials) {
+      const held = mats.find(m => m.itemId === line.itemId);
+      if (!held) continue;
+      const actual = Math.min(line.amount, held.amount);
+      if (actual <= 0) continue;
+      mats = consumeBagItem(mats, line.itemId, actual);
+      bag = addBagItem(bag, line.itemId, actual);
+    }
+
+    set({ inventory: inv, bagItems: bag, ...warehousePatch(shared, equip, mats) });
+    get().saveState();
+  },
+
+  depositWarehouseGold: (amount) => {
+    const char = get().character;
+    if (!char || amount <= 0) return 0;
+    const actual = Math.min(amount, char.gold);
+    if (actual <= 0) return 0;
+    set({
+      character: { ...char, gold: char.gold - actual },
+      warehouseGold: get().warehouseGold + actual,
+    });
+    get().saveState();
+    return actual;
+  },
+
+  withdrawWarehouseGold: (amount) => {
+    const char = get().character;
+    if (!char || amount <= 0) return 0;
+    const actual = Math.min(amount, get().warehouseGold);
+    if (actual <= 0) return 0;
+    set({
+      character: { ...char, gold: char.gold + actual },
+      warehouseGold: get().warehouseGold - actual,
+    });
+    get().saveState();
+    return actual;
+  },
+
+  sellEquipmentInstances: (ids, templates) => {
+    if (ids.length === 0 || templates.length === 0) return 0;
+    const idSet = new Set(ids);
+    const inventory = get().inventory;
+    const selling = inventory.filter(i => i.id != null && idSet.has(i.id));
+    if (selling.length === 0) return 0;
+
+    const gained = getEquipmentSellTotal(selling, templates);
+    set({
+      character: { ...get().character!, gold: get().character!.gold + gained },
+      inventory: inventory.filter(i => i.id == null || !idSet.has(i.id)),
+    });
+    db.equipmentInstances.bulkDelete(selling.map(i => i.id!));
+    get().saveState();
+    return gained;
   },
 
   pendingDiscard: null,
@@ -2051,6 +2427,7 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     scriptRules: state.scriptRules,
     scriptTemplates: state.scriptTemplates,
     activeTemplateId: state.activeTemplateId,
+    lastHuntLocation: state.lastHuntLocation,
     quickSlots: state.quickSlots,
     afterCombatHpThreshold: state.afterCombatHpThreshold,
     afterCombatMpThreshold: state.afterCombatMpThreshold,
@@ -2088,6 +2465,7 @@ interface LoadedPreferences {
   scriptRules: ScriptRule[];
   scriptTemplates: ScriptTemplate[];
   activeTemplateId: string;
+  lastHuntLocation: HuntLocation | null;
   quickSlots: QuickSlots;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
@@ -2149,6 +2527,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
       activeTemplateId: templates.some((t: ScriptTemplate) => t.id === data.activeTemplateId)
         ? data.activeTemplateId
         : templates[0].id,
+      lastHuntLocation: data.lastHuntLocation ?? null,
       quickSlots: normalizeQuickSlots(data.quickSlots),
       afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
       afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,

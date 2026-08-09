@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
-import { db } from '../db/database';
 import type { EquipmentTemplate } from '../models/equipment';
-
-let cachedTemplates: EquipmentTemplate[] | null = null;
+import { getCachedEquipmentTemplates, loadEquipmentTemplates } from '../db/equipmentTemplateCache';
 
 export function useEquipmentTemplates(): EquipmentTemplate[] {
-  const [templates, setTemplates] = useState<EquipmentTemplate[]>(cachedTemplates ?? []);
+  const [templates, setTemplates] = useState<EquipmentTemplate[]>(getCachedEquipmentTemplates);
 
   useEffect(() => {
-    if (cachedTemplates) return;
-    db.equipmentTemplates.toArray().then(data => {
-      cachedTemplates = data;
-      setTemplates(data);
+    let cancelled = false;
+    loadEquipmentTemplates().then(data => {
+      if (!cancelled) setTemplates(data);
     });
+    return () => { cancelled = true; };
   }, []);
 
   return templates;

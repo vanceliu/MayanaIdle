@@ -1,30 +1,14 @@
 import { useGameStore, selectPersistentRules, selectEmergencyRetreat } from '../stores/gameStore';
 import type { PersistentRule, PersistentConditionType, PersistentActionType, PersistentCondition, PersistentAction, ScriptDebuffCondition } from '../models/scriptEngine';
-import { SCRIPT_DEBUFF_LABELS } from '../models/scriptEngine';
+import {
+  SCRIPT_DEBUFF_LABELS,
+  PERSISTENT_CONDITION_LABELS as CONDITION_LABELS,
+  PERSISTENT_ACTION_LABELS as ACTION_LABELS,
+} from '../models/scriptEngine';
 import { CURE_ITEMS } from '../models/cureItem';
 import { getItemById } from '../models/items';
 import type { PotionType, SpeedPotionType } from '../stores/gameStore';
 import { ALL_TOWN_SCROLLS } from '../models/townScroll';
-
-const CONDITION_LABELS: Record<PersistentConditionType, string> = {
-  always: '永遠',
-  hp_below: 'HP 低於',
-  hp_above: 'HP 高於',
-  mp_below: 'MP 低於',
-  mp_above: 'MP 高於',
-  buff_not_active: 'Buff 未激活',
-  speed_not_active: '加速未激活',
-  skill_ready: '技能就緒',
-  debuff_active: '狀態異常',
-};
-
-const ACTION_LABELS: Record<PersistentActionType, string> = {
-  potion: '使用藥水',
-  speed_potion: '使用加速藥水',
-  buff_skill: '施放 Buff',
-  heal_skill: '施放治癒',
-  cure_item: '使用解除道具',
-};
 
 const POTION_LABELS: Record<PotionType, string> = {
   red: '紅色藥水',

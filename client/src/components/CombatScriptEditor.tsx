@@ -1,31 +1,11 @@
 import { useGameStore, selectCombatRules } from '../stores/gameStore';
 import type { CombatRule, CombatConditionType, CombatActionType, CombatCondition, CombatAction } from '../models/scriptEngine';
-import { DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
-
-const CONDITION_LABELS: Record<CombatConditionType, string> = {
-  always: '永遠',
-  monster_count_gte: '攻擊範圍內怪物數 ≥',
-  monsters_near_self_gte: '自身周圍怪物數 ≥',
-  aoe_hit_count_gte: '本招命中數 ≥',
-  monster_hp_below: '目標 HP 低於',
-  monster_hp_above: '目標 HP 高於',
-  mp_above: 'MP 高於',
-  mp_below: 'MP 低於',
-  skill_ready: '技能就緒',
-};
-
-/** 條件的補充說明，滑鼠移上去看得到（`03-combat.md` § 3.12） */
-const CONDITION_HINTS: Partial<Record<CombatConditionType, string>> = {
-  monster_count_gte: '以這條規則自己的射程為半徑：技能用技能射程，普通攻擊用武器射程',
-  monsters_near_self_gte: '以角色為圓心、指定碼數內的活怪數，用來判斷是不是被圍住了',
-  aoe_hit_count_gte: '照這條規則要放的技能實算命中幾隻。範圍技怪沒聚在一起就不放，單體技與普攻永遠是 1',
-};
-
-const ACTION_LABELS: Record<CombatActionType, string> = {
-  skill: '施放攻擊技能',
-  normal_attack: '普通攻擊',
-  wait: '不動作',
-};
+import {
+  DEFAULT_NEAR_SELF_RADIUS,
+  COMBAT_CONDITION_LABELS as CONDITION_LABELS,
+  COMBAT_CONDITION_HINTS as CONDITION_HINTS,
+  COMBAT_ACTION_LABELS as ACTION_LABELS,
+} from '../models/scriptEngine';
 
 export function CombatScriptEditor() {
   const combatRules = useGameStore(selectCombatRules);

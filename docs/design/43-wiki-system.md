@@ -34,6 +34,7 @@ client/src/wiki/
 │   ├── AttributesPage.tsx— 屬性公式說明
 │   ├── CombatPage.tsx    — 戰鬥計算公式
 │   ├── QuestsPage.tsx    — 任務系統
+│   ├── ScriptsPage.tsx   — 自動腳本（三套腳本的條件／動作、腳本分頁）
 │   ├── DropsPage.tsx     — 掉落總覽
 │   └── CreditsPage.tsx   — 第三方素材來源與授權
 ```
@@ -55,6 +56,7 @@ client/src/wiki/
 | 屬性公式 | 硬編碼文字（對應 `systems/combat.ts` 計算） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |
 | 任務 | `QUEST_TEMPLATES`、guild 相關 seed |
+| 自動腳本 | `COMBAT_*` / `PERSISTENT_*` / `SCRIPT_DEBUFF_LABELS`（`models/scriptEngine`）、`VILLAGE_*_LABELS`（`models/villageScript`）—— 條件與動作名稱與編輯器共用同一份常數，判定頻率為硬編碼文字（規格見 `03-combat.md` § 3.12~3.14、`49-village-script.md`） |
 | 素材來源 | `ASSET_CREDITS`（`client/src/wiki/data/assetCredits.ts`），與 `client/src/assets/CREDITS.md` 同步維護 |
 
 ### useWikiData.ts 提供的 hook
@@ -179,10 +181,16 @@ client/src/wiki/
 ### 4.11 任務 (QuestsPage)
 - 冒險者工會等階、任務類型、獎勵
 
-### 4.12 掉落 (DropsPage)
+### 4.12 自動腳本 (ScriptsPage)
+- 三套腳本的判定時機與優先順序、各自的條件／動作對照表
+- 腳本分頁（template）規則、可照抄的範例腳本
+- 條件與動作名稱由 `models` 的標籤常數渲染，與編輯器共用同一份 ——
+  面板改名 Wiki 會跟著動。判定頻率等數字為硬編碼文字
+
+### 4.13 掉落 (DropsPage)
 - 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）
 
-### 4.13 素材來源 (CreditsPage)
+### 4.14 素材來源 (CreditsPage)
 - 列出版庫中收錄的**第三方素材**：用途、素材名稱、作者、授權、來源 URL、版庫路徑
 - 授權與來源皆為可點擊外部連結（`target="_blank"` + `rel="noopener noreferrer"`）
 - 呈現 CC BY 3.0 要求的標注文字原文
@@ -218,6 +226,7 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/attributes   → AttributesPage
 /wiki/combat       → CombatPage
 /wiki/quests       → QuestsPage
+/wiki/scripts      → ScriptsPage
 /wiki/drops        → DropsPage
 /wiki/credits      → CreditsPage
 ```
@@ -239,6 +248,7 @@ Wiki 頁面直接 import seed 常數與 model 定義，**不存在複製資料**
 | CombatPage | 公式敘述文字（各項上限已改為 import 常數） | `systems/combat.ts` |
 | SkillsPage | 職業學習條件文字 | `models/skillRestrictions.ts` |
 | QuestsPage | 整頁硬編碼（任務類型、Boss 列表等） | 部分為未實作的設計前瞻內容 |
+| ScriptsPage | 判定頻率、優先順序、各條件的說明文字（名稱本身走常數） | `systems/scriptRunner.ts`、`systems/villageScriptRunner.ts`、`stores/gameStore.ts` |
 
 ### 已修正項目
 

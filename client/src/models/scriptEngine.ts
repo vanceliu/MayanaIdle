@@ -58,6 +58,33 @@ export interface CombatRule {
   action: CombatAction;
 }
 
+// === 顯示標籤（編輯器與 Wiki 共用同一份，改名不會走鐘）===
+
+export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
+  always: '永遠',
+  monster_count_gte: '攻擊範圍內怪物數 ≥',
+  monsters_near_self_gte: '自身周圍怪物數 ≥',
+  aoe_hit_count_gte: '本招命中數 ≥',
+  monster_hp_below: '目標 HP 低於',
+  monster_hp_above: '目標 HP 高於',
+  mp_above: 'MP 高於',
+  mp_below: 'MP 低於',
+  skill_ready: '技能就緒',
+};
+
+/** 條件的補充說明，滑鼠移上去看得到（`03-combat.md` § 3.12） */
+export const COMBAT_CONDITION_HINTS: Partial<Record<CombatConditionType, string>> = {
+  monster_count_gte: '以這條規則自己的射程為半徑：技能用技能射程，普通攻擊用武器射程',
+  monsters_near_self_gte: '以角色為圓心、指定碼數內的活怪數，用來判斷是不是被圍住了',
+  aoe_hit_count_gte: '照這條規則要放的技能實算命中幾隻。範圍技怪沒聚在一起就不放，單體技與普攻永遠是 1',
+};
+
+export const COMBAT_ACTION_LABELS: Record<CombatActionType, string> = {
+  skill: '施放攻擊技能',
+  normal_attack: '普通攻擊',
+  wait: '不動作',
+};
+
 /** `monsters_near_self_gte` 沒填半徑時的預設值（碼） */
 export const DEFAULT_NEAR_SELF_RADIUS = 3;
 
@@ -100,6 +127,26 @@ export interface PersistentRule {
   conditions: PersistentCondition[];
   action: PersistentAction;
 }
+
+export const PERSISTENT_CONDITION_LABELS: Record<PersistentConditionType, string> = {
+  always: '永遠',
+  hp_below: 'HP 低於',
+  hp_above: 'HP 高於',
+  mp_below: 'MP 低於',
+  mp_above: 'MP 高於',
+  buff_not_active: 'Buff 未激活',
+  speed_not_active: '加速未激活',
+  skill_ready: '技能就緒',
+  debuff_active: '狀態異常',
+};
+
+export const PERSISTENT_ACTION_LABELS: Record<PersistentActionType, string> = {
+  potion: '使用藥水',
+  speed_potion: '使用加速藥水',
+  buff_skill: '施放 Buff',
+  heal_skill: '施放治癒',
+  cure_item: '使用解除道具',
+};
 
 // === Emergency Retreat ===
 

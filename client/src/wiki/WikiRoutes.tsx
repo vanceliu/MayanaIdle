@@ -13,6 +13,7 @@ import { CombatPage } from './pages/CombatPage'
 import { AffixesPage } from './pages/AffixesPage'
 import { ItemsPage } from './pages/ItemsPage'
 import { QuestsPage } from './pages/QuestsPage'
+import { ScriptsPage } from './pages/ScriptsPage'
 import { CreditsPage } from './pages/CreditsPage'
 
 /**
@@ -46,6 +47,7 @@ export default function WikiRoutes() {
         <Route path="items" element={<ItemsPage />} />
         <Route path="items/:itemName" element={<ItemsPage />} />
         <Route path="quests" element={<QuestsPage />} />
+        <Route path="scripts" element={<ScriptsPage />} />
         <Route path="credits" element={<CreditsPage />} />
       </Route>
     </Routes>

@@ -1,4 +1,6 @@
 import type { CombatRule, PersistentRule, EmergencyRetreat } from './scriptEngine';
+import type { VillageRule } from './villageScript';
+import { DEFAULT_VILLAGE_SCRIPT, normalizeVillageRules } from './villageScript';
 import {
   DEFAULT_COMBAT_SCRIPT,
   DEFAULT_PERSISTENT_SCRIPT,
@@ -10,7 +12,7 @@ import {
 /**
  * 腳本 Template（`03-combat.md` § 3.14）
  *
- * 一個 template 是**整包**設定：戰鬥腳本＋常駐腳本＋緊急撤退。
+ * 一個 template 是**整包**設定：戰鬥腳本＋常駐腳本＋村莊腳本＋緊急撤退。
  * 玩家切換情境（清怪／打王／練功）時一次到位，不必分三處各切一遍。
  */
 export interface ScriptTemplate {
@@ -18,6 +20,7 @@ export interface ScriptTemplate {
   name: string;
   combatRules: CombatRule[];
   persistentRules: PersistentRule[];
+  villageRules: VillageRule[];
   emergencyRetreat: EmergencyRetreat;
 }
 
@@ -34,6 +37,7 @@ export function createDefaultTemplate(): ScriptTemplate {
     name: '預設',
     combatRules: DEFAULT_COMBAT_SCRIPT,
     persistentRules: DEFAULT_PERSISTENT_SCRIPT,
+    villageRules: DEFAULT_VILLAGE_SCRIPT,
     emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
   };
 }
@@ -49,6 +53,7 @@ export function createScriptTemplate(id: string, name: string): ScriptTemplate {
     name,
     combatRules: DEFAULT_COMBAT_SCRIPT,
     persistentRules: DEFAULT_PERSISTENT_SCRIPT,
+    villageRules: DEFAULT_VILLAGE_SCRIPT,
     emergencyRetreat: DEFAULT_EMERGENCY_RETREAT,
   };
 }
@@ -79,6 +84,7 @@ export function normalizeScriptTemplates(value: unknown): ScriptTemplate[] {
       name: t.name,
       combatRules: normalizeCombatRules(t.combatRules),
       persistentRules: normalizePersistentRules(t.persistentRules),
+      villageRules: normalizeVillageRules(t.villageRules),
       emergencyRetreat: t.emergencyRetreat ?? DEFAULT_EMERGENCY_RETREAT,
     });
   }

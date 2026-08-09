@@ -69,6 +69,7 @@
 | 狀態解除道具（解毒/止血/淨化） | `30-items.md` | § 狀態解除道具 |
 | 戰鬥腳本 / 常駐腳本（自動戰鬥 AI） | `03-combat.md` | § 3.12（戰鬥腳本）、§ 3.13（常駐腳本＋緊急撤退） |
 | 腳本 Template（分頁切換） | `03-combat.md` | § 3.14（整包切換、預設分頁不可刪） |
+| 村莊腳本（自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
@@ -166,6 +167,7 @@
 | 檔案 | 主題 | 關鍵內容 |
 |---|---|---|
 | `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
+| `49-village-script.md` | 村莊腳本 | 自動回城／販售／採買／返回掛機點。預設為空 |
 | `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
 | `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
 | `44-dps-prediction.md` | DPS 預測 / 職業平衡健檢 | Lv.75 滿裝 vs 百柱死神。裝備由腳本自動選 BiS，五職業落差 2.22 倍 |
@@ -282,7 +284,7 @@
   ←→ 13-town.md § 13.2.1（NPC 逐設施固定外觀；敵我的顏色區分改由地面標記承擔）
   色票增刪時必須重算「每個膚色至少 4 個對比 ≥2.2 的眼色」對照表
 
-04-character.md § 4.9（經驗曲線）←→ 28-monster-stats.md（怪物經驗值全表依此推算）
+28-monster-stats.md（怪物經驗值＝唯一出處）→ 04-character.md § 4.9（經驗曲線依怪物表校準，反向不成立）
        ↕
 09-dungeon.md（等級分佈）←→ 04-character.md § 4.9（經驗曲線）
 
@@ -357,6 +359,14 @@
 13-town.md（雜貨店/武器店/防具店販售功能）
        ↕
 30-items.md（素材 iconTier / sellPrice）←→ 34-ui-guidelines.md（面板統一樣式）
+       ↕
+49-village-script.md（自動販售沿用同一套顏色門檻與定價，見 `systems/shop.ts`）
+
+49-village-script.md ←→ 03-combat.md § 3.14（村莊腳本屬於腳本 template 的一部分）
+       ↕                    ↕
+38-map-control.md（返回掛機點走一般地圖切換）  35-inventory-constraints.md（背包格數條件）
+       ↕
+13-town.md § 13.8（倉庫存取：共用／個人／共用倉庫金幣）
 
 13-town.md § 13.11（新手 NPC 對話分頁的前期知識條列 STARTER_TIPS，唯讀複述）
   ← 02-core-loop.md / 03-combat.md / 41-arpg-combat.md（戰鬥與探索）
