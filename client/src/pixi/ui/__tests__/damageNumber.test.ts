@@ -2,42 +2,55 @@ import { describe, it, expect } from 'vitest';
 import { DamageNumberManager } from '../DamageNumber';
 
 /**
- * 後蓋前（`48-vfx.md` § 48.7.3）。
+ * 多下判定的數字排法（`48-vfx.md` § 48.7.3）。
  *
- * 多下判定會在幾十毫秒內連跳好幾個數字，全部留著會疊成一團 ——
- * 帶同一個 key 的新數字要把還在演的那個收掉。
+ * **每一下都要看得完整** —— 後面蓋掉前面的話等於少跳了幾下。
+ * 但錯開的時間換不到足夠距離（100ms 只有 5px，字高 14），所以要明確攤開。
  */
-describe('傷害數字的後蓋前', () => {
-  it('同一個 key 只留最新的一個', () => {
+describe('多下判定的傷害數字', () => {
+  it('連續多下全部留著，不會互相取代', () => {
     const m = new DamageNumberManager();
-    m.spawn(0, 0, 10, 'normal', 'monster-1');
-    m.spawn(0, 0, 20, 'normal', 'monster-1');
-    m.spawn(0, 0, 30, 'normal', 'monster-1');
-    expect(m.activeCount).toBe(1);
+    for (let i = 0; i < 3; i++) m.spawn(0, 0, 10, 'normal', { index: i, count: 3 });
+    expect(m.activeCount).toBe(3);
     m.destroy();
   });
 
-  it('不同怪的數字同時看得到，不互相取代', () => {
+  it('左右攤開，三個數字不會落在同一點', () => {
     const m = new DamageNumberManager();
-    m.spawn(0, 0, 10, 'normal', 'monster-1');
-    m.spawn(0, 0, 20, 'normal', 'monster-2');
-    expect(m.activeCount).toBe(2);
+    const xs: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      m.spawn(100, 50, 10, 'normal', { index: i, count: 3 });
+      xs.push(m.lastSpawnX);
+    }
+    expect(new Set(xs).size).toBe(3);
+    /* 以落點為中心左右分開，不是全部往同一邊擠 */
+    expect(Math.min(...xs)).toBeLessThan(100);
+    expect(Math.max(...xs)).toBeGreaterThan(100);
     m.destroy();
   });
 
-  it('沒帶 key 的照舊全部並存', () => {
+  it('逐下抬高，順序讀得出來', () => {
     const m = new DamageNumberManager();
-    m.spawn(0, 0, 10, 'normal');
-    m.spawn(0, 0, 20, 'normal');
-    expect(m.activeCount).toBe(2);
+    const ys: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      m.spawn(100, 50, 10, 'normal', { index: i, count: 3 });
+      ys.push(m.lastSpawnY);
+    }
+    expect(ys[1]).toBeLessThan(ys[0]);
+    expect(ys[2]).toBeLessThan(ys[1]);
     m.destroy();
   });
 
-  it('被取代掉的會回到池子，不會漏掉', () => {
+  it('單下維持原本的隨機偏移，不受多下的排法影響', () => {
     const m = new DamageNumberManager();
-    m.spawn(0, 0, 10, 'normal', 'k');
-    m.spawn(0, 0, 20, 'normal', 'k');
-    /* 演完之後兩個都該回收 */
+    m.spawn(100, 50, 10, 'normal', { index: 0, count: 1 });
+    expect(m.lastSpawnY).toBe(50);
+    m.destroy();
+  });
+
+  it('演完全部回收', () => {
+    const m = new DamageNumberManager();
+    for (let i = 0; i < 3; i++) m.spawn(0, 0, 10, 'normal', { index: i, count: 3 });
     m.update(2000);
     expect(m.activeCount).toBe(0);
     m.destroy();

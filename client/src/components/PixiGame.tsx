@@ -567,18 +567,18 @@ function playPlayerAttackFx(o: {
      * **一下一個回呼**（`21-combat-formula.md` § 21.4：雙持雙擊與多段技能
      * 每下獨立判定）。合成一個的話「第二下 MISS」在畫面上讀不出來。
      *
-     * 數字與受擊回饋一律**後蓋前**（`replaceKey` 用怪的 id）：
-     * 幾十毫秒內連跳好幾個，全部留著會疊成一團。
+     * 數字**每一下都完整演完**，靠左右攤開避免疊在一起（`DamageNumberStack`）——
+     * 後面蓋掉前面的話，等於少跳了幾下。
      */
     for (let i = 0; i < dmg.hits.length; i++) entity?.reserveHit();
     targets.push({
       x: sx, y,
       crit: dmg.isCrit,
-      onLandHit: dmg.hits.map(hit => () => {
+      onLandHit: dmg.hits.map((hit, i) => () => {
         effectLayer.spawnDamageNumber(
           sx, y, hit.damage,
           hit.isMiss ? 'miss' : resolveHitDamageType(hit, damageType),
-          dmg.targetId,
+          { index: i, count: dmg.hits.length },
         );
         entity?.releaseHit();
         /* 閃避沒有打到，不該彈 —— 彈了就看不出這一下是 MISS */

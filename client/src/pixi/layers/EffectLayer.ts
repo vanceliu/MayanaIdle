@@ -1,5 +1,5 @@
 import { Container } from 'pixi.js';
-import { DamageNumberManager } from '../ui/DamageNumber';
+import { DamageNumberManager, type DamageNumberStack } from '../ui/DamageNumber';
 import { SkillFxManager } from '../ui/skillFx';
 import type { DamageType } from '../ui/CombatVisualEvent';
 
@@ -18,15 +18,15 @@ export class EffectLayer {
     this.container.addChild(this.damageNumbers.container);
   }
 
-  /** `replaceKey` 見 `DamageNumberManager.spawn()`：多下判定的數字後蓋前 */
+  /** `stack` 見 `DamageNumberManager.spawn()`：多下判定時把數字攤開 */
   spawnDamageNumber(
     screenX: number,
     screenY: number,
     value: number,
     damageType: DamageType,
-    replaceKey?: string,
+    stack?: DamageNumberStack,
   ): void {
-    this.damageNumbers.spawn(screenX, screenY, value, damageType, replaceKey);
+    this.damageNumbers.spawn(screenX, screenY, value, damageType, stack);
   }
 
   update(deltaMS: number): void {
