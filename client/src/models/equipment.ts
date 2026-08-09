@@ -251,6 +251,18 @@ export const isWeaponSlot = isHandSlot;
  */
 export const OFFHAND_DEFENSE_TYPES: WeaponType[] = ['shield', 'magicBook', 'armGuard'];
 
+/**
+ * 這件裝備會不會**佔住一隻手**（`06-equipment.md` § 6.5）。
+ *
+ * 臂甲是唯一的例外：它套在前臂上，手仍然是空的，
+ * 所以可以與雙手武器並存 —— 盾牌與魔導書要握著，不行。
+ */
+export function occupiesHand(item: { slot: EquipSlot; type: string } | null | undefined): boolean {
+  if (!item) return false;
+  if (item.slot !== 'leftHand' && item.slot !== 'rightHand') return false;
+  return item.type !== 'armGuard';
+}
+
 export function isOffhandDefenseType(type: string): boolean {
   return (OFFHAND_DEFENSE_TYPES as string[]).includes(type);
 }

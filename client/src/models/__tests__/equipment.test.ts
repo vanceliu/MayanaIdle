@@ -1,8 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { isWeaponSlot, isWeaponEquipment, isOffhandDefenseType } from '../equipment';
+import { isWeaponSlot, isWeaponEquipment, isOffhandDefenseType, occupiesHand } from '../equipment';
 import type { EquipmentInstance, EquipSlot } from '../equipment';
 
 describe('equipment model', () => {
+  /**
+   * 佔不佔手（`06-equipment.md` § 6.5）。
+   * 雙手武器的互斥判斷靠它 —— 臂甲套在前臂上，手是空的。
+   */
+  describe('occupiesHand', () => {
+    const hand = (type: string) => ({ slot: 'leftHand' as const, type });
+
+    it('盾牌與魔導書要握著，佔手', () => {
+      expect(occupiesHand(hand('shield'))).toBe(true);
+      expect(occupiesHand(hand('magicBook'))).toBe(true);
+    });
+
+    it('臂甲套在前臂上，不佔手', () => {
+      expect(occupiesHand(hand('armGuard'))).toBe(false);
+    });
+
+    it('武器一律佔手', () => {
+      expect(occupiesHand(hand('sword'))).toBe(true);
+      expect(occupiesHand({ slot: 'rightHand' as const, type: 'twoHandAxe' })).toBe(true);
+    });
+
+    it('不是手部欄位的一律不佔手', () => {
+      expect(occupiesHand({ slot: 'gloves' as const, type: 'armor' })).toBe(false);
+      expect(occupiesHand(null)).toBe(false);
+    });
+  });
+
   describe('isWeaponSlot', () => {
     it('should return true for rightHand', () => {
       expect(isWeaponSlot('rightHand')).toBe(true);

@@ -5,7 +5,7 @@ import type { MonsterInstance } from '../models/monster';
 import { useMapMonsterStore } from './mapMonsterStore';
 import { useMapControlStore } from './mapControlStore';
 import type { EquipmentInstance, EquippedGear } from '../models/equipment';
-import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, SLOT_ORDER } from '../models/equipment';
+import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
 import type { DropResult } from '../systems/drops';
@@ -880,15 +880,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       targetSlot = 'ring2';
     }
 
-    // Two-handed mutual exclusion (check BEFORE unequipping existing)
+    /*
+     * 雙手武器與副手的雙向互斥（`06-equipment.md` § 6.5）。
+     *
+     * **臂甲不在互斥範圍內**：它套在前臂上，手仍然是空的，
+     * 所以雙手武器照樣裝得下（`occupiesHand()`）。盾牌與魔導書要握著，不行。
+     */
     if (item.isTwoHanded) {
       const otherSlot = targetSlot === 'rightHand' ? 'leftHand' : 'rightHand';
-      if (gear[otherSlot]) {
+      if (occupiesHand(gear[otherSlot])) {
         set({ combatLogs: addLog(state.combatLogs, { text: `無法裝備 ${item.name}，需先卸除副手裝備`, type: 'system' }) });
         return;
       }
     }
-    if (!item.isTwoHanded && (targetSlot === 'leftHand' || targetSlot === 'rightHand')) {
+    if (!item.isTwoHanded && occupiesHand(item)) {
       const otherSlot = targetSlot === 'rightHand' ? 'leftHand' : 'rightHand';
       if (gear[otherSlot]?.isTwoHanded) {
         set({ combatLogs: addLog(state.combatLogs, { text: `無法裝備 ${item.name}，已裝備雙手武器`, type: 'system' }) });
