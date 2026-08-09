@@ -18,8 +18,15 @@ export class EffectLayer {
     this.container.addChild(this.damageNumbers.container);
   }
 
-  spawnDamageNumber(screenX: number, screenY: number, value: number, damageType: DamageType): void {
-    this.damageNumbers.spawn(screenX, screenY, value, damageType);
+  /** `replaceKey` 見 `DamageNumberManager.spawn()`：多下判定的數字後蓋前 */
+  spawnDamageNumber(
+    screenX: number,
+    screenY: number,
+    value: number,
+    damageType: DamageType,
+    replaceKey?: string,
+  ): void {
+    this.damageNumbers.spawn(screenX, screenY, value, damageType, replaceKey);
   }
 
   update(deltaMS: number): void {

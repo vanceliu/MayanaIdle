@@ -18,6 +18,7 @@ import {
   absorbWithShield,
   getTotalMagicResist,
   getWeaponHitCount,
+  type HitBreakdown,
 } from './combat';
 import { getErosion, getOnHitRestore } from '../models/affix';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
@@ -101,6 +102,13 @@ export interface DamageResult {
   isCrit: boolean;
   isMiss: boolean;
   killed: boolean;
+  /**
+   * 逐下明細。**長度至少 1**，一般攻擊就是一筆。
+   *
+   * 多下判定（雙持雙擊、多段技能）要讓畫面一下跳一個數字
+   * （`48-vfx.md` § 48.7.3）—— 只有合計的話，「第二下 MISS」表現不出來。
+   */
+  hits: HitBreakdown[];
 }
 
 export interface PlayerAttackResult {
@@ -224,6 +232,8 @@ export function processPlayerAttack(
     let damage = 0;
     let isCrit = false;
     let isMiss = false;
+    /** 逐下明細。魔法技能只有一下，統一在最後補齊 */
+    let hits: HitBreakdown[] = [];
 
     if (event.action.type === 'normal_attack') {
       const result = calculatePlayerAttack(
@@ -237,10 +247,22 @@ export function processPlayerAttack(
       damage = result.damage;
       isCrit = result.isCritical;
       isMiss = !result.hit;
+      hits = result.hits;
     } else if (skill) {
       if (skill.hits) {
-        // Multi-hit physical skill
+        /**
+         * 多段物理技能（目前只有三連射）。
+         *
+         * **每一發獨立判定命中**（`23-class-magic.md` § 23.4：「每箭獨立判定命中」，
+         * 與雙刀／鋼爪的雙擊同一條規則，`21-combat-formula.md` § 21.4）——
+         * 未命中的那一發回傳 0 傷害，不影響其他發。
+         *
+         * 只有**每一發都沒中**才算 MISS。任一發沒中就整筆作廢的話，
+         * 打中的那幾發會連傷害一起被丟掉（後面是 `!isMiss && damage > 0` 才扣血）。
+         */
         const fireEnchant = hasActiveFireEnchant(effectsForDamage);
+        let anyHit = false;
+        hits = [];
         for (let h = 0; h < skill.hits; h++) {
           const hitResult = calculatePhysicalSkillHit(
             character,
@@ -255,8 +277,14 @@ export function processPlayerAttack(
           );
           damage += hitResult.damage;
           if (hitResult.isCritical) isCrit = true;
-          if (!hitResult.hit) isMiss = true;
+          if (hitResult.hit) anyHit = true;
+          hits.push({
+            damage: hitResult.damage,
+            isCrit: hitResult.isCritical,
+            isMiss: !hitResult.hit,
+          });
         }
+        isMiss = !anyHit;
       } else {
         // Magic skill
         const result = calculateSkillAttack(
@@ -380,15 +408,31 @@ export function processPlayerAttack(
       }
     }
 
-    damages.push({ targetId, damage, isCrit, isMiss, killed });
+    damages.push({
+      targetId, damage, isCrit, isMiss, killed,
+      /* 單下判定的技能沒有明細，補一筆讓下游不必分兩種寫法 */
+      hits: hits.length > 0 ? hits : [{ damage, isCrit, isMiss }],
+    });
 
     // Build log
     const actionName = skill ? skill.name : '攻擊';
-    if (isMiss) {
-      logs.push({ text: `${actionName} ${monster.name} MISS！`, type: 'miss' });
-    } else {
-      const critText = isCrit ? '（暴擊）' : '';
-      logs.push({ text: `${actionName} 對 ${monster.name} 造成 ${damage} 傷害${critText}`, type: 'player' });
+    /**
+     * **一下一行**（`21-combat-formula.md` § 21.4：每下獨立判定命中與爆擊）。
+     *
+     * 擠成一行會變成一串加號，而且爆擊只能標在整行上 ——
+     * 分開之後哪一下爆、哪一下沒中，一眼就看得到。
+     */
+    for (const h of hits) {
+      logs.push(h.isMiss
+        ? { text: `${actionName} ${monster.name} MISS！`, type: 'miss' }
+        : {
+            text: `${actionName} 對 ${monster.name} 造成 ${h.damage} 傷害${h.isCrit ? '（暴擊）' : ''}`,
+            type: 'player',
+          });
+    }
+
+    /* 每一下都沒中就沒有後續 —— 擊敗、debuff、吸血都不該發生 */
+    if (!isMiss) {
       if (killed) {
         logs.push({ text: `${monster.name} 被擊敗！`, type: 'system' });
       }

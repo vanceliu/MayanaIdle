@@ -214,17 +214,77 @@ describe('playSkillFx：整份技能表都跑得完', () => {
     fx.destroy();
   });
 
+  it('多下判定一下跳一個數字，不是一個合計', () => {
+    const fx = new SkillFxManager();
+    const plan = resolveSkillFxPlan(ALL_SKILLS.find(s => s.id === 'triple-shot')!);
+    const landed: number[] = [];
+    let clock = 0;
+
+    playSkillFx(fx, {
+      plan, fromX: 0, fromY: 0, toX: 200, toY: 100,
+      targets: [{
+        x: 200, y: 100,
+        onLandHit: [0, 1, 2].map(i => () => landed.push(i)),
+      }],
+    });
+    for (; clock < 4000; clock += 16) fx.update(16);
+
+    /* 三下各自跳，而且照順序 */
+    expect(landed).toEqual([0, 1, 2]);
+    fx.destroy();
+  });
+
+  it('近戰的多下判定（雙持雙擊）也是一下一個爆點，錯開不疊在一起', () => {
+    const fx = new SkillFxManager();
+    const plan = resolveNormalAttackFxPlan({ ranged: false, bow: false });
+    const at: number[] = [];
+    let clock = 0;
+
+    playSkillFx(fx, {
+      plan, fromX: 0, fromY: 0, toX: 200, toY: 100,
+      targets: [{
+        x: 200, y: 100,
+        onLandHit: [() => at.push(clock), () => at.push(clock)],
+      }],
+    });
+    for (; clock < 4000; clock += 16) fx.update(16);
+
+    expect(at.length).toBe(2);
+    expect(at[1]).toBeGreaterThan(at[0]);
+    fx.destroy();
+  });
+
+  it('沒有逐下明細時仍然只跳一次，不會因為改動而變成每發都跳', () => {
+    const fx = new SkillFxManager();
+    const plan = resolveSkillFxPlan(ALL_SKILLS.find(s => s.id === 'triple-shot')!);
+    let landed = 0;
+    playSkillFx(fx, {
+      plan, fromX: 0, fromY: 0, toX: 200, toY: 100,
+      targets: [{ x: 200, y: 100, onLand: () => { landed += 1; } }],
+    });
+    run(fx, 4000);
+    expect(landed).toBe(1);
+    fx.destroy();
+  });
+
   it('三連射：起手 ＋ 三支箭，沒有命中爆點', () => {
     const fx = new SkillFxManager();
     const triple = ALL_SKILLS.find(s => s.id === 'triple-shot')!;
     const plan = resolveSkillFxPlan(triple);
+    expect(plan.hits).toBe(3);
 
     const landed: number[] = [];
     let clock = 0;
-    /* 三發打同一隻怪，每一發各自判定命中，數字也各跳一個 */
-    const targets = [0, 1, 2].map(() => ({
-      x: 200, y: 100, onLand: () => landed.push(clock),
-    }));
+    /**
+     * **一隻怪只有一個 target**。判定層把三段加總成一筆傷害
+     * （`arpgEventHandler.ts`：`damage += hitResult.damage` 之後才 push 一筆），
+     * 所以每一發都掛 `onLand` 會把同一個總和跳三次，
+     * 而且 `releaseHit()` 會比 `reserveHit()` 多呼叫兩次。
+     */
+    const targets = [{
+      x: 200, y: 100,
+      onLandHit: [0, 1, 2].map(() => () => landed.push(clock)),
+    }];
     playSkillFx(fx, { plan, fromX: 0, fromY: 0, toX: 200, toY: 100, targets });
 
     /* 起手 1 ＋ 箭 3 ＝ 4。沒有第五個（命中爆點） */
@@ -232,11 +292,20 @@ describe('playSkillFx：整份技能表都跑得完', () => {
 
     for (; clock < 4000; clock += 16) fx.update(16);
     expect(landed.length).toBe(3);
-    /* 三發是連射，不是射了三次 —— 依序到點且間隔不長 */
-    expect(landed[1]).toBeGreaterThan(landed[0]);
-    expect(landed[2]).toBeGreaterThan(landed[1]);
-    expect(landed[2] - landed[0]).toBeLessThan(400);
     expect(fx.activeCount).toBe(0);
+    fx.destroy();
+  });
+
+  it('三支箭錯開出發，不是三支疊成一支', () => {
+    const fx = new SkillFxManager();
+    const plan = resolveSkillFxPlan(ALL_SKILLS.find(s => s.id === 'triple-shot')!);
+    const total = playSkillFx(fx, {
+      plan, fromX: 0, fromY: 0, toX: 200, toY: 100,
+      targets: [{ x: 200, y: 100 }],
+    });
+
+    /* 最後一發比第一發晚出發兩個間隔，總長必須包含那一段 */
+    expect(total).toBeGreaterThan(2 * SKILL_FX_ART.travel.multiHitStaggerMs);
     fx.destroy();
   });
 

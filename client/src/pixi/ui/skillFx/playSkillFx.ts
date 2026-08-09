@@ -23,6 +23,20 @@ export interface SkillFxTarget {
    * 判定早就結算完了，這只是讓數字等演出（§ 48.7.4）。
    */
   onLand?: () => void;
+  /**
+   * 逐下回呼 —— 多下判定（雙持雙擊、三連射）每一下各一個
+   * （`21-combat-formula.md` § 21.4、`48-vfx.md` § 48.7.3）。
+   *
+   * 有這個就**取代** `onLand`：兩個都跑會把同一下算兩次。
+   * 長度不足時多出來的那幾下沒有回呼（只飛不跳數字）。
+   */
+  onLandHit?: Array<(() => void) | undefined>;
+}
+
+/** 這一下該呼叫誰：逐下優先，沒有逐下才退回整筆的 `onLand` */
+function hitCallback(t: SkillFxTarget, index: number): (() => void) | undefined {
+  if (t.onLandHit) return t.onLandHit[index];
+  return index === 0 ? t.onLand : undefined;
 }
 
 export interface PlaySkillFxOpts {
@@ -187,16 +201,15 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
     for (let i = 0; i < plan.hits; i++) {
       const at = cursor + i * art.travel.multiHitStaggerMs;
       const spread = (i - (plan.hits - 1) / 2) * art.travel.multiHitSpread;
-      /* 每一發各自判定命中，所以傷害數字也是各自一個 */
-      const hit = targets[i] ?? t0;
       const ms = travelDurationMs(t0.x - muzzleX, t0.y - (muzzleY + spread), o.speed);
 
+      /* 每一發掛自己那一下的回呼（`onLandHit`）—— 一下一個數字 */
       fx.spawn({
         prototype: 'travel',
         x: muzzleX, y: muzzleY + spread, toX: t0.x, toY: t0.y,
         color: plan.color, shape: plan.shape, speed: o.speed,
         delayMs: at,
-        onArrive: hit.onLand,
+        onArrive: hitCallback(t0, i),
       });
       last = Math.max(last, at + ms);
     }
@@ -308,15 +321,22 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
       break;
 
     case 'impact':
-      /* 每個目標各一個命中點。單體技能就是一個，三連射是三個 */
+      /*
+       * 每個目標各一個命中點。**多下判定的目標各有好幾個**
+       * （雙持雙擊、多段技能）—— 一下一個爆點、一下一個數字，
+       * 依 `multiHitStaggerMs` 錯開，疊在同一格會看起來只有一下。
+       */
       for (const t of targets) {
-        fx.spawn({
-          prototype: 'impact',
-          x: t.x, y: t.y, color: plan.color, crit: t.crit, accent: plan.accent,
-          minimal: plan.minimalImpact,
-          delayMs: cursor,
-          onStart: t.onLand,
-        });
+        const count = t.onLandHit?.length ?? 1;
+        for (let i = 0; i < count; i++) {
+          fx.spawn({
+            prototype: 'impact',
+            x: t.x, y: t.y, color: plan.color, crit: t.crit, accent: plan.accent,
+            minimal: plan.minimalImpact,
+            delayMs: cursor + i * art.travel.multiHitStaggerMs,
+            onStart: hitCallback(t, i),
+          });
+        }
       }
       break;
 

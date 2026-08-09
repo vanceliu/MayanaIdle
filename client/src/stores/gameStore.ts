@@ -52,6 +52,7 @@ import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics, normalizeStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
 import { evaluatePersistentScript, evaluateEmergencyRetreat, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
+import { pushSelfCastFx } from '../systems/selfCastFx';
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
 import { DEFAULT_SCRIPT, DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT, DEFAULT_EMERGENCY_RETREAT } from '../models/scriptEngine';
 import type { MapLocation } from '../models/area';
@@ -1422,6 +1423,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           } else {
             set({ character: newChar, skills: newSkills, combatLogs: logs });
           }
+          /*
+           * 常駐腳本碰不到 Pixi，所以演出走佇列（`48-vfx.md` § 48.8.5）——
+           * 少了這一行，設在常駐腳本上的 buff 一個特效都不會演。
+           */
+          pushSelfCastFx({ skillId: skill.id, healed: 0 });
           break;
         }
         case 'heal_skill': {
@@ -1442,6 +1448,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           newSkills[skillIdx] = { ...skill, lastUsedAt: now };
           const logs = addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
           set({ character: newChar, skills: newSkills, combatLogs: logs });
+          pushSelfCastFx({ skillId: skill.id, healed });
           break;
         }
       }

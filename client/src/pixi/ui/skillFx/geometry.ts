@@ -511,6 +511,17 @@ export interface HitReactionArt {
   deathHoldRatio: number;
   /** 淡出期間往下沉多少 px —— 原地消失讀起來像被刪掉，不像倒下 */
   deathSinkPx: number;
+  /**
+   * 判定判死之後，最多等多久才強制開始淡出（ms）。
+   *
+   * 判定與演出是兩條時間線：怪在判定的那一刻就從 store 消失，
+   * 但打死牠的那一發可能還在空中（起手 ＋ 飛行常常三、四百毫秒）。
+   * 屍體要等那一發落地才開始淡，否則投射物會打在一個已經不存在的位置上。
+   *
+   * 這個上限是**保險絲**，不是正常路徑 —— 特效被池子擠掉時 `onLand`
+   * 不會觸發，沒有它屍體就會永遠留在畫面上。
+   */
+  corpseGraceMs: number;
 }
 
 export const HIT_REACTION_ART: HitReactionArt = {
@@ -519,6 +530,7 @@ export const HIT_REACTION_ART: HitReactionArt = {
   deathFadeMs: 320,
   deathHoldRatio: 0.25,
   deathSinkPx: 6,
+  corpseGraceMs: 2000,
 };
 
 /**

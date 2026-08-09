@@ -235,6 +235,18 @@ function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 
  * 額外攻擊、STR 加成、材質克制兩下都算（每下都是完整公式）。
  * 它們的基傷因此只有其他雙手武器的一半（`21-combat-formula.md` § 21.4）。
  */
+/**
+ * 一次攻擊裡**單獨一下**的結果。
+ *
+ * 多下判定（雙持雙擊、多段技能）要讓畫面一下跳一個數字，
+ * 所以判定層不能只回合計 —— 合計看不出「第二下 MISS」。
+ */
+export interface HitBreakdown {
+  damage: number;
+  isCrit: boolean;
+  isMiss: boolean;
+}
+
 export function getWeaponHitCount(weapon: EquipmentInstance | null): number {
   return weapon?.type === 'dualBlade' || weapon?.type === 'claw' ? 2 : 1;
 }
@@ -512,7 +524,7 @@ export function calculatePlayerAttack(
   equippedGear: (EquipmentInstance | null)[] = [],
   activeEffects: ActiveEffect[] = [],
   targetIdx: number = 0
-): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
+): { damage: number; hit: boolean; isCritical: boolean; hits: HitBreakdown[]; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effSTR = getEffectiveSTR(attrs.STR);
   const effAGI = getEffectiveAGI(attrs.AGI);
@@ -546,10 +558,19 @@ export function calculatePlayerAttack(
   let total = 0;
   let anyHit = false;
   let anyCrit = false;
+  /**
+   * 逐下明細 —— 演出層要一下跳一個數字（`48-vfx.md` § 48.7.3）。
+   * 只回合計的話，畫面沒有辦法把「第二下 MISS」這件事表現出來。
+   */
+  const hits: HitBreakdown[] = [];
 
   for (let i = 0; i < hitCount; i++) {
-    if (!(Math.random() * 100 < hitRate)) continue;
+    if (!(Math.random() * 100 < hitRate)) {
+      hits.push({ damage: 0, isCrit: false, isMiss: true });
+      continue;
+    }
     anyHit = true;
+    let hitCrit = false;
 
     // Base damage (including race/element counter bonuses)
     let damage = getWeaponDamage(weapon, monster.size) + strBonus + (weapon?.extraAttack ?? 0)
@@ -568,6 +589,7 @@ export function calculatePlayerAttack(
     // Critical check
     if (Math.random() * 100 < critRate) {
       anyCrit = true;
+      hitCrit = true;
       damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
     }
 
@@ -575,11 +597,16 @@ export function calculatePlayerAttack(
     damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
     // 虛弱 debuff（攻擊力 -20%）作用於最終傷害（§ 21.3）
-    total += applyWeaken(damage, activeEffects);
+    const final = applyWeaken(damage, activeEffects);
+    total += final;
+    hits.push({ damage: final, isCrit: hitCrit, isMiss: false });
   }
 
   if (!anyHit) {
-    return { damage: 0, hit: false, isCritical: false, log: { type: 'player_miss', message: '攻擊未命中' } };
+    return {
+      damage: 0, hit: false, isCritical: false, hits,
+      log: { type: 'player_miss', message: '攻擊未命中' },
+    };
   }
 
   const prefix = hitCount > 1 ? '雙擊！' : '';
@@ -587,7 +614,7 @@ export function calculatePlayerAttack(
     ? { type: 'player_crit', message: `${prefix}暴擊！對 ${monster.name} 造成 ${total} 點傷害` }
     : { type: 'player_hit', message: `${prefix}對 ${monster.name} 造成 ${total} 點傷害` };
 
-  return { damage: total, hit: true, isCritical: anyCrit, log };
+  return { damage: total, hit: true, isCritical: anyCrit, hits, log };
 }
 
 export function calculatePhysicalSkillHit(

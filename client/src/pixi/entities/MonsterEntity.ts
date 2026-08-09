@@ -2,6 +2,7 @@ import { Graphics, Container } from 'pixi.js';
 import { worldToScreen, getEntityDepth, TILE_H } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
 import { HealthBar } from '../ui/HealthBar';
+import { HIT_REACTION_ART } from '../ui/skillFx';
 import { HitReaction } from './hitReaction';
 
 const MONSTER_COLOR = 0xff6b6b;
@@ -22,6 +23,10 @@ export class MonsterEntity {
   /** 沒有受擊偏移時該站的螢幕座標。淡出期間沒有 `updatePosition()` 可依靠 */
   private baseX = 0;
   private baseY = 0;
+  /** 還有幾發特效正在飛向這隻怪。>0 就還不能開始淡出 */
+  private pendingHits = 0;
+  /** 判死之後等了多久（ms），用來觸發保險絲 */
+  private graceMs = 0;
 
   constructor(id: string, isBoss = false) {
     this.id = id;
@@ -91,6 +96,36 @@ export class MonsterEntity {
   }
 
   /**
+   * 有一發特效正在飛向這隻怪。
+   *
+   * **判定與演出是兩條時間線** —— 怪在判定的那一刻就從 store 消失，
+   * 但打死牠的那一發可能還在空中。沒有這個保留，屍體會在投射物落地前
+   * 就淡光並被銷毀，`onLand` 那一刻連實體都找不到，白閃與抖動一次都不會發生。
+   */
+  reserveHit(): void {
+    this.pendingHits++;
+  }
+
+  /** 那一發落地了 */
+  releaseHit(): void {
+    this.pendingHits = Math.max(0, this.pendingHits - 1);
+  }
+
+  /**
+   * store 已經把牠拿掉了 —— 該不該現在開始淡。
+   *
+   * 還有特效在飛就再等一幀；等超過保險絲就不等了
+   * （特效被池子擠掉時 `onLand` 不會觸發，不設上限屍體會永遠留著）。
+   */
+  retire(deltaMs: number): void {
+    if (this.pendingHits > 0 && this.graceMs < HIT_REACTION_ART.corpseGraceMs) {
+      this.graceMs += deltaMs;
+      return;
+    }
+    this.die();
+  }
+
+  /**
    * 死了 —— 淡出並下沉（§ 48.7.6）。期間不可再被選為目標。
    *
    * **血條要先歸零再淡。** 判定那一刻怪就從 store 拿掉了，
@@ -107,12 +142,19 @@ export class MonsterEntity {
     return this.hitReaction.faded;
   }
 
+  /** 這一幀白閃疊了多亮（0–1）。測試用來確認秒殺時那一下有演到 */
+  get flashAlpha(): number {
+    return this.flash.alpha;
+  }
+
   /**
    * 回到全新的狀態（沒被打過、沒死）。
    *
    * **只有調校頁重播用得到** —— 遊戲裡死了就是拿掉，不會復活。
    */
   revive(): void {
+    this.pendingHits = 0;
+    this.graceMs = 0;
     this.hitReaction.reset();
     this.flash.alpha = 0;
     this.container.alpha = 1;

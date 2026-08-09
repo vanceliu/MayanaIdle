@@ -980,6 +980,7 @@ window.probeNormal = (crit, ms) => {
     fx: stage.fxBounds[4],
     monster: { x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10 },
     alpha: Math.round(m.alpha * 100) / 100,
+    flash: Math.round((m.children.find(c => c.blendMode === 'add')?.alpha ?? -1) * 100) / 100,
     barPx: bar ? Math.round(bar.children[1].getLocalBounds().width) : -1,
   };
 };

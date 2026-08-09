@@ -36,13 +36,15 @@ import { getMonsterProjectileStyle } from '../pixi/ui/projectileStyle';
 import {
   HIT_LIFT, playSkillFx, resolveAttackFxContext,
   resolveMonsterAttackFxPlan, resolveMuzzleOffset, resolvePlayerAttackFxPlan,
-  resolveAuraColor, resolveStatusTint, StatusMarkTracker,
-  type SkillFxTarget, type StatusFxTarget,
+  resolveAuraColor, resolveSkillFxPlan, resolveStatusTint, StatusMarkTracker,
+  type SkillFxPlan, type SkillFxTarget, type StatusFxTarget,
 } from '../pixi/ui/skillFx';
+import { clearSelfCastFx, drainSelfCastFx } from '../systems/selfCastFx';
 import type { DamageResult, PlayerAttackResult } from '../systems/arpgEventHandler';
 import type { Skill } from '../models/skill';
 import type { Affix } from '../models/affix';
-import type { WeaponMaterial } from '../models/equipment';
+import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
+import { getSkillTemplate } from '../models/skillTemplate';
 import type { ActiveEffect } from '../models/effect';
 import { resolveRenderLimits } from '../pixi/renderLimits';
 
@@ -152,6 +154,9 @@ export function PixiGame() {
 
         syncMonsters(useMapMonsterStore.getState().monsters, map, scene!, monsterMapRef.current, monsterInstancesRef.current, delta);
 
+        /* 常駐腳本放的 buff／治癒在 store 那一層，只能靠佇列傳過來 */
+        drainSelfCastFxInto(scene!.effectLayer, map, playerPos);
+
         /* 染色與暈眩標記跟著 debuff 存續，所以每幀對一次帳（§ 48.8.2、§ 48.8.3） */
         syncStatusFx(
           map, scene!.effectLayer, statusMarksRef.current,
@@ -242,6 +247,8 @@ export function PixiGame() {
        * 標記就永遠不會再出現（而且不會報錯）。
        */
       statusMarksRef.current.clear(sceneRef.current.effectLayer.skillFx);
+      /* 還沒演的自身技能是上一張地圖的事，丟掉 */
+      clearSelfCastFx();
       monsterMapRef.current.forEach(m => {
         sceneRef.current?.entityLayer.container.removeChild(m.container);
         m.destroy();
@@ -420,6 +427,18 @@ function resolveDamageType(dmg: DamageResult, skill: Skill | undefined): DamageT
 }
 
 /**
+ * 這一下的數字用什麼顏色。
+ *
+ * 爆擊是**逐下判定**的，所以顏色也要逐下看 ——
+ * 用整筆的 `isCrit` 會讓沒爆的那一下也染成爆擊色。
+ * 元素／技能色不分下數，沿用整筆的。
+ */
+function resolveHitDamageType(hit: { isCrit: boolean }, whole: DamageType): DamageType {
+  if (hit.isCrit) return 'crit';
+  return whole === 'crit' ? 'normal' : whole;
+}
+
+/**
  * 玩家這一次攻擊的演出（`48-vfx.md` § 48.7）。
  *
  * 判定早就結算完了 —— 這裡只把結果演出來，**傷害數字掛在演出到點的那一刻**
@@ -428,6 +447,68 @@ function resolveDamageType(dmg: DamageResult, skill: Skill | undefined): DamageT
  * **一次攻擊只呼叫一次 `playSkillFx`**：AoE 是「一發炸一片」，
  * 每個目標各叫一次會變成同一招放了好幾遍（§ 48.7.4）。
  */
+/** 這一招演在自己身上（治癒、buff）—— 沒有目標，錨在腳下 */
+function isSelfCast(plan: SkillFxPlan): boolean {
+  return plan.landing === 'heal' || plan.landing === 'aura';
+}
+
+/**
+ * 演在自己身上的那一類（§ 48.8.1）。
+ *
+ * 錨點是**腳下**，不是身體高度 —— 地面環抬起來會變成半空中的一個圈。
+ *
+ * 抽出來共用，是因為同一批 buff 有兩條施放路徑：戰鬥腳本走 ARPG 事件管線，
+ * 常駐腳本直接寫在 `gameStore` 裡（見 `systems/selfCastFx.ts`）。
+ * 兩邊各接一份必然分岔。
+ */
+function playSelfCastFxAt(
+  effectLayer: EffectLayer,
+  plan: SkillFxPlan,
+  foot: { sx: number; sy: number },
+  healed: number,
+): void {
+  playSkillFx(effectLayer.skillFx, {
+    plan,
+    fromX: foot.sx, fromY: foot.sy,
+    toX: foot.sx, toY: foot.sy,
+    targets: [{
+      x: foot.sx, y: foot.sy,
+      onLand: healed > 0
+        ? () => effectLayer.spawnDamageNumber(foot.sx, foot.sy - HIT_LIFT, healed, 'heal')
+        : undefined,
+    }],
+  });
+}
+
+/**
+ * 常駐腳本放的自身技能（§ 48.8.1）。
+ *
+ * 那條路跑在 `gameStore` 的 `setInterval` 裡，碰不到 Pixi，
+ * 所以它只 push 事件，由這裡每幀取走演出。
+ */
+function drainSelfCastFxInto(
+  effectLayer: EffectLayer,
+  map: MapData,
+  playerPos: Position,
+): void {
+  const events = drainSelfCastFx();
+  if (events.length === 0) return;
+
+  const gs = useGameStore.getState();
+  const held = getEquippedWeapon(Object.values(gs.equippedGear).filter(Boolean) as EquipmentInstance[]);
+  const ctx = resolveAttackFxContext(held?.affixes, gs.activeEffects);
+  const foot = mapPositionToScreen(map, playerPos);
+
+  for (const ev of events) {
+    const skill = getSkillTemplate(ev.skillId);
+    if (!skill) continue;
+    const plan = resolveSkillFxPlan(skill, ctx);
+    /* 只有自身類走這條 —— 攻擊技能不會由常駐腳本施放 */
+    if (!isSelfCast(plan)) continue;
+    playSelfCastFxAt(effectLayer, plan, foot, ev.healed);
+  }
+}
+
 function playPlayerAttackFx(o: {
   effectLayer: EffectLayer;
   player: PlayerEntity | null;
@@ -460,23 +541,8 @@ function playPlayerAttackFx(o: {
 
   const from = mapPositionToScreen(map, playerPos);
 
-  /*
-   * 治癒與 buff 演在自己身上，而且錨在**腳下**不是身體高度 ——
-   * 地面環抬起來會變成半空中的一個圈。
-   */
-  if (plan.landing === 'heal' || plan.landing === 'aura') {
-    const healed = result.healAmount ?? 0;
-    playSkillFx(fx, {
-      plan,
-      fromX: from.sx, fromY: from.sy,
-      toX: from.sx, toY: from.sy,
-      targets: [{
-        x: from.sx, y: from.sy,
-        onLand: healed > 0
-          ? () => effectLayer.spawnDamageNumber(from.sx, from.sy - HIT_LIFT, healed, 'heal')
-          : undefined,
-      }],
-    });
+  if (isSelfCast(plan)) {
+    playSelfCastFxAt(effectLayer, plan, from, result.healAmount ?? 0);
     return;
   }
 
@@ -490,20 +556,40 @@ function playPlayerAttackFx(o: {
     const y = sy - HIT_LIFT;
     firstTarget ??= monster.position;
     const damageType = resolveDamageType(dmg, skill);
+    /*
+     * 先把這隻怪保留住。**判定與演出是兩條時間線** ——
+     * 牠在判定的那一刻就從 store 消失了，但這一發還在空中；
+     * 不保留的話屍體會在投射物落地前就淡光並銷毀，
+     * 到了 `onLand` 連實體都找不到，白閃與抖動一次都不會發生。
+     */
+    const entity = o.monsterEntities.get(dmg.targetId);
+    /*
+     * **一下一個回呼**（`21-combat-formula.md` § 21.4：雙持雙擊與多段技能
+     * 每下獨立判定）。合成一個的話「第二下 MISS」在畫面上讀不出來。
+     *
+     * 數字與受擊回饋一律**後蓋前**（`replaceKey` 用怪的 id）：
+     * 幾十毫秒內連跳好幾個，全部留著會疊成一團。
+     */
+    for (let i = 0; i < dmg.hits.length; i++) entity?.reserveHit();
     targets.push({
       x: sx, y,
       crit: dmg.isCrit,
-      onLand: () => {
-        effectLayer.spawnDamageNumber(sx, y, dmg.damage, damageType);
+      onLandHit: dmg.hits.map(hit => () => {
+        effectLayer.spawnDamageNumber(
+          sx, y, hit.damage,
+          hit.isMiss ? 'miss' : resolveHitDamageType(hit, damageType),
+          dmg.targetId,
+        );
+        entity?.releaseHit();
         /* 閃避沒有打到，不該彈 —— 彈了就看不出這一下是 MISS */
-        if (dmg.isMiss) return;
+        if (hit.isMiss) return;
         /*
          * 方向要用**螢幕座標**算，不能用世界格 ——
          * 位移是疊在 `container.x/y` 上的，而等距投影會把世界方向轉過去；
          * 用世界格的話，正東邊的怪會被往正右方推，不是往右下。
          */
-        o.monsterEntities.get(dmg.targetId)?.hit(sx - from.sx, sy - from.sy);
-      },
+        entity?.hit(sx - from.sx, sy - from.sy);
+      }),
     });
   }
   if (!firstTarget) return;
@@ -1182,10 +1268,12 @@ function syncMonsters(
     if (currentIds.has(id)) continue;
     /*
      * 死掉的怪**先淡出再拿掉**（§ 48.7.6）——
-     * 判定那一刻就把它從 store 刪了，畫面上直接消失讀起來像被刪除，
-     * 而且最後一下的命中爆點會演在一個已經不存在的位置上。
+     * 判定那一刻就把它從 store 刪了，畫面上直接消失讀起來像被刪除。
+     *
+     * `retire()` 而不是 `die()`：打死牠的那一發可能還在空中，
+     * 要等落地才開始淡（否則投射物會打在一個已經不存在的位置上）。
      */
-    entity.die();
+    entity.retire(deltaMs);
     entity.update(deltaMs);
     if (!entity.faded) continue;
     scene.entityLayer.container.removeChild(entity.container);

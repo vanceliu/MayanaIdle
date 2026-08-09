@@ -12,6 +12,8 @@ interface ActiveDamageNumber {
   startX: number;
   startY: number;
   elapsed: number;
+  /** 後蓋前用的識別（見 `spawn`）。沒有給的就不參與取代 */
+  replaceKey?: string;
 }
 
 export class DamageNumberManager {
@@ -19,7 +21,28 @@ export class DamageNumberManager {
   private active: ActiveDamageNumber[] = [];
   readonly container = new Container();
 
-  spawn(screenX: number, screenY: number, value: number, damageType: DamageType): void {
+  /**
+   * 跳一個傷害數字。
+   *
+   * `replaceKey`：**後蓋前**。多下判定（雙持雙擊、三連射）會在幾十毫秒內
+   * 連跳好幾個數字，全部留著會三個一起飄、互相疊在一起讀不出來。
+   * 帶同一個 key 的新數字會先把還在演的那個收掉，只留最新的一個。
+   *
+   * 不帶 key 的照舊全部並存 —— 不同怪的數字本來就該同時看得到。
+   */
+  /** 目前還在演的數字有幾個 —— 測試用來確認後蓋前有沒有生效 */
+  get activeCount(): number {
+    return this.active.length;
+  }
+
+  spawn(
+    screenX: number,
+    screenY: number,
+    value: number,
+    damageType: DamageType,
+    replaceKey?: string,
+  ): void {
+    if (replaceKey !== undefined) this.retireKey(replaceKey);
     const text = this.acquire();
     const isCrit = damageType === 'crit';
     const isMiss = damageType === 'miss';
@@ -42,7 +65,7 @@ export class DamageNumberManager {
     text.alpha = 1;
     text.visible = true;
 
-    this.active.push({ text, startX: text.x, startY: screenY, elapsed: 0 });
+    this.active.push({ text, startX: text.x, startY: screenY, elapsed: 0, replaceKey });
   }
 
   update(deltaMS: number): void {
@@ -58,6 +81,15 @@ export class DamageNumberManager {
         this.release(entry.text);
         this.active.splice(i, 1);
       }
+    }
+  }
+
+  /** 收掉還在演的同 key 數字 —— 後蓋前 */
+  private retireKey(key: string): void {
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      if (this.active[i].replaceKey !== key) continue;
+      this.release(this.active[i].text);
+      this.active.splice(i, 1);
     }
   }
 
