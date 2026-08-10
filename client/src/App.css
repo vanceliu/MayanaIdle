@@ -4049,6 +4049,66 @@ button.active {
   color: var(--text-secondary);
 }
 
+/*
+ * § 35.7.6：技能格不可用時整格變暗。
+ * CD 中／MP 不足／武器不符共用同一種變暗 —— 三者都是「現在按不下去」，
+ * 用三種灰階只會讓玩家去猜差別在哪，差別交給 tooltip 說明。
+ */
+.quick-slot.blocked {
+  opacity: 0.45;
+  filter: grayscale(0.5);
+}
+
+/*
+ * § 35.7.6：技能冷卻指針。
+ *
+ * `--cd-angle` 由 `QuickSlotBar` 以 rAF 直接寫進 style（不經 React），
+ * 代表**剩餘**冷卻對應的角度：360deg → 0deg。
+ *
+ * conic-gradient 本身是順時針鋪的，但這裡鋪的是「還沒轉完的那一塊」，
+ * 所以角度遞減時邊界線是**逆時針**掃回 12 點鐘方向 —— 正是指針倒轉的觀感。
+ * 角度歸零時整塊遮罩消失，格子同時解除 `.blocked`。
+ */
+.quick-slot-cd {
+  --cd-angle: 0deg;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  background: conic-gradient(
+    rgba(4, 8, 18, 0.68) 0deg var(--cd-angle),
+    transparent var(--cd-angle) 360deg
+  );
+}
+
+/* 指針本體：扇形的邊界，跟著同一個角度轉，讓「在動」比純扇形更明顯 */
+.quick-slot-cd::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 50%;
+  background: var(--accent-warning, #F59E0B);
+  transform-origin: 50% 0;
+  /*
+   * `+ 180deg` 不是隨手加的：指針從中心往**下**長，rotate(0) 會指向 6 點鐘，
+   * 而扇形是從 12 點鐘開始鋪的。轉半圈才讓兩者的 0 度對在同一個方向，
+   * 指針因此永遠貼著扇形的邊界走。
+   */
+  transform: translate(-50%, 0) rotate(calc(var(--cd-angle) + 180deg));
+  opacity: 0.9;
+}
+
+/*
+ * 沒有 CD 在跑時整塊收掉（`hidden` 由 rAF 那一支負責開關）。
+ * 不可改用 `[style*='--cd-angle: 0deg']` 之類的屬性選擇器比對 ——
+ * 那要賭瀏覽器把 CSS 變數序列化成哪種寫法。
+ */
+.quick-slot-cd[hidden] {
+  display: none;
+}
+
 /* --- Bag Grid --- */
 .bag-panel {
   display: flex;
@@ -4708,19 +4768,12 @@ button.active {
   border-color: var(--accent-primary-dim);
 }
 
-.skill-cell-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-dim);
-}
-
-.skill-cell-dot.class-skill {
-  background: var(--accent-primary);
-}
-
-.skill-cell.locked .skill-cell-dot {
-  background: var(--text-dim);
+/*
+ * 未習得的格子整格已經壓暗（`.skill-cell.locked` 的 opacity），
+ * 圖示不再另外去色 —— 兩層變暗疊起來會暗到看不出是哪一招。
+ */
+.skill-cell .game-icon {
+  flex-shrink: 0;
 }
 
 .skill-cell-name {

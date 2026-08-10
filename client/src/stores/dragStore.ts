@@ -24,11 +24,25 @@ export interface DropTarget {
   index: number;
 }
 
+/**
+ * 技能面板拖出來的技能（`35-inventory-constraints.md` § 35.7.3）。
+ *
+ * 技能是快捷格裡唯一不來自背包的內容，所以它沒有格子索引、沒有數量、也不能丟到地圖上。
+ * 用 `kind` 與背包 payload 分流，而不是硬塞進 `BagDragPayload` 再留一堆空欄位。
+ */
+export interface SkillDragPayload {
+  kind: 'skill';
+  skillId: string;
+  name: string;
+}
+
+export type DragPayload = BagDragPayload | SkillDragPayload;
+
 export interface DragItem {
-  /** 來源在背包版面的格子索引（背包內重排要用） */
+  /** 來源在背包版面的格子索引（背包內重排要用）。技能沒有格子，一律 -1 */
   fromIndex: number;
   /** 交給快捷格／地圖丟棄的描述（`35-inventory-constraints.md` § 35.5.3） */
-  payload: BagDragPayload;
+  payload: DragPayload;
   /** 跟著指標跑的殘影上顯示的字 */
   label: string;
 }

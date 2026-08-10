@@ -1,5 +1,5 @@
 import { Graphics, Container } from 'pixi.js';
-import { worldToScreen, getEntityDepth, TILE_H } from '../utils/isometric';
+import { worldToScreen, getEntityDepth, TILE_H, TILE_W } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
 import { HealthBar } from '../ui/HealthBar';
 import { HIT_REACTION_ART } from '../ui/skillFx';
@@ -10,12 +10,16 @@ const BOSS_COLOR = 0xcc00cc;
 const GLOW_COLOR = 0xff8888;
 const BOSS_GLOW_COLOR = 0xff00ff;
 const RADIUS = TILE_H * 0.45;
+/** 目標環用暖白：怪物是紅、Boss 是紫，兩者都不會與它混淆 */
+const TARGET_RING_COLOR = 0xffe9a8;
 
 export class MonsterEntity {
   public container: Container;
   public id: string;
   private glow: Graphics;
   private body: Graphics;
+  /** 當前目標的地面環（`03-combat.md` § 3.6.1） */
+  private targetRing: Graphics;
   private flash: Graphics;
   private healthBar: HealthBar;
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
@@ -35,6 +39,17 @@ export class MonsterEntity {
     const glowColor = isBoss ? BOSS_GLOW_COLOR : GLOW_COLOR;
     const bodyColor = isBoss ? BOSS_COLOR : MONSTER_COLOR;
 
+    /*
+     * 目標環畫在**腳下**而不是球體上：球體本身已經用顏色區分 Boss 與一般怪，
+     * 再疊一層外框會與 Boss 的紫色糊在一起。地面環是等角投影，
+     * 所以是壓扁的橢圓（TILE_H / TILE_W = 1/2），畫成正圓會浮在半空中。
+     */
+    this.targetRing = new Graphics();
+    this.targetRing
+      .ellipse(0, 0, TILE_W * 0.34, TILE_H * 0.34)
+      .stroke({ color: TARGET_RING_COLOR, width: 2, alpha: 0.95 });
+    this.targetRing.visible = false;
+
     this.glow = new Graphics();
     this.glow.circle(0, -RADIUS, RADIUS + 2).fill({ color: glowColor, alpha: 0.3 });
 
@@ -51,6 +66,8 @@ export class MonsterEntity {
     this.flash.blendMode = 'add';
     this.flash.alpha = 0;
 
+    // 環在最底層，球體壓在它上面才有「站在圈裡」的感覺
+    this.container.addChild(this.targetRing);
     this.container.addChild(this.glow);
     this.container.addChild(this.body);
     this.container.addChild(this.flash);
@@ -172,6 +189,11 @@ export class MonsterEntity {
 
   updateHp(current: number, max: number): void {
     this.healthBar.update(current, max);
+  }
+
+  /** 這隻是不是玩家目前的目標（§ 3.6.1）。每幀對帳，不需要另外清除 */
+  setTargeted(targeted: boolean): void {
+    this.targetRing.visible = targeted;
   }
 
   /**

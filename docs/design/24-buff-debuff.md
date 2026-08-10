@@ -415,6 +415,10 @@ interface PlayerDotEffect {
 - **UI 補充**：Lucide Icons（ISC License，通用 UI icon）
 - **整合方式**：SVG 內嵌，透過統一元件渲染
 - **顏色控制**：SVG fill 以 CSS currentColor 驅動，適配 dark fantasy 主題
+- **category → icon 的對應表**在 `16-tech-frontend-architecture.md` § 32.12（`EFFECT_ICON_MAP`），
+  不在這裡重述。技能面板與快捷格的 buff 圖示走**同一張表**，
+  所以改一個 category 的圖示，狀態列、技能面板、快捷格會一起變 —— 那是刻意的
+- 沒有 `buffCategory` 的 buff 技能，其效果 category 退回 `skill.id`，查表方式相同
 
 ### 24.8.5 戰鬥日誌整合
 

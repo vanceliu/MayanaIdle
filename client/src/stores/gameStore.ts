@@ -34,7 +34,7 @@ import { purgeOutdatedData } from '../systems/dataVersionPurge';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
-import { getSkillCooldownReduction, getAffixBonusesFromGear } from '../systems/combat';
+import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon } from '../systems/combat';
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -51,7 +51,8 @@ import { acceptCraftQuest as acceptCraftQuestFn, abandonCraftQuest as abandonCra
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics, normalizeStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
-import { evaluatePersistentScript, evaluateEmergencyRetreat, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
+import { evaluatePersistentScript, evaluateEmergencyRetreat, skillMeetsWeaponRequirement, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
+import { useCombatCommandStore } from './combatCommandStore';
 import { pushSelfCastFx } from '../systems/selfCastFx';
 import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
 import {
@@ -333,6 +334,18 @@ interface GameState {
   /** § 35.1.3：寫入背包格子位置（拖曳與整理共用），同時持久化到本機 */
   setBagSlotMap: (slotMap: BagSlotMap) => void;
   useQuickSlot: (slotIdx: number) => void;
+  /**
+   * 快捷格的手動施放（`03-combat.md` § 3.6.2）。回傳是否受理。
+   *
+   * 攻擊技能排進下一個攻擊 tick；buff／治癒立即施放。
+   * CD／MP／武器不符當場拒絕並發日誌，**不排隊**。
+   */
+  castQuickSlotSkill: (skillId: string) => boolean;
+  /**
+   * 對自己施放 buff／治癒技能。回傳是否真的放出去。
+   * 常駐腳本與快捷格手動施放共用這一支，不可各寫一套。
+   */
+  castSelfSkill: (skillId: string) => boolean;
   useTownScroll: (scrollItemId: number) => void;
   useCureItem: (itemId: number) => void;
   changeArea: (areaId: string) => void;
@@ -633,7 +646,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     const scriptTemplates = prefs?.scriptTemplates ?? [createDefaultTemplate()];
     const activeTemplateId = prefs?.activeTemplateId ?? DEFAULT_TEMPLATE_ID;
     const lastHuntLocation = prefs?.lastHuntLocation ?? null;
-    const quickSlots = normalizeQuickSlots(prefs?.quickSlots);
+    // 技能格指向未習得的技能時剔除（§ 35.7.4）；名單取自這隻角色實際學到的招
+    const quickSlots = normalizeQuickSlots(
+      prefs?.quickSlots,
+      new Set((char.skills ?? []).map(s => s.id)),
+    );
     // § 35.17：格子位置不在 prefs 裡，走獨立 key（不隨角色匯出）
     const bagSlotMap = loadBagLayout(char.id!);
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
@@ -1231,7 +1248,138 @@ export const useGameStore = create<GameState>((set, get) => ({
         get().assignQuickSlot(slotIdx, null);
         return;
       }
+      case 'skill': {
+        const skill = state.skills.find(s => s.id === action.skillId);
+        // 未習得 → 該格失效（§ 35.7.4）。CD／MP／武器不符**不清空**，那些是暫時狀態
+        if (!skill) {
+          get().assignQuickSlot(slotIdx, null);
+          return;
+        }
+        get().castQuickSlotSkill(skill.id);
+        return;
+      }
     }
+  },
+
+  castQuickSlotSkill: (skillId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return false;
+
+    const skill = state.skills.find(s => s.id === skillId);
+    if (!skill) return false;
+
+    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+    const weapon = getEquippedWeapon(allGear);
+    const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
+    const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
+
+    /*
+     * § 3.6.2：CD 中／MP 不足／武器不符一律**當場拒絕並說明原因**，不排隊等待。
+     * 排隊會讓「按下去之後不知道何時會放」變成常態；說明原因是為了讓玩家
+     * 分得出「還在轉 CD」與「這把武器放不出這招」——兩者的畫面都是灰的。
+     */
+    if (!skillMeetsWeaponRequirement(skill, weaponType)) {
+      set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} 需要對應武器`, type: 'system' }) });
+      return false;
+    }
+    if (char.mp < skill.mpCost) {
+      set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} MP 不足`, type: 'system' }) });
+      return false;
+    }
+    if (!canUseSkill(skill, char.mp, Date.now(), cooldownReduction)) {
+      set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} 冷卻中`, type: 'system' }) });
+      return false;
+    }
+
+    /*
+     * buff／治癒**不佔攻擊 tick**，立即施放（§ 3.6.2）。
+     * 攻擊 tick 只在「有目標且進入射程」時才觸發，把補血排進去
+     * 等於「地圖上沒怪就補不了血」—— 而那正是最需要手動補的時候。
+     */
+    if (skill.type === 'buff' || skill.type === 'heal') {
+      return get().castSelfSkill(skill.id);
+    }
+
+    // 攻擊技能排進下一個攻擊 tick，由 ARPG 引擎覆蓋該 tick 的腳本判定
+    useCombatCommandStore.getState().requestSkill(skill.id);
+    return true;
+  },
+
+  castSelfSkill: (skillId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return false;
+
+    const skillIdx = state.skills.findIndex(s => s.id === skillId);
+    if (skillIdx < 0) return false;
+    const skill = state.skills[skillIdx];
+    if (skill.type !== 'buff' && skill.type !== 'heal') return false;
+
+    const now = Date.now();
+    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+    const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
+    if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return false;
+
+    const template = getSkillTemplate(skill.id);
+    const newSkills = [...state.skills];
+    newSkills[skillIdx] = { ...skill, lastUsedAt: now };
+
+    if (skill.type === 'heal') {
+      if (!skill.healAmount) return false;
+      const healBonuses = getAffixBonusesFromGear(allGear);
+      const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+      const effectiveHeal = Math.floor(skill.healAmount * (1 + healBonuses.heal_effect / 100));
+      const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
+      set({
+        character: { ...char, hp: char.hp + healed, mp: char.mp - skill.mpCost },
+        skills: newSkills,
+        combatLogs: addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' }),
+      });
+      pushSelfCastFx({ skillId: skill.id, healed });
+      return true;
+    }
+
+    const newChar = { ...char, mp: char.mp - skill.mpCost };
+    const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}`, type: 'player' });
+    const buffDuration = template?.buffDuration ?? skill.buffDuration;
+
+    if (buffDuration) {
+      const buffEffect: ActiveEffect = {
+        id: `buff-${skill.id}-${now}`,
+        sourceSkillId: skill.id,
+        sourceSkillName: skill.name,
+        category: template?.buffCategory ?? skill.buffCategory ?? skill.id,
+        type: 'buff',
+        target: 'player',
+        modifiers: template?.buffModifiers ?? skill.buffModifiers ?? [],
+        startTime: now,
+        duration: buffDuration,
+        tags: [],
+        name: skill.name,
+        description: template?.buffEffect ?? skill.buffEffect ?? '',
+      };
+      const hotAmount = template?.hotAmount ?? skill.hotAmount;
+      if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
+      if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
+      if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
+      const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
+      if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
+      const applied = applyPlayerBuff(get().activeEffects, buffEffect);
+      const buffLogs = applied.cancelledSlow
+        ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })
+        : logs;
+      set({ character: newChar, skills: newSkills, combatLogs: buffLogs, activeEffects: applied.effects });
+    } else {
+      set({ character: newChar, skills: newSkills, combatLogs: logs });
+    }
+
+    /*
+     * 常駐腳本碰不到 Pixi，所以演出走佇列（`48-vfx.md` § 48.8.5）——
+     * 少了這一行，設在常駐腳本上的 buff 一個特效都不會演。
+     */
+    pushSelfCastFx({ skillId: skill.id, healed: 0 });
+    return true;
   },
 
   useCureItem: (itemId) => {
@@ -1534,74 +1682,15 @@ export const useGameStore = create<GameState>((set, get) => ({
           get().useCureItem(action.cureItemId);
           break;
         }
-        case 'buff_skill': {
-          const skillIdx = state.skills.findIndex(s => s.id === action.skillId);
-          if (skillIdx < 0) return;
-          const skill = state.skills[skillIdx];
-          if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return;
-
-          const template = getSkillTemplate(skill.id);
-          const newChar = { ...char, mp: char.mp - skill.mpCost };
-          const newSkills = [...state.skills];
-          newSkills[skillIdx] = { ...skill, lastUsedAt: now };
-          const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}`, type: 'player' });
-
-          const buffDuration = template?.buffDuration ?? skill.buffDuration;
-          if (buffDuration) {
-            const buffEffect: ActiveEffect = {
-              id: `buff-${skill.id}-${now}`,
-              sourceSkillId: skill.id,
-              sourceSkillName: skill.name,
-              category: template?.buffCategory ?? skill.buffCategory ?? skill.id,
-              type: 'buff',
-              target: 'player',
-              modifiers: template?.buffModifiers ?? skill.buffModifiers ?? [],
-              startTime: now,
-              duration: buffDuration,
-              tags: [],
-              name: skill.name,
-              description: template?.buffEffect ?? skill.buffEffect ?? '',
-            };
-            const hotAmount = template?.hotAmount ?? skill.hotAmount;
-            if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
-            if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
-        if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
-            const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
-            if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
-            const applied = applyPlayerBuff(get().activeEffects, buffEffect);
-            const buffLogs = applied.cancelledSlow
-              ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })
-              : logs;
-            set({ character: newChar, skills: newSkills, combatLogs: buffLogs, activeEffects: applied.effects });
-          } else {
-            set({ character: newChar, skills: newSkills, combatLogs: logs });
-          }
-          /*
-           * 常駐腳本碰不到 Pixi，所以演出走佇列（`48-vfx.md` § 48.8.5）——
-           * 少了這一行，設在常駐腳本上的 buff 一個特效都不會演。
-           */
-          pushSelfCastFx({ skillId: skill.id, healed: 0 });
-          break;
-        }
+        /*
+         * buff／治癒與快捷格的手動施放**共用同一支** `castSelfSkill()`（§ 3.6.2）。
+         * 兩份實作會走鐘：MP 扣除、CD 寫入、buff 疊加規則、特效佇列全都要一致，
+         * 而其中任何一項改了只改一邊，症狀都是「手動放跟自動放效果不同」這種難查的 bug。
+         */
+        case 'buff_skill':
         case 'heal_skill': {
-          const skillIdx = state.skills.findIndex(s => s.id === action.skillId);
-          if (skillIdx < 0) return;
-          const skill = state.skills[skillIdx];
-          if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return;
-          if (!skill.healAmount) return;
-
-          const allGearForHeal = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
-          const healBonuses = getAffixBonusesFromGear(allGearForHeal);
-          const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
-          const effectiveHeal = Math.floor(skill.healAmount * (1 + healBonuses.heal_effect / 100));
-          const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
-
-          const newChar = { ...char, hp: char.hp + healed, mp: char.mp - skill.mpCost };
-          const newSkills = [...state.skills];
-          newSkills[skillIdx] = { ...skill, lastUsedAt: now };
-          const logs = addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
-          set({ character: newChar, skills: newSkills, combatLogs: logs });
-          pushSelfCastFx({ skillId: skill.id, healed });
+          if (!action.skillId) break;
+          get().castSelfSkill(action.skillId);
           break;
         }
       }

@@ -11,6 +11,16 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'evasion': 'buffs/dodging',
   'poison-enchant': 'buffs/vile-fluid',
   'atk-debuff': 'buffs/fire-shield',
+  // 以下原本沒有 category 對應，一律落在通用的 concentration-orb，這裡給它們各自的圖示。
+  // `agility-boost` / `strength-boost` / `holy-light` 三招沒有 buffCategory，
+  // 效果的 category 會退回 skill.id（見 `gameStore.castSelfSkill`），所以用 id 當 key。
+  'protect-shield': 'buffs/shield-echoes',
+  'weapon-bless': 'buffs/sparkling-sabre',
+  'invincible': 'buffs/bubble-field',
+  'agility-boost': 'buffs/wingfoot',
+  'strength-boost': 'buffs/muscle-up',
+  'sanctuary': 'buffs/beams-aura',
+  'holy-light': 'buffs/freedom-dove',
 
   // Debuffs (tag → icon path)
   'stun': 'debuffs/stoned-skull',
@@ -110,6 +120,92 @@ export const SKILL_ICON_MAP: Record<string, string> = {
   'slash': 'skills/quick-slash',
 };
 
+/**
+ * 每一招攻擊／治癒技能的專屬圖示（`05-skill.md` § 技能圖示）。
+ *
+ * **buff 技能不在這張表裡** —— 它們沿用 buff bar 已經在用的
+ * `getEffectIcon(buffCategory)`，技能面板、快捷格與狀態列因此是同一顆圖示。
+ * 在這裡另外給 buff 一顆，等於同一個 buff 在兩個地方長不一樣。
+ *
+ * 素材全部來自 game-icons.net（CC BY 3.0），署名見 `assets/icons/CREDITS.md`；
+ * 新增技能時要一併補這張表與素材檔，`skillIconCoverage.test.ts` 會擋下漏的。
+ */
+export const SKILL_ID_ICON_MAP: Record<string, string> = {
+  // --- 基礎魔法 · 風 ---
+  'wind-blade': 'skills/wind-slap',
+  'thunder-strike': 'skills/lightning-slashes',
+  'storm': 'skills/whirlwind',
+  'gale-storm': 'skills/half-tornado',
+  'tornado': 'skills/tornado',
+  'chain-lightning': 'skills/lightning-arc',
+  'divine-thunder': 'skills/thunder-struck',
+
+  // --- 基礎魔法 · 火 ---
+  'flame-arrow': 'skills/fire-ray',
+  'fireball': 'skills/fireball',
+  'inferno': 'skills/flame-spin',
+  'hellfire': 'skills/burning-embers',
+  'flame-pillar': 'skills/flame-tunnel',
+  'meteor-shot': 'skills/fragmented-meteor',
+  'purgatory': 'skills/burning-blobs',
+  'meteor-shower': 'skills/burning-meteor',
+  'apocalypse-flame': 'skills/bright-explosion',
+
+  // --- 基礎魔法 · 冰 ---
+  'ice-bolt': 'skills/frozen-orb',
+  'frost': 'skills/snowflake-1',
+  'ice-fog': 'skills/snowing',
+  'ice-lance': 'skills/frozen-arrow',
+  'ice-ring': 'skills/icicles-aura',
+  'blizzard': 'skills/snowflake-2',
+  'blizzard-storm': 'skills/icicles-fence',
+  'absolute-zero': 'skills/frozen-block',
+
+  // --- 基礎魔法 · 地 ---
+  'rock-fall': 'skills/falling-boulder',
+  'earth-rend': 'skills/earth-crack',
+  'armor-break': 'skills/slashed-shield',
+  'earth-shatter': 'skills/quake-stomp',
+
+  // --- 基礎魔法 · 暗 ---
+  'shadow-ball': 'skills/smoking-orb',
+  'vampire-kiss': 'skills/marrow-drain',
+  'curse': 'skills/cursed-star',
+  'shadow-burst': 'skills/shadow-grasp',
+
+  // --- 基礎魔法 · 光／無 ---
+  'holy-bolt': 'skills/ringed-beam',
+  'ultimate-ray': 'skills/explosion-rays',
+
+  // --- 基礎魔法 · 治癒 ---
+  'heal': 'skills/healing',
+  'mid-heal': 'skills/healing-shield',
+  'great-heal': 'skills/health-increase',
+  'full-heal': 'skills/life-support',
+
+  // --- 職業魔法 · 騎士 ---
+  'shield-bash': 'skills/shield-bash',
+  'rend': 'skills/serrated-slash',
+  'taunt': 'skills/sonic-shout',
+  'vengeance': 'skills/bloody-sword',
+
+  // --- 職業魔法 · 妖精 ---
+  'triple-shot': 'skills/arrow-cluster',
+  'arrow-rain': 'skills/split-arrows',
+
+  // --- 職業魔法 · 元素師 ---
+  'mana-drain': 'skills/life-tap',
+  'element-storm': 'skills/atomic-slashes',
+
+  // --- 職業魔法 · 牧師 ---
+  'holy-judgment': 'skills/sunbeams',
+  'high-heal': 'skills/heart-plus',
+  'group-heal': 'skills/prayer',
+
+  // --- 職業魔法 · 盜賊 ---
+  'backstab': 'skills/backstab',
+};
+
 export function getEffectIcon(category: string): string {
   return EFFECT_ICON_MAP[category] || 'buffs/concentration-orb';
 }
@@ -138,4 +234,24 @@ export function getEquipIcon(equipType: string): string {
 
 export function getSkillIcon(element: string): string {
   return SKILL_ICON_MAP[element] || 'skills/star-swirl';
+}
+
+/**
+ * 一招技能該顯示哪個圖示 —— 技能面板、快捷格、Wiki 共用這一支。
+ *
+ * 查找順序：
+ * 1. **buff 技能** → `getEffectIcon(buffCategory)`，與 buff bar 同一顆
+ * 2. `SKILL_ID_ICON_MAP` 的專屬圖示
+ * 3. 依元素退回 `getSkillIcon()`
+ *
+ * 順序不可對調：buff 若先查專屬表，同一個 buff 會在狀態列與技能面板長不一樣。
+ */
+export function getSkillDisplayIcon(skill: {
+  id: string;
+  type?: string;
+  element?: string;
+  buffCategory?: string;
+}): string {
+  if (skill.type === 'buff') return getEffectIcon(skill.buffCategory ?? skill.id);
+  return SKILL_ID_ICON_MAP[skill.id] ?? getSkillIcon(skill.element ?? 'none');
 }

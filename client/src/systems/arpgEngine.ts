@@ -23,7 +23,8 @@ import {
 } from './monsterCombatFSM';
 import { resolveActionTargets } from './targeting';
 import type { MonsterAttackType } from '../models/monster';
-import { evaluateCombatScript, type CombatScriptContext, type ScriptMonsterView } from './scriptRunner';
+import { evaluateCombatScript, skillMeetsWeaponRequirement, type CombatScriptContext, type ScriptMonsterView } from './scriptRunner';
+import { canUseSkill } from '../models/skill';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
 import { isPlayerStunned } from './playerDebuffSystem';
 
@@ -38,6 +39,13 @@ export interface ArpgEngineState {
   playerCtx: PlayerCombatContext;
   monsters: Map<string, ArpgMonster>;
   active: boolean;
+  /**
+   * 玩家從快捷格指定、要在下一個攻擊 tick 施放的**攻擊技能**（`03-combat.md` § 3.6.2）。
+   *
+   * 放在引擎狀態而不是每 tick 的 input：指令下達與攻擊 tick 之間隔著不定幀數
+   * （要等冷卻、等走進射程），每 tick 傳一次的話呼叫端無從得知哪一幀真的用掉了它。
+   */
+  manualSkillId: string | null;
 }
 
 export function createArpgEngine(): ArpgEngineState {
@@ -45,7 +53,47 @@ export function createArpgEngine(): ArpgEngineState {
     playerCtx: createPlayerCombatContext(),
     monsters: new Map(),
     active: false,
+    manualSkillId: null,
   };
+}
+
+/**
+ * 玩家點怪指定目標（§ 3.6.1）。回傳是否採納。
+ *
+ * 屍體與不在場上的怪一律不採納，維持原目標 —— 指令作廢比清空目標安全，
+ * 後者會讓角色站著發呆一個 tick。
+ */
+export function applyManualTarget(engine: ArpgEngineState, monsterId: string): boolean {
+  const target = engine.monsters.get(monsterId);
+  if (!target || target.instance.currentHp <= 0) return false;
+  engine.playerCtx.targetMonsterId = monsterId;
+  return true;
+}
+
+/** 玩家從快捷格指定攻擊技能。重複指定只保留最後一次（§ 3.6.2） */
+export function queueManualSkill(engine: ArpgEngineState, skillId: string): void {
+  engine.manualSkillId = skillId;
+}
+
+/**
+ * 手動指定的技能此刻能不能出。查不到、不是攻擊技能、CD／MP／武器不符一律回 null。
+ *
+ * 按下的當下已經擋過一次（`gameStore.useQuickSlot`），這裡是第二道 ——
+ * 指令排到出手之間可能隔了好幾秒，MP 早就被腳本用掉了。
+ */
+function resolveManualAttackSkill(
+  skillId: string | null,
+  skills: Skill[],
+  mp: number,
+  now: number,
+  cooldownReduction: number,
+  weaponType: string | undefined,
+): Skill | null {
+  if (!skillId) return null;
+  const skill = skills.find(s => s.id === skillId);
+  if (!skill || skill.type !== 'attack') return null;
+  if (!skillMeetsWeaponRequirement(skill, weaponType)) return null;
+  return canUseSkill(skill, mp, now, cooldownReduction) ? skill : null;
 }
 
 export interface ArpgTickInput {
@@ -123,6 +171,17 @@ export function tickArpgEngine(
   // 少了這一條，技能全在冷卻時射程會塌回武器射程，遠程職業就會往怪身上蹭（§ 3.1）
   attackConfig.chaseRange = getScriptChaseRange(combatRules, skills, attackConfig.range);
 
+  const cooldownReduction = getSkillCooldownReduction(character, equippedGear, activeEffects);
+
+  /*
+   * 手動指定的技能優先於腳本（§ 3.6.3），因此追擊距離與「有沒有事可做」都要先看它 ——
+   * 少了這一步，玩家指定一招射程比腳本更遠的技能時，角色會照腳本的射程走位，
+   * 走到定位才發現要放的是另一招。
+   */
+  const manualSkill = resolveManualAttackSkill(
+    engine.manualSkillId, skills, character.mp, Date.now(), cooldownReduction, weaponType,
+  );
+
   let hasExecutableAction = true;
   if (aliveForScript.length > 0) {
     const scriptCtx: CombatScriptContext = {
@@ -130,13 +189,15 @@ export function tickArpgEngine(
       monsters: aliveForScript,
       skills,
       now: Date.now(),
-      cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
+      cooldownReduction,
       weaponType,
       playerPos,
       primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
       weaponRange,
     };
-    const nextAction = evaluateCombatScript(combatRules, scriptCtx);
+    const nextAction: CombatAction | null = manualSkill
+      ? { type: 'skill', skillId: manualSkill.id }
+      : evaluateCombatScript(combatRules, scriptCtx);
     hasExecutableAction = nextAction !== null;
     if (nextAction?.type === 'skill' && nextAction.skillId) {
       const skill = skills.find(s => s.id === nextAction.skillId);
@@ -185,12 +246,19 @@ export function tickArpgEngine(
       monsters: buildScriptMonsters(engine),
       skills,
       now: Date.now(),
-      cooldownReduction: getSkillCooldownReduction(character, equippedGear, activeEffects),
+      cooldownReduction,
       weaponType,
       playerPos,
       primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
       weaponRange,
     };
+
+    /*
+     * 手動指定只對**這一個**攻擊 tick 有效（§ 3.6.2），因此無論用不用得成都先清掉。
+     * 留著會變成「按一次放兩次」：指令等在那裡，下一個 tick 又被撿起來。
+     */
+    const manualId = engine.manualSkillId;
+    engine.manualSkillId = null;
 
     /**
      * 腳本評估不出動作就**不出手**，不可退回普通攻擊。
@@ -203,7 +271,11 @@ export function tickArpgEngine(
      * 正常情況下這裡不會是 null —— `tickPlayerCombat` 在 `hasExecutableAction === false`
      * 時就不會發 `attack` 了；只有「評估兩次之間剛好有技能轉好／條件變動」的極短競態會落到這裡。
      */
-    const action = evaluateCombatScript(combatRules, scriptCtx);
+    // § 3.6.3 優先權：手動指定的技能 → 戰鬥腳本 → 不動作
+    const action: CombatAction | null =
+      manualId && manualSkill && manualSkill.id === manualId
+        ? { type: 'skill', skillId: manualId }
+        : evaluateCombatScript(combatRules, scriptCtx);
 
     // 超重時無法攻擊也無法施放魔法（§ 20.7）。攻擊冷卻照樣走完才判定，
     // 所以訊息的頻率等同出手頻率，不會每個 frame 洗版。

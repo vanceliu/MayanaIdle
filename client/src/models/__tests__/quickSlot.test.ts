@@ -9,6 +9,7 @@ import {
   normalizeQuickSlots,
   resolveQuickSlotAction,
   toQuickSlotEntry,
+  toQuickSlotSkillEntry,
   quickSlotLabel,
   keyToQuickSlotIndex,
 } from '../quickSlot';
@@ -179,5 +180,74 @@ describe('鍵盤對應（§ 35.7）', () => {
     for (let i = 0; i < QUICK_SLOT_COUNT; i++) {
       expect(keyToQuickSlotIndex(quickSlotLabel(i)), `slot ${i}`).toBe(i);
     }
+  });
+});
+
+describe('技能格（§ 35.7.2 / § 35.7.4）', () => {
+  const LEARNED = 'wind-blade';
+  const NOT_LEARNED = 'fireball';
+  const learned = new Set([LEARNED]);
+
+  it('已習得的技能可綁定，未習得的不行', () => {
+    expect(toQuickSlotSkillEntry(LEARNED, learned)).toEqual({ kind: 'skill', skillId: LEARNED });
+    expect(toQuickSlotSkillEntry(NOT_LEARNED, learned)).toBeNull();
+  });
+
+  it('技能表查不到的 id 一律不可綁定（改版刪招）', () => {
+    expect(toQuickSlotSkillEntry('no-such-skill', new Set(['no-such-skill']))).toBeNull();
+  });
+
+  it('解析得出施放行為', () => {
+    expect(resolveQuickSlotAction({ kind: 'skill', skillId: LEARNED }))
+      .toEqual({ type: 'skill', skillId: LEARNED });
+  });
+
+  it('技能表查不到時解析不出行為', () => {
+    expect(resolveQuickSlotAction({ kind: 'skill', skillId: 'no-such-skill' })).toBeNull();
+  });
+
+  it('顯示名稱由技能表反查，不存名稱', () => {
+    const name = getQuickSlotItemName({ kind: 'skill', skillId: LEARNED });
+    expect(name).not.toBe('未知技能');
+    expect(name.length).toBeGreaterThan(0);
+  });
+
+  it('同一支技能視為同一格內容，不同技能不是', () => {
+    expect(isSameQuickSlotEntry(
+      { kind: 'skill', skillId: LEARNED },
+      { kind: 'skill', skillId: LEARNED },
+    )).toBe(true);
+    expect(isSameQuickSlotEntry(
+      { kind: 'skill', skillId: LEARNED },
+      { kind: 'skill', skillId: NOT_LEARNED },
+    )).toBe(false);
+    // 跨型別不可誤判成同一格
+    expect(isSameQuickSlotEntry(
+      { kind: 'skill', skillId: LEARNED },
+      { kind: 'bagItem', itemId: 1 },
+    )).toBe(false);
+  });
+
+  it('讀檔時剔除未習得的技能格，已習得的保留', () => {
+    const raw = [
+      { kind: 'skill', skillId: LEARNED },
+      { kind: 'skill', skillId: NOT_LEARNED },
+    ];
+    const slots = normalizeQuickSlots(raw, learned);
+    expect(slots[0]).toEqual({ kind: 'skill', skillId: LEARNED });
+    expect(slots[1]).toBeNull();
+  });
+
+  it('沒有傳習得名單時不剔除技能格（匯入存檔的時機點還讀不到技能）', () => {
+    const slots = normalizeQuickSlots([{ kind: 'skill', skillId: NOT_LEARNED }]);
+    expect(slots[0]).toEqual({ kind: 'skill', skillId: NOT_LEARNED });
+  });
+
+  it('技能表查不到的 id 一律剔除，與習得名單無關', () => {
+    const slots = normalizeQuickSlots(
+      [{ kind: 'skill', skillId: 'no-such-skill' }],
+      new Set(['no-such-skill']),
+    );
+    expect(slots[0]).toBeNull();
   });
 });

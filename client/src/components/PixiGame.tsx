@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
+import { useCombatCommandStore } from '../stores/combatCommandStore';
 import { MonsterListOverlay } from './MonsterListOverlay';
 import { useGameStore, getEffectiveMaxHp, selectCombatRules, type CombatLog } from '../stores/gameStore';
 import { getNearestTown } from '../models/mapData';
@@ -20,7 +21,9 @@ import { findAttackPosition } from '../systems/pathfinding';
 import { db } from '../db/database';
 import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
-import { createArpgEngine, tickArpgEngine, type ArpgEngineState } from '../systems/arpgEngine';
+import {
+  createArpgEngine, tickArpgEngine, applyManualTarget, queueManualSkill, type ArpgEngineState,
+} from '../systems/arpgEngine';
 import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
 import { getEquippedWeapon, getPlayerAttackInterval } from '../systems/combat';
 import {
@@ -154,7 +157,11 @@ export function PixiGame() {
         pixiApp.camera.setTarget(sx, sy);
         pixiApp.camera.update();
 
-        syncMonsters(useMapMonsterStore.getState().monsters, map, scene!, monsterMapRef.current, monsterInstancesRef.current, delta);
+        syncMonsters(
+          useMapMonsterStore.getState().monsters, map, scene!,
+          monsterMapRef.current, monsterInstancesRef.current, delta,
+          arpgEngineRef.current.playerCtx.targetMonsterId,
+        );
 
         /* 常駐腳本放的 buff／治癒在 store 那一層，只能靠佇列傳過來 */
         drainSelfCastFxInto(scene!.effectLayer, map, playerPos);
@@ -260,6 +267,8 @@ export function PixiGame() {
       arpgEngineRef.current = createArpgEngine();
       monsterInstancesRef.current.clear();
       useMonsterHudStore.getState().clear();
+      /* 還沒消費的手動指令指的是上一張地圖的怪，跟著清掉（§ 3.6） */
+      useCombatCommandStore.getState().clear();
 
       // Reset camera to new player position
       const pos = state.playerPosition;
@@ -318,6 +327,32 @@ export function PixiGame() {
       if (npc) {
         // 點得到就開，不看距離（§ 13.2.1）
         useTownStore.getState().openFacility(npc.facility as TownFacility);
+        return;
+      }
+
+      /*
+       * 點怪切目標（§ 3.6.1）。判定順序是 **NPC → 怪物 → 地格移動**，
+       * 而且必須在 `screenToMapTile` 之前 —— 怪物站的格子是可通行的，
+       * 先取格子會把「點正中怪物」變成一道移動指令，目標永遠切不掉。
+       *
+       * 命中判定共用 hover 那支 `findEntityAtScreen`：兩者用不同的半徑或錨點時，
+       * 會出現「名字浮出來了但點下去沒反應」。
+       */
+      const entity = findEntityAtScreen(
+        map,
+        worldScreenX,
+        worldScreenY,
+        useMapControlStore.getState().playerPosition,
+        useGameStore.getState().character?.name ?? '',
+        useMapMonsterStore.getState().monsters,
+        monsterInstancesRef.current,
+      );
+      if (entity?.target.kind === 'monster' && entity.target.id) {
+        const instance = monsterInstancesRef.current.get(entity.target.id);
+        // 屍體不可指定；點到就當作沒點到，維持原目標
+        if (instance && instance.currentHp > 0) {
+          useCombatCommandStore.getState().requestTarget(entity.target.id);
+        }
         return;
       }
 
@@ -677,6 +712,19 @@ function tickArpgCombatLoop(
   for (const id of monsterInstances.keys()) {
     if (!activeIds.has(id)) monsterInstances.delete(id);
   }
+
+  /*
+   * 手動介入指令（§ 3.6）。**必須在 `tickArpgEngine` 之前消費**：
+   * 引擎在同一個 tick 內就會用掉它們，晚一步等於玩家的操作永遠慢一幀。
+   *
+   * 也必須在上面的怪物同步之後 —— `applyManualTarget` 查的是 `engine.monsters`，
+   * 剛進場的怪還沒同步進去就會被當成「不在場上」而作廢。
+   */
+  const commands = useCombatCommandStore.getState();
+  const manualTargetId = commands.consumeTarget();
+  if (manualTargetId) applyManualTarget(engine, manualTargetId);
+  const manualSkillId = commands.consumeSkill();
+  if (manualSkillId) queueManualSkill(engine, manualSkillId);
 
   const events = tickArpgEngine(engine, {
     playerPos,
@@ -1335,6 +1383,8 @@ function syncMonsters(
   monsterInstances: Map<string, MonsterInstance>,
   /** 受擊反應要每幀推進；位置在同一支裡重設，順序不能反過來 */
   deltaMs: number,
+  /** 玩家目前的目標，畫地面環用（§ 3.6.1）。null＝沒有目標 */
+  targetId: string | null,
 ) {
   const currentIds = new Set(monsters.map(m => m.id));
 
@@ -1364,6 +1414,7 @@ function syncMonsters(
     }
     entity.update(deltaMs);
     entity.updatePosition(monster.position, getRenderedElevation(map, monster.position));
+    entity.setTargeted(monster.id === targetId);
 
     const inst = monsterInstances.get(monster.id);
     if (inst) {

@@ -254,6 +254,11 @@ export function BagPanel() {
    */
   function applyDrop(target: DropTarget | null, item: DragItem) {
     if (!target) return;
+    /*
+     * 技能拖曳由 `SkillPanel` 自己落地（§ 35.7.3）。這裡只會收到背包自己發起的拖曳，
+     * 但型別上 payload 是聯集，早退比在下面每一處補 `?.` 清楚。
+     */
+    if (item.payload.kind === 'skill') return;
     if (target.kind === 'bag-slot') {
       moveTo(item.fromIndex, target.index);
       return;

@@ -255,7 +255,11 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 1. **基礎魔法** — 10 行 × 5 格 = 50 格。每格對應 `SKILL_CATALOG` 的固定位置（按 level 分行，行內按 catalog 順序），已學習顯示內容，未學習顯示空格
 2. **職業魔法** — 1 行 × 5 格。已習得的職業技能依序填入
 
-每格顯示：元素色點、技能名稱（不顯示等級，由列首標示）。Hover 顯示 tooltip（威力/MP/冷卻/效果）。
+每格顯示：**技能圖示**（`getSkillDisplayIcon()`，見 § 32.12「技能 Icon」）搭配元素配色、
+技能名稱（不顯示等級，由列首標示）。Hover 顯示 tooltip（威力/MP/冷卻/效果）。
+
+> 圖示與快捷格走**同一支函式、同一套元素配色**。原本這裡是純元素色點、
+> 快捷格是圖示，同一招在兩處長不一樣 —— 而技能正是從這裡拖到快捷格的。
 
 `SKILL_CATALOG` 共 50 個技能（Lv1~10，每級 5 個），定義於 `models/skill.ts`。
 
@@ -290,7 +294,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
 | 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold`, `afterCombatHpResumeThreshold`, `afterCombatMpResumeThreshold` | 戰鬥後等待/恢復閾值（HP/MP %） |
 | 搜尋 | `searchMode` | 自動/手動搜尋模式。**只有模式，沒有「搜尋中」狀態** —— 遭遇由地圖紅點碰撞觸發（`38-map-control.md` § 搜尋模式對應） |
-| 快捷 | `quickSlots` | 10 格快捷鍵（鍵盤 1~9 與 0；藥水／狀態解除道具／卷軸／裝備，見 `35-inventory-constraints.md` § 35.7） |
+| 快捷 | `quickSlots` | 10 格快捷鍵（鍵盤 1~9 與 0；藥水／狀態解除道具／卷軸／裝備／技能，見 `35-inventory-constraints.md` § 35.7） |
 | 倉庫 | `storedEquipment`, `storedMaterials`, `warehouseGold` | 城鎮倉庫（帳號共用） |
 
 ### BagItem 型別
@@ -596,8 +600,8 @@ interface ScriptTemplate {
 | `Tooltip` | 通用 hover tooltip，用於 buff/裝備/物品/技能 |
 | `MapNavigation` | 頂部 HUD 下拉式地圖選擇器（Zone → Region → Floor） |
 | `TownView` | 疊在城鎮地圖上的設施快捷列 + 設施 Modal（地圖上的 NPC 見 § 13.2.1） |
-| `QuickSlotBar` | 10 格快捷按鈕，GameIcon + 藥水顏色 + 數量顯示（見 `35-inventory-constraints.md` § 35.7） |
-| `SkillPanel` | 技能面板：列首標示等級，5×10 基礎魔法（固定位置對應 SKILL_CATALOG）+ 5×1 職業魔法 |
+| `QuickSlotBar` | 10 格快捷按鈕，GameIcon + 藥水顏色 + 數量顯示 + 技能 CD 指針（見 `35-inventory-constraints.md` § 35.7） |
+| `SkillPanel` | 技能面板：列首標示等級，5×10 基礎魔法（固定位置對應 SKILL_CATALOG）+ 5×1 職業魔法。**已習得的格子同時是快捷格的拖曳來源**（§ 35.7.3） |
 
 ### 城鎮設施組件
 
@@ -806,6 +810,13 @@ const EFFECT_ICON_MAP: Record<string, string> = {
   'evasion': 'buffs/dodging',
   'poison-enchant': 'buffs/vile-fluid',
   'atk-debuff': 'buffs/fire-shield',
+  'protect-shield': 'buffs/shield-echoes',
+  'weapon-bless': 'buffs/sparkling-sabre',
+  'invincible': 'buffs/bubble-field',
+  'sanctuary': 'buffs/beams-aura',
+  'agility-boost': 'buffs/wingfoot',   // 無 buffCategory，category 退回 skill.id
+  'strength-boost': 'buffs/muscle-up', // 同上
+  'holy-light': 'buffs/freedom-dove',  // 同上
   'stun': 'debuffs/stoned-skull',
   'bleeding': 'debuffs/bleeding-wound',
   'poisoned': 'debuffs/poison-gas',
@@ -829,15 +840,41 @@ const ITEM_ICON_MAP: Record<string, string> = {
 // 裝備 icon 映射
 const EQUIP_ICON_MAP: Record<string, string> = { ... };
 
-// 技能元素 icon 映射
+// 技能元素 icon 映射（fallback 用）
 const SKILL_ICON_MAP: Record<string, string> = { ... };
+
+// 每一招攻擊／治癒技能的專屬 icon
+const SKILL_ID_ICON_MAP: Record<string, string> = { ... };
 ```
 
 **取得函數：**
 - `getItemIcon(itemType)` — 物品 icon 路徑
 - `getEquipIcon(equipType)` — 裝備 icon 路徑
 - `getEffectIcon(category)` — buff/debuff icon 路徑
-- `getSkillIcon(element)` — 技能元素 icon 路徑
+- `getSkillIcon(element)` — 技能元素 icon 路徑（**fallback 專用**）
+- `getSkillDisplayIcon(skill)` — **一招技能該顯示什麼的唯一出處**
+
+### 技能 Icon（唯一出處）
+
+技能面板、快捷格、Wiki 一律走 `getSkillDisplayIcon(skill)`，不可各自組。
+查找順序**不可對調**：
+
+| 順位 | 條件 | 來源 |
+|---|---|---|
+| 1 | `type === 'buff'` | `getEffectIcon(buffCategory)` —— 與 buff bar 同一顆 |
+| 2 | 攻擊／治癒技能 | `SKILL_ID_ICON_MAP[skill.id]` 的專屬 icon |
+| 3 | 查無 | `getSkillIcon(element)` 依元素退回 |
+
+- **buff 不進 `SKILL_ID_ICON_MAP`**：在那裡另給一顆，同一個 buff 會在狀態列與
+  技能面板長不一樣。沒有對應 `buffCategory` 的 buff 落到 `buffs/concentration-orb`，
+  這是刻意的通用圖示，不是缺漏
+- **攻擊與治癒技能一招一顆，不可重複**：重複就失去分辨的意義，
+  由 `skillIconCoverage.test.ts` 擋下
+- icon 是**打包進 bundle 的本機 SVG**（`GameIcon` 走 `import.meta.glob`），
+  檔案不在只會靜默顯示空白，不報錯也不 404 ——
+  因此同一份測試同時驗「對應表有寫」與「素材檔真的在」
+- 素材一律取自 game-icons.net（CC BY 3.0），新增時**必須**同步補
+  `client/src/assets/icons/CREDITS.md` 的署名列
 
 ### 物品 Icon 分類規則（BagPanel）
 
@@ -869,6 +906,8 @@ BagPanel 的 icon 渲染使用排除法：
 - 紅色藥水 → `standing-potion` + `#DC2626`
 - 橙色藥水 → `bubbling-flask` + `#F59E0B`
 - 白色藥水 → `potion-ball` + `#E2E8F0`
+- 技能 → `getSkillDisplayIcon(skill)` + 元素配色（與技能面板**同一支函式、同一套配色**；
+  玩家是從技能面板拖過來的，兩邊長不一樣會認不出綁到哪一招）
 
 ---
 

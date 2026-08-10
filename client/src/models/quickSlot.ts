@@ -2,6 +2,7 @@ import { CURE_ITEMS } from './cureItem';
 import { ALL_TOWN_SCROLLS } from './townScroll';
 import { REGIONS } from './mapData';
 import { getItemById, getItemId } from './items';
+import { getSkillTemplate } from './skillTemplate';
 
 /**
  * 快捷鍵系統（`35-inventory-constraints.md` § 35.7）。
@@ -19,13 +20,16 @@ export type BasicPotionType = 'red' | 'orange' | 'white';
  * - `potion`：紅／橙／白，走 `usePotionByType`
  * - `bagItem`：其餘可使用的背包物品（加速藥水、狀態解除、卷軸），依**道具 id** 分派
  * - `equipment`：背包中的裝備實例，點擊等同換裝
+ * - `skill`：已習得的主動技能，點擊等同手動施放（`03-combat.md` § 3.6.2）
  *
  * `bagItem` 存 id 不存名稱：快捷鍵是持久化設定，存名稱會在道具改名後指向不存在的東西。
+ * `skill` 同理存 `skillId`，顯示名稱一律由 `getSkillTemplate()` 反查。
  */
 export type QuickSlotEntry =
   | { kind: 'potion'; potionType: BasicPotionType }
   | { kind: 'bagItem'; itemId: number }
-  | { kind: 'equipment'; equipmentId: number; name: string };
+  | { kind: 'equipment'; equipmentId: number; name: string }
+  | { kind: 'skill'; skillId: string };
 
 export type QuickSlots = (QuickSlotEntry | null)[];
 
@@ -80,7 +84,8 @@ export type QuickSlotAction =
   | { type: 'cure'; itemId: number }
   | { type: 'townScroll'; itemId: number }
   | { type: 'travel'; regionId: string; scrollItemId: number }
-  | { type: 'equip'; equipmentId: number };
+  | { type: 'equip'; equipmentId: number }
+  | { type: 'skill'; skillId: string };
 
 /**
  * 解析快捷鍵格的點擊行為。回 `null` 代表這格沒有可執行的動作。
@@ -97,6 +102,11 @@ export function resolveQuickSlotAction(entry: QuickSlotEntry | null): QuickSlotA
 
   if (entry.kind === 'equipment') {
     return { type: 'equip', equipmentId: entry.equipmentId };
+  }
+
+  if (entry.kind === 'skill') {
+    // 技能表查不到就不是可用技能（改版刪招時的舊格子）
+    return getSkillTemplate(entry.skillId) ? { type: 'skill', skillId: entry.skillId } : null;
   }
 
   const { itemId } = entry;
@@ -138,6 +148,21 @@ export function toQuickSlotEntry(
   return { kind: 'bagItem', itemId };
 }
 
+/**
+ * 技能轉成快捷鍵格內容（§ 35.7.3）。
+ *
+ * **只接受已習得的技能** —— 技能面板會把未習得的格子也畫出來，
+ * 少了這道檢查，玩家可以把還學不到的招綁上快捷鍵。
+ */
+export function toQuickSlotSkillEntry(
+  skillId: string,
+  learnedSkillIds: ReadonlySet<string>,
+): QuickSlotEntry | null {
+  if (!learnedSkillIds.has(skillId)) return null;
+  if (!getSkillTemplate(skillId)) return null;
+  return { kind: 'skill', skillId };
+}
+
 /** 兩個快捷鍵格內容是否指向同一個物品 */
 export function isSameQuickSlotEntry(
   a: QuickSlotEntry | null | undefined,
@@ -147,6 +172,7 @@ export function isSameQuickSlotEntry(
   if (a.kind === 'potion' && b.kind === 'potion') return a.potionType === b.potionType;
   if (a.kind === 'bagItem' && b.kind === 'bagItem') return a.itemId === b.itemId;
   if (a.kind === 'equipment' && b.kind === 'equipment') return a.equipmentId === b.equipmentId;
+  if (a.kind === 'skill' && b.kind === 'skill') return a.skillId === b.skillId;
   return false;
 }
 
@@ -157,6 +183,7 @@ export function getQuickSlotItemName(entry: QuickSlotEntry): string {
     return getItemById(id)?.name ?? '藥水';
   }
   if (entry.kind === 'bagItem') return getItemById(entry.itemId)?.name ?? '未知道具';
+  if (entry.kind === 'skill') return getSkillTemplate(entry.skillId)?.name ?? '未知技能';
   return entry.name;
 }
 
@@ -166,7 +193,16 @@ export function getQuickSlotItemName(entry: QuickSlotEntry): string {
  * 舊格式是 `(PotionType | null)[]` 且只有 5 格，直接讀會壞掉；
  * 這裡一併處理格式轉換與補齊到 `QUICK_SLOT_COUNT` 格。
  */
-export function normalizeQuickSlots(raw: unknown): QuickSlots {
+export function normalizeQuickSlots(
+  raw: unknown,
+  /**
+   * 已習得的技能 id。傳入時會剔除指向未習得技能的格子（§ 35.7.4）。
+   *
+   * **省略＝不剔除技能格**：匯入存檔的正規化跑在角色技能載入之前，
+   * 那裡沒有可信的名單，寧可留著讓下一次載入角色時剔除，也不要誤刪玩家的設定。
+   */
+  learnedSkillIds?: ReadonlySet<string>,
+): QuickSlots {
   const out: QuickSlots = Array.from({ length: QUICK_SLOT_COUNT }, () => null);
   if (!Array.isArray(raw)) return out;
 
@@ -202,6 +238,12 @@ export function normalizeQuickSlots(raw: unknown): QuickSlots {
     } else if (e.kind === 'equipment' && typeof (e as { equipmentId?: number }).equipmentId === 'number') {
       const ee = e as { equipmentId: number; name?: string };
       out[i] = { kind: 'equipment', equipmentId: ee.equipmentId, name: ee.name ?? '裝備' };
+    } else if (e.kind === 'skill' && typeof (e as { skillId?: string }).skillId === 'string') {
+      const { skillId } = e as { skillId: string };
+      // 改版刪招 → 技能表查不到；未習得 → 不在名單裡。兩者都剔除
+      if (!getSkillTemplate(skillId)) continue;
+      if (learnedSkillIds && !learnedSkillIds.has(skillId)) continue;
+      out[i] = { kind: 'skill', skillId };
     }
   }
 

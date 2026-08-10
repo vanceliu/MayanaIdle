@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { useMonsterHudStore } from '../stores/monsterHudStore';
+import { useCombatCommandStore } from '../stores/combatCommandStore';
 import { GameIcon } from './GameIcon';
 import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
@@ -29,6 +30,7 @@ function formatTime(ms: number): string {
 export function MonsterListOverlay() {
   const entries = useMonsterHudStore(s => s.entries);
   const targetId = useMonsterHudStore(s => s.targetId);
+  const requestTarget = useCombatCommandStore(s => s.requestTarget);
   const activeEffects = useGameStore(s => s.activeEffects);
   const [, setTick] = useState(0);
 
@@ -57,6 +59,22 @@ export function MonsterListOverlay() {
             key={entry.id}
             className={`monster-card${entry.isBoss ? ' is-boss' : ''}${entry.id === targetId ? ' is-target' : ''}`}
             data-testid="monster-card"
+            role="button"
+            tabIndex={0}
+            aria-pressed={entry.id === targetId}
+            aria-label={`指定目標 ${entry.name}`}
+            /*
+             * 卡片也是切目標的入口（§ 3.6.1）：怪擠在一起時地圖上點不準，
+             * 列表是唯一分得開的地方。走 `onPointerDown` 而不是 `onClick` ——
+             * 卡片會隨怪物死亡而消失，按下與放開之間清單重排時 click 會整個丟失。
+             */
+            onPointerDown={() => requestTarget(entry.id)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                requestTarget(entry.id);
+              }
+            }}
           >
             <div className="monster-card-name">{entry.name}</div>
             <div className="monster-card-hp">

@@ -52,9 +52,13 @@ export interface CombatScriptContext {
  * 沒有標 `requiredWeaponType` 的技能一律通過；標了就必須手持該類武器，
  * 空手（`weaponType` 為 undefined）同樣不通過。
  */
-function meetsWeaponRequirement(skill: Skill, ctx: CombatScriptContext): boolean {
+export function skillMeetsWeaponRequirement(skill: Skill, weaponType: string | undefined): boolean {
   if (!skill.requiredWeaponType) return true;
-  return ctx.weaponType === skill.requiredWeaponType;
+  return weaponType === skill.requiredWeaponType;
+}
+
+function meetsWeaponRequirement(skill: Skill, ctx: CombatScriptContext): boolean {
+  return skillMeetsWeaponRequirement(skill, ctx.weaponType);
 }
 
 export function evaluateCombatScript(rules: CombatRule[], ctx: CombatScriptContext): CombatAction | null {
