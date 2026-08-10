@@ -67,5 +67,13 @@ export interface MonsterInstance {
   debuffs?: MonsterDebuffAbility[];
   /** § 24.6 Boss 控場免疫：被控場後 10 秒內免疫任何控場效果（時間戳 ms） */
   ccImmuneUntil?: number;
+  /**
+   * 試驗場木樁（`50-training-ground.md` § 50.4.1）。
+   *
+   * 帶這個旗標的怪**不走一般擊殺結算**：不掉落、不給經驗、不給金幣、
+   * 不計入 `37-statistics.md` 的任何欄位（那些數字會上傳排行榜）。
+   * 它也不移動、不攻擊。
+   */
+  isTrainingDummy?: boolean;
   _processed?: boolean;
 }

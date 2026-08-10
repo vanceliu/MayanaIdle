@@ -307,6 +307,7 @@ a,
 .hud > *,
 .town-npc-bar,
 .town-modal,
+.training-readout,
 .floating-window,
 .combat-log-window,
 .modal-overlay > * {
@@ -431,7 +432,37 @@ a,
   pointer-events: none;
 }
 
-.town-view > * {
+/*
+ * 試驗場（`50-training-ground.md`）靠左直排，**不置中**。
+ *
+ * 頂部中央到右側整條是怪物列表 HUD 的地盤（`24-buff-debuff.md` § 24.8.3）——
+ * 召喚八隻木樁時它有八列血條、往下長到 y≈235，置中的話會整片蓋住。
+ * 而看木樁血條正是量測時要看的東西，不能被自己的面板擋住。
+ *
+ * 左欄只有角色狀態卡（高 148），排在它下面就完全不打架；怪物列表在手機版
+ * 改靠右直排，左欄兩種版面都是空的。
+ *
+ * 也刻意不用 `left: 50% + transform`：`transform` 會讓內部 `position: fixed`
+ * 的設施視窗改以本容器為定位基準，視窗會被壓成一條窄長條。
+ */
+.training-view {
+  position: absolute;
+  top: 172px;
+  left: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+/* 靠左直排，不再置中；寬度與數據卡對齊 */
+.training-view .town-npc-bar {
+  justify-content: flex-start;
+}
+
+.town-view > *,
+.training-view > * {
   pointer-events: auto;
 }
 
@@ -1092,34 +1123,6 @@ button.active {
 .combat-indicator {
   color: var(--accent-danger);
   animation: none;
-}
-
-.btn-search {
-  padding: 5px 12px;
-  font-size: var(--fs-sm);
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.btn-search:hover {
-  background: var(--accent-primary-dim);
-}
-
-.btn-search.searching {
-  background: var(--accent-danger);
-  animation: pulse-search 1.2s ease-in-out infinite;
-}
-
-.btn-search.searching:hover {
-  background: var(--accent-danger-dim, #b91c1c);
-}
-
-@keyframes pulse-search {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
 }
 
 .death-banner {
@@ -2208,6 +2211,9 @@ button.active {
 }
 
 /* --- Town View --- */
+/* `height: 100%` 是設施視窗撐得開的前提：容器有 `transform`，
+   內部 `position: fixed` 的 overlay 以本容器為定位基準，容器多高視窗就多高。
+   試驗場不吃這條 —— 它沒有 `transform`，overlay 直接對齊視窗。 */
 .town-view {
   display: flex;
   flex-direction: column;
@@ -7446,4 +7452,121 @@ button.active {
   }
   .sig-sweep { opacity: 0; }
   .sig-swap-in { opacity: 1; }
+}
+
+/* ============================================================
+   試驗場（`50-training-ground.md` § 50.3~§ 50.5）
+   ============================================================ */
+
+/* 容器定位與 `.town-view` 共用（見上方兩處宣告）；這裡只放試驗場自己的內容樣式 */
+
+/* 220px 是為了讓整條卡片留在怪物列表左緣（x≈236）之內，兩者不會咬到 */
+.training-readout {
+  width: 220px;
+  padding: 8px 10px;
+  background: rgba(18, 18, 30, 0.86);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.training-readout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.training-measure-btn {
+  padding: 2px 12px;
+  font-size: var(--fs-xs);
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.training-measure-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 兩欄：標籤靠左、數值靠右，數值用等寬才不會每 100ms 抖一下 */
+.training-readout-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+
+.training-readout-grid dt {
+  color: var(--text-dim);
+}
+
+.training-readout-grid dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+}
+
+.training-hint {
+  margin: 6px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.training-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.training-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+}
+
+.training-field input,
+.training-field select {
+  width: 140px;
+  padding: 4px 6px;
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.training-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.training-warning {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: var(--fs-xs);
+  color: var(--accent-warning, #f5b342);
+  background: rgba(245, 179, 66, 0.1);
+  border: 1px solid rgba(245, 179, 66, 0.35);
+  border-radius: var(--radius-sm);
+}
+
+.training-entrance-notes {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.training-entrance-notes li {
+  margin-bottom: 4px;
 }

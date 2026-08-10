@@ -90,7 +90,7 @@ describe('mapDataControl - getMapForRegion', () => {
 
   it('validates every static JSON map and preserves its declared dimensions', async () => {
     const maps = await loadAllMaps();
-    expect(maps).toHaveLength(53); // 50 張野外/副本 + 3 張城鎮（§ 13.2.1）
+    expect(maps).toHaveLength(54); // 50 張野外/副本 + 3 張城鎮（§ 13.2.1）+ 1 張試驗場（§ 50.3）
     expect(new Set(maps.map(map => map.id)).size).toBe(maps.length);
     for (const map of maps) {
       expect(map.tiles).toHaveLength(map.height);

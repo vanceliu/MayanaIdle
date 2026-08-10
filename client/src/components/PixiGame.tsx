@@ -47,6 +47,8 @@ import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
 import { getSkillTemplate } from '../models/skillTemplate';
 import type { ActiveEffect } from '../models/effect';
 import { resolveRenderLimits } from '../pixi/renderLimits';
+import { useTrainingGroundStore } from '../stores/trainingGroundStore';
+import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
 
 const PLAYER_PROJECTILE_SPEED = 512;
 /** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
@@ -775,6 +777,7 @@ function tickArpgCombatLoop(
         }
 
         for (const dmg of result.damages) {
+          recordTrainingHits(monsterInstances.get(dmg.targetId), dmg);
           if (dmg.killed) {
             const inst = monsterInstances.get(dmg.targetId);
             const monsterIdx = monsterStore.monsters.findIndex(m => m.id === dmg.targetId);
@@ -786,6 +789,7 @@ function tickArpgCombatLoop(
             });
           }
         }
+        stopTrainingIfNoDummiesLeft();
         break;
       }
 
@@ -1032,6 +1036,10 @@ function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLa
     if (!inst || inst.currentHp <= 0) continue;
 
     inst.currentHp = Math.max(0, inst.currentHp - effect.dot.damage);
+    // DoT 不判定命中，所以只累加傷害、不動命中率的分子分母（§ 50.5.2）
+    if (inst.isTrainingDummy) {
+      useTrainingGroundStore.getState().recordDamage(effect.dot.damage, 0, 0);
+    }
     logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'debuff-enemy' });
 
     if (effectLayer) {
@@ -1051,6 +1059,7 @@ function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLa
       useMapMonsterStore.setState({
         monsters: monsterStore.monsters.filter(m => m.id !== monsterId),
       });
+      stopTrainingIfNoDummiesLeft();
     }
   }
 
@@ -1127,6 +1136,9 @@ function spawnDotTickFx(
 }
 
 function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemplate[]): MonsterInstance {
+  // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
+  if (mm.dummy) return createTrainingDummy(mm.dummy);
+
   // Pick a template matching boss/non-boss
   const pool = mm.isBoss
     ? templates.filter(t => t.isBoss)
@@ -1179,6 +1191,65 @@ function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemplate[])
   };
 }
 
+/**
+ * 把一次攻擊結果記進試驗場的量測（`50-training-ground.md` § 50.5.2）。
+ *
+ * 只記木樁 —— 場地雖然不生怪，但這支被主戰鬥迴圈共用，
+ * 不看旗標的話任何地圖的傷害都會被算進去。
+ *
+ * 命中率的分母走 `hits[]` 而不是「這次出手」：雙刀與鋼爪一次攻擊打兩下，
+ * 每下獨立判定命中（`21-combat-formula.md` § 21.2），多段技能同理。
+ */
+function recordTrainingHits(inst: MonsterInstance | undefined, dmg: DamageResult): void {
+  if (!inst?.isTrainingDummy) return;
+  const hits = dmg.hits.length > 0 ? dmg.hits : [{ damage: dmg.damage, isCrit: dmg.isCrit, isMiss: dmg.isMiss }];
+  let damage = 0;
+  let landed = 0;
+  for (const h of hits) {
+    if (h.isMiss) continue;
+    damage += h.damage;
+    landed++;
+  }
+  useTrainingGroundStore.getState().recordDamage(damage, hits.length, landed);
+}
+
+/** 木樁全滅＝量測結束（§ 50.5.1）。沒在量測時 `stopIfRunning` 自己會忽略 */
+function stopTrainingIfNoDummiesLeft(): void {
+  const store = useTrainingGroundStore.getState();
+  if (!store.measurement.running) return;
+  if (useMapMonsterStore.getState().monsters.some(m => m.dummy)) return;
+  store.stop();
+}
+
+/**
+ * 試驗場木樁（`50-training-ground.md` § 50.4）。
+ *
+ * `exp: 0` 只是保險，真正擋住產出的是 `isTrainingDummy` ——
+ * 擊殺流程整段被跳過，掉落／任務進度／統計數據一律不會動到。
+ */
+function createTrainingDummy(spec: TrainingDummySpec): MonsterInstance {
+  const hp = spec.hp ?? DUMMY_INFINITE_HP;
+  return {
+    templateId: 0,
+    name: '木樁',
+    level: spec.level,
+    currentHp: hp,
+    maxHp: hp,
+    attackMin: 0,
+    attackMax: 0,
+    defense: spec.defense,
+    exp: 0,
+    race: 'normal',
+    size: spec.size,
+    element: spec.element,
+    isBoss: false,
+    attackType: 'melee',
+    attackRange: 1.5,
+    attackInterval: 1200,
+    isTrainingDummy: true,
+  };
+}
+
 function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monsterId?: string) {
   const get = useGameStore.getState;
   const set = (s: any) => useGameStore.setState(s);
@@ -1205,6 +1276,9 @@ function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monste
   if (cleaned.length !== effects.length) {
     set({ activeEffects: cleaned });
   }
+
+  // 木樁沒有任何產出可存（§ 50.4.1）。debuff 清理仍要跑完，所以擋在這裡而不是提早 return
+  if (monster.isTrainingDummy) return;
 
   // Auto-save after kill —— 掉落與任務進度是在 processMonsterDeath 的 async 佇列裡才寫入 store，
   // 這裡必須等佇列結算完再存，否則存下去的永遠是「上一次擊殺」的進度，

@@ -1,4 +1,8 @@
-export type RegionType = 'field' | 'dungeon' | 'town';
+/**
+ * `training` 是試驗場（`50-training-ground.md`）。它不屬於任何 Zone，
+ * 因此不會出現在地圖導覽選單裡 —— 唯一入口是城鎮 NPC。
+ */
+export type RegionType = 'field' | 'dungeon' | 'town' | 'training';
 
 export interface Floor {
   floor: number;

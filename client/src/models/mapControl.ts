@@ -89,8 +89,15 @@ export interface MapData {
   theme?: MapTheme;
   tiles: number[][];
   spawnPoint: Position;
-  /** 只有城鎮地圖會有；NPC 站在可通行格上，玩家走到相鄰格互動 */
+  /** 城鎮與試驗場會有；NPC 站在可通行格上，玩家走到相鄰格互動 */
   npcs?: MapNpc[];
+  /**
+   * 省略＝true。`false` 代表這張圖不自動生怪（試驗場，`50-training-ground.md` § 50.3）。
+   *
+   * 與城鎮的 `theme === 'town'` 是**兩條獨立的路**，不可互相取代：
+   * 城鎮同時要擋掉自動移動，試驗場則必須允許 —— 角色得走過去打木樁。
+   */
+  autoSpawn?: boolean;
 }
 
 export function isInBounds(map: MapData, position: Position): boolean {

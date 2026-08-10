@@ -6,6 +6,7 @@ import {
   formatViolations,
   getTerrainStats,
   validateMapSafety,
+  isDesignRegulatedMap,
 } from '../mapDesignRules';
 
 /**
@@ -23,15 +24,16 @@ describe('全地圖設計規範合規', () => {
   beforeAll(async () => {
     clearMapCache();
     allMaps = await loadAllMaps();
-    // 城鎮是安全區，§ 38.12 的密度／叢聚／生怪規範是為野外戰鬥訂的，不適用（§ 13.2.1）
+    // 城鎮是安全區、試驗場是空地，§ 38.12 的密度／叢聚／生怪規範是為野外戰鬥訂的，
+    // 兩者都不適用（§ 13.2.1、`50-training-ground.md` § 50.3）
     townMaps = allMaps.filter(map => map.theme === 'town');
-    maps = allMaps.filter(map => map.theme !== 'town');
+    maps = allMaps.filter(isDesignRegulatedMap);
   });
 
-  it('地圖數量與 profile 指派一致（城鎮地圖不進 profile）', () => {
+  it('地圖數量與 profile 指派一致（城鎮與試驗場不進 profile）', () => {
     expect(maps).toHaveLength(Object.keys(MAP_DESIGN_PROFILES).length);
-    for (const town of townMaps) {
-      expect(MAP_DESIGN_PROFILES[town.id as keyof typeof MAP_DESIGN_PROFILES]).toBeUndefined();
+    for (const unregulated of allMaps.filter(map => !isDesignRegulatedMap(map))) {
+      expect(MAP_DESIGN_PROFILES[unregulated.id as keyof typeof MAP_DESIGN_PROFILES]).toBeUndefined();
     }
   });
 

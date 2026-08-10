@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Position, MapData } from '../models/mapControl';
 import { findPath, getRandomWalkablePosition, canMoveBetween } from '../systems/pathfinding';
+import type { TrainingDummySpec } from '../models/trainingGround';
 
 export interface MapMonster {
   id: string;
@@ -13,6 +14,13 @@ export interface MapMonster {
   moveTimer: number;
   lastPathPlayerPos: Position;
   isBoss: boolean;
+  /**
+   * 試驗場木樁（`50-training-ground.md` § 50.4）。
+   *
+   * 帶著參數走是因為木樁不是從 `monsterTemplates` 抽出來的 ——
+   * 它的素質由玩家在面板上決定，`createMonsterFromTemplate` 看到這欄就照它建實例。
+   */
+  dummy?: TrainingDummySpec;
 }
 
 const SPAWN_INTERVAL_MS = 1000;
@@ -76,6 +84,8 @@ export interface MapMonsterState {
   setCombatMonsters: (ids: string[]) => void;
   clearCombatMonsters: () => void;
   clearAll: () => void;
+  /** 試驗場：以指定參數在指定座標放一批木樁，並清掉場上原有的木樁（§ 50.4） */
+  summonDummies: (spec: TrainingDummySpec, positions: Position[]) => void;
   setMaxMonsters: (max: number) => void;
   setPaused: (paused: boolean) => void;
   setHasBossInPool: (has: boolean) => void;
@@ -93,6 +103,9 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
     const state = get();
     // 城鎮是安全區，永遠不生怪（§ 13.1、§ 13.2.1）。擋在最前面而不是靠呼叫端記得不要呼叫。
     if (map.theme === 'town') return;
+    // 試驗場只有玩家自己召喚的木樁（`50-training-ground.md` § 50.3）。
+    // 這是與城鎮不同的一條路：城鎮還要擋自動移動，試驗場必須允許。
+    if (map.autoSpawn === false) return;
     if (state.paused) return;
     if (state.monsters.length >= state.maxMonsters) return;
 
@@ -164,6 +177,16 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
     for (const monster of state.monsters) {
       if (state.combatMonsterIds.includes(monster.id)) {
+        updated.push(monster);
+        continue;
+      }
+
+      /*
+       * 木樁不移動、也不脫離（§ 50.4.1）。這一段必須擋在脫離判定之前 ——
+       * 玩家跑到場地另一頭時，木樁不可以就這樣消失，量測會直接斷掉。
+       */
+      if (monster.dummy) {
+        occupied.add(`${Math.round(monster.position.x)},${Math.round(monster.position.y)}`);
         updated.push(monster);
         continue;
       }
@@ -344,6 +367,27 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
   clearAll: () => {
     set({ monsters: [], spawnTimer: 0 });
+  },
+
+  summonDummies: (spec, positions) => {
+    const dummies: MapMonster[] = positions.map(position => ({
+      id: nextMonsterId(),
+      position: { ...position },
+      targetPosition: { ...position },
+      speed: 0,
+      path: [],
+      pathIndex: 0,
+      pathRecalcTimer: 0,
+      moveTimer: 0,
+      lastPathPlayerPos: { ...position },
+      isBoss: false,
+      dummy: { ...spec },
+    }));
+    set(state => ({
+      // 舊木樁一律清掉：留著會讓下一次量測混到上一批的參數
+      monsters: [...state.monsters.filter(m => !m.dummy), ...dummies],
+      combatMonsterIds: [],
+    }));
   },
 
   setMaxMonsters: (max) => {

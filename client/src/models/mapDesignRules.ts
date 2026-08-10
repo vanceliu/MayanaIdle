@@ -13,6 +13,22 @@ import { TileType, isInBounds, isWalkableTile, isSpawnableTile } from './mapCont
 // 型別
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * 這張地圖要不要受設計規範管（§ 38.11、§ 38.12）。
+ *
+ * 規範談的是「戰鬥地圖好不好打」——地形多樣性、掩體、繞路距離。
+ * 兩種圖不在管轄範圍內，因為它們的空曠是刻意的、不是設計失誤：
+ *
+ * - **城鎮**（`theme === 'town'`）：沒有戰鬥
+ * - **試驗場**（`autoSpawn === false`）：一整塊空地才量得準，
+ *   放掩體反而會擋住投射物、污染 DPS（`50-training-ground.md` § 50.3）
+ *
+ * 這支是判定的唯一出處，測試與生成腳本一律走它，不要各自寫一份 filter。
+ */
+export function isDesignRegulatedMap(map: MapData): boolean {
+  return map.theme !== 'town' && map.autoSpawn !== false;
+}
+
 /** 佈局原型（§ 38.12） */
 export type LayoutArchetype = 'open' | 'semi-open' | 'pillar-hall' | 'room-corridor' | 'cavern';
 

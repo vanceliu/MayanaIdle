@@ -104,7 +104,8 @@ interface MapData {
   theme: MapTheme;       // 環境主題，決定配色（必填）
   tiles: number[][];     // 2D 陣列 [y][x]，每格對應地形代碼
   spawnPoint: Position;  // 玩家首次進入地圖時的起始位置
-  npcs?: MapNpc[];       // 只有城鎮地圖會有
+  npcs?: MapNpc[];       // 城鎮與試驗場會有
+  autoSpawn?: boolean;   // 省略＝true。false 代表這張圖不自動生怪（試驗場）
 }
 
 /** 城鎮 NPC：站在可通行格上，玩家走到相鄰格才互動 */
@@ -142,6 +143,10 @@ interface Position { x: number; y: number; }
 8. 至少存在一個可生成格
 9. `npcs`（若有）：每個 NPC 的 `facility`／`name`／`icon` 非空、座標在範圍內、
    站在**可通行且走得到**的格子上，且不可兩個 NPC 站同一格
+
+`autoSpawn: false` 的地圖由 `mapMonsterStore.spawnTick` 直接返回，不生怪也不累積 pressure。
+城鎮走的是另一條路（`theme === 'town'`），兩者互不取代 ——
+城鎮同時要擋掉自動移動，試驗場則必須允許（角色要走去打木樁）。
 
 存檔座標（`mapPositionX` / `mapPositionY`）載入時同樣重新驗證範圍與可通行性，失效則回到 `spawnPoint`。
 
@@ -250,6 +255,9 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 | 手動搜尋 | 角色僅依點擊移動，怪物仍依 Pressure 生成並靠近 |
 
 怪物生成完全由 Pressure 與 `mapMonsterStore.spawnTick` 控制，與搜尋模式無關。
+
+**探索控制列只有這兩顆模式按鈕，沒有「搜尋」按鈕。** 手動搜尋＝玩家自己點格子移動，
+遭遇由紅點碰撞觸發，沒有一個「開始搜尋」的動作可以按。
 
 ### HP/MP 門檻等待
 

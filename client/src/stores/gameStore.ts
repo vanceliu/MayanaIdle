@@ -276,8 +276,6 @@ interface GameState {
   /** 村莊腳本上次判定的時間戳。它會花錢與存檔，不需要跟常駐腳本一樣快 */
   lastVillageTickAt: number;
   searchMode: SearchMode;
-  isManualSearching: boolean;
-  manualSearchId: number | null;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
   afterCombatHpResumeThreshold: number;
@@ -323,8 +321,6 @@ interface GameState {
   loadCharacter: () => Promise<boolean>;
   startExploring: () => void;
   stopExploring: () => void;
-  manualSearch: () => void;
-  cancelManualSearch: () => void;
   setSearchMode: (mode: SearchMode) => void;
   startRegen: () => void;
   stopRegen: () => void;
@@ -518,8 +514,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastHuntLocation: null,
   lastVillageTickAt: 0,
   searchMode: 'auto',
-  isManualSearching: false,
-  manualSearchId: null,
   afterCombatHpThreshold: 30,
   afterCombatMpThreshold: 20,
   afterCombatHpResumeThreshold: 60,
@@ -778,7 +772,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().stopExploring();
     get().stopRegen();
     get().stopPersistentLoop();
-    get().cancelManualSearch();
     await saveGame(get());
     set({
       character: null,
@@ -921,19 +914,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     const id = get().gameLoopId;
     if (id) clearInterval(id);
     set({ gameLoopId: null });
-  },
-
-  manualSearch: () => {
-    // Map control system handles encounter via red dot collision
-    // Manual search is now just "manual movement" on the map (player clicks to move)
-  },
-
-  cancelManualSearch: () => {
-    const state = get();
-    if (state.manualSearchId) {
-      clearInterval(state.manualSearchId);
-    }
-    set({ isManualSearching: false, manualSearchId: null });
   },
 
   setSearchMode: (mode) => {
@@ -2211,6 +2191,16 @@ export function processMonsterDeath(
 ): { char: Character; logs: CombatLog[] } {
   const dead = monsters[deadIdx];
   monsters[deadIdx] = { ...dead, _processed: true };
+
+  /*
+   * 試驗場木樁零產出（`50-training-ground.md` § 50.1、§ 50.4.1）。
+   *
+   * 擋在這裡而不是只擋呼叫端：擊殺結算有兩個入口（直接傷害與 DoT），
+   * 未來還可能長出第三個。任何一條漏掉，木樁就會開始給經驗、掉裝備、
+   * 累加 `37-statistics.md` 的殺敵數 —— 而那些數字會上傳排行榜。
+   */
+  if (dead.isTrainingDummy) return { char, logs };
+
   logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
 
   // 清除死亡怪物身上的 debuff

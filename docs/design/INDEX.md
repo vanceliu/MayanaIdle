@@ -110,6 +110,8 @@
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（結論見 § 44.7、§ 44.10） |
+| **試驗場（木樁／DPS 量測）** | `50-training-ground.md` | 全文 |
+| 木樁可調參數（防禦/血量/等級/體型/元素/數量） | `50-training-ground.md` | § 50.4.2 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
 | 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4，API 見 `37-statistics.md` § 37.4.3 |
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` | § 37.4.9，另見 `45-legacy-archive.md` § 45.4.1 |
@@ -203,6 +205,7 @@
 | `37-statistics.md` | 角色統計數據 | 殺敵數、BOSS討伐、死亡、強化、任務完成、金幣獲得、T7 武器／防具掉落數 |
 | `38-map-control.md` | 地圖控制系統 | 等距俯瞰地圖、地形 catalog、移動/尋路、紅點生成、環境主題地形配方 |
 | `39-batch-sell.md` | 批量販售系統 | 依等級分類批量販售、裝備顏色等級、素材 Tier 篩選 |
+| `50-training-ground.md` | 試驗場 | 木樁參數、DPS／命中率／MP 淨消耗量測。零產出、無獎勵、無週期 |
 
 ### 技術架構
 
@@ -367,6 +370,16 @@
 38-map-control.md（返回掛機點走一般地圖切換）  35-inventory-constraints.md（背包格數條件）
        ↕
 13-town.md § 13.8（倉庫存取：共用／個人／共用倉庫金幣）
+
+50-training-ground.md（試驗場＝工具，零掉落／零經驗／零金幣／無獎勵／無週期）
+  ←→ 13-town.md § 13.2.1 / § 13.3（城鎮 NPC 入口，沿用同一套 NPC 互動規則）
+  ←→ 38-map-control.md § 38.4（場地與 `autoSpawn: false`）
+  ←→ 21-combat-formula.md（防禦減傷／防禦溢出轉迴避／命中率等級差＝木樁參數的意義來源）
+  ←→ 06-equipment.md § 6.11（體型參數＝小怪／大怪基傷）←→ 42-element-system.md（元素參數）
+  ←→ 29-regen.md § 29.2（MP 淨消耗已扣掉自然回魔）
+  ←→ 44-dps-prediction.md（理論驗算的實測對照，數值仍以該文件為準）
+  ✕ 不連動 27-drop-table.md / 28-monster-stats.md 的經驗值 / 37-statistics.md ——
+    木樁一律不結算，任何一條接上去都會污染排行榜欄位
 
 13-town.md § 13.11（新手 NPC 對話分頁的前期知識條列 STARTER_TIPS，唯讀複述）
   ← 02-core-loop.md / 03-combat.md / 41-arpg-combat.md（戰鬥與探索）

@@ -1,5 +1,6 @@
 import type { Zone, Region, Floor } from './area';
 import { getItemId } from './items';
+import { TRAINING_GROUND_REGION_ID } from './trainingGround';
 
 // ============================================================
 // Zones
@@ -132,6 +133,22 @@ const neutralTown: Region = {
   id: 'neutral-town',
   name: '薄暮村',
   type: 'town',
+  levelMin: 1,
+  levelMax: 99,
+  zoneId: 'newbie-neutral',
+};
+
+/**
+ * 試驗場（`50-training-ground.md`）。
+ *
+ * `zoneId` 指向新手中立區只是為了讓 `getNearestTown` 有東西可退（離開時回薄暮村）；
+ * 它**沒有被列進任何 Zone 的 `regions`**，所以不會出現在地圖導覽選單裡 ——
+ * 唯一入口是城鎮的試驗場管理員 NPC。
+ */
+const trainingGround: Region = {
+  id: TRAINING_GROUND_REGION_ID,
+  name: '試驗場',
+  type: 'training',
   levelMin: 1,
   levelMax: 99,
   zoneId: 'newbie-neutral',
@@ -444,6 +461,8 @@ export const REGIONS: Region[] = [
   trialHighlands,
   trialHighlandsTop,
   neutralTown,
+  // 試驗場（不屬於任何 Zone，只在這裡登記讓 getRegion 查得到）
+  trainingGround,
   // 象牙塔
   snowField,
   snowFieldDeep,
@@ -486,8 +505,15 @@ export function getRegion(regionId: string): Region | undefined {
   return REGIONS.find(r => r.id === regionId);
 }
 
+/**
+ * 導覽用的區域清單。
+ *
+ * 排除試驗場（`50-training-ground.md` § 50.2）—— 它掛在中立區的 `zoneId` 只是
+ * 為了讓 `getNearestTown` 有東西可退，本身不是一個「去得了的地方」，
+ * 唯一入口是城鎮 NPC。留在清單裡會讓地圖選擇器多出一個假選項。
+ */
 export function getRegionsByZone(zoneId: string): Region[] {
-  return REGIONS.filter(r => r.zoneId === zoneId);
+  return REGIONS.filter(r => r.zoneId === zoneId && r.type !== 'training');
 }
 
 /** `resolveArea` 的結果：area id 對應的 region、樓層與**該樓層**的等級區間 */

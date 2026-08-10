@@ -6,12 +6,14 @@ import { useGameStore } from '../stores/gameStore';
  */
 export function ExploreBar() {
   const phase = useGameStore(s => s.phase);
-  const manualSearch = useGameStore(s => s.manualSearch);
-  const cancelManualSearch = useGameStore(s => s.cancelManualSearch);
-  const isManualSearching = useGameStore(s => s.isManualSearching);
   const searchMode = useGameStore(s => s.searchMode);
   const setSearchMode = useGameStore(s => s.setSearchMode);
 
+  /*
+   * 只有模式切換，沒有「搜尋」按鈕：遭遇改由地圖紅點碰撞觸發
+   * （`38-map-control.md` § 搜尋模式對應），手動搜尋＝玩家自己點格子移動。
+   * 舊的「搜尋／取消搜尋」按鈕早就按了不會有任何事，已移除。
+   */
   return (
     <div className="battle-top-bar">
       <div className="explore-bar">
@@ -19,12 +21,6 @@ export function ExploreBar() {
           <button className={searchMode === 'auto' ? 'active' : ''} onClick={() => setSearchMode('auto')}>自動搜尋</button>
           <button className={searchMode === 'manual' ? 'active' : ''} onClick={() => setSearchMode('manual')}>手動搜尋</button>
         </div>
-        {searchMode === 'manual' && phase === 'explore' && !isManualSearching && (
-          <button className="btn-search" onClick={manualSearch}>搜尋</button>
-        )}
-        {searchMode === 'manual' && phase === 'explore' && isManualSearching && (
-          <button className="btn-search searching" onClick={cancelManualSearch}>取消搜尋</button>
-        )}
         {searchMode === 'auto' && phase === 'explore' && (
           <span className="explore-indicator">探索中...</span>
         )}

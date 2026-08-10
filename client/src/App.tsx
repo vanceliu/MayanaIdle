@@ -15,6 +15,7 @@ import { BattleView } from './components/BattleView';
 import { ExploreBar } from './components/ExploreBar';
 import { MapNavigation } from './components/MapNavigation';
 import { TownView } from './components/TownView';
+import { TrainingGroundView } from './components/TrainingGroundView';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
 import { GameToolbar } from './components/GameToolbar';
@@ -59,6 +60,8 @@ function App() {
 
   const region = currentRegion ? getRegion(currentRegion) : null;
   const isInTown = region?.type === 'town';
+  // 試驗場不是城鎮：它有自己的一組 HUD（`50-training-ground.md` § 50.3）
+  const isInTrainingGround = region?.type === 'training';
 
   const initialized = useRef(false);
 
@@ -134,7 +137,7 @@ function App() {
     );
   }
 
-  return <GameLayout isInTown={isInTown} />;
+  return <GameLayout isInTown={isInTown} isInTrainingGround={isInTrainingGround} />;
 }
 
 /**
@@ -143,7 +146,7 @@ function App() {
  * 三段式：頂部（地圖選擇 + 探索控制 + 面板按鈕 + 系統按鈕）／stage（純地圖或城鎮）／
  * 底部（戰鬥日誌 + 狀態面板 + 快捷格）。獨立成元件是為了讓版面測試不必經過 DB 開機流程。
  */
-export function GameLayout({ isInTown }: { isInTown: boolean }) {
+export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown: boolean; isInTrainingGround?: boolean }) {
   // 地圖選擇器展開時會蓋到城鎮視窗，所以它也要能被提到最上層（§ 32.15）
   const mapNavZIndex = useWindowZIndex('map-nav');
   const focusWindow = useWindowLayerStore(s => s.focusWindow);
@@ -161,6 +164,7 @@ export function GameLayout({ isInTown }: { isInTown: boolean }) {
         <BattleView />
       </div>
       {isInTown && <TownView />}
+      {isInTrainingGround && <TrainingGroundView />}
 
       {/*
         * 上方 HUD 帶。桌機是 `display: contents` —— 這個容器在版面上不存在，

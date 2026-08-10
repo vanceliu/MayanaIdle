@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getMapForRegion, clearMapCache } from '../mapDataControl';
-import { isWalkableTile, type MapData } from '../mapControl';
+import { TileType, isWalkableTile, type MapData } from '../mapControl';
 import { REGIONS } from '../mapData';
 import { useMapMonsterStore } from '../../stores/mapMonsterStore';
 
@@ -10,7 +10,7 @@ const TOWN_IDS = ['neutral-town', 'elsarth-town', 'varden-town'];
 const KNOWN_FACILITIES = new Set([
   'general-store', 'blacksmith', 'weapon-shop', 'armor-shop', 'inn', 'storage',
   'magic-academy', 'class-guild', 'starter-npc', 'adventurer-guild', 'statistics-center',
-  'sigil-master',
+  'sigil-master', 'training-ground',
 ]);
 
 describe('城鎮地圖（§ 13.2.1）', () => {
@@ -64,6 +64,33 @@ describe('城鎮地圖（§ 13.2.1）', () => {
     for (const map of towns) {
       const tiles = map.npcs!.map(n => `${n.x},${n.y}`);
       expect(new Set(tiles).size, map.id).toBe(tiles.length);
+    }
+  });
+
+  /**
+   * 版面規範（§ 13.2.1）：上下各一排六間建築，每個設施都有自己的門面。
+   *
+   * 這條是防止「又多一個設施就隨便找塊空地塞進去」——
+   * 試驗場管理員一開始就是這樣被塞在沒有建築的 (26, 6)，整排看起來就歪了。
+   */
+  it('每個設施 NPC 都站在門口（正上方兩格是建築），只有新手指導員例外', () => {
+    for (const map of towns) {
+      for (const npc of map.npcs!) {
+        if (npc.facility === 'starter-npc') continue; // 迎新的人站廣場，不佔門面
+        expect([6, 15], `${map.id} 的 ${npc.name} 不在門口列`).toContain(npc.y);
+        for (const dy of [1, 2]) {
+          const tile = map.tiles[npc.y - dy][npc.x];
+          expect(tile, `${map.id} 的 ${npc.name} 頭上沒有建築`).toBe(TileType.Wall);
+        }
+      }
+    }
+  });
+
+  it('兩排各六個設施，且三城的門面數量一致', () => {
+    for (const map of towns) {
+      const facilities = map.npcs!.filter(n => n.facility !== 'starter-npc');
+      expect(facilities.filter(n => n.y === 6), `${map.id} 上排`).toHaveLength(6);
+      expect(facilities.filter(n => n.y === 15), `${map.id} 下排`).toHaveLength(6);
     }
   });
 

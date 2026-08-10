@@ -15,8 +15,14 @@ import { StarterNpc } from './town/StarterNpc';
 import { AdventurerGuild } from './town/AdventurerGuild';
 import { StatisticsCenter } from './town/StatisticsCenter';
 import { SigilMaster } from './town/SigilMaster';
+import { TrainingGroundEntrance } from './town/TrainingGroundEntrance';
 
-export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master';
+/**
+ * `training-ground` 是城鎮側的試驗場入口；`training-dummy` 是**場內**管理員的面板，
+ * 由 `TrainingGroundView` 渲染，不在城鎮裡（`50-training-ground.md` § 50.2~§ 50.3）。
+ * 兩者共用 `townStore.facility` 這條開關，因為 NPC 點擊只有這一條路。
+ */
+export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master' | 'training-ground' | 'training-dummy';
 
 interface FacilityInfo {
   id: TownFacility;
@@ -24,18 +30,24 @@ interface FacilityInfo {
   icon: string;
 }
 
+/**
+ * 順序＝城鎮地圖上的排列（`13-town.md` § 13.2.1）：
+ * 上排六間商店／製作，下排六間服務／系統，各自由左至右。
+ * 兩邊對齊之後，快捷列讀起來就等於在鎮上從左走到右。
+ */
 const FACILITIES: FacilityInfo[] = [
   { id: 'general-store', name: '雜貨店', icon: '🛒' },
   { id: 'weapon-shop', name: '武器店', icon: '⚔️' },
   { id: 'armor-shop', name: '防具店', icon: '🛡️' },
   { id: 'blacksmith', name: '鐵匠鋪', icon: '🔨' },
+  { id: 'sigil-master', name: '印記師', icon: '🔯' },
   { id: 'inn', name: '旅館', icon: '🏨' },
   { id: 'storage', name: '倉庫', icon: '📦' },
   { id: 'magic-academy', name: '魔法學院', icon: '📖' },
   { id: 'class-guild', name: '職業工會', icon: '⚜️' },
   { id: 'adventurer-guild', name: '冒險者工會', icon: '🏛️' },
   { id: 'statistics-center', name: '統計中心', icon: '📊' },
-  { id: 'sigil-master', name: '印記師', icon: '🔯' },
+  { id: 'training-ground', name: '試驗場管理員', icon: '🎯' },
 ];
 
 const STARTER_NPC_FACILITY: FacilityInfo = { id: 'starter-npc', name: '新手指導員', icon: '🧭' };
@@ -53,6 +65,7 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
     case 'adventurer-guild': return <AdventurerGuild />;
     case 'statistics-center': return <StatisticsCenter />;
     case 'sigil-master': return <SigilMaster />;
+    case 'training-ground': return <TrainingGroundEntrance />;
     case 'starter-npc': return <StarterNpc />;
     default: return null;
   }

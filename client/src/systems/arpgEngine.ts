@@ -252,6 +252,12 @@ export function tickArpgEngine(
   // Tick each monster FSM
   for (const [id, arpgMonster] of engine.monsters) {
     if (arpgMonster.instance.currentHp <= 0) continue;
+    /*
+     * 木樁不還手（`50-training-ground.md` § 50.4.1）。整個 FSM 都跳過而不是只丟掉
+     * attack 事件 —— 跑 FSM 會讓它進入 chase 狀態並累積攻擊計時器，
+     * 哪天有人把「木樁反擊模式」接回來時會突然一次噴出一整排攻擊。
+     */
+    if (arpgMonster.instance.isTrainingDummy) continue;
 
     // Check if this monster is stunned
     const isStunned = activeEffects.some(

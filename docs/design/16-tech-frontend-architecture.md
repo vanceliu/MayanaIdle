@@ -289,7 +289,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 腳本 | `combatRules`, `persistentRules`, `emergencyRetreat` | 戰鬥/常駐/緊急撤退 |
 | 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
 | 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold`, `afterCombatHpResumeThreshold`, `afterCombatMpResumeThreshold` | 戰鬥後等待/恢復閾值（HP/MP %） |
-| 搜尋 | `searchMode`, `isManualSearching`, `manualSearchId` | 自動/手動搜尋模式與狀態 |
+| 搜尋 | `searchMode` | 自動/手動搜尋模式。**只有模式，沒有「搜尋中」狀態** —— 遭遇由地圖紅點碰撞觸發（`38-map-control.md` § 搜尋模式對應） |
 | 快捷 | `quickSlots` | 10 格快捷鍵（鍵盤 1~9 與 0；藥水／狀態解除道具／卷軸／裝備，見 `35-inventory-constraints.md` § 35.7） |
 | 倉庫 | `storedEquipment`, `storedMaterials`, `warehouseGold` | 城鎮倉庫（帳號共用） |
 
