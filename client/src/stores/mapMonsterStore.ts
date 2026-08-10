@@ -19,7 +19,10 @@ const SPAWN_INTERVAL_MS = 1000;
 const BASE_SPAWN_CHANCE = 0.15;
 const BASE_MAX_MONSTERS = 3;
 const MIN_SPAWN_DISTANCE = 5;
+/** 超過此距離的怪物停止追蹤（原地待機），仍留在地圖上（見 `26-spawn-pressure.md` § 26.8） */
 const MAX_TRACK_DISTANCE = 15;
+/** 超過此距離的怪物才真正從地圖移除（見 `26-spawn-pressure.md` § 26.8） */
+const DESPAWN_DISTANCE = 25;
 const TRIGGER_DISTANCE = 1.2;
 const MONSTER_SPEED = 1;
 const PATH_RECALC_INTERVAL = 5000;
@@ -165,12 +168,22 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
         continue;
       }
 
-      if (distance(monster.position, playerPos) > MAX_TRACK_DISTANCE) {
+      const distToPlayerNow = distance(monster.position, playerPos);
+
+      // 超過脫離距離：從地圖移除
+      if (distToPlayerNow > DESPAWN_DISTANCE) {
+        continue;
+      }
+
+      // 超過追蹤距離：原地待機，保留在地圖上（仍佔格，避免其他怪物穿過）
+      if (distToPlayerNow > MAX_TRACK_DISTANCE) {
+        occupied.add(`${Math.round(monster.position.x)},${Math.round(monster.position.y)}`);
+        updated.push({ ...monster, path: [], pathIndex: 0, pathRecalcTimer: 0 });
         continue;
       }
 
       // Stop moving if already within melee attack range of player
-      if (distance(monster.position, playerPos) <= TRIGGER_DISTANCE) {
+      if (distToPlayerNow <= TRIGGER_DISTANCE) {
         occupied.add(`${Math.round(monster.position.x)},${Math.round(monster.position.y)}`);
         updated.push(monster);
         continue;
@@ -184,9 +197,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       const { moveTimer } = monster;
       pathRecalcTimer += deltaMs;
 
-      const distToPlayer = distance(monster.position, playerPos);
-
-      if (distToPlayer <= ASTAR_DISTANCE) {
+      if (distToPlayerNow <= ASTAR_DISTANCE) {
         // Near player: use A* pathfinding
         const playerMoved = distance(playerPos, lastPathPlayerPos) >= PLAYER_MOVE_THRESHOLD;
         const timerExpired = pathRecalcTimer >= PATH_RECALC_INTERVAL;
