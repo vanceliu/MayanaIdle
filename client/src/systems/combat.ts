@@ -251,29 +251,6 @@ export function getWeaponHitCount(weapon: EquipmentInstance | null): number {
   return weapon?.type === 'dualBlade' || weapon?.type === 'claw' ? 2 : 1;
 }
 
-/** § 21.4：魔法公式裡技能側（技能攻擊力＋INT加成＋裝備魔攻）的權重 */
-export const SKILL_SIDE_WEIGHT = 0.5;
-/** § 21.4：魔法公式裡武器白字的權重 */
-export const WEAPON_WHITE_WEIGHT = 0.2;
-
-/**
- * 武器白字（`21-combat-formula.md` § 21.4）。
- *
- * `((小怪傷害 + 大怪傷害) / 2 + 強化 + 額外攻擊) × (1 + 攻擊力%)`
- *
- * 技能不分怪物體型，所以取小怪／大怪的平均。**刻意不含「普攻元素傷害%」**
- * —— 那是普攻的乘區，與魔法傷害無關。沒有武器時為 0（不套普攻的保底值 1）。
- */
-export function getWeaponWhiteDamage(
-  weapon: EquipmentInstance | null,
-  attackPowerPercent: number,
-): number {
-  if (!weapon || weapon.smallMonsterDamage == null || weapon.largeMonsterDamage == null) return 0;
-  const enh = weapon.enhancement ?? 0;
-  const base = (weapon.smallMonsterDamage + weapon.largeMonsterDamage) / 2 + enh + (weapon.extraAttack ?? 0);
-  return base * (1 + attackPowerPercent / 100);
-}
-
 /**
  * 裝備提供的魔法攻擊固定值。
  * 基底 `magicAttack` + 法杖／雙手法杖／魔導書的強化加成（§ 6.9 每 +2 強化 → 魔攻 +1）。
@@ -443,8 +420,13 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
   return Math.max(MIN_ATTACK_INTERVAL_MS, interval);
 }
 
-/** § 20.6：INT 每 2 點提供的技能威力% */
-export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 10;
+/**
+ * § 20.6：INT 每 2 點提供的技能威力%。
+ *
+ * 係數必須小於 `1 / (屬性上限 35 → 有效INT 34 / 2) ≈ 5.88%`，
+ * 否則 INT 加成會超過技能攻擊力本身，違反「技能攻擊力 > INT加成 > 裝備魔攻」的排序。
+ */
+export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 5;
 /** § 20.6：INT 每 2 點提供的冷卻縮減% */
 export const INT_COOLDOWN_PERCENT_PER_2 = 1;
 /** § 21.4：冷卻縮減總上限 */
@@ -693,6 +675,72 @@ export function calculatePhysicalSkillHit(
   return { damage, hit: true, isCritical, log };
 }
 
+/**
+ * 基礎魔攻（`21-combat-formula.md` § 21.4）：`技能攻擊力 + INT加成 + 裝備魔攻 + 元素克制`。
+ *
+ * § 21.4 的魔法技能與 § 21.4a 的物理快照技能共用這一段，
+ * 兩者的技能側必須完全一致 —— 不可各算各的。
+ */
+export function getBaseMagicAttack(
+  char: Character,
+  skillPower: number,
+  skillElement: string,
+  monster: MonsterInstance,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[],
+): number {
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
+  const effINT = getEffectiveINT(attrs.INT);
+  const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
+  return skillPower + intBonus + getTotalMagicAttack(equippedGear)
+    + getElementCounterBonus(skillElement, monster.element);
+}
+
+/**
+ * 物理快照技能（`21-combat-formula.md` § 21.4a）：盾擊／裂傷斬／挑釁怒吼。
+ *
+ * `傷害 = 基礎魔攻 + 當下基礎物理傷害` → 爆擊 → 怪物防禦減傷。
+ *
+ * 技能側與 § 21.4 完全相同（含 INT 加成與裝備魔攻）；
+ * 物理側取 `calculateBasePhysicalDamage()`（與流血／毒 DoT 的快照同一顆），
+ * 因此含 STR 加成、強化、額外攻擊、攻擊力%與虛弱，**不含元素刻印%與材質種族克制**。
+ * 與普攻不同的是**必定命中**，不做命中判定。
+ */
+export function calculatePhysicalSnapshotSkill(
+  char: Character,
+  skillPower: number,
+  skillElement: string,
+  weapon: EquipmentInstance | null,
+  monster: MonsterInstance,
+  equippedGear: (EquipmentInstance | null)[] = [],
+  skillName: string = '技能',
+  activeEffects: ActiveEffect[] = [],
+  targetIdx: number = 0,
+  ignoreDefensePercent: number = 0,
+): { damage: number; isCritical: boolean; log: CombatLog } {
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+
+  let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects)
+    + calculateBasePhysicalDamage(char, weapon, equippedGear, activeEffects);
+
+  const critRate = Math.min(75, 5 + bonuses.crit_rate);
+  const isCritical = Math.random() * 100 < critRate;
+  if (isCritical) {
+    damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
+  }
+
+  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
+  const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef, 75), ignoreDefensePercent);
+  damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
+
+  const log: CombatLog = isCritical
+    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
+    : { type: 'skill_hit', message: `${skillName} 對 ${monster.name} 造成 ${damage} 點傷害` };
+
+  return { damage, isCritical, log };
+}
+
 export function calculateSkillAttack(
   char: Character,
   skillPower: number,
@@ -704,17 +752,10 @@ export function calculateSkillAttack(
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
-  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
-  // Base magic damage (including element counter bonus)
-  // § 21.4：基礎魔攻 = (技能攻擊力 + INT加成 + 裝備魔攻) × 0.5 + 武器白字 × 0.2
-  const effINT = getEffectiveINT(attrs.INT);
-  const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
-  const gearMagicAttack = getTotalMagicAttack(equippedGear);
-  const skillSide = (skillPower + intBonus + gearMagicAttack) * SKILL_SIDE_WEIGHT;
-  const weaponSide = getWeaponWhiteDamage(getEquippedWeapon(equippedGear), bonuses.attack_power) * WEAPON_WHITE_WEIGHT;
-  let damage = Math.floor(skillSide + weaponSide) + getElementCounterBonus(skillElement, monster.element);
+  // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻 + 元素克制
+  let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects);
 
   // Apply skill elemental% multiplier (only if skill has element)
   if (skillElement && skillElement !== 'none') {

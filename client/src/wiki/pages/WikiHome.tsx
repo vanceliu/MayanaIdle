@@ -11,7 +11,7 @@ const CATEGORIES = [
   { path: '/wiki/skills', label: '技能', desc: '職業技能列表、學習限制' },
   { path: '/wiki/crafting', label: '鐵匠鋪', desc: '製作配方、材料需求與來源' },
   { path: '/wiki/exp-table', label: '經驗表', desc: 'Lv.1~100 升級所需經驗' },
-  { path: '/wiki/attributes', label: '屬性公式', desc: 'STR/DEX/CON/INT/WIS 效果' },
+  { path: '/wiki/attributes', label: '屬性公式', desc: 'STR/AGI/VIT/SPI/INT/CHA 效果' },
   { path: '/wiki/combat', label: '戰鬥計算', desc: '攻擊力、技能、命中、防禦公式' },
   { path: '/wiki/quests', label: '任務', desc: '冒險者工會、職業工會任務、貢獻等階' },
   { path: '/wiki/scripts', label: '自動腳本', desc: '戰鬥／常駐／村莊腳本的條件與動作、腳本分頁' },

@@ -9,6 +9,7 @@ import {
   calculatePlayerAttack,
   calculateSkillAttack,
   calculatePhysicalSkillHit,
+  calculatePhysicalSnapshotSkill,
   calculateMonsterAttack,
   calculateBasePhysicalDamage,
   getEquippedWeapon,
@@ -285,6 +286,23 @@ export function processPlayerAttack(
           });
         }
         isMiss = !anyHit;
+      } else if (skill.physicalSnapshot) {
+        // § 21.4a：技能攻擊力 + 當下基礎物理傷害（盾擊／裂傷斬／挑釁怒吼），仍然必定命中
+        const result = calculatePhysicalSnapshotSkill(
+          character,
+          skill.power,
+          skill.element,
+          weapon,
+          monster,
+          equippedGear,
+          skill.name,
+          effectsForDamage,
+          targetIdx,
+          skill.ignoreDefensePercent ?? 0,
+        );
+        damage = result.damage;
+        isCrit = result.isCritical;
+        isMiss = false;
       } else {
         // Magic skill
         const result = calculateSkillAttack(

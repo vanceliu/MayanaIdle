@@ -29,6 +29,7 @@ import {
   calculatePlayerAttack,
   calculateSkillAttack,
   calculatePhysicalSkillHit,
+  calculatePhysicalSnapshotSkill,
   calculateBasePhysicalDamage,
   getPlayerAttackInterval,
   getCombatBonuses,
@@ -479,6 +480,8 @@ interface RotationEntry {
   element?: string;
   ignoreDefensePercent?: number;
   hits?: number;
+  /** § 21.4a 物理快照技能（盾擊／裂傷斬／挑釁怒吼） */
+  physicalSnapshot?: boolean;
   cooldown: number;
   mpCost: number;
   mpDrainRatio?: number;
@@ -490,7 +493,7 @@ interface RotationEntry {
 function magicEntry(s: Omit<Skill, 'lastUsedAt'>): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill',
-    power: s.power, element: s.element,
+    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
     mpCost: s.mpCost,
@@ -617,7 +620,9 @@ function orderRotation(
             s += r.hit ? r.damage : 0;
           }
         } else {
-          const r = calculateSkillAttack(char, e.power ?? 0, e.element ?? 'none', monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+          const r = e.physicalSnapshot
+            ? calculatePhysicalSnapshotSkill(char, e.power ?? 0, e.element ?? 'none', loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0)
+            : calculateSkillAttack(char, e.power ?? 0, e.element ?? 'none', monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
           s += r.damage;
         }
       }
@@ -746,7 +751,9 @@ function simulateOnce(
     } else {
       currentMp -= entry.mpCost;
       if (entry.selfBuff) addTimed(makeBuff(entry.name, entry.selfBuff.category, entry.selfBuff.modifiers), entry.selfBuff.duration);
-      const res = calculateSkillAttack(char, entry.power ?? 0, entry.element ?? 'none', monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0);
+      const res = entry.physicalSnapshot
+        ? calculatePhysicalSnapshotSkill(char, entry.power ?? 0, entry.element ?? 'none', loadout.weapon, monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0)
+        : calculateSkillAttack(char, entry.power ?? 0, entry.element ?? 'none', monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0);
       hit(res.damage);
       if (entry.mpDrainRatio) currentMp = Math.min(maxMp, currentMp + Math.floor(res.damage * entry.mpDrainRatio));
       if (entry.dot && !dots.some(d => d.category === entry.dot!.category)) {

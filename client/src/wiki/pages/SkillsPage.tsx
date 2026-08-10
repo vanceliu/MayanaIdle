@@ -151,7 +151,9 @@ export function SkillsPage() {
                       <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
                       <td>{s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius ?? '?'}格/${s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
                       <td>{formatSkillRange(s.skill) || '-'}</td>
-                      <td className="cell-number">{s.skill.power || '-'}</td>
+                      <td className="cell-number">
+                        {s.skill.physicalSnapshot ? `${s.skill.power} + 物理` : (s.skill.power || '-')}
+                      </td>
                       <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>
                       <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>

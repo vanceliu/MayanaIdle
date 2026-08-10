@@ -48,7 +48,7 @@ export function AttributesPage() {
                 <td>智力</td>
                 <td>INT</td>
                 <td className="cell-number">floor(INT / 2) × 2</td>
-                <td>技能傷害加成：skillPower × (有效INT / 2 × 10) / 100</td>
+                <td>技能傷害加成：skillPower × (有效INT / 2 × 5) / 100；冷卻縮減：有效INT / 2 × 1%</td>
               </tr>
               <tr>
                 <td>魅力</td>

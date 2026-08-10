@@ -50,6 +50,7 @@
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
 | 戰鬥公式（攻擊/防禦/命中/迴避） | `21-combat-formula.md` | 全文 |
+| **技能傷害走哪條公式（魔法／物理快照／物理普攻）** | `21-combat-formula.md` § 21.4 / § 21.4a、`23-class-magic.md` § 23.1.1 | — |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
 | **角色外觀（髮型/睫毛/膚色髮色眼色/四朝向）** | `04-character.md` | § 4.10 |

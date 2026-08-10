@@ -22,6 +22,7 @@ import {
   calculatePlayerAttack,
   calculateSkillAttack,
   calculatePhysicalSkillHit,
+  calculatePhysicalSnapshotSkill,
   calculateBasePhysicalDamage,
   getPlayerAttackInterval,
   getCombatBonuses,
@@ -536,6 +537,8 @@ interface RotationEntry {
   ignoreDefensePercent?: number;
   /** physical_skill（三連射）用 */
   hits?: number;
+  /** § 21.4a 物理快照技能（盾擊／裂傷斬／挑釁怒吼）：基礎魔攻 + 基礎物理傷害 */
+  physicalSnapshot?: boolean;
   /** 冷卻（ms，未套 CDR） */
   cooldown: number;
   /** MP 消耗（`canUseSkill` 會擋） */
@@ -561,7 +564,7 @@ function classSkill(id: string): Omit<Skill, 'lastUsedAt'> {
 function magicEntry(s: Omit<Skill, 'lastUsedAt'>, isBasicMagic = false): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill', isBasicMagic,
-    power: s.power, element: s.element,
+    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
     mpCost: s.mpCost,
@@ -699,6 +702,9 @@ function calibrate(
             const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
             s += r.hit ? r.damage : 0;
           }
+        } else if (e.physicalSnapshot) {
+          const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, char.className), e.element!, loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+          s += r.damage;
         } else {
           const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, char.className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
           s += r.damage;
@@ -927,10 +933,15 @@ function simulateOnce(
       if (entry.selfBuff) {
         addTimed(makeBuff(entry.name, entry.selfBuff.category, entry.selfBuff.modifiers), entry.selfBuff.duration);
       }
-      const res = calculateSkillAttack(
-        char, ruledSkillPower(entry, effInt, char.className), entry.element!, monster, loadout.gear, entry.name, effects, 0,
-        entry.ignoreDefensePercent ?? 0,
-      );
+      const res = entry.physicalSnapshot
+        ? calculatePhysicalSnapshotSkill(
+            char, ruledSkillPower(entry, effInt, char.className), entry.element!, loadout.weapon, monster, loadout.gear, entry.name, effects, 0,
+            entry.ignoreDefensePercent ?? 0,
+          )
+        : calculateSkillAttack(
+            char, ruledSkillPower(entry, effInt, char.className), entry.element!, monster, loadout.gear, entry.name, effects, 0,
+            entry.ignoreDefensePercent ?? 0,
+          );
       stats.hits++;
       if (res.isCritical) stats.crits++;
       applyDamage(res.damage);
@@ -1149,6 +1160,9 @@ function proxyDps(className: ClassName, loadout: Loadout, seed: number): number 
             const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
             s += r.hit ? r.damage : 0;
           }
+        } else if (e.physicalSnapshot) {
+          const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+          s += r.damage;
         } else {
           const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
           s += r.damage;

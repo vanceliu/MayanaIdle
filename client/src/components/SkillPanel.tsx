@@ -281,7 +281,9 @@ export function SkillPanel() {
             </div>
           )}
           {tooltip.skill.type === 'attack' && (
-            <div className="skill-tooltip-stat">威力: {tooltip.skill.power}</div>
+            <div className="skill-tooltip-stat">
+              威力: {tooltip.skill.power}{tooltip.skill.physicalSnapshot && ' + 物理傷害'}
+            </div>
           )}
           {formatSkillRange(tooltip.skill) && (
             <div className="skill-tooltip-stat">射程: {formatSkillRange(tooltip.skill)}</div>

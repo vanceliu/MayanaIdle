@@ -66,6 +66,12 @@ export interface Skill {
   buffCategory?: string;
   cleanse?: boolean;
   hits?: number; // multi-hit: uses physical attack formula per hit
+  /**
+   * 走「技能攻擊力 + 當下基礎物理傷害」結算（`21-combat-formula.md` § 21.4a）。
+   * `power` 是技能攻擊力，物理部分取 `calculateBasePhysicalDamage()`。
+   * 仍然必定命中，不做命中判定。目前只有盾擊／裂傷斬／挑釁怒吼。
+   */
+  physicalSnapshot?: boolean;
   hotAmount?: number; // heal over time per second
   ignoreDefensePercent?: number; // 無視目標防禦的百分比（0~100）
   invincible?: boolean;

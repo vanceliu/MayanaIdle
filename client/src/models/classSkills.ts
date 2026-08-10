@@ -14,13 +14,13 @@ export interface ClassSkillDef {
 
 export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'shield-bash', name: '盾擊', className: 'knight', classLevel: 1, requiredLevel: 10, bookItemId: 102,
-    skill: { id: 'shield-bash', name: '盾擊', level: 1, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 15, cooldown: 10000, range: 1.5, applyDebuff: { category: 'stun', name: '暈眩', description: '無法行動，攻擊計時器暫停', duration: 2000, stun: true, tags: ['stunned'] } } },
+    skill: { id: 'shield-bash', name: '盾擊', level: 1, element: 'none', type: 'attack', target: 'single', power: 10, physicalSnapshot: true, mpCost: 15, cooldown: 10000, range: 1.5, applyDebuff: { category: 'stun', name: '暈眩', description: '無法行動，攻擊計時器暫停', duration: 2000, stun: true, tags: ['stunned'] } } },
   { id: 'rend', name: '裂傷斬', className: 'knight', classLevel: 2, requiredLevel: 20, bookItemId: 103,
-    skill: { id: 'rend', name: '裂傷斬', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, mpCost: 20, cooldown: 8000, range: 1.5, applyDebuff: { category: 'bleeding', name: '流血', description: '每秒 50% 物理傷害', dotDamagePercent: 0.5, dotInterval: 1000, dotDuration: 5000, dotElement: 'none', tags: ['bleeding'] } } },
+    skill: { id: 'rend', name: '裂傷斬', level: 2, element: 'none', type: 'attack', target: 'single', power: 25, physicalSnapshot: true, mpCost: 20, cooldown: 8000, range: 1.5, applyDebuff: { category: 'bleeding', name: '流血', description: '每秒 50% 物理傷害', dotDamagePercent: 0.5, dotInterval: 1000, dotDuration: 5000, dotElement: 'none', tags: ['bleeding'] } } },
   { id: 'iron-shield', name: '鋼鐵護盾', className: 'knight', classLevel: 3, requiredLevel: 30, bookItemId: 104,
     skill: { id: 'iron-shield', name: '鋼鐵護盾', level: 3, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 30, cooldown: 30000, range: 0, buffEffect: '減傷20%', buffDuration: 15000, buffModifiers: [{ stat: 'damageReduction', value: 20, isPercent: true }], buffCategory: 'defense-buff' } },
   { id: 'taunt', name: '挑釁怒吼', className: 'knight', classLevel: 4, requiredLevel: 40, bookItemId: 105,
-    skill: { id: 'taunt', name: '挑釁怒吼', level: 4, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 25, cooldown: 20000, range: 3, applyDebuff: { category: 'atk-down', name: '挑釁', description: '攻擊力降低20%', duration: 10000, modifiers: [{ stat: 'attack', value: -20, isPercent: true }], tags: ['taunt'] } } },
+    skill: { id: 'taunt', name: '挑釁怒吼', level: 4, element: 'none', type: 'attack', target: 'single', power: 20, physicalSnapshot: true, mpCost: 25, cooldown: 20000, range: 3, applyDebuff: { category: 'atk-down', name: '挑釁', description: '攻擊力降低20%', duration: 10000, modifiers: [{ stat: 'attack', value: -20, isPercent: true }], tags: ['taunt'] } } },
   { id: 'vengeance', name: '復仇之刃', className: 'knight', classLevel: 5, requiredLevel: 50, bookItemId: 106,
     skill: { id: 'vengeance', name: '復仇之刃', level: 5, element: 'none', type: 'attack', target: 'single', power: 80, mpCost: 50, cooldown: 25000, range: 1.5,
       selfBuff: { category: 'vengeance', name: '復仇', description: '依已損失血量提升攻擊力，最高 +50%',

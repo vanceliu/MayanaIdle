@@ -183,10 +183,10 @@ describe('裝備額外屬性在戰鬥中生效', () => {
   });
 
   it('INT +2 讓技能傷害多 5% 技能威力', () => {
-    // § 20.6：INT 每 2 點 +10%（`20-attributes.md` § 20.6）→ INT 10 → +50%；INT 12 → +60%
-    // § 21.4：技能側再 × 0.5，武器白字 (10+10)/2 × 0.2 = 2
-    //   INT 10 → floor((100 + 50) × 0.5 + 2) = 77
-    //   INT 12 → floor((100 + 60) × 0.5 + 2) = 82
+    // § 20.6：INT 每 2 點 +5%（`20-attributes.md` § 20.6）→ INT 10 → +25%；INT 12 → +30%
+    // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻（測試裝備無魔攻）
+    //   INT 10 → 100 + 25 = 125
+    //   INT 12 → 100 + 30 = 130
     const char = createCharacter();
     const monster = createMonster();
     const plain = createItem();
@@ -197,8 +197,8 @@ describe('裝備額外屬性在戰鬥中生效', () => {
     try {
       const a = calculateSkillAttack(char, 100, 'none', monster, [plain]);
       const b = calculateSkillAttack(char, 100, 'none', monster, [buffed]);
-      expect(a.damage).toBe(77);
-      expect(b.damage).toBe(82);
+      expect(a.damage).toBe(125);
+      expect(b.damage).toBe(130);
     } finally {
       Math.random = orig;
     }
@@ -226,16 +226,16 @@ describe('§ 20.6 INT 的兩個作用', () => {
     const orig = Math.random;
     Math.random = () => 0.99; // 不暴擊
     try {
-      // 技能威力 100，INT 0 / 20 / 21（有效 20）/ 40
-      // § 20.6：每 2 點 +10%；§ 21.4：技能側 × 0.5，再加武器白字 (10+10)/2 × 0.2 = 2
+      // 技能威力 100，INT 0 / 20 / 21（有效 20）/ 34（屬性上限 35 的有效值）
+      // § 20.6：每 2 點 +5%；§ 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻
       const at = (int: number) => calculateSkillAttack(
         createCharacter({ baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: int, CHA: 1 } }),
         100, 'none', monster, gear,
       ).damage;
-      expect(at(0)).toBe(52);    // (100 + 0) × 0.5 + 2
-      expect(at(20)).toBe(102);  // 20 / 2 × 10% = +100% → (100 + 100) × 0.5 + 2
-      expect(at(21)).toBe(102);  // 有效 20，與 20 相同
-      expect(at(40)).toBe(152);  // 40 / 2 × 10% = +200% → (100 + 200) × 0.5 + 2
+      expect(at(0)).toBe(100);   // 100 + 0
+      expect(at(20)).toBe(150);  // 20 / 2 × 5% = +50% → 100 + 50
+      expect(at(21)).toBe(150);  // 有效 20，與 20 相同
+      expect(at(34)).toBe(185);  // 34 / 2 × 5% = +85% → 100 + 85
     } finally {
       Math.random = orig;
     }
@@ -283,8 +283,8 @@ describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
     expect(power('mana-drain')).toBe(17);
     expect(power('element-storm')).toBe(70);
     expect(power('holy-judgment')).toBe(49);
-    // 騎士／妖精／盜賊：不動
-    expect(power('shield-bash')).toBe(20);
+    // 騎士／妖精／盜賊：只有盾擊隨 § 21.4a 改算法時由 20 下修為 10
+    expect(power('shield-bash')).toBe(10);
     expect(power('rend')).toBe(25);
     expect(power('taunt')).toBe(20);
     expect(power('vengeance')).toBe(80);
