@@ -423,10 +423,13 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
 /**
  * § 20.6：INT 每 2 點提供的技能威力%。
  *
- * 係數必須小於 `1 / (屬性上限 35 → 有效INT 34 / 2) ≈ 5.88%`，
- * 否則 INT 加成會超過技能攻擊力本身，違反「技能攻擊力 > INT加成 > 裝備魔攻」的排序。
+ * 8 ＝ 每 2 點 +8%，即 `INT加成 = floor(技能攻擊力 × (有效INT / 2 × 0.08))`（§ 21.4）。
+ * 這個值決定基礎魔攻的組成 —— 滿裝法系（有效INT 42）為
+ * 智力 59%／技能攻擊力 35%／裝備魔攻 6%。
+ * 技能攻擊力表已依此係數縮放（§ 22.4、§ 23.7.1），改係數就要重新縮表。
  */
-export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 5;
+export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 8;
+
 /** § 20.6：INT 每 2 點提供的冷卻縮減% */
 export const INT_COOLDOWN_PERCENT_PER_2 = 1;
 /** § 21.4：冷卻縮減總上限 */
@@ -676,7 +679,10 @@ export function calculatePhysicalSkillHit(
 }
 
 /**
- * 基礎魔攻（`21-combat-formula.md` § 21.4）：`技能攻擊力 + INT加成 + 裝備魔攻 + 元素克制`。
+ * 基礎魔攻（`21-combat-formula.md` § 21.4）：
+ * `floor(技能攻擊力 × (1 + 裝備魔攻/100)) + INT加成 + 元素克制`。
+ *
+ * **裝備魔攻是乘區不是加項** —— 它乘在技能攻擊力上，因此高階魔法才吃得到魔攻的價值。
  *
  * § 21.4 的魔法技能與 § 21.4a 的物理快照技能共用這一段，
  * 兩者的技能側必須完全一致 —— 不可各算各的。
@@ -692,7 +698,8 @@ export function getBaseMagicAttack(
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effINT = getEffectiveINT(attrs.INT);
   const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
-  return skillPower + intBonus + getTotalMagicAttack(equippedGear)
+  return Math.floor(skillPower * (1 + getTotalMagicAttack(equippedGear) / 100))
+    + intBonus
     + getElementCounterBonus(skillElement, monster.element);
 }
 

@@ -107,26 +107,38 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     expect(getTotalMagicAttack([null, book({ magicAttack: 3 }), null])).toBe(3);
   });
 
-  it('技能傷害以固定值加算裝備魔攻', () => {
+  it('裝備魔攻是乘在技能攻擊力上的乘區（§ 21.4）', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // 不暴擊
     const c = char();
     const m = monster({ defense: 0 });
     const without = calculateSkillAttack(c, 20, 'none', m, []).damage;
-    const withBook = calculateSkillAttack(c, 20, 'none', m, [book({ magicAttack: 6 })]).damage;
-    // § 21.4：裝備魔攻以固定值加算 → 6 點魔攻 = 6 點傷害
+    const withBook = calculateSkillAttack(c, 20, 'none', m, [book({ magicAttack: 30 })]).damage;
+    // 技能攻擊力 20 × (1 + 30/100) = 26 → 多 6 點
     expect(withBook - without).toBe(6);
   });
 
-  it('裝備魔攻不進 INT 倍率（純固定值）', () => {
+  it('技能攻擊力越高，同一件魔攻裝備給的絕對值越大', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const c = char();
+    const m = monster({ defense: 0 });
+    const gain = (power: number) =>
+      calculateSkillAttack(c, power, 'none', m, [book({ magicAttack: 50 })]).damage
+      - calculateSkillAttack(c, power, 'none', m, []).damage;
+    // ×1.5 的乘區：威力 10 → +5、威力 40 → +20
+    expect(gain(10)).toBe(5);
+    expect(gain(40)).toBe(20);
+  });
+
+  it('裝備魔攻不進 INT 倍率（只乘技能攻擊力那一段）', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const m = monster({ defense: 0 });
     const lowInt = char({ baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 } });
     const highInt = char({ baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 18, CHA: 12 } });
-    const deltaLow = calculateSkillAttack(lowInt, 20, 'none', m, [book({ magicAttack: 6 })]).damage
+    const deltaLow = calculateSkillAttack(lowInt, 20, 'none', m, [book({ magicAttack: 30 })]).damage
       - calculateSkillAttack(lowInt, 20, 'none', m, []).damage;
-    const deltaHigh = calculateSkillAttack(highInt, 20, 'none', m, [book({ magicAttack: 6 })]).damage
+    const deltaHigh = calculateSkillAttack(highInt, 20, 'none', m, [book({ magicAttack: 30 })]).damage
       - calculateSkillAttack(highInt, 20, 'none', m, []).damage;
-    // 高低 INT 的增量相同 → 魔攻確實沒有進 INT 倍率
+    // 高低 INT 的增量相同 → 魔攻沒有被 INT 放大
     expect(deltaLow).toBe(6);
     expect(deltaHigh).toBe(6);
   });

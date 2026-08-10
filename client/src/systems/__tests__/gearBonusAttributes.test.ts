@@ -182,11 +182,11 @@ describe('裝備額外屬性在戰鬥中生效', () => {
     }
   });
 
-  it('INT +2 讓技能傷害多 5% 技能威力', () => {
-    // § 20.6：INT 每 2 點 +5%（`20-attributes.md` § 20.6）→ INT 10 → +25%；INT 12 → +30%
-    // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻（測試裝備無魔攻）
-    //   INT 10 → 100 + 25 = 125
-    //   INT 12 → 100 + 30 = 130
+  it('INT +2 讓技能傷害多 8% 技能威力', () => {
+    // § 20.6：INT 每 2 點 +8% → INT 10 → ×0.40；INT 12 → ×0.48
+    // § 21.4：基礎魔攻 = floor(技能攻擊力 × (1 + 魔攻/100)) + INT加成（測試裝備無魔攻）
+    //   INT 10 → 100 + 40 = 140
+    //   INT 12 → 100 + 48 = 148
     const char = createCharacter();
     const monster = createMonster();
     const plain = createItem();
@@ -197,8 +197,8 @@ describe('裝備額外屬性在戰鬥中生效', () => {
     try {
       const a = calculateSkillAttack(char, 100, 'none', monster, [plain]);
       const b = calculateSkillAttack(char, 100, 'none', monster, [buffed]);
-      expect(a.damage).toBe(125);
-      expect(b.damage).toBe(130);
+      expect(a.damage).toBe(140);
+      expect(b.damage).toBe(148);
     } finally {
       Math.random = orig;
     }
@@ -220,22 +220,22 @@ describe('裝備額外屬性不影響升級成長', () => {
 });
 
 describe('§ 20.6 INT 的兩個作用', () => {
-  it('技能傷害：每 2 點 +5%（奇數取最小偶數）', () => {
+  it('技能傷害：每 2 點 +8%（奇數取最小偶數）', () => {
     const monster = createMonster();
     const gear = [createItem()];
     const orig = Math.random;
     Math.random = () => 0.99; // 不暴擊
     try {
       // 技能威力 100，INT 0 / 20 / 21（有效 20）/ 34（屬性上限 35 的有效值）
-      // § 20.6：每 2 點 +5%；§ 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻
+      // § 20.6：每 2 點 +8%；§ 21.4：基礎魔攻 = floor(技能攻擊力 × (1 + 魔攻/100)) + INT加成
       const at = (int: number) => calculateSkillAttack(
         createCharacter({ baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: int, CHA: 1 } }),
         100, 'none', monster, gear,
       ).damage;
       expect(at(0)).toBe(100);   // 100 + 0
-      expect(at(20)).toBe(150);  // 20 / 2 × 5% = +50% → 100 + 50
-      expect(at(21)).toBe(150);  // 有效 20，與 20 相同
-      expect(at(34)).toBe(185);  // 34 / 2 × 5% = +85% → 100 + 85
+      expect(at(20)).toBe(180);  // 20 / 2 × 0.08 = ×0.8 → 100 + 80
+      expect(at(21)).toBe(180);  // 有效 20，與 20 相同
+      expect(at(34)).toBe(236);  // 34 / 2 × 0.08 = ×1.36 → 100 + 136
     } finally {
       Math.random = orig;
     }
@@ -266,29 +266,37 @@ describe('§ 20.6 INT 的兩個作用', () => {
 
 describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
   it('基礎魔法的攻擊技能威力皆為調整後的值', () => {
+    // INT 係數定為每 2 點 +8%，技能攻擊力表配合縮放至「智力 59%／技能 35%／魔攻 6%」
     const expected: Record<string, number> = {
-      // 1~4 級已回復 nerf 前的原值（前期補償），5 級以上維持 ×0.7
-      'wind-blade': 10, 'ice-bolt': 10, 'flame-arrow': 20, 'holy-bolt': 20,
-      'ice-lance': 38, 'flame-pillar': 38, 'meteor-shower': 59,
-      'divine-thunder': 70, 'apocalypse-flame': 70, 'ultimate-ray': 77,
+      'wind-blade': 10, 'ice-bolt': 10, 'flame-arrow': 19, 'holy-bolt': 19,
+      'ice-lance': 39, 'flame-pillar': 39, 'meteor-shower': 62,
+      'divine-thunder': 75, 'apocalypse-flame': 75, 'ultimate-ray': 81,
     };
     for (const [id, power] of Object.entries(expected)) {
       expect(SKILL_CATALOG.find(s => s.id === id)?.power, id).toBe(power);
     }
   });
 
-  it('元素師／牧師的傷害型職業魔法已調整，其他職業維持原值', () => {
+  it('基礎魔法的最高與最低威力落在 10 ~ 81', () => {
+    const powers = SKILL_CATALOG.filter(s => s.type === 'attack' && s.power > 0).map(s => s.power);
+    expect(Math.min(...powers)).toBe(10);
+    expect(Math.max(...powers)).toBe(81);
+  });
+
+  it('所有職業攻擊魔法與基礎魔法同步縮放（§ 23.7.1）', () => {
     const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill.power;
-    // 元素師／牧師：×0.7
-    expect(power('mana-drain')).toBe(17);
-    expect(power('element-storm')).toBe(70);
-    expect(power('holy-judgment')).toBe(49);
-    // 騎士／妖精／盜賊：只有盾擊隨 § 21.4a 改算法時由 20 下修為 10
-    expect(power('shield-bash')).toBe(10);
-    expect(power('rend')).toBe(25);
-    expect(power('taunt')).toBe(20);
-    expect(power('vengeance')).toBe(80);
-    expect(power('arrow-rain')).toBe(50);
-    expect(power('backstab')).toBe(100);
+    expect(power('mana-drain')).toBe(19);
+    expect(power('element-storm')).toBe(75);
+    expect(power('holy-judgment')).toBe(52);
+    expect(power('arrow-rain')).toBe(52);
+    expect(power('vengeance')).toBe(84);
+    expect(power('backstab')).toBe(104);
+  });
+
+  it('物理快照三招也同步縮放（§ 21.4a）', () => {
+    const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill.power;
+    expect(power('shield-bash')).toBe(32);
+    expect(power('rend')).toBe(81);
+    expect(power('taunt')).toBe(65);
   });
 });

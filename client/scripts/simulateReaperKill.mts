@@ -150,8 +150,9 @@ function intCooldownReduction(effInt: number): number {
 }
 
 /**
- * 交給 `calculateSkillAttack()` 的威力：先套規則組的威力倍率，再自行加上 INT 加成。
- * 因為傳入的 char/gear 已把 INT 歸零，combat.ts 不會重複計算 INT 項。
+ * 交給 `calculateSkillAttack()` 的威力：只套規則組的威力倍率。
+ * **INT 一律交給 combat.ts 原生處理** —— § 21.4 改成乘區之後，
+ * 腳本側先折算會整個繞過那個乘區，量到的數字會與遊戲不符。
  */
 function ruledSkillPower(
   entry: { power?: number; isBasicMagic?: boolean },
@@ -161,8 +162,7 @@ function ruledSkillPower(
   const mult = entry.isBasicMagic
     ? RULES.basicPowerMult
     : (RULES.classPowerMultBy?.[className] ?? RULES.classPowerMult);
-  const nerfed = Math.floor((entry.power ?? 0) * mult);
-  return applyIntBonus(nerfed, effInt);
+  return Math.floor((entry.power ?? 0) * mult);
 }
 /** PixiJS ticker 60fps —— 行動只會在幀邊界觸發，模擬時對齊避免高估 DPS */
 const FRAME_MS = 1000 / 60;
@@ -250,13 +250,13 @@ function levelTo75(base: Attributes, bonus: Attributes): { maxHp: number; maxMp:
 
 function buildCharacter(className: ClassName): Character {
   const raw = CREATION_ATTRIBUTES[className];
-  const base = { ...raw, INT: 0 }; // INT 交給 applyIntBonus，避免 combat.ts 重複加成
+  const base = { ...raw }; // INT 交給 combat.ts 原生處理（§ 21.4 的乘區無法在腳本側先折算）
   const alloc = LEVELUP_ALLOCATION[className];
   const bonus: Attributes = {
     STR: alloc.STR ?? 0, AGI: alloc.AGI ?? 0, VIT: alloc.VIT ?? 0,
-    SPI: alloc.SPI ?? 0, INT: 0, CHA: alloc.CHA ?? 0,
+    SPI: alloc.SPI ?? 0, INT: alloc.INT ?? 0, CHA: alloc.CHA ?? 0,
   };
-  const spent = ATTRIBUTE_KEYS.reduce((s, k) => s + bonus[k], 0) + (alloc.INT ?? 0);
+  const spent = ATTRIBUTE_KEYS.reduce((s, k) => s + bonus[k], 0);
   if (spent !== 25) throw new Error(`${className} 升級配點應為 25 點，實得 ${spent}`);
   const creationTotal = ATTRIBUTE_KEYS.reduce((s, k) => s + raw[k], 0);
   if (creationTotal !== 80) throw new Error(`${className} 建角配點應為 80 點，實得 ${creationTotal}`);
@@ -384,7 +384,7 @@ function erosionRollValue(base: number): number {
 }
 
 function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[]): EquipmentInstance {
-  const bonusAttributes = tpl.bonusAttributes ? { ...tpl.bonusAttributes, INT: 0 } : tpl.bonusAttributes;
+  const bonusAttributes = tpl.bonusAttributes;
   return {
     ...tpl, bonusAttributes, templateId: tpl.id!, quality: QUALITY, enhancement,
     affixes: affixTypes.map(type => ({
@@ -539,6 +539,8 @@ interface RotationEntry {
   hits?: number;
   /** § 21.4a 物理快照技能（盾擊／裂傷斬／挑釁怒吼）：基礎魔攻 + 基礎物理傷害 */
   physicalSnapshot?: boolean;
+  /** § 99.1 第 6 條：【需裝備弓】是實際限制，配裝不符時整招不可用 */
+  requiredWeaponType?: string;
   /** 冷卻（ms，未套 CDR） */
   cooldown: number;
   /** MP 消耗（`canUseSkill` 會擋） */
@@ -561,10 +563,16 @@ function classSkill(id: string): Omit<Skill, 'lastUsedAt'> {
   return s.skill;
 }
 
+/** § 99.1 第 6 條：配裝是否滿足技能的武器需求 */
+function meetsWeaponRequirement(e: RotationEntry, loadout: Loadout): boolean {
+  return !e.requiredWeaponType || loadout.weapon?.type === e.requiredWeaponType;
+}
+
 function magicEntry(s: Omit<Skill, 'lastUsedAt'>, isBasicMagic = false): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill', isBasicMagic,
     power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot,
+    requiredWeaponType: s.requiredWeaponType,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
     mpCost: s.mpCost,
@@ -601,7 +609,7 @@ function buildRotation(className: ClassName): RotationEntry[] {
 
   if (className === 'elf') {
     const triple = classSkill('triple-shot');
-    r.push({ id: triple.id, name: triple.name, kind: 'physical_skill', hits: triple.hits, cooldown: triple.cooldown, mpCost: triple.mpCost });
+    r.push({ id: triple.id, name: triple.name, kind: 'physical_skill', hits: triple.hits, cooldown: triple.cooldown, mpCost: triple.mpCost, requiredWeaponType: triple.requiredWeaponType });
     r.push(magicEntry(classSkill('arrow-rain')));
   }
 
@@ -671,11 +679,14 @@ interface ActionScore { name: string; avg: number; note: string }
 function calibrate(
   char: Character,
   loadout: Loadout,
-  rotation: RotationEntry[],
+  allEntries: RotationEntry[],
   effects: ActiveEffect[],
   effInt: number,
   seed: number,
 ): { order: RotationEntry[]; scores: ActionScore[] } {
+  // § 99.1 第 6 條：requiredWeaponType 是實際限制（scriptRunner 的 meetsWeaponRequirement 會擋），
+  // 配裝不帶弓時三連射／穿透箭雨整招不可用，不可讓它們照樣進校準。
+  const rotation = allEntries.filter(e => meetsWeaponRequirement(e, loadout));
   const monster = makeReaper();
   const scores: ActionScore[] = [];
   let normalAvg = 0;
@@ -1152,6 +1163,7 @@ function proxyDps(className: ClassName, loadout: Loadout, seed: number): number 
     best = sum / PROXY_SAMPLES;
     for (const e of rotation) {
       if (e.kind === 'self_buff') continue;
+      if (!meetsWeaponRequirement(e, loadout)) continue;
       let s = 0;
       for (let i = 0; i < PROXY_SAMPLES; i++) {
         if (e.kind === 'physical_skill') {
