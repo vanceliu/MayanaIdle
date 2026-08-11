@@ -31,7 +31,7 @@ export const ZONES: Zone[] = [
     faction: 'west',
     levelMin: 30,
     levelMax: 50,
-    regions: ['demon-forest', 'misty-cave', 'elsarth-town'],
+    regions: ['demon-forest', 'rotleaf-path', 'demon-altar', 'misty-cave', 'elsarth-town'],
     connectedZones: ['grey-ridge'],
   },
   {
@@ -40,7 +40,7 @@ export const ZONES: Zone[] = [
     faction: 'east',
     levelMin: 30,
     levelMax: 50,
-    regions: ['mirror-forest', 'underwater-prison', 'varden-town'],
+    regions: ['mirror-forest', 'glimmer-shore', 'shattered-mirror', 'underwater-prison', 'varden-town'],
     connectedZones: ['grey-ridge'],
   },
   {
@@ -199,9 +199,29 @@ const demonForest: Region = {
   name: '妖魔森林',
   type: 'field',
   levelMin: 30,
+  levelMax: 33,
+  zoneId: 'elsarth',
+  monsters: ['妖魔幼獸', '蝕木藤妖', '高等妖魔', '妖魔神射手', '妖魔咒術師'],
+};
+
+const rotleafPath: Region = {
+  id: 'rotleaf-path',
+  name: '腐葉林道',
+  type: 'field',
+  levelMin: 34,
+  levelMax: 36,
+  zoneId: 'elsarth',
+  monsters: ['腐葉巨蛛', '妖魔獵犬', '高等妖魔鬥士', '腐生樹妖', '妖魔投斧手'],
+};
+
+const demonAltar: Region = {
+  id: 'demon-altar',
+  name: '妖魔祭壇',
+  type: 'field',
+  levelMin: 37,
   levelMax: 40,
   zoneId: 'elsarth',
-  monsters: ['高等妖魔', '高等妖魔鬥士', '妖魔神射手', '巨人'],
+  monsters: ['祭壇守衛', '巨人', '妖魔祭司', '血祭石像', '妖魔統領'],
 };
 
 const mistyCave: Region = {
@@ -234,9 +254,29 @@ const mirrorForest: Region = {
   name: '明鏡森林',
   type: 'field',
   levelMin: 30,
+  levelMax: 33,
+  zoneId: 'varden',
+  monsters: ['微光蝶', '鏡水蜥', '鏡面精靈', '光影狐', '折光魔像'],
+};
+
+const glimmerShore: Region = {
+  id: 'glimmer-shore',
+  name: '幻光湖畔',
+  type: 'field',
+  levelMin: 34,
+  levelMax: 36,
+  zoneId: 'varden',
+  monsters: ['湖畔水靈', '潛鏡蛇', '鏡湖歌者', '明鏡樹妖', '幻影鹿'],
+};
+
+const shatteredMirror: Region = {
+  id: 'shattered-mirror',
+  name: '碎鏡深林',
+  type: 'field',
+  levelMin: 37,
   levelMax: 40,
   zoneId: 'varden',
-  monsters: ['鏡面精靈', '光影狐', '明鏡樹妖', '幻光獵蛾'],
+  monsters: ['碎鏡魔像', '逆影獵手', '幻光獵蛾', '鏡界巡守', '碎鏡之影'],
 };
 
 const underwaterPrison: Region = {
@@ -469,10 +509,14 @@ export const REGIONS: Region[] = [
   ivoryTowerDungeon,
   // 艾爾薩斯
   demonForest,
+  rotleafPath,
+  demonAltar,
   mistyCave,
   elsarthTown,
   // 瓦爾登
   mirrorForest,
+  glimmerShore,
+  shatteredMirror,
   underwaterPrison,
   vardenTown,
   // 龍之谷

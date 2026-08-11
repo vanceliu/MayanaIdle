@@ -9,6 +9,8 @@ import type { EquipmentInstance } from '../../models/equipment';
 /** 弓箭手系怪物（25-monster-system.md § 25.8「遠程物理」） */
 const ARCHERS = [
   '妖魔神射手',
+  '妖魔投斧手',
+  '逆影獵手',
   '高階骷髏神射手',
   '戰場骷髏弓手',
   '遠古弓箭手',
@@ -65,8 +67,8 @@ function noRandom() {
 describe('弓箭手 seed 設定（§ 25.8 遠程物理）', () => {
   const rangedSeeds = MONSTER_SEEDS.filter(m => m.attackType === 'ranged');
 
-  it('7 種弓箭手系怪物，共 18 筆', () => {
-    expect(rangedSeeds).toHaveLength(18);
+  it('9 種弓箭手系怪物，共 20 筆', () => {
+    expect(rangedSeeds).toHaveLength(20);
     expect([...new Set(rangedSeeds.map(m => m.name))].sort()).toEqual([...ARCHERS].sort());
   });
 
@@ -87,8 +89,8 @@ describe('弓箭手 seed 設定（§ 25.8 遠程物理）', () => {
     expect(magicArchers).toEqual([]);
   });
 
-  it('巫師／魔導系維持 magic 9 筆，未被本次改動波及', () => {
-    expect(MONSTER_SEEDS.filter(m => m.attackType === 'magic')).toHaveLength(9);
+  it('巫師／魔導系維持 magic 12 筆，未被本次改動波及', () => {
+    expect(MONSTER_SEEDS.filter(m => m.attackType === 'magic')).toHaveLength(12);
   });
 
   it('ranged 需要射程與視線判定', () => {

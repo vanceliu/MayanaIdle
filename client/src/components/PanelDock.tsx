@@ -7,7 +7,7 @@ import { useIsMobile } from '../hooks/useViewport';
 /**
  * 底部面板按鈕列（16-tech-frontend-architecture.md § 32.15）
  * 與快捷鍵列同排。六個面板一律開成可拖曳浮動視窗；
- * 任務與自動腳本要顯示數量 badge，因此按鈕由各自的組件渲染。
+ * 任務與自動腳本帶指示，因此按鈕由各自的組件渲染。
  */
 export function PanelDock() {
   const open = usePanelWindowStore(s => s.open);
@@ -17,7 +17,6 @@ export function PanelDock() {
 
   return (
     <div className="panel-dock">
-      <QuestTrackerButton />
       {DOCK_PANEL_KEYS.map(key => (
         <button
           key={key}
@@ -29,6 +28,7 @@ export function PanelDock() {
           <PanelDockFace panelKey={key} />
         </button>
       ))}
+      <QuestTrackerButton />
       <ScriptEditorButton />
     </div>
   );

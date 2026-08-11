@@ -99,6 +99,9 @@
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
 | 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
+| **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`，倍率記於該節） |
+| **數量徽章（配色／字級／自動腳本只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
+| **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（順序不可任意調動，由 `PanelDock.test.tsx` 把守） |
 | **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
 | 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
 | **技能特效（原型／技能對應／AoE 一發／通用戰鬥特效）** | `48-vfx.md` | § 48.7（元素色見 `42-element-system.md` § 42.4） |
@@ -215,7 +218,7 @@
 | `16-tech.md` | 技術方向 | React/Vite/TypeScript/PostgreSQL |
 | `16-tech-frontend-architecture.md` | 前端架構 | 目錄結構、狀態管理、資料流、計時器、組件職責 |
 | `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
-| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限 |
+| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限、**線條與分區色相**、**數量徽章**、**面板按鈕分組** |
 | `47-mobile.md` | 行動裝置適配 | 斷點、觸控互動、指標拖放、手機版面、PWA |
 | `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、印記師、**武器攻擊演出**、**技能特效**、**Buff／Debuff 場上特效** |
 | `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
@@ -363,6 +366,14 @@
 13-town.md（雜貨店/武器店/防具店販售功能）
        ↕
 30-items.md（素材 iconTier / sellPrice）←→ 34-ui-guidelines.md（面板統一樣式）
+
+34-ui-guidelines.md § 34.10（線條／彩度／分區色相／徽章／按鈕分組）
+  ←→ 34-ui-guidelines.md § 34.1（統一色彩語意：區色只上框與標題，不可與語意色搶同一個位置）
+  ←→ 34-ui-guidelines.md § 34.6（字級一律走 --fs-*，徽章不可寫死 px）
+  ←→ 34-ui-guidelines.md § 34.8（分組間隔只在 >1200px 給；以下是圖示模式，空間會把徽章擠出去）
+  ←→ 49-village-script.md（自動腳本指示只表達「有沒有規則」，三個分頁一視同仁）
+  ※ 介面彩度與地圖彩度是**兩條相反的旋鈕**：地圖是背景可以往上，
+    介面的框往上會吃掉事件（超重／瀕死／掉寶）的音量。改任一邊都要重看另一邊
        ↕
 49-village-script.md（自動販售沿用同一套顏色門檻與定價，見 `systems/shop.ts`）
 

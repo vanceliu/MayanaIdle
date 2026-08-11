@@ -392,14 +392,14 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 
 ## 38.10 地圖清單與尺寸規範
 
-目前共 **53** 張靜態地圖：50 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
+目前共 **57** 張靜態地圖：54 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
 ＋ **3 張城鎮**（`neutral-town`／`elsarth-town`／`varden-town`，皆 30×20，主題 `town`）。
 
 | 主題 | 地圖 | 尺寸 |
 |---|---|---|
 | `grassland` | dawn-plains、green-valley | 20×15 |
 | `forest` | wind-woods | 20×15 |
-| `forest` | demon-forest、mirror-forest | 30×20 |
+| `forest` | demon-forest、rotleaf-path、demon-altar、mirror-forest、glimmer-shore、shattered-mirror | 30×20 |
 | `swamp` | misty-swamp | 20×15 |
 | `snow` | snow-field-deep | 20×15 |
 | `snow` | snow-field | 30×20 |
@@ -488,7 +488,11 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 | `green-valley` | grassland | 開闊 | 標準 | 樹木 `10` | 疏林草原，散落小水池 |
 | `wind-woods` | forest | 半開闊 | 標準 | 草叢 `16` | 風語林地，林間空地多 |
 | `demon-forest` | forest | 半開闊 | **極密** | 樹木 `10` | 妖魔森林，成片密林只留獸徑 |
+| `rotleaf-path` | forest | 半開闊 | 密集 | 樹木 `10` | 腐葉林道，密林間踩出的獸徑網 |
+| `demon-altar` | forest | 半開闊 | **極密** | 岩石 `11` | 妖魔祭壇，巨石環立、枯木壓境 |
 | `mirror-forest` | forest | 半開闊 | 密集 | 水池 `13` | 明鏡森林，鏡湖群切割疏林 |
+| `glimmer-shore` | forest | 半開闊 | 標準 | 水池 `13` | 幻光湖畔，開闊鏡湖與寬闊灘岸 |
+| `shattered-mirror` | forest | 半開闊 | 密集 | 岩石 `11` | 碎鏡深林，碎鏡般的岩柱插滿林地 |
 | `misty-swamp` | swamp | 半開闊 | 密集 | 水池 `13` | 沼澤水道，草洲相連 |
 | `snow-field` | snow | 開闊 | 空曠 | 岩石 `11` | 雪原，大片空曠 |
 | `snow-field-deep` | snow | 開闊 | 密集 | 水池 `13` | 冰湖群，繞湖行進 |

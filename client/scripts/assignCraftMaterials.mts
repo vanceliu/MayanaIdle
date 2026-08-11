@@ -29,7 +29,8 @@ const WRITE = process.argv.includes('--write');
 const TIER_AREAS: Record<number, string[]> = {
   4: [
     'trial-highlands', 'trial-highlands-top', 'snow-field', 'demon-forest',
-    'mirror-forest', 'dragon-valley-surface', 'snow-field-deep',
+    'rotleaf-path', 'demon-altar', 'mirror-forest', 'glimmer-shore',
+    'shattered-mirror', 'dragon-valley-surface', 'snow-field-deep',
   ],
   5: [
     'ancient-battlefield',
@@ -49,6 +50,16 @@ const AMOUNTS: Record<number, number[]> = { 4: [4, 3, 2], 5: [6, 5, 4, 3] };
  * 印記已改歸 `scroll`，本來就不在 `category === 'material'` 的篩選裡，不需另外排除。
  */
 const EXCLUDED = (name: string) => name.startsWith('魔法書材料');
+
+/**
+ * 每階的使用把數上限。
+ *
+ * 魔法書碎片是魔法書系統的通用素材（`30-items.md` § 魔法書材料），只掉在雪原（T4 區帶）
+ * 與象牙塔 1~5F（T5 區帶）。這兩區的素材池都只有「3 種區域素材 + 碎片」，池小、
+ * 每份配方又要取 2~3 種，輪替下來碎片會被高頻抽中 —— 改版前有 27 把在吃它。
+ * 它不該退化成「所有中階裝備的通用需求」，因此限成少數配方的點綴（使用者定案：各階 3 把）。
+ */
+const MATERIAL_USAGE_LIMIT: Record<string, number> = { 魔法書碎片: 3 };
 
 // ------------------------------------------------------------ 區域 → 材料
 
@@ -83,23 +94,35 @@ for (const tier of [4, 5]) {
     .filter(e => e.acquireType === 'craft' && e.tier === tier)
     .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
 
+  // 上限是「每階」算的，額滿後該素材退出候選（見 MATERIAL_USAGE_LIMIT）
+  const tierUsage = new Map<string, number>();
+  const capped = (name: string) => (tierUsage.get(name) ?? 0) >= (MATERIAL_USAGE_LIMIT[name] ?? Infinity);
+  /** 候選不足時退回原池 —— 寧可超過上限，也不能讓配方湊不出材料 */
+  const candidates = (pool: string[], need: number) => {
+    const open = pool.filter(m => !capped(m));
+    return open.length >= need ? open : pool;
+  };
+
   recipes.forEach((e, i) => {
     const primary = areas[i % areas.length];
     // 跨區的那一份取「下一個區域」，讓相鄰區域彼此有交集
     const neighbour = areas[(i + 1) % areas.length];
     const amounts = AMOUNTS[tier];
 
-    const pool = areaMaterials.get(primary)!;
     const mats: { name: string; amount: number }[] = [];
     // 主區域取 amounts.length - 1 種，起點隨配方序號位移，避免同區域的配方長一樣
+    const pool = candidates(areaMaterials.get(primary)!, amounts.length - 1);
     for (let k = 0; k < amounts.length - 1; k++) {
       mats.push({ name: pool[(i + k) % pool.length], amount: amounts[k] });
     }
-    const cross = areaMaterials.get(neighbour)!;
+    const cross = candidates(areaMaterials.get(neighbour)!, 1);
     const crossName = cross.find(m => !mats.some(x => x.name === m)) ?? cross[0];
     mats.push({ name: crossName, amount: amounts[amounts.length - 1] });
 
-    for (const m of mats) usage.set(m.name, (usage.get(m.name) ?? 0) + 1);
+    for (const m of mats) {
+      usage.set(m.name, (usage.get(m.name) ?? 0) + 1);
+      tierUsage.set(m.name, (tierUsage.get(m.name) ?? 0) + 1);
+    }
     assignments.push({ id: e.id!, name: e.name, tier, area: primary, mats });
   });
 }

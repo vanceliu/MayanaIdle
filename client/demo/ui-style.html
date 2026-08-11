@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>介面風格調校 — MayanaIdle</title>
+<!--
+  介面風格調校頁（線條粗細 / 彩度 / 圓角）。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/ui-style.html
+  直接用 file:// 開會拿不到 App.css 與 TS 模組，整頁沒有樣式。
+
+  要回答的問題：**介面的線條與彩度要多重，才跟角色 sprite 是同一套語言。**
+  角色是近黑粗描邊 + 高飽和色塊，介面是 1px 藍灰細線 + 低飽和 dark HUD，
+  兩者對比策略不一致 —— 這頁把三者（地圖 / 角色 / 介面）擺在同一畫面裡調。
+
+  規則（`99-ai-constraints.md` § 99.2 階段 1）：
+  - 介面元素**全部用 App.css 的真 class**，所以左欄看到的就是現在遊戲的樣子
+  - 候選樣式只寫在下面 `.lab-new` 底下，**定案前不進 `src/`**
+  - 調色只做「同一組色的 S 倍率 / L 偏移」，不引入新色票；
+    定案後階段 3 才把結果寫死回 token
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版（不會進 App.css） ═══════════ */
+body {
+  margin: 0;
+  padding: 20px;
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-note code { color: var(--text-secondary); }
+
+.lab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-panel);
+}
+.lab-bar label { font-size: var(--fs-sm); color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
+.lab-bar input[type='range'] { width: 120px; }
+.lab-bar output { font-family: var(--font-mono); color: var(--accent-gold); min-width: 3.2em; }
+.lab-bar button {
+  padding: 5px 12px; background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+  font-size: var(--fs-sm); font-family: var(--font-body);
+}
+.lab-bar button:hover { background: var(--bg-card-hover); }
+.lab-sep { width: 100%; height: 0; }
+
+.lab-stage { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+
+/*
+ * 欄框是**這頁的家具，不是遊戲介面** —— 顏色寫死，不吃候選變數。
+ * 吃了的話右欄整片會被 `--bg-deepest` 染色，看起來像「介面變彩了」，
+ * 但遊戲裡 HUD 背後是 Pixi 地圖，根本不是這個色。
+ */
+.lab-col {
+  flex: 1 1 520px;
+  min-width: 480px;
+  border: 1px solid #1E1E4A;
+  border-radius: 12px;
+  padding: 14px;
+  background: #0A0A1A;
+}
+.lab-col > h2 {
+  font-family: var(--font-display); font-size: var(--fs-md);
+  margin: 0 0 10px; font-weight: 600;
+}
+.lab-col--old > h2 { color: var(--text-secondary); }
+.lab-col--new > h2 { color: var(--accent-gold); }
+.lab-sub {
+  font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 600;
+  color: var(--text-dim); margin: 22px 0 10px;
+  border-top: 1px dashed #1E1E4A; padding-top: 14px;
+}
+
+.lab-scene { display: block; border-radius: var(--radius-md); margin-bottom: 14px; }
+
+/*
+ * 表面區：把真 HUD 元件從 fixed/absolute 拉回文件流，其餘樣式一律照 App.css。
+ *
+ * `transform: none` 一定要跟著收 —— `position: static` 只讓 `left/right/bottom` 失效，
+ * `.hud-bottomcenter` 的 `translateX(-50%)` 還是會生效，整條快捷格會平移出欄外。
+ */
+.lab-surface { display: flex; flex-direction: column; gap: 14px; }
+.lab-surface .hud,
+.lab-surface .combat-log-window {
+  position: static;
+  transform: none;
+  width: auto;
+}
+.lab-surface .hud-topleft,
+.lab-surface .hud-topright { pointer-events: auto; }
+.lab-surface .status-panel { width: 100%; }
+.lab-surface .map-selector { width: 320px; }
+.lab-surface .combat-log { max-height: 132px; }
+.lab-surface .town-npc-bar { margin-bottom: 0; }
+.lab-surface .panel-dock,
+.lab-surface .quick-slot-bar { justify-content: flex-start; }
+.lab-row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+
+/* ═══════════ 面板按鈕分組 ═══════════
+ *
+ * 現況沒有分組語言：`.panel-dock` 內部 `gap: 6px`，dock 與 `.game-toolbar`（⚙）
+ * 之間是 `.hud` 的 `gap: 8px` —— **差 2px，看不出來**。
+ *
+ * 三組是照功能分的，不是照「誰有徽章」：
+ *   角色        詳細狀態 / 裝備欄 / 背包 / 技能   —— 看你自己現在怎樣
+ *   目標與自動化 任務 / 自動腳本                  —— 外部給的目標、你設定的行為
+ *   系統        ⚙                                —— 跟遊戲無關
+ *
+ * 只在 `.lab-grouped` 底下生效，`.lab-plain` 是現況對照。
+ */
+.lab-grouped .lab-group-start { margin-left: var(--dock-group-gap); }
+
+/*
+ * 圖示模式（`App.css` 的 `max-width: 1200px` 那段，條件是空間不足而不是手機）。
+ * 這裡用 class 複製同一組規則，才能在桌機寬度下直接比 —— 分組的間隔預算在這個
+ * 模式下最緊（`App.css` 註解記著 badge 曾被擠到溢出）。
+ */
+.lab-iconmode .panel-dock-icon { display: inline; }
+.lab-iconmode .panel-dock-label { display: none; }
+.lab-iconmode .panel-dock-btn {
+  padding: 6px 10px;
+  font-size: var(--fs-lg);
+  line-height: 1;
+}
+
+.lab-dock-case { margin-bottom: 18px; }
+.lab-dock-case > h4 {
+  font-size: var(--fs-sm); color: var(--text-secondary);
+  margin: 0 0 8px; font-weight: 500;
+}
+.lab-dock-case > h4 em { color: var(--text-dim); font-style: normal; }
+
+/* 分組區的按鈕列同樣包在真 HUD 容器裡，一樣要收掉定位與位移 */
+#dock-lab .hud { position: static; transform: none; width: auto; }
+
+/*
+ * 文字大小 150% 的對照。`--fs-*` 必須在這裡**重新宣告**，不能只設 `--font-scale` ——
+ * 自訂屬性的 var() 在宣告的元素上就完成代換，`:root` 的 `--fs-xs` 早就烤死了
+ * （同 `34-ui-guidelines.md` § 34.6 的實作限制）。
+ * 這正好也是要看的東西：`.quest-count-badge` 的 10px 是寫死的，不管怎麼調都不會變。
+ */
+.lab-fs150 {
+  --fs-xs: 18px; --fs-sm: 19.5px; --fs-base: 24px; --fs-md: 25.5px;
+}
+
+.lab-out {
+  margin-top: 18px; padding: 12px 14px;
+  background: var(--bg-inset); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   候選樣式 —— 階段 2 定案後才搬進 App.css（`99-ai-constraints.md` § 99.2）
+
+   分成三塊，因為它們的搬遷成本完全不同：
+   A. 只吃 token（顏色、圓角）  → 改 `:root` 就好，零風險
+   B. 線寬                     → App.css 有 136 處硬編碼 border，要先抽 token
+   C. 硬編碼色                 → 那幾條規則沒用 token，必須逐條改寫
+   ═══════════════════════════════════════════════════════════════ */
+
+/* --- B. 線寬：粗線要有效，顏色必須夠暗才形成「描邊」而不是「糊掉的框」 --- */
+.lab-new .status-panel,
+.lab-new .bar,
+.lab-new .map-selector-trigger,
+.lab-new .town-npc-btn,
+.lab-new .quick-slot-bar,
+.lab-new .quick-slot,
+.lab-new .panel-dock,
+.lab-new .panel-dock-btn,
+.lab-new .combat-log-title,
+.lab-new .combat-log,
+.lab-new .shop-item {
+  border-width: var(--lab-bd);
+  border-style: solid;
+}
+
+/*
+ * 邊框色 = 描邊色 與 該區色相 的混合，濃度由 `--lab-tint` 決定。
+ * `--area` 沒設時退回描邊色，混出來還是描邊色 —— 所以同一條規則同時服務
+ * 「不分區」與「分區」兩種狀態，不必寫兩套。
+ *
+ * active 態的邊框色是狀態指示（`34-ui-guidelines.md` § 34.1），排除在外不被蓋掉。
+ */
+.lab-new .status-panel,
+.lab-new .bar,
+.lab-new .map-selector-trigger,
+.lab-new .town-npc-btn:not(.active),
+.lab-new .quick-slot-bar,
+.lab-new .quick-slot:not(.selected),
+.lab-new .panel-dock,
+.lab-new .panel-dock-btn:not(.active),
+.lab-new .combat-log-title,
+.lab-new .combat-log,
+.lab-new .shop-item {
+  border-color: color-mix(
+    in srgb,
+    var(--area, var(--lab-outline)) calc(var(--lab-tint) * 100%),
+    var(--lab-outline)
+  );
+}
+
+/* ═══════════ 分區色相 ═══════════
+ *
+ * 「彩一點」的來源。整體拉飽和度只會讓紫的更紫 —— 真正會被感覺到的是
+ * **不同功能區用不同色相**。
+ *
+ * 兩條規矩：
+ *
+ * 1. **只用既有的 accent token，不新增色票**。五個區色分別就是
+ *    `--accent-primary / info / success / danger / gold`，所以這不是換配色，
+ *    是把已經存在的色指派到區域。
+ * 2. **區色只上「框、標題、active 態」，不上內容文字**。
+ *    `34-ui-guidelines.md` § 34.1 已經把 gold＝金幣、danger＝危險警告、
+ *    info＝裝備基礎屬性 綁定成語意色 —— 同一個色如果同時當「區域」與「語意」，
+ *    玩家分不出金色是「這裡是商店」還是「這個數字是價格」。
+ *    框與標題不承載語意，是安全的落點；內容一律維持原本的語意色。
+ */
+.lab-new.is-area .status-panel   { --area: var(--area-char); }
+.lab-new.is-area .map-selector   { --area: var(--area-nav); }
+.lab-new.is-area .town-npc-bar   { --area: var(--area-town); }
+.lab-new.is-area .combat-log-window { --area: var(--area-battle); }
+.lab-new.is-area .quick-slot-bar { --area: var(--area-item); }
+.lab-new.is-area .shop-items     { --area: var(--area-item); }
+.lab-new.is-area .panel-dock     { --area: var(--area-char); }
+
+/*
+ * 區色只上容器：`--area: initial` 讓 `var(--area, …)` 退回 fallback（描邊色）。
+ *
+ * 差別很大 —— 村莊列有 12 顆按鈕，每顆都框綠色就是一排 12 個綠框；
+ * 只框整條列則是「一區一個色」。前者是裝飾，後者才是分區。
+ */
+.lab-new.is-area.area-container .town-npc-btn:not(.active),
+.lab-new.is-area.area-container .quick-slot:not(.selected),
+.lab-new.is-area.area-container .panel-dock-btn:not(.active),
+.lab-new.is-area.area-container .bar,
+.lab-new.is-area.area-container .shop-item {
+  --area: initial;
+}
+
+/*
+ * 商店清單在 App.css 裡沒有容器框（`.shop-items` 只有 flex 與 gap），補一個讓物品區有落點。
+ *
+ * **村莊列（`.town-npc-bar`）刻意不補**（使用者定案）：它本來就是一排浮在地圖上的按鈕，
+ * 沒有面板底，框起來等於憑空生出一個容器。村莊綠改為只活在 active 的設施鈕上 ——
+ * 那才是「你正開著哪一間」，比框住整排更有資訊量。
+ */
+.lab-new.is-area.area-container .shop-items {
+  border: var(--lab-bd) solid color-mix(
+    in srgb,
+    var(--area, var(--lab-outline)) calc(var(--lab-tint) * 100%),
+    var(--lab-outline)
+  );
+  border-radius: var(--radius-md);
+  padding: 6px;
+}
+
+/* ═══════════ 數量徽章 ═══════════
+ *
+ * 現況兩顆徽章講同一件事（數量）卻是兩套視覺，而且都讀不清楚：
+ *
+ *   `.quest-count-badge`  16×16 圓形、絕對定位在按鈕外 −4px、**字級 10px 寫死**
+ *   `.script-badge`       圓角膠囊、inline 排在文字後、字級 `--fs-xs`
+ *
+ * 三個問題，這裡各給一個開關：
+ *
+ * 1. **對比 2.72:1** —— 白字在 `--accent-primary` 紫底上，低於 4.5:1。
+ *    而且紫正是 `.panel-dock-btn.active` 的背景色，「有 3 個任務」與「面板開著」同色
+ * 2. **10px 寫死不吃 `--font-scale`** —— 文字放到 150% 時只有它不變（違反 § 34.6）
+ * 3. **`.script-badge` 連 0 都畫** —— 徽章的作用是「這裡有東西」，
+ *    永遠亮著一顆 0 會稀釋真的有規則時的訊號
+ *
+ * `box-shadow` 的一圈底色是為了讓徽章與加粗後的框線隔開，不然會壓在框上。
+ */
+.lab-new .quest-count-badge,
+.lab-new .script-badge {
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-size: var(--fs-xs);   /* 不寫死 px，跟著 --font-scale 走 */
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg-inset);
+}
+
+/* 統一成角落圓形：inline 膠囊會把按鈕撐寬，手機只剩圖示時沒地方擺 */
+.lab-new.badge-unified .script-panel-trigger { position: relative; }
+.lab-new.badge-unified .quest-count-badge,
+.lab-new.badge-unified .script-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(40%, -40%);
+  width: auto;
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/*
+ * 腳本徽章拿掉數字（使用者定案）。理由不是視覺，是**那個數字回答不了任何問題** ——
+ * 「我有 12 條規則」不會讓你做任何事；玩家真正會問的是「現在有沒有在跑」。
+ *
+ * 而且它現在算的東西是錯的：`ScriptEditorPanel.tsx` 的
+ * `totalRules = combatRules.length + persistentRules.length` **漏掉村莊規則**
+ * （面板有三個分頁，`selectVillageRules` 存在但沒被算）——
+ * 只寫村莊腳本的玩家會看到 0，面板裡卻滿滿是規則。
+ *
+ * 小點只表達「有／沒有」，三個分頁怎麼加都不會算錯。
+ */
+.lab-new.script-dot .script-badge {
+  font-size: 0;
+  min-width: 0;
+  width: 0.55em;
+  height: 0.55em;
+  padding: 0;
+  border-radius: 50%;
+  /* em 在 font-size: 0 之下會塌掉，尺寸改用 --fs-xs 直接算 */
+  width: calc(var(--fs-xs) * 0.55);
+  height: calc(var(--fs-xs) * 0.55);
+}
+.lab-new.script-dot .script-badge[data-count='0'],
+.lab-new.script-none .script-badge { display: none; }
+
+/* 標題吃區色。內容文字不動 —— 那裡是語意色的地盤 */
+.lab-new.is-area .combat-log-title { color: var(--area); }
+
+/* active 態改用區色，維持「亮起來的是這一區」而不是「亮起來的都是紫的」 */
+.lab-new.is-area .town-npc-btn.active,
+.lab-new.is-area .panel-dock-btn.active {
+  background: color-mix(in srgb, var(--area) 42%, var(--bg-card));
+  border-color: var(--area);
+  color: var(--text-primary);
+}
+
+/* 日誌標題與內容是同一個盒子的上下兩半，中間那條要收掉才不會出現雙線 */
+.lab-new .combat-log-title { border-bottom: none; }
+
+/* --- C. 硬編碼色：這三處沒有走 token，飽和度滑桿吃不到，只能另外覆蓋 --- */
+.lab-new .status-panel { background: var(--lab-panel-bg); }
+.lab-new .combat-log-title { background: var(--lab-panel-bg); }
+
+/* --- 標籤加粗 / 文字描邊（選項，預設關） --- */
+.lab-new.is-bold .npc-label,
+.lab-new.is-bold .panel-dock-label,
+.lab-new.is-bold .map-selector-label,
+.lab-new.is-bold .quick-slot-key,
+.lab-new.is-bold .char-class { font-weight: 700; }
+
+/*
+ * 文字描邊固定用近黑，**不吃 `--lab-outline`** —— 描邊的作用是讓字在任何底色上
+ * 都讀得出來，跟著框線色跑（亮邊路線下就是亮紫）等於把字糊掉。
+ */
+.lab-new.is-textoutline .npc-label,
+.lab-new.is-textoutline .panel-dock-label,
+.lab-new.is-textoutline .map-selector-label,
+.lab-new.is-textoutline .char-name,
+.lab-new.is-textoutline .bar span {
+  text-shadow:
+     1px 0 0 #0a0a1a, -1px 0 0 #0a0a1a,
+     0 1px 0 #0a0a1a,  0 -1px 0 #0a0a1a;
+}
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">介面風格調校</h1>
+<p class="demo-note">
+  左右兩欄是<strong>同一份 DOM、同一份 <code>src/App.css</code></strong>，差別只有右欄多套了候選變數。<br>
+  地圖色來自 <code>src/pixi/mapThemes.ts</code>，角色來自 <code>src/pixi/entities/pawn/</code> —— 三邊都是遊戲跑的那一份，不是另抄的示意圖。<br>
+  <strong>角色永遠不調</strong>：它是這頁的對照基準，一起調就沒有東西可以對齊了。
+</p>
+<p class="demo-note">
+  <strong>先看這件事再拉滑桿</strong>：輪廓要成立，線與面必須有明度差。目前面板是近黑（L≈8%），
+  所以<strong>近黑描邊在上面等於看不見</strong> —— 只把線加粗不會變粗獷，只會變糊。兩條路線：<br>
+  <strong>A / B　亮邊</strong>：面板維持近黑，描邊改亮色。<strong>面板是主體時走這條</strong> ——
+  暗色閱讀面 + 亮色框，長時間看不累，而且不必動 <code>--text-*</code>。<br>
+  <strong>C / D　提亮面板</strong>：描邊維持近黑，把面板 L 拉高。跟角色 sprite 同一套語言，
+  但大面積亮底看幾小時是負擔，且 <code>--text-*</code> 沒有跟著調（刻意的，見下方輸出），面板一亮文字對比就會掉。
+</p>
+<p class="demo-note">
+  <strong>「彩一點」的來源是分區色相，不是整體飽和度。</strong>
+  整體拉飽和度只會讓紫的更紫；真正會被感覺到的是不同功能區用不同色相 ——
+  角色紫 / 導航青 / 村莊綠 / 戰鬥紅 / 物品金。五個都是<strong>既有的 accent token</strong>，不新增色票。<br>
+  規矩：區色<strong>只上框、標題、active 態，不上內容文字</strong>。
+  <code>34-ui-guidelines.md</code> § 34.1 已經把 gold＝金幣、danger＝危險、info＝裝備基礎屬性 綁成語意色，
+  同一個色若同時當「區域」與「語意」，玩家分不出金色是「這裡是商店」還是「這個數字是價格」。
+</p>
+
+<div class="lab-bar">
+  <label>線寬
+    <input id="bd" type="range" min="1" max="4" step="0.25" value="1.75">
+    <output id="bd-v">1.75px</output>
+  </label>
+  <label>描邊色
+    <input id="outline" type="color" value="#4a4585">
+  </label>
+  <label>介面飽和度
+    <input id="sat" type="range" min="0.6" max="2.4" step="0.05" value="1">
+    <output id="sat-v">1.00×</output>
+  </label>
+  <label>面板亮度
+    <input id="light" type="range" min="-10" max="26" step="1" value="0">
+    <output id="light-v">0</output>
+  </label>
+  <label>圓角
+    <input id="radius" type="range" min="0.5" max="2.5" step="0.25" value="1">
+    <output id="radius-v">1.00×</output>
+  </label>
+  <label><input id="textfix" type="checkbox"> 退回舊的 --text-dim</label>
+
+  <span class="lab-sep"></span>
+
+  <label><input id="area" type="checkbox" checked> 分區色相</label>
+  <label><input id="areaContainer" type="checkbox" checked> 只上容器</label>
+  <label>區色濃度
+    <input id="tint" type="range" min="0" max="1" step="0.05" value="0.35">
+    <output id="tint-v">0.35</output>
+  </label>
+  <label>角色<input id="area-char" type="color" value="#a78bfa"></label>
+  <label>導航<input id="area-nav" type="color" value="#06b6d4"></label>
+  <label>村莊<input id="area-town" type="color" value="#22c55e"></label>
+  <label>戰鬥<input id="area-battle" type="color" value="#f43f5e"></label>
+  <label>物品<input id="area-item" type="color" value="#f59e0b"></label>
+
+  <span class="lab-sep"></span>
+
+  <label>地圖飽和度
+    <input id="mapsat" type="range" min="0.6" max="2.4" step="0.05" value="1">
+    <output id="mapsat-v">1.00×</output>
+  </label>
+  <label><input id="link" type="checkbox"> 與介面連動</label>
+  <label><input id="bold" type="checkbox" checked> 標籤加粗</label>
+  <label><input id="textoutline" type="checkbox"> 文字描邊</label>
+
+  <span class="lab-sep"></span>
+
+  <label>徽章
+    <select id="badge">
+      <option value="current">現況（紫底白字 2.7:1 ✗）</option>
+      <option value="gold" selected>金底深字 9.1:1</option>
+      <option value="info">青底深字 8.1:1</option>
+      <option value="danger">紅底白字 4.7:1</option>
+      <option value="dark">深底金字 9.1:1（較低調）</option>
+    </select>
+  </label>
+  <label><input id="badgeUnified" type="checkbox" checked> 統一成角落圓形</label>
+  <label>腳本指示
+    <select id="scriptInd">
+      <option value="dot" selected>小點（有規則才亮）</option>
+      <option value="none">完全不顯示</option>
+      <option value="count">維持數字</option>
+    </select>
+  </label>
+  <label>組間間隔
+    <input id="groupGap" type="range" min="6" max="28" step="1" value="16">
+    <output id="groupGap-v">16px</output>
+  </label>
+
+  <span class="lab-sep"></span>
+
+  <button data-preset="current">現況（＝已上線）</button>
+  <button data-preset="mild">A 再收一點</button>
+  <button data-preset="glow">B 再重一點</button>
+  <button data-preset="toon">C 提亮面板 + 近黑描邊</button>
+  <button data-preset="heavy">D 極端（看警示被蓋掉）</button>
+  <button id="copy">複製參數</button>
+</div>
+
+<div class="lab-stage">
+  <section class="lab-col lab-col--old">
+    <h2>現況</h2>
+    <canvas class="lab-scene" id="scene-old"></canvas>
+    <div class="lab-surface" id="surface-old"></div>
+    <h3 class="lab-sub">事件對比</h3>
+    <div class="lab-surface" id="events-old"></div>
+    <h3 class="lab-sub">數量徽章（下排為文字大小 150%）</h3>
+    <div class="lab-surface" id="badges-old"></div>
+  </section>
+
+  <section class="lab-col lab-col--new lab-new" id="col-new">
+    <h2>候選</h2>
+    <canvas class="lab-scene" id="scene-new"></canvas>
+    <div class="lab-surface" id="surface-new"></div>
+    <h3 class="lab-sub">事件對比</h3>
+    <div class="lab-surface" id="events-new"></div>
+    <h3 class="lab-sub">數量徽章（下排為文字大小 150%）</h3>
+    <div class="lab-surface" id="badges-new"></div>
+  </section>
+</div>
+
+<p class="demo-note" style="margin-top:14px">
+  <strong>事件對比要看的是這件事</strong>：上面那組是「什麼都沒發生」的常態，下面這組是同時發生
+  超重、瀕死、掉寶、升級、中毒、藥水耗盡。放置遊戲一開好幾小時，<strong>畫面上會變的只有下面那些</strong> ——
+  對比預算應該幾乎全給它們。按 <strong>D 極端</strong> 看框亮到什麼程度時，超重的紅色警示就跟旁邊的裝飾框分不出來了。<br>
+  <strong>順便看得到的缺口</strong>：<code>App.css</code> 目前<strong>沒有低血量警示</strong>（沒有對應的 class），
+  所以下面那條 HP 8% 跟上面那條 HP 78% 除了長度以外長得一模一樣。
+  對比預算現在正被花在永遠不變的框上，而真正該喊的地方是啞的。
+</p>
+
+<section class="lab-col lab-col--new lab-new" id="dock-lab" style="margin-top:18px">
+  <h2>面板按鈕分組</h2>
+  <p class="demo-note" style="margin-bottom:16px">
+    三組照<strong>功能</strong>分，不是照「誰有徽章」：<br>
+    <strong>角色</strong>（詳細狀態／裝備欄／背包／技能）＝ 看你自己現在怎樣　·
+    <strong>目標與自動化</strong>（任務／自動腳本）＝ 外部給的目標與你設定的行為　·
+    <strong>系統</strong>（⚙）<br>
+    兩種排法差在<strong>誰要移動</strong>：排法 1 任務留在最左（自動腳本往左移），排法 2 自動腳本留在最右（任務往右移）。
+    每種都附圖示模式 —— 那是 1200px 以下的樣子，間隔預算最緊的地方。
+  </p>
+  <div id="dock-cases"></div>
+</section>
+
+<div class="lab-out" id="out"></div>
+
+<script type="module">
+import { renderScene, tuneCssValue, tuneColor } from './uiStyleDemo.ts';
+
+/* ═══════════ 真 HUD 元件的靜態複製（class 全部照 App.css） ═══════════
+ *
+ * 快捷格與面板列**必須包在 .hud.hud-bottomcenter / .hud.hud-bottomright 裡**。
+ * 那兩條選擇器有各自的半透明玻璃底（--glass-rgb + blur），
+ * 而 .panel-dock 的基礎規則是不透明的 --bg-inset，兩者差很多 ——
+ * 少包一層就會出現「demo 比較暗、實際比較亮」。
+ *
+ * 另外：這幾段是 JS 樣板字串，**內文不可出現反引號**（會提早結束字串），
+ * 所以下面的註解一律用純文字寫 class 名，不加反引號。
+ */
+const SURFACE_HTML = `
+  <div class="hud hud-topleft">
+    <div class="status-panel">
+      <div class="char-header">
+        <span class="char-name">好熱</span>
+        <span class="char-class">元素師</span>
+        <span class="char-level">Lv.12</span>
+      </div>
+      <div class="bars">
+        <div class="bar hp-bar"><div class="bar-fill" style="width:78%"></div><span>HP 156/200</span></div>
+        <div class="bar mp-bar"><div class="bar-fill" style="width:45%"></div><span>MP 27/60</span></div>
+        <div class="bar exp-bar"><div class="bar-fill" style="width:33%"></div><span>EXP 420/1250</span></div>
+        <div class="bar-row">
+          <div class="bar weight-bar is-normal"><div class="bar-fill" style="width:52%"></div><span>負重 92/4300</span></div>
+          <span class="defense-value">防禦: 34</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud hud-topright">
+    <div class="map-selector">
+      <button class="map-selector-trigger">
+        <span class="map-selector-label">目前: 薄暮村</span>
+        <span class="map-selector-arrow">▼</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="town-npc-bar">
+    <button class="town-npc-btn "><span class="npc-icon">🛒</span><span class="npc-label">雜貨店</span></button>
+    <button class="town-npc-btn "><span class="npc-icon">⚔️</span><span class="npc-label">武器店</span></button>
+    <button class="town-npc-btn "><span class="npc-icon">🛡️</span><span class="npc-label">防具店</span></button>
+    <button class="town-npc-btn "><span class="npc-icon">🔨</span><span class="npc-label">鐵匠鋪</span></button>
+    <button class="town-npc-btn active"><span class="npc-icon">🔯</span><span class="npc-label">印記師</span></button>
+    <button class="town-npc-btn "><span class="npc-icon">🏨</span><span class="npc-label">旅館</span></button>
+    <button class="town-npc-btn "><span class="npc-icon">📦</span><span class="npc-label">倉庫</span></button>
+    <button class="town-npc-btn "><span class="npc-icon">📖</span><span class="npc-label">魔法學院</span></button>
+  </div>
+
+  <div class="hud combat-log-window " style="--log-alpha:0.8">
+    <div class="combat-log-title">
+      <span>戰鬥紀錄</span>
+      <div class="log-menu-wrap"><button class="log-menu-btn " title="視窗設定">⚙</button></div>
+    </div>
+    <div class="bottom-log-wrap log-size-0">
+      <div class="combat-log bottom-log">
+        <div class="log-entry log-player">你對 綠哥布林 造成 34 點傷害</div>
+        <div class="log-entry log-monster">綠哥布林 對你造成 12 點傷害</div>
+        <div class="log-entry log-loot">獲得 鋼心劍 +1</div>
+        <div class="log-entry log-system">升級！Lv.12</div>
+        <div class="log-entry log-debuff-enemy">綠哥布林 中毒（8 秒）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud hud-bottomcenter">
+  <div class="quick-slot-bar">
+    <button class="quick-slot empty " aria-disabled="true"><span class="quick-slot-key">1</span></button>
+    <button class="quick-slot  " aria-disabled="false"><span class="quick-slot-key">2</span><span class="quick-slot-count">12</span></button>
+    <button class="quick-slot  " aria-disabled="false"><span class="quick-slot-key">3</span><span class="quick-slot-count">4</span></button>
+    <button class="quick-slot selected " aria-disabled="false"><span class="quick-slot-key">4</span><span class="quick-slot-count">9</span></button>
+    <button class="quick-slot empty " aria-disabled="true"><span class="quick-slot-key">5</span></button>
+    <button class="quick-slot empty " aria-disabled="true"><span class="quick-slot-key">6</span></button>
+  </div>
+  </div>
+
+  <div class="hud hud-bottomright lab-row">
+    <div class="panel-dock">
+      <button class="panel-dock-btn quest-tracker-btn "><span class="panel-dock-icon">📋</span><span class="panel-dock-label">任務</span><span class="quest-count-badge">3</span></button>
+      <button class="panel-dock-btn "><span class="panel-dock-label">詳細狀態</span></button>
+      <button class="panel-dock-btn "><span class="panel-dock-label">裝備欄</span></button>
+      <button class="panel-dock-btn active"><span class="panel-dock-label">背包</span></button>
+      <button class="panel-dock-btn script-panel-trigger "><span class="panel-dock-label">自動腳本</span><span class="script-badge" data-count="0">0</span></button>
+    </div>
+    <div class="game-toolbar">
+      <button class="panel-dock-btn btn-settings">⚙</button>
+    </div>
+  </div>
+
+  <div class="shop-items">
+    <div class="shop-item">
+      <div class="shop-item-info">
+        <span class="shop-item-name">鋼心劍 +6</span>
+        <span class="shop-item-desc">攻擊 24+6 / 22+6 · 重量 90</span>
+      </div>
+      <div class="shop-item-actions"><button>購買</button></div>
+    </div>
+    <div class="shop-item">
+      <div class="shop-item-info">
+        <span class="shop-item-name">薄暮胸甲</span>
+        <span class="shop-item-desc">防禦 11+4 · 重量 220</span>
+      </div>
+      <div class="shop-item-actions"><button>購買</button></div>
+    </div>
+  </div>
+`;
+
+/*
+ * 同一批元件，換成「事情正在發生」的狀態。全部是 App.css 已經有的 class，
+ * 沒有為了這頁新造警示樣式 —— 這頁要看的正是「現有的警示在框變亮之後還剩多少音量」。
+ */
+const EVENTS_HTML = `
+  <div class="hud hud-topleft">
+    <div class="status-panel">
+      <div class="char-header">
+        <span class="char-name">好熱</span>
+        <span class="char-class">元素師</span>
+        <span class="char-level">Lv.12</span>
+      </div>
+      <div class="bars">
+        <div class="bar hp-bar"><div class="bar-fill" style="width:8%"></div><span>HP 16/200</span></div>
+        <div class="bar mp-bar"><div class="bar-fill" style="width:5%"></div><span>MP 3/60</span></div>
+        <div class="bar exp-bar"><div class="bar-fill" style="width:99%"></div><span>EXP 1240/1250</span></div>
+        <div class="bar-row">
+          <div class="bar weight-bar is-over"><div class="bar-fill" style="width:100%"></div><span>負重 4520/4300 ⚠ 無法攻擊</span></div>
+          <span class="defense-value">防禦: 34</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud combat-log-window " style="--log-alpha:0.8">
+    <div class="combat-log-title">
+      <span>戰鬥紀錄</span>
+      <div class="log-menu-wrap"><button class="log-menu-btn " title="視窗設定">⚙</button></div>
+    </div>
+    <div class="bottom-log-wrap log-size-0">
+      <div class="combat-log bottom-log">
+        <div class="log-entry log-monster">綠哥布林 對你造成 48 點傷害</div>
+        <div class="log-entry log-debuff-self">你 中毒（12 秒）</div>
+        <div class="log-entry log-loot">獲得 破曉之刃（T6 詞綴）</div>
+        <div class="log-entry log-system">升級！Lv.13</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud hud-bottomcenter">
+  <div class="quick-slot-bar">
+    <button class="quick-slot  " aria-disabled="false"><span class="quick-slot-key">1</span><span class="quick-slot-count">3</span></button>
+    <button class="quick-slot blocked " aria-disabled="false"><span class="quick-slot-key">2</span><span class="quick-slot-count">0</span></button>
+    <button class="quick-slot exhausted " aria-disabled="true"><span class="quick-slot-key">3</span><span class="quick-slot-count">0</span></button>
+    <button class="quick-slot selected " aria-disabled="false"><span class="quick-slot-key">4</span><span class="quick-slot-count">2</span></button>
+    <button class="quick-slot empty " aria-disabled="true"><span class="quick-slot-key">5</span></button>
+  </div>
+  </div>
+
+  <div class="hud hud-bottomright lab-row">
+    <div class="panel-dock">
+      <button class="panel-dock-btn quest-tracker-btn "><span class="panel-dock-icon">📋</span><span class="panel-dock-label">任務</span><span class="quest-count-badge">3</span></button>
+      <button class="panel-dock-btn "><span class="panel-dock-label">背包</span></button>
+      <button class="panel-dock-btn script-panel-trigger "><span class="panel-dock-label">自動腳本</span><span class="script-badge" data-count="2">2</span></button>
+    </div>
+  </div>
+`;
+
+/** 三種數量（0 / 3 / 12）× 兩種文字大小，看徽章在極端值下會不會爆版或消失 */
+const BADGE_ROW = `
+  <div class="hud hud-bottomright"><div class="panel-dock">
+    <button class="panel-dock-btn quest-tracker-btn "><span class="panel-dock-label">任務</span><span class="quest-count-badge">3</span></button>
+    <button class="panel-dock-btn script-panel-trigger "><span class="panel-dock-label">自動腳本</span><span class="script-badge" data-count="0">0</span></button>
+    <button class="panel-dock-btn script-panel-trigger "><span class="panel-dock-label">自動腳本</span><span class="script-badge" data-count="12">12</span></button>
+    <button class="panel-dock-btn active quest-tracker-btn "><span class="panel-dock-label">任務（開啟中）</span><span class="quest-count-badge">3</span></button>
+  </div></div>
+`;
+const BADGES_HTML = `
+  <div class="lab-row">${BADGE_ROW}</div>
+  <div class="lab-row lab-fs150">${BADGE_ROW}</div>
+`;
+
+document.getElementById('surface-old').innerHTML = SURFACE_HTML;
+document.getElementById('surface-new').innerHTML = SURFACE_HTML;
+document.getElementById('events-old').innerHTML = EVENTS_HTML;
+document.getElementById('events-new').innerHTML = EVENTS_HTML;
+document.getElementById('badges-old').innerHTML = BADGES_HTML;
+document.getElementById('badges-new').innerHTML = BADGES_HTML;
+
+/* ═══════════ 面板按鈕分組 ═══════════ */
+
+/** 圖示取自 `stores/panelWindowStore.ts` 的 `PANEL_ICONS`，順序與名稱不自創 */
+const DOCK_BTNS = {
+  quest:  { label: '任務',     icon: '📋', cls: 'quest-tracker-btn', badge: '<span class="quest-count-badge">3</span>' },
+  stats:  { label: '詳細狀態', icon: '💪' },
+  equip:  { label: '裝備欄',   icon: '🧥' },
+  bag:    { label: '背包',     icon: '👜' },
+  skill:  { label: '技能',     icon: '✨' },
+  script: { label: '自動腳本', icon: '📜', cls: 'script-panel-trigger', badge: '<span class="script-badge" data-count="2">2</span>' },
+};
+
+function dockBtn(key, groupStart) {
+  const b = DOCK_BTNS[key];
+  return `<button class="panel-dock-btn ${b.cls ?? ''} ${groupStart ? 'lab-group-start' : ''}">` +
+    `<span class="panel-dock-icon" aria-hidden="true">${b.icon}</span>` +
+    `<span class="panel-dock-label">${b.label}</span>${b.badge ?? ''}</button>`;
+}
+
+/** `keys` 內以 `null` 標記換組 —— 換組後的第一顆吃 `--dock-group-gap` */
+function dockRow(keys) {
+  let groupStart = false;
+  const btns = keys.map((k) => {
+    if (k === null) { groupStart = true; return ''; }
+    const html = dockBtn(k, groupStart);
+    groupStart = false;
+    return html;
+  }).join('');
+  return `<div class="hud hud-bottomright lab-row"><div class="panel-dock">${btns}</div>` +
+    `<div class="game-toolbar lab-group-start"><button class="panel-dock-btn btn-settings">⚙</button></div></div>`;
+}
+
+const DOCK_CASES = [
+  { title: '不分組', note: '現況的排序與間隔（dock 內 6px、⚙ 前 8px —— 差 2px，看不出來）。徽章已是候選樣式，這區只比分組', grouped: false,
+    keys: ['quest', 'stats', 'equip', 'bag', 'skill', 'script'] },
+  { title: '排法 1', note: '任務留在最左，自動腳本往左移到它旁邊（未採用）', grouped: true,
+    keys: ['quest', 'script', null, 'stats', 'equip', 'bag', 'skill'] },
+  { title: '排法 2 ✅ 定案', note: '自動腳本留在最右，任務往右移到它旁邊', grouped: true,
+    keys: ['stats', 'equip', 'bag', 'skill', null, 'quest', 'script'] },
+];
+
+document.getElementById('dock-cases').innerHTML = DOCK_CASES.map((c) => `
+  <div class="lab-dock-case ${c.grouped ? 'lab-grouped' : 'lab-plain'}">
+    <h4>${c.title}　<em>${c.note}</em></h4>
+    ${dockRow(c.keys)}
+    <div class="lab-iconmode" style="margin-top:8px">${dockRow(c.keys)}</div>
+  </div>
+`).join('');
+
+/* ═══════════ 要跟著調的 token ═══════════
+   刻意**不含 `--text-*`**：文字色是低飽和灰藍，拉飽和度會整片泛藍，
+   而且直接動到對比度 —— 那是無障礙問題，不是風格問題。 */
+const TOKENS = [
+  '--bg-deepest', '--bg-panel', '--bg-card', '--bg-card-hover', '--bg-inset',
+  '--accent-primary', '--accent-primary-dim', '--accent-danger', '--accent-success',
+  '--accent-gold', '--accent-mana', '--accent-info',
+  '--border', '--border-subtle',
+  '--hp-bar', '--mp-bar', '--exp-bar',
+  '--weight-bar', '--weight-bar-warning', '--weight-bar-critical', '--weight-bar-over',
+  '--monster-hp',
+];
+
+/*
+ * 基準值一律讀 App.css 的 `:root`，這頁不留第二份色表。
+ *
+ * **所有倍率都是相對於「目前上線的樣式」**，不是相對於某個歷史配色。
+ * 階段 3 已經把定案值寫死進 `:root`（`34-ui-guidelines.md` § 34.10），
+ * 所以「飽和度 ×1.00、圓角 ×1.00、地圖 ×1.00」＝ 遊戲裡現在的樣子，
+ * 兩欄在預設值下**應該完全一模一樣**。
+ *
+ * 曾經踩過：這裡寫死 4/8/12 當圓角基準、預設飽和度留在 1.30，
+ * 上線後基準已經是 5/10/15 與乘過 1.30 的色票 —— 等於再乘一次，
+ * demo 與遊戲的按鈕底色就對不起來（rgb(14,14,80) vs rgb(22,22,72)）。
+ */
+const rootStyle = getComputedStyle(document.documentElement);
+const BASE = Object.fromEntries(TOKENS.map((t) => [t, rootStyle.getPropertyValue(t).trim()]));
+const BASE_RADIUS = Object.fromEntries(
+  ['--radius-sm', '--radius-md', '--radius-lg'].map(
+    (n) => [n, parseFloat(rootStyle.getPropertyValue(n))],
+  ),
+);
+/** HUD 玻璃底：`:root` 存的是 RGB 三元組（`--glass-rgb`），這裡轉回 hex 好套變換 */
+const BASE_PANEL_BG = '#' + rootStyle.getPropertyValue('--glass-rgb').trim()
+  .split(',').map((n) => (+n.trim()).toString(16).padStart(2, '0')).join('');
+
+/**
+ * 文字對比修正。`--text-dim` 原本是 #64748B，在面板上只有 3.4:1，低於 WCAG 的 4.5:1，
+ * 而它用在 `.npc-label`、`.quick-slot-key` 這些真的要讀的字。
+ *
+ * **階段 3 已經套進 `:root`**，所以這個開關現在是「退回舊值看差別」用的，預設關閉。
+ */
+const TEXT_DIM_FIXED = '#8A99B5';
+const TEXT_DIM_LEGACY = '#64748B';
+
+/** 區色的預設值就是既有的 accent token —— 這頁不新增色票 */
+const AREAS = ['char', 'nav', 'town', 'battle', 'item'];
+
+/**
+ * 徽章配色。底色跟著飽和度變換走，**字色固定** ——
+ * 字色是可讀性的下限，不該被風格滑桿動到。
+ * `current` 的底色留空，執行時取當下的 `--accent-primary`（＝現況那組）。
+ */
+const BADGES = {
+  current: { bg: null,      fg: '#FFFFFF' },
+  gold:    { bg: '#F59E0B', fg: '#0A0A1A' },
+  info:    { bg: '#06B6D4', fg: '#0A0A1A' },
+  danger:  { bg: '#E11D48', fg: '#FFFFFF' },
+  dark:    { bg: '#0A0A1A', fg: '#F59E0B' },
+};
+
+const el = {
+  bd: document.getElementById('bd'),
+  outline: document.getElementById('outline'),
+  sat: document.getElementById('sat'),
+  light: document.getElementById('light'),
+  radius: document.getElementById('radius'),
+  textfix: document.getElementById('textfix'),
+  badge: document.getElementById('badge'),
+  badgeUnified: document.getElementById('badgeUnified'),
+  scriptInd: document.getElementById('scriptInd'),
+  groupGap: document.getElementById('groupGap'),
+  dock: document.getElementById('dock-lab'),
+  area: document.getElementById('area'),
+  areaContainer: document.getElementById('areaContainer'),
+  tint: document.getElementById('tint'),
+  mapsat: document.getElementById('mapsat'),
+  link: document.getElementById('link'),
+  bold: document.getElementById('bold'),
+  textoutline: document.getElementById('textoutline'),
+  col: document.getElementById('col-new'),
+  out: document.getElementById('out'),
+};
+
+const areaInputs = Object.fromEntries(AREAS.map((a) => [a, document.getElementById(`area-${a}`)]));
+
+/**
+ * 四個預設是**兩條互斥路線**的取樣點，不是「輕→重」的同一條線：
+ *
+ *   A / B：面板維持近黑，描邊改用亮色 —— 靠「亮線在暗面上」建立輪廓
+ *   C / D：描邊維持近黑，把面板提亮 —— 靠「暗線在亮面上」建立輪廓（角色 sprite 走的是這條）
+ *
+ * 近黑面板配近黑描邊（第一版的直覺）兩者都不成立：兩個近黑疊在一起等於沒有線。
+ */
+const PRESETS = {
+  current: { bd: 1.75, outline: '#4a4585', sat: 1,    light: 0,  radius: 1,   mapsat: 1,   area: true,  areaContainer: true,  tint: 0.35, bold: true, textoutline: false, textfix: false },
+  mild:    { bd: 1.5,  outline: '#3d3a6b', sat: 0.9,  light: 0,  radius: 1,   mapsat: 0.9, area: true,  areaContainer: true,  tint: 0.2,  bold: true, textoutline: false, textfix: false },
+  glow:    { bd: 2.25, outline: '#6a63b8', sat: 1.15, light: 0,  radius: 1.2, mapsat: 1.1, area: true,  areaContainer: true,  tint: 0.6,  bold: true, textoutline: false, textfix: false },
+  toon:    { bd: 2.25, outline: '#0a0a1a', sat: 1.1,  light: 14, radius: 1.2, mapsat: 1,   area: false, areaContainer: true,  tint: 0,    bold: true, textoutline: false, textfix: false },
+  heavy:   { bd: 4,    outline: '#8b7bd8', sat: 1.5,  light: 0,  radius: 1.6, mapsat: 1.3, area: true,  areaContainer: false, tint: 1,    bold: true, textoutline: true,  textfix: false },
+};
+
+function apply() {
+  const bd = Number(el.bd.value);
+  const sat = Number(el.sat.value);
+  const light = Number(el.light.value);
+  const radius = Number(el.radius.value);
+  if (el.link.checked) el.mapsat.value = String(sat);
+  const mapsat = Number(el.mapsat.value);
+  const tune = { sat, light };
+
+  /* 候選欄與分組區是兩個 `.lab-new`，變數要各設一份（自訂屬性只往下繼承） */
+  const targets = [el.col, el.dock];
+  const setVar = (n, v) => targets.forEach((t) => t.style.setProperty(n, v));
+  const setClass = (n, on) => targets.forEach((t) => t.classList.toggle(n, on));
+
+  setVar('--lab-bd', `${bd}px`);
+  setVar('--lab-outline', el.outline.value);
+  setVar('--dock-group-gap', `${el.groupGap.value}px`);
+  for (const [name, value] of Object.entries(BASE)) {
+    setVar(name, tuneCssValue(value, tune));
+  }
+  for (const [name, px] of Object.entries(BASE_RADIUS)) {
+    setVar(name, `${(px * radius).toFixed(1)}px`);
+  }
+  setVar('--lab-panel-bg', hexToRgba(tuneColor(BASE_PANEL_BG, tune), 0.86));
+
+  // 勾起來＝退回舊值看差別；`:root` 現在已經是修正後的值
+  if (el.textfix.checked) setVar('--text-dim', TEXT_DIM_LEGACY);
+  else targets.forEach((t) => t.style.removeProperty('--text-dim'));
+
+  // 區色也跟著飽和度／亮度變換，否則拉滑桿時框線與面板會愈走愈遠
+  const tint = el.area.checked ? Number(el.tint.value) : 0;
+  setVar('--lab-tint', String(tint));
+  for (const a of AREAS) {
+    setVar(`--area-${a}`, tuneColor(areaInputs[a].value, tune));
+  }
+
+  const badge = BADGES[el.badge.value];
+  setVar('--badge-bg', tuneColor(badge.bg ?? '#A78BFA', tune));
+  setVar('--badge-fg', badge.fg);
+  setClass('badge-unified', el.badgeUnified.checked);
+  setClass('script-dot', el.scriptInd.value === 'dot');
+  setClass('script-none', el.scriptInd.value === 'none');
+
+  setClass('is-area', el.area.checked);
+  setClass('area-container', el.areaContainer.checked);
+  setClass('is-bold', el.bold.checked);
+  setClass('is-textoutline', el.textoutline.checked);
+
+  document.getElementById('groupGap-v').textContent = `${el.groupGap.value}px`;
+  document.getElementById('tint-v').textContent = tint.toFixed(2);
+  document.getElementById('bd-v').textContent = `${bd}px`;
+  document.getElementById('sat-v').textContent = `${sat.toFixed(2)}×`;
+  document.getElementById('light-v').textContent = light > 0 ? `+${light}` : String(light);
+  document.getElementById('radius-v').textContent = `${radius.toFixed(2)}×`;
+  document.getElementById('mapsat-v').textContent = `${mapsat.toFixed(2)}×`;
+
+  renderScene(document.getElementById('scene-old'), { sat: 1, light: 0 });
+  renderScene(document.getElementById('scene-new'), { sat: mapsat, light: 0 });
+
+  el.out.textContent = report({ bd, outline: el.outline.value, sat, light, radius, mapsat, tint });
+}
+
+function hexToRgba(hex, alpha) {
+  const v = parseInt(hex.slice(1), 16);
+  return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${alpha})`;
+}
+
+/** 定案後直接把這段貼進 `99-ai-constraints.md` § 99.2，階段 3 照著改 App.css */
+function report(p) {
+  const tune = { sat: p.sat, light: p.light };
+  const lines = [
+    '── 目前參數（定案後貼進 99-ai-constraints.md § 99.2）──',
+    `線寬        --border-width: ${p.bd}px`,
+    `描邊色      --outline-dark: ${p.outline}`,
+    `飽和度倍率  S × ${p.sat.toFixed(2)}    亮度偏移  L ${p.light >= 0 ? '+' : ''}${p.light}`,
+    `圓角倍率    × ${p.radius.toFixed(2)}  →  sm ${(4 * p.radius).toFixed(1)}px / md ${(8 * p.radius).toFixed(1)}px / lg ${(12 * p.radius).toFixed(1)}px`,
+    `地圖飽和度  S × ${p.mapsat.toFixed(2)}（mapThemes.ts）`,
+    `區色濃度    --area-tint: ${p.tint.toFixed(2)}${p.tint === 0 ? '（分區關閉）' : ''}　範圍: ${el.areaContainer.checked ? '只上容器' : '容器與每顆按鈕'}`,
+    `文字對比    --text-dim: ${el.textfix.checked ? `#64748B → ${TEXT_DIM_FIXED}（修正，與線寬彩度無關的既有缺陷）` : '#64748B（未修正，面板上約 3.4:1，低於 4.5:1）'}`,
+    `數量徽章    --badge-bg: ${BADGES[el.badge.value].bg ?? '（沿用 --accent-primary）'}　--badge-fg: ${BADGES[el.badge.value].fg}`,
+    `            字級改吃 --fs-xs（原本 .quest-count-badge 寫死 10px）` +
+      `${el.badgeUnified.checked ? '、統一成角落圓形' : ''}`,
+    `腳本指示    ${{ dot: '小點（有規則才亮，不顯示條數）', none: '完全不顯示', count: '維持數字' }[el.scriptInd.value]}` +
+      `${el.scriptInd.value === 'count' ? '　※ totalRules 漏算村莊規則，保留數字就必須補 selectVillageRules' : ''}`,
+    `按鈕分組    --dock-group-gap: ${el.groupGap.value}px（組內維持 6px）` +
+      `　三組: 角色 / 目標與自動化 / 系統`,
+    '',
+    '── 分區色相（只上框／標題／active，不上內容文字）──',
+  ];
+  const AREA_LABEL = { char: '角色 / 系統', nav: '導航', town: '村莊', battle: '戰鬥', item: '物品 / 商店' };
+  const AREA_SURFACE = {
+    char: '.status-panel、.panel-dock',
+    nav: '.map-selector',
+    town: '.town-npc-bar',
+    battle: '.combat-log-window',
+    item: '.quick-slot-bar、.shop-items',
+  };
+  for (const a of AREAS) {
+    const base = areaInputs[a].value;
+    lines.push(`--area-${a.padEnd(7)} ${base}  →  ${tuneColor(base, tune)}   ${AREA_LABEL[a]}　${AREA_SURFACE[a]}`);
+  }
+  lines.push('');
+  lines.push('── 換算後的 token 值 ──');
+  for (const [name, value] of Object.entries(BASE)) {
+    lines.push(`${name.padEnd(24)} ${value}  →  ${tuneCssValue(value, tune)}`);
+  }
+  lines.push('');
+  lines.push('── 階段 3 要一併處理的硬編碼色（沒走 token，滑桿吃不到）──');
+  lines.push('.hud-topleft .status-panel   background: rgba(18, 18, 30, 0.82)');
+  lines.push('.combat-log-title            background: rgba(18, 18, 30, calc(var(--log-alpha) + 0.1))');
+  lines.push('.combat-log-overlay .combat-log  background: #12121e');
+  return lines.join('\n');
+}
+
+const inputs = [
+  el.bd, el.outline, el.sat, el.light, el.radius, el.textfix,
+  el.badge, el.badgeUnified, el.scriptInd, el.groupGap, el.area, el.areaContainer, el.tint,
+  el.mapsat, el.link, el.bold, el.textoutline, ...Object.values(areaInputs),
+];
+for (const input of inputs) input.addEventListener('input', apply);
+
+for (const btn of document.querySelectorAll('[data-preset]')) {
+  btn.addEventListener('click', () => {
+    const p = PRESETS[btn.dataset.preset];
+    el.bd.value = p.bd; el.outline.value = p.outline;
+    el.sat.value = p.sat; el.light.value = p.light; el.radius.value = p.radius;
+    el.textfix.checked = p.textfix;
+    el.area.checked = p.area; el.areaContainer.checked = p.areaContainer; el.tint.value = p.tint;
+    el.link.checked = false; el.mapsat.value = p.mapsat;
+    el.bold.checked = p.bold; el.textoutline.checked = p.textoutline;
+    apply();
+  });
+}
+
+document.getElementById('copy').addEventListener('click', () => {
+  navigator.clipboard.writeText(el.out.textContent);
+});
+
+apply();
+</script>
+
+</body>
+</html>

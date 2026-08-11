@@ -199,7 +199,7 @@ export const THEME_TERRAIN_PALETTES: Readonly<Record<MapTheme, readonly TileType
 };
 
 /**
- * § 38.11.2 全地圖個性指派表（50 張，逐張照抄，不得由主題推導）
+ * § 38.11.2 全地圖個性指派表（54 張，逐張照抄，不得由主題推導）
  *
  * `isBossFloor` 依 `mapData.ts` 的 `isBossFloor` 欄位。
  */
@@ -210,7 +210,11 @@ export const MAP_DESIGN_PROFILES: Readonly<Record<string, MapDesignProfile>> = {
   // forest
   'wind-woods': { archetype: 'semi-open', density: 'standard', dominantTerrain: TileType.Grass },
   'demon-forest': { archetype: 'semi-open', density: 'very-dense', dominantTerrain: TileType.Tree },
+  'rotleaf-path': { archetype: 'semi-open', density: 'dense', dominantTerrain: TileType.Tree },
+  'demon-altar': { archetype: 'semi-open', density: 'very-dense', dominantTerrain: TileType.Rock },
   'mirror-forest': { archetype: 'semi-open', density: 'dense', dominantTerrain: TileType.Water },
+  'glimmer-shore': { archetype: 'semi-open', density: 'standard', dominantTerrain: TileType.Water },
+  'shattered-mirror': { archetype: 'semi-open', density: 'dense', dominantTerrain: TileType.Rock },
   // swamp
   'misty-swamp': { archetype: 'semi-open', density: 'dense', dominantTerrain: TileType.Water },
   // snow

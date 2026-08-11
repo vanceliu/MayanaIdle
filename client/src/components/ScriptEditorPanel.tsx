@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { useGameStore, selectActiveTemplate, selectCombatRules, selectPersistentRules } from '../stores/gameStore';
+import {
+  useGameStore,
+  selectActiveTemplate,
+  selectCombatRules,
+  selectPersistentRules,
+  selectVillageRules,
+} from '../stores/gameStore';
 import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
@@ -13,18 +19,19 @@ type ScriptTab = 'combat' | 'persistent' | 'village';
 /**
  * 自動腳本（16-tech-frontend-architecture.md § 32.16）
  *
- * 按鈕位於底部 `PanelDock` 最右側，與其他面板按鈕並列（額外帶規則數量 badge）；
+ * 按鈕位於底部 `PanelDock` 最右側，與其他面板按鈕並列（額外帶指示點）；
  * 點擊後開啟可拖曳浮動視窗，與詳細狀態／裝備欄／背包／技能／任務共用同一套機制
  * （可拖曳、可多開、點擊置頂、無遮罩）。
  */
 export function ScriptEditorButton() {
   const combatRules = useGameStore(selectCombatRules);
   const persistentRules = useGameStore(selectPersistentRules);
+  const villageRules = useGameStore(selectVillageRules);
   const isOpen = usePanelWindowStore(s => s.open.script);
   const toggle = usePanelWindowStore(s => s.toggle);
   const isMobile = useIsMobile();
 
-  const totalRules = combatRules.length + persistentRules.length;
+  const hasRules = combatRules.length > 0 || persistentRules.length > 0 || villageRules.length > 0;
 
   return (
     <button
@@ -35,7 +42,7 @@ export function ScriptEditorButton() {
     >
       {/* 圖示與文字兩者都畫，由 CSS 決定顯示哪一個（`47-mobile.md`） */}
       <PanelDockFace panelKey="script" />
-      <span className="script-badge">{totalRules}</span>
+      {hasRules && <span className="script-badge" aria-hidden="true" />}
     </button>
   );
 }

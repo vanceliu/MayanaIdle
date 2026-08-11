@@ -37,16 +37,42 @@ export const MONSTER_SEEDS: MonsterTemplate[] = [
   { id: 25, name: '雪人', level: 34, hp: 270, attackMin: 27, attackMax: 38, defense: 17, exp: 550, race: 'normal', size: 'large', element: 'ice', area: 'snow-field-deep', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
   { id: 26, name: '雪怪', level: 35, hp: 290, attackMin: 28, attackMax: 40, defense: 18, exp: 580, race: 'normal', size: 'large', element: 'ice', area: 'snow-field-deep', isBoss: false },
   { id: 27, name: '雪地之主', level: 35, hp: 1500, attackMin: 35, attackMax: 48, defense: 22, exp: 3000, race: 'normal', size: 'large', element: 'ice', area: 'snow-field-deep', isBoss: true, debuffs: [{ type: 'stun', chance: 15 }] },
-  // 妖魔森林 Lv.30~40
+  // 妖魔森林 Lv.30~33
   { id: 28, name: '高等妖魔', level: 32, hp: 240, attackMin: 24, attackMax: 35, defense: 15, exp: 490, race: 'demon', size: 'small', element: 'dark', area: 'demon-forest', isBoss: false, debuffs: [{ type: 'curse', chance: 12 }] },
-  { id: 29, name: '高等妖魔鬥士', level: 35, hp: 300, attackMin: 28, attackMax: 42, defense: 18, exp: 600, race: 'demon', size: 'small', element: 'fire', area: 'demon-forest', isBoss: false, debuffs: [{ type: 'curse', chance: 12 }] },
   { id: 30, name: '妖魔神射手', level: 33, hp: 255, attackMin: 26, attackMax: 36, defense: 16, exp: 520, race: 'demon', size: 'small', element: 'wind', attackType: 'ranged', attackRange: 10, area: 'demon-forest', isBoss: false },
-  { id: 31, name: '巨人', level: 38, hp: 360, attackMin: 33, attackMax: 46, defense: 21, exp: 730, race: 'normal', size: 'large', element: 'earth', area: 'demon-forest', isBoss: false, debuffs: [{ type: 'stun', chance: 10 }] },
-  // 明鏡森林 Lv.30~40
+  { id: 200, name: '妖魔幼獸', level: 30, hp: 210, attackMin: 22, attackMax: 32, defense: 14, exp: 420, race: 'demon', size: 'small', element: 'dark', area: 'demon-forest', isBoss: false },
+  { id: 201, name: '蝕木藤妖', level: 31, hp: 225, attackMin: 23, attackMax: 33, defense: 15, exp: 455, race: 'normal', size: 'small', element: 'earth', area: 'demon-forest', isBoss: false, debuffs: [{ type: 'poison', chance: 15 }] },
+  { id: 202, name: '妖魔咒術師', level: 33, hp: 235, attackMin: 25, attackMax: 35, defense: 15, exp: 510, race: 'demon', size: 'small', element: 'dark', attackType: 'magic', attackRange: 8, area: 'demon-forest', isBoss: false, debuffs: [{ type: 'weaken', chance: 12 }] },
+  // 腐葉林道 Lv.34~36
+  { id: 29, name: '高等妖魔鬥士', level: 35, hp: 300, attackMin: 28, attackMax: 42, defense: 18, exp: 600, race: 'demon', size: 'small', element: 'fire', area: 'rotleaf-path', isBoss: false, debuffs: [{ type: 'curse', chance: 12 }] },
+  { id: 203, name: '腐葉巨蛛', level: 34, hp: 270, attackMin: 27, attackMax: 38, defense: 17, exp: 550, race: 'normal', size: 'small', element: 'earth', area: 'rotleaf-path', isBoss: false, debuffs: [{ type: 'poison', chance: 18 }] },
+  { id: 204, name: '妖魔獵犬', level: 34, hp: 265, attackMin: 27, attackMax: 39, defense: 17, exp: 545, race: 'demon', size: 'small', element: 'dark', area: 'rotleaf-path', isBoss: false, debuffs: [{ type: 'bleed', chance: 18 }] },
+  { id: 205, name: '腐生樹妖', level: 35, hp: 315, attackMin: 29, attackMax: 41, defense: 19, exp: 605, race: 'normal', size: 'large', element: 'earth', area: 'rotleaf-path', isBoss: false, debuffs: [{ type: 'poison', chance: 15 }] },
+  { id: 206, name: '妖魔投斧手', level: 36, hp: 300, attackMin: 30, attackMax: 42, defense: 18, exp: 630, race: 'demon', size: 'small', element: 'fire', attackType: 'ranged', attackRange: 10, area: 'rotleaf-path', isBoss: false, debuffs: [{ type: 'bleed', chance: 15 }] },
+  // 妖魔祭壇 Lv.37~40
+  { id: 31, name: '巨人', level: 38, hp: 360, attackMin: 33, attackMax: 46, defense: 21, exp: 730, race: 'normal', size: 'large', element: 'earth', area: 'demon-altar', isBoss: false, debuffs: [{ type: 'stun', chance: 10 }] },
+  { id: 207, name: '祭壇守衛', level: 37, hp: 340, attackMin: 31, attackMax: 44, defense: 20, exp: 680, race: 'demon', size: 'large', element: 'dark', area: 'demon-altar', isBoss: false, debuffs: [{ type: 'curse', chance: 15 }] },
+  { id: 208, name: '妖魔祭司', level: 38, hp: 330, attackMin: 32, attackMax: 45, defense: 20, exp: 715, race: 'demon', size: 'small', element: 'dark', attackType: 'magic', attackRange: 8, area: 'demon-altar', isBoss: false, debuffs: [{ type: 'curse', chance: 15 }, { type: 'weaken', chance: 15 }] },
+  { id: 209, name: '血祭石像', level: 39, hp: 375, attackMin: 34, attackMax: 47, defense: 22, exp: 750, race: 'demon', size: 'large', element: 'earth', area: 'demon-altar', isBoss: false, debuffs: [{ type: 'curse', chance: 12 }] },
+  { id: 210, name: '妖魔統領', level: 40, hp: 390, attackMin: 35, attackMax: 48, defense: 22, exp: 780, race: 'demon', size: 'large', element: 'fire', area: 'demon-altar', isBoss: false, debuffs: [{ type: 'bleed', chance: 18 }, { type: 'curse', chance: 15 }] },
+  // 明鏡森林 Lv.30~33
   { id: 32, name: '鏡面精靈', level: 32, hp: 235, attackMin: 24, attackMax: 34, defense: 15, exp: 480, race: 'normal', size: 'small', element: 'light', area: 'mirror-forest', isBoss: false },
   { id: 33, name: '光影狐', level: 33, hp: 250, attackMin: 25, attackMax: 36, defense: 16, exp: 510, race: 'normal', size: 'small', element: 'light', area: 'mirror-forest', isBoss: false },
-  { id: 34, name: '明鏡樹妖', level: 36, hp: 310, attackMin: 29, attackMax: 41, defense: 18, exp: 620, race: 'normal', size: 'large', element: 'earth', area: 'mirror-forest', isBoss: false },
-  { id: 35, name: '幻光獵蛾', level: 38, hp: 350, attackMin: 32, attackMax: 45, defense: 20, exp: 720, race: 'normal', size: 'small', element: 'light', area: 'mirror-forest', isBoss: false },
+  { id: 211, name: '微光蝶', level: 30, hp: 205, attackMin: 22, attackMax: 31, defense: 14, exp: 415, race: 'normal', size: 'small', element: 'light', area: 'mirror-forest', isBoss: false },
+  { id: 212, name: '鏡水蜥', level: 31, hp: 225, attackMin: 23, attackMax: 33, defense: 15, exp: 450, race: 'normal', size: 'small', element: 'ice', area: 'mirror-forest', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
+  { id: 213, name: '折光魔像', level: 33, hp: 265, attackMin: 26, attackMax: 36, defense: 17, exp: 525, race: 'normal', size: 'large', element: 'light', area: 'mirror-forest', isBoss: false },
+  // 幻光湖畔 Lv.34~36
+  { id: 34, name: '明鏡樹妖', level: 36, hp: 310, attackMin: 29, attackMax: 41, defense: 18, exp: 620, race: 'normal', size: 'large', element: 'earth', area: 'glimmer-shore', isBoss: false },
+  { id: 214, name: '湖畔水靈', level: 34, hp: 280, attackMin: 27, attackMax: 38, defense: 18, exp: 555, race: 'normal', size: 'large', element: 'ice', area: 'glimmer-shore', isBoss: false, debuffs: [{ type: 'slow', chance: 10 }] },
+  { id: 215, name: '潛鏡蛇', level: 34, hp: 260, attackMin: 27, attackMax: 38, defense: 17, exp: 545, race: 'normal', size: 'small', element: 'ice', area: 'glimmer-shore', isBoss: false, debuffs: [{ type: 'poison', chance: 18 }] },
+  { id: 216, name: '鏡湖歌者', level: 35, hp: 275, attackMin: 28, attackMax: 40, defense: 17, exp: 585, race: 'normal', size: 'small', element: 'light', attackType: 'magic', attackRange: 8, area: 'glimmer-shore', isBoss: false, debuffs: [{ type: 'weaken', chance: 15 }] },
+  { id: 217, name: '幻影鹿', level: 36, hp: 295, attackMin: 29, attackMax: 41, defense: 18, exp: 615, race: 'normal', size: 'small', element: 'light', area: 'glimmer-shore', isBoss: false },
+  // 碎鏡深林 Lv.37~40
+  { id: 35, name: '幻光獵蛾', level: 38, hp: 350, attackMin: 32, attackMax: 45, defense: 20, exp: 720, race: 'normal', size: 'small', element: 'light', area: 'shattered-mirror', isBoss: false },
+  { id: 218, name: '碎鏡魔像', level: 37, hp: 345, attackMin: 31, attackMax: 43, defense: 21, exp: 675, race: 'normal', size: 'large', element: 'earth', area: 'shattered-mirror', isBoss: false },
+  { id: 219, name: '逆影獵手', level: 38, hp: 325, attackMin: 32, attackMax: 45, defense: 20, exp: 710, race: 'normal', size: 'small', element: 'dark', attackType: 'ranged', attackRange: 10, area: 'shattered-mirror', isBoss: false, debuffs: [{ type: 'bleed', chance: 15 }] },
+  { id: 220, name: '鏡界巡守', level: 39, hp: 380, attackMin: 34, attackMax: 47, defense: 22, exp: 755, race: 'normal', size: 'large', element: 'light', area: 'shattered-mirror', isBoss: false },
+  { id: 221, name: '碎鏡之影', level: 40, hp: 385, attackMin: 35, attackMax: 48, defense: 22, exp: 775, race: 'demon', size: 'large', element: 'dark', area: 'shattered-mirror', isBoss: false, debuffs: [{ type: 'curse', chance: 15 }, { type: 'weaken', chance: 15 }] },
   // 龍之谷（地表）Lv.30~40
   { id: 36, name: '飛龍', level: 35, hp: 300, attackMin: 28, attackMax: 40, defense: 18, exp: 600, race: 'dragon', size: 'large', element: 'wind', area: 'dragon-valley-surface', isBoss: false, debuffs: [{ type: 'bleed', chance: 18 }] },
   { id: 37, name: '高階骷髏警衛', level: 33, hp: 260, attackMin: 26, attackMax: 37, defense: 16, exp: 530, race: 'undead', size: 'small', element: 'dark', area: 'dragon-valley-surface', isBoss: false, debuffs: [{ type: 'curse', chance: 12 }] },

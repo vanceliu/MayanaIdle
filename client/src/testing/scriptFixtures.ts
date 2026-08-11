@@ -1,5 +1,6 @@
 import { useGameStore } from '../stores/gameStore';
 import type { CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
+import type { VillageRule } from '../models/villageScript';
 import { createDefaultTemplate, DEFAULT_TEMPLATE_ID } from '../models/scriptTemplate';
 
 /**
@@ -11,6 +12,7 @@ import { createDefaultTemplate, DEFAULT_TEMPLATE_ID } from '../models/scriptTemp
 export function setActiveScripts(overrides: {
   combatRules?: CombatRule[];
   persistentRules?: PersistentRule[];
+  villageRules?: VillageRule[];
   emergencyRetreat?: EmergencyRetreat;
 }): void {
   useGameStore.setState({

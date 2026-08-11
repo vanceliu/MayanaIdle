@@ -13,7 +13,7 @@ import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { EquipmentInstance } from '../../models/equipment';
 
-const WIZARDS = ['象牙巫師', '象牙魔導師', '暗影巫師', '不死巫妖', '霜凍女巫', '精靈王魔導士'];
+const WIZARDS = ['妖魔咒術師', '妖魔祭司', '鏡湖歌者', '象牙巫師', '象牙魔導師', '暗影巫師', '不死巫妖', '霜凍女巫', '精靈王魔導士'];
 
 function char(spi: number): Character {
   return {
@@ -128,8 +128,8 @@ describe('怪物魔法攻擊減傷（§ 21.16）', () => {
 describe('魔法怪 seed 設定', () => {
   const magicSeeds = MONSTER_SEEDS.filter(m => m.attackType === 'magic');
 
-  it('僅巫師／魔導系 6 種怪物，共 9 筆', () => {
-    expect(magicSeeds).toHaveLength(9);
+  it('僅巫師／魔導系 9 種怪物，共 12 筆', () => {
+    expect(magicSeeds).toHaveLength(12);
     expect([...new Set(magicSeeds.map(m => m.name))].sort()).toEqual([...WIZARDS].sort());
   });
 

@@ -163,7 +163,11 @@ export const AREA_POOLS: Record<BaseQuestDifficulty, AreaPoolEntry[]> = {
   ],
   A: [
     { areaId: 'demon-forest', areaName: '妖魔森林', avgGold: 160 },
+    { areaId: 'rotleaf-path', areaName: '腐葉林道', avgGold: 175 },
+    { areaId: 'demon-altar', areaName: '妖魔祭壇', avgGold: 190 },
     { areaId: 'mirror-forest', areaName: '明鏡森林', avgGold: 160 },
+    { areaId: 'glimmer-shore', areaName: '幻光湖畔', avgGold: 175 },
+    { areaId: 'shattered-mirror', areaName: '碎鏡深林', avgGold: 190 },
     { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
     { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
     ...createFloorAreaEntries('ivory-tower', '象牙塔', [4, 5], 200),
@@ -199,6 +203,8 @@ export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<BaseQuestDiffic
   'elsarth-town': {
     A: [
       { areaId: 'demon-forest', areaName: '妖魔森林', avgGold: 160 },
+      { areaId: 'rotleaf-path', areaName: '腐葉林道', avgGold: 175 },
+      { areaId: 'demon-altar', areaName: '妖魔祭壇', avgGold: 190 },
       { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
       { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
       ...createFloorAreaEntries('misty-cave', '朦朧洞窟', [1, 2, 3], 250),
@@ -213,6 +219,8 @@ export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<BaseQuestDiffic
   'varden-town': {
     A: [
       { areaId: 'mirror-forest', areaName: '明鏡森林', avgGold: 160 },
+      { areaId: 'glimmer-shore', areaName: '幻光湖畔', avgGold: 175 },
+      { areaId: 'shattered-mirror', areaName: '碎鏡深林', avgGold: 190 },
       { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
       { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
       ...createFloorAreaEntries('underwater-prison', '水下監獄', [1, 2, 3, 4], 250),
@@ -241,7 +249,11 @@ const QUEST_AREA_MAPPING: Record<string, { questArea: string; difficulty: BaseQu
   'ivory-tower-4f': { questArea: 'ivory-tower-4f', difficulty: 'A' },
   'ivory-tower-5f': { questArea: 'ivory-tower-5f', difficulty: 'A' },
   'demon-forest': { questArea: 'demon-forest', difficulty: 'A' },
+  'rotleaf-path': { questArea: 'rotleaf-path', difficulty: 'A' },
+  'demon-altar': { questArea: 'demon-altar', difficulty: 'A' },
   'mirror-forest': { questArea: 'mirror-forest', difficulty: 'A' },
+  'glimmer-shore': { questArea: 'glimmer-shore', difficulty: 'A' },
+  'shattered-mirror': { questArea: 'shattered-mirror', difficulty: 'A' },
   'dragon-valley-surface': { questArea: 'dragon-valley-surface', difficulty: 'A' },
   'ancient-battlefield': { questArea: 'ancient-battlefield', difficulty: 'A' },
   'misty-cave-1f': { questArea: 'misty-cave-1f', difficulty: 'A' },

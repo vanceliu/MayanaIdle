@@ -31,11 +31,31 @@ describe('ScriptEditorButton（PanelDock 觸發鈕）', () => {
     usePanelWindowStore.getState().closeAll();
   });
 
-  it('顯示規則總數 badge', () => {
-    render(<ScriptEditorButton />);
+  it('有規則時顯示指示點，且不顯示條數', () => {
+    const { container } = render(<ScriptEditorButton />);
     expect(screen.getByText('自動腳本')).toBeTruthy();
+    expect(container.querySelector('.script-badge')).toBeTruthy();
+
     const total = DEFAULT_COMBAT_SCRIPT.length + DEFAULT_PERSISTENT_SCRIPT.length;
-    expect(screen.getByText(String(total))).toBeTruthy();
+    expect(screen.queryByText(String(total))).toBeNull();
+  });
+
+  it('完全沒有規則時不顯示指示點', () => {
+    setActiveScripts({ combatRules: [], persistentRules: [], villageRules: [] });
+    const { container } = render(<ScriptEditorButton />);
+    expect(container.querySelector('.script-badge')).toBeNull();
+  });
+
+  it('只有村莊規則時仍然亮起（條數版本會漏算這一種）', () => {
+    setActiveScripts({
+      combatRules: [],
+      persistentRules: [],
+      villageRules: [
+        { id: 'v1', enabled: true, conditions: [], action: { type: 'return_town' } },
+      ],
+    });
+    const { container } = render(<ScriptEditorButton />);
+    expect(container.querySelector('.script-badge')).toBeTruthy();
   });
 
   it('點擊切換 script 面板開關（與其他面板同一套 store）', () => {

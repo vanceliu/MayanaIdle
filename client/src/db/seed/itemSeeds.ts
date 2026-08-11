@@ -76,6 +76,8 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 43, name: '蟲殼碎片', category: 'material', description: '洞窟巨蟲的殼片', weight: 5, sellPrice: 400, iconType: 'bone', iconTier: 3 },
   { id: 44, name: '幻獸水晶', category: 'material', description: '朦朧幻獸的水晶', weight: 5, sellPrice: 520, iconType: 'crystal', iconTier: 3 },
   { id: 45, name: '洞窟菌絲', category: 'material', description: '洞窟深處的菌絲', weight: 5, sellPrice: 640, iconType: 'fabric', iconTier: 3 },
+  { id: 151, name: '腐葉孢囊', category: 'material', description: '腐生樹妖的孢囊', weight: 4, sellPrice: 400, iconType: 'misc', iconTier: 3 },
+  { id: 152, name: '祭壇黑曜石', category: 'material', description: '妖魔祭壇的黑曜石塊', weight: 5, sellPrice: 480, iconType: 'ore', iconTier: 3 },
 
   // === 區域素材（瓦爾登領地）===
   { id: 46, name: '鏡面碎片', category: 'material', description: '鏡面精靈的碎片', weight: 4, sellPrice: 200, iconType: 'crystal', iconTier: 3 },
@@ -84,6 +86,8 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 49, name: '亡靈碎骨', category: 'material', description: '溺水亡靈的碎骨', weight: 5, sellPrice: 400, iconType: 'bone', iconTier: 3 },
   { id: 50, name: '深海藻液', category: 'material', description: '深海藻獸的黏液', weight: 5, sellPrice: 520, iconType: 'misc', iconTier: 3 },
   { id: 51, name: '潮汐珠', category: 'material', description: '潮汐元素的珠子', weight: 5, sellPrice: 640, iconType: 'crystal', iconTier: 3 },
+  { id: 153, name: '湖鏡水晶', category: 'material', description: '湖畔水靈凝出的水晶', weight: 4, sellPrice: 400, iconType: 'crystal', iconTier: 3 },
+  { id: 154, name: '逆光鏡片', category: 'material', description: '碎鏡之影留下的鏡片', weight: 5, sellPrice: 480, iconType: 'crystal', iconTier: 3 },
 
   // === 區域素材（龍之谷）===
   { id: 52, name: '飛龍鱗片', category: 'material', description: '飛龍的鱗片', weight: 4, sellPrice: 200, iconType: 'fabric', iconTier: 3 },

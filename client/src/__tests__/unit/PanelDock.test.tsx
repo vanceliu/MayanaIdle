@@ -34,6 +34,13 @@ describe('PanelDock', () => {
     }
   });
 
+  it('按鈕順序＝分組：角色四顆在前，任務與自動腳本在後', () => {
+    render(<PanelDock />);
+    const names = [...document.querySelectorAll<HTMLElement>('.panel-dock > button')]
+      .map(b => b.getAttribute('aria-label') ?? b.textContent);
+    expect(names).toEqual(['詳細狀態', '裝備欄', '背包', '技能', '📋 任務', '自動腳本']);
+  });
+
   it('任務與自動腳本不在泛用按鈕清單內（按鈕由各自組件渲染以帶 badge）', () => {
     for (const key of ['quest', 'script'] as const) {
       expect(DOCK_PANEL_KEYS, key).not.toContain(key);

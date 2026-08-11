@@ -14,8 +14,9 @@ import { SIGIL_DEFINITIONS } from '../../models/sigil';
 const SIGIL_AREAS = [
   'snow-field', 'snow-field-deep',
   'ivory-tower-1f', 'ivory-tower-2f', 'ivory-tower-3f', 'ivory-tower-4f', 'ivory-tower-5f',
-  'demon-forest', 'misty-cave-1f', 'misty-cave-2f', 'misty-cave-3f',
-  'mirror-forest',
+  'demon-forest', 'rotleaf-path', 'demon-altar',
+  'misty-cave-1f', 'misty-cave-2f', 'misty-cave-3f',
+  'mirror-forest', 'glimmer-shore', 'shattered-mirror',
   'underwater-prison-1f', 'underwater-prison-2f', 'underwater-prison-3f', 'underwater-prison-4f',
   'dragon-valley-surface',
   'dragon-valley-1f', 'dragon-valley-2f', 'dragon-valley-3f', 'dragon-valley-4f',
