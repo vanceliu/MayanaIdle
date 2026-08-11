@@ -14,11 +14,11 @@ import {
   calculateBasePhysicalDamage,
   getEquippedWeapon,
   hasActiveFireEnchant,
-  getAffixBonusesFromGear,
   calculateMpRestored,
   absorbWithShield,
   getTotalMagicResist,
   getWeaponHitCount,
+  calculateHealAmount,
   type HitBreakdown,
 } from './combat';
 import { getErosion, getOnHitRestore } from '../models/affix';
@@ -193,11 +193,11 @@ export function processPlayerAttack(
       }
 
       logs.push({ text: `施放 ${skill.name}`, type: 'player' });
-    } else if (skill.type === 'heal' && skill.healAmount) {
+    } else if (skill.type === 'heal' && skill.power) {
       const allGear = Object.values(gs.equippedGear).filter(Boolean) as EquipmentInstance[];
-      const healBonuses = getAffixBonusesFromGear(allGear);
       const effMaxHp = getEffectiveMaxHp(character, gs.equippedGear);
-      const effectiveHeal = Math.floor(skill.healAmount * (1 + healBonuses.heal_effect / 100));
+      // § 21.4c：與常駐腳本／快捷格共用 `calculateHealAmount()`，不可各算各的
+      const effectiveHeal = calculateHealAmount(character, skill.power, allGear, gs.activeEffects);
       const healed = Math.min(effMaxHp - character.hp, effectiveHeal);
 
       const newChar = { ...character, hp: character.hp + healed, mp: character.mp - skill.mpCost };

@@ -34,7 +34,7 @@ import { purgeOutdatedData } from '../systems/dataVersionPurge';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
-import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon } from '../systems/combat';
+import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount } from '../systems/combat';
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -1326,10 +1326,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     newSkills[skillIdx] = { ...skill, lastUsedAt: now };
 
     if (skill.type === 'heal') {
-      if (!skill.healAmount) return false;
-      const healBonuses = getAffixBonusesFromGear(allGear);
+      if (!skill.power) return false;
       const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
-      const effectiveHeal = Math.floor(skill.healAmount * (1 + healBonuses.heal_effect / 100));
+      // § 21.4c：治癒量走技能側公式（技能攻擊力 × 魔攻乘區 + INT 加成）× 治癒效果%
+      const effectiveHeal = calculateHealAmount(char, skill.power, allGear, state.activeEffects);
       const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
       set({
         character: { ...char, hp: char.hp + healed, mp: char.mp - skill.mpCost },

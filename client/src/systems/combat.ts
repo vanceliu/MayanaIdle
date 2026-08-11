@@ -201,7 +201,15 @@ function applyIgnoreDefense(reduction: number, ignorePercent: number): number {
 }
 
 /** 強化可提升魔法攻擊的武器類型（§ 6.9：每 +2 強化 → 魔攻 +1） */
-const MAGIC_ATTACK_WEAPON_TYPES = new Set(['staff', 'twoHandStaff', 'magicBook']);
+/**
+ * 強化會提供魔法攻擊的**武器**類型（`06-equipment.md` § 6.9）。
+ *
+ * **`magicBook` 不在此列。** 魔導書是防具（§ 6.5：詞綴走防具池、用防具強化卷軸、
+ * 走 § 6.10 的防具成功率），強化只給防禦。把它加回來會讓它成為唯一同時吃到
+ * 武器強化與防具強化兩套效果的裝備 —— 兩套系統是獨立的，不可合併。
+ * 魔導書的 `magicAttack` 基底照算，不受影響。
+ */
+const MAGIC_ATTACK_WEAPON_TYPES = new Set(['staff', 'twoHandStaff']);
 
 /**
  * 手持武器的**唯一取用來源**：依 slot 語意取，右手優先，右手空手時才看左手。
@@ -423,12 +431,65 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
 /**
  * § 20.6：INT 每 2 點提供的技能威力%。
  *
- * 8 ＝ 每 2 點 +8%，即 `INT加成 = floor(技能攻擊力 × (有效INT / 2 × 0.08))`（§ 21.4）。
- * 這個值決定基礎魔攻的組成 —— 滿裝法系（有效INT 42）為
- * 智力 59%／技能攻擊力 35%／裝備魔攻 6%。
- * 技能攻擊力表已依此係數縮放（§ 22.4、§ 23.7.1），改係數就要重新縮表。
+ * 9.5 ＝ 每 2 點 +9.5%，即 `INT加成 = floor(技能攻擊力 × (有效INT / 2 × 0.095))`（§ 21.4）。
+ * 這個值與 `MAGIC_ATTACK_PERCENT_PER_POINT` 共同決定基礎魔攻的組成 ——
+ * 滿裝法系（有效INT 42、裝備魔攻 15）為 智力 50%／技能攻擊力 25%／裝備魔攻 25%。
+ * 技能攻擊力表已依此係數縮放（§ 22.4、§ 23.7.1），**改係數就要重新縮表**。
  */
-export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 8;
+export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 9.5;
+
+/**
+ * § 21.4：裝備魔攻每 1 點換算的技能威力%。
+ *
+ * 6.5 ＝ 滿裝魔攻 15 點給 +97.5%，讓裝備魔攻與技能攻擊力本體在基礎魔攻裡各佔約 25%。
+ * 它是**乘在技能攻擊力上的乘區**，不是加項 —— 同一件魔攻裝備在高階魔法上給的絕對值更大。
+ *
+ * 與 `INT_SKILL_DAMAGE_PERCENT_PER_2` 是一組的：兩者任一改動都會讓 50:25:25 跑掉，
+ * 也都需要重新縮技能攻擊力表並重跑 `scripts/simulateReaperKill.mts` 驗證。
+ */
+export const MAGIC_ATTACK_PERCENT_PER_POINT = 6.5;
+
+/**
+ * § 21.4 的「技能側」：`floor(技能攻擊力 × (1 + 裝備魔攻%)) + INT加成`。
+ *
+ * 傷害與治癒共用同一段 —— 傷害在這之上再加元素克制（`getBaseMagicAttack()`），
+ * 治癒則換上治癒效果%乘區（`calculateHealAmount()`）。
+ * **兩邊不可各自展開這段算式**：任何一次係數調整都必須同時反映在傷害與治癒上。
+ */
+function getSkillSideValue(
+  char: Character,
+  skillPower: number,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[],
+): number {
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
+  const effINT = getEffectiveINT(attrs.INT);
+  const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
+  const magicAttackPercent = getTotalMagicAttack(equippedGear) * MAGIC_ATTACK_PERCENT_PER_POINT;
+  return Math.floor(skillPower * (1 + magicAttackPercent / 100)) + intBonus;
+}
+
+/**
+ * 治癒量（`21-combat-formula.md` § 21.4c）。
+ *
+ * 與傷害走**同一條技能側公式**，兩點差異：
+ * - 沒有元素克制 —— 治癒對自己，沒有目標元素可比
+ * - 最後的乘區是「治癒效果%」而非「技能元素傷害%」
+ *   （治癒全是無屬性，技能元素%對它本來就恆為 ×1，等於把那個位置讓出來）
+ *
+ * **唯一實作**：常駐腳本、戰鬥腳本、快捷格手動施放全部走這一支。
+ * 回傳的是「打算回多少」，呼叫端自行夾在有效最大 HP 之內。
+ */
+export function calculateHealAmount(
+  char: Character,
+  skillPower: number,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  const base = getSkillSideValue(char, skillPower, equippedGear, activeEffects);
+  const healEffect = getAffixBonusesFromGear(equippedGear).heal_effect;
+  return Math.floor(base * (1 + healEffect / 100));
+}
 
 /** § 20.6：INT 每 2 點提供的冷卻縮減% */
 export const INT_COOLDOWN_PERCENT_PER_2 = 1;
@@ -695,11 +756,7 @@ export function getBaseMagicAttack(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[],
 ): number {
-  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const effINT = getEffectiveINT(attrs.INT);
-  const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
-  return Math.floor(skillPower * (1 + getTotalMagicAttack(equippedGear) / 100))
-    + intBonus
+  return getSkillSideValue(char, skillPower, equippedGear, activeEffects)
     + getElementCounterBonus(skillElement, monster.element);
 }
 

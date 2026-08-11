@@ -91,15 +91,26 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     expect(getTotalMagicAttack([book({ magicAttack: 4 }), book({ magicAttack: 2 })])).toBe(6);
   });
 
-  it('法杖／雙手法杖／魔導書每 +2 強化 → 魔攻 +1', () => {
-    expect(getTotalMagicAttack([book({ magicAttack: 0, enhancement: 8 })])).toBe(4);
+  it('法杖／雙手法杖每 +2 強化 → 魔攻 +1', () => {
     const staff = book({ type: 'staff', slot: 'rightHand', magicAttack: 0, enhancement: 6 });
     expect(getTotalMagicAttack([staff])).toBe(3);
     const twoStaff = book({ type: 'twoHandStaff', slot: 'rightHand', magicAttack: 0, enhancement: 5 });
     expect(getTotalMagicAttack([twoStaff])).toBe(2);
   });
 
-  it('非法杖／魔導書的武器強化不提供魔攻', () => {
+  /**
+   * 魔導書是**防具**（`06-equipment.md` § 6.5）：詞綴走防具池、用防具強化卷軸、
+   * 走 § 6.10 的防具成功率，強化只給防禦。
+   *
+   * 它一度同時吃到武器強化的魔攻，是唯一橫跨兩套強化系統的裝備。
+   * 這條把它釘死 —— 兩套系統獨立，不可合併（`CLAUDE.md` 實作規則第 6 條）。
+   */
+  it('魔導書的強化不給魔攻，但基底 magicAttack 照算', () => {
+    expect(getTotalMagicAttack([book({ magicAttack: 0, enhancement: 8 })])).toBe(0);
+    expect(getTotalMagicAttack([book({ magicAttack: 7, enhancement: 8 })])).toBe(7);
+  });
+
+  it('非法杖的武器強化不提供魔攻', () => {
     expect(getTotalMagicAttack([weapon({ enhancement: 10 })])).toBe(0);
   });
 
@@ -113,8 +124,9 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const m = monster({ defense: 0 });
     const without = calculateSkillAttack(c, 20, 'none', m, []).damage;
     const withBook = calculateSkillAttack(c, 20, 'none', m, [book({ magicAttack: 30 })]).damage;
-    // 技能攻擊力 20 × (1 + 30/100) = 26 → 多 6 點
-    expect(withBook - without).toBe(6);
+    // § 21.4：每 1 點魔攻 → +6.5%。魔攻 30 → +195%
+    // 技能攻擊力 20 × 2.95 = 59 → 多 39 點
+    expect(withBook - without).toBe(39);
   });
 
   it('技能攻擊力越高，同一件魔攻裝備給的絕對值越大', () => {
@@ -124,9 +136,9 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const gain = (power: number) =>
       calculateSkillAttack(c, power, 'none', m, [book({ magicAttack: 50 })]).damage
       - calculateSkillAttack(c, power, 'none', m, []).damage;
-    // ×1.5 的乘區：威力 10 → +5、威力 40 → +20
-    expect(gain(10)).toBe(5);
-    expect(gain(40)).toBe(20);
+    // 魔攻 50 → +325%，即 ×4.25 的乘區：威力 10 → +32、威力 40 → +130
+    expect(gain(10)).toBe(32);
+    expect(gain(40)).toBe(130);
   });
 
   it('裝備魔攻不進 INT 倍率（只乘技能攻擊力那一段）', () => {
@@ -139,8 +151,8 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const deltaHigh = calculateSkillAttack(highInt, 20, 'none', m, [book({ magicAttack: 30 })]).damage
       - calculateSkillAttack(highInt, 20, 'none', m, []).damage;
     // 高低 INT 的增量相同 → 魔攻沒有被 INT 放大
-    expect(deltaLow).toBe(6);
-    expect(deltaHigh).toBe(6);
+    expect(deltaLow).toBe(39);
+    expect(deltaHigh).toBe(39);
   });
 });
 

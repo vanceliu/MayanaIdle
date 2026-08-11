@@ -6,6 +6,8 @@ import {
   QUICK_SLOT_COUNT, quickSlotLabel, toQuickSlotSkillEntry, isSameQuickSlotEntry,
 } from '../models/quickSlot';
 import { getSkillDisplayIcon } from '../models/iconMap';
+import { calculateHealAmount } from '../systems/combat';
+import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
@@ -60,6 +62,9 @@ export function SkillPanel() {
   const character = useGameStore(s => s.character);
   const quickSlots = useGameStore(s => s.quickSlots);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  const equippedGearList = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
   const [contextMenu, setContextMenu] = useState<{ skillId: string; x: number; y: number } | null>(null);
   const pressRef = useRef<{ skillId: string; name: string; x: number; y: number } | null>(null);
 
@@ -297,8 +302,14 @@ export function SkillPanel() {
           {tooltip.skill.applyDebuff && (
             <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {(tooltip.skill.applyDebuff.dotDuration ?? tooltip.skill.applyDebuff.duration ?? 0) / 1000}s)</div>
           )}
-          {tooltip.skill.type === 'heal' && tooltip.skill.healAmount && (
-            <div className="skill-tooltip-stat">回復: {tooltip.skill.healAmount}</div>
+          {tooltip.skill.type === 'heal' && tooltip.skill.power > 0 && (
+            /*
+             * § 21.4c：治癒量隨智力與裝備魔攻變動，沒有固定值可標。
+             * 這裡直接算「這名角色現在放會回多少」—— 比印一個與實際不符的常數有用。
+             */
+            <div className="skill-tooltip-stat">
+              回復: {calculateHealAmount(character, tooltip.skill.power, equippedGearList, activeEffects)}
+            </div>
           )}
           {tooltip.skill.buffEffect && (
             <div className="skill-tooltip-stat">效果: {tooltip.skill.buffEffect}</div>

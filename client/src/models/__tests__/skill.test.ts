@@ -34,10 +34,15 @@ describe('skill model', () => {
       });
     });
 
-    it('heal skills should have healAmount', () => {
+    /*
+     * 治癒量改走 § 21.4c 的技能側公式後，固定的 `healAmount` 欄位已移除 ——
+     * 治癒與攻擊技能一樣以 `power` 為輸入，實際回復量依智力與裝備魔攻計算。
+     */
+    it('heal skills should have power', () => {
       const healSkills = SKILL_CATALOG.filter(s => s.type === 'heal');
+      expect(healSkills.length).toBeGreaterThan(0);
       healSkills.forEach(skill => {
-        expect(skill.healAmount).toBeGreaterThan(0);
+        expect(skill.power, skill.id).toBeGreaterThan(0);
       });
     });
 

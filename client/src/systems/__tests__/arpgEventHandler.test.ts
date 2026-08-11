@@ -107,12 +107,12 @@ describe('processPlayerAttack', () => {
       },
     );
 
-    // 魔力奪取威力 19（§ 23.5）+ INT 加成 floor(19 × (18/2 × 0.08)) = 13
-    // § 21.4：基礎魔攻 = floor(19 × 1.00) + 13 = 32（未裝備 → 魔攻乘區為 ×1）
-    expect(result.damages[0].damage).toBe(32);
-    expect(result.mpRestored).toBe(32);
-    expect(useGameStore.getState().character!.mp).toBe(42);
-    expect(result.logs).toContainEqual({ text: '魔力奪取 回復 32 MP', type: 'player' });
+    // 魔力奪取威力 13（§ 23.5）+ INT 加成 floor(13 × (18/2 × 0.095)) = 11
+    // § 21.4：基礎魔攻 = floor(13 × 1.00) + 11 = 24（未裝備 → 魔攻乘區為 ×1）
+    expect(result.damages[0].damage).toBe(24);
+    expect(result.mpRestored).toBe(24);
+    expect(useGameStore.getState().character!.mp).toBe(34);
+    expect(result.logs).toContainEqual({ text: '魔力奪取 回復 24 MP', type: 'player' });
   });
 
   /**

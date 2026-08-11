@@ -85,15 +85,20 @@ const MP_DRAIN_THRESHOLD = 0.3;
 /**
  * 可切換的規則組（`--rules=<name>`），用來評估數值調整的假設。
  *
- * INT 在 `combat.ts` 裡**只有一個作用**（`combat.ts:578-579`，全檔沒有第二個 INT 讀取點），
- * 因此本腳本一律把傳給 combat.ts 的 char/gear 的 INT 歸零，改由 `applyIntBonus()` 自行加算 ——
- * `current` 規則組會**逐位元重現**原本的公式（`intBonus = floor(威力 × 有效INT / 20)`），
- * 其餘乘區、暴擊、防禦減傷、取整順序全部仍由真實的 `calculateSkillAttack()` 負責。
+ * **INT 不在規則組的控制範圍內。** 傷害一律交給 `combat.ts` 的 `calculateSkillAttack()`
+ * 原生處理（含 INT 加成、魔攻乘區、暴擊、防禦減傷與取整順序），腳本不重算任何公式。
+ * 規則組能動的只有「餵進去的技能威力」與「裝備上的 magicAttack」。
  */
 interface Rules {
   name: string;
   label: string;
-  /** 每 2 點有效 INT 提供的「技能威力%」 */
+  /**
+   * 每 2 點有效 INT 提供的「技能威力%」—— **僅供表頭顯示，不會改變計算**。
+   *
+   * INT 加成由 `combat.ts` 的 `getBaseMagicAttack()` 原生處理，腳本沒有覆寫點。
+   * 要試算不同的 INT 係數，只能暫時改 `INT_SKILL_DAMAGE_PERCENT_PER_2` 再跑。
+   * 曾有 `no-int` / `int-10` 兩組規則掛在這個欄位上，因為改了不生效而**靜默失真**，已移除。
+   */
   intDamagePer2: number;
   /** 每 2 點有效 INT 提供的「冷卻縮減%」（與詞綴/buff 加總後同樣受 50% 上限） */
   intCdrPer2: number;
@@ -103,6 +108,12 @@ interface Rules {
   classPowerMult: number;
   /** 職業魔法威力倍率的職業別覆寫 */
   classPowerMultBy?: Partial<Record<ClassName, number>>;
+  /**
+   * 裝備 `magicAttack` 的倍率，用來試算「每 1 點魔攻換算幾 %」的匯率調整。
+   * 1 = 現行（每 1 點 → +1%）。法杖強化那一份走 `getTotalMagicAttack()`，
+   * 不吃這個倍率，因此本欄只放大裝備模板上的基底魔攻。
+   */
+  magicAttackMult: number;
 }
 
 /**
@@ -114,23 +125,13 @@ const RULE_SETS: Record<string, Rules> = {
     name: 'current', label: '現行規則',
     intDamagePer2: INT_SKILL_DAMAGE_PERCENT_PER_2,
     intCdrPer2: INT_COOLDOWN_PERCENT_PER_2,
-    basicPowerMult: 1, classPowerMult: 1,
-  },
-  'no-int': {
-    name: 'no-int', label: '拿掉 INT 的技能傷害加成（保留冷卻縮減）',
-    intDamagePer2: 0, intCdrPer2: INT_COOLDOWN_PERCENT_PER_2,
-    basicPowerMult: 1, classPowerMult: 1,
-  },
-  'int-10': {
-    name: 'int-10', label: 'INT 技能傷害回到每 2 點 +10%',
-    intDamagePer2: 10, intCdrPer2: INT_COOLDOWN_PERCENT_PER_2,
-    basicPowerMult: 1, classPowerMult: 1,
+    basicPowerMult: 1, classPowerMult: 1, magicAttackMult: 1,
   },
   'nerf-more': {
     name: 'nerf-more', label: '技能威力再砍 20%（在現行值之上）',
     intDamagePer2: INT_SKILL_DAMAGE_PERCENT_PER_2,
     intCdrPer2: INT_COOLDOWN_PERCENT_PER_2,
-    basicPowerMult: 0.8, classPowerMult: 1,
+    basicPowerMult: 0.8, classPowerMult: 1, magicAttackMult: 1,
     classPowerMultBy: { elementalist: 0.8, priest: 0.8 },
   },
 };
@@ -138,11 +139,6 @@ const RULE_SETS: Record<string, Rules> = {
 const RULES_ARG = process.argv.find(a => a.startsWith('--rules='))?.split('=')[1] ?? 'current';
 const RULES = RULE_SETS[RULES_ARG];
 if (!RULES) throw new Error(`未知的規則組：${RULES_ARG}（可用：${Object.keys(RULE_SETS).join(', ')}）`);
-
-/** § 21.4：INT 加成 = floor(技能威力 × (有效INT / 2 × 每2點%) / 100) */
-function applyIntBonus(power: number, effInt: number): number {
-  return power + Math.floor(power * (effInt / 2 * RULES.intDamagePer2) / 100);
-}
 
 /** INT 提供的冷卻縮減%（未套 50% 上限） */
 function intCooldownReduction(effInt: number): number {
@@ -189,7 +185,7 @@ const CREATION_ATTRIBUTES: Record<ClassName, Attributes> = {
   thief: { STR: 18, AGI: 18, VIT: 12, SPI: 10, INT: 12, CHA: 10 },
 };
 
-/** 各職業「設計上」的有效 INT（配點 + 裝備），用於 applyIntBonus 與 INT 冷卻縮減 */
+/** 各職業「設計上」的有效 INT（配點 + 裝備），用於 INT 冷卻縮減與表頭顯示 */
 function designEffectiveInt(className: ClassName, gear: (EquipmentInstance | null)[]): number {
   const raw = CREATION_ATTRIBUTES[className].INT + (LEVELUP_ALLOCATION[className].INT ?? 0);
   const fromGear = gear.reduce((sum, g) => sum + (GEAR_INT_BONUS.get(g?.name ?? '') ?? 0), 0);
@@ -385,8 +381,27 @@ function erosionRollValue(base: number): number {
 
 function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[]): EquipmentInstance {
   const bonusAttributes = tpl.bonusAttributes;
+  /*
+   * 裝備魔攻的「點數 → 百分比」匯率調整（`magicAttackMult`）。
+   *
+   * `getBaseMagicAttack()` 是 `floor(威力 × (1 + Σ魔攻 / 100))`，把裝備上的
+   * `magicAttack` 先乘上倍率，效果**等同**改那個 /100 的匯率，不必動 `combat.ts`。
+   *
+   * 但法杖／雙手法杖的強化那一份是 `getTotalMagicAttack()` 於執行期補的
+   * `floor(強化/2)`，吃不到這裡的倍率 —— 因此把差額 `floor(強化/2) × (倍率−1)`
+   * 一併塞進來，讓最終總和等於 `(基底 + 強化) × 倍率`。少了這段，
+   * 匯率只套到一半，量出來的法系會低估。
+   */
+  const mult = RULES.magicAttackMult;
+  // 與 `combat.ts` 的 `MAGIC_ATTACK_WEAPON_TYPES` 一致：魔導書是防具，強化不給魔攻
+  const enhanceMagic = (tpl.type === 'staff' || tpl.type === 'twoHandStaff')
+    ? Math.floor(enhancement / 2)
+    : 0;
+  const magicAttack = (tpl.magicAttack != null || enhanceMagic > 0)
+    ? Math.round((tpl.magicAttack ?? 0) * mult + enhanceMagic * (mult - 1))
+    : tpl.magicAttack;
   return {
-    ...tpl, bonusAttributes, templateId: tpl.id!, quality: QUALITY, enhancement,
+    ...tpl, bonusAttributes, magicAttack, templateId: tpl.id!, quality: QUALITY, enhancement,
     affixes: affixTypes.map(type => ({
       type, tier: 7, value: T7,
       ...(type === 'element_brand' || type === 'element_erosion' ? { element: BIS_BRAND_ELEMENT } : {}),
@@ -1119,9 +1134,18 @@ const WEAPON_AFFIX_POOL: AffixType[] = [
 ];
 /** 粗排用的取樣數（全模擬另有 RUNS） */
 const PROXY_SAMPLES = 600;
-/** 粗排後進入下一階段的組合數 */
-const TOP_HANDS = 3;
-const TOP_FINAL = 3;
+/**
+ * 粗排後進入下一階段的組合數。可用 `--top=<n>` 放大。
+ *
+ * **粗排是「最佳單次動作 ÷ 攻擊間隔」，會高估長 CD 的大招。**
+ * 試算魔攻類規則時特別明顯：盜賊的背刺走魔法公式（§ 21.4），
+ * 魔攻匯率一放大，粗排就會把法杖排到爪類前面，爪類連全模擬都進不去，
+ * 量出來的職業 DPS 因此整個失真。改規則組後若看到職業拿了不合理的武器，
+ * 先用 `--top` 放大再判斷，不要直接採信。
+ */
+const TOP_N_ARG = Number(process.argv.find(a => a.startsWith('--top='))?.split('=')[1]);
+const TOP_HANDS = Number.isFinite(TOP_N_ARG) && TOP_N_ARG > 0 ? TOP_N_ARG : 3;
+const TOP_FINAL = TOP_HANDS;
 
 const SEED_AFFIXES: Record<ClassName, AffixType[]> = {
   knight: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],

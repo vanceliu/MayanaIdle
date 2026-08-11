@@ -129,9 +129,9 @@ describe('§ 21.4a 吃哪些來源', () => {
     const highInt = char({ baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 34, CHA: 12 } });
     const a = calculatePhysicalSnapshotSkill(lowInt, 10, 'none', w, dummy(), [w]).damage;
     const b = calculatePhysicalSnapshotSkill(highInt, 10, 'none', w, dummy(), [w]).damage;
-    // 有效INT 4 → floor(10 × 0.16) = 1；有效INT 34 → floor(10 × 1.36) = 13
+    // § 20.6 每 2 點 +9.5%：有效INT 4 → floor(10 × 0.19) = 1；有效INT 34 → floor(10 × 1.615) = 16
     expect(a).toBe(28);
-    expect(b).toBe(40);
+    expect(b).toBe(43);
   });
 
   it('裝備魔攻照 § 21.4 乘在技能攻擊力上（日後有魔攻裝備時吃得到）', () => {
@@ -139,8 +139,9 @@ describe('§ 21.4a 吃哪些來源', () => {
     const w = sword();
     const a = calculatePhysicalSnapshotSkill(char(), 10, 'none', w, dummy(), [w]).damage;
     const b = calculatePhysicalSnapshotSkill(char(), 10, 'none', w, dummy(), [w, book({ magicAttack: 50 })]).damage;
-    // 技能攻擊力 10 × (1 + 50/100) = 15 → 多 5 點
-    expect(b - a).toBe(5);
+    // § 21.4 每 1 點魔攻 → +6.5%：魔攻 50 → +325%
+    // 技能攻擊力 10 × 4.25 = 42 → 多 32 點
+    expect(b - a).toBe(32);
   });
 });
 

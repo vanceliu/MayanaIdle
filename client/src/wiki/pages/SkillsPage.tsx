@@ -59,7 +59,6 @@ export function SkillsPage() {
               <th>目標</th>
               <th>射程</th>
               <th>威力</th>
-              <th>治療量</th>
               <th>MP 消耗</th>
               <th>冷卻(秒)</th>
               <th>持續</th>
@@ -76,7 +75,6 @@ export function SkillsPage() {
                 <td>{s.target === 'aoe' ? `範圍(半徑${s.aoeRadius ?? '?'}格/${s.maxTargets ? `最多${s.maxTargets}隻` : '無上限'})` : '單體'}</td>
                 <td>{formatSkillRange(s) || '-'}</td>
                 <td className="cell-number">{s.power || '-'}</td>
-                <td className="cell-number">{s.healAmount || '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
                 <td className="cell-number">{(s.cooldown / 1000).toFixed(1)}</td>
                 <td>{formatBuffDuration(s) || '-'}</td>
@@ -133,8 +131,7 @@ export function SkillsPage() {
                     <th>目標</th>
                     <th>射程</th>
                     <th>威力</th>
-                    <th>治療量</th>
-                    <th>MP</th>
+                          <th>MP</th>
                     <th>冷卻(秒)</th>
                     <th>持續</th>
                     <th>效果</th>
@@ -154,7 +151,6 @@ export function SkillsPage() {
                       <td className="cell-number">
                         {s.skill.physicalSnapshot ? `${s.skill.power} + 物理` : (s.skill.power || '-')}
                       </td>
-                      <td className="cell-number">{s.skill.healAmount || '-'}</td>
                       <td className="cell-number">{s.skill.mpCost}</td>
                       <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>
                       <td>{formatBuffDuration(s.skill) || '-'}</td>
