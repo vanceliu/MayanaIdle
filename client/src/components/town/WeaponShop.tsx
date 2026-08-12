@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { db } from '../../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
@@ -98,15 +98,12 @@ export function WeaponShop() {
     sellCart.clear();
   }
 
-  const batchSellWeapons = useMemo(
-    () => (batchTier === null ? [] : collectBatchSellEquipment(weaponsInBag, allTemplates, batchTier)),
-    [weaponsInBag, batchTier, allTemplates],
-  );
-
-  const batchSellTotal = useMemo(
-    () => getEquipmentSellTotal(batchSellWeapons, allTemplates),
-    [batchSellWeapons, allTemplates],
-  );
+  /* 同 `ArmorShop`：deps 是每次 render 新生的陣列，memo 不會命中，
+     且擺在早期 return 之後會讓 hook 數量隨 char 有無變動 */
+  const batchSellWeapons = batchTier === null
+    ? []
+    : collectBatchSellEquipment(weaponsInBag, allTemplates, batchTier);
+  const batchSellTotal = getEquipmentSellTotal(batchSellWeapons, allTemplates);
 
   function executeBatchSell() {
     if (!char || batchSellWeapons.length === 0) return;

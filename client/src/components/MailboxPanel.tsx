@@ -57,6 +57,7 @@ function describeItem(item: MailItem): string {
 
 function MailRow({ mail }: { mail: Mail }) {
   const claim = useMailboxStore(s => s.claim);
+  const remove = useMailboxStore(s => s.remove);
   const characterId = useGameStore(s => s.character?.id);
   const claimed = mail.claimedAt !== null;
 
@@ -72,8 +73,18 @@ function MailRow({ mail }: { mail: Mail }) {
         <span className="mail-title">{mail.title}</span>
         <span className="mail-items">{mail.items.map(describeItem).join('、')}</span>
       </div>
+      {/* 已領取的可以自己刪掉，不必等換版清理（§ 52.4）。未領取的沒有刪除鈕 */}
       {claimed
-        ? <span className="mail-claimed-tag">已領取</span>
+        ? (
+          <button
+            className="mail-delete-btn"
+            aria-label="刪除"
+            title="刪除這封信"
+            onClick={() => void remove(mail.id!)}
+          >
+            ✕
+          </button>
+        )
         : <button className="mail-claim-btn" onClick={onClaim}>領取</button>}
     </li>
   );
@@ -83,7 +94,9 @@ export function MailboxContent() {
   const mails = useMailboxStore(s => s.mails);
   const unread = useMailboxStore(s => s.unread);
   const claimAll = useMailboxStore(s => s.claimAll);
+  const purgeClaimed = useMailboxStore(s => s.purgeClaimed);
   const characterId = useGameStore(s => s.character?.id);
+  const claimedCount = mails.length - unread;
 
   async function onClaimAll() {
     if (await claimAll() > 0 && characterId) {
@@ -97,11 +110,18 @@ export function MailboxContent() {
 
   return (
     <div className="mailbox-content">
-      {unread > 0 && (
+      {(unread > 0 || claimedCount > 0) && (
         <div className="mail-actions">
-          <button className="mail-claim-all-btn" onClick={onClaimAll}>
-            全部領取（{unread}）
-          </button>
+          {unread > 0 && (
+            <button className="mail-claim-all-btn" onClick={onClaimAll}>
+              全部領取（{unread}）
+            </button>
+          )}
+          {claimedCount > 0 && (
+            <button className="mail-purge-btn" onClick={() => void purgeClaimed()}>
+              清除已領取（{claimedCount}）
+            </button>
+          )}
         </div>
       )}
       {/* 未領取在上、已領取在下，排序在 `systems/mailbox.ts` 的 listMail */}

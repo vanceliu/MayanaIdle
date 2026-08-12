@@ -106,8 +106,13 @@ function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixIns
     setBinding(null);
   }
 
-  /** 綁定用的下拉：選了不直接寫入，先跳確認 */
-  function BindSelect({ label, options }: { label: string; options: { value: string; name: string }[] }) {
+  /*
+   * 綁定用的下拉：選了不直接寫入，先跳確認。
+   *
+   * **是函式不是元件**：寫成 `<BindSelect/>` 的話，每次 render 都會產生一個新的
+   * 元件型別，React 會把整個 `<select>` 卸載重建 —— 下拉會在打字／選取途中重置。
+   */
+  function bindUI(label: string, options: { value: string; name: string }[]) {
     return (
       <>
         <label className="talent-param is-binding">
@@ -190,24 +195,14 @@ function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixIns
           </span>
         );
       }
-      return (
-        <BindSelect
-          label={field.label}
-          options={usable.map(sk => ({ value: sk.id, name: sk.name }))}
-        />
-      );
+      return bindUI(field.label, usable.map(sk => ({ value: sk.id, name: sk.name })));
     }
 
     /* 池型：先綁一個系別，之後只能在該系別內自選 */
     let pooled = usable;
     if (def?.form === 'pool') {
       if (!affix.boundParam) {
-        return (
-          <BindSelect
-            label="系別"
-            options={SKILL_POOL_KEYS.map(k => ({ value: k, name: SKILL_POOL_LABELS[k] }))}
-          />
-        );
+        return bindUI('系別', SKILL_POOL_KEYS.map(k => ({ value: k, name: SKILL_POOL_LABELS[k] })));
       }
       pooled = usable.filter(sk => matchesSkillPool(sk, affix.boundParam!));
     }

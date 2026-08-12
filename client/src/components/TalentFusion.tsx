@@ -60,8 +60,8 @@ export function TalentFusion() {
     setPicked([]);
     if (!r) return;
     setResult(r.success
-      ? { ok: true, text: `成功　${affixLabel(r.produced!)}` }
-      : { ok: false, text: '失敗　退回其中 1 份' });
+      ? { ok: true, text: `成功：${affixLabel(r.produced!)}` }
+      : { ok: false, text: '失敗：退回其中 1 份' });
   }
 
   return (

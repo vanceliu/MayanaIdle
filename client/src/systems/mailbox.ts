@@ -177,6 +177,19 @@ export async function purgeClaimedMail(characterId: number): Promise<number> {
   return stale.length;
 }
 
+/**
+ * 刪一封已領取的信（§ 52.4）。
+ *
+ * **未領取的刪不掉**：那等於把還沒拿的東西丟了，而且玩家不會知道自己丟了什麼。
+ * 要清就先領。
+ */
+export async function deleteClaimedMail(mailId: number): Promise<boolean> {
+  const mail = await db.mailbox.get(mailId);
+  if (!mail || mail.claimedAt === null) return false;
+  await db.mailbox.delete(mailId);
+  return true;
+}
+
 const PURGE_VERSION_KEY = 'mayana_mail_purged_version';
 
 /**

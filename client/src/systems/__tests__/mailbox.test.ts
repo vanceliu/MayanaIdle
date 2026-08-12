@@ -4,6 +4,7 @@ import { db } from '../../db/database';
 import {
   claimAll,
   claimMail,
+  deleteClaimedMail,
   expectedTalentSlotGrants,
   listMail,
   purgeClaimedMail,
@@ -197,6 +198,39 @@ describe('系統信箱（`52-mailbox.md`）', () => {
       const affixes = await db.talentAffixes.where('characterId').equals(CHAR).toArray();
       expect(affixes).toHaveLength(2);
       expect(affixes.every(a => a.slotId === null && a.boundParam === null)).toBe(true);
+    });
+  });
+
+  /* § 52.4：已領取的可以自己刪，不必等換版清理 */
+  describe('手動刪除（§ 52.4）', () => {
+    async function oneMail() {
+      await syncTalentSlotGrants(CHAR, 5);
+      return (await listMail(CHAR))[0];
+    }
+
+    it('已領取的刪得掉', async () => {
+      const mail = await oneMail();
+      await claimMail(mail.id!);
+      expect(await deleteClaimedMail(mail.id!)).toBe(true);
+      expect(await listMail(CHAR)).toHaveLength(0);
+    });
+
+    // 刪未領取的等於把還沒拿的東西丟了，而且玩家不會知道自己丟了什麼
+    it('未領取的刪不掉', async () => {
+      const mail = await oneMail();
+      expect(await deleteClaimedMail(mail.id!)).toBe(false);
+      expect(await listMail(CHAR)).toHaveLength(1);
+    });
+
+    it('清除已領取只掃已領取的那些', async () => {
+      await syncTalentSlotGrants(CHAR, 10);
+      const mails = await listMail(CHAR);
+      await claimMail(mails[0].id!);
+
+      expect(await purgeClaimedMail(CHAR)).toBe(1);
+      const left = await listMail(CHAR);
+      expect(left).toHaveLength(1);
+      expect(left[0].claimedAt).toBeNull();
     });
   });
 });

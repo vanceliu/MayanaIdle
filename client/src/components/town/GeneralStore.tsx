@@ -60,6 +60,24 @@ export function GeneralStore() {
   const buyCart = useShopCart();
   const sellCart = useShopCart();
 
+  /*
+   * **memo 必須在早期 return 之前**：擺在後面的話 hook 數量會隨 char 有無變動，
+   * 切角色或登出時 React 會丟「rendered fewer hooks than expected」。
+   * 這幾個的依賴都不需要 char。
+   */
+  const batchSellItems = useMemo(
+    () => (batchTier === null ? [] : collectSellableMaterials(bagItems, batchTier, { skipCraftMaterials })),
+    [bagItems, batchTier, skipCraftMaterials],
+  );
+
+  /** 被保護規則擋下來的素材，讓玩家知道少賣了什麼，而不是靜默漏掉 */
+  const protectedItems = useMemo(
+    () => (batchTier === null || !skipCraftMaterials ? [] : collectProtectedMaterials(bagItems, batchTier)),
+    [bagItems, batchTier, skipCraftMaterials],
+  );
+
+  const batchSellTotal = useMemo(() => getMaterialsSellTotal(batchSellItems), [batchSellItems]);
+
   if (!char) return null;
 
   const gold = char.gold;
@@ -142,19 +160,6 @@ export function GeneralStore() {
     );
     sellCart.clear();
   }
-
-  const batchSellItems = useMemo(
-    () => (batchTier === null ? [] : collectSellableMaterials(bagItems, batchTier, { skipCraftMaterials })),
-    [bagItems, batchTier, skipCraftMaterials],
-  );
-
-  /** 被保護規則擋下來的素材，讓玩家知道少賣了什麼，而不是靜默漏掉 */
-  const protectedItems = useMemo(
-    () => (batchTier === null || !skipCraftMaterials ? [] : collectProtectedMaterials(bagItems, batchTier)),
-    [bagItems, batchTier, skipCraftMaterials],
-  );
-
-  const batchSellTotal = useMemo(() => getMaterialsSellTotal(batchSellItems), [batchSellItems]);
 
   function executeBatchSell() {
     if (!char || batchSellItems.length === 0) return;

@@ -7726,8 +7726,10 @@ button.active {
 .mail-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
 }
 
+.mail-purge-btn,
 .mail-claim-all-btn,
 .mail-claim-btn {
   padding: 4px 10px;
@@ -7739,9 +7741,15 @@ button.active {
   cursor: pointer;
 }
 
+.mail-purge-btn:hover,
 .mail-claim-all-btn:hover,
 .mail-claim-btn:hover {
   background: var(--bg-card-hover);
+}
+
+/* 清除是次要動作：領取才是玩家來信箱的目的 */
+.mail-purge-btn {
+  color: var(--text-dim);
 }
 
 .mail-list {
@@ -7788,9 +7796,20 @@ button.active {
   color: var(--accent-gold);
 }
 
-.mail-claimed-tag {
-  font-size: var(--fs-xs);
+/* 已領取那一列的刪除鈕。淡色不搶眼，滑過才變明顯 */
+.mail-delete-btn {
+  padding: 2px 6px;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-dim);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.mail-delete-btn:hover {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
 }
 
 /* === 自動天賦（`51-auto-talent.md`） === */

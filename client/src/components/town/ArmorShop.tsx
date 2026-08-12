@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { db } from '../../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
@@ -98,15 +98,15 @@ export function ArmorShop() {
     sellCart.clear();
   }
 
-  const batchSellArmors = useMemo(
-    () => (batchTier === null ? [] : collectBatchSellEquipment(armorsInBag, allTemplates, batchTier)),
-    [armorsInBag, batchTier, allTemplates],
-  );
-
-  const batchSellTotal = useMemo(
-    () => getEquipmentSellTotal(batchSellArmors, allTemplates),
-    [batchSellArmors, allTemplates],
-  );
+  /*
+   * **不包 `useMemo`**：`armorsInBag` 每次 render 都是新陣列，memo 永遠不命中；
+   * 而且這裡在 `if (!char) return null` 之後，包了會讓 hook 數量隨 char 有無變動 ——
+   * 切角色或登出時 React 會直接丟「rendered fewer hooks than expected」。
+   */
+  const batchSellArmors = batchTier === null
+    ? []
+    : collectBatchSellEquipment(armorsInBag, allTemplates, batchTier);
+  const batchSellTotal = getEquipmentSellTotal(batchSellArmors, allTemplates);
 
   function executeBatchSell() {
     if (!char || batchSellArmors.length === 0) return;
