@@ -41,7 +41,7 @@ client/
 │   │   ├── skillRestrictions.ts # 職業魔法學習限制
 │   │   ├── skillTemplate.ts  # 技能模板定義
 │   │   ├── classSkills.ts    # 職業技能定義
-│   │   ├── scriptEngine.ts   # 腳本規則型別 + 預設腳本
+│   │   ├── scriptEngine.ts   # 天賦格型別 + 預設配置
 │   │   ├── area.ts           # Zone / Region / Floor 型別
 │   │   ├── mapData.ts        # 地圖常數（6 Zone、全面 area ID 分離）
 │   │   ├── crafting.ts       # 製作相關型別（CraftTier, CraftMaterial, CRAFT_TIER_NAMES）
@@ -57,7 +57,7 @@ client/
 │   │   ├── drops.ts          # 掉落判定 + 裝備生成
 │   │   ├── regen.ts          # HP/MP 自然回復
 │   │   ├── navigation.ts     # 地圖移動驗證
-│   │   ├── scriptRunner.ts   # 腳本引擎（條件 → 動作）
+│   │   ├── scriptRunner.ts   # 天賦引擎（條件 → 動作）
 │   │   ├── questSystem.ts    # 任務系統邏輯
 │   │   ├── classSkillBookDrop.ts # 職業技能書掉落判定
 │   │   ├── characterTransfer.ts  # 角色轉移邏輯
@@ -88,10 +88,10 @@ client/
 │   │   ├── EquipmentInfo.tsx    # 統一裝備資訊顯示元件
 │   │   ├── BagPanel.tsx
 │   │   ├── SkillPanel.tsx
-│   │   ├── CombatScriptEditor.tsx   # 戰鬥腳本編輯
-│   │   ├── PersistentScriptEditor.tsx # 常駐腳本編輯
-│   │   ├── ScriptEditor.tsx       # 舊版腳本編輯器（legacy）
-│   │   ├── ScriptEditorPanel.tsx  # 自動腳本按鈕（PanelDock）+ 內容（浮動視窗，§ 32.16）
+│   │   ├── CombatScriptEditor.tsx   # 戰鬥天賦編輯
+│   │   ├── PersistentScriptEditor.tsx # 常駐天賦編輯
+│   │   ├── ScriptEditor.tsx       # 舊版編輯器（legacy）
+│   │   ├── ScriptEditorPanel.tsx  # 自動天賦按鈕（PanelDock）+ 內容（浮動視窗，§ 32.16）
 │   │   ├── AttributeUpModal.tsx # Lv50+ 屬性配點浮動視窗
 │   │   ├── GameIcon.tsx      # 統一 icon 渲染元件
 │   │   ├── Tooltip.tsx       # 通用 Tooltip 元件
@@ -174,12 +174,12 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 │ └──────────────────────┘        └────────────────────┘             │
 │                                          ┌ .hud-bottomright ────┐ │
 │                                          │[任務][詳細狀態][裝備]│ │
-│                                          │[背包][技能][自動腳本]│ │
+│                                          │[背包][技能][自動天賦]│ │
 │                                          │ v0.0.1 Wiki 匯出 登出│ │
 └──────────────────────────────────────────┴──────────────────────┴─┘
         ↓ PanelDock 按鈕開關 → 可拖曳、可多開、無遮罩的浮動視窗
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ 裝備欄     ✕ │  │ 背包       ✕ │  │ 自動腳本   ✕ │  六個面板一律
+│ 裝備欄     ✕ │  │ 背包       ✕ │  │ 自動天賦   ✕ │  六個面板一律
 │ ...          │  │ ...          │  │ ...          │  走同一套機制
 └──────────────┘  └──────────────┘  └──────────────┘  （§ 32.16）
 ```
@@ -290,7 +290,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 效果 | `activeEffects` | 角色 buff + 怪物 debuff（ActiveEffect[]） |
 | 戰鬥 | `combatLogs`, `selectedTargetIdx`, `lastDropResult` | 戰鬥日誌 / 目標 / 掉落結果 |
 | 計時器 | `gameLoopId`, `hpRegenId`, `mpRegenId`, `persistentLoopId` | 各 interval ID |
-| 腳本 | `combatRules`, `persistentRules`, `emergencyRetreat` | 戰鬥/常駐/緊急撤退 |
+| 天賦 | `combatRules`, `persistentRules`, `emergencyRetreat` | 戰鬥/常駐/緊急撤退 |
 | 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
 | 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold`, `afterCombatHpResumeThreshold`, `afterCombatMpResumeThreshold` | 戰鬥後等待/恢復閾值（HP/MP %） |
 | 搜尋 | `searchMode` | 自動/手動搜尋模式。**只有模式，沒有「搜尋中」狀態** —— 遭遇由地圖紅點碰撞觸發（`38-map-control.md` § 搜尋模式對應） |
@@ -375,7 +375,7 @@ interface BagItem {
 | 儲存位置 | 內容 | 時機 |
 |---|---|---|
 | IndexedDB (Dexie) | 角色數值、bagItems、裝備實例、倉庫 | `saveState()` 呼叫時 |
-| localStorage | 腳本規則、快捷鍵、戰鬥後等待閾值 | `saveLocalPreferences()` 呼叫時 |
+| localStorage | 天賦配置、快捷鍵、戰鬥後等待閾值 | `saveLocalPreferences()` 呼叫時 |
 
 `saveState()` 會同時觸發兩者，所有城鎮組件在 setState 後統一呼叫 `useGameStore.getState().saveState()`。
 
@@ -414,7 +414,7 @@ interface BagItem {
 | 掉落判定 | Client rollDrops() | Server 計算，推送結果 |
 | 裝備操作 | Client 直接寫 DB | Client 請求 → Server 驗證 → 回傳結果 |
 | 計時器 | Client setInterval | Server 事件排程（避免高頻輪詢） |
-| 腳本執行 | Client scriptRunner | Server 執行（防作弊） |
+| 天賦執行 | Client scriptRunner | Server 執行（防作弊） |
 | 藥水使用 | Client 扣除 | Server 驗證冷卻 + 扣除 |
 
 **遷移策略：**
@@ -431,9 +431,9 @@ interface BagItem {
 | Game Loop | 每幀（PixiJS Ticker） | 地圖載入 + explore phase | 怪物生成、移動、FSM tick、戰鬥計算 |
 | HP Regen | 5000ms | 角色存活時 | VIT 基礎回血（戰鬥中減半） |
 | MP Regen | 6000ms | 角色存活時 | SPI 基礎回魔（戰鬥中減半） |
-| Player Attack | 1200ms | `combat` phase | 玩家攻擊（腳本驅動） |
+| Player Attack | 1200ms | `combat` phase | 玩家攻擊（天賦驅動） |
 | Monster Attack | 1200ms (offset 600ms) | `combat` phase | 怪物攻擊 |
-| Potion Timer | 300ms | 任何狀態 | 常駐腳本判定（藥水/buff/治癒） |
+| Potion Timer | 300ms | 任何狀態 | 常駐天賦判定（藥水/buff/治癒） |
 
 生命週期：
 - 探索計時器隨 `startExploring()` / `stopExploring()` 啟停
@@ -442,11 +442,11 @@ interface BagItem {
 
 ---
 
-## 32.7 腳本引擎
+## 32.7 天賦引擎
 
 ### 架構
 
-腳本分為三層：
+天賦分為三層：
 
 ```
 CombatRule[]     → evaluateCombatScript(rules, context) → CombatAction | null
@@ -459,21 +459,21 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 - 一條規則帶 `conditions: Condition[]`，**全部成立**才觸發（AND）；空陣列＝無條件
 - 讀檔一律經 `models/scriptEngine.ts` 的 `normalizeCombatRules()` /
   `normalizePersistentRules()`：**不做欄位轉換**，只要有一條規則不是現行形狀
-  （沒有 `conditions` 陣列），整份腳本重置成 `DEFAULT_*`。玩家自訂的順序會消失，
+  （沒有 `conditions` 陣列），整份配置重置成 `DEFAULT_*`。玩家自訂的順序會消失，
   這是刻意接受的代價 —— 不留「一半舊一半新」的混合狀態。
-  腳本以外的 prefs（快捷列、統計、公會、任務）不受影響，照常讀回來。
+  天賦以外的 prefs（快捷列、統計、公會、任務）不受影響，照常讀回來。
   這道防線不可省略：舊 localStorage 不會過期，少了它會直接炸在 `rule.conditions.every`
-- 戰鬥腳本：player attack timer 觸發（攻擊、技能）
-- 常駐腳本：persistent loop 觸發（喝水、buff、治癒），任何狀態下生效
+- 戰鬥天賦：player attack timer 觸發（攻擊、技能）
+- 常駐天賦：persistent loop 觸發（喝水、buff、治癒），任何狀態下生效
 - 緊急撤退：獨立判定（HP 低於閾值 → 回城）
-- 村莊腳本：同一個 persistent loop 帶動，但自帶 1000ms 節流
-  （`VILLAGE_TICK_MS`）；順序在常駐腳本與緊急撤退之後，保命動作永遠優先。
+- 補給天賦：同一個 persistent loop 帶動，但自帶 1000ms 節流
+  （`VILLAGE_TICK_MS`）；順序在常駐天賦與緊急撤退之後，保命動作永遠優先。
   買賣一律走 `systems/shop.ts` 的定價與 store 的 `sellBagItems` /
   `buyBagItems` / `sellEquipmentInstances`，倉庫存取走 `depositToWarehouse` /
   `withdrawFromWarehouse` / `depositWarehouseGold` / `withdrawWarehouseGold`，
   與玩家在商店／倉庫面板的手動操作同一條路徑
 
-### 腳本 Template
+### 天賦配置（原腳本 Template）
 
 規格見 `03-combat.md` § 3.14。實作上的關鍵是**唯一真相**：
 
@@ -493,14 +493,14 @@ interface ScriptTemplate {
   留一份頂層鏡像再同步回 template，遲早會不同步，症狀是「面板顯示 A、實際跑 B」
 - `setCombatRules()` 等 setter 一律寫進**使用中的那一頁**，寫完立刻 `saveLocalPreferences`
 - 讀檔：`normalizeScriptTemplates()`；還沒有 template 的存檔由
-  `wrapLegacyScriptsAsTemplate()` 把既有腳本包成 id 為 `default` 的第一頁
+  `wrapLegacyScriptsAsTemplate()` 把既有配置包成 id 為 `default` 的第一頁
   （規則格式相容，只是多一層容器，所以**照包不重置**）
 - `DEFAULT_TEMPLATE_ID` 那一頁不可刪（`isDeletableTemplate()`），
   所以清單永遠非空，`resolveActiveTemplate()` 不會回 undefined
-- 測試要塞腳本一律用 `testing/scriptFixtures.ts` 的 `setActiveScripts()`，
+- 測試要塞天賦一律用 `testing/scriptFixtures.ts` 的 `setActiveScripts()`，
   直接 `setState({ combatRules })` 已經無效
 
-### 戰鬥腳本條件類型
+### 戰鬥天賦條件類型
 
 語意規格見 `03-combat.md` § 3.12，這裡只列型別對應。
 
@@ -519,7 +519,7 @@ interface ScriptTemplate {
 位置相關條件需要 `CombatScriptContext` 帶 `playerPos` / `primaryTargetId` / `weaponRange`
 與 `monsters: ScriptMonsterView[]`（`{ id, instance, position }`），由 `arpgEngine` 供給。
 
-### 戰鬥腳本動作類型
+### 戰鬥天賦動作類型
 
 | 動作 | 參數 | 說明 |
 |---|---|---|
@@ -527,7 +527,7 @@ interface ScriptTemplate {
 | `normal_attack` | — | 普通攻擊 |
 | `wait` | — | 該 tick 不動作 |
 
-### 常駐腳本條件類型
+### 常駐天賦條件類型
 
 | 條件 | 參數 | 說明 |
 |---|---|---|
@@ -540,7 +540,7 @@ interface ScriptTemplate {
 | `skill_ready` | skillId | 指定技能冷卻完畢 |
 | `debuff_active` | debuffType | 指定狀態生效中（poison / bleed / curse_weaken / slow） |
 
-### 常駐腳本動作類型
+### 常駐天賦動作類型
 
 | 動作 | 參數 | 說明 |
 |---|---|---|
@@ -580,7 +580,7 @@ interface ScriptTemplate {
 | `StatusPanel` | 左上角浮動 HUD：角色名/職業/等級一列，HP/MP/EXP/負重＋防禦 四條由上往下堆疊 |
 | `BuffBar` | 角色 buff/debuff icon 垂直欄，浮於 `.stage-area` 左上，每秒刷新倒數，hover tooltip |
 | `FloatingWindow` | 通用可拖曳浮動視窗（標題列拖曳、點擊置頂、✕ 關閉、無遮罩） |
-| `PanelDock` | 底部面板按鈕列（詳細狀態/裝備欄/背包/技能 + 自動腳本觸發鈕） |
+| `PanelDock` | 底部面板按鈕列（詳細狀態/裝備欄/背包/技能 + 自動天賦觸發鈕） |
 | `PanelWindows` | 依 `panelWindowStore` 渲染六個面板的浮動視窗 |
 | `QuestTracker` | `QuestTrackerButton`（PanelDock 內，帶任務數量 badge）+ `QuestTrackerContent`（浮動視窗內容） |
 | `CharacterStats` | 六大屬性詳細數值、戰鬥數據（含詞綴 + buff + 裝備 regen 加成） |
@@ -591,10 +591,10 @@ interface ScriptTemplate {
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
 | `BagPanel` | 背包 grid（無收合），格數 = 60 + 腰帶擴充，支援拖放自由擺放（位置持久化於本機，不隨角色匯出），底部「印記」抽屜，GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
 | `Inventory` | 裝備背包列表元件 |
-| `CombatScriptEditor` | 戰鬥腳本規則 CRUD（僅攻擊技能/普攻） |
-| `PersistentScriptEditor` | 常駐腳本規則 CRUD（喝水/加速藥水/buff/治癒） |
-| `ScriptEditor` | 舊版腳本編輯器（legacy，供遷移保留） |
-| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶規則數量 badge）+ `ScriptEditorContent`（浮動視窗內容：上排 template 分頁、下排常駐/戰鬥兩個 tab，§ 32.16） |
+| `CombatScriptEditor` | 戰鬥天賦格編輯（僅攻擊技能/普攻） |
+| `PersistentScriptEditor` | 常駐天賦格編輯（喝水/加速藥水/buff/治癒） |
+| `ScriptEditor` | 舊版編輯器（legacy，供遷移保留） |
+| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶「有沒有鑲入」指示點）+ `ScriptEditorContent`（浮動視窗內容：上排天賦配置分頁、下排常駐/戰鬥/補給/天賦合成四個 tab，§ 32.16） |
 | `AttributeUpModal` | Lv50+ 屬性配點浮動視窗，有未分配點數時自動顯示 |
 | `GameIcon` | 統一 SVG icon 渲染（name, size, color），支援 Game-icons.net + Lucide |
 | `Tooltip` | 通用 hover tooltip，用於 buff/裝備/物品/技能 |
@@ -716,8 +716,8 @@ Key: `mayana_prefs_${characterId}`
 
 | 欄位 | 說明 |
 |---|---|
-| `combatRules` | 戰鬥腳本規則 |
-| `persistentRules` | 常駐腳本規則 |
+| `combatRules` | 戰鬥天賦格 |
+| `persistentRules` | 常駐天賦格 |
 | `emergencyRetreat` | 緊急撤退設定 |
 | `quickSlots` | 快捷鍵配置 |
 | `afterCombatHpThreshold` | 戰鬥後等待 HP 閾值 |
@@ -1027,7 +1027,7 @@ interface TooltipProps {
 | `bag` | 背包 | `BagPanel` | 420px |
 | `skill` | 技能 | `SkillPanel` | 420px |
 | `quest` | 進行中的任務 | `QuestTrackerContent` | 320px |
-| `script` | 自動腳本 | `ScriptEditorContent` | 480px |
+| `script` | 自動天賦 | `ScriptEditorContent` | 480px |
 
 內容組件本身不變（拖放、右鍵選單、tooltip 行為完全沿用）。
 
@@ -1141,15 +1141,15 @@ interface TooltipProps {
 呼叫一次 `focusWindow()`。手機最明顯：面板是滿版 sheet，
 城鎮設施列卻整條浮在它上面（`47-mobile.md`）。
 
-## 32.16 自動腳本浮動視窗（ScriptEditorPanel）
+## 32.16 自動天賦浮動視窗（ScriptEditorPanel）
 
-> **設計變更（使用者要求）**：原本明定「腳本編輯為設定用途，維持置中 overlay modal、
+> **設計變更（使用者要求）**：原本明定「天賦編輯為設定用途，維持置中 overlay modal、
 > 非 `FloatingWindow`」。因 modal 無法移動、且會遮住 idle 進行中的畫面，
 > 已改為與其他面板一致的可拖曳浮動視窗。**不可再改回 modal 形式。**
 
 ### 觸發
 
-- 底部 `PanelDock` 最右側顯示「自動腳本」按鈕（含規則數量 badge，沿用 `.panel-dock-btn` 樣式）
+- 底部 `PanelDock` 最右側顯示「自動天賦」按鈕（含「有沒有鑲入」指示點，沿用 `.panel-dock-btn` 樣式）
 - 點擊按鈕開關 `PanelKey = 'script'` 浮動視窗；`script` 與 `quest` 同理不在 `DOCK_PANEL_KEYS`
   內（按鈕要帶 badge，由 `ScriptEditorButton` 自行渲染）
 
@@ -1160,10 +1160,10 @@ interface TooltipProps {
 - 視窗寬 480px、高 `82vh`（`.floating-window.is-script`）。
   固定高度是為了讓 tab 列釘在頂端、只有規則清單捲動 ——
   若沿用 `.floating-window-body` 預設的 auto 高度 + `overflow-y`，捲動會發生在 body 上而把 tab 一起帶走
-- 內容為兩個 tab：常駐腳本 + 戰鬥腳本，預設為常駐腳本（tab 選擇為視窗內 local state，關閉即重置）
-- 常駐腳本含：規則 CRUD、排序、緊急撤退設定、戰鬥後等待/恢復閾值（HP/MP %）
+- 內容為四個 tab：常駐／戰鬥／補給／天賦合成，預設為常駐（tab 選擇為視窗內 local state，關閉即重置）
+- 常駐分頁含：天賦格編輯、排序、緊急撤退設定、戰鬥後等待/恢復閾值（HP/MP %）
 - 戰鬥後等待閾值修改後自動 saveState 持久化
-- 關閉後腳本規則保留（state 存在 Zustand，不隨視窗 unmount 消失）
+- 關閉後天賦配置保留（state 存在 Zustand，不隨視窗 unmount 消失）
 
 ### 組件
 
@@ -1208,3 +1208,22 @@ relative 會讓桌機那組貼角座標重新生效，因此 `top/right/bottom/l
 - `systems/pathfinding.ts` / `lineOfSight.ts`：只依賴上述純資料 contract，不依賴 React、Zustand 或 Pixi。
 - `pixi/mapRenderPlan.ts`：將 MapData 轉成純 draw plan；`mapThemes.ts` 管理視覺色盤。
 - JSON 保持靜態內容與單一 numeric tiles grid，便於未來 server/CDN 發佈且避免 gameplay 與 renderer 各自維護 elevation。
+
+---
+
+## 32.18 自動天賦的模組邊界（`51-auto-talent.md`）
+
+| 模組 | 職責 | 不負責 |
+|---|---|---|
+| `scriptRunner.ts` | 戰鬥／常駐天賦格的判定與選中 | 鑲材的取得、合成、鑲嵌 |
+| `villageScriptRunner.ts` | 補給天賦格的判定與選中 | 同上 |
+| `ScriptEditorPanel.tsx` | 四個分頁的容器、天賦配置切換 | 鑲材清單的顯示（在背包） |
+| `BagPanel.tsx` | 背包分頁列、天賦分頁的鑲材清單 | 鑲嵌判定 |
+| 新增：天賦格與鑲材的 store | 持有鑲材、天賦格、鑲嵌狀態、合成 | 判定 |
+
+**判定與取得必須分開。** `scriptRunner` 只看「這個天賦格鑲了什麼」，
+不查玩家持有哪些鑲材；混在一起會讓每個判定 tick 都要掃鑲材表。
+
+**鑲材實例不進 `characterBag`**（`18-data-schema.md` § 18.9）——
+`BagItem` 的形狀放不下 roll 出來的參數，天賦分頁是顯示層讀獨立表，
+不是把鑲材塞進背包資料。

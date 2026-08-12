@@ -68,9 +68,12 @@
 | 怪物 Debuff 能力（已併入怪物屬性表） | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
 | 狀態解除道具（解毒/止血/淨化） | `30-items.md` | § 狀態解除道具 |
-| 戰鬥腳本 / 常駐腳本（自動戰鬥 AI） | `03-combat.md` | § 3.12（戰鬥腳本）、§ 3.13（常駐腳本＋緊急撤退） |
-| 腳本 Template（分頁切換） | `03-combat.md` | § 3.14（整包切換、預設分頁不可刪） |
-| 村莊腳本（自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
+| **自動天賦（原自動腳本）：天賦格／鑲材／合成／掉落** | `51-auto-talent.md` | 全文 |
+| **鑲材清單與 tier 歸屬** | `51-auto-talent.md` | § 51.4.5~51.4.11 |
+| **天賦格取得（等級／合成／Boss 掉落）** | `51-auto-talent.md` | § 51.3.3 |
+| 戰鬥天賦 / 常駐天賦的條件與動作規格 | `03-combat.md` | § 3.12、§ 3.13（＋緊急撤退）。取得方式見 `51-auto-talent.md` |
+| 天賦配置（原腳本 Template，分頁切換） | `03-combat.md` | § 3.14（整包切換、預設分頁不可刪） |
+| 補給天賦（原村莊腳本：自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
@@ -100,7 +103,7 @@
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
 | 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
 | **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`，倍率記於該節） |
-| **數量徽章（配色／字級／自動腳本只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
+| **數量徽章（配色／字級／自動天賦只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
 | **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（順序不可任意調動，由 `PanelDock.test.tsx` 把守） |
 | **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
 | 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
@@ -173,7 +176,8 @@
 | 檔案 | 主題 | 關鍵內容 |
 |---|---|---|
 | `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
-| `49-village-script.md` | 村莊腳本 | 自動回城／販售／採買／返回掛機點。預設為空 |
+| `51-auto-talent.md` | 自動天賦系統 | 天賦格、鑲材、合成鏈、掉落。原「自動腳本」的改版 |
+| `49-village-script.md` | 補給天賦（原村莊腳本） | 自動回城／販售／採買／返回掛機點。預設為空 |
 | `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
 | `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
 | `44-dps-prediction.md` | DPS 預測 / 職業平衡健檢 | Lv.75 滿裝 vs 百柱死神。裝備由腳本自動選 BiS，五職業落差 2.22 倍 |
@@ -371,17 +375,34 @@
   ←→ 34-ui-guidelines.md § 34.1（統一色彩語意：區色只上框與標題，不可與語意色搶同一個位置）
   ←→ 34-ui-guidelines.md § 34.6（字級一律走 --fs-*，徽章不可寫死 px）
   ←→ 34-ui-guidelines.md § 34.8（分組間隔只在 >1200px 給；以下是圖示模式，空間會把徽章擠出去）
-  ←→ 49-village-script.md（自動腳本指示只表達「有沒有規則」，三個分頁一視同仁）
+  ←→ 49-village-script.md（自動天賦指示只表達「有沒有鑲入」，分頁一視同仁）
   ※ 介面彩度與地圖彩度是**兩條相反的旋鈕**：地圖是背景可以往上，
     介面的框往上會吃掉事件（超重／瀕死／掉寶）的音量。改任一邊都要重看另一邊
        ↕
 49-village-script.md（自動販售沿用同一套顏色門檻與定價，見 `systems/shop.ts`）
 
-49-village-script.md ←→ 03-combat.md § 3.14（村莊腳本屬於腳本 template 的一部分）
+49-village-script.md ←→ 03-combat.md § 3.14（補給天賦屬於天賦配置的一部分）
        ↕                    ↕
 38-map-control.md（返回掛機點走一般地圖切換）  35-inventory-constraints.md（背包格數條件）
        ↕
 13-town.md § 13.8（倉庫存取：共用／個人／共用倉庫金幣）
+
+51-auto-talent.md（自動天賦＝天賦格＋鑲材。原「自動腳本」的改版）
+  ←→ 03-combat.md § 3.12~3.14（條件與動作的**規格內容仍在該處**，51 只管取得與鑲嵌）
+  ←→ 49-village-script.md（補給天賦，同上）
+  ←→ 27-drop-table.md（鑲材與天賦格掉落；§ 27.1 的**掉落值可為小數**）
+  ←→ 30-items.md（鑲材的重量／賣價／用途標記）
+  ←→ 35-inventory-constraints.md（背包分頁列；天賦分頁不佔格不計重不可存倉庫；
+       § 35.20 印記抽屜改位於「一般」分頁內）
+  ←→ 18-data-schema.md（鑲材**獨立實例表**，不進 characterBag）
+  ←→ 13-town.md § 13.8（倉庫不收鑲材）／**不新增設施**，合成在天賦面板內
+  ←→ 34-ui-guidelines.md（天賦面板四分頁：常駐／戰鬥／補給／天賦合成）
+  ←→ 43-wiki-system.md（未取得的鑲材走 Wiki 查詢）
+  ←→ 16-tech-frontend-architecture.md（scriptRunner／villageScriptRunner／編輯器組件）
+  ←→ 25-monster-system.md（詠唱與召喚機制＝§ 51.4.4 阻擋項的前置，
+       怪物側沒開就不可先出對應鑲材）
+  ← 04-character.md § 4.9（**單向**：經驗曲線決定玩家實質卡在幾級 → 終局有幾個 T1 格
+       → 合成鏈比例。曲線一動天賦格節奏必須重算，**反向不成立**）
 
 50-training-ground.md（試驗場＝工具，零掉落／零經驗／零金幣／無獎勵／無週期）
   ←→ 13-town.md § 13.2.1 / § 13.3（城鎮 NPC 入口，沿用同一套 NPC 互動規則）

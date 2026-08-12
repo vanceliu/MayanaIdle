@@ -170,7 +170,7 @@ API 細節見 `37-statistics.md` § 37.4.3。
 | 金幣 | Character | 各角色獨立 |
 | 技能 | Character | 各角色獨立 |
 | 進度（位置/等級/經驗） | Character | 各角色獨立 |
-| 戰鬥腳本 | Character | 各角色獨立 |
+| 天賦配置 | Character | 各角色獨立 |
 | 快捷欄配置 | Character | 各角色獨立 |
 
 ---

@@ -333,7 +333,7 @@ interface PlayerDotEffect {
 
 1. **清除過期效果** — 移除超過 duration 的效果（每幀檢查）
 2. **DoT 傷害計時** — 累積 deltaMs，每 1000ms 結算一次 DoT 傷害
-3. **玩家 FSM tick** — 狀態機更新（idle/chasing/attacking），攻擊時執行腳本決定技能
+3. **玩家 FSM tick** — 狀態機更新（idle/chasing/attacking），攻擊時執行天賦格決定技能
 4. **怪物 FSM tick** — 每隻怪物獨立更新，檢查 stun debuff，暈眩中跳過攻擊
 5. **事件處理** — 收集 ArpgEvent（player_attack, monster_attack, move_to）更新狀態
 

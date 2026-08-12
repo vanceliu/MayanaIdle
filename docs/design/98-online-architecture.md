@@ -27,7 +27,7 @@ Client (React) → WebSocket → Game Server → Redis / PostgreSQL
 
 | 項目 | 間隔 | Tick 數 |
 |---|---|---|
-| 常駐腳本判定 | 300ms | 1 |
+| 常駐天賦判定 | 300ms | 1 |
 | 紅色藥水冷卻 | 600ms | 2 |
 | 橙色藥水冷卻 | 900ms | 3 |
 | 加速後攻擊間隔 | 900ms | 3 |
@@ -277,7 +277,7 @@ PostgreSQL 單機能扛 5,000+ writes/s，100/s 完全無壓力。
 | 遊戲邏輯 | client 執行 | server 執行 |
 | 狀態管理 | Zustand + IndexedDB | Zustand（接收 server push） |
 | 戰鬥判定 | client 計算 | server 計算，client 顯示 |
-| 腳本判定 | client 執行 | server 執行 |
+| 天賦判定 | client 執行 | server 執行 |
 | Client 職責 | 全部 | UI 渲染 + 操作指令發送 + 動畫插值 |
 
 ### 通訊原則

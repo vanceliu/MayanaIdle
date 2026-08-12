@@ -746,13 +746,13 @@ Buff 不染色是因為 buff 幾乎常駐（多數 600s），染整場等於角�
 兩節分開只是因為規則的出處不同（`24-buff-debuff.md` vs 技能表）。
 
 **同一批 buff 有兩條施放路徑，兩條都要接上演出。**
-戰鬥腳本走 ARPG 事件管線（`arpgEngine` → `player_attack` → `playPlayerAttackFx`），
-常駐腳本則直接寫在 `stores/gameStore.ts` 的 `setInterval` 裡 ——
+戰鬥天賦走 ARPG 事件管線（`arpgEngine` → `player_attack` → `playPlayerAttackFx`），
+常駐天賦則直接寫在 `stores/gameStore.ts` 的 `setInterval` 裡 ——
 **那一層碰不到 Pixi**，所以它只 push 到 `systems/selfCastFx.ts` 的佇列，
 由 `PixiGame` 每幀取走演出。
 
-漏掉這條橋的話，設在常駐腳本上的 buff **一個特效都不會演**，
-而玩家的 buff 幾乎都設在那裡（常駐腳本在探索與戰鬥中都會判定）。
+漏掉這條橋的話，設在常駐天賦上的 buff **一個特效都不會演**，
+而玩家的 buff 幾乎都設在那裡（常駐天賦在探索與戰鬥中都會判定）。
 兩條路共用 `playSelfCastFxAt()`，各接一份必然分岔。
 
 **染色與暈眩標記每幀對一次帳，不在「施加的那一刻」放完就算。**

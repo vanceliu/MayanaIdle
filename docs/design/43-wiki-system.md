@@ -34,7 +34,7 @@ client/src/wiki/
 │   ├── AttributesPage.tsx— 屬性公式說明
 │   ├── CombatPage.tsx    — 戰鬥計算公式
 │   ├── QuestsPage.tsx    — 任務系統
-│   ├── ScriptsPage.tsx   — 自動腳本（三套腳本的條件／動作、腳本分頁）
+│   ├── TalentsPage.tsx   — 自動天賦（三種類型的條件／動作、鑲材總表、合成鏈）
 │   ├── DropsPage.tsx     — 掉落總覽
 │   └── CreditsPage.tsx   — 第三方素材來源與授權
 ```
@@ -56,7 +56,7 @@ client/src/wiki/
 | 屬性公式 | 硬編碼文字（對應 `systems/combat.ts` 計算） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |
 | 任務 | `QUEST_TEMPLATES`、guild 相關 seed |
-| 自動腳本 | `COMBAT_*` / `PERSISTENT_*` / `SCRIPT_DEBUFF_LABELS`（`models/scriptEngine`）、`VILLAGE_*_LABELS`（`models/villageScript`）—— 條件與動作名稱與編輯器共用同一份常數，判定頻率為硬編碼文字（規格見 `03-combat.md` § 3.12~3.14、`49-village-script.md`） |
+| 自動天賦 | `COMBAT_*` / `PERSISTENT_*` / `SCRIPT_DEBUFF_LABELS`（`models/scriptEngine`）、`VILLAGE_*_LABELS`（`models/villageScript`）—— 條件與動作名稱與編輯器共用同一份常數，判定頻率為硬編碼文字（規格見 `03-combat.md` § 3.12~3.14、`49-village-script.md`；鑲材總表見 `51-auto-talent.md`） |
 | 素材來源 | `ASSET_CREDITS`（`client/src/wiki/data/assetCredits.ts`），與 `client/src/assets/CREDITS.md` 同步維護 |
 
 ### useWikiData.ts 提供的 hook
@@ -181,11 +181,15 @@ client/src/wiki/
 ### 4.11 任務 (QuestsPage)
 - 冒險者工會等階、任務類型、獎勵
 
-### 4.12 自動腳本 (ScriptsPage)
-- 三套腳本的判定時機與優先順序、各自的條件／動作對照表
-- 腳本分頁（template）規則、可照抄的範例腳本
+### 4.12 自動天賦 (TalentsPage)
+- 三種類型的判定時機與優先順序、各自的條件／動作對照表
+- 天賦格與天賦配置規則、可照抄的範例配置
 - 條件與動作名稱由 `models` 的標籤常數渲染，與編輯器共用同一份 ——
   面板改名 Wiki 會跟著動。判定頻率等數字為硬編碼文字
+- **鑲材總表**：全部鑲材的 tier、型態（指定／池／自選）、適用類型、取得管道。
+  **必須列出玩家尚未取得的** —— 編輯器只顯示已持有的（`51-auto-talent.md` § 51.10），
+  「還有什麼可以刷」只有 Wiki 回答得了
+- 合成鏈與成功率表、掉落 tier 的區域分帶（來源：`51-auto-talent.md`、`27-drop-table.md` § 27.9）
 
 ### 4.13 掉落 (DropsPage)
 - 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）

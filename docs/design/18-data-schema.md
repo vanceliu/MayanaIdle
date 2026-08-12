@@ -158,7 +158,7 @@ baseValue × (1 + qualityPercent / 100)
 
 | 資料 | 說明 |
 |---|---|
-| 戰鬥腳本 | ScriptRule[] — 自動戰鬥的條件/動作規則 |
+| 天賦配置 | 天賦格列表 — 自動戰鬥的條件/動作（見 § 18.9） |
 | 快捷欄配置 | QuickSlot 綁定 |
 
 ### 分層原則
@@ -303,3 +303,59 @@ baseValue × (1 + qualityPercent / 100)
 ```
 
 素材對應 `item_definitions` 表中的材料物品。
+
+---
+
+## 18.9 自動天賦（`51-auto-talent.md`）
+
+### 鑲材定義（靜態）
+
+seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**（§ 99.1 第 3、7 條）。
+
+| 欄位 | 說明 |
+|---|---|
+| `id` | 鑲材定義 id |
+| `kind` | `condition`（條件）／`action`（實作） |
+| `appliesTo` | 適用類型陣列：`combat`／`persistent`／`supply`，可多選 |
+| `tier` | T1~T7 |
+| `form` | `fixed`（指定型）／`pool`（池型）／`free`（自選型） |
+| `ruleId` | 對應 `03-combat.md` § 3.12~3.13 或 `49-village-script.md` § 49.2~49.3 的條件／動作 |
+
+### 鑲材實例
+
+**獨立資料表，不進 `characterBag`。** `BagItem` 只有 `{ itemId, amount }`，
+放不下 roll 出來的參數。
+
+| 欄位 | 說明 |
+|---|---|
+| `id` | 實例 id |
+| `characterId` | 持有角色。**不跨角色轉移**，不進倉庫表 |
+| `definitionId` | 指向鑲材定義 |
+| `boundParam` | 指定型／池型 roll 出來的綁定值（技能 id、技能子集、道具類別）。自選型為 null |
+| `slotId` | 鑲在哪一個天賦格；未鑲入為 null。**比照 `equipmentInstances.equipped`** |
+| `slotIndex` | 鑲在該格的第幾個條件槽；實作槽為 null |
+
+**一實體一格**：`slotId` 是單一值，同一份鑲材不可能同時出現在兩個天賦格
+或兩組天賦配置裡（`51-auto-talent.md` § 51.5.1）。
+
+**起始的指定型鑲材為未綁定**：`boundParam` 初始為 null，首次鑲入時寫入，之後不可更改。
+
+### 天賦格
+
+| 欄位 | 說明 |
+|---|---|
+| `id` | 天賦格 id |
+| `characterId` | 持有角色 |
+| `tier` | T1~T4，決定條件槽數（1~4） |
+| `assignedType` | 指派給哪個類型：`combat`／`persistent`／`supply`。**可隨時改** |
+| `templateId` | 屬於哪一組天賦配置 |
+| `order` | 判定順序 |
+| `enabled` | 啟用／停用 |
+
+天賦格**不綁類型**，`assignedType` 可隨時重新指派，該格已鑲的鑲材一併帶走
+（`51-auto-talent.md` § 51.3.2）。
+
+### 天賦配置
+
+沿用現行 template 的存放位置，每角色獨立（`03-combat.md` § 3.14）。
+內容為戰鬥／常駐／補給三類的天賦格列表 ＋ 緊急撤退設定。

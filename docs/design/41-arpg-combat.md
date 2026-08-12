@@ -9,14 +9,14 @@
 - 角色和怪物在地圖上有實際的攻擊動作和位移
 - 攻擊分為近戰/遠程兩種類型，由武器決定基礎射程
 - AOE 技能可同時命中範圍內多隻怪（自身中心/目標中心兩種模式）
-- 自動模式下由戰鬥腳本（scriptRunner）決定目標與技能
+- 自動模式下由戰鬥天賦（scriptRunner）決定目標與技能
 - 玩家的**追擊距離**與**出手判定**是兩個不同的數字（見 § 3.1）
 
 ## 2. 設計原則
 
 - **combat.ts 計算邏輯不變**：命中/暴擊/傷害/閃避公式完全保留
 - **攻擊節奏不變**：base 1200ms，受攻速詞綴/綠色藥水/加速術影響
-- **腳本系統保留**：scriptRunner 依然決定施放技能/攻擊方式
+- **天賦系統保留**：scriptRunner 依然決定施放技能/攻擊方式
 - **視線判定**：攻擊目標和角色之間不能有牆壁阻擋
 - **自動為主**：Idle 自動是核心體驗，手動模式為未來擴充
 
@@ -52,7 +52,7 @@
 ### 射程的顯示
 
 攻擊技能的射程必須在介面上看得到 —— 玩家要能理解「為什麼我的角色站在這個距離」
-（追擊距離由腳本會用到的技能射程決定，見下節）。
+（追擊距離由天賦格會用到的技能射程決定，見下節）。
 
 | 顯示位置 | 呈現 |
 |---|---|
@@ -71,7 +71,7 @@
 
 | | 取值 | 決定什麼 | 實作 |
 |---|---|---|---|
-| **追擊距離** `chaseRange` | 腳本**啟用**規則會用到的最遠射程 | 角色走多近就停 | `getScriptChaseRange()` |
+| **追擊距離** `chaseRange` | **啟用中**天賦格會用到的最遠射程 | 角色走多近就停 | `getScriptChaseRange()` |
 | **出手判定** `range` | 當下**選中動作**自己的射程 | 這一擊打不打得到 | `resolveTargets()` 的 `maxRange` |
 
 `getScriptChaseRange()` 的取法：
@@ -109,7 +109,7 @@
 ### 3.2 攻擊流程
 
 ```
-腳本決定目標與技能
+天賦決定目標與技能
   ↓
 檢查距離 & 視線
   ↓ 不滿足 → 角色移動靠近
@@ -123,7 +123,7 @@
   ↓
 傷害結果 → 更新怪物 HP、顯示傷害數字
   ↓
-等待攻擊間隔（cooldown）→ 下一輪腳本決定
+等待攻擊間隔（cooldown）→ 下一輪天賦決定
 ```
 
 ### 3.3 視線判定（Line of Sight）
@@ -151,7 +151,7 @@ interface AoeProps {
 **執行流程：**
 
 **target 模式：**
-1. 腳本選定主目標
+1. 天賦選定主目標
 2. 以主目標位置為圓心，搜索 `aoeRadius` 格內所有活著的怪物
 3. 依距離排序，取最近的 `maxTargets` 隻（主目標一定包含在內）
 4. 對每一隻分別計算 combat.ts
@@ -214,7 +214,7 @@ interface SkillCombatProps {
 ### 4.2 目標選擇
 
 1. **玩家手動指定**（點擊怪物或怪物列表卡片）→ 使用該目標
-2. 腳本有指定目標 → 使用腳本目標
+2. 天賦有指定目標 → 使用該目標
 3. 無指定 → 選擇最近的活著的怪物
 4. 無怪物 → 回到 IDLE（繼續自動探索）
 
@@ -285,7 +285,7 @@ explore（含戰鬥）：
 - 角色在地圖上自由移動
 - 怪物在地圖上追蹤
 - 進入攻擊範圍 → 開始即時攻擊交換
-- 怪物 HP 歸零 → 死亡消失 → 腳本選下一個目標
+- 怪物 HP 歸零 → 死亡消失 → 天賦選下一個目標
 - 無目標 → 繼續自動探索
 ```
 
@@ -320,14 +320,14 @@ gameLoop.gameLoopTick(deltaMs)
 arpgEngine.tickArpgEngine(engine, input)
   ├─ syncMonsterContexts：同步怪物戰鬥上下文（新增/移除/更新）
   ├─ 決定武器類型 → getWeaponAttackConfig（bow=15, others=1.5）
-  ├─ 預評估戰鬥腳本：若下一動是遠程技能，動態擴展攻擊範圍
+  ├─ 預評估戰鬥天賦：若下一動是遠程技能，動態擴展攻擊範圍
   ├─ tickPlayerCombat（玩家 FSM）：
   │     idle → 選最近活著的怪
   │     chasing → 返回 move_to 事件
   │     attacking → CD 到達時返回 attack 事件
   ├─ 處理 attack 結果：
   │     evaluateCombatScript → 決定 action（條件可看位置：範圍內怪數、周圍怪數、本招命中數）
-  │     resolveTargets → 單體/AOE 目標解析（targeting.ts，與腳本條件共用）
+  │     resolveTargets → 單體/AOE 目標解析（targeting.ts，與天賦條件共用）
   └─ tickMonsterCombat（每隻怪物 FSM）：
         檢查 stun → roaming/chasing/attacking
   ↓
@@ -369,13 +369,13 @@ interface Projectile {
 
 | 模組 | 檔案 | 內容 |
 |------|------|------|
-| ARPG Engine | `arpgEngine.ts` | 核心協調器：每幀 tick、怪物上下文同步、武器判定、腳本預評估、目標解析 |
+| ARPG Engine | `arpgEngine.ts` | 核心協調器：每幀 tick、怪物上下文同步、武器判定、天賦預評估、目標解析 |
 | 玩家 FSM | `playerCombatFSM.ts` | idle/chasing/attacking 三態、最近目標選擇、射程+視線判定 |
 | 怪物 FSM | `monsterCombatFSM.ts` | roaming/chasing/attacking 三態、stun 檢查 |
 | 視線判定 | `lineOfSight.ts` | LoS 計算、距離函式、半徑目標搜索 |
 | Game Loop | `gameLoop.ts` | OccupationManager、HP/MP 門檻暫停、pressure 生怪、A* 尋路、DoT timer |
-| AOE 解析 | `targeting.ts` resolveActionTargets | self-centered（無上限）與 target-centered（maxTargets）。純函式，`arpgEngine.resolveTargets` 與腳本的「本招命中數」條件共用同一份，兩邊算出的命中集合保證一致 |
-| 攻擊範圍動態擴展 | `arpgEngine.ts` / `gameLoop.ts` | 預評估腳本可用技能，取最大 range |
+| AOE 解析 | `targeting.ts` resolveActionTargets | self-centered（無上限）與 target-centered（maxTargets）。純函式，`arpgEngine.resolveTargets` 與天賦的「本招命中數」條件共用同一份，兩邊算出的命中集合保證一致 |
+| 攻擊範圍動態擴展 | `arpgEngine.ts` / `gameLoop.ts` | 預評估天賦可用技能，取最大 range |
 
 ### 待實作
 
@@ -434,7 +434,7 @@ interface Projectile {
 | 大量怪物同時計算 AI 效能 | 限制同時活動怪物數量（maxMonsters = 10），遠處怪物降低 AI 頻率 |
 | 投射物過多時渲染壓力 | 用 object pool 管理投射物 sprite |
 | 舊存檔相容性 | phase 欄位向下相容，讀到 'combat' 自動轉為 'explore' |
-| 腳本系統相容 | scriptRunner 介面保留，只改觸發時機 |
+| 天賦系統相容 | scriptRunner 介面保留，只改觸發時機 |
 
 ## 12. 地形、LOS 與投射物語意
 
