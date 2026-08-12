@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { WikiLayout } from './components/WikiLayout'
 import { WikiHome } from './pages/WikiHome'
 import { WeaponsPage } from './pages/WeaponsPage'
@@ -13,7 +13,7 @@ import { CombatPage } from './pages/CombatPage'
 import { AffixesPage } from './pages/AffixesPage'
 import { ItemsPage } from './pages/ItemsPage'
 import { QuestsPage } from './pages/QuestsPage'
-import { ScriptsPage } from './pages/ScriptsPage'
+import { TalentsPage } from './pages/TalentsPage'
 import { CreditsPage } from './pages/CreditsPage'
 
 /**
@@ -47,7 +47,9 @@ export default function WikiRoutes() {
         <Route path="items" element={<ItemsPage />} />
         <Route path="items/:itemName" element={<ItemsPage />} />
         <Route path="quests" element={<QuestsPage />} />
-        <Route path="scripts" element={<ScriptsPage />} />
+        <Route path="talents" element={<TalentsPage />} />
+        {/* 舊路徑：自動腳本改名為自動天賦，外面貼出去的連結不該變成 404 */}
+        <Route path="scripts" element={<Navigate to="/wiki/talents" replace />} />
         <Route path="credits" element={<CreditsPage />} />
       </Route>
     </Routes>

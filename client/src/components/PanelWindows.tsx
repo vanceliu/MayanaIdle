@@ -5,6 +5,7 @@ import { BagPanel } from './BagPanel';
 import { SkillPanel } from './SkillPanel';
 import { QuestTrackerContent } from './QuestTracker';
 import { ScriptEditorContent } from './ScriptEditorPanel';
+import { MailboxContent } from './MailboxPanel';
 import {
   usePanelWindowStore,
   PANEL_TITLES,
@@ -39,6 +40,11 @@ export function PanelWindows() {
       {open.skill && (
         <FloatingWindow panelKey="skill" title={PANEL_TITLES.skill} width={PANEL_WIDTHS.skill}>
           <SkillPanel />
+        </FloatingWindow>
+      )}
+      {open.mail && (
+        <FloatingWindow panelKey="mail" title={PANEL_TITLES.mail} width={PANEL_WIDTHS.mail}>
+          <MailboxContent />
         </FloatingWindow>
       )}
       {open.quest && (

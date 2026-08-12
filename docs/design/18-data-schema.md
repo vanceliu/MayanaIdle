@@ -347,15 +347,39 @@ seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**�
 | `id` | 天賦格 id |
 | `characterId` | 持有角色 |
 | `tier` | T1~T4，決定條件槽數（1~4） |
-| `assignedType` | 指派給哪個類型：`combat`／`persistent`／`supply`。**可隨時改** |
-| `templateId` | 屬於哪一組天賦配置 |
-| `order` | 判定順序 |
+| `assignedType` | 指派給哪個類型：`combat`／`persistent`／`supply`。**null ＝ 未安裝** |
+| `templateId` | 屬於哪一組天賦配置。未安裝時為 null |
+| `order` | 判定順序。未安裝時為 null |
 | `enabled` | 啟用／停用 |
 
-天賦格**不綁類型**，`assignedType` 可隨時重新指派，該格已鑲的鑲材一併帶走
+**未安裝的天賦格躺在背包「天賦」分頁，不進判定**（`51-auto-talent.md` § 51.3.4）。
+安裝＝指派類型。改類型走拆下再安裝，拆下時 `assignedType`／`templateId`／`order`
+一併清回 null，該格鑲材退回背包，不隨天賦格消失。
+
+`templateId` 是單一值 —— **同一個天賦格不可能同時在兩份天賦配置裡**。
+安裝一個已屬於別份配置的天賦格等於搬家，那一份就少一格
 （`51-auto-talent.md` § 51.3.2）。
 
 ### 天賦配置
 
 沿用現行 template 的存放位置，每角色獨立（`03-combat.md` § 3.14）。
 內容為戰鬥／常駐／補給三類的天賦格列表 ＋ 緊急撤退設定。
+
+---
+
+## 18.10 系統信箱（`52-mailbox.md`）
+
+| 欄位 | 說明 |
+|---|---|
+| `id` | 信件 id |
+| `characterId` | 持有角色。**信箱角色獨立**，不跨角色 |
+| `sourceKey` | 發放來源鍵。**對 `characterId` 唯一**，重複發放靠它擋 |
+| `title` | 顯示標題 |
+| `items` | 發放項目陣列：道具（`itemId` ＋數量）／金幣／天賦格（tier）／鑲材（`definitionId` ＋ `boundParam`） |
+| `createdAt` | 發放時間 |
+| `claimedAt` | 領取時間。**null ＝ 未領取** |
+
+- `items` 內的道具與鑲材**一律存 id 不存名稱**（§ 99.1 第 7 條）
+- **換版清理**：`BUILD_INFO.version` 改變時刪除 `claimedAt` 不為 null 的信；
+  **未領取的一律保留**（`52-mailbox.md` § 52.7.1）—— 刪掉等於沒收玩家的天賦格
+- 公告的 `lastReadVersion` 存本機設定，**不進 DB**

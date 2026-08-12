@@ -1,5 +1,6 @@
 import { ScriptEditorButton } from './ScriptEditorPanel';
 import { QuestTrackerButton } from './QuestTracker';
+import { MailboxButton } from './MailboxPanel';
 import { usePanelWindowStore, DOCK_PANEL_KEYS, panelButtonA11y } from '../stores/panelWindowStore';
 import { PanelDockFace } from './PanelDockFace';
 import { useIsMobile } from '../hooks/useViewport';
@@ -7,7 +8,7 @@ import { useIsMobile } from '../hooks/useViewport';
 /**
  * 底部面板按鈕列（16-tech-frontend-architecture.md § 32.15）
  * 與快捷鍵列同排。六個面板一律開成可拖曳浮動視窗；
- * 任務與自動腳本帶指示，因此按鈕由各自的組件渲染。
+ * 任務／信箱／自動天賦帶指示，因此按鈕由各自的組件渲染。
  */
 export function PanelDock() {
   const open = usePanelWindowStore(s => s.open);
@@ -29,6 +30,7 @@ export function PanelDock() {
         </button>
       ))}
       <QuestTrackerButton />
+      <MailboxButton />
       <ScriptEditorButton />
     </div>
   );

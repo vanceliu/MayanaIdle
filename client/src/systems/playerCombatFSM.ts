@@ -4,11 +4,25 @@ import { hasLineOfSight, getDistance } from './lineOfSight';
 
 export type PlayerCombatState = 'idle' | 'chasing' | 'attacking';
 
+/** 走位意圖（`51-auto-talent.md` § 51.4.9）。由天賦動作設定，FSM 在下一幀消費 */
+export interface MoveIntent {
+  kind: 'keep_distance' | 'close_in' | 'disengage';
+  /** 目標距離（碼）。未帶時用武器射程 */
+  distance?: number;
+}
+
 export interface PlayerCombatContext {
   state: PlayerCombatState;
   targetMonsterId: string | null;
   attackCooldown: number;
   attackTimer: number;
+  /**
+   * 鎖定目標（§ 51.4.9 的 `lock_target`）。非 null 時 FSM 不改挑最近的一隻，
+   * 直到那隻死掉或離場。
+   */
+  lockedTargetId: string | null;
+  /** 走位意圖。設了之後由 FSM 消費一次就清掉 */
+  moveIntent: MoveIntent | null;
 }
 
 export function createPlayerCombatContext(): PlayerCombatContext {
@@ -17,6 +31,8 @@ export function createPlayerCombatContext(): PlayerCombatContext {
     targetMonsterId: null,
     attackCooldown: 1200,
     attackTimer: 0,
+    lockedTargetId: null,
+    moveIntent: null,
   };
 }
 
@@ -123,6 +139,13 @@ export function tickPlayerCombat(
     : null;
 
   if (!currentTarget || !currentTarget.alive) {
+    /**
+     * 鎖定的目標死掉或離場就自動解鎖（`51-auto-talent.md` § 51.4.9）——
+     * 不清的話 FSM 會一直卡在一個不存在的 id 上，等於角色停手。
+     */
+    if (ctx.lockedTargetId && ctx.lockedTargetId === ctx.targetMonsterId) {
+      ctx.lockedTargetId = null;
+    }
     const nearest = findNearestMonster(playerPos, aliveMonsters);
     if (!nearest) {
       ctx.state = 'idle';
@@ -133,6 +156,22 @@ export function tickPlayerCombat(
   }
 
   const target = monsters.find(m => m.id === ctx.targetMonsterId)!;
+
+  /**
+   * 走位意圖（§ 51.4.9）。**消費一次就清掉** —— 它是「這個 tick 要移動」的指令，
+   * 留著會變成角色永遠在退，連攻擊都不做。
+   */
+  if (ctx.moveIntent) {
+    const intent = ctx.moveIntent;
+    ctx.moveIntent = null;
+    const move = resolveMoveIntent(intent, playerPos, target, aliveMonsters, attackConfig);
+    if (move) {
+      ctx.state = 'chasing';
+      // 走位期間攻擊計時器照走：走路的時間本來就過去了
+      ctx.attackTimer = Math.min(ctx.attackTimer + deltaMs, ctx.attackCooldown);
+      return move;
+    }
+  }
   const dist = getDistance(playerPos, target.position);
   const inRange = dist <= attackConfig.range;
   const hasLos = hasLineOfSight(playerPos, target.position, map);
@@ -206,4 +245,48 @@ function findNearestMonster(
     }
   }
   return nearest;
+}
+
+/**
+ * 走位意圖 → 移動指令。回 null 代表不必動（已經在該站的位置）。
+ *
+ * 三種意圖的共同點是「相對於某個東西的距離」：
+ * 保持距離與進逼看**當前目標**，脫離看**最近的怪**。
+ */
+function resolveMoveIntent(
+  intent: MoveIntent,
+  playerPos: Position,
+  target: MonsterInfo,
+  aliveMonsters: MonsterInfo[],
+  attackConfig: AttackConfig,
+): PlayerTickResult | null {
+  const want = intent.distance ?? attackConfig.range;
+
+  if (intent.kind === 'close_in') {
+    const dist = getDistance(playerPos, target.position);
+    if (dist <= want) return null;
+    return { action: 'move_to', moveTarget: target.position, moveRange: want };
+  }
+
+  // keep_distance／disengage 都是「往外退」，差別在參考點
+  const anchor = intent.kind === 'keep_distance'
+    ? target
+    : findNearestMonster(playerPos, aliveMonsters);
+  if (!anchor) return null;
+
+  const dist = getDistance(playerPos, anchor.position);
+  if (dist >= want) return null;
+
+  // 沿著「怪 → 玩家」的方向退到目標距離
+  const dx = playerPos.x - anchor.position.x;
+  const dy = playerPos.y - anchor.position.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return {
+    action: 'move_to',
+    moveTarget: {
+      x: Math.round(anchor.position.x + (dx / len) * want),
+      y: Math.round(anchor.position.y + (dy / len) * want),
+    },
+    moveRange: 0,
+  };
 }

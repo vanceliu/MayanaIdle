@@ -4,7 +4,8 @@ import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
 import { useCombatCommandStore } from '../stores/combatCommandStore';
 import { MonsterListOverlay } from './MonsterListOverlay';
-import { useGameStore, getEffectiveMaxHp, selectCombatRules, type CombatLog } from '../stores/gameStore';
+import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
+import { talentCombatRules } from '../stores/talentStore';
 import { getNearestTown } from '../models/mapData';
 import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
@@ -732,7 +733,9 @@ function tickArpgCombatLoop(
     skills: gameState.skills,
     activeEffects: gameState.activeEffects,
     equippedGear: allGear,
-    combatRules: selectCombatRules(gameState),
+    // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
+    combatRules: talentCombatRules(gameState.activeTemplateId),
+    effectiveMaxHp: getEffectiveMaxHp(gameState.character, gameState.equippedGear),
     mapMonsters: monsterStore.monsters,
     monsterInstances,
     map: mapStore.currentMap,

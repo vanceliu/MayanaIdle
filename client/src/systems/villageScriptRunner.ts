@@ -44,6 +44,11 @@ export interface VillageScriptContext {
   };
   /** 背包剩餘格數，取出東西前要看得到 */
   bagFreeSlots: number;
+  /**
+   * 旅館有沒有事情可做：HP／MP 未滿，或身上有異常狀態（`13-town.md` § 13.7）。
+   * 未帶＝當作不需要，避免「使用旅館」永遠成立而擋住後面的規則。
+   */
+  needsInn?: boolean;
 }
 
 export function evaluateVillageScript(
@@ -72,6 +77,24 @@ function checkVillageCondition(condition: VillageCondition, ctx: VillageScriptCo
       return ctx.gold < (condition.value ?? 0);
     case 'gold_above':
       return ctx.gold > (condition.value ?? 0);
+
+    // === § 51.4.8 新增 ===
+    case 'in_town':
+      return condition.match === 'field' ? !ctx.inTown : ctx.inTown;
+    case 'bag_free_slots_lte':
+      return ctx.bagFreeSlots <= (condition.value ?? 0);
+    case 'has_hunt_location':
+      return ctx.lastHuntLocation !== null;
+    case 'warehouse_gold_gte':
+      // 金幣只有共用倉庫有（`13-town.md` § 13.8）
+      return ctx.warehouse.gold >= (condition.value ?? 0);
+    case 'warehouse_item_gte': {
+      if (condition.itemId == null) return false;
+      const kind = condition.warehouse ?? 'shared';
+      return getBagItemAmount(ctx.warehouse[kind].materials, condition.itemId)
+        >= (condition.value ?? 0);
+    }
+
     default:
       return false;
   }
@@ -95,9 +118,14 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
       return ctx.gold >= price;
     }
     case 'sell_materials':
+    case 'sell_materials_threshold_only':
       return ctx.inTown && collectVillageSellMaterials(action, ctx).length > 0;
     case 'sell_equipment':
+    case 'sell_equipment_threshold_only':
       return ctx.inTown && collectVillageSellEquipment(action, ctx).length > 0;
+    case 'use_inn':
+      // 旅館要錢；HP／MP 都滿且沒有異常狀態時不必去（避免佔住判定）
+      return ctx.inTown && ctx.gold > 0 && ctx.needsInn === true;
     case 'deposit_materials':
       return ctx.inTown && collectDepositMaterials(action, ctx).length > 0;
     case 'deposit_equipment':
@@ -201,9 +229,17 @@ export function getBuyAmount(action: VillageAction, ctx: VillageScriptContext): 
 
 export function collectVillageSellMaterials(action: VillageAction, ctx: VillageScriptContext): BagItem[] {
   if (action.maxTier == null) return [];
-  return collectSellableMaterials(ctx.bagItems, action.maxTier, {
-    skipCraftMaterials: action.skipCraftMaterials ?? true,
+  /**
+   * 「僅門檻」版（§ 51.4.11 的 T2）：保護開關**固定開啟**，也不吃白名單。
+   * 它少的是保留設定，**不是門檻** —— 沒有門檻會把剛掉的高階素材一起賣掉。
+   */
+  const thresholdOnly = action.type === 'sell_materials_threshold_only';
+  const picked = collectSellableMaterials(ctx.bagItems, action.maxTier, {
+    skipCraftMaterials: thresholdOnly ? true : (action.skipCraftMaterials ?? true),
   });
+  if (thresholdOnly || !action.keepItemIds?.length) return picked;
+  const keep = new Set(action.keepItemIds);
+  return picked.filter(item => !keep.has(item.itemId));
 }
 
 /**
@@ -215,6 +251,10 @@ export function collectVillageSellEquipment(
   ctx: VillageScriptContext,
 ): EquipmentInstance[] {
   if (action.maxTier == null) return [];
+  // 「僅門檻」版不吃 § 49.4 的保留條件，但硬保護（新手裝／drop_only／裝備中）照舊
+  if (action.type === 'sell_equipment_threshold_only') {
+    action = { ...action, keep: undefined };
+  }
   const sellable = ctx.inventory.filter(i => isSellableEquipment(i, ctx.templates, ctx.equippedIds));
   const inTier = collectBatchSellEquipment(sellable, ctx.templates, action.maxTier as EquipmentTierLevel);
   return inTier.filter(i => !matchesEquipmentFilter(i, action.keep, ctx.className));

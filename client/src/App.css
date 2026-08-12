@@ -4,6 +4,13 @@
 
 /* --- Design Tokens --- */
 :root {
+  /*
+   * 天賦格的槽位高（`＋ 條件`／已鑲入的鑲材共用），
+   * 以及由它算出來的整列高 —— 一列＝條件列＋4px gap＋實作列＋上下 6px padding。
+   * 安裝鈕（＋）直接吃 `--talent-row-height`，所以永遠跟天賦格一樣大。
+   */
+  --talent-cell-height: 28px;
+  --talent-row-height: calc(var(--talent-cell-height) * 2 + 4px + 12px);
   --bg-deepest: #08081C;
   --bg-panel: #0E0E2F;
   --bg-card: #161648;
@@ -4167,27 +4174,6 @@ button.active {
   gap: 8px;
 }
 
-.bag-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 2px;
-}
-
-.bag-panel-title {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--text-bright);
-}
-
-.bag-panel-meta {
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .bag-sort-toggle {
   padding: 2px 8px;
   font-size: var(--fs-xs);
@@ -4201,6 +4187,13 @@ button.active {
 
 .bag-sort-toggle:hover {
   border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+/* 天賦分頁的整理是持續狀態，不是一次性動作，所以要看得出現在開著 */
+.bag-sort-toggle.active {
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
   color: var(--text-primary);
 }
 
@@ -5129,7 +5122,8 @@ button.active {
 
 .script-tab.active {
   color: var(--text-primary);
-  background: var(--accent-primary);
+  /* 與 `.panel-dock-btn.active` 同一套混色，不用實心亮底 */
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
   border-bottom-color: var(--accent-primary);
 }
 
@@ -7687,4 +7681,746 @@ button.active {
 
 .training-entrance-notes li {
   margin-bottom: 4px;
+}
+
+/* === 系統信箱（`52-mailbox.md`） === */
+
+/* 徽章與任務鈕共用同一套（§ 34.10），只是掛在不同按鈕上 */
+.mailbox-btn {
+  position: relative;
+}
+
+.mailbox-btn .quest-count-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(40%, -40%);
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--bg-inset);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mailbox-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mail-empty {
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.mail-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mail-claim-all-btn,
+.mail-claim-btn {
+  padding: 4px 10px;
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.mail-claim-all-btn:hover,
+.mail-claim-btn:hover {
+  background: var(--bg-card-hover);
+}
+
+.mail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+.mail-row:last-child {
+  margin-bottom: 0;
+}
+
+/* 已領取的退到背景：列表以「還沒拿的」為主角 */
+.mail-row.is-claimed {
+  opacity: 0.55;
+}
+
+.mail-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mail-title {
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.mail-items {
+  font-size: var(--fs-xs);
+  color: var(--accent-gold);
+}
+
+.mail-claimed-tag {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/* === 自動天賦（`51-auto-talent.md`） === */
+
+.bag-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+
+/* 整理與格數靠右併進分頁列 —— 視窗標題已經是「背包」，不必再獨立一列標題 */
+.bag-tabs-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/*
+ * 分頁與按鈕沿用 `.panel-dock-btn` 的語言：
+ * active ＝ `--accent-primary` 底、`--bg-inset` 字。
+ * 底部那排按鈕已經是這套，天賦面板內另立一套會看起來像別的遊戲。
+ */
+.bag-tab,
+.talent-slot,
+.talent-row-uninstall,
+.talent-install button,
+.fusion-go {
+  padding: 4px 10px;
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.bag-tab:hover,
+.talent-slot:hover,
+.talent-row-uninstall:hover,
+.talent-install button:hover,
+.fusion-go:not(:disabled):hover {
+  background: var(--bg-card-hover);
+}
+
+/*
+ * 分頁的 active 態沿用 `.panel-dock-btn.active` 的**混色**寫法：
+ * 42% `--accent-primary` 混進 `--bg-card`、文字維持 `--text-primary`。
+ * 實心亮底會比底部那排搶眼一階，兩者擺在同一個畫面就不像同一套介面。
+ */
+.bag-tab.active {
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* 合成與安裝是一般按鈕，不搶分頁的視覺層級 */
+.fusion-go.is-primary:not(:disabled) {
+  border-color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.fusion-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.talent-editor,
+.bag-talent,
+.talent-fusion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+}
+
+.talent-empty,
+.bag-talent-empty,
+.fusion-note,
+.talent-slot-menu-empty {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  margin: 0;
+}
+
+.talent-list,
+.bag-talent-list,
+.talent-slot-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* === 天賦格編輯 === */
+
+.talent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: var(--talent-row-height);
+  padding: 6px;
+  margin-bottom: 6px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+/* 停用的整列淡掉，但仍看得到內容 —— 玩家要能確認「我關掉的是哪一條」 */
+.talent-row.is-disabled {
+  opacity: 0.45;
+}
+
+.talent-row.drag-over,
+.talent-row-tail.drag-over,
+.talent-install.drag-over {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+}
+
+/* 只有把手可拖：整列可拖的話，改參數時一動就會被當成拖曳 */
+.talent-row-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  user-select: none;
+  touch-action: none;
+  padding: 0 2px;
+}
+
+.talent-row-handle:active {
+  cursor: grabbing;
+}
+
+.talent-row-order {
+  min-width: 1.2em;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.talent-row-enable input {
+  cursor: pointer;
+}
+
+/* 已綁定的指定型：唯讀，用鎖頭講清楚它為什麼不能改 */
+.talent-param.is-bound {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.talent-param-lock {
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
+.talent-param.is-binding select {
+  border-color: var(--accent-danger);
+}
+
+/* 排到最尾端用的落點：平常幾乎看不見，拖曳時才亮 */
+/*
+ * 排到最尾端的落點。**平時不佔高度** —— 佔了就會在最後一列與 ＋ 之間
+ * 多出一段別處沒有的空白，看起來像 ＋ 沒對齊。拖曳中才撐開。
+ */
+.talent-row-tail {
+  height: 0;
+  border: var(--border-width) dashed transparent;
+  border-radius: var(--radius-sm);
+}
+
+.talent-editor.is-dragging .talent-row-tail {
+  height: 10px;
+  margin-bottom: 6px;
+}
+
+.talent-add-wrap {
+  position: relative;
+}
+
+/*
+ * 安裝鈕：清單末尾的一顆 ＋，數量走角標。
+ * **尺寸與 `.talent-row` 對齊**（同 padding、同高、同圓角）——
+ * 它就是「還沒填的下一列」，畫成一條比天賦格細的長條會像另一種東西。
+ */
+.talent-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--talent-row-height);
+  padding: 6px;
+  margin-bottom: 6px;
+  border: var(--border-width) dashed var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-lg);
+  cursor: pointer;
+}
+
+.talent-add:hover,
+.talent-add.drag-over {
+  border-style: solid;
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.talent-add-count {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  font-size: var(--fs-xs);
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+
+.talent-row-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 條件放不下就換行；同一列的條件是 AND，換行不影響讀法 */
+.talent-row-conds,
+.talent-row-act {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.talent-row-arrow,
+.fusion-arrow {
+  color: var(--text-dim);
+}
+
+/* 空槽必須看得出來 —— 玩家要知道還能鑲幾個（§ 51.10） */
+.talent-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: var(--talent-cell-height);
+  box-sizing: border-box;
+}
+
+/* 已鑲入的是容器不是按鈕：裡面要放參數輸入 */
+.talent-slot.is-filled {
+  cursor: default;
+}
+
+.talent-slot-name {
+  color: var(--text-primary);
+}
+
+.talent-slot-remove {
+  margin-left: 2px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.talent-slot-remove:hover {
+  color: var(--accent-danger);
+}
+
+/* 參數就地編輯：數字與下拉都貼在鑲材名稱旁，不另開對話框 */
+.talent-param {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.talent-param input,
+.talent-param select {
+  padding: 1px 4px;
+  border: 1px solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.talent-param input {
+  width: 4.5em;
+}
+
+.talent-param select {
+  max-width: 9em;
+}
+
+.talent-param-suffix {
+  color: var(--text-dim);
+}
+
+/* 拖曳中的可放置提示 */
+.talent-slot.can-drop {
+  border-color: var(--accent-info);
+}
+
+.talent-slot.drag-over {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+}
+
+.talent-slot.is-empty {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+
+.talent-slot-menu button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 合成台的材料槽：圖示在上、名稱在下 */
+.fusion-cell {
+  align-items: center;
+  text-align: center;
+}
+
+.talent-slot-tier,
+.fusion-chip {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.fusion-chip.is-out {
+  color: var(--accent-success);
+}
+
+.talent-slot-wrap {
+  position: relative;
+}
+
+.talent-slot-menu {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-panel);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+}
+
+.talent-slot-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.talent-slot-menu button:hover {
+  background: var(--bg-card-hover);
+}
+
+.talent-install,
+.bag-talent-slots,
+.bag-talent-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+/* === 合成台 === */
+
+.fusion-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-md);
+}
+
+.fusion-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.fusion-sub {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.fusion-slot-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fusion-slot-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-inset);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+.fusion-slot-card.is-short {
+  opacity: 0.5;
+}
+
+.fusion-slot-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+}
+
+.fusion-count {
+  color: var(--text-secondary);
+}
+
+/* 材料槽 → 產物槽。三個格子一排，一眼看得出在做什麼 */
+.fusion-bench {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fusion-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 120px;
+  min-height: 56px;
+  padding: 6px 8px;
+  background: var(--bg-inset);
+  border: var(--border-width) dashed var(--outline-dark);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.fusion-cell.is-filled {
+  border-style: solid;
+  border-color: var(--accent-primary);
+}
+
+.fusion-cell.is-output {
+  cursor: default;
+  border-color: var(--border-subtle);
+}
+
+.fusion-cell.is-output.is-ready {
+  border-style: solid;
+  border-color: var(--accent-success);
+}
+
+.fusion-cell-hint {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.fusion-cell-name {
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+}
+
+.fusion-arrow.is-big {
+  font-size: var(--fs-md);
+}
+
+.fusion-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fusion-rate {
+  font-size: var(--fs-sm);
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.fusion-rate.is-dim {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.fusion-result {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.fusion-result.is-ok {
+  background: rgba(10, 221, 88, 0.15);
+  color: var(--accent-success);
+}
+
+.fusion-result.is-fail {
+  background: rgba(255, 52, 87, 0.12);
+  color: var(--accent-danger);
+}
+
+/* 可選材料池 */
+.fusion-pool {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.fusion-pool-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-inset);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.fusion-pool-item:not(:disabled):hover {
+  background: var(--bg-card-hover);
+}
+
+/* 配不起來的淡掉但仍看得見 —— 藏起來的話玩家會以為東西不見了 */
+.fusion-pool-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.fusion-pool-item.is-picked {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+}
+
+.fusion-pool-meta,
+.bag-talent-affix-meta {
+  color: var(--text-dim);
+}
+
+/* === 背包天賦分頁 === */
+
+.bag-talent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /*
+   * **左右不加 padding**：一般分頁的 `.bag-grid-container` 直接掛在 `.bag-panel` 底下，
+   * 這裡多包一層又縮進 8px 的話，同樣 5 欄的格子會比一般分頁窄一圈。
+   */
+  min-height: 0;
+  flex: 1;
+}
+
+.bag-talent-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.bag-talent-count {
+  color: var(--text-dim);
+}
+
+/*
+ * 格子**不覆寫尺寸**：`.bag-cell` 與 `.bag-grid` 的列高沿用一般分頁，
+ * 兩個分頁切過去大小才一致。這裡只加分類色帶與 tier 角標。
+ */
+.bag-cell.is-talent-slot { border-left: 3px solid var(--accent-primary); }
+.bag-cell.is-talent-affix.is-condition { border-left: 3px solid var(--accent-info); }
+.bag-cell.is-talent-affix.is-action { border-left: 3px solid var(--accent-success); }
+
+.bag-cell.is-talent-slot,
+.bag-cell.is-talent-affix {
+  cursor: default;
+}
+
+/* tier 角標放左上，右下留給數量（與素材的 `×N` 不打架） */
+.bag-cell-tier {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent-gold);
+  line-height: 1;
+  pointer-events: none;
 }

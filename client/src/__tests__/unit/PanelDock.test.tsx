@@ -5,7 +5,11 @@ import { PanelDock } from '../../components/PanelDock';
 import { usePanelWindowStore, PANEL_KEYS, DOCK_PANEL_KEYS } from '../../stores/panelWindowStore';
 
 vi.mock('../../components/ScriptEditorPanel', () => ({
-  ScriptEditorButton: () => <button className="panel-dock-btn script-panel-trigger">自動腳本</button>,
+  ScriptEditorButton: () => <button className="panel-dock-btn script-panel-trigger">自動天賦</button>,
+}));
+
+vi.mock('../../components/MailboxPanel', () => ({
+  MailboxButton: () => <button className="panel-dock-btn mailbox-btn">✉️ 信箱</button>,
 }));
 
 vi.mock('../../components/QuestTracker', () => ({
@@ -27,22 +31,27 @@ const dockButton = (name: string) => screen.getByRole('button', { name });
 describe('PanelDock', () => {
   beforeEach(reset);
 
-  it('渲染任務、四個面板按鈕與自動腳本按鈕', () => {
+  it('渲染任務、信箱、四個面板按鈕與自動天賦按鈕', () => {
     render(<PanelDock />);
-    for (const label of ['📋 任務', '詳細狀態', '裝備欄', '背包', '技能', '自動腳本']) {
+    for (const label of ['📋 任務', '✉️ 信箱', '詳細狀態', '裝備欄', '背包', '技能', '自動天賦']) {
       expect(screen.getByText(label), label).toBeTruthy();
     }
   });
 
-  it('按鈕順序＝分組：角色四顆在前，任務與自動腳本在後', () => {
+  /**
+   * § 34.10 的分組：角色四顆一組，任務／信箱／自動天賦一組。
+   * 間隔掛在 `.quest-tracker-btn` 自己的 class 上，所以**任務鈕必須是第二組的第一顆** ——
+   * 順序被改時間隔會落在錯的位置，而且不會有任何錯誤訊息。
+   */
+  it('按鈕順序＝分組：角色四顆在前，任務／信箱／自動天賦在後', () => {
     render(<PanelDock />);
     const names = [...document.querySelectorAll<HTMLElement>('.panel-dock > button')]
       .map(b => b.getAttribute('aria-label') ?? b.textContent);
-    expect(names).toEqual(['詳細狀態', '裝備欄', '背包', '技能', '📋 任務', '自動腳本']);
+    expect(names).toEqual(['詳細狀態', '裝備欄', '背包', '技能', '📋 任務', '✉️ 信箱', '自動天賦']);
   });
 
-  it('任務與自動腳本不在泛用按鈕清單內（按鈕由各自組件渲染以帶 badge）', () => {
-    for (const key of ['quest', 'script'] as const) {
+  it('任務／信箱／自動天賦不在泛用按鈕清單內（按鈕由各自組件渲染以帶指示）', () => {
+    for (const key of ['quest', 'mail', 'script'] as const) {
       expect(DOCK_PANEL_KEYS, key).not.toContain(key);
       expect(PANEL_KEYS, key).toContain(key);
     }

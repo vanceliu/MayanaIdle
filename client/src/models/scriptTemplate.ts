@@ -58,11 +58,11 @@ export function createScriptTemplate(id: string, name: string): ScriptTemplate {
   };
 }
 
-/** 依既有名稱給出不重複的新分頁名（腳本 1、腳本 2…） */
+/** 依既有名稱給出不重複的新分頁名（配置 1、配置 2…） */
 export function nextTemplateName(existing: ScriptTemplate[]): string {
   const taken = new Set(existing.map(t => t.name));
   for (let i = 1; ; i += 1) {
-    const name = `腳本 ${i}`;
+    const name = `配置 ${i}`;
     if (!taken.has(name)) return name;
   }
 }

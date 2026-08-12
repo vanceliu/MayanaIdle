@@ -23,11 +23,11 @@ describe('腳本 Template', () => {
   });
 
   it('新分頁名稱會避開已用過的', () => {
-    expect(nextTemplateName([])).toBe('腳本 1');
+    expect(nextTemplateName([])).toBe('配置 1');
     expect(nextTemplateName([
-      { ...createDefaultTemplate(), name: '腳本 1' },
-      { ...createDefaultTemplate(), id: 'a', name: '腳本 2' },
-    ])).toBe('腳本 3');
+      { ...createDefaultTemplate(), name: '配置 1' },
+      { ...createDefaultTemplate(), id: 'a', name: '配置 2' },
+    ])).toBe('配置 3');
   });
 
   describe('normalizeScriptTemplates', () => {

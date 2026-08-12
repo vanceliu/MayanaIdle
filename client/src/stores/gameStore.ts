@@ -8,6 +8,12 @@ import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../mode
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
+import { syncTalentSlotGrants, syncStartingAffixBackfill } from '../systems/mailbox';
+import { rollTalentAffixDrop, rollTalentSlotDrop } from '../systems/talentDrops';
+import { useMailboxStore } from './mailboxStore';
+import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
+import { useTalentStore, talentPersistentRules, talentVillageRules } from './talentStore';
+import { BUILD_INFO } from '../buildInfo';
 import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
@@ -35,6 +41,17 @@ import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/le
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount } from '../systems/combat';
+import { getWeightStatus } from '../systems/weight';
+import type { HpSample } from '../systems/scriptRunner';
+
+/**
+ * 短期 HP 取樣（`51-auto-talent.md` § 51.4.5 的 `hp_dropped_recently`）。
+ *
+ * **不進 store、不持久化**：這是「剛剛掉多快」的暫時緩衝，
+ * 進 state 會讓每 300ms 一次的取樣觸發整棵樹重繪。
+ */
+const HP_SAMPLE_WINDOW_MS = 10_000;
+let hpSamples: HpSample[] = [];
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
@@ -124,6 +141,14 @@ export interface CombatLog {
 export type CombatLowHpAction = 'town' | 'teleport';
 export type PotionType = 'red' | 'orange' | 'white';
 export type SpeedPotionType = 'green' | 'enhanced-green';
+
+/**
+ * 旅館價格（`13-town.md` § 13.7）。
+ *
+ * 手動使用（`components/town/Inn.tsx`）與補給天賦的「使用旅館」共用同一份 ——
+ * 兩邊各抄一份的話，改價時一定有一邊忘了。
+ */
+export const INN_PRICES = { full: 50, hpOnly: 30, mpOnly: 20 } as const;
 
 export const POTION_CONFIG: Record<PotionType, { itemId: number; healMin: number; healMax: number; cooldown: number; name: string }> = {
   red: { itemId: 1, healMin: 10, healMax: 15, cooldown: 600, name: '紅色藥水' },
@@ -708,6 +733,34 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().startRegen();
     get().startPersistentLoop();
     get().initQuestBoard();
+
+    /**
+     * 自動天賦與信箱的初始化（`51-auto-talent.md`、`52-mailbox.md`）。
+     *
+     * 順序有意義：
+     * 1. 換版清理**先做**，只刪已領取的（未領取的一律保留，§ 52.7.1）
+     * 2. 補發天賦格信 —— 走累計數，之前漏掉的（例如在別台裝置升級）一起補上
+     * 3. 起始配置改版的補發，只補改版前就存在的角色
+     * 4. 起始配置只在完全沒有資料時發，重複呼叫安全
+     *
+     * 順序不可調換：補發要在 `grantStartingIfEmpty` **之前**判斷，
+     * 否則新角色會先被發滿起始資料，看起來就像改版前就存在的舊角色。
+     */
+    void (async () => {
+      const charId = char.id!;
+      await purgeClaimedMailOnVersionChange(charId, BUILD_INFO.version);
+      await syncTalentSlotGrants(charId, char.level);
+      await syncStartingAffixBackfill(charId);
+      await useTalentStore.getState().grantStartingIfEmpty(charId);
+      await useTalentStore.getState().load(charId);
+      await useMailboxStore.getState().load(charId);
+    })().catch(() => {
+      /*
+       * 吞掉即可：這是**背景初始化**，失敗的後果是天賦格晚一點才出現，
+       * 不影響已經載入的角色。最常見的失敗是測試把 DB 關掉而這裡還沒跑完
+       * （`DatabaseClosedError`），讓它變成 unhandled rejection 只會蓋掉真正的錯誤。
+       */
+    });
     const region = getRegion(char.currentRegion);
     if (region?.type !== 'town') {
       get().startExploring();
@@ -1613,6 +1666,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
       const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
 
+      /**
+       * HP 取樣（`hp_dropped_recently`）。在常駐 loop 維護：它每 300ms 跑一次，
+       * 是全遊戲最穩定的取樣節奏，掛在戰鬥 tick 上則會隨攻速變頻。
+       */
+      const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+      hpSamples.push({ t: now, percent: effMaxHp > 0 ? (char.hp / effMaxHp) * 100 : 100 });
+      while (hpSamples.length > 0 && now - hpSamples[0].t > HP_SAMPLE_WINDOW_MS) hpSamples.shift();
+
       const ctx: PersistentScriptContext = {
         character: char,
         skills: state.skills,
@@ -1623,9 +1684,22 @@ export const useGameStore = create<GameState>((set, get) => ({
         cooldownReduction,
         effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
         effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear),
+        /**
+         * 共用鑲材（§ 51.4.5）在常駐格也要成立，因此這幾個欄位不能只餵給戰鬥。
+         * 少一個就等於那些鑲材鑲進常駐格之後永遠不觸發，而且不會報錯。
+         */
+        playerPos: useMapControlStore.getState().playerPosition,
+        monsterPositions: useMapMonsterStore.getState().monsters.map(m => m.position),
+        weaponType: getEquippedWeapon(allGear)?.type,
+        hpHistory: hpSamples,
+        weightPercent: (() => {
+          const w = getWeightStatus(char, allGear, state.bagItems);
+          return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
+        })(),
       };
 
-      const action = evaluatePersistentScript(selectPersistentRules(state), ctx);
+      // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
+      const action = evaluatePersistentScript(talentPersistentRules(state.activeTemplateId), ctx);
       if (!action) {
         const retreatCtx: EmergencyRetreatContext = {
           character: char,
@@ -1727,7 +1801,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const char = state.character;
     if (!char) return;
 
-    const rules = selectVillageRules(state);
+    const rules = talentVillageRules(state.activeTemplateId);
     if (rules.length === 0) return;
 
     const now = Date.now();
@@ -1756,6 +1830,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
       bagFreeSlots: getBagMaxSlots(state.equippedGear)
         - getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear),
+      // 旅館有沒有事情可做（`13-town.md` § 13.7）。全滿又沒異常狀態就別去，
+      // 否則「使用旅館」會永遠成立而擋住後面的規則
+      needsInn: char.hp < getEffectiveMaxHp(char, state.equippedGear)
+        || char.mp < getEffectiveMaxMp(char, state.equippedGear)
+        || state.activeEffects.some(e => e.type === 'debuff' && e.target === 'player'),
     };
 
     const action = evaluateVillageScript(rules, ctx);
@@ -1767,6 +1846,25 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (!scroll) return;
         get().rememberHuntLocation();
         get().useTownScroll(scroll.itemId);
+        break;
+      }
+      case 'use_inn': {
+        /**
+         * 旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7）。
+         * 價格與手動使用同一份（`components/town/Inn.tsx` 的 `INN_PRICES.full`）。
+         */
+        if (char.gold < INN_PRICES.full) return;
+        set({
+          character: {
+            ...char,
+            hp: getEffectiveMaxHp(char, state.equippedGear),
+            mp: getEffectiveMaxMp(char, state.equippedGear),
+            gold: char.gold - INN_PRICES.full,
+          },
+          activeEffects: state.activeEffects.filter(
+            e => !(e.type === 'debuff' && e.target === 'player'),
+          ),
+        });
         break;
       }
       case 'return_to_hunt': {
@@ -1787,14 +1885,16 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
         break;
       }
-      case 'sell_materials': {
+      case 'sell_materials':
+      case 'sell_materials_threshold_only': {
         const items = collectVillageSellMaterials(action, ctx);
         if (items.length === 0) return;
         const gained = get().sellBagItems(items.map(i => ({ itemId: i.itemId, amount: i.amount })));
         set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：販售素材 ${items.length} 種，獲得 ${gained.toLocaleString()}G`, type: 'system' }) });
         break;
       }
-      case 'sell_equipment': {
+      case 'sell_equipment':
+      case 'sell_equipment_threshold_only': {
         const items = collectVillageSellEquipment(action, ctx);
         if (items.length === 0) return;
         const gained = get().sellEquipmentInstances(items.map(i => i.id!), templates);
@@ -2310,6 +2410,16 @@ export function processMonsterDeath(
     const equippedGear = get().equippedGear;
     char.hp = getEffectiveMaxHp(char, equippedGear);
     char.mp = getEffectiveMaxMp(char, equippedGear);
+    // 每 5 級一封天賦格信（`52-mailbox.md` § 52.2）。
+    // 走「累計數」而不是升級事件：一次連升多級也不會漏，重複呼叫安全
+    const levelForGrant = char.level;
+    const charIdForGrant = char.id;
+    if (charIdForGrant) {
+      void syncTalentSlotGrants(charIdForGrant, levelForGrant)
+        .then(sent => { if (sent > 0) return useMailboxStore.getState().refresh(); })
+        // 發信失敗不該打斷結算：下次載入角色會用累計數補回來
+        .catch(() => {});
+    }
   }
 
   // 掉落處理（排隊避免 race condition）
@@ -2328,12 +2438,45 @@ export function processMonsterDeath(
     const drops = monsterIsBoss
       ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
       : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);
+    // 鑲材與天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
+    // 兩者都不佔背包格，所以不需要容量檢查，撿不到的情況不存在
+    const talentDropMult = 1 + dropBonuses.drop_rate / 100;
+    const talentAffix = rollTalentAffixDrop(areaLevel, monsterIsBoss, talentDropMult);
+    const talentSlotTier = rollTalentSlotDrop(areaLevel, monsterIsBoss, talentDropMult);
+    const talentLogs: string[] = [];
+    if (char.id) {
+      if (talentAffix) {
+        await db.talentAffixes.add({
+          characterId: char.id,
+          definitionId: talentAffix.def.id,
+          boundParam: talentAffix.boundParam,
+          params: null,
+          slotId: null,
+          slotIndex: null,
+        });
+        talentLogs.push(`獲得鑲材（T${talentAffix.def.tier}）`);
+      }
+      if (talentSlotTier !== null) {
+        await db.talentSlots.add({
+          characterId: char.id,
+          tier: talentSlotTier,
+          assignedType: null,
+          templateId: null,
+          order: null,
+          enabled: true,
+        });
+        talentLogs.push(`獲得天賦格（T${talentSlotTier}）`);
+      }
+    }
+
     const state2 = get();
     if (!state2.character) return;
     let char2 = { ...state2.character };
     const logs2 = [...state2.combatLogs];
     let newBag = state2.bagItems.map(b => ({ ...b }));
     const newEquipInv = [...state2.inventory];
+
+    for (const text of talentLogs) logs2.push({ text, type: 'loot' });
 
     char2.gold += drops.gold;
     if (drops.gold > 0) {

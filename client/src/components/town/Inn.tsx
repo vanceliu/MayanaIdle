@@ -1,10 +1,4 @@
-import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../../stores/gameStore';
-
-const INN_PRICES = {
-  full: 50,
-  hpOnly: 30,
-  mpOnly: 20,
-};
+import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, INN_PRICES } from '../../stores/gameStore';
 
 export function Inn() {
   const char = useGameStore(s => s.character);

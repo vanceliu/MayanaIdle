@@ -16,6 +16,7 @@ function reset() {
       bag: { x: 100, y: 80 },
       skill: { x: 60, y: 120 },
       quest: { x: 80, y: 120 },
+    mail: { x: 0, y: 0 },
       script: { x: 120, y: 120 },
     },
     order: [...PANEL_KEYS],

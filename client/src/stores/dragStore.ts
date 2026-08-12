@@ -16,12 +16,25 @@ import type { BagDragPayload } from '../models/bagLayout';
  * 這讓「誰可以被放」不必在 store 註冊，新增目標只要標屬性。
  */
 
-export type DropKind = 'bag-slot' | 'quick-slot' | 'map';
+export type DropKind =
+  | 'bag-slot' | 'quick-slot' | 'map'
+  /** 鑲材落在天賦格的某個槽位上 */
+  | 'talent-slot'
+  /** 天賦格落在某一列上＝插到那個順序（`51-auto-talent.md` § 51.3.1） */
+  | 'talent-row'
+  /** 未安裝的天賦格落在編輯區＝安裝到這個類型 */
+  | 'talent-install';
 
 export interface DropTarget {
   kind: DropKind;
   /** 地圖沒有索引，統一補 -1，呼叫端不必判 undefined */
   index: number;
+  /**
+   * 第二層索引（`data-drop-sub`）。天賦格要兩個座標：`index` ＝ 天賦格 id、
+   * `sub` ＝ 第幾個條件槽（`null` ＝ 實作槽，`51-auto-talent.md` § 51.3）。
+   * 其餘目標一律 null。
+   */
+  sub: number | null;
 }
 
 /**
@@ -36,7 +49,27 @@ export interface SkillDragPayload {
   name: string;
 }
 
-export type DragPayload = BagDragPayload | SkillDragPayload;
+/**
+ * 從背包「天賦」分頁拖出來的鑲材（`51-auto-talent.md`）。
+ *
+ * 與背包 payload 分流的理由同技能：鑲材不進 `characterBag`、沒有格子索引、
+ * 也不能丟到地圖上，硬塞進 `BagDragPayload` 只會多一堆空欄位。
+ */
+export interface TalentAffixDragPayload {
+  kind: 'talent-affix';
+  affixId: number;
+  name: string;
+}
+
+/** 拖天賦格：從背包拖出來安裝，或把已安裝的拖到別的順序 */
+export interface TalentSlotDragPayload {
+  kind: 'talent-slot-item';
+  slotId: number;
+  name: string;
+}
+
+export type DragPayload =
+  | BagDragPayload | SkillDragPayload | TalentAffixDragPayload | TalentSlotDragPayload;
 
 export interface DragItem {
   /** 來源在背包版面的格子索引（背包內重排要用）。技能沒有格子，一律 -1 */
@@ -65,16 +98,20 @@ export function hitTestDropTarget(x: number, y: number): DropTarget | null {
   const host = (el as HTMLElement | null)?.closest?.('[data-drop-kind]') as HTMLElement | null;
   if (!host) return null;
   const kind = host.dataset.dropKind as DropKind | undefined;
-  if (kind !== 'bag-slot' && kind !== 'quick-slot' && kind !== 'map') return null;
+  const KINDS: DropKind[] = ['bag-slot', 'quick-slot', 'map', 'talent-slot', 'talent-row', 'talent-install'];
+  if (!kind || !KINDS.includes(kind)) return null;
   const raw = host.dataset.dropIndex;
   const index = raw == null ? -1 : Number(raw);
-  return { kind, index: Number.isFinite(index) ? index : -1 };
+  const rawSub = host.dataset.dropSub;
+  // 沒標或標了非數字（實作槽用 `action`）一律當 null
+  const sub = rawSub == null || !Number.isFinite(Number(rawSub)) ? null : Number(rawSub);
+  return { kind, index: Number.isFinite(index) ? index : -1, sub };
 }
 
 function sameTarget(a: DropTarget | null, b: DropTarget | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.kind === b.kind && a.index === b.index;
+  return a.kind === b.kind && a.index === b.index && a.sub === b.sub;
 }
 
 export const useDragStore = create<DragState>((set, get) => ({
@@ -103,8 +140,9 @@ export const useDragStore = create<DragState>((set, get) => ({
 }));
 
 /** 目標元件用來判斷「現在是不是被拖到我頭上」。訂閱範圍收到布林，避免整條快捷格重畫 */
-export function useIsDragOver(kind: DropKind, index: number): boolean {
-  return useDragStore(s => s.over?.kind === kind && s.over.index === index);
+export function useIsDragOver(kind: DropKind, index: number, sub: number | null = null): boolean {
+  return useDragStore(s =>
+    s.over?.kind === kind && s.over.index === index && (kind !== 'talent-slot' || s.over.sub === sub));
 }
 
 /** 有沒有正在進行的拖曳（目標元件用來亮起可放置提示） */

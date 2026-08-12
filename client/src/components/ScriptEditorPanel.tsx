@@ -9,12 +9,11 @@ import {
 import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
-import { CombatScriptEditor } from './CombatScriptEditor';
-import { PersistentScriptEditor } from './PersistentScriptEditor';
-import { VillageScriptEditor } from './VillageScriptEditor';
+import { TalentTypeEditor } from './TalentEditor';
+import { TalentFusion } from './TalentFusion';
 import { isDeletableTemplate } from '../models/scriptTemplate';
 
-type ScriptTab = 'combat' | 'persistent' | 'village';
+type ScriptTab = 'combat' | 'persistent' | 'supply' | 'fusion';
 
 /**
  * 自動腳本（16-tech-frontend-architecture.md § 32.16）
@@ -78,7 +77,7 @@ function ScriptTemplateTabs() {
 
   return (
     <div className="template-bar">
-      <div className="template-tabs" role="tablist" aria-label="腳本分頁">
+      <div className="template-tabs" role="tablist" aria-label="天賦配置分頁">
         {templates.map(t => (
           renaming === t.id ? (
             <input
@@ -131,29 +130,27 @@ export function ScriptEditorContent() {
   return (
     <>
       <ScriptTemplateTabs />
+      {/* 分頁順序固定為常駐／戰鬥／補給／天賦合成（`34-ui-guidelines.md` § 34.11） */}
       <div className="script-tabs">
-        <button
-          className={`script-tab ${tab === 'persistent' ? 'active' : ''}`}
-          onClick={() => setTab('persistent')}
-        >
-          常駐腳本
-        </button>
-        <button
-          className={`script-tab ${tab === 'combat' ? 'active' : ''}`}
-          onClick={() => setTab('combat')}
-        >
-          戰鬥腳本
-        </button>
-        <button
-          className={`script-tab ${tab === 'village' ? 'active' : ''}`}
-          onClick={() => setTab('village')}
-        >
-          村莊腳本
-        </button>
+        {([
+          ['persistent', '常駐'],
+          ['combat', '戰鬥'],
+          ['supply', '補給'],
+          ['fusion', '天賦合成'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            className={`script-tab ${tab === key ? 'active' : ''}`}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      {tab === 'combat' && <CombatScriptEditor />}
-      {tab === 'persistent' && <PersistentScriptEditor />}
-      {tab === 'village' && <VillageScriptEditor />}
+      {tab === 'combat' && <TalentTypeEditor type="combat" />}
+      {tab === 'persistent' && <TalentTypeEditor type="persistent" />}
+      {tab === 'supply' && <TalentTypeEditor type="supply" />}
+      {tab === 'fusion' && <TalentFusion />}
     </>
   );
 }

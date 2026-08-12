@@ -29,7 +29,7 @@ describe('腳本 template 分頁列', () => {
 
     expect(useGameStore.getState().scriptTemplates).toHaveLength(2);
     expect(screen.getAllByRole('tab')).toHaveLength(2);
-    expect(screen.getByRole('tab', { name: /腳本 1/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: /配置 1/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('點分頁即切換使用中的 template', () => {

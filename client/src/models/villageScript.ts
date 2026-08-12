@@ -15,7 +15,16 @@ export type VillageConditionType =
   /** 指定道具持有量 < N */
   | 'item_count_below'
   | 'gold_below'
-  | 'gold_above';
+  | 'gold_above'
+  // === `51-auto-talent.md` § 51.4.8 新增 ===
+  /** 在城鎮（`match: 'town'`）或在野外（`'field'`） */
+  | 'in_town'
+  /** 背包剩餘格數 ≤ N。取東西前該看的是剩餘，不是已用 */
+  | 'bag_free_slots_lte'
+  /** 有上次掛機點紀錄 */
+  | 'has_hunt_location'
+  | 'warehouse_gold_gte'
+  | 'warehouse_item_gte';
 
 export type VillageActionType =
   /** 消耗回城卷軸回到城鎮，回城前會記下當前掛機點 */
@@ -37,7 +46,14 @@ export type VillageActionType =
   /** 從共用倉庫領金幣，補到 targetAmount */
   | 'withdraw_gold'
   /** 回到上次掛機點 */
-  | 'return_to_hunt';
+  | 'return_to_hunt'
+  // === `51-auto-talent.md` § 51.4.11 新增 ===
+  /** 使用旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7） */
+  | 'use_inn'
+  /** 販售素材（僅門檻）：不吃保留設定，保護開關固定開啟 */
+  | 'sell_materials_threshold_only'
+  /** 販售裝備（僅門檻）：不吃 § 49.4 的保留條件，但**門檻照樣要設** */
+  | 'sell_equipment_threshold_only';
 
 /** 共用倉庫（帳號層級）或個人倉庫（角色層級），見 `13-town.md` § 13.8 */
 export type WarehouseKind = 'shared' | 'personal';
@@ -45,8 +61,12 @@ export type WarehouseKind = 'shared' | 'personal';
 export interface VillageCondition {
   type: VillageConditionType;
   value?: number;
-  /** `item_count_below` 用。存 id 不存名稱（§ 99.1.7） */
+  /** `item_count_below`／`warehouse_item_gte` 用。存 id 不存名稱（§ 99.1.7） */
   itemId?: number;
+  /** `in_town` 用：`'town'` 或 `'field'` */
+  match?: string;
+  /** `warehouse_*` 用：共用或個人倉庫 */
+  warehouse?: WarehouseKind;
 }
 
 /**
@@ -87,6 +107,18 @@ export interface VillageAction {
   warehouse?: WarehouseKind;
   /** `deposit_gold`：身上要留下的金幣，其餘存進倉庫 */
   keepGold?: number;
+  /**
+   * `sell_materials`：素材白名單，指定的永遠不賣。
+   *
+   * 補 `hasMaterialUsage()` 涵蓋不到的情況 —— 收集任務的目標素材沒有配方用途，
+   * 正在做任務時被門檻掃掉就是實質損失（`51-auto-talent.md` § 51.4.11）。
+   */
+  keepItemIds?: number[];
+  /**
+   * `buy_item`／`withdraw_item`：多組「道具＋目標數量」。
+   * T1 的池型版只能設 1 組，T4 的自選版最多 3 組（§ 51.4.11）。
+   */
+  groups?: { itemId: number; targetAmount: number }[];
 }
 
 export interface VillageRule {
@@ -114,11 +146,19 @@ export const VILLAGE_CONDITION_LABELS: Record<VillageConditionType, string> = {
   item_count_below: '道具數量少於',
   gold_below: '金幣少於',
   gold_above: '金幣多於',
+  in_town: '在城鎮／在野外',
+  bag_free_slots_lte: '背包剩餘格數 ≤',
+  has_hunt_location: '有上次掛機點',
+  warehouse_gold_gte: '倉庫金幣 ≥',
+  warehouse_item_gte: '倉庫有指定道具 ≥',
 };
 
 export const VILLAGE_ACTION_LABELS: Record<VillageActionType, string> = {
   return_town: '回城',
   sell_materials: '販售素材',
+  use_inn: '使用旅館',
+  sell_materials_threshold_only: '販售素材（僅門檻）',
+  sell_equipment_threshold_only: '販售裝備（僅門檻）',
   sell_equipment: '販售裝備',
   buy_item: '購買道具至',
   deposit_materials: '存入素材',

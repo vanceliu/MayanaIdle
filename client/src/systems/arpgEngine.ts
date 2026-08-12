@@ -23,7 +23,9 @@ import {
 } from './monsterCombatFSM';
 import { resolveActionTargets } from './targeting';
 import type { MonsterAttackType } from '../models/monster';
-import { evaluateCombatScript, skillMeetsWeaponRequirement, type CombatScriptContext, type ScriptMonsterView } from './scriptRunner';
+import { evaluateCombatScript, skillMeetsWeaponRequirement, type CombatScriptContext, type ScriptMonsterView, type HpSample } from './scriptRunner';
+import { pickTargetBy, type TargetPickCandidate, type TargetStrategy } from './targeting';
+import { isNonAttackAction } from '../models/scriptEngine';
 import { canUseSkill } from '../models/skill';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
 import { isPlayerStunned } from './playerDebuffSystem';
@@ -109,6 +111,10 @@ export interface ArpgTickInput {
   deltaMs: number;
   /** 背包內容，用於負重判定（§ 20.7）。未提供時視為不超重 */
   bagItems?: BagItemLike[];
+  /** 共用條件用（`51-auto-talent.md` § 51.4.5）。未提供時對應條件一律不成立 */
+  effectiveMaxHp?: number;
+  weightPercent?: number;
+  hpHistory?: HpSample[];
 }
 
 export interface PlayerAttackEvent {
@@ -151,6 +157,7 @@ export function tickArpgEngine(
   const {
     playerPos, character, skills, activeEffects, equippedGear,
     combatRules, mapMonsters, monsterInstances, map, deltaMs,
+    effectiveMaxHp, weightPercent, hpHistory,
   } = input;
 
   // Sync monster combat contexts
@@ -194,6 +201,11 @@ export function tickArpgEngine(
       playerPos,
       primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
       weaponRange,
+      // 目標身上的 debuff／護盾條件要靠它（`51-auto-talent.md` § 51.4.10 的「接線」項）
+      activeEffects,
+      effectiveMaxHp,
+      weightPercent,
+      hpHistory,
     };
     const nextAction: CombatAction | null = manualSkill
       ? { type: 'skill', skillId: manualSkill.id }
@@ -251,6 +263,11 @@ export function tickArpgEngine(
       playerPos,
       primaryTargetId: engine.playerCtx.targetMonsterId ?? null,
       weaponRange,
+      // 目標身上的 debuff／護盾條件要靠它（`51-auto-talent.md` § 51.4.10 的「接線」項）
+      activeEffects,
+      effectiveMaxHp,
+      weightPercent,
+      hpHistory,
     };
 
     /*
@@ -280,7 +297,14 @@ export function tickArpgEngine(
     // 超重時無法攻擊也無法施放魔法（§ 20.7）。攻擊冷卻照樣走完才判定，
     // 所以訊息的頻率等同出手頻率，不會每個 frame 洗版。
     const weight = getWeightStatus(character, equippedGear, input.bagItems ?? []);
-    if (!action) {
+    if (action && isNonAttackAction(action.type) && action.type !== 'wait') {
+      /*
+       * 切換目標與走位（§ 51.4.9）。**消耗這次出手機會**，與「不動作」同性質 ——
+       * 一個天賦格只有一個實作槽，先切目標再打就是兩格兩個 tick。
+       * 超重不擋這些：走位與改打誰不是攻擊，超重的人更需要跑。
+       */
+      applyNonAttackAction(engine, action, scriptCtx, playerPos, activeEffects);
+    } else if (!action) {
       // 沒有可執行動作：原地待命，什麼事都不做
     } else if (weight.overweight) {
       events.push({ type: 'overweight_blocked', message: getOverweightMessage(weight) });
@@ -438,3 +462,53 @@ function resolveTargets(
     maxRange,
   });
 }
+
+/** 切換目標／走位動作的實際效果（`51-auto-talent.md` § 51.4.9） */
+function applyNonAttackAction(
+  engine: ArpgEngineState,
+  action: CombatAction,
+  ctx: CombatScriptContext,
+  playerPos: Position,
+  activeEffects: ActiveEffect[],
+): void {
+  const now = Date.now();
+
+  if (action.type === 'lock_target') {
+    // 鎖定：把當下的目標釘住，FSM 不再改挑最近的一隻
+    engine.playerCtx.lockedTargetId = engine.playerCtx.targetMonsterId ?? null;
+    return;
+  }
+
+  const strategy = TARGET_STRATEGY_OF[action.type];
+  if (strategy) {
+    const candidates: TargetPickCandidate[] = ctx.monsters.map(m => ({
+      id: m.id,
+      position: m.position,
+      hpPercent: m.instance.maxHp > 0 ? (m.instance.currentHp / m.instance.maxHp) * 100 : 0,
+      race: m.instance.race,
+      element: m.instance.element,
+      debuffTags: activeEffects
+        .filter(e => e.target === 'monster' && e.targetMonsterId === m.id && now - e.startTime < e.duration)
+        .flatMap(e => e.tags),
+    }));
+    const picked = pickTargetBy(strategy, candidates, playerPos, action.match);
+    // 挑不到就維持原目標 —— 切不成不該讓角色變成沒有目標
+    if (picked) {
+      engine.playerCtx.targetMonsterId = picked;
+      engine.playerCtx.lockedTargetId = null;
+    }
+    return;
+  }
+
+  // 走位：只設意圖，實際移動由 FSM 在下一幀處理
+  if (action.type === 'keep_distance' || action.type === 'close_in' || action.type === 'disengage') {
+    engine.playerCtx.moveIntent = { kind: action.type, distance: action.distance };
+  }
+}
+
+const TARGET_STRATEGY_OF: Partial<Record<string, TargetStrategy>> = {
+  switch_target_lowest_hp: 'lowest_hp',
+  switch_target_highest_hp: 'highest_hp',
+  switch_target_farthest: 'farthest',
+  switch_target_by_kind: 'by_kind',
+};

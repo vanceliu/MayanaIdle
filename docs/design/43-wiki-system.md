@@ -182,8 +182,12 @@ client/src/wiki/
 - 冒險者工會等階、任務類型、獎勵
 
 ### 4.12 自動天賦 (TalentsPage)
+- **天賦格與鑲材**：階級對應的條件槽數、取得管道（創角／每 5 級信箱／Boss 掉落／合成）、
+  鑲材的三種型態與「一實體一格」、各類型的合成上限
 - 三種類型的判定時機與優先順序、各自的條件／動作對照表
-- 天賦格與天賦配置規則、可照抄的範例配置
+- **天賦配置是換裝不是複製**（`51-auto-talent.md` § 51.3.2）——
+  沒寫清楚玩家會以為切配置能複製一整套天賦格
+- 可照抄的範例配置
 - 條件與動作名稱由 `models` 的標籤常數渲染，與編輯器共用同一份 ——
   面板改名 Wiki 會跟著動。判定頻率等數字為硬編碼文字
 - **鑲材總表**：全部鑲材的 tier、型態（指定／池／自選）、適用類型、取得管道。
@@ -230,7 +234,8 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/attributes   → AttributesPage
 /wiki/combat       → CombatPage
 /wiki/quests       → QuestsPage
-/wiki/scripts      → ScriptsPage
+/wiki/talents      → TalentsPage
+/wiki/scripts      → 轉址至 /wiki/talents（改名前的舊路徑）
 /wiki/drops        → DropsPage
 /wiki/credits      → CreditsPage
 ```

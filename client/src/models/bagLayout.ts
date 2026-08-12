@@ -32,6 +32,7 @@ export function bagLayoutStorageKey(characterId: number): string {
   return `mayana_bag_layout_${characterId}`;
 }
 
+
 /** 整理（§ 35.8.1）需要的欄位。裝備中的項目才有 `equippedSlot` */
 export interface BagSortItem extends BagSlotItem {
   type: string;

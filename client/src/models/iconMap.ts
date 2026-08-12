@@ -255,3 +255,114 @@ export function getSkillDisplayIcon(skill: {
   if (skill.type === 'buff') return getEffectIcon(skill.buffCategory ?? skill.id);
   return SKILL_ID_ICON_MAP[skill.id] ?? getSkillIcon(skill.element ?? 'none');
 }
+
+/**
+ * 天賦鑲材的圖示（`51-auto-talent.md`）。key ＝ `ruleId`。
+ *
+ * 沒對到的用 `getTalentAffixIcon` 的 kind 預設 ——
+ * 89 筆鑲材不必逐筆配圖，同一族（目標系、倉庫系…）共用一個就夠認。
+ */
+export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
+  // 自身狀態
+  hp_below: 'buffs/holy-grail',
+  hp_above: 'buffs/holy-grail',
+  hp_dropped_recently: 'debuffs/bleeding-wound',
+  mp_below: 'items/potion-ball',
+  mp_above: 'items/potion-ball',
+  skill_ready: 'buffs/concentration-orb',
+  buff_not_active: 'buffs/aura',
+  speed_not_active: 'buffs/sprint',
+  debuff_active: 'debuffs/poison-gas',
+  self_shielded: 'buffs/magic-shield',
+  buff_remaining_below: 'items/hourglass',
+  potion_cooldown_ready: 'items/standing-potion',
+  weight_over: 'items/swap-bag',
+  weapon_type_is: 'buffs/sparkling-sabre',
+  area_dwell_gte: 'items/hourglass',
+  current_area_is: 'items/tied-scroll',
+
+  // 場上與目標
+  monster_count_gte: 'buffs/crosshair',
+  monsters_near_self_gte: 'buffs/crosshair',
+  aoe_hit_count_gte: 'skills/arrow-cluster',
+  monster_hp_below: 'buffs/on-target',
+  monster_hp_above: 'buffs/on-target',
+  target_distance: 'buffs/on-target',
+  target_attack_type: 'skills/arrow-cluster',
+  target_race: 'debuffs/skull-crossed-bones',
+  target_element: 'buffs/embrassed-energy',
+  target_size: 'buffs/muscle-up',
+  target_is_boss: 'debuffs/stoned-skull',
+  target_defense: 'debuffs/broken-shield',
+  target_level_diff: 'buffs/muscle-up',
+  target_range_gt: 'buffs/flaming-arrow',
+  target_has_debuff: 'debuffs/poison-gas',
+  target_lacks_debuff: 'debuffs/poison-gas',
+  target_cc_immune: 'debuffs/cracked-shield',
+  target_shielded: 'buffs/shield-reflect',
+  field_has_race: 'debuffs/skull-crossed-bones',
+  field_avg_hp_below: 'buffs/crosshair',
+  can_kill_target: 'buffs/deadly-strike',
+  can_kill_count_gte: 'buffs/deadly-strike',
+
+  // 補給條件
+  in_town: 'items/tied-scroll',
+  bag_slots_used_gte: 'items/swap-bag',
+  bag_free_slots_lte: 'items/swap-bag',
+  item_count_below: 'items/potion-ball',
+  gold_below: 'items/cut-diamond',
+  gold_above: 'items/cut-diamond',
+  has_hunt_location: 'items/tied-scroll',
+  warehouse_gold_gte: 'items/cut-diamond',
+  warehouse_item_gte: 'items/swap-bag',
+
+  // 戰鬥動作
+  normal_attack: 'skills/bloody-sword',
+  wait: 'items/hourglass',
+  skill: 'buffs/sparkling-sabre',
+  skill_class_only: 'buffs/holy-symbol',
+  switch_target_lowest_hp: 'buffs/on-target',
+  switch_target_highest_hp: 'buffs/on-target',
+  switch_target_farthest: 'buffs/crosshair',
+  switch_target_by_kind: 'buffs/crosshair',
+  switch_target_by_debuff: 'debuffs/poison-gas',
+  lock_target: 'buffs/on-target',
+  keep_distance: 'buffs/wingfoot',
+  close_in: 'buffs/run',
+  disengage: 'buffs/freedom-dove',
+
+  // 常駐動作
+  potion: 'items/standing-potion',
+  heal_skill: 'buffs/holy-grail',
+  buff_skill: 'buffs/aura',
+  speed_potion: 'buffs/sprint',
+  cure_item: 'items/bubbling-flask',
+  use_town_scroll: 'items/scroll-unfurled',
+  use_consumable: 'items/potion-ball',
+  refill_to_percent: 'items/standing-potion',
+  refill_all_buffs: 'buffs/beams-aura',
+
+  // 補給動作
+  return_town: 'items/scroll-unfurled',
+  return_to_hunt: 'items/tied-scroll',
+  use_inn: 'buffs/holy-grail',
+  buy_item: 'items/cut-diamond',
+  withdraw_item: 'items/swap-bag',
+  sell_materials: 'items/clay-brick',
+  sell_materials_threshold_only: 'items/clay-brick',
+  sell_equipment: 'items/gem-pendant',
+  sell_equipment_threshold_only: 'items/gem-pendant',
+  deposit_materials: 'items/swap-bag',
+  deposit_equipment: 'items/swap-bag',
+  deposit_gold: 'items/cut-diamond',
+  withdraw_gold: 'items/cut-diamond',
+};
+
+/** 對不到就用種類預設：條件＝準星、實作＝劍 */
+export function getTalentAffixIcon(ruleId: string, kind: 'condition' | 'action'): string {
+  return TALENT_AFFIX_ICON_MAP[ruleId]
+    ?? (kind === 'condition' ? 'buffs/crosshair' : 'skills/bloody-sword');
+}
+
+/** 天賦格的圖示：tier 越高條件槽越多，用同一個符號帶 tier 標示 */
+export const TALENT_SLOT_ICON = 'items/three-keys';

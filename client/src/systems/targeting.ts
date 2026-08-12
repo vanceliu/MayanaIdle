@@ -102,3 +102,68 @@ export function resolveActionTargets(params: ResolveTargetsParams): string[] {
 
   return [primaryId];
 }
+
+// === 目標選擇策略（`51-auto-talent.md` § 51.4.9）===
+
+/**
+ * 切換目標用的候選。比 `TargetCandidate` 多帶判斷依據 ——
+ * 「最低血」要看 HP、「指定種族」要看 race。
+ */
+export interface TargetPickCandidate extends TargetCandidate {
+  hpPercent: number;
+  race: string;
+  element: string;
+  /** 身上有哪些 debuff tag */
+  debuffTags: string[];
+}
+
+export type TargetStrategy =
+  | 'lowest_hp' | 'highest_hp' | 'farthest'
+  | 'by_kind' | 'by_debuff' | 'by_lacking_debuff';
+
+/**
+ * 依策略挑一個目標，挑不到回 null（呼叫端維持原目標）。
+ *
+ * **不做射程判定**：切目標與打得到是兩件事 —— 切完之後角色會自己追過去，
+ * 加上射程 gate 會讓「先切遠處的召喚者」永遠切不成。
+ */
+export function pickTargetBy(
+  strategy: TargetStrategy,
+  candidates: TargetPickCandidate[],
+  playerPos: Position,
+  match?: string,
+): string | null {
+  if (candidates.length === 0) return null;
+
+  switch (strategy) {
+    case 'lowest_hp':
+      return minBy(candidates, c => c.hpPercent)?.id ?? null;
+    case 'highest_hp':
+      return minBy(candidates, c => -c.hpPercent)?.id ?? null;
+    case 'farthest':
+      return minBy(candidates, c => -getDistance(playerPos, c.position))?.id ?? null;
+    case 'by_kind': {
+      const hit = candidates.filter(c => c.race === match || c.element === match);
+      // 同類有多隻時取最近的：切目標的意圖是「換一隻打」，不是「跑最遠那隻」
+      return minBy(hit, c => getDistance(playerPos, c.position))?.id ?? null;
+    }
+    case 'by_debuff':
+    case 'by_lacking_debuff': {
+      const want = strategy === 'by_debuff';
+      const hit = candidates.filter(c => (match ? c.debuffTags.includes(match) : c.debuffTags.length > 0) === want);
+      return minBy(hit, c => getDistance(playerPos, c.position))?.id ?? null;
+    }
+    default:
+      return null;
+  }
+}
+
+function minBy<T>(items: T[], score: (item: T) => number): T | null {
+  let best: T | null = null;
+  let bestScore = Infinity;
+  for (const item of items) {
+    const s = score(item);
+    if (s < bestScore) { bestScore = s; best = item; }
+  }
+  return best;
+}

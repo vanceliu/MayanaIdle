@@ -13,14 +13,14 @@ import { create } from 'zustand';
  * 存的同時記下**當時的視窗尺寸**：換到不同大小的視窗時按比例換算回來，
  * 否則在 1920 寬排好的版面到 1280 就整排擠在畫面外緣（夾制後全部黏在右邊）。
  */
-export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest' | 'script';
+export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest' | 'mail' | 'script';
 
-export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest', 'script'];
+export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest', 'mail', 'script'];
 
 /**
  * PanelDock 以泛用按鈕渲染的面板。
- * `quest` 與 `script` 不在此列 —— 兩者的按鈕要顯示數量 badge，
- * 由 `QuestTrackerButton` / `ScriptEditorButton` 自行渲染。
+ * `quest`／`mail`／`script` 不在此列 —— 三者的按鈕要顯示指示，
+ * 由 `QuestTrackerButton` / `MailboxButton` / `ScriptEditorButton` 自行渲染。
  */
 export const DOCK_PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill'];
 
@@ -30,7 +30,8 @@ export const PANEL_TITLES: Record<PanelKey, string> = {
   bag: '背包',
   skill: '技能',
   quest: '進行中的任務',
-  script: '自動腳本',
+  mail: '信箱',
+  script: '自動天賦',
 };
 
 /**
@@ -51,6 +52,8 @@ export const PANEL_ICONS: Record<PanelKey, string> = {
   bag: '👜',
   skill: '✨',
   quest: '📋',
+  /** 不可與城鎮設施撞號（見上）：✉️ 目前沒有設施在用 */
+  mail: '✉️',
   script: '📜',
 };
 
@@ -80,6 +83,7 @@ export const PANEL_WIDTHS: Record<PanelKey, number> = {
   bag: 420,
   skill: 420,
   quest: 320,
+  mail: 360,
   script: 480,
 };
 
@@ -99,6 +103,7 @@ const DEFAULT_POSITIONS: Record<PanelKey, PanelPosition> = {
   skill: { x: 1224, y: 120 },
   // 任務預設落在 stage 右上角（小螢幕會被 FloatingWindow 夾回可視範圍）
   quest: { x: 1576, y: 128 },
+  mail: { x: 1230, y: 128 },
   // 自動腳本較高（82vh），預設靠上避免下緣被夾動
   script: { x: 700, y: 72 },
 };

@@ -23,9 +23,10 @@ describe('BagPanel', () => {
     useGameStore.setState({ bagSlotMap: {} });
   });
 
+  // 面板裡不再重複寫「背包」（視窗標題已經是），分頁列與格數就是唯一的表頭
   it('renders with section header and slot count', () => {
     render(<BagPanel />);
-    expect(screen.getByText('背包')).toBeDefined();
+    expect(screen.getByRole('tab', { name: '一般' })).toBeDefined();
     // § 35.1：無腰帶時為基礎 60 格
     expect(screen.getByText(/\/60/)).toBeDefined();
   });
@@ -46,7 +47,7 @@ it('shows gold row when expanded', () => {
   it('shows empty message when no items', () => {
     useGameStore.setState({ bagItems: [], inventory: [] });
     render(<BagPanel />);
-    expect(screen.getByText('背包')).toBeDefined();
+    expect(screen.getByRole('tab', { name: '一般' })).toBeDefined();
   });
 
   describe('兩段式點擊（§ 35.1.4）', () => {
@@ -145,7 +146,7 @@ it('shows gold row when expanded', () => {
       tap(cell());
       expect(document.querySelector('.bag-cell.is-selected')).not.toBeNull();
 
-      const header = document.querySelector('.bag-panel-header')!;
+      const header = document.querySelector('.bag-tabs')!;
       fireEvent.pointerDown(header, { button: 0 });
       fireEvent.click(header);
       expect(document.querySelector('.bag-cell.is-selected')).toBeNull();

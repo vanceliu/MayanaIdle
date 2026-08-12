@@ -5,6 +5,8 @@ import { generateCharacterUuid } from '../models/characterIdentity';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
+import type { TalentAffixInstance, TalentSlot } from '../models/talent';
+import type { Mail } from '../models/mailbox';
 import { ITEM_DEFINITIONS } from './seed/itemSeeds';
 
 
@@ -150,6 +152,11 @@ export class GameDB extends Dexie {
   users!: Table<UserEntry>;
   warehouses!: Table<WarehouseEntry>;
   warehouseGold!: Table<WarehouseGoldEntry>;
+  /** 自動天賦（`51-auto-talent.md`）。鑲材帶 roll 出來的參數，不進 characterBag */
+  talentAffixes!: Table<TalentAffixInstance>;
+  talentSlots!: Table<TalentSlot>;
+  /** 系統信箱（`52-mailbox.md`）。首版只發天賦格 */
+  mailbox!: Table<Mail>;
 
   constructor() {
     super('MayanaIdleDB');
@@ -329,6 +336,22 @@ export class GameDB extends Dexie {
       await tx.table('characters').toCollection().modify(row => {
         if (!row.appearance) row.appearance = createDefaultAppearance();
       });
+    });
+
+    /**
+     * v18：自動天賦（`51-auto-talent.md`）與系統信箱（`52-mailbox.md`）。
+     *
+     * **只建表，不塞資料。** 起始鑲材與天賦格、以及舊自動腳本規則的重置，
+     * 都在角色載入時處理（`18-data-schema.md` § 18.9）——
+     * upgrade 拿不到「哪一隻角色現在要用」的上下文，而天賦格與鑲材是逐角色的。
+     *
+     * `talentAffixes.slotId` 與 `talentSlots.assignedType` 建索引：
+     * 判定每 tick 都要撈「這個天賦格鑲了什麼」與「這個類型有哪些格」。
+     */
+    this.version(18).stores({
+      talentAffixes: '++id, characterId, definitionId, slotId',
+      talentSlots: '++id, characterId, assignedType, templateId',
+      mailbox: '++id, characterId, sourceKey, claimedAt',
     });
   }
 }

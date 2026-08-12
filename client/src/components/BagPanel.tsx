@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { buildBagLayout, moveBagSlot, sortBagLayout, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
+import {
+  buildTalentBagCells,
+  sortTalentBag,
+  loadTalentBagOrder,
+  saveTalentBagOrder,
+} from '../models/talentBag';
+import { useTalentStore, availableSlots, availableAffixes } from '../stores/talentStore';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
@@ -17,8 +24,8 @@ import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { roundWeight } from '../systems/weight';
 import { isSigilItemId } from '../models/sigil';
-
-const BAG_COLUMNS = 5;
+import { BagTalentTab } from './BagTalentTab';
+import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
 
 /** 按下到放開的位移在這個範圍內都算「點擊」，超過就是拖曳的起手（px） */
 const CLICK_SLOP = 8;
@@ -40,13 +47,6 @@ interface BagGridItem {
    * 有值＝「裝備中」：一樣佔背包格，第二次點擊是卸下而不是穿上，且不可丟棄。
    */
   equippedSlot?: EquipSlot;
-}
-
-function getShortName(name: string): string {
-  const floorMatch = name.match(/^(.+?)\s*(\d+F)/);
-  if (floorMatch) return `${floorMatch[1]}${floorMatch[2]}`;
-  if (name.length <= 4) return name;
-  return name.slice(0, 4);
 }
 
 function getItemIconKey(name: string, type: string): string {
@@ -78,6 +78,25 @@ function totalItemWeight(item: { itemId?: number; count?: number }): number {
 export function BagPanel() {
   /** § 35.20：印記抽屜的開合。不持久化，重開回到收合 */
   const [sigilOpen, setSigilOpen] = useState(false);
+  /** § 35.21 背包分頁。不持久化：切分頁是當下的動作，不是設定 */
+  const [bagTab, setBagTab] = useState<'normal' | 'talent'>('normal');
+  const charId = useGameStore(s => s.character?.id ?? 0);
+  /** 天賦分頁的順序。**與一般分頁同一套**：整理一次性落位、位置持久化（§ 35.21.1） */
+  const [talentOrder, setTalentOrder] = useState(() => loadTalentBagOrder(charId));
+  const talentSlots = useTalentStore(s => s.slots);
+  const talentAffixes = useTalentStore(s => s.affixes);
+  const activeTemplateId = useGameStore(s => s.activeTemplateId);
+
+  /** 天賦分頁的整理。與 `handleSort` 同一個語意：把當下的排序結果整批寫成位置 */
+  function handleTalentSort() {
+    const cells = buildTalentBagCells(
+      availableSlots(talentSlots, activeTemplateId),
+      availableAffixes(talentAffixes, talentSlots, activeTemplateId),
+    );
+    const next = sortTalentBag(cells, talentAffixes);
+    setTalentOrder(next);
+    saveTalentBagOrder(charId, next);
+  }
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
   /**
@@ -264,6 +283,8 @@ export function BagPanel() {
       return;
     }
     if (target.kind === 'quick-slot') {
+      // 天賦的東西不能綁快捷格：不是道具，也沒有「使用」這個動作
+      if (item.payload.kind === 'talent-affix' || item.payload.kind === 'talent-slot-item') return;
       const entry = toQuickSlotEntry(
         item.payload.kind,
         item.payload.itemId ?? -1,
@@ -273,6 +294,8 @@ export function BagPanel() {
       if (entry) assignQuickSlot(target.index, entry);
       return;
     }
+    // 天賦的東西不進地圖丟棄流程：不佔格、沒有丟棄的動機（§ 35.21.1）
+    if (item.payload.kind === 'talent-affix' || item.payload.kind === 'talent-slot-item') return;
     // § 35.9：裝備中的東西不能丟，先脫下來才算數
     if (item.payload.equipped) return;
     // § 35.5.3：丟到地圖上＝丟棄，需二次確認（DiscardConfirmModal）
@@ -646,19 +669,36 @@ export function BagPanel() {
     );
   }
 
+  /*
+   * § 35.21：背包分頁列。「一般」＝現有格子 ＋ 印記抽屜，「天賦」＝未安裝的天賦格與鑲材。
+   * 印記**維持抽屜**掛在一般分頁底下，不獨立成第三個分頁 ——
+   * 六種兩排就放得下，分頁列與抽屜兩套收納語言不必並存。
+   */
+  if (bagTab === 'talent') {
+    return (
+      <div className="bag-panel">
+        {/* 列數與一般分頁對齊，兩個分頁切換時視窗不會忽大忽小 */}
+        <BagTabs tab={bagTab} onChange={setBagTab}>
+          {/* 整理鈕與一般分頁同一顆、同一個位置、同一種行為：一次性落位，不是開關 */}
+          <button className="bag-sort-toggle" onClick={handleTalentSort}>整理</button>
+        </BagTabs>
+        <BagTalentTab rows={rowsForSlots(maxSlots)} order={talentOrder} />
+      </div>
+    );
+  }
+
   return (
     <div className="bag-panel" ref={panelRef} onPointerDown={handlePanelPointerDown}>
-      <div className="bag-panel-header">
-        <span className="bag-panel-title">背包</span>
-        <span className="bag-panel-meta">
-          <button className="bag-sort-toggle" onClick={handleSort}>
-            整理
-          </button>
-          <span className={`bag-slots-count${usedSlots >= maxSlots ? ' danger' : usedSlots >= maxSlots * 0.9 ? ' warning' : ''}`}>
-            {usedSlots}/{maxSlots}
-          </span>
+      {/*
+        視窗標題已經寫著「背包」，面板裡不必再寫一次 ——
+        少一列標題，分頁列與格子就能整個往上移。
+      */}
+      <BagTabs tab={bagTab} onChange={setBagTab}>
+        <button className="bag-sort-toggle" onClick={handleSort}>整理</button>
+        <span className={`bag-slots-count${usedSlots >= maxSlots ? ' danger' : usedSlots >= maxSlots * 0.9 ? ' warning' : ''}`}>
+          {usedSlots}/{maxSlots}
         </span>
-      </div>
+      </BagTabs>
       <div className="bag-gold-row">
         <span className="bag-gold-label">金幣</span>
         <span className="bag-gold-value">{character?.gold ?? 0}</span>
@@ -669,7 +709,7 @@ export function BagPanel() {
         </div>
       )}
       <div className="bag-grid-container">
-        <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
+        <BagGrid>
           {layout.map((item, idx) => {
             /* 落點是靠 `elementFromPoint` 命中這兩個 data 屬性，不是靠事件冒泡 ——
                拖曳期間指標被來源格 capture 住，目標格收不到任何 pointer 事件（`47-mobile.md`） */
@@ -709,7 +749,7 @@ export function BagPanel() {
               </div>
             );
           })}
-        </div>
+        </BagGrid>
       </div>
 
       {/*
@@ -722,7 +762,7 @@ export function BagPanel() {
           {sigilItems.length === 0 ? (
             <div className="bag-sigil-empty">還沒有任何印記</div>
           ) : (
-            <div className="bag-grid" style={{ gridTemplateColumns: `repeat(${BAG_COLUMNS}, 1fr)` }}>
+            <BagGrid>
               {/*
                 § 35.20.3：印記格不做拖曳重排、不進 slotMap、不吃整理 ——
                 種類固定且只有六種，位置管理沒有意義。點一下只選取（沒有可執行的動作），
@@ -740,7 +780,7 @@ export function BagPanel() {
                   {cellVisual(item)}
                 </div>
               ))}
-            </div>
+            </BagGrid>
           )}
         </div>
       )}
@@ -821,6 +861,33 @@ export function BagPanel() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * 背包分頁列（`35-inventory-constraints.md` § 35.21）。
+ * `children` 是靠右的分頁工具列（整理、格數），由各分頁自己給。
+ */
+function BagTabs({ tab, onChange, children }: {
+  tab: 'normal' | 'talent';
+  onChange: (t: 'normal' | 'talent') => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="bag-tabs" role="tablist">
+      {([['normal', '一般'], ['talent', '天賦']] as const).map(([key, label]) => (
+        <button
+          key={key}
+          role="tab"
+          aria-selected={tab === key}
+          className={`bag-tab${tab === key ? ' active' : ''}`}
+          onClick={() => onChange(key)}
+        >
+          {label}
+        </button>
+      ))}
+      {children && <span className="bag-tabs-meta">{children}</span>}
     </div>
   );
 }

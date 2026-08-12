@@ -11,8 +11,8 @@ import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
 import type { BagItem } from '../models/bagItem';
-import { hasBagItem } from '../models/bagItem';
-import { getPotionCount, SPEED_POTION_CONFIG } from '../stores/gameStore';
+import { hasBagItem, getBagItemAmount } from '../models/bagItem';
+import { getPotionCount, SPEED_POTION_CONFIG, POTION_CONFIG } from '../stores/gameStore';
 import { canUseSkill } from '../models/skill';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { PLAYER_DEBUFF_DEFS } from '../models/playerDebuff';
@@ -45,6 +45,36 @@ export interface CombatScriptContext {
   primaryTargetId: string | null;
   /** 普通攻擊射程（武器原值）。沒有技能的動作用它當「攻擊範圍」 */
   weaponRange: number;
+  /** `self_shielded` 用。未帶＝當作沒有護盾（`51-auto-talent.md` § 51.4.10 的「接線」項） */
+  activeEffects?: ActiveEffect[];
+  /** `weight_over` 用：當前負重百分比 */
+  weightPercent?: number;
+  /** `hp_below`／`hp_above` 用的有效上限，未帶時退回 `character.maxHp` */
+  effectiveMaxHp?: number;
+  /** `hp_dropped_recently` 用：短期 HP 取樣 */
+  hpHistory?: HpSample[];
+}
+
+/** HP 取樣點。`hp_dropped_recently` 要看的是「掉多快」，單一數值答不了 */
+export interface HpSample {
+  t: number;
+  /** 當下 HP 佔有效上限的百分比 */
+  percent: number;
+}
+
+/**
+ * 在 `seconds` 秒內 HP 掉了幾個百分點。
+ *
+ * 取樣窗內的**最高值**減現在 —— 用「窗起點」會在剛補完血時誤判成沒掉，
+ * 而爆發傷害的重點正是「剛剛還很滿」。
+ */
+export function hpDropInWindow(history: HpSample[], now: number, seconds: number): number {
+  const from = now - seconds * 1000;
+  const inWindow = history.filter(s => s.t >= from);
+  if (inWindow.length === 0) return 0;
+  const peak = Math.max(...inWindow.map(s => s.percent));
+  const current = inWindow[inWindow.length - 1].percent;
+  return peak - current;
 }
 
 /**
@@ -157,9 +187,120 @@ function checkCombatCondition(
       if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, now, ctx.cooldownReduction ?? 0);
     }
+
+    // === 共用條件（§ 51.4.5）===
+    case 'hp_below':
+    case 'hp_above': {
+      const maxHp = ctx.effectiveMaxHp ?? ctx.character.maxHp;
+      const pct = maxHp > 0 ? (ctx.character.hp / maxHp) * 100 : 100;
+      return condition.type === 'hp_below'
+        ? pct < (condition.value ?? 0)
+        : pct > (condition.value ?? 0);
+    }
+    case 'weapon_type_is':
+      return ctx.weaponType === condition.match;
+    case 'area_dwell_gte': {
+      // 直接對應 `26-spawn-pressure.md` 的壓力累積：待越久怪越多
+      const minutes = (now - ctx.character.areaEnteredAt) / 60000;
+      return minutes >= (condition.value ?? 0);
+    }
+    case 'weight_over':
+      return (ctx.weightPercent ?? 0) > (condition.value ?? 0);
+    case 'self_shielded':
+      return hasActiveShield(ctx.activeEffects ?? [], now, 'player');
+    case 'hp_dropped_recently': {
+      if (!ctx.hpHistory) return false;
+      // value ＝ 掉了幾個百分點；radius 借用來當秒數，避免再開一個欄位
+      return hpDropInWindow(ctx.hpHistory, now, condition.radius ?? 3) > (condition.value ?? 0);
+    }
+    case 'current_area_is':
+      return ctx.character.currentArea === condition.match
+        || ctx.character.currentRegion === condition.match;
+
+    // === 戰鬥專屬條件（§ 51.4.6）===
+    case 'target_distance': {
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      const d = getDistance(ctx.playerPos, target.position);
+      return compareValue(d, condition.value ?? 0, condition.compare);
+    }
+    case 'target_attack_type': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.attackType === condition.match;
+    }
+    case 'target_race': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.race === condition.match;
+    }
+    case 'target_element': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.element === condition.match;
+    }
+    case 'target_size': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.size === condition.match;
+    }
+    case 'target_is_boss': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.isBoss;
+    }
+    case 'target_defense': {
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      return compareValue(target.instance.defense, condition.value ?? 0, condition.compare);
+    }
+    case 'target_level_diff': {
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      const diff = target.instance.level - ctx.character.level;
+      return compareValue(diff, condition.value ?? 0, condition.compare);
+    }
+    case 'target_range_gt': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.attackRange > (condition.value ?? 0);
+    }
+    case 'target_has_debuff':
+    case 'target_lacks_debuff': {
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      const has = (ctx.activeEffects ?? []).some(e =>
+        e.target === 'monster'
+        && e.targetMonsterId === target.id
+        && now - e.startTime < e.duration
+        && (condition.match ? e.tags.includes(condition.match) : true));
+      return condition.type === 'target_has_debuff' ? has : !has;
+    }
+    case 'target_cc_immune': {
+      const target = getPrimaryTarget(ctx);
+      // § 24.6：被控場後 10 秒內免疫。免疫窗內放控場技是純浪費 MP
+      return !!target && (target.instance.ccImmuneUntil ?? 0) > now;
+    }
+    case 'target_shielded': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && hasActiveShield(ctx.activeEffects ?? [], now, 'monster', target.id);
+    }
+
     default:
       return false;
   }
+}
+
+/** `compare` 沒帶時當作 `gt` —— 舊資料與手寫測試不必每次都填 */
+function compareValue(actual: number, threshold: number, mode?: 'gt' | 'lt'): boolean {
+  return mode === 'lt' ? actual < threshold : actual > threshold;
+}
+
+/** 無敵或還有護盾量。兩者都表示「這一下不會照常吃傷害」 */
+function hasActiveShield(
+  effects: ActiveEffect[], now: number,
+  target: 'player' | 'monster', monsterId?: string,
+): boolean {
+  return effects.some(e => {
+    if (e.target !== target) return false;
+    if (monsterId !== undefined && e.targetMonsterId !== monsterId) return false;
+    if (now - e.startTime >= e.duration) return false;
+    return e.invincible === true || (e.shieldRemaining ?? 0) > 0;
+  });
 }
 
 function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext): boolean {
@@ -192,6 +333,20 @@ export interface PersistentScriptContext {
   phase?: string;
   effectiveMaxHp?: number;
   effectiveMaxMp?: number;
+  /**
+   * 共用條件要用的欄位（`51-auto-talent.md` § 51.4.5）。
+   * 共用鑲材兩邊都鑲得進去，常駐這側缺欄位就等於那些鑲材鑲了也不會成立。
+   */
+  playerPos?: Position;
+  /**
+   * 只餵**位置**，不是完整的 `MonsterInstance` ——
+   * 常駐這側唯一用到怪物的條件是「周圍幾隻」，數個數不必知道牠們是什麼。
+   * 完整實例只存在於 `PixiGame` 的 ref 裡，硬要傳得先把戰鬥狀態搬進 store。
+   */
+  monsterPositions?: Position[];
+  weaponType?: string;
+  weightPercent?: number;
+  hpHistory?: HpSample[];
 }
 
 export function evaluatePersistentScript(rules: PersistentRule[], ctx: PersistentScriptContext): PersistentAction | null {
@@ -259,6 +414,53 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
         t => hasActivePlayerDebuff(activeEffects, PLAYER_DEBUFF_DEFS[t].category, now)
       );
     }
+
+    // === 共用條件（§ 51.4.5）===
+    case 'monsters_near_self_gte': {
+      if (!ctx.playerPos || !ctx.monsterPositions) return false;
+      const radius = condition.radius ?? DEFAULT_NEAR_SELF_RADIUS;
+      const count = ctx.monsterPositions.filter(p => getDistance(ctx.playerPos!, p) <= radius).length;
+      return count >= (condition.value ?? 1);
+    }
+    case 'weapon_type_is':
+      return ctx.weaponType === condition.match;
+    case 'area_dwell_gte':
+      return (now - character.areaEnteredAt) / 60000 >= (condition.value ?? 0);
+    case 'weight_over':
+      return (ctx.weightPercent ?? 0) > (condition.value ?? 0);
+    case 'self_shielded':
+      return activeEffects.some(e =>
+        e.target === 'player'
+        && now - e.startTime < e.duration
+        && (e.invincible === true || (e.shieldRemaining ?? 0) > 0));
+    case 'hp_dropped_recently': {
+      if (!ctx.hpHistory) return false;
+      return hpDropInWindow(ctx.hpHistory, now, condition.radius ?? 3) > (condition.value ?? 0);
+    }
+    case 'current_area_is':
+      return character.currentArea === condition.match
+        || character.currentRegion === condition.match;
+    case 'item_count_below': {
+      if (condition.itemId == null) return false;
+      return getBagItemAmount(ctx.bagItems, condition.itemId) < (condition.value ?? 0);
+    }
+
+    // === 常駐專屬條件（§ 51.4.7）===
+    case 'buff_remaining_below': {
+      // 提前續 buff，而不是等它掉光才補
+      const active = activeEffects.find(
+        e => e.sourceSkillId === condition.skillId && e.type === 'buff' && e.target === 'player',
+      );
+      if (!active) return false;
+      const remaining = active.duration - (now - active.startTime);
+      return remaining > 0 && remaining < (condition.value ?? 0) * 1000;
+    }
+    case 'potion_cooldown_ready': {
+      // 冷卻的唯一出處是 `POTION_CONFIG`（`30-items.md` § 30.1），不另抄一份
+      const cd = condition.potionType ? POTION_CONFIG[condition.potionType].cooldown : 0;
+      return now - ctx.lastPotionUsedAt >= cd;
+    }
+
     default:
       return false;
   }
