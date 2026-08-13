@@ -116,7 +116,7 @@ export function TalentAffixesPage() {
                 <td>{d.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}</td>
                 <td>{FORM_LABELS[d.form]}</td>
                 {/* 未開放的鑲材標明原因，免得玩家白刷（§ 51.4.3.2、§ 51.4.4） */}
-                <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／合成／兌換'}</td>
+                <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／升級／兌換'}</td>
               </tr>
             ))}
             {rows.length === 0 && (

@@ -3,7 +3,8 @@ import {
   useTalentStore,
   unequippedAffixes,
   uninstalledSlots,
-  canFuseAffixes,
+  canUpgradeAffixes,
+  upgradeTargetTypes,
   canExchangeAffixes,
   canDowngradeAffix,
 } from '../stores/talentStore';
@@ -12,19 +13,23 @@ import {
   DOWNGRADE_INPUT_COUNT,
   EXCHANGE_INPUT_COUNT,
   FUSE_INPUT_COUNT,
+  TALENT_TYPES,
   TALENT_TYPE_LABELS,
+  type TalentAffixDef,
   type TalentAffixInstance,
   type TalentSlotTier,
   type TalentTier,
+  type TalentType,
 } from '../models/talent';
 import { TALENT_AFFIX_DEFS, getTalentAffixDef } from '../db/seed/talentSeeds';
 import { affixLabel, affixLabelOf, AffixIcon } from './TalentEditor';
+import { boundParamLabel } from '../models/talentLabels';
 
 /** 鑲材的三種換法（`51-auto-talent.md` § 51.5.2~51.5.3） */
-type Mode = 'fuse' | 'exchange' | 'downgrade';
+type Mode = 'upgrade' | 'exchange' | 'downgrade';
 
 const MODES: { key: Mode; label: string; inputs: number; sub: string }[] = [
-  { key: 'fuse', label: '合成', inputs: FUSE_INPUT_COUNT, sub: `同階級 ×${FUSE_INPUT_COUNT} → 隨機高一階・有失敗率` },
+  { key: 'upgrade', label: '升級', inputs: FUSE_INPUT_COUNT, sub: `同階級 ×${FUSE_INPUT_COUNT} → 指定類型的高一階・有失敗率` },
   { key: 'exchange', label: '定向兌換', inputs: EXCHANGE_INPUT_COUNT, sub: `同階級 ×${EXCHANGE_INPUT_COUNT} → 指定同階級・必定成功` },
   { key: 'downgrade', label: '降階', inputs: DOWNGRADE_INPUT_COUNT, sub: '高階 ×1 → 指定任一低階・必定成功' },
 ];
@@ -34,23 +39,26 @@ export function TalentFusion() {
   const slots = useTalentStore(s => s.slots);
   const affixes = useTalentStore(s => s.affixes);
   const fuseSlots = useTalentStore(s => s.fuseSlots);
-  const fuseAffixes = useTalentStore(s => s.fuseAffixes);
+  const upgradeAffixes = useTalentStore(s => s.upgradeAffixes);
   const exchangeAffixes = useTalentStore(s => s.exchangeAffixes);
   const downgradeAffix = useTalentStore(s => s.downgradeAffix);
 
-  const [mode, setMode] = useState<Mode>('fuse');
+  const [mode, setMode] = useState<Mode>('upgrade');
   const [picked, setPicked] = useState<number[]>([]);
   const [targetDefId, setTargetDefId] = useState<number | null>(null);
+  const [targetType, setTargetType] = useState<TalentType | null>(null);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const spare = uninstalledSlots(slots);
   const loose = unequippedAffixes(affixes);
   const inputCount = MODES.find(m => m.key === mode)!.inputs;
+  const pool = buildPool(loose);
 
   function switchMode(next: Mode) {
     setMode(next);
     setPicked([]);
     setTargetDefId(null);
+    setTargetType(null);
     setResult(null);
   }
 
@@ -62,53 +70,75 @@ export function TalentFusion() {
       : p.length >= inputCount ? p : [...p, id]);
   }
 
+  /**
+   * 同一種鑲材堆成一列（§ 51.10）：點一下拿一份，拿滿了再點退一份。
+   * 「合成 ×2」在同一列上按兩次就湊齊，不必到清單各處去找另一份。
+   */
+  function toggleGroup(ids: number[]) {
+    setResult(null);
+    setTargetDefId(null);
+    setPicked(p => {
+      const free = ids.find(id => !p.includes(id) && pairable(id));
+      if (free !== undefined && p.length < inputCount) return [...p, free];
+      const mine = ids.filter(id => p.includes(id));
+      return mine.length > 0 ? p.filter(x => x !== mine[mine.length - 1]) : p;
+    });
+  }
+
   const pickedAffixes = picked.map(id => affixes.find(a => a.id === id)).filter(Boolean);
 
   /**
    * 玩家指定的產物候選（§ 51.5.3）。判斷一律走 store 的同一支，
    * UI 不自己複製規則 —— 複製過的規則遲早跟 store 分岔。
    */
-  const targets = mode === 'fuse' || pickedAffixes.length !== inputCount
+  const targets = mode === 'upgrade' || pickedAffixes.length !== inputCount
     ? []
     : TALENT_AFFIX_DEFS.filter(d => mode === 'exchange'
       ? canExchangeAffixes(pickedAffixes, d.id)
       : canDowngradeAffix(pickedAffixes[0], d.id));
 
-  const ready = mode === 'fuse'
-    ? canFuseAffixes(pickedAffixes)
+  /**
+   * 升級的產物類型（§ 51.5.2）。**先選類型再挑材料**，
+   * 所以材料還沒湊齊時三個都列出來；湊齊之後沒有候選的那些才禁用。
+   */
+  const usableTypes = mode === 'upgrade' && pickedAffixes.length === inputCount
+    ? upgradeTargetTypes(pickedAffixes)
+    : TALENT_TYPES;
+
+  const ready = mode === 'upgrade'
+    ? canUpgradeAffixes(pickedAffixes, targetType)
     : targetDefId !== null && targets.some(d => d.id === targetDefId);
 
-  const outputTier = mode === 'fuse'
-    ? (canFuseAffixes(pickedAffixes)
+  const outputTier = mode === 'upgrade'
+    ? (pickedAffixes.length === inputCount
       ? (getTalentAffixDef(pickedAffixes[0]!.definitionId)!.tier + 1) as TalentTier
       : null)
     : (targetDefId !== null ? getTalentAffixDef(targetDefId)?.tier ?? null : null);
 
-  const rate = mode === 'fuse'
+  const rate = mode === 'upgrade'
     ? (outputTier ? AFFIX_FUSE_SUCCESS_RATE[outputTier as Exclude<TalentTier, 1>] : null)
     : 100;
 
   /**
    * 已經挑了一份時，配不起來的一律不可選。
-   * 降階只吃 1 份，沒有配對問題；合成與兌換都要同階級同種類同適用類型。
+   * 降階只吃 1 份，沒有配對問題；升級與兌換都要同階級同種類。
    */
   function pairable(id: number): boolean {
     if (picked.includes(id) || picked.length === 0) return true;
     if (picked.length >= inputCount) return false;
     if (mode === 'downgrade') return false;
 
+    // 升級與兌換的配對條件相同：同階級、同種類
     const first = affixes.find(a => a.id === picked[0]);
     const cand = affixes.find(a => a.id === id);
-    return mode === 'fuse'
-      ? canFuseAffixes([first, cand])
-      : stackable(first, cand);
+    return stackable(first, cand);
   }
 
   async function run() {
     let text: { ok: boolean; text: string } | null = null;
 
-    if (mode === 'fuse') {
-      const r = await fuseAffixes(picked);
+    if (mode === 'upgrade') {
+      const r = await upgradeAffixes(picked, targetType!);
       if (r) {
         text = r.success
           ? { ok: true, text: `成功：${affixLabel(r.produced!)}` }
@@ -123,6 +153,7 @@ export function TalentFusion() {
 
     setPicked([]);
     setTargetDefId(null);
+    setTargetType(null);
     if (text) setResult(text);
   }
 
@@ -175,6 +206,23 @@ export function TalentFusion() {
           ))}
         </div>
 
+        {mode === 'upgrade' && (
+          <div className="fusion-types">
+            <span className="fusion-types-label">產物類型</span>
+            {TALENT_TYPES.map(ty => (
+              <button
+                key={ty}
+                className={`fusion-type${targetType === ty ? ' is-active' : ''}`}
+                disabled={!usableTypes.includes(ty)}
+                title={usableTypes.includes(ty) ? undefined : '這個類型在下一階沒有鑲材'}
+                onClick={() => { setTargetType(ty); setResult(null); }}
+              >
+                {TALENT_TYPE_LABELS[ty]}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="fusion-bench">
           {Array.from({ length: inputCount }, (_, i) => {
             const a = pickedAffixes[i];
@@ -198,13 +246,15 @@ export function TalentFusion() {
           <span className="fusion-arrow is-big">→</span>
 
           <div className={`fusion-cell is-output${ready ? ' is-ready' : ''}`}>
-            {mode === 'fuse'
-              ? (ready && outputTier
+            {mode === 'upgrade'
+              ? (targetType && outputTier
                 ? <>
                     <span className="fusion-chip is-out">T{outputTier}</span>
-                    <span className="fusion-cell-name">隨機同類鑲材</span>
+                    <span className="fusion-cell-name">
+                      {TALENT_TYPE_LABELS[targetType]}・隨機一個
+                    </span>
                   </>
-                : <span className="fusion-cell-hint">產物</span>)
+                : <span className="fusion-cell-hint">先選產物類型</span>)
               : (targets.length > 0
                 ? <select
                     className="fusion-target"
@@ -233,32 +283,111 @@ export function TalentFusion() {
         )}
 
         <div className="fusion-pool">
-          {loose.map(a => {
-            const def = getTalentAffixDef(a.definitionId)!;
-            return (
-              <button
-                key={a.id}
-                className={`fusion-pool-item${picked.includes(a.id!) ? ' is-picked' : ''}`}
-                disabled={!pairable(a.id!)}
-                onClick={() => toggle(a.id!)}
-              >
-                <AffixIcon affix={a} size={16} />
-                <span className="fusion-chip">T{def.tier}</span>
-                <span className="fusion-pool-name">{affixLabel(a)}</span>
-                <span className="fusion-pool-meta">
-                  {def.kind === 'condition' ? '條件' : '實作'}
-                  ・{def.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}
-                </span>
-              </button>
-            );
-          })}
+          {pool.map(section => (
+            <div key={section.key} className="fusion-pool-section">
+              <div className="fusion-pool-title">
+                {section.title}
+                <span className="fusion-pool-title-count">{section.groups.length} 種</span>
+              </div>
+              <div className="fusion-pool-items">
+                {section.groups.map(g => {
+                  const pickedHere = g.ids.filter(id => picked.includes(id)).length;
+                  const bound = boundParamLabel(g.boundParam);
+                  return (
+                    <button
+                      key={g.key}
+                      className={`fusion-pool-item${pickedHere > 0 ? ' is-picked' : ''}`}
+                      disabled={pickedHere === 0 && !g.ids.some(id => pairable(id))}
+                      onClick={() => toggleGroup(g.ids)}
+                    >
+                      <AffixIcon affix={g.sample} size={16} />
+                      <span className="fusion-pool-name">
+                        {affixLabelOf(g.def)}{bound ? `・${bound}` : ''}
+                      </span>
+                      {g.ids.length > 1 && (
+                        <span className="fusion-pool-count">
+                          ×{g.ids.length}{pickedHere > 0 ? `（選 ${pickedHere}）` : ''}
+                        </span>
+                      )}
+                      <span className="fusion-pool-meta">
+                        {g.def.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </div>
   );
 }
 
-/** 兌換的材料能不能疊在一起：同階級、同種類、適用類型有交集（§ 51.5.3） */
+/** 適用類型的固定排序，讓同型的鑲材在清單上相鄰 */
+const TYPE_ORDER: Record<string, number> = { combat: 0, persistent: 1, supply: 2 };
+
+export interface PoolGroup {
+  key: string;
+  def: TalentAffixDef;
+  boundParam: string | null;
+  sample: TalentAffixInstance;
+  ids: number[];
+}
+
+export interface PoolSection {
+  key: string;
+  title: string;
+  groups: PoolGroup[];
+}
+
+/**
+ * 合成清單的分區與排序（`51-auto-talent.md` § 51.10）。
+ *
+ * **一個分區 ＝ 同種類 ＋ 同階級**，也就是合成／兌換的必要條件（§ 51.5.2）。
+ * 跨分區一定合不起來，同分區內只差「適用類型要有交集」。
+ *
+ * 分區內同一種鑲材（同定義、同綁定）疊成一列，`ids` 是它底下的實例。
+ */
+export function buildPool(loose: TalentAffixInstance[]): PoolSection[] {
+  const groups = new Map<string, PoolGroup>();
+  for (const a of loose) {
+    const def = getTalentAffixDef(a.definitionId);
+    if (!def) continue;
+    const key = `${a.definitionId}:${a.boundParam ?? ''}`;
+    const g = groups.get(key);
+    if (g) g.ids.push(a.id!);
+    else groups.set(key, { key, def, boundParam: a.boundParam ?? null, sample: a, ids: [a.id!] });
+  }
+
+  const sections = new Map<string, PoolSection>();
+  for (const g of [...groups.values()].sort(compareGroup)) {
+    const key = `${g.def.kind}:${g.def.tier}`;
+    const title = `${g.def.kind === 'condition' ? '條件' : '實作'} T${g.def.tier}`;
+    const s = sections.get(key);
+    if (s) s.groups.push(g);
+    else sections.set(key, { key, title, groups: [g] });
+  }
+
+  return [...sections.values()].sort((a, b) => {
+    const [ka, ta] = a.key.split(':');
+    const [kb, tb] = b.key.split(':');
+    return ka === kb ? Number(ta) - Number(tb) : (ka === 'condition' ? -1 : 1);
+  });
+}
+
+/** 分區內：先依適用類型，再依名稱與綁定，讓可以互相配對的排在一起 */
+function compareGroup(a: PoolGroup, b: PoolGroup): number {
+  const ta = a.def.appliesTo.map(t => TYPE_ORDER[t]).join(',');
+  const tb = b.def.appliesTo.map(t => TYPE_ORDER[t]).join(',');
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  const na = affixLabelOf(a.def);
+  const nb = affixLabelOf(b.def);
+  if (na !== nb) return na.localeCompare(nb, 'zh-Hant');
+  return (a.boundParam ?? '').localeCompare(b.boundParam ?? '');
+}
+
+/** 兌換的材料能不能疊在一起：同階級、同種類。**類型不限**（§ 51.5.3） */
 function stackable(
   a: TalentAffixInstance | undefined,
   b: TalentAffixInstance | undefined,
@@ -266,7 +395,5 @@ function stackable(
   const da = a && getTalentAffixDef(a.definitionId);
   const db = b && getTalentAffixDef(b.definitionId);
   if (!da || !db) return false;
-  return da.tier === db.tier
-    && da.kind === db.kind
-    && da.appliesTo.some(t => db.appliesTo.includes(t));
+  return da.tier === db.tier && da.kind === db.kind;
 }

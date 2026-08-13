@@ -8,10 +8,13 @@ import {
   unequippedAffixes,
   availableSlots,
   availableAffixes,
-  canFuseAffixes,
+  canUpgradeAffixes,
+  upgradeTargetTypes,
+  canExchangeAffixes,
+  canDowngradeAffix,
 } from '../talentStore';
 import { STARTING_SLOT_COUNT, isSlotInstalled, type TalentSlot } from '../../models/talent';
-import { STARTING_LAYOUT } from '../../db/seed/talentSeeds';
+import { STARTING_LAYOUT, getTalentAffixDef } from '../../db/seed/talentSeeds';
 
 const CHAR = 1;
 
@@ -238,22 +241,31 @@ describe('talentStore（`51-auto-talent.md`）', () => {
     });
   });
 
-  describe('鑲材合成（§ 51.5.2：有失敗率）', () => {
-    it('成功時投入 2 份、產出 1 份 T+1', async () => {
+  /*
+   * 升級（§ 51.5.2）：同階級同種類 ×2 → **玩家指定類型**的 T+1。
+   * 產物在該類型內隨機，但類型是選的 —— 三個類型的鑲材數量差很多，
+   * 類型也隨機的話，投入什麼與拿到什麼就沒有關係。
+   */
+  describe('鑲材升級', () => {
+    it('成功時投入 2 份、產出 1 份指定類型的 T+1', async () => {
       await addAffix(1001);
       await addAffix(1002);
       await useTalentStore.getState().load(CHAR);
 
       // rng 恆回 0 → 必定成功（0 < 50%）
-      const result = await useTalentStore.getState().fuseAffixes(
+      const result = await useTalentStore.getState().upgradeAffixes(
         useTalentStore.getState().affixes.map(a => a.id!),
+        'supply',
         () => 0,
       );
 
       expect(result?.success).toBe(true);
       const { affixes } = useTalentStore.getState();
       expect(affixes).toHaveLength(1);
-      expect(affixes[0].definitionId).not.toBe(1001);
+      const def = getTalentAffixDef(affixes[0].definitionId)!;
+      expect(def.tier).toBe(2);
+      expect(def.kind).toBe('condition');
+      expect(def.appliesTo).toContain('supply');
     });
 
     it('失敗時退回其中 1 份，淨損 1 份、不歸零', async () => {
@@ -262,8 +274,9 @@ describe('talentStore（`51-auto-talent.md`）', () => {
       await useTalentStore.getState().load(CHAR);
 
       // rng 恆回 0.99 → 必定失敗（99 > 50%）
-      const result = await useTalentStore.getState().fuseAffixes(
+      const result = await useTalentStore.getState().upgradeAffixes(
         useTalentStore.getState().affixes.map(a => a.id!),
+        'combat',
         () => 0.99,
       );
 
@@ -271,7 +284,7 @@ describe('talentStore（`51-auto-talent.md`）', () => {
       expect(useTalentStore.getState().affixes).toHaveLength(1);
     });
 
-    it('已鑲入的鑲材不能拿去合成', async () => {
+    it('已鑲入的鑲材不能拿去升級', async () => {
       const slot = await addSlot(1, true);
       const a = await addAffix(1001);
       await addAffix(1002);
@@ -279,24 +292,46 @@ describe('talentStore（`51-auto-talent.md`）', () => {
       await useTalentStore.getState().equipAffix(a, slot, 0);
 
       const ids = useTalentStore.getState().affixes.map(x => x.id!);
-      expect(await useTalentStore.getState().fuseAffixes(ids, () => 0)).toBeNull();
+      expect(await useTalentStore.getState().upgradeAffixes(ids, 'combat', () => 0)).toBeNull();
     });
 
-    it('不同 tier／不同種類不能合成', async () => {
+    it('不同 tier／不同種類不能升級', async () => {
       await addAffix(1001); // 條件 T1
       await addAffix(2001); // 實作 T1
       await useTalentStore.getState().load(CHAR);
       const ids = useTalentStore.getState().affixes.map(x => x.id!);
-      expect(await useTalentStore.getState().fuseAffixes(ids, () => 0)).toBeNull();
+      expect(await useTalentStore.getState().upgradeAffixes(ids, 'combat', () => 0)).toBeNull();
     });
 
-    it('到達該池上限就不再合成（常駐專屬止於 T3）', async () => {
-      // 1201/1202 = 常駐專屬條件 T3，上限 T3
+    /* 類型不限（§ 51.5.2）：材料只是燃料，湊得出同階同種類就能升 */
+    it('材料的類型可以完全不相干', async () => {
+      await addAffix(1101); // 戰鬥專屬條件 T1
+      await addAffix(1301); // 補給專屬條件 T1
+      await useTalentStore.getState().load(CHAR);
+      const ids = useTalentStore.getState().affixes.map(x => x.id!);
+      const result = await useTalentStore.getState().upgradeAffixes(ids, 'combat', () => 0);
+      expect(result?.success).toBe(true);
+    });
+
+    /* 各池上限（§ 51.4.3）：常駐專屬止於 T3，所以升到 T4 時選不到常駐 */
+    it('該類型在 T+1 沒有鑲材就不列為可選類型', async () => {
+      await addAffix(1201);
+      await addAffix(1202);
+      await useTalentStore.getState().load(CHAR);
+      const inputs = useTalentStore.getState().affixes;
+
+      expect(upgradeTargetTypes(inputs)).not.toContain('persistent');
+      expect(canUpgradeAffixes(inputs, 'persistent')).toBe(false);
+    });
+
+    it('封頂的常駐 T3 仍可當材料升成別的類型', async () => {
       await addAffix(1201);
       await addAffix(1202);
       await useTalentStore.getState().load(CHAR);
       const ids = useTalentStore.getState().affixes.map(x => x.id!);
-      expect(await useTalentStore.getState().fuseAffixes(ids, () => 0)).toBeNull();
+      const result = await useTalentStore.getState().upgradeAffixes(ids, 'combat', () => 0);
+      expect(result?.success).toBe(true);
+      expect(getTalentAffixDef(result!.produced!.definitionId)!.tier).toBe(4);
     });
   });
 
@@ -351,14 +386,16 @@ describe('talentStore（`51-auto-talent.md`）', () => {
       expect(await useTalentStore.getState().exchangeAffixes(ids, 1005)).toBeNull();
     });
 
-    it('適用類型沒有交集就換不成', async () => {
-      // 1101 戰鬥專屬條件 T1、1301 補給條件 T1
+    /* 類型不互通那道牆已拆（§ 51.5.3）：只打一種內容不該永遠補不到另一邊 */
+    it('適用類型沒有交集照樣換得成', async () => {
+      // 1001 戰鬥∪常駐、1101 戰鬥專屬、1301 補給專屬，皆為條件 T1
       await addAffix(1001);
       await addAffix(1101);
       await addAffix(1301);
       await useTalentStore.getState().load(CHAR);
       const ids = useTalentStore.getState().affixes.map(a => a.id!);
-      expect(await useTalentStore.getState().exchangeAffixes(ids, 1005)).toBeNull();
+      const produced = await useTalentStore.getState().exchangeAffixes(ids, 1005);
+      expect(produced?.definitionId).toBe(1005);
     });
   });
 
@@ -631,10 +668,10 @@ describe('重排與啟用停用（`51-auto-talent.md` § 51.3.1）', () => {
   });
 
   /*
-   * 合成規則只有這一支（§ 51.5.2），合成台的預覽與可選狀態都讀它 ——
-   * 畫面自己算一套就會出現「秀著能合、按下去被擋掉」。
+   * 升級規則只有這一支（§ 51.5.2），合成台的預覽與可選狀態都讀它 ——
+   * 畫面自己算一套就會出現「秀著能升、按下去被擋掉」。
    */
-  describe('canFuseAffixes', () => {
+  describe('canUpgradeAffixes', () => {
     beforeEach(async () => {
       await db.talentAffixes.clear();
       useTalentStore.setState({ slots: [], affixes: [], characterId: null });
@@ -647,34 +684,90 @@ describe('重排與啟用停用（`51-auto-talent.md` § 51.3.1）', () => {
       return useTalentStore.getState().affixes;
     }
 
-    it('同 tier、同種類、同適用類型才合得成', async () => {
-      expect(canFuseAffixes(await two(1001, 1002))).toBe(true);   // 皆 T1 條件、戰鬥∪常駐
+    it('同 tier、同種類就升得動', async () => {
+      expect(canUpgradeAffixes(await two(1001, 1002), 'combat')).toBe(true);
     });
 
-    it('tier 不同不能合成', async () => {
-      expect(canFuseAffixes(await two(1001, 1006))).toBe(false);  // T1 vs T2
+    it('tier 不同不能升級', async () => {
+      expect(canUpgradeAffixes(await two(1001, 1006), 'combat')).toBe(false);  // T1 vs T2
     });
 
-    it('種類不同不能合成', async () => {
+    it('種類不同不能升級', async () => {
       const [cond] = await two(1001, 1002);
       const actionId = await addAffix(2001);
       await useTalentStore.getState().load(CHAR);
       const action = useTalentStore.getState().affixes.find(a => a.id === actionId);
-      expect(canFuseAffixes([cond, action])).toBe(false);
+      expect(canUpgradeAffixes([cond, action], 'combat')).toBe(false);
     });
 
-    it('已鑲入的不能拿去合成', async () => {
+    it('已鑲入的不能拿去升級', async () => {
       const slotId = await addSlot(1, true);
       const affixes = await two(1001, 1002);
       await useTalentStore.getState().equipAffix(affixes[0].id!, slotId, 0);
       const after = useTalentStore.getState().affixes;
-      expect(canFuseAffixes(after)).toBe(false);
+      expect(canUpgradeAffixes(after, 'combat')).toBe(false);
     });
 
-    it('數量不是 2 份就不能合成', async () => {
+    it('數量不是 2 份就不能升級', async () => {
       const affixes = await two(1001, 1002);
-      expect(canFuseAffixes([affixes[0]])).toBe(false);
-      expect(canFuseAffixes([...affixes, affixes[0]])).toBe(false);
+      expect(canUpgradeAffixes([affixes[0]], 'combat')).toBe(false);
+      expect(canUpgradeAffixes([...affixes, affixes[0]], 'combat')).toBe(false);
+    });
+
+    it('沒選類型不算數', async () => {
+      expect(canUpgradeAffixes(await two(1001, 1002), null)).toBe(false);
+    });
+
+    /* 材料類型不限（§ 51.5.2）：戰鬥專屬 × 補給專屬照樣升得動 */
+    it('材料沒有共用類型照樣升得動', async () => {
+      expect(canUpgradeAffixes(await two(1101, 1301), 'combat')).toBe(true);
+    });
+  });
+
+  /*
+   * 兌換與降階**不限類型**（§ 51.5.3）：種類（條件／實作）永遠不互通，
+   * 但戰鬥的存貨換得到補給的，否則只打一種內容就永遠補不到另一邊。
+   */
+  describe('canExchangeAffixes / canDowngradeAffix', () => {
+    beforeEach(async () => {
+      await db.talentAffixes.clear();
+      useTalentStore.setState({ slots: [], affixes: [], characterId: null });
+    });
+
+    async function held(...defIds: number[]) {
+      for (const id of defIds) await addAffix(id);
+      await useTalentStore.getState().load(CHAR);
+      return useTalentStore.getState().affixes;
+    }
+
+    it('戰鬥專屬 ×3 換得到補給專屬', async () => {
+      const inputs = await held(1101, 1102, 1001);
+      expect(canExchangeAffixes(inputs, 1301)).toBe(true);
+    });
+
+    it('換不到不同種類的', async () => {
+      const inputs = await held(1101, 1102, 1001);
+      expect(canExchangeAffixes(inputs, 2001)).toBe(false);
+    });
+
+    it('換不到不同階級的', async () => {
+      const inputs = await held(1101, 1102, 1001);
+      expect(canExchangeAffixes(inputs, 1006)).toBe(false);
+    });
+
+    it('投入的階級不一致就不受理', async () => {
+      const inputs = await held(1101, 1102, 1006);
+      expect(canExchangeAffixes(inputs, 1301)).toBe(false);
+    });
+
+    it('降階也不限類型', async () => {
+      const [high] = await held(1006);
+      expect(canDowngradeAffix(high, 1301)).toBe(true);
+    });
+
+    it('降階仍不可跨種類', async () => {
+      const [high] = await held(1006);
+      expect(canDowngradeAffix(high, 2001)).toBe(false);
     });
   });
 

@@ -184,7 +184,7 @@ export function TalentsPage() {
           把它鑲到別的地方，原本那個槽位就空了。
         </p>
 
-        <h4 style={subTitleStyle}>合成上限</h4>
+        <h4 style={subTitleStyle}>升級上限</h4>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead><tr><th>類型</th><th>條件鑲材上限</th><th>實作鑲材上限</th></tr></thead>
@@ -301,13 +301,13 @@ export function TalentsPage() {
           <li>改動直接存進使用中的配置，沒有「儲存／放棄」兩段式</li>
           <li>「預設」配置不可刪除，所以清單永遠至少有一份</li>
           <li>搬過來的鑲材如果不適用新類型（例如常駐格搬到補給），該鑲材退回背包</li>
-          <li>合成<strong>只吃完全沒安裝的</strong>天賦格與鑲材，不會去拆別份配置</li>
+          <li>合成與升級<strong>只吃完全沒安裝的</strong>天賦格與鑲材，不會去拆別份配置</li>
           <li>配置存在角色身上，不跨角色共用（規則裡的技能綁職業）</li>
         </ul>
       </section>
 
       <section style={{ marginBottom: 32 }}>
-        <h3 style={SECTION_TITLE}>合成與掉落</h3>
+        <h3 style={SECTION_TITLE}>合成、升級與掉落</h3>
         <TalentFusionTable />
       </section>
 
@@ -370,7 +370,7 @@ export function TalentAffixTable() {
               <td>{d.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}</td>
               <td>{d.form === 'fixed' ? '指定' : d.form === 'pool' ? '池' : '自選'}</td>
               {/* 未開放的鑲材標明原因，免得玩家白刷（§ 51.4.3.2、§ 51.4.4） */}
-              <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／合成／兌換'}</td>
+              <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／升級／兌換'}</td>
             </tr>
           ))}
         </tbody>
@@ -379,22 +379,25 @@ export function TalentAffixTable() {
   );
 }
 
-/** 合成鏈、兌換、降階與掉落分帶（`51-auto-talent.md` § 51.5.2~51.5.3、§ 51.6） */
+/** 天賦格合成鏈、鑲材升級、兌換、降階與掉落分帶（`51-auto-talent.md` § 51.5.2~51.5.3、§ 51.6） */
 export function TalentFusionTable() {
   return (
     <div>
-      <h3>合成與掉落</h3>
+      <h3>合成、升級與掉落</h3>
       <p>
         天賦格：低階 ×2 → 高階 ×1，<strong>必定成功</strong>。
-        鑲材有三種換法，投入一律要<strong>同種類、同適用類型</strong>，且只吃沒鑲入天賦格的：
+        鑲材有三種換法，投入一律要<strong>同種類</strong>（條件與實作永不互通），
+        且只吃沒鑲入天賦格的。
+        <strong>投入的適用類型不限</strong>——戰鬥的存貨換得到補給的。
+        升級的<strong>產出類型由玩家指定</strong>，該類型在下一階沒有鑲材時就選不到：
       </p>
       <table className="wiki-table">
         <thead><tr><th></th><th>投入</th><th>產出</th><th>成功率</th></tr></thead>
         <tbody>
           <tr>
-            <td>合成</td>
+            <td>升級</td>
             <td>同階級 ×{FUSE_INPUT_COUNT}</td>
-            <td><strong>隨機</strong>一份 T+1</td>
+            <td><strong>指定類型</strong>的 T+1，該類型內隨機</td>
             <td>見下表，失敗只退回其中 1 份</td>
           </tr>
           <tr>
@@ -412,7 +415,7 @@ export function TalentFusionTable() {
         </tbody>
       </table>
       <table className="wiki-table">
-        <thead><tr><th>產出</th><th>鑲材合成成功率</th><th>一般怪掉率</th><th>Boss 掉率</th></tr></thead>
+        <thead><tr><th>產出</th><th>鑲材升級成功率</th><th>一般怪掉率</th><th>Boss 掉率</th></tr></thead>
         <tbody>
           {([1, 2, 3, 4, 5, 6, 7] as TalentTier[]).map(tier => (
             <tr key={tier}>

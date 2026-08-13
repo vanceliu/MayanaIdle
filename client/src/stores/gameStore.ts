@@ -2481,6 +2481,11 @@ export function processMonsterDeath(
         });
         talentLogs.push(`獲得天賦格（T${talentSlotTier}）`);
       }
+      // 掉落只寫 DB，天賦面板與背包分頁讀的是 store，不重載就要等下次載入角色才看得到。
+      // 只在真的掉了東西時重載：`load()` 會重讀兩張表並重建三套規則
+      if (talentAffixes.length > 0 || talentSlotTier !== null) {
+        await useTalentStore.getState().load(char.id);
+      }
     }
 
     const state2 = get();

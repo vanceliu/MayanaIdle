@@ -8367,13 +8367,42 @@ button.active {
   color: var(--accent-danger);
 }
 
-/* 可選材料池 */
+/* 可選材料池。一個分區 ＝ 同種類同階級，跨分區合不起來（§ 51.5.2） */
 .fusion-pool {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.fusion-pool-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-bottom: 3px;
+  border-bottom: var(--border-width) solid var(--outline-dark);
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.fusion-pool-title-count {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.fusion-pool-items {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  max-height: 200px;
-  overflow-y: auto;
+}
+
+/* 同一種鑲材疊成一列的份數 */
+.fusion-pool-count {
+  color: var(--accent-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .fusion-pool-item {
@@ -8413,6 +8442,40 @@ button.active {
 .fusion-modes {
   display: flex;
   gap: 4px;
+}
+
+/* 升級：先選產物類型，再挑材料（§ 51.5.2） */
+.fusion-types {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fusion-types-label {
+  margin-right: 4px;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.fusion-type {
+  padding: 3px 10px;
+  background: var(--bg-inset);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.fusion-type.is-active {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.fusion-type:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .fusion-mode {

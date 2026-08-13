@@ -88,9 +88,9 @@ describe('鑲材總表（§ 43.4.12）', () => {
     }
   });
 
-  // 總表只有表，合成與掉落在自動天賦頁
-  it('不含合成與掉落表', () => {
+  // 總表只有表，合成／升級／掉落在自動天賦頁
+  it('不含合成、升級與掉落表', () => {
     renderPage();
-    expect(screen.queryByText('合成與掉落')).toBeNull();
+    expect(screen.queryByText('合成、升級與掉落')).toBeNull();
   });
 });

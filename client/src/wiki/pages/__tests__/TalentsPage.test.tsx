@@ -84,8 +84,8 @@ describe('鑲材總表（§ 43.4.12）', () => {
   });
 });
 
-describe('合成與掉落表', () => {
-  it('T1 沒有合成成功率（它是起點），T7 標明不掉落', () => {
+describe('合成、升級與掉落表', () => {
+  it('T1 沒有升級成功率（它是起點），T7 標明不掉落', () => {
     render(<TalentFusionTable />);
     const rows = [...document.querySelectorAll('tbody tr')].map(r =>
       [...r.querySelectorAll('td')].map(td => td.textContent));

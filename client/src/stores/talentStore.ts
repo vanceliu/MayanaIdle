@@ -12,7 +12,7 @@ import {
   EXCHANGE_INPUT_COUNT,
   FUSE_INPUT_COUNT,
   STARTING_SLOT_COUNT,
-  TALENT_POOL_TIER_CAP,
+  TALENT_TYPES,
   conditionSlotCount,
   isSlotInstalled,
   type TalentAffixDef,
@@ -60,7 +60,7 @@ export interface TalentState {
   reset: () => void;
 
   fuseSlots: (tier: TalentSlotTier) => Promise<TalentSlot | null>;
-  fuseAffixes: (affixIds: number[], rng?: Rng) => Promise<FuseAffixResult | null>;
+  upgradeAffixes: (affixIds: number[], targetType: TalentType, rng?: Rng) => Promise<FuseAffixResult | null>;
   exchangeAffixes: (affixIds: number[], targetDefinitionId: number) => Promise<TalentAffixInstance | null>;
   downgradeAffix: (affixId: number, targetDefinitionId: number) => Promise<TalentAffixInstance | null>;
 }
@@ -120,57 +120,53 @@ export function canEquipAffix(
 }
 
 /**
- * 產物候選：同種類、T+1、且**適用類型與投入的兩份有交集**（§ 51.5.2）。
- * 用交集而不是「集合完全相等」—— 相等的話共用鑲材幾乎合不出東西。
+ * 升級的產物候選（§ 51.5.2）：**玩家指定類型**的 T+1、同種類。
+ *
+ * 產物在候選中隨機，但**類型是玩家選的** —— 三個類型的鑲材數量差很多，
+ * 產物類型若也隨機，投入什麼與拿到什麼就沒有關係。
+ *
+ * 各池上限（§ 51.4.3）自動生效：常駐專屬止於 T3，所以升到 T4 時
+ * 「常駐」根本沒有候選，那個類型不會出現在可選清單裡。
  */
-function fuseCandidates(d0: TalentAffixDef, d1: TalentAffixDef): TalentAffixDef[] {
-  const shared = d0.appliesTo.filter(t => d1.appliesTo.includes(t));
-  const targetTier = d0.tier + 1;
+export function upgradeCandidates(
+  tier: TalentTier,
+  kind: TalentAffixKind,
+  targetType: TalentType,
+): TalentAffixDef[] {
   return TALENT_AFFIX_DEFS.filter(
-    d => !d.blocked
-      && d.tier === targetTier
-      && d.kind === d0.kind
-      && d.appliesTo.some(t => shared.includes(t)),
+    d => !d.blocked && d.tier === tier + 1 && d.kind === kind && d.appliesTo.includes(targetType),
   );
 }
 
-/** 該類型該種類的合成上限（§ 51.4.3）。共用鑲材走戰鬥池 */
-function fuseCapFor(def: { appliesTo: TalentType[]; kind: TalentAffixKind }): TalentTier {
-  return def.appliesTo
-    .map(t => TALENT_POOL_TIER_CAP[t][def.kind])
-    .reduce((a, b) => (a > b ? a : b));
+/** 這批投入可以升成哪些類型（§ 51.5.2）。空陣列 ＝ 這批東西升不上去 */
+export function upgradeTargetTypes(inputs: (TalentAffixInstance | undefined)[]): TalentType[] {
+  const defs = validUpgradeInputs(inputs);
+  if (!defs) return [];
+  return TALENT_TYPES.filter(t => upgradeCandidates(defs[0].tier, defs[0].kind, t).length > 0);
 }
 
-/** 這幾份鑲材能不能合成（§ 51.5.2）。UI 與 store 共用這一支 */
-export function canFuseAffixes(inputs: (TalentAffixInstance | undefined)[]): boolean {
-  if (inputs.length !== FUSE_INPUT_COUNT) return false;
-  if (inputs.some(a => !a || a.slotId !== null)) return false;
-
-  const defs = inputs.map(a => getTalentAffixDef(a!.definitionId));
-  if (defs.some(d => !d)) return false;
-  const [d0, d1] = defs as TalentAffixDef[];
-
-  // 同 tier、同種類、且**共用至少一個適用類型**（§ 51.5.2）
-  if (d0.tier !== d1.tier || d0.kind !== d1.kind) return false;
-  const shared = d0.appliesTo.filter(t => d1.appliesTo.includes(t));
-  if (shared.length === 0) return false;
-  if (d0.tier >= fuseCapFor(d0)) return false;
-  // 產不出東西就不算合得成
-  return fuseCandidates(d0, d1).length > 0;
+/** 投入本身合不合格：份數、沒鑲入、同階級、同種類。**類型不限** */
+function validUpgradeInputs(
+  inputs: (TalentAffixInstance | undefined)[],
+): TalentAffixDef[] | null {
+  if (inputs.length !== FUSE_INPUT_COUNT) return null;
+  const defs = inputDefs(inputs);
+  if (!defs) return null;
+  if (defs.some(d => d.tier !== defs[0].tier || d.kind !== defs[0].kind)) return null;
+  return defs;
 }
 
-/**
- * 投入的每一份都適用的類型（§ 51.5.3）。空陣列 ＝ 湊不成一組。
- * 與合成一樣取交集而非要求集合相等，否則共用鑲材幾乎換不動。
- */
-function sharedTypes(defs: TalentAffixDef[]): TalentType[] {
-  return defs.reduce<TalentType[]>(
-    (acc, d) => acc.filter(t => d.appliesTo.includes(t)),
-    [...defs[0].appliesTo],
-  );
+/** 這幾份鑲材能不能升成指定類型（§ 51.5.2）。UI 與 store 共用這一支 */
+export function canUpgradeAffixes(
+  inputs: (TalentAffixInstance | undefined)[],
+  targetType: TalentType | null,
+): boolean {
+  const defs = validUpgradeInputs(inputs);
+  if (!defs || !targetType) return false;
+  return upgradeCandidates(defs[0].tier, defs[0].kind, targetType).length > 0;
 }
 
-/** 投入的鑲材全部存在、都沒鑲入、同種類，且有共用的適用類型 */
+/** 投入的鑲材全部存在、都沒鑲入 */
 function inputDefs(inputs: (TalentAffixInstance | undefined)[]): TalentAffixDef[] | null {
   if (inputs.some(a => !a || a.slotId !== null)) return null;
   const defs = inputs.map(a => getTalentAffixDef(a!.definitionId));
@@ -178,17 +174,16 @@ function inputDefs(inputs: (TalentAffixInstance | undefined)[]): TalentAffixDef[
   return defs as TalentAffixDef[];
 }
 
-/** 產出可不可以是這一筆定義：同種類、指定 tier、適用類型與投入有交集 */
+/** 產出可不可以是這一筆定義：同種類、指定 tier。**類型不限**（§ 51.5.3） */
 function canProduce(target: TalentAffixDef, defs: TalentAffixDef[], tier: TalentTier): boolean {
   if (target.blocked) return false;
   if (target.tier !== tier) return false;
-  if (target.kind !== defs[0].kind) return false;
-  const shared = sharedTypes(defs);
-  return shared.length > 0 && target.appliesTo.some(t => shared.includes(t));
+  // 種類不互通，類型互通（§ 51.5.3）——兌換與降階是玩家指定產物，不看投入的類型
+  return target.kind === defs[0].kind;
 }
 
 /**
- * 定向兌換能不能成立（§ 51.5.3）：同類型同種類同 tier ×3 → 指定同 tier ×1。
+ * 定向兌換能不能成立（§ 51.5.3）：同種類同 tier ×3 → 指定同 tier ×1，**類型不限**。
  * UI 與 store 共用這一支。
  */
 export function canExchangeAffixes(
@@ -424,16 +419,16 @@ export const useTalentStore = create<TalentState>((set, get) => ({
   },
 
   /**
-   * 鑲材合成：同 tier 同類型同種類 ×2 → 隨機 T+1 ×1。
+   * 鑲材升級：同 tier 同種類 ×2 → **玩家指定類型**的 T+1 ×1（該類型內隨機）。
    *
    * **有失敗率**（§ 51.5.2），失敗時**退回投入的其中 1 份**（淨損 1 份），不歸零。
    */
-  fuseAffixes: async (affixIds, rng = defaultRng) => {
+  upgradeAffixes: async (affixIds, targetType, rng = defaultRng) => {
     const { characterId, affixes } = get();
     if (characterId === null || affixIds.length !== FUSE_INPUT_COUNT) return null;
 
     const inputs = affixIds.map(id => affixes.find(a => a.id === id));
-    if (!canFuseAffixes(inputs)) return null;
+    if (!canUpgradeAffixes(inputs, targetType)) return null;
 
     const d0 = getTalentAffixDef(inputs[0]!.definitionId)!;
     const targetTier = (d0.tier + 1) as Exclude<TalentTier, 1>;
@@ -445,7 +440,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
 
     let produced: TalentAffixInstance | null = null;
     if (success) {
-      const candidates = fuseCandidates(d0, getTalentAffixDef(inputs[1]!.definitionId)!);
+      const candidates = upgradeCandidates(d0.tier, d0.kind, targetType);
       if (candidates.length === 0) return null;
       const picked = candidates[Math.floor(rng() * candidates.length)];
       produced = {
@@ -467,7 +462,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
   },
 
   /**
-   * 定向兌換：同類型同種類同 tier ×3 → **玩家指定**的同 tier ×1（§ 51.5.3）。
+   * 定向兌換：同種類同 tier ×3 → **玩家指定**的同 tier ×1，**類型不限**（§ 51.5.3）。
    * 必定成功、不收金幣。
    */
   exchangeAffixes: async (affixIds, targetDefinitionId) => {
