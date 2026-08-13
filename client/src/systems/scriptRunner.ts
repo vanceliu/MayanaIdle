@@ -10,6 +10,7 @@ import { getDistance } from './lineOfSight';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
+import { isClassMagic } from '../models/classSkills';
 import type { ActiveEffect } from '../models/effect';
 import type { BagItem } from '../models/bagItem';
 import { hasBagItem, getBagItemAmount } from '../models/bagItem';
@@ -367,14 +368,14 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
   switch (action.type) {
     case 'skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
-      if (!skill) return false;
+      if (!skill || skill.type !== 'attack') return false;
       if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     // 職業魔法：可選範圍窄一階，但可執行條件與一般技能相同（§ 51.4.9）
     case 'skill_class_only': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
-      if (!skill) return false;
+      if (!skill || skill.type !== 'attack' || !isClassMagic(skill.id)) return false;
       if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
@@ -555,13 +556,13 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
     }
     case 'buff_skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
-      if (!skill) return false;
+      if (skill?.type !== 'buff') return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'heal_skill': {
       if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
       const skill = ctx.skills.find(s => s.id === action.skillId);
-      if (!skill) return false;
+      if (skill?.type !== 'heal') return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'cure_item': {

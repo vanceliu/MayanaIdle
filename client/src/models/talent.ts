@@ -181,9 +181,9 @@ export const DOWNGRADE_INPUT_COUNT = 1;
 
 /** 鑲材掉率（一般怪，%）。T7 不掉落。Boss 為 2 倍 */
 export const AFFIX_DROP_RATE: Record<TalentTier, number> = {
-  1: 3,
-  2: 2,
-  3: 0.5,
+  1: 5,
+  2: 3,
+  3: 1,
   4: 0.1,
   5: 0.1,
   6: 0.1,

@@ -22,6 +22,23 @@ export const SCRIPT_DEBUFF_LABELS: Record<ScriptDebuffCondition, string> = {
   slow: '減速',
 };
 
+/**
+ * 技能施加於**怪物**的 debuff tag（`24-buff-debuff.md` § 24.4.1 下半）。
+ *
+ * 與上面的 `SCRIPT_DEBUFF_*` 是兩套：那是玩家身上的合併條件，
+ * 這裡的 key 是場上效果 `ActiveEffect.tags` 的實際字面值，鑲材選項一律取自這張表。
+ */
+export const MONSTER_DEBUFF_TAG_LABELS: Record<string, string> = {
+  poisoned: '中毒',
+  bleeding: '流血',
+  cursed: '詛咒',
+  slowed: '減速',
+  stunned: '暈眩',
+  'armor-break': '護甲崩壞',
+  'defense-down': '防禦下降',
+  taunt: '挑釁',
+};
+
 // === Combat Script Types ===
 
 export type CombatConditionType =

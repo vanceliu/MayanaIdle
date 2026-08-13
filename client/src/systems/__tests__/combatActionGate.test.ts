@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { evaluateCombatScript, type CombatScriptContext } from '../scriptRunner';
 import type { CombatRule, CombatActionType } from '../../models/scriptEngine';
 import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
+import { CLASS_SKILLS } from '../../models/classSkills';
+
+/** 職業魔法閘門會驗 id 是否真的在 `CLASS_SKILLS` 裡，所以測試不能用假 id */
+const CLASS_ATTACK_ID = CLASS_SKILLS.find(c => c.skill.type === 'attack')!.id;
 
 /**
  * 戰鬥動作的可執行閘門（`51-auto-talent.md` § 51.4.9）。
@@ -56,8 +60,9 @@ describe('戰鬥動作閘門', () => {
     const actions = TALENT_AFFIX_DEFS
       .filter(d => !d.blocked && d.kind === 'action' && d.appliesTo.includes('combat'));
     for (const def of actions) {
-      const skills = [{ id: 'x', name: 'x', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0 } as never];
-      const action = { type: def.ruleId as CombatActionType, skillId: 'x' };
+      const skillId = def.ruleId === 'skill_class_only' ? CLASS_ATTACK_ID : 'x';
+      const skills = [{ id: skillId, name: 'x', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0 } as never];
+      const action = { type: def.ruleId as CombatActionType, skillId };
       const result = evaluateCombatScript(
         [{ id: 'r', enabled: true, conditions: [], action } as CombatRule],
         ctx({ skills }),
@@ -71,18 +76,32 @@ describe('戰鬥動作閘門', () => {
    * 走到普通攻擊那條的話，傷害用武器白值、日誌印「攻擊」而不是技能名。
    */
   it('職業魔法與一般技能走同一條路徑', () => {
-    const skill = {
-      id: 'x', name: '火球', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
-      range: 12, target: 'single',
-    } as never;
     for (const type of ['skill', 'skill_class_only'] as CombatActionType[]) {
-      const action = { type, skillId: 'x' };
+      const skillId = type === 'skill_class_only' ? CLASS_ATTACK_ID : 'x';
+      const skill = {
+        id: skillId, name: '火球', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
+        range: 12, target: 'single',
+      } as never;
+      const action = { type, skillId };
       const result = evaluateCombatScript(
         [{ id: 'r', enabled: true, conditions: [], action } as CombatRule],
         ctx({ skills: [skill] }),
       );
       expect(result?.type).toBe(type);
-      expect((result as { skillId?: string }).skillId).toBe('x');
+      expect((result as { skillId?: string }).skillId).toBe(skillId);
     }
+  });
+
+  /* 職業魔法鑲材只吃職業魔法（§ 51.4.9 T3），基礎魔法必須被擋下 */
+  it('職業魔法鑲材放基礎魔法不成立', () => {
+    const skill = {
+      id: 'wind-blade', name: '風刃', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
+      range: 10, target: 'single',
+    } as never;
+    const action = { type: 'skill_class_only' as CombatActionType, skillId: 'wind-blade' };
+    expect(evaluateCombatScript(
+      [{ id: 'r', enabled: true, conditions: [], action } as CombatRule],
+      ctx({ skills: [skill] }),
+    )).toBeNull();
   });
 });

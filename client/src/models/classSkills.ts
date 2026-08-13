@@ -72,3 +72,10 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
       selfBuff: { category: 'backstab', name: '背刺', description: '攻擊力 +50%（×1.5）',
         duration: 5000, modifiers: [{ stat: 'attack_power', value: 50, isPercent: true }] } } },
 ];
+
+const CLASS_SKILL_IDS = new Set(CLASS_SKILLS.map(s => s.id));
+
+/** 這個技能 id 是不是職業魔法（`23-class-magic.md`）。基礎魔法一律 false */
+export function isClassMagic(skillId: string | undefined): boolean {
+  return !!skillId && CLASS_SKILL_IDS.has(skillId);
+}

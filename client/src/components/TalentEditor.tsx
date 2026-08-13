@@ -25,8 +25,10 @@ import { slotSkipReason, type SlotSkipReason } from '../systems/talentRules';
 import { PersistentSettings } from './PersistentSettings';
 import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 import { BindConfirmModal } from './BindConfirmModal';
-import { getParamFields, type ParamField } from '../models/talentParams';
+import { getParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
 import { getItemById } from '../models/items';
+import { isClassMagic } from '../models/classSkills';
+import type { Skill } from '../models/skill';
 import { affixLabel, affixLabelOf } from '../models/talentLabels';
 
 /** 天賦格編輯（`51-auto-talent.md` § 51.10） */
@@ -42,6 +44,25 @@ function matchesSkillPool(skill: { element?: string; aoeRadius?: number; maxTarg
   if (key === 'single') return !skill.aoeRadius;
   if (key === 'aoe') return !!skill.aoeRadius;
   return skill.element === key;
+}
+
+/**
+ * 技能選單的範圍（`talentParams.ts` 的 `filter`）。
+ *
+ * `byTalentType` 是共用鑲材（技能就緒）用的：戰鬥分頁列攻擊型、
+ * 常駐分頁列 buff 與治癒（`03-combat.md` § 3.12／§ 3.13）。
+ */
+export function matchesSkillFilter(
+  skill: Skill, filter: ParamSkillFilter, slotType: TalentType | null,
+): boolean {
+  switch (filter) {
+    case 'attack': return skill.type === 'attack';
+    case 'heal': return skill.type === 'heal';
+    case 'buff': return skill.type === 'buff';
+    case 'classMagic': return skill.type === 'attack' && isClassMagic(skill.id);
+    case 'byTalentType':
+      return slotType === 'combat' ? skill.type === 'attack' : skill.type !== 'attack';
+  }
 }
 
 function tierTag(affix: TalentAffixInstance): string {
@@ -65,7 +86,9 @@ export function AffixIcon({ affix, size = 18 }: { affix: TalentAffixInstance; si
  * 參數編輯（`51-auto-talent.md` § 51.4.1）。
  * 欄位由 `models/talentParams.ts` 依 `ruleId` 宣告。
  */
-function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixInstance }) {
+function ParamInput(
+  { field, affix, slotType }: { field: ParamField; affix: TalentAffixInstance; slotType: TalentType | null },
+) {
   const setAffixParams = useTalentStore(s => s.setAffixParams);
   const bindAffix = useTalentStore(s => s.bindAffix);
   const skills = useGameStore(s => s.skills);
@@ -162,8 +185,7 @@ function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixIns
 
   if (field.kind === 'skill') {
     // 只列**已學會**的：列沒學的等於讓玩家設一條永遠不成立的規則
-    const usable = skills.filter(sk =>
-      field.filter === 'attack' ? sk.type === 'attack' : sk.type === 'buff' || sk.type === 'heal');
+    const usable = skills.filter(sk => matchesSkillFilter(sk, field.filter, slotType));
     const def = getTalentAffixDef(affix.definitionId);
 
     /* 指定型：未綁定時挑一次就定死，之後只顯示不給改（§ 51.4.1） */
@@ -257,7 +279,9 @@ function Slot({
         <AffixIcon affix={occupant} />
         <span className="talent-slot-tier">{tierTag(occupant)}</span>
         <span className="talent-slot-name">{affixLabel(occupant)}</span>
-        {fields.map(f => <ParamInput key={f.key} field={f} affix={occupant} />)}
+        {fields.map(f => (
+          <ParamInput key={f.key} field={f} affix={occupant} slotType={slot.assignedType} />
+        ))}
         <button
           className="talent-slot-remove"
           onClick={() => unequipAffix(occupant.id!)}

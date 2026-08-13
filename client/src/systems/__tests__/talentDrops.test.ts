@@ -5,7 +5,7 @@ import {
   rollTalentAffixDrops,
   rollTalentSlotDrop,
 } from '../talentDrops';
-import { affixTierBandFor, slotTierBandFor } from '../../models/talent';
+import { affixTierBandFor, slotTierBandFor, AFFIX_DROP_RATE, BOSS_DROP_MULTIPLIER } from '../../models/talent';
 import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
 
 /** 依序回放的假亂數，讓抽取路徑可控 */
@@ -91,11 +91,12 @@ describe('鑲材與天賦格掉落（`27-drop-table.md` § 27.9）', () => {
     });
 
     it('Boss 掉率是一般怪的 2 倍', () => {
-      // 取一個介於一般怪與 Boss 掉率之間的 roll：一般怪不中、Boss 中
-      // T1 一般怪 3% → 掉落值 30；Boss 6% → 60。roll 0.045 * 1000 = 45
-      const between = seq([0.045, 0, 0]);
-      expect(rollTalentAffixDrop(10, false, 1, between)).toBeNull();
-      expect(rollTalentAffixDrop(10, true, 1, seq([0.045, 0, 0]))).not.toBeNull();
+      // 取一個介於一般怪與 Boss 掉率之間的 roll：一般怪不中、Boss 中。
+      // 由掉率常數推導，掉率調整時不必回頭改這個數字
+      const normal = AFFIX_DROP_RATE[1] / 100;
+      const between = (normal + normal * BOSS_DROP_MULTIPLIER) / 2;
+      expect(rollTalentAffixDrop(10, false, 1, seq([between, 0, 0]))).toBeNull();
+      expect(rollTalentAffixDrop(10, true, 1, seq([between, 0, 0]))).not.toBeNull();
     });
 
     it('掉出來的鑲材一定適用被抽中的類型', () => {
