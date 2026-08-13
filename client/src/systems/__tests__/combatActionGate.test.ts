@@ -65,4 +65,24 @@ describe('戰鬥動作閘門', () => {
       expect(result, `${def.ruleId} 閘門不認得`).not.toBeNull();
     }
   });
+
+  /*
+   * `skill_class_only` 只是可選範圍窄一階，執行路徑必須與一般技能相同 ——
+   * 走到普通攻擊那條的話，傷害用武器白值、日誌印「攻擊」而不是技能名。
+   */
+  it('職業魔法與一般技能走同一條路徑', () => {
+    const skill = {
+      id: 'x', name: '火球', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
+      range: 12, target: 'single',
+    } as never;
+    for (const type of ['skill', 'skill_class_only'] as CombatActionType[]) {
+      const action = { type, skillId: 'x' };
+      const result = evaluateCombatScript(
+        [{ id: 'r', enabled: true, conditions: [], action } as CombatRule],
+        ctx({ skills: [skill] }),
+      );
+      expect(result?.type).toBe(type);
+      expect((result as { skillId?: string }).skillId).toBe('x');
+    }
+  });
 });

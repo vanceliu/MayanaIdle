@@ -173,7 +173,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
         prototype: 'impact',
         x: t.x, y: t.y, color: plan.color, crit: t.crit, accent: plan.accent,
         delayMs: at + (bounce ? hopMs : hopMs * 0.4),
-        onStart: t.onLand,
+        onStart: hitCallback(t, 0),
       });
 
       fromPtX = t.x;
@@ -243,15 +243,23 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
             delayMs: at,
           });
 
-      fx.spawn({
-        prototype: 'impact',
-        x: t.x, y: t.y, color: plan.color, crit: t.crit, accent: plan.accent,
-        minimal: plan.minimalImpact,
-        delayMs: at + ms,
-        onStart: t.onLand,
-      });
+      /*
+       * 回呼一律走 `hitCallback` —— 直接用 `t.onLand` 的話，
+       * 呼叫端只給了逐下的 `onLandHit` 時會拿到 undefined，
+       * 齊射技能（火球、冰霧、箭雨、流星雨）就一個傷害數字都不跳。
+       */
+      const count = t.onLandHit?.length ?? 1;
+      for (let h = 0; h < count; h++) {
+        fx.spawn({
+          prototype: 'impact',
+          x: t.x, y: t.y, color: plan.color, crit: t.crit, accent: plan.accent,
+          minimal: plan.minimalImpact,
+          delayMs: at + ms + h * art.travel.multiHitStaggerMs,
+          onStart: hitCallback(t, h),
+        });
+      }
 
-      last = Math.max(last, at + ms + art.impact.durationMs);
+      last = Math.max(last, at + ms + (count - 1) * art.travel.multiHitStaggerMs + art.impact.durationMs);
     });
 
     return last;
@@ -312,7 +320,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
         fx.spawn({
           prototype: 'pillar',
           x: t.x, y: t.y + (o.groundLift ?? 0),
-          color: plan.color, delayMs: cursor, onStart: t.onLand,
+          color: plan.color, delayMs: cursor, onStart: hitCallback(t, 0),
         });
       }
       cursor += art.pillar.durationMs;
@@ -346,10 +354,11 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
         delayMs: cursor,
       });
       for (const t of targets) {
-        if (!t.onLand) continue;
+        const cb = hitCallback(t, 0);
+        if (!cb) continue;
         fx.spawn({
           prototype: 'impact', x: t.x, y: t.y, color: plan.color, crit: t.crit,
-          accent: plan.accent, delayMs: cursor, onStart: t.onLand,
+          accent: plan.accent, delayMs: cursor, onStart: cb,
         });
       }
       cursor += art.burst.durationMs;
@@ -362,10 +371,11 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
         delayMs: cursor,
       });
       for (const t of targets) {
-        if (!t.onLand) continue;
+        const cb = hitCallback(t, 0);
+        if (!cb) continue;
         fx.spawn({
           prototype: 'impact', x: t.x, y: t.y, color: plan.color, crit: t.crit,
-          accent: plan.accent, delayMs: cursor, onStart: t.onLand,
+          accent: plan.accent, delayMs: cursor, onStart: cb,
         });
       }
       cursor += art.nova.durationMs;
@@ -377,7 +387,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
       for (const t of list) {
         fx.spawn({
           prototype: 'heal', x: t.x, y: t.y, color: plan.color,
-          delayMs: cursor, onStart: t.onLand,
+          delayMs: cursor, onStart: hitCallback(t, 0),
         });
       }
       cursor += art.heal.durationMs;
@@ -394,11 +404,11 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
         fx.spawn(plan.shield
           ? {
               prototype: 'shield', x: t.x, y: t.y,
-              shieldKind: plan.shield, delayMs: cursor, onStart: t.onLand,
+              shieldKind: plan.shield, delayMs: cursor, onStart: hitCallback(t, 0),
             }
           : {
               prototype: 'aura', x: t.x, y: t.y, color: plan.color,
-              delayMs: cursor, onStart: t.onLand,
+              delayMs: cursor, onStart: hitCallback(t, 0),
             });
         /*
          * 徽記與藍環**同時起跑但各走各的長度**（§ 48.8.1）：

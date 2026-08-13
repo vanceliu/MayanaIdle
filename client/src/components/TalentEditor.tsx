@@ -11,14 +11,13 @@ import {
   SKILL_POOL_LABELS,
   TALENT_TYPE_LABELS,
   type SkillPoolKey,
-  type TalentAffixDef,
   conditionSlotCount,
   isSlotInstalled,
   type TalentAffixInstance,
   type TalentSlot,
   type TalentType,
 } from '../models/talent';
-import { getTalentAffixDef, PENDING_AFFIX_LABELS } from '../db/seed/talentSeeds';
+import { getTalentAffixDef } from '../db/seed/talentSeeds';
 import { getTalentAffixIcon, MATERIAL_TIER_COLORS } from '../models/iconMap';
 import { GameIcon } from './GameIcon';
 import { useIsDragOver, useIsDragging, useDragStore, hitTestDropTarget } from '../stores/dragStore';
@@ -28,28 +27,12 @@ import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 import { BindConfirmModal } from './BindConfirmModal';
 import { getParamFields, type ParamField } from '../models/talentParams';
 import { getItemById } from '../models/items';
-import { COMBAT_CONDITION_LABELS, COMBAT_ACTION_LABELS, PERSISTENT_CONDITION_LABELS, PERSISTENT_ACTION_LABELS } from '../models/scriptEngine';
-import { VILLAGE_CONDITION_LABELS, VILLAGE_ACTION_LABELS } from '../models/villageScript';
+import { affixLabel, affixLabelOf } from '../models/talentLabels';
 
 /** 天賦格編輯（`51-auto-talent.md` § 51.10） */
 
-/** 鑲材顯示名稱。標籤取自既有常數，與 Wiki 共用同一份（§ 43.4.12） */
-export function affixLabel(affix: TalentAffixInstance): string {
-  const def = getTalentAffixDef(affix.definitionId);
-  return def ? affixLabelOf(def) : '未知鑲材';
-}
-
-/** 由定義取名稱。信箱只有定義沒有實例，所以拆成兩支 */
-export function affixLabelOf(def: TalentAffixDef): string {
-  const maps: Record<string, string>[] = def.kind === 'condition'
-    ? [COMBAT_CONDITION_LABELS, PERSISTENT_CONDITION_LABELS, VILLAGE_CONDITION_LABELS]
-    : [COMBAT_ACTION_LABELS, PERSISTENT_ACTION_LABELS, VILLAGE_ACTION_LABELS];
-  for (const m of maps) {
-    if (def.ruleId in m) return m[def.ruleId];
-  }
-  // 尚未接上判定引擎的鑲材，標籤表裡查不到（`talentSeeds.ts`）
-  return PENDING_AFFIX_LABELS[def.ruleId] ?? def.ruleId;
-}
+// 名稱解析在 model 層，日誌與 Wiki 也在用（`models/talentLabels.ts`）
+export { affixLabel, affixLabelOf };
 
 /**
  * 技能落不落在該系別內（§ 51.4.9 的 9 個子集）。

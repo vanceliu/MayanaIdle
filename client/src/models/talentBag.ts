@@ -1,5 +1,6 @@
 import type { TalentAffixInstance, TalentSlot } from './talent';
 import { getTalentAffixDef } from '../db/seed/talentSeeds';
+import { buildBagLayout, type BagSlotMap } from './bagLayout';
 
 /**
  * 背包「天賦」分頁的格子與順序（`35-inventory-constraints.md` § 35.21）。
@@ -15,7 +16,8 @@ export function talentCellKey(cell: TalentBagCell): string {
   return cell.kind === 'slot' ? `slot-${cell.tier}` : `affix-${cell.id}`;
 }
 
-export type TalentBagOrder = Record<string, number>;
+/** 格子鍵 → 格子索引。形狀與 `BagSlotMap` 相同，兩邊共用同一組函式 */
+export type TalentBagOrder = BagSlotMap;
 
 export function talentBagOrderStorageKey(characterId: number): string {
   return `mayana_talent_bag_order_${characterId}`;
@@ -57,20 +59,25 @@ export function sortTalentBag(
   return order;
 }
 
-/** 套用位置表。沒有位置的排在後面，維持取得順序 */
-export function applyTalentBagOrder(
+/** 帶著格子鍵的項目。`buildBagLayout`／`moveBagSlot` 吃的是 `{ id }` */
+export interface TalentBagSlotItem {
+  id: string;
+  cell: TalentBagCell;
+}
+
+/**
+ * 排出天賦分頁的版面，空格為 null。
+ *
+ * **與一般分頁同一套**（`models/bagLayout.ts`）：位置表是例外表，
+ * 手動擺過的照位置放，其餘依取得順序流進剩下的空格。
+ */
+export function buildTalentBagLayout(
   cells: TalentBagCell[],
   order: TalentBagOrder,
-): TalentBagCell[] {
-  const placed: { cell: TalentBagCell; at: number }[] = [];
-  const rest: TalentBagCell[] = [];
-  for (const cell of cells) {
-    const at = order[talentCellKey(cell)];
-    if (at === undefined) rest.push(cell);
-    else placed.push({ cell, at });
-  }
-  placed.sort((a, b) => a.at - b.at);
-  return [...placed.map(p => p.cell), ...rest];
+  totalSlots: number,
+): (TalentBagSlotItem | null)[] {
+  const items = cells.map(cell => ({ id: talentCellKey(cell), cell }));
+  return buildBagLayout(items, order, totalSlots);
 }
 
 export function loadTalentBagOrder(characterId: number): TalentBagOrder {

@@ -426,11 +426,14 @@ export function processPlayerAttack(
       }
     }
 
-    damages.push({
-      targetId, damage, isCrit, isMiss, killed,
-      /* 單下判定的技能沒有明細，補一筆讓下游不必分兩種寫法 */
-      hits: hits.length > 0 ? hits : [{ damage, isCrit, isMiss }],
-    });
+    /*
+     * 單下判定的技能（魔法、快照型物理）不填 `hits`，這裡補一筆。
+     * **必須在日誌與傷害明細之前補** —— 補在 `damages.push` 的參數裡的話，
+     * 下面的日誌迴圈跑的還是空陣列，火球那類技能會完全沒有日誌。
+     */
+    if (hits.length === 0) hits = [{ damage, isCrit, isMiss }];
+
+    damages.push({ targetId, damage, isCrit, isMiss, killed, hits });
 
     // Build log
     const actionName = skill ? skill.name : '攻擊';

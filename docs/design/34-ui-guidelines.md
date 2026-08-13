@@ -486,6 +486,24 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 
 ---
 
+### 分頁切換鈕（硬性）
+
+**所有分頁切換鈕的 active 態只有一份 CSS 規則**（`App.css` 的
+`.storage-tabs button.active, .stats-tab.active, …` 那一組）。
+
+倉庫、統計中心、商店、外觀、背包、自動天賦、腳本分頁全部指到同一份。
+各寫一份的結果是同一種東西在七個地方有七種顏色 —— 這已經發生過一次。
+
+| 屬性 | 值 |
+|---|---|
+| 底色 | `color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card))` |
+| 邊框 | `var(--accent-primary)` |
+| 文字 | `var(--text-primary)`、`font-weight: 600` |
+
+**不用實心亮底**：那會比底部 `PanelDock` 那排搶眼一階，兩者同框就不像同一套介面。
+沒有邊框的分頁列（例如倉庫的膠囊式）要補 `border: … solid transparent` 佔位，
+不然切換時整排會位移。
+
 ## 34.11 自動天賦與背包的分頁
 
 ### 自動天賦面板

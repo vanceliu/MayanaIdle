@@ -26,9 +26,7 @@ import { roundWeight } from '../systems/weight';
 import { isSigilItemId } from '../models/sigil';
 import { BagTalentTab } from './BagTalentTab';
 import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
-
-/** 按下到放開的位移在這個範圍內都算「點擊」，超過就是拖曳的起手（px） */
-const CLICK_SLOP = 8;
+import { CLICK_SLOP } from '../hooks/usePressDrag';
 
 interface BagGridItem {
   id: string;
@@ -685,7 +683,11 @@ export function BagPanel() {
           {/* 整理鈕與一般分頁同一顆、同一個位置、同一種行為 */}
           <button className="bag-sort-toggle" onClick={handleTalentSort}>整理</button>
         </BagTabs>
-        <BagTalentTab rows={rowsForSlots(maxSlots)} order={talentOrder} />
+        <BagTalentTab
+          rows={rowsForSlots(maxSlots)}
+          order={talentOrder}
+          onReorder={next => { setTalentOrder({ charId, order: next }); saveTalentBagOrder(charId, next); }}
+        />
       </div>
     );
   }

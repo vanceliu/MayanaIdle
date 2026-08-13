@@ -66,19 +66,31 @@ export function WeaponShop() {
   // --- 購買頁購物車 ---
   const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory, equippedGear);
   // 勾選狀態跨分類保留，切換分類不會靜默丟掉已勾的武器
-  const buyLines = cartLines(buyCart, templates, { keyOf: t => t.name, maxOf: () => 1 });
-  const buyTotal = buyLines.reduce((sum, l) => sum + (l.item.buyPrice ?? 0), 0);
+  /*
+   * 裝備可以買多件（與雜貨店同一套）—— 每件都是獨立實例、各佔一格，
+   * 所以上限同時看金幣與背包空格，不是寫死 1。
+   */
+  const buyLines = cartLines(buyCart, templates, {
+    keyOf: t => `tpl:${t.id}`,
+    // 上限只用金幣算：背包空格是**所有列共用**的，逐列夾不出來，由下方合計檢查
+    maxOf: t => Math.floor(char.gold / Math.max(1, t.buyPrice ?? 1)),
+    hardCap: Infinity,
+  });
+  const buyTotal = buyLines.reduce((sum, l) => sum + (l.item.buyPrice ?? 0) * l.qty, 0);
+  const buyCount = buyLines.reduce((sum, l) => sum + l.qty, 0);
   const buyHint = buyLines.length === 0
     ? null
     : buyTotal > char.gold
       ? '金幣不足'
-      : buyLines.length > freeSlots
+      : buyCount > freeSlots
         ? '背包欄位不足'
         : null;
 
   async function checkoutBuy() {
     if (buyLines.length === 0 || buyHint) return;
-    const instances = await createShopEquipment(buyLines.map(l => l.item), char!.level, char!.id!);
+    // 買幾件就開幾個實例，各自 roll 詞綴
+    const ordered = buyLines.flatMap(l => Array.from({ length: l.qty }, () => l.item));
+    const instances = await createShopEquipment(ordered, char!.level, char!.id!);
     const state = useGameStore.getState();
     set({
       character: { ...state.character!, gold: state.character!.gold - buyTotal },
@@ -152,13 +164,13 @@ export function WeaponShop() {
                 <span className="shop-item-price">{t.buyPrice.toLocaleString()}G</span>
               </div>
               <div className="shop-item-actions">
-                {/* 裝備是唯一實例，一次只能買一件，介面仍與雜貨店一致 */}
+                {/* 上限同時看金幣與背包空格 —— 每件都是獨立實例，各佔一格 */}
                 <QtyStepper
                   label={t.name}
-                  value={buyCart.raw(t.name)}
-                  max={1}
+                  value={buyCart.raw(`tpl:${t.id}`)}
+                  max={Math.floor(char.gold / Math.max(1, t.buyPrice ?? 1))}
                   min={0}
-                  onChange={next => buyCart.set(t.name, next)}
+                  onChange={next => buyCart.set(`tpl:${t.id}`, next)}
                 />
               </div>
             </div>
@@ -241,7 +253,7 @@ export function WeaponShop() {
       {/* 動作列固定在面板底部，全視窗只有這一顆結帳鈕（§ 34.1） */}
       {tab === 'buy' ? (
         <ShopCartFooter
-          summary={cartSummary(buyLines, '件')}
+          summary={cartSummary(buyLines, '個')}
           amount={`${buyTotal.toLocaleString()}G`}
           actionLabel="購買"
           hint={buyHint}

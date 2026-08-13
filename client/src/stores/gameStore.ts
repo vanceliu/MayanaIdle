@@ -11,6 +11,7 @@ import { CURRENT_DATA_VERSION } from '../config';
 import { syncTalentSlotGrants, syncCompensations, mailPurgeStorageKey } from '../systems/mailbox';
 import { talentBagOrderStorageKey } from '../models/talentBag';
 import { rollTalentAffixDrops, rollTalentSlotDrop } from '../systems/talentDrops';
+import { affixDropLabel } from '../models/talentLabels';
 import { useMailboxStore } from './mailboxStore';
 import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
 import { useTalentStore, talentPersistentRules, talentVillageRules } from './talentStore';
@@ -2467,7 +2468,7 @@ export function processMonsterDeath(
           slotId: null,
           slotIndex: null,
         });
-        talentLogs.push(`獲得鑲材（T${talentAffix.def.tier}）`);
+        talentLogs.push(`獲得鑲材：${affixDropLabel(talentAffix.def, talentAffix.boundParam)}`);
       }
       if (talentSlotTier !== null) {
         await db.talentSlots.add({

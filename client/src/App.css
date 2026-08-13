@@ -1205,11 +1205,6 @@ button.active {
   color: var(--text-dim);
 }
 
-.search-mode-toggle button.active {
-  background: var(--accent-primary);
-  color: white;
-}
-
 @keyframes pulse {
   0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(124, 58, 237, 0.5); }
   50% { opacity: 0.5; text-shadow: 0 0 20px rgba(124, 58, 237, 0.8); }
@@ -2886,12 +2881,6 @@ button.active {
   font-size: var(--fs-sm);
 }
 
-.shop-tabs button.active {
-  background: var(--accent-primary-dim);
-  color: var(--text-bright);
-  border-color: var(--accent-primary);
-}
-
 /* BOSS 任務分頁（B+/A+/S+，§ 36.6.1）以金色區隔於一般分頁 */
 .shop-tabs button.is-boss-tab {
   color: var(--accent-gold);
@@ -3210,6 +3199,25 @@ button.active {
   text-align: left;
 }
 
+/*
+ * 分頁切換鈕的 active 態（`34-ui-guidelines.md` § 34.10）。
+ *
+ * **唯一出處**。倉庫、統計中心、商店、外觀、背包、天賦、腳本分頁全部指到這裡 ——
+ * 各寫一份的結果是同一種東西在七個地方有七種顏色。
+ */
+.storage-tabs button.active,
+.stats-tab.active,
+.shop-tabs button.active,
+.appearance-tabs button.active,
+.search-mode-toggle button.active,
+.script-tab.active,
+.bag-tab.active {
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 /* --- Storage --- */
 .storage-tabs {
   display: flex;
@@ -3224,7 +3232,8 @@ button.active {
   flex: 1;
   padding: 5px 8px;
   font-size: var(--fs-sm);
-  border: none;
+  /* 透明邊框佔位：active 態要畫邊框，沒有的話切換時整排會位移 */
+  border: var(--border-width) solid transparent;
   border-radius: var(--radius-sm);
 }
 
@@ -5109,13 +5118,6 @@ button.active {
   border-bottom: 2px solid transparent;
 }
 
-.script-tab.active {
-  color: var(--text-primary);
-  /* 與 `.panel-dock-btn.active` 同一套混色，不用實心亮底 */
-  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
-  border-bottom-color: var(--accent-primary);
-}
-
 /* --- 腳本 Template 分頁列（`03-combat.md` § 3.14） ---
  *
  * 分頁數量由玩家決定，所以分頁區自己水平捲動（`min-width: 0` + `overflow-x`）。
@@ -6037,12 +6039,6 @@ button.active {
 
 .stats-tab:hover {
   background: var(--bg-card-hover);
-}
-
-.stats-tab.active {
-  background: var(--accent-primary);
-  color: var(--bg-base);
-  border-color: var(--accent-primary);
 }
 
 .stats-grid {
@@ -7033,12 +7029,6 @@ button.active {
   cursor: pointer;
 }
 
-.appearance-tabs button.active {
-  background: var(--accent-primary-dim);
-  border-color: transparent;
-  color: #fff;
-}
-
 /* 勾選框要與文字同一行 —— .form-group label 是 block，不改的話會各佔一行 */
 .check-label {
   display: flex !important;
@@ -7845,18 +7835,6 @@ button.active {
 .talent-install button:hover,
 .fusion-go:not(:disabled):hover {
   background: var(--bg-card-hover);
-}
-
-/*
- * 分頁的 active 態沿用 `.panel-dock-btn.active` 的**混色**寫法：
- * 42% `--accent-primary` 混進 `--bg-card`、文字維持 `--text-primary`。
- * 實心亮底會比底部那排搶眼一階，兩者擺在同一個畫面就不像同一套介面。
- */
-.bag-tab.active {
-  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
-  border-color: var(--accent-primary);
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 /* 合成與安裝是一般按鈕，不搶分頁的視覺層級 */

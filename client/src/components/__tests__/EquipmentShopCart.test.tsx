@@ -127,14 +127,28 @@ describe('武器店購買 — 購物車', () => {
     expect(checkoutBtn().disabled).toBe(true);
   });
 
-  it('每件裝備數量上限為 1', async () => {
-    await setup(100_000);
+  // 裝備可以買多件（與雜貨店同一套），上限看金幣與背包空格
+  it('數量上限由金幣算出來', async () => {
+    await setup(2_500);
+    pick('鐵劍', '鐵劍');
     pick('鐵劍', '鐵劍');
 
     const buttons = within(row('鐵劍'));
-    expect((buttons.getByLabelText('鐵劍 數量') as HTMLInputElement).value).toBe('1');
+    // 2500G ÷ 1000G ＝ 2 件
+    expect((buttons.getByLabelText('鐵劍 數量') as HTMLInputElement).value).toBe('2');
     expect((buttons.getByRole('button', { name: '鐵劍 增加數量' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((buttons.getByRole('button', { name: '鐵劍 增加十個' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('同一件可以買多把，每把各自是獨立實例', async () => {
+    await setup(100_000);
+    pick('鐵劍', '鐵劍');
+    pick('鐵劍', '鐵劍');
+    pick('鐵劍', '鐵劍');
+
+    expect(footerText('.shop-cart-amount')).toBe('3,000G');
+    fireEvent.click(checkoutBtn());
+    await vi.waitFor(() => expect(useGameStore.getState().inventory).toHaveLength(3));
+    expect(useGameStore.getState().inventory.every(i => i.name === '鐵劍')).toBe(true);
   });
 
   it('可一次買多件，金幣與背包內容正確', async () => {
@@ -142,7 +156,7 @@ describe('武器店購買 — 購物車', () => {
     pick('鐵劍', '鐵劍');
     pick('鋼劍', '鋼劍');
 
-    expect(footerText('.shop-cart-summary')).toBe('已選 2 件');
+    expect(footerText('.shop-cart-summary')).toBe('已選 2 種 · 共 2 個');
     expect(footerText('.shop-cart-amount')).toBe('4,000G');
 
     fireEvent.click(checkoutBtn());
@@ -154,8 +168,9 @@ describe('武器店購買 — 購物車', () => {
     expect(useGameStore.getState().inventory.map(i => i.name).sort()).toEqual(['鋼劍', '鐵劍']);
   });
 
+  // 上限逐列以金幣夾，但多列合計仍可能超過
   it('合計超過金幣時擋下並說明原因', async () => {
-    await setup(2_000);
+    await setup(3_500);
     pick('鐵劍', '鐵劍');
     pick('鋼劍', '鋼劍');
 

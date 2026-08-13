@@ -4,15 +4,17 @@ import { TALENT_TYPES, TALENT_TYPE_LABELS, type TalentType } from '../models/tal
 import { getTalentAffixDef } from '../db/seed/talentSeeds';
 import {
   buildTalentBagCells,
-  applyTalentBagOrder,
+  buildTalentBagLayout,
   type TalentBagCell,
   type TalentBagOrder,
 } from '../models/talentBag';
+import { moveBagSlot } from '../models/bagLayout';
 import { getTalentAffixIcon, TALENT_SLOT_ICON, MATERIAL_TIER_COLORS } from '../models/iconMap';
 import { GameIcon } from './GameIcon';
-import { BagGrid, getShortName, padToRows } from './BagGrid';
+import { BagGrid, BAG_COLUMNS, getShortName } from './BagGrid';
 import { affixLabel } from './TalentEditor';
 import { useDragStore, hitTestDropTarget } from '../stores/dragStore';
+import { usePressDrag } from '../hooks/usePressDrag';
 import { useGameStore } from '../stores/gameStore';
 
 /**
@@ -26,18 +28,24 @@ const TOOLTIP_WIDTH = 220;
 
 type Cell = TalentBagCell;
 
-export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOrder }) {
+export function BagTalentTab({ rows, order, onReorder }: {
+  rows: number;
+  order: TalentBagOrder;
+  onReorder: (next: TalentBagOrder) => void;
+}) {
   const slots = useTalentStore(s => s.slots);
   const affixes = useTalentStore(s => s.affixes);
   const equipAffix = useTalentStore(s => s.equipAffix);
   const installSlot = useTalentStore(s => s.installSlot);
   const activeTemplateId = useGameStore(s => s.activeTemplateId);
-  const beginDrag = useDragStore(s => s.begin);
-  const moveDrag = useDragStore(s => s.move);
   const endDrag = useDragStore(s => s.drop);
+  const dragItem = useDragStore(s => s.item);
+  const dragOver = useDragStore(s => s.over);
   const [kind, setKind] = useState<'all' | 'condition' | 'action'>('all');
   const [type, setType] = useState<TalentType | 'all'>('all');
   const [tooltip, setTooltip] = useState<{ cell: Cell; x: number; y: number } | null>(null);
+  // 與一般分頁共用同一支：按下先記著，超過容忍距離才轉拖曳，觸控不拖
+  const pressDrag = usePressDrag(() => setTooltip(null));
   /* 顯示這份天賦配置沒用到的，含別份配置佔著的（§ 51.3.2） */
   const spareSlots = availableSlots(slots, activeTemplateId);
   const loose = availableAffixes(affixes, slots, activeTemplateId).filter(a => {
@@ -48,8 +56,11 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
     return true;
   });
 
-  // 整理寫下的位置優先，沒有位置的排在後面維持取得順序（`models/talentBag.ts`）
-  const cells = applyTalentBagOrder(buildTalentBagCells(spareSlots, loose), order);
+  // 手動擺過的照位置放，其餘依取得順序流進剩下的空格（與一般分頁同一套）
+  const layout = buildTalentBagLayout(
+    buildTalentBagCells(spareSlots, loose), order, rows * BAG_COLUMNS,
+  );
+  const cellCount = layout.filter(Boolean).length;
 
   /** 拖鑲材到天賦格（§ 51.10）。走 `dragStore` 指標拖放，不用 HTML5 drag */
   function showTooltipFor(el: HTMLElement, cell: Cell) {
@@ -60,21 +71,9 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
     setTooltip({ cell, x, y: rect.bottom + 8 });
   }
 
-  function startDrag(e: React.PointerEvent, affixId: number, label: string) {
-    if (e.button !== 0) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    beginDrag({ fromIndex: -1, payload: { kind: 'talent-affix', affixId, name: label }, label },
-      e.clientX, e.clientY);
-  }
-
-  function startSlotDrag(e: React.PointerEvent, slotId: number) {
-    if (e.button !== 0) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    beginDrag({ fromIndex: -1, payload: { kind: 'talent-slot-item', slotId, name: '天賦格' }, label: '天賦格' },
-      e.clientX, e.clientY);
-  }
-
   async function finishDrag(e: React.PointerEvent) {
+    const { wasClick } = pressDrag.onPointerUp(e);
+    if (wasClick) return;
     setTooltip(null);
     const el = e.currentTarget as HTMLElement;
     if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
@@ -83,6 +82,11 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
     endDrag();
     if (!item || !target) return;
 
+    // 分頁內自由擺放（§ 35.21.1）：與一般分頁同一套，目標有東西就互換
+    if (target.kind === 'talent-cell') {
+      onReorder(moveBagSlot(layout, order, item.fromIndex, target.index));
+      return;
+    }
     // 鑲材 → 天賦格的槽位
     if (item.payload.kind === 'talent-affix' && target.kind === 'talent-slot') {
       await equipAffix(item.payload.affixId, target.index, target.sub);
@@ -141,29 +145,48 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
             <option key={t} value={t}>{TALENT_TYPE_LABELS[t]}</option>
           ))}
         </select>
-        <span className="bag-talent-count">{cells.length} 項</span>
+        <span className="bag-talent-count">{cellCount} 項</span>
       </div>
 
       <div className="bag-grid-container">
         <BagGrid>
-          {padToRows(cells, rows).map((cell, idx) => {
-            if (!cell) return <div key={`empty-${idx}`} className="bag-cell empty" />;
+          {layout.map((entry, idx) => {
+            /* 落點用 `elementFromPoint` 命中這兩個屬性，不靠事件冒泡（拖曳期間指標被 capture 住） */
+            const dropProps = { 'data-drop-kind': 'talent-cell', 'data-drop-index': idx } as const;
+            const over = dragOver?.kind === 'talent-cell' && dragOver.index === idx ? ' drag-over' : '';
+            if (!entry) {
+              return <div key={`empty-${idx}`} className={`bag-cell empty${over}`} {...dropProps} />;
+            }
+            const cell = entry.cell;
 
             if (cell.kind === 'slot') {
               return (
                 <div
-                  key={`slot-${cell.tier}`}
-                  className="bag-cell is-talent-slot"
+                  key={entry.id}
+                  {...dropProps}
+                  className={`bag-cell is-talent-slot${over}${
+                    dragItem?.payload.kind === 'talent-slot-item'
+                      && dragItem.payload.slotId === spareSlots.find(s => s.tier === cell.tier)?.id
+                      ? ' dragging' : ''
+                  }`}
                   onMouseEnter={e => showTooltipFor(e.currentTarget, cell)}
                   onMouseLeave={() => setTooltip(null)}
                   onPointerDown={e => {
                     // 觸控沒有 hover，按下就把詳情叫出來（`47-mobile.md`）
                     if (e.pointerType === 'touch') showTooltipFor(e.currentTarget, cell);
-                    startSlotDrag(e, spareSlots.find(s => s.tier === cell.tier)!.id!);
+                    pressDrag.onPointerDown(e);
                   }}
-                  onPointerMove={e => moveDrag(e.clientX, e.clientY)}
+                  onPointerMove={e => pressDrag.onPointerMove(e, () => {
+                    const slotId = spareSlots.find(s => s.tier === cell.tier)?.id;
+                    if (slotId == null) return null;
+                    return {
+                      fromIndex: idx,
+                      payload: { kind: 'talent-slot-item', slotId, name: '天賦格' },
+                      label: '天賦格',
+                    };
+                  })}
                   onPointerUp={finishDrag}
-                  onPointerCancel={() => endDrag()}
+                  onPointerCancel={() => { pressDrag.onPointerCancel(); endDrag(); }}
                   onLostPointerCapture={() => endDrag()}
                 >
                   {/* tier 走素材那套色階，與背包裡的素材同一種語言 */}
@@ -180,17 +203,25 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
             const label = affixLabel(a);
             return (
               <div
-                key={`affix-${a.id}`}
-                className={`bag-cell is-talent-affix is-${def.kind}`}
+                key={entry.id}
+                {...dropProps}
+                className={`bag-cell is-talent-affix is-${def.kind}${over}${
+                  dragItem?.payload.kind === 'talent-affix' && dragItem.payload.affixId === a.id
+                    ? ' dragging' : ''
+                }`}
                 onMouseEnter={e => showTooltipFor(e.currentTarget, cell)}
                 onMouseLeave={() => setTooltip(null)}
                 onPointerDown={e => {
                   if (e.pointerType === 'touch') showTooltipFor(e.currentTarget, cell);
-                  startDrag(e, a.id!, label);
+                  pressDrag.onPointerDown(e);
                 }}
-                onPointerMove={e => moveDrag(e.clientX, e.clientY)}
+                onPointerMove={e => pressDrag.onPointerMove(e, () => ({
+                  fromIndex: idx,
+                  payload: { kind: 'talent-affix', affixId: a.id!, name: label },
+                  label,
+                }))}
                 onPointerUp={finishDrag}
-                onPointerCancel={() => endDrag()}
+                onPointerCancel={() => { pressDrag.onPointerCancel(); endDrag(); }}
                 onLostPointerCapture={() => endDrag()}
               >
                 <GameIcon

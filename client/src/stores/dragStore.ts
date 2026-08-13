@@ -20,7 +20,9 @@ export type DropKind =
   /** 天賦格落在某一列上＝插到那個順序（`51-auto-talent.md` § 51.3.1） */
   | 'talent-row'
   /** 未安裝的天賦格落在編輯區＝安裝到這個類型 */
-  | 'talent-install';
+  | 'talent-install'
+  /** 天賦分頁的格子。與 `bag-slot` 同一種自由擺放（§ 35.21.1） */
+  | 'talent-cell';
 
 export interface DropTarget {
   kind: DropKind;
@@ -94,7 +96,9 @@ export function hitTestDropTarget(x: number, y: number): DropTarget | null {
   const host = (el as HTMLElement | null)?.closest?.('[data-drop-kind]') as HTMLElement | null;
   if (!host) return null;
   const kind = host.dataset.dropKind as DropKind | undefined;
-  const KINDS: DropKind[] = ['bag-slot', 'quick-slot', 'map', 'talent-slot', 'talent-row', 'talent-install'];
+  const KINDS: DropKind[] = [
+    'bag-slot', 'quick-slot', 'map', 'talent-slot', 'talent-row', 'talent-install', 'talent-cell',
+  ];
   if (!kind || !KINDS.includes(kind)) return null;
   const raw = host.dataset.dropIndex;
   const index = raw == null ? -1 : Number(raw);

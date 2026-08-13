@@ -115,7 +115,7 @@ function toCandidates(ctx: CombatScriptContext): TargetCandidate[] {
  * 12 碼的火球上，本來就該是兩個不同的圈。
  */
 function getActionRange(action: CombatAction, ctx: CombatScriptContext): number {
-  if (action.type === 'skill' && action.skillId) {
+  if ((action.type === 'skill' || action.type === 'skill_class_only') && action.skillId) {
     const skill = ctx.skills.find(s => s.id === action.skillId);
     if (skill?.range) return skill.range;
   }
