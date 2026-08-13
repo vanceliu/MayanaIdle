@@ -91,8 +91,6 @@ export type CombatActionType =
   | 'normal_attack'
   | 'wait'
   // === `51-auto-talent.md` § 51.4.9 新增 ===
-  /** 只放該職業的職業魔法（`23-class-magic.md`），可選範圍階梯的 T3 */
-  | 'skill_class_only'
   | 'switch_target_lowest_hp'
   | 'switch_target_highest_hp'
   | 'switch_target_farthest'
@@ -204,7 +202,6 @@ export const COMBAT_ACTION_LABELS: Record<CombatActionType, string> = {
   skill: '施放攻擊技能',
   normal_attack: '普通攻擊',
   wait: '不動作',
-  skill_class_only: '施放職業攻擊技能',
   switch_target_lowest_hp: '切換目標：最低 HP%',
   switch_target_highest_hp: '切換目標：最高 HP%',
   switch_target_farthest: '切換目標：最遠',

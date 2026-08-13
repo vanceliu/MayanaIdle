@@ -77,7 +77,7 @@ describe('非攻擊動作的分類', () => {
   });
 
   it('攻擊類不在其中', () => {
-    for (const t of ['skill', 'normal_attack', 'skill_class_only'] as const) {
+    for (const t of ['skill', 'normal_attack'] as const) {
       expect(isNonAttackAction(t), t).toBe(false);
     }
   });

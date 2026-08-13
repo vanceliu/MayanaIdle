@@ -34,7 +34,6 @@ describe('系統信箱（`52-mailbox.md`）', () => {
   beforeEach(async () => {
     await db.mailbox.clear();
     await db.talentSlots.clear();
-    await db.talentAffixes.clear();
     await db.characters.clear();
     await db.characters.add({ id: CHAR, createdAt: 1000 } as never);
     COMPENSATIONS.length = 0;
@@ -338,24 +337,20 @@ describe('系統信箱（`52-mailbox.md`）', () => {
     });
   });
 
-  // 補償可以發鑲材，領取後進背包「天賦」分頁（§ 52.3）
-  it('鑲材型的發放項目領得到', async () => {
+  /* 條件與動作一律內建，信箱沒有鑲材型別（§ 52.3、§ 51.4.1） */
+  it('不認得的項目型別不會發出東西，也不會讓領取失敗', async () => {
     await db.mailbox.add({
       characterId: CHAR,
-      sourceKey: 'affix-grant',
-      title: '鑲材',
-      items: [{ type: 'talent_affix', affixDefId: 2003, boundParam: null }],
+      sourceKey: 'unknown-grant',
+      title: '未知項目',
+      items: [{ type: 'talent_affix' } as never],
       createdAt: 1,
       claimedAt: null,
     });
     const [mail] = await listMail(CHAR);
     expect(await claimMail(mail.id!)).toBe(true);
 
-    const affixes = await db.talentAffixes.where('characterId').equals(CHAR).toArray();
-    expect(affixes).toHaveLength(1);
-    expect(affixes[0].definitionId).toBe(2003);
-    expect(affixes[0].slotId).toBeNull();
-    expect(affixes[0].boundParam).toBeNull();
+    expect(await db.talentSlots.where('characterId').equals(CHAR).count()).toBe(0);
   });
 
   /* 唯一約束是第二道防線：第一道（發放計數）漏了也不會寫進兩封一樣的信 */

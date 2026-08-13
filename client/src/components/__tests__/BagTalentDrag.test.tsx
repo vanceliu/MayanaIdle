@@ -5,7 +5,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { useTalentStore } from '../../stores/talentStore';
 import { useDragStore } from '../../stores/dragStore';
 import { pointAt, restoreElementFromPoint } from '../../testing/pointerDrag';
-import type { TalentAffixInstance } from '../../models/talent';
+import { emptyConditions, type TalentSlot } from '../../models/talent';
 
 vi.mock('../../hooks/useEquipmentTemplates', () => ({
   useEquipmentTemplates: () => [],
@@ -20,8 +20,18 @@ vi.mock('../../hooks/useEquipmentTemplates', () => ({
 
 const CHAR = 1;
 
-function affix(id: number, definitionId: number): TalentAffixInstance {
-  return { id, characterId: CHAR, definitionId, boundParam: null, params: null, slotId: null, slotIndex: null };
+function slot(id: number): TalentSlot {
+  return {
+    id,
+    characterId: CHAR,
+    tier: 1,
+    assignedType: null,
+    templateId: null,
+    order: null,
+    enabled: true,
+    conditions: emptyConditions(1),
+    action: null,
+  };
 }
 
 function openTalentTab() {
@@ -35,7 +45,7 @@ describe('天賦分頁的拖曳', () => {
   beforeEach(() => {
     useDragStore.getState().cancel();
     useGameStore.setState({ character: { id: CHAR } as never, bagItems: [], inventory: [] });
-    useTalentStore.setState({ characterId: CHAR, slots: [], affixes: [affix(10, 1001)] });
+    useTalentStore.setState({ characterId: CHAR, slots: [slot(10)] });
   });
 
   it('只是點一下不會開始拖曳', () => {
@@ -49,7 +59,7 @@ describe('天賦分頁的拖曳', () => {
     openTalentTab();
     fireEvent.pointerDown(cell(), { button: 0, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(cell(), { clientX: 40, clientY: 40 });
-    expect(useDragStore.getState().item?.payload.kind).toBe('talent-affix');
+    expect(useDragStore.getState().item?.payload.kind).toBe('talent-slot-item');
   });
 
   // 長按已被次要選單佔走，按住滑動要留給捲動（`47-mobile.md`）

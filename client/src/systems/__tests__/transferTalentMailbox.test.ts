@@ -23,7 +23,6 @@ describe('資料版本淘汰（§ 19.9）', () => {
     await db.characters.clear();
     await db.equipmentInstances.clear();
     await db.talentSlots.clear();
-    await db.talentAffixes.clear();
     await db.mailbox.clear();
     localStorageMock.clear();
   });
@@ -40,16 +39,17 @@ describe('資料版本淘汰（§ 19.9）', () => {
     expect(left[0].storageType).toBe('shared');
   });
 
-  it('清掉該角色的天賦格、鑲材與信件', async () => {
+  it('清掉該角色的天賦格與信件', async () => {
     await db.characters.add({ id: 1, userId: 1, name: '舊', dataVersion: 1 } as never);
-    await db.talentSlots.add({ characterId: 1, tier: 1, assignedType: null, templateId: null, order: null, enabled: true });
-    await db.talentAffixes.add({ characterId: 1, definitionId: 1001, boundParam: null, params: null, slotId: null, slotIndex: null });
+    await db.talentSlots.add({
+      characterId: 1, tier: 1, assignedType: null, templateId: null, order: null, enabled: true,
+      conditions: [null], action: null,
+    });
     await db.mailbox.add({ characterId: 1, sourceKey: 'k', title: 't', items: [], createdAt: 1, claimedAt: null });
 
     await purgeOutdatedData();
 
     expect(await db.talentSlots.count()).toBe(0);
-    expect(await db.talentAffixes.count()).toBe(0);
     expect(await db.mailbox.count()).toBe(0);
   });
 });

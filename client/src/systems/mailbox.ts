@@ -3,7 +3,12 @@
  * 首版做天賦格與補償，里程碑與道具／金幣型別不做（§ 52.0）。
  */
 import { db } from '../db/database';
-import { SLOT_GRANT_LEVEL_INTERVAL, type TalentSlot, type TalentSlotTier } from '../models/talent';
+import {
+  SLOT_GRANT_LEVEL_INTERVAL,
+  emptyConditions,
+  type TalentSlot,
+  type TalentSlotTier,
+} from '../models/talent';
 import { talentSlotGrantKey, type Mail, type MailItem } from '../models/mailbox';
 import { COMPENSATIONS, isCompensationActive } from '../db/seed/compensations';
 
@@ -95,37 +100,27 @@ export function unclaimedCount(mails: Mail[]): number {
   return mails.filter(m => m.claimedAt === null).length;
 }
 
-/** 把一個發放項目變成實際資料。首版處理天賦格與鑲材（§ 52.0） */
+/** 把一個發放項目變成實際資料。首版只處理天賦格（§ 52.0） */
 async function grantItem(characterId: number, item: MailItem): Promise<void> {
-  if (item.type === 'talent_slot') {
-    const slot: TalentSlot = {
-      characterId,
-      tier: (item.slotTier ?? 1) as TalentSlotTier,
-      // 未安裝狀態（§ 51.3.4）
-      assignedType: null,
-      templateId: null,
-      order: null,
-      enabled: true,
-    };
-    await db.talentSlots.add(slot);
-    return;
-  }
-  if (item.type === 'talent_affix' && item.affixDefId !== undefined) {
-    // 未鑲入狀態。指定型不代綁，由玩家選（§ 51.4.1）
-    await db.talentAffixes.add({
-      characterId,
-      definitionId: item.affixDefId,
-      boundParam: item.boundParam ?? null,
-      params: null,
-      slotId: null,
-      slotIndex: null,
-    });
-  }
+  if (item.type !== 'talent_slot') return;
+  const tier = (item.slotTier ?? 1) as TalentSlotTier;
+  const slot: TalentSlot = {
+    characterId,
+    tier,
+    // 未安裝狀態（§ 51.3.4）
+    assignedType: null,
+    templateId: null,
+    order: null,
+    enabled: true,
+    conditions: emptyConditions(tier),
+    action: null,
+  };
+  await db.talentSlots.add(slot);
 }
 
 /** 領取一封信。已領過回 false。首版不做背包容量檢查（§ 52.0） */
 export async function claimMail(mailId: number): Promise<boolean> {
-  return await db.transaction('rw', db.mailbox, db.talentSlots, db.talentAffixes, async () => {
+  return await db.transaction('rw', db.mailbox, db.talentSlots, async () => {
     const mail = await db.mailbox.get(mailId);
     if (!mail || mail.claimedAt !== null) return false;
     for (const item of mail.items) {

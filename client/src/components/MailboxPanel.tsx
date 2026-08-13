@@ -5,8 +5,6 @@ import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore
 import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
 import type { Mail, MailItem } from '../models/mailbox';
-import { getTalentAffixDef } from '../db/seed/talentSeeds';
-import { affixLabelOf } from './TalentEditor';
 
 /** 系統信箱（`52-mailbox.md`）。首版只發天賦格與補償（§ 52.0） */
 
@@ -34,10 +32,6 @@ function describeItem(item: MailItem): string {
   switch (item.type) {
     case 'talent_slot':
       return `天賦格 T${item.slotTier ?? 1}`;
-    case 'talent_affix': {
-      const def = item.affixDefId !== undefined ? getTalentAffixDef(item.affixDefId) : undefined;
-      return def ? `${affixLabelOf(def)}（T${def.tier}）` : '鑲材';
-    }
     case 'gold':
       return `${item.amount ?? 0} 金幣`;
     default:

@@ -590,7 +590,7 @@ interface ScriptTemplate {
 | `CombatScriptEditor` | 戰鬥天賦格編輯（僅攻擊技能/普攻） |
 | `PersistentScriptEditor` | 常駐天賦格編輯（喝水/加速藥水/buff/治癒） |
 | `ScriptEditor` | 舊版編輯器（legacy，供遷移保留） |
-| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶「有沒有鑲入」指示點）+ `ScriptEditorContent`（浮動視窗內容：上排天賦配置分頁、下排常駐/戰鬥/補給/天賦合成四個 tab，§ 32.16） |
+| `ScriptEditorPanel` | `ScriptEditorButton`（PanelDock 內，帶「有沒有設規則」指示點）+ `ScriptEditorContent`（浮動視窗內容：上排天賦配置分頁、下排常駐/戰鬥/補給/天賦合成四個 tab，§ 32.16） |
 | `AttributeUpModal` | Lv50+ 屬性配點浮動視窗，有未分配點數時自動顯示 |
 | `GameIcon` | 統一 SVG icon 渲染（name, size, color），支援 Game-icons.net + Lucide |
 | `Tooltip` | 通用 hover tooltip，用於 buff/裝備/物品/技能 |
@@ -1145,7 +1145,7 @@ interface TooltipProps {
 
 ### 觸發
 
-- 底部 `PanelDock` 最右側顯示「自動天賦」按鈕（含「有沒有鑲入」指示點，沿用 `.panel-dock-btn` 樣式）
+- 底部 `PanelDock` 最右側顯示「自動天賦」按鈕（含「有沒有設規則」指示點，沿用 `.panel-dock-btn` 樣式）
 - 點擊按鈕開關 `PanelKey = 'script'` 浮動視窗；`script` 與 `quest` 同理不在 `DOCK_PANEL_KEYS`
   內（按鈕要帶 badge，由 `ScriptEditorButton` 自行渲染）
 
@@ -1211,15 +1211,18 @@ relative 會讓桌機那組貼角座標重新生效，因此 `top/right/bottom/l
 
 | 模組 | 職責 | 不負責 |
 |---|---|---|
-| `scriptRunner.ts` | 戰鬥／常駐天賦格的判定與選中 | 鑲材的取得、合成、鑲嵌 |
+| `scriptRunner.ts` | 戰鬥／常駐天賦格的判定與選中 | 天賦格的取得、合成、安裝 |
 | `villageScriptRunner.ts` | 補給天賦格的判定與選中 | 同上 |
-| `ScriptEditorPanel.tsx` | 四個分頁的容器、天賦配置切換 | 鑲材清單的顯示（在背包） |
-| `BagPanel.tsx` | 背包分頁列、天賦分頁的鑲材清單 | 鑲嵌判定 |
-| 新增：天賦格與鑲材的 store | 持有鑲材、天賦格、鑲嵌狀態、合成 | 判定 |
+| `ScriptEditorPanel.tsx` | 四個分頁的容器、天賦配置切換、條件與動作的選單 | 未安裝天賦格的清單（在背包） |
+| `BagPanel.tsx` | 背包分頁列、天賦分頁的未安裝天賦格清單 | 安裝判定 |
+| 新增：天賦格 store | 持有的天賦格、安裝狀態、合成 | 判定 |
 
-**判定與取得必須分開。** `scriptRunner` 只看「這個天賦格鑲了什麼」，
-不查玩家持有哪些鑲材；混在一起會讓每個判定 tick 都要掃鑲材表。
+**判定與取得必須分開。** `scriptRunner` 只看「這個天賦格設了什麼」，
+不查玩家持有幾個天賦格；混在一起會讓每個判定 tick 都要掃天賦格表。
 
-**鑲材實例不進 `characterBag`**（`18-data-schema.md` § 18.9）——
-`BagItem` 的形狀放不下 roll 出來的參數，天賦分頁是顯示層讀獨立表，
-不是把鑲材塞進背包資料。
+**條件與動作沒有 store。** 它們是 seed 常數，選單直接讀定義表過濾 `appliesTo`
+與 `blocked`（`51-auto-talent.md` § 51.4.3.2），沒有「持有」這個狀態要管。
+
+**天賦格實例不進 `characterBag`**（`18-data-schema.md` § 18.9）——
+`BagItem` 的形狀放不下條件與動作設定，天賦分頁是顯示層讀獨立表，
+不是把天賦格塞進背包資料。

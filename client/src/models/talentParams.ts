@@ -3,15 +3,15 @@ import { ELEMENT_LABELS, RACE_LABELS } from './monster';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine';
 
 /**
- * 鑲材的可調參數（`51-auto-talent.md` § 51.4.1）。
+ * 條件與動作的可調參數（`51-auto-talent.md` § 51.4.1）。
  *
- * 「有序參數一律由玩家自訂」—— 這裡宣告**每個 `ruleId` 要玩家填什麼**，
- * 編輯器照著渲染。值存在鑲材實例的 `params` 上（§ 18.9），跟著鑲材走。
+ * 「參數一律由玩家自訂、隨時可改」—— 這裡宣告**每個 `ruleId` 要玩家填什麼**，
+ * 編輯器照著渲染。值存在天賦格的槽位上（§ 18.9），跟著那一格走。
  *
- * **不逐筆列 89 個**：沒有參數的鑲材（普通攻擊、不動作、在城鎮…）根本不進這張表。
+ * **不逐筆列 81 個**：沒有參數的（普通攻擊、不動作、在城鎮…）根本不進這張表。
  */
 
-export type ParamSkillFilter = 'attack' | 'heal' | 'buff' | 'classMagic' | 'byTalentType';
+export type ParamSkillFilter = 'attack' | 'heal' | 'buff' | 'byTalentType';
 
 export type ParamField =
   | { key: string; kind: 'number'; label: string; suffix?: string; min?: number; max?: number; def: number }
@@ -24,7 +24,6 @@ export type ParamField =
    * | `attack` | `type === 'attack'` |
    * | `heal` | `type === 'heal'` |
    * | `buff` | `type === 'buff'` |
-   * | `classMagic` | `CLASS_SKILLS` 內的攻擊技能（§ 51.4.9 T3） |
    * | `byTalentType` | 依鑲入的分頁：戰鬥＝攻擊型、常駐＝buff ＋ 治癒（`03-combat.md` § 3.12／§ 3.13） |
    *
    * `optional` ＝ 留空不算「沒選定」，規則照樣進判定（§ 51.3.1）。
@@ -167,7 +166,6 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
 
   // === 動作 ===
   skill: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'attack' }],
-  skill_class_only: [{ key: 'skillId', kind: 'skill', label: '職業魔法', filter: 'classMagic' }],
   potion: [{ key: 'potionType', kind: 'select', label: '藥水', options: POTION_OPTIONS, def: 'red' }],
   speed_potion: [{
     key: 'speedPotionType', kind: 'select', label: '藥水', def: 'green',
@@ -197,18 +195,14 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     { key: 'itemId', kind: 'item', label: '道具' },
     { key: 'targetAmount', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
   ],
-  // T3 比「僅門檻」多了保護開關（§ 51.4.11）
   sell_materials: [
     { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 },
     { key: 'skipCraftMaterials', kind: 'boolean', label: '保留有用途的素材', def: true },
   ],
-  sell_materials_threshold_only: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 }],
-  // T3 比「僅門檻」多了 § 49.4 的保留條件
   sell_equipment: [
     { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 6, def: 3 },
     ...KEEP_FIELDS,
   ],
-  sell_equipment_threshold_only: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 6, def: 3 }],
   deposit_materials: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 7 }],
   // 保留條件是這個動作的判定依據，沒有就什麼都不存（`villageScriptRunner.ts`）
   deposit_equipment: [...KEEP_FIELDS],

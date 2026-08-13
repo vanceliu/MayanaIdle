@@ -64,20 +64,9 @@ describe('販售素材的兩階（§ 51.4.11）', () => {
     expect(picked.map(i => i.itemId)).not.toContain(20);
   });
 
-  it('僅門檻版：不吃白名單，保護開關固定開啟', () => {
-    const thresholdOnly: VillageAction = {
-      type: 'sell_materials_threshold_only', maxTier: 7,
-      // 這兩個設了也不生效
-      skipCraftMaterials: false, keepItemIds: [20],
-    };
-    const picked = collectVillageSellMaterials(thresholdOnly, ctx({ bagItems: items }));
-    expect(picked.map(i => i.itemId)).toContain(20);
-  });
-
-  it('兩階都要有門檻 —— 沒門檻一件都不賣，不會誤清背包', () => {
-    for (const type of ['sell_materials', 'sell_materials_threshold_only'] as const) {
-      const noThreshold: VillageAction = { type };
-      expect(collectVillageSellMaterials(noThreshold, ctx({ bagItems: items })), type).toHaveLength(0);
-    }
+  /* 限縮版已刪除（§ 51.4.1），只剩帶保留設定的完整版 */
+  it('沒門檻一件都不賣，不會誤清背包', () => {
+    const noThreshold: VillageAction = { type: 'sell_materials' };
+    expect(collectVillageSellMaterials(noThreshold, ctx({ bagItems: items }))).toHaveLength(0);
   });
 });

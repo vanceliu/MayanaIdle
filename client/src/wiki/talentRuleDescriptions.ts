@@ -1,9 +1,8 @@
 import { COMBAT_CONDITION_HINTS, DEFAULT_NEAR_SELF_RADIUS, SCRIPT_DEBUFF_LABELS } from '../models/scriptEngine';
-import type { TalentAffixDef } from '../models/talent';
+import type { TalentRuleDef } from '../models/talent';
 
 /**
- * 鑲材的功能說明（`43-wiki-system.md` § 4.12.1）。
- * 鑲材總表與自動天賦頁共用這一份，鍵是 `ruleId`。
+ * 條件與動作的功能說明（`43-wiki-system.md` § 4.12）。鍵是 `ruleId`。
  */
 
 export const COMBAT_CONDITION_DESC: Record<string, string> = {
@@ -114,8 +113,6 @@ export const VILLAGE_CONDITION_DESC: Record<string, string> = {
 export const VILLAGE_ACTION_DESC: Record<string, string> = {
   return_town: '消耗回城卷軸。只有在野外才成立，回城前會記下掛機點',
   use_inn: '恢復 HP／MP 並解除異常狀態。HP／MP 全滿又沒有異常狀態時不會觸發',
-  sell_materials_threshold_only: '只有顏色門檻，保護開關固定開啟、不吃白名單',
-  sell_equipment_threshold_only: '只有顏色門檻，不吃保留條件。新手裝與裝備中的照樣不賣',
   sell_materials: '依顏色等級批量販售，可選擇保留進得了配方的素材',
   sell_equipment: '依顏色等級批量販售，可設保留條件',
   buy_item: '補到目標數量。買不起就只買買得起的量',
@@ -128,11 +125,11 @@ export const VILLAGE_ACTION_DESC: Record<string, string> = {
 };
 
 /**
- * 只列**真的拿得到的鑲材**（§ 51.4.4）。
+ * 只列**真的選得到的**（§ 51.4.3.2）。
  *
- * 標籤表是判定引擎的，裡面有不存在對應鑲材的項目 —— 例如「永遠」：
- * 天賦系統的條件槽留空就是永遠（§ 51.3.1），不需要也沒有這份鑲材。
- * 怪物側機制沒開的（`blocked`）同樣不列，它們現在拿不到。
+ * 標籤表是判定引擎的，裡面有不存在對應定義的項目 —— 例如「永遠」：
+ * 天賦系統的條件槽留空就是永遠（§ 51.3.1），不需要也沒有這一筆。
+ * 沒接上引擎的（`blocked`）同樣不列，它們現在選不到。
  */
 
 /** 依 `ruleId` 查說明。三種類型的鍵不重疊，合起來查即可 */
@@ -145,7 +142,7 @@ const ALL_DESC: Record<string, string> = {
   ...VILLAGE_ACTION_DESC,
 };
 
-/** 尚未接上判定引擎的鑲材說明（`talentSeeds.ts` 的 `PENDING_AFFIX_LABELS`） */
+/** 尚未接上判定引擎的說明（`talentSeeds.ts` 的 `PENDING_RULE_LABELS`） */
 const PENDING_DESC: Record<string, string> = {
   target_casting: '目標正在讀條施法',
   can_kill_target: '本招的預期傷害足以擊殺當前目標',
@@ -153,8 +150,6 @@ const PENDING_DESC: Record<string, string> = {
   switch_target_summoner: '把目標切到召喚出這批小怪的本體',
 };
 
-export function affixDescription(def: TalentAffixDef): string {
+export function ruleDescription(def: TalentRuleDef): string {
   return ALL_DESC[def.ruleId] ?? PENDING_DESC[def.ruleId] ?? '';
 }
-
-

@@ -3,7 +3,7 @@ import { normalizeAppearance } from '../models/appearance';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../models/bagItem';
-import type { TalentSlot, TalentAffixInstance } from '../models/talent';
+import type { TalentSlot } from '../models/talent';
 import type { Mail } from '../models/mailbox';
 import { makeBagItem } from '../models/bagItem';
 import type { WarehouseEntry } from '../db/database';
@@ -23,9 +23,8 @@ interface CharacterExportData {
   equipmentInstances: EquipmentInstance[];
   bagItems: BagItem[];
   personalWarehouseItems: BagItem[];
-  /** 天賦格與鑲材（`51-auto-talent.md`），匯出必須帶走 */
+  /** 天賦格（`51-auto-talent.md`），條件與動作是它的欄位，匯出必須帶走 */
   talentSlots?: TalentSlot[];
-  talentAffixes?: TalentAffixInstance[];
   /** 未領取的信同樣是角色資產（`52-mailbox.md`） */
   mailbox?: Mail[];
   localPreferences: Record<string, unknown> | null;
@@ -117,7 +116,6 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     .filter((b): b is BagItem => b !== null);
 
   const talentSlots = await db.talentSlots.where('characterId').equals(characterId).toArray();
-  const talentAffixes = await db.talentAffixes.where('characterId').equals(characterId).toArray();
   const mailbox = await db.mailbox.where('characterId').equals(characterId).toArray();
 
   const prefsRaw = localStorage.getItem(`mayana_prefs_${characterId}`);
@@ -132,7 +130,6 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     bagItems,
     personalWarehouseItems,
     talentSlots,
-    talentAffixes,
     mailbox,
     localPreferences,
   };
@@ -291,28 +288,17 @@ export async function importCharacterData(
 
   /*
    * 天賦與信箱（v3 起）。**一律先清掉這一格原本的**，即使匯入檔沒帶 ——
-   * 不清的話被覆寫角色的天賦格、鑲材、未領信件會原封不動留給匯入進來的角色。
+   * 不清的話被覆寫角色的天賦格與未領信件會原封不動留給匯入進來的角色。
    * 舊檔（v2）匯入後天賦是空的，載入角色時由 `grantStartingIfEmpty` 補起始配置。
+   *
+   * 條件與動作是天賦格上的欄位，跟著 `talentSlots` 一起走（§ 51.5.1）——
+   * 沒有第二張表要對 id。
    */
   await db.talentSlots.where('characterId').equals(currentCharacterId).delete();
-  await db.talentAffixes.where('characterId').equals(currentCharacterId).delete();
   await db.mailbox.where('characterId').equals(currentCharacterId).delete();
 
-  if (data.talentSlots?.length || data.talentAffixes?.length) {
-    // 天賦格 id 會重新配發，鑲材的 slotId 要跟著對應過去
-    const slotIdMap = new Map<number, number>();
-    for (const slot of data.talentSlots ?? []) {
-      const oldId = slot.id;
-      const newId = await db.talentSlots.add({ ...slot, id: undefined, characterId: currentCharacterId });
-      if (oldId != null) slotIdMap.set(oldId, newId as number);
-    }
-    for (const affix of data.talentAffixes ?? []) {
-      const slotId = affix.slotId != null ? slotIdMap.get(affix.slotId) ?? null : null;
-      await db.talentAffixes.add({
-        ...affix, id: undefined, characterId: currentCharacterId,
-        slotId, slotIndex: slotId === null ? null : affix.slotIndex,
-      });
-    }
+  for (const slot of data.talentSlots ?? []) {
+    await db.talentSlots.add({ ...slot, id: undefined, characterId: currentCharacterId });
   }
   if (data.mailbox?.length) {
     await db.mailbox.bulkAdd(

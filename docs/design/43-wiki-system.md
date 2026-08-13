@@ -34,7 +34,7 @@ client/src/wiki/
 │   ├── AttributesPage.tsx— 屬性公式說明
 │   ├── CombatPage.tsx    — 戰鬥計算公式
 │   ├── QuestsPage.tsx    — 任務系統
-│   ├── TalentsPage.tsx   — 自動天賦（三種類型的條件／動作、鑲材總表、合成與升級）
+│   ├── TalentsPage.tsx   — 自動天賦（三種類型的條件／動作、天賦格與合成）
 │   ├── DropsPage.tsx     — 掉落總覽
 │   └── CreditsPage.tsx   — 第三方素材來源與授權
 ```
@@ -56,7 +56,7 @@ client/src/wiki/
 | 屬性公式 | 硬編碼文字（對應 `systems/combat.ts` 計算） |
 | 掉落 | `DROP_TABLE_SEEDS`、`BOSS_DROP_TABLE_SEEDS` |
 | 任務 | `QUEST_TEMPLATES`、guild 相關 seed |
-| 自動天賦 | `COMBAT_*` / `PERSISTENT_*` / `SCRIPT_DEBUFF_LABELS`（`models/scriptEngine`）、`VILLAGE_*_LABELS`（`models/villageScript`）—— 條件與動作名稱與編輯器共用同一份常數，判定頻率為硬編碼文字（規格見 `03-combat.md` § 3.12~3.14、`49-village-script.md`；鑲材總表見 `51-auto-talent.md`） |
+| 自動天賦 | `COMBAT_*` / `PERSISTENT_*` / `SCRIPT_DEBUFF_LABELS`（`models/scriptEngine`）、`VILLAGE_*_LABELS`（`models/villageScript`）—— 條件與動作名稱與編輯器共用同一份常數，判定頻率為硬編碼文字（規格見 `03-combat.md` § 3.12~3.14、`49-village-script.md`；天賦格見 `51-auto-talent.md`） |
 | 素材來源 | `ASSET_CREDITS`（`client/src/wiki/data/assetCredits.ts`），與 `client/src/assets/CREDITS.md` 同步維護 |
 
 ### useWikiData.ts 提供的 hook
@@ -122,10 +122,10 @@ client/src/wiki/
 ### 4.3 怪物頁 (MonstersPage)
 - 列表：名稱、等級、HP、攻擊、防禦、經驗、屬性、種族、體型、Boss 標記、出沒區域
 - 詳細頁：`/wiki/monsters/:name`，含掉落表（一般區域掉落 / Boss 專屬掉落 / 技能書掉落 /
-  **天賦鑲材掉落**）
-- **鑲材不走掉落表**（`51-auto-talent.md` § 51.6）：掉率只看階級與是不是 Boss、
-  可掉階級只看區域等級。不列的話玩家在怪物頁完全查不到鑲材從哪來。
-  階級連到鑲材總表（§ 4.12.1）
+  **天賦格掉落**）
+- **天賦格不走掉落表**（`51-auto-talent.md` § 51.6）：只有 Boss 會掉，掉率固定，
+  可掉階級只看區域等級。不列的話玩家在怪物頁完全查不到天賦格從哪來。
+  階級連到自動天賦頁（§ 4.12）
 - 篩選：區域、屬性、種族、關鍵字
 - 排序：等級、HP、防禦、經驗
 
@@ -186,34 +186,20 @@ client/src/wiki/
 - 冒險者工會等階、任務類型、獎勵
 
 ### 4.12 自動天賦 (TalentsPage)
-- **天賦格與鑲材**：階級對應的條件槽數、取得管道（創角／每 5 級信箱／Boss 掉落／
-  合成／升級／定向兌換／降階）、鑲材的三種型態與「一實體一格」、各類型的升級上限
+- **天賦格**：階級對應的條件槽數、取得管道（創角／每 5 級信箱／Boss 掉落／合成）、
+  合成鏈與掉落階級的區域分帶（來源：`51-auto-talent.md`、`27-drop-table.md` § 27.9）
 - 三種類型的判定時機與優先順序、各自的條件／動作對照表
-- **天賦配置是換裝不是複製**（`51-auto-talent.md` § 51.3.2）——
+- **天賦格是換裝不是複製，條件與動作是複製不是換裝**（`51-auto-talent.md` § 51.3.2）——
   沒寫清楚玩家會以為切配置能複製一整套天賦格
-- **合成、升級與掉落**：天賦格合成鏈、鑲材升級的成功率表與產物類型指定、
-  定向兌換與降階的投入產出、掉落階級的區域分帶
-  （來源：`51-auto-talent.md`、`27-drop-table.md` § 27.9）
+- **條件與動作一律內建，沒有取得管道可查**（`51-auto-talent.md` § 51.4.1）。
+  對照表只講「這個條件什麼時候成立」「這個動作做什麼」，**不設取得欄**
 - 可照抄的範例配置
 - 條件與動作名稱由 `models` 的標籤常數渲染，與編輯器共用同一份 ——
   面板改名 Wiki 會跟著動。判定頻率等數字為硬編碼文字
-- 條件／動作對照表**只列真的拿得到的鑲材**：`always`（條件槽留空即恆真）
-  與 `blocked` 的不列（`51-auto-talent.md` § 51.3.1、§ 51.4.4）
-
-### 4.12.1 鑲材總表 (TalentAffixesPage)
-
-`/wiki/talents/affixes`。**鑲材不併進道具總表** —— 它不在 `characterBag`、
-沒有 `itemId`、不佔格、不計重、不可堆疊，欄位也完全不同（階級／種類／適用類型／型態）。
-
-- 全部鑲材的**功能說明**、階級、種類、適用類型、型態、取得管道。
-  說明與自動天賦頁共用 `wiki/talentAffixDescriptions.ts`，不必兩邊查
-- **必須列出玩家尚未取得的** —— 編輯器只顯示已持有的（`51-auto-talent.md` § 51.10），
-  「還有什麼可以刷」只有 Wiki 回答得了
-- 篩選：階級／種類／適用類型／型態。階級走網址參數 `?tier=`，怪物頁的掉落表由此連入
-**這一頁只有表**：合成鏈、升級成功率、掉落分帶都在自動天賦頁（§ 4.12）。
-
-**分帶表的兩欄不可用索引配對**：鑲材分帶 6 段、天賦格分帶 3 段，
-要用同一個區域等級各自查。
+- 條件／動作對照表**不列** `always`（條件槽留空即恆真）與 `blocked` 的
+  （`51-auto-talent.md` § 51.3.1、§ 51.4.3.2）
+- **未開放的項目另立一區**，照 `blockedReason` 說明原因（`monster`／`pending`），
+  不與可用的混列
 
 ### 4.13 掉落 (DropsPage)
 - 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）
@@ -254,8 +240,7 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/attributes   → AttributesPage
 /wiki/combat       → CombatPage
 /wiki/quests       → QuestsPage
-/wiki/talents          → TalentsPage
-/wiki/talents/affixes  → TalentAffixesPage（鑲材總表）
+/wiki/talents      → TalentsPage
 /wiki/scripts      → 轉址至 /wiki/talents（改名前的舊路徑）
 /wiki/drops        → DropsPage
 /wiki/credits      → CreditsPage

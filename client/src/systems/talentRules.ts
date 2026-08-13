@@ -1,17 +1,17 @@
 /**
- * 天賦格 ＋ 鑲材 → 既有的規則形狀（`51-auto-talent.md`）。
+ * 天賦格 → 既有的規則形狀（`51-auto-talent.md`）。
  *
  * **判定邏輯完全不動。** `evaluateCombatScript` / `evaluatePersistentScript` /
  * `evaluateVillageScript` 吃的還是 `CombatRule[]` 那些形狀，這裡只負責
  * 「規則從哪裡來」—— 從玩家寫的陣列改成從天賦格組出來。
  *
  * 這也是 `16-tech-frontend-architecture.md` § 32.18 要的分工：
- * runner 只看天賦格鑲了什麼，不查持有清單。
+ * runner 只看天賦格設了什麼，不查持有清單。
  */
 import type { CombatRule, PersistentRule } from '../models/scriptEngine';
 import type { VillageRule } from '../models/villageScript';
-import { isSlotInstalled, type TalentAffixInstance, type TalentSlot, type TalentType } from '../models/talent';
-import { getTalentAffixDef } from '../db/seed/talentSeeds';
+import { isSlotInstalled, type TalentSlot, type TalentSlotEntry, type TalentType } from '../models/talent';
+import { getTalentRuleDef } from '../db/seed/talentSeeds';
 import { getParamFields } from '../models/talentParams';
 
 /** 組出來的一條規則（三種類型共用同一個形狀，差別只在 type 字串） */
@@ -23,18 +23,17 @@ interface BuiltRule {
 }
 
 /**
- * 把鑲材攤平成 `{ type, ...params }`。
+ * 把槽位攤平成 `{ type, ...params }`。
  *
- * `fixed` 型的綁定值蓋過玩家參數 —— 那是掉落時 roll 死的，玩家不可更改（§ 51.4.1）。
- * 目前只有技能類會用到綁定值；日後的指定類別道具在這裡加分支。
+ * 參數一律來自玩家設定（§ 51.4.1）—— 沒有 roll 出來的綁定值要蓋。
  */
-function toRulePart(affix: TalentAffixInstance): Record<string, unknown> | null {
-  const def = getTalentAffixDef(affix.definitionId);
+function toRulePart(entry: TalentSlotEntry): Record<string, unknown> | null {
+  const def = getTalentRuleDef(entry.ruleId);
   if (!def || def.blocked) return null;
 
-  const part: Record<string, unknown> = { type: def.ruleId, ...(affix.params ?? {}) };
+  const part: Record<string, unknown> = { type: def.ruleId, ...(entry.params ?? {}) };
   /*
-   * `keep` 是巢狀物件，但鑲材的 params 是平的，所以用 `keepXxx` 前綴宣告再組回來
+   * `keep` 是巢狀物件，但槽位的 params 是平的，所以用 `keepXxx` 前綴宣告再組回來
    * （§ 49.4 的保留條件）。
    */
   if ('keepClassUsable' in part || 'keepAffixTierAbove' in part) {
@@ -45,17 +44,14 @@ function toRulePart(affix: TalentAffixInstance): Record<string, unknown> | null 
     delete part.keepClassUsable;
     delete part.keepAffixTierAbove;
   }
-  if (def.form === 'fixed' && affix.boundParam !== null) {
-    part.skillId = affix.boundParam;
-  }
   return part;
 }
 
 /**
- * 技能／道具還沒選定的實作 —— 這條規則放不出來（§ 51.3.1）。
+ * 技能／道具還沒選定的動作 —— 這條規則放不出來（§ 51.3.1）。
  *
- * 數值與選單型的參數鑲入時就有預設值，只有技能與道具沒有：
- * 指定型要玩家選定、自選型要玩家挑，沒選之前這條規則必須跳過。
+ * 數值與選單型的參數設定時就有預設值，只有技能與道具沒有：
+ * 開局三格「施放攻擊技能」都是未選定的，沒選之前這條規則必須跳過（§ 51.7）。
  */
 function isUnresolved(part: Record<string, unknown>, ruleId: string): boolean {
   return getParamFields(ruleId).some(f =>
@@ -68,41 +64,34 @@ function isUnresolved(part: Record<string, unknown>, ruleId: string): boolean {
 export type SlotSkipReason = 'no-action' | 'unresolved';
 
 /** 組出單一天賦格的規則；不參與判定時回傳原因 */
-function buildSlotRule(slot: TalentSlot, inSlot: TalentAffixInstance[]): BuiltRule | SlotSkipReason {
-  const actionAffix = inSlot.find(a => a.slotIndex === null);
-  if (!actionAffix) return 'no-action';
+function buildSlotRule(slot: TalentSlot): BuiltRule | SlotSkipReason {
+  if (!slot.action) return 'no-action';
 
-  const action = toRulePart(actionAffix);
+  const action = toRulePart(slot.action);
   if (!action) return 'no-action';
-  const actionDef = getTalentAffixDef(actionAffix.definitionId)!;
-  if (isUnresolved(action, actionDef.ruleId)) return 'unresolved';
+  if (isUnresolved(action, slot.action.ruleId)) return 'unresolved';
 
   const conditions: Record<string, unknown>[] = [];
-  const conditionAffixes = inSlot
-    .filter(a => a.slotIndex !== null)
-    .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
-  for (const affix of conditionAffixes) {
-    const part = toRulePart(affix);
+  for (const entry of slot.conditions) {
+    // 空槽視為恆真（§ 51.3.1）
+    if (!entry) continue;
+    const part = toRulePart(entry);
     if (!part) continue;
-    const def = getTalentAffixDef(affix.definitionId)!;
-    if (isUnresolved(part, def.ruleId)) return 'unresolved';
+    if (isUnresolved(part, entry.ruleId)) return 'unresolved';
     conditions.push(part);
   }
 
   return {
     id: `slot-${slot.id}`,
     enabled: slot.enabled,
-    // 條件槽全空＝恆真（§ 51.3.1）
     conditions,
     action,
   };
 }
 
 /** 編輯器用：這一列有沒有進判定 */
-export function slotSkipReason(
-  slot: TalentSlot, affixes: TalentAffixInstance[],
-): SlotSkipReason | null {
-  const built = buildSlotRule(slot, affixes.filter(a => a.slotId === slot.id));
+export function slotSkipReason(slot: TalentSlot): SlotSkipReason | null {
+  const built = buildSlotRule(slot);
   return typeof built === 'string' ? built : null;
 }
 
@@ -111,36 +100,29 @@ export function slotSkipReason(
  *
  * 跳過的情況：
  * - 天賦格未安裝（躺在背包，§ 51.3.4）
- * - **實作槽留空** —— 該天賦格不參與判定（§ 51.3.1）
- * - **技能／道具還沒選定**（實作或條件）—— 判定往下一條走
+ * - **動作槽留空** —— 該天賦格不參與判定（§ 51.3.1）
+ * - **技能／道具還沒選定**（動作或條件）—— 判定往下一條走
  */
 export function buildRules(
   type: TalentType,
   slots: TalentSlot[],
-  affixes: TalentAffixInstance[],
   templateId: string,
 ): BuiltRule[] {
   return slots
     .filter(s => isSlotInstalled(s) && s.assignedType === type && s.templateId === templateId)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map(slot => buildSlotRule(slot, affixes.filter(a => a.slotId === slot.id)))
+    .map(buildSlotRule)
     .filter((r): r is BuiltRule => typeof r !== 'string');
 }
 
-export function buildCombatRules(
-  slots: TalentSlot[], affixes: TalentAffixInstance[], templateId: string,
-): CombatRule[] {
-  return buildRules('combat', slots, affixes, templateId) as unknown as CombatRule[];
+export function buildCombatRules(slots: TalentSlot[], templateId: string): CombatRule[] {
+  return buildRules('combat', slots, templateId) as unknown as CombatRule[];
 }
 
-export function buildPersistentRules(
-  slots: TalentSlot[], affixes: TalentAffixInstance[], templateId: string,
-): PersistentRule[] {
-  return buildRules('persistent', slots, affixes, templateId) as unknown as PersistentRule[];
+export function buildPersistentRules(slots: TalentSlot[], templateId: string): PersistentRule[] {
+  return buildRules('persistent', slots, templateId) as unknown as PersistentRule[];
 }
 
-export function buildVillageRules(
-  slots: TalentSlot[], affixes: TalentAffixInstance[], templateId: string,
-): VillageRule[] {
-  return buildRules('supply', slots, affixes, templateId) as unknown as VillageRule[];
+export function buildVillageRules(slots: TalentSlot[], templateId: string): VillageRule[] {
+  return buildRules('supply', slots, templateId) as unknown as VillageRule[];
 }

@@ -12,30 +12,21 @@ import {
   PERSISTENT_ACTION_DESC,
   VILLAGE_CONDITION_DESC,
   VILLAGE_ACTION_DESC,
-} from '../talentAffixDescriptions';
+} from '../talentRuleDescriptions';
 import {
   VILLAGE_CONDITION_LABELS,
   VILLAGE_ACTION_LABELS,
 } from '../../models/villageScript';
-import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
+import { selectableRules } from '../../db/seed/talentSeeds';
 import {
-  AFFIX_DROP_RATE,
-  AFFIX_FUSE_SUCCESS_RATE,
-  AFFIX_TIER_BAND,
-  DOWNGRADE_INPUT_COUNT,
-  EXCHANGE_INPUT_COUNT,
   FUSE_INPUT_COUNT,
   SLOT_DROP_RATE_BOSS,
-  slotTierBandFor,
+  SLOT_TIER_BAND,
   SLOT_GRANT_LEVEL_INTERVAL,
   STARTING_SLOT_COUNT,
-  TALENT_POOL_TIER_CAP,
-  BLOCKED_LABELS,
-  TALENT_TYPE_LABELS,
   conditionSlotCount,
   type TalentType,
   type TalentSlotTier,
-  type TalentTier,
 } from '../../models/talent';
 
 /**
@@ -100,11 +91,7 @@ function toRows(
   kind: 'condition' | 'action',
   type: TalentType,
 ): [string, string][] {
-  const obtainable = new Set(
-    TALENT_AFFIX_DEFS
-      .filter(d => !d.blocked && d.kind === kind && d.appliesTo.includes(type))
-      .map(d => d.ruleId),
-  );
+  const obtainable = new Set(selectableRules(type, kind).map(d => d.ruleId));
   return Object.entries(labels)
     .filter(([key]) => obtainable.has(key))
     .map(([key, label]) => [label, desc[key] ?? '']);
@@ -116,16 +103,16 @@ export function TalentsPage() {
       <h2 className="wiki-page-title">自動天賦</h2>
 
       <section style={{ marginBottom: 32 }}>
-        <h3 style={SECTION_TITLE}>天賦格與鑲材</h3>
+        <h3 style={SECTION_TITLE}>天賦格</h3>
         <p style={noteStyle}>
-          一個<strong>天賦格</strong>就是一條規則。格子本身是空的，
-          條件與實作由<strong>鑲材</strong>提供 —— 鑲材是打怪掉的，不是一開始就全部給你。
-          天賦格的階級決定它有幾個條件槽，實作槽固定 1 個。
+          一個<strong>天賦格</strong>就是一條規則：幾個條件槽 ＋ 1 個動作槽。
+          <strong>條件與動作全部內建</strong>，創角起就全部可選，不必去刷。
+          要煩惱的只有一件事 —— 你有幾個天賦格、階級多高。
         </p>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>天賦格</th><th>條件槽</th><th>實作槽</th><th>能鑲的鑲材階級</th></tr>
+              <tr><th>天賦格</th><th>條件槽</th><th>動作槽</th></tr>
             </thead>
             <tbody>
               {([1, 2, 3, 4] as TalentSlotTier[]).map(tier => (
@@ -133,7 +120,6 @@ export function TalentsPage() {
                   <td>T{tier}</td>
                   <td>{conditionSlotCount(tier)}</td>
                   <td>1</td>
-                  <td>不限</td>
                 </tr>
               ))}
             </tbody>
@@ -141,64 +127,22 @@ export function TalentsPage() {
         </div>
         <p style={noteStyle}>
           天賦格<strong>不綁類型</strong>：同一個格子安裝到戰鬥、常駐或補給都可以。
-          要換類型就拆下再到目標分頁安裝，拆下時鑲材全部退回背包，不會消失。
+          要換類型就拆下再到目標分頁安裝，設定會原樣保留，裝回同類型即復原。
         </p>
 
         <h4 style={subTitleStyle}>取得</h4>
         <ul style={noteStyle}>
-          <li>創角給 {STARTING_SLOT_COUNT} 個 T1 天賦格，其中 3 個已經裝好可以直接打</li>
+          <li>創角給 {STARTING_SLOT_COUNT} 個 T1 天賦格，全部已經裝好可以直接打</li>
           <li>每 {SLOT_GRANT_LEVEL_INTERVAL} 級由信箱發 1 個 T1 天賦格，要自己領、自己安裝</li>
-          <li>高階天賦格只有 Boss 會掉（{SLOT_DROP_RATE_BOSS}%），或用低階 ×2 合成</li>
-          <li>鑲材由一般怪與 Boss 掉落，Boss 掉率是一般怪的兩倍</li>
-          <li>
-            缺哪一份鑲材可以自己換：同階級 ×{EXCHANGE_INPUT_COUNT} 換指定的同階級 1 份，
-            或用任一較高階級 1 份換指定的較低階級 1 份，兩者都必定成功
-          </li>
+          <li>高階天賦格只有 Boss 會掉（{SLOT_DROP_RATE_BOSS}%），或用低階 ×{FUSE_INPUT_COUNT} 合成</li>
+          <li>條件與動作<strong>不掉落、不合成</strong> —— 一律內建</li>
         </ul>
 
-        <h4 style={subTitleStyle}>鑲材的三種型態</h4>
-        <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead><tr><th>型態</th><th>意思</th><th>能不能改</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>指定</td>
-                <td>掉落時就綁死一個對象（某個技能、某類道具）</td>
-                <td><strong>首次鑲入時選定，之後不可更改</strong></td>
-              </tr>
-              <tr>
-                <td>池</td>
-                <td>掉落時綁一個子集（例如「火系攻擊技能」）</td>
-                <td>子集不可更改，子集內可自由挑</td>
-              </tr>
-              <tr>
-                <td>自選</td>
-                <td>沒有綁定對象，數值自己填</td>
-                <td>隨時可改</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <h4 style={subTitleStyle}>要多幾條規則，還是少幾條複雜的</h4>
         <p style={noteStyle}>
-          <strong>一份鑲材只能在一個槽位</strong>：同一份不可能同時出現在兩個天賦格或兩份天賦配置裡。
-          把它鑲到別的地方，原本那個槽位就空了。
+          合成把低階 ×{FUSE_INPUT_COUNT} 換成高階 ×1：規則數量少一條，換到那一條能多掛一個條件。
+          一個 T4 格要吃 8 個 T1 格 —— 這是整個系統唯一要衡量的取捨。
         </p>
-
-        <h4 style={subTitleStyle}>升級上限</h4>
-        <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead><tr><th>類型</th><th>條件鑲材上限</th><th>實作鑲材上限</th></tr></thead>
-            <tbody>
-              {(['combat', 'persistent', 'supply'] as const).map(t => (
-                <tr key={t}>
-                  <td>{TALENT_TYPE_LABELS[t]}</td>
-                  <td>T{TALENT_POOL_TIER_CAP[t].condition}</td>
-                  <td>T{TALENT_POOL_TIER_CAP[t].action}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
 
       <section style={{ marginBottom: 32 }}>
@@ -292,22 +236,23 @@ export function TalentsPage() {
           切換情境（清怪／打王／練功）時一次到位，不必分三處各切一遍，切了立刻生效。
         </p>
         <p style={noteStyle}>
-          <strong>配置之間是換裝，不是複製。</strong>
-          天賦格與鑲材都是實體，同一個只能在一份配置裡。
-          所以切到另一份配置時，別份配置正在用的天賦格會出現在背包「天賦」分頁 ——
+          <strong>天賦格是換裝，條件與動作是複製。</strong>
+          天賦格是實體，同一個只能在一份配置裡；所以切到另一份配置時，
+          別份配置正在用的天賦格會出現在背包「天賦」分頁 ——
           裝過來就等於從那一份搬過來，那一份會少一格。
+          條件與動作不是實體，任何格子都能重複選同一個。
         </p>
         <ul style={noteStyle}>
           <li>改動直接存進使用中的配置，沒有「儲存／放棄」兩段式</li>
           <li>「預設」配置不可刪除，所以清單永遠至少有一份</li>
-          <li>搬過來的鑲材如果不適用新類型（例如常駐格搬到補給），該鑲材退回背包</li>
-          <li>合成與升級<strong>只吃完全沒安裝的</strong>天賦格與鑲材，不會去拆別份配置</li>
+          <li>搬過來的槽位如果不適用新類型（例如常駐格搬到補給），該槽位清空</li>
+          <li>合成<strong>只吃完全沒安裝的</strong>天賦格，不會去拆別份配置</li>
           <li>配置存在角色身上，不跨角色共用（規則裡的技能綁職業）</li>
         </ul>
       </section>
 
       <section style={{ marginBottom: 32 }}>
-        <h3 style={SECTION_TITLE}>合成、升級與掉落</h3>
+        <h3 style={SECTION_TITLE}>合成與掉落</h3>
         <TalentFusionTable />
       </section>
 
@@ -343,109 +288,42 @@ export function TalentsPage() {
   );
 }
 
-/**
- * 鑲材總表（`43-wiki-system.md` § 4.12）。
- *
- * **必須列出玩家尚未取得的** —— 編輯器只顯示已持有的（`51-auto-talent.md` § 51.10），
- * 「還有什麼可以刷」只有 Wiki 回答得了。
- */
-export function TalentAffixTable() {
-  const rows = [...TALENT_AFFIX_DEFS].sort((a, b) =>
-    a.tier - b.tier || a.kind.localeCompare(b.kind) || a.id - b.id);
-
-  return (
-    <div>
-      <h3>鑲材總表（{TALENT_AFFIX_DEFS.length} 筆）</h3>
-      <table className="wiki-table">
-        <thead>
-          <tr>
-            <th>Tier</th><th>種類</th><th>適用</th><th>型態</th><th>取得</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(d => (
-            <tr key={d.id}>
-              <td>T{d.tier}</td>
-              <td>{d.kind === 'condition' ? '條件' : '實作'}</td>
-              <td>{d.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}</td>
-              <td>{d.form === 'fixed' ? '指定' : d.form === 'pool' ? '池' : '自選'}</td>
-              {/* 未開放的鑲材標明原因，免得玩家白刷（§ 51.4.3.2、§ 51.4.4） */}
-              <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／升級／兌換'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** 天賦格合成鏈、鑲材升級、兌換、降階與掉落分帶（`51-auto-talent.md` § 51.5.2~51.5.3、§ 51.6） */
+/** 天賦格合成鏈與掉落分帶（`51-auto-talent.md` § 51.5.2、§ 51.6） */
 export function TalentFusionTable() {
+  const range = (min: number, max: number) => (min === max ? `T${min}` : `T${min}～T${max}`);
   return (
     <div>
-      <h3>合成、升級與掉落</h3>
+      <h3>合成與掉落</h3>
       <p>
-        天賦格：低階 ×2 → 高階 ×1，<strong>必定成功</strong>。
-        鑲材有三種換法，投入一律要<strong>同種類</strong>（條件與實作永不互通），
-        且只吃沒鑲入天賦格的。
-        <strong>投入的適用類型不限</strong>——戰鬥的存貨換得到補給的。
-        升級的<strong>產出類型由玩家指定</strong>，該類型在下一階沒有鑲材時就選不到：
+        天賦格：低階 ×{FUSE_INPUT_COUNT} → 高階 ×1，<strong>必定成功</strong>，
+        不需要 NPC、不限地點、不收金幣。只吃<strong>完全沒安裝</strong>的天賦格。
+        <strong>這是系統唯一的合成</strong> —— 條件與動作內建，沒有升級、兌換或降階。
       </p>
       <table className="wiki-table">
-        <thead><tr><th></th><th>投入</th><th>產出</th><th>成功率</th></tr></thead>
+        <thead><tr><th>合成</th><th>換算成 T1 格</th></tr></thead>
         <tbody>
-          <tr>
-            <td>升級</td>
-            <td>同階級 ×{FUSE_INPUT_COUNT}</td>
-            <td><strong>指定類型</strong>的 T+1，該類型內隨機</td>
-            <td>見下表，失敗只退回其中 1 份</td>
-          </tr>
-          <tr>
-            <td>定向兌換</td>
-            <td>同階級 ×{EXCHANGE_INPUT_COUNT}</td>
-            <td><strong>指定</strong>一份同階級</td>
-            <td>必定成功</td>
-          </tr>
-          <tr>
-            <td>降階</td>
-            <td>任一較高階級 ×{DOWNGRADE_INPUT_COUNT}</td>
-            <td><strong>指定</strong>一份較低階級，不必逐階</td>
-            <td>必定成功</td>
-          </tr>
-        </tbody>
-      </table>
-      <table className="wiki-table">
-        <thead><tr><th>產出</th><th>鑲材升級成功率</th><th>一般怪掉率</th><th>Boss 掉率</th></tr></thead>
-        <tbody>
-          {([1, 2, 3, 4, 5, 6, 7] as TalentTier[]).map(tier => (
+          {([1, 2, 3] as TalentSlotTier[]).map(tier => (
             <tr key={tier}>
-              <td>T{tier}</td>
-              <td>{tier === 1 ? '—' : `${AFFIX_FUSE_SUCCESS_RATE[tier as Exclude<TalentTier, 1>]}%`}</td>
-              <td>{AFFIX_DROP_RATE[tier] === 0 ? '不掉落' : `${AFFIX_DROP_RATE[tier]}%`}</td>
-              <td>{AFFIX_DROP_RATE[tier] === 0 ? '不掉落' : `${AFFIX_DROP_RATE[tier] * 2}%`}</td>
+              <td>T{tier} ×{FUSE_INPUT_COUNT} → T{tier + 1} ×1</td>
+              <td>{2 ** tier}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <h4>掉落階級的區域分帶</h4>
+      <h4>Boss 掉落的天賦格</h4>
+      <p>
+        掉率固定 {SLOT_DROP_RATE_BOSS}%，<strong>只有 Boss 會掉</strong>。
+        T1 格不掉落，只從角色等級取得。
+      </p>
       <table className="wiki-table">
-        <thead><tr><th>區域最高等級</th><th>可掉鑲材</th><th>可掉天賦格（Boss）</th></tr></thead>
+        <thead><tr><th>區域最高等級</th><th>可掉天賦格</th></tr></thead>
         <tbody>
-          {/*
-            兩張分帶表的列數不一樣（鑲材 6 段、天賦格 3 段），
-            **不可以用索引配對** —— 要用同一個區域等級各自查。
-          */}
-          {AFFIX_TIER_BAND.map(b => {
-            const slotBand = slotTierBandFor(b.maxAreaLevel);
-            const range = (min: number, max: number) => (min === max ? `T${min}` : `T${min}～T${max}`);
-            return (
-              <tr key={b.maxAreaLevel}>
-                <td>{b.maxAreaLevel === Infinity ? '61+' : `～${b.maxAreaLevel}`}</td>
-                <td>{range(b.min, b.max)}</td>
-                <td>{range(slotBand.min, slotBand.max)}</td>
-              </tr>
-            );
-          })}
+          {SLOT_TIER_BAND.map(b => (
+            <tr key={b.maxAreaLevel}>
+              <td>{b.maxAreaLevel === Infinity ? '61+' : `～${b.maxAreaLevel}`}</td>
+              <td>{range(b.min, b.max)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

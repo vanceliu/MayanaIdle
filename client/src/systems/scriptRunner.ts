@@ -10,7 +10,6 @@ import { getDistance } from './lineOfSight';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { Skill } from '../models/skill';
-import { isClassMagic } from '../models/classSkills';
 import type { ActiveEffect } from '../models/effect';
 import type { BagItem } from '../models/bagItem';
 import { hasBagItem, getBagItemAmount } from '../models/bagItem';
@@ -116,7 +115,7 @@ function toCandidates(ctx: CombatScriptContext): TargetCandidate[] {
  * 12 格的火球上，本來就該是兩個不同的圈。
  */
 function getActionRange(action: CombatAction, ctx: CombatScriptContext): number {
-  if ((action.type === 'skill' || action.type === 'skill_class_only') && action.skillId) {
+  if (action.type === 'skill' && action.skillId) {
     const skill = ctx.skills.find(s => s.id === action.skillId);
     if (skill?.range) return skill.range;
   }
@@ -369,13 +368,6 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
     case 'skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (!skill || skill.type !== 'attack') return false;
-      if (!meetsWeaponRequirement(skill, ctx)) return false;
-      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
-    }
-    // 職業魔法：可選範圍窄一階，但可執行條件與一般技能相同（§ 51.4.9）
-    case 'skill_class_only': {
-      const skill = ctx.skills.find(s => s.id === action.skillId);
-      if (!skill || skill.type !== 'attack' || !isClassMagic(skill.id)) return false;
       if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }

@@ -307,8 +307,7 @@ export function tickArpgEngine(
       // 沒有可執行動作：原地待命，什麼事都不做
     } else if (weight.overweight) {
       events.push({ type: 'overweight_blocked', message: getOverweightMessage(weight) });
-    /* `skill_class_only` 只是可選範圍窄一階，執行路徑與一般技能相同（§ 51.4.9 T3） */
-    } else if ((action.type === 'skill' || action.type === 'skill_class_only') && action.skillId) {
+    } else if (action.type === 'skill' && action.skillId) {
       const skill = skills.find(s => s.id === action.skillId);
       if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
         events.push({

@@ -51,11 +51,7 @@ export type VillageActionType =
   | 'return_to_hunt'
   // === `51-auto-talent.md` § 51.4.11 新增 ===
   /** 使用旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7） */
-  | 'use_inn'
-  /** 販售素材（僅門檻）：不吃保留設定，保護開關固定開啟 */
-  | 'sell_materials_threshold_only'
-  /** 販售裝備（僅門檻）：不吃 § 49.4 的保留條件，但**門檻照樣要設** */
-  | 'sell_equipment_threshold_only';
+  | 'use_inn';
 
 /** 共用倉庫（帳號層級）或個人倉庫（角色層級），見 `13-town.md` § 13.8 */
 export type WarehouseKind = 'shared' | 'personal';
@@ -160,8 +156,6 @@ export const VILLAGE_ACTION_LABELS: Record<VillageActionType, string> = {
   return_town: '回城',
   sell_materials: '販售素材',
   use_inn: '使用旅館',
-  sell_materials_threshold_only: '販售素材（僅門檻）',
-  sell_equipment_threshold_only: '販售裝備（僅門檻）',
   sell_equipment: '販售裝備',
   buy_item: '購買道具至',
   deposit_materials: '存入素材',

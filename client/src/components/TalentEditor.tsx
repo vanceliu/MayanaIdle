@@ -1,55 +1,39 @@
 import { useState, useRef } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { useTalentStore, availableSlots } from '../stores/talentStore';
 import {
-  useTalentStore,
-  canEquipAffix,
-  availableAffixes,
-  availableSlots,
-} from '../stores/talentStore';
-import {
-  SKILL_POOL_KEYS,
-  SKILL_POOL_LABELS,
+  TALENT_GROUPS,
+  TALENT_GROUP_LABELS,
   TALENT_TYPE_LABELS,
-  type SkillPoolKey,
   conditionSlotCount,
   isSlotInstalled,
-  type TalentAffixInstance,
+  type TalentGroup,
+  type TalentRuleDef,
   type TalentSlot,
+  type TalentSlotEntry,
   type TalentType,
 } from '../models/talent';
-import { getTalentAffixDef } from '../db/seed/talentSeeds';
-import { getTalentAffixIcon, MATERIAL_TIER_COLORS } from '../models/iconMap';
+import { selectableRules } from '../db/seed/talentSeeds';
+import { getTalentAffixIcon } from '../models/iconMap';
 import { GameIcon } from './GameIcon';
 import { useIsDragOver, useIsDragging, useDragStore, hitTestDropTarget } from '../stores/dragStore';
 import { slotSkipReason, type SlotSkipReason } from '../systems/talentRules';
 import { PersistentSettings } from './PersistentSettings';
 import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
-import { BindConfirmModal } from './BindConfirmModal';
 import { getParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
 import { getItemById } from '../models/items';
-import { isClassMagic } from '../models/classSkills';
 import type { Skill } from '../models/skill';
-import { affixLabel, affixLabelOf } from '../models/talentLabels';
+import { ruleLabel, ruleLabelOf } from '../models/talentLabels';
 
 /** 天賦格編輯（`51-auto-talent.md` § 51.10） */
 
-// 名稱解析在 model 層，日誌與 Wiki 也在用（`models/talentLabels.ts`）
-export { affixLabel, affixLabelOf };
-
-/**
- * 技能落不落在該系別內（§ 51.4.9 的 9 個子集）。
- * 元素看 `element`，型態看有沒有 AoE 參數 —— 兩個家族刻意重疊。
- */
-function matchesSkillPool(skill: { element?: string; aoeRadius?: number; maxTargets?: number }, key: string): boolean {
-  if (key === 'single') return !skill.aoeRadius;
-  if (key === 'aoe') return !!skill.aoeRadius;
-  return skill.element === key;
-}
+// 名稱解析在 model 層，Wiki 也在用（`models/talentLabels.ts`）
+export { ruleLabel, ruleLabelOf };
 
 /**
  * 技能選單的範圍（`talentParams.ts` 的 `filter`）。
  *
- * `byTalentType` 是共用鑲材（技能就緒）用的：戰鬥分頁列攻擊型、
+ * `byTalentType` 是共用條件（技能就緒）用的：戰鬥分頁列攻擊型、
  * 常駐分頁列 buff 與治癒（`03-combat.md` § 3.12／§ 3.13）。
  */
 export function matchesSkillFilter(
@@ -59,82 +43,36 @@ export function matchesSkillFilter(
     case 'attack': return skill.type === 'attack';
     case 'heal': return skill.type === 'heal';
     case 'buff': return skill.type === 'buff';
-    case 'classMagic': return skill.type === 'attack' && isClassMagic(skill.id);
     case 'byTalentType':
       return slotType === 'combat' ? skill.type === 'attack' : skill.type !== 'attack';
   }
 }
 
-function tierTag(affix: TalentAffixInstance): string {
-  return `T${getTalentAffixDef(affix.definitionId)?.tier ?? '?'}`;
-}
-
-/** 鑲材圖示。tier 用素材那套色階，與背包分頁一致 */
-export function AffixIcon({ affix, size = 18 }: { affix: TalentAffixInstance; size?: number }) {
-  const def = getTalentAffixDef(affix.definitionId);
-  if (!def) return null;
-  return (
-    <GameIcon
-      name={getTalentAffixIcon(def.ruleId, def.kind)}
-      size={size}
-      color={MATERIAL_TIER_COLORS[def.tier]}
-    />
-  );
+/** 條件／動作的圖示 */
+export function RuleIcon({ def, size = 18 }: { def: TalentRuleDef; size?: number }) {
+  return <GameIcon name={getTalentAffixIcon(def.ruleId, def.kind)} size={size} />;
 }
 
 /**
  * 參數編輯（`51-auto-talent.md` § 51.4.1）。
- * 欄位由 `models/talentParams.ts` 依 `ruleId` 宣告。
+ * 欄位由 `models/talentParams.ts` 依 `ruleId` 宣告，**一律玩家自訂、隨時可改**。
  */
-function ParamInput(
-  { field, affix, slotType }: { field: ParamField; affix: TalentAffixInstance; slotType: TalentType | null },
-) {
-  const setAffixParams = useTalentStore(s => s.setAffixParams);
-  const bindAffix = useTalentStore(s => s.bindAffix);
+function ParamInput({
+  field, slotId, slotIndex, entry, slotType,
+}: {
+  field: ParamField;
+  slotId: number;
+  slotIndex: number | null;
+  entry: TalentSlotEntry;
+  slotType: TalentType | null;
+}) {
+  const setEntryParams = useTalentStore(s => s.setEntryParams);
   const skills = useGameStore(s => s.skills);
   const bagItems = useGameStore(s => s.bagItems);
-  const params = affix.params ?? {};
-  /* 綁定不可更改（§ 51.4.1），所以要先確認再寫入 */
-  const [binding, setBinding] = useState<{ label: string; target: string; value: string } | null>(null);
+  const params = entry.params ?? {};
 
   function write(value: unknown) {
-    void setAffixParams(affix.id!, { ...params, [field.key]: value });
-  }
-
-  function confirmBind() {
-    if (binding) void bindAffix(affix.id!, binding.value);
-    setBinding(null);
-  }
-
-  /* 綁定用的下拉：選了先跳確認再寫入。是函式不是元件（元件會在 render 時重建） */
-  function bindUI(label: string, options: { value: string; name: string }[]) {
-    return (
-      <>
-        <label className="talent-param is-binding">
-          <span>{label}</span>
-          <select
-            value=""
-            onChange={e => {
-              const opt = options.find(o => o.value === e.target.value);
-              if (opt) setBinding({ label, target: opt.name, value: opt.value });
-            }}
-            onClick={e => e.stopPropagation()}
-            title="選定後不可更改"
-          >
-            <option value="">選定（不可更改）</option>
-            {options.map(o => <option key={o.value} value={o.value}>{o.name}</option>)}
-          </select>
-        </label>
-        {binding && (
-          <BindConfirmModal
-            label={binding.label}
-            target={binding.target}
-            onCancel={() => setBinding(null)}
-            onConfirm={confirmBind}
-          />
-        )}
-      </>
-    );
+    void setEntryParams(slotId, slotIndex, { ...params, [field.key]: value });
   }
 
   if (field.kind === 'number') {
@@ -186,41 +124,16 @@ function ParamInput(
   if (field.kind === 'skill') {
     // 只列**已學會**的：列沒學的等於讓玩家設一條永遠不成立的規則
     const usable = skills.filter(sk => matchesSkillFilter(sk, field.filter, slotType));
-    const def = getTalentAffixDef(affix.definitionId);
-
-    /* 指定型：未綁定時挑一次就定死，之後只顯示不給改（§ 51.4.1） */
-    if (def?.form === 'fixed') {
-      if (affix.boundParam) {
-        const bound = skills.find(sk => sk.id === affix.boundParam);
-        return (
-          <span className="talent-param is-bound" title="指定型鑲材，綁定後不可更改">
-            {bound?.name ?? affix.boundParam}
-            <span className="talent-param-lock">🔒</span>
-          </span>
-        );
-      }
-      return bindUI(field.label, usable.map(sk => ({ value: sk.id, name: sk.name })));
-    }
-
-    /* 池型：先綁一個系別，之後只能在該系別內自選 */
-    let pooled = usable;
-    if (def?.form === 'pool') {
-      if (!affix.boundParam) {
-        return bindUI('系別', SKILL_POOL_KEYS.map(k => ({ value: k, name: SKILL_POOL_LABELS[k] })));
-      }
-      pooled = usable.filter(sk => matchesSkillPool(sk, affix.boundParam!));
-    }
-
     return (
       <label className="talent-param">
-        <span>{def?.form === 'pool' ? SKILL_POOL_LABELS[affix.boundParam as SkillPoolKey] : field.label}</span>
+        <span>{field.label}</span>
         <select
           value={(params[field.key] as string | undefined) ?? ''}
           onChange={e => write(e.target.value || undefined)}
           onClick={e => e.stopPropagation()}
         >
           <option value="">未選擇</option>
-          {pooled.map(sk => <option key={sk.id} value={sk.id}>{sk.name}</option>)}
+          {usable.map(sk => <option key={sk.id} value={sk.id}>{sk.name}</option>)}
         </select>
       </label>
     );
@@ -244,17 +157,51 @@ function ParamInput(
   );
 }
 
-/** 一個槽位。空的可點開選單，有東西的可卸下 */
+/** 依 `group` 分區的選單（§ 51.10）。分區順序照 `TALENT_GROUPS` */
+function RuleMenu({
+  type, kind, onPick,
+}: { type: TalentType; kind: 'condition' | 'action'; onPick: (ruleId: string) => void }) {
+  const defs = selectableRules(type, kind);
+  const byGroup = new Map<TalentGroup, TalentRuleDef[]>();
+  for (const d of defs) {
+    const list = byGroup.get(d.group) ?? [];
+    list.push(d);
+    byGroup.set(d.group, list);
+  }
+
+  return (
+    <ul className="talent-slot-menu">
+      {defs.length === 0 && <li className="talent-slot-menu-empty">這個類型沒有可選項目</li>}
+      {TALENT_GROUPS.filter(g => byGroup.has(g)).map(group => (
+        <li key={group} className="talent-slot-menu-group">
+          <span className="talent-slot-menu-group-label">{TALENT_GROUP_LABELS[group]}</span>
+          <ul>
+            {byGroup.get(group)!
+              .map(d => ({ def: d, name: ruleLabelOf(d) }))
+              .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
+              .map(({ def, name }) => (
+                <li key={def.ruleId}>
+                  <button onClick={() => onPick(def.ruleId)}>
+                    <RuleIcon def={def} size={16} />
+                    {name}
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** 一個槽位。空的可點開選單，有東西的可清空 */
 function Slot({
-  slot, slotIndex, occupant,
-}: { slot: TalentSlot; slotIndex: number | null; occupant?: TalentAffixInstance }) {
+  slot, slotIndex, entry,
+}: { slot: TalentSlot; slotIndex: number | null; entry: TalentSlotEntry | null }) {
   const [picking, setPicking] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   useDismissOnOutside(wrapRef, picking, () => setPicking(false));
-  const affixes = useTalentStore(s => s.affixes);
-  const slots = useTalentStore(s => s.slots);
-  const equipAffix = useTalentStore(s => s.equipAffix);
-  const unequipAffix = useTalentStore(s => s.unequipAffix);
+  const setEntry = useTalentStore(s => s.setEntry);
   // 放置目標以 DOM 屬性宣告自己（`stores/dragStore.ts`），不必在 store 註冊
   const dropProps = {
     'data-drop-kind': 'talent-slot',
@@ -264,29 +211,32 @@ function Slot({
   const isOver = useIsDragOver('talent-slot', slot.id!, slotIndex);
   const dragging = useIsDragging();
 
-  // 只列出**已持有且這份配置沒用到**的（§ 51.10）。未取得的走 Wiki
-  const options = availableAffixes(affixes, slots, slot.templateId ?? '')
-    .filter(a => canEquipAffix(a, slot, slotIndex));
-
-  if (occupant) {
-    const def = getTalentAffixDef(occupant.definitionId);
-    const fields = def ? getParamFields(def.ruleId) : [];
+  if (entry) {
+    const def = selectableRules(slot.assignedType!, slotIndex === null ? 'action' : 'condition')
+      .find(d => d.ruleId === entry.ruleId);
+    const fields = getParamFields(entry.ruleId);
     return (
       <div
         className={`talent-slot is-filled${isOver ? ' drag-over' : ''}${dragging ? ' can-drop' : ''}`}
         {...dropProps}
       >
-        <AffixIcon affix={occupant} />
-        <span className="talent-slot-tier">{tierTag(occupant)}</span>
-        <span className="talent-slot-name">{affixLabel(occupant)}</span>
+        {def && <RuleIcon def={def} />}
+        <span className="talent-slot-name">{ruleLabel(entry.ruleId)}</span>
         {fields.map(f => (
-          <ParamInput key={f.key} field={f} affix={occupant} slotType={slot.assignedType} />
+          <ParamInput
+            key={f.key}
+            field={f}
+            slotId={slot.id!}
+            slotIndex={slotIndex}
+            entry={entry}
+            slotType={slot.assignedType}
+          />
         ))}
         <button
           className="talent-slot-remove"
-          onClick={() => unequipAffix(occupant.id!)}
-          title="卸下（免費、無損）"
-          aria-label="卸下"
+          onClick={() => setEntry(slot.id!, slotIndex, null)}
+          title="清空（免費、無損）"
+          aria-label="清空"
         >
           ✕
         </button>
@@ -299,36 +249,28 @@ function Slot({
       <button
         className={`talent-slot is-empty${isOver ? ' drag-over' : ''}${dragging ? ' can-drop' : ''}`}
         onClick={() => setPicking(v => !v)}
-        title="點一下從清單選，或從背包拖鑲材過來"
+        title="點一下從清單選"
         {...dropProps}
       >
-        {slotIndex === null ? '＋ 實作' : '＋ 條件'}
+        {slotIndex === null ? '＋ 動作' : '＋ 條件'}
       </button>
-      {picking && (
-        <ul className="talent-slot-menu">
-          {options.length === 0 && <li className="talent-slot-menu-empty">沒有可鑲的鑲材</li>}
-          {options.map(a => (
-            <li key={a.id}>
-              <button onClick={() => { equipAffix(a.id!, slot.id!, slotIndex); setPicking(false); }}>
-                <AffixIcon affix={a} size={16} />
-                <span className="talent-slot-tier">{tierTag(a)}</span>
-                {affixLabel(a)}
-              </button>
-            </li>
-          ))}
-        </ul>
+      {picking && slot.assignedType && (
+        <RuleMenu
+          type={slot.assignedType}
+          kind={slotIndex === null ? 'action' : 'condition'}
+          onPick={ruleId => { void setEntry(slot.id!, slotIndex, ruleId); setPicking(false); }}
+        />
       )}
     </div>
   );
 }
 
 const SKIP_HINT: Record<SlotSkipReason, string> = {
-  'no-action': '實作槽是空的，這一列不進判定',
+  'no-action': '動作槽是空的，這一列不進判定',
   unresolved: '技能／道具還沒選定，這一列不進判定',
 };
 
 function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
-  const affixes = useTalentStore(s => s.affixes);
   const uninstallSlot = useTalentStore(s => s.uninstallSlot);
   const toggleSlot = useTalentStore(s => s.toggleSlot);
   const beginDrag = useDragStore(s => s.begin);
@@ -336,10 +278,8 @@ function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
   const endDrag = useDragStore(s => s.drop);
   const reorderSlot = useTalentStore(s => s.reorderSlot);
   const isOver = useIsDragOver('talent-row', order);
-  const inSlot = affixes.filter(a => a.slotId === slot.id);
-  const action = inSlot.find(a => a.slotIndex === null);
   // 沒進判定的列要看得出來。停用不掛 —— 勾選框已經表達了（§ 51.3.1）
-  const skip = slot.enabled ? slotSkipReason(slot, affixes) : null;
+  const skip = slot.enabled ? slotSkipReason(slot) : null;
 
   /** 拖把手才是拖曳來源：整列可拖的話，改參數時一動就會被當成拖曳 */
   function startDrag(e: React.PointerEvent) {
@@ -389,27 +329,22 @@ function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
       <label className="talent-row-enable" title={slot.enabled ? '停用這一列' : '啟用這一列'}>
         <input type="checkbox" checked={slot.enabled} onChange={() => toggleSlot(slot.id!)} />
       </label>
-      {/* 條件一行、實作一行，條件多時換行 */}
+      {/* 條件一行、動作一行，條件多時換行 */}
       <div className="talent-row-slots">
         <div className="talent-row-conds">
           {Array.from({ length: conditionSlotCount(slot.tier) }, (_, i) => (
-            <Slot
-              key={i}
-              slot={slot}
-              slotIndex={i}
-              occupant={inSlot.find(a => a.slotIndex === i)}
-            />
+            <Slot key={i} slot={slot} slotIndex={i} entry={slot.conditions[i] ?? null} />
           ))}
         </div>
         <div className="talent-row-act">
           <span className="talent-row-arrow">→</span>
-          <Slot slot={slot} slotIndex={null} occupant={action} />
+          <Slot slot={slot} slotIndex={null} entry={slot.action} />
         </div>
       </div>
       <button
         className="talent-row-uninstall"
         onClick={() => uninstallSlot(slot.id!)}
-        title="拆下天賦格。已鑲的鑲材會一併退回背包"
+        title="拆下天賦格。設定會原樣保留，裝回同類型即復原"
       >
         拆下
       </button>

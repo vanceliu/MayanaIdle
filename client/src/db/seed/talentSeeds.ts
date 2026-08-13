@@ -1,189 +1,189 @@
-import type { TalentAffixDef } from '../../models/talent';
+import type { TalentRuleDef, TalentSlotEntry, TalentType } from '../../models/talent';
 
 /**
- * 鑲材定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 89 筆。
+ * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 81 筆，**全部內建**。
  *
- * **id 是唯一的鍵**（§ 99.1 第 3、7 條）：實例、天賦格、掉落一律用它比對，
- * 不可用 `ruleId` 或名稱查 —— `ruleId` 在共用鑲材上會重複（同一條規則同時屬於
- * 戰鬥與常駐），名稱則會隨標籤常數改動。
+ * **`ruleId` 是唯一的鍵**（§ 99.1 第 3、7 條）：天賦格存的就是它，不可用名稱查。
+ * 能力階梯塌成完整版之後 `ruleId` 不再重複（§ 51.4.1）——
+ * `skill`、`buff_skill`、`buy_item`、`withdraw_item`、`sell_materials`、
+ * `sell_equipment` 原本各有兩到三階，現在各只有一筆完整版。
  *
  * **標籤不在這裡**：一律經 `models/scriptEngine.ts` 與 `models/villageScript.ts`
  * 的標籤常數渲染，編輯器與 Wiki 共用同一份。
  *
- * id 分段：
- * - 1000~ 共用條件
- * - 1100~ 戰鬥專屬條件
- * - 1200~ 常駐專屬條件
- * - 1300~ 補給條件
- * - 2000~ 戰鬥專屬實作
- * - 2100~ 常駐專屬實作
- * - 2200~ 補給實作
+ * `group` 只決定選單分區（§ 51.4.2），**不是 tier、不是門檻**。
  */
+
 /**
- * 尚未接上判定引擎的鑲材名稱（§ 51.4.5~51.4.11 已定規格）。
+ * 尚未接上判定引擎的項目名稱（§ 51.4.5~51.4.11 已定規格）。
  *
  * 這些 `ruleId` 還沒有型別與 evaluator，所以標籤表裡查不到。
  * 全部標 `blocked`，接上之後把這裡的項目移進 `scriptEngine.ts` 的標籤表。
  */
-export const PENDING_AFFIX_LABELS: Record<string, string> = {
+export const PENDING_RULE_LABELS: Record<string, string> = {
   target_casting: '目標正在詠唱',
   can_kill_target: '本招可擊殺目標',
   can_kill_count_gte: '本招可擊殺 ≥ N 隻',
   switch_target_summoner: '切換目標：場上的召喚本體',
 };
 
-export const TALENT_AFFIX_DEFS: TalentAffixDef[] = [
+const COMBAT_PERSISTENT: TalentType[] = ['combat', 'persistent'];
+const COMBAT: TalentType[] = ['combat'];
+const PERSISTENT: TalentType[] = ['persistent'];
+const SUPPLY: TalentType[] = ['supply'];
+
+export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   // === 共用條件（戰鬥 ∪ 常駐）：15 筆 ===
-  { id: 1001, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 1, form: 'free', ruleId: 'hp_below' },
-  { id: 1002, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 1, form: 'free', ruleId: 'hp_above' },
-  { id: 1003, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 1, form: 'free', ruleId: 'mp_below' },
-  { id: 1004, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 1, form: 'free', ruleId: 'mp_above' },
-  { id: 1005, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 1, form: 'free', ruleId: 'skill_ready' },
-  { id: 1006, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 2, form: 'free', ruleId: 'monsters_near_self_gte' },
-  { id: 1007, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 2, form: 'free', ruleId: 'buff_not_active' },
-  { id: 1008, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 2, form: 'free', ruleId: 'speed_not_active' },
-  { id: 1009, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 2, form: 'free', ruleId: 'debuff_active' },
-  { id: 1010, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 3, form: 'free', ruleId: 'weapon_type_is' },
-  { id: 1011, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 3, form: 'free', ruleId: 'area_dwell_gte' },
-  { id: 1012, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 3, form: 'free', ruleId: 'hp_dropped_recently' },
-  { id: 1013, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 3, form: 'free', ruleId: 'weight_over' },
-  { id: 1014, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 3, form: 'free', ruleId: 'self_shielded' },
+  { ruleId: 'hp_below', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
+  { ruleId: 'hp_above', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
+  { ruleId: 'mp_below', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
+  { ruleId: 'mp_above', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
+  { ruleId: 'hp_dropped_recently', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
+  { ruleId: 'skill_ready', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
+  { ruleId: 'buff_not_active', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
+  { ruleId: 'speed_not_active', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
+  { ruleId: 'debuff_active', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
+  { ruleId: 'self_shielded', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
+  { ruleId: 'weapon_type_is', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'gear' },
+  { ruleId: 'weight_over', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'gear' },
+  { ruleId: 'monsters_near_self_gte', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'surroundings' },
+  { ruleId: 'area_dwell_gte', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'surroundings' },
   // 三類型共用：不同區域回不同城，補給也用得到
-  { id: 1015, kind: 'condition', appliesTo: ['combat', 'persistent', 'supply'], tier: 3, form: 'free', ruleId: 'current_area_is' },
+  { ruleId: 'current_area_is', kind: 'condition', appliesTo: ['combat', 'persistent', 'supply'], group: 'location' },
 
   // === 戰鬥專屬條件：22 筆 ===
-  { id: 1101, kind: 'condition', appliesTo: ['combat'], tier: 1, form: 'free', ruleId: 'monster_hp_below' },
-  { id: 1102, kind: 'condition', appliesTo: ['combat'], tier: 1, form: 'free', ruleId: 'monster_hp_above' },
-  { id: 1103, kind: 'condition', appliesTo: ['combat'], tier: 2, form: 'free', ruleId: 'monster_count_gte' },
-  { id: 1104, kind: 'condition', appliesTo: ['combat'], tier: 3, form: 'free', ruleId: 'aoe_hit_count_gte' },
-  { id: 1105, kind: 'condition', appliesTo: ['combat'], tier: 3, form: 'free', ruleId: 'target_distance' },
-  { id: 1106, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_attack_type' },
-  { id: 1107, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_race' },
-  { id: 1108, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_element' },
-  { id: 1109, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_size' },
-  { id: 1110, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_is_boss' },
-  { id: 1111, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_defense' },
-  { id: 1112, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_level_diff' },
-  { id: 1113, kind: 'condition', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'target_range_gt' },
-  { id: 1114, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_has_debuff' },
-  { id: 1115, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_lacks_debuff' },
-  { id: 1116, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_cc_immune' },
-  { id: 1117, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_shielded' },
+  { ruleId: 'monster_hp_below', kind: 'condition', appliesTo: COMBAT, group: 'target_hp' },
+  { ruleId: 'monster_hp_above', kind: 'condition', appliesTo: COMBAT, group: 'target_hp' },
+  { ruleId: 'target_attack_type', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_race', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_element', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_size', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_is_boss', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_defense', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_level_diff', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_range_gt', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_has_debuff', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
+  { ruleId: 'target_lacks_debuff', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
+  { ruleId: 'target_cc_immune', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
+  { ruleId: 'target_shielded', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   // 怪物沒有詠唱狀態，§ 51.4.4 成對原則擋住
-  { id: 1118, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_casting', blocked: true, blockedReason: 'monster' },
-  { id: 1119, kind: 'condition', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'field_has_race' },
-  { id: 1120, kind: 'condition', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'field_avg_hp_below' },
-  { id: 1121, kind: 'condition', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'can_kill_target', blocked: true, blockedReason: 'pending' },
-  { id: 1122, kind: 'condition', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'can_kill_count_gte', blocked: true, blockedReason: 'pending' },
+  { ruleId: 'target_casting', kind: 'condition', appliesTo: COMBAT, group: 'target_state', blocked: true, blockedReason: 'monster' },
+  { ruleId: 'target_distance', kind: 'condition', appliesTo: COMBAT, group: 'range' },
+  { ruleId: 'monster_count_gte', kind: 'condition', appliesTo: COMBAT, group: 'range' },
+  { ruleId: 'aoe_hit_count_gte', kind: 'condition', appliesTo: COMBAT, group: 'range' },
+  { ruleId: 'field_has_race', kind: 'condition', appliesTo: COMBAT, group: 'field' },
+  { ruleId: 'field_avg_hp_below', kind: 'condition', appliesTo: COMBAT, group: 'field' },
+  { ruleId: 'can_kill_target', kind: 'condition', appliesTo: COMBAT, group: 'forecast', blocked: true, blockedReason: 'pending' },
+  { ruleId: 'can_kill_count_gte', kind: 'condition', appliesTo: COMBAT, group: 'forecast', blocked: true, blockedReason: 'pending' },
 
   // === 常駐專屬條件：2 筆 ===
-  { id: 1201, kind: 'condition', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'buff_remaining_below' },
-  { id: 1202, kind: 'condition', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'potion_cooldown_ready' },
+  { ruleId: 'buff_remaining_below', kind: 'condition', appliesTo: PERSISTENT, group: 'timing' },
+  { ruleId: 'potion_cooldown_ready', kind: 'condition', appliesTo: PERSISTENT, group: 'timing' },
 
   // === 補給條件：9 筆 ===
-  { id: 1301, kind: 'condition', appliesTo: ['supply'], tier: 1, form: 'free', ruleId: 'in_town' },
-  { id: 1302, kind: 'condition', appliesTo: ['supply'], tier: 1, form: 'free', ruleId: 'bag_slots_used_gte' },
-  { id: 1303, kind: 'condition', appliesTo: ['supply'], tier: 1, form: 'free', ruleId: 'bag_free_slots_lte' },
+  { ruleId: 'in_town', kind: 'condition', appliesTo: SUPPLY, group: 'location' },
+  { ruleId: 'has_hunt_location', kind: 'condition', appliesTo: SUPPLY, group: 'location' },
+  { ruleId: 'bag_slots_used_gte', kind: 'condition', appliesTo: SUPPLY, group: 'bag' },
+  { ruleId: 'bag_free_slots_lte', kind: 'condition', appliesTo: SUPPLY, group: 'bag' },
   // 唯一同時適用常駐的補給條件：藥水快見底時改用低階藥水（§ 51.2.1）
-  { id: 1304, kind: 'condition', appliesTo: ['supply', 'persistent'], tier: 1, form: 'free', ruleId: 'item_count_below' },
-  { id: 1305, kind: 'condition', appliesTo: ['supply'], tier: 2, form: 'free', ruleId: 'gold_below' },
-  { id: 1306, kind: 'condition', appliesTo: ['supply'], tier: 2, form: 'free', ruleId: 'gold_above' },
-  { id: 1307, kind: 'condition', appliesTo: ['supply'], tier: 2, form: 'free', ruleId: 'has_hunt_location' },
-  { id: 1308, kind: 'condition', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'warehouse_gold_gte' },
-  { id: 1309, kind: 'condition', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'warehouse_item_gte' },
+  { ruleId: 'item_count_below', kind: 'condition', appliesTo: ['supply', 'persistent'], group: 'bag' },
+  { ruleId: 'gold_below', kind: 'condition', appliesTo: SUPPLY, group: 'gold' },
+  { ruleId: 'gold_above', kind: 'condition', appliesTo: SUPPLY, group: 'gold' },
+  { ruleId: 'warehouse_gold_gte', kind: 'condition', appliesTo: SUPPLY, group: 'gold' },
+  { ruleId: 'warehouse_item_gte', kind: 'condition', appliesTo: SUPPLY, group: 'gold' },
 
-  // === 戰鬥專屬實作：16 筆 ===
-  { id: 2001, kind: 'action', appliesTo: ['combat'], tier: 1, form: 'free', ruleId: 'normal_attack' },
-  { id: 2002, kind: 'action', appliesTo: ['combat'], tier: 1, form: 'free', ruleId: 'wait' },
-  // 可選範圍階梯：綁一招 → 綁一個系別 → 職業魔法全部 → 全部已學會的
-  { id: 2003, kind: 'action', appliesTo: ['combat'], tier: 1, form: 'fixed', ruleId: 'skill' },
-  { id: 2004, kind: 'action', appliesTo: ['combat'], tier: 2, form: 'pool', ruleId: 'skill' },
-  { id: 2005, kind: 'action', appliesTo: ['combat'], tier: 3, form: 'free', ruleId: 'skill_class_only' },
-  { id: 2006, kind: 'action', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'skill' },
-  { id: 2007, kind: 'action', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'switch_target_lowest_hp' },
-  { id: 2008, kind: 'action', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'switch_target_highest_hp' },
-  { id: 2009, kind: 'action', appliesTo: ['combat'], tier: 4, form: 'free', ruleId: 'switch_target_farthest' },
+  // === 戰鬥專屬動作：13 筆 ===
+  { ruleId: 'normal_attack', kind: 'action', appliesTo: COMBAT, group: 'attack' },
+  { ruleId: 'wait', kind: 'action', appliesTo: COMBAT, group: 'attack' },
+  // 原「指定一招 → 指定系別 → 職業魔法 → 全部」四階塌成完整版（§ 51.4.9）
+  { ruleId: 'skill', kind: 'action', appliesTo: COMBAT, group: 'attack' },
   // 移動類共用：探索途中脫離危險與戰鬥中拉開距離是同一件事
-  { id: 2010, kind: 'action', appliesTo: ['combat', 'persistent'], tier: 5, form: 'free', ruleId: 'keep_distance' },
-  { id: 2011, kind: 'action', appliesTo: ['combat', 'persistent'], tier: 5, form: 'free', ruleId: 'close_in' },
-  { id: 2012, kind: 'action', appliesTo: ['combat', 'persistent'], tier: 5, form: 'free', ruleId: 'disengage' },
-  { id: 2013, kind: 'action', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'switch_target_by_kind' },
-  { id: 2014, kind: 'action', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'switch_target_by_debuff' },
+  { ruleId: 'keep_distance', kind: 'action', appliesTo: COMBAT_PERSISTENT, group: 'movement' },
+  { ruleId: 'close_in', kind: 'action', appliesTo: COMBAT_PERSISTENT, group: 'movement' },
+  { ruleId: 'disengage', kind: 'action', appliesTo: COMBAT_PERSISTENT, group: 'movement' },
+  { ruleId: 'switch_target_lowest_hp', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
+  { ruleId: 'switch_target_highest_hp', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
+  { ruleId: 'switch_target_farthest', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
+  { ruleId: 'switch_target_by_kind', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
+  { ruleId: 'switch_target_by_debuff', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
   // 怪物沒有召喚機制，§ 51.4.4 成對原則擋住
-  { id: 2015, kind: 'action', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'switch_target_summoner', blocked: true, blockedReason: 'monster' },
-  { id: 2016, kind: 'action', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'lock_target' },
+  { ruleId: 'switch_target_summoner', kind: 'action', appliesTo: COMBAT, group: 'targeting', blocked: true, blockedReason: 'monster' },
+  { ruleId: 'lock_target', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
 
-  // === 常駐專屬實作：10 筆 ===
-  { id: 2101, kind: 'action', appliesTo: ['persistent'], tier: 1, form: 'free', ruleId: 'potion' },
-  { id: 2102, kind: 'action', appliesTo: ['persistent'], tier: 1, form: 'free', ruleId: 'heal_skill' },
-  { id: 2103, kind: 'action', appliesTo: ['persistent'], tier: 2, form: 'fixed', ruleId: 'buff_skill' },
-  { id: 2104, kind: 'action', appliesTo: ['persistent'], tier: 2, form: 'free', ruleId: 'speed_potion' },
-  { id: 2105, kind: 'action', appliesTo: ['persistent'], tier: 2, form: 'free', ruleId: 'cure_item' },
-  { id: 2106, kind: 'action', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'buff_skill' },
-  { id: 2107, kind: 'action', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'use_town_scroll' },
-  { id: 2108, kind: 'action', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'use_consumable' },
-  { id: 2109, kind: 'action', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'refill_to_percent' },
-  { id: 2110, kind: 'action', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'refill_all_buffs' },
+  // === 常駐專屬動作：9 筆 ===
+  { ruleId: 'potion', kind: 'action', appliesTo: PERSISTENT, group: 'healing' },
+  { ruleId: 'heal_skill', kind: 'action', appliesTo: PERSISTENT, group: 'healing' },
+  { ruleId: 'refill_to_percent', kind: 'action', appliesTo: PERSISTENT, group: 'healing' },
+  // 原「施放特定招式」是指定型才有意義，塌陷後其範圍恰為 heal_skill ∪ buff_skill（§ 51.4.10）
+  { ruleId: 'buff_skill', kind: 'action', appliesTo: PERSISTENT, group: 'buffs' },
+  { ruleId: 'refill_all_buffs', kind: 'action', appliesTo: PERSISTENT, group: 'buffs' },
+  { ruleId: 'speed_potion', kind: 'action', appliesTo: PERSISTENT, group: 'buffs' },
+  { ruleId: 'cure_item', kind: 'action', appliesTo: PERSISTENT, group: 'consumables' },
+  { ruleId: 'use_town_scroll', kind: 'action', appliesTo: PERSISTENT, group: 'consumables' },
+  { ruleId: 'use_consumable', kind: 'action', appliesTo: PERSISTENT, group: 'consumables' },
 
-  // === 補給實作：15 筆 ===
-  { id: 2201, kind: 'action', appliesTo: ['supply'], tier: 1, form: 'free', ruleId: 'return_town' },
-  { id: 2202, kind: 'action', appliesTo: ['supply'], tier: 1, form: 'free', ruleId: 'return_to_hunt' },
-  { id: 2203, kind: 'action', appliesTo: ['supply'], tier: 1, form: 'free', ruleId: 'use_inn' },
-  { id: 2204, kind: 'action', appliesTo: ['supply'], tier: 1, form: 'pool', ruleId: 'buy_item' },
-  { id: 2205, kind: 'action', appliesTo: ['supply'], tier: 1, form: 'pool', ruleId: 'withdraw_item' },
-  { id: 2206, kind: 'action', appliesTo: ['supply'], tier: 2, form: 'free', ruleId: 'sell_materials_threshold_only' },
-  { id: 2207, kind: 'action', appliesTo: ['supply'], tier: 2, form: 'free', ruleId: 'sell_equipment_threshold_only' },
-  { id: 2208, kind: 'action', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'sell_materials' },
-  { id: 2209, kind: 'action', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'sell_equipment' },
-  { id: 2210, kind: 'action', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'deposit_materials' },
-  { id: 2211, kind: 'action', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'deposit_gold' },
-  { id: 2212, kind: 'action', appliesTo: ['supply'], tier: 3, form: 'free', ruleId: 'withdraw_gold' },
-  { id: 2213, kind: 'action', appliesTo: ['supply'], tier: 4, form: 'free', ruleId: 'deposit_equipment' },
-  { id: 2214, kind: 'action', appliesTo: ['supply'], tier: 4, form: 'free', ruleId: 'buy_item' },
-  { id: 2215, kind: 'action', appliesTo: ['supply'], tier: 4, form: 'free', ruleId: 'withdraw_item' },
+  // === 補給動作：11 筆 ===
+  { ruleId: 'return_town', kind: 'action', appliesTo: SUPPLY, group: 'travel' },
+  { ruleId: 'return_to_hunt', kind: 'action', appliesTo: SUPPLY, group: 'travel' },
+  { ruleId: 'use_inn', kind: 'action', appliesTo: SUPPLY, group: 'travel' },
+  // 原池型單組版刪除，只留自選最多 3 組的完整版（§ 51.4.11）
+  { ruleId: 'buy_item', kind: 'action', appliesTo: SUPPLY, group: 'restock' },
+  { ruleId: 'withdraw_item', kind: 'action', appliesTo: SUPPLY, group: 'restock' },
+  { ruleId: 'withdraw_gold', kind: 'action', appliesTo: SUPPLY, group: 'restock' },
+  // 原「僅門檻」版刪除，只留帶保留設定的完整版（§ 51.4.11）
+  { ruleId: 'sell_materials', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'sell_equipment', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'deposit_materials', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'deposit_equipment', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'deposit_gold', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
 ];
 
-const DEF_BY_ID = new Map(TALENT_AFFIX_DEFS.map(d => [d.id, d]));
+const DEF_BY_RULE_ID = new Map(TALENT_RULE_DEFS.map(d => [d.ruleId, d]));
 
-export function getTalentAffixDef(id: number): TalentAffixDef | undefined {
-  return DEF_BY_ID.get(id);
+export function getTalentRuleDef(ruleId: string): TalentRuleDef | undefined {
+  return DEF_BY_RULE_ID.get(ruleId);
 }
 
 /**
- * 起始配置（§ 51.7）。全職業相同：5 個 T1 格全部鑲好。
+ * 某個類型某個種類選得到的項目（§ 51.10）。
  *
- * | 格 | 類型 | 條件槽 | 實作槽 |
+ * **全部列出** —— 條件與動作一律內建，沒有「已取得／未取得」的區隔。
+ * 只有 `blocked` 的不列：選得上去卻永遠不觸發（§ 51.4.3.2）。
+ */
+export function selectableRules(type: TalentType, kind: TalentRuleDef['kind']): TalentRuleDef[] {
+  return TALENT_RULE_DEFS.filter(d => !d.blocked && d.kind === kind && d.appliesTo.includes(type));
+}
+
+/**
+ * 起始配置（§ 51.7）。全職業相同：5 個 T1 格全部設定好。
+ *
+ * | 格 | 類型 | 條件槽 | 動作槽 |
  * |---|---|---|---|
- * | 0 | 戰鬥 | 空 | 施放指定攻擊技能（未綁定） |
- * | 1 | 戰鬥 | 空 | 施放指定攻擊技能（未綁定） |
+ * | 0 | 戰鬥 | 空 | 施放攻擊技能（未選定） |
+ * | 1 | 戰鬥 | 空 | 施放攻擊技能（未選定） |
  * | 2 | 常駐 | HP 低於 30% | 使用藥水（紅） |
- * | 3 | 戰鬥 | 空 | 施放指定攻擊技能（未綁定） |
+ * | 3 | 戰鬥 | 空 | 施放攻擊技能（未選定） |
  * | 4 | 戰鬥 | 空 | 普通攻擊 |
  *
- * `2003` 發放時 `boundParam` 為 null，首次鑲入時由玩家選定。
- * 不發「技能就緒」鑲材：CD／MP／武器需求由動作本身檢查（`03-combat.md` § 3.12）。
+ * 施放攻擊技能發放時未選定技能，**整條規則跳過**（§ 51.3.1），
+ * 玩家學會技能後自己挑，隨時可改。
+ * 不設「技能就緒」條件：CD／MP／武器需求由動作本身檢查（`03-combat.md` § 3.12）。
  */
-export interface StartingAffixPlacement {
-  definitionId: number;
-  /** 鑲到第幾個起始天賦格 */
-  slotIndex: number;
-  /** 條件槽 index；null ＝ 實作槽 */
-  conditionIndex: number | null;
-  params: Record<string, unknown> | null;
+export interface StartingSlotLayout {
+  type: TalentType;
+  conditions: (TalentSlotEntry | null)[];
+  action: TalentSlotEntry | null;
 }
 
-/**
- * 起始配置（§ 51.7）：戰鬥 3 條施放技能 ＋ 1 條普通攻擊，常駐 1 條喝藥，五格用滿。
- * 三份施放技能都是未綁定的指定型，首次鑲入時才選技能。
- */
-export const STARTING_LAYOUT: StartingAffixPlacement[] = [
-  { definitionId: 2003, slotIndex: 0, conditionIndex: null, params: null },
-  { definitionId: 2003, slotIndex: 1, conditionIndex: null, params: null },
-  { definitionId: 1001, slotIndex: 2, conditionIndex: 0, params: { value: 30 } },
-  { definitionId: 2101, slotIndex: 2, conditionIndex: null, params: { potionType: 'red' } },
-  { definitionId: 2003, slotIndex: 3, conditionIndex: null, params: null },
-  { definitionId: 2001, slotIndex: 4, conditionIndex: null, params: null },
+export const STARTING_LAYOUT: StartingSlotLayout[] = [
+  { type: 'combat', conditions: [null], action: { ruleId: 'skill', params: null } },
+  { type: 'combat', conditions: [null], action: { ruleId: 'skill', params: null } },
+  {
+    type: 'persistent',
+    conditions: [{ ruleId: 'hp_below', params: { value: 30 } }],
+    action: { ruleId: 'potion', params: { potionType: 'red' } },
+  },
+  { type: 'combat', conditions: [null], action: { ruleId: 'skill', params: null } },
+  // 普通攻擊排最後：規則由上往下取第一個成立者（§ 51.7）
+  { type: 'combat', conditions: [null], action: { ruleId: 'normal_attack', params: null } },
 ];
-
-/** 起始天賦格各自指派給哪個類型（格 2 是常駐的喝藥規則，其餘都是戰鬥） */
-export const STARTING_SLOT_TYPES = ['combat', 'combat', 'persistent', 'combat', 'combat'] as const;

@@ -18,7 +18,7 @@ vi.mock('../../hooks/useEquipmentTemplates', () => ({
  */
 describe('常駐分頁的門檻設定（§ 3.13）', () => {
   beforeEach(() => {
-    useTalentStore.setState({ characterId: 1, slots: [], affixes: [] });
+    useTalentStore.setState({ characterId: 1, slots: [] });
     useGameStore.setState({
       afterCombatHpThreshold: 40,
       afterCombatMpThreshold: 30,

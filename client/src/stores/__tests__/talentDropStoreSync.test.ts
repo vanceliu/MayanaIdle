@@ -1,9 +1,9 @@
 /**
- * 掉落的鑲材與天賦格要**立刻**進 store（`51-auto-talent.md` § 51.6）。
+ * 掉落的天賦格要**立刻**進 store（`51-auto-talent.md` § 51.6）。
  *
- * 兩者走獨立實例表，擊殺結算只寫 DB；背包的「天賦」分頁與天賦面板讀的是
+ * 天賦格走獨立實例表，擊殺結算只寫 DB；背包的「天賦」分頁與天賦面板讀的是
  * `talentStore`，不同步重載的話玩家要等下次載入角色才看得到剛掉的東西 ——
- * 而戰鬥日誌已經寫了「獲得鑲材」，看起來就像掉落被吃掉了。
+ * 而戰鬥日誌已經寫了「獲得天賦格」，看起來就像掉落被吃掉了。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
@@ -23,13 +23,11 @@ vi.mock('../../systems/drops', async () => {
   };
 });
 
-/** rng 恆為 0 → 每一階都命中，鑲材與天賦格必定掉 */
+/** rng 恆為 0 → 必定命中。天賦格真實掉率只有 0.01%，靠運氣測不到 */
 vi.mock('../../systems/talentDrops', async () => {
   const actual = await vi.importActual<typeof import('../../systems/talentDrops')>('../../systems/talentDrops');
   return {
     ...actual,
-    rollTalentAffixDrops: (areaLevel: number, isBoss: boolean) =>
-      actual.rollTalentAffixDrops(areaLevel, isBoss, 1, () => 0),
     rollTalentSlotDrop: (areaLevel: number, isBoss: boolean) =>
       actual.rollTalentSlotDrop(areaLevel, isBoss, 1, () => 0),
   };
@@ -84,7 +82,7 @@ const deadBoss = {
  */
 async function waitForTalentInit() {
   for (let i = 0; i < 100; i++) {
-    if (useTalentStore.getState().affixes.length > 0) return;
+    if (useTalentStore.getState().slots.length > 0) return;
     await new Promise(r => setTimeout(r, 0));
   }
   throw new Error('天賦起始配置沒有載入');
@@ -137,30 +135,26 @@ describe('天賦掉落與 store 同步', () => {
     vi.restoreAllMocks();
   });
 
-  it('掉落的鑲材立刻出現在 store，不必重新載入角色', async () => {
+  it('掉落的天賦格立刻出現在 store，不必重新載入角色', async () => {
     // 模擬玩家已經在遊戲裡：起始配置載完才開打
     await waitForTalentInit();
     const characterId = useGameStore.getState().character!.id!;
-    const before = useTalentStore.getState().affixes.length;
+    const before = useTalentStore.getState().slots.length;
 
     await killBoss();
 
-    const dbAffixes = await db.talentAffixes.where('characterId').equals(characterId).count();
-    expect(dbAffixes).toBeGreaterThan(before);
-    expect(useTalentStore.getState().affixes).toHaveLength(dbAffixes);
+    const dbSlots = await db.talentSlots.where('characterId').equals(characterId).count();
+    expect(dbSlots).toBeGreaterThan(before);
+    expect(useTalentStore.getState().slots).toHaveLength(dbSlots);
   });
 
-  /* 天賦格與鑲材寫在同一段，兩張表都要跟 DB 對得起來 */
   it('擊殺後 store 與 DB 完全一致', async () => {
     await waitForTalentInit();
     await killBoss();
 
     const characterId = useGameStore.getState().character!.id!;
-    const dbAffixes = await db.talentAffixes.where('characterId').equals(characterId).count();
     const dbSlots = await db.talentSlots.where('characterId').equals(characterId).count();
 
-    expect(useTalentStore.getState().affixes).toHaveLength(dbAffixes);
     expect(useTalentStore.getState().slots).toHaveLength(dbSlots);
   });
-
 });

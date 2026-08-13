@@ -6,7 +6,7 @@ import { REGIONS } from '../mapData';
 import { SKILL_CATALOG } from '../skill';
 import { CLASS_SKILLS, isClassMagic } from '../classSkills';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
-import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
+import { TALENT_RULE_DEFS } from '../../db/seed/talentSeeds';
 
 /**
  * 鑲材選項的**值域**（`51-auto-talent.md` § 51.4.1）。
@@ -153,12 +153,11 @@ describe('技能選單的範圍', () => {
       getParamFields(ruleId).find(f => f.kind === 'skill' && f.key === 'skillId');
     expect(filterOf('heal_skill')).toMatchObject({ filter: 'heal' });
     expect(filterOf('buff_skill')).toMatchObject({ filter: 'buff' });
-    expect(filterOf('skill_class_only')).toMatchObject({ filter: 'classMagic' });
     expect(filterOf('skill')).toMatchObject({ filter: 'attack' });
   });
 
-  it('技能就緒是共用鑲材，範圍依分頁決定', () => {
-    const def = TALENT_AFFIX_DEFS.find(d => d.ruleId === 'skill_ready');
+  it('技能就緒是共用條件，範圍依分頁決定', () => {
+    const def = TALENT_RULE_DEFS.find(d => d.ruleId === 'skill_ready');
     expect(def?.appliesTo).toEqual(expect.arrayContaining(['combat', 'persistent']));
     expect(getParamFields('skill_ready')[0]).toMatchObject({ filter: 'byTalentType' });
   });

@@ -57,7 +57,6 @@ async function purgeCharacter(characterId: number, characterUuid?: string): Prom
   await db.warehouses.where('characterId').equals(characterId).delete();
   // 天賦與信箱同樣以 characterId 綁定，不清的話 id 重用時會被新角色撿到
   await db.talentSlots.where('characterId').equals(characterId).delete();
-  await db.talentAffixes.where('characterId').equals(characterId).delete();
   await db.mailbox.where('characterId').equals(characterId).delete();
   await db.characters.delete(characterId);
 

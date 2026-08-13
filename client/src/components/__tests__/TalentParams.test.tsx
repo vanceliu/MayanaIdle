@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { getParamFields, defaultParams } from '../../models/talentParams';
-import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
+import { TALENT_RULE_DEFS } from '../../db/seed/talentSeeds';
 
 /**
  * 參數 schema（`51-auto-talent.md` § 51.4.1）。
  *
  * 這批測試守的是「規則不會變成 HP 低於 ??」——
- * 有門檻語意的鑲材一定要有欄位，鑲入時一定要有預設值。
+ * 有門檻語意的條件一定要有欄位，放進槽位時一定要有預設值。
  */
 
 /** 名稱裡帶比較詞的，判定一定要吃參數，不能沒有欄位 */
@@ -15,7 +15,7 @@ const NEEDS_PARAM = /_below$|_above$|_gte$|_lte$|_over$|_diff$|_distance$|_recen
 
 describe('參數 schema', () => {
   it('所有帶門檻語意的條件都有可填欄位', () => {
-    const missing = TALENT_AFFIX_DEFS
+    const missing = TALENT_RULE_DEFS
       .filter(d => d.kind === 'condition' && NEEDS_PARAM.test(d.ruleId))
       .filter(d => getParamFields(d.ruleId).length === 0)
       .map(d => d.ruleId);
@@ -29,13 +29,13 @@ describe('參數 schema', () => {
     }
   });
 
-  it('沒有參數的鑲材回空陣列，不會硬塞欄位', () => {
+  it('沒有參數的項目回空陣列，不會硬塞欄位', () => {
     for (const ruleId of ['normal_attack', 'wait', 'return_town', 'use_inn', 'lock_target']) {
       expect(getParamFields(ruleId), ruleId).toEqual([]);
     }
   });
 
-  it('數字與下拉欄位都有預設值 —— 鑲入即可用，不必逐格填', () => {
+  it('數字與下拉欄位都有預設值 —— 選了即可用，不必逐格填', () => {
     for (const [ruleId, fields] of Object.entries({
       hp_below: getParamFields('hp_below'),
       potion: getParamFields('potion'),
@@ -58,7 +58,7 @@ describe('參數 schema', () => {
 
   it('預設值落在 min/max 之內', () => {
     for (const [ruleId, fields] of Object.entries(
-      Object.fromEntries(TALENT_AFFIX_DEFS.map(d => [d.ruleId, getParamFields(d.ruleId)])),
+      Object.fromEntries(TALENT_RULE_DEFS.map(d => [d.ruleId, getParamFields(d.ruleId)])),
     )) {
       for (const f of fields) {
         if (f.kind !== 'number') continue;
@@ -69,7 +69,7 @@ describe('參數 schema', () => {
   });
 
   it('下拉的預設值一定在選項裡', () => {
-    for (const d of TALENT_AFFIX_DEFS) {
+    for (const d of TALENT_RULE_DEFS) {
       for (const f of getParamFields(d.ruleId)) {
         if (f.kind !== 'select') continue;
         expect(f.options.map(o => o.value), `${d.ruleId}.${f.key}`).toContain(f.def);
@@ -78,19 +78,21 @@ describe('參數 schema', () => {
   });
 });
 
-describe('可選範圍軸的三種型態（§ 51.4.1）', () => {
-  const bySkill = TALENT_AFFIX_DEFS.filter(d => d.ruleId === 'skill');
-
-  it('施放攻擊技能的階梯：T1 指定、T2 池、T4 自選', () => {
-    expect(bySkill.find(d => d.tier === 1)?.form).toBe('fixed');
-    expect(bySkill.find(d => d.tier === 2)?.form).toBe('pool');
-    expect(bySkill.find(d => d.tier === 4)?.form).toBe('free');
+describe('一律內建、一律完整版（§ 51.4.1）', () => {
+  it('施放攻擊技能只有一筆定義，沒有階梯', () => {
+    expect(TALENT_RULE_DEFS.filter(d => d.ruleId === 'skill')).toHaveLength(1);
   });
 
-  it('三階都吃同一組參數欄位 —— 差別在能選的範圍，不在參數形狀', () => {
-    // 判定拿到的都是 `{ type: 'skill', skillId }`，只是誰能改、能改成什麼不同
-    for (const d of bySkill) {
-      expect(getParamFields(d.ruleId).some(f => f.kind === 'skill'), `T${d.tier}`).toBe(true);
+  it('原本分階的動作都塌成一筆', () => {
+    for (const ruleId of ['skill', 'buff_skill', 'buy_item', 'withdraw_item',
+      'sell_materials', 'sell_equipment']) {
+      expect(TALENT_RULE_DEFS.filter(d => d.ruleId === ruleId), ruleId).toHaveLength(1);
     }
+  });
+
+  /* 限縮版刪掉之後，完整版必須真的帶著完整參數（§ 51.4.1 既有能力不可流失） */
+  it('販售素材與販售裝備留的是完整版，不是僅門檻版', () => {
+    expect(getParamFields('sell_materials').map(f => f.key)).toContain('skipCraftMaterials');
+    expect(getParamFields('sell_equipment').length).toBeGreaterThan(1);
   });
 });

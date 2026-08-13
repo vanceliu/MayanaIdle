@@ -124,10 +124,8 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
       return ctx.gold >= price;
     }
     case 'sell_materials':
-    case 'sell_materials_threshold_only':
       return ctx.inTown && collectVillageSellMaterials(action, ctx).length > 0;
     case 'sell_equipment':
-    case 'sell_equipment_threshold_only':
       return ctx.inTown && collectVillageSellEquipment(action, ctx).length > 0;
     case 'use_inn':
       // 旅館要錢；HP／MP 都滿且沒有異常狀態時不必去（避免佔住判定）
@@ -235,15 +233,10 @@ export function getBuyAmount(action: VillageAction, ctx: VillageScriptContext): 
 
 export function collectVillageSellMaterials(action: VillageAction, ctx: VillageScriptContext): BagItem[] {
   if (action.maxTier == null) return [];
-  /**
-   * 「僅門檻」版（§ 51.4.11 的 T2）：保護開關**固定開啟**，也不吃白名單。
-   * 它少的是保留設定，**不是門檻** —— 沒有門檻會把剛掉的高階素材一起賣掉。
-   */
-  const thresholdOnly = action.type === 'sell_materials_threshold_only';
   const picked = collectSellableMaterials(ctx.bagItems, action.maxTier, {
-    skipCraftMaterials: thresholdOnly ? true : (action.skipCraftMaterials ?? true),
+    skipCraftMaterials: action.skipCraftMaterials ?? true,
   });
-  if (thresholdOnly || !action.keepItemIds?.length) return picked;
+  if (!action.keepItemIds?.length) return picked;
   const keep = new Set(action.keepItemIds);
   return picked.filter(item => !keep.has(item.itemId));
 }
@@ -257,10 +250,6 @@ export function collectVillageSellEquipment(
   ctx: VillageScriptContext,
 ): EquipmentInstance[] {
   if (action.maxTier == null) return [];
-  // 「僅門檻」版不吃 § 49.4 的保留條件，但硬保護（新手裝／drop_only／裝備中）照舊
-  if (action.type === 'sell_equipment_threshold_only') {
-    action = { ...action, keep: undefined };
-  }
   const sellable = ctx.inventory.filter(i => isSellableEquipment(i, ctx.templates, ctx.equippedIds));
   const inTier = collectBatchSellEquipment(sellable, ctx.templates, action.maxTier as EquipmentTierLevel);
   return inTier.filter(i => !matchesEquipmentFilter(i, action.keep, ctx.className));

@@ -304,53 +304,45 @@ baseValue × (1 + qualityPercent / 100)
 
 ## 18.9 自動天賦（`51-auto-talent.md`）
 
-### 鑲材定義（靜態）
+### 條件與動作的定義（靜態）
 
 seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**（§ 99.1 第 3、7 條）。
 
+**全部內建，沒有實例表** —— 玩家不「持有」條件與動作（`51-auto-talent.md` § 51.5）。
+
 | 欄位 | 說明 |
 |---|---|
-| `id` | 鑲材定義 id |
-| `kind` | `condition`（條件）／`action`（實作） |
+| `id` | 定義 id |
+| `kind` | `condition`（條件）／`action`（動作） |
 | `appliesTo` | 適用類型陣列：`combat`／`persistent`／`supply`，可多選 |
-| `tier` | T1~T7 |
-| `form` | `fixed`（指定型）／`pool`（池型）／`free`（自選型） |
+| `group` | 選單分區（`51-auto-talent.md` § 51.4.2）。**不是 tier，不是門檻** |
 | `ruleId` | 對應 `03-combat.md` § 3.12~3.13 或 `49-village-script.md` § 49.2~49.3 的條件／動作 |
-
-### 鑲材實例
-
-**獨立資料表，不進 `characterBag`。** `BagItem` 只有 `{ itemId, amount }`，
-放不下 roll 出來的參數。
-
-| 欄位 | 說明 |
-|---|---|
-| `id` | 實例 id |
-| `characterId` | 持有角色。**不跨角色轉移**，不進倉庫表 |
-| `definitionId` | 指向鑲材定義 |
-| `boundParam` | 指定型／池型 roll 出來的綁定值（技能 id、技能子集、道具類別）。自選型為 null |
-| `slotId` | 鑲在哪一個天賦格；未鑲入為 null。**比照 `equipmentInstances.equipped`** |
-| `slotIndex` | 鑲在該格的第幾個條件槽；實作槽為 null |
-
-**一實體一格**：`slotId` 是單一值，同一份鑲材不可能同時出現在兩個天賦格
-或兩組天賦配置裡（`51-auto-talent.md` § 51.5.1）。
-
-**起始的指定型鑲材為未綁定**：`boundParam` 初始為 null，首次鑲入時寫入，之後不可更改。
+| `blocked` | 未接上判定引擎則為真，**不出現在選單**（`51-auto-talent.md` § 51.4.3.2） |
+| `blockedReason` | `monster`／`pending` |
 
 ### 天賦格
+
+**自動天賦唯一的實例表，不進 `characterBag`。**
 
 | 欄位 | 說明 |
 |---|---|
 | `id` | 天賦格 id |
-| `characterId` | 持有角色 |
+| `characterId` | 持有角色。**不跨角色轉移**，不進倉庫表 |
 | `tier` | T1~T4，決定條件槽數（1~4） |
 | `assignedType` | 指派給哪個類型：`combat`／`persistent`／`supply`。**null ＝ 未安裝** |
 | `templateId` | 屬於哪一組天賦配置。未安裝時為 null |
 | `order` | 判定順序。未安裝時為 null |
 | `enabled` | 啟用／停用 |
+| `conditions` | 條件槽陣列，每項為 `{ ruleId, params }`。長度上限＝`tier`，空槽為 null |
+| `action` | 動作槽 `{ ruleId, params }`，未設為 null |
+
+**條件與動作是天賦格上的欄位，不是獨立實體。** 同一個 `ruleId` 可出現在任意多個天賦格，
+各自帶不同 `params`（`51-auto-talent.md` § 51.5.1）。
+`params` 內的技能與道具指涉**一律存 id**（§ 99.1 第 7 條）。
 
 **未安裝的天賦格躺在背包「天賦」分頁，不進判定**（`51-auto-talent.md` § 51.3.4）。
 安裝＝指派類型。改類型走拆下再安裝，拆下時 `assignedType`／`templateId`／`order`
-一併清回 null，該格鑲材退回背包，不隨天賦格消失。
+一併清回 null，`conditions`／`action` **原樣保留**，重新安裝到同類型即復原。
 
 `templateId` 是單一值 —— **同一個天賦格不可能同時在兩份天賦配置裡**。
 安裝一個已屬於別份配置的天賦格等於搬家，那一份就少一格
@@ -371,11 +363,11 @@ seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**�
 | `characterId` | 持有角色。**信箱角色獨立**，不跨角色 |
 | `sourceKey` | 發放來源鍵。**對 `characterId` 唯一**，重複發放靠它擋 |
 | `title` | 顯示標題 |
-| `items` | 發放項目陣列：道具（`itemId` ＋數量）／金幣／天賦格（tier）／鑲材（`definitionId` ＋ `boundParam`） |
+| `items` | 發放項目陣列：道具（`itemId` ＋數量）／金幣／天賦格（tier） |
 | `createdAt` | 發放時間 |
 | `claimedAt` | 領取時間。**null ＝ 未領取** |
 
-- `items` 內的道具與鑲材**一律存 id 不存名稱**（§ 99.1 第 7 條）
+- `items` 內的道具**一律存 id 不存名稱**（§ 99.1 第 7 條）
 - **換版清理**：`BUILD_INFO.version` 改變時刪除 `claimedAt` 不為 null 的信；
   **未領取的一律保留**（`52-mailbox.md` § 52.7.1）—— 刪掉等於沒收玩家的天賦格
 - 公告的 `lastReadVersion` 存本機設定，**不進 DB**

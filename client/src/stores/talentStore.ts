@@ -1,83 +1,59 @@
 /**
  * 自動天賦的持有與配置（`51-auto-talent.md`）。
  *
- * **只管「有什麼、鑲在哪」，不管判定。** 判定在 `systems/scriptRunner.ts` 與
- * `systems/villageScriptRunner.ts`，它們只看天賦格鑲了什麼，不查持有清單 ——
- * 混在一起會讓每個判定 tick 都要掃鑲材表（`16-tech-frontend-architecture.md` § 32.18）。
+ * **只管「有幾格、格上設了什麼」，不管判定。** 判定在 `systems/scriptRunner.ts` 與
+ * `systems/villageScriptRunner.ts`，它們只看天賦格設了什麼，不查持有清單
+ * （`16-tech-frontend-architecture.md` § 32.18）。
+ *
+ * 條件與動作**沒有 store** —— 它們是 seed 常數，全部內建（§ 51.4.1）。
  */
 import { create } from 'zustand';
 import { db } from '../db/database';
 import {
-  AFFIX_FUSE_SUCCESS_RATE,
-  EXCHANGE_INPUT_COUNT,
   FUSE_INPUT_COUNT,
   STARTING_SLOT_COUNT,
-  TALENT_TYPES,
   conditionSlotCount,
+  emptyConditions,
   isSlotInstalled,
-  type TalentAffixDef,
-  type TalentAffixInstance,
-  type TalentAffixKind,
   type TalentSlot,
+  type TalentSlotEntry,
   type TalentSlotTier,
-  type TalentTier,
   type TalentType,
 } from '../models/talent';
-import { STARTING_LAYOUT, STARTING_SLOT_TYPES, TALENT_AFFIX_DEFS, getTalentAffixDef } from '../db/seed/talentSeeds';
+import { STARTING_LAYOUT, getTalentRuleDef } from '../db/seed/talentSeeds';
 import { defaultParams } from '../models/talentParams';
 import { buildCombatRules, buildPersistentRules, buildVillageRules } from '../systems/talentRules';
 import type { CombatRule, PersistentRule } from '../models/scriptEngine';
 import type { VillageRule } from '../models/villageScript';
 
-/** 可注入的亂數，讓合成機率測得起來 */
-export type Rng = () => number;
-const defaultRng: Rng = () => Math.random();
-
-export interface FuseAffixResult {
-  success: boolean;
-  /** 成功時的產物；失敗為 null */
-  produced: TalentAffixInstance | null;
-}
-
 export interface TalentState {
   characterId: number | null;
   slots: TalentSlot[];
-  affixes: TalentAffixInstance[];
 
   load: (characterId: number) => Promise<void>;
   grantStartingIfEmpty: (characterId: number) => Promise<void>;
+  reset: () => void;
 
   installSlot: (slotId: number, type: TalentType, templateId: string) => Promise<void>;
   uninstallSlot: (slotId: number) => Promise<void>;
-
-  equipAffix: (affixId: number, slotId: number, slotIndex: number | null) => Promise<void>;
-  setAffixParams: (affixId: number, params: Record<string, unknown>) => Promise<void>;
   reorderSlot: (slotId: number, toOrder: number) => Promise<void>;
   toggleSlot: (slotId: number) => Promise<void>;
-  unequipAffix: (affixId: number) => Promise<void>;
-  bindAffix: (affixId: number, boundParam: string) => Promise<void>;
 
-  reset: () => void;
+  /** 設定或清空一個槽位。`slotIndex` 為 null ＝ 動作槽；`ruleId` 為 null ＝ 清空 */
+  setEntry: (slotId: number, slotIndex: number | null, ruleId: string | null) => Promise<void>;
+  setEntryParams: (slotId: number, slotIndex: number | null, params: Record<string, unknown>) => Promise<void>;
 
   fuseSlots: (tier: TalentSlotTier) => Promise<TalentSlot | null>;
-  upgradeAffixes: (affixIds: number[], targetType: TalentType, rng?: Rng) => Promise<FuseAffixResult | null>;
-  exchangeAffixes: (affixIds: number[], targetDefinitionId: number) => Promise<TalentAffixInstance | null>;
-  downgradeAffix: (affixId: number, targetDefinitionId: number) => Promise<TalentAffixInstance | null>;
 }
 
-/** 完全沒安裝在任何天賦配置裡的天賦格。合成只能吃這一種 */
+/** 完全沒安裝在任何天賦配置裡的天賦格。合成只能吃這一種（§ 51.5.2） */
 export function uninstalledSlots(slots: TalentSlot[]): TalentSlot[] {
   return slots.filter(s => !isSlotInstalled(s));
 }
 
-/** 完全沒鑲在任何天賦格裡的鑲材。合成只能吃這一種 */
-export function unequippedAffixes(affixes: TalentAffixInstance[]): TalentAffixInstance[] {
-  return affixes.filter(a => a.slotId === null);
-}
-
 /**
  * 這份天賦配置可動用的天賦格（§ 51.3.2）：沒安裝的 ＋ 擺在別份配置裡的。
- * 全新的排在前面。
+ * 全新的排在前面 —— 手上有閒置格時不該去動別份配置。
  */
 export function availableSlots(slots: TalentSlot[], templateId: string): TalentSlot[] {
   const free = slots.filter(s => !isSlotInstalled(s));
@@ -85,252 +61,119 @@ export function availableSlots(slots: TalentSlot[], templateId: string): TalentS
   return [...free, ...elsewhere];
 }
 
-/** 同上，鑲材版：沒鑲入的、以及鑲在別份配置的格子裡的 */
-export function availableAffixes(
-  affixes: TalentAffixInstance[],
-  slots: TalentSlot[],
-  templateId: string,
-): TalentAffixInstance[] {
-  const here = new Set(
-    slots.filter(s => s.templateId === templateId).map(s => s.id),
-  );
-  return affixes.filter(a => a.slotId === null || !here.has(a.slotId));
-}
-
 /**
- * 鑲材能不能鑲進這個天賦格。
+ * 這個條件／動作能不能放進這個槽位。
  *
- * 三道檢查缺一不可：類型（§ 51.2.1 的 `appliesTo`）、種類（條件槽只收條件）、
- * 以及 `blocked`（怪物側機制沒開的鑲材根本不該出現，§ 51.4.4）。
+ * 四道檢查缺一不可：定義存在、沒被 `blocked`（§ 51.4.3.2）、
+ * 適用該類型（§ 51.2.1）、種類對得上（條件槽只收條件）。
  */
-export function canEquipAffix(
-  affix: TalentAffixInstance,
+export function canPlaceRule(
+  ruleId: string,
   slot: TalentSlot,
   slotIndex: number | null,
 ): boolean {
-  const def = getTalentAffixDef(affix.definitionId);
+  const def = getTalentRuleDef(ruleId);
   if (!def || def.blocked) return false;
   if (!isSlotInstalled(slot)) return false;
   if (!def.appliesTo.includes(slot.assignedType!)) return false;
 
-  const wantKind: TalentAffixKind = slotIndex === null ? 'action' : 'condition';
+  const wantKind = slotIndex === null ? 'action' : 'condition';
   if (def.kind !== wantKind) return false;
-  if (slotIndex !== null && slotIndex >= conditionSlotCount(slot.tier)) return false;
+  if (slotIndex !== null && (slotIndex < 0 || slotIndex >= conditionSlotCount(slot.tier))) return false;
   return true;
 }
 
-/**
- * 升級的產物候選（§ 51.5.2）：**玩家指定類型**的 T+1、同種類。
- *
- * 產物在候選中隨機，但**類型是玩家選的** —— 三個類型的鑲材數量差很多，
- * 產物類型若也隨機，投入什麼與拿到什麼就沒有關係。
- *
- * 各池上限（§ 51.4.3）自動生效：常駐專屬止於 T3，所以升到 T4 時
- * 「常駐」根本沒有候選，那個類型不會出現在可選清單裡。
- */
-export function upgradeCandidates(
-  tier: TalentTier,
-  kind: TalentAffixKind,
-  targetType: TalentType,
-): TalentAffixDef[] {
-  return TALENT_AFFIX_DEFS.filter(
-    d => !d.blocked && d.tier === tier + 1 && d.kind === kind && d.appliesTo.includes(targetType),
-  );
+/** 換類型時留不下來的槽位一律清空（§ 51.3.2） */
+function keepApplicable(slot: TalentSlot, type: TalentType): Pick<TalentSlot, 'conditions' | 'action'> {
+  const applies = (e: TalentSlotEntry | null) =>
+    e !== null && (getTalentRuleDef(e.ruleId)?.appliesTo.includes(type) ?? false);
+  return {
+    conditions: slot.conditions.map(c => (applies(c) ? c : null)),
+    action: applies(slot.action) ? slot.action : null,
+  };
 }
 
-/** 這批投入可以升成哪些類型（§ 51.5.2）。空陣列 ＝ 這批東西升不上去 */
-export function upgradeTargetTypes(inputs: (TalentAffixInstance | undefined)[]): TalentType[] {
-  const defs = validUpgradeInputs(inputs);
-  if (!defs) return [];
-  return TALENT_TYPES.filter(t => upgradeCandidates(defs[0].tier, defs[0].kind, t).length > 0);
-}
-
-/** 投入本身合不合格：份數、沒鑲入、同階級、同種類。**類型不限** */
-function validUpgradeInputs(
-  inputs: (TalentAffixInstance | undefined)[],
-): TalentAffixDef[] | null {
-  if (inputs.length !== FUSE_INPUT_COUNT) return null;
-  const defs = inputDefs(inputs);
-  if (!defs) return null;
-  if (defs.some(d => d.tier !== defs[0].tier || d.kind !== defs[0].kind)) return null;
-  return defs;
-}
-
-/** 這幾份鑲材能不能升成指定類型（§ 51.5.2）。UI 與 store 共用這一支 */
-export function canUpgradeAffixes(
-  inputs: (TalentAffixInstance | undefined)[],
-  targetType: TalentType | null,
-): boolean {
-  const defs = validUpgradeInputs(inputs);
-  if (!defs || !targetType) return false;
-  return upgradeCandidates(defs[0].tier, defs[0].kind, targetType).length > 0;
-}
-
-/** 投入的鑲材全部存在、都沒鑲入 */
-function inputDefs(inputs: (TalentAffixInstance | undefined)[]): TalentAffixDef[] | null {
-  if (inputs.some(a => !a || a.slotId !== null)) return null;
-  const defs = inputs.map(a => getTalentAffixDef(a!.definitionId));
-  if (defs.some(d => !d)) return null;
-  return defs as TalentAffixDef[];
-}
-
-/** 產出可不可以是這一筆定義：同種類、指定 tier。**類型不限**（§ 51.5.3） */
-function canProduce(target: TalentAffixDef, defs: TalentAffixDef[], tier: TalentTier): boolean {
-  if (target.blocked) return false;
-  if (target.tier !== tier) return false;
-  // 種類不互通，類型互通（§ 51.5.3）——兌換與降階是玩家指定產物，不看投入的類型
-  return target.kind === defs[0].kind;
-}
-
-/**
- * 定向兌換能不能成立（§ 51.5.3）：同種類同 tier ×3 → 指定同 tier ×1，**類型不限**。
- * UI 與 store 共用這一支。
- */
-export function canExchangeAffixes(
-  inputs: (TalentAffixInstance | undefined)[],
-  targetDefinitionId: number,
-): boolean {
-  if (inputs.length !== EXCHANGE_INPUT_COUNT) return false;
-  const ids = inputs.map(a => a?.id);
-  if (new Set(ids).size !== ids.length) return false;
-
-  const defs = inputDefs(inputs);
-  if (!defs) return false;
-  if (defs.some(d => d.tier !== defs[0].tier || d.kind !== defs[0].kind)) return false;
-
-  const target = getTalentAffixDef(targetDefinitionId);
-  if (!target) return false;
-  return canProduce(target, defs, defs[0].tier);
-}
-
-/**
- * 降階能不能成立（§ 51.5.3）：較高 tier ×1 → 指定較低 tier ×1。
- * **不必逐階**，T6 可一步換 T1；產出比投入低，不受各池上限限制。
- */
-export function canDowngradeAffix(
-  input: TalentAffixInstance | undefined,
-  targetDefinitionId: number,
-): boolean {
-  const defs = inputDefs([input]);
-  if (!defs) return false;
-
-  const target = getTalentAffixDef(targetDefinitionId);
-  if (!target || target.tier >= defs[0].tier) return false;
-  return canProduce(target, defs, target.tier);
+/** 寫回單一槽位後的完整欄位 */
+function withEntry(
+  slot: TalentSlot,
+  slotIndex: number | null,
+  entry: TalentSlotEntry | null,
+): Pick<TalentSlot, 'conditions' | 'action'> {
+  if (slotIndex === null) return { conditions: slot.conditions, action: entry };
+  const conditions = [...slot.conditions];
+  // 舊存檔的陣列可能短於 tier（§ 51.9），補齊再寫
+  while (conditions.length < conditionSlotCount(slot.tier)) conditions.push(null);
+  conditions[slotIndex] = entry;
+  return { conditions, action: slot.action };
 }
 
 export const useTalentStore = create<TalentState>((set, get) => ({
   characterId: null,
   slots: [],
-  affixes: [],
 
   load: async characterId => {
-    const [slots, affixes] = await Promise.all([
-      db.talentSlots.where('characterId').equals(characterId).toArray(),
-      db.talentAffixes.where('characterId').equals(characterId).toArray(),
-    ]);
-    set({ characterId, slots, affixes });
+    const slots = await db.talentSlots.where('characterId').equals(characterId).toArray();
+    set({ characterId, slots });
   },
 
   /**
-   * 創角配置（§ 51.3.3.1、§ 51.7）：5 個 T1 格 ＋ 6 份鑲材，直接安裝好。
+   * 創角配置（§ 51.3.3、§ 51.7）：5 個 T1 格，直接安裝好並設定內容。
    * 已經有資料就不重發。
    */
   grantStartingIfEmpty: async characterId => {
     const existing = await db.talentSlots.where('characterId').equals(characterId).count();
     if (existing > 0) return;
 
-    /* 鑲材必須鑲進天賦格，不能只丟背包 —— 判定讀的是天賦格 */
-    await db.transaction('rw', db.talentSlots, db.talentAffixes, async () => {
-      const slotIds: number[] = [];
+    await db.transaction('rw', db.talentSlots, async () => {
       for (let i = 0; i < STARTING_SLOT_COUNT; i++) {
-        const id = await db.talentSlots.add({
+        const layout = STARTING_LAYOUT[i];
+        await db.talentSlots.add({
           characterId,
-          tier: 1 as TalentSlotTier,
-          // 格 3 是常駐（喝藥），其餘給戰鬥
-          assignedType: STARTING_SLOT_TYPES[i] as TalentType,
+          tier: 1,
+          assignedType: layout.type,
           templateId: 'default',
           order: i,
           enabled: true,
-        }) as number;
-        slotIds.push(id);
-      }
-
-      for (const p of STARTING_LAYOUT) {
-        await db.talentAffixes.add({
-          characterId,
-          definitionId: p.definitionId,
-          boundParam: null,
-          params: p.params,
-          slotId: slotIds[p.slotIndex],
-          slotIndex: p.conditionIndex,
+          conditions: layout.conditions,
+          action: layout.action,
         });
       }
     });
     await get().load(characterId);
   },
 
-  /**
-   * 安裝天賦格到某個類型。來源含別份配置裡的格子（等於搬家）。
-   * 鑲材跟著走，不適用新類型的退回背包。
-   */
-  reset: () => set({ characterId: null, slots: [], affixes: [] }),
+  reset: () => set({ characterId: null, slots: [] }),
 
+  /**
+   * 安裝天賦格到某個類型。來源含別份配置裡的格子（等於搬家，§ 51.3.2）。
+   * 設定跟著走，不適用新類型的槽位清空。
+   */
   installSlot: async (slotId, type, templateId) => {
-    const { slots, affixes, characterId } = get();
+    const { slots, characterId } = get();
     if (characterId === null) return;
+    const slot = slots.find(s => s.id === slotId);
+    if (!slot) return;
+
     const sameType = slots.filter(s => s.assignedType === type && s.templateId === templateId);
     const nextOrder = sameType.reduce((max, s) => Math.max(max, s.order ?? -1), -1) + 1;
-    const dropped = affixes
-      .filter(a => a.slotId === slotId)
-      .filter(a => !getTalentAffixDef(a.definitionId)?.appliesTo.includes(type))
-      .map(a => a.id!);
-    await db.transaction('rw', db.talentSlots, db.talentAffixes, async () => {
-      if (dropped.length > 0) {
-        await db.talentAffixes.where('id').anyOf(dropped)
-          .modify({ slotId: null, slotIndex: null });
-      }
-      await db.talentSlots.update(slotId, { assignedType: type, templateId, order: nextOrder });
+
+    await db.talentSlots.update(slotId, {
+      assignedType: type,
+      templateId,
+      order: nextOrder,
+      ...keepApplicable(slot, type),
     });
     await get().load(characterId);
   },
 
-  /** 拆下天賦格 → 回背包。已鑲的鑲材一併退回（§ 51.3.4） */
+  /**
+   * 拆下天賦格 → 回背包。**設定原樣保留**（§ 51.3.4）：
+   * 條件與動作不是實體，沒有東西需要退回，重新安裝到同類型即復原。
+   */
   uninstallSlot: async slotId => {
     const { characterId } = get();
     if (characterId === null) return;
-    await db.transaction('rw', db.talentSlots, db.talentAffixes, async () => {
-      await db.talentAffixes.where('slotId').equals(slotId)
-        .modify({ slotId: null, slotIndex: null });
-      await db.talentSlots.update(slotId, { assignedType: null, templateId: null, order: null });
-    });
-    await get().load(characterId);
-  },
-
-  /**
-   * 鑲入。**一實體一格**（§ 51.5.1）：先清掉這份鑲材原本的位置，
-   * 再把目標槽位原本那份退回背包。
-   */
-  equipAffix: async (affixId, slotId, slotIndex) => {
-    const { characterId, affixes, slots } = get();
-    if (characterId === null) return;
-    const affix = affixes.find(a => a.id === affixId);
-    const slot = slots.find(s => s.id === slotId);
-    if (!affix || !slot || !canEquipAffix(affix, slot, slotIndex)) return;
-
-    const occupant = affixes.find(
-      a => a.slotId === slotId && a.slotIndex === slotIndex && a.id !== affixId,
-    );
-    /* 第一次鑲入時塞預設參數（`models/talentParams.ts`） */
-    const def = getTalentAffixDef(affix.definitionId);
-    const seeded = affix.params ?? (def ? defaultParams(def.ruleId) : null);
-
-    await db.transaction('rw', db.talentAffixes, async () => {
-      if (occupant) {
-        await db.talentAffixes.update(occupant.id!, { slotId: null, slotIndex: null });
-      }
-      await db.talentAffixes.update(affixId, { slotId, slotIndex, params: seeded });
-    });
+    await db.talentSlots.update(slotId, { assignedType: null, templateId: null, order: null });
     await get().load(characterId);
   },
 
@@ -367,33 +210,39 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     await get().load(characterId);
   },
 
-  setAffixParams: async (affixId, params) => {
-    const { characterId } = get();
+  /**
+   * 設定槽位。同一個 `ruleId` 可出現在任意多個天賦格（§ 51.5.1），
+   * 所以這裡不必去別處清位置 —— 沒有「一實體一格」要維護。
+   */
+  setEntry: async (slotId, slotIndex, ruleId) => {
+    const { characterId, slots } = get();
     if (characterId === null) return;
-    await db.talentAffixes.update(affixId, { params });
+    const slot = slots.find(s => s.id === slotId);
+    if (!slot) return;
+
+    let entry: TalentSlotEntry | null = null;
+    if (ruleId !== null) {
+      if (!canPlaceRule(ruleId, slot, slotIndex)) return;
+      entry = { ruleId, params: defaultParams(ruleId) };
+    }
+    await db.talentSlots.update(slotId, withEntry(slot, slotIndex, entry));
     await get().load(characterId);
   },
 
-  unequipAffix: async affixId => {
-    const { characterId } = get();
+  setEntryParams: async (slotId, slotIndex, params) => {
+    const { characterId, slots } = get();
     if (characterId === null) return;
-    await db.talentAffixes.update(affixId, { slotId: null, slotIndex: null });
-    await get().load(characterId);
-  },
-
-  /** 綁定指定型／池型的參數。只能綁一次（§ 51.4.1） */
-  bindAffix: async (affixId, boundParam) => {
-    const { characterId, affixes } = get();
-    if (characterId === null) return;
-    const affix = affixes.find(a => a.id === affixId);
-    if (!affix || affix.boundParam !== null) return;
-    await db.talentAffixes.update(affixId, { boundParam });
+    const slot = slots.find(s => s.id === slotId);
+    if (!slot) return;
+    const current = slotIndex === null ? slot.action : slot.conditions[slotIndex] ?? null;
+    if (!current) return;
+    await db.talentSlots.update(slotId, withEntry(slot, slotIndex, { ...current, params }));
     await get().load(characterId);
   },
 
   /**
    * 天賦格合成：同 tier ×2 → T+1 ×1，**必定成功**（§ 51.5.2）。
-   * 純換算、產物確定，不查成功率表。
+   * 純換算、產物確定，沒有成功率表 —— 這是系統唯一的合成。
    */
   fuseSlots: async tier => {
     const { characterId, slots } = get();
@@ -402,13 +251,16 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     if (pool.length < FUSE_INPUT_COUNT) return null;
 
     const consumed = pool.slice(0, FUSE_INPUT_COUNT);
+    const nextTier = (tier + 1) as TalentSlotTier;
     const produced: TalentSlot = {
       characterId,
-      tier: (tier + 1) as TalentSlotTier,
+      tier: nextTier,
       assignedType: null,
       templateId: null,
       order: null,
       enabled: true,
+      conditions: emptyConditions(nextTier),
+      action: null,
     };
     await db.transaction('rw', db.talentSlots, async () => {
       await db.talentSlots.bulkDelete(consumed.map(s => s.id!));
@@ -417,107 +269,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     await get().load(characterId);
     return produced;
   },
-
-  /**
-   * 鑲材升級：同 tier 同種類 ×2 → **玩家指定類型**的 T+1 ×1（該類型內隨機）。
-   *
-   * **有失敗率**（§ 51.5.2），失敗時**退回投入的其中 1 份**（淨損 1 份），不歸零。
-   */
-  upgradeAffixes: async (affixIds, targetType, rng = defaultRng) => {
-    const { characterId, affixes } = get();
-    if (characterId === null || affixIds.length !== FUSE_INPUT_COUNT) return null;
-
-    const inputs = affixIds.map(id => affixes.find(a => a.id === id));
-    if (!canUpgradeAffixes(inputs, targetType)) return null;
-
-    const d0 = getTalentAffixDef(inputs[0]!.definitionId)!;
-    const targetTier = (d0.tier + 1) as Exclude<TalentTier, 1>;
-    const success = rng() * 100 < AFFIX_FUSE_SUCCESS_RATE[targetTier];
-
-    // 失敗只消耗 1 份：投入 2 份、退回 1 份
-    const consumeCount = success ? FUSE_INPUT_COUNT : FUSE_INPUT_COUNT - 1;
-    const consumed = inputs.slice(0, consumeCount).map(a => a!.id!);
-
-    let produced: TalentAffixInstance | null = null;
-    if (success) {
-      const candidates = upgradeCandidates(d0.tier, d0.kind, targetType);
-      if (candidates.length === 0) return null;
-      const picked = candidates[Math.floor(rng() * candidates.length)];
-      produced = {
-        characterId,
-        definitionId: picked.id,
-        boundParam: null,
-        params: null,
-        slotId: null,
-        slotIndex: null,
-      };
-    }
-
-    await db.transaction('rw', db.talentAffixes, async () => {
-      await db.talentAffixes.bulkDelete(consumed);
-      if (produced) await db.talentAffixes.add(produced);
-    });
-    await get().load(characterId);
-    return { success, produced };
-  },
-
-  /**
-   * 定向兌換：同種類同 tier ×3 → **玩家指定**的同 tier ×1，**類型不限**（§ 51.5.3）。
-   * 必定成功、不收金幣。
-   */
-  exchangeAffixes: async (affixIds, targetDefinitionId) => {
-    const { characterId, affixes } = get();
-    if (characterId === null || affixIds.length !== EXCHANGE_INPUT_COUNT) return null;
-
-    const inputs = affixIds.map(id => affixes.find(a => a.id === id));
-    if (!canExchangeAffixes(inputs, targetDefinitionId)) return null;
-
-    return consumeAndProduce(
-      characterId,
-      inputs.map(a => a!.id!),
-      targetDefinitionId,
-      get().load,
-    );
-  },
-
-  /**
-   * 降階：較高 tier ×1 → **玩家指定**的較低 tier ×1（§ 51.5.3）。
-   * 不必逐階，必定成功、不收金幣。
-   */
-  downgradeAffix: async (affixId, targetDefinitionId) => {
-    const { characterId, affixes } = get();
-    if (characterId === null) return null;
-
-    const input = affixes.find(a => a.id === affixId);
-    if (!canDowngradeAffix(input, targetDefinitionId)) return null;
-
-    return consumeAndProduce(characterId, [input!.id!], targetDefinitionId, get().load);
-  },
 }));
-
-/** 兌換與降階的共同結算：吃掉投入、產出未綁定的指定鑲材（§ 51.5.3） */
-async function consumeAndProduce(
-  characterId: number,
-  consumed: number[],
-  targetDefinitionId: number,
-  reload: (characterId: number) => Promise<void>,
-): Promise<TalentAffixInstance> {
-  const produced: TalentAffixInstance = {
-    characterId,
-    definitionId: targetDefinitionId,
-    boundParam: null,
-    params: null,
-    slotId: null,
-    slotIndex: null,
-  };
-
-  await db.transaction('rw', db.talentAffixes, async () => {
-    await db.talentAffixes.bulkDelete(consumed);
-    await db.talentAffixes.add(produced);
-  });
-  await reload(characterId);
-  return produced;
-}
 
 /**
  * 判定用的規則（`systems/talentRules.ts`）。
@@ -526,16 +278,13 @@ async function consumeAndProduce(
  * **不查持有清單**（`16-tech-frontend-architecture.md` § 32.18）。
  */
 export function talentCombatRules(templateId: string): CombatRule[] {
-  const { slots, affixes } = useTalentStore.getState();
-  return buildCombatRules(slots, affixes, templateId);
+  return buildCombatRules(useTalentStore.getState().slots, templateId);
 }
 
 export function talentPersistentRules(templateId: string): PersistentRule[] {
-  const { slots, affixes } = useTalentStore.getState();
-  return buildPersistentRules(slots, affixes, templateId);
+  return buildPersistentRules(useTalentStore.getState().slots, templateId);
 }
 
 export function talentVillageRules(templateId: string): VillageRule[] {
-  const { slots, affixes } = useTalentStore.getState();
-  return buildVillageRules(slots, affixes, templateId);
+  return buildVillageRules(useTalentStore.getState().slots, templateId);
 }

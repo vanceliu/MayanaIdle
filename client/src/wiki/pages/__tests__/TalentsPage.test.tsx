@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { TALENT_AFFIX_DEFS } from '../../../db/seed/talentSeeds';
-import { slotTierBandFor } from '../../../models/talent';
-import { TalentsPage, TalentAffixTable, TalentFusionTable } from '../TalentsPage';
+import { TALENT_RULE_DEFS } from '../../../db/seed/talentSeeds';
+import { SLOT_TIER_BAND, FUSE_INPUT_COUNT } from '../../../models/talent';
+import { TalentsPage, TalentFusionTable } from '../TalentsPage';
 import {
   COMBAT_CONDITION_LABELS,
   COMBAT_ACTION_LABELS,
@@ -29,13 +29,13 @@ const ALL_LABELS = [
 ];
 
 describe('Wiki 自動天賦頁', () => {
-  // 拿得到的鑲材都要列；「永遠」與 blocked 的不算（§ 51.3.1、§ 51.4.4）
-  it('每一個拿得到的條件與動作都列得出來', () => {
+  // 選得到的都要列；「永遠」與 blocked 的不算（§ 51.3.1、§ 51.4.3.2）
+  it('每一個選得到的條件與動作都列得出來', () => {
     render(<TalentsPage />);
-    const obtainable = new Set(TALENT_AFFIX_DEFS.filter(d => !d.blocked).map(d => d.ruleId));
+    const selectable = new Set(TALENT_RULE_DEFS.filter(d => !d.blocked).map(d => d.ruleId));
     for (const labels of ALL_LABELS) {
       for (const [key, label] of Object.entries(labels)) {
-        if (!obtainable.has(key)) continue;
+        if (!selectable.has(key)) continue;
         expect(screen.getAllByText(label).length).toBeGreaterThan(0);
       }
     }
@@ -66,78 +66,67 @@ describe('Wiki 自動天賦頁', () => {
     render(<TalentsPage />);
     expect(screen.getByText(/完全不出手/)).toBeDefined();
   });
-});
 
-describe('鑲材總表（§ 43.4.12）', () => {
-  it('列出全部 89 筆鑲材 —— 含玩家尚未取得的', () => {
-    render(<TalentAffixTable />);
-    // 編輯器只顯示已持有的，「還有什麼可以刷」只有 Wiki 回答得了
-    const rows = document.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(TALENT_AFFIX_DEFS.length);
-  });
-
-  it('怪物側機制未開的鑲材標明「尚未開放」，免得玩家白刷', () => {
-    render(<TalentAffixTable />);
-    const blocked = TALENT_AFFIX_DEFS.filter(d => d.blocked);
-    expect(blocked.length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/尚未開放/)).toHaveLength(blocked.length);
-  });
-});
-
-describe('合成、升級與掉落表', () => {
-  it('T1 沒有升級成功率（它是起點），T7 標明不掉落', () => {
-    render(<TalentFusionTable />);
-    const rows = [...document.querySelectorAll('tbody tr')].map(r =>
-      [...r.querySelectorAll('td')].map(td => td.textContent));
-    const t1 = rows.find(r => r[0] === 'T1')!;
-    const t7 = rows.find(r => r[0] === 'T7')!;
-    expect(t1[1]).toBe('—');
-    expect(t7[2]).toBe('不掉落');
-  });
-
-  /* § 51.3.2：配置之間是換裝，Wiki 沒講清楚玩家會以為切分頁能複製一整套 */
-  it('說明天賦配置是換裝，不是複製', () => {
+  /* § 51.4.1：條件與動作內建，Wiki 不該再有「怎麼取得」這種欄位 */
+  it('講明條件與動作全部內建，不必去刷', () => {
     render(<TalentsPage />);
-    expect(screen.getByText(/配置之間是換裝，不是複製/)).toBeDefined();
+    expect(screen.getByText(/條件與動作全部內建/)).toBeDefined();
+    expect(screen.getByText(/不掉落、不合成/)).toBeDefined();
   });
 
-  it('說明天賦格與鑲材的取得與型態', () => {
+  /* § 51.3.2：天賦格是換裝，Wiki 沒講清楚玩家會以為切分頁能複製一整套 */
+  it('說明天賦格是換裝、條件與動作是複製', () => {
     render(<TalentsPage />);
-    expect(screen.getByRole('heading', { name: '天賦格與鑲材' })).toBeDefined();
-    // 指定型綁定後不可更改（§ 51.4.1）是玩家最容易踩的一條
-    expect(screen.getByText(/首次鑲入時選定，之後不可更改/)).toBeDefined();
+    expect(screen.getByText(/天賦格是換裝，條件與動作是複製/)).toBeDefined();
   });
 
-  /* 條件槽留空就是永遠（§ 51.3.1），所以沒有也不需要「永遠」這份鑲材 */
-  it('條件表不列沒有對應鑲材的項目', () => {
+  it('說明天賦格的取得與階級', () => {
+    render(<TalentsPage />);
+    expect(screen.getByRole('heading', { name: '天賦格' })).toBeDefined();
+    expect(screen.getByText(/每 5 級/)).toBeDefined();
+  });
+
+  /* 條件槽留空就是永遠（§ 51.3.1），所以沒有也不需要「永遠」這一筆 */
+  it('條件表不列沒有對應定義的項目', () => {
     render(<TalentsPage />);
     expect(screen.queryByText('永遠')).toBeNull();
   });
 
-  // 怪物側機制沒開的鑲材現在拿不到，列在條件表會讓玩家白找（§ 51.4.4）
-  it('條件表不列 blocked 的鑲材', () => {
+  // 沒接上引擎的現在選不到，列在條件表會讓玩家白找（§ 51.4.3.2）
+  it('條件表不列 blocked 的項目', () => {
     render(<TalentsPage />);
-    for (const def of TALENT_AFFIX_DEFS.filter(d => d.blocked)) {
+    for (const def of TALENT_RULE_DEFS.filter(d => d.blocked)) {
       const label = COMBAT_CONDITION_LABELS[def.ruleId as keyof typeof COMBAT_CONDITION_LABELS];
       if (label) expect(screen.queryByText(label)).toBeNull();
     }
   });
+});
 
-  /*
-   * 鑲材分帶 6 段、天賦格分帶 3 段，用索引配對會整欄錯位
-   * （~15 的區域會顯示成掉 T2 天賦格）。
-   */
-  it('分帶表的天賦格欄位依區域等級查，不是照索引配', () => {
+describe('合成與掉落表', () => {
+  it('列出完整的天賦格合成鏈與換算成本', () => {
+    render(<TalentFusionTable />);
+    const rows = [...document.querySelectorAll('tbody tr')].map(r =>
+      [...r.querySelectorAll('td')].map(td => td.textContent));
+    expect(rows).toContainEqual([`T1 ×${FUSE_INPUT_COUNT} → T2 ×1`, '2']);
+    expect(rows).toContainEqual([`T3 ×${FUSE_INPUT_COUNT} → T4 ×1`, '8']);
+  });
+
+  it('掉落分帶跟著常數走，不是寫死的', () => {
     render(<TalentFusionTable />);
     const rows = [...document.querySelectorAll('tbody tr')]
-      .map(r => [...r.querySelectorAll('td')].map(td => td.textContent))
-      .filter(r => r.length === 3);
+      .map(r => [...r.querySelectorAll('td')].map(td => td.textContent));
 
-    for (const [area, , slot] of rows) {
-      const level = area === '61+' ? Infinity : Number(area!.replace('～', ''));
-      const band = slotTierBandFor(level);
-      const expected = band.min === band.max ? `T${band.min}` : `T${band.min}～T${band.max}`;
-      expect(slot).toBe(expected);
+    for (const b of SLOT_TIER_BAND) {
+      const area = b.maxAreaLevel === Infinity ? '61+' : `～${b.maxAreaLevel}`;
+      const expected = b.min === b.max ? `T${b.min}` : `T${b.min}～T${b.max}`;
+      expect(rows).toContainEqual([area, expected]);
     }
+  });
+
+  /* 升級／兌換／降階已隨鑲材一併廢除（§ 51.5.2），表格不該再有那三欄 */
+  it('表格只剩合成鏈與掉落分帶', () => {
+    render(<TalentFusionTable />);
+    const headers = [...document.querySelectorAll('th')].map(th => th.textContent);
+    expect(headers).toEqual(['合成', '換算成 T1 格', '區域最高等級', '可掉天賦格']);
   });
 });

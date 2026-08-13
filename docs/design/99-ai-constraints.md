@@ -30,6 +30,51 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 自動天賦簡化（分支 `talent-simplify`，僅改設計文件）
+
+天賦格是唯一資源；條件與動作全部內建、開局全開、無 tier、無實體、無掉落、無綁定。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| 1 | § 51.4~51.5 改寫：刪三型態／roll 綁定／池上限／升級／兌換／降階／一實體一格 | 完成 |
+| 2 | § 51.4.5~51.4.11 的 tier 欄改為主題分組；能力階梯塌成完整版 | 完成 |
+| 3 | § 51.3.2~51.3.4 放寬：天賦格維持實體換裝，條件與動作自由複製 | 完成 |
+| 4 | § 51.6 掉落改為只剩天賦格；§ 51.7 起始配置去除鑲材份數 | 完成 |
+| 5 | § 51.8 背包天賦分頁、§ 51.11 鑲材實例表刪除；§ 51.10 UI 分頁調整 | 完成 |
+| 6 | § 51.13 連動清單重寫為實際改動清單 | 完成 |
+| 7 | 連動文件 15 份全部改到位 | 完成 |
+
+- 一般怪的天賦掉落歸零後**不補回饋**，文件註明為已知取捨
+- 長尾條件保留 `pending`，語意改為「未開放，選單不出現」
+- 天賦格 T4 上限、`MULTI_GROUP_MAX = 3` 均維持
+
+### 實作階段（分支 `talent-simplify`）
+
+`TalentAffixInstance` 整個消失，條件與動作改為天賦格上的欄位
+`{ ruleId, params }`，定義表以 **`ruleId` 為鍵**（塌陷後不再重複）。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| A | `models/talent.ts`：刪 tier／form／池上限／掉率／子集；新增 `group` | 完成 |
+| B | `db/seed/talentSeeds.ts`：89 筆塌成 81 筆，改以 `ruleId` 為鍵 | 完成 |
+| C | `db/database.ts`：刪 `talentAffixes` 表，`talentSlots` 加 `conditions`／`action` | 完成 |
+| D | `stores/talentStore.ts`：刪鑲材實例與升級／兌換／降階，只留天賦格 | 完成 |
+| E | `systems/talentRules.ts`：改讀天賦格欄位 | 完成 |
+| F | `systems/talentDrops.ts`：刪鑲材掉落，只留天賦格 | 完成 |
+| G | `components/TalentEditor.tsx`：選單改列全部定義 | 完成 |
+| H | `components/TalentFusion.tsx`：只剩天賦格合成 | 完成 |
+| I | `components/BagTalentTab.tsx`、`models/talentBag.ts`：只列未安裝天賦格 | 完成 |
+| J | Wiki：刪 `TalentAffixesPage`，`TalentsPage` 去除鑲材段 | 完成 |
+| K | 測試清理與新增；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
+
+**DB 遷移是 v22**：`talentAffixes` 整張表刪除，內容搬進天賦格欄位，
+對照表在 `db/migrations/talentAffixLegacy.ts`。**天賦格本身不動**。
+
+**能力塌陷的對應**（同 `ruleId` 的多階合成一筆，取完整版）：
+`skill`（2003/2004/2006，`skill_class_only` 刪除）、`buff_skill`（2103/2106）、
+`buy_item`（2204/2214）、`withdraw_item`（2205/2215）、
+`sell_materials`／`sell_equipment`（刪 `*_threshold_only`）。
+
 ### 尚未清理的殘留
 
 `components/CombatScriptEditor.tsx`、`PersistentScriptEditor.tsx`、`VillageScriptEditor.tsx`、

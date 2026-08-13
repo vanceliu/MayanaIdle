@@ -5,7 +5,8 @@ import { generateCharacterUuid } from '../models/characterIdentity';
 import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
-import type { TalentAffixInstance, TalentSlot } from '../models/talent';
+import type { TalentSlot } from '../models/talent';
+import { migrateSlotContent, type LegacyAffixRow } from './migrations/talentAffixLegacy';
 import { planMailDedupe, type Mail } from '../models/mailbox';
 import { ITEM_DEFINITIONS } from './seed/itemSeeds';
 
@@ -152,7 +153,6 @@ export class GameDB extends Dexie {
   warehouses!: Table<WarehouseEntry>;
   warehouseGold!: Table<WarehouseGoldEntry>;
   /** 自動天賦（`51-auto-talent.md`）。鑲材帶 roll 出來的參數，不進 characterBag */
-  talentAffixes!: Table<TalentAffixInstance>;
   talentSlots!: Table<TalentSlot>;
   /** 系統信箱（`52-mailbox.md`） */
   mailbox!: Table<Mail>;
@@ -407,6 +407,36 @@ export class GameDB extends Dexie {
      */
     this.version(21).stores({
       mailbox: '++id, characterId, sourceKey, claimedAt, &[characterId+sourceKey]',
+    });
+
+    /**
+     * v22：條件與動作改為內建（`51-auto-talent.md` § 51.4.1）。
+     *
+     * `talentAffixes` 整張表刪除 —— 條件與動作不再是實體，改存成天賦格上的
+     * `conditions` / `action` 欄位（`18-data-schema.md` § 18.9）。
+     *
+     * **天賦格本身不動。** 它是玩家用等級與合成換來的唯一資源，
+     * 清掉等於沒收；只有格子上的內容做搬遷，查不到對照的丟掉
+     * （`db/migrations/talentAffixLegacy.ts`）。
+     */
+    this.version(22).stores({
+      talentAffixes: null,
+      talentSlots: '++id, characterId, assignedType, templateId',
+    }).upgrade(async tx => {
+      const affixes: (LegacyAffixRow & { slotId: number | null })[] =
+        await tx.table('talentAffixes').toArray();
+      const bySlot = new Map<number, LegacyAffixRow[]>();
+      for (const a of affixes) {
+        if (a.slotId === null) continue;
+        const list = bySlot.get(a.slotId) ?? [];
+        list.push(a);
+        bySlot.set(a.slotId, list);
+      }
+      await tx.table('talentSlots').toCollection().modify(row => {
+        const { conditions, action } = migrateSlotContent(row.tier, bySlot.get(row.id) ?? []);
+        row.conditions = conditions;
+        row.action = action;
+      });
     });
   }
 }

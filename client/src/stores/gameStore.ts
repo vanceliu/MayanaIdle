@@ -10,8 +10,8 @@ import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
 import { syncTalentSlotGrants, syncCompensations, mailPurgeStorageKey } from '../systems/mailbox';
 import { talentBagOrderStorageKey } from '../models/talentBag';
-import { rollTalentAffixDrops, rollTalentSlotDrop } from '../systems/talentDrops';
-import { affixDropLabel } from '../models/talentLabels';
+import { rollTalentSlotDrop } from '../systems/talentDrops';
+import { emptyConditions } from '../models/talent';
 import { useMailboxStore } from './mailboxStore';
 import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
 import { useTalentStore, talentPersistentRules, talentVillageRules } from './talentStore';
@@ -809,10 +809,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       .delete();
     /*
      * characterId 會被重用，下列各項必須一併清除：
-     * 天賦格與鑲材、未領取的信、背包排列（§ 35.17）、天賦分頁順序、換版清理的版本戳記。
+     * 天賦格、未領取的信、背包排列（§ 35.17）、天賦分頁順序、換版清理的版本戳記。
      */
     await db.talentSlots.where('characterId').equals(characterId).delete();
-    await db.talentAffixes.where('characterId').equals(characterId).delete();
     await db.mailbox.where('characterId').equals(characterId).delete();
     await db.characters.delete(characterId);
     localStorage.removeItem(`mayana_prefs_${characterId}`);
@@ -1899,16 +1898,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
         break;
       }
-      case 'sell_materials':
-      case 'sell_materials_threshold_only': {
+      case 'sell_materials': {
         const items = collectVillageSellMaterials(action, ctx);
         if (items.length === 0) return;
         const gained = get().sellBagItems(items.map(i => ({ itemId: i.itemId, amount: i.amount })));
         set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：販售素材 ${items.length} 種，獲得 ${gained.toLocaleString()}G`, type: 'system' }) });
         break;
       }
-      case 'sell_equipment':
-      case 'sell_equipment_threshold_only': {
+      case 'sell_equipment': {
         const items = collectVillageSellEquipment(action, ctx);
         if (items.length === 0) return;
         const gained = get().sellEquipmentInstances(items.map(i => i.id!), templates);
@@ -2451,41 +2448,26 @@ export function processMonsterDeath(
     const drops = monsterIsBoss
       ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
       : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);
-    // 鑲材與天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
-    // 兩者都不佔背包格，所以不需要容量檢查，撿不到的情況不存在
+    // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
+    // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
+    // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
     const talentDropMult = 1 + dropBonuses.drop_rate / 100;
-    // 各 tier 獨立判定，一次擊殺可能掉多份（§ 51.6.1）
-    const talentAffixes = rollTalentAffixDrops(areaLevel, monsterIsBoss, talentDropMult);
     const talentSlotTier = rollTalentSlotDrop(areaLevel, monsterIsBoss, talentDropMult);
     const talentLogs: string[] = [];
-    if (char.id) {
-      for (const talentAffix of talentAffixes) {
-        await db.talentAffixes.add({
-          characterId: char.id,
-          definitionId: talentAffix.def.id,
-          boundParam: talentAffix.boundParam,
-          params: null,
-          slotId: null,
-          slotIndex: null,
-        });
-        talentLogs.push(`獲得鑲材：${affixDropLabel(talentAffix.def, talentAffix.boundParam)}`);
-      }
-      if (talentSlotTier !== null) {
-        await db.talentSlots.add({
-          characterId: char.id,
-          tier: talentSlotTier,
-          assignedType: null,
-          templateId: null,
-          order: null,
-          enabled: true,
-        });
-        talentLogs.push(`獲得天賦格（T${talentSlotTier}）`);
-      }
-      // 掉落只寫 DB，天賦面板與背包分頁讀的是 store，不重載就要等下次載入角色才看得到。
-      // 只在真的掉了東西時重載：`load()` 會重讀兩張表並重建三套規則
-      if (talentAffixes.length > 0 || talentSlotTier !== null) {
-        await useTalentStore.getState().load(char.id);
-      }
+    if (char.id && talentSlotTier !== null) {
+      await db.talentSlots.add({
+        characterId: char.id,
+        tier: talentSlotTier,
+        assignedType: null,
+        templateId: null,
+        order: null,
+        enabled: true,
+        conditions: emptyConditions(talentSlotTier),
+        action: null,
+      });
+      talentLogs.push(`獲得天賦格（T${talentSlotTier}）`);
+      // 掉落只寫 DB，天賦面板與背包分頁讀的是 store，不重載就要等下次載入角色才看得到
+      await useTalentStore.getState().load(char.id);
     }
 
     const state2 = get();

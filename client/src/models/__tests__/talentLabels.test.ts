@@ -1,61 +1,42 @@
 import { describe, it, expect } from 'vitest';
-import { affixDropLabel, affixLabelOf, boundParamLabel } from '../talentLabels';
-import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
+import { ruleLabel, ruleLabelOf } from '../talentLabels';
+import { TALENT_RULE_DEFS, getTalentRuleDef } from '../../db/seed/talentSeeds';
 
-const defOf = (ruleId: string, form?: string) =>
-  TALENT_AFFIX_DEFS.find(d => d.ruleId === ruleId && (!form || d.form === form))!;
-
-/*
- * 掉落日誌要看得出撿到什麼（§ 51.6.1）。
- * 只有階級的話，同一階十幾種鑲材玩家得開背包翻。
- */
-describe('鑲材的掉落日誌名稱', () => {
-  it('自選型只有名稱與階級', () => {
-    const def = defOf('hp_below');
-    expect(affixDropLabel(def, null)).toBe(`${affixLabelOf(def)}（T${def.tier}）`);
-  });
-
-  // 池型在掉落時 roll 出子集，不顯示的話兩份長得一樣但綁的不同
-  it('池型帶出 roll 到的子集', () => {
-    const def = defOf('skill', 'pool');
-    expect(affixDropLabel(def, 'fire')).toContain('・火系');
-    expect(affixDropLabel(def, 'aoe')).toContain('・範圍');
-  });
-
-  it('道具類別的池型也帶得出來', () => {
-    const def = defOf('buy_item', 'pool');
-    expect(affixDropLabel(def, 'potion')).toContain('・藥水');
-  });
-
-  it('查不到的綁定值不顯示，不印出原始 key', () => {
-    expect(boundParamLabel('nonsense-key')).toBeNull();
-    const def = defOf('hp_below');
-    expect(affixDropLabel(def, 'nonsense-key')).not.toContain('nonsense');
-  });
-});
+const defOf = (ruleId: string) => getTalentRuleDef(ruleId)!;
 
 /*
- * 可選範圍階梯（§ 51.4.1）共用同一個 `ruleId`，名稱是玩家唯一分得出階級的線索。
- * 同名的話合成台與背包會出現好幾份「施放攻擊技能」，看不出差別。
+ * 標籤一律取自既有常數，編輯器與 Wiki 共用同一份（§ 43.4.12）——
+ * 面板改名 Wiki 會跟著動，不會出現「Wiki 寫的選項在面板上找不到」。
  */
-describe('同一條規則橫跨多階時名稱不同', () => {
-  it('攻擊技能三階各有各的名字', () => {
-    expect(affixLabelOf(defOf('skill', 'fixed'))).toBe('施放指定攻擊技能');
-    expect(affixLabelOf(defOf('skill', 'pool'))).toBe('施放指定系別攻擊技能');
-    expect(affixLabelOf(defOf('skill', 'free'))).toBe('施放攻擊技能');
+describe('條件與動作的顯示名稱', () => {
+  it('從判定引擎的標籤常數取名', () => {
+    expect(ruleLabelOf(defOf('hp_below'))).toBe('HP 低於');
+    expect(ruleLabel('normal_attack')).toBe('普通攻擊');
   });
 
-  it('buff 技能、購買、從倉庫取也分得開', () => {
-    expect(affixLabelOf(defOf('buff_skill', 'fixed'))).toBe('施放特定招式');
-    expect(affixLabelOf(defOf('buff_skill', 'free'))).not.toBe('施放特定招式');
-    expect(affixLabelOf(defOf('buy_item', 'pool'))).toContain('指定類別');
-    expect(affixLabelOf(defOf('buy_item', 'free'))).not.toContain('指定類別');
-    expect(affixLabelOf(defOf('withdraw_item', 'pool'))).toContain('指定類別');
-    expect(affixLabelOf(defOf('withdraw_item', 'free'))).not.toContain('指定類別');
+  it('查不到定義時回傳 ruleId 本身，不拋錯', () => {
+    expect(ruleLabel('nonsense-rule')).toBe('nonsense-rule');
   });
 
+  /* 沒接上引擎的在標籤表裡查不到，改由 `PENDING_RULE_LABELS` 補（§ 51.4.3.2） */
+  it('未開放的項目仍有名字可顯示', () => {
+    expect(ruleLabelOf(defOf('target_casting'))).toBe('目標正在詠唱');
+    expect(ruleLabelOf(defOf('can_kill_target'))).toBe('本招可擊殺目標');
+  });
+
+  /*
+   * 能力階梯塌成完整版之後一個 `ruleId` 只有一個名字（§ 51.4.1）。
+   * 同名兩筆會讓選單出現兩個「施放攻擊技能」，玩家看不出差別。
+   */
   it('沒有兩筆定義叫同一個名字', () => {
-    const names = TALENT_AFFIX_DEFS.map(affixLabelOf);
+    const names = TALENT_RULE_DEFS.map(ruleLabelOf);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('每一筆都有名字，沒有漏掉標籤退回 ruleId 的', () => {
+    const nameless = TALENT_RULE_DEFS
+      .filter(d => ruleLabelOf(d) === d.ruleId)
+      .map(d => d.ruleId);
+    expect(nameless).toEqual([]);
   });
 });

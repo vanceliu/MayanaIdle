@@ -1,15 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateCombatScript, type CombatScriptContext } from '../scriptRunner';
 import type { CombatRule, CombatActionType } from '../../models/scriptEngine';
-import { TALENT_AFFIX_DEFS } from '../../db/seed/talentSeeds';
-import { CLASS_SKILLS } from '../../models/classSkills';
-
-/** 職業魔法閘門會驗 id 是否真的在 `CLASS_SKILLS` 裡，所以測試不能用假 id */
-const CLASS_ATTACK_ID = CLASS_SKILLS.find(c => c.skill.type === 'attack')!.id;
-
+import { selectableRules } from '../../db/seed/talentSeeds';
 /**
  * 戰鬥動作的可執行閘門（`51-auto-talent.md` § 51.4.9）。
- * 閘門漏了哪一個，那個鑲材就永遠選不上，而且不會報錯。
+ * 閘門漏了哪一個，那個動作就永遠選不上，而且不會報錯。
  */
 
 function ctx(over: Partial<CombatScriptContext> = {}): CombatScriptContext {
@@ -55,12 +50,10 @@ describe('戰鬥動作閘門', () => {
     }
   });
 
-  /* 沒被 blocked 的戰鬥實作鑲材，閘門一定要認得 */
-  it('所有可用的戰鬥實作鑲材，閘門都認得', () => {
-    const actions = TALENT_AFFIX_DEFS
-      .filter(d => !d.blocked && d.kind === 'action' && d.appliesTo.includes('combat'));
-    for (const def of actions) {
-      const skillId = def.ruleId === 'skill_class_only' ? CLASS_ATTACK_ID : 'x';
+  /* 沒被 blocked 的戰鬥動作，閘門一定要認得 */
+  it('所有可選的戰鬥動作，閘門都認得', () => {
+    for (const def of selectableRules('combat', 'action')) {
+      const skillId = 'x';
       const skills = [{ id: skillId, name: 'x', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0 } as never];
       const action = { type: def.ruleId as CombatActionType, skillId };
       const result = evaluateCombatScript(
@@ -72,36 +65,18 @@ describe('戰鬥動作閘門', () => {
   });
 
   /*
-   * `skill_class_only` 只是可選範圍窄一階，執行路徑必須與一般技能相同 ——
-   * 走到普通攻擊那條的話，傷害用武器白值、日誌印「攻擊」而不是技能名。
+   * 施放技能必須走技能路徑，不可掉到普通攻擊 ——
+   * 掉下去的話傷害用武器白值、日誌印「攻擊」而不是技能名。
    */
-  it('職業魔法與一般技能走同一條路徑', () => {
-    for (const type of ['skill', 'skill_class_only'] as CombatActionType[]) {
-      const skillId = type === 'skill_class_only' ? CLASS_ATTACK_ID : 'x';
-      const skill = {
-        id: skillId, name: '火球', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
-        range: 12, target: 'single',
-      } as never;
-      const action = { type, skillId };
-      const result = evaluateCombatScript(
-        [{ id: 'r', enabled: true, conditions: [], action } as CombatRule],
-        ctx({ skills: [skill] }),
-      );
-      expect(result?.type).toBe(type);
-      expect((result as { skillId?: string }).skillId).toBe(skillId);
-    }
-  });
-
-  /* 職業魔法鑲材只吃職業魔法（§ 51.4.9 T3），基礎魔法必須被擋下 */
-  it('職業魔法鑲材放基礎魔法不成立', () => {
+  it('施放技能走技能路徑', () => {
     const skill = {
-      id: 'wind-blade', name: '風刃', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
-      range: 10, target: 'single',
+      id: 'x', name: '火球', type: 'attack', mpCost: 0, cooldown: 0, lastUsedAt: 0,
+      range: 12, target: 'single',
     } as never;
-    const action = { type: 'skill_class_only' as CombatActionType, skillId: 'wind-blade' };
-    expect(evaluateCombatScript(
-      [{ id: 'r', enabled: true, conditions: [], action } as CombatRule],
+    const result = evaluateCombatScript(
+      [{ id: 'r', enabled: true, conditions: [], action: { type: 'skill', skillId: 'x' } } as CombatRule],
       ctx({ skills: [skill] }),
-    )).toBeNull();
+    );
+    expect(result?.type).toBe('skill');
   });
 });

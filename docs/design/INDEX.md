@@ -65,12 +65,13 @@
 | **debuff tag 一覽（免疫詞綴／解除道具／控場免疫的查表 key）** | `24-buff-debuff.md` | § 24.4.1 |
 | **技能施加於怪物的 debuff（效果與秒數走技能表，只有 tag 共用）** | `24-buff-debuff.md` | § 24.4.1 下半 |
 | 狀態解除道具（解毒/止血/淨化） | `30-items.md` | § 狀態解除道具 |
-| **自動天賦（原自動腳本）：天賦格／鑲材／合成／兌換／降階／掉落** | `51-auto-talent.md` | 全文 |
-| **鑲材清單與 tier 歸屬** | `51-auto-talent.md` | § 51.4.5~51.4.11 |
+| **自動天賦（原自動腳本）：天賦格／合成／掉落** | `51-auto-talent.md` | 全文 |
+| **條件與動作清單（一律內建，無 tier、無取得管道）** | `51-auto-talent.md` | § 51.4.5~51.4.11 |
+| **條件與動作為何不是可收集物** | `51-auto-talent.md` | § 51.4.1、§ 51.12 |
 | **天賦格取得（等級／合成／Boss 掉落）** | `51-auto-talent.md` | § 51.3.3 |
 | **天賦格要先安裝（領取→背包→安裝）** | `51-auto-talent.md` | § 51.3.4 |
-| **鑲材總表（Wiki）不併進道具總表** | `43-wiki-system.md` | § 4.12.1 |
-| 戰鬥天賦 / 常駐天賦的條件與動作規格 | `03-combat.md` | § 3.12、§ 3.13（＋緊急撤退）。取得方式見 `51-auto-talent.md` |
+| **天賦格是換裝、條件與動作是複製** | `51-auto-talent.md` | § 51.3.2、§ 51.5.1 |
+| 戰鬥天賦 / 常駐天賦的條件與動作規格 | `03-combat.md` | § 3.12、§ 3.13（＋緊急撤退）。天賦格取得見 `51-auto-talent.md` |
 | 天賦配置（原腳本 Template，分頁切換） | `03-combat.md` | § 3.14 |
 | 補給天賦（原村莊腳本：自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
 | **系統信箱／更新公告（發放與領取）** | `52-mailbox.md` | 全文 |
@@ -272,10 +273,10 @@
 51-auto-talent.md
   ←→ 03-combat.md § 3.12~3.14
   ←→ 49-village-script.md
-  ←→ 27-drop-table.md § 27.1
-  ←→ 30-items.md
-  ←→ 35-inventory-constraints.md § 35.20~35.21
-  ←→ 18-data-schema.md
+  ←→ 27-drop-table.md § 27.9（只有天賦格）
+  ←→ 30-items.md § 天賦格
+  ←→ 35-inventory-constraints.md § 35.21
+  ←→ 18-data-schema.md § 18.9
   ←→ 13-town.md § 13.8
   ←→ 34-ui-guidelines.md
   ←→ 43-wiki-system.md

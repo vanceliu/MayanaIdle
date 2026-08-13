@@ -7,7 +7,7 @@ import {
   loadTalentBagOrder,
   saveTalentBagOrder,
 } from '../models/talentBag';
-import { useTalentStore, availableSlots, availableAffixes } from '../stores/talentStore';
+import { useTalentStore, availableSlots } from '../stores/talentStore';
 import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
@@ -88,16 +88,12 @@ export function BagPanel() {
     ? talentOrderState.order
     : loadTalentBagOrder(charId);
   const talentSlots = useTalentStore(s => s.slots);
-  const talentAffixes = useTalentStore(s => s.affixes);
   const activeTemplateId = useGameStore(s => s.activeTemplateId);
 
   /** 天賦分頁的整理。把當下的排序結果整批寫成位置 */
   function handleTalentSort() {
-    const cells = buildTalentBagCells(
-      availableSlots(talentSlots, activeTemplateId),
-      availableAffixes(talentAffixes, talentSlots, activeTemplateId),
-    );
-    const next = sortTalentBag(cells, talentAffixes);
+    const cells = buildTalentBagCells(availableSlots(talentSlots, activeTemplateId));
+    const next = sortTalentBag(cells);
     setTalentOrder({ charId, order: next });
     saveTalentBagOrder(charId, next);
   }

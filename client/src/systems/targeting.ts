@@ -68,8 +68,7 @@ export function resolveActionTargets(params: ResolveTargetsParams): string[] {
     return [primaryId];
   }
 
-  // `skill_class_only` 的取目標方式與一般技能相同，差別只在可選範圍（§ 51.4.9 T3）
-  if ((action.type === 'skill' || action.type === 'skill_class_only') && action.skillId) {
+  if (action.type === 'skill' && action.skillId) {
     const skill = skills.find(s => s.id === action.skillId);
     if (!skill) return [primaryId];
 
