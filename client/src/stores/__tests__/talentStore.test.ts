@@ -300,6 +300,106 @@ describe('talentStore（`51-auto-talent.md`）', () => {
     });
   });
 
+  describe('定向兌換（§ 51.5.3：同 tier ×3 → 指定同 tier ×1）', () => {
+    it('投入 3 份、產出指定的那一份，必定成功', async () => {
+      // 1001~1003 皆為共用條件 T1
+      await addAffix(1001);
+      await addAffix(1002);
+      await addAffix(1003);
+      await useTalentStore.getState().load(CHAR);
+
+      const ids = useTalentStore.getState().affixes.map(a => a.id!);
+      const produced = await useTalentStore.getState().exchangeAffixes(ids, 1005);
+
+      expect(produced?.definitionId).toBe(1005);
+      const { affixes } = useTalentStore.getState();
+      expect(affixes).toHaveLength(1);
+      expect(affixes[0].definitionId).toBe(1005);
+      // 產物未綁定，首次鑲入時才選定（§ 51.4.1）
+      expect(affixes[0].boundParam).toBeNull();
+    });
+
+    it('份數不足擋下', async () => {
+      await addAffix(1001);
+      await addAffix(1002);
+      await useTalentStore.getState().load(CHAR);
+      const ids = useTalentStore.getState().affixes.map(a => a.id!);
+      expect(await useTalentStore.getState().exchangeAffixes(ids, 1005)).toBeNull();
+    });
+
+    it('產出不可跨 tier 或跨種類', async () => {
+      await addAffix(1001);
+      await addAffix(1002);
+      await addAffix(1003);
+      await useTalentStore.getState().load(CHAR);
+      const ids = useTalentStore.getState().affixes.map(a => a.id!);
+
+      expect(await useTalentStore.getState().exchangeAffixes(ids, 1006)).toBeNull(); // T2 條件
+      expect(await useTalentStore.getState().exchangeAffixes(ids, 2001)).toBeNull(); // T1 實作
+      expect(useTalentStore.getState().affixes).toHaveLength(3);
+    });
+
+    it('已鑲入的不能拿去兌換', async () => {
+      const slot = await addSlot(1, true);
+      const a = await addAffix(1001);
+      await addAffix(1002);
+      await addAffix(1003);
+      await useTalentStore.getState().load(CHAR);
+      await useTalentStore.getState().equipAffix(a, slot, 0);
+
+      const ids = useTalentStore.getState().affixes.map(x => x.id!);
+      expect(await useTalentStore.getState().exchangeAffixes(ids, 1005)).toBeNull();
+    });
+
+    it('適用類型沒有交集就換不成', async () => {
+      // 1101 戰鬥專屬條件 T1、1301 補給條件 T1
+      await addAffix(1001);
+      await addAffix(1101);
+      await addAffix(1301);
+      await useTalentStore.getState().load(CHAR);
+      const ids = useTalentStore.getState().affixes.map(a => a.id!);
+      expect(await useTalentStore.getState().exchangeAffixes(ids, 1005)).toBeNull();
+    });
+  });
+
+  describe('降階（§ 51.5.3：高階 ×1 → 指定低階 ×1）', () => {
+    it('不必逐階，T3 可一步換成指定的 T1', async () => {
+      const id = await addAffix(1010); // 共用條件 T3
+      await useTalentStore.getState().load(CHAR);
+
+      const produced = await useTalentStore.getState().downgradeAffix(id, 1001);
+
+      expect(produced?.definitionId).toBe(1001);
+      const { affixes } = useTalentStore.getState();
+      expect(affixes).toHaveLength(1);
+      expect(affixes[0].definitionId).toBe(1001);
+    });
+
+    it('不可平階或升階', async () => {
+      const id = await addAffix(1006); // 共用條件 T2
+      await useTalentStore.getState().load(CHAR);
+
+      expect(await useTalentStore.getState().downgradeAffix(id, 1007)).toBeNull(); // 同為 T2
+      expect(await useTalentStore.getState().downgradeAffix(id, 1010)).toBeNull(); // T3
+      expect(useTalentStore.getState().affixes).toHaveLength(1);
+    });
+
+    it('T1 沒有更低階可換', async () => {
+      const id = await addAffix(1001);
+      await useTalentStore.getState().load(CHAR);
+      expect(await useTalentStore.getState().downgradeAffix(id, 1002)).toBeNull();
+    });
+
+    it('已鑲入的不能拿去降階', async () => {
+      const slot = await addSlot(1, true);
+      const id = await addAffix(1010);
+      await useTalentStore.getState().load(CHAR);
+      await useTalentStore.getState().equipAffix(id, slot, 0);
+
+      expect(await useTalentStore.getState().downgradeAffix(id, 1001)).toBeNull();
+    });
+  });
+
   describe('綁定（§ 51.4.1）', () => {
     it('未綁定的可以綁一次，綁過就不可更改', async () => {
       const id = await addAffix(2003); // 施放指定攻擊技能，指定型

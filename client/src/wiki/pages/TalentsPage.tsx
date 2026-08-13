@@ -22,6 +22,9 @@ import {
   AFFIX_DROP_RATE,
   AFFIX_FUSE_SUCCESS_RATE,
   AFFIX_TIER_BAND,
+  DOWNGRADE_INPUT_COUNT,
+  EXCHANGE_INPUT_COUNT,
+  FUSE_INPUT_COUNT,
   SLOT_DROP_RATE_BOSS,
   slotTierBandFor,
   SLOT_GRANT_LEVEL_INTERVAL,
@@ -147,6 +150,10 @@ export function TalentsPage() {
           <li>每 {SLOT_GRANT_LEVEL_INTERVAL} 級由信箱發 1 個 T1 天賦格，要自己領、自己安裝</li>
           <li>高階天賦格只有 Boss 會掉（{SLOT_DROP_RATE_BOSS}%），或用低階 ×2 合成</li>
           <li>鑲材由一般怪與 Boss 掉落，Boss 掉率是一般怪的兩倍</li>
+          <li>
+            缺哪一份鑲材可以自己換：同階級 ×{EXCHANGE_INPUT_COUNT} 換指定的同階級 1 份，
+            或用任一較高階級 1 份換指定的較低階級 1 份，兩者都必定成功
+          </li>
         </ul>
 
         <h4 style={subTitleStyle}>鑲材的三種型態</h4>
@@ -305,11 +312,6 @@ export function TalentsPage() {
       </section>
 
       <section style={{ marginBottom: 32 }}>
-        <h3 style={SECTION_TITLE}>合成與掉落</h3>
-        <TalentFusionTable />
-      </section>
-
-      <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>範例</h3>
         <h4 style={subTitleStyle}>戰鬥天賦：怪聚成一團才放範圍技</h4>
         <pre style={codeStyle}>{`#1 如果 本招命中數 ≥ 3 且 MP 高於 40%  → 施放火球
@@ -368,7 +370,7 @@ export function TalentAffixTable() {
               <td>{d.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}</td>
               <td>{d.form === 'fixed' ? '指定' : d.form === 'pool' ? '池' : '自選'}</td>
               {/* 未開放的鑲材標明原因，免得玩家白刷（§ 51.4.3.2、§ 51.4.4） */}
-              <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／合成'}</td>
+              <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／合成／兌換'}</td>
             </tr>
           ))}
         </tbody>
@@ -377,15 +379,38 @@ export function TalentAffixTable() {
   );
 }
 
-/** 合成鏈與掉落分帶（`51-auto-talent.md` § 51.5.2、§ 51.6） */
+/** 合成鏈、兌換、降階與掉落分帶（`51-auto-talent.md` § 51.5.2~51.5.3、§ 51.6） */
 export function TalentFusionTable() {
   return (
     <div>
       <h3>合成與掉落</h3>
       <p>
         天賦格：低階 ×2 → 高階 ×1，<strong>必定成功</strong>。
-        鑲材：<strong>同階級、同種類、同適用類型</strong> ×2 → 隨機同類 T+1，失敗只退回其中 1 份。
+        鑲材有三種換法，投入一律要<strong>同種類、同適用類型</strong>，且只吃沒鑲入天賦格的：
       </p>
+      <table className="wiki-table">
+        <thead><tr><th></th><th>投入</th><th>產出</th><th>成功率</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>合成</td>
+            <td>同階級 ×{FUSE_INPUT_COUNT}</td>
+            <td><strong>隨機</strong>一份 T+1</td>
+            <td>見下表，失敗只退回其中 1 份</td>
+          </tr>
+          <tr>
+            <td>定向兌換</td>
+            <td>同階級 ×{EXCHANGE_INPUT_COUNT}</td>
+            <td><strong>指定</strong>一份同階級</td>
+            <td>必定成功</td>
+          </tr>
+          <tr>
+            <td>降階</td>
+            <td>任一較高階級 ×{DOWNGRADE_INPUT_COUNT}</td>
+            <td><strong>指定</strong>一份較低階級，不必逐階</td>
+            <td>必定成功</td>
+          </tr>
+        </tbody>
+      </table>
       <table className="wiki-table">
         <thead><tr><th>產出</th><th>鑲材合成成功率</th><th>一般怪掉率</th><th>Boss 掉率</th></tr></thead>
         <tbody>

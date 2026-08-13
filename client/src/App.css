@@ -8409,6 +8409,43 @@ button.active {
   color: var(--text-dim);
 }
 
+/* 合成／定向兌換／降階的切換 */
+.fusion-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.fusion-mode {
+  padding: 4px 10px;
+  background: var(--bg-inset);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.fusion-mode:hover {
+  background: var(--bg-card-hover);
+}
+
+.fusion-mode.is-active {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+/* 產物槽裡的指定產物選單 */
+.fusion-target {
+  max-width: 100%;
+  padding: 2px 4px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+}
+
 /* === 背包天賦分頁 === */
 
 .bag-talent {

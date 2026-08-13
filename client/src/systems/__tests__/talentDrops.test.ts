@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   affixCandidates,
   rollTalentAffixDrop,
+  rollTalentAffixDrops,
   rollTalentSlotDrop,
 } from '../talentDrops';
 import { affixTierBandFor, slotTierBandFor } from '../../models/talent';
@@ -15,16 +16,15 @@ function seq(values: number[]): () => number {
 
 describe('鑲材與天賦格掉落（`27-drop-table.md` § 27.9）', () => {
   describe('tier 區域分帶（§ 51.6.1）', () => {
-    it('低等區只掉 T1，高等區不再掉 T1', () => {
+    it('只設上限不設下限，T1 全區域掉落', () => {
       expect(affixTierBandFor(10)).toEqual({ min: 1, max: 1 });
       expect(affixTierBandFor(35)).toEqual({ min: 1, max: 3 });
-      // Lv.41 以上不再掉 T1 —— 區間有下限
-      expect(affixTierBandFor(45)).toEqual({ min: 2, max: 4 });
-      expect(affixTierBandFor(55)).toEqual({ min: 3, max: 5 });
-      expect(affixTierBandFor(80)).toEqual({ min: 4, max: 6 });
+      expect(affixTierBandFor(45)).toEqual({ min: 1, max: 4 });
+      expect(affixTierBandFor(55)).toEqual({ min: 1, max: 5 });
+      expect(affixTierBandFor(80)).toEqual({ min: 1, max: 6 });
     });
 
-    it('天賦格沿用同一組分帶', () => {
+    it('天賦格與鑲材不同，保留區間下限', () => {
       expect(slotTierBandFor(30)).toEqual({ min: 2, max: 2 });
       expect(slotTierBandFor(55)).toEqual({ min: 2, max: 3 });
       expect(slotTierBandFor(70)).toEqual({ min: 3, max: 4 });
@@ -83,10 +83,11 @@ describe('鑲材與天賦格掉落（`27-drop-table.md` § 27.9）', () => {
       }
     });
 
-    it('高等區掉不出 T1', () => {
-      const drop = rollTalentAffixDrop(80, false, 1, seq([0, 0, 0]));
-      expect(drop).not.toBeNull();
-      expect(drop!.def.tier).toBeGreaterThanOrEqual(4);
+    it('高等區照樣掉 T1（分帶沒有下限）', () => {
+      // rng 恆 0 → 每一階都命中，區間內的 tier 全部掉一份
+      const drops = rollTalentAffixDrops(80, false, 1, () => 0);
+      expect(drops.map(d => d.def.tier)).toContain(1);
+      expect(drops.map(d => d.def.tier)).toContain(6);
     });
 
     it('Boss 掉率是一般怪的 2 倍', () => {

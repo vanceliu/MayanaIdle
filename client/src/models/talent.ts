@@ -171,6 +171,12 @@ export const AFFIX_FUSE_SUCCESS_RATE: Record<Exclude<TalentTier, 1>, number> = {
   7: 2,
 };
 
+/** 定向兌換投入數：同 tier ×3 → 指定同 tier ×1，必定成功（§ 51.5.3） */
+export const EXCHANGE_INPUT_COUNT = 3;
+
+/** 降階投入數：較高 tier ×1 → 指定較低 tier ×1，必定成功、不必逐階（§ 51.5.3） */
+export const DOWNGRADE_INPUT_COUNT = 1;
+
 // === 掉落（`27-drop-table.md` § 27.9）===
 
 /** 鑲材掉率（一般怪，%）。T7 不掉落。Boss 為 2 倍 */
@@ -193,19 +199,20 @@ export const SLOT_DROP_RATE_BOSS = 0.01;
 /**
  * 區域最高等級 → 可掉的鑲材 tier 區間（§ 51.6.1）。
  *
- * **區間有下限**：Lv.41 以上的區域不再掉 T1，Lv.51 以上不再掉 T2。
- * 低階鑲材只在低等區產出。
+ * **只設上限，不設下限**：低階鑲材全區域掉落。
+ * 低階鑲材有大量沒有更高階替代版本的能力（「使用藥水」「HP 低於」），
+ * 斷貨的話高等區補不到，而合成只能向上、淨吃 2 份。
  */
 export const AFFIX_TIER_BAND: readonly { maxAreaLevel: number; min: TalentTier; max: TalentTier }[] = [
   { maxAreaLevel: 15, min: 1, max: 1 },
   { maxAreaLevel: 30, min: 1, max: 2 },
   { maxAreaLevel: 40, min: 1, max: 3 },
-  { maxAreaLevel: 50, min: 2, max: 4 },
-  { maxAreaLevel: 60, min: 3, max: 5 },
-  { maxAreaLevel: Infinity, min: 4, max: 6 },
+  { maxAreaLevel: 50, min: 1, max: 4 },
+  { maxAreaLevel: 60, min: 1, max: 5 },
+  { maxAreaLevel: Infinity, min: 1, max: 6 },
 ];
 
-/** Boss 掉落的天賦格 tier 區間，沿用同一組區域分帶（§ 51.6.2） */
+/** Boss 掉落的天賦格 tier 區間。**天賦格保留下限**，與鑲材不同（§ 51.6.2） */
 export const SLOT_TIER_BAND: readonly { maxAreaLevel: number; min: TalentSlotTier; max: TalentSlotTier }[] = [
   { maxAreaLevel: 40, min: 2, max: 2 },
   { maxAreaLevel: 60, min: 2, max: 3 },

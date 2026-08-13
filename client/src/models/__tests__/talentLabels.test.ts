@@ -33,3 +33,29 @@ describe('鑲材的掉落日誌名稱', () => {
     expect(affixDropLabel(def, 'nonsense-key')).not.toContain('nonsense');
   });
 });
+
+/*
+ * 可選範圍階梯（§ 51.4.1）共用同一個 `ruleId`，名稱是玩家唯一分得出階級的線索。
+ * 同名的話合成台與背包會出現好幾份「施放攻擊技能」，看不出差別。
+ */
+describe('同一條規則橫跨多階時名稱不同', () => {
+  it('攻擊技能三階各有各的名字', () => {
+    expect(affixLabelOf(defOf('skill', 'fixed'))).toBe('施放指定攻擊技能');
+    expect(affixLabelOf(defOf('skill', 'pool'))).toBe('施放指定系別攻擊技能');
+    expect(affixLabelOf(defOf('skill', 'free'))).toBe('施放攻擊技能');
+  });
+
+  it('buff 技能、購買、從倉庫取也分得開', () => {
+    expect(affixLabelOf(defOf('buff_skill', 'fixed'))).toBe('施放特定招式');
+    expect(affixLabelOf(defOf('buff_skill', 'free'))).not.toBe('施放特定招式');
+    expect(affixLabelOf(defOf('buy_item', 'pool'))).toContain('指定類別');
+    expect(affixLabelOf(defOf('buy_item', 'free'))).not.toContain('指定類別');
+    expect(affixLabelOf(defOf('withdraw_item', 'pool'))).toContain('指定類別');
+    expect(affixLabelOf(defOf('withdraw_item', 'free'))).not.toContain('指定類別');
+  });
+
+  it('沒有兩筆定義叫同一個名字', () => {
+    const names = TALENT_AFFIX_DEFS.map(affixLabelOf);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});

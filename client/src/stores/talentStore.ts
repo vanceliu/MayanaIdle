@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { db } from '../db/database';
 import {
   AFFIX_FUSE_SUCCESS_RATE,
+  EXCHANGE_INPUT_COUNT,
   FUSE_INPUT_COUNT,
   STARTING_SLOT_COUNT,
   TALENT_POOL_TIER_CAP,
@@ -60,6 +61,8 @@ export interface TalentState {
 
   fuseSlots: (tier: TalentSlotTier) => Promise<TalentSlot | null>;
   fuseAffixes: (affixIds: number[], rng?: Rng) => Promise<FuseAffixResult | null>;
+  exchangeAffixes: (affixIds: number[], targetDefinitionId: number) => Promise<TalentAffixInstance | null>;
+  downgradeAffix: (affixId: number, targetDefinitionId: number) => Promise<TalentAffixInstance | null>;
 }
 
 /** 完全沒安裝在任何天賦配置裡的天賦格。合成只能吃這一種 */
@@ -154,6 +157,71 @@ export function canFuseAffixes(inputs: (TalentAffixInstance | undefined)[]): boo
   if (d0.tier >= fuseCapFor(d0)) return false;
   // 產不出東西就不算合得成
   return fuseCandidates(d0, d1).length > 0;
+}
+
+/**
+ * 投入的每一份都適用的類型（§ 51.5.3）。空陣列 ＝ 湊不成一組。
+ * 與合成一樣取交集而非要求集合相等，否則共用鑲材幾乎換不動。
+ */
+function sharedTypes(defs: TalentAffixDef[]): TalentType[] {
+  return defs.reduce<TalentType[]>(
+    (acc, d) => acc.filter(t => d.appliesTo.includes(t)),
+    [...defs[0].appliesTo],
+  );
+}
+
+/** 投入的鑲材全部存在、都沒鑲入、同種類，且有共用的適用類型 */
+function inputDefs(inputs: (TalentAffixInstance | undefined)[]): TalentAffixDef[] | null {
+  if (inputs.some(a => !a || a.slotId !== null)) return null;
+  const defs = inputs.map(a => getTalentAffixDef(a!.definitionId));
+  if (defs.some(d => !d)) return null;
+  return defs as TalentAffixDef[];
+}
+
+/** 產出可不可以是這一筆定義：同種類、指定 tier、適用類型與投入有交集 */
+function canProduce(target: TalentAffixDef, defs: TalentAffixDef[], tier: TalentTier): boolean {
+  if (target.blocked) return false;
+  if (target.tier !== tier) return false;
+  if (target.kind !== defs[0].kind) return false;
+  const shared = sharedTypes(defs);
+  return shared.length > 0 && target.appliesTo.some(t => shared.includes(t));
+}
+
+/**
+ * 定向兌換能不能成立（§ 51.5.3）：同類型同種類同 tier ×3 → 指定同 tier ×1。
+ * UI 與 store 共用這一支。
+ */
+export function canExchangeAffixes(
+  inputs: (TalentAffixInstance | undefined)[],
+  targetDefinitionId: number,
+): boolean {
+  if (inputs.length !== EXCHANGE_INPUT_COUNT) return false;
+  const ids = inputs.map(a => a?.id);
+  if (new Set(ids).size !== ids.length) return false;
+
+  const defs = inputDefs(inputs);
+  if (!defs) return false;
+  if (defs.some(d => d.tier !== defs[0].tier || d.kind !== defs[0].kind)) return false;
+
+  const target = getTalentAffixDef(targetDefinitionId);
+  if (!target) return false;
+  return canProduce(target, defs, defs[0].tier);
+}
+
+/**
+ * 降階能不能成立（§ 51.5.3）：較高 tier ×1 → 指定較低 tier ×1。
+ * **不必逐階**，T6 可一步換 T1；產出比投入低，不受各池上限限制。
+ */
+export function canDowngradeAffix(
+  input: TalentAffixInstance | undefined,
+  targetDefinitionId: number,
+): boolean {
+  const defs = inputDefs([input]);
+  if (!defs) return false;
+
+  const target = getTalentAffixDef(targetDefinitionId);
+  if (!target || target.tier >= defs[0].tier) return false;
+  return canProduce(target, defs, target.tier);
 }
 
 export const useTalentStore = create<TalentState>((set, get) => ({
@@ -397,7 +465,64 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     await get().load(characterId);
     return { success, produced };
   },
+
+  /**
+   * 定向兌換：同類型同種類同 tier ×3 → **玩家指定**的同 tier ×1（§ 51.5.3）。
+   * 必定成功、不收金幣。
+   */
+  exchangeAffixes: async (affixIds, targetDefinitionId) => {
+    const { characterId, affixes } = get();
+    if (characterId === null || affixIds.length !== EXCHANGE_INPUT_COUNT) return null;
+
+    const inputs = affixIds.map(id => affixes.find(a => a.id === id));
+    if (!canExchangeAffixes(inputs, targetDefinitionId)) return null;
+
+    return consumeAndProduce(
+      characterId,
+      inputs.map(a => a!.id!),
+      targetDefinitionId,
+      get().load,
+    );
+  },
+
+  /**
+   * 降階：較高 tier ×1 → **玩家指定**的較低 tier ×1（§ 51.5.3）。
+   * 不必逐階，必定成功、不收金幣。
+   */
+  downgradeAffix: async (affixId, targetDefinitionId) => {
+    const { characterId, affixes } = get();
+    if (characterId === null) return null;
+
+    const input = affixes.find(a => a.id === affixId);
+    if (!canDowngradeAffix(input, targetDefinitionId)) return null;
+
+    return consumeAndProduce(characterId, [input!.id!], targetDefinitionId, get().load);
+  },
 }));
+
+/** 兌換與降階的共同結算：吃掉投入、產出未綁定的指定鑲材（§ 51.5.3） */
+async function consumeAndProduce(
+  characterId: number,
+  consumed: number[],
+  targetDefinitionId: number,
+  reload: (characterId: number) => Promise<void>,
+): Promise<TalentAffixInstance> {
+  const produced: TalentAffixInstance = {
+    characterId,
+    definitionId: targetDefinitionId,
+    boundParam: null,
+    params: null,
+    slotId: null,
+    slotIndex: null,
+  };
+
+  await db.transaction('rw', db.talentAffixes, async () => {
+    await db.talentAffixes.bulkDelete(consumed);
+    await db.talentAffixes.add(produced);
+  });
+  await reload(characterId);
+  return produced;
+}
 
 /**
  * 判定用的規則（`systems/talentRules.ts`）。
