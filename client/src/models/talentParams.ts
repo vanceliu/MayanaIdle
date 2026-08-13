@@ -90,17 +90,17 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   monster_count_gte: [COUNT('至少', 3)],
   monsters_near_self_gte: [
     COUNT('至少', 4),
-    { key: 'radius', kind: 'number', label: '半徑', suffix: '碼', min: 1, max: 15, def: 3 },
+    { key: 'radius', kind: 'number', label: '半徑', suffix: '格', min: 1, max: 15, def: 3 },
   ],
   aoe_hit_count_gte: [COUNT('命中至少', 3)],
   monster_hp_below: [PERCENT('低於', 30)],
   monster_hp_above: [PERCENT('高於', 70)],
   field_avg_hp_below: [PERCENT('低於', 30)],
   can_kill_count_gte: [COUNT('至少', 2)],
-  target_distance: [COMPARE, { key: 'value', kind: 'number', label: '距離', suffix: '碼', min: 1, max: 20, def: 5 }],
+  target_distance: [COMPARE, { key: 'value', kind: 'number', label: '距離', suffix: '格', min: 1, max: 20, def: 5 }],
   target_defense: [COMPARE, { key: 'value', kind: 'number', label: '防禦', min: 0, max: 200, def: 40 }],
   target_level_diff: [COMPARE, { key: 'value', kind: 'number', label: '等級差', min: -50, max: 50, def: 0 }],
-  target_range_gt: [{ key: 'value', kind: 'number', label: '大於', suffix: '碼', min: 1, max: 20, def: 5 }],
+  target_range_gt: [{ key: 'value', kind: 'number', label: '大於', suffix: '格', min: 1, max: 20, def: 5 }],
   target_attack_type: [{
     key: 'match', kind: 'select', label: '型別', def: 'ranged',
     options: [
@@ -152,9 +152,9 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   }],
   heal_skill: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'support' }],
   buff_skill: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'support' }],
-  keep_distance: [{ key: 'distance', kind: 'number', label: '保持', suffix: '碼', min: 1, max: 20, def: 8 }],
-  close_in: [{ key: 'distance', kind: 'number', label: '貼近到', suffix: '碼', min: 1, max: 20, def: 2 }],
-  disengage: [{ key: 'distance', kind: 'number', label: '拉開', suffix: '碼', min: 1, max: 20, def: 10 }],
+  keep_distance: [{ key: 'distance', kind: 'number', label: '保持', suffix: '格', min: 1, max: 20, def: 8 }],
+  close_in: [{ key: 'distance', kind: 'number', label: '貼近到', suffix: '格', min: 1, max: 20, def: 2 }],
+  disengage: [{ key: 'distance', kind: 'number', label: '拉開', suffix: '格', min: 1, max: 20, def: 10 }],
   switch_target_by_kind: [{
     key: 'match', kind: 'select', label: '種族／元素', def: 'undead',
     options: [...RACE_OPTIONS, ...ELEMENT_OPTIONS],

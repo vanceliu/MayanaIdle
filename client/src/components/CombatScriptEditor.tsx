@@ -154,7 +154,7 @@ export function CombatScriptEditor() {
                         value={cond.radius ?? DEFAULT_NEAR_SELF_RADIUS}
                         onChange={e => updateCondition(idx, condIdx, { radius: Number(e.target.value) })}
                       />
-                      <span className="unit-label">碼</span>
+                      <span className="unit-label">格</span>
                     </>
                   )}
                   {cond.type === 'skill_ready' && (

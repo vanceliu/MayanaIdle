@@ -107,7 +107,7 @@ export interface CombatCondition {
   type: CombatConditionType;
   value?: number;
   skillId?: string;
-  /** `monsters_near_self_gte` 用：以角色為圓心的半徑（碼） */
+  /** `monsters_near_self_gte` 用：以角色為圓心的半徑（格） */
   radius?: number;
   /** `target_distance`／`target_defense`／`target_level_diff` 用 */
   compare?: CompareMode;
@@ -124,7 +124,7 @@ export interface CombatAction {
   match?: string;
   /** `switch_target_by_debuff` 用：true＝挑**沒有**該 debuff 的 */
   invert?: boolean;
-  /** `keep_distance`／`close_in` 用：目標距離（碼）。未帶時用武器射程 */
+  /** `keep_distance`／`close_in` 用：目標距離（格）。未帶時用武器射程 */
   distance?: number;
 }
 
@@ -179,7 +179,7 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
 /** 條件的補充說明，滑鼠移上去看得到（`03-combat.md` § 3.12） */
 export const COMBAT_CONDITION_HINTS: Partial<Record<CombatConditionType, string>> = {
   monster_count_gte: '以這條規則自己的射程為半徑：技能用技能射程，普通攻擊用武器射程',
-  monsters_near_self_gte: '以角色為圓心、指定碼數內的活怪數，用來判斷是不是被圍住了',
+  monsters_near_self_gte: '以角色為圓心、指定格數內的活怪數，用來判斷是不是被圍住了',
   aoe_hit_count_gte: '照這條規則要放的技能實算命中幾隻。範圍技怪沒聚在一起就不放，單體技與普攻永遠是 1',
 };
 
@@ -199,7 +199,7 @@ export const COMBAT_ACTION_LABELS: Record<CombatActionType, string> = {
   disengage: '脫離',
 };
 
-/** `monsters_near_self_gte` 沒填半徑時的預設值（碼） */
+/** `monsters_near_self_gte` 沒填半徑時的預設值（格） */
 export const DEFAULT_NEAR_SELF_RADIUS = 3;
 
 // === Persistent Script Types ===
@@ -240,7 +240,7 @@ export interface PersistentCondition {
   skillId?: string;
   /** debuff_active 用：指定狀態異常條件 */
   debuffType?: ScriptDebuffCondition;
-  /** `monsters_near_self_gte` 用：以角色為圓心的半徑（碼） */
+  /** `monsters_near_self_gte` 用：以角色為圓心的半徑（格） */
   radius?: number;
   /** `weapon_type_is`／`current_area_is` 用 */
   match?: string;
@@ -264,7 +264,7 @@ export interface PersistentAction {
   /** `refill_all_buffs` 用：依序檢查的第 2、3 個 buff（第 1 個走 `skillId`） */
   skillId2?: string;
   skillId3?: string;
-  /** 走位用：目標距離（碼） */
+  /** 走位用：目標距離（格） */
   distance?: number;
 }
 

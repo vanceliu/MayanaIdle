@@ -7,7 +7,7 @@ export type PlayerCombatState = 'idle' | 'chasing' | 'attacking';
 /** 走位意圖（`51-auto-talent.md` § 51.4.9）。由天賦動作設定，FSM 在下一幀消費 */
 export interface MoveIntent {
   kind: 'keep_distance' | 'close_in' | 'disengage';
-  /** 目標距離（碼）。未帶時用武器射程 */
+  /** 目標距離（格）。未帶時用武器射程 */
   distance?: number;
 }
 

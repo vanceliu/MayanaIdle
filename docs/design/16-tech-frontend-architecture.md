@@ -504,7 +504,7 @@ interface ScriptTemplate {
 |---|---|---|
 | `always` | — | 永遠成立 |
 | `monster_count_gte` | 數量 | 攻擊範圍內怪物數 ≥ N（範圍＝該規則動作自己的射程） |
-| `monsters_near_self_gte` | 數量 + `radius` | 自身周圍 R 碼內怪物數 ≥ N |
+| `monsters_near_self_gte` | 數量 + `radius` | 自身周圍 R 格內怪物數 ≥ N |
 | `aoe_hit_count_gte` | 數量 | 本招實算命中數 ≥ N（走 `targeting.ts`，不套射程 gate） |
 | `monster_hp_below` | 閾值 (%) | 當前目標 HP 低於百分比 |
 | `monster_hp_above` | 閾值 (%) | 當前目標 HP 高於百分比 |

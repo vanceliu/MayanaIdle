@@ -15,7 +15,7 @@ export interface MapMonster {
   lastPathPlayerPos: Position;
   isBoss: boolean;
   /**
-   * 攻擊射程（碼）。遠程與魔法怪不必貼身（`41-arpg-combat.md` § 5.2）。
+   * 攻擊射程（格）。遠程與魔法怪不必貼身（`41-arpg-combat.md` § 5.2）。
    * 生成當下還沒挑模板，所以由 `PixiGame` 建實例時回填。
    */
   attackRange?: number;

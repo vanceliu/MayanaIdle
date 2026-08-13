@@ -315,7 +315,7 @@ export function TalentsPage() {
         <h3 style={SECTION_TITLE}>範例</h3>
         <h4 style={subTitleStyle}>戰鬥天賦：怪聚成一團才放範圍技</h4>
         <pre style={codeStyle}>{`#1 如果 本招命中數 ≥ 3 且 MP 高於 40%  → 施放火球
-#2 如果 自身周圍怪物數 ≥ 4（半徑 3 碼） → 施放天雷
+#2 如果 自身周圍怪物數 ≥ 4（半徑 3 格） → 施放天雷
 #3 如果 目標 HP 低於 30%                → 施放風刃
 #4 永遠                                 → 普通攻擊`}</pre>
 

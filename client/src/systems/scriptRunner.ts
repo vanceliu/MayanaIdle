@@ -112,7 +112,7 @@ function toCandidates(ctx: CombatScriptContext): TargetCandidate[] {
 /**
  * 這個動作自己的射程：技能有 `range` 就用技能的，其餘（普攻／不動作）用武器射程。
  * 「攻擊範圍內的怪物數」要跟著規則走 —— 同一條「範圍內 ≥ 3 隻」掛在近戰普攻與
- * 12 碼的火球上，本來就該是兩個不同的圈。
+ * 12 格的火球上，本來就該是兩個不同的圈。
  */
 function getActionRange(action: CombatAction, ctx: CombatScriptContext): number {
   if ((action.type === 'skill' || action.type === 'skill_class_only') && action.skillId) {

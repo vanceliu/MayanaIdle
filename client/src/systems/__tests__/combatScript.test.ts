@@ -216,7 +216,7 @@ describe('evaluateCombatScript', () => {
         { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'skill', skillId: 'fireball' } },
         { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
       ];
-      // 第二隻在 20 碼外，超出火球的 12 碼射程 → 圈內只有 1 隻
+      // 第二隻在 20 格外，超出火球的 12 格射程 → 圈內只有 1 隻
       const monsters = [mon({ x: 3, y: 0 }), mon({ x: 20, y: 0 })];
       const ctx = createCombatContext({ monsters, skills: [createFireball()] });
       expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'normal_attack' });
@@ -226,7 +226,7 @@ describe('evaluateCombatScript', () => {
       const rules: CombatRule[] = [
         { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'normal_attack' } },
       ];
-      // 武器射程 1.5：一隻貼身、一隻 5 碼外 → 不成立
+      // 武器射程 1.5：一隻貼身、一隻 5 格外 → 不成立
       const ctx = createCombatContext({ monsters: [mon({ x: 1, y: 0 }), mon({ x: 5, y: 0 })] });
       expect(evaluateCombatScript(rules, ctx)).toBeNull();
     });
@@ -282,7 +282,7 @@ describe('evaluateCombatScript', () => {
         { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 3 }], action: { type: 'skill', skillId: 'fireball' } },
         { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
       ];
-      // 怪群在 40 碼外（遠超火球 12 碼射程）：條件仍要成立
+      // 怪群在 40 格外（遠超火球 12 格射程）：條件仍要成立
       const monsters = [mon({ x: 40, y: 0 }), mon({ x: 41, y: 0 }), mon({ x: 40, y: 2 })];
       const ctx = createCombatContext({ monsters, skills: [createFireball()] });
       expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'fireball' });
