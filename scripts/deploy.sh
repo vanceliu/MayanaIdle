@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 #
-# 部署到 gh-pages（docs/RELEASE.md 流程 A：不動任何版本）
-#
-# 這支腳本是把 RELEASE.md § 8 的檢查清單寫成程式，不是單純包一層 build + deploy。
-# 每一項檢查都對應一個實際踩過的坑，失敗就中止，不會讓半套的東西上線。
+# 部署到 gh-pages（docs/RELEASE.md 流程 A）
 #
 # 用法：
-#   ./scripts/deploy.sh            完整流程
-#   ./scripts/deploy.sh --dry-run  只跑檢查與建置，不推上 gh-pages
-#   ./scripts/deploy.sh --skip-tests  略過測試（趕時間時用，會警告）
+#   ./scripts/deploy.sh               完整流程
+#   ./scripts/deploy.sh --dry-run     只跑檢查與建置，不推上 gh-pages
+#   ./scripts/deploy.sh --skip-tests  略過測試
 #
 set -euo pipefail
 
@@ -22,9 +19,7 @@ for arg in "$@"; do
   case "$arg" in
     --dry-run)    DRY_RUN=1 ;;
     --skip-tests) SKIP_TESTS=1 ;;
-    -h|--help)    sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
-    # 變數後面緊接全形字時一律加大括號：bash 會把全形字併進變數名，
-    # 在 set -u 下變成「unbound variable」而不是印出訊息
+    -h|--help)    sed -n '2,9p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "未知參數：${arg}（可用 --dry-run / --skip-tests）" >&2; exit 2 ;;
   esac
 done
@@ -37,8 +32,6 @@ die()   { printf '\n\033[0;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 cd "$REPO_ROOT"
 
 # ── 1. 工作區必須乾淨 ───────────────────────────────────────────────
-# RELEASE.md § 7.5：版本標示取的是最後一個 commit 的 SHA，
-# 未提交的改動會讓線上標示指向上一個 commit，之後追問題會被誤導。
 step "檢查工作區"
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
@@ -48,8 +41,6 @@ COMMIT_SHA="$(git rev-parse --short HEAD)"
 ok "工作區乾淨，HEAD = $COMMIT_SHA"
 
 # ── 2. 版本一致性 ──────────────────────────────────────────────────
-# RELEASE.md § 1：客戶端與 Worker 的 CURRENT_DATA_VERSION 必須永遠相同。
-# 不一致會讓所有寫入回 409（§ 7.1），而且那是部署後才會發現的災難。
 step "檢查資料版本一致性"
 CLIENT_VER="$(grep -oE 'CURRENT_DATA_VERSION *= *[0-9]+' "$CLIENT_DIR/src/config.ts" | grep -oE '[0-9]+$' || true)"
 WORKER_FILE="$REPO_ROOT/leaderboard-worker/src/index.js"
@@ -69,8 +60,6 @@ else
   ok "資料版本一致（v${CLIENT_VER:-?}）"
 fi
 
-# 最近一次 commit 若動過 config.ts，很可能是提高了資料版本 —— 那是流程 C，
-# 必須 Worker 先部署（RELEASE.md § 5.3），用這支腳本會把順序做反。
 if ! git diff --quiet HEAD~1 HEAD -- client/src/config.ts 2>/dev/null; then
   warn "最近一個 commit 動過 config.ts。"
   warn "若你提高了 CURRENT_DATA_VERSION，請改走 RELEASE.md § 5 流程 C（Worker 要先部署）。"
@@ -79,8 +68,6 @@ if ! git diff --quiet HEAD~1 HEAD -- client/src/config.ts 2>/dev/null; then
 fi
 
 # ── 3. 型別檢查 ────────────────────────────────────────────────────
-# CLAUDE.md：一律用 tsc -b。根 tsconfig 是 references 形式，
-# tsc --noEmit 不會檢查任何檔案，是空跑。
 step "型別檢查（tsc -b）"
 cd "$CLIENT_DIR"
 npx tsc -b
@@ -100,9 +87,7 @@ step "建置"
 npm run build
 ok "建置完成"
 
-# ── 6. 建置產物必須內嵌正確的 commit SHA ──────────────────────────
-# vite.config.ts 用 __BUILD_COMMIT__ 注入 git short SHA，
-# 這是唯一能在線上確認「玩家跑的是哪一版」的依據（RELEASE.md § 7.2）。
+# ── 6. 驗證產物版本標示 ────────────────────────────────────────────
 step "驗證產物版本標示"
 if grep -rqF "$COMMIT_SHA" dist/assets/*.js; then
   ok "產物內嵌 SHA = $COMMIT_SHA"
@@ -122,11 +107,9 @@ npm run deploy
 ok "已推送"
 
 # ── 8. 線上驗證 ────────────────────────────────────────────────────
-# 只確認新資產可取得 + SHA 正確。index.html 有 max-age=600（§ 7.2），
-# 所以不比對 index.html 的內容 —— CDN 邊緣節點可能還握著舊副本，
-# 那不代表部署失敗。
+# pipefail 下不可用 curl | grep -q 或 | head：提前關閉管道會讓上游非零，比對成功被判成失敗。
 step "線上驗證"
-MAIN_JS="$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/index.html | head -1)"
+MAIN_JS="$(grep -m1 -oE 'assets/index-[A-Za-z0-9_-]+\.js' dist/index.html)"
 [[ -n "$MAIN_JS" ]] || die "解析不出主 bundle 檔名"
 
 for i in $(seq 1 20); do
@@ -137,7 +120,12 @@ for i in $(seq 1 20); do
   sleep 5
 done
 
-if curl -fsS --max-time 20 "${SITE_URL}${MAIN_JS}" | grep -qF "$COMMIT_SHA"; then
+ONLINE_BUNDLE="$(mktemp)"
+trap 'rm -f "$ONLINE_BUNDLE"' EXIT
+curl -fsS --max-time 30 -o "$ONLINE_BUNDLE" "${SITE_URL}${MAIN_JS}" \
+  || die "抓不到線上 bundle ${MAIN_JS}"
+
+if grep -qF "$COMMIT_SHA" "$ONLINE_BUNDLE"; then
   ok "線上 bundle 的版本標示 = $COMMIT_SHA"
 else
   die "線上 bundle 找不到 $COMMIT_SHA"
