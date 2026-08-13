@@ -8,8 +8,9 @@ import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../mode
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { CURRENT_DATA_VERSION } from '../config';
-import { syncTalentSlotGrants, syncStartingAffixBackfill } from '../systems/mailbox';
-import { rollTalentAffixDrop, rollTalentSlotDrop } from '../systems/talentDrops';
+import { syncTalentSlotGrants, syncCompensations, mailPurgeStorageKey } from '../systems/mailbox';
+import { talentBagOrderStorageKey } from '../models/talentBag';
+import { rollTalentAffixDrops, rollTalentSlotDrop } from '../systems/talentDrops';
 import { useMailboxStore } from './mailboxStore';
 import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
 import { useTalentStore, talentPersistentRules, talentVillageRules } from './talentStore';
@@ -685,7 +686,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const adventurerQuests = prefs?.adventurerQuests ?? [];
     const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
     const craftQuests = prefs?.craftQuests ?? [];
-    // 舊存檔缺少後來新增的統計欄位，補上預設值（否則 `+= 1` 會變成 NaN）
+    // 舊存檔缺少後來新增的統計欄位，補上預設值
     const statistics = normalizeStatistics(prefs?.statistics);
 
     // Reset areaEnteredAt so pressure doesn't accumulate during character select
@@ -734,33 +735,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().startPersistentLoop();
     get().initQuestBoard();
 
-    /**
-     * 自動天賦與信箱的初始化（`51-auto-talent.md`、`52-mailbox.md`）。
-     *
-     * 順序有意義：
-     * 1. 換版清理**先做**，只刪已領取的（未領取的一律保留，§ 52.7.1）
-     * 2. 補發天賦格信 —— 走累計數，之前漏掉的（例如在別台裝置升級）一起補上
-     * 3. 起始配置改版的補發，只補改版前就存在的角色
-     * 4. 起始配置只在完全沒有資料時發，重複呼叫安全
-     *
-     * 順序不可調換：補發要在 `grantStartingIfEmpty` **之前**判斷，
-     * 否則新角色會先被發滿起始資料，看起來就像改版前就存在的舊角色。
-     */
-    void (async () => {
-      const charId = char.id!;
-      await purgeClaimedMailOnVersionChange(charId, BUILD_INFO.version);
-      await syncTalentSlotGrants(charId, char.level);
-      await syncStartingAffixBackfill(charId);
-      await useTalentStore.getState().grantStartingIfEmpty(charId);
-      await useTalentStore.getState().load(charId);
-      await useMailboxStore.getState().load(charId);
-    })().catch(() => {
-      /*
-       * 吞掉即可：這是**背景初始化**，失敗的後果是天賦格晚一點才出現，
-       * 不影響已經載入的角色。最常見的失敗是測試把 DB 關掉而這裡還沒跑完
-       * （`DatabaseClosedError`），讓它變成 unhandled rejection 只會蓋掉真正的錯誤。
-       */
-    });
+    void initTalentAndMailbox(char.id!, char.level);
     const region = getRegion(char.currentRegion);
     if (region?.type !== 'town') {
       get().startExploring();
@@ -831,10 +806,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     await db.warehouses.where('characterId').equals(characterId)
       .filter(row => row.storageType === 'personal')
       .delete();
+    /*
+     * characterId 會被重用，下列各項必須一併清除：
+     * 天賦格與鑲材、未領取的信、背包排列（§ 35.17）、天賦分頁順序、換版清理的版本戳記。
+     */
+    await db.talentSlots.where('characterId').equals(characterId).delete();
+    await db.talentAffixes.where('characterId').equals(characterId).delete();
+    await db.mailbox.where('characterId').equals(characterId).delete();
     await db.characters.delete(characterId);
     localStorage.removeItem(`mayana_prefs_${characterId}`);
-    // characterId 會被重用，不清掉的話新角色會撿到前一個角色的背包排列（§ 35.17）
     localStorage.removeItem(bagLayoutStorageKey(characterId));
+    localStorage.removeItem(talentBagOrderStorageKey(characterId));
+    localStorage.removeItem(mailPurgeStorageKey(characterId));
+    if (get().character?.id === characterId) {
+      useTalentStore.getState().reset();
+      useMailboxStore.getState().reset();
+    }
     await get().loadCharacterList();
   },
 
@@ -865,6 +852,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       guildProgress: { rank: 'F', points: 0 },
       craftQuests: [],
     });
+    // 天賦與信箱是獨立 store，不跟著 set 清掉的話會留著上一隻角色的資料
+    useTalentStore.getState().reset();
+    useMailboxStore.getState().reset();
     await get().loadCharacterList();
   },
 
@@ -960,6 +950,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
     get().startRegen();
     get().initQuestBoard();
+    void initTalentAndMailbox(char.id!, char.level);
   },
 
   loadCharacter: async () => {
@@ -1605,7 +1596,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setActiveTemplate: (id) => {
     if (!get().scriptTemplates.some(t => t.id === id)) return;
     set({ activeTemplateId: id });
-    // 常駐腳本換了一整份，計時器要重掛才不會照舊規則跑
+    // 常駐腳本換了一整份，計時器要重掛
     get().startPersistentLoop();
     persistTemplates(get);
   },
@@ -1679,6 +1670,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         skills: state.skills,
         bagItems: state.bagItems,
         lastPotionUsedAt: state.lastPotionUsedAt,
+        lastPotionCooldown: state.lastPotionCooldown,
         now,
         activeEffects: state.activeEffects,
         cooldownReduction,
@@ -1726,24 +1718,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       switch (action.type) {
         case 'potion': {
-          const potionType = action.potionType ?? 'red';
-          const config = POTION_CONFIG[potionType];
-          if (now - state.lastPotionUsedAt < state.lastPotionCooldown) return;
-
-          if (getPotionCount(state.bagItems, potionType) <= 0) return;
-
-          const bonuses = getAffixBonusesFromGear(allGear);
-          const baseHeal = Math.floor(Math.random() * (config.healMax - config.healMin + 1)) + config.healMin;
-          const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
-          const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
-          const newHp = Math.min(effMaxHp, char.hp + heal);
-          set({
-            character: { ...char, hp: newHp },
-            bagItems: consumePotionFromBag(state.bagItems, potionType),
-            lastPotionUsedAt: now,
-            lastPotionCooldown: config.cooldown,
-            combatLogs: addLog(state.combatLogs, { text: `使用${config.name}回復 ${heal} HP`, type: 'system' as const }),
-          });
+          drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
           break;
         }
         case 'speed_potion': {
@@ -1765,6 +1740,44 @@ export const useGameStore = create<GameState>((set, get) => ({
         case 'heal_skill': {
           if (!action.skillId) break;
           get().castSelfSkill(action.skillId);
+          break;
+        }
+        case 'use_town_scroll': {
+          const scroll = findScrollInBag(state.bagItems);
+          if (!scroll) break;
+          get().rememberHuntLocation();
+          get().useTownScroll(scroll.itemId);
+          break;
+        }
+        case 'use_consumable': {
+          if (action.itemId == null) break;
+          useConsumableById(get, action.itemId);
+          break;
+        }
+        /*
+         * 補到指定百分比：每一次判定喝一瓶，到標了條件就不成立，自然停下來。
+         * 藥水冷卻擋住時直接跳過這一次（§ 51.4.10）。
+         */
+        case 'refill_to_percent': {
+          const target = action.value ?? 80;
+          const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+          if (char.hp / effMaxHp * 100 >= target) break;
+          drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
+          break;
+        }
+        // 依序檢查，第一個沒生效的就放。一次只放一個，下一輪再處理下一個
+        // 走位只設意圖，實際移動由 ARPG 的 FSM 處理（§ 51.4.9 T5）
+        case 'keep_distance':
+        case 'close_in':
+        case 'disengage':
+          useCombatCommandStore.getState().requestMove({
+            kind: action.type, distance: action.distance,
+          });
+          break;
+        case 'refill_all_buffs': {
+          const ids = [action.skillId, action.skillId2, action.skillId3].filter(Boolean) as string[];
+          const next = ids.find(id => !isBuffActive(id, state.skills, state.activeEffects, now));
+          if (next) get().castSelfSkill(next);
           break;
         }
       }
@@ -1822,6 +1835,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       bagUsedSlots: getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear),
       bagMaxSlots: getBagMaxSlots(state.equippedGear),
       inTown: getRegion(char.currentRegion)?.type === 'town',
+      currentArea: char.currentArea,
       lastHuntLocation: state.lastHuntLocation,
       warehouse: {
         shared: { materials: state.storedMaterials, equipment: state.storedEquipment },
@@ -1830,8 +1844,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
       bagFreeSlots: getBagMaxSlots(state.equippedGear)
         - getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear),
-      // 旅館有沒有事情可做（`13-town.md` § 13.7）。全滿又沒異常狀態就別去，
-      // 否則「使用旅館」會永遠成立而擋住後面的規則
+      // 旅館有沒有事情可做（`13-town.md` § 13.7）。全滿又沒異常狀態時為 false。
       needsInn: char.hp < getEffectiveMaxHp(char, state.equippedGear)
         || char.mp < getEffectiveMaxMp(char, state.equippedGear)
         || state.activeEffects.some(e => e.type === 'debuff' && e.target === 'player'),
@@ -2032,7 +2045,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   depositToWarehouse: ({ warehouse, equipmentIds = [], materials = [] }) => {
     const state = get();
     const shared = warehouse === 'shared';
-    // 共用倉庫的裝備要記 ownerId 才知道是誰寄放的，沒有登入者就不搬裝備
+    // 共用倉庫的裝備要記 ownerId，沒有登入者就不搬裝備
     const canMoveEquip = shared ? !!state.userId : !!state.character;
 
     let inv = state.inventory;
@@ -2410,8 +2423,7 @@ export function processMonsterDeath(
     const equippedGear = get().equippedGear;
     char.hp = getEffectiveMaxHp(char, equippedGear);
     char.mp = getEffectiveMaxMp(char, equippedGear);
-    // 每 5 級一封天賦格信（`52-mailbox.md` § 52.2）。
-    // 走「累計數」而不是升級事件：一次連升多級也不會漏，重複呼叫安全
+    // 每 5 級一封天賦格信（`52-mailbox.md` § 52.2）
     const levelForGrant = char.level;
     const charIdForGrant = char.id;
     if (charIdForGrant) {
@@ -2441,11 +2453,12 @@ export function processMonsterDeath(
     // 鑲材與天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 兩者都不佔背包格，所以不需要容量檢查，撿不到的情況不存在
     const talentDropMult = 1 + dropBonuses.drop_rate / 100;
-    const talentAffix = rollTalentAffixDrop(areaLevel, monsterIsBoss, talentDropMult);
+    // 各 tier 獨立判定，一次擊殺可能掉多份（§ 51.6.1）
+    const talentAffixes = rollTalentAffixDrops(areaLevel, monsterIsBoss, talentDropMult);
     const talentSlotTier = rollTalentSlotDrop(areaLevel, monsterIsBoss, talentDropMult);
     const talentLogs: string[] = [];
     if (char.id) {
-      if (talentAffix) {
+      for (const talentAffix of talentAffixes) {
         await db.talentAffixes.add({
           characterId: char.id,
           definitionId: talentAffix.def.id,
@@ -2563,6 +2576,88 @@ export function waitForPendingDrops(): Promise<void> {
   return dropQueue;
 }
 
+/**
+ * 自動天賦與信箱的初始化（`51-auto-talent.md`、`52-mailbox.md`）。
+ * 載入角色與**創角**都要跑 —— 創角不跑的話新角色身上一個天賦格都沒有。
+ *
+ * 順序有意義：
+ * 1. 換版清理先做，只刪已領取的（§ 52.7.1）
+ * 2. 補發天賦格信（走發放計數）
+ * 3. 這一版的補償
+ * 4. 起始配置只在完全沒有資料時發
+ */
+async function initTalentAndMailbox(characterId: number, level: number): Promise<void> {
+  try {
+    await purgeClaimedMailOnVersionChange(characterId, BUILD_INFO.version);
+    await syncTalentSlotGrants(characterId, level);
+    await syncCompensations(characterId, BUILD_INFO.version);
+    await useTalentStore.getState().grantStartingIfEmpty(characterId);
+    await useTalentStore.getState().load(characterId);
+    await useMailboxStore.getState().load(characterId);
+  } catch {
+    // 背景初始化，失敗只是天賦格晚一點出現。測試關掉 DB 時最常見（DatabaseClosedError）
+  }
+}
+
+/**
+ * 常駐天賦的喝藥（`51-auto-talent.md` § 51.4.10）。
+ * `potion` 與 `refill_to_percent` 共用 —— 冷卻、存量、詞綴加成三件事必須一致。
+ */
+function drinkPotion(
+  set: (partial: Partial<GameState>) => void,
+  state: GameState,
+  char: Character,
+  allGear: EquipmentInstance[],
+  now: number,
+  potionType: PotionType,
+): void {
+  const config = POTION_CONFIG[potionType];
+  if (now - state.lastPotionUsedAt < state.lastPotionCooldown) return;
+  if (getPotionCount(state.bagItems, potionType) <= 0) return;
+
+  const bonuses = getAffixBonusesFromGear(allGear);
+  const baseHeal = Math.floor(Math.random() * (config.healMax - config.healMin + 1)) + config.healMin;
+  const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
+  const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+  set({
+    character: { ...char, hp: Math.min(effMaxHp, char.hp + heal) },
+    bagItems: consumePotionFromBag(state.bagItems, potionType),
+    lastPotionUsedAt: now,
+    lastPotionCooldown: config.cooldown,
+    combatLogs: addLog(state.combatLogs, { text: `使用${config.name}回復 ${heal} HP`, type: 'system' as const }),
+  });
+}
+
+/** buff 是否還在生效。判定與 `buff_not_active` 條件同一套（`systems/scriptRunner.ts`） */
+function isBuffActive(
+  skillId: string, skills: Skill[], activeEffects: ActiveEffect[], now: number,
+): boolean {
+  const category = skills.find(s => s.id === skillId)?.buffCategory;
+  if (!category) return false;
+  const active = activeEffects.find(
+    e => e.category === category && e.type === 'buff' && e.target === 'player',
+  );
+  return active !== undefined && now - active.startTime < active.duration;
+}
+
+/**
+ * 使用指定消耗品（§ 51.4.10）。依道具 id 分派到既有的使用路徑，
+ * 不另寫一套消耗與效果邏輯。
+ */
+function useConsumableById(get: () => GameState, itemId: number): void {
+  const potion = (Object.entries(POTION_CONFIG) as [PotionType, { itemId: number }][])
+    .find(([, c]) => c.itemId === itemId);
+  if (potion) { get().usePotionByType(potion[0]); return; }
+
+  const speed = (Object.entries(SPEED_POTION_CONFIG) as [SpeedPotionType, { itemId: number }][])
+    .find(([, c]) => c.itemId === itemId);
+  if (speed) { get().useSpeedPotion(speed[0]); return; }
+
+  if (getTownScrollByItemId(itemId)) { get().useTownScroll(itemId); return; }
+
+  get().useCureItem(itemId);
+}
+
 async function saveGame(state: GameState) {
   const char = state.character;
   if (!char || !char.id) return;
@@ -2619,7 +2714,7 @@ async function saveGame(state: GameState) {
       await db.warehouses.bulkAdd(warehouseEntries);
     }
     // 金幣走獨立表：以 userId 為主鍵 put，不需要先刪再寫（§ 18.7）。
-    // 餘額為 0 也要寫，否則「全部領走」會退回上一次的餘額。
+    // 餘額為 0 也要寫。
     await db.warehouseGold.put({ userId, amount: state.warehouseGold });
   }
 

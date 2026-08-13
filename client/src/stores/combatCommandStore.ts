@@ -24,15 +24,28 @@ export interface CombatCommandState {
   requestTarget: (monsterId: string) => void;
   requestSkill: (skillId: string) => void;
   /** ticker 專用：取出並清空目標指令 */
+  pendingMove: PendingMove | null;
   consumeTarget: () => string | null;
   /** ticker 專用：取出並清空技能指令 */
   consumeSkill: () => string | null;
+  /**
+   * 走位意圖（`51-auto-talent.md` § 51.4.9 T5）。
+   * 常駐天賦碰不到 ARPG 引擎，所以與手動指令共用同一條佇列。
+   */
+  requestMove: (intent: PendingMove) => void;
+  consumeMove: () => PendingMove | null;
   clear: () => void;
+}
+
+export interface PendingMove {
+  kind: 'keep_distance' | 'close_in' | 'disengage';
+  distance?: number;
 }
 
 export const useCombatCommandStore = create<CombatCommandState>((set, get) => ({
   pendingTargetId: null,
   pendingSkillId: null,
+  pendingMove: null,
 
   requestTarget: monsterId => set({ pendingTargetId: monsterId }),
 
@@ -49,6 +62,14 @@ export const useCombatCommandStore = create<CombatCommandState>((set, get) => ({
     const id = get().pendingSkillId;
     if (id != null) set({ pendingSkillId: null });
     return id;
+  },
+
+  requestMove: intent => set({ pendingMove: intent }),
+
+  consumeMove: () => {
+    const move = get().pendingMove;
+    if (move) set({ pendingMove: null });
+    return move;
   },
 
   clear: () => {

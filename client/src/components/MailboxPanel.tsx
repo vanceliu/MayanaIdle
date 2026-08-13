@@ -8,19 +8,9 @@ import type { Mail, MailItem } from '../models/mailbox';
 import { getTalentAffixDef } from '../db/seed/talentSeeds';
 import { affixLabelOf } from './TalentEditor';
 
-/**
- * 系統信箱（`52-mailbox.md`）
- *
- * **首版只發天賦格**（§ 52.0）。公告分頁、補償、里程碑與其他項目型別都不做。
- */
+/** 系統信箱（`52-mailbox.md`）。首版只發天賦格與補償（§ 52.0） */
 
-/**
- * 徽章只算**未領取**封數（§ 52.5）。
- *
- * 指示器掛在「領取」上，**不可掛在「安裝天賦格」上** ——
- * 囤著不裝是正常玩法（T1 格合成 T2 要吃兩個），
- * 掛在安裝上會變成永遠亮著的雜訊（`51-auto-talent.md` § 51.3.4.1）。
- */
+/** 徽章只算未領取封數（§ 52.5）。不可掛在「安裝天賦格」上 */
 export function MailboxButton() {
   const unread = useMailboxStore(s => s.unread);
   const isOpen = usePanelWindowStore(s => s.open.mail);
@@ -63,7 +53,7 @@ function MailRow({ mail }: { mail: Mail }) {
 
   async function onClaim() {
     if (!await claim(mail.id!)) return;
-    // 領到的天賦格進背包「天賦」分頁，未安裝 —— 讓天賦面板立刻看得到
+    // 領到的天賦格進背包「天賦」分頁，未安裝
     if (characterId) await useTalentStore.getState().load(characterId);
   }
 
@@ -73,7 +63,7 @@ function MailRow({ mail }: { mail: Mail }) {
         <span className="mail-title">{mail.title}</span>
         <span className="mail-items">{mail.items.map(describeItem).join('、')}</span>
       </div>
-      {/* 已領取的可以自己刪掉，不必等換版清理（§ 52.4）。未領取的沒有刪除鈕 */}
+      {/* 已領取的才有刪除鈕（§ 52.4） */}
       {claimed
         ? (
           <button

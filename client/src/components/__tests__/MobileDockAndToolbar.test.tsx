@@ -91,7 +91,7 @@ describe('面板按鈕圖示模式（47-mobile）', () => {
     }
   });
 
-  /** 桌機的樣子是已定案的設計：任務鈕本來就長「📋 任務」，不可因為支援手機而弄不見 */
+  /** 桌機的任務鈕固定為「📋 任務」，支援手機不得改動 */
   it('CSS：寬螢幕的任務鈕保留圖示（其餘藏起來）', () => {
     const wide = APP_CSS.slice(0, APP_CSS.indexOf('@media (max-width: 1200px)'));
     expect(wide).toMatch(/\.quest-tracker-btn \.panel-dock-icon\s*\{[^}]*display:\s*inline/);

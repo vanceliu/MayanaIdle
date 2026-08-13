@@ -220,4 +220,44 @@ describe('接線項：目標狀態與 HP 歷程（§ 51.4.10、階段 7）', () 
   it('沒有 HP 歷程時不成立，不會誤觸發', () => {
     expect(check({ type: 'hp_dropped_recently', value: 1, radius: 3 }, ctx())).toBe(false);
   });
+
+  /* 場上判定看的是全場活著的怪，不是當前目標（§ 51.4.6 T6） */
+  describe('場上判定', () => {
+    function field(specs: { race?: string; element?: string; hp: number; maxHp: number }[]) {
+      return specs.map((m, i) => ({
+        id: `m${i}`,
+        position: { x: i, y: 0 },
+        instance: monster({
+          race: (m.race ?? 'beast') as never,
+          element: (m.element ?? 'none') as never,
+          currentHp: m.hp,
+          maxHp: m.maxHp,
+        }),
+      }));
+    }
+
+    it('場上存在指定種族', () => {
+      const monsters = field([{ race: 'beast', hp: 10, maxHp: 10 }, { race: 'undead', hp: 10, maxHp: 10 }]);
+      expect(check({ type: 'field_has_race', match: 'undead' }, ctx({ monsters }))).toBe(true);
+      expect(check({ type: 'field_has_race', match: 'demon' }, ctx({ monsters }))).toBe(false);
+    });
+
+    // 種族與元素取值不重疊，同一個欄位吃兩種
+    it('場上存在指定元素', () => {
+      const monsters = field([{ element: 'fire', hp: 10, maxHp: 10 }]);
+      expect(check({ type: 'field_has_race', match: 'fire' }, ctx({ monsters }))).toBe(true);
+    });
+
+    it('場上平均 HP 低於門檻', () => {
+      const monsters = field([{ hp: 2, maxHp: 10 }, { hp: 4, maxHp: 10 }]);
+      // 平均 30%
+      expect(check({ type: 'field_avg_hp_below', value: 40 }, ctx({ monsters }))).toBe(true);
+      expect(check({ type: 'field_avg_hp_below', value: 20 }, ctx({ monsters }))).toBe(false);
+    });
+
+    it('場上沒怪時不成立', () => {
+      expect(check({ type: 'field_avg_hp_below', value: 90 }, ctx({ monsters: [] }))).toBe(false);
+      expect(check({ type: 'field_has_race', match: 'undead' }, ctx({ monsters: [] }))).toBe(false);
+    });
+  });
 });

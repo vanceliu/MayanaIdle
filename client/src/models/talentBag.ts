@@ -3,17 +3,14 @@ import { getTalentAffixDef } from '../db/seed/talentSeeds';
 
 /**
  * 背包「天賦」分頁的格子與順序（`35-inventory-constraints.md` § 35.21）。
- *
- * 順序機制**與一般分頁同一套**（§ 35.8）：整理是一次性落位，把當下的排序結果
- * 整批寫成位置；之後新拿到的東西排在後面，不會插隊到分類中間。
- * 差別只在一般分頁的位置是格子索引，這裡是清單順序 —— 天賦分頁不做手動擺放。
+ * 整理是一次性落位（§ 35.8）；位置是清單順序，不是格子索引。
  */
 
 export type TalentBagCell =
   | { kind: 'slot'; tier: 1 | 2 | 3 | 4; count: number }
   | { kind: 'affix'; id: number };
 
-/** 位置表的鍵。天賦格同階堆成一格，所以以階級為鍵；鑲材是獨立實例，以 id 為鍵 */
+/** 位置表的鍵：天賦格以階級為鍵，鑲材以 id 為鍵 */
 export function talentCellKey(cell: TalentBagCell): string {
   return cell.kind === 'slot' ? `slot-${cell.tier}` : `affix-${cell.id}`;
 }
@@ -24,11 +21,7 @@ export function talentBagOrderStorageKey(characterId: number): string {
   return `mayana_talent_bag_order_${characterId}`;
 }
 
-/**
- * 這份天賦配置可動用的格子清單，未套用位置表。
- *
- * 同階的天賦格長得一模一樣，堆成一格帶數量 —— 六個一模一樣的格子沒有資訊量。
- */
+/** 可動用的格子清單，未套用位置表。同階天賦格堆成一格帶數量 */
 export function buildTalentBagCells(
   spareSlots: TalentSlot[],
   looseAffixes: TalentAffixInstance[],
@@ -64,10 +57,7 @@ export function sortTalentBag(
   return order;
 }
 
-/**
- * 套用位置表。**沒有位置的排在後面**，維持取得順序 ——
- * 整理過後新拿到的鑲材因此不會插進已經排好的分類中間。
- */
+/** 套用位置表。沒有位置的排在後面，維持取得順序 */
 export function applyTalentBagOrder(
   cells: TalentBagCell[],
   order: TalentBagOrder,

@@ -16,8 +16,7 @@ export function CombatScriptEditor() {
 
   /**
    * 沒有任何「啟用的攻擊規則」時角色會完全不出手（`41-arpg-combat.md`）。
-   * 引擎刻意不再偷偷退回普通攻擊，所以這個狀態必須讓玩家看得見，
-   * 否則會以為是遊戲壞掉。
+   * 引擎不退回普通攻擊，此狀態必須在畫面上明示。
    */
   const hasEnabledAttackRule = combatRules.some(rule => {
     if (!rule.enabled) return false;

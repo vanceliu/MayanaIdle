@@ -10,7 +10,7 @@ import type { Character } from '../../models/character';
  * 匯入則會連名稱與線上身分一起覆蓋。兩者都必須在動作前講清楚。
  *
  * 這兩顆按鈕已從右下角的常駐工具列搬進設定視窗的「帳號」頁（`47-mobile.md`），
- * 但**確認流程與文案一個字都不能少** —— 換位置不是放寬警告的理由。
+ * **確認流程與文案一個字都不能少**。
  */
 
 const exportCharacterData = vi.fn();

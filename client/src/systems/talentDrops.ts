@@ -5,6 +5,8 @@
  * 兩者都不進 `characterBag`，塞不進 `DroppedItem` 的形狀。
  */
 import {
+  SKILL_POOL_KEYS,
+  ITEM_POOL_KEYS,
   AFFIX_DROP_RATE,
   BOSS_DROP_MULTIPLIER,
   SLOT_DROP_RATE_BOSS,
@@ -57,14 +59,19 @@ export interface TalentAffixDrop {
  * 順序（§ 51.6.1.1）：**各 tier 獨立判定** → 命中後均等抽類型 →
  * 該類型該 tier 沒東西就改抽其他類型 → 候選中均等抽一個。
  */
-export function rollTalentAffixDrop(
+/**
+ * 抽鑲材掉落。**各 tier 獨立判定**（§ 51.6.1）——
+ * 低階命中不會吃掉高階的判定機會，一次擊殺可能掉多份。
+ */
+export function rollTalentAffixDrops(
   areaLevel: number,
   isBoss: boolean,
   dropRateMultiplier = 1,
   rng: Rng = defaultRng,
-): TalentAffixDrop | null {
+): TalentAffixDrop[] {
   const band = affixTierBandFor(areaLevel);
   const bossMult = isBoss ? BOSS_DROP_MULTIPLIER : 1;
+  const drops: TalentAffixDrop[] = [];
 
   for (let tier = band.min; tier <= band.max; tier++) {
     const t = tier as TalentTier;
@@ -79,22 +86,43 @@ export function rollTalentAffixDrop(
 
     const candidates = affixCandidates(type, t);
     const def = candidates[Math.floor(rng() * candidates.length)];
-    return { def, boundParam: rollBoundParam(def, rng) };
+    drops.push({ def, boundParam: rollBoundParam(def, rng) });
   }
-  return null;
+  return drops;
+}
+
+/** 單份版本。回傳最高階的那一份 */
+export function rollTalentAffixDrop(
+  areaLevel: number,
+  isBoss: boolean,
+  dropRateMultiplier = 1,
+  rng: Rng = defaultRng,
+): TalentAffixDrop | null {
+  const drops = rollTalentAffixDrops(areaLevel, isBoss, dropRateMultiplier, rng);
+  return drops.length > 0 ? drops[drops.length - 1] : null;
 }
 
 /**
- * 指定型／池型在掉落當下綁定參數（§ 51.4.1）。
+ * 掉落當下 roll 出綁定值（§ 51.4.1）。
  *
- * **這裡只決定「綁不綁」與形狀**；實際可選的技能清單要角色上下文（學了哪些招），
- * 由呼叫端在寫入實例前補上。自選型恆為 null。
+ * 池型 roll 出一個有語意的子集（技能系別／道具類別），玩家在子集內自選。
+ * 指定型的對象是單一技能，可選範圍要角色上下文（學了哪些招），
+ * 所以掉落層回 null，由首次鑲入時玩家選定並鎖死。
  */
-export function rollBoundParam(def: TalentAffixDef, _rng: Rng = defaultRng): string | null {
-  if (def.form === 'free') return null;
-  // 綁定值由呼叫端依角色可用範圍決定；掉落層只標記「這份需要綁定」
-  return null;
+export function rollBoundParam(def: TalentAffixDef, rng: Rng = defaultRng): string | null {
+  if (def.form !== 'pool') return null;
+  const keys = POOL_KEYS_OF[def.ruleId];
+  if (!keys || keys.length === 0) return null;
+  return keys[Math.floor(rng() * keys.length)];
 }
+
+/** 池型鑲材的子集來源（§ 51.4.9、§ 51.4.11） */
+const POOL_KEYS_OF: Record<string, readonly string[]> = {
+  // T2「施放特定系別攻擊技能」與 T1 技能一樣是 `skill`，靠 `form` 區分
+  skill: SKILL_POOL_KEYS,
+  buy_item: ITEM_POOL_KEYS,
+  withdraw_item: ITEM_POOL_KEYS,
+};
 
 /**
  * 抽天賦格。**只有 Boss 會掉，一般怪不掉**（§ 51.6.2）。

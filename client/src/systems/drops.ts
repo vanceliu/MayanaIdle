@@ -27,7 +27,7 @@ export interface DroppedItem {
   equipmentInstance?: EquipmentInstance;
   /**
    * 掉落物的裝備階級（`37-statistics.md` § 37.3 的 T7 計數用）。
-   * 在此帶出是因為模板此刻就在手上；交給呼叫端事後查表得再打一次 DB。
+   * 由此處帶出，呼叫端不必再查一次 DB。
    */
   equipmentTier?: EquipmentTierLevel;
 }
@@ -84,13 +84,18 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
   const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
-  let highTierRolled = false;
+  /*
+   * 同一個 tier 的武器／防具是**一組連動條目**，只擲一次再 50/50 決定給哪一種
+   * （`27-drop-table.md` § 27.6）。旗標必須**每個 tier 各一份** ——
+   * 整張表共用一個的話，id 較大的 T7 條目永遠被前面的 T4 吃掉，掉率實質為 0。
+   */
+  const rolledTiers = new Set<number>();
 
   for (const entry of entries) {
-    // equipmentPool entries: roll once (10%), then 50/50 weapon or armor
     if (entry.equipmentPool) {
-      if (highTierRolled) continue;
-      highTierRolled = true;
+      const tierKey = entry.tier ?? 4;
+      if (rolledTiers.has(tierKey)) continue;
+      rolledTiers.add(tierKey);
       const roll = Math.random() * DROP_ROLL_MAX;
       const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
       if (roll >= boostedDropValue) continue;

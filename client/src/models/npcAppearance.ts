@@ -25,7 +25,7 @@ interface NpcLookSpec {
 }
 
 const SPECS: Record<string, NpcLookSpec> = {
-  /* 深膚配亮眼、淺膚配深眼 —— 混著給，城鎮裡才不會一整排長得像親戚 */
+  /* 深膚配亮眼、淺膚配深眼，混著給 */
   'general-store': { hair: 'twin', skin: '#e8c9a0', hairColor: '#7a5a3c', eyeColor: '#2a1a12', cloth: '#4a9c5e', lash: true },
   blacksmith: { hair: 'bald', skin: '#7c4f2c', hairColor: '#2f2a33', eyeColor: '#e3a45f', cloth: '#4a3728' },
   'weapon-shop': { hair: 'buzz', skin: '#c98f5e', hairColor: '#2f2a33', eyeColor: '#0b0b16', cloth: '#3d7fb8' },

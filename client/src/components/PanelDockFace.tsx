@@ -11,8 +11,7 @@ import { PANEL_BUTTON_LABELS, PANEL_ICONS, type PanelKey } from '../stores/panel
 
 /**
  * **圖示與文字兩者都畫出來，由 CSS 決定顯示哪一個** —— 桌機藏圖示、手機藏文字。
- * 用 CSS 而不是條件渲染，是因為斷點兩側的差異只是「看得到什麼」，
- * 讓 JS 也參一腳等於同一件事有兩個真相來源。
+ * 一律用 CSS，不可改用條件渲染。
  */
 export function PanelDockFace({ panelKey }: { panelKey: PanelKey }) {
   return (

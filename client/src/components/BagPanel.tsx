@@ -81,20 +81,25 @@ export function BagPanel() {
   /** § 35.21 背包分頁。不持久化：切分頁是當下的動作，不是設定 */
   const [bagTab, setBagTab] = useState<'normal' | 'talent'>('normal');
   const charId = useGameStore(s => s.character?.id ?? 0);
-  /** 天賦分頁的順序。**與一般分頁同一套**：整理一次性落位、位置持久化（§ 35.21.1） */
-  const [talentOrder, setTalentOrder] = useState(() => loadTalentBagOrder(charId));
+  /** 天賦分頁的順序。整理一次性落位、位置持久化（§ 35.21.1） */
+  const [talentOrderState, setTalentOrder] = useState(
+    () => ({ charId, order: loadTalentBagOrder(charId) }));
+  // 換角色時重讀，不可沿用上一隻的順序
+  const talentOrder = talentOrderState.charId === charId
+    ? talentOrderState.order
+    : loadTalentBagOrder(charId);
   const talentSlots = useTalentStore(s => s.slots);
   const talentAffixes = useTalentStore(s => s.affixes);
   const activeTemplateId = useGameStore(s => s.activeTemplateId);
 
-  /** 天賦分頁的整理。與 `handleSort` 同一個語意：把當下的排序結果整批寫成位置 */
+  /** 天賦分頁的整理。把當下的排序結果整批寫成位置 */
   function handleTalentSort() {
     const cells = buildTalentBagCells(
       availableSlots(talentSlots, activeTemplateId),
       availableAffixes(talentAffixes, talentSlots, activeTemplateId),
     );
     const next = sortTalentBag(cells, talentAffixes);
-    setTalentOrder(next);
+    setTalentOrder({ charId, order: next });
     saveTalentBagOrder(charId, next);
   }
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
@@ -199,12 +204,10 @@ export function BagPanel() {
 
   /*
    * § 35.1：穿上不等於離開背包 —— 裝備中的裝備照樣佔一格，只是多一個「裝備中」標記。
-   * 格子 id 用裝備實例 id，因此穿脫時同一件東西的 id 不變，
-   * 手動擺放的位置與快捷鍵綁定都不會因為換裝而失效。
+   * 格子 id 用裝備實例 id，穿脫時同一件東西的 id 不變。
    *
-   * § 35.1.3：**裝備中與背包裝備排在同一個序列裡**，依實例 id（取得順序）排。
-   * 分兩段推入的話，穿上 A 的同時 B 被換下來，兩件在預設順序中的分組互換，
-   * 沒有手動位置的那兩格會當場對調 —— 位置只該由整理或拖曳改變。
+   * § 35.1.3：**裝備中與背包裝備排在同一個序列裡**，依實例 id（取得順序）排，
+   * 不可分兩段推入。位置只由整理或拖曳改變。
    */
   const allEquipment: { item: EquipmentInstance; slot?: EquipSlot }[] = [];
   for (const slot of SLOT_ORDER) {
@@ -425,7 +428,7 @@ export function BagPanel() {
     }
     if (!(e.target as HTMLElement).closest?.('.bag-cell:not(.empty)')) {
       setSelectedId(null);
-      // 觸控沒有 mouseleave，詳情要跟著取消選取一起收，否則會一直卡在畫面上
+      // 觸控沒有 mouseleave，詳情要跟著取消選取一起收
       setTooltip(null);
     }
   }
@@ -677,9 +680,9 @@ export function BagPanel() {
   if (bagTab === 'talent') {
     return (
       <div className="bag-panel">
-        {/* 列數與一般分頁對齊，兩個分頁切換時視窗不會忽大忽小 */}
+        {/* 列數與一般分頁對齊 */}
         <BagTabs tab={bagTab} onChange={setBagTab}>
-          {/* 整理鈕與一般分頁同一顆、同一個位置、同一種行為：一次性落位，不是開關 */}
+          {/* 整理鈕與一般分頁同一顆、同一個位置、同一種行為 */}
           <button className="bag-sort-toggle" onClick={handleTalentSort}>整理</button>
         </BagTabs>
         <BagTalentTab rows={rowsForSlots(maxSlots)} order={talentOrder} />
@@ -689,10 +692,6 @@ export function BagPanel() {
 
   return (
     <div className="bag-panel" ref={panelRef} onPointerDown={handlePanelPointerDown}>
-      {/*
-        視窗標題已經寫著「背包」，面板裡不必再寫一次 ——
-        少一列標題，分頁列與格子就能整個往上移。
-      */}
       <BagTabs tab={bagTab} onChange={setBagTab}>
         <button className="bag-sort-toggle" onClick={handleSort}>整理</button>
         <span className={`bag-slots-count${usedSlots >= maxSlots ? ' danger' : usedSlots >= maxSlots * 0.9 ? ' warning' : ''}`}>
@@ -865,10 +864,7 @@ export function BagPanel() {
   );
 }
 
-/**
- * 背包分頁列（`35-inventory-constraints.md` § 35.21）。
- * `children` 是靠右的分頁工具列（整理、格數），由各分頁自己給。
- */
+/** 背包分頁列（§ 35.21）。`children` 是靠右的工具列（整理、格數） */
 function BagTabs({ tab, onChange, children }: {
   tab: 'normal' | 'talent';
   onChange: (t: 'normal' | 'talent') => void;

@@ -6,9 +6,8 @@ export type BagItemType = 'material' | 'potion' | 'scroll' | 'spellbook';
  * 背包／個人倉庫／共用倉庫的一格。
  *
  * **`itemId` 是唯一的鍵**（`99-ai-constraints.md` § 99.1）：所有比對、合併、扣除一律用它。
- * `name` 與 `type` 是**由 id 反查 seed 產生的顯示快取**，不是獨立資料 ——
- * 一律經 `makeBagItem()` 產生，不可手寫。曾因為以名稱當鍵，
- * 道具改名等於玩家存量憑空消失，必須寫 Dexie upgrade 補救（v14／v15）。
+ * `name` 與 `type` 是**由 id 反查 seed 產生的顯示快取**，不是獨立資料：
+ * 一律經 `makeBagItem()` 產生，不可手寫，**不可以名稱當鍵**。
  */
 export interface BagItem {
   itemId: number;

@@ -4,8 +4,7 @@
  *   localStorage.setItem('mayana:unlock-regions', '1')   // 解除通行卷軸限制
  *   localStorage.removeItem('mayana:unlock-regions')     // 關閉
  *
- * 用途是測試地圖時免去湊卷軸。因為狀態存在瀏覽器而不是程式碼裡，
- * 不需要事後記得改回來，也不會影響測試。
+ * 用途是測試地圖時免去湊卷軸。狀態存在瀏覽器，不進程式碼、不影響測試。
  */
 export function isRegionUnlockEnabled(): boolean {
   try {

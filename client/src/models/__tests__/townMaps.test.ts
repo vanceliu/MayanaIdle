@@ -6,7 +6,7 @@ import { useMapMonsterStore } from '../../stores/mapMonsterStore';
 
 const TOWN_IDS = ['neutral-town', 'elsarth-town', 'varden-town'];
 
-/** TownView 認得的設施 ID（NPC 的 facility 必須落在這組裡，否則點了開不出面板） */
+/** TownView 認得的設施 ID：NPC 的 facility 必須落在這組裡 */
 const KNOWN_FACILITIES = new Set([
   'general-store', 'blacksmith', 'weapon-shop', 'armor-shop', 'inn', 'storage',
   'magic-academy', 'class-guild', 'starter-npc', 'adventurer-guild', 'statistics-center',

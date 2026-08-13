@@ -3,6 +3,8 @@ import { normalizeAppearance } from '../models/appearance';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../models/bagItem';
+import type { TalentSlot, TalentAffixInstance } from '../models/talent';
+import type { Mail } from '../models/mailbox';
 import { makeBagItem } from '../models/bagItem';
 import type { WarehouseEntry } from '../db/database';
 import { instantiateFromTemplate } from '../models/skillTemplate';
@@ -13,13 +15,19 @@ const ENCRYPTION_PASSPHRASE = 'MayanaIdle-v1-8f3k2m9x';
 const SALT = new Uint8Array([77, 97, 121, 97, 110, 97, 73, 100, 108, 101, 83, 97, 108, 116, 50, 48]);
 
 interface CharacterExportData {
-  version: 2;
+  /** v3 起帶天賦與信箱。舊檔（v2）匯入時這三項為 undefined，視為空 */
+  version: 2 | 3;
   dataVersion: number;
   exportedAt: number;
   character: Character;
   equipmentInstances: EquipmentInstance[];
   bagItems: BagItem[];
   personalWarehouseItems: BagItem[];
+  /** 天賦格與鑲材（`51-auto-talent.md`），匯出必須帶走 */
+  talentSlots?: TalentSlot[];
+  talentAffixes?: TalentAffixInstance[];
+  /** 未領取的信同樣是角色資產（`52-mailbox.md`） */
+  mailbox?: Mail[];
   localPreferences: Record<string, unknown> | null;
 }
 
@@ -108,17 +116,24 @@ export async function exportCharacterData(characterId: number): Promise<string> 
     .map(r => makeBagItem(r.itemTemplateId!, r.amount))
     .filter((b): b is BagItem => b !== null);
 
+  const talentSlots = await db.talentSlots.where('characterId').equals(characterId).toArray();
+  const talentAffixes = await db.talentAffixes.where('characterId').equals(characterId).toArray();
+  const mailbox = await db.mailbox.where('characterId').equals(characterId).toArray();
+
   const prefsRaw = localStorage.getItem(`mayana_prefs_${characterId}`);
   const localPreferences = prefsRaw ? JSON.parse(prefsRaw) : null;
 
   const data: CharacterExportData = {
-    version: 2,
+    version: 3,
     dataVersion: character.dataVersion ?? 1,
     exportedAt: Date.now(),
     character,
     equipmentInstances,
     bagItems,
     personalWarehouseItems,
+    talentSlots,
+    talentAffixes,
+    mailbox,
     localPreferences,
   };
 
@@ -149,7 +164,7 @@ export async function importCharacterData(
 
   const data = JSON.parse(json) as Omit<CharacterExportData, 'version'> & { version: number };
 
-  if (data.version !== 1 && data.version !== 2) {
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
     throw new Error('不支援的匯出版本');
   }
   if (!data.dataVersion || data.dataVersion < CURRENT_DATA_VERSION) {
@@ -209,11 +224,18 @@ export async function importCharacterData(
     areaEnteredAt: Date.now(),
   });
 
-  // Delete character-owned equipment (exclude shared warehouse items)
-  await db.equipmentInstances.where('ownerId').equals(currentCharacterId).delete();
+  // 共用倉庫裝備的 ownerId 是 userId，與 characterId 會撞號（§ 19.7）
+  await db.equipmentInstances.where('ownerId').equals(currentCharacterId)
+    .filter(item => item.storageType !== 'shared')
+    .delete();
   if (data.equipmentInstances.length > 0) {
-    // Build name→id map for templateId remapping across environments
+    /*
+     * 模板一律以 **id** 對應（`99-ai-constraints.md` § 99.1 第 3 條）——
+     * seed 的 template id 是固定的，跨環境不會變。
+     * 名稱只在 id 查不到時當退路（改名前匯出的舊檔）。
+     */
     const allTemplates = await db.equipmentTemplates.toArray();
+    const templateIds = new Set(allTemplates.map(t => t.id).filter((id): id is number => id != null));
     const templateNameToId = new Map<string, number>();
     for (const t of allTemplates) {
       if (t.id != null) templateNameToId.set(t.name, t.id);
@@ -222,7 +244,9 @@ export async function importCharacterData(
     const instances = data.equipmentInstances
       .filter(ei => ei.storageType !== 'shared')
       .map(ei => {
-        const resolvedTemplateId = templateNameToId.get(ei.name) ?? ei.templateId;
+        const resolvedTemplateId = templateIds.has(ei.templateId)
+          ? ei.templateId
+          : templateNameToId.get(ei.name) ?? ei.templateId;
         return {
           ...ei,
           id: undefined,
@@ -247,7 +271,7 @@ export async function importCharacterData(
   }
 
   // Restore personal warehouse materials (version 2+)
-  if (data.version === 2 && data.personalWarehouseItems && data.personalWarehouseItems.length > 0) {
+  if (data.version >= 2 && data.personalWarehouseItems && data.personalWarehouseItems.length > 0) {
     await db.warehouses
       .where('characterId').equals(currentCharacterId)
       .filter(row => row.storageType === 'personal')
@@ -263,6 +287,37 @@ export async function importCharacterData(
       characterId: currentCharacterId,
     }));
     await db.warehouses.bulkAdd(personalEntries);
+  }
+
+  /*
+   * 天賦與信箱（v3 起）。**一律先清掉這一格原本的**，即使匯入檔沒帶 ——
+   * 不清的話被覆寫角色的天賦格、鑲材、未領信件會原封不動留給匯入進來的角色。
+   * 舊檔（v2）匯入後天賦是空的，載入角色時由 `grantStartingIfEmpty` 補起始配置。
+   */
+  await db.talentSlots.where('characterId').equals(currentCharacterId).delete();
+  await db.talentAffixes.where('characterId').equals(currentCharacterId).delete();
+  await db.mailbox.where('characterId').equals(currentCharacterId).delete();
+
+  if (data.talentSlots?.length || data.talentAffixes?.length) {
+    // 天賦格 id 會重新配發，鑲材的 slotId 要跟著對應過去
+    const slotIdMap = new Map<number, number>();
+    for (const slot of data.talentSlots ?? []) {
+      const oldId = slot.id;
+      const newId = await db.talentSlots.add({ ...slot, id: undefined, characterId: currentCharacterId });
+      if (oldId != null) slotIdMap.set(oldId, newId as number);
+    }
+    for (const affix of data.talentAffixes ?? []) {
+      const slotId = affix.slotId != null ? slotIdMap.get(affix.slotId) ?? null : null;
+      await db.talentAffixes.add({
+        ...affix, id: undefined, characterId: currentCharacterId,
+        slotId, slotIndex: slotId === null ? null : affix.slotIndex,
+      });
+    }
+  }
+  if (data.mailbox?.length) {
+    await db.mailbox.bulkAdd(
+      data.mailbox.map(m => ({ ...m, id: undefined, characterId: currentCharacterId })),
+    );
   }
 
   if (data.localPreferences) {

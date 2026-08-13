@@ -55,7 +55,7 @@ const CATEGORY_FALLBACK_ICON: Record<string, string> = {
 
 /**
  * 圖示與顏色一律取自 seed（`resolveItemIcon` 為背包／商店／Wiki 共用的單一來源），
- * 不可在 Wiki 端用名稱猜測 —— 否則同一道具在遊戲內與 Wiki 會顯示成兩種樣子。
+ * 不可在 Wiki 端用名稱猜測。
  */
 function getWikiItemIcon(item: ItemDefinition): { icon: string; color?: string } {
   return resolveItemIcon(item, CATEGORY_FALLBACK_ICON[item.category] ?? 'material');

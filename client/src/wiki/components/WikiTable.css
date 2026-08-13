@@ -144,3 +144,10 @@
   padding: 40px;
   font-size: var(--fs-base);
 }
+
+/* 鑲材總表的名稱欄：圖示與名稱同一行 */
+.wiki-affix-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

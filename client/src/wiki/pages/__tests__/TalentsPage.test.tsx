@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TALENT_AFFIX_DEFS } from '../../../db/seed/talentSeeds';
+import { slotTierBandFor } from '../../../models/talent';
 import { TalentsPage, TalentAffixTable, TalentFusionTable } from '../TalentsPage';
 import {
   COMBAT_CONDITION_LABELS,
@@ -28,10 +29,13 @@ const ALL_LABELS = [
 ];
 
 describe('Wiki 自動天賦頁', () => {
-  it('每一個條件與動作都列得出來', () => {
+  // 拿得到的鑲材都要列；「永遠」與 blocked 的不算（§ 51.3.1、§ 51.4.4）
+  it('每一個拿得到的條件與動作都列得出來', () => {
     render(<TalentsPage />);
+    const obtainable = new Set(TALENT_AFFIX_DEFS.filter(d => !d.blocked).map(d => d.ruleId));
     for (const labels of ALL_LABELS) {
-      for (const label of Object.values(labels)) {
+      for (const [key, label] of Object.entries(labels)) {
+        if (!obtainable.has(key)) continue;
         expect(screen.getAllByText(label).length).toBeGreaterThan(0);
       }
     }
@@ -55,7 +59,7 @@ describe('Wiki 自動天賦頁', () => {
     expect(screen.getByText('常駐天賦', { selector: 'h3' })).toBeDefined();
     expect(screen.getByText('補給天賦', { selector: 'h3' })).toBeDefined();
     expect(screen.getByText(/每 300ms/)).toBeDefined();
-    expect(screen.getByText(/每 1000ms/)).toBeDefined();
+    expect(screen.getByText(/每 1200ms/)).toBeDefined();
   });
 
   it('點出「沒有攻擊規則就不出手」這個容易踩的雷', () => {
@@ -102,5 +106,38 @@ describe('合成與掉落表', () => {
     expect(screen.getByRole('heading', { name: '天賦格與鑲材' })).toBeDefined();
     // 指定型綁定後不可更改（§ 51.4.1）是玩家最容易踩的一條
     expect(screen.getByText(/首次鑲入時選定，之後不可更改/)).toBeDefined();
+  });
+
+  /* 條件槽留空就是永遠（§ 51.3.1），所以沒有也不需要「永遠」這份鑲材 */
+  it('條件表不列沒有對應鑲材的項目', () => {
+    render(<TalentsPage />);
+    expect(screen.queryByText('永遠')).toBeNull();
+  });
+
+  // 怪物側機制沒開的鑲材現在拿不到，列在條件表會讓玩家白找（§ 51.4.4）
+  it('條件表不列 blocked 的鑲材', () => {
+    render(<TalentsPage />);
+    for (const def of TALENT_AFFIX_DEFS.filter(d => d.blocked)) {
+      const label = COMBAT_CONDITION_LABELS[def.ruleId as keyof typeof COMBAT_CONDITION_LABELS];
+      if (label) expect(screen.queryByText(label)).toBeNull();
+    }
+  });
+
+  /*
+   * 鑲材分帶 6 段、天賦格分帶 3 段，用索引配對會整欄錯位
+   * （~15 的區域會顯示成掉 T2 天賦格）。
+   */
+  it('分帶表的天賦格欄位依區域等級查，不是照索引配', () => {
+    render(<TalentFusionTable />);
+    const rows = [...document.querySelectorAll('tbody tr')]
+      .map(r => [...r.querySelectorAll('td')].map(td => td.textContent))
+      .filter(r => r.length === 3);
+
+    for (const [area, , slot] of rows) {
+      const level = area === '61+' ? Infinity : Number(area!.replace('～', ''));
+      const band = slotTierBandFor(level);
+      const expected = band.min === band.max ? `T${band.min}` : `T${band.min}～T${band.max}`;
+      expect(slot).toBe(expected);
+    }
   });
 });

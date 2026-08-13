@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
+import { useTalentStore } from '../talentStore';
+import { STARTING_SLOT_COUNT } from '../../models/talent';
+import { STARTING_LAYOUT } from '../../db/seed/talentSeeds';
 import { useGameStore } from '../gameStore';
 import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
 
@@ -167,6 +170,39 @@ describe('Multi-character system', () => {
 
       const dbChar = await db.characters.get(charId);
       expect(dbChar).toBeUndefined();
+    });
+
+    // 創角就要有天賦格，不是等下次載入角色才補
+    it('創角時就把起始天賦裝在身上', async () => {
+      await useGameStore.getState().createCharacter('Fresh', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+      await vi.waitFor(async () => {
+        expect(await db.talentSlots.where('characterId').equals(charId).count())
+          .toBe(STARTING_SLOT_COUNT);
+      });
+      const affixes = await db.talentAffixes.where('characterId').equals(charId).toArray();
+      expect(affixes).toHaveLength(STARTING_LAYOUT.length);
+      // 全部鑲在天賦格上，不是躺在背包
+      expect(affixes.every(a => a.slotId !== null)).toBe(true);
+    });
+
+    /* characterId 會被重用，殘留資料會被下一隻角色撿走 */
+    it('刪角色時一併清掉天賦格、鑲材與信件', async () => {
+      await useGameStore.getState().createCharacter('TalentDel', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+
+      await useTalentStore.getState().grantStartingIfEmpty(charId);
+      await db.mailbox.add({
+        characterId: charId, sourceKey: 'k', title: 't', items: [],
+        createdAt: 1, claimedAt: null,
+      });
+      expect(await db.talentSlots.where('characterId').equals(charId).count()).toBeGreaterThan(0);
+
+      await useGameStore.getState().deleteCharacter(charId);
+
+      expect(await db.talentSlots.where('characterId').equals(charId).count()).toBe(0);
+      expect(await db.talentAffixes.where('characterId').equals(charId).count()).toBe(0);
+      expect(await db.mailbox.where('characterId').equals(charId).count()).toBe(0);
     });
 
     it('should not affect warehouse when deleting character', async () => {

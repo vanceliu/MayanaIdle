@@ -14,6 +14,7 @@ import { AffixesPage } from './pages/AffixesPage'
 import { ItemsPage } from './pages/ItemsPage'
 import { QuestsPage } from './pages/QuestsPage'
 import { TalentsPage } from './pages/TalentsPage'
+import { TalentAffixesPage } from './pages/TalentAffixesPage'
 import { CreditsPage } from './pages/CreditsPage'
 
 /**
@@ -48,6 +49,7 @@ export default function WikiRoutes() {
         <Route path="items/:itemName" element={<ItemsPage />} />
         <Route path="quests" element={<QuestsPage />} />
         <Route path="talents" element={<TalentsPage />} />
+        <Route path="talents/affixes" element={<TalentAffixesPage />} />
         {/* 舊路徑：自動腳本改名為自動天賦，外面貼出去的連結不該變成 404 */}
         <Route path="scripts" element={<Navigate to="/wiki/talents" replace />} />
         <Route path="credits" element={<CreditsPage />} />

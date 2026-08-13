@@ -110,7 +110,7 @@ export function PixiGame() {
       if (currentMap) {
         scene.loadMap(currentMap);
         // 地圖已經載好才掛載（重新整理／回到同一張圖）時，地圖變更的訂閱不會觸發，
-        // NPC 必須在這裡補畫，否則城鎮上一個 NPC 都看不到。
+        // NPC 必須在這裡補畫。
         syncNpcs(currentMap, scene, npcEntitiesRef.current);
         const pos = useMapControlStore.getState().playerPosition;
         player.updatePosition(pos, getRenderedElevation(currentMap, pos));
@@ -244,8 +244,7 @@ export function PixiGame() {
       const currentMap = state.currentMap;
       if (currentMap === prevMapRef) return;
 
-      // 場景尚未建好（init 仍在進行）時不可記錄 prevMapRef，
-      // 否則這張地圖會被永久跳過 —— 之後同一個 map 物件不會再觸發通知。
+      // 場景尚未建好（init 仍在進行）時不可記錄 prevMapRef；
       // 這種情況由 init 完成後讀取 store 當下的 currentMap 補畫。
       if (!currentMap || !sceneRef.current) return;
       prevMapRef = currentMap;
@@ -317,12 +316,10 @@ export function PixiGame() {
       if (!map) return;
 
       /*
-       * 城鎮 NPC 判定（§ 13.2.1）。三個順序上的地雷：
-       * 1. 必須在 screenToMapTile 之前 —— NPC 站的格子不可通行（他有實體），
-       *    而 screenToMapTile 對不可通行格回傳 null，先取格子會把「點正中 NPC」早退掉。
-       * 2. 必須跟地圖移動走同一個 DOM handler —— 用 Pixi 的 pointertap 會與這裡各自
-       *    派路徑，後跑的覆蓋先跑的。
-       * 3. 用圖示的螢幕範圍判定，不用格子距離 —— 否則點旁邊空地想走過去也被當成互動。
+       * 城鎮 NPC 判定（§ 13.2.1）。三條硬性順序：
+       * 1. 必須在 screenToMapTile 之前（NPC 站在不可通行格上，screenToMapTile 回傳 null）
+       * 2. 必須跟地圖移動走同一個 DOM handler，不可用 Pixi 的 pointertap
+       * 3. 用圖示的螢幕範圍判定，不用格子距離
        */
       const npc = findNpcAtScreen(map, worldScreenX, worldScreenY);
       if (npc) {
@@ -493,11 +490,10 @@ function isSelfCast(plan: SkillFxPlan): boolean {
 /**
  * 演在自己身上的那一類（§ 48.8.1）。
  *
- * 錨點是**腳下**，不是身體高度 —— 地面環抬起來會變成半空中的一個圈。
+ * 錨點是**腳下**，不是身體高度。
  *
- * 抽出來共用，是因為同一批 buff 有兩條施放路徑：戰鬥腳本走 ARPG 事件管線，
+ * 兩條施放路徑共用同一份：戰鬥腳本走 ARPG 事件管線，
  * 常駐腳本直接寫在 `gameStore` 裡（見 `systems/selfCastFx.ts`）。
- * 兩邊各接一份必然分岔。
  */
 function playSelfCastFxAt(
   effectLayer: EffectLayer,
@@ -706,7 +702,12 @@ function tickArpgCombatLoop(
   // Ensure monster instances exist
   for (const mm of monsterStore.monsters) {
     if (!monsterInstances.has(mm.id)) {
-      monsterInstances.set(mm.id, createMonsterFromTemplate(mm, areaTemplates));
+      const inst = createMonsterFromTemplate(mm, areaTemplates);
+      monsterInstances.set(mm.id, inst);
+      // 射程回填到 MapMonster，移動邏輯才停得在射程上（`41-arpg-combat.md` § 5.2）
+      if (mm.attackRange !== inst.attackRange) {
+        monsterStore.setMonsterAttackRange(mm.id, inst.attackRange);
+      }
     }
   }
   const activeIds = new Set(monsterStore.monsters.map(m => m.id));
@@ -726,6 +727,9 @@ function tickArpgCombatLoop(
   if (manualTargetId) applyManualTarget(engine, manualTargetId);
   const manualSkillId = commands.consumeSkill();
   if (manualSkillId) queueManualSkill(engine, manualSkillId);
+  // 常駐天賦的走位（§ 51.4.9 T5）：只設意圖，實際移動由 FSM 下一幀處理
+  const pendingMove = commands.consumeMove();
+  if (pendingMove) engine.playerCtx.moveIntent = pendingMove;
 
   const events = tickArpgEngine(engine, {
     playerPos,
@@ -753,7 +757,7 @@ function tickArpgCombatLoop(
   for (const event of events) {
     switch (event.type) {
       case 'overweight_blocked': {
-        // 每次出手判定都顯示一次（§ 20.7），玩家才知道自己為什麼打不出去
+        // 每次出手判定都顯示一次（§ 20.7）
         logs.push({ text: event.message, type: 'system' });
         break;
       }
@@ -782,8 +786,7 @@ function tickArpgCombatLoop(
           : event;
         if (isRangedAttackType(event.attackType) && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
 
-        // 轉向被打的那隻 —— 攻擊方向與角色朝向要一致，
-        // 否則會出現「面向右、往左射箭」。多目標時以第一個為準。
+        // 轉向被打的那隻：攻擊方向與角色朝向必須一致。多目標時以第一個為準。
         const facingTarget = monsterStore.monsters.find(
           m => m.id === attackEvent.targetMonsterIds[0],
         );
@@ -900,7 +903,7 @@ function tickArpgCombatLoop(
                       prototype: 'aura', x: sx, y: sy, color: resolveAuraColor('debuff'),
                     });
                   }
-                  /* 閃掉了就不彈 —— 彈了會讀成「被打到但沒扣血」 */
+                  /* 閃掉了就不彈 */
                   if (result.isDodged || !monster) return;
                   /* 方向一律用螢幕座標算（等距投影會把世界方向轉過去） */
                   const src = mapPositionToScreen(currentMap, monster.position);
@@ -1331,9 +1334,8 @@ function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monste
   // 木樁沒有任何產出可存（§ 50.4.1）。debuff 清理仍要跑完，所以擋在這裡而不是提早 return
   if (monster.isTrainingDummy) return;
 
-  // Auto-save after kill —— 掉落與任務進度是在 processMonsterDeath 的 async 佇列裡才寫入 store，
-  // 這裡必須等佇列結算完再存，否則存下去的永遠是「上一次擊殺」的進度，
-  // 剛打完就重整會讓這次的掉落／任務進度回滾。
+  // Auto-save after kill：掉落與任務進度在 processMonsterDeath 的 async 佇列裡才寫入 store，
+  // 必須等佇列結算完再存。
   void waitForPendingDrops().then(() => {
     useGameStore.getState().saveState();
   });
@@ -1394,11 +1396,8 @@ function syncMonsters(
   for (const [id, entity] of existingMap) {
     if (currentIds.has(id)) continue;
     /*
-     * 死掉的怪**先淡出再拿掉**（§ 48.7.6）——
-     * 判定那一刻就把它從 store 刪了，畫面上直接消失讀起來像被刪除。
-     *
-     * `retire()` 而不是 `die()`：打死牠的那一發可能還在空中，
-     * 要等落地才開始淡（否則投射物會打在一個已經不存在的位置上）。
+     * 死掉的怪**先淡出再拿掉**（§ 48.7.6）。
+     * 用 `retire()` 而不是 `die()`：致命的那一發可能還在空中，要等落地才開始淡。
      */
     entity.retire(deltaMs);
     entity.update(deltaMs);

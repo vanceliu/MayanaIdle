@@ -6,7 +6,7 @@ import type { MonsterTemplate } from '../models/monster';
 import type { EquipmentTemplate, EquipmentInstance, EquipmentTier } from '../models/equipment';
 import type { ItemDefinition } from '../models/items';
 import type { TalentAffixInstance, TalentSlot } from '../models/talent';
-import type { Mail } from '../models/mailbox';
+import { planMailDedupe, type Mail } from '../models/mailbox';
 import { ITEM_DEFINITIONS } from './seed/itemSeeds';
 
 
@@ -96,8 +96,7 @@ export interface CharacterStorageEntry {
 }
 
 /**
- * 遺產封存（§ 45.2）。`payload` 必須是 JSON **字串**，不可存成物件 ——
- * 存物件等於把當時的型別結構寫進 DB，日後型別改動會讓舊紀錄變成無法解讀的殘骸。
+ * 遺產封存（§ 45.2）。`payload` 必須是 JSON **字串**，不可存成物件。
  */
 export interface LegacyArchiveEntry {
   id?: number;
@@ -155,7 +154,7 @@ export class GameDB extends Dexie {
   /** 自動天賦（`51-auto-talent.md`）。鑲材帶 roll 出來的參數，不進 characterBag */
   talentAffixes!: Table<TalentAffixInstance>;
   talentSlots!: Table<TalentSlot>;
-  /** 系統信箱（`52-mailbox.md`）。首版只發天賦格 */
+  /** 系統信箱（`52-mailbox.md`） */
   mailbox!: Table<Mail>;
 
   constructor() {
@@ -268,12 +267,10 @@ export class GameDB extends Dexie {
     /**
      * 背包／倉庫改以 `itemTemplateId` 為鍵（`99-ai-constraints.md` § 99.1）。
      *
-     * **只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填 ——
-     * 名稱反查正是這次要拔掉的東西，為了搶救少數早期列而留一條名稱路徑，
-     * 等於把問題原封不動帶進新設計。往後只認 id。
+     * **只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填。往後只認 id。
      *
-     * 有 id 的列順便對齊 seed：`name` 與 `type` 都由 id 反查重寫，
-     * 清掉 v14 之前存進來的舊名與錯誤分類。id 已不在 seed 的同樣廢棄。
+     * 有 id 的列順便對齊 seed：`name` 與 `type` 都由 id 反查重寫。
+     * id 已不在 seed 的同樣廢棄。
      */
     this.version(15).stores({
       characterBag: '++id, characterId, name, type, itemTemplateId',
@@ -352,6 +349,64 @@ export class GameDB extends Dexie {
       talentAffixes: '++id, characterId, definitionId, slotId',
       talentSlots: '++id, characterId, assignedType, templateId',
       mailbox: '++id, characterId, sourceKey, claimedAt',
+    });
+
+    /**
+     * v19：天賦格發放數記到 `characters.talentSlotGrants`（`52-mailbox.md` § 52.2.3）。
+     * 既有角色由現有信件回填。
+     */
+    this.version(19).stores({}).upgrade(async tx => {
+      const mails = await tx.table('mailbox').toArray();
+      const issued = new Map<number, number>();
+      for (const m of mails) {
+        const n = /^talent-slot-(\d+)$/.exec(m.sourceKey);
+        if (!n) continue;
+        issued.set(m.characterId, Math.max(issued.get(m.characterId) ?? 0, Number(n[1])));
+      }
+      await tx.table('characters').toCollection().modify(row => {
+        row.talentSlotGrants = issued.get(row.id) ?? 0;
+      });
+    });
+
+    /**
+     * v20：重複發放對帳（`52-mailbox.md` § 52.2.3.1）。
+     * 同一個 `sourceKey` 只留一封、收回多領的天賦格（只收沒安裝沒鑲東西的 T1）、
+     * `talentSlotGrants` 重算成應發封數。
+     */
+    this.version(20).stores({}).upgrade(async tx => {
+      const { drop, extraClaims } = planMailDedupe(await tx.table('mailbox').toArray());
+      if (drop.length > 0) await tx.table('mailbox').bulkDelete(drop);
+
+      for (const [characterId, extra] of extraClaims) {
+        const slots = await tx.table('talentSlots')
+          .where('characterId').equals(characterId).toArray();
+        const occupied = new Set(
+          (await tx.table('talentAffixes').where('characterId').equals(characterId).toArray())
+            .map((a: { slotId: number | null }) => a.slotId),
+        );
+        const removable = slots
+          .filter((sl: { id: number; tier: number; assignedType: string | null }) =>
+            sl.tier === 1 && sl.assignedType === null && !occupied.has(sl.id))
+          .slice(0, extra)
+          .map((sl: { id: number }) => sl.id);
+        if (removable.length > 0) await tx.table('talentSlots').bulkDelete(removable);
+      }
+
+      // 應發封數＝等級推導，與信箱狀態無關
+      await tx.table('characters').toCollection().modify(row => {
+        row.talentSlotGrants = Math.floor((row.level ?? 1) / 5);
+      });
+    });
+
+    /**
+     * v21：`mailbox` 的 `sourceKey` 對 `characterId` 加上唯一約束
+     * （`52-mailbox.md` § 52.2、`18-data-schema.md` § 18.10）。
+     *
+     * v20 已把歷史重複列清乾淨，這裡才能建唯一索引。
+     * 唯一約束是**第二道防線** —— 第一道是角色身上的發放計數與已寄 key（§ 52.2.3）。
+     */
+    this.version(21).stores({
+      mailbox: '++id, characterId, sourceKey, claimedAt, &[characterId+sourceKey]',
     });
   }
 }

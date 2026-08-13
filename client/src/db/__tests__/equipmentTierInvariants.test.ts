@@ -80,8 +80,8 @@ describe('掉落池的 tier 標記', () => {
   });
 
   it('新手裝一律是 Tier 1', () => {
-    // 新手裝就是裝備Tier 1（沒有 Tier 0），創角直接穿上整套。
-    // 因為它跟掉落池共用 tier 比對，`drops.ts` 必須另外以 acquireType 排除。
+    // 新手裝就是裝備 Tier 1（沒有 Tier 0），創角直接穿上整套。
+    // 它與掉落池共用 tier 比對，`drops.ts` 必須另外以 acquireType 排除。
     const wrong = EQUIPMENT_SEEDS
       .filter(t => t.acquireType === 'starter' && t.tier !== 1)
       .map(t => `${t.name}(T${t.tier ?? '—'})`);
@@ -157,12 +157,8 @@ describe('T6/T7 掉落限定', () => {
 /**
  * 每個武器類型 × 每個 tier **至少 2 把**，T7 例外可為 1 把。
  *
- * 這條規則原本只寫在文件裡，沒有任何東西在守 —— 結果 T4 一度**完全沒有雙手武器**
- * （雙手劍／雙手斧／雙手法杖／雙刀／鋼爪五種全空），雙刀與鋼爪連 T3 也空。
- * 玩家練到那一階時雙手流派會斷層，只能退回單手，傷害不升反降。
- *
- * 下面「tier 素質單調遞增」那條抓不到，因為它逐類型比相鄰階的天花板：
- * **空格沒有資料可比，就靜默跳過**。缺格必須由本條負責。
+ * 「tier 素質單調遞增」那條逐類型比相鄰階的天花板，**空格沒有資料可比會靜默跳過**，
+ * 缺格一律由本條負責。
  */
 describe('每類型每階的件數下限', () => {
   const WEAPON_TYPES = [...new Set(REAL.filter(t => t.smallMonsterDamage != null).map(t => t.type))];

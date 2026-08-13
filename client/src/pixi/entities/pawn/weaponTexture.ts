@@ -1,16 +1,14 @@
 /**
  * 把武器剪影烘成貼圖 —— 每個「武器類型 × 材質」各一張，用到才烘。
  *
- * 與角色同一個理由（`40-pixijs-migration.md` § 10）：形狀在遊戲中不會改變，
- * 每幀重畫等於把 CPU 花在畫同一張圖上。
+ * 形狀在遊戲中不會改變，一律烘成貼圖（`40-pixijs-migration.md` § 10）。
  *
- * ── 為什麼貼圖是「指向正上方」的姿勢 ──
- * 揮擊靠 sprite 的 `rotation` 與位置表達（`weaponPose()` 回傳的就是那兩個值），
- * 所以貼圖只需要一個姿勢。把旋轉畫進路徑的話，每個角度都要烘一張。
+ * ── 貼圖姿勢一律「指向正上方」 ──
+ * 揮擊靠 sprite 的 `rotation` 與位置表達（`weaponPose()` 的回傳值），旋轉不畫進路徑。
  *
- * ── 快取鍵為什麼不是只有類型 ──
+ * ── 快取鍵 ──
  * `lead`（刃口朝哪一側）只有不對稱的形狀吃得到；`pull`（拉弦）只有弓吃得到。
- * 無關的武器不把它們放進鍵裡，否則對稱的劍會憑空多烘一倍。
+ * 無關的武器不把它們放進鍵裡。
  */
 import { Texture } from 'pixi.js';
 import type { WeaponMaterial } from '../../../models/equipment';
@@ -36,7 +34,7 @@ export const WEAPON_TEX_H = 62;
 export const WEAPON_ANCHOR_X = 24;
 export const WEAPON_ANCHOR_Y = 44;
 
-/** 超取樣倍率：烘大一倍再縮著用，鏡頭拉近時才不會糊 */
+/** 超取樣倍率：烘大一倍再縮著用 */
 export const WEAPON_BAKE_SCALE = 2;
 
 /**

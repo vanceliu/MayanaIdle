@@ -78,6 +78,13 @@ export interface Character {
   areaEnteredAt: number;
   createdAt: number;
   dataVersion?: number;
+  /**
+   * 天賦格已發過幾封（`52-mailbox.md` § 52.2.3）。
+   * 選填是為了相容 DB v19 以前的角色，v19 upgrade 會回填。
+   */
+  talentSlotGrants?: number;
+  /** 補償信寄送紀錄（`52-mailbox.md` § 52.2.4.2）：補償 key → 寄過了沒 */
+  sentMailKeys?: Record<string, boolean>;
   mapPositionX?: number;
   mapPositionY?: number;
 }

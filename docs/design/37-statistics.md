@@ -150,7 +150,7 @@ character_stats.auth_token_hash = excluded.auth_token_hash`），因此不存在
 只會落在 N 名之後。因此結果與總玩家數無關，**不會因為玩家變多而失準**。
 
 **同分序必須決定性**：伺服端 `ORDER BY <field> DESC, character_id ASC`，
-客戶端 `buildBoard` 使用相同比較子，否則邊界名次會在兩端之間跳動。
+客戶端 `buildBoard` 必須使用相同比較子。
 
 ### 37.4.5 上傳與快取時機
 

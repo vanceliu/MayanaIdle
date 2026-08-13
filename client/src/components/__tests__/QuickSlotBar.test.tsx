@@ -34,6 +34,9 @@ describe('QuickSlotBar', () => {
       quickSlots: emptyQuickSlots(),
       bagItems: [bagItem('紅色藥水', 5)],
       inventory: [],
+      // 藥水冷卻全域共用，跨測試會殘留，必須重置
+      lastPotionUsedAt: 0,
+      lastPotionCooldown: 0,
     });
   });
 
@@ -187,8 +190,9 @@ describe('滑鼠兩段確認（§ 35.7.5）', () => {
         i === 0 ? { kind: 'potion' as const, potionType: 'red' as const } : null),
       bagItems: [bagItem('紅色藥水', 5)],
       inventory: [],
-      // 藥水冷卻是全域共用（`30-items.md`），跨測試會殘留，必須重置
+      // 藥水冷卻全域共用（`30-items.md` § 30.1），跨測試會殘留，必須重置
       lastPotionUsedAt: 0,
+      lastPotionCooldown: 0,
       character: {
         name: 'T', className: 'knight', level: 10, exp: 0, expToNext: 100,
         hp: 50, maxHp: 100, mp: 30, maxMp: 50,
@@ -378,5 +382,50 @@ describe('裝備快捷鍵的品階著色', () => {
       expect(slots()[0].getAttribute('aria-disabled')).toBe('false');
       view.unmount();
     });
+  });
+});
+
+/*
+ * 藥水冷卻指針（§ 35.7.6）。三種藥水冷卻長度不同（600/900/1500），
+ * 但鎖住所有藥水的是最後喝的那一瓶 —— 指針必須照那個總長走。
+ */
+describe('藥水冷卻指針', () => {
+  beforeEach(() => {
+    useGameStore.setState({
+      quickSlots: emptyQuickSlots().map((_, i) =>
+        i === 0 ? { kind: 'potion' as const, potionType: 'red' as const }
+          : i === 1 ? { kind: 'potion' as const, potionType: 'white' as const } : null),
+      bagItems: [bagItem('紅色藥水', 5), bagItem('白色藥水', 5)],
+      inventory: [],
+      lastPotionUsedAt: 0,
+      lastPotionCooldown: 0,
+    });
+  });
+
+  const cds = () => document.querySelectorAll('[data-testid="quick-slot-cd"]');
+
+  it('藥水格有冷卻指針', () => {
+    render(<QuickSlotBar />);
+    expect(cds()).toHaveLength(2);
+  });
+
+  it('沒在冷卻時指針收著', () => {
+    render(<QuickSlotBar />);
+    for (const el of cds()) expect((el as HTMLElement).hidden).toBe(true);
+  });
+
+  // 喝了白藥，紅藥格也要照白藥的 1500ms 轉 —— 冷卻是全域共用的
+  it('冷卻中兩格一起轉，總長是最後喝的那一瓶', async () => {
+    render(<QuickSlotBar />);
+    act(() => {
+      useGameStore.setState({ lastPotionUsedAt: Date.now(), lastPotionCooldown: 1500 });
+    });
+    await act(async () => { await new Promise(r => requestAnimationFrame(() => r(null))); });
+
+    for (const el of cds()) {
+      const angle = (el as HTMLElement).style.getPropertyValue('--cd-angle');
+      expect((el as HTMLElement).hidden).toBe(false);
+      expect(parseFloat(angle)).toBeGreaterThan(0);
+    }
   });
 });

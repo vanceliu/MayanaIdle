@@ -4,9 +4,8 @@ import { createDefaultAppearance } from '../../../../models/appearance';
 import type { PawnDirectionId } from '../geometry';
 
 /**
- * 只把「烘貼圖」換掉 —— jsdom 沒有 canvas，烘不出東西。
- * 其餘（PawnSprite 本身、朝向的取捨）一律用真的，
- * 否則測到的是測試裡複製的一份邏輯，改壞了也不會紅。
+ * 只把「烘貼圖」換掉（jsdom 沒有 canvas）。
+ * 其餘（PawnSprite 本身、朝向的取捨）一律用真的，不可在測試裡複製一份邏輯。
  */
 const getPawnTexture = vi.fn((_look: unknown, dir: PawnDirectionId) => {
   void dir;

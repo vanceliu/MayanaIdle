@@ -8,8 +8,8 @@ const sectionHeading = {
 };
 
 /**
- * WikiTable.css 的 td 預設 nowrap，長內容需個別放行換行，否則表格會被撐出畫面。
- * 一般文字只放行換行（避免把 Sbed 拆成 S/bed）；網址與路徑才允許任意位置斷行。
+ * WikiTable.css 的 td 預設 nowrap，長內容需個別放行換行。
+ * 一般文字只放行換行；網址與路徑才允許任意位置斷行。
  */
 const wrapText = { whiteSpace: 'normal' as const };
 const wrapUrl = {

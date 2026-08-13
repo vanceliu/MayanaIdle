@@ -61,8 +61,7 @@
 > 每次改名都得補一版 Dexie 遷移（v14 就是這樣來的）。
 > 詳細規則見 `99-ai-constraints.md` § 99.1。
 >
-> Dexie v15 完成鍵的轉換：**只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填 ——
-> 為了搶救少數早期列而留一條名稱路徑，等於把問題帶進新設計。
+> Dexie v15 完成鍵的轉換：**只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填。
 
 同一條分界也適用於**設定表指涉道具**：卷軸、狀態解除道具、印記、技能書、
 裝備配方材料（`craftMaterials`）、冒險者工會獎勵一律存 id，顯示名由 id 反查。
@@ -76,7 +75,7 @@
 - 裝備模板
 - 玩家實際擁有的裝備實例
 
-因為每件裝備可能有：
+每件裝備可能有：
 
 - 品質 %
 - 詞綴
@@ -199,7 +198,7 @@ baseValue × (1 + qualityPercent / 100)
 
 | 落點 | 要做什麼 |
 |---|---|
-| `db/database.ts` migrate | 新版 `.upgrade()` 內 `modify` 補上預設外觀，既有角色才不會是空值 |
+| `db/database.ts` migrate | 新版 `.upgrade()` 內 `modify` 為既有角色補上預設外觀 |
 | `systems/characterTransfer.ts` 匯出 | 整列打包，**自動帶走**，不需改 |
 | `systems/characterTransfer.ts` 匯入 | **必須手動加**：那裡是逐欄位 `db.characters.update({...})`，漏列的欄位會靜默消失 |
 | `systems/legacyArchive.ts` 快照 | `character: {...}` 只存部分欄位，遺產角色要顯示外觀就得加（見 `45-legacy-archive.md` § 45.2） |
@@ -235,14 +234,11 @@ baseValue × (1 + qualityPercent / 100)
 | drop_tables | 區域掉落池配置 | ~120 |
 | boss_drop_tables | Boss 專屬掉落池 | ~50 |
 
-### 設計理由（統一表 vs 分表）
+### 模板表結構
 
-早期設計曾規劃將武器、防具、盾牌、魔導書、飾品拆為 5 張獨立模板表。實作後改為統一 `equipment_templates` 表，理由：
-
-1. 全遊戲裝備約 200 件，資料量不需要分表
-2. 商店、鐵匠鋪、掉落系統都需跨類型操作，統一表減少 JOIN/UNION
-3. 以 `type` + `slot` 欄位區分類型，nullable 欄位處理各類型差異
-4. 線上化時維持同樣設計，Prisma 單一 model + enum 比 polymorphic relation 好維護
+武器、防具、盾牌、魔導書、飾品共用單一 `equipment_templates` 表，
+以 `type` + `slot` 欄位區分類型，各類型差異以 nullable 欄位承載。
+線上化後維持同一設計：Prisma 單一 model + enum，不做 polymorphic relation。
 
 ### equipment_templates 欄位
 

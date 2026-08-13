@@ -12,72 +12,75 @@
 
 | 要實作的功能 | 必讀文件 | 章節 |
 |---|---|---|
+| 核心循環 | `02-core-loop.md` | 全文 |
+| 遊戲定位／核心方向 | `00-overview.md` | 全文 |
 | 背包系統限制（容量/負重/互動/顯示） | `35-inventory-constraints.md` | 全文 |
 | **裝備中的裝備仍留在背包並佔格（基礎 60 格）** | `35-inventory-constraints.md` § 35.1、§ 35.9 | — |
 | **印記不佔格也不計重（走底部抽屜）** | `35-inventory-constraints.md` § 35.20、`30-items.md` § 30.2 | — |
 | **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
-| 裝備品質提升（印記師） | `08-quality.md` | 全文 |
-| 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
-| **印記（詞綴升階／重骰／品質）** | `46-sigil.md` | 全文 |
-| 印記掉落率 | `27-drop-table.md` | § 27.8 |
-| 印記師 NPC | `13-town.md` | § 13.13 |
-| 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
-| 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
 | 武器類型/職業限制 | `06-equipment.md` | § 6.6~6.7 |
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
 | 武器傷害（小怪/大怪） | `06-equipment.md` | § 6.11 |
+| 裝備品質提升（印記師） | `08-quality.md` | 全文 |
+| 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
+| 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
+| 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
+| 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
+| **印記（詞綴升階／重骰／品質）** | `46-sigil.md` | 全文 |
+| 印記掉落率 | `27-drop-table.md` | § 27.8 |
+| 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
-| 裝備數量分配（各類型各階梯幾把） | `06-equipment-requirement.md` | 武器規格表 |
-| 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
-| **防具防禦目標（全套 +4 的總防禦）** | `06-equipment-armor.md` | 逐件清單 |
-| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-armor.md` | 左手區塊 |
-| **三件的定位（防禦/續戰/屬性型）** | `06-equipment-armor.md` | 「定位」欄 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
-| **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-armor.md`、`35-inventory-constraints.md` § 35.1 | — |
-| **製作材料分配規則** | `06-equipment-acquire.md` | § 6A.3 |
-| 製作費（T4 5萬/T5 10萬/T6 20萬） | `06-equipment-acquire.md` | § 6A.3 |
-| **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-armor.md` | — |
-| 新手裝（T1，創角直接穿上） | `04-character.md` | § 4.3 |
-| 回血/回魔/HP/MP 的部位上限 | `06-equipment-armor.md` | 逐件清單 |
-| 額外屬性走向（各路線各部位） | `06-equipment-armor.md` | 逐件清單 |
-| 職業效率反向補償（武器數值） | **已取消**（不做補償，見 `06-equipment-requirement.md` 的職業上限表） | — |
-| 武器走向（攻擊/輔助/INT/SPI/STR/AGI 型） | `06-equipment-requirement.md` | — |
-| T7 陣容（以武器類型為單位） | `06-equipment-requirement.md` | — |
+| **製作材料分配規則／製作費** | `06-equipment-acquire.md` | § 6A.3 |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
+| **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
+| 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
+| **防具防禦目標／回血回魔 HP MP 部位上限／額外屬性走向** | `06-equipment-armor.md` | 逐件清單 |
+| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-armor.md` | 左手區塊 |
+| **三件的定位（防禦/續戰/屬性型）** | `06-equipment-armor.md` | 「定位」欄 |
+| **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-armor.md` | — |
+| **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-armor.md`、`35-inventory-constraints.md` § 35.1 | — |
+| 戰鬥系統（自動/手動） | `03-combat.md` | 全文 |
 | 戰鬥公式（攻擊/防禦/命中/迴避） | `21-combat-formula.md` | 全文 |
 | **技能傷害走哪條公式（魔法／物理快照／物理普攻）** | `21-combat-formula.md` § 21.4 / § 21.4a、`23-class-magic.md` § 23.1.1 | — |
+| ARPG 即時戰鬥（LOS／投射物／位移） | `41-arpg-combat.md` | 全文 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
+| 新手裝（T1，創角直接穿上） | `04-character.md` | § 4.3 |
 | **角色外觀（髮型/睫毛/膚色髮色眼色/四朝向）** | `04-character.md` | § 4.10 |
-| **武器外觀與揮擊演出（揮擊角度/演出長度）** | `48-vfx.md` | § 48.6 |
 | 創角的外觀步驟 | `19-account-character.md` | § 19.4（規格見 `04-character.md` § 4.10） |
 | 外觀存哪／匯出匯入落點 | `18-data-schema.md` | § 18.7 |
+| **武器外觀與揮擊演出（揮擊角度/演出長度）** | `48-vfx.md` | § 48.6 |
 | 技能系統規則 | `05-skill.md` | 全文 |
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
 | 職業魔法（5 職業各 5 級） | `23-class-magic.md` | 全文 |
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
-| 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩） | `24-buff-debuff.md` | § 24.4, § 24.10 |
-| **技能施加於怪物的 debuff（效果與秒數走技能表，只有 tag 共用）** | `24-buff-debuff.md` | § 24.4.1 下半 |
-| **debuff tag 一覽（免疫詞綴／解除道具／控場免疫的查表 key）** | `24-buff-debuff.md` | § 24.4.1 |
+| 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩） | `24-buff-debuff.md` | § 24.4、§ 24.10 |
 | Debuff 解除手段（道具/免疫詞綴） | `24-buff-debuff.md` | § 24.10 |
-| 怪物 Debuff 能力（已併入怪物屬性表） | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
-| 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
+| **debuff tag 一覽（免疫詞綴／解除道具／控場免疫的查表 key）** | `24-buff-debuff.md` | § 24.4.1 |
+| **技能施加於怪物的 debuff（效果與秒數走技能表，只有 tag 共用）** | `24-buff-debuff.md` | § 24.4.1 下半 |
 | 狀態解除道具（解毒/止血/淨化） | `30-items.md` | § 狀態解除道具 |
 | **自動天賦（原自動腳本）：天賦格／鑲材／合成／掉落** | `51-auto-talent.md` | 全文 |
 | **鑲材清單與 tier 歸屬** | `51-auto-talent.md` | § 51.4.5~51.4.11 |
 | **天賦格取得（等級／合成／Boss 掉落）** | `51-auto-talent.md` | § 51.3.3 |
 | **天賦格要先安裝（領取→背包→安裝）** | `51-auto-talent.md` | § 51.3.4 |
-| **系統信箱／更新公告（發放與領取）** | `52-mailbox.md` | 全文 |
+| **鑲材總表（Wiki）不併進道具總表** | `43-wiki-system.md` | § 4.12.1 |
 | 戰鬥天賦 / 常駐天賦的條件與動作規格 | `03-combat.md` | § 3.12、§ 3.13（＋緊急撤退）。取得方式見 `51-auto-talent.md` |
-| 天賦配置（原腳本 Template，分頁切換） | `03-combat.md` | § 3.14（整包切換、預設分頁不可刪） |
+| 天賦配置（原腳本 Template，分頁切換） | `03-combat.md` | § 3.14 |
 | 補給天賦（原村莊腳本：自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
+| **系統信箱／更新公告（發放與領取）** | `52-mailbox.md` | 全文 |
+| **補償的版本範圍（單版／到某版之前／全版本）** | `52-mailbox.md` | § 52.2.4 |
+| **補償寄送紀錄記在角色身上** | `52-mailbox.md` | § 52.2.4.2 |
+| **新增補償前必須先問使用者範圍** | `52-mailbox.md` | § 52.2.4.3 |
+| **防重複發放看角色身上的計數，不看信箱** | `52-mailbox.md` | § 52.2.3 |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
+| 怪物 Debuff 能力 | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
@@ -85,36 +88,19 @@
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
 | 道具定義（藥水/卷軸/材料） | `30-items.md` | 全文 |
 | 城鎮設施（雜貨店/鐵匠/旅館等） | `13-town.md` | § 13.3~13.10 |
-| 新手 NPC（新手裝備/強化/領取限制） | `13-town.md` | § 13.11 |
 | 回城卷軸/死亡機制 | `13-town.md` | § 13.8 |
+| 新手 NPC（新手裝備/強化/領取限制） | `13-town.md` | § 13.11 |
 | 副本系統/地圖結構 | `09-dungeon.md` | 全文 |
 | HP/MP 自然回復 | `29-regen.md` | 全文 |
 | 陣營系統 | `10-faction.md` | 全文 |
 | 公會系統 | `11-guild.md` | 全文 |
 | 寵物系統 | `12-pet.md` | 全文 |
 | 成就/排行榜 | `14-endgame.md` | 全文 |
-| 核心循環 | `02-core-loop.md` | 全文 |
-| 戰鬥系統（自動/手動） | `03-combat.md` | 全文 |
-| 資料結構設計 | `18-data-schema.md` | 全文 |
-| 技術方向 | `16-tech.md` | 全文 |
-| 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
-| 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文 |
-| 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
-| 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
-| 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
-| 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
-| 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
-| **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`，倍率記於該節） |
-| **數量徽章（配色／字級／自動天賦只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
-| **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（順序不可任意調動，由 `PanelDock.test.tsx` 把守） |
-| **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
-| 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
-| **技能特效（原型／技能對應／AoE 一發／通用戰鬥特效）** | `48-vfx.md` | § 48.7（元素色見 `42-element-system.md` § 42.4） |
-| **Buff／Debuff 場上特效（施加閃光／染色／頭頂標記／DoT 粒子）** | `48-vfx.md` | § 48.8（規則與 icon 見 `24-buff-debuff.md`） |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
+| 刪除角色 / 清除線上紀錄 | `37-statistics.md` § 37.4.9、`45-legacy-archive.md` § 45.4.1 | — |
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
@@ -122,9 +108,26 @@
 | **試驗場（木樁／DPS 量測）** | `50-training-ground.md` | 全文 |
 | 木樁可調參數（防禦/血量/等級/體型/元素/數量） | `50-training-ground.md` | § 50.4.2 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
-| 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4，API 見 `37-statistics.md` § 37.4.3 |
-| 刪除角色 / 清除線上紀錄 | `37-statistics.md` | § 37.4.9，另見 `45-legacy-archive.md` § 45.4.1 |
+| 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文 |
+| 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4（API 見 `37-statistics.md` § 37.4.3） |
 | 資料版本淘汰（CURRENT_DATA_VERSION） | `19-account-character.md` | § 19.9 |
+| 資料結構設計 | `18-data-schema.md` | 全文 |
+| 技術方向 | `16-tech.md` | 全文 |
+| 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
+| 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
+| Pixi 渲染（分層／theme palette／RenderTexture） | `40-pixijs-migration.md` | 全文 |
+| In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
+| 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
+| 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
+| 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
+| **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`） |
+| **數量徽章（配色／字級／自動天賦只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
+| **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（由 `PanelDock.test.tsx` 把守） |
+| 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
+| **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
+| 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
+| **技能特效（原型／技能對應／AoE 一發／通用戰鬥特效）** | `48-vfx.md` | § 48.7（元素色見 `42-element-system.md` § 42.4） |
+| **Buff／Debuff 場上特效（施加閃光／染色／頭頂標記／DoT 粒子）** | `48-vfx.md` | § 48.8（規則與 icon 見 `24-buff-debuff.md`） |
 
 ### 依限制查找
 
@@ -138,300 +141,172 @@
 
 ---
 
-## 文件完整清單（依分類）
-
-### 基礎設定
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `00-overview.md` | 文件用途/基本資訊 | 遊戲定位、核心方向 |
-| `01-worldview.md` | 世界觀 | 兩大王國、禁止方向 |
-| `02-core-loop.md` | 核心循環 | 探索→戰鬥→掉落→強化 loop |
-
-### 角色與職業
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `04-character.md` | 五職業定義 | 初始屬性、職業特性 |
-| `20-attributes.md` | 屬性系統 | 六大屬性、換算公式、負重 |
-| `05-skill.md` | 技能規則 | 學習限制、MP 消耗、冷卻 |
-| `22-basic-magic.md` | 基礎魔法 | 50 個魔法、1~10 級 |
-| `23-class-magic.md` | 職業魔法 | 5 職業各 5 級 |
-| `19-account-character.md` | 帳號與多角色 | 角色格數、角色選擇、登出、倉庫共用 |
-
-### 裝備系統
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `06-equipment.md` | 裝備核心系統 | 部位、武器類型、**強化規則**、壞刀 |
-| `06-equipment-acquire.md` | 裝備取得 | 商店購買/鐵匠製作、價格表 |
-| `06-equipment-requirement.md` | **武器規格（唯一來源）** | 每類型每階件數、五職業階梯上限、變體走向 |
-| `06-equipment-weapons.md` | 武器模板索引 | ⚠️ **逐把清單已由產生器取代**，見 `06-equipment-acquire.md` § 6A.4 |
-| `06-equipment-weapons-*.md` | 各類型武器子文件（14 份，含盾牌/魔導書/臂甲） | ⚠️ 同上，由產生器輸出 |
-| `06-equipment-armor.md` | 防具模板 | ⚠️ **由產生器輸出**，勿手改 |
-| `07-affix.md` | 詞綴系統 | T1~T7 數值、詞綴 pool、生成規則 |
-| `46-sigil.md` | 印記系統 | 混沌／刺針／重刻／精鍊／突破／工藝印記、印記師 |
-| `08-quality.md` | 品質系統 | 0%~20%、工藝印記、影響範圍 |
-
-### 戰鬥系統
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `03-combat.md` | 戰鬥系統 | 手動/自動/Pressure |
-| `51-auto-talent.md` | 自動天賦系統 | 天賦格、鑲材、合成鏈、掉落。原「自動腳本」的改版 |
-| `52-mailbox.md` | 系統信箱與更新公告 | 本機觸發的發放與領取、版本公告。天賦格的等級發放走這裡 |
-| `49-village-script.md` | 補給天賦（原村莊腳本） | 自動回城／販售／採買／返回掛機點。預設為空 |
-| `21-combat-formula.md` | 戰鬥公式 | 物理/魔法攻擊、防禦減傷、命中迴避 |
-| `24-buff-debuff.md` | Buff/Debuff 系統 | 疊加規則、控場、DoT、Boss 免疫、UI 顯示 |
-| `44-dps-prediction.md` | DPS 預測 / 職業平衡健檢 | Lv.75 滿裝 vs 百柱死神。裝備由腳本自動選 BiS，五職業落差 2.22 倍 |
-
-### 怪物系統
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `25-monster-system.md` | 怪物系統 | 種族、體型（元素已移至 42） |
-| `26-spawn-pressure.md` | 怪物生成 | Pressure 公式、生成數量 |
-| `27-drop-table.md` | 掉落表 | 區域掉落池、Boss 掉落 |
-| `28-monster-stats.md` | 怪物素質 | HP/攻/防/經驗值 |
-| `42-element-system.md` | 元素系統 | 元素類型、克制關係、傷害顏色規則 |
-
-### 世界與城鎮
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `09-dungeon.md` | 副本/地圖 | 區域結構、層數、Boss |
-| `13-town.md` | 城鎮系統 | 設施功能、**回城卷軸**、**死亡機制**、**鐵匠鋪**、**新手 NPC** |
-| `29-regen.md` | HP/MP 回復 | 自然回復公式 |
-| `30-items.md` | 道具系統 | 藥水、卷軸、材料、重量 |
-
-### 社交與成長
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `10-faction.md` | 陣營 | 兩陣營、Lv30 開啟 |
-| `11-guild.md` | 公會 | 公會功能 |
-| `12-pet.md` | 寵物 | 寵物定位 |
-| `14-endgame.md` | 成就/排行榜 | 長期目標 |
-| `36-quest-system.md` | 每日任務系統 | 冒險者工會、40 個任務、每日重置、獎勵機制 |
-| `37-statistics.md` | 角色統計數據 | 殺敵數、BOSS討伐、死亡、強化、任務完成、金幣獲得、T7 武器／防具掉落數 |
-| `38-map-control.md` | 地圖控制系統 | 等距俯瞰地圖、地形 catalog、移動/尋路、紅點生成、環境主題地形配方 |
-| `39-batch-sell.md` | 批量販售系統 | 依等級分類批量販售、裝備顏色等級、素材 Tier 篩選 |
-| `50-training-ground.md` | 試驗場 | 木樁參數、DPS／命中率／MP 淨消耗量測。零產出、無獎勵、無週期 |
-
-### 技術架構
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `16-tech.md` | 技術方向 | React/Vite/TypeScript/PostgreSQL |
-| `16-tech-frontend-architecture.md` | 前端架構 | 目錄結構、狀態管理、資料流、計時器、組件職責 |
-| `18-data-schema.md` | 資料結構 | 模板 vs 實例、DB 設計、帳號角色關係 |
-| `34-ui-guidelines.md` | UI 統一規範 | 城鎮面板統一樣式、卡片行佈局、裝備組件使用規則、技能面板顯示規則、渲染上限、**線條與分區色相**、**數量徽章**、**面板按鈕分組** |
-| `47-mobile.md` | 行動裝置適配 | 斷點、觸控互動、指標拖放、手機版面、PWA |
-| `48-vfx.md` | 特效規範 | DOM／Pixi 分工、效能預算、強化演出、印記師、**武器攻擊演出**、**技能特效**、**Buff／Debuff 場上特效** |
-| `35-inventory-constraints.md` | 背包系統限制 | 容量/負重/互動方式/Tooltip/快捷鍵/禁止事項 |
-| `43-wiki-system.md` | In-App Wiki 系統 | Wiki 架構、頁面清單、資料來源、路由、擴充指引 |
-
-### 專案管理與限制
-
-| 檔案 | 主題 | 關鍵內容 |
-|---|---|---|
-| `15-excluded.md` | 排除系統 | 不做的功能 |
-| `17-mvp-priority.md` | MVP 順序 | 五階段優先順序 |
-| `98-online-architecture.md` | 線上化架構設計 | 統一 tick、事件驅動、資料分層、Buffer 策略、Auto-scaling |
-| `99-ai-constraints.md` | AI 限制 | 7 條設計文件查不到的規則 |
-
----
-
 ## 連動關係圖
 
-實作時修改一個系統，必須檢查連動文件：
+實作時修改一個系統，必須檢查連動文件。
+
+- `A ←→ B`、`A ↕ B`：雙向連動，改任一邊都要檢查另一邊
+- `A → B`／`B ← A`：單向，改 A 要檢查 B，反向不成立
+- `✕`：明確不連動
 
 ```
-46-sigil.md（印記＝詞綴的升階、重骰與品質）
-  ←→ 07-affix.md § 7.11（Tier 上限／特殊詞綴機率的另一個入口）
-  ←→ 27-drop-table.md § 27.8（掉落率）←→ 30-items.md（重量／賣價）
-  ←→ 13-town.md § 13.13（印記師）←→ 43-wiki-system.md（Wiki 呈現）
-
-06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 46-sigil.md ←→ 13-town.md（鐵匠鋪／印記師）
-       ↕                    ↕                              ↕
-06-equipment-acquire.md ────┘（§ 6A.6 各管道詞綴 Tier 上限 ←→ § 7.2 取得方式）
-       ↕            （§ 6A.3 前置武器以 templateId 比對 ←→ 18-data-schema.md § 18.8 欄位）
-       ↕                                              30-items.md（材料/卷軸）
+【裝備／詞綴／印記】
+06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 13-town.md（鐵匠鋪／印記師）
+       ↕                    ↕
+06-equipment-acquire.md ────┘（§ 6A.6 ←→ § 7.2；§ 6A.3 ←→ 18-data-schema.md § 18.8）
+       ↕                     └→ 30-items.md（材料／卷軸）
        ↕
-06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md（武器強度 vs 怪物防禦）
+06-equipment-weapons.md / 06-equipment-armor.md ←→ 28-monster-stats.md
        ↕
-06-equipment-requirement.md（武器規格：件數／職業上限／走向）
-  → 依規格表產生武器數值
-  ← 由 TTK 校準反推；改動下列任一者需重跑校準：
-    21-combat-formula.md / 20-attributes.md / 04-character.md / 05-skill.md
-    22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 07-affix.md
+06-equipment-requirement.md
+       ↕
+46-sigil.md
+  ←→ 07-affix.md § 7.11
+  ←→ 27-drop-table.md § 27.8 ←→ 30-items.md
+  ←→ 13-town.md § 13.13 ←→ 43-wiki-system.md
+  ←→ 35-inventory-constraints.md § 35.20
 
+【數值校準（來源文件改動後必須重跑）】
+06-equipment-requirement.md（TTK 校準）
+  ← 04-character.md / 05-skill.md / 20-attributes.md / 21-combat-formula.md
+  ← 07-affix.md / 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
+44-dps-prediction.md（驗算腳本）
+  ← 04-character.md / 20-attributes.md / 21-combat-formula.md / 41-arpg-combat.md
+  ← 06-equipment.md / 07-affix.md / 08-quality.md
+  ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
+
+【戰鬥／技能／Buff】
 03-combat.md ←→ 04-character.md ←→ 05-skill.md ←→ 20-attributes.md
        ↕                                    ↕
 21-combat-formula.md                 22-basic-magic.md / 23-class-magic.md
        ↕                                                        ↕
-24-buff-debuff.md ←→ 25-monster-system.md（怪物 debuff / Boss 控場免疫 / 怪物 debuff 能力表）
-  ※ 改任何 debuff 的 tag 必須同步 § 24.4.1 —— 免疫詞綴、狀態解除道具、
-    Boss 控場免疫、場上染色都以 tag 為查表 key，打錯一個字整條查不到且不報錯。
-    技能側與怪物側的效果、秒數各自獨立，但同一種狀態的 tag 必須同字
+24-buff-debuff.md § 24.4.1 ←→ 25-monster-system.md § 25.8~25.9
        ↕                                                        ↕
-07-affix.md（免疫詞綴 § 7.10）←→ 30-items.md（狀態解除道具）←→ 13-town.md（雜貨店商品清單）
+07-affix.md § 7.10 ←→ 30-items.md ←→ 13-town.md ←→ 27-drop-table.md
        ↕
 16-tech-frontend-architecture.md（Icon 系統 / BuffBar / 浮動面板視窗 / Tooltip）
-                                                                ↕
-                                        27-drop-table.md ←→ 13-town.md（職業工會任務）
 
+【怪物／元素／掉落】
 25-monster-system.md ←→ 26-spawn-pressure.md ←→ 28-monster-stats.md
                 ↕
 42-element-system.md ←→ 05-skill.md / 22-basic-magic.md / 23-class-magic.md / 40-pixijs-migration.md
                                                         ↕
                                                   27-drop-table.md ←→ 30-items.md
                                                         ↕
-                                                  06-equipment-acquire.md（區域素材→製作配方）
+                                                  06-equipment-acquire.md
+28-monster-stats.md → 04-character.md § 4.9 ←→ 09-dungeon.md
 
-04-character.md § 4.10（角色外觀＝髮型/睫毛/色票/四朝向的唯一出處）
-  ←→ 48-vfx.md § 48.6（武器外觀＝武器類型造型/揮擊角度/演出長度的唯一出處）
-  ←→ 19-account-character.md § 19.4（創角流程的外觀步驟）／§ 19.9（匯出匯入帶 appearance）
-  ←→ 18-data-schema.md § 18.7（appearance 欄位與四個落點，匯入必須逐欄位列出）
-  ←→ 40-pixijs-migration.md（玩家/NPC 用剪影並烘成 RenderTexture，怪物維持圓形）
-  ←→ 45-legacy-archive.md § 45.2（遺產快照要帶外觀）
-  ←→ 13-town.md § 13.2.1（NPC 逐設施固定外觀；敵我的顏色區分改由地面標記承擔）
-  色票增刪時必須重算「每個膚色至少 4 個對比 ≥2.2 的眼色」對照表
+【角色外觀】
+04-character.md § 4.10
+  ←→ 48-vfx.md § 48.6
+  ←→ 19-account-character.md § 19.4 / § 19.9
+  ←→ 18-data-schema.md § 18.7
+  ←→ 40-pixijs-migration.md
+  ←→ 45-legacy-archive.md § 45.2
+  ←→ 13-town.md § 13.2.1
 
-28-monster-stats.md（怪物經驗值＝唯一出處）→ 04-character.md § 4.9（經驗曲線依怪物表校準，反向不成立）
+【帳號／資料／統計】
+19-account-character.md ←→ 04-character.md（§ 4.10）／20-attributes.md § 20.10
        ↕
-09-dungeon.md（等級分佈）←→ 04-character.md § 4.9（經驗曲線）
+18-data-schema.md
+       ↕      ←→ 13-town.md
+       ↕      ←→ 35-inventory-constraints.md § 共用倉庫
+       ↕      ←→ 16-tech-frontend-architecture.md
+       ↕
+37-statistics.md ←→ 45-legacy-archive.md
 
-19-account-character.md ←→ 04-character.md（職業/初始配置、§ 4.10 外觀）
-       ↕      ←→ 20-attributes.md § 20.10（角色卡屬性＝建角＋升級配點，不含裝備／buff）
-       ↕
-18-data-schema.md（User/Character 關係、character uuid、共用倉庫金幣獨立表）
-       ↕      ←→ 13-town.md（個人倉庫共用）
-       ↕      ←→ 35-inventory-constraints.md § 共用倉庫（金幣存取）
-       ↕      ←→ 16-tech-frontend-architecture.md（DB 表清單）
-       ↕      ←→ 45-legacy-archive.md（封存快照的 gold 來源）
-       ↕
-37-statistics.md（排行榜以 uuid 為 key／角色密鑰驗證寫入／名稱不唯一以 #uuid 區分）
-       ↕
-45-legacy-archive.md（資料版本淘汰 → 快照封存；統計欄位語意不可變更；手動刪角清線上紀錄）
-
-35-inventory-constraints.md ←→ 20-attributes.md（負重公式）
+【背包／負重】
+35-inventory-constraints.md ←→ 20-attributes.md
        ↕                              ↕
-30-items.md（物品重量）         06-equipment.md（裝備穿脫）
+30-items.md                    06-equipment.md
        ↕                              ↕
-13-town.md（倉庫/商店/鐵匠）   16-tech-frontend-architecture.md（BagPanel）
+13-town.md                     16-tech-frontend-architecture.md（BagPanel）
        ↕
-46-sigil.md ←→ 35-inventory-constraints.md § 35.20（印記不佔格不計重，走底部抽屜）
-       ↕
-34-ui-guidelines.md（顯示規範）←→ 18-data-schema.md（資料結構）
+34-ui-guidelines.md ←→ 18-data-schema.md
 
-48-vfx.md（特效：演出時機／長度／技術路線）
-  ←→ 34-ui-guidelines.md § 34.9（渲染上限＝特效的效能預算，數值只在該節）
-  ←→ 06-equipment.md § 6.9~6.10（強化的成功率與安定值＝演出的觸發條件，數值只在該節）
-  ←→ 40-pixijs-migration.md（EffectLayer 是戰鬥特效的掛載點）
-  ←→ 46-sigil.md（印記師的成功率與確認訊息＝演出的觸發條件，數值只在該文件）
-  ←→ 42-element-system.md § 42.4（技能特效的元素色＝投射物色表，§ 48.7 不另立一張）
-  ←→ 22-basic-magic.md / 23-class-magic.md（技能的 type／target／aoeCenter／range
-       ＝ § 48.7.3 推導原型的依據；新增技能不需要改 48-vfx.md，落下名單除外）
-  ←→ 24-buff-debuff.md § 24.4／§ 24.8（buff/debuff 的規則與 icon 只在該文件，
-       § 48.8 只規範場上表現；藍/紅兩色沿用 § 24.8.2 的框色）
-  特效不得改變任何規則；改動機率或安定值時本文件不需同步，反之亦然
+【UI／特效／行動裝置】
+48-vfx.md
+  ←  34-ui-guidelines.md § 34.9
+  ←  06-equipment.md § 6.9~6.10
+  ←  46-sigil.md
+  ←  42-element-system.md § 42.4
+  ←  22-basic-magic.md / 23-class-magic.md（§ 48.7.3）
+  ←  24-buff-debuff.md § 24.4 / § 24.8
+  ←→ 40-pixijs-migration.md（EffectLayer）
        ↕
-16-tech-frontend-architecture.md § 32.15.1（視窗層級／底部 HUD 帶寬 --hud-band-bottom）
+16-tech-frontend-architecture.md § 32.15.1 / § 32.17
        ↕
-47-mobile.md（行動裝置：斷點／觸控互動／指標拖放／手機版面／PWA）
-  ←→ 16-tech-frontend-architecture.md § 32.17（useViewport／dragStore／HUD 帶模組邊界）
-  ←→ 34-ui-guidelines.md § 34.6（介面縮放：縮放層內不可寫 vh/vw，行動版同樣適用）
-  ←→ 34-ui-guidelines.md § 34.9（渲染上限：桌機與手持共用同一張表，§ 47.8 只留指標）
-  ←→ 35-inventory-constraints.md § 35.1.3／§ 35.5.3（背包重排與丟棄，兩者都由拖放承載）
-  ←→ 24-buff-debuff.md § 24.8.3（怪物列表：手機改靠右直排並縮到七成）
+47-mobile.md
+  ←→ 34-ui-guidelines.md § 34.6 / § 34.9
+  ←→ 35-inventory-constraints.md § 35.1.3 / § 35.5.3
+  ←→ 24-buff-debuff.md § 24.8.3
+       ↕
+34-ui-guidelines.md § 34.10 ←→ § 34.1 / § 34.6 / § 34.8
 
-36-quest-system.md ←→ 13-town.md（冒險者工會設施）
+【任務／販售／村莊】
+36-quest-system.md ←→ 13-town.md ←→ 30-items.md
+       ↕
+27-drop-table.md / 28-monster-stats.md ←→ 09-dungeon.md
+       ↕
+36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
+       ↕                    ←  06-equipment-acquire.md § 6A.3
+       ↕                    ←  18-data-schema.md § 18.8
+       ↕
+39-batch-sell.md ←→ 06-equipment-acquire.md ←→ 30-items.md ←→ 34-ui-guidelines.md
+       ↕
+49-village-script.md（`systems/shop.ts`）
+  ←→ 03-combat.md § 3.14
+  ←→ 34-ui-guidelines.md § 34.10
+  ←→ 38-map-control.md
+  ←→ 35-inventory-constraints.md
+  ←→ 13-town.md § 13.8
+
+【地圖】
+38-map-control.md ←→ 03-combat.md / 41-arpg-combat.md
        ↕                    ↕
-27-drop-table.md（收集任務目標）  30-items.md（獎勵藥水/卷軸）
-       ↕
-28-monster-stats.md（擊殺任務目標）←→ 09-dungeon.md（區域對應）
-       ↕
-36-quest-system.md § 36.13（製作任務）←→ 13-town.md § 13.5（鐵匠鋪＝製作追蹤入口）
-       ↕                          ←→ 06-equipment-acquire.md § 6A.3（配方需求＝任務需求的唯一來源）
-       ↕                          ←→ 18-data-schema.md § 18.8（craftMaterials／craftPrerequisiteWeapon 欄位）
-改動配方需求欄位或製作費時，製作任務的顯示與判定同步受影響，無須另改 § 36.13
-
-38-map-control.md ←→ 03-combat.md / 41-arpg-combat.md（即時戰鬥、LOS、投射物）
+26-spawn-pressure.md   09-dungeon.md
        ↕                    ↕
-26-spawn-pressure.md（合法生成地格）  09-dungeon.md（區域與 theme 對應）
-       ↕                    ↕
-40-pixijs-migration.md（theme palette / 分層渲染）←→ 16-tech-frontend-architecture.md（模組邊界）
+40-pixijs-migration.md ←→ 16-tech-frontend-architecture.md
 
-44-dps-prediction.md（被以下任一文件的數值變更所影響，需重跑驗算腳本）
-  ← 21-combat-formula.md / 20-attributes.md / 04-character.md
-  ← 07-affix.md / 08-quality.md / 06-equipment.md
-  ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md / 41-arpg-combat.md
-
-39-batch-sell.md ←→ 06-equipment-acquire.md（shopTier / craftTier 定義）
+【自動天賦／信箱】
+51-auto-talent.md
+  ←→ 03-combat.md § 3.12~3.14
+  ←→ 49-village-script.md
+  ←→ 27-drop-table.md § 27.1
+  ←→ 30-items.md
+  ←→ 35-inventory-constraints.md § 35.20~35.21
+  ←→ 18-data-schema.md
+  ←→ 13-town.md § 13.8
+  ←→ 34-ui-guidelines.md
+  ←→ 43-wiki-system.md
+  ←→ 16-tech-frontend-architecture.md（scriptRunner / villageScriptRunner）
+  ←→ 25-monster-system.md（§ 51.4.4）
+  ←  04-character.md § 4.9
        ↕
-13-town.md（雜貨店/武器店/防具店販售功能）
-       ↕
-30-items.md（素材 iconTier / sellPrice）←→ 34-ui-guidelines.md（面板統一樣式）
+52-mailbox.md
+  ←→ 51-auto-talent.md § 51.3.3~51.3.4
+  ←→ 35-inventory-constraints.md § 35.21
+  ←→ 19-account-character.md § 19.9
+  ←→ 34-ui-guidelines.md § 34.10
+  ←→ 18-data-schema.md
+  ←→ 30-items.md
 
-34-ui-guidelines.md § 34.10（線條／彩度／分區色相／徽章／按鈕分組）
-  ←→ 34-ui-guidelines.md § 34.1（統一色彩語意：區色只上框與標題，不可與語意色搶同一個位置）
-  ←→ 34-ui-guidelines.md § 34.6（字級一律走 --fs-*，徽章不可寫死 px）
-  ←→ 34-ui-guidelines.md § 34.8（分組間隔只在 >1200px 給；以下是圖示模式，空間會把徽章擠出去）
-  ←→ 49-village-script.md（自動天賦指示只表達「有沒有鑲入」，分頁一視同仁）
-  ※ 介面彩度與地圖彩度是**兩條相反的旋鈕**：地圖是背景可以往上，
-    介面的框往上會吃掉事件（超重／瀕死／掉寶）的音量。改任一邊都要重看另一邊
-       ↕
-49-village-script.md（自動販售沿用同一套顏色門檻與定價，見 `systems/shop.ts`）
+【試驗場】
+50-training-ground.md
+  ←→ 13-town.md § 13.2.1 / § 13.3
+  ←→ 38-map-control.md § 38.4
+  ←→ 21-combat-formula.md
+  ←→ 06-equipment.md § 6.11 ←→ 42-element-system.md
+  ←→ 29-regen.md § 29.2
+  ←→ 44-dps-prediction.md
+  ✕  27-drop-table.md / 28-monster-stats.md / 37-statistics.md
 
-49-village-script.md ←→ 03-combat.md § 3.14（補給天賦屬於天賦配置的一部分）
-       ↕                    ↕
-38-map-control.md（返回掛機點走一般地圖切換）  35-inventory-constraints.md（背包格數條件）
-       ↕
-13-town.md § 13.8（倉庫存取：共用／個人／共用倉庫金幣）
-
-51-auto-talent.md（自動天賦＝天賦格＋鑲材。原「自動腳本」的改版）
-  ←→ 03-combat.md § 3.12~3.14（條件與動作的**規格內容仍在該處**，51 只管取得與鑲嵌）
-  ←→ 49-village-script.md（補給天賦，同上）
-  ←→ 27-drop-table.md（鑲材與天賦格掉落；§ 27.1 的**掉落值可為小數**）
-  ←→ 30-items.md（鑲材的重量／賣價／用途標記）
-  ←→ 35-inventory-constraints.md（背包分頁列；天賦分頁不佔格不計重不可存倉庫；
-       § 35.20 印記抽屜改位於「一般」分頁內）
-  ←→ 18-data-schema.md（鑲材**獨立實例表**，不進 characterBag）
-  ←→ 13-town.md § 13.8（倉庫不收鑲材）／**不新增設施**，合成在天賦面板內
-  ←→ 34-ui-guidelines.md（天賦面板四分頁：常駐／戰鬥／補給／天賦合成）
-  ←→ 43-wiki-system.md（未取得的鑲材走 Wiki 查詢）
-  ←→ 16-tech-frontend-architecture.md（scriptRunner／villageScriptRunner／編輯器組件）
-  ←→ 25-monster-system.md（詠唱與召喚機制＝§ 51.4.4 阻擋項的前置，
-       怪物側沒開就不可先出對應鑲材）
-  ← 04-character.md § 4.9（**單向**：經驗曲線決定玩家實質卡在幾級 → 終局有幾個 T1 格
-       → 合成鏈比例。曲線一動天賦格節奏必須重算，**反向不成立**）
-  ←→ 52-mailbox.md（天賦格的等級發放走信箱；領取後**未安裝**，要玩家自己裝上去）
-
-52-mailbox.md（系統信箱＋更新公告。全部本機觸發，沒有遠端發放）
-  ←→ 51-auto-talent.md § 51.3.3~51.3.4（每 5 級 +1 個 T1 格由信箱發放）
-  ←→ 35-inventory-constraints.md § 35.21（領到的天賦格與鑲材進「天賦」分頁）
-  ←→ 19-account-character.md § 19.9（版本補償的觸發來源＝CURRENT_DATA_VERSION）
-  ←→ 34-ui-guidelines.md § 34.10（未領封數走數量徽章；PanelDock 順序不可任意調動）
-  ←→ 18-data-schema.md（mailbox 表，sourceKey 對 characterId 唯一）
-  ←→ 30-items.md（發放的道具定義）
-
-50-training-ground.md（試驗場＝工具，零掉落／零經驗／零金幣／無獎勵／無週期）
-  ←→ 13-town.md § 13.2.1 / § 13.3（城鎮 NPC 入口，沿用同一套 NPC 互動規則）
-  ←→ 38-map-control.md § 38.4（場地與 `autoSpawn: false`）
-  ←→ 21-combat-formula.md（防禦減傷／防禦溢出轉迴避／命中率等級差＝木樁參數的意義來源）
-  ←→ 06-equipment.md § 6.11（體型參數＝小怪／大怪基傷）←→ 42-element-system.md（元素參數）
-  ←→ 29-regen.md § 29.2（MP 淨消耗已扣掉自然回魔）
-  ←→ 44-dps-prediction.md（理論驗算的實測對照，數值仍以該文件為準）
-  ✕ 不連動 27-drop-table.md / 28-monster-stats.md 的經驗值 / 37-statistics.md ——
-    木樁一律不結算，任何一條接上去都會污染排行榜欄位
-
-13-town.md § 13.11（新手 NPC 對話分頁的前期知識條列 STARTER_TIPS，唯讀複述）
-  ← 02-core-loop.md / 03-combat.md / 41-arpg-combat.md（戰鬥與探索）
-  ← 13-town.md § 13.7~13.8（死亡、回城、旅館）
-  ← 30-items.md § 30.1~30.2（藥水價格/冷卻/狀態解除）
-  ← 06-equipment.md § 6.1 / § 6.8~6.10（左右手、安定值、強化失敗消失）
-  ← 35-inventory-constraints.md § 35.2 / 20-attributes.md § 20.7（格數與負重、超重懲罰）
-  ← 13-town.md § 13.9~13.10 / 36-quest-system.md / 43-wiki-system.md（技能與任務）
-  上列任一數值變動時，必須同步更新新手指引內容
+【新手指引】
+13-town.md § 13.11（STARTER_TIPS）
+  ← 02-core-loop.md / 03-combat.md / 41-arpg-combat.md
+  ← 13-town.md § 13.7~13.8 / § 13.9~13.10
+  ← 30-items.md § 30.1~30.2
+  ← 06-equipment.md § 6.1 / § 6.8~6.10
+  ← 35-inventory-constraints.md § 35.2 / 20-attributes.md § 20.7
+  ← 36-quest-system.md / 43-wiki-system.md
 ```

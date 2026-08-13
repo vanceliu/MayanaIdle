@@ -577,4 +577,15 @@ describe('重排與啟用停用（`51-auto-talent.md` § 51.3.1）', () => {
       expect(canFuseAffixes([...affixes, affixes[0]])).toBe(false);
     });
   });
+
+  it('reset 清空持有資料', async () => {
+    await useTalentStore.getState().grantStartingIfEmpty(CHAR);
+    expect(useTalentStore.getState().slots.length).toBeGreaterThan(0);
+
+    useTalentStore.getState().reset();
+    const { characterId, slots, affixes } = useTalentStore.getState();
+    expect(characterId).toBeNull();
+    expect(slots).toEqual([]);
+    expect(affixes).toEqual([]);
+  });
 });

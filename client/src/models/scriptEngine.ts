@@ -42,6 +42,10 @@ export type CombatConditionType =
   | 'weight_over'
   | 'self_shielded'
   | 'current_area_is'
+  /** 共用條件（戰鬥 ∪ 常駐，§ 51.4.5）：判定的是**自身**的 buff／加速／狀態異常 */
+  | 'buff_not_active'
+  | 'speed_not_active'
+  | 'debuff_active'
   // === 戰鬥專屬，§ 51.4.6 ===
   | 'target_distance'
   | 'target_attack_type'
@@ -55,6 +59,10 @@ export type CombatConditionType =
   | 'hp_dropped_recently'
   | 'target_has_debuff'
   | 'target_lacks_debuff'
+  /** 場上存在指定種族／元素的怪（§ 51.4.6 T6） */
+  | 'field_has_race'
+  /** 場上怪物平均 HP 低於 X%（§ 51.4.6 T6） */
+  | 'field_avg_hp_below'
   | 'target_cc_immune'
   | 'target_shielded';
 
@@ -105,6 +113,8 @@ export interface CombatCondition {
   compare?: CompareMode;
   /** `weapon_type_is`／`target_attack_type`／`target_race`／`target_element`／`target_size`／`current_area_is` 用 */
   match?: string;
+  /** `debuff_active` 用：自身狀態異常條件（§ 51.4.5） */
+  debuffType?: ScriptDebuffCondition;
 }
 
 export interface CombatAction {
@@ -145,6 +155,9 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
   weight_over: '負重超過',
   self_shielded: '自身無敵中／帶護盾',
   current_area_is: '所在區域 ＝',
+  buff_not_active: 'Buff 未激活',
+  speed_not_active: '加速未激活',
+  debuff_active: '狀態異常',
   target_distance: '目標距離',
   target_attack_type: '目標攻擊型別 ＝',
   target_race: '目標種族 ＝',
@@ -155,6 +168,8 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
   target_level_diff: '目標等級 － 自身',
   target_range_gt: '目標射程 大於',
   hp_dropped_recently: 'HP 在 N 秒內下降超過',
+  field_has_race: '場上存在指定種族／元素',
+  field_avg_hp_below: '場上怪物平均 HP 低於',
   target_has_debuff: '目標身上有指定 debuff',
   target_lacks_debuff: '目標身上沒有指定 debuff',
   target_cc_immune: '目標控場免疫中',
@@ -213,7 +228,11 @@ export type PersistentConditionType =
   | 'potion_cooldown_ready'
   | 'hp_dropped_recently';
 
-export type PersistentActionType = 'potion' | 'speed_potion' | 'buff_skill' | 'heal_skill' | 'cure_item';
+export type PersistentActionType =
+  | 'potion' | 'speed_potion' | 'buff_skill' | 'heal_skill' | 'cure_item'
+  | 'use_town_scroll' | 'use_consumable' | 'refill_to_percent' | 'refill_all_buffs'
+  /** 走位（戰鬥 ∪ 常駐，§ 51.4.9 T5）。只設意圖，實際移動由 FSM 處理 */
+  | 'keep_distance' | 'close_in' | 'disengage';
 
 export interface PersistentCondition {
   type: PersistentConditionType;
@@ -236,8 +255,17 @@ export interface PersistentAction {
   potionType?: 'red' | 'orange' | 'white';
   speedPotionType?: 'green' | 'enhanced-green';
   skillId?: string;
-  /** cure_item 用：狀態解除道具的 `ITEM_DEFINITIONS` id（存 id 不存名稱，改名才不會失效） */
+  /** cure_item 用：狀態解除道具的 `ITEM_DEFINITIONS` id（存 id，不存名稱） */
   cureItemId?: number;
+  /** `use_consumable` 用：道具 id */
+  itemId?: number;
+  /** `refill_to_percent` 用：補到 HP 的百分之幾 */
+  value?: number;
+  /** `refill_all_buffs` 用：依序檢查的第 2、3 個 buff（第 1 個走 `skillId`） */
+  skillId2?: string;
+  skillId3?: string;
+  /** 走位用：目標距離（碼） */
+  distance?: number;
 }
 
 export interface PersistentRule {
@@ -276,6 +304,13 @@ export const PERSISTENT_ACTION_LABELS: Record<PersistentActionType, string> = {
   buff_skill: '施放 Buff',
   heal_skill: '施放治癒',
   cure_item: '使用解除道具',
+  use_town_scroll: '使用回城卷軸',
+  use_consumable: '使用指定消耗品',
+  refill_to_percent: '補至指定百分比',
+  refill_all_buffs: '依序補滿多個 buff',
+  keep_distance: '保持距離',
+  close_in: '進逼',
+  disengage: '脫離戰鬥',
 };
 
 // === Emergency Retreat ===

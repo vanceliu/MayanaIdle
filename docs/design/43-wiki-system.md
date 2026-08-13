@@ -102,7 +102,7 @@ client/src/wiki/
 2. **詞綴一覽**：依 `07-affix.md` § 7.4 的分類小標分組（攻擊類／防禦類／補給類／掉落類／
    盾牌專屬／飾品盾牌專屬／特殊詞綴），每組一張 4 欄窄表：詞綴／適用部位／效果／數值區間。
    - 效果敘述與分類小標存在 `AFFIX_DEFINITIONS` 的 `description`／`group` 欄位，
-     **不在 Wiki 端另寫一份**（否則會與 § 7.4 drift）
+     **不在 Wiki 端另寫一份**
    - 數值區間 = `getAffixTierTable(type)` 的 T1 下限 ~ T7 上限，魔法抗性自動顯示 § 7.3.1 的專屬區間
    - 特殊詞綴同表列出，數值欄改顯示「固定效果 · Lv.N+ 掉落」
    - 附「適用部位」下拉篩選；選定部位時同時顯示該部位的可選詞綴數（`getAffixPoolForSlot`），
@@ -121,7 +121,11 @@ client/src/wiki/
 
 ### 4.3 怪物頁 (MonstersPage)
 - 列表：名稱、等級、HP、攻擊、防禦、經驗、屬性、種族、體型、Boss 標記、出沒區域
-- 詳細頁：`/wiki/monsters/:name`，含掉落表（一般區域掉落 / Boss 專屬掉落 / 技能書掉落）
+- 詳細頁：`/wiki/monsters/:name`，含掉落表（一般區域掉落 / Boss 專屬掉落 / 技能書掉落 /
+  **天賦鑲材掉落**）
+- **鑲材不走掉落表**（`51-auto-talent.md` § 51.6）：掉率只看階級與是不是 Boss、
+  可掉階級只看區域等級。不列的話玩家在怪物頁完全查不到鑲材從哪來。
+  階級連到鑲材總表（§ 4.12.1）
 - 篩選：區域、屬性、種族、關鍵字
 - 排序：等級、HP、防禦、經驗
 
@@ -140,7 +144,7 @@ client/src/wiki/
 - 價格一律取自 `ITEM_DEFINITIONS`：
   - 購買價格 = `buyPrice`，無值顯示 `—`
   - 售價 = `sellPrice`；`noSell: true` 顯示「不可販售」，與「沒填價格」明確區分
-  - **素材只有 `sellPrice` 沒有 `buyPrice`**，故售價欄不可省略，否則整批素材價格全空
+  - **素材只有 `sellPrice` 沒有 `buyPrice`**，售價欄不可省略
 - 圖示與顏色一律經由 `resolveItemIcon()`（`models/iconMap.ts`）取自 seed：
   `icon` / `iconColor` → `iconType` / `iconTier` → 類別預設值。
   **不可在 Wiki 端用道具名稱猜測圖示** —— 該作法會讓同一道具在背包與 Wiki 顯示成兩種樣子
@@ -187,13 +191,28 @@ client/src/wiki/
 - 三種類型的判定時機與優先順序、各自的條件／動作對照表
 - **天賦配置是換裝不是複製**（`51-auto-talent.md` § 51.3.2）——
   沒寫清楚玩家會以為切配置能複製一整套天賦格
+- **合成與掉落**：合成鏈與成功率表、掉落階級的區域分帶
+  （來源：`51-auto-talent.md`、`27-drop-table.md` § 27.9）
 - 可照抄的範例配置
 - 條件與動作名稱由 `models` 的標籤常數渲染，與編輯器共用同一份 ——
   面板改名 Wiki 會跟著動。判定頻率等數字為硬編碼文字
-- **鑲材總表**：全部鑲材的 tier、型態（指定／池／自選）、適用類型、取得管道。
-  **必須列出玩家尚未取得的** —— 編輯器只顯示已持有的（`51-auto-talent.md` § 51.10），
+- 條件／動作對照表**只列真的拿得到的鑲材**：`always`（條件槽留空即恆真）
+  與 `blocked` 的不列（`51-auto-talent.md` § 51.3.1、§ 51.4.4）
+
+### 4.12.1 鑲材總表 (TalentAffixesPage)
+
+`/wiki/talents/affixes`。**鑲材不併進道具總表** —— 它不在 `characterBag`、
+沒有 `itemId`、不佔格、不計重、不可堆疊，欄位也完全不同（階級／種類／適用類型／型態）。
+
+- 全部鑲材的**功能說明**、階級、種類、適用類型、型態、取得管道。
+  說明與自動天賦頁共用 `wiki/talentAffixDescriptions.ts`，不必兩邊查
+- **必須列出玩家尚未取得的** —— 編輯器只顯示已持有的（`51-auto-talent.md` § 51.10），
   「還有什麼可以刷」只有 Wiki 回答得了
-- 合成鏈與成功率表、掉落 tier 的區域分帶（來源：`51-auto-talent.md`、`27-drop-table.md` § 27.9）
+- 篩選：階級／種類／適用類型／型態。階級走網址參數 `?tier=`，怪物頁的掉落表由此連入
+**這一頁只有表**：合成鏈、成功率、掉落分帶都在自動天賦頁（§ 4.12）。
+
+**分帶表的兩欄不可用索引配對**：鑲材分帶 6 段、天賦格分帶 3 段，
+要用同一個區域等級各自查。
 
 ### 4.13 掉落 (DropsPage)
 - 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）
@@ -234,7 +253,8 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/attributes   → AttributesPage
 /wiki/combat       → CombatPage
 /wiki/quests       → QuestsPage
-/wiki/talents      → TalentsPage
+/wiki/talents          → TalentsPage
+/wiki/talents/affixes  → TalentAffixesPage（鑲材總表）
 /wiki/scripts      → 轉址至 /wiki/talents（改名前的舊路徑）
 /wiki/drops        → DropsPage
 /wiki/credits      → CreditsPage

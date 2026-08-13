@@ -4,6 +4,14 @@ import { CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
 import { getSkillBookLevel, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
+import {
+  AFFIX_DROP_RATE,
+  BOSS_DROP_MULTIPLIER,
+  SLOT_DROP_RATE_BOSS,
+  affixTierBandFor,
+  slotTierBandFor,
+  type TalentTier,
+} from '../../models/talent';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -209,6 +217,7 @@ function MonsterDetail({ name }: { name: string }) {
       )}
 
       <SkillBookDropInfo isBoss={first.isBoss} areas={allAreas} />
+      <TalentDropInfo isBoss={first.isBoss} areas={allAreas} />
     </div>
   );
 }
@@ -375,24 +384,75 @@ const CLASS_LABELS_BOOK: Record<string, string> = {
   knight: '騎士', elf: '妖精', thief: '盜賊', elementalist: '元素師', priest: '牧師',
 };
 
-function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
+/** 區域 id → 最高等級。樓層走 `parent-Nf` 的形式，要回頭查母區域 */
+function useMaxAreaLevel(areas: string[]): number {
   const regions = useRegions();
-  const areaLevels = areas.map(a => {
+  return Math.max(...areas.map(a => {
     const region = regions.find(r => r.id === a);
     if (region) return region.levelMax;
     const floorMatch = a.match(/^(.+)-(\d+)f$/);
     if (floorMatch) {
       const parent = regions.find(r => r.id === floorMatch[1]);
-      if (parent?.floors) {
-        const floor = parent.floors.find(f => f.floor === Number(floorMatch[2]));
-        if (floor) return floor.levelMax;
-      }
-      return parent?.levelMax ?? 0;
+      const floor = parent?.floors?.find(f => f.floor === Number(floorMatch[2]));
+      return floor?.levelMax ?? parent?.levelMax ?? 0;
     }
     return 0;
-  });
+  }));
+}
 
-  const maxAreaLevel = Math.max(...areaLevels);
+/**
+ * 鑲材與天賦格掉落（`51-auto-talent.md` § 51.6）。
+ *
+ * 這一段**每隻怪都一樣**，不進掉落表：掉率只看 tier 與是不是 Boss，
+ * 可掉的 tier 只看區域等級。不列的話玩家在怪物頁完全查不到鑲材從哪來。
+ */
+function TalentDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
+  const maxAreaLevel = useMaxAreaLevel(areas);
+  const band = affixTierBandFor(maxAreaLevel);
+  const mult = isBoss ? BOSS_DROP_MULTIPLIER : 1;
+  const tiers = ([1, 2, 3, 4, 5, 6, 7] as TalentTier[])
+    .filter(t => t >= band.min && t <= band.max && AFFIX_DROP_RATE[t] > 0);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h4 style={{ color: 'var(--accent-info)', marginBottom: 8 }}>
+        天賦鑲材掉落（區域 Lv.{maxAreaLevel}）
+      </h4>
+      <div className="wiki-table-wrap">
+        <table className="wiki-table">
+          <thead>
+            <tr><th>鑲材階級</th><th>掉落機率</th></tr>
+          </thead>
+          <tbody>
+            {tiers.map(t => (
+              <tr key={t}>
+                {/* 連到鑲材總表，帶著階級篩選：玩家要知道的是「這一階能刷到什麼」 */}
+                <td><Link to={`/wiki/talents/affixes?tier=${t}`}>T{t}</Link></td>
+                <td>{(AFFIX_DROP_RATE[t] * mult).toFixed(1)}%</td>
+              </tr>
+            ))}
+            {isBoss && (
+              <tr>
+                <td>天賦格 T{slotTierBandFor(maxAreaLevel).min}
+                  {slotTierBandFor(maxAreaLevel).min !== slotTierBandFor(maxAreaLevel).max
+                    && `～T${slotTierBandFor(maxAreaLevel).max}`}
+                </td>
+                <td>{SLOT_DROP_RATE_BOSS}%</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0' }}>
+        各階級獨立判定。天賦格只有 Boss 會掉，一般怪不掉。
+        點階級可查<Link to="/wiki/talents/affixes">鑲材總表</Link>。
+      </p>
+    </div>
+  );
+}
+
+function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
+  const maxAreaLevel = useMaxAreaLevel(areas);
   const bookLevel = getSkillBookLevel(maxAreaLevel);
 
   if (bookLevel === null) return null;

@@ -557,8 +557,8 @@ describe('§ 48.8 Buff／Debuff 的顏色', () => {
 /**
  * `24-buff-debuff.md` § 24.4.1 登記過的 debuff tag（兩張表的聯集）。
  *
- * **技能與怪物是兩條獨立的路**（效果與秒數各走各的），共用的只有 tag ——
- * 同一種狀態在兩邊必須是同一個字，查表才不會靜默漏掉。
+ * **技能與怪物是兩條獨立的路**（效果與秒數各走各的），共用的只有 tag：
+ * 同一種狀態在兩邊必須是同一個字。
  */
 const DEBUFF_TAGS_24_4_1 = [
   'poisoned', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned',

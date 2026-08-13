@@ -53,8 +53,7 @@ export interface AttackConfig {
   /**
    * **追擊距離**：要走多近才停。等於腳本啟用規則會用到的最遠射程。
    *
-   * 與 `range` 分開的理由：技能全在冷卻時 `range` 會塌回武器射程，
-   * 若拿它當追擊目標，遠程職業每個冷卻空檔都會往怪身上蹭
+   * 與 `range` 分開：技能全在冷卻時 `range` 會塌回武器射程，**不可拿它當追擊目標**
    * （`41-arpg-combat.md` § 3.1）。省略時視同 `range`。
    */
   chaseRange?: number;
@@ -70,9 +69,8 @@ export function getWeaponAttackConfig(weaponType: string | undefined): AttackCon
 /**
  * 腳本啟用的規則實際會用到的最遠射程 —— 這才是角色該站的位置。
  *
- * **停用的規則不計入**：玩家把「普通攻擊」關掉就代表不打算貼身，
- * 武器的 1.5 格不該再把他拖進近身（這正是原本的缺陷：武器射程是無條件起點）。
- * 一條啟用的攻擊規則都沒有時退回武器射程，因為沒有別的依據。
+ * **停用的規則不計入**：武器射程不是無條件起點。
+ * 一條啟用的攻擊規則都沒有時才退回武器射程。
  */
 export function getScriptChaseRange(
   rules: { enabled: boolean; action: { type: string; skillId?: string } }[],
@@ -117,7 +115,7 @@ export function tickPlayerCombat(
   isStunned: boolean = false,
   /**
    * 腳本此刻是否有可執行的動作。false 代表技能都在冷卻（或條件不成立），
-   * 此時不可用 `range` 當追擊目標，否則會蹭到怪身邊 —— 改用 `chaseRange` 原地等。
+   * 此時**不可用 `range` 當追擊目標**，改用 `chaseRange` 原地等。
    */
   hasExecutableAction: boolean = true,
 ): PlayerTickResult {
@@ -214,14 +212,8 @@ export function tickPlayerCombat(
   /**
    * 追擊中計時器**照走，但只累積到冷卻的一半**（`41-arpg-combat.md` § 3.1）。
    *
-   * 歸零是錯的：冷卻是「距離上一次出手過了多久」，走路那段時間本來就過去了，
-   * 抹掉它等於同一件事算兩次。
-   *
-   * 但也不能整段照算：一刀一隻的密集怪群下，每次接敵都補滿冷卻，
-   * 兩次出手的間隔會被走路時間吃掉一大截，實際 DPS 高於攻速面板。
-   * 折半是兩者之間 —— 走路不白走，也不會走到就打。
-   *
-   * 已經超過一半的不倒扣：那是站定等冷卻累積來的，不該因為怪跑掉而沒收。
+   * **不可歸零，也不可整段照算**，一律折半。
+   * 已經超過一半的不倒扣。
    */
   const carried = ctx.attackCooldown * CHASE_COOLDOWN_CARRY;
   if (ctx.attackTimer < carried) {

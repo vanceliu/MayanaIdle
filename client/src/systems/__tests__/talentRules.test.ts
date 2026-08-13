@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCombatRules, buildPersistentRules } from '../talentRules';
+import { buildCombatRules, buildPersistentRules, slotSkipReason } from '../talentRules';
 import type { TalentAffixInstance, TalentSlot, TalentType } from '../../models/talent';
 
 const CHAR = 1;
@@ -130,5 +130,88 @@ describe('天賦格 → 規則（`systems/talentRules.ts`）', () => {
 
     // 動作照樣成立，但那個條件被濾掉 —— 不會讓整條規則變成無法判定
     expect(rule.conditions).toEqual([]);
+  });
+
+  /*
+   * 技能沒選定的規則放不出來，判定必須往下一條走 —— 不跳過的話
+   * 起始那三格未綁定的「施放攻擊技能」會把普通攻擊卡在後面，角色整場不出手。
+   */
+  describe('技能／道具沒選定就跳過（§ 51.3.1）', () => {
+    it('未綁定的施放技能不進規則列表', () => {
+      const slots = [slot(1, 'combat', 0), slot(2, 'combat', 1)];
+      const affixes = [
+        affix(10, 2003, 1, null),   // 施放指定攻擊技能，未綁定
+        affix(11, 2001, 2, null),   // 普通攻擊
+      ];
+      const rules = buildCombatRules(slots, affixes, TPL);
+      expect(rules).toHaveLength(1);
+      expect((rules[0] as unknown as { action: { type: string } }).action.type).toBe('normal_attack');
+    });
+
+    it('綁定之後就進來，順序照天賦格', () => {
+      const slots = [slot(1, 'combat', 0), slot(2, 'combat', 1)];
+      const affixes = [
+        affix(10, 2003, 1, null, null, 'wind-blade'),
+        affix(11, 2001, 2, null),
+      ];
+      const rules = buildCombatRules(slots, affixes, TPL);
+      expect(rules).toHaveLength(2);
+      const first = rules[0] as unknown as { action: { type: string; skillId: string } };
+      expect(first.action.type).toBe('skill');
+      expect(first.action.skillId).toBe('wind-blade');
+    });
+
+    it('條件的技能沒選定，整條規則跳過', () => {
+      const slots = [slot(1, 'combat', 0), slot(2, 'combat', 1)];
+      const affixes = [
+        affix(10, 1005, 1, 0),      // 技能就緒，未指定技能
+        affix(11, 2001, 1, null),
+        affix(12, 2001, 2, null),
+      ];
+      const rules = buildCombatRules(slots, affixes, TPL);
+      expect(rules).toHaveLength(1);
+      expect((rules[0] as unknown as { id: string }).id).toBe('slot-2');
+    });
+
+    it('數值型參數有預設值，不算沒選定', () => {
+      const slots = [slot(1, 'persistent', 0)];
+      const affixes = [
+        affix(10, 1001, 1, 0, { value: 30 }),          // HP 低於 30%
+        affix(11, 2101, 1, null, { potionType: 'red' }),
+      ];
+      expect(buildPersistentRules(slots, affixes, TPL)).toHaveLength(1);
+    });
+  });
+
+  /* 編輯器靠這支在沒進判定的列上掛警示標記 */
+  describe('slotSkipReason', () => {
+    it('實作槽留空回 no-action', () => {
+      expect(slotSkipReason(slot(1, 'combat', 0), [])).toBe('no-action');
+    });
+
+    it('技能未選定回 unresolved', () => {
+      expect(slotSkipReason(slot(1, 'combat', 0), [affix(10, 2003, 1, null)]))
+        .toBe('unresolved');
+    });
+
+    it('條件的技能未選定也回 unresolved', () => {
+      const affixes = [affix(10, 1005, 1, 0), affix(11, 2001, 1, null)];
+      expect(slotSkipReason(slot(1, 'combat', 0), affixes)).toBe('unresolved');
+    });
+
+    it('正常的列回 null', () => {
+      expect(slotSkipReason(slot(1, 'combat', 0), [affix(10, 2001, 1, null)])).toBeNull();
+    });
+
+    // 停用是玩家自己關的，勾選框已經表達了，不必再掛警示
+    it('停用不算跳過', () => {
+      const s = slot(1, 'combat', 0, 1, false);
+      expect(slotSkipReason(s, [affix(10, 2001, 1, null)])).toBeNull();
+    });
+
+    // 停用且實作槽空著時，編輯器也不掛警示（`TalentEditor` 先看 enabled）
+    it('停用且實作槽空著，仍不掛警示', () => {
+      expect(slotSkipReason(slot(1, 'combat', 0), [])).toBe('no-action');
+    });
   });
 });

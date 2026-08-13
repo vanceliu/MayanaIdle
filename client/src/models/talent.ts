@@ -68,10 +68,15 @@ export interface TalentAffixDef {
   form: TalentAffixForm;
   ruleId: string;
   /**
-   * 怪物側機制未做，**不可先行實作**（§ 51.4.4 成對原則）。
-   * 帶這個旗標的鑲材不進掉落池、不可合成產出、編輯器不顯示。
+   * 尚未開放。帶這個旗標的鑲材不進掉落池、不可合成產出、編輯器不顯示。
+   * 阻擋項見 `blockedReason`。
    */
   blocked?: boolean;
+  /**
+   * `monster`：怪物側機制未做，不可先行實作（§ 51.4.4 成對原則）
+   * `pending`：判定引擎還沒接上（§ 51.4.3.2）
+   */
+  blockedReason?: 'monster' | 'pending';
 }
 
 /**
@@ -170,9 +175,9 @@ export const AFFIX_FUSE_SUCCESS_RATE: Record<Exclude<TalentTier, 1>, number> = {
 
 /** 鑲材掉率（一般怪，%）。T7 不掉落。Boss 為 2 倍 */
 export const AFFIX_DROP_RATE: Record<TalentTier, number> = {
-  1: 1,
-  2: 1,
-  3: 0.1,
+  1: 3,
+  2: 2,
+  3: 0.5,
   4: 0.1,
   5: 0.1,
   6: 0.1,
@@ -249,3 +254,9 @@ export const ITEM_POOL_LABELS: Record<ItemPoolKey, string> = {
 
 /** T4「購買道具至」「從倉庫取道具至」的組數上限（§ 51.4.11） */
 export const MULTI_GROUP_MAX = 3;
+
+/** 未開放的原因，Wiki 的「取得」欄用（§ 51.4.3.2、§ 51.4.4） */
+export const BLOCKED_LABELS: Record<'monster' | 'pending', string> = {
+  monster: '尚未開放（等怪物機制）',
+  pending: '尚未開放（等判定實作）',
+};

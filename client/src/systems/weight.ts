@@ -9,7 +9,7 @@ import { getItemById } from '../models/items';
  * 負重上限 = (有效力量 + 有效體質) × 100 + 腰帶的負重加成
  *
  * **超重懲罰：無法攻擊、無法施放魔法**（可以移動、可以回血回魔）。
- * 判定發生在每次出手時，戰鬥記錄會逐次顯示，讓玩家知道自己為什麼打不出去。
+ * 判定發生在每次出手時，戰鬥記錄逐次顯示。
  */
 
 /** 每點力量／體質提供的負重 */
@@ -34,7 +34,7 @@ export function getCarryCapacity(
 /**
  * 目前負重 = 裝備重量 + 背包物品重量 × 數量。
  *
- * 裝備在身上的東西一樣計重 —— 否則「全部穿起來」就能繞過上限。
+ * 裝備在身上的東西一樣計重。
  */
 export function getCarriedWeight(
   equippedGear: (EquipmentInstance | null | undefined)[],

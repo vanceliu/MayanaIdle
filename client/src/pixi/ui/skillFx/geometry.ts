@@ -45,10 +45,7 @@ export function tilesToGroundRadius(tiles: number): { rx: number; ry: number } {
 /**
  * 把顏色往白色混 —— **同色系的亮版**，用來當高光。
  *
- * 特效只用一個純色會讀成一張色紙：沒有亮部就沒有立體感，
- * 也分不出「核心」與「外緣」。但**不可以直接改用白色** ——
- * 那會把元素色洗掉，火球與冰彈的中心就長一樣了（§ 48.7.2）。
- * 所以是往白混一點，不是換成白。
+ * **不可改用純白**（§ 48.7.2）。
  *
  * `amount` 0 ＝ 原色、1 ＝ 純白。
  */
@@ -193,16 +190,12 @@ export interface ImpactParams {
    *
    * **只有暴擊專屬的那兩樣（衝擊環、星芒）跟著變慢** ——
    * 元素色的閃點與火花仍然照原本的絕對時間收掉。
-   * 全部一起拉長會讀成慢動作，而不是「這一下比較重」。
    */
   critDurationMul: number;
   /** 高光：中心閃點與火花尖端往白混多少 */
   light: number;
   /**
-   * 帶 debuff 時，幾成的火花改用點綴色（§ 48.7.4.3）。
-   *
-   * **只換一部分** —— 全部換掉等於把元素色蓋掉，
-   * 玩家會以為裂傷斬是紅屬性技能，而它是無屬性物理。
+   * 帶 debuff 時，幾成的火花改用點綴色（§ 48.7.4.3）。**只換一部分，不可全換。**
    */
   accentRatio: number;
   /** 帶 debuff 時額外飛出幾顆點綴色的小點（流血讀起來就是這幾顆） */
@@ -255,11 +248,7 @@ export interface DropParams {
   /**
    * 起點往旁邊偏多少 px —— 落下路徑的傾角就是這個值除以 `fallFromY`。
    *
-   * **直直落下不好看**：正下方的軌跡在畫面上是一條垂直線，
-   * 讀起來像東西從天花板掉下來，沒有「飛過來砸下去」的速度感。
-   *
-   * 齊射（流星雨）時每一顆用**同一個角度**，路徑互相平行 ——
-   * 各自亂偏會讀成一群沒關係的東西同時掉下來，平行才讀成一場雨。
+   * 齊射（流星雨）時每一顆用**同一個角度**，路徑互相平行。
    */
   fallTiltX: number;
   /** 預示環半徑（格）與粗細 */
@@ -281,7 +270,7 @@ export interface DropParams {
  */
 export interface BoltParams {
   durationMs: number;
-  /** 鋸齒分幾段。太少讀成折線，太多在 20px 下糊成一條直線 */
+  /** 鋸齒分幾段 */
   segments: number;
   /** 每一節往旁邊歪多少 px */
   jitter: number;
@@ -297,10 +286,10 @@ export interface BoltParams {
 /**
  * 地裂（`crack`）：從施法者往目標裂開的一條地縫（地裂術）。
  *
- * 跟著投射物一起長，不是一次畫完 —— 一次畫完會讀成「地上本來就有一條線」。
+ * 跟著投射物一起長，不是一次畫完。
  */
 export interface CrackParams {
-  /** 地縫分幾節。太少讀成折線，太多在 20px 下糊成一條 */
+  /** 地縫分幾節 */
   segments: number;
   /** 每一節往旁邊歪多少 px */
   jitter: number;
@@ -445,9 +434,8 @@ export interface EmblemParams {
 /**
  * `buffCategory` → 徽記（§ 48.8.1）。**沒有列到的 buff 就不放徽記**。
  *
- * 用 category 而不是技能 id：祝福武器與祝福魔法武器是同一類 buff
- * （`22-basic-magic.md` § 22.4 說明兩者互斥），本來就共用 `buffCategory`，
- * 逐技能列等於把同一件事寫兩次。之後同類的新 buff 也自動吃得到。
+ * 以 `buffCategory` 為 key，不逐技能列（祝福武器與祝福魔法武器共用同一個
+ * `buffCategory`，見 `22-basic-magic.md` § 22.4）。
  */
 export const BUFF_EMBLEM_BY_CATEGORY: Record<string, EmblemKind> = {
   'weapon-bless': 'sword',     // 祝福武器、祝福魔法武器
@@ -490,9 +478,8 @@ export function resolveDebuffTint(tags: Iterable<string>): number | null {
 /**
  * 實體自己的受擊反應（§ 48.7.6）。
  *
- * **不是原型**，所以不進 `SKILL_FX_ART` —— 它動的是角色與怪物的 sprite，
- * 不是特效層的 `Graphics`。放在這裡是因為「所有數字一個出處」那條規則，
- * 分兩個檔案遲早會出現調校頁與遊戲不同步。
+ * **不是原型**，不進 `SKILL_FX_ART`：它動的是角色與怪物的 sprite，不是特效層的 `Graphics`。
+ * 數值與特效原型同一個出處，不得分到另一個檔案。
  */
 export interface HitReactionArt {
   /** 白閃多久（ms）。要比抖動短 —— 閃是「這一下」，抖是「被推開」 */
@@ -504,9 +491,7 @@ export interface HitReactionArt {
   /**
    * 開始淡之前先撐多久（佔全長的比例，0–1）。
    *
-   * 這一段是留給**血條歸零被看見**的 —— 判定那一刻怪就從 store 拿掉，
-   * 血條在 `die()` 時歸零，如果同一瞬間開始淡，一擊必殺就讀成
-   * 「滿血的怪憑空消失」。順序必須是「血空掉 → 才倒下」。
+   * 順序必須是「血條歸零 → 才倒下」。
    */
   deathHoldRatio: number;
   /** 淡出期間往下沉多少 px —— 原地消失讀起來像被刪掉，不像倒下 */
@@ -514,12 +499,8 @@ export interface HitReactionArt {
   /**
    * 判定判死之後，最多等多久才強制開始淡出（ms）。
    *
-   * 判定與演出是兩條時間線：怪在判定的那一刻就從 store 消失，
-   * 但打死牠的那一發可能還在空中（起手 ＋ 飛行常常三、四百毫秒）。
-   * 屍體要等那一發落地才開始淡，否則投射物會打在一個已經不存在的位置上。
-   *
-   * 這個上限是**保險絲**，不是正常路徑 —— 特效被池子擠掉時 `onLand`
-   * 不會觸發，沒有它屍體就會永遠留在畫面上。
+   * 正常路徑是屍體等致命那一發落地才開始淡。
+   * 此上限是**保險絲**：特效被池子擠掉時 `onLand` 不會觸發。
    */
   corpseGraceMs: number;
 }
@@ -547,10 +528,7 @@ export function hitFlashAlpha(elapsedMs: number, p: HitReactionArt): number {
 /**
  * 死亡淡出此刻的樣子。
  *
- * 透明度**先撐一下再掉**（`deathHoldRatio`），有兩個理由：
- * 血條要先被看到歸零（不然一擊必殺讀成滿血消失），
- * 而且最後一下的命中爆點不該演在一個已經半透明的東西上。
- * 下沉從第一幀就開始 —— 撐的是透明度，不是整個動作。
+ * 透明度**先撐一下再掉**（`deathHoldRatio`）；下沉從第一幀就開始。
  */
 export function deathFadeState(
   elapsedMs: number,
@@ -565,35 +543,26 @@ export function deathFadeState(
 /**
  * 命中抖動此刻的位移（px）。回傳正值，方向由呼叫端決定。
  *
- * 拿出來共用，是因為之後接進遊戲時抖的是 `MonsterEntity` 的 sprite，
- * 不是特效層的 `Graphics` —— 兩邊各算一份會走鐘。
+ * 調校頁與遊戲共用同一份：遊戲中抖的是 `MonsterEntity` 的 sprite。
  */
 export function hitShakeOffset(elapsedMs: number, p: ImpactParams): number {
   if (elapsedMs < 0 || elapsedMs >= p.hitShakeMs) return 0;
   const k = 1 - elapsedMs / p.hitShakeMs;
-  /* 一次來回就好 —— 抖第二下會讀成「連續被打」而不是「這一下很重」 */
+  /* 一次來回 */
   return Math.sin(k * Math.PI) * p.hitShakePx * k;
 }
 
 /**
  * 徽記自己的顏色。`null` ＝ 沿用呼叫端給的色（buff 藍）。
  *
- * **這是 § 48.8.1「只有藍與紅」的例外，而且只開在符號上**：
- * 環仍然只有藍紅兩色，好壞照舊一眼可讀；
- * 符號是「哪一類」那條通道，毒就是綠的、暴擊就是黃的 ——
- * 硬把毒畫成藍色反而要玩家多記一層對應。
- *
- * 綠色直接取 `DEBUFF_TINT.poisoned`、黃色取 § 42.3 的暴擊數字色 ——
- * **不新增色票**，玩家在別處已經學過這兩個顏色的意思。
+ * **這是 § 48.8.1「只有藍與紅」的例外，只開在符號上**：環仍然只有藍紅兩色。
+ * 綠色取 `DEBUFF_TINT.poisoned`、黃色取 § 42.3 的暴擊數字色，**不新增色票**。
  */
 /**
- * 屬性色 —— **這是新開的一組色票**，因為專案目前沒有任何地方替六大屬性上色。
+ * 屬性色 —— **新開的一組色票**，專案其他地方尚未替六大屬性上色。
  *
- * 之後角色卡若要替屬性上色，**必須沿用這兩個值**，
- * 不然玩家會在兩個地方看到不同顏色代表同一個屬性。
- *
- * 力量紅與流血紅（`DEBUFF_TINT.bleeding`）相近是刻意接受的：
- * 一個灑在頭上、一個濺在命中點，位置與動作都不同，不會混淆。
+ * 之後角色卡若要替屬性上色，**必須沿用這兩個值**。
+ * 力量紅與流血紅（`DEBUFF_TINT.bleeding`）相近是刻意接受的。
  */
 export const ATTRIBUTE_COLORS = {
   agility: 0x5bc8ff,
@@ -660,11 +629,8 @@ export interface MarkParams {
 /**
  * 護盾／無敵掛上去的那一下（§ 48.8.3）。
  *
- * 是**罩住整個角色的球**，不是腳下一圈環 —— 環讀起來是「站在一個圈裡」，
- * 而護盾擋的是從各個方向來的傷害，那件事只有包起來的球講得清楚。
- *
+ * 是**罩住整個角色的球**，不是腳下一圈環。
  * 等距畫面上的球＝一個圓外框 ＋ 一圈 2:1 的赤道 ＋ 一圈貼地的底環。
- * 只畫圓的話會讀成一個立起來的環；加了赤道與底環才有體積。
  *
  * **這是一次性的，球演完就沒了**（§ 48.8.3）。護盾還在不在由 icon 表達。
  */

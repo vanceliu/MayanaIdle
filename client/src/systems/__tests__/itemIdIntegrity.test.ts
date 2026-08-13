@@ -77,9 +77,9 @@ describe('設定表引用的道具 id 都存在於 seed', () => {
   });
 
   /**
-   * `requiresScroll` 是舊的「一個 region 分多段」機制，百柱塔改成十個獨立 region 後
-   * 目前沒有區域在用。留著是因為機制本身仍是活的（`navigation.ts` 有分支），
-   * 之後若有區域啟用，這條會立刻檢查它組出來的卷軸名反查得到 id。
+   * `requiresScroll` 是舊的「一個 region 分多段」機制，目前沒有區域在用，
+   * 但機制仍是活的（`navigation.ts` 有分支）。
+   * 有區域啟用時，這條會檢查它組出來的卷軸名反查得到 id。
    */
   it('分段副本的通行卷軸每一段都反查得到（名稱組字串是唯一的例外路徑）', () => {
     const dungeons = REGIONS.filter(r => r.requiresScroll && r.scrollSegmentSize);

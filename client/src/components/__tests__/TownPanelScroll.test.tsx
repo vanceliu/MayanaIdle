@@ -64,7 +64,7 @@ function scrollRegion(container: HTMLElement): HTMLElement {
   return region as HTMLElement;
 }
 
-/** 底部動作列固定在捲動區外面，才不會被清單捲走（§ 34.1） */
+/** 底部動作列固定在捲動區外面（§ 34.1） */
 function expectFooterOutsideScroll(container: HTMLElement) {
   const scroll = scrollRegion(container);
   const footer = container.querySelector('.shop-cart-footer');

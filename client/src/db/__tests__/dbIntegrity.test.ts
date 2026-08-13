@@ -173,7 +173,7 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
         expect(usedIn.length, `${mat} 未在任何配方中使用`).toBeGreaterThan(0);
       }
 
-      // 頂級素材目前無配方用途，但必須保有賣店價值，否則玩家打 Boss 的掉落等於全廢
+      // 頂級素材目前無配方用途，但必須保有賣店價值
       for (const mat of ['奧里哈魯根碎片', '遠古騎士紋章', '巨龍逆鱗']) {
         const def = ITEM_DEFINITIONS.find(i => i.name === mat);
         expect(def, `${mat} 不存在於道具定義`).toBeDefined();

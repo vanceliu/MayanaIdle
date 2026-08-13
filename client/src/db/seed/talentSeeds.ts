@@ -19,6 +19,19 @@ import type { TalentAffixDef } from '../../models/talent';
  * - 2100~ 常駐專屬實作
  * - 2200~ 補給實作
  */
+/**
+ * 尚未接上判定引擎的鑲材名稱（§ 51.4.5~51.4.11 已定規格）。
+ *
+ * 這些 `ruleId` 還沒有型別與 evaluator，所以標籤表裡查不到。
+ * 全部標 `blocked`，接上之後把這裡的項目移進 `scriptEngine.ts` 的標籤表。
+ */
+export const PENDING_AFFIX_LABELS: Record<string, string> = {
+  target_casting: '目標正在詠唱',
+  can_kill_target: '本招可擊殺目標',
+  can_kill_count_gte: '本招可擊殺 ≥ N 隻',
+  switch_target_summoner: '切換目標：場上的召喚本體',
+};
+
 export const TALENT_AFFIX_DEFS: TalentAffixDef[] = [
   // === 共用條件（戰鬥 ∪ 常駐）：15 筆 ===
   { id: 1001, kind: 'condition', appliesTo: ['combat', 'persistent'], tier: 1, form: 'free', ruleId: 'hp_below' },
@@ -57,11 +70,11 @@ export const TALENT_AFFIX_DEFS: TalentAffixDef[] = [
   { id: 1116, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_cc_immune' },
   { id: 1117, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_shielded' },
   // 怪物沒有詠唱狀態，§ 51.4.4 成對原則擋住
-  { id: 1118, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_casting', blocked: true },
+  { id: 1118, kind: 'condition', appliesTo: ['combat'], tier: 5, form: 'free', ruleId: 'target_casting', blocked: true, blockedReason: 'monster' },
   { id: 1119, kind: 'condition', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'field_has_race' },
   { id: 1120, kind: 'condition', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'field_avg_hp_below' },
-  { id: 1121, kind: 'condition', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'can_kill_target' },
-  { id: 1122, kind: 'condition', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'can_kill_count_gte' },
+  { id: 1121, kind: 'condition', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'can_kill_target', blocked: true, blockedReason: 'pending' },
+  { id: 1122, kind: 'condition', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'can_kill_count_gte', blocked: true, blockedReason: 'pending' },
 
   // === 常駐專屬條件：2 筆 ===
   { id: 1201, kind: 'condition', appliesTo: ['persistent'], tier: 3, form: 'free', ruleId: 'buff_remaining_below' },
@@ -97,7 +110,7 @@ export const TALENT_AFFIX_DEFS: TalentAffixDef[] = [
   { id: 2013, kind: 'action', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'switch_target_by_kind' },
   { id: 2014, kind: 'action', appliesTo: ['combat'], tier: 6, form: 'free', ruleId: 'switch_target_by_debuff' },
   // 怪物沒有召喚機制，§ 51.4.4 成對原則擋住
-  { id: 2015, kind: 'action', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'switch_target_summoner', blocked: true },
+  { id: 2015, kind: 'action', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'switch_target_summoner', blocked: true, blockedReason: 'monster' },
   { id: 2016, kind: 'action', appliesTo: ['combat'], tier: 7, form: 'free', ruleId: 'lock_target' },
 
   // === 常駐專屬實作：10 筆 ===
@@ -137,19 +150,18 @@ export function getTalentAffixDef(id: number): TalentAffixDef | undefined {
 }
 
 /**
- * 起始配置（§ 51.7）。全職業相同：5 個 T1 格，其中 3 格鑲好、2 格空著。
+ * 起始配置（§ 51.7）。全職業相同：5 個 T1 格全部鑲好。
  *
  * | 格 | 類型 | 條件槽 | 實作槽 |
  * |---|---|---|---|
- * | 0 | 戰鬥 | 空 | 施放指定攻擊技能（**未綁定**） |
- * | 1 | 戰鬥 | 空 | 普通攻擊 |
+ * | 0 | 戰鬥 | 空 | 施放指定攻擊技能（未綁定） |
+ * | 1 | 戰鬥 | 空 | 施放指定攻擊技能（未綁定） |
  * | 2 | 常駐 | HP 低於 30% | 使用藥水（紅） |
+ * | 3 | 戰鬥 | 空 | 施放指定攻擊技能（未綁定） |
+ * | 4 | 戰鬥 | 空 | 普通攻擊 |
  *
- * `2003` 發放時 `boundParam` 為 **null（未綁定）**，首次鑲入時由玩家選定 ——
- * 騎士／妖精／盜賊創角時沒有任何技能可綁（`stores/gameStore.ts` 只給元素師與牧師風刃）。
- *
- * **不發「技能就緒」鑲材**：動作是技能時，CD／MP／武器需求由動作本身檢查
- * （`03-combat.md` § 3.12），格 0 留空條件即可。
+ * `2003` 發放時 `boundParam` 為 null，首次鑲入時由玩家選定。
+ * 不發「技能就緒」鑲材：CD／MP／武器需求由動作本身檢查（`03-combat.md` § 3.12）。
  */
 export interface StartingAffixPlacement {
   definitionId: number;
@@ -161,14 +173,8 @@ export interface StartingAffixPlacement {
 }
 
 /**
- * 五格全部用掉：戰鬥 3 條施放技能 ＋ 1 條普通攻擊保底，常駐 1 條喝藥。
- *
- * **三條施放技能**：只給一條的話，學了第二、第三個技能也放不出來，
- * 要等刷到鑲材才排得進去 —— 開局的可玩範圍不該卡在掉落上。
- * 普通攻擊排在最後：規則由上往下，技能全部放不出來時才輪到它。
- *
- * 三份都是**未綁定**的指定型（`18-data-schema.md`），首次鑲入時才選技能。
- * 等級低、只學了一個技能時可以先擱著不選 —— 選了就不可更改。
+ * 起始配置（§ 51.7）：戰鬥 3 條施放技能 ＋ 1 條普通攻擊，常駐 1 條喝藥，五格用滿。
+ * 三份施放技能都是未綁定的指定型，首次鑲入時才選技能。
  */
 export const STARTING_LAYOUT: StartingAffixPlacement[] = [
   { definitionId: 2003, slotIndex: 0, conditionIndex: null, params: null },

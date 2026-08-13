@@ -6,6 +6,7 @@ import { getBagItemAmount } from '../models/bagItem';
 import type { WarehouseKind } from '../models/villageScript';
 import { matchesEquipmentFilter } from '../models/villageScript';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
+import { INN_PRICES } from '../stores/gameStore';
 import {
   collectSellableMaterials,
   collectBatchSellEquipment,
@@ -34,6 +35,8 @@ export interface VillageScriptContext {
   bagMaxSlots: number;
   /** 角色現在是否站在城鎮 */
   inTown: boolean;
+  /** `current_area_is` 用：所在區域 id */
+  currentArea?: string;
   /** 上次掛機點；沒有就回不去 */
   lastHuntLocation: HuntLocation | null;
   /** 倉庫內容（`13-town.md` § 13.8） */
@@ -85,6 +88,9 @@ function checkVillageCondition(condition: VillageCondition, ctx: VillageScriptCo
       return ctx.bagFreeSlots <= (condition.value ?? 0);
     case 'has_hunt_location':
       return ctx.lastHuntLocation !== null;
+    // 三類型共用（§ 51.4.5）：與戰鬥／常駐版比對同一個欄位
+    case 'current_area_is':
+      return condition.match !== undefined && ctx.currentArea === condition.match;
     case 'warehouse_gold_gte':
       // 金幣只有共用倉庫有（`13-town.md` § 13.8）
       return ctx.warehouse.gold >= (condition.value ?? 0);
@@ -125,7 +131,7 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
       return ctx.inTown && collectVillageSellEquipment(action, ctx).length > 0;
     case 'use_inn':
       // 旅館要錢；HP／MP 都滿且沒有異常狀態時不必去（避免佔住判定）
-      return ctx.inTown && ctx.gold > 0 && ctx.needsInn === true;
+      return ctx.inTown && ctx.gold >= INN_PRICES.full && ctx.needsInn === true;
     case 'deposit_materials':
       return ctx.inTown && collectDepositMaterials(action, ctx).length > 0;
     case 'deposit_equipment':

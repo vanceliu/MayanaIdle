@@ -15,10 +15,15 @@ export interface MapMonster {
   lastPathPlayerPos: Position;
   isBoss: boolean;
   /**
+   * 攻擊射程（碼）。遠程與魔法怪不必貼身（`41-arpg-combat.md` § 5.2）。
+   * 生成當下還沒挑模板，所以由 `PixiGame` 建實例時回填。
+   */
+  attackRange?: number;
+  /**
    * 試驗場木樁（`50-training-ground.md` § 50.4）。
    *
-   * 帶著參數走是因為木樁不是從 `monsterTemplates` 抽出來的 ——
-   * 它的素質由玩家在面板上決定，`createMonsterFromTemplate` 看到這欄就照它建實例。
+   * 木樁不從 `monsterTemplates` 抽，素質由玩家在面板上決定；
+   * `createMonsterFromTemplate` 看到這欄就照它建實例。
    */
   dummy?: TrainingDummySpec;
 }
@@ -87,6 +92,8 @@ export interface MapMonsterState {
   /** 試驗場：以指定參數在指定座標放一批木樁，並清掉場上原有的木樁（§ 50.4） */
   summonDummies: (spec: TrainingDummySpec, positions: Position[]) => void;
   setMaxMonsters: (max: number) => void;
+  /** 建實例時回填射程，移動邏輯才停得在射程上 */
+  setMonsterAttackRange: (id: string, attackRange: number) => void;
   setPaused: (paused: boolean) => void;
   setHasBossInPool: (has: boolean) => void;
 }
@@ -387,6 +394,12 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       // 舊木樁一律清掉：留著會讓下一次量測混到上一批的參數
       monsters: [...state.monsters.filter(m => !m.dummy), ...dummies],
       combatMonsterIds: [],
+    }));
+  },
+
+  setMonsterAttackRange: (id, attackRange) => {
+    set(state => ({
+      monsters: state.monsters.map(m => (m.id === id ? { ...m, attackRange } : m)),
     }));
   },
 

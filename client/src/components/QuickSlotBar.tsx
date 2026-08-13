@@ -49,6 +49,8 @@ export function QuickSlotBar() {
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const templates = useEquipmentTemplates();
   const skills = useGameStore(s => s.skills);
+  /** 只為了在喝藥後重啟 rAF 迴圈；實際數值在迴圈內走 `getState()` 取最新 */
+  const lastPotionUsedAt = useGameStore(s => s.lastPotionUsedAt);
   const character = useGameStore(s => s.character);
   const activeEffects = useGameStore(s => s.activeEffects);
 
@@ -118,11 +120,10 @@ export function QuickSlotBar() {
   }
 
   /**
-   * 這個技能此刻能不能按。三種不可用原因分開回報，因為畫面上都是灰的，
-   * 玩家得靠 tooltip 才分得出「還在轉 CD」與「這把武器放不出這招」。
+   * 這個技能此刻能不能按。三種不可用原因分開回報，供 tooltip 區分。
    *
-   * **冷卻不在這裡讀時間**：`Date.now()` 是不純的，放進 render 會讓同一次繪製
-   * 前後不一致。冷卻中的格子由下面那支 rAF 維護成 `cdSlots`，render 只讀結果。
+   * **冷卻不在這裡讀時間**：`Date.now()` 不純，不可放進 render。
+   * 冷卻中的格子由下面那支 rAF 維護成 `cdSlots`，render 只讀結果。
    */
   function skillBlockReason(skill: Skill, idx: number): string | null {
     if (!skillMeetsWeaponRequirement(skill, weaponType)) return '需要對應武器';
@@ -198,25 +199,46 @@ export function QuickSlotBar() {
    */
   const publishedCdRef = useRef<number[]>([]);
   useEffect(() => {
-    const skillSlots: number[] = [];
-    quickSlots.forEach((entry, i) => { if (entry?.kind === 'skill') skillSlots.push(i); });
+    /*
+     * 技能與藥水都要畫指針。藥水的冷卻是**全域共用**（`30-items.md` § 30.1），
+     * 所以三種藥水格會一起轉 —— 那正是規則本身的樣子。
+     */
+    const cdSlotIdx: number[] = [];
+    quickSlots.forEach((entry, i) => {
+      if (entry?.kind === 'skill' || entry?.kind === 'potion') cdSlotIdx.push(i);
+    });
 
     let raf = 0;
     const step = () => {
       const now = Date.now();
-      const live = useGameStore.getState().skills;
+      const state = useGameStore.getState();
+      const live = state.skills;
       const running: number[] = [];
 
-      for (const i of skillSlots) {
+      for (const i of cdSlotIdx) {
         const el = cdRefs.current[i];
         const entry = quickSlots[i];
-        if (!el || !entry || entry.kind !== 'skill') continue;
-        const skill = live.find(s => s.id === entry.skillId);
-        // § 35.7.6：冷卻長度取實際值（含冷卻縮減），不可用技能表上的原始秒數
-        const total = skill
-          ? Math.floor(skill.cooldown * (1 - Math.min(cooldownReduction, 50) / 100))
-          : 0;
-        const remaining = skill && total > 0 ? Math.max(0, skill.lastUsedAt + total - now) : 0;
+        if (!el || !entry) continue;
+
+        let total: number;
+        let remaining: number;
+        if (entry.kind === 'skill') {
+          const skill = live.find(s => s.id === entry.skillId);
+          // § 35.7.6：冷卻長度取實際值（含冷卻縮減），不可用技能表上的原始秒數
+          total = skill
+            ? Math.floor(skill.cooldown * (1 - Math.min(cooldownReduction, 50) / 100))
+            : 0;
+          remaining = skill && total > 0 ? Math.max(0, skill.lastUsedAt + total - now) : 0;
+        } else {
+          /*
+           * 三種藥水的冷卻長度不同（600/900/1500），但鎖住所有藥水的是
+           * **最後喝的那一瓶**的冷卻（`30-items.md` § 30.1）。
+           * 所以總長取 `lastPotionCooldown`，不是這一格自己那瓶的。
+           */
+          total = state.lastPotionCooldown;
+          remaining = total > 0 ? Math.max(0, state.lastPotionUsedAt + total - now) : 0;
+        }
+
         if (remaining > 0) running.push(i);
         el.style.setProperty('--cd-angle', `${total > 0 ? (remaining / total) * 360 : 0}deg`);
         // 扇形只在真的有 CD 在跑時出現：MP 不足／武器不符沒有「還要多久」可畫
@@ -241,8 +263,11 @@ export function QuickSlotBar() {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-    // `skills` 進 deps：每次施放都會換掉陣列識別，迴圈因此重新啟動
-  }, [quickSlots, cooldownReduction, skills]);
+    /*
+     * `skills` 進 deps：每次施放都會換掉陣列識別，迴圈因此重新啟動。
+     * `lastPotionUsedAt` 同理 —— 喝藥不會動到 `skills`，少了它指針不會開始轉。
+     */
+  }, [quickSlots, cooldownReduction, skills, lastPotionUsedAt]);
 
   /** § 35.7.5：第一次點擊選取，再點同一格才執行 */
   function handleClick(idx: number, canUse: boolean) {
@@ -311,10 +336,10 @@ export function QuickSlotBar() {
                   <span className="quick-slot-count">{count}</span>
                 )}
                 {/*
-                  CD 扇形只畫在技能格上；MP 不足與武器不符只變暗不畫扇形，
+                  CD 扇形畫在技能與藥水格上；MP 不足與武器不符只變暗不畫扇形，
                   否則玩家會以為在跑 CD（§ 35.7.6）
                 */}
-                {entry.kind === 'skill' && (
+                {(entry.kind === 'skill' || entry.kind === 'potion') && (
                   <span
                     className="quick-slot-cd"
                     data-testid="quick-slot-cd"

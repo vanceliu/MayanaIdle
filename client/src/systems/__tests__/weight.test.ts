@@ -42,7 +42,6 @@ describe('負重上限', () => {
 
 describe('目前負重', () => {
   it('裝備在身上的東西一樣計重', () => {
-    // 否則「全部穿起來」就能繞過上限
     expect(getCarriedWeight([gear({ weight: 30 }), gear({ weight: 12 })], [])).toBe(42);
   });
 

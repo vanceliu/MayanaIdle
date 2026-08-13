@@ -1,13 +1,9 @@
 /**
  * 角色剪影的繪製 —— RimWorld 式的無腳 pawn（`04-character.md` § 4.10）。
  *
- * 用 Canvas 2D 而不是 Pixi Graphics 畫，再把整張畫布烘成貼圖
- * （`pawnTexture.ts`）。理由：
- *
- * 1. 反正**本來就要烘成貼圖**，不會每幀重畫，所以誰畫的沒有效能差別
- * 2. Pixi Graphics 沒有 `miterLimit`，`roundRect` 的圓角語意也不同 ——
- *    改用它等於把調校過的形狀重新賭一次
- * 3. 同一份實作能同時餵給 `client/demo/` 的調校頁，形狀不會兩邊分岔
+ * 用 Canvas 2D 而不是 Pixi Graphics 畫，再把整張畫布烘成貼圖（`pawnTexture.ts`）。
+ * Pixi Graphics 沒有 `miterLimit`，`roundRect` 的圓角語意也不同，**不可改用**。
+ * 同一份實作同時餵給 `client/demo/` 的調校頁。
  *
  * 只用到下面 `PawnContext` 列出的 API，換渲染器時看那個介面就知道要補什麼。
  */
@@ -181,7 +177,7 @@ function bodyPath(
   const top = gy - h;
   const rb = Math.min(r, hi * 0.9, h * 0.4);
 
-  /* 前傾：腳底不動，愈往上偏移愈多 —— 等於把輪廓剪切一個角度 */
+  /* 前傾：腳底不動，愈往上偏移愈多 */
   const xTop = cx + lean;       // 肩線
   const xC1 = cx + lean * 0.62; // 上段控制點（離地 62%）
   const xC2 = cx + lean * 0.38; // 下段控制點（離地 38%）
@@ -352,11 +348,10 @@ export function drawPawn(
   /**
    * 長髮是**獨立部件**，不沿用預設髮際線。
    *
-   * 一條封閉路徑同時畫出：外輪廓、兩側垂髮、瀏海，中間留一個臉的開口
-   * （像一頂假髮）。整頭只有一條輪廓線，所以結構上不可能出現接縫 ——
-   * 先前把它拆成「髮際線 + 髮量」兩塊各自描邊，才會不管怎麼調都在某處被切開。
+   * **一條封閉路徑**同時畫出：外輪廓、兩側垂髮、瀏海，中間留一個臉的開口。
+   * 不可拆成「髮際線 + 髮量」兩塊各自描邊。
    *
-   * 因為自帶臉部開口，可以直接畫在頭與軀幹之上，不需要逐朝向調繪製順序。
+   * 自帶臉部開口，直接畫在頭與軀幹之上，不需要逐朝向調繪製順序。
    */
   function drawLongHair(): void {
     const half = headW / 2;
@@ -400,8 +395,7 @@ export function drawPawn(
       );
     } else {
       /**
-       * 臉部開口的半寬必須**小於那一側的下襬外緣**，否則內外邊界會交叉，
-       * 路徑自我相交，側面就會冒出一片多餘的細長形狀。
+       * 臉部開口的半寬必須**小於那一側的下襬外緣**（避免路徑自我相交）。
        */
       const fR = Math.min(fw0, cx + hemR - openCx - lockMin);
       const fL = Math.min(fw0, openCx - (cx - hemL) - lockMin);
@@ -451,13 +445,12 @@ export function drawPawn(
       if (dir.view === 'back') {
         tails.push({ x: headCx, y, bias: 1 });
       } else if (isSide) {
-        /* 側面要推到頭的輪廓外，不然髮髻會變成黏在臉頰上的一顆球。
-           y 必須與正面／背面同高 —— 髮髻是同一顆，換個角度看不該上下跑 */
+        /* 側面要推到頭的輪廓外；y 必須與正面／背面同高 */
         tails.push({ x: headCx - dir.sign * headW * (g.ponySideOffPct / 100), y, bias: -dir.sign });
       } else if (hs.knot) {
         /**
          * 正面：髮髻在腦後、被頭擋住，只有凸出頭輪廓的那一小坨露得出來。
-         * 位置必須與背面同一點，否則正面看到的位置會跟背面對不起來。
+         * 位置必須與背面同一點。
          */
         const kr = (g.knotR / 100) * headW;
         ctx.beginPath();
@@ -509,10 +502,8 @@ export function drawPawn(
       }
 
       /**
-       * 束起來的髮髻：一顆小包包頭，髮尾從它下面垂出來 ——
-       * 結構上就是「丸子頭多留一串髮下來」。
-       * 收集起來等頭與髮際線都畫完再畫，否則整顆會被頭蓋掉，
-       * 只剩一彎月牙露在頭底，看起來像缺角而不是髮髻。
+       * 束起來的髮髻：一顆小包包頭，髮尾從它下面垂出來。
+       * 收集起來等頭與髮際線都畫完再畫。
        */
       if (hs.knot) knots.push({ x: tx, y: ty });
     };
@@ -553,11 +544,8 @@ export function drawPawn(
       /**
        * 睫毛：從眼角往外掃出去的一道弧，末端上翹。
        *
-       * 起點壓在眼球的**外上緣**（0.72 er 外、0.72 er 高），不是眼睛正上方 ——
-       * 睫毛長在眼角。浮在眼睛正上方、又往外斜上去的一道線會讀成眉毛，
-       * 兩邊一起看就是一張怒臉，而不是有睫毛的臉。
-       *
-       * 控制點在 0.62 而不是中點，弧才會「貼著眼睛走一小段再往上勾」。
+       * 起點壓在眼球的**外上緣**（0.72 er 外、0.72 er 高），不是眼睛正上方。
+       * 控制點在 0.62 而不是中點。
        */
       if (lashCfg.on) {
         const L = (lashCfg.len / 10) * er; // 往外
@@ -591,7 +579,7 @@ export function drawPawn(
       hL = covB;
       hR = covB;
     } else {
-      /* 側面：面朝那側再往上收一截，眼睛才不會被瀏海壓住 */
+      /* 側面：面朝那側再往上收一截 */
       const covSide = covF * (cc.sideFront / 100);
       hL = dir.sign > 0 ? covB : covSide;
       hR = dir.sign > 0 ? covSide : covB;

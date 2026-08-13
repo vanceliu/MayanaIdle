@@ -11,8 +11,7 @@ export interface ItemDefinition {
   buyPrice?: number;
   sellPrice?: number;
   /**
-   * 不可販售。專用材料（魔法書材料等）即使沒有 `sellPrice` 也要明確標記 ——
-   * 否則「賣不掉」只是漏填欄位的副作用，補上價格就會變成可賣。
+   * 不可販售。專用材料（魔法書材料等）即使沒有 `sellPrice` 也**必須明確標記**。
    */
   noSell?: boolean;
   healMin?: number;

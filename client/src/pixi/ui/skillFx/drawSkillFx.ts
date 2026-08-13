@@ -1,13 +1,10 @@
 /**
  * 技能特效的形狀（`48-vfx.md` § 48.7.7）。數字在 `geometry.ts`。
  *
- * ── 為什麼每幀重建幾何 ──
- * `34-ui-guidelines.md` § 34.9.1 的「狀態沒變就不重建」是給常駐物件的；
- * 這些東西**每一幀的形狀都不一樣**（環在擴、火花在飛），本來就沒有可以沿用的幾何。
+ * ── 每幀重建幾何 ──
+ * `34-ui-guidelines.md` § 34.9.1 的「狀態沒變就不重建」只適用常駐物件。
  * 代價由同時存在的實例上限壓住（`SkillFxManager.MAX_ACTIVE`）。
- *
- * 用 scale 動畫代替重建的話，描邊寬度會跟著放大 —— 擴張中的環會愈擴愈粗，
- * 讀起來是一團在膨脹的甜甜圈，不是一圈往外推的衝擊波。
+ * **不可改用 scale 動畫**：描邊寬度會跟著放大。
  *
  * ── 一律 Graphics，不用 filter ──
  * § 48.2：掛 filter 的容器每個都是一個額外 render pass。
@@ -146,7 +143,7 @@ export function drawBolt(
   /* 垂直於連線的方向，鋸齒往這兩邊歪 */
   const nx = -dy / len;
   const ny = dx / len;
-  /* 中途換一次形狀 —— 同一條鋸齒撐完全程會讀成一張貼圖 */
+  /* 中途換一次形狀 */
   const phase = t < p.crackleAt ? 0 : 1;
   const alpha = 1 - t;
 
@@ -258,8 +255,7 @@ export function drawImpact(
 ): void {
   const s = (crit ? p.critScale : 1) * (minimal ? p.normalScale : 1);
   /*
-   * 暴擊的整段比較長，但**元素色的部分照原本的絕對時間收掉** ——
-   * 把閃點與火花一起拉長會讀成慢動作，而不是「這一下比較重」。
+   * 暴擊的整段比較長，但**元素色的部分照原本的絕對時間收掉**。
    * 留下來的尾巴只給暴擊專屬的衝擊環與星芒。
    */
   const bt = crit ? clamp01(t * p.critDurationMul) : t;
@@ -267,7 +263,7 @@ export function drawImpact(
   const a = fadeAfter(bt, 0.35);
 
   const lit = lighten(color, p.light);
-  /* 中心是最亮的地方 —— 整個命中點同一個顏色會讀成一個貼紙 */
+  /* 中心是最亮的地方 */
   g.circle(0, 0, p.flashR * s * (1 - k * 0.7)).fill({ color, alpha: a });
   g.circle(0, 0, p.flashR * s * (1 - k * 0.7) * 0.55).fill({ color: lit, alpha: a });
 
@@ -316,10 +312,8 @@ export function drawImpact(
   /*
    * 暴擊的星芒：四根又長又尖的白刺，一瞬間張開再收掉。
    *
-   * **形狀要跟平常不一樣**，不能只是「同樣的東西大一點」——
-   * 環是圓的、火花是元素色的短線，星芒是白色的細長三角，
-   * 三者同時出現時各自認得出來。畫成三角形而不是圓頭線段：
-   * 圓頭在 20px 下會鈍掉，讀成四根棒子。
+   * 星芒是白色細長三角，與圓環、元素色短火花三者形狀互不重複。
+   * **畫三角形，不可用圓頭線段。**
    */
   if (crit && t < p.critSpikeT) {
     const sk = easeOutCubic(t / p.critSpikeT);
@@ -429,7 +423,7 @@ export function drawHeal(g: Graphics, p: HealParams, color: number, t: number): 
   groundRing(g, 0, 0, p.ringR, p.ringW, color, a * 0.7 * (1 - t * 0.5));
 
   for (let i = 0; i < p.motes; i++) {
-    /* 每顆光點錯開起飛時間，同時起飛會讀成一條線往上抽 */
+    /* 每顆光點錯開起飛時間 */
     const tt = clamp01((t - (i / p.motes) * 0.35) / 0.65);
     if (tt <= 0) continue;
     const ang = (i / p.motes) * Math.PI * 2;
@@ -566,15 +560,13 @@ function drawPoisonGlyph(
     { x: r * 0.92, y: bulbY + r * 0.1 },
     { x: -r * 0.92, y: bulbY + r * 0.1 },
   ]).fill({ color, alpha });
-  /* 高光：偏一側的小白點，沒有它水滴會讀成一顆實心球 */
+  /* 高光：偏一側的小白點 */
   g.circle(-r * 0.32, bulbY - r * 0.28, r * 0.24).fill({ color: 0xffffff, alpha: alpha * 0.5 });
 }
 
 /**
  * 致命一擊：頭上一個 X，**兩筆依序畫出來**（`23-class-magic.md` § 23.7）。
  *
- * 兩筆同時長出來只會讀成「一個 X 淡入」；一筆一筆畫才有「被畫上去」的感覺，
- * 而那正是「標記了目標」的語意。
  */
 function drawCritGlyph(
   g: Graphics, p: EmblemParams, color: number,
@@ -651,8 +643,7 @@ function drawSwordGlyph(
 /**
  * 加速的符號：往上疊的幾層人字（加速術／強化加速術）。
  *
- * **層數是必要的** —— 單一個箭頭讀成「往上」（那是升級或增益的通用語彙），
- * 疊起來的人字才讀成「連續、快」。最上層最亮，方向感靠亮度遞減帶出來。
+ * **必須是疊起來的多層人字，不可用單一箭頭。** 最上層最亮，方向感靠亮度遞減帶出來。
  */
 function drawHasteGlyph(
   g: Graphics, p: EmblemParams, color: number,
@@ -721,7 +712,7 @@ function drawFlameGlyph(
       .fill({ color, alpha: alpha * p.glowAlpha * (1 - (i - 1) / Math.max(1, p.glow)) });
   }
   g.poly(body(1)).fill({ color, alpha });
-  /* 內焰：中間那撮比較亮，少了它整團會讀成一塊平的色塊 */
+  /* 內焰：中間那撮比較亮 */
   g.poly(body(0.5)).fill({ color: 0xffdd66, alpha: alpha * 0.85 });
 }
 
@@ -824,17 +815,16 @@ export function drawMark(g: Graphics, p: MarkParams, kind: MarkKind, t: number):
   const color = MARK_COLORS[kind];
   for (let i = 0; i < p.stars; i++) {
     const ang = t * Math.PI * 2 + (i / p.stars) * Math.PI * 2;
-    /* 星星繞的是橢圓 —— 正圓在等距畫面上會讀成立起來的圈 */
+    /* 星星繞的是橢圓，不是正圓 */
     g.star(Math.cos(ang) * p.orbitR, p.starY + Math.sin(ang) * p.orbitR * 0.4, 4, p.starR, p.starR * 0.4)
       .fill({ color, alpha: 0.75 + 0.25 * Math.sin(ang) });
   }
 }
 
 /**
- * 球形罩的三個構件。護盾與破裂共用，兩邊各畫一份必然走鐘。
+ * 球形罩的三個構件。護盾與破裂共用同一份。
  *
- * 只畫一個圓外框的話會讀成「立起來的環」；
- * 補上 2:1 的赤道與貼地的底環，才讀得出那是一顆包住角色的球。
+ * 圓外框 ＋ 2:1 的赤道 ＋ 貼地的底環，三者缺一不可。
  */
 function shieldSphere(
   g: Graphics, p: ShieldParams, color: number, r: number, alphaMul: number,
@@ -867,11 +857,8 @@ function shieldSphere(
  * 護盾／無敵掛上去的那一下（§ 48.8.3）。**一次性，三拍演完就沒了**：
  * 球長出來 → 停一下 → 撐大淡掉。
  *
- * 不留一顆常駐的球，是因為護盾常常一掛就是 20 秒（§ 24.4.9），
- * 常駐等於每一幀都要重建那顆球的幾何，而它整段時間長得一模一樣。
- * 護盾還在不在由 icon 表達（§ 24.8.1），場上只演「罩上來了」這件事。
- *
- * 收掉時撐大但**不變亮** —— 一顆愈脹愈亮的球讀起來是在爆炸，不是在散掉。
+ * **不留常駐的球**：護盾還在不在由 icon 表達（§ 24.8.1），場上只演「罩上來了」。
+ * 收掉時撐大但**不變亮**。
  */
 export function drawShield(g: Graphics, p: ShieldParams, kind: ShieldKind, t: number): void {
   const color = MARK_COLORS[kind];

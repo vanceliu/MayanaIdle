@@ -45,8 +45,8 @@ function query(q: string): boolean {
 }
 
 /*
- * `useSyncExternalStore` 的 getSnapshot 必須回傳**同一個參照**，否則每次 render
- * 都會被判定為「外部狀態變了」而無限重繪。快照只在媒體查詢真的翻面時才換新物件。
+ * `useSyncExternalStore` 的 getSnapshot 必須回傳**同一個參照**。
+ * 快照只在媒體查詢真的翻面時才換新物件。
  */
 let snapshot: Viewport = DESKTOP;
 

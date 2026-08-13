@@ -67,7 +67,7 @@ describe('index.html', () => {
 
 describe('service worker', () => {
   const sw = read('public/sw.js');
-  /** 註解裡本來就會提到這些名字（說明「為什麼不用」），斷言只能看真正的程式碼 */
+  /** 註解裡會提到這些名字，斷言只能看真正的程式碼 */
   const code = sw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
   it('不做 skipWaiting：中途換版會讓 lazy chunk 要到已被換掉的檔名而 404', () => {
@@ -98,9 +98,7 @@ describe('app icon', () => {
   const svg = read('public/icons/app-icon.svg');
 
   /**
-   * XML 註解裡不可出現連續兩個 ASCII 連字號。違反時整份 SVG 解析失敗，
-   * 而且是**靜默**的 —— 圖示變成空白，沒有任何錯誤訊息。
-   * 曾經因為註解裡寫了 CSS 變數名（帶兩個連字號的前綴）而踩到。
+   * XML 註解裡不可出現連續兩個 ASCII 連字號：違反時整份 SVG **靜默**解析失敗。
    */
   it('註解裡沒有連續兩個 ASCII 連字號', () => {
     for (const comment of svg.match(/<!--[\s\S]*?-->/g) ?? []) {

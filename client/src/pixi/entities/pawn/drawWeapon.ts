@@ -82,13 +82,13 @@ function drawAxe(
   /**
    * 斧刃：**靠柄窄、刃口寬、下緣往內凹**。
    *
-   * 三條曲線各有分工，少一條就不是斧頭：
+   * 三條曲線缺一不可：
    *   上緣  從柄往外撐出去
-   *   刃口  外凸的一段弧（斧頭唯一該鼓出來的地方）
-   *   下緣  往回內凹（斧的「鬍鬚」）—— 少了它會變成一片半圓，讀成湯勺
+   *   刃口  外凸的一段弧（唯一鼓出來的地方）
+   *   下緣  往回內凹（斧的「鬍鬚」）
    */
   const sx = shaftW * 0.3;
-  /* 單刃：刃口朝弧線前進的那一側，不然就是拿刀背在砍 */
+  /* 單刃：刃口朝弧線前進的那一側 */
   for (const side of p.double ? [1, -1] : [lead]) {
     ctx.beginPath();
     ctx.moveTo(ox + side * sx, ty);
@@ -111,14 +111,13 @@ function drawMace(
   const spike = p.spikeLen * s;
   const cy = top + r * 0.85;
 
-  /* 球先畫，星形疊上去 —— 球的描邊會從尖刺之間露出來，讀成「球上長了刺」 */
+  /* 球先畫，星形疊上去 */
   ctx.beginPath();
   ctx.ellipse(ox, cy, r, r, 0, 0, Math.PI * 2);
   paint(ctx, c.metal, ol);
 
   /**
-   * 尖刺的**谷底貼著球面**（0.97r），不是縮到球心去。
-   * 谷底往內收的話整顆會變成一顆星星，讀成魔杖而不是鈍器。
+   * 尖刺的**谷底貼著球面**（0.97r），不可往內收。
    */
   const n = Math.max(3, Math.round(p.spikes));
   ctx.beginPath();

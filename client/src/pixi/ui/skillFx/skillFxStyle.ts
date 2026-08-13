@@ -1,11 +1,10 @@
 /**
  * 技能 → 演出原型的判定（`48-vfx.md` § 48.7.3）。
  *
- * **這裡是純函式，沒有 Pixi**，所以判定本身可以直接跑 unit test ——
- * 75 個技能有沒有人掉出所有規則之外，測試掃一次就知道。
+ * **純函式，沒有 Pixi**，判定可直接跑 unit test。
  *
  * 判定盡量從 `Skill` 既有欄位推導，**新增技能不需要改這個檔案**。
- * 兩張逐技能表是例外，因為那兩件事讀不出任何欄位（見下方註解）。
+ * 兩張逐技能表是例外，不由欄位推導。
  */
 import type { SkillElement, SkillTarget, SkillType } from '../../../models/skill';
 import type { ProjectileShape } from '../projectileStyle';
@@ -168,9 +167,7 @@ export type SkillFxChainStyle = 'bolt' | 'bounce';
 /**
  * 連鎖長什麼樣子，**由元素決定，不用第二張名單**。
  *
- * 風系（`22-basic-magic.md` § 22.2 明文「風系包含雷屬性魔法」）走電弧 ——
- * 電就是一瞬間跳過去的東西。其餘走彈跳：火球從第一隻怪彈到第二隻，
- * 那是實體的東西在飛，用電弧演會讀成「火在放電」。
+ * 風系走電弧（`22-basic-magic.md` § 22.2 明文「風系包含雷屬性魔法」），其餘走彈跳。
  */
 export function resolveChainStyle(element: SkillElement): SkillFxChainStyle {
   return element === 'wind' ? 'bolt' : 'bounce';
@@ -310,8 +307,8 @@ export function resolveNormalAttackFxPlan(
 
 /**
  * 判定順序由上而下，第一個成立的就是答案（§ 48.7.3 那張表）。
- * 順序不可調換：落下名單必須排在近戰與 AoE 之前，
- * 否則震裂術（AoE）會被 `target: 'aoe'` 先接走，落下就不見了。
+ * 順序不可調換：落下名單必須排在近戰與 AoE 之前
+ * （震裂術是 AoE，會被 `target: 'aoe'` 先接走）。
  */
 export function resolveSkillFxPlan(skill: SkillFxInput, ctx: SkillFxContext = {}): SkillFxPlan {
   return applyOverride(derivePlan(skill, ctx), skill);

@@ -4,14 +4,12 @@ import { EQUIPMENT_SEEDS } from './equipmentSeeds';
 /**
  * 清掉過時的裝備模板。
  *
- * `performSeed` 用 `bulkPut` 寫入 seed，**只覆寫不刪除**，所以裝備換過 id 之後
- * 舊的那筆會永遠留在玩家的 IndexedDB 裡。同名兩筆的後果是查表撈到舊資料
- * （皮腰帶 id 70 `bonusWeight: 1000` vs id 593 `1700`），數值直接錯掉。
+ * `performSeed` 用 `bulkPut` 寫入 seed，**只覆寫不刪除**，裝備換過 id 之後
+ * 舊的那筆會留在玩家的 IndexedDB 裡。
  *
  * 處理順序：
- * 1. 指向孤兒模板的裝備實例，若 seed 還有同名品項 → 改指新 id（玩家的東西保住，數值校正）
- * 2. 找不到同名 seed（該裝備已從遊戲移除）→ 連同實例一起刪除，
- *    否則實例會變成沒有任何數值的空殼（`toStorableInstance` 只存 templateId，不存 stat）
+ * 1. 指向孤兒模板的裝備實例，若 seed 還有同名品項 → 改指新 id
+ * 2. 找不到同名 seed（該裝備已從遊戲移除）→ 連同實例一起刪除
  * 3. 刪掉所有不在 seed 內的模板列
  *
  * 快捷鍵指向的是**實例 id**，實例被刪時 `QuickSlotBar` 找不到就自動失效，不需另外清。

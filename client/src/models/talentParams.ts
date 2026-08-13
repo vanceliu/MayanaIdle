@@ -13,10 +13,14 @@ import { SCRIPT_DEBUFF_LABELS } from './scriptEngine';
 export type ParamField =
   | { key: string; kind: 'number'; label: string; suffix?: string; min?: number; max?: number; def: number }
   | { key: string; kind: 'select'; label: string; options: readonly { value: string; label: string }[]; def: string }
-  /** 從角色**已學會**的技能挑。`filter` 決定只列攻擊型或輔助型 */
-  | { key: string; kind: 'skill'; label: string; filter: 'attack' | 'support' }
+  /**
+   * 從角色**已學會**的技能挑。`filter` 決定只列攻擊型或輔助型。
+   * `optional` ＝ 留空不算「沒選定」，規則照樣進判定（§ 51.3.1）。
+   */
+  | { key: string; kind: 'skill'; label: string; filter: 'attack' | 'support'; optional?: boolean }
   /** 從背包挑道具。存 id 不存名稱（§ 99.1 第 7 條） */
-  | { key: string; kind: 'item'; label: string };
+  | { key: string; kind: 'item'; label: string; optional?: boolean }
+  | { key: string; kind: 'boolean'; label: string; def: boolean };
 
 const PERCENT = (label: string, def: number): ParamField =>
   ({ key: 'value', kind: 'number', label, suffix: '%', min: 0, max: 100, def });
@@ -28,6 +32,12 @@ const COMPARE: ParamField = {
   key: 'compare', kind: 'select', label: '方向', def: 'gt',
   options: [{ value: 'gt', label: '大於' }, { value: 'lt', label: '小於' }],
 };
+
+/** § 49.4 的保留條件。販售裝備（T3）與存入裝備（T4）共用同一組 */
+const KEEP_FIELDS: ParamField[] = [
+  { key: 'keepClassUsable', kind: 'boolean', label: '保留本職業可裝備的', def: true },
+  { key: 'keepAffixTierAbove', kind: 'number', label: '詞綴 Tier 高於', min: 0, max: 7, def: 5 },
+];
 
 const POTION_OPTIONS = [
   { value: 'red', label: '紅色藥水' },
@@ -100,7 +110,11 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     ],
   }],
   target_race: [{ key: 'match', kind: 'select', label: '種族', options: RACE_OPTIONS, def: 'undead' }],
-  field_has_race: [{ key: 'match', kind: 'select', label: '種族', options: RACE_OPTIONS, def: 'undead' }],
+  // `match` 同時吃種族與元素，兩者取值不重疊
+  field_has_race: [{
+    key: 'match', kind: 'select', label: '種族／元素', def: 'undead',
+    options: [...RACE_OPTIONS, ...ELEMENT_OPTIONS],
+  }],
   target_element: [{ key: 'match', kind: 'select', label: '元素', options: ELEMENT_OPTIONS, def: 'fire' }],
   target_size: [{
     key: 'match', kind: 'select', label: '體型', def: 'large',
@@ -160,11 +174,21 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     { key: 'itemId', kind: 'item', label: '道具' },
     { key: 'targetAmount', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
   ],
-  sell_materials: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 }],
+  // T3 比「僅門檻」多了保護開關（§ 51.4.11）
+  sell_materials: [
+    { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 },
+    { key: 'skipCraftMaterials', kind: 'boolean', label: '保留有用途的素材', def: true },
+  ],
   sell_materials_threshold_only: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 }],
-  sell_equipment: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 6, def: 3 }],
+  // T3 比「僅門檻」多了 § 49.4 的保留條件
+  sell_equipment: [
+    { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 6, def: 3 },
+    ...KEEP_FIELDS,
+  ],
   sell_equipment_threshold_only: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 6, def: 3 }],
   deposit_materials: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 7 }],
+  // 保留條件是這個動作的判定依據，沒有就什麼都不存（`villageScriptRunner.ts`）
+  deposit_equipment: [...KEEP_FIELDS],
   deposit_gold: [{ key: 'keepGold', kind: 'number', label: '身上留', suffix: 'G', min: 0, max: 9_999_999, def: 50_000 }],
   withdraw_gold: [{ key: 'targetAmount', kind: 'number', label: '補到', suffix: 'G', min: 0, max: 9_999_999, def: 10_000 }],
   use_consumable: [{ key: 'itemId', kind: 'item', label: '道具' }],
@@ -172,6 +196,12 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   refill_to_percent: [
     { key: 'potionType', kind: 'select', label: '藥水', options: POTION_OPTIONS, def: 'red' },
     PERCENT('補到', 80),
+  ],
+  // 依序檢查，第一個沒生效的就放。三個上限沿用 `MULTI_GROUP_MAX`
+  refill_all_buffs: [
+    { key: 'skillId', kind: 'skill', label: 'Buff 1', filter: 'support' },
+    { key: 'skillId2', kind: 'skill', label: 'Buff 2', filter: 'support', optional: true },
+    { key: 'skillId3', kind: 'skill', label: 'Buff 3', filter: 'support', optional: true },
   ],
 };
 

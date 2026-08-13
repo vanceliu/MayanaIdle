@@ -82,7 +82,7 @@ describe('素材批量販售', () => {
   });
 
   it('預設保護配方素材', () => {
-    // 前提：銀礦石確實是配方素材，否則這個測試沒有在測東西
+    // 前提：銀礦石確實是配方素材
     expect(hasMaterialUsage(SILVER_ORE)).toBe(true);
 
     const picked = collectSellableMaterials(bag, 7);

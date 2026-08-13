@@ -125,7 +125,7 @@ export interface TrainingReadout {
   elapsedSeconds: number;
   totalDamage: number;
   dps: number;
-  /** 0~100；沒有任何判定時為 null（不是 0，那會被讀成「全 MISS」） */
+  /** 0~100；沒有任何判定時為 null，不可用 0 */
   hitRate: number | null;
   /** 每秒 MP 淨消耗；正值代表在燒 MP。尚未計時時為 null */
   mpPerSecond: number | null;

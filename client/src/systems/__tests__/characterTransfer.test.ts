@@ -79,7 +79,7 @@ describe('角色匯出／匯入', () => {
 
     // 檔案裡有密鑰
     expect(payload.character.authToken).toBeTruthy();
-    // 本機也留著同一把 —— 兩邊必須一致，否則原機器上傳後新機器就被鎖死
+    // 本機也留著同一把，兩邊必須一致
     expect((await db.characters.get(charId))!.authToken).toBe(payload.character.authToken);
   });
 

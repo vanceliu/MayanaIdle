@@ -4,11 +4,7 @@
 
 /* --- Design Tokens --- */
 :root {
-  /*
-   * 天賦格的槽位高（`＋ 條件`／已鑲入的鑲材共用），
-   * 以及由它算出來的整列高 —— 一列＝條件列＋4px gap＋實作列＋上下 6px padding。
-   * 安裝鈕（＋）直接吃 `--talent-row-height`，所以永遠跟天賦格一樣大。
-   */
+  /* 天賦槽位高與整列高。安裝鈕（＋）與天賦格共用 */
   --talent-cell-height: 28px;
   --talent-row-height: calc(var(--talent-cell-height) * 2 + 4px + 12px);
   --bg-deepest: #08081C;
@@ -4190,13 +4186,6 @@ button.active {
   color: var(--text-primary);
 }
 
-/* 天賦分頁的整理是持續狀態，不是一次性動作，所以要看得出現在開著 */
-.bag-sort-toggle.active {
-  border-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
-  color: var(--text-primary);
-}
-
 
 .bag-slots-count.warning {
   color: #FACC15;
@@ -7747,7 +7736,7 @@ button.active {
   background: var(--bg-card-hover);
 }
 
-/* 清除是次要動作：領取才是玩家來信箱的目的 */
+
 .mail-purge-btn {
   color: var(--text-dim);
 }
@@ -7796,7 +7785,7 @@ button.active {
   color: var(--accent-gold);
 }
 
-/* 已領取那一列的刪除鈕。淡色不搶眼，滑過才變明顯 */
+/* 已領取那一列的刪除鈕 */
 .mail-delete-btn {
   padding: 2px 6px;
   border: var(--border-width) solid transparent;
@@ -7821,7 +7810,7 @@ button.active {
   padding: 6px 8px 0;
 }
 
-/* 整理與格數靠右併進分頁列 —— 視窗標題已經是「背包」，不必再獨立一列標題 */
+/* 整理與格數靠右併進分頁列 */
 .bag-tabs-meta {
   margin-left: auto;
   display: flex;
@@ -7922,6 +7911,62 @@ button.active {
   border-radius: var(--radius-sm);
 }
 
+/* 常駐分頁底下的門檻設定，與天賦列之間畫一條界線 */
+.talent-settings {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: var(--border-width) solid var(--outline-dark);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.talent-setting-title {
+  margin: 0 0 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.talent-setting-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.talent-setting-row input[type="number"] {
+  width: 56px;
+  padding: 2px 4px;
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+  font-size: var(--fs-xs);
+}
+
+.talent-setting-row select {
+  padding: 2px 4px;
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+}
+
+.talent-setting-fixed {
+  color: var(--text-secondary);
+}
+
+/* 沒進判定的警示標記 */
+.talent-row-skip {
+  color: var(--accent-gold);
+  font-size: var(--fs-sm);
+  cursor: help;
+  user-select: none;
+}
+
 /* 停用的整列淡掉，但仍看得到內容 —— 玩家要能確認「我關掉的是哪一條」 */
 .talent-row.is-disabled {
   opacity: 0.45;
@@ -7974,10 +8019,7 @@ button.active {
 }
 
 /* 排到最尾端用的落點：平常幾乎看不見，拖曳時才亮 */
-/*
- * 排到最尾端的落點。**平時不佔高度** —— 佔了就會在最後一列與 ＋ 之間
- * 多出一段別處沒有的空白，看起來像 ＋ 沒對齊。拖曳中才撐開。
- */
+/* 排到最尾端的落點。平時不佔高度，拖曳中才撐開 */
 .talent-row-tail {
   height: 0;
   border: var(--border-width) dashed transparent;
@@ -7993,11 +8035,7 @@ button.active {
   position: relative;
 }
 
-/*
- * 安裝鈕：清單末尾的一顆 ＋，數量走角標。
- * **尺寸與 `.talent-row` 對齊**（同 padding、同高、同圓角）——
- * 它就是「還沒填的下一列」，畫成一條比天賦格細的長條會像另一種東西。
- */
+/* 安裝鈕：尺寸與 `.talent-row` 對齊，數量走角標 */
 .talent-add {
   position: relative;
   display: flex;
@@ -8041,7 +8079,7 @@ button.active {
   min-width: 0;
 }
 
-/* 條件放不下就換行；同一列的條件是 AND，換行不影響讀法 */
+/* 條件放不下就換行 */
 .talent-row-conds,
 .talent-row-act {
   display: flex;
@@ -8377,7 +8415,7 @@ button.active {
   background: var(--bg-card-hover);
 }
 
-/* 配不起來的淡掉但仍看得見 —— 藏起來的話玩家會以為東西不見了 */
+/* 配不起來的淡掉但仍看得見 */
 .fusion-pool-item:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -8399,10 +8437,7 @@ button.active {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /*
-   * **左右不加 padding**：一般分頁的 `.bag-grid-container` 直接掛在 `.bag-panel` 底下，
-   * 這裡多包一層又縮進 8px 的話，同樣 5 欄的格子會比一般分頁窄一圈。
-   */
+  /* 左右不加 padding，格子寬度才與一般分頁一致 */
   min-height: 0;
   flex: 1;
 }

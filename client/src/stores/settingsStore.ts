@@ -23,8 +23,7 @@ const LINK_SCALES_KEY = 'mayana_scale_linked';
 
 /** 夾到 [0.8, 1.5] 並對齊 5% 級距；非數值一律回預設 */
 export function normalizeScale(value: unknown): number {
-  // `Number(null)` 與 `Number('')` 都是 0，會被夾成 80% —— 這些不是「太小的倍率」
-  // 而是「沒有值」，必須先擋掉才不會把壞掉的設定變成合法的最小值
+  // `Number(null)` 與 `Number('')` 都是 0，會被夾成 80%：必須先擋掉再夾制
   if (value == null || value === '') return SCALE_DEFAULT;
   const num = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(num)) return SCALE_DEFAULT;
@@ -107,7 +106,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   setLinkScales(linked) {
-    // 打開連動時以「介面大小」為準把文字拉齊，否則玩家會看到勾選後畫面沒動
+    // 打開連動時以「介面大小」為準把文字拉齊
     const fontScale = linked ? get().uiScale : get().fontScale;
     set({ linkScales: linked, fontScale });
     writeStored(LINK_SCALES_KEY, linked);
@@ -132,8 +131,8 @@ export function initDisplaySettings(): void {
 /**
  * 元素實際的縮放比（`zoom` 生效後 `getBoundingClientRect` 與版面座標的比值）。
  *
- * 拖曳事件的 `clientX/Y` 是視窗座標（已含縮放），而 `left/top` 寫的是版面座標，
- * 兩者在縮放後不同單位，必須除以這個比值才不會愈拖愈偏。
+ * 拖曳事件的 `clientX/Y` 是視窗座標（已含縮放），`left/top` 寫的是版面座標，
+ * 兩者在縮放後不同單位，必須除以這個比值。
  */
 export function getElementScale(el: HTMLElement | null): number {
   if (!el) return 1;

@@ -10,14 +10,7 @@ import {
 import { getTalentAffixDef } from '../db/seed/talentSeeds';
 import { affixLabel, AffixIcon } from './TalentEditor';
 
-/**
- * 天賦合成分頁（`51-auto-talent.md` § 51.5.2）。
- *
- * **不需要 NPC、不限地點** —— 不走印記師，印記管的是裝備詞綴，兩套系統不混。
- *
- * 版面是「材料槽 → 產物槽」的合成台，不是條列說明：
- * 玩家要看的是「我放了什麼、會變成什麼、機率多少」，那三件事該同時在畫面上。
- */
+/** 天賦合成分頁（`51-auto-talent.md` § 51.5.2）。不需要 NPC、不限地點 */
 export function TalentFusion() {
   const slots = useTalentStore(s => s.slots);
   const affixes = useTalentStore(s => s.affixes);
@@ -37,18 +30,14 @@ export function TalentFusion() {
   }
 
   const pickedAffixes = picked.map(id => affixes.find(a => a.id === id)).filter(Boolean);
-  /*
-   * 產物與成功率**只在這組真的合得成時才算**（`canFuseAffixes`，與 store 同一支）。
-   * 用第一份的 tier 推產物的話，T1＋T2 會秀出「T2、成功率 50%」，
-   * 按下去卻被 store 擋掉 —— 畫面在騙人。
-   */
+  /* 產物與成功率只在真的合得成時才算，判斷與 store 共用 `canFuseAffixes` */
   const ready = canFuseAffixes(pickedAffixes);
   const outputTier = ready
     ? (getTalentAffixDef(pickedAffixes[0]!.definitionId)!.tier + 1) as TalentTier
     : null;
   const rate = outputTier ? AFFIX_FUSE_SUCCESS_RATE[outputTier as Exclude<TalentTier, 1>] : null;
 
-  /* 已經挑了一份時，配不起來的就選不到 —— 讓玩家按下去才知道不行是最差的回饋 */
+  /* 已經挑了一份時，配不起來的一律不可選 */
   function pairable(id: number): boolean {
     if (picked.includes(id) || picked.length === 0) return true;
     if (picked.length >= FUSE_INPUT_COUNT) return false;
@@ -95,8 +84,7 @@ export function TalentFusion() {
 
       {/* === 鑲材：合成台 === */}
       <section className="fusion-section">
-        {/* 規則不寫在檯面上：合成台要講的只有「會變成什麼、機率多少」。
-            不合的組合本來就按不下去，寫成一行小字是每次都要重讀的雜訊 */}
+
         <h4 className="fusion-heading">鑲材</h4>
 
         <div className="fusion-bench">

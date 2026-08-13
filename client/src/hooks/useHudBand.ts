@@ -5,9 +5,9 @@ import { isMobileViewport } from './useViewport';
 /**
  * 底部常駐 HUD 帶的量測（`16-tech-frontend-architecture.md` § 32.15.1）。
  *
- * 快捷格與面板按鈕列是 z-index 800，**永遠壓在視窗之上**，所以城鎮設施視窗的
- * 底部動作列必須整條停在這條帶子上面 —— 否則按鈕看得到卻點不到。
- * 帶寬不能寫死：快捷格會隨視窗寬度換行、整條 HUD 又吃 `--ui-scale`，
+ * 快捷格與面板按鈕列是 z-index 800，**永遠壓在視窗之上**；城鎮設施視窗的
+ * 底部動作列必須整條停在這條帶子上面。
+ * **帶寬不可寫死**（快捷格會隨視窗寬度換行、整條 HUD 又吃 `--ui-scale`）：
  * 量到的值寫進 `--hud-band-bottom`，由 `.town-modal-overlay` 的 padding 讀。
  */
 

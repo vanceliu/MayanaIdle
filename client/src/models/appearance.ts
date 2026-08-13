@@ -5,9 +5,7 @@
  * 髮型清單、可調項與範圍、色票、預設值。
  * 實際怎麼畫（髮際線座標、髮尾曲線、體型）屬於渲染，在 `pixi/entities/pawn/`。
  *
- * 分界的理由：外觀資料會被存檔、匯出、封存，改動它要顧相容性；
- * 繪製參數只影響畫面，改了重畫就好。兩者混在一起，
- * 調一條曲線就會變成一次資料遷移。
+ * 外觀資料會被存檔、匯出、封存；繪製參數只影響畫面。兩者不可混在一起。
  */
 
 /* ═══════════════════════════════════════════════════════════
@@ -120,7 +118,7 @@ export const PALETTE: readonly string[] = PALETTE_ROWS.flat();
 /** 低於這個對比，眼珠在遊戲內尺寸會糊進膚色裡 */
 export const MIN_EYE_CONTRAST = 2.2;
 
-/** 每個膚色至少要有這麼多個顏色能當眼色，否則等於沒得挑（§ 4.10） */
+/** 每個膚色至少要有這麼多個顏色能當眼色（§ 4.10） */
 export const MIN_EYE_TONES_PER_SKIN = 8;
 
 /** sRGB 相對亮度（WCAG）。只用於判斷可見度，不做配色 */
@@ -195,10 +193,8 @@ export function createDefaultAppearance(): Appearance {
 /**
  * 顏色只收 `#rrggbb`。
  *
- * 不是為了挑剔格式 —— 這個字串會直接餵給 canvas 的 fillStyle，
- * 收下任意字串等於讓匯入檔決定畫布上的顏色語法。
- * 不在色票內的合法色碼放行（色票是 UI 提供的選項，不是資料的限制），
- * 否則日後動一次色票就會把既有角色的顏色洗掉。
+ * 這個字串會直接餵給 canvas 的 fillStyle，不可放行任意字串。
+ * 不在色票內的合法色碼一律放行：色票是 UI 提供的選項，不是資料的限制。
  */
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -228,7 +224,7 @@ function normalizeTune(raw: unknown): Appearance['tune'] {
     const entry: HairTune = {};
     for (const t of HAIR_TUNABLES) {
       const v = (values as Record<string, unknown>)[t.key];
-      /* 沒設過的項目要保持沒設過 —— 補成基準值就等於把差異寫死，
+      /* 沒設過的項目要保持沒設過（不可補成基準值），
          日後調髮型基準時這隻角色不會跟著更新 */
       if (v === undefined) continue;
       entry[t.key] = clampInt(v, t.min, t.max, t.min);

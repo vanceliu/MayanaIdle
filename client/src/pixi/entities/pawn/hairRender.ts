@@ -1,8 +1,7 @@
 /**
  * 逐髮型的**繪製設定** —— 髮型清單本身在 `models/appearance.ts`。
  *
- * 分開的理由：`models/appearance.ts` 的東西會被存檔與匯出，改動要顧相容性；
- * 這裡的曲線與座標只影響畫面，改了重畫就好。
+ * `models/appearance.ts` 的東西會被存檔與匯出；這裡的曲線與座標只影響畫面。
  * 兩者以 `HairStyleId` 相接，測試會檢查每個髮型都有一組設定。
  */
 import type { HairStyleId, HairTune } from '../../../models/appearance';
@@ -72,7 +71,7 @@ export interface HairRender {
   tail: 'none' | 'pony' | 'side' | 'twin';
   /** 髮尾加上分節（麻花辮） */
   braid: boolean;
-  /** 髮根加一顆髮髻 —— 束起來的髮型需要它，否則只是一塊垂著的頭髮 */
+  /** 髮根加一顆髮髻，束起來的髮型必備 */
   knot: boolean;
   /** 髮束畫在頭與髮際線之上（貼著頭髮），而不是藏在頭後面 */
   overHead: boolean;

@@ -1,13 +1,18 @@
 import '../components/WikiTable.css';
 import {
   COMBAT_CONDITION_LABELS,
-  COMBAT_CONDITION_HINTS,
   COMBAT_ACTION_LABELS,
   PERSISTENT_CONDITION_LABELS,
   PERSISTENT_ACTION_LABELS,
-  SCRIPT_DEBUFF_LABELS,
-  DEFAULT_NEAR_SELF_RADIUS,
 } from '../../models/scriptEngine';
+import {
+  COMBAT_CONDITION_DESC,
+  COMBAT_ACTION_DESC,
+  PERSISTENT_CONDITION_DESC,
+  PERSISTENT_ACTION_DESC,
+  VILLAGE_CONDITION_DESC,
+  VILLAGE_ACTION_DESC,
+} from '../talentAffixDescriptions';
 import {
   VILLAGE_CONDITION_LABELS,
   VILLAGE_ACTION_LABELS,
@@ -17,13 +22,15 @@ import {
   AFFIX_DROP_RATE,
   AFFIX_FUSE_SUCCESS_RATE,
   AFFIX_TIER_BAND,
-  SLOT_TIER_BAND,
   SLOT_DROP_RATE_BOSS,
+  slotTierBandFor,
   SLOT_GRANT_LEVEL_INTERVAL,
   STARTING_SLOT_COUNT,
   TALENT_POOL_TIER_CAP,
+  BLOCKED_LABELS,
   TALENT_TYPE_LABELS,
   conditionSlotCount,
+  type TalentType,
   type TalentSlotTier,
   type TalentTier,
 } from '../../models/talent';
@@ -84,116 +91,20 @@ function LabelTable({ head, rows }: { head: string; rows: [string, string][] }) 
   );
 }
 
-const COMBAT_CONDITION_DESC: Record<string, string> = {
-  always: '無條件觸發',
-  monster_count_gte: COMBAT_CONDITION_HINTS.monster_count_gte!,
-  monsters_near_self_gte: `${COMBAT_CONDITION_HINTS.monsters_near_self_gte!}（未指定時 ${DEFAULT_NEAR_SELF_RADIUS} 碼）`,
-  aoe_hit_count_gte: COMBAT_CONDITION_HINTS.aoe_hit_count_gte!,
-  monster_hp_below: '當前目標的 HP 百分比。未選定目標時看距離最近的一隻',
-  monster_hp_above: '當前目標的 HP 百分比。未選定目標時看距離最近的一隻',
-  mp_above: '角色 MP 百分比',
-  mp_below: '角色 MP 百分比',
-  skill_ready: '指定攻擊技能冷卻完成、MP 足夠、武器符合需求',
-  hp_below: '自身 HP 百分比',
-  hp_above: '自身 HP 百分比',
-  weapon_type_is: '手持武器的類型。換武器時不必重寫整份配置',
-  area_dwell_gte: '在本區停留的分鐘數。怪物隨停留時間增加，這是「該撤了」的判斷依據',
-  weight_over: '負重百分比。超重無法攻擊或施法',
-  self_shielded: '身上有無敵效果，或護盾還有剩餘吸收量',
-  current_area_is: '目前所在的區域或地區',
-  target_distance: '與當前目標的距離（碼）。遠程職業拉開距離的依據',
-  target_attack_type: '近戰／遠程物理／遠程魔法',
-  target_race: '一般／不死／惡魔／龍',
-  target_element: '火／冰／風／地／光／暗／無',
-  target_size: '小怪／大怪。武器對兩者的基礎傷害不同',
-  target_is_boss: '當前目標是不是 Boss',
-  target_defense: '當前目標的防禦力',
-  target_level_diff: '目標等級減去自身等級。正數＝目標比較高',
-  target_range_gt: '當前目標的攻擊射程（碼）',
-  hp_dropped_recently: '指定秒數內 HP 掉了幾個百分點。用來偵測爆發傷害',
-  target_has_debuff: '當前目標身上有指定的 debuff（依 tag 比對）',
-  target_lacks_debuff: '當前目標身上沒有指定的 debuff。避免 DoT 與控場技重複覆蓋',
-  target_cc_immune: '當前目標處於控場免疫窗內。這時放控場技是純浪費 MP',
-  target_shielded: '當前目標有無敵效果或還有護盾量',
-};
-
-const COMBAT_ACTION_DESC: Record<string, string> = {
-  skill: '對當前目標施放攻擊技能。取代該次普通攻擊，不是額外動作',
-  normal_attack: '物理攻擊當前目標',
-  wait: '這次攻擊機會跳過，角色原地等待',
-  skill_class_only: '只放該職業的職業魔法，不含基礎魔法',
-  switch_target_lowest_hp: '改打場上血量百分比最低的一隻。補刀用',
-  switch_target_highest_hp: '改打血量百分比最高的一隻',
-  switch_target_farthest: '改打距離最遠的一隻',
-  switch_target_by_kind: '改打指定種族或元素的一隻，同類取最近的',
-  switch_target_by_debuff: '改打帶著（或沒有）指定 debuff 的一隻',
-  lock_target: '釘住當前目標，牠死掉或離場前不再改挑最近的',
-  keep_distance: '退到指定距離外。未指定時退到武器射程邊緣',
-  close_in: '貼近目標到指定距離',
-  disengage: '遠離所有怪物',
-};
-
-const PERSISTENT_CONDITION_DESC: Record<string, string> = {
-  always: '無條件觸發',
-  hp_below: '自身 HP 百分比',
-  hp_above: '自身 HP 百分比',
-  mp_below: '自身 MP 百分比',
-  mp_above: '自身 MP 百分比',
-  buff_not_active: '指定 buff 效果不存在或已過期',
-  speed_not_active: '沒有任何加速效果（藥水與加速術互斥，共用同一格）',
-  skill_ready: '指定技能冷卻完成且 MP 足夠',
-  debuff_active: `身上有指定狀態：${Object.values(SCRIPT_DEBUFF_LABELS).join('／')}。暈眩不列入，暈眩中無法使用任何道具`,
-  monsters_near_self_gte: '以角色為圓心、指定碼數內的怪物數，用來判斷是不是被圍住了',
-  weapon_type_is: '手持武器的類型',
-  area_dwell_gte: '在本區停留的分鐘數',
-  weight_over: '負重百分比。超重無法攻擊或施法',
-  self_shielded: '身上有無敵效果，或護盾還有剩餘吸收量',
-  current_area_is: '目前所在的區域或地區',
-  item_count_below: '指定道具的持有量。藥水快見底時可改用低階的',
-  buff_remaining_below: '指定 buff 的剩餘秒數。用來提前續，而不是等它掉光',
-  potion_cooldown_ready: '指定藥水的冷卻已經走完',
-  hp_dropped_recently: '指定秒數內 HP 掉了幾個百分點。用來偵測爆發傷害',
-};
-
-const PERSISTENT_ACTION_DESC: Record<string, string> = {
-  potion: '紅／橙／白，受各自的藥水冷卻限制',
-  speed_potion: '綠色／強化綠色藥水',
-  buff_skill: '施放輔助型技能（魔法盔甲、祝福武器等）',
-  heal_skill: '施放回復型技能。HP 全滿時不會觸發',
-  cure_item: '解毒藥水／止血繃帶／淨化藥水。沒有對應狀態時不會使用',
-};
-
-const VILLAGE_CONDITION_DESC: Record<string, string> = {
-  always: '無條件觸發',
-  bag_slots_used_gte: '背包已用格數（含裝備佔格）',
-  item_count_below: '指定道具的持有量',
-  gold_below: '身上金幣（實際金額）',
-  gold_above: '身上金幣（實際金額）',
-  in_town: '角色現在站在城鎮還是野外',
-  bag_free_slots_lte: '背包剩餘格數。取東西前該看的是剩餘，不是已用',
-  has_hunt_location: '有沒有上次掛機點的紀錄。沒有就回不去',
-  warehouse_gold_gte: '共用倉庫的金幣餘額',
-  warehouse_item_gte: '倉庫裡指定道具的存量',
-};
-
-const VILLAGE_ACTION_DESC: Record<string, string> = {
-  return_town: '消耗回城卷軸。只有在野外才成立，回城前會記下掛機點',
-  use_inn: '恢復 HP／MP 並解除異常狀態。HP／MP 全滿又沒有異常狀態時不會觸發',
-  sell_materials_threshold_only: '只有顏色門檻，保護開關固定開啟、不吃白名單',
-  sell_equipment_threshold_only: '只有顏色門檻，不吃保留條件。新手裝與裝備中的照樣不賣',
-  sell_materials: '依顏色等級批量販售，可選擇保留進得了配方的素材',
-  sell_equipment: '依顏色等級批量販售，可設保留條件',
-  buy_item: '補到目標數量。買不起就只買買得起的量',
-  deposit_materials: '依顏色等級存進共用或個人倉庫',
-  deposit_equipment: '把命中篩選條件的裝備存進倉庫。沒設條件就不存',
-  withdraw_item: '從倉庫補到目標數量，受倉庫存量與背包格數限制',
-  deposit_gold: '身上留下指定金額，其餘存進共用倉庫',
-  withdraw_gold: '從共用倉庫領到目標金額',
-  return_to_hunt: '回到上次離開的座標。需要通行卷軸的區域一樣要有卷軸',
-};
-
-function toRows(labels: Record<string, string>, desc: Record<string, string>): [string, string][] {
-  return Object.entries(labels).map(([key, label]) => [label, desc[key] ?? '']);
+function toRows(
+  labels: Record<string, string>,
+  desc: Record<string, string>,
+  kind: 'condition' | 'action',
+  type: TalentType,
+): [string, string][] {
+  const obtainable = new Set(
+    TALENT_AFFIX_DEFS
+      .filter(d => !d.blocked && d.kind === kind && d.appliesTo.includes(type))
+      .map(d => d.ruleId),
+  );
+  return Object.entries(labels)
+    .filter(([key]) => obtainable.has(key))
+    .map(([key, label]) => [label, desc[key] ?? '']);
 }
 
 export function TalentsPage() {
@@ -312,7 +223,7 @@ export function TalentsPage() {
               </tr>
               <tr>
                 <td>補給天賦</td>
-                <td>每 1000ms，任何地點</td>
+                <td>每 1200ms，任何地點</td>
                 <td>回城、買賣、倉庫存取、返回掛機點</td>
               </tr>
             </tbody>
@@ -325,8 +236,8 @@ export function TalentsPage() {
 
       <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>戰鬥天賦</h3>
-        <LabelTable head="條件" rows={toRows(COMBAT_CONDITION_LABELS, COMBAT_CONDITION_DESC)} />
-        <LabelTable head="動作" rows={toRows(COMBAT_ACTION_LABELS, COMBAT_ACTION_DESC)} />
+        <LabelTable head="條件" rows={toRows(COMBAT_CONDITION_LABELS, COMBAT_CONDITION_DESC, 'condition', 'combat')} />
+        <LabelTable head="動作" rows={toRows(COMBAT_ACTION_LABELS, COMBAT_ACTION_DESC, 'action', 'combat')} />
         <p style={noteStyle}>
           <strong>不需要多掛「技能就緒」</strong>：動作選了技能時，冷卻、MP、武器需求
           本來就會被檢查，不過關就跳到下一條規則。
@@ -339,8 +250,8 @@ export function TalentsPage() {
 
       <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>常駐天賦</h3>
-        <LabelTable head="條件" rows={toRows(PERSISTENT_CONDITION_LABELS, PERSISTENT_CONDITION_DESC)} />
-        <LabelTable head="動作" rows={toRows(PERSISTENT_ACTION_LABELS, PERSISTENT_ACTION_DESC)} />
+        <LabelTable head="條件" rows={toRows(PERSISTENT_CONDITION_LABELS, PERSISTENT_CONDITION_DESC, 'condition', 'persistent')} />
+        <LabelTable head="動作" rows={toRows(PERSISTENT_ACTION_LABELS, PERSISTENT_ACTION_DESC, 'action', 'persistent')} />
         <p style={noteStyle}>
           面板下方另有獨立的「緊急撤退」設定（HP 低於門檻就回城），
           只在附近有敵人時生效，不參與規則列表的排序。
@@ -349,8 +260,8 @@ export function TalentsPage() {
 
       <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>補給天賦</h3>
-        <LabelTable head="條件" rows={toRows(VILLAGE_CONDITION_LABELS, VILLAGE_CONDITION_DESC)} />
-        <LabelTable head="動作" rows={toRows(VILLAGE_ACTION_LABELS, VILLAGE_ACTION_DESC)} />
+        <LabelTable head="條件" rows={toRows(VILLAGE_CONDITION_LABELS, VILLAGE_CONDITION_DESC, 'condition', 'supply')} />
+        <LabelTable head="動作" rows={toRows(VILLAGE_ACTION_LABELS, VILLAGE_ACTION_DESC, 'action', 'supply')} />
         <p style={noteStyle}>
           動作做不出來時就跳過該規則。因此在野外時整份規則會自然掉到「回城」那條，
           回城之後才輪到買賣 —— 同一份規則同時描述了「何時該回城」與「回城後做什麼」。
@@ -386,6 +297,16 @@ export function TalentsPage() {
           <li>合成<strong>只吃完全沒安裝的</strong>天賦格與鑲材，不會去拆別份配置</li>
           <li>配置存在角色身上，不跨角色共用（規則裡的技能綁職業）</li>
         </ul>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={SECTION_TITLE}>合成與掉落</h3>
+        <TalentFusionTable />
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={SECTION_TITLE}>合成與掉落</h3>
+        <TalentFusionTable />
       </section>
 
       <section style={{ marginBottom: 32 }}>
@@ -446,8 +367,8 @@ export function TalentAffixTable() {
               <td>{d.kind === 'condition' ? '條件' : '實作'}</td>
               <td>{d.appliesTo.map(t => TALENT_TYPE_LABELS[t]).join('／')}</td>
               <td>{d.form === 'fixed' ? '指定' : d.form === 'pool' ? '池' : '自選'}</td>
-              {/* 怪物側機制沒開的鑲材不存在於世界上，標明免得玩家白刷（§ 51.4.4） */}
-              <td>{d.blocked ? '尚未開放（等怪物機制）' : '掉落／合成'}</td>
+              {/* 未開放的鑲材標明原因，免得玩家白刷（§ 51.4.3.2、§ 51.4.4） */}
+              <td>{d.blocked ? BLOCKED_LABELS[d.blockedReason ?? 'monster'] : '掉落／合成'}</td>
             </tr>
           ))}
         </tbody>
@@ -482,17 +403,18 @@ export function TalentFusionTable() {
       <table className="wiki-table">
         <thead><tr><th>區域最高等級</th><th>可掉鑲材</th><th>可掉天賦格（Boss）</th></tr></thead>
         <tbody>
-          {AFFIX_TIER_BAND.map((b, i) => {
-            const slotBand = SLOT_TIER_BAND[i];
+          {/*
+            兩張分帶表的列數不一樣（鑲材 6 段、天賦格 3 段），
+            **不可以用索引配對** —— 要用同一個區域等級各自查。
+          */}
+          {AFFIX_TIER_BAND.map(b => {
+            const slotBand = slotTierBandFor(b.maxAreaLevel);
+            const range = (min: number, max: number) => (min === max ? `T${min}` : `T${min}～T${max}`);
             return (
               <tr key={b.maxAreaLevel}>
                 <td>{b.maxAreaLevel === Infinity ? '61+' : `～${b.maxAreaLevel}`}</td>
-                <td>{b.min === b.max ? `T${b.min}` : `T${b.min}～T${b.max}`}</td>
-                <td>
-                  {!slotBand ? '—'
-                    : slotBand.min === slotBand.max ? `T${slotBand.min}`
-                    : `T${slotBand.min}～T${slotBand.max}`}
-                </td>
+                <td>{range(b.min, b.max)}</td>
+                <td>{range(slotBand.min, slotBand.max)}</td>
               </tr>
             );
           })}

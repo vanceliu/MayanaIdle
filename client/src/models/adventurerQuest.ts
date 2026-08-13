@@ -422,7 +422,7 @@ export const TOWN_BOSS_POOLS = buildTownBossPools();
 
 /**
  * § 36.6.1：一般分頁需要該城鎮有對應區域池；
- * BOSS 分頁另需該池內至少有一隻 BOSS，否則整個分頁不顯示（不降級為殲滅任務）。
+ * BOSS 分頁另需該池內至少有一隻 BOSS；不滿足時整個分頁不顯示，不降級為殲滅任務。
  */
 export function getTownDifficulties(townId: QuestTownId): AdventurerQuestDifficulty[] {
   return QUEST_DIFFICULTY_ORDER.filter(d => (

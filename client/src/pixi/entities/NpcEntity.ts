@@ -14,11 +14,10 @@ export const NPC_BODY_OFFSET = TILE_H * 0.45;
 /**
  * 城鎮 NPC：角色剪影 + 綠色地面標記 + 設施 icon + 名稱（§ 13.2.1）。
  *
- * 外觀依設施固定（`models/npcAppearance.ts`），所以認人靠的是長相而不只是名字。
- * 敵我的顏色區分改由地面標記承擔 —— 剪影本身只有髮色膚色，沒有敵我資訊。
+ * 外觀依設施固定（`models/npcAppearance.ts`）。敵我的顏色區分由地面標記承擔。
  *
- * 只負責顯示 —— 點擊由 PixiGame 的 DOM click handler 依格子判斷，
- * 不在這裡掛 Pixi 事件（否則會與地圖移動各自派工，互相覆蓋目標）。
+ * 只負責顯示：點擊由 PixiGame 的 DOM click handler 依格子判斷，
+ * **不在這裡掛 Pixi 事件**。
  */
 export class NpcEntity {
   public container: Container;

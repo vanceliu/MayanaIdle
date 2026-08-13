@@ -161,8 +161,6 @@ export interface Affix {
 
 /**
  * 受擊回復的**回復比例**（§ 7.4）：回血 2~4%、回魔 2~5% 的最大值。
- * 兩條分開是因為量級不同 —— 滿裝 maxHP 約 2810，2~4% 換算的等價減傷約 32%，
- * 與其他防禦詞綴仍需取捨；maxMP 的同比例只等於一發技能，故容許到 5%。
  *
  * **Tier 只決定觸發率**（走通用表），回復比例與 Tier 無關，另外抽。
  */
@@ -235,7 +233,7 @@ export function getErosion(
 
 /**
  * 元素侵蝕的每跳傷害（§ 7.4）：`武器平均基傷的一半 ~ 武器平均基傷` 之間隨機，
- * 抽到當下決定，之後固定。下緣取一半而不是 1 —— 否則低 roll 等於沒抽到。
+ * 抽到當下決定，之後固定。下緣為平均基傷的一半，不可低於此。
  */
 export function rollErosionDamage(weaponBaseDamage: number): number {
   const max = Math.max(1, Math.floor(weaponBaseDamage));

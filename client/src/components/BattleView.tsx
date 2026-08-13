@@ -70,8 +70,8 @@ export function BattleView() {
           const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear);
           const hpPct = (ch.hp / effMaxHp) * 100;
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
-          // 已在恢復等待中就維持暫停：此時 HP/MP 可能已高於暫停門檻但未達恢復門檻，
-          // 不可因為「沒低於門檻」就重新起步（由 gameLoopTick 的 aboveResume 分支解除）。
+          // 已在恢復等待中就維持暫停：HP/MP 可能已高於暫停門檻但未達恢復門檻，
+          // 「沒低於門檻」不可重新起步（由 gameLoopTick 的 aboveResume 分支解除）。
           const alreadyPaused = useMapMonsterStore.getState().paused;
           if (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
             useMapMonsterStore.getState().setPaused(true);

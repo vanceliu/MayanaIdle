@@ -57,7 +57,7 @@ export function validateMapData(data: MapData, expectedId = data.id): MapData {
   }
   assert(spawnableCount > 0, expectedId, 'at least one spawnable tile is required');
 
-  // NPC（只有城鎮地圖會有）：站在可通行格上，且必須走得到，否則玩家永遠互動不到
+  // NPC（只有城鎮地圖會有）：站在可通行格上，且必須走得到
   if (data.npcs !== undefined) {
     assert(Array.isArray(data.npcs), expectedId, 'npcs must be an array');
     const seen = new Set<string>();
@@ -68,7 +68,7 @@ export function validateMapData(data: MapData, expectedId = data.id): MapData {
       assert(typeof npc?.icon === 'string' && npc.icon.length > 0, expectedId, `npc "${npc?.facility}" needs an icon`);
       assert(isInBounds(data, npc), expectedId, `npc "${npc.facility}" is outside map bounds`);
       // NPC 有實體：自己站的格子不可通行（尋路要繞過他），
-      // 但必須至少有一個走得到的相鄰格，否則玩家永遠靠不過去。
+      // 但必須至少有一個走得到的相鄰格。
       assert(!isWalkableTile(data, npc), expectedId, `npc "${npc.facility}" must stand on a blocking tile`);
       const hasApproach = CARDINAL_AND_DIAGONAL.some(offset => {
         const neighbour = { x: npc.x + offset.x, y: npc.y + offset.y };

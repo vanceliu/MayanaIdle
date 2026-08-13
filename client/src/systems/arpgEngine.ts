@@ -139,8 +139,7 @@ export interface MoveToEvent {
 }
 
 /**
- * 超重擋下了這次出手（§ 20.7）。
- * 每次出手判定都會發一次，讓玩家知道自己為什麼打不出去。
+ * 超重擋下了這次出手（§ 20.7）。每次出手判定都會發一次。
  */
 export interface OverweightBlockedEvent {
   type: 'overweight_blocked';
@@ -491,7 +490,10 @@ function applyNonAttackAction(
         .filter(e => e.target === 'monster' && e.targetMonsterId === m.id && now - e.startTime < e.duration)
         .flatMap(e => e.tags),
     }));
-    const picked = pickTargetBy(strategy, candidates, playerPos, action.match);
+    const resolved: TargetStrategy = strategy === 'by_debuff' && action.invert
+      ? 'by_lacking_debuff'
+      : strategy;
+    const picked = pickTargetBy(resolved, candidates, playerPos, action.match);
     // 挑不到就維持原目標 —— 切不成不該讓角色變成沒有目標
     if (picked) {
       engine.playerCtx.targetMonsterId = picked;
@@ -511,4 +513,6 @@ const TARGET_STRATEGY_OF: Partial<Record<string, TargetStrategy>> = {
   switch_target_highest_hp: 'highest_hp',
   switch_target_farthest: 'farthest',
   switch_target_by_kind: 'by_kind',
+  // `invert` 決定切到「帶著的」還是「沒有的」（§ 51.4.9 T6）
+  switch_target_by_debuff: 'by_debuff',
 };

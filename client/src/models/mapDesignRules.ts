@@ -16,12 +16,10 @@ import { TileType, isInBounds, isWalkableTile, isSpawnableTile } from './mapCont
 /**
  * 這張地圖要不要受設計規範管（§ 38.11、§ 38.12）。
  *
- * 規範談的是「戰鬥地圖好不好打」——地形多樣性、掩體、繞路距離。
- * 兩種圖不在管轄範圍內，因為它們的空曠是刻意的、不是設計失誤：
+ * 規範談的是戰鬥地圖的地形多樣性、掩體、繞路距離。兩種圖不受管轄：
  *
- * - **城鎮**（`theme === 'town'`）：沒有戰鬥
- * - **試驗場**（`autoSpawn === false`）：一整塊空地才量得準，
- *   放掩體反而會擋住投射物、污染 DPS（`50-training-ground.md` § 50.3）
+ * - **城鎮**（`theme === 'town'`）
+ * - **試驗場**（`autoSpawn === false`）：必須維持一整塊空地（`50-training-ground.md` § 50.3）
  *
  * 這支是判定的唯一出處，測試與生成腳本一律走它，不要各自寫一份 filter。
  */
@@ -755,11 +753,11 @@ export function getFallenPillarAxis(map: MapData, x: number, y: number): 'horizo
 
   const [dx, dy] = neighbours[0];
   const [nx, ny] = [x + dx, y + dy];
-  // 對方也必須只有這一個石柱鄰居，否則是三根以上連成的石堆
+  // 對方也必須只有這一個石柱鄰居（三根以上連成的石堆不算）
   const back = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const)
     .filter(([bx, by]) => isPillar(nx + bx, ny + by));
   if (back.length !== 1) return null;
-  // 兩格都不可有斜向的石柱，否則會糊成一團
+  // 兩格都不可有斜向的石柱
   for (const [cx, cy] of [[x, y], [nx, ny]]) {
     for (const [ox, oy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
       if (isPillar(cx + ox, cy + oy)) return null;

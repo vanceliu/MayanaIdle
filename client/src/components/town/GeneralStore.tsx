@@ -119,8 +119,8 @@ export function GeneralStore() {
   });
   const buyTotal = buyLines.reduce((sum, l) => sum + l.item.price * l.qty, 0);
   /**
-   * 尚未在背包裡的品項才需要新的欄位，多品項要一次算完才知道放不放得下。
-   * 印記不佔格（§ 35.20）—— 目前商店沒賣，但判定放這裡才不會在上架時漏掉。
+   * 尚未在背包裡的品項才需要新的欄位，多品項一次算完再判定。
+   * 印記不佔格（§ 35.20）。
    */
   const buyNewSlots = buyLines.filter(
     l => !isSigilItemId(l.item.itemId) && !hasBagItem(bagItems, l.item.itemId),

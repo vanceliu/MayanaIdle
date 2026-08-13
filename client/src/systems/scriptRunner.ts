@@ -1,6 +1,7 @@
 import type {
   ScriptRule, ScriptAction, CombatRule, CombatCondition, CombatAction,
   PersistentRule, PersistentCondition, PersistentAction, EmergencyRetreat,
+  ScriptDebuffCondition,
 } from '../models/scriptEngine';
 import { SCRIPT_DEBUFF_TYPES, DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
 import type { Position } from '../models/mapControl';
@@ -132,6 +133,39 @@ function countMonstersWithin(ctx: CombatScriptContext, radius: number): number {
   return ctx.monsters.filter(m => getDistance(ctx.playerPos, m.position) <= radius).length;
 }
 
+/**
+ * 共用條件的自身狀態判定（§ 51.4.5）。
+ * 戰鬥與常駐**必須同一套** —— 兩邊各寫一份，改了一邊就會出現
+ * 「同一條規則放在戰鬥格與常駐格結果不同」這種難查的 bug。
+ */
+function isSelfBuffExpired(
+  skillId: string | undefined, skills: Skill[], activeEffects: ActiveEffect[], now: number,
+): boolean {
+  const category = skills.find(s => s.id === skillId)?.buffCategory;
+  const active = category
+    ? activeEffects.find(e => e.category === category && e.type === 'buff' && e.target === 'player')
+    : activeEffects.find(e => e.sourceSkillId === skillId && e.type === 'buff' && e.target === 'player');
+  if (!active) return true;
+  return now - active.startTime >= active.duration;
+}
+
+function hasActiveSpeedBuff(activeEffects: ActiveEffect[], now: number): boolean {
+  const buff = activeEffects.find(
+    e => e.category === 'speed' && e.type === 'buff' && e.target === 'player',
+  );
+  return buff !== undefined && now - buff.startTime < buff.duration;
+}
+
+function hasSelfDebuff(
+  debuffType: ScriptDebuffCondition | undefined, activeEffects: ActiveEffect[], now: number,
+): boolean {
+  if (!debuffType) return false;
+  // 合併條件（如「詛咒或虛弱」）只要其中一項成立即可
+  return SCRIPT_DEBUFF_TYPES[debuffType].some(
+    t => hasActivePlayerDebuff(activeEffects, PLAYER_DEBUFF_DEFS[t].category, now),
+  );
+}
+
 function checkCombatCondition(
   condition: CombatCondition,
   action: CombatAction,
@@ -208,6 +242,16 @@ function checkCombatCondition(
       return (ctx.weightPercent ?? 0) > (condition.value ?? 0);
     case 'self_shielded':
       return hasActiveShield(ctx.activeEffects ?? [], now, 'player');
+    /*
+     * 共用條件（§ 51.4.5）判定的是**自身**狀態，與常駐版完全同一套邏輯。
+     * 兩邊各寫一份會走鐘，所以抽成共用函式。
+     */
+    case 'buff_not_active':
+      return isSelfBuffExpired(condition.skillId, ctx.skills, ctx.activeEffects ?? [], now);
+    case 'speed_not_active':
+      return !hasActiveSpeedBuff(ctx.activeEffects ?? [], now);
+    case 'debuff_active':
+      return hasSelfDebuff(condition.debuffType, ctx.activeEffects ?? [], now);
     case 'hp_dropped_recently': {
       if (!ctx.hpHistory) return false;
       // value ＝ 掉了幾個百分點；radius 借用來當秒數，避免再開一個欄位
@@ -231,6 +275,22 @@ function checkCombatCondition(
     case 'target_race': {
       const target = getPrimaryTarget(ctx);
       return !!target && target.instance.race === condition.match;
+    }
+    /*
+     * 場上判定（§ 51.4.6 T6）：看的是**全場活著的怪**，不是當前目標。
+     * `match` 同時吃種族與元素 —— 兩者的取值不重疊，不必分成兩個條件。
+     */
+    case 'field_has_race':
+      return ctx.monsters.some(
+        m => m.instance.race === condition.match || m.instance.element === condition.match,
+      );
+    case 'field_avg_hp_below': {
+      if (ctx.monsters.length === 0) return false;
+      const total = ctx.monsters.reduce(
+        (sum, m) => sum + (m.instance.maxHp > 0 ? (m.instance.currentHp / m.instance.maxHp) * 100 : 0),
+        0,
+      );
+      return total / ctx.monsters.length < (condition.value ?? 0);
     }
     case 'target_element': {
       const target = getPrimaryTarget(ctx);
@@ -311,10 +371,32 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
       if (!meetsWeaponRequirement(skill, ctx)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
+    // 職業魔法：可選範圍窄一階，但可執行條件與一般技能相同（§ 51.4.9）
+    case 'skill_class_only': {
+      const skill = ctx.skills.find(s => s.id === action.skillId);
+      if (!skill) return false;
+      if (!meetsWeaponRequirement(skill, ctx)) return false;
+      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+    }
     case 'normal_attack':
       return true;
     case 'wait':
       return true;
+    // 切換目標：場上至少要有別的怪可以切
+    case 'switch_target_lowest_hp':
+    case 'switch_target_highest_hp':
+    case 'switch_target_farthest':
+    case 'switch_target_by_kind':
+    case 'switch_target_by_debuff':
+      return ctx.monsters.length > 0;
+    // 鎖定目標：要先有目標才鎖得住
+    case 'lock_target':
+      return ctx.primaryTargetId !== null;
+    // 走位：有目標才有「靠近／拉開」的對象
+    case 'keep_distance':
+    case 'close_in':
+    case 'disengage':
+      return ctx.primaryTargetId !== null;
     default:
       return false;
   }
@@ -327,6 +409,10 @@ export interface PersistentScriptContext {
   skills: Skill[];
   bagItems: BagItem[];
   lastPotionUsedAt: number;
+  /** 上次使用的那瓶藥水的冷卻長度。冷卻全域共用（`30-items.md` § 30.1） */
+  lastPotionCooldown?: number;
+  /** 走位動作用：現在在不在戰鬥中 */
+  inCombat?: boolean;
   now: number;
   activeEffects: ActiveEffect[];
   cooldownReduction?: number;
@@ -379,41 +465,17 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
       return mpPercent < (condition.value ?? 0);
     case 'mp_above':
       return mpPercent > (condition.value ?? 0);
-    case 'buff_not_active': {
-      const skill = skills.find(s => s.id === condition.skillId);
-      const category = skill?.buffCategory;
-      if (category) {
-        const active = activeEffects.find(
-          e => e.category === category && e.type === 'buff' && e.target === 'player'
-        );
-        if (!active) return true;
-        return now - active.startTime >= active.duration;
-      }
-      const active = activeEffects.find(
-        e => e.sourceSkillId === condition.skillId && e.type === 'buff' && e.target === 'player'
-      );
-      if (!active) return true;
-      return now - active.startTime >= active.duration;
-    }
-    case 'speed_not_active': {
-      const speedBuff = activeEffects.find(
-        e => e.category === 'speed' && e.type === 'buff' && e.target === 'player'
-      );
-      if (!speedBuff) return true;
-      return now - speedBuff.startTime >= speedBuff.duration;
-    }
+    case 'buff_not_active':
+      return isSelfBuffExpired(condition.skillId, skills, activeEffects, now);
+    case 'speed_not_active':
+      return !hasActiveSpeedBuff(activeEffects, now);
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);
       if (!skill) return false;
       return canUseSkill(skill, character.mp, now, ctx.cooldownReduction ?? 0);
     }
-    case 'debuff_active': {
-      if (!condition.debuffType) return false;
-      // 合併條件（如「詛咒或虛弱」）只要其中一項成立即可
-      return SCRIPT_DEBUFF_TYPES[condition.debuffType].some(
-        t => hasActivePlayerDebuff(activeEffects, PLAYER_DEBUFF_DEFS[t].category, now)
-      );
-    }
+    case 'debuff_active':
+      return hasSelfDebuff(condition.debuffType, activeEffects, now);
 
     // === 共用條件（§ 51.4.5）===
     case 'monsters_near_self_gte': {
@@ -466,12 +528,23 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
   }
 }
 
+/**
+ * 藥水冷卻好了沒。**冷卻全域共用**（`30-items.md` § 30.1）——
+ * 使用任一藥水後，所有藥水一起進入該藥水對應的冷卻。
+ */
+function isPotionReady(ctx: PersistentScriptContext): boolean {
+  return ctx.now - ctx.lastPotionUsedAt >= (ctx.lastPotionCooldown ?? 0);
+}
+
 function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScriptContext): boolean {
   switch (action.type) {
     case 'potion': {
-      if (ctx.character.hp >= ctx.character.maxHp) return false;
+      // 有效上限含裝備加血；用基礎 maxHp 的話有加血裝就永遠判定為滿血
+      if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
       const { potionType } = action;
       if (!potionType) return false;
+      // 冷卻中不算可執行
+      if (!isPotionReady(ctx)) return false;
       return getPotionCount(ctx.bagItems, potionType) > 0;
     }
     case 'speed_potion': {
@@ -486,7 +559,7 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'heal_skill': {
-      if (ctx.character.hp >= ctx.character.maxHp) return false;
+      if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (!skill) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
@@ -499,6 +572,38 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       if (!hasBagItem(ctx.bagItems, def.itemId)) return false;
       // 無對應 debuff 時不可使用（§ 24.10.1）
       return hasCurableDebuff(def, ctx.activeEffects, ctx.now);
+    }
+    case 'use_town_scroll':
+      // 暈眩中無法使用任何道具（§ 24.10.1）
+      if (isPlayerStunned(ctx.activeEffects, ctx.now)) return false;
+      return findScrollInBag(ctx.bagItems) !== null;
+    case 'use_consumable': {
+      if (isPlayerStunned(ctx.activeEffects, ctx.now)) return false;
+      return action.itemId != null && hasBagItem(ctx.bagItems, action.itemId);
+    }
+    case 'refill_to_percent': {
+      if (isPlayerStunned(ctx.activeEffects, ctx.now)) return false;
+      const { potionType } = action;
+      if (!potionType) return false;
+      if (!isPotionReady(ctx)) return false;
+      const maxHp = ctx.effectiveMaxHp ?? ctx.character.maxHp;
+      if ((ctx.character.hp / maxHp) * 100 >= (action.value ?? 0)) return false;
+      return getPotionCount(ctx.bagItems, potionType) > 0;
+    }
+    // 依序檢查，只要還有一個沒生效且放得出來就成立
+    // 走位：要在戰鬥中且有目標才有「靠近／拉開」的對象
+    case 'keep_distance':
+    case 'close_in':
+    case 'disengage':
+      return ctx.inCombat === true;
+    case 'refill_all_buffs': {
+      const ids = [action.skillId, action.skillId2, action.skillId3]
+        .filter((id): id is string => Boolean(id));
+      return ids.some(id => {
+        const skill = ctx.skills.find(sk => sk.id === id);
+        if (!skill) return false;
+        return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+      });
     }
     default:
       return false;

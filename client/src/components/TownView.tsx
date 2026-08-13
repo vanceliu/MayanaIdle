@@ -20,7 +20,7 @@ import { TrainingGroundEntrance } from './town/TrainingGroundEntrance';
 /**
  * `training-ground` 是城鎮側的試驗場入口；`training-dummy` 是**場內**管理員的面板，
  * 由 `TrainingGroundView` 渲染，不在城鎮裡（`50-training-ground.md` § 50.2~§ 50.3）。
- * 兩者共用 `townStore.facility` 這條開關，因為 NPC 點擊只有這一條路。
+ * 兩者共用 `townStore.facility` 這條開關。
  */
 export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master' | 'training-ground' | 'training-dummy';
 

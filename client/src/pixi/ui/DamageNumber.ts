@@ -6,7 +6,7 @@ const CRIT_FONT_SIZE = 20;
 const FLOAT_DISTANCE = 40;
 const DURATION_MS = 800;
 const X_SPREAD = 15;
-/** 連續多下時左右攤開的間距 —— 要大於字寬才不會互相壓住 */
+/** 連續多下時左右攤開的間距，必須大於字寬 */
 const STACK_X_STEP = 26;
 /** 連續多下時每一下再抬高一點，讓順序讀得出來 */
 const STACK_Y_STEP = 10;

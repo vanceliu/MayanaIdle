@@ -4,16 +4,13 @@ import type { BagDragPayload } from '../models/bagLayout';
 /**
  * 指標拖放（`47-mobile.md`）。
  *
- * 取代原本的 HTML5 drag-and-drop：`draggable` + `dragstart/drop` 這一套
- * **在觸控裝置上完全不會觸發**，手機玩家等於失去背包重排、快捷格綁定與丟棄。
- * Pointer Events 是滑鼠與觸控共用的同一組事件，改走它兩邊都活。
+ * 一律走 Pointer Events，**不可用 HTML5 drag-and-drop**（觸控裝置不觸發）。
  *
- * 落點判定不靠事件冒泡，而是 `document.elementFromPoint()` ——
- * 拖曳期間指標被來源元素 capture 住（否則手指移出格子就收不到 move），
- * 目標元素根本收不到 pointerover。
+ * 落點判定用 `document.elementFromPoint()`，不靠事件冒泡：
+ * 拖曳期間指標被來源元素 capture 住，目標元素收不到 pointerover。
  *
- * 目標元素以 DOM 屬性宣告自己：`data-drop-kind` + `data-drop-index`。
- * 這讓「誰可以被放」不必在 store 註冊，新增目標只要標屬性。
+ * 目標元素以 DOM 屬性宣告自己：`data-drop-kind` + `data-drop-index`，
+ * 不在 store 註冊。
  */
 
 export type DropKind =
@@ -52,8 +49,7 @@ export interface SkillDragPayload {
 /**
  * 從背包「天賦」分頁拖出來的鑲材（`51-auto-talent.md`）。
  *
- * 與背包 payload 分流的理由同技能：鑲材不進 `characterBag`、沒有格子索引、
- * 也不能丟到地圖上，硬塞進 `BagDragPayload` 只會多一堆空欄位。
+ * 與背包 payload 分流（同技能）：鑲材不進 `characterBag`、沒有格子索引、不能丟到地圖上。
  */
 export interface TalentAffixDragPayload {
   kind: 'talent-affix';

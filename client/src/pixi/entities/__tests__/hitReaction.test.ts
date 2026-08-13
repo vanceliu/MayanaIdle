@@ -1,8 +1,7 @@
 /**
  * 受擊往後彈（`48-vfx.md` § 48.7.6）。
  *
- * 位移是每幀重算後疊在基準位置上 —— 這裡釘的就是「會回到 0」，
- * 因為累加版本在連續被打時會把實體推走，而且推多遠取決於掉幀。
+ * 位移每幀重算後疊在基準位置上，**必須回到 0**（不可累加）。
  */
 import { describe, it, expect } from 'vitest';
 import { HIT_REACTION_ART, SKILL_FX_ART } from '../../ui/skillFx';

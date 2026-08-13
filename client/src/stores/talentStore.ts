@@ -56,6 +56,8 @@ export interface TalentState {
   unequipAffix: (affixId: number) => Promise<void>;
   bindAffix: (affixId: number, boundParam: string) => Promise<void>;
 
+  reset: () => void;
+
   fuseSlots: (tier: TalentSlotTier) => Promise<TalentSlot | null>;
   fuseAffixes: (affixIds: number[], rng?: Rng) => Promise<FuseAffixResult | null>;
 }
@@ -71,14 +73,8 @@ export function unequippedAffixes(affixes: TalentAffixInstance[]): TalentAffixIn
 }
 
 /**
- * 這個天賦配置**現在可以動用**的天賦格。
- *
- * 天賦配置是換裝，不是複製：天賦格是實體，`templateId` 是單一值
- * （`18-data-schema.md`），同一個格子不可能同時在兩份配置裡跑。
- * 所以「沒被這份配置用到」的格子——不管是全新的、還是擺在別份配置裡的——
- * 一律回到背包供這裡取用；裝進來就等於從那一份搬過來。
- *
- * 全新的排在前面：手上有閒置格時不該去拆別份配置。
+ * 這份天賦配置可動用的天賦格（§ 51.3.2）：沒安裝的 ＋ 擺在別份配置裡的。
+ * 全新的排在前面。
  */
 export function availableSlots(slots: TalentSlot[], templateId: string): TalentSlot[] {
   const free = slots.filter(s => !isSlotInstalled(s));
@@ -96,11 +92,6 @@ export function availableAffixes(
     slots.filter(s => s.templateId === templateId).map(s => s.id),
   );
   return affixes.filter(a => a.slotId === null || !here.has(a.slotId));
-}
-
-/** 這個格子現在擺在哪份配置裡（沒安裝則為 null）——背包詳情要講清楚會從哪搬走 */
-export function slotHomeTemplate(slot: TalentSlot): string | null {
-  return isSlotInstalled(slot) ? slot.templateId : null;
 }
 
 /**
@@ -125,6 +116,21 @@ export function canEquipAffix(
   return true;
 }
 
+/**
+ * 產物候選：同種類、T+1、且**適用類型與投入的兩份有交集**（§ 51.5.2）。
+ * 用交集而不是「集合完全相等」—— 相等的話共用鑲材幾乎合不出東西。
+ */
+function fuseCandidates(d0: TalentAffixDef, d1: TalentAffixDef): TalentAffixDef[] {
+  const shared = d0.appliesTo.filter(t => d1.appliesTo.includes(t));
+  const targetTier = d0.tier + 1;
+  return TALENT_AFFIX_DEFS.filter(
+    d => !d.blocked
+      && d.tier === targetTier
+      && d.kind === d0.kind
+      && d.appliesTo.some(t => shared.includes(t)),
+  );
+}
+
 /** 該類型該種類的合成上限（§ 51.4.3）。共用鑲材走戰鬥池 */
 function fuseCapFor(def: { appliesTo: TalentType[]; kind: TalentAffixKind }): TalentTier {
   return def.appliesTo
@@ -132,12 +138,7 @@ function fuseCapFor(def: { appliesTo: TalentType[]; kind: TalentAffixKind }): Ta
     .reduce((a, b) => (a > b ? a : b));
 }
 
-/**
- * 這幾份鑲材能不能合成（§ 51.5.2）。
- *
- * **UI 與 store 共用這一支**：畫面自己算一套的話，就會出現像 T1＋T2
- * 那樣預覽秀著「T2、成功率 50%」、按下去卻被 store 擋掉的假訊息。
- */
+/** 這幾份鑲材能不能合成（§ 51.5.2）。UI 與 store 共用這一支 */
 export function canFuseAffixes(inputs: (TalentAffixInstance | undefined)[]): boolean {
   if (inputs.length !== FUSE_INPUT_COUNT) return false;
   if (inputs.some(a => !a || a.slotId !== null)) return false;
@@ -146,10 +147,13 @@ export function canFuseAffixes(inputs: (TalentAffixInstance | undefined)[]): boo
   if (defs.some(d => !d)) return false;
   const [d0, d1] = defs as TalentAffixDef[];
 
-  // 同 tier、同種類、同適用類型，且未達該池上限
+  // 同 tier、同種類、且**共用至少一個適用類型**（§ 51.5.2）
   if (d0.tier !== d1.tier || d0.kind !== d1.kind) return false;
-  if (d0.appliesTo.join() !== d1.appliesTo.join()) return false;
-  return d0.tier < fuseCapFor(d0);
+  const shared = d0.appliesTo.filter(t => d1.appliesTo.includes(t));
+  if (shared.length === 0) return false;
+  if (d0.tier >= fuseCapFor(d0)) return false;
+  // 產不出東西就不算合得成
+  return fuseCandidates(d0, d1).length > 0;
 }
 
 export const useTalentStore = create<TalentState>((set, get) => ({
@@ -166,22 +170,14 @@ export const useTalentStore = create<TalentState>((set, get) => ({
   },
 
   /**
-   * 創角配置（§ 51.3.3.1、§ 51.7）：5 個 T1 格 ＋ 4 份鑲材。
-   *
-   * **創角的 5 個直接安裝好**，是 § 51.3.4 的唯一例外 ——
-   * 否則新角色開局要先開信箱與背包才動得了。
-   * 已經有資料就不重發，這個函式在每次載入角色時呼叫都安全。
+   * 創角配置（§ 51.3.3.1、§ 51.7）：5 個 T1 格 ＋ 6 份鑲材，直接安裝好。
+   * 已經有資料就不重發。
    */
   grantStartingIfEmpty: async characterId => {
     const existing = await db.talentSlots.where('characterId').equals(characterId).count();
     if (existing > 0) return;
 
-    /**
-     * § 51.7 的預設配置：5 個 T1 格，其中 3 格鑲好、2 格空著（清單見 `STARTING_LAYOUT`）。
-     *
-     * **鑲材必須鑲進去，不能只丟背包** —— 判定讀的是天賦格，
-     * 起始鑲材留在背包等於新角色完全不會出手。
-     */
+    /* 鑲材必須鑲進天賦格，不能只丟背包 —— 判定讀的是天賦格 */
     await db.transaction('rw', db.talentSlots, db.talentAffixes, async () => {
       const slotIds: number[] = [];
       for (let i = 0; i < STARTING_SLOT_COUNT; i++) {
@@ -212,12 +208,11 @@ export const useTalentStore = create<TalentState>((set, get) => ({
   },
 
   /**
-   * 安裝天賦格到某個類型。
-   *
-   * 來源可以是背包裡的閒置格，也可以是**別份天賦配置**裡的格子——後者等於搬家
-   * （`availableSlots`）。搬家時已鑲的鑲材跟著走，但**不適用新類型的會退回背包**：
-   * 例如常駐的格子搬到補給，補給讀不懂的鑲材留在上面只會變成看不見的死設定。
+   * 安裝天賦格到某個類型。來源含別份配置裡的格子（等於搬家）。
+   * 鑲材跟著走，不適用新類型的退回背包。
    */
+  reset: () => set({ characterId: null, slots: [], affixes: [] }),
+
   installSlot: async (slotId, type, templateId) => {
     const { slots, affixes, characterId } = get();
     if (characterId === null) return;
@@ -237,12 +232,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     await get().load(characterId);
   },
 
-  /**
-   * 拆下天賦格 → 回背包。
-   *
-   * **已鑲的鑲材一併退回背包**（§ 51.3.4），不隨天賦格消失 ——
-   * 鑲材是玩家刷來的實體，拆個格子就把它吃掉沒有道理。
-   */
+  /** 拆下天賦格 → 回背包。已鑲的鑲材一併退回（§ 51.3.4） */
   uninstallSlot: async slotId => {
     const { characterId } = get();
     if (characterId === null) return;
@@ -268,10 +258,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     const occupant = affixes.find(
       a => a.slotId === slotId && a.slotIndex === slotIndex && a.id !== affixId,
     );
-    /*
-     * 第一次鑲入時塞預設參數（`models/talentParams.ts`）。
-     * 不塞的話規則會是「HP 低於 ??」—— 判定拿不到門檻，等於鑲了也不會觸發。
-     */
+    /* 第一次鑲入時塞預設參數（`models/talentParams.ts`） */
     const def = getTalentAffixDef(affix.definitionId);
     const seeded = affix.params ?? (def ? defaultParams(def.ruleId) : null);
 
@@ -284,10 +271,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     await get().load(characterId);
   },
 
-  /**
-   * 重排天賦格（§ 51.3.1）。順序決定判定優先權 ——
-   * 由上往下取第一個成立者，所以「補刀」擺在「普攻」前面才有意義。
-   */
+  /** 重排天賦格（§ 51.3.1）。順序決定判定優先權 */
   reorderSlot: async (slotId, toOrder) => {
     const { characterId, slots } = get();
     if (characterId === null) return;
@@ -334,10 +318,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     await get().load(characterId);
   },
 
-  /**
-   * 綁定指定型／池型的參數。**只能綁一次**（§ 51.4.1）——
-   * 起始發放的是未綁定的，首次鑲入時由玩家選定，之後與掉落品一樣不可更改。
-   */
+  /** 綁定指定型／池型的參數。只能綁一次（§ 51.4.1） */
   bindAffix: async (affixId, boundParam) => {
     const { characterId, affixes } = get();
     if (characterId === null) return;
@@ -396,12 +377,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
 
     let produced: TalentAffixInstance | null = null;
     if (success) {
-      const candidates = TALENT_AFFIX_DEFS.filter(
-        d => !d.blocked
-          && d.tier === targetTier
-          && d.kind === d0.kind
-          && d.appliesTo.join() === d0.appliesTo.join(),
-      );
+      const candidates = fuseCandidates(d0, getTalentAffixDef(inputs[1]!.definitionId)!);
       if (candidates.length === 0) return null;
       const picked = candidates[Math.floor(rng() * candidates.length)];
       produced = {

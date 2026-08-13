@@ -103,8 +103,7 @@ const CHAIN_HOP_OVERLAP = 0.62;
 /**
  * 彈跳連鎖每一段的速度（px/s）。
  *
- * 比一般投射物快 —— 那是已經打出去的東西被彈開，不是重新射一發；
- * 用一般速度會讀成「連續施法好幾次」。
+ * 必須比一般投射物快。
  */
 const CHAIN_BOUNCE_SPEED = 620;
 
@@ -135,9 +134,8 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
   /*
    * 連鎖（§ 48.7.3）：電打到第一隻之後，**從那一隻再往下一隻跳**。
    *
-   * 與齊射的差別在起點 —— 齊射每一發都從施法者出去，連鎖是接力。
-   * 順序照 `targets` 走，也就是實際命中名單：**不會連到沒被打到的怪**，
-   * 否則畫面就在騙人（§ 48.1）。
+   * 與齊射的差別在起點：齊射每一發都從施法者出去，連鎖是接力。
+   * 順序照 `targets` 走，也就是實際命中名單，**不會連到沒被打到的怪**（§ 48.1）。
    */
   if (plan.delivery === 'chain') {
     let fromPtX = muzzleX;
@@ -404,8 +402,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
             });
         /*
          * 徽記與藍環**同時起跑但各走各的長度**（§ 48.8.1）：
-         * 環是 0.3 秒的一下，符號要讀得懂就得停久一點。
-         * 排在環之後的話，玩家會先看到環結束、再冒出一把劍，讀成兩件事。
+         * 環 0.3 秒，符號停留較久。**不可排在環之後。**
          */
         if (plan.emblem) {
           fx.spawn({
@@ -421,7 +418,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
   }
 
   if (plan.landing === 'impact') {
-    /* 有暴擊的話尾巴比較長，時間軸要跟著算，不然最後一段會被切掉 */
+    /* 有暴擊時尾巴較長，時間軸要跟著算 */
     const critMul = targets.some(t => t.crit) ? art.impact.critDurationMul : 1;
     cursor += art.impact.durationMs * critMul;
   }

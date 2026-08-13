@@ -30,64 +30,9 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
-### 自動天賦系統：實作（`51-auto-talent.md` 已定稿，13 份連動文件已同步）
+### 尚未清理的殘留
 
-**前置已完成**：設計定稿、連動文件同步（commit 0f35ee6）。本階段起動程式。
+`components/CombatScriptEditor.tsx`、`PersistentScriptEditor.tsx`、`VillageScriptEditor.tsx`、
+`ScriptEditor.tsx` 四個舊編輯器已無使用端（只剩測試檔引用），可刪。
+`scriptTemplates[].combatRules`／`persistentRules`／`villageRules` 三個陣列已無人讀取。
 
-**不可先行實作**：`51-auto-talent.md` § 51.4.4 阻擋中的兩個鑲材
-（目標正在詠唱、切換目標：召喚本體）—— 怪物側機制未做，兩者必須與機制同階段。
-
-| 階段 | 內容 | 狀態 |
-|---|---|---|
-| 1 | `models/talent.ts`＋`models/mailbox.ts` 型別；`db/seed/talentSeeds.ts` 鑲材定義 89 筆 | ✅ 完成 |
-| 2 | Dexie v18：`talentAffixes`／`talentSlots`／`mailbox` 三張表（**只建表**） | ✅ 完成 |
-| 3 | `stores/talentStore.ts`：持有鑲材、天賦格、安裝／拆下、鑲嵌／卸下、合成；**起始配置與舊規則重置在角色載入時處理**（upgrade 拿不到角色上下文）。**含 22 個測試** | ✅ 完成 |
-| 4 | 取得：升級補發天賦格信、`systems/talentDrops.ts` 鑲材與天賦格掉落（tier 區域分帶、抽取規則）、角色載入時的初始化。**含 16 個測試** | ✅ 完成 |
-| 5 | 判定改接：新增 `systems/talentRules.ts` adapter（天賦格→既有規則形狀），三個 runner 接點改讀它。**evaluator 完全不動**。含 11 個測試 | ✅ 完成 |
-| 6 | 零前置的新條件：戰鬥 15、常駐 9、補給 5；含 Wiki 說明與 13 個測試。**`hp_dropped_recently` 延到階段 7**（需保留短期 HP 歷程，不是零前置） | ✅ 完成 |
-| 7 | 接線項：戰鬥 ctx 帶 `activeEffects` → 目標 debuff／控場免疫／護盾；`hp_dropped_recently` 的 HP 取樣（常駐 loop 維護，不進 store）。含 8 個測試 | ✅ 完成 |
-| 8 | 引擎新能力：`targeting.ts` 目標選擇策略（6 種）、`playerCombatFSM` 走位與鎖定目標。**切換目標與走位消耗出手機會**。含 10 個測試 | ✅ 完成 |
-| 9 | 補給新動作：使用旅館（價格與手動共用 `INN_PRICES`）、僅門檻版販售、素材白名單、多組購買欄位。含 5 個測試 | ✅ 完成 |
-| 10 | UI：天賦面板四分頁（`TalentEditor` ＋ `TalentFusion`），取代三個舊腳本編輯器 | ✅ 完成 |
-| 11 | UI：背包分頁列（一般／天賦）、`BagTalentTab` 鑲材清單與篩選、樣式 | ✅ 完成 |
-| 12 | Wiki：`ScriptsPage` → `TalentsPage`，加鑲材總表（89 筆，含未取得與「尚未開放」標記）、合成成功率、掉落分帶。含 3 個測試 | ✅ 完成 |
-| 13 | 測試：判定、合成機率、掉落分帶與抽取、遷移防線、一實體一格 | ✅ 完成（隨各階段補齊，共 8 個新測試檔） |
-
-**信箱（`52-mailbox.md`）併在階段 4**：首版**只做天賦格發放**（§ 52.0），
-不做公告分頁、補償、里程碑與其他項目型別。天賦格的等級發放是它唯一的內容來源。
-
-| 階段 | 內容 | 狀態 |
-|---|---|---|
-| 4a | `mailbox` 表 ＋ `systems/mailbox.ts` 發放／領取／清理，`stores/mailboxStore.ts`。**含 12 個測試** | ✅ 完成 |
-| 4b | 信箱面板 ＋ `PanelDock` 按鈕與未領封數徽章；領取後天賦格進背包（未安裝） | ✅ 完成 |
-| 4c | 換版清理：`BUILD_INFO.version` 改變時刪已領取的信，**未領取一律保留**。已接進角色載入 | ✅ 完成 |
-
-**驗證**：13 階段全數完成。`npx tsc -b` 乾淨、`npx vitest run` **234 檔 2967 個測試全過**、
-0 個 unhandled rejection。
-
-**尚未清理的殘留**（等實機驗證過再刪，免得要回退時沒得看）：
-
-| 檔案 | 狀態 |
-|---|---|
-| `components/CombatScriptEditor.tsx` | 已無人使用，只剩兩個測試檔還在引用 |
-| `components/PersistentScriptEditor.tsx` | 已無人使用 |
-| `components/VillageScriptEditor.tsx` | 已無人使用 |
-| `components/ScriptEditor.tsx` | 原本就標 legacy |
-| `scriptTemplates[].combatRules` 等三個陣列 | 判定已改讀天賦格，欄位還在但沒人讀 |
-
-**還沒做的**：`51-auto-talent.md` § 51.4.1 的 `params` 欄位（玩家設的 X%／N／技能名）
-目前只有資料層，**編輯器還不能改參數** —— 鑲材鑲進去之後用的是預設值。
-下一步要在 `TalentEditor` 加參數編輯。
-
-### 未排入階段的既有問題
-
-與自動天賦、介面風格都無關，尚未安排：
-
-- **低血量警示不存在**：`App.css` 只有負重的 `.weight-bar.is-critical`，
-  HP 沒有對應 class —— HP 8% 與 HP 78% 除了長度外完全一樣。
-  對比預算花在永遠不變的框上，真正該喊的地方是啞的
-- **`:focus-visible` 為 0**：`App.css` 有 3 個 `:focus`（全在輸入框且接 `outline: none`），
-  沒有任何 `:focus-visible`，鍵盤焦點在加粗彩框之後更看不見
-- **面板圖示用 emoji**：`PANEL_ICONS`（`stores/panelWindowStore.ts`）與 `TownView` 的
-  `FACILITIES` 用 emoji，專案已有 SVG 圖示系統（`GameIcon` + `assets/icons/`）卻沒用在這兩處；
-  `panelWindowStore.ts` 註解記錄的「圖示撞號兩次」即其症狀

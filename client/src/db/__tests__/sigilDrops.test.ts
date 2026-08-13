@@ -138,8 +138,7 @@ describe('印記掉落（§ 27.8）', () => {
 
 /**
  * § 30.2：六種印記共用同一個圖示，只用顏色區分。
- * 印記走 `icon` + `iconColor`，不吃素材的 `iconType`／`iconTier` 色階 ——
- * 那套色階表達的是素材稀有度，套在印記上會讓玩家把印記讀成素材。
+ * 印記走 `icon` + `iconColor`，**不吃**素材的 `iconType`／`iconTier` 色階。
  */
 describe('印記圖示（§ 30.2）', () => {
   const ALL_SIGILS = SIGIL_DEFINITIONS.map(d => d.name);

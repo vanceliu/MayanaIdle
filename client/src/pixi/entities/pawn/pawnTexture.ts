@@ -1,9 +1,7 @@
 /**
  * 把角色剪影烘成貼圖 —— 每個造型 × 4 朝向各一張，建立時烘一次。
  *
- * 一個造型是幾十條 bezier，每幀重畫等於把 CPU 花在畫同一張圖上；
- * 造型在遊戲中不會改變，所以烘完之後只換 texture
- * （`40-pixijs-migration.md` § 10）。
+ * 造型在遊戲中不會改變，烘完之後只換 texture（`40-pixijs-migration.md` § 10）。
  */
 import { Texture } from 'pixi.js';
 import type { Appearance } from '../../../models/appearance';
@@ -29,7 +27,7 @@ export const PAWN_TEX_H = 56;
 export const PAWN_ANCHOR_X = 24;
 export const PAWN_ANCHOR_Y = 54;
 
-/** 超取樣倍率：烘大一倍再縮著用，鏡頭拉近時才不會糊 */
+/** 超取樣倍率：烘大一倍再縮著用 */
 export const PAWN_BAKE_SCALE = 2;
 
 /** 地面陰影由地圖那層負責，不烘進角色貼圖 —— 烘進去會跟著角色一起被排序遮擋 */

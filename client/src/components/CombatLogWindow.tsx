@@ -62,12 +62,12 @@ export function clampLogPosition(pos: LogPosition, size: { width: number; height
 /**
  * 調整大小後的位置：讓**下緣停在原處**（等同往上長），再把整個視窗收進畫面。
  *
- * 與 `clampLogPosition` 分開的理由：
- *  - 拖曳允許把視窗收到只剩 40px 露出（刻意的，想把它塞到邊邊）
- *  - 改變大小不是玩家在挪位置，長出去的部分應該自動收回來
+ * 與 `clampLogPosition` 分開：
+ *  - 拖曳允許把視窗收到只剩 40px 露出
+ *  - 改變大小時長出去的部分一律收回畫面內
  *
- * 沒拖曳過時視窗靠 CSS `bottom` 定位，長高自然往上長；但拖曳過之後改用 `top`
- * 定位（`.is-moved` 會把 `bottom` 收掉），長高就變成往下長而衝出畫面底部。
+ * 沒拖曳過時視窗靠 CSS `bottom` 定位；拖曳過之後改用 `top` 定位
+ * （`.is-moved` 會把 `bottom` 收掉）。
  */
 export function resizeLogPosition(
   bottomAnchor: number,
@@ -87,10 +87,8 @@ export function resizeLogPosition(
  */
 export function CombatLogWindow() {
   /*
-   * 手機改成貼在下方 HUD 帶上的抽屜（`47-mobile.md`）：
-   * 全寬、不可拖曳。393px 寬的畫面沒有「把視窗挪到不擋路的地方」這種空間，
-   * 拖曳只會讓玩家把日誌弄丟。`▲` 的三段高度照舊 ——
-   * 放大時蓋住地圖是刻意的設計，不因為換成手機就改掉。
+   * 手機改成貼在下方 HUD 帶上的抽屜（`47-mobile.md`）：全寬、不可拖曳。
+   * `▲` 的三段高度照舊，放大時蓋住地圖。
    */
   const isMobile = useIsMobile();
   const [logSize, setLogSize] = useState<0 | 1 | 2>(0);

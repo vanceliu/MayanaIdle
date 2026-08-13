@@ -79,7 +79,7 @@ const applyBtn = (name: string) =>
 
 /*
  * 同一句話會同時出現在兩個區塊（印記說明 vs 消耗行、詞綴列的原因 vs 底部訊息），
- * 所以斷言一律指名區塊，不用全域 getByText —— 否則測到的是哪一個並不確定。
+ * 斷言一律指名區塊，不可用全域 getByText。
  */
 const costText = () => document.querySelector('.sigil-cost')!.textContent ?? '';
 const footerText = () => document.querySelector('.sigil-footer-msg')!.textContent ?? '';

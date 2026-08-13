@@ -91,10 +91,10 @@ describe('鑲材與天賦格掉落（`27-drop-table.md` § 27.9）', () => {
 
     it('Boss 掉率是一般怪的 2 倍', () => {
       // 取一個介於一般怪與 Boss 掉率之間的 roll：一般怪不中、Boss 中
-      // T1 一般怪 1% → 掉落值 10；Boss 2% → 20。roll 0.015 * 1000 = 15
-      const between = seq([0.015, 0, 0]);
+      // T1 一般怪 3% → 掉落值 30；Boss 6% → 60。roll 0.045 * 1000 = 45
+      const between = seq([0.045, 0, 0]);
       expect(rollTalentAffixDrop(10, false, 1, between)).toBeNull();
-      expect(rollTalentAffixDrop(10, true, 1, seq([0.015, 0, 0]))).not.toBeNull();
+      expect(rollTalentAffixDrop(10, true, 1, seq([0.045, 0, 0]))).not.toBeNull();
     });
 
     it('掉出來的鑲材一定適用被抽中的類型', () => {
@@ -129,4 +129,5 @@ describe('鑲材與天賦格掉落（`27-drop-table.md` § 27.9）', () => {
       }
     });
   });
+
 });

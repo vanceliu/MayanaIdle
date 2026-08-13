@@ -95,7 +95,7 @@ export class WallLayer {
     return graphic;
   }
 
-  /** 樹冠大小與高度也依格座標微調，成片林子才不會像複製貼上 */
+  /** 樹冠大小與高度依格座標微調 */
   private drawTree(sx: number, sy: number, foliage: number, trunk: number, x: number, y: number): Graphics {
     const scale = 0.85 + tileVariance(x, y, 4) * 0.3;    // 0.85 ~ 1.15
     const lean = Math.round((tileVariance(x, y, 5) - 0.5) * 6);
@@ -126,7 +126,7 @@ export class WallLayer {
 
     const points: number[] = [];
     for (let i = 0; i < sides; i++) {
-      // 上半圈才是輪廓，下半壓平成貼地的底邊，石頭才不會浮起來
+      // 上半圈是輪廓，下半壓平成貼地的底邊
       const angle = Math.PI + (Math.PI * i) / (sides - 1);
       const jitter = 0.7 + tileVariance(x, y, 20 + i) * 0.6;
       points.push(
@@ -222,9 +222,8 @@ export class WallLayer {
   }
 
   /**
-   * 堆放的雜物。四種樣式依格座標輪替，成排的裝飾才不會像複製貼上：
-   * 箱堆、陶罐、布捆、散落的碎片。可通行但不生怪，
-   * 用來雕塑怪物生成分佈而不擋路。
+   * 堆放的雜物：箱堆、陶罐、布捆、散落的碎片，四種樣式依格座標輪替。
+   * 可通行但不生怪。
    */
   private drawDecoration(sx: number, sy: number, color: number, x = 0, y = 0): Graphics {
     const graphic = new Graphics();

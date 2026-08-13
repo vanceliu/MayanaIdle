@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import {
   useTalentStore,
@@ -18,27 +18,22 @@ import {
   type TalentSlot,
   type TalentType,
 } from '../models/talent';
-import { getTalentAffixDef } from '../db/seed/talentSeeds';
+import { getTalentAffixDef, PENDING_AFFIX_LABELS } from '../db/seed/talentSeeds';
 import { getTalentAffixIcon, MATERIAL_TIER_COLORS } from '../models/iconMap';
 import { GameIcon } from './GameIcon';
 import { useIsDragOver, useIsDragging, useDragStore, hitTestDropTarget } from '../stores/dragStore';
+import { slotSkipReason, type SlotSkipReason } from '../systems/talentRules';
+import { PersistentSettings } from './PersistentSettings';
+import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 import { BindConfirmModal } from './BindConfirmModal';
 import { getParamFields, type ParamField } from '../models/talentParams';
 import { getItemById } from '../models/items';
 import { COMBAT_CONDITION_LABELS, COMBAT_ACTION_LABELS, PERSISTENT_CONDITION_LABELS, PERSISTENT_ACTION_LABELS } from '../models/scriptEngine';
 import { VILLAGE_CONDITION_LABELS, VILLAGE_ACTION_LABELS } from '../models/villageScript';
 
-/**
- * 天賦格編輯（`51-auto-talent.md` § 51.10）。
- *
- * 取代舊的三個腳本編輯器：規則不再是玩家自由新增的陣列，
- * 而是「有幾個天賦格、每格鑲了什麼」。
- */
+/** 天賦格編輯（`51-auto-talent.md` § 51.10） */
 
-/**
- * 鑲材顯示名稱。**標籤一律取自既有常數**，與 Wiki 共用同一份 ——
- * 這裡自己寫一份的話，面板改名 Wiki 不會跟著動（§ 43.4.12）。
- */
+/** 鑲材顯示名稱。標籤取自既有常數，與 Wiki 共用同一份（§ 43.4.12） */
 export function affixLabel(affix: TalentAffixInstance): string {
   const def = getTalentAffixDef(affix.definitionId);
   return def ? affixLabelOf(def) : '未知鑲材';
@@ -52,7 +47,8 @@ export function affixLabelOf(def: TalentAffixDef): string {
   for (const m of maps) {
     if (def.ruleId in m) return m[def.ruleId];
   }
-  return def.ruleId;
+  // 尚未接上判定引擎的鑲材，標籤表裡查不到（`talentSeeds.ts`）
+  return PENDING_AFFIX_LABELS[def.ruleId] ?? def.ruleId;
 }
 
 /**
@@ -83,10 +79,8 @@ export function AffixIcon({ affix, size = 18 }: { affix: TalentAffixInstance; si
 }
 
 /**
- * 參數編輯（`51-auto-talent.md` § 51.4.1「有序參數一律由玩家自訂」）。
- *
- * 沒有這個，規則就是「HP 低於 ??」—— 判定拿不到門檻，鑲了也不會觸發。
- * 欄位由 `models/talentParams.ts` 依 `ruleId` 宣告，這裡只負責畫。
+ * 參數編輯（`51-auto-talent.md` § 51.4.1）。
+ * 欄位由 `models/talentParams.ts` 依 `ruleId` 宣告。
  */
 function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixInstance }) {
   const setAffixParams = useTalentStore(s => s.setAffixParams);
@@ -106,12 +100,7 @@ function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixIns
     setBinding(null);
   }
 
-  /*
-   * 綁定用的下拉：選了不直接寫入，先跳確認。
-   *
-   * **是函式不是元件**：寫成 `<BindSelect/>` 的話，每次 render 都會產生一個新的
-   * 元件型別，React 會把整個 `<select>` 卸載重建 —— 下拉會在打字／選取途中重置。
-   */
+  /* 綁定用的下拉：選了先跳確認再寫入。是函式不是元件（元件會在 render 時重建） */
   function bindUI(label: string, options: { value: string; name: string }[]) {
     return (
       <>
@@ -159,6 +148,20 @@ function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixIns
     );
   }
 
+  if (field.kind === 'boolean') {
+    return (
+      <label className="talent-param">
+        <span>{field.label}</span>
+        <input
+          type="checkbox"
+          checked={(params[field.key] as boolean | undefined) ?? field.def}
+          onChange={e => write(e.target.checked)}
+          onClick={e => e.stopPropagation()}
+        />
+      </label>
+    );
+  }
+
   if (field.kind === 'select') {
     return (
       <label className="talent-param">
@@ -180,11 +183,7 @@ function ParamInput({ field, affix }: { field: ParamField; affix: TalentAffixIns
       field.filter === 'attack' ? sk.type === 'attack' : sk.type === 'buff' || sk.type === 'heal');
     const def = getTalentAffixDef(affix.definitionId);
 
-    /*
-     * 指定型：**綁定後不可更改**（§ 51.4.1）。
-     * 未綁定時挑一次就定死，之後只顯示不給改 —— 讓它像自選型一樣隨便換，
-     * 「想放某一招就得刷到綁那一招的鑲材」這條 tier 軸就沒有意義了。
-     */
+    /* 指定型：未綁定時挑一次就定死，之後只顯示不給改（§ 51.4.1） */
     if (def?.form === 'fixed') {
       if (affix.boundParam) {
         const bound = skills.find(sk => sk.id === affix.boundParam);
@@ -245,6 +244,8 @@ function Slot({
   slot, slotIndex, occupant,
 }: { slot: TalentSlot; slotIndex: number | null; occupant?: TalentAffixInstance }) {
   const [picking, setPicking] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useDismissOnOutside(wrapRef, picking, () => setPicking(false));
   const affixes = useTalentStore(s => s.affixes);
   const slots = useTalentStore(s => s.slots);
   const equipAffix = useTalentStore(s => s.equipAffix);
@@ -287,7 +288,7 @@ function Slot({
   }
 
   return (
-    <div className="talent-slot-wrap">
+    <div className="talent-slot-wrap" ref={wrapRef}>
       <button
         className={`talent-slot is-empty${isOver ? ' drag-over' : ''}${dragging ? ' can-drop' : ''}`}
         onClick={() => setPicking(v => !v)}
@@ -314,6 +315,11 @@ function Slot({
   );
 }
 
+const SKIP_HINT: Record<SlotSkipReason, string> = {
+  'no-action': '實作槽是空的，這一列不進判定',
+  unresolved: '技能／道具還沒選定，這一列不進判定',
+};
+
 function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
   const affixes = useTalentStore(s => s.affixes);
   const uninstallSlot = useTalentStore(s => s.uninstallSlot);
@@ -325,6 +331,8 @@ function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
   const isOver = useIsDragOver('talent-row', order);
   const inSlot = affixes.filter(a => a.slotId === slot.id);
   const action = inSlot.find(a => a.slotIndex === null);
+  // 沒進判定的列要看得出來。停用不掛 —— 勾選框已經表達了（§ 51.3.1）
+  const skip = slot.enabled ? slotSkipReason(slot, affixes) : null;
 
   /** 拖把手才是拖曳來源：整列可拖的話，改參數時一動就會被當成拖曳 */
   function startDrag(e: React.PointerEvent) {
@@ -366,13 +374,15 @@ function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
         ⠿
       </span>
       <span className="talent-row-order">{order + 1}</span>
+      {skip && (
+        <span className="talent-row-skip" title={SKIP_HINT[skip]} aria-label={SKIP_HINT[skip]}>
+          ⚠
+        </span>
+      )}
       <label className="talent-row-enable" title={slot.enabled ? '停用這一列' : '啟用這一列'}>
         <input type="checkbox" checked={slot.enabled} onChange={() => toggleSlot(slot.id!)} />
       </label>
-      {/*
-        條件一行、實作一行。條件多的時候自己換行，不做橫向捲動 ——
-        捲動要拖過去才看得到後面設了什麼，而規則本來就該一眼讀完。
-      */}
+      {/* 條件一行、實作一行，條件多時換行 */}
       <div className="talent-row-slots">
         <div className="talent-row-conds">
           {Array.from({ length: conditionSlotCount(slot.tier) }, (_, i) => (
@@ -412,6 +422,8 @@ export function TalentTypeEditor({ type }: { type: TalentType }) {
   const tailOver = useIsDragOver('talent-row', mine.length);
   const installOver = useIsDragOver('talent-install', -1);
   const [adding, setAdding] = useState(false);
+  const addRef = useRef<HTMLLIElement>(null);
+  useDismissOnOutside(addRef, adding, () => setAdding(false));
   const dragging = useIsDragging();
 
   // 同 tier 的天賦格一模一樣，堆成一列帶數量
@@ -439,12 +451,9 @@ export function TalentTypeEditor({ type }: { type: TalentType }) {
           data-drop-kind="talent-row"
           data-drop-index={String(mine.length)}
         />
-        {/*
-          安裝＝清單末尾的一顆 `＋`，同時是拖放落點。
-          數量走角標，不寫成一整句話 —— 那是每次打開都要重讀一遍的雜訊。
-        */}
+        {/* 安裝鈕，同時是拖放落點。數量走角標 */}
         {spare.length > 0 && (
-          <li className="talent-add-wrap">
+          <li className="talent-add-wrap" ref={addRef}>
             <button
               className={`talent-add${installOver ? ' drag-over' : ''}`}
               data-drop-kind="talent-install"
@@ -475,6 +484,8 @@ export function TalentTypeEditor({ type }: { type: TalentType }) {
           </li>
         )}
       </ul>
+      {/* 緊急撤退與戰鬥後等待不是天賦規則，是常駐的門檻設定（§ 3.13） */}
+      {type === 'persistent' && <PersistentSettings />}
     </div>
   );
 }

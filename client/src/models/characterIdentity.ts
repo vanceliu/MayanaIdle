@@ -9,16 +9,11 @@
 /**
  * § 19.4：中英數 + 符號 `- _ ~ = .`，2~12 字。符號可放在任何位置（含開頭與結尾）。
  *
- * 只有兩條實質限制：
- * 1. 不可全部都是符號 —— 純符號名稱難以辨識與稱呼
- * 2. 不可有空白（含全形）—— 對齊與冒名的主要來源
+ * 兩條實質限制：
+ * 1. 不可全部都是符號
+ * 2. 不可有空白（含全形）
  *
- * 刻意不開放的符號與理由：
- * - `< > & " '`：雖然 React 會轉義，但混進名稱只會製造閱讀與回報上的困擾
- * - `/ \ %`：容易與網址、路徑、百分比編碼混淆
- * - `| , ;`：常見的分隔符，混進資料時難以辨別邊界
- * - `+ * ?`：查詢字串與萬用字元語意
- * - emoji 與控制字元：跨平台顯示不一致
+ * 不開放：`< > & " '`、`/ \ %`、`| , ;`、`+ * ?`、emoji 與控制字元。
  */
 export const CHARACTER_NAME_PATTERN = /^(?=.*[A-Za-z0-9一-龥])[A-Za-z0-9一-龥\-_~=.]{2,12}$/;
 
@@ -52,7 +47,7 @@ const ALLOWED_CHAR_PATTERN = /^[A-Za-z0-9一-龥\-_~=.]+$/;
 /** 至少要有一個中英數 */
 const HAS_ALNUM_PATTERN = /[A-Za-z0-9一-龥]/;
 
-/** 通過回傳 null，否則回傳錯誤代碼 */
+/** 通過回傳 null，未通過回傳錯誤代碼 */
 export function validateCharacterName(name: string): CharacterNameError | null {
   const normalized = normalizeCharacterName(name);
   if (normalized.length === 0) return 'empty';

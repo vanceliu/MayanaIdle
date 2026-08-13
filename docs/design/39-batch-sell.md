@@ -88,7 +88,6 @@
 - 判定用 `hasMaterialUsage()`（`systems/craftMaterialUsage.ts`），涵蓋裝備配方素材
   （印記歸 `scroll`，本來就不在素材篩選內，見 `30-items.md` § 30.2 印記）
 - 被保護而未列入販售的素材要**明確列出來**，不可靜默漏掉 ——
-  否則玩家會以為「Tier 4 以下」真的全賣了
 - 取消勾選即回到純粹依 `iconTier` 篩選的舊行為
 
 **武器店 / 防具店（裝備）：**

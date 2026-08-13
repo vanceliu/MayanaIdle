@@ -133,7 +133,7 @@ export function SigilMaster() {
     return allTemplates.find(t => t.id === it.templateId)?.acquireType === 'starter';
   }
 
-  /** 這件裝備所有印記都不受理，清單上直接標出來，不必點進去才知道 */
+  /** 這件裝備所有印記都不受理，清單上直接標出來 */
   function inertReason(it: EquipmentInstance): string | null {
     if (isStarterGear(it)) return '新手裝';
     if ((it.affixes?.length ?? 0) === 0) return '無詞綴';

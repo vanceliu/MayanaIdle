@@ -29,7 +29,7 @@ export const useWindowLayerStore = create<WindowLayerState>((set, get) => ({
 
   focusWindow(key) {
     const order = get().order;
-    // 已經在最上層就不要寫入狀態，否則每次 pointerdown 都會觸發整批視窗重繪
+    // 已經在最上層就不寫入狀態（避免每次 pointerdown 觸發整批視窗重繪）
     if (order[order.length - 1] === key) return;
     set({ order: [...order.filter(k => k !== key), key] });
   },

@@ -21,7 +21,7 @@ export async function loadEquipmentTemplates(): Promise<EquipmentTemplate[]> {
   return cached;
 }
 
-/** 測試在重新 seed 之間必須清掉，否則會拿到上一輪的模板 */
+/** 測試在重新 seed 之間必須清掉 */
 export function resetEquipmentTemplateCache(): void {
   cached = null;
 }

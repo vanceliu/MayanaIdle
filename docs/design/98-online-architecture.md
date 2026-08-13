@@ -149,7 +149,7 @@ UPDATE characters SET gold = gold + 100 WHERE id = 123;
 
 以下事件觸發立即 flush 該玩家的 dirty state：
 
-| 事件 | 理由 |
+| 事件 | 備註 |
 |---|---|
 | 玩家登出 | 確保進度不丟 |
 | Server shutdown（graceful） | 全部玩家 flush |
@@ -299,7 +299,7 @@ PostgreSQL 單機能扛 5,000+ writes/s，100/s 完全無壓力。
 
 ---
 
-## 12. 風險與取捨
+## 12. 風險緩解
 
 | 風險 | 影響 | 緩解 |
 |---|---|---|

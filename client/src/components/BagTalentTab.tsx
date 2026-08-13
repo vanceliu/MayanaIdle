@@ -17,16 +17,11 @@ import { useGameStore } from '../stores/gameStore';
 
 /**
  * 背包的「天賦」分頁（`35-inventory-constraints.md` § 35.21）。
- *
- * 收未安裝的天賦格與未鑲入的鑲材。**不佔背包格、不計負重、不可存倉庫**；
- * 顯示層在背包、資料層在獨立實例表（`18-data-schema.md` § 18.9）。
- *
- * **格子與一般分頁完全一致**：同欄數、同 `.bag-grid` 列高、24px 圖示 ＋ 短名 ＋ 角標，
- * 空位一樣畫成空格，詳情也走同一顆 `.bag-tooltip`。
- * 兩個分頁的格子長得不一樣的話，切過去會像換了一個遊戲。
+ * 收未安裝的天賦格與未鑲入的鑲材：不佔格、不計重、不可存倉庫。
+ * 格子與一般分頁共用同一套（§ 35.21.3）。
  */
 
-/** 詳情框寬度，與 `BagPanel` 同值 —— 靠右的格子要靠這個往左收才不會被切掉 */
+/** 詳情框寬度，與 `BagPanel` 同值；靠右的格子依此往左收 */
 const TOOLTIP_WIDTH = 220;
 
 type Cell = TalentBagCell;
@@ -43,11 +38,7 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
   const [kind, setKind] = useState<'all' | 'condition' | 'action'>('all');
   const [type, setType] = useState<TalentType | 'all'>('all');
   const [tooltip, setTooltip] = useState<{ cell: Cell; x: number; y: number } | null>(null);
-  /*
-   * 背包顯示的是「這份天賦配置沒用到的」，不是「完全沒安裝的」——
-   * 天賦配置是換裝（`51-auto-talent.md` § 51.3.2），別份配置佔著的格子
-   * 對現在這一頁而言就是可動用的庫存。
-   */
+  /* 顯示這份天賦配置沒用到的，含別份配置佔著的（§ 51.3.2） */
   const spareSlots = availableSlots(slots, activeTemplateId);
   const loose = availableAffixes(affixes, slots, activeTemplateId).filter(a => {
     const def = getTalentAffixDef(a.definitionId);
@@ -60,12 +51,7 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
   // 整理寫下的位置優先，沒有位置的排在後面維持取得順序（`models/talentBag.ts`）
   const cells = applyTalentBagOrder(buildTalentBagCells(spareSlots, loose), order);
 
-  /**
-   * 拖鑲材到天賦格（`51-auto-talent.md` § 51.10）。
-   *
-   * 走 `dragStore` 的指標拖放，不是 HTML5 drag —— 那一套在觸控裝置完全不觸發
-   * （`47-mobile.md`），手機玩家會變成只能用下拉選單。
-   */
+  /** 拖鑲材到天賦格（§ 51.10）。走 `dragStore` 指標拖放，不用 HTML5 drag */
   function showTooltipFor(el: HTMLElement, cell: Cell) {
     const rect = el.getBoundingClientRect();
     let x = rect.left;
@@ -102,11 +88,7 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
       await equipAffix(item.payload.affixId, target.index, target.sub);
       return;
     }
-    /*
-     * 天賦格 → 編輯區＝安裝到那個類型。
-     * 落在 `talent-row` 也算安裝：玩家的意圖是「放進這個清單」，
-     * 要求他精準命中安裝區只是多一道關卡。
-     */
+    /* 天賦格 → 編輯區＝安裝。落在 `talent-row` 也算 */
     if (item.payload.kind === 'talent-slot-item'
       && (target.kind === 'talent-install' || target.kind === 'talent-row')) {
       const editor = document.querySelector<HTMLElement>('[data-talent-type]');
@@ -115,11 +97,7 @@ export function BagTalentTab({ rows, order }: { rows: number; order: TalentBagOr
     }
   }
 
-  /**
-   * 詳情走 `.bag-tooltip`／`.bag-tooltip-content`，與一般分頁同一顆框、同一組 class。
-   * 原本掛在 `title=` 上的是瀏覽器原生提示：延遲一秒才出現、樣式不受控、
-   * 觸控完全不會觸發，跟旁邊的背包看起來像兩套東西。
-   */
+  /** 詳情走 `.bag-tooltip`，與一般分頁同一組 class */
   function renderTooltipContent(cell: Cell) {
     if (cell.kind === 'slot') {
       return (

@@ -6,8 +6,8 @@ import { getDistance } from './lineOfSight';
 /**
  * 目標選取的純函式版本（`41-arpg-combat.md` § 3.4／§ 3.5）。
  *
- * 抽出來的理由：戰鬥腳本的「AoE 命中數」條件必須算出**和實際出手完全一樣**的命中集合，
- * 否則會出現「條件說會打到 3 隻、真的放下去只打到 1 隻」的落差。共用同一份實作才不會走鐘。
+ * 戰鬥腳本的「AoE 命中數」條件必須算出**和實際出手完全一樣**的命中集合，
+ * 兩邊共用這一份實作。
  */
 export interface TargetCandidate {
   id: string;

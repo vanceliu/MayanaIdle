@@ -227,8 +227,12 @@ function moveMonstersSafe(
       continue;
     }
 
-    // Stop only at a position that can actually attack the player.
-    if (dist <= TRIGGER_DISTANCE && hasLineOfSight(monster.position, playerPos, map)) {
+    /*
+     * 停在**打得到**的位置就好，不必貼身 —— 遠程與魔法怪有自己的射程
+     * （`41-arpg-combat.md` § 5.2）。射程還沒回填時退回近戰距離。
+     */
+    const stopDistance = monster.attackRange ?? TRIGGER_DISTANCE;
+    if (dist <= stopDistance && hasLineOfSight(monster.position, playerPos, map)) {
       updated.push(monster);
       continue;
     }
@@ -253,7 +257,7 @@ function moveMonstersSafe(
           map,
           playerSnapped,
           monsterSnapped,
-          TRIGGER_DISTANCE,
+          stopDistance,
           occupiedSet,
         );
         const newPath = attackPosition

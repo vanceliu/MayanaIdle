@@ -1,17 +1,17 @@
 import { db } from '../db/database';
 import { CURRENT_DATA_VERSION } from '../config';
 import { buildCharacterArchive, buildSharedWarehouseArchive } from './legacyArchive';
+import { talentBagOrderStorageKey } from '../models/talentBag';
+import { mailPurgeStorageKey } from './mailbox';
 import { bagLayoutStorageKey } from '../models/bagLayout';
 
 /**
  * 資料版本淘汰：`CURRENT_DATA_VERSION` 提高後，清除所有低於該版本的角色與其全部附屬資料。
  *
- * 這是「一次性打掉重來」的唯一開關 —— 改 `config.ts` 的 `CURRENT_DATA_VERSION` 即可觸發，
- * 不需要動 Dexie 的 schema 版本（那是給結構遷移用的，兩者互相獨立）。
+ * 這是「一次性打掉重來」的唯一開關：改 `config.ts` 的 `CURRENT_DATA_VERSION` 即可觸發。
+ * 與 Dexie 的 schema 版本互相獨立，不需要動它。
  *
- * 必須把附屬資料一起清乾淨，否則：
- * - 會留下永遠不會被讀取的孤兒列
- * - 新角色取得相同的自增 id 時，會撿到上一個角色的裝備與背包
+ * **附屬資料必須一起清乾淨**（characterId 會被重用）。
  */
 
 /** 共用倉庫為帳號層級，與角色的 dataVersion 無關，故僅在該帳號「所有角色都被淘汰」時才清除 */
@@ -43,16 +43,29 @@ function removeLocalStorageKey(key: string): void {
 
 /** 清除單一角色與其附屬資料（不含帳號層級的共用倉庫） */
 async function purgeCharacter(characterId: number, characterUuid?: string): Promise<void> {
-  await db.equipmentInstances.where('ownerId').equals(characterId).delete();
+  /*
+   * **必須排除共用倉庫**：共用倉庫裝備的 `ownerId` 是 userId（`19-account-character.md` § 19.7），
+   * 而 users 與 characters 是兩條各自獨立的自增序列 —— 單帳號玩家必然 userId 1、
+   * 第一隻角色 id 1，不過濾就會把整批共用倉庫裝備一起刪掉。
+   */
+  await db.equipmentInstances.where('ownerId').equals(characterId)
+    .filter(item => item.storageType !== 'shared')
+    .delete();
   await db.characterBag.where('characterId').equals(characterId).delete();
   await db.characterStorage.where('characterId').equals(characterId).delete();
   // 個人倉庫（storageType === 'personal'）以 characterId 綁定
   await db.warehouses.where('characterId').equals(characterId).delete();
+  // 天賦與信箱同樣以 characterId 綁定，不清的話 id 重用時會被新角色撿到
+  await db.talentSlots.where('characterId').equals(characterId).delete();
+  await db.talentAffixes.where('characterId').equals(characterId).delete();
+  await db.mailbox.where('characterId').equals(characterId).delete();
   await db.characters.delete(characterId);
 
   removeLocalStorageKey(`mayana_prefs_${characterId}`);
   // 背包格子位置走獨立 key（§ 35.17），characterId 重用時不清會被新角色撿到
   removeLocalStorageKey(bagLayoutStorageKey(characterId));
+  removeLocalStorageKey(talentBagOrderStorageKey(characterId));
+  removeLocalStorageKey(mailPurgeStorageKey(characterId));
   if (characterUuid) removeLocalStorageKey(`mayana_stats_upload_${characterUuid}`);
 }
 

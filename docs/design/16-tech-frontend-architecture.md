@@ -194,22 +194,18 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | `.hud-bottomcenter` | `ExploreBar` ＋ `QuickSlotBar`（10 格一排） |
 | `.hud-bottomright` | `PanelDock`（六顆一列）＋ `GameToolbar`（只剩 ⚙），合起來是一整排（`47-mobile.md` § 47.6） |
 
-> **HUD 容器不可吃滑鼠事件。** `.town-view` 曾因為保留舊的 `height: 100%`
-> 又改成絕對定位，變成一塊 830×滿高的透明板壓在地圖上，玩家完全點不到地圖與 NPC。
+> **HUD 容器不可吃滑鼠事件。**
 > 容器一律 `pointer-events: none`，只有裡面的按鈕／面板 `pointer-events: auto`。
 > **四個 `.hud-*` 島同樣適用**：島的盒子包含島內元素之間的空隙，以及城鎮那格
-> `visibility: hidden` 的 `ExploreBar` 佔位，全都是看不見卻會擋點擊的區域 ——
-> `.hud-bottomcenter` 的右緣曾剛好切在商店購買鈕中間，導致按鈕只有右側十幾 px
-> 點得動。`CombatLogWindow` 雖然也掛 `.hud`，但它是實體視窗，不在此列。
-> 改完要用 `document.elementFromPoint()` 驗「真滑鼠會打到誰」——
-> 用 `dispatchEvent` 直接對 canvas 派事件會繞過命中測試，測不出這種問題。
+> `visibility: hidden` 的 `ExploreBar` 佔位。
+> `CombatLogWindow` 雖然也掛 `.hud`，但它是實體視窗，不在此列。
+> 改完要用 `document.elementFromPoint()` 驗命中；不可用 `dispatchEvent` 直接對 canvas 派事件。
 
-**地圖選擇器：** 觸發鈕與下拉選單**必須同寬**（都 340px）。
-選單另設 `min-width` 會比鈕寬，貼在右上角時直接頂出視窗外。
+**地圖選擇器：** 觸發鈕與下拉選單**必須同寬**（都 340px），選單不可另設 `min-width`。
 
 **城鎮與野外的一致性：** 城鎮沒有探索控制，但 `ExploreBar` 仍包在
-`.explore-bar-slot` 內以 `visibility: hidden` 保留位置（`.is-hidden`），
-否則快捷格會上下位移。不可改用「城鎮不渲染 ExploreBar」的寫法。
+`.explore-bar-slot` 內以 `visibility: hidden` 保留位置（`.is-hidden`）。
+不可改用「城鎮不渲染 ExploreBar」的寫法。
 
 #### § 32.3.1 戰鬥紀錄視窗（CombatLogWindow）
 
@@ -1044,7 +1040,7 @@ interface TooltipProps {
 - **可拖曳**：僅標題列可拖，位置夾制在 viewport 內；開啟時先把預設座標夾回可視範圍
 - **點擊置頂**：z-index 由 `panelWindowStore.order` 決定（`PANEL_Z_BASE = 300`，末端最上層）
 - **關閉**：標題列右上 ✕。標題列的 pointer capture 會讓 ✕ 的 `pointerup` 改派到標題列，
-  因此 `handleDragStart` 必須在 target 位於 `.floating-window-close` 內時直接 return，否則 click 不觸發
+  因此 `handleDragStart` 必須在 target 位於 `.floating-window-close` 內時直接 return
 - **位置持久化**：拖曳後的座標存 localStorage（`mayana_panel_positions`），全域 key、與角色無關 ——
   那是「這台機器上的使用習慣」而不是角色資料。**開關狀態與 z 順序仍不持久化**
   （每次進遊戲從乾淨畫面開始，與背包格子順序一致）
@@ -1116,7 +1112,7 @@ interface TooltipProps {
 |---|---|---|
 | 地圖／角色卡等一般 HUD | 20 | 不參與堆疊 |
 | 視窗帶狀區間 | 500 + 順序 | 浮動面板、戰鬥日誌、城鎮設施視窗、地圖選擇器 |
-| 常駐 HUD 控制 | 800 | 快捷格、面板按鈕列 —— **永遠壓在視窗之上**，否則開了設施視窗就點不到 |
+| 常駐 HUD 控制 | 800 | 快捷格、面板按鈕列 —— **永遠壓在視窗之上** |
 
 - 各視窗根元素以 inline `style={{ zIndex }}` 讀取，`onPointerDown` 呼叫 `focusWindow(key)`。
 - **不可再靠 CSS 寫死 z-index 決勝負**：`.town-view` 與 `.hud` 都是 20 時只能比 DOM 順序，

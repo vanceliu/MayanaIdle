@@ -1,9 +1,4 @@
-/**
- * 系統信箱的 UI 狀態（`52-mailbox.md`）。
- *
- * 發放與領取的邏輯在 `systems/mailbox.ts`；這裡只持有列表與未領封數，
- * 讓 `PanelDock` 的徽章不必每次重繪都打 DB。
- */
+/** 系統信箱的 UI 狀態（`52-mailbox.md`）。發放與領取邏輯在 `systems/mailbox.ts` */
 import { create } from 'zustand';
 import type { Mail } from '../models/mailbox';
 import {
@@ -18,7 +13,7 @@ import {
 export interface MailboxState {
   characterId: number | null;
   mails: Mail[];
-  /** 未領封數。徽章只算這個 —— 指示器掛在「領取」上，不掛「安裝」（§ 52.5） */
+  /** 未領封數。徽章只算這個（§ 52.5） */
   unread: number;
 
   load: (characterId: number) => Promise<void>;

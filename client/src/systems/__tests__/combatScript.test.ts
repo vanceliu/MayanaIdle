@@ -282,8 +282,7 @@ describe('evaluateCombatScript', () => {
         { id: 'r1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 3 }], action: { type: 'skill', skillId: 'fireball' } },
         { id: 'r2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
       ];
-      // 怪群在 40 碼外（遠超火球 12 碼射程）：條件仍要成立，
-      // 否則角色永遠不會為了這條規則走過去，射程也會塌回武器射程
+      // 怪群在 40 碼外（遠超火球 12 碼射程）：條件仍要成立
       const monsters = [mon({ x: 40, y: 0 }), mon({ x: 41, y: 0 }), mon({ x: 40, y: 2 })];
       const ctx = createCombatContext({ monsters, skills: [createFireball()] });
       expect(evaluateCombatScript(rules, ctx)).toEqual({ type: 'skill', skillId: 'fireball' });
