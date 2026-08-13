@@ -56,7 +56,7 @@ export function BagTalentTab({ rows, order, onReorder }: {
 
   // 手動擺過的照位置放，其餘依取得順序流進剩下的空格（與一般分頁同一套）
   const layout = buildTalentBagLayout(
-    buildTalentBagCells(spareSlots, loose), order, rows * BAG_COLUMNS,
+    buildTalentBagCells(spareSlots, loose), order, rows * BAG_COLUMNS, BAG_COLUMNS,
   );
   const cellCount = layout.filter(Boolean).length;
 

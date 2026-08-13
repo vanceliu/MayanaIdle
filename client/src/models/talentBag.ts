@@ -59,6 +59,12 @@ export function sortTalentBag(
   return order;
 }
 
+/**
+ * 網格欄數的預設值。真正的唯一出處是 `components/BagGrid.tsx` 的 `BAG_COLUMNS`
+ * （§ 35.21.3），model 層不 import 元件，所以由呼叫端傳進來，這裡只是同值的預設。
+ */
+export const TALENT_BAG_COLUMNS = 5;
+
 /** 帶著格子鍵的項目。`buildBagLayout`／`moveBagSlot` 吃的是 `{ id }` */
 export interface TalentBagSlotItem {
   id: string;
@@ -70,14 +76,20 @@ export interface TalentBagSlotItem {
  *
  * **與一般分頁同一套**（`models/bagLayout.ts`）：位置表是例外表，
  * 手動擺過的照位置放，其餘依取得順序流進剩下的空格。
+ *
+ * `minSlots` 只是**視覺下限**（列數對齊一般分頁，§ 35.21.3），不是容量 ——
+ * 天賦分頁不佔背包格也沒有格數上限（§ 35.21.1），
+ * 持有數超過就往下多長幾列，不可把排不下的靜默丟掉。
  */
 export function buildTalentBagLayout(
   cells: TalentBagCell[],
   order: TalentBagOrder,
-  totalSlots: number,
+  minSlots: number,
+  columns: number = TALENT_BAG_COLUMNS,
 ): (TalentBagSlotItem | null)[] {
   const items = cells.map(cell => ({ id: talentCellKey(cell), cell }));
-  return buildBagLayout(items, order, totalSlots);
+  const needed = Math.ceil(items.length / columns) * columns;
+  return buildBagLayout(items, order, Math.max(minSlots, needed));
 }
 
 export function loadTalentBagOrder(characterId: number): TalentBagOrder {
