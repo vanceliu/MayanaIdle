@@ -106,7 +106,7 @@ export const VILLAGE_CONDITION_DESC: Record<string, string> = {
   gold_above: '身上金幣（實際金額）',
   in_town: '角色現在站在城鎮還是野外',
   bag_free_slots_lte: '背包剩餘格數。取東西前該看的是剩餘，不是已用',
-  has_hunt_location: '有沒有上次掛機點的紀錄。沒有就回不去',
+  has_hunt_location: '有沒有可以走回去的座標。只有「回城」與緊急撤退會記下離開時的位置，新角色沒有',
   warehouse_gold_gte: '共用倉庫的金幣餘額',
   warehouse_item_gte: '倉庫裡指定道具的存量',
 };
@@ -124,7 +124,7 @@ export const VILLAGE_ACTION_DESC: Record<string, string> = {
   withdraw_item: '從倉庫補到目標數量，受倉庫存量與背包格數限制',
   deposit_gold: '身上留下指定金額，其餘存進共用倉庫',
   withdraw_gold: '從共用倉庫領到目標金額',
-  return_to_hunt: '回到上次離開的座標。需要通行卷軸的區域一樣要有卷軸',
+  return_to_hunt: '回到「回城」或緊急撤退時記下的那個座標。需要通行卷軸的區域一樣要有卷軸',
 };
 
 /**
