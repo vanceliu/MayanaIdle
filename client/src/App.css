@@ -4575,14 +4575,6 @@ button.active {
   overflow-wrap: break-word;
 }
 
-.bag-tooltip.above {
-  transform: translateY(-100%);
-}
-
-.bag-tooltip.below {
-  transform: translateY(0);
-}
-
 .bag-tooltip-content {
   display: flex;
   flex-direction: column;
@@ -8442,6 +8434,25 @@ button.active {
 .fusion-modes {
   display: flex;
   gap: 4px;
+}
+
+/* 產物是隨機的，這顆按鈕展開該階級的候選清單 */
+.fusion-peek {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: var(--bg-inset);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fusion-peek:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
 }
 
 /* 升級：先選產物類型，再挑材料（§ 51.5.2） */

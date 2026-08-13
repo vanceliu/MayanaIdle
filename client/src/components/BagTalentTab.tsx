@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTalentStore, availableAffixes, availableSlots } from '../stores/talentStore';
+import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
 import { TALENT_TYPES, TALENT_TYPE_LABELS, type TalentType } from '../models/talent';
 import { getTalentAffixDef } from '../db/seed/talentSeeds';
 import {
@@ -23,9 +24,6 @@ import { useGameStore } from '../stores/gameStore';
  * 格子與一般分頁共用同一套（§ 35.21.3）。
  */
 
-/** 詳情框寬度，與 `BagPanel` 同值；靠右的格子依此往左收 */
-const TOOLTIP_WIDTH = 220;
-
 type Cell = TalentBagCell;
 
 export function BagTalentTab({ rows, order, onReorder }: {
@@ -43,7 +41,7 @@ export function BagTalentTab({ rows, order, onReorder }: {
   const dragOver = useDragStore(s => s.over);
   const [kind, setKind] = useState<'all' | 'condition' | 'action'>('all');
   const [type, setType] = useState<TalentType | 'all'>('all');
-  const [tooltip, setTooltip] = useState<{ cell: Cell; x: number; y: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ cell: Cell; anchor: AnchorRect } | null>(null);
   // 與一般分頁共用同一支：按下先記著，超過容忍距離才轉拖曳，觸控不拖
   const pressDrag = usePressDrag(() => setTooltip(null));
   /* 顯示這份天賦配置沒用到的，含別份配置佔著的（§ 51.3.2） */
@@ -64,11 +62,8 @@ export function BagTalentTab({ rows, order, onReorder }: {
 
   /** 拖鑲材到天賦格（§ 51.10）。走 `dragStore` 指標拖放，不用 HTML5 drag */
   function showTooltipFor(el: HTMLElement, cell: Cell) {
-    const rect = el.getBoundingClientRect();
-    let x = rect.left;
-    if (x + TOOLTIP_WIDTH > window.innerWidth) x = rect.right - TOOLTIP_WIDTH;
-    if (x < 0) x = 4;
-    setTooltip({ cell, x, y: rect.bottom + 8 });
+    // 落點與邊界翻轉都在 `BagTooltip` 裡算（§ 35.6.4），這裡只給錨點
+    setTooltip({ cell, anchor: anchorOf(el) });
   }
 
   async function finishDrag(e: React.PointerEvent) {
@@ -239,9 +234,9 @@ export function BagTalentTab({ rows, order, onReorder }: {
       </div>
 
       {tooltip && (
-        <div className="bag-tooltip below" style={{ left: tooltip.x, top: tooltip.y }}>
+        <BagTooltip anchor={tooltip.anchor}>
           {renderTooltipContent(tooltip.cell)}
-        </div>
+        </BagTooltip>
       )}
     </div>
   );

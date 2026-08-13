@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   useTalentStore,
   unequippedAffixes,
   uninstalledSlots,
   canUpgradeAffixes,
   upgradeTargetTypes,
+  upgradeCandidates,
   canExchangeAffixes,
   canDowngradeAffix,
 } from '../stores/talentStore';
@@ -24,6 +25,8 @@ import {
 import { TALENT_AFFIX_DEFS, getTalentAffixDef } from '../db/seed/talentSeeds';
 import { affixLabel, affixLabelOf, AffixIcon } from './TalentEditor';
 import { boundParamLabel } from '../models/talentLabels';
+import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
+import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 
 /** 鑲材的三種換法（`51-auto-talent.md` § 51.5.2~51.5.3） */
 type Mode = 'upgrade' | 'exchange' | 'downgrade';
@@ -47,6 +50,11 @@ export function TalentFusion() {
   const [picked, setPicked] = useState<number[]>([]);
   const [targetDefId, setTargetDefId] = useState<number | null>(null);
   const [targetType, setTargetType] = useState<TalentType | null>(null);
+  /** 「這一階會出什麼」的展開位置。null ＝ 收起 */
+  const [peek, setPeek] = useState<AnchorRect | null>(null);
+  const peekRef = useRef<HTMLButtonElement>(null);
+  // 點到別處或按 Esc 就收起來
+  useDismissOnOutside(peekRef, peek !== null, () => setPeek(null));
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const spare = uninstalledSlots(slots);
@@ -60,11 +68,13 @@ export function TalentFusion() {
     setTargetDefId(null);
     setTargetType(null);
     setResult(null);
+    setPeek(null);
   }
 
   function toggle(id: number) {
     setResult(null);
     setTargetDefId(null);
+    setPeek(null);
     setPicked(p => p.includes(id)
       ? p.filter(x => x !== id)
       : p.length >= inputCount ? p : [...p, id]);
@@ -77,6 +87,7 @@ export function TalentFusion() {
   function toggleGroup(ids: number[]) {
     setResult(null);
     setTargetDefId(null);
+    setPeek(null);
     setPicked(p => {
       const free = ids.find(id => !p.includes(id) && pairable(id));
       if (free !== undefined && p.length < inputCount) return [...p, free];
@@ -114,6 +125,15 @@ export function TalentFusion() {
       ? (getTalentAffixDef(pickedAffixes[0]!.definitionId)!.tier + 1) as TalentTier
       : null)
     : (targetDefId !== null ? getTalentAffixDef(targetDefId)?.tier ?? null : null);
+
+  /** 展開時列出的候選（§ 51.5.2）。判斷走 store 的同一支，UI 不自己算 */
+  const peekList = mode === 'upgrade' && targetType && pickedAffixes.length === inputCount
+    ? upgradeCandidates(
+      getTalentAffixDef(pickedAffixes[0]!.definitionId)!.tier,
+      getTalentAffixDef(pickedAffixes[0]!.definitionId)!.kind,
+      targetType,
+    )
+    : [];
 
   const rate = mode === 'upgrade'
     ? (outputTier ? AFFIX_FUSE_SUCCESS_RATE[outputTier as Exclude<TalentTier, 1>] : null)
@@ -215,7 +235,7 @@ export function TalentFusion() {
                 className={`fusion-type${targetType === ty ? ' is-active' : ''}`}
                 disabled={!usableTypes.includes(ty)}
                 title={usableTypes.includes(ty) ? undefined : '這個類型在下一階沒有鑲材'}
-                onClick={() => { setTargetType(ty); setResult(null); }}
+                onClick={() => { setTargetType(ty); setResult(null); setPeek(null); }}
               >
                 {TALENT_TYPE_LABELS[ty]}
               </button>
@@ -253,6 +273,16 @@ export function TalentFusion() {
                     <span className="fusion-cell-name">
                       {TALENT_TYPE_LABELS[targetType]}・隨機一個
                     </span>
+                    {/* 產物是隨機的，玩家至少要看得到這一階的候選有哪些 */}
+                    <button
+                      ref={peekRef}
+                      className="fusion-peek"
+                      title="這一階會出什麼"
+                      aria-label="這一階會出什麼"
+                      onClick={e => setPeek(peek ? null : anchorOf(e.currentTarget))}
+                    >
+                      ?
+                    </button>
                   </>
                 : <span className="fusion-cell-hint">先選產物類型</span>)
               : (targets.length > 0
@@ -269,6 +299,20 @@ export function TalentFusion() {
                 : <span className="fusion-cell-hint">先湊齊材料</span>)}
           </div>
         </div>
+
+        {peek && targetType && outputTier && (
+          <BagTooltip anchor={peek}>
+            <div className="bag-tooltip-content">
+              <div className="tooltip-name">
+                T{outputTier}・{TALENT_TYPE_LABELS[targetType]}（{peekList.length} 種）
+              </div>
+              {peekList.map(d => (
+                <div key={d.id} className="tooltip-stat">{affixLabelOf(d)}</div>
+              ))}
+              <div className="tooltip-hint">成功時從這些之中隨機一個</div>
+            </div>
+          </BagTooltip>
+        )}
 
         <div className="fusion-actions">
           <span className={`fusion-rate${rate != null ? '' : ' is-dim'}`}>

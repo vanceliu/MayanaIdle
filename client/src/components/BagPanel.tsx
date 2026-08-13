@@ -8,6 +8,7 @@ import {
   saveTalentBagOrder,
 } from '../models/talentBag';
 import { useTalentStore, availableSlots, availableAffixes } from '../stores/talentStore';
+import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
@@ -100,7 +101,7 @@ export function BagPanel() {
     setTalentOrder({ charId, order: next });
     saveTalentBagOrder(charId, next);
   }
-  const [tooltip, setTooltip] = useState<{ item: BagGridItem; x: number; y: number; above: boolean } | null>(null);
+  const [tooltip, setTooltip] = useState<{ item: BagGridItem; anchor: AnchorRect } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
   /**
    * 「移動」模式選中的格子（`47-mobile.md`）。
@@ -320,16 +321,8 @@ export function BagPanel() {
   }
 
   function showTooltipFor(el: HTMLElement, item: BagGridItem) {
-    const rect = el.getBoundingClientRect();
-    const tooltipWidth = 220;
-    let x = rect.left;
-    if (x + tooltipWidth > window.innerWidth) {
-      x = rect.right - tooltipWidth;
-    }
-    if (x < 0) x = 4;
-
-    const y = rect.bottom + 8;
-    setTooltip({ item, x, y, above: false });
+    // 落點與邊界翻轉都在 `BagTooltip` 裡算（§ 35.6.4），這裡只給錨點
+    setTooltip({ item, anchor: anchorOf(el) });
   }
 
   function handleMouseEnter(e: React.MouseEvent, item: BagGridItem) {
@@ -796,12 +789,9 @@ export function BagPanel() {
       </div>
 
       {tooltip && (
-        <div
-          className={`bag-tooltip ${tooltip.above ? 'above' : 'below'}`}
-          style={{ left: tooltip.x, top: tooltip.y }}
-        >
+        <BagTooltip anchor={tooltip.anchor}>
           {renderTooltipContent(tooltip.item)}
-        </div>
+        </BagTooltip>
       )}
 
       {contextMenu && (
