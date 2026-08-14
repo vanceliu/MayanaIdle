@@ -36,17 +36,17 @@ describe('天賦格掉落（`27-drop-table.md` § 27.9）', () => {
       expect(tier!).toBeLessThanOrEqual(band.max);
     });
 
-    it('掉率極低（0.01%），一般 roll 不會中', () => {
-      expect(SLOT_DROP_RATE_BOSS).toBe(0.01);
+    it('掉率 1%，一般 roll 不會中', () => {
+      expect(SLOT_DROP_RATE_BOSS).toBe(1);
       expect(rollTalentSlotDrop(99, true, 1, seq(0.5))).toBeNull();
     });
 
     it('掉率加成會放大命中機會', () => {
-      // 0.01% → 掉落值 0.1；基數 1000，所以 rng 要小於 0.0001
-      expect(rollTalentSlotDrop(99, true, 1, seq(0.00005, 0))).not.toBeNull();
-      expect(rollTalentSlotDrop(99, true, 1, seq(0.00015, 0))).toBeNull();
+      // 1% → 掉落值 10；基數 1000，所以 rng 要小於 0.01
+      expect(rollTalentSlotDrop(99, true, 1, seq(0.005, 0))).not.toBeNull();
+      expect(rollTalentSlotDrop(99, true, 1, seq(0.015, 0))).toBeNull();
       // 加成 ×10 之後同一個 roll 就中得了
-      expect(rollTalentSlotDrop(99, true, 10, seq(0.00015, 0))).not.toBeNull();
+      expect(rollTalentSlotDrop(99, true, 10, seq(0.015, 0))).not.toBeNull();
     });
   });
 });

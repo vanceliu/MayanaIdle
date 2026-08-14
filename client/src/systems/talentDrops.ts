@@ -18,8 +18,7 @@ export type Rng = () => number;
 const defaultRng: Rng = () => Math.random();
 
 /**
- * 掉落值 → 是否命中。沿用 `27-drop-table.md` § 27.1 的公式，
- * **掉落值可為小數**（天賦格的 0.01% 對應 0.1）。
+ * 掉落值 → 是否命中。沿用 `27-drop-table.md` § 27.1 的公式（基數 1000）。
  */
 function hits(percent: number, multiplier: number, rng: Rng): boolean {
   const dropValue = percent * 10; // % → 掉落值（基數 1000）

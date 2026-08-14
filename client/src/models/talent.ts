@@ -181,7 +181,7 @@ export const FUSE_INPUT_COUNT = 2;
 // === 掉落（`27-drop-table.md` § 27.9）===
 
 /** 天賦格掉率（僅 Boss，%）。一般怪不掉，T1 格不掉落（§ 51.6.1） */
-export const SLOT_DROP_RATE_BOSS = 0.01;
+export const SLOT_DROP_RATE_BOSS = 1;
 
 /** Boss 掉落的天賦格 tier 區間。**天賦格保留下限**（§ 51.6.1） */
 export const SLOT_TIER_BAND: readonly { maxAreaLevel: number; min: TalentSlotTier; max: TalentSlotTier }[] = [
