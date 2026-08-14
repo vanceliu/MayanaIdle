@@ -2,16 +2,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useMapMonsterStore, type MapMonster } from '../mapMonsterStore';
 import type { MapData, Position } from '../../models/mapControl';
 
-/** 40×40 全開放地圖（外圈牆），足以測到 25 格以上的脫離距離 */
+/** 70×40 全開放地圖（外圈牆），足以測到 50 格以上的脫離距離 */
 const openMap: MapData = {
   id: 'open-map',
   name: 'Open Map',
-  width: 40,
+  width: 70,
   height: 40,
   spawnPoint: { x: 5, y: 20 },
   tiles: Array.from({ length: 40 }, (_, y) =>
-    Array.from({ length: 40 }, (_, x) =>
-      x === 0 || y === 0 || x === 39 || y === 39 ? 1 : 0
+    Array.from({ length: 70 }, (_, x) =>
+      x === 0 || y === 0 || x === 69 || y === 39 ? 1 : 0
     )
   ),
 };
@@ -62,7 +62,7 @@ describe('追蹤距離與脫離距離（26-spawn-pressure.md § 26.8）', () => 
     expect(m.position.x).toBeLessThan(15);
   });
 
-  it('15~25 格：保留在地圖上但原地待機', () => {
+  it('15~50 格：保留在地圖上但原地待機', () => {
     setMonsters([makeMonster('idle', 25, 20)]); // 距離 20
     move();
 
@@ -85,27 +85,27 @@ describe('追蹤距離與脫離距離（26-spawn-pressure.md § 26.8）', () => 
     expect(m.position.x).toBeLessThan(25);
   });
 
-  it('超過 25 格：從地圖移除', () => {
-    setMonsters([makeMonster('far', 35, 20)]); // 距離 30
+  it('超過 50 格：從地圖移除', () => {
+    setMonsters([makeMonster('far', 60, 20)]); // 距離 55
     move();
 
     expect(useMapMonsterStore.getState().monsters).toHaveLength(0);
   });
 
   it('戰鬥中的怪物不受距離規則影響', () => {
-    setMonsters([makeMonster('fighting', 35, 20)], ['fighting']); // 距離 30
+    setMonsters([makeMonster('fighting', 60, 20)], ['fighting']); // 距離 55
     move();
 
     const [m] = useMapMonsterStore.getState().monsters;
     expect(m).toBeDefined();
-    expect(m.position).toEqual({ x: 35, y: 20 });
+    expect(m.position).toEqual({ x: 60, y: 20 });
   });
 
   it('三段距離同時存在時各自套用對應行為', () => {
     setMonsters([
       makeMonster('near', 15, 20), // 10 → 追蹤
-      makeMonster('idle', 25, 20), // 20 → 待機
-      makeMonster('far', 35, 20), // 30 → 移除
+      makeMonster('idle', 45, 20), // 40 → 待機
+      makeMonster('far', 60, 20), // 55 → 移除
     ]);
     move();
 

@@ -2,7 +2,7 @@ import type { Position, MapData } from '../models/mapControl';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import { OccupationManager } from './occupationManager';
 import { useMapControlStore } from '../stores/mapControlStore';
-import { useMapMonsterStore } from '../stores/mapMonsterStore';
+import { useMapMonsterStore, MAX_TRACK_DISTANCE, DESPAWN_DISTANCE } from '../stores/mapMonsterStore';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { calculatePressure } from './pressure';
 import { drainRestedExp } from './restedExp';
@@ -224,7 +224,6 @@ function moveMonstersSafe(
 
   const updated: MapMonster[] = [];
   const playerSnapped = { x: Math.round(playerPos.x), y: Math.round(playerPos.y) };
-  const MAX_TRACK_DISTANCE = 15;
   const TRIGGER_DISTANCE = 1.2;
   const ASTAR_DISTANCE = 8;
   const PATH_RECALC_INTERVAL = 5000;
@@ -236,9 +235,16 @@ function moveMonstersSafe(
       (monster.position.y - playerPos.y) ** 2,
     );
 
-    // Despawn if too far
-    if (dist > MAX_TRACK_DISTANCE) {
-      continue;
+    /*
+     * `26-spawn-pressure.md` § 26.8 的三段：追蹤 / 原地待機 / 移除。
+     * 戰鬥中的怪物一律保留，不論距離。
+     */
+    if (!monsterStore.combatMonsterIds.includes(monster.id)) {
+      if (dist > DESPAWN_DISTANCE) continue;
+      if (dist > MAX_TRACK_DISTANCE) {
+        updated.push({ ...monster, path: [], pathIndex: 0, pathRecalcTimer: 0 });
+        continue;
+      }
     }
 
     /*

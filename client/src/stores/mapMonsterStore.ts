@@ -33,9 +33,9 @@ const BASE_SPAWN_CHANCE = 0.15;
 const BASE_MAX_MONSTERS = 3;
 const MIN_SPAWN_DISTANCE = 5;
 /** 超過此距離的怪物停止追蹤（原地待機），仍留在地圖上（見 `26-spawn-pressure.md` § 26.8） */
-const MAX_TRACK_DISTANCE = 15;
+export const MAX_TRACK_DISTANCE = 15;
 /** 超過此距離的怪物才真正從地圖移除（見 `26-spawn-pressure.md` § 26.8） */
-const DESPAWN_DISTANCE = 25;
+export const DESPAWN_DISTANCE = 50;
 const TRIGGER_DISTANCE = 1.2;
 const MONSTER_SPEED = 1;
 const PATH_RECALC_INTERVAL = 5000;

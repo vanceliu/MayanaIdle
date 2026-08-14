@@ -942,6 +942,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       phase: 'explore',
     });
     get().startRegen();
+    // 常駐迴圈同時餵常駐天賦、緊急撤退與補給天賦（`runVillageScriptTick`）。
+    // 少這一行的話新角色要登出重進才會有這三樣，而且不會報錯。
+    get().startPersistentLoop();
     get().initQuestBoard();
     void initTalentAndMailbox(char.id!, char.level);
   },
