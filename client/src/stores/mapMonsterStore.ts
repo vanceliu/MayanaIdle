@@ -116,17 +116,24 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
     if (state.paused) return;
     if (state.monsters.length >= state.maxMonsters) return;
 
-    const newTimer = state.spawnTimer + deltaMs;
-    const frequencyMultiplier = 1 + pressure * 0.2;
-    const adjustedInterval = SPAWN_INTERVAL_MS / frequencyMultiplier;
-    if (newTimer < adjustedInterval) {
-      set({ spawnTimer: newTimer });
-      return;
+    // 清場補位（`26-spawn-pressure.md` § 26.2）：場上全空時立即判定且必定成功。
+    // 沒有它，擊殺速度快於判定間隔的角色會停在空地上等下一個週期再擲 15%，
+    // DPS 完全兌現不到擊殺速率。
+    const isRefill = state.monsters.length === 0;
+
+    if (!isRefill) {
+      const newTimer = state.spawnTimer + deltaMs;
+      const frequencyMultiplier = 1 + pressure * 0.2;
+      const adjustedInterval = SPAWN_INTERVAL_MS / frequencyMultiplier;
+      if (newTimer < adjustedInterval) {
+        set({ spawnTimer: newTimer });
+        return;
+      }
     }
 
     set({ spawnTimer: 0 });
 
-    if (Math.random() > BASE_SPAWN_CHANCE) return;
+    if (!isRefill && Math.random() > BASE_SPAWN_CHANCE) return;
 
     // Determine spawn count based on elapsed time (partySize=1 baseline)
     const spawnCount = rollSpawnCount(elapsedMinutes);

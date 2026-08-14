@@ -2,10 +2,9 @@ import { useState } from 'react';
 import {
   useGameStore,
   selectActiveTemplate,
-  selectCombatRules,
-  selectPersistentRules,
-  selectVillageRules,
 } from '../stores/gameStore';
+import { useTalentStore } from '../stores/talentStore';
+import { isSlotInstalled } from '../models/talent';
 import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
@@ -23,14 +22,14 @@ type ScriptTab = 'combat' | 'persistent' | 'supply' | 'fusion';
  * （可拖曳、可多開、點擊置頂、無遮罩）。
  */
 export function ScriptEditorButton() {
-  const combatRules = useGameStore(selectCombatRules);
-  const persistentRules = useGameStore(selectPersistentRules);
-  const villageRules = useGameStore(selectVillageRules);
+  const talentSlots = useTalentStore(s => s.slots);
   const isOpen = usePanelWindowStore(s => s.open.script);
   const toggle = usePanelWindowStore(s => s.toggle);
   const isMobile = useIsMobile();
 
-  const hasRules = combatRules.length > 0 || persistentRules.length > 0 || villageRules.length > 0;
+  // 指示點原本看三個規則陣列，那三個已隨自動天賦改版廢除；
+  // 現在面板編的是天賦格，指示點跟著改看「有沒有裝上任何一格」（`51-auto-talent.md`）
+  const hasRules = talentSlots.some(isSlotInstalled);
 
   return (
     <button

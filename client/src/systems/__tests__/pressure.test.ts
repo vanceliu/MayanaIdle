@@ -1,57 +1,57 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePressure } from '../pressure';
+import { calculatePressure, getPressureDropMultiplier, PRESSURE_DROP_CAP } from '../pressure';
 
 describe('pressure system', () => {
   describe('calculatePressure', () => {
-    it('should return 0 pressure when just entered', () => {
-      const now = Date.now();
-      const enteredAt = now - 30 * 1000;
-
-      const result = calculatePressure(enteredAt, now);
+    it('should return 0 pressure with no kills on the map', () => {
+      const result = calculatePressure(0);
 
       expect(result.pressure).toBe(0);
       expect(result.maxMonsters).toBe(3);
     });
 
-    it('should return 0 pressure within first 30 minutes', () => {
-      const now = Date.now();
-
-      const result20min = calculatePressure(now - 20 * 60 * 1000, now);
-      expect(result20min.pressure).toBe(0);
-      expect(result20min.maxMonsters).toBe(3);
-
-      const result30min = calculatePressure(now - 30 * 60 * 1000, now);
-      expect(result30min.pressure).toBe(0);
-      expect(result30min.maxMonsters).toBe(3);
+    it('should stay at 0 pressure below the 640-kill threshold', () => {
+      expect(calculatePressure(479).pressure).toBe(0);
+      expect(calculatePressure(639).pressure).toBe(0);
+      expect(calculatePressure(639).maxMonsters).toBe(3);
     });
 
-    it('should increase pressure by 1 every 10 minutes after 30 minutes', () => {
-      const now = Date.now();
+    it('should increase pressure by 1 every 160 kills past the base', () => {
+      expect(calculatePressure(640).pressure).toBe(1);
+      expect(calculatePressure(640).maxMonsters).toBe(4);
 
-      const result40min = calculatePressure(now - 40 * 60 * 1000, now);
-      expect(result40min.pressure).toBe(1);
-      expect(result40min.maxMonsters).toBe(4);
+      expect(calculatePressure(800).pressure).toBe(2);
+      expect(calculatePressure(800).maxMonsters).toBe(5);
 
-      const result50min = calculatePressure(now - 50 * 60 * 1000, now);
-      expect(result50min.pressure).toBe(2);
-      expect(result50min.maxMonsters).toBe(5);
-
-      const result70min = calculatePressure(now - 70 * 60 * 1000, now);
-      expect(result70min.pressure).toBe(4);
-      expect(result70min.maxMonsters).toBe(7);
+      expect(calculatePressure(1120).pressure).toBe(4);
+      expect(calculatePressure(1120).maxMonsters).toBe(7);
     });
 
-    it('should cap maxMonsters at 10', () => {
-      const now = Date.now();
-      const result = calculatePressure(now - 120 * 60 * 1000, now); // 120 min → pressure 9
-      expect(result.pressure).toBe(9);
+    it('should cap maxMonsters at 10 while pressure keeps climbing', () => {
+      const result = calculatePressure(2400);
+      expect(result.pressure).toBe(12);
       expect(result.maxMonsters).toBe(10);
     });
 
-    it('should preserve areaEnteredAt in result', () => {
-      const enteredAt = 1000000;
-      const result = calculatePressure(enteredAt, enteredAt + 120000);
-      expect(result.areaEnteredAt).toBe(enteredAt);
+    it('should never return negative pressure', () => {
+      expect(calculatePressure(-50).pressure).toBe(0);
+    });
+  });
+
+  describe('getPressureDropMultiplier', () => {
+    it('should be 1 at pressure 0', () => {
+      expect(getPressureDropMultiplier(0)).toBe(1);
+    });
+
+    it('should add 0.2 per pressure level', () => {
+      expect(getPressureDropMultiplier(1)).toBeCloseTo(1.2);
+      expect(getPressureDropMultiplier(3)).toBeCloseTo(1.6);
+    });
+
+    /** maxMonsters 與生成間隔沒有這個上限，只有掉落倍率有（§ 26.3） */
+    it('should cap at pressure 7 → x2.4', () => {
+      expect(getPressureDropMultiplier(PRESSURE_DROP_CAP)).toBeCloseTo(2.4);
+      expect(getPressureDropMultiplier(20)).toBeCloseTo(2.4);
     });
   });
 });

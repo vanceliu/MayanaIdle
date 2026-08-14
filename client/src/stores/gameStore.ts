@@ -40,6 +40,8 @@ import {
 } from '../services/leaderboardService';
 import { purgeOutdatedData } from '../systems/dataVersionPurge';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
+import { calculatePressure, getPressureDropMultiplier } from '../systems/pressure';
+import { accrueRestedExp, getRestedExpMultiplier } from '../systems/restedExp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount } from '../systems/combat';
@@ -73,10 +75,9 @@ import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } fr
 import { evaluatePersistentScript, evaluateEmergencyRetreat, skillMeetsWeaponRequirement, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
 import { useCombatCommandStore } from './combatCommandStore';
 import { pushSelfCastFx } from '../systems/selfCastFx';
-import type { ScriptRule, CombatRule, PersistentRule, EmergencyRetreat } from '../models/scriptEngine';
+import type { ScriptRule, EmergencyRetreat } from '../models/scriptEngine';
 import {
   DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT,
-  normalizeCombatRules, normalizePersistentRules,
 } from '../models/scriptEngine';
 import type { ScriptTemplate } from '../models/scriptTemplate';
 import {
@@ -92,7 +93,7 @@ import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database'
 import { getItemSellPrice, getEquipmentSellTotal } from '../systems/shop';
 import { getItemBasePrice } from '../systems/shop';
 import { getCachedEquipmentTemplates } from '../db/equipmentTemplateCache';
-import type { HuntLocation, VillageRule } from '../models/villageScript';
+import type { HuntLocation } from '../models/villageScript';
 import {
   evaluateVillageScript, findReturnScroll, getBuyAmount, getWarehouseKind,
   collectVillageSellMaterials, collectVillageSellEquipment,
@@ -378,10 +379,7 @@ interface GameState {
   changeArea: (areaId: string) => void;
   navigateTo: (location: MapLocation) => void;
   setScriptRules: (rules: ScriptRule[]) => void;
-  setCombatRules: (rules: CombatRule[]) => void;
-  setPersistentRules: (rules: PersistentRule[]) => void;
   setEmergencyRetreat: (retreat: EmergencyRetreat) => void;
-  setVillageRules: (rules: VillageRule[]) => void;
   /** 切換使用中的 template；id 不存在時不動作 */
   setActiveTemplate: (id: string) => void;
   /** 新增一頁（內容為預設腳本），並立刻切過去 */
@@ -494,20 +492,8 @@ export function selectActiveTemplate(state: GameState): ScriptTemplate {
   return resolveActiveTemplate(state.scriptTemplates, state.activeTemplateId);
 }
 
-export function selectCombatRules(state: GameState): CombatRule[] {
-  return selectActiveTemplate(state).combatRules;
-}
-
-export function selectPersistentRules(state: GameState): PersistentRule[] {
-  return selectActiveTemplate(state).persistentRules;
-}
-
 export function selectEmergencyRetreat(state: GameState): EmergencyRetreat {
   return selectActiveTemplate(state).emergencyRetreat;
-}
-
-export function selectVillageRules(state: GameState): VillageRule[] {
-  return selectActiveTemplate(state).villageRules;
 }
 
 type StoreSet = (partial: Partial<GameState>) => void;
@@ -692,6 +678,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Reset areaEnteredAt so pressure doesn't accumulate during character select
     char.areaEnteredAt = Date.now();
+    char.areaKills = 0;
+
+    // 離線時長換成加倍存量（`04-character.md` § 4.11）
+    Object.assign(char, accrueRestedExp(char, Date.now()));
 
     // Backfill unspent attribute points for legacy characters above level 50
     if (char.unspentAttributePoints == null) {
@@ -901,6 +891,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       skills: startingSkills,
       quests: [],
       areaEnteredAt: Date.now(),
+      areaKills: 0,
+      restedExpMs: 0,
+      lastSeenAt: Date.now(),
       createdAt: Date.now(),
       dataVersion: CURRENT_DATA_VERSION,
     };
@@ -1481,6 +1474,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const townZone = ZONES.find(z => z.regions.includes(scrollInfo.townId));
     if (townZone) char.currentZone = townZone.id;
     char.areaEnteredAt = Date.now();
+    char.areaKills = 0;
 
     get().stopExploring();
     set({
@@ -1514,6 +1508,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentRegion: areaId,
       currentFloor: region?.type === 'dungeon' ? (region.floors?.[0]?.floor ?? 1) : null,
       areaEnteredAt: Date.now(),
+      areaKills: 0,
       mapPositionX: undefined,
       mapPositionY: undefined,
     };
@@ -1550,6 +1545,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentRegion: location.regionId,
       currentFloor: location.floor,
       areaEnteredAt: Date.now(),
+      areaKills: 0,
       mapPositionX: undefined,
       mapPositionY: undefined,
     };
@@ -1576,21 +1572,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  setCombatRules: (rules) => {
-    updateActiveTemplate(set, get, t => ({ ...t, combatRules: rules }));
-  },
-
-  setPersistentRules: (rules) => {
-    updateActiveTemplate(set, get, t => ({ ...t, persistentRules: rules }));
-    get().startPersistentLoop();
-  },
-
   setEmergencyRetreat: (retreat) => {
     updateActiveTemplate(set, get, t => ({ ...t, emergencyRetreat: retreat }));
-  },
-
-  setVillageRules: (rules) => {
-    updateActiveTemplate(set, get, t => ({ ...t, villageRules: rules }));
   },
 
   setActiveTemplate: (id) => {
@@ -2412,7 +2395,12 @@ export function processMonsterDeath(
     set({ activeEffects: cleanedEffects });
   }
 
-  const expGained = dead.exp * 3;
+  // 該地圖累積擊殺數是 Pressure 的輸入（`26-spawn-pressure.md` § 26.3）。
+  // 木樁在上面就 return 了，不會計入。
+  char = { ...char, areaKills: (char.areaKills ?? 0) + 1 };
+
+  // 基礎 ×3（`28-monster-stats.md` § 28.1）再乘回鍋加倍（`04-character.md` § 4.11）
+  const expGained = dead.exp * 3 * getRestedExpMultiplier(char);
   const prevLevel = char.level;
   char = addExp(char, expGained);
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
@@ -2434,6 +2422,10 @@ export function processMonsterDeath(
 
   // 掉落處理（排隊避免 race condition）
   const dropBonuses = getAffixBonusesFromGear(allGear);
+  // Pressure 掉落倍率是掉寶倍率的一個因子（`26-spawn-pressure.md` § 26.3）
+  const pressureDropMult = getPressureDropMultiplier(
+    calculatePressure(char.areaKills ?? 0).pressure,
+  );
   const defeatedMonsterName = dead.name;
   const monsterIsBoss = dead.isBoss;
   dropQueue = dropQueue.then(async () => {
@@ -2446,8 +2438,8 @@ export function processMonsterDeath(
     // 不是整座副本的（`27-drop-table.md` § 27.3 的掉落表本來就是逐層列的）
     const areaLevel = resolveArea(dropAreaId)?.levelMax ?? dropRegion?.levelMax ?? dead.level;
     const drops = monsterIsBoss
-      ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate })
-      : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate }, false, dead.level);
+      ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult })
+      : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult }, false, dead.level);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
@@ -2670,6 +2662,10 @@ async function saveGame(state: GameState) {
     currentRegion: char.currentRegion,
     currentFloor: char.currentFloor,
     areaEnteredAt: char.areaEnteredAt,
+    areaKills: char.areaKills ?? 0,
+    // 這兩個漏掉的話離線時長永遠算不出來（`18-data-schema.md` § 18.11）
+    restedExpMs: char.restedExpMs ?? 0,
+    lastSeenAt: char.lastSeenAt ?? Date.now(),
     mapPositionX: Math.round(mapPos.x),
     mapPositionY: Math.round(mapPos.y),
   });
@@ -2792,22 +2788,14 @@ function migrateEmergencyRetreat(saved: EmergencyRetreat | undefined): Emergency
 }
 
 /**
- * 還沒有 template 概念的存檔：把既有那一份腳本包成名為「預設」的第一頁。
+ * 還沒有 template 概念的存檔：只撈得回緊急撤退，包成名為「預設」的第一頁。
  *
- * 這不是格式轉換 —— 規則本身完全相容，只是多一層容器，所以照包不重置。
- * （規則層若真的是舊格式，`normalizeScriptTemplates` 內的 normalize 仍會擋下來。）
+ * 舊存檔的三個規則陣列隨自動天賦改版廢除，這裡直接丟棄不再轉換
+ * （規則本體現在在天賦格，見 `51-auto-talent.md`）。
  */
 function wrapLegacyScriptsAsTemplate(data: any): ScriptTemplate[] {
-  const persistent = Array.isArray(data.persistentRules)
-    ? data.persistentRules.filter(
-        (r: any) => r?.action?.type !== 'flee_town' && r?.action?.type !== 'flee_teleport'
-      )
-    : data.persistentRules;
-
   return [{
     ...createDefaultTemplate(),
-    combatRules: normalizeCombatRules(data.combatRules),
-    persistentRules: normalizePersistentRules(persistent),
     emergencyRetreat: migrateEmergencyRetreat(data.emergencyRetreat),
   }];
 }

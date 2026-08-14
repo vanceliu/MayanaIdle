@@ -5,15 +5,18 @@ import { ScriptEditorButton, ScriptEditorContent } from '../../components/Script
 import { PanelWindows } from '../../components/PanelWindows';
 import { setActiveScripts } from '../../testing/scriptFixtures';
 import { usePanelWindowStore } from '../../stores/panelWindowStore';
-import { DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT } from '../../models/scriptEngine';
+import { useTalentStore } from '../../stores/talentStore';
+import type { TalentSlot } from '../../models/talent';
 
-vi.mock('../../components/CombatScriptEditor', () => ({
-  CombatScriptEditor: () => <div data-testid="combat-script-editor">CombatScriptEditor</div>,
-}));
-
-vi.mock('../../components/PersistentScriptEditor', () => ({
-  PersistentScriptEditor: () => <div data-testid="persistent-script-editor">PersistentScriptEditor</div>,
-}));
+/** 指示點看的是「有沒有裝上任何一格天賦」（`51-auto-talent.md`） */
+function setTalentSlots(slots: Partial<TalentSlot>[]): void {
+  useTalentStore.setState({
+    slots: slots.map((s, i) => ({
+      id: i + 1, characterId: 1, tier: 1, assignedType: null,
+      templateId: null, order: null, conditions: [], action: null, ...s,
+    })) as TalentSlot[],
+  });
+}
 
 // PanelWindows 的其他面板需要角色資料，這裡只驗自動天賦
 vi.mock('../../components/CharacterStats', () => ({ CharacterStats: () => null }));
@@ -24,36 +27,32 @@ vi.mock('../../components/QuestTracker', () => ({ QuestTrackerContent: () => nul
 
 describe('ScriptEditorButton（PanelDock 觸發鈕）', () => {
   beforeEach(() => {
-    setActiveScripts({
-      combatRules: DEFAULT_COMBAT_SCRIPT,
-      persistentRules: DEFAULT_PERSISTENT_SCRIPT,
-    });
+    setActiveScripts();
+    setTalentSlots([{ assignedType: 'combat' }]);
     usePanelWindowStore.getState().closeAll();
   });
 
-  it('有規則時顯示指示點，且不顯示條數', () => {
+  it('有裝上天賦格時顯示指示點，且不顯示格數', () => {
     const { container } = render(<ScriptEditorButton />);
     expect(screen.getByText('自動天賦')).toBeTruthy();
     expect(container.querySelector('.script-badge')).toBeTruthy();
-
-    const total = DEFAULT_COMBAT_SCRIPT.length + DEFAULT_PERSISTENT_SCRIPT.length;
-    expect(screen.queryByText(String(total))).toBeNull();
+    expect(screen.queryByText('1')).toBeNull();
   });
 
-  it('完全沒有規則時不顯示指示點', () => {
-    setActiveScripts({ combatRules: [], persistentRules: [], villageRules: [] });
+  it('沒有任何天賦格時不顯示指示點', () => {
+    setTalentSlots([]);
     const { container } = render(<ScriptEditorButton />);
     expect(container.querySelector('.script-badge')).toBeNull();
   });
 
-  it('只有村莊規則時仍然亮起（條數版本會漏算這一種）', () => {
-    setActiveScripts({
-      combatRules: [],
-      persistentRules: [],
-      villageRules: [
-        { id: 'v1', enabled: true, conditions: [], action: { type: 'return_town' } },
-      ],
-    });
+  it('有格子但都沒裝上時不顯示指示點', () => {
+    setTalentSlots([{ assignedType: null }, { assignedType: null }]);
+    const { container } = render(<ScriptEditorButton />);
+    expect(container.querySelector('.script-badge')).toBeNull();
+  });
+
+  it('裝在補給分頁也會亮起', () => {
+    setTalentSlots([{ assignedType: 'supply' }]);
     const { container } = render(<ScriptEditorButton />);
     expect(container.querySelector('.script-badge')).toBeTruthy();
   });

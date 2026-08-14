@@ -5,15 +5,19 @@ import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { calculatePressure } from './pressure';
+import { drainRestedExp } from './restedExp';
 import { findPath, findAttackPosition, canMoveBetween } from './pathfinding';
 import { hasLineOfSight } from './lineOfSight';
 
 const ATTACK_RANGE_MELEE = 1.5;
 const DOT_TICK_INTERVAL = 1000;
+/** 回鍋加倍存量的落帳週期 */
+const RESTED_TICK_MS = 10_000;
 
 export const occupation = new OccupationManager();
 
 let dotTickTimer = 0;
+let restedTickTimer = 0;
 let pauseLogShown = false;
 let combatInterruptLogShown = false;
 
@@ -26,6 +30,15 @@ export function gameLoopTick(deltaMs: number) {
   if (!map || !gameState.character) return;
 
   const playerPos = mapStore.playerPosition;
+
+  // === 回鍋加倍存量：以實時扣減，並持續更新離線基準（`04-character.md` § 4.11）===
+  // 每幀寫一次會讓整棵訂閱 character 的 UI 每幀重繪，所以累積到 RESTED_TICK_MS 才落一次。
+  restedTickTimer += deltaMs;
+  if (restedTickTimer >= RESTED_TICK_MS) {
+    const drained = drainRestedExp(gameState.character, restedTickTimer, Date.now());
+    restedTickTimer = 0;
+    if (drained !== gameState.character) useGameStore.setState({ character: drained });
+  }
 
   // === Rebuild occupation map ===
   occupation.clear();
@@ -102,7 +115,8 @@ export function gameLoopTick(deltaMs: number) {
   // === Spawn monsters (only if player is not in recovery) ===
   if (!monsterStore.paused) {
     const now = Date.now();
-    const { pressure, maxMonsters } = calculatePressure(gameState.character.areaEnteredAt, now);
+    const { pressure, maxMonsters } = calculatePressure(gameState.character.areaKills ?? 0);
+    // 生成隻數分布與 Boss 門檻仍以停留時間為輸入（`26-spawn-pressure.md` § 26.2、§ 26.4）
     const elapsedMinutes = (now - gameState.character.areaEnteredAt) / (1000 * 60);
     monsterStore.setMaxMonsters(maxMonsters);
     monsterStore.spawnTick(deltaMs, map, playerPos, pressure, elapsedMinutes);

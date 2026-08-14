@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useGameStore, selectCombatRules, selectPersistentRules, selectActiveTemplate } from '../gameStore';
+import { useGameStore, selectEmergencyRetreat, selectActiveTemplate } from '../gameStore';
 import { createDefaultTemplate, DEFAULT_TEMPLATE_ID } from '../../models/scriptTemplate';
-import { DEFAULT_COMBAT_SCRIPT } from '../../models/scriptEngine';
-import type { CombatRule } from '../../models/scriptEngine';
+import { DEFAULT_EMERGENCY_RETREAT } from '../../models/scriptEngine';
+import type { EmergencyRetreat } from '../../models/scriptEngine';
 
-const ONLY_WAIT: CombatRule[] = [
-  { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'wait' } },
-];
+const RETREAT_AT_HALF: EmergencyRetreat = { ...DEFAULT_EMERGENCY_RETREAT, enabled: true, hpThreshold: 50 };
 
 describe('腳本 template：store 行為', () => {
   beforeEach(() => {
@@ -17,18 +15,18 @@ describe('腳本 template：store 行為', () => {
     });
   });
 
-  it('編輯腳本寫進使用中的那一頁，不會外溢到其他頁', () => {
+  it('編輯緊急撤退寫進使用中的那一頁，不會外溢到其他頁', () => {
     useGameStore.getState().addScriptTemplate();
     const newId = useGameStore.getState().activeTemplateId;
-    useGameStore.getState().setCombatRules(ONLY_WAIT);
+    useGameStore.getState().setEmergencyRetreat(RETREAT_AT_HALF);
 
-    expect(selectCombatRules(useGameStore.getState())).toEqual(ONLY_WAIT);
+    expect(selectEmergencyRetreat(useGameStore.getState())).toEqual(RETREAT_AT_HALF);
 
     useGameStore.getState().setActiveTemplate(DEFAULT_TEMPLATE_ID);
-    expect(selectCombatRules(useGameStore.getState())).toEqual(DEFAULT_COMBAT_SCRIPT);
+    expect(selectEmergencyRetreat(useGameStore.getState())).toEqual(DEFAULT_EMERGENCY_RETREAT);
 
     useGameStore.getState().setActiveTemplate(newId);
-    expect(selectCombatRules(useGameStore.getState())).toEqual(ONLY_WAIT);
+    expect(selectEmergencyRetreat(useGameStore.getState())).toEqual(RETREAT_AT_HALF);
   });
 
   it('新增分頁會立刻切過去，名稱不重複', () => {
@@ -42,15 +40,15 @@ describe('腳本 template：store 行為', () => {
   });
 
   it('複製分頁會帶走內容但拿到新 id', () => {
-    useGameStore.getState().setCombatRules(ONLY_WAIT);
+    useGameStore.getState().setEmergencyRetreat(RETREAT_AT_HALF);
     useGameStore.getState().duplicateScriptTemplate(DEFAULT_TEMPLATE_ID);
 
     const copy = selectActiveTemplate(useGameStore.getState());
     expect(copy.id).not.toBe(DEFAULT_TEMPLATE_ID);
-    expect(copy.combatRules).toEqual(ONLY_WAIT);
+    expect(copy.emergencyRetreat).toEqual(RETREAT_AT_HALF);
     // 來源沒有被動到
     useGameStore.getState().setActiveTemplate(DEFAULT_TEMPLATE_ID);
-    expect(selectCombatRules(useGameStore.getState())).toEqual(ONLY_WAIT);
+    expect(selectEmergencyRetreat(useGameStore.getState())).toEqual(RETREAT_AT_HALF);
   });
 
   it('預設分頁不可刪除', () => {
@@ -80,6 +78,6 @@ describe('腳本 template：store 行為', () => {
   it('切到不存在的 id 不動作（避免面板指向空白頁）', () => {
     useGameStore.getState().setActiveTemplate('ghost');
     expect(useGameStore.getState().activeTemplateId).toBe(DEFAULT_TEMPLATE_ID);
-    expect(selectPersistentRules(useGameStore.getState())).toHaveLength(1);
+    expect(selectActiveTemplate(useGameStore.getState()).id).toBe(DEFAULT_TEMPLATE_ID);
   });
 });

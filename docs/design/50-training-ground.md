@@ -49,7 +49,7 @@
 | 木樁站位 | 以 (10, 7) 為中心的九宮格，兩格一間隔 |
 | 主題 | `battlefield` |
 | 自動生怪 | **關閉**（`autoSpawn: false`） |
-| Pressure | 不適用（沒有自動生怪就沒有 pressure 累積） |
+| Pressure | 不適用（無自動生怪，且木樁擊殺不計入擊殺數，見 `26-spawn-pressure.md` § 26.3） |
 
 尺寸選 20×15 是為了容納 AoE 驗證：`22-basic-magic.md` 的流星雨半徑 8、
 上限 8 隻，8 隻木樁散在 18×13 內全部落得進半徑，`maxTargets` 上限測得到。

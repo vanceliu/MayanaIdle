@@ -39,12 +39,26 @@ function randomInt(min: number, max: number): number {
 export interface DropBonuses {
   drop_rate: number;
   gold_rate: number;
+  /**
+   * Pressure 掉落倍率（`26-spawn-pressure.md` § 26.3），掉寶倍率的一個因子。
+   * 選填、預設 1 —— 不帶就是沒有 Pressure 加成，既有呼叫端不受影響。
+   */
+  pressure_mult?: number;
 }
 
 export const DROP_ROLL_MAX = 1000;
 
 function getDropRateMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER;
+  return (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER * (bonuses?.pressure_mult ?? 1);
+}
+
+/**
+ * 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）——
+ * `27-drop-table.md` § 27.7 第 8 條的「金幣單次上限 500」是明文通膨閘門，
+ * 而金幣量沒有素材／卷軸那種「上限只管基礎值」的豁免。
+ */
+function getGoldRateMultiplier(bonuses?: DropBonuses): number {
+  return (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
 }
 
 /**
@@ -83,7 +97,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
-  const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
+  const goldRateMultiplier = getGoldRateMultiplier(bonuses);
   /*
    * 同一個 tier 的武器／防具是**一組連動條目**，只擲一次再 50/50 決定給哪一種
    * （`27-drop-table.md` § 27.6）。旗標必須**每個 tier 各一份** ——
@@ -230,7 +244,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
-  const goldRateMultiplier = (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
+  const goldRateMultiplier = getGoldRateMultiplier(bonuses);
 
   for (const entry of entries) {
     let effectiveDropValue = entry.dropValue;

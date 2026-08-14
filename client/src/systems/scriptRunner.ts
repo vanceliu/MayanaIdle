@@ -236,7 +236,8 @@ function checkCombatCondition(
     case 'weapon_type_is':
       return ctx.weaponType === condition.match;
     case 'area_dwell_gte': {
-      // 直接對應 `26-spawn-pressure.md` 的壓力累積：待越久怪越多
+      // 停留時間本身，**不是** Pressure —— Pressure 改由累積擊殺數推進
+      // （`26-spawn-pressure.md` § 26.3）。時間只剩生成隻數分布與 Boss 門檻在用。
       const minutes = (now - ctx.character.areaEnteredAt) / 60000;
       return minutes >= (condition.value ?? 0);
     }

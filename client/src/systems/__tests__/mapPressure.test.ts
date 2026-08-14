@@ -29,6 +29,14 @@ const testMap: MapData = {
   ],
 };
 
+function seedOneMonster() {
+  useMapMonsterStore.setState({
+    monsters: [
+      { id: 'seed', position: { x: 12, y: 12 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
+    ],
+  });
+}
+
 describe('Map Control Phase 3 - Pressure Integration', () => {
   beforeEach(() => {
     useMapMonsterStore.setState({
@@ -52,18 +60,15 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
 
   describe('Pressure affects monster cap', () => {
     it('maxMonsters = 3 + pressure', () => {
-      const now = Date.now();
-      const { pressure: p0 } = calculatePressure(now, now);
+      const { pressure: p0 } = calculatePressure(0);
       expect(p0).toBe(0);
       expect(3 + p0).toBe(3);
 
-      const fortyMinAgo = now - 40 * 60 * 1000;
-      const { pressure: p1 } = calculatePressure(fortyMinAgo, now);
+      const { pressure: p1 } = calculatePressure(640);
       expect(p1).toBe(1);
       expect(3 + p1).toBe(4);
 
-      const sixtyMinAgo = now - 60 * 60 * 1000;
-      const { pressure: p3 } = calculatePressure(sixtyMinAgo, now);
+      const { pressure: p3 } = calculatePressure(960);
       expect(p3).toBe(3);
       expect(3 + p3).toBe(6);
     });
@@ -96,10 +101,12 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       const store = useMapMonsterStore.getState();
       store.setMaxMonsters(10);
+      // 場上留一隻才量得到週期判定 —— 全空會走清場補位，直接繞過計時器（§ 26.2）
+      seedOneMonster();
 
       // With pressure=0, interval is 1000ms. 900ms should NOT trigger
       store.spawnTick(900, testMap, { x: 1, y: 1 }, 0);
-      expect(useMapMonsterStore.getState().monsters.length).toBe(0);
+      expect(useMapMonsterStore.getState().monsters.length).toBe(1);
 
       // Reset timer
       useMapMonsterStore.setState({ spawnTimer: 0 });
@@ -109,6 +116,42 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       // May or may not spawn depending on position finding, but timer should have fired
       expect(useMapMonsterStore.getState().spawnTimer).toBe(0);
 
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe('清場補位（§ 26.2）', () => {
+    it('場上全空時立即生成，不等判定間隔也不擲 15%', () => {
+      // random 回 0.99：週期判定會被 BASE_SPAWN_CHANCE 擋掉，補位不會
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+      useMapMonsterStore.setState({ monsters: [], spawnTimer: 0, maxMonsters: 3 });
+
+      useMapMonsterStore.getState().spawnTick(1, testMap, { x: 1, y: 1 }, 0);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBeGreaterThan(0);
+      expect(useMapMonsterStore.getState().spawnTimer).toBe(0);
+      vi.restoreAllMocks();
+    });
+
+    it('場上還有怪時不補位', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+      useMapMonsterStore.setState({ spawnTimer: 0, maxMonsters: 3 });
+      seedOneMonster();
+
+      useMapMonsterStore.getState().spawnTick(1, testMap, { x: 1, y: 1 }, 0);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBe(1);
+      vi.restoreAllMocks();
+    });
+
+    it('paused 時不補位', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      useMapMonsterStore.setState({ monsters: [], spawnTimer: 0, maxMonsters: 3, paused: true });
+
+      useMapMonsterStore.getState().spawnTick(1, testMap, { x: 1, y: 1 }, 0);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBe(0);
+      useMapMonsterStore.setState({ paused: false });
       vi.restoreAllMocks();
     });
   });
@@ -171,8 +214,9 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
     });
 
     it('can spawn boss when hasBossInPool is true and none on map', () => {
+      // 場上全空走清場補位，不擲 BASE_SPAWN_CHANCE（§ 26.2），
+      // 所以第一個 random 直接是 rollSpawnCount
       vi.spyOn(Math, 'random')
-        .mockReturnValueOnce(0) // spawn chance pass
         .mockReturnValueOnce(0.5) // rollSpawnCount → 1 monster
         .mockReturnValueOnce(0.05) // boss roll = true (< 0.1)
         .mockReturnValue(0.5); // position finding

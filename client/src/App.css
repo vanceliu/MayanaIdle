@@ -5325,6 +5325,24 @@ button.active {
   color: #EF4444;
 }
 
+/* § 24.8.6 回鍋經驗加倍倒數：金框，與 buff 藍框、debuff 紅框區隔 */
+.buff-icon.is-rested .game-icon {
+  border: 1px solid #F59E0B;
+  border-radius: var(--radius-sm);
+  box-sizing: content-box;
+  color: #F59E0B;
+}
+
+.buff-icon.is-rested {
+  width: auto;
+  min-width: 44px;
+  padding-inline: 5px;
+}
+
+.buff-tooltip-name.rested {
+  color: #F59E0B;
+}
+
 .buff-timer {
   font-size: var(--fs-sm);
   color: var(--text-secondary);

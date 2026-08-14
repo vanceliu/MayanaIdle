@@ -438,6 +438,22 @@ export class GameDB extends Dexie {
         row.action = action;
       });
     });
+
+    /*
+     * 升級節奏重塑：`areaKills`（Pressure 輸入）與回鍋加倍的兩個欄位。
+     *
+     * `lastSeenAt` 一定要回填成 upgrade 當下的時間，不能留 undefined ——
+     * 留空的話舊角色第一次上線會把「帳號建立至今」全算成離線時長，
+     * 直接領到滿額 24 小時（`04-character.md` § 4.11 不追溯發放）。
+     */
+    this.version(23).stores({}).upgrade(async tx => {
+      const now = Date.now();
+      await tx.table('characters').toCollection().modify(row => {
+        row.areaKills = 0;
+        row.restedExpMs = 0;
+        row.lastSeenAt = now;
+      });
+    });
   }
 }
 

@@ -110,27 +110,24 @@ describe('Integration: Character Creation Flow', () => {
 
 describe('Integration: Exploration and Pressure', () => {
   it('should start with low monster cap then scale up', () => {
-    const now = Date.now();
-
-    const early = calculatePressure(now - 30 * 1000, now);
+    const early = calculatePressure(10);
     expect(early.maxMonsters).toBe(3);
 
-    const later = calculatePressure(now - 50 * 60 * 1000, now); // 50 min → pressure 2
+    const later = calculatePressure(800); // 800 kills → pressure 2
     expect(later.maxMonsters).toBe(5);
   });
 
   it('should reset pressure on area change', () => {
-    const now = Date.now();
-    const oldAreaPressure = calculatePressure(now - 60 * 60 * 1000, now); // 60 min → pressure 3
+    const oldAreaPressure = calculatePressure(960); // 960 kills → pressure 3
     expect(oldAreaPressure.pressure).toBeGreaterThan(0);
 
-    const newAreaPressure = calculatePressure(now, now);
+    // 切圖時 areaKills 歸零（`26-spawn-pressure.md` § 26.3）
+    const newAreaPressure = calculatePressure(0);
     expect(newAreaPressure.pressure).toBe(0);
   });
 
   it('should cap maxMonsters at 10', () => {
-    const now = Date.now();
-    const result = calculatePressure(now - 150 * 60 * 1000, now); // 150 min → pressure 12
+    const result = calculatePressure(2400); // 2400 kills → pressure 12
     expect(result.maxMonsters).toBe(10);
   });
 });

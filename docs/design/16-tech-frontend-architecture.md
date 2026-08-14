@@ -291,7 +291,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 效果 | `activeEffects` | 角色 buff + 怪物 debuff（ActiveEffect[]） |
 | 戰鬥 | `combatLogs`, `selectedTargetIdx`, `lastDropResult` | 戰鬥日誌 / 目標 / 掉落結果 |
 | 計時器 | `gameLoopId`, `hpRegenId`, `mpRegenId`, `persistentLoopId` | 各 interval ID |
-| 天賦 | `combatRules`, `persistentRules`, `emergencyRetreat` | 戰鬥/常駐/緊急撤退 |
+| 天賦 | `scriptTemplates`, `activeTemplateId` | 天賦配置分頁；規則本體在 talentStore |
 | 藥水 | `lastPotionUsedAt`, `lastPotionCooldown` | 藥水冷卻追蹤 |
 | 戰鬥後 | `afterCombatHpThreshold`, `afterCombatMpThreshold`, `afterCombatHpResumeThreshold`, `afterCombatMpResumeThreshold` | 戰鬥後等待/恢復閾值（HP/MP %） |
 | 搜尋 | `searchMode` | 自動/手動搜尋模式。**只有模式，沒有「搜尋中」狀態** —— 遭遇由地圖紅點碰撞觸發（`38-map-control.md` § 搜尋模式對應） |
@@ -482,17 +482,16 @@ EmergencyRetreat → evaluateEmergencyRetreat(retreat, context) → RetreatActio
 // models/scriptTemplate.ts
 interface ScriptTemplate {
   id: string; name: string;
-  combatRules: CombatRule[]; persistentRules: PersistentRule[];
-  villageRules: VillageRule[];            // 49-village-script.md
-  emergencyRetreat: EmergencyRetreat;
+  emergencyRetreat: EmergencyRetreat;     // 規則本體在天賦格，見 51-auto-talent.md
 }
 ```
 
-- store 只有 `scriptTemplates` + `activeTemplateId`；
-  `combatRules` / `persistentRules` / `emergencyRetreat` **不是頂層 state**，
-  一律經 `selectCombatRules()` / `selectPersistentRules()` / `selectEmergencyRetreat()` 讀。
+- store 只有 `scriptTemplates` + `activeTemplateId`；`emergencyRetreat` **不是頂層 state**，
+  一律經 `selectEmergencyRetreat()` 讀。
   留一份頂層鏡像再同步回 template，遲早會不同步，症狀是「面板顯示 A、實際跑 B」
-- `setCombatRules()` 等 setter 一律寫進**使用中的那一頁**，寫完立刻 `saveLocalPreferences`
+- 戰鬥／常駐規則不存在 template 上，由 `talentStore` 的天賦格即時組出
+  （`talentCombatRules()` / `talentPersistentRules()`）
+- `setEmergencyRetreat()` 寫進**使用中的那一頁**，寫完立刻 `saveLocalPreferences`
 - 讀檔：`normalizeScriptTemplates()`；還沒有 template 的存檔由
   `wrapLegacyScriptsAsTemplate()` 把既有配置包成 id 為 `default` 的第一頁
   （規則格式相容，只是多一層容器，所以**照包不重置**）

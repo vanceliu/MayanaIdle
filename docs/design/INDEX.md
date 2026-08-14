@@ -87,6 +87,8 @@
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
+| 怪物經驗公式與結算倍率 | `28-monster-stats.md` | § 28.1 |
+| **回鍋經驗加倍（離線存量）** | `04-character.md` | § 4.11 |
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
 | 道具定義（藥水/卷軸/材料） | `30-items.md` | 全文 |
 | 城鎮設施（雜貨店/鐵匠/旅館等） | `13-town.md` | § 13.3~13.10 |
@@ -198,7 +200,11 @@
                                                   27-drop-table.md ←→ 30-items.md
                                                         ↕
                                                   06-equipment-acquire.md
-28-monster-stats.md → 04-character.md § 4.9 ←→ 09-dungeon.md
+28-monster-stats.md § 28.1 → 04-character.md § 4.9 ←→ 09-dungeon.md
+26-spawn-pressure.md § 26.3（掉落倍率）→ 27-drop-table.md
+04-character.md § 4.11（回鍋經驗加倍）
+  ✕  26-spawn-pressure.md —— 經驗軸與 Pressure 刻意不相接，見 § 4.11 連動注意
+  ←→ 18-data-schema.md § 18.11
 
 【角色外觀】
 04-character.md § 4.10

@@ -219,6 +219,10 @@ export async function importCharacterData(
     skills: importChar.skills,
     quests: importChar.quests ?? [],
     areaEnteredAt: Date.now(),
+    areaKills: 0,
+    // 加倍存量跟著角色走，漏了這兩行同樣不會報錯（`18-data-schema.md` § 18.11）
+    restedExpMs: importChar.restedExpMs ?? 0,
+    lastSeenAt: Date.now(),
   });
 
   // 共用倉庫裝備的 ownerId 是 userId，與 characterId 會撞號（§ 19.7）

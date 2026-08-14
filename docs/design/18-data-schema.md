@@ -371,3 +371,16 @@ seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**�
 - **換版清理**：`BUILD_INFO.version` 改變時刪除 `claimedAt` 不為 null 的信；
   **未領取的一律保留**（`52-mailbox.md` § 52.7.1）—— 刪掉等於沒收玩家的天賦格
 - 公告的 `lastReadVersion` 存本機設定，**不進 DB**
+
+## 18.11 回鍋經驗加倍（`04-character.md` § 4.11）
+
+角色資料新增兩個欄位：
+
+| 欄位 | 說明 |
+|---|---|
+| `restedExpMs` | 加倍時間存量（毫秒）。上限 43,200,000（12 小時） |
+| `lastSeenAt` | 上次在線時間戳。上線時以 `now - lastSeenAt` 換算離線時長 |
+
+- `lastSeenAt` 在遊戲迴圈中定期寫入，離線時長取兩次寫入的差值
+- 兩個欄位都隨角色匯出／匯入（§ 18.7），**不進遺產快照**（`45-legacy-archive.md`）
+- 舊角色以 `restedExpMs = 0`、`lastSeenAt = 上線當下` 補齊，不追溯發放

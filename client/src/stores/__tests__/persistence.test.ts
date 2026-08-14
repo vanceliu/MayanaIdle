@@ -2,11 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
-import { useGameStore, selectCombatRules, selectPersistentRules, selectEmergencyRetreat } from '../gameStore';
+import { useGameStore, selectEmergencyRetreat } from '../gameStore';
 import { emptyQuickSlots } from '../../models/quickSlot';
 import { bagItem } from '../../testing/bagFixtures';
 import { bagLayoutStorageKey } from '../../models/bagLayout';
-import { DEFAULT_COMBAT_SCRIPT, DEFAULT_PERSISTENT_SCRIPT } from '../../models/scriptEngine';
 
 // Mock localStorage for node environment
 const localStorageMock = (() => {
@@ -157,7 +156,7 @@ describe('Game persistence', () => {
     expect(useGameStore.getState().quickSlots[0]).toEqual({ kind: 'potion', potionType: 'red' });
   });
 
-  it('舊格式腳本重置成預設，但腳本以外的 prefs 保留', async () => {
+  it('舊存檔的腳本陣列被丟棄，但腳本以外的 prefs 保留', async () => {
     await useGameStore.getState().createCharacter('LegacyScript', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
     const charId = useGameStore.getState().character!.id!;
 
@@ -173,24 +172,21 @@ describe('Game persistence', () => {
     await useGameStore.getState().loadCharacter();
 
     const state = useGameStore.getState();
-    expect(selectCombatRules(state)).toEqual(DEFAULT_COMBAT_SCRIPT);
-    expect(selectPersistentRules(state)).toEqual(DEFAULT_PERSISTENT_SCRIPT);
+    expect(state.scriptTemplates[0]).not.toHaveProperty('combatRules');
+    expect(state.scriptTemplates[0]).not.toHaveProperty('persistentRules');
     // 腳本格式的世代交替不該波及進度資料
     expect(state.quickSlots[0]).toEqual({ kind: 'potion', potionType: 'orange' });
     expect(state.guildProgress).toEqual({ rank: 'C', points: 420 });
   });
 
-  it('還沒有 template 的存檔：既有腳本包成「預設」分頁，內容不動', async () => {
+  it('還沒有 template 的存檔：包成「預設」分頁，只留緊急撤退', async () => {
     await useGameStore.getState().createCharacter('WrapScript', 'elf', { STR: 0, AGI: 2, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
     const charId = useGameStore.getState().character!.id!;
 
-    // 現行規則格式，只是還沒有 template 這層容器 → 照包不重置
-    const combatRules = [
-      { id: 'c1', enabled: true, conditions: [{ type: 'aoe_hit_count_gte', value: 3 }], action: { type: 'skill', skillId: 'fireball' } },
-      { id: 'c2', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
-    ];
     localStorage.setItem(`mayana_prefs_${charId}`, JSON.stringify({
-      combatRules,
+      combatRules: [
+        { id: 'c1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'normal_attack' } },
+      ],
       persistentRules: [{ id: 'p1', enabled: true, conditions: [{ type: 'hp_below', value: 45 }], action: { type: 'potion', potionType: 'red' } }],
       emergencyRetreat: { enabled: true, hpThreshold: 22, action: 'flee_town' },
     }));
@@ -201,8 +197,7 @@ describe('Game persistence', () => {
     const state = useGameStore.getState();
     expect(state.scriptTemplates).toHaveLength(1);
     expect(state.scriptTemplates[0].name).toBe('預設');
-    expect(selectCombatRules(state)).toEqual(combatRules);
-    expect(selectPersistentRules(state)[0].conditions[0].value).toBe(45);
+    expect(state.scriptTemplates[0]).not.toHaveProperty('combatRules');
     expect(selectEmergencyRetreat(state).hpThreshold).toBe(22);
   });
 

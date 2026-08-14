@@ -76,6 +76,22 @@ export interface Character {
   skills: Skill[];
   quests: Quest[];
   areaEnteredAt: number;
+  /**
+   * 當前地圖的累積擊殺數，Pressure 的輸入（`26-spawn-pressure.md` § 26.3）。
+   * 與 `areaEnteredAt` 同生命週期：離開地圖／切圖／死亡一起歸零。
+   * 選填是為了相容 DB v22 以前的角色，讀取一律 `?? 0`。
+   */
+  areaKills?: number;
+  /**
+   * 回鍋經驗加倍的存量（毫秒），上限 24 小時（`04-character.md` § 4.11）。
+   * 選填是為了相容 DB v22 以前的角色，讀取一律 `?? 0`。
+   */
+  restedExpMs?: number;
+  /**
+   * 上次在線時間戳，離線時長由它與上線時間的差值換算（`18-data-schema.md` § 18.11）。
+   * 選填是為了相容 DB v22 以前的角色；缺值時視為無離線時間，不追溯發放。
+   */
+  lastSeenAt?: number;
   createdAt: number;
   dataVersion?: number;
   /**
