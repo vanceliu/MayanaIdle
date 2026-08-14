@@ -120,9 +120,9 @@ describe('天賦格 → 規則（`systems/talentRules.ts`）', () => {
     expect(rules[1].conditions).toEqual([{ type: 'hp_below', value: 70 }]);
   });
 
-  it('blocked 的項目不進規則（怪物側機制未做，§ 51.4.4）', () => {
+  it('blocked 的項目不進規則（引擎未接上，§ 51.4.3.2）', () => {
     const slots = [slot(1, 'combat', 0, {
-      conditions: [e('target_casting')],
+      conditions: [e('can_kill_target')],
       action: e('normal_attack'),
     })];
 

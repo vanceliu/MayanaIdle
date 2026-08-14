@@ -300,6 +300,7 @@ export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
   target_lacks_debuff: 'debuffs/poison-gas',
   target_cc_immune: 'debuffs/cracked-shield',
   target_shielded: 'buffs/shield-reflect',
+  target_casting: 'skills/star-swirl',
   field_has_race: 'debuffs/skull-crossed-bones',
   field_avg_hp_below: 'buffs/crosshair',
   can_kill_target: 'buffs/deadly-strike',

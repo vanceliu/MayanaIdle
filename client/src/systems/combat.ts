@@ -955,7 +955,9 @@ export function calculateMonsterAttack(
   char: Character,
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
-  monsterIdx: number = 0
+  monsterIdx: number = 0,
+  /** 詠唱攻擊的傷害倍率，套在基礎傷害上（`25-monster-system.md` § 25.11） */
+  damageMultiplier: number = 1,
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
@@ -1001,6 +1003,9 @@ export function calculateMonsterAttack(
 
   // Monster damage (apply attack debuffs)
   let rawDamage = randomInt(monster.attackMin, monster.attackMax);
+  if (damageMultiplier !== 1) {
+    rawDamage = Math.max(1, Math.floor(rawDamage * damageMultiplier));
+  }
   const atkDebuffPercent = getMonsterDebuffModifier(activeEffects, monsterIdx, 'attack');
   if (atkDebuffPercent !== 0) {
     rawDamage = Math.max(1, Math.floor(rawDamage * (100 + atkDebuffPercent) / 100));

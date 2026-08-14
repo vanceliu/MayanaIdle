@@ -130,6 +130,8 @@ export interface MonsterAttackEvent {
   monsterId: string;
   attackType?: MonsterAttackType;
   projectileSpeed?: number;
+  /** 詠唱攻擊的傷害倍率（`25-monster-system.md` § 25.11）。瞬發攻擊不帶 */
+  damageMultiplier?: number;
 }
 
 export interface MoveToEvent {
@@ -386,6 +388,7 @@ export function tickArpgEngine(
         monsterId: id,
         attackType: arpgMonster.attackConfig.attackType,
         projectileSpeed: arpgMonster.instance.projectileSpeed,
+        damageMultiplier: result.damageMultiplier,
       });
     }
   }
@@ -438,7 +441,12 @@ function buildScriptMonsters(engine: ArpgEngineState): ScriptMonsterView[] {
   const views: ScriptMonsterView[] = [];
   for (const [id, m] of engine.monsters) {
     if (m.instance.currentHp > 0) {
-      views.push({ id, instance: m.instance, position: m.mapMonster.position });
+      views.push({
+        id,
+        instance: m.instance,
+        position: m.mapMonster.position,
+        casting: m.combatCtx.state === 'casting',
+      });
     }
   }
   return views;

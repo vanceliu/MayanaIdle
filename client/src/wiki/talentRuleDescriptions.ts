@@ -41,6 +41,7 @@ export const COMBAT_CONDITION_DESC: Record<string, string> = {
   target_lacks_debuff: '當前目標身上沒有指定的 debuff。避免 DoT 與控場技重複覆蓋',
   target_cc_immune: '當前目標處於控場免疫窗內。這時放控場技是純浪費 MP',
   target_shielded: '當前目標有無敵效果或還有護盾量',
+  target_casting: '當前目標正在讀條施法。詠唱不可打斷，走出射程才會中止',
 };
 
 export const COMBAT_ACTION_DESC: Record<string, string> = {
@@ -144,7 +145,6 @@ const ALL_DESC: Record<string, string> = {
 
 /** 尚未接上判定引擎的說明（`talentSeeds.ts` 的 `PENDING_RULE_LABELS`） */
 const PENDING_DESC: Record<string, string> = {
-  target_casting: '目標正在讀條施法',
   can_kill_target: '本招的預期傷害足以擊殺當前目標',
   can_kill_count_gte: '本招的預期傷害足以擊殺 N 隻以上',
   switch_target_summoner: '把目標切到召喚出這批小怪的本體',

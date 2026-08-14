@@ -81,7 +81,9 @@ export type CombatConditionType =
   /** 場上怪物平均 HP 低於 X%（§ 51.4.6 T6） */
   | 'field_avg_hp_below'
   | 'target_cc_immune'
-  | 'target_shielded';
+  | 'target_shielded'
+  /** 目標正在詠唱前搖（`25-monster-system.md` § 25.11） */
+  | 'target_casting';
 
 /** 數值比較方向。「目標距離 大於／小於 N」這種一條鑲材兩個方向的用它 */
 export type CompareMode = 'gt' | 'lt';
@@ -189,6 +191,7 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
   target_lacks_debuff: '目標身上沒有指定 debuff',
   target_cc_immune: '目標控場免疫中',
   target_shielded: '目標無敵中／帶護盾',
+  target_casting: '目標正在詠唱',
 };
 
 /** 條件的補充說明，滑鼠移上去看得到（`03-combat.md` § 3.12） */

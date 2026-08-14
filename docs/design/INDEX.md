@@ -82,6 +82,7 @@
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
 | 怪物 Debuff 能力 | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
+| **怪物詠唱（前搖攻擊）** | `25-monster-system.md` | § 25.11 |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
@@ -182,6 +183,7 @@
 21-combat-formula.md                 22-basic-magic.md / 23-class-magic.md
        ↕                                                        ↕
 24-buff-debuff.md § 24.4.1 ←→ 25-monster-system.md § 25.8~25.9
+25-monster-system.md § 25.11 ←→ 48-vfx.md § 48.7a ←→ 51-auto-talent.md § 51.4.6
        ↕                                                        ↕
 07-affix.md § 7.10 ←→ 30-items.md ←→ 13-town.md ←→ 27-drop-table.md
        ↕

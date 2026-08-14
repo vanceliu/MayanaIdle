@@ -21,7 +21,6 @@ import type { TalentRuleDef, TalentSlotEntry, TalentType } from '../../models/ta
  * 全部標 `blocked`，接上之後把這裡的項目移進 `scriptEngine.ts` 的標籤表。
  */
 export const PENDING_RULE_LABELS: Record<string, string> = {
-  target_casting: '目標正在詠唱',
   can_kill_target: '本招可擊殺目標',
   can_kill_count_gte: '本招可擊殺 ≥ N 隻',
   switch_target_summoner: '切換目標：場上的召喚本體',
@@ -66,8 +65,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'target_lacks_debuff', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_cc_immune', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_shielded', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
-  // 怪物沒有詠唱狀態，§ 51.4.4 成對原則擋住
-  { ruleId: 'target_casting', kind: 'condition', appliesTo: COMBAT, group: 'target_state', blocked: true, blockedReason: 'monster' },
+  { ruleId: 'target_casting', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_distance', kind: 'condition', appliesTo: COMBAT, group: 'range' },
   { ruleId: 'monster_count_gte', kind: 'condition', appliesTo: COMBAT, group: 'range' },
   { ruleId: 'aoe_hit_count_gte', kind: 'condition', appliesTo: COMBAT, group: 'range' },

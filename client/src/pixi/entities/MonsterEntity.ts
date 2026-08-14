@@ -1,6 +1,7 @@
 import { Graphics, Container } from 'pixi.js';
 import { worldToScreen, getEntityDepth, TILE_H, TILE_W } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
+import { CastBar } from '../ui/CastBar';
 import { HealthBar } from '../ui/HealthBar';
 import { HIT_REACTION_ART } from '../ui/skillFx';
 import { HitReaction } from './hitReaction';
@@ -22,6 +23,7 @@ export class MonsterEntity {
   private targetRing: Graphics;
   private flash: Graphics;
   private healthBar: HealthBar;
+  private castBar: CastBar;
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
   private readonly hitReaction = new HitReaction();
   /** 沒有受擊偏移時該站的螢幕座標。淡出期間沒有 `updatePosition()` 可依靠 */
@@ -78,6 +80,8 @@ export class MonsterEntity {
 
     this.healthBar = new HealthBar(isBoss);
     this.container.addChild(this.healthBar.container);
+    this.castBar = new CastBar();
+    this.container.addChild(this.castBar.container);
   }
 
   private drawBossHorns(): void {
@@ -152,6 +156,7 @@ export class MonsterEntity {
   die(): void {
     this.hitReaction.die();
     this.healthBar.update(0, 1);
+    this.castBar.update(0);
   }
 
   /** 淡出演完了沒。呼叫端靠它決定何時把實體拿掉 */
@@ -187,6 +192,11 @@ export class MonsterEntity {
     this.container.zIndex = getEntityDepth(pos, elevation);
   }
 
+  /** 詠唱進度 0~1，0 ＝ 沒在詠唱（`systems/monsterCombatFSM.ts` 的 `castProgress`） */
+  updateCast(progress: number): void {
+    this.castBar.update(progress);
+  }
+
   updateHp(current: number, max: number): void {
     this.healthBar.update(current, max);
   }
@@ -209,6 +219,7 @@ export class MonsterEntity {
 
   destroy(): void {
     this.healthBar.destroy();
+    this.castBar.destroy();
     this.container.destroy({ children: true });
   }
 }

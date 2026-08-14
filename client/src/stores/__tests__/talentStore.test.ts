@@ -198,7 +198,7 @@ describe('talentStore（`51-auto-talent.md`）', () => {
 
     /* 沒接上引擎的選得上去卻永遠不觸發，玩家只會覺得規則寫錯了 */
     it('blocked 的不可放入', () => {
-      expect(canPlaceRule('target_casting', slot('combat'), 0)).toBe(false);
+      expect(canPlaceRule('can_kill_target', slot('combat'), 0)).toBe(false);
     });
 
     it('不存在的 ruleId 不可放入', () => {

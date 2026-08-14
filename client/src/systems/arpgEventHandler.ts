@@ -618,6 +618,8 @@ export function processMonsterAttack(
     equippedGear,
     activeEffects,
     monsterIdx,
+    // 詠唱攻擊帶倍率，瞬發不帶（`25-monster-system.md` § 25.11）
+    event.damageMultiplier ?? 1,
   );
 
   // 護盾吸收（§ 24.4.9）：在所有減傷之後、實際扣血之前

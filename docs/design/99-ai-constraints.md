@@ -30,9 +30,23 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 怪物詠唱（分支 `talent-simplify`）
+
+規格見 `25-monster-system.md` § 25.11。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| A | `monsterCombatFSM.ts`：加 `casting` 狀態與詠唱常數 | 完成 |
+| B | `arpgEngine.ts`：`monster_attack` 事件帶 `damageMultiplier`；`ScriptMonsterView` 帶 `casting` | 完成 |
+| C | `combat.ts`：`calculateMonsterAttack` 吃倍率 | 完成 |
+| D | `pixi/ui/CastBar.ts` ＋ `MonsterEntity`：怪物頭上的詠唱條 | 完成 |
+| E | `target_casting` 接上 evaluator，解除 `blocked` | 完成 |
+| F | 文件連動：`25-monster-system.md`、`51-auto-talent.md`、`48-vfx.md`、`INDEX.md` | 完成 |
+| G | 測試；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
+
 ### 自動天賦簡化（分支 `talent-simplify`，僅改設計文件）
 
-天賦格是唯一資源；條件與動作全部內建、開局全開、無 tier、無實體、無掉落、無綁定。
+規格見 `51-auto-talent.md`。
 
 | 階段 | 內容 | 狀態 |
 |---|---|---|
@@ -44,14 +58,9 @@
 | 6 | § 51.13 連動清單重寫為實際改動清單 | 完成 |
 | 7 | 連動文件 15 份全部改到位 | 完成 |
 
-- 一般怪的天賦掉落歸零後**不補回饋**，文件註明為已知取捨
-- 長尾條件保留 `pending`，語意改為「未開放，選單不出現」
-- 天賦格 T4 上限、`MULTI_GROUP_MAX = 3` 均維持
-
 ### 實作階段（分支 `talent-simplify`）
 
-`TalentAffixInstance` 整個消失，條件與動作改為天賦格上的欄位
-`{ ruleId, params }`，定義表以 **`ruleId` 為鍵**（塌陷後不再重複）。
+規格見 `51-auto-talent.md`，資料落點見 `18-data-schema.md` § 18.9。
 
 | 階段 | 內容 | 狀態 |
 |---|---|---|
@@ -66,14 +75,6 @@
 | I | `components/BagTalentTab.tsx`、`models/talentBag.ts`：只列未安裝天賦格 | 完成 |
 | J | Wiki：刪 `TalentAffixesPage`，`TalentsPage` 去除鑲材段 | 完成 |
 | K | 測試清理與新增；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
-
-**DB 遷移是 v22**：`talentAffixes` 整張表刪除，內容搬進天賦格欄位，
-對照表在 `db/migrations/talentAffixLegacy.ts`。**天賦格本身不動**。
-
-**能力塌陷的對應**（同 `ruleId` 的多階合成一筆，取完整版）：
-`skill`（2003/2004/2006，`skill_class_only` 刪除）、`buff_skill`（2103/2106）、
-`buy_item`（2204/2214）、`withdraw_item`（2205/2215）、
-`sell_materials`／`sell_equipment`（刪 `*_threshold_only`）。
 
 ### 尚未清理的殘留
 

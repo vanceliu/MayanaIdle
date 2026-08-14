@@ -45,17 +45,6 @@ export function TalentFusion() {
           只吃沒有安裝的天賦格 —— 裝在任何一份天賦配置上的都不會被吃掉。
         </p>
       </section>
-
-      <section className="fusion-section">
-        <h4 className="fusion-heading">
-          條件與動作
-          <span className="fusion-sub">全部內建，不必取得</span>
-        </h4>
-        <p className="fusion-note">
-          條件與動作在天賦格內直接選，沒有掉落、合成或兌換。
-          能寫幾條規則、每條掛幾個條件，只看你有幾個天賦格、階級多高。
-        </p>
-      </section>
     </div>
   );
 }

@@ -30,6 +30,8 @@ export interface ScriptMonsterView {
   id: string;
   instance: MonsterInstance;
   position: Position;
+  /** 正在詠唱前搖（`25-monster-system.md` § 25.11）。未帶＝false */
+  casting?: boolean;
 }
 
 export interface CombatScriptContext {
@@ -338,6 +340,10 @@ function checkCombatCondition(
     case 'target_shielded': {
       const target = getPrimaryTarget(ctx);
       return !!target && hasActiveShield(ctx.activeEffects ?? [], now, 'monster', target.id);
+    }
+    case 'target_casting': {
+      const target = getPrimaryTarget(ctx);
+      return target?.casting === true;
     }
 
     default:

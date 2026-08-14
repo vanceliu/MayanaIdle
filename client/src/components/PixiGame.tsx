@@ -31,6 +31,7 @@ import {
   isPawnWeaponType, weaponAimFromDelta, weaponPlaybackMs, WEAPON_ART,
 } from '../pixi/entities/pawn/weaponGeometry';
 import { isRangedAttackType } from '../models/monster';
+import { castProgress } from '../systems/monsterCombatFSM';
 import { isPlayerInvincible, absorbWithShield } from '../systems/combat';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance } from '../models/monster';
@@ -747,6 +748,12 @@ function tickArpgCombatLoop(
     deltaMs,
   });
 
+  if (monsterEntities) {
+    for (const [id, m] of engine.monsters) {
+      monsterEntities.get(id)?.updateCast(castProgress(m.combatCtx));
+    }
+  }
+
   // If player FSM is idle and autoMove (not paused), find next target
   if (engine.playerCtx.state === 'idle' && mapStore.autoMove && !mapStore.isMoving && !monsterStore.paused) {
     useMapControlStore.getState().pickRandomTarget();
@@ -869,7 +876,9 @@ function tickArpgCombatLoop(
           if (effectLayer) {
             const pPos = useMapControlStore.getState().playerPosition;
             const { sx, sy } = mapPositionToScreen(currentMap, pPos);
-            const dmgType: DamageType = result.isDodged ? 'miss' : 'normal';
+            const dmgType: DamageType = result.isDodged
+              ? 'miss'
+              : (event.damageMultiplier ?? 1) > 1 ? 'crit' : 'normal';
             const dmgValue = result.isDodged ? 0 : result.damage;
             const monster = monsterStore.monsters.find(m => m.id === event.monsterId);
             /* 遠程要有視線才演投射物；沒有視線就退回近戰演出（傷害照樣結算） */
