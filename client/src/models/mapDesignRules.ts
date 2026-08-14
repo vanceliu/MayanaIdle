@@ -197,7 +197,7 @@ export const THEME_TERRAIN_PALETTES: Readonly<Record<MapTheme, readonly TileType
 };
 
 /**
- * § 38.11.2 全地圖個性指派表（54 張，逐張照抄，不得由主題推導）
+ * § 38.11.2 全地圖個性指派表（55 張，逐張照抄，不得由主題推導）
  *
  * `isBossFloor` 依 `mapData.ts` 的 `isBossFloor` 欄位。
  */
@@ -243,6 +243,7 @@ export const MAP_DESIGN_PROFILES: Readonly<Record<string, MapDesignProfile>> = {
   'ancient-dungeon-8f': { archetype: 'room-corridor', density: 'very-dense', dominantTerrain: TileType.Pillar },
   'ancient-dungeon-9f': { archetype: 'room-corridor', density: 'sparse', dominantTerrain: TileType.Pillar, isBossFloor: true },
   // dragon
+  'dragon-valley-outskirts': { archetype: 'semi-open', density: 'standard', dominantTerrain: TileType.Rock },
   'dragon-valley-surface': { archetype: 'semi-open', density: 'sparse', dominantTerrain: TileType.Rock },
   'dragon-valley-1f': { archetype: 'semi-open', density: 'standard', dominantTerrain: TileType.Lava },
   'dragon-valley-2f': { archetype: 'semi-open', density: 'dense', dominantTerrain: TileType.Rock },

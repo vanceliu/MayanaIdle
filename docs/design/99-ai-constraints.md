@@ -76,6 +76,21 @@
 | J | Wiki：刪 `TalentAffixesPage`，`TalentsPage` 去除鑲材段 | 完成 |
 | K | 測試清理與新增；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
 
+### 龍之谷拆區（分支 `talent-simplify`）
+
+龍之谷地表拆成龍之谷外圍（Lv.30~35）與龍之谷（Lv.36~40）。
+規格見 `09-dungeon.md` § 9.8、`28-monster-stats.md` § 28.6、`27-drop-table.md`、`30-items.md`。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| A | 設計文件：`09` / `25` / `27` / `28` / `30` / `36` / `38` / `06-equipment-acquire` | 完成 |
+| B | `mapData.ts` 新區、`mapDesignRules.ts` 個性、`dragon-valley-outskirts.json` | 完成 |
+| C | `monsterSeeds.ts`：新怪 4 隻、飛龍升 Lv.40、巨人補 seed、骷髏系改無屬性 | 完成 |
+| D | `itemSeeds.ts` 龍蛻碎片；`dropSeeds.ts` 外圍掉落表 | 完成 |
+| E | `adventurerQuest.ts` 任務池；`sigilDrops.test.ts` 區域清單 | 完成 |
+| F | `assignCraftMaterials.mts --write`：T4 區帶加入外圍 | 完成 |
+| G | `dragonValleySplit.test.ts`；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
+
 ### 尚未清理的殘留
 
 `components/CombatScriptEditor.tsx`、`PersistentScriptEditor.tsx`、`VillageScriptEditor.tsx`、

@@ -238,7 +238,7 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 > | 類別 | 射程 | 怪物 | 出現區域 |
 > |---|---|---|---|
 > | 遠程魔法（巫師／魔導系 6 種） | 8 格 | 象牙巫師、象牙魔導師、暗影巫師、不死巫妖、霜凍女巫、精靈王魔導士 | 象牙塔全樓層、百柱塔 21~30F／31~40F／61~70F／91~100F |
-> | 遠程物理（弓箭手系 7 種） | 10 格 | 妖魔神射手、高階骷髏神射手、戰場骷髏弓手、遠古弓箭手、遠古神射手、高階哥布林弓手、精靈王射手 | 妖魔森林、龍之谷（地表／1F~4F）、遠古戰場、遠古地城 1F~9F、百柱塔 11~20F／91~100F |
+> | 遠程物理（弓箭手系 7 種） | 10 格 | 妖魔神射手、高階骷髏神射手、戰場骷髏弓手、遠古弓箭手、遠古神射手、高階哥布林弓手、精靈王射手 | 妖魔森林、龍之谷外圍、龍之谷 1F~4F、遠古戰場、遠古地城 1F~9F、百柱塔 11~20F／91~100F |
 >
 > 因此**上述所有區域的低窪障礙都已是雙向對射地形**，其餘區域仍維持「玩家單向優勢」。
 > **地圖設計不得為了遠程怪重新調整既有地形**（使用者已確認的約束）；
@@ -387,7 +387,7 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 
 ## 38.10 地圖清單與尺寸規範
 
-目前共 **57** 張靜態地圖：54 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
+目前共 **58** 張靜態地圖：55 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
 ＋ **3 張城鎮**（`neutral-town`／`elsarth-town`／`varden-town`，皆 30×20，主題 `town`）。
 
 | 主題 | 地圖 | 尺寸 |
@@ -404,7 +404,7 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 | `cave` | misty-cave-1f ~ 3f | 30×20 |
 | `prison` | underwater-prison-1f ~ 2f | 30×20 |
 | `prison` | underwater-prison-3f ~ 4f | 40×30 |
-| `dragon` | dragon-valley-1f ~ 4f | 30×20 |
+| `dragon` | dragon-valley-1f ~ 4f、dragon-valley-outskirts | 30×20 |
 | `dragon` | dragon-valley-5f ~ 7f、dragon-valley-surface | 40×30 |
 | `battlefield` | ancient-battlefield | 40×30 |
 | `ancient` | ancient-dungeon-1f ~ 4f | 30×20 |
@@ -510,6 +510,7 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 | `ancient-dungeon-7f` | ancient | 房間走廊 | 空曠 | 深淵 `15` | 大片斷裂地板 + 開闊 |
 | `ancient-dungeon-8f` | ancient | 房間走廊 | **極密** | 柱子 `12` | 最深柱林，壓迫感最高 |
 | `ancient-dungeon-9f` | ancient | 房間走廊 | 空曠 | 柱子 `12` | **Boss 層**，終層列柱大廳，中央 ≥ 8×8 |
+| `dragon-valley-outskirts` | dragon | 半開闊 | 標準 | 岩石 `11` | 谷口岩地，散落巨岩與灰燼沙洲 |
 | `dragon-valley-surface` | dragon | 半開闊 | 空曠 | 岩石 `11` | 地表谷地開闊 |
 | `dragon-valley-1f` | dragon | 半開闊 | 標準 | 岩漿 `14` | 熔岩支流 |
 | `dragon-valley-2f` | dragon | 半開闊 | 密集 | 岩石 `11` | 亂石谷 |

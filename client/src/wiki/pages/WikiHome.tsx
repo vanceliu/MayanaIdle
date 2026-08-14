@@ -14,8 +14,7 @@ const CATEGORIES = [
   { path: '/wiki/attributes', label: '屬性公式', desc: 'STR/AGI/VIT/SPI/INT/CHA 效果' },
   { path: '/wiki/combat', label: '戰鬥計算', desc: '攻擊力、技能、命中、防禦公式' },
   { path: '/wiki/quests', label: '任務', desc: '冒險者工會、職業工會任務、貢獻等階' },
-  { path: '/wiki/talents', label: '自動天賦', desc: '天賦格與鑲材、三種天賦的條件與實作、掉落與升級' },
-  { path: '/wiki/talents/affixes', label: '鑲材總表', desc: '全部鑲材的階級、種類、適用類型、型態與取得管道' },
+  { path: '/wiki/talents', label: '自動天賦', desc: '天賦格、三種天賦的條件與實作、掉落與升級' },
   { path: '/wiki/credits', label: '素材來源', desc: '第三方素材的作者、授權與來源網址' },
 ];
 

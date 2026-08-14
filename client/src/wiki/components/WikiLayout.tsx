@@ -16,7 +16,6 @@ const NAV_ITEMS = [
   { path: '/wiki/combat', label: '戰鬥計算' },
   { path: '/wiki/quests', label: '任務系統' },
   { path: '/wiki/talents', label: '自動天賦' },
-  { path: '/wiki/talents/affixes', label: '鑲材' },
   { path: '/wiki/credits', label: '素材來源' },
 ];
 

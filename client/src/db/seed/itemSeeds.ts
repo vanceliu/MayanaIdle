@@ -90,6 +90,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 154, name: '逆光鏡片', category: 'material', description: '碎鏡之影留下的鏡片', weight: 5, sellPrice: 480, iconType: 'crystal', iconTier: 3 },
 
   // === 區域素材（龍之谷）===
+  { id: 155, name: '龍蛻碎片', category: 'material', description: '谷口幼龍蛻下的鱗屑', weight: 4, sellPrice: 240, iconType: 'fabric', iconTier: 3 },
   { id: 52, name: '飛龍鱗片', category: 'material', description: '飛龍的鱗片', weight: 4, sellPrice: 200, iconType: 'fabric', iconTier: 3 },
   { id: 53, name: '骷髏兵裝飾', category: 'material', description: '高階骷髏兵的裝飾', weight: 4, sellPrice: 280, iconType: 'misc', iconTier: 3 },
   { id: 54, name: '亞利安結晶', category: 'material', description: '亞利安的結晶', weight: 4, sellPrice: 360, iconType: 'crystal', iconTier: 3 },

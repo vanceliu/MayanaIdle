@@ -30,7 +30,7 @@ const TIER_AREAS: Record<number, string[]> = {
   4: [
     'trial-highlands', 'trial-highlands-top', 'snow-field', 'demon-forest',
     'rotleaf-path', 'demon-altar', 'mirror-forest', 'glimmer-shore',
-    'shattered-mirror', 'dragon-valley-surface', 'snow-field-deep',
+    'shattered-mirror', 'dragon-valley-outskirts', 'dragon-valley-surface', 'snow-field-deep',
   ],
   5: [
     'ancient-battlefield',

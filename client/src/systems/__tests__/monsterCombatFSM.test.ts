@@ -58,13 +58,15 @@ describe('monsterCombatFSM', () => {
     ctx.state = 'attacking';
     ctx.attackTimer = 0;
     const config = { ...DEFAULT_MONSTER_ATTACK_CONFIG, attackInterval: 100 };
+    // rng 回 1 → 必定走瞬發那條（§ 25.11 的詠唱有 CAST_CHANCE 機率，不注入會隨機變 casting）
+    const noCast = () => 1;
 
     // First tick: timer accumulates
-    tickMonsterCombat(ctx, { x: 0, y: 0 }, { x: 1, y: 0 }, config, openMap, 50);
+    tickMonsterCombat(ctx, { x: 0, y: 0 }, { x: 1, y: 0 }, config, openMap, 50, false, noCast);
     expect(ctx.attackTimer).toBe(50);
 
     // Second tick: timer exceeds interval
-    const result = tickMonsterCombat(ctx, { x: 0, y: 0 }, { x: 1, y: 0 }, config, openMap, 60);
+    const result = tickMonsterCombat(ctx, { x: 0, y: 0 }, { x: 1, y: 0 }, config, openMap, 60, false, noCast);
     expect(result.action).toBe('attack');
     expect(ctx.attackTimer).toBe(0);
   });

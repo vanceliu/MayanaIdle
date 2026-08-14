@@ -49,7 +49,7 @@ export const ZONES: Zone[] = [
     faction: 'neutral',
     levelMin: 30,
     levelMax: 50,
-    regions: ['dragon-valley-surface', 'dragon-valley'],
+    regions: ['dragon-valley-outskirts', 'dragon-valley-surface', 'dragon-valley'],
     connectedZones: ['grey-ridge'],
   },
   {
@@ -305,14 +305,24 @@ const vardenTown: Region = {
 
 // --- 龍之谷 ---
 
+const dragonValleyOutskirts: Region = {
+  id: 'dragon-valley-outskirts',
+  name: '龍之谷外圍',
+  type: 'field',
+  levelMin: 30,
+  levelMax: 35,
+  zoneId: 'dragon-valley-zone',
+  monsters: ['谷口幼龍', '高階骷髏神射手', '高階骷髏警衛', '高階骷髏斥候', '熔岩巨蜥'],
+};
+
 const dragonValleySurface: Region = {
   id: 'dragon-valley-surface',
   name: '龍之谷',
   type: 'field',
-  levelMin: 30,
+  levelMin: 36,
   levelMax: 40,
   zoneId: 'dragon-valley-zone',
-  monsters: ['飛龍', '高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '亞利安', '巨人'],
+  monsters: ['高階骷髏鬥士', '亞利安', '巨人', '高階骷髏將領', '飛龍'],
 };
 
 const dragonValleyDungeon: Region = {
@@ -520,6 +530,7 @@ export const REGIONS: Region[] = [
   underwaterPrison,
   vardenTown,
   // 龍之谷
+  dragonValleyOutskirts,
   dragonValleySurface,
   dragonValleyDungeon,
   // 灰脊山脈

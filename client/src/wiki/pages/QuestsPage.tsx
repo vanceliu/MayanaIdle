@@ -32,8 +32,8 @@ export function QuestsPage() {
             </thead>
             <tbody>
               <tr><td>薄暮村</td><td>D / C / B / B+ / A / A+</td><td>曙光草原 ~ 象牙塔 5F</td></tr>
-              <tr><td>艾爾薩斯</td><td>A / A+ / S / S+</td><td>妖魔森林三段、龍之谷、朦朧洞窟、龍谷地間、百柱塔、遠古地監等</td></tr>
-              <tr><td>瓦爾登</td><td>A / A+ / S / S+</td><td>明鏡森林三段、龍之谷、水下監獄、龍谷地間、百柱塔、遠古地監等</td></tr>
+              <tr><td>艾爾薩斯</td><td>A / A+ / S / S+</td><td>妖魔森林三段、龍之谷兩段、朦朧洞窟、龍谷地間、百柱塔、遠古地監等</td></tr>
+              <tr><td>瓦爾登</td><td>A / A+ / S / S+</td><td>明鏡森林三段、龍之谷兩段、水下監獄、龍谷地間、百柱塔、遠古地監等</td></tr>
             </tbody>
           </table>
         </div>
@@ -89,7 +89,7 @@ export function QuestsPage() {
               <tr><td>D 級</td><td>曙光草原、翠綠谷地</td><td className="cell-number">15~20</td><td className="cell-number">50~60</td><td className="cell-number">—</td></tr>
               <tr><td>C 級</td><td>風語林地、迷霧沼澤、試煉高地</td><td className="cell-number">15~20</td><td className="cell-number">55~70</td><td className="cell-number">—</td></tr>
               <tr><td>B 級 / B+ 級</td><td>試煉高地頂部、雪原、象牙塔 1F／2F／3F</td><td className="cell-number">20~25</td><td className="cell-number">60~80</td><td className="cell-number">1~3</td></tr>
-              <tr><td>A 級 / A+ 級</td><td>妖魔森林三段、明鏡森林三段、龍之谷、遠古戰場、象牙塔 4F／5F、朦朧洞窟／水下監獄／龍谷地間各樓層、百柱塔 1-30F、遠古地監 1F～6F</td><td className="cell-number">20~30</td><td className="cell-number">70~90</td><td className="cell-number">1~3</td></tr>
+              <tr><td>A 級 / A+ 級</td><td>妖魔森林三段、明鏡森林三段、龍之谷兩段、遠古戰場、象牙塔 4F／5F、朦朧洞窟／水下監獄／龍谷地間各樓層、百柱塔 1-30F、遠古地監 1F～6F</td><td className="cell-number">20~30</td><td className="cell-number">70~90</td><td className="cell-number">1~3</td></tr>
               <tr><td>S 級 / S+ 級</td><td>百柱塔 31-100F、遠古地監 7F／8F／9F</td><td className="cell-number">25~30</td><td className="cell-number">80~100</td><td className="cell-number">1~3</td></tr>
             </tbody>
           </table>

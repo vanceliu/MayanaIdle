@@ -582,15 +582,15 @@ describe('checkLowObstacleBypass', () => {
 });
 
 describe('MAP_DESIGN_PROFILES', () => {
-  it('涵蓋 54 張地圖', () => {
-    expect(Object.keys(MAP_DESIGN_PROFILES)).toHaveLength(54);
+  it('涵蓋 55 張地圖', () => {
+    expect(Object.keys(MAP_DESIGN_PROFILES)).toHaveLength(55);
   });
 
   it('每張正式地圖都有 profile，且主導地形在該 theme 的色盤內', async () => {
     clearMapCache();
     // 城鎮（§ 13.2.1）與試驗場（`50-training-ground.md` § 50.3）不進 profile、不套設計規範
     const maps = (await loadAllMaps()).filter(isDesignRegulatedMap);
-    expect(maps).toHaveLength(54);
+    expect(maps).toHaveLength(55);
 
     for (const map of maps) {
       const designProfile = getMapDesignProfile(map.id);
