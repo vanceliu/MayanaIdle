@@ -53,6 +53,7 @@ const TOWN_NAMES: Record<QuestTownId, string> = {
   'neutral-town': '薄暮村',
   'elsarth-town': '艾爾薩斯',
   'varden-town': '瓦爾登',
+  'greyridge-town': '灰脊',
 };
 
 export function AdventurerGuild() {

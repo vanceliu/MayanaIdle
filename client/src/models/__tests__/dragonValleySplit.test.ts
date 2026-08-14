@@ -74,15 +74,16 @@ describe('龍之谷地表拆分', () => {
     expect(areas, `${EXCLUSIVE_MATERIAL.name} 應為外圍限定`).toEqual([EXCLUSIVE_MATERIAL.area]);
   });
 
-  it('兩區都進 A 級任務池，且同時掛在兩座陣營城鎮（§ 36.12.3 共享區域）', () => {
+  it('兩區都進 A 級任務池，且只掛在灰脊分部（§ 36.12.3）', () => {
     const inPool = (pool: { areaId: string }[] | undefined, id: string) =>
       (pool ?? []).some(entry => entry.areaId === id);
 
     for (const { id } of CHAIN) {
       expect(inPool(AREA_POOLS.A, id), `${id} 不在 A 級區域池`).toBe(true);
       expect(MONSTER_POOLS.A.some(m => m.area === id), `${id} 的怪沒進 A 級怪物池`).toBe(true);
-      expect(inPool(TOWN_AREA_POOLS['elsarth-town'].A, id), `${id} 不在艾爾薩斯池`).toBe(true);
-      expect(inPool(TOWN_AREA_POOLS['varden-town'].A, id), `${id} 不在瓦爾登池`).toBe(true);
+      expect(inPool(TOWN_AREA_POOLS['greyridge-town'].A, id), `${id} 不在灰脊池`).toBe(true);
+      expect(inPool(TOWN_AREA_POOLS['elsarth-town'].A, id), `${id} 不該在艾爾薩斯池`).toBe(false);
+      expect(inPool(TOWN_AREA_POOLS['varden-town'].A, id), `${id} 不該在瓦爾登池`).toBe(false);
     }
   });
 

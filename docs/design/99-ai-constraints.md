@@ -91,6 +91,31 @@
 | F | `assignCraftMaterials.mts --write`：T4 區帶加入外圍 | 完成 |
 | G | `dragonValleySplit.test.ts`；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
 
+### 灰脊城鎮（分支 `talent-simplify`）
+
+灰脊山脈新增第四座城鎮 `greyridge-town`，三階梯版面、12 設施全套、無新手指導員。
+規格見 `13-town.md` § 13.2~13.2.1、`36-quest-system.md` § 36.12.2。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| A | 設計文件：`01` / `09` / `13` / `30` / `36` / `38` / `46` | 完成 |
+| B | `mapData.ts` region＋zone＋`getNearestTown`；`greyridge-town.json` | 完成 |
+| C | `itemSeeds.ts` 灰脊回城卷軸；`townScroll.ts` | 完成 |
+| D | `adventurerQuest.ts` 任務池（龍之谷與百柱塔改為灰脊專屬）；`AdventurerGuild.tsx` 鎮名 | 完成 |
+| E | 測試：`townMaps` / `trainingGround` / `townScroll` / `adventurerQuestSystem` / `mapData` / `regionGroup` / `mapDataControl` / `dragonValleySplit` | 完成 |
+| F | `npx tsc -b` ＋ `vitest` 全綠 | 完成 |
+
+### 龍谷地間產出分化（分支 `talent-simplify`）
+
+龍谷地間定位為金幣與賣錢素材產地，遠古地監維持 T6 裝備獵場。
+重疊等級帶（Lv.45~50）的單位擊殺收益比值目標 1.5×。遠古地監不動。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| A | `dropSeeds.ts`：龍谷地間 1~7F 金幣掉落量 | 完成 |
+| B | `09-dungeon.md` § 9.10、`INDEX.md` 補上兩座副本的產出定位 | 完成 |
+| C | `dungeonYieldSplit.test.ts`；`npx tsc -b` ＋ `vitest` 全綠 | 完成 |
+
 ### 尚未清理的殘留
 
 `components/CombatScriptEditor.tsx`、`PersistentScriptEditor.tsx`、`VillageScriptEditor.tsx`、

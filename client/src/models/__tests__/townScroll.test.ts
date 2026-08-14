@@ -1,16 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { findScrollInBag, consumeTownScroll, TOWN_SCROLL_CONFIG, ALL_TOWN_SCROLLS } from '../townScroll';
 import { getItemId } from '../items';
+import { REGIONS, getRegion } from '../mapData';
 
 /** 測試以名稱閱讀，實際比對的一律是 id */
 const id = (name: string) => getItemId(name)!;
 
 describe('townScroll', () => {
   describe('TOWN_SCROLL_CONFIG', () => {
-    it('should define scrolls for all three towns', () => {
-      expect(TOWN_SCROLL_CONFIG['neutral-town']).toBeDefined();
-      expect(TOWN_SCROLL_CONFIG['elsarth-town']).toBeDefined();
-      expect(TOWN_SCROLL_CONFIG['varden-town']).toBeDefined();
+    it('每座城鎮都有自己的回城卷軸（§ 13.4）', () => {
+      const townIds = REGIONS.filter(r => r.type === 'town').map(r => r.id);
+      for (const townId of townIds) {
+        expect(TOWN_SCROLL_CONFIG[townId], townId).toBeDefined();
+      }
+      expect(ALL_TOWN_SCROLLS).toHaveLength(townIds.length);
     });
 
     it('should have correct town IDs and names', () => {
@@ -18,6 +21,13 @@ describe('townScroll', () => {
       expect(TOWN_SCROLL_CONFIG['neutral-town'].townName).toBe('薄暮村');
       expect(TOWN_SCROLL_CONFIG['elsarth-town'].townName).toBe('艾爾薩斯城鎮');
       expect(TOWN_SCROLL_CONFIG['varden-town'].townName).toBe('瓦爾登城鎮');
+      expect(TOWN_SCROLL_CONFIG['greyridge-town'].townName).toBe('灰脊城鎮');
+    });
+
+    it('卷軸綁的城鎮名與 region 名一致', () => {
+      for (const scroll of ALL_TOWN_SCROLLS) {
+        expect(getRegion(scroll.townId)?.name, scroll.name).toBe(scroll.townName);
+      }
     });
 
     it('每張回城卷軸的 itemId 都對得上 seed', () => {

@@ -83,7 +83,7 @@ client/
 │   │   ├── QuestTracker.tsx  # 任務按鈕（PanelDock）+ 任務內容（浮動視窗，§ 36.10.3）
 │   │   ├── CharacterStats.tsx
 │   │   ├── BattleView.tsx
-│   │   ├── ExploreBar.tsx    # 探索控制列（自動/手動搜尋、探索/戰鬥指示）
+│   │   ├── ExploreBar.tsx    # 探索控制列（自動/手動搜尋、探索/戰鬥指示、停留時間）
 │   │   ├── EquipmentPanel.tsx
 │   │   ├── EquipmentInfo.tsx    # 統一裝備資訊顯示元件
 │   │   ├── BagPanel.tsx
@@ -202,10 +202,15 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 > 改完要用 `document.elementFromPoint()` 驗命中；不可用 `dispatchEvent` 直接對 canvas 派事件。
 
 **地圖選擇器：** 觸發鈕與下拉選單**必須同寬**（都 340px），選單不可另設 `min-width`。
+區域清單中**城鎮排在最上方**，其餘依等級遞增（由 `getRegionsByZone()` 決定順序）。
 
 **城鎮與野外的一致性：** 城鎮沒有探索控制，但 `ExploreBar` 仍包在
 `.explore-bar-slot` 內以 `visibility: hidden` 保留位置（`.is-hidden`）。
 不可改用「城鎮不渲染 ExploreBar」的寫法。
+
+**停留時間：** 探索控制列最右端顯示待在目前地圖的時間，格式 `5:07`，滿一小時進位為 `1:05:07`。
+時鐘基準是 `character.areaEnteredAt`，與生怪壓力（`26-spawn-pressure.md` § 26.4）同源 ——
+畫面上的數字即壓力累積進度。該欄位在選角進入遊戲時重設，故顯示的是本次上線後的停留時間。
 
 #### § 32.3.1 戰鬥紀錄視窗（CombatLogWindow）
 
@@ -581,7 +586,7 @@ interface ScriptTemplate {
 | `QuestTracker` | `QuestTrackerButton`（PanelDock 內，帶任務數量 badge）+ `QuestTrackerContent`（浮動視窗內容） |
 | `CharacterStats` | 六大屬性詳細數值、戰鬥數據（含詞綴 + buff + 裝備 regen 加成） |
 | `BattleView` | Pixi 地圖容器、戰鬥日誌（含 log 大小切換） |
-| `ExploreBar` | 探索控制（自動/手動搜尋）、探索/戰鬥指示、死亡橫幅；位於頂部 HUD |
+| `ExploreBar` | 探索控制（自動/手動搜尋）、探索/戰鬥指示、停留時間、死亡橫幅；位於頂部 HUD |
 | `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作。**兩欄部位格**（2×5）：格子只印部位名 + 裝備名（Tier 色與背包同源），數值／詞綴／材質／職業一律 hover tooltip；空部位畫虛線框；選取用金色外框，與 `.bag-cell.is-selected` 同一套 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
@@ -1156,6 +1161,11 @@ interface TooltipProps {
 - 視窗寬 480px、高 `82vh`（`.floating-window.is-script`）。
   固定高度是為了讓 tab 列釘在頂端、只有規則清單捲動 ——
   若沿用 `.floating-window-body` 預設的 auto 高度 + `overflow-y`，捲動會發生在 body 上而把 tab 一起帶走
+- **捲動發生在分頁內容自己身上**：body 是 `overflow: hidden` 的 flex 容器，
+  每個分頁的根元素都必須列進 `.floating-window.is-script` 的
+  `flex: 1; min-height: 0; overflow-y: auto` 規則（天賦三頁是 `.talent-editor`、
+  合成頁是 `.talent-fusion`）。漏列的分頁會溢出被裁掉且沒有捲軸，
+  由 `ScriptPanelScroll.test.tsx` 把守
 - 內容為四個 tab：常駐／戰鬥／補給／天賦合成，預設為常駐（tab 選擇為視窗內 local state，關閉即重置）
 - 常駐分頁含：天賦格編輯、排序、緊急撤退設定、戰鬥後等待/恢復閾值（HP/MP %）
 - 戰鬥後等待閾值修改後自動 saveState 持久化
@@ -1166,7 +1176,7 @@ interface TooltipProps {
 | 匯出 | 說明 |
 |---|---|
 | `ScriptEditorButton` | PanelDock 內的觸發鈕（帶規則數量 badge） |
-| `ScriptEditorContent` | 視窗內容（tab 列 + `PersistentScriptEditor` / `CombatScriptEditor`），由 `PanelWindows` 包在 `FloatingWindow` 內渲染 |
+| `ScriptEditorContent` | 視窗內容（template 列 + tab 列 + `TalentTypeEditor` / `TalentFusion`），由 `PanelWindows` 包在 `FloatingWindow` 內渲染 |
 
 ## 32.17 行動裝置模組邊界
 

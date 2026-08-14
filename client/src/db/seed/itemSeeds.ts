@@ -17,6 +17,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 4, name: '薄暮村回城卷軸', category: 'scroll', description: '使用後傳送至薄暮村', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
   { id: 5, name: '艾爾薩斯回城卷軸', category: 'scroll', description: '使用後傳送至艾爾薩斯城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
   { id: 6, name: '瓦爾登回城卷軸', category: 'scroll', description: '使用後傳送至瓦爾登城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
+  { id: 156, name: '灰脊回城卷軸', category: 'scroll', description: '使用後傳送至灰脊城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
 
   // === 強化卷軸 ===
   { id: 7, name: '武器強化卷軸', category: 'scroll', description: '鐵匠鋪武器強化用', weight: 1, buyPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6' },

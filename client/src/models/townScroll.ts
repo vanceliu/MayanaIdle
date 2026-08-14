@@ -29,6 +29,13 @@ export const TOWN_SCROLL_CONFIG: Record<string, TownScrollInfo> = {
     townName: '瓦爾登城鎮',
     price: 500,
   },
+  'greyridge-town': {
+    itemId: 156,
+    name: '灰脊回城卷軸',
+    townId: 'greyridge-town',
+    townName: '灰脊城鎮',
+    price: 500,
+  },
 };
 
 export const ALL_TOWN_SCROLLS = Object.values(TOWN_SCROLL_CONFIG);

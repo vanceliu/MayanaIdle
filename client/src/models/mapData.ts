@@ -58,7 +58,7 @@ export const ZONES: Zone[] = [
     faction: 'neutral',
     levelMin: 40,
     levelMax: 100,
-    regions: ['ancient-battlefield', 'hundred-pillar-1-10f', 'hundred-pillar-11-20f', 'hundred-pillar-21-30f', 'hundred-pillar-31-40f', 'hundred-pillar-41-50f', 'hundred-pillar-51-60f', 'hundred-pillar-61-70f', 'hundred-pillar-71-80f', 'hundred-pillar-81-90f', 'hundred-pillar-91-100f', 'ancient-dungeon'],
+    regions: ['greyridge-town', 'ancient-battlefield', 'hundred-pillar-1-10f', 'hundred-pillar-11-20f', 'hundred-pillar-21-30f', 'hundred-pillar-31-40f', 'hundred-pillar-41-50f', 'hundred-pillar-51-60f', 'hundred-pillar-61-70f', 'hundred-pillar-71-80f', 'hundred-pillar-81-90f', 'hundred-pillar-91-100f', 'ancient-dungeon'],
     connectedZones: ['newbie-neutral', 'elsarth', 'varden', 'dragon-valley-zone'],
   },
 ];
@@ -141,9 +141,8 @@ const neutralTown: Region = {
 /**
  * 試驗場（`50-training-ground.md`）。
  *
- * `zoneId` 指向新手中立區只是為了讓 `getNearestTown` 有東西可退（離開時回薄暮村）；
- * 它**沒有被列進任何 Zone 的 `regions`**，所以不會出現在地圖導覽選單裡 ——
- * 唯一入口是城鎮的試驗場管理員 NPC。
+ * `zoneId` 掛新手中立區只為讓 `getNearestTown` 有得退；
+ * **不列進任何 Zone 的 `regions`**，入口只有城鎮的試驗場管理員 NPC。
  */
 const trainingGround: Region = {
   id: TRAINING_GROUND_REGION_ID,
@@ -345,6 +344,15 @@ const dragonValleyDungeon: Region = {
 
 // --- 灰脊山脈 ---
 
+const greyridgeTown: Region = {
+  id: 'greyridge-town',
+  name: '灰脊城鎮',
+  type: 'town',
+  levelMin: 1,
+  levelMax: 99,
+  zoneId: 'grey-ridge',
+};
+
 const ancientBattlefield: Region = {
   id: 'ancient-battlefield',
   name: '遠古戰場',
@@ -534,6 +542,7 @@ export const REGIONS: Region[] = [
   dragonValleySurface,
   dragonValleyDungeon,
   // 灰脊山脈
+  greyridgeTown,
   ancientBattlefield,
   hundredPillar1_10,
   hundredPillar11_20,
@@ -563,12 +572,12 @@ export function getRegion(regionId: string): Region | undefined {
 /**
  * 導覽用的區域清單。
  *
- * 排除試驗場（`50-training-ground.md` § 50.2）—— 它掛在中立區的 `zoneId` 只是
- * 為了讓 `getNearestTown` 有東西可退，本身不是一個「去得了的地方」，
- * 唯一入口是城鎮 NPC。留在清單裡會讓地圖選擇器多出一個假選項。
+ * 排除試驗場（`50-training-ground.md` § 50.2）。
+ * **城鎮排最前**，其餘維持宣告順序（`16-tech-frontend-architecture.md` § 32.3）。
  */
 export function getRegionsByZone(zoneId: string): Region[] {
-  return REGIONS.filter(r => r.zoneId === zoneId && r.type !== 'training');
+  const regions = REGIONS.filter(r => r.zoneId === zoneId && r.type !== 'training');
+  return [...regions.filter(r => r.type === 'town'), ...regions.filter(r => r.type !== 'town')];
 }
 
 /** `resolveArea` 的結果：area id 對應的 region、樓層與**該樓層**的等級區間 */
@@ -583,13 +592,9 @@ export interface ResolvedArea {
 /**
  * 把 **area id** 解析成 region 與等級區間。
  *
- * 掉落表、任務、地圖用的是 **area id**，副本樓層的 area id 是
- * `<regionId>-<floor>f`（例：`ivory-tower-3f`），**不是 region id** ——
- * 直接丟給 `getRegion()` 會拿到 undefined，區域等級就會退化成 1，
- * 連帶讓該副本的詞綴階級權重（`07-affix.md` § 7.7）與特殊詞綴機率（§ 7.10.3）全部算錯。
- *
- * 有樓層時回傳**該樓層**的等級區間，而不是整座副本的 —— 掉落表本來就是逐層列的
- * （`27-drop-table.md` § 27.3）。
+ * 副本樓層的 area id 是 `<regionId>-<floor>f`（例：`ivory-tower-3f`），**不是 region id**，
+ * 直接丟 `getRegion()` 會拿到 undefined，區域等級靜默退化成 1。
+ * 有樓層時回傳**該樓層**的等級區間（`27-drop-table.md` § 27.3）。
  */
 export function resolveArea(areaId: string): ResolvedArea | undefined {
   const direct = getRegion(areaId);
@@ -632,9 +637,8 @@ export function getScrollSegmentForFloor(floor: number, segmentSize: number): nu
 /**
  * 分段式副本（百柱塔）進入某層所需的通行卷軸 id。
  *
- * 卷軸有十張、隨樓層區段遞增，逐一寫進 region 反而更容易漏；因此這裡**唯一**
- * 允許以名稱組出卷軸再換成 id，換算只發生在這個函式裡，其餘一律傳 id。
- * `itemIdIntegrity.test.ts` 會掃過所有區段，確保每一張都反查得到。
+ * 全專案**唯一**允許以名稱組出卷軸再換 id 的地方，其餘一律傳 id
+ * （`99-ai-constraints.md` § 99.1），由 `itemIdIntegrity.test.ts` 全段掃過。
  */
 export function getRequiredScrollItemId(regionId: string, targetFloor: number): number | null {
   const region = getRegion(regionId);
@@ -644,11 +648,20 @@ export function getRequiredScrollItemId(regionId: string, targetFloor: number): 
   return getItemId(`${region.name} ${segment}F 通行卷軸`) ?? null;
 }
 
+/** 自己沒有城鎮的 Zone 退到哪一座（`13-town.md` § 13.2） */
+const ZONE_FALLBACK_TOWN: Record<string, string> = {
+  'dragon-valley-zone': 'greyridge-town',
+};
+
 export function getNearestTown(currentRegionId: string): Region {
   const currentRegion = getRegion(currentRegionId);
   if (currentRegion) {
     const sameZoneTown = REGIONS.find(r => r.zoneId === currentRegion.zoneId && r.type === 'town');
     if (sameZoneTown) return sameZoneTown;
+
+    const fallbackId = ZONE_FALLBACK_TOWN[currentRegion.zoneId];
+    const fallbackTown = fallbackId ? getRegion(fallbackId) : undefined;
+    if (fallbackTown) return fallbackTown;
   }
   return REGIONS.find(r => r.id === 'neutral-town')!;
 }

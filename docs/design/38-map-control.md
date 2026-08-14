@@ -387,8 +387,9 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 
 ## 38.10 地圖清單與尺寸規範
 
-目前共 **58** 張靜態地圖：55 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
-＋ **3 張城鎮**（`neutral-town`／`elsarth-town`／`varden-town`，皆 30×20，主題 `town`）。
+目前共 **59** 張靜態地圖：55 張野外／副本（覆蓋 `09-dungeon.md` 定義的全部區域與樓層）
+＋ **4 張城鎮**（`neutral-town`／`elsarth-town`／`varden-town`／`greyridge-town`，
+皆 30×20，主題 `town`；版面見 `13-town.md` § 13.2.1）。
 
 | 主題 | 地圖 | 尺寸 |
 |---|---|---|

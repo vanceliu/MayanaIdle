@@ -9,7 +9,7 @@ export type BossQuestDifficulty = 'B+' | 'A+' | 'S+';
 export type AdventurerQuestDifficulty = BaseQuestDifficulty | BossQuestDifficulty;
 export type AdventurerQuestStatus = 'available' | 'active' | 'completable';
 export type GuildRank = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'US';
-export type QuestTownId = 'neutral-town' | 'elsarth-town' | 'varden-town';
+export type QuestTownId = 'neutral-town' | 'elsarth-town' | 'varden-town' | 'greyridge-town';
 
 export type RewardType = 'gold' | 'potion' | 'quality-stone' | 'enhancement-stone' | 'weapon-scroll' | 'armor-scroll' | 'crafting-material';
 
@@ -192,6 +192,12 @@ export const AREA_POOLS: Record<BaseQuestDifficulty, AreaPoolEntry[]> = {
   ],
 };
 
+/**
+ * 龍之谷與百柱塔是灰脊城鎮的守備範圍（§ 36.12.2）——
+ * 兩陣營城鎮的 S 池因此只剩遠古地監深層。
+ */
+const CENTRAL_S_POOL: AreaPoolEntry[] = createFloorAreaEntries('ancient-dungeon', '遠古地監', [7, 8, 9], 400);
+
 export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<BaseQuestDifficulty, AreaPoolEntry[]>>> = {
   'neutral-town': {
     D: AREA_POOLS.D,
@@ -206,27 +212,28 @@ export const TOWN_AREA_POOLS: Record<QuestTownId, Partial<Record<BaseQuestDiffic
       { areaId: 'demon-forest', areaName: '妖魔森林', avgGold: 160 },
       { areaId: 'rotleaf-path', areaName: '腐葉林道', avgGold: 175 },
       { areaId: 'demon-altar', areaName: '妖魔祭壇', avgGold: 190 },
-      { areaId: 'dragon-valley-outskirts', areaName: '龍之谷外圍', avgGold: 120 },
-      { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
       { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
       ...createFloorAreaEntries('misty-cave', '朦朧洞窟', [1, 2, 3], 250),
-      ...createFloorAreaEntries('dragon-valley', '龍谷地間', [1, 2, 3, 4, 5, 6, 7], 250),
-      { areaId: 'hundred-pillar-1-10f', areaName: '百柱塔 1-10F', avgGold: 275 },
-      { areaId: 'hundred-pillar-11-20f', areaName: '百柱塔 11-20F', avgGold: 290 },
-      { areaId: 'hundred-pillar-21-30f', areaName: '百柱塔 21-30F', avgGold: 300 },
       ...createFloorAreaEntries('ancient-dungeon', '遠古地監', [1, 2, 3, 4, 5, 6], 280),
     ],
-    S: AREA_POOLS.S,
+    S: CENTRAL_S_POOL,
   },
   'varden-town': {
     A: [
       { areaId: 'mirror-forest', areaName: '明鏡森林', avgGold: 160 },
       { areaId: 'glimmer-shore', areaName: '幻光湖畔', avgGold: 175 },
       { areaId: 'shattered-mirror', areaName: '碎鏡深林', avgGold: 190 },
-      { areaId: 'dragon-valley-outskirts', areaName: '龍之谷外圍', avgGold: 120 },
-      { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
       { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
       ...createFloorAreaEntries('underwater-prison', '水下監獄', [1, 2, 3, 4], 250),
+      ...createFloorAreaEntries('ancient-dungeon', '遠古地監', [1, 2, 3, 4, 5, 6], 280),
+    ],
+    S: CENTRAL_S_POOL,
+  },
+  'greyridge-town': {
+    A: [
+      { areaId: 'ancient-battlefield', areaName: '遠古戰場', avgGold: 275 },
+      { areaId: 'dragon-valley-outskirts', areaName: '龍之谷外圍', avgGold: 120 },
+      { areaId: 'dragon-valley-surface', areaName: '龍之谷', avgGold: 160 },
       ...createFloorAreaEntries('dragon-valley', '龍谷地間', [1, 2, 3, 4, 5, 6, 7], 250),
       { areaId: 'hundred-pillar-1-10f', areaName: '百柱塔 1-10F', avgGold: 275 },
       { areaId: 'hundred-pillar-11-20f', areaName: '百柱塔 11-20F', avgGold: 290 },
@@ -338,8 +345,9 @@ const BOSS_QUEST_CONFIG: BossQuestConfig[] = [
   { monsterName: '試煉飛龍', difficulty: 'B+', questArea: 'trial-highlands-top', avgGold: 2500 },
   { monsterName: '雪地之主', difficulty: 'B+', questArea: 'snow-field-deep', avgGold: 3000 },
   { monsterName: '象牙塔惡魔', difficulty: 'A+', questArea: 'ivory-tower-5f', avgGold: 4000 },
-  { monsterName: '朦朧蛇魔', difficulty: 'A+', questArea: 'misty-cave-3f', avgGold: 5000 },
-  { monsterName: '深海獄王', difficulty: 'A+', questArea: 'underwater-prison-4f', avgGold: 5000 },
+  // 艾爾薩斯／瓦爾登各只有一隻 A+ BOSS，併入 S+ 讓兩鎮只開一個 BOSS 分頁（§ 36.12.5）
+  { monsterName: '朦朧蛇魔', difficulty: 'S+', questArea: 'misty-cave-3f', avgGold: 5000 },
+  { monsterName: '深海獄王', difficulty: 'S+', questArea: 'underwater-prison-4f', avgGold: 5000 },
   { monsterName: '安塔巨龍', difficulty: 'A+', questArea: 'dragon-valley-7f', avgGold: 5000 },
   { monsterName: '毒之皇女', difficulty: 'A+', questArea: 'hundred-pillar-1-10f', avgGold: 4500 },
   { monsterName: '哥布林之王', difficulty: 'A+', questArea: 'hundred-pillar-11-20f', avgGold: 4500 },
@@ -382,14 +390,16 @@ function getTownAreaIds(townId: QuestTownId): Set<string> {
   return ids;
 }
 
+/** 分部名單唯一來源是 `TOWN_AREA_POOLS` —— 新增城鎮只改那一份，兩個池不必跟著列 */
+export const QUEST_TOWN_IDS = Object.keys(TOWN_AREA_POOLS) as QuestTownId[];
+
+function emptyPoolsByTown<T>(): Record<QuestTownId, T> {
+  return Object.fromEntries(QUEST_TOWN_IDS.map(town => [town, {}])) as Record<QuestTownId, T>;
+}
+
 function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]>>> {
-  const result: Record<QuestTownId, Partial<Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]>>> = {
-    'neutral-town': {},
-    'elsarth-town': {},
-    'varden-town': {},
-  };
-  const towns: QuestTownId[] = ['neutral-town', 'elsarth-town', 'varden-town'];
-  for (const town of towns) {
+  const result = emptyPoolsByTown<Partial<Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]>>>();
+  for (const town of QUEST_TOWN_IDS) {
     const areaIds = getTownAreaIds(town);
     const difficulties = Object.keys(TOWN_AREA_POOLS[town]) as BaseQuestDifficulty[];
     for (const diff of difficulties) {
@@ -403,13 +413,8 @@ function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<BaseQuestDi
 export const TOWN_MONSTER_POOLS = buildTownMonsterPools();
 
 function buildTownBossPools(): Record<QuestTownId, Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>> {
-  const result: Record<QuestTownId, Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>> = {
-    'neutral-town': {},
-    'elsarth-town': {},
-    'varden-town': {},
-  };
-  const towns: QuestTownId[] = ['neutral-town', 'elsarth-town', 'varden-town'];
-  for (const town of towns) {
+  const result = emptyPoolsByTown<Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>>();
+  for (const town of QUEST_TOWN_IDS) {
     const areaIds = getTownAreaIds(town);
     const difficulties: BossQuestDifficulty[] = ['B+', 'A+', 'S+'];
     for (const diff of difficulties) {

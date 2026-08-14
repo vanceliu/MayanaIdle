@@ -1176,6 +1176,15 @@ button.active {
   animation: none;
 }
 
+/* 停留時間靠右，等寬數字避免每秒跳動時左右抖動 */
+.area-elapsed {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 .death-banner {
   padding: 10px 14px;
   background: rgba(244, 63, 94, 0.1);
@@ -5036,13 +5045,17 @@ button.active {
   flex-direction: column;
 }
 
+.floating-window.is-script .template-bar,
 .floating-window.is-script .script-tabs {
   flex: 0 0 auto;
 }
 
+.floating-window.is-script .talent-editor,
+.floating-window.is-script .talent-fusion,
 .floating-window.is-script .script-editor-content {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 /* --- 自動腳本觸發鈕（沿用 dock 按鈕樣式，僅加上規則數 badge） --- */

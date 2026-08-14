@@ -4,7 +4,18 @@ import { TileType, isWalkableTile, type MapData } from '../mapControl';
 import { REGIONS } from '../mapData';
 import { useMapMonsterStore } from '../../stores/mapMonsterStore';
 
-const TOWN_IDS = ['neutral-town', 'elsarth-town', 'varden-town'];
+/**
+ * 逐鎮版面（§ 13.2.1）：`doorRows` 是門口列的 y，`perRow` 是每列幾個門面。
+ * 舊三鎮兩排各六間，灰脊城鎮是三階梯各四間。
+ */
+const TOWN_LAYOUTS: Record<string, { doorRows: number[]; perRow: number }> = {
+  'neutral-town': { doorRows: [6, 15], perRow: 6 },
+  'elsarth-town': { doorRows: [6, 15], perRow: 6 },
+  'varden-town': { doorRows: [6, 15], perRow: 6 },
+  'greyridge-town': { doorRows: [4, 10, 16], perRow: 4 },
+};
+
+const TOWN_IDS = Object.keys(TOWN_LAYOUTS);
 
 /** TownView 認得的設施 ID：NPC 的 facility 必須落在這組裡 */
 const KNOWN_FACILITIES = new Set([
@@ -75,9 +86,10 @@ describe('城鎮地圖（§ 13.2.1）', () => {
    */
   it('每個設施 NPC 都站在門口（正上方兩格是建築），只有新手指導員例外', () => {
     for (const map of towns) {
+      const { doorRows } = TOWN_LAYOUTS[map.id];
       for (const npc of map.npcs!) {
         if (npc.facility === 'starter-npc') continue; // 迎新的人站廣場，不佔門面
-        expect([6, 15], `${map.id} 的 ${npc.name} 不在門口列`).toContain(npc.y);
+        expect(doorRows, `${map.id} 的 ${npc.name} 不在門口列`).toContain(npc.y);
         for (const dy of [1, 2]) {
           const tile = map.tiles[npc.y - dy][npc.x];
           expect(tile, `${map.id} 的 ${npc.name} 頭上沒有建築`).toBe(TileType.Wall);
@@ -86,21 +98,35 @@ describe('城鎮地圖（§ 13.2.1）', () => {
     }
   });
 
-  it('兩排各六個設施，且三城的門面數量一致', () => {
+  it('每個門口列的門面數量與該鎮版面一致，且四鎮設施總數相同', () => {
     for (const map of towns) {
+      const { doorRows, perRow } = TOWN_LAYOUTS[map.id];
       const facilities = map.npcs!.filter(n => n.facility !== 'starter-npc');
-      expect(facilities.filter(n => n.y === 6), `${map.id} 上排`).toHaveLength(6);
-      expect(facilities.filter(n => n.y === 15), `${map.id} 下排`).toHaveLength(6);
+      for (const y of doorRows) {
+        expect(facilities.filter(n => n.y === y), `${map.id} 門口列 y=${y}`).toHaveLength(perRow);
+      }
+      expect(facilities, `${map.id} 設施總數`).toHaveLength(doorRows.length * perRow);
     }
   });
 
-  it('只有中立城有新手指導員（§ 13.2 三城設施相同，指導員是例外）', () => {
+  /** 快捷列四鎮共用，因此每座城鎮都得放齊同一組設施（§ 13.2.1） */
+  it('四鎮的設施清單完全相同（新手指導員除外）', () => {
+    const facilitySets = towns.map(map => (
+      map.npcs!.filter(n => n.facility !== 'starter-npc').map(n => n.facility).sort()
+    ));
+    for (const set of facilitySets) {
+      expect(set, '設施清單與薄暮村不一致').toEqual(facilitySets[0]);
+    }
+  });
+
+  it('只有中立城有新手指導員（§ 13.2 四城設施相同，指導員是例外）', () => {
     const byId = new Map(towns.map(m => [m.id, m]));
     const hasStarter = (id: string) => byId.get(id)!.npcs!.some(n => n.facility === 'starter-npc');
 
     expect(hasStarter('neutral-town')).toBe(true);
     expect(hasStarter('elsarth-town')).toBe(false);
     expect(hasStarter('varden-town')).toBe(false);
+    expect(hasStarter('greyridge-town')).toBe(false);
   });
 
   it('城鎮是安全區：spawnTick 不生成任何怪物', () => {

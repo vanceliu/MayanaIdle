@@ -21,11 +21,11 @@ describe('區域導覽分組', () => {
     expect(ids).toContain('hundred-pillar-91-100f');
   });
 
-  it('灰脊山脈的清單收合後從 12 個入口變成 3 個', () => {
+  it('灰脊山脈的清單收合後從 13 個入口變成 4 個', () => {
     const regions = getRegionsByZone('grey-ridge');
     const collapsed = new Set(regions.map(r => r.group?.id ?? r.id));
-    expect(regions.length).toBe(12);
-    expect(collapsed.size).toBe(3);          // 遠古戰場 + 百柱塔(收合) + 遠古地監
+    expect(regions.length).toBe(13);
+    expect(collapsed.size).toBe(4);          // 灰脊城鎮 + 遠古戰場 + 百柱塔(收合) + 遠古地監
   });
 
   it('其他區域沒有分組，維持原本的平鋪', () => {

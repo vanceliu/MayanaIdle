@@ -12,8 +12,9 @@ export function QuestsPage() {
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             冒險者工會提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
-            三個城鎮皆設有冒險者工會分部，各分部僅顯示與該城鎮相關區域的任務。<br />
-            BOSS 任務獨立於 B+ / A+ / S+ 分頁，不與一般任務混在同一頁。<br />
+            四個城鎮皆設有冒險者工會分部，各分部僅顯示與該城鎮相關區域的任務。<br />
+            BOSS 任務獨立於 B+ / A+ / S+ 分頁，不與一般任務混在同一頁；
+            該城鎮沒有對應難度的 BOSS 時該分頁不顯示。<br />
             每個難度等級顯示 5~8 個隨機任務，最多同時接取 3 個。<br />
             任務列表每次登入時重新生成，已接取任務可隨時免費退出（扣除等量貢獻點數）。<br />
             也可花 50 貢獻按「重整」手動刷新目前分頁，貢獻不足 50 時無法使用。
@@ -32,8 +33,9 @@ export function QuestsPage() {
             </thead>
             <tbody>
               <tr><td>薄暮村</td><td>D / C / B / B+ / A / A+</td><td>曙光草原 ~ 象牙塔 5F</td></tr>
-              <tr><td>艾爾薩斯</td><td>A / A+ / S / S+</td><td>妖魔森林三段、龍之谷兩段、朦朧洞窟、龍谷地間、百柱塔、遠古地監等</td></tr>
-              <tr><td>瓦爾登</td><td>A / A+ / S / S+</td><td>明鏡森林三段、龍之谷兩段、水下監獄、龍谷地間、百柱塔、遠古地監等</td></tr>
+              <tr><td>艾爾薩斯</td><td>A / S / S+</td><td>妖魔森林三段、遠古戰場、朦朧洞窟、遠古地監</td></tr>
+              <tr><td>瓦爾登</td><td>A / S / S+</td><td>明鏡森林三段、遠古戰場、水下監獄、遠古地監</td></tr>
+              <tr><td>灰脊</td><td>A / A+ / S / S+</td><td>遠古戰場、龍之谷兩段、龍谷地間、百柱塔、遠古地監</td></tr>
             </tbody>
           </table>
         </div>
@@ -109,12 +111,12 @@ export function QuestsPage() {
               <tr><td>B+ 級</td><td>試煉飛龍 (Lv.30)</td><td>試煉高地頂部</td></tr>
               <tr><td>B+ 級</td><td>雪地之主 (Lv.35)</td><td>雪原地帶深處</td></tr>
               <tr><td>A+ 級</td><td>象牙塔惡魔 (Lv.45)</td><td>象牙塔 5F</td></tr>
-              <tr><td>A+ 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟 3F</td></tr>
-              <tr><td>A+ 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄 4F</td></tr>
               <tr><td>A+ 級</td><td>安塔巨龍 (Lv.50)</td><td>龍谷地間 7F</td></tr>
               <tr><td>A+ 級</td><td>毒之皇女 (Lv.52)</td><td>百柱塔 1-10F</td></tr>
               <tr><td>A+ 級</td><td>哥布林之王 (Lv.52)</td><td>百柱塔 11-20F</td></tr>
               <tr><td>A+ 級</td><td>暗影吸血鬼 (Lv.52)</td><td>百柱塔 21-30F</td></tr>
+              <tr><td>S+ 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟 3F</td></tr>
+              <tr><td>S+ 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄 4F</td></tr>
               <tr><td>S+ 級</td><td>不死殭屍王 (Lv.57)</td><td>百柱塔 31-40F</td></tr>
               <tr><td>S+ 級</td><td>龍王約特勒 (Lv.57)</td><td>百柱塔 41-50F</td></tr>
               <tr><td>S+ 級</td><td>冥王哈馬斯 (Lv.57)</td><td>百柱塔 51-60F</td></tr>

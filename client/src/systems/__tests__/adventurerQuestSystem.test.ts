@@ -14,9 +14,11 @@ import {
 import {
   AREA_POOLS,
   ENDURANCE_COUNT_RANGE,
+  BOSS_KILL_COUNT_RANGE,
   BOSS_POOLS,
   MONSTER_POOLS,
   TOWN_AREA_POOLS,
+  TOWN_BOSS_POOLS,
   CRAFTING_MATERIAL_REWARDS,
   getTownDifficulties,
   getRankForPoints,
@@ -183,11 +185,11 @@ describe('adventurerQuestSystem', () => {
     it('keeps boss quests scoped to the boss floor', () => {
       expect(BOSS_POOLS['A+']).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: '象牙塔惡魔', area: 'ivory-tower-5f' }),
-        expect.objectContaining({ name: '朦朧蛇魔', area: 'misty-cave-3f' }),
-        expect.objectContaining({ name: '深海獄王', area: 'underwater-prison-4f' }),
         expect.objectContaining({ name: '安塔巨龍', area: 'dragon-valley-7f' }),
       ]));
       expect(BOSS_POOLS['S+']).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: '朦朧蛇魔', area: 'misty-cave-3f' }),
+        expect.objectContaining({ name: '深海獄王', area: 'underwater-prison-4f' }),
         expect.objectContaining({ name: '遠古騎士', area: 'ancient-dungeon-9f' }),
       ]));
     });
@@ -416,8 +418,19 @@ describe('adventurerQuestSystem', () => {
     it('getTownDifficulties returns correct difficulties per town', () => {
       // § 36.6.1：BOSS 分頁需該城鎮該難度池內至少有一隻 BOSS
       expect(getTownDifficulties('neutral-town')).toEqual(['D', 'C', 'B', 'B+', 'A', 'A+']);
-      expect(getTownDifficulties('elsarth-town')).toEqual(['A', 'A+', 'S', 'S+']);
-      expect(getTownDifficulties('varden-town')).toEqual(['A', 'A+', 'S', 'S+']);
+      expect(getTownDifficulties('elsarth-town')).toEqual(['A', 'S', 'S+']);
+      expect(getTownDifficulties('varden-town')).toEqual(['A', 'S', 'S+']);
+      expect(getTownDifficulties('greyridge-town')).toEqual(['A', 'A+', 'S', 'S+']);
+    });
+
+    it('陣營城鎮的 BOSS 全部集中在 S+ 一頁（§ 36.12.5）', () => {
+      const names = (town: 'elsarth-town' | 'varden-town') =>
+        (TOWN_BOSS_POOLS[town]['S+'] ?? []).map(b => b.name).sort();
+
+      expect(TOWN_BOSS_POOLS['elsarth-town']['A+']).toBeUndefined();
+      expect(TOWN_BOSS_POOLS['varden-town']['A+']).toBeUndefined();
+      expect(names('elsarth-town')).toEqual(['朦朧蛇魔', '遠古騎士'].sort());
+      expect(names('varden-town')).toEqual(['深海獄王', '遠古騎士'].sort());
     });
 
     it('neutral-town quests only target neutral/snow/ivory areas', () => {
@@ -458,6 +471,40 @@ describe('adventurerQuestSystem', () => {
           }
         }
       }
+    });
+
+    it('greyridge-town A quests target grey ridge and dragon valley areas', () => {
+      const greyridgeAreaIds = new Set(
+        (TOWN_AREA_POOLS['greyridge-town'].A ?? []).map(a => a.areaId)
+      );
+      for (let i = 0; i < 50; i++) {
+        const quests = generateQuestList('A', 'F', 'greyridge-town');
+        for (const q of quests) {
+          if (q.type === 'errand' || q.type === 'endurance') {
+            expect(greyridgeAreaIds.has(q.targetArea)).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('greyridge-town 不收兩陣營的專屬區域（§ 36.12.2）', () => {
+      const greyridgeAreaIds = new Set(
+        Object.values(TOWN_AREA_POOLS['greyridge-town']).flat().map(a => a.areaId)
+      );
+      for (const areaId of ['demon-forest', 'misty-cave-1f', 'mirror-forest', 'underwater-prison-1f']) {
+        expect(greyridgeAreaIds.has(areaId), areaId).toBe(false);
+      }
+    });
+
+    it('龍之谷與百柱塔只掛灰脊分部（§ 36.12.3）', () => {
+      const central = (areaId: string) =>
+        areaId.startsWith('dragon-valley') || areaId.startsWith('hundred-pillar');
+      for (const town of ['elsarth-town', 'varden-town'] as const) {
+        const areaIds = Object.values(TOWN_AREA_POOLS[town]).flat().map(a => a.areaId);
+        expect(areaIds.filter(central), `${town} 仍留有中央區域`).toEqual([]);
+      }
+      const greyridge = Object.values(TOWN_AREA_POOLS['greyridge-town']).flat().map(a => a.areaId);
+      expect(greyridge.filter(central).length, '灰脊池沒有中央區域').toBeGreaterThan(0);
     });
 
     it('elsarth-town does not produce D/C/B quests', () => {
@@ -545,10 +592,11 @@ describe('adventurerQuestSystem', () => {
     it('US 等階的 BOSS 任務仍享有且僅有 ×2', () => {
       const us = goldAmounts('US', true);
       expect(us.length).toBeGreaterThan(0);
-      // 還原後應等於 avgGold × count × 3，S 級 BOSS avgGold 7000~9000、count 1~3
+      // 還原後應等於 avgGold × count × 3，count 1~3
+      const golds = BOSS_POOLS['S+'].map(b => b.avgGold);
       for (const base of us) {
-        expect(base).toBeGreaterThanOrEqual(7000 * 1 * 3);
-        expect(base).toBeLessThanOrEqual(9000 * 3 * 3);
+        expect(base).toBeGreaterThanOrEqual(Math.min(...golds) * BOSS_KILL_COUNT_RANGE.min * 3);
+        expect(base).toBeLessThanOrEqual(Math.max(...golds) * BOSS_KILL_COUNT_RANGE.max * 3);
       }
     });
   });

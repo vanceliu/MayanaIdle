@@ -29,7 +29,7 @@ import {
   useTrainingGroundStore,
 } from '../../stores/trainingGroundStore';
 
-const TOWN_IDS = ['neutral-town', 'elsarth-town', 'varden-town'];
+const TOWN_IDS = ['neutral-town', 'elsarth-town', 'varden-town', 'greyridge-town'];
 
 describe('試驗場 region（§ 50.2）', () => {
   it('登記在 REGIONS 裡，type 為 training', () => {

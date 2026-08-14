@@ -121,6 +121,19 @@ describe('mapData', () => {
       expect(regions.map(r => r.id)).toContain('neutral-town');
     });
 
+    it('getRegionsByZone 把城鎮排在最上方，其餘維持宣告順序', () => {
+      for (const zone of ZONES) {
+        const regions = getRegionsByZone(zone.id);
+        const towns = regions.filter(r => r.type === 'town');
+        if (towns.length === 0) continue;
+        expect(regions.slice(0, towns.length).every(r => r.type === 'town'), zone.id).toBe(true);
+
+        const rest = regions.slice(towns.length).map(r => r.id);
+        const declared = REGIONS.filter(r => r.zoneId === zone.id && r.type !== 'town' && r.type !== 'training').map(r => r.id);
+        expect(rest, zone.id).toEqual(declared);
+      }
+    });
+
     it('getMonstersAtLocation returns field monsters', () => {
       const monsters = getMonstersAtLocation('dawn-plains', null);
       expect(monsters).toContain('暴牙兔');
@@ -157,6 +170,16 @@ describe('mapData', () => {
     it('should return varden-town for varden zone regions', () => {
       const town = getNearestTown('mirror-forest');
       expect(town.id).toBe('varden-town');
+    });
+
+    it('should return greyridge-town for grey ridge zone regions', () => {
+      const town = getNearestTown('ancient-battlefield');
+      expect(town.id).toBe('greyridge-town');
+    });
+
+    it('should return greyridge-town for dragon valley（該 zone 自己沒有城鎮）', () => {
+      const town = getNearestTown('dragon-valley-surface');
+      expect(town.id).toBe('greyridge-town');
     });
 
     it('should return neutral-town as fallback for unknown region', () => {

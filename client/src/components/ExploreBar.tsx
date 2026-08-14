@@ -1,13 +1,15 @@
 import { useGameStore } from '../stores/gameStore';
+import { useAreaElapsed, formatElapsed } from '../hooks/useAreaElapsed';
 
 /**
- * 探索控制列（自動/手動搜尋、探索/戰鬥指示、死亡橫幅）
+ * 探索控制列（自動/手動搜尋、探索/戰鬥指示、停留時間、死亡橫幅）
  * 位於頂部 HUD，與地圖選擇器同一列（16-tech-frontend-architecture.md § 32.3）。
  */
 export function ExploreBar() {
   const phase = useGameStore(s => s.phase);
   const searchMode = useGameStore(s => s.searchMode);
   const setSearchMode = useGameStore(s => s.setSearchMode);
+  const elapsedMs = useAreaElapsed();
 
   /*
    * 只有模式切換，沒有「搜尋」按鈕：遭遇改由地圖紅點碰撞觸發
@@ -26,6 +28,11 @@ export function ExploreBar() {
         )}
         {phase === 'combat' && (
           <span className="explore-indicator combat-indicator">戰鬥中</span>
+        )}
+        {elapsedMs != null && (
+          <span className="area-elapsed" title="待在這張地圖的時間">
+            {formatElapsed(elapsedMs)}
+          </span>
         )}
       </div>
 
