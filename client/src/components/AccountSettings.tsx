@@ -84,7 +84,7 @@ export function AccountSettings({ onClose }: { onClose: () => void }) {
           />
         </div>
         <p className="settings-hint">
-          匯出檔含有這個角色的身分憑證，等同密碼，請勿分享（§ 19.9）。
+          匯出檔含有這個角色的身分憑證，等同密碼，請勿分享。
           匯入會覆蓋目前這一格的角色。
         </p>
       </div>
