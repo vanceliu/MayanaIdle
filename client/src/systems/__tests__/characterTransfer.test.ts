@@ -4,6 +4,7 @@ import { db } from '../../db/database';
 import { CURRENT_DATA_VERSION } from '../../config';
 import { exportCharacterData, importCharacterData, decryptExport, encryptExport } from '../characterTransfer';
 import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
+import { syncTalentSlotGrants } from '../mailbox';
 
 /**
  * 角色匯出／匯入。
@@ -185,4 +186,51 @@ describe('角色匯出／匯入', () => {
     });
   });
 
+  describe('天賦與信箱', () => {
+    async function addSlots(characterId: number, count: number) {
+      for (let i = 0; i < count; i++) {
+        await db.talentSlots.add({
+          characterId, tier: 1, assignedType: 'combat', templateId: 'default',
+          order: i, enabled: true, conditions: [], action: { type: 'normal_attack' },
+        } as never);
+      }
+    }
+
+    it('天賦格跟著匯出檔走，匯入後掛在目標角色底下', async () => {
+      const srcId = await db.characters.add(makeCharacter()) as number;
+      const dstId = await db.characters.add(makeCharacter({ uuid: 'uuid-dst', name: '目標' })) as number;
+      await addSlots(srcId, 3);
+
+      await importCharacterData(await exportCharacterData(srcId), dstId);
+
+      const slots = await db.talentSlots.where('characterId').equals(dstId).toArray();
+      expect(slots).toHaveLength(3);
+      expect(slots.every(s => s.templateId === 'default')).toBe(true);
+    });
+
+    it('發放計數器跟著信箱一起還原 —— 不然下次載入會重發已存在的信而整段中斷', async () => {
+      const srcId = await db.characters.add(makeCharacter({ level: 30 })) as number;
+      const dstId = await db.characters.add(makeCharacter({ uuid: 'uuid-dst', name: '目標' })) as number;
+      await addSlots(srcId, 3);
+      await syncTalentSlotGrants(srcId, 30);
+
+      await importCharacterData(await exportCharacterData(srcId), dstId);
+
+      const dst = await db.characters.get(dstId);
+      expect(dst!.talentSlotGrants).toBe((await db.characters.get(srcId))!.talentSlotGrants);
+      await expect(syncTalentSlotGrants(dstId, 30)).resolves.toBe(0);
+      const slots = await db.talentSlots.where('characterId').equals(dstId).toArray();
+      expect(slots).toHaveLength(3);
+    });
+
+    it('計數器對不上時也不重發已存在的信', async () => {
+      const charId = await db.characters.add(makeCharacter({ level: 30 })) as number;
+      await syncTalentSlotGrants(charId, 30);
+      const before = await db.mailbox.where('characterId').equals(charId).count();
+      await db.characters.update(charId, { talentSlotGrants: 0 });
+
+      await expect(syncTalentSlotGrants(charId, 30)).resolves.toBe(0);
+      expect(await db.mailbox.where('characterId').equals(charId).count()).toBe(before);
+    });
+  });
 });

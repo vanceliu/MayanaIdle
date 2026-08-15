@@ -21,6 +21,15 @@ export function expectedTalentSlotGrants(level: number): number {
  * 補齊天賦格發放信。回傳這次新發的封數。
  * 依據是 `characters.talentSlotGrants`，不看信箱（§ 52.2.3）。
  */
+/** 濾掉已存在的 `sourceKey` —— `[characterId+sourceKey]` 是唯一索引，重發會整批失敗 */
+async function withoutExistingKeys(characterId: number, pending: Mail[]): Promise<Mail[]> {
+  if (pending.length === 0) return pending;
+  const existing = new Set(
+    (await db.mailbox.where('characterId').equals(characterId).toArray()).map(m => m.sourceKey),
+  );
+  return pending.filter(m => !existing.has(m.sourceKey));
+}
+
 export async function syncTalentSlotGrants(characterId: number, level: number): Promise<number> {
   const expected = expectedTalentSlotGrants(level);
   const character = await db.characters.get(characterId);
@@ -40,12 +49,14 @@ export async function syncTalentSlotGrants(characterId: number, level: number): 
       claimedAt: null,
     });
   }
+  const fresh = await withoutExistingKeys(characterId, pending);
+
   // 發信與記數必須同一個交易（§ 52.2.3）
   await db.transaction('rw', db.mailbox, db.characters, async () => {
-    await db.mailbox.bulkAdd(pending);
+    if (fresh.length > 0) await db.mailbox.bulkAdd(fresh);
     await db.characters.update(characterId, { talentSlotGrants: expected });
   });
-  return pending.length;
+  return fresh.length;
 }
 
 /**
@@ -77,14 +88,16 @@ export async function syncCompensations(
     claimedAt: null,
   }));
 
+  const fresh = await withoutExistingKeys(characterId, pending);
+
   // 發信與記 key 必須同一個交易（§ 52.2.4.2）
   await db.transaction('rw', db.mailbox, db.characters, async () => {
-    await db.mailbox.bulkAdd(pending);
+    if (fresh.length > 0) await db.mailbox.bulkAdd(fresh);
     await db.characters.update(characterId, {
       sentMailKeys: { ...sent, ...Object.fromEntries(due.map(c => [c.id, true])) },
     });
   });
-  return pending.length;
+  return fresh.length;
 }
 
 export async function listMail(characterId: number): Promise<Mail[]> {

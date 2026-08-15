@@ -223,6 +223,8 @@ export async function importCharacterData(
     // 加倍存量跟著角色走，漏了這兩行同樣不會報錯（`18-data-schema.md` § 18.11）
     restedExpMs: importChar.restedExpMs ?? 0,
     lastSeenAt: Date.now(),
+    talentSlotGrants: importChar.talentSlotGrants ?? existing.talentSlotGrants ?? 0,
+    sentMailKeys: importChar.sentMailKeys ?? existing.sentMailKeys ?? {},
   });
 
   // 共用倉庫裝備的 ownerId 是 userId，與 characterId 會撞號（§ 19.7）

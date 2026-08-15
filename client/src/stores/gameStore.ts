@@ -2578,6 +2578,11 @@ async function initTalentAndMailbox(characterId: number, level: number): Promise
     await syncTalentSlotGrants(characterId, level);
     await syncCompensations(characterId, BUILD_INFO.version);
     await useTalentStore.getState().grantStartingIfEmpty(characterId);
+  } catch {
+    // 發放失敗不可中斷載入，否則面板會停在空的
+  }
+
+  try {
     await useTalentStore.getState().load(characterId);
     await useMailboxStore.getState().load(characterId);
   } catch {
