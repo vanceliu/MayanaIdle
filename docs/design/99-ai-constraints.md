@@ -55,3 +55,15 @@
 - [x] Phase 2 五處補 `saveState()`
 - [x] Phase 3 `talentInitReady()` 取代 fire-and-forget，五個測試檔改用它
 - [x] Phase 4 `consumablePersist.test.ts` ＋ `npx tsc -b` ＋ 3270 測試全綠
+
+### 移除走位動作「脫離」並修正保持距離
+
+規格見 `15-excluded.md` § 15.6 與 `51-auto-talent.md` § 51.4.9。
+舊存檔含 `disengage` 的規則整條刪除；保持距離的落點改走 `findNearestWalkable`。
+
+- [x] Phase 1 設計文件：`51-auto-talent.md` § 51.4.4／§ 51.4.9、`25-monster-system.md` § 25.11、`15-excluded.md`
+- [x] Phase 2 型別與定義：`scriptEngine.ts`、`talentParams.ts`、`talentSeeds.ts`、`iconMap.ts`、`talentRuleDescriptions.ts`
+- [x] Phase 3 判定與執行：`scriptRunner.ts`、`arpgEngine.ts`、`playerCombatFSM.ts`、`combatCommandStore.ts`、`gameStore.ts`
+- [x] Phase 4 走位落點修正：`PixiGame.tsx` 走位事件不經 `findAttackPosition`，落點失敗保留目標
+- [x] Phase 5 舊存檔遷移：DB v24 清空動作為 `disengage` 的天賦格
+- [x] Phase 6 `keepDistanceMove.test.ts` ＋ `npx tsc -b` ＋ 3279 測試全綠

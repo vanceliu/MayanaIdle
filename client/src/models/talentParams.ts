@@ -14,7 +14,11 @@ import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine'
 export type ParamSkillFilter = 'attack' | 'heal' | 'buff' | 'byTalentType';
 
 export type ParamField =
-  | { key: string; kind: 'number'; label: string; suffix?: string; min?: number; max?: number; def: number }
+  /** `def` 為 null ＝ 不寫入預設值，留空由判定引擎決定 */
+  | {
+      key: string; kind: 'number'; label: string; suffix?: string;
+      min?: number; max?: number; def: number | null; placeholder?: string;
+    }
   | { key: string; kind: 'select'; label: string; options: readonly { value: string; label: string }[]; def: string }
   /**
    * 從角色**已學會**的技能挑。`filter` 決定列哪一類：
@@ -173,9 +177,12 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   }],
   heal_skill: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'heal' }],
   buff_skill: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'buff' }],
-  keep_distance: [{ key: 'distance', kind: 'number', label: '保持', suffix: '格', min: 1, max: 20, def: 8 }],
+  // 留空＝退到武器射程邊緣（`51-auto-talent.md` § 51.4.9）
+  keep_distance: [{
+    key: 'distance', kind: 'number', label: '保持', suffix: '格',
+    min: 1, max: 20, def: null, placeholder: '武器射程',
+  }],
   close_in: [{ key: 'distance', kind: 'number', label: '貼近到', suffix: '格', min: 1, max: 20, def: 2 }],
-  disengage: [{ key: 'distance', kind: 'number', label: '拉開', suffix: '格', min: 1, max: 20, def: 10 }],
   switch_target_by_kind: [{
     key: 'match', kind: 'select', label: '種族／元素', def: 'undead',
     options: [...RACE_OPTIONS, ...ELEMENT_OPTIONS],
@@ -232,6 +239,7 @@ export function defaultParams(ruleId: string): Record<string, unknown> | null {
   if (fields.length === 0) return null;
   const out: Record<string, unknown> = {};
   for (const f of fields) {
+    if (f.kind === 'number' && f.def === null) continue;
     if (f.kind === 'number' || f.kind === 'select') out[f.key] = f.def;
   }
   return out;

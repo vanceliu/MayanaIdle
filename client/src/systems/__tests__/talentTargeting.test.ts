@@ -70,7 +70,7 @@ describe('非攻擊動作的分類', () => {
   it('切換目標與走位都消耗出手機會，與「不動作」同性質', () => {
     for (const t of [
       'wait', 'switch_target_lowest_hp', 'switch_target_by_kind',
-      'lock_target', 'keep_distance', 'close_in', 'disengage',
+      'lock_target', 'keep_distance', 'close_in',
     ] as const) {
       expect(isNonAttackAction(t), t).toBe(true);
     }

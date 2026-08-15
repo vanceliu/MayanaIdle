@@ -95,10 +95,8 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'wait', kind: 'action', appliesTo: COMBAT, group: 'attack' },
   // 原「指定一招 → 指定系別 → 職業魔法 → 全部」四階塌成完整版（§ 51.4.9）
   { ruleId: 'skill', kind: 'action', appliesTo: COMBAT, group: 'attack' },
-  // 移動類共用：探索途中脫離危險與戰鬥中拉開距離是同一件事
   { ruleId: 'keep_distance', kind: 'action', appliesTo: COMBAT_PERSISTENT, group: 'movement' },
   { ruleId: 'close_in', kind: 'action', appliesTo: COMBAT_PERSISTENT, group: 'movement' },
-  { ruleId: 'disengage', kind: 'action', appliesTo: COMBAT_PERSISTENT, group: 'movement' },
   { ruleId: 'switch_target_lowest_hp', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
   { ruleId: 'switch_target_highest_hp', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
   { ruleId: 'switch_target_farthest', kind: 'action', appliesTo: COMBAT, group: 'targeting' },

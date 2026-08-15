@@ -395,7 +395,6 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
     // 走位：有目標才有「靠近／拉開」的對象
     case 'keep_distance':
     case 'close_in':
-    case 'disengage':
       return ctx.primaryTargetId !== null;
     default:
       return false;
@@ -594,7 +593,6 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
     // 走位：要在戰鬥中且有目標才有「靠近／拉開」的對象
     case 'keep_distance':
     case 'close_in':
-    case 'disengage':
       return ctx.inCombat === true;
     case 'refill_all_buffs': {
       const ids = [action.skillId, action.skillId2, action.skillId3]

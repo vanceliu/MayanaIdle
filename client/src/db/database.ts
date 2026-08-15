@@ -454,6 +454,15 @@ export class GameDB extends Dexie {
         row.lastSeenAt = now;
       });
     });
+
+    /* 走位動作「脫離」移除（`15-excluded.md` § 15.6）：動作是它的天賦格整條清空 */
+    this.version(24).stores({}).upgrade(async tx => {
+      await tx.table('talentSlots').toCollection().modify(row => {
+        if (row.action?.ruleId !== 'disengage') return;
+        row.action = null;
+        row.conditions = (row.conditions ?? []).map(() => null);
+      });
+    });
   }
 }
 

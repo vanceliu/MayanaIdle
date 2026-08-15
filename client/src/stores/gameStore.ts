@@ -1768,7 +1768,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         // 走位只設意圖，實際移動由 ARPG 的 FSM 處理（§ 51.4.9 T5）
         case 'keep_distance':
         case 'close_in':
-        case 'disengage':
           useCombatCommandStore.getState().requestMove({
             kind: action.type, distance: action.distance,
           });

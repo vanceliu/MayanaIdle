@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TALENT_PARAM_FIELDS, getParamFields } from '../talentParams';
+import { TALENT_PARAM_FIELDS, defaultParams, getParamFields } from '../talentParams';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from '../scriptEngine';
 import { ELEMENT_LABELS, RACE_LABELS } from '../monster';
 import { REGIONS } from '../mapData';
@@ -160,5 +160,18 @@ describe('技能選單的範圍', () => {
     const def = TALENT_RULE_DEFS.find(d => d.ruleId === 'skill_ready');
     expect(def?.appliesTo).toEqual(expect.arrayContaining(['combat', 'persistent']));
     expect(getParamFields('skill_ready')[0]).toMatchObject({ filter: 'byTalentType' });
+  });
+});
+
+describe('走位動作', () => {
+  it('只有保持距離與進逼（`15-excluded.md` § 15.6）', () => {
+    const movement = TALENT_RULE_DEFS.filter(d => d.group === 'movement').map(d => d.ruleId);
+    expect(movement).toEqual(['keep_distance', 'close_in']);
+  });
+
+  it('保持距離的距離留空，由引擎補成武器射程', () => {
+    expect(getParamFields('keep_distance')[0]).toMatchObject({ key: 'distance', def: null });
+    expect(defaultParams('keep_distance')).toEqual({});
+    expect(defaultParams('close_in')).toEqual({ distance: 2 });
   });
 });

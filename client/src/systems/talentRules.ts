@@ -50,7 +50,8 @@ function toRulePart(entry: TalentSlotEntry): Record<string, unknown> | null {
 /**
  * 技能／道具還沒選定的動作 —— 這條規則放不出來（§ 51.3.1）。
  *
- * 數值與選單型的參數設定時就有預設值，只有技能與道具沒有：
+ * 數值與選單型的參數設定時就有預設值（`def` 為 null 的數值欄留空，由引擎補），
+ * 只有技能與道具沒有：
  * 開局三格「施放攻擊技能」都是未選定的，沒選之前這條規則必須跳過（§ 51.7）。
  */
 function isUnresolved(part: Record<string, unknown>, ruleId: string): boolean {

@@ -6,7 +6,7 @@ export type PlayerCombatState = 'idle' | 'chasing' | 'attacking';
 
 /** 走位意圖（`51-auto-talent.md` § 51.4.9）。由天賦動作設定，FSM 在下一幀消費 */
 export interface MoveIntent {
-  kind: 'keep_distance' | 'close_in' | 'disengage';
+  kind: 'keep_distance' | 'close_in';
   /** 目標距離（格）。未帶時用武器射程 */
   distance?: number;
 }
@@ -96,6 +96,8 @@ export interface PlayerTickResult {
   action: 'none' | 'move_to' | 'attack';
   moveTarget?: Position;
   moveRange?: number;
+  /** `moveTarget` 是落腳格本身，不是攻擊對象；`findAttackPosition` 必定排除該格，不可用它解析 */
+  moveExact?: boolean;
   attackTargetIdx?: number;
 }
 
@@ -162,7 +164,7 @@ export function tickPlayerCombat(
   if (ctx.moveIntent) {
     const intent = ctx.moveIntent;
     ctx.moveIntent = null;
-    const move = resolveMoveIntent(intent, playerPos, target, aliveMonsters, attackConfig);
+    const move = resolveMoveIntent(intent, playerPos, target, attackConfig);
     if (move) {
       ctx.state = 'chasing';
       // 走位期間攻擊計時器照走：走路的時間本來就過去了
@@ -249,36 +251,29 @@ function resolveMoveIntent(
   intent: MoveIntent,
   playerPos: Position,
   target: MonsterInfo,
-  aliveMonsters: MonsterInfo[],
   attackConfig: AttackConfig,
 ): PlayerTickResult | null {
   const want = intent.distance ?? attackConfig.range;
+  const dist = getDistance(playerPos, target.position);
 
   if (intent.kind === 'close_in') {
-    const dist = getDistance(playerPos, target.position);
     if (dist <= want) return null;
     return { action: 'move_to', moveTarget: target.position, moveRange: want };
   }
 
-  // keep_distance／disengage 都是「往外退」，差別在參考點
-  const anchor = intent.kind === 'keep_distance'
-    ? target
-    : findNearestMonster(playerPos, aliveMonsters);
-  if (!anchor) return null;
-
-  const dist = getDistance(playerPos, anchor.position);
   if (dist >= want) return null;
 
   // 沿著「怪 → 玩家」的方向退到目標距離
-  const dx = playerPos.x - anchor.position.x;
-  const dy = playerPos.y - anchor.position.y;
+  const dx = playerPos.x - target.position.x;
+  const dy = playerPos.y - target.position.y;
   const len = Math.hypot(dx, dy) || 1;
   return {
     action: 'move_to',
     moveTarget: {
-      x: Math.round(anchor.position.x + (dx / len) * want),
-      y: Math.round(anchor.position.y + (dy / len) * want),
+      x: Math.round(target.position.x + (dx / len) * want),
+      y: Math.round(target.position.y + (dy / len) * want),
     },
     moveRange: 0,
+    moveExact: true,
   };
 }

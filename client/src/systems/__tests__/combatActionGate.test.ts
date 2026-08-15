@@ -25,7 +25,7 @@ function rule(type: CombatActionType): CombatRule {
 }
 
 describe('戰鬥動作閘門', () => {
-  const MOVE: CombatActionType[] = ['keep_distance', 'close_in', 'disengage'];
+  const MOVE: CombatActionType[] = ['keep_distance', 'close_in'];
   const SWITCH: CombatActionType[] = [
     'switch_target_lowest_hp', 'switch_target_highest_hp',
     'switch_target_farthest', 'switch_target_by_kind', 'switch_target_by_debuff',

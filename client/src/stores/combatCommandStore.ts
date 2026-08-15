@@ -38,7 +38,7 @@ export interface CombatCommandState {
 }
 
 export interface PendingMove {
-  kind: 'keep_distance' | 'close_in' | 'disengage';
+  kind: 'keep_distance' | 'close_in';
   distance?: number;
 }
 

@@ -18,7 +18,7 @@ import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } fr
 import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
 import { hasProjectilePath } from '../systems/lineOfSight';
 import { gameLoopTick, consumeDotTick, occupation } from '../systems/gameLoop';
-import { findAttackPosition, isAttackPosition } from '../systems/pathfinding';
+import { findAttackPosition, findNearestWalkable, isAttackPosition } from '../systems/pathfinding';
 import { db } from '../db/database';
 import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
@@ -948,6 +948,13 @@ function tickArpgCombatLoop(
              */
             const playerPos = mapCtrl.playerPosition;
             const occupied = occupation.getOccupiedSet('player');
+
+            // 後退：`event.target` 就是落腳格，走不到就留在原地，不清目標
+            if (event.exact) {
+              const dest = findNearestWalkable(map, event.target, playerPos);
+              if (dest) useMapControlStore.getState().moveToTarget(dest, occupied);
+              break;
+            }
 
             const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
             const keepCurrent = mapCtrl.isMoving && currentDest

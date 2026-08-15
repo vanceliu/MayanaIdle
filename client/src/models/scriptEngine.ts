@@ -100,8 +100,7 @@ export type CombatActionType =
   | 'switch_target_by_debuff'
   | 'lock_target'
   | 'keep_distance'
-  | 'close_in'
-  | 'disengage';
+  | 'close_in';
 
 /**
  * 切換目標與走位類動作。
@@ -113,7 +112,7 @@ export const NON_ATTACK_ACTIONS: readonly CombatActionType[] = [
   'wait',
   'switch_target_lowest_hp', 'switch_target_highest_hp', 'switch_target_farthest',
   'switch_target_by_kind', 'switch_target_by_debuff', 'lock_target',
-  'keep_distance', 'close_in', 'disengage',
+  'keep_distance', 'close_in',
 ];
 
 export function isNonAttackAction(type: CombatActionType): boolean {
@@ -213,7 +212,6 @@ export const COMBAT_ACTION_LABELS: Record<CombatActionType, string> = {
   lock_target: '鎖定目標（目標死前不換）',
   keep_distance: '保持距離',
   close_in: '進逼',
-  disengage: '脫離',
 };
 
 /** `monsters_near_self_gte` 沒填半徑時的預設值（格） */
@@ -249,7 +247,7 @@ export type PersistentActionType =
   | 'potion' | 'speed_potion' | 'buff_skill' | 'heal_skill' | 'cure_item'
   | 'use_town_scroll' | 'use_consumable' | 'refill_to_percent' | 'refill_all_buffs'
   /** 走位（戰鬥 ∪ 常駐，§ 51.4.9 T5）。只設意圖，實際移動由 FSM 處理 */
-  | 'keep_distance' | 'close_in' | 'disengage';
+  | 'keep_distance' | 'close_in';
 
 export interface PersistentCondition {
   type: PersistentConditionType;
@@ -327,7 +325,6 @@ export const PERSISTENT_ACTION_LABELS: Record<PersistentActionType, string> = {
   refill_all_buffs: '依序補滿多個 buff',
   keep_distance: '保持距離',
   close_in: '進逼',
-  disengage: '脫離戰鬥',
 };
 
 // === Emergency Retreat ===

@@ -55,9 +55,8 @@ export const COMBAT_ACTION_DESC: Record<string, string> = {
   switch_target_by_kind: '改打指定種族或元素的一隻，同類取最近的',
   switch_target_by_debuff: '改打帶著（或沒有）指定 debuff 的一隻',
   lock_target: '釘住當前目標，牠死掉或離場前不再改挑最近的',
-  keep_distance: '退到指定距離外。未指定時退到武器射程邊緣',
+  keep_distance: '退到指定距離外。留空時退到武器射程邊緣',
   close_in: '貼近目標到指定距離',
-  disengage: '遠離所有怪物',
 };
 
 export const PERSISTENT_CONDITION_DESC: Record<string, string> = {
@@ -83,9 +82,8 @@ export const PERSISTENT_CONDITION_DESC: Record<string, string> = {
 };
 
 export const PERSISTENT_ACTION_DESC: Record<string, string> = {
-  keep_distance: '退到指定距離外。未指定時退到武器射程邊緣',
+  keep_distance: '退到指定距離外。留空時退到武器射程邊緣',
   close_in: '貼近目標到指定距離',
-  disengage: '遠離所有怪物',
   use_town_scroll: '使用背包裡的回城卷軸傳送回城鎮，辦完事會被送回掛機點',
   use_consumable: '使用指定的消耗品。依道具種類走各自的使用路徑',
   refill_to_percent: '每次判定喝一瓶，直到 HP 達到指定百分比。受藥水冷卻限制',

@@ -61,7 +61,7 @@ describe('參數 schema', () => {
       Object.fromEntries(TALENT_RULE_DEFS.map(d => [d.ruleId, getParamFields(d.ruleId)])),
     )) {
       for (const f of fields) {
-        if (f.kind !== 'number') continue;
+        if (f.kind !== 'number' || f.def === null) continue;
         if (f.min != null) expect(f.def, `${ruleId}.${f.key}`).toBeGreaterThanOrEqual(f.min);
         if (f.max != null) expect(f.def, `${ruleId}.${f.key}`).toBeLessThanOrEqual(f.max);
       }

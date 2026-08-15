@@ -329,7 +329,6 @@ export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
   lock_target: 'buffs/on-target',
   keep_distance: 'buffs/wingfoot',
   close_in: 'buffs/run',
-  disengage: 'buffs/freedom-dove',
 
   // 常駐動作
   potion: 'items/standing-potion',

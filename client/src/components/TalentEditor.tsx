@@ -81,10 +81,11 @@ function ParamInput({
         <span>{field.label}</span>
         <input
           type="number"
-          value={(params[field.key] as number | undefined) ?? field.def}
+          value={(params[field.key] as number | undefined) ?? field.def ?? ''}
+          placeholder={field.placeholder}
           min={field.min}
           max={field.max}
-          onChange={e => write(Number(e.target.value))}
+          onChange={e => write(e.target.value === '' ? undefined : Number(e.target.value))}
           onClick={e => e.stopPropagation()}
         />
         {field.suffix && <span className="talent-param-suffix">{field.suffix}</span>}

@@ -138,6 +138,8 @@ export interface MoveToEvent {
   type: 'move_to';
   target: Position;
   range: number;
+  /** true ＝ `target` 是落腳格本身（後退），不是要繞到射程內的攻擊對象 */
+  exact?: boolean;
 }
 
 /**
@@ -249,7 +251,12 @@ export function tickArpgEngine(
   );
 
   if (playerResult.action === 'move_to' && playerResult.moveTarget && playerResult.moveRange !== undefined) {
-    events.push({ type: 'move_to', target: playerResult.moveTarget, range: playerResult.moveRange });
+    events.push({
+      type: 'move_to',
+      target: playerResult.moveTarget,
+      range: playerResult.moveRange,
+      exact: playerResult.moveExact,
+    });
   }
 
   if (playerResult.action === 'attack') {
@@ -511,7 +518,7 @@ function applyNonAttackAction(
   }
 
   // 走位：只設意圖，實際移動由 FSM 在下一幀處理
-  if (action.type === 'keep_distance' || action.type === 'close_in' || action.type === 'disengage') {
+  if (action.type === 'keep_distance' || action.type === 'close_in') {
     engine.playerCtx.moveIntent = { kind: action.type, distance: action.distance };
   }
 }

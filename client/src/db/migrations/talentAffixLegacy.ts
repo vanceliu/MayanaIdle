@@ -38,7 +38,7 @@ export const LEGACY_AFFIX_RULE_IDS: Record<number, string> = {
   2003: 'skill', 2004: 'skill', 2005: 'skill', 2006: 'skill',
   2007: 'switch_target_lowest_hp', 2008: 'switch_target_highest_hp',
   2009: 'switch_target_farthest', 2010: 'keep_distance', 2011: 'close_in',
-  2012: 'disengage', 2013: 'switch_target_by_kind', 2014: 'switch_target_by_debuff',
+  2013: 'switch_target_by_kind', 2014: 'switch_target_by_debuff',
   2015: 'switch_target_summoner', 2016: 'lock_target',
 
   2101: 'potion', 2102: 'heal_skill', 2103: 'buff_skill', 2104: 'speed_potion',
