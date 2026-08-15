@@ -300,8 +300,10 @@ interface GameState {
   persistentLoopId: number | null;
   lastPotionUsedAt: number;
   lastPotionCooldown: number;
-  /** 上次掛機點（`49-village-script.md`）。回城前記下來，村莊腳本照它走回去 */
+  /** 上次掛機點（`49-village-script.md` § 49.5）。進入非城鎮區域時記下來 */
   lastHuntLocation: HuntLocation | null;
+  /** 待返回掛機點（§ 49.5）。只有自動回城設起，回到野外清除 */
+  huntReturnPending: boolean;
   /** 村莊腳本上次判定的時間戳。它會花錢與存檔，不需要跟常駐腳本一樣快 */
   lastVillageTickAt: number;
   searchMode: SearchMode;
@@ -391,7 +393,6 @@ interface GameState {
   removeScriptTemplate: (id: string) => void;
   startPersistentLoop: () => void;
   stopPersistentLoop: () => void;
-  /** 記下現在所在的掛機點，供村莊腳本的「返回上次掛機點」使用 */
   rememberHuntLocation: () => void;
   /** 村莊腳本判定一輪（由常駐迴圈帶動，見 `49-village-script.md`） */
   runVillageScriptTick: () => void;
@@ -538,6 +539,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastPotionUsedAt: 0,
   lastPotionCooldown: 0,
   lastHuntLocation: null,
+  huntReturnPending: false,
   lastVillageTickAt: 0,
   searchMode: 'auto',
   afterCombatHpThreshold: 30,
@@ -659,6 +661,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const scriptTemplates = prefs?.scriptTemplates ?? [createDefaultTemplate()];
     const activeTemplateId = prefs?.activeTemplateId ?? DEFAULT_TEMPLATE_ID;
     const lastHuntLocation = prefs?.lastHuntLocation ?? null;
+    const huntReturnPending = prefs?.huntReturnPending ?? false;
     // 技能格指向未習得的技能時剔除（§ 35.7.4）；名單取自這隻角色實際學到的招
     const quickSlots = normalizeQuickSlots(
       prefs?.quickSlots,
@@ -710,6 +713,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       scriptTemplates,
       activeTemplateId,
       lastHuntLocation,
+      huntReturnPending,
       quickSlots,
       bagSlotMap,
       afterCombatHpThreshold,
@@ -726,7 +730,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().startPersistentLoop();
     get().initQuestBoard();
 
-    void initTalentAndMailbox(char.id!, char.level);
+    startTalentAndMailboxInit(char.id!, char.level);
     const region = getRegion(char.currentRegion);
     if (region?.type !== 'town') {
       get().startExploring();
@@ -946,7 +950,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 少這一行的話新角色要登出重進才會有這三樣，而且不會報錯。
     get().startPersistentLoop();
     get().initQuestBoard();
-    void initTalentAndMailbox(char.id!, char.level);
+    startTalentAndMailboxInit(char.id!, char.level);
   },
 
   loadCharacter: async () => {
@@ -1148,6 +1152,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       bagItems: consumePotionFromBag(state.bagItems, potionType),
       combatLogs: addLog(state.combatLogs, { text: `使用${config.name}回復 ${heal} HP`, type: 'system' }),
     });
+    get().saveState();
   },
 
   usePotionByType: (type) => {
@@ -1177,6 +1182,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastPotionCooldown: config.cooldown,
       combatLogs: addLog(state.combatLogs, { text: `使用${config.name}回復 ${heal} HP`, type: 'system' }),
     });
+    get().saveState();
   },
 
   useSpeedPotion: (type) => {
@@ -1213,6 +1219,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ? { text: `使用${config.name}，解除減速`, type: 'debuff-self' }
         : { text: `使用${config.name}（攻速+33%）`, type: 'system' }),
     });
+    get().saveState();
   },
 
   assignQuickSlot: (slotIdx, entry) => {
@@ -1377,6 +1384,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         combatLogs: addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' }),
       });
       pushSelfCastFx({ skillId: skill.id, healed });
+      get().saveState();
       return true;
     }
 
@@ -1419,6 +1427,7 @@ export const useGameStore = create<GameState>((set, get) => ({
      * 少了這一行，設在常駐腳本上的 buff 一個特效都不會演。
      */
     pushSelfCastFx({ skillId: skill.id, healed: 0 });
+    get().saveState();
     return true;
   },
 
@@ -1455,6 +1464,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         type: 'debuff-self',
       }),
     });
+    get().saveState();
   },
 
   useTownScroll: (scrollItemId) => {
@@ -1520,6 +1530,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       character: updated,
       combatLogs: addLog(state.combatLogs, { text: `進入 ${areaName}！`, type: 'system' }),
     });
+    // 必須在 saveGame 之前，否則存到的是舊快照
+    get().rememberHuntLocation();
     saveGame(get());
     get().stopExploring();
     get().startExploring();
@@ -1560,6 +1572,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       bagItems: newBag,
       combatLogs: addLog(state.combatLogs, { text: `進入 ${areaName}${floorText}！`, type: 'system' }),
     });
+    // 必須在 saveGame 之前，否則存到的是舊快照
+    get().rememberHuntLocation();
     saveGame(get());
     get().stopExploring();
     if (region?.type !== 'town') {
@@ -1691,8 +1705,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
             : findScrollInBag(state.bagItems);
           if (!scroll) return;
-          // 緊急撤退也算離開掛機點，記下來村莊腳本才回得去
-          get().rememberHuntLocation();
+          set({ huntReturnPending: true });
           // 與手動使用回城卷軸共用同一條流程（停止探索、重置地圖座標、存檔）
           get().useTownScroll(scroll.itemId);
           return;
@@ -1731,7 +1744,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         case 'use_town_scroll': {
           const scroll = findScrollInBag(state.bagItems);
           if (!scroll) break;
-          get().rememberHuntLocation();
+          set({ huntReturnPending: true });
           get().useTownScroll(scroll.itemId);
           break;
         }
@@ -1783,15 +1796,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!char) return;
     // 城鎮不是掛機點，記下去會讓「返回上次掛機點」原地打轉
     if (getRegion(char.currentRegion)?.type === 'town') return;
-    const pos = useMapControlStore.getState().playerPosition;
     set({
       lastHuntLocation: {
         zoneId: char.currentZone,
         regionId: char.currentRegion,
         floor: char.currentFloor,
-        x: pos.x,
-        y: pos.y,
       },
+      huntReturnPending: false,
     });
   },
 
@@ -1823,6 +1834,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       inTown: getRegion(char.currentRegion)?.type === 'town',
       currentArea: char.currentArea,
       lastHuntLocation: state.lastHuntLocation,
+      huntReturnPending: state.huntReturnPending,
       warehouse: {
         shared: { materials: state.storedMaterials, equipment: state.storedEquipment },
         personal: { materials: state.personalStoredMaterials, equipment: state.personalStoredEquipment },
@@ -1843,7 +1855,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       case 'return_town': {
         const scroll = findReturnScroll(action.scrollTownId, ctx);
         if (!scroll) return;
-        get().rememberHuntLocation();
+        set({ huntReturnPending: true });
         get().useTownScroll(scroll.itemId);
         break;
       }
@@ -1864,6 +1876,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             e => !(e.type === 'debuff' && e.target === 'player'),
           ),
         });
+        get().saveState();
         break;
       }
       case 'return_to_hunt': {
@@ -2572,6 +2585,16 @@ export function waitForPendingDrops(): Promise<void> {
  * 3. 這一版的補償
  * 4. 起始配置只在完全沒有資料時發
  */
+let talentInitPromise: Promise<void> = Promise.resolve();
+
+export function talentInitReady(): Promise<void> {
+  return talentInitPromise;
+}
+
+function startTalentAndMailboxInit(characterId: number, level: number): void {
+  talentInitPromise = initTalentAndMailbox(characterId, level);
+}
+
 async function initTalentAndMailbox(characterId: number, level: number): Promise<void> {
   try {
     await purgeClaimedMailOnVersionChange(characterId, BUILD_INFO.version);
@@ -2649,11 +2672,19 @@ function useConsumableById(get: () => GameState, itemId: number): void {
   get().useCureItem(itemId);
 }
 
-async function saveGame(state: GameState) {
+let saveQueue: Promise<void> = Promise.resolve();
+
+/** 存檔唯一入口，不可直接呼叫 `writeSave()`。串成佇列使寫入順序等於呼叫順序 */
+function saveGame(state: GameState): Promise<void> {
+  const mapPos = useMapControlStore.getState().playerPosition;
+  const mine = saveQueue.then(() => writeSave(state, mapPos));
+  saveQueue = mine.catch(() => {});
+  return mine;
+}
+
+async function writeSave(state: GameState, mapPos: { x: number; y: number }) {
   const char = state.character;
   if (!char || !char.id) return;
-
-  const mapPos = useMapControlStore.getState().playerPosition;
 
   await db.characters.update(char.id, {
     level: char.level,
@@ -2740,6 +2771,7 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     scriptTemplates: state.scriptTemplates,
     activeTemplateId: state.activeTemplateId,
     lastHuntLocation: state.lastHuntLocation,
+    huntReturnPending: state.huntReturnPending,
     quickSlots: state.quickSlots,
     afterCombatHpThreshold: state.afterCombatHpThreshold,
     afterCombatMpThreshold: state.afterCombatMpThreshold,
@@ -2778,6 +2810,7 @@ interface LoadedPreferences {
   scriptTemplates: ScriptTemplate[];
   activeTemplateId: string;
   lastHuntLocation: HuntLocation | null;
+  huntReturnPending: boolean;
   quickSlots: QuickSlots;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
@@ -2832,6 +2865,7 @@ function loadLocalPreferences(characterId: number): LoadedPreferences | null {
         ? data.activeTemplateId
         : templates[0].id,
       lastHuntLocation: data.lastHuntLocation ?? null,
+      huntReturnPending: data.huntReturnPending ?? false,
       quickSlots: normalizeQuickSlots(data.quickSlots),
       afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
       afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,

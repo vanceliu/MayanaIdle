@@ -30,4 +30,28 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
-目前無進行中的計畫。
+### 掛機點拆成「位置」與「待返回旗標」
+
+`lastHuntLocation` 改為進入非城鎮區域時記錄；新增 `huntReturnPending`，
+只有自動回城（補給天賦 `return_town`、緊急撤退、常駐天賦 `use_town_scroll`）設起，
+進入非城鎮區域時清除。`return_to_hunt` 可執行條件加上該旗標。
+`HuntLocation` 刪除 `x, y`。
+
+- [x] Phase 1 設計文件：`49-village-script.md` § 49.3 / § 49.5（`51-auto-talent.md` 無可執行條件欄，不需改）
+- [x] Phase 2 型別與判定：`models/villageScript.ts`、`systems/villageScriptRunner.ts`
+- [x] Phase 3 gameStore：記錄時機搬到 `navigateTo` / `changeArea`，三個自動回城端設旗標，旗標進 prefs 存讀
+- [x] Phase 4 Wiki 文案：`wiki/talentRuleDescriptions.ts` 四條描述
+- [x] Phase 5 測試：`villageScript.test.ts` 旗標判定、`stores/__tests__/huntReturn.test.ts` 手動／自動回城行為，`npx tsc -b` ＋ 3258 測試全綠
+
+### 存檔缺漏與時序修正
+
+- [x] Phase 1 `runVillageScriptTick()` 的 `use_inn` 補 `saveState()`
+- [x] Phase 2 `saveGame()` 串成佇列，寫入順序等於呼叫順序，單次失敗不卡死後續
+- [x] Phase 3 測試：`innSupplyPersist.test.ts`、`saveQueue.test.ts`，`npx tsc -b` ＋ 3264 測試全綠
+
+### 存檔紀律稽核
+
+- [x] Phase 1 稽核完成，漏存五處：`usePotion`、`usePotionByType`、`useSpeedPotion`、`useCureItem`、`castSelfSkill`
+- [x] Phase 2 五處補 `saveState()`
+- [x] Phase 3 `talentInitReady()` 取代 fire-and-forget，五個測試檔改用它
+- [x] Phase 4 `consumablePersist.test.ts` ＋ `npx tsc -b` ＋ 3270 測試全綠

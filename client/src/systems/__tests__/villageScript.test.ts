@@ -56,6 +56,7 @@ function ctx(overrides: Partial<VillageScriptContext> = {}): VillageScriptContex
     bagMaxSlots: 50,
     inTown: true,
     lastHuntLocation: null,
+    huntReturnPending: true,
     warehouse: {
       shared: { materials: [] as BagItem[], equipment: [] },
       personal: { materials: [] as BagItem[], equipment: [] },
@@ -78,7 +79,7 @@ describe('村莊腳本判定', () => {
 
   it('停用的規則跳過', () => {
     const rules = [{ ...rule({ type: 'return_to_hunt' }), enabled: false }];
-    const c = ctx({ lastHuntLocation: { zoneId: 'z', regionId: 'r', floor: null, x: 1, y: 1 } });
+    const c = ctx({ lastHuntLocation: { zoneId: 'z', regionId: 'r', floor: null } });
     expect(evaluateVillageScript(rules, c)).toBeNull();
   });
 
@@ -165,7 +166,7 @@ describe('村莊腳本判定', () => {
         rule({ type: 'sell_materials', maxTier: 7 }),
         rule({ type: 'return_to_hunt' }),
       ];
-      const c = ctx({ bagItems: [], lastHuntLocation: { zoneId: 'z', regionId: 'r', floor: null, x: 1, y: 1 } });
+      const c = ctx({ bagItems: [], lastHuntLocation: { zoneId: 'z', regionId: 'r', floor: null } });
       expect(evaluateVillageScript(rules, c)?.type).toBe('return_to_hunt');
     });
 
@@ -183,14 +184,34 @@ describe('村莊腳本判定', () => {
     });
   });
 
+  /** 可執行條件：在城鎮 ＋ 有掛機點記錄 ＋ 待返回旗標（§ 49.3、§ 49.5） */
   describe('返回掛機點', () => {
+    const HUNT = { zoneId: 'z', regionId: 'r', floor: null };
+
+    it('三者齊備才成立', () => {
+      const c = ctx({ inTown: true, lastHuntLocation: HUNT, huntReturnPending: true });
+      expect(evaluateVillageScript([rule({ type: 'return_to_hunt' })], c)?.type).toBe('return_to_hunt');
+    });
+
     it('沒有記錄過掛機點就不成立', () => {
-      expect(evaluateVillageScript([rule({ type: 'return_to_hunt' })], ctx())).toBeNull();
+      expect(evaluateVillageScript([rule({ type: 'return_to_hunt' })], ctx({ huntReturnPending: true }))).toBeNull();
+    });
+
+    it('沒有待返回旗標就不成立（玩家自己走回城鎮不會被傳走）', () => {
+      const c = ctx({ inTown: true, lastHuntLocation: HUNT, huntReturnPending: false });
+      expect(evaluateVillageScript([rule({ type: 'return_to_hunt' })], c)).toBeNull();
     });
 
     it('在野外時不成立（人已經在外面了）', () => {
-      const c = ctx({ inTown: false, lastHuntLocation: { zoneId: 'z', regionId: 'r', floor: null, x: 1, y: 1 } });
+      const c = ctx({ inTown: false, lastHuntLocation: HUNT, huntReturnPending: true });
       expect(evaluateVillageScript([rule({ type: 'return_to_hunt' })], c)).toBeNull();
+    });
+
+    /** 條件「有上次掛機點」只看位置紀錄，不看旗標（§ 49.5） */
+    it('條件「有上次掛機點」不受待返回旗標影響', () => {
+      const rules = [rule({ type: 'sell_materials', maxTier: 7 }, [{ type: 'has_hunt_location' }])];
+      const c = ctx({ bagItems: [makeBagItem(TUSK, 5)] as BagItem[], lastHuntLocation: HUNT, huntReturnPending: false });
+      expect(evaluateVillageScript(rules, c)?.type).toBe('sell_materials');
     });
   });
 });

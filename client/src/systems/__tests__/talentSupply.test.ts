@@ -25,6 +25,7 @@ function ctx(over: Partial<VillageScriptContext> = {}): VillageScriptContext {
     bagMaxSlots: 60,
     inTown: true,
     lastHuntLocation: null,
+    huntReturnPending: false,
     warehouse: {
       shared: { materials: [], equipment: [] },
       personal: { materials: [], equipment: [] },

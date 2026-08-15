@@ -86,7 +86,7 @@ export const PERSISTENT_ACTION_DESC: Record<string, string> = {
   keep_distance: '退到指定距離外。未指定時退到武器射程邊緣',
   close_in: '貼近目標到指定距離',
   disengage: '遠離所有怪物',
-  use_town_scroll: '使用背包裡的回城卷軸傳送回城鎮，並記下掛機點',
+  use_town_scroll: '使用背包裡的回城卷軸傳送回城鎮，辦完事會被送回掛機點',
   use_consumable: '使用指定的消耗品。依道具種類走各自的使用路徑',
   refill_to_percent: '每次判定喝一瓶，直到 HP 達到指定百分比。受藥水冷卻限制',
   refill_all_buffs: '依序檢查最多三個 buff，放出第一個還沒生效的',
@@ -106,13 +106,13 @@ export const VILLAGE_CONDITION_DESC: Record<string, string> = {
   gold_above: '身上金幣（實際金額）',
   in_town: '角色現在站在城鎮還是野外',
   bag_free_slots_lte: '背包剩餘格數。取東西前該看的是剩餘，不是已用',
-  has_hunt_location: '有沒有可以走回去的座標。只有「回城」與緊急撤退會記下離開時的位置，新角色沒有',
+  has_hunt_location: '有沒有可以走回去的地點。每次進入野外都會更新，只在城鎮待過的新角色沒有',
   warehouse_gold_gte: '共用倉庫的金幣餘額',
   warehouse_item_gte: '倉庫裡指定道具的存量',
 };
 
 export const VILLAGE_ACTION_DESC: Record<string, string> = {
-  return_town: '消耗回城卷軸。只有在野外才成立，回城前會記下掛機點',
+  return_town: '消耗回城卷軸。只有在野外才成立，辦完事會被送回掛機點',
   use_inn: '恢復 HP／MP 並解除異常狀態。HP／MP 全滿又沒有異常狀態時不會觸發',
   sell_materials: '依顏色等級批量販售，可選擇保留進得了配方的素材',
   sell_equipment: '依顏色等級批量販售，可設保留條件',
@@ -122,7 +122,7 @@ export const VILLAGE_ACTION_DESC: Record<string, string> = {
   withdraw_item: '從倉庫補到目標數量，受倉庫存量與背包格數限制',
   deposit_gold: '身上留下指定金額，其餘存進共用倉庫',
   withdraw_gold: '從共用倉庫領到目標金額',
-  return_to_hunt: '回到「回城」或緊急撤退時記下的那個座標。需要通行卷軸的區域一樣要有卷軸',
+  return_to_hunt: '回到最後待過的野外地點。只有被自動回城帶進城時才會觸發，玩家自己走回城鎮不會被傳走。需要通行卷軸的區域一樣要有卷軸',
 };
 
 /**

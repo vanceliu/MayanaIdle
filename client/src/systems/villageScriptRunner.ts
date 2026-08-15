@@ -39,6 +39,8 @@ export interface VillageScriptContext {
   currentArea?: string;
   /** 上次掛機點；沒有就回不去 */
   lastHuntLocation: HuntLocation | null;
+  /** 待返回旗標（§ 49.5）：只有自動回城帶進城時為 true */
+  huntReturnPending: boolean;
   /** 倉庫內容（`13-town.md` § 13.8） */
   warehouse: {
     shared: { materials: BagItem[]; equipment: EquipmentInstance[] };
@@ -115,7 +117,7 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
       return findReturnScroll(action.scrollTownId, ctx) !== null;
     }
     case 'return_to_hunt':
-      return ctx.inTown && ctx.lastHuntLocation !== null;
+      return ctx.inTown && ctx.lastHuntLocation !== null && ctx.huntReturnPending;
     case 'buy_item': {
       if (!ctx.inTown || action.itemId == null) return false;
       const price = getItemBasePrice(action.itemId);

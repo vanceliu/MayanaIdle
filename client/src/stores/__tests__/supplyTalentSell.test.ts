@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db } from '../../db/database';
 import { seedDatabase, resetSeedState } from '../../db/seed';
-import { useGameStore } from '../gameStore';
+import { useGameStore, talentInitReady } from '../gameStore';
 import { useTalentStore } from '../talentStore';
 import { getItemDefinition } from '../../models/items';
 import { makeBagItem } from '../../models/bagItem';
@@ -57,6 +57,8 @@ describe('補給天賦：販售素材（`49-village-script.md`、`51-auto-talent
     await useGameStore.getState().createCharacter(
       'Seller', 'elf', { STR: 0, AGI: 2, VIT: 0, SPI: 0, INT: 0, CHA: 2 },
     );
+    // 天賦初始化會蓋掉 slots，必須等它做完才塞測試用天賦格
+    await talentInitReady();
     // 角色建立後在城鎮，背包塞三種可賣素材
     useGameStore.setState({
       bagItems: MATERIALS.map(n => makeBagItem(getItemDefinition(n)!.id!, 5)!),

@@ -33,7 +33,7 @@ vi.mock('../../systems/talentDrops', async () => {
   };
 });
 
-import { useGameStore, processMonsterDeath, waitForPendingDrops } from '../gameStore';
+import { useGameStore, processMonsterDeath, waitForPendingDrops, talentInitReady } from '../gameStore';
 import { useTalentStore } from '../talentStore';
 
 if (typeof globalThis.window === 'undefined') {
@@ -75,18 +75,6 @@ const deadBoss = {
   attackInterval: 1000,
   _processed: false,
 };
-
-/**
- * `initTalentAndMailbox` 在 `createCharacter` 裡是 fire-and-forget，
- * 不等它結束就開打的話，它會在擊殺途中才把 store 載好，測試就測不到東西。
- */
-async function waitForTalentInit() {
-  for (let i = 0; i < 100; i++) {
-    if (useTalentStore.getState().slots.length > 0) return;
-    await new Promise(r => setTimeout(r, 0));
-  }
-  throw new Error('天賦起始配置沒有載入');
-}
 
 async function killBoss() {
   const char = useGameStore.getState().character!;
@@ -137,7 +125,7 @@ describe('天賦掉落與 store 同步', () => {
 
   it('掉落的天賦格立刻出現在 store，不必重新載入角色', async () => {
     // 模擬玩家已經在遊戲裡：起始配置載完才開打
-    await waitForTalentInit();
+    await talentInitReady();
     const characterId = useGameStore.getState().character!.id!;
     const before = useTalentStore.getState().slots.length;
 
@@ -149,7 +137,8 @@ describe('天賦掉落與 store 同步', () => {
   });
 
   it('擊殺後 store 與 DB 完全一致', async () => {
-    await waitForTalentInit();
+    // 模擬玩家已經在遊戲裡：起始配置載完才開打
+    await talentInitReady();
     await killBoss();
 
     const characterId = useGameStore.getState().character!.id!;

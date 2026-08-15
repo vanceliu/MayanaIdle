@@ -29,7 +29,7 @@ export type VillageConditionType =
   | 'warehouse_item_gte';
 
 export type VillageActionType =
-  /** 消耗回城卷軸回到城鎮，回城前會記下當前掛機點 */
+  /** 消耗回城卷軸回到城鎮，並設起待返回旗標（§ 49.5） */
   | 'return_town'
   /** 把指定道具補到目標數量（買不起就買到買得起為止） */
   | 'buy_item'
@@ -47,7 +47,7 @@ export type VillageActionType =
   | 'deposit_gold'
   /** 從共用倉庫領金幣，補到 targetAmount */
   | 'withdraw_gold'
-  /** 回到上次掛機點 */
+  /** 回到上次掛機點。只有自動回城帶進城時才成立（§ 49.5 待返回旗標） */
   | 'return_to_hunt'
   // === `51-auto-talent.md` § 51.4.11 新增 ===
   /** 使用旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7） */
@@ -166,13 +166,11 @@ export const VILLAGE_ACTION_LABELS: Record<VillageActionType, string> = {
   return_to_hunt: '返回上次掛機點',
 };
 
-/** 上次掛機點：回城前記下來，`return_to_hunt` 照它走回去 */
+/** 上次掛機點（§ 49.5）：進入非城鎮區域時記下 */
 export interface HuntLocation {
   zoneId: string;
   regionId: string;
   floor: number | null;
-  x: number;
-  y: number;
 }
 
 // === 保留條件判定 ===
