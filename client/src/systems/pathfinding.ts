@@ -136,6 +136,18 @@ export function findAttackPosition(
   return null;
 }
 
+/** 該格是否打得到 `target` */
+export function isAttackPosition(
+  map: MapData,
+  position: Position,
+  target: Position,
+  range: number,
+  occupied?: Set<string>,
+): boolean {
+  if (occupied?.has(`${position.x},${position.y}`)) return false;
+  return getDistance(position, target) <= range && hasLineOfSight(position, target, map);
+}
+
 export function findAdjacentWalkable(map: MapData, target: Position, from: Position): Position | null {
   return findAttackPosition(map, target, from, Math.SQRT2);
 }

@@ -18,7 +18,7 @@ import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } fr
 import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
 import { hasProjectilePath } from '../systems/lineOfSight';
 import { gameLoopTick, consumeDotTick, occupation } from '../systems/gameLoop';
-import { findAttackPosition } from '../systems/pathfinding';
+import { findAttackPosition, isAttackPosition } from '../systems/pathfinding';
 import { db } from '../db/database';
 import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
 import type { MonsterTemplate } from '../models/monster';
@@ -948,16 +948,16 @@ function tickArpgCombatLoop(
              */
             const playerPos = mapCtrl.playerPosition;
             const occupied = occupation.getOccupiedSet('player');
+
+            const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
+            const keepCurrent = mapCtrl.isMoving && currentDest
+              && isAttackPosition(map, currentDest, event.target, event.range, occupied);
+            if (keepCurrent) break;
+
             const attackPosition = findAttackPosition(map, event.target, playerPos, event.range, occupied)
               ?? findAttackPosition(map, event.target, playerPos, event.range);
             if (attackPosition) {
-              // Repath if not moving, or if current destination differs from desired
-              const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
-              const needsRepath = !mapCtrl.isMoving ||
-                !currentDest || currentDest.x !== attackPosition.x || currentDest.y !== attackPosition.y;
-              if (needsRepath) {
-                useMapControlStore.getState().moveToTarget(attackPosition, occupied);
-              }
+              useMapControlStore.getState().moveToTarget(attackPosition, occupied);
             } else {
               engine.playerCtx.targetMonsterId = null;
               engine.playerCtx.state = 'idle';
