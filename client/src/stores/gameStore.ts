@@ -2256,13 +2256,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   completeAdventurerQuest: (questId) => {
     const state = get();
     const quest = state.adventurerQuests.find(q => q.id === questId);
-    const { activeQuests, guildProgress, reward } = completeAdvQuest(
-      state.adventurerQuests, questId, state.guildProgress
+    const { activeQuests, guildProgress, reward, consumed } = completeAdvQuest(
+      state.adventurerQuests, questId, state.guildProgress, state.bagItems
     );
     if (!reward) return;
 
     let newBag = state.bagItems;
     let newChar = state.character;
+
+    // 交付型：先扣掉交出去的東西，再給獎勵（§ 36.11）
+    if (consumed) newBag = consumeBagItem(newBag, consumed.itemId, consumed.amount);
 
     if (reward.type === 'gold' && newChar) {
       newChar = { ...newChar, gold: newChar.gold + reward.amount };

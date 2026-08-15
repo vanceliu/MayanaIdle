@@ -32,6 +32,11 @@ export class HealthBar {
     this.bar.fill(this.barColor);
   }
 
+  /** 這一刻畫出來的血量比例（0–1）。測試用來確認血條跟的是演出而不是判定 */
+  get ratio(): number {
+    return this.lastRatio;
+  }
+
   destroy(): void {
     this.container.destroy({ children: true });
   }

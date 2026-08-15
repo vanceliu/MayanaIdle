@@ -16,7 +16,8 @@ export interface MapControlState {
   moveSpeed: number;
 
   loadMap: (regionId: string, floor?: number | null, savedPosition?: Position | null) => Promise<void>;
-  moveToTarget: (target: Position) => void;
+  /** `occupied`：怪物佔住的格子（角色自己那格不計入），追擊時用來繞開 */
+  moveToTarget: (target: Position, occupied?: Set<string>) => void;
   setAutoMove: (auto: boolean) => void;
   tick: (deltaMs: number) => void;
   pickRandomTarget: () => void;
@@ -56,7 +57,7 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     });
   },
 
-  moveToTarget: (target) => {
+  moveToTarget: (target, occupied) => {
     const { currentMap, playerPosition, isMoving } = get();
     if (!currentMap) return;
 
@@ -71,7 +72,12 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       finalTarget = nearest;
     }
 
-    const path = findPath(currentMap, startTile, finalTarget);
+    /*
+     * 繞不開就照原本的路走 —— 怪物會移動，硬走過去頂多在牠面前停一格，
+     * 直接放棄反而讓角色站在原地不動。
+     */
+    const path = findPath(currentMap, startTile, finalTarget, occupied)
+      ?? findPath(currentMap, startTile, finalTarget);
     if (!path || path.length === 0) return;
 
     set({

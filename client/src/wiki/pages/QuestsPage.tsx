@@ -52,13 +52,37 @@ export function QuestsPage() {
             </thead>
             <tbody>
               <tr><td>殲滅任務</td><td>在指定區域擊殺怪物（不限種類）</td><td className="cell-number">15~30 隻</td><td>全等級</td></tr>
-              <tr><td>素材收集任務</td><td>收集指定怪物的掉落素材（10% 掉率）</td><td className="cell-number">5 個</td><td>全等級</td></tr>
+              <tr><td>素材收集任務</td><td>收集指定怪物的掉落素材（40% 掉率）</td><td className="cell-number">1~5 個</td><td>全等級</td></tr>
               <tr><td>持續戰鬥任務</td><td>在指定區域累計擊殺大量怪物</td><td className="cell-number">50~100 隻</td><td>全等級</td></tr>
               <tr><td>BOSS 殲滅任務</td><td>擊殺指定 BOSS</td><td className="cell-number">1~3 隻</td><td>B+ 級以上</td></tr>
               <tr><td>BOSS 素材收集</td><td>收集指定 BOSS 掉落素材（30% 掉率）</td><td className="cell-number">1~3 個</td><td>B+ 級以上</td></tr>
+              <tr><td>多目標殲滅任務</td><td>在同一區域擊殺 2~3 種指定怪物</td><td className="cell-number">總數同殲滅</td><td>全等級</td></tr>
+              <tr><td>交付素材任務</td><td>交出指定製作素材，不必打怪</td><td className="cell-number">3~10 個</td><td>全等級</td></tr>
+              <tr><td>交付印記任務</td><td>交出精鍊或工藝印記換取報酬</td><td className="cell-number">8~120 個</td><td>全等級</td></tr>
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
+          交付印記的兌換率
+        </h3>
+        <div className="wiki-table-wrap">
+          <table className="wiki-table">
+            <thead>
+              <tr><th>分頁</th><th>兌換率</th><th>一張最多換</th><th>交付數量</th><th>報酬</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>D / C</td><td>—</td><td>—</td><td className="cell-number">8~12</td><td>金幣（印記賣價 × 數量 × 5）</td></tr>
+              <tr><td>B / A</td><td className="cell-number">8~12 : 1</td><td className="cell-number">4</td><td className="cell-number">8~48</td><td>混沌／刺針／重刻印記</td></tr>
+              <tr><td>S</td><td className="cell-number">45~60 : 1</td><td className="cell-number">2</td><td className="cell-number">45~120</td><td>突破印記</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 8 }}>
+          兌換率依掉率比訂定：精鍊／工藝印記 5~7%、混沌／刺針／重刻 1%、突破 0.1%。
+        </p>
       </section>
 
       <section style={{ marginBottom: 32 }}>
@@ -68,11 +92,11 @@ export function QuestsPage() {
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>適用等級</th><th>殲滅</th><th>素材收集</th><th>持續戰鬥</th><th>BOSS殲滅</th><th>BOSS素材</th></tr>
+              <tr><th>適用等級</th><th>殲滅</th><th>素材收集</th><th>持續戰鬥</th><th>多目標</th><th>交付素材</th><th>交付印記</th><th>BOSS殲滅</th><th>BOSS素材</th></tr>
             </thead>
             <tbody>
-              <tr><td>D / C / B / A / S 級</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">30</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B+ / A+ / S+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">50</td><td className="cell-number">50</td></tr>
+              <tr><td>D / C / B / A / S 級</td><td className="cell-number">30</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">5</td><td className="cell-number">5</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B+ / A+ / S+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">50</td><td className="cell-number">50</td></tr>
             </tbody>
           </table>
         </div>
@@ -137,9 +161,12 @@ export function QuestsPage() {
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             一般任務基準值 = 區域平均金幣 × 殺怪數量<br />
+            收集任務基準值 = 區域平均金幣 × 素材個數 ÷ 掉率<br />
+            交付素材基準值 = 素材售價 × 個數 × 3<br />
             一般任務獎勵 = 基準值 × 2<br />
-            BOSS任務基準值 = BOSS金幣掉落 × 數量 × 3<br />
-            BOSS任務獎勵 = 基準值 × 2
+            BOSS任務基準值 = BOSS金幣掉落 × 數量 × 3（收集型再 ÷ 掉率）<br />
+            BOSS任務獎勵 = 基準值 × 2<br />
+            交付印記任務的獎勵由分頁固定，不走上列公式
           </p>
         </div>
       </section>
@@ -161,6 +188,8 @@ export function QuestsPage() {
               <tr><td>武器強化卷軸</td><td>1 張</td></tr>
               <tr><td>防具強化卷軸</td><td>1 張</td></tr>
               <tr><td>製作素材（B／B+ 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
+              <tr><td>詞綴印記（混沌/刺針/重刻隨機）</td><td>基準值 ÷ 1,000（最少 1 個）</td></tr>
+              <tr><td>突破印記</td><td>1 個</td></tr>
             </tbody>
           </table>
         </div>
@@ -178,10 +207,10 @@ export function QuestsPage() {
             <tbody>
               <tr><td>F ~ D</td><td>金幣、藥水、工藝印記、精鍊印記</td></tr>
               <tr><td>C</td><td>同上（工藝印記/精鍊印記權重提升）</td></tr>
-              <tr><td>B</td><td>+ 防具強化卷軸、製作素材（銀礦石、銀精華）</td></tr>
+              <tr><td>B</td><td>+ 防具強化卷軸、製作素材（銀礦石、銀精華）、詞綴印記</td></tr>
               <tr><td>A</td><td>+ 武器強化卷軸、製作素材升級（米索利碎片、米索利礦石）</td></tr>
-              <tr><td>S ~ SS</td><td>卷軸權重提高、製作素材升級（龍骨、奧里哈魯根）</td></tr>
-              <tr><td>US</td><td>所有獎勵 ×10</td></tr>
+              <tr><td>S ~ SS</td><td>卷軸權重提高、製作素材升級（龍骨、奧里哈魯根）、+ 突破印記</td></tr>
+              <tr><td>US</td><td>與 S ~ SS 相同（等階只影響獎勵種類權重，不給數量倍率）</td></tr>
             </tbody>
           </table>
         </div>
@@ -194,14 +223,14 @@ export function QuestsPage() {
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>等階</th><th>金幣</th><th>藥水</th><th>工藝印記</th><th>精鍊印記</th><th>防具卷軸</th><th>武器卷軸</th><th>製作素材</th></tr>
+              <tr><th>等階</th><th>金幣</th><th>藥水</th><th>工藝印記</th><th>精鍊印記</th><th>防具卷軸</th><th>武器卷軸</th><th>製作素材</th><th>詞綴印記</th><th>突破印記</th></tr>
             </thead>
             <tbody>
-              <tr><td>F ~ D</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>C</td><td className="cell-number">35</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">20</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">10</td></tr>
-              <tr><td>A</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">13</td><td className="cell-number">10</td><td className="cell-number">12</td></tr>
-              <tr><td>S ~ SS</td><td className="cell-number">17</td><td className="cell-number">13</td><td className="cell-number">13</td><td className="cell-number">13</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">14</td></tr>
+              <tr><td>F ~ D</td><td className="cell-number">40</td><td className="cell-number">30</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>C</td><td className="cell-number">35</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">20</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B</td><td className="cell-number">25</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">—</td><td className="cell-number">10</td><td className="cell-number">10</td><td className="cell-number">—</td></tr>
+              <tr><td>A</td><td className="cell-number">20</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">13</td><td className="cell-number">10</td><td className="cell-number">12</td><td className="cell-number">10</td><td className="cell-number">—</td></tr>
+              <tr><td>S ~ US</td><td className="cell-number">17</td><td className="cell-number">13</td><td className="cell-number">13</td><td className="cell-number">13</td><td className="cell-number">15</td><td className="cell-number">15</td><td className="cell-number">14</td><td className="cell-number">10</td><td className="cell-number">5</td></tr>
             </tbody>
           </table>
         </div>
@@ -217,7 +246,7 @@ export function QuestsPage() {
             公式：最終貢獻 = 基底貢獻 + floor(區域平均金幣 / 10)<br />
             完成任務獲得貢獻點數，累積到門檻自動升階。<br />
             退出任務扣除等量貢獻點數，可能降階。<br />
-            大部分玩家會卡在 A 階，S/SS/US 為長期目標。US 等階獎勵全部 ×10。
+            大部分玩家會卡在 A 階，S/SS/US 為長期目標。等階只影響獎勵種類的權重，不影響數量。
           </p>
         </div>
       </section>
@@ -229,17 +258,17 @@ export function QuestsPage() {
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>難度</th><th>殲滅</th><th>素材收集</th><th>持續戰鬥</th><th>BOSS殲滅</th><th>BOSS素材</th></tr>
+              <tr><th>難度</th><th>殲滅</th><th>素材收集</th><th>持續戰鬥</th><th>多目標</th><th>交付素材</th><th>交付印記</th><th>BOSS殲滅</th><th>BOSS素材</th></tr>
             </thead>
             <tbody>
-              <tr><td>D 級</td><td className="cell-number">10</td><td className="cell-number">20</td><td className="cell-number">30</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>C 級</td><td className="cell-number">15</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B 級</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">60</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>B+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">80</td><td className="cell-number">100</td></tr>
-              <tr><td>A 級</td><td className="cell-number">80</td><td className="cell-number">100</td><td className="cell-number">120</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>A+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">150</td><td className="cell-number">200</td></tr>
-              <tr><td>S 級</td><td className="cell-number">150</td><td className="cell-number">160</td><td className="cell-number">180</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
-              <tr><td>S+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">200</td><td className="cell-number">250</td></tr>
+              <tr><td>D 級</td><td className="cell-number">10</td><td className="cell-number">20</td><td className="cell-number">30</td><td className="cell-number">12</td><td className="cell-number">20</td><td className="cell-number">20</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>C 級</td><td className="cell-number">15</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">18</td><td className="cell-number">30</td><td className="cell-number">30</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B 級</td><td className="cell-number">30</td><td className="cell-number">45</td><td className="cell-number">60</td><td className="cell-number">36</td><td className="cell-number">45</td><td className="cell-number">45</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>B+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">80</td><td className="cell-number">100</td></tr>
+              <tr><td>A 級</td><td className="cell-number">80</td><td className="cell-number">100</td><td className="cell-number">120</td><td className="cell-number">96</td><td className="cell-number">100</td><td className="cell-number">100</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>A+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">150</td><td className="cell-number">200</td></tr>
+              <tr><td>S 級</td><td className="cell-number">150</td><td className="cell-number">160</td><td className="cell-number">180</td><td className="cell-number">180</td><td className="cell-number">160</td><td className="cell-number">160</td><td className="cell-number">—</td><td className="cell-number">—</td></tr>
+              <tr><td>S+ 級</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">—</td><td className="cell-number">200</td><td className="cell-number">250</td></tr>
             </tbody>
           </table>
         </div>

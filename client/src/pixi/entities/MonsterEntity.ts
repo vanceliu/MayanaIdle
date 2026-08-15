@@ -31,6 +31,8 @@ export class MonsterEntity {
   private baseY = 0;
   /** 還有幾發特效正在飛向這隻怪。>0 就還不能開始淡出 */
   private pendingHits = 0;
+  /** 還在空中的那幾發已經扣掉、但畫面上還不該扣的血量 */
+  private pendingDamage = 0;
   /** 判死之後等了多久（ms），用來觸發保險絲 */
   private graceMs = 0;
 
@@ -123,13 +125,15 @@ export class MonsterEntity {
    * 但打死牠的那一發可能還在空中。沒有這個保留，屍體會在投射物落地前
    * 就淡光並被銷毀，`onLand` 那一刻連實體都找不到，白閃與抖動一次都不會發生。
    */
-  reserveHit(): void {
+  reserveHit(damage = 0): void {
     this.pendingHits++;
+    this.pendingDamage += damage;
   }
 
   /** 那一發落地了 */
-  releaseHit(): void {
+  releaseHit(damage = 0): void {
     this.pendingHits = Math.max(0, this.pendingHits - 1);
+    this.pendingDamage = Math.max(0, this.pendingDamage - damage);
   }
 
   /**
@@ -169,6 +173,11 @@ export class MonsterEntity {
     return this.flash.alpha;
   }
 
+  /** 血條這一刻畫出來的比例（0–1） */
+  get hpRatio(): number {
+    return this.healthBar.ratio;
+  }
+
   /**
    * 回到全新的狀態（沒被打過、沒死）。
    *
@@ -197,8 +206,12 @@ export class MonsterEntity {
     this.castBar.update(progress);
   }
 
+  /**
+   * 血條跟著**演出**走，不跟著判定：還在空中的那幾發先加回去，
+   * 落地扣掉 `pendingDamage` 時血條才下降 —— 否則箭一射出去血就先扣完了。
+   */
   updateHp(current: number, max: number): void {
-    this.healthBar.update(current, max);
+    this.healthBar.update(Math.min(current + this.pendingDamage, max), max);
   }
 
   /** 這隻是不是玩家目前的目標（§ 3.6.1）。每幀對帳，不需要另外清除 */

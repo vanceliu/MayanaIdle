@@ -184,9 +184,19 @@ function movePlayerSafe(deltaMs: number) {
 
     // Check if next tile is occupied by a monster
     if (occupation.isOccupiedByType(nextTile, 'monster')) {
-      // Stop before monster — we're adjacent, let FSM handle attacking
-      useMapControlStore.setState({ isMoving: false });
-      break;
+      /*
+       * 停在怪物前一格，位置**維持原地不回拉**。路徑一併清掉 ——
+       * 留著會讓下一次追擊沿同一條被擋死的路重算。
+       */
+      occupation.unregister({ x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) });
+      occupation.register({ x: Math.round(pos.x), y: Math.round(pos.y) }, 'player', 'player');
+      useMapControlStore.setState({
+        isMoving: false,
+        currentPath: [],
+        pathIndex: 0,
+        playerPosition: pos,
+      });
+      return;
     }
 
     const dx = next.x - pos.x;
@@ -223,7 +233,6 @@ function moveMonstersSafe(
   if (monsterStore.monsters.length === 0) return;
 
   const updated: MapMonster[] = [];
-  const playerSnapped = { x: Math.round(playerPos.x), y: Math.round(playerPos.y) };
   const TRIGGER_DISTANCE = 1.2;
   const ASTAR_DISTANCE = 8;
   const PATH_RECALC_INTERVAL = 5000;
@@ -273,10 +282,15 @@ function moveMonstersSafe(
       if (needsRecalc) {
         const monsterSnapped = { x: Math.round(monster.position.x), y: Math.round(monster.position.y) };
         const occupiedSet = occupation.getOccupiedSet(monster.id);
+        /*
+         * 落腳格一律對**雙方的真實座標**算，不可餵四捨五入後的格心 ——
+         * 停在格與格之間時會挑到「尋路說已就位、攻擊判定說超出射程」的位置，
+         * 怪物與角色就此互相僵住。
+         */
         const attackPosition = findAttackPosition(
           map,
-          playerSnapped,
-          monsterSnapped,
+          playerPos,
+          monster.position,
           stopDistance,
           occupiedSet,
         );
@@ -286,7 +300,11 @@ function moveMonstersSafe(
         if (newPath && newPath.length > 0) {
           path = newPath;
           pathIndex = 0;
-        } else if (!attackPosition) {
+        } else {
+          /*
+           * 走不到（`attackPosition` 為 null）與**已在該站的格子**（`findPath` 回空）
+           * 都要清掉舊路徑 —— 留著會讓怪物沿上一次的目的地繼續走，離玩家愈走愈遠。
+           */
           path = [];
           pathIndex = 0;
         }
@@ -340,12 +358,14 @@ function moveMonstersSafe(
     let remaining = moveDistance;
     let pos = { ...monster.position };
     let idx = pathIndex;
+    let blocked = false;
 
     while (remaining > 0 && idx < path.length) {
       const next = path[idx];
       const nextTile = { x: Math.round(next.x), y: Math.round(next.y) };
 
       if (!occupation.canMoveTo(nextTile, monster.id)) {
+        blocked = true;
         break;
       }
 
@@ -362,6 +382,12 @@ function moveMonstersSafe(
         pos = { x: pos.x + dx * ratio, y: pos.y + dy * ratio };
         remaining = 0;
       }
+    }
+
+    // 被別的怪擋住：原地停住，丟掉這條路，下一次重算才會繞開
+    if (blocked) {
+      path = [];
+      idx = 0;
     }
 
     // Update occupation

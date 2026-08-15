@@ -229,7 +229,8 @@ interface SkillCombatProps {
 
 - 近戰：尋路到目標相鄰格（距離 ≤ 1.5）
 - 遠程：找到距離 ≤ 技能 range 且有視線的位置（優先當前位置）
-- 使用現有 A* pathfinding
+- 使用現有 A* pathfinding；避開佔位、落腳格判定用真實座標等移動規則見
+  `38-map-control.md` § 38.5
 
 ## 5. 怪物行為
 

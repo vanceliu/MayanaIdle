@@ -81,3 +81,39 @@ describe('屍體的等待', () => {
     m.destroy();
   });
 });
+
+describe('血條跟著演出走', () => {
+  it('投射物還在空中時血條不動，落地才扣', () => {
+    const m = new MonsterEntity('m1');
+    m.updateHp(100, 100);
+
+    // 判定已經扣完血，但那一發還在飛
+    m.reserveHit(40);
+    m.updateHp(60, 100);
+    expect(m.hpRatio).toBe(1);
+
+    m.releaseHit(40);
+    m.updateHp(60, 100);
+    expect(m.hpRatio).toBeCloseTo(0.6);
+    m.destroy();
+  });
+
+  it('多段技能一發一發扣，不是一次扣完', () => {
+    const m = new MonsterEntity('m1');
+    m.updateHp(100, 100);
+
+    m.reserveHit(20);
+    m.reserveHit(20);
+    m.updateHp(60, 100);
+    expect(m.hpRatio).toBe(1);
+
+    m.releaseHit(20);
+    m.updateHp(60, 100);
+    expect(m.hpRatio).toBeCloseTo(0.8);
+
+    m.releaseHit(20);
+    m.updateHp(60, 100);
+    expect(m.hpRatio).toBeCloseTo(0.6);
+    m.destroy();
+  });
+});

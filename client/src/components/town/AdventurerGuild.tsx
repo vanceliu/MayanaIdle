@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import type { AdventurerQuest, AdventurerQuestDifficulty, QuestTownId } from '../../models/adventurerQuest';
-import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties, isBossDifficulty, QUEST_BOARD_REFRESH_COST } from '../../models/adventurerQuest';
-import { getPointsToNextRank } from '../../systems/adventurerQuestSystem';
+import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties, isBossDifficulty, QUEST_BOARD_REFRESH_COST, isDeliverQuestType } from '../../models/adventurerQuest';
+import { getPointsToNextRank, isDeliverQuestSatisfied } from '../../systems/adventurerQuestSystem';
 import { getItemById } from '../../models/items';
+import { getBagItemAmount } from '../../models/bagItem';
 
 function QuestDescription({ description }: { description: string }) {
   const parts = description.split(/(\*\*[^*]+\*\*)/g);
@@ -41,11 +42,125 @@ function RewardPreview({ quest }: { quest: AdventurerQuest }) {
       return <span className="quest-reward">📜 {rewardItemName(reward)} ×{reward.amount}</span>;
     case 'crafting-material':
       return <span className="quest-reward">🔧 {rewardItemName(reward)} ×{reward.amount}</span>;
+    case 'affix-sigil':
+    case 'breakthrough-sigil':
+      return <span className="quest-reward">🗝️ {rewardItemName(reward)} ×{reward.amount}</span>;
   }
 }
 
+/**
+ * 交付型不累積進度，可交付與否看當下背包（§ 36.11）；
+ * 其餘型別看 `status`，那是擊殺累積出來的。
+ */
+function useQuestCompletable(quest: AdventurerQuest | undefined): boolean {
+  const bagItems = useGameStore(s => s.bagItems);
+  if (!quest) return false;
+  return isDeliverQuestType(quest.type)
+    ? isDeliverQuestSatisfied(quest, bagItems)
+    : quest.status === 'completable';
+}
+
+/** 交付型顯示 `have/need`，與製作任務同格式（§ 36.10.2） */
+function QuestProgress({ quest }: { quest: AdventurerQuest }) {
+  const bagItems = useGameStore(s => s.bagItems);
+  if (isDeliverQuestType(quest.type) && quest.targetItemId != null) {
+    const have = getBagItemAmount(bagItems, quest.targetItemId);
+    const name = getItemById(quest.targetItemId)?.name ?? '未知道具';
+    return (
+      <span className="quest-progress">
+        {name}：<strong className={have >= quest.targetCount ? '' : 'lacking'}>
+          {have}/{quest.targetCount}
+        </strong>
+      </span>
+    );
+  }
+  if (quest.type === 'multierrand' && quest.subTargets) {
+    return (
+      <span className="quest-progress">
+        {quest.subTargets.map(sub => (
+          <span key={sub.monster} className="quest-subtarget">
+            {sub.monster} <strong>{sub.currentCount}/{sub.targetCount}</strong>
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <span className="quest-progress">
+      進度：<strong>{quest.currentCount}/{quest.targetCount}</strong>
+    </span>
+  );
+}
+
+function ActiveQuestCard({ quest, onComplete, onAbandon }: {
+  quest: AdventurerQuest;
+  onComplete: (id: string) => void;
+  onAbandon: (id: string) => void;
+}) {
+  const completable = useQuestCompletable(quest);
+  return (
+    <div className={`shop-item ${completable ? 'completable' : ''}`}>
+      <div className="shop-item-info">
+        <span className="shop-item-name">
+          <QuestTypeTag type={quest.type} /> {quest.title}
+          <span className="quest-difficulty-badge">{quest.difficulty}</span>
+        </span>
+        <QuestDescription description={quest.description} />
+        <QuestProgress quest={quest} />
+        <RewardPreview quest={quest} />
+      </div>
+      <div className="shop-item-actions">
+        {completable ? (
+          <button onClick={() => onComplete(quest.id)}>交付</button>
+        ) : (
+          <button className="btn-danger" onClick={() => onAbandon(quest.id)}>退出</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BoardQuestCard({ quest, activeVersion, canAccept, onAccept, onComplete, onAbandon }: {
+  quest: AdventurerQuest;
+  activeVersion: AdventurerQuest | undefined;
+  canAccept: boolean;
+  onAccept: (quest: AdventurerQuest) => void;
+  onComplete: (id: string) => void;
+  onAbandon: (id: string) => void;
+}) {
+  const completable = useQuestCompletable(activeVersion);
+  return (
+    <div className={`shop-item ${completable ? 'completable' : ''}`}>
+      <div className="shop-item-info">
+        <span className="shop-item-name">
+          <QuestTypeTag type={quest.type} /> {quest.title}
+        </span>
+        <QuestDescription description={quest.description} />
+        {activeVersion && <QuestProgress quest={activeVersion} />}
+        <RewardPreview quest={quest} />
+        <span className="quest-contribution">貢獻 +{quest.contributionPoints}</span>
+      </div>
+      <div className="shop-item-actions">
+        {completable ? (
+          <button onClick={() => onComplete(quest.id)}>交付</button>
+        ) : activeVersion ? (
+          <button className="btn-danger" onClick={() => onAbandon(quest.id)}>退出</button>
+        ) : (
+          <button onClick={() => onAccept(quest)} disabled={!canAccept}>
+            接取
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function QuestTypeTag({ type }: { type: AdventurerQuest['type'] }) {
-  const labels = { errand: '殲滅', collect: '收集', endurance: '持續', errandboss: 'BOSS討伐', collectboss: 'BOSS素材' };
+  const labels: Record<AdventurerQuest['type'], string> = {
+    errand: '殲滅', collect: '收集', endurance: '持續',
+    errandboss: 'BOSS討伐', collectboss: 'BOSS素材',
+    multierrand: '多目標', deliver: '交付', sigil: '印記',
+  };
   return <span className="quest-type-tag">[{labels[type]}]</span>;
 }
 
@@ -112,26 +227,12 @@ export function AdventurerGuild() {
           <h4>進行中的任務</h4>
           <div className="shop-items">
             {activeQuests.map(quest => (
-              <div key={quest.id} className={`shop-item ${quest.status === 'completable' ? 'completable' : ''}`}>
-                <div className="shop-item-info">
-                  <span className="shop-item-name">
-                    <QuestTypeTag type={quest.type} /> {quest.title}
-                    <span className="quest-difficulty-badge">{quest.difficulty}</span>
-                  </span>
-                  <QuestDescription description={quest.description} />
-                  <span className="quest-progress">
-                    進度：<strong>{quest.currentCount}/{quest.targetCount}</strong>
-                  </span>
-                  <RewardPreview quest={quest} />
-                </div>
-                <div className="shop-item-actions">
-                  {quest.status === 'completable' ? (
-                    <button onClick={() => completeAdventurerQuest(quest.id)}>交付</button>
-                  ) : (
-                    <button className="btn-danger" onClick={() => abandonAdventurerQuest(quest.id)}>退出</button>
-                  )}
-                </div>
-              </div>
+              <ActiveQuestCard
+                key={quest.id}
+                quest={quest}
+                onComplete={completeAdventurerQuest}
+                onAbandon={abandonAdventurerQuest}
+              />
             ))}
           </div>
         </>
@@ -164,40 +265,17 @@ export function AdventurerGuild() {
         {currentBoard.length === 0 && (
           <p className="empty-text">目前沒有可用任務</p>
         )}
-        {currentBoard.map(quest => {
-          const isAccepted = activeQuests.some(q => q.id === quest.id);
-          const activeVersion = activeQuests.find(q => q.id === quest.id);
-          const isCompletable = activeVersion?.status === 'completable';
-
-          return (
-            <div key={quest.id} className={`shop-item ${isCompletable ? 'completable' : ''}`}>
-              <div className="shop-item-info">
-                <span className="shop-item-name">
-                  <QuestTypeTag type={quest.type} /> {quest.title}
-                </span>
-                <QuestDescription description={quest.description} />
-                {isAccepted && activeVersion && (
-                  <span className="quest-progress">
-                    進度：<strong>{activeVersion.currentCount}/{activeVersion.targetCount}</strong>
-                  </span>
-                )}
-                <RewardPreview quest={quest} />
-                <span className="quest-contribution">貢獻 +{quest.contributionPoints}</span>
-              </div>
-              <div className="shop-item-actions">
-                {isCompletable ? (
-                  <button onClick={() => completeAdventurerQuest(quest.id)}>交付</button>
-                ) : isAccepted ? (
-                  <button className="btn-danger" onClick={() => abandonAdventurerQuest(quest.id)}>退出</button>
-                ) : (
-                  <button onClick={() => acceptAdventurerQuest(quest)} disabled={!canAccept}>
-                    接取
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {currentBoard.map(quest => (
+          <BoardQuestCard
+            key={quest.id}
+            quest={quest}
+            activeVersion={activeQuests.find(q => q.id === quest.id)}
+            canAccept={canAccept}
+            onAccept={acceptAdventurerQuest}
+            onComplete={completeAdventurerQuest}
+            onAbandon={abandonAdventurerQuest}
+          />
+        ))}
       </div>
       </div>
     </div>

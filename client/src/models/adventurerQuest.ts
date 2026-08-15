@@ -1,7 +1,18 @@
 import { MONSTER_SEEDS } from '../db/seed/monsterSeeds';
 import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
+import { DROP_TABLE_SEEDS } from '../db/seed/dropSeeds';
 
-export type AdventurerQuestType = 'errand' | 'collect' | 'endurance' | 'errandboss' | 'collectboss';
+export type AdventurerQuestType =
+  | 'errand' | 'collect' | 'endurance' | 'errandboss' | 'collectboss'
+  /** 多目標殲滅：同一區域 2~3 種怪各 N 隻（§ 36.2.8） */
+  | 'multierrand'
+  /** 交付素材（§ 36.2.6）、交付印記（§ 36.2.7）。兩者都不累積進度，看當下背包 */
+  | 'deliver' | 'sigil';
+
+/** 交付型任務：進度不累積，需求由當下背包即時計算（§ 36.11） */
+export function isDeliverQuestType(type: AdventurerQuestType): boolean {
+  return type === 'deliver' || type === 'sigil';
+}
 /** 一般任務分頁（errand／collect／endurance） */
 export type BaseQuestDifficulty = 'D' | 'C' | 'B' | 'A' | 'S';
 /** BOSS 任務分頁（errandboss／collectboss），區域池沿用同字母的一般難度（§ 36.3.2） */
@@ -11,7 +22,13 @@ export type AdventurerQuestStatus = 'available' | 'active' | 'completable';
 export type GuildRank = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'US';
 export type QuestTownId = 'neutral-town' | 'elsarth-town' | 'varden-town' | 'greyridge-town';
 
-export type RewardType = 'gold' | 'potion' | 'quality-stone' | 'enhancement-stone' | 'weapon-scroll' | 'armor-scroll' | 'crafting-material';
+export type RewardType =
+  | 'gold' | 'potion' | 'quality-stone' | 'enhancement-stone'
+  | 'weapon-scroll' | 'armor-scroll' | 'crafting-material'
+  /** 混沌／刺針／重刻印記，發放時隨機取一種（§ 36.5.1） */
+  | 'affix-sigil'
+  /** 突破印記，固定 1 個（§ 36.5.1） */
+  | 'breakthrough-sigil';
 
 export interface QuestReward {
   type: RewardType;
@@ -33,6 +50,13 @@ export interface AdventurerQuest {
   currentCount: number;
   reward: QuestReward;
   contributionPoints: number;
+  /**
+   * 交付型的目標道具 id（§ 36.2.6／§ 36.2.7）。
+   * 一律存 id，名稱由 seed 反查（`99-ai-constraints.md` § 99.1 第 7 條）
+   */
+  targetItemId?: number;
+  /** 多目標殲滅的各個子目標（§ 36.2.8）。`targetCount` 存的是總擊殺數 */
+  subTargets?: { monster: string; targetCount: number; currentCount: number }[];
 }
 
 export interface GuildProgress {
@@ -60,12 +84,15 @@ export const GUILD_RANK_THRESHOLDS: Record<GuildRank, number> = {
 };
 
 /** § 36.4.2 基底貢獻表（一般分頁） */
-export const CONTRIBUTION_POINTS: Record<BaseQuestDifficulty, Record<'errand' | 'collect' | 'endurance', number>> = {
-  D: { errand: 10, collect: 20, endurance: 30 },
-  C: { errand: 15, collect: 30, endurance: 45 },
-  B: { errand: 30, collect: 45, endurance: 60 },
-  A: { errand: 80, collect: 100, endurance: 120 },
-  S: { errand: 150, collect: 160, endurance: 180 },
+export const CONTRIBUTION_POINTS: Record<
+  BaseQuestDifficulty,
+  Record<'errand' | 'collect' | 'endurance' | 'multierrand' | 'deliver' | 'sigil', number>
+> = {
+  D: { errand: 10, collect: 20, endurance: 30, multierrand: 12, deliver: 20, sigil: 20 },
+  C: { errand: 15, collect: 30, endurance: 45, multierrand: 18, deliver: 30, sigil: 30 },
+  B: { errand: 30, collect: 45, endurance: 60, multierrand: 36, deliver: 45, sigil: 45 },
+  A: { errand: 80, collect: 100, endurance: 120, multierrand: 96, deliver: 100, sigil: 100 },
+  S: { errand: 150, collect: 160, endurance: 180, multierrand: 180, deliver: 160, sigil: 160 },
 };
 
 /** § 36.4.2 基底貢獻表（BOSS 分頁），數值與拆分前的 B/A/S 相同 */
@@ -75,7 +102,9 @@ export const BOSS_CONTRIBUTION_POINTS: Record<BossQuestDifficulty, Record<'erran
   'S+': { errandboss: 200, collectboss: 250 },
 };
 
-export const QUEST_TYPE_WEIGHTS = { errand: 40, collect: 30, endurance: 30 };
+export const QUEST_TYPE_WEIGHTS = {
+  errand: 30, collect: 25, endurance: 20, multierrand: 15, deliver: 5, sigil: 5,
+};
 export const QUEST_TYPE_WEIGHTS_BOSS = { errandboss: 50, collectboss: 50 };
 
 /** 一般難度 → 對應的 BOSS 分頁（§ 36.3.2） */
@@ -125,6 +154,40 @@ export const COLLECT_DROP_RATE = 0.4;
 export const BOSS_KILL_COUNT_RANGE = { min: 1, max: 3 };
 export const BOSS_COLLECT_TARGET_COUNT = 3;
 export const BOSS_COLLECT_DROP_RATE = 0.3;
+
+/** § 36.2.8：同一區域指定幾種怪。總擊殺數沿用 `KILL_COUNT_RANGE` */
+export const MULTI_ERRAND_TARGET_RANGE = { min: 2, max: 3 };
+/** § 36.2.6：交付素材的目標個數，與難度無關 */
+export const DELIVER_COUNT_RANGE = { min: 3, max: 10 };
+/** § 36.2.6：交付素材的基準值倍率。低於這個倍率玩家會選擇直接賣掉 */
+export const DELIVER_VALUE_MULTIPLIER = 3;
+
+/** § 36.2.7：可交付的印記（工藝、精鍊），生成時隨機指定一種 */
+export const SIGIL_DELIVER_ITEM_IDS = [9, 10];
+/** § 36.2.7：報酬用的詞綴印記（混沌、刺針、重刻），發放時隨機一種 */
+export const AFFIX_SIGIL_ITEM_IDS = [147, 148, 149];
+/** § 36.2.7：突破印記 */
+export const BREAKTHROUGH_SIGIL_ITEM_ID = 150;
+
+/**
+ * § 36.2.7 交付印記的分頁對照。
+ *
+ * `exchangeRate` 是「幾個換一個」，`rewardCount` 是這張任務最多換幾個；
+ * D／C 沒有印記可換，改給金幣（`goldMultiplier` × 印記賣價 × 交付數量）。
+ */
+export const SIGIL_QUEST_TABLE: Record<BaseQuestDifficulty, {
+  exchangeRate?: { min: number; max: number };
+  rewardCount?: { min: number; max: number };
+  rewardType?: RewardType;
+  deliverCount?: { min: number; max: number };
+  goldMultiplier?: number;
+}> = {
+  D: { deliverCount: { min: 8, max: 12 }, goldMultiplier: 5 },
+  C: { deliverCount: { min: 8, max: 12 }, goldMultiplier: 5 },
+  B: { exchangeRate: { min: 8, max: 12 }, rewardCount: { min: 1, max: 4 }, rewardType: 'affix-sigil' },
+  A: { exchangeRate: { min: 8, max: 12 }, rewardCount: { min: 1, max: 4 }, rewardType: 'affix-sigil' },
+  S: { exchangeRate: { min: 45, max: 60 }, rewardCount: { min: 1, max: 2 }, rewardType: 'breakthrough-sigil' },
+};
 
 export interface AreaPoolEntry {
   areaId: string;
@@ -328,6 +391,46 @@ function buildMonsterPools(): Record<BaseQuestDifficulty, { name: string; area: 
 
 export const MONSTER_POOLS: Record<BaseQuestDifficulty, { name: string; area: string; questArea: string }[]> = buildMonsterPools();
 
+export interface MaterialPoolEntry {
+  itemId: number;
+  area: string;
+  sellPrice: number;
+}
+
+/**
+ * § 36.2.6 交付素材的可指定素材 —— 由**掉落表**推導，不另行維護名單。
+ *
+ * 只收 `category === 'material'`：印記與藥水雖然也在掉落表裡，但它們不是製作素材，
+ * 交付印記走自己的型別（§ 36.2.7）。
+ */
+function buildMaterialPools(): Record<BaseQuestDifficulty, MaterialPoolEntry[]> {
+  const pools: Record<BaseQuestDifficulty, Map<string, MaterialPoolEntry>> = {
+    D: new Map(), C: new Map(), B: new Map(), A: new Map(), S: new Map(),
+  };
+
+  for (const drop of DROP_TABLE_SEEDS) {
+    if (drop.itemType !== 'item' || drop.itemTemplateId == null) continue;
+    const mapping = QUEST_AREA_MAPPING[drop.area];
+    if (!mapping) continue;
+    const item = ITEM_DEFINITIONS.find(i => i.id === drop.itemTemplateId);
+    if (!item || item.category !== 'material' || !item.sellPrice) continue;
+    const key = `${item.id}|${drop.area}`;
+    if (!pools[mapping.difficulty].has(key)) {
+      pools[mapping.difficulty].set(key, { itemId: item.id, area: drop.area, sellPrice: item.sellPrice });
+    }
+  }
+
+  return {
+    D: [...pools.D.values()],
+    C: [...pools.C.values()],
+    B: [...pools.B.values()],
+    A: [...pools.A.values()],
+    S: [...pools.S.values()],
+  };
+}
+
+export const MATERIAL_POOLS: Record<BaseQuestDifficulty, MaterialPoolEntry[]> = buildMaterialPools();
+
 export interface BossPoolEntry {
   name: string;
   area: string;
@@ -412,6 +515,21 @@ function buildTownMonsterPools(): Record<QuestTownId, Partial<Record<BaseQuestDi
 
 export const TOWN_MONSTER_POOLS = buildTownMonsterPools();
 
+function buildTownMaterialPools(): Record<QuestTownId, Partial<Record<BaseQuestDifficulty, MaterialPoolEntry[]>>> {
+  const result = emptyPoolsByTown<Partial<Record<BaseQuestDifficulty, MaterialPoolEntry[]>>>();
+  for (const town of QUEST_TOWN_IDS) {
+    const areaIds = getTownAreaIds(town);
+    const difficulties = Object.keys(TOWN_AREA_POOLS[town]) as BaseQuestDifficulty[];
+    for (const diff of difficulties) {
+      const filtered = MATERIAL_POOLS[diff].filter(m => areaIds.has(m.area));
+      if (filtered.length > 0) result[town][diff] = filtered;
+    }
+  }
+  return result;
+}
+
+export const TOWN_MATERIAL_POOLS = buildTownMaterialPools();
+
 function buildTownBossPools(): Record<QuestTownId, Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>> {
   const result = emptyPoolsByTown<Partial<Record<BossQuestDifficulty, BossPoolEntry[]>>>();
   for (const town of QUEST_TOWN_IDS) {
@@ -473,6 +591,7 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
     { type: 'enhancement-stone', weight: 15 },
     { type: 'armor-scroll', weight: 15 },
     { type: 'crafting-material', weight: 10 },
+    { type: 'affix-sigil', weight: 10 },
   ],
   A: [
     { type: 'gold', weight: 20 },
@@ -482,6 +601,7 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
     { type: 'armor-scroll', weight: 13 },
     { type: 'weapon-scroll', weight: 10 },
     { type: 'crafting-material', weight: 12 },
+    { type: 'affix-sigil', weight: 10 },
   ],
   S: [
     { type: 'gold', weight: 17 },
@@ -491,6 +611,8 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
     { type: 'armor-scroll', weight: 15 },
     { type: 'weapon-scroll', weight: 15 },
     { type: 'crafting-material', weight: 14 },
+    { type: 'affix-sigil', weight: 10 },
+    { type: 'breakthrough-sigil', weight: 5 },
   ],
   SS: [
     { type: 'gold', weight: 17 },
@@ -500,6 +622,8 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
     { type: 'armor-scroll', weight: 15 },
     { type: 'weapon-scroll', weight: 15 },
     { type: 'crafting-material', weight: 14 },
+    { type: 'affix-sigil', weight: 10 },
+    { type: 'breakthrough-sigil', weight: 5 },
   ],
   US: [
     { type: 'gold', weight: 17 },
@@ -509,6 +633,8 @@ export const REWARD_WEIGHTS: Record<GuildRank, { type: RewardType; weight: numbe
     { type: 'armor-scroll', weight: 15 },
     { type: 'weapon-scroll', weight: 15 },
     { type: 'crafting-material', weight: 14 },
+    { type: 'affix-sigil', weight: 10 },
+    { type: 'breakthrough-sigil', weight: 5 },
   ],
 };
 

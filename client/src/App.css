@@ -6021,6 +6021,19 @@ button.active {
   color: var(--accent-danger);
 }
 
+/* 交付型的 have/need 不足時標紅，與製作任務同一個訊號（§ 36.10.2） */
+.quest-progress strong.lacking,
+.tracker-progress strong.lacking {
+  color: var(--accent-danger);
+}
+
+/* 多目標殲滅逐項一行（§ 36.10.3） */
+.quest-subtarget {
+  display: inline-block;
+  margin-right: 10px;
+  white-space: nowrap;
+}
+
 .quest-tracker-item .tracker-actions {
   display: flex;
   align-items: center;

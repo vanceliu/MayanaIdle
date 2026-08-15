@@ -10,11 +10,24 @@ import {
   rollCollectMaterialDrop,
   completeQuest,
   getPointsToNextRank,
+  isDeliverQuestSatisfied,
 } from '../adventurerQuestSystem';
 import {
   AREA_POOLS,
   ENDURANCE_COUNT_RANGE,
   BOSS_KILL_COUNT_RANGE,
+  BOSS_COLLECT_TARGET_COUNT,
+  BOSS_COLLECT_DROP_RATE,
+  COLLECT_DROP_RATE,
+  isDeliverQuestType,
+  KILL_COUNT_RANGE,
+  MULTI_ERRAND_TARGET_RANGE,
+  DELIVER_COUNT_RANGE,
+  DELIVER_VALUE_MULTIPLIER,
+  MATERIAL_POOLS,
+  SIGIL_DELIVER_ITEM_IDS,
+  AFFIX_SIGIL_ITEM_IDS,
+  BREAKTHROUGH_SIGIL_ITEM_ID,
   BOSS_POOLS,
   MONSTER_POOLS,
   TOWN_AREA_POOLS,
@@ -24,6 +37,7 @@ import {
   getRankForPoints,
 } from '../../models/adventurerQuest';
 import { getAreaDisplayName } from '../../wiki/hooks/useWikiData';
+import { makeBagItem } from '../../models/bagItem';
 
 function makeQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest {
   return {
@@ -64,7 +78,8 @@ describe('adventurerQuestSystem', () => {
     it('quests have valid types', () => {
       const quests = generateQuestList('A', 'A');
       for (const q of quests) {
-        expect(['errand', 'collect', 'endurance', 'errandboss', 'collectboss']).toContain(q.type);
+        expect(['errand', 'collect', 'endurance', 'multierrand', 'deliver', 'sigil', 'errandboss', 'collectboss'])
+          .toContain(q.type);
       }
     });
 
@@ -73,7 +88,7 @@ describe('adventurerQuestSystem', () => {
       for (const difficulty of ['D', 'C', 'B', 'A', 'S'] as const) {
         for (let i = 0; i < 30; i++) {
           for (const q of generateQuestList(difficulty, 'S')) {
-            expect(['errand', 'collect', 'endurance']).toContain(q.type);
+            expect(['errand', 'collect', 'endurance', 'multierrand', 'deliver', 'sigil']).toContain(q.type);
             expect(q.difficulty).toBe(difficulty);
           }
         }
@@ -440,6 +455,11 @@ describe('adventurerQuestSystem', () => {
       for (let i = 0; i < 50; i++) {
         const quests = generateQuestList('D', 'F', 'neutral-town');
         for (const q of quests) {
+          // 交付型沒有目標區域（§ 36.10.2）
+          if (isDeliverQuestType(q.type)) {
+            expect(q.targetArea).toBe('');
+            continue;
+          }
           expect(neutralAreaIds.has(q.targetArea)).toBe(true);
         }
       }
@@ -551,18 +571,75 @@ describe('adventurerQuestSystem', () => {
     });
   });
 
+  describe('收集類的基準值除以掉率（§ 36.9 步驟 2d）', () => {
+    /**
+     * 收集任務的 `targetCount` 是**素材個數**不是擊殺數。
+     * 不除掉率的話，40% 掉率等於把每殺報酬砍到殲滅的四成 —— 這條就是釘那個洞。
+     */
+    function goldBaseByType(difficulty: 'S' | 'S+'): Map<AdventurerQuest['type'], number[]> {
+      const out = new Map<AdventurerQuest['type'], number[]>();
+      for (let i = 0; i < 300; i++) {
+        for (const q of generateQuestList(difficulty, 'F')) {
+          if (q.reward.type !== 'gold') continue;
+          const isBoss = q.type === 'errandboss' || q.type === 'collectboss';
+          const base = q.reward.amount / (2 * (isBoss ? 2 : 1));
+          // 還原成「每個素材／每隻怪的基準值」，才比得起來
+          out.set(q.type, [...(out.get(q.type) ?? []), base / q.targetCount]);
+        }
+      }
+      return out;
+    }
+
+    it('素材收集的每素材基準值 = 區域平均金幣 ÷ 掉率', () => {
+      const perUnit = goldBaseByType('S').get('collect') ?? [];
+      expect(perUnit.length).toBeGreaterThan(0);
+      const golds = AREA_POOLS.S.map(a => a.avgGold);
+      for (const value of perUnit) {
+        expect(value).toBeGreaterThanOrEqual(Math.min(...golds) / COLLECT_DROP_RATE - 0.001);
+        expect(value).toBeLessThanOrEqual(Math.max(...golds) / COLLECT_DROP_RATE + 0.001);
+      }
+    });
+
+    it('素材收集的每殺價值與殲滅同級（差距在區域金幣的範圍內）', () => {
+      const byType = goldBaseByType('S');
+      // 每殺價值 = 每素材基準值 × 掉率
+      const collect = (byType.get('collect') ?? []).map(v => v * COLLECT_DROP_RATE);
+      const errand = byType.get('errand') ?? [];
+      expect(collect.length).toBeGreaterThan(0);
+      expect(errand.length).toBeGreaterThan(0);
+      const golds = AREA_POOLS.S.map(a => a.avgGold);
+      for (const value of [...collect, ...errand]) {
+        expect(value).toBeGreaterThanOrEqual(Math.min(...golds) - 0.001);
+        expect(value).toBeLessThanOrEqual(Math.max(...golds) + 0.001);
+      }
+    });
+
+    it('BOSS 素材收集同樣除以自己的 30% 掉率', () => {
+      const perUnit = goldBaseByType('S+').get('collectboss') ?? [];
+      expect(perUnit.length).toBeGreaterThan(0);
+      const golds = BOSS_POOLS['S+'].map(b => b.avgGold);
+      for (const value of perUnit) {
+        expect(value).toBeGreaterThanOrEqual(Math.min(...golds) * 3 / BOSS_COLLECT_DROP_RATE - 0.001);
+        expect(value).toBeLessThanOrEqual(Math.max(...golds) * 3 / BOSS_COLLECT_DROP_RATE + 0.001);
+      }
+    });
+  });
+
   describe('獎勵倍率（§ 36.3 / § 36.9 步驟 2f）', () => {
     // 等階只影響獎勵「種類」的權重（§ 36.5.2），不得影響數量倍率。
     // 迴歸：原實作對 US 等階額外乘 10，且與 BOSS ×2 互斥，兩者皆無文件依據。
-    function goldAmounts(rank: GuildProgress['rank'], bossOnly: boolean): number[] {
-      const out: number[] = [];
+    function goldAmounts(
+      rank: GuildProgress['rank'],
+      bossOnly: boolean,
+    ): { base: number; type: AdventurerQuest['type'] }[] {
+      const out: { base: number; type: AdventurerQuest['type'] }[] = [];
       // 拆分後 BOSS 任務只出現在 S+ 分頁（§ 36.3.2）
       for (let i = 0; i < 400; i++) {
         for (const q of generateQuestList(bossOnly ? 'S+' : 'S', rank)) {
           const isBoss = q.type === 'errandboss' || q.type === 'collectboss';
           if (q.reward.type === 'gold' && isBoss === bossOnly) {
             // 還原基準值：金幣獎勵 = 基準值 × 2
-            out.push(q.reward.amount / (2 * (isBoss ? 2 : 1)));
+            out.push({ base: q.reward.amount / (2 * (isBoss ? 2 : 1)), type: q.type });
           }
         }
       }
@@ -585,18 +662,261 @@ describe('adventurerQuestSystem', () => {
       const us = goldAmounts('US', false);
       expect(s.length).toBeGreaterThan(0);
       expect(us.length).toBeGreaterThan(0);
-      expect(Math.max(...s)).toBeLessThanOrEqual(MAX_NORMAL_BASE);
-      expect(Math.max(...us)).toBeLessThanOrEqual(MAX_NORMAL_BASE);
+      expect(Math.max(...s.map(q => q.base))).toBeLessThanOrEqual(MAX_NORMAL_BASE);
+      expect(Math.max(...us.map(q => q.base))).toBeLessThanOrEqual(MAX_NORMAL_BASE);
     });
 
     it('US 等階的 BOSS 任務仍享有且僅有 ×2', () => {
       const us = goldAmounts('US', true);
       expect(us.length).toBeGreaterThan(0);
-      // 還原後應等於 avgGold × count × 3，count 1~3
+      // 還原後應等於 avgGold × 期望擊殺數 × 3。收集型的擊殺數 = 素材個數 ÷ 掉率（§ 36.9 步驟 2d）
       const golds = BOSS_POOLS['S+'].map(b => b.avgGold);
-      for (const base of us) {
+      for (const { base, type } of us) {
+        const maxKills = type === 'collectboss'
+          ? BOSS_COLLECT_TARGET_COUNT / BOSS_COLLECT_DROP_RATE
+          : BOSS_KILL_COUNT_RANGE.max;
         expect(base).toBeGreaterThanOrEqual(Math.min(...golds) * BOSS_KILL_COUNT_RANGE.min * 3);
-        expect(base).toBeLessThanOrEqual(Math.max(...golds) * BOSS_KILL_COUNT_RANGE.max * 3);
+        expect(base).toBeLessThanOrEqual(Math.max(...golds) * maxKills * 3);
+      }
+    });
+  });
+
+  describe('多目標殲滅（§ 36.2.8）', () => {
+    function multiQuests(difficulty: 'D' | 'C' | 'B' | 'A' | 'S', rounds = 60): AdventurerQuest[] {
+      const out: AdventurerQuest[] = [];
+      for (let i = 0; i < rounds; i++) {
+        out.push(...generateQuestList(difficulty, 'S').filter(q => q.type === 'multierrand'));
+      }
+      return out;
+    }
+
+    it('子目標全部在同一個區域，且總數等於殲滅任務的數量範圍', () => {
+      const quests = multiQuests('A');
+      expect(quests.length).toBeGreaterThan(0);
+      for (const q of quests) {
+        expect(q.subTargets!.length).toBeGreaterThanOrEqual(MULTI_ERRAND_TARGET_RANGE.min);
+        expect(q.subTargets!.length).toBeLessThanOrEqual(MULTI_ERRAND_TARGET_RANGE.max);
+        const total = q.subTargets!.reduce((sum, t) => sum + t.targetCount, 0);
+        expect(total).toBe(q.targetCount);
+        expect(q.targetCount).toBeGreaterThanOrEqual(KILL_COUNT_RANGE.A.min);
+        expect(q.targetCount).toBeLessThanOrEqual(KILL_COUNT_RANGE.A.max);
+        // 指定的怪必須都住在目標區域（§ 36.2.8）
+        const inArea = new Set(MONSTER_POOLS.A.filter(m => m.area === q.targetArea).map(m => m.name));
+        for (const sub of q.subTargets!) expect(inArea.has(sub.monster)).toBe(true);
+      }
+    });
+
+    it('子目標不重複', () => {
+      for (const q of multiQuests('B')) {
+        const names = q.subTargets!.map(s => s.monster);
+        expect(new Set(names).size).toBe(names.length);
+      }
+    });
+
+    it('進度逐項計數，區域不符不計', () => {
+      const quest = makeQuest({
+        type: 'multierrand', status: 'active', targetCount: 10, targetArea: 'dawn-plains',
+        subTargets: [
+          { monster: '暴牙兔', targetCount: 6, currentCount: 0 },
+          { monster: '野牛', targetCount: 4, currentCount: 0 },
+        ],
+      });
+
+      // 區域不符：完全不計
+      const elsewhere = updateQuestProgress([quest], 'green-valley', '暴牙兔', 3);
+      expect(elsewhere[0].currentCount).toBe(0);
+
+      // 名稱符合才進那一項
+      const hit = updateQuestProgress([quest], 'dawn-plains', '暴牙兔', 3);
+      expect(hit[0].subTargets![0].currentCount).toBe(3);
+      expect(hit[0].subTargets![1].currentCount).toBe(0);
+      expect(hit[0].currentCount).toBe(3);
+      expect(hit[0].status).toBe('active');
+    });
+
+    it('只有每一項都滿了才算可交付 —— 打爆一種怪不能完成任務', () => {
+      const quest = makeQuest({
+        type: 'multierrand', status: 'active', targetCount: 10, targetArea: 'dawn-plains',
+        subTargets: [
+          { monster: '暴牙兔', targetCount: 6, currentCount: 0 },
+          { monster: '野牛', targetCount: 4, currentCount: 0 },
+        ],
+      });
+
+      const overkill = updateQuestProgress([quest], 'dawn-plains', '暴牙兔', 99);
+      expect(overkill[0].subTargets![0].currentCount).toBe(6);   // 夾在上限
+      expect(overkill[0].status).toBe('active');
+
+      const done = updateQuestProgress(overkill, 'dawn-plains', '野牛', 4);
+      expect(done[0].status).toBe('completable');
+      expect(done[0].currentCount).toBe(10);
+    });
+  });
+
+  describe('交付素材（§ 36.2.6）', () => {
+    function deliverQuests(rounds = 200): AdventurerQuest[] {
+      const out: AdventurerQuest[] = [];
+      for (let i = 0; i < rounds; i++) {
+        out.push(...generateQuestList('A', 'F').filter(q => q.type === 'deliver'));
+      }
+      return out;
+    }
+
+    it('指定的是該難度掉落表裡的素材，數量 3~10，且不寫區域', () => {
+      const quests = deliverQuests();
+      expect(quests.length).toBeGreaterThan(0);
+      const validIds = new Set(MATERIAL_POOLS.A.map(m => m.itemId));
+      for (const q of quests) {
+        expect(validIds.has(q.targetItemId!)).toBe(true);
+        expect(q.targetCount).toBeGreaterThanOrEqual(DELIVER_COUNT_RANGE.min);
+        expect(q.targetCount).toBeLessThanOrEqual(DELIVER_COUNT_RANGE.max);
+        expect(q.targetArea).toBe('');
+      }
+    });
+
+    it('金幣獎勵 = 素材售價 × 數量 × 3 × 2（基準值 ×2）', () => {
+      const goldQuests = deliverQuests().filter(q => q.reward.type === 'gold');
+      expect(goldQuests.length).toBeGreaterThan(0);
+      for (const q of goldQuests) {
+        const sellPrice = MATERIAL_POOLS.A.find(m => m.itemId === q.targetItemId)!.sellPrice;
+        expect(q.reward.amount).toBe(sellPrice * q.targetCount * DELIVER_VALUE_MULTIPLIER * 2);
+      }
+    });
+  });
+
+  describe('交付印記（§ 36.2.7）', () => {
+    function sigilQuests(difficulty: 'D' | 'C' | 'B' | 'A' | 'S', rounds = 200): AdventurerQuest[] {
+      const out: AdventurerQuest[] = [];
+      for (let i = 0; i < rounds; i++) {
+        out.push(...generateQuestList(difficulty, 'F').filter(q => q.type === 'sigil'));
+      }
+      return out;
+    }
+
+    it('交付的一律是精鍊或工藝印記', () => {
+      for (const q of sigilQuests('B')) {
+        expect(SIGIL_DELIVER_ITEM_IDS).toContain(q.targetItemId!);
+      }
+    });
+
+    it('D／C 給金幣 = 印記賣價 × 數量 × 5，數量 8~12', () => {
+      const quests = [...sigilQuests('D'), ...sigilQuests('C')];
+      expect(quests.length).toBeGreaterThan(0);
+      for (const q of quests) {
+        expect(q.reward.type).toBe('gold');
+        expect(q.targetCount).toBeGreaterThanOrEqual(8);
+        expect(q.targetCount).toBeLessThanOrEqual(12);
+        expect(q.reward.amount).toBe(50 * q.targetCount * 5);
+      }
+    });
+
+    it('B／A 是 8~12 換 1 個詞綴印記，一張最多 4 個', () => {
+      const quests = [...sigilQuests('B'), ...sigilQuests('A')];
+      expect(quests.length).toBeGreaterThan(0);
+      for (const q of quests) {
+        expect(q.reward.type).toBe('affix-sigil');
+        expect(AFFIX_SIGIL_ITEM_IDS).toContain(q.reward.itemId!);
+        expect(q.reward.amount).toBeGreaterThanOrEqual(1);
+        expect(q.reward.amount).toBeLessThanOrEqual(4);
+        const rate = q.targetCount / q.reward.amount;
+        expect(Number.isInteger(rate)).toBe(true);
+        expect(rate).toBeGreaterThanOrEqual(8);
+        expect(rate).toBeLessThanOrEqual(12);
+      }
+    });
+
+    it('S 是 45~60 換 1 個突破印記，一張最多 2 個', () => {
+      const quests = sigilQuests('S');
+      expect(quests.length).toBeGreaterThan(0);
+      for (const q of quests) {
+        expect(q.reward.type).toBe('breakthrough-sigil');
+        expect(q.reward.itemId).toBe(BREAKTHROUGH_SIGIL_ITEM_ID);
+        expect(q.reward.amount).toBeGreaterThanOrEqual(1);
+        expect(q.reward.amount).toBeLessThanOrEqual(2);
+        const rate = q.targetCount / q.reward.amount;
+        expect(rate).toBeGreaterThanOrEqual(45);
+        expect(rate).toBeLessThanOrEqual(60);
+      }
+    });
+  });
+
+  describe('交付型的完成判定（§ 36.11）', () => {
+    const quest = () => makeQuest({
+      type: 'deliver', status: 'active', targetItemId: 19, targetCount: 5,
+      reward: { type: 'gold', amount: 210 },
+    });
+
+    it('背包不足就交不了，也不會扣貢獻', () => {
+      const q = quest();
+      const bag = [makeBagItem(19, 4)!];
+      expect(isDeliverQuestSatisfied(q, bag)).toBe(false);
+      const result = completeQuest([q], q.id, { rank: 'F', points: 0 }, bag);
+      expect(result.reward).toBeNull();
+      expect(result.activeQuests).toHaveLength(1);
+      expect(result.guildProgress.points).toBe(0);
+    });
+
+    it('背包足量就能交，並回報要扣掉的數量', () => {
+      const q = quest();
+      const bag = [makeBagItem(19, 7)!];
+      expect(isDeliverQuestSatisfied(q, bag)).toBe(true);
+      const result = completeQuest([q], q.id, { rank: 'F', points: 0 }, bag);
+      expect(result.reward).toEqual({ type: 'gold', amount: 210 });
+      expect(result.consumed).toEqual({ itemId: 19, amount: 5 });
+      expect(result.activeQuests).toHaveLength(0);
+      expect(result.guildProgress.points).toBe(q.contributionPoints);
+    });
+
+    it('狀態停在 active 也交得了 —— 交付型不靠 status（§ 36.11）', () => {
+      const q = quest();
+      expect(q.status).toBe('active');
+      const result = completeQuest([q], q.id, { rank: 'F', points: 0 }, [makeBagItem(19, 5)!]);
+      expect(result.reward).not.toBeNull();
+    });
+
+    it('非交付型不回報 consumed', () => {
+      const q = makeQuest({ status: 'completable' });
+      const result = completeQuest([q], q.id, { rank: 'F', points: 0 });
+      expect(result.consumed).toBeUndefined();
+    });
+  });
+
+  describe('生成降級（§ 36.9 步驟 8）', () => {
+    /**
+     * 可指定目標不足時必須退回殲滅任務，不能產出殘缺的任務。
+     * 用抽空池子的方式逼出降級路徑 —— 正式資料裡三個池都是滿的。
+     */
+    it('該難度沒有可指定素材時，交付素材降級為殲滅', () => {
+      const original = [...MATERIAL_POOLS.D];
+      MATERIAL_POOLS.D.length = 0;
+      try {
+        for (let i = 0; i < 200; i++) {
+          const quest = generateSingleQuest('D', 'F', 0);
+          expect(quest.type).not.toBe('deliver');
+          if (quest.type === 'errand') {
+            expect(quest.targetArea).not.toBe('');
+            expect(quest.targetCount).toBeGreaterThanOrEqual(KILL_COUNT_RANGE.D.min);
+          }
+        }
+      } finally {
+        MATERIAL_POOLS.D.push(...original);
+      }
+    });
+
+    it('該區域怪物不足兩種時，多目標殲滅降級為殲滅', () => {
+      const original = [...MONSTER_POOLS.D];
+      // 只留一隻怪：任何區域都湊不出兩種
+      MONSTER_POOLS.D.length = 0;
+      MONSTER_POOLS.D.push(original[0]);
+      try {
+        for (let i = 0; i < 200; i++) {
+          const quest = generateSingleQuest('D', 'F', 0);
+          expect(quest.type).not.toBe('multierrand');
+          expect(quest.subTargets).toBeUndefined();
+        }
+      } finally {
+        MONSTER_POOLS.D.length = 0;
+        MONSTER_POOLS.D.push(...original);
       }
     });
   });

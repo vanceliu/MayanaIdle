@@ -17,7 +17,7 @@ import type { TownFacility } from './TownView';
 import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } from '../pixi/utils/isometric';
 import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
 import { hasProjectilePath } from '../systems/lineOfSight';
-import { gameLoopTick, consumeDotTick } from '../systems/gameLoop';
+import { gameLoopTick, consumeDotTick, occupation } from '../systems/gameLoop';
 import { findAttackPosition } from '../systems/pathfinding';
 import { db } from '../db/database';
 import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
@@ -605,7 +605,7 @@ function playPlayerAttackFx(o: {
      * 數字**每一下都完整演完**，靠左右攤開避免疊在一起（`DamageNumberStack`）——
      * 後面蓋掉前面的話，等於少跳了幾下。
      */
-    for (let i = 0; i < dmg.hits.length; i++) entity?.reserveHit();
+    for (const hit of dmg.hits) entity?.reserveHit(hit.isMiss ? 0 : hit.damage);
     targets.push({
       x: sx, y,
       crit: dmg.isCrit,
@@ -615,7 +615,7 @@ function playPlayerAttackFx(o: {
           hit.isMiss ? 'miss' : resolveHitDamageType(hit, damageType),
           { index: i, count: dmg.hits.length },
         );
-        entity?.releaseHit();
+        entity?.releaseHit(hit.isMiss ? 0 : hit.damage);
         /* 閃避沒有打到，不該彈 —— 彈了就看不出這一下是 MISS */
         if (hit.isMiss) return;
         /*
@@ -937,24 +937,26 @@ function tickArpgCombatLoop(
         if (monsterStore.paused) break;
         const mapCtrl = useMapControlStore.getState();
         if (mapCtrl.autoMove) {
-          const targetTile = {
-            x: Math.round(event.target.x),
-            y: Math.round(event.target.y),
-          };
           const map = mapCtrl.currentMap;
           if (map) {
-            const playerTile = {
-              x: Math.round(mapCtrl.playerPosition.x),
-              y: Math.round(mapCtrl.playerPosition.y),
-            };
-            const attackPosition = findAttackPosition(map, targetTile, playerTile, event.range);
+            /*
+             * 距離一律對**雙方的真實座標**算，不可用四捨五入後的格子 ——
+             * 兩者最多差 0.7 格，用格子算會挑到「尋路說在射程內、FSM 說在射程外」的位置，
+             * 角色站在那裡不動也不出手。
+             *
+             * 佔位表讓目的地與路徑都繞開別的怪，否則角色會走進死路、停在擋路的怪前面不動。
+             */
+            const playerPos = mapCtrl.playerPosition;
+            const occupied = occupation.getOccupiedSet('player');
+            const attackPosition = findAttackPosition(map, event.target, playerPos, event.range, occupied)
+              ?? findAttackPosition(map, event.target, playerPos, event.range);
             if (attackPosition) {
               // Repath if not moving, or if current destination differs from desired
               const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
               const needsRepath = !mapCtrl.isMoving ||
                 !currentDest || currentDest.x !== attackPosition.x || currentDest.y !== attackPosition.y;
               if (needsRepath) {
-                useMapControlStore.getState().moveToTarget(attackPosition);
+                useMapControlStore.getState().moveToTarget(attackPosition, occupied);
               }
             } else {
               engine.playerCtx.targetMonsterId = null;

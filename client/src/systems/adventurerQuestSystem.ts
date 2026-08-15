@@ -23,6 +23,15 @@ import {
   BOSS_KILL_COUNT_RANGE,
   BOSS_COLLECT_TARGET_COUNT,
   BOSS_COLLECT_DROP_RATE,
+  MULTI_ERRAND_TARGET_RANGE,
+  DELIVER_COUNT_RANGE,
+  DELIVER_VALUE_MULTIPLIER,
+  SIGIL_DELIVER_ITEM_IDS,
+  AFFIX_SIGIL_ITEM_IDS,
+  BREAKTHROUGH_SIGIL_ITEM_ID,
+  SIGIL_QUEST_TABLE,
+  MATERIAL_POOLS,
+  TOWN_MATERIAL_POOLS,
   AREA_POOLS,
   TOWN_AREA_POOLS,
   MONSTER_POOLS,
@@ -38,8 +47,11 @@ import {
   getRankIndex,
   getBaseDifficulty,
   isBossDifficulty,
+  isDeliverQuestType,
   BOSS_DIFFICULTY_OF,
 } from '../models/adventurerQuest';
+import type { BagItem } from '../models/bagItem';
+import { hasBagItem } from '../models/bagItem';
 import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
 import { QUEST_TITLE_TEMPLATES, QUEST_DESCRIPTION_TEMPLATES } from '../db/seed/questTemplateSeeds';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
@@ -79,6 +91,9 @@ function pickQuestType(difficulty: AdventurerQuestDifficulty): AdventurerQuestTy
     { type: 'errand' as const, weight: QUEST_TYPE_WEIGHTS.errand },
     { type: 'collect' as const, weight: QUEST_TYPE_WEIGHTS.collect },
     { type: 'endurance' as const, weight: QUEST_TYPE_WEIGHTS.endurance },
+    { type: 'multierrand' as const, weight: QUEST_TYPE_WEIGHTS.multierrand },
+    { type: 'deliver' as const, weight: QUEST_TYPE_WEIGHTS.deliver },
+    { type: 'sigil' as const, weight: QUEST_TYPE_WEIGHTS.sigil },
   ];
   return weightedPick(items).type;
 }
@@ -114,15 +129,24 @@ function generateQuestDescription(
   areaName: string,
   monsterName: string | undefined,
   count: number,
+  extra: {
+    itemId?: number;
+    subTargets?: { monster: string; targetCount: number }[];
+  } = {},
 ): string {
   const templates = QUEST_DESCRIPTION_TEMPLATES[type];
-  const opening = pickRandom(templates.openings)
-    .replace('{area}', areaName);
-  const task = pickRandom(templates.tasks)
+  // 道具名一律由 id 反查 seed（`99-ai-constraints.md` § 99.1 第 7 條）
+  const itemName = extra.itemId != null ? getItem(extra.itemId).name : '';
+  const targets = (extra.subTargets ?? [])
+    .map(t => `**${t.monster} ${t.targetCount} 隻**`)
+    .join('、');
+  const fill = (text: string) => text
     .replace('{area}', areaName)
     .replace('{monster}', monsterName ?? '')
+    .replace('{item}', itemName)
+    .replace('{targets}', targets)
     .replace('{count}', String(count));
-  return opening + task;
+  return fill(pickRandom(templates.openings)) + fill(pickRandom(templates.tasks));
 }
 
 function calculateReward(
@@ -161,6 +185,14 @@ function calculateReward(
       const amount = Math.max(1, Math.floor(baseValue / (item.sellPrice! * 3)));
       return { type: 'crafting-material', itemId: item.id, amount };
     }
+    case 'affix-sigil': {
+      // § 36.5.1：以 1,000 金/個計（賣價 500 的兩倍，與 50 金印記的 100 金/個同一條規則）
+      const item = getItem(pickRandom(AFFIX_SIGIL_ITEM_IDS));
+      return { type: 'affix-sigil', itemId: item.id, amount: Math.max(1, Math.floor(baseValue / 1000)) };
+    }
+    case 'breakthrough-sigil':
+      // § 36.5.1：固定 1 個。掉率 0.1%，換算數量會讓它變成大宗貨
+      return { type: 'breakthrough-sigil', itemId: BREAKTHROUGH_SIGIL_ITEM_ID, amount: 1 };
   }
 }
 
@@ -183,6 +215,62 @@ export function generateSingleQuest(
   const areaPool = (townId ? TOWN_AREA_POOLS[townId][base] : undefined) ?? AREA_POOLS[base];
   const monsterPool = (townId ? TOWN_MONSTER_POOLS[townId]?.[base] : undefined) ?? MONSTER_POOLS[base];
   const bossPool = getBossPool(difficulty, townId);
+
+  const materialPool = (townId ? TOWN_MATERIAL_POOLS[townId]?.[base] : undefined) ?? MATERIAL_POOLS[base];
+
+  /** § 36.9 步驟 8：可指定目標不足時一律降級為殲滅任務 */
+  const fallbackErrand = (): AdventurerQuest => {
+    const areaEntry = pickRandom(areaPool);
+    return buildQuest(
+      'errand', difficulty, areaEntry.areaId, getAreaDisplayName(areaEntry.areaId), undefined,
+      randomInt(KILL_COUNT_RANGE[base].min, KILL_COUNT_RANGE[base].max),
+      areaEntry.avgGold, guildRank, index,
+    );
+  };
+
+  if (type === 'sigil') {
+    return buildSigilQuest(difficulty, base, guildRank, index, areaPool);
+  }
+
+  if (type === 'deliver') {
+    if (materialPool.length === 0) return fallbackErrand();
+    const material = pickRandom(materialPool);
+    const count = randomInt(DELIVER_COUNT_RANGE.min, DELIVER_COUNT_RANGE.max);
+    return buildQuest(
+      'deliver', difficulty, '', '', undefined, count,
+      averageAreaGold(areaPool), guildRank, index,
+      {
+        targetItemId: material.itemId,
+        // § 36.2.6：交付型以兌換率定價，不用擊殺數
+        baseValueOverride: material.sellPrice * count * DELIVER_VALUE_MULTIPLIER,
+      },
+    );
+  }
+
+  if (type === 'multierrand') {
+    const areaEntry = pickRandom(areaPool);
+    const inArea = monsterPool.filter(m => m.area === areaEntry.areaId);
+    if (inArea.length < MULTI_ERRAND_TARGET_RANGE.min) return fallbackErrand();
+
+    const kinds = Math.min(
+      randomInt(MULTI_ERRAND_TARGET_RANGE.min, MULTI_ERRAND_TARGET_RANGE.max),
+      inArea.length,
+    );
+    const chosen = shuffle(inArea).slice(0, kinds);
+    const total = randomInt(KILL_COUNT_RANGE[base].min, KILL_COUNT_RANGE[base].max);
+    const per = Math.floor(total / kinds);
+    // 餘數給第一個，總數才對得起 `targetCount`（§ 36.2.8）
+    const subTargets = chosen.map((m, i) => ({
+      monster: m.name,
+      targetCount: i === 0 ? per + (total - per * kinds) : per,
+      currentCount: 0,
+    }));
+
+    return buildQuest(
+      'multierrand', difficulty, areaEntry.areaId, getAreaDisplayName(areaEntry.areaId), undefined,
+      total, areaEntry.avgGold, guildRank, index, { subTargets },
+    );
+  }
 
   if (type === 'collect') {
     if (monsterPool.length === 0) {
@@ -231,6 +319,17 @@ export function generateSingleQuest(
   return buildQuest(type, difficulty, targetArea, areaName, targetMonster, targetCount, avgGold, guildRank, index);
 }
 
+interface BuildQuestExtra {
+  /** 交付型的目標道具（§ 36.2.6／§ 36.2.7） */
+  targetItemId?: number;
+  /** 多目標殲滅的子目標（§ 36.2.8） */
+  subTargets?: { monster: string; targetCount: number; currentCount: number }[];
+  /** 交付素材的基準值不看區域金幣，改由素材售價算（§ 36.9 步驟 2d） */
+  baseValueOverride?: number;
+  /** 交付印記的獎勵由分頁固定，不抽權重表（§ 36.2.7） */
+  fixedReward?: QuestReward;
+}
+
 function buildQuest(
   type: AdventurerQuestType,
   difficulty: AdventurerQuestDifficulty,
@@ -241,22 +340,41 @@ function buildQuest(
   avgGold: number,
   guildRank: GuildRank,
   index: number,
+  extra: BuildQuestExtra = {},
 ): AdventurerQuest {
   const isBossQuest = type === 'errandboss' || type === 'collectboss';
-  const baseValue = isBossQuest ? avgGold * targetCount * 3 : avgGold * targetCount;
-  const rewardWeights = REWARD_WEIGHTS[guildRank];
-  const rewardType = weightedPick(rewardWeights).type;
+  /*
+   * § 36.9 步驟 2d：收集類的 `targetCount` 是**素材個數**不是擊殺數，
+   * 基準值要除以掉率換回期望擊殺數 —— 不除的話 40% 掉率等於把每殺報酬
+   * 直接砍到殲滅的四成。
+   */
+  const dropRate = type === 'collect' ? COLLECT_DROP_RATE
+    : type === 'collectboss' ? BOSS_COLLECT_DROP_RATE
+    : 1;
+  const killEquivalent = targetCount / dropRate;
+  const baseValue = extra.baseValueOverride
+    ?? (isBossQuest ? avgGold * killEquivalent * 3 : avgGold * killEquivalent);
   // § 36.9 步驟 2f：BOSS 任務獎勵 ×2。等階只影響獎勵「種類」的權重（§ 36.5.2），不影響數量倍率。
   const rewardMultiplier = isBossQuest ? 2 : 1;
-  const reward = calculateReward(rewardType, baseValue * rewardMultiplier, difficulty);
+  // 獎勵固定的型別（交付印記）連抽都不抽，抽了只是白轉一次 RNG
+  const reward = extra.fixedReward ?? calculateReward(
+    weightedPick(REWARD_WEIGHTS[guildRank]).type,
+    baseValue * rewardMultiplier,
+    difficulty,
+  );
   // § 36.4.2：BOSS 分頁與一般分頁各有一張基底貢獻表
   const baseContribution = isBossQuest
     ? BOSS_CONTRIBUTION_POINTS[toBossDifficulty(difficulty)][type as 'errandboss' | 'collectboss']
-    : CONTRIBUTION_POINTS[getBaseDifficulty(difficulty)][type as 'errand' | 'collect' | 'endurance'];
+    : CONTRIBUTION_POINTS[getBaseDifficulty(difficulty)][
+      type as 'errand' | 'collect' | 'endurance' | 'multierrand' | 'deliver' | 'sigil'
+    ];
   const areaBonus = Math.floor(avgGold / 10);
   const contributionPoints = baseContribution + areaBonus;
   const title = generateQuestTitle(type);
-  const description = generateQuestDescription(type, areaName, targetMonster, targetCount);
+  const description = generateQuestDescription(
+    type, areaName, targetMonster, targetCount,
+    { itemId: extra.targetItemId, subTargets: extra.subTargets },
+  );
 
   return {
     id: `adv-${difficulty}-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -271,7 +389,64 @@ function buildQuest(
     currentCount: 0,
     reward,
     contributionPoints,
+    ...(extra.targetItemId != null ? { targetItemId: extra.targetItemId } : {}),
+    ...(extra.subTargets ? { subTargets: extra.subTargets } : {}),
   };
+}
+
+/** 交付型沒有目標區域，額外貢獻改用該難度區域池的平均金幣（§ 36.4.2） */
+function averageAreaGold(areaPool: { avgGold: number }[]): number {
+  if (areaPool.length === 0) return 0;
+  return Math.floor(areaPool.reduce((sum, a) => sum + a.avgGold, 0) / areaPool.length);
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * § 36.2.7 交付印記：交付數量與獎勵都由分頁固定，完全不看區域，也不抽獎勵權重表。
+ *
+ * D／C 沒有印記可換（Lv.31 前拿不到詞綴印記），改給金幣。
+ */
+function buildSigilQuest(
+  difficulty: AdventurerQuestDifficulty,
+  base: ReturnType<typeof getBaseDifficulty>,
+  guildRank: GuildRank,
+  index: number,
+  areaPool: { avgGold: number }[],
+): AdventurerQuest {
+  const config = SIGIL_QUEST_TABLE[base];
+  const deliverItem = getItem(pickRandom(SIGIL_DELIVER_ITEM_IDS));
+
+  let count: number;
+  let reward: QuestReward;
+
+  if (config.exchangeRate && config.rewardCount && config.rewardType) {
+    const rate = randomInt(config.exchangeRate.min, config.exchangeRate.max);
+    const rewardCount = randomInt(config.rewardCount.min, config.rewardCount.max);
+    count = rate * rewardCount;
+    reward = config.rewardType === 'breakthrough-sigil'
+      ? { type: 'breakthrough-sigil', itemId: BREAKTHROUGH_SIGIL_ITEM_ID, amount: rewardCount }
+      : { type: 'affix-sigil', itemId: pickRandom(AFFIX_SIGIL_ITEM_IDS), amount: rewardCount };
+  } else {
+    count = randomInt(config.deliverCount!.min, config.deliverCount!.max);
+    reward = {
+      type: 'gold',
+      amount: Math.floor(deliverItem.sellPrice! * count * config.goldMultiplier!),
+    };
+  }
+
+  return buildQuest(
+    'sigil', difficulty, '', '', undefined, count,
+    averageAreaGold(areaPool), guildRank, index,
+    { targetItemId: deliverItem.id, fixedReward: reward },
+  );
 }
 
 export function generateQuestList(
@@ -325,6 +500,29 @@ export function updateQuestProgress(
   return activeQuests.map(quest => {
     if (quest.status !== 'active') return quest;
 
+    /*
+     * § 36.2.8：多目標殲滅要**區域與怪物名稱都符合**，而且逐項計數 ——
+     * 只加總數會讓玩家把一種怪打爆就完成，指定三種等於白寫。
+     */
+    if (quest.type === 'multierrand' && quest.subTargets) {
+      if (quest.targetArea !== currentArea) return quest;
+      let changed = false;
+      const subTargets = quest.subTargets.map(sub => {
+        if (sub.monster !== monsterName || sub.currentCount >= sub.targetCount) return sub;
+        changed = true;
+        return { ...sub, currentCount: Math.min(sub.currentCount + killCount, sub.targetCount) };
+      });
+      if (!changed) return quest;
+      const total = subTargets.reduce((sum, s) => sum + s.currentCount, 0);
+      const done = subTargets.every(s => s.currentCount >= s.targetCount);
+      return {
+        ...quest,
+        subTargets,
+        currentCount: total,
+        status: done ? 'completable' as const : 'active' as const,
+      };
+    }
+
     let shouldUpdate = false;
 
     if (quest.type === 'errand' || quest.type === 'endurance') {
@@ -377,13 +575,34 @@ export function rollCollectMaterialDrop(
   return Math.random() < COLLECT_DROP_RATE;
 }
 
+/**
+ * 交付型任務**不累積進度**，可交付與否每次由當下背包算（§ 36.11）。
+ *
+ * 與製作任務同一條規則：事後把素材賣掉，可交付狀態就即時消失，不做鎖定。
+ */
+export function isDeliverQuestSatisfied(quest: AdventurerQuest, bagItems: BagItem[]): boolean {
+  if (!isDeliverQuestType(quest.type) || quest.targetItemId == null) return false;
+  return hasBagItem(bagItems, quest.targetItemId, quest.targetCount);
+}
+
 export function completeQuest(
   activeQuests: AdventurerQuest[],
   questId: string,
   guildProgress: GuildProgress,
-): { activeQuests: AdventurerQuest[]; guildProgress: GuildProgress; reward: QuestReward | null } {
+  /** 交付型必須帶背包：交不出東西就不算完成 */
+  bagItems: BagItem[] = [],
+): {
+  activeQuests: AdventurerQuest[];
+  guildProgress: GuildProgress;
+  reward: QuestReward | null;
+  /** 交付型要扣掉的道具，呼叫端負責從背包扣除 */
+  consumed?: { itemId: number; amount: number };
+} {
   const quest = activeQuests.find(q => q.id === questId);
-  if (!quest || quest.status !== 'completable') {
+  if (!quest) return { activeQuests, guildProgress, reward: null };
+
+  const isDeliver = isDeliverQuestType(quest.type);
+  if (isDeliver ? !isDeliverQuestSatisfied(quest, bagItems) : quest.status !== 'completable') {
     return { activeQuests, guildProgress, reward: null };
   }
 
@@ -394,6 +613,7 @@ export function completeQuest(
     activeQuests: activeQuests.filter(q => q.id !== questId),
     guildProgress: { rank: newRank, points: newPoints },
     reward: quest.reward,
+    ...(isDeliver ? { consumed: { itemId: quest.targetItemId!, amount: quest.targetCount } } : {}),
   };
 }
 

@@ -9,6 +9,11 @@ import type { CraftQuest } from '../models/craftQuest';
 import { evaluateCraftRequirements } from '../systems/craftQuestSystem';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getItemById } from '../models/items';
+import type { AdventurerQuest } from '../models/adventurerQuest';
+import { isDeliverQuestType } from '../models/adventurerQuest';
+import { isDeliverQuestSatisfied } from '../systems/adventurerQuestSystem';
+import type { BagItem } from '../models/bagItem';
+import { getBagItemAmount } from '../models/bagItem';
 
 /**
  * 任務追蹤（§ 36.10.3）
@@ -101,12 +106,46 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   );
 }
 
+/** 交付型看背包、其餘看累積進度（§ 36.11） */
+function isAdventurerQuestDone(quest: AdventurerQuest, bagItems: BagItem[]): boolean {
+  return isDeliverQuestType(quest.type)
+    ? isDeliverQuestSatisfied(quest, bagItems)
+    : quest.status === 'completable';
+}
+
+function AdventurerQuestProgress({ quest, bagItems }: { quest: AdventurerQuest; bagItems: BagItem[] }) {
+  if (isDeliverQuestType(quest.type) && quest.targetItemId != null) {
+    const have = getBagItemAmount(bagItems, quest.targetItemId);
+    const name = getItemById(quest.targetItemId)?.name ?? '未知道具';
+    return (
+      <>
+        {name}：<strong className={have >= quest.targetCount ? '' : 'lacking'}>
+          {have}/{quest.targetCount}
+        </strong>
+      </>
+    );
+  }
+  if (quest.type === 'multierrand' && quest.subTargets) {
+    return (
+      <>
+        {quest.subTargets.map(sub => (
+          <span key={sub.monster} className="quest-subtarget">
+            {sub.monster} <strong>{sub.currentCount}/{sub.targetCount}</strong>
+          </span>
+        ))}
+      </>
+    );
+  }
+  return <>進度：<strong>{quest.currentCount}/{quest.targetCount}</strong></>;
+}
+
 /** 任務內容（由 `PanelWindows` 包在 FloatingWindow 內渲染） */
 export function QuestTrackerContent() {
   const character = useGameStore(s => s.character);
   const adventurerQuests = useGameStore(s => s.adventurerQuests);
   const craftQuests = useGameStore(s => s.craftQuests);
   const abandonAdventurerQuest = useGameStore(s => s.abandonAdventurerQuest);
+  const bagItems = useGameStore(s => s.bagItems);
 
   if (!character) return null;
 
@@ -143,18 +182,21 @@ export function QuestTrackerContent() {
       ))}
 
       {adventurerQuests.map(quest => (
-        <div key={quest.id} className={`quest-tracker-item ${quest.status === 'completable' ? 'completable' : ''}`}>
+        <div key={quest.id} className={`quest-tracker-item ${isAdventurerQuestDone(quest, bagItems) ? 'completable' : ''}`}>
           <div className="tracker-title">
             <span className="tracker-source">[冒險]</span>
             {quest.title}
           </div>
-          <div className="tracker-area">
-            {getAreaDisplayName(quest.targetArea)}
-            {quest.targetMonster && ` — ${quest.targetMonster}`}
-          </div>
+          {/* 交付型不看區域，寫了會被讀成必須去那裡（§ 36.10.2） */}
+          {!isDeliverQuestType(quest.type) && (
+            <div className="tracker-area">
+              {getAreaDisplayName(quest.targetArea)}
+              {quest.targetMonster && ` — ${quest.targetMonster}`}
+            </div>
+          )}
           <div className="tracker-progress">
-            進度：<strong>{quest.currentCount}/{quest.targetCount}</strong>
-            {quest.status === 'completable' && <span className="quest-highlight"> — 可交付</span>}
+            <AdventurerQuestProgress quest={quest} bagItems={bagItems} />
+            {isAdventurerQuestDone(quest, bagItems) && <span className="quest-highlight"> — 可交付</span>}
           </div>
           <div className="tracker-actions">
             {/* § 36.10.3：追蹤視窗直接退出，代價與冒險者工會面板相同（扣等量貢獻） */}

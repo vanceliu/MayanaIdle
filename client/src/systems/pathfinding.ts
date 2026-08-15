@@ -82,6 +82,13 @@ export function findPath(map: MapData, start: Position, end: Position, occupied?
   return null;
 }
 
+/**
+ * 找一個「打得到 `target`」的落腳格。回 null 代表附近沒有這種格子。
+ *
+ * `from` 與 `target` 都收**真實座標**：起點那一格的射程與視線一律用 `from` 原值判，
+ * 不用四捨五入後的格心。停在格與格之間時兩者最多差 0.7 格，用格心判會得出
+ * 「尋路說已就位、戰鬥判定說超出射程」，雙方靜止不動也不出手。
+ */
 export function findAttackPosition(
   map: MapData,
   target: Position,
@@ -106,9 +113,11 @@ export function findAttackPosition(
     if (current.cost !== bestCosts.get(currentKey)) continue;
 
     const isTarget = current.position.x === targetPosition.x && current.position.y === targetPosition.y;
+    const isStart = current.position.x === start.x && current.position.y === start.y;
+    const evalFrom = isStart ? from : current.position;
     if (!isTarget
-      && getDistance(current.position, target) <= range
-      && hasLineOfSight(current.position, target, map)) {
+      && getDistance(evalFrom, target) <= range
+      && hasLineOfSight(evalFrom, target, map)) {
       return current.position;
     }
 
