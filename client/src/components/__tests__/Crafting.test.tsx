@@ -112,6 +112,34 @@ describe('TownBlacksmith - Crafting', () => {
     expect(await findRecipeTitle('霜紋劍')).toBeDefined();
   });
 
+  /** 每個有製作配方的防具部位都必須有分類按鈕，否則配方永遠沒有入口（§ 6A.7） */
+  it('每個可製作的防具部位都有分類按鈕', async () => {
+    const SLOT_LABELS: Record<string, string> = {
+      helmet: '頭盔', chest: '胸甲', gloves: '手套', boots: '鞋子',
+      belt: '腰帶', necklace: '項鍊', ring1: '戒指',
+    };
+    const craftableSlots = new Set(
+      EQUIPMENT_SEEDS
+        .filter(t => t.type === 'armor' && t.acquireType === 'craft' && t.slot)
+        .map(t => t.slot as string),
+    );
+    expect(craftableSlots.size).toBeGreaterThan(0);
+
+    render(<TownBlacksmith />);
+    fireEvent.click(screen.getByText('裝備製作'));
+    for (const slot of craftableSlots) {
+      expect(await screen.findByText(SLOT_LABELS[slot]), slot).toBeDefined();
+    }
+  });
+
+  it('腰帶分類列出 T4／T5 製作配方（§ 6A.7）', async () => {
+    render(<TownBlacksmith />);
+    fireEvent.click(screen.getByText('裝備製作'));
+    fireEvent.click(await screen.findByText('腰帶'));
+    expect(await findRecipeTitle('銀扣腰帶')).toBeDefined();
+    expect(await findRecipeTitle('力之腰帶')).toBeDefined();
+  });
+
   it('shows recipe detail when selected', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));

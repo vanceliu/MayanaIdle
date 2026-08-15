@@ -414,6 +414,7 @@ export function TownBlacksmith() {
             { key: 'armor-chest', label: '胸甲' },
             { key: 'armor-gloves', label: '手套' },
             { key: 'armor-boots', label: '鞋子' },
+            { key: 'armor-belt', label: '腰帶' },
             { key: 'armor-necklace', label: '項鍊' },
             { key: 'armor-ring1', label: '戒指' },
           ].map(cat => {
