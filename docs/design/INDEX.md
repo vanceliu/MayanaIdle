@@ -97,7 +97,7 @@
 | 副本系統/地圖結構 | `09-dungeon.md` | 全文 |
 | **龍谷地間與遠古地監的產出分工（重疊等級帶）** | `09-dungeon.md` | § 9.10 |
 | HP/MP 自然回復 | `29-regen.md` | 全文 |
-| 陣營系統 | `10-faction.md` | 全文 |
+| 陣營系統（暫不實作，見 `15-excluded.md` § 15.7） | `10-faction.md` | 全文 |
 | 公會系統 | `11-guild.md` | 全文 |
 | 寵物系統 | `12-pet.md` | 全文 |
 | 成就/排行榜 | `14-endgame.md` | 全文 |
@@ -120,6 +120,8 @@
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
 | 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
+| （可能做法）野外離線模擬＋5 分鐘同步／組隊選項 | `98-online-architecture.md` | § 14~§ 15（未定案） |
+| （可能做法）自架私服（單 process／各服註冊／本服排行） | `97-selfhosted-server.md` | 全文（未定案） |
 | Pixi 渲染（分層／theme palette／RenderTexture） | `40-pixijs-migration.md` | 全文 |
 | In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
