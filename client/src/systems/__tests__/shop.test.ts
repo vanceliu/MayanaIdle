@@ -34,7 +34,7 @@ const RED_POTION = 1;
 const TEMPLATES: EquipmentTemplate[] = [
   { id: 1, name: '鐵劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 10, largeMonsterDamage: 8, buyPrice: 1000, acquireType: 'shop', tier: 2 },
   { id: 2, name: '新手劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 4, largeMonsterDamage: 3, buyPrice: 100, acquireType: 'starter', tier: 1 },
-  { id: 3, name: '龍鱗甲', type: 'armor', slot: 'chest', isTwoHanded: false, defense: 50, craftGold: 8000, acquireType: 'craft', tier: 5, craftTier: 'mid' },
+  { id: 3, name: '龍鱗甲', type: 'armor', slot: 'chest', isTwoHanded: false, defense: 50, craftGold: 0, acquireType: 'craft', tier: 5, craftTier: 'mid' },
   { id: 4, name: '深淵之刃', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 90, largeMonsterDamage: 80, buyPrice: 50_000, acquireType: 'drop_only', tier: 7 },
 ] as EquipmentTemplate[];
 
@@ -113,8 +113,8 @@ describe('裝備定價與可賣判定', () => {
     expect(getEquipmentSellPrice(instance(1), TEMPLATES)).toBe(500);
   });
 
-  it('製作裝備用 craftGold 一半', () => {
-    expect(getEquipmentSellPrice(instance(3), TEMPLATES)).toBe(4000);
+  it('製作裝備依階級固定賣價，與製作費無關', () => {
+    expect(getEquipmentSellPrice(instance(3), TEMPLATES)).toBe(20000);
   });
 
   it('新手裝不能賣（靠模板的 acquireType，不是靠實例旗標）', () => {
@@ -149,6 +149,6 @@ describe('裝備批量販售', () => {
   });
 
   it('總價是各件回收價相加', () => {
-    expect(getEquipmentSellTotal([instance(1), instance(3)], TEMPLATES)).toBe(4500);
+    expect(getEquipmentSellTotal([instance(1), instance(3)], TEMPLATES)).toBe(20500);
   });
 });

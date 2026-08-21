@@ -272,7 +272,7 @@ baseValue × (1 + qualityPercent / 100)
 | acquireType | enum | shop / craft / drop_only |
 | buyPrice | number? | 商店價格（shop 時必填） |
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
-| craftGold | number? | 製作金幣（craft 時必填） |
+| craftGold | number? | 製作金幣，一律 0（製作不收費，見 `06-equipment-acquire.md` § 6A.3） |
 | craftMaterials | json? | 製作素材 `[{name, amount}]`（craft 時必填） |
 | craftPrerequisiteWeapon | json? | 前置武器需求 `{templateId, quantity}`（高級進階以上製作品）。**存 templateId 不存名稱**，見 `99-ai-constraints.md` § 99.1 第 3 條 |
 

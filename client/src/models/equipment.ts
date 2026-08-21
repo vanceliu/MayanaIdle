@@ -181,6 +181,7 @@ export interface EquipmentTemplate {
   shopTier?: ShopTier;
   /** @deprecated 由 `tier` 取代 */
   craftTier?: CraftTier;
+  /** 製作費，一律 0 —— 製作不收金幣（`06-equipment-acquire.md` § 6A.3） */
   craftGold?: number;
   craftMaterials?: CraftMaterial[];
   craftPrerequisiteWeapon?: CraftPrerequisiteWeapon;

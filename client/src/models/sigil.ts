@@ -64,7 +64,7 @@ export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   },
   {
     type: 'polish', itemId: 9, name: '工藝印記', target: 'item',
-    description: '整件裝備品質 +1%（上限 20%），必定成功，另收 50,000G',
+    description: '整件裝備品質 +1%（上限 20%），必定成功，另收 5,000G',
   },
 ];
 
@@ -140,10 +140,10 @@ export const ENHANCE_SIGIL_RATES: { from: number; rate: number }[] = [
 /** § 46.7 突破印記失敗後掉回的 Tier */
 export const ENHANCE_SIGIL_FAIL_TIER = 1;
 
-/** § 46.8 工藝印記：每次品質 +1%、上限 20%、另收 50,000G（數值來源 `08-quality.md` § 8.3） */
+/** § 46.8 工藝印記：每次品質 +1%、上限 20%、另收 5,000G（數值來源 `08-quality.md` § 8.3） */
 export const POLISH_SIGIL_QUALITY_STEP = 1;
 export const POLISH_SIGIL_QUALITY_MAX = 20;
-export const POLISH_SIGIL_GOLD_COST = 50000;
+export const POLISH_SIGIL_GOLD_COST = 5000;
 
 export function getEnhanceSigilRate(tier: number): number | undefined {
   return ENHANCE_SIGIL_RATES.find(r => r.from === tier)?.rate;

@@ -27,32 +27,27 @@ export interface CraftPrerequisiteStatus {
 
 export interface CraftRequirementStatus {
   materials: CraftMaterialStatus[];
-  gold: { have: number; need: number; enough: boolean };
   /** 配方沒有前置裝備需求時為 null（T4／T6 與防具皆是） */
   prerequisite: CraftPrerequisiteStatus | null;
-  /** 素材、金幣、前置三者皆滿足 */
+  /** 素材與前置皆滿足 */
   ready: boolean;
 }
 
 /**
  * 評估某配方當下的需求狀態（§ 36.13.3）。
  *
- * 沒有累積進度 —— 每次都由當下背包／金幣即時算，
- * 事後把素材賣掉或金幣花掉，`ready` 就會跟著掉回 false。
+ * 沒有累積進度 —— 每次都由當下背包即時算，
+ * 事後把素材或前置裝備賣掉，`ready` 就會跟著掉回 false。
  */
 export function evaluateCraftRequirements(
   recipe: EquipmentTemplate,
   bagItems: BagItem[],
   inventory: EquipmentInstance[],
-  gold: number,
 ): CraftRequirementStatus {
   const materials: CraftMaterialStatus[] = (recipe.craftMaterials ?? []).map(mat => {
     const have = getBagItemAmount(bagItems, mat.itemId);
     return { itemId: mat.itemId, have, need: mat.amount, enough: have >= mat.amount };
   });
-
-  const goldNeed = recipe.craftGold ?? 0;
-  const goldStatus = { have: gold, need: goldNeed, enough: gold >= goldNeed };
 
   let prerequisite: CraftPrerequisiteStatus | null = null;
   if (recipe.craftPrerequisiteWeapon) {
@@ -62,14 +57,14 @@ export function evaluateCraftRequirements(
     prerequisite = { templateId, have, need: quantity, enough: have >= quantity };
   }
 
-  // 沒有 craftMaterials 的模板不是「零需求配方」，是根本不能製作的模板
-  const isCraftable = !!recipe.craftMaterials && !!recipe.craftGold;
+  // 沒有 craftMaterials 的模板不是「零需求配方」，是根本不能製作的模板。
+  // 製作費一律 0（§ 6A.3），可製作與否不看 craftGold
+  const isCraftable = !!recipe.craftMaterials?.length;
   const ready = isCraftable
     && materials.every(m => m.enough)
-    && goldStatus.enough
     && (prerequisite?.enough ?? true);
 
-  return { materials, gold: goldStatus, prerequisite, ready };
+  return { materials, prerequisite, ready };
 }
 
 /** § 36.13.2：上限 3 個、同一配方只能追蹤一張。無法加入時回傳 null */

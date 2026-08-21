@@ -14,8 +14,8 @@ import { bagItemById } from '../../testing/bagFixtures';
 /**
  * 製作任務在追蹤視窗的顯示（`36-quest-system.md` § 36.13.4）
  *
- * 配方固定用鋼心劍，但材料與製作費一律由 seed 反查 —— § 6A.3 重新分配材料時
- * 這組測試不該變紅。
+ * 配方固定用鋼心劍，但材料一律由 seed 反查 —— § 6A.3 重新分配材料時
+ * 這組測試不該變紅。製作不收金幣，角色金幣一律 0。
  */
 const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
 const recipeBag = (amount: number) => RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, amount));
@@ -43,7 +43,7 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     await seedDatabase();
     await loadTemplateCache();
 
-    setChar(RECIPE.craftGold!);
+    setChar(0);
     useGameStore.setState({
       equippedGear: {},
       inventory: [],
@@ -61,10 +61,10 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     for (const mat of RECIPE.craftMaterials!) {
       expect(screen.getByText(getItemById(mat.itemId)!.name)).toBeTruthy();
     }
-    expect(screen.getByText('金幣')).toBeTruthy();
+    expect(screen.queryByText('金幣')).toBeNull();
   });
 
-  it('素材、金幣皆滿足時套用 completable 外框並標示可製作', async () => {
+  it('素材滿足時套用 completable 外框並標示可製作（金幣為 0 也一樣）', async () => {
     const { container } = render(<QuestTrackerContent />);
 
     await screen.findByText('[製作]');
@@ -82,14 +82,6 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     expect(container.querySelector('.quest-tracker-item.completable')).toBeNull();
     expect(container.querySelectorAll('.tracker-craft-req.lacking').length).toBeGreaterThan(0);
     expect(screen.queryByText('可製作')).toBeNull();
-  });
-
-  it('金幣不足時不亮框（素材全滿也一樣）', async () => {
-    setChar(0);
-    const { container } = render(<QuestTrackerContent />);
-
-    await screen.findByText('[製作]');
-    expect(container.querySelector('.quest-tracker-item.completable')).toBeNull();
   });
 
   it('取消製作任務不扣貢獻（§ 36.13.5）', async () => {

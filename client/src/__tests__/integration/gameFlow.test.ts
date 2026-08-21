@@ -364,10 +364,10 @@ describe('Integration: Blacksmith Quality Upgrade', () => {
   });
 
   it('should cost gold and quality stone per upgrade', () => {
-    const UPGRADE_COST_GOLD = 50000;
+    const UPGRADE_COST_GOLD = 5000;
     const UPGRADE_COST_STONE = 1;
 
-    let gold = 200000;
+    let gold = 20000;
     let qualityStones = 5;
     let quality = 0;
 
@@ -381,7 +381,7 @@ describe('Integration: Blacksmith Quality Upgrade', () => {
     }
 
     expect(quality).toBe(3);
-    expect(gold).toBe(50000);
+    expect(gold).toBe(5000);
     expect(qualityStones).toBe(2);
   });
 });

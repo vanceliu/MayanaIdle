@@ -32,7 +32,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 150, name: '突破印記', category: 'scroll', description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
   // 精鍊與工藝走全區域掉落（§ 30.2 印記），故賣價 50G 與其他印記不同；
   // 六種印記重量一律 0（不計負重），圖示同為 millenium-key，只用顏色區分
-  { id: 9, name: '工藝印記', category: 'scroll', description: '整件裝備品質 +1%（上限 20%），另收 50,000G', weight: 0, sellPrice: 50, icon: 'items/millenium-key', iconColor: '#FACC15' },
+  { id: 9, name: '工藝印記', category: 'scroll', description: '整件裝備品質 +1%（上限 20%），另收 5,000G', weight: 0, sellPrice: 50, icon: 'items/millenium-key', iconColor: '#FACC15' },
   { id: 10, name: '精鍊印記', category: 'scroll', description: '指定一條詞綴 Tier +1，必定成功，最高 T5（商店裝 T3）', weight: 0, sellPrice: 50, icon: 'items/millenium-key', iconColor: '#F1F5F9' },
 
   // === 製作用素材 ===

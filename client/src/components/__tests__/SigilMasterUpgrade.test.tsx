@@ -221,7 +221,7 @@ describe('印記師 — 突破印記（§ 46.7）', () => {
 describe('印記師 — 工藝印記（§ 46.8）', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('消耗工藝印記 ×1 + 50,000G，品質 +1%，不需指定詞綴', () => {
+  it('消耗工藝印記 ×1 + 5,000G，品質 +1%，不需指定詞綴', () => {
     setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [
       { name: '工藝印記', amount: 1 },
     ], 60_000);
@@ -232,7 +232,7 @@ describe('印記師 — 工藝印記（§ 46.8）', () => {
     fireEvent.click(applyBtn('工藝印記'));
 
     expect(useGameStore.getState().inventory[0].quality).toBe(1);
-    expect(useGameStore.getState().character!.gold).toBe(10_000);
+    expect(useGameStore.getState().character!.gold).toBe(55_000);
     expect(useGameStore.getState().bagItems.find(b => b.name === '工藝印記')).toBeUndefined();
   });
 

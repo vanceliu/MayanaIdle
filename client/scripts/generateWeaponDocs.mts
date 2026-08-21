@@ -13,6 +13,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { getTierGroup } from '../src/models/equipmentTier';
+import { getItemById } from '../src/models/items';
 import type { EquipmentTemplate, EquipmentTier, WeaponType } from '../src/models/equipment';
 
 const DOCS = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design');
@@ -58,13 +59,17 @@ function bonusOf(t: EquipmentTemplate): string {
   return parts.join('、') || '—';
 }
 
+
+/** 素材與前置一律存 id，顯示名由 id 反查（`99-ai-constraints.md` § 99.1 第 3、7 條） */
+const matName = (id: number) => getItemById(id)?.name ?? `#${id}`;
+
 function craftOf(t: EquipmentTemplate): string {
-  if (!t.craftGold) return '—';
-  const mats = (t.craftMaterials ?? []).map(m => `${m.name}×${m.amount}`).join('、');
+  if (!t.craftMaterials?.length) return '—';
+  const mats = t.craftMaterials.map(m => `${matName(m.itemId)}×${m.amount}`).join('、');
   const pre = t.craftPrerequisiteWeapon
-    ? `<br>前置：${t.craftPrerequisiteWeapon.name}×${t.craftPrerequisiteWeapon.quantity}`
+    ? `<br>前置：${EQUIPMENT_SEEDS.find(e => e.id === t.craftPrerequisiteWeapon!.templateId)?.name ?? `#${t.craftPrerequisiteWeapon.templateId}`}×${t.craftPrerequisiteWeapon.quantity}`
     : '';
-  return `${t.craftGold.toLocaleString()}G<br>${mats}${pre}`;
+  return `${mats}${pre}`;
 }
 
 function renderType(type: WeaponType, items: EquipmentTemplate[]): string {

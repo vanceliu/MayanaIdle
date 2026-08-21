@@ -279,7 +279,7 @@ describe('印記系統（§ 46）', () => {
     });
 
     it('唯一收金幣的印記，金額同 `08-quality.md` § 8.3', () => {
-      expect(POLISH_SIGIL_GOLD_COST).toBe(50000);
+      expect(POLISH_SIGIL_GOLD_COST).toBe(5000);
     });
 
     it('品質已滿或裝備無詞綴時不受理', () => {

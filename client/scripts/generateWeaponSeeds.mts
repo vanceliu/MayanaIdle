@@ -112,7 +112,8 @@ function acquireOf(tier: number, idx: number): 'starter' | 'shop' | 'craft' | 'd
   if (tier === 6) return idx === 0 ? 'craft' : 'drop_only'; // T6 一半可製作
   return 'drop_only';
 }
-const CRAFT_GOLD: Record<number, number> = { 4: 50000, 5: 100000, 6: 200000 };
+/** 製作費一律 0（`06-equipment-acquire.md` § 6A.3） */
+const CRAFT_GOLD = 0;
 /** `06-equipment-acquire.md` § 6A.1：米索利與奧里哈魯根只出現在 T4 以上 */
 const MAT_LOW = ['iron', 'silver', 'wood', 'dragon'];
 const MAT_HIGH = ['mithril', 'orichalcum', 'dragon', 'silver', 'wood', 'iron'];
@@ -237,7 +238,7 @@ for (const sp of SPEC) {
       f.push('buyPrice: 0', `stability: ${sp.offhand ? 4 : 6}`, `canBreak: ${tier < 7}`,
              `acquireType: '${acquire}'`, `tier: ${tier}`);
       if (acquire === 'craft') {
-        f.push(`craftGold: ${CRAFT_GOLD[tier]}`, 'craftMaterials: []');
+        f.push(`craftGold: ${CRAFT_GOLD}`, 'craftMaterials: []');
         // 製作鏈：T5／T6 需要同類型前一階的第一把當前置
         const prev = firstOf[`${sp.type}|${tier - 1}`];
         if (tier >= 5 && prev) f.push(`craftPrerequisiteWeapon: { name: '${prev}', quantity: 1 }`);

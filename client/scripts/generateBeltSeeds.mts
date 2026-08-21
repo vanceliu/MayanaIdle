@@ -36,8 +36,8 @@ const WEIGHT_BONUS = [1700, 2500, 3300, 5000, 6700, 8300, 10000];
 const MATERIAL = ['iron', 'iron', 'iron', 'iron', 'iron', 'iron', 'iron'];
 /** T1 不販售（新手裝），T2/T3 才有售價 */
 const SHOP_PRICE = [0, 8000, 15000];
-/** 製作費：T4 5 萬、T5 10 萬（§ 6A.3） */
-const CRAFT_GOLD = [50000, 100000];
+/** 製作費一律 0（§ 6A.3） */
+const CRAFT_GOLD = 0;
 const ATTR_ZH: Record<string, string> = { STR: '力量', AGI: '敏捷', INT: '智力', SPI: '精神' };
 
 interface BeltSpec { tier: number; name: string; attr?: [string, number]; defense?: number }
@@ -104,7 +104,7 @@ for (const b of BELTS) {
   f.push(`weight: ${10 + i * 2}`, `material: '${MATERIAL[i]}'`,
     `buyPrice: ${acquire === 'shop' ? SHOP_PRICE[i] : 0}`, 'stability: -1',
     `acquireType: '${acquire}'`, `tier: ${b.tier}`);
-  if (acquire === 'craft') f.push(`craftGold: ${CRAFT_GOLD[b.tier - 4]}`, `craftMaterials: ${craftMaterialsFor(b.tier)}`);
+  if (acquire === 'craft') f.push(`craftGold: ${CRAFT_GOLD}`, `craftMaterials: ${craftMaterialsFor(b.tier)}`);
   lines.push(`  { ${f.join(', ')} },`);
 }
 

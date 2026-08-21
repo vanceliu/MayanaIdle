@@ -144,13 +144,13 @@ describe('TownBlacksmith - Crafting', () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
-    // 製作費由 § 6A.3 的階級表決定（T4 5 萬、T5 10 萬），不寫死在測試裡
-    const recipe = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
-    const priceText = new RegExp(recipe.craftGold!.toLocaleString().replace(/,/g, '.?'));
-    expect(screen.getAllByText(priceText).length).toBeGreaterThan(0);
+    // 需求只有素材與前置，配方卡片不顯示金幣（§ 6A.3）
+    for (const m of RECIPE.craftMaterials!) {
+      expect(screen.getAllByText(`10/${m.amount}`).length).toBeGreaterThan(0);
+    }
   });
 
-  it('crafts item successfully when materials and gold available', async () => {
+  it('crafts item successfully when materials available', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
@@ -159,8 +159,8 @@ describe('TownBlacksmith - Crafting', () => {
     fireEvent.click(enabledBtn);
 
     const state = useGameStore.getState();
-    const cost = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!.craftGold!;
-    expect(state.character!.gold).toBe(500000 - cost);
+    // 製作不收金幣（§ 6A.3）
+    expect(state.character!.gold).toBe(500000);
     expect(state.inventory.some(i => i.name === '鋼心劍')).toBe(true);
     for (const m of RECIPE.craftMaterials!) {
       expect(state.bagItems.find(b => b.itemId === m.itemId)?.amount, String(m.itemId)).toBe(10 - m.amount);
@@ -191,16 +191,21 @@ describe('TownBlacksmith - Crafting', () => {
     expect(Array.isArray(crafted.affixes)).toBe(true);
   });
 
-  it('disables craft button when not enough gold', async () => {
+  it('金幣為 0 一樣做得出來（製作不收費，§ 6A.3）', async () => {
     useGameStore.setState({
-      character: { ...useGameStore.getState().character!, gold: 100 },
+      character: { ...useGameStore.getState().character!, gold: 0 },
     });
     render(<TownBlacksmith />);
     fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
 
     const craftBtns = screen.getAllByText('製作');
-    expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
+    const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
+    fireEvent.click(enabledBtn);
+
+    const state = useGameStore.getState();
+    expect(state.character!.gold).toBe(0);
+    expect(state.inventory.some(i => i.name === '鋼心劍')).toBe(true);
   });
 
   it('disables craft button when not enough materials', async () => {

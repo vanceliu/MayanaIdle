@@ -63,7 +63,6 @@ export function CraftingPage() {
               <th>成品</th>
               <th>類型</th>
               <th>階級</th>
-              <th>製作費用</th>
               <th>前置武器</th>
               <th>所需材料</th>
             </tr>
@@ -90,7 +89,6 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       </td>
       <td>{TYPE_LABELS[item.type] || item.type}</td>
       <td>{item.tier != null ? TIER_LABELS[item.tier] ?? `裝備Tier ${item.tier}` : '-'}</td>
-      <td className="cell-number">{item.craftGold?.toLocaleString() || '-'} G</td>
       <td>
         {item.craftPrerequisiteWeapon
           ? (() => {

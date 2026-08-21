@@ -27,8 +27,8 @@ const minPerTier = (tier: number) => (tier <= 1 ? 0 : tier === 2 ? 1 : tier === 
  */
 const MATERIAL = ['iron', 'iron', 'iron', 'iron', 'iron', 'iron', 'iron'];
 const SHOP_PRICE = [5000, 50000, 150000];
-/** 製作費：T4 5 萬、T5 10 萬（§ 6A.3） */
-const CRAFT_GOLD = [50000, 100000];
+/** 製作費一律 0（§ 6A.3） */
+const CRAFT_GOLD = 0;
 const BLOCK_RATE = [5, 8, 10, 12, 14, 16, 18];
 
 /** 候選名稱：每階列出足夠的備選，只取需要的數量 */
@@ -125,7 +125,7 @@ for (const { type, tier, count } of need) {
       `buyPrice: ${acquire === 'shop' ? SHOP_PRICE[i] : 0}`, 'stability: 4',
       `requiredClass: [${REQUIRED_CLASS[type].map(c => `'${c}'`).join(', ')}]`,
       `acquireType: '${acquire}'`, `tier: ${tier}`);
-    if (acquire === 'craft') f.push(`craftGold: ${CRAFT_GOLD[tier - 4]}`, `craftMaterials: ${craftMaterialsFor(tier)}`);
+    if (acquire === 'craft') f.push(`craftGold: ${CRAFT_GOLD}`, `craftMaterials: ${craftMaterialsFor(tier)}`);
     lines.push(`  { ${f.join(', ')} },`);
   });
 }

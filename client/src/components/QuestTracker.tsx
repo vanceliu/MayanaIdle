@@ -55,13 +55,12 @@ export function QuestTrackerButton() {
 /**
  * 製作任務的單張卡片（§ 36.13.4）
  *
- * 需求沒有累積進度，每次 render 都由當下的背包／金幣重算 ——
- * 賣掉素材或花掉金幣，「可製作」就會即時消失。
+ * 需求沒有累積進度，每次 render 都由當下的背包重算 ——
+ * 賣掉素材或前置裝備，「可製作」就會即時消失。
  */
 function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   const bagItems = useGameStore(s => s.bagItems);
   const inventory = useGameStore(s => s.inventory);
-  const gold = useGameStore(s => s.character?.gold ?? 0);
   const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
   const templates = useEquipmentTemplates();
 
@@ -69,7 +68,7 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   const recipe = templates.find(t => t.id === quest.templateId);
   if (!recipe) return null;
 
-  const status = evaluateCraftRequirements(recipe, bagItems, inventory, gold);
+  const status = evaluateCraftRequirements(recipe, bagItems, inventory);
   const prereqName = status.prerequisite
     ? templates.find(t => t.id === status.prerequisite!.templateId)?.name ?? `#${status.prerequisite.templateId}`
     : null;
@@ -91,9 +90,6 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
             {getItemById(mat.itemId)?.name ?? `#${mat.itemId}`} <strong>{mat.have}/{mat.need}</strong>
           </span>
         ))}
-        <span className={`tracker-craft-req ${status.gold.enough ? '' : 'lacking'}`}>
-          金幣 <strong>{status.gold.have.toLocaleString()}/{status.gold.need.toLocaleString()}</strong>
-        </span>
       </div>
       <div className="tracker-actions">
         {status.ready && <span className="quest-highlight">可製作</span>}

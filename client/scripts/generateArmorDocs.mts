@@ -11,6 +11,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { getTierGroup } from '../src/models/equipmentTier';
+import { getItemById } from '../src/models/items';
 import type { EquipmentTemplate, EquipmentTier } from '../src/models/equipment';
 
 const DOC = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design/06-equipment-armor.md');
@@ -42,11 +43,14 @@ function roleOf(t: EquipmentTemplate): string {
 
 const num = (v: number | undefined) => (v ? String(v) : '—');
 
+
+/** 素材與前置一律存 id，顯示名由 id 反查（`99-ai-constraints.md` § 99.1 第 3、7 條） */
+const matName = (id: number) => getItemById(id)?.name ?? `#${id}`;
+
 function craftOf(t: EquipmentTemplate): string {
   if (t.buyPrice) return `${t.buyPrice.toLocaleString()}G`;
-  if (!t.craftGold) return '—';
-  const mats = (t.craftMaterials ?? []).map(m => `${m.name}×${m.amount}`).join('、');
-  return `${t.craftGold.toLocaleString()}G<br>${mats}`;
+  if (!t.craftMaterials?.length) return '—';
+  return t.craftMaterials.map(m => `${matName(m.itemId)}×${m.amount}`).join('、');
 }
 
 // 左手三種（盾牌／魔導書／臂甲）是防具，不是武器 —— 它們的防禦計入

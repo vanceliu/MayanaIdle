@@ -20,6 +20,12 @@ import { hasMaterialUsage } from './craftMaterialUsage';
 /** 商店回收價一律為買價的一半 */
 export const SHOP_SELL_RATE = 0.5;
 
+/**
+ * 製作品的賣店價依階級固定（`06-equipment-acquire.md` § 6A.4）。
+ * 製作不收金幣，賣價不能再由製作費推算。
+ */
+export const CRAFT_SELL_PRICE: Record<number, number> = { 4: 10000, 5: 20000, 6: 30000 };
+
 // === 道具（雜貨店） ===
 
 /** 道具的基準價（買價或標定的售價）。`noSell` 明確不可販售，不靠「沒填價格」來擋 */
@@ -89,7 +95,7 @@ export function getEquipmentSellPrice(
   const template = templates.find(t => t.id === item.templateId);
   if (template?.acquireType === 'starter') return 0;
   if (template?.buyPrice) return Math.floor(template.buyPrice * SHOP_SELL_RATE);
-  if (template?.craftGold) return Math.floor(template.craftGold * SHOP_SELL_RATE);
+  if (template?.acquireType === 'craft') return CRAFT_SELL_PRICE[template.tier ?? 0] ?? 0;
   return 0;
 }
 

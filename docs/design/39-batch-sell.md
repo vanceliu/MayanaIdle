@@ -139,13 +139,13 @@
 **武器店（武器）：**
 ```
 售價 = Math.floor(template.buyPrice * 0.5)
-若 buyPrice 為 0（製作品）：Math.floor(template.craftGold * 0.5)
+若 buyPrice 為 0（製作品）：依 tier 固定（T4 10,000／T5 20,000／T6 30,000）
 ```
 
 **防具店（防具）：**
 ```
 售價 = Math.floor(template.buyPrice * 0.5)
-若 buyPrice 為 0（製作品）：Math.floor(template.craftGold * 0.5)
+若 buyPrice 為 0（製作品）：依 tier 固定（T4 10,000／T5 20,000／T6 30,000）
 ```
 
 ---

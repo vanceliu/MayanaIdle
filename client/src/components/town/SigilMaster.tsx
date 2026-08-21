@@ -284,7 +284,7 @@ export function SigilMaster() {
    * 突破印記的成功率跟著**目前選到的那條詞綴**走，沒選就把兩段都列出來。
    */
   function renderCost() {
-    // 金幣接在印記後面當同一句（「工藝印記 ×1 ＋ 50,000G」），不另起一段
+    // 金幣接在印記後面當同一句（「工藝印記 ×1 ＋ 5,000G」），不另起一段
     const cost = sigilType === 'polish'
       ? `${display.name} ×1 ＋ ${POLISH_SIGIL_GOLD_COST.toLocaleString()}G`
       : `${display.name} ×1`;

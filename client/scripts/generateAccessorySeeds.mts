@@ -41,8 +41,8 @@ const CAP = {
 const MATERIAL = ['iron', 'iron', 'iron', 'iron', 'iron', 'iron', 'iron'];
 /** T2/T3 的售價沿用 § 6A.2 的防具區間上緣（飾品是純加成，沒有防禦可比） */
 const SHOP_PRICE = { 2: 8000, 3: 15000 } as const;
-/** 製作費：T4 5 萬、T5 10 萬（§ 6A.3） */
-const CRAFT_GOLD = { 4: 50000, 5: 100000 } as const;
+/** 製作費一律 0（§ 6A.3） */
+const CRAFT_GOLD = 0;
 const ATTR_ZH: Record<string, string> = {
   STR: '力量', AGI: '敏捷', VIT: '體質', SPI: '精神', INT: '智力', CHA: '魅力',
 };
@@ -145,7 +145,7 @@ for (const [kind, specs, slot] of [
       `acquireType: '${acquire}'`, `tier: ${spec.tier}`,
     ];
     if (acquire === 'craft') {
-      f.push(`craftGold: ${CRAFT_GOLD[spec.tier as 4 | 5]}`, `craftMaterials: ${craftMaterialsFor(spec.tier)}`);
+      f.push(`craftGold: ${CRAFT_GOLD}`, `craftMaterials: ${craftMaterialsFor(spec.tier)}`);
     }
     lines.push(`  { ${f.join(', ')} },`);
   }

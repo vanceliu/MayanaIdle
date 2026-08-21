@@ -24,8 +24,8 @@ import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 const SEED_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../src/db/seed/equipmentSeeds.ts');
 const WRITE = process.argv.includes('--write');
 
-/** T6 的製作費（T4 5 萬、T5 10 萬 → T6 20 萬） */
-const CRAFT_GOLD = 200000;
+/** 製作費一律 0（§ 6A.3） */
+const CRAFT_GOLD = 0;
 /** 每份 T6 配方的材料需求量 */
 const AMOUNTS = [8, 6, 5, 4];
 /** 材料來源：Lv.57 以上的深層區域 */

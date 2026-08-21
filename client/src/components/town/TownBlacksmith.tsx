@@ -112,7 +112,7 @@ export function TownBlacksmith() {
     db.equipmentTemplates
       .filter(t => t.acquireType === 'craft')
       .toArray()
-      .then(arr => setCraftTemplates(arr.sort((a, b) => (a.craftGold ?? 0) - (b.craftGold ?? 0))));
+      .then(arr => setCraftTemplates(arr.sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0))));
   }, []);
 
   if (!char) return null;
@@ -255,13 +255,13 @@ export function TownBlacksmith() {
    */
   function canCraftRecipe(recipe: EquipmentTemplate): boolean {
     if (!char) return false;
-    return evaluateCraftRequirements(recipe, bagItems, inventory, char.gold).ready;
+    return evaluateCraftRequirements(recipe, bagItems, inventory).ready;
   }
 
   async function handleCraft() {
     if (!selectedRecipe || !char) return;
     if (!canCraftRecipe(selectedRecipe)) return;
-    if (!selectedRecipe.craftMaterials || !selectedRecipe.craftGold) return;
+    if (!selectedRecipe.craftMaterials?.length) return;
     const currentInv = useGameStore.getState().inventory;
     const currentBag = useGameStore.getState().bagItems;
     if (getBagUsedSlots(currentBag, currentInv, equippedGear) >= getBagMaxSlots(equippedGear)) return;
@@ -286,9 +286,6 @@ export function TownBlacksmith() {
         }
       }
     }
-
-    const newGold = char.gold - selectedRecipe.craftGold;
-    if (char.id) db.characters.update(char.id, { gold: newGold });
 
     const affixCategory: AffixCategory = getAffixCategoryForSlot(selectedRecipe.slot, selectedRecipe.type);
     const craftedAffixes = generateCraftAffixes(affixCategory, selectedRecipe);
@@ -323,7 +320,6 @@ export function TownBlacksmith() {
 
     const newInv = [...newInvAfterPrereq, newEquip];
     useGameStore.setState({
-      character: { ...char, gold: newGold },
       bagItems: newBag,
       inventory: newInv,
       // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
@@ -558,7 +554,6 @@ export function TownBlacksmith() {
                     );
                   })}
                 </span>
-                <span className="shop-item-price">{(recipe.craftGold ?? 0).toLocaleString()}G</span>
               </div>
               <div className="shop-item-actions">
                 <button

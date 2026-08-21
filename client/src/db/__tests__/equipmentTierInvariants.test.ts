@@ -133,12 +133,17 @@ describe('T6/T7 掉落限定', () => {
     expect(t7).toEqual([]);
   });
 
-  it('可製作的 T6 都有製作費與材料', () => {
+  it('可製作的 T6 都有材料', () => {
     const bad = REAL
       .filter(t => t.tier === MONSTER_DROP_ONLY_TIER && t.acquireType === 'craft')
-      .filter(t => !t.craftGold || !t.craftMaterials?.length)
+      .filter(t => !t.craftMaterials?.length)
       .map(t => t.name);
     expect(bad).toEqual([]);
+  });
+
+  it('製作品一律不收金幣（`06-equipment-acquire.md` § 6A.3）', () => {
+    const charged = REAL.filter(t => t.acquireType === 'craft' && t.craftGold).map(t => t.name);
+    expect(charged).toEqual([]);
   });
 
   it('T6 與 T7 都有裝備存在', () => {

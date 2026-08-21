@@ -474,7 +474,7 @@ const SIGILS = [
   { tab: 'enhance', label: '突破印記', target: 'affix', owned: 1, color: '#FB923C', danger: true,
     desc: '指定一條詞綴 T5→T6（成功率 10%）／T6→T7（2%）。失敗時該詞綴掉回 T1 並重骰數值，印記照樣消耗。使用前會再問一次。' },
   { tab: 'polish',  label: '工藝印記', target: 'item',  owned: 4, color: '#FACC15',
-    desc: '整件裝備品質 +1%（上限 20%），必定成功。唯一要收金幣的印記：工藝印記 ×1 ＋ 50,000G。' },
+    desc: '整件裝備品質 +1%（上限 20%），必定成功。唯一要收金幣的印記：工藝印記 ×1 ＋ 5,000G。' },
 ];
 
 const ITEMS = [
@@ -670,7 +670,7 @@ function renderCost() {
   const affix = s.target === 'affix' && selectedAffix != null ? it.affixes[selectedAffix] : null;
 
   let html = `消耗：${s.label} ×1`;
-  if (selectedSigil === 'polish') html += ' ＋ 50,000G';
+  if (selectedSigil === 'polish') html += ' ＋ 5,000G';
   if (s.target === 'item') html += '　對象是整件裝備，不需指定詞綴';
   if (selectedSigil === 'temper') html += '　必定成功';
   if (selectedSigil === 'enhance') {
@@ -749,7 +749,7 @@ $('apply').addEventListener('click', () => {
     const rate = breakthroughRate(it.affixes[selectedAffix].tier);
     extra = `　→ 消耗突破印記×1，成功率 ${Math.round(rate * 100)}%，失敗掉回 T1（正式版這裡會先跳確認視窗）`;
   }
-  if (selectedSigil === 'polish') extra = '　→ 消耗工藝印記×1 + 50,000G，品質 +1%';
+  if (selectedSigil === 'polish') extra = '　→ 消耗工藝印記×1 + 5,000G，品質 +1%';
   $('log').textContent = `[使用] ${it.name}｜${s.label}｜${target}${extra}\n` + $('log').textContent;
 });
 

@@ -34,7 +34,7 @@
 | 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
-| **製作材料分配規則／製作費** | `06-equipment-acquire.md` | § 6A.3 |
+| **製作材料分配規則／製作消耗** | `06-equipment-acquire.md` | § 6A.3 |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
 | 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
