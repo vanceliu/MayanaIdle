@@ -16,6 +16,8 @@ const SLOT_ICON_MAP: Record<EquipSlot, string> = {
   leftHand: 'shield',
   helmet: 'helmet',
   chest: 'chest',
+  shirt: 'shirt',
+  cloak: 'cloak',
   belt: 'belt',
   gloves: 'gloves',
   boots: 'boots',
@@ -93,7 +95,7 @@ export function EquipmentPanel() {
               </span>
               {item ? (
                 // 格子只印部位名 + 裝備名；數值、詞綴、Tier、材質、職業一律 hover 才出。
-                // 十個欄位各印四五行數值會把面板拉到整個畫面高（見 `16-tech-frontend-architecture.md` § 32.15）
+                // 十二個欄位各印四五行數值會把面板拉到整個畫面高（見 `16-tech-frontend-architecture.md` § 32.15）
                 <Tooltip
                   position="right"
                   content={(

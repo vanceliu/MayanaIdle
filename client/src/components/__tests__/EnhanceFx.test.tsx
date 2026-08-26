@@ -63,7 +63,7 @@ function setup(enhancement: number) {
   });
 }
 
-const clickEnhance = () => fireEvent.click(screen.getByRole('button', { name: /→ \+/ }));
+const clickEnhance = () => fireEvent.click(screen.getByTestId('enh-btn'));
 
 describe('強化演出（§ 48.4）', () => {
   beforeEach(async () => {

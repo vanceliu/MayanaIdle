@@ -115,8 +115,8 @@ describe('TownBlacksmith - Crafting', () => {
   /** 每個有製作配方的防具部位都必須有分類按鈕，否則配方永遠沒有入口（§ 6A.7） */
   it('每個可製作的防具部位都有分類按鈕', async () => {
     const SLOT_LABELS: Record<string, string> = {
-      helmet: '頭盔', chest: '胸甲', gloves: '手套', boots: '鞋子',
-      belt: '腰帶', necklace: '項鍊', ring1: '戒指',
+      helmet: '頭盔', chest: '胸甲', shirt: '上衣', cloak: '斗篷',
+      gloves: '手套', boots: '鞋子', belt: '腰帶', necklace: '項鍊', ring1: '戒指',
     };
     const craftableSlots = new Set(
       EQUIPMENT_SEEDS

@@ -154,7 +154,7 @@ describe('Bag capacity', () => {
     expect(isBagFull(bag, [], {})).toBe(false); // 沒穿裝備時 58/60 還有空間
   });
 
-  it('BAG_BASE_SLOTS is 60（10 個裝備欄改為佔格後的補償，§ 35.1）', () => {
+  it('BAG_BASE_SLOTS is 60（裝備欄改為佔格後的補償，§ 35.1）', () => {
     expect(BAG_BASE_SLOTS).toBe(60);
   });
 });

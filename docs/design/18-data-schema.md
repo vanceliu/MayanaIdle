@@ -247,7 +247,7 @@ baseValue × (1 + qualityPercent / 100)
 | id | number (PK) | 模板唯一 ID |
 | name | string | 裝備名稱（唯一） |
 | type | enum | sword / dagger / axe / mace / staff / bow / twoHandSword / twoHandAxe / twoHandStaff / dualBlade / claw / armor / shield / magicBook / accessory |
-| slot | enum | rightHand / leftHand / helmet / chest / gloves / boots / belt / necklace / ring |
+| slot | enum | rightHand / leftHand / helmet / chest / shirt / cloak / gloves / boots / belt / necklace / ring |
 | isTwoHanded | boolean | 是否雙手武器 |
 | material | enum | wood / iron / silver / mithril / dragon / orichalcum |
 | weight | number | 重量 |

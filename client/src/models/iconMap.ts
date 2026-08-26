@@ -53,7 +53,7 @@ export const ITEM_ICON_MAP: Record<string, string> = {
   'key': 'items/three-keys',
 };
 
-import type { MaterialIconType } from './items';
+import type { IconGlow, MaterialIconType } from './items';
 
 export const MATERIAL_ICON_MAP: Record<MaterialIconType, string> = {
   'ore': 'items/cut-diamond',
@@ -100,6 +100,8 @@ export const EQUIP_ICON_MAP: Record<string, string> = {
   'armGuard': 'equipment/bracer',
   'helmet': 'equipment/visored-helm',
   'chest': 'equipment/breastplate',
+  'shirt': 'equipment/armor-vest',
+  'cloak': 'equipment/cape-armor',
   'belt': 'equipment/belt-armor',
   'gloves': 'equipment/gloves',
   'boots': 'equipment/boots',
@@ -220,12 +222,13 @@ export function getItemIcon(itemType: string): string {
  * 背包與商店共用此函式，避免兩邊各自實作而顯示不一致。
  */
 export function resolveItemIcon(
-  def: { icon?: string; iconColor?: string; iconType?: MaterialIconType; iconTier?: number } | undefined,
+  def: { icon?: string; iconColor?: string; iconType?: MaterialIconType; iconTier?: number; iconGlow?: IconGlow } | undefined,
   fallbackKey: string,
-): { icon: string; color?: string } {
-  if (def?.icon) return { icon: def.icon, color: def.iconColor };
-  if (def?.iconType) return { icon: getMaterialIcon(def.iconType), color: getMaterialColor(def.iconTier) };
-  return { icon: getItemIcon(fallbackKey), color: undefined };
+): { icon: string; color?: string; glowClass: string } {
+  const glowClass = def?.iconGlow ? `item-icon-glow item-icon-glow--${def.iconGlow}` : '';
+  if (def?.icon) return { icon: def.icon, color: def.iconColor, glowClass };
+  if (def?.iconType) return { icon: getMaterialIcon(def.iconType), color: getMaterialColor(def.iconTier), glowClass };
+  return { icon: getItemIcon(fallbackKey), color: undefined, glowClass };
 }
 
 export function getEquipIcon(equipType: string): string {

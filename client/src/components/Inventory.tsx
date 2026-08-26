@@ -1,22 +1,7 @@
 import { useGameStore } from '../stores/gameStore';
-import type { EquipSlot } from '../models/equipment';
+import { SLOT_NAMES, SLOT_ORDER } from '../models/equipment';
 import { EquipmentDetail } from './EquipmentInfo';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
-
-const SLOT_NAMES: Record<EquipSlot, string> = {
-  rightHand: '右手',
-  leftHand: '左手',
-  helmet: '頭盔',
-  chest: '胸甲',
-  belt: '腰帶',
-  gloves: '手套',
-  boots: '鞋子',
-  necklace: '項鍊',
-  ring1: '戒指1',
-  ring2: '戒指2',
-};
-
-const SLOT_ORDER: EquipSlot[] = ['rightHand', 'leftHand', 'helmet', 'chest', 'belt', 'gloves', 'boots', 'necklace', 'ring1', 'ring2'];
 
 export function Inventory() {
   const character = useGameStore(s => s.character);

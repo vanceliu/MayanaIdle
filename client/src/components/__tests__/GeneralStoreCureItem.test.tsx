@@ -123,7 +123,7 @@ describe('道具 icon 一律來自 item 定義', () => {
     // 解除道具的 category 是 potion，名稱不含「石」，
     // 舊邏輯會落到 material 的鑽石 icon
     expect(resolveItemIcon(getItemDefinition('解毒藥水'), 'material'))
-      .toEqual({ icon: 'items/potion-ball', color: '#2DD4BF' });
+      .toEqual({ icon: 'items/potion-ball', color: '#2DD4BF', glowClass: '' });
     // 素材仍走 iconType / iconTier
     expect(resolveItemIcon(getItemDefinition('品質石'), 'material').icon)
       .toBe('items/cut-diamond');

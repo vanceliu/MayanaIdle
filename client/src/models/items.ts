@@ -1,5 +1,8 @@
 export type ItemCategory = 'potion' | 'scroll' | 'material' | 'dungeon' | 'spellbook' | 'other';
 
+/** 圖示描邊色：上位卷軸金、下位卷軸紅 */
+export type IconGlow = 'gold' | 'red';
+
 export type MaterialIconType = 'ore' | 'fabric' | 'bone' | 'crystal' | 'misc' | 'spellbook-mat' | 'stone' | 'whetstone';
 
 export interface ItemDefinition {
@@ -23,6 +26,8 @@ export interface ItemDefinition {
   icon?: string;
   /** icon 著色 */
   iconColor?: string;
+  /** 特殊卷軸：圖示描邊＋貼邊微光的顏色（`06-equipment.md` § 6.12） */
+  iconGlow?: IconGlow;
   /** 素材類專用：以材質分類決定 icon */
   iconType?: MaterialIconType;
   /** 素材類專用：以稀有度決定顏色 */

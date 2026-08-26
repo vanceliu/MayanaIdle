@@ -3,7 +3,7 @@ import {
   AFFIX_DEFINITIONS,
   SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
-  AFFIX_TIER_OVERRIDES,
+  AFFIX_TIER_TABLES,
   DEFAULT_MAX_AFFIX_TIER,
   SHOP_MAX_AFFIX_TIER,
   getAffixPoolForSlot,
@@ -177,7 +177,6 @@ export function AffixesPage() {
   }, [category]);
 
   const visibleCount = groups.reduce((n, g) => n + g.rows.length, 0);
-  const overriddenTypes = Object.keys(AFFIX_TIER_OVERRIDES) as AffixType[];
 
   return (
     <div>
@@ -239,10 +238,8 @@ export function AffixesPage() {
               <tr>
                 <th>階級</th>
                 <th>通用數值</th>
-                {overriddenTypes.map(type => (
-                  <th key={type}>
-                    {AFFIX_DEFINITIONS.find(d => d.type === type)?.name ?? type}
-                  </th>
+                {AFFIX_TIER_TABLES.map(o => (
+                  <th key={o.label}>{o.label}</th>
                 ))}
                 <th>取得方式</th>
               </tr>
@@ -256,11 +253,11 @@ export function AffixesPage() {
                   <td className="cell-number">
                     {t.min}~{t.max}%
                   </td>
-                  {overriddenTypes.map(type => {
-                    const o = getAffixTierTable(type)[t.tier - 1];
+                  {AFFIX_TIER_TABLES.map(o => {
+                    const row = o.tiers[t.tier - 1];
                     return (
-                      <td key={type} className="cell-number">
-                        <span className={`affix-tag tier-${t.tier}`}>{o.min}~{o.max}%</span>
+                      <td key={o.label} className="cell-number">
+                        <span className={`affix-tag tier-${t.tier}`}>{row.min}~{row.max}%</span>
                       </td>
                     );
                   })}

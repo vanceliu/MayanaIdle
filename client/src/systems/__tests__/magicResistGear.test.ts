@@ -6,6 +6,7 @@ import {
   rollAffixValue,
   generateAffixes,
   AFFIX_TIERS,
+  ARMOR_POOL_TIERS,
 } from '../../models/affix';
 import {
   getAccessoryMagicResist,
@@ -90,9 +91,23 @@ describe('魔抗詞綴專屬階級表（§ 7.3.1）', () => {
     }
   });
 
-  it('其他詞綴仍套用通用區間', () => {
-    expect(getAffixTierTable('defense')).toBe(AFFIX_TIERS);
+  it('防具池 9 種走自己的專屬表，其餘套用通用區間', () => {
+    // 防具詞綴欄位是 11 部位 ×4，武器池只有 4 條 —— 兩池共表會讓防具那 9 種膨脹
+    expect(getAffixTierTable('defense')).toBe(ARMOR_POOL_TIERS);
+    expect(getAffixTierTable('drop_rate')).toBe(ARMOR_POOL_TIERS);
+    // 格擋率只出現在盾牌一個部位，不隨部位數膨脹
+    expect(getAffixTierTable('block_rate')).toBe(AFFIX_TIERS);
+    expect(getAffixTierTable('attack_power')).toBe(AFFIX_TIERS);
     expect(getAffixTierTable(undefined)).toBe(AFFIX_TIERS);
+  });
+
+  it('防具池專屬表各階不重疊且遞增（約通用表的 82%）', () => {
+    for (let i = 0; i < ARMOR_POOL_TIERS.length; i++) {
+      const t = ARMOR_POOL_TIERS[i];
+      expect(t.min, `T${t.tier}`).toBeLessThanOrEqual(t.max);
+      expect(t.max, `T${t.tier} 低於通用表`).toBeLessThan(AFFIX_TIERS[i].max);
+      if (i > 0) expect(t.min, `T${t.tier} 不與前一階重疊`).toBeGreaterThan(ARMOR_POOL_TIERS[i - 1].max);
+    }
   });
 
   it('rollAffixValue 依詞綴類型查表，落在該階級區間內', () => {

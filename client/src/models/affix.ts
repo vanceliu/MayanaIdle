@@ -304,22 +304,52 @@ export function getBossTierWeights(level: number): number[] {
 }
 
 /**
- * 特定詞綴的專屬階級表（§ 7.3.1）。未列出者一律套用通用 `AFFIX_TIERS`。
+ * 防具池 9 種詞綴的專屬階級表（§ 7.3.1），約為通用表的 82%。
  *
- * 魔法抗性的區間明顯低於通用表：它可同時出現在項鍊／戒指 ×2／盾牌
- * 共 4 個部位，套用通用表會過快頂到 75% 減傷上限。
+ * 防具池的詞綴欄位是 11 個部位 ×4 = 44 條，武器池只有右手 4 條。
+ * 兩池共用同一張表的話，防具池那 9 種會隨部位數一起膨脹。
  */
-export const AFFIX_TIER_OVERRIDES: Partial<Record<AffixType, AffixTier[]>> = {
-  magic_resist: [
-    { tier: 1, min: 1, max: 2 },
-    { tier: 2, min: 3, max: 4 },
-    { tier: 3, min: 5, max: 6 },
-    { tier: 4, min: 7, max: 8 },
-    { tier: 5, min: 9, max: 10 },
-    { tier: 6, min: 11, max: 15 },
-    { tier: 7, min: 16, max: 20 },
-  ],
-};
+export const ARMOR_POOL_TIERS: AffixTier[] = [
+  { tier: 1, min: 3, max: 4 },
+  { tier: 2, min: 5, max: 6 },
+  { tier: 3, min: 7, max: 9 },
+  { tier: 4, min: 10, max: 11 },
+  { tier: 5, min: 12, max: 13 },
+  { tier: 6, min: 14, max: 15 },
+  { tier: 7, min: 16, max: 17 },
+];
+
+/**
+ * 魔法抗性的專屬階級表（§ 7.3.1）。區間明顯低於通用表：
+ * 它可同時出現在項鍊／戒指 ×2／盾牌共 4 個部位，套用通用表會過快頂到 75% 減傷上限。
+ */
+export const MAGIC_RESIST_TIERS: AffixTier[] = [
+  { tier: 1, min: 1, max: 2 },
+  { tier: 2, min: 3, max: 4 },
+  { tier: 3, min: 5, max: 6 },
+  { tier: 4, min: 7, max: 8 },
+  { tier: 5, min: 9, max: 10 },
+  { tier: 6, min: 11, max: 15 },
+  { tier: 7, min: 16, max: 20 },
+];
+
+/**
+ * 專屬階級表（§ 7.3.1）與其涵蓋的詞綴。未列出的詞綴一律套用通用 `AFFIX_TIERS` ——
+ * 格擋率只出現在盾牌一個部位，不隨部位數膨脹，維持通用表。
+ * Wiki 依此列欄，共用同一張表的詞綴合成一欄。
+ */
+export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: AffixType[] }[] = [
+  {
+    label: '防具池',
+    tiers: ARMOR_POOL_TIERS,
+    types: ['defense', 'max_hp', 'max_mp', 'heal_effect', 'potion_effect',
+      'drop_rate', 'gold_rate', 'on_hit_hp', 'on_hit_mp'],
+  },
+  { label: '魔法抗性', tiers: MAGIC_RESIST_TIERS, types: ['magic_resist'] },
+];
+
+export const AFFIX_TIER_OVERRIDES: Partial<Record<AffixType, AffixTier[]>> =
+  Object.fromEntries(AFFIX_TIER_TABLES.flatMap(t => t.types.map(type => [type, t.tiers])));
 
 export function getAffixTierTable(type?: AffixType): AffixTier[] {
   return (type && AFFIX_TIER_OVERRIDES[type]) || AFFIX_TIERS;

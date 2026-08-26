@@ -146,8 +146,8 @@ export function Storage() {
   function itemIcon(itemId: number) {
     const def = getItemById(itemId);
     const fallback = def?.category === 'scroll' || def?.category === 'dungeon' ? 'scroll' : 'material';
-    const { icon, color } = resolveItemIcon(def, fallback);
-    return <GameIcon name={icon} size={16} color={color} />;
+    const { icon, color, glowClass } = resolveItemIcon(def, fallback);
+    return <GameIcon name={icon} size={16} color={color} className={glowClass} />;
   }
 
   /** 可堆疊物品的一列（存入／取出共用） */

@@ -16,9 +16,9 @@ import type { EquipmentTemplate, EquipmentTier } from '../src/models/equipment';
 
 const DOC = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design/06-equipment-armor.md');
 
-const SLOTS = ['helmet', 'chest', 'gloves', 'boots', 'leftHand', 'belt', 'necklace', 'ring1'] as const;
+const SLOTS = ['helmet', 'chest', 'shirt', 'cloak', 'gloves', 'boots', 'leftHand', 'belt', 'necklace', 'ring1'] as const;
 const SLOT_ZH: Record<string, string> = {
-  helmet: '頭盔', chest: '胸甲', gloves: '手套', boots: '鞋子',
+  helmet: '頭盔', chest: '胸甲', shirt: '上衣', cloak: '斗篷', gloves: '手套', boots: '鞋子',
   leftHand: '左手（盾牌／魔導書／臂甲）', belt: '腰帶', necklace: '項鍊', ring1: '戒指',
 };
 const CLASS_ZH: Record<string, string> = {
@@ -114,11 +114,11 @@ for (const slot of SLOTS) {
           + `${t.weight ?? 0} | ${craftOf(t)} |`);
       }
     } else {
-      out.push('| 名稱 | 定位 | 防禦 | 回血 | 回魔 | HP | MP | 額外屬性 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
-      out.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+      out.push('| 名稱 | 定位 | 防禦 | 回血 | 回魔 | 額外屬性 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
+      out.push('|---|---|---|---|---|---|---|---|---|---|---|');
       for (const t of list) {
         out.push(`| ${t.name} | ${roleOf(t)} | ${t.defense ?? 0} | ${num(t.hpRegen)} | ${num(t.mpRegen)} | `
-          + `${num(t.bonusHp)} | ${num(t.bonusMp)} | ${t.bonusStats ?? '—'} | ${t.stability ?? 0} | ${classesOf(t)} | `
+          + `${t.bonusStats ?? '—'} | ${t.stability ?? 0} | ${classesOf(t)} | `
           + `${t.weight ?? 0} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
       }
     }

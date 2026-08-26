@@ -162,8 +162,8 @@ export function QuickSlotBar() {
         : getSkillIcon(element);
       return <GameIcon name={icon} size={24} color={SKILL_ELEMENT_COLORS[element] ?? SKILL_ELEMENT_COLORS.none} />;
     }
-    const { icon, color } = resolveItemIcon(getItemById(entry.itemId), 'scroll');
-    return <GameIcon name={icon} size={24} color={color} />;
+    const { icon, color, glowClass } = resolveItemIcon(getItemById(entry.itemId), 'scroll');
+    return <GameIcon name={icon} size={24} color={color} className={glowClass} />;
   }
 
   /**

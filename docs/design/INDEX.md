@@ -21,6 +21,8 @@
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
+| **上衣／斗篷（T4 起開放／件數／防禦階梯）** | `06-equipment.md` | § 6A.8.9 |
+| **防具件數／三定位／共用件／回復部位上限** | `06-equipment.md` | § 6A.8.8 |
 | 武器類型/職業限制 | `06-equipment.md` | § 6.6~6.7 |
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
 | 武器傷害（小怪/大怪） | `06-equipment.md` | § 6.11 |
@@ -40,7 +42,7 @@
 | 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
-| **防具防禦目標／回血回魔 HP MP 部位上限／額外屬性走向** | `06-equipment-armor.md` | 逐件清單 |
+| **防具防禦目標／回血回魔／額外屬性走向** | `06-equipment-armor.md` | 逐件清單 |
 | 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-armor.md` | 左手區塊 |
 | **三件的定位（防禦/續戰/屬性型）** | `06-equipment-armor.md` | 「定位」欄 |
 | **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-armor.md` | — |
@@ -133,6 +135,7 @@
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
 | **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
 | 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
+| **特殊強化卷軸（＋／－）** | `06-equipment.md` | § 6.12（圖示描邊見 `34-ui-guidelines.md` § 34.13） |
 | **技能特效（原型／技能對應／AoE 一發／通用戰鬥特效）** | `48-vfx.md` | § 48.7（元素色見 `42-element-system.md` § 42.4） |
 | **Buff／Debuff 場上特效（施加閃光／染色／頭頂標記／DoT 粒子）** | `48-vfx.md` | § 48.8（規則與 icon 見 `24-buff-debuff.md`） |
 

@@ -6,6 +6,8 @@ export type EquipSlot =
   | 'leftHand'
   | 'helmet'
   | 'chest'
+  | 'shirt'
+  | 'cloak'
   | 'belt'
   | 'gloves'
   | 'boots'
@@ -41,6 +43,8 @@ export const SLOT_NAMES: Record<EquipSlot, string> = {
   leftHand: '左手',
   helmet: '頭盔',
   chest: '胸甲',
+  shirt: '上衣',
+  cloak: '斗篷',
   belt: '腰帶',
   gloves: '手套',
   boots: '鞋子',
@@ -54,7 +58,7 @@ export const SLOT_NAMES: Record<EquipSlot, string> = {
  * 兩邊各留一份會在改順序時只改到一邊。
  */
 export const SLOT_ORDER: EquipSlot[] = [
-  'rightHand', 'leftHand', 'helmet', 'chest', 'belt',
+  'rightHand', 'leftHand', 'helmet', 'chest', 'shirt', 'cloak', 'belt',
   'gloves', 'boots', 'necklace', 'ring1', 'ring2',
 ];
 
@@ -281,6 +285,16 @@ export function isWeaponEquipment(slot: EquipSlot, type: string): boolean {
  */
 export function isArmorEquipment(slot: EquipSlot, type: string): boolean {
   return !isWeaponEquipment(slot, type);
+}
+
+/**
+ * 強化等級是否計入防禦（`21-combat-formula.md` § 21.5）。
+ *
+ * 判斷看**分類**不看基礎防禦數值：基礎防禦 0 的防具（T4 上衣，`06-equipment.md` § 6A.8.9）
+ * 強化照樣給防禦；飾品的強化走 § 6.10.1 的魔抗與數值倍率，不進防禦合計。
+ */
+export function enhancementCountsAsDefense(item: { slot: EquipSlot; type: string }): boolean {
+  return isArmorEquipment(item.slot, item.type) && !isAccessorySlot(item.slot);
 }
 
 export type EquippedGear = Partial<Record<EquipSlot, EquipmentInstance | null>>;

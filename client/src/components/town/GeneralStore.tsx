@@ -105,7 +105,7 @@ export function GeneralStore() {
     });
   }
 
-  function getShopItemIcon(itemId: number): { icon: string; color?: string } {
+  function getShopItemIcon(itemId: number): { icon: string; color?: string; glowClass: string } {
     // 顯示方式一律以 item 定義為準，與背包共用同一份資料
     const def = getItemById(itemId);
     return resolveItemIcon(def, def?.category === 'scroll' || def?.category === 'dungeon' ? 'scroll' : 'material');
@@ -184,14 +184,14 @@ export function GeneralStore() {
       {tab === 'buy' && (
         <div className="shop-items">
           {buyEntries.map(entry => {
-            const { icon, color } = getShopItemIcon(entry.itemId);
+            const { icon, color, glowClass } = getShopItemIcon(entry.itemId);
             const affordable = Math.floor(gold / entry.price);
             const cartKey = String(entry.itemId);
             return (
             <div key={entry.itemId} className="shop-item">
               <div className="shop-item-info">
                 <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <GameIcon name={icon} size={16} color={color} />
+                  <GameIcon name={icon} size={16} color={color} className={glowClass} />
                   {entry.name}
                 </span>
                 <span className="shop-item-desc">{entry.description} | 重量: {getItemById(entry.itemId)?.weight ?? 0}</span>
@@ -281,7 +281,7 @@ export function GeneralStore() {
               <div key={item.itemId} className="shop-item">
                 <div className="shop-item-info">
                   <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {(() => { const { icon, color } = getShopItemIcon(item.itemId); return <GameIcon name={icon} size={16} color={color} />; })()}
+                    {(() => { const { icon, color, glowClass } = getShopItemIcon(item.itemId); return <GameIcon name={icon} size={16} color={color} className={glowClass} />; })()}
                     {item.name} ×{item.amount}
                     <CraftUsageBadge itemId={item.itemId} />
                   </span>

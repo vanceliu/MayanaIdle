@@ -7,6 +7,7 @@ import { WikiHome } from '../../wiki/pages/WikiHome';
 import {
   AFFIX_DEFINITIONS,
   AFFIX_TIERS,
+  AFFIX_TIER_TABLES,
   SPECIAL_AFFIX_DEFINITIONS,
   getAffixPoolForSlot,
   getAffixTierTable,
@@ -83,21 +84,25 @@ describe('詞綴 wiki 頁', () => {
     }
   });
 
-  it('階級數值表列出通用區間、魔抗專屬區間與取得方式', () => {
+  it('階級數值表列出通用區間、每張專屬表與取得方式', () => {
     const { container } = render(<AffixesPage />);
     const rows = container.querySelectorAll('#affix-tiers tbody tr');
     expect(rows.length).toBe(AFFIX_TIERS.length);
 
+    // 欄位：階級、通用、每張專屬表各一欄、取得方式
+    const acquireCol = 2 + AFFIX_TIER_TABLES.length;
     AFFIX_TIERS.forEach((t, i) => {
       const cells = rows[i].querySelectorAll('td');
       expect(cells[0].textContent).toBe(`T${t.tier}`);
       expect(cells[1].textContent).toBe(`${t.min}~${t.max}%`);
-      const mr = getAffixTierTable('magic_resist')[i];
-      expect(cells[2].textContent, `T${t.tier} 魔抗`).toBe(`${mr.min}~${mr.max}%`);
+      AFFIX_TIER_TABLES.forEach((o, col) => {
+        const row = o.tiers[i];
+        expect(cells[2 + col].textContent, `T${t.tier} ${o.label}`).toBe(`${row.min}~${row.max}%`);
+      });
     });
     // T6/T7 只能靠掉落取得
-    expect(rows[5].querySelectorAll('td')[3].textContent).toBe('怪物掉落');
-    expect(rows[6].querySelectorAll('td')[3].textContent).toBe('Boss 限定掉落');
+    expect(rows[5].querySelectorAll('td')[acquireCol].textContent).toBe('怪物掉落');
+    expect(rows[6].querySelectorAll('td')[acquireCol].textContent).toBe('Boss 限定掉落');
   });
 
   it('說明詛咒／虛弱／減速沒有免疫詞綴', () => {

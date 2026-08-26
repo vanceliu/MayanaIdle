@@ -11,6 +11,8 @@ import '../components/WikiTable.css';
 const SLOT_LABELS: Record<string, string> = {
   helmet: '頭盔',
   chest: '盔甲',
+  shirt: '上衣',
+  cloak: '斗篷',
   belt: '腰帶',
   gloves: '手套',
   boots: '鞋子',

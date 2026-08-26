@@ -636,11 +636,11 @@ export function BagPanel() {
         ) : (
           (() => {
             // 顯示方式一律以 item 定義為準（icon / iconColor / iconType / iconTier）
-            const { icon, color } = resolveItemIcon(
+            const { icon, color, glowClass } = resolveItemIcon(
               itemDef(item),
               getItemIconKey(item.name, item.type),
             );
-            return <GameIcon name={icon} size={24} color={color} />;
+            return <GameIcon name={icon} size={24} color={color} className={glowClass} />;
           })()
         )}
         <span className="bag-cell-name">{getShortName(item.name)}</span>

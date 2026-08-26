@@ -33,15 +33,15 @@ describe('EquipmentDetail 詞綴滿值標示', () => {
     render(
       <EquipmentDetail
         item={instanceWithAffixes([
-          { type: 'max_hp', tier: 4, value: 13 },  // 通用表 T4 = 12~13 → 滿值
-          { type: 'defense', tier: 4, value: 12 }, // 同 Tier 非滿值
+          { type: 'max_hp', tier: 4, value: 11 },  // 防具池表 T4 = 10~11 → 滿值
+          { type: 'defense', tier: 4, value: 10 }, // 同 Tier 非滿值
         ])}
       />,
     );
 
-    const maxed = screen.getByText(/最大 HP \+13% \(T4\)/);
+    const maxed = screen.getByText(/最大 HP \+11% \(T4\)/);
     expect(maxed.className).toContain('max-roll');
-    const notMaxed = screen.getByText(/防禦力 \+12% \(T4\)/);
+    const notMaxed = screen.getByText(/防禦力 \+10% \(T4\)/);
     expect(notMaxed.className).not.toContain('max-roll');
   });
 

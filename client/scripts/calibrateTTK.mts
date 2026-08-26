@@ -331,6 +331,10 @@ const ARMOR_AFFIXES: AffixType[] = ['defense', 'max_hp', 'max_mp'];
 
 /** 取該 Tier 的數值上緣（`07-affix.md` § 7.3 通用表）。校準取上緣＝該階梯的理論最佳解。 */
 const TIER_MAX: Record<number, number> = { 1: 5, 2: 8, 3: 11, 4: 13, 5: 15, 6: 18, 7: 20 };
+/** 防具池 9 種走專屬階級表（§ 7.3.1），數值低於通用表 */
+const TIER_MAX_ARMOR: Record<number, number> = { 1: 4, 2: 6, 3: 9, 4: 11, 5: 13, 6: 15, 7: 17 };
+const tierMax = (type: AffixType, tier: number) =>
+  (ARMOR_AFFIXES.includes(type) ? TIER_MAX_ARMOR : TIER_MAX)[tier];
 
 function makeItem(tpl: EquipmentTemplate, affixTypes: AffixType[], affixTier: number, enhancement: number): EquipmentInstance {
   return {
@@ -338,7 +342,7 @@ function makeItem(tpl: EquipmentTemplate, affixTypes: AffixType[], affixTier: nu
     templateId: tpl.id!,
     quality: 0,
     enhancement,
-    affixes: affixTypes.map(type => ({ type, tier: affixTier, value: TIER_MAX[affixTier] })),
+    affixes: affixTypes.map(type => ({ type, tier: affixTier, value: tierMax(type, affixTier) })),
     ownerId: 1,
     equipped: true,
   } as EquipmentInstance;

@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
-import { isWeaponSlot } from '../../models/equipment';
+import { isWeaponSlot, SLOT_NAMES } from '../../models/equipment';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
@@ -16,25 +16,19 @@ import { useOneShotFx, FX_DURATION_MS } from './useOneShotFx';
 /** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱 */
 const WEAPON_ENHANCE_SCROLL_ID = 7;
 const ARMOR_ENHANCE_SCROLL_ID = 8;
+/** 上位卷軸：一次隨機 +1~3（`06-equipment.md` § 6.12） */
+const WEAPON_ENHANCE_PLUS_SCROLL_ID = 157;
+const ARMOR_ENHANCE_PLUS_SCROLL_ID = 158;
+const PLUS_SCROLL_MAX_LEVELS = 3;
+/** 下位卷軸：強化等級 -1，必定成功（`06-equipment.md` § 6.12） */
+const WEAPON_ENHANCE_MINUS_SCROLL_ID = 159;
+const ARMOR_ENHANCE_MINUS_SCROLL_ID = 160;
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
 import { resolveEquipment } from '../../systems/templateSync';
 import { getWeaponEnhanceRate, getArmorEnhanceRate } from '../../systems/enhancement';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
-
-const SLOT_NAMES: Record<EquipSlot, string> = {
-  rightHand: '右手',
-  leftHand: '左手',
-  helmet: '頭盔',
-  chest: '胸甲',
-  belt: '腰帶',
-  gloves: '手套',
-  boots: '鞋子',
-  necklace: '項鍊',
-  ring1: '戒指1',
-  ring2: '戒指2',
-};
 
 type Tab = 'enhance' | 'craft';
 
@@ -119,6 +113,10 @@ export function TownBlacksmith() {
 
   const weaponScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_SCROLL_ID);
   const armorScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_SCROLL_ID);
+  const weaponPlusScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_PLUS_SCROLL_ID);
+  const armorPlusScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_PLUS_SCROLL_ID);
+  const weaponMinusScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_MINUS_SCROLL_ID);
+  const armorMinusScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_MINUS_SCROLL_ID);
 
   const allItems: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }[] = [];
 
@@ -160,25 +158,38 @@ export function TownBlacksmith() {
    * 失敗時裝備已經被移除，卡片會跟著消失，所以用 `ghost` 存一份快照原地演完碎裂。
    */
 
-  function handleEnhance(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
+  /**
+   * 強化一次。`plus` 為上位卷軸（`06-equipment.md` § 6.12）：
+   * 級數隨機 +1~3 均等。**成功率看使用前的等級**（＝普通卷軸這次要判的那一格），
+   * 抽到幾級只決定跳多遠，不影響成敗 —— +5 的武器抽到 +3 一樣必成，
+   * 因為判的是 +6 那一格，它在安定值內。
+   */
+  function handleEnhance(
+    entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot },
+    plus = false,
+  ) {
     if (!char) return;
     const { item, source, slot } = entry;
-    const nextLevel = (item.enhancement ?? 0) + 1;
+    const steps = plus ? 1 + Math.floor(Math.random() * PLUS_SCROLL_MAX_LEVELS) : 1;
+    const nextLevel = (item.enhancement ?? 0) + steps;
 
     const itemIsWeapon = isWeapon(item);
-    const scrollItemId = itemIsWeapon ? WEAPON_ENHANCE_SCROLL_ID : ARMOR_ENHANCE_SCROLL_ID;
-    const scrollCount = itemIsWeapon ? weaponScrolls : armorScrolls;
+    const scrollItemId = itemIsWeapon
+      ? (plus ? WEAPON_ENHANCE_PLUS_SCROLL_ID : WEAPON_ENHANCE_SCROLL_ID)
+      : (plus ? ARMOR_ENHANCE_PLUS_SCROLL_ID : ARMOR_ENHANCE_SCROLL_ID);
+    const scrollCount = getBagItemAmount(bagItems, scrollItemId);
     if (scrollCount <= 0) return;
 
     const stability = getStability(item);
+    // 判定的永遠是「使用前等級的下一級」，＋卷軸不因為跳得遠而變難（§ 6.12）
+    const judgedLevel = (item.enhancement ?? 0) + 1;
     const rate = itemIsWeapon
-      ? getWeaponEnhanceRate(nextLevel, stability)
-      : getArmorEnhanceRate(nextLevel, stability);
+      ? getWeaponEnhanceRate(judgedLevel, stability)
+      : getArmorEnhanceRate(judgedLevel, stability);
 
     const success = Math.random() < rate;
     const newBag = consumeFromBag(scrollItemId);
-    const remainingScrolls = (itemIsWeapon ? weaponScrolls : armorScrolls) - 1;
-    persistBagItem(scrollItemId, remainingScrolls);
+    persistBagItem(scrollItemId, scrollCount - 1);
 
     if (success) {
       const updatedItem = { ...item, enhancement: nextLevel };
@@ -225,6 +236,40 @@ export function TownBlacksmith() {
       if (!success) stats.armorsBroken += 1;
     }
     useGameStore.setState({ statistics: stats });
+    useGameStore.getState().saveState();
+  }
+
+  /**
+   * 下位卷軸：強化等級 -1，**必定成功、裝備不會消失**（`06-equipment.md` § 6.12）。
+   * 沒有判定，所以不計入強化次數與損毀數。
+   */
+  function handleDowngrade(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
+    if (!char) return;
+    const { item, source, slot } = entry;
+    const current = item.enhancement ?? 0;
+    if (current <= 0) return;
+
+    const itemIsWeapon = isWeapon(item);
+    const scrollItemId = itemIsWeapon ? WEAPON_ENHANCE_MINUS_SCROLL_ID : ARMOR_ENHANCE_MINUS_SCROLL_ID;
+    const scrollCount = getBagItemAmount(bagItems, scrollItemId);
+    if (scrollCount <= 0) return;
+
+    const newBag = consumeFromBag(scrollItemId);
+    persistBagItem(scrollItemId, scrollCount - 1);
+
+    const nextLevel = current - 1;
+    const updatedItem = { ...item, enhancement: nextLevel };
+    persistEquipment(updatedItem);
+    if (source === 'equipped' && slot) {
+      useGameStore.setState({ equippedGear: { ...equippedGear, [slot]: updatedItem }, bagItems: newBag });
+    } else {
+      useGameStore.setState({
+        inventory: inventory.map(i => (i.id === item.id ? updatedItem : i)),
+        bagItems: newBag,
+      });
+    }
+    setResultMsg(`${item.name} 已降為 +${nextLevel}`);
+    playFx({ kind: 'safe', itemId: item.id!, label: `+${nextLevel}` });
     useGameStore.getState().saveState();
   }
 
@@ -345,24 +390,44 @@ export function TownBlacksmith() {
         </div>
       );
     }
-    const nextLevel = (item.enhancement ?? 0) + 1;
+    const current = item.enhancement ?? 0;
+    const nextLevel = current + 1;
     const itemIsWeapon = isWeapon(item);
     const scrollName = itemIsWeapon ? '武器卷' : '防具卷';
     const scrollCount = itemIsWeapon ? weaponScrolls : armorScrolls;
-    const rate = itemIsWeapon
-      ? getWeaponEnhanceRate(nextLevel, stability)
-      : getArmorEnhanceRate(nextLevel, stability);
+    const plusCount = itemIsWeapon ? weaponPlusScrolls : armorPlusScrolls;
+    const minusCount = itemIsWeapon ? weaponMinusScrolls : armorMinusScrolls;
+    const rateAt = (level: number) => itemIsWeapon
+      ? getWeaponEnhanceRate(level, stability)
+      : getArmorEnhanceRate(level, stability);
+    const rate = rateAt(nextLevel);
     const isSafe = nextLevel <= stability;
+    const asPct = (r: number) => `${Math.floor(r * 100)}%`;
 
     return (
       <div className="shop-item-actions bs-actions">
         <div className="bs-action-summary">
           <span className="bs-action-cost">{scrollName}×1</span>
-          <span className="bs-action-rate">{isSafe ? '100%' : `${Math.floor(rate * 100)}%`}</span>
+          <span className="bs-action-rate">{isSafe ? '100%' : asPct(rate)}</span>
           {!isSafe && <span className="bs-action-warn">失敗消失</span>}
         </div>
-        <button onClick={() => handleEnhance(entry)} disabled={scrollCount <= 0}>
-          +{item.enhancement ?? 0} → +{nextLevel}
+        <button data-testid="enh-btn" onClick={() => handleEnhance(entry)} disabled={scrollCount <= 0}>
+          +{current} → +{nextLevel}
+        </button>
+        <div className="bs-action-summary">
+          <span className="bs-action-cost">{scrollName}＋×1</span>
+          <span className="bs-action-rate">{isSafe ? '100%' : asPct(rate)}</span>
+          {!isSafe && <span className="bs-action-warn">失敗消失</span>}
+        </div>
+        <button data-testid="enh-btn-plus" onClick={() => handleEnhance(entry, true)} disabled={plusCount <= 0}>
+          +{current} → +{current + 1}~{current + PLUS_SCROLL_MAX_LEVELS}
+        </button>
+        <div className="bs-action-summary">
+          <span className="bs-action-cost">{scrollName}－×1</span>
+          <span className="bs-action-rate">100%</span>
+        </div>
+        <button data-testid="enh-btn-minus" onClick={() => handleDowngrade(entry)} disabled={minusCount <= 0 || current <= 0}>
+          +{current} → +{Math.max(0, current - 1)}
         </button>
       </div>
     );
@@ -373,8 +438,8 @@ export function TownBlacksmith() {
       <p className="shop-greeting">「想強化什麼裝備？拿來讓我瞧瞧。」</p>
       <div className="bs-resources">
         <span>金幣: {char.gold.toLocaleString()}G</span>
-        <span>武器卷: {weaponScrolls}</span>
-        <span>防具卷: {armorScrolls}</span>
+        <span>武器卷: {weaponScrolls}（＋{weaponPlusScrolls}／－{weaponMinusScrolls}）</span>
+        <span>防具卷: {armorScrolls}（＋{armorPlusScrolls}／－{armorMinusScrolls}）</span>
         {tab === 'craft' && <span>製作任務: {craftQuests.length}/{MAX_ACTIVE_CRAFT_QUESTS}</span>}
       </div>
 
@@ -408,6 +473,8 @@ export function TownBlacksmith() {
             { key: 'armGuard', label: '臂甲' },
             { key: 'armor-helmet', label: '頭盔' },
             { key: 'armor-chest', label: '胸甲' },
+            { key: 'armor-shirt', label: '上衣' },
+            { key: 'armor-cloak', label: '斗篷' },
             { key: 'armor-gloves', label: '手套' },
             { key: 'armor-boots', label: '鞋子' },
             { key: 'armor-belt', label: '腰帶' },
@@ -544,10 +611,10 @@ export function TownBlacksmith() {
                     const have = getBagItemAmount(bagItems, m.itemId);
                     const enough = have >= m.amount;
                     const def = getItemById(m.itemId);
-                    const { icon, color } = resolveItemIcon(def, 'material');
+                    const { icon, color, glowClass } = resolveItemIcon(def, 'material');
                     return (
                       <span key={m.itemId} className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
-                        <GameIcon name={icon} size={14} color={color} />
+                        <GameIcon name={icon} size={14} color={color} className={glowClass} />
                         <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{def?.name ?? '未知素材'}</span>
                         <span className="bs-craft-mat-count">{have}/{m.amount}</span>
                       </span>

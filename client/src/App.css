@@ -4909,6 +4909,25 @@ button.active {
   border-radius: var(--radius-sm);
 }
 
+/*
+ * 特殊卷軸的圖示描邊＋貼邊微光（`06-equipment.md` § 6.12）。
+ * stroke-width 是 SVG viewBox（512）的座標，不是螢幕 px —— 換圖示要按比例重算。
+ * paint-order 讓描邊畫在填色下面，光只往外長，不吃掉圖示本身。
+ */
+.item-icon-glow svg path {
+  stroke: var(--icon-glow);
+  stroke-width: 40;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+.item-icon-glow {
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--icon-glow) 75%, transparent));
+}
+
+.item-icon-glow--gold { --icon-glow: #FACC15; }
+.item-icon-glow--red { --icon-glow: #FF0000; }
+
 /* --- PanelDock：底部面板按鈕列（§ 32.15） --- */
 @media (min-width: 1201px) {
   .hud-bottomright { --dock-group-gap: 16px; }

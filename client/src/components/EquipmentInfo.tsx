@@ -1,23 +1,10 @@
-import { getWeaponRange, isRangedWeapon } from '../models/equipment';
-import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
+import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
+import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { getEquipmentTierColor, getEquipmentInstanceTierColor, getEquipmentTierLevel, getEquipmentInstanceTierLevel } from '../models/equipmentTier';
-
-const SLOT_NAMES: Record<EquipSlot, string> = {
-  rightHand: '右手',
-  leftHand: '左手',
-  helmet: '頭盔',
-  chest: '胸甲',
-  belt: '腰帶',
-  gloves: '手套',
-  boots: '鞋子',
-  necklace: '項鍊',
-  ring1: '戒指1',
-  ring2: '戒指2',
-};
 
 const MATERIAL_NAMES: Record<string, string> = {
   wood: '木',
@@ -124,7 +111,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {item.quality > 0 && (
         <div className="equip-detail-stat">品質: {item.quality}%</div>
       )}
-      {/* 詞綴只在完整模式顯示：裝備欄十個欄位各印四條詞綴會把面板灌爆，改由 hover tooltip 呈現 */}
+      {/* 詞綴只在完整模式顯示：裝備欄十二個欄位各印四條詞綴會把面板灌爆，改由 hover tooltip 呈現 */}
       {!compact && item.affixes && item.affixes.length > 0 && (
         <div className="equip-detail-affixes">
           {item.affixes.map((affix, i) => (

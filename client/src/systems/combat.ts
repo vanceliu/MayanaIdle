@@ -1,7 +1,7 @@
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
-import { isAccessorySlot } from '../models/equipment';
+import { isAccessorySlot, enhancementCountsAsDefense } from '../models/equipment';
 import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
@@ -280,7 +280,7 @@ export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): num
   return equippedGear.reduce((sum, g) => {
     if (!g) return sum;
     const base = g.defense ?? 0;
-    const enhance = base > 0 ? (g.enhancement ?? 0) : 0;
+    const enhance = enhancementCountsAsDefense(g) ? (g.enhancement ?? 0) : 0;
     return sum + base + enhance;
   }, 0);
 }

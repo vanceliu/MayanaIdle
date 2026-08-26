@@ -57,7 +57,7 @@ const CATEGORY_FALLBACK_ICON: Record<string, string> = {
  * 圖示與顏色一律取自 seed（`resolveItemIcon` 為背包／商店／Wiki 共用的單一來源），
  * 不可在 Wiki 端用名稱猜測。
  */
-function getWikiItemIcon(item: ItemDefinition): { icon: string; color?: string } {
+function getWikiItemIcon(item: ItemDefinition): { icon: string; color?: string; glowClass: string } {
   return resolveItemIcon(item, CATEGORY_FALLBACK_ICON[item.category] ?? 'material');
 }
 
@@ -142,12 +142,12 @@ function ItemList() {
           </thead>
           <tbody>
             {filtered.map(item => {
-              const { icon, color } = getWikiItemIcon(item);
+              const { icon, color, glowClass } = getWikiItemIcon(item);
               return (
               <tr key={item.name}>
                 <td>
                   <Link className="wiki-link" to={`/wiki/items/${encodeURIComponent(item.name)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <GameIcon name={icon} size={16} color={color} />
+                    <GameIcon name={icon} size={16} color={color} className={glowClass} />
                     {item.name}
                   </Link>
                 </td>
@@ -233,8 +233,8 @@ function ItemDetail({ name }: { name: string }) {
 
       <h2 className="wiki-page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {(() => {
-          const { icon, color } = getWikiItemIcon(item);
-          return <GameIcon name={icon} size={24} color={color} />;
+          const { icon, color, glowClass } = getWikiItemIcon(item);
+          return <GameIcon name={icon} size={24} color={color} className={glowClass} />;
         })()}
         {item.name}
       </h2>

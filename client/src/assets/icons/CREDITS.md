@@ -59,6 +59,7 @@
 | 檔名 | 作者 | 來源頁面 |
 |---|---|---|
 | armor-vest.svg | Lorc | https://game-icons.net/1x1/lorc/armor-vest.html |
+| cape-armor.svg | Delapouite | https://game-icons.net/1x1/delapouite/cape-armor.html |
 | battle-axe.svg | Lorc | https://game-icons.net/1x1/lorc/battle-axe.html |
 | belt-armor.svg | Delapouite | https://game-icons.net/1x1/delapouite/belt-armor.html |
 | book-cover.svg | Lorc | https://game-icons.net/1x1/lorc/book-cover.html |

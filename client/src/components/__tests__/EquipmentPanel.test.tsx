@@ -37,13 +37,13 @@ describe('EquipmentPanel', () => {
   it('shows empty slot text when nothing equipped', () => {
     render(<EquipmentPanel />);
     const emptySlots = screen.getAllByText('-- 空 --');
-    expect(emptySlots.length).toBe(10);
+    expect(emptySlots.length).toBe(12);
   });
 
   it('renders slot icons', () => {
     const { container } = render(<EquipmentPanel />);
     const icons = container.querySelectorAll('.slot-icon');
-    expect(icons.length).toBe(10);
+    expect(icons.length).toBe(12);
   });
 
   describe('hover tooltip', () => {
@@ -104,9 +104,9 @@ describe('EquipmentPanel', () => {
 
     it('沒穿的部位標成 is-empty，缺哪個部位一眼看得到', () => {
       const { container } = render(<EquipmentPanel />);
-      // 十個部位只穿了腰帶，其餘九格都是空的
-      expect(container.querySelectorAll('.equip-slot.is-empty')).toHaveLength(9);
-      expect(container.querySelectorAll('.equip-slot')).toHaveLength(10);
+      // 十二個部位只穿了腰帶，其餘十一格都是空的
+      expect(container.querySelectorAll('.equip-slot.is-empty')).toHaveLength(11);
+      expect(container.querySelectorAll('.equip-slot')).toHaveLength(12);
     });
 
     it('裝備欄不列詞綴，避免十個欄位各印四條把面板灌爆', () => {
