@@ -45,6 +45,7 @@ import { accrueRestedExp, getRestedExpMultiplier } from '../systems/restedExp';
 import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount } from '../systems/combat';
+import { getEffectiveGearArray } from '../systems/gear';
 import { getWeightStatus } from '../systems/weight';
 import type { HpSample } from '../systems/scriptRunner';
 
@@ -87,7 +88,7 @@ import {
 import type { MapLocation } from '../models/area';
 import { getRegion, resolveArea, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
-import { resolveEquipment } from '../systems/templateSync';
+import { resolveEquipment, rollNewInstanceFields } from '../systems/templateSync';
 import { findScrollInBag, consumeTownScroll, getTownScrollByItemId, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database';
 import { getItemSellPrice, getEquipmentSellTotal } from '../systems/shop';
@@ -462,18 +463,22 @@ function addLog(logs: CombatLog[], entry: CombatLog): CombatLog[] {
   return next.length > MAX_LOGS ? next.slice(-MAX_LOGS) : next;
 }
 
-export function getEffectiveMaxHp(char: Character, gear: EquippedGear): number {
-  const allGear = Object.values(gear).filter(Boolean) as EquipmentInstance[];
+/**
+ * 最大 HP／MP 的詞綴是**固定值**（`07-affix.md` § 7.3.1），直接加算，不是百分比。
+ * 飾品模板的 `bonusHp`／`bonusMp` 仍是另一個加算來源。
+ */
+export function getEffectiveMaxHp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[] = []): number {
+  const allGear = getEffectiveGearArray(char, activeEffects, gear);
   const bonuses = getAffixBonusesFromGear(allGear);
   const flatHp = allGear.reduce((sum, g) => sum + (g.bonusHp ?? 0), 0);
-  return Math.floor((char.maxHp + flatHp) * (1 + bonuses.max_hp / 100));
+  return char.maxHp + flatHp + bonuses.max_hp;
 }
 
-export function getEffectiveMaxMp(char: Character, gear: EquippedGear): number {
-  const allGear = Object.values(gear).filter(Boolean) as EquipmentInstance[];
+export function getEffectiveMaxMp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[] = []): number {
+  const allGear = getEffectiveGearArray(char, activeEffects, gear);
   const bonuses = getAffixBonusesFromGear(allGear);
   const flatMp = allGear.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0);
-  return Math.floor((char.maxMp + flatMp) * (1 + bonuses.max_mp / 100));
+  return char.maxMp + flatMp + bonuses.max_mp;
 }
 
 function isInArpgCombat(): boolean {
@@ -916,13 +921,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     for (const template of starterTemplates) {
       const dbRecord = {
         templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [] as any[],
+        ...rollNewInstanceFields(template),
         ownerId: char.id!, equipped: true, isStarterGear: true,
       };
       const instId = await db.equipmentInstances.add(dbRecord as any);
       equippedGear[template.slot as keyof EquippedGear] = resolveEquipment({
         id: instId as number, templateId: template.id!, name: template.name, type: template.type,
         slot: template.slot, isTwoHanded: template.isTwoHanded,
-        quality: 0, enhancement: 0, affixes: [], ownerId: char.id!, equipped: true, isStarterGear: true,
+        quality: 0, enhancement: 0, affixes: [], ...rollNewInstanceFields(template),
+        ownerId: char.id!, equipped: true, isStarterGear: true,
       });
     }
 
@@ -995,7 +1002,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
       if (state.character.hp >= effMaxHp) return;
       const inCombat = state.phase === 'combat' || isInArpgCombat();
-      const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+      const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
       const regen = getHpRegen(state.character, inCombat, allGear, state.activeEffects);
       if (regen <= 0) return;
       const newHp = Math.min(effMaxHp, state.character.hp + regen);
@@ -1008,7 +1015,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear);
       if (state.character.mp >= effMaxMp) return;
       const inCombat = state.phase === 'combat' || isInArpgCombat();
-      const allGearMp = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+      const allGearMp = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
       const regen = getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
       if (regen <= 0) return;
       const newMp = Math.min(effMaxMp, state.character.mp + regen);
@@ -1130,7 +1137,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     if (!state.character) return;
     if (blockedByStun(state, set)) return;
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+    const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
     if (state.character.hp >= effMaxHp) {
       set({ combatLogs: addLog(state.combatLogs, { text: 'HP 已滿，無法使用藥水', type: 'system' }) });
@@ -1170,7 +1177,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const config = POTION_CONFIG[type];
     if (now - state.lastPotionUsedAt < state.lastPotionCooldown) return;
 
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+    const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const bonuses = getAffixBonusesFromGear(allGear);
     const baseHeal = Math.floor(Math.random() * (config.healMax - config.healMin + 1)) + config.healMin;
     const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
@@ -1316,7 +1323,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const skill = state.skills.find(s => s.id === skillId);
     if (!skill) return false;
 
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+    const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const weapon = getEquippedWeapon(allGear);
     const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
@@ -1364,7 +1371,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (skill.type !== 'buff' && skill.type !== 'heal') return false;
 
     const now = Date.now();
-    const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+    const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
     if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return false;
 
@@ -1654,7 +1661,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       const now = Date.now();
       const char = state.character;
-      const allGear = Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[];
+      const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
       const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
 
       /**

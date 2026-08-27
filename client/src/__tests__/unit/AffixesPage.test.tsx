@@ -11,6 +11,8 @@ import {
   SPECIAL_AFFIX_DEFINITIONS,
   getAffixPoolForSlot,
   getAffixTierTable,
+  isAttributeAffixType,
+  isFlatAffixType,
   type AffixCategory,
 } from '../../models/affix';
 
@@ -50,8 +52,14 @@ describe('詞綴 wiki 頁', () => {
       );
       expect(description, `${def.name} 效果`).toBe(def.description);
 
+      // 額外屬性無 Tier；固定值型不帶百分號（`07-affix.md` § 7.3.1）
+      if (isAttributeAffixType(def.type)) {
+        expect(range, `${def.name} 區間`).toBe('固定 +1 · 無 Tier');
+        continue;
+      }
       const tiers = getAffixTierTable(def.type);
-      expect(range, `${def.name} 區間`).toBe(`${tiers[0].min}% ~ ${tiers[tiers.length - 1].max}%`);
+      const unit = isFlatAffixType(def.type) ? '' : '%';
+      expect(range, `${def.name} 區間`).toBe(`${tiers[0].min}${unit} ~ ${tiers[tiers.length - 1].max}${unit}`);
     }
   });
 
@@ -97,7 +105,8 @@ describe('詞綴 wiki 頁', () => {
       expect(cells[1].textContent).toBe(`${t.min}~${t.max}%`);
       AFFIX_TIER_TABLES.forEach((o, col) => {
         const row = o.tiers[i];
-        expect(cells[2 + col].textContent, `T${t.tier} ${o.label}`).toBe(`${row.min}~${row.max}%`);
+        const unit = o.flat ? '' : '%';
+        expect(cells[2 + col].textContent, `T${t.tier} ${o.label}`).toBe(`${row.min}~${row.max}${unit}`);
       });
     });
     // T6/T7 只能靠掉落取得

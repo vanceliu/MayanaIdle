@@ -4,7 +4,6 @@ import { getPotionCount } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon, getItemIcon, getSkillIcon, getSkillDisplayIcon, resolveItemIcon } from '../models/iconMap';
 import type { Skill } from '../models/skill';
-import type { EquipmentInstance } from '../models/equipment';
 import { getEquippedWeapon, getSkillCooldownReduction } from '../systems/combat';
 import { skillMeetsWeaponRequirement } from '../systems/scriptRunner';
 import { getItemById } from '../models/items';
@@ -22,6 +21,7 @@ import {
   type BasicPotionType,
   type QuickSlotEntry,
 } from '../models/quickSlot';
+import { getEffectiveGearArray } from '../systems/gear';
 
 const POTION_COLORS: Record<BasicPotionType, string> = {
   red: '#DC2626',
@@ -54,7 +54,7 @@ export function QuickSlotBar() {
   const character = useGameStore(s => s.character);
   const activeEffects = useGameStore(s => s.activeEffects);
 
-  const allGear = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
+  const allGear = character ? getEffectiveGearArray(character, activeEffects, equippedGear) : [];
   const weapon = getEquippedWeapon(allGear);
   const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const cooldownReduction = character ? getSkillCooldownReduction(character, allGear, activeEffects) : 0;

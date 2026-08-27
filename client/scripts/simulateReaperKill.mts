@@ -179,7 +179,8 @@ const ATTRIBUTE_CAP_NOTE = '建角 80 點（單項上限 18）+ Lv.51~75 每級 
  */
 const CREATION_ATTRIBUTES: Record<ClassName, Attributes> = {
   knight: { STR: 18, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
-  elf: { STR: 18, AGI: 16, VIT: 14, SPI: 12, INT: 10, CHA: 10 },
+  // 妖精用弓，普攻吃敏捷不吃力量（`21-combat-formula.md` § 21.3）—— 建角把敏捷推到 18
+  elf: { STR: 14, AGI: 18, VIT: 16, SPI: 12, INT: 10, CHA: 10 },
   elementalist: { STR: 8, AGI: 8, VIT: 18, SPI: 16, INT: 18, CHA: 12 },
   priest: { STR: 6, AGI: 8, VIT: 18, SPI: 15, INT: 18, CHA: 15 },
   thief: { STR: 18, AGI: 18, VIT: 12, SPI: 10, INT: 12, CHA: 10 },
@@ -200,7 +201,7 @@ const GEAR_INT_BONUS = new Map<string, number>(
 /** § 44.4：Lv.51~75 的 25 點升級配點（主攻屬性 17 點推到 35，餘 8 點） */
 const LEVELUP_ALLOCATION: Record<ClassName, Partial<Attributes>> = {
   knight: { STR: 17, VIT: 8 },
-  elf: { STR: 17, AGI: 8 },
+  elf: { AGI: 17, STR: 8 },
   elementalist: { INT: 17, VIT: 8 },
   priest: { INT: 17, VIT: 8 },
   thief: { STR: 17, AGI: 8 },
@@ -343,8 +344,12 @@ const MISSING: string[] = [];
 
 const ARMOR_SLOTS = ['helmet', 'chest', 'gloves', 'boots', 'belt', 'necklace', 'ring1'] as const;
 const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
+/**
+ * 各職業的主攻屬性。**妖精是敏捷** —— 弓走遠程公式，基礎攻擊力吃 AGI 加成
+ * （`21-combat-formula.md` § 21.3）。盜賊的雙刀與鋼爪是近戰，維持力量。
+ */
 const MAIN_STAT: Record<ClassName, keyof Attributes> = {
-  knight: 'STR', elf: 'STR', thief: 'STR', elementalist: 'INT', priest: 'INT',
+  knight: 'STR', elf: 'AGI', thief: 'STR', elementalist: 'INT', priest: 'INT',
 };
 
 function usableBy(t: Template, cn: ClassName): boolean {

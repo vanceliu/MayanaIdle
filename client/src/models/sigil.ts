@@ -18,6 +18,9 @@ import {
   getAffixPoolForSlot,
   getSpecialAffixPoolForSlot,
   isSpecialAffixType,
+  isTierlessAffixType,
+  isAttributeAffixType,
+  BONUS_ATTRIBUTE_VALUE,
   rollAffixValue,
   rollErosionDamage,
   rollRestorePercent,
@@ -26,6 +29,7 @@ import {
   type AffixType,
   type AnyAffixType,
 } from './affix';
+import { ATTRIBUTE_KEYS } from './attributes';
 
 export type SigilType = 'chaos' | 'sting' | 'recarve' | 'temper' | 'enhance' | 'polish';
 
@@ -188,7 +192,8 @@ export function getUpgradeSigilFor(
   affix: Affix,
   maxAffixTier?: number,
 ): { type: 'temper' | 'enhance'; rate: number } | undefined {
-  if (isSpecialAffixType(affix.type)) return undefined;
+  // 特殊詞綴與額外屬性都沒有 Tier（§ 46.9）
+  if (isTierlessAffixType(affix.type)) return undefined;
   const cap = maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
   if (affix.tier < cap) return { type: 'temper', rate: 1 };
   const rate = getEnhanceSigilRate(affix.tier);
@@ -221,12 +226,14 @@ export function canUseSigil(
   if (affixIndex == null || !affixes[affixIndex]) return { ok: false, reason: '請先指定一條詞綴' };
 
   const affix = affixes[affixIndex];
-  if (isSpecialAffixType(affix.type)) {
-    if (type === 'recarve') return { ok: false, reason: '特殊詞綴沒有數值，無法重刻' };
+  // § 46.9 無 Tier 的兩類：特殊詞綴與額外屬性。升階與重刻都不受理，只有刺針換得掉
+  if (isTierlessAffixType(affix.type)) {
+    const what = isAttributeAffixType(affix.type) ? '額外屬性' : '特殊詞綴';
+    if (type === 'recarve') return { ok: false, reason: `${what}沒有數值，無法重刻` };
     if (type === 'temper' || type === 'enhance') {
-      return { ok: false, reason: '特殊詞綴沒有 Tier，無法升階' };
+      return { ok: false, reason: `${what}沒有 Tier，無法升階` };
     }
-    return { ok: true }; // 刺針可以把特殊詞綴換掉
+    return { ok: true };
   }
 
   if (type === 'temper' || type === 'enhance') {
@@ -320,8 +327,17 @@ export function applyStingSigil(
     return { affixes: next, success: true, message: `刺針印記：換成 ${affixName(picked)}` };
   }
 
-  // 原本是特殊詞綴時沒有 Tier 可繼承，固定 T5（仍以實例的硬上限夾住）
-  const tier = isSpecialAffixType(old.type)
+  // § 7.3.1 額外屬性同樣無 Tier，值固定 +1，加在哪個屬性當下才抽
+  if (isAttributeAffixType(picked)) {
+    next[affixIndex] = {
+      type: picked, tier: 0, value: BONUS_ATTRIBUTE_VALUE,
+      attribute: ATTRIBUTE_KEYS[Math.floor(Math.random() * ATTRIBUTE_KEYS.length)],
+    };
+    return { affixes: next, success: true, message: `刺針印記：換成 ${affixName(picked)}` };
+  }
+
+  // 原本無 Tier 時沒有 Tier 可繼承，固定 T5（仍以實例的硬上限夾住）
+  const tier = isTierlessAffixType(old.type)
     ? Math.min(STING_SPECIAL_REPLACEMENT_TIER, ctx.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER)
     : old.tier;
   const type = picked as AffixType;
@@ -357,6 +373,9 @@ export function applyRecarveSigil(
   ctx: SigilContext,
 ): SigilResult {
   const old = affixes[affixIndex];
+  if (isTierlessAffixType(old.type)) {
+    return { affixes, success: false, message: '重刻印記只受理有數值的詞綴' };
+  }
   const type = old.type as AffixType;
   const next = [...affixes];
 
@@ -388,7 +407,7 @@ export function applyTemperSigil(
 ): SigilResult {
   const old = affixes[affixIndex];
   const cap = ctx.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
-  if (isSpecialAffixType(old.type) || old.tier >= cap) {
+  if (isTierlessAffixType(old.type) || old.tier >= cap) {
     return { affixes, success: false, message: `精鍊印記只受理 T${cap} 以下的一般詞綴` };
   }
 

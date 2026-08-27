@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
-import { isWeaponSlot, SLOT_NAMES } from '../../models/equipment';
+import { SLOT_NAMES, ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { EquipmentDetail } from '../EquipmentInfo';
@@ -26,7 +26,7 @@ const ARMOR_ENHANCE_MINUS_SCROLL_ID = 160;
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
-import { resolveEquipment } from '../../systems/templateSync';
+import { resolveEquipment, rollNewInstanceFields } from '../../systems/templateSync';
 import { getWeaponEnhanceRate, getArmorEnhanceRate } from '../../systems/enhancement';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
@@ -340,7 +340,7 @@ export function TownBlacksmith() {
       slot: selectedRecipe.slot,
       quality: 0,
       enhancement: 0,
-      stability: selectedRecipe.stability ?? (isWeaponSlot(selectedRecipe.slot) ? 6 : 4),
+      ...rollNewInstanceFields(selectedRecipe),
       affixes: craftedAffixes,
       ownerId: char.id!,
       equipped: false,
@@ -357,7 +357,7 @@ export function TownBlacksmith() {
       isTwoHanded: selectedRecipe.isTwoHanded,
       quality: 0,
       enhancement: 0,
-      stability: selectedRecipe.stability ?? (isWeaponSlot(selectedRecipe.slot) ? 6 : 4),
+      ...rollNewInstanceFields(selectedRecipe),
       affixes: craftedAffixes,
       ownerId: char.id!,
       equipped: false,
@@ -581,7 +581,8 @@ export function TownBlacksmith() {
                   {recipe.bonusStats ? `${recipe.bonusStats} | ` : ''}
                   {recipe.material ? `${recipe.material === 'wood' ? '木' : recipe.material === 'iron' ? '鐵' : recipe.material === 'silver' ? '銀' : recipe.material === 'mithril' ? '米索利' : recipe.material === 'dragon' ? '龍' : '奧里哈魯根'} | ` : ''}
                   重量{recipe.weight ?? '—'}
-                  {` | 安定值${recipe.stability ?? (isWeaponSlot(recipe.slot) ? 6 : 4)}`}
+                  {/* 防具的安定值在製作當下才抽（§ 6.10），配方只能標出範圍 */}
+                  {` | 安定值${recipe.stability ?? `${ARMOR_STABILITY_MIN}~${ARMOR_STABILITY_MAX}`}`}
                   {` | ${recipe.canBreak === false ? '不壞刀' : '會壞刀'}`}
                 </span>
                 <span className="shop-item-desc">

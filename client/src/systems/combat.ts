@@ -1,7 +1,8 @@
 import type { Character } from '../models/character';
+import type { Attributes } from '../models/attributes';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
-import { isAccessorySlot, enhancementCountsAsDefense } from '../models/equipment';
+import { isAccessorySlot, enhancementCountsAsDefense, isRangedWeapon } from '../models/equipment';
 import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
@@ -276,12 +277,20 @@ export function getTotalMagicAttack(equippedGear: (EquipmentInstance | null)[]):
   return total;
 }
 
+/**
+ * 裝備防禦合計 —— 逐件三段相加（`21-combat-formula.md` § 21.5）：
+ * 基礎 `defense` + 隨機額外 `defenseBonus`(0~2) + 強化等級。
+ *
+ * 後兩段與強化同一條規則：**看裝備分類，不看基礎防禦數值**，
+ * 所以基礎 0 的 T4 上衣照樣吃隨機額外與強化，飾品則兩者都不計入。
+ * 素質需求未滿足時三段全部照算（凍結的只有詞綴）。
+ */
 export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): number {
   return equippedGear.reduce((sum, g) => {
     if (!g) return sum;
+    const counts = enhancementCountsAsDefense(g);
     const base = g.defense ?? 0;
-    const enhance = enhancementCountsAsDefense(g) ? (g.enhancement ?? 0) : 0;
-    return sum + base + enhance;
+    return sum + base + (counts ? (g.defenseBonus ?? 0) + (g.enhancement ?? 0) : 0);
   }, 0);
 }
 
@@ -526,6 +535,27 @@ export function getWeaponElement(weapon: EquipmentInstance | null): BrandElement
   return getBrandElement(weapon?.affixes);
 }
 
+/**
+ * 普攻基礎攻擊力裡的屬性加成（`21-combat-formula.md` § 21.3）。
+ *
+ * | 武器 | 屬性 |
+ * |---|---|
+ * | 近戰（劍／斧／錘／杖／雙刀／鋼爪） | 有效力量 / 2 |
+ * | 遠程（弓） | 有效敏捷 / 2 |
+ *
+ * 換算率相同，但有效敏捷走每 3 點門檻、有效力量走每 2 點（`20-attributes.md` § 20.2），
+ * 所以遠程的每點邊際比近戰鈍。盜賊的雙刀與鋼爪是近戰，維持吃力量。
+ */
+export function getWeaponAttributeBonus(
+  weapon: EquipmentInstance | null,
+  attrs: Attributes,
+): number {
+  const effective = isRangedWeapon(weapon?.type)
+    ? getEffectiveAGI(attrs.AGI)
+    : getEffectiveSTR(attrs.STR);
+  return Math.floor(effective / 2);
+}
+
 export function getWeaponAttackSuccess(weapon: EquipmentInstance | null): number {
   if (!weapon) return 0;
   const baseSuccess = weapon.attackSuccess ?? 0;
@@ -541,14 +571,13 @@ export function calculateBasePhysicalDamage(
   activeEffects: ActiveEffect[] = []
 ): number {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const effSTR = getEffectiveSTR(attrs.STR);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // § 6.9：強化同時提升小怪／大怪基傷，取平均後等同直接加上強化等級
   const weaponDmg = weapon
     ? ((weapon.smallMonsterDamage ?? 0) + (weapon.largeMonsterDamage ?? 0)) / 2 + (weapon.enhancement ?? 0)
     : 1;
-  const strBonus = Math.floor(effSTR / 2);
+  const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
@@ -570,7 +599,6 @@ export function calculatePlayerAttack(
   targetIdx: number = 0
 ): { damage: number; hit: boolean; isCritical: boolean; hits: HitBreakdown[]; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const effSTR = getEffectiveSTR(attrs.STR);
   const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
@@ -586,7 +614,7 @@ export function calculatePlayerAttack(
 
   // `21-combat-formula.md` § 21.4：雙刀與鋼爪是雙持，一次攻擊打兩下，每下獨立判定命中與爆擊
   const hitCount = getWeaponHitCount(weapon);
-  const strBonus = Math.floor(effSTR / 2);
+  const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
@@ -698,7 +726,7 @@ export function calculatePhysicalSkillHit(
 
   // Base damage (physical formula, including race/element counter bonuses + fire enchant)
   const weaponDmg = getWeaponDamage(weapon, monster.size);
-  const strBonus = Math.floor(getEffectiveSTR(attrs.STR) / 2);
+  const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const fireEnchantDmg = hasFireEnchant ? getFireEnchantBonus(activeEffects) : 0;
   const brandElement = getWeaponElement(weapon);
   const attackElement = brandElement ?? (hasFireEnchant ? 'fire' : undefined);

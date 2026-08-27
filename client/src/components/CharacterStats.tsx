@@ -3,7 +3,6 @@ import { getWeightStatus } from '../systems/weight';
 import { useGameStore } from '../stores/gameStore';
 import { Tooltip } from './Tooltip';
 import { getTotalAttributes, getMagicResist } from '../models/character';
-import type { EquipmentInstance } from '../models/equipment';
 import {
   getCombatBonuses,
   getEffectiveDefense,
@@ -18,6 +17,7 @@ import {
   getGearMagicResist,
   getSkillCooldownReduction,
 } from '../systems/combat';
+import { getEffectiveGearArray } from '../systems/gear';
 
 interface StatTip {
   /** 這個欄位是什麼 */
@@ -58,7 +58,7 @@ export function CharacterStats() {
   if (!char) return null;
 
   // 一律使用戰鬥系統的聚合函式，避免面板與實際戰鬥各算一份而漂移
-  const gearList = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
+  const gearList = getEffectiveGearArray(char, activeEffects, equippedGear);
 
   const attrs = getTotalAttributes(char, activeEffects, gearList);
   const effectiveSTR = Math.floor(attrs.STR / 2) * 2;

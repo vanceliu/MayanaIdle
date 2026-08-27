@@ -9,7 +9,7 @@
 import { db } from '../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, SHOP_MAX_AFFIX_TIER } from '../models/affix';
-import { resolveEquipment } from './templateSync';
+import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 
 /**
  * 依模板清單生成裝備實例並寫入 DB，回傳解析完成的實例（順序與傳入清單一致）。
@@ -46,6 +46,7 @@ export async function createShopEquipment(
       slot: d.template.slot,
       quality: 0,
       enhancement: 0,
+      ...rollNewInstanceFields(d.template),
       affixes: d.affixes,
       maxAffixTier: SHOP_MAX_AFFIX_TIER,
       ownerId,
@@ -63,6 +64,7 @@ export async function createShopEquipment(
     isTwoHanded: d.template.isTwoHanded,
     quality: 0,
     enhancement: 0,
+    ...rollNewInstanceFields(d.template),
     affixes: d.affixes,
     maxAffixTier: SHOP_MAX_AFFIX_TIER,
     ownerId,

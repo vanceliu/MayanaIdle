@@ -1,7 +1,11 @@
 import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
-import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType } from '../models/affix';
+import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix } from '../models/affix';
 import { CLASS_NAMES_ZH } from '../models/character';
+import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
+import { DEFENSE_BONUS_MAX } from '../models/equipment';
+import { useGameStore } from '../stores/gameStore';
+import { getEffectiveGearArray, getUnmetAttributes } from '../systems/gear';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { getEquipmentTierColor, getEquipmentInstanceTierColor, getEquipmentTierLevel, getEquipmentInstanceTierLevel } from '../models/equipmentTier';
@@ -24,6 +28,19 @@ function isStaff(type: string): boolean {
   return type === 'staff' || type === 'twoHandStaff';
 }
 
+/**
+ * 素質需求還沒達標的屬性（`06-equipment.md` § 6A.8.8）。
+ * 沒有角色時（角色選擇畫面、Wiki）一律當作達標 —— 那裡沒有可比對的屬性。
+ */
+function useUnmetAttributes(item: EquipmentInstance): (keyof typeof ATTRIBUTE_NAMES_ZH)[] {
+  const character = useGameStore(s => s.character);
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  if (!item.requiredAttributes || !character) return [];
+  const gear = getEffectiveGearArray(character, activeEffects, equippedGear);
+  return getUnmetAttributes(character, activeEffects, gear, item);
+}
+
 interface EquipmentDetailProps {
   item: EquipmentInstance;
   hint?: string;
@@ -42,6 +59,10 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const tierColor = templates ? getEquipmentInstanceTierColor(item, templates) : '#FFFFFF';
   // 「裝備Tier」與「詞綴 Tier」同為 1~7 但意義不同，標籤必須寫清楚（`06-equipment-acquire.md` § 6A.1）
   const tierLevel = templates ? getEquipmentInstanceTierLevel(item, templates) : 0;
+  const defenseBonus = item.defenseBonus ?? 0;
+  const defenseTotal = (item.defense ?? 0) + defenseBonus + enhancement;
+  const unmet = useUnmetAttributes(item);
+  const frozen = unmet.length > 0;
 
   return (
     <div className="equip-detail">
@@ -58,8 +79,18 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
           攻擊: {item.smallMonsterDamage}{enhancement > 0 ? `+${enhancement}` : ''}/{item.largeMonsterDamage}{enhancement > 0 ? `+${enhancement}` : ''}
         </div>
       )}
-      {!isWeapon && item.defense != null && item.defense > 0 && (
-        <div className="equip-detail-stat">防禦: {item.defense}{enhancement > 0 ? `+${enhancement}` : ''}</div>
+      {/* § 21.5 防禦是三段：基礎 + 隨機額外(+0~+2) + 強化。基礎 0 的 T4 上衣照樣要顯示 */}
+      {!isWeapon && defenseTotal > 0 && (
+        <div className="equip-detail-stat">
+          防禦: {item.defense ?? 0}
+          {defenseBonus > 0 && (
+            <span
+              className={defenseBonus >= DEFENSE_BONUS_MAX ? 'equip-detail-maxroll' : undefined}
+              title={defenseBonus >= DEFENSE_BONUS_MAX ? '隨機額外防禦為最大值' : '隨機額外防禦'}
+            >+{defenseBonus}</span>
+          )}
+          {enhancement > 0 ? `+${enhancement}` : ''}
+        </div>
       )}
       {(item.blockRate ?? 0) > 0 && (
         <div className="equip-detail-stat">格擋率: {item.blockRate}%</div>
@@ -112,8 +143,22 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         <div className="equip-detail-stat">品質: {item.quality}%</div>
       )}
       {/* 詞綴只在完整模式顯示：裝備欄十二個欄位各印四條詞綴會把面板灌爆，改由 hover tooltip 呈現 */}
+      {/* § 6A.8.8 素質需求。未達標的屬性標紅，該件的詞綴全部凍結 */}
+      {item.requiredAttributes && (
+        <div className={`equip-detail-stat${frozen ? ' equip-detail-unmet' : ''}`}>
+          素質需求:{' '}
+          {(Object.keys(item.requiredAttributes) as (keyof typeof ATTRIBUTE_NAMES_ZH)[]).map((k, i) => (
+            <span key={k} className={unmet.includes(k) ? 'equip-detail-unmet-attr' : undefined}>
+              {i > 0 ? ' / ' : ''}{ATTRIBUTE_NAMES_ZH[k]} {item.requiredAttributes![k]}
+            </span>
+          ))}
+        </div>
+      )}
+      {!compact && frozen && (
+        <div className="equip-detail-frozen">素質不足 · 詞綴未生效</div>
+      )}
       {!compact && item.affixes && item.affixes.length > 0 && (
-        <div className="equip-detail-affixes">
+        <div className={`equip-detail-affixes${frozen ? ' is-frozen' : ''}`}>
           {item.affixes.map((affix, i) => (
             // § 7.10.5 特殊詞綴：金色顯示、標記 [特殊]、無 Tier，且不吃品質加成
             isSpecialAffixType(affix.type) ? (
@@ -121,11 +166,14 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
                 {formatAffixDisplay(affix)}
               </div>
             ) : (
-              // § 7.3.2 滾到該 Tier 上限的詞綴以粗體標示
+              // § 7.3.2 滾到該 Tier 上限的詞綴以粗體標示；額外屬性無 Tier，一律粗體
               <div
                 key={i}
-                className={`equip-detail-affix tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`}
-                title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
+                className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}`}
+                title={
+                  isTierlessAffixType(affix.type) ? '額外屬性無 Tier，印記只能重骰不能升階'
+                    : isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined
+                }
               >
                 {formatAffixDisplay(affix, item.quality)}
               </div>
@@ -133,7 +181,10 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
           ))}
         </div>
       )}
-      {!compact && <div className="equip-detail-class">可用職業: {getClassDisplay(item.requiredClass)}</div>}
+      {/* 走素質需求的防具沒有職業限制，不列這行（§ 6A.8.8） */}
+      {!compact && !item.requiredAttributes && (
+        <div className="equip-detail-class">可用職業: {getClassDisplay(item.requiredClass)}</div>
+      )}
       {hint && <div className="equip-detail-hint">{hint}</div>}
     </div>
   );

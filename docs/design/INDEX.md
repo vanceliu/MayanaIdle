@@ -22,12 +22,18 @@
 | 防具強化 | `06-equipment.md` | § 6.10 |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
 | **上衣／斗篷（T4 起開放／件數／防禦階梯）** | `06-equipment.md` | § 6A.8.9 |
-| **防具件數／三定位／共用件／回復部位上限** | `06-equipment.md` | § 6A.8.8 |
+| **防具路線（布／輕／重）／素質需求／件數** | `06-equipment.md` | § 6A.8.8 |
+| **素質需求未滿足＝可裝備但詞綴凍結** | `06-equipment.md` | § 6A.8.8 |
+| **需求判定的最小固定點（裝備屬性算不算）** | `06-equipment.md` § 6A.8.8、`20-attributes.md` § 20.10 | — |
+| **防禦三段組成（基礎＋隨機 +0~+2＋強化）／全套防禦目標** | `06-equipment.md` | § 6A.8.8 |
+| **防具安定值逐件抽 4~6** | `06-equipment.md` | § 6.10 |
 | 武器類型/職業限制 | `06-equipment.md` | § 6.6~6.7 |
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
 | 武器傷害（小怪/大怪） | `06-equipment.md` | § 6.11 |
 | 裝備品質提升（印記師） | `08-quality.md` | 全文 |
 | 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
+| **固定值型詞綴（最大 HP／MP／回血／回魔的 range）** | `07-affix.md` | § 7.3.1 |
+| **額外屬性詞綴（無 Tier、固定 +1、印記不可升階）** | `07-affix.md` § 7.3.1、`46-sigil.md` § 46.9 | — |
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
 | 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
 | 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
@@ -42,9 +48,8 @@
 | 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
-| **防具防禦目標／回血回魔／額外屬性走向** | `06-equipment-armor.md` | 逐件清單 |
-| 副手（盾牌/魔導書/臂甲）防禦上限 | `06-equipment-armor.md` | 左手區塊 |
-| **三件的定位（防禦/續戰/屬性型）** | `06-equipment-armor.md` | 「定位」欄 |
+| **防具逐件防禦與素質需求** | `06-equipment-armor.md` | 逐件清單 |
+| 副手（盾牌/魔導書/臂甲）對應路線與防禦 | `06-equipment-armor.md` | 左手區塊 |
 | **項鍊/戒指（HP/MP/回復/屬性上限）** | `06-equipment-armor.md` | — |
 | **腰帶（格數/屬性/防禦的階梯）** | `06-equipment-armor.md`、`35-inventory-constraints.md` § 35.1 | — |
 | 戰鬥系統（自動/手動） | `03-combat.md` | 全文 |
@@ -52,6 +57,7 @@
 | **技能傷害走哪條公式（魔法／物理快照／物理普攻）** | `21-combat-formula.md` § 21.4 / § 21.4a、`23-class-magic.md` § 23.1.1 | — |
 | ARPG 即時戰鬥（LOS／投射物／位移） | `41-arpg-combat.md` | 全文 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
+| **遠程攻擊吃敏捷、近戰吃力量** | `21-combat-formula.md` § 21.3、`20-attributes.md` § 20.3 | — |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
 | 新手裝（T1，創角直接穿上） | `04-character.md` | § 4.3 |
 | **角色外觀（髮型/睫毛/膚色髮色眼色/四朝向）** | `04-character.md` | § 4.10 |

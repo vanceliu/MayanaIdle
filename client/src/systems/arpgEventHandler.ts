@@ -25,6 +25,7 @@ import { getErosion, getOnHitRestore } from '../models/affix';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { getSkillTemplate } from '../models/skillTemplate';
 import { rollMonsterDebuff, applyPlayerDebuff, applyPlayerBuff } from './playerDebuffSystem';
+import { getEffectiveGearArray } from './gear';
 
 /** § 24.6 Boss 控場免疫冷卻 */
 export const BOSS_CC_IMMUNE_MS = 10_000;
@@ -194,7 +195,7 @@ export function processPlayerAttack(
 
       logs.push({ text: `施放 ${skill.name}`, type: 'player' });
     } else if (skill.type === 'heal' && skill.power) {
-      const allGear = Object.values(gs.equippedGear).filter(Boolean) as EquipmentInstance[];
+      const allGear = getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear);
       const effMaxHp = getEffectiveMaxHp(character, gs.equippedGear);
       // § 21.4c：與常駐腳本／快捷格共用 `calculateHealAmount()`，不可各算各的
       const effectiveHeal = calculateHealAmount(character, skill.power, allGear, gs.activeEffects);

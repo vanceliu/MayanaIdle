@@ -3102,6 +3102,27 @@ button.active {
 /* § 7.10.5 特殊詞綴（免疫詞綴）金色顯示，無 Tier 之分，一律粗體 */
 .equip-detail-affix.special { color: #FFD700; text-shadow: 0 0 6px rgba(255,215,0,0.3); font-weight: 700; }
 
+/* § 6A.8.8 素質需求：未達標的屬性標紅，該件的詞綴整組凍結 */
+.equip-detail-unmet { color: var(--accent-danger); }
+.equip-detail-unmet-attr { color: var(--accent-danger); font-weight: 700; }
+.equip-detail-frozen {
+  color: var(--accent-danger);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.equip-detail-affixes.is-frozen { opacity: 0.4; text-decoration: line-through; }
+/* 隨機額外防禦抽到上限（+2）—— 與詞綴滿值同一套標示 */
+.equip-detail-maxroll { font-weight: 700; }
+
+/* 裝備欄格子上的凍結標示：狀態要在格子上就看得到，不能只藏在 tooltip 裡 */
+.equip-slot.is-frozen { border-color: var(--accent-danger); }
+.equip-slot-frozen {
+  color: var(--accent-danger);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
 .equip-detail-class {
   color: var(--accent-info);
   font-size: var(--fs-xs);

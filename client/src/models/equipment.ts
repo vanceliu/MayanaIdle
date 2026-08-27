@@ -1,5 +1,7 @@
 import type { Affix } from './affix';
-import type { Attributes } from './character';
+import { collectAffixAttributes } from './affix';
+import type { Attributes } from './attributes';
+import { ATTRIBUTE_KEYS } from './attributes';
 
 export type EquipSlot =
   | 'rightHand'
@@ -85,6 +87,48 @@ export function isAccessorySlot(slot: EquipSlot): boolean {
 }
 
 export type WeaponMaterial = 'wood' | 'iron' | 'silver' | 'mithril' | 'dragon' | 'orichalcum';
+
+/**
+ * 防具路線（`06-equipment.md` § 6A.8.8）。取代防具的職業限制 ——
+ * 誰穿得上改由 `requiredAttributes` 決定，路線只決定「看哪個屬性」。
+ *
+ * | 路線 | 主需求 | 第二需求 | 左手對應 |
+ * |---|---|---|---|
+ * | robe | 智力 | 精神 | 魔導書 |
+ * | light | 敏捷 | 體質 | 臂甲 |
+ * | heavy | 力量 | 體質 | 盾牌 |
+ */
+export type ArmorLine = 'robe' | 'light' | 'heavy';
+
+/** 各路線的主需求／第二需求看哪個屬性（§ 6A.8.8） */
+export const ARMOR_LINE_ATTRIBUTES: Record<ArmorLine, { primary: keyof Attributes; secondary: keyof Attributes }> = {
+  robe: { primary: 'INT', secondary: 'SPI' },
+  light: { primary: 'AGI', secondary: 'VIT' },
+  heavy: { primary: 'STR', secondary: 'VIT' },
+};
+
+/**
+ * 素質需求階梯（§ 6A.8.8）。索引即裝備 tier，T1 新手裝無需求。
+ * T6 的 18 是建角配點的單項上限，T7 的 24 只有 Lv51+ 加點才碰得到。
+ */
+export const ARMOR_REQUIREMENT_LADDER: { primary: number; secondary: number }[] = [
+  { primary: 0, secondary: 0 },   // T0（未使用）
+  { primary: 0, secondary: 0 },   // T1 新手裝
+  { primary: 10, secondary: 0 },  // T2
+  { primary: 12, secondary: 0 },  // T3
+  { primary: 14, secondary: 12 }, // T4
+  { primary: 16, secondary: 14 }, // T5
+  { primary: 18, secondary: 16 }, // T6
+  { primary: 24, secondary: 18 }, // T7
+];
+
+/** 防具隨機額外防禦的範圍（§ 6A.8.8）：實例生成時抽，0／1／2 均等 */
+export const DEFENSE_BONUS_MIN = 0;
+export const DEFENSE_BONUS_MAX = 2;
+
+/** 防具安定值的抽取範圍（§ 6.10）：實例生成時抽，4／5／6 均等 */
+export const ARMOR_STABILITY_MIN = 4;
+export const ARMOR_STABILITY_MAX = 6;
 
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
 
@@ -174,6 +218,17 @@ export interface EquipmentTemplate {
   blockRate?: number;
   weight?: number;
   material?: WeaponMaterial;
+  /**
+   * 防具路線（`06-equipment.md` § 6A.8.8）。防具必填，武器與飾品為 undefined。
+   * 決定 `requiredAttributes` 看哪個屬性，也決定同一（部位 × 階級）的三件怎麼分。
+   */
+  line?: ArmorLine;
+  /**
+   * 素質需求（§ 6A.8.8）。**防具沒有 `requiredClass`**，能不能穿看這裡。
+   * 未滿足時仍可裝備，但該件的詞綴全部凍結。
+   */
+  requiredAttributes?: Partial<Attributes>;
+  /** 職業限制（武器與 T1 新手裝用；一般防具改用 `requiredAttributes`） */
   requiredClass?: string[];
   buyPrice: number;
   stability?: number;
@@ -228,10 +283,23 @@ export interface EquipmentInstance {
   blockRate?: number;
   weight?: number;
   material?: WeaponMaterial;
+  /** 防具路線（§ 6A.8.8），由模板複製而來 */
+  line?: ArmorLine;
+  /** 素質需求（§ 6A.8.8），由模板複製而來 */
+  requiredAttributes?: Partial<Attributes>;
+  /**
+   * 隨機額外防禦（§ 6A.8.8）。**實例生成時抽 0~2，均等**，之後不變。
+   * 與基礎防禦、強化等級三段相加才是這件的實際防禦（`21-combat-formula.md` § 21.5）。
+   */
+  defenseBonus?: number;
   element?: string;
   quality: number; // 0~20
   enhancement: number;
-  stability?: number; // weapon default 6, armor default 4, -1 = no enhance
+  /**
+   * 安定值。武器 6、飾品 0、腰帶 -1（不可強化）皆沿用模板值；
+   * **防具於實例生成時抽 4~6**（§ 6.10），因此同模板的兩件可以不同。
+   */
+  stability?: number;
   affixes: Affix[]; // up to 4 affix slots
   requiredClass?: string[];
   ownerId: number;
@@ -239,6 +307,115 @@ export interface EquipmentInstance {
   inStorage?: boolean;
   storageType?: 'personal' | 'shared';
   isStarterGear?: boolean;
+}
+
+/** 防具隨機額外防禦：實例生成時抽 0／1／2，均等（§ 6A.8.8） */
+export function rollDefenseBonus(): number {
+  return DEFENSE_BONUS_MIN + Math.floor(Math.random() * (DEFENSE_BONUS_MAX - DEFENSE_BONUS_MIN + 1));
+}
+
+/** 防具安定值：實例生成時抽 4／5／6，均等（§ 6.10） */
+export function rollArmorStability(): number {
+  return ARMOR_STABILITY_MIN + Math.floor(Math.random() * (ARMOR_STABILITY_MAX - ARMOR_STABILITY_MIN + 1));
+}
+
+/**
+ * 一件防具的實際防禦（`21-combat-formula.md` § 21.5 的第一段）：
+ * 基礎固定值 + 隨機額外 + 強化等級。素質需求未滿足時**三段照算**，凍結的只有詞綴。
+ */
+export function getItemDefense(item: {
+  defense?: number; defenseBonus?: number; enhancement?: number;
+}): number {
+  return (item.defense ?? 0) + (item.defenseBonus ?? 0) + (item.enhancement ?? 0);
+}
+
+/**
+ * 某（路線 × 階級）的素質需求（§ 6A.8.8）。第二需求為 0 的階級不列該屬性。
+ * 主需求與第二需求同屬性時（不會發生於現行三路線）取較大值。
+ */
+export function getArmorRequirement(line: ArmorLine, tier: EquipmentTier): Partial<Attributes> {
+  const ladder = ARMOR_REQUIREMENT_LADDER[tier];
+  if (!ladder || ladder.primary <= 0) return {};
+  const { primary, secondary } = ARMOR_LINE_ATTRIBUTES[line];
+  const out: Partial<Attributes> = { [primary]: ladder.primary };
+  if (ladder.secondary > 0) {
+    out[secondary] = Math.max(out[secondary] ?? 0, ladder.secondary);
+  }
+  return out;
+}
+
+/** 這組屬性是否滿足該件的素質需求（§ 6A.8.8） */
+export function meetsAttributeRequirement(
+  required: Partial<Attributes> | undefined,
+  attributes: Attributes,
+): boolean {
+  if (!required) return true;
+  return ATTRIBUTE_KEYS.every(k => attributes[k] >= (required[k] ?? 0));
+}
+
+/** 一件裝備提供的額外屬性：模板的 `bonusAttributes` 加上額外屬性詞綴（§ 20.10） */
+function itemAttributeContribution(item: EquipmentInstance): Partial<Attributes> {
+  const out: Partial<Attributes> = { ...item.bonusAttributes };
+  const fromAffixes = collectAffixAttributes([item]);
+  for (const k of ATTRIBUTE_KEYS) {
+    const v = fromAffixes[k];
+    if (v) out[k] = (out[k] ?? 0) + v;
+  }
+  return out;
+}
+
+/**
+ * 素質需求的**最小固定點**解（§ 6A.8.8）。
+ *
+ * 1. 起算值＝角色自身屬性（建角＋升級配點＋buff），**不含任何裝備**
+ * 2. 掃過裝備，把需求已滿足的納入，累加其額外屬性
+ * 3. 重複第 2 步，直到沒有新的裝備被納入
+ *
+ * 「A 撐起 B」成立；兩件互相認證（A 給敏捷需力量、B 給力量需敏捷）不成立 ——
+ * 起算值不含裝備，兩件誰都進不了第一輪。判定結果與穿戴順序無關。
+ *
+ * 回傳「詞綴生效」的裝備集合。不在集合裡的件仍然裝備著、防禦與重量照算，
+ * 只有那 4 條詞綴凍結。
+ */
+export function resolveActiveGear(
+  gear: (EquipmentInstance | null | undefined)[],
+  selfAttributes: Attributes,
+): Set<EquipmentInstance> {
+  const total: Attributes = { ...selfAttributes };
+  const active = new Set<EquipmentInstance>();
+  const pending: EquipmentInstance[] = [];
+
+  const admit = (item: EquipmentInstance) => {
+    active.add(item);
+    const contrib = itemAttributeContribution(item);
+    for (const k of ATTRIBUTE_KEYS) total[k] += contrib[k] ?? 0;
+  };
+
+  for (const item of gear) {
+    if (!item) continue;
+    if (!item.requiredAttributes) admit(item);
+    else pending.push(item);
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = pending.length - 1; i >= 0; i--) {
+      if (!meetsAttributeRequirement(pending[i].requiredAttributes, total)) continue;
+      admit(pending.splice(i, 1)[0]);
+      changed = true;
+    }
+  }
+
+  return active;
+}
+
+/** 這件裝備的詞綴目前有沒有生效（§ 6A.8.8）。`active` 由 `resolveActiveGear()` 取得 */
+export function areAffixesActive(
+  item: EquipmentInstance | null | undefined,
+  active: Set<EquipmentInstance>,
+): boolean {
+  return !!item && (!item.requiredAttributes || active.has(item));
 }
 
 export function isHandSlot(slot: EquipSlot): boolean {

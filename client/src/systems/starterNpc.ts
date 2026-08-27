@@ -2,7 +2,7 @@ import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/
 import type { ClassName } from '../models/character';
 import { db } from '../db/database';
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
-import { resolveEquipment } from './templateSync';
+import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 
 const STARTER_MAX_LEVEL = 30;
 const STARTER_ENHANCE_COST = 500;
@@ -99,6 +99,7 @@ export async function claimStarterGear(
       slot: template.slot as EquipSlot,
       quality: 0,
       enhancement: 0,
+      ...rollNewInstanceFields(template),
       affixes: [],
       ownerId: characterId,
       equipped: false,
@@ -115,6 +116,7 @@ export async function claimStarterGear(
       isTwoHanded: template.isTwoHanded,
       quality: 0,
       enhancement: 0,
+      ...rollNewInstanceFields(template),
       affixes: [],
       ownerId: characterId,
       equipped: false,

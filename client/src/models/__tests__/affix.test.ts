@@ -23,7 +23,7 @@ describe('affix model', () => {
 
     it('should return only armor affixes for armor', () => {
       const pool = getAffixPoolForSlot('armor');
-      expect(pool.length).toBe(9);
+      expect(pool.length).toBe(12);
       pool.forEach(def => {
         expect(def.category).toContain('armor');
       });
@@ -43,7 +43,7 @@ describe('affix model', () => {
     it('should return armor + block_rate + magic_resist for shield', () => {
       // 盾牌可選 11 種：防具 9 + 格擋率（盾牌專屬）+ 魔法抗性（飾品／盾牌專屬，§ 7.6）
       const pool = getAffixPoolForSlot('shield');
-      expect(pool.length).toBe(11);
+      expect(pool.length).toBe(14);
       pool.forEach(def => {
         expect(def.category).toContain('shield');
       });

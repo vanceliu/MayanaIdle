@@ -4,6 +4,8 @@ import {
   SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
   AFFIX_TIER_TABLES,
+  isAttributeAffixType,
+  isFlatAffixType,
   DEFAULT_MAX_AFFIX_TIER,
   SHOP_MAX_AFFIX_TIER,
   getAffixPoolForSlot,
@@ -97,10 +99,15 @@ const noteStyle = {
   marginTop: 10,
 } as const;
 
-/** 某詞綴在專屬／通用階級表下的完整數值區間（T1 下限 ~ T7 上限） */
+/**
+ * 某詞綴在專屬／通用階級表下的完整數值區間（T1 下限 ~ T7 上限）。
+ * 固定值型不帶百分號；額外屬性無 Tier 也無區間（§ 7.3.1）。
+ */
 function tierRange(type: AffixType): string {
+  if (isAttributeAffixType(type)) return '固定 +1 · 無 Tier';
   const t = getAffixTierTable(type);
-  return `${t[0].min}% ~ ${t[t.length - 1].max}%`;
+  const unit = isFlatAffixType(type) ? '' : '%';
+  return `${t[0].min}${unit} ~ ${t[t.length - 1].max}${unit}`;
 }
 
 function categoryText(categories: AffixCategory[]): string {
@@ -227,6 +234,8 @@ export function AffixesPage() {
           「數值區間」為 T1 下限到 T7 上限的完整範圍，各階明細見下方〈階級數值〉。
           <br />
           魔法抗性使用專屬階級表，每一階都低於其他詞綴（它可同時出現在項鍊、戒指 ×2、盾牌共 4 個部位）。
+          <br />
+          最大 HP／MP 與回血／回魔是<strong>固定值</strong>，不是百分比；額外屬性無 Tier，一律 +1。
         </p>
       </section>
 
@@ -255,9 +264,10 @@ export function AffixesPage() {
                   </td>
                   {AFFIX_TIER_TABLES.map(o => {
                     const row = o.tiers[t.tier - 1];
+                    const unit = o.flat ? '' : '%';
                     return (
                       <td key={o.label} className="cell-number">
-                        <span className={`affix-tag tier-${t.tier}`}>{row.min}~{row.max}%</span>
+                        <span className={`affix-tag tier-${t.tier}`}>{row.min}~{row.max}{unit}</span>
                       </td>
                     );
                   })}

@@ -94,6 +94,8 @@
 - qualityPercent
 - baseSmallMonsterDamage
 - baseLargeMonsterDamage
+- defenseBonus（防具的隨機額外防禦 0~2，生成時抽）
+- stability（防具生成時抽 4~6；武器／飾品／腰帶沿用模板值）
 - durability，若未來需要
 - createdAt
 - updatedAt
@@ -253,19 +255,21 @@ baseValue × (1 + qualityPercent / 100)
 | weight | number | 重量 |
 | smallMonsterDamage | number? | 對小怪傷害（武器用） |
 | largeMonsterDamage | number? | 對大怪傷害（武器用） |
-| defense | number? | 防禦力（防具/盾牌用） |
+| defense | number? | **基礎**防禦力（防具/盾牌用）。實例的實際防禦另加隨機額外與強化，見 `06-equipment.md` § 6A.8.8 |
+| line | enum? | 防具路線：robe / light / heavy（防具必填，決定素質需求看哪個屬性） |
+| requiredAttributes | Partial\<Attributes\>? | 素質需求（防具用）。未滿足時可裝備但詞綴凍結，見 `06-equipment.md` § 6A.8.8 |
 | magicAttack | number? | 魔法攻擊（法杖/魔導書用） |
 | attackSuccess | number? | 攻擊成功（命中加成） |
 | extraAttack | number? | 額外攻擊力 |
-| hpRegen | number? | 回血量 |
-| mpRegen | number? | 回魔量 |
+| hpRegen | number? | 回血量。**防具不再使用**（改走「回血」詞綴），飾品與腰帶仍用 |
+| mpRegen | number? | 回魔量。**防具不再使用**（改走「回魔」詞綴），飾品與腰帶仍用 |
 | bonusHp | number? | 增加血量 |
 | bonusMp | number? | 增加魔量 |
 | bonusWeight | number? | 增加負重上限（腰帶用；**生效中**，見 `35-inventory-constraints.md` § 35.2.1） |
 | bonusBagSlots | number? | 擴充背包格數（腰帶用，見 `35-inventory-constraints.md` § 35.1） |
 | bonusStats | string? | 額外屬性的**顯示字串**（如「敏捷+1」），不參與計算 |
-| bonusAttributes | Partial\<Attributes\>? | 額外屬性的**實際數值**（如 `{ AGI: 1 }`），生效來源。見 `06-equipment.md` § 6.8 |
-| stability | number | 安定值（武器預設 6、防具預設 4、-1 = 不可強化） |
+| bonusAttributes | Partial\<Attributes\>? | 額外屬性的**實際數值**（如 `{ AGI: 1 }`），生效來源。見 `06-equipment.md` § 6.8。**防具不再使用**（改走「額外屬性」詞綴） |
+| stability | number | 安定值（武器 6、飾品 0、腰帶 -1）。**防具不放模板**，逐件抽 4~6，見 `06-equipment.md` § 6.10 |
 | canBreak | boolean? | 是否受壞刀機制影響（武器用） |
 | requiredLevel | number | 需求等級 |
 | requiredClass | string[]? | 職業限制（null = 全職業） |

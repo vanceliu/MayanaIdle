@@ -4,6 +4,7 @@ import {
   SHOP_MAX_AFFIX_TIER,
   getAffixTierTable,
   isSpecialAffixType,
+  isTierlessAffixType,
   type Affix,
 } from '../affix';
 import { getItemById } from '../items';
@@ -74,7 +75,7 @@ describe('印記系統（§ 46）', () => {
         expect(affixes).toHaveLength(CHAOS_SIGIL_SLOTS);
         expect(new Set(affixes.map(a => a.type)).size).toBe(affixes.length);
         for (const a of affixes) {
-          if (isSpecialAffixType(a.type)) continue;
+          if (isTierlessAffixType(a.type)) continue;
           expect(a.tier).toBeGreaterThanOrEqual(1);
           expect(a.tier).toBeLessThanOrEqual(CHAOS_SIGIL_MAX_TIER);
         }
@@ -125,21 +126,29 @@ describe('印記系統（§ 46）', () => {
         const next = affixes[0];
         expect(next.type).not.toBe('defense');
         expect(next.type).not.toBe('max_hp');
-        expect(next.tier).toBe(6);
+        // 換成無 Tier 的那兩類（特殊詞綴、額外屬性）時原本的 Tier 直接作廢
+        expect(next.tier).toBe(isTierlessAffixType(next.type) ? 0 : 6);
         expect(affixes[1]).toEqual(base[1]);
       }
     });
 
     it('原本是特殊詞綴時，換出來的一般詞綴固定 T5', () => {
       const withSpecial: Affix[] = [{ type: 'immune_poison', tier: 0, value: 0 }, base[1]];
-      // charLevel 30：特殊詞綴池為空，必定換成一般詞綴
-      const { affixes } = applyStingSigil(withSpecial, 0, dropCtx({ charLevel: 30 }));
-      expect(isSpecialAffixType(affixes[0].type)).toBe(false);
-      expect(affixes[0].tier).toBe(STING_SPECIAL_REPLACEMENT_TIER);
-      const table = getAffixTierTable(affixes[0].type as never);
-      const t5 = table.find(t => t.tier === STING_SPECIAL_REPLACEMENT_TIER)!;
-      expect(affixes[0].value).toBeGreaterThanOrEqual(t5.min);
-      expect(affixes[0].value).toBeLessThanOrEqual(t5.max);
+      let checked = 0;
+      for (let run = 0; run < 200; run++) {
+        // charLevel 30：特殊詞綴池為空，必定換成一般詞綴
+        const { affixes } = applyStingSigil(withSpecial, 0, dropCtx({ charLevel: 30 }));
+        expect(isSpecialAffixType(affixes[0].type)).toBe(false);
+        // 額外屬性同樣無 Tier，沒有 Tier 可繼承這件事對它不適用
+        if (isTierlessAffixType(affixes[0].type)) continue;
+        checked++;
+        expect(affixes[0].tier).toBe(STING_SPECIAL_REPLACEMENT_TIER);
+        const table = getAffixTierTable(affixes[0].type as never);
+        const t5 = table.find(t => t.tier === STING_SPECIAL_REPLACEMENT_TIER)!;
+        expect(affixes[0].value).toBeGreaterThanOrEqual(t5.min);
+        expect(affixes[0].value).toBeLessThanOrEqual(t5.max);
+      }
+      expect(checked).toBeGreaterThan(0);
     });
 
     it('骰到特殊詞綴時維持無 Tier（§ 7.10.2）', () => {

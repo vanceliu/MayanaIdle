@@ -1,6 +1,6 @@
 import { db } from '../db/database';
 import type { EquipmentInstance } from '../models/equipment';
-import { resolveEquipment } from './templateSync';
+import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 import { isWeaponSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
 import type { EquipmentTierLevel } from '../models/equipmentTier';
@@ -131,6 +131,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         slot: template.slot,
         quality: 0,
         enhancement: 0,
+        ...rollNewInstanceFields(template),
         affixes,
         ownerId,
         equipped: false,
@@ -145,6 +146,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         isTwoHanded: template.isTwoHanded,
         quality: 0,
         enhancement: 0,
+        ...rollNewInstanceFields(template),
         affixes,
         ownerId,
         equipped: false,
@@ -180,6 +182,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           slot: template.slot,
           quality: 0,
           enhancement: 0,
+          ...rollNewInstanceFields(template),
           affixes,
           ownerId,
           equipped: false,
@@ -194,6 +197,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           isTwoHanded: template.isTwoHanded,
           quality: 0,
           enhancement: 0,
+          ...rollNewInstanceFields(template),
           affixes,
           ownerId,
           equipped: false,
@@ -300,6 +304,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
           slot: template.slot,
           quality: 0,
           enhancement: 0,
+          ...rollNewInstanceFields(template),
           affixes,
           ownerId,
           equipped: false,
@@ -314,6 +319,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
           isTwoHanded: template.isTwoHanded,
           quality: 0,
           enhancement: 0,
+          ...rollNewInstanceFields(template),
           affixes,
           ownerId,
           equipped: false,

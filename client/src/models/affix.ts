@@ -1,3 +1,6 @@
+import type { Attributes } from './attributes';
+import { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from './attributes';
+
 /**
  * 詞綴適用分類。
  * `accessory` = 項鍊／戒指 —— 它們的 `type` 同為 `'armor'`，
@@ -24,7 +27,10 @@ export type AffixType =
   | 'block_rate'
   | 'magic_resist'
   | 'on_hit_hp'
-  | 'on_hit_mp';
+  | 'on_hit_mp'
+  | 'hp_regen'
+  | 'mp_regen'
+  | 'bonus_attribute';
 
 /**
  * 特殊詞綴（免疫詞綴）— docs/design/07-affix.md § 7.10
@@ -119,10 +125,13 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'crit_damage', name: '爆擊傷害', category: ['weapon'], group: '攻擊類', description: '爆擊傷害 +X%' },
   { type: 'attack_speed', name: '攻擊速度', category: ['weapon'], group: '攻擊類', description: '攻擊速度 +X%' },
   { type: 'cooldown_reduction', name: '減少冷卻時間', category: ['weapon'], group: '攻擊類', description: '技能冷卻時間 -X%' },
-  // Armor affixes (7) —— 一般防具、盾牌、飾品皆可出現
+  // Armor affixes (12) —— 一般防具、盾牌、飾品皆可出現（§ 7.6）
   { type: 'defense', name: '防禦力', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '防禦力 +X%' },
-  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 HP +X%' },
-  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 MP +X%' },
+  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 HP +X（固定值）' },
+  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 MP +X（固定值）' },
+  { type: 'hp_regen', name: '回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回血 +X（固定值）' },
+  { type: 'mp_regen', name: '回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回魔 +X（固定值）' },
+  { type: 'bonus_attribute', name: '額外屬性', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '六大屬性之一 +1，roll 時均等決定是哪一個。無 Tier' },
   { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '技能補血效果 +X%' },
   { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '藥水效果 +X%' },
   { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '掉寶率 +X%（影響一般怪與 Boss 主掉落表、3~5 級職業技能書；工會任務收集物不受影響）' },
@@ -157,7 +166,35 @@ export interface Affix {
    * 抽到當下決定，之後不變 —— 回血 2~4、回魔 2~5。其他詞綴一律 undefined。
    */
   restorePercent?: number;
+  /**
+   * 額外屬性詞綴（§ 7.3.1）加到哪個屬性。抽到當下六種均等決定，之後不變。
+   * 其他詞綴一律 undefined。
+   */
+  attribute?: keyof Attributes;
 }
+
+/**
+ * 固定值型詞綴（§ 7.1）：數值不是百分比，走各自的階級表。
+ * 額外屬性不在此列 —— 它無 Tier 也無數值區間，固定 +1。
+ */
+export const FLAT_AFFIX_TYPES = new Set<AnyAffixType>(['max_hp', 'max_mp', 'hp_regen', 'mp_regen']);
+
+export function isFlatAffixType(type: AnyAffixType): boolean {
+  return FLAT_AFFIX_TYPES.has(type);
+}
+
+/** 額外屬性詞綴（§ 7.3.1）：無 Tier、無數值、固定 +1，印記只能重骰不能升階 */
+export function isAttributeAffixType(type: AnyAffixType): type is 'bonus_attribute' {
+  return type === 'bonus_attribute';
+}
+
+/** 這條詞綴是否**沒有 Tier**（特殊詞綴與額外屬性）。印記的升階／重刻一律不受理 */
+export function isTierlessAffixType(type: AnyAffixType): type is SpecialAffixType | 'bonus_attribute' {
+  return isSpecialAffixType(type) || isAttributeAffixType(type);
+}
+
+/** 額外屬性詞綴固定給 +1（§ 7.3.1），不受品質放大 */
+export const BONUS_ATTRIBUTE_VALUE = 1;
 
 /**
  * 受擊回復的**回復比例**（§ 7.4）：回血 2~4%、回魔 2~5% 的最大值。
@@ -304,10 +341,11 @@ export function getBossTierWeights(level: number): number[] {
 }
 
 /**
- * 防具池 9 種詞綴的專屬階級表（§ 7.3.1），約為通用表的 82%。
+ * 防具池**百分比詞綴**的專屬階級表（§ 7.3.1），約為通用表的 82%。
  *
  * 防具池的詞綴欄位是 11 個部位 ×4 = 44 條，武器池只有右手 4 條。
- * 兩池共用同一張表的話，防具池那 9 種會隨部位數一起膨脹。
+ * 兩池共用同一張表的話，防具池那些會隨部位數一起膨脹。
+ * 固定值型（最大 HP／MP、回血／回魔）走各自的表，不在此列。
  */
 export const ARMOR_POOL_TIERS: AffixTier[] = [
   { tier: 1, min: 3, max: 4 },
@@ -317,6 +355,36 @@ export const ARMOR_POOL_TIERS: AffixTier[] = [
   { tier: 5, min: 12, max: 13 },
   { tier: 6, min: 14, max: 15 },
   { tier: 7, min: 16, max: 17 },
+];
+
+/**
+ * 最大 HP／最大 MP 的固定值階級表（§ 7.3.1）。單位是點數，不是百分比。
+ *
+ * 固定值不隨等級成長：T7 的 100 在 Lv50（約 594 HP）相當於 17%，
+ * 在 Lv100（約 1168 HP）只剩 8.6%。後期血量由等級本身承擔。
+ */
+export const FLAT_HP_MP_TIERS: AffixTier[] = [
+  { tier: 1, min: 15, max: 20 },
+  { tier: 2, min: 25, max: 32 },
+  { tier: 3, min: 38, max: 46 },
+  { tier: 4, min: 50, max: 58 },
+  { tier: 5, min: 62, max: 70 },
+  { tier: 6, min: 75, max: 84 },
+  { tier: 7, min: 90, max: 100 },
+];
+
+/**
+ * 回血／回魔的固定值階級表（§ 7.3.1）。加算至 `29-regen.md` 的裝備回復加總。
+ * **防具模板不再提供回血回魔**，此詞綴是防具側的唯一來源。
+ */
+export const FLAT_REGEN_TIERS: AffixTier[] = [
+  { tier: 1, min: 1, max: 2 },
+  { tier: 2, min: 2, max: 3 },
+  { tier: 3, min: 3, max: 5 },
+  { tier: 4, min: 5, max: 6 },
+  { tier: 5, min: 7, max: 8 },
+  { tier: 6, min: 9, max: 10 },
+  { tier: 7, min: 11, max: 12 },
 ];
 
 /**
@@ -338,13 +406,15 @@ export const MAGIC_RESIST_TIERS: AffixTier[] = [
  * 格擋率只出現在盾牌一個部位，不隨部位數膨脹，維持通用表。
  * Wiki 依此列欄，共用同一張表的詞綴合成一欄。
  */
-export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: AffixType[] }[] = [
+export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: AffixType[]; flat?: boolean }[] = [
   {
     label: '防具池',
     tiers: ARMOR_POOL_TIERS,
-    types: ['defense', 'max_hp', 'max_mp', 'heal_effect', 'potion_effect',
+    types: ['defense', 'heal_effect', 'potion_effect',
       'drop_rate', 'gold_rate', 'on_hit_hp', 'on_hit_mp'],
   },
+  { label: '最大 HP／MP', tiers: FLAT_HP_MP_TIERS, types: ['max_hp', 'max_mp'], flat: true },
+  { label: '回血／回魔', tiers: FLAT_REGEN_TIERS, types: ['hp_regen', 'mp_regen'], flat: true },
   { label: '魔法抗性', tiers: MAGIC_RESIST_TIERS, types: ['magic_resist'] },
 ];
 
@@ -413,6 +483,14 @@ export function generateAffixes(
     }
     const idx = Math.floor(Math.random() * available.length);
     const def = available.splice(idx, 1)[0];
+    // § 7.3.1 額外屬性：無 Tier、無數值區間，固定 +1，只決定加在哪個屬性
+    if (def.type === 'bonus_attribute') {
+      affixes.push({
+        type: def.type, tier: 0, value: BONUS_ATTRIBUTE_VALUE,
+        attribute: ATTRIBUTE_KEYS[Math.floor(Math.random() * ATTRIBUTE_KEYS.length)],
+      });
+      continue;
+    }
     const cap = options.maxTier ?? 7;
     const tier = options.uniformTier
       ? 1 + Math.floor(Math.random() * cap)
@@ -443,6 +521,8 @@ export function generateAffixes(
 }
 
 export function getEffectiveAffixValue(affix: Affix, quality: number): number {
+  // § 7.3.1 額外屬性固定 +1，不受品質放大（否則會突破「額外屬性最多 +2」）
+  if (isAttributeAffixType(affix.type)) return affix.value;
   return Math.floor(affix.value * (1 + quality / 100));
 }
 
@@ -451,12 +531,20 @@ export function getEffectiveAffixValue(affix: Affix, quality: number): number {
  *
  * 判定用未吃品質的原始 `value` —— 品質是裝備屬性、對每條詞綴等比放大，
  * 不影響「這次 roll 在該 Tier 內是否完美」這件事。
- * 特殊詞綴無 Tier 也無數值，一律 false。
+ * 特殊詞綴與額外屬性無 Tier 也無數值，一律 false —— 它們改由 `shouldBoldAffix()` 一律粗體。
  */
 export function isMaxRollAffix(affix: Affix): boolean {
-  if (isSpecialAffixType(affix.type)) return false;
+  if (isTierlessAffixType(affix.type)) return false;
   const t = getAffixTierTable(affix.type)[affix.tier - 1];
   return !!t && affix.value === t.max;
+}
+
+/**
+ * UI 是否以粗體顯示這條詞綴（§ 7.3.2）：滾到 Tier 上限的一般詞綴，
+ * 加上無 Tier 的特殊詞綴與額外屬性（兩者一律粗體）。
+ */
+export function shouldBoldAffix(affix: Affix): boolean {
+  return isTierlessAffixType(affix.type) || isMaxRollAffix(affix);
 }
 
 /**
@@ -471,6 +559,11 @@ export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
     const def = getSpecialAffixDefinition(affix.type);
     return `[特殊] ${def?.name ?? affix.type}`;
   }
+  // § 7.3.1 額外屬性：無 Tier，顯示成「力量 +1」
+  if (isAttributeAffixType(affix.type)) {
+    const attr = affix.attribute ? ATTRIBUTE_NAMES_ZH[affix.attribute] : '屬性';
+    return `${attr} +${affix.value}`;
+  }
   const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
   const name = affix.element ? `${def?.name}（${BRAND_ELEMENT_ZH[affix.element]}）` : (def?.name ?? affix.type);
   // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
@@ -484,7 +577,9 @@ export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
     const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));
     return `${name} ${getEffectiveAffixValue(affix, quality)}% 觸發／每秒 ${dot} (T${affix.tier})`;
   }
-  return `${name} +${getEffectiveAffixValue(affix, quality)}% (T${affix.tier})`;
+  // § 7.1 固定值型詞綴不帶百分號
+  const unit = isFlatAffixType(affix.type) ? '' : '%';
+  return `${name} +${getEffectiveAffixValue(affix, quality)}${unit} (T${affix.tier})`;
 }
 
 export interface AffixBonuses {
@@ -507,6 +602,11 @@ export interface AffixBonuses {
   magic_resist: number;
   on_hit_hp: number;
   on_hit_mp: number;
+  /** 固定值：直接加算至最大 HP／MP（§ 7.3.1），不是百分比 */
+  hp_regen: number;
+  mp_regen: number;
+  /** 額外屬性詞綴的加總不放這裡，改走 `collectAffixAttributes()` */
+  bonus_attribute: number;
 }
 
 export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number }[]): AffixBonuses {
@@ -530,6 +630,9 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
     magic_resist: 0,
     on_hit_hp: 0,
     on_hit_mp: 0,
+    hp_regen: 0,
+    mp_regen: 0,
+    bonus_attribute: 0,
   };
 
   for (const item of gear) {
@@ -543,6 +646,21 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
   }
 
   return bonuses;
+}
+
+/**
+ * 額外屬性詞綴（§ 7.3.1）的加總。與模板的 `bonusAttributes` 分開收集 ——
+ * 兩者都疊在「建角配點 + 升級配點」之上（`20-attributes.md` § 20.10）。
+ */
+export function collectAffixAttributes(gear: { affixes?: Affix[] }[]): Partial<Attributes> {
+  const out: Partial<Attributes> = {};
+  for (const item of gear) {
+    for (const affix of item.affixes ?? []) {
+      if (!isAttributeAffixType(affix.type) || !affix.attribute) continue;
+      out[affix.attribute] = (out[affix.attribute] ?? 0) + affix.value;
+    }
+  }
+  return out;
 }
 
 /** 收集裝備上所有特殊詞綴類型（多件不疊加，以 Set 表示） */

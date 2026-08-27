@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   generateAffixes,
   isSpecialAffixType,
+  isTierlessAffixType,
   SHOP_MAX_AFFIX_TIER,
   DEFAULT_MAX_AFFIX_TIER,
   CRAFT_MAX_AFFIX_TIER,
@@ -47,6 +48,8 @@ describe('商店裝詞綴 Tier 上限', () => {
     const seen = new Set<number>();
     for (let i = 0; i < 300; i++) {
       for (const affix of generateAffixes('armor', 10, 4, false, SHOP_OPTIONS)) {
+        // 額外屬性無 Tier（§ 7.3.1），不參與 Tier 分佈
+        if (isTierlessAffixType(affix.type)) continue;
         seen.add(affix.tier);
       }
     }

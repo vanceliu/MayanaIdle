@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { SLOT_NAMES, SLOT_ORDER, type EquipSlot } from '../models/equipment';
+import { SLOT_NAMES, SLOT_ORDER, type EquipSlot, type EquipmentInstance } from '../models/equipment';
+import { getFrozenGear } from '../systems/gear';
 import { EquipmentDetail } from './EquipmentInfo';
 import { Tooltip } from './Tooltip';
 import { GameIcon } from './GameIcon';
@@ -30,6 +31,15 @@ export function EquipmentPanel() {
   const equippedGear = useGameStore(s => s.equippedGear);
   const unequipItem = useGameStore(s => s.unequipItem);
   const templates = useEquipmentTemplates();
+  const character = useGameStore(s => s.character);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  // 一次解完整套的凍結狀態，逐格各解一次會是 O(部位²)
+  const frozenSet = useMemo(
+    () => (character
+      ? getFrozenGear(character, activeEffects, Object.values(equippedGear))
+      : new Set<EquipmentInstance>()),
+    [character, activeEffects, equippedGear],
+  );
   // 卸下要點兩次：第一次選取、第二次才真的脫下來，避免滑一下就把裝備脫掉
   const [selectedSlot, setSelectedSlot] = useState<EquipSlot | null>(null);
   /** 這次按壓的起點：判斷放開時算不算「點擊」，以及是不是剛選起來的那一下 */
@@ -84,11 +94,14 @@ export function EquipmentPanel() {
         {SLOT_ORDER.map(slot => {
           const item = equippedGear[slot];
           const enhancement = item?.enhancement ?? 0;
+          // § 6A.8.8：素質不足的件詞綴凍結。狀態要在格子上就看得出來，
+          // 不能只藏在 tooltip 裡 —— 拔掉撐住需求的那件時會連鎖，玩家得馬上看到是哪幾格
+          const frozen = !!item && frozenSet.has(item);
           return (
             // 選取狀態掛在整個格子上（金色外框），與背包格的 `.bag-cell.is-selected` 同一套語言
             <div
               key={slot}
-              className={`equip-slot${item ? '' : ' is-empty'}${selectedSlot === slot ? ' is-selected' : ''}`}
+              className={`equip-slot${item ? '' : ' is-empty'}${selectedSlot === slot ? ' is-selected' : ''}${frozen ? ' is-frozen' : ''}`}
             >
               <span className="slot-icon">
                 <GameIcon name={getEquipIcon(SLOT_ICON_MAP[slot])} size={20} />
@@ -111,7 +124,10 @@ export function EquipmentPanel() {
                     onPointerDown={(e) => handleSlotPointerDown(e, slot)}
                     onPointerUp={(e) => handleSlotPointerUp(e, slot)}
                   >
-                    <span className="slot-name">{SLOT_NAMES[slot]}</span>
+                    <span className="slot-name">
+                      {SLOT_NAMES[slot]}
+                      {frozen && <span className="equip-slot-frozen" title="素質不足，詞綴未生效">素質不足</span>}
+                    </span>
                     {/* Tier 色與背包格同一個來源，同一件裝備在兩邊不會是兩個顏色 */}
                     <span
                       className="equip-slot-item-name"

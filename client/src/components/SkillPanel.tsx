@@ -7,12 +7,12 @@ import {
 } from '../models/quickSlot';
 import { getSkillDisplayIcon } from '../models/iconMap';
 import { calculateHealAmount } from '../systems/combat';
-import type { EquipmentInstance } from '../models/equipment';
 import { GameIcon } from './GameIcon';
 import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
 import { CLASS_MAGIC_RESTRICTIONS } from '../models/skillRestrictions';
 import type { ClassName } from '../models/character';
+import { getEffectiveGearArray } from '../systems/gear';
 
 const GRID_COLUMNS = 5;
 const CLASS_MAGIC_SLOTS = GRID_COLUMNS;
@@ -64,7 +64,7 @@ export function SkillPanel() {
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const equippedGear = useGameStore(s => s.equippedGear);
   const activeEffects = useGameStore(s => s.activeEffects);
-  const equippedGearList = Object.values(equippedGear).filter(Boolean) as EquipmentInstance[];
+  const equippedGearList = character ? getEffectiveGearArray(character, activeEffects, equippedGear) : [];
   const [contextMenu, setContextMenu] = useState<{ skillId: string; x: number; y: number } | null>(null);
   const pressRef = useRef<{ skillId: string; name: string; x: number; y: number } | null>(null);
 

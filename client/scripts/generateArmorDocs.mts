@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { getTierGroup } from '../src/models/equipmentTier';
 import { getItemById } from '../src/models/items';
+import { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from '../src/models/character';
+import { ARMOR_LINE_ATTRIBUTES } from '../src/models/equipment';
 import type { EquipmentTemplate, EquipmentTier } from '../src/models/equipment';
 
 const DOC = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design/06-equipment-armor.md');
@@ -31,14 +33,25 @@ const MATERIAL_ZH: Record<string, string> = {
 const acquireOf = (tier: EquipmentTier) =>
   tier === 1 ? '新手裝' : tier <= 3 ? '商店' : tier <= 5 ? '鐵匠製作' : tier === 6 ? '怪物掉落' : 'Boss 掉落';
 
+/** 走素質需求的防具沒有職業限制，該欄留白；只有 T1 新手裝與武器仍列職業 */
 const classesOf = (t: EquipmentTemplate) =>
-  t.requiredClass?.length ? t.requiredClass.map(c => CLASS_ZH[c] ?? c).join('／') : '**共用**';
+  t.requiredClass?.length ? t.requiredClass.map(c => CLASS_ZH[c] ?? c).join('／')
+    : t.requiredAttributes ? '**全職業**' : '**共用**';
 
-/** 依附加素質反推定位，純粹為了文件可讀性 */
-function roleOf(t: EquipmentTemplate): string {
-  if (t.bonusAttributes) return '屬性';
-  if (t.hpRegen || t.mpRegen || t.bonusHp || t.bonusMp) return '續戰';
-  return '防禦';
+const LINE_ZH: Record<string, string> = { heavy: '重', light: '輕', robe: '布' };
+const lineOf = (t: EquipmentTemplate) => (t.line ? LINE_ZH[t.line] : '—');
+
+/** 素質需求（§ 6A.8.8）。新手裝無需求，顯示職業限制那一欄即可 */
+function reqOf(t: EquipmentTemplate): string {
+  const req = t.requiredAttributes;
+  if (!req) return '—';
+  // 主需求排前面，第二需求排後面 —— 依路線取序，不用 ATTRIBUTE_KEYS 的固定順序
+  const { primary, secondary } = ARMOR_LINE_ATTRIBUTES[t.line ?? 'heavy'];
+  const order = [primary, secondary, ...ATTRIBUTE_KEYS];
+  return [...new Set(order)]
+    .filter(k => req[k])
+    .map(k => `${ATTRIBUTE_NAMES_ZH[k]} ${req[k]}`)
+    .join('／') || '—';
 }
 
 const num = (v: number | undefined) => (v ? String(v) : '—');
@@ -54,18 +67,23 @@ function craftOf(t: EquipmentTemplate): string {
 }
 
 // 左手三種（盾牌／魔導書／臂甲）是防具，不是武器 —— 它們的防禦計入
-// 「全套 +4 防禦目標」，因此列在本檔而非 06-equipment-weapons-*.md
+// 全套防禦目標（§ 6A.8.8），因此列在本檔而非 06-equipment-weapons-*.md
 const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
 const armors = EQUIPMENT_SEEDS.filter(t => t.type === 'armor' || OFFHAND_TYPES.has(String(t.type)));
 const out: string[] = [
   '# 防具與飾品列表',
   '',
   '> **本檔案由產生器輸出，請勿手改。**',
-  '> 防禦值與附加素質依防禦目標表與定位規則統一產生；',
+  '> 基礎防禦與素質需求依 `06-equipment.md` § 6A.8.8 的目標表統一產生；',
   '> 要調整請改目標表後重跑，不要動個別數值。',
   '',
-  `全部 ${armors.length} 件。「定位」欄：防禦型打滿防禦目標、`,
-  '續戰型換回血回魔與 HP／MP、屬性型換額外屬性。',
+  `全部 ${armors.length} 件。防具**不限職業**，每（部位 × 階級）布／輕／重各一件，`,
+  '誰穿得上看素質需求；需求未滿足時仍可裝備，但該件的詞綴全部凍結。',
+  '',
+  '表上的「防禦」是**基礎固定值**。實際防禦另加實例生成時抽的隨機額外（+0~+2）',
+  '與強化等級，安定值同樣逐件抽 4~6（`06-equipment.md` § 6.10）。',
+  '',
+  '回血／回魔／額外屬性改由詞綴提供（`07-affix.md` § 7.3.1），不再列於此表。',
   '',
 ];
 
@@ -95,15 +113,14 @@ for (const slot of SLOTS) {
           + `${t.weight ?? 0} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
       }
     } else if (slot === 'leftHand') {
-      // 左手三種（盾牌／魔導書／臂甲）的價值在格擋率與魔攻，防禦封頂 8
-      out.push('| 名稱 | 類型 | 防禦 | 格擋率 | 魔法攻擊 | 額外屬性 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
+      // 左手三種各對應一條路線：盾牌＝重、臂甲＝輕、魔導書＝布（§ 6A.8.8）
+      out.push('| 名稱 | 類型 | 路線 | 防禦 | 素質需求 | 適用職業 | 格擋率 | 魔法攻擊 | 重量 | 材質 | 價格／製作 |');
       out.push('|---|---|---|---|---|---|---|---|---|---|---|');
       const OFF_ZH: Record<string, string> = { shield: '盾牌', magicBook: '魔導書', armGuard: '臂甲' };
       for (const t of list) {
-        out.push(`| ${t.name} | ${OFF_ZH[String(t.type)] ?? t.type} | ${t.defense ?? 0} | `
-          + `${t.blockRate ? `${t.blockRate}%` : '—'} | ${t.magicAttack ?? '—'} | ${t.bonusStats ?? '—'} | `
-          + `${t.stability ?? 0} | ${classesOf(t)} | ${t.weight ?? 0} | `
-          + `${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
+        out.push(`| ${t.name} | ${OFF_ZH[String(t.type)] ?? t.type} | ${lineOf(t)} | ${t.defense ?? 0} | `
+          + `${reqOf(t)} | ${classesOf(t)} | ${t.blockRate ? `${t.blockRate}%` : '—'} | ${t.magicAttack ?? '—'} | `
+          + `${t.weight ?? 0} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
       }
     } else if (slot === 'necklace' || slot === 'ring1') {
       out.push('| 名稱 | 回血 | 回魔 | HP | MP | 額外屬性 | 防禦 | 安定值 | 適用職業 | 重量 | 價格／製作 |');
@@ -114,11 +131,11 @@ for (const slot of SLOTS) {
           + `${t.weight ?? 0} | ${craftOf(t)} |`);
       }
     } else {
-      out.push('| 名稱 | 定位 | 防禦 | 回血 | 回魔 | 額外屬性 | 安定值 | 適用職業 | 重量 | 材質 | 價格／製作 |');
-      out.push('|---|---|---|---|---|---|---|---|---|---|---|');
+      // T1 新手裝維持職業專屬且無素質需求，因此兩欄並存
+      out.push('| 名稱 | 路線 | 防禦 | 素質需求 | 適用職業 | 重量 | 材質 | 價格／製作 |');
+      out.push('|---|---|---|---|---|---|---|---|');
       for (const t of list) {
-        out.push(`| ${t.name} | ${roleOf(t)} | ${t.defense ?? 0} | ${num(t.hpRegen)} | ${num(t.mpRegen)} | `
-          + `${t.bonusStats ?? '—'} | ${t.stability ?? 0} | ${classesOf(t)} | `
+        out.push(`| ${t.name} | ${lineOf(t)} | ${t.defense ?? 0} | ${reqOf(t)} | ${classesOf(t)} | `
           + `${t.weight ?? 0} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${craftOf(t)} |`);
       }
     }

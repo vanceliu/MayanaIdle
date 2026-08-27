@@ -54,6 +54,7 @@ import type { ActiveEffect } from '../models/effect';
 import { resolveRenderLimits } from '../pixi/renderLimits';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
+import { getEffectiveGearArray } from '../systems/gear';
 
 const PLAYER_PROJECTILE_SPEED = 512;
 /** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
@@ -698,7 +699,7 @@ function tickArpgCombatLoop(
 
   const playerPos = mapStore.playerPosition;
   const currentMap = mapStore.currentMap;
-  const allGear = Object.values(gameState.equippedGear).filter(Boolean) as any[];
+  const allGear = getEffectiveGearArray(gameState.character!, gameState.activeEffects, gameState.equippedGear) as any[];
 
   // Ensure monster instances exist
   for (const mm of monsterStore.monsters) {
@@ -1328,7 +1329,7 @@ function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monste
   const gs = get();
   if (!gs.character) return;
 
-  const allGear = Object.values(gs.equippedGear).filter(Boolean) as any[];
+  const allGear = getEffectiveGearArray(gs.character, gs.activeEffects, gs.equippedGear) as any[];
   const monsters = [monster];
 
   const result = processMonsterDeath(get, set, monsters, 0, { ...gs.character }, [...gs.combatLogs], allGear);
