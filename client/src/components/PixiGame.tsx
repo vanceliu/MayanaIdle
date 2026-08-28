@@ -53,7 +53,7 @@ import { getSkillTemplate } from '../models/skillTemplate';
 import type { ActiveEffect } from '../models/effect';
 import { resolveRenderLimits } from '../pixi/renderLimits';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
-import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
+import { createMonsterFromTemplate } from '../systems/monsterSpawn';
 import { getEffectiveGearArray } from '../systems/gear';
 
 const PLAYER_PROJECTILE_SPEED = 512;
@@ -126,6 +126,7 @@ export function PixiGame() {
           const areaId = char.currentFloor != null
             ? `${char.currentRegion}-${char.currentFloor}f`
             : char.currentRegion;
+          areaTemplatesRef.current = [];
           db.monsterTemplates.where('area').equals(areaId).toArray().then(templates => {
             areaTemplatesRef.current = templates;
           });
@@ -289,6 +290,8 @@ export function PixiGame() {
         const areaId = char.currentFloor != null
           ? `${char.currentRegion}-${char.currentFloor}f`
           : char.currentRegion;
+        // 先清空：換區時若沿用上一區的模板，會生出不屬於這張圖的怪
+        areaTemplatesRef.current = [];
         db.monsterTemplates.where('area').equals(areaId).toArray().then(templates => {
           areaTemplatesRef.current = templates;
         });
@@ -705,6 +708,8 @@ function tickArpgCombatLoop(
   for (const mm of monsterStore.monsters) {
     if (!monsterInstances.has(mm.id)) {
       const inst = createMonsterFromTemplate(mm, areaTemplates);
+      // 模板未載入 → 這個 frame 先不建實例，下一個 frame 再試（不生假怪）
+      if (!inst) continue;
       monsterInstances.set(mm.id, inst);
       // 射程回填到 MapMonster，移動邏輯才停得在射程上（`41-arpg-combat.md` § 5.2）
       if (mm.attackRange !== inst.attackRange) {
@@ -1208,61 +1213,6 @@ function spawnDotTickFx(
   });
 }
 
-function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemplate[]): MonsterInstance {
-  // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
-  if (mm.dummy) return createTrainingDummy(mm.dummy);
-
-  // Pick a template matching boss/non-boss
-  const pool = mm.isBoss
-    ? templates.filter(t => t.isBoss)
-    : templates.filter(t => !t.isBoss);
-  const template = pool.length > 0
-    ? pool[Math.floor(Math.random() * pool.length)]
-    : templates[Math.floor(Math.random() * templates.length)];
-
-  if (!template) {
-    // Fallback if no templates loaded yet
-    return {
-      templateId: 0,
-      name: mm.isBoss ? 'Boss' : '怪物',
-      level: 1,
-      currentHp: 30,
-      maxHp: 30,
-      attackMin: 2,
-      attackMax: 4,
-      defense: 1,
-      exp: 10,
-      race: 'normal',
-      size: mm.isBoss ? 'large' : 'small',
-      element: 'none',
-      isBoss: mm.isBoss,
-      attackType: 'melee',
-      attackRange: 1.5,
-      attackInterval: 1200,
-    };
-  }
-
-  return {
-    templateId: template.id!,
-    name: template.name,
-    level: template.level,
-    currentHp: template.hp,
-    maxHp: template.hp,
-    attackMin: template.attackMin,
-    attackMax: template.attackMax,
-    defense: template.defense,
-    exp: template.exp,
-    race: template.race,
-    size: template.size,
-    element: template.element,
-    isBoss: template.isBoss,
-    attackType: template.attackType ?? 'melee',
-    attackRange: template.attackRange ?? 1.5,
-    attackInterval: template.attackInterval ?? 1200,
-    projectileSpeed: template.projectileSpeed,
-    debuffs: template.debuffs,
-  };
-}
 
 /**
  * 把一次攻擊結果記進試驗場的量測（`50-training-ground.md` § 50.5.2）。
@@ -1300,28 +1250,6 @@ function stopTrainingIfNoDummiesLeft(): void {
  * `exp: 0` 只是保險，真正擋住產出的是 `isTrainingDummy` ——
  * 擊殺流程整段被跳過，掉落／任務進度／統計數據一律不會動到。
  */
-function createTrainingDummy(spec: TrainingDummySpec): MonsterInstance {
-  const hp = spec.hp ?? DUMMY_INFINITE_HP;
-  return {
-    templateId: 0,
-    name: '木樁',
-    level: spec.level,
-    currentHp: hp,
-    maxHp: hp,
-    attackMin: 0,
-    attackMax: 0,
-    defense: spec.defense,
-    exp: 0,
-    race: 'normal',
-    size: spec.size,
-    element: spec.element,
-    isBoss: false,
-    attackType: 'melee',
-    attackRange: 1.5,
-    attackInterval: 1200,
-    isTrainingDummy: true,
-  };
-}
 
 function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monsterId?: string) {
   const get = useGameStore.getState;
@@ -1522,9 +1450,10 @@ function findEntityAtScreen(
     if (hits(npc)) return { text: npc.name, target: { kind: 'npc', pos: { x: npc.x, y: npc.y } } };
   }
   for (const monster of monsters) {
-    if (hits(monster.position)) {
-      const name = monsterInstances.get(monster.id)?.name ?? (monster.isBoss ? 'Boss' : '怪物');
-      return { text: name, target: { kind: 'monster', id: monster.id } };
+    // 還沒建出實例的怪不給 hover —— 名字要等模板載入才知道
+    const inst = monsterInstances.get(monster.id);
+    if (inst && hits(monster.position)) {
+      return { text: inst.name, target: { kind: 'monster', id: monster.id } };
     }
   }
   return playerName && hits(playerPos) ? { text: playerName, target: { kind: 'player' } } : null;

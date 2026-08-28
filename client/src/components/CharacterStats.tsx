@@ -16,7 +16,11 @@ import {
   getMagicDefenseContribution,
   getGearMagicResist,
   getSkillCooldownReduction,
+  getWeaponAttributeBonus,
+  BASE_CHARACTER_DEFENSE,
+  INT_SKILL_DAMAGE_PERCENT_PER_2,
 } from '../systems/combat';
+import { isRangedWeapon } from '../models/equipment';
 import { getEffectiveGearArray } from '../systems/gear';
 
 interface StatTip {
@@ -61,7 +65,6 @@ export function CharacterStats() {
   const gearList = getEffectiveGearArray(char, activeEffects, equippedGear);
 
   const attrs = getTotalAttributes(char, activeEffects, gearList);
-  const effectiveSTR = Math.floor(attrs.STR / 2) * 2;
   // 敏捷每 3 點生效（§ 20.2），其餘每 2 點
   const effectiveAGI = Math.floor(attrs.AGI / 3) * 3;
   const effectiveVIT = Math.floor(attrs.VIT / 2) * 2;
@@ -100,7 +103,10 @@ export function CharacterStats() {
   // 防禦：含 buff 固定防禦與詛咒 -20%
   const totalDefense = getEffectiveDefense(gearList, activeEffects, bonuses.defense);
 
-  const strBonus = Math.floor(effectiveSTR / 2);
+  // 普攻的屬性加成：近戰吃力量、遠程吃敏捷（§ 21.3）。
+  // 一律走戰鬥系統的 `getWeaponAttributeBonus()`，面板自己算一份會與實際戰鬥漂移
+  const attackAttrBonus = getWeaponAttributeBonus(weapon ?? null, attrs);
+  const ranged = isRangedWeapon(weapon?.type);
   const agiBonus = Math.floor(effectiveAGI / 3);
 
   // 攻擊力：含額外攻擊 buff、遠程加成，以及虛弱 debuff
@@ -108,7 +114,7 @@ export function CharacterStats() {
   const flatAttackBuff = getBuffFlatBonus(activeEffects, 'extra_attack')
     + getRangedAttackBonus(weapon ?? null, activeEffects);
   const applyAtk = (base: number) => Math.max(1, Math.floor(
-    Math.floor((base + weaponEnhance + weaponExtraAttack + flatAttackBuff + strBonus) * (1 + attackPower / 100))
+    Math.floor((base + weaponEnhance + weaponExtraAttack + flatAttackBuff + attackAttrBonus) * (1 + attackPower / 100))
     * (100 + weakenPercent) / 100
   ));
   const physicalSmall = applyAtk(weaponSmall);
@@ -152,19 +158,19 @@ export function CharacterStats() {
       <div className="char-stats-grid">
         <div className="stat-group">
           <div className="stat-group-title">基礎屬性</div>
-          <StatRow label="STR" value={attrs.STR} tip={{ desc: '力量。提升近戰攻擊力。', formula: '近戰攻擊 +1 / 每 2 點', note: '每 2 點才生效一次，奇數無效（STR 13 以 12 計算）' }} />
-          <StatRow label="AGI" value={attrs.AGI} tip={{ desc: '敏捷。影響命中率與迴避率。', formula: '命中 +1、迴避 +1 / 每 3 點', note: '每 3 點才生效一次（AGI 8 以 6 計算）' }} />
-          <StatRow label="VIT" value={attrs.VIT} tip={{ desc: '體質。影響升級 HP 成長與每次回血量。', formula: '升級 HP +random(VIT-6, VIT-3)；回血 +1 / 每 2 點', note: '升級成長使用原始值，回血使用每 2 點生效的有效值' }} />
+          <StatRow label="STR" value={attrs.STR} tip={{ desc: '力量。提升近戰攻擊力與負重上限。', formula: '近戰攻擊 +1 / 每 2 點', note: '只作用於近戰武器，弓的攻擊力吃敏捷。每 2 點才生效一次，奇數無效（STR 13 以 12 計算）' }} />
+          <StatRow label="AGI" value={attrs.AGI} tip={{ desc: '敏捷。提升遠程攻擊力，並影響命中率與迴避率。', formula: '遠程攻擊 +1 / 每 2 點有效值；命中 +1、迴避 +1 / 每 3 點', note: '遠程攻擊只作用於弓。每 3 點才生效一次（AGI 8 以 6 計算），因此每點的邊際比力量鈍' }} />
+          <StatRow label="VIT" value={attrs.VIT} tip={{ desc: '體質。影響升級 HP 成長、每次回血量與負重上限。', formula: '升級 HP +random(VIT-6, VIT-3)；回血 +1 / 每 2 點', note: '升級成長使用原始值，回血使用每 2 點生效的有效值' }} />
           <StatRow label="SPI" value={attrs.SPI} tip={{ desc: '精神。影響升級 MP 成長、每次回魔與魔法抗性。', formula: '升級 MP +random(SPI-6, SPI-3)；回魔 +1、魔法抗性 +1% / 每 2 點', note: '魔法抗性是抵擋怪物魔法傷害的來源之一' }} />
-          <StatRow label="INT" value={attrs.INT} tip={{ desc: '智力。提升魔法技能的傷害與冷卻縮減。', formula: '技能傷害 +5%、冷卻縮減 +1% / 每 2 點', note: '傷害只影響走技能公式的招式，不影響普攻；冷卻縮減與詞綴加總後上限 50%' }} />
+          <StatRow label="INT" value={attrs.INT} tip={{ desc: '智力。提升魔法技能的傷害與冷卻縮減。', formula: `技能傷害 +${INT_SKILL_DAMAGE_PERCENT_PER_2}%、冷卻縮減 +1% / 每 2 點`, note: '傷害只影響走技能公式的招式，不影響普攻；冷卻縮減與詞綴加總後上限 50%' }} />
           <StatRow label="CHA" value={attrs.CHA} tip={{ desc: '魅力。規劃用於寵物攜帶數量。', note: '寵物系統尚未實作，目前此屬性沒有任何效果' }} />
         </div>
 
         <div className="stat-group">
           <div className="stat-group-title">攻擊</div>
-          <StatRow label="物理(小怪)" value={physicalSmall} tip={{ desc: '對「小型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: '(武器小怪基傷 + 強化等級 + 額外攻擊 + STR加成) × (1 + 攻擊力%)', note: '怪物體型分小型/大型，武器對兩者的基傷不同' }} />
-          <StatRow label="物理(大怪)" value={physicalLarge} tip={{ desc: '對「大型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: '(武器大怪基傷 + 強化等級 + 額外攻擊 + STR加成) × (1 + 攻擊力%)', note: '多數 Boss 為大型，但小型 Boss 也存在' }} />
-          <StatRow label="普攻元素" value={<>+{attackElemental}%</>} tip={{ desc: '普通攻擊的元素傷害加成，來自裝備詞綴。', formula: '所有「普攻元素傷害」詞綴加總', note: '只在武器帶元素屬性（或火矢附魔生效）時才計入，無屬性武器吃不到' }} />
+          <StatRow label="物理(小怪)" value={physicalSmall} tip={{ desc: '對「小型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器小怪基傷 + 強化等級 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)`, note: `怪物體型分小型/大型，武器對兩者的基傷不同。${ranged ? '遠程武器的屬性加成吃敏捷' : '近戰武器的屬性加成吃力量'}（§ 21.3）` }} />
+          <StatRow label="物理(大怪)" value={physicalLarge} tip={{ desc: '對「大型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器大怪基傷 + 強化等級 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)`, note: '多數 Boss 為大型，但小型 Boss 也存在' }} />
+          <StatRow label="普攻元素" value={<>+{attackElemental}%</>} tip={{ desc: '普通攻擊的元素傷害加成，來自裝備詞綴。', formula: '所有「元素刻印」詞綴加總', note: '只在武器帶元素屬性（或火矢附魔生效）時才計入，無屬性武器吃不到' }} />
           <StatRow label="技能元素" value={<>+{skillElemental}%</>} tip={{ desc: '元素技能的傷害加成，來自裝備詞綴與 buff。', formula: '「技能元素傷害」詞綴 + 元素增幅等 buff', note: '只對有元素屬性的技能生效，無屬性技能吃不到' }} />
           <StatRow label="攻速加成" value={<>{attackSpeed >= 0 ? '+' : ''}{attackSpeed}%</>} tip={{ desc: '縮短普攻間隔。負值代表被減速。', formula: '攻擊間隔 = 1200ms / (1 + 攻速%)', note: '加速 buff 與減速 debuff 的百分比先相加再換算' }} />
           <StatRow label="冷卻縮減" value={<>+{cooldownReduction}%</>} tip={{ desc: '縮短所有技能的冷卻時間。', formula: '「減少冷卻時間」詞綴 + 冷卻縮減類 buff + 智力（每 2 點 +1%）', note: '上限 50%，已包含在顯示值內' }} />
@@ -172,8 +178,8 @@ export function CharacterStats() {
 
         <div className="stat-group">
           <div className="stat-group-title">防禦</div>
-          <StatRow label="防禦值" value={totalDefense} tip={{ desc: '裝備提供的防禦總量。這是「數值」，不是百分比。', formula: '(裝備防禦 + 防具強化等級 + buff固定防禦) × (1 + 防禦力%詞綴)', note: '被詛咒時再 -20%。防禦值超過 75 的部分會轉為迴避率' }} />
-          <StatRow label="減傷率" value={<>{damageReduction}%</>} tip={{ desc: '受到「物理」傷害時實際減少的比例。', formula: 'min(防禦值, 75) 與 buff減傷 類間乘算', note: '防禦值的減傷上限為 75%，堆再高也不會超過' }} />
+          <StatRow label="防禦值" value={totalDefense} tip={{ desc: '裝備提供的防禦總量。這是「數值」，不是百分比。', formula: `(逐件 基礎防禦+隨機額外+強化等級 的加總 + buff固定防禦) × (1 + 防禦力%詞綴) − ${-BASE_CHARACTER_DEFENSE}`, note: `角色自身防禦為 ${BASE_CHARACTER_DEFENSE}，在百分比之後才扣。被詛咒時再 -20%。防禦值超過 ${DAMAGE_REDUCTION_CAP} 的部分會轉為迴避率` }} />
+          <StatRow label="減傷率" value={<>{damageReduction}%</>} tip={{ desc: '受到「物理」傷害時實際減少的比例。', formula: `min(防禦值, ${DAMAGE_REDUCTION_CAP}) 與 buff減傷 類間乘算`, note: `防禦值的減傷上限為 ${DAMAGE_REDUCTION_CAP}%，堆再高也不會超過` }} />
           <StatRow label="魔法減傷率" value={<>{magicDamageReduction}%</>} tip={{ desc: '受到「魔法」傷害時實際減少的比例 —— 這是最終結果。', formula: 'min(防禦值,75) × 0.5 + 魔法抗性，上限 75%，再與 buff減傷 乘算', note: '裝備防禦對魔法只有一半效力（最多貢獻 37.5%），缺口要靠下面的「魔法抗性」補' }} />
           <StatRow label="魔法抗性" value={<>{magicResist}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速」的機率' }} />
           <StatRow label="迴避率" value={<>{totalDodge}%</>} tip={{ desc: '完全閃避怪物攻擊的機率（傷害歸零）。物理與魔法皆可迴避。', formula: '基礎(一般 5%／盜賊 10%) + AGI每3點+1 + 防禦溢出((防禦-75)/5)', note: '上限 35%，已包含在顯示值內' }} />
