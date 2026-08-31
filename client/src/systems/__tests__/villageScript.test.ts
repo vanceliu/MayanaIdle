@@ -11,7 +11,8 @@ import {
   type VillageScriptContext,
 } from '../villageScriptRunner';
 import { matchesEquipmentFilter, normalizeVillageRules, DEFAULT_VILLAGE_SCRIPT } from '../../models/villageScript';
-import type { VillageRule } from '../../models/villageScript';
+import type { VillageRule, EquipmentFilterSubject } from '../../models/villageScript';
+import type { Attributes } from '../../models/attributes';
 import { makeBagItem } from '../../models/bagItem';
 import type { BagItem } from '../../models/bagItem';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
@@ -44,9 +45,16 @@ function equip(templateId: number, overrides: Partial<EquipmentInstance> = {}): 
   } as EquipmentInstance;
 }
 
+/** 騎士的建角基礎（`CLASS_BASE_ATTRIBUTES`）：STR 14 / AGI 14 / VIT 16 */
+const KNIGHT_ATTRS: Attributes = { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 };
+
+/** 「本角色穿得起的」的判定對象（§ 49.4） */
+const KNIGHT: EquipmentFilterSubject = { className: 'knight', selfAttributes: KNIGHT_ATTRS };
+
 function ctx(overrides: Partial<VillageScriptContext> = {}): VillageScriptContext {
   return {
     className: 'knight',
+    selfAttributes: KNIGHT_ATTRS,
     gold: 10_000,
     bagItems: [] as BagItem[],
     inventory: [],
@@ -297,44 +305,65 @@ describe('倉庫存取', () => {
 
 describe('裝備保留條件', () => {
   it('沒設保留條件就全賣', () => {
-    expect(matchesEquipmentFilter(equip(1), undefined, 'knight')).toBe(false);
-    expect(matchesEquipmentFilter(equip(1), {}, 'knight')).toBe(false);
+    expect(matchesEquipmentFilter(equip(1), undefined, KNIGHT)).toBe(false);
+    expect(matchesEquipmentFilter(equip(1), {}, KNIGHT)).toBe(false);
   });
 
   it('詞綴 Tier 高於門檻就保留', () => {
     const good = equip(1, { affixes: [{ type: 'attack_power', tier: 6, value: 17 }] } as Partial<EquipmentInstance>);
     const plain = equip(1, { affixes: [{ type: 'attack_power', tier: 3, value: 10 }] } as Partial<EquipmentInstance>);
-    expect(matchesEquipmentFilter(good, { affixTierAbove: 5 }, 'knight')).toBe(true);
-    expect(matchesEquipmentFilter(plain, { affixTierAbove: 5 }, 'knight')).toBe(false);
+    expect(matchesEquipmentFilter(good, { affixTierAbove: 5 }, KNIGHT)).toBe(true);
+    expect(matchesEquipmentFilter(plain, { affixTierAbove: 5 }, KNIGHT)).toBe(false);
   });
 
   it('指定詞綴就保留', () => {
     const item = equip(1, { affixes: [{ type: 'crit_rate', tier: 2, value: 7 }] } as Partial<EquipmentInstance>);
-    expect(matchesEquipmentFilter(item, { affixTypes: ['crit_rate'] }, 'knight')).toBe(true);
-    expect(matchesEquipmentFilter(item, { affixTypes: ['attack_power'] }, 'knight')).toBe(false);
+    expect(matchesEquipmentFilter(item, { affixTypes: ['crit_rate'] }, KNIGHT)).toBe(true);
+    expect(matchesEquipmentFilter(item, { affixTypes: ['attack_power'] }, KNIGHT)).toBe(false);
   });
 
-  it('本職業可裝備就保留（沒標職業的是全職業共用，也算可裝備）', () => {
+  it('穿得起就保留：職業通過且無素質需求', () => {
     const knightOnly = equip(1, { requiredClass: ['knight'] });
-    const elfOnly = equip(1, { requiredClass: ['elf'] });
     const anyClass = equip(1);
-    expect(matchesEquipmentFilter(knightOnly, { classUsable: true }, 'knight')).toBe(true);
-    expect(matchesEquipmentFilter(elfOnly, { classUsable: true }, 'knight')).toBe(false);
-    expect(matchesEquipmentFilter(anyClass, { classUsable: true }, 'knight')).toBe(true);
+    expect(matchesEquipmentFilter(knightOnly, { classUsable: true }, KNIGHT)).toBe(true);
+    expect(matchesEquipmentFilter(anyClass, { classUsable: true }, KNIGHT)).toBe(true);
+  });
+
+  it('職業不符就不保留', () => {
+    const elfOnly = equip(1, { requiredClass: ['elf'] });
+    expect(matchesEquipmentFilter(elfOnly, { classUsable: true }, KNIGHT)).toBe(false);
+  });
+
+  it('素質需求達標才保留（職業通過也一樣，條件內是 AND）', () => {
+    const met = equip(3, { requiredAttributes: { STR: 14, VIT: 12 } });
+    const unmet = equip(3, { requiredAttributes: { STR: 16, VIT: 14 } });
+    expect(matchesEquipmentFilter(met, { classUsable: true }, KNIGHT)).toBe(true);
+    expect(matchesEquipmentFilter(unmet, { classUsable: true }, KNIGHT)).toBe(false);
+  });
+
+  it('素質達標但職業不符仍不保留', () => {
+    const item = equip(1, { requiredClass: ['elf'], requiredAttributes: { AGI: 10 } });
+    expect(matchesEquipmentFilter(item, { classUsable: true }, KNIGHT)).toBe(false);
+  });
+
+  it('判定基準不含裝備與 buff：只看角色自身配點', () => {
+    // 自身 STR 14，需求 16。靠裝備或 buff 撐到 16 也不改變這裡的答案
+    const item = equip(3, { requiredAttributes: { STR: 16 }, bonusAttributes: { STR: 2 } });
+    expect(matchesEquipmentFilter(item, { classUsable: true }, KNIGHT)).toBe(false);
   });
 
   it('指定裝備類型就保留', () => {
-    expect(matchesEquipmentFilter(equip(1), { equipTypes: ['sword'] }, 'knight')).toBe(true);
-    expect(matchesEquipmentFilter(equip(3), { equipTypes: ['sword'] }, 'knight')).toBe(false);
+    expect(matchesEquipmentFilter(equip(1), { equipTypes: ['sword'] }, KNIGHT)).toBe(true);
+    expect(matchesEquipmentFilter(equip(3), { equipTypes: ['sword'] }, KNIGHT)).toBe(false);
   });
 
   it('白名單模板一律保留', () => {
-    expect(matchesEquipmentFilter(equip(1), { templateIds: [1] }, 'knight')).toBe(true);
+    expect(matchesEquipmentFilter(equip(1), { templateIds: [1] }, KNIGHT)).toBe(true);
   });
 
   it('多條保留條件是 OR：符合任一就保留', () => {
     const item = equip(3, { requiredClass: ['elf'] });
-    expect(matchesEquipmentFilter(item, { classUsable: true, equipTypes: ['armor'] }, 'knight')).toBe(true);
+    expect(matchesEquipmentFilter(item, { classUsable: true, equipTypes: ['armor'] }, KNIGHT)).toBe(true);
   });
 
   it('保留條件會把裝備從販售清單濾掉', () => {

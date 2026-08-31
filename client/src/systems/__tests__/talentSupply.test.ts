@@ -16,6 +16,7 @@ function bag(itemId: number, name: string, amount = 1): BagItem {
 function ctx(over: Partial<VillageScriptContext> = {}): VillageScriptContext {
   return {
     className: 'knight',
+    selfAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     gold: 1000,
     bagItems: [],
     inventory: [],

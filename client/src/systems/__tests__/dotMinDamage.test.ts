@@ -108,11 +108,11 @@ afterEach(() => {
 });
 
 describe('裂傷斬 — 流血 DoT 快照（§ 23.3 / § 24.4.5）', () => {
-  it('DoT 傷害為角色物理傷害的 50%（快照制）', () => {
+  it('DoT 傷害為角色物理傷害的 70%（快照制）', () => {
     const gear = [sword()];
     const char = testCharacter(20);
     useGameStore.setState({ character: char });
-    const expected = Math.floor(calculateBasePhysicalDamage(char, gear[0], gear, []) * 0.5);
+    const expected = Math.floor(calculateBasePhysicalDamage(char, gear[0], gear, []) * 0.7);
     expect(expected).toBeGreaterThan(1); // 確保這條測的是公式而非最低值
 
     castRend(gear, target());

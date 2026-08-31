@@ -179,11 +179,11 @@ describe('§ 21.4a 結算規則', () => {
 describe('§ 23.3 走本公式的技能', () => {
   const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill;
 
-  it('盾擊／裂傷斬／挑釁怒吼標記為物理快照，技能攻擊力為 32 / 81 / 65', () => {
+  it('盾擊／裂傷斬／挑釁怒吼標記為物理快照，技能攻擊力為 32 / 50 / 65', () => {
     expect(power('shield-bash').physicalSnapshot).toBe(true);
     expect(power('shield-bash').power).toBe(32);
     expect(power('rend').physicalSnapshot).toBe(true);
-    expect(power('rend').power).toBe(81);
+    expect(power('rend').power).toBe(50);
     expect(power('taunt').physicalSnapshot).toBe(true);
     expect(power('taunt').power).toBe(65);
   });

@@ -348,10 +348,26 @@ export function getEffectiveDefense(
   activeEffects: ActiveEffect[],
   defensePercent: number,
 ): number {
+  return Math.max(0, getUnclampedDefense(equippedGear, activeEffects, defensePercent));
+}
+
+/**
+ * 未夾底的最終防禦值 —— **顯示專用**，戰鬥一律走 `getEffectiveDefense()`。
+ *
+ * 起始防禦是 -10（§ 21.5），所以新手裝一整套也還在負值區。
+ * 夾底到 0 顯示的話，玩家換上前幾件防具時面板紋風不動，看起來像裝備沒作用；
+ * 顯示負值才看得出「還差幾點才開始減傷」。
+ * 減傷率仍以夾底後的值計算，負防禦不會讓玩家承受超過 100% 傷害。
+ */
+export function getUnclampedDefense(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[],
+  defensePercent: number,
+): number {
   const rawDefense = getTotalDefense(equippedGear) + getBuffDefenseBonus(activeEffects);
   const curseDefPercent = getPlayerDebuffModifier(activeEffects, 'defense');
   const geared = Math.floor(rawDefense * (1 + defensePercent / 100) * (100 + curseDefPercent) / 100);
-  return Math.max(0, geared + BASE_CHARACTER_DEFENSE);
+  return geared + BASE_CHARACTER_DEFENSE;
 }
 
 export function getAffixBonusesFromGear(equippedGear: (EquipmentInstance | null)[]): AffixBonuses {

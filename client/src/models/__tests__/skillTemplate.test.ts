@@ -26,7 +26,7 @@ describe('getSkillTemplate', () => {
     expect(template!.id).toBe('rend');
     expect(template!.applyDebuff).toBeDefined();
     expect(template!.applyDebuff!.category).toBe('bleeding');
-    expect(template!.applyDebuff!.dotDamagePercent).toBe(0.5);
+    expect(template!.applyDebuff!.dotDamagePercent).toBe(0.7);
   });
 
   it('returns class skill with buffModifiers (iron-shield)', () => {

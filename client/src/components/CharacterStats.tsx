@@ -17,6 +17,7 @@ import {
   getGearMagicResist,
   getSkillCooldownReduction,
   getWeaponAttributeBonus,
+  getUnclampedDefense,
   BASE_CHARACTER_DEFENSE,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
 } from '../systems/combat';
@@ -102,6 +103,8 @@ export function CharacterStats() {
 
   // 防禦：含 buff 固定防禦與詛咒 -20%
   const totalDefense = getEffectiveDefense(gearList, activeEffects, bonuses.defense);
+  // 「防禦值」那一列顯示未夾底的數字；減傷率仍走夾底後的 `totalDefense`
+  const shownDefense = getUnclampedDefense(gearList, activeEffects, bonuses.defense);
 
   // 普攻的屬性加成：近戰吃力量、遠程吃敏捷（§ 21.3）。
   // 一律走戰鬥系統的 `getWeaponAttributeBonus()`，面板自己算一份會與實際戰鬥漂移
@@ -178,7 +181,7 @@ export function CharacterStats() {
 
         <div className="stat-group">
           <div className="stat-group-title">防禦</div>
-          <StatRow label="防禦值" value={totalDefense} tip={{ desc: '裝備提供的防禦總量。這是「數值」，不是百分比。', formula: `(逐件 基礎防禦+隨機額外+強化等級 的加總 + buff固定防禦) × (1 + 防禦力%詞綴) − ${-BASE_CHARACTER_DEFENSE}`, note: `角色自身防禦為 ${BASE_CHARACTER_DEFENSE}，在百分比之後才扣。被詛咒時再 -20%。防禦值超過 ${DAMAGE_REDUCTION_CAP} 的部分會轉為迴避率` }} />
+          <StatRow label="防禦值" value={shownDefense} tip={{ desc: '裝備提供的防禦總量。這是「數值」，不是百分比。', formula: `(逐件 基礎防禦+隨機額外+強化等級 的加總 + buff固定防禦) × (1 + 防禦力%詞綴) − ${-BASE_CHARACTER_DEFENSE}`, note: `角色自身防禦為 ${BASE_CHARACTER_DEFENSE}，在百分比之後才扣，所以裝備不足時這裡會是負數（負值不減傷，也不會讓你多受傷）。被詛咒時再 -20%。防禦值超過 ${DAMAGE_REDUCTION_CAP} 的部分會轉為迴避率` }} />
           <StatRow label="減傷率" value={<>{damageReduction}%</>} tip={{ desc: '受到「物理」傷害時實際減少的比例。', formula: `min(防禦值, ${DAMAGE_REDUCTION_CAP}) 與 buff減傷 類間乘算`, note: `防禦值的減傷上限為 ${DAMAGE_REDUCTION_CAP}%，堆再高也不會超過` }} />
           <StatRow label="魔法減傷率" value={<>{magicDamageReduction}%</>} tip={{ desc: '受到「魔法」傷害時實際減少的比例 —— 這是最終結果。', formula: 'min(防禦值,75) × 0.5 + 魔法抗性，上限 75%，再與 buff減傷 乘算', note: '裝備防禦對魔法只有一半效力（最多貢獻 37.5%），缺口要靠下面的「魔法抗性」補' }} />
           <StatRow label="魔法抗性" value={<>{magicResist}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速」的機率' }} />

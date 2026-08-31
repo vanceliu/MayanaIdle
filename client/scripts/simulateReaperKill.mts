@@ -77,7 +77,15 @@ function withSeed<T>(seed: number, fn: () => T): T {
 
 // ---------------------------------------------------------------- 常數
 
-const RUNS = 10_000;
+/**
+ * 每個情境的模擬次數。`--runs=N` 可覆寫。
+ *
+ * **預設 600**：全五職業 `--top=40` 約 9.5 分鐘，落在「改一次數值就能重跑」的範圍。
+ * 每個候選的成本約 4.7 秒 × (runs/1000)，粗排的固定成本不到 1 秒。
+ * `--runs=10000` 誤差更小但全跑要兩個多小時，只在要把數字寫進報告時才用。
+ */
+const RUNS_ARG = Number(process.argv.find(a => a.startsWith('--runs='))?.split('=')[1]);
+const RUNS = Number.isFinite(RUNS_ARG) && RUNS_ARG > 0 ? RUNS_ARG : 600;
 
 /** 回魔技（魔力奪取）的施放門檻：MP 低於上限的這個比例才放 */
 const MP_DRAIN_THRESHOLD = 0.3;
@@ -619,9 +627,17 @@ function buildRotation(className: ClassName): RotationEntry[] {
       // scaleByMissingHp：打木樁不掉血 → 加成 0%，不施加 buff（arpgEventHandler.ts:48-53）
     });
     const rend = classSkill('rend');
+    // DoT 一律讀技能定義（§ 44.9「腳本裡不得有任何手抄數字」）——
+    // 這裡原本寫死 percent 0.5，改了 `classSkills.ts` 的流血比例後量到的仍是舊值
+    const bleed = rend.applyDebuff!;
     r.push({
       ...magicEntry(rend),
-      dot: { category: 'bleeding', percent: 0.5, interval: 1000, duration: 5000 },
+      dot: {
+        category: bleed.category,
+        percent: bleed.dotDamagePercent!,
+        interval: bleed.dotInterval!,
+        duration: bleed.dotDuration!,
+      },
     });
     r.push(magicEntry(classSkill('shield-bash')));
     r.push(magicEntry(classSkill('taunt')));
@@ -1149,7 +1165,7 @@ const PROXY_SAMPLES = 600;
  * 先用 `--top` 放大再判斷，不要直接採信。
  */
 const TOP_N_ARG = Number(process.argv.find(a => a.startsWith('--top='))?.split('=')[1]);
-const TOP_HANDS = Number.isFinite(TOP_N_ARG) && TOP_N_ARG > 0 ? TOP_N_ARG : 3;
+const TOP_HANDS = Number.isFinite(TOP_N_ARG) && TOP_N_ARG > 0 ? TOP_N_ARG : 40;
 const TOP_FINAL = TOP_HANDS;
 
 const SEED_AFFIXES: Record<ClassName, AffixType[]> = {
@@ -1256,8 +1272,21 @@ function searchBis(className: ClassName): { loadouts: Loadout[]; searched: numbe
 }
 
 console.log('## BiS 自動選定（§ 44.5）\n');
+/**
+ * `--class=knight[,thief]` 只跑指定職業。改動只影響單一職業的技能時
+ * （例：裂傷斬是騎士專屬），沒有必要把另外四個職業重算一遍。
+ */
+const CLASS_ARG = process.argv.find(a => a.startsWith('--class='))?.split('=')[1];
+const ALL_CLASSES: ClassName[] = ['knight', 'elf', 'thief', 'elementalist', 'priest'];
+const TARGET_CLASSES = CLASS_ARG
+  ? ALL_CLASSES.filter(c => CLASS_ARG.split(',').includes(c))
+  : ALL_CLASSES;
+if (TARGET_CLASSES.length === 0) {
+  throw new Error(`--class 無效：${CLASS_ARG}（可用 ${ALL_CLASSES.join('／')}）`);
+}
+
 const SCENARIOS: { className: ClassName; loadouts: Loadout[] }[] = [];
-for (const cn of ['knight', 'elf', 'thief', 'elementalist', 'priest'] as ClassName[]) {
+for (const cn of TARGET_CLASSES) {
   const { loadouts, searched } = searchBis(cn);
   console.log(`- ${CLASS_NAMES_ZH[cn]}：粗排 ${searched} 組（手部 ${handCombos(cn).length} × 詞綴 ${choose4(WEAPON_AFFIX_POOL).length}），`
     + `取前 ${loadouts.length} 名進全模擬 → ${loadouts.map(l => l.label).join(' / ')}`);
@@ -1272,7 +1301,8 @@ function fmt(n: number, d = 1): string {
   return n.toFixed(d);
 }
 
-console.log(`# Lv.75 滿裝 vs 百柱死神 — ${RUNS.toLocaleString()} 次模擬 / 情境`);
+console.log(`# Lv.75 滿裝 vs 百柱死神 — ${RUNS.toLocaleString()} 次模擬 / 情境`
+  + `${TARGET_CLASSES.length < ALL_CLASSES.length ? `（僅 ${TARGET_CLASSES.map(c => CLASS_NAMES_ZH[c]).join('／')}）` : ''}`);
 console.log(`目標：${REAPER_SEED.name} Lv.${REAPER_SEED.level} HP ${REAPER_SEED.hp} 防禦 ${REAPER_SEED.defense}`
   + `（減傷 ${Math.min(REAPER_SEED.defense, 75)}%）${REAPER_SEED.race}/${REAPER_SEED.size}/${REAPER_SEED.element}`);
 console.log(`屬性預算：${ATTRIBUTE_CAP_NOTE}`);

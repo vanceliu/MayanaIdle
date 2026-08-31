@@ -5,6 +5,7 @@ import type { HuntLocation } from '../models/villageScript';
 import { getBagItemAmount } from '../models/bagItem';
 import type { WarehouseKind } from '../models/villageScript';
 import { matchesEquipmentFilter } from '../models/villageScript';
+import type { Attributes } from '../models/attributes';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { INN_PRICES } from '../stores/gameStore';
 import {
@@ -25,6 +26,11 @@ import type { EquipmentTierLevel } from '../models/equipmentTier';
 
 export interface VillageScriptContext {
   className: string;
+  /**
+   * 角色自身屬性（建角＋升級配點），**不含裝備、不含 buff**。
+   * 「本角色穿得起的」篩選條件的判定基準（`49-village-script.md` § 49.4）。
+   */
+  selfAttributes: Attributes;
   gold: number;
   bagItems: BagItem[];
   inventory: EquipmentInstance[];
@@ -176,7 +182,7 @@ export function collectDepositEquipment(
   return ctx.inventory.filter(
     i => !ctx.equippedIds.has(i.id)
       && !i.isStarterGear
-      && matchesEquipmentFilter(i, action.keep, ctx.className),
+      && matchesEquipmentFilter(i, action.keep, ctx),
   );
 }
 
@@ -254,5 +260,5 @@ export function collectVillageSellEquipment(
   if (action.maxTier == null) return [];
   const sellable = ctx.inventory.filter(i => isSellableEquipment(i, ctx.templates, ctx.equippedIds));
   const inTier = collectBatchSellEquipment(sellable, ctx.templates, action.maxTier as EquipmentTierLevel);
-  return inTier.filter(i => !matchesEquipmentFilter(i, action.keep, ctx.className));
+  return inTier.filter(i => !matchesEquipmentFilter(i, action.keep, ctx));
 }

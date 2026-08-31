@@ -100,14 +100,9 @@ describe('TownBlacksmith - Crafting', () => {
     });
   });
 
-  it('renders craft tab', () => {
+  // 強化已搬到背包（`35-inventory-constraints.md` § 35.5.5），鐵匠鋪只剩製作，沒有分頁
+  it('shows recipe list', async () => {
     render(<TownBlacksmith />);
-    expect(screen.getByText('裝備製作')).toBeDefined();
-  });
-
-  it('shows recipe list when craft tab selected', async () => {
-    render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     expect(await findRecipeTitle('鋼心劍')).toBeDefined();
     expect(await findRecipeTitle('霜紋劍')).toBeDefined();
   });
@@ -126,7 +121,6 @@ describe('TownBlacksmith - Crafting', () => {
     expect(craftableSlots.size).toBeGreaterThan(0);
 
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     for (const slot of craftableSlots) {
       expect(await screen.findByText(SLOT_LABELS[slot]), slot).toBeDefined();
     }
@@ -134,7 +128,6 @@ describe('TownBlacksmith - Crafting', () => {
 
   it('腰帶分類列出 T4／T5 製作配方（§ 6A.7）', async () => {
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await screen.findByText('腰帶'));
     expect(await findRecipeTitle('銀扣腰帶')).toBeDefined();
     expect(await findRecipeTitle('力之腰帶')).toBeDefined();
@@ -142,7 +135,6 @@ describe('TownBlacksmith - Crafting', () => {
 
   it('shows recipe detail when selected', async () => {
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
     // 需求只有素材與前置，配方卡片不顯示金幣（§ 6A.3）
     for (const m of RECIPE.craftMaterials!) {
@@ -152,7 +144,6 @@ describe('TownBlacksmith - Crafting', () => {
 
   it('crafts item successfully when materials available', async () => {
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
@@ -169,7 +160,6 @@ describe('TownBlacksmith - Crafting', () => {
 
   it('crafted item has correct stats', async () => {
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
@@ -196,7 +186,6 @@ describe('TownBlacksmith - Crafting', () => {
       character: { ...useGameStore.getState().character!, gold: 0 },
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
 
     const craftBtns = screen.getAllByText('製作');
@@ -213,7 +202,6 @@ describe('TownBlacksmith - Crafting', () => {
       bagItems: recipeBag(1),
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
 
     const craftBtns = screen.getAllByText('製作');
@@ -222,7 +210,6 @@ describe('TownBlacksmith - Crafting', () => {
 
   it('shows success message after crafting', async () => {
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await findRecipeTitle('鋼心劍'));
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
@@ -242,7 +229,6 @@ describe('TownBlacksmith - Crafting', () => {
       ],
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
@@ -266,7 +252,6 @@ describe('TownBlacksmith - Crafting', () => {
       inventory: [],
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
 
     const craftBtns = screen.getAllByText('製作');
@@ -284,7 +269,6 @@ describe('TownBlacksmith - Crafting', () => {
       ],
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
@@ -313,7 +297,6 @@ describe('TownBlacksmith - Crafting', () => {
       ],
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
 
     const craftBtns = screen.getAllByText('製作');
@@ -336,7 +319,6 @@ describe('TownBlacksmith - Crafting', () => {
       ],
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
@@ -359,7 +341,6 @@ describe('TownBlacksmith - Crafting', () => {
       ],
     });
     render(<TownBlacksmith />);
-    fireEvent.click(screen.getByText('裝備製作'));
     fireEvent.click(await screen.findByText('雙刀'));
     fireEvent.click((await screen.findAllByText('月牙雙刀'))[0]);
     const craftBtns = screen.getAllByText('製作');
@@ -377,7 +358,6 @@ describe('TownBlacksmith - Crafting', () => {
   describe('製作追蹤', () => {
     it('加入追蹤後任務只存 templateId，按鈕改為取消追蹤', async () => {
       render(<TownBlacksmith />);
-      fireEvent.click(screen.getByText('裝備製作'));
       fireEvent.click(await findRecipeTitle('鋼心劍'));
 
       fireEvent.click(screen.getAllByText('製作追蹤')[0]);
@@ -397,7 +377,6 @@ describe('TownBlacksmith - Crafting', () => {
         ],
       });
       render(<TownBlacksmith />);
-      fireEvent.click(screen.getByText('裝備製作'));
       await findRecipeTitle('鋼心劍');
 
       const btns = screen.getAllByText('製作追蹤');
@@ -407,7 +386,6 @@ describe('TownBlacksmith - Crafting', () => {
     it('取消追蹤移除任務', async () => {
       useGameStore.setState({ craftQuests: [{ id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }] });
       render(<TownBlacksmith />);
-      fireEvent.click(screen.getByText('裝備製作'));
       await findRecipeTitle('鋼心劍');
 
       fireEvent.click(screen.getByText('取消追蹤'));
@@ -418,7 +396,6 @@ describe('TownBlacksmith - Crafting', () => {
     it('製作成功後自動移除同配方的任務（§ 36.13.5）', async () => {
       useGameStore.setState({ craftQuests: [{ id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }] });
       render(<TownBlacksmith />);
-      fireEvent.click(screen.getByText('裝備製作'));
       fireEvent.click(await findRecipeTitle('鋼心劍'));
       const enabledBtn = screen.getAllByText('製作').find(btn => !(btn as HTMLButtonElement).disabled)!;
       fireEvent.click(enabledBtn);
@@ -432,7 +409,6 @@ describe('TownBlacksmith - Crafting', () => {
     it('沒加進追蹤就直接製作時不影響其他任務', async () => {
       useGameStore.setState({ craftQuests: [{ id: 'craft-999', templateId: 999 }] });
       render(<TownBlacksmith />);
-      fireEvent.click(screen.getByText('裝備製作'));
       fireEvent.click(await findRecipeTitle('鋼心劍'));
       const enabledBtn = screen.getAllByText('製作').find(btn => !(btn as HTMLButtonElement).disabled)!;
       fireEvent.click(enabledBtn);

@@ -1,26 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import 'fake-indexeddb/auto';
-import { TownBlacksmith, ENHANCE_FX_DURATION_MS } from '../town/TownBlacksmith';
+import { BagPanel } from '../BagPanel';
+import { FX_DURATION_MS } from '../town/useOneShotFx';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { useGameStore } from '../../stores/gameStore';
 import { seedDatabase, resetSeedState } from '../../db/seed';
 import { db } from '../../db/database';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { bagItemById } from '../../testing/bagFixtures';
+import { WEAPON_ENHANCE_SCROLL_ID } from '../../systems/enhanceScroll';
+
+vi.mock('../../hooks/useEquipmentTemplates', () => ({
+  useEquipmentTemplates: () => [],
+}));
 
 /**
  * @vitest-environment jsdom
  */
 
 /**
- * 強化演出（`48-vfx.md` § 48.4）。
+ * 強化演出（`48-vfx.md` § 48.4），入口在背包（`35-inventory-constraints.md` § 35.5.5）。
  *
  * 這裡驗的是「演出不影響判定」與「三段各自掛對 class」，
- * 成功率與安定值本身由 `enhancement` 的單元測試負責，不在這裡重測。
+ * 成功率與安定值本身由 `enhanceScroll` 的單元測試負責，不在這裡重測。
  */
-
-const WEAPON_SCROLL_ID = 7;
 
 /** 鋼心劍：安定值 6，+3 → +4 落在安定值內，+6 → +7 超出 */
 function sword(enhancement: number) {
@@ -45,25 +49,37 @@ function sword(enhancement: number) {
 
 function setup(enhancement: number) {
   useGameStore.setState({
-    character: {
-      name: 'FxHero', className: 'knight', level: 30, exp: 0, expToNext: 5000,
-      hp: 200, maxHp: 200, mp: 50, maxMp: 50,
-      baseAttributes: { STR: 18, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
-      bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-      gold: 500000,
-      currentArea: 'neutral-town', currentZone: 'newbie-neutral',
-      currentRegion: 'neutral-town', currentFloor: null,
-      skills: [], unspentAttributePoints: 0, quests: [],
-      areaEnteredAt: Date.now(), createdAt: Date.now(), userId: 1, id: 1,
-    } as never,
+    character: { name: 'FxHero', className: 'knight', level: 30, gold: 0, id: 1, userId: 1 } as never,
     equippedGear: {},
     inventory: [sword(enhancement)],
-    bagItems: [bagItemById(WEAPON_SCROLL_ID, 5)],
-    craftQuests: [],
+    bagItems: [bagItemById(WEAPON_ENHANCE_SCROLL_ID, 5)],
+    bagSlotMap: {},
+    combatLogs: [],
   });
 }
 
-const clickEnhance = () => fireEvent.click(screen.getByTestId('enh-btn'));
+/** 卷軸在第 0 格、裝備在第 1 格（背包道具排在裝備之前） */
+function cellAt(index: number): HTMLElement {
+  return (document.querySelectorAll('.bag-cell')[index]) as HTMLElement;
+}
+
+function tap(el: Element) {
+  fireEvent.pointerDown(el, { button: 0, clientX: 10, clientY: 10 });
+  fireEvent.pointerUp(el, { button: 0, clientX: 10, clientY: 10 });
+}
+
+/**
+ * 點卷軸進入指定目標模式，再點裝備結算。
+ * 未選取時要兩下（選取→執行），已選取的格子一下就進得去（§ 35.1.4）。
+ */
+function enhanceSword() {
+  const scroll = cellAt(0);
+  const before = useGameStore.getState().combatLogs.length;
+  tap(scroll);
+  // 未選取時要兩下（選取→執行），已選取的格子一下就進得去（§ 35.1.4）
+  if (useGameStore.getState().combatLogs.length === before) tap(scroll);
+  fireEvent.pointerDown(cellAt(1), { button: 0, clientX: 10, clientY: 10 });
+}
 
 describe('強化演出（§ 48.4）', () => {
   beforeEach(async () => {
@@ -80,22 +96,11 @@ describe('強化演出（§ 48.4）', () => {
     vi.restoreAllMocks();
   });
 
-  it('可強化的卡片維持待命呼吸，安定值內外共用同一種', () => {
-    setup(3);
-    const { container } = render(<TownBlacksmith />);
-    expect(container.querySelectorAll('.enh-standby')).toHaveLength(1);
-
-    setup(6); // 超過安定值，仍是同一個 class
-    render(<TownBlacksmith />);
-    expect(document.querySelectorAll('.enh-standby').length).toBeGreaterThan(0);
-    expect(document.querySelectorAll('.enh-risky')).toHaveLength(0);
-  });
-
   it('安定值內成功只給白閃，沒有金色與光環', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     setup(3);
-    const { container } = render(<TownBlacksmith />);
-    clickEnhance();
+    const { container } = render(<BagPanel />);
+    enhanceSword();
 
     expect(container.querySelector('.enh-flash-soft')).not.toBeNull();
     expect(container.querySelector('.enh-flash-gold')).toBeNull();
@@ -106,8 +111,8 @@ describe('強化演出（§ 48.4）', () => {
   it('超過安定值成功：白閃 + 金色 + 兩圈光環 + +N', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     setup(6);
-    const { container } = render(<TownBlacksmith />);
-    clickEnhance();
+    const { container } = render(<BagPanel />);
+    enhanceSword();
 
     expect(container.querySelector('.enh-flash-soft')).not.toBeNull();
     expect(container.querySelector('.enh-flash-gold')).not.toBeNull();
@@ -115,11 +120,11 @@ describe('強化演出（§ 48.4）', () => {
     expect(screen.getByText('+7')).toBeDefined();
   });
 
-  it('失敗：裝備立刻從清單移除，碎裂由殘影卡片演完', () => {
+  it('失敗：裝備立刻從背包移除，碎裂由殘影演完', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     setup(6);
-    const { container } = render(<TownBlacksmith />);
-    clickEnhance();
+    const { container } = render(<BagPanel />);
+    enhanceSword();
 
     // 判定不因演出延後（§ 48.1）：庫存當下就空了
     expect(useGameStore.getState().inventory).toHaveLength(0);
@@ -142,12 +147,12 @@ describe('強化演出（§ 48.4）', () => {
   it('連續強化時演出會重播，不是沿用同一個節點', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     setup(3);
-    render(<TownBlacksmith />);
-    clickEnhance();
+    render(<BagPanel />);
+    enhanceSword();
     const first = screen.getByTestId('enh-fx-success');
 
-    // 不等演出結束就再按一次
-    clickEnhance();
+    // 不等演出結束就再強化一次
+    enhanceSword();
     const second = screen.getByTestId('enh-fx-success');
     expect(second).not.toBe(first);
   });
@@ -155,11 +160,11 @@ describe('強化演出（§ 48.4）', () => {
   it('演出結束後殘影收掉，不留在畫面上', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     setup(6);
-    render(<TownBlacksmith />);
-    clickEnhance();
+    render(<BagPanel />);
+    enhanceSword();
     expect(screen.getByTestId('enh-fx-ghost')).toBeDefined();
 
-    act(() => { vi.advanceTimersByTime(ENHANCE_FX_DURATION_MS + 50); });
+    act(() => { vi.advanceTimersByTime(FX_DURATION_MS + 50); });
     expect(screen.queryByTestId('enh-fx-ghost')).toBeNull();
   });
 });

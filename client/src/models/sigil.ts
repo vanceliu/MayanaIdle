@@ -2,7 +2,7 @@
  * 印記系統 — `docs/design/46-sigil.md`
  *
  * 印記是**只操作詞綴**的消耗品，在印記師（`13-town.md` § 13.13）使用。
- * 詞綴的升階、重骰與品質全部走這裡，鐵匠鋪只管強化等級（+N）與製作。
+ * 詞綴的升階、重骰與品質全部走這裡，強化等級（+N）走背包卷軸，兩套互不影響。
  *
  * 這裡的四支 `apply*` 一律走 `models/affix.ts` 的既有 roll 函式
  * （`generateAffixes` / `rollAffixValue` / `rollErosionDamage` / `rollRestorePercent`），

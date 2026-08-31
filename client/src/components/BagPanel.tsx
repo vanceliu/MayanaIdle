@@ -28,6 +28,12 @@ import { isSigilItemId } from '../models/sigil';
 import { BagTalentTab } from './BagTalentTab';
 import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
 import { CLICK_SLOP } from '../hooks/usePressDrag';
+import {
+  getEnhanceScroll, canScrollTarget, applyEnhanceScroll, isEnhanceable,
+  type EnhanceScroll,
+} from '../systems/enhanceScroll';
+import { EnhanceRateWindow } from './EnhanceRateWindow';
+import { useOneShotFx } from './town/useOneShotFx';
 
 interface BagGridItem {
   id: string;
@@ -47,6 +53,33 @@ interface BagGridItem {
    */
   equippedSlot?: EquipSlot;
 }
+
+/**
+ * 指定目標模式。`scroll` 是「點卷軸 → 點裝備」的強化，`rate` 是機率查詢。
+ * 兩者的選取與取消完全相同，只差最後對目標做什麼。
+ */
+type TargetingMode =
+  | { kind: 'scroll'; scroll: EnhanceScroll; label: string }
+  | { kind: 'rate' };
+
+function scrollTargetLabel(scroll: EnhanceScroll): string {
+  const category = scroll.category === 'weapon' ? '武器' : '防具';
+  return scroll.variant === 'minus' ? `要降級的${category}` : `要強化的${category}`;
+}
+
+/**
+ * 強化演出（`48-vfx.md` § 48.4）。背包格 `overflow: hidden` 會切掉光環與碎片，
+ * 所以演出不畫在格子裡，而是照格子當下的位置疊一層 fixed 覆蓋層。
+ * 失敗時裝備已從背包移除，覆蓋層自己畫一份 `ghost` 把碎裂演完。
+ */
+interface BagEnhanceFx {
+  kind: 'safe' | 'success' | 'fail';
+  rect: { left: number; top: number; width: number; height: number };
+  label?: string;
+  ghost?: EquipmentInstance;
+}
+
+const SHARD_INDEXES = [1, 2, 3, 4, 5, 6];
 
 function getItemIconKey(name: string, type: string): string {
   if (type === 'scroll') return 'scroll';
@@ -107,6 +140,15 @@ export function BagPanel() {
    * 改成選單裡選「移動」→ 點目標格，兩下完成，滑鼠玩家照樣可以用。
    */
   const [movingId, setMovingId] = useState<string | null>(null);
+  /**
+   * 指定目標模式：卷軸強化與機率查詢共用同一套（`35-inventory-constraints.md` § 35.5.5）。
+   * 模式中所有點擊都被它接管，不會落到原本的使用／裝備／移動。
+   */
+  const [targeting, setTargeting] = useState<TargetingMode | null>(null);
+  // 提示一律走 log：背包版面不因為點了什麼而位移，插一列提示會把整片格子往下推
+  /** 機率視窗要看的裝備。由指定目標模式選出來 */
+  const [rateTarget, setRateTarget] = useState<EquipmentInstance | null>(null);
+  const { fx: enhanceFx, play: playEnhanceFx } = useOneShotFx<BagEnhanceFx>();
 
   // 拖曳狀態由 dragStore 統一持有：落點可能在背包外（快捷格／地圖），
   // 每個目標各自記一份 hover 狀態會對不起來
@@ -141,6 +183,7 @@ export function BagPanel() {
   const useTownScroll = useGameStore(s => s.useTownScroll);
   const useCureItem = useGameStore(s => s.useCureItem);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
+  const pushSystemLog = useGameStore(s => s.pushSystemLog);
   /** § 35.1.3：格子位置持久化在 store，拖曳與整理共用同一條寫入路徑 */
   const slotMap = useGameStore(s => s.bagSlotMap);
   const setSlotMap = useGameStore(s => s.setBagSlotMap);
@@ -217,6 +260,18 @@ export function BagPanel() {
   for (const { item, slot } of allEquipment) {
     gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item, equippedSlot: slot });
   }
+
+  // Esc 退出指定目標。面板不吃鍵盤焦點，所以掛在 window 上
+  useEffect(() => {
+    if (!targeting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setTargeting(null);
+      useGameStore.getState().pushSystemLog('已取消選擇目標');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [targeting]);
 
   // 選取的東西離開背包（用掉、穿上、賣掉、丟棄）後把選取狀態收掉。
   // 兩個分頁的格子都可能被選取，所以一起看。
@@ -395,6 +450,9 @@ export function BagPanel() {
       equipItem(item.equipment);
     } else if (item.type === 'scroll' && item.itemId != null && isTownScroll(item.itemId)) {
       useTownScroll(item.itemId);
+    } else {
+      // 強化卷軸不直接生效，第二下是「進入指定目標模式」（§ 35.5.5）
+      enterScrollTargeting(item);
     }
   }
 
@@ -412,6 +470,8 @@ export function BagPanel() {
     // 移動模式要能點到空格，所以只有「連格子都沒點到」才取消
     if (!(e.target as HTMLElement).closest?.('.bag-cell')) {
       setMovingId(null);
+      // 格子以外的地方（面板留白、標題列）點下去就退出指定目標
+      cancelTargeting();
     }
     if (!(e.target as HTMLElement).closest?.('.bag-cell:not(.empty)')) {
       setSelectedId(null);
@@ -527,6 +587,72 @@ export function BagPanel() {
     return true;
   }
 
+  /** 這一格在目前的指定目標模式下能不能點。機率查詢與卷軸共用同一組標示 */
+  function isTargetable(item: BagGridItem): boolean {
+    if (!targeting || !item.equipment) return false;
+    if (targeting.kind === 'rate') return isEnhanceable(item.equipment);
+    return canScrollTarget(targeting.scroll, item.equipment);
+  }
+
+  /** 取消指定目標。點空白、點不能當目標的東西、Esc 都走這裡 */
+  function cancelTargeting() {
+    if (!targeting) return;
+    setTargeting(null);
+    pushSystemLog('已取消選擇目標');
+  }
+
+  /**
+   * 第二次點擊卷軸＝進入指定目標模式（不是直接使用）。
+   * 回傳 true 代表這一下已經被卷軸吃掉。
+   */
+  function enterScrollTargeting(item: BagGridItem): boolean {
+    const scroll = getEnhanceScroll(item.itemId);
+    if (!scroll) return false;
+    const label = scrollTargetLabel(scroll);
+    setTargeting({ kind: 'scroll', scroll, label });
+    pushSystemLog(`${item.name}：請選擇${label}（Esc 或點空白處取消）`);
+    return true;
+  }
+
+  /**
+   * 指定目標模式下點任何一格。回傳 true 代表這一下已經被模式吃掉，
+   * 呼叫端不要再當成一般點擊 —— 否則點到藥水會順手喝掉。
+   */
+  function consumeTargetTap(item?: BagGridItem, cell?: Element | null): boolean {
+    if (!targeting) return false;
+    const equipment = item?.equipment;
+    // 空格與非裝備都是取消手勢（含「再點一次該卷軸」）
+    if (!equipment) {
+      cancelTargeting();
+      return true;
+    }
+    if (targeting.kind === 'rate') {
+      setTargeting(null);
+      setRateTarget(equipment);
+      return true;
+    }
+    const { scroll } = targeting;
+    setTargeting(null);
+    if (!canScrollTarget(scroll, equipment)) {
+      pushSystemLog(`${equipment.name} 不是${targeting.label}`);
+      return true;
+    }
+    const box = cell?.getBoundingClientRect();
+    const outcome = applyEnhanceScroll(scroll, { item: equipment, slot: item.equippedSlot });
+    if (!outcome) return true;
+    pushSystemLog(outcome.message);
+    // 演出不參與判定（§ 48.1）：結算已經寫完狀態，這裡只是照剛才的位置疊一層
+    if (box) {
+      playEnhanceFx({
+        kind: outcome.fx,
+        rect: { left: box.left, top: box.top, width: box.width, height: box.height },
+        label: outcome.fx === 'fail' ? undefined : `+${outcome.nextLevel}`,
+        ghost: outcome.ghost,
+      });
+    }
+    return true;
+  }
+
   function renderTooltipContent(item: BagGridItem) {
     if (item.potionType) {
       const config = POTION_CONFIG[item.potionType];
@@ -607,6 +733,11 @@ export function BagPanel() {
             {selectedId === item.id ? '再點一次傳送至城鎮' : '點擊選取'}
           </div>
         )}
+        {getEnhanceScroll(item.itemId) && (
+          <div className="tooltip-hint">
+            {selectedId === item.id ? '再點一次選擇強化目標' : '點擊選取'}
+          </div>
+        )}
       </div>
     );
   }
@@ -621,6 +752,7 @@ export function BagPanel() {
     setTooltip(null);
     setContextMenu(null);
     setMovingId(null);
+    setTargeting(null);
   }
 
   /** 格子內容。一般分頁與印記分頁只差在互動，長相完全一樣 */
@@ -685,6 +817,12 @@ export function BagPanel() {
     <div className="bag-panel" ref={panelRef} onPointerDown={handlePanelPointerDown}>
       <BagTabs tab={bagTab} onChange={setBagTab}>
         <button className="bag-sort-toggle" onClick={handleSort}>整理</button>
+        <button
+          className="bag-rate-toggle"
+          onClick={() => setTargeting(t => (t?.kind === 'rate' ? null : { kind: 'rate' }))}
+        >
+          機率
+        </button>
         <span className={`bag-slots-count${usedSlots >= maxSlots ? ' danger' : usedSlots >= maxSlots * 0.9 ? ' warning' : ''}`}>
           {usedSlots}/{maxSlots}
         </span>
@@ -711,7 +849,7 @@ export function BagPanel() {
                   key={`empty-${idx}`}
                   className={`bag-cell empty${overClass}${movingId ? ' move-target' : ''}`}
                   {...dropProps}
-                  onPointerDown={() => consumeMoveTap(idx)}
+                  onPointerDown={() => { if (!consumeTargetTap()) consumeMoveTap(idx); }}
                 />
               );
             }
@@ -722,12 +860,15 @@ export function BagPanel() {
                   dragItem?.fromIndex === idx ? ' dragging' : ''
                 }${item.equippedSlot ? ' is-equipped' : ''}${selectedId === item.id ? ' is-selected' : ''}${
                   movingId === item.id ? ' is-moving' : movingId ? ' move-target' : ''
-                }`}
+                }${targeting ? (isTargetable(item) ? ' enh-target' : ' enh-target-off') : ''}`}
                 {...dropProps}
                 onMouseEnter={(e) => handleMouseEnter(e, item)}
                 onMouseLeave={handleMouseLeave}
                 onContextMenu={(e) => handleContextMenu(e, item)}
-                onPointerDown={(e) => { if (!consumeMoveTap(idx)) handleCellPointerDown(e, item, idx); }}
+                onPointerDown={(e) => {
+                  if (consumeTargetTap(item, e.currentTarget)) return;
+                  if (!consumeMoveTap(idx)) handleCellPointerDown(e, item, idx);
+                }}
                 onPointerMove={handleCellPointerMove}
                 onPointerUp={(e) => handleCellPointerUp(e, item)}
                 onPointerCancel={handleCellPointerCancel}
@@ -746,6 +887,48 @@ export function BagPanel() {
         § 35.20：印記抽屜。由下往上展開，**覆蓋**在背包格上方而不是把格子往上推 ——
         推擠會讓格子區高度與捲動位置跟著跳。開合狀態不持久化。
       */}
+      {enhanceFx && (
+        <div
+          key={`bag-enh-fx-${enhanceFx.token}`}
+          className={`bag-enh-fx${enhanceFx.kind === 'fail' ? ' enh-shake enh-breaking' : ''}`}
+          style={{
+            left: enhanceFx.rect.left, top: enhanceFx.rect.top,
+            width: enhanceFx.rect.width, height: enhanceFx.rect.height,
+          }}
+          data-testid={enhanceFx.kind === 'fail' ? 'enh-fx-ghost' : 'enh-fx-success'}
+        >
+          {enhanceFx.ghost && (
+            <>
+              <GameIcon
+                name={getEquipIcon(enhanceFx.ghost.type === 'armor' ? (enhanceFx.ghost.slot || 'chest') : (enhanceFx.ghost.type || 'sword'))}
+                size={24}
+                color={getEquipmentInstanceTierColor(enhanceFx.ghost, templates)}
+              />
+              <span className="bag-cell-name">{getShortName(enhanceFx.ghost.name)}</span>
+            </>
+          )}
+          <div className="enh-fx-layer">
+            {enhanceFx.kind === 'success' && (
+              <>
+                <div className="enh-flash-gold" />
+                <div className="enh-ring" />
+                <div className="enh-ring delay" />
+              </>
+            )}
+            {enhanceFx.kind === 'fail' && (
+              <>
+                <div className="enh-flash-red" />
+                {SHARD_INDEXES.map(i => <div key={i} className={`enh-shard enh-shard--${i}`} />)}
+              </>
+            )}
+            {enhanceFx.label && <div className="enh-float">{enhanceFx.label}</div>}
+            <div className="enh-flash-soft" />
+          </div>
+        </div>
+      )}
+
+      {rateTarget && <EnhanceRateWindow item={rateTarget} onClose={() => setRateTarget(null)} />}
+
       <div className="bag-sigil-dock">
       {sigilOpen && (
         <div className="bag-sigil-drawer" role="group" aria-label="印記">

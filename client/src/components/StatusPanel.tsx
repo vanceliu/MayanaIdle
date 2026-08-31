@@ -1,7 +1,7 @@
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
-import { getEffectiveDefense, getCombatBonuses } from '../systems/combat';
+import { getUnclampedDefense, getCombatBonuses } from '../systems/combat';
 import type { ActiveEffect } from '../models/effect';
 import { getWeightStatus } from '../systems/weight';
 
@@ -22,10 +22,11 @@ export function StatusPanel() {
 
   const allGear = Object.values(gear).filter(Boolean) as EquipmentInstance[];
 
-  // 防禦一律走 systems/combat 的 getEffectiveDefense —— 這裡原本自己算一份，
+  // 防禦一律走 systems/combat —— 這裡原本自己算一份，
   // 漏掉詛咒的 -20%，與戰鬥實際採用的值不一致（`21-combat-formula.md` § 21.5）
   const defenseBonuses = getCombatBonuses(allGear, activeEffects as ActiveEffect[]);
-  const totalDef = getEffectiveDefense(allGear, activeEffects as ActiveEffect[], defenseBonuses.defense);
+  // 顯示未夾底值：起始防禦 -10，夾底到 0 會讓前幾件防具看起來沒作用（§ 21.5）
+  const totalDef = getUnclampedDefense(allGear, activeEffects as ActiveEffect[], defenseBonuses.defense);
   /**
    * 負重（`20-attributes.md` § 20.7）。超重會擋下攻擊與魔法，所以要常駐可見。
    *

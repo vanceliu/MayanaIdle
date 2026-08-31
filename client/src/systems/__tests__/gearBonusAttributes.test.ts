@@ -302,7 +302,11 @@ describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
   it('物理快照三招也同步縮放（§ 21.4a）', () => {
     const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill.power;
     expect(power('shield-bash')).toBe(32);
-    expect(power('rend')).toBe(81);
     expect(power('taunt')).toBe(65);
+    // 裂傷斬同樣豁免 § 23.7.1 的縮放，但**後續另行調整為 50／流血 70%**
+    // （技能攻擊力是常數、流血跟著裝備成長，81 在低等級占即時傷害八成）。
+    // 這條測的是「有沒有被縮表」，不是現行值 —— 現行值由
+    // `physicalSnapshotSkill.test.ts` 把守。
+    expect(power('rend')).toBe(50);
   });
 });

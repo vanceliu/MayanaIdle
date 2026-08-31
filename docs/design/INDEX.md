@@ -20,6 +20,7 @@
 | **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
+| **強化入口（背包點卷軸／指定目標／機率視窗）** | `35-inventory-constraints.md` | § 35.5.5 |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
 | **上衣／斗篷（T4 起開放／件數／防禦階梯）** | `06-equipment.md` | § 6A.8.9 |
 | **防具路線（布／輕／重）／素質需求／件數** | `06-equipment.md` | § 6A.8.8 |
@@ -82,6 +83,7 @@
 | 戰鬥天賦 / 常駐天賦的條件與動作規格 | `03-combat.md` | § 3.12、§ 3.13（＋緊急撤退）。天賦格取得見 `51-auto-talent.md` |
 | 天賦配置（原腳本 Template，分頁切換） | `03-combat.md` | § 3.14 |
 | 補給天賦（原村莊腳本：自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
+| **裝備篩選條件（販售保留／存入命中）／「本角色穿得起的」判定基準** | `49-village-script.md` | § 49.4 |
 | **系統信箱／更新公告（發放與領取）** | `52-mailbox.md` | 全文 |
 | **補償的版本範圍（單版／到某版之前／全版本）** | `52-mailbox.md` | § 52.2.4 |
 | **補償寄送紀錄記在角色身上** | `52-mailbox.md` | § 52.2.4.2 |
@@ -168,6 +170,7 @@
 ```
 【裝備／詞綴／印記】
 06-equipment.md ←→ 07-affix.md ←→ 08-quality.md ←→ 13-town.md（鐵匠鋪／印記師）
+  § 6.9~6.10 ←→ 35-inventory-constraints.md § 35.5.5（強化入口在背包）
        ↕                    ↕
 06-equipment-acquire.md ────┘（§ 6A.6 ←→ § 7.2；§ 6A.3 ←→ 18-data-schema.md § 18.8）
        ↕                     └→ 30-items.md（材料／卷軸）
@@ -281,6 +284,7 @@
   ←→ 38-map-control.md
   ←→ 35-inventory-constraints.md
   ←→ 13-town.md § 13.8
+  ←  06-equipment.md § 6A.8.8（§ 49.4 的素質判定）
 
 【地圖】
 38-map-control.md ←→ 03-combat.md / 41-arpg-combat.md

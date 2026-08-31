@@ -486,7 +486,7 @@ export function processPlayerAttack(
         if (!alreadyActive || isRefreshable) {
           if (debuffDef.dotDamage || debuffDef.dotDamagePercent) {
             // DoT debuff (snapshot damage at cast time)
-            // § 23.3 裂傷斬：每秒 50% 物理傷害（快照制）— 基準為角色物理傷害，與 § 23.7 淬毒一致
+            // § 23.3 裂傷斬：每秒 70% 物理傷害（快照制）— 基準為角色物理傷害，與 § 23.7 淬毒一致
             // § 24.4.5：DoT 傷害於施加當下快照，最低 1 點
             const baseDmg = debuffDef.dotDamagePercent
               ? Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuffDef.dotDamagePercent))

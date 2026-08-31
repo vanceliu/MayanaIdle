@@ -41,6 +41,16 @@ function useUnmetAttributes(item: EquipmentInstance): (keyof typeof ATTRIBUTE_NA
   return getUnmetAttributes(character, activeEffects, gear, item);
 }
 
+/**
+ * 本角色的職業是否不在該件的 `requiredClass` 內（`06-equipment.md` § 6.6）。
+ * 沒有角色時（角色選擇畫面、Wiki）一律當作符合。
+ */
+function useClassMismatch(requiredClass?: string[]): boolean {
+  const className = useGameStore(s => s.character?.className);
+  if (!requiredClass?.length || !className) return false;
+  return !requiredClass.includes(className);
+}
+
 interface EquipmentDetailProps {
   item: EquipmentInstance;
   hint?: string;
@@ -63,6 +73,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const defenseTotal = (item.defense ?? 0) + defenseBonus + enhancement;
   const unmet = useUnmetAttributes(item);
   const frozen = unmet.length > 0;
+  const classMismatch = useClassMismatch(item.requiredClass);
 
   return (
     <div className="equip-detail">
@@ -143,6 +154,12 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         <div className="equip-detail-stat">品質: {item.quality}%</div>
       )}
       {/* 詞綴只在完整模式顯示：裝備欄十二個欄位各印四條詞綴會把面板灌爆，改由 hover tooltip 呈現 */}
+      {/* 魔導書／臂甲有素質需求也仍有職業限制（§ 6.6），不能因為有素質需求就略過這列 */}
+      {!compact && (!item.requiredAttributes || (item.requiredClass?.length ?? 0) > 0) && (
+        <div className={`equip-detail-class${classMismatch ? ' equip-detail-unmet' : ''}`}>
+          可用職業: {getClassDisplay(item.requiredClass)}
+        </div>
+      )}
       {/* § 6A.8.8 素質需求。未達標的屬性標紅，該件的詞綴全部凍結 */}
       {item.requiredAttributes && (
         <div className={`equip-detail-stat${frozen ? ' equip-detail-unmet' : ''}`}>
@@ -181,10 +198,6 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
           ))}
         </div>
       )}
-      {/* 走素質需求的防具沒有職業限制，不列這行（§ 6A.8.8） */}
-      {!compact && !item.requiredAttributes && (
-        <div className="equip-detail-class">可用職業: {getClassDisplay(item.requiredClass)}</div>
-      )}
       {hint && <div className="equip-detail-hint">{hint}</div>}
     </div>
   );
@@ -197,6 +210,7 @@ interface EquipmentTemplateDetailProps {
 
 export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDetailProps) {
   const isWeapon = !!(template.smallMonsterDamage || template.largeMonsterDamage);
+  const templateClassMismatch = useClassMismatch(template.requiredClass);
   const baseAttackSuccess = template.attackSuccess ?? 0;
   const baseExtraAttack = template.extraAttack ?? 0;
   const tierColor = getEquipmentTierColor(template);
@@ -261,7 +275,9 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
       {(template.weight ?? 0) > 0 && (
         <div className="equip-detail-stat">重量: {template.weight}</div>
       )}
-      <div className="equip-detail-class">可用職業: {getClassDisplay(template.requiredClass)}</div>
+      <div className={`equip-detail-class${templateClassMismatch ? ' equip-detail-unmet' : ''}`}>
+        可用職業: {getClassDisplay(template.requiredClass)}
+      </div>
       {hint && <div className="equip-detail-hint">{hint}</div>}
     </div>
   );

@@ -1,3 +1,5 @@
+import { ATTRIBUTE_KEYS } from './attributes';
+import type { Attributes } from './attributes';
 import type { EquipmentInstance } from './equipment';
 
 /**
@@ -79,7 +81,7 @@ export interface EquipmentKeepFilter {
   affixTierAbove?: number;
   /** 帶有這些詞綴之一就保留 */
   affixTypes?: string[];
-  /** 本職業可裝備的保留 */
+  /** 本角色穿得起的保留（職業 AND 素質，§ 49.4） */
   classUsable?: boolean;
   /** 這些武器類型／`armor` 保留 */
   equipTypes?: string[];
@@ -176,14 +178,37 @@ export interface HuntLocation {
 // === 保留條件判定 ===
 
 /**
+ * 篩選條件的判定對象。
+ *
+ * `selfAttributes` 是**角色自身屬性（建角＋升級配點），不含裝備、不含 buff**（§ 49.4）。
+ * 與 § 6A.8.8 凍結判定的最小固定點刻意不同：販售不可逆，
+ * 基準不能隨當下穿戴集合與 buff 變動，否則同一件戰利品會今天賣明天不賣。
+ */
+export interface EquipmentFilterSubject {
+  className: string;
+  selfAttributes: Attributes;
+}
+
+/**
+ * 這件裝備這個角色穿不穿得起（§ 49.4）：職業 **AND** 素質，兩者都要通過。
+ * 無 `requiredClass` ＝ 全職業；無 `requiredAttributes` ＝ 無素質門檻。
+ */
+function isEquippableBy(item: EquipmentInstance, subject: EquipmentFilterSubject): boolean {
+  if (item.requiredClass?.length && !item.requiredClass.includes(subject.className)) return false;
+  const req = item.requiredAttributes;
+  if (!req) return true;
+  return ATTRIBUTE_KEYS.every(k => (req[k] ?? 0) <= subject.selfAttributes[k]);
+}
+
+/**
  * 這件裝備是否命中篩選條件。
  * 任一條成立即命中 —— 販售時代表保留，存倉庫時代表要存。
- * 保留方向寧可少賣不可誤賣，所以是 OR 不是 AND。
+ * 保留方向寧可少賣不可誤賣，所以條件之間是 OR 不是 AND。
  */
 export function matchesEquipmentFilter(
   item: EquipmentInstance,
   keep: EquipmentKeepFilter | undefined,
-  className: string,
+  subject: EquipmentFilterSubject,
 ): boolean {
   if (!keep) return false;
 
@@ -197,12 +222,7 @@ export function matchesEquipmentFilter(
     if (item.affixes?.some(a => keep.affixTypes!.includes(a.type))) return true;
   }
 
-  if (keep.classUsable) {
-    // 沒標 requiredClass 的是全職業共用，對任何職業都算「可裝備」
-    const usable = !item.requiredClass || item.requiredClass.length === 0
-      || item.requiredClass.includes(className);
-    if (usable) return true;
-  }
+  if (keep.classUsable && isEquippableBy(item, subject)) return true;
 
   if (keep.equipTypes?.length && keep.equipTypes.includes(item.type)) return true;
 

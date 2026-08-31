@@ -441,6 +441,8 @@ interface GameState {
   /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
   abandonCraftQuest: (questId: string) => void;
   saveState: () => void;
+  /** 推一則系統訊息到戰鬥日誌。面板動作的提示與結果一律走這裡，不各自持有 log 陣列 */
+  pushSystemLog: (text: string) => void;
 }
 
 const MAX_LOGS = 200;
@@ -1830,6 +1832,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     );
     const ctx: VillageScriptContext = {
       className: char.className,
+      // 不傳 activeEffects／equippedGear：篩選基準不含裝備與 buff（§ 49.4）
+      selfAttributes: getTotalAttributes(char),
       gold: char.gold,
       bagItems: state.bagItems,
       inventory: state.inventory,
@@ -2374,6 +2378,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       board[d] = generateQuestList(d, state.guildProgress.rank, townId);
     }
     set({ adventurerQuestBoard: board, questBoardTownId: townId ?? null });
+  },
+
+  pushSystemLog: (text: string) => {
+    set(state => ({ combatLogs: addLog(state.combatLogs, { text, type: 'system' }) }));
   },
 
   saveState: () => {

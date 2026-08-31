@@ -50,7 +50,7 @@ const COMPARE: ParamField = {
 
 /** § 49.4 的保留條件。販售裝備（T3）與存入裝備（T4）共用同一組 */
 const KEEP_FIELDS: ParamField[] = [
-  { key: 'keepClassUsable', kind: 'boolean', label: '保留本職業可裝備的', def: true },
+  { key: 'keepClassUsable', kind: 'boolean', label: '保留本角色穿得起的', def: true },
   { key: 'keepAffixTierAbove', kind: 'number', label: '詞綴 Tier 高於', min: 0, max: 7, def: 5 },
 ];
 

@@ -93,3 +93,35 @@ describe('額外屬性詞綴的顯示', () => {
     expect(el.getAttribute('title')).toContain('無 Tier');
   });
 });
+
+/** `06-equipment.md` § 6.6：魔導書／臂甲是防具裡唯二保留職業限制的件 */
+describe('副手的職業限制顯示', () => {
+  const armGuard = item({
+    templateId: 1175, name: '鐵鑄護腕', type: 'armGuard', slot: 'leftHand',
+    defense: 3, line: 'light', requiredAttributes: { AGI: 12 }, requiredClass: ['thief'],
+  });
+
+  it('有素質需求也要列出可用職業', () => {
+    setStore(character({ AGI: 12 }));
+    render(<EquipmentDetail item={armGuard} />);
+    expect(screen.getByText(/可用職業/).textContent).toContain('盜賊');
+  });
+
+  it('本角色職業不符時標紅', () => {
+    setStore(character({ AGI: 12 }));
+    render(<EquipmentDetail item={armGuard} />);
+    expect(screen.getByText(/可用職業/).className).toContain('equip-detail-unmet');
+  });
+
+  it('職業相符時不標紅', () => {
+    setStore({ ...character({ AGI: 12 }), className: 'thief' });
+    render(<EquipmentDetail item={armGuard} />);
+    expect(screen.getByText(/可用職業/).className).not.toContain('equip-detail-unmet');
+  });
+
+  it('compact 模式仍不列可用職業', () => {
+    setStore(character({ AGI: 12 }));
+    render(<EquipmentDetail item={armGuard} compact />);
+    expect(screen.queryByText(/可用職業/)).toBeNull();
+  });
+});

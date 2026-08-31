@@ -224,11 +224,11 @@ export interface EquipmentTemplate {
    */
   line?: ArmorLine;
   /**
-   * 素質需求（§ 6A.8.8）。**防具沒有 `requiredClass`**，能不能穿看這裡。
-   * 未滿足時仍可裝備，但該件的詞綴全部凍結。
+   * 素質需求（§ 6A.8.8）。未滿足時仍可裝備，但該件的詞綴全部凍結。
+   * 與 `requiredClass` 並存：魔導書／臂甲兩者都要過。
    */
   requiredAttributes?: Partial<Attributes>;
-  /** 職業限制（武器與 T1 新手裝用；一般防具改用 `requiredAttributes`） */
+  /** 職業限制（武器、T1 新手裝、魔導書／臂甲；其餘防具不限職業，見 § 6.6） */
   requiredClass?: string[];
   buyPrice: number;
   stability?: number;

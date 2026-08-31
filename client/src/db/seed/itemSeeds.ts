@@ -20,12 +20,12 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 156, name: '灰脊回城卷軸', category: 'scroll', description: '使用後傳送至灰脊城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
 
   // === 強化卷軸 ===
-  { id: 7, name: '武器強化卷軸', category: 'scroll', description: '鐵匠鋪武器強化用', weight: 1, buyPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6' },
-  { id: 8, name: '防具強化卷軸', category: 'scroll', description: '鐵匠鋪防具強化用', weight: 1, buyPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA' },
-  { id: 157, name: '武器強化卷軸＋', category: 'scroll', description: '鐵匠鋪武器強化用，隨機 +1~3', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'gold' },
-  { id: 158, name: '防具強化卷軸＋', category: 'scroll', description: '鐵匠鋪防具強化用，隨機 +1~3', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'gold' },
-  { id: 159, name: '武器強化卷軸－', category: 'scroll', description: '鐵匠鋪武器強化等級 -1，必定成功', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'red' },
-  { id: 160, name: '防具強化卷軸－', category: 'scroll', description: '鐵匠鋪防具強化等級 -1，必定成功', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'red' },
+  { id: 7, name: '武器強化卷軸', category: 'scroll', description: '點擊後指定背包武器強化', weight: 1, buyPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6' },
+  { id: 8, name: '防具強化卷軸', category: 'scroll', description: '點擊後指定背包防具強化', weight: 1, buyPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA' },
+  { id: 157, name: '武器強化卷軸＋', category: 'scroll', description: '點擊後指定背包武器強化，隨機 +1~3', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'gold' },
+  { id: 158, name: '防具強化卷軸＋', category: 'scroll', description: '點擊後指定背包防具強化，隨機 +1~3', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'gold' },
+  { id: 159, name: '武器強化卷軸－', category: 'scroll', description: '武器強化等級 -1，必定成功', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'red' },
+  { id: 160, name: '防具強化卷軸－', category: 'scroll', description: '防具強化等級 -1，必定成功', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'red' },
 
   // === 印記（`46-sigil.md`）===
   // 詞綴專用消耗品，只在印記師使用。歸 scroll 而非 material —— 它們不是製作原料，

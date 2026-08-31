@@ -1,68 +1,21 @@
-import { Fragment, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
-import type { EquipmentInstance, EquipSlot, EquipmentTemplate } from '../../models/equipment';
-import { SLOT_NAMES, ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
+import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
+import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
-import { EquipmentDetail } from '../EquipmentInfo';
 import { GameIcon } from '../GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
 import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
 import { evaluateCraftRequirements, hasCraftQuestFor, removeCraftQuestByTemplate } from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
-import { useOneShotFx, FX_DURATION_MS } from './useOneShotFx';
 
-/** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱 */
-const WEAPON_ENHANCE_SCROLL_ID = 7;
-const ARMOR_ENHANCE_SCROLL_ID = 8;
-/** 上位卷軸：一次隨機 +1~3（`06-equipment.md` § 6.12） */
-const WEAPON_ENHANCE_PLUS_SCROLL_ID = 157;
-const ARMOR_ENHANCE_PLUS_SCROLL_ID = 158;
-const PLUS_SCROLL_MAX_LEVELS = 3;
-/** 下位卷軸：強化等級 -1，必定成功（`06-equipment.md` § 6.12） */
-const WEAPON_ENHANCE_MINUS_SCROLL_ID = 159;
-const ARMOR_ENHANCE_MINUS_SCROLL_ID = 160;
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { db } from '../../db/database';
 import { resolveEquipment, rollNewInstanceFields } from '../../systems/templateSync';
-import { getWeaponEnhanceRate, getArmorEnhanceRate } from '../../systems/enhancement';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
-
-type Tab = 'enhance' | 'craft';
-
-/**
- * 強化演出的總長度（`48-vfx.md` § 48.4.3）。
- * 最長的一段是成功的 `+N` 浮字：stagger 0.32s + 1.1s。
- * 失敗（碎裂）與紅閃同一拍，stagger + 0.88s 更短。
- */
-export const ENHANCE_FX_DURATION_MS = FX_DURATION_MS;
-
-type EnhanceFxKind = 'safe' | 'success' | 'fail';
-
-interface EnhanceFx {
-  kind: EnhanceFxKind;
-  itemId: number;
-  /** 成功時往上飄的 `+N` */
-  label?: string;
-  /** 失敗時的殘影快照：裝備已從清單移除，靠這份原地演完碎裂 */
-  ghost?: EquipmentInstance;
-  ghostIndex?: number;
-  ghostSlot?: EquipSlot;
-}
-
-const SHARD_INDEXES = [1, 2, 3, 4, 5, 6];
-
-function isWeapon(item: EquipmentInstance): boolean {
-  return !!item.smallMonsterDamage;
-}
-
-function getStability(item: EquipmentInstance): number {
-  if (isWeapon(item)) return item.stability ?? 6;
-  if (item.stability != null) return item.stability;
-  return 4;
-}
 
 /**
  * 製作品的詞綴（§ 6A.6）：4 個、Tier **T1~T5 均等隨機**、不出特殊詞綴。
@@ -93,13 +46,10 @@ export function TownBlacksmith() {
   const craftQuests = useGameStore(s => s.craftQuests);
   const acceptCraftQuest = useGameStore(s => s.acceptCraftQuest);
   const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
-  const [tab, setTab] = useState<Tab>('enhance');
-  const [_selectedItem, _setSelectedItem] = useState<{ item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot } | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<EquipmentTemplate | null>(null);
   const [craftTemplates, setCraftTemplates] = useState<EquipmentTemplate[]>([]);
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
-  const { fx, play: playFx } = useOneShotFx<EnhanceFx>();
   const allTemplates = useEquipmentTemplates();
 
   useEffect(() => {
@@ -111,29 +61,6 @@ export function TownBlacksmith() {
 
   if (!char) return null;
 
-  const weaponScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_SCROLL_ID);
-  const armorScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_SCROLL_ID);
-  const weaponPlusScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_PLUS_SCROLL_ID);
-  const armorPlusScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_PLUS_SCROLL_ID);
-  const weaponMinusScrolls = getBagItemAmount(bagItems, WEAPON_ENHANCE_MINUS_SCROLL_ID);
-  const armorMinusScrolls = getBagItemAmount(bagItems, ARMOR_ENHANCE_MINUS_SCROLL_ID);
-
-  const allItems: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }[] = [];
-
-  for (const [slot, item] of Object.entries(equippedGear)) {
-    if (item) {
-      allItems.push({ item, source: 'equipped', slot: slot as EquipSlot });
-    }
-  }
-  for (const item of inventory) {
-    allItems.push({ item, source: 'bag' });
-  }
-
-  function consumeFromBag(itemId: number) {
-    return consumeBagItem(useGameStore.getState().bagItems, itemId);
-  }
-
-  /** 背包列一律以 `itemTemplateId` 定位（§ 99.1），不可用 name 查 —— 改名即失聯 */
   function persistBagItem(itemId: number, newAmount: number) {
     if (!char?.id) return;
     const rows = db.characterBag.where({ characterId: char.id, itemTemplateId: itemId });
@@ -144,155 +71,10 @@ export function TownBlacksmith() {
     }
   }
 
-  function persistEquipment(item: EquipmentInstance) {
-    if (!item.id) return;
-    db.equipmentInstances.update(item.id, {
-      enhancement: item.enhancement,
-      quality: item.quality,
-      affixes: item.affixes,
-    });
-  }
-
   /*
    * 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1）——
    * 失敗時裝備已經被移除，卡片會跟著消失，所以用 `ghost` 存一份快照原地演完碎裂。
    */
-
-  /**
-   * 強化一次。`plus` 為上位卷軸（`06-equipment.md` § 6.12）：
-   * 級數隨機 +1~3 均等。**成功率看使用前的等級**（＝普通卷軸這次要判的那一格），
-   * 抽到幾級只決定跳多遠，不影響成敗 —— +5 的武器抽到 +3 一樣必成，
-   * 因為判的是 +6 那一格，它在安定值內。
-   */
-  function handleEnhance(
-    entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot },
-    plus = false,
-  ) {
-    if (!char) return;
-    const { item, source, slot } = entry;
-    const steps = plus ? 1 + Math.floor(Math.random() * PLUS_SCROLL_MAX_LEVELS) : 1;
-    const nextLevel = (item.enhancement ?? 0) + steps;
-
-    const itemIsWeapon = isWeapon(item);
-    const scrollItemId = itemIsWeapon
-      ? (plus ? WEAPON_ENHANCE_PLUS_SCROLL_ID : WEAPON_ENHANCE_SCROLL_ID)
-      : (plus ? ARMOR_ENHANCE_PLUS_SCROLL_ID : ARMOR_ENHANCE_SCROLL_ID);
-    const scrollCount = getBagItemAmount(bagItems, scrollItemId);
-    if (scrollCount <= 0) return;
-
-    const stability = getStability(item);
-    // 判定的永遠是「使用前等級的下一級」，＋卷軸不因為跳得遠而變難（§ 6.12）
-    const judgedLevel = (item.enhancement ?? 0) + 1;
-    const rate = itemIsWeapon
-      ? getWeaponEnhanceRate(judgedLevel, stability)
-      : getArmorEnhanceRate(judgedLevel, stability);
-
-    const success = Math.random() < rate;
-    const newBag = consumeFromBag(scrollItemId);
-    persistBagItem(scrollItemId, scrollCount - 1);
-
-    if (success) {
-      const updatedItem = { ...item, enhancement: nextLevel };
-      persistEquipment(updatedItem);
-      if (source === 'equipped' && slot) {
-        const gear = { ...equippedGear, [slot]: updatedItem };
-        useGameStore.setState({ equippedGear: gear, bagItems: newBag });
-      } else {
-        const newInv = inventory.map(i => i.id === item.id ? updatedItem : i);
-        useGameStore.setState({ inventory: newInv, bagItems: newBag });
-      }
-      setResultMsg(`強化成功！${item.name} +${nextLevel}`);
-      // § 48.4：安定值內只給白閃，超過安定值才是金色那一套
-      playFx({
-        kind: nextLevel <= stability ? 'safe' : 'success',
-        itemId: item.id!,
-        label: `+${nextLevel}`,
-      });
-    } else {
-      if (item.id) db.equipmentInstances.delete(item.id);
-      if (source === 'equipped' && slot) {
-        const gear = { ...equippedGear, [slot]: null };
-        useGameStore.setState({ equippedGear: gear, bagItems: newBag });
-      } else {
-        const newInv = inventory.filter(i => i.id !== item.id);
-        useGameStore.setState({ inventory: newInv, bagItems: newBag });
-      }
-      setResultMsg(`強化失敗！${item.name} 已損毀...`);
-      // 裝備已經從清單移除，碎裂只能靠殘影卡片演（狀態不為了特效延後，見 `48-vfx.md` § 48.1）
-      playFx({
-        kind: 'fail',
-        itemId: item.id!,
-        ghost: item,
-        ghostIndex: allItems.findIndex(e => e.item.id === item.id),
-        ghostSlot: source === 'equipped' ? slot : undefined,
-      });
-    }
-    const stats = { ...useGameStore.getState().statistics };
-    if (itemIsWeapon) {
-      stats.weaponEnhanceAttempts += 1;
-      if (!success) stats.weaponsBroken += 1;
-    } else {
-      stats.armorEnhanceAttempts += 1;
-      if (!success) stats.armorsBroken += 1;
-    }
-    useGameStore.setState({ statistics: stats });
-    useGameStore.getState().saveState();
-  }
-
-  /**
-   * 下位卷軸：強化等級 -1，**必定成功、裝備不會消失**（`06-equipment.md` § 6.12）。
-   * 沒有判定，所以不計入強化次數與損毀數。
-   */
-  function handleDowngrade(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
-    if (!char) return;
-    const { item, source, slot } = entry;
-    const current = item.enhancement ?? 0;
-    if (current <= 0) return;
-
-    const itemIsWeapon = isWeapon(item);
-    const scrollItemId = itemIsWeapon ? WEAPON_ENHANCE_MINUS_SCROLL_ID : ARMOR_ENHANCE_MINUS_SCROLL_ID;
-    const scrollCount = getBagItemAmount(bagItems, scrollItemId);
-    if (scrollCount <= 0) return;
-
-    const newBag = consumeFromBag(scrollItemId);
-    persistBagItem(scrollItemId, scrollCount - 1);
-
-    const nextLevel = current - 1;
-    const updatedItem = { ...item, enhancement: nextLevel };
-    persistEquipment(updatedItem);
-    if (source === 'equipped' && slot) {
-      useGameStore.setState({ equippedGear: { ...equippedGear, [slot]: updatedItem }, bagItems: newBag });
-    } else {
-      useGameStore.setState({
-        inventory: inventory.map(i => (i.id === item.id ? updatedItem : i)),
-        bagItems: newBag,
-      });
-    }
-    setResultMsg(`${item.name} 已降為 +${nextLevel}`);
-    playFx({ kind: 'safe', itemId: item.id!, label: `+${nextLevel}` });
-    useGameStore.getState().saveState();
-  }
-
-  /** 失敗時的殘影卡片：純視覺，沒有任何按鈕，演完就由 `playFx` 收掉 */
-  const ghostCard = fx?.kind === 'fail' && fx.ghost
-    ? (
-      <div
-        key={`enh-ghost-${fx.token}`}
-        className="shop-item bs-shop-item enh-shake enh-breaking"
-        data-testid="enh-fx-ghost"
-      >
-        <div className="shop-item-info">
-          {fx.ghostSlot && <span className="bs-slot-tag">[{SLOT_NAMES[fx.ghostSlot]}]</span>}
-          <EquipmentDetail item={fx.ghost} templates={allTemplates} />
-        </div>
-        <div className="enh-fx-layer">
-          <div className="enh-flash-red" />
-          <div className="enh-flash-soft" />
-          {SHARD_INDEXES.map(i => <div key={i} className={`enh-shard enh-shard--${i}`} />)}
-        </div>
-      </div>
-    )
-    : null;
 
   /**
    * 製作按鈕與製作任務外框走**同一支判定**（`36-quest-system.md` § 36.13.3）——
@@ -380,83 +162,19 @@ export function TownBlacksmith() {
     useGameStore.getState().saveState();
   }
 
-  function renderEnhanceActions(entry: { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot }) {
-    const { item } = entry;
-    const stability = getStability(item);
-    if (stability < 0) {
-      return (
-        <div className="shop-item-actions">
-          <span className="bs-action-cost">不可強化</span>
-        </div>
-      );
-    }
-    const current = item.enhancement ?? 0;
-    const nextLevel = current + 1;
-    const itemIsWeapon = isWeapon(item);
-    const scrollName = itemIsWeapon ? '武器卷' : '防具卷';
-    const scrollCount = itemIsWeapon ? weaponScrolls : armorScrolls;
-    const plusCount = itemIsWeapon ? weaponPlusScrolls : armorPlusScrolls;
-    const minusCount = itemIsWeapon ? weaponMinusScrolls : armorMinusScrolls;
-    const rateAt = (level: number) => itemIsWeapon
-      ? getWeaponEnhanceRate(level, stability)
-      : getArmorEnhanceRate(level, stability);
-    const rate = rateAt(nextLevel);
-    const isSafe = nextLevel <= stability;
-    const asPct = (r: number) => `${Math.floor(r * 100)}%`;
-
-    return (
-      <div className="shop-item-actions bs-actions">
-        <div className="bs-action-summary">
-          <span className="bs-action-cost">{scrollName}×1</span>
-          <span className="bs-action-rate">{isSafe ? '100%' : asPct(rate)}</span>
-          {!isSafe && <span className="bs-action-warn">失敗消失</span>}
-        </div>
-        <button data-testid="enh-btn" onClick={() => handleEnhance(entry)} disabled={scrollCount <= 0}>
-          +{current} → +{nextLevel}
-        </button>
-        <div className="bs-action-summary">
-          <span className="bs-action-cost">{scrollName}＋×1</span>
-          <span className="bs-action-rate">{isSafe ? '100%' : asPct(rate)}</span>
-          {!isSafe && <span className="bs-action-warn">失敗消失</span>}
-        </div>
-        <button data-testid="enh-btn-plus" onClick={() => handleEnhance(entry, true)} disabled={plusCount <= 0}>
-          +{current} → +{current + 1}~{current + PLUS_SCROLL_MAX_LEVELS}
-        </button>
-        <div className="bs-action-summary">
-          <span className="bs-action-cost">{scrollName}－×1</span>
-          <span className="bs-action-rate">100%</span>
-        </div>
-        <button data-testid="enh-btn-minus" onClick={() => handleDowngrade(entry)} disabled={minusCount <= 0 || current <= 0}>
-          +{current} → +{Math.max(0, current - 1)}
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="shop-panel blacksmith-panel">
-      <p className="shop-greeting">「想強化什麼裝備？拿來讓我瞧瞧。」</p>
+      <p className="shop-greeting">「想打什麼裝備？材料備齊了就開工。」</p>
       <div className="bs-resources">
         <span>金幣: {char.gold.toLocaleString()}G</span>
-        <span>武器卷: {weaponScrolls}（＋{weaponPlusScrolls}／－{weaponMinusScrolls}）</span>
-        <span>防具卷: {armorScrolls}（＋{armorPlusScrolls}／－{armorMinusScrolls}）</span>
-        {tab === 'craft' && <span>製作任務: {craftQuests.length}/{MAX_ACTIVE_CRAFT_QUESTS}</span>}
+        <span>製作任務: {craftQuests.length}/{MAX_ACTIVE_CRAFT_QUESTS}</span>
       </div>
 
-      <div className="shop-tabs">
-        <button className={tab === 'enhance' ? 'active' : ''} onClick={() => { setTab('enhance'); setResultMsg(null); }}>
-          裝備強化
-        </button>
-        <button className={tab === 'craft' ? 'active' : ''} onClick={() => { setTab('craft'); setResultMsg(null); setSelectedRecipe(null); }}>
-          裝備製作
-        </button>
-      </div>
 
       {resultMsg && <p className="bs-result">{resultMsg}</p>}
 
       {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨配方清單捲動 */}
-      {tab === 'craft' && (
-        <div className="bs-craft-categories">
+      <div className="bs-craft-categories">
           {[
             { key: 'sword', label: '單手劍' },
             { key: 'axe', label: '單手斧' },
@@ -498,53 +216,11 @@ export function TownBlacksmith() {
               </button>
             );
           })}
-        </div>
-      )}
+      </div>
 
-      {/* 只有裝備／配方清單會捲動，資源列與分頁固定在上方 */}
+      {/* 只有配方清單會捲動，資源列與分類固定在上方 */}
       <div className="panel-scroll">
-      {tab !== 'craft' && (
-        <div className="shop-items">
-          {allItems.length === 0 && !ghostCard && <p className="empty-text">沒有裝備</p>}
-          {allItems.map((entry, index) => (
-            <Fragment key={entry.item.id}>
-              {ghostCard && fx?.ghostIndex === index && ghostCard}
-              <div
-                className={`shop-item bs-shop-item${
-                  tab === 'enhance' && getStability(entry.item) >= 0 ? ' enh-standby' : ''
-                }`}
-              >
-                <div className="shop-item-info">
-                  {entry.source === 'equipped' && entry.slot && (
-                    <span className="bs-slot-tag">[{SLOT_NAMES[entry.slot]}]</span>
-                  )}
-                  <EquipmentDetail item={entry.item} templates={allTemplates} />
-                </div>
-                {tab === 'enhance' && renderEnhanceActions(entry)}
-                {fx && fx.kind !== 'fail' && fx.itemId === entry.item.id && (
-                  /* key 帶 token：連點時沿用同一個節點會讓 CSS 動畫不重跑 */
-                  <div key={fx.token} className="enh-fx-layer" data-testid="enh-fx-success">
-                    {fx.kind === 'success' && (
-                      <>
-                        <div className="enh-flash-gold" />
-                        <div className="enh-ring" />
-                        <div className="enh-ring delay" />
-                      </>
-                    )}
-                    {fx.label && <div className="enh-float">{fx.label}</div>}
-                    <div className="enh-flash-soft" />
-                  </div>
-                )}
-              </div>
-            </Fragment>
-          ))}
-          {/* 殘影原本的位置已被別的卡片遞補，或它本來就在最後一個，補在清單尾端 */}
-          {ghostCard && (fx?.ghostIndex == null || fx.ghostIndex >= allItems.length) && ghostCard}
-        </div>
-      )}
-
-      {tab === 'craft' && (
-        <div className="shop-items">
+      <div className="shop-items">
           {craftTemplates
             .filter(recipe => {
               if (craftCategory.startsWith('armor-')) {
@@ -657,8 +333,7 @@ export function TownBlacksmith() {
               </div>
             </div>
           ))}
-        </div>
-      )}
+      </div>
       </div>
     </div>
   );

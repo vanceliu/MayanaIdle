@@ -15,7 +15,7 @@
 | **DOM 特效** | 城鎮面板、背包、任務等 React 面板 | 純 CSS `@keyframes`，不加依賴 |
 | **Pixi 特效** | 戰鬥畫面（`EffectLayer`，`40-pixijs-migration.md`） | Graphics／粒子／filter |
 
-強化在鐵匠鋪面板裡，屬於 DOM 側；受擊、投射物、死亡在 Pixi 側。
+強化在背包面板裡，屬於 DOM 側；受擊、投射物、死亡在 Pixi 側。
 
 ---
 
@@ -59,7 +59,7 @@ CSS 動畫不會因為 class 或內容變了就重跑。
 
 ---
 
-## 48.4 裝備強化（鐵匠鋪）
+## 48.4 裝備強化（背包）
 
 對應規則：`06-equipment.md` § 6.9（武器）／§ 6.10（防具）。
 安定值內必定成功；超過安定值後有失敗率，**失敗即裝備消失**。
@@ -98,8 +98,9 @@ CSS 動畫不會因為 class 或內容變了就重跑。
 | 項目 | 位置 |
 |---|---|
 | 正式樣式 | `client/src/App.css` 的「裝備強化演出」區塊（**唯一出處**） |
-| 觸發點 | `TownBlacksmith.tsx` 的強化結算（已有安定值與 `success`，不需另算）；新手裝走 `StarterNpc.tsx` |
+| 觸發點 | `BagPanel.tsx` 的強化結算（`systems/enhanceScroll.ts` 回傳 `fx` 與 `nextLevel`，不需另算）；新手裝走 `StarterNpc.tsx` |
 | 共用狀態 | `useOneShotFx`（token／收尾計時器／卸載清除，見 § 48.3.1）—— 三個面板都用它，不各寫一份 |
+| 背包格的落點 | 背包格 `overflow: hidden`，演出改成照格子矩形疊一層 `.bag-enh-fx`（`position: fixed`），飛散距離以 `--enh-fx-scale` 收斂 |
 | 預覽頁 | `client/demo/enhance-fx.html`（Vite dev server 下開 `/MayanaIdle/demo/enhance-fx.html`） |
 
 - 預覽頁**直接 `<link>` `src/App.css`**，不自帶一份特效 CSS —— 兩邊各留一份必然走鐘。
