@@ -1,5 +1,5 @@
 import type { Position, MapData } from '../models/mapControl';
-import { hasLineOfSight, getDistance } from './lineOfSight';
+import { hasLineOfSight, getDistance, isWithinAttackRange } from './lineOfSight';
 import type { MonsterAttackType } from '../models/monster';
 
 /** 怪物戰鬥 FSM。`casting` 是詠唱前搖（`25-monster-system.md` § 25.11） */
@@ -113,7 +113,7 @@ export function tickMonsterCombat(
         return { action: 'leash' };
       }
 
-      const inRange = dist <= config.attackRange;
+      const inRange = isWithinAttackRange(monsterPos, playerPos, config.attackRange);
       const hasLos = hasLineOfSight(monsterPos, playerPos, map);
 
       if (inRange && hasLos) {
@@ -131,7 +131,7 @@ export function tickMonsterCombat(
         return { action: 'leash' };
       }
 
-      const inRange = dist <= config.attackRange;
+      const inRange = isWithinAttackRange(monsterPos, playerPos, config.attackRange);
       const hasLos = hasLineOfSight(monsterPos, playerPos, map);
 
       if (!inRange || !hasLos) {
@@ -159,7 +159,7 @@ export function tickMonsterCombat(
         return { action: 'leash' };
       }
 
-      const inRange = dist <= config.attackRange;
+      const inRange = isWithinAttackRange(monsterPos, playerPos, config.attackRange);
       const hasLos = hasLineOfSight(monsterPos, playerPos, map);
 
       if (!inRange || !hasLos) {

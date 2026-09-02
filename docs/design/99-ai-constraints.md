@@ -30,6 +30,27 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 近戰判定改為相鄰格
+
+定案規格：
+
+- 近戰（射程 ≤ 1.5）的出手判定與落腳格判定一律**以格為單位判相鄰**（含斜角，Chebyshev ≤ 1），
+  不用真實座標的歐氏距離
+- 射程 > 1.5（技能、弓）維持真實座標歐氏距離
+- 出手判定與落腳格判定**必須用同一個函式**，不可各寫一份
+- 玩家與怪物同一條規則
+- 成因：角色停在格與格之間時真實距離可能是 1.52，剛好超出 1.5，而
+  `findAttackPosition` 的起點格只用真實座標判一次 → 回 null → 目標被清掉 →
+  重選同一隻 → 不出手也不移動的死結
+
+階段：
+
+1. 共用判定函式 `isWithinAttackRange()`（`systems/lineOfSight.ts`）
+2. 玩家側接上：`playerCombatFSM`（出手／已就位）、`pathfinding`（`findAttackPosition`／`isAttackPosition`）、`targeting`（射程 gate）
+3. 怪物側接上：`monsterCombatFSM` 的 inRange、`gameLoop` 的停下距離與「附近有怪」判定
+4. 測試：更新 `movementDeadlock.test.ts` 至新規則，新增死角掃描回歸（各地圖死角數必須為 0）
+5. 文件同步：`41-arpg-combat.md` § 3.1／§ 4.3、`38-map-control.md` § 38.5／§ 38.7、`25-monster-system.md` § 25.8
+
 ### 強化入口從鐵匠鋪搬到背包
 
 定案規格：

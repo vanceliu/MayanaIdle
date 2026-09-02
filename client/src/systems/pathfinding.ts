@@ -1,6 +1,6 @@
 import type { Position, MapData } from '../models/mapControl';
 import { canTransition, isInBounds, isSpawnableTile, isWalkableTile } from '../models/mapControl';
-import { getDistance, hasLineOfSight } from './lineOfSight';
+import { getDistance, hasLineOfSight, isWithinAttackRange } from './lineOfSight';
 
 interface AStarNode {
   x: number;
@@ -116,7 +116,7 @@ export function findAttackPosition(
     const isStart = current.position.x === start.x && current.position.y === start.y;
     const evalFrom = isStart ? from : current.position;
     if (!isTarget
-      && getDistance(evalFrom, target) <= range
+      && isWithinAttackRange(evalFrom, target, range)
       && hasLineOfSight(evalFrom, target, map)) {
       return current.position;
     }
@@ -145,7 +145,7 @@ export function isAttackPosition(
   occupied?: Set<string>,
 ): boolean {
   if (occupied?.has(`${position.x},${position.y}`)) return false;
-  return getDistance(position, target) <= range && hasLineOfSight(position, target, map);
+  return isWithinAttackRange(position, target, range) && hasLineOfSight(position, target, map);
 }
 
 export function findAdjacentWalkable(map: MapData, target: Position, from: Position): Position | null {

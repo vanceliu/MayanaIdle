@@ -1,5 +1,6 @@
 import type { Position, MapData } from '../models/mapControl';
 import { getElevation, getTileAt, isInBounds } from '../models/mapControl';
+import { MELEE_WEAPON_RANGE } from '../models/equipment';
 
 export type RayPurpose = 'sight' | 'projectile';
 
@@ -48,6 +49,26 @@ export function hasProjectilePath(from: Position, to: Position, map: MapData): b
 
 export function getDistance(a: Position, b: Position): number {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
+
+/**
+ * 射程判定（`41-arpg-combat.md` § 3.1）。**出手判定與落腳格判定共用這一個函式**。
+ *
+ * 近戰（`range <= MELEE_WEAPON_RANGE`）判**相鄰格**：以格為單位，含斜角。
+ * 停在格與格之間時真實距離可能是 1.52 —— 差 0.02 格就打不到，而所在格的格心明明相鄰，
+ * 尋路又找不出「該站哪一格」（自己這格已經佔著），兩邊就此僵住。
+ *
+ * 射程 > 1.5（技能、弓）維持真實座標歐氏距離：那個尺度沒有邊界縫隙問題，
+ * 改判格座標反而會在遠距離累積誤差。
+ *
+ * `range: 0` 是「同一點」（對自身施放、走位的精確落點），**不可當成相鄰格**。
+ */
+export function isWithinAttackRange(from: Position, to: Position, range: number): boolean {
+  if (range <= 0 || range > MELEE_WEAPON_RANGE) return getDistance(from, to) <= range;
+  return Math.max(
+    Math.abs(Math.round(from.x) - Math.round(to.x)),
+    Math.abs(Math.round(from.y) - Math.round(to.y)),
+  ) <= 1;
 }
 
 export function findTargetsInRadius(

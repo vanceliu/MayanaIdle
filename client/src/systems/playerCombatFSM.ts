@@ -1,6 +1,6 @@
 import { getWeaponRange, isRangedWeapon } from '../models/equipment';
 import type { Position, MapData } from '../models/mapControl';
-import { hasLineOfSight, getDistance } from './lineOfSight';
+import { hasLineOfSight, getDistance, isWithinAttackRange } from './lineOfSight';
 
 export type PlayerCombatState = 'idle' | 'chasing' | 'attacking';
 
@@ -172,8 +172,7 @@ export function tickPlayerCombat(
       return move;
     }
   }
-  const dist = getDistance(playerPos, target.position);
-  const inRange = dist <= attackConfig.range;
+  const inRange = isWithinAttackRange(playerPos, target.position, attackConfig.range);
   const hasLos = hasLineOfSight(playerPos, target.position, map);
 
   // Can attack?
@@ -201,7 +200,7 @@ export function tickPlayerCombat(
     : attackConfig.chaseRange ?? attackConfig.range;
 
   // 已經在該站的位置、視線也通 → 原地等冷卻，不要再往前蹭
-  if (dist <= moveRange && hasLos) {
+  if (isWithinAttackRange(playerPos, target.position, moveRange) && hasLos) {
     ctx.state = 'attacking';
     // 計時器照走，冷卻一結束就能立刻出手，不必再等一個完整攻擊間隔
     ctx.attackTimer += deltaMs;

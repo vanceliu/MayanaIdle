@@ -1,7 +1,7 @@
 import type { Position } from '../models/mapControl';
 import type { Skill } from '../models/skill';
 import type { CombatAction } from '../models/scriptEngine';
-import { getDistance } from './lineOfSight';
+import { getDistance, isWithinAttackRange } from './lineOfSight';
 
 /**
  * 目標選取的純函式版本（`41-arpg-combat.md` § 3.4／§ 3.5）。
@@ -62,7 +62,7 @@ export function resolveActionTargets(params: ResolveTargetsParams): string[] {
 
   const primary = candidates.find(c => c.id === primaryId)!;
   // 主目標超出這個動作的射程就不出手（FSM 的追擊距離與出手判定是兩個數字）
-  if (getDistance(playerPos, primary.position) > maxRange) return [];
+  if (!isWithinAttackRange(playerPos, primary.position, maxRange)) return [];
 
   if (action.type === 'normal_attack') {
     return [primaryId];

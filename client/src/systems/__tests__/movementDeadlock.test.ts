@@ -12,9 +12,9 @@ import type { MapData } from '../../models/mapControl';
 /**
  * 回歸情境：怪物停在射程外不動、角色也不出手，雙方靜止。
  *
- * 成因為射程判定用真實座標、落腳格判定用四捨五入的格心，兩者最多差 0.7 格，
- * 停在格與格之間時雙方會同時判定「已就位」。
- * 修正方向是**判定對齊**（一律用真實座標判），不是把位置拉回格心。
+ * 成因為出手判定與落腳格判定各用一套距離。修正方向是**判定對齊** ——
+ * 近戰一律判相鄰格（`41-arpg-combat.md` § 3.1），出手與尋路共用
+ * `isWithinAttackRange()`，不是把位置拉回格心。
  */
 
 /** 外圍一圈牆、內部全空的地圖；`autoSpawn: false` 讓測試期間不會自己生怪 */
@@ -101,11 +101,11 @@ function setup(
   useMapMonsterStore.setState({ monsters, paused: false, combatMonsterIds: [], maxMonsters: 3 });
 }
 
-describe('落腳格判定用真實座標', () => {
-  it('停在格與格之間且超出射程時，不會把原地當成已就位', () => {
+describe('近戰落腳格判定', () => {
+  it('所在格與目標格不相鄰時，不會把原地當成已就位', () => {
     const monster = { x: 8, y: 5 };
-    const from = { x: 6.4, y: 5 };   // 真實距離 1.6 > 1.5，四捨五入後的格心距離 2 也不合格
-    const between = { x: 6.6, y: 5 }; // 真實距離 1.4 ≤ 1.5，但格心（7,5）距離 1 也合格
+    const from = { x: 6.4, y: 5 };   // 所在格 (6,5) 與 (8,5) 不相鄰
+    const between = { x: 6.6, y: 5 }; // 所在格 (7,5) 與 (8,5) 相鄰
 
     // 超出射程：必須挑別的格子，回原地會讓角色站著不動也不出手
     expect(findAttackPosition(MAP, monster, from, MELEE_RANGE)).not.toEqual({ x: 6, y: 5 });
@@ -192,9 +192,11 @@ describe('僵局回歸', () => {
     expect(getDistance(monster.position, { x: 5, y: 5 })).toBeLessThanOrEqual(MELEE_RANGE);
   });
 
-  it('角色停在格與格之間、距離在射程內時出得了手', () => {
-    const playerPos = { x: 5.4, y: 5 };
-    const monsters: MonsterInfo[] = [{ id: 'm1', index: 0, position: { x: 6.6, y: 5 }, alive: true }];
+  it('角色停在格與格之間、所在格與目標格相鄰時出得了手', () => {
+    // 真實距離 1.52 剛好超出 1.5，但所在格 (5,5) 與 (5,6) 相鄰 ——
+    // 這正是舊規則的死角：打不到，`findAttackPosition` 又找不出別的落腳格
+    const playerPos = { x: 5.45, y: 4.55 };
+    const monsters: MonsterInfo[] = [{ id: 'm1', index: 0, position: { x: 5, y: 6 }, alive: true }];
     const ctx = createPlayerCombatContext();
 
     const result = tickPlayerCombat(
@@ -203,5 +205,17 @@ describe('僵局回歸', () => {
 
     expect(result.action).toBe('attack');
     expect(result.attackTargetIdx).toBe(0);
+  });
+
+  it('所在格與目標格不相鄰時走位，不會靜止', () => {
+    const playerPos = { x: 5.4, y: 5 };
+    const monsters: MonsterInfo[] = [{ id: 'm1', index: 0, position: { x: 6.6, y: 5 }, alive: true }];
+    const ctx = createPlayerCombatContext();
+
+    const result = tickPlayerCombat(
+      ctx, playerPos, monsters, { attackType: 'melee', range: MELEE_RANGE }, MAP, ctx.attackCooldown,
+    );
+
+    expect(result.action).toBe('move_to');
   });
 });

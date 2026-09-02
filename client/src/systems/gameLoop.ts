@@ -7,7 +7,7 @@ import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/ga
 import { calculatePressure } from './pressure';
 import { drainRestedExp } from './restedExp';
 import { findPath, findAttackPosition, canMoveBetween } from './pathfinding';
-import { hasLineOfSight } from './lineOfSight';
+import { hasLineOfSight, isWithinAttackRange } from './lineOfSight';
 
 const ATTACK_RANGE_MELEE = 1.5;
 const DOT_TICK_INTERVAL = 1000;
@@ -65,11 +65,9 @@ export function gameLoopTick(deltaMs: number) {
   const aboveResume = hpPct >= gameState.afterCombatHpResumeThreshold && mpPct >= gameState.afterCombatMpResumeThreshold;
 
   // Only trigger pause in idle state (no nearby monsters in attack range)
-  const hasNearbyMonster = monsterStore.monsters.some(m => {
-    const dx = m.position.x - playerPos.x;
-    const dy = m.position.y - playerPos.y;
-    return Math.sqrt(dx * dx + dy * dy) <= ATTACK_RANGE_MELEE;
-  });
+  const hasNearbyMonster = monsterStore.monsters.some(
+    m => isWithinAttackRange(playerPos, m.position, ATTACK_RANGE_MELEE),
+  );
   const isIdle = !hasNearbyMonster;
 
   if (belowThreshold && !monsterStore.paused && isIdle) {
@@ -261,7 +259,8 @@ function moveMonstersSafe(
      * （`41-arpg-combat.md` § 5.2）。射程還沒回填時退回近戰距離。
      */
     const stopDistance = monster.attackRange ?? TRIGGER_DISTANCE;
-    if (dist <= stopDistance && hasLineOfSight(monster.position, playerPos, map)) {
+    if (isWithinAttackRange(monster.position, playerPos, stopDistance)
+      && hasLineOfSight(monster.position, playerPos, map)) {
       updated.push(monster);
       continue;
     }

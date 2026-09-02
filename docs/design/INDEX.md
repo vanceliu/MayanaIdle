@@ -57,6 +57,7 @@
 | 戰鬥公式（攻擊/防禦/命中/迴避） | `21-combat-formula.md` | 全文 |
 | **技能傷害走哪條公式（魔法／物理快照／物理普攻）** | `21-combat-formula.md` § 21.4 / § 21.4a、`23-class-magic.md` § 23.1.1 | — |
 | ARPG 即時戰鬥（LOS／投射物／位移） | `41-arpg-combat.md` | 全文 |
+| **近戰判相鄰格、遠程判真實座標（出手與落腳格共用）** | `41-arpg-combat.md` | § 3.1 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | **遠程攻擊吃敏捷、近戰吃力量** | `21-combat-formula.md` § 21.3、`20-attributes.md` § 20.3 | — |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
