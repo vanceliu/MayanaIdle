@@ -105,6 +105,7 @@ export const VILLAGE_CONDITION_DESC: Record<string, string> = {
   in_town: '角色現在站在城鎮還是野外',
   bag_free_slots_lte: '背包剩餘格數。取東西前該看的是剩餘，不是已用',
   has_hunt_location: '有沒有可以走回去的地點。每次進入野外都會更新，只在城鎮待過的新角色沒有',
+  weight_over: '負重百分比。快滿了就是該回村的時候',
   warehouse_gold_gte: '共用倉庫的金幣餘額',
   warehouse_item_gte: '倉庫裡指定道具的存量',
 };

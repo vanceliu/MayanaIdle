@@ -5,6 +5,7 @@ import { SKILL_CATALOG } from '../../models/skill';
 import type { Skill } from '../../models/skill';
 import { canLearnBasicMagic, getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_NAMES_ZH } from '../../models/character';
+import { isClassMagic } from '../../models/classSkills';
 import { getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { getItemById } from '../../models/items';
 import { hasBagItem, addBagItem, consumeBagItem, getBagItemAmount } from '../../models/bagItem';
@@ -62,7 +63,9 @@ export function MagicAcademy() {
 
   const restriction = CLASS_MAGIC_RESTRICTIONS[char.className];
   const learnableLevel = getLearnableMaxLevel(char.className, char.level);
-  const currentSkillCount = skills.length;
+  /** 學習額度只算基礎魔法，職業魔法走 `23-class-magic.md` 的獨立額度 */
+  const learnedBasicSkills = skills.filter(s => !isClassMagic(s.id));
+  const currentSkillCount = learnedBasicSkills.length;
 
   const learnableByGold = SKILL_CATALOG.filter(s => {
     const level = s.level ?? 1;
@@ -236,8 +239,8 @@ export function MagicAcademy() {
       )}
 
       <h4>已學習魔法</h4>
-      {skills.length === 0 && <p className="empty-text">尚未學習任何魔法</p>}
-      {skills.map(skill => (
+      {learnedBasicSkills.length === 0 && <p className="empty-text">尚未學習任何魔法</p>}
+      {learnedBasicSkills.map(skill => (
         <div key={skill.id} className="learned-skill">
           <span>{skill.name}</span>
           <span className="skill-meta">MP:{skill.mpCost} / {skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}{formatBuffDuration(skill) && ` / 持續:${formatBuffDuration(skill)}`}</span>

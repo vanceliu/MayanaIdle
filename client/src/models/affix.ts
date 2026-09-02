@@ -554,18 +554,38 @@ export function shouldBoldAffix(affix: Affix): boolean {
  * 遺產快照是唯一例外：封存當下就把這段文字寫死，日後 `AFFIX_DEFINITIONS`
  * 改名或刪詞綴時，舊紀錄仍顯示封存當時的正確名稱（§ 45.1）。
  */
-export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
+export function formatAffixName(affix: Affix): string {
   if (isSpecialAffixType(affix.type)) {
     const def = getSpecialAffixDefinition(affix.type);
     return `[特殊] ${def?.name ?? affix.type}`;
   }
-  // § 7.3.1 額外屬性：無 Tier，顯示成「力量 +1」
+  // § 7.3.1 額外屬性：無 Tier，名稱就是屬性本身
   if (isAttributeAffixType(affix.type)) {
-    const attr = affix.attribute ? ATTRIBUTE_NAMES_ZH[affix.attribute] : '屬性';
-    return `${attr} +${affix.value}`;
+    return affix.attribute ? ATTRIBUTE_NAMES_ZH[affix.attribute] : '屬性';
   }
   const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
-  const name = affix.element ? `${def?.name}（${BRAND_ELEMENT_ZH[affix.element]}）` : (def?.name ?? affix.type);
+  return affix.element ? `${def?.name}（${BRAND_ELEMENT_ZH[affix.element]}）` : (def?.name ?? affix.type);
+}
+
+/**
+ * 詞綴數值（含單位）。**固定值型與額外屬性不帶百分號**（§ 7.3.1）。
+ * 特殊詞綴沒有數值，回空字串。
+ *
+ * 名稱與數值分開輸出是給「要各自上樣式」的呼叫端用的（滿值粗體、印記師的兩段式列），
+ * 單位規則只有這一份，各面板不可自己拼 `+${value}%`。
+ */
+export function formatAffixValue(affix: Affix, quality: number = 0): string {
+  if (isSpecialAffixType(affix.type)) return '';
+  const unit = isFlatAffixType(affix.type) || isAttributeAffixType(affix.type) ? '' : '%';
+  return `+${getEffectiveAffixValue(affix, quality)}${unit}`;
+}
+
+export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
+  if (isSpecialAffixType(affix.type)) return formatAffixName(affix);
+  if (isAttributeAffixType(affix.type)) {
+    return `${formatAffixName(affix)} ${formatAffixValue(affix, quality)}`;
+  }
+  const name = formatAffixName(affix);
   // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
   if (affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') {
     // 名稱已含「受擊」，回復量的「最大 HP／MP 百分比」省略成「回血／回魔 X%」（§ 7.4）
@@ -577,9 +597,7 @@ export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
     const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));
     return `${name} ${getEffectiveAffixValue(affix, quality)}% 觸發／每秒 ${dot} (T${affix.tier})`;
   }
-  // § 7.1 固定值型詞綴不帶百分號
-  const unit = isFlatAffixType(affix.type) ? '' : '%';
-  return `${name} +${getEffectiveAffixValue(affix, quality)}${unit} (T${affix.tier})`;
+  return `${name} ${formatAffixValue(affix, quality)} (T${affix.tier})`;
 }
 
 export interface AffixBonuses {

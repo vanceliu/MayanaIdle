@@ -92,6 +92,39 @@ describe('Warehouse (account-level storage)', () => {
     expect(useGameStore.getState().warehouseGold).toBe(2500);
   });
 
+  it('金額不是有效數字時不搬錢（NaN 會把兩邊餘額一起汙染）', async () => {
+    const attrs = { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 };
+    await useGameStore.getState().createCharacter('NaNGuard', 'knight', attrs);
+    useGameStore.setState({ warehouseGold: 1000 });
+    const gold = useGameStore.getState().character!.gold;
+
+    expect(useGameStore.getState().depositWarehouseGold(NaN)).toBe(0);
+    expect(useGameStore.getState().withdrawWarehouseGold(NaN)).toBe(0);
+    expect(useGameStore.getState().character!.gold).toBe(gold);
+    expect(useGameStore.getState().warehouseGold).toBe(1000);
+  });
+
+  it('讀檔時清掉 NaN 金幣，並一次性補回事故金額', async () => {
+    const attrs = { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 };
+    await useGameStore.getState().createCharacter('NaNSave', 'knight', attrs);
+    const charId = useGameStore.getState().character!.id!;
+    const userId = useGameStore.getState().userId!;
+    await useGameStore.getState().logout();
+
+    await db.characters.update(charId, { gold: NaN });
+    await db.warehouseGold.put({ userId, amount: NaN });
+
+    await useGameStore.getState().selectCharacter(charId);
+    expect(useGameStore.getState().warehouseGold).toBe(0);
+    expect(useGameStore.getState().character!.gold).toBe(2_379_024);
+
+    // 補回只做一次：再讀一次不會又加一份
+    await useGameStore.getState().logout();
+    await db.characters.update(charId, { gold: NaN });
+    await useGameStore.getState().selectCharacter(charId);
+    expect(useGameStore.getState().character!.gold).toBe(0);
+  });
+
   it('should not delete warehouse when character is deleted', async () => {
     const attrs = { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 };
     await useGameStore.getState().createCharacter('Deletable', 'knight', attrs);

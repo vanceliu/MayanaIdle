@@ -54,13 +54,19 @@ export function Storage() {
   const currentMaterialStored = isShared ? storedMaterials : personalStoredMaterials;
 
   // --- Gold (shared only) ---
+  /** 空字串／非數字一律當 0，不可讓 NaN 進到餘額運算（會把兩邊的金幣一起洗成 NaN） */
+  const goldInput = Number.parseInt(goldAmount, 10);
+  const goldInputValid = Number.isFinite(goldInput) && goldInput > 0;
+
   function depositGold() {
-    useGameStore.getState().depositWarehouseGold(parseInt(goldAmount, 10));
+    if (!goldInputValid) return;
+    useGameStore.getState().depositWarehouseGold(goldInput);
     setGoldAmount('');
   }
 
   function withdrawGold() {
-    useGameStore.getState().withdrawWarehouseGold(parseInt(goldAmount, 10));
+    if (!goldInputValid) return;
+    useGameStore.getState().withdrawWarehouseGold(goldInput);
     setGoldAmount('');
   }
 
@@ -214,8 +220,8 @@ export function Storage() {
               placeholder="金額"
               className="gold-input"
             />
-            <button onClick={depositGold} disabled={!character || character.gold <= 0}>存入</button>
-            <button onClick={withdrawGold} disabled={warehouseGold <= 0}>取出</button>
+            <button onClick={depositGold} disabled={!goldInputValid || !character || character.gold <= 0}>存入</button>
+            <button onClick={withdrawGold} disabled={!goldInputValid || warehouseGold <= 0}>取出</button>
           </div>
         </div>
       )}

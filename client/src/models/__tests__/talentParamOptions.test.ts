@@ -156,6 +156,12 @@ describe('技能選單的範圍', () => {
     expect(filterOf('skill')).toMatchObject({ filter: 'attack' });
   });
 
+  it('負重超過三類型共用，補給分頁也能鑲', () => {
+    const def = TALENT_RULE_DEFS.find(d => d.ruleId === 'weight_over');
+    expect(def?.appliesTo).toEqual(expect.arrayContaining(['combat', 'persistent', 'supply']));
+    expect(getParamFields('weight_over')[0]).toMatchObject({ key: 'value', suffix: '%' });
+  });
+
   it('技能就緒是共用條件，範圍依分頁決定', () => {
     const def = TALENT_RULE_DEFS.find(d => d.ruleId === 'skill_ready');
     expect(def?.appliesTo).toEqual(expect.arrayContaining(['combat', 'persistent']));

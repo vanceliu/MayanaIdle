@@ -9,6 +9,7 @@ import type { Attributes } from '../models/attributes';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { INN_PRICES } from '../stores/gameStore';
 import {
+  collectMaterialsByTier,
   collectSellableMaterials,
   collectBatchSellEquipment,
   isSellableEquipment,
@@ -60,6 +61,8 @@ export interface VillageScriptContext {
    * 未帶＝當作不需要，避免「使用旅館」永遠成立而擋住後面的規則。
    */
   needsInn?: boolean;
+  /** `weight_over` 用：當前負重百分比。未帶＝當作 0 */
+  weightPercent?: number;
 }
 
 export function evaluateVillageScript(
@@ -96,6 +99,9 @@ function checkVillageCondition(condition: VillageCondition, ctx: VillageScriptCo
       return ctx.bagFreeSlots <= (condition.value ?? 0);
     case 'has_hunt_location':
       return ctx.lastHuntLocation !== null;
+    // 三類型共用（§ 51.4.5）：與戰鬥／常駐版同一個門檻語意
+    case 'weight_over':
+      return (ctx.weightPercent ?? 0) > (condition.value ?? 0);
     // 三類型共用（§ 51.4.5）：與戰鬥／常駐版比對同一個欄位
     case 'current_area_is':
       return condition.match !== undefined && ctx.currentArea === condition.match;
@@ -162,10 +168,10 @@ function warehouseSide(action: VillageAction, ctx: VillageScriptContext) {
   return ctx.warehouse[getWarehouseKind(action)];
 }
 
-/** 要存進倉庫的素材：與販售同一套顏色門檻 */
+/** 要存進倉庫的素材：與販售同一套顏色門檻，但不受可販售限制（不可販售的素材照樣能存） */
 export function collectDepositMaterials(action: VillageAction, ctx: VillageScriptContext): BagItem[] {
   if (action.maxTier == null) return [];
-  return collectSellableMaterials(ctx.bagItems, action.maxTier, {
+  return collectMaterialsByTier(ctx.bagItems, action.maxTier, {
     skipCraftMaterials: action.skipCraftMaterials ?? false,
   });
 }

@@ -3,6 +3,8 @@ import {
   FLAT_HP_MP_TIERS,
   FLAT_REGEN_TIERS,
   formatAffixDisplay,
+  formatAffixName,
+  formatAffixValue,
   generateAffixes,
   getAffixTierTable,
   getEffectiveAffixValue,
@@ -35,6 +37,14 @@ describe('固定值型詞綴（§ 7.3.1）', () => {
     const a: Affix = { type: 'max_hp', tier: 7, value: 95 };
     expect(formatAffixDisplay(a)).toBe('最大 HP +95 (T7)');
     expect(formatAffixDisplay({ type: 'hp_regen', tier: 5, value: 8 })).toBe('回血 +8 (T5)');
+  });
+
+  // 印記師把名稱與數值拆成兩個元素上樣式，單位規則只有 `formatAffixValue` 一份
+  it('拆開輸出的數值同樣不帶百分號，百分比型才帶', () => {
+    expect(formatAffixValue({ type: 'max_hp', tier: 7, value: 95 })).toBe('+95');
+    expect(formatAffixValue({ type: 'mp_regen', tier: 5, value: 8 })).toBe('+8');
+    expect(formatAffixValue({ type: 'attack_power', tier: 5, value: 12 })).toBe('+12%');
+    expect(formatAffixName({ type: 'max_hp', tier: 7, value: 95 })).toBe('最大 HP');
   });
 
   it('仍受品質放大，也仍參與滿值判定', () => {

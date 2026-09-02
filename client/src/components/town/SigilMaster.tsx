@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { SLOT_NAMES, SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../../models/equipment';
 import {
-  AFFIX_DEFINITIONS,
   DEFAULT_MAX_AFFIX_TIER,
   getAffixCategoryForSlot,
-  getSpecialAffixDefinition,
   getWeaponBaseDamage,
   isSpecialAffixType,
   isMaxRollAffix,
+  isTierlessAffixType,
+  formatAffixName,
+  formatAffixValue,
   type Affix,
 } from '../../models/affix';
 import {
@@ -73,12 +74,10 @@ interface SigilFx {
   label?: string;
 }
 
+/** 名稱與 Tier。名稱走 `formatAffixName`，無 Tier 的（特殊、額外屬性）不接 T 標 */
 function affixLabel(affix: Affix): string {
-  if (isSpecialAffixType(affix.type)) {
-    return `[特殊] ${getSpecialAffixDefinition(affix.type)?.name ?? affix.type}`;
-  }
-  const def = AFFIX_DEFINITIONS.find(d => d.type === affix.type);
-  return `${def?.name ?? affix.type} T${affix.tier}`;
+  const name = formatAffixName(affix);
+  return isTierlessAffixType(affix.type) ? name : `${name} T${affix.tier}`;
 }
 
 /**
@@ -532,7 +531,7 @@ export function SigilMaster() {
                       `sigil-affix-value${isMaxRollAffix(affix) ? ' max-roll' : ''}${valueFxClass(rowFx)}`
                     }
                   >
-                    {isSpecialAffixType(affix.type) ? '' : `+${affix.value}%`}
+                    {formatAffixValue(affix)}
                   </span>
                   {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
                   {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}

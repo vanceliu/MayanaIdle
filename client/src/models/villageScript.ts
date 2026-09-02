@@ -25,6 +25,8 @@ export type VillageConditionType =
   | 'bag_free_slots_lte'
   /** 有上次掛機點紀錄 */
   | 'has_hunt_location'
+  /** 三類型共用（§ 51.4.5）：負重超過 X%（`20-attributes.md` § 20.7） */
+  | 'weight_over'
   /** 三類型共用（§ 51.4.5）：所在區域 ＝ 指定區域 */
   | 'current_area_is'
   | 'warehouse_gold_gte'
@@ -149,6 +151,7 @@ export const VILLAGE_CONDITION_LABELS: Record<VillageConditionType, string> = {
   in_town: '在城鎮／在野外',
   bag_free_slots_lte: '背包剩餘格數 ≤',
   has_hunt_location: '有上次掛機點',
+  weight_over: '負重超過',
   current_area_is: '所在區域 ＝',
   warehouse_gold_gte: '倉庫金幣 ≥',
   warehouse_item_gte: '倉庫有指定道具 ≥',

@@ -445,6 +445,20 @@ interface GameState {
   pushSystemLog: (text: string) => void;
 }
 
+/**
+ * 倉庫金幣輸入框空白時 `parseInt('')` 產生 NaN，把身上與倉庫的餘額一起寫成 NaN，
+ * 金額本身無法從存檔還原。這是那一次事故的一次性補回，每個瀏覽器只執行一次。
+ * 補回後即可刪除本區塊與 `takeGoldNaNRepair()` 的呼叫點。
+ */
+const GOLD_NAN_REPAIR_AMOUNT = 2_379_024;
+const GOLD_NAN_REPAIR_KEY = 'mayana_gold_nan_repair';
+
+function takeGoldNaNRepair(): number {
+  if (localStorage.getItem(GOLD_NAN_REPAIR_KEY)) return 0;
+  localStorage.setItem(GOLD_NAN_REPAIR_KEY, '1');
+  return GOLD_NAN_REPAIR_AMOUNT;
+}
+
 const MAX_LOGS = 200;
 
 /**
@@ -648,7 +662,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
     // 金幣是餘額不是物品，自 v16 起存在獨立表（`18-data-schema.md` § 18.7）
-    const warehouseGold = (await db.warehouseGold.get(userId))?.amount ?? 0;
+    const storedWarehouseGold = (await db.warehouseGold.get(userId))?.amount ?? 0;
+    const warehouseGold = Number.isFinite(storedWarehouseGold) ? storedWarehouseGold : 0;
 
     // Load personal warehouse materials (character-level storage)
     const personalWarehouseRows = await db.warehouses
@@ -702,6 +717,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!char.quests) {
       char.quests = [];
     }
+
+    // 讀檔防線：存檔裡的金幣曾被 NaN 汙染過，NaN 會沿著每次加減擴散出去
+    const goldCorrupted = !Number.isFinite(char.gold) || !Number.isFinite(storedWarehouseGold);
+    if (!Number.isFinite(char.gold)) char.gold = 0;
+    if (goldCorrupted) char.gold += takeGoldNaNRepair();
 
     set({
       character: char,
@@ -1852,6 +1872,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
       bagFreeSlots: getBagMaxSlots(state.equippedGear)
         - getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear),
+      weightPercent: (() => {
+        const w = getWeightStatus(
+          char,
+          getEffectiveGearArray(char, state.activeEffects, state.equippedGear),
+          state.bagItems,
+        );
+        return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
+      })(),
       // 旅館有沒有事情可做（`13-town.md` § 13.7）。全滿又沒異常狀態時為 false。
       needsInn: char.hp < getEffectiveMaxHp(char, state.equippedGear)
         || char.mp < getEffectiveMaxMp(char, state.equippedGear)
@@ -2123,7 +2151,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   depositWarehouseGold: (amount) => {
     const char = get().character;
-    if (!char || amount <= 0) return 0;
+    // NaN 過不了 `<= 0`，不擋就會把身上與倉庫的餘額一起寫成 NaN
+    if (!char || !Number.isFinite(amount) || amount <= 0) return 0;
     const actual = Math.min(amount, char.gold);
     if (actual <= 0) return 0;
     set({
@@ -2136,7 +2165,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   withdrawWarehouseGold: (amount) => {
     const char = get().character;
-    if (!char || amount <= 0) return 0;
+    if (!char || !Number.isFinite(amount) || amount <= 0) return 0;
     const actual = Math.min(amount, get().warehouseGold);
     if (actual <= 0) return 0;
     set({

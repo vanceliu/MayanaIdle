@@ -3,6 +3,7 @@ import {
   evaluateVillageScript,
   getBuyAmount,
   collectVillageSellEquipment,
+  collectDepositMaterials,
   collectDepositEquipment,
   getWithdrawAmount,
   getDepositGoldAmount,
@@ -22,6 +23,7 @@ import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipmen
 const RED_POTION = 1;   // buyPrice 25
 const TUSK = 19;        // 素材，iconTier 1，純販售
 const TOWN_SCROLL = 5;  // 回城卷軸（薄暮村）
+const SPELLBOOK_FRAGMENT = 127; // 素材，iconTier 2，noSell
 
 const TEMPLATES: EquipmentTemplate[] = [
   { id: 1, name: '鐵劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 10, largeMonsterDamage: 8, buyPrice: 1000, acquireType: 'shop', tier: 2 },
@@ -131,6 +133,15 @@ describe('村莊腳本判定', () => {
       expect(evaluateVillageScript(rules, ctx({ bagItems: many }))).toBeNull();
     });
 
+    it('負重超過 X%：門檻是嚴格大於，未帶負重當作 0', () => {
+      const rules = [rule({ type: 'return_town' }, [{ type: 'weight_over', value: 80 }])];
+      const bag = [makeBagItem(TOWN_SCROLL, 1)] as BagItem[];
+      expect(evaluateVillageScript(rules, ctx({ inTown: false, bagItems: bag, weightPercent: 80 }))).toBeNull();
+      expect(evaluateVillageScript(rules, ctx({ inTown: false, bagItems: bag, weightPercent: 81 }))?.type)
+        .toBe('return_town');
+      expect(evaluateVillageScript(rules, ctx({ inTown: false, bagItems: bag }))).toBeNull();
+    });
+
     it('多條件 AND：全部成立才觸發', () => {
       const rules = [rule({ type: 'buy_item', itemId: RED_POTION, targetAmount: 100 }, [
         { type: 'item_count_below', itemId: RED_POTION, value: 20 },
@@ -235,6 +246,12 @@ describe('倉庫存取', () => {
     const c = ctx({ bagItems: [makeBagItem(TUSK, 3)] as BagItem[] });
     expect(evaluateVillageScript([rule({ type: 'deposit_materials', maxTier: 1 })], c)?.type)
       .toBe('deposit_materials');
+  });
+
+  it('存入素材：不可販售的素材照樣存得進去', () => {
+    const c = ctx({ bagItems: [makeBagItem(SPELLBOOK_FRAGMENT, 110)] as BagItem[] });
+    expect(collectDepositMaterials({ type: 'deposit_materials', maxTier: 7 }, c).map(i => i.itemId))
+      .toEqual([SPELLBOOK_FRAGMENT]);
   });
 
   it('存入裝備：沒設條件就不存（不會整包倒進倉庫）', () => {

@@ -51,8 +51,8 @@ export interface MaterialBatchOptions {
   skipCraftMaterials?: boolean;
 }
 
-/** 批量販售：挑出 iconTier ≤ maxTier 的素材 */
-export function collectSellableMaterials(
+/** 顏色門檻挑素材：不看售價，存倉庫等非販售用途走這支 */
+export function collectMaterialsByTier(
   bagItems: BagItem[],
   maxTier: number,
   options: MaterialBatchOptions = {},
@@ -61,11 +61,20 @@ export function collectSellableMaterials(
   return bagItems.filter(item => {
     if (item.type !== 'material') return false;
     const def = getItemById(item.itemId);
-    if (!def || !def.iconTier || def.noSell) return false;
+    if (!def || !def.iconTier) return false;
     if (skipCraftMaterials && hasMaterialUsage(item.itemId)) return false;
-    if (getItemSellPrice(item.itemId) <= 0) return false;
     return def.iconTier <= maxTier;
   });
+}
+
+/** 批量販售：顏色門檻之外，再排除賣不掉的素材 */
+export function collectSellableMaterials(
+  bagItems: BagItem[],
+  maxTier: number,
+  options: MaterialBatchOptions = {},
+): BagItem[] {
+  return collectMaterialsByTier(bagItems, maxTier, options)
+    .filter(item => getItemSellPrice(item.itemId) > 0);
 }
 
 /** 被「跳過配方素材」擋下來的素材，用來告訴玩家少賣了什麼，而不是靜默漏掉 */

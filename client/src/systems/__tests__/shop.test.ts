@@ -4,6 +4,7 @@ import {
   getItemBasePrice,
   getItemSellPrice,
   isSellableItem,
+  collectMaterialsByTier,
   collectSellableMaterials,
   collectProtectedMaterials,
   getMaterialsSellTotal,
@@ -30,6 +31,8 @@ const TUSK = 19;
 const SILVER_ORE = 11;
 // 紅色藥水：buyPrice 25，沒有 sellPrice
 const RED_POTION = 1;
+// 魔法書碎片：iconTier 2、noSell、無配方以外用途
+const SPELLBOOK_FRAGMENT = 127;
 
 const TEMPLATES: EquipmentTemplate[] = [
   { id: 1, name: '鐵劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 10, largeMonsterDamage: 8, buyPrice: 1000, acquireType: 'shop', tier: 2 },
@@ -70,6 +73,21 @@ describe('道具定價', () => {
   it('不存在的道具賣不掉', () => {
     expect(isSellableItem(999_999)).toBe(false);
     expect(getItemSellPrice(999_999)).toBe(0);
+  });
+});
+
+describe('顏色門檻挑素材（非販售用途）', () => {
+  it('不可販售的素材照樣挑得到，販售挑選器則排除', () => {
+    const bag = [makeBagItem(SPELLBOOK_FRAGMENT, 110)] as BagItem[];
+    const opts = { skipCraftMaterials: false };
+    expect(collectMaterialsByTier(bag, 7, opts).map(i => i.itemId)).toEqual([SPELLBOOK_FRAGMENT]);
+    expect(collectSellableMaterials(bag, 7, opts)).toEqual([]);
+  });
+
+  it('顏色門檻與配方保護與販售一致', () => {
+    const bag = [makeBagItem(TUSK, 3), makeBagItem(SILVER_ORE, 2)] as BagItem[];
+    expect(collectMaterialsByTier(bag, 7).map(i => i.itemId)).toEqual([TUSK]);
+    expect(collectMaterialsByTier(bag, 1, { skipCraftMaterials: false }).map(i => i.itemId)).toEqual([TUSK]);
   });
 });
 

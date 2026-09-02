@@ -44,7 +44,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'debuff_active', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
   { ruleId: 'self_shielded', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
   { ruleId: 'weapon_type_is', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'gear' },
-  { ruleId: 'weight_over', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'gear' },
+  { ruleId: 'weight_over', kind: 'condition', appliesTo: ['combat', 'persistent', 'supply'], group: 'gear' },
   { ruleId: 'monsters_near_self_gte', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'surroundings' },
   { ruleId: 'area_dwell_gte', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'surroundings' },
   // 三類型共用：不同區域回不同城，補給也用得到

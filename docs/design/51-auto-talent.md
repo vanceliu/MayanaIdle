@@ -242,7 +242,8 @@ Wiki 照 `blockedReason` 顯示未開放的原因：
 | 周遭 | 自身周圍怪物數 ≥ N | `monsters_near_self_gte` |
 | 周遭 | 在本區停留超過 N 分鐘 | 新增 |
 
-**三類型共用**：「所在區域 ＝ 指定區域」（`currentArea`／`currentRegion`／`currentFloor`）。
+**三類型共用**：「所在區域 ＝ 指定區域」（`currentArea`／`currentRegion`／`currentFloor`）、
+「負重超過 X%」。
 
 ### 51.4.6 戰鬥專屬條件
 
