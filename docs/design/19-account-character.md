@@ -235,7 +235,15 @@ API 細節見 `37-statistics.md` § 37.4.3。
 | 設定 | 預設 | 說明 |
 |---|---|---|
 | `CURRENT_DATA_VERSION` | 3 | 資料結構版本號，同時是舊角色淘汰與匯入檔的門檻 |
-| `GOLD_RATE_MULTIPLIER` | 1.0 | 全域金幣掉落倍率 |
-| `DROP_RATE_MULTIPLIER` | 1.0 | 全域道具掉落倍率 |
+| `GOLD_RATE_MULTIPLIER` | 1.0 | 全域金幣倍率，作用於怪物金幣掉落（`27-drop-table.md` § 27.1）與任務金幣獎勵（`36-quest-system.md` § 36.3） |
+| `DROP_RATE_MULTIPLIER` | 1.0 | 全域道具掉落倍率，作用範圍見 `27-drop-table.md` § 27.1（含印記與天賦格） |
+| `EXP_RATE_MULTIPLIER` | 1.0 | 全域擊殺經驗倍率，作用位置見 `28-monster-stats.md` § 28.1 |
+| `PRESSURE_RATE_MULTIPLIER` | 1.0 | Pressure 累積倍率，作用位置見 `26-spawn-pressure.md` § 26.3；0 = Pressure 恆為 0 |
+| `SPAWN_RATE_MULTIPLIER` | 1.0 | 怪物生成頻率倍率，作用位置見 `26-spawn-pressure.md` § 26.2；必須 > 0 |
+| `MONSTER_HP_MULTIPLIER` | 1.0 | 怪物血量倍率，作用位置見 `28-monster-stats.md` § 28.1；必須 > 0 |
+| `MONSTER_ATTACK_MULTIPLIER` | 1.0 | 怪物攻擊力倍率，作用位置見 `28-monster-stats.md` § 28.1；必須 > 0 |
+| `BOSS_SPAWN_RATE_MULTIPLIER` | 1.0 | Boss 生成機率倍率，作用位置見 `26-spawn-pressure.md` § 26.4；0 = 不生成 Boss |
 
 掉落計算公式：`最終倍率 = (1 + 角色裝備加成%) × 全域倍率`
+
+八個倍率只作用於各自標明的公式，彼此獨立。回鍋經驗加倍（`04-character.md` § 4.11）與 `EXP_RATE_MULTIPLIER` 相乘，不另設倍率。線上模式的落點為 `server.properties`（`97-selfhosted-server.md` § 97.2）。
