@@ -7,7 +7,8 @@ import { useMapControlStore } from './mapControlStore';
 import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
-import { CURRENT_DATA_VERSION } from '../config';
+import { CURRENT_DATA_VERSION, DROP_RATE_MULTIPLIER } from '../config';
+import { settleKillExp } from '../systems/globalRates';
 import { syncTalentSlotGrants, syncCompensations, mailPurgeStorageKey } from '../systems/mailbox';
 import { talentBagOrderStorageKey } from '../models/talentBag';
 import { rollTalentSlotDrop } from '../systems/talentDrops';
@@ -2461,8 +2462,8 @@ export function processMonsterDeath(
   // 木樁在上面就 return 了，不會計入。
   char = { ...char, areaKills: (char.areaKills ?? 0) + 1 };
 
-  // 基礎 ×3（`28-monster-stats.md` § 28.1）再乘回鍋加倍（`04-character.md` § 4.11）
-  const expGained = dead.exp * 3 * getRestedExpMultiplier(char);
+  // 基礎 ×3（`28-monster-stats.md` § 28.1）× 回鍋加倍（`04-character.md` § 4.11）× 全域經驗倍率
+  const expGained = settleKillExp(dead.exp, getRestedExpMultiplier(char));
   const prevLevel = char.level;
   char = addExp(char, expGained);
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
@@ -2505,8 +2506,8 @@ export function processMonsterDeath(
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
-    const talentDropMult = 1 + dropBonuses.drop_rate / 100;
-    const talentSlotTier = rollTalentSlotDrop(areaLevel, monsterIsBoss, talentDropMult);
+    // 天賦格只吃全域掉落倍率，不吃 `drop_rate` 與 Pressure（`27-drop-table.md` § 27.9）
+    const talentSlotTier = rollTalentSlotDrop(areaLevel, monsterIsBoss, DROP_RATE_MULTIPLIER);
     const talentLogs: string[] = [];
     if (char.id && talentSlotTier !== null) {
       await db.talentSlots.add({

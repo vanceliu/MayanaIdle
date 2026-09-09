@@ -1,3 +1,5 @@
+import { PRESSURE_RATE_MULTIPLIER } from '../config';
+
 export interface PressureState {
   pressure: number;
   maxMonsters: number;
@@ -18,8 +20,9 @@ export const PRESSURE_DROP_CAP = 7;
  * —— 停留時間會讓站著不動的角色與滿裝角色以同速推進，
  * 玩家的 DPS 因此完全兌現不到產出（`26-spawn-pressure.md` § 26.3）。
  */
-export function calculatePressure(areaKills: number): PressureState {
-  const pressure = Math.max(0, Math.floor((areaKills - PRESSURE_KILL_BASE) / PRESSURE_KILL_STEP));
+export function calculatePressure(areaKills: number, globalRate = PRESSURE_RATE_MULTIPLIER): PressureState {
+  // 累積擊殺數 × 全域 Pressure 倍率再套門檻；倍率 0 時 Pressure 恆為 0
+  const pressure = Math.max(0, Math.floor((areaKills * globalRate - PRESSURE_KILL_BASE) / PRESSURE_KILL_STEP));
   const maxMonsters = Math.min(MAX_MONSTERS_CAP, BASE_MAX_MONSTERS + pressure);
 
   return { pressure, maxMonsters };

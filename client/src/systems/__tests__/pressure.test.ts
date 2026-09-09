@@ -16,6 +16,17 @@ describe('pressure system', () => {
       expect(calculatePressure(639).maxMonsters).toBe(3);
     });
 
+    it('全域 Pressure 倍率作用於累積擊殺數（19 § 19.9）', () => {
+      expect(calculatePressure(320, 2).pressure).toBe(1);
+      expect(calculatePressure(400, 2).pressure).toBe(2);
+      expect(calculatePressure(1280, 0.5).pressure).toBe(1);
+    });
+
+    it('倍率 0 時 Pressure 恆為 0', () => {
+      expect(calculatePressure(5000, 0).pressure).toBe(0);
+      expect(calculatePressure(5000, 0).maxMonsters).toBe(3);
+    });
+
     it('should increase pressure by 1 every 160 kills past the base', () => {
       expect(calculatePressure(640).pressure).toBe(1);
       expect(calculatePressure(640).maxMonsters).toBe(4);

@@ -55,6 +55,7 @@ import { hasBagItem } from '../models/bagItem';
 import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
 import { QUEST_TITLE_TEMPLATES, QUEST_DESCRIPTION_TEMPLATES } from '../db/seed/questTemplateSeeds';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
+import { settleQuestGold } from './globalRates';
 
 function getItem(id: number) {
   return ITEM_DEFINITIONS.find(i => i.id === id)!;
@@ -156,7 +157,7 @@ function calculateReward(
 ): QuestReward {
   switch (type) {
     case 'gold':
-      return { type: 'gold', amount: Math.floor(baseValue * 2) };
+      return { type: 'gold', amount: settleQuestGold(Math.floor(baseValue * 2)) };
     case 'potion': {
       const potion = pickRandom(POTION_REWARDS);
       const amount = Math.max(1, Math.floor(baseValue / potion.unitPrice));
@@ -438,7 +439,7 @@ function buildSigilQuest(
     count = randomInt(config.deliverCount!.min, config.deliverCount!.max);
     reward = {
       type: 'gold',
-      amount: Math.floor(deliverItem.sellPrice! * count * config.goldMultiplier!),
+      amount: settleQuestGold(Math.floor(deliverItem.sellPrice! * count * config.goldMultiplier!)),
     };
   }
 

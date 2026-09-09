@@ -53,3 +53,44 @@ describe('模板未載入時不生假怪', () => {
     expect(d.maxHp).toBe(DUMMY_INFINITE_HP);
   });
 });
+
+describe('全域怪物血量與攻擊力倍率（28 § 28.1）', () => {
+  it('倍率 1.0 時素質等於模板', () => {
+    const inst = createMonsterFromTemplate(mapMonster(), [template()], { hp: 1, attack: 1 })!;
+    expect(inst.maxHp).toBe(120);
+    expect(inst.currentHp).toBe(120);
+    expect(inst.attackMin).toBe(8);
+    expect(inst.attackMax).toBe(12);
+  });
+
+  it('血量倍率只動 HP，攻擊力倍率只動攻擊區間', () => {
+    const inst = createMonsterFromTemplate(mapMonster(), [template()], { hp: 2, attack: 1.5 })!;
+    expect(inst.maxHp).toBe(240);
+    expect(inst.currentHp).toBe(240);
+    expect(inst.attackMin).toBe(12);
+    expect(inst.attackMax).toBe(18);
+    expect(inst.defense).toBe(3);
+    expect(inst.exp).toBe(40);
+  });
+
+  it('Boss 同樣套用', () => {
+    const inst = createMonsterFromTemplate(
+      mapMonster({ isBoss: true }),
+      [template({ isBoss: true, hp: 1000, attackMin: 20, attackMax: 30 })],
+      { hp: 0.5, attack: 2 },
+    )!;
+    expect(inst.maxHp).toBe(500);
+    expect(inst.attackMin).toBe(40);
+    expect(inst.attackMax).toBe(60);
+  });
+
+  it('木樁不套用', () => {
+    const inst = createMonsterFromTemplate(
+      mapMonster({ dummy: { hp: 100, defense: 0, level: 1, size: 'small', element: 'none' } as any }),
+      [template()],
+      { hp: 5, attack: 5 },
+    )!;
+    expect(inst.maxHp).toBe(100);
+    expect(inst.attackMax).toBe(0);
+  });
+});

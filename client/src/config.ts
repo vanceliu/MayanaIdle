@@ -8,6 +8,20 @@
 //     會永久卡在「無法上榜」，趁玩家數尚少一次重來。
 export const CURRENT_DATA_VERSION = 5;
 
-// === 全域倍率 ===
+// === 全域倍率（`19-account-character.md` § 19.9）===
+/** 怪物金幣掉落與任務金幣獎勵共用 */
 export const GOLD_RATE_MULTIPLIER = 1.0;
+/** 作用範圍見 `27-drop-table.md` § 27.1 */
 export const DROP_RATE_MULTIPLIER = 1.0;
+/** 只作用於擊殺經驗（`28-monster-stats.md` § 28.1） */
+export const EXP_RATE_MULTIPLIER = 1.0;
+/** 累積擊殺數 × 倍率再套 Pressure 門檻；0 = Pressure 恆為 0 */
+export const PRESSURE_RATE_MULTIPLIER = 1.0;
+/** 只縮放生成判定間隔；必須 > 0 */
+export const SPAWN_RATE_MULTIPLIER = 1.0;
+/** 怪物實例 HP；必須 > 0，木樁不套用 */
+export const MONSTER_HP_MULTIPLIER = 1.0;
+/** 怪物實例攻擊力區間；必須 > 0，木樁不套用 */
+export const MONSTER_ATTACK_MULTIPLIER = 1.0;
+/** Boss 生成機率 10% × 倍率，上限 100%；0 = 不生成 Boss */
+export const BOSS_SPAWN_RATE_MULTIPLIER = 1.0;

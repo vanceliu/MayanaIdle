@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getSpawnInterval, getBossSpawnChance } from '../systems/globalRates';
 import type { Position, MapData } from '../models/mapControl';
 import { findPath, getRandomWalkablePosition, canMoveBetween } from '../systems/pathfinding';
 import type { TrainingDummySpec } from '../models/trainingGround';
@@ -43,8 +44,6 @@ const ASTAR_DISTANCE = 8;
 const PLAYER_MOVE_THRESHOLD = 2;
 /** Boss 生成門檻：本次進區停留分鐘數（見 `26-spawn-pressure.md` § 26.4） */
 export const BOSS_SPAWN_MIN_MINUTES = 5;
-/** 滿足門檻後每次生成判定產生 Boss 的機率 */
-export const BOSS_SPAWN_CHANCE = 0.1;
 
 function rollSpawnCount(elapsedMinutes: number): number {
   const roll = Math.random();
@@ -123,8 +122,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
     if (!isRefill) {
       const newTimer = state.spawnTimer + deltaMs;
-      const frequencyMultiplier = 1 + pressure * 0.2;
-      const adjustedInterval = SPAWN_INTERVAL_MS / frequencyMultiplier;
+      const adjustedInterval = getSpawnInterval(SPAWN_INTERVAL_MS, pressure);
       if (newTimer < adjustedInterval) {
         set({ spawnTimer: newTimer });
         return;
@@ -146,7 +144,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       const bossAlreadyOnMap = currentMonsters.some(m => m.isBoss);
       let isBoss = false;
       if (state.hasBossInPool && !bossAlreadyOnMap && elapsedMinutes >= BOSS_SPAWN_MIN_MINUTES) {
-        isBoss = Math.random() < BOSS_SPAWN_CHANCE;
+        isBoss = Math.random() < getBossSpawnChance();
       }
 
       // Find a spawn position at least MIN_SPAWN_DISTANCE from player

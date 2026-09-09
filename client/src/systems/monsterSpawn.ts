@@ -7,6 +7,7 @@
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance, MonsterTemplate } from '../models/monster';
 import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
+import { DEFAULT_MONSTER_STAT_RATES, scaleMonsterStat, type MonsterStatRates } from './globalRates';
 
 /**
  * 由區域模板建怪物實例。**模板還沒載入時回 `null`，不生假怪。**
@@ -18,7 +19,11 @@ import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGro
  *
  * 試驗場木樁的素質來自面板參數、不吃模板，不受此限。
  */
-export function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemplate[]): MonsterInstance | null {
+export function createMonsterFromTemplate(
+  mm: MapMonster,
+  templates: MonsterTemplate[],
+  rates: MonsterStatRates = DEFAULT_MONSTER_STAT_RATES,
+): MonsterInstance | null {
   // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
   if (mm.dummy) return createTrainingDummy(mm.dummy);
 
@@ -32,14 +37,16 @@ export function createMonsterFromTemplate(mm: MapMonster, templates: MonsterTemp
 
   if (!template) return null;
 
+  // 全域怪物血量與攻擊力倍率（`28-monster-stats.md` § 28.1）；木樁在上面就回傳了，不套用
+  const maxHp = scaleMonsterStat(template.hp, rates.hp);
   return {
     templateId: template.id!,
     name: template.name,
     level: template.level,
-    currentHp: template.hp,
-    maxHp: template.hp,
-    attackMin: template.attackMin,
-    attackMax: template.attackMax,
+    currentHp: maxHp,
+    maxHp,
+    attackMin: scaleMonsterStat(template.attackMin, rates.attack),
+    attackMax: scaleMonsterStat(template.attackMax, rates.attack),
     defense: template.defense,
     exp: template.exp,
     race: template.race,

@@ -49,6 +49,22 @@ describe('drops system', () => {
       expect(result.items).toHaveLength(0);
     });
 
+    it('印記套用完整掉寶倍率：drop_rate 與 Pressure 都吃（27 § 27.8）', async () => {
+      // 基礎 1%（掉落值 10）；roll 固定 25 → 無加成不掉，×(1.5 × 2) = 30 就掉
+      vi.spyOn(Math, 'random').mockReturnValue(0.025);
+      const entries = [{ area: 'snow-field', itemType: 'item', itemTemplateId: 147, dropValue: 10 }];
+      vi.mocked(db.dropTables.where).mockReturnValue({
+        equals: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue(entries) }),
+      } as any);
+
+      const plain = await rollDrops('snow-field', 1, { drop_rate: 0, gold_rate: 0 });
+      expect(plain.items).toHaveLength(0);
+
+      const boosted = await rollDrops('snow-field', 1, { drop_rate: 50, gold_rate: 0, pressure_mult: 2 });
+      expect(boosted.items).toHaveLength(1);
+      expect(boosted.items[0].itemTemplateId).toBe(147);
+    });
+
     it('should drop gold at face value (no multiplier)', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       vi.mocked(db.dropTables.where).mockReturnValue({

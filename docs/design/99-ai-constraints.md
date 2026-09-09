@@ -73,3 +73,15 @@
 4. 機率按鈕與視窗
 5. 移除鐵匠鋪強化分頁
 6. 文件同步：`35-inventory-constraints.md` § 35.5.1／§ 35.13、`13-town.md` § 13.5、`34-ui-guidelines.md`、`48-vfx.md` § 48.4、`39-batch-sell.md`、`17-mvp-priority.md`、`INDEX.md`
+
+### 全域倍率（單機版落點 `client/src/config.ts`）
+
+定案規格：`19-account-character.md` § 19.9 的 8 個倍率，作用位置各在其標明的公式。
+
+階段：
+
+1. `config.ts` 新增 `EXP_RATE_MULTIPLIER`、`PRESSURE_RATE_MULTIPLIER`、`SPAWN_RATE_MULTIPLIER`、`MONSTER_HP_MULTIPLIER`、`MONSTER_ATTACK_MULTIPLIER`、`BOSS_SPAWN_RATE_MULTIPLIER`，預設 1.0
+2. 掉落：`drops.ts` 金幣單次上限 500 × 倍率；天賦格改只吃 `DROP_RATE_MULTIPLIER`（`gameStore` 呼叫端）；印記走完整掉寶倍率的回歸測試
+3. 經驗與任務金幣：擊殺結算 × `EXP_RATE_MULTIPLIER`（`gameStore`）；冒險者工會金幣獎勵與印記交付金幣 × `GOLD_RATE_MULTIPLIER`（`adventurerQuestSystem.ts`）
+4. 怪物：`pressure.ts` 累積擊殺數 × 倍率；`mapMonsterStore` 生成間隔與 Boss 機率；`monsterSpawn.ts` HP 與攻擊力區間
+5. 每個公式的 unit test 以參數注入倍率驗證；`tsc -b` 與 `vitest run` 全過

@@ -9,7 +9,8 @@ import type { AffixCategory } from '../models/affix';
 import { resolveArea } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
 import { getItemById } from '../models/items';
-import { GOLD_RATE_MULTIPLIER, DROP_RATE_MULTIPLIER } from '../config';
+import { DROP_RATE_MULTIPLIER } from '../config';
+import { settleGoldDrop } from './globalRates';
 
 export interface DropResult {
   gold: number;
@@ -52,13 +53,9 @@ function getDropRateMultiplier(bonuses?: DropBonuses): number {
   return (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER * (bonuses?.pressure_mult ?? 1);
 }
 
-/**
- * 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）——
- * `27-drop-table.md` § 27.7 第 8 條的「金幣單次上限 500」是明文通膨閘門，
- * 而金幣量沒有素材／卷軸那種「上限只管基礎值」的豁免。
- */
-function getGoldRateMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.gold_rate ?? 0) / 100) * GOLD_RATE_MULTIPLIER;
+/** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率與 500 上限在 `settleGoldDrop` */
+function getGoldAffixMultiplier(bonuses?: DropBonuses): number {
+  return 1 + (bonuses?.gold_rate ?? 0) / 100;
 }
 
 /**
@@ -97,7 +94,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
-  const goldRateMultiplier = getGoldRateMultiplier(bonuses);
+  const goldAffixMultiplier = getGoldAffixMultiplier(bonuses);
   /*
    * 同一個 tier 的武器／防具是**一組連動條目**，只擲一次再 50/50 決定給哪一種
    * （`27-drop-table.md` § 27.6）。旗標必須**每個 tier 各一份** ——
@@ -167,7 +164,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
 
     if (entry.itemType === 'gold') {
       const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
-      gold += Math.floor(baseGold * goldRateMultiplier);
+      gold += settleGoldDrop(baseGold, goldAffixMultiplier);
     } else if (entry.itemType === 'equipment') {
       const template = entry.equipmentTemplateId
         ? await db.equipmentTemplates.get(entry.equipmentTemplateId)
@@ -248,7 +245,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
-  const goldRateMultiplier = getGoldRateMultiplier(bonuses);
+  const goldAffixMultiplier = getGoldAffixMultiplier(bonuses);
 
   for (const entry of entries) {
     let effectiveDropValue = entry.dropValue;
@@ -272,7 +269,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
 
     if (entry.itemType === 'gold') {
       const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
-      gold += Math.floor(baseGold * goldRateMultiplier);
+      gold += settleGoldDrop(baseGold, goldAffixMultiplier);
     } else if (entry.itemType === 'equipment') {
       let template;
       if (entry.equipmentPool) {
