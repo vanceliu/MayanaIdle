@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { EquipmentDetail } from '../EquipmentInfo';
+import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useGameStore } from '../../stores/gameStore';
-import type { EquipmentInstance } from '../../models/equipment';
+import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import type { Character } from '../../models/character';
 import type { Attributes } from '../../models/attributes';
 
@@ -59,6 +59,31 @@ describe('素質需求的顯示', () => {
   it('防具不再列可用職業', () => {
     render(<EquipmentDetail item={item()} />);
     expect(screen.queryByText(/可用職業/)).toBeNull();
+  });
+});
+
+/** 商店與鐵匠鋪看的是模板（`06-equipment.md` § 6A.8.8）：買／做之前就要看得到 */
+describe('模板的素質需求顯示', () => {
+  const template = (over: Partial<EquipmentTemplate> = {}): EquipmentTemplate => ({
+    id: 9001, name: '龍鱗盾', type: 'shield', slot: 'leftHand', isTwoHanded: false,
+    defense: 2, line: 'heavy', requiredAttributes: { STR: 14, VIT: 12 },
+    weight: 40, buyPrice: 0, acquireType: 'craft', tier: 4, ...over,
+  } as EquipmentTemplate);
+
+  it('列出需求，未達標的屬性標紅', () => {
+    setStore(character({ STR: 12, VIT: 12 }));
+    render(<EquipmentTemplateDetail template={template()} />);
+    const line = screen.getByText(/素質需求/);
+    expect(line.textContent).toContain('力量 14');
+    expect(line.textContent).toContain('體質 12');
+    expect(screen.getByText(/力量 14/).className).toContain('unmet-attr');
+    expect(screen.getByText(/體質 12/).className).not.toContain('unmet-attr');
+  });
+
+  it('沒有素質需求的模板不印這一列', () => {
+    setStore(character({ STR: 24 }));
+    render(<EquipmentTemplateDetail template={template({ requiredAttributes: undefined })} />);
+    expect(screen.queryByText(/素質需求/)).toBeNull();
   });
 });
 

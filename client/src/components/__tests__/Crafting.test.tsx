@@ -8,6 +8,7 @@ import { seedDatabase, resetSeedState } from '../../db/seed';
 import { db } from '../../db/database';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { bagItemById } from '../../testing/bagFixtures';
+import { ATTRIBUTE_NAMES_ZH } from '../../models/attributes';
 
 /**
  * @vitest-environment jsdom
@@ -101,6 +102,55 @@ describe('TownBlacksmith - Crafting', () => {
   });
 
   // 強化已搬到背包（`35-inventory-constraints.md` § 35.5.5），鐵匠鋪只剩製作，沒有分頁
+  /**
+   * § 6A.8.8：素質需求要在製作前就看得到 —— 做得出來不等於穿得動，
+   * 需求沒滿足時該件的四條詞綴全部凍結。未達標的屬性逐項標紅。
+   */
+  it('配方列出素質需求，未達標的屬性標紅', async () => {
+    // 需求由 seed 決定，測試不寫死數字（§ 99.1 第 3 條：一律由 id／seed 反查）
+    const armor = EQUIPMENT_SEEDS.find(
+      t => t.acquireType === 'craft' && t.type === 'armor' && t.slot === 'chest' && t.requiredAttributes,
+    )!;
+    const [attr, need] = Object.entries(armor.requiredAttributes!)[0] as [string, number];
+    const label = ATTRIBUTE_NAMES_ZH[attr as keyof typeof ATTRIBUTE_NAMES_ZH];
+
+    const char = useGameStore.getState().character!;
+    useGameStore.setState({
+      character: { ...char, baseAttributes: { ...char.baseAttributes, [attr]: need - 1 } },
+    });
+
+    render(<TownBlacksmith />);
+    fireEvent.click(await screen.findByText('胸甲'));
+
+    const title = await findRecipeTitle(armor.name);
+    const row = title.closest('.shop-item')!;
+    const line = row.querySelector('.equip-detail-stat')!;
+    expect(line.textContent).toContain(`素質需求`);
+    expect(line.textContent).toContain(`${label} ${need}`);
+    expect(line.className).toContain('equip-detail-unmet');
+    expect(line.querySelector('.equip-detail-unmet-attr')!.textContent).toContain(`${label} ${need}`);
+  });
+
+  it('素質達標時不標紅', async () => {
+    const armor = EQUIPMENT_SEEDS.find(
+      t => t.acquireType === 'craft' && t.type === 'armor' && t.slot === 'chest' && t.requiredAttributes,
+    )!;
+    const char = useGameStore.getState().character!;
+    const boosted = { ...char.baseAttributes };
+    for (const [attr, need] of Object.entries(armor.requiredAttributes!)) {
+      boosted[attr as keyof typeof boosted] = need as number;
+    }
+    useGameStore.setState({ character: { ...char, baseAttributes: boosted } });
+
+    render(<TownBlacksmith />);
+    fireEvent.click(await screen.findByText('胸甲'));
+
+    const row = (await findRecipeTitle(armor.name)).closest('.shop-item')!;
+    const line = row.querySelector('.equip-detail-stat')!;
+    expect(line.className).not.toContain('equip-detail-unmet');
+    expect(line.querySelector('.equip-detail-unmet-attr')).toBeNull();
+  });
+
   it('shows recipe list', async () => {
     render(<TownBlacksmith />);
     expect(await findRecipeTitle('鋼心劍')).toBeDefined();

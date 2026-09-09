@@ -20,3 +20,15 @@ export const ATTRIBUTE_KEYS: (keyof Attributes)[] = ['STR', 'AGI', 'VIT', 'SPI',
 export const ATTRIBUTE_NAMES_ZH: Record<keyof Attributes, string> = {
   STR: '力量', AGI: '敏捷', VIT: '體質', SPI: '精神', INT: '智力', CHA: '魅力',
 };
+
+/**
+ * 素質需求的顯示項（`06-equipment.md` § 6A.8.8）。背包、裝備欄、商店、鐵匠鋪共用一份。
+ * **順序照模板寫的順序**（主需求在前），不重排成 `ATTRIBUTE_KEYS` 的順序。
+ */
+export function attributeRequirementEntries(
+  requirement: Partial<Attributes>,
+): { key: keyof Attributes; label: string; value: number }[] {
+  return (Object.keys(requirement) as (keyof Attributes)[])
+    .filter(key => (requirement[key] ?? 0) > 0)
+    .map(key => ({ key, label: ATTRIBUTE_NAMES_ZH[key], value: requirement[key]! }));
+}

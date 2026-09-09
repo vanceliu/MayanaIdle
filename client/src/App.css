@@ -3105,6 +3105,9 @@ button.active {
 /* § 6A.8.8 素質需求：未達標的屬性標紅，該件的詞綴整組凍結 */
 .equip-detail-unmet { color: var(--accent-danger); }
 .equip-detail-unmet-attr { color: var(--accent-danger); font-weight: 700; }
+/* 商品／配方摘要裡的素質需求跟著摘要走灰色，未達標仍標紅 */
+.shop-item-desc.equip-detail-stat { color: var(--text-dim); }
+.shop-item-desc.equip-detail-stat.equip-detail-unmet { color: var(--accent-danger); }
 .equip-detail-frozen {
   color: var(--accent-danger);
   font-size: var(--fs-xs);

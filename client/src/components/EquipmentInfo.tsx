@@ -6,6 +6,7 @@ import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
 import { DEFENSE_BONUS_MAX } from '../models/equipment';
 import { useGameStore } from '../stores/gameStore';
 import { getEffectiveGearArray, getUnmetAttributes } from '../systems/gear';
+import { AttributeRequirement } from './AttributeRequirement';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { getEquipmentTierColor, getEquipmentInstanceTierColor, getEquipmentTierLevel, getEquipmentInstanceTierLevel } from '../models/equipmentTier';
@@ -161,16 +162,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         </div>
       )}
       {/* § 6A.8.8 素質需求。未達標的屬性標紅，該件的詞綴全部凍結 */}
-      {item.requiredAttributes && (
-        <div className={`equip-detail-stat${frozen ? ' equip-detail-unmet' : ''}`}>
-          素質需求:{' '}
-          {(Object.keys(item.requiredAttributes) as (keyof typeof ATTRIBUTE_NAMES_ZH)[]).map((k, i) => (
-            <span key={k} className={unmet.includes(k) ? 'equip-detail-unmet-attr' : undefined}>
-              {i > 0 ? ' / ' : ''}{ATTRIBUTE_NAMES_ZH[k]} {item.requiredAttributes![k]}
-            </span>
-          ))}
-        </div>
-      )}
+      <AttributeRequirement requirement={item.requiredAttributes} exclude={item} />
       {!compact && frozen && (
         <div className="equip-detail-frozen">素質不足 · 詞綴未生效</div>
       )}
@@ -278,6 +270,8 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
       <div className={`equip-detail-class${templateClassMismatch ? ' equip-detail-unmet' : ''}`}>
         可用職業: {getClassDisplay(template.requiredClass)}
       </div>
+      {/* § 6A.8.8 素質需求：買下去之前就要看得到穿不穿得動 */}
+      <AttributeRequirement requirement={template.requiredAttributes} />
       {hint && <div className="equip-detail-hint">{hint}</div>}
     </div>
   );

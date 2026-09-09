@@ -95,15 +95,28 @@ export function getUnmetAttributes(
   equippedGear: (EquipmentInstance | null)[],
   item: EquipmentInstance,
 ): (keyof Attributes)[] {
-  const req = item.requiredAttributes;
-  if (!req) return [];
+  return getUnmetRequirement(char, activeEffects, equippedGear, item.requiredAttributes, item);
+}
+
+/**
+ * 同上，但直接收需求本身 —— 商店與鐵匠鋪看的是**模板**，手上還沒有實例。
+ * `exclude` 是「這件自己」，已裝備時要排掉自己的額外屬性（不可自我認證，§ 6A.8.8）。
+ */
+export function getUnmetRequirement(
+  char: Character,
+  activeEffects: ActiveEffect[],
+  equippedGear: (EquipmentInstance | null)[],
+  requirement: Partial<Attributes> | undefined,
+  exclude?: EquipmentInstance,
+): (keyof Attributes)[] {
+  if (!requirement) return [];
   const self = getTotalAttributes(char, activeEffects);
-  const others = equippedGear.filter(g => g && g !== item) as EquipmentInstance[];
+  const others = equippedGear.filter(g => g && g !== exclude) as EquipmentInstance[];
   const active = resolveActiveGear(others, self);
   const total = { ...self };
   for (const g of others) {
     if (!areAffixesActive(g, active)) continue;
     for (const k of ATTRIBUTE_KEYS) total[k] += getGearAttributeBonus([g], k);
   }
-  return ATTRIBUTE_KEYS.filter(k => (req[k] ?? 0) > total[k]);
+  return ATTRIBUTE_KEYS.filter(k => (requirement[k] ?? 0) > total[k]);
 }

@@ -4,6 +4,7 @@ import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipmen
 import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
+import { AttributeRequirement } from '../AttributeRequirement';
 import { GameIcon } from '../GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
@@ -267,6 +268,8 @@ export function TownBlacksmith() {
                     ? recipe.requiredClass.map(c => CLASS_NAMES_ZH[c as keyof typeof CLASS_NAMES_ZH] ?? c).join('、')
                     : '全職業'}
                 </span>
+                {/* § 6A.8.8 素質需求：做得出來不等於穿得動，未達標的屬性標紅 */}
+                <AttributeRequirement requirement={recipe.requiredAttributes} className="shop-item-desc" />
                 <span className="shop-item-desc bs-craft-materials">
                   {recipe.craftPrerequisiteWeapon && (() => {
                     const { templateId, quantity } = recipe.craftPrerequisiteWeapon!;

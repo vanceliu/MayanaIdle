@@ -12,6 +12,7 @@ import {
 import type { EquipmentInstance } from '../equipment';
 import type { Attributes } from '../character';
 import { collectAffixAttributes } from '../affix';
+import { attributeRequirementEntries } from '../attributes';
 
 const ZERO: Attributes = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
 const attrs = (partial: Partial<Attributes>): Attributes => ({ ...ZERO, ...partial });
@@ -123,5 +124,22 @@ describe('額外屬性詞綴的加總（§ 7.3.1）', () => {
       { affixes: [{ type: 'bonus_attribute' as const, tier: 0, value: 1, attribute: 'INT' as const }] },
     ];
     expect(collectAffixAttributes(gear)).toEqual({ STR: 2, INT: 1 });
+  });
+});
+
+/** 顯示用的需求項（`06-equipment.md` § 6A.8.8）。四個介面共用這一份 */
+describe('attributeRequirementEntries', () => {
+  it('照模板寫的順序輸出，主需求在前', () => {
+    expect(attributeRequirementEntries({ INT: 18, SPI: 16 })).toEqual([
+      { key: 'INT', label: '智力', value: 18 },
+      { key: 'SPI', label: '精神', value: 16 },
+    ]);
+  });
+
+  it('0 與未填的屬性不列出', () => {
+    expect(attributeRequirementEntries({ STR: 10, VIT: 0 })).toEqual([
+      { key: 'STR', label: '力量', value: 10 },
+    ]);
+    expect(attributeRequirementEntries({})).toEqual([]);
   });
 });
