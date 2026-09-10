@@ -6,6 +6,7 @@ import type { Appearance } from './appearance';
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS } from './attributes';
 import { collectAffixAttributes } from './affix';
+import { gameNow } from '../core/clock';
 
 export type ClassName = 'knight' | 'elf' | 'elementalist' | 'priest' | 'thief';
 
@@ -163,7 +164,7 @@ export function getTotalAttributes(
   }
 
   if (activeEffects) {
-    const now = Date.now();
+    const now = gameNow();
     for (const effect of activeEffects) {
       if (effect.type !== 'buff' || effect.target !== 'player') continue;
       if (now - effect.startTime >= effect.duration) continue;

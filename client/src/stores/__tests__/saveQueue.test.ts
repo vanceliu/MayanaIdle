@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore, talentInitReady } from '../gameStore';
 
 const localStorageMock = (() => {
@@ -51,10 +49,7 @@ describe('存檔佇列', () => {
   let realUpdate: typeof db.characters.update;
 
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({ phase: 'title', userId: null, characterList: [], character: null, bagItems: [] });
     await useGameStore.getState().initUser();

@@ -11,9 +11,9 @@ import { create } from 'zustand';
  *
  * 存的同時記下**當時的視窗尺寸**，換到不同大小的視窗時按比例換算回來。
  */
-export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest' | 'mail' | 'script';
+export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest' | 'mail' | 'script' | 'party' | 'onmap' | 'trade';
 
-export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest', 'mail', 'script'];
+export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest', 'mail', 'script', 'party', 'onmap', 'trade'];
 
 /**
  * PanelDock 以泛用按鈕渲染的面板。
@@ -21,6 +21,13 @@ export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'sk
  * 由 `QuestTrackerButton` / `MailboxButton` / `ScriptEditorButton` 自行渲染。
  */
 export const DOCK_PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill'];
+
+/**
+ * 只在線上模式出現的面板（`97-selfhosted-server.md`）；單機形態不畫按鈕。
+ * `trade` 沒有按鈕：交易由隊伍面板的玩家名單發起，收到邀請或成立時自動開窗。
+ */
+export const ONLINE_ONLY_PANEL_KEYS: readonly PanelKey[] = ['party', 'onmap', 'trade'];
+export const NO_BUTTON_PANEL_KEYS: readonly PanelKey[] = ['trade'];
 
 export const PANEL_TITLES: Record<PanelKey, string> = {
   stats: '詳細狀態',
@@ -30,6 +37,10 @@ export const PANEL_TITLES: Record<PanelKey, string> = {
   quest: '進行中的任務',
   mail: '信箱',
   script: '自動天賦',
+  /** 線上模式才有（`97-selfhosted-server.md` § 97.7.3） */
+  party: '隊伍',
+  onmap: '本地圖玩家',
+  trade: '交易',
 };
 
 /**
@@ -53,12 +64,17 @@ export const PANEL_ICONS: Record<PanelKey, string> = {
   /** 不可與城鎮設施撞號（見上）：✉️ 目前沒有設施在用 */
   mail: '✉️',
   script: '📜',
+  /** 不可與城鎮設施撞號（見上）：👥／🧑‍🤝‍🧑／🤝 目前沒有設施在用 */
+  party: '👥',
+  onmap: '🧑‍🤝‍🧑',
+  trade: '🤝',
 };
 
 /** 按鈕上顯示的短標籤。`quest` 的完整標題是視窗抬頭，按鈕上放不下 */
 export const PANEL_BUTTON_LABELS: Record<PanelKey, string> = {
   ...PANEL_TITLES,
   quest: '任務',
+  onmap: '在線',
 };
 
 /**
@@ -83,6 +99,9 @@ export const PANEL_WIDTHS: Record<PanelKey, number> = {
   quest: 320,
   mail: 360,
   script: 480,
+  party: 360,
+  onmap: 340,
+  trade: 520,
 };
 
 /** 浮動視窗 z-index 基準：高於地圖 HUD，低於 modal overlay（.modal-overlay = 1000） */
@@ -104,6 +123,9 @@ const DEFAULT_POSITIONS: Record<PanelKey, PanelPosition> = {
   mail: { x: 1230, y: 128 },
   // 自動腳本較高（82vh），預設靠上避免下緣被夾動
   script: { x: 700, y: 72 },
+  party: { x: 24, y: 420 },
+  onmap: { x: 400, y: 420 },
+  trade: { x: 600, y: 160 },
 };
 
 /**

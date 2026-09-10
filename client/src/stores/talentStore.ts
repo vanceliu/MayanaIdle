@@ -8,7 +8,6 @@
  * 條件與動作**沒有 store** —— 它們是 seed 常數，全部內建（§ 51.4.1）。
  */
 import { create } from 'zustand';
-import { db } from '../db/database';
 import {
   FUSE_INPUT_COUNT,
   STARTING_SLOT_COUNT,
@@ -25,6 +24,7 @@ import { defaultParams } from '../models/talentParams';
 import { buildCombatRules, buildPersistentRules, buildVillageRules } from '../systems/talentRules';
 import type { CombatRule, PersistentRule } from '../models/scriptEngine';
 import type { VillageRule } from '../models/villageScript';
+import { defaultSession, type Session } from './session';
 
 export interface TalentState {
   characterId: number | null;
@@ -107,12 +107,13 @@ function withEntry(
   return { conditions, action: slot.action };
 }
 
-export const useTalentStore = create<TalentState>((set, get) => ({
+export function createTalentStore(session: Session) {
+  return create<TalentState>((set, get) => ({
   characterId: null,
   slots: [],
 
   load: async characterId => {
-    const slots = await db.talentSlots.where('characterId').equals(characterId).toArray();
+    const slots = await session.repo.listTalentSlots(characterId);
     set({ characterId, slots });
   },
 
@@ -121,13 +122,13 @@ export const useTalentStore = create<TalentState>((set, get) => ({
    * 已經有資料就不重發。
    */
   grantStartingIfEmpty: async characterId => {
-    const existing = await db.talentSlots.where('characterId').equals(characterId).count();
+    const existing = await session.repo.countTalentSlots(characterId);
     if (existing > 0) return;
 
-    await db.transaction('rw', db.talentSlots, async () => {
+    await session.repo.transaction(async () => {
       for (let i = 0; i < STARTING_SLOT_COUNT; i++) {
         const layout = STARTING_LAYOUT[i];
-        await db.talentSlots.add({
+        await session.repo.addTalentSlot({
           characterId,
           tier: 1,
           assignedType: layout.type,
@@ -157,7 +158,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     const sameType = slots.filter(s => s.assignedType === type && s.templateId === templateId);
     const nextOrder = sameType.reduce((max, s) => Math.max(max, s.order ?? -1), -1) + 1;
 
-    await db.talentSlots.update(slotId, {
+    await session.repo.updateTalentSlot(slotId, {
       assignedType: type,
       templateId,
       order: nextOrder,
@@ -173,7 +174,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
   uninstallSlot: async slotId => {
     const { characterId } = get();
     if (characterId === null) return;
-    await db.talentSlots.update(slotId, { assignedType: null, templateId: null, order: null });
+    await session.repo.updateTalentSlot(slotId, { assignedType: null, templateId: null, order: null });
     await get().load(characterId);
   },
 
@@ -192,9 +193,9 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     const clamped = Math.max(0, Math.min(toOrder, without.length));
     without.splice(clamped, 0, moving);
 
-    await db.transaction('rw', db.talentSlots, async () => {
+    await session.repo.transaction(async () => {
       for (let i = 0; i < without.length; i++) {
-        await db.talentSlots.update(without[i].id!, { order: i });
+        await session.repo.updateTalentSlot(without[i].id!, { order: i });
       }
     });
     await get().load(characterId);
@@ -206,7 +207,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     if (characterId === null) return;
     const slot = slots.find(s => s.id === slotId);
     if (!slot) return;
-    await db.talentSlots.update(slotId, { enabled: !slot.enabled });
+    await session.repo.updateTalentSlot(slotId, { enabled: !slot.enabled });
     await get().load(characterId);
   },
 
@@ -225,7 +226,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
       if (!canPlaceRule(ruleId, slot, slotIndex)) return;
       entry = { ruleId, params: defaultParams(ruleId) };
     }
-    await db.talentSlots.update(slotId, withEntry(slot, slotIndex, entry));
+    await session.repo.updateTalentSlot(slotId, withEntry(slot, slotIndex, entry));
     await get().load(characterId);
   },
 
@@ -236,7 +237,7 @@ export const useTalentStore = create<TalentState>((set, get) => ({
     if (!slot) return;
     const current = slotIndex === null ? slot.action : slot.conditions[slotIndex] ?? null;
     if (!current) return;
-    await db.talentSlots.update(slotId, withEntry(slot, slotIndex, { ...current, params }));
+    await session.repo.updateTalentSlot(slotId, withEntry(slot, slotIndex, { ...current, params }));
     await get().load(characterId);
   },
 
@@ -262,14 +263,18 @@ export const useTalentStore = create<TalentState>((set, get) => ({
       conditions: emptyConditions(nextTier),
       action: null,
     };
-    await db.transaction('rw', db.talentSlots, async () => {
-      await db.talentSlots.bulkDelete(consumed.map(s => s.id!));
-      await db.talentSlots.add(produced);
+    await session.repo.transaction(async () => {
+      await session.repo.bulkDeleteTalentSlots(consumed.map(s => s.id!));
+      await session.repo.addTalentSlot(produced);
     });
     await get().load(characterId);
     return produced;
   },
 }));
+}
+
+export const useTalentStore = createTalentStore(defaultSession);
+defaultSession.talent = useTalentStore;
 
 /**
  * 判定用的規則（`systems/talentRules.ts`）。
@@ -277,14 +282,14 @@ export const useTalentStore = create<TalentState>((set, get) => ({
  * 這三個是 runner 的唯一入口 —— 讀天賦格組出既有的規則形狀，
  * **不查持有清單**（`16-tech-frontend-architecture.md` § 32.18）。
  */
-export function talentCombatRules(templateId: string): CombatRule[] {
-  return buildCombatRules(useTalentStore.getState().slots, templateId);
+export function talentCombatRules(templateId: string, slots: TalentSlot[] = useTalentStore.getState().slots): CombatRule[] {
+  return buildCombatRules(slots, templateId);
 }
 
-export function talentPersistentRules(templateId: string): PersistentRule[] {
-  return buildPersistentRules(useTalentStore.getState().slots, templateId);
+export function talentPersistentRules(templateId: string, slots: TalentSlot[] = useTalentStore.getState().slots): PersistentRule[] {
+  return buildPersistentRules(slots, templateId);
 }
 
-export function talentVillageRules(templateId: string): VillageRule[] {
-  return buildVillageRules(useTalentStore.getState().slots, templateId);
+export function talentVillageRules(templateId: string, slots: TalentSlot[] = useTalentStore.getState().slots): VillageRule[] {
+  return buildVillageRules(slots, templateId);
 }

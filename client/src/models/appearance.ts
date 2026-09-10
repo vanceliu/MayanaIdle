@@ -1,3 +1,4 @@
+import { random } from '../core/rng';
 /**
  * 角色外觀 —— 規格見 `docs/design/04-character.md` § 4.10。
  *
@@ -264,7 +265,7 @@ export function normalizeAppearance(raw: unknown): Appearance {
  *
  * `rng` 可注入，測試才能斷定結果而不是碰運氣。
  */
-export function randomAppearance(rng: () => number = Math.random): Appearance {
+export function randomAppearance(rng: () => number = random): Appearance {
   const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
   const skin = pick(SKIN_TONES);
   const usable = usableEyeTones(skin);

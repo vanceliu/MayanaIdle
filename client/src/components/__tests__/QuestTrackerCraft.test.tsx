@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import 'fake-indexeddb/auto';
 import { QuestTrackerContent } from '../QuestTracker';
 import { useGameStore } from '../../stores/gameStore';
-import { seedDatabase, resetSeedState } from '../../db/seed';
-import { db } from '../../db/database';
+import { resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { getItemById } from '../../models/items';
@@ -37,10 +35,7 @@ function setChar(gold: number) {
 
 describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
   beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    resetSeedState();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
 
     setChar(0);

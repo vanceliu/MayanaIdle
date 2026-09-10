@@ -50,20 +50,11 @@ MayanaIdle 是一款以 Web 為主要平台的放置型 ARPG。
 
 優先以 Web 為主。
 
-推薦技術方向：
+技術方向（`16-tech.md`、`97-selfhosted-server.md`）：
 
-- 前端：React / Vite / TypeScript
-- 後端：Node.js / NestJS 或 Express
-- 資料庫：PostgreSQL
-- ORM：Prisma
-- 即時通訊：WebSocket / Socket.IO
-
-如果要簡化 MVP，可優先使用：
-
-- Next.js
-- PostgreSQL
-- Prisma
-- Socket.IO
+- 前端：React / Vite / TypeScript / PixiJS
+- server：Node.js 單一 process / WebSocket / SQLite
+- 單機與開放線上為同一個 server，只差 bind 位址
 
 ---
 

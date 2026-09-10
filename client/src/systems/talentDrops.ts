@@ -13,9 +13,10 @@ import {
   type TalentSlotTier,
 } from '../models/talent';
 import { DROP_ROLL_MAX } from './drops';
+import { random } from '../core/rng';
 
 export type Rng = () => number;
-const defaultRng: Rng = () => Math.random();
+const defaultRng: Rng = () => random();
 
 /**
  * 掉落值 → 是否命中。沿用 `27-drop-table.md` § 27.1 的公式（基數 1000）。

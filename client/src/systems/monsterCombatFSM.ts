@@ -1,6 +1,7 @@
 import type { Position, MapData } from '../models/mapControl';
 import { hasLineOfSight, getDistance, isWithinAttackRange } from './lineOfSight';
 import type { MonsterAttackType } from '../models/monster';
+import { random } from '../core/rng';
 
 /** 怪物戰鬥 FSM。`casting` 是詠唱前搖（`25-monster-system.md` § 25.11） */
 export type MonsterCombatState = 'roaming' | 'chasing' | 'attacking' | 'casting';
@@ -66,7 +67,7 @@ export interface MonsterTickResult {
 
 /** 可注入的亂數，讓詠唱機率與讀條長度測得起來 */
 export type Rng = () => number;
-const defaultRng: Rng = () => Math.random();
+const defaultRng: Rng = () => random();
 
 /** 詠唱進度 0~1，給頭上的詠唱條用。沒在詠唱回 0 */
 export function castProgress(ctx: MonsterCombatContext): number {
@@ -74,8 +75,8 @@ export function castProgress(ctx: MonsterCombatContext): number {
   return Math.max(0, Math.min(ctx.castTimer / ctx.castTime, 1));
 }
 
-/** 中止詠唱並回到指定狀態。射程或視線斷掉時用 */
-function abortCast(ctx: MonsterCombatContext, next: MonsterCombatState): void {
+/** 中止詠唱並回到指定狀態。射程或視線斷掉、詠唱中目標死亡或離線（§ 25.11.1）時用 */
+export function abortCast(ctx: MonsterCombatContext, next: MonsterCombatState): void {
   ctx.state = next;
   ctx.castTimer = 0;
   ctx.castTime = 0;

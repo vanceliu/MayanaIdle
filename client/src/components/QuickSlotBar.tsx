@@ -22,6 +22,7 @@ import {
   type QuickSlotEntry,
 } from '../models/quickSlot';
 import { getEffectiveGearArray } from '../systems/gear';
+import { gameNow } from '../core/clock';
 
 const POTION_COLORS: Record<BasicPotionType, string> = {
   red: '#DC2626',
@@ -122,7 +123,7 @@ export function QuickSlotBar() {
   /**
    * 這個技能此刻能不能按。三種不可用原因分開回報，供 tooltip 區分。
    *
-   * **冷卻不在這裡讀時間**：`Date.now()` 不純，不可放進 render。
+   * **冷卻不在這裡讀時間**：`gameNow()` 不純，不可放進 render。
    * 冷卻中的格子由下面那支 rAF 維護成 `cdSlots`，render 只讀結果。
    */
   function skillBlockReason(skill: Skill, idx: number): string | null {
@@ -210,7 +211,7 @@ export function QuickSlotBar() {
 
     let raf = 0;
     const step = () => {
-      const now = Date.now();
+      const now = gameNow();
       const state = useGameStore.getState();
       const live = state.skills;
       const running: number[] = [];

@@ -4,7 +4,7 @@ import { DROP_ROLL_MAX } from '../../systems/drops';
 import type { MonsterTemplate } from '../../models/monster';
 import { isArmorEquipment } from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
-import type { DropTableEntry, BossDropTableEntry } from '../../db/database';
+import type { DropTableEntry, BossDropTableEntry } from '../../db/rowTypes';
 import type { Zone, Region } from '../../models/area';
 import { getItemById } from '../../models/items';
 

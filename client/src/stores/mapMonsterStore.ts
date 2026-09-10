@@ -3,10 +3,14 @@ import { getSpawnInterval, getBossSpawnChance } from '../systems/globalRates';
 import type { Position, MapData } from '../models/mapControl';
 import { findPath, getRandomWalkablePosition, canMoveBetween } from '../systems/pathfinding';
 import type { TrainingDummySpec } from '../models/trainingGround';
+import { random } from '../core/rng';
+import { defaultSession, type Session } from './session';
 
 export interface MapMonster {
   id: string;
   position: Position;
+  /** 上一個模擬 tick 的位置，渲染插值用（`systems/tickDriver.ts`） */
+  prevPosition?: Position;
   targetPosition: Position;
   speed: number;
   path: Position[];
@@ -46,7 +50,7 @@ const PLAYER_MOVE_THRESHOLD = 2;
 export const BOSS_SPAWN_MIN_MINUTES = 5;
 
 function rollSpawnCount(elapsedMinutes: number): number {
-  const roll = Math.random();
+  const roll = random();
   if (elapsedMinutes < 5) {
     // 1隻(80%), 2隻(15%), 3隻(5%)
     if (roll < 0.80) return 1;
@@ -78,13 +82,18 @@ export interface MapMonsterState {
   monsters: MapMonster[];
   maxMonsters: number;
   spawnTimer: number;
-  paused: boolean;
   combatMonsterIds: string[];
   hasBossInPool: boolean;
 
-  spawnTick: (deltaMs: number, map: MapData, playerPos: Position, pressure: number, elapsedMinutes?: number) => void;
+  /**
+   * 生成判定。恢復等待（`mapControl.paused`）由呼叫端擋，這裡不看。
+   * `anchors`：實例全體在場成員的位置，生成點須與每一位距離 ≥ 5 格（§ 97.7.1 多人實例）
+   */
+  spawnTick: (deltaMs: number, map: MapData, playerPos: Position, pressure: number, elapsedMinutes?: number, anchors?: Position[]) => void;
   moveMonsters: (deltaMs: number, map: MapData, playerPos: Position) => void;
   checkCollisions: (playerPos: Position) => MapMonster[];
+  /** 迴圈整批寫回移動後的怪物 */
+  setMonsters: (monsters: MapMonster[]) => void;
   setCombatMonsters: (ids: string[]) => void;
   clearCombatMonsters: () => void;
   clearAll: () => void;
@@ -93,27 +102,26 @@ export interface MapMonsterState {
   setMaxMonsters: (max: number) => void;
   /** 建實例時回填射程，移動邏輯才停得在射程上 */
   setMonsterAttackRange: (id: string, attackRange: number) => void;
-  setPaused: (paused: boolean) => void;
   setHasBossInPool: (has: boolean) => void;
 }
 
-export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
+export function createMapMonsterStore(_session?: Session) {
+  return create<MapMonsterState>((set, get) => ({
   monsters: [],
   maxMonsters: BASE_MAX_MONSTERS,
   spawnTimer: 0,
-  paused: false,
   combatMonsterIds: [],
   hasBossInPool: false,
 
-  spawnTick: (deltaMs, map, playerPos, pressure, elapsedMinutes = 0) => {
+  spawnTick: (deltaMs, map, playerPos, pressure, elapsedMinutes = 0, anchors) => {
     const state = get();
     // 城鎮是安全區，永遠不生怪（§ 13.1、§ 13.2.1）。擋在最前面而不是靠呼叫端記得不要呼叫。
     if (map.theme === 'town') return;
     // 試驗場只有玩家自己召喚的木樁（`50-training-ground.md` § 50.3）。
     // 這是與城鎮不同的一條路：城鎮還要擋自動移動，試驗場必須允許。
     if (map.autoSpawn === false) return;
-    if (state.paused) return;
     if (state.monsters.length >= state.maxMonsters) return;
+    const farFromAll = (pos: Position) => (anchors ?? [playerPos]).every(a => distance(pos, a) >= MIN_SPAWN_DISTANCE);
 
     // 清場補位（`26-spawn-pressure.md` § 26.2）：場上全空時立即判定且必定成功。
     // 沒有它，擊殺速度快於判定間隔的角色會停在空地上等下一個週期再擲 15%，
@@ -131,7 +139,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
 
     set({ spawnTimer: 0 });
 
-    if (!isRefill && Math.random() > BASE_SPAWN_CHANCE) return;
+    if (!isRefill && random() > BASE_SPAWN_CHANCE) return;
 
     // Determine spawn count based on elapsed time (partySize=1 baseline)
     const spawnCount = rollSpawnCount(elapsedMinutes);
@@ -144,7 +152,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
       const bossAlreadyOnMap = currentMonsters.some(m => m.isBoss);
       let isBoss = false;
       if (state.hasBossInPool && !bossAlreadyOnMap && elapsedMinutes >= BOSS_SPAWN_MIN_MINUTES) {
-        isBoss = Math.random() < getBossSpawnChance();
+        isBoss = random() < getBossSpawnChance();
       }
 
       // Find a spawn position at least MIN_SPAWN_DISTANCE from player
@@ -153,7 +161,7 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
         attempts++;
         const pos = getRandomWalkablePosition(map, playerPos);
         if (!pos) continue;
-        if (distance(pos, playerPos) >= MIN_SPAWN_DISTANCE) {
+        if (farFromAll(pos)) {
           const monster: MapMonster = {
             id: nextMonsterId(),
             position: { ...pos },
@@ -365,6 +373,10 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
     );
   },
 
+  setMonsters: (monsters) => {
+    set({ monsters });
+  },
+
   setCombatMonsters: (ids) => {
     set({ combatMonsterIds: ids });
   },
@@ -412,11 +424,11 @@ export const useMapMonsterStore = create<MapMonsterState>((set, get) => ({
     set({ maxMonsters: max });
   },
 
-  setPaused: (paused) => {
-    set({ paused });
-  },
-
   setHasBossInPool: (has) => {
     set({ hasBossInPool: has });
   },
 }));
+}
+
+export const useMapMonsterStore = createMapMonsterStore(defaultSession);
+defaultSession.mapMonster = useMapMonsterStore;

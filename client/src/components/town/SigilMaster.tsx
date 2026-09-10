@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { useGameStore } from '../../stores/gameStore';
+import { useGameStore, type SigilApplyResult } from '../../stores/gameStore';
 import { SLOT_NAMES, SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../../models/equipment';
 import {
   DEFAULT_MAX_AFFIX_TIER,
-  getAffixCategoryForSlot,
-  getWeaponBaseDamage,
   isSpecialAffixType,
   isMaxRollAffix,
   isTierlessAffixType,
@@ -18,22 +16,13 @@ import {
   SIGIL_DEFINITIONS,
   SIGIL_PANEL_ORDER,
   DEFAULT_PANEL_SIGIL,
-  applyChaosSigil,
-  applyEnhanceSigil,
-  applyPolishSigil,
-  applyRecarveSigil,
-  applyStingSigil,
-  applyTemperSigil,
   canUseSigil,
   getEnhanceSigilRate,
   getSigilDefinition,
   getUpgradeSigilFor,
-  type SigilContext,
-  type SigilResult,
   type SigilType,
 } from '../../models/sigil';
-import { db } from '../../db/database';
-import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
+import { getBagItemAmount } from '../../models/bagItem';
 import { getItemById } from '../../models/items';
 import { resolveItemIcon, getEquipIcon } from '../../models/iconMap';
 import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
@@ -139,17 +128,6 @@ export function SigilMaster() {
     return null;
   }
 
-  function buildContext(it: EquipmentInstance): SigilContext {
-    return {
-      category: getAffixCategoryForSlot(it.slot, it.type),
-      charLevel: char!.level,
-      maxAffixTier: it.maxAffixTier,
-      quality: it.quality ?? 0,
-      weaponBaseDamage: getWeaponBaseDamage(it),
-      isStarterGear: isStarterGear(it),
-    };
-  }
-
   /** 這一條詞綴能不能被目前選到的印記受理。判定只有 `canUseSigil()` 一個來源 */
   function checkAffix(idx: number) {
     if (!item) return { ok: false as const, reason: '沒有裝備' };
@@ -158,49 +136,6 @@ export function SigilMaster() {
       maxAffixTier: item.maxAffixTier,
       quality: item.quality ?? 0,
     });
-  }
-
-  /** 背包列一律以 `itemTemplateId` 定位（§ 99.1），不可用 name 查 —— 改名即失聯 */
-  function persistBagItem(itemId: number, newAmount: number) {
-    if (!char?.id) return;
-    const rows = db.characterBag.where({ characterId: char.id, itemTemplateId: itemId });
-    if (newAmount <= 0) {
-      rows.delete();
-    } else {
-      rows.modify({ amount: newAmount });
-    }
-  }
-
-  /** 扣掉一個印記並寫回裝備 */
-  function commit(message: string, patch: Partial<EquipmentInstance>, goldCost = 0) {
-    if (!entry || !item) return;
-    const updatedItem = { ...item, ...patch };
-    if (item.id) {
-      db.equipmentInstances.update(item.id, patch);
-    }
-
-    const newBag = consumeBagItem(useGameStore.getState().bagItems, def.itemId);
-    persistBagItem(def.itemId, sigilCounts[sigilType] - 1);
-
-    const updatedChar = goldCost > 0 ? { ...char!, gold: char!.gold - goldCost } : char!;
-    if (goldCost > 0 && char!.id) db.characters.update(char!.id, { gold: updatedChar.gold });
-
-    if (entry.source === 'equipped' && entry.slot) {
-      useGameStore.setState({
-        character: updatedChar,
-        equippedGear: { ...equippedGear, [entry.slot]: updatedItem },
-        bagItems: newBag,
-      });
-    } else {
-      useGameStore.setState({
-        character: updatedChar,
-        inventory: inventory.map(i => (i.id === item.id ? updatedItem : i)),
-        bagItems: newBag,
-      });
-    }
-
-    setResultMsg(`${item.name}｜${message}`);
-    useGameStore.getState().saveState();
   }
 
   /**
@@ -219,52 +154,25 @@ export function SigilMaster() {
 
   /* 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1） */
 
-  function handleApply() {
+  async function handleApply() {
     if (!item) return;
-    const ctx = buildContext(item);
-
-    // § 46.8 工藝印記：對象是整件裝備，且是唯一要收金幣的印記
-    if (sigilType === 'polish') {
-      const check = canUseSigil('polish', item.affixes, undefined, ctx);
-      if (!check.ok) return setResultMsg(check.reason ?? '無法使用');
-      if (char!.gold < POLISH_SIGIL_GOLD_COST) return setResultMsg('金幣不足');
-      const polished = applyPolishSigil(item.quality ?? 0);
-      if (!polished.success) return setResultMsg(polished.message);
-      commit(polished.message, { quality: polished.quality }, POLISH_SIGIL_GOLD_COST);
-      playFx({ mode: 'polish', color: SWEEP_COLOR.polish });
-      return;
-    }
-
-    const check = canUseSigil(sigilType, item.affixes, affixIndex ?? undefined, ctx);
-    if (!check.ok) return setResultMsg(check.reason ?? '無法使用');
-    if (sigilCounts[sigilType] <= 0) return;
-
+    if (def.target === 'affix' && affixIndex == null) return setResultMsg('請先選一條詞綴');
     // 突破印記失敗會把詞綴砍回 T1（§ 46.7），代價不可逆，動手前先問一次
     if (sigilType === 'enhance' && !confirmBreakthrough(affixIndex!)) return;
 
-    let result: SigilResult;
-    if (sigilType === 'chaos') {
-      result = applyChaosSigil(ctx);
-    } else if (sigilType === 'sting') {
-      result = applyStingSigil(item.affixes!, affixIndex!, ctx);
-    } else if (sigilType === 'recarve') {
-      result = applyRecarveSigil(item.affixes!, affixIndex!, ctx);
-    } else if (sigilType === 'temper') {
-      result = applyTemperSigil(item.affixes!, affixIndex!, ctx);
-    } else {
-      result = applyEnhanceSigil(item.affixes!, affixIndex!);
-    }
+    // 判定與消耗在 store action（單機同步、線上模式回 Promise）；這裡只負責訊息與演出
+    const settled = useGameStore.getState().applySigil(item.id!, sigilType, affixIndex);
+    const result: SigilApplyResult = settled && typeof (settled as Promise<unknown>).then === 'function'
+      ? await (settled as Promise<SigilApplyResult>)
+      : settled as SigilApplyResult;
+    setResultMsg(result.message);
+    if (!result.ok) return;
 
-    // 池抽空之類的「沒有東西可換」不消耗印記
-    if (result.affixes === item.affixes) {
-      setResultMsg(result.message);
-      return;
-    }
-    commit(result.message, { affixes: result.affixes });
-
-    if (sigilType === 'enhance') {
+    if (sigilType === 'polish') {
+      playFx({ mode: 'polish', color: SWEEP_COLOR.polish });
+    } else if (sigilType === 'enhance') {
       // 突破：兩拍，時間軸與強化共用，只有顏色與浮字換掉（§ 48.5）
-      const newTier = result.affixes[affixIndex!]?.tier ?? 1;
+      const newTier = result.affixes?.[affixIndex!]?.tier ?? 1;
       playFx({
         mode: result.success ? 'break-ok' : 'break-fail',
         affixIndex: affixIndex!,

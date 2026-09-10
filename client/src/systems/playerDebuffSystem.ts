@@ -4,6 +4,8 @@ import type { MonsterInstance } from '../models/monster';
 import type { PlayerDebuffType } from '../models/playerDebuff';
 import { PLAYER_DEBUFF_DEFS, PLAYER_DEBUFF_TYPES } from '../models/playerDebuff';
 import { collectSpecialAffixTypes, type SpecialAffixType } from '../models/affix';
+import { random } from '../core/rng';
+import { gameNow } from '../core/clock';
 
 /**
  * 角色 Debuff 觸發系統
@@ -48,7 +50,7 @@ export function getDebuffImmunityRate(
   type: PlayerDebuffType,
   specials: Set<SpecialAffixType>,
   activeEffects: ActiveEffect[] = [],
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): number {
   // 生效中的「免疫負面狀態」buff（神聖領域，§ 23.6）對所有 debuff 類型提供 100% 免疫
   if (hasDebuffImmunityBuff(activeEffects, now)) return 1;
@@ -60,7 +62,7 @@ export function getDebuffImmunityRate(
 /** buff 來源的全類型 debuff 免疫（`immuneDebuff` 標記），目前唯一來源為神聖領域 */
 export function hasDebuffImmunityBuff(
   activeEffects: ActiveEffect[],
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): boolean {
   return activeEffects.some(
     e => e.type === 'buff' && e.target === 'player' && e.immuneDebuff === true
@@ -76,7 +78,7 @@ export function hasStunResist(specials: Set<SpecialAffixType>): boolean {
 export function hasActivePlayerDebuff(
   activeEffects: ActiveEffect[],
   category: string,
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): boolean {
   return activeEffects.some(
     e => e.type === 'debuff' && e.target === 'player' && e.category === category
@@ -84,13 +86,13 @@ export function hasActivePlayerDebuff(
   );
 }
 
-export function isPlayerStunned(activeEffects: ActiveEffect[], now: number = Date.now()): boolean {
+export function isPlayerStunned(activeEffects: ActiveEffect[], now: number = gameNow()): boolean {
   return activeEffects.some(
     e => e.type === 'debuff' && e.target === 'player' && e.stun && now < e.startTime + e.duration
   );
 }
 
-export function getPlayerDebuffTags(activeEffects: ActiveEffect[], now: number = Date.now()): string[] {
+export function getPlayerDebuffTags(activeEffects: ActiveEffect[], now: number = gameNow()): string[] {
   const tags: string[] = [];
   for (const e of activeEffects) {
     if (e.type !== 'debuff' || e.target !== 'player') continue;
@@ -165,7 +167,7 @@ export function rollMonsterDebuff(
   monster: MonsterInstance,
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[],
-  now: number = Date.now(),
+  now: number = gameNow(),
   magicResist: number = 0,
 ): DebuffRollResult {
   const none: DebuffRollResult = { effect: null, triggered: false, type: null };
@@ -181,13 +183,13 @@ export function rollMonsterDebuff(
     const finalChance = ability.chance * (1 - immunity);
     if (finalChance <= 0) continue;
 
-    if (Math.random() * 100 >= finalChance) continue;
+    if (random() * 100 >= finalChance) continue;
 
     // § 24.4.2：詛咒／虛弱／減速 命中後，再以魔法抗性判定是否被擋下。
     // 擋下仍消耗本次判定（§ 25.9.2 命中即停），與「免疫詞綴讓觸發率歸零、直接換下一種」不同。
     if (isMagicResistibleDebuff(ability.type) && magicResist > 0) {
       const resistChance = Math.min(magicResist, 100);
-      if (Math.random() * 100 < resistChance) {
+      if (random() * 100 < resistChance) {
         return { effect: null, triggered: true, type: ability.type, resisted: true };
       }
     }
@@ -210,7 +212,7 @@ export function rollMonsterDebuff(
 /** 加速 buff 的 category（見 24-buff-debuff.md § 24.3.1） */
 export const SPEED_BUFF_CATEGORY = 'speed';
 
-export function hasActiveSpeedBuff(activeEffects: ActiveEffect[], now: number = Date.now()): boolean {
+export function hasActiveSpeedBuff(activeEffects: ActiveEffect[], now: number = gameNow()): boolean {
   return activeEffects.some(
     e => e.type === 'buff' && e.target === 'player' && e.category === SPEED_BUFF_CATEGORY
       && now < e.startTime + e.duration
@@ -231,7 +233,7 @@ export interface DebuffApplyResult {
 export function applyPlayerDebuff(
   activeEffects: ActiveEffect[],
   effect: ActiveEffect,
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): DebuffApplyResult {
   if (effect.category === PLAYER_DEBUFF_DEFS.slow.category && hasActiveSpeedBuff(activeEffects, now)) {
     return {
@@ -268,7 +270,7 @@ export interface SpeedBuffApplyResult {
 export function applySpeedBuff(
   activeEffects: ActiveEffect[],
   buffEffect: ActiveEffect,
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): SpeedBuffApplyResult {
   const slowCategory = PLAYER_DEBUFF_DEFS.slow.category;
   if (hasActivePlayerDebuff(activeEffects, slowCategory, now)) {
@@ -292,7 +294,7 @@ export function applySpeedBuff(
 export function applyPlayerBuff(
   activeEffects: ActiveEffect[],
   buffEffect: ActiveEffect,
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): SpeedBuffApplyResult {
   if (buffEffect.category === SPEED_BUFF_CATEGORY) {
     return applySpeedBuff(activeEffects, buffEffect, now);

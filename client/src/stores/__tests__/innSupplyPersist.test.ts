@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, INN_PRICES, talentInitReady } from '../gameStore';
 import { useTalentStore } from '../talentStore';
 import type { TalentSlot } from '../../models/talent';
@@ -64,10 +62,7 @@ function playerEffect(over: Partial<ActiveEffect>): ActiveEffect {
  */
 describe('補給天賦：使用旅館', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({ phase: 'title', userId: null, characterList: [], character: null, bagItems: [] });
     await useGameStore.getState().initUser();

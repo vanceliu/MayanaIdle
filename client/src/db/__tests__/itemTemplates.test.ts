@@ -1,15 +1,11 @@
+import { ITEM_DEFINITIONS } from '../../db/seed';
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../database';
-import { seedDatabase, resetSeedState, ITEM_DEFINITIONS } from '../seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { getItemById, getItemDefinition } from '../../models/items';
 
 describe('itemTemplates', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
   });
 
   describe('seed 正確性', () => {

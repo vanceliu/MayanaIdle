@@ -315,7 +315,7 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 - 縮放層裡的彈窗要 `createPortal` 到 `body`。
 - **縮放層內不可直接寫 `vh` / `vw`**，一律用 `calc(N * var(--vh-unit, 1vh))`（`--vh-unit` / `--vw-unit` 在縮放層宣告為
   `calc(1vh / var(--ui-scale))`）。同理，縮放層讀未縮放外層的 `100%` 時要除以 `--ui-scale`。
-- 拖曳座標（`FloatingWindow`／`CombatLogWindow`）必須用 `getElementScale()` 換算：
+- 拖曳座標（`FloatingWindow`／`LogWindow`）必須用 `getElementScale()` 換算：
   指標事件是視窗座標（含縮放），`left/top` 是版面座標，不換算會愈拖愈偏。
 - 設定存 localStorage 全域 key（`mayana_ui_scale`／`mayana_font_scale`／`mayana_scale_linked`），
   與角色無關，換角色不必重設。

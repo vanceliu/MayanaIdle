@@ -1,27 +1,28 @@
-import { db } from './database';
 import type { EquipmentTemplate } from '../models/equipment';
+import { EQUIPMENT_SEEDS } from './seed/equipmentSeeds';
 
 /**
  * 裝備模板的行程內快取。
  *
- * 模板是 seed 資料，一次讀進來就不會變，但讀它的地方不只 React
- * （商店面板用 hook，商店買賣與村莊腳本的自動販售在 store 裡），
- * 所以快取放在這裡讓兩邊共用，而不是綁在 hook 的模組作用域。
+ * 模板隨程式碼發布（`97-selfhosted-server.md` § 97.4），開機就是完整的，
+ * 不必等任何載入；讀它的地方不只 React，所以放在這裡讓 store 與 hook 共用。
  */
-let cached: EquipmentTemplate[] | null = null;
+let cached: EquipmentTemplate[] = EQUIPMENT_SEEDS as EquipmentTemplate[];
 
-/** 同步取用。尚未載入時回空陣列 —— 需要保證有值的路徑請用 `loadEquipmentTemplates()` */
 export function getCachedEquipmentTemplates(): EquipmentTemplate[] {
-  return cached ?? [];
-}
-
-export async function loadEquipmentTemplates(): Promise<EquipmentTemplate[]> {
-  if (cached) return cached;
-  cached = await db.equipmentTemplates.toArray();
   return cached;
 }
 
-/** 測試在重新 seed 之間必須清掉 */
+export async function loadEquipmentTemplates(): Promise<EquipmentTemplate[]> {
+  return cached;
+}
+
+/** 測試改過模板之後還原 */
 export function resetEquipmentTemplateCache(): void {
-  cached = null;
+  cached = EQUIPMENT_SEEDS as EquipmentTemplate[];
+}
+
+/** 測試注入自訂模板 */
+export function setEquipmentTemplateCache(templates: EquipmentTemplate[]): void {
+  cached = templates;
 }

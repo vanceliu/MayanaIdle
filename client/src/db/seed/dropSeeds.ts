@@ -1,4 +1,4 @@
-import type { DropTableEntry, BossDropTableEntry } from '../database';
+import type { DropTableEntry, BossDropTableEntry } from '../rowTypes';
 
 export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   // 曙光草原 Lv.1~5

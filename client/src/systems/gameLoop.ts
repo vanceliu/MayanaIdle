@@ -1,58 +1,68 @@
+/**
+ * 遊戲迴圈的移動與生成層。兩層結構（`97-selfhosted-server.md` § 97.7.1）：
+ *
+ * - 每玩家：`tickPlayerPre`（回復、回鍋、HP/MP 門檻）與 `tickPlayerPost`（玩家移動、效果到期）
+ * - 每實例：`tickInstanceWorld`（佔位表、生成、怪物移動）
+ *
+ * `gameLoopTick` 是本機（一人實例）的組合入口；server 由 `systems/worldTick.ts` 逐層呼叫。
+ */
 import type { Position, MapData } from '../models/mapControl';
 import type { MapMonster } from '../stores/mapMonsterStore';
-import { OccupationManager } from './occupationManager';
-import { useMapControlStore } from '../stores/mapControlStore';
-import { useMapMonsterStore, MAX_TRACK_DISTANCE, DESPAWN_DISTANCE } from '../stores/mapMonsterStore';
-import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
-import { calculatePressure } from './pressure';
+import { MAX_TRACK_DISTANCE, DESPAWN_DISTANCE } from '../stores/mapMonsterStore';
+import type { MapMonsterState } from '../stores/mapMonsterStore';
+import { getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
+import { defaultSession, type Session } from '../stores/session';
+import { calculatePressure, partyMaxMonsters } from './pressure';
 import { drainRestedExp } from './restedExp';
 import { findPath, findAttackPosition, canMoveBetween } from './pathfinding';
 import { hasLineOfSight, isWithinAttackRange } from './lineOfSight';
+import { gameNow, advanceMs, TICK_MS } from '../core/clock';
+import { playerOccupantId } from '../models/unit';
+import type { OccupationManager } from './occupationManager';
+import {
+  ensureInstance, instanceElapsedMinutes, memberIdOf, monsterTargetPosition, presentMembers, type MapInstance,
+} from './mapInstance';
 
 const ATTACK_RANGE_MELEE = 1.5;
 const DOT_TICK_INTERVAL = 1000;
 /** 回鍋加倍存量的落帳週期 */
 const RESTED_TICK_MS = 10_000;
 
-export const occupation = new OccupationManager();
+/** 本機入口：推進時鐘後跑完一人實例的整個移動層 */
+export function gameLoopTick(deltaMs: number, session: Session = defaultSession) {
+  advanceMs(deltaMs);
+  const instance = ensureInstance(session);
+  snapshotPrevPlayerPosition(session);
+  snapshotPrevMonsterPositions(instance);
+  if (!session.game.getState().character) return;
+  tickPlayerPre(deltaMs, session);
+  tickInstanceWorld(deltaMs, instance);
+  tickPlayerPost(deltaMs, session);
+}
 
-let dotTickTimer = 0;
-let restedTickTimer = 0;
-let pauseLogShown = false;
-let combatInterruptLogShown = false;
+/** 回復與常駐天賦（與地圖無關）、回鍋加倍、HP/MP 門檻的恢復等待 */
+export function tickPlayerPre(deltaMs: number, session: Session): void {
+  const loop = session.loop;
+  if (!session.game.getState().character) return;
 
-export function gameLoopTick(deltaMs: number) {
-  const mapStore = useMapControlStore.getState();
-  const monsterStore = useMapMonsterStore.getState();
-  const gameState = useGameStore.getState();
+  // === 回復與常駐天賦：角色在就跑（原 setInterval 併入 tick）===
+  tickCharacterTimers(deltaMs, session);
+
+  const mapStore = session.mapControl.getState();
+  const monsterStore = session.mapMonster.getState();
+  const gameState = session.game.getState();
   const map = mapStore.currentMap;
-
   if (!map || !gameState.character) return;
 
   const playerPos = mapStore.playerPosition;
 
   // === 回鍋加倍存量：以實時扣減，並持續更新離線基準（`04-character.md` § 4.11）===
   // 每幀寫一次會讓整棵訂閱 character 的 UI 每幀重繪，所以累積到 RESTED_TICK_MS 才落一次。
-  restedTickTimer += deltaMs;
-  if (restedTickTimer >= RESTED_TICK_MS) {
-    const drained = drainRestedExp(gameState.character, restedTickTimer, Date.now());
-    restedTickTimer = 0;
-    if (drained !== gameState.character) useGameStore.setState({ character: drained });
-  }
-
-  // === Rebuild occupation map ===
-  occupation.clear();
-  occupation.register(
-    { x: Math.round(playerPos.x), y: Math.round(playerPos.y) },
-    'player',
-    'player',
-  );
-  for (const m of monsterStore.monsters) {
-    occupation.register(
-      { x: Math.round(m.position.x), y: Math.round(m.position.y) },
-      'monster',
-      m.id,
-    );
+  loop.restedTickTimer += deltaMs;
+  if (loop.restedTickTimer >= RESTED_TICK_MS) {
+    const drained = drainRestedExp(gameState.character, loop.restedTickTimer, Date.now());
+    loop.restedTickTimer = 0;
+    if (drained !== gameState.character) session.game.setState({ character: drained });
   }
 
   // === HP/MP threshold check ===
@@ -69,97 +79,165 @@ export function gameLoopTick(deltaMs: number) {
     m => isWithinAttackRange(playerPos, m.position, ATTACK_RANGE_MELEE),
   );
   const isIdle = !hasNearbyMonster;
+  const paused = mapStore.paused;
 
-  if (belowThreshold && !monsterStore.paused && isIdle) {
-    monsterStore.setPaused(true);
-    useMapControlStore.getState().setAutoMove(false);
-    const existing = useGameStore.getState().combatLogs;
-    useGameStore.setState({
+  if (belowThreshold && !paused && isIdle) {
+    session.mapControl.getState().setPaused(true);
+    session.mapControl.getState().setAutoMove(false);
+    const existing = session.game.getState().combatLogs;
+    session.game.setState({
       combatLogs: [...existing.slice(-199), { text: 'HP/MP 低於門檻，等待恢復中...', type: 'system' }],
     });
-    pauseLogShown = true;
-  } else if (belowThreshold && monsterStore.paused && !pauseLogShown) {
+    loop.pauseLogShown = true;
+  } else if (belowThreshold && paused && !loop.pauseLogShown) {
     // Already paused on load — show log once
-    const existing = useGameStore.getState().combatLogs;
-    useGameStore.setState({
+    const existing = session.game.getState().combatLogs;
+    session.game.setState({
       combatLogs: [...existing.slice(-199), { text: 'HP/MP 低於門檻，等待恢復中...', type: 'system' }],
     });
-    pauseLogShown = true;
-  } else if (aboveResume && monsterStore.paused) {
-    monsterStore.setPaused(false);
+    loop.pauseLogShown = true;
+  } else if (aboveResume && paused) {
+    session.mapControl.getState().setPaused(false);
     if (gameState.searchMode === 'auto') {
-      useMapControlStore.getState().setAutoMove(true);
+      session.mapControl.getState().setAutoMove(true);
     }
-    const existing = useGameStore.getState().combatLogs;
-    useGameStore.setState({
+    const existing = session.game.getState().combatLogs;
+    session.game.setState({
       combatLogs: [...existing.slice(-199), { text: '恢復完畢，繼續探索', type: 'system' }],
     });
-    pauseLogShown = false;
+    loop.pauseLogShown = false;
   }
 
   // Pause interrupted by monster approaching
-  if (monsterStore.paused && hasNearbyMonster && !combatInterruptLogShown) {
-    const existing = useGameStore.getState().combatLogs;
-    useGameStore.setState({
+  const pausedNow = session.mapControl.getState().paused;
+  if (pausedNow && hasNearbyMonster && !loop.combatInterruptLogShown) {
+    const existing = session.game.getState().combatLogs;
+    session.game.setState({
       combatLogs: [...existing.slice(-199), { text: '等待被打斷，進入戰鬥中', type: 'system' }],
     });
-    combatInterruptLogShown = true;
-  } else if (monsterStore.paused && !hasNearbyMonster) {
-    combatInterruptLogShown = false;
-  } else if (!monsterStore.paused) {
-    combatInterruptLogShown = false;
+    loop.combatInterruptLogShown = true;
+  } else if (pausedNow && !hasNearbyMonster) {
+    loop.combatInterruptLogShown = false;
+  } else if (!pausedNow) {
+    loop.combatInterruptLogShown = false;
+  }
+}
+
+/** 實例層：佔位表重建、生成、怪物移動（每 tick 一次，不論成員數） */
+export function tickInstanceWorld(deltaMs: number, instance: MapInstance): void {
+  const members = presentMembers(instance);
+  if (members.length === 0) return;
+  const map = members[0].mapControl.getState().currentMap!;
+  const monsterStore = instance.mapMonster.getState();
+  const occupation = instance.occupation;
+
+  // === Rebuild occupation map ===
+  occupation.clear();
+  const anchors: Position[] = [];
+  for (const m of members) {
+    const pos = m.mapControl.getState().playerPosition;
+    anchors.push(pos);
+    occupation.register({ x: Math.round(pos.x), y: Math.round(pos.y) }, 'player', playerOccupantId(memberIdOf(m)));
+  }
+  for (const m of monsterStore.monsters) {
+    occupation.register({ x: Math.round(m.position.x), y: Math.round(m.position.y) }, 'monster', m.id);
   }
 
-  // === Spawn monsters (only if player is not in recovery) ===
-  if (!monsterStore.paused) {
-    const now = Date.now();
-    const { pressure, maxMonsters } = calculatePressure(gameState.character.areaKills ?? 0);
+  // === Spawn monsters：任一在場成員不在恢復等待中就生 ===
+  const anyActive = members.some(m => !m.mapControl.getState().paused);
+  if (anyActive) {
+    const { pressure } = calculatePressure(instance.kills);
+    const maxMonsters = partyMaxMonsters(pressure, members.length);
     // 生成隻數分布與 Boss 門檻仍以停留時間為輸入（`26-spawn-pressure.md` § 26.2、§ 26.4）
-    const elapsedMinutes = (now - gameState.character.areaEnteredAt) / (1000 * 60);
+    const elapsedMinutes = instanceElapsedMinutes(instance);
     monsterStore.setMaxMonsters(maxMonsters);
-    monsterStore.spawnTick(deltaMs, map, playerPos, pressure, elapsedMinutes);
+    const anchor = members.find(m => !m.mapControl.getState().paused) ?? members[0];
+    monsterStore.spawnTick(deltaMs, map, anchor.mapControl.getState().playerPosition, pressure, elapsedMinutes, anchors);
   }
 
   // === Move monsters (always, not affected by player pause) ===
-  moveMonstersSafe(deltaMs, map, playerPos, monsterStore);
-
-  // === Move player (always allow movement for manual click) ===
-  movePlayerSafe(deltaMs);
-
-  // === DoT tick + effect expiration ===
-  tickDotsAndEffects(deltaMs);
+  moveMonstersSafe(
+    deltaMs, map,
+    m => monsterTargetPosition(instance, m.id, m.position),
+    instance.mapMonster.getState(), occupation,
+  );
 }
 
-function tickDotsAndEffects(deltaMs: number) {
-  const now = Date.now();
-  const gs = useGameStore.getState();
+/** 玩家移動、效果到期與 DoT 計時 */
+export function tickPlayerPost(deltaMs: number, session: Session): void {
+  const gameState = session.game.getState();
+  if (!gameState.character || !session.mapControl.getState().currentMap) return;
+  movePlayerSafe(deltaMs, session);
+  tickDotsAndEffects(deltaMs, session);
+}
+
+/** 回復（5000／6000ms）與常駐天賦（300ms）各自累積，滿週期即觸發 */
+export const PERSISTENT_TICK_MS = TICK_MS;
+
+function tickCharacterTimers(deltaMs: number, session: Session) {
+  const game = session.game.getState();
+  if (game.regenActive) game.tickRegen(deltaMs);
+  if (game.persistentLoopActive) {
+    const loop = session.loop;
+    loop.persistentAcc += deltaMs;
+    let guard = 0;
+    while (loop.persistentAcc >= PERSISTENT_TICK_MS && guard < 5) {
+      loop.persistentAcc -= PERSISTENT_TICK_MS;
+      guard++;
+      session.game.getState().tickPersistent();
+    }
+    if (guard === 5) loop.persistentAcc = 0;
+  }
+}
+
+/** 本 tick 開始前把位置存成「上一 tick」，渲染端據此插值 */
+export function snapshotPrevPlayerPosition(session: Session): void {
+  const mapStore = session.mapControl.getState();
+  if (mapStore.prevPlayerPosition !== mapStore.playerPosition) {
+    session.mapControl.setState({ prevPlayerPosition: mapStore.playerPosition });
+  }
+}
+
+export function snapshotPrevMonsterPositions(instance: MapInstance): void {
+  const monsters = instance.mapMonster.getState().monsters;
+  if (monsters.length > 0) {
+    instance.mapMonster.setState({ monsters: monsters.map(m => m.prevPosition === m.position ? m : { ...m, prevPosition: m.position }) });
+  }
+}
+
+function tickDotsAndEffects(deltaMs: number, session: Session) {
+  const now = gameNow();
+  const gs = session.game.getState();
 
   // Clear expired effects
   const activeEffects = gs.activeEffects;
   const stillActive = activeEffects.filter(e => now < e.startTime + e.duration);
   if (stillActive.length !== activeEffects.length) {
-    useGameStore.setState({ activeEffects: stillActive });
+    session.game.setState({ activeEffects: stillActive });
   }
 
-  // DoT timer accumulation (actual DoT damage is processed in tickArpgCombatLoop)
-  dotTickTimer += deltaMs;
-  if (dotTickTimer >= DOT_TICK_INTERVAL) {
-    dotTickTimer = 0;
-    dotTickReady = true;
+  // DoT timer accumulation (actual DoT damage is processed in tickMemberCombat)
+  const loop = session.loop;
+  loop.dotTickTimer += deltaMs;
+  if (loop.dotTickTimer >= DOT_TICK_INTERVAL) {
+    loop.dotTickTimer = 0;
+    loop.dotTickReady = true;
   }
 }
 
-export let dotTickReady = false;
-export function consumeDotTick(): boolean {
-  if (dotTickReady) {
-    dotTickReady = false;
+export function consumeDotTick(session: Session = defaultSession): boolean {
+  const loop = session.loop;
+  if (loop.dotTickReady) {
+    loop.dotTickReady = false;
     return true;
   }
   return false;
 }
 
-function movePlayerSafe(deltaMs: number) {
-  const store = useMapControlStore.getState();
+function movePlayerSafe(deltaMs: number, session: Session) {
+  const occupation = session.loop.occupation;
+  const store = session.mapControl.getState();
+  const selfId = playerOccupantId(memberIdOf(session));
 
   if (!store.isMoving) {
     return;
@@ -167,7 +245,7 @@ function movePlayerSafe(deltaMs: number) {
 
   const { currentPath, pathIndex, playerPosition, moveSpeed } = store;
   if (currentPath.length === 0 || pathIndex >= currentPath.length) {
-    useMapControlStore.setState({ isMoving: false });
+    session.mapControl.setState({ isMoving: false });
     return;
   }
 
@@ -187,8 +265,8 @@ function movePlayerSafe(deltaMs: number) {
        * 留著會讓下一次追擊沿同一條被擋死的路重算。
        */
       occupation.unregister({ x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) });
-      occupation.register({ x: Math.round(pos.x), y: Math.round(pos.y) }, 'player', 'player');
-      useMapControlStore.setState({
+      occupation.register({ x: Math.round(pos.x), y: Math.round(pos.y) }, 'player', selfId);
+      session.mapControl.setState({
         isMoving: false,
         currentPath: [],
         pathIndex: 0,
@@ -214,19 +292,24 @@ function movePlayerSafe(deltaMs: number) {
 
   // Update occupation
   occupation.unregister({ x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) });
-  occupation.register({ x: Math.round(pos.x), y: Math.round(pos.y) }, 'player', 'player');
+  occupation.register({ x: Math.round(pos.x), y: Math.round(pos.y) }, 'player', selfId);
 
-  useMapControlStore.setState({
+  session.mapControl.setState({
     playerPosition: pos,
     pathIndex: idx,
   });
 }
 
-function moveMonstersSafe(
+/**
+ * 怪物移動。每隻怪追自己的目標成員（`targetPosOf`）；
+ * 回 null 的怪沒有可追的對象，原地待機。
+ */
+export function moveMonstersSafe(
   deltaMs: number,
   map: MapData,
-  playerPos: Position,
-  monsterStore: ReturnType<typeof useMapMonsterStore.getState>,
+  targetPosOf: (monster: MapMonster) => Position | null,
+  monsterStore: MapMonsterState,
+  occupation: OccupationManager,
 ) {
   if (monsterStore.monsters.length === 0) return;
 
@@ -237,6 +320,11 @@ function moveMonstersSafe(
   const PLAYER_MOVE_THRESHOLD = 2;
 
   for (const monster of monsterStore.monsters) {
+    const playerPos = targetPosOf(monster);
+    if (!playerPos) {
+      updated.push(monster);
+      continue;
+    }
     const dist = Math.sqrt(
       (monster.position.x - playerPos.x) ** 2 +
       (monster.position.y - playerPos.y) ** 2,
@@ -396,5 +484,5 @@ function moveMonstersSafe(
     updated.push({ ...monster, position: pos, path, pathIndex: idx, pathRecalcTimer, lastPathPlayerPos, moveTimer });
   }
 
-  useMapMonsterStore.setState({ monsters: updated });
+  monsterStore.setMonsters(updated);
 }

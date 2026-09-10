@@ -1,5 +1,6 @@
 import type { ActiveEffect } from './effect';
 import { PLAYER_DEBUFF_DEFS } from './playerDebuff';
+import { gameNow } from '../core/clock';
 
 /**
  * 狀態解除道具
@@ -61,7 +62,7 @@ export function isCureItem(itemId: number): boolean {
 export function hasCurableDebuff(
   def: CureItemDefinition,
   activeEffects: ActiveEffect[],
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): boolean {
   return activeEffects.some(
     e => e.type === 'debuff' && e.target === 'player'

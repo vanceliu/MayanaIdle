@@ -28,7 +28,6 @@ function resetStores(paused: boolean) {
     monsters: [],
     maxMonsters: 3,
     spawnTimer: 0,
-    paused,
     combatMonsterIds: [],
     hasBossInPool: false,
   });
@@ -40,6 +39,7 @@ function resetStores(paused: boolean) {
     pathIndex: 0,
     isMoving: false,
     autoMove: false,
+    paused,
   });
 }
 
@@ -89,7 +89,7 @@ describe('setAutoMove 與戰鬥後恢復等待', () => {
     expect(useMapControlStore.getState().isMoving).toBe(false);
 
     // gameLoopTick 的 aboveResume 分支：解除暫停後重新啟動自動移動
-    useMapMonsterStore.getState().setPaused(false);
+    useMapControlStore.getState().setPaused(false);
     useMapControlStore.getState().setAutoMove(true);
 
     expect(useMapControlStore.getState().isMoving).toBe(true);

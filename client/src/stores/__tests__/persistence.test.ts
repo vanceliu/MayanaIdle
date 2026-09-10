@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore, selectEmergencyRetreat } from '../gameStore';
 import { emptyQuickSlots } from '../../models/quickSlot';
 import { bagItem } from '../../testing/bagFixtures';
@@ -31,10 +29,7 @@ if (typeof globalThis.window === 'undefined') {
 
 describe('Game persistence', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',
@@ -52,8 +47,7 @@ describe('Game persistence', () => {
       quickSlots: emptyQuickSlots(),
       combatLogs: [],
       gameLoopId: null,
-      hpRegenId: null,
-      mpRegenId: null,
+      regenActive: false,
     });
     await useGameStore.getState().initUser();
   });

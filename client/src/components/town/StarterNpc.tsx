@@ -3,10 +3,7 @@ import { useGameStore } from '../../stores/gameStore';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { ClassName } from '../../models/character';
 import {
-  claimStarterGear,
   canClaimStarterGear,
-  enhanceStarterGear,
-  persistStarterEnhance,
   getStarterEnhanceCost,
   getStarterEnhanceMax,
   getStarterEnhanceState,
@@ -17,7 +14,6 @@ import { CLASS_NAMES_ZH } from '../../models/character';
 import { GameIcon } from '../GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import { STARTER_TIPS } from '../../systems/starterTips';
-import { db } from '../../db/database';
 import { useOneShotFx } from './useOneShotFx';
 
 type NpcTab = 'talk' | 'claim' | 'enhance';
@@ -58,58 +54,20 @@ export function StarterNpc() {
 
   async function handleClaim() {
     if (!char) return;
-    const result = await claimStarterGear(
-      char.id!,
-      char.className as ClassName,
-      char.level,
-      allOwned,
-    );
-    if (result.claimed.length === 0) {
+    const claimed = await useGameStore.getState().claimStarterGear();
+    if (claimed.length === 0) {
       setMsg('你已經擁有所有新手裝備了。');
       return;
     }
-    const inv = useGameStore.getState().inventory;
-    useGameStore.setState({ inventory: [...inv, ...result.claimed] });
-    useGameStore.getState().saveState();
-    setMsg(`獲得了 ${result.claimed.map(e => e.name).join('、')}！`);
+    setMsg(`獲得了 ${claimed.join('、')}！`);
   }
 
   async function handleEnhance(item: EquipmentInstance) {
     if (!char) return;
-    const cost = getStarterEnhanceCost();
-    if (char.gold < cost) {
-      setMsg('金幣不足！');
-      return;
-    }
-    const state = getStarterEnhanceState(item);
-    if (state !== 'enhanceable') {
-      setMsg(state === 'unsupported' ? '此部位不適用強化系統。' : '此裝備已達強化上限。');
-      return;
-    }
-
-    const enhanced = enhanceStarterGear(item);
-    await persistStarterEnhance(enhanced);
-
-    const newChar = { ...char, gold: char.gold - cost };
-    await db.characters.update(char.id!, { gold: newChar.gold });
-
-    const equip = useGameStore.getState().equippedGear;
-    const inv = useGameStore.getState().inventory;
-
-    const inEquipped = Object.entries(equip).find(([, v]) => v?.id === item.id);
-    if (inEquipped) {
-      useGameStore.setState({
-        character: newChar,
-        equippedGear: { ...equip, [inEquipped[0]]: enhanced },
-      });
-    } else {
-      useGameStore.setState({
-        character: newChar,
-        inventory: inv.map(i => i.id === item.id ? enhanced : i),
-      });
-    }
-    useGameStore.getState().saveState();
-    setMsg(`${enhanced.name} 強化成功！(+${enhanced.enhancement})`);
+    const result = await useGameStore.getState().enhanceStarterGear(item.id!);
+    setMsg(result.message);
+    if (!result.ok) return;
+    const enhanced = { ...item, enhancement: result.enhancement ?? item.enhancement };
     /*
      * 新手裝強化**必定成功**（`13-town.md` § 13.10），所以只演安定值內那一段：
      * 白閃 + `+N` 浮字，不放金色爆閃與碎裂（`48-vfx.md` § 48.4.2）。

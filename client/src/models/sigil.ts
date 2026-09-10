@@ -30,6 +30,7 @@ import {
   type AnyAffixType,
 } from './affix';
 import { ATTRIBUTE_KEYS } from './attributes';
+import { random } from '../core/rng';
 
 export type SigilType = 'chaos' | 'sting' | 'recarve' | 'temper' | 'enhance' | 'polish';
 
@@ -258,7 +259,7 @@ export interface SigilResult {
 
 /** 元素刻印／元素侵蝕抽到當下決定的元素（§ 7.4，六種均等） */
 function rollElement() {
-  return BRAND_ELEMENTS[Math.floor(Math.random() * BRAND_ELEMENTS.length)];
+  return BRAND_ELEMENTS[Math.floor(random() * BRAND_ELEMENTS.length)];
 }
 
 function affixName(type: AnyAffixType): string {
@@ -318,7 +319,7 @@ export function applyStingSigil(
     return { affixes, success: false, message: '沒有其他詞綴可以換了' };
   }
 
-  const picked = pool[Math.floor(Math.random() * pool.length)];
+  const picked = pool[Math.floor(random() * pool.length)];
   const next = [...affixes];
 
   if (isSpecialAffixType(picked)) {
@@ -331,7 +332,7 @@ export function applyStingSigil(
   if (isAttributeAffixType(picked)) {
     next[affixIndex] = {
       type: picked, tier: 0, value: BONUS_ATTRIBUTE_VALUE,
-      attribute: ATTRIBUTE_KEYS[Math.floor(Math.random() * ATTRIBUTE_KEYS.length)],
+      attribute: ATTRIBUTE_KEYS[Math.floor(random() * ATTRIBUTE_KEYS.length)],
     };
     return { affixes: next, success: true, message: `刺針印記：換成 ${affixName(picked)}` };
   }
@@ -439,7 +440,7 @@ export function applyEnhanceSigil(
     return { affixes, success: false, message: '突破印記只受理 T5／T6 的詞綴' };
   }
 
-  const success = Math.random() < rate;
+  const success = random() < rate;
   const tier = success ? old.tier + 1 : ENHANCE_SIGIL_FAIL_TIER;
   const type = old.type as AffixType;
   const next = [...affixes];

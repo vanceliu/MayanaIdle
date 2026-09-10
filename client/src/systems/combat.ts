@@ -7,6 +7,8 @@ import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
 import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, type AffixBonuses, type BrandElement } from '../models/affix';
+import { random } from '../core/rng';
+import { gameNow } from '../core/clock';
 
 export type CombatLogType =
   | 'player_miss'
@@ -33,7 +35,7 @@ export interface CombatResult {
 }
 
 function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(random() * (max - min + 1)) + min;
 }
 
 const MATERIAL_RACE_TABLE: Record<string, { races: string[]; min: number; max: number }> = {
@@ -68,7 +70,7 @@ export function getElementCounterBonus(attackElement: string | undefined, monste
 }
 
 export function getFireEnchantBonus(activeEffects: ActiveEffect[]): number {
-  const now = Date.now();
+  const now = gameNow();
   let bonus = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
@@ -83,7 +85,7 @@ export function getFireEnchantBonus(activeEffects: ActiveEffect[]): number {
 }
 
 export function hasActiveFireEnchant(activeEffects: ActiveEffect[]): boolean {
-  const now = Date.now();
+  const now = gameNow();
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
     if (now - effect.startTime >= effect.duration) continue;
@@ -94,7 +96,7 @@ export function hasActiveFireEnchant(activeEffects: ActiveEffect[]): boolean {
 
 /** 角色 buff 的固定值加成（非百分比），例如 命中 +3、額外攻擊 +5 */
 export function getBuffFlatBonus(activeEffects: ActiveEffect[], stat: string): number {
-  const now = Date.now();
+  const now = gameNow();
   let bonus = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
@@ -120,7 +122,7 @@ export function getRangedAttackBonus(
 }
 
 export function getRaceHitBonus(activeEffects: ActiveEffect[], monsterRace: string): number {
-  const now = Date.now();
+  const now = gameNow();
   let bonus = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
@@ -134,7 +136,7 @@ export function getRaceHitBonus(activeEffects: ActiveEffect[], monsterRace: stri
 }
 
 export function getMonsterDebuffModifier(activeEffects: ActiveEffect[], targetIdx: number, stat: string): number {
-  const now = Date.now();
+  const now = gameNow();
   let percentMod = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'debuff' || effect.target !== 'monster') continue;
@@ -153,7 +155,7 @@ export function getMonsterDebuffModifier(activeEffects: ActiveEffect[], targetId
  * 設計來源：docs/design/24-buff-debuff.md § 24.4.1
  */
 export function getPlayerDebuffModifier(activeEffects: ActiveEffect[], stat: string): number {
-  const now = Date.now();
+  const now = gameNow();
   let percentMod = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'debuff' || effect.target !== 'player') continue;
@@ -181,7 +183,7 @@ export function getMonsterDebuffModifierById(
   monsterId: string,
   stat: string,
 ): number {
-  const now = Date.now();
+  const now = gameNow();
   let percentMod = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'debuff' || effect.target !== 'monster') continue;
@@ -301,7 +303,7 @@ export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): num
 const BUFFABLE_AFFIX_STATS = ['attack_power', 'crit_rate', 'crit_damage', 'skill_elemental', 'cooldown_reduction'] as const;
 
 function getBuffPercentBonus(activeEffects: ActiveEffect[], stat: string): number {
-  const now = Date.now();
+  const now = gameNow();
   let bonus = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
@@ -653,7 +655,7 @@ export function calculatePlayerAttack(
   const hits: HitBreakdown[] = [];
 
   for (let i = 0; i < hitCount; i++) {
-    if (!(Math.random() * 100 < hitRate)) {
+    if (!(random() * 100 < hitRate)) {
       hits.push({ damage: 0, isCrit: false, isMiss: true });
       continue;
     }
@@ -675,7 +677,7 @@ export function calculatePlayerAttack(
     }
 
     // Critical check
-    if (Math.random() * 100 < critRate) {
+    if (random() * 100 < critRate) {
       anyCrit = true;
       hitCrit = true;
       damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
@@ -730,7 +732,7 @@ export function calculatePhysicalSkillHit(
   const buffHitBonus = getBuffFlatBonus(activeEffects, 'hit');
   const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus - monsterDodge));
 
-  const hit = Math.random() * 100 < hitRate;
+  const hit = random() * 100 < hitRate;
   if (!hit) {
     return {
       damage: 0,
@@ -759,7 +761,7 @@ export function calculatePhysicalSkillHit(
 
   // Critical check
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const isCritical = Math.random() * 100 < critRate;
+  const isCritical = random() * 100 < critRate;
   if (isCritical) {
     const critMultiplier = 2.0 + bonuses.crit_damage / 100;
     damage = Math.floor(damage * critMultiplier);
@@ -830,7 +832,7 @@ export function calculatePhysicalSnapshotSkill(
     + calculateBasePhysicalDamage(char, weapon, equippedGear, activeEffects);
 
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const isCritical = Math.random() * 100 < critRate;
+  const isCritical = random() * 100 < critRate;
   if (isCritical) {
     damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
   }
@@ -870,7 +872,7 @@ export function calculateSkillAttack(
 
   // Critical check
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const isCritical = Math.random() * 100 < critRate;
+  const isCritical = random() * 100 < critRate;
   if (isCritical) {
     const critMultiplier = 2.0 + bonuses.crit_damage / 100;
     damage = Math.floor(damage * critMultiplier);
@@ -922,7 +924,7 @@ export interface ShieldAbsorbResult {
 export function absorbWithShield(
   damage: number,
   activeEffects: ActiveEffect[],
-  now: number = Date.now(),
+  now: number = gameNow(),
 ): ShieldAbsorbResult {
   if (damage <= 0) return { damage, absorbed: 0, effects: activeEffects, broken: false };
 
@@ -960,14 +962,14 @@ export function absorbWithShield(
 }
 
 /** 是否處於無敵狀態（絕對屏障）：完全免疫傷害 */
-export function isPlayerInvincible(activeEffects: ActiveEffect[], now: number = Date.now()): boolean {
+export function isPlayerInvincible(activeEffects: ActiveEffect[], now: number = gameNow()): boolean {
   return activeEffects.some(
     e => e.type === 'buff' && e.target === 'player' && e.invincible && now < e.startTime + e.duration
   );
 }
 
 export function getBuffDamageReduction(activeEffects: ActiveEffect[]): number {
-  const now = Date.now();
+  const now = gameNow();
   let reduction = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
@@ -981,7 +983,7 @@ export function getBuffDamageReduction(activeEffects: ActiveEffect[]): number {
 }
 
 export function getBuffDefenseBonus(activeEffects: ActiveEffect[]): number {
-  const now = Date.now();
+  const now = gameNow();
   let bonus = 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
@@ -1035,7 +1037,7 @@ export function calculateMonsterAttack(
   }
   const dodgeRate = Math.min(35, baseDodge + agiDodge + defOverflowDodge + evasionBuffBonus);
 
-  const dodged = Math.random() * 100 < dodgeRate;
+  const dodged = random() * 100 < dodgeRate;
   if (dodged) {
     return {
       damage: 0,
@@ -1074,7 +1076,7 @@ export function calculateMonsterAttack(
 
   // Block check (only with shield equipped, after defense reduction)
   const totalBlockRate = getPlayerBlockRate(equippedGear);
-  const blocked = totalBlockRate > 0 && Math.random() * 100 < totalBlockRate;
+  const blocked = totalBlockRate > 0 && random() * 100 < totalBlockRate;
   if (blocked) {
     finalDamage = Math.max(1, Math.floor(finalDamage / 2));
     return {

@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import { useGameStore, talentInitReady } from '../gameStore';
 import { useTalentStore } from '../talentStore';
 import { makeBagItem } from '../../models/bagItem';
@@ -60,10 +58,7 @@ function goHunt() {
 /** 上次掛機點與待返回旗標（`49-village-script.md` § 49.5） */
 describe('返回掛機點', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({ phase: 'title', userId: null, characterList: [], character: null, bagItems: [] });
     await useGameStore.getState().initUser();

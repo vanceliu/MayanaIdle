@@ -1,5 +1,6 @@
 import { CLASS_SKILLS } from '../models/classSkills';
 import type { ClassName } from '../models/character';
+import { random } from '../core/rng';
 
 interface SkillBookEntry {
   /** 技能書的 `ITEM_DEFINITIONS` id。名稱一律由 id 反查（§ 99.1） */
@@ -37,11 +38,11 @@ export function rollClassSkillBookDrop(areaLevel: number, isBoss: boolean, dropR
 
   const baseDropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
   const dropRate = Math.min(baseDropRate * dropRateMultiplier, 1);
-  if (Math.random() >= dropRate) return null;
+  if (random() >= dropRate) return null;
 
   const pool = ALL_CLASS_SKILL_BOOKS.filter(b => b.level === bookLevel);
   if (pool.length === 0) return null;
 
-  const idx = Math.floor(Math.random() * pool.length);
+  const idx = Math.floor(random() * pool.length);
   return pool[idx].itemId;
 }

@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { loadTemplateCache } from '../templateSync';
 import {
@@ -17,10 +15,7 @@ import type { EquipmentInstance } from '../../models/equipment';
 
 describe('starterNpc', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
   });
 

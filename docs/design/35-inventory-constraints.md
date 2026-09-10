@@ -655,7 +655,6 @@ Tooltip 會依狀態顯示「點一次選取」或「再點一次使用」。
 |------|------|
 | 倉庫綁定 | 角色（Character）層級，僅該角色可存取 |
 | 可存放物品 | 裝備、素材、消耗品 |
-| 匯出角色 | 個人倉庫物品一起帶走 |
 | 刪除角色 | 個人倉庫物品一併刪除 |
 | 取出限制 | 背包已滿時不可取出（見 § 35.3） |
 | 存入限制 | 無特殊限制（倉庫容量待設計文件補充） |
@@ -668,7 +667,6 @@ Tooltip 會依狀態顯示「點一次選取」或「再點一次使用」。
 | 可存放物品 | 裝備、素材、消耗品 |
 | 金幣存取 | 共用倉庫有獨立金幣欄位（獨立於物品表，見 `18-data-schema.md` § 18.7），角色可存入/取出 |
 | 跨角色轉移 | 透過共用倉庫中轉（A 存入 → B 取出） |
-| 匯出角色 | 共用倉庫物品不帶走 |
 | 刪除角色 | 不影響共用倉庫內物品 |
 | 取出限制 | 背包已滿時不可取出（見 § 35.3） |
 | 存入限制 | 無特殊限制（倉庫容量待設計文件補充） |
@@ -755,22 +753,21 @@ Tooltip 會依狀態顯示「點一次選取」或「再點一次使用」。
 
 ## 35.17 持久化規則
 
+所有背包操作為 client 送指令 → server 判定 → server 推送結果；client 不直接改數量。
+
 | 資料 | 儲存位置 | 觸發時機 |
 |------|----------|----------|
-| bagItems（消耗品） | IndexedDB（characters table） | 物品數量變更時 |
-| inventory（裝備） | IndexedDB（equipment_instances） | 裝備穿脫/獲得/丟棄時 |
-| quickSlots | localStorage（`mayana_prefs_${characterId}`） | 快捷欄設定變更時 |
-| 金幣 | IndexedDB（characters table） | 金幣數量變更時 |
-| slotMap（格子位置） | localStorage（`mayana_bag_layout_${characterId}`） | 拖曳／整理後 |
+| bagItems（消耗品） | server `character_bag` | 物品數量變更時 |
+| inventory（裝備） | server `equipment_instances` | 裝備穿脫/獲得/丟棄時 |
+| quickSlots | server `quick_slots` | 快捷欄設定變更時 |
+| 金幣 | server `characters` | 金幣數量變更時 |
+| slotMap（格子位置） | server `bag_layouts` | 拖曳／整理後 |
 
-**slotMap 不與角色綁定，不隨角色匯出**：匯入時裝備實例會重新配發 id
-（`characterTransfer.ts` 寫入 `id: undefined`），帶過去的 `equip-{id}` 必然全部對不上，
-只會留下一堆 stale entry。因此它存在**獨立的 localStorage key**，不進 `mayana_prefs_`。
+資料表見 `18-data-schema.md` § 18.12。
 
-- 存檔時**剔除不在當前版面的 id**，表不會無限膨脹 ——
+- slotMap 存檔時**剔除不在當前版面的 id**，表不會無限膨脹 ——
   代價是「存進倉庫 → 取出」位置不保留，回到自動填格
-- 刪除角色與資料版本清除時必須一併移除該 key（characterId 會被重用）；
-  新角色會撿到前一個角色的排列
+- 刪除角色時一併刪除該角色的 `bag_layouts` 列
 
 ---
 

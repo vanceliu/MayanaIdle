@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { gameNow } from '../core/clock';
 
 /** 毫秒 → `5:07`，滿一小時進位為 `1:05:07` */
 export function formatElapsed(ms: number): string {
@@ -19,10 +20,10 @@ export function formatElapsed(ms: number): string {
  */
 export function useAreaElapsed(): number | null {
   const areaEnteredAt = useGameStore(s => s.character?.areaEnteredAt);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => gameNow());
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(gameNow()), 1000);
     return () => clearInterval(id);
   }, []);
 

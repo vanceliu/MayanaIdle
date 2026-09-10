@@ -9,6 +9,7 @@ import {
   purgeClaimedMail,
   unclaimedCount,
 } from '../systems/mailbox';
+import { defaultSession, type Session } from './session';
 
 export interface MailboxState {
   characterId: number | null;
@@ -27,7 +28,8 @@ export interface MailboxState {
   reset: () => void;
 }
 
-export const useMailboxStore = create<MailboxState>((set, get) => ({
+export function createMailboxStore(_session: Session) {
+  return create<MailboxState>((set, get) => ({
   characterId: null,
   mails: [],
   unread: 0,
@@ -73,3 +75,7 @@ export const useMailboxStore = create<MailboxState>((set, get) => ({
 
   reset: () => set({ characterId: null, mails: [], unread: 0 }),
 }));
+}
+
+export const useMailboxStore = createMailboxStore(defaultSession);
+defaultSession.mailbox = useMailboxStore;

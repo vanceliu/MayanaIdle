@@ -22,6 +22,7 @@ maxMonsters = Math.min(10, BASE_MAX_MONSTERS + Pressure)
 
 - `BASE_MAX_MONSTERS = 3`
 - 地圖上同時存在的怪物硬上限 = 10 隻
+- 多人隊伍實例的上限公式見 `97-selfhosted-server.md` § 97.7.1，一人隊伍結果與本表相同
 
 | Pressure | maxMonsters |
 |---|---|
@@ -149,6 +150,7 @@ Pressure = max(0, floor((該地圖累積擊殺數 × 全域 Pressure 倍率 - 48
 - 離開地圖（回城、傳送、死亡）：累積擊殺數歸零，Pressure 隨之歸零
 - 切換地圖：累積擊殺數歸零
 - 停留在同一地圖：累積擊殺數持續累積
+- 多人：累積擊殺數與歸零以隊伍實例為單位（`97-selfhosted-server.md` § 97.7.1）
 
 離開地圖的損失由 `04-character.md` § 4.11 的回鍋經驗加倍另行補償，
 **不可為此放寬本節的重置規則** —— 兩者是不同軸上的獨立機制。

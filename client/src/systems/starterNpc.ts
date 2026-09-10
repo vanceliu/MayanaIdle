@@ -1,6 +1,7 @@
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../models/equipment';
 import type { ClassName } from '../models/character';
-import { db } from '../db/database';
+import type { GameRepository } from '../db/repository';
+import { defaultSession } from '../stores/session';
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 
@@ -72,6 +73,7 @@ export async function claimStarterGear(
   className: ClassName,
   level: number,
   ownedEquipment: EquipmentInstance[],
+  repo: GameRepository = defaultSession.repo,
 ): Promise<ClaimResult> {
   if (!canClaimStarterGear(level)) {
     return { claimed: [], alreadyOwned: [] };
@@ -91,7 +93,7 @@ export async function claimStarterGear(
 
   for (const seed of missing) {
     // 一律用 id 取模板：名字可能重複，id 不會（見 `db/seed/purgeStaleTemplates.ts`）
-    const template = await db.equipmentTemplates.get(seed.id!);
+    const template = await repo.getEquipmentTemplate(seed.id!);
     if (!template) continue;
 
     const dbRecord = {
@@ -106,9 +108,9 @@ export async function claimStarterGear(
       isStarterGear: true,
     };
 
-    const instId = await db.equipmentInstances.add(dbRecord as any);
+    const instId = await repo.addEquipment(dbRecord as any);
     const instance = resolveEquipment({
-      id: instId as number,
+      id: instId,
       templateId: template.id!,
       name: template.name,
       type: template.type,
@@ -128,6 +130,6 @@ export async function claimStarterGear(
   return { claimed, alreadyOwned };
 }
 
-export async function persistStarterEnhance(item: EquipmentInstance): Promise<void> {
-  await db.equipmentInstances.update(item.id!, { enhancement: item.enhancement });
+export async function persistStarterEnhance(item: EquipmentInstance, repo: GameRepository = defaultSession.repo): Promise<void> {
+  await repo.updateEquipment(item.id!, { enhancement: item.enhancement });
 }

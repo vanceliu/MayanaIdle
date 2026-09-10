@@ -8,7 +8,7 @@
 - Sprite batch 批次繪製，支撐大量實體同時顯示
 - 內建粒子系統，未來可做技能特效
 - 深度排序原生支援（sortableChildren / zIndex）
-- 為未來「手動操作模式」和「線上化」打好基礎
+- 為「手動操作模式」與 server 模式（`97-selfhosted-server.md`）打好基礎
 
 ## 2. 設計原則
 

@@ -1,5 +1,6 @@
 import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
-import { db } from '../db/database';
+import type { GameRepository } from '../db/repository';
+import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 import { isAccessorySlot, rollDefenseBonus, rollArmorStability, ARMOR_STABILITY_MIN } from '../models/equipment';
 import { getAccessoryStatMultiplier } from './enhancement';
 
@@ -9,8 +10,12 @@ const ACCESSORY_SCALED_FIELDS = ['bonusHp', 'bonusMp', 'hpRegen', 'mpRegen'] as 
 let templateCache: Map<number, EquipmentTemplate> = new Map();
 let templateByNameCache: Map<string, EquipmentTemplate> = new Map();
 
-export async function loadTemplateCache(): Promise<void> {
-  const templates = await db.equipmentTemplates.toArray();
+/**
+ * 裝備模板隨程式碼發布（`97-selfhosted-server.md` § 97.4）：
+ * client 直接用 bundle 裡的 seed，server 傳入自己的 repo（SQLite）。
+ */
+export async function loadTemplateCache(repo?: GameRepository): Promise<void> {
+  const templates = repo ? await repo.listEquipmentTemplates() : (EQUIPMENT_SEEDS as EquipmentTemplate[]);
   templateCache = new Map(templates.map(t => [t.id!, t]));
   templateByNameCache = new Map(templates.map(t => [t.name, t]));
 }
@@ -21,6 +26,10 @@ export function getTemplateById(id: number): EquipmentTemplate | undefined {
 
 export function getTemplateByName(name: string): EquipmentTemplate | undefined {
   return templateByNameCache.get(name);
+}
+
+export function getCachedTemplates(): EquipmentTemplate[] {
+  return [...templateCache.values()];
 }
 
 export function isTemplateCacheReady(): boolean {

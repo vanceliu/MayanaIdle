@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore } from '../gameStore';
 import { bagItem } from '../../testing/bagFixtures';
 
@@ -27,10 +25,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 
 describe('Dual Warehouse System (personal + shared)', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',
@@ -50,8 +45,7 @@ describe('Dual Warehouse System (personal + shared)', () => {
       quickSlots: [null, null, null, null, null],
       combatLogs: [],
       gameLoopId: null,
-      hpRegenId: null,
-      mpRegenId: null,
+      regenActive: false,
     });
     await useGameStore.getState().initUser();
   });

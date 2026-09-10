@@ -1,7 +1,7 @@
 # 52. 系統信箱與更新公告
 
 發放項目與版本公告的收納處。**全部由本機觸發，沒有遠端發放**
-—— 目前是離線 client-only，`leaderboard-worker` 只有唯讀端點。
+—— 發放由 server 端的管理介面執行（`97-selfhosted-server.md` § 97.8）。
 
 | 項目 | 規則 |
 |---|---|
@@ -57,10 +57,7 @@
 
 ### 52.2.2 補償綁哪個版本（硬性）
 
-**補償一律綁 `BUILD_INFO.version`（顯示版本），不可綁 `CURRENT_DATA_VERSION`。**
-
-`CURRENT_DATA_VERSION` 一升，`19-account-character.md` § 19.9 會**刪光所有舊角色**
-（先封存遺產）。升級後留下的都是新角色，從沒經歷過舊版本，補償沒有對象。
+**補償一律綁 `BUILD_INFO.version`（顯示版本），不可綁資料結構的遷移版本（`19-account-character.md` § 19.9）。**
 
 **新角色不領舊補償**：每筆補償帶 `publishedAt`，只發給
 `character.createdAt < publishedAt` 的角色。沒有這條，新玩家一開檔就會收到
@@ -76,7 +73,7 @@
 
 | 來源 | 記什麼 | 存在哪 |
 |---|---|---|
-| 天賦格 | 已發過幾封 | `characters.talentSlotGrants` |
+| 天賦格 | 已發過幾封 | `characters.talentSlotGrants`（server SQLite，`18-data-schema.md` § 18.12） |
 
 發信與記數**必須同一個交易**：只發信沒記數會重發，只記數沒發信會讓玩家永久少一個格子。
 
@@ -117,7 +114,7 @@
 
 #### 52.2.4.2 寄送紀錄（硬性）
 
-寄送紀錄記在 `characters.sentMailKeys`：**補償 key → true/false**。不另開表。
+寄送紀錄記在 `characters.sentMailKeys`：**補償 key → true/false**。不另開表。判定在 server 端執行（管理介面發放見 `97-selfhosted-server.md` § 97.8）。
 
 | 規則 |
 |---|
@@ -232,7 +229,7 @@
 
 | 不做 | 原因 |
 |---|---|
-| 遠端發放 | 沒有後端寫入端點，`leaderboard-worker` 是唯讀的 |
+| 遠端發放 | 由管理介面發送（`97-selfhosted-server.md` § 97.8 信箱補償） |
 | 兌換碼 | 離線版的碼一定會被拆出來 |
 | 每次版本更新發一封信 | 久沒玩的玩家會收到一長串沒有內容的通知（§ 52.2.1） |
 | 玩家之間寄信 | 單機遊戲 |
@@ -245,7 +242,7 @@
 |---|---|
 | `51-auto-talent.md` § 51.3.3 | 天賦格的等級發放走信箱；領取後進背包，需玩家手動安裝 |
 | `35-inventory-constraints.md` § 35.21 | 未安裝的天賦格收在「天賦」分頁，不佔格不計重 |
-| `19-account-character.md` § 19.9 | **反面連動**：`CURRENT_DATA_VERSION` 會刪角色，補償**不可**綁它（§ 52.2.2） |
+| `19-account-character.md` § 19.9 | **反面連動**：補償不可綁資料結構遷移版本（§ 52.2.2） |
 | `34-ui-guidelines.md` § 34.10 | 數量徽章、`PanelDock` 按鈕分組與順序 |
 | `18-data-schema.md` | `mailbox` 表 |
 | `30-items.md` | 發放的道具定義 |

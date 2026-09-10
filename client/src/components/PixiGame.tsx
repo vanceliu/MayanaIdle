@@ -4,35 +4,29 @@ import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
 import { useCombatCommandStore } from '../stores/combatCommandStore';
 import { MonsterListOverlay } from './MonsterListOverlay';
-import { useGameStore, getEffectiveMaxHp, type CombatLog } from '../stores/gameStore';
-import { talentCombatRules } from '../stores/talentStore';
-import { getNearestTown } from '../models/mapData';
+import { useGameStore } from '../stores/gameStore';
 import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
-import { PlayerEntity } from '../pixi/entities/PlayerEntity';
+import { PlayerEntity, TEAMMATE_MARKER } from '../pixi/entities/PlayerEntity';
+import { usePartyStore, type TeammateView } from '../stores/partyStore';
 import { MonsterEntity } from '../pixi/entities/MonsterEntity';
 import { NpcEntity, NPC_BODY_OFFSET } from '../pixi/entities/NpcEntity';
 import { useTownStore } from '../stores/townStore';
 import type { TownFacility } from './TownView';
 import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } from '../pixi/utils/isometric';
 import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
-import { hasProjectilePath } from '../systems/lineOfSight';
-import { gameLoopTick, consumeDotTick, occupation } from '../systems/gameLoop';
-import { findAttackPosition, findNearestWalkable, isAttackPosition } from '../systems/pathfinding';
-import { db } from '../db/database';
-import { processMonsterDeath, waitForPendingDrops } from '../stores/gameStore';
-import type { MonsterTemplate } from '../models/monster';
-import {
-  createArpgEngine, tickArpgEngine, applyManualTarget, queueManualSkill, type ArpgEngineState,
-} from '../systems/arpgEngine';
-import { processPlayerAttack, processMonsterAttack } from '../systems/arpgEventHandler';
-import { getEquippedWeapon, getPlayerAttackInterval } from '../systems/combat';
+import { gameLoopTick } from '../systems/gameLoop';
+import { isOnline } from '../net/online';
+import { mirrorLastTickAt, drainMirrorVisuals, mirrorCastProgress } from '../net/mirror';
+import { lerpPosition } from '../systems/tickDriver';
+import { TICK_MS } from '../core/clock';
+import { tickCombat, resetCombat, loadAreaTemplates, type CombatVisual } from '../systems/combatLoop';
+import { defaultSession } from '../stores/session';
+import { getEquippedWeapon } from '../systems/combat';
 import {
   isPawnWeaponType, weaponAimFromDelta, weaponPlaybackMs, WEAPON_ART,
 } from '../pixi/entities/pawn/weaponGeometry';
-import { isRangedAttackType } from '../models/monster';
 import { castProgress } from '../systems/monsterCombatFSM';
-import { isPlayerInvincible, absorbWithShield } from '../systems/combat';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance } from '../models/monster';
 import type { DamageType } from '../pixi/ui/CombatVisualEvent';
@@ -52,9 +46,7 @@ import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
 import { getSkillTemplate } from '../models/skillTemplate';
 import type { ActiveEffect } from '../models/effect';
 import { resolveRenderLimits } from '../pixi/renderLimits';
-import { useTrainingGroundStore } from '../stores/trainingGroundStore';
-import { createMonsterFromTemplate } from '../systems/monsterSpawn';
-import { getEffectiveGearArray } from '../systems/gear';
+import { gameNow } from '../core/clock';
 
 const PLAYER_PROJECTILE_SPEED = 512;
 /** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
@@ -69,17 +61,16 @@ export function PixiGame() {
    * 名稱要跟著球體跑（怪物會動、鏡頭也會動），用 state 更新等於每幀 re-render。
    */
   const [hoverText, setHoverText] = useState<string | null>(null);
-  const hoverTargetRef = useRef<{ kind: 'npc' | 'monster' | 'player'; id?: string; pos?: Position } | null>(null);
+  const hoverTargetRef = useRef<EntityHover['target'] | null>(null);
   const hoverLabelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pixiAppRef = useRef<PixiApp | null>(null);
   const sceneRef = useRef<GameScene | null>(null);
   const playerEntityRef = useRef<PlayerEntity | null>(null);
   const monsterMapRef = useRef<Map<string, MonsterEntity>>(new Map());
+  /** 同實例在場隊友的剪影，鍵為角色 id（§ 97.7.1） */
+  const teammateMapRef = useRef<Map<number, PlayerEntity>>(new Map());
   const npcEntitiesRef = useRef<NpcEntity[]>([]);
-  const arpgEngineRef = useRef<ArpgEngineState>(createArpgEngine());
-  const monsterInstancesRef = useRef<Map<string, MonsterInstance>>(new Map());
-  const areaTemplatesRef = useRef<MonsterTemplate[]>([]);
   const hudPublishTimerRef = useRef(0);
   /** 暈眩標記是常駐原型，要記住誰身上已經有一個（§ 48.8.3） */
   const statusMarksRef = useRef(new StatusMarkTracker());
@@ -126,10 +117,7 @@ export function PixiGame() {
           const areaId = char.currentFloor != null
             ? `${char.currentRegion}-${char.currentFloor}f`
             : char.currentRegion;
-          areaTemplatesRef.current = [];
-          db.monsterTemplates.where('area').equals(areaId).toArray().then(templates => {
-            areaTemplatesRef.current = templates;
-          });
+          loadAreaTemplates(areaId);
         }
       }
 
@@ -139,18 +127,34 @@ export function PixiGame() {
         const map = useMapControlStore.getState().currentMap;
         if (!map) return;
 
+        // 線上模式：模擬在 server，這裡只在兩個 tick 之間插值並畫演出
+        let alpha = 1;
         try {
-          // 1. Movement & collision (unified)
-          gameLoopTick(delta);
+          if (isOnline()) {
+            alpha = Math.min(1, (performance.now() - mirrorLastTickAt()) / TICK_MS);
+            syncTeammates(usePartyStore.getState().teammates, map, scene!, teammateMapRef.current, delta, alpha);
+            renderCombatVisuals(drainMirrorVisuals(), scene!.effectLayer, playerEntityRef.current, monsterMapRef.current, teammateMapRef.current);
+            for (const [id, entity] of monsterMapRef.current) {
+              entity.updateCast(mirrorCastProgress(id) ?? 0);
+            }
+          } else {
+            // 1. Movement & collision (unified)
+            gameLoopTick(delta);
 
-          // 2. ARPG combat
-          tickArpgCombatLoop(arpgEngineRef.current, monsterInstancesRef.current, areaTemplatesRef.current, delta, scene!.effectLayer, playerEntityRef.current, monsterMapRef.current);
+            // 2. ARPG combat：模擬在 session，演出由回傳的 CombatVisual 畫
+            const visuals = tickCombat(delta);
+            renderCombatVisuals(visuals, scene!.effectLayer, playerEntityRef.current, monsterMapRef.current, teammateMapRef.current);
+            for (const [id, m] of defaultSession.combat.engine.monsters) {
+              monsterMapRef.current.get(id)?.updateCast(castProgress(m.combatCtx));
+            }
+          }
         } catch (e) {
           console.error('[GameLoop] Error:', e);
         }
 
-        // 3. Render sync
-        const playerPos = useMapControlStore.getState().playerPosition;
+        // 3. Render sync（線上模式對 prev→cur 插值；單機 alpha 固定 1）
+        const mapCtrlNow = useMapControlStore.getState();
+        const playerPos = lerpPosition(mapCtrlNow.prevPlayerPosition, mapCtrlNow.playerPosition, alpha) as Position;
         if (playerEntityRef.current) {
           /* 武器演出要在位置同步之前推進：出手那一幀才會用到剛設好的朝向 */
           playerEntityRef.current.update(delta);
@@ -163,12 +167,13 @@ export function PixiGame() {
 
         syncMonsters(
           useMapMonsterStore.getState().monsters, map, scene!,
-          monsterMapRef.current, monsterInstancesRef.current, delta,
-          arpgEngineRef.current.playerCtx.targetMonsterId,
+          monsterMapRef.current, defaultSession.combat.monsterInstances, delta,
+          defaultSession.combat.engine.playerCtx.targetMonsterId,
+          alpha,
         );
 
-        /* 常駐腳本放的 buff／治癒在 store 那一層，只能靠佇列傳過來 */
-        drainSelfCastFxInto(scene!.effectLayer, map, playerPos);
+        /* 常駐腳本放的 buff／治癒在 store 那一層，只能靠佇列傳過來（線上模式由 server 以 `self_cast` 推送） */
+        if (!isOnline()) drainSelfCastFxInto(scene!.effectLayer, map, playerPos);
 
         /* 染色與暈眩標記跟著 debuff 存續，所以每幀對一次帳（§ 48.8.2、§ 48.8.3） */
         syncStatusFx(
@@ -183,8 +188,8 @@ export function PixiGame() {
           hudPublishTimerRef.current = 0;
           publishMonsterHud(
             useMapMonsterStore.getState().monsters,
-            monsterInstancesRef.current,
-            arpgEngineRef.current.playerCtx.targetMonsterId,
+            defaultSession.combat.monsterInstances,
+            defaultSession.combat.engine.playerCtx.targetMonsterId,
           );
         }
 
@@ -196,7 +201,9 @@ export function PixiGame() {
             ? useMapControlStore.getState().playerPosition
             : hoverTarget.kind === 'monster'
               ? useMapMonsterStore.getState().monsters.find(m => m.id === hoverTarget.id)?.position
-              : hoverTarget.pos;
+              : hoverTarget.kind === 'teammate'
+                ? usePartyStore.getState().teammates.find(t => t.characterId === hoverTarget.memberId)?.position
+                : hoverTarget.pos;
           if (pos) {
             const anchor = entityScreenPos(map, pos);
             const offset = pixiApp.camera.getOffset();
@@ -228,6 +235,8 @@ export function PixiGame() {
       destroyed = true;
       monsterMapRef.current.forEach(m => m.destroy());
       monsterMapRef.current.clear();
+      teammateMapRef.current.forEach(t => t.destroy());
+      teammateMapRef.current.clear();
       npcEntitiesRef.current.forEach(n => n.destroy());
       npcEntitiesRef.current.length = 0;
       useMonsterHudStore.getState().clear();
@@ -266,9 +275,13 @@ export function PixiGame() {
         m.destroy();
       });
       monsterMapRef.current.clear();
+      teammateMapRef.current.forEach(t => {
+        sceneRef.current?.entityLayer.container.removeChild(t.container);
+        t.destroy();
+      });
+      teammateMapRef.current.clear();
       syncNpcs(currentMap, sceneRef.current, npcEntitiesRef.current);
-      arpgEngineRef.current = createArpgEngine();
-      monsterInstancesRef.current.clear();
+      resetCombat();
       useMonsterHudStore.getState().clear();
       /* 還沒消費的手動指令指的是上一張地圖的怪，跟著清掉（§ 3.6） */
       useCombatCommandStore.getState().clear();
@@ -291,10 +304,7 @@ export function PixiGame() {
           ? `${char.currentRegion}-${char.currentFloor}f`
           : char.currentRegion;
         // 先清空：換區時若沿用上一區的模板，會生出不屬於這張圖的怪
-        areaTemplatesRef.current = [];
-        db.monsterTemplates.where('area').equals(areaId).toArray().then(templates => {
-          areaTemplatesRef.current = templates;
-        });
+        loadAreaTemplates(areaId);
       }
     });
     return unsubscribe;
@@ -348,10 +358,11 @@ export function PixiGame() {
         useMapControlStore.getState().playerPosition,
         useGameStore.getState().character?.name ?? '',
         useMapMonsterStore.getState().monsters,
-        monsterInstancesRef.current,
+        defaultSession.combat.monsterInstances,
+        usePartyStore.getState().teammates,
       );
       if (entity?.target.kind === 'monster' && entity.target.id) {
-        const instance = monsterInstancesRef.current.get(entity.target.id);
+        const instance = defaultSession.combat.monsterInstances.get(entity.target.id);
         // 屍體不可指定；點到就當作沒點到，維持原目標
         if (instance && instance.currentHp > 0) {
           useCombatCommandStore.getState().requestTarget(entity.target.id);
@@ -386,7 +397,8 @@ export function PixiGame() {
         useMapControlStore.getState().playerPosition,
         useGameStore.getState().character?.name ?? '',
         useMapMonsterStore.getState().monsters,
-        monsterInstancesRef.current,
+        defaultSession.combat.monsterInstances,
+        usePartyStore.getState().teammates,
       );
 
       hoverTargetRef.current = hit ? hit.target : null;
@@ -556,7 +568,8 @@ function playPlayerAttackFx(o: {
   /** 這一擊要不要飛過去（遠程物理或遠程魔法） */
   ranged: boolean;
   result: PlayerAttackResult;
-  monsters: MapMonster[];
+  /** 每個目標在判定當下的位置（`systems/combatLoop.ts` 的 `CombatVisual`） */
+  targetPositions: Record<string, Position>;
   /** 手持武器的詞綴 —— 元素刻印決定普攻顏色（§ 42.4） */
   weaponAffixes: Affix[] | undefined;
   weaponType: string | undefined;
@@ -585,15 +598,18 @@ function playPlayerAttackFx(o: {
     return;
   }
 
-  /* 命中點各一個。找不到怪的（同一幀已經被清掉）就不演 */
+  /*
+   * 命中點各一個。座標來自演出事件（判定當下抄下來的），**不可回頭查 store** ——
+   * 致命的那一擊在同一個 tick 就把怪拿掉了，查 store 會讓最後一下整段不演。
+   */
   const targets: SkillFxTarget[] = [];
   let firstTarget: Position | null = null;
   for (const dmg of result.damages) {
-    const monster = o.monsters.find(m => m.id === dmg.targetId);
-    if (!monster) continue;
-    const { sx, sy } = mapPositionToScreen(map, monster.position);
+    const targetPos = o.targetPositions[dmg.targetId];
+    if (!targetPos) continue;
+    const { sx, sy } = mapPositionToScreen(map, targetPos);
     const y = sy - HIT_LIFT;
-    firstTarget ??= monster.position;
+    firstTarget ??= targetPos;
     const damageType = resolveDamageType(dmg, skill);
     /*
      * 先把這隻怪保留住。**判定與演出是兩條時間線** ——
@@ -683,471 +699,129 @@ function playPlayerAttackFx(o: {
   });
 }
 
-function tickArpgCombatLoop(
-  engine: ArpgEngineState,
-  monsterInstances: Map<string, MonsterInstance>,
-  areaTemplates: MonsterTemplate[],
-  deltaMs: number,
-  effectLayer?: EffectLayer,
-  /** 出手時要轉向目標，所以戰鬥迴圈需要拿得到玩家實體 */
-  player?: PlayerEntity | null,
-  /** 命中時要讓被打的那隻往後彈（§ 48.7.6） */
-  monsterEntities?: Map<string, MonsterEntity>,
-) {
-  const gameState = useGameStore.getState();
-  const mapStore = useMapControlStore.getState();
-  const monsterStore = useMapMonsterStore.getState();
-
-  if (!gameState.character || !mapStore.currentMap) return;
-
-  const playerPos = mapStore.playerPosition;
-  const currentMap = mapStore.currentMap;
-  const allGear = getEffectiveGearArray(gameState.character!, gameState.activeEffects, gameState.equippedGear) as any[];
-
-  // Ensure monster instances exist
-  for (const mm of monsterStore.monsters) {
-    if (!monsterInstances.has(mm.id)) {
-      const inst = createMonsterFromTemplate(mm, areaTemplates);
-      // 模板未載入 → 這個 frame 先不建實例，下一個 frame 再試（不生假怪）
-      if (!inst) continue;
-      monsterInstances.set(mm.id, inst);
-      // 射程回填到 MapMonster，移動邏輯才停得在射程上（`41-arpg-combat.md` § 5.2）
-      if (mm.attackRange !== inst.attackRange) {
-        monsterStore.setMonsterAttackRange(mm.id, inst.attackRange);
-      }
-    }
+/**
+ * 把模擬回傳的演出需求畫出來（`systems/combatLoop.ts`）。
+ * 模擬層不碰 Pixi；這裡是唯一把 `CombatVisual` 轉成特效、數字、受擊反應的地方。
+ */
+/** 演出的主角：自己或某位隊友。`memberId` 0 或等於自己的角色 id 都是自己 */
+function resolveVisualActor(
+  memberId: number,
+  player: PlayerEntity | null,
+  teammates: Map<number, PlayerEntity>,
+): { entity: PlayerEntity | null; pos: Position } | null {
+  const selfId = useGameStore.getState().character?.id ?? 0;
+  if (memberId === 0 || memberId === selfId) {
+    return { entity: player, pos: useMapControlStore.getState().playerPosition };
   }
-  const activeIds = new Set(monsterStore.monsters.map(m => m.id));
-  for (const id of monsterInstances.keys()) {
-    if (!activeIds.has(id)) monsterInstances.delete(id);
-  }
+  const view = usePartyStore.getState().teammates.find(t => t.characterId === memberId);
+  if (!view) return null;
+  return { entity: teammates.get(memberId) ?? null, pos: view.position };
+}
 
-  /*
-   * 手動介入指令（§ 3.6）。**必須在 `tickArpgEngine` 之前消費**：
-   * 引擎在同一個 tick 內就會用掉它們，晚一步等於玩家的操作永遠慢一幀。
-   *
-   * 也必須在上面的怪物同步之後 —— `applyManualTarget` 查的是 `engine.monsters`，
-   * 剛進場的怪還沒同步進去就會被當成「不在場上」而作廢。
-   */
-  const commands = useCombatCommandStore.getState();
-  const manualTargetId = commands.consumeTarget();
-  if (manualTargetId) applyManualTarget(engine, manualTargetId);
-  const manualSkillId = commands.consumeSkill();
-  if (manualSkillId) queueManualSkill(engine, manualSkillId);
-  // 常駐天賦的走位（§ 51.4.9 T5）：只設意圖，實際移動由 FSM 下一幀處理
-  const pendingMove = commands.consumeMove();
-  if (pendingMove) engine.playerCtx.moveIntent = pendingMove;
+function renderCombatVisuals(
+  visuals: CombatVisual[],
+  effectLayer: EffectLayer,
+  player: PlayerEntity | null,
+  monsterEntities: Map<string, MonsterEntity>,
+  teammates: Map<number, PlayerEntity>,
+): void {
+  if (visuals.length === 0) return;
+  const map = useMapControlStore.getState().currentMap;
+  if (!map) return;
+  const gs = useGameStore.getState();
 
-  const events = tickArpgEngine(engine, {
-    playerPos,
-    character: gameState.character,
-    skills: gameState.skills,
-    activeEffects: gameState.activeEffects,
-    equippedGear: allGear,
-    // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
-    combatRules: talentCombatRules(gameState.activeTemplateId),
-    effectiveMaxHp: getEffectiveMaxHp(gameState.character, gameState.equippedGear),
-    mapMonsters: monsterStore.monsters,
-    monsterInstances,
-    map: mapStore.currentMap,
-    bagItems: gameState.bagItems,
-    deltaMs,
-  });
-
-  if (monsterEntities) {
-    for (const [id, m] of engine.monsters) {
-      monsterEntities.get(id)?.updateCast(castProgress(m.combatCtx));
-    }
-  }
-
-  // If player FSM is idle and autoMove (not paused), find next target
-  if (engine.playerCtx.state === 'idle' && mapStore.autoMove && !mapStore.isMoving && !monsterStore.paused) {
-    useMapControlStore.getState().pickRandomTarget();
-  }
-
-  const logs: CombatLog[] = [];
-
-  for (const event of events) {
-    switch (event.type) {
-      case 'overweight_blocked': {
-        // 每次出手判定都顯示一次（§ 20.7）
-        logs.push({ text: event.message, type: 'system' });
+  for (const v of visuals) {
+    const actor = resolveVisualActor(v.memberId, player, teammates);
+    if (!actor) continue;
+    const actorScreen = mapPositionToScreen(map, actor.pos);
+    switch (v.kind) {
+      case 'face': {
+        actor.entity?.faceToward(actor.pos, v.target);
         break;
       }
       case 'player_attack': {
-        // Stop after reaching the current tile waypoint
-        const mapCtrl2 = useMapControlStore.getState();
-        if (mapCtrl2.isMoving && mapCtrl2.currentPath.length > 0) {
-          const nextIdx = mapCtrl2.pathIndex;
-          // Keep only the next waypoint so player finishes stepping onto it, then stops
-          if (nextIdx < mapCtrl2.currentPath.length) {
-            useMapControlStore.setState({
-              currentPath: mapCtrl2.currentPath.slice(0, nextIdx + 1),
-            });
-          } else {
-            useMapControlStore.setState({ isMoving: false, currentPath: [], pathIndex: 0 });
-          }
-        }
-        const attackEvent = isRangedAttackType(event.attackType)
-          ? {
-              ...event,
-              targetMonsterIds: event.targetMonsterIds.filter(targetId => {
-                const target = monsterStore.monsters.find(monster => monster.id === targetId);
-                return target && hasProjectilePath(playerPos, target.position, currentMap);
-              }),
-            }
-          : event;
-        if (isRangedAttackType(event.attackType) && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
-
-        // 轉向被打的那隻：攻擊方向與角色朝向必須一致。多目標時以第一個為準。
-        const facingTarget = monsterStore.monsters.find(
-          m => m.id === attackEvent.targetMonsterIds[0],
-        );
-        /**
-         * 武器一律用 `getEquippedWeapon()` 取（`99-ai-constraints.md` § 99.1 第 5 條）——
-         * `equippedGear` 是插入順序不是部位順序，用索引會靜默取到防具。
-         */
-        const held = getEquippedWeapon(allGear);
-
-        /*
-         * 轉向要**在演出之前**、而且不管這一招碰不碰武器都要轉 ——
-         * 施法不揮武器（§ 48.6.1），但人還是要面向目標。
-         */
-        if (facingTarget && player) player.faceToward(playerPos, facingTarget.position);
-
-        const result = processPlayerAttack(attackEvent, {
-          character: gameState.character,
-          equippedGear: allGear,
-          activeEffects: gameState.activeEffects,
-          skills: gameState.skills,
-          monsterInstances,
-          mapMonsters: monsterStore.monsters,
+        playPlayerAttackFx({
+          effectLayer,
+          player: actor.entity,
+          map,
+          playerPos: v.playerPos,
+          ranged: v.ranged,
+          result: v.result,
+          targetPositions: v.targetPositions,
+          weaponAffixes: v.weapon?.affixes,
+          weaponType: v.weapon?.type,
+          monsterEntities,
+          weaponMaterial: v.weapon?.material ?? null,
+          activeEffects: gs.activeEffects,
+          attackIntervalMs: v.attackIntervalMs,
         });
-        logs.push(...result.logs);
-
-        if (effectLayer) {
-          playPlayerAttackFx({
-            effectLayer,
-            player: player ?? null,
-            map: currentMap,
-            playerPos,
-            ranged: isRangedAttackType(event.attackType),
-            result,
-            monsters: monsterStore.monsters,
-            weaponAffixes: held?.affixes,
-            weaponType: held?.type,
-            monsterEntities: monsterEntities ?? new Map(),
-            weaponMaterial: held?.material ?? null,
-            activeEffects: gameState.activeEffects,
-            attackIntervalMs: getPlayerAttackInterval(allGear, gameState.activeEffects),
-          });
-        }
-
-        for (const dmg of result.damages) {
-          recordTrainingHits(monsterInstances.get(dmg.targetId), dmg);
-          if (dmg.killed) {
-            const inst = monsterInstances.get(dmg.targetId);
-            const monsterIdx = monsterStore.monsters.findIndex(m => m.id === dmg.targetId);
-            if (inst) handleMonsterDeath(inst, monsterIdx, dmg.targetId);
-            monsterInstances.delete(dmg.targetId);
-            const currentMonsters = useMapMonsterStore.getState().monsters;
-            useMapMonsterStore.setState({
-              monsters: currentMonsters.filter(m => m.id !== dmg.targetId),
-            });
-          }
-        }
-        stopTrainingIfNoDummiesLeft();
         break;
       }
-
       case 'monster_attack': {
-        if (isRangedAttackType(event.attackType)) {
-          const attacker = monsterStore.monsters.find(monster => monster.id === event.monsterId);
-          if (!attacker || !hasProjectilePath(attacker.position, playerPos, mapStore.currentMap)) break;
-        }
-        const result = processMonsterAttack(event, {
-          character: gameState.character,
-          equippedGear: allGear,
-          activeEffects: gameState.activeEffects,
-          skills: gameState.skills,
-          monsterInstances,
-          mapMonsters: monsterStore.monsters,
+        /* 被打的成員位置同樣走事件：他可能在這一擊之後就被傳回城鎮 */
+        const victim = mapPositionToScreen(map, v.victimPos);
+        const { sx, sy } = victim;
+        const dmgType: DamageType = v.isDodged ? 'miss' : v.crit ? 'crit' : 'normal';
+        const from = v.ranged && v.attackerPos
+          ? mapPositionToScreen(map, v.attackerPos)
+          : { sx, sy };
+        // 外型與顏色見 § 42.4：物理＝白箭矢、魔法＝依該怪元素上色的彈丸
+        const { shape, color } = getMonsterProjectileStyle(v.attackType, v.element);
+        playSkillFx(effectLayer.skillFx, {
+          plan: resolveMonsterAttackFxPlan({ ranged: v.ranged, shape, color }),
+          fromX: from.sx, fromY: from.sy,
+          muzzleX: from.sx, muzzleY: from.sy - HIT_LIFT,
+          toX: sx, toY: sy - HIT_LIFT,
+          targets: [{
+            x: sx, y: sy - HIT_LIFT,
+            onLand: () => {
+              effectLayer.spawnDamageNumber(sx, sy - HIT_LIFT, v.damage, dmgType);
+              /*
+               * 被上了 debuff 就在腳下擴一圈紅環（§ 48.8.1）——
+               * 染色是「持續掛著」，這一圈是「剛剛被上了」，兩件事。
+               */
+              if (v.hasDebuff) {
+                effectLayer.skillFx.spawn({
+                  prototype: 'aura', x: sx, y: sy, color: resolveAuraColor('debuff'),
+                });
+              }
+              /* 閃掉了就不彈 */
+              if (v.isDodged || !v.attackerPos) return;
+              /* 方向一律用螢幕座標算（等距投影會把世界方向轉過去） */
+              const src = mapPositionToScreen(map, v.attackerPos);
+              actor.entity?.hit(sx - src.sx, sy - src.sy);
+            },
+          }],
+          speed: v.projectileSpeed ?? DEFAULT_MONSTER_PROJECTILE_SPEED,
+          groundLift: HIT_LIFT,
         });
-        if (result) {
-          logs.push(result.log);
-          if (result.shieldLog) logs.push(result.shieldLog);
-          if (result.debuffLog) logs.push(result.debuffLog);
-          if (result.restoreLogs) logs.push(...result.restoreLogs);
-
-          if (effectLayer) {
-            const pPos = useMapControlStore.getState().playerPosition;
-            const { sx, sy } = mapPositionToScreen(currentMap, pPos);
-            const dmgType: DamageType = result.isDodged
-              ? 'miss'
-              : (event.damageMultiplier ?? 1) > 1 ? 'crit' : 'normal';
-            const dmgValue = result.isDodged ? 0 : result.damage;
-            const monster = monsterStore.monsters.find(m => m.id === event.monsterId);
-            /* 遠程要有視線才演投射物；沒有視線就退回近戰演出（傷害照樣結算） */
-            const ranged = isRangedAttackType(event.attackType)
-              && !!monster
-              && hasProjectilePath(monster.position, playerPos, currentMap);
-            const from = ranged && monster
-              ? mapPositionToScreen(currentMap, monster.position)
-              : { sx, sy };
-            // 外型與顏色見 § 42.4：物理＝白箭矢、魔法＝依該怪元素上色的彈丸
-            const { shape, color } = getMonsterProjectileStyle(
-              event.attackType,
-              monsterInstances.get(event.monsterId)?.element,
-            );
-
-            playSkillFx(effectLayer.skillFx, {
-              plan: resolveMonsterAttackFxPlan({ ranged, shape, color }),
-              fromX: from.sx, fromY: from.sy,
-              muzzleX: from.sx, muzzleY: from.sy - HIT_LIFT,
-              toX: sx, toY: sy - HIT_LIFT,
-              targets: [{
-                x: sx, y: sy - HIT_LIFT,
-                onLand: () => {
-                  effectLayer.spawnDamageNumber(sx, sy - HIT_LIFT, dmgValue, dmgType);
-                  /*
-                   * 被上了 debuff 就在腳下擴一圈紅環（§ 48.8.1）——
-                   * 染色是「持續掛著」，這一圈是「剛剛被上了」，兩件事。
-                   */
-                  if (result.debuffLog) {
-                    effectLayer.skillFx.spawn({
-                      prototype: 'aura', x: sx, y: sy, color: resolveAuraColor('debuff'),
-                    });
-                  }
-                  /* 閃掉了就不彈 */
-                  if (result.isDodged || !monster) return;
-                  /* 方向一律用螢幕座標算（等距投影會把世界方向轉過去） */
-                  const src = mapPositionToScreen(currentMap, monster.position);
-                  player?.hit(sx - src.sx, sy - src.sy);
-                },
-              }],
-              speed: event.projectileSpeed ?? DEFAULT_MONSTER_PROJECTILE_SPEED,
-              groundLift: HIT_LIFT,
-            });
-          }
-
-          const updatedChar = useGameStore.getState().character;
-          if (updatedChar && updatedChar.hp <= 0) {
-            handlePlayerDeath();
-          }
-        }
         break;
       }
-
-      case 'move_to': {
-        // FSM wants player to chase a target
-        if (monsterStore.paused) break;
-        const mapCtrl = useMapControlStore.getState();
-        if (mapCtrl.autoMove) {
-          const map = mapCtrl.currentMap;
-          if (map) {
-            /*
-             * 距離一律對**雙方的真實座標**算，不可用四捨五入後的格子 ——
-             * 兩者最多差 0.7 格，用格子算會挑到「尋路說在射程內、FSM 說在射程外」的位置，
-             * 角色站在那裡不動也不出手。
-             *
-             * 佔位表讓目的地與路徑都繞開別的怪，否則角色會走進死路、停在擋路的怪前面不動。
-             */
-            const playerPos = mapCtrl.playerPosition;
-            const occupied = occupation.getOccupiedSet('player');
-
-            // 後退：`event.target` 就是落腳格，走不到就留在原地，不清目標
-            if (event.exact) {
-              const dest = findNearestWalkable(map, event.target, playerPos);
-              if (dest) useMapControlStore.getState().moveToTarget(dest, occupied);
-              break;
-            }
-
-            const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
-            const keepCurrent = mapCtrl.isMoving && currentDest
-              && isAttackPosition(map, currentDest, event.target, event.range, occupied);
-            if (keepCurrent) break;
-
-            const attackPosition = findAttackPosition(map, event.target, playerPos, event.range, occupied)
-              ?? findAttackPosition(map, event.target, playerPos, event.range);
-            if (attackPosition) {
-              useMapControlStore.getState().moveToTarget(attackPosition, occupied);
-            } else {
-              engine.playerCtx.targetMonsterId = null;
-              engine.playerCtx.state = 'idle';
-            }
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  if (logs.length > 0) {
-    const existing = useGameStore.getState().combatLogs;
-    useGameStore.setState({
-      combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
-    });
-  }
-
-  // === DoT tick (every 1000ms) ===
-  if (consumeDotTick()) {
-    processDotTick(monsterInstances, effectLayer);
-    processPlayerDotTick(effectLayer);
-    processPlayerHotTick(effectLayer);
-  }
-}
-
-/**
- * 角色持續回復結算（聖域每秒回血 20）
- * 與 DoT 共用 1000ms tick；回復不超過有效最大 HP，死亡狀態不回復。
- */
-function processPlayerHotTick(effectLayer?: EffectLayer) {
-  const gs = useGameStore.getState();
-  const now = Date.now();
-  const hotEffects = gs.activeEffects.filter(
-    e => e.type === 'buff' && e.target === 'player' && e.hot && now < e.startTime + e.duration
-  );
-  if (hotEffects.length === 0) return;
-
-  const char = gs.character;
-  if (!char || char.hp <= 0) return;
-
-  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear);
-  if (char.hp >= effMaxHp) return;
-
-  const total = hotEffects.reduce((sum, e) => sum + (e.hot?.amount ?? 0), 0);
-  const healed = Math.min(effMaxHp - char.hp, total);
-  if (healed <= 0) return;
-
-  const logs: CombatLog[] = [{ text: `${hotEffects.map(e => e.name).join('、')} 回復 ${healed} HP`, type: 'system' }];
-  const existing = useGameStore.getState().combatLogs;
-  useGameStore.setState({
-    character: { ...char, hp: char.hp + healed },
-    combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
-  });
-
-  if (effectLayer) {
-    const map = useMapControlStore.getState().currentMap;
-    if (map) {
-      const pPos = useMapControlStore.getState().playerPosition;
-      const { sx, sy } = mapPositionToScreen(map, pPos);
-      effectLayer.spawnDamageNumber(sx, sy - 20, healed, 'heal');
-    }
-  }
-}
-
-/**
- * 角色 DoT 結算（中毒 / 流血）
- * § 24.4.4：無視防禦、不觸發爆擊、可致死
- */
-function processPlayerDotTick(effectLayer?: EffectLayer) {
-  const gs = useGameStore.getState();
-  const now = Date.now();
-  const dotEffects = gs.activeEffects.filter(
-    e => e.type === 'debuff' && e.target === 'player' && e.dot && now < e.startTime + e.duration
-  );
-  if (dotEffects.length === 0) return;
-
-  const char = gs.character;
-  if (!char || char.hp <= 0) return;
-  // 無敵期間免疫所有傷害，含 DoT
-  if (isPlayerInvincible(gs.activeEffects, now)) return;
-
-  const logs: CombatLog[] = [];
-  let hp = char.hp;
-  let effects = gs.activeEffects;
-  for (const effect of dotEffects) {
-    if (!effect.dot) continue;
-    // 護盾同樣吸收 DoT 傷害（§ 24.4.9）
-    const shield = absorbWithShield(effect.dot.damage, effects, now);
-    effects = shield.effects;
-    if (shield.absorbed > 0) {
-      logs.push({ text: `聖光護盾吸收 ${shield.absorbed} 傷害${shield.broken ? '後破裂' : ''}`, type: 'system' });
-    }
-    const dmg = shield.damage;
-    if (dmg <= 0) continue;
-    hp = Math.max(0, hp - dmg);
-    logs.push({ text: `${effect.name} 造成 ${dmg} 傷害`, type: 'debuff-self' });
-
-    if (effectLayer) {
-      const map = useMapControlStore.getState().currentMap;
-      if (map) {
-        const pPos = useMapControlStore.getState().playerPosition;
-        const { sx, sy } = mapPositionToScreen(map, pPos);
+      case 'dot': {
+        /* DoT 也可能打死怪：位置一樣走事件帶來的那一份 */
+        const foot = mapPositionToScreen(map, v.position);
         /* 粒子色走 debuff 的染色，數字一律粉紅（§ 48.8.4） */
-        spawnDotTickFx(effectLayer, sx, sy, effect.tags ?? []);
-        effectLayer.spawnDamageNumber(sx, sy - HIT_LIFT, dmg, 'dot');
+        spawnDotTickFx(effectLayer, foot.sx, foot.sy, v.tags);
+        effectLayer.spawnDamageNumber(foot.sx, foot.sy - HIT_LIFT, v.damage, 'dot');
+        break;
+      }
+      case 'heal': {
+        effectLayer.spawnDamageNumber(actorScreen.sx, actorScreen.sy - 20, v.amount, 'heal');
+        break;
+      }
+      case 'self_cast': {
+        const skill = getSkillTemplate(v.skillId);
+        if (!skill) break;
+        const held = getEquippedWeapon(Object.values(gs.equippedGear).filter(Boolean) as EquipmentInstance[]);
+        const plan = resolveSkillFxPlan(skill, resolveAttackFxContext(held?.affixes, gs.activeEffects));
+        if (!isSelfCast(plan)) break;
+        playSelfCastFxAt(effectLayer, plan, actorScreen, v.healed);
+        break;
       }
     }
-    if (hp <= 0) break;
-  }
-
-  const existing = useGameStore.getState().combatLogs;
-  useGameStore.setState({
-    character: { ...useGameStore.getState().character!, hp },
-    activeEffects: effects,
-    combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
-  });
-
-  if (hp <= 0) handlePlayerDeath();
-}
-
-function processDotTick(monsterInstances: Map<string, MonsterInstance>, effectLayer?: EffectLayer) {
-  const gs = useGameStore.getState();
-  const now = Date.now();
-  const dotEffects = gs.activeEffects.filter(
-    e => e.type === 'debuff' && e.target === 'monster' && e.dot && now < e.startTime + e.duration
-  );
-
-  if (dotEffects.length === 0) return;
-
-  const logs: CombatLog[] = [];
-  const monsterStore = useMapMonsterStore.getState();
-
-  for (const effect of dotEffects) {
-    if (!effect.dot) continue;
-    // Use targetMonsterId for reliable lookup
-    const monsterId = effect.targetMonsterId;
-    if (!monsterId) continue;
-
-    const inst = monsterInstances.get(monsterId);
-    if (!inst || inst.currentHp <= 0) continue;
-
-    inst.currentHp = Math.max(0, inst.currentHp - effect.dot.damage);
-    // DoT 不判定命中，所以只累加傷害、不動命中率的分子分母（§ 50.5.2）
-    if (inst.isTrainingDummy) {
-      useTrainingGroundStore.getState().recordDamage(effect.dot.damage, 0, 0);
-    }
-    logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'debuff-enemy' });
-
-    if (effectLayer) {
-      const targetMonster = monsterStore.monsters.find(m => m.id === monsterId);
-      const map = useMapControlStore.getState().currentMap;
-      if (targetMonster && map) {
-        const { sx, sy } = mapPositionToScreen(map, targetMonster.position);
-        spawnDotTickFx(effectLayer, sx, sy, effect.tags ?? []);
-        effectLayer.spawnDamageNumber(sx, sy - HIT_LIFT, effect.dot.damage, 'dot');
-      }
-    }
-
-    if (inst.currentHp <= 0) {
-      const monsterIdx = monsterStore.monsters.findIndex(m => m.id === monsterId);
-      handleMonsterDeath(inst, monsterIdx, monsterId);
-      monsterInstances.delete(monsterId);
-      useMapMonsterStore.setState({
-        monsters: monsterStore.monsters.filter(m => m.id !== monsterId),
-      });
-      stopTrainingIfNoDummiesLeft();
-    }
-  }
-
-  if (logs.length > 0) {
-    const existing = useGameStore.getState().combatLogs;
-    useGameStore.setState({
-      combatLogs: [...existing.slice(-(200 - logs.length)), ...logs],
-    });
   }
 }
+
 
 /**
  * 場上狀態特效（§ 48.8.2 染色、§ 48.8.3 暈眩標記）。
@@ -1165,7 +839,7 @@ function syncStatusFx(
   monsters: MapMonster[],
   monsterEntities: Map<string, MonsterEntity>,
 ): void {
-  const now = Date.now();
+  const now = gameNow();
   const effects = useGameStore.getState().activeEffects
     .filter(e => e.type === 'debuff' && now < e.startTime + e.duration);
 
@@ -1214,117 +888,6 @@ function spawnDotTickFx(
 }
 
 
-/**
- * 把一次攻擊結果記進試驗場的量測（`50-training-ground.md` § 50.5.2）。
- *
- * 只記木樁 —— 場地雖然不生怪，但這支被主戰鬥迴圈共用，
- * 不看旗標的話任何地圖的傷害都會被算進去。
- *
- * 命中率的分母走 `hits[]` 而不是「這次出手」：雙刀與鋼爪一次攻擊打兩下，
- * 每下獨立判定命中（`21-combat-formula.md` § 21.2），多段技能同理。
- */
-function recordTrainingHits(inst: MonsterInstance | undefined, dmg: DamageResult): void {
-  if (!inst?.isTrainingDummy) return;
-  const hits = dmg.hits.length > 0 ? dmg.hits : [{ damage: dmg.damage, isCrit: dmg.isCrit, isMiss: dmg.isMiss }];
-  let damage = 0;
-  let landed = 0;
-  for (const h of hits) {
-    if (h.isMiss) continue;
-    damage += h.damage;
-    landed++;
-  }
-  useTrainingGroundStore.getState().recordDamage(damage, hits.length, landed);
-}
-
-/** 木樁全滅＝量測結束（§ 50.5.1）。沒在量測時 `stopIfRunning` 自己會忽略 */
-function stopTrainingIfNoDummiesLeft(): void {
-  const store = useTrainingGroundStore.getState();
-  if (!store.measurement.running) return;
-  if (useMapMonsterStore.getState().monsters.some(m => m.dummy)) return;
-  store.stop();
-}
-
-/**
- * 試驗場木樁（`50-training-ground.md` § 50.4）。
- *
- * `exp: 0` 只是保險，真正擋住產出的是 `isTrainingDummy` ——
- * 擊殺流程整段被跳過，掉落／任務進度／統計數據一律不會動到。
- */
-
-function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monsterId?: string) {
-  const get = useGameStore.getState;
-  const set = (s: any) => useGameStore.setState(s);
-  const gs = get();
-  if (!gs.character) return;
-
-  const allGear = getEffectiveGearArray(gs.character, gs.activeEffects, gs.equippedGear) as any[];
-  const monsters = [monster];
-
-  const result = processMonsterDeath(get, set, monsters, 0, { ...gs.character }, [...gs.combatLogs], allGear);
-
-  set({
-    character: result.char,
-    combatLogs: result.logs.slice(-200),
-  });
-
-  // Clear debuffs on this monster (use ID if available, fallback to index)
-  const effects = get().activeEffects;
-  const cleaned = effects.filter(e => {
-    if (e.target !== 'monster') return true;
-    if (monsterId && e.targetMonsterId) return e.targetMonsterId !== monsterId;
-    return e.targetIdx !== monsterIdx;
-  });
-  if (cleaned.length !== effects.length) {
-    set({ activeEffects: cleaned });
-  }
-
-  // 木樁沒有任何產出可存（§ 50.4.1）。debuff 清理仍要跑完，所以擋在這裡而不是提早 return
-  if (monster.isTrainingDummy) return;
-
-  // Auto-save after kill：掉落與任務進度在 processMonsterDeath 的 async 佇列裡才寫入 store，
-  // 必須等佇列結算完再存。
-  void waitForPendingDrops().then(() => {
-    useGameStore.getState().saveState();
-  });
-}
-
-function handlePlayerDeath() {
-  const gs = useGameStore.getState();
-  const char = gs.character;
-  if (!char) return;
-
-  const nearestTown = getNearestTown(char.currentRegion);
-
-  // § 13.8：HP 恢復至「有效最大 HP」的 50%（含裝備 bonusHp 與最大HP%詞綴）
-  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear);
-
-  const updatedChar = {
-    ...char,
-    hp: Math.floor(effMaxHp * 0.5),
-    currentArea: nearestTown.id,
-    currentRegion: nearestTown.id,
-    currentFloor: null,
-    currentZone: nearestTown.zoneId,
-    areaEnteredAt: Date.now(),
-    mapPositionX: undefined,
-    mapPositionY: undefined,
-  };
-
-  const stats = { ...gs.statistics, deathCount: gs.statistics.deathCount + 1 };
-
-  useGameStore.setState({
-    character: updatedChar,
-    combatLogs: [
-      ...gs.combatLogs.slice(-199),
-      { text: `你倒下了...傳送至${nearestTown.name}`, type: 'system' },
-    ],
-    statistics: stats,
-  });
-
-  useMapMonsterStore.getState().clearAll();
-  useGameStore.getState().saveState();
-}
-
 // === Sprite Sync ===
 
 function syncMonsters(
@@ -1337,6 +900,8 @@ function syncMonsters(
   deltaMs: number,
   /** 玩家目前的目標，畫地面環用（§ 3.6.1）。null＝沒有目標 */
   targetId: string | null,
+  /** 兩個模擬 tick 之間的插值比例；單機為 1 */
+  alpha = 1,
 ) {
   const currentIds = new Set(monsters.map(m => m.id));
 
@@ -1362,13 +927,46 @@ function syncMonsters(
       scene.entityLayer.container.addChild(entity.container);
     }
     entity.update(deltaMs);
-    entity.updatePosition(monster.position, getRenderedElevation(map, monster.position));
+    const shown = lerpPosition(monster.prevPosition, monster.position, alpha) as Position;
+    entity.updatePosition(shown, getRenderedElevation(map, shown));
     entity.setTargeted(monster.id === targetId);
 
     const inst = monsterInstances.get(monster.id);
     if (inst) {
       entity.updateHp(inst.currentHp, inst.maxHp);
     }
+  }
+}
+
+/**
+ * 同實例在場隊友的剪影（§ 97.7.1 只渲染自己與隊友）。位置在兩個 tick 之間插值。
+ */
+function syncTeammates(
+  teammates: TeammateView[],
+  map: MapData,
+  scene: GameScene,
+  existing: Map<number, PlayerEntity>,
+  deltaMs: number,
+  alpha: number,
+): void {
+  const seen = new Set<number>();
+  for (const t of teammates) {
+    seen.add(t.characterId);
+    let entity = existing.get(t.characterId);
+    if (!entity) {
+      entity = new PlayerEntity(t.appearance, TEAMMATE_MARKER);
+      existing.set(t.characterId, entity);
+      scene.entityLayer.container.addChild(entity.container);
+    }
+    entity.update(deltaMs);
+    const shown = lerpPosition(t.prevPosition, t.position, alpha) as Position;
+    entity.updatePosition(shown, getRenderedElevation(map, shown));
+  }
+  for (const [id, entity] of existing) {
+    if (seen.has(id)) continue;
+    scene.entityLayer.container.removeChild(entity.container);
+    entity.destroy();
+    existing.delete(id);
   }
 }
 
@@ -1418,7 +1016,7 @@ function entityScreenPos(map: MapData, pos: Position): { sx: number; sy: number 
 export interface EntityHover {
   text: string;
   /** 指到的是誰 —— 標籤要每幀跟著他的目前位置，不是停在懸停當下的座標 */
-  target: { kind: 'npc' | 'monster' | 'player'; id?: string; pos?: Position };
+  target: { kind: 'npc' | 'monster' | 'player' | 'teammate'; id?: string; memberId?: number; pos?: Position };
 }
 
 /**
@@ -1436,6 +1034,7 @@ function findEntityAtScreen(
   playerName: string,
   monsters: MapMonster[],
   monsterInstances: Map<string, MonsterInstance>,
+  teammates: TeammateView[] = [],
 ): EntityHover | null {
   const hits = (pos: Position): boolean => {
     // 用「原始小數座標」而不是取整到格子：玩家與怪物移動中畫在格子之間，
@@ -1455,6 +1054,9 @@ function findEntityAtScreen(
     if (inst && hits(monster.position)) {
       return { text: inst.name, target: { kind: 'monster', id: monster.id } };
     }
+  }
+  for (const t of teammates) {
+    if (hits(t.position)) return { text: t.name, target: { kind: 'teammate', memberId: t.characterId } };
   }
   return playerName && hits(playerPos) ? { text: playerName, target: { kind: 'player' } } : null;
 }

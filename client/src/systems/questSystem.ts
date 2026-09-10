@@ -8,6 +8,7 @@ import {
   pickRandomErrandArea,
   pickRandomCollectMonster,
 } from '../models/quest';
+import { random } from '../core/rng';
 
 export function getAvailableQuests(character: Character): Quest[] {
   const className = character.className;
@@ -87,7 +88,7 @@ export function rollQuestMaterialDrop(character: Character, monsterName: string)
     q => q.type === 'collect' && q.status === 'active' && q.targetMonster === monsterName
   );
   if (!hasActiveCollectQuest) return false;
-  return Math.random() < COLLECT_MATERIAL_DROP_RATE;
+  return random() < COLLECT_MATERIAL_DROP_RATE;
 }
 
 export function updateCollectProgress(character: Character, amount: number): Character {

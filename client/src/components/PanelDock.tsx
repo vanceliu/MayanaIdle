@@ -1,6 +1,7 @@
 import { ScriptEditorButton } from './ScriptEditorPanel';
 import { QuestTrackerButton } from './QuestTracker';
 import { MailboxButton } from './MailboxPanel';
+import { PartyButton, OnMapButton } from './PartyPanel';
 import { usePanelWindowStore, DOCK_PANEL_KEYS, panelButtonA11y } from '../stores/panelWindowStore';
 import { PanelDockFace } from './PanelDockFace';
 import { useIsMobile } from '../hooks/useViewport';
@@ -32,6 +33,8 @@ export function PanelDock() {
       <QuestTrackerButton />
       <MailboxButton />
       <ScriptEditorButton />
+      <PartyButton />
+      <OnMapButton />
     </div>
   );
 }

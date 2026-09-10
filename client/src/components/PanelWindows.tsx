@@ -6,6 +6,8 @@ import { SkillPanel } from './SkillPanel';
 import { QuestTrackerContent } from './QuestTracker';
 import { ScriptEditorContent } from './ScriptEditorPanel';
 import { MailboxContent } from './MailboxPanel';
+import { PartyPanelContent, OnMapPanelContent } from './PartyPanel';
+import { TradePanelContent } from './TradePanel';
 import {
   usePanelWindowStore,
   PANEL_TITLES,
@@ -45,6 +47,21 @@ export function PanelWindows() {
       {open.mail && (
         <FloatingWindow panelKey="mail" title={PANEL_TITLES.mail} width={PANEL_WIDTHS.mail}>
           <MailboxContent />
+        </FloatingWindow>
+      )}
+      {open.party && (
+        <FloatingWindow panelKey="party" title={PANEL_TITLES.party} width={PANEL_WIDTHS.party}>
+          <PartyPanelContent />
+        </FloatingWindow>
+      )}
+      {open.trade && (
+        <FloatingWindow panelKey="trade" title={PANEL_TITLES.trade} width={PANEL_WIDTHS.trade}>
+          <TradePanelContent />
+        </FloatingWindow>
+      )}
+      {open.onmap && (
+        <FloatingWindow panelKey="onmap" title={PANEL_TITLES.onmap} width={PANEL_WIDTHS.onmap}>
+          <OnMapPanelContent />
         </FloatingWindow>
       )}
       {open.quest && (

@@ -1,14 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { processPlayerAttack } from '../arpgEventHandler';
 import { SKILL_CATALOG } from '../../models/skill';
 import type { MonsterInstance } from '../../models/monster';
 
-vi.mock('../../stores/gameStore', async (orig) => {
-  const actual = await orig() as Record<string, unknown>;
-  return {
-    ...actual,
-    useGameStore: { getState: () => ({ skills: [], activeEffects: [] }), setState: () => {} },
-  };
+import { useGameStore } from '../../stores/gameStore';
+
+beforeEach(() => {
+  useGameStore.setState({ skills: [], activeEffects: [] });
 });
 
 /*

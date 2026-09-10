@@ -7,7 +7,8 @@
 import type { MapMonster } from '../stores/mapMonsterStore';
 import type { MonsterInstance, MonsterTemplate } from '../models/monster';
 import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
-import { DEFAULT_MONSTER_STAT_RATES, scaleMonsterStat, type MonsterStatRates } from './globalRates';
+import { defaultMonsterStatRates, scaleMonsterStat, type MonsterStatRates } from './globalRates';
+import { random } from '../core/rng';
 
 /**
  * 由區域模板建怪物實例。**模板還沒載入時回 `null`，不生假怪。**
@@ -22,7 +23,7 @@ import { DEFAULT_MONSTER_STAT_RATES, scaleMonsterStat, type MonsterStatRates } f
 export function createMonsterFromTemplate(
   mm: MapMonster,
   templates: MonsterTemplate[],
-  rates: MonsterStatRates = DEFAULT_MONSTER_STAT_RATES,
+  rates: MonsterStatRates = defaultMonsterStatRates(),
 ): MonsterInstance | null {
   // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
   if (mm.dummy) return createTrainingDummy(mm.dummy);
@@ -32,8 +33,8 @@ export function createMonsterFromTemplate(
     ? templates.filter(t => t.isBoss)
     : templates.filter(t => !t.isBoss);
   const template = pool.length > 0
-    ? pool[Math.floor(Math.random() * pool.length)]
-    : templates[Math.floor(Math.random() * templates.length)];
+    ? pool[Math.floor(random() * pool.length)]
+    : templates[Math.floor(random() * templates.length)];
 
   if (!template) return null;
 

@@ -79,3 +79,13 @@
 - 跨陣營 PvP
 
 保留：兩大王國作為地名與地理分區（`09-dungeon.md`、`13-town.md`、`27-drop-table.md`）。
+
+## 15.8 全球排行榜與跨服
+
+排行榜限單一 server（`97-selfhosted-server.md` § 97.4）。
+
+不要設計：
+
+- 跨 server 的全球排行榜
+- 單機存檔上傳至外部服務
+- 角色在 server 之間搬移

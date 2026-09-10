@@ -29,7 +29,6 @@ function resetStore(hasBossInPool: boolean) {
     monsters: [],
     maxMonsters: 3,
     spawnTimer: 0,
-    paused: false,
     combatMonsterIds: [],
     hasBossInPool,
   });

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
-import { db } from '../../db/database';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
@@ -9,7 +8,6 @@ import {
   getEquipmentSellPrice, isSellableEquipment, isWeaponInstance,
   collectBatchSellEquipment, getEquipmentSellTotal, EQUIPMENT_TIER_OPTIONS,
 } from '../../systems/shop';
-import { createShopEquipment } from '../../systems/shopEquipment';
 import { QtyStepper } from '../common/QtyStepper';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 
@@ -34,7 +32,6 @@ export function WeaponShop() {
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
   const equippedGear = useGameStore(s => s.equippedGear);
-  const set = useGameStore.setState;
   const [tab, setTab] = useState<ShopTab>('buy');
   const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
   const [category, setCategory] = useState('all');
@@ -45,11 +42,8 @@ export function WeaponShop() {
   const allTemplates = useEquipmentTemplates();
 
   useEffect(() => {
-    db.equipmentTemplates
-      .filter(t => t.slot === 'rightHand' && t.acquireType === 'shop')
-      .sortBy('buyPrice')
-      .then(setTemplates);
-  }, []);
+    setTemplates(allTemplates.filter(t => t.slot === 'rightHand' && t.acquireType === 'shop').sort((a, b) => (a.buyPrice ?? 0) - (b.buyPrice ?? 0)));
+  }, [allTemplates]);
 
   if (!char) return null;
 
@@ -89,14 +83,9 @@ export function WeaponShop() {
   async function checkoutBuy() {
     if (buyLines.length === 0 || buyHint) return;
     // 買幾件就開幾個實例，各自 roll 詞綴
-    const ordered = buyLines.flatMap(l => Array.from({ length: l.qty }, () => l.item));
-    const instances = await createShopEquipment(ordered, char!.level, char!.id!);
-    const state = useGameStore.getState();
-    set({
-      character: { ...state.character!, gold: state.character!.gold - buyTotal },
-      inventory: [...state.inventory, ...instances],
-    });
-    state.saveState();
+    const ordered = buyLines.flatMap(l => Array.from({ length: l.qty }, () => l.item.id!));
+    // 金幣與格數由 store action 判定（線上模式在 server）
+    await useGameStore.getState().buyShopEquipment(ordered);
     buyCart.clear();
   }
 

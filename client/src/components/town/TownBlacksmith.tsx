@@ -1,47 +1,23 @@
 import { useState, useEffect } from 'react';
-import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
-import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
+import { useGameStore, type CraftResult } from '../../stores/gameStore';
+import type { EquipmentTemplate } from '../../models/equipment';
 import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
-import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_MAX_AFFIX_TIER, type AffixCategory, type Affix } from '../../models/affix';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { AttributeRequirement } from '../AttributeRequirement';
 import { GameIcon } from '../GameIcon';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
-import { getBagItemAmount, consumeBagItem } from '../../models/bagItem';
-import { evaluateCraftRequirements, hasCraftQuestFor, removeCraftQuestByTemplate } from '../../systems/craftQuestSystem';
+import { getBagItemAmount } from '../../models/bagItem';
+import { evaluateCraftRequirements, hasCraftQuestFor } from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
 
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
-import { db } from '../../db/database';
-import { resolveEquipment, rollNewInstanceFields } from '../../systems/templateSync';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
-/**
- * 製作品的詞綴（§ 6A.6）：4 個、Tier **T1~T5 均等隨機**、不出特殊詞綴。
- *
- * 這裡走與商店／掉落同一支 `generateAffixes`，只是帶不同選項。
- * 改版前這裡是另一份複製的實作，規則一樣但程式碼分開，很容易單邊改動就走鐘。
- *
- * **這也是「製作版 T6」與「掉落版 T6」的差別所在**：模板素質相同，
- * 但掉落版可以帶 T6/T7 詞綴與特殊詞綴，製作版最高只有 T5、且不會有特殊詞綴。
- */
-function generateCraftAffixes(
-  category: AffixCategory,
-  tpl?: { smallMonsterDamage?: number | null; largeMonsterDamage?: number | null },
-): Affix[] {
-  return generateAffixes(category, 1, 4, false, {
-    maxTier: CRAFT_MAX_AFFIX_TIER,
-    uniformTier: true,
-    noSpecialAffix: true,
-    ...(tpl ? { weaponBaseDamage: getWeaponBaseDamage(tpl) } : {}),
-  });
-}
 
 export function TownBlacksmith() {
   const char = useGameStore(s => s.character);
-  const equippedGear = useGameStore(s => s.equippedGear);
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
   const craftQuests = useGameStore(s => s.craftQuests);
@@ -54,23 +30,10 @@ export function TownBlacksmith() {
   const allTemplates = useEquipmentTemplates();
 
   useEffect(() => {
-    db.equipmentTemplates
-      .filter(t => t.acquireType === 'craft')
-      .toArray()
-      .then(arr => setCraftTemplates(arr.sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0))));
-  }, []);
+    setCraftTemplates(allTemplates.filter(t => t.acquireType === 'craft').sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0)));
+  }, [allTemplates]);
 
   if (!char) return null;
-
-  function persistBagItem(itemId: number, newAmount: number) {
-    if (!char?.id) return;
-    const rows = db.characterBag.where({ characterId: char.id, itemTemplateId: itemId });
-    if (newAmount <= 0) {
-      rows.delete();
-    } else {
-      rows.modify({ amount: newAmount });
-    }
-  }
 
   /*
    * 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1）——
@@ -89,78 +52,13 @@ export function TownBlacksmith() {
   async function handleCraft() {
     if (!selectedRecipe || !char) return;
     if (!canCraftRecipe(selectedRecipe)) return;
-    if (!selectedRecipe.craftMaterials?.length) return;
-    const currentInv = useGameStore.getState().inventory;
-    const currentBag = useGameStore.getState().bagItems;
-    if (getBagUsedSlots(currentBag, currentInv, equippedGear) >= getBagMaxSlots(equippedGear)) return;
-
-    let newBag = [...useGameStore.getState().bagItems];
-    for (const mat of selectedRecipe.craftMaterials) {
-      const newAmount = getBagItemAmount(newBag, mat.itemId) - mat.amount;
-      persistBagItem(mat.itemId, newAmount);
-      newBag = consumeBagItem(newBag, mat.itemId, mat.amount);
+    const settled = useGameStore.getState().craftEquipment(selectedRecipe.id!);
+    // 單機同步、線上模式 Promise；訊息在同一個 click 內就要出現（單機）
+    if (settled && typeof (settled as Promise<unknown>).then === 'function') {
+      setResultMsg((await (settled as Promise<CraftResult>)).message);
+    } else {
+      setResultMsg((settled as CraftResult).message);
     }
-
-    let newInvAfterPrereq = [...currentInv];
-    if (selectedRecipe.craftPrerequisiteWeapon) {
-      const { templateId, quantity } = selectedRecipe.craftPrerequisiteWeapon;
-      let removed = 0;
-      for (const item of currentInv) {
-        if (removed >= quantity) break;
-        if (item.templateId === templateId) {
-          if (item.id) await db.equipmentInstances.delete(item.id);
-          newInvAfterPrereq = newInvAfterPrereq.filter(i => i.id !== item.id);
-          removed++;
-        }
-      }
-    }
-
-    const affixCategory: AffixCategory = getAffixCategoryForSlot(selectedRecipe.slot, selectedRecipe.type);
-    const craftedAffixes = generateCraftAffixes(affixCategory, selectedRecipe);
-
-    const dbRecord = {
-      templateId: selectedRecipe.id!,
-      slot: selectedRecipe.slot,
-      quality: 0,
-      enhancement: 0,
-      ...rollNewInstanceFields(selectedRecipe),
-      affixes: craftedAffixes,
-      ownerId: char.id!,
-      equipped: false,
-    };
-
-    const id = char.id ? await db.equipmentInstances.add(dbRecord as any) : undefined;
-
-    const newEquip: EquipmentInstance = resolveEquipment({
-      id: id as number,
-      templateId: selectedRecipe.id!,
-      name: selectedRecipe.name,
-      type: selectedRecipe.type,
-      slot: selectedRecipe.slot,
-      isTwoHanded: selectedRecipe.isTwoHanded,
-      quality: 0,
-      enhancement: 0,
-      ...rollNewInstanceFields(selectedRecipe),
-      affixes: craftedAffixes,
-      ownerId: char.id!,
-      equipped: false,
-    });
-
-    const newInv = [...newInvAfterPrereq, newEquip];
-    useGameStore.setState({
-      bagItems: newBag,
-      inventory: newInv,
-      // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
-      craftQuests: removeCraftQuestByTemplate(
-        useGameStore.getState().craftQuests,
-        selectedRecipe.id!,
-      ),
-    });
-
-    setResultMsg(`製作成功！獲得 ${selectedRecipe.name}`);
-    const craftStats = { ...useGameStore.getState().statistics, equipmentCrafted: useGameStore.getState().statistics.equipmentCrafted + 1 };
-    useGameStore.setState({ statistics: craftStats });
-    useGameStore.getState().saveState();
   }
 
   return (

@@ -1,93 +1,78 @@
-import { useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { exportCharacterData, downloadExport, importCharacterData } from '../systems/characterTransfer';
+import { useOnlineStore } from '../net/online';
+import { connection } from '../net/connection';
 import { BuildLabel } from './BuildLabel';
+
+/**
+ * 線上模式的帳號密碼（`97-selfhosted-server.md` § 97.5）。
+ *
+ * 單機形態的 host 帳號一開始沒有密碼（由本機自動登入），但**管理介面要密碼**（§ 97.8），
+ * 對外開放也要密碼，所以設定入口必須在遊戲裡。
+ */
+function OnlineAccount() {
+  const online = useOnlineStore(s => s.enabled);
+  const username = useOnlineStore(s => s.username);
+  const isHost = useOnlineStore(s => s.isHost);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  if (!online) return null;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) return setMessage('密碼至少 6 個字元');
+    if (password !== confirm) return setMessage('兩次輸入的密碼不一樣');
+    connection.send({ t: 'set_password', password });
+    setPassword('');
+    setConfirm('');
+    setMessage('已設定密碼');
+  };
+
+  return (
+    <div className="settings-row">
+      <span className="settings-label">帳號</span>
+      <div className="settings-control settings-control-wrap">
+        <span className="settings-account-name">{username}</span>
+        {/* 管理介面的帳號密碼在 server.properties，與遊戲帳號無關（§ 97.8）；單機時開服者就在本機，給個入口 */}
+        {isHost && (
+          <a className="btn-wiki" href="/admin" target="_blank" rel="noopener noreferrer">開啟管理介面</a>
+        )}
+      </div>
+      {/* host 的密碼由設定檔決定（`97-selfhosted-server.md` § 97.5），遊戲裡不提供修改 */}
+      {!isHost && (
+        <form className="settings-password" onSubmit={submit}>
+          <input type="password" value={password} placeholder="新密碼" autoComplete="new-password" aria-label="新密碼" onChange={e => setPassword(e.target.value)} />
+          <input type="password" value={confirm} placeholder="再輸入一次" autoComplete="new-password" aria-label="再輸入一次" onChange={e => setConfirm(e.target.value)} />
+          <button className="btn-transfer" type="submit">設定密碼</button>
+        </form>
+      )}
+      <p className="settings-hint">
+        {isHost
+          ? '單機世界只有你一個玩家，本機連線自動登入，不需要密碼。管理介面的帳號密碼在 server.properties。'
+          : '這組帳號密碼用於登入這個 server。管理介面的帳號另外設在 server.properties，與遊戲帳號無關。'}
+        {message && <span className="settings-password-msg">{message}</span>}
+      </p>
+    </div>
+  );
+}
 
 /**
  * 帳號與資料（`47-mobile.md`）。
  *
- * Wiki／匯出／匯入／登出原本是右下角常駐的一整排，但它們**一局裡大概按不到一次** ——
+ * Wiki／登出原本是右下角常駐的一整排，但它們**一局裡大概按不到一次** ——
  * 與「開背包」這種每分鐘都在按的操作放在同一層，等於拿最貴的畫面位置去換最低頻的功能。
  * 全部收進設定視窗的「帳號」頁，右下只留一顆 ⚙。
+ *
+ * **沒有角色匯出／匯入**（`19-account-character.md` § 19.9）：角色存在 server 的 SQLite，
+ * 備份是開服者複製資料庫檔的事（`97-selfhosted-server.md` § 97.8）。
  */
 export function AccountSettings({ onClose }: { onClose: () => void }) {
   const logout = useGameStore(s => s.logout);
-  const character = useGameStore(s => s.character);
-  const selectCharacter = useGameStore(s => s.selectCharacter);
-  const uploadOwnStats = useGameStore(s => s.uploadOwnStats);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleExport = useCallback(async () => {
-    if (!character?.id) return;
-
-    // § 19.9：匯出檔含該角色的排行榜寫入密鑰，而檔案的加密金鑰就寫在前端原始碼裡，
-    // 等同明文。外流＝對方能覆寫你的排行榜資料，所以這件事必須講在下載之前。
-    const confirmed = window.confirm(
-      '匯出檔含有這個角色的身分憑證，等同密碼。\n\n' +
-      '取得檔案的人可以覆寫你在排行榜上的紀錄，請勿分享或上傳到雲端硬碟、聊天室等地方。\n\n' +
-      '確定要匯出嗎？'
-    );
-    if (!confirmed) return;
-
-    try {
-      // 先把統計推一次，讓密鑰在伺服端綁定好再讓檔案出門（§ 37.4.3）。
-      // **刻意不檢查結果**：密鑰已經寫進本機與匯出檔，兩台裝置拿到的是同一把，
-      // 誰先上傳誰綁定、另一台照樣相符。拿連線當匯出的門檻只會讓玩家在
-      // 最需要備份的時候備份不了。
-      await uploadOwnStats({ force: true });
-
-      const json = await exportCharacterData(character.id);
-      downloadExport(json, character.name);
-    } catch (e) {
-      alert(`匯出失敗: ${(e as Error).message}`);
-    }
-  }, [character, uploadOwnStats]);
-
-  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !character?.id) return;
-
-    // § 19.9：匯入是「還原完整身分」，名稱與 uuid 都會被檔案取代
-    const confirmed = window.confirm(
-      '匯入將覆蓋當前角色的所有資料，包含名稱與排行榜身分。\n\n' +
-      '這一格原本的角色會從排行榜上停止更新。確定繼續？'
-    );
-    if (!confirmed) {
-      e.target.value = '';
-      return;
-    }
-
-    try {
-      const json = await file.text();
-      await importCharacterData(json, character.id);
-      await selectCharacter(character.id);
-      alert('匯入成功！');
-    } catch (err) {
-      alert(`匯入失敗: ${(err as Error).message}`);
-    }
-    e.target.value = '';
-  }, [character, selectCharacter]);
 
   return (
     <div className="settings-body">
-      <div className="settings-row">
-        <span className="settings-label">遊戲資料</span>
-        <div className="settings-control settings-control-wrap">
-          <button className="btn-transfer" onClick={handleExport}>匯出角色</button>
-          <button className="btn-transfer" onClick={() => fileInputRef.current?.click()}>匯入角色</button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".dat"
-            style={{ display: 'none' }}
-            onChange={handleImport}
-          />
-        </div>
-        <p className="settings-hint">
-          匯出檔含有這個角色的身分憑證，等同密碼，請勿分享。
-          匯入會覆蓋目前這一格的角色。
-        </p>
-      </div>
+      <OnlineAccount />
 
       <div className="settings-row">
         <span className="settings-label">資料庫</span>

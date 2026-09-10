@@ -2,8 +2,7 @@
  * 角色身分：全球唯一 ID 與名稱規則
  * 規格見 `docs/design/19-account-character.md` § 19.4
  *
- * 此處的規則必須與 `leaderboard-worker/src/index.js` 的 NAME_PATTERN / validateName 一致，
- * 客戶端驗證只是 UX，伺服端會再驗一次。
+ * client 的驗證只是 UX，真正把關的是 server（建角時再驗一次，並查名稱唯一索引）。
  */
 
 /**

@@ -1,6 +1,7 @@
 import type { Position, MapData } from '../models/mapControl';
 import { canTransition, isInBounds, isSpawnableTile, isWalkableTile } from '../models/mapControl';
 import { getDistance, hasLineOfSight, isWithinAttackRange } from './lineOfSight';
+import { random } from '../core/rng';
 
 interface AStarNode {
   x: number;
@@ -183,5 +184,5 @@ export function getRandomWalkablePosition(map: MapData, exclude?: Position): Pos
       candidates.push(position);
     }
   }
-  return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : { ...map.spawnPoint };
+  return candidates.length > 0 ? candidates[Math.floor(random() * candidates.length)] : { ...map.spawnPoint };
 }

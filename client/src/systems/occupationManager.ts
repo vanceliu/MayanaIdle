@@ -1,6 +1,7 @@
 import type { Position } from '../models/mapControl';
+import type { OccupantType } from '../models/unit';
 
-export type OccupantType = 'player' | 'monster';
+export type { OccupantType };
 
 export interface Occupant {
   type: OccupantType;

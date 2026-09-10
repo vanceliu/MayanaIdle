@@ -1,0 +1,41 @@
+{
+  "name": "mayana-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && electron .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "package": "node scripts/build.mjs && node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.3",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.2",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.8"
+  },
+  "build": {
+    "appId": "com.mayanaidle.desktop",
+    "productName": "MayanaIdle",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "ui/**/*",
+      "client-dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.games"
+    }
+  }
+}

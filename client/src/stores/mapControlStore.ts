@@ -3,36 +3,46 @@ import type { Position, MapData } from '../models/mapControl';
 import { isWalkableTile } from '../models/mapControl';
 import { getMapForRegion } from '../models/mapDataControl';
 import { findPath, findNearestWalkable, findAdjacentWalkable, getRandomWalkablePosition } from '../systems/pathfinding';
-import { useMapMonsterStore } from './mapMonsterStore';
+import { random } from '../core/rng';
+import { defaultSession, type Session } from './session';
+import './mapMonsterStore';
 
 export interface MapControlState {
   currentMap: MapData | null;
   playerPosition: Position;
+  /** 上一個模擬 tick 的位置，渲染插值用（`systems/tickDriver.ts`） */
+  prevPlayerPosition: Position;
   targetPosition: Position | null;
   currentPath: Position[];
   pathIndex: number;
   isMoving: boolean;
   autoMove: boolean;
   moveSpeed: number;
+  /** 恢復等待中（HP/MP 低於門檻）：不自動移動、不由本人觸發生成（`38-map-control.md` § 38.8） */
+  paused: boolean;
 
   loadMap: (regionId: string, floor?: number | null, savedPosition?: Position | null) => Promise<void>;
   /** `occupied`：怪物佔住的格子（角色自己那格不計入），追擊時用來繞開 */
   moveToTarget: (target: Position, occupied?: Set<string>) => void;
   setAutoMove: (auto: boolean) => void;
+  setPaused: (paused: boolean) => void;
   tick: (deltaMs: number) => void;
   pickRandomTarget: () => void;
   stopMoving: () => void;
 }
 
-export const useMapControlStore = create<MapControlState>((set, get) => ({
+export function createMapControlStore(session: Session) {
+  return create<MapControlState>((set, get) => ({
   currentMap: null,
   playerPosition: { x: 0, y: 0 },
+  prevPlayerPosition: { x: 0, y: 0 },
   targetPosition: null,
   currentPath: [],
   pathIndex: 0,
   isMoving: false,
   autoMove: false,
   moveSpeed: 2,
+  paused: false,
 
   loadMap: async (regionId, floor, savedPosition) => {
     const map = await getMapForRegion(regionId, floor);
@@ -45,11 +55,12 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       ? savedTile
       : map.spawnPoint;
 
-    useMapMonsterStore.getState().clearAll();
+    session.mapMonster.getState().clearAll();
 
     set({
       currentMap: { ...map },
       playerPosition: { ...startPos },
+      prevPlayerPosition: { ...startPos },
       targetPosition: null,
       currentPath: [],
       pathIndex: 0,
@@ -100,7 +111,7 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
       // 恢復等待中（HP/MP 低於門檻）時只記旗標，不排路徑。
       // movePlayerSafe 不檢查 paused，這裡若排了路徑角色會硬走完一趟。
       // 恢復完成時由 gameLoopTick 的 aboveResume 分支重新呼叫本函式接手。
-      if (useMapMonsterStore.getState().paused) return;
+      if (get().paused) return;
       get().pickRandomTarget();
     } else {
       const { playerPosition } = get();
@@ -114,13 +125,17 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     }
   },
 
+  setPaused: (paused) => {
+    set({ paused });
+  },
+
   pickRandomTarget: () => {
     const { currentMap, playerPosition } = get();
     if (!currentMap) return;
     const snappedPos = { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) };
 
     // Check if there are monsters on the map — move toward the nearest one
-    const monsterState = useMapMonsterStore.getState();
+    const monsterState = session.mapMonster.getState();
     const activeMonsters = monsterState.monsters.filter(
       m => !monsterState.combatMonsterIds.includes(m.id)
     );
@@ -207,7 +222,7 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
         targetPosition: null,
       });
       if (state.autoMove) {
-        setTimeout(() => get().pickRandomTarget(), 500 + Math.random() * 1000);
+        setTimeout(() => get().pickRandomTarget(), 500 + random() * 1000);
       }
     } else {
       set({ playerPosition: pos, pathIndex });
@@ -225,3 +240,7 @@ export const useMapControlStore = create<MapControlState>((set, get) => ({
     });
   },
 }));
+}
+
+export const useMapControlStore = createMapControlStore(defaultSession);
+defaultSession.mapControl = useMapControlStore;

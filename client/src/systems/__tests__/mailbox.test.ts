@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
+import { db } from '../../testing/testDb';
 import {
   claimAll,
   claimMail,

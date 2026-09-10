@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PanelDock } from '../PanelDock';
 import { GameToolbar } from '../GameToolbar';
-import { usePanelWindowStore, PANEL_KEYS, PANEL_ICONS, PANEL_BUTTON_LABELS } from '../../stores/panelWindowStore';
+import { usePanelWindowStore, PANEL_KEYS, PANEL_ICONS, PANEL_BUTTON_LABELS, ONLINE_ONLY_PANEL_KEYS } from '../../stores/panelWindowStore';
 import { installFakeViewport, uninstallFakeViewport, VIEWPORTS } from '../../testing/viewport';
 
 /**
@@ -71,8 +71,10 @@ describe('面板按鈕圖示模式（47-mobile）', () => {
 
   it('圖示與文字兩者都畫進 DOM（顯示哪一個交給 CSS）', () => {
     render(<PanelDock />);
-    expect(document.querySelectorAll('.panel-dock-icon').length).toBe(PANEL_KEYS.length);
-    expect(document.querySelectorAll('.panel-dock-label').length).toBe(PANEL_KEYS.length);
+    // 隊伍鈕只在線上模式出現（`ONLINE_ONLY_PANEL_KEYS`）
+    const visible = PANEL_KEYS.length - ONLINE_ONLY_PANEL_KEYS.length;
+    expect(document.querySelectorAll('.panel-dock-icon').length).toBe(visible);
+    expect(document.querySelectorAll('.panel-dock-label').length).toBe(visible);
   });
 
   /** 只剩圖示時，按鈕的名字全靠這兩個屬性 —— 少了就變成「六顆看不懂的方塊」 */
@@ -146,17 +148,18 @@ describe('系統按鈕整合（47-mobile）', () => {
     expect(screen.getByRole('button', { name: '帳號' })).toBeTruthy();
   });
 
-  it('帳號頁裝著原本在右下角的四個動作', () => {
+  /** 匯出／匯入已移除（`19-account-character.md` § 19.9：角色存在 server，備份是複製 SQLite 檔） */
+  it('帳號頁裝著原本在右下角的動作', () => {
     installFakeViewport(VIEWPORTS.phonePortrait);
     render(<GameToolbar />);
 
     fireEvent.click(screen.getByLabelText('系統設定'));
     fireEvent.click(screen.getByRole('button', { name: '帳號' }));
 
-    for (const name of ['匯出角色', '匯入角色', '登出']) {
-      expect(screen.getByRole('button', { name }), name).toBeTruthy();
-    }
+    expect(screen.getByRole('button', { name: '登出' })).toBeTruthy();
     expect(screen.getByRole('link', { name: '開啟 Wiki' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '匯出角色' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '匯入角色' })).toBeNull();
   });
 
   /** 桌機與手機共用同一個排法：⚙ 是那一列的第七顆，不自成一列 */

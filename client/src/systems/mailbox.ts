@@ -2,7 +2,8 @@
  * 系統信箱的發放與領取（`52-mailbox.md`）。
  * 首版做天賦格與補償，里程碑與道具／金幣型別不做（§ 52.0）。
  */
-import { db } from '../db/database';
+import type { GameRepository } from '../db/repository';
+import { defaultSession } from '../stores/session';
 import {
   SLOT_GRANT_LEVEL_INTERVAL,
   emptyConditions,
@@ -22,17 +23,15 @@ export function expectedTalentSlotGrants(level: number): number {
  * 依據是 `characters.talentSlotGrants`，不看信箱（§ 52.2.3）。
  */
 /** 濾掉已存在的 `sourceKey` —— `[characterId+sourceKey]` 是唯一索引，重發會整批失敗 */
-async function withoutExistingKeys(characterId: number, pending: Mail[]): Promise<Mail[]> {
+async function withoutExistingKeys(characterId: number, pending: Mail[], repo: GameRepository): Promise<Mail[]> {
   if (pending.length === 0) return pending;
-  const existing = new Set(
-    (await db.mailbox.where('characterId').equals(characterId).toArray()).map(m => m.sourceKey),
-  );
+  const existing = new Set((await repo.listMail(characterId)).map(m => m.sourceKey));
   return pending.filter(m => !existing.has(m.sourceKey));
 }
 
-export async function syncTalentSlotGrants(characterId: number, level: number): Promise<number> {
+export async function syncTalentSlotGrants(characterId: number, level: number, repo: GameRepository = defaultSession.repo): Promise<number> {
   const expected = expectedTalentSlotGrants(level);
-  const character = await db.characters.get(characterId);
+  const character = await repo.getCharacter(characterId);
   if (!character) return 0;
 
   const issued = character.talentSlotGrants ?? 0;
@@ -49,12 +48,12 @@ export async function syncTalentSlotGrants(characterId: number, level: number): 
       claimedAt: null,
     });
   }
-  const fresh = await withoutExistingKeys(characterId, pending);
+  const fresh = await withoutExistingKeys(characterId, pending, repo);
 
   // 發信與記數必須同一個交易（§ 52.2.3）
-  await db.transaction('rw', db.mailbox, db.characters, async () => {
-    if (fresh.length > 0) await db.mailbox.bulkAdd(fresh);
-    await db.characters.update(characterId, { talentSlotGrants: expected });
+  await repo.transaction(async () => {
+    if (fresh.length > 0) await repo.bulkAddMail(fresh);
+    await repo.updateCharacter(characterId, { talentSlotGrants: expected });
   });
   return fresh.length;
 }
@@ -68,8 +67,9 @@ export async function syncTalentSlotGrants(characterId: number, level: number): 
 export async function syncCompensations(
   characterId: number,
   currentVersion: string,
+  repo: GameRepository = defaultSession.repo,
 ): Promise<number> {
-  const character = await db.characters.get(characterId);
+  const character = await repo.getCharacter(characterId);
   if (!character) return 0;
 
   const sent = character.sentMailKeys ?? {};
@@ -88,20 +88,20 @@ export async function syncCompensations(
     claimedAt: null,
   }));
 
-  const fresh = await withoutExistingKeys(characterId, pending);
+  const fresh = await withoutExistingKeys(characterId, pending, repo);
 
   // 發信與記 key 必須同一個交易（§ 52.2.4.2）
-  await db.transaction('rw', db.mailbox, db.characters, async () => {
-    if (fresh.length > 0) await db.mailbox.bulkAdd(fresh);
-    await db.characters.update(characterId, {
+  await repo.transaction(async () => {
+    if (fresh.length > 0) await repo.bulkAddMail(fresh);
+    await repo.updateCharacter(characterId, {
       sentMailKeys: { ...sent, ...Object.fromEntries(due.map(c => [c.id, true])) },
     });
   });
   return fresh.length;
 }
 
-export async function listMail(characterId: number): Promise<Mail[]> {
-  const rows = await db.mailbox.where('characterId').equals(characterId).toArray();
+export async function listMail(characterId: number, repo: GameRepository = defaultSession.repo): Promise<Mail[]> {
+  const rows = await repo.listMail(characterId);
   // 未領取在上，其餘照發放時間新到舊
   return rows.sort((a, b) => {
     if ((a.claimedAt === null) !== (b.claimedAt === null)) return a.claimedAt === null ? -1 : 1;
@@ -114,7 +114,7 @@ export function unclaimedCount(mails: Mail[]): number {
 }
 
 /** 把一個發放項目變成實際資料。首版只處理天賦格（§ 52.0） */
-async function grantItem(characterId: number, item: MailItem): Promise<void> {
+async function grantItem(characterId: number, item: MailItem, repo: GameRepository): Promise<void> {
   if (item.type !== 'talent_slot') return;
   const tier = (item.slotTier ?? 1) as TalentSlotTier;
   const slot: TalentSlot = {
@@ -128,49 +128,46 @@ async function grantItem(characterId: number, item: MailItem): Promise<void> {
     conditions: emptyConditions(tier),
     action: null,
   };
-  await db.talentSlots.add(slot);
+  await repo.addTalentSlot(slot);
 }
 
 /** 領取一封信。已領過回 false。首版不做背包容量檢查（§ 52.0） */
-export async function claimMail(mailId: number): Promise<boolean> {
-  return await db.transaction('rw', db.mailbox, db.talentSlots, async () => {
-    const mail = await db.mailbox.get(mailId);
+export async function claimMail(mailId: number, repo: GameRepository = defaultSession.repo): Promise<boolean> {
+  return await repo.transaction(async () => {
+    const mail = await repo.getMail(mailId);
     if (!mail || mail.claimedAt !== null) return false;
     for (const item of mail.items) {
-      await grantItem(mail.characterId, item);
+      await grantItem(mail.characterId, item, repo);
     }
-    await db.mailbox.update(mailId, { claimedAt: Date.now() });
+    await repo.updateMail(mailId, { claimedAt: Date.now() });
     return true;
   });
 }
 
 /** 全部領取。回傳實際領到的封數 */
-export async function claimAll(characterId: number): Promise<number> {
-  const mails = await db.mailbox.where('characterId').equals(characterId).toArray();
+export async function claimAll(characterId: number, repo: GameRepository = defaultSession.repo): Promise<number> {
+  const mails = await repo.listMail(characterId);
   let claimed = 0;
   for (const mail of mails) {
     if (mail.claimedAt !== null) continue;
-    if (await claimMail(mail.id!)) claimed++;
+    if (await claimMail(mail.id!, repo)) claimed++;
   }
   return claimed;
 }
 
 /** 換版清理（§ 52.7.1）：只刪已領取的。發放紀錄不動 */
-export async function purgeClaimedMail(characterId: number): Promise<number> {
-  const stale = await db.mailbox
-    .where('characterId').equals(characterId)
-    .filter(m => m.claimedAt !== null)
-    .toArray();
+export async function purgeClaimedMail(characterId: number, repo: GameRepository = defaultSession.repo): Promise<number> {
+  const stale = (await repo.listMail(characterId)).filter(m => m.claimedAt !== null);
   if (stale.length === 0) return 0;
-  await db.mailbox.bulkDelete(stale.map(m => m.id!));
+  await repo.bulkDeleteMail(stale.map(m => m.id!));
   return stale.length;
 }
 
 /** 刪一封已領取的信（§ 52.4）。未領取的刪不掉 */
-export async function deleteClaimedMail(mailId: number): Promise<boolean> {
-  const mail = await db.mailbox.get(mailId);
+export async function deleteClaimedMail(mailId: number, repo: GameRepository = defaultSession.repo): Promise<boolean> {
+  const mail = await repo.getMail(mailId);
   if (!mail || mail.claimedAt === null) return false;
-  await db.mailbox.delete(mailId);
+  await repo.deleteMail(mailId);
   return true;
 }
 
@@ -188,11 +185,11 @@ export function mailPurgeStorageKey(characterId: number): string {
 export async function purgeClaimedMailOnVersionChange(
   characterId: number,
   currentVersion: string,
+  repo: GameRepository = defaultSession.repo,
 ): Promise<boolean> {
-  const key = mailPurgeStorageKey(characterId);
-  const seen = localStorage.getItem(key);
+  const seen = await repo.getMailPurgeVersion(characterId);
   if (seen === currentVersion) return false;
-  await purgeClaimedMail(characterId);
-  localStorage.setItem(key, currentVersion);
+  await purgeClaimedMail(characterId, repo);
+  await repo.setMailPurgeVersion(characterId, currentVersion);
   return true;
 }

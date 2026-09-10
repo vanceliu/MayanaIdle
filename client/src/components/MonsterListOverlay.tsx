@@ -7,6 +7,7 @@ import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
 import { useIsMobile } from '../hooks/useViewport';
 import type { ActiveEffect } from '../models/effect';
+import { gameNow } from '../core/clock';
 
 const MAX_VISIBLE_DEBUFFS = 4;
 
@@ -42,7 +43,7 @@ export function MonsterListOverlay() {
 
   if (entries.length === 0) return null;
 
-  const now = Date.now();
+  const now = gameNow();
 
   return (
     <div className="monster-list-overlay" data-testid="monster-list-overlay">

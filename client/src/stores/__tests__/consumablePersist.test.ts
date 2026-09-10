@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore, POTION_CONFIG, SPEED_POTION_CONFIG, talentInitReady } from '../gameStore';
 import { makeBagItem } from '../../models/bagItem';
 import { instantiateSkill } from '../../models/skill';
@@ -63,10 +61,7 @@ describe('消耗品與自我施法的存檔', () => {
   let characterId: number;
 
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({ phase: 'title', userId: null, characterList: [], character: null, bagItems: [] });
     await useGameStore.getState().initUser();

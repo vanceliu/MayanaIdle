@@ -20,38 +20,23 @@
 - CSS：純 CSS + 自定義 Design Token（無 Tailwind）
 - 測試：Vitest + Testing Library
 
-### 離線資料庫
+### server
 
-- IndexedDB（Dexie）— 目前為離線 client-only
+- Node.js 單一 process（`97-selfhosted-server.md` § 97.2）
+- WebSocket（`ws`）
+- SQLite（WAL）
+- 發布為 Node Single Executable Application
 
-### 未來後端
+## 16.3 不採用
 
-- Node.js
-- Express 或 NestJS
-- PostgreSQL
-- Prisma
-- Socket.IO 或 WebSocket
-
-## 16.3 若使用 Next.js
-
-也可用：
-
-- Next.js
-- PostgreSQL
-- Prisma
-- Socket.IO
-
-優點：
-
-- 前後端整合快
-- 適合快速做 MVP
-- 適合 Web 遊戲管理介面與遊戲 UI
+- Next.js、PostgreSQL、Prisma、Redis、Socket.IO
+- 雲端全域架構（`98-online-architecture.md`，保留備查）
 
 ## 16.4 即時系統需求
 
 需要即時功能的地方：
 
 - 公會聊天
-- 戰鬥狀態同步，若戰鬥由伺服器控制
+- 戰鬥狀態同步（server authoritative，`97-selfhosted-server.md` § 97.6）
 - 排行榜更新
 - 未來陣營活動

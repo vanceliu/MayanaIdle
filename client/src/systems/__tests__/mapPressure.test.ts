@@ -2,7 +2,21 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useMapMonsterStore } from '../../stores/mapMonsterStore';
 import { useMapControlStore } from '../../stores/mapControlStore';
 import { calculatePressure } from '../../systems/pressure';
+import { tickInstanceWorld } from '../../systems/gameLoop';
+import { createMapInstance, type MapInstance } from '../../systems/mapInstance';
+import type { Session } from '../../stores/session';
 import type { MapData } from '../../models/mapControl';
+
+/** 一位在場成員（角色 id 1）的實例，怪物 store 沿用 `useMapMonsterStore` */
+function instanceWithMember(): MapInstance {
+  const instance = createMapInstance('test', useMapMonsterStore);
+  const member = {
+    game: { getState: () => ({ character: { id: 1, hp: 100 } }) },
+    mapControl: useMapControlStore,
+  } as unknown as Session;
+  instance.members.push(member);
+  return instance;
+}
 
 const testMap: MapData = {
   id: 'test-map',
@@ -43,7 +57,6 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       monsters: [],
       maxMonsters: 3,
       spawnTimer: 0,
-      paused: false,
       combatMonsterIds: [],
       hasBossInPool: false,
     });
@@ -144,14 +157,15 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       vi.restoreAllMocks();
     });
 
-    it('paused 時不補位', () => {
+    it('恢復等待中不補位（實例層以成員的 paused 擋生成）', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
-      useMapMonsterStore.setState({ monsters: [], spawnTimer: 0, maxMonsters: 3, paused: true });
+      useMapMonsterStore.setState({ monsters: [], spawnTimer: 0, maxMonsters: 3 });
+      useMapControlStore.setState({ currentMap: testMap, playerPosition: { x: 1, y: 1 }, paused: true });
 
-      useMapMonsterStore.getState().spawnTick(1, testMap, { x: 1, y: 1 }, 0);
+      tickInstanceWorld(1, instanceWithMember());
 
       expect(useMapMonsterStore.getState().monsters.length).toBe(0);
-      useMapMonsterStore.setState({ paused: false });
+      useMapControlStore.setState({ paused: false });
       vi.restoreAllMocks();
     });
   });
@@ -180,21 +194,19 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
         monsters: [
           { id: 'm1', position: { x: 8, y: 8 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [{ x: 7, y: 7 }], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
         ],
-        paused: true,
         maxMonsters: 5,
       });
+      useMapControlStore.setState({ currentMap: testMap, playerPosition: { x: 5, y: 5 }, paused: true });
 
       vi.spyOn(Math, 'random').mockReturnValue(0);
 
-      // Spawn should not work when paused
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 5, y: 5 }, 0);
+      // 恢復等待中不生成，但怪物照樣移動
+      tickInstanceWorld(1100, instanceWithMember());
       expect(useMapMonsterStore.getState().monsters.length).toBe(1);
-
-      // Move should still work
-      useMapMonsterStore.getState().moveMonsters(500, testMap, { x: 5, y: 5 });
       const movedMonster = useMapMonsterStore.getState().monsters[0];
       expect(movedMonster.position.x).not.toBe(8);
 
+      useMapControlStore.setState({ paused: false });
       vi.restoreAllMocks();
     });
   });

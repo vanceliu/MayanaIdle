@@ -1,17 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
 import { resolveEquipment } from '../templateSync';
 import type { EquipmentInstance } from '../../models/equipment';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache } from '../templateSync';
 
 describe('templateSync - resolveEquipment slot handling', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
   });
 

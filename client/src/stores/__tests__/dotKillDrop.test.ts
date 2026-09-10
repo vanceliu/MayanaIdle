@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore, processMonsterDeath, waitForPendingDrops } from '../gameStore';
 
 if (typeof globalThis.window === 'undefined') {
@@ -26,10 +24,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 
 describe('processMonsterDeath — DOT kill triggers drops', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',
@@ -47,8 +42,7 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       quickSlots: [null, null, null, null, null],
       combatLogs: [],
       gameLoopId: null,
-      hpRegenId: null,
-      mpRegenId: null,
+      regenActive: false,
       activeEffects: [],
     });
     await useGameStore.getState().initUser();

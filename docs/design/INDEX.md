@@ -64,7 +64,7 @@
 | 新手裝（T1，創角直接穿上） | `04-character.md` | § 4.3 |
 | **角色外觀（髮型/睫毛/膚色髮色眼色/四朝向）** | `04-character.md` | § 4.10 |
 | 創角的外觀步驟 | `19-account-character.md` | § 19.4（規格見 `04-character.md` § 4.10） |
-| 外觀存哪／匯出匯入落點 | `18-data-schema.md` | § 18.7 |
+| 外觀存哪／落點 | `18-data-schema.md` | § 18.7 |
 | **武器外觀與揮擊演出（揮擊角度/演出長度）** | `48-vfx.md` | § 48.6 |
 | 技能系統規則 | `05-skill.md` | 全文 |
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
@@ -111,7 +111,7 @@
 | 陣營系統（暫不實作，見 `15-excluded.md` § 15.7） | `10-faction.md` | 全文 |
 | 公會系統 | `11-guild.md` | 全文 |
 | 寵物系統 | `12-pet.md` | 全文 |
-| 成就/排行榜 | `14-endgame.md` | 全文 |
+| 成就/排行榜 | `14-endgame.md` | 全文（排行榜規格在 `37-statistics.md` § 37.4） |
 | 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
@@ -124,16 +124,23 @@
 | **試驗場（木樁／DPS 量測）** | `50-training-ground.md` | 全文 |
 | 木樁可調參數（防禦/血量/等級/體型/元素/數量） | `50-training-ground.md` | § 50.4.2 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
-| 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文 |
-| 角色身分與密鑰（uuid / authToken） | `19-account-character.md` | § 19.4（API 見 `37-statistics.md` § 37.4.3） |
-| 資料版本淘汰（CURRENT_DATA_VERSION） | `19-account-character.md` | § 19.9 |
+| 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文（帳號規則在 `97-selfhosted-server.md` § 97.5） |
+| 角色識別（uuid） | `19-account-character.md` | § 19.4 |
+| 資料版本與遷移 | `19-account-character.md` § 19.9、`97-selfhosted-server.md` § 97.4 | — |
 | **全域倍率（金幣／掉落／經驗／Pressure／生成頻率／怪物血量／怪物攻擊力／Boss 生成）** | `19-account-character.md` § 19.9 | 作用位置：`27-drop-table.md` § 27.1、`36-quest-system.md` § 36.3、`28-monster-stats.md` § 28.1、`26-spawn-pressure.md` § 26.2~26.4、`04-character.md` § 4.11 |
 | 資料結構設計 | `18-data-schema.md` | 全文 |
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
-| 線上化架構（tick/事件驅動/DB策略/scaling） | `98-online-architecture.md` | 全文 |
-| （可能做法）野外離線模擬＋5 分鐘同步／組隊選項 | `98-online-architecture.md` | § 14~§ 15（未定案） |
-| （可能做法）自架私服（單 process／各服註冊／本服排行） | `97-selfhosted-server.md` | 全文（未定案） |
+| **自架私服（單機＝本機 server／開放＝對外 bind）** | `97-selfhosted-server.md` | 全文（定案） |
+| **`server.properties`（設定鍵／生效時機／headless）** | `97-selfhosted-server.md` | § 97.2 |
+| **帳號／host 帳號／session** | `97-selfhosted-server.md` | § 97.5 |
+| **決定性要求（seeded PRNG／tick 時間／純函數）** | `97-selfhosted-server.md` | § 97.6 |
+| **地圖實例／隊伍怪物上限／怪物目標／掉落經驗分配** | `97-selfhosted-server.md` | § 97.7.1 |
+| **聊天頻道** | `97-selfhosted-server.md` | § 97.7.2 |
+| **組隊（邀請／隊長／離線／跨地圖）** | `97-selfhosted-server.md` | § 97.7.3 |
+| **管理介面** | `97-selfhosted-server.md` | § 97.8 |
+| server 端資料表 | `18-data-schema.md` | § 18.12 |
+| 雲端全域架構（保留備查，不採用） | `98-online-architecture.md` | § 2 tick 對齊、§ 10 頻寬、§ 13 模板 |
 | Pixi 渲染（分層／theme palette／RenderTexture） | `40-pixijs-migration.md` | 全文 |
 | In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
@@ -233,13 +240,33 @@
 
 【帳號／資料／統計】
 19-account-character.md ←→ 04-character.md（§ 4.10）／20-attributes.md § 20.10
-       ↕
+       ↕      ←→ 97-selfhosted-server.md § 97.5
 18-data-schema.md
        ↕      ←→ 13-town.md
-       ↕      ←→ 35-inventory-constraints.md § 共用倉庫
+       ↕      ←→ 35-inventory-constraints.md § 共用倉庫／§ 35.17
        ↕      ←→ 16-tech-frontend-architecture.md
-       ↕
-37-statistics.md ←→ 45-legacy-archive.md
+       ↕      ←→ 97-selfhosted-server.md § 97.4（§ 18.12）
+37-statistics.md § 37.4 ←→ 97-selfhosted-server.md § 97.4
+45-legacy-archive.md ←  97-selfhosted-server.md § 97.5（無觸發來源）
+
+【自架私服】
+97-selfhosted-server.md
+  ←→ 19-account-character.md § 19.1 / § 19.4 / § 19.9
+  ←→ 18-data-schema.md § 18.1 / § 18.6 / § 18.7 / § 18.12
+  ←→ 37-statistics.md § 37.4
+  ←→ 26-spawn-pressure.md § 26.2 / § 26.3（§ 97.7.1）
+  ←→ 27-drop-table.md § 27.1（§ 97.7.1）
+  ←→ 25-monster-system.md § 25.8 / 41-arpg-combat.md § 5.2（§ 97.7.1）
+  ←→ 38-map-control.md § 38.14（§ 97.7.1）
+  ←→ 16-tech.md / 16-tech-frontend-architecture.md § 32.5 / § 32.6 / § 32.10
+  ←→ 35-inventory-constraints.md § 35.17
+  ←→ 47-mobile.md § 47.9
+  ←→ 52-mailbox.md § 52.2.3 / § 52.2.4
+  ←→ 15-excluded.md § 15.8 / 17-mvp-priority.md § 17.5
+  ←  19-account-character.md § 19.9 全域倍率（§ 97.2 `server.properties`）
+  ←  98-online-architecture.md § 2 / § 10 / § 13
+  ←  11-guild.md § 11.1（§ 97.7.2）
+  ✕  10-faction.md —— 陣營不做（15-excluded.md § 15.7）
 
 【背包／負重】
 35-inventory-constraints.md ←→ 20-attributes.md

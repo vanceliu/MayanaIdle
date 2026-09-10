@@ -2,20 +2,16 @@ import { create } from 'zustand';
 import { normalizeAppearance, type Appearance } from '../models/appearance';
 import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
-import { useMapMonsterStore } from './mapMonsterStore';
-import { useMapControlStore } from './mapControlStore';
 import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
-import { CURRENT_DATA_VERSION, DROP_RATE_MULTIPLIER } from '../config';
+import { rates } from '../core/rates';
 import { settleKillExp } from '../systems/globalRates';
-import { syncTalentSlotGrants, syncCompensations, mailPurgeStorageKey } from '../systems/mailbox';
-import { talentBagOrderStorageKey } from '../models/talentBag';
+import { syncTalentSlotGrants, syncCompensations } from '../systems/mailbox';
 import { rollTalentSlotDrop } from '../systems/talentDrops';
 import { emptyConditions } from '../models/talent';
-import { useMailboxStore } from './mailboxStore';
 import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
-import { useTalentStore, talentPersistentRules, talentVillageRules } from './talentStore';
+import { talentPersistentRules, talentVillageRules } from './talentStore';
 import { BUILD_INFO } from '../buildInfo';
 import type { DropResult } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
@@ -32,14 +28,6 @@ import {
 import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
-import { ensureCharacterAuthToken } from '../systems/authToken';
-import {
-  uploadStats,
-  shouldUploadStats,
-  markStatsUploaded,
-  LeaderboardError,
-} from '../services/leaderboardService';
-import { purgeOutdatedData } from '../systems/dataVersionPurge';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { calculatePressure, getPressureDropMultiplier } from '../systems/pressure';
 import { accrueRestedExp, getRestedExpMultiplier } from '../systems/restedExp';
@@ -57,12 +45,11 @@ import type { HpSample } from '../systems/scriptRunner';
  * 進 state 會讓每 300ms 一次的取樣觸發整棵樹重繪。
  */
 const HP_SAMPLE_WINDOW_MS = 10_000;
-let hpSamples: HpSample[] = [];
 import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { getItemId, getItemById } from '../models/items';
-import { bagLayoutStorageKey, type BagSlotMap } from '../models/bagLayout';
+import type { BagSlotMap } from '../models/bagLayout';
 import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
@@ -75,7 +62,6 @@ import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics, normalizeStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
 import { evaluatePersistentScript, evaluateEmergencyRetreat, skillMeetsWeaponRequirement, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
-import { useCombatCommandStore } from './combatCommandStore';
 import { pushSelfCastFx } from '../systems/selfCastFx';
 import type { ScriptRule, EmergencyRetreat } from '../models/scriptEngine';
 import {
@@ -89,9 +75,22 @@ import {
 import type { MapLocation } from '../models/area';
 import { getRegion, resolveArea, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
-import { resolveEquipment, rollNewInstanceFields } from '../systems/templateSync';
+import { resolveEquipment, rollNewInstanceFields, getCachedTemplates, getTemplateById } from '../systems/templateSync';
+import { createShopEquipment } from '../systems/shopEquipment';
+import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
+import { generateCraftAffixes } from '../systems/crafting';
+import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
+import {
+  POLISH_SIGIL_GOLD_COST, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
+  canUseSigil, getSigilDefinition, type SigilContext, type SigilResult, type SigilType,
+} from '../models/sigil';
+import {
+  claimStarterGear as claimStarterGearFn, enhanceStarterGear as enhanceStarterGearFn, getStarterEnhanceCost, getStarterEnhanceState, persistStarterEnhance,
+} from '../systems/starterNpc';
+import { applyEnhanceScroll, getEnhanceScroll, type EnhanceOutcome } from '../systems/enhanceScroll';
+import type { EquipSlot } from '../models/equipment';
 import { findScrollInBag, consumeTownScroll, getTownScrollByItemId, TOWN_SCROLL_CONFIG } from '../models/townScroll';
-import { db, type CharacterBagEntry, type WarehouseEntry } from '../db/database';
+import type { CharacterBagEntry, WarehouseEntry } from '../db/rowTypes';
 import { getItemSellPrice, getEquipmentSellTotal } from '../systems/shop';
 import { getItemBasePrice } from '../systems/shop';
 import { getCachedEquipmentTemplates } from '../db/equipmentTemplateCache';
@@ -103,6 +102,15 @@ import {
   getWithdrawAmount, getDepositGoldAmount, getWithdrawGoldAmount,
   type VillageScriptContext,
 } from '../systems/villageScriptRunner';
+import { random } from '../core/rng';
+import { gameNow } from '../core/clock';
+import { defaultSession, type Session } from './session';
+// 會話內其他 store 必須先登記進 defaultSession（模組副作用）
+import './mapMonsterStore';
+import './mapControlStore';
+import './mailboxStore';
+import './talentStore';
+import './combatCommandStore';
 
 /** 倉庫存取的搬運單。裝備走實例 id，道具走 id＋數量 */
 export interface WarehouseMove {
@@ -122,17 +130,23 @@ function warehousePatch(shared: boolean, equip: EquipmentInstance[], materials: 
 const VILLAGE_TICK_MS = 1000;
 
 /** `legacy` 為遺產頁（§ 45.3）：唯讀，只能返回 characterSelect，不可進入任何遊玩畫面 */
-export type GamePhase = 'title' | 'characterSelect' | 'create' | 'legacy' | 'explore' | 'combat' | 'result' | 'dead';
-export type SearchMode = 'auto' | 'manual';
+export type GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'result' | 'dead';
 
-/** 統計上傳結果（§ 37.4.5）。`skipped` = 節流或數值未變，不算失敗。 */
-export type StatsUploadResult =
-  | 'skipped'
-  | 'uploaded'
-  | 'invalid_auth_token'
-  | 'outdated_client'
-  | 'invalid_name'
-  | 'failed';
+export interface CraftResult {
+  ok: boolean;
+  message: string;
+  name?: string;
+}
+
+export interface SigilApplyResult {
+  ok: boolean;
+  message: string;
+  /** 突破成功與否；其餘印記一律 true */
+  success?: boolean;
+  affixes?: Affix[];
+  quality?: number;
+}
+export type SearchMode = 'auto' | 'manual';
 
 export interface CombatLog {
   text: string;
@@ -276,7 +290,7 @@ export interface CharacterSummary {
   attributes: Attributes;
 }
 
-interface GameState {
+export interface GameState {
   phase: GamePhase;
   userId: number | null;
   characterList: CharacterSummary[];
@@ -288,8 +302,8 @@ interface GameState {
   combatLogs: CombatLog[];
   lastDropResult: DropResult | null;
   gameLoopId: number | null;
-  hpRegenId: number | null;
-  mpRegenId: number | null;
+  /** 回復是否進行中；實際回復由 `gameLoopTick` 以 tick 累積觸發 `tickRegen` */
+  regenActive: boolean;
   scriptRules: ScriptRule[];
   /**
    * 腳本 template（`03-combat.md` § 3.14）。
@@ -299,7 +313,8 @@ interface GameState {
    */
   scriptTemplates: ScriptTemplate[];
   activeTemplateId: string;
-  persistentLoopId: number | null;
+  /** 常駐天賦迴圈是否進行中；由 `gameLoopTick` 每 300ms 觸發 `tickPersistent` */
+  persistentLoopActive: boolean;
   lastPotionUsedAt: number;
   lastPotionCooldown: number;
   /** 上次掛機點（`49-village-script.md` § 49.5）。進入非城鎮區域時記下來 */
@@ -317,7 +332,7 @@ interface GameState {
   /**
    * 背包格子位置（`35-inventory-constraints.md` § 35.1.3、§ 35.17）。
    * 只收錄被拖曳或整理過的項目，存在獨立的 localStorage key，
-   * **不隨角色匯出** —— 匯入會重發裝備實例 id，帶過去必然全部對不上。
+   * **不跟著角色走** —— 裝備實例 id 由持久層配發，帶過去必然全部對不上。
    */
   bagSlotMap: BagSlotMap;
   storedEquipment: EquipmentInstance[];
@@ -342,21 +357,16 @@ interface GameState {
   /** 純本機刪除。刪角不通知伺服端（§ 37.4.3），榜上舊列靠版本跳號清掉。 */
   deleteCharacter: (characterId: number) => Promise<void>;
   logout: () => Promise<void>;
-  /** `uuid` 與 `authToken` 皆於此產生，建立角色是純本機行為、不需要連線（§ 19.4）。 */
+  /** 建角在 server 端完成（`97-selfhosted-server.md` § 97.5），`uuid` 由 server 產生 */
   createCharacter: (name: string, className: ClassName, bonusAttrs: Attributes, appearance?: Appearance) => Promise<void>;
-  /** 取得目前角色的排行榜寫入密鑰；此機制上線前建立的角色在此補產生（TOFU，§ 37.4.3）。 */
-  ensureAuthToken: () => Promise<string | null>;
-  /**
-   * 上傳目前角色的統計（§ 37.4.5）。`force` 略過 10 分鐘節流與「數值未變」判定，
-   * 匯出前要用它把密鑰在伺服端綁定好。回傳結果碼供 UI 決定提示文字。
-   */
-  uploadOwnStats: (options?: { force?: boolean }) => Promise<StatsUploadResult>;
   loadCharacter: () => Promise<boolean>;
   startExploring: () => void;
   stopExploring: () => void;
   setSearchMode: (mode: SearchMode) => void;
   startRegen: () => void;
   stopRegen: () => void;
+  /** 累積 elapsedMs，滿回復週期即回復一次（`29-regen.md`） */
+  tickRegen: (elapsedMs: number) => void;
   equipItem: (item: EquipmentInstance) => void;
   unequipItem: (slot: keyof EquippedGear) => void;
   usePotion: () => void;
@@ -395,6 +405,8 @@ interface GameState {
   removeScriptTemplate: (id: string) => void;
   startPersistentLoop: () => void;
   stopPersistentLoop: () => void;
+  /** 常駐天賦判定一次（`51-auto-talent.md`），每 300ms 由遊戲迴圈呼叫 */
+  tickPersistent: () => void;
   rememberHuntLocation: () => void;
   /** 村莊腳本判定一輪（由常駐迴圈帶動，見 `49-village-script.md`） */
   runVillageScriptTick: () => void;
@@ -411,7 +423,21 @@ interface GameState {
    * 模板要由呼叫端傳進來 —— 價格算不出來就等於 0 元成交，
    * 讓依賴的模板從參數走，就不會有「快取還沒暖起來就白送」這種靜默失敗。
    */
-  sellEquipmentInstances: (ids: number[], templates: EquipmentTemplate[]) => number;
+  /** 模板省略時以快取為準（線上模式 client 只傳 id） */
+  sellEquipmentInstances: (ids: number[], templates?: EquipmentTemplate[]) => number;
+  /** 商店購買：金幣與格數在 server 判定（`06-equipment-acquire.md` § 6A.2） */
+  buyShopEquipment: (templateIds: number[]) => Promise<EquipmentInstance[]>;
+  /** 鐵匠鋪製作（`06-equipment-acquire.md` § 6A.3） */
+  /** 單機且模板已快取時同步結算；線上模式回 Promise */
+  craftEquipment: (templateId: number) => CraftResult | Promise<CraftResult>;
+  /** 印記師（`46-sigil.md`） */
+  /** 單機同步結算；線上模式回 Promise（server 判定） */
+  applySigil: (itemId: number, sigilType: SigilType, affixIndex: number | null) => SigilApplyResult | Promise<SigilApplyResult>;
+  /** 新手 NPC：領取新手裝（`13-town.md` § 13.11）；回傳領到的名稱 */
+  claimStarterGear: () => Promise<string[]>;
+  enhanceStarterGear: (itemId: number) => Promise<{ ok: boolean; message: string; enhancement?: number }>;
+  /** 背包強化卷軸（`35-inventory-constraints.md` § 35.5.5） */
+  enhanceWithScroll: (scrollItemId: number, itemId: number, slot?: EquipSlot) => EnhanceOutcome | null | Promise<EnhanceOutcome | null>;
   /**
    * === 倉庫存取（`13-town.md` § 13.8）===
    * 手動存取與村莊腳本的自動存取共用這兩個 action。
@@ -455,8 +481,10 @@ const GOLD_NAN_REPAIR_AMOUNT = 2_379_024;
 const GOLD_NAN_REPAIR_KEY = 'mayana_gold_nan_repair';
 
 function takeGoldNaNRepair(): number {
-  if (localStorage.getItem(GOLD_NAN_REPAIR_KEY)) return 0;
-  localStorage.setItem(GOLD_NAN_REPAIR_KEY, '1');
+  const storage = globalThis.localStorage;
+  if (!storage) return 0;
+  if (storage.getItem(GOLD_NAN_REPAIR_KEY)) return 0;
+  storage.setItem(GOLD_NAN_REPAIR_KEY, '1');
   return GOLD_NAN_REPAIR_AMOUNT;
 }
 
@@ -498,10 +526,10 @@ export function getEffectiveMaxMp(char: Character, gear: EquippedGear, activeEff
   return char.maxMp + flatMp + bonuses.max_mp;
 }
 
-function isInArpgCombat(): boolean {
-  const monsters = useMapMonsterStore.getState().monsters;
+function isInArpgCombat(session: Session): boolean {
+  const monsters = session.mapMonster.getState().monsters;
   if (monsters.length === 0) return false;
-  const playerPos = useMapControlStore.getState().playerPosition;
+  const playerPos = session.mapControl.getState().playerPosition;
   return monsters.some((m: any) => {
     const dx = m.position.x - playerPos.x;
     const dy = m.position.y - playerPos.y;
@@ -522,9 +550,9 @@ export function selectEmergencyRetreat(state: GameState): EmergencyRetreat {
 type StoreSet = (partial: Partial<GameState>) => void;
 type StoreGet = () => GameState;
 
-function persistTemplates(get: StoreGet): void {
+function persistTemplates(get: StoreGet, session: Session): void {
   const char = get().character;
-  if (char?.id) saveLocalPreferences(char.id, get());
+  if (char?.id) saveLocalPreferences(char.id, get(), session);
 }
 
 /** 所有腳本編輯都寫進「使用中的那一頁」，寫完立刻持久化 */
@@ -532,15 +560,18 @@ function updateActiveTemplate(
   set: StoreSet,
   get: StoreGet,
   updater: (template: ScriptTemplate) => ScriptTemplate,
+  session: Session,
 ): void {
   const activeId = selectActiveTemplate(get()).id;
   set({
     scriptTemplates: get().scriptTemplates.map(t => (t.id === activeId ? updater(t) : t)),
   });
-  persistTemplates(get);
+  persistTemplates(get, session);
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
+export function createGameStore(session: Session) {
+  let hpSamples: HpSample[] = [];
+  return create<GameState>((set, get) => ({
   phase: 'title',
   userId: null,
   characterList: [],
@@ -552,12 +583,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   combatLogs: [],
   lastDropResult: null,
   gameLoopId: null,
-  hpRegenId: null,
-  mpRegenId: null,
+  regenActive: false,
   scriptRules: DEFAULT_SCRIPT,
   scriptTemplates: [createDefaultTemplate()],
   activeTemplateId: DEFAULT_TEMPLATE_ID,
-  persistentLoopId: null,
+  persistentLoopActive: false,
   lastPotionUsedAt: 0,
   lastPotionCooldown: 0,
   lastHuntLocation: null,
@@ -586,19 +616,19 @@ export const useGameStore = create<GameState>((set, get) => ({
   setPhase: (phase) => set({ phase }),
 
   initUser: async () => {
-    const existingUser = await db.users.orderBy('createdAt').first();
+    const existingUser = await session.repo.firstUser();
     if (existingUser) {
       set({ userId: existingUser.id! });
     } else {
-      const id = await db.users.add({ createdAt: Date.now() });
-      set({ userId: id as number });
+      const id = await session.repo.addUser({ createdAt: Date.now() });
+      set({ userId: id });
     }
   },
 
   loadCharacterList: async () => {
     const userId = get().userId;
     if (!userId) return;
-    const chars = await db.characters.where('userId').equals(userId).toArray();
+    const chars = await session.repo.listCharacters(userId);
     const list: CharacterSummary[] = chars.map(c => ({
       id: c.id!,
       name: c.name,
@@ -611,18 +641,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   selectCharacter: async (characterId) => {
-    const char = await db.characters.get(characterId);
+    const char = await session.repo.getCharacter(characterId);
     if (!char) return;
 
-    // 開機時已掃過一次，這裡是保險：匯入還原的角色也可能帶著過期的 dataVersion。
-    // 一律走同一個清除流程，避免兩處邏輯不一致而留下孤兒資料。
-    if (!char.dataVersion || char.dataVersion < CURRENT_DATA_VERSION) {
-      await purgeOutdatedData();
-      await get().loadCharacterList();
-      return;
-    }
-
-    const items = await db.equipmentInstances.where('ownerId').equals(char.id!).toArray();
+    const items = await session.repo.listEquipmentByOwner(char.id!);
     const equipped: EquippedGear = {};
     const inventory: EquipmentInstance[] = [];
     const personalStoredEquipItems: EquipmentInstance[] = [];
@@ -639,22 +661,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Load shared warehouse equipment (ownerId = userId)
     const userId = get().userId!;
-    const sharedEquipItems = await db.equipmentInstances
-      .where('ownerId').equals(userId)
-      .filter(item => item.inStorage === true && item.storageType === 'shared')
-      .toArray();
+    const sharedEquipItems = await session.repo.listSharedWarehouseEquipment(userId);
     const storedEquipItems: EquipmentInstance[] = sharedEquipItems.map(resolveEquipment);
 
-    const bagRows = await db.characterBag.where('characterId').equals(char.id!).toArray();
+    const bagRows = await session.repo.listBag(char.id!);
     // 名稱與分頁一律由 id 反查（§ 99.1），DB 列裡的舊 name 只是遷移殘留，不採用
     const bagItems: BagItem[] = bagRows
       .map(row => makeBagItem(row.itemTemplateId!, row.amount))
       .filter((b): b is BagItem => b !== null);
 
     // Load warehouse materials (account-level shared storage)
-    const warehouseRows = await db.warehouses.where('userId').equals(userId)
-      .filter(row => !row.storageType || row.storageType === 'shared')
-      .toArray();
+    const warehouseRows = await session.repo.listSharedWarehouse(userId);
     const storedMaterials: BagItem[] = [];
     for (const row of warehouseRows) {
       if (row.type !== 'equipment') {
@@ -663,14 +680,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
     // 金幣是餘額不是物品，自 v16 起存在獨立表（`18-data-schema.md` § 18.7）
-    const storedWarehouseGold = (await db.warehouseGold.get(userId))?.amount ?? 0;
+    const storedWarehouseGold = await session.repo.getWarehouseGold(userId);
     const warehouseGold = Number.isFinite(storedWarehouseGold) ? storedWarehouseGold : 0;
 
     // Load personal warehouse materials (character-level storage)
-    const personalWarehouseRows = await db.warehouses
-      .where('characterId').equals(char.id!)
-      .filter(row => row.storageType === 'personal')
-      .toArray();
+    const personalWarehouseRows = await session.repo.listPersonalWarehouse(char.id!);
     const personalStoredMaterials: BagItem[] = [];
     for (const row of personalWarehouseRows) {
       if (row.type !== 'equipment') {
@@ -679,7 +693,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
-    const prefs = loadLocalPreferences(char.id!);
+    const prefs = await loadLocalPreferences(char.id!, session);
     const scriptRules = prefs?.scriptRules ?? DEFAULT_SCRIPT;
     const scriptTemplates = prefs?.scriptTemplates ?? [createDefaultTemplate()];
     const activeTemplateId = prefs?.activeTemplateId ?? DEFAULT_TEMPLATE_ID;
@@ -690,8 +704,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       prefs?.quickSlots,
       new Set((char.skills ?? []).map(s => s.id)),
     );
-    // § 35.17：格子位置不在 prefs 裡，走獨立 key（不隨角色匯出）
-    const bagSlotMap = loadBagLayout(char.id!);
+    // § 35.17：格子位置不在 prefs 裡，走獨立 key
+    const bagSlotMap = await loadBagLayout(char.id!, session);
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
     const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
     const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? 60;
@@ -703,7 +717,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const statistics = normalizeStatistics(prefs?.statistics);
 
     // Reset areaEnteredAt so pressure doesn't accumulate during character select
-    char.areaEnteredAt = Date.now();
+    char.areaEnteredAt = gameNow();
     char.areaKills = 0;
 
     // 離線時長換成加倍存量（`04-character.md` § 4.11）
@@ -729,7 +743,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       equippedGear: equipped,
       inventory,
       skills: (char.skills ?? []).map(s => {
-        return instantiateFromTemplate(s.id, s.lastUsedAt ?? 0);
+        // 遊戲時鐘自載入起算，存檔中的冷卻時間戳不再有意義
+        return instantiateFromTemplate(s.id, 0);
       }).filter(Boolean) as Skill[],
       bagItems,
       storedMaterials,
@@ -758,91 +773,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().startPersistentLoop();
     get().initQuestBoard();
 
-    startTalentAndMailboxInit(char.id!, char.level);
+    startTalentAndMailboxInit(char.id!, char.level, session);
     const region = getRegion(char.currentRegion);
     if (region?.type !== 'town') {
       get().startExploring();
     }
   },
 
-  ensureAuthToken: async () => {
-    const char = get().character;
-    if (!char?.id) return null;
-
-    const authToken = await ensureCharacterAuthToken(char.id);
-    if (authToken && authToken !== char.authToken) {
-      set({ character: { ...char, authToken } });
-    }
-    return authToken;
-  },
-
-  uploadOwnStats: async (options = {}) => {
-    const { character, statistics, guildProgress } = get();
-    if (!character?.uuid || !statistics) return 'skipped';
-
-    const authToken = await get().ensureAuthToken();
-    if (!authToken) return 'skipped';
-
-    const payload = {
-      character_id: character.uuid,
-      character_name: character.name,
-      auth_token: authToken,
-      class_name: character.className,
-      character_level: character.level,
-      monstersKilled: statistics.monstersKilled,
-      bossesKilled: statistics.bossesKilled,
-      deathCount: statistics.deathCount,
-      equipmentCrafted: statistics.equipmentCrafted,
-      weaponEnhanceAttempts: statistics.weaponEnhanceAttempts,
-      armorEnhanceAttempts: statistics.armorEnhanceAttempts,
-      weaponsBroken: statistics.weaponsBroken,
-      armorsBroken: statistics.armorsBroken,
-      questsCompleted: statistics.questsCompleted,
-      totalGoldEarned: statistics.totalGoldEarned,
-      tier7WeaponsLooted: statistics.tier7WeaponsLooted,
-      tier7ArmorsLooted: statistics.tier7ArmorsLooted,
-      contribution: guildProgress.points,
-    };
-
-    // 節流 + 數值未變則完全不送出（見 leaderboardService.shouldUploadStats）
-    if (!options.force && !shouldUploadStats(character.uuid, payload)) return 'skipped';
-
-    try {
-      // upsert：首次上傳直接建列並綁定密鑰，不需要事先註冊
-      await uploadStats(payload);
-      markStatsUploaded(character.uuid, payload);
-      return 'uploaded';
-    } catch (err) {
-      if (!(err instanceof LeaderboardError)) return 'failed';
-      if (err.code === 'invalid_auth_token') return 'invalid_auth_token';
-      if (err.code === 'outdated_client') return 'outdated_client';
-      if (err.code === 'invalid_name') return 'invalid_name';
-      return 'failed';
-    }
-  },
-
   deleteCharacter: async (characterId) => {
-    await db.equipmentInstances.where('ownerId').equals(characterId)
-      .filter(item => item.storageType !== 'shared')
-      .delete();
-    await db.characterBag.where('characterId').equals(characterId).delete();
-    await db.warehouses.where('characterId').equals(characterId)
-      .filter(row => row.storageType === 'personal')
-      .delete();
+    await session.repo.deleteCharacterEquipment(characterId);
+    await session.repo.deleteBag(characterId);
+    await session.repo.deletePersonalWarehouse(characterId);
     /*
      * characterId 會被重用，下列各項必須一併清除：
      * 天賦格、未領取的信、背包排列（§ 35.17）、天賦分頁順序、換版清理的版本戳記。
      */
-    await db.talentSlots.where('characterId').equals(characterId).delete();
-    await db.mailbox.where('characterId').equals(characterId).delete();
-    await db.characters.delete(characterId);
-    localStorage.removeItem(`mayana_prefs_${characterId}`);
-    localStorage.removeItem(bagLayoutStorageKey(characterId));
-    localStorage.removeItem(talentBagOrderStorageKey(characterId));
-    localStorage.removeItem(mailPurgeStorageKey(characterId));
+    await session.repo.deleteTalentSlots(characterId);
+    await session.repo.deleteMailByCharacter(characterId);
+    await session.repo.deleteCharacter(characterId);
+    await session.repo.deleteCharacterPrefs(characterId);
     if (get().character?.id === characterId) {
-      useTalentStore.getState().reset();
-      useMailboxStore.getState().reset();
+      session.talent.getState().reset();
+      session.mailbox.getState().reset();
     }
     await get().loadCharacterList();
   },
@@ -851,7 +803,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().stopExploring();
     get().stopRegen();
     get().stopPersistentLoop();
-    await saveGame(get());
+    await saveGame(get(), session);
     set({
       character: null,
       equippedGear: {},
@@ -875,8 +827,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       craftQuests: [],
     });
     // 天賦與信箱是獨立 store，不跟著 set 清掉的話會留著上一隻角色的資料
-    useTalentStore.getState().reset();
-    useMailboxStore.getState().reset();
+    session.talent.getState().reset();
+    session.mailbox.getState().reset();
     await get().loadCharacterList();
   },
 
@@ -885,7 +837,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!userId) return;
 
     // Check character limit (max 4)
-    const existingCount = await db.characters.where('userId').equals(userId).count();
+    const existingCount = await session.repo.countCharacters(userId);
     if (existingCount >= 4) return;
 
     const base = CLASS_BASE_ATTRIBUTES[className];
@@ -922,22 +874,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentFloor: null,
       skills: startingSkills,
       quests: [],
-      areaEnteredAt: Date.now(),
+      areaEnteredAt: gameNow(),
       areaKills: 0,
       restedExpMs: 0,
       lastSeenAt: Date.now(),
       createdAt: Date.now(),
-      dataVersion: CURRENT_DATA_VERSION,
     };
-    const id = await db.characters.add(char);
-    char.id = id as number;
+    const id = await session.repo.addCharacter(char);
+    char.id = id;
 
     // 創角直接穿上整套新手裝（裝備Tier 1）。清單與新手指導員共用
     // `STARTER_GEAR_MAP`，不要在這裡另外推導一份。
     // 舊版寫死「短劍／木弓…＋皮甲」，發的其實是商店貨而不是新手裝，
     // 而且只有武器與胸甲兩件。
     const starterNames = new Set(getStarterGearNames(className));
-    const starterTemplates = (await db.equipmentTemplates.toArray())
+    const starterTemplates = (await session.repo.listEquipmentTemplates())
       .filter(t => starterNames.has(t.name));
 
     const equippedGear: EquippedGear = {};
@@ -947,9 +898,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...rollNewInstanceFields(template),
         ownerId: char.id!, equipped: true, isStarterGear: true,
       };
-      const instId = await db.equipmentInstances.add(dbRecord as any);
+      const instId = await session.repo.addEquipment(dbRecord as any);
       equippedGear[template.slot as keyof EquippedGear] = resolveEquipment({
-        id: instId as number, templateId: template.id!, name: template.name, type: template.type,
+        id: instId, templateId: template.id!, name: template.name, type: template.type,
         slot: template.slot, isTwoHanded: template.isTwoHanded,
         quality: 0, enhancement: 0, affixes: [], ...rollNewInstanceFields(template),
         ownerId: char.id!, equipped: true, isStarterGear: true,
@@ -958,7 +909,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Save initial bag items to DB
     const starterBag = addPotionToBag([], 'red', 10);
-    await db.characterBag.bulkAdd(starterBag.map(item => ({
+    await session.repo.replaceBag(char.id!, starterBag.map(item => ({
       characterId: char.id!, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount,
     })));
 
@@ -980,13 +931,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 少這一行的話新角色要登出重進才會有這三樣，而且不會報錯。
     get().startPersistentLoop();
     get().initQuestBoard();
-    startTalentAndMailboxInit(char.id!, char.level);
+    startTalentAndMailboxInit(char.id!, char.level, session);
   },
 
   loadCharacter: async () => {
     const userId = get().userId;
     if (!userId) return false;
-    const char = await db.characters.where('userId').equals(userId).last();
+    const char = await session.repo.lastCharacter(userId);
     if (!char) return false;
     await get().selectCharacter(char.id!);
     return true;
@@ -1017,42 +968,49 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   startRegen: () => {
-    get().stopRegen();
-
-    const hpId = window.setInterval(() => {
-      const state = get();
-      if (!state.character || state.character.hp <= 0) return;
-      const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
-      if (state.character.hp >= effMaxHp) return;
-      const inCombat = state.phase === 'combat' || isInArpgCombat();
-      const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-      const regen = getHpRegen(state.character, inCombat, allGear, state.activeEffects);
-      if (regen <= 0) return;
-      const newHp = Math.min(effMaxHp, state.character.hp + regen);
-      set({ character: { ...state.character, hp: newHp } });
-    }, HP_REGEN_INTERVAL_MS);
-
-    const mpId = window.setInterval(() => {
-      const state = get();
-      if (!state.character || state.character.hp <= 0) return;
-      const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear);
-      if (state.character.mp >= effMaxMp) return;
-      const inCombat = state.phase === 'combat' || isInArpgCombat();
-      const allGearMp = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-      const regen = getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
-      if (regen <= 0) return;
-      const newMp = Math.min(effMaxMp, state.character.mp + regen);
-      set({ character: { ...state.character, mp: newMp } });
-    }, MP_REGEN_INTERVAL_MS);
-
-    set({ hpRegenId: hpId, mpRegenId: mpId });
+    set({ regenActive: true });
   },
 
   stopRegen: () => {
-    const { hpRegenId, mpRegenId } = get();
-    if (hpRegenId) clearInterval(hpRegenId);
-    if (mpRegenId) clearInterval(mpRegenId);
-    set({ hpRegenId: null, mpRegenId: null });
+    set({ regenActive: false });
+  },
+
+  tickRegen: (elapsedMs) => {
+    const loop = session.loop;
+    loop.regenHpAcc += elapsedMs;
+    loop.regenMpAcc += elapsedMs;
+    if (loop.regenHpAcc >= HP_REGEN_INTERVAL_MS) {
+      loop.regenHpAcc -= HP_REGEN_INTERVAL_MS;
+      const state = get();
+      if (state.character && state.character.hp > 0) {
+        const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
+        if (state.character.hp < effMaxHp) {
+          const inCombat = state.phase === 'combat' || isInArpgCombat(session);
+          const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
+          const regen = getHpRegen(state.character, inCombat, allGear, state.activeEffects);
+          if (regen > 0) {
+            const newHp = Math.min(effMaxHp, state.character.hp + regen);
+            set({ character: { ...state.character, hp: newHp } });
+          }
+        }
+      }
+    }
+    if (loop.regenMpAcc >= MP_REGEN_INTERVAL_MS) {
+      loop.regenMpAcc -= MP_REGEN_INTERVAL_MS;
+      const state = get();
+      if (state.character && state.character.hp > 0) {
+        const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear);
+        if (state.character.mp < effMaxMp) {
+          const inCombat = state.phase === 'combat' || isInArpgCombat(session);
+          const allGearMp = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
+          const regen = getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
+          if (regen > 0) {
+            const newMp = Math.min(effMaxMp, state.character.mp + regen);
+            set({ character: { ...state.character, mp: newMp } });
+          }
+        }
+      }
+    }
   },
 
   equipItem: (item) => {
@@ -1113,14 +1071,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (existing) {
       existing.equipped = false;
       inv.push(existing);
-      db.equipmentInstances.update(existing.id!, { equipped: false });
+      session.repo.updateEquipment(existing.id!, { equipped: false });
     }
 
     // Equip
     gear[targetSlot] = item;
     item.equipped = true;
     item.slot = targetSlot;
-    db.equipmentInstances.update(item.id!, { equipped: true, slot: targetSlot });
+    session.repo.updateEquipment(item.id!, { equipped: true, slot: targetSlot });
 
     const filtered = inv.filter(i => i.id !== item.id);
     set({ equippedGear: gear, inventory: filtered });
@@ -1152,7 +1110,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       item.slot = 'ring1';
     }
     gear[slot] = null;
-    db.equipmentInstances.update(item.id!, { equipped: false, slot: item.slot });
+    session.repo.updateEquipment(item.id!, { equipped: false, slot: item.slot });
     set({ equippedGear: gear, inventory: [...state.inventory, item] });
   },
 
@@ -1174,7 +1132,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const config = POTION_CONFIG[potionType];
     const bonuses = getAffixBonusesFromGear(allGear);
-    const baseHeal = Math.floor(Math.random() * (config.healMax - config.healMin + 1)) + config.healMin;
+    const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
     const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
     const newHp = Math.min(effMaxHp, state.character.hp + heal);
     set({
@@ -1196,13 +1154,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
     if (getPotionCount(state.bagItems, type) <= 0) return;
 
-    const now = Date.now();
+    const now = gameNow();
     const config = POTION_CONFIG[type];
     if (now - state.lastPotionUsedAt < state.lastPotionCooldown) return;
 
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const bonuses = getAffixBonusesFromGear(allGear);
-    const baseHeal = Math.floor(Math.random() * (config.healMax - config.healMin + 1)) + config.healMin;
+    const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
     const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
     const newHp = Math.min(effMaxHp, state.character.hp + heal);
     set({
@@ -1223,14 +1181,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!hasBagItem(state.bagItems, config.itemId)) return;
 
     const speedBuff: ActiveEffect = {
-      id: `buff-speed-potion-${Date.now()}`,
+      id: `buff-speed-potion-${gameNow()}`,
       sourceSkillId: `speed-potion-${type}`,
       sourceSkillName: config.name,
       category: 'speed',
       type: 'buff',
       target: 'player',
       modifiers: [{ stat: 'attack_speed', value: 33, isPercent: true }],
-      startTime: Date.now(),
+      startTime: gameNow(),
       duration: config.duration,
       tags: [],
       name: config.name,
@@ -1272,14 +1230,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ quickSlots: slots });
     const char = get().character;
     if (char?.id) {
-      saveLocalPreferences(char.id, get());
+      saveLocalPreferences(char.id, get(), session);
     }
   },
 
   setBagSlotMap: (slotMap) => {
     set({ bagSlotMap: slotMap });
     const char = get().character;
-    if (char?.id) saveBagLayout(char.id, slotMap);
+    if (char?.id) saveBagLayout(char.id, slotMap, session);
   },
 
   useQuickSlot: (slotIdx) => {
@@ -1364,7 +1322,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} MP 不足`, type: 'system' }) });
       return false;
     }
-    if (!canUseSkill(skill, char.mp, Date.now(), cooldownReduction)) {
+    if (!canUseSkill(skill, char.mp, gameNow(), cooldownReduction)) {
       set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} 冷卻中`, type: 'system' }) });
       return false;
     }
@@ -1379,7 +1337,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // 攻擊技能排進下一個攻擊 tick，由 ARPG 引擎覆蓋該 tick 的腳本判定
-    useCombatCommandStore.getState().requestSkill(skill.id);
+    session.combatCommand.getState().requestSkill(skill.id);
     return true;
   },
 
@@ -1393,7 +1351,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const skill = state.skills[skillIdx];
     if (skill.type !== 'buff' && skill.type !== 'heal') return false;
 
-    const now = Date.now();
+    const now = gameNow();
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
     if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return false;
@@ -1413,7 +1371,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         skills: newSkills,
         combatLogs: addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' }),
       });
-      pushSelfCastFx({ skillId: skill.id, healed });
+      pushSelfCastFx({ skillId: skill.id, healed }, session.loop.selfCastFx);
       get().saveState();
       return true;
     }
@@ -1456,7 +1414,7 @@ export const useGameStore = create<GameState>((set, get) => ({
      * 常駐腳本碰不到 Pixi，所以演出走佇列（`48-vfx.md` § 48.8.5）——
      * 少了這一行，設在常駐腳本上的 buff 一個特效都不會演。
      */
-    pushSelfCastFx({ skillId: skill.id, healed: 0 });
+    pushSelfCastFx({ skillId: skill.id, healed: 0 }, session.loop.selfCastFx);
     get().saveState();
     return true;
   },
@@ -1477,7 +1435,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const now = Date.now();
+    const now = gameNow();
     const cleared = state.activeEffects.filter(
       e => e.type === 'debuff' && e.target === 'player'
         && def.cures.includes(e.category)
@@ -1516,7 +1474,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     char.mapPositionY = undefined;
     const townZone = ZONES.find(z => z.regions.includes(scrollInfo.townId));
     if (townZone) char.currentZone = townZone.id;
-    char.areaEnteredAt = Date.now();
+    char.areaEnteredAt = gameNow();
     char.areaKills = 0;
 
     get().stopExploring();
@@ -1526,7 +1484,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       phase: 'explore',
       combatLogs: addLog(state.combatLogs, { text: `使用${scrollInfo.name}，傳送至${scrollInfo.townName}`, type: 'system' }),
     });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   changeArea: (areaId) => {
@@ -1550,7 +1508,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentZone: zone?.id ?? state.character.currentZone,
       currentRegion: areaId,
       currentFloor: region?.type === 'dungeon' ? (region.floors?.[0]?.floor ?? 1) : null,
-      areaEnteredAt: Date.now(),
+      areaEnteredAt: gameNow(),
       areaKills: 0,
       mapPositionX: undefined,
       mapPositionY: undefined,
@@ -1562,7 +1520,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
     // 必須在 saveGame 之前，否則存到的是舊快照
     get().rememberHuntLocation();
-    saveGame(get());
+    saveGame(get(), session);
     get().stopExploring();
     get().startExploring();
   },
@@ -1589,7 +1547,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentZone: location.zoneId,
       currentRegion: location.regionId,
       currentFloor: location.floor,
-      areaEnteredAt: Date.now(),
+      areaEnteredAt: gameNow(),
       areaKills: 0,
       mapPositionX: undefined,
       mapPositionY: undefined,
@@ -1604,7 +1562,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
     // 必須在 saveGame 之前，否則存到的是舊快照
     get().rememberHuntLocation();
-    saveGame(get());
+    saveGame(get(), session);
     get().stopExploring();
     if (region?.type !== 'town') {
       get().startExploring();
@@ -1615,12 +1573,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ scriptRules: rules });
     const char = get().character;
     if (char?.id) {
-      saveLocalPreferences(char.id, get());
+      saveLocalPreferences(char.id, get(), session);
     }
   },
 
   setEmergencyRetreat: (retreat) => {
-    updateActiveTemplate(set, get, t => ({ ...t, emergencyRetreat: retreat }));
+    updateActiveTemplate(set, get, t => ({ ...t, emergencyRetreat: retreat }), session);
   },
 
   setActiveTemplate: (id) => {
@@ -1628,7 +1586,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ activeTemplateId: id });
     // 常駐腳本換了一整份，計時器要重掛
     get().startPersistentLoop();
-    persistTemplates(get);
+    persistTemplates(get, session);
   },
 
   addScriptTemplate: () => {
@@ -1636,7 +1594,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const created = createScriptTemplate(`tpl-${Date.now()}`, nextTemplateName(templates));
     set({ scriptTemplates: [...templates, created], activeTemplateId: created.id });
     get().startPersistentLoop();
-    persistTemplates(get);
+    persistTemplates(get, session);
   },
 
   duplicateScriptTemplate: (id) => {
@@ -1650,7 +1608,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
     set({ scriptTemplates: [...templates, copy], activeTemplateId: copy.id });
     get().startPersistentLoop();
-    persistTemplates(get);
+    persistTemplates(get, session);
   },
 
   renameScriptTemplate: (id, name) => {
@@ -1659,7 +1617,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       scriptTemplates: get().scriptTemplates.map(t => (t.id === id ? { ...t, name: trimmed } : t)),
     });
-    persistTemplates(get);
+    persistTemplates(get, session);
   },
 
   removeScriptTemplate: (id) => {
@@ -1670,154 +1628,151 @@ export const useGameStore = create<GameState>((set, get) => ({
     const activeId = get().activeTemplateId === id ? remaining[0].id : get().activeTemplateId;
     set({ scriptTemplates: remaining, activeTemplateId: activeId });
     get().startPersistentLoop();
-    persistTemplates(get);
+    persistTemplates(get, session);
   },
 
   startPersistentLoop: () => {
-    get().stopPersistentLoop();
-
-    const id = window.setInterval(() => {
-      const state = get();
-      if (!state.character) return;
-
-      get().clearExpiredEffects();
-
-      const now = Date.now();
-      const char = state.character;
-      const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-      const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
-
-      /**
-       * HP 取樣（`hp_dropped_recently`）。在常駐 loop 維護：它每 300ms 跑一次，
-       * 是全遊戲最穩定的取樣節奏，掛在戰鬥 tick 上則會隨攻速變頻。
-       */
-      const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
-      hpSamples.push({ t: now, percent: effMaxHp > 0 ? (char.hp / effMaxHp) * 100 : 100 });
-      while (hpSamples.length > 0 && now - hpSamples[0].t > HP_SAMPLE_WINDOW_MS) hpSamples.shift();
-
-      const ctx: PersistentScriptContext = {
-        character: char,
-        skills: state.skills,
-        bagItems: state.bagItems,
-        lastPotionUsedAt: state.lastPotionUsedAt,
-        lastPotionCooldown: state.lastPotionCooldown,
-        now,
-        activeEffects: state.activeEffects,
-        cooldownReduction,
-        effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
-        effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear),
-        /**
-         * 共用鑲材（§ 51.4.5）在常駐格也要成立，因此這幾個欄位不能只餵給戰鬥。
-         * 少一個就等於那些鑲材鑲進常駐格之後永遠不觸發，而且不會報錯。
-         */
-        playerPos: useMapControlStore.getState().playerPosition,
-        monsterPositions: useMapMonsterStore.getState().monsters.map(m => m.position),
-        weaponType: getEquippedWeapon(allGear)?.type,
-        hpHistory: hpSamples,
-        weightPercent: (() => {
-          const w = getWeightStatus(char, allGear, state.bagItems);
-          return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
-        })(),
-      };
-
-      // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
-      const action = evaluatePersistentScript(talentPersistentRules(state.activeTemplateId), ctx);
-      if (!action) {
-        const retreatCtx: EmergencyRetreatContext = {
-          character: char,
-          bagItems: state.bagItems,
-          inCombat: isInArpgCombat(),
-          effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
-        };
-        const retreat = evaluateEmergencyRetreat(selectEmergencyRetreat(state), retreatCtx);
-        if (retreat) {
-          const scroll = retreat.scrollTownId
-            ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
-            : findScrollInBag(state.bagItems);
-          if (!scroll) return;
-          set({ huntReturnPending: true });
-          // 與手動使用回城卷軸共用同一條流程（停止探索、重置地圖座標、存檔）
-          get().useTownScroll(scroll.itemId);
-          return;
-        }
-        // 保命動作都沒事做的時候才輪到村莊腳本（它會花錢、賣東西、把角色傳走）
-        get().runVillageScriptTick();
-        return;
-      }
-
-      switch (action.type) {
-        case 'potion': {
-          drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
-          break;
-        }
-        case 'speed_potion': {
-          const speedType = action.speedPotionType ?? 'green';
-          get().useSpeedPotion(speedType);
-          break;
-        }
-        case 'cure_item': {
-          if (action.cureItemId == null) return;
-          get().useCureItem(action.cureItemId);
-          break;
-        }
-        /*
-         * buff／治癒與快捷格的手動施放**共用同一支** `castSelfSkill()`（§ 3.6.2）。
-         * 兩份實作會走鐘：MP 扣除、CD 寫入、buff 疊加規則、特效佇列全都要一致，
-         * 而其中任何一項改了只改一邊，症狀都是「手動放跟自動放效果不同」這種難查的 bug。
-         */
-        case 'buff_skill':
-        case 'heal_skill': {
-          if (!action.skillId) break;
-          get().castSelfSkill(action.skillId);
-          break;
-        }
-        case 'use_town_scroll': {
-          const scroll = findScrollInBag(state.bagItems);
-          if (!scroll) break;
-          set({ huntReturnPending: true });
-          get().useTownScroll(scroll.itemId);
-          break;
-        }
-        case 'use_consumable': {
-          if (action.itemId == null) break;
-          useConsumableById(get, action.itemId);
-          break;
-        }
-        /*
-         * 補到指定百分比：每一次判定喝一瓶，到標了條件就不成立，自然停下來。
-         * 藥水冷卻擋住時直接跳過這一次（§ 51.4.10）。
-         */
-        case 'refill_to_percent': {
-          const target = action.value ?? 80;
-          const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
-          if (char.hp / effMaxHp * 100 >= target) break;
-          drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
-          break;
-        }
-        // 依序檢查，第一個沒生效的就放。一次只放一個，下一輪再處理下一個
-        // 走位只設意圖，實際移動由 ARPG 的 FSM 處理（§ 51.4.9 T5）
-        case 'keep_distance':
-        case 'close_in':
-          useCombatCommandStore.getState().requestMove({
-            kind: action.type, distance: action.distance,
-          });
-          break;
-        case 'refill_all_buffs': {
-          const ids = [action.skillId, action.skillId2, action.skillId3].filter(Boolean) as string[];
-          const next = ids.find(id => !isBuffActive(id, state.skills, state.activeEffects, now));
-          if (next) get().castSelfSkill(next);
-          break;
-        }
-      }
-    }, 300);
-
-    set({ persistentLoopId: id });
+    session.loop.persistentAcc = 0;
+    set({ persistentLoopActive: true });
   },
 
   stopPersistentLoop: () => {
-    const id = get().persistentLoopId;
-    if (id) clearInterval(id);
-    set({ persistentLoopId: null });
+    set({ persistentLoopActive: false });
+  },
+
+  tickPersistent: () => {
+    const state = get();
+    if (!state.character) return;
+
+    get().clearExpiredEffects();
+
+    const now = gameNow();
+    const char = state.character;
+    const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
+    const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
+
+    /**
+     * HP 取樣（`hp_dropped_recently`）。在常駐 loop 維護：它每 300ms 跑一次，
+     * 是全遊戲最穩定的取樣節奏，掛在戰鬥 tick 上則會隨攻速變頻。
+     */
+    const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+    hpSamples.push({ t: now, percent: effMaxHp > 0 ? (char.hp / effMaxHp) * 100 : 100 });
+    while (hpSamples.length > 0 && now - hpSamples[0].t > HP_SAMPLE_WINDOW_MS) hpSamples.shift();
+
+    const ctx: PersistentScriptContext = {
+      character: char,
+      skills: state.skills,
+      bagItems: state.bagItems,
+      lastPotionUsedAt: state.lastPotionUsedAt,
+      lastPotionCooldown: state.lastPotionCooldown,
+      now,
+      activeEffects: state.activeEffects,
+      cooldownReduction,
+      effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
+      effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear),
+      /**
+       * 共用鑲材（§ 51.4.5）在常駐格也要成立，因此這幾個欄位不能只餵給戰鬥。
+       * 少一個就等於那些鑲材鑲進常駐格之後永遠不觸發，而且不會報錯。
+       */
+      playerPos: session.mapControl.getState().playerPosition,
+      monsterPositions: session.mapMonster.getState().monsters.map(m => m.position),
+      weaponType: getEquippedWeapon(allGear)?.type,
+      hpHistory: hpSamples,
+      weightPercent: (() => {
+        const w = getWeightStatus(char, allGear, state.bagItems);
+        return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
+      })(),
+    };
+
+    // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
+    const action = evaluatePersistentScript(talentPersistentRules(state.activeTemplateId, session.talent.getState().slots), ctx);
+    if (!action) {
+      const retreatCtx: EmergencyRetreatContext = {
+        character: char,
+        bagItems: state.bagItems,
+        inCombat: isInArpgCombat(session),
+        effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
+      };
+      const retreat = evaluateEmergencyRetreat(selectEmergencyRetreat(state), retreatCtx);
+      if (retreat) {
+        const scroll = retreat.scrollTownId
+          ? TOWN_SCROLL_CONFIG[retreat.scrollTownId] ?? null
+          : findScrollInBag(state.bagItems);
+        if (!scroll) return;
+        set({ huntReturnPending: true });
+        // 與手動使用回城卷軸共用同一條流程（停止探索、重置地圖座標、存檔）
+        get().useTownScroll(scroll.itemId);
+        return;
+      }
+      // 保命動作都沒事做的時候才輪到村莊腳本（它會花錢、賣東西、把角色傳走）
+      get().runVillageScriptTick();
+      return;
+    }
+
+    switch (action.type) {
+      case 'potion': {
+        drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
+        break;
+      }
+      case 'speed_potion': {
+        const speedType = action.speedPotionType ?? 'green';
+        get().useSpeedPotion(speedType);
+        break;
+      }
+      case 'cure_item': {
+        if (action.cureItemId == null) return;
+        get().useCureItem(action.cureItemId);
+        break;
+      }
+      /*
+       * buff／治癒與快捷格的手動施放**共用同一支** `castSelfSkill()`（§ 3.6.2）。
+       * 兩份實作會走鐘：MP 扣除、CD 寫入、buff 疊加規則、特效佇列全都要一致，
+       * 而其中任何一項改了只改一邊，症狀都是「手動放跟自動放效果不同」這種難查的 bug。
+       */
+      case 'buff_skill':
+      case 'heal_skill': {
+        if (!action.skillId) break;
+        get().castSelfSkill(action.skillId);
+        break;
+      }
+      case 'use_town_scroll': {
+        const scroll = findScrollInBag(state.bagItems);
+        if (!scroll) break;
+        set({ huntReturnPending: true });
+        get().useTownScroll(scroll.itemId);
+        break;
+      }
+      case 'use_consumable': {
+        if (action.itemId == null) break;
+        useConsumableById(get, action.itemId);
+        break;
+      }
+      /*
+       * 補到指定百分比：每一次判定喝一瓶，到標了條件就不成立，自然停下來。
+       * 藥水冷卻擋住時直接跳過這一次（§ 51.4.10）。
+       */
+      case 'refill_to_percent': {
+        const target = action.value ?? 80;
+        const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+        if (char.hp / effMaxHp * 100 >= target) break;
+        drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
+        break;
+      }
+      // 依序檢查，第一個沒生效的就放。一次只放一個，下一輪再處理下一個
+      // 走位只設意圖，實際移動由 ARPG 的 FSM 處理（§ 51.4.9 T5）
+      case 'keep_distance':
+      case 'close_in':
+        session.combatCommand.getState().requestMove({
+          kind: action.type, distance: action.distance,
+        });
+        break;
+      case 'refill_all_buffs': {
+        const ids = [action.skillId, action.skillId2, action.skillId3].filter(Boolean) as string[];
+        const next = ids.find(id => !isBuffActive(id, state.skills, state.activeEffects, now));
+        if (next) get().castSelfSkill(next);
+        break;
+      }
+    }
   },
 
   rememberHuntLocation: () => {
@@ -1840,10 +1795,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const char = state.character;
     if (!char) return;
 
-    const rules = talentVillageRules(state.activeTemplateId);
+    const rules = talentVillageRules(state.activeTemplateId, session.talent.getState().slots);
     if (rules.length === 0) return;
 
-    const now = Date.now();
+    const now = gameNow();
     if (now - state.lastVillageTickAt < VILLAGE_TICK_MS) return;
     set({ lastVillageTickAt: now });
 
@@ -2023,7 +1978,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   clearExpiredEffects: () => {
-    const now = Date.now();
+    const now = gameNow();
     set({ activeEffects: get().activeEffects.filter(e => e.startTime + e.duration > now) });
   },
 
@@ -2033,7 +1988,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!existing) return;
     const drop = Math.max(1, Math.min(amount, existing.amount));
     set({ bagItems: consumeBagItem(bag, itemId, drop) });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   /**
@@ -2098,7 +2053,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           : { inStorage: true, storageType: 'personal' as const, ownerId: state.character!.id! };
         inv = inv.filter(i => i.id !== id);
         equip = [...equip, { ...item, ...changes }];
-        db.equipmentInstances.update(id, changes);
+        session.repo.updateEquipment(id, changes);
       }
     }
 
@@ -2134,7 +2089,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         : { inStorage: false, storageType: undefined };
       equip = equip.filter(i => i.id !== id);
       inv = [...inv, { ...item, ...changes }];
-      db.equipmentInstances.update(id, changes);
+      session.repo.updateEquipment(id, changes);
     }
 
     for (const line of materials) {
@@ -2177,7 +2132,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     return actual;
   },
 
-  sellEquipmentInstances: (ids, templates) => {
+  sellEquipmentInstances: (ids, templatesArg) => {
+    const templates = templatesArg?.length ? templatesArg : getCachedTemplates();
     if (ids.length === 0 || templates.length === 0) return 0;
     const idSet = new Set(ids);
     const inventory = get().inventory;
@@ -2189,7 +2145,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       character: { ...get().character!, gold: get().character!.gold + gained },
       inventory: inventory.filter(i => i.id == null || !idSet.has(i.id)),
     });
-    db.equipmentInstances.bulkDelete(selling.map(i => i.id!));
+    session.repo.bulkDeleteEquipment(selling.map(i => i.id!));
     get().saveState();
     return gained;
   },
@@ -2221,8 +2177,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   discardInventoryItem: (id) => {
     const inv = get().inventory;
     set({ inventory: inv.filter(i => i.id !== id) });
-    db.equipmentInstances.delete(id);
-    saveGame(get());
+    session.repo.deleteEquipment(id);
+    saveGame(get(), session);
   },
 
   spendAttributePoint: (attr) => {
@@ -2238,7 +2194,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         unspentAttributePoints: char.unspentAttributePoints - 1,
       },
     });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   acceptQuest: (questId) => {
@@ -2246,7 +2202,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!char) return;
     const updated = acceptQuestAction(char, questId);
     set({ character: updated });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   completeQuest: (questId) => {
@@ -2272,7 +2228,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const questStats = { ...get().statistics, questsCompleted: get().statistics.questsCompleted + 1 };
     set({ character: updated, bagItems: newBag, statistics: questStats });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   acceptAdventurerQuest: (quest) => {
@@ -2280,7 +2236,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const result = acceptAdvQuest(state.adventurerQuests, quest);
     if (!result) return;
     set({ adventurerQuests: result });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   abandonAdventurerQuest: (questId) => {
@@ -2303,7 +2259,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     set({ adventurerQuests: activeQuests, guildProgress, adventurerQuestBoard: board });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   completeAdventurerQuest: (questId) => {
@@ -2357,20 +2313,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       statistics: advQuestStats,
       adventurerQuestBoard: board,
     });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   acceptCraftQuest: (templateId) => {
     const result = acceptCraftQuestFn(get().craftQuests, templateId);
     if (!result) return;
     set({ craftQuests: result });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   abandonCraftQuest: (questId) => {
     // § 36.13.5：取消製作任務不動貢獻，與冒險者工會的退出不同
     set({ craftQuests: abandonCraftQuestFn(get().craftQuests, questId) });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   refreshQuestBoard: (difficulty) => {
@@ -2396,7 +2352,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     board[difficulty] = generateQuestList(difficulty, guildProgress.rank, townId);
 
     set({ adventurerQuestBoard: board, guildProgress });
-    saveGame(get());
+    saveGame(get(), session);
   },
 
   initQuestBoard: () => {
@@ -2414,11 +2370,222 @@ export const useGameStore = create<GameState>((set, get) => ({
     set(state => ({ combatLogs: addLog(state.combatLogs, { text, type: 'system' }) }));
   },
 
+  buyShopEquipment: async (templateIds) => {
+    const state = get();
+    const char = state.character;
+    if (!char?.id || templateIds.length === 0) return [];
+    // 以 id 查模板（§ 99.1 第 3 條），一次撈齊
+    const wanted = new Set(templateIds);
+    const found = await session.repo.findEquipmentTemplates(t => wanted.has(t.id!));
+    const byId = new Map(found.map(t => [t.id!, t]));
+    const templates: EquipmentTemplate[] = [];
+    for (const id of templateIds) {
+      const t = byId.get(id);
+      if (!t || t.acquireType !== 'shop') return [];
+      templates.push(t);
+    }
+    const total = templates.reduce((sum, t) => sum + (t.buyPrice ?? 0), 0);
+    if (total > char.gold) return [];
+    const freeSlots = getBagMaxSlots(state.equippedGear) - getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear);
+    if (templates.length > freeSlots) return [];
+    const instances = await createShopEquipment(templates, char.level, char.id, session.repo);
+    const s2 = get();
+    set({
+      character: { ...s2.character!, gold: s2.character!.gold - total },
+      inventory: [...s2.inventory, ...instances],
+    });
+    get().saveState();
+    return instances;
+  },
+
+  craftEquipment: (templateId) => {
+    // 快取命中時整段同步結算（無 id 的角色不持久化，與舊鐵匠鋪流程相同）；線上模式回 Promise
+    const cached = getTemplateById(templateId);
+    const run = (recipe: EquipmentTemplate | undefined): CraftResult | Promise<CraftResult> => {
+      const char = get().character;
+      if (!char) return { ok: false, message: '沒有角色' };
+      if (!recipe || recipe.acquireType !== 'craft' || !recipe.craftMaterials?.length) return { ok: false, message: '無此配方' };
+      const state = get();
+      if (!evaluateCraftRequirements(recipe, state.bagItems, state.inventory).ready) return { ok: false, message: '材料不足' };
+      if (getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
+
+      let newBag = [...state.bagItems];
+      for (const mat of recipe.craftMaterials) {
+        const newAmount = getBagItemAmount(newBag, mat.itemId) - mat.amount;
+        if (char.id) void session.repo.setBagItemAmount(char.id, mat.itemId, newAmount);
+        newBag = consumeBagItem(newBag, mat.itemId, mat.amount);
+      }
+      let inv = [...state.inventory];
+      if (recipe.craftPrerequisiteWeapon) {
+        const { templateId: prereqId, quantity } = recipe.craftPrerequisiteWeapon;
+        let removed = 0;
+        for (const item of state.inventory) {
+          if (removed >= quantity) break;
+          if (item.templateId === prereqId) {
+            if (item.id) void session.repo.deleteEquipment(item.id);
+            inv = inv.filter(i => i.id !== item.id);
+            removed++;
+          }
+        }
+      }
+      const affixCategory = getAffixCategoryForSlot(recipe.slot, recipe.type);
+      const affixes = generateCraftAffixes(affixCategory, recipe);
+      const fields = rollNewInstanceFields(recipe);
+      const dbRecord = {
+        templateId: recipe.id!, slot: recipe.slot, quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
+      };
+      const finish = (id: number | undefined): CraftResult => {
+        const newEquip = resolveEquipment({
+          id, templateId: recipe.id!, name: recipe.name, type: recipe.type, slot: recipe.slot, isTwoHanded: recipe.isTwoHanded,
+          quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
+        } as EquipmentInstance);
+        const s2 = get();
+        set({
+          bagItems: newBag,
+          inventory: [...inv, newEquip],
+          // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
+          craftQuests: removeCraftQuestByTemplate(s2.craftQuests, recipe.id!),
+          statistics: { ...s2.statistics, equipmentCrafted: s2.statistics.equipmentCrafted + 1 },
+        });
+        get().saveState();
+        return { ok: true, message: `製作成功！獲得 ${recipe.name}`, name: recipe.name };
+      };
+      return char.id ? session.repo.addEquipment(dbRecord as any).then(finish) : finish(undefined);
+    };
+    return cached ? run(cached) : session.repo.findEquipmentTemplates(t => t.id === templateId).then(list => run(list[0]));
+  },
+
+  applySigil: (itemId, sigilType, affixIndex) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return { ok: false, message: '沒有角色' };
+    let slot: EquipSlot | null = null;
+    let item: EquipmentInstance | null = state.inventory.find(i => i.id === itemId) ?? null;
+    if (!item) {
+      for (const s of SLOT_ORDER) {
+        const it = state.equippedGear[s];
+        if (it?.id === itemId) { item = it; slot = s; break; }
+      }
+    }
+    if (!item) return { ok: false, message: '沒有裝備' };
+    const def = getSigilDefinition(sigilType);
+    const count = getBagItemAmount(state.bagItems, def.itemId);
+    if (count <= 0) return { ok: false, message: `背包裡沒有${def.name}` };
+    const ctx: SigilContext = {
+      category: getAffixCategoryForSlot(item.slot, item.type),
+      charLevel: char.level,
+      maxAffixTier: item.maxAffixTier,
+      quality: item.quality ?? 0,
+      weaponBaseDamage: getWeaponBaseDamage(item),
+      // 新手裝名單只有 seed 一個來源（§ 99.1 第 4 條）
+      isStarterGear: getTemplateById(item.templateId)?.acquireType === 'starter',
+    };
+
+    let patch: Partial<EquipmentInstance>;
+    let message: string;
+    let goldCost = 0;
+    let success = true;
+    if (sigilType === 'polish') {
+      // § 46.8 工藝印記：對象是整件裝備，且是唯一要收金幣的印記
+      const check = canUseSigil('polish', item.affixes, undefined, ctx);
+      if (!check.ok) return { ok: false, message: check.reason ?? '無法使用' };
+      if (char.gold < POLISH_SIGIL_GOLD_COST) return { ok: false, message: '金幣不足' };
+      const polished = applyPolishSigil(item.quality ?? 0);
+      if (!polished.success) return { ok: false, message: polished.message };
+      patch = { quality: polished.quality };
+      message = polished.message;
+      goldCost = POLISH_SIGIL_GOLD_COST;
+    } else {
+      const check = canUseSigil(sigilType, item.affixes, affixIndex ?? undefined, ctx);
+      if (!check.ok) return { ok: false, message: check.reason ?? '無法使用' };
+      let result: SigilResult;
+      if (sigilType === 'chaos') result = applyChaosSigil(ctx);
+      else if (affixIndex == null) return { ok: false, message: '請先選一條詞綴' };
+      else if (sigilType === 'sting') result = applyStingSigil(item.affixes!, affixIndex, ctx);
+      else if (sigilType === 'recarve') result = applyRecarveSigil(item.affixes!, affixIndex, ctx);
+      else if (sigilType === 'temper') result = applyTemperSigil(item.affixes!, affixIndex, ctx);
+      else result = applyEnhanceSigil(item.affixes!, affixIndex);
+      // 池抽空之類的「沒有東西可換」不消耗印記
+      if (result.affixes === item.affixes) return { ok: false, message: result.message };
+      patch = { affixes: result.affixes };
+      message = result.message;
+      success = result.success;
+    }
+
+    const updatedItem = { ...item, ...patch };
+    if (item.id) void session.repo.updateEquipment(item.id, patch);
+    const newBag = consumeBagItem(state.bagItems, def.itemId);
+    if (char.id) void session.repo.setBagItemAmount(char.id, def.itemId, count - 1);
+    const updatedChar = goldCost > 0 ? { ...char, gold: char.gold - goldCost } : char;
+    if (slot) {
+      set({ character: updatedChar, equippedGear: { ...state.equippedGear, [slot]: updatedItem }, bagItems: newBag });
+    } else {
+      set({ character: updatedChar, inventory: state.inventory.map(i => (i.id === item!.id ? updatedItem : i)), bagItems: newBag });
+    }
+    get().saveState();
+    return { ok: true, message: `${item.name}｜${message}`, success, affixes: updatedItem.affixes, quality: updatedItem.quality };
+  },
+
+  claimStarterGear: async () => {
+    const state = get();
+    const char = state.character;
+    if (!char) return [];
+    const allOwned = [
+      ...state.inventory,
+      ...(Object.values(state.equippedGear).filter(Boolean) as EquipmentInstance[]),
+      ...state.storedEquipment,
+      ...state.personalStoredEquipment,
+    ];
+    const result = await claimStarterGearFn(char.id!, char.className, char.level, allOwned, session.repo);
+    if (result.claimed.length === 0) return [];
+    set({ inventory: [...get().inventory, ...result.claimed] });
+    get().saveState();
+    return result.claimed.map(e => e.name);
+  },
+
+  enhanceStarterGear: async (itemId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return { ok: false, message: '沒有角色' };
+    const cost = getStarterEnhanceCost();
+    if (char.gold < cost) return { ok: false, message: '金幣不足！' };
+    const inEquipped = Object.entries(state.equippedGear).find(([, v]) => v?.id === itemId);
+    const item = inEquipped?.[1] ?? state.inventory.find(i => i.id === itemId);
+    if (!item) return { ok: false, message: '沒有裝備' };
+    const enhanceState = getStarterEnhanceState(item);
+    if (enhanceState !== 'enhanceable') {
+      return { ok: false, message: enhanceState === 'unsupported' ? '此部位不適用強化系統。' : '此裝備已達強化上限。' };
+    }
+    const enhanced = enhanceStarterGearFn(item);
+    await persistStarterEnhance(enhanced, session.repo);
+    const newChar = { ...char, gold: char.gold - cost };
+    if (inEquipped) {
+      set({ character: newChar, equippedGear: { ...state.equippedGear, [inEquipped[0]]: enhanced } });
+    } else {
+      set({ character: newChar, inventory: state.inventory.map(i => (i.id === itemId ? enhanced : i)) });
+    }
+    get().saveState();
+    return { ok: true, message: `${enhanced.name} 強化成功！(+${enhanced.enhancement})`, enhancement: enhanced.enhancement };
+  },
+
+  enhanceWithScroll: (scrollItemId, itemId, slot) => {
+    const scroll = getEnhanceScroll(scrollItemId);
+    if (!scroll) return null;
+    const state = get();
+    const item = slot ? state.equippedGear[slot] : state.inventory.find(i => i.id === itemId);
+    if (!item || item.id !== itemId) return null;
+    return applyEnhanceScroll(scroll, { item, slot: slot ?? undefined }, random, session);
+  },
+
   saveState: () => {
-    saveGame(get());
+    saveGame(get(), session);
   },
 
 }));
+}
+
+export const useGameStore = createGameStore(defaultSession);
+defaultSession.game = useGameStore;
 
 /**
  * 單隻怪物死亡處理：任何傷害來源（普攻、技能、AOE、DOT）導致怪物 HP <= 0 時，
@@ -2426,6 +2593,20 @@ export const useGameStore = create<GameState>((set, get) => ({
  * 負責：擊敗日誌、清除 debuff、經驗值、掉落 roll、任務進度更新。
  * 回傳更新後的 character 與 logs。
  */
+/**
+ * 隊伍結算選項（`97-selfhosted-server.md` § 97.7.1）。省略＝一人隊伍：全額經驗、自己收掉落。
+ */
+export interface MonsterDeathOptions {
+  /** 經驗平分的人數 */
+  expDivisor?: number;
+  /** 這位成員是不是掉落接收者 */
+  withDrops?: boolean;
+  /** 實例的累積擊殺數（已含這一隻）；省略時以角色自己的 `areaKills` +1 */
+  instanceKills?: number;
+  /** 擊殺發生的區域；接收者可能在別張地圖（掉落模式「全隊」） */
+  killArea?: { regionId: string; floor: number | null; areaId: string };
+}
+
 export function processMonsterDeath(
   get: () => GameState,
   set: (s: Partial<GameState>) => void,
@@ -2433,10 +2614,14 @@ export function processMonsterDeath(
   deadIdx: number,
   char: Character,
   logs: CombatLog[],
-  allGear: EquipmentInstance[]
+  allGear: EquipmentInstance[],
+  session: Session = defaultSession,
+  options: MonsterDeathOptions = {},
 ): { char: Character; logs: CombatLog[] } {
   const dead = monsters[deadIdx];
   monsters[deadIdx] = { ...dead, _processed: true };
+  const withDrops = options.withDrops ?? true;
+  const expDivisor = Math.max(1, options.expDivisor ?? 1);
 
   /*
    * 試驗場木樁零產出（`50-training-ground.md` § 50.1、§ 50.4.1）。
@@ -2458,12 +2643,14 @@ export function processMonsterDeath(
     set({ activeEffects: cleanedEffects });
   }
 
-  // 該地圖累積擊殺數是 Pressure 的輸入（`26-spawn-pressure.md` § 26.3）。
+  // 實例累積擊殺數是 Pressure 的輸入（`26-spawn-pressure.md` § 26.3、§ 97.7.1 隊伍全體共計）。
   // 木樁在上面就 return 了，不會計入。
-  char = { ...char, areaKills: (char.areaKills ?? 0) + 1 };
+  const areaKills = options.instanceKills ?? (char.areaKills ?? 0) + 1;
+  if (options.instanceKills === undefined && session.instance) session.instance.kills = areaKills;
+  char = { ...char, areaKills };
 
-  // 基礎 ×3（`28-monster-stats.md` § 28.1）× 回鍋加倍（`04-character.md` § 4.11）× 全域經驗倍率
-  const expGained = settleKillExp(dead.exp, getRestedExpMultiplier(char));
+  // 基礎 ×3（`28-monster-stats.md` § 28.1）× 回鍋加倍（`04-character.md` § 4.11）× 全域經驗倍率；隊伍在參與者之間平分
+  const expGained = settleKillExp(dead.exp / expDivisor, getRestedExpMultiplier(char));
   const prevLevel = char.level;
   char = addExp(char, expGained);
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
@@ -2477,7 +2664,7 @@ export function processMonsterDeath(
     const charIdForGrant = char.id;
     if (charIdForGrant) {
       void syncTalentSlotGrants(charIdForGrant, levelForGrant)
-        .then(sent => { if (sent > 0) return useMailboxStore.getState().refresh(); })
+        .then(sent => { if (sent > 0) return session.mailbox.getState().refresh(); })
         // 發信失敗不該打斷結算：下次載入角色會用累計數補回來
         .catch(() => {});
     }
@@ -2491,26 +2678,30 @@ export function processMonsterDeath(
   );
   const defeatedMonsterName = dead.name;
   const monsterIsBoss = dead.isBoss;
+  const killArea = options.killArea ?? { regionId: char.currentRegion, floor: char.currentFloor, areaId: char.currentArea };
   dropQueue = dropQueue.then(async () => {
-    const dropRegion = getRegion(char.currentRegion);
+    const dropRegion = getRegion(killArea.regionId);
     const dropHasFloors = dropRegion?.floors && dropRegion.floors.length > 0;
-    const dropAreaId = dropHasFloors && char.currentFloor != null
-      ? `${char.currentRegion}-${char.currentFloor}f`
-      : char.currentArea;
+    const dropAreaId = dropHasFloors && killArea.floor != null
+      ? `${killArea.regionId}-${killArea.floor}f`
+      : killArea.areaId;
     // Boss 掉落的區域等級也走 area id 解析：副本要取**該樓層**的等級，
     // 不是整座副本的（`27-drop-table.md` § 27.3 的掉落表本來就是逐層列的）
     const areaLevel = resolveArea(dropAreaId)?.levelMax ?? dropRegion?.levelMax ?? dead.level;
-    const drops = monsterIsBoss
-      ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult })
-      : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult }, false, dead.level);
+    const noDrops: Awaited<ReturnType<typeof rollDrops>> = { gold: 0, items: [] };
+    const drops = !withDrops
+      ? noDrops
+      : monsterIsBoss
+        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult })
+        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult }, false, dead.level);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
     // 天賦格只吃全域掉落倍率，不吃 `drop_rate` 與 Pressure（`27-drop-table.md` § 27.9）
-    const talentSlotTier = rollTalentSlotDrop(areaLevel, monsterIsBoss, DROP_RATE_MULTIPLIER);
+    const talentSlotTier = withDrops ? rollTalentSlotDrop(areaLevel, monsterIsBoss, rates.drop) : null;
     const talentLogs: string[] = [];
     if (char.id && talentSlotTier !== null) {
-      await db.talentSlots.add({
+      await session.repo.addTalentSlot({
         characterId: char.id,
         tier: talentSlotTier,
         assignedType: null,
@@ -2522,7 +2713,7 @@ export function processMonsterDeath(
       });
       talentLogs.push(`獲得天賦格（T${talentSlotTier}）`);
       // 掉落只寫 DB，天賦面板與背包分頁讀的是 store，不重載就要等下次載入角色才看得到
-      await useTalentStore.getState().load(char.id);
+      await session.talent.getState().load(char.id);
     }
 
     const state2 = get();
@@ -2635,23 +2826,23 @@ export function talentInitReady(): Promise<void> {
   return talentInitPromise;
 }
 
-function startTalentAndMailboxInit(characterId: number, level: number): void {
-  talentInitPromise = initTalentAndMailbox(characterId, level);
+function startTalentAndMailboxInit(characterId: number, level: number, session: Session): void {
+  talentInitPromise = initTalentAndMailbox(characterId, level, session);
 }
 
-async function initTalentAndMailbox(characterId: number, level: number): Promise<void> {
+async function initTalentAndMailbox(characterId: number, level: number, session: Session): Promise<void> {
   try {
     await purgeClaimedMailOnVersionChange(characterId, BUILD_INFO.version);
     await syncTalentSlotGrants(characterId, level);
     await syncCompensations(characterId, BUILD_INFO.version);
-    await useTalentStore.getState().grantStartingIfEmpty(characterId);
+    await session.talent.getState().grantStartingIfEmpty(characterId);
   } catch {
     // 發放失敗不可中斷載入，否則面板會停在空的
   }
 
   try {
-    await useTalentStore.getState().load(characterId);
-    await useMailboxStore.getState().load(characterId);
+    await session.talent.getState().load(characterId);
+    await session.mailbox.getState().load(characterId);
   } catch {
     // 背景初始化，失敗只是天賦格晚一點出現。測試關掉 DB 時最常見（DatabaseClosedError）
   }
@@ -2674,7 +2865,7 @@ function drinkPotion(
   if (getPotionCount(state.bagItems, potionType) <= 0) return;
 
   const bonuses = getAffixBonusesFromGear(allGear);
-  const baseHeal = Math.floor(Math.random() * (config.healMax - config.healMin + 1)) + config.healMin;
+  const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
   const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
   const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
   set({
@@ -2719,18 +2910,18 @@ function useConsumableById(get: () => GameState, itemId: number): void {
 let saveQueue: Promise<void> = Promise.resolve();
 
 /** 存檔唯一入口，不可直接呼叫 `writeSave()`。串成佇列使寫入順序等於呼叫順序 */
-function saveGame(state: GameState): Promise<void> {
-  const mapPos = useMapControlStore.getState().playerPosition;
-  const mine = saveQueue.then(() => writeSave(state, mapPos));
+function saveGame(state: GameState, session: Session): Promise<void> {
+  const mapPos = session.mapControl.getState().playerPosition;
+  const mine = saveQueue.then(() => writeSave(state, mapPos, session));
   saveQueue = mine.catch(() => {});
   return mine;
 }
 
-async function writeSave(state: GameState, mapPos: { x: number; y: number }) {
+async function writeSave(state: GameState, mapPos: { x: number; y: number }, session: Session) {
   const char = state.character;
   if (!char || !char.id) return;
 
-  await db.characters.update(char.id, {
+  await session.repo.updateCharacter(char.id, {
     level: char.level,
     exp: char.exp,
     expToNext: char.expToNext,
@@ -2757,59 +2948,45 @@ async function writeSave(state: GameState, mapPos: { x: number; y: number }) {
   });
 
   // Save bag items (all items including potions)
-  await db.characterBag.where('characterId').equals(char.id).delete();
   const bagEntries: CharacterBagEntry[] = [];
   for (const item of state.bagItems) {
     if (item.amount > 0) {
       bagEntries.push({ characterId: char.id, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount });
     }
   }
-  if (bagEntries.length > 0) {
-    await db.characterBag.bulkAdd(bagEntries);
-  }
+  await session.repo.replaceBag(char.id, bagEntries);
 
   // Save shared warehouse (account-level storage)
   const userId = state.userId;
   if (userId) {
-    await db.warehouses.where('userId').equals(userId)
-      .filter(row => !row.storageType || row.storageType === 'shared')
-      .delete();
     const warehouseEntries: WarehouseEntry[] = [];
     for (const item of state.storedMaterials) {
       if (item.amount > 0) {
         warehouseEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'shared' });
       }
     }
-    if (warehouseEntries.length > 0) {
-      await db.warehouses.bulkAdd(warehouseEntries);
-    }
+    await session.repo.replaceSharedWarehouse(userId, warehouseEntries);
     // 金幣走獨立表：以 userId 為主鍵 put，不需要先刪再寫（§ 18.7）。
     // 餘額為 0 也要寫。
-    await db.warehouseGold.put({ userId, amount: state.warehouseGold });
+    await session.repo.putWarehouseGold(userId, state.warehouseGold);
   }
 
   // Save personal warehouse (character-level storage)
   if (userId) {
-    await db.warehouses.where('characterId').equals(char.id)
-      .filter(row => row.storageType === 'personal')
-      .delete();
     const personalEntries: WarehouseEntry[] = [];
     for (const item of state.personalStoredMaterials) {
       if (item.amount > 0) {
         personalEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'personal', characterId: char.id });
       }
     }
-    if (personalEntries.length > 0) {
-      await db.warehouses.bulkAdd(personalEntries);
-    }
+    await session.repo.replacePersonalWarehouse(char.id, personalEntries);
   }
 
   // Save script rules + quick slots to localStorage
-  saveLocalPreferences(char.id, state);
+  saveLocalPreferences(char.id, state, session);
 }
 
-function saveLocalPreferences(characterId: number, state: GameState) {
-  const key = `mayana_prefs_${characterId}`;
+function saveLocalPreferences(characterId: number, state: GameState, session: Session) {
   const data = {
     scriptRules: state.scriptRules,
     scriptTemplates: state.scriptTemplates,
@@ -2826,18 +3003,17 @@ function saveLocalPreferences(characterId: number, state: GameState) {
     craftQuests: state.craftQuests,
     statistics: state.statistics,
   };
-  localStorage.setItem(key, JSON.stringify(data));
+  void session.repo.putCharacterPrefs(characterId, data);
 }
 
-function saveBagLayout(characterId: number, slotMap: BagSlotMap) {
-  localStorage.setItem(bagLayoutStorageKey(characterId), JSON.stringify(slotMap));
+function saveBagLayout(characterId: number, slotMap: BagSlotMap, session: Session) {
+  void session.repo.putBagLayout(characterId, slotMap);
 }
 
-function loadBagLayout(characterId: number): BagSlotMap {
-  const raw = localStorage.getItem(bagLayoutStorageKey(characterId));
-  if (!raw) return {};
+async function loadBagLayout(characterId: number, session: Session): Promise<BagSlotMap> {
+  const data = await session.repo.getBagLayout(characterId);
+  if (!data) return {};
   try {
-    const data = JSON.parse(raw);
     if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
     const next: BagSlotMap = {};
     for (const [id, idx] of Object.entries(data)) {
@@ -2888,12 +3064,10 @@ function wrapLegacyScriptsAsTemplate(data: any): ScriptTemplate[] {
   }];
 }
 
-function loadLocalPreferences(characterId: number): LoadedPreferences | null {
-  const key = `mayana_prefs_${characterId}`;
-  const raw = localStorage.getItem(key);
-  if (!raw) return null;
+async function loadLocalPreferences(characterId: number, session: Session): Promise<LoadedPreferences | null> {
+  const data = (await session.repo.getCharacterPrefs(characterId)) as any;
+  if (!data) return null;
   try {
-    const data = JSON.parse(raw);
     /**
      * 腳本一律走 normalize：認不得的舊格式**整份重置成預設**，不做欄位轉換。
      * 腳本以外的欄位（快捷列、統計、公會、冒險者／工藝任務）照常讀回來 ——

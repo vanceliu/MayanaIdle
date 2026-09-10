@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
 import { useGameStore, type BagItem } from '../gameStore';
 
 import { getItemId } from '../../models/items';

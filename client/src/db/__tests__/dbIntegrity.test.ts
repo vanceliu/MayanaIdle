@@ -1,7 +1,6 @@
+import { EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../../db/seed';
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../database';
-import { seedDatabase, resetSeedState, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache, resolveEquipment } from '../../systems/templateSync';
 import { getItemById } from '../../models/items';
 import { ITEM_DEFINITIONS } from '../seed/itemSeeds';
@@ -12,10 +11,7 @@ import { getItemId } from '../../models/items';
  */
 describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
   beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    resetSeedState();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
   });
 
@@ -208,9 +204,6 @@ describe('DB 完整性驗證 — 角色/裝備/掉落對應', () => {
         ownerId: 1,
         equipped: true,
       } as any);
-
-      resetSeedState();
-      await seedDatabase();
       await loadTemplateCache();
 
       const instances = await db.equipmentInstances.toArray();

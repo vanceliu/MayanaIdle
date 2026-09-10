@@ -1,4 +1,5 @@
-import { db } from '../db/database';
+import type { GameRepository } from '../db/repository';
+import { defaultSession } from '../stores/session';
 import type { EquipmentInstance } from '../models/equipment';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 import { isWeaponSlot } from '../models/equipment';
@@ -9,7 +10,7 @@ import type { AffixCategory } from '../models/affix';
 import { resolveArea } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
 import { getItemById } from '../models/items';
-import { DROP_RATE_MULTIPLIER } from '../config';
+import { rates } from '../core/rates';
 import { settleGoldDrop } from './globalRates';
 
 export interface DropResult {
@@ -18,6 +19,7 @@ export interface DropResult {
 }
 
 import { mapItemCategoryToBagType as mapItemCategoryToInventoryType } from '../models/bagItem';
+import { random } from '../core/rng';
 type InventoryItemType = 'material' | 'potion' | 'scroll' | 'spellbook';
 
 export interface DroppedItem {
@@ -34,7 +36,7 @@ export interface DroppedItem {
 }
 
 function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(random() * (max - min + 1)) + min;
 }
 
 export interface DropBonuses {
@@ -50,7 +52,7 @@ export interface DropBonuses {
 export const DROP_ROLL_MAX = 1000;
 
 function getDropRateMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.drop_rate ?? 0) / 100) * DROP_RATE_MULTIPLIER * (bonuses?.pressure_mult ?? 1);
+  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1);
 }
 
 /** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率與 500 上限在 `settleGoldDrop` */
@@ -69,7 +71,7 @@ export function pickEquipmentCategory<T extends { slot: string }>(candidates: T[
   const armors = candidates.filter(t => !isWeaponSlot(t.slot as any));
   if (weapons.length === 0) return armors;
   if (armors.length === 0) return weapons;
-  return Math.random() < 0.5 ? weapons : armors;
+  return random() < 0.5 ? weapons : armors;
 }
 
 /**
@@ -89,8 +91,8 @@ export function scaleDropValue(
   return Math.min(max, Math.floor(base + (max - base) * progress));
 }
 
-export async function rollBossDrops(bossName: string, ownerId: number, areaLevel: number, bonuses?: DropBonuses): Promise<DropResult> {
-  const entries = await db.bossDropTables.where('bossName').equals(bossName).toArray();
+export async function rollBossDrops(bossName: string, ownerId: number, areaLevel: number, bonuses?: DropBonuses, repo: GameRepository = defaultSession.repo): Promise<DropResult> {
+  const entries = await repo.listBossDropTable(bossName);
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
@@ -107,18 +109,16 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       const tierKey = entry.tier ?? 4;
       if (rolledTiers.has(tierKey)) continue;
       rolledTiers.add(tierKey);
-      const roll = Math.random() * DROP_ROLL_MAX;
+      const roll = random() * DROP_ROLL_MAX;
       const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
       if (roll >= boostedDropValue) continue;
-      const pickWeapon = Math.random() < 0.5;
+      const pickWeapon = random() < 0.5;
       // `06-equipment-acquire.md` § 6A.1：掉落池以裝備階級 tier 比對（取代舊的 craftTier）
       const tier = entry.tier ?? 4;
-      const candidates = await db.equipmentTemplates
-        .filter(t => t.tier === tier && t.acquireType !== 'starter'
-          && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)))
-        .toArray();
+      const candidates = await repo.findEquipmentTemplates(t => t.tier === tier && t.acquireType !== 'starter'
+          && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)));
       if (candidates.length === 0) continue;
-      const template = candidates[Math.floor(Math.random() * candidates.length)];
+      const template = candidates[Math.floor(random() * candidates.length)];
       const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
       const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
         weaponBaseDamage: getWeaponBaseDamage(template),
@@ -133,9 +133,9 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         ownerId,
         equipped: false,
       };
-      const id = await db.equipmentInstances.add(dbRecord as any);
+      const id = await repo.addEquipment(dbRecord as any);
       const instance: EquipmentInstance = resolveEquipment({
-        id: id as number,
+        id,
         templateId: template.id!,
         name: template.name,
         type: template.type,
@@ -158,7 +158,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       continue;
     }
 
-    const roll = Math.random() * DROP_ROLL_MAX;
+    const roll = random() * DROP_ROLL_MAX;
     const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
     if (roll >= boostedDropValue) continue;
 
@@ -167,7 +167,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       gold += settleGoldDrop(baseGold, goldAffixMultiplier);
     } else if (entry.itemType === 'equipment') {
       const template = entry.equipmentTemplateId
-        ? await db.equipmentTemplates.get(entry.equipmentTemplateId)
+        ? await repo.getEquipmentTemplate(entry.equipmentTemplateId)
         : undefined;
       if (template) {
         const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
@@ -184,9 +184,9 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           ownerId,
           equipped: false,
         };
-        const id = await db.equipmentInstances.add(dbRecord as any);
+        const id = await repo.addEquipment(dbRecord as any);
         const instance: EquipmentInstance = resolveEquipment({
-          id: id as number,
+          id,
           templateId: template.id!,
           name: template.name,
           type: template.type,
@@ -234,8 +234,8 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   return { gold, items };
 }
 
-export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropBonuses, isBoss: boolean = false, monsterLevel?: number): Promise<DropResult> {
-  const entries = await db.dropTables.where('area').equals(areaId).toArray();
+export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropBonuses, isBoss: boolean = false, monsterLevel?: number, repo: GameRepository = defaultSession.repo): Promise<DropResult> {
+  const entries = await repo.listDropTable(areaId);
   // 副本樓層的 area id 是 `<regionId>-<floor>f`，不是 region id ——
   // 一律走 `resolveArea`，直接 `getRegion(areaId)` 會讓整座副本的區域等級退化成 1
   const area = resolveArea(areaId);
@@ -263,7 +263,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
         );
       }
     }
-    const roll = Math.random() * DROP_ROLL_MAX;
+    const roll = random() * DROP_ROLL_MAX;
     const boostedDropValue = Math.min(effectiveDropValue * dropRateMultiplier, DROP_ROLL_MAX);
     if (roll >= boostedDropValue) continue;
 
@@ -274,22 +274,20 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       let template;
       if (entry.equipmentPool) {
         const pool = entry.equipmentPool;
-        const candidates = await db.equipmentTemplates
-          .filter(t => {
+        const candidates = await repo.findEquipmentTemplates(t => {
             // `06-equipment-acquire.md` § 6A.1：掉落池以裝備階級 tier 比對。tier 已隱含取得管道
             // （T1~T3 = 商店可買、T4~T7 = 鐵匠製作），不需再比 acquireType。
             if (entry.tier != null && t.tier !== entry.tier) return false;
             if (pool === 'weapon') return isWeaponSlot(t.slot);
             if (pool === 'armor') return !isWeaponSlot(t.slot);
             return true;
-          })
-          .toArray();
+          });
         const finalists = pool === 'all' ? pickEquipmentCategory(candidates) : candidates;
         if (finalists.length > 0) {
-          template = finalists[Math.floor(Math.random() * finalists.length)];
+          template = finalists[Math.floor(random() * finalists.length)];
         }
       } else if (entry.equipmentTemplateId) {
-        template = await db.equipmentTemplates.get(entry.equipmentTemplateId);
+        template = await repo.getEquipmentTemplate(entry.equipmentTemplateId);
       }
       if (template) {
         const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
@@ -306,9 +304,9 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
           ownerId,
           equipped: false,
         };
-        const id = await db.equipmentInstances.add(dbRecord as any);
+        const id = await repo.addEquipment(dbRecord as any);
         const instance: EquipmentInstance = resolveEquipment({
-          id: id as number,
+          id,
           templateId: template.id!,
           name: template.name,
           type: template.type,

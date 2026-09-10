@@ -2,6 +2,7 @@ import type { Affix } from './affix';
 import { collectAffixAttributes } from './affix';
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS } from './attributes';
+import { random } from '../core/rng';
 
 export type EquipSlot =
   | 'rightHand'
@@ -311,12 +312,12 @@ export interface EquipmentInstance {
 
 /** 防具隨機額外防禦：實例生成時抽 0／1／2，均等（§ 6A.8.8） */
 export function rollDefenseBonus(): number {
-  return DEFENSE_BONUS_MIN + Math.floor(Math.random() * (DEFENSE_BONUS_MAX - DEFENSE_BONUS_MIN + 1));
+  return DEFENSE_BONUS_MIN + Math.floor(random() * (DEFENSE_BONUS_MAX - DEFENSE_BONUS_MIN + 1));
 }
 
 /** 防具安定值：實例生成時抽 4／5／6，均等（§ 6.10） */
 export function rollArmorStability(): number {
-  return ARMOR_STABILITY_MIN + Math.floor(Math.random() * (ARMOR_STABILITY_MAX - ARMOR_STABILITY_MIN + 1));
+  return ARMOR_STABILITY_MIN + Math.floor(random() * (ARMOR_STABILITY_MAX - ARMOR_STABILITY_MIN + 1));
 }
 
 /**

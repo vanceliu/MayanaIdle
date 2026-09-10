@@ -1,5 +1,6 @@
 import type { Attributes, Character } from '../models/character';
 import { ATTRIBUTE_CAP, getTotalAttributes, LEVELUP_ATTRIBUTE_START_LEVEL } from '../models/character';
+import { random } from '../core/rng';
 
 const ATTR_KEYS: (keyof Attributes)[] = ['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'];
 
@@ -9,7 +10,7 @@ function isAllAttributesCapped(attrs: Attributes): boolean {
 }
 
 function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(random() * (max - min + 1)) + min;
 }
 
 export const INITIAL_HP = 30;

@@ -98,7 +98,7 @@ function setup(
     autoMove: true,
     moveSpeed: 2,
   });
-  useMapMonsterStore.setState({ monsters, paused: false, combatMonsterIds: [], maxMonsters: 3 });
+  useMapMonsterStore.setState({ monsters, combatMonsterIds: [], maxMonsters: 3 });
 }
 
 describe('近戰落腳格判定', () => {

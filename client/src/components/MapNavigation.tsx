@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { usePartyStore } from '../stores/partyStore';
+import { useOnlineStore } from '../net/online';
 import { ZONES, getRegionsByZone, getRegion } from '../models/mapData';
 import { isRegionUnlockEnabled } from '../systems/devFlags';
 import type { Region } from '../models/area';
@@ -11,6 +13,9 @@ export function MapNavigation() {
   const phase = useGameStore(s => s.phase);
   const navigateTo = useGameStore(s => s.navigateTo);
   const bagItems = useGameStore(s => s.bagItems);
+  const online = useOnlineStore(s => s.enabled);
+  // 名單不含自己，人數要含（`97-selfhosted-server.md` § 97.7.1）
+  const onMapCount = usePartyStore(s => s.onMap.length) + 1;
   const [open, setOpen] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
@@ -211,6 +216,7 @@ export function MapNavigation() {
         }}
       >
         <span className="map-selector-label">目前: {locationLabel}{floorLabel}</span>
+        {online && <span className="map-selector-count">{onMapCount} 人</span>}
         <span className="map-selector-arrow">{open ? '▲' : '▼'}</span>
       </button>
       {open && (

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { useTownStore } from '../stores/townStore';
+import { useOnlineStore } from '../net/online';
 import {
   CLASS_BASE_ATTRIBUTES,
   CLASS_NAMES_ZH,
@@ -36,6 +37,8 @@ export function CharacterCreate() {
   const [appearance, setAppearance] = useState<Appearance>(createDefaultAppearance);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // 線上模式的建角失敗（例如名稱被用掉）由 server 回，走連線狀態的錯誤欄
+  const onlineError = useOnlineStore(s => s.error);
 
   const baseAttrs = CLASS_BASE_ATTRIBUTES[selectedClass];
   const maxPoints = getAvailablePoints(selectedClass);
@@ -65,14 +68,16 @@ export function CharacterCreate() {
   }
 
   /**
-   * 建立角色是**純本機行為**（§ 19.4）：名稱不要求唯一，也沒有要註冊的東西，
-   * 因此離線也建得起來。uuid 與寫入密鑰都在 store 內產生。
+   * 單機是純本機行為，離線也建得起來；線上模式由 server 建立並檢查名稱唯一性
+   * （`19-account-character.md` § 19.4）。被拒絕時錯誤走 `useOnlineStore.error`，
+   * 因為 `create_character` 是一則訊息而不是等回覆的 RPC。
    */
   async function handleCreate() {
     if (!trimmedName || localNameError || submitting) return;
 
     setSubmitting(true);
     setSubmitError('');
+    useOnlineStore.setState({ error: null });
     try {
       await createCharacter(trimmedName, selectedClass, bonus, appearance);
       // 新角色一律出生在薄暮村（中立城鎮），直接把新手指導員開起來 ——
@@ -170,7 +175,7 @@ export function CharacterCreate() {
         </div>
       </div>
 
-      {submitError && <div className="create-error">{submitError}</div>}
+      {(submitError || onlineError) && <div className="create-error">{submitError || onlineError}</div>}
 
       <button className="btn-primary" onClick={handleCreate} disabled={!canSubmit}>
         {submitting ? '驗證名稱中...' : remaining > 0 ? `還有 ${remaining} 點未分配` : '開始冒險'}

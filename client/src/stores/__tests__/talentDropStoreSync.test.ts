@@ -6,9 +6,7 @@
  * 而戰鬥日誌已經寫了「獲得天賦格」，看起來就像掉落被吃掉了。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import type { DropResult } from '../../systems/drops';
 import { createDefaultStatistics } from '../../models/statistics';
 
@@ -95,10 +93,7 @@ async function killBoss() {
 
 describe('天賦掉落與 store 同步', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     rollDropsMock.mockReset();
     useGameStore.setState({

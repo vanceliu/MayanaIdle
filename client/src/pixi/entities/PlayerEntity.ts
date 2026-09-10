@@ -10,6 +10,8 @@ import { HitReaction } from './hitReaction';
 
 /** 地面標記沿用原本圓點的藍 —— 剪影本身沒有敵我資訊，那個區分不能消失 */
 const PLAYER_MARKER = 0x4dabf7;
+/** 隊友的地面標記（§ 97.7.1 只渲染自己與隊友）：綠色，與自己的藍區分 */
+export const TEAMMATE_MARKER = 0x51cf66;
 
 /**
  * 玩家：RimWorld 式無腳剪影（`04-character.md` § 4.10）。
@@ -21,10 +23,10 @@ export class PlayerEntity {
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
   private readonly hitReaction = new HitReaction();
 
-  constructor(appearance: Appearance = createDefaultAppearance()) {
+  constructor(appearance: Appearance = createDefaultAppearance(), marker: number = PLAYER_MARKER) {
     this.container = new Container();
     /* 舊角色的 appearance 可能少欄位，一律收乾淨再用 —— 缺欄位會畫成 undefined 色 */
-    this.pawn = new PawnSprite(toPawnLook(normalizeAppearance(appearance)), PLAYER_MARKER);
+    this.pawn = new PawnSprite(toPawnLook(normalizeAppearance(appearance)), marker);
     this.container.addChild(this.pawn.container);
   }
 

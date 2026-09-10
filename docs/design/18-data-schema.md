@@ -35,14 +35,13 @@
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
-| id | number (PK) | 本機 IndexedDB 自增值，**僅本機有效** |
-| uuid | string | 全球唯一識別碼（`crypto.randomUUID()`），跨裝置／跨玩家的唯一 key |
+| id | number (PK) | server SQLite 自增值，只在 server 內部使用 |
+| uuid | string | 公開識別碼，server 建立角色時產生 |
 | name | string | 角色名稱，**不要求唯一**（格式規則見 `19-account-character.md` § 19.4） |
-| authToken | string | 該角色的排行榜寫入密鑰（`crypto.randomUUID()`），**機密**，伺服端只存 SHA-256 |
+| seasonId | number | 賽季編號，首版固定 0（`97-selfhosted-server.md` § 97.10） |
+| pool | string | 角色池，首版固定 `standard` |
 
-> **不可用 `id` 當作對外識別**：`id` 是每個瀏覽器各自的自增值，所有玩家的第一隻角色都是 `1`。
-> 任何送往伺服端的角色識別（排行榜、未來的線上化）一律使用 `uuid`。
-> `uuid` 於 DB version 12 導入，既有角色在 upgrade 時補發。
+> 送往 client 的角色識別一律使用 `uuid`，不送 `id`。
 
 ### 背包／倉庫的鍵
 
@@ -56,12 +55,9 @@
 | type | string | 背包分頁，同樣由 seed 的 `category` 反查決定 |
 | amount | number | 數量 |
 
-> **不可用名字查背包**（禁用 `characterBag.where({ name })`）——
-> 道具一改名，玩家 IndexedDB 裡的舊名就再也對不上，那批存量等於消失，
-> 每次改名都得補一版 Dexie 遷移（v14 就是這樣來的）。
+> **不可用名字查背包**（禁用以 `name` 為條件的查詢）——
+> 道具一改名，存檔裡的舊名就再也對不上，那批存量等於消失。
 > 詳細規則見 `99-ai-constraints.md` § 99.1。
->
-> Dexie v15 完成鍵的轉換：**只有名稱、沒有 id 的舊列一律廢棄**，不做名稱回填。
 
 同一條分界也適用於**設定表指涉道具**：卷軸、狀態解除道具、印記、技能書、
 裝備配方材料（`craftMaterials`）、冒險者工會獎勵一律存 id，顯示名由 id 反查。
@@ -127,7 +123,7 @@ baseValue × (1 + qualityPercent / 100)
 
 ### 持久層（DB）
 
-儲存位置：IndexedDB（單機模式）/ PostgreSQL（線上模式）
+儲存位置：server SQLite（`97-selfhosted-server.md` § 97.4）
 
 必須持久化的資料，關閉瀏覽器或斷線後不可遺失：
 
@@ -153,20 +149,27 @@ baseValue × (1 + qualityPercent / 100)
 | 搜尋模式 | 自動 / 手動 |
 | UI 狀態 | 面板開關、分頁選擇 |
 
-### 前端持久化（localStorage / IndexedDB，不走後端）
-
-關閉瀏覽器後保留，但屬於玩家操作偏好，線上模式不需伺服器驗證：
+### 角色偏好（server SQLite，綁角色）
 
 | 資料 | 說明 |
 |---|---|
-| 天賦配置 | 天賦格列表 — 自動戰鬥的條件/動作（見 § 18.9） |
+| 天賦配置 | 天賦格列表 — 自動戰鬥的條件/動作（見 § 18.9）；server 執行，必須在 server |
 | 快捷欄配置 | QuickSlot 綁定 |
+| 背包格子排列（slotMap） | `35-inventory-constraints.md` § 35.17 |
+
+### 瀏覽器 localStorage（純 client）
+
+| 資料 | 說明 |
+|---|---|
+| UI 縮放、面板位置、公告已讀 | 與帳號無關的裝置偏好 |
+| 模板快取 | `97-selfhosted-server.md` § 97.4 |
 
 ### 分層原則
 
-1. **會影響遊戲公平性的資料** → 必須存 DB（線上模式由 Server 驗證）
-2. **玩家操作偏好** → 前端持久化即可，不需伺服器介入
-3. **純即時/暫態資料** → 僅存 Zustand，不持久化
+1. **會影響遊戲判定的資料** → server SQLite，由 server 執行與驗證
+2. **綁角色的操作偏好** → server SQLite，跟著角色走
+3. **裝置偏好與快取** → localStorage
+4. **純即時/暫態資料** → 僅存 Zustand，不持久化
 
 ---
 
@@ -175,6 +178,10 @@ baseValue × (1 + qualityPercent / 100)
 ### User（帳號）
 
 - id
+- username（唯一）
+- passwordHash（argon2id，`97-selfhosted-server.md` § 97.5）
+- isAdmin
+- bannedUntil（null ＝ 未封鎖；永久封鎖為遠期值）
 - createdAt
 
 ### Character（角色）
@@ -189,25 +196,21 @@ baseValue × (1 + qualityPercent / 100)
 - 屬性點分配
 - 當前位置
 - appearance（外觀，見下）
+- seasonId、pool（§ 18.1）
+- talentSlotGrants、sentMailKeys（§ 18.10）
+- restedExpMs、lastSeenAt（§ 18.11）
 - createdAt
 
 ### appearance（角色外觀）
 
-外觀存在 **`characters` 列上的 `appearance` 欄位**，不另立資料表 ——
-匯出是整列打包，存在角色列上才會自動跟著走。
+外觀存在 **`characters` 列上的 `appearance` 欄位**，不另立資料表。
 
 內容的規格（髮型清單、可調範圍、色票）在 `04-character.md` § 4.10，這裡只講落點。
 
 | 落點 | 要做什麼 |
 |---|---|
-| `db/database.ts` migrate | 新版 `.upgrade()` 內 `modify` 為既有角色補上預設外觀 |
-| `systems/characterTransfer.ts` 匯出 | 整列打包，**自動帶走**，不需改 |
-| `systems/characterTransfer.ts` 匯入 | **必須手動加**：那裡是逐欄位 `db.characters.update({...})`，漏列的欄位會靜默消失 |
-| `systems/legacyArchive.ts` 快照 | `character: {...}` 只存部分欄位，遺產角色要顯示外觀就得加（見 `45-legacy-archive.md` § 45.2） |
-| 舊匯出檔 | 沒有 `appearance` 時退回預設，**不可拋錯** |
-
-> 匯入那一列是最容易漏的：匯出會自動帶走，所以測試「匯出→看檔案」會過，
-> 但「匯出→匯入→開角色」時外觀已經沒了，而且**不會有任何錯誤訊息**。
+| server 遷移 | 缺 `appearance` 的角色補預設值 |
+| server → client 角色資料 | 整列含 `appearance` 送出；缺值退回預設，**不可拋錯** |
 
 ### 關係規則
 
@@ -217,7 +220,7 @@ baseValue × (1 + qualityPercent / 100)
 - 金幣存於 Character，各角色獨立；倉庫另有獨立金幣存放欄位供跨角色轉移
 - 共用倉庫金幣**不與物品同表**：實作為獨立的 `warehouseGold`（主鍵 `userId`，一帳號一列）。
   金幣是餘額不是物品 —— 不佔格數、不計重量、沒有 `itemTemplateId`，
-  且線上化後需要「不可為負」的原子扣減（`98-online-architecture.md` § 4）
+  且需要「不可為負」的原子扣減（交易前強制 flush，`97-selfhosted-server.md` § 97.4）
 
 ---
 
@@ -240,7 +243,7 @@ baseValue × (1 + qualityPercent / 100)
 
 武器、防具、盾牌、魔導書、飾品共用單一 `equipment_templates` 表，
 以 `type` + `slot` 欄位區分類型，各類型差異以 nullable 欄位承載。
-線上化後維持同一設計：Prisma 單一 model + enum，不做 polymorphic relation。
+server 端維持同一設計：單一資料表 + 型別欄位，不做 polymorphic relation。
 
 ### equipment_templates 欄位
 
@@ -386,5 +389,28 @@ seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**�
 | `lastSeenAt` | 上次在線時間戳。上線時以 `now - lastSeenAt` 換算離線時長 |
 
 - `lastSeenAt` 在遊戲迴圈中定期寫入，離線時長取兩次寫入的差值
-- 兩個欄位都隨角色匯出／匯入（§ 18.7），**不進遺產快照**（`45-legacy-archive.md`）
+- 兩個欄位存於 `characters` 列（§ 18.7）
 - 舊角色以 `restedExpMs = 0`、`lastSeenAt = 上線當下` 補齊，不追溯發放
+
+## 18.12 server 端資料表（`97-selfhosted-server.md`）
+
+SQLite（WAL）。靜態模板隨程式碼發布，不進資料庫（§ 18.8）。
+
+| 資料表 | 鍵 | 內容 |
+|---|---|---|
+| `users` | `id` | § 18.7 User。**沒有管理員欄位** —— 管理介面憑證在 `server.properties`（`97-selfhosted-server.md` § 97.8） |
+| `sessions` | `token` | `userId`、`createdAt`、`expiresAt`；登出即刪 |
+| `characters` | `id`、`uuid` 唯一、`nameKey` 唯一 | § 18.7 Character，含 `seasonId`、`pool`、統計欄位（`37-statistics.md` § 37.2）。`nameKey` 為名稱正規化後的比對鍵（`19-account-character.md` § 19.4） |
+| `equipment_instances` | `id` | § 18.3，`ownerId` 指向角色或帳號（共用倉庫） |
+| `character_bag`、`character_storage` | `id` | § 18.1 背包／倉庫的鍵 |
+| `warehouses`、`warehouse_gold` | `id`／`userId` | § 18.7 共用倉庫 |
+| `talent_slots` | `id` | § 18.9 天賦格實例 |
+| `talent_configs` | `characterId` | § 18.9 天賦配置 |
+| `quick_slots` | `characterId` | 快捷欄 |
+| `bag_layouts` | `characterId` | `35-inventory-constraints.md` § 35.17 slotMap |
+| `mailbox` | `id` | § 18.10 |
+| `server_meta` | `key` | 世界層級的固定資訊，目前只有 `mode`（單機／開放，`97-selfhosted-server.md` § 97.1） |
+| `schema_version` | — | 遷移版本（`97-selfhosted-server.md` § 97.4） |
+
+- 隊伍、地圖實例、怪物、Pressure 為 server 記憶體狀態，不持久化；server 重啟即消失
+- 聊天訊息是否持久化未定（`97-selfhosted-server.md` § 97.10）

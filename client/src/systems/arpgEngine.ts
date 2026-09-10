@@ -29,6 +29,7 @@ import { isNonAttackAction } from '../models/scriptEngine';
 import { canUseSkill } from '../models/skill';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
 import { isPlayerStunned } from './playerDebuffSystem';
+import { gameNow } from '../core/clock';
 
 export interface ArpgMonster {
   instance: MonsterInstance;
@@ -115,6 +116,8 @@ export interface ArpgTickInput {
   effectiveMaxHp?: number;
   weightPercent?: number;
   hpHistory?: HpSample[];
+  /** 多人實例：怪物 FSM 由實例層以 `tickMonsterEngines` 推進，這裡只跑玩家 */
+  skipMonsters?: boolean;
 }
 
 export interface PlayerAttackEvent {
@@ -128,6 +131,8 @@ export interface PlayerAttackEvent {
 export interface MonsterAttackEvent {
   type: 'monster_attack';
   monsterId: string;
+  /** 被攻擊的成員（`97-selfhosted-server.md` § 97.7.1）；省略＝單機的唯一玩家 */
+  targetMemberId?: number;
   attackType?: MonsterAttackType;
   projectileSpeed?: number;
   /** 詠唱攻擊的傷害倍率（`25-monster-system.md` § 25.11）。瞬發攻擊不帶 */
@@ -189,7 +194,7 @@ export function tickArpgEngine(
    * 走到定位才發現要放的是另一招。
    */
   const manualSkill = resolveManualAttackSkill(
-    engine.manualSkillId, skills, character.mp, Date.now(), cooldownReduction, weaponType,
+    engine.manualSkillId, skills, character.mp, gameNow(), cooldownReduction, weaponType,
   );
 
   let hasExecutableAction = true;
@@ -198,7 +203,7 @@ export function tickArpgEngine(
       character,
       monsters: aliveForScript,
       skills,
-      now: Date.now(),
+      now: gameNow(),
       cooldownReduction,
       weaponType,
       playerPos,
@@ -265,7 +270,7 @@ export function tickArpgEngine(
       character,
       monsters: buildScriptMonsters(engine),
       skills,
-      now: Date.now(),
+      now: gameNow(),
       cooldownReduction,
       weaponType,
       playerPos,
@@ -353,7 +358,45 @@ export function tickArpgEngine(
     }
   }
 
-  // Tick each monster FSM
+  if (input.skipMonsters) return events;
+
+  // 單機：所有怪的目標都是這一位玩家
+  events.push(...tickMonsterEngines(engine, map, deltaMs, id => ({
+    memberId: 0,
+    position: playerPos,
+    stunned: isMonsterStunned(activeEffects, id),
+    slowPercent: getMonsterDebuffModifierById(activeEffects, id, 'attack_speed'),
+  })));
+
+  return events;
+}
+
+/** 怪物這個 tick 的目標與身上的控場（多人時由實例層彙整全體成員的效果） */
+export interface MonsterTargetInfo {
+  memberId: number;
+  position: Position;
+  stunned: boolean;
+  /** 攻速 debuff 百分比（負值減速） */
+  slowPercent: number;
+}
+
+export function isMonsterStunned(activeEffects: ActiveEffect[], monsterId: string): boolean {
+  return activeEffects.some(
+    e => e.type === 'debuff' && e.target === 'monster' && e.stun && e.targetMonsterId === monsterId,
+  );
+}
+
+/**
+ * 逐隻推進怪物 FSM，每隻對自己的目標成員判定（§ 97.7.1）。
+ * `targetOf` 回 null ＝ 沒有可攻擊的對象，這隻怪本 tick 不動。
+ */
+export function tickMonsterEngines(
+  engine: Pick<ArpgEngineState, 'monsters'>,
+  map: MapData,
+  deltaMs: number,
+  targetOf: (monsterId: string, monster: ArpgMonster) => MonsterTargetInfo | null,
+): MonsterAttackEvent[] {
+  const events: MonsterAttackEvent[] = [];
   for (const [id, arpgMonster] of engine.monsters) {
     if (arpgMonster.instance.currentHp <= 0) continue;
     /*
@@ -363,18 +406,15 @@ export function tickArpgEngine(
      */
     if (arpgMonster.instance.isTrainingDummy) continue;
 
-    // Check if this monster is stunned
-    const isStunned = activeEffects.some(
-      e => e.type === 'debuff' && e.target === 'monster' && e.stun && e.targetMonsterId === id
-    );
+    const target = targetOf(id, arpgMonster);
+    if (!target) continue;
 
     // 減速 debuff：攻速百分比換算為攻擊間隔（冰系魔法）
-    const slowPercent = getMonsterDebuffModifierById(activeEffects, id, 'attack_speed');
-    const attackConfigForTick = slowPercent !== 0
+    const attackConfigForTick = target.slowPercent !== 0
       ? {
           ...arpgMonster.attackConfig,
           attackInterval: Math.floor(
-            arpgMonster.attackConfig.attackInterval / Math.max(0.1, 1 + slowPercent / 100)
+            arpgMonster.attackConfig.attackInterval / Math.max(0.1, 1 + target.slowPercent / 100)
           ),
         }
       : arpgMonster.attackConfig;
@@ -382,29 +422,29 @@ export function tickArpgEngine(
     const result = tickMonsterCombat(
       arpgMonster.combatCtx,
       arpgMonster.mapMonster.position,
-      playerPos,
+      target.position,
       attackConfigForTick,
       map,
       deltaMs,
-      isStunned,
+      target.stunned,
     );
 
     if (result.action === 'attack') {
       events.push({
         type: 'monster_attack',
         monsterId: id,
+        targetMemberId: target.memberId,
         attackType: arpgMonster.attackConfig.attackType,
         projectileSpeed: arpgMonster.instance.projectileSpeed,
         damageMultiplier: result.damageMultiplier,
       });
     }
   }
-
   return events;
 }
 
-function syncMonsterContexts(
-  engine: ArpgEngineState,
+export function syncMonsterContexts(
+  engine: Pick<ArpgEngineState, 'monsters'>,
   mapMonsters: MapMonster[],
   monsterInstances: Map<string, MonsterInstance>,
 ): void {
@@ -485,7 +525,7 @@ function applyNonAttackAction(
   playerPos: Position,
   activeEffects: ActiveEffect[],
 ): void {
-  const now = Date.now();
+  const now = gameNow();
 
   if (action.type === 'lock_target') {
     // 鎖定：把當下的目標釘住，FSM 不再改挑最近的一隻

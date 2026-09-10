@@ -6,7 +6,8 @@
  * 購物車一次買多件時整批寫入，避免逐件 await 造成多次 DB 往返。
  */
 
-import { db } from '../db/database';
+import type { GameRepository } from '../db/repository';
+import { defaultSession } from '../stores/session';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, SHOP_MAX_AFFIX_TIER } from '../models/affix';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
@@ -19,6 +20,7 @@ export async function createShopEquipment(
   templates: EquipmentTemplate[],
   charLevel: number,
   ownerId: number,
+  repo: GameRepository = defaultSession.repo,
 ): Promise<EquipmentInstance[]> {
   if (templates.length === 0) return [];
 
@@ -40,7 +42,7 @@ export async function createShopEquipment(
     return { template, affixes };
   });
 
-  const ids = await db.equipmentInstances.bulkAdd(
+  const ids = await repo.bulkAddEquipment(
     drafts.map(d => ({
       templateId: d.template.id!,
       slot: d.template.slot,
@@ -52,11 +54,10 @@ export async function createShopEquipment(
       ownerId,
       equipped: false,
     })) as any,
-    { allKeys: true },
   );
 
   return drafts.map((d, i) => resolveEquipment({
-    id: (ids as unknown as number[])[i],
+    id: ids[i],
     templateId: d.template.id!,
     name: d.template.name,
     type: d.template.type,

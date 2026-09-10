@@ -5,9 +5,7 @@
  * 這裡守住掉落與任務獎勵兩條會靜默丟東西的路徑。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import type { DropResult } from '../../systems/drops';
 import { createDefaultStatistics } from '../../models/statistics';
 import { getItemId } from '../../models/items';
@@ -93,10 +91,7 @@ function itemDrop(name: string, amount: number): DropResult {
 
 describe('印記不佔格（§ 35.20）', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     rollDropsMock.mockReset();
     useGameStore.setState({

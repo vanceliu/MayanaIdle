@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import 'fake-indexeddb/auto';
 import { BagPanel } from '../BagPanel';
 import { useGameStore } from '../../stores/gameStore';
 import { bagItem, bagItemById } from '../../testing/bagFixtures';

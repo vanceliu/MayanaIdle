@@ -20,7 +20,7 @@ MayanaIdle 瑪雅那Idle是一款以 Web 為主要平台的放置型 ARPG（Idle
 
 - **索引文件**：`docs/design/INDEX.md` — 依功能/依限制快速查找表
 - **AI 限制**：`docs/design/99-ai-constraints.md` — 7 條設計文件查不到的硬性規則
-- **MVP 順序**：`docs/design/17-mvp-priority.md` — 五階段優先順序，Phase 3 已完成
+- **MVP 順序**：`docs/design/17-mvp-priority.md` — 五階段優先順序，Phase 5（自架私服）進行中
 - **排除系統**：`docs/design/15-excluded.md` — 不做的功能
 
 ## 規則寫在哪裡
@@ -37,8 +37,9 @@ MayanaIdle 瑪雅那Idle是一款以 Web 為主要平台的放置型 ARPG（Idle
 - 測試：Vitest + Testing Library
 - 型別檢查：**一律用 `npx tsc -b`**（根 `tsconfig.json` 是 `{"files": [], "references": [...]}`，
   `tsc --noEmit` 不會檢查任何檔案，是空跑）
-- 資料庫：IndexedDB (Dexie) — 目前為離線 client-only
-- 未來後端：Node.js / PostgreSQL / Prisma / Socket.IO
+- 資料庫：server 端 SQLite（`node:sqlite`）；client 沒有資料庫，測試用記憶體實作（`client/src/db/memoryRepository.ts`）
+- server（`docs/design/97-selfhosted-server.md`）：Node.js 單一 process / WebSocket (`ws`) / SQLite；單機與開放為同一 server，只差 bind 位址
+- 桌面版：Electron 啟動器（`desktop/`），行程內起 server；發布另有無視窗的 server 執行檔（Node SEA）
 
 ## 開發原則
 

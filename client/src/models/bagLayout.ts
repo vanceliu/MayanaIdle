@@ -24,7 +24,7 @@ export type BagSlotMap = Record<string, number>;
  * 格子位置的 localStorage key（§ 35.17）。
  *
  * 刻意**不放進 `mayana_prefs_`** —— prefs 會跟著角色匯出，
- * 而匯入時裝備實例會重新配發 id（`characterTransfer.ts` 寫入 `id: undefined`），
+ * 而裝備實例的 id 由持久層配發，
  * 帶過去的 `equip-{id}` 必然全部對不上，只會留下一堆 stale entry。
  * 這是純本機的顯示偏好，不與角色綁定。
  */

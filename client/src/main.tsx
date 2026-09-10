@@ -1,4 +1,5 @@
 import { StrictMode, Suspense, lazy } from 'react'
+import './models/mapSource.vite'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'

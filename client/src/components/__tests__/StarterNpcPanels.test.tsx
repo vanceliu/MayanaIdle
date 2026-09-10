@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 // 強化會寫 IndexedDB（persistStarterEnhance / characters.update）
-import 'fake-indexeddb/auto';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { StarterNpc } from '../town/StarterNpc';
 import { useGameStore } from '../../stores/gameStore';

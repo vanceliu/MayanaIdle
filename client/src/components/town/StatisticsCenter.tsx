@@ -3,15 +3,33 @@ import { useGameStore } from '../../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import type { ClassName } from '../../models/character';
 import {
-  fetchSnapshot,
-  readCachedSnapshot,
   buildBoard,
-  LeaderboardError,
   LEADERBOARD_FIELDS,
   LEADERBOARD_LABELS,
   type LeaderboardField,
   type LeaderboardSnapshot,
 } from '../../services/leaderboardService';
+import { connection } from '../../net/connection';
+
+/** snapshot 由本服 server 即時計算，client 快取 10 分鐘（`37-statistics.md` § 37.4.1） */
+let onlineCache: { fetchedAt: number; snapshot: LeaderboardSnapshot } | null = null;
+const ONLINE_CACHE_TTL_MS = 10 * 60 * 1000;
+
+/** 測試之間要清掉：快取是模組級的，一份會跟著整個測試檔跑 */
+export function resetLeaderboardCache(): void {
+  onlineCache = null;
+}
+
+function readOnlineCache(): LeaderboardSnapshot | null {
+  if (!onlineCache || Date.now() - onlineCache.fetchedAt >= ONLINE_CACHE_TTL_MS) return null;
+  return onlineCache.snapshot;
+}
+
+async function fetchOnlineSnapshot(): Promise<LeaderboardSnapshot> {
+  const snapshot = await connection.requestLeaderboard(EXPANDED_LIMIT) as LeaderboardSnapshot;
+  onlineCache = { fetchedAt: Date.now(), snapshot };
+  return snapshot;
+}
 
 /** 九宮格每個榜單顯示的名次數 */
 const CARD_LIMIT = 5;
@@ -22,9 +40,8 @@ export function StatisticsCenter() {
   const character = useGameStore(s => s.character);
   const statistics = useGameStore(s => s.statistics);
   const guildProgress = useGameStore(s => s.guildProgress);
-  const uploadOwnStats = useGameStore(s => s.uploadOwnStats);
 
-  const [snapshot, setSnapshot] = useState<LeaderboardSnapshot | null>(() => readCachedSnapshot());
+  const [snapshot, setSnapshot] = useState<LeaderboardSnapshot | null>(() => readOnlineCache());
   const [loading, setLoading] = useState(false);
   const [expandedField, setExpandedField] = useState<LeaderboardField | null>(null);
   const [message, setMessage] = useState('');
@@ -36,8 +53,8 @@ export function StatisticsCenter() {
   useEffect(() => {
     if (tab !== 'leaderboard') return;
 
-    // 快取仍在 10 分鐘內 → 完全不打 API（§ 37.4.4）
-    const cached = readCachedSnapshot();
+    // 快取仍在 10 分鐘內 → 完全不向 server 要（§ 37.4.4）
+    const cached = readOnlineCache();
     if (cached) {
       setSnapshot(cached);
       return;
@@ -54,34 +71,13 @@ export function StatisticsCenter() {
     setLoading(true);
     setMessage('');
     try {
-      await uploadAndReport();
-      const fresh = await fetchSnapshot({ force: true });
-      setSnapshot(fresh);
-    } catch (err) {
-      if (!snapshot) setMessage(err instanceof LeaderboardError && err.code === 'network'
-        ? '無法連線到排行榜伺服器'
-        : '無法載入排行榜');
+      // 沒有上傳這回事：統計本來就在 server（§ 37.4.1）
+      setSnapshot(await fetchOnlineSnapshot());
+    } catch {
+      if (!snapshot) setMessage('無法載入排行榜');
     } finally {
       setLoading(false);
       syncingRef.current = false;
-    }
-  }
-
-  /** 上傳邏輯在 store（匯出時也要用同一份），這裡只負責把結果碼翻成提示文字 */
-  async function uploadAndReport() {
-    switch (await uploadOwnStats()) {
-      case 'outdated_client':
-        // 部署期間的版本落差，或瀏覽器快取到舊 bundle
-        setMessage('遊戲已更新，請重新整理頁面以繼續上傳統計');
-        break;
-      case 'invalid_auth_token':
-        // 該 uuid 已被別的密鑰綁定：多半是同一份匯出檔在兩台裝置各自產生過密鑰
-        setMessage('此角色的排行榜紀錄由另一份存檔持有，統計無法上傳');
-        break;
-      case 'invalid_name':
-        setMessage('角色名稱不符合現行規則，此角色無法登上排行榜');
-        break;
-      // 其餘（含上傳失敗）不擋排行榜瀏覽
     }
   }
 

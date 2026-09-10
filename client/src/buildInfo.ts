@@ -2,7 +2,6 @@
  * 建置資訊：由 `vite.config.ts` 的 `define` 在建置時注入。
  *
  * 用途是回報問題時能一眼確認玩家跑的是哪一版 —— 例如判斷是不是卡在快取的舊 bundle。
- * 注意：這與 IndexedDB 的 schema 版本（`db/database.ts` 的 `this.version(n)`）無關，兩者各自獨立。
  *
  * vitest 沒有套用 `define`，故以 typeof 判斷後退回 'dev'，測試環境不會噴 ReferenceError。
  */

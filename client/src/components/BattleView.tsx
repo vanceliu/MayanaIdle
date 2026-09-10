@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { useMapControlStore } from '../stores/mapControlStore';
+import { getMonsterTemplates } from '../models/monsterTemplates';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { PixiGame } from './PixiGame';
 import { getRegion, getFloor } from '../models/mapData';
-import { db } from '../db/database';
+import { isOnline } from '../net/online';
 
 export function BattleView() {
   const phase = useGameStore(s => s.phase);
@@ -17,6 +18,7 @@ export function BattleView() {
 
   // Load map when character region changes
   useEffect(() => {
+    if (isOnline()) return;
     if (!character) return;
     const savedPos = (character.mapPositionX != null && character.mapPositionY != null)
       ? { x: character.mapPositionX, y: character.mapPositionY }
@@ -32,9 +34,7 @@ export function BattleView() {
         const areaId = hasFloors && character.currentFloor != null
           ? `${character.currentRegion}-${character.currentFloor}f`
           : character.currentRegion;
-        db.monsterTemplates.where('area').equals(areaId).toArray().then(monsters => {
-          useMapMonsterStore.getState().setHasBossInPool(monsters.some(m => m.isBoss));
-        });
+        useMapMonsterStore.getState().setHasBossInPool(getMonsterTemplates(areaId).some(m => m.isBoss));
       }
 
       // If auto search is active, start moving after map loads
@@ -49,7 +49,7 @@ export function BattleView() {
           const hpPct = (ch.hp / effMaxHp) * 100;
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
           if (hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
-            useMapMonsterStore.getState().setPaused(true);
+            useMapControlStore.getState().setPaused(true);
           } else {
             useMapControlStore.getState().setAutoMove(true);
           }
@@ -60,6 +60,7 @@ export function BattleView() {
 
   // Sync search mode with auto move
   useEffect(() => {
+    if (isOnline()) return;
     if (searchMode === 'auto' && phase === 'explore') {
       const map = useMapControlStore.getState().currentMap;
       if (map) {
@@ -72,9 +73,9 @@ export function BattleView() {
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
           // 已在恢復等待中就維持暫停：HP/MP 可能已高於暫停門檻但未達恢復門檻，
           // 「沒低於門檻」不可重新起步（由 gameLoopTick 的 aboveResume 分支解除）。
-          const alreadyPaused = useMapMonsterStore.getState().paused;
+          const alreadyPaused = useMapControlStore.getState().paused;
           if (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
-            useMapMonsterStore.getState().setPaused(true);
+            useMapControlStore.getState().setPaused(true);
           }
           setAutoMove(true);
         } else {
@@ -88,9 +89,10 @@ export function BattleView() {
 
   // Unpause monsters when returning to explore
   useEffect(() => {
+    if (isOnline()) return;
     if (phase === 'explore') {
       useMapMonsterStore.getState().clearCombatMonsters();
-      useMapMonsterStore.getState().setPaused(false);
+      useMapControlStore.getState().setPaused(false);
     }
   }, [phase]);
 

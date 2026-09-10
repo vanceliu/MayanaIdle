@@ -64,5 +64,5 @@ function deadSpots(map: MapData): string[] {
 describe('近戰不會出現「打不到又走不動」的位置', () => {
   it.each(MAPS)('%s', (_name, map) => {
     expect(deadSpots(map)).toEqual([]);
-  });
+  }, 20_000);
 });

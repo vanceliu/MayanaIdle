@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import { useGameStore } from '../gameStore';
 import type { BagItem } from '../gameStore';
 import { bagItem, bagItemById } from '../../testing/bagFixtures';
@@ -28,10 +26,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 
 describe('Multi-monster drop race condition', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',
@@ -49,8 +44,7 @@ describe('Multi-monster drop race condition', () => {
       quickSlots: [null, null, null, null, null],
       combatLogs: [],
       gameLoopId: null,
-      hpRegenId: null,
-      mpRegenId: null,
+      regenActive: false,
     });
     await useGameStore.getState().initUser();
   });

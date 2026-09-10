@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import 'fake-indexeddb/auto';
 import { TownBlacksmith } from '../town/TownBlacksmith';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { useGameStore } from '../../stores/gameStore';
-import { seedDatabase, resetSeedState } from '../../db/seed';
-import { db } from '../../db/database';
+import { resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { bagItemById } from '../../testing/bagFixtures';
 import { ATTRIBUTE_NAMES_ZH } from '../../models/attributes';
@@ -63,10 +61,7 @@ function equipFixture(
 
 describe('TownBlacksmith - Crafting', () => {
   beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    resetSeedState();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
 
     useGameStore.setState({

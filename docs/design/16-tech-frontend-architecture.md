@@ -8,7 +8,6 @@
 | 建置工具 | Vite | 8 | 開發伺服器 + 打包 |
 | 語言 | TypeScript | 6 | 型別安全 |
 | 狀態管理 | Zustand | 5 | 全域狀態（單一 store） |
-| 離線資料庫 | Dexie | 4 | IndexedDB ORM（單機模式） |
 | 測試 | Vitest + Testing Library | — | 單元 / 組件測試 |
 | 樣式 | 純 CSS + Design Token | — | 無 Tailwind、無 CSS-in-JS |
 
@@ -60,15 +59,16 @@ client/
 │   │   ├── scriptRunner.ts   # 天賦引擎（條件 → 動作）
 │   │   ├── questSystem.ts    # 任務系統邏輯
 │   │   ├── classSkillBookDrop.ts # 職業技能書掉落判定
-│   │   ├── characterTransfer.ts  # 角色轉移邏輯
-│   │   └── templateSync.ts   # 模板同步（DB 版本升級）
+│   │   └── templateSync.ts   # 裝備模板快取（seed → 記憶體）
 │   ├── hooks/                # 跨組件共用的 React hook
 │   │   ├── useAutoScrollLog.ts   # 戰鬥日誌自動捲到底
 │   │   ├── useEquipmentTemplates.ts # 裝備模板快取
 │   │   └── useHudBand.ts     # 量測底部常駐 HUD 帶寬（§ 32.15.1）
-│   ├── db/                   # 資料庫層
-│   │   ├── database.ts       # Dexie schema 定義
-│   │   └── seed.ts           # 初始化種子資料
+│   ├── db/                   # 持久層介面與靜態模板
+│   │   ├── repository.ts     # `GameRepository`（實作在 server 的 SQLite）
+│   │   ├── memoryDb.ts       # 記憶體資料表（測試用）
+│   │   ├── memoryRepository.ts # `GameRepository` 的記憶體實作
+│   │   └── seed/             # 靜態模板常數（怪物、裝備、掉落、道具）
 │   ├── assets/
 │   │   └── icons/            # Game-icons.net SVG 檔案
 │   ├── components/           # React UI 組件
@@ -167,7 +167,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 │ │ [⚡][🛡] ← BuffBar    │       城鎮也是一張地圖（§ 99.6）          │
 │ └──────────────────────┘                                          │
 │                                                                   │
-│ ┌ CombatLogWindow ─────┐                                          │
+│ ┌ LogDock ─────────────┐                                          │
 │ │ 戰鬥紀錄          ⚙ │        ┌ .hud-bottomcenter ┐             │
 │ │ 風刃 對 野牛 造成 9  │        │ [自動搜尋][手動搜尋]│             │
 │ │ 野牛 被擊敗！    [▲] │        │ [1][2][3]...[0]    │             │
@@ -190,7 +190,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 |---|---|
 | `.hud-topleft` | `StatusPanel`（角色卡）＋ `BuffBar`（接在卡片下方） |
 | `.hud-topright` | `MapNavigation`（寬度必須與下拉選單一致，見下） |
-| `CombatLogWindow` | 左下角，**可拖曳**（見 § 32.3.1） |
+| `LogDock` | 左下角，**可拖曳**（見 § 32.3.1） |
 | `.hud-bottomcenter` | `ExploreBar` ＋ `QuickSlotBar`（10 格一排） |
 | `.hud-bottomright` | `PanelDock`（六顆一列）＋ `GameToolbar`（只剩 ⚙），合起來是一整排（`47-mobile.md` § 47.6） |
 
@@ -198,10 +198,11 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 > 容器一律 `pointer-events: none`，只有裡面的按鈕／面板 `pointer-events: auto`。
 > **四個 `.hud-*` 島同樣適用**：島的盒子包含島內元素之間的空隙，以及城鎮那格
 > `visibility: hidden` 的 `ExploreBar` 佔位。
-> `CombatLogWindow` 雖然也掛 `.hud`，但它是實體視窗，不在此列。
+> `LogDock` 雖然也掛 `.hud`，但它是實體視窗，不在此列。
 > 改完要用 `document.elementFromPoint()` 驗命中；不可用 `dispatchEvent` 直接對 canvas 派事件。
 
 **地圖選擇器：** 觸發鈕與下拉選單**必須同寬**（都 340px），選單不可另設 `min-width`。
+線上模式的觸發鈕在地圖名後面標本地圖在線人數（`97-selfhosted-server.md` § 97.7.1）。
 區域清單中**城鎮排在最上方**，其餘依等級遞增（由 `getRegionsByZone()` 決定順序）。
 
 **城鎮與野外的一致性：** 城鎮沒有探索控制，但 `ExploreBar` 仍包在
@@ -212,18 +213,33 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 時鐘基準是 `character.areaEnteredAt`，與生怪壓力（`26-spawn-pressure.md` § 26.4）同源 ——
 畫面上的數字即壓力累積進度。該欄位在選角進入遊戲時重設，故顯示的是本次上線後的停留時間。
 
-#### § 32.3.1 戰鬥紀錄視窗（CombatLogWindow）
+#### § 32.3.1 紀錄視窗（LogDock）
 
 常駐日誌是一個獨立的可拖曳視窗，城鎮與野外共用同一份
 （`TownView`／`BattleView` 都不自己渲染日誌）。
 
-- **預設停在左下角**；拖曳標題列可移動，位置存在 `localStorage`
+**戰鬥紀錄與聊天是同一個視窗的兩個分頁**，不是兩個視窗，也不是同一份 log ——
+兩者的產生速率差兩個數量級，混成一串等於戰鬥把聊天洗掉。
+
+| 項目 | 規則 |
+|---|---|
+| 分頁鈕 | 在標題列左側，`⚙` 仍在右側；分頁鈕自己吃掉指標事件（標題列同時是拖曳握把） |
+| 外框色相 | 跟著當下的分頁走（`34-ui-guidelines.md` § 34.10）：戰鬥紀錄是戰鬥區、聊天是角色／系統區 |
+| 預設分頁 | 戰鬥紀錄；分頁狀態不持久化 |
+| 單機形態 | 沒有聊天分頁，不畫分頁列，標題列顯示「戰鬥紀錄」 |
+| 緩衝與捲動 | 兩個分頁各自獨立（戰鬥 200 行、聊天 300 則） |
+| 未讀 | 聊天分頁沒顯示時累加，數字標在分頁鈕上（`34-ui-guidelines.md` § 34.10），切過去歸零 |
+| 位置與透明度 | 整個視窗一份，鍵沿用 `mayana.combatLogPos`／`mayana.combatLogOpacity` |
+
+- **預設停在左下角、下方 HUD 帶之上**（`bottom` 由量測到的 `--hud-band-bottom` 決定）——
+  帶子是 z-index 800、永遠壓在視窗上面，貼齊畫面底部會讓聊天的輸入列與 `▲` 被快捷格蓋住。
+- 拖曳標題列可移動，位置存在 `localStorage`
   （`mayana.combatLogPos`），雙擊標題列或選單裡的「回到預設位置」可復原。
 - 位置會夾在視窗內，至少留 40px 在畫面上 —— 拖到螢幕外就再也抓不回來。
 - 標題列右側 `⚙` 展開視窗設定。**之後這個視窗要加的選項一律往 `.log-menu`
   多加一列，不要再往標題列塞控制項。** 目前有「背景透明度」（0~100 對應
   背景 alpha 0~0.95，存 `mayana.combatLogOpacity`）與「回到預設位置」。
-- `▲` 循環三段大小：原大小 → 40vh → 70vh。視窗釘在左下角，長高就是往上長、
+- `▲` 循環三段大小：原大小 → 40vh → 70vh，兩個分頁共用同一段高度。視窗釘在左下角，長高就是往上長、
   蓋在遊戲畫面上（這是刻意的，見 § 99 的「日誌浮動是刻意設計」）。
 - 讀取透明度時**不可寫成 `Number(getItem(...))`**：沒存過時 `getItem` 回 `null`，
   `Number(null)` 是 0，會被當成「使用者把透明度調到 0」，第一次開遊戲背景會全透明。
@@ -345,12 +361,10 @@ interface BagItem {
 
 ## 32.5 資料流
 
-### 單機模式（當前）
-
 ```
-┌──────────────┐     seed / load / save     ┌──────────────────┐
-│  IndexedDB   │ ←──────────────────────────→│  Zustand Store   │
-│  (Dexie)     │                             │                  │
+┌──────────────┐   patch / RPC（WebSocket）  ┌──────────────────┐
+│ server        │ ←──────────────────────────→│  Zustand Store   │
+│ (SQLite＋判定)│                             │  （鏡像）        │
 └──────────────┘                             └────────┬─────────┘
                                                       │
                                               useGameStore(selector)
@@ -375,8 +389,11 @@ interface BagItem {
 
 | 儲存位置 | 內容 | 時機 |
 |---|---|---|
-| IndexedDB (Dexie) | 角色數值、bagItems、裝備實例、倉庫 | `saveState()` 呼叫時 |
+| server SQLite | 角色數值、bagItems、裝備實例、倉庫 | `saveState()` 呼叫時（走 RPC，判定在 server） |
 | localStorage | 天賦配置、快捷鍵、戰鬥後等待閾值 | `saveLocalPreferences()` 呼叫時 |
+
+**client 沒有資料庫。** 遊戲資料一律在 server（`97-selfhosted-server.md` § 97.5），
+本機只留隨 bundle 發布的靜態模板與少數介面偏好。
 
 `saveState()` 會同時觸發兩者，所有城鎮組件在 setState 後統一呼叫 `useGameStore.getState().saveState()`。
 
@@ -385,61 +402,50 @@ interface BagItem {
 - 戰鬥日誌
 - 計時器 ID
 
-### 線上模式（未來）
+### server 模式（目標，`97-selfhosted-server.md`）
 
 ```
 ┌──────────────┐                   ┌───────────────┐
-│ React 組件   │ ←── state ────── │ Zustand Store │
+│ React / Pixi │ ←── state ────── │ Zustand Store │
 └──────┬───────┘                   └───────┬───────┘
-       │                                   │
-       │ action                     sync / event
+       │ 操作指令                            │ delta 套用
        ▼                                   ▼
 ┌──────────────┐     WebSocket      ┌──────────────┐
-│  API Layer   │ ←────────────────→ │   Server     │
-│  (client)    │     Socket.IO      │  (Node.js)   │
+│ transport    │ ←────────────────→ │ Node server  │
+│  (client)    │                    │ 遊戲迴圈 300ms│
 └──────────────┘                    └──────┬───────┘
-                                           │
                                            ▼
                                     ┌──────────────┐
-                                    │ PostgreSQL   │
-                                    │  (Prisma)    │
+                                    │   SQLite     │
                                     └──────────────┘
 ```
 
-**線上化原則：**
+| 項目 | 規則 |
+|---|---|
+| 資料來源 | server 推送的 delta；client 無 IndexedDB |
+| 戰鬥、掉落、天賦、藥水、背包操作 | server 判定，client 送指令並套用結果 |
+| 計時器 | 全部在 server tick（§ 32.6） |
+| 渲染 | client 對 server 位置做插值 |
+| 樂觀更新 | 只允許純顯示層（按鈕狀態、開關面板），數值一律等 server |
 
-| 項目 | 單機 | 線上 |
-|---|---|---|
-| 資料來源 | IndexedDB (Dexie) | Server API + WebSocket |
-| 戰鬥計算 | Client 端 setInterval | Server 事件驅動 |
-| 掉落判定 | Client rollDrops() | Server 計算，推送結果 |
-| 裝備操作 | Client 直接寫 DB | Client 請求 → Server 驗證 → 回傳結果 |
-| 計時器 | Client setInterval | Server 事件排程（避免高頻輪詢） |
-| 天賦執行 | Client scriptRunner | Server 執行（防作弊） |
-| 藥水使用 | Client 扣除 | Server 驗證冷卻 + 扣除 |
-
-**遷移策略：**
-1. 抽出 API Layer（adapter pattern），Store actions 呼叫 adapter 而非直接操作 DB
-2. 單機模式 adapter 對接 Dexie，線上模式 adapter 對接 REST + WebSocket
-3. 戰鬥系統改為事件驅動（server push），client 僅負責呈現
+遷移步驟見 `99-ai-constraints.md` § 99.2。
 
 ---
 
 ## 32.6 計時器架構
 
-| 計時器 | 間隔 | 觸發條件 | 職責 |
-|---|---|---|---|
-| Game Loop | 每幀（PixiJS Ticker） | 地圖載入 + explore phase | 怪物生成、移動、FSM tick、戰鬥計算 |
-| HP Regen | 5000ms | 角色存活時 | VIT 基礎回血（戰鬥中減半） |
-| MP Regen | 6000ms | 角色存活時 | SPI 基礎回魔（戰鬥中減半） |
-| Player Attack | 1200ms | `combat` phase | 玩家攻擊（天賦驅動） |
-| Monster Attack | 1200ms (offset 600ms) | `combat` phase | 怪物攻擊 |
-| Potion Timer | 300ms | 任何狀態 | 常駐天賦判定（藥水/buff/治癒） |
+所有遊戲時間以 server 的 300ms tick 計數（`97-selfhosted-server.md` § 97.6），client 沒有遊戲計時器。
 
-生命週期：
-- 探索計時器隨 `startExploring()` / `stopExploring()` 啟停
-- 回復計時器隨 `startRegen()` / `stopRegen()` 啟停
-- 戰鬥計時器隨 `spawnCombat()` 建立，`clearCombatTimers()` 統一清除
+| 項目 | tick 數 |
+|---|---|
+| 常駐天賦判定 | 1 |
+| 生怪判定（Pressure 0） | 依 `26-spawn-pressure.md` § 26.2 換算，取整數 tick |
+| 玩家攻擊間隔 | 4 |
+| 怪物攻擊間隔 | 4（offset 2） |
+| HP 回復 | 約 17（5000ms → 5100ms） |
+| MP 回復 | 20 |
+
+對齊表的來源為 `98-online-architecture.md` § 2。client 端唯一的計時是 Pixi ticker 的渲染插值。
 
 ---
 
@@ -690,25 +696,15 @@ Hook：`useWikiData` — 從 DB 讀取模板資料供 Wiki 頁面使用。
 
 ---
 
-## 32.10 資料庫 Schema（單機模式）
+## 32.10 靜態模板與本機偏好
 
-使用 Dexie（IndexedDB ORM），Database: `MayanaIdleDB`
+client 沒有資料庫（`97-selfhosted-server.md` § 97.5 廢止 IndexedDB）。
+角色、裝備實例、背包、倉庫全在 server 的 SQLite（`18-data-schema.md` § 18.12）。
 
-| Table | Primary Key | 索引 | 用途 |
-|---|---|---|---|
-| `users` | `++id` | `createdAt` | 使用者帳號 |
-| `characters` | `++id` | `name, className, createdAt, userId` | 角色存檔 |
-| `monsterTemplates` | `++id` | `name, area, level` | 怪物模板 |
-| `equipmentTemplates` | `++id` | `name, type, slot` | 裝備模板（武器+防具+盾+飾品統一） |
-| `equipmentInstances` | `++id` | `templateId, ownerId, equipped` | 裝備實例 |
-| `dropTables` | `++id` | `area, itemType` | 掉落表（按 area ID 分離） |
-| `bossDropTables` | `++id` | `bossName, itemType` | Boss 專屬掉落表 |
-| `characterBag` | `++id` | `characterId, name, type` | 背包物品（BagItem 持久化） |
-| `characterStorage` | `++id` | `characterId, name, type` | 角色個人倉庫 |
-| `warehouses` | `++id` | `userId, name, type` | 帳號共用倉庫（素材，**不含金幣**） |
-| `warehouseGold` | `userId` | — | 共用倉庫金幣餘額，一帳號一列（`18-data-schema.md` § 18.7） |
-
-初始化：`seedDatabase()` 在 App mount 時執行，若 DB 空則寫入種子資料。
+| 本機保有 | 內容 |
+|---|---|
+| bundle 內的 seed 常數 | 怪物、裝備、掉落表、道具模板（`db/seed/`），開機即在記憶體 |
+| localStorage | 視窗位置與透明度、介面倍率、天賦背包排列 |
 
 **localStorage 儲存（per character）：**
 
@@ -752,10 +748,10 @@ Key: `mayana_prefs_${characterId}`
 1. **Phase 驅動而非 URL 路由** — 單畫面遊戲不需要 URL 分頁
 2. **單一 Store、無 middleware** — 簡單直觀，適合個人/小團隊
 3. **Models 與 Systems 純函數** — 不依賴 React，可獨立測試
-4. **內容即程式碼** — 怪物/裝備/配方以 TypeScript 常數定義，seed 進 IndexedDB
-5. **計時器驅動遊戲循環** — 多個獨立 `setInterval`，適合 Idle 類遊戲（不需 rAF 精度）
+4. **內容即程式碼** — 怪物/裝備/配方以 TypeScript 常數定義，server 啟動載入記憶體（`18-data-schema.md` § 18.8）
+5. **tick 驅動遊戲循環** — server 300ms tick（§ 32.6），client 無遊戲計時器
 6. **戰鬥日誌統一管理** — 所有 log 透過 `addLog` 入口，常數 `MAX_LOGS` 控制上限
-7. **線上化預備** — 未來透過 adapter pattern 抽換資料來源，client 端邏輯不變
+7. **server 模式** — 遊戲邏輯只在 server（`97-selfhosted-server.md` § 97.6），client 只做渲染、輸入與插值
 
 ---
 

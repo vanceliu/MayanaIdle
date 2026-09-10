@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { defaultSession, type Session } from './session';
 
 /**
  * 手動介入指令佇列（`03-combat.md` § 3.6）。
@@ -42,7 +43,8 @@ export interface PendingMove {
   distance?: number;
 }
 
-export const useCombatCommandStore = create<CombatCommandState>((set, get) => ({
+export function createCombatCommandStore(_session: Session) {
+  return create<CombatCommandState>((set, get) => ({
   pendingTargetId: null,
   pendingSkillId: null,
   pendingMove: null,
@@ -78,3 +80,7 @@ export const useCombatCommandStore = create<CombatCommandState>((set, get) => ({
     set({ pendingTargetId: null, pendingSkillId: null });
   },
 }));
+}
+
+export const useCombatCommandStore = createCombatCommandStore(defaultSession);
+defaultSession.combatCommand = useCombatCommandStore;

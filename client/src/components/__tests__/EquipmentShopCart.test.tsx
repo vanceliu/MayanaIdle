@@ -7,6 +7,8 @@ import { useGameStore, BAG_BASE_SLOTS } from '../../stores/gameStore';
 import type { Character } from '../../models/character';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { fillerBagItems } from '../../testing/bagFixtures';
+import { db, repo, resetTestDb } from '../../testing/testDb';
+import { defaultSession } from '../../stores/session';
 
 /**
  * 武器店／防具店的購物車（§ 34.1 底部動作列）：
@@ -18,6 +20,7 @@ const TEMPLATES: EquipmentTemplate[] = [
   { id: 2, name: '鋼劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 20, largeMonsterDamage: 16, buyPrice: 3000, acquireType: 'shop', tier: 3 },
 ];
 
+/** 買賣的落地由 repository 負責，這裡監看它有沒有被叫到（`18-data-schema.md` § 18.12） */
 const bulkAdd = vi.fn(async (records: unknown[]) => records.map((_, i) => 900 + i));
 const bulkDelete = vi.fn();
 
@@ -28,25 +31,6 @@ vi.mock('../../hooks/useEquipmentTemplates', () => ({
 vi.mock('../GameIcon', () => ({
   GameIcon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
 }));
-
-vi.mock('../../db/database', () => {
-  const collection = {
-    toArray: () => Promise.resolve(TEMPLATES),
-    sortBy: () => Promise.resolve(TEMPLATES),
-  };
-  return {
-    db: {
-      equipmentTemplates: {
-        filter: () => collection,
-        where: () => ({ equals: () => collection }),
-      },
-      equipmentInstances: {
-        bulkAdd: (...args: unknown[]) => bulkAdd(...(args as [unknown[]])),
-        bulkDelete: (...args: unknown[]) => bulkDelete(...args),
-      },
-    },
-  };
-});
 
 function testCharacter(gold: number): Character {
   return {
@@ -113,9 +97,21 @@ function pick(rowName: string, label: string) {
   fireEvent.click(within(row(rowName)).getByRole('button', { name: `${label} 增加數量` }));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // 上一輪的 spy 必須還原，否則會一層包一層地疊上去
+  vi.restoreAllMocks();
+  resetTestDb();
+  // 商店查表走 repository，測試用的兩把劍要真的在模板表裡
+  await db.equipmentTemplates.clear();
+  await db.equipmentTemplates.bulkAdd(TEMPLATES);
+  defaultSession.repo = repo;
   bulkAdd.mockClear();
   bulkDelete.mockClear();
+  // 監看有沒有真的落地，但仍要真的寫進去 —— 背包內容是從 repository 讀回來的
+  const realAdd = repo.bulkAddEquipment.bind(repo);
+  const realDelete = repo.bulkDeleteEquipment.bind(repo);
+  vi.spyOn(repo, 'bulkAddEquipment').mockImplementation(async records => { bulkAdd(records); return realAdd(records); });
+  vi.spyOn(repo, 'bulkDeleteEquipment').mockImplementation(async ids => { bulkDelete(ids); await realDelete(ids); });
   useGameStore.setState({ character: null, inventory: [], bagItems: [], equippedGear: {} });
 });
 

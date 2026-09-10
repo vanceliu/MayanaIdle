@@ -56,22 +56,23 @@ import { ITEM_DEFINITIONS } from '../db/seed/itemSeeds';
 import { QUEST_TITLE_TEMPLATES, QUEST_DESCRIPTION_TEMPLATES } from '../db/seed/questTemplateSeeds';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
 import { settleQuestGold } from './globalRates';
+import { random } from '../core/rng';
 
 function getItem(id: number) {
   return ITEM_DEFINITIONS.find(i => i.id === id)!;
 }
 
 function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(random() * (max - min + 1)) + min;
 }
 
 function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(random() * arr.length)];
 }
 
 function weightedPick<T extends { weight: number }>(items: T[]): T {
   const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-  let roll = Math.random() * totalWeight;
+  let roll = random() * totalWeight;
   for (const item of items) {
     roll -= item.weight;
     if (roll <= 0) return item;
@@ -122,7 +123,7 @@ function toBossDifficulty(difficulty: AdventurerQuestDifficulty): BossQuestDiffi
 
 function generateQuestTitle(type: AdventurerQuestType): string {
   const titles = QUEST_TITLE_TEMPLATES[type];
-  return titles[Math.floor(Math.random() * titles.length)];
+  return titles[Math.floor(random() * titles.length)];
 }
 
 function generateQuestDescription(
@@ -378,7 +379,7 @@ function buildQuest(
   );
 
   return {
-    id: `adv-${difficulty}-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `adv-${difficulty}-${index}-${Date.now()}-${random().toString(36).slice(2, 6)}`,
     type,
     difficulty,
     status: 'available',
@@ -404,7 +405,7 @@ function averageAreaGold(areaPool: { avgGold: number }[]): number {
 function shuffle<T>(arr: T[]): T[] {
   const out = [...arr];
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
@@ -567,13 +568,13 @@ export function rollCollectMaterialDrop(
   const hasActiveBossCollect = activeQuests.some(
     q => q.type === 'collectboss' && q.status === 'active' && q.targetMonster === monsterName
   );
-  if (hasActiveBossCollect) return Math.random() < BOSS_COLLECT_DROP_RATE;
+  if (hasActiveBossCollect) return random() < BOSS_COLLECT_DROP_RATE;
 
   const hasActiveCollect = activeQuests.some(
     q => q.type === 'collect' && q.status === 'active' && q.targetMonster === monsterName
   );
   if (!hasActiveCollect) return false;
-  return Math.random() < COLLECT_DROP_RATE;
+  return random() < COLLECT_DROP_RATE;
 }
 
 /**

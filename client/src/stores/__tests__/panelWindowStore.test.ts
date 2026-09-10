@@ -21,6 +21,9 @@ function reset() {
       quest: { x: 1576, y: 128 },
     mail: { x: 0, y: 0 },
       script: { x: 700, y: 72 },
+      party: { x: 24, y: 420 },
+      onmap: { x: 400, y: 420 },
+      trade: { x: 600, y: 160 },
     },
     order: [...PANEL_KEYS],
   });

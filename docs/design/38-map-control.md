@@ -796,7 +796,7 @@ Boss 層一律使用「空曠」密度，中央保留 **≥ 8×8 開闊空地**�
 | `mapControlStore` | 當前地圖、玩家位置、路徑、移動狀態、自動移動開關 |
 | `mapMonsterStore` | 紅點列表、生成/移動/碰撞判定、暫停狀態、Boss 池旗標 |
 | `gameLoop.ts` | 每幀主迴圈：重建佔位表 → HP/MP 門檻檢查 → 生成 → 怪物移動 → 玩家移動 → DoT tick |
-| `occupationManager` | 玩家與怪物的格子佔用表，供尋路避讓 |
+| `occupationManager` | 玩家、隊友與本實例怪物的格子佔用表，供尋路避讓 |
 | `pathfinding.ts` | A*、最近可通行格、相鄰可通行格、隨機可生成格 |
 | `lineOfSight.ts` | 視線與投射物射線判定 |
 
@@ -816,18 +816,17 @@ Boss 層一律使用「空曠」密度，中央保留 **≥ 8×8 開闊空地**�
 - 怪物尋路每 5 秒重算（非每幀），距離 > 8 格改用 greedy one-step
 - 障礙物與實體共用 `EntityLayer` 的 `sortableChildren` 排序
 
-### 線上化考量
+### server 模式
 
-- 目前 client-only，地圖邏輯全在前端
-- 未來線上化時，怪物生成與移動需移至 server 端（見 `98-online-architecture.md`）
-- 地圖資料為靜態資源，無需動態生成，可直接由 CDN 提供
+- 怪物生成與移動在 server（`97-selfhosted-server.md` § 97.7.1），client 只渲染與插值
+- 地圖為隊伍實例，非隊友不顯示（§ 38.14）
 
 ## 38.14 不做的事
 
 - 不做地圖隨機生成（所有地圖為固定預設計的靜態 JSON）
 - 不做小地圖/全域地圖（地圖本身就是全域視角）
 - 不做霧戰（Fog of War）
-- 不做多人同地圖顯示（未來線上化再考慮）
+- 不做非隊友的同地圖顯示；隊友顯示、`occupationManager` 容納隊友、怪物生成與移動在 server 見 `97-selfhosted-server.md` § 97.7.1
 - 不做地形傷害（岩漿/深淵僅為不可通行，不造成傷害）
 - 不因地圖改版新增樓層或改變既有副本結構
 

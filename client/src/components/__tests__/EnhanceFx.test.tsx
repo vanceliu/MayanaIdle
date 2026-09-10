@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import 'fake-indexeddb/auto';
 import { BagPanel } from '../BagPanel';
 import { FX_DURATION_MS } from '../town/useOneShotFx';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { useGameStore } from '../../stores/gameStore';
-import { seedDatabase, resetSeedState } from '../../db/seed';
-import { db } from '../../db/database';
+import { resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { bagItemById } from '../../testing/bagFixtures';
 import { WEAPON_ENHANCE_SCROLL_ID } from '../../systems/enhanceScroll';
@@ -83,10 +81,7 @@ function enhanceSword() {
 
 describe('強化演出（§ 48.4）', () => {
   beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    resetSeedState();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });

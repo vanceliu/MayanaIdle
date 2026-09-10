@@ -1,16 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../database';
-import { seedDatabase, resetSeedState } from '../seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { rollDrops } from '../../systems/drops';
 import { loadTemplateCache } from '../../systems/templateSync';
 
 describe('rollDrops', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
   });
 
@@ -42,8 +37,6 @@ describe('rollDrops', () => {
   });
 
   it('should produce drops consistent with seed data after rebuild', async () => {
-    // Simulate the fix scenario: call seedDatabase again (rebuild)
-    await seedDatabase();
 
     const entries = await db.dropTables.where('area').equals('dawn-plains').toArray();
     expect(entries).toHaveLength(7);
@@ -81,14 +74,10 @@ describe('rollDrops', () => {
 
 describe('Integration: seed → drops flow (no duplication)', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
+    resetTestDb();
   });
 
-  it('should not produce duplicate drops even if seedDatabase called twice', async () => {
-    await seedDatabase();
-    await seedDatabase();
+  it('should not produce duplicate drops', async () => {
 
     const entries = await db.dropTables.where('area').equals('dawn-plains').toArray();
     expect(entries).toHaveLength(7);
@@ -99,20 +88,8 @@ describe('Integration: seed → drops flow (no duplication)', () => {
     expect(uniqueNames.size).toBe(itemNames.length);
   });
 
-  it('should not produce duplicate drops on concurrent seedDatabase calls', async () => {
-    await Promise.all([seedDatabase(), seedDatabase()]);
-
-    const entries = await db.dropTables.where('area').equals('dawn-plains').toArray();
-    expect(entries).toHaveLength(7);
-
-    const result = await rollDrops('dawn-plains', 1);
-    const itemNames = result.items.map(i => i.name);
-    const uniqueNames = new Set(itemNames);
-    expect(uniqueNames.size).toBe(itemNames.length);
-  });
 
   it('all areas should have correct entry counts after seed', async () => {
-    await seedDatabase();
 
     const allDrops = await db.dropTables.toArray();
     const areaCounts: Record<string, number> = {};

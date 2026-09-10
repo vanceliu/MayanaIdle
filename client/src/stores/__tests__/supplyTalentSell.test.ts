@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import { useGameStore, talentInitReady } from '../gameStore';
 import { useTalentStore } from '../talentStore';
 import { getItemDefinition } from '../../models/items';
@@ -47,10 +45,7 @@ function supplySlot(over: Partial<TalentSlot> = {}): TalentSlot {
 
 describe('補給天賦：販售素材（`49-village-script.md`、`51-auto-talent.md`）', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({ phase: 'title', userId: null, characterList: [], character: null, bagItems: [] });
     await useGameStore.getState().initUser();
@@ -101,7 +96,7 @@ describe('補給天賦：販售素材（`49-village-script.md`、`51-auto-talent
    * 新角色沒起迴圈的話，補給／常駐／緊急撤退三樣全部靜默失效。
    */
   it('createCharacter 會啟動常駐迴圈', () => {
-    expect(useGameStore.getState().persistentLoopId).not.toBeNull();
+    expect(useGameStore.getState().persistentLoopActive).toBe(true);
   });
 
   it('不在城鎮時不賣', () => {

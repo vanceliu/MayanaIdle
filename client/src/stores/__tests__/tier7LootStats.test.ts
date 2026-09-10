@@ -6,9 +6,7 @@
  * 2. 背包滿而被丟棄的 T7 **仍然計數** —— 記錄的是運氣，不是持有數
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import type { DropResult } from '../../systems/drops';
 import type { EquipmentInstance } from '../../models/equipment';
 import { createDefaultStatistics } from '../../models/statistics';
@@ -104,10 +102,7 @@ async function killMonster() {
 
 describe('T7 掉落統計', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     rollDropsMock.mockReset();
     useGameStore.setState({
@@ -126,8 +121,7 @@ describe('T7 掉落統計', () => {
       quickSlots: [null, null, null, null, null],
       combatLogs: [],
       gameLoopId: null,
-      hpRegenId: null,
-      mpRegenId: null,
+      regenActive: false,
       activeEffects: [],
       statistics: createDefaultStatistics(),
     });

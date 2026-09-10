@@ -1,5 +1,6 @@
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from './attributes';
+import { random } from '../core/rng';
 
 /**
  * 詞綴適用分類。
@@ -209,7 +210,7 @@ export const ON_HIT_RESTORE_PERCENT: Record<'on_hit_hp' | 'on_hit_mp', [number, 
 /** 受擊回復比例：抽到當下在該範圍內決定後固定不變（單位為百分比）。 */
 export function rollRestorePercent(type: 'on_hit_hp' | 'on_hit_mp'): number {
   const [min, max] = ON_HIT_RESTORE_PERCENT[type];
-  return min + Math.floor(Math.random() * (max - min + 1));
+  return min + Math.floor(random() * (max - min + 1));
 }
 
 /** 回復比例套上裝備品質後的實際值（單位仍為百分比） */
@@ -275,7 +276,7 @@ export function getErosion(
 export function rollErosionDamage(weaponBaseDamage: number): number {
   const max = Math.max(1, Math.floor(weaponBaseDamage));
   const min = Math.max(1, Math.floor(max / 2));
-  return min + Math.floor(Math.random() * (max - min + 1));
+  return min + Math.floor(random() * (max - min + 1));
 }
 
 /** 元素侵蝕的傷害上限＝武器小怪／大怪基傷的平均（抽詞綴時強化必為 0，故不含強化） */
@@ -313,7 +314,7 @@ export function getAffixPoolForSlot(category: AffixCategory): AffixDefinition[] 
 export function rollAffixTier(areaLevel: number, isBoss: boolean = false): number {
   const weights = isBoss ? getBossTierWeights(areaLevel) : getTierWeights(areaLevel);
   const total = weights.reduce((s, w) => s + w, 0);
-  let roll = Math.random() * total;
+  let roll = random() * total;
   for (let i = 0; i < weights.length; i++) {
     roll -= weights[i];
     if (roll <= 0) return i + 1;
@@ -427,7 +428,7 @@ export function getAffixTierTable(type?: AffixType): AffixTier[] {
 
 export function rollAffixValue(tier: number, type?: AffixType): number {
   const t = getAffixTierTable(type)[tier - 1];
-  return Math.floor(Math.random() * (t.max - t.min + 1)) + t.min;
+  return Math.floor(random() * (t.max - t.min + 1)) + t.min;
 }
 
 /**
@@ -475,31 +476,31 @@ export function generateAffixes(
   const actualSlots = Math.min(slotCount, available.length);
   for (let i = 0; i < actualSlots; i++) {
     // § 7.10.3 特殊詞綴取代一個一般詞綴位置
-    if (specialAvailable.length > 0 && Math.random() * 100 < specialChance) {
-      const sIdx = Math.floor(Math.random() * specialAvailable.length);
+    if (specialAvailable.length > 0 && random() * 100 < specialChance) {
+      const sIdx = Math.floor(random() * specialAvailable.length);
       const sDef = specialAvailable.splice(sIdx, 1)[0];
       affixes.push({ type: sDef.type, tier: 0, value: 0 });
       continue;
     }
-    const idx = Math.floor(Math.random() * available.length);
+    const idx = Math.floor(random() * available.length);
     const def = available.splice(idx, 1)[0];
     // § 7.3.1 額外屬性：無 Tier、無數值區間，固定 +1，只決定加在哪個屬性
     if (def.type === 'bonus_attribute') {
       affixes.push({
         type: def.type, tier: 0, value: BONUS_ATTRIBUTE_VALUE,
-        attribute: ATTRIBUTE_KEYS[Math.floor(Math.random() * ATTRIBUTE_KEYS.length)],
+        attribute: ATTRIBUTE_KEYS[Math.floor(random() * ATTRIBUTE_KEYS.length)],
       });
       continue;
     }
     const cap = options.maxTier ?? 7;
     const tier = options.uniformTier
-      ? 1 + Math.floor(Math.random() * cap)
+      ? 1 + Math.floor(random() * cap)
       : Math.min(cap, rollAffixTier(areaLevel, isBoss));
     const value = rollAffixValue(tier, def.type);
     // § 7.4 元素刻印／元素侵蝕：抽到當下才決定屬性，六種均等隨機，兩條各自獨立抽
     const needsElement = def.type === 'element_brand' || def.type === 'element_erosion';
     const element = needsElement
-      ? BRAND_ELEMENTS[Math.floor(Math.random() * BRAND_ELEMENTS.length)]
+      ? BRAND_ELEMENTS[Math.floor(random() * BRAND_ELEMENTS.length)]
       : undefined;
     // § 7.4 元素侵蝕：每跳傷害在抽到當下由 `武器平均基傷的一半 ~ 武器平均基傷` 決定，之後固定不變
     const dotDamage = def.type === 'element_erosion'

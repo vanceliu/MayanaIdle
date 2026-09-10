@@ -2,29 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { describeInitError } from '../../App';
 
 /**
- * 開機失敗必須給出玩家看得懂、且指得出下一步的訊息（docs/RELEASE.md § 7.3）。
+ * 開機失敗必須給出玩家看得懂、且指得出下一步的訊息。
+ * 遊戲資料全在 server（`97-selfhosted-server.md` § 97.5），開機唯一會擋住人的是連不上 server。
  */
-
-function errorWithName(name: string, message = 'boom'): Error {
-  const err = new Error(message);
-  err.name = name;
-  return err;
-}
-
 describe('describeInitError', () => {
-  it('Dexie VersionError：提示載到舊版程式，請重新整理', () => {
-    const text = describeInitError(errorWithName('VersionError'));
-    expect(text).toContain('較新版本');
-    expect(text).toContain('重新整理');
-  });
-
-  it('儲存空間不足', () => {
-    expect(describeInitError(errorWithName('QuotaExceededError'))).toContain('儲存空間不足');
-  });
-
-  it('無痕模式 / 封鎖網站資料', () => {
-    expect(describeInitError(errorWithName('InvalidStateError'))).toContain('無痕模式');
-    expect(describeInitError(errorWithName('SecurityError'))).toContain('無痕模式');
+  it('連不上 server：指出要先啟動 server、確認網址', () => {
+    const text = describeInitError(new Error('連不上遊戲 server'));
+    expect(text).toContain('server');
+    expect(text).toContain('啟動');
   });
 
   it('其他錯誤保留原始訊息，方便回報', () => {

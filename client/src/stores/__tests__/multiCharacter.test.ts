@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { db, resetTestDb } from '../../testing/testDb';
 import { useTalentStore } from '../talentStore';
 import { STARTING_SLOT_COUNT } from '../../models/talent';
 import { STARTING_LAYOUT } from '../../db/seed/talentSeeds';
@@ -30,10 +28,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 
 describe('Multi-character system', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',
@@ -51,8 +46,7 @@ describe('Multi-character system', () => {
       quickSlots: [null, null, null, null, null],
       combatLogs: [],
       gameLoopId: null,
-      hpRegenId: null,
-      mpRegenId: null,
+      regenActive: false,
     });
     await useGameStore.getState().initUser();
   });
@@ -238,27 +232,6 @@ describe('Multi-character system', () => {
       expect(a.authToken).not.toBe(b.authToken);
     });
 
-    it('ensureAuthToken 對已有密鑰的角色回傳原本那把', async () => {
-      await useGameStore.getState().createCharacter('Keyed', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
-      const charId = useGameStore.getState().character!.id!;
-      const original = (await db.characters.get(charId))!.authToken;
-
-      expect(await useGameStore.getState().ensureAuthToken()).toBe(original);
-    });
-
-    it('舊角色沒有密鑰時補發並寫回 DB（TOFU）', async () => {
-      await useGameStore.getState().createCharacter('Legacy', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
-      const charId = useGameStore.getState().character!.id!;
-      // 模擬此機制上線前建立的角色
-      await db.characters.update(charId, { authToken: undefined });
-      useGameStore.setState({ character: { ...useGameStore.getState().character!, authToken: undefined } });
-
-      const issued = await useGameStore.getState().ensureAuthToken();
-
-      expect(issued).toBeTruthy();
-      expect((await db.characters.get(charId))!.authToken).toBe(issued);
-      expect(useGameStore.getState().character!.authToken).toBe(issued);
-    });
   });
 
   describe('logout', () => {

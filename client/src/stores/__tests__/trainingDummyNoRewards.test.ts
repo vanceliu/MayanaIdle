@@ -6,9 +6,7 @@
  * （`37-statistics.md` § 37.4），被木樁灌爆就再也修不回來。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import type { DropResult } from '../../systems/drops';
 import type { MonsterInstance } from '../../models/monster';
 import { createDefaultStatistics } from '../../models/statistics';
@@ -88,10 +86,7 @@ async function kill(monster: MonsterInstance) {
 
 describe('木樁擊殺不結算（§ 50.4.1）', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     rollDropsMock.mockReset();
     rollDropsMock.mockResolvedValue({ gold: 999, items: [] });
@@ -100,7 +95,7 @@ describe('木樁擊殺不結算（§ 50.4.1）', () => {
       equippedGear: {}, inventory: [], bagItems: [], skills: [],
       storedEquipment: [], storedMaterials: [], warehouseGold: 0,
       scriptRules: [], quickSlots: [null, null, null, null, null],
-      combatLogs: [], gameLoopId: null, hpRegenId: null, mpRegenId: null,
+      combatLogs: [], gameLoopId: null, regenActive: false,
       activeEffects: [], statistics: createDefaultStatistics(),
     });
     await useGameStore.getState().initUser();

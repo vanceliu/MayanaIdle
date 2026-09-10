@@ -5,9 +5,7 @@
  * 這裡守的是「扣了東西卻沒給獎勵」與「沒扣東西就給獎勵」兩個方向。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import { createDefaultStatistics } from '../../models/statistics';
 import { makeBagItem, getBagItemAmount } from '../../models/bagItem';
 import type { AdventurerQuest } from '../../models/adventurerQuest';
@@ -55,10 +53,7 @@ function deliverQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest
 
 describe('交付型任務的交付（§ 36.11）', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',

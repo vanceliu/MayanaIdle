@@ -29,7 +29,7 @@ import { BagTalentTab } from './BagTalentTab';
 import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
 import { CLICK_SLOP } from '../hooks/usePressDrag';
 import {
-  getEnhanceScroll, canScrollTarget, applyEnhanceScroll, isEnhanceable,
+  getEnhanceScroll, canScrollTarget, isEnhanceable, type EnhanceOutcome,
   type EnhanceScroll,
 } from '../systems/enhanceScroll';
 import { EnhanceRateWindow } from './EnhanceRateWindow';
@@ -638,18 +638,23 @@ export function BagPanel() {
       return true;
     }
     const box = cell?.getBoundingClientRect();
-    const outcome = applyEnhanceScroll(scroll, { item: equipment, slot: item.equippedSlot });
-    if (!outcome) return true;
-    pushSystemLog(outcome.message);
-    // 演出不參與判定（§ 48.1）：結算已經寫完狀態，這裡只是照剛才的位置疊一層
-    if (box) {
-      playEnhanceFx({
-        kind: outcome.fx,
-        rect: { left: box.left, top: box.top, width: box.width, height: box.height },
-        label: outcome.fx === 'fail' ? undefined : `+${outcome.nextLevel}`,
-        ghost: outcome.ghost,
-      });
-    }
+    // 單機同步結算；線上模式回 Promise（server 判定）。演出兩邊共用同一段
+    const settled = useGameStore.getState().enhanceWithScroll(scroll.itemId, equipment.id!, item.equippedSlot);
+    const apply = (outcome: EnhanceOutcome | null) => {
+      if (!outcome) return;
+      pushSystemLog(outcome.message);
+      // 演出不參與判定（§ 48.1）：結算已經寫完狀態，這裡只是照剛才的位置疊一層
+      if (box) {
+        playEnhanceFx({
+          kind: outcome.fx,
+          rect: { left: box.left, top: box.top, width: box.width, height: box.height },
+          label: outcome.fx === 'fail' ? undefined : `+${outcome.nextLevel}`,
+          ghost: outcome.ghost,
+        });
+      }
+    };
+    if (settled && typeof (settled as Promise<unknown>).then === 'function') void (settled as Promise<EnhanceOutcome | null>).then(apply);
+    else apply(settled as EnhanceOutcome | null);
     return true;
   }
 

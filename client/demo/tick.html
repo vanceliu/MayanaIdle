@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>300ms Tick Demo — MayanaIdle</title>
+<!--
+  固定步長模擬調校頁 —— 規格見 `docs/design/97-selfhosted-server.md` § 97.6、`98-online-architecture.md` § 2。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/tick.html
+
+  ── 這頁在解決什麼 ──
+  server authoritative 之後，模擬只在 300ms tick 跑一次，角色與怪物的位置每 300ms 才變一次。
+  渲染端在前一 tick 與本 tick 之間插值，畫面才會連續。這頁要確認的是：
+    1. 「每幀」（現行）與「300ms tick ＋ 插值」的移動手感差多少
+    2. 插值關掉時的跳格感，作為對照
+    3. 單一 tick 的模擬耗時（server 承載估算的基準）
+
+  ── 跑的是同一份 ──
+  地圖、`gameLoopTick`、玩家與怪物實體全部來自 `client/src/`；這頁只有模式切換與統計。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px; background: var(--bg-deepest, #0A0A1A); color: var(--text-primary, #E2E8F0); font-family: var(--font-body, sans-serif); }
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-note code, .demo-note b { color: var(--text-primary, #E2E8F0); }
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-stage { width: 960px; height: 600px; background: #000; border: 1px solid var(--border-subtle, #1E293B); border-radius: 8px; overflow: hidden; }
+.demo-card { background: var(--bg-panel, #111827); border: 1px solid var(--border-subtle, #1E293B); border-radius: 8px; padding: 16px; width: 320px; }
+.demo-card h2 { font-size: 14px; margin: 0 0 12px; color: var(--accent-primary, #A78BFA); }
+.demo-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; font-size: 13px; }
+.demo-row input[type=range] { flex: 1; }
+.demo-row output { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+.demo-stats { font-size: 13px; line-height: 1.9; font-variant-numeric: tabular-nums; }
+.demo-stats b { display: inline-block; width: 120px; color: var(--text-dim, #64748B); font-weight: normal; }
+textarea { width: 100%; height: 120px; background: #0b1020; color: #cbd5e1; border: 1px solid #1E293B; border-radius: 6px; font-family: monospace; font-size: 12px; }
+button, select { background: var(--bg-elevated, #1E293B); color: inherit; border: 1px solid var(--border-subtle, #334155); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+label.mode { display: block; margin: 4px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1 class="demo-title">300ms Tick Demo</h1>
+<p class="demo-note">
+  <b>每幀</b>＝現行做法。<b>固定 tick</b>＝模擬每 300ms 跑一次、畫面直接用 tick 位置。<b>固定 tick ＋ 插值</b>＝server 模式的目標。<br>
+  角色自動亂走、怪物照 <code>26-spawn-pressure.md</code> 的規則生成並追擊；沒有戰鬥。「單 tick 模擬耗時」是 server 承載估算的基準。
+</p>
+<div class="demo-layout">
+  <div id="stage" class="demo-stage"></div>
+  <div>
+    <div class="demo-card">
+      <h2>模式</h2>
+      <label class="mode"><input type="radio" name="mode" value="frame"> 每幀（現行）</label>
+      <label class="mode"><input type="radio" name="mode" value="tick"> 固定 tick，無插值</label>
+      <label class="mode"><input type="radio" name="mode" value="tick-lerp" checked> 固定 tick ＋ 插值</label>
+      <div class="demo-row"><span>tick 間隔</span><input id="tickMs" type="range" min="100" max="600" step="50" value="300"><output id="tickMsOut">300</output></div>
+      <div class="demo-row"><span>角色速度</span><input id="playerSpeed" type="range" min="1" max="6" step="0.5" value="2"><output id="playerSpeedOut">2</output></div>
+      <div class="demo-row"><span>怪物速度</span><input id="monsterSpeed" type="range" min="0.5" max="6" step="0.5" value="1"><output id="monsterSpeedOut">1</output></div>
+      <div class="demo-row"><span>地圖</span><select id="map"></select></div>
+    </div>
+    <div class="demo-card" style="margin-top: 12px">
+      <h2>統計</h2>
+      <div class="demo-stats">
+        <div><b>FPS</b><span id="fps">—</span></div>
+        <div><b>tick / 秒</b><span id="tps">—</span></div>
+        <div><b>單 tick 模擬耗時</b><span id="simMs">—</span> ms</div>
+        <div><b>場上怪物</b><span id="monsters">—</span></div>
+      </div>
+    </div>
+    <div class="demo-card" style="margin-top: 12px">
+      <h2>匯出參數</h2>
+      <textarea id="export" readonly></textarea>
+      <div class="demo-row"><button id="exportBtn">匯出 JSON</button></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { TickDemoStage } from './tickDemo.ts';
+
+const $ = (id) => document.getElementById(id);
+const stage = new TickDemoStage();
+await stage.init($('stage'));
+
+const mapSel = $('map');
+for (const m of stage.maps) {
+  const opt = document.createElement('option');
+  opt.value = m.id; opt.textContent = `${m.name ?? m.id}（${m.id}）`;
+  mapSel.appendChild(opt);
+}
+mapSel.addEventListener('change', () => stage.loadMap(mapSel.value));
+if (stage.maps.length > 0) await stage.loadMap(stage.maps[0].id);
+
+for (const r of document.querySelectorAll('input[name=mode]')) {
+  r.addEventListener('change', () => stage.setParams({ mode: r.value }));
+}
+const bind = (id, key) => {
+  const el = $(id);
+  const out = $(id + 'Out');
+  el.addEventListener('input', () => { out.textContent = el.value; stage.setParams({ [key]: Number(el.value) }); });
+};
+bind('tickMs', 'tickMs');
+bind('playerSpeed', 'playerSpeed');
+bind('monsterSpeed', 'monsterSpeed');
+
+stage.subscribeStats(s => {
+  $('fps').textContent = s.fps;
+  $('tps').textContent = s.ticksPerSec;
+  $('simMs').textContent = s.simMsPerTick;
+  $('monsters').textContent = s.monsters;
+});
+$('exportBtn').addEventListener('click', () => { $('export').value = stage.exportParams(); });
+</script>
+</body>
+</html>

@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from './stores/gameStore';
-import { seedDatabase } from './db/seed';
 import { loadTemplateCache } from './systems/templateSync';
-import { purgeOutdatedData } from './systems/dataVersionPurge';
 import { CharacterCreate } from './components/CharacterCreate';
 import { CharacterSelect } from './components/CharacterSelect';
-import { LegacyArchiveView } from './components/LegacyArchiveView';
 import { StatusPanel } from './components/StatusPanel';
-import { CombatLogWindow } from './components/CombatLogWindow';
+import { LogDock } from './components/LogDock';
+import { TradeAutoOpen } from './components/TradePanel';
 import { DiscardConfirmModal } from './components/DiscardConfirmModal';
 import { BuffBar } from './components/BuffBar';
+import { PartyHud } from './components/PartyPanel';
 import { AttributeUpModal } from './components/AttributeUpModal';
 import { BattleView } from './components/BattleView';
 import { ExploreBar } from './components/ExploreBar';
@@ -18,6 +17,10 @@ import { TownView } from './components/TownView';
 import { TrainingGroundView } from './components/TrainingGroundView';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
+import { LoginScreen } from './components/LoginScreen';
+import { useOnlineStore, resolveServerWsUrl } from './net/online';
+import { connection } from './net/connection';
+import { installOnlineProxies } from './net/mirror';
 import { GameToolbar } from './components/GameToolbar';
 import { BuildLabel } from './components/BuildLabel';
 import { PanelWindows } from './components/PanelWindows';
@@ -30,22 +33,13 @@ import './App.css';
 /**
  * 把開機失敗轉成玩家看得懂、且指得出下一步的訊息。
  *
- * 最常見的是 Dexie 的 `VersionError`：瀏覽器的 IndexedDB 已經升到較新的版本，
- * 卻載到只認得舊版本的程式碼（部署回滾，或快取到舊 bundle）。
- * 見 `docs/RELEASE.md` § 7.3。
+ * 遊戲資料全在 server（`97-selfhosted-server.md` § 97.5），所以開機唯一會擋住人的
+ * 是連不上 server —— 通常是執行檔沒開，或網址打到別台。
  */
 export function describeInitError(error: unknown): string {
-  const name = (error as { name?: string } | null)?.name ?? '';
   const message = error instanceof Error ? error.message : String(error);
-
-  if (name === 'VersionError') {
-    return '此瀏覽器的存檔是由較新版本建立的，目前載入的是舊版程式。請重新整理頁面取得最新版本。';
-  }
-  if (name === 'QuotaExceededError') {
-    return '瀏覽器儲存空間不足，無法載入存檔。請清出空間後重新整理。';
-  }
-  if (name === 'InvalidStateError' || name === 'SecurityError') {
-    return '無法存取瀏覽器資料庫。若使用無痕模式或封鎖了網站資料，請改用一般視窗。';
+  if (message.includes('server')) {
+    return '連不上遊戲 server。請確認 server 已啟動，且網址與埠號正確。';
   }
   return `載入失敗：${message}`;
 }
@@ -53,9 +47,9 @@ export function describeInitError(error: unknown): string {
 function App() {
   const phase = useGameStore(s => s.phase);
   const setPhase = useGameStore(s => s.setPhase);
-  const initUser = useGameStore(s => s.initUser);
-  const loadCharacterList = useGameStore(s => s.loadCharacterList);
   const currentRegion = useGameStore(s => s.character?.currentRegion);
+  const onlineEnabled = useOnlineStore(s => s.enabled);
+  const onlineStatus = useOnlineStore(s => s.status);
   const [initError, setInitError] = useState<string | null>(null);
 
   const region = currentRegion ? getRegion(currentRegion) : null;
@@ -70,13 +64,13 @@ function App() {
     initialized.current = true;
 
     async function init() {
-      await seedDatabase();
+      // 遊戲資料全在 server（`97-selfhosted-server.md`）：本機只留隨 bundle 發布的模板
       await loadTemplateCache();
-      // 必須在 loadCharacterList 之前：讓過期角色在選擇畫面出現之前就消失，
-      // 而不是「點下去角色才不見」
-      await purgeOutdatedData();
-      await initUser();
-      await loadCharacterList();
+      const wsUrl = await resolveServerWsUrl();
+      if (!wsUrl) throw new Error('連不上遊戲 server');
+      useOnlineStore.setState({ enabled: true });
+      installOnlineProxies(connection);
+      connection.connect(wsUrl);
     }
     // 不可靜默失敗：開機流程掛掉會讓畫面停在標題頁或空白，玩家完全沒有線索
     init().catch((err: unknown) => {
@@ -94,6 +88,10 @@ function App() {
         <BuildLabel />
       </div>
     );
+  }
+
+  if (onlineEnabled && onlineStatus !== 'authed') {
+    return <LoginScreen />;
   }
 
   if (phase === 'title') {
@@ -128,15 +126,6 @@ function App() {
   }
 
   // § 45.3：遺產頁唯讀，只能返回角色選擇，不掛任何遊玩中的 UI
-  if (phase === 'legacy') {
-    return (
-      <div className="app">
-        <LegacyArchiveView />
-        <BuildLabel />
-      </div>
-    );
-  }
-
   return <GameLayout isInTown={isInTown} isInTrainingGround={isInTrainingGround} />;
 }
 
@@ -177,6 +166,7 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
         <div className="hud hud-topleft">
           <StatusPanel />
           <BuffBar />
+          <PartyHud />
         </div>
 
         {/* 右上：只放地圖選擇器（系統按鈕與版本標示都在右下角） */}
@@ -189,8 +179,8 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
         </div>
       </div>
 
-      {/* 戰鬥日誌：可拖曳的視窗，預設停在左下角 */}
-      <CombatLogWindow />
+      {/* 戰鬥日誌：可拖曳的視窗，預設停在左下角。聊天是同一套視窗，預設停在它右邊 */}
+      <LogDock />
 
       {/*
         * 下方 HUD 帶。同樣是桌機 `display: contents`、手機才成形（`47-mobile.md`）。
@@ -206,7 +196,7 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
           <QuickSlotBar />
         </div>
 
-        {/* 右下：面板按鈕 + 系統按鈕（Wiki／匯出／匯入／登出） */}
+        {/* 右下：面板按鈕 + 系統按鈕（Wiki／登出） */}
         <div className="hud hud-bottomright">
           <PanelDock />
           <GameToolbar />
@@ -214,6 +204,8 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
       </div>
 
       <PanelWindows />
+      {/* 交易沒有面板按鈕：有邀請或交易成立時自動開窗 */}
+      <TradeAutoOpen />
       <AttributeUpModal />
       <DiscardConfirmModal />
       {/* 指標拖曳的殘影（`47-mobile.md`）。掛在最外層，任何面板拖出來的東西都畫得到 */}

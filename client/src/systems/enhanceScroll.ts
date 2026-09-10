@@ -9,9 +9,9 @@
 
 import type { EquipmentInstance, EquipSlot } from '../models/equipment';
 import { getBagItemAmount, consumeBagItem, type BagItem } from '../models/bagItem';
-import { useGameStore } from '../stores/gameStore';
-import { db } from '../db/database';
+import { defaultSession, type Session } from '../stores/session';
 import { getWeaponEnhanceRate, getArmorEnhanceRate } from './enhancement';
+import { random } from '../core/rng';
 
 /** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱（§ 99.1） */
 export const WEAPON_ENHANCE_SCROLL_ID = 7;
@@ -121,53 +121,52 @@ export interface EnhanceOutcome {
 }
 
 /** 背包列一律以 `itemTemplateId` 定位（§ 99.1），不可用 name 查 */
-function persistBagItem(itemId: number, newAmount: number) {
-  const charId = useGameStore.getState().character?.id;
+function persistBagItem(itemId: number, newAmount: number, session: Session) {
+  const charId = session.game.getState().character?.id;
   if (!charId) return;
-  const rows = db.characterBag.where({ characterId: charId, itemTemplateId: itemId });
-  if (newAmount <= 0) rows.delete();
-  else rows.modify({ amount: newAmount });
+  void session.repo.setBagItemAmount(charId, itemId, newAmount);
 }
 
-function persistEquipment(item: EquipmentInstance) {
+function persistEquipment(item: EquipmentInstance, session: Session) {
   if (!item.id) return;
-  db.equipmentInstances.update(item.id, {
+  void session.repo.updateEquipment(item.id, {
     enhancement: item.enhancement,
     quality: item.quality,
     affixes: item.affixes,
   });
 }
 
-function writeBack(target: EnhanceTarget, updated: EquipmentInstance | null, bagItems: BagItem[]) {
-  const { equippedGear, inventory } = useGameStore.getState();
+function writeBack(target: EnhanceTarget, updated: EquipmentInstance | null, bagItems: BagItem[], session: Session) {
+  const { equippedGear, inventory } = session.game.getState();
   if (target.slot) {
-    useGameStore.setState({ equippedGear: { ...equippedGear, [target.slot]: updated }, bagItems });
+    session.game.setState({ equippedGear: { ...equippedGear, [target.slot]: updated }, bagItems });
   } else if (updated) {
-    useGameStore.setState({ inventory: inventory.map(i => (i.id === target.item.id ? updated : i)), bagItems });
+    session.game.setState({ inventory: inventory.map(i => (i.id === target.item.id ? updated : i)), bagItems });
   } else {
-    useGameStore.setState({ inventory: inventory.filter(i => i.id !== target.item.id), bagItems });
+    session.game.setState({ inventory: inventory.filter(i => i.id !== target.item.id), bagItems });
   }
 }
 
 /**
  * 消耗一張卷軸並結算。卷軸不足或目標不合法時回 null，不消耗任何東西。
  *
- * `randomFn` 只為測試留的注入點，正式路徑一律用 `Math.random`。
+ * `randomFn` 只為測試留的注入點，正式路徑一律用 `random`。
  */
 export function applyEnhanceScroll(
   scroll: EnhanceScroll,
   target: EnhanceTarget,
-  randomFn: () => number = Math.random,
+  randomFn: () => number = random,
+  session: Session = defaultSession,
 ): EnhanceOutcome | null {
   const { item } = target;
   if (!canScrollTarget(scroll, item)) return null;
 
-  const bagItems = useGameStore.getState().bagItems;
+  const bagItems = session.game.getState().bagItems;
   const scrollCount = getBagItemAmount(bagItems, scroll.itemId);
   if (scrollCount <= 0) return null;
 
   const newBag = consumeBagItem(bagItems, scroll.itemId);
-  persistBagItem(scroll.itemId, scrollCount - 1);
+  persistBagItem(scroll.itemId, scrollCount - 1, session);
 
   const current = item.enhancement ?? 0;
 
@@ -175,9 +174,9 @@ export function applyEnhanceScroll(
     // 沒有判定，所以不計入強化次數與損毀數（§ 6.12）
     const nextLevel = current - 1;
     const updated = { ...item, enhancement: nextLevel };
-    persistEquipment(updated);
-    writeBack(target, updated, newBag);
-    useGameStore.getState().saveState();
+    persistEquipment(updated, session);
+    writeBack(target, updated, newBag, session);
+    session.game.getState().saveState();
     return { fx: 'safe', success: true, nextLevel, message: `${item.name} 已降為 +${nextLevel}` };
   }
 
@@ -189,8 +188,8 @@ export function applyEnhanceScroll(
   let outcome: EnhanceOutcome;
   if (success) {
     const updated = { ...item, enhancement: nextLevel };
-    persistEquipment(updated);
-    writeBack(target, updated, newBag);
+    persistEquipment(updated, session);
+    writeBack(target, updated, newBag, session);
     outcome = {
       fx: nextLevel <= stability ? 'safe' : 'success',
       success: true,
@@ -198,8 +197,8 @@ export function applyEnhanceScroll(
       message: `強化成功！${item.name} +${nextLevel}`,
     };
   } else {
-    if (item.id) db.equipmentInstances.delete(item.id);
-    writeBack(target, null, newBag);
+    if (item.id) void session.repo.deleteEquipment(item.id);
+    writeBack(target, null, newBag, session);
     outcome = {
       fx: 'fail',
       success: false,
@@ -209,7 +208,7 @@ export function applyEnhanceScroll(
     };
   }
 
-  const stats = { ...useGameStore.getState().statistics };
+  const stats = { ...session.game.getState().statistics };
   if (scroll.category === 'weapon') {
     stats.weaponEnhanceAttempts += 1;
     if (!success) stats.weaponsBroken += 1;
@@ -217,8 +216,8 @@ export function applyEnhanceScroll(
     stats.armorEnhanceAttempts += 1;
     if (!success) stats.armorsBroken += 1;
   }
-  useGameStore.setState({ statistics: stats });
-  useGameStore.getState().saveState();
+  session.game.setState({ statistics: stats });
+  session.game.getState().saveState();
 
   return outcome;
 }

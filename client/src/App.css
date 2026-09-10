@@ -134,7 +134,6 @@
 .panel-dock { --area: var(--area-char); }
 .map-selector { --area: var(--area-nav); }
 .town-npc-bar { --area: var(--area-town); }
-.combat-log-window { --area: var(--area-battle); }
 .quick-slot-bar,
 .shop-items { --area: var(--area-item); }
 
@@ -250,6 +249,39 @@ a,
   color: var(--text-secondary);
   font-size: var(--fs-md);
   margin-bottom: 2.5rem;
+}
+
+/* --- 登入畫面（開放形態，`97-selfhosted-server.md` § 97.5） --- */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(320px, 90vw);
+  margin: 0 auto 1.5rem;
+  text-align: left;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.login-form input {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: var(--border-width) solid var(--outline-dark);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: var(--fs-md);
+}
+
+.login-error {
+  color: var(--accent-danger);
+  font-size: var(--fs-sm);
+  margin: 0;
 }
 
 /* --- Game Layout（滿版遊戲畫面 + 浮動 HUD，§ 32.3） --- */
@@ -539,13 +571,27 @@ a,
   width: 340px;
 }
 
-/* --- 戰鬥日誌視窗：預設左下角，可拖曳，背景透明度可調 --- */
+/* --- 紀錄視窗（戰鬥紀錄／聊天分頁）：預設左下角，可拖曳，背景透明度可調 --- */
+/*
+ * 停在下方 HUD 帶**之上**：帶子是 z-index 800，永遠壓在視窗上面，
+ * 貼齊畫面底部會讓聊天的輸入列與 ▲ 被快捷格蓋住（點得到的是快捷格）。
+ * 帶高由 `useHudBandBottom()` 量測，不寫死。
+ */
 .combat-log-window {
-  bottom: 12px;
+  bottom: calc(var(--hud-band-bottom, 12px) + 12px);
   left: 12px;
   flex-direction: column;
   gap: 0;
+  --area: var(--area-battle);
   --log-alpha: 0.8;
+}
+
+/*
+ * 外框色相跟著當下的分頁走（§ 34.10 分區色相）：聊天分頁改用角色／系統區。
+ * 框線的顏色是檔頭那條 `--outline-dark` 由 `--area` 算出來的，改這裡就整個視窗一起換。
+ */
+.combat-log-window.is-chat {
+  --area: var(--area-char);
 }
 
 /* 拖過之後改用 left/top（inline style），要把預設的 bottom 收掉 */
@@ -567,6 +613,39 @@ a,
   cursor: move;
   user-select: none;
   touch-action: none;
+}
+
+/*
+ * 標題列的分頁鈕（§ 32.3.1）。標題列同時是拖曳握把，分頁鈕自己吃掉指標事件；
+ * 未讀徽章沿用面板按鈕那一顆（§ 34.10）。
+ */
+.log-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.log-tab {
+  position: relative;
+  padding: 1px 10px;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.log-tab.active {
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.log-tab .quest-count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
 }
 
 /* 視窗設定：標題列只放一顆 ⚙，選項全部收在下拉選單裡 */
@@ -997,6 +1076,14 @@ button.active {
 .map-selector-label {
   font-family: var(--font-display);
   font-weight: 500;
+}
+
+/* 本地圖在線人數（含自己，`97-selfhosted-server.md` § 97.7.1）：緊跟在地圖名後面 */
+.map-selector-count {
+  margin-right: auto;
+  padding-left: 8px;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
 }
 
 .map-selector-arrow {
@@ -8793,4 +8880,516 @@ button.active {
   color: var(--accent-gold);
   line-height: 1;
   pointer-events: none;
+}
+
+/* === 隊伍（`97-selfhosted-server.md` § 97.7.3；只在線上模式出現） === */
+
+.party-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 260px;
+}
+
+.party-hud-row {
+  padding: 6px 8px;
+  background: rgba(var(--glass-rgb), 0.75);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+.party-hud-row.is-offline,
+.party-row.is-offline {
+  opacity: 0.55;
+}
+
+.party-hud-head,
+.party-hud-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--fs-xs);
+}
+
+.party-hud-name,
+.party-row-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.party-hud-class,
+.party-row-class,
+.party-row-sub,
+.party-hud-map {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.party-row-class {
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.party-leader-mark {
+  color: var(--accent-gold);
+  margin-right: 3px;
+}
+
+.party-member-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0;
+}
+
+.party-bar {
+  height: 6px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.party-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width var(--transition-normal);
+}
+
+.party-hp .party-bar-fill { background: var(--hp-bar); }
+.party-mp .party-bar-fill { background: var(--mp-bar); }
+
+.party-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.party-section {
+  padding: 8px 10px;
+}
+
+.party-section + .party-section {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.party-section-title {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.party-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.party-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+.party-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+
+.party-action-btn {
+  padding: 3px 8px;
+  border: var(--border-width) solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.party-action-btn.is-secondary {
+  border-color: var(--outline-dark);
+  background: var(--bg-card);
+}
+
+.party-action-btn.is-danger {
+  border-color: var(--accent-danger);
+  background: transparent;
+  color: var(--accent-danger);
+}
+
+.party-action-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.party-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+}
+
+.party-drop-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.party-drop-mode select {
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: var(--fs-xs);
+}
+
+.party-empty {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  padding: 4px 0;
+}
+
+/* 以角色名稱邀請（`97-selfhosted-server.md` § 97.7.3） */
+.party-invite-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.party-invite-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+}
+
+.party-message {
+  padding: 6px 10px;
+  color: var(--accent-gold);
+  border-left: 3px solid var(--accent-gold);
+  font-size: var(--fs-sm);
+}
+
+/* === 聊天（`97-selfhosted-server.md` § 97.7.2）：紀錄視窗的一個分頁（§ 32.3.1） === */
+
+/* 視窗殼是 flex row（內容 ＋ ▲ 按鈕），聊天整塊當成那個「內容」 */
+/* 外框要與戰鬥紀錄分頁（`.combat-log`）同一條，否則切到聊天時視窗只剩標題列有框 */
+.chat-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: rgba(var(--glass-rgb), var(--log-alpha));
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  backdrop-filter: blur(4px);
+}
+
+.chat-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px 0;
+}
+
+.chat-tab {
+  padding: 2px 10px;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+/* active 態走 § 34.11 分頁切換鈕那一份，不另外定義顏色 */
+.chat-tab.active {
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* 底色由 `.chat-body` 出，訊息區只負責捲動與內距 */
+.combat-log.chat-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  backdrop-filter: none;
+  padding: 6px 8px;
+}
+
+.chat-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  line-height: 1.4;
+}
+
+.chat-line.is-mine .chat-name {
+  color: var(--accent-primary);
+}
+
+.chat-time {
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+
+.chat-name {
+  color: var(--accent-info);
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.chat-name-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline dotted;
+}
+
+.chat-text {
+  color: var(--text-primary);
+  word-break: break-word;
+  min-width: 0;
+}
+
+/* 右側留出 ▲ 按鈕的寬度：它絕對定位在視窗右緣，不讓位就會蓋住送出鈕 */
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  padding-right: 40px;
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.chat-send-btn {
+  padding: 4px 12px;
+  border: var(--border-width) solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-primary) 42%, var(--bg-card));
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.chat-send-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chat-error {
+  padding: 0 6px 6px;
+  color: var(--accent-danger);
+  font-size: var(--fs-xs);
+}
+
+/* === 交易（`97-selfhosted-server.md` § 97.7 表） === */
+
+.trade-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.trade-side {
+  padding: 8px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  min-height: 90px;
+}
+
+.trade-side.is-locked {
+  border-color: var(--accent-gold);
+}
+
+.trade-side-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.trade-side-state {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.trade-list,
+.trade-pick-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.trade-item {
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.trade-item.is-empty {
+  color: var(--text-dim);
+}
+
+.trade-gold {
+  color: var(--accent-gold);
+}
+
+.trade-editor-group {
+  margin-bottom: 8px;
+}
+
+.trade-editor-label {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.trade-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+
+.trade-pick-qty {
+  justify-content: space-between;
+}
+
+.trade-pick input[type='number'] {
+  width: 72px;
+  padding: 2px 6px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+}
+
+.trade-pick-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+/* 線上模式的帳號區（`97-selfhosted-server.md` § 97.5） */
+.settings-account-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.pill-admin {
+  font-size: var(--fs-xs);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.settings-password {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.settings-password input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.settings-password-msg {
+  margin-left: 6px;
+  color: var(--accent-gold);
+}
+
+/* 聊天：頻道選單與密語對象（`97-selfhosted-server.md` § 97.7.2） */
+.chat-input-channel,
+.chat-whisper-target {
+  padding: 4px 6px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  flex: 0 0 auto;
+}
+
+.chat-whisper-target {
+  width: 110px;
+  min-width: 0;
+}
+
+/* 分類鈕是開關：關掉的那個退到背景 */
+.chat-tab:not(.active) {
+  opacity: 0.5;
+}
+
+.chat-channel {
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+
+/*
+ * 密語在共用 log 裡換色。**送出與收到必須不同色** ——
+ * 同色的話一來一往看起來像同一個人在自言自語。
+ */
+.chat-line.chat-whisper.is-outgoing .chat-text,
+.chat-line.chat-whisper.is-outgoing .chat-name {
+  color: var(--accent-primary);
+}
+
+.chat-line.chat-whisper.is-incoming .chat-text,
+.chat-line.chat-whisper.is-incoming .chat-name {
+  color: var(--accent-gold);
 }

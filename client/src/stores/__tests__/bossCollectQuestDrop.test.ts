@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import { useGameStore, processMonsterDeath, waitForPendingDrops } from '../gameStore';
 import type { AdventurerQuest } from '../../models/adventurerQuest';
 
@@ -45,10 +43,7 @@ function bossCollectQuest(id: string, title: string): AdventurerQuest {
 
 describe('collectboss 任務 — 同一隻 BOSS 的兩張任務同時進度', () => {
   beforeEach(async () => {
-    resetSeedState();
-    await db.delete();
-    await db.open();
-    await seedDatabase();
+    resetTestDb();
     localStorage.clear();
     useGameStore.setState({
       phase: 'title',

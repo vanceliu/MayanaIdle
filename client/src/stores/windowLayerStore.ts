@@ -14,7 +14,8 @@ export const WINDOW_Z_BASE = 500;
 
 export type WindowLayerKey =
   | `panel:${string}`
-  | 'combat-log'
+  /** 底部紀錄視窗（`LogDock`）：戰鬥紀錄與聊天兩個分頁 */
+  | 'combatLog'
   | 'town'
   | 'map-nav';
 

@@ -22,10 +22,13 @@ import {
   type HitBreakdown,
 } from './combat';
 import { getErosion, getOnHitRestore } from '../models/affix';
-import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
+import { getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
+import { defaultSession, type Session } from '../stores/session';
 import { getSkillTemplate } from '../models/skillTemplate';
 import { rollMonsterDebuff, applyPlayerDebuff, applyPlayerBuff } from './playerDebuffSystem';
 import { getEffectiveGearArray } from './gear';
+import { random } from '../core/rng';
+import { gameNow } from '../core/clock';
 
 /** § 24.6 Boss 控場免疫冷卻 */
 export const BOSS_CC_IMMUNE_MS = 10_000;
@@ -48,7 +51,8 @@ export function applySkillSelfBuff(
   skill: Skill,
   character: Character,
   activeEffects: ActiveEffect[],
-  now: number = Date.now(),
+  now: number = gameNow(),
+  session: Session = defaultSession,
 ): SelfBuffApplyResult | null {
   const def = skill.selfBuff;
   if (!def) return null;
@@ -57,7 +61,7 @@ export function applySkillSelfBuff(
   let description = def.description;
 
   if (def.scaleByMissingHp) {
-    const maxHp = getEffectiveMaxHp(character, useGameStore.getState().equippedGear);
+    const maxHp = getEffectiveMaxHp(character, session.game.getState().equippedGear);
     const missingPercent = maxHp > 0 ? (1 - character.hp / maxHp) * 100 : 0;
     const bonus = Math.floor(Math.min(def.scaleByMissingHp.maxPercent, Math.max(0, missingPercent)));
     if (bonus <= 0) return null;
@@ -90,6 +94,8 @@ export function applySkillSelfBuff(
 }
 
 export interface ArpgEventContext {
+  /** 省略＝client 的 defaultSession */
+  session?: Session;
   character: Character;
   equippedGear: (EquipmentInstance | null)[];
   activeEffects: ActiveEffect[];
@@ -138,6 +144,7 @@ export function processPlayerAttack(
   event: PlayerAttackEvent,
   ctx: ArpgEventContext,
 ): PlayerAttackResult {
+  const session = ctx.session ?? defaultSession;
   const { character, equippedGear, activeEffects } = ctx;
   const damages: DamageResult[] = [];
   const logs: CombatLog[] = [];
@@ -148,8 +155,8 @@ export function processPlayerAttack(
 
   // Handle buff/heal skills — these target the player, not monsters
   if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
-    const now = Date.now();
-    const gs = useGameStore.getState();
+    const now = gameNow();
+    const gs = session.game.getState();
     const skillIdx = gs.skills.findIndex(s => s.id === skill.id);
 
     if (skill.type === 'buff') {
@@ -183,14 +190,14 @@ export function processPlayerAttack(
 
         if (skill.cleanse) {
           const cleansed = gs.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
-          useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: cleansed });
+          session.game.setState({ character: newChar, skills: newSkills, activeEffects: cleansed });
         } else {
           const applied = applyPlayerBuff(gs.activeEffects, buffEffect);
-          useGameStore.setState({ character: newChar, skills: newSkills, activeEffects: applied.effects });
+          session.game.setState({ character: newChar, skills: newSkills, activeEffects: applied.effects });
           if (applied.cancelledSlow) logs.push({ text: `${skill.name} 解除了減速`, type: 'debuff-self' });
         }
       } else {
-        useGameStore.setState({ character: newChar, skills: newSkills });
+        session.game.setState({ character: newChar, skills: newSkills });
       }
 
       logs.push({ text: `施放 ${skill.name}`, type: 'player' });
@@ -205,7 +212,7 @@ export function processPlayerAttack(
       const newSkills = [...gs.skills];
       if (skillIdx >= 0) newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
 
-      useGameStore.setState({ character: newChar, skills: newSkills });
+      session.game.setState({ character: newChar, skills: newSkills });
       logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
       return { damages: [], logs, skillUsed: skill, healAmount: healed };
     }
@@ -217,9 +224,9 @@ export function processPlayerAttack(
   // 於傷害結算「前」施加，本次攻擊也吃得到加成。
   let effectsForDamage = activeEffects;
   if (skill?.selfBuff) {
-    const applied = applySkillSelfBuff(skill, character, useGameStore.getState().activeEffects);
+    const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects);
     if (applied) {
-      useGameStore.setState({ activeEffects: applied.effects });
+      session.game.setState({ activeEffects: applied.effects });
       effectsForDamage = applied.effects;
       logs.push({ text: `${skill.name}：${applied.description}`, type: 'player' });
     }
@@ -337,8 +344,8 @@ export function processPlayerAttack(
         e => e.type === 'buff' && e.target === 'player' && e.category === 'poison-enchant'
       );
       if (poisonBuff) {
-        const now = Date.now();
-        const gs = useGameStore.getState();
+        const now = gameNow();
+        const gs = session.game.getState();
         const envenomTemplate = getSkillTemplate('envenom');
         const debuff = envenomTemplate?.onHitDebuff;
         // § 24.3.2 DoT 不可刷新：中毒存續期間不重複施加，也不重複輸出日誌
@@ -382,8 +389,8 @@ export function processPlayerAttack(
     if (!isMiss && !killed) {
       const erosion = getErosion(weapon?.affixes, weapon?.quality ?? 0);
       if (erosion) {
-        const now = Date.now();
-        const gs = useGameStore.getState();
+        const now = gameNow();
+        const gs = session.game.getState();
         // § 24.3.2 DoT 不可刷新：存續期間不重複施加
         const alreadyEroded = gs.activeEffects.some(
           e => e.type === 'debuff' && e.category === EROSION_CATEGORY
@@ -394,7 +401,7 @@ export function processPlayerAttack(
           const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
           let triggered = false;
           for (let r = 0; r < rolls && !triggered; r++) {
-            if (Math.random() * 100 < erosion.chance) triggered = true;
+            if (random() * 100 < erosion.chance) triggered = true;
           }
           if (triggered) {
             gs.addEffect({
@@ -462,8 +469,8 @@ export function processPlayerAttack(
       // Apply skill debuff on hit (DoT or stat modifier)
       if (!killed && skill?.applyDebuff) {
         const debuffDef = skill.applyDebuff;
-        const now = Date.now();
-        const gs = useGameStore.getState();
+        const now = gameNow();
+        const gs = session.game.getState();
 
         // Check if same category debuff already active on this target
         const alreadyActive = gs.activeEffects.some(
@@ -476,7 +483,7 @@ export function processPlayerAttack(
         // DoT（§ 24.3.2）與控場（§ 24.3.3）維持「存續期間不可重新施加」
         const isRefreshable = !debuffDef.dotDamage && !debuffDef.dotDamagePercent && !debuffDef.stun;
         if (alreadyActive && isRefreshable) {
-          useGameStore.setState({
+          session.game.setState({
             activeEffects: gs.activeEffects.filter(
               e => !(e.type === 'debuff' && e.category === debuffDef.category && e.target === 'monster' && e.targetMonsterId === targetId)
             ),
@@ -565,8 +572,8 @@ export function processPlayerAttack(
 
   // Update skill cooldown in store
   if (skill) {
-    const now = Date.now();
-    const gs = useGameStore.getState();
+    const now = gameNow();
+    const gs = session.game.getState();
     const skillIdx = gs.skills.findIndex(s => s.id === skill.id);
     if (skillIdx >= 0) {
       const newSkills = [...gs.skills];
@@ -589,7 +596,7 @@ export function processPlayerAttack(
       }
 
       const newChar = { ...gs.character!, mp: mpAfterCost + mpRestored, hp: gs.character!.hp + hpRestored };
-      useGameStore.setState({ skills: newSkills, character: newChar });
+      session.game.setState({ skills: newSkills, character: newChar });
       if (mpRestored > 0) {
         logs.push({ text: `${skill.name} 回復 ${mpRestored} MP`, type: 'player' });
       }
@@ -607,6 +614,7 @@ export function processMonsterAttack(
   event: MonsterAttackEvent,
   ctx: ArpgEventContext,
 ): MonsterAttackResult | null {
+  const session = ctx.session ?? defaultSession;
   const monster = ctx.monsterInstances.get(event.monsterId);
   if (!monster || monster.currentHp <= 0) return null;
 
@@ -627,11 +635,11 @@ export function processMonsterAttack(
   let actualDamage = result.damage;
   let shieldLog: CombatLog | undefined;
   if (!result.dodged && result.damage > 0) {
-    const gsForShield = useGameStore.getState();
+    const gsForShield = session.game.getState();
     const shield = absorbWithShield(result.damage, gsForShield.activeEffects);
     if (shield.absorbed > 0) {
       actualDamage = shield.damage;
-      useGameStore.setState({ activeEffects: shield.effects });
+      session.game.setState({ activeEffects: shield.effects });
       shieldLog = shield.broken
         ? { text: `聖光護盾吸收 ${shield.absorbed} 傷害後破裂`, type: 'system' }
         : { text: `聖光護盾吸收 ${shield.absorbed} 傷害`, type: 'system' };
@@ -654,16 +662,16 @@ export function processMonsterAttack(
   // 同一條詞綴可以出現在多個部位，每件各自判定一次。
   const restoreLogs: CombatLog[] = [];
   if (!result.dodged && actualDamage > 0) {
-    const gs = useGameStore.getState();
+    const gs = session.game.getState();
     const maxHp = getEffectiveMaxHp(character, gs.equippedGear);
     const maxMp = getEffectiveMaxMp(character, gs.equippedGear);
     let hpGain = 0;
     for (const r of getOnHitRestore(equippedGear, 'on_hit_hp')) {
-      if (Math.random() * 100 < r.chance) hpGain += Math.max(1, Math.floor(maxHp * r.percent / 100));
+      if (random() * 100 < r.chance) hpGain += Math.max(1, Math.floor(maxHp * r.percent / 100));
     }
     let mpGain = 0;
     for (const r of getOnHitRestore(equippedGear, 'on_hit_mp')) {
-      if (Math.random() * 100 < r.chance) mpGain += Math.max(1, Math.floor(maxMp * r.percent / 100));
+      if (random() * 100 < r.chance) mpGain += Math.max(1, Math.floor(maxMp * r.percent / 100));
     }
     if (hpGain > 0 && character.hp > 0) {
       const before = character.hp;
@@ -682,14 +690,14 @@ export function processMonsterAttack(
   // 命中後判定角色 debuff（§ 24.4.2 / § 25.9.2）
   let debuffLog: CombatLog | undefined;
   if (!result.dodged) {
-    const gs = useGameStore.getState();
+    const gs = session.game.getState();
     const magicResist = getTotalMagicResist(character, equippedGear, gs.activeEffects);
-    const roll = rollMonsterDebuff(monster, equippedGear, gs.activeEffects, Date.now(), magicResist);
+    const roll = rollMonsterDebuff(monster, equippedGear, gs.activeEffects, gameNow(), magicResist);
     if (roll.resisted) {
       debuffLog = { text: `魔法抗性擋下了 ${monster.name} 的負面效果`, type: 'debuff-self' };
     } else if (roll.effect) {
       const applied = applyPlayerDebuff(gs.activeEffects, roll.effect);
-      useGameStore.setState({ activeEffects: applied.effects });
+      session.game.setState({ activeEffects: applied.effects });
       debuffLog = applied.cancelledSpeedBuff
         ? { text: `${monster.name} 的減速抵銷了你的加速效果`, type: 'debuff-self' }
         : { text: `${monster.name} 使你 ${roll.effect.name} ${roll.effect.duration / 1000}s`, type: 'debuff-self' };

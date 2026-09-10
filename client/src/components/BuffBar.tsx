@@ -5,6 +5,7 @@ import { Tooltip } from './Tooltip';
 import { getEffectIcon } from '../models/iconMap';
 import { getRestedExpRemaining } from '../systems/restedExp';
 import type { ActiveEffect } from '../models/effect';
+import { gameNow } from '../core/clock';
 
 /** icon 邊長（§ 24.8.1）。外框由 `.buff-icon` 的寬度決定，兩者要一起改 */
 const BUFF_ICON_SIZE = 36;
@@ -84,7 +85,7 @@ function RestedExpRow({ remainingMs }: { remainingMs: number }) {
 }
 
 function EffectRow({ effects, kind }: { effects: ActiveEffect[]; kind: 'buff' | 'debuff' }) {
-  const now = Date.now();
+  const now = gameNow();
   const visible = effects.slice(0, MAX_VISIBLE_PER_ROW);
   const overflow = effects.length - MAX_VISIBLE_PER_ROW;
   const isDebuff = kind === 'debuff';

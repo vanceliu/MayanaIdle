@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import 'fake-indexeddb/auto';
 import { SigilMaster } from '../town/SigilMaster';
 import { useGameStore } from '../../stores/gameStore';
 import type { EquipmentInstance } from '../../models/equipment';

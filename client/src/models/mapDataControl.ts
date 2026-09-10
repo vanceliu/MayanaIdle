@@ -1,7 +1,7 @@
 import type { MapData, MapTheme, Position } from './mapControl';
 import { TILE_DEFINITIONS, TileType, canTransition, isInBounds, isSpawnableTile, isWalkableTile } from './mapControl';
+import { requireMapSource } from './mapSource';
 
-const mapModules = import.meta.glob<MapData>('../data/maps/*.json', { eager: false, import: 'default' });
 const mapCache = new Map<string, MapData>();
 
 export const MAP_THEMES: readonly MapTheme[] = [
@@ -10,9 +10,8 @@ export const MAP_THEMES: readonly MapTheme[] = [
   'town',
 ];
 
-function getMapKey(id: string): string | null {
-  const suffix = `/${id}.json`;
-  return Object.keys(mapModules).find(path => path.endsWith(suffix)) ?? null;
+function hasMap(id: string): boolean {
+  return requireMapSource().ids().includes(id);
 }
 
 function assert(condition: unknown, mapId: string, message: string): asserts condition {
@@ -114,9 +113,8 @@ function getReachablePositions(map: MapData, start: Position): Set<string> {
 
 async function loadMap(id: string): Promise<MapData | null> {
   if (mapCache.has(id)) return mapCache.get(id)!;
-  const key = getMapKey(id);
-  if (!key) return null;
-  const data = await mapModules[key]() as MapData;
+  if (!hasMap(id)) return null;
+  const data = await requireMapSource().load(id);
   const validated = validateMapData(data, id);
   mapCache.set(id, validated);
   return validated;
@@ -131,7 +129,7 @@ export async function getMapForRegion(regionId: string, floor?: number | null): 
 }
 
 export async function loadAllMaps(): Promise<MapData[]> {
-  const ids = Object.keys(mapModules).map(path => path.slice(path.lastIndexOf('/') + 1, -5)).sort();
+  const ids = [...requireMapSource().ids()].sort();
   return Promise.all(ids.map(async id => {
     const map = await loadMap(id);
     if (!map) throw new Error(`Map module disappeared: ${id}`);

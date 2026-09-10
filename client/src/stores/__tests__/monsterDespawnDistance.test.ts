@@ -38,7 +38,6 @@ function setMonsters(monsters: MapMonster[], combatMonsterIds: string[] = []) {
     monsters,
     maxMonsters: 10,
     spawnTimer: 0,
-    paused: false,
     combatMonsterIds,
     hasBossInPool: false,
   });

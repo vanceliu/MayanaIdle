@@ -1,5 +1,6 @@
 import type { ClassName } from './character';
 import { MONSTER_SEEDS } from '../db/seed';
+import { random } from '../core/rng';
 
 function getMonstersByArea(areaId: string): string[] {
   return MONSTER_SEEDS.filter(m => m.area === areaId && !m.isBoss).map(m => m.name);
@@ -68,11 +69,11 @@ export const ERRAND_AREA_POOL = ['green-valley', 'wind-woods'];
 export const COLLECT_AREA_POOL = ['misty-swamp', 'trial-highlands'];
 
 export function pickRandomCollectMonster(): { area: string; monster: string } {
-  const areaIdx = Math.floor(Math.random() * COLLECT_AREA_POOL.length);
+  const areaIdx = Math.floor(random() * COLLECT_AREA_POOL.length);
   const area = COLLECT_AREA_POOL[areaIdx];
   const monsters = getMonstersByArea(area);
   if (monsters.length === 0) return pickRandomCollectMonster();
-  const monsterIdx = Math.floor(Math.random() * monsters.length);
+  const monsterIdx = Math.floor(random() * monsters.length);
   return { area, monster: monsters[monsterIdx] };
 }
 
@@ -101,6 +102,6 @@ export function isQuestCompletable(quest: Quest): boolean {
 }
 
 export function pickRandomErrandArea(): string {
-  const idx = Math.floor(Math.random() * ERRAND_AREA_POOL.length);
+  const idx = Math.floor(random() * ERRAND_AREA_POOL.length);
   return ERRAND_AREA_POOL[idx];
 }

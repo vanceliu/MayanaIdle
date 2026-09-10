@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import 'fake-indexeddb/auto';
-import { db } from '../../db/database';
-import { seedDatabase, resetSeedState } from '../../db/seed';
+import { resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { useGameStore } from '../../stores/gameStore';
 import { bagItemById } from '../../testing/bagFixtures';
@@ -76,10 +74,7 @@ describe('強化卷軸的目標判定', () => {
 
 describe('強化卷軸的結算', () => {
   beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    resetSeedState();
-    await seedDatabase();
+    resetTestDb();
     await loadTemplateCache();
   });
 
