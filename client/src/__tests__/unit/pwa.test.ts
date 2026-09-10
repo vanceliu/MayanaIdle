@@ -19,7 +19,7 @@ describe('manifest', () => {
   const manifest = JSON.parse(read('public/manifest.webmanifest'));
 
   it('start_url 與 scope 都在部署的子路徑底下', () => {
-    // GitHub Pages 部署在 /MayanaIdle/；寫成 '/' 會讓安裝後的捷徑開到 404
+    // 前端掛在 /MayanaIdle/；寫成 '/' 會讓安裝後的捷徑開到 404
     expect(manifest.start_url).toBe(BASE);
     expect(manifest.scope).toBe(BASE);
   });

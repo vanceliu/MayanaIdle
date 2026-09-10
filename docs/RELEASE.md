@@ -37,47 +37,52 @@
 
 ## 3. 發布流程
 
-### 3.1 server 執行檔
+### 3.1 正式發布：GitHub Actions
+
+**發布一律靠 CI**（`.github/workflows/release.yml`）。三個 runner 各自原生打包自己的平台，
+所以不必在本機處理跨平台那堆麻煩，也不會在硬碟上堆幾 GB 的產物。
 
 ```bash
-./scripts/release.sh               # 完整流程，三平台
-./scripts/release.sh --host-only   # 只打包本機平台（自己測用）
-./scripts/release.sh --skip-tests  # 略過測試
+# 版本號改在 client/package.json，commit 之後打 tag
+git tag v0.7.1 && git push origin v0.7.1
 ```
+
+推 tag 會跑：型別檢查 → 三個 workspace 的測試 → 三平台打包 → 建立 GitHub Release。
+想先看產物不發布，就到 Actions 頁手動觸發（`workflow_dispatch`），檔案在該次執行的 artifacts。
+
+每個平台各兩個檔案：
+
+| 平台 | 桌面版 | server 執行檔 |
+|---|---|---|
+| macOS（arm64） | `MayanaIdle-<版本>-mac-arm64.dmg` / `.zip` | `mayana-server-macos-arm64` |
+| Windows（x64） | `MayanaIdle-<版本>-win-x64.zip` | `mayana-server-win-x64.exe` |
+| Linux（x64） | `MayanaIdle-<版本>-linux-x64.tar.gz` | `mayana-server-linux-x64` |
+
+**版本號取自 `client/package.json`**，桌面版、server 執行檔、前端永遠是同一個
+（連線時比對的就是它）。`desktop/package.json` 的 `version` 固定寫 `0.0.0`，打包時被蓋掉 ——
+要改版本只改 `client/package.json` 一處。
+
+### 3.2 本機打包（試打用）
+
+```bash
+./scripts/release.sh                # 只打這台機器的平台
+./scripts/release.sh --all-servers  # server 執行檔也打另外兩個平台（會下載對應的 node）
+./scripts/release.sh --skip-tests   # 略過測試
+```
+
+**預設只打本機平台。** 跨平台的產物在本機用不到，一輪三平台會留下 2 GB 左右：
+`desktop/release/`（各平台的 app 與壓縮檔）、`server/release/`、`server/.node-cache/`（下載回來的 node）。
+不需要時直接刪掉這三個目錄即可，它們都在 `.gitignore` 裡。
 
 腳本做的事，任一步失敗即中止：
 
 | 步驟 | 對應的坑 |
 |---|---|
-| 工作區必須乾淨 | 未提交就打包，執行檔裡的版本標示會指向上一個 commit |
-| `npx tsc -b`（client 與 server） | 根 tsconfig 是 references 形式，`tsc --noEmit` 是空跑 |
-| `vitest run`（client 與 server） | — |
+| 工作區必須乾淨 | 未提交就打包，產物裡的版本標示會指向上一個 commit |
+| `npx tsc -b`（client、server、desktop） | 根 tsconfig 是 references 形式，`tsc --noEmit` 是空跑 |
+| `vitest run`（三個 workspace） | — |
 | `npm run build`（client 與 server） | 前端 bundle 與 server 的 CJS bundle |
-| `node scripts/package.mjs --all` | 三平台執行檔，產物在 `server/release/` |
-
-產物：
-
-| 檔案 | 平台 |
-|---|---|
-| `mayana-server-macos-arm64` | macOS（Apple Silicon） |
-| `mayana-server-linux-x64` | Linux |
-| `mayana-server-win-x64.exe` | Windows |
-
-### 3.2 桌面版（目前只出 macOS）
-
-```bash
-cd client && npm run build      # 前端要先有
-cd ../desktop && npm run package
-```
-
-產物在 `desktop/release/`：`MayanaIdle-<版本>-arm64.dmg` 與 `-mac.zip`。
-
-**版本號取自 `client/package.json`**，桌面版、server 執行檔、前端永遠是同一個版本
-（連線時比對的就是它）。`desktop/package.json` 的 `version` 是 npm 的必填欄位，
-固定寫 `0.0.0`，打包時被蓋掉 —— 要改版本只改 `client/package.json` 一處。
-
-桌面版**不能跨平台打包**：Windows 與 Linux 版要在該平台或 CI 上跑
-（electron-builder 在 macOS 上產不出 Windows 安裝檔）。在補上之前，那兩個平台請用 § 3.1 的 server 執行檔。
+| 打包 | server 執行檔 ＋ 桌面版，產物在 `server/release/`、`desktop/release/` |
 
 未簽章：macOS 會被 Gatekeeper 擋，自己用可 `xattr -d com.apple.quarantine MayanaIdle.app`。
 
@@ -92,10 +97,18 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 |---|---|
 | 為什麼是 CJS | **SEA 只支援 CommonJS**。`server/scripts/build.mjs` 因此出兩份 bundle：`server.js`（ESM，原始碼執行用）與 `server.cjs`（打包用，相依全部內嵌） |
 | 前端怎麼進去 | `client/dist` 的每個檔案都是一個 SEA 資產，鍵是 `client/<相對路徑>`；`server/src/staticFiles.ts` 在 SEA 模式改讀資產，從原始碼跑則讀磁碟 |
-| 跨平台 | 目標平台的 node 由 `nodejs.org/dist` 下載並快取在 `server/.node-cache/`，所以一台機器就能出三份 |
+| 跨平台 | 目標平台的 node 由 `nodejs.org/dist` 下載並快取在 `server/.node-cache/`。CI 上每個 runner 只打自己的平台，所以用不到這個快取 |
 | macOS 簽章 | 注入會破壞既有簽章，打包腳本會 `codesign --remove-signature` 再 ad-hoc 重簽。**在非 macOS 上打包的 macOS 執行檔無法簽章**，對方會被 Gatekeeper 擋下 |
 | Windows 簽章 | postject 會印 `The signature seems corrupted!` —— node.exe 的 Authenticode 簽章因注入而失效，屬預期。未簽章的執行檔仍可執行，但 SmartScreen 會警告 |
-| node 版本 | 取自打包機的 `process.versions.node`，三個平台一致 |
+| node 版本 | 取自打包機的 `process.versions.node`；CI 三個 runner 都用同一個 major（workflow 的 `NODE_VERSION`） |
+
+### 桌面版（Electron）
+
+| 項目 | 說明 |
+|---|---|
+| server 從哪來 | 打進主行程的 bundle 裡，**不另外帶一份 server 執行檔** —— Electron 的 Node 有 `node:sqlite` |
+| 前端從哪來 | 打包前把 `client/dist` 複製成 `desktop/client-dist`，隨 app 一起包進 asar |
+| 為什麼要各平台原生打 | Windows 的 exe 資源編輯要 wine、Linux 的格式要對應環境；跨平台雖然出得來，但只有原生打的才是能簽章、能裝的正常產物 |
 
 ---
 

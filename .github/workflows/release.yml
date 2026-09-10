@@ -1,0 +1,115 @@
+# 發布（docs/RELEASE.md）：桌面版與 server 執行檔都在這裡打包。
+#
+# 每個平台由對應的 runner 原生打包 —— 桌面版沒辦法可靠地跨平台打
+# （Windows 的 exe 資源要 wine、Linux 格式要對應環境），本機打包只當備援。
+#
+# 觸發：推 `v*` tag 會建 GitHub Release；也可以在 Actions 頁手動跑一次拿產物。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# node:sqlite 要 Node 24
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  test:
+    name: 型別與測試
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci
+        working-directory: client
+      - run: npm ci
+        working-directory: server
+      - run: npm ci
+        working-directory: desktop
+      # 根 tsconfig 是 references 形式，一律 tsc -b（--noEmit 是空跑）
+      - run: npx tsc -b
+        working-directory: client
+      - run: npx tsc -b
+        working-directory: server
+      - run: npx tsc -p tsconfig.json
+        working-directory: desktop
+      - run: npx vitest run
+        working-directory: client
+      - run: npx vitest run
+        working-directory: server
+      - run: npx vitest run
+        working-directory: desktop
+
+  build:
+    name: 打包 ${{ matrix.label }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS (arm64)
+            desktop: --mac
+          - os: ubuntu-latest
+            label: Linux (x64)
+            desktop: --linux
+          - os: windows-latest
+            label: Windows (x64)
+            desktop: --win
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - run: npm ci
+        working-directory: client
+      - run: npm ci
+        working-directory: server
+      - run: npm ci
+        working-directory: desktop
+
+      # 前端要先有：server 執行檔與桌面版都把它包進去
+      - run: npm run build
+        working-directory: client
+      - run: npm run build
+        working-directory: server
+
+      # server 執行檔：只打這台 runner 的平台（三個 runner 合起來就是三平台）
+      - run: node scripts/package.mjs
+        working-directory: server
+
+      - run: npm run package -- ${{ matrix.desktop }}
+        working-directory: desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mayana-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            server/release/mayana-server-*
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.tar.gz
+            desktop/release/*.exe
+
+  release:
+    name: 建立 Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      # 用內建的 gh，不引入第三方 action
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes artifacts/*/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,8 @@
 /**
- * 桌面版打包（`docs/RELEASE.md` § 3.2）。
+ * 桌面版打包（`docs/RELEASE.md` § 3）。
+ *
+ * **預設只打這台機器的平台**：跨平台打出來的東西在本機用不到，還佔上百 MB。
+ * 三平台由 GitHub Actions 各自的 runner 原生打包（`.github/workflows/release.yml`）。
  *
  * 版本號一律取自 `client/package.json` —— 執行檔、前端、桌面版是同一個版本
  * （連線時比對的就是它，見 § 97.2 版本協商）。`desktop/package.json` 的
@@ -14,13 +17,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = join(here, '..');
 const { version } = JSON.parse(readFileSync(join(desktopRoot, '..', 'client', 'package.json'), 'utf-8'));
 
+const HOST_FLAG = { darwin: '--mac', win32: '--win', linux: '--linux' };
+
+// 要打別的平台就明講（CI 就是這樣傳的）
 const targets = process.argv.slice(2).filter(a => a.startsWith('--'));
-const platform = targets.length > 0 ? targets : ['--mac'];
+const platform = targets.length > 0 ? targets : [HOST_FLAG[process.platform] ?? '--linux'];
 
 console.log(`打包版本 ${version}（取自 client/package.json）`);
+// Windows 的 bin 是 .cmd，直接叫沒有副檔名的那個會找不到
+const bin = process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder';
 const result = spawnSync(
-  join(desktopRoot, 'node_modules', '.bin', 'electron-builder'),
+  join(desktopRoot, 'node_modules', '.bin', bin),
   [...platform, `-c.extraMetadata.version=${version}`],
-  { cwd: desktopRoot, stdio: 'inherit' },
+  { cwd: desktopRoot, stdio: 'inherit', shell: process.platform === 'win32' },
 );
 process.exit(result.status ?? 1);

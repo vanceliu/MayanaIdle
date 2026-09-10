@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 #
-# 打包三平台單一執行檔（docs/RELEASE.md）
+# 本機打包（docs/RELEASE.md § 3.2）：**只打這台機器的平台**。
+# 正式發布走 GitHub Actions（打 tag），三平台在那裡各自原生打包；
+# 本機打其他平台的產物用不到，還佔上百 MB。
 #
 # 用法：
-#   ./scripts/release.sh                完整流程（三平台）
-#   ./scripts/release.sh --host-only    只打包目前這台機器的平台
+#   ./scripts/release.sh                本機平台的桌面版 ＋ server 執行檔
+#   ./scripts/release.sh --all-servers  server 執行檔也打其他兩個平台（需下載對應的 node）
 #   ./scripts/release.sh --skip-tests   略過測試
 #
 set -euo pipefail
@@ -12,15 +14,16 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLIENT_DIR="$REPO_ROOT/client"
 SERVER_DIR="$REPO_ROOT/server"
+DESKTOP_DIR="$REPO_ROOT/desktop"
 
-HOST_ONLY=0
+ALL_SERVERS=0
 SKIP_TESTS=0
 for arg in "$@"; do
   case "$arg" in
-    --host-only)  HOST_ONLY=1 ;;
-    --skip-tests) SKIP_TESTS=1 ;;
-    -h|--help)    sed -n '2,9p' "${BASH_SOURCE[0]}"; exit 0 ;;
-    *) echo "未知參數：${arg}（可用 --host-only / --skip-tests）" >&2; exit 2 ;;
+    --all-servers) ALL_SERVERS=1 ;;
+    --skip-tests)  SKIP_TESTS=1 ;;
+    -h|--help)    sed -n '2,11p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "未知參數：${arg}（可用 --all-servers / --skip-tests）" >&2; exit 2 ;;
   esac
 done
 
@@ -42,7 +45,8 @@ ok "工作區乾淨（$(git rev-parse --short HEAD)）"
 step "型別檢查"
 (cd "$CLIENT_DIR" && npx tsc -b)
 (cd "$SERVER_DIR" && npx tsc -b)
-ok "client 與 server 型別無誤"
+(cd "$DESKTOP_DIR" && npx tsc -p tsconfig.json)
+ok "client、server、desktop 型別無誤"
 
 # ── 3. 測試 ───────────────────────────────────────────────────────
 if [[ $SKIP_TESTS -eq 1 ]]; then
@@ -51,6 +55,7 @@ else
   step "測試"
   (cd "$CLIENT_DIR" && npx vitest run)
   (cd "$SERVER_DIR" && npx vitest run)
+  (cd "$DESKTOP_DIR" && npx vitest run)
   ok "全部通過"
 fi
 
@@ -60,13 +65,17 @@ step "建置"
 (cd "$SERVER_DIR" && npm run build)
 ok "client/dist 與 server/dist 完成"
 
-# ── 5. 打包執行檔 ─────────────────────────────────────────────────
-step "打包執行檔"
-if [[ $HOST_ONLY -eq 1 ]]; then
-  (cd "$SERVER_DIR" && node scripts/package.mjs)
-else
+# ── 5. 打包 ───────────────────────────────────────────────────────
+step "打包 server 執行檔"
+if [[ $ALL_SERVERS -eq 1 ]]; then
   (cd "$SERVER_DIR" && node scripts/package.mjs --all)
+else
+  (cd "$SERVER_DIR" && node scripts/package.mjs)
 fi
+
+step "打包桌面版（本機平台）"
+(cd "$DESKTOP_DIR" && npm run package)
 
 step "產物"
 ls -lh "$SERVER_DIR/release"
+ls -lh "$DESKTOP_DIR/release" | grep -Ev "blockmap|unpacked|\.yml|^total"

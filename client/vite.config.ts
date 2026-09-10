@@ -44,8 +44,8 @@ export default defineConfig({
          * 改一行程式就整包換名字，回訪玩家要重抓 1.4 MB；拆開後 vendor 檔名不變，
          * 直接命中快取或 304，只有 app chunk 需要重抓。
          *
-         * GitHub Pages 固定 `max-age=600` 且無法自訂 headers，這點更重要 ——
-         * 超過 10 分鐘一定會回源驗證，此時「檔名有沒有變」就是要不要重傳的唯一依據。
+         * server 只讓帶 hash 的 `assets/` 走 immutable，其餘一律 `no-cache`
+         * （`server/src/http.ts`），所以「檔名有沒有變」就是要不要重傳的唯一依據。
          *
          * 規則以模組路徑判定，結果與模組載入順序無關，hash 才會穩定。
          */

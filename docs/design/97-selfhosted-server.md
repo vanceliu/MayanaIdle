@@ -442,7 +442,7 @@ Web UI，掛在 § 97.2 的同一個 HTTP server，路由 `/admin`。沿用既�
 | 備份 | 玩家無匯出手段，SQLite 檔備份由開服者負責 |
 | 版本歧異 | 靠 § 97.2 版本協商阻擋 |
 | 延遲 | 無 CDN 與多區域部署，取決於開服者網路位置 |
-| 既有瀏覽器存檔 | gh-pages 版 IndexedDB 角色不搬移至 server |
+| 既有瀏覽器存檔 | 舊的瀏覽器版（IndexedDB）角色不搬移至 server |
 
 ---
 

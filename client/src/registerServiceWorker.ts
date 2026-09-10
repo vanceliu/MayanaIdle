@@ -7,7 +7,7 @@
 
 import { BUILD_INFO } from './buildInfo';
 
-/** Service Worker 的路徑（GitHub Pages 部署在子路徑底下，作用範圍必須跟著它） */
+/** Service Worker 的路徑（前端掛在 `/MayanaIdle/` 子路徑下，作用範圍必須跟著它） */
 const SW_URL = '/MayanaIdle/sw.js';
 
 export function registerServiceWorker(): void {
