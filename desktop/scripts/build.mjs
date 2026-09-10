@@ -1,10 +1,14 @@
 // esbuild：主行程與 preload 各打一份 CJS（Electron 的主行程走 CommonJS）
 import { build } from 'esbuild';
+import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+// 主行程把 server 打進來，所以那份地圖索引（build 產物，不進版控）要先生出來
+execFileSync(process.execPath, [join(here, '..', '..', 'server', 'scripts', 'genMapsIndex.mjs')], { stdio: 'inherit' });
 const clientPkg = JSON.parse(readFileSync(join(here, '..', '..', 'client', 'package.json'), 'utf-8'));
 
 const common = {

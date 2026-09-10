@@ -44,18 +44,20 @@ jobs:
         working-directory: server
       - run: npm ci
         working-directory: desktop
-      # 根 tsconfig 是 references 形式，一律 tsc -b（--noEmit 是空跑）
+      # 根 tsconfig 是 references 形式，一律 tsc -b（--noEmit 是空跑）。
+      # server 與 desktop 走各自的 script —— 它們會先產生 `src/generated/mapsIndex`
+      # （那是 build 產物、不進版控），少了它型別檢查就找不到模組。
       - run: npx tsc -b
         working-directory: client
-      - run: npx tsc -b
+      - run: npm run typecheck
         working-directory: server
-      - run: npx tsc -p tsconfig.json
+      - run: npm run typecheck
         working-directory: desktop
       - run: npx vitest run
         working-directory: client
-      - run: npx vitest run
+      - run: npm test
         working-directory: server
-      - run: npx vitest run
+      - run: npm test
         working-directory: desktop
 
   build:

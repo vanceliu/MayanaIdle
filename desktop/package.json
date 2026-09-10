@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs && electron .",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "node ../server/scripts/genMapsIndex.mjs && tsc -p tsconfig.json",
     "test": "vitest run",
     "package": "node scripts/build.mjs && node scripts/package.mjs"
   },

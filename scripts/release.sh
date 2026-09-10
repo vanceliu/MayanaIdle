@@ -44,8 +44,9 @@ ok "工作區乾淨（$(git rev-parse --short HEAD)）"
 # ── 2. 型別檢查（一律 tsc -b，--noEmit 在這個 repo 是空跑） ────────
 step "型別檢查"
 (cd "$CLIENT_DIR" && npx tsc -b)
-(cd "$SERVER_DIR" && npx tsc -b)
-(cd "$DESKTOP_DIR" && npx tsc -p tsconfig.json)
+# server／desktop 走各自的 script：裡面會先產生 src/generated/mapsIndex
+(cd "$SERVER_DIR" && npm run typecheck)
+(cd "$DESKTOP_DIR" && npm run typecheck)
 ok "client、server、desktop 型別無誤"
 
 # ── 3. 測試 ───────────────────────────────────────────────────────
@@ -54,8 +55,8 @@ if [[ $SKIP_TESTS -eq 1 ]]; then
 else
   step "測試"
   (cd "$CLIENT_DIR" && npx vitest run)
-  (cd "$SERVER_DIR" && npx vitest run)
-  (cd "$DESKTOP_DIR" && npx vitest run)
+  (cd "$SERVER_DIR" && npm test)
+  (cd "$DESKTOP_DIR" && npm test)
   ok "全部通過"
 fi
 
