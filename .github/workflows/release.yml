@@ -103,16 +103,24 @@ jobs:
       - run: npm run package -- ${{ matrix.desktop }}
         working-directory: desktop
 
+      # 先收成一層平的：upload-artifact 會保留共同上層路徑，
+      # 直接上傳兩個目錄的話，下載回來是 `server/release/...` 的巢狀結構，
+      # Release 那步的 glob 就會抓到目錄而不是檔案。
+      - name: 收齊要發布的檔案
+        shell: bash
+        run: |
+          mkdir -p dist-out
+          shopt -s nullglob
+          cp server/release/mayana-server-* dist-out/
+          # 桌面版只取可散布的，不要 blockmap、unpacked 目錄與 builder-debug.yml
+          cp desktop/release/*.dmg desktop/release/*.zip desktop/release/*.tar.gz desktop/release/*.exe dist-out/
+          ls -lh dist-out
+
       - uses: actions/upload-artifact@v4
         with:
           name: mayana-${{ matrix.os }}
           if-no-files-found: error
-          path: |
-            server/release/mayana-server-*
-            desktop/release/*.dmg
-            desktop/release/*.zip
-            desktop/release/*.tar.gz
-            desktop/release/*.exe
+          path: dist-out/*
 
   release:
     name: 建立 Release
@@ -126,14 +134,19 @@ jobs:
         with:
           path: artifacts
       # 用內建的 gh，不引入第三方 action
-      # 帶後綴的 tag（0.7.0-rc1）標成 pre-release，正式版的列表才不會被試跑的塞滿
+      # 帶後綴的 tag（0.7.0-rc1）標成 pre-release，正式版的列表才不會被試跑的塞滿。
+      # 建立與上傳分開：同一個 tag 重跑時沿用既有的 Release，附檔以 --clobber 覆蓋，
+      # 不必先手動把上一次失敗的殘骸刪掉。
       - run: |
-          prerelease=""
-          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes $prerelease \
-            artifacts/*/*
+          set -eu
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            prerelease=""
+            case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes $prerelease
+          fi
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
