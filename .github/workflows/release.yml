@@ -26,13 +26,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      # tag 與版本號必須一致：版本取自 package.json，對不上就會發出一包名不副實的 Release
+      # 產物的版本號取自 package.json，不是 tag —— 對不上就會發出一包名不副實的東西。
+      # 允許 `0.7.0-rc1` 這種預發布後綴（試跑用），但基底版本必須相同。
       - name: 核對 tag 與 client/package.json 版本
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           version=$(node -p "require('./client/package.json').version")
-          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_REF_NAME" != "$version" ] && [ "${GITHUB_REF_NAME%%-*}" != "$version" ]; then
             echo "tag $GITHUB_REF_NAME 與 client/package.json 的 $version 不一致" >&2
+            echo "（要試跑可以用 $version-rc1 這種後綴）" >&2
             exit 1
           fi
 
@@ -122,6 +124,14 @@ jobs:
         with:
           path: artifacts
       # 用內建的 gh，不引入第三方 action
-      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes artifacts/*/*
+      # 帶後綴的 tag（0.7.0-rc1）標成 pre-release，正式版的列表才不會被試跑的塞滿
+      - run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes $prerelease \
+            artifacts/*/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

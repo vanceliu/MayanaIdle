@@ -48,7 +48,16 @@ git tag 0.7.1 && git push origin 0.7.1
 ```
 
 推 tag 會跑：**核對 tag 與 `client/package.json` 版本** → 型別檢查 → 三個 workspace 的測試
-→ 三平台打包 → 建立 GitHub Release。兩邊版本對不上會直接中止，不會發出名不副實的一包。
+→ 三平台打包 → 建立 GitHub Release。基底版本對不上會直接中止（產物的版本號取自
+`package.json` 而不是 tag，不擋就會發出名不副實的一包）。
+
+想先試跑就用預發布後綴，不必改 `package.json`：
+
+```bash
+git tag 0.7.0-rc1 && git push origin 0.7.0-rc1
+```
+
+`0.7.0-rc1` 的基底版本是 `0.7.0`，檢查放行；建出來的 Release 會標成 pre-release。
 想先看產物不發布，就到 Actions 頁手動觸發（`workflow_dispatch`），檔案在該次執行的 artifacts。
 
 每個平台各兩個檔案：
