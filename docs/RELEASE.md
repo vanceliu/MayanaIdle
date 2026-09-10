@@ -43,11 +43,12 @@
 所以不必在本機處理跨平台那堆麻煩，也不會在硬碟上堆幾 GB 的產物。
 
 ```bash
-# 版本號改在 client/package.json，commit 之後打 tag
-git tag v0.7.1 && git push origin v0.7.1
+# 版本號改在 client/package.json，commit 之後打 tag（純版本號，不加 v）
+git tag 0.7.1 && git push origin 0.7.1
 ```
 
-推 tag 會跑：型別檢查 → 三個 workspace 的測試 → 三平台打包 → 建立 GitHub Release。
+推 tag 會跑：**核對 tag 與 `client/package.json` 版本** → 型別檢查 → 三個 workspace 的測試
+→ 三平台打包 → 建立 GitHub Release。兩邊版本對不上會直接中止，不會發出名不副實的一包。
 想先看產物不發布，就到 Actions 頁手動觸發（`workflow_dispatch`），檔案在該次執行的 artifacts。
 
 每個平台各兩個檔案：
