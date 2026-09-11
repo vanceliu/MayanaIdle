@@ -196,10 +196,10 @@ describe('LogDock 分頁', () => {
     useGameStore.setState({ combatLogs: [] });
     useChatStore.getState().reset();
     useChatStore.getState().setPanelOpen(false);
-    useOnlineStore.setState({ enabled: true, status: 'authed' });
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
   });
 
-  afterEach(() => useOnlineStore.setState({ enabled: false, status: 'offline' }));
+  afterEach(() => useOnlineStore.setState({ enabled: false, status: 'offline', worldMode: null }));
 
   const tab = (name: string) => screen.getByRole('tab', { name: new RegExp(name) });
 
@@ -219,12 +219,21 @@ describe('LogDock 分頁', () => {
     expect(screen.queryByText('目前沒有戰鬥紀錄')).toBeNull();
   });
 
-  it('單機沒有聊天分頁，標題列退回單純的標題', () => {
-    useOnlineStore.setState({ enabled: false, status: 'offline' });
+  it('沒連 server 就沒有聊天分頁，標題列退回單純的標題', () => {
+    useOnlineStore.setState({ enabled: false, status: 'offline', worldMode: null });
     const { container } = render(<LogDock />);
 
     expect(screen.queryAllByRole('tab')).toEqual([]);
     expect(container.querySelector('.combat-log-title')?.textContent).toContain('戰鬥紀錄');
+  });
+
+  // 單機世界照樣連著 server，所以不能只看有沒有連線（§ 97.1）
+  it('單機形態沒有聊天分頁', () => {
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'solo' });
+    render(<LogDock />);
+
+    expect(screen.queryAllByRole('tab')).toEqual([]);
+    expect(screen.queryByLabelText('聊天輸入')).toBeNull();
   });
 
   it('停在戰鬥分頁時聊天累加未讀，切過去歸零', () => {

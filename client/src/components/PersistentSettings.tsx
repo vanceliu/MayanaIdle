@@ -15,9 +15,11 @@ export function PersistentSettings() {
   const afterCombatHpResumeThreshold = useGameStore(s => s.afterCombatHpResumeThreshold);
   const afterCombatMpResumeThreshold = useGameStore(s => s.afterCombatMpResumeThreshold);
 
+  // 門檻存在角色偏好裡、由（線上模式下跑在 server 的）迴圈讀取，所以要走 store action
+  const setThreshold = useGameStore(s => s.setAfterCombatThreshold);
+
   function writeThreshold(key: string, value: number) {
-    useGameStore.setState({ [key]: value } as never);
-    useGameStore.getState().saveState();
+    setThreshold(key as Parameters<typeof setThreshold>[0], value);
   }
 
   return (

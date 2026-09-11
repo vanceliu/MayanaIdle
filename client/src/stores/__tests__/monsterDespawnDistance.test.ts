@@ -37,7 +37,6 @@ function setMonsters(monsters: MapMonster[], combatMonsterIds: string[] = []) {
   useMapMonsterStore.setState({
     monsters,
     maxMonsters: 10,
-    spawnTimer: 0,
     combatMonsterIds,
     hasBossInPool: false,
   });

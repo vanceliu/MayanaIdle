@@ -21,7 +21,8 @@ import {
 } from './servers';
 import {
   applyConfigEdits, buildWorldProperties, formatProperties, isValidWorldId, mergeConfigValues,
-  portTaken, summarize, uniqueWorldId, worldIdFromName, type ConfigField, type WorldSummary,
+  portTaken, summarize, uniqueWorldId, validateConfigValues, worldIdFromName,
+  type ConfigField, type WorldSummary,
 } from './worlds';
 
 type WorldKind = 'solo' | 'open';
@@ -243,13 +244,14 @@ ipcMain.handle('servers:rename', (_e, target: { host: string; port: number }, na
 
 ipcMain.handle('worlds:list', () => listOpenWorlds());
 
-/** 表單欄位由 server 的 `CONFIG_SPECS` 產生，鍵與預設值只有那一份 */
+/** 表單欄位由 server 的 `CONFIG_SPECS` 產生，鍵、型別與預設值只有那一份 */
 function configFields(dataDir: string): ConfigField[] {
   return CONFIG_SPECS
     // `bind` 由形態決定，不讓人在表單上填成回送位址而建出一個假的開放世界
     .filter(s => s.key !== 'bind')
-    .map(s => ({ key: s.key, timing: s.timing, value: s.format(s.default(dataDir) as never) }));
+    .map(s => ({ key: s.key, timing: s.timing, ui: s.ui, value: s.format(s.default(dataDir) as never) }));
 }
+
 
 ipcMain.handle('worlds:fields', () => configFields(join('<資料目錄>')));
 
@@ -269,8 +271,9 @@ ipcMain.handle('worlds:saveConfig', (_e, kind: WorldKind, id: string | undefined
   const dir = kind === 'solo' ? worldDir('solo') : worldDir('open', id);
   const file = join(dir, 'server.properties');
 
+  const invalid = validateConfigValues(values, dir);
+  if (invalid) return { ok: false, message: invalid };
   const port = Number(values.port);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, message: '埠號必須是 1~65535' };
   if (kind === 'open') {
     const others = listOpenWorlds().filter(w => w.id !== id);
     if (portTaken(port, others)) return { ok: false, message: `埠 ${port} 已經被另一個世界用了` };
@@ -292,8 +295,9 @@ ipcMain.handle('worlds:create', async (_e, name: string, values: Record<string, 
   const trimmed = (name ?? '').trim();
   if (!trimmed) return { ok: false, message: '請填 server 名稱' };
 
+  const invalid = validateConfigValues(values, worldDir('open', 'new'));
+  if (invalid) return { ok: false, message: invalid };
   const port = Number(values.port);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, message: '埠號必須是 1~65535' };
   if (portTaken(port, worlds)) return { ok: false, message: `埠 ${port} 已經被另一個世界用了` };
 
   const id = uniqueWorldId(worldIdFromName(trimmed, Date.now()), worlds.map(w => w.id));

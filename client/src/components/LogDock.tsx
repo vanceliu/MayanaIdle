@@ -3,7 +3,7 @@ import { CombatLogPanel } from './CombatLogPanel';
 import { ChatPanelContent } from './ChatPanel';
 import { LogWindow, opacityKey, positionKey } from './LogWindow';
 import { useChatStore } from '../stores/chatStore';
-import { useOnlineStore } from '../net/online';
+import { useOnlineStore, useMultiplayer } from '../net/online';
 
 /**
  * 底部紀錄視窗（§ 32.3.1）：戰鬥紀錄與聊天合成一個視窗，以分頁切換。
@@ -25,7 +25,7 @@ export type LogTab = (typeof LOG_TABS)[number];
 export const LOG_TAB_LABELS: Record<LogTab, string> = { combat: '戰鬥紀錄', chat: '聊天' };
 
 export function LogDock() {
-  const online = useOnlineStore(s => s.enabled);
+  const online = useMultiplayer();
   const authed = useOnlineStore(s => s.status === 'authed');
   const unread = useChatStore(s => s.unread);
   const setPanelOpen = useChatStore(s => s.setPanelOpen);

@@ -11,6 +11,12 @@ import type { Session } from '../stores/session';
 import { getBagMaxSlots, getBagUsedSlots, type GameState } from '../stores/gameStore';
 import type { TradeLine, TradeOfferInput } from '../stores/tradeStore';
 
+/**
+ * 一側最多放幾樣（`97-selfhosted-server.md` § 97.7）。裝備與道具列合計，金幣不佔格。
+ * 交易視窗是固定 10 格的格線，放得下多少就是看得到多少 —— 沒有捲動、沒有隱藏的東西。
+ */
+export const TRADE_MAX_SLOTS = 10;
+
 export interface TradeValidation {
   ok: boolean;
   message?: string;
@@ -21,6 +27,9 @@ export function validateOffer(state: GameState, input: TradeOfferInput): TradeVa
   if (!state.character) return { ok: false, message: '尚未進入世界' };
   if (!Number.isInteger(input.gold) || input.gold < 0) return { ok: false, message: '金幣數量不合法' };
   if (input.gold > state.character.gold) return { ok: false, message: '金幣不足' };
+  if (input.equipmentIds.length + input.items.length > TRADE_MAX_SLOTS) {
+    return { ok: false, message: `一次最多交易 ${TRADE_MAX_SLOTS} 樣（金幣不算）` };
+  }
   const seen = new Set<number>();
   for (const id of input.equipmentIds) {
     if (seen.has(id)) return { ok: false, message: '同一件裝備重複放入' };

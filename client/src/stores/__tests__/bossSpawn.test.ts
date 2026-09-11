@@ -28,7 +28,6 @@ function resetStore(hasBossInPool: boolean) {
   useMapMonsterStore.setState({
     monsters: [],
     maxMonsters: 3,
-    spawnTimer: 0,
     combatMonsterIds: [],
     hasBossInPool,
   });
@@ -39,9 +38,9 @@ function forceSpawnRolls() {
   vi.spyOn(Math, 'random').mockReturnValue(0);
 }
 
-/** 觸發一次生成判定（間隔 1000ms，Pressure 0） */
+/** 生一波（Pressure 0） */
 function tick(elapsedMinutes: number) {
-  useMapMonsterStore.getState().spawnTick(1000, testMap, playerPos, 0, elapsedMinutes);
+  useMapMonsterStore.getState().spawnTick(testMap, playerPos, 0, elapsedMinutes);
 }
 
 describe('Boss 生成門檻（26-spawn-pressure.md § 26.4）', () => {

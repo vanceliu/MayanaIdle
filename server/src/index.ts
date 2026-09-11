@@ -159,7 +159,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
     log.warn('server.properties 的 admin-password 是空的，管理介面無法登入（§ 97.8）');
   }
 
-  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, leaderboard: top => computeLeaderboard(db, top) });
+  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: top => computeLeaderboard(db, top) });
   const tickLoop = new TickLoop(gameServer.world);
   const staticSource = resolveStatic(options.staticDir ?? null);
 

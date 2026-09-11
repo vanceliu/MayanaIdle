@@ -7,6 +7,8 @@
  * 這裡只負責產生它與讀回摘要。
  */
 
+import { CONFIG_SPECS, type FieldUi } from '../../server/src/config';
+
 /** 目錄名稱：只收檔名安全的字元，長度有限，避免奇怪的路徑 */
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 
@@ -97,8 +99,11 @@ export function portTaken(port: number, worlds: readonly WorldSummary[]): boolea
 export interface ConfigField {
   key: string;
   timing: 'live' | 'restart';
+  /** 輸入型別（整數／小數／布林／列舉…），由 server 的 `CONFIG_SPECS` 帶過來 */
+  ui: FieldUi;
   value: string;
 }
+
 
 /**
  * 表單要顯示的值：檔案裡有就用檔案的，沒有就用該鍵的預設。
@@ -107,6 +112,26 @@ export interface ConfigField {
 export function mergeConfigValues(fields: readonly ConfigField[], propertiesText: string): ConfigField[] {
   const props = parseProperties(propertiesText);
   return fields.map(f => ({ ...f, value: props.get(f.key) ?? f.value }));
+}
+
+/**
+ * 逐鍵驗證，用的是 server 啟動時的**同一支** `parse`。
+ * 表單擋得住的與 server 擋得住的必須一致，否則使用者會存下一份
+ * 「存得進去但啟動不了」的設定，而錯誤要等到下次開站才看得到。
+ *
+ * 回傳第一個錯誤訊息，沒問題時回 null。
+ */
+export function validateConfigValues(values: Record<string, string>, dataDir: string): string | null {
+  for (const s of CONFIG_SPECS) {
+    const raw = values[s.key];
+    if (raw === undefined) continue;
+    try {
+      s.parse(raw, dataDir);
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+  return null;
 }
 
 /**

@@ -195,7 +195,9 @@ export class World {
           if (!target) throw new TradeError('target_offline', '對方不在線上');
           this.trades.offer(session, target, now);
           affected.add(target);
-          return { ok: true, message: `已向 ${target.game.getState().character!.name} 提出交易` };
+          // 交易視窗要等對方接受才會開，回饋只能留在按下「交易」的那個面板
+          session.party.setState({ message: `已向 ${target.game.getState().character!.name} 提出交易` });
+          return { ok: true };
         }
         case 'accept': {
           const trade = this.trades.accept(String(args[0]), session, now);
@@ -222,8 +224,8 @@ export class World {
           if (completed && current) {
             for (const s of this.tradeSessions(current)) {
               const other = s === current.a.session ? current.b : current.a;
+              // 交易一成立視窗就關了，結果只留在系統紀錄
               s.game.getState().pushSystemLog(`與 ${other.name} 的交易完成`);
-              s.trade.setState({ message: '交易完成' });
             }
           }
           return { ok: true };
@@ -233,7 +235,9 @@ export class World {
           if (trade) {
             for (const s of this.tradeSessions(trade)) {
               affected.add(s);
-              if (s !== session) s.trade.setState({ message: `${me.name} 取消了交易` });
+              // 視窗會跟著交易一起關掉，所以結果寫進系統紀錄才留得住
+              const text = s === session ? '已取消交易' : `${me.name} 取消了交易`;
+              s.game.getState().pushSystemLog(text);
             }
           }
           return { ok: true };

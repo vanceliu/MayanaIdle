@@ -2,48 +2,14 @@ import { formatSkillRange, formatBuffDuration } from '../../models/skill';
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { SKILL_CATALOG } from '../../models/skill';
-import type { Skill } from '../../models/skill';
 import { canLearnBasicMagic, getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { isClassMagic } from '../../models/classSkills';
-import { getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import { getItemById } from '../../models/items';
-import { hasBagItem, addBagItem, consumeBagItem, getBagItemAmount } from '../../models/bagItem';
-
-const LEARN_PRICES: Record<number, number> = {
-  1: 100,
-  2: 500,
-  3: 700,
-};
-
-/** 魔法書碎片（所有配方共用的素材） */
-const SPELLBOOK_FRAGMENT_ID = 127;
-
-interface SpellbookRecipe {
-  /** 成品魔法書的 `ITEM_DEFINITIONS` id。名稱一律由 id 反查（§ 99.1） */
-  bookItemId: number;
-  levels: string;
-  fragments: number;
-  materialItemId: number;
-  materialAmount: number;
-}
-
-const SPELLBOOK_RECIPES: SpellbookRecipe[] = [
-  { bookItemId: 97, levels: '4~5', fragments: 3, materialItemId: 128, materialAmount: 5 },
-  { bookItemId: 98, levels: '6~7', fragments: 5, materialItemId: 129, materialAmount: 5 },
-  { bookItemId: 99, levels: '8', fragments: 10, materialItemId: 130, materialAmount: 10 },
-  { bookItemId: 100, levels: '9', fragments: 20, materialItemId: 131, materialAmount: 20 },
-  { bookItemId: 101, levels: '10', fragments: 40, materialItemId: 131, materialAmount: 40 },
-];
-
-function getRequiredBookId(level: number): number | null {
-  if (level >= 4 && level <= 5) return 97;
-  if (level >= 6 && level <= 7) return 98;
-  if (level === 8) return 99;
-  if (level === 9) return 100;
-  if (level === 10) return 101;
-  return null;
-}
+import { getBagItemAmount } from '../../models/bagItem';
+import {
+  LEARN_PRICES, SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, getRequiredBookId,
+} from '../../models/magicAcademy';
 
 function itemName(itemId: number): string {
   return getItemById(itemId)?.name ?? '未知道具';
@@ -55,8 +21,9 @@ export function MagicAcademy() {
   const char = useGameStore(s => s.character);
   const skills = useGameStore(s => s.skills);
   const bagItems = useGameStore(s => s.bagItems);
-  const equippedGear = useGameStore(s => s.equippedGear);
-  const set = useGameStore.setState;
+  // 判定、扣款、消耗都在 store（線上模式轉成 RPC 交給 server）
+  const learnBasicMagic = useGameStore(s => s.learnBasicMagic);
+  const craftSpellbook = useGameStore(s => s.craftSpellbook);
   const [tab, setTab] = useState<AcademyTab>('learn');
 
   if (!char) return null;
@@ -80,62 +47,6 @@ export function MagicAcademy() {
     if (skills.some(k => k.id === s.id)) return false;
     return canLearnBasicMagic(char.className, char.level, level, currentSkillCount);
   });
-
-  function learnWithGold(skill: Omit<Skill, 'lastUsedAt'>) {
-    const level = skill.level ?? 1;
-    const price = LEARN_PRICES[level];
-    if (!price || !char || char.gold < price) return;
-    if (!canLearnBasicMagic(char.className, char.level, level, currentSkillCount)) return;
-
-    const updatedSkills = [...skills, { ...skill, lastUsedAt: 0 }];
-    set({
-      character: { ...char, gold: char.gold - price, skills: updatedSkills },
-      skills: updatedSkills,
-    });
-    useGameStore.getState().saveState();
-  }
-
-  function learnWithBook(skill: Omit<Skill, 'lastUsedAt'>) {
-    const level = skill.level ?? 1;
-    if (!canLearnBasicMagic(char!.className, char!.level, level, currentSkillCount)) return;
-
-    const bookItemId = getRequiredBookId(level);
-    if (bookItemId == null) return;
-
-    const hasBook = hasBagItem(bagItems, bookItemId);
-    if (!hasBook) return;
-
-    const newBag = consumeBagItem(bagItems, bookItemId);
-
-    const updatedSkills = [...skills, { ...skill, lastUsedAt: 0 }];
-    set({
-      bagItems: newBag,
-      skills: updatedSkills,
-      character: char ? { ...char, skills: updatedSkills } : char,
-    });
-    useGameStore.getState().saveState();
-  }
-
-  function craftBook(recipe: SpellbookRecipe) {
-    const currentBag = useGameStore.getState().bagItems;
-    const currentInv = useGameStore.getState().inventory;
-    const fragments = getBagItemAmount(currentBag, SPELLBOOK_FRAGMENT_ID);
-    const materials = getBagItemAmount(currentBag, recipe.materialItemId);
-
-    if (fragments < recipe.fragments || materials < recipe.materialAmount) return;
-
-    let newBag = consumeBagItem(currentBag, SPELLBOOK_FRAGMENT_ID, recipe.fragments);
-    newBag = consumeBagItem(newBag, recipe.materialItemId, recipe.materialAmount);
-
-    if (!hasBagItem(newBag, recipe.bookItemId)
-      && getBagUsedSlots(newBag, currentInv, equippedGear) >= getBagMaxSlots(equippedGear)) {
-      return;
-    }
-    newBag = addBagItem(newBag, recipe.bookItemId, 1);
-
-    set({ bagItems: newBag });
-    useGameStore.getState().saveState();
-  }
 
   return (
     <div className="academy-panel">
@@ -178,7 +89,7 @@ export function MagicAcademy() {
                   <span className="shop-item-price">{price}G</span>
                 </div>
                 <div className="shop-item-actions">
-                  <button onClick={() => learnWithGold(skill)} disabled={char.gold < price}>學習</button>
+                  <button onClick={() => learnBasicMagic(skill.id)} disabled={char.gold < price}>學習</button>
                 </div>
               </div>
             );
@@ -198,7 +109,7 @@ export function MagicAcademy() {
                   <span className="shop-item-desc">需要: {itemName(bookItemId)} (持有: {bookCount})</span>
                 </div>
                 <div className="shop-item-actions">
-                  <button onClick={() => learnWithBook(skill)} disabled={!hasBook}>
+                  <button onClick={() => learnBasicMagic(skill.id)} disabled={!hasBook}>
                     {hasBook ? '學習' : '缺少魔法書'}
                   </button>
                 </div>
@@ -228,7 +139,7 @@ export function MagicAcademy() {
                   </span>
                 </div>
                 <div className="shop-item-actions">
-                  <button onClick={() => craftBook(recipe)} disabled={!canCraft}>
+                  <button onClick={() => craftSpellbook(recipe.bookItemId)} disabled={!canCraft}>
                     {canCraft ? '製作' : '素材不足'}
                   </button>
                 </div>

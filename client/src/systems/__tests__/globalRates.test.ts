@@ -3,7 +3,7 @@ import {
   settleGoldDrop,
   settleQuestGold,
   settleKillExp,
-  getSpawnInterval,
+  getWaveSize,
   getBossSpawnChance,
   scaleMonsterStat,
   GOLD_DROP_CAP,
@@ -53,17 +53,26 @@ describe('全域倍率作用點（19 § 19.9）', () => {
     });
   });
 
-  describe('getSpawnInterval（26 § 26.2）', () => {
-    it('倍率 1.0 時只受 Pressure 影響', () => {
-      expect(getSpawnInterval(1000, 0)).toBe(1000);
-      expect(getSpawnInterval(1000, 0, 1)).toBe(1000);
-      expect(getSpawnInterval(1000, 5, 1)).toBe(500);
+  describe('getWaveSize（26 § 26.2）', () => {
+    it('倍率 1.0 時就是擲出的隻數', () => {
+      expect(getWaveSize(1, 3)).toBe(1);
+      expect(getWaveSize(3, 3, 1)).toBe(3);
     });
 
-    it('全域生成倍率只縮放判定間隔', () => {
-      expect(getSpawnInterval(1000, 0, 2)).toBe(500);
-      expect(getSpawnInterval(1000, 5, 2)).toBe(250);
-      expect(getSpawnInterval(1000, 0, 0.5)).toBe(2000);
+    it('先夾在地圖上限內', () => {
+      expect(getWaveSize(6, 3)).toBe(3);
+      expect(getWaveSize(99, 10, 1)).toBe(10);
+    });
+
+    it('倍率作用在夾制之後，可以超過硬上限', () => {
+      expect(getWaveSize(99, 10, 2)).toBe(20);
+      expect(getWaveSize(3, 3, 2.5)).toBe(7);
+    });
+
+    it('向下取整，但一波至少 1 隻', () => {
+      expect(getWaveSize(3, 3, 0.5)).toBe(1);
+      expect(getWaveSize(3, 3, 0.1)).toBe(1);
+      expect(getWaveSize(10, 10, 0.35)).toBe(3);
     });
   });
 

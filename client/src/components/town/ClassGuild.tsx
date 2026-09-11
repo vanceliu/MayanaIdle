@@ -1,14 +1,12 @@
 import { formatSkillRange, formatBuffDuration } from '../../models/skill';
 import { useGameStore } from '../../stores/gameStore';
-import type { Skill } from '../../models/skill';
 import { QUEST_TEMPLATES, ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../../models/quest';
 import type { Quest } from '../../models/quest';
 import { getAvailableQuests } from '../../systems/questSystem';
 import { getRegion } from '../../models/mapData';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
-import { hasBagItem, consumeBagItem } from '../../models/bagItem';
-import type { ClassSkillDef } from '../../models/classSkills';
+import { hasBagItem } from '../../models/bagItem';
 
 export function ClassGuild() {
   const char = useGameStore(s => s.character);
@@ -16,6 +14,8 @@ export function ClassGuild() {
   const bagItems = useGameStore(s => s.bagItems);
 
   const acceptQuest = useGameStore(s => s.acceptQuest);
+  // 學習與消耗技能書在 store（線上模式轉 RPC），元件不自己改 store
+  const learnClassSkill = useGameStore(s => s.learnClassSkill);
   const completeQuest = useGameStore(s => s.completeQuest);
 
   if (!char) return null;
@@ -53,27 +53,6 @@ export function ClassGuild() {
         為了製作技能書的特殊墨水，工會需要特定素材。請擊殺 <strong className="quest-highlight">{areaName}</strong> 的 <strong className="quest-highlight">{quest.targetMonster}</strong> 收集素材 <strong className="quest-highlight">{COLLECT_MATERIAL_TARGET} 個</strong>。
       </span>
     );
-  }
-
-  function learnSkill(def: ClassSkillDef) {
-    const bag = useGameStore.getState().bagItems;
-    if (!hasBagItem(bag, def.bookItemId)) return;
-    if (char!.level < def.requiredLevel) return;
-    if (learnedIds.includes(def.id)) return;
-
-    const newBag = consumeBagItem(bag, def.bookItemId);
-
-    const newSkill: Skill = { ...def.skill, lastUsedAt: 0 };
-    const currentSkills = useGameStore.getState().skills;
-    const updatedSkills = [...currentSkills, newSkill];
-    const currentChar = useGameStore.getState().character;
-
-    useGameStore.setState({
-      bagItems: newBag,
-      skills: updatedSkills,
-      character: currentChar ? { ...currentChar, skills: updatedSkills } : currentChar,
-    });
-    useGameStore.getState().saveState();
   }
 
   return (
@@ -148,7 +127,7 @@ export function ClassGuild() {
                   <span className="guild-learned-tag">已學習</span>
                 ) : (
                   <button
-                    onClick={() => learnSkill(def)}
+                    onClick={() => learnClassSkill(def.id)}
                     disabled={!canLearn}
                     title={!levelOk ? `需要等級 ${def.requiredLevel}` : !hasBook ? `需要 ${getItemById(def.bookItemId)?.name ?? '技能書'}` : ''}
                   >

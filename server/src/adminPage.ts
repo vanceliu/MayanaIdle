@@ -196,7 +196,7 @@ function body() {
     return '<div class="row"><button onclick="doBackup()">建立備份</button>' +
       '<span class="hint">WAL checkpoint 後複製到 server.properties 的 backup-dir，不停服</span></div>' +
       '<div class="row"><button class="danger" onclick="doShutdown()">graceful shutdown</button>' +
-      '<span class="hint">關閉 server；重新啟動要回到主機上執行</span></div>' +
+      '<span class="hint">先廣播倒數給在線玩家，時間到才關閉；<b>不可取消</b>，重新啟動要回到主機上執行</span></div>' +
       (S.data.backup ? '<div class="msg">已備份：' + esc(S.data.backup.file) + '（' + bytes(S.data.backup.bytes) + '）</div>' : '');
   }
   if (S.tab === 'config') {
@@ -243,7 +243,10 @@ window.doSendMail = () => guard(async () => {
   say('已發送 ' + r.sent + ' 封（目標 ' + r.targets + ' 個角色，重複的 sourceKey 自動跳過）');
 });
 window.doBackup = () => guard(async () => { S.data.backup = await api('backup', {}); say('備份完成'); });
-window.doShutdown = () => guard(async () => { await api('shutdown', {}); say('已要求關閉 server'); });
+window.doShutdown = () => guard(async () => {
+  const r = await api('shutdown', {});
+  say('已開始關服倒數：' + r.seconds + ' 秒後關閉，期間拒絕新連線，無法取消');
+});
 window.doSaveConfig = () => guard(async () => {
   const values = {};
   for (const k of S.data.config) values[k.key] = el('#cfg-' + CSS.escape(k.key)).value;

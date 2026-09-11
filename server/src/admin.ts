@@ -18,6 +18,7 @@ import type { GameServer } from './ws';
 import type { TickStats } from './tick';
 import { adminPage } from './adminPage';
 import { log } from './log';
+import { SHUTDOWN_ANNOUNCE_AT, SHUTDOWN_COUNTDOWN_SECONDS } from './shutdown';
 
 export interface AdminDeps {
   db: DatabaseSync;
@@ -351,10 +352,19 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       json(res, 200, { ok: true, file, bytes: statSync(file).size });
     },
 
+    /**
+     * 關服倒數（§ 97.8）：先給玩家 `SHUTDOWN_COUNTDOWN_SECONDS` 秒把自己處理好，
+     * 倒數期間拒新連線並持續廣播，時間到才送 SIGTERM 走原本的 graceful shutdown。
+     * **不可取消**，所以重複按只會回報剩幾秒。
+     */
     '/admin/api/shutdown': async ({ res }) => {
-      json(res, 200, { ok: true });
-      log.info('管理介面要求 graceful shutdown');
-      setTimeout(() => process.kill(process.pid, 'SIGTERM'), 100);
+      log.info(`管理介面要求 graceful shutdown（${SHUTDOWN_COUNTDOWN_SECONDS} 秒後）`);
+      deps.server.beginShutdown(
+        SHUTDOWN_COUNTDOWN_SECONDS,
+        SHUTDOWN_ANNOUNCE_AT,
+        () => process.kill(process.pid, 'SIGTERM'),
+      );
+      json(res, 200, { ok: true, seconds: SHUTDOWN_COUNTDOWN_SECONDS });
     },
 
     // ---------- 設定（`server.properties`） ----------

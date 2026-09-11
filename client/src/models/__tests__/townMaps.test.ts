@@ -131,10 +131,10 @@ describe('城鎮地圖（§ 13.2.1）', () => {
 
   it('城鎮是安全區：spawnTick 不生成任何怪物', () => {
     const town = towns[0];
-    useMapMonsterStore.setState({ monsters: [], spawnTimer: 0 });
+    useMapMonsterStore.setState({ monsters: [] });
 
     // 給足夠長的 delta，野外地圖在這個時間早就生出怪了
-    useMapMonsterStore.getState().spawnTick(60_000, town, town.spawnPoint, 5, 30);
+    useMapMonsterStore.getState().spawnTick(town, town.spawnPoint, 30);
 
     expect(useMapMonsterStore.getState().monsters).toHaveLength(0);
   });

@@ -7,6 +7,7 @@ import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { isOffhandDefenseType } from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
 import '../components/WikiTable.css';
+import { requirementText } from '../requirementText'
 
 const SLOT_LABELS: Record<string, string> = {
   helmet: '頭盔',
@@ -139,6 +140,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
               <th>安定值</th>
               <th>附加效果</th>
               <th>職業限制</th>
+              <th>素質需求</th>
               <th>取得方式</th>
               <th>掉落來源</th>
             </tr>
@@ -190,6 +192,7 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
           ? a.requiredClass.map(c => <span key={c} className="wiki-tag">{CLASS_LABELS[c] || c}</span>)
           : '全職業'}
       </td>
+      <td>{requirementText(a.requiredAttributes)}</td>
       <td>{acquireLabel}</td>
       <td>
         {dropSources.length > 0

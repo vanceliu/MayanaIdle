@@ -181,7 +181,7 @@
 | `DROP_RATE_MULTIPLIER` | 1.0 | 全域道具掉落倍率，作用範圍見 `27-drop-table.md` § 27.1（含印記與天賦格） |
 | `EXP_RATE_MULTIPLIER` | 1.0 | 全域擊殺經驗倍率，作用位置見 `28-monster-stats.md` § 28.1 |
 | `PRESSURE_RATE_MULTIPLIER` | 1.0 | Pressure 累積倍率，作用位置見 `26-spawn-pressure.md` § 26.3；0 = Pressure 恆為 0 |
-| `SPAWN_RATE_MULTIPLIER` | 1.0 | 怪物生成頻率倍率，作用位置見 `26-spawn-pressure.md` § 26.2；必須 > 0 |
+| `SPAWN_RATE_MULTIPLIER` | 1.0 | 怪物生成倍率：乘在一波的隻數上，作用位置見 `26-spawn-pressure.md` § 26.2；必須 > 0 |
 | `MONSTER_HP_MULTIPLIER` | 1.0 | 怪物血量倍率，作用位置見 `28-monster-stats.md` § 28.1；必須 > 0 |
 | `MONSTER_ATTACK_MULTIPLIER` | 1.0 | 怪物攻擊力倍率，作用位置見 `28-monster-stats.md` § 28.1；必須 > 0 |
 | `BOSS_SPAWN_RATE_MULTIPLIER` | 1.0 | Boss 生成機率倍率，作用位置見 `26-spawn-pressure.md` § 26.4；0 = 不生成 Boss |

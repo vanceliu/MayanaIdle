@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交易視窗 調校 — MayanaIdle</title>
+<!--
+  交易視窗的調校頁。正式介面是 `src/components/TradePanel.tsx`，
+  這頁掛的是**同一個元件、同一份 CSS**，只把 server 換成本機的假對手。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/trade.html
+
+  ── 這頁在確認什麼 ──
+  1. 同名同階的武器分不分得出來：背包裡有三把同名戰斧（強化 +0／+1／+2、詞綴各不同），
+     滑過格子看 tooltip，確認**放進去之前**就知道是哪一把
+  2. 放入方式：從下方背包格拖到「我提供」；拖回背包或點一下取出
+  3. 堆疊道具：拖進去前先用拉桿決定數量
+  4. 金幣不佔格，放開拉桿才送出
+
+  ── 規格（`97-selfhosted-server.md` § 97.7.4）──
+  - 一側上限 10 樣（裝備＋道具合計），金幣不佔格
+  - 任一側改動內容，雙方的鎖定與確認一併取消 —— 所以放入是即時送出，沒有「更新」按鈕
+  - demo 的 `setOffer` / `lock` / `confirm` 是本機假的，不會真的換手
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-note code { color: var(--text-primary, #E2E8F0); }
+.demo-note ol { margin: 6px 0 0; padding-left: 20px; }
+
+/* 模擬浮動視窗的框，寬度與遊戲內的交易視窗一致 */
+#root { max-width: 560px; }
+.panel-window.is-demo {
+  position: static;
+  background: var(--bg-panel, #141428);
+  border: 1px solid var(--outline-dark, #2A2A4A);
+  border-radius: 8px;
+  overflow: visible;
+}
+.panel-window.is-demo .panel-window-title {
+  padding: 10px 12px;
+  font-family: var(--font-display, sans-serif);
+  color: var(--text-primary, #E2E8F0);
+  border-bottom: 1px solid var(--outline-dark, #2A2A4A);
+}
+.panel-window.is-demo .panel-scroll { max-height: none; }
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">交易視窗 調校</h1>
+<p class="demo-note">
+  正式元件是 <code>src/components/TradePanel.tsx</code>，這頁掛的是同一個元件，只把 server 換成本機假對手。
+<ol>
+  <li>背包裡有<strong>三把同名戰斧</strong>（強化 +0／+1／+2、詞綴各不同）：滑過格子看 tooltip，確認放進去之前就分得出哪一把。</li>
+  <li>把背包格<strong>拖到「我提供」</strong>放入；<strong>拖回背包或點一下</strong>取出。觸控沒有拖曳，所以點擊一定要能放入。</li>
+  <li>堆疊道具（印記、藥水）拖進去前會跳出<strong>數量拉桿</strong>。</li>
+  <li>放滿 10 格後來源格會變灰；<strong>已經放進去的那一種道具例外</strong>，加量是併到原本那一格，不佔新格。</li>
+  <li>金幣不佔格：拉桿或右邊的輸入格都可以，放開拉桿／離開輸入格／按 Enter 才送出。</li>
+</ol>
+</p>
+
+<div id="root"></div>
+
+<script type="module" src="./tradeDemo.tsx"></script>
+
+</body>
+</html>

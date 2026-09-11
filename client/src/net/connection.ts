@@ -104,7 +104,7 @@ export class GameConnection {
   private handle(msg: ServerMessage): void {
     switch (msg.t) {
       case 'hello_ok': {
-        useOnlineStore.setState({ serverName: msg.serverName, serverVersion: msg.version, registration: msg.registration });
+        useOnlineStore.setState({ serverName: msg.serverName, serverVersion: msg.version, registration: msg.registration, worldMode: msg.mode });
         if (msg.autoLogin) {
           writeSessionToken(msg.autoLogin.token);
           useOnlineStore.setState({ status: 'authed', username: msg.autoLogin.username, userId: msg.autoLogin.userId, hasPassword: false, isHost: msg.autoLogin.isHost });

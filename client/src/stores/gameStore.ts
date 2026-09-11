@@ -53,6 +53,13 @@ import type { BagSlotMap } from '../models/bagLayout';
 import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
+import { CLASS_SKILLS } from '../models/classSkills';
+import {
+  LEARN_PRICES, SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, getRequiredBookId,
+} from '../models/magicAcademy';
+import { canLearnBasicMagic } from '../models/skillRestrictions';
+import { isClassMagic } from '../models/classSkills';
+import { SKILL_CATALOG } from '../models/skill';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
 import { getTownDifficulties, QUEST_DIFFICULTY_ORDER, createEmptyQuestBoard, QUEST_BOARD_REFRESH_COST, getRankForPoints } from '../models/adventurerQuest';
@@ -434,6 +441,24 @@ export interface GameState {
   /** 單機同步結算；線上模式回 Promise（server 判定） */
   applySigil: (itemId: number, sigilType: SigilType, affixIndex: number | null) => SigilApplyResult | Promise<SigilApplyResult>;
   /** 新手 NPC：領取新手裝（`13-town.md` § 13.11）；回傳領到的名稱 */
+  /**
+   * 旅館休息（`13-town.md` § 13.7）。判定在這裡，元件不可自己改 store ——
+   * 線上模式的角色狀態由 server 推回來，本機改的會被蓋掉，金幣也不會真的扣。
+   */
+  restAtInn: (mode: 'full' | 'hp' | 'mp') => boolean;
+  /** 用技能書學職業技能：書要消耗掉，判定與消耗必須同一步（§ 13.9） */
+  learnClassSkill: (skillId: string) => boolean;
+  /** 魔法學院學基礎魔法（`13-town.md` § 13.6）：Lv1~3 付金幣、Lv4 以上交魔法書 */
+  learnBasicMagic: (skillId: string) => boolean;
+  /** 魔法學院製作魔法書：碎片＋素材換一本 */
+  craftSpellbook: (bookItemId: number) => boolean;
+  /** 試驗場的免費補滿（`50-training-ground.md` § 50.5.3）；只在試驗場內有效 */
+  restoreInTrainingGround: () => boolean;
+  /** 戰鬥後的等待／恢復門檻（存在角色偏好，線上模式由 server 的迴圈讀取） */
+  setAfterCombatThreshold: (
+    key: 'afterCombatHpThreshold' | 'afterCombatMpThreshold' | 'afterCombatHpResumeThreshold' | 'afterCombatMpResumeThreshold',
+    value: number,
+  ) => void;
   claimStarterGear: () => Promise<string[]>;
   enhanceStarterGear: (itemId: number) => Promise<{ ok: boolean; message: string; enhancement?: number }>;
   /** 背包強化卷軸（`35-inventory-constraints.md` § 35.5.5） */
@@ -716,7 +741,7 @@ export function createGameStore(session: Session) {
     // 舊存檔缺少後來新增的統計欄位，補上預設值
     const statistics = normalizeStatistics(prefs?.statistics);
 
-    // Reset areaEnteredAt so pressure doesn't accumulate during character select
+    // 載入角色即重置（`26-spawn-pressure.md` § 26.3 重置條件）
     char.areaEnteredAt = gameNow();
     char.areaKills = 0;
 
@@ -1854,23 +1879,8 @@ export function createGameStore(session: Session) {
         break;
       }
       case 'use_inn': {
-        /**
-         * 旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7）。
-         * 價格與手動使用同一份（`components/town/Inn.tsx` 的 `INN_PRICES.full`）。
-         */
-        if (char.gold < INN_PRICES.full) return;
-        set({
-          character: {
-            ...char,
-            hp: getEffectiveMaxHp(char, state.equippedGear),
-            mp: getEffectiveMaxMp(char, state.equippedGear),
-            gold: char.gold - INN_PRICES.full,
-          },
-          activeEffects: state.activeEffects.filter(
-            e => !(e.type === 'debuff' && e.target === 'player'),
-          ),
-        });
-        get().saveState();
+        // 旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7）。與手動休息同一支
+        get().restAtInn('full');
         break;
       }
       case 'return_to_hunt': {
@@ -2524,6 +2534,136 @@ export function createGameStore(session: Session) {
     }
     get().saveState();
     return { ok: true, message: `${item.name}｜${message}`, success, affixes: updatedItem.affixes, quality: updatedItem.quality };
+  },
+
+  restAtInn: (mode) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return false;
+
+    const price = mode === 'full' ? INN_PRICES.full : mode === 'hp' ? INN_PRICES.hpOnly : INN_PRICES.mpOnly;
+    if (char.gold < price) return false;
+
+    const maxHp = getEffectiveMaxHp(char, state.equippedGear);
+    const maxMp = getEffectiveMaxMp(char, state.equippedGear);
+    if (mode === 'hp' && char.hp >= maxHp) return false;
+    if (mode === 'mp' && char.mp >= maxMp) return false;
+    if (mode === 'full' && char.hp >= maxHp && char.mp >= maxMp) return false;
+
+    set({
+      character: {
+        ...char,
+        hp: mode === 'mp' ? char.hp : maxHp,
+        mp: mode === 'hp' ? char.mp : maxMp,
+        gold: char.gold - price,
+      },
+      // § 24.10.4：完全休息同時解除所有角色 debuff
+      ...(mode === 'full'
+        ? { activeEffects: state.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player')) }
+        : {}),
+    });
+    get().saveState();
+    return true;
+  },
+
+  learnClassSkill: (skillId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return false;
+
+    const def = CLASS_SKILLS.find(s => s.id === skillId && s.className === char.className);
+    if (!def) return false;
+    if (char.level < def.requiredLevel) return false;
+    if (state.skills.some(s => s.id === def.id)) return false;
+    if (!hasBagItem(state.bagItems, def.bookItemId)) return false;
+
+    const skills = [...state.skills, { ...def.skill, lastUsedAt: 0 }];
+    set({
+      bagItems: consumeBagItem(state.bagItems, def.bookItemId),
+      skills,
+      character: { ...char, skills },
+    });
+    get().saveState();
+    return true;
+  },
+
+  learnBasicMagic: (skillId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return false;
+
+    const def = SKILL_CATALOG.find(s => s.id === skillId);
+    if (!def || isClassMagic(def.id)) return false;
+    if (state.skills.some(s => s.id === def.id)) return false;
+
+    const level = def.level ?? 1;
+    // 學習額度只算基礎魔法，職業魔法走 `23-class-magic.md` 的獨立額度
+    const basicCount = state.skills.filter(s => !isClassMagic(s.id)).length;
+    if (!canLearnBasicMagic(char.className, char.level, level, basicCount)) return false;
+
+    const skills = [...state.skills, { ...def, lastUsedAt: 0 }];
+
+    if (level <= 3) {
+      const price = LEARN_PRICES[level];
+      if (!price || char.gold < price) return false;
+      set({ character: { ...char, gold: char.gold - price, skills }, skills });
+      get().saveState();
+      return true;
+    }
+
+    const bookItemId = getRequiredBookId(level);
+    if (bookItemId == null || !hasBagItem(state.bagItems, bookItemId)) return false;
+    set({
+      bagItems: consumeBagItem(state.bagItems, bookItemId),
+      skills,
+      character: { ...char, skills },
+    });
+    get().saveState();
+    return true;
+  },
+
+  craftSpellbook: (bookItemId) => {
+    const state = get();
+    const recipe = SPELLBOOK_RECIPES.find(r => r.bookItemId === bookItemId);
+    if (!recipe) return false;
+
+    const fragments = getBagItemAmount(state.bagItems, SPELLBOOK_FRAGMENT_ID);
+    const materials = getBagItemAmount(state.bagItems, recipe.materialItemId);
+    if (fragments < recipe.fragments || materials < recipe.materialAmount) return false;
+
+    let bag = consumeBagItem(state.bagItems, SPELLBOOK_FRAGMENT_ID, recipe.fragments);
+    bag = consumeBagItem(bag, recipe.materialItemId, recipe.materialAmount);
+    // 已經有同一本就不佔新格；沒有的話要留得下一格才做得成
+    if (!hasBagItem(bag, recipe.bookItemId)
+      && getBagUsedSlots(bag, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) {
+      return false;
+    }
+
+    set({ bagItems: addBagItem(bag, recipe.bookItemId, 1) });
+    get().saveState();
+    return true;
+  },
+
+  restoreInTrainingGround: () => {
+    const state = get();
+    const char = state.character;
+    // 免費、瞬間、不進統計，但只在試驗場內 —— 否則它就成了免費的旅館
+    if (!char || getRegion(char.currentRegion)?.type !== 'training') return false;
+    set({
+      character: {
+        ...char,
+        hp: getEffectiveMaxHp(char, state.equippedGear),
+        mp: getEffectiveMaxMp(char, state.equippedGear),
+      },
+    });
+    get().saveState();
+    return true;
+  },
+
+  setAfterCombatThreshold: (key, value) => {
+    const clamped = Math.min(100, Math.max(0, Math.round(value)));
+    set({ [key]: clamped } as Partial<GameState>);
+    get().saveState();
   },
 
   claimStarterGear: async () => {

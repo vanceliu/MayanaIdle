@@ -12,21 +12,18 @@ import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
-import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type PotionType, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
-import { SLOT_NAMES, SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../models/equipment';
+import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
+import { SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../models/equipment';
 import { GameIcon } from './GameIcon';
-import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
-import { formatMaterialUsage, hasMaterialUsage } from '../systems/craftMaterialUsage';
-import { EquipmentDetail } from './EquipmentInfo';
-import { getItemById } from '../models/items';
+import { getEquipIcon } from '../models/iconMap';
 import { isCureItem, getCureItem, hasCurableDebuff } from '../models/cureItem';
 import { getTownScrollByItemId } from '../models/townScroll';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
-import { roundWeight } from '../systems/weight';
 import { isSigilItemId } from '../models/sigil';
 import { BagTalentTab } from './BagTalentTab';
 import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
+import { BagCellVisual, BagItemTooltipBody, type BagGridItem } from './BagCell';
 import { CLICK_SLOP } from '../hooks/usePressDrag';
 import {
   getEnhanceScroll, canScrollTarget, isEnhanceable, type EnhanceOutcome,
@@ -34,25 +31,6 @@ import {
 } from '../systems/enhanceScroll';
 import { EnhanceRateWindow } from './EnhanceRateWindow';
 import { useOneShotFx } from './town/useOneShotFx';
-
-interface BagGridItem {
-  id: string;
-  type: 'potion' | 'material' | 'scroll' | 'equipment' | 'spellbook';
-  /** 顯示用名稱。背包物品一律由 `itemId` 反查，不從狀態帶舊名 */
-  name: string;
-  /** 背包物品的道具 id（裝備格沒有） */
-  itemId?: number;
-  count?: number;
-  potionType?: PotionType;
-  speedPotionType?: SpeedPotionType;
-  cureItemId?: number;
-  equipment?: EquipmentInstance;
-  /**
-   * 這件裝備正穿在哪個部位（§ 35.1）。
-   * 有值＝「裝備中」：一樣佔背包格，第二次點擊是卸下而不是穿上，且不可丟棄。
-   */
-  equippedSlot?: EquipSlot;
-}
 
 /**
  * 指定目標模式。`scroll` 是「點卷軸 → 點裝備」的強化，`rate` 是機率查詢。
@@ -81,32 +59,11 @@ interface BagEnhanceFx {
 
 const SHARD_INDEXES = [1, 2, 3, 4, 5, 6];
 
-function getItemIconKey(name: string, type: string): string {
-  if (type === 'scroll') return 'scroll';
-  if (type === 'spellbook') return 'spellbook';
-  if (name.includes('磨刀石')) return 'whetstone';
-  if (name.includes('石')) return 'stone';
-  return 'material';
-}
-
 function isTownScroll(itemId: number): boolean {
   return getTownScrollByItemId(itemId) != null;
 }
 
 /** 背包格對應的道具定義。一律以 id 反查 seed（§ 99.1），不用名稱 */
-function itemDef(item: { itemId?: number }) {
-  return item.itemId != null ? getItemById(item.itemId) : undefined;
-}
-
-function itemWeight(item: { itemId?: number }): number {
-  return itemDef(item)?.weight ?? 0;
-}
-
-/** 堆疊總重。小數重量乘上數量會留浮點尾數並直接印在 tooltip 上，一律先收過 */
-function totalItemWeight(item: { itemId?: number; count?: number }): number {
-  return roundWeight(itemWeight(item) * (item.count ?? 1));
-}
-
 export function BagPanel() {
   /** § 35.20：印記抽屜的開合。不持久化，重開回到收合 */
   const [sigilOpen, setSigilOpen] = useState(false);
@@ -658,92 +615,41 @@ export function BagPanel() {
     return true;
   }
 
-  function renderTooltipContent(item: BagGridItem) {
-    if (item.potionType) {
-      const config = POTION_CONFIG[item.potionType];
-      const totalWeight = totalItemWeight(item);
-      return (
-        <div className="bag-tooltip-content">
-          <div className="tooltip-name">{item.name}</div>
-          <div className="tooltip-stat">回復 {config.healMin}~{config.healMax} HP</div>
-          <div className="tooltip-stat">冷卻 {config.cooldown}ms</div>
-          <div className="tooltip-stat">重量: {totalWeight}</div>
-          <div className="tooltip-count">數量: {item.count}</div>
-          <div className="tooltip-hint">
-            {selectedId === item.id ? '再點一次使用' : '點擊選取'} / 右鍵設為快捷鍵
-          </div>
-        </div>
-      );
+  /** 操作提示是背包自己的事（點一次選取、再點一次執行）；數值區與交易共用 */
+  function tooltipHint(item: BagGridItem) {
+    const selected = selectedId === item.id;
+    if (item.potionType || item.speedPotionType) {
+      return <div className="tooltip-hint">{selected ? '再點一次使用' : '點擊選取'} / 右鍵設為快捷鍵</div>;
     }
-
     if (item.cureItemId != null) {
       const def = getCureItem(item.cureItemId);
-      const totalWeight = totalItemWeight(item);
       const curable = def ? hasCurableDebuff(def, activeEffects) : false;
-      return (
-        <div className="bag-tooltip-content">
-          <div className="tooltip-name">{item.name}</div>
-          <div className="tooltip-stat">{def?.description ?? itemDef(item)?.description ?? ''}</div>
-          <div className="tooltip-stat">重量: {totalWeight}</div>
-          <div className="tooltip-count">數量: {item.count}</div>
-          <div className="tooltip-hint">
-            {!curable ? '沒有需要解除的狀態' : selectedId === item.id ? '再點一次使用' : '點擊選取'}
-          </div>
-        </div>
-      );
+      return <div className="tooltip-hint">{!curable ? '沒有需要解除的狀態' : selected ? '再點一次使用' : '點擊選取'}</div>;
     }
-
-    if (item.speedPotionType) {
-      const totalWeight = totalItemWeight(item);
-      return (
-        <div className="bag-tooltip-content">
-          <div className="tooltip-name">{item.name}</div>
-          <div className="tooltip-stat">{itemDef(item)?.description ?? ''}</div>
-          <div className="tooltip-stat">重量: {totalWeight}</div>
-          <div className="tooltip-count">數量: {item.count}</div>
-          <div className="tooltip-hint">
-            {selectedId === item.id ? '再點一次使用' : '點擊選取'}
-          </div>
-        </div>
-      );
-    }
-
     if (item.equipment) {
-      const eq = item.equipment;
       return (
-        <div className="bag-tooltip-content">
-          {item.equippedSlot && (
-            <div className="tooltip-equipped">裝備中（{SLOT_NAMES[item.equippedSlot]}）</div>
-          )}
-          <EquipmentDetail item={eq} templates={templates} />
-          <div className="tooltip-hint">
-            {selectedId === item.id
-              ? (item.equippedSlot ? '再點一次卸下' : '再點一次裝備')
-              : '點擊選取'}
-          </div>
+        <div className="tooltip-hint">
+          {selected ? (item.equippedSlot ? '再點一次卸下' : '再點一次裝備') : '點擊選取'}
         </div>
       );
     }
+    if (item.type === 'scroll' && item.name.includes('回城卷軸')) {
+      return <div className="tooltip-hint">{selected ? '再點一次傳送至城鎮' : '點擊選取'}</div>;
+    }
+    if (getEnhanceScroll(item.itemId)) {
+      return <div className="tooltip-hint">{selected ? '再點一次選擇強化目標' : '點擊選取'}</div>;
+    }
+    return null;
+  }
 
-    const craftUsage = item.itemId != null ? formatMaterialUsage(item.itemId) : '';
+  function renderTooltipContent(item: BagGridItem) {
     return (
-      <div className="bag-tooltip-content">
-        <div className="tooltip-name">{item.name}</div>
-        <div className="tooltip-stat">重量: {totalItemWeight(item)}</div>
-        {item.count && <div className="tooltip-count">數量: {item.count}</div>}
-        {/* 顏色只表達稀有度，用途另外講明，免得玩家把配方材料賣掉 */}
-        {craftUsage && <div className="tooltip-craft-usage">⚒ 用途：{craftUsage}</div>}
-        {item.type === 'scroll' && item.name.includes('回城卷軸') && (
-          <div className="tooltip-hint">
-            {selectedId === item.id ? '再點一次傳送至城鎮' : '點擊選取'}
-          </div>
-        )}
-        {getEnhanceScroll(item.itemId) && (
-          <div className="tooltip-hint">
-            {selectedId === item.id ? '再點一次選擇強化目標' : '點擊選取'}
-          </div>
-        )}
-      </div>
+      <BagItemTooltipBody
+        item={item}
+        templates={templates}
+        activeEffects={activeEffects}
+        hint={tooltipHint(item)}
+      />
     );
   }
 
@@ -762,38 +668,7 @@ export function BagPanel() {
 
   /** 格子內容。一般分頁與印記分頁只差在互動，長相完全一樣 */
   function cellVisual(item: BagGridItem) {
-    return (
-      <>
-        {item.type === 'equipment' ? (
-          <GameIcon
-            name={getEquipIcon(item.equipment?.type === 'armor' ? (item.equipment?.slot || 'chest') : (item.equipment?.type || 'sword'))}
-            size={24}
-            color={item.equipment ? getEquipmentInstanceTierColor(item.equipment, templates) : undefined}
-          />
-        ) : (
-          (() => {
-            // 顯示方式一律以 item 定義為準（icon / iconColor / iconType / iconTier）
-            const { icon, color, glowClass } = resolveItemIcon(
-              itemDef(item),
-              getItemIconKey(item.name, item.type),
-            );
-            return <GameIcon name={icon} size={24} color={color} className={glowClass} />;
-          })()
-        )}
-        <span className="bag-cell-name">{getShortName(item.name)}</span>
-        {item.equippedSlot && (
-          <span className="bag-cell-equipped" aria-label={`裝備中：${SLOT_NAMES[item.equippedSlot]}`}>
-            裝備中
-          </span>
-        )}
-        {item.count != null && item.count > 1 && (
-          <span className="bag-cell-count">×{item.count}</span>
-        )}
-        {item.itemId != null && hasMaterialUsage(item.itemId) && (
-          <span className="bag-cell-craft" title="有用途的素材" aria-label="有用途的素材">⚒</span>
-        )}
-      </>
-    );
+    return <BagCellVisual item={item} templates={templates} />;
   }
 
   /*

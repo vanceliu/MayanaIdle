@@ -148,11 +148,12 @@ export function tickInstanceWorld(deltaMs: number, instance: MapInstance): void 
   if (anyActive) {
     const { pressure } = calculatePressure(instance.kills);
     const maxMonsters = partyMaxMonsters(pressure, members.length);
-    // 生成隻數分布與 Boss 門檻仍以停留時間為輸入（`26-spawn-pressure.md` § 26.2、§ 26.4）
+    // 一波的隻數分布與 Boss 門檻都以停留時間為輸入（`26-spawn-pressure.md` § 26.2、§ 26.4）
     const elapsedMinutes = instanceElapsedMinutes(instance);
+    // 波次隻數會夾在上限內，所以上限一定要在生成之前寫進去
     monsterStore.setMaxMonsters(maxMonsters);
     const anchor = members.find(m => !m.mapControl.getState().paused) ?? members[0];
-    monsterStore.spawnTick(deltaMs, map, anchor.mapControl.getState().playerPosition, pressure, elapsedMinutes, anchors);
+    monsterStore.spawnTick(map, anchor.mapControl.getState().playerPosition, pressure, elapsedMinutes, anchors);
   }
 
   // === Move monsters (always, not affected by player pause) ===

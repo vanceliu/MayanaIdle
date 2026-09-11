@@ -5,6 +5,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import type { WorldMode } from '../../../client/src/net/protocol';
 
 export const DB_FILE = 'mayana.sqlite';
 
@@ -133,7 +134,7 @@ export function migrate(db: DatabaseSync): { from: number; to: number } {
   return { from, to };
 }
 
-export type WorldMode = 'solo' | 'open';
+export type { WorldMode };
 
 const MODE_KEY = 'mode';
 const MODE_LABEL: Record<WorldMode, string> = { solo: '單機', open: '開放' };

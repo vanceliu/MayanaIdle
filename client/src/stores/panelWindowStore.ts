@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { emitWindowPositionReset } from './windowPositionReset';
 
 /**
  * 浮動面板視窗狀態（16-tech-frontend-architecture.md § 32.15）
@@ -359,6 +360,8 @@ export const usePanelWindowStore = create<PanelWindowState>((set) => ({
       // 清不掉就只影響下次開啟，狀態本身已重設
     }
     set({ positions: clampedDefaults(getCurrentViewport()) });
+    // 戰鬥紀錄視窗與隊伍 HUD 各自記自己的位置，靠廣播通知它們一起回去
+    emitWindowPositionReset();
   },
 }));
 

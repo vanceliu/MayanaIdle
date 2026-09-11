@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PartyPanelContent, OnMapPanelContent } from '../PartyPanel';
+import { PartyPanelContent, OnMapPanelContent, PartyButton, OnMapButton } from '../PartyPanel';
 import { usePartyStore } from '../../stores/partyStore';
 import { useGameStore } from '../../stores/gameStore';
+import { useOnlineStore, type OnlineState } from '../../net/online';
 
 /**
  * @vitest-environment jsdom
@@ -114,5 +115,41 @@ describe('隊伍面板：結果訊息在重新開啟時清掉', () => {
     expect(screen.getAllByText('已有隊伍')).toHaveLength(1);
     // 未標記的人照樣邀得出去
     expect(screen.getAllByRole('button', { name: '邀請' })).toHaveLength(1);
+  });
+});
+
+/**
+ * 單機世界沒有別的玩家，隊伍與在線名單的入口就不該存在（§ 97.1）。
+ * 單機一樣是連著一個 server，所以判斷條件是世界形態而不是有沒有連線。
+ */
+describe('單機世界隱藏隊伍與在線名單', () => {
+  beforeEach(() => {
+    usePartyStore.setState({ party: null, invites: [{ fromCharacterId: 2, fromName: 'Bob' }] as never });
+    useGameStore.setState({ character: { id: 1, name: '我' } as never });
+  });
+
+  const cases: Array<[string, Partial<OnlineState>]> = [
+    ['沒連 server', { enabled: false, status: 'offline', worldMode: null }],
+    ['單機形態', { enabled: true, status: 'authed', worldMode: 'solo' }],
+  ];
+
+  for (const [label, state] of cases) {
+    it(`${label}：兩個按鈕都不出現`, () => {
+      useOnlineStore.setState(state as never);
+      const party = render(<PartyButton />);
+      const onmap = render(<OnMapButton />);
+
+      expect(party.container.querySelector('button')).toBeNull();
+      expect(onmap.container.querySelector('button')).toBeNull();
+    });
+  }
+
+  it('開放形態：兩個按鈕都在', () => {
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
+    const party = render(<PartyButton />);
+    const onmap = render(<OnMapButton />);
+
+    expect(party.container.querySelector('button')).toBeTruthy();
+    expect(onmap.container.querySelector('button')).toBeTruthy();
   });
 });

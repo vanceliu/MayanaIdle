@@ -56,7 +56,6 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
     useMapMonsterStore.setState({
       monsters: [],
       maxMonsters: 3,
-      spawnTimer: 0,
       combatMonsterIds: [],
       hasBossInPool: false,
     });
@@ -91,7 +90,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       expect(useMapMonsterStore.getState().maxMonsters).toBe(5);
     });
 
-    it('spawnTick respects maxMonsters', () => {
+    it('場上還有怪就不生（沒有平時補位）', () => {
       // Manually add a monster to reach the cap
       useMapMonsterStore.setState({
         maxMonsters: 1,
@@ -101,65 +100,95 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       });
 
       vi.spyOn(Math, 'random').mockReturnValue(0);
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0);
-      // Should not spawn because already at max
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0);
       expect(useMapMonsterStore.getState().monsters.length).toBe(1);
 
       vi.restoreAllMocks();
     });
   });
 
-  describe('Pressure affects spawn frequency', () => {
-    it('higher pressure reduces effective spawn interval', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0);
-      const store = useMapMonsterStore.getState();
-      store.setMaxMonsters(10);
-      // 場上留一隻才量得到週期判定 —— 全空會走清場補位，直接繞過計時器（§ 26.2）
+  describe('一波的隻數＝停留時間分布 ＋ Pressure（§ 26.2）', () => {
+    /** 第一個 random 是 rollSpawnCount，其餘給找位置用 */
+    function mockRolls(first: number) {
+      vi.spyOn(Math, 'random').mockReturnValueOnce(first).mockReturnValue(0.5);
+    }
+
+    it('Pressure 0、剛進區：80% 是 1 隻', () => {
+      mockRolls(0.5);
+      useMapMonsterStore.setState({ monsters: [], maxMonsters: 3 });
+
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0, 0);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBe(1);
+      vi.restoreAllMocks();
+    });
+
+    it('同一張表在停留 20 分鐘後擲得出 3 隻', () => {
+      mockRolls(0.9);
+      useMapMonsterStore.setState({ monsters: [], maxMonsters: 3 });
+
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0, 25);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBe(3);
+      vi.restoreAllMocks();
+    });
+
+    it('Pressure 直接加在擲出的隻數上', () => {
+      mockRolls(0.5); // 剛進區 → 1 隻
+      useMapMonsterStore.setState({ monsters: [], maxMonsters: 6 });
+
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 3, 0);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBe(4);
+      vi.restoreAllMocks();
+    });
+
+    it('加完仍夾在上限內', () => {
+      mockRolls(0.99); // 3 隻
+      useMapMonsterStore.setState({ monsters: [], maxMonsters: 4 });
+
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 3, 25);
+
+      expect(useMapMonsterStore.getState().monsters.length).toBe(4);
+      vi.restoreAllMocks();
+    });
+
+    it('打到剩一隻也不會被補位 —— 要清空才有下一波', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      useMapMonsterStore.setState({ maxMonsters: 6 });
       seedOneMonster();
 
-      // With pressure=0, interval is 1000ms. 900ms should NOT trigger
-      store.spawnTick(900, testMap, { x: 1, y: 1 }, 0);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0);
       expect(useMapMonsterStore.getState().monsters.length).toBe(1);
-
-      // Reset timer
-      useMapMonsterStore.setState({ spawnTimer: 0 });
-
-      // With pressure=5, interval = 1000/2.0 = 500ms. 600ms SHOULD trigger
-      useMapMonsterStore.getState().spawnTick(600, testMap, { x: 1, y: 1 }, 5);
-      // May or may not spawn depending on position finding, but timer should have fired
-      expect(useMapMonsterStore.getState().spawnTimer).toBe(0);
-
       vi.restoreAllMocks();
     });
   });
 
-  describe('清場補位（§ 26.2）', () => {
-    it('場上全空時立即生成，不等判定間隔也不擲 15%', () => {
-      // random 回 0.99：週期判定會被 BASE_SPAWN_CHANCE 擋掉，補位不會
+  describe('下一波（§ 26.1）', () => {
+    it('場上清空就立刻出下一波，不等任何間隔', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
-      useMapMonsterStore.setState({ monsters: [], spawnTimer: 0, maxMonsters: 3 });
+      useMapMonsterStore.setState({ monsters: [], maxMonsters: 3 });
 
-      useMapMonsterStore.getState().spawnTick(1, testMap, { x: 1, y: 1 }, 0);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0);
 
       expect(useMapMonsterStore.getState().monsters.length).toBeGreaterThan(0);
-      expect(useMapMonsterStore.getState().spawnTimer).toBe(0);
       vi.restoreAllMocks();
     });
 
-    it('場上還有怪時不補位', () => {
+    it('場上還有怪時不生', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
-      useMapMonsterStore.setState({ spawnTimer: 0, maxMonsters: 3 });
+      useMapMonsterStore.setState({ maxMonsters: 3 });
       seedOneMonster();
 
-      useMapMonsterStore.getState().spawnTick(1, testMap, { x: 1, y: 1 }, 0);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0);
 
       expect(useMapMonsterStore.getState().monsters.length).toBe(1);
       vi.restoreAllMocks();
     });
 
-    it('恢復等待中不補位（實例層以成員的 paused 擋生成）', () => {
+    it('恢復等待中不生（實例層以成員的 paused 擋生成）', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
-      useMapMonsterStore.setState({ monsters: [], spawnTimer: 0, maxMonsters: 3 });
+      useMapMonsterStore.setState({ monsters: [], maxMonsters: 3 });
       useMapControlStore.setState({ currentMap: testMap, playerPosition: { x: 1, y: 1 }, paused: true });
 
       tickInstanceWorld(1, instanceWithMember());
@@ -171,20 +200,17 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
   });
 
   describe('Map switch clears monsters', () => {
-    it('clearAll removes all monsters and resets timer', () => {
+    it('clearAll removes all monsters', () => {
       useMapMonsterStore.setState({
         monsters: [
           { id: 'm1', position: { x: 3, y: 3 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: false },
           { id: 'm2', position: { x: 7, y: 7 }, targetPosition: { x: 5, y: 5 }, speed: 1, path: [], pathIndex: 0, pathRecalcTimer: 0, moveTimer: 0, lastPathPlayerPos: { x: 5, y: 5 }, isBoss: true },
         ],
-        spawnTimer: 500,
       });
 
       useMapMonsterStore.getState().clearAll();
 
-      const state = useMapMonsterStore.getState();
-      expect(state.monsters).toHaveLength(0);
-      expect(state.spawnTimer).toBe(0);
+      expect(useMapMonsterStore.getState().monsters).toHaveLength(0);
     });
   });
 
@@ -216,7 +242,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       useMapMonsterStore.setState({ hasBossInPool: false, maxMonsters: 10 });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 15);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0, 15);
       const monsters = useMapMonsterStore.getState().monsters;
       if (monsters.length > 0) {
         expect(monsters[0].isBoss).toBe(false);
@@ -226,16 +252,15 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
     });
 
     it('can spawn boss when hasBossInPool is true and none on map', () => {
-      // 場上全空走清場補位，不擲 BASE_SPAWN_CHANCE（§ 26.2），
-      // 所以第一個 random 直接是 rollSpawnCount
+      // 第一個 random 是波次隻數（§ 26.2），第二個才是 Boss 判定（§ 26.4）
       vi.spyOn(Math, 'random')
-        .mockReturnValueOnce(0.5) // rollSpawnCount → 1 monster
+        .mockReturnValueOnce(0.5) // rollSpawnCount → 1 隻
         .mockReturnValueOnce(0.05) // boss roll = true (< 0.1)
         .mockReturnValue(0.5); // position finding
 
       useMapMonsterStore.setState({ hasBossInPool: true, maxMonsters: 10 });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 15);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0, 15);
       const monsters = useMapMonsterStore.getState().monsters;
       if (monsters.length > 0) {
         expect(monsters[0].isBoss).toBe(true);
@@ -254,7 +279,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
         ],
       });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 15);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0, 15);
       const monsters = useMapMonsterStore.getState().monsters;
       const bossCount = monsters.filter(m => m.isBoss).length;
       expect(bossCount).toBe(1);
@@ -266,7 +291,7 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       useMapMonsterStore.setState({ hasBossInPool: true, maxMonsters: 10 });
 
-      useMapMonsterStore.getState().spawnTick(1100, testMap, { x: 1, y: 1 }, 0, 5);
+      useMapMonsterStore.getState().spawnTick(testMap, { x: 1, y: 1 }, 0, 5);
       const monsters = useMapMonsterStore.getState().monsters;
       if (monsters.length > 0) {
         expect(monsters[0].isBoss).toBe(false);

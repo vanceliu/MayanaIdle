@@ -22,7 +22,11 @@ export type DropKind =
   /** 未安裝的天賦格落在編輯區＝安裝到這個類型 */
   | 'talent-install'
   /** 天賦分頁的格子。與 `bag-slot` 同一種自由擺放（§ 35.21.1） */
-  | 'talent-cell';
+  | 'talent-cell'
+  /** 交易：自己要提供的那一側（§ 97.7.4）。拖進去＝放入 */
+  | 'trade-offer'
+  /** 交易：下方的來源格（等同背包）。從交易格拖回來＝取出 */
+  | 'trade-source';
 
 export interface DropTarget {
   kind: DropKind;
@@ -98,6 +102,7 @@ export function hitTestDropTarget(x: number, y: number): DropTarget | null {
   const kind = host.dataset.dropKind as DropKind | undefined;
   const KINDS: DropKind[] = [
     'bag-slot', 'quick-slot', 'map', 'talent-slot', 'talent-row', 'talent-install', 'talent-cell',
+    'trade-offer', 'trade-source',
   ];
   if (!kind || !KINDS.includes(kind)) return null;
   const raw = host.dataset.dropIndex;

@@ -66,7 +66,19 @@
     color: var(--text);
     font: inherit;
   }
-  input:focus { outline: none; border-color: var(--accent); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  select {
+    flex: 1;
+    padding: 10px 12px;
+    background: #0f1430;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font: inherit;
+  }
+  /* 型別提示：整數／小數／不可為負，寫在鍵名底下 */
+  .field-hint { color: var(--dim); font-size: 11px; }
+  input:invalid { border-color: #ef4444; }
   button.go {
     padding: 10px 20px;
     background: var(--accent);
@@ -334,12 +346,52 @@
     for (const field of fields) {
       if (field.key === 'server-name') continue;
       const label = document.createElement('label');
-      label.innerHTML = `<span class="key">${field.key}</span>` + (field.timing === 'restart' ? '<br>改了要重啟' : '');
-      const input = document.createElement('input');
-      input.dataset.key = field.key;
-      input.value = field.value;
-      form.append(label, input);
+      label.innerHTML = `<span class="key">${field.key}</span>`
+        + (field.timing === 'restart' ? '<br>改了要重啟' : '')
+        + `<br><span class="field-hint">${hintOf(field.ui)}</span>`;
+      form.append(label, fieldInput(field));
     }
+  }
+
+  /** 型別提示：整數／小數／可不可以是 0，與 server 的驗證同一套規則（§ 97.2） */
+  function hintOf(ui) {
+    if (ui.kind === 'int') return `整數 ${ui.min}~${ui.max}`;
+    if (ui.kind === 'rate') return ui.allowZero ? '小數，≥ 0（0 = 關閉）' : '小數，必須 > 0';
+    if (ui.kind === 'bool') return 'true／false';
+    if (ui.kind === 'enum') return ui.options.join('／');
+    if (ui.kind === 'path') return '資料夾路徑';
+    return '';
+  }
+
+  /**
+   * 依型別畫輸入框：整數不給填小數、倍率不給填負數、布林與列舉直接給選單。
+   * 真正的把關仍在 server 的 `parse`（存檔時會再跑一次），這裡只是不讓人先填錯。
+   */
+  function fieldInput(field) {
+    const ui = field.ui ?? { kind: 'text' };
+    if (ui.kind === 'bool' || ui.kind === 'enum') {
+      const select = document.createElement('select');
+      select.dataset.key = field.key;
+      for (const opt of ui.kind === 'bool' ? ['true', 'false'] : ui.options) {
+        const o = document.createElement('option');
+        o.value = o.textContent = opt;
+        select.append(o);
+      }
+      select.value = field.value;
+      return select;
+    }
+
+    const input = document.createElement('input');
+    input.dataset.key = field.key;
+    input.value = field.value;
+    if (ui.kind === 'password') input.type = 'password';
+    if (ui.kind === 'int' || ui.kind === 'rate') {
+      input.type = 'number';
+      input.step = ui.step === 'any' ? 'any' : String(ui.step ?? 1);
+      if (ui.min !== undefined) input.min = String(ui.min);
+      if (ui.max !== undefined) input.max = String(ui.max);
+    }
+    return input;
   }
 
   async function openCreateForm() {
@@ -368,7 +420,7 @@
   async function submitForm() {
     const name = $('create-name').value.trim();
     const values = {};
-    for (const input of $('create-form').querySelectorAll('input[data-key]')) values[input.dataset.key] = input.value.trim();
+    for (const input of $('create-form').querySelectorAll('[data-key]')) values[input.dataset.key] = input.value.trim();
     $('create-message').textContent = '';
 
     if (formMode.create) {

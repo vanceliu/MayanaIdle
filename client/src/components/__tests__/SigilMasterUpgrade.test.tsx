@@ -345,3 +345,26 @@ describe('印記師 — 選取流程（§ 13.13）', () => {
     expect((name as HTMLElement).style.color).toBe('');
   });
 });
+
+/**
+ * 版面契約（`34-ui-guidelines.md`）：印記師不用 `.panel-scroll`，
+ * 它是「左右兩欄各自捲動 ＋ 固定頁腳」的變體 —— 欄位必須是自己的捲動容器，
+ * 否則內容會溢出盒子、直接畫在頁腳的動作鈕上（小解析度必中）。
+ *
+ * jsdom 量不到 CSS，能擋的是結構：頁腳在 body **外面**、兩欄都在。
+ * 捲動屬性本身由 `App.css` 的 `.sigil-col { overflow-y: auto }` 負責。
+ */
+describe('版面結構', () => {
+  it('頁腳不在捲動的 body 裡，兩欄都在', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), []);
+    const { container } = render(<SigilMaster />);
+
+    const body = container.querySelector('.sigil-body')!;
+    const footer = container.querySelector('.sigil-footer')!;
+
+    expect(body).toBeTruthy();
+    expect(footer).toBeTruthy();
+    expect(body.contains(footer)).toBe(false);
+    expect(container.querySelectorAll('.sigil-col')).toHaveLength(2);
+  });
+});

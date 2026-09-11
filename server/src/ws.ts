@@ -9,7 +9,7 @@ import { AuthError, type AuthService } from './auth';
 import { isLoopbackBind, type ServerConfig } from './config';
 import { applyAutoMove, createPlayerSession, resetPatches, syncWorld, type PlayerSession } from './playerSession';
 import { flush } from './tick';
-import { ACTION_ALLOWLIST, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage } from '../../client/src/net/protocol';
+import { ACTION_ALLOWLIST, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
 import { World } from './world';
 import { log } from './log';
 
@@ -21,6 +21,8 @@ export interface GameServerDeps {
   config: () => ServerConfig;
   version: string;
   hostUsername: string;
+  /** 世界形態（§ 97.1）。client 據此決定有沒有聊天、隊伍、在線名單 */
+  mode: WorldMode;
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4） */
   leaderboard: (top: number) => LeaderboardSnapshotView;
 }
@@ -29,11 +31,17 @@ function isLoopbackAddress(address: string): boolean {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
+/** 倒數公告的文案。單數複數不分，中文沒這個問題 */
+export function shutdownNotice(seconds: number): string {
+  return `server 將在 ${seconds} 秒後關閉，請盡快回到安全處並登出`;
+}
+
 export class GameServer {
   readonly world = new World();
   readonly sessions: Set<PlayerSession>;
   private readonly deps: GameServerDeps;
   private closing = false;
+  private readonly shutdownTimers: ReturnType<typeof setTimeout>[] = [];
 
   constructor(deps: GameServerDeps) {
     this.deps = deps;
@@ -121,7 +129,35 @@ export class GameServer {
     return targets.length;
   }
 
+  /** 全服公告（§ 97.8）。玩家頻道會被聊天洗掉，公告自己一條路 */
+  announce(text: string): void {
+    for (const session of this.sessions) session.send({ t: 'notice', text });
+    log.info(`公告：${text}`);
+  }
+
+  /**
+   * 關服倒數（§ 97.8）：立刻拒新連線並開始廣播，時間到才真的關。
+   *
+   * **不可取消**，所以按鈕按下去就進到這個狀態；倒數期間遊戲照常跑，
+   * 玩家可以自己走人，時間到仍在線的走原本的強制 flush。
+   */
+  beginShutdown(seconds: number, announceAt: readonly number[], onExpire: () => void): void {
+    if (this.closing) return;
+    this.closing = true;
+    this.announce(shutdownNotice(seconds));
+    for (const at of announceAt) {
+      if (at >= seconds || at <= 0) continue;
+      const timer = setTimeout(() => this.announce(shutdownNotice(at)), (seconds - at) * 1000);
+      timer.unref?.();
+      this.shutdownTimers.push(timer);
+    }
+    const final = setTimeout(onExpire, seconds * 1000);
+    this.shutdownTimers.push(final);
+  }
+
   async shutdown(): Promise<void> {
+    for (const timer of this.shutdownTimers) clearTimeout(timer);
+    this.shutdownTimers.length = 0;
     this.closing = true;
     for (const session of [...this.sessions]) {
       session.send({ t: 'kicked', reason: 'server shutdown' });
@@ -148,7 +184,7 @@ export class GameServer {
             autoLogin = { token, username: host.username, userId: host.id, isHost: true };
           }
         }
-        session.send({ t: 'hello_ok', serverName: config.serverName, version: this.deps.version, registration: config.registration, autoLogin });
+        session.send({ t: 'hello_ok', serverName: config.serverName, version: this.deps.version, registration: config.registration, mode: this.deps.mode, autoLogin });
         return;
       }
       case 'register': {

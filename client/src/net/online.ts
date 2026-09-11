@@ -3,6 +3,7 @@
  * 由同源 `/api/version` 或 `?server=ws://host:port` 決定是否連線 server；沒有 server 即現行單機版。
  */
 import { create } from 'zustand';
+import type { WorldMode } from './protocol';
 
 export type OnlineStatus = 'offline' | 'connecting' | 'login' | 'authed' | 'disconnected' | 'version_mismatch';
 
@@ -13,6 +14,8 @@ export interface OnlineState {
   serverName: string;
   serverVersion: string;
   registration: string;
+  /** server 的世界形態；尚未握手前為 null（`97-selfhosted-server.md` § 97.1） */
+  worldMode: WorldMode | null;
   username: string | null;
   userId: number | null;
   hasPassword: boolean;
@@ -29,6 +32,7 @@ export const useOnlineStore = create<OnlineState>(() => ({
   serverName: '',
   serverVersion: '',
   registration: 'open',
+  worldMode: null,
   username: null,
   userId: null,
   hasPassword: false,
@@ -39,6 +43,21 @@ export const useOnlineStore = create<OnlineState>(() => ({
 
 export function isOnline(): boolean {
   return useOnlineStore.getState().enabled;
+}
+
+/**
+ * 有沒有別的玩家可言（`97-selfhosted-server.md` § 97.1）。
+ * 單機世界也是連著一個 server 的，所以 `enabled` 不足以判斷 ——
+ * 聊天、隊伍、在線名單、交易這些只在開放形態存在。
+ */
+export function isMultiplayer(): boolean {
+  const { enabled, worldMode } = useOnlineStore.getState();
+  return enabled && worldMode === 'open';
+}
+
+/** 元件用：跟著 store 變動重繪 */
+export function useMultiplayer(): boolean {
+  return useOnlineStore(s => s.enabled && s.worldMode === 'open');
 }
 
 export const SESSION_TOKEN_KEY = 'mayana_session_token';

@@ -68,7 +68,7 @@ describe('管理介面 API', () => {
     auth = new AuthService(db);
     config = { ...buildConfig(new Map(), dataDir).config, adminUser: 'ops', adminPassword: 'opspw123' };
     auth.ensureHost('host');
-    server = new GameServer({ repo, auth, config: () => config, version: 'test', hostUsername: 'host', leaderboard: () => ({ top: 20, count: 0, fields: [], rows: [] }) });
+    server = new GameServer({ repo, auth, config: () => config, version: 'test', hostUsername: 'host', mode: 'open', leaderboard: () => ({ top: 20, count: 0, fields: [], rows: [] }) });
     handler = createAdminHandler({
       db, dataDir, dbPath: join(dataDir, DB_FILE), auth, server,
       stats: () => ({ samples: 1, avgMs: 0.5, p99Ms: 1, overruns: 0, lastMs: 0.5 }),

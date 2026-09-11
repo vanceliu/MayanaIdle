@@ -34,8 +34,11 @@ export type ClientMessage =
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4）；`top` 預設 20、上限 100 */
   | { t: 'leaderboard'; id?: number; top?: number };
 
+/** 世界形態（`97-selfhosted-server.md` § 97.1）。單機不提供聊天、隊伍、交易 */
+export type WorldMode = 'solo' | 'open';
+
 export type ServerMessage =
-  | { t: 'hello_ok'; serverName: string; version: string; registration: string; autoLogin?: { token: string; username: string; userId: number; isHost: boolean } }
+  | { t: 'hello_ok'; serverName: string; version: string; registration: string; mode: WorldMode; autoLogin?: { token: string; username: string; userId: number; isHost: boolean } }
   | { t: 'version_mismatch'; required: string; received: string }
   /** `isHost`：這個帳號的密碼由 `server.properties` 的 `host-password` 決定，遊戲裡不提供修改 */
   | { t: 'auth_ok'; token: string; username: string; userId: number; hasPassword: boolean; isHost: boolean }
@@ -47,6 +50,8 @@ export type ServerMessage =
   | { t: 'action_ok'; id: number; result: unknown }
   | { t: 'chat'; message: ChatMessageView }
   | { t: 'leaderboard'; id?: number; snapshot: LeaderboardSnapshotView }
+  /** server 公告（`97-selfhosted-server.md` § 97.8）：關服倒數這類全服訊息，不走聊天頻道 */
+  | { t: 'notice'; text: string }
   | { t: 'kicked'; reason: string };
 
 /** 與 `services/leaderboardService.ts` 的 columnar 格式相同 */
@@ -89,6 +94,8 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'refreshQuestBoard', 'rerollQuestBoard', 'initQuestBoard', 'acceptCraftQuest', 'abandonCraftQuest',
     'saveState', 'pushSystemLog',
     'buyShopEquipment', 'craftEquipment', 'applySigil', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
+    'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'restoreInTrainingGround',
+    'setAfterCombatThreshold',
   ]),
   mapControl: new Set(['moveToTarget', 'setAutoMove', 'stopMoving']),
   mapMonster: new Set(['summonDummies', 'clearAll']),

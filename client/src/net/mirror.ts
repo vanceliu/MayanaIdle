@@ -10,6 +10,7 @@ import { createCombatState } from '../systems/combatLoop';
 import type { CombatVisual } from '../systems/combatLoop';
 import { ACTION_ALLOWLIST, type ActionStore, type ServerMessage, type StoreKey } from './protocol';
 import { useChatStore } from '../stores/chatStore';
+import { useNoticeStore } from '../stores/noticeStore';
 import { TICK_MS, setClockSource } from '../core/clock';
 import type { GameConnection } from './connection';
 
@@ -93,6 +94,14 @@ export function applyServerMessage(msg: ServerMessage): void {
       return;
     case 'chat':
       useChatStore.getState().receive(msg.message);
+      return;
+    /*
+     * server 公告（§ 97.8）：橫幅 ＋ 系統紀錄各留一份。
+     * 只放橫幅的話，關服倒數會在玩家切走視窗時完全錯過；只寫紀錄則會被戰鬥洗掉。
+     */
+    case 'notice':
+      useNoticeStore.getState().show(msg.text);
+      defaultSession.game.getState().pushSystemLog(msg.text);
       return;
     default:
       return;

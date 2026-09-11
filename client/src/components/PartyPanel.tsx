@@ -3,7 +3,8 @@ import { useGameStore } from '../stores/gameStore';
 import { usePartyStore, isPartyLeader, PARTY_MAX_MEMBERS, type PartyMemberView } from '../stores/partyStore';
 import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
-import { useOnlineStore } from '../net/online';
+import { useDraggableIsland } from '../hooks/useDraggableIsland';
+import { useMultiplayer } from '../net/online';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { getRegion } from '../models/mapData';
 import { PanelDockFace } from './PanelDockFace';
@@ -23,7 +24,7 @@ function mapName(regionId: string, floor: number | null): string {
 
 /** 徽章＝待處理的邀請數（`34-ui-guidelines.md` § 34.10 數量徽章） */
 export function PartyButton() {
-  const online = useOnlineStore(s => s.enabled);
+  const online = useMultiplayer();
   const invites = usePartyStore(s => s.invites.length);
   const isOpen = usePanelWindowStore(s => s.open.party);
   const toggle = usePanelWindowStore(s => s.toggle);
@@ -54,19 +55,35 @@ function MemberBars({ m }: { m: PartyMemberView }) {
   );
 }
 
+/** 隊伍 HUD 記住拖到哪裡的 localStorage 鍵 */
+export const PARTY_HUD_KEY = 'partyHud';
+
 /**
  * 隊伍 HUD：一列隊員 —— 名稱、職業、HP／MP 條、所在地圖、離線標記；不顯示隊員 buff（§ 97.7.3）。
- * 掛在狀態卡下方，自己不列。
+ *
+ * 預設接在狀態卡與 buff 下面；**可以拖走**（§ 32.3）——
+ * buff 一多就會把它一路往下推，推到看不見的人需要自己挪位置。
+ * 沒拖過就維持原本的流排，拖過之後改成固定座標，buff 再長也推不到它。
  */
 export function PartyHud() {
   const party = usePartyStore(s => s.party);
   const myId = useGameStore(s => s.character?.id);
+  // 手機的 HUD 是一條全寬的狀態列（`47-mobile.md`），沒有空位可以拖過去
+  const isMobile = useIsMobile();
+  const { ref, position, handlers } = useDraggableIsland(PARTY_HUD_KEY, isMobile);
+
   if (!party) return null;
   const others = party.members.filter(m => m.characterId !== myId);
   if (others.length === 0) return null;
 
   return (
-    <div className="party-hud" aria-label="隊伍">
+    <div
+      ref={ref}
+      className={`party-hud${position ? ' is-floating' : ''}`}
+      aria-label="隊伍"
+      style={position ? { left: position.left, top: position.top } : undefined}
+      {...handlers}
+    >
       {others.map(m => (
         <div key={m.characterId} className={`party-hud-row${m.online ? '' : ' is-offline'}`}>
           <div className="party-hud-head">
@@ -220,7 +237,7 @@ export function PartyPanelContent() {
  * 兩者的更新頻率與使用時機都不一樣，擠在同一個視窗會互相推擠。
  */
 export function OnMapButton() {
-  const online = useOnlineStore(s => s.enabled);
+  const online = useMultiplayer();
   const isOpen = usePanelWindowStore(s => s.open.onmap);
   const toggle = usePanelWindowStore(s => s.toggle);
   const isMobile = useIsMobile();

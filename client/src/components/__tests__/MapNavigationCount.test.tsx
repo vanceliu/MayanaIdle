@@ -23,14 +23,14 @@ describe('地圖選擇器的在線人數', () => {
     usePartyStore.setState({ onMap: [] });
   });
 
-  afterEach(() => useOnlineStore.setState({ enabled: false, status: 'offline' }));
+  afterEach(() => useOnlineStore.setState({ enabled: false, status: 'offline', worldMode: null }));
 
   const person = (characterId: number) => ({
     characterId, name: `P${characterId}`, className: 'knight', level: 1, inParty: false,
   });
 
   it('線上顯示人數，且**含自己**', () => {
-    useOnlineStore.setState({ enabled: true, status: 'authed' });
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
     usePartyStore.setState({ onMap: [person(2), person(3)] as never });
     render(<MapNavigation />);
 
@@ -38,19 +38,26 @@ describe('地圖選擇器的在線人數', () => {
   });
 
   it('地圖上只有自己時是 1 人', () => {
-    useOnlineStore.setState({ enabled: true, status: 'authed' });
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
     render(<MapNavigation />);
 
     expect(screen.getByText('1 人')).toBeTruthy();
   });
 
-  it('單機不顯示人數', () => {
+  it('沒連 server 不顯示人數', () => {
+    const { container } = render(<MapNavigation />);
+    expect(container.querySelector('.map-selector-count')).toBeNull();
+  });
+
+  // 單機世界也是連著一個 server 的，所以不能只看有沒有連線（§ 97.1）
+  it('單機形態不顯示人數', () => {
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'solo' });
     const { container } = render(<MapNavigation />);
     expect(container.querySelector('.map-selector-count')).toBeNull();
   });
 
   it('面板按鈕不再標人數徽章（同一個數字不放兩處）', () => {
-    useOnlineStore.setState({ enabled: true, status: 'authed' });
+    useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
     usePartyStore.setState({ onMap: [person(2)] as never });
     const { container } = render(<OnMapButton />);
 

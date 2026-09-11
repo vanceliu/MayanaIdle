@@ -210,7 +210,7 @@ describe('木樁召喚（§ 50.4.1）', () => {
       spawnPoint: { x: 4, y: 7 },
     };
     for (let i = 0; i < 200; i++) {
-      useMapMonsterStore.getState().spawnTick(1000, map, { x: 4, y: 7 }, 10, 30);
+      useMapMonsterStore.getState().spawnTick(map, { x: 4, y: 7 }, 30);
     }
     expect(useMapMonsterStore.getState().monsters).toHaveLength(0);
   });

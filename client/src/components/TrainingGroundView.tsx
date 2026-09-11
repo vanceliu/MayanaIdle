@@ -3,15 +3,22 @@
  *
  * 分成兩塊：
  * - **設定面板**（modal）：木樁參數與召喚。由管理員 NPC 或快捷鈕開啟。
+ *   以 portal 掛在 `document.body`：常駐 HUD 那半邊住在 `.hud-topleft`（z-index 20 的
+ *   堆疊脈絡）裡，modal 留在原處會被面板視窗（500 起跳）蓋住。
  * - **數據卡**（常駐 HUD）：計時／DPS／命中率／總傷害／MP 淨消耗，
  *   以及開始／停止。量測時要一邊打一邊看數字，這塊不能藏在 modal 裡。
+ *   它跟隊伍 HUD 一樣**可以拖走**（§ 32.3）——預設接在 buff 下面，
+ *   buff 一多就會把它推下去，想固定位置的人自己拖。
  */
 import { useEffect, useState } from 'react';
-import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
+import { createPortal } from 'react-dom';
+import { useGameStore } from '../stores/gameStore';
 import { useTownStore } from '../stores/townStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
+import { useIsMobile } from '../hooks/useViewport';
+import { useDraggableIsland } from '../hooks/useDraggableIsland';
 import { canRestore, getReadout, useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { getNearestTown, getRegion } from '../models/mapData';
 import { isWalkableTile } from '../models/mapControl';
@@ -25,6 +32,9 @@ import {
   DUMMY_SLOTS,
   getDefenseOverflowDodge,
 } from '../models/trainingGround';
+
+/** 數據卡記住拖到哪裡的 localStorage 鍵 */
+export const TRAINING_VIEW_KEY = 'trainingView';
 
 const SIZE_OPTIONS: { value: MonsterSize; label: string }[] = [
   { value: 'small', label: '小怪' },
@@ -54,7 +64,6 @@ function useTicker(active: boolean): number {
 
 export function TrainingGroundView() {
   const char = useGameStore(s => s.character);
-  const gear = useGameStore(s => s.equippedGear);
   const navigateTo = useGameStore(s => s.navigateTo);
   const facility = useTownStore(s => s.facility);
   const openFacility = useTownStore(s => s.openFacility);
@@ -69,6 +78,7 @@ export function TrainingGroundView() {
 
   const zIndex = useWindowZIndex('town');
   const focusWindow = useWindowLayerStore(s => s.focusWindow);
+  const isMobile = useIsMobile();
   const now = useTicker(measurement.running);
 
   if (!char) return null;
@@ -104,11 +114,12 @@ export function TrainingGroundView() {
    */
   function restoreFull() {
     if (!char || !canRestore(useTrainingGroundStore.getState().measurement)) return;
-    useGameStore.setState({
-      character: { ...char, hp: getEffectiveMaxHp(char, gear), mp: getEffectiveMaxMp(char, gear) },
-    });
-    useGameStore.getState().saveState();
+    // 補滿在 store（線上模式轉 RPC）：本機改角色狀態會被 server 推回來的蓋掉
+    useGameStore.getState().restoreInTrainingGround();
   }
+
+  /** 記住拖到哪裡的 localStorage 鍵；手機不給拖（HUD 是一條全寬狀態列） */
+  const { ref, position, handlers } = useDraggableIsland(TRAINING_VIEW_KEY, isMobile);
 
   function toggleMeasurement() {
     const store = useTrainingGroundStore.getState();
@@ -117,7 +128,13 @@ export function TrainingGroundView() {
   }
 
   return (
-    <div className="training-view" style={{ zIndex }} onPointerDown={() => focusWindow('town')}>
+    <div
+      ref={ref}
+      className={`training-view${position ? ' is-floating' : ''}`}
+      style={position ? { left: position.left, top: position.top } : undefined}
+      {...handlers}
+      onPointerDown={e => { focusWindow('town'); handlers.onPointerDown(e); }}
+    >
       <div className="town-npc-bar">
         <button
           className={`town-npc-btn ${facility === 'training-dummy' ? 'active' : ''}`}
@@ -152,8 +169,8 @@ export function TrainingGroundView() {
         <p className="training-hint">建議量測 30 秒以上，短時間會低估 DPS。</p>
       </div>
 
-      {facility === 'training-dummy' && (
-        <div className="town-modal-overlay" onClick={closeFacility}>
+      {facility === 'training-dummy' && createPortal((
+        <div className="town-modal-overlay" style={{ zIndex }} onClick={closeFacility}>
           <div className="town-modal" onClick={e => e.stopPropagation()}>
             <div className="town-modal-header">
               <span>木樁設定</span>
@@ -236,7 +253,7 @@ export function TrainingGroundView() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

@@ -3,7 +3,8 @@ import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, INN_PRICES } from '
 export function Inn() {
   const char = useGameStore(s => s.character);
   const gear = useGameStore(s => s.equippedGear);
-  const set = useGameStore.setState;
+  // 判定與扣款在 store（線上模式會轉成 RPC 交給 server），這裡只負責畫面
+  const restAtInn = useGameStore(s => s.restAtInn);
 
   if (!char) return null;
 
@@ -11,35 +12,6 @@ export function Inn() {
   const effMaxMp = getEffectiveMaxMp(char, gear);
   const hpFull = char.hp >= effMaxHp;
   const mpFull = char.mp >= effMaxMp;
-
-  function restFull() {
-    if (!char || char.gold < INN_PRICES.full) return;
-    // § 24.10.4：休息同時解除所有角色 debuff
-    const remainingEffects = useGameStore.getState().activeEffects.filter(
-      e => !(e.type === 'debuff' && e.target === 'player')
-    );
-    set({
-      character: { ...char, hp: effMaxHp, mp: effMaxMp, gold: char.gold - INN_PRICES.full },
-      activeEffects: remainingEffects,
-    });
-    useGameStore.getState().saveState();
-  }
-
-  function restHp() {
-    if (!char || char.gold < INN_PRICES.hpOnly || hpFull) return;
-    set({
-      character: { ...char, hp: effMaxHp, gold: char.gold - INN_PRICES.hpOnly },
-    });
-    useGameStore.getState().saveState();
-  }
-
-  function restMp() {
-    if (!char || char.gold < INN_PRICES.mpOnly || mpFull) return;
-    set({
-      character: { ...char, mp: effMaxMp, gold: char.gold - INN_PRICES.mpOnly },
-    });
-    useGameStore.getState().saveState();
-  }
 
   return (
     <div className="inn-panel">
@@ -54,21 +26,21 @@ export function Inn() {
       <div className="inn-options">
         <button
           className="inn-btn"
-          onClick={restFull}
+          onClick={() => restAtInn('full')}
           disabled={char.gold < INN_PRICES.full || (hpFull && mpFull)}
         >
           完全休息（HP + MP 全滿）— {INN_PRICES.full}G
         </button>
         <button
           className="inn-btn"
-          onClick={restHp}
+          onClick={() => restAtInn('hp')}
           disabled={char.gold < INN_PRICES.hpOnly || hpFull}
         >
           回復 HP — {INN_PRICES.hpOnly}G
         </button>
         <button
           className="inn-btn"
-          onClick={restMp}
+          onClick={() => restAtInn('mp')}
           disabled={char.gold < INN_PRICES.mpOnly || mpFull}
         >
           回復 MP — {INN_PRICES.mpOnly}G

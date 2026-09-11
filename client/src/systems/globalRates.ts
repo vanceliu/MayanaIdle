@@ -28,9 +28,15 @@ export function settleKillExp(baseExp: number, restedMultiplier: number, globalR
   return Math.floor(baseExp * KILL_EXP_MULTIPLIER * restedMultiplier * globalRate);
 }
 
-/** `26-spawn-pressure.md` § 26.2：判定間隔 = 基礎 / ((1 + Pressure × 0.2) × 全域生成倍率) */
-export function getSpawnInterval(baseIntervalMs: number, pressure: number, globalRate = rates.spawn): number {
-  return baseIntervalMs / ((1 + pressure * 0.2) * globalRate);
+/**
+ * `26-spawn-pressure.md` § 26.2：一波的隻數。
+ *
+ * `rolled` 是停留時間擲出的 1~3 再加上 Pressure，先夾在地圖上限內，
+ * 最後才乘全域生成倍率 —— 倍率作用在上限**之後**，大於 1 時場上隻數會超過
+ * § 26.2 的硬上限，那正是開服者調高這個值要的效果。最少 1 隻。
+ */
+export function getWaveSize(rolled: number, maxMonsters: number, globalRate = rates.spawn): number {
+  return Math.max(1, Math.floor(Math.min(rolled, maxMonsters) * globalRate));
 }
 
 /** `26-spawn-pressure.md` § 26.4：min(100%, 10% × 全域 Boss 生成倍率) */

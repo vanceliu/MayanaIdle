@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getSpawnInterval, getBossSpawnChance } from '../systems/globalRates';
+import { getBossSpawnChance, getWaveSize } from '../systems/globalRates';
 import type { Position, MapData } from '../models/mapControl';
 import { findPath, getRandomWalkablePosition, canMoveBetween } from '../systems/pathfinding';
 import type { TrainingDummySpec } from '../models/trainingGround';
@@ -33,9 +33,31 @@ export interface MapMonster {
   dummy?: TrainingDummySpec;
 }
 
-const SPAWN_INTERVAL_MS = 1000;
-const BASE_SPAWN_CHANCE = 0.15;
 const BASE_MAX_MONSTERS = 3;
+
+/**
+ * 一波基本盤：依**停留時間**擲 1~3 隻（`26-spawn-pressure.md` § 26.2）。
+ * 待越久單波越大，Pressure 再往上加。
+ */
+function rollSpawnCount(elapsedMinutes: number): number {
+  const roll = random();
+  if (elapsedMinutes < 5) {
+    // 1隻(80%), 2隻(15%), 3隻(5%)
+    if (roll < 0.80) return 1;
+    if (roll < 0.95) return 2;
+    return 3;
+  }
+  if (elapsedMinutes < 20) {
+    // 1隻(60%), 2隻(30%), 3隻(10%)
+    if (roll < 0.60) return 1;
+    if (roll < 0.90) return 2;
+    return 3;
+  }
+  // 20 分鐘以上：1隻(50%), 2隻(25%), 3隻(25%)
+  if (roll < 0.50) return 1;
+  if (roll < 0.75) return 2;
+  return 3;
+}
 const MIN_SPAWN_DISTANCE = 5;
 /** 超過此距離的怪物停止追蹤（原地待機），仍留在地圖上（見 `26-spawn-pressure.md` § 26.8） */
 export const MAX_TRACK_DISTANCE = 15;
@@ -49,25 +71,6 @@ const PLAYER_MOVE_THRESHOLD = 2;
 /** Boss 生成門檻：本次進區停留分鐘數（見 `26-spawn-pressure.md` § 26.4） */
 export const BOSS_SPAWN_MIN_MINUTES = 5;
 
-function rollSpawnCount(elapsedMinutes: number): number {
-  const roll = random();
-  if (elapsedMinutes < 5) {
-    // 1隻(80%), 2隻(15%), 3隻(5%)
-    if (roll < 0.80) return 1;
-    if (roll < 0.95) return 2;
-    return 3;
-  } else if (elapsedMinutes < 20) {
-    // 1隻(60%), 2隻(30%), 3隻(10%)
-    if (roll < 0.60) return 1;
-    if (roll < 0.90) return 2;
-    return 3;
-  } else {
-    // 20分鐘以上 (含30+): 1隻(50%), 2隻(25%), 3隻(25%)
-    if (roll < 0.50) return 1;
-    if (roll < 0.75) return 2;
-    return 3;
-  }
-}
 
 let monsterIdCounter = 0;
 function nextMonsterId(): string {
@@ -81,7 +84,6 @@ function distance(a: Position, b: Position): number {
 export interface MapMonsterState {
   monsters: MapMonster[];
   maxMonsters: number;
-  spawnTimer: number;
   combatMonsterIds: string[];
   hasBossInPool: boolean;
 
@@ -89,7 +91,11 @@ export interface MapMonsterState {
    * 生成判定。恢復等待（`mapControl.paused`）由呼叫端擋，這裡不看。
    * `anchors`：實例全體在場成員的位置，生成點須與每一位距離 ≥ 5 格（§ 97.7.1 多人實例）
    */
-  spawnTick: (deltaMs: number, map: MapData, playerPos: Position, pressure: number, elapsedMinutes?: number, anchors?: Position[]) => void;
+  /**
+   * 波次制（`26-spawn-pressure.md` § 26.1）：場上清空才生下一波。
+   * 一波的隻數＝停留時間的 1~3 分布 ＋ `pressure`，夾在 `maxMonsters` 內。
+   */
+  spawnTick: (map: MapData, playerPos: Position, pressure: number, elapsedMinutes?: number, anchors?: Position[]) => void;
   moveMonsters: (deltaMs: number, map: MapData, playerPos: Position) => void;
   checkCollisions: (playerPos: Position) => MapMonster[];
   /** 迴圈整批寫回移動後的怪物 */
@@ -109,44 +115,42 @@ export function createMapMonsterStore(_session?: Session) {
   return create<MapMonsterState>((set, get) => ({
   monsters: [],
   maxMonsters: BASE_MAX_MONSTERS,
-  spawnTimer: 0,
   combatMonsterIds: [],
   hasBossInPool: false,
 
-  spawnTick: (deltaMs, map, playerPos, pressure, elapsedMinutes = 0, anchors) => {
+  spawnTick: (map, playerPos, pressure, elapsedMinutes = 0, anchors) => {
     const state = get();
     // 城鎮是安全區，永遠不生怪（§ 13.1、§ 13.2.1）。擋在最前面而不是靠呼叫端記得不要呼叫。
     if (map.theme === 'town') return;
     // 試驗場只有玩家自己召喚的木樁（`50-training-ground.md` § 50.3）。
     // 這是與城鎮不同的一條路：城鎮還要擋自動移動，試驗場必須允許。
     if (map.autoSpawn === false) return;
-    if (state.monsters.length >= state.maxMonsters) return;
+
+    /*
+     * 波次制（`26-spawn-pressure.md` § 26.1）：**場上還有怪就不生**。
+     * 沒有平時補位 —— 打到剩一隻時不會被默默補回上限，一波就是一波。
+     *
+     * 下一波不另設間隔：休息由「HP/MP 等待回復時暫停生成」負責（§ 26.2），
+     * 血夠就接著打，血不夠時怪本來就不會來。
+     */
+    if (state.monsters.length > 0) return;
+
     const farFromAll = (pos: Position) => (anchors ?? [playerPos]).every(a => distance(pos, a) >= MIN_SPAWN_DISTANCE);
 
-    // 清場補位（`26-spawn-pressure.md` § 26.2）：場上全空時立即判定且必定成功。
-    // 沒有它，擊殺速度快於判定間隔的角色會停在空地上等下一個週期再擲 15%，
-    // DPS 完全兌現不到擊殺速率。
-    const isRefill = state.monsters.length === 0;
+    /*
+     * 一波的隻數：停留時間擲 1~3（§ 26.2）再加 Pressure，夾在上限內、乘全域生成倍率。
+     *
+     * 兩個輸入缺一不可：分布讓每一波不一樣（固定隻數的波次玩起來像節拍器），
+     * Pressure 則是「打得越多、怪越多」那條路 —— 只留分布的話，
+     * 清了一整天的地圖跟剛進來的地圖一模一樣。
+     */
+    const spawnCount = getWaveSize(rollSpawnCount(elapsedMinutes) + pressure, state.maxMonsters);
 
-    if (!isRefill) {
-      const newTimer = state.spawnTimer + deltaMs;
-      const adjustedInterval = getSpawnInterval(SPAWN_INTERVAL_MS, pressure);
-      if (newTimer < adjustedInterval) {
-        set({ spawnTimer: newTimer });
-        return;
-      }
-    }
 
-    set({ spawnTimer: 0 });
-
-    if (!isRefill && random() > BASE_SPAWN_CHANCE) return;
-
-    // Determine spawn count based on elapsed time (partySize=1 baseline)
-    const spawnCount = rollSpawnCount(elapsedMinutes);
-
+    // 進到這裡場上一定是空的，所以生滿整波就好，不必再夾一次上限
+    // —— 夾了的話全域生成倍率會被上限吃掉。
     for (let i = 0; i < spawnCount; i++) {
       const currentMonsters = get().monsters;
-      if (currentMonsters.length >= get().maxMonsters) break;
 
       // Determine if this spawn is a boss
       const bossAlreadyOnMap = currentMonsters.some(m => m.isBoss);
@@ -390,7 +394,7 @@ export function createMapMonsterStore(_session?: Session) {
   },
 
   clearAll: () => {
-    set({ monsters: [], spawnTimer: 0 });
+    set({ monsters: [] });
   },
 
   summonDummies: (spec, positions) => {

@@ -86,3 +86,72 @@ describe('管理介面憑證（§ 97.8）', () => {
     expect(CONFIG_SPECS.some(s => s.key === 'host-password')).toBe(false);
   });
 });
+
+/**
+ * 每個鍵的型別標示（`ui`）與實際驗證（`parse`）必須一致（§ 97.2）——
+ * 桌面啟動器的表單是照 `ui` 畫的，兩邊對不上就會出現「表單填得進去、server 起不來」。
+ */
+describe('設定值的型別（§ 97.2）', () => {
+  const specOf = (key: string) => CONFIG_SPECS.find(s => s.key === key)!;
+  const rejects = (key: string, raw: string) => {
+    expect(() => specOf(key).parse(raw, '/data'), `${key}=${raw}`).toThrow();
+  };
+  const accepts = (key: string, raw: string) => {
+    expect(() => specOf(key).parse(raw, '/data'), `${key}=${raw}`).not.toThrow();
+  };
+
+  it('整數鍵不收小數、負數與範圍外的值', () => {
+    for (const s of CONFIG_SPECS.filter(s => s.ui.kind === 'int')) {
+      rejects(s.key, '1.5');
+      rejects(s.key, '-1');
+      rejects(s.key, 'abc');
+      rejects(s.key, String((s.ui.max ?? 0) + 1));
+      accepts(s.key, String(s.ui.min));
+      accepts(s.key, String(s.ui.max));
+    }
+  });
+
+  it('倍率鍵收小數但不收負數', () => {
+    for (const s of CONFIG_SPECS.filter(s => s.ui.kind === 'rate')) {
+      accepts(s.key, '0.5');
+      accepts(s.key, '2.75');
+      rejects(s.key, '-0.1');
+      rejects(s.key, 'abc');
+    }
+  });
+
+  it('allowZero 決定 0 收不收 —— 0 等於把該項關掉，有些項關不得', () => {
+    for (const s of CONFIG_SPECS.filter(s => s.ui.kind === 'rate')) {
+      if (s.ui.allowZero) accepts(s.key, '0');
+      else rejects(s.key, '0');
+    }
+    // 生怪相關的三項不可為 0：0 隻怪、0 血、0 傷害都會讓遊戲直接停擺
+    for (const key of ['spawn-rate', 'monster-hp-rate', 'monster-attack-rate']) {
+      expect(specOf(key).ui.allowZero, key).toBe(false);
+    }
+    // 產出相關的可以關掉
+    for (const key of ['gold-rate', 'drop-rate', 'exp-rate', 'pressure-rate', 'boss-spawn-rate']) {
+      expect(specOf(key).ui.allowZero, key).toBe(true);
+    }
+  });
+
+  it('布林與列舉只收自己那幾個字', () => {
+    for (const s of CONFIG_SPECS.filter(s => s.ui.kind === 'bool')) {
+      accepts(s.key, 'true');
+      accepts(s.key, 'false');
+      rejects(s.key, '1');
+      rejects(s.key, 'yes');
+    }
+    for (const s of CONFIG_SPECS.filter(s => s.ui.kind === 'enum')) {
+      for (const opt of s.ui.options!) accepts(s.key, opt);
+      rejects(s.key, 'nope');
+    }
+  });
+
+  it('每個鍵都標了型別，且預設值自己過得了驗證', () => {
+    for (const s of CONFIG_SPECS) {
+      expect(s.ui.kind, s.key).toBeTruthy();
+      accepts(s.key, s.format(s.default('/data') as never));
+    }
+  });
+});

@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useEffect, useRef, useState } from 'react
 import { getElementScale } from '../stores/settingsStore';
 import { useWindowLayerStore, useWindowZIndex } from '../stores/windowLayerStore';
 import { useIsMobile } from '../hooks/useViewport';
+import { onWindowPositionReset } from '../stores/windowPositionReset';
 
 /**
  * 底部浮動視窗的共同殼（§ 32.3）：可拖曳的標題列、背景透明度、三段高度。
@@ -116,6 +117,16 @@ export function LogWindow({ storageKey, title, titleContent, className = '', dra
     setPos(loadWindowPosition(posStorageKey));
     setOpacity(loadWindowOpacity(opacityStorageKey));
   }, [posStorageKey, opacityStorageKey]);
+
+  // 「重設視窗位置」：位置存在自己的鍵裡，要自己清（§ 32.15）
+  useEffect(() => onWindowPositionReset(() => {
+    try {
+      localStorage.removeItem(posStorageKey);
+    } catch {
+      // 清不掉就只影響下次開啟，畫面上已經回到預設位置
+    }
+    setPos(null);
+  }), [posStorageKey]);
 
   /**
    * 讀回來的位置也要夾一次：在 1920 螢幕存的座標，換到 1280 開就整個在畫面外。

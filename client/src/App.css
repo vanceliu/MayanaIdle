@@ -528,15 +528,21 @@ a,
  * 也刻意不用 `left: 50% + transform`：`transform` 會讓內部 `position: fixed`
  * 的設施視窗改以本容器為定位基準，視窗會被壓成一條窄長條。
  */
+/*
+ * 試驗場的按鈕與數據卡。**不定位**：它住在 `.hud-topleft` 那一疊裡，接在 buff 下面。
+ * 原本是 `position: absolute; top: 172px`（假設角色卡到那裡結束），
+ * buff 一長就被它整片蓋住 —— 寫死的偏移擋不住會長高的東西。
+ */
 .training-view {
-  position: absolute;
-  top: 172px;
-  left: 12px;
-  z-index: 20;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  pointer-events: none;
+  gap: 8px;
+}
+
+/* 拖過之後改成固定座標（`useDraggableIsland`），與隊伍 HUD 同一套 */
+.training-view.is-floating {
+  position: fixed;
 }
 
 /* 靠左直排，不再置中；寬度與數據卡對齊 */
@@ -544,8 +550,7 @@ a,
   justify-content: flex-start;
 }
 
-.town-view > *,
-.training-view > * {
+.town-view > * {
   pointer-events: auto;
 }
 
@@ -3793,11 +3798,17 @@ button.active {
   flex: 1;
 }
 
+/*
+ * 兩欄各自捲動。**沒有 `overflow` 的那一欄會溢出畫在頁尾上面** ——
+ * `.town-modal-body` 是 `overflow: hidden`，`.sigil-body` 又是 `flex: 1`，
+ * 欄位盒子被壓短之後，右欄（詞綴＋印記＋說明＋消耗）就直接疊到動作鈕那一列上。
+ */
 .sigil-col {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .sigil-section-title {
@@ -6677,8 +6688,12 @@ button.active {
 }
 
 @media (max-width: 767px) {
-  /* 印記師：左右欄疊成上下，清單壓矮（`47-mobile.md`） */
-  .sigil-body { grid-template-columns: 1fr; }
+  /*
+   * 印記師：左右欄疊成上下，清單壓矮（`47-mobile.md`）。
+   * 疊起來之後改成**整塊一起捲**：單欄裡再塞兩個捲動區，手指放哪裡捲到什麼全憑運氣。
+   */
+  .sigil-body { grid-template-columns: 1fr; overflow-y: auto; }
+  .sigil-col { overflow: visible; }
   /* 疊成上下後清單不能再吃滿高度，否則下面的詞綴與印記整個被推出畫面 */
   .sigil-picker { flex: none; max-height: 150px; }
   .sigil-apply { width: 100%; }
@@ -8890,6 +8905,29 @@ button.active {
   gap: 6px;
   width: 100%;
   max-width: 260px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.party-hud:active {
+  cursor: grabbing;
+}
+
+/*
+ * 拖過之後改成固定座標（`useDraggableIsland`）：
+ * 留在流排裡的話 buff 一長就會繼續把它往下推，而那正是要拖走的原因。
+ */
+.party-hud.is-floating {
+  position: fixed;
+  width: 260px;
+}
+
+/* 手機的 HUD 是一條全寬狀態列（`47-mobile.md`），不給拖也不改定位 */
+@media (max-width: 768px) {
+  .party-hud {
+    cursor: default;
+    touch-action: auto;
+  }
 }
 
 .party-hud-row {
@@ -9222,6 +9260,26 @@ button.active {
   font-size: var(--fs-xs);
 }
 
+/* === server 公告橫幅（`97-selfhosted-server.md` § 97.8） === */
+
+.notice-banner {
+  position: fixed;
+  top: calc(12px + var(--safe-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  max-width: min(90vw, 520px);
+  padding: 10px 18px;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: rgba(var(--glass-rgb), 0.95);
+  border: var(--border-width) solid var(--accent-danger);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
 /* === 交易（`97-selfhosted-server.md` § 97.7 表） === */
 
 .trade-sides {
@@ -9243,6 +9301,78 @@ button.active {
   border-color: var(--accent-gold);
 }
 
+/* 拖到頭上時整區亮起來：落點是整個區塊，不是某一格 */
+.trade-side.is-drop-target,
+.trade-source.is-drop-target {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary) inset;
+}
+
+/* 來源格＝自己的背包，外觀與背包一致（`BagGrid` / `BagCell`） */
+.trade-source {
+  padding: 8px;
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+.trade-source .bag-grid {
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.trade-source-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.trade-source-hint {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+/* 交易格放滿時來源格仍看得到，但點不動 */
+.trade-source .bag-cell.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 堆疊道具放入前先決定數量 */
+.trade-qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px;
+  background: var(--bg-panel);
+  border: var(--border-width) solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.trade-qty input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--accent-primary);
+}
+
+.trade-qty-name {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.trade-qty-value {
+  flex: 0 0 auto;
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .trade-side-title {
   display: flex;
   justify-content: space-between;
@@ -9257,35 +9387,50 @@ button.active {
   font-size: var(--fs-xs);
 }
 
-.trade-list,
-.trade-pick-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
+/* 雙方放入的內容用背包格呈現（`BagCell`），格線與 tooltip 與背包共用 */
+.trade-side .bag-grid {
   gap: 3px;
 }
 
-.trade-item {
+.trade-side-gold {
+  margin-top: 6px;
   font-size: var(--fs-sm);
-  color: var(--text-primary);
+  color: var(--accent-gold);
+  text-align: right;
 }
 
-.trade-item.is-empty {
+.trade-side-gold:empty,
+.trade-side .bag-cell.empty {
   color: var(--text-dim);
 }
 
-.trade-gold {
-  color: var(--accent-gold);
-}
-
-.trade-editor-group {
-  margin-bottom: 8px;
-}
-
-.trade-editor-label {
+.trade-editor-slots {
   font-size: var(--fs-xs);
   color: var(--text-dim);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.trade-editor-gold {
+  margin-top: 8px;
+}
+
+/* 金幣可以直接打數字：拉桿對不準確切的值 */
+.trade-gold-input {
+  flex: 0 0 auto;
+  width: 88px;
+  padding: 2px 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--accent-gold);
+  background: var(--bg-deepest);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+}
+
+.trade-gold-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
 }
 
 .trade-pick {
@@ -9299,19 +9444,24 @@ button.active {
   justify-content: space-between;
 }
 
-.trade-pick input[type='number'] {
-  width: 72px;
-  padding: 2px 6px;
-  background: var(--bg-inset);
-  color: var(--text-primary);
-  border: var(--border-width) solid var(--outline-dark);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-xs);
+/* 數量用拉桿：堆疊物一次拉到要的量，比按上下鍵快 */
+.trade-pick input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--accent-primary);
 }
 
-.trade-pick-list {
-  max-height: 160px;
-  overflow-y: auto;
+.trade-pick-name {
+  flex: 0 0 auto;
+}
+
+.trade-pick-value {
+  flex: 0 0 auto;
+  min-width: 56px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
 }
 
 /* 線上模式的帳號區（`97-selfhosted-server.md` § 97.5） */

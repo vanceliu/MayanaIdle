@@ -35,14 +35,35 @@ export interface ServerConfig {
 /** 生效時機：`restart` 的鍵改動後由管理介面標示需重啟 */
 export type ApplyTiming = 'live' | 'restart';
 
+/**
+ * 輸入型別（`97-selfhosted-server.md` § 97.2）。
+ * 給編輯設定的介面用，**限制本身仍由 `parse` 決定** —— 這裡只描述該長成什麼樣子的輸入框。
+ */
+export interface FieldUi {
+  kind: 'text' | 'password' | 'path' | 'int' | 'rate' | 'bool' | 'enum';
+  /** int／rate：可輸入的範圍。rate 的 min 為 0 或大於 0 的最小值 */
+  min?: number;
+  max?: number;
+  /** int 一律 1（不接受小數）；rate 為 `any`（可填小數） */
+  step?: number | 'any';
+  /** rate 專用：0 可不可以（0 等於把該項關掉，有些項關不得） */
+  allowZero?: boolean;
+  options?: readonly string[];
+}
+
 interface KeySpec<K extends keyof ServerConfig> {
   key: string;
   field: K;
   timing: ApplyTiming;
+  ui: FieldUi;
   default: (dataDir: string) => ServerConfig[K];
   parse: (raw: string, dataDir: string) => ServerConfig[K];
   format: (value: ServerConfig[K]) => string;
 }
+
+/** 倍率：可填小數、不可為負；`allowZero` 為 false 時連 0 都不行（0 會讓該項完全消失） */
+const rateUi = (allowZero: boolean): FieldUi => ({ kind: 'rate', min: 0, step: 'any', allowZero });
+const intUi = (min: number, max: number): FieldUi => ({ kind: 'int', min, max, step: 1 });
 
 function parseInt10(raw: string, key: string, min: number, max: number): number {
   const n = Number(raw);
@@ -69,30 +90,30 @@ const num = (v: number) => String(v);
 const spec = <K extends keyof ServerConfig>(s: KeySpec<K>) => s as unknown as KeySpec<keyof ServerConfig>;
 
 export const CONFIG_SPECS: ReadonlyArray<KeySpec<keyof ServerConfig>> = [
-  spec<'serverName'>({ key: 'server-name', field: 'serverName', timing: 'live', default: () => 'MayanaIdle', parse: str, format: str }),
-  spec<'bind'>({ key: 'bind', field: 'bind', timing: 'restart', default: () => '127.0.0.1', parse: (raw) => {
+  spec<'serverName'>({ key: 'server-name', field: 'serverName', timing: 'live', ui: { kind: 'text' }, default: () => 'MayanaIdle', parse: str, format: str }),
+  spec<'bind'>({ key: 'bind', field: 'bind', timing: 'restart', ui: { kind: 'text' }, default: () => '127.0.0.1', parse: (raw) => {
     if (!raw.trim()) throw new Error('bind: 不可為空');
     return raw.trim();
   }, format: str }),
-  spec<'port'>({ key: 'port', field: 'port', timing: 'restart', default: () => 25580, parse: (raw) => parseInt10(raw, 'port', 1, 65535), format: num }),
-  spec<'maxPlayers'>({ key: 'max-players', field: 'maxPlayers', timing: 'live', default: () => 50, parse: (raw) => parseInt10(raw, 'max-players', 1, 100000), format: num }),
-  spec<'registration'>({ key: 'registration', field: 'registration', timing: 'live', default: () => 'open', parse: (raw) => {
+  spec<'port'>({ key: 'port', field: 'port', timing: 'restart', ui: intUi(1, 65535), default: () => 25580, parse: (raw) => parseInt10(raw, 'port', 1, 65535), format: num }),
+  spec<'maxPlayers'>({ key: 'max-players', field: 'maxPlayers', timing: 'live', ui: intUi(1, 100000), default: () => 50, parse: (raw) => parseInt10(raw, 'max-players', 1, 100000), format: num }),
+  spec<'registration'>({ key: 'registration', field: 'registration', timing: 'live', ui: { kind: 'enum', options: ['open', 'invite', 'closed'] }, default: () => 'open', parse: (raw) => {
     if (raw === 'open' || raw === 'invite' || raw === 'closed') return raw;
     throw new Error(`registration: 必須是 open／invite／closed（收到 "${raw}"）`);
   }, format: str }),
-  spec<'inviteCode'>({ key: 'invite-code', field: 'inviteCode', timing: 'live', default: () => '', parse: str, format: str }),
-  spec<'adminUser'>({ key: 'admin-user', field: 'adminUser', timing: 'live', default: () => 'admin', parse: str, format: str }),
-  spec<'adminPassword'>({ key: 'admin-password', field: 'adminPassword', timing: 'live', default: () => '', parse: str, format: str }),
-  spec<'autoOpenBrowser'>({ key: 'auto-open-browser', field: 'autoOpenBrowser', timing: 'restart', default: () => true, parse: (raw) => parseBool(raw, 'auto-open-browser'), format: (v) => String(v) }),
-  spec<'backupDir'>({ key: 'backup-dir', field: 'backupDir', timing: 'live', default: (dataDir) => join(dataDir, 'backups'), parse: str, format: str }),
-  spec<'goldRate'>({ key: 'gold-rate', field: 'goldRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'gold-rate', true), format: num }),
-  spec<'dropRate'>({ key: 'drop-rate', field: 'dropRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'drop-rate', true), format: num }),
-  spec<'expRate'>({ key: 'exp-rate', field: 'expRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'exp-rate', true), format: num }),
-  spec<'pressureRate'>({ key: 'pressure-rate', field: 'pressureRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'pressure-rate', true), format: num }),
-  spec<'spawnRate'>({ key: 'spawn-rate', field: 'spawnRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'spawn-rate', false), format: num }),
-  spec<'monsterHpRate'>({ key: 'monster-hp-rate', field: 'monsterHpRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'monster-hp-rate', false), format: num }),
-  spec<'monsterAttackRate'>({ key: 'monster-attack-rate', field: 'monsterAttackRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'monster-attack-rate', false), format: num }),
-  spec<'bossSpawnRate'>({ key: 'boss-spawn-rate', field: 'bossSpawnRate', timing: 'live', default: () => 1, parse: (raw) => parseRate(raw, 'boss-spawn-rate', true), format: num }),
+  spec<'inviteCode'>({ key: 'invite-code', field: 'inviteCode', timing: 'live', ui: { kind: 'text' }, default: () => '', parse: str, format: str }),
+  spec<'adminUser'>({ key: 'admin-user', field: 'adminUser', timing: 'live', ui: { kind: 'text' }, default: () => 'admin', parse: str, format: str }),
+  spec<'adminPassword'>({ key: 'admin-password', field: 'adminPassword', timing: 'live', ui: { kind: 'password' }, default: () => '', parse: str, format: str }),
+  spec<'autoOpenBrowser'>({ key: 'auto-open-browser', field: 'autoOpenBrowser', timing: 'restart', ui: { kind: 'bool' }, default: () => true, parse: (raw) => parseBool(raw, 'auto-open-browser'), format: (v) => String(v) }),
+  spec<'backupDir'>({ key: 'backup-dir', field: 'backupDir', timing: 'live', ui: { kind: 'path' }, default: (dataDir) => join(dataDir, 'backups'), parse: str, format: str }),
+  spec<'goldRate'>({ key: 'gold-rate', field: 'goldRate', timing: 'live', ui: rateUi(true), default: () => 1, parse: (raw) => parseRate(raw, 'gold-rate', true), format: num }),
+  spec<'dropRate'>({ key: 'drop-rate', field: 'dropRate', timing: 'live', ui: rateUi(true), default: () => 1, parse: (raw) => parseRate(raw, 'drop-rate', true), format: num }),
+  spec<'expRate'>({ key: 'exp-rate', field: 'expRate', timing: 'live', ui: rateUi(true), default: () => 1, parse: (raw) => parseRate(raw, 'exp-rate', true), format: num }),
+  spec<'pressureRate'>({ key: 'pressure-rate', field: 'pressureRate', timing: 'live', ui: rateUi(true), default: () => 1, parse: (raw) => parseRate(raw, 'pressure-rate', true), format: num }),
+  spec<'spawnRate'>({ key: 'spawn-rate', field: 'spawnRate', timing: 'live', ui: rateUi(false), default: () => 1, parse: (raw) => parseRate(raw, 'spawn-rate', false), format: num }),
+  spec<'monsterHpRate'>({ key: 'monster-hp-rate', field: 'monsterHpRate', timing: 'live', ui: rateUi(false), default: () => 1, parse: (raw) => parseRate(raw, 'monster-hp-rate', false), format: num }),
+  spec<'monsterAttackRate'>({ key: 'monster-attack-rate', field: 'monsterAttackRate', timing: 'live', ui: rateUi(false), default: () => 1, parse: (raw) => parseRate(raw, 'monster-attack-rate', false), format: num }),
+  spec<'bossSpawnRate'>({ key: 'boss-spawn-rate', field: 'bossSpawnRate', timing: 'live', ui: rateUi(true), default: () => 1, parse: (raw) => parseRate(raw, 'boss-spawn-rate', true), format: num }),
 ];
 
 export const CONFIG_FILE = 'server.properties';

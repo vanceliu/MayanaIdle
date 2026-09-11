@@ -5,6 +5,7 @@ import { CharacterCreate } from './components/CharacterCreate';
 import { CharacterSelect } from './components/CharacterSelect';
 import { StatusPanel } from './components/StatusPanel';
 import { LogDock } from './components/LogDock';
+import { NoticeBanner } from './components/NoticeBanner';
 import { TradeAutoOpen } from './components/TradePanel';
 import { DiscardConfirmModal } from './components/DiscardConfirmModal';
 import { BuffBar } from './components/BuffBar';
@@ -153,7 +154,6 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
         <BattleView />
       </div>
       {isInTown && <TownView />}
-      {isInTrainingGround && <TrainingGroundView />}
 
       {/*
         * 上方 HUD 帶。桌機是 `display: contents` —— 這個容器在版面上不存在，
@@ -167,6 +167,8 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
           <StatusPanel />
           <BuffBar />
           <PartyHud />
+          {/* 試驗場的按鈕與數據卡：接在 buff 下面，跟隊伍 HUD 一樣可以拖走 */}
+          {isInTrainingGround && <TrainingGroundView />}
         </div>
 
         {/* 右上：只放地圖選擇器（系統按鈕與版本標示都在右下角） */}
@@ -178,6 +180,9 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
           <MapNavigation />
         </div>
       </div>
+
+      {/* server 公告（關服倒數等）：畫面上方正中，蓋住地圖是刻意的 */}
+      <NoticeBanner />
 
       {/* 戰鬥日誌：可拖曳的視窗，預設停在左下角。聊天是同一套視窗，預設停在它右邊 */}
       <LogDock />

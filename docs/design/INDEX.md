@@ -127,7 +127,7 @@
 | 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文（帳號規則在 `97-selfhosted-server.md` § 97.5） |
 | 角色識別（uuid） | `19-account-character.md` | § 19.4 |
 | 資料版本與遷移 | `19-account-character.md` § 19.9、`97-selfhosted-server.md` § 97.4 | — |
-| **全域倍率（金幣／掉落／經驗／Pressure／生成頻率／怪物血量／怪物攻擊力／Boss 生成）** | `19-account-character.md` § 19.9 | 作用位置：`27-drop-table.md` § 27.1、`36-quest-system.md` § 36.3、`28-monster-stats.md` § 28.1、`26-spawn-pressure.md` § 26.2~26.4、`04-character.md` § 4.11 |
+| **全域倍率（金幣／掉落／經驗／Pressure／生成隻數／怪物血量／怪物攻擊力／Boss 生成）** | `19-account-character.md` § 19.9 | 作用位置：`27-drop-table.md` § 27.1、`36-quest-system.md` § 36.3、`28-monster-stats.md` § 28.1、`26-spawn-pressure.md` § 26.2~26.4、`04-character.md` § 4.11 |
 | 資料結構設計 | `18-data-schema.md` | 全文 |
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |

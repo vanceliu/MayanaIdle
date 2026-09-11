@@ -188,11 +188,25 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 
 | 島 | 內容 |
 |---|---|
-| `.hud-topleft` | `StatusPanel`（角色卡）＋ `BuffBar`（接在卡片下方） |
+| `.hud-topleft` | `StatusPanel`（角色卡）＋ `BuffBar`（接在卡片下方）＋ `PartyHud` ＋ `TrainingGroundView`（試驗場才有）。後兩者接在 buff 下方且**可拖曳**，見下 |
 | `.hud-topright` | `MapNavigation`（寬度必須與下拉選單一致，見下） |
 | `LogDock` | 左下角，**可拖曳**（見 § 32.3.1） |
 | `.hud-bottomcenter` | `ExploreBar` ＋ `QuickSlotBar`（10 格一排） |
 | `.hud-bottomright` | `PanelDock`（六顆一列）＋ `GameToolbar`（只剩 ⚙），合起來是一整排（`47-mobile.md` § 47.6） |
+
+**可拖曳的 HUD 小島：** 隊伍 HUD（`PartyHud`）與試驗場的數據卡（`TrainingGroundView`）
+和戰鬥紀錄視窗一樣可以拖走。
+
+| 規則 | 內容 |
+|---|---|
+| 預設 | 不浮動，照原本的流排接在 buff 下方 |
+| 拖過之後 | 改為固定座標，buff 再長也推不到它 |
+| 位置記憶 | 各自一個 localStorage 鍵，夾在畫面內（`useDraggableIsland`） |
+| 手機 | 不可拖（HUD 是一條全寬狀態列，`47-mobile.md`） |
+| 重設 | 設定的「重設視窗位置」會廣播，各視窗自己清掉自己的鍵並回到預設位置 |
+
+**小島內的 modal 要 portal 到 `document.body`**：`.hud-*` 是 `z-index: 20` 的堆疊脈絡，
+留在裡面的 modal 會被面板視窗（500 起跳）蓋住。試驗場的「木樁設定」即屬此例。
 
 > **HUD 容器不可吃滑鼠事件。**
 > 容器一律 `pointer-events: none`，只有裡面的按鈕／面板 `pointer-events: auto`。
@@ -630,7 +644,7 @@ interface ScriptTemplate {
 |---|---|
 | `WikiLayout` | Wiki 頁面共用版面（側邊導航 + 內容區） |
 | `WikiHome` | Wiki 首頁（功能總覽） |
-| `ArmorPage` | 防具資料查詢 |
+| `ArmorPage` | 防具資料查詢（含盾牌／魔導書／臂甲）。列出**素質需求**——武器走職業限制、沒有需求，故 `WeaponsPage` 不列這一欄（`06-equipment.md` § 6A.8） |
 | `AttributesPage` | 屬性說明 |
 | `CombatPage` | 戰鬥系統說明 |
 | `CraftingPage` | 製作系統資料 |
@@ -1069,6 +1083,8 @@ interface TooltipProps {
 
 沒有 `viewport` 欄位（舊格式）或當下取不到視窗尺寸時，維持絕對座標不換算。
 逃生門：顯示設定的「重設視窗位置」→ `resetPositions()`，清存檔並回到預設停靠位置。
+它同時廣播給自己記位置的視窗（戰鬥紀錄、隊伍 HUD），由它們各自清掉自己的鍵 ——
+只清面板那一份的話，玩家會看到「有些視窗回去了，有些沒有」。
 
 ### 狀態（`stores/panelWindowStore.ts`）
 

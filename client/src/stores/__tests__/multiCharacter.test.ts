@@ -82,6 +82,20 @@ describe('Multi-character system', () => {
       expect(list[1].name).toBe('Hero2');
     });
 
+    /**
+     * 載入角色即重置累積擊殺數（`26-spawn-pressure.md` § 26.3 重置條件）。
+     * Pressure 的輸入是該地圖的累積擊殺數，重登後從 0 起算。
+     */
+    it('選角載入時把 areaKills 歸零', async () => {
+      await useGameStore.getState().createCharacter('Hero1', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });
+      const charId = useGameStore.getState().character!.id!;
+      await db.characters.update(charId, { areaKills: 700 });
+
+      await useGameStore.getState().selectCharacter(charId);
+
+      expect(useGameStore.getState().character!.areaKills).toBe(0);
+    });
+
     /** 角色選擇畫面要列出屬性：建角配點 + Lv.51+ 配點（§ 20.10，不含裝備／buff） */
     it('summary 帶上建角配點與升級配點的合計', async () => {
       await useGameStore.getState().createCharacter('Hero1', 'knight', { STR: 2, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 2 });

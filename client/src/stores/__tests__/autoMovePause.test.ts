@@ -27,7 +27,6 @@ function resetStores(paused: boolean) {
   useMapMonsterStore.setState({
     monsters: [],
     maxMonsters: 3,
-    spawnTimer: 0,
     combatMonsterIds: [],
     hasBossInPool: false,
   });
