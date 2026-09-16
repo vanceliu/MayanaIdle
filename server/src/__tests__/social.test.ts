@@ -8,6 +8,7 @@ import { computeLeaderboard } from '../leaderboard';
 import type { ServerMessage } from '../../../client/src/net/protocol';
 import { addBagItem } from '../../../client/src/models/bagItem';
 import type { DatabaseSync } from 'node:sqlite';
+import { CHAT_MAX_LENGTH, CHAT_RATE_MAX, MUTED_MESSAGE, TOO_LONG_MESSAGE } from '../chatLimit';
 
 /** 第 5 階段：聊天（§ 97.7.2）、交易（§ 97.7 表）、本服排行榜（`37-statistics.md` § 37.4） */
 const ATTRS = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 } as never;
@@ -187,10 +188,9 @@ describe('社交', () => {
     const b = await enter(2, 'B');
     a.game.setState({ statistics: { ...a.game.getState().statistics, monstersKilled: 5 } });
     b.game.setState({ character: { ...b.game.getState().character!, level: 9 } });
-    a.game.getState().saveState();
-    b.game.getState().saveState();
-    // 存檔走佇列（`gameStore` 的 saveQueue），等它排完再讀
-    await new Promise(resolve => setTimeout(resolve, 20));
+    // 排行榜讀的是 SQLite，所以要強制落地（`saveState` 只標記 dirty，§ 97.4）
+    await a.game.getState().flushSaveNow();
+    await b.game.getState().flushSaveNow();
     const snap = computeLeaderboard(db, 20);
     expect(snap.count).toBe(2);
     expect(snap.rows).toHaveLength(2);
@@ -204,5 +204,78 @@ describe('社交', () => {
     const top1 = computeLeaderboard(db, 1);
     // A 是殺敵榜第一、B 是等級榜第一，聯集仍是兩人
     expect(top1.rows).toHaveLength(2);
+  });
+
+  /** 發話頻率與禁言（§ 97.7.2）：規則本身在 `chatLimit.test.ts`，這裡驗它真的接在聊天入口上 */
+  it('只有公開頻道計次；禁言後所有頻道都不能講', async () => {
+    const a = await enter(1, 'A');
+    const b = await enter(2, 'B');
+
+    // 密語不計次：連送也不會把自己禁掉
+    for (let i = 0; i < CHAT_RATE_MAX + 1; i++) {
+      expect(world.handleChat(a, 'whisper', `悄悄 ${i}`, 'B').ok).toBe(true);
+    }
+
+    for (let i = 0; i < CHAT_RATE_MAX; i++) {
+      expect(world.handleChat(a, 'world', `第 ${i} 則`).ok).toBe(true);
+    }
+
+    // 超出的那一則不送出，並進入禁言
+    const blocked = world.handleChat(a, 'world', '再一則');
+    expect(blocked).toEqual({ ok: false, message: MUTED_MESSAGE });
+    expect(chats(b).map(m => m.message.text)).not.toContain('再一則');
+
+    // 禁言中：公開與私下的頻道一律擋
+    expect(world.handleChat(a, 'town', '城鎮')).toEqual({ ok: false, message: MUTED_MESSAGE });
+    expect(world.handleChat(a, 'whisper', '悄悄話', 'B')).toEqual({ ok: false, message: MUTED_MESSAGE });
+    expect(world.handleChat(a, 'party', '隊伍')).toEqual({ ok: false, message: MUTED_MESSAGE });
+
+    // 管理介面解除後可以再發
+    world.chatLimit.unmute(a.game.getState().character!.id!);
+    expect(world.handleChat(a, 'world', '解禁了').ok).toBe(true);
+  });
+
+  it('拒絕交易邀請要通知發起者', async () => {
+    const a = await enter(1, 'A');
+    const b = await enter(2, 'B');
+
+    await world.handleTradeAction(a, 'offer', [b.game.getState().character!.id]);
+    const offerId = b.trade.getState().offers[0].id;
+    await world.handleTradeAction(b, 'decline', [offerId]);
+
+    // 沒有通知的話發起者只能盯著畫面等邀請過期
+    expect(a.game.getState().combatLogs.map(l => l.text)).toContain('B 拒絕了你的交易邀請');
+    expect(b.trade.getState().offers).toHaveLength(0);
+  });
+
+  it('拒絕組隊邀請要通知邀請者', async () => {
+    const a = await enter(1, 'A');
+    const b = await enter(2, 'B');
+
+    await world.handlePartyAction(a, 'invite', [b.game.getState().character!.id]);
+    const inviteId = b.party.getState().invites[0].id;
+    await world.handlePartyAction(b, 'decline', [inviteId]);
+
+    expect(a.game.getState().combatLogs.map(l => l.text)).toContain('B 拒絕了你的隊伍邀請');
+    expect(b.party.getState().invites).toHaveLength(0);
+  });
+
+  it(`單條訊息超過 ${CHAT_MAX_LENGTH} 字即退回，且不計次`, async () => {
+    const a = await enter(1, 'A');
+    const b = await enter(2, 'B');
+
+    expect(world.handleChat(a, 'world', '字'.repeat(CHAT_MAX_LENGTH)).ok).toBe(true);
+
+    // 超長的退回，內容不外流
+    const tooLong = '字'.repeat(CHAT_MAX_LENGTH + 1);
+    expect(world.handleChat(a, 'world', tooLong)).toEqual({ ok: false, message: TOO_LONG_MESSAGE });
+    expect(chats(b).map(m => m.message.text)).not.toContain(tooLong);
+
+    // 被退回的不計次：再送滿一輪仍不會被禁
+    for (let i = 0; i < CHAT_MAX_LENGTH; i++) world.handleChat(a, 'world', tooLong);
+    expect(world.handleChat(a, 'world', '還能講').ok).toBe(true);
+
+    // 表情符號算一個字，不是兩個
+    expect(world.handleChat(a, 'world', '🙂'.repeat(CHAT_MAX_LENGTH)).ok).toBe(true);
   });
 });

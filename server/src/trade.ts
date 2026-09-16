@@ -123,9 +123,12 @@ export class TradeManager {
     return trade;
   }
 
-  decline(offerId: string, characterId: number): void {
+  /** 回傳被拒絕的那筆邀請，呼叫端才通知得到發起者（`97-selfhosted-server.md` § 97.7.4） */
+  decline(offerId: string, characterId: number): PendingOffer | undefined {
     const offer = this.offers.get(offerId);
-    if (offer && offer.toCharacterId === characterId) this.offers.delete(offerId);
+    if (!offer || offer.toCharacterId !== characterId) return undefined;
+    this.offers.delete(offerId);
+    return offer;
   }
 
   private sideOf(trade: Trade, characterId: number): { mine: TradeSide; theirs: TradeSide } {

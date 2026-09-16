@@ -194,7 +194,8 @@ export function StatisticsCenter() {
         <div className="stats-my">
           <div className="stats-my-grid">
             {LEADERBOARD_FIELDS.map(f => {
-              let value = 0;
+              // 三個分支一定會指派，不必先給 0
+              let value: number;
               if (f === 'character_level') {
                 value = character?.level ?? 0;
               } else if (f === 'contribution') {

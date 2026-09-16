@@ -36,6 +36,28 @@ export interface LoopState {
   persistentAcc: number;
   /** 常駐天賦的自身施法演出佇列（`48-vfx.md` § 48.8.5） */
   selfCastFx: SelfCastFxEvent[];
+  /*
+   * 以下三條佇列**必須每個 session 一份**（§ 97.6）。
+   * 放在模組層的話 server 上全服共用一條：A 的掉落結算會卡住 B 的存檔，
+   * 而它們都是 `await` 持久層的非同步工作，人一多就互相排隊。
+   */
+  /** 掉落結算佇列：同一次擊殺的掉落要照順序寫，不可交錯 */
+  dropQueue: Promise<void>;
+  /** 存檔佇列：寫入順序等於呼叫順序（`18-data-schema.md`） */
+  saveQueue: Promise<void>;
+  /** 天賦與信箱的初始化（載入角色與創角都會跑） */
+  talentInit: Promise<void>;
+
+  /*
+   * 存檔改為 dirty 標記 ＋ 週期 flush（§ 97.4）。
+   * 原本每殺一隻怪就寫一次盤，而一次寫入是角色列＋整份背包＋兩個倉庫、各自提交。
+   */
+  /** 有沒有還沒落地的變動 */
+  saveDirty: boolean;
+  /** 距離上次 flush 累積的毫秒 */
+  saveAcc: number;
+  /** 各表上次寫進去的內容簽章：一樣就不重寫（§ 97.4 只寫有變的表） */
+  savedSig: Record<string, string>;
 }
 
 export function createLoopState(): LoopState {
@@ -50,6 +72,12 @@ export function createLoopState(): LoopState {
     regenMpAcc: 0,
     persistentAcc: 0,
     selfCastFx: [],
+    dropQueue: Promise.resolve(),
+    saveQueue: Promise.resolve(),
+    talentInit: Promise.resolve(),
+    saveDirty: false,
+    saveAcc: 0,
+    savedSig: {},
   };
 }
 

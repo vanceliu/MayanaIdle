@@ -79,7 +79,7 @@ describe('Multi-monster drop race condition', () => {
     function applyDrops(drops: DropResult) {
       const state2 = get();
       if (!state2.character) return;
-      let char2 = { ...state2.character };
+      const char2 = { ...state2.character };
       const newBag: BagItem[] = state2.bagItems.map(b => ({ ...b }));
 
       char2.gold += drops.gold;

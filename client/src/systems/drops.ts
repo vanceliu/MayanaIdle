@@ -2,7 +2,7 @@ import type { GameRepository } from '../db/repository';
 import { defaultSession } from '../stores/session';
 import type { EquipmentInstance } from '../models/equipment';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
-import { isWeaponSlot } from '../models/equipment';
+import { isWeaponSlot, type EquipSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
 import type { EquipmentTierLevel } from '../models/equipmentTier';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
@@ -67,8 +67,8 @@ function getGoldAffixMultiplier(bonuses?: DropBonuses): number {
  * 單邊為空時退回另一邊，避免抽不到東西。
  */
 export function pickEquipmentCategory<T extends { slot: string }>(candidates: T[]): T[] {
-  const weapons = candidates.filter(t => isWeaponSlot(t.slot as any));
-  const armors = candidates.filter(t => !isWeaponSlot(t.slot as any));
+  const weapons = candidates.filter(t => isWeaponSlot(t.slot as EquipSlot));
+  const armors = candidates.filter(t => !isWeaponSlot(t.slot as EquipSlot));
   if (weapons.length === 0) return armors;
   if (armors.length === 0) return weapons;
   return random() < 0.5 ? weapons : armors;
@@ -123,7 +123,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
         weaponBaseDamage: getWeaponBaseDamage(template),
       });
-      const dbRecord: Record<string, unknown> = {
+      const dbRecord: Partial<EquipmentInstance> = {
         templateId: template.id!,
         slot: template.slot,
         quality: 0,
@@ -133,7 +133,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         ownerId,
         equipped: false,
       };
-      const id = await repo.addEquipment(dbRecord as any);
+      const id = await repo.addEquipment(dbRecord);
       const instance: EquipmentInstance = resolveEquipment({
         id,
         templateId: template.id!,
@@ -174,7 +174,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
           weaponBaseDamage: getWeaponBaseDamage(template),
         });
-        const dbRecord: Record<string, unknown> = {
+        const dbRecord: Partial<EquipmentInstance> = {
           templateId: template.id!,
           slot: template.slot,
           quality: 0,
@@ -184,7 +184,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           ownerId,
           equipped: false,
         };
-        const id = await repo.addEquipment(dbRecord as any);
+        const id = await repo.addEquipment(dbRecord);
         const instance: EquipmentInstance = resolveEquipment({
           id,
           templateId: template.id!,
@@ -294,7 +294,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
         const affixes = generateAffixes(affixCategory, areaLevel, 4, isBoss, {
           weaponBaseDamage: getWeaponBaseDamage(template),
         });
-        const dbRecord: Record<string, unknown> = {
+        const dbRecord: Partial<EquipmentInstance> = {
           templateId: template.id!,
           slot: template.slot,
           quality: 0,
@@ -304,7 +304,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
           ownerId,
           equipped: false,
         };
-        const id = await repo.addEquipment(dbRecord as any);
+        const id = await repo.addEquipment(dbRecord);
         const instance: EquipmentInstance = resolveEquipment({
           id,
           templateId: template.id!,

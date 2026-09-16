@@ -195,7 +195,7 @@
   ←→ 35-inventory-constraints.md § 35.20
 
 【數值校準（來源文件改動後必須重跑）】
-06-equipment-requirement.md（TTK 校準）
+06-equipment-requirement.md（武器規格：件數／職業階梯上限／走向）
   ← 04-character.md / 05-skill.md / 20-attributes.md / 21-combat-formula.md
   ← 07-affix.md / 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
 44-dps-prediction.md（驗算腳本）

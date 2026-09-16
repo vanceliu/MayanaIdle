@@ -82,6 +82,12 @@ export interface GameRepository {
   putCharacterPrefs(characterId: number, data: unknown): Promise<void>;
   getBagLayout(characterId: number): Promise<unknown | null>;
   putBagLayout(characterId: number, data: unknown): Promise<void>;
+  /**
+   * 天賦分頁的格子位置（`35-inventory-constraints.md` § 35.21.1）。
+   * 與一般分頁分開存：兩個分頁的版面互不相干，塞進同一份 blob 只會互相覆蓋。
+   */
+  getTalentBagLayout(characterId: number): Promise<unknown | null>;
+  putTalentBagLayout(characterId: number, data: unknown): Promise<void>;
   /** 換版清理戳記（`52-mailbox.md` § 52.7.1）；無資料回 null */
   getMailPurgeVersion(characterId: number): Promise<string | null>;
   setMailPurgeVersion(characterId: number, version: string): Promise<void>;

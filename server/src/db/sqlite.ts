@@ -99,12 +99,30 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
       `);
     },
   },
+  {
+    /** 天賦分頁的格子位置（`35-inventory-constraints.md` § 35.21.1）。與一般分頁分開一張表 */
+    version: 2,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS talent_bag_layouts (
+          character_id INTEGER PRIMARY KEY,
+          data TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function openDatabase(path: string): DatabaseSync {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL');
+  /*
+   * WAL 下的常規設定：提交不再每次 fsync。
+   * 資料庫不會因此損壞，最壞情況是主機**斷電**時掉最後幾筆已提交的交易 ——
+   * 與 § 97.4「crash 最壞損失 5 秒進度」是同一個量級。
+   */
+  db.exec('PRAGMA synchronous = NORMAL');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
   return db;

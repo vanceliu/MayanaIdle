@@ -17,14 +17,23 @@ import { TradeError, TradeManager, type Trade } from './trade';
 import type { ChatChannel, ChatMessageView } from '../../client/src/net/protocol';
 import { getRegion } from '../../client/src/models/mapData';
 import type { PlayerSession } from './playerSession';
+import { ChatLimiter, CHAT_MAX_LENGTH, MUTED_MESSAGE, TOO_LONG_MESSAGE, chatTextLength } from './chatLimit';
 
 export interface PartyActionResult {
   ok: boolean;
   message?: string;
 }
 
+/**
+ * 只有公開頻道**計次**（§ 97.7.2）——騷擾發生在這裡。
+ * 禁言一旦生效則擋住**所有**頻道：被禁言就是不能講話。
+ */
+const RATE_COUNTED_CHANNELS: ReadonlySet<string> = new Set(['world', 'town']);
+
 export class World {
   readonly sessions = new Set<PlayerSession>();
+  /** 公開頻道的發話頻率與禁言（§ 97.7.2）。只存記憶體 */
+  readonly chatLimit = new ChatLimiter();
   readonly parties = new PartyManager();
   readonly instances = new InstanceManager();
   readonly trades = new TradeManager();
@@ -83,6 +92,7 @@ export class World {
   onCharacterLeave(session: PlayerSession): void {
     const identity = this.identityOf(session);
     if (identity) {
+      this.chatLimit.forget(identity.characterId);
       this.parties.setOnline(identity.characterId, false);
       const dropped = this.trades.dropCharacter(identity.characterId);
       if (dropped) this.syncTradeViews(this.tradeSessions(dropped));
@@ -126,6 +136,16 @@ export class World {
     if (!me) return { ok: false, message: '尚未進入世界' };
     const text = String(rawText ?? '').trim();
     if (!text) return { ok: false, message: '訊息不可為空' };
+    // 超長的訊息直接退回，不截斷也不計次（§ 97.7.2）
+    if (chatTextLength(text) > CHAT_MAX_LENGTH) return { ok: false, message: TOO_LONG_MESSAGE };
+
+    const now = Date.now();
+    // 禁言中：所有頻道都擋，連密語也不行（§ 97.7.2）
+    if (this.chatLimit.isMuted(me.characterId, now)) return { ok: false, message: MUTED_MESSAGE };
+    // 計次只看公開頻道；空訊息不計次，所以擋在上面那一行之後。超量的那一則本身也不送出
+    if (RATE_COUNTED_CHANNELS.has(channel) && this.chatLimit.record(me.characterId, now)) {
+      return { ok: false, message: MUTED_MESSAGE };
+    }
     const ch = session.game.getState().character!;
     let recipients: PlayerSession[];
     let to: { characterId: number; name: string } | undefined;
@@ -204,9 +224,16 @@ export class World {
           for (const s of this.tradeSessions(trade)) affected.add(s);
           return { ok: true };
         }
-        case 'decline':
-          this.trades.decline(String(args[0]), me.characterId);
+        case 'decline': {
+          // 拒絕要讓發起者知道，否則他只能盯著畫面等邀請自己過期（§ 97.7.4）
+          const declined = this.trades.decline(String(args[0]), me.characterId);
+          const from = declined ? this.sessionOf(declined.fromCharacterId) : undefined;
+          if (from) {
+            affected.add(from);
+            from.game.getState().pushSystemLog(`${me.name} 拒絕了你的交易邀請`);
+          }
           return { ok: true };
+        }
         case 'setOffer': {
           const trade = this.trades.setOffer(me.characterId, (args[0] ?? {}) as never);
           for (const s of this.tradeSessions(trade)) affected.add(s);
@@ -332,9 +359,16 @@ export class World {
           this.afterPartyChange(party);
           return { ok: true };
         }
-        case 'decline':
-          this.parties.decline(String(args[0]), me.characterId);
+        case 'decline': {
+          // 同交易：拒絕組隊也要回報邀請者（§ 97.7.3）
+          const declined = this.parties.decline(String(args[0]), me.characterId);
+          const from = declined ? this.sessionOf(declined.fromCharacterId) : undefined;
+          if (from) {
+            from.game.getState().pushSystemLog(`${me.name} 拒絕了你的隊伍邀請`);
+            this.syncPartyViews([from]);
+          }
           return { ok: true };
+        }
         case 'leave': {
           const party = this.parties.leave(me.characterId);
           if (party) this.afterPartyChange(party, beforeIds, [me.characterId]);

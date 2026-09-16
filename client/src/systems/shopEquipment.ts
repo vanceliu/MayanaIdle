@@ -53,7 +53,7 @@ export async function createShopEquipment(
       maxAffixTier: SHOP_MAX_AFFIX_TIER,
       ownerId,
       equipped: false,
-    })) as any,
+    })),
   );
 
   return drafts.map((d, i) => resolveEquipment({

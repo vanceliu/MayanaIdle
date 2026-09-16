@@ -68,7 +68,7 @@
 
 ## 17.5 第五階段：自架私服與多人（進行中，`97-selfhosted-server.md`）
 
-依 `99-ai-constraints.md` § 99.2 的分階段計畫執行：
+九個階段已全部完成，規格見 `97-selfhosted-server.md`。涵蓋範圍：
 
 - 核心抽離為 server 可執行的純函數、300ms tick、決定性
 - server：帳號、session、WebSocket、SQLite、`server.properties`、版本協商

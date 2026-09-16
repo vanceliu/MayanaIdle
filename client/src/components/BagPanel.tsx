@@ -4,8 +4,6 @@ import { buildBagLayout, moveBagSlot, sortBagLayout, type BagDragPayload, type B
 import {
   buildTalentBagCells,
   sortTalentBag,
-  loadTalentBagOrder,
-  saveTalentBagOrder,
 } from '../models/talentBag';
 import { useTalentStore, availableSlots } from '../stores/talentStore';
 import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
@@ -69,14 +67,12 @@ export function BagPanel() {
   const [sigilOpen, setSigilOpen] = useState(false);
   /** § 35.21 背包分頁。不持久化：切分頁是當下的動作，不是設定 */
   const [bagTab, setBagTab] = useState<'normal' | 'talent'>('normal');
-  const charId = useGameStore(s => s.character?.id ?? 0);
-  /** 天賦分頁的順序。整理一次性落位、位置持久化（§ 35.21.1） */
-  const [talentOrderState, setTalentOrder] = useState(
-    () => ({ charId, order: loadTalentBagOrder(charId) }));
-  // 換角色時重讀，不可沿用上一隻的順序
-  const talentOrder = talentOrderState.charId === charId
-    ? talentOrderState.order
-    : loadTalentBagOrder(charId);
+  /**
+   * 天賦分頁的順序。整理一次性落位、位置持久化（§ 35.21.1）。
+   * 存在角色資料裡（線上模式即 server），換角色時跟著角色一起載入。
+   */
+  const talentOrder = useGameStore(s => s.talentBagOrder);
+  const setTalentOrder = useGameStore(s => s.setTalentBagOrder);
   const talentSlots = useTalentStore(s => s.slots);
   const activeTemplateId = useGameStore(s => s.activeTemplateId);
 
@@ -84,8 +80,7 @@ export function BagPanel() {
   function handleTalentSort() {
     const cells = buildTalentBagCells(availableSlots(talentSlots, activeTemplateId));
     const next = sortTalentBag(cells);
-    setTalentOrder({ charId, order: next });
-    saveTalentBagOrder(charId, next);
+    setTalentOrder(next);
   }
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; anchor: AnchorRect } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
@@ -687,7 +682,7 @@ export function BagPanel() {
         <BagTalentTab
           rows={rowsForSlots(maxSlots)}
           order={talentOrder}
-          onReorder={next => { setTalentOrder({ charId, order: next }); saveTalentBagOrder(charId, next); }}
+          onReorder={setTalentOrder}
         />
       </div>
     );

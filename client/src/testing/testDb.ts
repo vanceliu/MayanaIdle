@@ -20,4 +20,12 @@ defaultSession.repo = repo;
 export function resetTestDb(): void {
   for (const table of db.playerTables) table.restore({ rows: new Map(), nextId: 1 });
   db.warehouseGold.replace(new Map());
+  /*
+   * 存檔的記帳也要歸零（§ 97.4）：資料庫被清空之後，
+   * 「這張表上次寫進去的內容」那份簽章就成了謊話 —— 內容看起來沒變，
+   * 於是該寫的表被跳過，下一個測試拿到的是空表。
+   */
+  defaultSession.loop.savedSig = {};
+  defaultSession.loop.saveDirty = false;
+  defaultSession.loop.saveAcc = 0;
 }

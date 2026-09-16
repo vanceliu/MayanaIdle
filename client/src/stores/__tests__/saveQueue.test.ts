@@ -66,9 +66,9 @@ describe('存檔佇列', () => {
     // 天賦／信箱初始化也會存檔，要等它做完才輪得到計數
     await talentInitReady();
 
-    // 佇列是模組層共用的：先排空建角留下的存檔，否則會混進本測試的計數
+    // 佇列是每個 session 一份（`session.loop.saveQueue`）：先排空建角留下的存檔，否則會混進本測試的計數
     setGold(GOLD_DRAIN);
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect((await db.characters.get(characterId))!.gold).toBe(GOLD_DRAIN);
     });
@@ -91,9 +91,9 @@ describe('存檔佇列', () => {
     }) as unknown as typeof db.characters.update);
 
     setGold(GOLD_FIRST);
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
     setGold(GOLD_SECOND);
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
 
     await vi.waitFor(() => {
       expect(db.characters.update).toHaveBeenCalled();
@@ -115,13 +115,13 @@ describe('存檔佇列', () => {
     }) as unknown as typeof db.characters.update);
 
     setGold(GOLD_FAILED);
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
     await vi.waitFor(() => {
       expect(db.characters.update).toHaveBeenCalledTimes(1);
     });
 
     setGold(GOLD_RECOVERED);
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
 
     await vi.waitFor(async () => {
       expect((await db.characters.get(characterId))!.gold).toBe(GOLD_RECOVERED);

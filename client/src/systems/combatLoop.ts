@@ -13,7 +13,7 @@ import type { MonsterInstance, MonsterAttackType, ElementType } from '../models/
 import { isRangedAttackType } from '../models/monster';
 import type { EquipmentInstance } from '../models/equipment';
 import type { CombatLog } from '../stores/gameStore';
-import { getEffectiveMaxHp, processMonsterDeath, waitForPendingDrops, type MonsterDeathOptions } from '../stores/gameStore';
+import { getEffectiveMaxHp, processMonsterDeath, waitForPendingDrops, type GameState, type MonsterDeathOptions } from '../stores/gameStore';
 import { talentCombatRules } from '../stores/talentStore';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { defaultSession, type Session } from '../stores/session';
@@ -214,7 +214,7 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
     const playerPos = mapStore.playerPosition;
     const currentMap = mapStore.currentMap;
     const monsterInstances = instance.monsterInstances;
-    const allGear = getEffectiveGearArray(gameState.character, gameState.activeEffects, gameState.equippedGear) as any[];
+    const allGear = getEffectiveGearArray(gameState.character, gameState.activeEffects, gameState.equippedGear);
 
     if (isRangedAttackType(event.attackType)) {
       const attacker = monsterStore.monsters.find(monster => monster.id === event.monsterId);
@@ -278,7 +278,7 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
   const memberId = memberIdOf(session);
   const playerPos = mapStore.playerPosition;
   const currentMap = mapStore.currentMap;
-  const allGear = getEffectiveGearArray(gameState.character!, gameState.activeEffects, gameState.equippedGear) as any[];
+  const allGear = getEffectiveGearArray(gameState.character!, gameState.activeEffects, gameState.equippedGear);
 
   /*
    * 手動介入指令（§ 3.6）。**必須在 `tickArpgEngine` 之前消費**：
@@ -672,11 +672,11 @@ function settleMemberKill(
   options: MonsterDeathOptions,
 ) {
   const get = session.game.getState;
-  const set = (s: any) => session.game.setState(s);
+  const set = (s: Partial<GameState>) => session.game.setState(s);
   const gs = get();
   if (!gs.character) return;
 
-  const allGear = getEffectiveGearArray(gs.character, gs.activeEffects, gs.equippedGear) as any[];
+  const allGear = getEffectiveGearArray(gs.character, gs.activeEffects, gs.equippedGear);
   const monsters = [monster];
 
   const result = processMonsterDeath(get, set, monsters, 0, { ...gs.character }, [...gs.combatLogs], allGear, session, options);
@@ -702,7 +702,7 @@ function settleMemberKill(
 
   // Auto-save after kill：掉落與任務進度在 processMonsterDeath 的 async 佇列裡才寫入 store，
   // 必須等佇列結算完再存。
-  void waitForPendingDrops().then(() => {
+  void waitForPendingDrops(session).then(() => {
     session.game.getState().saveState();
   });
 }
@@ -744,5 +744,6 @@ export function handlePlayerDeath(session: Session = defaultSession) {
   ensureInstance(session);
   resetPlayerCombat(session);
   leaveInstance(session);
-  session.game.getState().saveState();
+  // 死亡會傳送並改統計，強制落地（§ 97.4）
+  void session.game.getState().flushSaveNow();
 }

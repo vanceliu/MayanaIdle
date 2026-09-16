@@ -151,7 +151,12 @@ function body() {
         '<td>' + esc(p.regionId || '-') + (p.floor != null ? ' ' + p.floor + 'F' : '') + '</td>' +
         '<td>' + esc(p.instanceKey || '-') + '</td><td>' + esc(p.remoteAddress) + '</td>' +
         '<td><button class="danger" onclick="doKick(' + p.connectionId + ')">踢除</button>' +
-        (p.userId ? ' <button class="danger" onclick="doBan(' + p.userId + ')">封鎖</button>' : '') + '</td></tr>').join('') + '</table>';
+        (p.userId ? ' <button class="danger" onclick="doBan(' + p.userId + ')">封鎖</button>' : '') +
+        (p.characterId
+          ? (p.mutedUntil
+            ? ' <button onclick="doUnmute(' + p.characterId + ')">解除禁言</button>'
+            : ' <button class="danger" onclick="doMute(' + p.characterId + ')">禁言</button>')
+          : '') + '</td></tr>').join('') + '</table>';
   }
   if (S.tab === 'users') {
     const d = S.data.users; if (!d) return '載入中…';
@@ -224,6 +229,14 @@ window.doLogout = () => { S.token = null; localStorage.removeItem('mayana.adminT
 window.doKick = (connectionId) => guard(async () => { await api('kick', { connectionId }); say('已踢除連線 #' + connectionId); load(); });
 window.doBan = (userId) => guard(async () => { const r = await api('ban', { userId }); say('已封鎖帳號 #' + userId + '（踢除 ' + r.kicked + ' 個連線）'); load(); });
 window.doUnban = (userId) => guard(async () => { await api('unban', { userId }); say('已解除封鎖'); load(); });
+window.doMute = (characterId) => guard(async () => {
+  const minutes = Number(prompt('禁言幾分鐘？', '10'));
+  if (!Number.isFinite(minutes) || minutes <= 0) return;
+  await api('mute', { characterId, minutes });
+  say('已禁言角色 #' + characterId + ' ' + minutes + ' 分鐘');
+  load();
+});
+window.doUnmute = (characterId) => guard(async () => { await api('unmute', { characterId }); say('已解除禁言'); load(); });
 window.doSetPassword = (userId) => guard(async () => {
   await api('set-password', { userId, password: el('#pw' + userId).value });
   say('已重設密碼，玩家下次登入生效'); load();

@@ -80,6 +80,12 @@ export function TrainingGroundView() {
   const focusWindow = useWindowLayerStore(s => s.focusWindow);
   const isMobile = useIsMobile();
   const now = useTicker(measurement.running);
+  /*
+   * 記住拖到哪裡的 localStorage 鍵；手機不給拖（HUD 是一條全寬狀態列）。
+   * **必須放在任何 early return 之前**：hook 一旦條件式呼叫，沒角色與有角色兩種渲染的
+   * hook 順序就不一樣。
+   */
+  const { ref, position, handlers } = useDraggableIsland(TRAINING_VIEW_KEY, isMobile);
 
   if (!char) return null;
 
@@ -117,9 +123,6 @@ export function TrainingGroundView() {
     // 補滿在 store（線上模式轉 RPC）：本機改角色狀態會被 server 推回來的蓋掉
     useGameStore.getState().restoreInTrainingGround();
   }
-
-  /** 記住拖到哪裡的 localStorage 鍵；手機不給拖（HUD 是一條全寬狀態列） */
-  const { ref, position, handlers } = useDraggableIsland(TRAINING_VIEW_KEY, isMobile);
 
   function toggleMeasurement() {
     const store = useTrainingGroundStore.getState();

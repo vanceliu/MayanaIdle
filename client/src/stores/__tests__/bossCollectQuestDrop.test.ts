@@ -128,7 +128,7 @@ describe('collectboss 任務 — 同一隻 BOSS 的兩張任務同時進度', ()
     processMonsterDeath(() => useGameStore.getState(), s => useGameStore.setState(s), [deadBoss], 0, char as any, [], []);
     // PixiGame.handleMonsterDeath 的存檔時機：等掉落佇列結算完
     await waitForPendingDrops();
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
 
     // saveGame 內部有多段 await，localStorage 是最後一步才寫
     await vi.waitFor(() => {

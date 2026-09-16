@@ -75,10 +75,13 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
     }
     if (search) list = list.filter(a => a.name.includes(search));
     list = [...list].sort((a, b) => {
-      const av = sortKey === 'slot' ? getCategoryKey(a) : (a as any)[sortKey] ?? 0;
-      const bv = sortKey === 'slot' ? getCategoryKey(b) : (b as any)[sortKey] ?? 0;
-      if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-      return sortAsc ? av - bv : bv - av;
+      const av = sortKey === 'slot' ? getCategoryKey(a) : (a as unknown as Record<string, unknown>)[sortKey] ?? 0;
+      const bv = sortKey === 'slot' ? getCategoryKey(b) : (b as unknown as Record<string, unknown>)[sortKey] ?? 0;
+      // 排序鍵是動態的，兩邊都要各自窄化：字串比字串，其餘一律當數字
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortAsc ? Number(av) - Number(bv) : Number(bv) - Number(av);
     });
     return list;
   }, [armors, slotFilter, craftTierFilter, search, sortKey, sortAsc]);
@@ -160,7 +163,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
 function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number] }) {
   const dropSources = useDropSourceForItem(a.name);
   const acquireLabel = a.acquireType === 'shop' ? '商店' : a.acquireType === 'craft' ? '製作' : '掉落';
-  const tierColor = getEquipmentTierColor(a as any);
+  const tierColor = getEquipmentTierColor(a as EquipmentTemplate);
   const categoryKey = getCategoryKey(a);
 
   const extras: string[] = [];

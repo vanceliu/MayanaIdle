@@ -442,7 +442,7 @@ interface BagItem {
 | 渲染 | client 對 server 位置做插值 |
 | 樂觀更新 | 只允許純顯示層（按鈕狀態、開關面板），數值一律等 server |
 
-遷移步驟見 `99-ai-constraints.md` § 99.2。
+遷移已完成；規格見 `97-selfhosted-server.md`。
 
 ---
 

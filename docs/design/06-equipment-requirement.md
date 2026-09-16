@@ -1,6 +1,3 @@
-> **TTK 校準目前失效中**：妖精的遠程攻擊改吃敏捷（`21-combat-formula.md` § 21.3），
-> 弓的階梯上限需重驗。見 `99-ai-constraints.md` § 99.2 的 P7。
-
 單手劍
 
 t1 t2 t3 t4 t5 t6 t7

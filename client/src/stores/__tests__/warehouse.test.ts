@@ -53,7 +53,6 @@ describe('Warehouse (account-level storage)', () => {
 
     // Create character A
     await useGameStore.getState().createCharacter('CharA', 'knight', attrs);
-    useGameStore.getState().character!.id!;
 
     // Deposit materials and gold into warehouse, then logout (saves to DB)
     useGameStore.setState({

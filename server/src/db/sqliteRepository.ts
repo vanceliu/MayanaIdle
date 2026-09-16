@@ -284,6 +284,13 @@ export class SqliteRepository implements GameRepository {
   async putBagLayout(characterId: number, data: unknown) {
     this.db.prepare('INSERT INTO bag_layouts (character_id, data) VALUES (?, ?) ON CONFLICT(character_id) DO UPDATE SET data = excluded.data').run(characterId, JSON.stringify(data));
   }
+  async getTalentBagLayout(characterId: number) {
+    const row = this.db.prepare('SELECT data FROM talent_bag_layouts WHERE character_id = ?').get(characterId) as { data: string } | undefined;
+    return row ? JSON.parse(row.data) : null;
+  }
+  async putTalentBagLayout(characterId: number, data: unknown) {
+    this.db.prepare('INSERT INTO talent_bag_layouts (character_id, data) VALUES (?, ?) ON CONFLICT(character_id) DO UPDATE SET data = excluded.data').run(characterId, JSON.stringify(data));
+  }
   async getMailPurgeVersion(characterId: number) {
     const row = this.db.prepare('SELECT version FROM mail_purge WHERE character_id = ?').get(characterId) as { version: string } | undefined;
     return row?.version ?? null;
@@ -294,6 +301,7 @@ export class SqliteRepository implements GameRepository {
   async deleteCharacterPrefs(characterId: number) {
     this.db.prepare('DELETE FROM character_prefs WHERE character_id = ?').run(characterId);
     this.db.prepare('DELETE FROM bag_layouts WHERE character_id = ?').run(characterId);
+    this.db.prepare('DELETE FROM talent_bag_layouts WHERE character_id = ?').run(characterId);
     this.db.prepare('DELETE FROM mail_purge WHERE character_id = ?').run(characterId);
   }
 

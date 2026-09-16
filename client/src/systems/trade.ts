@@ -86,8 +86,9 @@ export async function executeTrade(a: TradeSideExec, b: TradeSideExec): Promise<
     for (const item of moveA.equipment) await repo.updateEquipment(item.id!, { ownerId: item.ownerId });
     for (const item of moveB.equipment) await repo.updateEquipment(item.id!, { ownerId: item.ownerId });
   });
-  a.session.game.getState().saveState();
-  b.session.game.getState().saveState();
+  // 交易是 § 97.4 明列的強制 flush 時機：換手後雙方都要立刻落地
+  void a.session.game.getState().flushSaveNow();
+  void b.session.game.getState().flushSaveNow();
 }
 
 interface Moved {

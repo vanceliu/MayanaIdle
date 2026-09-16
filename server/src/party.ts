@@ -132,9 +132,12 @@ export class PartyManager {
     return party;
   }
 
-  decline(inviteId: string, characterId: number): void {
+  /** 回傳被拒絕的那筆邀請，呼叫端才通知得到邀請者（`97-selfhosted-server.md` § 97.7.3） */
+  decline(inviteId: string, characterId: number): PartyInvite | undefined {
     const invite = this.invites.get(inviteId);
-    if (invite && invite.toCharacterId === characterId) this.invites.delete(inviteId);
+    if (!invite || invite.toCharacterId !== characterId) return undefined;
+    this.invites.delete(inviteId);
+    return invite;
   }
 
   /** 主動離隊：隊長離隊交給在線成員中入隊最早者；只剩 1 人自動解散 */

@@ -176,7 +176,8 @@ export function applyEnhanceScroll(
     const updated = { ...item, enhancement: nextLevel };
     persistEquipment(updated, session);
     writeBack(target, updated, newBag, session);
-    session.game.getState().saveState();
+    // 強化結果不可逆（裝備可能損毀），強制落地
+    void session.game.getState().flushSaveNow();
     return { fx: 'safe', success: true, nextLevel, message: `${item.name} 已降為 +${nextLevel}` };
   }
 
@@ -217,7 +218,8 @@ export function applyEnhanceScroll(
     if (!success) stats.armorsBroken += 1;
   }
   session.game.setState({ statistics: stats });
-  session.game.getState().saveState();
+  // 同上：判定結果不可逆
+  void session.game.getState().flushSaveNow();
 
   return outcome;
 }

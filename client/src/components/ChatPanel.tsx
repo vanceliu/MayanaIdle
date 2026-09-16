@@ -5,6 +5,7 @@ import { useChatStore, visibleMessages, CHAT_CHANNELS, CHAT_CHANNEL_LABELS } fro
 import { useAutoScrollLog } from '../hooks/useAutoScrollLog';
 import { getRegion } from '../models/mapData';
 import type { ChatChannel, ChatMessageView } from '../net/protocol';
+import { CHAT_MAX_LENGTH } from '../net/protocol';
 
 /**
  * 聊天內容（`97-selfhosted-server.md` § 97.7.2）。視窗與分頁在 `LogDock`。
@@ -137,6 +138,12 @@ export function ChatPanelContent() {
         <input
           className="chat-input"
           value={text}
+          /*
+           * 與 server 的判定同一個數字（§ 97.7.2）。
+           * `maxLength` 數的是 UTF-16 單位，表情符號會比 server 早一步擋下 ——
+           * 偏嚴不偏鬆，打得進去就一定送得出去。
+           */
+          maxLength={CHAT_MAX_LENGTH}
           disabled={!canSend(input)}
           placeholder={canSend(input) ? `對${CHAT_CHANNEL_LABELS[input]}頻道說…` : input === 'whisper' ? '先填密語對象' : '此頻道目前不可發言'}
           onChange={e => setText(e.target.value)}

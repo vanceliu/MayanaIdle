@@ -91,8 +91,11 @@ export function resolveEquipment(instance: EquipmentInstance): EquipmentInstance
   if (!template) return instance;
 
   const resolved = { ...instance };
+  // 逐欄位複製，欄位名來自常數清單；用 Record 索引而不是 any，才不會連型別檢查都關掉
+  const resolvedFields = resolved as unknown as Record<string, unknown>;
+  const templateFields = template as unknown as Record<string, unknown>;
   for (const field of TEMPLATE_FIELDS) {
-    (resolved as any)[field] = (template as any)[field];
+    resolvedFields[field] = templateFields[field];
   }
   resolved.stability = resolveStability(template, instance);
   if (!resolved.slot) {
@@ -105,9 +108,9 @@ export function resolveEquipment(instance: EquipmentInstance): EquipmentInstance
     const mult = getAccessoryStatMultiplier(resolved.enhancement ?? 0);
     if (mult > 1) {
       for (const field of ACCESSORY_SCALED_FIELDS) {
-        const base = (resolved as any)[field];
+        const base = resolvedFields[field];
         if (typeof base === 'number' && base > 0) {
-          (resolved as any)[field] = Math.floor(base * mult);
+          resolvedFields[field] = Math.floor(base * mult);
         }
       }
     }

@@ -342,6 +342,8 @@ export interface GameState {
    * **不跟著角色走** —— 裝備實例 id 由持久層配發，帶過去必然全部對不上。
    */
   bagSlotMap: BagSlotMap;
+  /** 天賦分頁的格子位置（§ 35.21.1）。與一般分頁分開存，線上模式進 server */
+  talentBagOrder: BagSlotMap;
   storedEquipment: EquipmentInstance[];
   storedMaterials: BagItem[];
   warehouseGold: number;
@@ -382,6 +384,7 @@ export interface GameState {
   assignQuickSlot: (slotIdx: number, entry: QuickSlotEntry | null) => void;
   /** § 35.1.3：寫入背包格子位置（拖曳與整理共用），同時持久化到本機 */
   setBagSlotMap: (slotMap: BagSlotMap) => void;
+  setTalentBagOrder: (order: BagSlotMap) => void;
   useQuickSlot: (slotIdx: number) => void;
   /**
    * 快捷格的手動施放（`03-combat.md` § 3.6.2）。回傳是否受理。
@@ -493,6 +496,8 @@ export interface GameState {
   /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
   abandonCraftQuest: (questId: string) => void;
   saveState: () => void;
+  /** 強制把 dirty 狀態寫進持久層（§ 97.4） */
+  flushSaveNow: () => Promise<void>;
   /** 推一則系統訊息到戰鬥日誌。面板動作的提示與結果一律走這裡，不各自持有 log 陣列 */
   pushSystemLog: (text: string) => void;
 }
@@ -555,7 +560,7 @@ function isInArpgCombat(session: Session): boolean {
   const monsters = session.mapMonster.getState().monsters;
   if (monsters.length === 0) return false;
   const playerPos = session.mapControl.getState().playerPosition;
-  return monsters.some((m: any) => {
+  return monsters.some(m => {
     const dx = m.position.x - playerPos.x;
     const dy = m.position.y - playerPos.y;
     return Math.sqrt(dx * dx + dy * dy) <= 8;
@@ -595,7 +600,7 @@ function updateActiveTemplate(
 }
 
 export function createGameStore(session: Session) {
-  let hpSamples: HpSample[] = [];
+  const hpSamples: HpSample[] = [];
   return create<GameState>((set, get) => ({
   phase: 'title',
   userId: null,
@@ -625,6 +630,7 @@ export function createGameStore(session: Session) {
   afterCombatMpResumeThreshold: 60,
   quickSlots: emptyQuickSlots(),
   bagSlotMap: {},
+  talentBagOrder: {},
   storedEquipment: [],
   storedMaterials: [],
   warehouseGold: 0,
@@ -731,6 +737,7 @@ export function createGameStore(session: Session) {
     );
     // § 35.17：格子位置不在 prefs 裡，走獨立 key
     const bagSlotMap = await loadBagLayout(char.id!, session);
+    const talentBagOrder = await loadTalentBagLayout(char.id!, session);
     const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
     const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
     const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? 60;
@@ -784,6 +791,7 @@ export function createGameStore(session: Session) {
       huntReturnPending,
       quickSlots,
       bagSlotMap,
+      talentBagOrder,
       afterCombatHpThreshold,
       afterCombatMpThreshold,
       afterCombatHpResumeThreshold,
@@ -845,6 +853,7 @@ export function createGameStore(session: Session) {
       activeTemplateId: DEFAULT_TEMPLATE_ID,
       quickSlots: emptyQuickSlots(),
       bagSlotMap: {},
+  talentBagOrder: {},
       adventurerQuests: [],
       adventurerQuestBoard: createEmptyQuestBoard(),
   questBoardTownId: null,
@@ -918,12 +927,12 @@ export function createGameStore(session: Session) {
 
     const equippedGear: EquippedGear = {};
     for (const template of starterTemplates) {
-      const dbRecord = {
-        templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [] as any[],
+      const dbRecord: Partial<EquipmentInstance> = {
+        templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [],
         ...rollNewInstanceFields(template),
         ownerId: char.id!, equipped: true, isStarterGear: true,
       };
-      const instId = await session.repo.addEquipment(dbRecord as any);
+      const instId = await session.repo.addEquipment(dbRecord);
       equippedGear[template.slot as keyof EquippedGear] = resolveEquipment({
         id: instId, templateId: template.id!, name: template.name, type: template.type,
         slot: template.slot, isTwoHanded: template.isTwoHanded,
@@ -1257,6 +1266,12 @@ export function createGameStore(session: Session) {
     if (char?.id) {
       saveLocalPreferences(char.id, get(), session);
     }
+  },
+
+  setTalentBagOrder: (order) => {
+    set({ talentBagOrder: order });
+    const char = get().character;
+    if (char?.id) saveTalentBagLayout(char.id, order, session);
   },
 
   setBagSlotMap: (slotMap) => {
@@ -2441,7 +2456,7 @@ export function createGameStore(session: Session) {
       const affixCategory = getAffixCategoryForSlot(recipe.slot, recipe.type);
       const affixes = generateCraftAffixes(affixCategory, recipe);
       const fields = rollNewInstanceFields(recipe);
-      const dbRecord = {
+      const dbRecord: Partial<EquipmentInstance> = {
         templateId: recipe.id!, slot: recipe.slot, quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
       };
       const finish = (id: number | undefined): CraftResult => {
@@ -2460,7 +2475,7 @@ export function createGameStore(session: Session) {
         get().saveState();
         return { ok: true, message: `製作成功！獲得 ${recipe.name}`, name: recipe.name };
       };
-      return char.id ? session.repo.addEquipment(dbRecord as any).then(finish) : finish(undefined);
+      return char.id ? session.repo.addEquipment(dbRecord).then(finish) : finish(undefined);
     };
     return cached ? run(cached) : session.repo.findEquipmentTemplates(t => t.id === templateId).then(list => run(list[0]));
   },
@@ -2717,9 +2732,16 @@ export function createGameStore(session: Session) {
     return applyEnhanceScroll(scroll, { item, slot: slot ?? undefined }, random, session);
   },
 
+  /*
+   * 標記有變動，不立刻寫盤（§ 97.4 dirty map）。
+   * 真正落地由 `gameLoop` 每 5 秒一次，或呼叫 `flushSaveNow()` 強制寫。
+   */
   saveState: () => {
-    saveGame(get(), session);
+    session.loop.saveDirty = true;
   },
+
+  /** 強制落地（§ 97.4 的強制 flush 時機：登出、關服、交易、不可逆的結算） */
+  flushSaveNow: () => saveGame(get(), session),
 
 }));
 }
@@ -2819,7 +2841,7 @@ export function processMonsterDeath(
   const defeatedMonsterName = dead.name;
   const monsterIsBoss = dead.isBoss;
   const killArea = options.killArea ?? { regionId: char.currentRegion, floor: char.currentFloor, areaId: char.currentArea };
-  dropQueue = dropQueue.then(async () => {
+  session.loop.dropQueue = session.loop.dropQueue.then(async () => {
     const dropRegion = getRegion(killArea.regionId);
     const dropHasFloors = dropRegion?.floors && dropRegion.floors.length > 0;
     const dropAreaId = dropHasFloors && killArea.floor != null
@@ -2944,10 +2966,8 @@ export function processMonsterDeath(
   return { char, logs };
 }
 
-let dropQueue: Promise<void> = Promise.resolve();
-
-export function waitForPendingDrops(): Promise<void> {
-  return dropQueue;
+export function waitForPendingDrops(session: Session = defaultSession): Promise<void> {
+  return session.loop.dropQueue;
 }
 
 /**
@@ -2960,14 +2980,12 @@ export function waitForPendingDrops(): Promise<void> {
  * 3. 這一版的補償
  * 4. 起始配置只在完全沒有資料時發
  */
-let talentInitPromise: Promise<void> = Promise.resolve();
-
-export function talentInitReady(): Promise<void> {
-  return talentInitPromise;
+export function talentInitReady(session: Session = defaultSession): Promise<void> {
+  return session.loop.talentInit;
 }
 
 function startTalentAndMailboxInit(characterId: number, level: number, session: Session): void {
-  talentInitPromise = initTalentAndMailbox(characterId, level, session);
+  session.loop.talentInit = initTalentAndMailbox(characterId, level, session);
 }
 
 async function initTalentAndMailbox(characterId: number, level: number, session: Session): Promise<void> {
@@ -3047,19 +3065,31 @@ function useConsumableById(get: () => GameState, itemId: number): void {
   get().useCureItem(itemId);
 }
 
-let saveQueue: Promise<void> = Promise.resolve();
-
 /** 存檔唯一入口，不可直接呼叫 `writeSave()`。串成佇列使寫入順序等於呼叫順序 */
 function saveGame(state: GameState, session: Session): Promise<void> {
   const mapPos = session.mapControl.getState().playerPosition;
-  const mine = saveQueue.then(() => writeSave(state, mapPos, session));
-  saveQueue = mine.catch(() => {});
+  const mine = session.loop.saveQueue.then(() => writeSave(state, mapPos, session));
+  session.loop.saveQueue = mine.catch(() => {});
   return mine;
+}
+
+/**
+ * 這份內容跟上次寫進去的一樣就不重寫（§ 97.4「只寫有變的表」）。
+ *
+ * 背包與倉庫都是 DELETE 全部再逐筆 INSERT，沒變也重寫等於每次存檔白付兩次交易。
+ */
+function changedSince(session: Session, key: string, value: unknown): boolean {
+  const sig = JSON.stringify(value);
+  if (session.loop.savedSig[key] === sig) return false;
+  session.loop.savedSig[key] = sig;
+  return true;
 }
 
 async function writeSave(state: GameState, mapPos: { x: number; y: number }, session: Session) {
   const char = state.character;
   if (!char || !char.id) return;
+  // 先清：寫入期間又發生的變動要能重新標記，不可在寫完後才清掉
+  session.loop.saveDirty = false;
 
   await session.repo.updateCharacter(char.id, {
     level: char.level,
@@ -3094,7 +3124,7 @@ async function writeSave(state: GameState, mapPos: { x: number; y: number }, ses
       bagEntries.push({ characterId: char.id, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount });
     }
   }
-  await session.repo.replaceBag(char.id, bagEntries);
+  if (changedSince(session, 'bag', bagEntries)) await session.repo.replaceBag(char.id, bagEntries);
 
   // Save shared warehouse (account-level storage)
   const userId = state.userId;
@@ -3105,10 +3135,10 @@ async function writeSave(state: GameState, mapPos: { x: number; y: number }, ses
         warehouseEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'shared' });
       }
     }
-    await session.repo.replaceSharedWarehouse(userId, warehouseEntries);
+    if (changedSince(session, 'shared', warehouseEntries)) await session.repo.replaceSharedWarehouse(userId, warehouseEntries);
     // 金幣走獨立表：以 userId 為主鍵 put，不需要先刪再寫（§ 18.7）。
     // 餘額為 0 也要寫。
-    await session.repo.putWarehouseGold(userId, state.warehouseGold);
+    if (changedSince(session, 'gold', state.warehouseGold)) await session.repo.putWarehouseGold(userId, state.warehouseGold);
   }
 
   // Save personal warehouse (character-level storage)
@@ -3119,7 +3149,7 @@ async function writeSave(state: GameState, mapPos: { x: number; y: number }, ses
         personalEntries.push({ userId, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount, storageType: 'personal', characterId: char.id });
       }
     }
-    await session.repo.replacePersonalWarehouse(char.id, personalEntries);
+    if (changedSince(session, 'personal', personalEntries)) await session.repo.replacePersonalWarehouse(char.id, personalEntries);
   }
 
   // Save script rules + quick slots to localStorage
@@ -3146,6 +3176,20 @@ function saveLocalPreferences(characterId: number, state: GameState, session: Se
   void session.repo.putCharacterPrefs(characterId, data);
 }
 
+function saveTalentBagLayout(characterId: number, order: BagSlotMap, session: Session) {
+  void session.repo.putTalentBagLayout(characterId, order);
+}
+
+async function loadTalentBagLayout(characterId: number, session: Session): Promise<BagSlotMap> {
+  const data = await session.repo.getTalentBagLayout(characterId);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  const next: BagSlotMap = {};
+  for (const [key, at] of Object.entries(data as Record<string, unknown>)) {
+    if (typeof at === 'number' && Number.isInteger(at) && at >= 0) next[key] = at;
+  }
+  return next;
+}
+
 function saveBagLayout(characterId: number, slotMap: BagSlotMap, session: Session) {
   void session.repo.putBagLayout(characterId, slotMap);
 }
@@ -3164,6 +3208,12 @@ async function loadBagLayout(characterId: number, session: Session): Promise<Bag
     return {};
   }
 }
+
+/**
+ * 存進持久層的偏好。欄位全是選用的：舊存檔缺什麼由讀取端補預設，
+ * 不可假設它與 `LoadedPreferences` 同形。
+ */
+type StoredPreferences = Partial<LoadedPreferences> & { emergencyRetreat?: EmergencyRetreat };
 
 interface LoadedPreferences {
   scriptRules: ScriptRule[];
@@ -3197,7 +3247,7 @@ function migrateEmergencyRetreat(saved: EmergencyRetreat | undefined): Emergency
  * 舊存檔的三個規則陣列隨自動天賦改版廢除，這裡直接丟棄不再轉換
  * （規則本體現在在天賦格，見 `51-auto-talent.md`）。
  */
-function wrapLegacyScriptsAsTemplate(data: any): ScriptTemplate[] {
+function wrapLegacyScriptsAsTemplate(data: { emergencyRetreat?: EmergencyRetreat }): ScriptTemplate[] {
   return [{
     ...createDefaultTemplate(),
     emergencyRetreat: migrateEmergencyRetreat(data.emergencyRetreat),
@@ -3205,7 +3255,7 @@ function wrapLegacyScriptsAsTemplate(data: any): ScriptTemplate[] {
 }
 
 async function loadLocalPreferences(characterId: number, session: Session): Promise<LoadedPreferences | null> {
-  const data = (await session.repo.getCharacterPrefs(characterId)) as any;
+  const data = (await session.repo.getCharacterPrefs(characterId)) as StoredPreferences | null;
   if (!data) return null;
   try {
     /**
@@ -3216,11 +3266,15 @@ async function loadLocalPreferences(characterId: number, session: Session): Prom
     const templates = normalizeScriptTemplates(
       data.scriptTemplates ?? wrapLegacyScriptsAsTemplate(data)
     );
+    // 存下來的 id 認不得就退回第一份：先取出來才窄化得掉 undefined
+    const savedTemplateId = data.activeTemplateId;
     return {
       ...data,
+      // 舊存檔可能整個沒有這欄（規則本體已移到天賦格），補空陣列才符合回傳型別
+      scriptRules: data.scriptRules ?? [],
       scriptTemplates: templates,
-      activeTemplateId: templates.some((t: ScriptTemplate) => t.id === data.activeTemplateId)
-        ? data.activeTemplateId
+      activeTemplateId: savedTemplateId && templates.some((t: ScriptTemplate) => t.id === savedTemplateId)
+        ? savedTemplateId
         : templates[0].id,
       lastHuntLocation: data.lastHuntLocation ?? null,
       huntReturnPending: data.huntReturnPending ?? false,

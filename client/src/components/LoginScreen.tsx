@@ -19,7 +19,7 @@ export function LoginScreen() {
     return (
       <div className="app title-screen">
         <h1>版本不符</h1>
-        <p>server 需要 v{requiredVersion}，請重新整理取得新版</p>
+        <p>連線協定不符（server 為 {requiredVersion}），請重新整理取得新版</p>
         <button className="btn-primary" onClick={() => window.location.reload()}>重新整理</button>
         <BuildLabel />
       </div>

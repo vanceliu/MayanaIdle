@@ -408,9 +408,10 @@ SQLite（WAL）。靜態模板隨程式碼發布，不進資料庫（§ 18.8）�
 | `talent_configs` | `characterId` | § 18.9 天賦配置 |
 | `quick_slots` | `characterId` | 快捷欄 |
 | `bag_layouts` | `characterId` | `35-inventory-constraints.md` § 35.17 slotMap |
+| `talent_bag_layouts` | `characterId` | 天賦分頁的格子位置（`35-inventory-constraints.md` § 35.21.1）。與一般分頁分開一張表 |
 | `mailbox` | `id` | § 18.10 |
 | `server_meta` | `key` | 世界層級的固定資訊，目前只有 `mode`（單機／開放，`97-selfhosted-server.md` § 97.1） |
 | `schema_version` | — | 遷移版本（`97-selfhosted-server.md` § 97.4） |
 
 - 隊伍、地圖實例、怪物、Pressure 為 server 記憶體狀態，不持久化；server 重啟即消失
-- 聊天訊息是否持久化未定（`97-selfhosted-server.md` § 97.10）
+- 聊天訊息**不持久化**（`97-selfhosted-server.md` § 97.7.2）：只即時轉發，不進資料庫

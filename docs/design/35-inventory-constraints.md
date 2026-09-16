@@ -762,6 +762,7 @@ Tooltip 會依狀態顯示「點一次選取」或「再點一次使用」。
 | quickSlots | server `quick_slots` | 快捷欄設定變更時 |
 | 金幣 | server `characters` | 金幣數量變更時 |
 | slotMap（格子位置） | server `bag_layouts` | 拖曳／整理後 |
+| 天賦分頁的位置（§ 35.21.1） | server `talent_bag_layouts` | 拖曳／整理後 |
 
 資料表見 `18-data-schema.md` § 18.12。
 

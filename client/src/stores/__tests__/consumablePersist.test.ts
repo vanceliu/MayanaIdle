@@ -92,7 +92,8 @@ describe('消耗品與自我施法的存檔', () => {
     });
 
     // DB 先落地成起始版：建角寫進去的是另一組數字，不覆蓋就看不出「有沒有存」
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       const row = await db.characters.get(characterId);
       expect(row!.hp).toBe(START_HP);
@@ -108,6 +109,7 @@ describe('消耗品與自我施法的存檔', () => {
     const hp = useGameStore.getState().character!.hp;
     expect(hp).toBeGreaterThan(START_HP);
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect((await db.characters.get(characterId))!.hp).toBe(hp);
       expect(await bagAmount(characterId, POTION_CONFIG.white.itemId)).toBe(STOCK - 1);
@@ -120,6 +122,7 @@ describe('消耗品與自我施法的存檔', () => {
     const hp = useGameStore.getState().character!.hp;
     expect(hp).toBeGreaterThan(START_HP);
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect((await db.characters.get(characterId))!.hp).toBe(hp);
       expect(await bagAmount(characterId, POTION_CONFIG.red.itemId)).toBe(STOCK - 1);
@@ -131,6 +134,7 @@ describe('消耗品與自我施法的存檔', () => {
 
     expect(useGameStore.getState().activeEffects.some(e => e.category === 'speed')).toBe(true);
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect(await bagAmount(characterId, SPEED_POTION_CONFIG.green.itemId)).toBe(STOCK - 1);
     });
@@ -145,6 +149,7 @@ describe('消耗品與自我施法的存檔', () => {
 
     expect(useGameStore.getState().activeEffects).toHaveLength(0);
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect(await bagAmount(characterId, POISON_CURE.itemId)).toBe(STOCK - 1);
     });
@@ -156,6 +161,7 @@ describe('消耗品與自我施法的存檔', () => {
     const hp = useGameStore.getState().character!.hp;
     expect(hp).toBeGreaterThan(START_HP);
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       const row = await db.characters.get(characterId);
       expect(row!.hp).toBe(hp);
@@ -166,6 +172,7 @@ describe('消耗品與自我施法的存檔', () => {
   it('castSelfSkill 施放增益後的 MP 寫進 DB', async () => {
     expect(useGameStore.getState().castSelfSkill(BUFF_SKILL_ID)).toBe(true);
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect((await db.characters.get(characterId))!.mp).toBe(MP_POOL - BUFF_MP_COST);
     });

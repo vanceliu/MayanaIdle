@@ -197,7 +197,8 @@ describe('World（隊伍與地圖實例）', () => {
     };
     const expBefore = [a, b, c].map(s => s.game.getState().character!.exp);
     handleMonsterDeath(dead, 0, 'm1', a);
-    await waitForPendingDrops();
+    // 掉落佇列每個 session 一份（§ 97.6），要逐一等
+    await Promise.all([a, b, c].map(s => waitForPendingDrops(s)));
     const gained = [a, b, c].map((s, i) => s.game.getState().character!.exp - expBefore[i]);
     // 基礎 ×3 ÷ 2 人
     expect(gained[0]).toBe(150);

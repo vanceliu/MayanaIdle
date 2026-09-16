@@ -249,6 +249,14 @@ export class MemoryRepository implements GameRepository {
     localStorage.setItem(bagLayoutStorageKey(characterId), JSON.stringify(data));
   }
 
+  async getTalentBagLayout(characterId: number) {
+    return readJson(talentBagOrderStorageKey(characterId));
+  }
+
+  async putTalentBagLayout(characterId: number, data: unknown) {
+    localStorage.setItem(talentBagOrderStorageKey(characterId), JSON.stringify(data));
+  }
+
   async getMailPurgeVersion(characterId: number) {
     return localStorage.getItem(mailPurgeStorageKey(characterId));
   }

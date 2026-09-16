@@ -86,7 +86,8 @@ describe('補給天賦：使用旅館', () => {
     });
 
     // DB 先落地成殘血版：建角寫進去的是全滿，不覆蓋掉的話「有沒有存」看不出差別
-    useGameStore.getState().saveState();
+    useGameStore.getState().flushSaveNow();
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect((await db.characters.get(char.id!))!.hp).toBe(1);
     });
@@ -120,6 +121,7 @@ describe('補給天賦：使用旅館', () => {
 
     useGameStore.getState().runVillageScriptTick();
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       const row = await db.characters.get(characterId);
       expect(row!.hp).toBe(effMaxHp);
@@ -136,6 +138,7 @@ describe('補給天賦：使用旅館', () => {
 
     useGameStore.getState().runVillageScriptTick();
 
+    await useGameStore.getState().flushSaveNow();
     await vi.waitFor(async () => {
       expect((await db.characters.get(characterId))!.gold).toBe(goldAfter);
     });

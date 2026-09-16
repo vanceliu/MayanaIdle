@@ -9,7 +9,7 @@ import { AuthError, type AuthService } from './auth';
 import { isLoopbackBind, type ServerConfig } from './config';
 import { applyAutoMove, createPlayerSession, resetPatches, syncWorld, type PlayerSession } from './playerSession';
 import { flush } from './tick';
-import { ACTION_ALLOWLIST, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
+import { ACTION_ALLOWLIST, PROTOCOL_VERSION, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
 import { World } from './world';
 import { log } from './log';
 
@@ -169,8 +169,9 @@ export class GameServer {
     const config = this.deps.config();
     switch (msg.t) {
       case 'hello': {
-        if (msg.version !== this.deps.version) {
-          session.send({ t: 'version_mismatch', required: this.deps.version, received: msg.version });
+        // 比的是**協定版本**，不是遊戲顯示版本：改版號不該把訊息格式沒變的 client 擋掉
+        if (msg.version !== PROTOCOL_VERSION) {
+          session.send({ t: 'version_mismatch', required: PROTOCOL_VERSION, received: msg.version });
           socket.close(4001, 'version mismatch');
           return;
         }

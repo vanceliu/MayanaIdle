@@ -74,20 +74,3 @@ export function buildTalentBagLayout(
   return buildBagLayout(items, order, Math.max(minSlots, needed));
 }
 
-export function loadTalentBagOrder(characterId: number): TalentBagOrder {
-  try {
-    const data = JSON.parse(localStorage.getItem(talentBagOrderStorageKey(characterId)) ?? 'null');
-    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
-    const next: TalentBagOrder = {};
-    for (const [key, at] of Object.entries(data)) {
-      if (typeof at === 'number' && Number.isInteger(at) && at >= 0) next[key] = at;
-    }
-    return next;
-  } catch {
-    return {};
-  }
-}
-
-export function saveTalentBagOrder(characterId: number, order: TalentBagOrder): void {
-  localStorage.setItem(talentBagOrderStorageKey(characterId), JSON.stringify(order));
-}

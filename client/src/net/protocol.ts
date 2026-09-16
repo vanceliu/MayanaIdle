@@ -34,6 +34,23 @@ export type ClientMessage =
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4）；`top` 預設 20、上限 100 */
   | { t: 'leaderboard'; id?: number; top?: number };
 
+/**
+ * 協定版本（`97-selfhosted-server.md` § 97.2）。
+ *
+ * **與遊戲顯示版本無關**：綁在一起的話，每次改版號就會把所有還開著的 client 擋在門外，
+ * 即使線上的訊息格式一個字都沒變。只有本檔的訊息格式真的改到不相容時才 +1。
+ */
+export const PROTOCOL_VERSION = '1';
+
+/**
+ * 單條聊天訊息的字數上限（`97-selfhosted-server.md` § 97.7.2）。
+ *
+ * 放在協定檔：server 的判定與 client 輸入框的限制必須是同一個數字，
+ * 各寫一份的結果是打得進去卻送不出來。
+ * 以**碼位**計 —— 中日文一字一碼位，表情符號的代理對也算一個。
+ */
+export const CHAT_MAX_LENGTH = 50;
+
 /** 世界形態（`97-selfhosted-server.md` § 97.1）。單機不提供聊天、隊伍、交易 */
 export type WorldMode = 'solo' | 'open';
 

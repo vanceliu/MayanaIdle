@@ -47,10 +47,13 @@ function MonsterList() {
     if (raceFilter !== 'all') list = list.filter(m => m.race === raceFilter);
     if (search) list = list.filter(m => m.name.includes(search));
     list = [...list].sort((a, b) => {
-      const av = (a as any)[sortKey] ?? 0;
-      const bv = (b as any)[sortKey] ?? 0;
-      if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-      return sortAsc ? av - bv : bv - av;
+      const av = (a as unknown as Record<string, unknown>)[sortKey] ?? 0;
+      const bv = (b as unknown as Record<string, unknown>)[sortKey] ?? 0;
+      // 排序鍵是動態的，兩邊都要各自窄化：字串比字串，其餘一律當數字
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortAsc ? Number(av) - Number(bv) : Number(bv) - Number(av);
     });
     return list;
   }, [monsters, areaFilter, elementFilter, raceFilter, search, sortKey, sortAsc]);

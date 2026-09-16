@@ -96,7 +96,7 @@ export async function claimStarterGear(
     const template = await repo.getEquipmentTemplate(seed.id!);
     if (!template) continue;
 
-    const dbRecord = {
+    const dbRecord: Partial<EquipmentInstance> = {
       templateId: template.id!,
       slot: template.slot as EquipSlot,
       quality: 0,
@@ -108,7 +108,7 @@ export async function claimStarterGear(
       isStarterGear: true,
     };
 
-    const instId = await repo.addEquipment(dbRecord as any);
+    const instId = await repo.addEquipment(dbRecord);
     const instance = resolveEquipment({
       id: instId,
       templateId: template.id!,

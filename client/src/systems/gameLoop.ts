@@ -175,8 +175,23 @@ export function tickPlayerPost(deltaMs: number, session: Session): void {
 /** 回復（5000／6000ms）與常駐天賦（300ms）各自累積，滿週期即觸發 */
 export const PERSISTENT_TICK_MS = TICK_MS;
 
+/**
+ * 存檔 flush 週期（`97-selfhosted-server.md` § 97.4）。
+ * crash 最壞損失就是這個長度；擊殺與其他變動只標 dirty，由這裡統一落地。
+ */
+export const SAVE_FLUSH_MS = 5000;
+
 function tickCharacterTimers(deltaMs: number, session: Session) {
   const game = session.game.getState();
+
+  // dirty 狀態每 SAVE_FLUSH_MS 落地一次（§ 97.4）
+  const loop = session.loop;
+  loop.saveAcc += deltaMs;
+  if (loop.saveAcc >= SAVE_FLUSH_MS) {
+    loop.saveAcc = 0;
+    if (loop.saveDirty) void game.flushSaveNow();
+  }
+
   if (game.regenActive) game.tickRegen(deltaMs);
   if (game.persistentLoopActive) {
     const loop = session.loop;

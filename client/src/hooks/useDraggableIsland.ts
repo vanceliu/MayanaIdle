@@ -38,10 +38,9 @@ function metrics(el: HTMLElement) {
 export function useDraggableIsland(storageKey: string, disabled = false): DraggableIsland {
   const key = positionKey(storageKey);
   const ref = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<LogPosition | null>(null);
+  // 讀回上次的位置一次就好，用惰性初始化 —— 在 effect 裡 setState 會多跑一輪渲染
+  const [position, setPosition] = useState<LogPosition | null>(() => loadWindowPosition(key));
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => setPosition(loadWindowPosition(key)), [key]);
 
   // 「重設視窗位置」：清掉自己那一份，回到流排位置
   useEffect(() => onWindowPositionReset(() => {

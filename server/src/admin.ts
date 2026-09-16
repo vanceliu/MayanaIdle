@@ -207,6 +207,8 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
           regionId: ch?.currentRegion ?? null,
           floor: ch?.currentFloor ?? null,
           instanceKey: s.instance?.key ?? null,
+          // 禁言狀態（§ 97.7.2）。只存記憶體，所以直接問 limiter
+          mutedUntil: ch?.id ? server.world.chatLimit.mutedUntil(ch.id, Date.now()) : 0,
           partyId: ch?.id ? server.world.parties.partyOf(ch.id)?.id ?? null : null,
         };
       });
@@ -231,6 +233,25 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       auth.revokeAllSessions(userId);
       const kicked = await server.kickUser(userId, '此帳號已被封鎖');
       json(res, 200, { ok: true, kicked });
+    },
+
+    /** 禁言（§ 97.7.2）。只擋公開頻道，且只存記憶體，server 重啟即清 */
+    '/admin/api/mute': async ({ req, res }) => {
+      const body = await readBody(req);
+      const characterId = Number(body.characterId);
+      const minutes = Number(body.minutes);
+      if (!Number.isInteger(characterId) || characterId <= 0) throw new AdminError(400, '角色 id 不合法');
+      if (!Number.isFinite(minutes) || minutes <= 0) throw new AdminError(400, '禁言時間必須大於 0 分鐘');
+      server.world.chatLimit.mute(characterId, Date.now() + minutes * 60_000);
+      json(res, 200, { ok: true });
+    },
+
+    '/admin/api/unmute': async ({ req, res }) => {
+      const body = await readBody(req);
+      const characterId = Number(body.characterId);
+      if (!Number.isInteger(characterId) || characterId <= 0) throw new AdminError(400, '角色 id 不合法');
+      server.world.chatLimit.unmute(characterId);
+      json(res, 200, { ok: true });
     },
 
     '/admin/api/unban': async ({ req, res }) => {

@@ -2,7 +2,7 @@
  * 與 server 的 WebSocket 連線：版本協商、登入、指令送出、斷線重連。
  * 收到的狀態一律交給 `mirror.ts` 套進 store。
  */
-import { BUILD_INFO } from '../buildInfo';
+import { PROTOCOL_VERSION } from './protocol';
 import type { ClientMessage, ServerMessage, ActionStore, LeaderboardSnapshotView } from './protocol';
 import { useOnlineStore, readSessionToken, writeSessionToken } from './online';
 import { applyServerMessage } from './mirror';
@@ -77,7 +77,8 @@ export class GameConnection {
     this.socket = socket;
     socket.onopen = () => {
       this.reconnectDelay = RECONNECT_BASE_MS;
-      this.send({ t: 'hello', version: BUILD_INFO.version });
+      // 送協定版本，不是遊戲顯示版本（§ 97.2）
+      this.send({ t: 'hello', version: PROTOCOL_VERSION });
     };
     socket.onmessage = ev => {
       let msg: ServerMessage;
