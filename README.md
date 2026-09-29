@@ -35,7 +35,8 @@ Web-based Idle ARPG — 持續戰鬥、隨機遇敵、裝備詞綴養成、陣�
 (cd server && npm install && npm run build)
 ```
 
-`client` 產出 `client/dist/`，server 啟動時自動從那裡提供前端；`server` 產出 `server/dist/server.js`。
+`client` 產出 `client/dist/`，server 啟動時自動從那裡提供前端。
+`server` 產出 `server/dist/server.js`（ESM，原始碼執行用）與 `server.cjs`（打包成單一執行檔用）。
 
 ### 執行
 
@@ -70,10 +71,14 @@ npm start
 |---|---|---|
 | `bind` | `127.0.0.1` | `127.0.0.1` 為單機形態（本機自動登入）；改成 `0.0.0.0` 對外開放 |
 | `port` | `25580` | 監聽埠 |
-| `admins` | `host` | 管理員帳號，第一個是 host 帳號 |
 | `registration` | `open` | `open`／`invite`／`closed` |
+| `admin-user` | `admin` | 管理介面的帳號，**不是遊戲帳號** |
+| `admin-password` | 空 | 管理介面的密碼；留空＝管理介面停用 |
 
-對外開放前，host 帳號必須先有密碼：在遊戲的 ⚙ → 帳號 設定，否則以 `bind` 非 loopback 啟動會中止。
+全部鍵、型別與生效時機見 `docs/design/97-selfhosted-server.md` § 97.2。
+未列於該表的鍵啟動時忽略並警告。
+
+無密碼的 host 帳號只在 `bind` 與連線來源**都是**回送位址時才自動登入。
 
 ### 服務化
 
@@ -87,18 +92,32 @@ Restart=always
 
 ## 測試
 
+三個 workspace 各自有測試：
+
 ```bash
-cd client
-npm test
+(cd client && npm test)
+(cd server && npm test)
+(cd desktop && npm test)
 ```
+
+型別檢查：client 用 `npx tsc -b`（根 `tsconfig.json` 是 references 形式，`--noEmit` 是空跑），
+server 與 desktop 用 `npm run typecheck`（會先產生 build 產物 `src/generated/mapsIndex`）。
 
 ## 發布
 
-兩種產物，流程見 `docs/RELEASE.md`：
+兩種產物（server 執行檔、桌面版），三平台都出，流程見 `docs/RELEASE.md`。
+**正式發布一律推版本號 tag 走 CI**，三個 runner 各自原生打包自己的平台：
 
 ```bash
-./scripts/release.sh                       # server 執行檔（三平台）→ server/release/
-(cd desktop && npm run build && npm run package)   # 桌面版（macOS）→ desktop/release/
+# 版本號改在 client/package.json，commit 之後打 tag（純版本號，不加 v）
+git tag 0.7.8 && git push origin 0.7.8
+```
+
+本機打包只當試打，**預設只打這台機器的平台**：
+
+```bash
+./scripts/release.sh                 # server 執行檔 ＋ 桌面版 → server/release/、desktop/release/
+./scripts/release.sh --all-servers   # server 執行檔也打另外兩個平台
 ```
 
 ## 專案結構
@@ -125,6 +144,10 @@ docs/
 
 ## 開發狀態
 
-- Phase 1~3：已完成（核心戰鬥、角色成長、裝備系統、地圖城鎮）
-- Phase 4：未開始（陣營、寵物、成就）
+依 `docs/design/17-mvp-priority.md`：
+
+- 第一~三階段：已完成（核心戰鬥、角色成長、裝備系統、地圖城鎮）
+- 第四階段：部分完成 —— 任務系統框架、高階技能書掉落、任務 NPC 已做；
+  NPC 對話、主支線任務、成就、副本、寵物排在第五階段之後
+- 第五階段（自架私服與多人）：進行中
 - 百柱塔通行卷軸系統：已實作

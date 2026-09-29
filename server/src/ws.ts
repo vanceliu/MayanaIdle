@@ -169,10 +169,16 @@ export class GameServer {
     const config = this.deps.config();
     switch (msg.t) {
       case 'hello': {
-        // 比的是**協定版本**，不是遊戲顯示版本：改版號不該把訊息格式沒變的 client 擋掉
+        // 協定版本與發布版本兩個都要相同（§ 97.2）：
+        // 協定擋格式不相容，發布版本擋同格式但行為不同的 client。
         if (msg.version !== PROTOCOL_VERSION) {
-          session.send({ t: 'version_mismatch', required: PROTOCOL_VERSION, received: msg.version });
-          socket.close(4001, 'version mismatch');
+          session.send({ t: 'version_mismatch', kind: 'protocol', required: PROTOCOL_VERSION, received: msg.version });
+          socket.close(4001, 'protocol version mismatch');
+          return;
+        }
+        if (msg.release !== this.deps.version) {
+          session.send({ t: 'version_mismatch', kind: 'release', required: this.deps.version, received: msg.release });
+          socket.close(4001, 'release version mismatch');
           return;
         }
         let autoLogin: Extract<ServerMessage, { t: 'hello_ok' }>['autoLogin'];

@@ -18,8 +18,18 @@ export interface ChatMessageView {
   at: number;
 }
 
+/**
+ * 協定版本（`97-selfhosted-server.md` § 97.2）：本檔訊息格式改到不相容時 +1。
+ *
+ * 版本協商**兩個都要比**：協定版本擋格式不相容，發布版本擋同格式但行為不同的 client。
+ */
+export const PROTOCOL_VERSION = '2';
+
+/** 版本協商擋在哪一關（`97-selfhosted-server.md` § 97.2） */
+export type VersionMismatchKind = 'protocol' | 'release';
+
 export type ClientMessage =
-  | { t: 'hello'; version: string }
+  | { t: 'hello'; version: string; release: string }
   | { t: 'register'; username: string; password: string; inviteCode?: string }
   | { t: 'login'; username: string; password: string }
   | { t: 'resume'; token: string }
@@ -35,14 +45,6 @@ export type ClientMessage =
   | { t: 'leaderboard'; id?: number; top?: number };
 
 /**
- * 協定版本（`97-selfhosted-server.md` § 97.2）。
- *
- * **與遊戲顯示版本無關**：綁在一起的話，每次改版號就會把所有還開著的 client 擋在門外，
- * 即使線上的訊息格式一個字都沒變。只有本檔的訊息格式真的改到不相容時才 +1。
- */
-export const PROTOCOL_VERSION = '1';
-
-/**
  * 單條聊天訊息的字數上限（`97-selfhosted-server.md` § 97.7.2）。
  *
  * 放在協定檔：server 的判定與 client 輸入框的限制必須是同一個數字，
@@ -56,7 +58,7 @@ export type WorldMode = 'solo' | 'open';
 
 export type ServerMessage =
   | { t: 'hello_ok'; serverName: string; version: string; registration: string; mode: WorldMode; autoLogin?: { token: string; username: string; userId: number; isHost: boolean } }
-  | { t: 'version_mismatch'; required: string; received: string }
+  | { t: 'version_mismatch'; kind: VersionMismatchKind; required: string; received: string }
   /** `isHost`：這個帳號的密碼由 `server.properties` 的 `host-password` 決定，遊戲裡不提供修改 */
   | { t: 'auth_ok'; token: string; username: string; userId: number; hasPassword: boolean; isHost: boolean }
   | { t: 'error'; code: string; message: string; id?: number }

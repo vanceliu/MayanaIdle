@@ -2,6 +2,7 @@
   "name": "mayana-desktop",
   "private": true,
   "version": "0.0.0",
+  "productName": "MayanaIdle",
   "main": "dist/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",

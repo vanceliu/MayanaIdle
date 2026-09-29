@@ -3,6 +3,7 @@
  * 收到的狀態一律交給 `mirror.ts` 套進 store。
  */
 import { PROTOCOL_VERSION } from './protocol';
+import { BUILD_INFO } from '../buildInfo';
 import type { ClientMessage, ServerMessage, ActionStore, LeaderboardSnapshotView } from './protocol';
 import { useOnlineStore, readSessionToken, writeSessionToken } from './online';
 import { applyServerMessage } from './mirror';
@@ -77,8 +78,8 @@ export class GameConnection {
     this.socket = socket;
     socket.onopen = () => {
       this.reconnectDelay = RECONNECT_BASE_MS;
-      // 送協定版本，不是遊戲顯示版本（§ 97.2）
-      this.send({ t: 'hello', version: PROTOCOL_VERSION });
+      // 協定版本與發布版本都送，server 兩個都比（§ 97.2）
+      this.send({ t: 'hello', version: PROTOCOL_VERSION, release: BUILD_INFO.version });
     };
     socket.onmessage = ev => {
       let msg: ServerMessage;
@@ -118,7 +119,7 @@ export class GameConnection {
         return;
       }
       case 'version_mismatch':
-        useOnlineStore.setState({ status: 'version_mismatch', requiredVersion: msg.required });
+        useOnlineStore.setState({ status: 'version_mismatch', mismatchKind: msg.kind, requiredVersion: msg.required });
         return;
       case 'auth_ok':
         writeSessionToken(msg.token);

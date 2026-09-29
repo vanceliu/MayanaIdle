@@ -46,7 +46,7 @@
 |---|---|
 | 前端由 server 自己 serve | 私服無 TLS 憑證，前端掛 `https://` 時瀏覽器會擋掉 `ws://`；必須同源 |
 | 單一可執行單元 | 不依賴外部 Redis / PostgreSQL |
-| 版本協商 | client 連線時比對**協定版本**（`net/protocol.ts` 的 `PROTOCOL_VERSION`），不匹配即拒連並顯示需求版本。協定版本與遊戲顯示版本分開：訊息格式沒變就不該因為改版號把 client 擋掉 |
+| 版本協商 | 握手時比兩個版本，**都必須完全相同**，任一不符即拒連並顯示需求版本：**協定版本**（`net/protocol.ts` 的 `PROTOCOL_VERSION`）擋訊息格式不相容，**發布版本**（`client/package.json` 的 `version`）擋格式相同但行為不同的 client。協定先判。發布版本這道不可省 —— 同格式、不同版本的 client 同時在線會產生難以追查的行為差異 |
 | client 無遊戲邏輯 | client 只做渲染、輸入與插值；所有判定在 server |
 
 ### 發布形態
@@ -62,7 +62,7 @@
 |---|---|
 | 設定檔 | `server.properties`，見下節；首次啟動自動產生 |
 | 手機 | 只作為 client 連線至 server，無本機單機 |
-| 平台 | server 執行檔：Linux、macOS、Windows 各一份，可在單一機器交叉打包。桌面版：各平台需在該平台打包，目前只出 macOS |
+| 平台 | server 執行檔：Linux、macOS、Windows 各一份，可在單一機器交叉打包。桌面版：三平台都出，但各平台需在該平台打包 |
 | 原始碼執行 | `node server/dist/server.js`（前端讀 `client/dist`） |
 
 #### 桌面啟動器

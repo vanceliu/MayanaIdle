@@ -10,6 +10,7 @@ export function LoginScreen() {
   const registration = useOnlineStore(s => s.registration);
   const error = useOnlineStore(s => s.error);
   const requiredVersion = useOnlineStore(s => s.requiredVersion);
+  const mismatchKind = useOnlineStore(s => s.mismatchKind);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +20,11 @@ export function LoginScreen() {
     return (
       <div className="app title-screen">
         <h1>版本不符</h1>
-        <p>連線協定不符（server 為 {requiredVersion}），請重新整理取得新版</p>
+        <p>
+          {mismatchKind === 'release'
+            ? `版本不符：server 是 ${requiredVersion}，請重新整理取得同一版`
+            : '連線協定不符，請重新整理取得新版'}
+        </p>
         <button className="btn-primary" onClick={() => window.location.reload()}>重新整理</button>
         <BuildLabel />
       </div>

@@ -111,7 +111,16 @@ jobs:
         run: |
           mkdir -p dist-out
           shopt -s nullglob
-          cp server/release/mayana-server-* dist-out/
+          # macOS／Linux 的 server 執行檔以 tar.gz 散布：upload-artifact 的 zip 不保留
+          # Unix 權限位，裸檔下載回來是 644。tar 保留權限位，解開即可執行。
+          export COPYFILE_DISABLE=1
+          for name in mayana-server-macos-arm64 mayana-server-linux-x64; do
+            [ -f "server/release/$name" ] || continue
+            tar -czf "dist-out/$name.tar.gz" -C server/release "$name"
+          done
+          # Windows 沒有執行權限位，裸檔即可。
+          # 走迴圈而非 `cp *.exe`：nullglob 下沒 .exe 的 runner 會少掉來源參數而失敗。
+          for f in server/release/*.exe; do cp "$f" dist-out/; done
           # 桌面版只取可散布的，不要 blockmap、unpacked 目錄與 builder-debug.yml
           cp desktop/release/*.dmg desktop/release/*.zip desktop/release/*.tar.gz desktop/release/*.exe dist-out/
           ls -lh dist-out
