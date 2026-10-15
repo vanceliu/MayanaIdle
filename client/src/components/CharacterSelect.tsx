@@ -1,4 +1,5 @@
 import { useGameStore } from '../stores/gameStore';
+import { useOnlineStore } from '../net/online';
 import { CLASS_NAMES_ZH, ATTRIBUTE_KEYS } from '../models/character';
 import type { Attributes } from '../models/character';
 
@@ -26,15 +27,18 @@ export function CharacterSelect() {
   const selectCharacter = useGameStore(s => s.selectCharacter);
   const deleteCharacter = useGameStore(s => s.deleteCharacter);
   const setPhase = useGameStore(s => s.setPhase);
+  const kickedReason = useOnlineStore(s => s.kickedReason);
   const emptySlots = MAX_CHARACTERS - characterList.length;
+  const clearKicked = () => useOnlineStore.setState({ kickedReason: null });
 
   return (
     <div className="character-select-screen">
       <h2>選擇角色</h2>
+      {kickedReason && <div className="select-notice" role="alert">{kickedReason}</div>}
       <div className="character-slots">
         {characterList.map(char => (
           <div key={char.id} className="character-slot filled">
-            <div className="slot-info" onClick={() => selectCharacter(char.id)}>
+            <div className="slot-info" onClick={() => { clearKicked(); void selectCharacter(char.id); }}>
               <span className="slot-name">{char.name}</span>
               <span className="slot-class">{CLASS_NAMES_ZH[char.className]}</span>
               <span className="slot-level">Lv.{char.level}</span>
@@ -55,7 +59,7 @@ export function CharacterSelect() {
         ))}
         {Array.from({ length: emptySlots }).map((_, i) => (
           <div key={`empty-${i}`} className="character-slot empty">
-            <button className="btn-create-char" onClick={() => setPhase('create')}>
+            <button className="btn-create-char" onClick={() => { clearKicked(); setPhase('create'); }}>
               建立新角色
             </button>
           </div>

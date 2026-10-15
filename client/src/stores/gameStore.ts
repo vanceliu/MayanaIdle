@@ -510,6 +510,21 @@ export interface GameState {
 const GOLD_NAN_REPAIR_AMOUNT = 2_379_024;
 const GOLD_NAN_REPAIR_KEY = 'mayana_gold_nan_repair';
 
+/** 帳號層級的共用倉庫（`19-account-character.md` § 19.7），選角與建角都要讀入 */
+async function loadSharedWarehouse(userId: number, session: Session) {
+  const storedEquipment = (await session.repo.listSharedWarehouseEquipment(userId)).map(resolveEquipment);
+  const storedMaterials: BagItem[] = [];
+  for (const row of await session.repo.listSharedWarehouse(userId)) {
+    if (row.type === 'equipment') continue;
+    const entry = makeBagItem(row.itemTemplateId!, row.amount);
+    if (entry) storedMaterials.push(entry);
+  }
+  // 金幣是餘額不是物品，自 v16 起存在獨立表（`18-data-schema.md` § 18.7）
+  const storedGold = await session.repo.getWarehouseGold(userId);
+  const goldCorrupted = !Number.isFinite(storedGold);
+  return { storedEquipment, storedMaterials, warehouseGold: goldCorrupted ? 0 : storedGold, goldCorrupted };
+}
+
 function takeGoldNaNRepair(): number {
   const storage = globalThis.localStorage;
   if (!storage) return 0;
@@ -690,29 +705,13 @@ export function createGameStore(session: Session) {
       }
     }
 
-    // Load shared warehouse equipment (ownerId = userId)
-    const userId = get().userId!;
-    const sharedEquipItems = await session.repo.listSharedWarehouseEquipment(userId);
-    const storedEquipItems: EquipmentInstance[] = sharedEquipItems.map(resolveEquipment);
+    const shared = await loadSharedWarehouse(get().userId!, session);
 
     const bagRows = await session.repo.listBag(char.id!);
     // 名稱與分頁一律由 id 反查（§ 99.1），DB 列裡的舊 name 只是遷移殘留，不採用
     const bagItems: BagItem[] = bagRows
       .map(row => makeBagItem(row.itemTemplateId!, row.amount))
       .filter((b): b is BagItem => b !== null);
-
-    // Load warehouse materials (account-level shared storage)
-    const warehouseRows = await session.repo.listSharedWarehouse(userId);
-    const storedMaterials: BagItem[] = [];
-    for (const row of warehouseRows) {
-      if (row.type !== 'equipment') {
-        const entry = makeBagItem(row.itemTemplateId!, row.amount);
-        if (entry) storedMaterials.push(entry);
-      }
-    }
-    // 金幣是餘額不是物品，自 v16 起存在獨立表（`18-data-schema.md` § 18.7）
-    const storedWarehouseGold = await session.repo.getWarehouseGold(userId);
-    const warehouseGold = Number.isFinite(storedWarehouseGold) ? storedWarehouseGold : 0;
 
     // Load personal warehouse materials (character-level storage)
     const personalWarehouseRows = await session.repo.listPersonalWarehouse(char.id!);
@@ -766,7 +765,7 @@ export function createGameStore(session: Session) {
     }
 
     // 讀檔防線：存檔裡的金幣曾被 NaN 汙染過，NaN 會沿著每次加減擴散出去
-    const goldCorrupted = !Number.isFinite(char.gold) || !Number.isFinite(storedWarehouseGold);
+    const goldCorrupted = !Number.isFinite(char.gold) || shared.goldCorrupted;
     if (!Number.isFinite(char.gold)) char.gold = 0;
     if (goldCorrupted) char.gold += takeGoldNaNRepair();
 
@@ -779,9 +778,9 @@ export function createGameStore(session: Session) {
         return instantiateFromTemplate(s.id, 0);
       }).filter(Boolean) as Skill[],
       bagItems,
-      storedMaterials,
-      storedEquipment: storedEquipItems,
-      warehouseGold,
+      storedMaterials: shared.storedMaterials,
+      storedEquipment: shared.storedEquipment,
+      warehouseGold: shared.warehouseGold,
       personalStoredEquipment: personalStoredEquipItems,
       personalStoredMaterials,
       scriptRules,
@@ -947,12 +946,19 @@ export function createGameStore(session: Session) {
       characterId: char.id!, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount,
     })));
 
+    const shared = await loadSharedWarehouse(userId, session);
+
     set({
       character: char,
       equippedGear,
       inventory: [],
       skills: startingSkills,
       bagItems: starterBag,
+      storedMaterials: shared.storedMaterials,
+      storedEquipment: shared.storedEquipment,
+      warehouseGold: shared.warehouseGold,
+      personalStoredEquipment: [],
+      personalStoredMaterials: [],
       adventurerQuests: [],
       adventurerQuestBoard: createEmptyQuestBoard(),
   questBoardTownId: null,
@@ -1784,7 +1790,7 @@ export function createGameStore(session: Session) {
       }
       case 'use_consumable': {
         if (action.itemId == null) break;
-        useConsumableById(get, action.itemId);
+        consumeItemById(get, action.itemId);
         break;
       }
       /*
@@ -3051,7 +3057,7 @@ function isBuffActive(
  * 使用指定消耗品（§ 51.4.10）。依道具 id 分派到既有的使用路徑，
  * 不另寫一套消耗與效果邏輯。
  */
-function useConsumableById(get: () => GameState, itemId: number): void {
+function consumeItemById(get: () => GameState, itemId: number): void {
   const potion = (Object.entries(POTION_CONFIG) as [PotionType, { itemId: number }][])
     .find(([, c]) => c.itemId === itemId);
   if (potion) { get().usePotionByType(potion[0]); return; }

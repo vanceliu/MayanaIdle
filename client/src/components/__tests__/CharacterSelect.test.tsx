@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { CharacterSelect } from '../CharacterSelect';
 import { useGameStore } from '../../stores/gameStore';
+import { useOnlineStore } from '../../net/online';
 
 /**
  * @vitest-environment jsdom
@@ -16,6 +17,7 @@ describe('CharacterSelect', () => {
       characterList: [],
       phase: 'characterSelect',
     });
+    useOnlineStore.setState({ kickedReason: null });
   });
 
   afterEach(() => {
@@ -93,6 +95,38 @@ describe('CharacterSelect', () => {
     render(<CharacterSelect />);
     const deleteBtn = screen.getByText('刪除');
     expect(deleteBtn).toBeDefined();
+  });
+
+  /** 同帳號另一處進場而被踢除（`97-selfhosted-server.md` § 97.5） */
+  describe('被踢除的原因', () => {
+    const REASON = '此帳號已在其他地方進入遊戲';
+
+    it('顯示原因，選角後清除', () => {
+      useOnlineStore.setState({ kickedReason: REASON });
+      useGameStore.setState({
+        characterList: [{ id: 7, name: 'Hero', className: 'knight', level: 1, attributes: ATTRS }],
+        selectCharacter: vi.fn(),
+      } as never);
+      render(<CharacterSelect />);
+
+      expect(screen.getByRole('alert').textContent).toBe(REASON);
+      fireEvent.click(screen.getByText('Hero'));
+      expect(useOnlineStore.getState().kickedReason).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('進入建角畫面也清除', () => {
+      useOnlineStore.setState({ kickedReason: REASON });
+      render(<CharacterSelect />);
+
+      fireEvent.click(screen.getAllByText('建立新角色')[0]);
+      expect(useOnlineStore.getState().kickedReason).toBeNull();
+    });
+
+    it('沒被踢除時不顯示', () => {
+      render(<CharacterSelect />);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 
   /** 刪除是純本機行為：名稱不唯一，沒有線上資源要回收（§ 37.4.3） */

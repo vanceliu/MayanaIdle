@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
-import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
+import type { EquipmentInstance } from '../../models/equipment';
 import { EquipmentDetail, EquipmentTemplateDetail } from '../EquipmentInfo';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor, type EquipmentTierLevel } from '../../models/equipmentTier';
@@ -33,17 +33,16 @@ export function WeaponShop() {
   const bagItems = useGameStore(s => s.bagItems);
   const equippedGear = useGameStore(s => s.equippedGear);
   const [tab, setTab] = useState<ShopTab>('buy');
-  const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
   const [category, setCategory] = useState('all');
   const [batchTier, setBatchTier] = useState<EquipmentTierLevel | null>(null);
   // 購物車：清單只勾數量（唯一裝備上限 1），實際買賣由底部單一按鈕結帳（§ 34.1）
   const buyCart = useShopCart();
   const sellCart = useShopCart();
   const allTemplates = useEquipmentTemplates();
-
-  useEffect(() => {
-    setTemplates(allTemplates.filter(t => t.slot === 'rightHand' && t.acquireType === 'shop').sort((a, b) => (a.buyPrice ?? 0) - (b.buyPrice ?? 0)));
-  }, [allTemplates]);
+  const templates = useMemo(
+    () => allTemplates.filter(t => t.slot === 'rightHand' && t.acquireType === 'shop').sort((a, b) => (a.buyPrice ?? 0) - (b.buyPrice ?? 0)),
+    [allTemplates],
+  );
 
   if (!char) return null;
 

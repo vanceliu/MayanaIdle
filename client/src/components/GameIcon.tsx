@@ -10,13 +10,11 @@ interface GameIconProps {
 const svgCache: Record<string, string> = {};
 
 export function GameIcon({ name, size = 32, color, className = '' }: GameIconProps) {
-  const [svgContent, setSvgContent] = useState<string>(svgCache[name] || '');
+  const [loaded, setLoaded] = useState<{ name: string; svg: string } | null>(null);
+  const svgContent = svgCache[name] || (loaded?.name === name ? loaded.svg : '');
 
   useEffect(() => {
-    if (svgCache[name]) {
-      setSvgContent(svgCache[name]);
-      return;
-    }
+    if (svgCache[name]) return;
 
     const modules = import.meta.glob('../assets/icons/**/*.svg', { query: '?raw', import: 'default' });
     const path = `../assets/icons/${name}.svg`;
@@ -24,7 +22,7 @@ export function GameIcon({ name, size = 32, color, className = '' }: GameIconPro
     if (modules[path]) {
       (modules[path]() as Promise<string>).then((raw) => {
         svgCache[name] = raw;
-        setSvgContent(raw);
+        setLoaded({ name, svg: raw });
       });
     }
   }, [name]);

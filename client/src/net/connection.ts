@@ -161,7 +161,7 @@ export class GameConnection {
         return;
       }
       case 'kicked':
-        useOnlineStore.setState({ error: msg.reason });
+        useOnlineStore.setState({ error: msg.reason, kickedReason: msg.reason });
         return;
       default:
         applyServerMessage(msg);

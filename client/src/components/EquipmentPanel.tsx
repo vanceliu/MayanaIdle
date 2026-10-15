@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { SLOT_NAMES, SLOT_ORDER, type EquipSlot, type EquipmentInstance } from '../models/equipment';
 import { getFrozenGear } from '../systems/gear';
@@ -46,11 +46,9 @@ export function EquipmentPanel() {
   const pressRef = useRef<{ slot: EquipSlot; x: number; y: number; justSelected: boolean } | null>(null);
 
   // 該欄位被別處清空（賣掉、強化失敗、換裝）時把選取狀態一起收掉
-  useEffect(() => {
-    if (selectedSlot && !equippedGear[selectedSlot]) {
-      setSelectedSlot(null);
-    }
-  }, [equippedGear, selectedSlot]);
+  if (selectedSlot && !equippedGear[selectedSlot]) {
+    setSelectedSlot(null);
+  }
 
   /**
    * 點在已裝備的欄位以外（空欄位、欄位標籤、面板留白）就取消選取。

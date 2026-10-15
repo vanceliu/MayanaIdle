@@ -178,7 +178,7 @@ function ItemDetail({ name }: { name: string }) {
     return BOSS_DROP_TABLE_SEEDS.filter(d => d.itemTemplateId === itemDef.id);
   }, [name]);
 
-  const skillBookEntry = useMemo(() => ALL_CLASS_SKILL_BOOKS.find(b => b.itemId === item?.id), [item?.id]);
+  const skillBookEntry = ALL_CLASS_SKILL_BOOKS.find(b => b.itemId === item?.id);
 
   const regions = useRegions();
 

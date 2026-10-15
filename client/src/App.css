@@ -1906,7 +1906,8 @@ button.active {
   color: var(--accent-danger);
 }
 
-.create-error {
+.create-error,
+.select-notice {
   margin-bottom: 12px;
   padding: 8px 12px;
   border: var(--border-width) solid var(--accent-danger);

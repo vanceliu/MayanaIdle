@@ -192,11 +192,9 @@ export function AdventurerGuild() {
     }
   }, [initQuestBoard, townId, questBoardTownId]);
 
-  useEffect(() => {
-    if (!availableDifficulties.includes(activeDifficulty)) {
-      setActiveDifficulty(availableDifficulties[0]);
-    }
-  }, [availableDifficulties, activeDifficulty]);
+  if (availableDifficulties.length > 0 && !availableDifficulties.includes(activeDifficulty)) {
+    setActiveDifficulty(availableDifficulties[0]);
+  }
 
   const currentBoard = questBoard[activeDifficulty] ?? [];
   const activeCount = activeQuests.length;

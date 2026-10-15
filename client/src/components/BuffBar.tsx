@@ -32,10 +32,10 @@ function formatTime(ms: number): string {
 export function BuffBar() {
   const activeEffects = useGameStore(s => s.activeEffects);
   const character = useGameStore(s => s.character);
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -44,7 +44,7 @@ export function BuffBar() {
     e => e.target === 'player' && (e.type === 'buff' || e.type === 'debuff')
   );
 
-  const restedMs = character ? getRestedExpRemaining(character, Date.now()) : 0;
+  const restedMs = character ? getRestedExpRemaining(character, now) : 0;
 
   if (playerEffects.length === 0 && restedMs <= 0) return null;
 

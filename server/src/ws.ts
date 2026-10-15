@@ -31,6 +31,9 @@ function isLoopbackAddress(address: string): boolean {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
+/** 同帳號另一處進場時，被踢一方收到的原因（§ 97.5） */
+export const DUPLICATE_ENTRY_REASON = '此帳號已在其他地方進入遊戲';
+
 /** 倒數公告的文案。單數複數不分，中文沒這個問題 */
 export function shutdownNotice(seconds: number): string {
   return `server 將在 ${seconds} 秒後關閉，請盡快回到安全處並登出`;
@@ -42,6 +45,8 @@ export class GameServer {
   private readonly deps: GameServerDeps;
   private closing = false;
   private readonly shutdownTimers: ReturnType<typeof setTimeout>[] = [];
+  /** 每個帳號的進場佇列尾端（§ 97.5 同帳號的進場依序執行） */
+  private readonly entryQueues = new Map<number, Promise<void>>();
 
   constructor(deps: GameServerDeps) {
     this.deps = deps;
@@ -249,25 +254,20 @@ export class GameServer {
         return;
       }
       case 'create_character': {
-        this.requireUser(session);
+        const userId = this.requireUser(session);
         if (!CLASS_NAMES.has(msg.className)) throw new AuthError('bad_class', '職業不存在');
         // 角色名稱在本服唯一（`19-account-character.md` § 19.4）
         if (this.deps.repo.nameTaken(msg.name)) throw new AuthError('name_taken', `名稱「${msg.name}」已經有人用了`);
-        await session.game.getState().createCharacter(msg.name, msg.className as ClassName, msg.bonusAttrs as unknown as Attributes, msg.appearance as never);
-        await syncWorld(session);
-        this.world.onCharacterEnter(session);
-        this.world.syncPartyViews([session]);
+        await this.enterGame(session, userId, () =>
+          session.game.getState().createCharacter(msg.name, msg.className as ClassName, msg.bonusAttrs as unknown as Attributes, msg.appearance as never));
         flush(session, []);
         return;
       }
       case 'select_character': {
-        this.requireUser(session);
-        const owned = (await this.deps.repo.getCharacter(msg.id))?.userId === session.userId;
+        const userId = this.requireUser(session);
+        const owned = (await this.deps.repo.getCharacter(msg.id))?.userId === userId;
         if (!owned) throw new AuthError('not_owner', '不是你的角色');
-        await session.game.getState().selectCharacter(msg.id);
-        await syncWorld(session);
-        this.world.onCharacterEnter(session);
-        this.world.syncPartyViews([session]);
+        await this.enterGame(session, userId, () => session.game.getState().selectCharacter(msg.id));
         flush(session, []);
         return;
       }
@@ -336,6 +336,32 @@ export class GameServer {
       }
       default:
         session.send({ t: 'error', code: 'unknown_message', message: `未知訊息 ${(msg as { t: string }).t}` });
+    }
+  }
+
+  /**
+   * 進入遊戲（§ 97.5）：同帳號其他在場的連線先踢除並 flush，才讀角色。
+   * 同帳號的進場排成佇列依序執行，同時送出的兩次進場只會留下後到的那條。
+   */
+  private async enterGame(session: PlayerSession, userId: number, load: () => Promise<unknown>): Promise<void> {
+    const previous = this.entryQueues.get(userId) ?? Promise.resolve();
+    const entry = previous.then(async () => {
+      for (const other of [...this.sessions]) {
+        if (other !== session && other.userId === userId && other.game.getState().character) {
+          await this.kick(other, DUPLICATE_ENTRY_REASON);
+        }
+      }
+      await load();
+      await syncWorld(session);
+      this.world.onCharacterEnter(session);
+      this.world.syncPartyViews([session]);
+    });
+    const tail = entry.catch(() => {});
+    this.entryQueues.set(userId, tail);
+    try {
+      await entry;
+    } finally {
+      if (this.entryQueues.get(userId) === tail) this.entryQueues.delete(userId);
     }
   }
 

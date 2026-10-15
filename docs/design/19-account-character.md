@@ -4,7 +4,7 @@
 
 每個玩家帳號（User）可建立多個角色（Character），在進入遊戲時需先選擇要操作的角色。
 
-帳號為 server 帳號，角色存於 server；帳號規則、host 帳號自動登入、session 見 `97-selfhosted-server.md` § 97.5。
+帳號為 server 帳號，角色存於 server；帳號規則、host 帳號自動登入、session、同帳號同時只能一隻角色在場見 `97-selfhosted-server.md` § 97.5。
 
 ---
 

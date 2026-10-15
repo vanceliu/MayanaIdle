@@ -49,7 +49,11 @@ export function TradePanelContent() {
   const [goldInput, setGoldInput] = useState(0);
 
   // 換一筆交易時把本機的金幣拉桿歸零
-  useEffect(() => setGoldInput(0), [trade?.id]);
+  const [goldInputFor, setGoldInputFor] = useState(trade?.id);
+  if (goldInputFor !== trade?.id) {
+    setGoldInputFor(trade?.id);
+    setGoldInput(0);
+  }
 
   const editing = !!trade && !trade.me.locked;
   /** 已放入的內容一律以 server 推回來的鏡像為準，本機不另外留一份 */

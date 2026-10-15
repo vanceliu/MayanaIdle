@@ -42,7 +42,8 @@ export function StatisticsCenter() {
   const guildProgress = useGameStore(s => s.guildProgress);
 
   const [snapshot, setSnapshot] = useState<LeaderboardSnapshot | null>(() => readOnlineCache());
-  const [loading, setLoading] = useState(false);
+  // 一開就在排行榜分頁：快取失效即是載入中（掛載時的 effect 會去抓）
+  const [loading, setLoading] = useState(() => readOnlineCache() === null);
   const [expandedField, setExpandedField] = useState<LeaderboardField | null>(null);
   const [message, setMessage] = useState('');
   const [tab, setTab] = useState<'leaderboard' | 'my-stats'>('leaderboard');
@@ -50,28 +51,13 @@ export function StatisticsCenter() {
 
   const myUuid = character?.uuid ?? null;
 
-  useEffect(() => {
-    if (tab !== 'leaderboard') return;
-
-    // 快取仍在 10 分鐘內 → 完全不向 server 要（§ 37.4.4）
-    const cached = readOnlineCache();
-    if (cached) {
-      setSnapshot(cached);
-      return;
-    }
-    void sync();
-    // sync 只依賴 ref 與 store 快照，不需列入依賴
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
-
-  /** 上傳自己的統計（必要時補註冊），再抓一次 snapshot。整趟最多 1 次 GET。 */
-  async function sync() {
-    if (syncingRef.current) return;
+  /**
+   * 抓一次 snapshot，整趟最多 1 次 GET。統計本來就在 server，沒有上傳這回事（§ 37.4.1）。
+   * 呼叫端先設好 loading 與 message。
+   */
+  async function fetchSnapshot() {
     syncingRef.current = true;
-    setLoading(true);
-    setMessage('');
     try {
-      // 沒有上傳這回事：統計本來就在 server（§ 37.4.1）
       setSnapshot(await fetchOnlineSnapshot());
     } catch {
       if (!snapshot) setMessage('無法載入排行榜');
@@ -79,6 +65,22 @@ export function StatisticsCenter() {
       setLoading(false);
       syncingRef.current = false;
     }
+  }
+
+  // 快取仍在 10 分鐘內 → 完全不向 server 要（§ 37.4.4）；快取只由 fetchSnapshot 寫入，snapshot 已是同一份
+  useEffect(() => {
+    if (readOnlineCache() || syncingRef.current) return;
+    void fetchSnapshot();
+    // 只在掛載時抓；之後由切回排行榜分頁觸發
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function showLeaderboard() {
+    setTab('leaderboard');
+    if (readOnlineCache() || syncingRef.current) return;
+    setLoading(true);
+    setMessage('');
+    void fetchSnapshot();
   }
 
   // 14 個榜單全部由同一份 snapshot 在本地切出，不再各打一支 API
@@ -101,7 +103,7 @@ export function StatisticsCenter() {
       <div className="stats-tabs">
         <button
           className={`stats-tab ${tab === 'leaderboard' ? 'active' : ''}`}
-          onClick={() => setTab('leaderboard')}
+          onClick={showLeaderboard}
         >
           排行榜
         </button>

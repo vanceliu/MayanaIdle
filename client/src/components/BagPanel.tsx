@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { buildBagLayout, moveBagSlot, sortBagLayout, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
 import {
@@ -11,7 +11,8 @@ import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStor
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
 import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
-import { SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../models/equipment';
+import { SLOT_ORDER, type EquipmentInstance, type EquippedGear, type EquipSlot } from '../models/equipment';
+import type { BagItem } from '../models/bagItem';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { isCureItem, getCureItem, hasCurableDebuff } from '../models/cureItem';
@@ -62,87 +63,12 @@ function isTownScroll(itemId: number): boolean {
 }
 
 /** 背包格對應的道具定義。一律以 id 反查 seed（§ 99.1），不用名稱 */
-export function BagPanel() {
-  /** § 35.20：印記抽屜的開合。不持久化，重開回到收合 */
-  const [sigilOpen, setSigilOpen] = useState(false);
-  /** § 35.21 背包分頁。不持久化：切分頁是當下的動作，不是設定 */
-  const [bagTab, setBagTab] = useState<'normal' | 'talent'>('normal');
-  /**
-   * 天賦分頁的順序。整理一次性落位、位置持久化（§ 35.21.1）。
-   * 存在角色資料裡（線上模式即 server），換角色時跟著角色一起載入。
-   */
-  const talentOrder = useGameStore(s => s.talentBagOrder);
-  const setTalentOrder = useGameStore(s => s.setTalentBagOrder);
-  const talentSlots = useTalentStore(s => s.slots);
-  const activeTemplateId = useGameStore(s => s.activeTemplateId);
-
-  /** 天賦分頁的整理。把當下的排序結果整批寫成位置 */
-  function handleTalentSort() {
-    const cells = buildTalentBagCells(availableSlots(talentSlots, activeTemplateId));
-    const next = sortTalentBag(cells);
-    setTalentOrder(next);
-  }
-  const [tooltip, setTooltip] = useState<{ item: BagGridItem; anchor: AnchorRect } | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
-  /**
-   * 「移動」模式選中的格子（`47-mobile.md`）。
-   *
-   * 觸控裝置**不做拖曳** —— 長按已經被次要選單佔走，再把拖曳疊上去只會互相誤觸，
-   * 而背包格擠在一起、手指又比游標粗，拖錯格的成本比多點一下高。
-   * 改成選單裡選「移動」→ 點目標格，兩下完成，滑鼠玩家照樣可以用。
-   */
-  const [movingId, setMovingId] = useState<string | null>(null);
-  /**
-   * 指定目標模式：卷軸強化與機率查詢共用同一套（`35-inventory-constraints.md` § 35.5.5）。
-   * 模式中所有點擊都被它接管，不會落到原本的使用／裝備／移動。
-   */
-  const [targeting, setTargeting] = useState<TargetingMode | null>(null);
-  // 提示一律走 log：背包版面不因為點了什麼而位移，插一列提示會把整片格子往下推
-  /** 機率視窗要看的裝備。由指定目標模式選出來 */
-  const [rateTarget, setRateTarget] = useState<EquipmentInstance | null>(null);
-  const { fx: enhanceFx, play: playEnhanceFx } = useOneShotFx<BagEnhanceFx>();
-
-  // 拖曳狀態由 dragStore 統一持有：落點可能在背包外（快捷格／地圖），
-  // 每個目標各自記一份 hover 狀態會對不起來
-  const dragItem = useDragStore(s => s.item);
-  const dragOver = useDragStore(s => s.over);
-  /**
-   * 背包一律點兩次才動作：第一次選取、第二次才使用／裝備。
-   * 一格一格擠在一起，手滑就喝掉藥水或換掉整套裝備，代價比多點一下高。
-   */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  /** 這次按壓的起點：判斷放開時算不算「點擊」，以及是不是剛選起來的那一下 */
-  const pressRef = useRef<{
-    id: string;
-    x: number;
-    y: number;
-    justSelected: boolean;
-    /** 按住的是哪一格（長按開選單、拖曳起手都要知道） */
-    item: BagGridItem;
-    index: number;
-    /** 觸控不走拖曳（見 `movingId`），起手判定要分流 */
-    touch: boolean;
-  } | null>(null);
-
-  const character = useGameStore(s => s.character);
-  const inventory = useGameStore(s => s.inventory);
-  const bagItems = useGameStore(s => s.bagItems);
-  const equippedGear = useGameStore(s => s.equippedGear);
-  const equipItem = useGameStore(s => s.equipItem);
-  const unequipItem = useGameStore(s => s.unequipItem);
-  const usePotionByType = useGameStore(s => s.usePotionByType);
-  const useTownScroll = useGameStore(s => s.useTownScroll);
-  const useCureItem = useGameStore(s => s.useCureItem);
-  const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
-  const pushSystemLog = useGameStore(s => s.pushSystemLog);
-  /** § 35.1.3：格子位置持久化在 store，拖曳與整理共用同一條寫入路徑 */
-  const slotMap = useGameStore(s => s.bagSlotMap);
-  const setSlotMap = useGameStore(s => s.setBagSlotMap);
-  const quickSlots = useGameStore(s => s.quickSlots);
-  const activeEffects = useGameStore(s => s.activeEffects);
-  const templates = useEquipmentTemplates();
-
+/** 背包格子與印記抽屜的內容，由 store 狀態推導（§ 35.1、§ 35.20） */
+function buildBagCells(
+  bagItems: BagItem[],
+  equippedGear: EquippedGear,
+  inventory: EquipmentInstance[],
+): { gridItems: BagGridItem[]; sigilItems: BagGridItem[] } {
   const gridItems: BagGridItem[] = [];
 
   const redCount = getPotionCount(bagItems, 'red');
@@ -213,6 +139,95 @@ export function BagPanel() {
     gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item, equippedSlot: slot });
   }
 
+  return { gridItems, sigilItems };
+}
+
+export function BagPanel() {
+  /** § 35.20：印記抽屜的開合。不持久化，重開回到收合 */
+  const [sigilOpen, setSigilOpen] = useState(false);
+  /** § 35.21 背包分頁。不持久化：切分頁是當下的動作，不是設定 */
+  const [bagTab, setBagTab] = useState<'normal' | 'talent'>('normal');
+  /**
+   * 天賦分頁的順序。整理一次性落位、位置持久化（§ 35.21.1）。
+   * 存在角色資料裡（線上模式即 server），換角色時跟著角色一起載入。
+   */
+  const talentOrder = useGameStore(s => s.talentBagOrder);
+  const setTalentOrder = useGameStore(s => s.setTalentBagOrder);
+  const talentSlots = useTalentStore(s => s.slots);
+  const activeTemplateId = useGameStore(s => s.activeTemplateId);
+
+  /** 天賦分頁的整理。把當下的排序結果整批寫成位置 */
+  function handleTalentSort() {
+    const cells = buildTalentBagCells(availableSlots(talentSlots, activeTemplateId));
+    const next = sortTalentBag(cells);
+    setTalentOrder(next);
+  }
+  const [tooltip, setTooltip] = useState<{ item: BagGridItem; anchor: AnchorRect } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
+  /**
+   * 「移動」模式選中的格子（`47-mobile.md`）。
+   *
+   * 觸控裝置**不做拖曳** —— 長按已經被次要選單佔走，再把拖曳疊上去只會互相誤觸，
+   * 而背包格擠在一起、手指又比游標粗，拖錯格的成本比多點一下高。
+   * 改成選單裡選「移動」→ 點目標格，兩下完成，滑鼠玩家照樣可以用。
+   */
+  const [movingId, setMovingId] = useState<string | null>(null);
+  /**
+   * 指定目標模式：卷軸強化與機率查詢共用同一套（`35-inventory-constraints.md` § 35.5.5）。
+   * 模式中所有點擊都被它接管，不會落到原本的使用／裝備／移動。
+   */
+  const [targeting, setTargeting] = useState<TargetingMode | null>(null);
+  // 提示一律走 log：背包版面不因為點了什麼而位移，插一列提示會把整片格子往下推
+  /** 機率視窗要看的裝備。由指定目標模式選出來 */
+  const [rateTarget, setRateTarget] = useState<EquipmentInstance | null>(null);
+  const { fx: enhanceFx, play: playEnhanceFx } = useOneShotFx<BagEnhanceFx>();
+
+  // 拖曳狀態由 dragStore 統一持有：落點可能在背包外（快捷格／地圖），
+  // 每個目標各自記一份 hover 狀態會對不起來
+  const dragItem = useDragStore(s => s.item);
+  const dragOver = useDragStore(s => s.over);
+  /**
+   * 背包一律點兩次才動作：第一次選取、第二次才使用／裝備。
+   * 一格一格擠在一起，手滑就喝掉藥水或換掉整套裝備，代價比多點一下高。
+   */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  /** 這次按壓的起點：判斷放開時算不算「點擊」，以及是不是剛選起來的那一下 */
+  const pressRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    justSelected: boolean;
+    /** 按住的是哪一格（長按開選單、拖曳起手都要知道） */
+    item: BagGridItem;
+    index: number;
+    /** 觸控不走拖曳（見 `movingId`），起手判定要分流 */
+    touch: boolean;
+  } | null>(null);
+
+  const character = useGameStore(s => s.character);
+  const inventory = useGameStore(s => s.inventory);
+  const bagItems = useGameStore(s => s.bagItems);
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const equipItem = useGameStore(s => s.equipItem);
+  const unequipItem = useGameStore(s => s.unequipItem);
+  const drinkPotionByType = useGameStore(s => s.usePotionByType);
+  const readTownScroll = useGameStore(s => s.useTownScroll);
+  const applyCureItem = useGameStore(s => s.useCureItem);
+  const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
+  const pushSystemLog = useGameStore(s => s.pushSystemLog);
+  /** § 35.1.3：格子位置持久化在 store，拖曳與整理共用同一條寫入路徑 */
+  const slotMap = useGameStore(s => s.bagSlotMap);
+  const setSlotMap = useGameStore(s => s.setBagSlotMap);
+  const quickSlots = useGameStore(s => s.quickSlots);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  const templates = useEquipmentTemplates();
+
+  const { gridItems, sigilItems } = useMemo(
+    () => buildBagCells(bagItems, equippedGear, inventory),
+    [bagItems, equippedGear, inventory],
+  );
+
   // Esc 退出指定目標。面板不吃鍵盤焦點，所以掛在 window 上
   useEffect(() => {
     if (!targeting) return;
@@ -227,13 +242,9 @@ export function BagPanel() {
 
   // 選取的東西離開背包（用掉、穿上、賣掉、丟棄）後把選取狀態收掉。
   // 兩個分頁的格子都可能被選取，所以一起看。
-  // 每次 render 都是新陣列，這裡每次都會跑，但只有真的失效才寫入狀態。
-  useEffect(() => {
-    const alive = [...gridItems, ...sigilItems].some(i => i.id === selectedId);
-    if (selectedId != null && !alive) {
-      setSelectedId(null);
-    }
-  }, [gridItems, sigilItems, selectedId]);
+  if (selectedId != null && ![...gridItems, ...sigilItems].some(i => i.id === selectedId)) {
+    setSelectedId(null);
+  }
 
   /*
    * § 35.17：剔除已不在版面上的位置（賣掉、存進倉庫、丟棄）。
@@ -390,9 +401,9 @@ export function BagPanel() {
   /** 第二次點擊才執行的實際動作 */
   function activate(item: BagGridItem) {
     if (item.potionType) {
-      usePotionByType(item.potionType);
+      drinkPotionByType(item.potionType);
     } else if (item.cureItemId != null) {
-      useCureItem(item.cureItemId);
+      applyCureItem(item.cureItemId);
     } else if (item.speedPotionType) {
       useGameStore.getState().useSpeedPotion(item.speedPotionType);
     } else if (item.equippedSlot) {
@@ -401,7 +412,7 @@ export function BagPanel() {
     } else if (item.equipment) {
       equipItem(item.equipment);
     } else if (item.type === 'scroll' && item.itemId != null && isTownScroll(item.itemId)) {
-      useTownScroll(item.itemId);
+      readTownScroll(item.itemId);
     } else {
       // 強化卷軸不直接生效，第二下是「進入指定目標模式」（§ 35.5.5）
       enterScrollTargeting(item);

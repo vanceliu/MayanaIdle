@@ -46,7 +46,7 @@ export function QuickSlotBar() {
   const bagItems = useGameStore(s => s.bagItems);
   const inventory = useGameStore(s => s.inventory);
   const equippedGear = useGameStore(s => s.equippedGear);
-  const useQuickSlot = useGameStore(s => s.useQuickSlot);
+  const triggerQuickSlot = useGameStore(s => s.useQuickSlot);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const templates = useEquipmentTemplates();
   const skills = useGameStore(s => s.skills);
@@ -84,11 +84,11 @@ export function QuickSlotBar() {
       e.preventDefault();
       // 鍵盤一按即發，並清掉滑鼠的選取狀態
       setSelectedIndex(null);
-      useQuickSlot(idx);
+      triggerQuickSlot(idx);
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [useQuickSlot]);
+  }, [triggerQuickSlot]);
 
   /**
    * 這件裝備現在在哪 —— 背包裡或穿在身上都算「還在」（§ 35.7.2）。
@@ -280,7 +280,7 @@ export function QuickSlotBar() {
     }
     if (selectedIndex === idx) {
       setSelectedIndex(null);
-      useQuickSlot(idx);
+      triggerQuickSlot(idx);
       return;
     }
     setSelectedIndex(idx);

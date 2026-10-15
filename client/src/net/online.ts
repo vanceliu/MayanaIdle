@@ -22,6 +22,8 @@ export interface OnlineState {
   /** host 帳號：密碼由 server.properties 的 host-password 決定，遊戲裡不提供修改 */
   isHost: boolean;
   error: string | null;
+  /** 被 server 踢除的原因；重連後保留，選角或建角時清除（§ 97.5） */
+  kickedReason: string | null;
   /** 版本協商擋在哪一關；尚未被擋為 null */
   mismatchKind: VersionMismatchKind | null;
   requiredVersion: string | null;
@@ -40,6 +42,7 @@ export const useOnlineStore = create<OnlineState>(() => ({
   hasPassword: false,
   isHost: false,
   error: null,
+  kickedReason: null,
   mismatchKind: null,
   requiredVersion: null,
 }));

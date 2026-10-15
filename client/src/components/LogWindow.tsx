@@ -101,8 +101,17 @@ export function LogWindow({ storageKey, title, titleContent, className = '', dra
   const isMobile = useIsMobile();
   const drawer = drawerOnMobile && isMobile;
   const [logSize, setLogSize] = useState<0 | 1 | 2>(0);
-  const [pos, setPos] = useState<LogPosition | null>(null);
-  const [opacity, setOpacity] = useState(80);
+  const posStorageKey = positionKey(storageKey);
+  const opacityStorageKey = opacityKey(storageKey);
+  const [pos, setPos] = useState<LogPosition | null>(() => loadWindowPosition(posStorageKey));
+  const [opacity, setOpacity] = useState(() => loadWindowOpacity(opacityStorageKey));
+  // 換一個 storageKey 時改讀該鍵存的位置與透明度
+  const [loadedFor, setLoadedFor] = useState(storageKey);
+  if (loadedFor !== storageKey) {
+    setLoadedFor(storageKey);
+    setPos(loadWindowPosition(posStorageKey));
+    setOpacity(loadWindowOpacity(opacityStorageKey));
+  }
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   // 點到就提到最上層（§ 32.15）：與城鎮設施視窗、浮動面板共用同一個堆疊順序
@@ -110,13 +119,6 @@ export function LogWindow({ storageKey, title, titleContent, className = '', dra
   const focusWindow = useWindowLayerStore(s => s.focusWindow);
   const menuRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
-  const posStorageKey = positionKey(storageKey);
-  const opacityStorageKey = opacityKey(storageKey);
-
-  useEffect(() => {
-    setPos(loadWindowPosition(posStorageKey));
-    setOpacity(loadWindowOpacity(opacityStorageKey));
-  }, [posStorageKey, opacityStorageKey]);
 
   // 「重設視窗位置」：位置存在自己的鍵裡，要自己清（§ 32.15）
   useEffect(() => onWindowPositionReset(() => {

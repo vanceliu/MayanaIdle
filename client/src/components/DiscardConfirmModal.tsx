@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 
 /**
@@ -12,9 +12,12 @@ export function DiscardConfirmModal() {
   const [amount, setAmount] = useState(1);
 
   // 換一個丟棄對象時重置數量
-  useEffect(() => {
+  const pendingKey = `${pending?.name}|${pending?.equipmentId}`;
+  const [amountFor, setAmountFor] = useState(pendingKey);
+  if (amountFor !== pendingKey) {
+    setAmountFor(pendingKey);
     setAmount(1);
-  }, [pending?.name, pending?.equipmentId]);
+  }
 
   if (!pending) return null;
 

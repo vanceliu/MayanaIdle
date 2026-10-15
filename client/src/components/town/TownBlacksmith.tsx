@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useGameStore, type CraftResult } from '../../stores/gameStore';
 import type { EquipmentTemplate } from '../../models/equipment';
 import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
@@ -24,14 +24,13 @@ export function TownBlacksmith() {
   const acceptCraftQuest = useGameStore(s => s.acceptCraftQuest);
   const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
   const [selectedRecipe, setSelectedRecipe] = useState<EquipmentTemplate | null>(null);
-  const [craftTemplates, setCraftTemplates] = useState<EquipmentTemplate[]>([]);
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const allTemplates = useEquipmentTemplates();
-
-  useEffect(() => {
-    setCraftTemplates(allTemplates.filter(t => t.acquireType === 'craft').sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0)));
-  }, [allTemplates]);
+  const craftTemplates = useMemo(
+    () => allTemplates.filter(t => t.acquireType === 'craft').sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0)),
+    [allTemplates],
+  );
 
   if (!char) return null;
 

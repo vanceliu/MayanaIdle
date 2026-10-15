@@ -79,6 +79,10 @@ export function PixiGame() {
   useEffect(() => {
     if (!containerRef.current) return;
     const container = containerRef.current;
+    // 這三個容器只原地增刪、從不換掉，cleanup 用同一份
+    const monsterMap = monsterMapRef.current;
+    const teammateMap = teammateMapRef.current;
+    const npcEntities = npcEntitiesRef.current;
 
     const pixiApp = new PixiApp();
     pixiAppRef.current = pixiApp;
@@ -233,12 +237,12 @@ export function PixiGame() {
 
     return () => {
       destroyed = true;
-      monsterMapRef.current.forEach(m => m.destroy());
-      monsterMapRef.current.clear();
-      teammateMapRef.current.forEach(t => t.destroy());
-      teammateMapRef.current.clear();
-      npcEntitiesRef.current.forEach(n => n.destroy());
-      npcEntitiesRef.current.length = 0;
+      monsterMap.forEach(m => m.destroy());
+      monsterMap.clear();
+      teammateMap.forEach(t => t.destroy());
+      teammateMap.clear();
+      npcEntities.forEach(n => n.destroy());
+      npcEntities.length = 0;
       useMonsterHudStore.getState().clear();
       playerEntityRef.current = null;
       sceneRef.current = null;

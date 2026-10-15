@@ -16,9 +16,10 @@ export function BattleView() {
   const loadMap = useMapControlStore(s => s.loadMap);
   const setAutoMove = useMapControlStore(s => s.setAutoMove);
 
-  // Load map when character region changes
+  // Load map when character region changes：只看區域與樓層，其他角色欄位變動不重載地圖
   useEffect(() => {
     if (isOnline()) return;
+    const character = useGameStore.getState().character;
     if (!character) return;
     const savedPos = (character.mapPositionX != null && character.mapPositionY != null)
       ? { x: character.mapPositionX, y: character.mapPositionY }
@@ -56,7 +57,7 @@ export function BattleView() {
         }
       }
     });
-  }, [character?.currentRegion, character?.currentFloor]);
+  }, [character?.currentRegion, character?.currentFloor, loadMap]);
 
   // Sync search mode with auto move
   useEffect(() => {
