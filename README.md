@@ -74,6 +74,7 @@ npm start
 | `registration` | `open` | `open`／`invite`／`closed` |
 | `admin-user` | `admin` | 管理介面的帳號，**不是遊戲帳號** |
 | `admin-password` | 空 | 管理介面的密碼；留空＝管理介面停用 |
+| `trust-proxy` | `false` | 放在反向代理後方才開啟：來源 IP 改讀 `X-Forwarded-For`。直接對外必須關閉 |
 
 全部鍵、型別與生效時機見 `docs/design/97-selfhosted-server.md` § 97.2。
 未列於該表的鍵啟動時忽略並警告。

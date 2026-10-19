@@ -111,6 +111,14 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
       `);
     },
   },
+  {
+    /** 救援碼雜湊（`97-selfhosted-server.md` § 97.5）。null ＝ 未產生 */
+    version: 3,
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
+      if (!columns.includes('recovery_hash')) db.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT');
+    },
+  },
 ];
 
 export function openDatabase(path: string): DatabaseSync {

@@ -4,6 +4,7 @@
 import { randomBytes } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { argon2id, argon2Verify } from 'hash-wasm';
+import { generateRecoveryCode, parseRecoveryCode } from './recoveryCode';
 
 /**
  * 遊戲帳號（`97-selfhosted-server.md` § 97.5）。
@@ -13,10 +14,12 @@ export interface UserRecord {
   id: number;
   username: string;
   hasPassword: boolean;
+  hasRecoveryCode: boolean;
   bannedUntil: number | null;
 }
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const USER_COLUMNS = 'id, username, password_hash, recovery_hash, banned_until';
 const USERNAME_RE = /^[A-Za-z0-9_\-.]{2,32}$/;
 
 export function validUsername(name: string): boolean {
@@ -47,6 +50,7 @@ interface UserRow {
   id: number;
   username: string;
   password_hash: string | null;
+  recovery_hash: string | null;
   banned_until: number | null;
 }
 
@@ -55,6 +59,7 @@ function toRecord(row: UserRow): UserRecord {
     id: row.id,
     username: row.username,
     hasPassword: row.password_hash !== null,
+    hasRecoveryCode: row.recovery_hash !== null,
     bannedUntil: row.banned_until,
   };
 }
@@ -67,17 +72,21 @@ export class AuthService {
   }
 
   findByUsername(username: string): UserRecord | null {
-    const row = this.db.prepare('SELECT id, username, password_hash, banned_until FROM users WHERE username = ?').get(username) as UserRow | undefined;
+    const row = this.db.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE username = ?`).get(username) as UserRow | undefined;
     return row ? toRecord(row) : null;
   }
 
   findById(id: number): UserRecord | null {
-    const row = this.db.prepare('SELECT id, username, password_hash, banned_until FROM users WHERE id = ?').get(id) as UserRow | undefined;
+    const row = this.row(id);
     return row ? toRecord(row) : null;
   }
 
+  private row(id: number): UserRow | undefined {
+    return this.db.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`).get(id) as UserRow | undefined;
+  }
+
   listUsers(): UserRecord[] {
-    return (this.db.prepare('SELECT id, username, password_hash, banned_until FROM users ORDER BY id').all() as unknown as UserRow[]).map(toRecord);
+    return (this.db.prepare(`SELECT ${USER_COLUMNS} FROM users ORDER BY id`).all() as unknown as UserRow[]).map(toRecord);
   }
 
   /**
@@ -93,7 +102,7 @@ export class AuthService {
 
   async register(username: string, password: string): Promise<UserRecord> {
     if (!validUsername(username)) throw new AuthError('invalid_username', '帳號只能用英數字、_ - .，長度 2~32');
-    if (password.length < 6) throw new AuthError('weak_password', '密碼至少 6 個字元');
+    assertPasswordStrength(password);
     if (this.findByUsername(username)) throw new AuthError('username_taken', '帳號已存在');
     const hash = await hashPassword(password);
     this.db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)').run(username, hash, Date.now());
@@ -101,7 +110,7 @@ export class AuthService {
   }
 
   async login(username: string, password: string): Promise<UserRecord> {
-    const row = this.db.prepare('SELECT id, username, password_hash, banned_until FROM users WHERE username = ?').get(username) as UserRow | undefined;
+    const row = this.db.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE username = ?`).get(username) as UserRow | undefined;
     if (!row || row.password_hash === null) throw new AuthError('invalid_credentials', '帳號或密碼錯誤');
     if (!(await verifyPassword(password, row.password_hash))) throw new AuthError('invalid_credentials', '帳號或密碼錯誤');
     const user = toRecord(row);
@@ -110,9 +119,58 @@ export class AuthService {
   }
 
   async setPassword(userId: number, password: string): Promise<void> {
-    if (password.length < 6) throw new AuthError('weak_password', '密碼至少 6 個字元');
+    assertPasswordStrength(password);
     const hash = await hashPassword(password);
     this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+  }
+
+  /** 產生新救援碼並取代舊的（§ 97.5）。回傳只顯示這一次的明碼 */
+  async issueRecoveryCode(userId: number): Promise<string> {
+    const { code, secret } = generateRecoveryCode(userId);
+    const hash = await hashPassword(secret);
+    this.db.prepare('UPDATE users SET recovery_hash = ? WHERE id = ?').run(hash, userId);
+    return code;
+  }
+
+  /** 設定視窗改密碼（§ 97.5）：`current` 為目前的密碼或救援碼 */
+  async changePassword(userId: number, current: string, newPassword: string): Promise<void> {
+    assertPasswordStrength(newPassword);
+    const row = this.row(userId);
+    const parsed = parseRecoveryCode(current);
+    const byRecovery = !!row?.recovery_hash && parsed?.userId === userId && await verifyPassword(parsed.secret, row.recovery_hash);
+    const byPassword = !byRecovery && row?.password_hash != null && await verifyPassword(current, row.password_hash);
+    if (!byRecovery && !byPassword) throw new AuthError('invalid_credentials', '目前的密碼或救援碼錯誤');
+    await this.setPassword(userId, newPassword);
+  }
+
+  /** 設定視窗產生救援碼（§ 97.5）：已有救援碼要驗目前的救援碼，沒有則驗密碼 */
+  async regenerateRecoveryCode(userId: number, current: string): Promise<string> {
+    const row = this.row(userId);
+    if (!row) throw new AuthError('invalid_credentials', '帳號不存在');
+    if (row.recovery_hash !== null) {
+      const parsed = parseRecoveryCode(current);
+      if (!parsed || parsed.userId !== userId || !(await verifyPassword(parsed.secret, row.recovery_hash))) {
+        throw new AuthError('invalid_recovery_code', '目前的救援碼錯誤');
+      }
+    } else if (row.password_hash === null || !(await verifyPassword(current, row.password_hash))) {
+      throw new AuthError('invalid_credentials', '密碼錯誤');
+    }
+    return this.issueRecoveryCode(userId);
+  }
+
+  /** 以救援碼重設密碼（§ 97.5）：設新密碼、撤銷全部 session、換發救援碼 */
+  async recover(code: string, newPassword: string): Promise<{ user: UserRecord; recoveryCode: string }> {
+    assertPasswordStrength(newPassword);
+    const parsed = parseRecoveryCode(code);
+    if (!parsed) throw new AuthError('invalid_recovery_code', '救援碼錯誤');
+    const row = this.row(parsed.userId);
+    if (!row || row.recovery_hash === null) throw new AuthError('invalid_recovery_code', '救援碼錯誤');
+    if (!(await verifyPassword(parsed.secret, row.recovery_hash))) throw new AuthError('invalid_recovery_code', '救援碼錯誤');
+    this.assertNotBanned(toRecord(row));
+    await this.setPassword(row.id, newPassword);
+    this.revokeAllSessions(row.id);
+    const recoveryCode = await this.issueRecoveryCode(row.id);
+    return { user: this.findById(row.id)!, recoveryCode };
   }
 
   ban(userId: number, until: number | null): void {
@@ -151,6 +209,14 @@ export class AuthService {
   revokeAllSessions(userId: number): void {
     this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
   }
+
+  revokeOtherSessions(userId: number, keepToken: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, keepToken);
+  }
+}
+
+function assertPasswordStrength(password: string): void {
+  if (password.length < 6) throw new AuthError('weak_password', '密碼至少 6 個字元');
 }
 
 export class AuthError extends Error {

@@ -11,10 +11,11 @@ export function LoginScreen() {
   const error = useOnlineStore(s => s.error);
   const requiredVersion = useOnlineStore(s => s.requiredVersion);
   const mismatchKind = useOnlineStore(s => s.mismatchKind);
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'recover'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
 
   if (status === 'version_mismatch') {
     return (
@@ -42,12 +43,45 @@ export function LoginScreen() {
   }
 
   const canRegister = registration !== 'closed';
+  const switchMode = (next: typeof mode) => {
+    setMode(next);
+    setPassword('');
+    useOnlineStore.setState({ error: null });
+  };
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === 'recover') {
+      if (!recoveryCode || !password) return;
+      connection.recover(recoveryCode, password);
+      return;
+    }
     if (!username || !password) return;
     if (mode === 'login') connection.login(username, password);
     else connection.register(username, password, inviteCode || undefined);
   };
+
+  if (mode === 'recover') {
+    return (
+      <div className="app title-screen">
+        <h1>{serverName || '瑪雅那 Idle'}</h1>
+        <form className="login-form" onSubmit={submit}>
+          <p className="login-hint">輸入註冊時拿到的救援碼與新密碼。重設後其他裝置的登入會失效，並換發一組新救援碼。</p>
+          <label>
+            救援碼
+            <input value={recoveryCode} onChange={e => setRecoveryCode(e.target.value)} autoComplete="off" spellCheck={false} placeholder="12-XXXX-XXXX-XXXX-XXXX" />
+          </label>
+          <label>
+            新密碼
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
+          </label>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button className="btn-primary" type="submit">重設密碼</button>
+          <button className="btn-secondary" type="button" onClick={() => switchMode('login')}>返回登入</button>
+        </form>
+        <BuildLabel />
+      </div>
+    );
+  }
 
   return (
     <div className="app title-screen">
@@ -70,9 +104,12 @@ export function LoginScreen() {
         {error && <p className="login-error" role="alert">{error}</p>}
         <button className="btn-primary" type="submit">{mode === 'login' ? '登入' : '註冊'}</button>
         {canRegister && (
-          <button className="btn-secondary" type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          <button className="btn-secondary" type="button" onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}>
             {mode === 'login' ? '註冊新帳號' : '已有帳號，登入'}
           </button>
+        )}
+        {mode === 'login' && (
+          <button className="login-forgot" type="button" onClick={() => switchMode('recover')}>忘記密碼？</button>
         )}
       </form>
       <BuildLabel />

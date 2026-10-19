@@ -19,7 +19,10 @@ export interface OnlineState {
   username: string | null;
   userId: number | null;
   hasPassword: boolean;
-  /** host 帳號：密碼由 server.properties 的 host-password 決定，遊戲裡不提供修改 */
+  hasRecoveryCode: boolean;
+  /** 剛換發、尚未關閉顯示視窗的救援碼（`97-selfhosted-server.md` § 97.5） */
+  recoveryCode: string | null;
+  /** 單機世界的 host 帳號：不設密碼（§ 97.5）；管理介面密碼是 server.properties 的 admin-password */
   isHost: boolean;
   error: string | null;
   /** 被 server 踢除的原因；重連後保留，選角或建角時清除（§ 97.5） */
@@ -40,6 +43,8 @@ export const useOnlineStore = create<OnlineState>(() => ({
   username: null,
   userId: null,
   hasPassword: false,
+  hasRecoveryCode: false,
+  recoveryCode: null,
   isHost: false,
   error: null,
   kickedReason: null,

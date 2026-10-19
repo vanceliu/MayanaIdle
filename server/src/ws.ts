@@ -6,6 +6,8 @@ import type { WebSocketServer } from 'ws';
 import type { GameRepository } from '../../client/src/db/repository';
 import type { ClassName, Attributes } from '../../client/src/models/character';
 import { AuthError, type AuthService } from './auth';
+import { LoginThrottle } from './loginThrottle';
+import { clientAddress } from './clientAddress';
 import { isLoopbackBind, type ServerConfig } from './config';
 import { applyAutoMove, createPlayerSession, resetPatches, syncWorld, type PlayerSession } from './playerSession';
 import { flush } from './tick';
@@ -34,6 +36,12 @@ function isLoopbackAddress(address: string): boolean {
 /** 同帳號另一處進場時，被踢一方收到的原因（§ 97.5） */
 export const DUPLICATE_ENTRY_REASON = '此帳號已在其他地方進入遊戲';
 
+/** 改密碼或救援碼重設後，同帳號其他連線收到的原因（§ 97.5） */
+export const PASSWORD_CHANGED_REASON = '密碼已變更，請重新登入';
+
+/** 計入登入嘗試限制的失敗（§ 97.5） */
+const CREDENTIAL_FAILURES: ReadonlySet<string> = new Set(['invalid_credentials', 'invalid_recovery_code']);
+
 /** 倒數公告的文案。單數複數不分，中文沒這個問題 */
 export function shutdownNotice(seconds: number): string {
   return `server 將在 ${seconds} 秒後關閉，請盡快回到安全處並登出`;
@@ -47,9 +55,11 @@ export class GameServer {
   private readonly shutdownTimers: ReturnType<typeof setTimeout>[] = [];
   /** 每個帳號的進場佇列尾端（§ 97.5 同帳號的進場依序執行） */
   private readonly entryQueues = new Map<number, Promise<void>>();
+  private readonly throttle: LoginThrottle;
 
-  constructor(deps: GameServerDeps) {
+  constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle()) {
     this.deps = deps;
+    this.throttle = throttle;
     this.sessions = this.world.sessions;
   }
 
@@ -63,10 +73,11 @@ export class GameServer {
       const session = createPlayerSession(this.deps.repo, remote, msg => {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(msg));
       });
+      session.clientAddress = clientAddress(req, this.deps.config().trustProxy);
       session.world = this.world;
       session.close = (code, reason) => socket.close(code, reason);
       this.sessions.add(session);
-      log.info(`connection #${session.connectionId} from ${remote}`);
+      log.info(`connection #${session.connectionId} from ${session.clientAddress}${session.clientAddress === remote ? '' : ` via ${remote}`}`);
 
       socket.on('message', raw => {
         let msg: ClientMessage;
@@ -132,6 +143,26 @@ export class GameServer {
     const targets = [...this.sessions].filter(s => s.userId === userId);
     for (const s of targets) await this.kick(s, reason);
     return targets.length;
+  }
+
+  private async kickOtherConnections(userId: number, except: PlayerSession, reason: string): Promise<void> {
+    const targets = [...this.sessions].filter(s => s.userId === userId && s !== except);
+    for (const s of targets) await this.kick(s, reason);
+  }
+
+  /** 登入嘗試限制（§ 97.5）：鎖定中直接拒絕，帳密或救援碼錯誤才計入失敗 */
+  private async throttled<T>(session: PlayerSession, attempt: () => Promise<T>): Promise<T> {
+    const ip = session.clientAddress;
+    const locked = this.throttle.lockedFor(ip);
+    if (locked > 0) throw new AuthError('rate_limited', `嘗試次數過多，請 ${Math.ceil(locked / 60_000)} 分鐘後再試`);
+    try {
+      const result = await attempt();
+      this.throttle.recordSuccess(ip);
+      return result;
+    } catch (e) {
+      if (e instanceof AuthError && CREDENTIAL_FAILURES.has(e.code)) this.throttle.recordFailure(ip);
+      throw e;
+    }
   }
 
   /** 全服公告（§ 97.8）。玩家頻道會被聊天洗掉，公告自己一條路 */
@@ -203,18 +234,28 @@ export class GameServer {
         if (config.registration === 'closed') throw new AuthError('registration_closed', '本服未開放註冊');
         if (config.registration === 'invite' && (msg.inviteCode ?? '') !== config.inviteCode) throw new AuthError('bad_invite', '邀請碼錯誤');
         const user = await this.deps.auth.register(msg.username, msg.password);
+        const recoveryCode = await this.deps.auth.issueRecoveryCode(user.id);
         this.assertCapacity();
         const token = this.deps.auth.issueSession(user.id);
         this.bindUser(session, user.id, user.username, token);
-        session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, isHost: user.username === this.deps.hostUsername });
+        session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, hasRecoveryCode: true, isHost: user.username === this.deps.hostUsername, recoveryCode });
         return;
       }
       case 'login': {
-        const user = await this.deps.auth.login(msg.username, msg.password);
+        const user = await this.throttled(session, () => this.deps.auth.login(msg.username, msg.password));
         this.assertCapacity();
         const token = this.deps.auth.issueSession(user.id);
         this.bindUser(session, user.id, user.username, token);
-        session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: user.hasPassword, isHost: user.username === this.deps.hostUsername });
+        session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: user.hasPassword, hasRecoveryCode: user.hasRecoveryCode, isHost: user.username === this.deps.hostUsername });
+        return;
+      }
+      case 'recover': {
+        const { user, recoveryCode } = await this.throttled(session, () => this.deps.auth.recover(msg.code, msg.password));
+        await this.kickOtherConnections(user.id, session, PASSWORD_CHANGED_REASON);
+        this.assertCapacity();
+        const token = this.deps.auth.issueSession(user.id);
+        this.bindUser(session, user.id, user.username, token);
+        session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, hasRecoveryCode: true, isHost: user.username === this.deps.hostUsername, recoveryCode });
         return;
       }
       case 'resume': {
@@ -223,14 +264,25 @@ export class GameServer {
         this.deps.auth.assertNotBanned(user);
         this.assertCapacity();
         this.bindUser(session, user.id, user.username, msg.token);
-        session.send({ t: 'auth_ok', token: msg.token, username: user.username, userId: user.id, hasPassword: user.hasPassword, isHost: user.username === this.deps.hostUsername });
+        session.send({ t: 'auth_ok', token: msg.token, username: user.username, userId: user.id, hasPassword: user.hasPassword, hasRecoveryCode: user.hasRecoveryCode, isHost: user.username === this.deps.hostUsername });
         return;
       }
       case 'set_password': {
         const userId = this.requireUser(session);
-        // host 的密碼只能由 `server.properties` 決定（§ 97.5）
-        if (session.username === this.deps.hostUsername) throw new AuthError('host_password_managed', 'host 帳號的密碼請改 server.properties 的 host-password');
-        await this.deps.auth.setPassword(userId, msg.password);
+        // host 不設密碼（§ 97.5）；單機世界要保護的只有管理介面，那是 admin-password
+        if (session.username === this.deps.hostUsername) throw new AuthError('host_no_password', 'host 帳號不設密碼；管理介面的密碼請改 server.properties 的 admin-password');
+        await this.throttled(session, () => this.deps.auth.changePassword(userId, msg.current, msg.password));
+        if (session.token) this.deps.auth.revokeOtherSessions(userId, session.token);
+        await this.kickOtherConnections(userId, session, PASSWORD_CHANGED_REASON);
+        if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: true });
+        return;
+      }
+      case 'regenerate_recovery_code': {
+        const userId = this.requireUser(session);
+        if (session.username === this.deps.hostUsername) throw new AuthError('host_no_recovery', 'host 帳號不使用救援碼');
+        const code = await this.throttled(session, () => this.deps.auth.regenerateRecoveryCode(userId, msg.current));
+        session.send({ t: 'recovery_code', code });
+        if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: true });
         return;
       }
       case 'logout': {

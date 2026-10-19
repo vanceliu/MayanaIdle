@@ -156,7 +156,7 @@ describe('系統按鈕整合（47-mobile）', () => {
     fireEvent.click(screen.getByLabelText('系統設定'));
     fireEvent.click(screen.getByRole('button', { name: '帳號' }));
 
-    expect(screen.getByRole('button', { name: '登出' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '回到角色清單' })).toBeTruthy();
     expect(screen.getByRole('link', { name: '開啟 Wiki' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '匯出角色' })).toBeNull();
     expect(screen.queryByRole('button', { name: '匯入角色' })).toBeNull();

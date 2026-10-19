@@ -284,6 +284,60 @@ a,
   margin: 0;
 }
 
+.login-hint {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+
+.login-forgot {
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.login-forgot:hover {
+  color: var(--text-primary);
+}
+
+/* --- 救援碼（`97-selfhosted-server.md` § 97.5） --- */
+.recovery-code-modal {
+  width: 400px;
+  height: auto;
+}
+
+.recovery-code-hint {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  margin: 0 0 12px;
+}
+
+.recovery-code-value {
+  display: block;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--bg-inset);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  color: var(--accent-gold);
+  font-size: var(--fs-md);
+  text-align: center;
+  letter-spacing: 0.05em;
+  user-select: all;
+  word-break: break-all;
+}
+
+.recovery-code-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* --- Game Layout（滿版遊戲畫面 + 浮動 HUD，§ 32.3） --- */
 .game-layout {
   display: block;
@@ -5761,9 +5815,10 @@ button.active {
   min-width: var(--tap-target);
 }
 
-/* 設定視窗的分頁列與城鎮面板共用 `.shop-tabs`，只補一點間距 */
+/* 設定視窗的分頁列與城鎮面板共用 `.shop-tabs`；左右內距與標題列、內容區同為 16px */
 .settings-tabs {
-  margin-bottom: 8px;
+  margin-bottom: 0;
+  padding: 12px 16px 0;
   flex-shrink: 0;
 }
 
@@ -9488,10 +9543,17 @@ button.active {
   margin-top: 6px;
 }
 
+/* 輸入格與按鈕同高：單獨一列的輸入格不會被同列按鈕撐高 */
+.settings-password input,
+.settings-password button {
+  box-sizing: border-box;
+  min-height: 2.6em;
+}
+
 .settings-password input {
   flex: 1 1 140px;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 6px 8px;
   background: var(--bg-inset);
   color: var(--text-primary);
   border: var(--border-width) solid var(--outline-dark);
@@ -9500,8 +9562,17 @@ button.active {
 }
 
 .settings-password-msg {
-  margin-left: 6px;
   color: var(--accent-gold);
+}
+
+.settings-password .settings-password-current {
+  flex-basis: 100%;
+}
+
+.settings-recovery-state {
+  flex-basis: 100%;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
 }
 
 /* 聊天：頻道選單與密語對象（`97-selfhosted-server.md` § 97.7.2） */

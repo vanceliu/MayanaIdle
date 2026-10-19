@@ -30,7 +30,10 @@ export interface PlayerSession extends Session {
   userId: number | null;
   username: string | null;
   token: string | null;
+  /** socket 對端位址；單機 host 自動登入只認這個（§ 97.5） */
   remoteAddress: string;
+  /** 玩家來源 IP：嘗試限制與管理介面顯示用；`trust-proxy` 開啟時取自 `X-Forwarded-For` */
+  clientAddress: string;
   send: (msg: ServerMessage) => void;
   /** 由 `ws.ts` 在連線建立時掛上；管理介面踢除連線用 */
   close: (code: number, reason: string) => void;
@@ -51,6 +54,7 @@ export function createPlayerSession(repo: GameRepository, remoteAddress: string,
     username: null,
     token: null,
     remoteAddress,
+    clientAddress: remoteAddress,
     send,
     close: (() => {}) as PlayerSession['close'],
     lastSent: { game: {}, mapControl: {}, mapMonster: {}, talent: {}, mailbox: {}, party: {}, trade: {} },

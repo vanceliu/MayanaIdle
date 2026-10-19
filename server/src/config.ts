@@ -20,6 +20,8 @@ export interface ServerConfig {
    */
   adminUser: string;
   adminPassword: string;
+  /** 反向代理後方時開啟：來源 IP 改讀 `X-Forwarded-For`（§ 97.2） */
+  trustProxy: boolean;
   autoOpenBrowser: boolean;
   backupDir: string;
   goldRate: number;
@@ -104,6 +106,7 @@ export const CONFIG_SPECS: ReadonlyArray<KeySpec<keyof ServerConfig>> = [
   spec<'inviteCode'>({ key: 'invite-code', field: 'inviteCode', timing: 'live', ui: { kind: 'text' }, default: () => '', parse: str, format: str }),
   spec<'adminUser'>({ key: 'admin-user', field: 'adminUser', timing: 'live', ui: { kind: 'text' }, default: () => 'admin', parse: str, format: str }),
   spec<'adminPassword'>({ key: 'admin-password', field: 'adminPassword', timing: 'live', ui: { kind: 'password' }, default: () => '', parse: str, format: str }),
+  spec<'trustProxy'>({ key: 'trust-proxy', field: 'trustProxy', timing: 'live', ui: { kind: 'bool' }, default: () => false, parse: (raw) => parseBool(raw, 'trust-proxy'), format: (v) => String(v) }),
   spec<'autoOpenBrowser'>({ key: 'auto-open-browser', field: 'autoOpenBrowser', timing: 'restart', ui: { kind: 'bool' }, default: () => true, parse: (raw) => parseBool(raw, 'auto-open-browser'), format: (v) => String(v) }),
   spec<'backupDir'>({ key: 'backup-dir', field: 'backupDir', timing: 'live', ui: { kind: 'path' }, default: (dataDir) => join(dataDir, 'backups'), parse: str, format: str }),
   spec<'goldRate'>({ key: 'gold-rate', field: 'goldRate', timing: 'live', ui: rateUi(true), default: () => 1, parse: (raw) => parseRate(raw, 'gold-rate', true), format: num }),

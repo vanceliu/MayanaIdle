@@ -33,7 +33,12 @@ export type ClientMessage =
   | { t: 'register'; username: string; password: string; inviteCode?: string }
   | { t: 'login'; username: string; password: string }
   | { t: 'resume'; token: string }
-  | { t: 'set_password'; password: string }
+  /** `current`：目前的密碼或救援碼（`97-selfhosted-server.md` § 97.5） */
+  | { t: 'set_password'; id?: number; current: string; password: string }
+  /** 以救援碼重設密碼並登入（§ 97.5） */
+  | { t: 'recover'; code: string; password: string }
+  /** `current`：已有救援碼時為目前的救援碼，沒有時為目前的密碼（§ 97.5） */
+  | { t: 'regenerate_recovery_code'; id?: number; current: string }
   | { t: 'logout' }
   | { t: 'characters' }
   | { t: 'create_character'; name: string; className: string; bonusAttrs: Record<string, number>; appearance?: unknown }
@@ -59,8 +64,10 @@ export type WorldMode = 'solo' | 'open';
 export type ServerMessage =
   | { t: 'hello_ok'; serverName: string; version: string; registration: string; mode: WorldMode; autoLogin?: { token: string; username: string; userId: number; isHost: boolean } }
   | { t: 'version_mismatch'; kind: VersionMismatchKind; required: string; received: string }
-  /** `isHost`：這個帳號的密碼由 `server.properties` 的 `host-password` 決定，遊戲裡不提供修改 */
-  | { t: 'auth_ok'; token: string; username: string; userId: number; hasPassword: boolean; isHost: boolean }
+  /** `isHost`：單機世界的 host 帳號，不設密碼（§ 97.5）；管理介面密碼是 `server.properties` 的 `admin-password` */
+  /** `recoveryCode`：註冊或救援碼重設時換發的新救援碼，只送這一次（§ 97.5） */
+  | { t: 'auth_ok'; token: string; username: string; userId: number; hasPassword: boolean; hasRecoveryCode: boolean; isHost: boolean; recoveryCode?: string }
+  | { t: 'recovery_code'; code: string }
   | { t: 'error'; code: string; message: string; id?: number }
   | { t: 'patch'; store: StoreKey; data: Record<string, unknown> }
   /** 每個 tick 的心跳。`now` 是 server 的遊戲時間（`core/clock.ts` 的 `gameNow()`），client 用它對時 */

@@ -18,6 +18,8 @@ import type { GameServer } from './ws';
 import type { TickStats } from './tick';
 import { adminPage } from './adminPage';
 import { log } from './log';
+import { LoginThrottle } from './loginThrottle';
+import { clientAddress } from './clientAddress';
 import { SHUTDOWN_ANNOUNCE_AT, SHUTDOWN_COUNTDOWN_SECONDS } from './shutdown';
 
 export interface AdminDeps {
@@ -103,6 +105,7 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
 export function createAdminHandler(deps: AdminDeps) {
   const routes = buildRoutes(deps);
   const sessions = new AdminSessions();
+  const throttle = new LoginThrottle();
   let lastCredential = credentialOf(deps.config());
 
   return async function handleAdmin(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
@@ -127,9 +130,15 @@ export function createAdminHandler(deps: AdminDeps) {
         const body = await readBody(req);
         const config = deps.config();
         if (!config.adminPassword) throw new AdminError(403, '尚未設定 admin-password，管理介面停用');
+        // 登入嘗試限制（§ 97.8）：規則同遊戲登入，計數獨立
+        const ip = clientAddress(req, config.trustProxy);
+        const locked = throttle.lockedFor(ip);
+        if (locked > 0) throw new AdminError(429, `嘗試次數過多，請 ${Math.ceil(locked / 60_000)} 分鐘後再試`);
         if (String(body.username ?? '') !== config.adminUser || String(body.password ?? '') !== config.adminPassword) {
+          throttle.recordFailure(ip);
           throw new AdminError(401, '帳號或密碼錯誤');
         }
+        throttle.recordSuccess(ip);
         json(res, 200, { token: sessions.issue(), username: config.adminUser });
         return true;
       }
@@ -200,7 +209,7 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
           connectionId: s.connectionId,
           userId: s.userId,
           username: s.username,
-          remoteAddress: s.remoteAddress,
+          remoteAddress: s.clientAddress,
           characterId: ch?.id ?? null,
           characterName: ch?.name ?? null,
           level: ch?.level ?? null,
@@ -274,6 +283,7 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
           id: u.id,
           username: u.username,
           hasPassword: u.hasPassword,
+          hasRecoveryCode: u.hasRecoveryCode,
           bannedUntil: u.bannedUntil,
           characters: counts.get(u.id) ?? 0,
           online: online.has(u.id),
@@ -282,14 +292,13 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       });
     },
 
-    '/admin/api/set-password': async ({ req, res }) => {
+    /** 發救援碼（§ 97.8）：取代玩家原本的救援碼，明碼只回這一次；玩家用它在登入畫面自行重設密碼 */
+    '/admin/api/issue-recovery-code': async ({ req, res }) => {
       const body = await readBody(req);
-      const userId = Number(body.userId);
-      if (!auth.findById(userId)) throw new AdminError(404, '找不到這個帳號');
-      await auth.setPassword(userId, String(body.password ?? ''));
-      // 密碼重設後舊的 session 一律作廢，玩家下次登入生效（§ 97.8 操作規則）
-      auth.revokeAllSessions(userId);
-      json(res, 200, { ok: true });
+      const user = auth.findById(Number(body.userId));
+      if (!user) throw new AdminError(404, '找不到這個帳號');
+      if (!user.hasPassword) throw new AdminError(400, 'host 帳號不使用救援碼');
+      json(res, 200, { code: await auth.issueRecoveryCode(user.id) });
     },
 
     // ---------- 角色查詢（唯讀） ----------

@@ -180,7 +180,7 @@ baseValue × (1 + qualityPercent / 100)
 - id
 - username（唯一）
 - passwordHash（argon2id，`97-selfhosted-server.md` § 97.5）
-- isAdmin
+- recoveryHash（救援碼的 argon2id 雜湊，null ＝ 未產生；`97-selfhosted-server.md` § 97.5）
 - bannedUntil（null ＝ 未封鎖；永久封鎖為遠期值）
 - createdAt
 

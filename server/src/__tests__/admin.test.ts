@@ -17,10 +17,11 @@ import { createPlayerSession } from '../playerSession';
 
 interface Reply { status: number; body: any }
 
-function fakeReq(method: string, token: string | null, body?: unknown): IncomingMessage {
+function fakeReq(method: string, token: string | null, body?: unknown, remoteAddress = '10.0.0.1'): IncomingMessage {
   const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
   const req = {
     method,
+    socket: { remoteAddress },
     headers: token ? { authorization: `Bearer ${token}` } : {},
     async *[Symbol.asyncIterator]() {
       for (const c of chunks) yield c;
@@ -51,10 +52,10 @@ describe('管理介面 API', () => {
   let dataDir: string;
   let token: string;
 
-  async function call(path: string, opts: { token?: string | null; body?: unknown; method?: string } = {}): Promise<Reply> {
+  async function call(path: string, opts: { token?: string | null; body?: unknown; method?: string; remoteAddress?: string } = {}): Promise<Reply> {
     const { res, reply } = fakeRes();
     const authToken = opts.token === undefined ? token : opts.token;
-    const handled = await handler(fakeReq(opts.method ?? (opts.body ? 'POST' : 'GET'), authToken, opts.body), res, new URL(`http://x${path}`));
+    const handled = await handler(fakeReq(opts.method ?? (opts.body ? 'POST' : 'GET'), authToken, opts.body, opts.remoteAddress), res, new URL(`http://x${path}`));
     expect(handled).toBe(true);
     return reply;
   }
@@ -97,6 +98,13 @@ describe('管理介面 API', () => {
     const playerToken = auth.issueSession(player.id);
     expect(await call('/admin/api/status', { token: playerToken })).toMatchObject({ status: 401 });
     expect((await call('/admin/api/login', { token: null, body: { username: 'player', password: 'playerpw' } })).status).toBe(401);
+  });
+
+  it('管理介面登入同 IP 失敗 5 次鎖定，正確密碼也被拒；其他 IP 不受影響（§ 97.8）', async () => {
+    const wrong = { token: null, body: { username: 'ops', password: 'nope' }, remoteAddress: '6.6.6.6' };
+    for (let i = 0; i < 5; i++) expect((await call('/admin/api/login', wrong)).status).toBe(401);
+    expect((await call('/admin/api/login', { ...wrong, body: { username: 'ops', password: 'opspw123' } })).status).toBe(429);
+    expect((await call('/admin/api/login', { token: null, body: { username: 'ops', password: 'opspw123' }, remoteAddress: '7.7.7.7' })).status).toBe(200);
   });
 
   it('admin-password 留空時管理介面停用', async () => {
@@ -146,17 +154,28 @@ describe('管理介面 API', () => {
     expect(auth.findById(user.id)!.bannedUntil).toBeNull();
   });
 
-  it('帳號列表與密碼重設；重設後舊 session 失效', async () => {
+  it('帳號列表與發救援碼：舊碼失效，玩家用新碼自行重設密碼（§ 97.8）', async () => {
     const user = await auth.register('someone', 'oldpw123');
-    const oldToken = auth.issueSession(user.id);
+    const oldCode = await auth.issueRecoveryCode(user.id);
     const users = await call('/admin/api/users');
     expect(users.body.users.map((u: any) => u.username)).toEqual(['host', 'someone']);
+    expect(users.body.users.find((u: any) => u.username === 'someone').hasRecoveryCode).toBe(true);
     expect(users.body.registration).toBe('open');
 
-    expect((await call('/admin/api/set-password', { body: { userId: user.id, password: 'short' } })).status).toBe(500);
-    expect((await call('/admin/api/set-password', { body: { userId: user.id, password: 'newpw12345' } })).status).toBe(200);
-    expect(auth.resolveSession(oldToken)).toBeNull();
+    const issued = await call('/admin/api/issue-recovery-code', { body: { userId: user.id } });
+    expect(issued.status).toBe(200);
+    expect(issued.body.code).toMatch(new RegExp(`^${user.id}-`));
+    await expect(auth.recover(oldCode, 'newpw12345')).rejects.toMatchObject({ code: 'invalid_recovery_code' });
+    await auth.recover(issued.body.code, 'newpw12345');
     await expect(auth.login('someone', 'newpw12345')).resolves.toMatchObject({ username: 'someone' });
+
+    expect((await call('/admin/api/set-password', { body: { userId: user.id, password: 'newpw67890' } })).status).toBe(404);
+  });
+
+  it('host 帳號不發救援碼；不存在的帳號回 404', async () => {
+    const host = auth.findByUsername('host')!;
+    expect((await call('/admin/api/issue-recovery-code', { body: { userId: host.id } })).status).toBe(400);
+    expect((await call('/admin/api/issue-recovery-code', { body: { userId: 999 } })).status).toBe(404);
   });
 
   it('角色查詢是唯讀的：列表、搜尋、明細', async () => {

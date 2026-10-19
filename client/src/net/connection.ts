@@ -46,6 +46,24 @@ export class GameConnection {
     });
   }
 
+  /** 設定視窗改密碼（§ 97.5）；失敗以錯誤訊息 reject */
+  async setPassword(current: string, password: string): Promise<void> {
+    await this.request(id => ({ t: 'set_password', id, current, password }));
+  }
+
+  /** 設定視窗產生救援碼（§ 97.5）；新碼經 `recovery_code` 進 store */
+  async regenerateRecoveryCode(current: string): Promise<void> {
+    await this.request(id => ({ t: 'regenerate_recovery_code', id, current }));
+  }
+
+  private request(build: (id: number) => ClientMessage): Promise<unknown> {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.send(build(id));
+    });
+  }
+
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4） */
   requestLeaderboard(top = 20): Promise<LeaderboardSnapshotView> {
     const id = this.nextId++;
@@ -60,6 +78,11 @@ export class GameConnection {
     this.send({ t: 'login', username, password });
   }
 
+  recover(code: string, password: string): void {
+    useOnlineStore.setState({ error: null });
+    this.send({ t: 'recover', code, password });
+  }
+
   register(username: string, password: string, inviteCode?: string): void {
     useOnlineStore.setState({ error: null });
     this.send({ t: 'register', username, password, inviteCode });
@@ -68,7 +91,7 @@ export class GameConnection {
   logout(): void {
     this.send({ t: 'logout' });
     writeSessionToken(null);
-    useOnlineStore.setState({ status: 'login', username: null, userId: null });
+    useOnlineStore.setState({ status: 'login', username: null, userId: null, hasRecoveryCode: false, recoveryCode: null });
   }
 
   private open(): void {
@@ -109,7 +132,7 @@ export class GameConnection {
         useOnlineStore.setState({ serverName: msg.serverName, serverVersion: msg.version, registration: msg.registration, worldMode: msg.mode });
         if (msg.autoLogin) {
           writeSessionToken(msg.autoLogin.token);
-          useOnlineStore.setState({ status: 'authed', username: msg.autoLogin.username, userId: msg.autoLogin.userId, hasPassword: false, isHost: msg.autoLogin.isHost });
+          useOnlineStore.setState({ status: 'authed', username: msg.autoLogin.username, userId: msg.autoLogin.userId, hasPassword: false, hasRecoveryCode: false, isHost: msg.autoLogin.isHost });
           this.send({ t: 'characters' });
           return;
         }
@@ -123,8 +146,14 @@ export class GameConnection {
         return;
       case 'auth_ok':
         writeSessionToken(msg.token);
-        useOnlineStore.setState({ status: 'authed', username: msg.username, userId: msg.userId, hasPassword: msg.hasPassword, isHost: msg.isHost, error: null });
+        useOnlineStore.setState({
+          status: 'authed', username: msg.username, userId: msg.userId, hasPassword: msg.hasPassword, hasRecoveryCode: msg.hasRecoveryCode, isHost: msg.isHost, error: null,
+          ...(msg.recoveryCode ? { recoveryCode: msg.recoveryCode } : {}),
+        });
         this.send({ t: 'characters' });
+        return;
+      case 'recovery_code':
+        useOnlineStore.setState({ recoveryCode: msg.code, hasRecoveryCode: true });
         return;
       case 'error': {
         if (msg.id !== undefined) {
@@ -137,7 +166,8 @@ export class GameConnection {
         }
         if (msg.code === 'session_expired') {
           writeSessionToken(null);
-          useOnlineStore.setState({ status: 'login', error: null });
+          // 改密碼撤銷了這條 session 時，回登入畫面要看得到原因（§ 97.5）
+          useOnlineStore.setState({ status: 'login', error: useOnlineStore.getState().kickedReason, kickedReason: null });
           return;
         }
         useOnlineStore.setState({ error: msg.message });

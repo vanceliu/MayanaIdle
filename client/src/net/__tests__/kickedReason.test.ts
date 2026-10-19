@@ -14,7 +14,7 @@ describe('踢除原因', () => {
     const handle = (msg: ServerMessage) => (conn as unknown as { handle(m: ServerMessage): void }).handle(msg);
 
     handle({ t: 'kicked', reason: '此帳號已在其他地方進入遊戲' });
-    handle({ t: 'auth_ok', token: 't', username: 'u', userId: 1, hasPassword: true, isHost: false });
+    handle({ t: 'auth_ok', token: 't', username: 'u', userId: 1, hasPassword: true, hasRecoveryCode: true, isHost: false });
 
     expect(useOnlineStore.getState().kickedReason).toBe('此帳號已在其他地方進入遊戲');
     expect(useOnlineStore.getState().error).toBeNull();

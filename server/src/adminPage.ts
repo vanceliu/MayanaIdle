@@ -165,14 +165,14 @@ function body() {
       ['open', 'invite', 'closed'].map(v => '<option value="' + v + '"' + (d.registration === v ? ' selected' : '') + '>' + v + '</option>').join('') +
       '</select><button onclick="doRegistration()">儲存</button>' +
       '<span class="hint">與設定頁的 registration 是同一個鍵</span></div>' +
-      '<table><tr><th>ID</th><th>帳號</th><th>角色數</th><th>狀態</th><th>新密碼</th><th></th></tr>' +
+      '<table><tr><th>ID</th><th>帳號</th><th>角色數</th><th>狀態</th><th></th></tr>' +
       d.users.map(u => '<tr><td>' + u.id + '</td><td>' + esc(u.username) + '</td>' +
         '<td>' + u.characters + '</td>' +
         '<td>' + (u.online ? '<span class="pill on">在線</span> ' : '') +
         (u.bannedUntil ? '<span class="pill warn">封鎖中</span>' : '') +
-        (u.hasPassword ? '' : ' <span class="pill">未設密碼</span>') + '</td>' +
-        '<td><input id="pw' + u.id + '" type="password" placeholder="至少 6 字"></td>' +
-        '<td><button onclick="doSetPassword(' + u.id + ')">重設密碼</button> ' +
+        (u.hasPassword ? '' : ' <span class="pill">未設密碼</span>') +
+        (u.hasPassword && !u.hasRecoveryCode ? ' <span class="pill">無救援碼</span>' : '') + '</td>' +
+        '<td>' + (u.hasPassword ? '<button onclick="doIssueRecoveryCode(' + u.id + ')">發救援碼</button> ' : '') +
         (u.bannedUntil ? '<button onclick="doUnban(' + u.id + ')">解除封鎖</button>' : '<button class="danger" onclick="doBan(' + u.id + ')">封鎖</button>') +
         '</td></tr>').join('') + '</table>';
   }
@@ -237,9 +237,11 @@ window.doMute = (characterId) => guard(async () => {
   load();
 });
 window.doUnmute = (characterId) => guard(async () => { await api('unmute', { characterId }); say('已解除禁言'); load(); });
-window.doSetPassword = (userId) => guard(async () => {
-  await api('set-password', { userId, password: el('#pw' + userId).value });
-  say('已重設密碼，玩家下次登入生效'); load();
+window.doIssueRecoveryCode = (userId) => guard(async () => {
+  const username = S.data.users.users.find(u => u.id === userId).username;
+  if (!confirm('發新救援碼給 ' + username + '？玩家原本的救援碼會立即失效。')) return;
+  const { code } = await api('issue-recovery-code', { userId });
+  say(username + ' 的救援碼：' + code + '（只顯示這一次）。請交給玩家，在登入畫面用「忘記密碼？」自行重設密碼'); load();
 });
 window.doRegistration = () => guard(async () => {
   await api('config/save', { values: { registration: el('#reg').value } });

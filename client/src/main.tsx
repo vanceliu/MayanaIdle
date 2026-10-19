@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
+import { RecoveryCodeModal } from './components/RecoveryCodeModal'
 import { initDisplaySettings } from './stores/settingsStore'
 import { registerServiceWorker } from './registerServiceWorker'
 
@@ -31,7 +32,7 @@ createRoot(document.getElementById('root')!).render(
             </Suspense>
           }
         />
-        <Route path="/*" element={<App />} />
+        <Route path="/*" element={<><App /><RecoveryCodeModal /></>} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
