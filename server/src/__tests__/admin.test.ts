@@ -121,7 +121,7 @@ describe('管理介面 API', () => {
   it('狀態總覽帶 tick 耗時、連線數與 SQLite 檔大小', async () => {
     const reply = await call('/admin/api/status');
     expect(reply.status).toBe(200);
-    expect(reply.body).toMatchObject({ version: 'test', online: 0, connections: 0, instances: 0, bind: '127.0.0.1' });
+    expect(reply.body).toMatchObject({ version: 'test', online: 0, connections: 0, instances: 0, bind: '0.0.0.0' });
     expect(reply.body.tick.avgMs).toBe(0.5);
     expect(reply.body.dbBytes).toBeGreaterThan(0);
   });

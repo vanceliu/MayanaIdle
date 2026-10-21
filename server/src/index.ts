@@ -237,7 +237,8 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
   if (staticSource) log.info(`前端 ${staticSource.describe}`);
   else log.warn('找不到前端 bundle，只提供 WebSocket 與 API（--static <dir> 指定）');
 
-  if (options.openBrowser !== false && config.autoOpenBrowser && hasGraphicalEnvironment() && staticSource) openBrowser(url);
+  const localUrl = `http://127.0.0.1:${config.port}${BASE_PATH}`;
+  if (options.openBrowser !== false && config.autoOpenBrowser && hasGraphicalEnvironment() && staticSource) openBrowser(localUrl);
 
   let closed = false;
   const close = async () => {
@@ -250,7 +251,6 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
     db.close();
   };
 
-  const localUrl = `http://127.0.0.1:${config.port}${BASE_PATH}`;
   return { url, localUrl, port: config.port, mode, dataDir, onlineCount: () => gameServer.onlineCount(), close };
 }
 

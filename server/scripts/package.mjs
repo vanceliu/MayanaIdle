@@ -3,11 +3,12 @@
  *
  * 流程：client dist ＋ server CJS bundle → SEA blob → 注入該平台的 node 執行檔。
  * 目標平台的 node 從官方 dist 下載後快取在 `server/.node-cache/`，
- * 所以在任何一台機器上都能一次產出三個平台的檔案；只有 macOS 的產物需要在 macOS 上簽章。
+ * 所以在任何一台機器上都能產出全部平台的檔案；只有 macOS 的產物需要在 macOS 上簽章。
+ * `linux-arm64` 給 64 位元的樹莓派等 ARM Linux 用；Node 24 官方沒有 32 位元 ARM 版。
  *
  *   node scripts/package.mjs                # 只打包目前這台機器的平台
- *   node scripts/package.mjs --all          # 三個平台都打
- *   node scripts/package.mjs --target linux-x64
+ *   node scripts/package.mjs --all          # 全部平台都打
+ *   node scripts/package.mjs --target linux-arm64
  */
 import { execFileSync } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
@@ -30,6 +31,7 @@ const NODE_VERSION = process.versions.node;
 
 const TARGETS = {
   'linux-x64': { archive: 'tar.gz', binary: 'bin/node', out: 'mayana-server-linux-x64' },
+  'linux-arm64': { archive: 'tar.gz', binary: 'bin/node', out: 'mayana-server-linux-arm64' },
   'darwin-arm64': { archive: 'tar.gz', binary: 'bin/node', out: 'mayana-server-macos-arm64' },
   'win-x64': { archive: 'zip', binary: 'node.exe', out: 'mayana-server-win-x64.exe' },
 };

@@ -7,7 +7,7 @@ import { parseArgs, DEFAULT_DATA_DIR } from '../index';
 describe('server.properties（97 § 97.2）', () => {
   it('缺鍵補預設並記錄', () => {
     const { config, filled, warnings } = buildConfig(parseProperties(''), '/data');
-    expect(config.bind).toBe('127.0.0.1');
+    expect(config.bind).toBe('0.0.0.0');
     expect(config.port).toBe(25580);
     expect(config.maxPlayers).toBe(50);
     expect(config.registration).toBe('open');

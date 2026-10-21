@@ -77,6 +77,9 @@ git tag 0.7.0-rc1 && git push origin 0.7.0-rc1
 | macOS（arm64） | `MayanaIdle-<版本>-mac-arm64.dmg` / `.zip` | `mayana-server-macos-arm64.tar.gz` |
 | Windows（x64） | `MayanaIdle-<版本>-win-x64.zip` | `mayana-server-win-x64.exe` |
 | Linux（x64） | `MayanaIdle-<版本>-linux-x64.tar.gz` | `mayana-server-linux-x64.tar.gz` |
+| Linux（arm64，樹莓派） | — | `mayana-server-linux-arm64.tar.gz` |
+
+Linux arm64 只出 server 執行檔，由 Linux runner 交叉打包（§ 4）。
 
 macOS 與 Linux 的 server 執行檔以 **tar.gz** 散布 —— 裸檔經 artifact zip 或 HTTP 下載一律掉
 Unix 權限位。Windows 沒有執行權限位，維持裸 `.exe`。
@@ -89,7 +92,7 @@ Unix 權限位。Windows 沒有執行權限位，維持裸 `.exe`。
 
 ```bash
 ./scripts/release.sh                # 只打這台機器的平台
-./scripts/release.sh --all-servers  # server 執行檔也打另外兩個平台（會下載對應的 node）
+./scripts/release.sh --all-servers  # server 執行檔也打其他平台，含 linux-arm64（會下載對應的 node）
 ./scripts/release.sh --skip-tests   # 略過測試
 ```
 
@@ -120,7 +123,8 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 |---|---|
 | 為什麼是 CJS | **SEA 只支援 CommonJS**。`server/scripts/build.mjs` 因此出兩份 bundle：`server.js`（ESM，原始碼執行用）與 `server.cjs`（打包用，相依全部內嵌） |
 | 前端怎麼進去 | `client/dist` 的每個檔案都是一個 SEA 資產，鍵是 `client/<相對路徑>`；`server/src/staticFiles.ts` 在 SEA 模式改讀資產，從原始碼跑則讀磁碟 |
-| 跨平台 | 目標平台的 node 由 `nodejs.org/dist` 下載並快取在 `server/.node-cache/`。CI 上每個 runner 只打自己的平台，所以用不到這個快取 |
+| 跨平台 | 目標平台的 node 由 `nodejs.org/dist` 下載並快取在 `server/.node-cache/`。CI 上每個 runner 打自己的平台；唯一例外是 Linux runner 另外交叉打包 `linux-arm64`（沒有對應的 runner） |
+| ARM | 只出 64 位元（`linux-arm64`）。Node 24 官方沒有 32 位元 ARM（armv7l）版，32 位元系統跑不起來 |
 | macOS 簽章 | 注入會破壞既有簽章，打包腳本會 `codesign --remove-signature` 再 ad-hoc 重簽。**在非 macOS 上打包的 macOS 執行檔無法簽章**，對方會被 Gatekeeper 擋下 |
 | Windows 簽章 | postject 會印 `The signature seems corrupted!` —— node.exe 的 Authenticode 簽章因注入而失效，屬預期。未簽章的執行檔仍可執行，但 SmartScreen 會警告 |
 | node 版本 | 取自打包機的 `process.versions.node`；CI 三個 runner 都用同一個 major（workflow 的 `NODE_VERSION`） |
@@ -154,7 +158,7 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 
 ### 5.2 server 執行檔（無視窗，給開站的人）
 
-三平台的參數與行為完全相同，差別只在怎麼取得執行權。
+各平台的參數與行為完全相同，差別只在怎麼取得執行權。
 
 **macOS（arm64）**
 
@@ -189,7 +193,54 @@ tar -xzf mayana-server-linux-x64.tar.gz
 無簽章機制，解開即可執行。無圖形環境（沒有 `DISPLAY` 與 `WAYLAND_DISPLAY`）時
 `auto-open-browser` 自動忽略（§ 97.2）。
 
-**三平台共通**
+**Linux（arm64，樹莓派）**
+
+只支援 **64 位元**系統（Pi 3B+／4／5 裝 64 位元 Raspberry Pi OS）。先確認：
+
+```bash
+uname -m        # 必須是 aarch64；armv7l 是 32 位元系統，跑不起來（§ 4）
+tar -xzf mayana-server-linux-arm64.tar.gz
+./mayana-server-linux-arm64 --data-dir ~/mayana-data
+```
+
+預設就是開放世界（`bind=0.0.0.0`），區網或外網的玩家可以直接連，各自註冊帳號。
+要管理介面，先在 `server.properties` 設 `admin-password`（留空即停用）。
+
+常駐用 systemd。以 `pi` 使用者、裝在 `/opt/mayana` 為例，
+寫入 `/etc/systemd/system/mayana.service`：
+
+```ini
+[Unit]
+Description=MayanaIdle server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+ExecStart=/opt/mayana/mayana-server-linux-arm64 --data-dir /opt/mayana/data
+Restart=always
+# graceful shutdown（flush 後關 DB）需要的時間
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now mayana
+journalctl -u mayana -f          # 看啟動輸出
+```
+
+更新版本：停服務 → 換掉執行檔 → 啟動。資料目錄不動。
+
+```bash
+sudo systemctl stop mayana
+tar -xzf mayana-server-linux-arm64.tar.gz -C /opt/mayana
+sudo systemctl start mayana
+```
+
+**全平台共通**
 
 ```bash
 ./mayana-server-macos-arm64 --data-dir ~/mayana-data
@@ -210,8 +261,11 @@ tar -xzf mayana-server-linux-x64.tar.gz
 
 | 形態 | 條件 | 行為 |
 |---|---|---|
-| 單機 | `bind` 是回送位址（預設 `127.0.0.1`） | 自動建立並登入 `host` 帳號，不顯示登入畫面 |
-| 開放 | `bind` 是其他位址（如 `0.0.0.0`） | 每個人自己註冊、自己設密碼 |
+| 開放 | `bind` 是非回送位址（**預設** `0.0.0.0`） | 每個人自己註冊、自己設密碼 |
+| 單機 | `bind` 是回送位址（`127.0.0.1`） | 自動建立並登入 `host` 帳號，不顯示登入畫面 |
+
+server 執行檔是給開站的人用的，所以預設開放。只想自己玩，在**首次啟動前**先建好資料目錄裡的
+`server.properties` 並寫入 `bind=127.0.0.1`，或改用桌面版。
 
 **形態一經建立即固定**（§ 97.1）：單機世界改 `bind` 想轉開放會**拒絕啟動**，
 要開開放世界請換一個乾淨的資料目錄。
@@ -311,7 +365,7 @@ server 執行檔已改以 tar.gz 散布（§ 3.1），舊版 Release 的裸檔�
 
 ### 6.7 開放世界連不進來
 
-NAT 與 port forwarding 要開服者自己開通（§ 97.9）；`bind` 要設成 `0.0.0.0`，
+NAT 與 port forwarding 要開服者自己開通（§ 97.9）；`bind` 要是 `0.0.0.0`（server 執行檔的預設），
 且防火牆放行 `port`（預設 25580）。
 
 ### 6.8 刪掉 seed 模板會讓既有裝備顯示異常

@@ -96,8 +96,12 @@ jobs:
       - run: npm run build
         working-directory: server
 
-      # server 執行檔：只打這台 runner 的平台（三個 runner 合起來就是三平台）
+      # server 執行檔：打這台 runner 的平台（三個 runner 合起來就是三平台）
       - run: node scripts/package.mjs
+        working-directory: server
+      # Linux arm64（樹莓派）沒有自己的 runner，由 Linux runner 交叉打包：下載同版本的 arm64 node 再注入
+      - run: node scripts/package.mjs --target linux-arm64
+        if: runner.os == 'Linux'
         working-directory: server
 
       - run: npm run package -- ${{ matrix.desktop }}
@@ -114,7 +118,7 @@ jobs:
           # macOS／Linux 的 server 執行檔以 tar.gz 散布：upload-artifact 的 zip 不保留
           # Unix 權限位，裸檔下載回來是 644。tar 保留權限位，解開即可執行。
           export COPYFILE_DISABLE=1
-          for name in mayana-server-macos-arm64 mayana-server-linux-x64; do
+          for name in mayana-server-macos-arm64 mayana-server-linux-x64 mayana-server-linux-arm64; do
             [ -f "server/release/$name" ] || continue
             tar -czf "dist-out/$name.tar.gz" -C server/release "$name"
           done

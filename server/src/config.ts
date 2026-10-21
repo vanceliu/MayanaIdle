@@ -93,7 +93,7 @@ const spec = <K extends keyof ServerConfig>(s: KeySpec<K>) => s as unknown as Ke
 
 export const CONFIG_SPECS: ReadonlyArray<KeySpec<keyof ServerConfig>> = [
   spec<'serverName'>({ key: 'server-name', field: 'serverName', timing: 'live', ui: { kind: 'text' }, default: () => 'MayanaIdle', parse: str, format: str }),
-  spec<'bind'>({ key: 'bind', field: 'bind', timing: 'restart', ui: { kind: 'text' }, default: () => '127.0.0.1', parse: (raw) => {
+  spec<'bind'>({ key: 'bind', field: 'bind', timing: 'restart', ui: { kind: 'text' }, default: () => '0.0.0.0', parse: (raw) => {
     if (!raw.trim()) throw new Error('bind: 不可為空');
     return raw.trim();
   }, format: str }),

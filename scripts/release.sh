@@ -6,7 +6,7 @@
 #
 # 用法：
 #   ./scripts/release.sh                本機平台的桌面版 ＋ server 執行檔
-#   ./scripts/release.sh --all-servers  server 執行檔也打其他兩個平台（需下載對應的 node）
+#   ./scripts/release.sh --all-servers  server 執行檔也打其他平台（含 linux-arm64，需下載對應的 node）
 #   ./scripts/release.sh --skip-tests   略過測試
 #
 set -euo pipefail

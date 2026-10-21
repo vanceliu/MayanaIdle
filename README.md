@@ -69,7 +69,7 @@ npm start
 
 | 鍵 | 預設 | 說明 |
 |---|---|---|
-| `bind` | `127.0.0.1` | `127.0.0.1` 為單機形態（本機自動登入）；改成 `0.0.0.0` 對外開放 |
+| `bind` | `0.0.0.0` | 預設對外開放；要單機形態（本機自動登入、不設密碼）改成 `127.0.0.1`，且須在首次啟動前改好 |
 | `port` | `25580` | 監聽埠 |
 | `registration` | `open` | `open`／`invite`／`closed` |
 | `admin-user` | `admin` | 管理介面的帳號，**不是遊戲帳號** |
@@ -106,7 +106,7 @@ server 與 desktop 用 `npm run typecheck`（會先產生 build 產物 `src/gene
 
 ## 發布
 
-兩種產物（server 執行檔、桌面版），三平台都出，流程見 `docs/RELEASE.md`。
+兩種產物（server 執行檔、桌面版），三平台都出；server 執行檔另出 Linux arm64（樹莓派），流程見 `docs/RELEASE.md`。
 **正式發布一律推版本號 tag 走 CI**，三個 runner 各自原生打包自己的平台：
 
 ```bash
@@ -118,7 +118,7 @@ git tag 0.7.8 && git push origin 0.7.8
 
 ```bash
 ./scripts/release.sh                 # server 執行檔 ＋ 桌面版 → server/release/、desktop/release/
-./scripts/release.sh --all-servers   # server 執行檔也打另外兩個平台
+./scripts/release.sh --all-servers   # server 執行檔也打其他平台（含樹莓派用的 linux-arm64）
 ```
 
 ## 專案結構
