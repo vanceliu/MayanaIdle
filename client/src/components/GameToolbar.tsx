@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SettingsModal } from './SettingsModal';
+import { LatencyIndicator } from './LatencyIndicator';
 
 /**
  * 系統按鈕（`47-mobile.md`）。
@@ -16,6 +17,7 @@ export function GameToolbar() {
 
   return (
     <div className="game-toolbar">
+      <LatencyIndicator />
       <button
         className="panel-dock-btn btn-settings"
         onClick={() => setSettingsOpen(true)}

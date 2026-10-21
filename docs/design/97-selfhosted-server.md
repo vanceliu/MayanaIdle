@@ -48,6 +48,7 @@
 | 單一可執行單元 | 不依賴外部 Redis / PostgreSQL |
 | 版本協商 | 握手時比兩個版本，**都必須完全相同**，任一不符即拒連並顯示需求版本：**協定版本**（`net/protocol.ts` 的 `PROTOCOL_VERSION`）擋訊息格式不相容，**發布版本**（`client/package.json` 的 `version`）擋格式相同但行為不同的 client。協定先判。發布版本這道不可省 —— 同格式、不同版本的 client 同時在線會產生難以追查的行為差異 |
 | client 無遊戲邏輯 | client 只做渲染、輸入與插值；所有判定在 server |
+| 連線心跳 | server 每 30 秒對每條連線送 WebSocket ping；上一輪的 ping 到下一輪仍沒收到 pong 即中斷連線，照一般斷線處理。收到 pong 時以 `latency` 訊息把往返毫秒數推給該連線（顯示見 `47-mobile.md` § 47.6）。間隔不可設定 |
 
 ### 發布形態
 

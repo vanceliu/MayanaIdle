@@ -118,6 +118,7 @@ export class GameConnection {
       this.socket = null;
       for (const p of this.pending.values()) p.reject(new Error('disconnected'));
       this.pending.clear();
+      useOnlineStore.setState({ latencyMs: null });
       const st = useOnlineStore.getState();
       if (this.closedByUser || st.status === 'version_mismatch') return;
       useOnlineStore.setState({ status: 'disconnected' });
@@ -190,6 +191,9 @@ export class GameConnection {
         }
         return;
       }
+      case 'latency':
+        useOnlineStore.setState({ latencyMs: msg.ms });
+        return;
       case 'kicked':
         useOnlineStore.setState({ error: msg.reason, kickedReason: msg.reason });
         return;

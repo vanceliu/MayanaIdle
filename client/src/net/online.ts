@@ -30,6 +30,8 @@ export interface OnlineState {
   /** 版本協商擋在哪一關；尚未被擋為 null */
   mismatchKind: VersionMismatchKind | null;
   requiredVersion: string | null;
+  /** 最近一次心跳量到的往返時間（ms）；尚未量到或已斷線為 null（§ 97.2） */
+  latencyMs: number | null;
 }
 
 export const useOnlineStore = create<OnlineState>(() => ({
@@ -50,6 +52,7 @@ export const useOnlineStore = create<OnlineState>(() => ({
   kickedReason: null,
   mismatchKind: null,
   requiredVersion: null,
+  latencyMs: null,
 }));
 
 export function isOnline(): boolean {

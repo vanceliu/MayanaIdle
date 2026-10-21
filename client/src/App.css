@@ -5815,6 +5815,20 @@ button.active {
   min-width: var(--tap-target);
 }
 
+/* 連線延遲：⚙ 左邊，分級顏色見 47-mobile.md § 47.6 */
+.latency-indicator {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.latency-indicator.is-good { color: var(--accent-success); }
+.latency-indicator.is-fair { color: var(--accent-gold); }
+.latency-indicator.is-poor { color: var(--accent-danger); }
+
 /* 設定視窗的分頁列與城鎮面板共用 `.shop-tabs`；左右內距與標題列、內容區同為 16px */
 .settings-tabs {
   margin-bottom: 0;

@@ -78,6 +78,8 @@ export type ServerMessage =
   | { t: 'leaderboard'; id?: number; snapshot: LeaderboardSnapshotView }
   /** server 公告（`97-selfhosted-server.md` § 97.8）：關服倒數這類全服訊息，不走聊天頻道 */
   | { t: 'notice'; text: string }
+  /** 連線心跳量到的往返時間（`97-selfhosted-server.md` § 97.2），毫秒 */
+  | { t: 'latency'; ms: number }
   | { t: 'kicked'; reason: string };
 
 /** 與 `services/leaderboardService.ts` 的 columnar 格式相同 */

@@ -17,6 +17,7 @@ import { registerBundledMaps } from './maps';
 import { createHttpServer } from './http';
 import { diskStatic, isPackaged, seaStatic, type StaticSource } from './staticFiles';
 import { GameServer } from './ws';
+import { startHeartbeat } from './heartbeat';
 import { TickLoop } from './tick';
 import { computeLeaderboard } from './leaderboard';
 import { createAdminHandler } from './admin';
@@ -200,6 +201,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
   // 傳輸層上限（聊天字數上限另見 `97-selfhosted-server.md` § 97.10 未定案）
   const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: 64 * 1024 });
   gameServer.attach(wss);
+  startHeartbeat(wss);
 
   /*
    * listen 失敗時 `WebSocketServer` 會把同一個錯誤再丟一次（它掛在 httpServer 上），

@@ -132,7 +132,7 @@
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
 | **自架私服（單機＝本機 server／開放＝對外 bind）** | `97-selfhosted-server.md` | 全文（定案） |
-| **`server.properties`（設定鍵／生效時機／headless）** | `97-selfhosted-server.md` | § 97.2 |
+| **`server.properties`（設定鍵／生效時機／headless）／連線心跳（ping／閒置斷線／latency 訊息）** | `97-selfhosted-server.md` | § 97.2 |
 | **帳號／host 帳號／session／同帳號重複進場／救援碼／登入嘗試限制** | `97-selfhosted-server.md` | § 97.5 |
 | **決定性要求（seeded PRNG／tick 時間／純函數）** | `97-selfhosted-server.md` | § 97.6 |
 | **地圖實例／隊伍怪物上限／怪物目標／掉落經驗分配** | `97-selfhosted-server.md` | § 97.7.1 |
@@ -150,6 +150,7 @@
 | **數量徽章（配色／字級／自動天賦只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
 | **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（由 `PanelDock.test.tsx` 把守） |
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
+| 右下角 ⚙／連線延遲顯示（ping 值／分級顏色） | `47-mobile.md` | § 47.6 |
 | **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
 | 裝備強化的成功／失敗演出 | `48-vfx.md` | § 48.4（機率與安定值見 `06-equipment.md` § 6.9~6.10） |
 | **特殊強化卷軸（＋／－）** | `06-equipment.md` | § 6.12（圖示描邊見 `34-ui-guidelines.md` § 34.13） |
@@ -260,7 +261,7 @@
   ←→ 38-map-control.md § 38.14（§ 97.7.1）
   ←→ 16-tech.md / 16-tech-frontend-architecture.md § 32.5 / § 32.6 / § 32.10
   ←→ 35-inventory-constraints.md § 35.17
-  ←→ 47-mobile.md § 47.9
+  ←→ 47-mobile.md § 47.6 / § 47.9
   ←→ 52-mailbox.md § 52.2.3 / § 52.2.4
   ←→ 15-excluded.md § 15.8 / 17-mvp-priority.md § 17.5
   ←  19-account-character.md § 19.9 全域倍率（§ 97.2 `server.properties`）
