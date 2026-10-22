@@ -57,9 +57,9 @@
 git tag 0.7.1 && git push origin 0.7.1
 ```
 
-推 tag 會跑：**核對 tag 與 `client/package.json` 版本** → 型別檢查 → 三個 workspace 的測試
-→ 三平台打包 → 建立 GitHub Release。基底版本對不上會直接中止（產物的版本號取自
-`package.json` 而不是 tag，不擋就會發出名不副實的一包）。
+推 tag 會跑兩條並行的 job：**核對 tag 與 `client/package.json` 版本** → 型別檢查 → 三個 workspace 的測試；
+以及三平台打包。兩者都成功才建立 GitHub Release。基底版本對不上即判失敗、不建 Release（產物的版本號取自
+`package.json` 而不是 tag，不擋就會發出名不副實的一包）；測試失敗時打包產物仍留在 Actions artifacts，不得當正式版散布。
 
 想先試跑就用預發布後綴，不必改 `package.json`：
 
@@ -135,6 +135,7 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 |---|---|
 | server 從哪來 | 打進主行程的 bundle 裡，**不另外帶一份 server 執行檔** —— Electron 的 Node 有 `node:sqlite` |
 | 前端從哪來 | 打包前把 `client/dist` 複製成 `desktop/client-dist`，隨 app 一起包進 asar |
+| 壓縮等級 | 封存檔（zip、tar.gz）一律等級 6，由 `desktop/scripts/package.mjs` 以 `ELECTRON_BUILDER_COMPRESSION_LEVEL` 指定（本機與 CI 相同） |
 | 為什麼要各平台原生打 | Windows 的 exe 資源編輯要 wine、Linux 的格式要對應環境；跨平台雖然出得來，但只有原生打的才是能簽章、能裝的正常產物 |
 
 ---

@@ -9,7 +9,8 @@ import { AuthError, type AuthService } from './auth';
 import { LoginThrottle } from './loginThrottle';
 import { clientAddress } from './clientAddress';
 import { isLoopbackBind, type ServerConfig } from './config';
-import { applyAutoMove, createPlayerSession, resetPatches, syncWorld, type PlayerSession } from './playerSession';
+import { applyAutoMove, createPlayerSession, syncWorld, type PlayerSession } from './playerSession';
+import { resetSync } from './sync';
 import { flush } from './tick';
 import { ACTION_ALLOWLIST, PROTOCOL_VERSION, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
 import { World } from './world';
@@ -294,15 +295,15 @@ export class GameServer {
         session.userId = null;
         session.username = null;
         session.token = null;
-        resetPatches(session);
+        resetSync(session);
         session.game.setState({ userId: null, characterList: [], phase: 'title' });
-        flush(session, []);
+        flush(session);
         return;
       }
       case 'characters': {
         this.requireUser(session);
         await session.game.getState().loadCharacterList();
-        flush(session, []);
+        flush(session);
         return;
       }
       case 'create_character': {
@@ -312,7 +313,7 @@ export class GameServer {
         if (this.deps.repo.nameTaken(msg.name)) throw new AuthError('name_taken', `名稱「${msg.name}」已經有人用了`);
         await this.enterGame(session, userId, () =>
           session.game.getState().createCharacter(msg.name, msg.className as ClassName, msg.bonusAttrs as unknown as Attributes, msg.appearance as never));
-        flush(session, []);
+        flush(session);
         return;
       }
       case 'select_character': {
@@ -320,7 +321,7 @@ export class GameServer {
         const owned = (await this.deps.repo.getCharacter(msg.id))?.userId === userId;
         if (!owned) throw new AuthError('not_owner', '不是你的角色');
         await this.enterGame(session, userId, () => session.game.getState().selectCharacter(msg.id));
-        flush(session, []);
+        flush(session);
         return;
       }
       case 'delete_character': {
@@ -329,7 +330,7 @@ export class GameServer {
         if (!owned) throw new AuthError('not_owner', '不是你的角色');
         await session.game.getState().deleteCharacter(msg.id);
         await session.game.getState().loadCharacterList();
-        flush(session, []);
+        flush(session);
         return;
       }
       case 'leave_character': {
@@ -340,7 +341,7 @@ export class GameServer {
         }
         await syncWorld(session);
         await session.game.getState().loadCharacterList();
-        flush(session, []);
+        flush(session);
         return;
       }
       case 'action': {
@@ -350,14 +351,14 @@ export class GameServer {
         if (msg.store === 'party') {
           const result = await this.world.handlePartyAction(session, msg.name, msg.args ?? []);
           if (result.message) session.party.setState({ message: result.message });
-          flush(session, []);
+          flush(session);
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
           return;
         }
         if (msg.store === 'trade') {
           const result = await this.world.handleTradeAction(session, msg.name, msg.args ?? []);
           if (result.message) session.trade.setState({ message: result.message });
-          flush(session, []);
+          flush(session);
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
           return;
         }
@@ -376,7 +377,7 @@ export class GameServer {
         const result = await (fn as (...a: unknown[]) => unknown)(...(msg.args ?? []));
         await syncWorld(session);
         applyAutoMove(session);
-        flush(session, []);
+        flush(session);
         if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result === undefined ? null : result });
         return;
       }

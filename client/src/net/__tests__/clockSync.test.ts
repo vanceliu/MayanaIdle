@@ -10,7 +10,7 @@ import { TICK_MS, setClockSource } from '../../core/clock';
 import type { ServerMessage } from '../protocol';
 
 function heartbeat(now: number): ServerMessage {
-  return { t: 'combat', now, instances: [], targetMonsterId: null, cast: {} };
+  return { t: 'frame', now };
 }
 
 describe('線上模式對時', () => {

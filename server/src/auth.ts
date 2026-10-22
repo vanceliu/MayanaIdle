@@ -26,13 +26,29 @@ export function validUsername(name: string): boolean {
   return USERNAME_RE.test(name);
 }
 
+export interface PasswordHashCost {
+  iterations: number;
+  /** KiB */
+  memorySize: number;
+}
+
+/** 正式參數 */
+export const PASSWORD_HASH_COST: PasswordHashCost = { iterations: 3, memorySize: 65536 };
+
+let hashCost: PasswordHashCost = PASSWORD_HASH_COST;
+
+/** 只供測試 setup 降低成本；雜湊字串自帶參數，驗證不受影響 */
+export function setPasswordHashCost(cost: PasswordHashCost): void {
+  hashCost = cost;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return argon2id({
     password,
     salt: randomBytes(16),
     parallelism: 1,
-    iterations: 3,
-    memorySize: 65536,
+    iterations: hashCost.iterations,
+    memorySize: hashCost.memorySize,
     hashLength: 32,
     outputType: 'encoded',
   });

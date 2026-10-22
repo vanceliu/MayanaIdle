@@ -26,9 +26,16 @@ const platform = targets.length > 0 ? targets : [HOST_FLAG[process.platform] ?? 
 console.log(`打包版本 ${version}（取自 client/package.json）`);
 // Windows 的 bin 是 .cmd，直接叫沒有副檔名的那個會找不到
 const bin = process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder';
+// 封存檔（zip、tar.gz）壓縮等級；electron-builder 預設 tar.gz 用 9
+const COMPRESSION_LEVEL = '6';
 const result = spawnSync(
   join(desktopRoot, 'node_modules', '.bin', bin),
   [...platform, `-c.extraMetadata.version=${version}`],
-  { cwd: desktopRoot, stdio: 'inherit', shell: process.platform === 'win32' },
+  {
+    cwd: desktopRoot,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+    env: { ...process.env, ELECTRON_BUILDER_COMPRESSION_LEVEL: COMPRESSION_LEVEL },
+  },
 );
 process.exit(result.status ?? 1);

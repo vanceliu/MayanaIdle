@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetTestDb } from '../../testing/testDb';
 import { useGameStore, INN_PRICES } from '../gameStore';

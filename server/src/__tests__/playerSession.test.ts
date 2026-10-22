@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { openDatabase, migrate } from '../db/sqlite';
 import { SqliteRepository } from '../db/sqliteRepository';
 import { defaultSession } from '../../../client/src/stores/session';
-import { createPlayerSession, syncWorld, collectPatches, type PlayerSession } from '../playerSession';
+import { createPlayerSession, syncWorld, type PlayerSession } from '../playerSession';
+import { collectStoreDeltas } from '../sync';
 import { gameLoopTick } from '../../../client/src/systems/gameLoop';
 import { tickCombat } from '../../../client/src/systems/combatLoop';
 import type { ServerMessage } from '../../../client/src/net/protocol';
@@ -41,12 +42,11 @@ describe('PlayerSession（97 § 97.6 一連線一會話）', () => {
   });
 
   it('delta 只含變動的頂層鍵', async () => {
-    const first = collectPatches(session);
-    expect(first.find(p => p.store === 'game')?.data).toHaveProperty('phase');
-    expect(collectPatches(session)).toEqual([]);
+    const first = collectStoreDeltas(session);
+    expect(first?.game?.set).toHaveProperty('phase');
+    expect(collectStoreDeltas(session)).toBeNull();
     session.game.setState({ searchMode: 'manual' });
-    const next = collectPatches(session);
-    expect(next).toEqual([{ store: 'game', data: { searchMode: 'manual' } }]);
+    expect(collectStoreDeltas(session)).toEqual({ game: { set: { searchMode: 'manual' } } });
   });
 
   it('換區時重新載圖', async () => {

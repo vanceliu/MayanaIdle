@@ -1,12 +1,11 @@
 /**
  * 300ms 全服 tick（`97-selfhosted-server.md` § 97.3、§ 97.6）：時鐘推進一次，
- * 每實例與每玩家的兩層由 `World.tick` 推進，再逐 session 推送 delta。
+ * 每實例與每玩家的兩層由 `World.tick` 推進，再逐 session 推送一則 `frame`（§ 97.2「狀態同步」）。
  * 輸出 tick 耗時監控（平均／p99／超時次數）。
  */
-import { TICK_MS, gameNow } from '../../client/src/core/clock';
-import { castProgress } from '../../client/src/systems/monsterCombatFSM';
-import { collectPatches, syncWorld, type PlayerSession } from './playerSession';
-import type { CombatInstanceView } from '../../client/src/net/protocol';
+import { TICK_MS } from '../../client/src/core/clock';
+import { syncWorld, type PlayerSession } from './playerSession';
+import { buildFrame } from './sync';
 import type { World } from './world';
 import { log } from './log';
 
@@ -60,7 +59,7 @@ export class TickLoop {
       const visuals = this.world.tick();
       for (const session of this.world.sessions) {
         try {
-          flush(session, visuals.get(session) ?? []);
+          flushTick(session, visuals.get(session) ?? []);
         } catch (e) {
           log.error(`flush session #${session.connectionId} failed`, e);
         }
@@ -77,24 +76,14 @@ export class TickLoop {
   }
 }
 
-export function flush(session: PlayerSession, visuals: unknown[]): void {
-  for (const p of collectPatches(session)) session.send({ t: 'patch', store: p.store, data: p.data });
-  if (session.game.getState().character) {
-    const { engine, monsterInstances } = session.combat;
-    const instances: CombatInstanceView[] = [];
-    for (const [id, inst] of monsterInstances) {
-      instances.push({
-        id, name: inst.name, level: inst.level, currentHp: inst.currentHp, maxHp: inst.maxHp,
-        isBoss: inst.isBoss, element: inst.element, attackType: inst.attackType,
-        isTrainingDummy: inst.isTrainingDummy,
-      });
-    }
-    const cast: Record<string, number> = {};
-    for (const [id, m] of engine.monsters) {
-      const p = castProgress(m.combatCtx);
-      if (p !== null && p !== undefined) cast[id] = p as number;
-    }
-    session.send({ t: 'combat', now: gameNow(), instances, targetMonsterId: engine.playerCtx.targetMonsterId ?? null, cast });
-  }
-  if (visuals.length > 0) session.send({ t: 'visuals', events: visuals });
+/** 操作回應的推送：只帶 store 變動 */
+export function flush(session: PlayerSession): void {
+  const frame = buildFrame(session, null);
+  if (frame) session.send(frame);
+}
+
+/** tick 推送：帶 `now`、怪物戰鬥狀態與演出 */
+export function flushTick(session: PlayerSession, visuals: unknown[]): void {
+  const frame = buildFrame(session, { visuals });
+  if (frame) session.send(frame);
 }

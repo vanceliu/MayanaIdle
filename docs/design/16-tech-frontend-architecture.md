@@ -8,7 +8,7 @@
 | 建置工具 | Vite | 8 | 開發伺服器 + 打包 |
 | 語言 | TypeScript | 6 | 型別安全 |
 | 狀態管理 | Zustand | 5 | 全域狀態（單一 store） |
-| 測試 | Vitest + Testing Library | — | 單元 / 組件測試 |
+| 測試 | Vitest + Testing Library | — | 單元 / 組件測試。`*.test.ts` 跑 node 環境，需要 DOM 的在檔頭標 `// @vitest-environment jsdom`；`*.test.tsx` 跑 jsdom |
 | 樣式 | 純 CSS + Design Token | — | 無 Tailwind、無 CSS-in-JS |
 
 ---
@@ -376,7 +376,7 @@ interface BagItem {
 ## 32.5 資料流
 
 ```
-┌──────────────┐   patch / RPC（WebSocket）  ┌──────────────────┐
+┌──────────────┐   frame / RPC（WebSocket）  ┌──────────────────┐
 │ server        │ ←──────────────────────────→│  Zustand Store   │
 │ (SQLite＋判定)│                             │  （鏡像）        │
 └──────────────┘                             └────────┬─────────┘

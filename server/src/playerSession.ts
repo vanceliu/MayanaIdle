@@ -16,7 +16,8 @@ import { createCombatState, loadAreaTemplates, resetCombat } from '../../client/
 import { attachInstance, createMapInstance } from '../../client/src/systems/mapInstance';
 import { getRegion, getFloor } from '../../client/src/models/mapData';
 import type { GameRepository } from '../../client/src/db/repository';
-import type { ServerMessage, StoreKey } from '../../client/src/net/protocol';
+import type { ServerMessage } from '../../client/src/net/protocol';
+import { createSyncState, type SyncState } from './sync';
 
 /** 世界層的回呼（`world.ts`）：進出地圖時安置到正確的實例 */
 export interface WorldHooks {
@@ -37,8 +38,8 @@ export interface PlayerSession extends Session {
   send: (msg: ServerMessage) => void;
   /** 由 `ws.ts` 在連線建立時掛上；管理介面踢除連線用 */
   close: (code: number, reason: string) => void;
-  /** 上次推送給 client 的各 store 頂層值，delta 以參照比對 */
-  lastSent: Record<StoreKey, Record<string, unknown>>;
+  /** 上次推送給 client 的內容（`sync.ts`） */
+  sync: SyncState;
   /** 已載入的地圖鍵（region|floor），用來偵測換區 */
   loadedWorldKey: string | null;
   worldLoading: boolean;
@@ -57,7 +58,7 @@ export function createPlayerSession(repo: GameRepository, remoteAddress: string,
     clientAddress: remoteAddress,
     send,
     close: (() => {}) as PlayerSession['close'],
-    lastSent: { game: {}, mapControl: {}, mapMonster: {}, talent: {}, mailbox: {}, party: {}, trade: {} },
+    sync: createSyncState(),
     loadedWorldKey: null,
     worldLoading: false,
     repo,
@@ -147,31 +148,4 @@ export function applyAutoMove(session: PlayerSession): void {
   } else if (gs.phase !== 'combat') {
     session.mapControl.getState().setAutoMove(false);
   }
-}
-
-const MIRRORED: StoreKey[] = ['game', 'mapControl', 'mapMonster', 'talent', 'mailbox', 'party', 'trade'];
-
-/** 各 store 頂層鍵以參照比對，只推送變動的鍵；函式不推送 */
-export function collectPatches(session: PlayerSession): Array<{ store: StoreKey; data: Record<string, unknown> }> {
-  const patches: Array<{ store: StoreKey; data: Record<string, unknown> }> = [];
-  for (const key of MIRRORED) {
-    const state = session[key].getState() as unknown as Record<string, unknown>;
-    const last = session.lastSent[key];
-    const data: Record<string, unknown> = {};
-    let changed = false;
-    for (const [k, v] of Object.entries(state)) {
-      if (typeof v === 'function') continue;
-      if (last[k] !== v) {
-        data[k] = v;
-        last[k] = v;
-        changed = true;
-      }
-    }
-    if (changed) patches.push({ store: key, data });
-  }
-  return patches;
-}
-
-export function resetPatches(session: PlayerSession): void {
-  session.lastSent = { game: {}, mapControl: {}, mapMonster: {}, talent: {}, mailbox: {}, party: {}, trade: {} };
 }

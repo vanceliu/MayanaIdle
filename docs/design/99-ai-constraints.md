@@ -30,7 +30,29 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
-目前沒有進行中的計畫。
+### 線上狀態同步瘦身（`97-selfhosted-server.md` § 97.2「狀態同步」）
+
+規格：每次推送一則 `frame`（`now` 僅 tick 推送帶）；store 欄位分 `set`／`merge`／`append`；
+`game.combatLogs` 走 append、`game.character` 走 merge、`mapMonster.monsters` 只送顯示欄位且內容不變不送；
+`combat` 只送新怪完整資料、變動血量、變動的目標與詠唱；`PROTOCOL_VERSION` 升 `'3'`。
+
+- [x] P1 共用 codec（`client/src/net/syncCodec.ts`）＋ 單元測試
+- [x] P2 server：`collectPatches` 改欄位編碼、`flush` 改單一 `frame`、combat delta；`resetPatches` 一併清；測試
+- [x] P3 client：`mirror.ts` 套用 `frame`、怪物還原與 prev 位置；`clockSync` 測試改寫；新增套用測試
+- [x] P4 `npx tsc -b`、client／server vitest 全綠；60 秒流量量測前後對照
+- [x] P5 文件：97 § 97.2 狀態同步、§ 97.3 備案清單、`INDEX.md`
+
+### CI 測試與打包提速（`docs/RELEASE.md`）
+
+規格：client `*.test.ts` 用 node 環境、`*.test.tsx` 與標註 `@vitest-environment jsdom` 的檔用 jsdom；
+server 測試的 argon2 用最低成本（正式參數不變）；桌面版封存壓縮等級 6；打包與測試並行，Release 等兩者。
+地圖測試條件執行不做。
+
+- [x] C1 client vitest 拆 node／jsdom 兩個 project，需要 DOM 的 `.ts` 測試加標註；全綠
+- [x] C2 server `setPasswordHashCost()` ＋ 測試 setup 降成本；全綠
+- [x] C3 `package.mjs` 壓縮等級 6
+- [x] C4 `release.yml`：`build` 不等 `test`，`release` 等 `test` 與 `build`
+- [x] C5 `docs/RELEASE.md` 同步；量測前後對照
 
 跨多次對話的實作**開工前**先在這裡寫下定案規格與分階段清單（見 `CLAUDE.md`）：
 中斷後靠它接續，全部完成並經使用者確認後刪除。

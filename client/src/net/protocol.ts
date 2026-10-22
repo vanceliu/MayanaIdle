@@ -2,6 +2,8 @@
  * client 與 server 共用的 WebSocket 訊息（JSON）。版本協商見 `97-selfhosted-server.md` § 97.2。
  * 唯一出處；server 以相對路徑引用。
  */
+import type { TrainingDummySpec } from '../models/trainingGround';
+
 export type StoreKey = 'game' | 'mapControl' | 'mapMonster' | 'talent' | 'mailbox' | 'party' | 'trade';
 
 /** 聊天頻道（`97-selfhosted-server.md` § 97.7.2） */
@@ -23,7 +25,7 @@ export interface ChatMessageView {
  *
  * 版本協商**兩個都要比**：協定版本擋格式不相容，發布版本擋同格式但行為不同的 client。
  */
-export const PROTOCOL_VERSION = '2';
+export const PROTOCOL_VERSION = '3';
 
 /** 版本協商擋在哪一關（`97-selfhosted-server.md` § 97.2） */
 export type VersionMismatchKind = 'protocol' | 'release';
@@ -69,10 +71,11 @@ export type ServerMessage =
   | { t: 'auth_ok'; token: string; username: string; userId: number; hasPassword: boolean; hasRecoveryCode: boolean; isHost: boolean; recoveryCode?: string }
   | { t: 'recovery_code'; code: string }
   | { t: 'error'; code: string; message: string; id?: number }
-  | { t: 'patch'; store: StoreKey; data: Record<string, unknown> }
-  /** 每個 tick 的心跳。`now` 是 server 的遊戲時間（`core/clock.ts` 的 `gameNow()`），client 用它對時 */
-  | { t: 'combat'; now: number; instances: CombatInstanceView[]; targetMonsterId: string | null; cast: Record<string, number> }
-  | { t: 'visuals'; events: unknown[] }
+  /**
+   * 狀態同步（`97-selfhosted-server.md` § 97.2「狀態同步」）：一次推送一則。
+   * `now` 只有 tick 推送帶，是 server 的遊戲時間（`core/clock.ts` 的 `gameNow()`），client 用它對時與插值。
+   */
+  | { t: 'frame'; now?: number; stores?: Partial<Record<StoreKey, StoreDelta>>; combat?: CombatDelta; visuals?: unknown[] }
   | { t: 'action_ok'; id: number; result: unknown }
   | { t: 'chat'; message: ChatMessageView }
   | { t: 'leaderboard'; id?: number; snapshot: LeaderboardSnapshotView }
@@ -88,6 +91,45 @@ export interface LeaderboardSnapshotView {
   count: number;
   fields: string[];
   rows: (string | number | null)[][];
+}
+
+/** 單一 store 的變動；同一欄位只會出現在其中一類 */
+export interface StoreDelta {
+  /** 整值取代 */
+  set?: Record<string, unknown>;
+  /** 物件欄位：只含變動的子鍵，client 併入現值 */
+  merge?: Record<string, Record<string, unknown>>;
+  /** 陣列欄位：只含尾端新增的元素，client 接上後保留最後 `length` 筆 */
+  append?: Record<string, AppendDelta>;
+}
+
+export interface AppendDelta {
+  items: unknown[];
+  length: number;
+}
+
+/** `mapMonster.monsters` 的線上格式：只含顯示用欄位 */
+export interface MonsterWire {
+  id: string;
+  position: { x: number; y: number };
+  isBoss: boolean;
+  attackRange?: number;
+  dummy?: TrainingDummySpec;
+}
+
+/** 怪物戰鬥狀態的變動 */
+export interface CombatDelta {
+  /** 先清空 client 的怪物實例再套用（session 的第一則） */
+  full?: true;
+  /** 新出現或最大血量變動的怪物，完整資料 */
+  add?: CombatInstanceView[];
+  /** 目前血量有變動的怪物 */
+  hp?: Record<string, number>;
+  remove?: string[];
+  /** 有此鍵才更新 */
+  target?: string | null;
+  /** 有此鍵才整份取代 */
+  cast?: Record<string, number>;
 }
 
 export interface CombatInstanceView {

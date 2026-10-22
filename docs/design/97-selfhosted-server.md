@@ -148,6 +148,21 @@ server 的所有可調項目只有這一個來源。檔案位於資料目錄，`
 | `SIGTERM`／`SIGINT` | graceful shutdown：拒新連線 → 全玩家強制 flush（§ 97.4）→ 關閉 SQLite → 結束。**訊號是立即執行**；管理介面的那顆按鈕另有 60 秒倒數（§ 97.8） |
 | 服務化 | 以 systemd、Docker 等外層工具常駐，server 本身不做 daemon 化與自動重啟 |
 
+### 狀態同步
+
+server → client 的遊戲狀態一律走 `frame` 訊息（`net/protocol.ts`），編碼與還原共用 `net/syncCodec.ts`。
+
+| 規則 | 內容 |
+|---|---|
+| 一次推送一則 | 每個 tick 對每條連線最多送一則 `frame`；操作回應的推送也是一則 |
+| tick 推送 | 帶 `now`（遊戲時間）、怪物戰鬥變動、演出；有角色時每個 tick 必送，作為 client 對時與插值的心跳 |
+| 操作回應推送 | 只帶 store 變動，不帶 `now`；沒有變動不送 |
+| store 變動 | 各 store 頂層欄位以參照比對，只送變動的欄位；`merge`／`append` 欄位改與上次送出時的淺拷貝比對（遊戲邏輯會就地改寫角色欄位） |
+| 欄位編碼 | 預設整值取代（`set`）。`game.character` 只送變動的子欄位（`merge`）；`game.combatLogs` 只送尾端新增的筆數並附總筆數（`append`）。不符合條件（子欄位被移除、陣列整份換掉）時改送整值 |
+| 怪物位置 | `mapMonster.monsters` 只送 `id`、`position`、`isBoss`、`attackRange`、`dummy`，內容不變不送。`prevPosition` 由 client 以上一次收到的位置推得；tick 推送沒有怪物更新時，client 把 `prevPosition` 對齊目前位置 |
+| 怪物戰鬥 | 新出現或最大血量變動的怪物送完整資料；之後只送變動的目前血量、移除的 id；目標與詠唱進度只在變動時送。session 的第一則帶 `full`，client 先清空再套用 |
+| 重送完整狀態 | 登出時清掉該 session 的已送紀錄，下一則推送送完整狀態；重連是新 session，同樣從完整狀態開始 |
+
 ---
 
 ## 97.3 規模
@@ -166,13 +181,12 @@ server 的所有可調項目只有這一個來源。檔案位於資料目錄，`
 單一 tick 無法完成全服計算時，依序採用：
 
 1. tick slot 分攤 —— 玩家分配到固定 slot，單一 tick 只處理該 slot
-2. delta push 合批 —— 同一 tick 內多筆變更合併成單次送出
-3. in-process 事件排程 —— 以最小堆排「下次觸發時間」取代逐 tick 掃描，不使用 Redis
-4. `worker_threads` 分片 —— 每個 worker 負責一段玩家，SQLite 寫入集中於主執行緒
+2. in-process 事件排程 —— 以最小堆排「下次觸發時間」取代逐 tick 掃描，不使用 Redis
+3. `worker_threads` 分片 —— 每個 worker 負責一段玩家，SQLite 寫入集中於主執行緒
 
 ### 頻寬
 
-上行需求以 `98-online-architecture.md` § 10 的 1~2 KB/s/人 估算。開服者上行頻寬為開放形態的硬性門檻。
+上行需求以 `98-online-architecture.md` § 10 的 1~2 KB/s/人 估算。開服者上行頻寬為開放形態的硬性門檻。推送格式見 § 97.2「狀態同步」。
 
 ---
 

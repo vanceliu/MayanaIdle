@@ -1,5 +1,5 @@
 /**
- * store 鏡像：server 推送的 `patch` 直接 `setState` 進 client 的 store，
+ * store 鏡像：server 推送的 `frame` 還原後 `setState` 進 client 的 store，
  * store 上的 action 換成 RPC 代理（`97-selfhosted-server.md` § 97.2：client 無遊戲邏輯）。
  */
 import type { StoreApi } from 'zustand';
@@ -8,7 +8,11 @@ import { defaultSession } from '../stores/session';
 import type { GameState } from '../stores/gameStore';
 import { createCombatState } from '../systems/combatLoop';
 import type { CombatVisual } from '../systems/combatLoop';
-import { ACTION_ALLOWLIST, type ActionStore, type ServerMessage, type StoreKey } from './protocol';
+import {
+  ACTION_ALLOWLIST, type ActionStore, type CombatDelta, type MonsterWire, type ServerMessage, type StoreDelta, type StoreKey,
+} from './protocol';
+import { FIELD_ENCODING, applyAppend, fromMonsterWire } from './syncCodec';
+import type { MapMonster } from '../stores/mapMonsterStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNoticeStore } from '../stores/noticeStore';
 import { TICK_MS, setClockSource } from '../core/clock';
@@ -17,8 +21,8 @@ import type { GameConnection } from './connection';
 /**
  * 上次收到 server tick 的時間（渲染插值用）。
  *
- * 心跳是 `combat` 訊息 —— 它每個 tick 都送（有角色時），而 `patch` 只在值有變才送。
- * 綁在 `mapControl` 的位置上會出現：玩家站著不動 → 沒有位置 patch → `alpha` 卡在 1 →
+ * 心跳是帶 `now` 的 tick `frame` —— 它每個 tick 都送（有角色時），而位置只在值有變才送。
+ * 綁在 `mapControl` 的位置上會出現：玩家站著不動 → 沒有位置更新 → `alpha` 卡在 1 →
  * 怪物每個 tick 直接跳一格的距離（看起來就是每 300ms 位移幾個 px 的頓挫）。
  */
 let lastTickAt = 0;
@@ -57,40 +61,69 @@ function storeOf(key: StoreKey): StoreApi<object> {
   return defaultSession[key] as unknown as StoreApi<object>;
 }
 
+function applyStoreDelta(key: StoreKey, delta: StoreDelta): void {
+  const store = storeOf(key);
+  const current = store.getState() as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(delta.set ?? {})) {
+    next[field] = FIELD_ENCODING[key]?.[field] === 'monsters'
+      ? fromMonsterWire(value as MonsterWire[], current[field] as MapMonster[])
+      : value;
+  }
+  for (const [field, diff] of Object.entries(delta.merge ?? {})) {
+    next[field] = { ...(current[field] as Record<string, unknown>), ...diff };
+  }
+  for (const [field, append] of Object.entries(delta.append ?? {})) {
+    next[field] = applyAppend(current[field] as unknown[] | undefined, append);
+  }
+  store.setState(next);
+}
+
+/** 這個 tick 沒有怪物位置更新：怪物沒動，插值起點對齊目前位置 */
+function settleMonsterPrevPositions(): void {
+  const store = defaultSession.mapMonster;
+  const monsters = store.getState().monsters;
+  if (!monsters.some(m => m.prevPosition !== m.position)) return;
+  store.setState({ monsters: monsters.map(m => ({ ...m, prevPosition: m.position })) });
+}
+
+function applyCombatDelta(delta: CombatDelta): void {
+  const combat = defaultSession.combat ?? (defaultSession.combat = createCombatState());
+  if (delta.full) combat.monsterInstances.clear();
+  for (const v of delta.add ?? []) {
+    combat.monsterInstances.set(v.id, {
+      templateId: 0, name: v.name, level: v.level, currentHp: v.currentHp, maxHp: v.maxHp,
+      attackMin: 0, attackMax: 0, defense: 0, exp: 0, race: 'normal', size: 'small',
+      element: v.element, isBoss: v.isBoss, attackType: v.attackType, attackRange: 1.5, attackInterval: 1200,
+      isTrainingDummy: v.isTrainingDummy,
+    } as MonsterInstance);
+  }
+  for (const [id, hp] of Object.entries(delta.hp ?? {})) {
+    const existing = combat.monsterInstances.get(id);
+    if (existing) existing.currentHp = hp;
+  }
+  for (const id of delta.remove ?? []) combat.monsterInstances.delete(id);
+  if (delta.target !== undefined) combat.engine.playerCtx.targetMonsterId = delta.target;
+  if (delta.cast !== undefined) castByMonster = delta.cast;
+}
+
+/** 狀態同步（`97-selfhosted-server.md` § 97.2「狀態同步」） */
+function applyFrame(frame: Extract<ServerMessage, { t: 'frame' }>): void {
+  for (const [key, delta] of Object.entries(frame.stores ?? {})) applyStoreDelta(key as StoreKey, delta);
+  if (frame.now !== undefined) {
+    // tick 推送是插值與對時的原點
+    lastTickAt = performance.now();
+    serverNow = frame.now;
+    if (!frame.stores?.mapMonster?.set?.monsters) settleMonsterPrevPositions();
+  }
+  if (frame.combat) applyCombatDelta(frame.combat);
+  if (frame.visuals) visualQueue.push(...(frame.visuals as CombatVisual[]));
+}
+
 export function applyServerMessage(msg: ServerMessage): void {
   switch (msg.t) {
-    case 'patch': {
-      storeOf(msg.store).setState(msg.data as object);
-      return;
-    }
-    case 'combat': {
-      // 每個 tick 的最後一則訊息（`server/src/tick.ts` 的 `flush`），拿它當插值與對時的原點
-      lastTickAt = performance.now();
-      serverNow = msg.now;
-      const combat = defaultSession.combat ?? (defaultSession.combat = createCombatState());
-      const seen = new Set<string>();
-      for (const v of msg.instances) {
-        seen.add(v.id);
-        const existing = combat.monsterInstances.get(v.id);
-        if (existing) {
-          existing.currentHp = v.currentHp;
-          existing.maxHp = v.maxHp;
-        } else {
-          combat.monsterInstances.set(v.id, {
-            templateId: 0, name: v.name, level: v.level, currentHp: v.currentHp, maxHp: v.maxHp,
-            attackMin: 0, attackMax: 0, defense: 0, exp: 0, race: 'normal', size: 'small',
-            element: v.element, isBoss: v.isBoss, attackType: v.attackType, attackRange: 1.5, attackInterval: 1200,
-            isTrainingDummy: v.isTrainingDummy,
-          } as MonsterInstance);
-        }
-      }
-      for (const id of [...combat.monsterInstances.keys()]) if (!seen.has(id)) combat.monsterInstances.delete(id);
-      combat.engine.playerCtx.targetMonsterId = msg.targetMonsterId;
-      castByMonster = msg.cast;
-      return;
-    }
-    case 'visuals':
-      visualQueue.push(...(msg.events as CombatVisual[]));
+    case 'frame':
+      applyFrame(msg);
       return;
     case 'chat':
       useChatStore.getState().receive(msg.message);
