@@ -223,7 +223,7 @@ export function AffixesPage() {
         <p style={{ ...noteStyle, marginTop: 0, marginBottom: 4 }}>
           {CATEGORIES.map(c => `${c.label}＝${c.slots}`).join('；')}。
           <br />
-          飾品的裝備類型與一般防具同為「防具」，但詞綴池獨立，可額外帶魔法抗性；
+          飾品的裝備類型與一般防具同為「防具」，但詞綴池獨立：可額外帶魔法抗性，不會出現防禦力；
           魔導書與臂甲雖佔左手欄位，詞綴池與一般防具相同（不含任何攻擊詞綴）。
         </p>
         {groups.map(g => (

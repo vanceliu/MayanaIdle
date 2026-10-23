@@ -27,6 +27,17 @@ describe('飾品詞綴分類（§ 7.6）', () => {
     expect(getAffixCategoryForSlot('ring2', 'armor')).toBe('accessory');
   });
 
+  it('飾品詞綴池不含防禦力', () => {
+    expect(getAffixPoolForSlot('accessory').map(d => d.type)).not.toContain('defense');
+
+    // 實際生成 200 件飾品也不該出現防禦力（Lv.60 Boss 掉落）
+    for (let i = 0; i < 200; i++) {
+      for (const affix of generateAffixes('accessory', 60, 4, true)) {
+        expect(affix.type).not.toBe('defense');
+      }
+    }
+  });
+
   it('魔導書的詞綴池不含任何攻擊詞綴（§ 7.6）', () => {
     const OFFENSIVE = [
       'attack_power', 'element_brand', 'skill_elemental',
@@ -69,8 +80,8 @@ describe('飾品詞綴分類（§ 7.6）', () => {
     expect(has('weapon')).toBe(false);
   });
 
-  it('飾品可選 13 種、一般防具 12 種、盾牌 14 種', () => {
-    expect(getAffixPoolForSlot('accessory')).toHaveLength(13);
+  it('飾品可選 12 種、一般防具 12 種、盾牌 14 種', () => {
+    expect(getAffixPoolForSlot('accessory')).toHaveLength(12);
     expect(getAffixPoolForSlot('armor')).toHaveLength(12);
     expect(getAffixPoolForSlot('shield')).toHaveLength(14);
   });

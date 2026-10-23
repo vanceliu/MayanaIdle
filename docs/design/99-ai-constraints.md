@@ -54,5 +54,15 @@ server 測試的 argon2 用最低成本（正式參數不變）；桌面版封�
 - [x] C4 `release.yml`：`build` 不等 `test`，`release` 等 `test` 與 `build`
 - [x] C5 `docs/RELEASE.md` 同步；量測前後對照
 
+### 飾品詞綴池移除防禦力（`07-affix.md` § 7.6）
+
+規格：飾品（項鍊／戒指）詞綴池去掉防禦力（12 種）；既有飾品上的防禦力詞綴保留不轉換。
+
+- [x] R1 防禦力的 `category` 移除 `'accessory'`
+- [x] R2 wiki `AffixesPage` 說明文字
+- [x] R3 測試：飾品池無防禦力、生成 200 件飾品不出防禦力、wiki 篩選
+- [x] R4 文件：07 § 7.4／§ 7.6
+- [x] R5 `npx tsc -b`、vitest 全綠
+
 跨多次對話的實作**開工前**先在這裡寫下定案規格與分階段清單（見 `CLAUDE.md`）：
 中斷後靠它接續，全部完成並經使用者確認後刪除。

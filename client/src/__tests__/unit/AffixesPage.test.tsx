@@ -114,6 +114,12 @@ describe('詞綴 wiki 頁', () => {
     expect(rows[6].querySelectorAll('td')[acquireCol].textContent).toBe('Boss 限定掉落');
   });
 
+  it('篩選飾品時不列出防禦力', () => {
+    render(<AffixesPage />);
+    fireEvent.change(screen.getByLabelText('適用部位篩選'), { target: { value: 'accessory' } });
+    expect(rowsFor('防禦力')).toHaveLength(0);
+  });
+
   it('說明詛咒／虛弱／減速沒有免疫詞綴', () => {
     render(<AffixesPage />);
     expect(screen.getByText(/詛咒、虛弱、減速改由魔法抗性依機率抵抗/)).toBeTruthy();

@@ -5,7 +5,7 @@ import { random } from '../core/rng';
 /**
  * 詞綴適用分類。
  * `accessory` = 項鍊／戒指 —— 它們的 `type` 同為 `'armor'`，
- * 需要獨立分類才能限定「魔法抗性」這種飾品專屬詞綴（§ 7.6）。
+ * 需要獨立分類才能限定飾品可帶魔法抗性、不帶防禦力（§ 7.6）。
  */
 export type AffixCategory = 'weapon' | 'armor' | 'shield' | 'accessory';
 
@@ -126,8 +126,8 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'crit_damage', name: '爆擊傷害', category: ['weapon'], group: '攻擊類', description: '爆擊傷害 +X%' },
   { type: 'attack_speed', name: '攻擊速度', category: ['weapon'], group: '攻擊類', description: '攻擊速度 +X%' },
   { type: 'cooldown_reduction', name: '減少冷卻時間', category: ['weapon'], group: '攻擊類', description: '技能冷卻時間 -X%' },
-  // Armor affixes (12) —— 一般防具、盾牌、飾品皆可出現（§ 7.6）
-  { type: 'defense', name: '防禦力', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '防禦力 +X%' },
+  // Armor affixes (12) —— 一般防具、盾牌皆可出現；飾品不含防禦力（§ 7.6）
+  { type: 'defense', name: '防禦力', category: ['armor', 'shield'], group: '防禦類', description: '防禦力 +X%' },
   { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 HP +X（固定值）' },
   { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 MP +X（固定值）' },
   { type: 'hp_regen', name: '回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回血 +X（固定值）' },
@@ -139,7 +139,7 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'gold_rate', name: '金幣獲得率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '金幣獲得率 +X%' },
   // Shield exclusive (1)
   { type: 'block_rate', name: '格擋率', category: ['shield'], group: '盾牌專屬', description: '格擋率 +X%' },
-  // Accessory + shield exclusive (1)
+  // 飾品／盾牌專屬 (1)
   { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'], group: '飾品／盾牌專屬', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速的機率' },
   // 受擊回復（2）—— X% 是觸發率，回復量另外抽（§ 7.4）
   { type: 'on_hit_hp', name: '受擊回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '受到傷害時 X% 機率回復最大 HP 的一定比例' },
