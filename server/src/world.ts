@@ -473,9 +473,9 @@ export class World {
         className: m.className,
         level: ch?.level ?? 0,
         hp: ch?.hp ?? 0,
-        maxHp: ch && gs ? getEffectiveMaxHp(ch, gs.equippedGear) : 0,
+        maxHp: ch && gs ? getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects) : 0,
         mp: ch?.mp ?? 0,
-        maxMp: ch && gs ? getEffectiveMaxMp(ch, gs.equippedGear) : 0,
+        maxMp: ch && gs ? getEffectiveMaxMp(ch, gs.equippedGear, gs.activeEffects) : 0,
         regionId: ch?.currentRegion ?? '',
         floor: ch?.currentFloor ?? null,
         online: m.online && !!ch,
@@ -503,7 +503,7 @@ export class World {
         position: mc.playerPosition,
         prevPosition: mc.prevPlayerPosition,
         hp: ch.hp,
-        maxHp: getEffectiveMaxHp(ch, gs.equippedGear),
+        maxHp: getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects),
       });
     }
     return out;

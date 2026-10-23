@@ -1,6 +1,6 @@
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { CLASS_NAMES_ZH } from '../models/character';
-import type { EquipmentInstance } from '../models/equipment';
+import { getEffectiveGearArray } from '../systems/gear';
 import { getUnclampedDefense, getCombatBonuses } from '../systems/combat';
 import type { ActiveEffect } from '../models/effect';
 import { getWeightStatus } from '../systems/weight';
@@ -14,13 +14,13 @@ export function StatusPanel() {
 
   if (!char) return null;
 
-  const effMaxHp = getEffectiveMaxHp(char, gear);
-  const effMaxMp = getEffectiveMaxMp(char, gear);
+  const effMaxHp = getEffectiveMaxHp(char, gear, activeEffects);
+  const effMaxMp = getEffectiveMaxMp(char, gear, activeEffects);
   const hpPercent = Math.floor((char.hp / effMaxHp) * 100);
   const mpPercent = Math.floor((char.mp / effMaxMp) * 100);
   const expPercent = Math.floor((char.exp / char.expToNext) * 100);
 
-  const allGear = Object.values(gear).filter(Boolean) as EquipmentInstance[];
+  const allGear = getEffectiveGearArray(char, activeEffects, gear);
 
   // 防禦一律走 systems/combat —— 這裡原本自己算一份，
   // 漏掉詛咒的 -20%，與戰鬥實際採用的值不一致（`21-combat-formula.md` § 21.5）

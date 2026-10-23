@@ -54,6 +54,8 @@ export interface CombatScriptContext {
   weightPercent?: number;
   /** `hp_below`／`hp_above` 用的有效上限，未帶時退回 `character.maxHp` */
   effectiveMaxHp?: number;
+  /** `mp_below`／`mp_above` 用的有效上限，未帶時退回 `character.maxMp` */
+  effectiveMaxMp?: number;
   /** `hp_dropped_recently` 用：短期 HP 取樣 */
   hpHistory?: HpSample[];
 }
@@ -174,7 +176,8 @@ function checkCombatCondition(
   ctx: CombatScriptContext,
 ): boolean {
   const { skills, now } = ctx;
-  const mpPercent = ctx.character.maxMp > 0 ? (ctx.character.mp / ctx.character.maxMp) * 100 : 100;
+  const maxMp = ctx.effectiveMaxMp ?? ctx.character.maxMp;
+  const mpPercent = maxMp > 0 ? (ctx.character.mp / maxMp) * 100 : 100;
 
   switch (condition.type) {
     case 'always':

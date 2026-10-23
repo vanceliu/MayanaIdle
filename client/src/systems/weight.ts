@@ -76,6 +76,16 @@ export function getWeightStatus(
   return { carried, capacity, overweight: carried > capacity };
 }
 
+/** 負重百分比（`weight_over` 天賦條件用），上限為 0 時回 0 */
+export function getWeightPercent(
+  character: Character,
+  equippedGear: (EquipmentInstance | null | undefined)[],
+  bagItems: BagItemLike[],
+): number {
+  const w = getWeightStatus(character, equippedGear, bagItems);
+  return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
+}
+
 /** 超重時顯示在戰鬥記錄的訊息。每次出手判定都會顯示一次。 */
 export function getOverweightMessage(status: WeightStatus): string {
   return `負重超過上限（${status.carried} / ${status.capacity}），無法攻擊或施放魔法`;

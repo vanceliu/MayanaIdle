@@ -3,13 +3,14 @@ import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, INN_PRICES } from '
 export function Inn() {
   const char = useGameStore(s => s.character);
   const gear = useGameStore(s => s.equippedGear);
+  const activeEffects = useGameStore(s => s.activeEffects);
   // 判定與扣款在 store（線上模式會轉成 RPC 交給 server），這裡只負責畫面
   const restAtInn = useGameStore(s => s.restAtInn);
 
   if (!char) return null;
 
-  const effMaxHp = getEffectiveMaxHp(char, gear);
-  const effMaxMp = getEffectiveMaxMp(char, gear);
+  const effMaxHp = getEffectiveMaxHp(char, gear, activeEffects);
+  const effMaxMp = getEffectiveMaxMp(char, gear, activeEffects);
   const hpFull = char.hp >= effMaxHp;
   const mpFull = char.mp >= effMaxMp;
 

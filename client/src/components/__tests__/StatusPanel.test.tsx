@@ -64,6 +64,22 @@ describe('StatusPanel（底部列 compact 版，§ 34.3）', () => {
     expect(bar.textContent).not.toContain('無法攻擊');
   });
 
+  it('素質需求未滿足的件，詞綴不計入負重上限', () => {
+    useGameStore.setState({
+      equippedGear: {
+        chest: {
+          templateId: 1, name: '重甲', type: 'armor', slot: 'chest', isTwoHanded: false,
+          quality: 0, enhancement: 0, ownerId: 1, equipped: true,
+          requiredAttributes: { STR: 99 },
+          affixes: [{ type: 'bonus_attribute', attribute: 'STR', value: 10 }],
+        } as never,
+      },
+    });
+    const { container } = render(<StatusPanel />);
+    // (STR 18 + VIT 16) × 100，凍結件的 STR +10 不算
+    expect(container.querySelector('.weight-bar')!.textContent).toContain('負重 0/3400');
+  });
+
   it('防禦值放在負重那一行（不獨立成一列）', () => {
     const { container } = render(<StatusPanel />);
     const row = container.querySelector('.bars .bar-row')!;

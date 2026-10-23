@@ -136,8 +136,8 @@ export function applyAutoMove(session: PlayerSession): void {
   const ch = gs.character;
   if (!ch || !session.mapControl.getState().currentMap) return;
   if (gs.searchMode === 'auto' && gs.phase === 'explore') {
-    const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear);
-    const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear);
+    const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects);
+    const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear, gs.activeEffects);
     const hpPct = (ch.hp / effMaxHp) * 100;
     const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
     const alreadyPaused = session.mapControl.getState().paused;

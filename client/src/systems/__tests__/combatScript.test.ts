@@ -373,6 +373,27 @@ describe('evaluateCombatScript', () => {
     });
   });
 
+  describe('MP 百分比用有效上限', () => {
+    const rules = (type: 'mp_above' | 'mp_below', value: number): CombatRule[] => [
+      { id: 'r1', enabled: true, conditions: [{ type, value }], action: { type: 'normal_attack' } },
+    ];
+
+    it('mp_above: 基礎上限 50＋裝備 25，MP 40 是 53%，不到 60%', () => {
+      const ctx = createCombatContext({ character: createTestCharacter({ mp: 40 }), effectiveMaxMp: 75 });
+      expect(evaluateCombatScript(rules('mp_above', 60), ctx)).toBeNull();
+    });
+
+    it('mp_below: 基礎上限 50＋裝備 25，MP 40 是 53%，低於 60%', () => {
+      const ctx = createCombatContext({ character: createTestCharacter({ mp: 40 }), effectiveMaxMp: 75 });
+      expect(evaluateCombatScript(rules('mp_below', 60), ctx)).toEqual({ type: 'normal_attack' });
+    });
+
+    it('未帶 effectiveMaxMp 時退回 character.maxMp', () => {
+      const ctx = createCombatContext({ character: createTestCharacter({ mp: 40 }) });
+      expect(evaluateCombatScript(rules('mp_above', 60), ctx)).toEqual({ type: 'normal_attack' });
+    });
+  });
+
   it('should evaluate rules in priority order (first match wins)', () => {
     const rules: CombatRule[] = [
       { id: 'r1', enabled: true, conditions: [{ type: 'monster_count_gte', value: 2 }], action: { type: 'skill', skillId: 'fireball' } },

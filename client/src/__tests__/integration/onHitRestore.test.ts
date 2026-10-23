@@ -149,7 +149,7 @@ describe('觸發', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.10); // 10：高於角色迴避率、低於 20% 觸發率
     const gear = [chest([onHitHp(20, 4)])];
     useGameStore.setState({ equippedGear: { chest: gear[0] } as never });
-    const maxHp = getEffectiveMaxHp(useGameStore.getState().character!, useGameStore.getState().equippedGear);
+    const maxHp = getEffectiveMaxHp(useGameStore.getState().character!, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
     const r = getHit(gear)!;
     // 先扣 60 傷害，再回 maxHp 的 4%
@@ -161,7 +161,7 @@ describe('觸發', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.10);
     const gear = [chest([onHitMp(20, 5)])];
     useGameStore.setState({ equippedGear: { chest: gear[0] } as never });
-    const maxMp = getEffectiveMaxMp(useGameStore.getState().character!, useGameStore.getState().equippedGear);
+    const maxMp = getEffectiveMaxMp(useGameStore.getState().character!, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
     const r = getHit(gear)!;
     expect(useGameStore.getState().character!.mp).toBe(200 + Math.floor(maxMp * 0.05));
@@ -191,7 +191,7 @@ describe('觸發', () => {
     const a = chest([onHitHp(20, 4)]);
     const b = { ...chest([onHitHp(20, 4)]), slot: 'gloves', templateId: 91 } as EquipmentInstance;
     useGameStore.setState({ equippedGear: { chest: a, gloves: b } as never });
-    const maxHp = getEffectiveMaxHp(useGameStore.getState().character!, useGameStore.getState().equippedGear);
+    const maxHp = getEffectiveMaxHp(useGameStore.getState().character!, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
     const r = getHit([a, b])!;
     expect(useGameStore.getState().character!.hp).toBe(500 - r.damage + Math.floor(maxHp * 0.04) * 2);
@@ -205,8 +205,8 @@ describe('觸發', () => {
       equippedGear: { chest: gear[0] } as never,
     });
     const gs = useGameStore.getState();
-    const maxHp = getEffectiveMaxHp(gs.character!, gs.equippedGear);
-    const maxMp = getEffectiveMaxMp(gs.character!, gs.equippedGear);
+    const maxHp = getEffectiveMaxHp(gs.character!, gs.equippedGear, gs.activeEffects);
+    const maxMp = getEffectiveMaxMp(gs.character!, gs.equippedGear, gs.activeEffects);
 
     getHit(gear);
     expect(useGameStore.getState().character!.hp).toBeLessThanOrEqual(maxHp);

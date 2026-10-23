@@ -67,8 +67,8 @@ export function tickPlayerPre(deltaMs: number, session: Session): void {
 
   // === HP/MP threshold check ===
   const ch = gameState.character;
-  const effMaxHp = getEffectiveMaxHp(ch, gameState.equippedGear);
-  const effMaxMp = getEffectiveMaxMp(ch, gameState.equippedGear);
+  const effMaxHp = getEffectiveMaxHp(ch, gameState.equippedGear, gameState.activeEffects);
+  const effMaxMp = getEffectiveMaxMp(ch, gameState.equippedGear, gameState.activeEffects);
   const hpPct = (ch.hp / effMaxHp) * 100;
   const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
   const belowThreshold = hpPct <= gameState.afterCombatHpThreshold || mpPct <= gameState.afterCombatMpThreshold;

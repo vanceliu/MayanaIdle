@@ -61,7 +61,8 @@ export function applySkillSelfBuff(
   let description = def.description;
 
   if (def.scaleByMissingHp) {
-    const maxHp = getEffectiveMaxHp(character, session.game.getState().equippedGear);
+    const { equippedGear, activeEffects } = session.game.getState();
+    const maxHp = getEffectiveMaxHp(character, equippedGear, activeEffects);
     const missingPercent = maxHp > 0 ? (1 - character.hp / maxHp) * 100 : 0;
     const bonus = Math.floor(Math.min(def.scaleByMissingHp.maxPercent, Math.max(0, missingPercent)));
     if (bonus <= 0) return null;
@@ -203,7 +204,7 @@ export function processPlayerAttack(
       logs.push({ text: `施放 ${skill.name}`, type: 'player' });
     } else if (skill.type === 'heal' && skill.power) {
       const allGear = getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear);
-      const effMaxHp = getEffectiveMaxHp(character, gs.equippedGear);
+      const effMaxHp = getEffectiveMaxHp(character, gs.equippedGear, gs.activeEffects);
       // § 21.4c：與常駐腳本／快捷格共用 `calculateHealAmount()`，不可各算各的
       const effectiveHeal = calculateHealAmount(character, skill.power, allGear, gs.activeEffects);
       const healed = Math.min(effMaxHp - character.hp, effectiveHeal);
@@ -583,7 +584,7 @@ export function processPlayerAttack(
         drainDamage,
         skill.mpDrainRatio,
         mpAfterCost,
-        getEffectiveMaxMp(gs.character!, gs.equippedGear),
+        getEffectiveMaxMp(gs.character!, gs.equippedGear, gs.activeEffects),
       );
 
       // Lifesteal: restore HP from damage dealt
@@ -591,7 +592,7 @@ export function processPlayerAttack(
       if (skill.lifestealPercent) {
         const totalDamage = damages.filter(d => !d.isMiss).reduce((sum, d) => sum + d.damage, 0);
         const lifestealAmount = Math.floor(totalDamage * skill.lifestealPercent / 100);
-        const effMaxHp = getEffectiveMaxHp(gs.character!, gs.equippedGear);
+        const effMaxHp = getEffectiveMaxHp(gs.character!, gs.equippedGear, gs.activeEffects);
         hpRestored = Math.min(effMaxHp - gs.character!.hp, lifestealAmount);
       }
 
@@ -663,8 +664,8 @@ export function processMonsterAttack(
   const restoreLogs: CombatLog[] = [];
   if (!result.dodged && actualDamage > 0) {
     const gs = session.game.getState();
-    const maxHp = getEffectiveMaxHp(character, gs.equippedGear);
-    const maxMp = getEffectiveMaxMp(character, gs.equippedGear);
+    const maxHp = getEffectiveMaxHp(character, gs.equippedGear, gs.activeEffects);
+    const maxMp = getEffectiveMaxMp(character, gs.equippedGear, gs.activeEffects);
     let hpGain = 0;
     for (const r of getOnHitRestore(equippedGear, 'on_hit_hp')) {
       if (random() * 100 < r.chance) hpGain += Math.max(1, Math.floor(maxHp * r.percent / 100));

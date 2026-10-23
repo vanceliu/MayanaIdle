@@ -35,8 +35,7 @@ import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
 import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount } from '../systems/combat';
 import { getEffectiveGearArray } from '../systems/gear';
-import { getWeightStatus } from '../systems/weight';
-import type { HpSample } from '../systems/scriptRunner';
+import { getWeightStatus, getWeightPercent } from '../systems/weight';
 
 /**
  * 短期 HP 取樣（`51-auto-talent.md` § 51.4.5 的 `hp_dropped_recently`）。
@@ -557,14 +556,14 @@ function addLog(logs: CombatLog[], entry: CombatLog): CombatLog[] {
  * 最大 HP／MP 的詞綴是**固定值**（`07-affix.md` § 7.3.1），直接加算，不是百分比。
  * 飾品模板的 `bonusHp`／`bonusMp` 仍是另一個加算來源。
  */
-export function getEffectiveMaxHp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[] = []): number {
+export function getEffectiveMaxHp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[]): number {
   const allGear = getEffectiveGearArray(char, activeEffects, gear);
   const bonuses = getAffixBonusesFromGear(allGear);
   const flatHp = allGear.reduce((sum, g) => sum + (g.bonusHp ?? 0), 0);
   return char.maxHp + flatHp + bonuses.max_hp;
 }
 
-export function getEffectiveMaxMp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[] = []): number {
+export function getEffectiveMaxMp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[]): number {
   const allGear = getEffectiveGearArray(char, activeEffects, gear);
   const bonuses = getAffixBonusesFromGear(allGear);
   const flatMp = allGear.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0);
@@ -615,7 +614,6 @@ function updateActiveTemplate(
 }
 
 export function createGameStore(session: Session) {
-  const hpSamples: HpSample[] = [];
   return create<GameState>((set, get) => ({
   phase: 'title',
   userId: null,
@@ -1023,7 +1021,7 @@ export function createGameStore(session: Session) {
       loop.regenHpAcc -= HP_REGEN_INTERVAL_MS;
       const state = get();
       if (state.character && state.character.hp > 0) {
-        const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
+        const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear, state.activeEffects);
         if (state.character.hp < effMaxHp) {
           const inCombat = state.phase === 'combat' || isInArpgCombat(session);
           const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
@@ -1039,7 +1037,7 @@ export function createGameStore(session: Session) {
       loop.regenMpAcc -= MP_REGEN_INTERVAL_MS;
       const state = get();
       if (state.character && state.character.hp > 0) {
-        const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear);
+        const effMaxMp = getEffectiveMaxMp(state.character, state.equippedGear, state.activeEffects);
         if (state.character.mp < effMaxMp) {
           const inCombat = state.phase === 'combat' || isInArpgCombat(session);
           const allGearMp = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
@@ -1159,7 +1157,7 @@ export function createGameStore(session: Session) {
     if (!state.character) return;
     if (blockedByStun(state, set)) return;
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-    const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
+    const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear, state.activeEffects);
     if (state.character.hp >= effMaxHp) {
       set({ combatLogs: addLog(state.combatLogs, { text: 'HP 已滿，無法使用藥水', type: 'system' }) });
       return;
@@ -1187,7 +1185,7 @@ export function createGameStore(session: Session) {
     const state = get();
     if (!state.character) return;
     if (blockedByStun(state, set)) return;
-    const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear);
+    const effMaxHp = getEffectiveMaxHp(state.character, state.equippedGear, state.activeEffects);
     if (state.character.hp >= effMaxHp) {
       set({ combatLogs: addLog(state.combatLogs, { text: 'HP 已滿，無法使用藥水', type: 'system' }) });
       return;
@@ -1408,7 +1406,7 @@ export function createGameStore(session: Session) {
 
     if (skill.type === 'heal') {
       if (!skill.power) return false;
-      const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+      const effMaxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
       // § 21.4c：治癒量走技能側公式（技能攻擊力 × 魔攻乘區 + INT 加成）× 治癒效果%
       const effectiveHeal = calculateHealAmount(char, skill.power, allGear, state.activeEffects);
       const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
@@ -1701,7 +1699,8 @@ export function createGameStore(session: Session) {
      * HP 取樣（`hp_dropped_recently`）。在常駐 loop 維護：它每 300ms 跑一次，
      * 是全遊戲最穩定的取樣節奏，掛在戰鬥 tick 上則會隨攻速變頻。
      */
-    const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+    const effMaxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
+    const hpSamples = session.loop.hpSamples;
     hpSamples.push({ t: now, percent: effMaxHp > 0 ? (char.hp / effMaxHp) * 100 : 100 });
     while (hpSamples.length > 0 && now - hpSamples[0].t > HP_SAMPLE_WINDOW_MS) hpSamples.shift();
 
@@ -1714,8 +1713,8 @@ export function createGameStore(session: Session) {
       now,
       activeEffects: state.activeEffects,
       cooldownReduction,
-      effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
-      effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear),
+      effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear, state.activeEffects),
+      effectiveMaxMp: getEffectiveMaxMp(char, state.equippedGear, state.activeEffects),
       /**
        * 共用鑲材（§ 51.4.5）在常駐格也要成立，因此這幾個欄位不能只餵給戰鬥。
        * 少一個就等於那些鑲材鑲進常駐格之後永遠不觸發，而且不會報錯。
@@ -1724,10 +1723,7 @@ export function createGameStore(session: Session) {
       monsterPositions: session.mapMonster.getState().monsters.map(m => m.position),
       weaponType: getEquippedWeapon(allGear)?.type,
       hpHistory: hpSamples,
-      weightPercent: (() => {
-        const w = getWeightStatus(char, allGear, state.bagItems);
-        return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
-      })(),
+      weightPercent: getWeightPercent(char, allGear, state.bagItems),
     };
 
     // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
@@ -1737,7 +1733,7 @@ export function createGameStore(session: Session) {
         character: char,
         bagItems: state.bagItems,
         inCombat: isInArpgCombat(session),
-        effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear),
+        effectiveMaxHp: getEffectiveMaxHp(char, state.equippedGear, state.activeEffects),
       };
       const retreat = evaluateEmergencyRetreat(selectEmergencyRetreat(state), retreatCtx);
       if (retreat) {
@@ -1799,7 +1795,7 @@ export function createGameStore(session: Session) {
        */
       case 'refill_to_percent': {
         const target = action.value ?? 80;
-        const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+        const effMaxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
         if (char.hp / effMaxHp * 100 >= target) break;
         drinkPotion(set, state, char, allGear, now, action.potionType ?? 'red');
         break;
@@ -1883,8 +1879,8 @@ export function createGameStore(session: Session) {
         return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
       })(),
       // 旅館有沒有事情可做（`13-town.md` § 13.7）。全滿又沒異常狀態時為 false。
-      needsInn: char.hp < getEffectiveMaxHp(char, state.equippedGear)
-        || char.mp < getEffectiveMaxMp(char, state.equippedGear)
+      needsInn: char.hp < getEffectiveMaxHp(char, state.equippedGear, state.activeEffects)
+        || char.mp < getEffectiveMaxMp(char, state.equippedGear, state.activeEffects)
         || state.activeEffects.some(e => e.type === 'debuff' && e.target === 'player'),
     };
 
@@ -2565,8 +2561,8 @@ export function createGameStore(session: Session) {
     const price = mode === 'full' ? INN_PRICES.full : mode === 'hp' ? INN_PRICES.hpOnly : INN_PRICES.mpOnly;
     if (char.gold < price) return false;
 
-    const maxHp = getEffectiveMaxHp(char, state.equippedGear);
-    const maxMp = getEffectiveMaxMp(char, state.equippedGear);
+    const maxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
+    const maxMp = getEffectiveMaxMp(char, state.equippedGear, state.activeEffects);
     if (mode === 'hp' && char.hp >= maxHp) return false;
     if (mode === 'mp' && char.mp >= maxMp) return false;
     if (mode === 'full' && char.hp >= maxHp && char.mp >= maxMp) return false;
@@ -2673,8 +2669,8 @@ export function createGameStore(session: Session) {
     set({
       character: {
         ...char,
-        hp: getEffectiveMaxHp(char, state.equippedGear),
-        mp: getEffectiveMaxMp(char, state.equippedGear),
+        hp: getEffectiveMaxHp(char, state.equippedGear, state.activeEffects),
+        mp: getEffectiveMaxMp(char, state.equippedGear, state.activeEffects),
       },
     });
     get().saveState();
@@ -2824,9 +2820,9 @@ export function processMonsterDeath(
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
   if (char.level > prevLevel) {
     logs.push({ text: `升級！等級 ${prevLevel} → ${char.level}`, type: 'system' });
-    const equippedGear = get().equippedGear;
-    char.hp = getEffectiveMaxHp(char, equippedGear);
-    char.mp = getEffectiveMaxMp(char, equippedGear);
+    const { equippedGear, activeEffects } = get();
+    char.hp = getEffectiveMaxHp(char, equippedGear, activeEffects);
+    char.mp = getEffectiveMaxMp(char, equippedGear, activeEffects);
     // 每 5 級一封天賦格信（`52-mailbox.md` § 52.2）
     const levelForGrant = char.level;
     const charIdForGrant = char.id;
@@ -3031,7 +3027,7 @@ function drinkPotion(
   const bonuses = getAffixBonusesFromGear(allGear);
   const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
   const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
-  const effMaxHp = getEffectiveMaxHp(char, state.equippedGear);
+  const effMaxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
   set({
     character: { ...char, hp: Math.min(effMaxHp, char.hp + heal) },
     bagItems: consumePotionFromBag(state.bagItems, potionType),

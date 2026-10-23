@@ -99,8 +99,8 @@ describe('補給天賦：使用旅館', () => {
   it('在城鎮且錢足夠時補滿 HP／MP、扣款、解除異常狀態', () => {
     const before = useGameStore.getState().character!;
     const goldBefore = before.gold;
-    const effMaxHp = getEffectiveMaxHp(before, useGameStore.getState().equippedGear);
-    const effMaxMp = getEffectiveMaxMp(before, useGameStore.getState().equippedGear);
+    const effMaxHp = getEffectiveMaxHp(before, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
+    const effMaxMp = getEffectiveMaxMp(before, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
     useGameStore.getState().runVillageScriptTick();
 
@@ -116,8 +116,8 @@ describe('補給天賦：使用旅館', () => {
     const before = useGameStore.getState().character!;
     const characterId = before.id!;
     const goldAfter = before.gold - INN_PRICES.full;
-    const effMaxHp = getEffectiveMaxHp(before, useGameStore.getState().equippedGear);
-    const effMaxMp = getEffectiveMaxMp(before, useGameStore.getState().equippedGear);
+    const effMaxHp = getEffectiveMaxHp(before, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
+    const effMaxMp = getEffectiveMaxMp(before, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
     useGameStore.getState().runVillageScriptTick();
 
@@ -134,7 +134,7 @@ describe('補給天賦：使用旅館', () => {
     const before = useGameStore.getState().character!;
     const characterId = before.id!;
     const goldAfter = before.gold - INN_PRICES.full;
-    const effMaxHp = getEffectiveMaxHp(before, useGameStore.getState().equippedGear);
+    const effMaxHp = getEffectiveMaxHp(before, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
     useGameStore.getState().runVillageScriptTick();
 

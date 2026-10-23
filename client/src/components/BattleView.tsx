@@ -45,8 +45,8 @@ export function BattleView() {
         const gs = useGameStore.getState();
         const ch = gs.character;
         if (ch) {
-          const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear);
-          const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear);
+          const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects);
+          const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear, gs.activeEffects);
           const hpPct = (ch.hp / effMaxHp) * 100;
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
           if (hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
@@ -68,8 +68,8 @@ export function BattleView() {
         const gs = useGameStore.getState();
         const ch = gs.character;
         if (ch) {
-          const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear);
-          const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear);
+          const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects);
+          const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear, gs.activeEffects);
           const hpPct = (ch.hp / effMaxHp) * 100;
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
           // 已在恢復等待中就維持暫停：HP/MP 可能已高於暫停門檻但未達恢復門檻，

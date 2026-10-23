@@ -13,7 +13,8 @@ import type { MonsterInstance, MonsterAttackType, ElementType } from '../models/
 import { isRangedAttackType } from '../models/monster';
 import type { EquipmentInstance } from '../models/equipment';
 import type { CombatLog } from '../stores/gameStore';
-import { getEffectiveMaxHp, processMonsterDeath, waitForPendingDrops, type GameState, type MonsterDeathOptions } from '../stores/gameStore';
+import { getWeightPercent } from './weight';
+import { getEffectiveMaxHp, getEffectiveMaxMp, processMonsterDeath, waitForPendingDrops, type GameState, type MonsterDeathOptions } from '../stores/gameStore';
 import { talentCombatRules } from '../stores/talentStore';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { defaultSession, type Session } from '../stores/session';
@@ -304,7 +305,11 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
     equippedGear: allGear,
     // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
     combatRules: talentCombatRules(gameState.activeTemplateId, session.talent.getState().slots),
-    effectiveMaxHp: getEffectiveMaxHp(gameState.character, gameState.equippedGear),
+    effectiveMaxHp: getEffectiveMaxHp(gameState.character, gameState.equippedGear, gameState.activeEffects),
+    effectiveMaxMp: getEffectiveMaxMp(gameState.character, gameState.equippedGear, gameState.activeEffects),
+    // 共用條件（§ 51.4.5）與常駐天賦吃同一份來源
+    weightPercent: getWeightPercent(gameState.character, allGear, gameState.bagItems),
+    hpHistory: session.loop.hpSamples,
     mapMonsters: monsterStore.monsters,
     monsterInstances,
     map: mapStore.currentMap,
@@ -492,7 +497,7 @@ function processPlayerHotTick(session: Session, visuals: CombatVisual[]) {
   const char = gs.character;
   if (!char || char.hp <= 0) return;
 
-  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear);
+  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear, gs.activeEffects);
   if (char.hp >= effMaxHp) return;
 
   const total = hotEffects.reduce((sum, e) => sum + (e.hot?.amount ?? 0), 0);
@@ -715,7 +720,7 @@ export function handlePlayerDeath(session: Session = defaultSession) {
   const nearestTown = getNearestTown(char.currentRegion);
 
   // § 13.8：HP 恢復至「有效最大 HP」的 50%（含裝備 bonusHp 與最大HP%詞綴）
-  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear);
+  const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear, gs.activeEffects);
 
   const updatedChar = {
     ...char,

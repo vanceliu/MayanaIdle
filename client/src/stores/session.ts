@@ -21,6 +21,7 @@ import type { MonsterInstance, MonsterTemplate } from '../models/monster';
 import type { GameRepository } from '../db/repository';
 import type { MapInstance } from '../systems/mapInstance';
 import type { SelfCastFxEvent } from '../systems/selfCastFx';
+import type { HpSample } from '../systems/scriptRunner';
 
 /** 遊戲迴圈的跨 tick 狀態，一個 session 一份 */
 export interface LoopState {
@@ -36,6 +37,8 @@ export interface LoopState {
   persistentAcc: number;
   /** 常駐天賦的自身施法演出佇列（`48-vfx.md` § 48.8.5） */
   selfCastFx: SelfCastFxEvent[];
+  /** `hp_dropped_recently` 的 HP 取樣，常駐 loop 寫入，常駐與戰鬥天賦共讀 */
+  hpSamples: HpSample[];
   /*
    * 以下三條佇列**必須每個 session 一份**（§ 97.6）。
    * 放在模組層的話 server 上全服共用一條：A 的掉落結算會卡住 B 的存檔，
@@ -72,6 +75,7 @@ export function createLoopState(): LoopState {
     regenMpAcc: 0,
     persistentAcc: 0,
     selfCastFx: [],
+    hpSamples: [],
     dropQueue: Promise.resolve(),
     saveQueue: Promise.resolve(),
     talentInit: Promise.resolve(),

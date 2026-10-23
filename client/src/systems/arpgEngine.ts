@@ -114,6 +114,7 @@ export interface ArpgTickInput {
   bagItems?: BagItemLike[];
   /** 共用條件用（`51-auto-talent.md` § 51.4.5）。未提供時對應條件一律不成立 */
   effectiveMaxHp?: number;
+  effectiveMaxMp?: number;
   weightPercent?: number;
   hpHistory?: HpSample[];
   /** 多人實例：怪物 FSM 由實例層以 `tickMonsterEngines` 推進，這裡只跑玩家 */
@@ -165,7 +166,7 @@ export function tickArpgEngine(
   const {
     playerPos, character, skills, activeEffects, equippedGear,
     combatRules, mapMonsters, monsterInstances, map, deltaMs,
-    effectiveMaxHp, weightPercent, hpHistory,
+    effectiveMaxHp, effectiveMaxMp, weightPercent, hpHistory,
   } = input;
 
   // Sync monster combat contexts
@@ -212,6 +213,7 @@ export function tickArpgEngine(
       // 目標身上的 debuff／護盾條件要靠它（`51-auto-talent.md` § 51.4.10 的「接線」項）
       activeEffects,
       effectiveMaxHp,
+      effectiveMaxMp,
       weightPercent,
       hpHistory,
     };
@@ -279,6 +281,7 @@ export function tickArpgEngine(
       // 目標身上的 debuff／護盾條件要靠它（`51-auto-talent.md` § 51.4.10 的「接線」項）
       activeEffects,
       effectiveMaxHp,
+      effectiveMaxMp,
       weightPercent,
       hpHistory,
     };
