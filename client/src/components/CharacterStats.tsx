@@ -23,6 +23,7 @@ import {
 } from '../systems/combat';
 import { isRangedWeapon } from '../models/equipment';
 import { getEffectiveGearArray } from '../systems/gear';
+import { getHpRegen, getMpRegen } from '../systems/regen';
 
 interface StatTip {
   /** 這個欄位是什麼 */
@@ -66,10 +67,8 @@ export function CharacterStats() {
   const gearList = getEffectiveGearArray(char, activeEffects, equippedGear);
 
   const attrs = getTotalAttributes(char, activeEffects, gearList);
-  // 敏捷每 3 點生效（§ 20.2），其餘每 2 點
+  // 敏捷每 3 點生效（§ 20.2）
   const effectiveAGI = Math.floor(attrs.AGI / 3) * 3;
-  const effectiveVIT = Math.floor(attrs.VIT / 2) * 2;
-  const effectiveSPI = Math.floor(attrs.SPI / 2) * 2;
   // const effectiveINT = Math.floor(attrs.INT / 2) * 2;
 
   const weapon = equippedGear.rightHand;
@@ -145,14 +144,9 @@ export function CharacterStats() {
   // 與 systems/combat.ts 的命中判定同一套：基礎命中 80 + AGI加成 + 武器攻擊成功（含強化 /2）
   const hitRate = 80 + agiBonus + getWeaponAttackSuccess(weapon ?? null);
 
-  let hpRegen = Math.floor(effectiveVIT / 2);
-  let mpRegen = Math.floor(effectiveSPI / 2);
-
-  for (const [, item] of Object.entries(equippedGear)) {
-    if (!item) continue;
-    if (item.hpRegen) hpRegen += item.hpRegen;
-    if (item.mpRegen) mpRegen += item.mpRegen;
-  }
+  // 非戰鬥狀態的回復量，與自然回復 tick 同一支（`29-regen.md`）
+  const hpRegen = getHpRegen(char, false, gearList, activeEffects);
+  const mpRegen = getMpRegen(char, false, gearList, activeEffects);
 
   const critRate = Math.min(75, critRate0);
 
@@ -198,8 +192,8 @@ export function CharacterStats() {
 
         <div className="stat-group">
           <div className="stat-group-title">回復</div>
-          <StatRow label="每次回血" value={hpRegen} tip={{ desc: '每 5 秒自動回復的 HP 量。', formula: 'floor(有效VIT / 2) + 裝備回血量加總', note: '戰鬥中減半（最低 1）' }} />
-          <StatRow label="每次回魔" value={mpRegen} tip={{ desc: '每 6 秒自動回復的 MP 量。', formula: 'floor(有效SPI / 2) + 裝備回魔量加總', note: '戰鬥中減半（最低 1）' }} />
+          <StatRow label="每次回血" value={hpRegen} tip={{ desc: '每 5 秒自動回復的 HP 量。', formula: 'floor(有效VIT / 2) + 裝備回血量加總（模板值 + 回血詞綴）', note: '戰鬥中減半（最低 1）' }} />
+          <StatRow label="每次回魔" value={mpRegen} tip={{ desc: '每 6 秒自動回復的 MP 量。', formula: 'floor(有效SPI / 2) + 裝備回魔量加總（模板值 + 回魔詞綴）', note: '戰鬥中減半（最低 1）' }} />
           <StatRow label="補血效果" value={<>+{healEffect}%</>} tip={{ desc: '提升「治癒類技能」的回復量。', formula: '所有「補血效果」詞綴加總', note: '不影響藥水，也不影響自然回血與聖域的每秒回血' }} />
           <StatRow label="藥水效果" value={<>+{potionEffect}%</>} tip={{ desc: '提升「藥水」的回復量。', formula: '所有「藥水效果」詞綴加總', note: '不影響治癒技能' }} />
         </div>

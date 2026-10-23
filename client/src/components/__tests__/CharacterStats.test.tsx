@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CharacterStats } from '../CharacterStats';
 import { useGameStore } from '../../stores/gameStore';
+import type { EquipmentInstance } from '../../models/equipment';
 
 describe('CharacterStats', () => {
   beforeEach(() => {
@@ -32,6 +33,7 @@ describe('CharacterStats', () => {
         userId: 1,
       },
       equippedGear: {},
+      activeEffects: [],
     });
   });
 
@@ -67,6 +69,44 @@ describe('CharacterStats', () => {
     render(<CharacterStats />);
     expect(screen.getByText('魔法抗性')).toBeDefined();
     expect(screen.getByText('魔法減傷率')).toBeDefined();
+  });
+
+  /** `29-regen.md` § 29.1~29.2：面板與自然回復 tick 同一套 */
+  describe('每次回血／每次回魔', () => {
+    const regenItem = (over: Partial<EquipmentInstance>) => ({
+      templateId: 1, name: 'x', type: 'armor', slot: 'chest', isTwoHanded: false,
+      quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true, ...over,
+    }) as EquipmentInstance;
+    const necklace = (over: Partial<EquipmentInstance> = {}) =>
+      regenItem({ slot: 'necklace', hpRegen: 2, mpRegen: 3, ...over });
+    const chest = (over: Partial<EquipmentInstance> = {}) => regenItem({
+      affixes: [{ type: 'hp_regen', tier: 3, value: 6 }, { type: 'mp_regen', tier: 4, value: 8 }],
+      ...over,
+    });
+    const rowValue = (label: string) =>
+      screen.getByText(label).closest('.stat-row')?.querySelector('.stat-value')?.textContent;
+
+    // VIT 16 → 8、SPI 10 → 5
+    it('裸裝只有屬性基礎量', () => {
+      render(<CharacterStats />);
+      expect(rowValue('每次回血')).toBe('8');
+      expect(rowValue('每次回魔')).toBe('5');
+    });
+
+    it('模板值與詞綴同時計入', () => {
+      useGameStore.setState({ equippedGear: { necklace: necklace(), chest: chest() } });
+      render(<CharacterStats />);
+      expect(rowValue('每次回血')).toBe(String(8 + 2 + 6));
+      expect(rowValue('每次回魔')).toBe(String(5 + 3 + 8));
+    });
+
+    it('素質需求未滿足：詞綴凍結，模板值照算', () => {
+      const unmet = { requiredAttributes: { STR: 99 } };
+      useGameStore.setState({ equippedGear: { necklace: necklace(unmet), chest: chest(unmet) } });
+      render(<CharacterStats />);
+      expect(rowValue('每次回血')).toBe(String(8 + 2));
+      expect(rowValue('每次回魔')).toBe(String(5 + 3));
+    });
   });
 
   it('returns null when no character', () => {
