@@ -13,9 +13,10 @@ on:
     tags: ['[0-9]*']
   workflow_dispatch:
 
-# node:sqlite 要 Node 24
+# node:sqlite 要 Node 24；寫完整版本號，只寫 major 會沿用 runner 快取的舊版。
+# 不可低於 server/scripts/package.mjs 的 MIN_NODE_VERSION。
 env:
-  NODE_VERSION: '24'
+  NODE_VERSION: '24.22.1'
 
 jobs:
   test:

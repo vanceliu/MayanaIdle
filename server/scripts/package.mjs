@@ -29,6 +29,18 @@ const cacheDir = join(serverRoot, '.node-cache');
 /** 打包用的 node 版本：node:sqlite 與 SEA 資產都要夠新 */
 const NODE_VERSION = process.versions.node;
 
+/** 打包用 node 的最低版本：低於此版含已公開的安全漏洞，產物會把它一起帶出去 */
+const MIN_NODE_VERSION = '24.22.1';
+
+function isOlderVersion(version, min) {
+  const a = version.split('.').map(Number);
+  const b = min.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i];
+  }
+  return false;
+}
+
 const TARGETS = {
   'linux-x64': { archive: 'tar.gz', binary: 'bin/node', out: 'mayana-server-linux-x64' },
   'linux-arm64': { archive: 'tar.gz', binary: 'bin/node', out: 'mayana-server-linux-arm64' },
@@ -134,6 +146,10 @@ async function packageFor(target, blobPath) {
 }
 
 async function main() {
+  if (isOlderVersion(NODE_VERSION, MIN_NODE_VERSION)) {
+    throw new Error(`打包用的 node 是 ${NODE_VERSION}，最低要 ${MIN_NODE_VERSION}，請先升級 node`);
+  }
+
   const argv = process.argv.slice(2);
   const targets = argv.includes('--all')
     ? Object.keys(TARGETS)

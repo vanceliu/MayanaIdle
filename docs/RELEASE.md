@@ -127,7 +127,7 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 | ARM | 只出 64 位元（`linux-arm64`）。Node 24 官方沒有 32 位元 ARM（armv7l）版，32 位元系統跑不起來 |
 | macOS 簽章 | 注入會破壞既有簽章，打包腳本會 `codesign --remove-signature` 再 ad-hoc 重簽。**在非 macOS 上打包的 macOS 執行檔無法簽章**，對方會被 Gatekeeper 擋下 |
 | Windows 簽章 | postject 會印 `The signature seems corrupted!` —— node.exe 的 Authenticode 簽章因注入而失效，屬預期。未簽章的執行檔仍可執行，但 SmartScreen 會警告 |
-| node 版本 | 取自打包機的 `process.versions.node`；CI 三個 runner 都用同一個 major（workflow 的 `NODE_VERSION`） |
+| node 版本 | 取自打包機的 `process.versions.node`；CI 三個 runner 都用 workflow 的 `NODE_VERSION`（完整版本號，只寫 major 會沿用 runner 快取的舊版）。低於 `server/scripts/package.mjs` 的 `MIN_NODE_VERSION` 拒絕打包；Node 出安全更新時兩處一起調高 |
 
 ### 桌面版（Electron）
 
