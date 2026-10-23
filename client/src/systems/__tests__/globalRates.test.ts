@@ -7,6 +7,7 @@ import {
   getBossSpawnChance,
   scaleMonsterStat,
   GOLD_DROP_CAP,
+  QUEST_GOLD_REWARD_CAP,
 } from '../globalRates';
 
 describe('全域倍率作用點（19 § 19.9）', () => {
@@ -34,6 +35,12 @@ describe('全域倍率作用點（19 § 19.9）', () => {
       expect(settleQuestGold(300, 1)).toBe(300);
       expect(settleQuestGold(300, 2.5)).toBe(750);
       expect(settleQuestGold(7, 1.5)).toBe(10);
+    });
+
+    it('上限 100,000 在倍率之前套用', () => {
+      expect(settleQuestGold(QUEST_GOLD_REWARD_CAP + 1, 1)).toBe(QUEST_GOLD_REWARD_CAP);
+      expect(settleQuestGold(540000, 2)).toBe(QUEST_GOLD_REWARD_CAP * 2);
+      expect(settleQuestGold(QUEST_GOLD_REWARD_CAP - 1, 1)).toBe(QUEST_GOLD_REWARD_CAP - 1);
     });
   });
 

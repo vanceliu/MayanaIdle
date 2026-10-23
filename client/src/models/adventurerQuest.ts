@@ -166,6 +166,15 @@ export const DELIVER_VALUE_MULTIPLIER = 3;
 export const SIGIL_DELIVER_ITEM_IDS = [9, 10];
 /** § 36.2.7：報酬用的詞綴印記（混沌、刺針、重刻），發放時隨機一種 */
 export const AFFIX_SIGIL_ITEM_IDS = [147, 148, 149];
+/** § 36.5.1：工藝／精鍊印記獎勵的換算單價（金/個） */
+export const CRAFT_SIGIL_UNIT_VALUE = 1000;
+/** § 36.5.1：詞綴印記獎勵的換算單價（金/個） */
+export const AFFIX_SIGIL_UNIT_VALUE = 10000;
+/** § 36.5.1：任務獎勵數量上限（金幣上限見 `systems/globalRates.ts`） */
+export const QUEST_POTION_REWARD_CAP = 100;
+export const BOSS_QUEST_POTION_REWARD_CAP = 150;
+export const QUEST_CRAFTING_MATERIAL_REWARD_CAP = 50;
+export const QUEST_SIGIL_REWARD_CAP = 50;
 /** § 36.2.7：突破印記 */
 export const BREAKTHROUGH_SIGIL_ITEM_ID = 150;
 

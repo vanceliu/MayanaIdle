@@ -8,6 +8,7 @@ import {
   isTierlessAffixType,
   formatAffixName,
   formatAffixValue,
+  formatAffixDescription,
   type Affix,
 } from '../../models/affix';
 import {
@@ -61,6 +62,12 @@ interface SigilFx {
   color?: string;
   /** 突破的浮字：成功 `T6`、失敗 `T1` */
   label?: string;
+}
+
+/** 詞綴列 tooltip（§ 13.13.1）：說明的數值與列上一致（不吃品質），滿值另起一行 */
+function affixRowTitle(affix: Affix): string {
+  const description = formatAffixDescription(affix);
+  return isMaxRollAffix(affix) ? `${description}\n此詞綴為該 Tier 最大值` : description;
 }
 
 /** 名稱與 Tier。名稱走 `formatAffixName`，無 Tier 的（特殊、額外屬性）不接 T 標 */
@@ -414,6 +421,7 @@ export function SigilMaster() {
                     + `${rowFx?.mode === 'break-fail' ? ' enh-shake' : ''}`
                   }
                   aria-disabled={!check.ok}
+                  title={affixRowTitle(affix)}
                   onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
                 >
                   <span
@@ -425,7 +433,6 @@ export function SigilMaster() {
                       + tagFxClass(rowFx)
                     }
                     style={fx?.mode === 'chaos' ? ({ '--i': i } as React.CSSProperties) : undefined}
-                    title={isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined}
                   >
                     {affixLabel(affix)}
                   </span>

@@ -7,6 +7,8 @@ import {
   getEffectiveAffixValue,
   isMaxRollAffix,
   collectAffixBonuses,
+  formatAffixDescription,
+  SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
   AFFIX_DEFINITIONS,
 } from '../affix';
@@ -304,5 +306,49 @@ describe('affix model', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('formatAffixDescription（§ 7.4）', () => {
+    it('百分比型：X 代入數值', () => {
+      expect(formatAffixDescription({ type: 'attack_power', tier: 4, value: 12 })).toBe('攻擊力 +12%');
+      expect(formatAffixDescription({ type: 'cooldown_reduction', tier: 2, value: 5 })).toBe('技能冷卻時間 -5%');
+    });
+
+    it('固定值型：X 代入數值，保留「固定值」字樣', () => {
+      expect(formatAffixDescription({ type: 'max_hp', tier: 2, value: 40 })).toBe('最大 HP +40（固定值）');
+    });
+
+    it('觸發率型：去掉「X% 是觸發率：」開頭，其餘 X 全部代入', () => {
+      expect(formatAffixDescription({ type: 'element_erosion', tier: 3, value: 8, element: 'fire', dotDamage: 10 }))
+        .toBe('命中後有 8% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒');
+      expect(formatAffixDescription({ type: 'on_hit_hp', tier: 3, value: 9, restorePercent: 3 }))
+        .toBe('受到傷害時 9% 機率回復最大 HP 的 3%');
+    });
+
+    it('受擊回血／回魔：回復比例代入該條抽到的值；定義本身寫範圍（Wiki 用）', () => {
+      expect(AFFIX_DEFINITIONS.find(d => d.type === 'on_hit_hp')!.description)
+        .toBe('受到傷害時 X% 機率回復最大 HP 的 2~4%');
+      expect(AFFIX_DEFINITIONS.find(d => d.type === 'on_hit_mp')!.description)
+        .toBe('受到傷害時 X% 機率回復最大 MP 的 2~5%');
+      expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 6, restorePercent: 5 }))
+        .toBe('受到傷害時 6% 機率回復最大 MP 的 5%');
+      expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 6, restorePercent: 5 }, 20))
+        .toBe('受到傷害時 7% 機率回復最大 MP 的 6%');
+    });
+
+    it('品質參數放大代入值', () => {
+      expect(formatAffixDescription({ type: 'attack_power', tier: 4, value: 12 }, 20)).toBe('攻擊力 +14%');
+    });
+
+    it('特殊詞綴：照原文', () => {
+      const def = SPECIAL_AFFIX_DEFINITIONS.find(d => d.type === 'immune_poison')!;
+      expect(formatAffixDescription({ type: 'immune_poison', tier: 0, value: 0 })).toBe(def.description);
+    });
+
+    it('所有一般詞綴代入後都不留 X', () => {
+      for (const def of AFFIX_DEFINITIONS) {
+        expect(formatAffixDescription({ type: def.type, tier: 1, value: 3 })).not.toMatch(/X/);
+      }
+    });
   });
 });

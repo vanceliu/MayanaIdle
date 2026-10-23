@@ -15,8 +15,6 @@ import {
 import {
   AREA_POOLS,
   ENDURANCE_COUNT_RANGE,
-  BOSS_KILL_COUNT_RANGE,
-  BOSS_COLLECT_TARGET_COUNT,
   BOSS_COLLECT_DROP_RATE,
   COLLECT_DROP_RATE,
   isDeliverQuestType,
@@ -27,6 +25,13 @@ import {
   MATERIAL_POOLS,
   SIGIL_DELIVER_ITEM_IDS,
   AFFIX_SIGIL_ITEM_IDS,
+  AFFIX_SIGIL_UNIT_VALUE,
+  CRAFT_SIGIL_UNIT_VALUE,
+  QUEST_POTION_REWARD_CAP,
+  BOSS_QUEST_POTION_REWARD_CAP,
+  QUEST_CRAFTING_MATERIAL_REWARD_CAP,
+  QUEST_SIGIL_REWARD_CAP,
+  isBossDifficulty,
   BREAKTHROUGH_SIGIL_ITEM_ID,
   BOSS_POOLS,
   MONSTER_POOLS,
@@ -37,6 +42,7 @@ import {
   getRankForPoints,
 } from '../../models/adventurerQuest';
 import { getAreaDisplayName } from '../../wiki/hooks/useWikiData';
+import { QUEST_GOLD_REWARD_CAP } from '../globalRates';
 import { makeBagItem } from '../../models/bagItem';
 
 function makeQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest {
@@ -581,8 +587,7 @@ describe('adventurerQuestSystem', () => {
       for (let i = 0; i < 300; i++) {
         for (const q of generateQuestList(difficulty, 'F')) {
           if (q.reward.type !== 'gold') continue;
-          const isBoss = q.type === 'errandboss' || q.type === 'collectboss';
-          const base = q.reward.amount / (2 * (isBoss ? 2 : 1));
+          const base = q.reward.amount / 2;
           // 還原成「每個素材／每隻怪的基準值」，才比得起來
           out.set(q.type, [...(out.get(q.type) ?? []), base / q.targetCount]);
         }
@@ -615,31 +620,32 @@ describe('adventurerQuestSystem', () => {
     });
 
     it('BOSS 素材收集同樣除以自己的 30% 掉率', () => {
-      const perUnit = goldBaseByType('S+').get('collectboss') ?? [];
-      expect(perUnit.length).toBeGreaterThan(0);
-      const golds = BOSS_POOLS['S+'].map(b => b.avgGold);
-      for (const value of perUnit) {
-        expect(value).toBeGreaterThanOrEqual(Math.min(...golds) * 3 / BOSS_COLLECT_DROP_RATE - 0.001);
-        expect(value).toBeLessThanOrEqual(Math.max(...golds) * 3 / BOSS_COLLECT_DROP_RATE + 0.001);
+      // 金幣在 S+ 幾乎都碰上限，改用不會碰上限的詞綴印記驗公式
+      let checked = 0;
+      for (let i = 0; i < 400; i++) {
+        for (const q of generateQuestList('S+', 'S')) {
+          if (q.type !== 'collectboss' || q.reward.type !== 'affix-sigil') continue;
+          const boss = BOSS_POOLS['S+'].find(b => b.name === q.targetMonster && b.area === q.targetArea)!;
+          const base = boss.avgGold * (q.targetCount / BOSS_COLLECT_DROP_RATE) * 3;
+          expect(q.reward.amount).toBe(Math.max(1, Math.floor(base / AFFIX_SIGIL_UNIT_VALUE)));
+          expect(q.reward.amount).toBeLessThan(QUEST_SIGIL_REWARD_CAP);
+          checked++;
+        }
       }
+      expect(checked).toBeGreaterThan(0);
     });
   });
 
   describe('獎勵倍率（§ 36.3 / § 36.9 步驟 2f）', () => {
     // 等階只影響獎勵「種類」的權重（§ 36.5.2），不得影響數量倍率。
-    // 迴歸：原實作對 US 等階額外乘 10，且與 BOSS ×2 互斥，兩者皆無文件依據。
-    function goldAmounts(
-      rank: GuildProgress['rank'],
-      bossOnly: boolean,
-    ): { base: number; type: AdventurerQuest['type'] }[] {
+    // 迴歸：原實作對 US 等階額外乘 10，無文件依據。
+    function goldAmounts(rank: GuildProgress['rank']): { base: number; type: AdventurerQuest['type'] }[] {
       const out: { base: number; type: AdventurerQuest['type'] }[] = [];
-      // 拆分後 BOSS 任務只出現在 S+ 分頁（§ 36.3.2）
       for (let i = 0; i < 400; i++) {
-        for (const q of generateQuestList(bossOnly ? 'S+' : 'S', rank)) {
-          const isBoss = q.type === 'errandboss' || q.type === 'collectboss';
-          if (q.reward.type === 'gold' && isBoss === bossOnly) {
+        for (const q of generateQuestList('S', rank)) {
+          if (q.reward.type === 'gold') {
             // 還原基準值：金幣獎勵 = 基準值 × 2
-            out.push({ base: q.reward.amount / (2 * (isBoss ? 2 : 1)), type: q.type });
+            out.push({ base: q.reward.amount / 2, type: q.type });
           }
         }
       }
@@ -658,26 +664,108 @@ describe('adventurerQuestSystem', () => {
       Math.max(...AREA_POOLS.S.map(a => a.avgGold)) * ENDURANCE_COUNT_RANGE.S.max;
 
     it('US 等階的一般任務金幣與 S 等階走同一條公式（無額外倍率）', () => {
-      const s = goldAmounts('S', false);
-      const us = goldAmounts('US', false);
+      const s = goldAmounts('S');
+      const us = goldAmounts('US');
       expect(s.length).toBeGreaterThan(0);
       expect(us.length).toBeGreaterThan(0);
       expect(Math.max(...s.map(q => q.base))).toBeLessThanOrEqual(MAX_NORMAL_BASE);
       expect(Math.max(...us.map(q => q.base))).toBeLessThanOrEqual(MAX_NORMAL_BASE);
     });
 
-    it('US 等階的 BOSS 任務仍享有且僅有 ×2', () => {
-      const us = goldAmounts('US', true);
-      expect(us.length).toBeGreaterThan(0);
-      // 還原後應等於 avgGold × 期望擊殺數 × 3。收集型的擊殺數 = 素材個數 ÷ 掉率（§ 36.9 步驟 2d）
-      const golds = BOSS_POOLS['S+'].map(b => b.avgGold);
-      for (const { base, type } of us) {
-        const maxKills = type === 'collectboss'
-          ? BOSS_COLLECT_TARGET_COUNT / BOSS_COLLECT_DROP_RATE
-          : BOSS_KILL_COUNT_RANGE.max;
-        expect(base).toBeGreaterThanOrEqual(Math.min(...golds) * BOSS_KILL_COUNT_RANGE.min * 3);
-        expect(base).toBeLessThanOrEqual(Math.max(...golds) * maxKills * 3);
+    it('US 等階的 BOSS 任務金幣 = min(100,000, BOSS 金幣 × 期望擊殺數 × 3 × 2)，無 BOSS ×2', () => {
+      // B+ 的 BOSS 殲滅金幣都在上限以下，驗得出有沒有多乘 ×2
+      let uncapped = 0;
+      for (let i = 0; i < 400; i++) {
+        for (const q of generateQuestList('B+', 'US')) {
+          if (q.reward.type !== 'gold') continue;
+          const boss = BOSS_POOLS['B+'].find(b => b.name === q.targetMonster && b.area === q.targetArea)!;
+          // 收集型的擊殺數 = 素材個數 ÷ 掉率（§ 36.9 步驟 2d）
+          const kills = q.type === 'collectboss' ? q.targetCount / BOSS_COLLECT_DROP_RATE : q.targetCount;
+          const expected = Math.floor(boss.avgGold * kills * 3 * 2);
+          expect(q.reward.amount).toBe(Math.min(QUEST_GOLD_REWARD_CAP, expected));
+          if (expected < QUEST_GOLD_REWARD_CAP) uncapped++;
+        }
       }
+      expect(uncapped).toBeGreaterThan(0);
+    });
+  });
+
+  describe('印記獎勵換算（§ 36.5.1）', () => {
+    const SIGIL_UNIT: Partial<Record<string, number>> = {
+      'quality-stone': CRAFT_SIGIL_UNIT_VALUE,
+      'enhancement-stone': CRAFT_SIGIL_UNIT_VALUE,
+      'affix-sigil': AFFIX_SIGIL_UNIT_VALUE,
+    };
+
+    it('換算單價：工藝／精鍊 1,000 金/個、詞綴 10,000 金/個', () => {
+      expect(CRAFT_SIGIL_UNIT_VALUE).toBe(1000);
+      expect(AFFIX_SIGIL_UNIT_VALUE).toBe(10000);
+    });
+
+    it('一般殲滅：數量 = min(50, max(1, floor(區域平均金幣 × 數量 ÷ 單價)))', () => {
+      const seen = new Set<string>();
+      for (let i = 0; i < 400; i++) {
+        for (const q of generateQuestList('S', 'S')) {
+          const unit = SIGIL_UNIT[q.reward.type];
+          if (q.type !== 'errand' || unit === undefined) continue;
+          const area = AREA_POOLS.S.find(a => a.areaId === q.targetArea)!;
+          expect(q.reward.amount).toBe(Math.min(QUEST_SIGIL_REWARD_CAP, Math.max(1, Math.floor(area.avgGold * q.targetCount / unit))));
+          seen.add(q.reward.type);
+        }
+      }
+      expect([...seen].sort()).toEqual(['affix-sigil', 'enhancement-stone', 'quality-stone']);
+    });
+
+    it('BOSS 殲滅：數量 = min(50, max(1, floor(BOSS 金幣 × 數量 × 3 ÷ 單價)))，無 BOSS ×2', () => {
+      const seen = new Set<string>();
+      for (let i = 0; i < 400; i++) {
+        for (const q of generateQuestList('S+', 'S')) {
+          const unit = SIGIL_UNIT[q.reward.type];
+          if (q.type !== 'errandboss' || unit === undefined) continue;
+          const boss = BOSS_POOLS['S+'].find(b => b.name === q.targetMonster && b.area === q.targetArea)!;
+          expect(q.reward.amount).toBe(Math.min(QUEST_SIGIL_REWARD_CAP, Math.max(1, Math.floor(boss.avgGold * q.targetCount * 3 / unit))));
+          seen.add(q.reward.type);
+        }
+      }
+      expect([...seen].sort()).toEqual(['affix-sigil', 'enhancement-stone', 'quality-stone']);
+    });
+  });
+
+  describe('獎勵數量上限（§ 36.5.1）', () => {
+    const TABS = ['D', 'C', 'B', 'B+', 'A', 'A+', 'S', 'S+'] as const;
+    const SIGIL_TYPES = new Set(['quality-stone', 'enhancement-stone', 'affix-sigil']);
+
+    function maxAmounts(): Map<string, number> {
+      const max = new Map<string, number>();
+      const track = (key: string, amount: number) => max.set(key, Math.max(max.get(key) ?? 0, amount));
+      for (const tab of TABS) {
+        for (let i = 0; i < 400; i++) {
+          for (const q of generateQuestList(tab, 'S')) {
+            const { type, amount } = q.reward;
+            if (type === 'potion') track(isBossDifficulty(tab) ? 'boss-potion' : 'potion', amount);
+            else if (SIGIL_TYPES.has(type)) track('sigil', amount);
+            else track(type, amount);
+          }
+        }
+      }
+      return max;
+    }
+
+    it('上限值：金幣 100,000、藥水 100／BOSS 150、製作素材 50、印記 50', () => {
+      expect(QUEST_GOLD_REWARD_CAP).toBe(100000);
+      expect(QUEST_POTION_REWARD_CAP).toBe(100);
+      expect(BOSS_QUEST_POTION_REWARD_CAP).toBe(150);
+      expect(QUEST_CRAFTING_MATERIAL_REWARD_CAP).toBe(50);
+      expect(QUEST_SIGIL_REWARD_CAP).toBe(50);
+    });
+
+    it('各類獎勵的最大值剛好等於上限（換算值超過上限的任務必定存在）', () => {
+      const max = maxAmounts();
+      expect(max.get('gold')).toBe(QUEST_GOLD_REWARD_CAP);
+      expect(max.get('potion')).toBe(QUEST_POTION_REWARD_CAP);
+      expect(max.get('boss-potion')).toBe(BOSS_QUEST_POTION_REWARD_CAP);
+      expect(max.get('crafting-material')).toBe(QUEST_CRAFTING_MATERIAL_REWARD_CAP);
+      expect(max.get('sigil')).toBe(QUEST_SIGIL_REWARD_CAP);
     });
   });
 

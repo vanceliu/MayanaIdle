@@ -116,6 +116,19 @@ export interface AffixDefinition {
   description: string;
 }
 
+/**
+ * 受擊回復的**回復比例**（§ 7.4）：回血 2~4%、回魔 2~5% 的最大值。
+ *
+ * **Tier 只決定觸發率**（走通用表），回復比例與 Tier 無關，另外抽。
+ */
+export const ON_HIT_RESTORE_PERCENT: Record<'on_hit_hp' | 'on_hit_mp', [number, number]> = {
+  on_hit_hp: [2, 4],
+  on_hit_mp: [2, 5],
+};
+
+const restoreRange = (type: 'on_hit_hp' | 'on_hit_mp') =>
+  `${ON_HIT_RESTORE_PERCENT[type][0]}~${ON_HIT_RESTORE_PERCENT[type][1]}%`;
+
 export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   // Weapon affixes (8) —— § 7.4 攻擊類
   { type: 'attack_power', name: '攻擊力', category: ['weapon'], group: '攻擊類', description: '攻擊力 +X%' },
@@ -142,8 +155,8 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   // 飾品／盾牌專屬 (1)
   { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'], group: '飾品／盾牌專屬', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速的機率' },
   // 受擊回復（2）—— X% 是觸發率，回復量另外抽（§ 7.4）
-  { type: 'on_hit_hp', name: '受擊回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '受到傷害時 X% 機率回復最大 HP 的一定比例' },
-  { type: 'on_hit_mp', name: '受擊回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '受到傷害時 X% 機率回復最大 MP 的一定比例' },
+  { type: 'on_hit_hp', name: '受擊回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: `受到傷害時 X% 機率回復最大 HP 的 ${restoreRange('on_hit_hp')}` },
+  { type: 'on_hit_mp', name: '受擊回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: `受到傷害時 X% 機率回復最大 MP 的 ${restoreRange('on_hit_mp')}` },
 ];
 
 export interface Affix {
@@ -196,16 +209,6 @@ export function isTierlessAffixType(type: AnyAffixType): type is SpecialAffixTyp
 
 /** 額外屬性詞綴固定給 +1（§ 7.3.1），不受品質放大 */
 export const BONUS_ATTRIBUTE_VALUE = 1;
-
-/**
- * 受擊回復的**回復比例**（§ 7.4）：回血 2~4%、回魔 2~5% 的最大值。
- *
- * **Tier 只決定觸發率**（走通用表），回復比例與 Tier 無關，另外抽。
- */
-export const ON_HIT_RESTORE_PERCENT: Record<'on_hit_hp' | 'on_hit_mp', [number, number]> = {
-  on_hit_hp: [2, 4],
-  on_hit_mp: [2, 5],
-};
 
 /** 受擊回復比例：抽到當下在該範圍內決定後固定不變（單位為百分比）。 */
 export function rollRestorePercent(type: 'on_hit_hp' | 'on_hit_mp'): number {
@@ -579,6 +582,23 @@ export function formatAffixValue(affix: Affix, quality: number = 0): string {
   if (isSpecialAffixType(affix.type)) return '';
   const unit = isFlatAffixType(affix.type) || isAttributeAffixType(affix.type) ? '' : '%';
   return `+${getEffectiveAffixValue(affix, quality)}${unit}`;
+}
+
+/**
+ * 詞綴說明（§ 7.4 效果文字）：X 代入數值，去掉開頭「X% 是觸發率：」；
+ * 受擊回血／回魔的回復比例範圍代入該條抽到的比例。
+ */
+export function formatAffixDescription(affix: Affix, quality: number = 0): string {
+  const description = isSpecialAffixType(affix.type)
+    ? getSpecialAffixDefinition(affix.type)?.description
+    : AFFIX_DEFINITIONS.find(d => d.type === affix.type)?.description;
+  if (!description) return '';
+  const value = String(getEffectiveAffixValue(affix, quality));
+  const text = description.replace(/^X% 是觸發率：/, '').replace(/X/g, value);
+  if ((affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') && affix.restorePercent != null) {
+    return text.replace(restoreRange(affix.type), `${restorePercentWithQuality(affix, quality)}%`);
+  }
+  return text;
 }
 
 export function formatAffixDisplay(affix: Affix, quality: number = 0): string {

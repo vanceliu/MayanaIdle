@@ -28,6 +28,12 @@ import {
   DELIVER_VALUE_MULTIPLIER,
   SIGIL_DELIVER_ITEM_IDS,
   AFFIX_SIGIL_ITEM_IDS,
+  CRAFT_SIGIL_UNIT_VALUE,
+  AFFIX_SIGIL_UNIT_VALUE,
+  QUEST_POTION_REWARD_CAP,
+  BOSS_QUEST_POTION_REWARD_CAP,
+  QUEST_CRAFTING_MATERIAL_REWARD_CAP,
+  QUEST_SIGIL_REWARD_CAP,
   BREAKTHROUGH_SIGIL_ITEM_ID,
   SIGIL_QUEST_TABLE,
   MATERIAL_POOLS,
@@ -151,6 +157,11 @@ function generateQuestDescription(
   return fill(pickRandom(templates.openings)) + fill(pickRandom(templates.tasks));
 }
 
+/** § 36.5.1：換算數量至少 1 個，不超過上限 */
+function convertAmount(baseValue: number, unitValue: number, cap: number): number {
+  return Math.min(cap, Math.max(1, Math.floor(baseValue / unitValue)));
+}
+
 function calculateReward(
   type: RewardType,
   baseValue: number,
@@ -161,16 +172,16 @@ function calculateReward(
       return { type: 'gold', amount: settleQuestGold(Math.floor(baseValue * 2)) };
     case 'potion': {
       const potion = pickRandom(POTION_REWARDS);
-      const amount = Math.max(1, Math.floor(baseValue / potion.unitPrice));
-      return { type: 'potion', itemId: potion.itemId, amount };
+      const cap = isBossDifficulty(difficulty) ? BOSS_QUEST_POTION_REWARD_CAP : QUEST_POTION_REWARD_CAP;
+      return { type: 'potion', itemId: potion.itemId, amount: convertAmount(baseValue, potion.unitPrice, cap) };
     }
     case 'quality-stone': {
       const item = getItem(9);
-      return { type: 'quality-stone', itemId: item.id, amount: Math.max(1, Math.floor(baseValue / 100)) };
+      return { type: 'quality-stone', itemId: item.id, amount: convertAmount(baseValue, CRAFT_SIGIL_UNIT_VALUE, QUEST_SIGIL_REWARD_CAP) };
     }
     case 'enhancement-stone': {
       const item = getItem(10);
-      return { type: 'enhancement-stone', itemId: item.id, amount: Math.max(1, Math.floor(baseValue / 100)) };
+      return { type: 'enhancement-stone', itemId: item.id, amount: convertAmount(baseValue, CRAFT_SIGIL_UNIT_VALUE, QUEST_SIGIL_REWARD_CAP) };
     }
     case 'weapon-scroll': {
       const item = getItem(7);
@@ -184,13 +195,12 @@ function calculateReward(
       const materialIds = CRAFTING_MATERIAL_REWARDS[getBaseDifficulty(difficulty)] ?? CRAFTING_MATERIAL_REWARDS.B!;
       const itemId = pickRandom(materialIds);
       const item = getItem(itemId);
-      const amount = Math.max(1, Math.floor(baseValue / (item.sellPrice! * 3)));
+      const amount = convertAmount(baseValue, item.sellPrice! * 3, QUEST_CRAFTING_MATERIAL_REWARD_CAP);
       return { type: 'crafting-material', itemId: item.id, amount };
     }
     case 'affix-sigil': {
-      // § 36.5.1：以 1,000 金/個計（賣價 500 的兩倍，與 50 金印記的 100 金/個同一條規則）
       const item = getItem(pickRandom(AFFIX_SIGIL_ITEM_IDS));
-      return { type: 'affix-sigil', itemId: item.id, amount: Math.max(1, Math.floor(baseValue / 1000)) };
+      return { type: 'affix-sigil', itemId: item.id, amount: convertAmount(baseValue, AFFIX_SIGIL_UNIT_VALUE, QUEST_SIGIL_REWARD_CAP) };
     }
     case 'breakthrough-sigil':
       // § 36.5.1：固定 1 個。掉率 0.1%，換算數量會讓它變成大宗貨
@@ -356,12 +366,11 @@ function buildQuest(
   const killEquivalent = targetCount / dropRate;
   const baseValue = extra.baseValueOverride
     ?? (isBossQuest ? avgGold * killEquivalent * 3 : avgGold * killEquivalent);
-  // § 36.9 步驟 2f：BOSS 任務獎勵 ×2。等階只影響獎勵「種類」的權重（§ 36.5.2），不影響數量倍率。
-  const rewardMultiplier = isBossQuest ? 2 : 1;
+  // 等階只影響獎勵「種類」的權重（§ 36.5.2），不影響數量倍率。
   // 獎勵固定的型別（交付印記）連抽都不抽，抽了只是白轉一次 RNG
   const reward = extra.fixedReward ?? calculateReward(
     weightedPick(REWARD_WEIGHTS[guildRank]).type,
-    baseValue * rewardMultiplier,
+    baseValue,
     difficulty,
   );
   // § 36.4.2：BOSS 分頁與一般分頁各有一張基底貢獻表

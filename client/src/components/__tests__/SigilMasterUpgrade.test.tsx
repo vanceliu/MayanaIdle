@@ -368,3 +368,33 @@ describe('版面結構', () => {
     expect(container.querySelectorAll('.sigil-col')).toHaveLength(2);
   });
 });
+
+describe('印記師 — 詞綴列 tooltip（§ 13.13.1）', () => {
+  const rowOf = (label: string) => screen.getByText(label).closest('button')!;
+
+  it('整列 title 是詞綴說明，數值與列上一致（不吃品質）', () => {
+    setup(gear([{ type: 'attack_power', tier: 4, value: 12 }], { quality: 20 }), []);
+    expect(rowOf('攻擊力 T4').getAttribute('title')).toBe('攻擊力 +12%');
+    expect(within(rowOf('攻擊力 T4')).getByText('+12%')).toBeTruthy();
+  });
+
+  it('滿值詞綴下一行接「此詞綴為該 Tier 最大值」，名稱標籤不再另掛 title', () => {
+    setup(gear([{ type: 'attack_power', tier: 4, value: 13 }]), []);
+    const row = rowOf('攻擊力 T4');
+    expect(row.getAttribute('title')).toBe('攻擊力 +13%\n此詞綴為該 Tier 最大值');
+    expect(screen.getByText('攻擊力 T4').getAttribute('title')).toBeNull();
+  });
+
+  it('受擊回血的回復比例代入該條抽到的值', () => {
+    setup(gear([{ type: 'on_hit_hp', tier: 3, value: 8, restorePercent: 3 }], { slot: 'body', type: 'armor' } as never), []);
+    expect(rowOf('受擊回血 T3').getAttribute('title')).toBe('受到傷害時 8% 機率回復最大 HP 的 3%');
+  });
+
+  it('不能選的詞綴列同樣有 title', () => {
+    setup(gear([{ type: 'immune_poison', tier: 0, value: 0 }]), [{ name: '精鍊印記', amount: 1 }]);
+    pickSigil('精鍊印記');
+    const row = rowOf('[特殊] 毒免疫');
+    expect(row.getAttribute('aria-disabled')).toBe('true');
+    expect(row.getAttribute('title')).toBe('免疫中毒（100%）');
+  });
+});

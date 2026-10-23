@@ -18,9 +18,12 @@ export function settleGoldDrop(baseGold: number, affixMultiplier: number, global
   return Math.floor(Math.min(baseGold, GOLD_DROP_CAP) * affixMultiplier * globalRate);
 }
 
-/** `36-quest-system.md` § 36.3：任務金幣獎勵 × 全域金幣倍率 */
+/** `36-quest-system.md` § 36.5.1：任務金幣獎勵上限，在全域倍率之前套用 */
+export const QUEST_GOLD_REWARD_CAP = 100000;
+
+/** `36-quest-system.md` § 36.3：min(任務金幣, 100,000) × 全域金幣倍率 */
 export function settleQuestGold(amount: number, globalRate = rates.gold): number {
-  return Math.floor(amount * globalRate);
+  return Math.floor(Math.min(amount, QUEST_GOLD_REWARD_CAP) * globalRate);
 }
 
 /** `28-monster-stats.md` § 28.1 ＋ `04-character.md` § 4.11：基礎 × 3 × 回鍋 × 全域經驗倍率 */
