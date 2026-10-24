@@ -146,6 +146,14 @@ describe('T6/T7 掉落限定', () => {
     expect(charged).toEqual([]);
   });
 
+  it('同一份配方的材料不重複（`06-equipment-acquire.md` § 6A.3）', () => {
+    const duplicated = REAL
+      .filter(t => t.craftMaterials?.length)
+      .filter(t => new Set(t.craftMaterials!.map(m => m.itemId)).size !== t.craftMaterials!.length)
+      .map(t => t.name);
+    expect(duplicated).toEqual([]);
+  });
+
   it('T6 與 T7 都有裝備存在', () => {
     expect(REAL.filter(t => t.tier === MONSTER_DROP_ONLY_TIER).length).toBeGreaterThan(0);
     expect(REAL.filter(t => t.tier === BOSS_DROP_ONLY_TIER).length).toBeGreaterThan(0);

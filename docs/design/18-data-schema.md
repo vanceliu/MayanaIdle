@@ -280,7 +280,7 @@ server 端維持同一設計：單一資料表 + 型別欄位，不做 polymorph
 | buyPrice | number? | 商店價格（shop 時必填） |
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
 | craftGold | number? | 製作金幣，一律 0（製作不收費，見 `06-equipment-acquire.md` § 6A.3） |
-| craftMaterials | json? | 製作素材 `[{name, amount}]`（craft 時必填） |
+| craftMaterials | json? | 製作素材 `[{itemId, amount}]`（craft 時必填；同配方 itemId 不重複，見 `06-equipment-acquire.md` § 6A.3） |
 | craftPrerequisiteWeapon | json? | 前置武器需求 `{templateId, quantity}`（高級進階以上製作品）。**存 templateId 不存名稱**，見 `99-ai-constraints.md` § 99.1 第 3 條 |
 
 ### 取得方式規則
