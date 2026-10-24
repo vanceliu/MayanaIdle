@@ -133,7 +133,7 @@
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
 | **自架私服（單機＝本機 server／開放＝對外 bind）** | `97-selfhosted-server.md` | 全文（定案） |
 | **`server.properties`（設定鍵／生效時機／headless）／連線心跳（ping／閒置斷線／latency 訊息）／狀態同步（`frame` 訊息／欄位編碼）** | `97-selfhosted-server.md` | § 97.2 |
-| **帳號／host 帳號／session／同帳號重複進場／救援碼／登入嘗試限制** | `97-selfhosted-server.md` | § 97.5 |
+| **帳號／host 帳號／session／同帳號重複進場／斷線重連回原角色／救援碼／登入嘗試限制** | `97-selfhosted-server.md` | § 97.5 |
 | **決定性要求（seeded PRNG／tick 時間／純函數）** | `97-selfhosted-server.md` | § 97.6 |
 | **地圖實例／隊伍怪物上限／怪物目標／掉落經驗分配** | `97-selfhosted-server.md` | § 97.7.1 |
 | **聊天頻道** | `97-selfhosted-server.md` | § 97.7.2 |

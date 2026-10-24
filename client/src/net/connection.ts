@@ -7,6 +7,7 @@ import { BUILD_INFO } from '../buildInfo';
 import type { ClientMessage, ServerMessage, ActionStore, LeaderboardSnapshotView } from './protocol';
 import { useOnlineStore, readSessionToken, writeSessionToken } from './online';
 import { applyServerMessage } from './mirror';
+import { defaultSession } from '../stores/session';
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
 
@@ -20,6 +21,10 @@ export class GameConnection {
   private pending = new Map<number, Pending>();
   private reconnectDelay = RECONNECT_BASE_MS;
   private closedByUser = false;
+  /** 斷線前遊戲中的角色，重連登入後自動選回（§ 97.5 斷線重連） */
+  private rejoinCharacterId: number | null = null;
+  /** 自動選回已送出、尚未收到結果 */
+  private rejoinPending = false;
 
   connect(url: string): void {
     this.url = url;
@@ -89,6 +94,7 @@ export class GameConnection {
   }
 
   logout(): void {
+    this.rejoinCharacterId = null;
     this.send({ t: 'logout' });
     writeSessionToken(null);
     useOnlineStore.setState({ status: 'login', username: null, userId: null, hasRecoveryCode: false, recoveryCode: null });
@@ -121,10 +127,19 @@ export class GameConnection {
       useOnlineStore.setState({ latencyMs: null });
       const st = useOnlineStore.getState();
       if (this.closedByUser || st.status === 'version_mismatch') return;
+      this.rejoinCharacterId = st.kickedReason ? null : defaultSession.game.getState().character?.id ?? null;
       useOnlineStore.setState({ status: 'disconnected' });
       setTimeout(() => this.open(), this.reconnectDelay);
       this.reconnectDelay = Math.min(RECONNECT_MAX_MS, this.reconnectDelay * 2);
     };
+  }
+
+  /** 登入後：有斷線前的角色就直接選回，否則進角色選擇 */
+  private enterAfterAuth(): void {
+    const id = this.rejoinCharacterId;
+    this.rejoinCharacterId = null;
+    this.rejoinPending = id !== null;
+    this.send(id !== null ? { t: 'select_character', id } : { t: 'characters' });
   }
 
   private handle(msg: ServerMessage): void {
@@ -134,7 +149,7 @@ export class GameConnection {
         if (msg.autoLogin) {
           writeSessionToken(msg.autoLogin.token);
           useOnlineStore.setState({ status: 'authed', username: msg.autoLogin.username, userId: msg.autoLogin.userId, hasPassword: false, hasRecoveryCode: false, isHost: msg.autoLogin.isHost });
-          this.send({ t: 'characters' });
+          this.enterAfterAuth();
           return;
         }
         const token = readSessionToken();
@@ -151,7 +166,7 @@ export class GameConnection {
           status: 'authed', username: msg.username, userId: msg.userId, hasPassword: msg.hasPassword, hasRecoveryCode: msg.hasRecoveryCode, isHost: msg.isHost, error: null,
           ...(msg.recoveryCode ? { recoveryCode: msg.recoveryCode } : {}),
         });
-        this.send({ t: 'characters' });
+        this.enterAfterAuth();
         return;
       case 'recovery_code':
         useOnlineStore.setState({ recoveryCode: msg.code, hasRecoveryCode: true });
@@ -167,8 +182,14 @@ export class GameConnection {
         }
         if (msg.code === 'session_expired') {
           writeSessionToken(null);
+          this.rejoinCharacterId = null;
           // 改密碼撤銷了這條 session 時，回登入畫面要看得到原因（§ 97.5）
           useOnlineStore.setState({ status: 'login', error: useOnlineStore.getState().kickedReason, kickedReason: null });
+          return;
+        }
+        if (this.rejoinPending) {
+          this.rejoinPending = false;
+          this.send({ t: 'characters' });
           return;
         }
         useOnlineStore.setState({ error: msg.message });
@@ -198,6 +219,7 @@ export class GameConnection {
         useOnlineStore.setState({ error: msg.reason, kickedReason: msg.reason });
         return;
       default:
+        if (msg.t === 'frame') this.rejoinPending = false;
         applyServerMessage(msg);
     }
   }

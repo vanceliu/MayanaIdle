@@ -2,7 +2,7 @@ import { useOnlineStore } from '../net/online';
 
 /** 延遲分級門檻（`47-mobile.md` § 47.6）：低於 good 為綠、到 fair（含）為黃、超過為紅 */
 export const LATENCY_GOOD_BELOW_MS = 100;
-export const LATENCY_FAIR_UP_TO_MS = 250;
+export const LATENCY_FAIR_UP_TO_MS = 300;
 
 export type LatencyLevel = 'good' | 'fair' | 'poor';
 

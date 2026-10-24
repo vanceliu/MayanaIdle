@@ -14,12 +14,12 @@ describe('連線延遲顯示', () => {
     useOnlineStore.setState({ enabled: true, latencyMs: null });
   });
 
-  it('分級：低於 100 綠、100～250 黃、超過 250 紅', () => {
+  it('分級：低於 100 綠、100～300 黃、超過 300 紅', () => {
     expect(latencyLevel(0)).toBe('good');
     expect(latencyLevel(99)).toBe('good');
     expect(latencyLevel(100)).toBe('fair');
-    expect(latencyLevel(250)).toBe('fair');
-    expect(latencyLevel(251)).toBe('poor');
+    expect(latencyLevel(300)).toBe('fair');
+    expect(latencyLevel(301)).toBe('poor');
   });
 
   it('顯示毫秒數並套用分級', () => {
