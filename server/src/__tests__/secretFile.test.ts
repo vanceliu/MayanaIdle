@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, statSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SECRET_FILE_MODE, writeSecretFile } from '../secretFile';
+import { SECRET_FILE_MODE, restrictFile, writeSecretFile } from '../secretFile';
 import { loadConfig, saveConfig } from '../config';
 import { openDatabase } from '../db/sqlite';
 
@@ -18,6 +18,22 @@ function tempDir(): string {
 
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+describe('權限收緊失敗（不支援 Unix 權限的檔案系統）', () => {
+  it('chmod 拋 EPERM：不中止，只記一次警告', () => {
+    const dir = tempDir();
+    const file = join(dir, 'on-usb');
+    writeFileSync(file, 'x');
+    const eperm = () => { throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' }); };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => restrictFile(file, eperm)).not.toThrow();
+    expect(() => restrictFile(file, eperm)).not.toThrow();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
 });
 
 describe.skipIf(process.platform === 'win32')('機密檔案權限', () => {

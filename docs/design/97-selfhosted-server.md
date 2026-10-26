@@ -55,7 +55,7 @@
 | 參數驗證 | 數量參數一律正的安全整數（丟棄確認例外：0 或負數丟 1 個，非整數不處理）；裝備欄位限 `SLOT_ORDER`；屬性鍵限六屬性；印記類型限已定義的種類、詞綴編號為 null 或範圍內整數；旅館 mode 限 full／hp／mp，且只在地區類型為城鎮時生效。不合格不處理 |
 | 天賦與撤退設定驗證 | 天賦參數依該規則的參數定義逐欄位驗證（數字在範圍內、選項在清單內、道具存在、開關為布林），未定義欄位（含 `type`）丟棄，任一欄不合格整筆不寫；格位編號為 null 或非負整數；安裝類型限三種、天賦配置須存在、數量上限見 `51-auto-talent.md` § 51.3.4。緊急撤退：HP 門檻 1~100、動作固定回城、城鎮為空或已定義的卷軸城鎮（`03-combat.md` § 3.13） |
 | HTTP 安全標頭 | 每個回應都帶 `X-Frame-Options: DENY`、`Content-Security-Policy: frame-ancestors 'none'`、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff` |
-| 機密檔案權限 | `server.properties`、SQLite（含 WAL／SHM）、備份檔一律 0600 |
+| 機密檔案權限 | `server.properties`、SQLite（含 WAL／SHM）、備份檔一律 0600。檔案系統不支援 Unix 權限（FAT／exFAT／NTFS 等）時只記一次警告、照常啟動，存取限制改由掛載選項負責 |
 | 訊息依序處理 | 同一連線的訊息依收到順序逐一處理，前一則處理完才處理下一則 |
 | 錯誤訊息不終止 server | 不是合法 JSON 回 `bad_json`；JSON 合法但不是含字串 `t` 的物件回 `bad_message`；兩者皆保留連線。HTTP request URL 無法解析回 400。非預期錯誤回 client 固定字串「伺服器內部錯誤」，細節只寫 log。未處理的 Promise rejection 只記 error log，行程不結束（server 執行檔與桌面版皆同） |
 | 連線心跳 | server 每 30 秒對每條連線送 WebSocket ping；上一輪的 ping 到下一輪仍沒收到 pong 即中斷連線，照一般斷線處理。收到 pong 時以 `latency` 訊息把往返毫秒數推給該連線（顯示見 `47-mobile.md` § 47.6）。間隔不可設定 |
