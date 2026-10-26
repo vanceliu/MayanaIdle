@@ -29,8 +29,15 @@ export interface MailboxState {
   reset: () => void;
 }
 
-export function createMailboxStore(_session: Session) {
-  return create<MailboxState>((set, get) => ({
+export function createMailboxStore(session: Session) {
+  return create<MailboxState>((set, get) => {
+  /** 領到的天賦格進背包「天賦」分頁，未安裝（§ 52.3） */
+  async function afterClaim(characterId: number) {
+    await get().refresh();
+    await session.talent.getState().load(characterId);
+  }
+
+  return {
   characterId: null,
   mails: [],
   unread: 0,
@@ -50,7 +57,7 @@ export function createMailboxStore(_session: Session) {
     const { characterId } = get();
     if (characterId === null || !(await isOwnMail(mailId, characterId))) return false;
     const ok = await claimMail(mailId);
-    if (ok) await get().refresh();
+    if (ok) await afterClaim(characterId);
     return ok;
   },
 
@@ -58,7 +65,7 @@ export function createMailboxStore(_session: Session) {
     const { characterId } = get();
     if (characterId === null) return 0;
     const n = await claimAllMail(characterId);
-    if (n > 0) await get().refresh();
+    if (n > 0) await afterClaim(characterId);
     return n;
   },
 
@@ -79,7 +86,8 @@ export function createMailboxStore(_session: Session) {
   },
 
   reset: () => set({ characterId: null, mails: [], unread: 0 }),
-}));
+  };
+  });
 }
 
 export const useMailboxStore = createMailboxStore(defaultSession);

@@ -151,7 +151,7 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
   game: new Set([
     'setSearchMode',
     'equipItem', 'unequipItem', 'usePotionByType', 'useSpeedPotion',
-    'assignQuickSlot', 'setBagSlotMap', 'useQuickSlot', 'castQuickSlotSkill', 'castSelfSkill',
+    'assignQuickSlot', 'setBagSlotMap', 'setTalentBagOrder', 'useQuickSlot', 'castQuickSlotSkill', 'castSelfSkill',
     'useTownScroll', 'useCureItem', 'navigateTo',
     'setEmergencyRetreat', 'setActiveTemplate', 'addScriptTemplate',
     'duplicateScriptTemplate', 'renameScriptTemplate', 'removeScriptTemplate',

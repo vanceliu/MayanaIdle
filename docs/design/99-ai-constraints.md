@@ -30,6 +30,19 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 線上模式 client 端呼叫修正（`97-selfhosted-server.md` § 97.2、`35-inventory-constraints.md` § 35.21.1、`52-mailbox.md` § 52.4）
+
+規格：遠端 action 參數必須可 JSON 序列化；寫入持久層或連動其他 store 的後續處理寫在 store action 內，元件不自行串接。
+天賦分頁位置經 server 寫入 `talent_bag_layouts`；背包與天賦分頁位置格式不合（非物件、值非非負整數）整筆不寫；領取信件後 server 端天賦格重新載入。
+
+- [x] P1 `ScriptEditorPanel.tsx` 新增分頁「＋」不傳事件物件（commit `387a32b`）
+- [x] P2 `protocol.ts` 加 `setTalentBagOrder`；`gameStore.ts` `setTalentBagOrder` 驗證格式
+- [x] P3 `mailboxStore.ts` `claim`／`claimAll` 成功後重新載入天賦；`MailboxPanel.tsx` 移除 `load()`
+- [x] P4 測試：線上整理送出 `setTalentBagOrder`；非法格式不寫；領取後天賦 store 含新格
+- [x] P5 `npx tsc -b`、client／server／desktop vitest
+- [x] P6 文件：97 § 97.2 硬性要求
+- [x] P7 `setBagSlotMap` 同樣驗證格式；測試；`npx tsc -b`、三邊 vitest；文件
+
 ### M4 ＋ Low 安全收尾（`97-selfhosted-server.md` § 97.2／§ 97.4／§ 97.5／§ 97.7.2／§ 97.8）
 
 規格：角色離開只清發話計數，未到期禁言保留；內部錯誤回固定字串；HTTP 回應帶防嵌入與 Referrer 標頭；

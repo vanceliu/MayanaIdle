@@ -20,6 +20,12 @@ export interface BagSlotItem {
 /** itemId → 格子索引。只收錄手動移動過的項目 */
 export type BagSlotMap = Record<string, number>;
 
+/** 遠端傳入的位置表格式檢查：一般物件，每個值都是非負安全整數 */
+export function isBagSlotMap(value: unknown): value is BagSlotMap {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return Object.values(value).every(at => Number.isSafeInteger(at) && (at as number) >= 0);
+}
+
 /**
  * 格子位置的 localStorage key（§ 35.17）。
  *

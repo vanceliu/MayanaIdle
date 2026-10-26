@@ -49,7 +49,7 @@ import { rollDrops, rollBossDrops } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { getItemId, getItemById } from '../models/items';
-import type { BagSlotMap } from '../models/bagLayout';
+import { isBagSlotMap, type BagSlotMap } from '../models/bagLayout';
 import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem, isPositiveCount } from '../models/bagItem';
@@ -1289,12 +1289,14 @@ export function createGameStore(session: Session) {
   },
 
   setTalentBagOrder: (order) => {
+    if (!isBagSlotMap(order)) return;
     set({ talentBagOrder: order });
     const char = get().character;
     if (char?.id) saveTalentBagLayout(char.id, order, session);
   },
 
   setBagSlotMap: (slotMap) => {
+    if (!isBagSlotMap(slotMap)) return;
     set({ bagSlotMap: slotMap });
     const char = get().character;
     if (char?.id) saveBagLayout(char.id, slotMap, session);

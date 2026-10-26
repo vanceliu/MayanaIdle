@@ -50,6 +50,7 @@
 | client 無遊戲邏輯 | client 只做渲染、輸入與插值；所有判定在 server |
 | tick 錯誤隔離 | tick 中單一玩家的步驟出錯：該玩家本 tick 其餘步驟跳過、記 error log、踢除（原因「角色狀態異常，已中斷連線」，踢除照常 flush），之後不再進 tick。單一實例出錯：該實例本 tick 其餘步驟跳過、記 error log；實例只有一名在場玩家時視同該玩家出錯。其他玩家與實例照常 |
 | 遠端 action 允許清單 | client 只能呼叫 `net/protocol.ts` 的 `ACTION_ALLOWLIST` 列出的 action，其餘回 `action_denied`。client 專用（介面狀態）或 server 內部用（效果增減、存檔、換區、任務板產生、舊腳本規則）的 action 不得列入；試驗場木樁（`mapMonster`）不經 server（§ 97.9）；介面操作提示（`pushSystemLog`）只在 client 本機顯示。任務板只在不屬於目前城鎮時重新產生（`ensureQuestBoardForTown`）；同城重刷只能走扣貢獻的 `rerollQuestBoard`（`36-quest-system.md` § 36.6.3） |
+| client 端呼叫遠端 action | 參數必須可 JSON 序列化：介面事件不可直接以 store action 當處理函式（事件物件會成為參數、序列化失敗、請求送不出）。寫入持久層或連動其他 store 的後續處理寫在 store action 內、由 server 執行，介面元件不自行串接（client 沒有持久層）。背包位置（`setBagSlotMap`、天賦分頁 `setTalentBagOrder`）格式不合（非物件、值非非負整數）整筆不寫 |
 | action 擁有權 | 以 id 指定對象的 action（裝備、丟棄、天賦格、信件），對象必須屬於自己，否則不處理。傳入完整物件的 action 只取其 id，從自己的資料取實例，其餘欄位不採用 |
 | 價格與內容由 server 決定 | 雜貨店購買只收道具 id 與數量，單價依所在城鎮貨架（`13-town.md` § 13.4）；非貨架品、數量非正整數、金幣或背包格數不足整筆不成交。裝備回收價只依 server 模板快取，新手裝與無回收價者不賣。接冒險者任務只取 id，任務內容取自自己的任務板 |
 | 參數驗證 | 數量參數一律正的安全整數（丟棄確認例外：0 或負數丟 1 個，非整數不處理）；裝備欄位限 `SLOT_ORDER`；屬性鍵限六屬性；印記類型限已定義的種類、詞綴編號為 null 或範圍內整數；旅館 mode 限 full／hp／mp，且只在地區類型為城鎮時生效。不合格不處理 |

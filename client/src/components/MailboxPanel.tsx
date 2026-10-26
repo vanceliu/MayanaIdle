@@ -1,6 +1,4 @@
 import { useMailboxStore } from '../stores/mailboxStore';
-import { useTalentStore } from '../stores/talentStore';
-import { useGameStore } from '../stores/gameStore';
 import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
@@ -42,14 +40,7 @@ function describeItem(item: MailItem): string {
 function MailRow({ mail }: { mail: Mail }) {
   const claim = useMailboxStore(s => s.claim);
   const remove = useMailboxStore(s => s.remove);
-  const characterId = useGameStore(s => s.character?.id);
   const claimed = mail.claimedAt !== null;
-
-  async function onClaim() {
-    if (!await claim(mail.id!)) return;
-    // 領到的天賦格進背包「天賦」分頁，未安裝
-    if (characterId) await useTalentStore.getState().load(characterId);
-  }
 
   return (
     <li className={`mail-row${claimed ? ' is-claimed' : ''}`}>
@@ -69,7 +60,7 @@ function MailRow({ mail }: { mail: Mail }) {
             ✕
           </button>
         )
-        : <button className="mail-claim-btn" onClick={onClaim}>領取</button>}
+        : <button className="mail-claim-btn" onClick={() => void claim(mail.id!)}>領取</button>}
     </li>
   );
 }
@@ -79,14 +70,7 @@ export function MailboxContent() {
   const unread = useMailboxStore(s => s.unread);
   const claimAll = useMailboxStore(s => s.claimAll);
   const purgeClaimed = useMailboxStore(s => s.purgeClaimed);
-  const characterId = useGameStore(s => s.character?.id);
   const claimedCount = mails.length - unread;
-
-  async function onClaimAll() {
-    if (await claimAll() > 0 && characterId) {
-      await useTalentStore.getState().load(characterId);
-    }
-  }
 
   if (mails.length === 0) {
     return <div className="mail-empty">目前沒有信件</div>;
@@ -97,7 +81,7 @@ export function MailboxContent() {
       {(unread > 0 || claimedCount > 0) && (
         <div className="mail-actions">
           {unread > 0 && (
-            <button className="mail-claim-all-btn" onClick={onClaimAll}>
+            <button className="mail-claim-all-btn" onClick={() => void claimAll()}>
               全部領取（{unread}）
             </button>
           )}
