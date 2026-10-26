@@ -10,14 +10,17 @@ import {
 import { getItemById } from '../items';
 import {
   CHAOS_SIGIL_MAX_TIER,
-  CHAOS_SIGIL_SLOTS,
+  MAX_SEALED_AFFIXES,
+  SEAL_SIGIL_SUCCESS_RATE,
   ENHANCE_SIGIL_FAIL_TIER,
   ENHANCE_SIGIL_RATES,
   POLISH_SIGIL_GOLD_COST,
   POLISH_SIGIL_QUALITY_MAX,
   SIGIL_DEFINITIONS,
   STING_SPECIAL_REPLACEMENT_TIER,
+  applyAddSigil,
   applyChaosSigil,
+  applySealSigil,
   applyEnhanceSigil,
   applyPolishSigil,
   applyRecarveSigil,
@@ -48,15 +51,23 @@ const dropCtx = (over: Partial<SigilContext> = {}): SigilContext => ({
   ...over,
 });
 
+/** 4 條都填滿的掉落品詞綴 */
+const FOUR: Affix[] = [
+  { type: 'defense', tier: 6, value: 15 },
+  { type: 'max_hp', tier: 4, value: 55 },
+  { type: 'drop_rate', tier: 2, value: 5 },
+  { type: 'gold_rate', tier: 1, value: 3 },
+];
+
 const shopCtx = (over: Partial<SigilContext> = {}): SigilContext =>
   dropCtx({ maxAffixTier: SHOP_MAX_AFFIX_TIER, ...over });
 
 describe('印記系統（§ 46）', () => {
   describe('定義與 seed 對應', () => {
-    it('六種印記各有唯一的道具 id', () => {
-      expect(SIGIL_DEFINITIONS).toHaveLength(6);
+    it('八種印記各有唯一的道具 id', () => {
+      expect(SIGIL_DEFINITIONS).toHaveLength(8);
       const ids = SIGIL_DEFINITIONS.map(d => d.itemId);
-      expect(new Set(ids).size).toBe(6);
+      expect(new Set(ids).size).toBe(8);
       for (const itemId of ids) {
         expect(getSigilByItemId(itemId)?.itemId).toBe(itemId);
       }
@@ -71,8 +82,8 @@ describe('印記系統（§ 46）', () => {
   describe('混沌印記（§ 46.3）', () => {
     it('掉落／製作品：4 條詞綴、Tier 落在 T1~T5、種類不重複', () => {
       for (let run = 0; run < 200; run++) {
-        const { affixes } = applyChaosSigil(dropCtx());
-        expect(affixes).toHaveLength(CHAOS_SIGIL_SLOTS);
+        const { affixes } = applyChaosSigil(FOUR, dropCtx());
+        expect(affixes).toHaveLength(FOUR.length);
         expect(new Set(affixes.map(a => a.type)).size).toBe(affixes.length);
         for (const a of affixes) {
           if (isTierlessAffixType(a.type)) continue;
@@ -84,7 +95,7 @@ describe('印記系統（§ 46）', () => {
 
     it('商店裝：Tier 不超過 T3，且完全不出特殊詞綴', () => {
       for (let run = 0; run < 300; run++) {
-        const { affixes } = applyChaosSigil(shopCtx());
+        const { affixes } = applyChaosSigil(FOUR, shopCtx());
         for (const a of affixes) {
           expect(isSpecialAffixType(a.type)).toBe(false);
           expect(a.tier).toBeLessThanOrEqual(SHOP_MAX_AFFIX_TIER);
@@ -94,14 +105,14 @@ describe('印記系統（§ 46）', () => {
 
     it('角色 Lv.30 以下不會出特殊詞綴（門檻同 § 7.10.1）', () => {
       for (let run = 0; run < 300; run++) {
-        const { affixes } = applyChaosSigil(dropCtx({ charLevel: 30 }));
+        const { affixes } = applyChaosSigil(FOUR, dropCtx({ charLevel: 30 }));
         expect(affixes.some(a => isSpecialAffixType(a.type))).toBe(false);
       }
     });
 
     it('角色 Lv.51+ 且機率判定命中時會出特殊詞綴', () => {
       mockRandom([0]); // 特殊詞綴判定必中，且一律取池中第一個
-      const { affixes } = applyChaosSigil(dropCtx({ charLevel: 60 }));
+      const { affixes } = applyChaosSigil(FOUR, dropCtx({ charLevel: 60 }));
       expect(affixes.some(a => isSpecialAffixType(a.type))).toBe(true);
     });
 
@@ -109,7 +120,10 @@ describe('印記系統（§ 46）', () => {
       const weaponTypes = new Set(
         AFFIX_DEFINITIONS.filter(d => d.category.includes('weapon')).map(d => d.type),
       );
-      const { affixes } = applyChaosSigil(dropCtx({ category: 'weapon' }));
+      const { affixes } = applyChaosSigil(
+        [{ type: 'attack_power', tier: 3, value: 10 }, { type: 'crit_rate', tier: 3, value: 10 }],
+        dropCtx({ category: 'weapon' }),
+      );
       for (const a of affixes) expect(weaponTypes.has(a.type as never)).toBe(true);
     });
   });
@@ -219,9 +233,9 @@ describe('印記系統（§ 46）', () => {
 
   // § 46.2：精鍊與突破**不可合併**，介面上是六個各自獨立的印記
   describe('印記清單（§ 46.2）', () => {
-    it('六種印記各自獨立，精鍊與突破不合併', () => {
+    it('八種印記各自獨立，精鍊與突破不合併', () => {
       expect(SIGIL_DEFINITIONS.map(d => d.type))
-        .toEqual(['chaos', 'sting', 'recarve', 'temper', 'enhance', 'polish']);
+        .toEqual(['chaos', 'sting', 'recarve', 'temper', 'enhance', 'polish', 'add', 'seal']);
     });
 
     it('每種印記都對得到一個道具 id，名稱與 seed 一致（§ 99.1 存 id 不存名稱）', () => {
@@ -362,18 +376,142 @@ describe('印記系統（§ 46）', () => {
       }
     });
 
-    it('沒有詞綴時，刺針／重刻／精鍊／突破／工藝不受理，混沌照常', () => {
+    it('沒有詞綴時，刺針／重刻／精鍊／突破／工藝／封印不受理，新增與混沌可用', () => {
       expect(canUseSigil('sting', [], undefined, {}).ok).toBe(false);
       expect(canUseSigil('recarve', undefined, undefined, {}).ok).toBe(false);
       expect(canUseSigil('temper', [], 0, {}).ok).toBe(false);
       expect(canUseSigil('enhance', [], 0, {}).ok).toBe(false);
       expect(canUseSigil('polish', [], undefined, {}).ok).toBe(false);
       expect(canUseSigil('chaos', [], undefined, {}).ok).toBe(true);
+      expect(canUseSigil('seal', [], 0, {}).ok).toBe(false);
+      expect(canUseSigil('add', [], undefined, {}).ok).toBe(true);
     });
 
     it('刺針可以把特殊詞綴換掉', () => {
       const special: Affix[] = [{ type: 'immune_poison', tier: 0, value: 0 }];
       expect(canUseSigil('sting', special, 0, {}).ok).toBe(true);
+    });
+  });
+
+  describe('混沌印記與詞綴洞（§ 46.3）', () => {
+    it('不看既有條數，一律抽滿 4 洞；毀壞的洞不算', () => {
+      for (let run = 0; run < 100; run++) {
+        expect(applyChaosSigil(FOUR.slice(0, 1), dropCtx()).affixes).toHaveLength(4);
+        expect(applyChaosSigil([], dropCtx()).affixes).toHaveLength(4);
+        expect(applyChaosSigil(FOUR.slice(0, 1), dropCtx({ affixSlots: 3 })).affixes).toHaveLength(3);
+      }
+    });
+
+    it('封印詞綴不佔洞：4 洞全部抽滿，封印詞綴原樣留在最後、種類不重複', () => {
+      const sealed: Affix = { type: 'max_hp', tier: 4, value: 55, sealed: true };
+      const base = [FOUR[0], FOUR[2], FOUR[3], sealed];
+      for (let run = 0; run < 200; run++) {
+        const { affixes } = applyChaosSigil(base, dropCtx());
+        expect(affixes).toHaveLength(5);
+        expect(affixes[4]).toBe(sealed);
+        expect(affixes.filter(a => a.type === 'max_hp')).toHaveLength(1);
+      }
+    });
+
+    it('沒有任何洞時不受理；沒有詞綴但有洞照常受理', () => {
+      const only: Affix[] = [{ type: 'defense', tier: 1, value: 3, sealed: true }];
+      expect(canUseSigil('chaos', only, undefined, { affixSlots: 1 }).ok).toBe(true);
+      expect(canUseSigil('chaos', only, undefined, { affixSlots: 0 }).ok).toBe(false);
+      expect(canUseSigil('chaos', [], undefined, {}).ok).toBe(true);
+      expect(canUseSigil('chaos', [], undefined, { affixSlots: 0 }).ok).toBe(false);
+    });
+  });
+
+  describe('新增印記（§ 46.11）', () => {
+    it('有空洞才受理；被毀壞的洞不算；封印詞綴不佔洞', () => {
+      const sealedLast: Affix[] = [...FOUR, { type: 'heal_effect', tier: 1, value: 3, sealed: true }];
+      expect(canUseSigil('add', sealedLast, undefined, {}).ok).toBe(false);
+      expect(canUseSigil('add', sealedLast.slice(1), undefined, {}).ok).toBe(true);
+      expect(canUseSigil('add', FOUR.slice(0, 3), undefined, {}).ok).toBe(true);
+      expect(canUseSigil('add', [], undefined, {}).ok).toBe(true);
+      expect(canUseSigil('add', FOUR, undefined, {}).ok).toBe(false);
+      expect(canUseSigil('add', FOUR.slice(0, 3), undefined, { affixSlots: 3 }).ok).toBe(false);
+    });
+
+    it('新增一條、種類不重複、Tier T1~T5', () => {
+      for (let run = 0; run < 300; run++) {
+        const { affixes, success } = applyAddSigil(FOUR.slice(0, 3), dropCtx());
+        expect(success).toBe(true);
+        expect(affixes).toHaveLength(4);
+        expect(new Set(affixes.map(a => a.type)).size).toBe(4);
+        const added = affixes[3];
+        if (!isTierlessAffixType(added.type)) expect(added.tier).toBeLessThanOrEqual(CHAOS_SIGIL_MAX_TIER);
+      }
+    });
+
+    it('商店裝 T3 上限且不出特殊詞綴', () => {
+      for (let run = 0; run < 300; run++) {
+        const added = applyAddSigil(FOUR.slice(0, 3), shopCtx()).affixes[3];
+        expect(isSpecialAffixType(added.type)).toBe(false);
+        expect(added.tier).toBeLessThanOrEqual(SHOP_MAX_AFFIX_TIER);
+      }
+    });
+
+    it('不與封印詞綴重複，新的一條排在封印詞綴之前', () => {
+      const sealed: Affix = { type: 'defense', tier: 1, value: 3, sealed: true };
+      for (let run = 0; run < 200; run++) {
+        const { affixes } = applyAddSigil([FOUR[1], sealed], dropCtx());
+        expect(affixes).toHaveLength(3);
+        expect(affixes[1].type).not.toBe('defense');
+        expect(affixes[2]).toBe(sealed);
+      }
+    });
+
+    it('新手裝不受理', () => {
+      expect(canUseSigil('add', [], undefined, { isStarterGear: true }).ok).toBe(false);
+    });
+  });
+
+  describe('封印印記（§ 46.12）', () => {
+    it(`成功率 ${SEAL_SIGIL_SUCCESS_RATE * 100}%：成功移出詞綴洞排到最後，原本的洞空出來`, () => {
+      mockRandom([SEAL_SIGIL_SUCCESS_RATE - 0.001]);
+      const r = applySealSigil(FOUR, 1, {});
+      expect(r.success).toBe(true);
+      expect(r.affixes).toEqual([FOUR[0], FOUR[2], FOUR[3], { ...FOUR[1], sealed: true }]);
+      expect(r.affixSlots).toBeUndefined();
+      // 空出來的洞可以用新增印記補
+      expect(canUseSigil('add', r.affixes, undefined, {}).ok).toBe(true);
+    });
+
+    it('失敗：該詞綴與洞一起毀壞（4 條變 3 條、洞 4→3）', () => {
+      mockRandom([SEAL_SIGIL_SUCCESS_RATE]);
+      const r = applySealSigil(FOUR, 1, {});
+      expect(r.success).toBe(false);
+      expect(r.affixes).toEqual([FOUR[0], FOUR[2], FOUR[3]]);
+      expect(r.affixSlots).toBe(3);
+      mockRandom([0.99]);
+      expect(applySealSigil(FOUR.slice(0, 2), 0, { affixSlots: 2 }).affixSlots).toBe(1);
+    });
+
+    it(`一件最多封 ${MAX_SEALED_AFFIXES} 條；已封印的不受理`, () => {
+      const one: Affix[] = [{ ...FOUR[0], sealed: true }, FOUR[1]];
+      expect(canUseSigil('seal', one, 1, {}).ok).toBe(false);
+      expect(canUseSigil('seal', one, 0, {}).ok).toBe(false);
+      expect(canUseSigil('seal', FOUR, 0, {}).ok).toBe(true);
+    });
+
+    it('特殊詞綴與額外屬性也可封印', () => {
+      const list: Affix[] = [
+        { type: 'immune_poison', tier: 0, value: 0 },
+        { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' },
+      ];
+      expect(canUseSigil('seal', list, 0, {}).ok).toBe(true);
+      expect(canUseSigil('seal', list, 1, {}).ok).toBe(true);
+    });
+
+    it('封印詞綴：刺針／重刻／精鍊／突破都不受理', () => {
+      const list: Affix[] = [{ type: 'defense', tier: 5, value: 12, sealed: true }];
+      for (const type of ['sting', 'recarve', 'temper', 'enhance'] as const) {
+        const check = canUseSigil(type, list, 0, {});
+        expect(check.ok, type).toBe(false);
+        expect(check.reason).toBe('封印詞綴無法變更');
+      }
+      expect(canUseSigil('polish', list, undefined, { quality: 0 }).ok).toBe(true);
     });
   });
 });

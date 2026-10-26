@@ -1,32 +1,57 @@
 import { describe, it, expect } from 'vitest';
 import { MONSTER_SEEDS } from '../seed';
-import { DAMAGE_REDUCTION_CAP } from '../../systems/combat';
 import type { MonsterTemplate } from '../../models/monster';
 
-/**
- * Boss 攻擊力的錨點（`28-monster-stats.md` § 28.1）。
- *
- * 全服最強的百柱死神在角色吃滿減傷上限時，單次傷害必須落在 50~60 ——
- * 整條 Boss 攻擊曲線是由這個數字回推的，改了它就等於改掉整個後期的承壓設計。
- */
-const bosses = (MONSTER_SEEDS as MonsterTemplate[]).filter(m => m.isBoss);
+/** 怪物攻擊力曲線（`28-monster-stats.md` § 28.1） */
+const all = MONSTER_SEEDS as MonsterTemplate[];
+const bosses = all.filter(m => m.isBoss);
+const normals = all.filter(m => !m.isBoss);
+const TOP_AREA = 'hundred-pillar-91-100f';
 
-/** 傷害計算與 `combat.ts` 同式：1 防禦＝1% 減傷，上限 75% */
-function damageAtCap(attack: number): number {
-  return Math.max(1, Math.floor(attack * (100 - DAMAGE_REDUCTION_CAP) / 100));
-}
+/** Lv.31~60 一般怪該級典型攻擊上限 */
+const curve = (level: number) => 36 * Math.pow(150 / 36, (level - 30) / 30);
 
-describe('Boss 攻擊力錨點', () => {
-  it('百柱死神在 75% 減傷下是 50~60', () => {
+const median = (values: number[]) => {
+  const s = [...values].sort((a, b) => a - b);
+  const n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+};
+
+describe('怪物攻擊力曲線', () => {
+  it('百柱死神 Lv.80、攻擊 250~300，是全服攻擊力最高的怪物', () => {
     const reaper = bosses.find(b => b.name === '百柱死神')!;
-    expect(damageAtCap(reaper.attackMin)).toBe(50);
-    expect(damageAtCap(reaper.attackMax)).toBe(60);
+    expect(reaper.level).toBe(80);
+    expect(reaper.attackMin).toBe(250);
+    expect(reaper.attackMax).toBe(300);
+    const strongest = all.reduce((top, m) => (m.attackMax > top.attackMax ? m : top));
+    expect(strongest.name).toBe('百柱死神');
   });
 
-  it('百柱死神是全服攻擊力最高的怪物 —— 錨點必須真的在頂端', () => {
-    const strongest = (MONSTER_SEEDS as MonsterTemplate[])
-      .reduce((top, m) => (m.attackMax > top.attackMax ? m : top));
-    expect(strongest.name).toBe('百柱死神');
+  it('百柱塔 91~100F 一般怪全為 Lv.80，最強的死之執行者上限 200', () => {
+    const top = normals.filter(m => m.area === TOP_AREA);
+    expect(top.length).toBeGreaterThan(0);
+    for (const m of top) expect(m.level, m.name).toBe(80);
+    const strongest = normals.reduce((a, m) => (m.attackMax > a.attackMax ? m : a));
+    expect(strongest.name).toBe('死之執行者');
+    expect(strongest.attackMax).toBe(200);
+  });
+
+  it('Lv.31~60 一般怪每級攻擊上限中位數貼齊曲線（±1）', () => {
+    for (let level = 31; level <= 60; level++) {
+      const peers = normals.filter(m => m.level === level);
+      if (peers.length === 0) continue;
+      expect(Math.abs(median(peers.map(p => p.attackMax)) - curve(level)), `Lv.${level}`)
+        .toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('Lv.31~57 每級最強的 Boss 上限 = 曲線 × 1.3', () => {
+    for (let level = 31; level <= 57; level++) {
+      const peers = bosses.filter(b => b.level === level);
+      if (peers.length === 0) continue;
+      expect(Math.max(...peers.map(b => b.attackMax)), `Lv.${level}`)
+        .toBe(Math.round(curve(level) * 1.3));
+    }
   });
 
   it('等級越高的 Boss 攻擊力不低於低等的（曲線不可倒掛）', () => {
@@ -37,55 +62,18 @@ describe('Boss 攻擊力錨點', () => {
     }
   });
 
-  /**
-   * 前期不可能吃到 75% 減傷，所以低等 Boss 的攻擊力必須明顯低於錨點 ——
-   * 照同一個倍率等比放大就是這裡會擋下來的錯誤。
-   */
-  it('低等 Boss 的傷害佔角色 HP 的比例與錨點相當（不會秒殺）', () => {
-    // 各級距實際拿得到的減傷（§ 28.1 錨點表）
-    const reduction: Record<number, number> = { 30: 25, 35: 30, 45: 40, 50: 50, 52: 55, 57: 65, 60: 75 };
-    // 角色 HP：起始 30，每級 +(VIT-6 ~ VIT-3)，以 VIT 16 不加點的保守值估
-    const hpAt = (level: number) => 30 + (level - 1) * 11.5;
-
-    for (const boss of bosses) {
-      const rate = reduction[boss.level];
-      expect(rate, `${boss.name} Lv.${boss.level} 沒有對應的減傷假設`).toBeDefined();
-      const share = (boss.attackMax * (1 - rate / 100)) / hpAt(boss.level);
-      expect(share, `${boss.name} 單次傷害佔 HP ${(share * 100).toFixed(1)}%`).toBeLessThan(0.11);
-    }
-  });
-
-  /**
-   * 一般怪是持續挨打的，後期不可以跟著 Boss 的錨點一起被拉上去 ——
-   * 那會讓雜魚打得跟終王一樣痛（§ 28.1 一般怪物的攻擊力）。
-   */
-  it('Lv.57~60 的一般怪單次傷害壓在角色 HP 的 3% 附近', () => {
-    const hpAt = (level: number) => 30 + (level - 1) * 11.5;
-    const reduction: Record<number, number> = { 57: 65, 58: 68, 59: 71, 60: 75 };
-
-    const late = (MONSTER_SEEDS as MonsterTemplate[]).filter(m => !m.isBoss && m.level >= 57);
-    expect(late.length).toBeGreaterThan(0);
-
-    for (const m of late) {
-      const mid = (m.attackMin + m.attackMax) / 2;
-      const share = (mid * (1 - reduction[m.level] / 100)) / hpAt(m.level);
-      expect(share, `${m.name} Lv.${m.level} 佔 ${(share * 100).toFixed(1)}%`).toBeLessThan(0.04);
-    }
-  });
-
   it('同級的 Boss 一定比一般怪痛', () => {
-    const all = MONSTER_SEEDS as MonsterTemplate[];
     for (const boss of bosses) {
-      const peers = all.filter(m => !m.isBoss && m.level === boss.level);
+      const peers = normals.filter(m => m.level === boss.level);
       if (peers.length === 0) continue;
       const peerMax = Math.max(...peers.map(p => p.attackMax));
       expect(boss.attackMax, `${boss.name} 不應弱於同級一般怪`).toBeGreaterThan(peerMax);
     }
   });
 
-  it('每隻 Boss 的攻擊下限都小於上限', () => {
-    for (const b of bosses) {
-      expect(b.attackMin, b.name).toBeLessThan(b.attackMax);
+  it('每隻怪的攻擊下限都小於上限', () => {
+    for (const m of all) {
+      expect(m.attackMin, m.name).toBeLessThan(m.attackMax);
     }
   });
 });

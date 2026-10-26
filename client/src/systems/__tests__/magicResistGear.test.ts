@@ -80,10 +80,10 @@ describe('飾品詞綴分類（§ 7.6）', () => {
     expect(has('weapon')).toBe(false);
   });
 
-  it('飾品可選 12 種、一般防具 12 種、盾牌 14 種', () => {
-    expect(getAffixPoolForSlot('accessory')).toHaveLength(12);
-    expect(getAffixPoolForSlot('armor')).toHaveLength(12);
-    expect(getAffixPoolForSlot('shield')).toHaveLength(14);
+  it('飾品可選 13 種、一般防具 13 種、盾牌 15 種', () => {
+    expect(getAffixPoolForSlot('accessory')).toHaveLength(13);
+    expect(getAffixPoolForSlot('armor')).toHaveLength(13);
+    expect(getAffixPoolForSlot('shield')).toHaveLength(15);
   });
 });
 

@@ -96,12 +96,14 @@ export async function claimStarterGear(
     const template = await repo.getEquipmentTemplate(seed.id!);
     if (!template) continue;
 
+    const fields = rollNewInstanceFields(template);
+
     const dbRecord: Partial<EquipmentInstance> = {
       templateId: template.id!,
       slot: template.slot as EquipSlot,
       quality: 0,
       enhancement: 0,
-      ...rollNewInstanceFields(template),
+      ...fields,
       affixes: [],
       ownerId: characterId,
       equipped: false,
@@ -118,7 +120,7 @@ export async function claimStarterGear(
       isTwoHanded: template.isTwoHanded,
       quality: 0,
       enhancement: 0,
-      ...rollNewInstanceFields(template),
+      ...fields,
       affixes: [],
       ownerId: characterId,
       equipped: false,

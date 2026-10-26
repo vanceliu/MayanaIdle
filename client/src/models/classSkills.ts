@@ -31,11 +31,11 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'fire-arrow', name: '火矢附魔', className: 'elf', classLevel: 2, requiredLevel: 20, bookItemId: 108,
     skill: { id: 'fire-arrow', name: '火矢附魔', level: 2, element: 'fire', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 3000, range: 0, buffEffect: '攻擊附加火屬性，弓額外+15火傷害，持續300s', buffDuration: 300000, buffModifiers: [{ stat: 'fire_damage', value: 15, isPercent: false }], buffCategory: 'fire-enchant' } },
   { id: 'triple-shot', name: '三連射', className: 'elf', classLevel: 3, requiredLevel: 30, bookItemId: 109,
-    skill: { id: 'triple-shot', name: '三連射', level: 3, element: 'none', type: 'attack', target: 'single', power: 0, mpCost: 25, cooldown: 8000, range: 15, hits: 3, requiredWeaponType: 'bow', description: '每箭獨立判定命中，傷害走物理普攻公式' } },
+    skill: { id: 'triple-shot', name: '三連射', level: 3, element: 'none', type: 'attack', target: 'single', power: 0, mpCost: 25, cooldown: 8000, range: 10, hits: 3, requiredWeaponType: 'bow', description: '每箭獨立判定命中，傷害走物理普攻公式' } },
   { id: 'hawk-eye', name: '鷹眼', className: 'elf', classLevel: 4, requiredLevel: 40, bookItemId: 110,
     skill: { id: 'hawk-eye', name: '鷹眼', level: 4, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 30, cooldown: 3000, range: 0, buffEffect: '命中+5,遠攻+3', buffDuration: 300000, buffModifiers: [{ stat: 'hit', value: 5, isPercent: false }, { stat: 'ranged_attack', value: 3, isPercent: false }], buffCategory: 'accuracy' } },
   { id: 'arrow-rain', name: '穿透箭雨', className: 'elf', classLevel: 5, requiredLevel: 50, bookItemId: 111,
-    skill: { id: 'arrow-rain', name: '穿透箭雨', level: 5, element: 'none', type: 'attack', target: 'aoe', power: 37, mpCost: 55, cooldown: 15000, range: 15, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6, requiredWeaponType: 'bow', ignoreDefensePercent: 50, description: '無視目標 50% 防禦' } },
+    skill: { id: 'arrow-rain', name: '穿透箭雨', level: 5, element: 'none', type: 'attack', target: 'aoe', power: 37, mpCost: 55, cooldown: 15000, range: 10, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6, requiredWeaponType: 'bow', ignoreDefensePercent: 50, description: '無視目標 50% 防禦' } },
 
   { id: 'cd-reduce', name: '冷卻縮減', className: 'elementalist', classLevel: 1, requiredLevel: 10, bookItemId: 112,
     skill: { id: 'cd-reduce', name: '冷卻縮減', level: 1, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 60000, range: 0, buffEffect: '冷卻-20%', buffDuration: 30000, buffModifiers: [{ stat: 'cooldown_reduction', value: 20, isPercent: true }], buffCategory: 'cd-reduction' } },

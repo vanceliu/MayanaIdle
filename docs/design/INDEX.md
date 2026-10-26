@@ -38,6 +38,11 @@
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
 | 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
 | 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
+| **命中下降／防禦下降／迴避詞綴** | `07-affix.md` | § 7.4、§ 7.9（迴避階級表 § 7.3.1） |
+| **T7 獨有詞綴（清單／觸發／同類去重／印記不可動）** | `07-affix-tier7.md` | 全文 |
+| **詞綴洞／掉落詞綴條數（1~4 條）** | `07-affix.md` | § 7.1 |
+| **封印詞綴 `(封)`** | `07-affix.md` § 7.11.1、`46-sigil.md` § 46.12 | — |
+| **新增印記／封印印記** | `46-sigil.md` | § 46.11、§ 46.12 |
 | **印記（詞綴升階／重骰／品質）** | `46-sigil.md` | 全文 |
 | 印記掉落率 | `27-drop-table.md` | § 27.8 |
 | 印記師 NPC | `13-town.md` | § 13.13 |
@@ -58,6 +63,8 @@
 | **技能傷害走哪條公式（魔法／物理快照／物理普攻）** | `21-combat-formula.md` § 21.4 / § 21.4a、`23-class-magic.md` § 23.1.1 | — |
 | ARPG 即時戰鬥（LOS／投射物／位移） | `41-arpg-combat.md` | 全文 |
 | **近戰判相鄰格、遠程判真實座標（出手與落腳格共用）** | `41-arpg-combat.md` | § 3.1 |
+| **武器普攻射程（弓 10 格，其餘近身）** | `41-arpg-combat.md` | § 3.1 |
+| **怪物仇恨範圍 10 格／脫離 15 格** | `41-arpg-combat.md` § 5.2、`25-monster-system.md` § 25.8 | — |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
 | **遠程攻擊吃敏捷、近戰吃力量** | `21-combat-formula.md` § 21.3、`20-attributes.md` § 20.3 | — |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
@@ -99,6 +106,7 @@
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
 | 怪物經驗公式與結算倍率 | `28-monster-stats.md` | § 28.1 |
+| **怪物攻擊力曲線（一般怪／Boss）／怪物等級上限與百柱塔 91~100F Lv.80 例外** | `28-monster-stats.md` | § 28.1 |
 | **回鍋經驗加倍（離線存量）** | `04-character.md` | § 4.11 |
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
 | 道具定義（藥水/卷軸/材料） | `30-items.md` | 全文 |
@@ -189,6 +197,11 @@
        ↕
 06-equipment-requirement.md
        ↕
+07-affix-tier7.md ←→ 07-affix.md § 7.12
+  ←→ 21-combat-formula.md § 21.5／§ 21.6／§ 21.16 ←→ 24-buff-debuff.md § 24.4.3
+  ←→ 18-data-schema.md § 18.3 ←→ 97-selfhosted-server.md § 97.4
+  ←→ 43-wiki-system.md § 4.1／§ 4.2／§ 4.2.1
+       ↕
 46-sigil.md
   ←→ 07-affix.md § 7.11
   ←→ 27-drop-table.md § 27.8 ←→ 30-items.md
@@ -201,7 +214,7 @@
   ← 07-affix.md / 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
 44-dps-prediction.md（驗算腳本）
   ← 04-character.md / 20-attributes.md / 21-combat-formula.md / 41-arpg-combat.md
-  ← 06-equipment.md / 07-affix.md / 08-quality.md
+  ← 06-equipment.md / 07-affix.md / 07-affix-tier7.md / 08-quality.md / 46-sigil.md § 46.12
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
 
 【戰鬥／技能／Buff】

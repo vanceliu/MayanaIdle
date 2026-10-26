@@ -64,8 +64,14 @@ describe('技能資料的射程完整性', () => {
 });
 
 describe('武器射程', () => {
+  it('需裝備弓的技能射程與弓普攻相同（10 格）', () => {
+    const bowSkills = CLASS_SKILLS.filter(d => d.skill.requiredWeaponType === 'bow');
+    expect(bowSkills.map(d => d.skill.id).sort()).toEqual(['arrow-rain', 'triple-shot']);
+    for (const d of bowSkills) expect(d.skill.range, d.skill.name).toBe(getWeaponRange('bow'));
+  });
+
   it('弓是唯一的遠程武器，其餘一律近戰', () => {
-    expect(getWeaponRange('bow')).toBe(15);
+    expect(getWeaponRange('bow')).toBe(10);
     expect(isRangedWeapon('bow')).toBe(true);
 
     for (const t of ['sword', 'sword', 'axe', 'mace', 'staff', 'magicBook',
@@ -82,7 +88,7 @@ describe('武器射程', () => {
   });
 
   it('FSM 的攻擊設定與共用常數一致（不可各自硬編）', () => {
-    expect(getWeaponAttackConfig('bow')).toEqual({ attackType: 'ranged', range: 15 });
+    expect(getWeaponAttackConfig('bow')).toEqual({ attackType: 'ranged', range: 10 });
     expect(getWeaponAttackConfig('sword')).toEqual({ attackType: 'melee', range: MELEE_WEAPON_RANGE });
   });
 

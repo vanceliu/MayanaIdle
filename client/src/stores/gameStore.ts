@@ -87,7 +87,7 @@ import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../system
 import { generateCraftAffixes } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
-  POLISH_SIGIL_GOLD_COST, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
+  POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
   canUseSigil, getSigilDefinition, type SigilContext, type SigilResult, type SigilType,
 } from '../models/sigil';
 import {
@@ -151,6 +151,8 @@ export interface SigilApplyResult {
   success?: boolean;
   affixes?: Affix[];
   quality?: number;
+  /** 封印印記失敗時的新洞數（§ 46.12） */
+  affixSlots?: number;
 }
 export type SearchMode = 'auto' | 'manual';
 
@@ -924,16 +926,17 @@ export function createGameStore(session: Session) {
 
     const equippedGear: EquippedGear = {};
     for (const template of starterTemplates) {
+      const fields = rollNewInstanceFields(template);
       const dbRecord: Partial<EquipmentInstance> = {
         templateId: template.id!, slot: template.slot, quality: 0, enhancement: 0, affixes: [],
-        ...rollNewInstanceFields(template),
+        ...fields,
         ownerId: char.id!, equipped: true, isStarterGear: true,
       };
       const instId = await session.repo.addEquipment(dbRecord);
       equippedGear[template.slot as keyof EquippedGear] = resolveEquipment({
         id: instId, templateId: template.id!, name: template.name, type: template.type,
         slot: template.slot, isTwoHanded: template.isTwoHanded,
-        quality: 0, enhancement: 0, affixes: [], ...rollNewInstanceFields(template),
+        quality: 0, enhancement: 0, affixes: [], ...fields,
         ownerId: char.id!, equipped: true, isStarterGear: true,
       });
     }
@@ -2506,6 +2509,7 @@ export function createGameStore(session: Session) {
       weaponBaseDamage: getWeaponBaseDamage(item),
       // 新手裝名單只有 seed 一個來源（§ 99.1 第 4 條）
       isStarterGear: getTemplateById(item.templateId)?.acquireType === 'starter',
+      affixSlots: item.affixSlots,
     };
 
     let patch: Partial<EquipmentInstance>;
@@ -2526,15 +2530,18 @@ export function createGameStore(session: Session) {
       const check = canUseSigil(sigilType, item.affixes, affixIndex ?? undefined, ctx);
       if (!check.ok) return { ok: false, message: check.reason ?? '無法使用' };
       let result: SigilResult;
-      if (sigilType === 'chaos') result = applyChaosSigil(ctx);
+      const affixes = item.affixes ?? [];
+      if (sigilType === 'chaos') result = applyChaosSigil(affixes, ctx);
+      else if (sigilType === 'add') result = applyAddSigil(affixes, ctx);
       else if (affixIndex == null) return { ok: false, message: '請先選一條詞綴' };
+      else if (sigilType === 'seal') result = applySealSigil(affixes, affixIndex, ctx);
       else if (sigilType === 'sting') result = applyStingSigil(item.affixes!, affixIndex, ctx);
       else if (sigilType === 'recarve') result = applyRecarveSigil(item.affixes!, affixIndex, ctx);
       else if (sigilType === 'temper') result = applyTemperSigil(item.affixes!, affixIndex, ctx);
       else result = applyEnhanceSigil(item.affixes!, affixIndex);
       // 池抽空之類的「沒有東西可換」不消耗印記
-      if (result.affixes === item.affixes) return { ok: false, message: result.message };
-      patch = { affixes: result.affixes };
+      if (result.affixes === affixes) return { ok: false, message: result.message };
+      patch = { affixes: result.affixes, ...(result.affixSlots != null ? { affixSlots: result.affixSlots } : {}) };
       message = result.message;
       success = result.success;
     }
@@ -2550,7 +2557,10 @@ export function createGameStore(session: Session) {
       set({ character: updatedChar, inventory: state.inventory.map(i => (i.id === item!.id ? updatedItem : i)), bagItems: newBag });
     }
     get().saveState();
-    return { ok: true, message: `${item.name}｜${message}`, success, affixes: updatedItem.affixes, quality: updatedItem.quality };
+    return {
+      ok: true, message: `${item.name}｜${message}`, success,
+      affixes: updatedItem.affixes, quality: updatedItem.quality, affixSlots: updatedItem.affixSlots,
+    };
   },
 
   restAtInn: (mode) => {

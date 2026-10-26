@@ -3,6 +3,9 @@ import { useGameStore, type SigilApplyResult } from '../../stores/gameStore';
 import { SLOT_NAMES, SLOT_ORDER, type EquipmentInstance, type EquipSlot } from '../../models/equipment';
 import {
   DEFAULT_MAX_AFFIX_TIER,
+  AFFIX_SOCKETS,
+  getAffixSockets,
+  countSocketedAffixes,
   isSpecialAffixType,
   isMaxRollAffix,
   isTierlessAffixType,
@@ -14,6 +17,7 @@ import {
 import {
   POLISH_SIGIL_GOLD_COST,
   POLISH_SIGIL_QUALITY_MAX,
+  SEAL_SIGIL_SUCCESS_RATE,
   SIGIL_DEFINITIONS,
   SIGIL_PANEL_ORDER,
   DEFAULT_PANEL_SIGIL,
@@ -51,6 +55,8 @@ const SWEEP_COLOR: Partial<Record<SigilType, string>> = {
   sting: 'var(--accent-primary)',
   chaos: 'var(--accent-primary)',
   polish: 'var(--accent-gold)',
+  add: 'var(--accent-info)',
+  seal: 'var(--accent-primary)',
 };
 
 type SigilFxMode = 'sweep' | 'chaos' | 'polish' | 'break-ok' | 'break-fail';
@@ -122,6 +128,10 @@ export function SigilMaster() {
   const def = getSigilDefinition(sigilType);
   const display = sigilDisplay(sigilType);
   const affixes = item?.affixes ?? [];
+  /** § 7.1 詞綴洞：可用洞數、空洞、被封印印記毀壞的洞 */
+  const sockets = item ? getAffixSockets(item) : AFFIX_SOCKETS;
+  const emptySockets = Math.max(0, sockets - countSocketedAffixes(affixes));
+  const brokenSockets = AFFIX_SOCKETS - sockets;
 
   /** 新手裝名單只有 seed 一個來源（`99-ai-constraints.md` 第 4 條） */
   function isStarterGear(it: EquipmentInstance): boolean {
@@ -131,7 +141,8 @@ export function SigilMaster() {
   /** 這件裝備所有印記都不受理，清單上直接標出來 */
   function inertReason(it: EquipmentInstance): string | null {
     if (isStarterGear(it)) return '新手裝';
-    if ((it.affixes?.length ?? 0) === 0) return '無詞綴';
+    // 沒有詞綴但還有空洞的，新增印記照樣能用（§ 46.11）
+    if ((it.affixes?.length ?? 0) === 0 && getAffixSockets(it) === 0) return '無詞綴';
     return null;
   }
 
@@ -142,6 +153,7 @@ export function SigilMaster() {
       isStarterGear: isStarterGear(item),
       maxAffixTier: item.maxAffixTier,
       quality: item.quality ?? 0,
+      affixSlots: item.affixSlots,
     });
   }
 
@@ -159,6 +171,17 @@ export function SigilMaster() {
     );
   }
 
+  /** 封印印記的確認訊息（§ 46.12）：失敗會連同詞綴洞一起毀壞，不可逆 */
+  function confirmSeal(idx: number): boolean {
+    const affix = affixes[idx];
+    const success = Math.round(SEAL_SIGIL_SUCCESS_RATE * 100);
+    return window.confirm(
+      `確定要對「${item!.name}」的 ${affixLabel(affix)} 使用封印印記嗎？\n\n`
+      + `成功率 ${success}%：這條詞綴移出詞綴洞變成 (封)，原本的洞空出來，之後任何印記都動不了它\n`
+      + `失敗 ${100 - success}%：這條詞綴連同詞綴洞一起毀壞（剩 ${sockets - 1} 洞），印記照樣消耗。`,
+    );
+  }
+
   /* 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1） */
 
   async function handleApply() {
@@ -166,6 +189,7 @@ export function SigilMaster() {
     if (def.target === 'affix' && affixIndex == null) return setResultMsg('請先選一條詞綴');
     // 突破印記失敗會把詞綴砍回 T1（§ 46.7），代價不可逆，動手前先問一次
     if (sigilType === 'enhance' && !confirmBreakthrough(affixIndex!)) return;
+    if (sigilType === 'seal' && !confirmSeal(affixIndex!)) return;
 
     // 判定與消耗在 store action（單機同步、線上模式回 Promise）；這裡只負責訊息與演出
     const settled = useGameStore.getState().applySigil(item.id!, sigilType, affixIndex);
@@ -188,6 +212,13 @@ export function SigilMaster() {
       });
     } else if (sigilType === 'chaos') {
       playFx({ mode: 'chaos', color: SWEEP_COLOR.chaos });
+    } else if (sigilType === 'add') {
+      // 新增的那條排在最後
+      playFx({ mode: 'sweep', affixIndex: (result.affixes?.length ?? 1) - 1, color: SWEEP_COLOR.add });
+    } else if (sigilType === 'seal') {
+      // 成功時那條移到最後（洞的下面）；失敗時已經不在了。原本的選取都不再指向它
+      if (result.success) playFx({ mode: 'sweep', affixIndex: (result.affixes?.length ?? 1) - 1, color: SWEEP_COLOR.seal });
+      setAffixIndex(null);
     } else {
       playFx({ mode: 'sweep', affixIndex: affixIndex!, color: SWEEP_COLOR[sigilType] });
     }
@@ -204,7 +235,19 @@ export function SigilMaster() {
       : `${display.name} ×1`;
     const parts: string[] = [`消耗：${cost}`];
     if (def.target === 'item') parts.push('對象是整件裝備，不需指定詞綴');
-    if (sigilType === 'temper') parts.push('必定成功');
+    if (sigilType === 'temper' || sigilType === 'add') parts.push('必定成功');
+    if (sigilType === 'add') parts.push(`空洞 ${emptySockets}`);
+
+    if (sigilType === 'seal') {
+      const success = Math.round(SEAL_SIGIL_SUCCESS_RATE * 100);
+      parts.push(`成功率 ${success}%`);
+      return (
+        <>
+          {parts.join('　')}
+          <span className="sigil-cost-warn">　失敗（{100 - success}%）時該詞綴連同詞綴洞一起毀壞，印記照樣消耗</span>
+        </>
+      );
+    }
 
     if (sigilType !== 'enhance') return <>{parts.join('　')}</>;
 
@@ -225,13 +268,14 @@ export function SigilMaster() {
   function blockReason(): string | null {
     if (!item) return '沒有裝備';
     const starter = inertReason(item);
-    if (starter) return starter === '新手裝' ? '新手裝不可使用任何印記' : '這件裝備沒有詞綴';
+    if (starter) return starter === '新手裝' ? '新手裝不可使用任何印記' : '這件裝備沒有詞綴也沒有詞綴洞';
     if (sigilCounts[sigilType] <= 0) return `背包裡沒有${display.name}`;
     if (def.target === 'affix' && affixIndex == null) return '請先選一條詞綴';
     const check = canUseSigil(sigilType, affixes, affixIndex ?? undefined, {
       isStarterGear: false,
       maxAffixTier: item.maxAffixTier,
       quality: item.quality ?? 0,
+      affixSlots: item.affixSlots,
     });
     if (!check.ok) return check.reason ?? '無法使用';
     if (sigilType === 'polish' && char!.gold < POLISH_SIGIL_GOLD_COST) return '金幣不足';
@@ -343,6 +387,54 @@ export function SigilMaster() {
     );
   }
 
+  /** 一條詞綴的列。`i` 是 `affixes` 的原始索引，印記一律以它指定 */
+  function renderAffixRow(affix: Affix, i: number) {
+    const check = checkAffix(i);
+    const rowFx = fxForRow(i);
+    return (
+      <button
+        key={i}
+        type="button"
+        className={
+          `sigil-affix-row${affixIndex === i ? ' is-selected' : ''}`
+          + `${check.ok ? '' : ' is-disabled'}`
+          + `${rowFx?.mode === 'break-fail' ? ' enh-shake' : ''}`
+        }
+        aria-disabled={!check.ok}
+        title={affixRowTitle(affix)}
+        onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
+      >
+        <span
+          key={`tag-${rowFx?.token ?? 0}`}
+          className={
+            (isSpecialAffixType(affix.type)
+              ? 'affix-tag special'
+              : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`)
+            + tagFxClass(rowFx)
+          }
+          style={fx?.mode === 'chaos' ? ({ '--i': i } as React.CSSProperties) : undefined}
+        >
+          {affixLabel(affix)}
+        </span>
+        {/*
+          * 滿值詞綴整條變粗，與背包 tooltip 一致（`34-ui-guidelines.md` § 34.2）——
+          * 這裡把名稱與數值拆成兩個元素，只粗體標籤的話同一條詞綴會一半粗一半不粗。
+          */}
+        <span
+          key={`value-${rowFx?.token ?? 0}`}
+          className={
+            `sigil-affix-value${isMaxRollAffix(affix) ? ' max-roll' : ''}${valueFxClass(rowFx)}`
+          }
+        >
+          {formatAffixValue(affix)}
+        </span>
+        {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
+        {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}
+        {rowFx && renderFxLayer(rowFx)}
+      </button>
+    );
+  }
+
   const blocked = blockReason();
   const maxAffixTier = item?.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
 
@@ -398,62 +490,34 @@ export function SigilMaster() {
                   精鍊上限 T{maxAffixTier}
                   {maxAffixTier < DEFAULT_MAX_AFFIX_TIER ? '（商店裝）' : ''}
                 </span>
-                <span>詞綴 {affixes.length} 條</span>
+                <span>
+                  詞綴 {countSocketedAffixes(affixes)} / {sockets} 洞{brokenSockets > 0 ? `（毀壞 ${brokenSockets}）` : ''}
+                  {affixes.length > countSocketedAffixes(affixes) ? '＋封印 1 條' : ''}
+                </span>
               </div>
             </div>
           )}
 
           <p className="sigil-section-title">選擇詞綴</p>
           <div className={`sigil-affixes${def.target === 'item' ? ' is-item-target' : ''}`}>
-            {affixes.length === 0 && (
-              <p className="empty-text">{item && inertReason(item) === '新手裝' ? '新手裝沒有詞綴' : '這件裝備沒有詞綴'}</p>
+            {affixes.length === 0 && item && inertReason(item) === '新手裝' && (
+              <p className="empty-text">新手裝沒有詞綴</p>
             )}
-            {affixes.map((affix, i) => {
-              const check = checkAffix(i);
-              const rowFx = fxForRow(i);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  className={
-                    `sigil-affix-row${affixIndex === i ? ' is-selected' : ''}`
-                    + `${check.ok ? '' : ' is-disabled'}`
-                    + `${rowFx?.mode === 'break-fail' ? ' enh-shake' : ''}`
-                  }
-                  aria-disabled={!check.ok}
-                  title={affixRowTitle(affix)}
-                  onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
-                >
-                  <span
-                    key={`tag-${rowFx?.token ?? 0}`}
-                    className={
-                      (isSpecialAffixType(affix.type)
-                        ? 'affix-tag special'
-                        : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`)
-                      + tagFxClass(rowFx)
-                    }
-                    style={fx?.mode === 'chaos' ? ({ '--i': i } as React.CSSProperties) : undefined}
-                  >
-                    {affixLabel(affix)}
-                  </span>
-                  {/*
-                    * 滿值詞綴整條變粗，與背包 tooltip 一致（`34-ui-guidelines.md` § 34.2）——
-                    * 這裡把名稱與數值拆成兩個元素，只粗體標籤的話同一條詞綴會一半粗一半不粗。
-                    */}
-                  <span
-                    key={`value-${rowFx?.token ?? 0}`}
-                    className={
-                      `sigil-affix-value${isMaxRollAffix(affix) ? ' max-roll' : ''}${valueFxClass(rowFx)}`
-                    }
-                  >
-                    {formatAffixValue(affix)}
-                  </span>
-                  {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
-                  {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}
-                  {rowFx && renderFxLayer(rowFx)}
-                </button>
-              );
-            })}
+            {affixes.map((affix, i) => (affix.sealed ? null : renderAffixRow(affix, i)))}
+            {/* § 7.1 空洞與毀壞的洞各佔一列，不可選 */}
+            {item && inertReason(item) !== '新手裝' && Array.from({ length: emptySockets }, (_, i) => (
+              <div key={`empty-${i}`} className="sigil-affix-row sigil-socket-empty" aria-disabled="true">
+                <span className="affix-tag">空洞</span>
+                <span className="sigil-affix-reason">可用新增印記補一條</span>
+              </div>
+            ))}
+            {item && inertReason(item) !== '新手裝' && Array.from({ length: brokenSockets }, (_, i) => (
+              <div key={`broken-${i}`} className="sigil-affix-row sigil-socket-broken" aria-disabled="true">
+                <span className="affix-tag">已毀壞</span>
+              </div>
+            ))}
+            {/* § 7.11.1 封印詞綴不佔洞，排在洞的下面 */}
+            {affixes.map((affix, i) => (affix.sealed ? renderAffixRow(affix, i) : null))}
           </div>
 
           <p className="sigil-section-title">選擇印記</p>
@@ -470,8 +534,8 @@ export function SigilMaster() {
                   onClick={() => { setSigilType(d.type); setResultMsg(null); }}
                 >
                   <span className="sigil-choice-dot" />
-                  {/* 突破印記失敗不可逆（§ 46.7），選單上就先標一個記號 */}
-                  {d.type === 'enhance' ? '⚠ ' : ''}{info.name}
+                  {/* 突破與封印失敗不可逆（§ 46.7、§ 46.12），選單上就先標一個記號 */}
+                  {d.type === 'enhance' || d.type === 'seal' ? '⚠ ' : ''}{info.name}
                   <span className="sigil-choice-count">×{owned}</span>
                 </button>
               );

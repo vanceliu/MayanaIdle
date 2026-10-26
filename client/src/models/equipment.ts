@@ -1,5 +1,7 @@
 import type { Affix } from './affix';
 import { collectAffixAttributes } from './affix';
+import type { UniqueAffix } from './uniqueAffix';
+import { sumUniqueAffix } from './uniqueAffix';
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS } from './attributes';
 import { random } from '../core/rng';
@@ -28,7 +30,7 @@ export type EquipSlot =
  */
 export const MELEE_WEAPON_RANGE = 1.5;
 export const WEAPON_RANGE: Record<string, number> = {
-  bow: 15,
+  bow: 10,
 };
 
 export function getWeaponRange(weaponType: string | undefined): number {
@@ -302,6 +304,10 @@ export interface EquipmentInstance {
    */
   stability?: number;
   affixes: Affix[]; // up to 4 affix slots
+  /** T7 獨有詞綴（`07-affix-tier7.md`）。生成時抽，之後不變；非 T7 為 undefined */
+  uniqueAffix?: UniqueAffix;
+  /** 可用詞綴洞數（`07-affix.md` § 7.1）。未設＝4；封印印記失敗時 −1 */
+  affixSlots?: number;
   requiredClass?: string[];
   ownerId: number;
   equipped: boolean;
@@ -354,7 +360,10 @@ export function meetsAttributeRequirement(
   return ATTRIBUTE_KEYS.every(k => attributes[k] >= (required[k] ?? 0));
 }
 
-/** 一件裝備提供的額外屬性：模板的 `bonusAttributes` 加上額外屬性詞綴（§ 20.10） */
+/**
+ * 一件裝備提供的額外屬性：模板的 `bonusAttributes` 加上額外屬性詞綴（§ 20.10）。
+ * T7 全屬性不在此列 —— 同類只取一件（§ 7T.3），由 `resolveActiveGear()` 取最大值。
+ */
 function itemAttributeContribution(item: EquipmentInstance): Partial<Attributes> {
   const out: Partial<Attributes> = { ...item.bonusAttributes };
   const fromAffixes = collectAffixAttributes([item]);
@@ -385,11 +394,17 @@ export function resolveActiveGear(
   const total: Attributes = { ...selfAttributes };
   const active = new Set<EquipmentInstance>();
   const pending: EquipmentInstance[] = [];
+  let allAttributes = 0;
 
   const admit = (item: EquipmentInstance) => {
     active.add(item);
     const contrib = itemAttributeContribution(item);
     for (const k of ATTRIBUTE_KEYS) total[k] += contrib[k] ?? 0;
+    const all = sumUniqueAffix([item], 'all_attributes');
+    if (all > allAttributes) {
+      for (const k of ATTRIBUTE_KEYS) total[k] += all - allAttributes;
+      allAttributes = all;
+    }
   };
 
   for (const item of gear) {

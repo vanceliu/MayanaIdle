@@ -297,12 +297,23 @@ describe('印記師 — 選取流程（§ 13.13）', () => {
     expect(footerText()).toBe('請先選一條詞綴');
   });
 
-  it('新手裝在清單上就標出來，且所有印記都不受理', () => {
-    setup(gear([]), [{ name: '混沌印記', amount: 1 }]);
+  it('沒有詞綴也沒有詞綴洞時，所有印記都不受理', () => {
+    setup(gear([], { affixSlots: 0 }), [{ name: '混沌印記', amount: 1 }]);
     pickSigil('混沌印記');
 
     expect(applyBtn('混沌印記').disabled).toBe(true);
-    expect(footerText()).toBe('這件裝備沒有詞綴');
+    expect(footerText()).toBe('這件裝備沒有詞綴也沒有詞綴洞');
+  });
+
+  it('沒有詞綴但還有洞時，混沌與新增印記可用，空洞列出來且不可選', () => {
+    setup(gear([]), [{ name: '混沌印記', amount: 1 }, { name: '新增印記', amount: 1 }]);
+    pickSigil('混沌印記');
+    expect(applyBtn('混沌印記').disabled).toBe(false);
+    pickSigil('新增印記');
+    expect(applyBtn('新增印記').disabled).toBe(false);
+    const empties = document.querySelectorAll('.sigil-socket-empty');
+    expect(empties).toHaveLength(4);
+    expect(empties[0].getAttribute('aria-disabled')).toBe('true');
   });
 
   /*
@@ -337,7 +348,7 @@ describe('印記師 — 選取流程（§ 13.13）', () => {
   });
 
   it('印記不受理的裝備維持灰階，名稱不上 Tier 色', () => {
-    setup(gear([]), [{ name: '混沌印記', amount: 1 }]);
+    setup(gear([], { affixSlots: 0 }), [{ name: '混沌印記', amount: 1 }]);
 
     const name = pickerName();
     expect(name.closest('button')!.className).toContain('is-inert');

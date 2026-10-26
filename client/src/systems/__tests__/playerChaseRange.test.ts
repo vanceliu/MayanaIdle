@@ -29,6 +29,7 @@ function openMap(size = 45): MapData {
 }
 
 const SKILLS = [
+  { id: 'shield-bash', type: 'attack', range: 1.5 },
   { id: 'wind-blade', type: 'attack', range: 10 },
   { id: 'fireball', type: 'attack', range: 12 },
   { id: 'ice-fog', type: 'attack', range: 12 },
@@ -58,12 +59,17 @@ describe('getScriptChaseRange', () => {
   });
 
   it('啟用普通攻擊時武器射程才計入（但仍取 max）', () => {
-    const bow = getWeaponAttackConfig('bow').range;  // 15
-    const rules = [
-      rule('1', true, { type: 'skill', skillId: 'fireball' }),  // 12
-      rule('2', true, { type: 'normal_attack' }),               // 15
+    const bow = getWeaponAttackConfig('bow').range;  // 10
+    const melee = [
+      rule('1', true, { type: 'skill', skillId: 'shield-bash' }),  // 1.5
+      rule('2', true, { type: 'normal_attack' }),                  // 10
     ];
-    expect(getScriptChaseRange(rules, SKILLS, bow)).toBe(15);
+    expect(getScriptChaseRange(melee, SKILLS, bow)).toBe(10);
+    const farther = [
+      rule('1', true, { type: 'skill', skillId: 'fireball' }),     // 12
+      rule('2', true, { type: 'normal_attack' }),                  // 10
+    ];
+    expect(getScriptChaseRange(farther, SKILLS, bow)).toBe(12);
   });
 
   it('buff / heal 技能不算站位依據（range 0 是對自己）', () => {

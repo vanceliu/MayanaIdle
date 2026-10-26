@@ -3249,6 +3249,16 @@ button.active {
 /* § 7.10.5 特殊詞綴（免疫詞綴）金色顯示，無 Tier 之分，一律粗體 */
 .equip-detail-affix.special { color: #FFD700; text-shadow: 0 0 6px rgba(255,215,0,0.3); font-weight: 700; }
 
+/* § 7.1 詞綴洞：空洞虛線框、毀壞的洞劃線；§ 7.11.1 封印詞綴實線外框 */
+.equip-detail-affix.empty-socket { color: var(--text-dim); background: transparent; border: var(--border-width) dashed var(--outline-dark); }
+.equip-detail-affix.broken-socket { color: var(--text-dim); background: transparent; text-decoration: line-through; opacity: 0.6; }
+.equip-detail-affix.sealed { outline: 1px solid currentColor; outline-offset: -1px; }
+
+/* § 7T.7 T7 獨有詞綴：紫色、下方分隔線；同類去重落敗者劃線 */
+.equip-detail-unique { padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.equip-detail-affix.unique { color: #A855F7; text-shadow: 0 0 6px rgba(168,85,247,0.3); font-weight: 700; }
+.equip-detail-affix.unique.suppressed { text-decoration: line-through; opacity: 0.5; }
+
 /* § 6A.8.8 素質需求：未達標的屬性標紅，該件的詞綴整組凍結 */
 .equip-detail-unmet { color: var(--accent-danger); }
 .equip-detail-unmet-attr { color: var(--accent-danger); font-weight: 700; }
@@ -4024,6 +4034,9 @@ button.active {
 }
 
 .sigil-affix-row[aria-disabled='true']:hover { background: var(--bg-inset); }
+/* § 7.1 空洞虛線框、毀壞的洞劃線（與裝備 tooltip 同一套標示） */
+.sigil-socket-empty { border-style: dashed; color: var(--text-dim); }
+.sigil-socket-broken { color: var(--text-dim); text-decoration: line-through; }
 
 /*
  * 數值很短且長度固定，**不可用 `flex: 1; min-width: 0`** ——

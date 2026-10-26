@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { MONSTER_SEEDS } from '../seed/monsterSeeds';
 import { getExpToNextLevel } from '../../systems/levelUp';
 
-/** `28-monster-stats.md` § 28.1 */
-const baseExp = (level: number) => Math.round(2 * Math.pow(1.1302, level - 1));
+/** `28-monster-stats.md` § 28.1：Lv60 以上封頂 */
+const baseExp = (level: number) => Math.round(2 * Math.pow(1.1302, Math.min(level, 60) - 1));
 /** `28-monster-stats.md` § 28.1 結算倍率（不含回鍋加倍） */
 const KILL_EXP_MULTIPLIER = 3;
 
@@ -27,9 +27,12 @@ describe('怪物經驗曲線（`28-monster-stats.md` § 28.1）', () => {
     expect(split).toEqual([]);
   });
 
-  it('怪物等級上限 60，經驗封頂 2,736', () => {
-    expect(Math.max(...MONSTER_SEEDS.map(m => m.level))).toBe(60);
+  it('Lv60 以上經驗封頂 2,736；只有百柱塔 91~100F 超過 Lv60', () => {
     expect(baseExp(60)).toBe(2736);
+    expect(baseExp(80)).toBe(2736);
+    const over60 = MONSTER_SEEDS.filter(m => m.level > 60);
+    expect(over60.length).toBeGreaterThan(0);
+    for (const m of over60) expect(m.area, m.name).toBe('hundred-pillar-91-100f');
   });
 
   it('Boss 經驗倍率落在 x4.4~x6.4', () => {

@@ -21,7 +21,24 @@ import {
   calculateHealAmount,
   type HitBreakdown,
 } from './combat';
-import { getErosion, getOnHitRestore } from '../models/affix';
+import {
+  getErosion,
+  getOnHitRestore,
+  getWeaponDebuffAffixes,
+  AFFIX_DEBUFF_CHANCE,
+  AFFIX_DEBUFF_DURATION_MS,
+  HIT_DOWN_CATEGORY,
+  DEFENSE_DOWN_CATEGORY,
+  HIT_DOWN_STAT,
+} from '../models/affix';
+import {
+  sumUniqueAffix,
+  hasUniqueAffix,
+  rollUniqueStruckBuffs,
+  UNIQUE_HIT_PROC_CHANCE,
+  UNIQUE_STUN_CATEGORY,
+  UNIQUE_STUN_DURATION_MS,
+} from '../models/uniqueAffix';
 import { getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { defaultSession, type Session } from '../stores/session';
 import { getSkillTemplate } from '../models/skillTemplate';
@@ -37,6 +54,38 @@ export const BOSS_CC_IMMUNE_MS = 10_000;
 export const EROSION_CATEGORY = 'dot-erosion';
 export const EROSION_TICK_MS = 1000;
 export const EROSION_DURATION_MS = 5000;
+
+/** 命中下降／防禦下降在怪物身上的 debuff 定義（`07-affix.md` § 7.9） */
+const WEAPON_DEBUFF_AFFIX = {
+  hit_down: { category: HIT_DOWN_CATEGORY, stat: HIT_DOWN_STAT, name: '命中下降' },
+  defense_down: { category: DEFENSE_DOWN_CATEGORY, stat: 'defense', name: '防禦下降' },
+} as const;
+
+function isActiveOnMonster(e: ActiveEffect, targetId: string, now: number): boolean {
+  return e.type === 'debuff' && e.target === 'monster' && e.targetMonsterId === targetId
+    && now < e.startTime + e.duration;
+}
+
+/**
+ * T7 命中回血／回魔／擊殺回血（`07-affix-tier7.md` § 7T.4）加回角色，回傳日誌。
+ * 角色已死亡時不回 HP。普攻／技能與怪物 DoT 擊殺共用。
+ */
+export function applyUniqueAffixRestore(session: Session, hpGain: number, mpGain: number): CombatLog[] {
+  if (hpGain <= 0 && mpGain <= 0) return [];
+  const gs = session.game.getState();
+  const c = gs.character;
+  if (!c) return [];
+  const maxHp = getEffectiveMaxHp(c, gs.equippedGear, gs.activeEffects);
+  const maxMp = getEffectiveMaxMp(c, gs.equippedGear, gs.activeEffects);
+  const hp = c.hp > 0 ? Math.min(maxHp, c.hp + hpGain) : c.hp;
+  const mp = Math.min(maxMp, c.mp + mpGain);
+  if (hp === c.hp && mp === c.mp) return [];
+  session.game.setState({ character: { ...c, hp, mp } });
+  const logs: CombatLog[] = [];
+  if (hp > c.hp) logs.push({ text: `獨有詞綴回復 ${hp - c.hp} HP`, type: 'system' });
+  if (mp > c.mp) logs.push({ text: `獨有詞綴回復 ${mp - c.mp} MP`, type: 'system' });
+  return logs;
+}
 
 export interface SelfBuffApplyResult {
   effects: ActiveEffect[];
@@ -151,6 +200,9 @@ export function processPlayerAttack(
   const logs: CombatLog[] = [];
   const weapon = getEquippedWeapon(equippedGear);
   let drainDamage = 0;
+  /** T7 命中回血／回魔／擊殺回血（`07-affix-tier7.md`），所有目標結算完再一次加回 */
+  let uniqueHpGain = 0;
+  let uniqueMpGain = 0;
 
   const skill = event.skill;
 
@@ -331,6 +383,23 @@ export function processPlayerAttack(
       }
     }
 
+    /*
+     * 單下判定的技能（魔法、快照型物理）不填 `hits`，這裡補一筆。
+     * **必須在追加傷害、日誌與傷害明細之前補** —— 補在 `damages.push` 的參數裡的話，
+     * 下面的日誌迴圈跑的還是空陣列，火球那類技能會完全沒有日誌。
+     */
+    if (hits.length === 0) hits = [{ damage, isCrit, isMiss }];
+
+    // § 7T.4 T7 追加傷害：每下命中各擲一次，加在該下最終傷害
+    const bonusDamage = sumUniqueAffix(equippedGear, 'hit_bonus_damage');
+    if (bonusDamage > 0 && !isMiss) {
+      hits = hits.map(h => (!h.isMiss && random() * 100 < UNIQUE_HIT_PROC_CHANCE
+        ? { ...h, damage: h.damage + bonusDamage }
+        : h));
+      damage = hits.reduce((sum, h) => sum + h.damage, 0);
+    }
+    const landedHits = hits.filter(h => !h.isMiss).length;
+
     // Apply damage
     if (!isMiss && damage > 0) {
       monster.currentHp = Math.max(0, monster.currentHp - damage);
@@ -435,12 +504,87 @@ export function processPlayerAttack(
       }
     }
 
-    /*
-     * 單下判定的技能（魔法、快照型物理）不填 `hits`，這裡補一筆。
-     * **必須在日誌與傷害明細之前補** —— 補在 `damages.push` 的參數裡的話，
-     * 下面的日誌迴圈跑的還是空陣列，火球那類技能會完全沒有日誌。
-     */
-    if (hits.length === 0) hits = [{ damage, isCrit, isMiss }];
+    // § 7.9 命中下降／防禦下降：判定次數同元素侵蝕；同一隻怪後施放覆蓋並刷新時間
+    if (!isMiss && !killed) {
+      const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
+      for (const proc of getWeaponDebuffAffixes(weapon?.affixes, weapon?.quality ?? 0)) {
+        let triggered = false;
+        for (let r = 0; r < rolls && !triggered; r++) {
+          if (random() * 100 < AFFIX_DEBUFF_CHANCE) triggered = true;
+        }
+        if (!triggered) continue;
+        const def = WEAPON_DEBUFF_AFFIX[proc.type];
+        const now = gameNow();
+        const gs = session.game.getState();
+        session.game.setState({
+          activeEffects: gs.activeEffects.filter(
+            e => !(e.category === def.category && isActiveOnMonster(e, targetId, now)),
+          ),
+        });
+        session.game.getState().addEffect({
+          id: `debuff-${def.category}-${targetId}-${now}`,
+          sourceSkillId: proc.type,
+          sourceSkillName: def.name,
+          category: def.category,
+          type: 'debuff',
+          target: 'monster',
+          targetIdx,
+          targetMonsterId: targetId,
+          modifiers: [{ stat: def.stat, value: -proc.value, isPercent: true }],
+          startTime: now,
+          duration: AFFIX_DEBUFF_DURATION_MS,
+          tags: [],
+          name: def.name,
+          description: `${def.name} ${proc.value}%`,
+        });
+        logs.push({
+          text: `${def.name}觸發！${monster.name} ${def.name} ${proc.value}% ${AFFIX_DEBUFF_DURATION_MS / 1000}s`,
+          type: 'debuff-enemy',
+        });
+      }
+    }
+
+    // § 7T.4 T7 命中類：每下命中判定一次
+    if (!isMiss) {
+      uniqueHpGain += landedHits * sumUniqueAffix(equippedGear, 'hit_heal');
+      uniqueMpGain += landedHits * sumUniqueAffix(equippedGear, 'hit_mana');
+      if (killed) uniqueHpGain += sumUniqueAffix(equippedGear, 'kill_heal');
+    }
+    if (!isMiss && !killed && hasUniqueAffix(equippedGear, 'hit_stun')) {
+      let triggered = false;
+      for (let r = 0; r < landedHits && !triggered; r++) {
+        if (random() * 100 < UNIQUE_HIT_PROC_CHANCE) triggered = true;
+      }
+      const now = gameNow();
+      const gs = session.game.getState();
+      // § 24.3.3 暈眩中不可再上
+      const alreadyStunned = gs.activeEffects.some(e => e.stun && isActiveOnMonster(e, targetId, now));
+      if (triggered && !alreadyStunned) {
+        // § 24.6 Boss 控場免疫冷卻
+        if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
+          logs.push({ text: `${monster.name} 免疫控場！`, type: 'debuff-enemy' });
+        } else {
+          gs.addEffect({
+            id: `debuff-${UNIQUE_STUN_CATEGORY}-${targetId}-${now}`,
+            sourceSkillId: UNIQUE_STUN_CATEGORY,
+            sourceSkillName: '命中暈眩',
+            category: UNIQUE_STUN_CATEGORY,
+            type: 'debuff',
+            target: 'monster',
+            targetIdx,
+            targetMonsterId: targetId,
+            stun: true,
+            startTime: now,
+            duration: UNIQUE_STUN_DURATION_MS,
+            tags: ['stunned'],
+            name: '暈眩',
+            description: '無法行動',
+          });
+          if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
+          logs.push({ text: `命中暈眩觸發！${monster.name} 暈眩 ${UNIQUE_STUN_DURATION_MS / 1000}s`, type: 'debuff-enemy' });
+        }
+      }
+    }
 
     damages.push({ targetId, damage, isCrit, isMiss, killed, hits });
 
@@ -571,6 +715,8 @@ export function processPlayerAttack(
     }
   }
 
+  logs.push(...applyUniqueAffixRestore(session, uniqueHpGain, uniqueMpGain));
+
   // Update skill cooldown in store
   if (skill) {
     const now = gameNow();
@@ -630,6 +776,7 @@ export function processMonsterAttack(
     monsterIdx,
     // 詠唱攻擊帶倍率，瞬發不帶（`25-monster-system.md` § 25.11）
     event.damageMultiplier ?? 1,
+    event.monsterId,
   );
 
   // 護盾吸收（§ 24.4.9）：在所有減傷之後、實際扣血之前
@@ -702,6 +849,20 @@ export function processMonsterAttack(
       debuffLog = applied.cancelledSpeedBuff
         ? { text: `${monster.name} 的減速抵銷了你的加速效果`, type: 'debuff-self' }
         : { text: `${monster.name} 使你 ${roll.effect.name} ${roll.effect.duration / 1000}s`, type: 'debuff-self' };
+    }
+  }
+
+  // § 7T.4 T7 受擊觸發：受到傷害才判定，同種類刷新時間。排在 debuff 判定之後，不影響這一下
+  if (!result.dodged && actualDamage > 0) {
+    const now = gameNow();
+    const buffs = rollUniqueStruckBuffs(equippedGear, now);
+    if (buffs.length > 0) {
+      let effects = session.game.getState().activeEffects;
+      for (const buff of buffs) {
+        effects = applyPlayerBuff(effects, buff, now).effects;
+        restoreLogs.push({ text: `${buff.name}觸發！${buff.description} ${buff.duration / 1000}s`, type: 'system' });
+      }
+      session.game.setState({ activeEffects: effects });
     }
   }
 

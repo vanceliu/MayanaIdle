@@ -73,7 +73,7 @@ describe('印記選單（`13-town.md` § 13.13.1）', () => {
     const labels = [...document.querySelectorAll('.sigil-choice')].map(
       el => el.textContent?.replace(/[⚠\s]|×\d+/g, '') ?? '',
     );
-    expect(labels).toEqual(['精鍊印記', '突破印記', '刺針印記', '重刻印記', '混沌印記', '工藝印記']);
+    expect(labels).toEqual(['精鍊印記', '突破印記', '刺針印記', '重刻印記', '混沌印記', '工藝印記', '新增印記', '封印印記']);
 
     // 預設不可停在突破印記 —— 失敗會把詞綴打回 T1
     const selected = document.querySelector('.sigil-choice.is-selected');

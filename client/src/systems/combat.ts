@@ -6,7 +6,8 @@ import { isAccessorySlot, enhancementCountsAsDefense, isRangedWeapon } from '../
 import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
-import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, type AffixBonuses, type BrandElement } from '../models/affix';
+import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, HIT_DOWN_STAT, type AffixBonuses, type BrandElement } from '../models/affix';
+import { sumUniqueAffix, type UniqueAffixType } from '../models/uniqueAffix';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
 
@@ -281,7 +282,7 @@ export function getTotalMagicAttack(equippedGear: (EquipmentInstance | null)[]):
 
 /**
  * 裝備防禦合計 —— 逐件三段相加（`21-combat-formula.md` § 21.5）：
- * 基礎 `defense` + 隨機額外 `defenseBonus`(0~2) + 強化等級。
+ * 基礎 `defense` + 隨機額外 `defenseBonus`(0~2) + 強化等級，再加 T7 額外防禦（`07-affix-tier7.md`）。
  *
  * 後兩段與強化同一條規則：**看裝備分類，不看基礎防禦數值**，
  * 所以基礎 0 的 T4 上衣照樣吃隨機額外與強化，飾品則兩者都不計入。
@@ -293,7 +294,7 @@ export function getTotalDefense(equippedGear: (EquipmentInstance | null)[]): num
     const counts = enhancementCountsAsDefense(g);
     const base = g.defense ?? 0;
     return sum + base + (counts ? (g.defenseBonus ?? 0) + (g.enhancement ?? 0) : 0);
-  }, 0);
+  }, 0) + sumUniqueAffix(equippedGear, 'extra_defense');
 }
 
 /**
@@ -372,13 +373,35 @@ export function getUnclampedDefense(
   return geared + BASE_CHARACTER_DEFENSE;
 }
 
+/** T7 獨有詞綴中併入同名加成欄位的常駐數值（`07-affix-tier7.md` § 7T.2：與一般詞綴加算） */
+const UNIQUE_AFFIX_BONUS_STATS: [keyof AffixBonuses, UniqueAffixType][] = [
+  ['crit_rate', 'crit_rate'],
+  ['crit_damage', 'crit_damage'],
+  ['attack_speed', 'attack_speed'],
+  ['drop_rate', 'drop_rate'],
+  ['magic_resist', 'magic_resist'],
+  ['evasion', 'evasion'],
+];
+
+/** 一般詞綴與 T7 獨有詞綴的合計。傳入的裝備須已過 `getEffectiveGear()`（凍結與同類去重） */
 export function getAffixBonusesFromGear(equippedGear: (EquipmentInstance | null)[]): AffixBonuses {
   const validGear = equippedGear.filter((g): g is EquipmentInstance => g != null);
-  return collectAffixBonuses(validGear);
+  const bonuses = collectAffixBonuses(validGear);
+  for (const [stat, unique] of UNIQUE_AFFIX_BONUS_STATS) {
+    bonuses[stat] += sumUniqueAffix(validGear, unique);
+  }
+  return bonuses;
 }
 
-function getPlayerBlockRate(equippedGear: (EquipmentInstance | null)[]): number {
-  let blockRate = 0;
+/** § 21.9 格擋率上限 */
+export const BLOCK_RATE_CAP = 50;
+
+/** 格擋率：副手基礎 + 格擋率詞綴 + buff（T7 不朽壁壘），上限 50%。戰鬥與狀態面板共用 */
+export function getPlayerBlockRate(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  let blockRate = getBuffFlatBonus(activeEffects, 'block_rate');
   for (const item of equippedGear) {
     if (!item) continue;
     if (item.blockRate) blockRate += item.blockRate;
@@ -390,7 +413,35 @@ function getPlayerBlockRate(equippedGear: (EquipmentInstance | null)[]): number 
       }
     }
   }
-  return Math.min(50, blockRate);
+  return Math.min(BLOCK_RATE_CAP, blockRate);
+}
+
+/** § 21.6 迴避率上限 */
+export const DODGE_RATE_CAP = 35;
+
+/**
+ * 迴避率（§ 21.6）：基礎 + AGI + 防禦溢出 + 迴避詞綴（一般與 T7）+ 迴避 buff，上限 35%。
+ * 命中下降不在此列 —— 它只對施加對象生效，且加在上限之後（`calculateMonsterAttack()`）。
+ * 戰鬥與狀態面板共用。
+ */
+export function getPlayerDodgeRate(
+  char: Character,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  const attrs = getTotalAttributes(char, activeEffects, equippedGear);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const baseDodge = char.className === 'thief' ? 10 : 5;
+  const agiDodge = Math.floor(getEffectiveAGI(attrs.AGI) / 3);
+  const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
+  const defOverflowDodge = finalDefense > DAMAGE_REDUCTION_CAP ? Math.floor((finalDefense - DAMAGE_REDUCTION_CAP) / 5) : 0;
+  const buffDodge = getBuffPercentBonus(activeEffects, 'evasion') + getBuffFlatBonus(activeEffects, 'evasion');
+  return Math.min(DODGE_RATE_CAP, baseDodge + agiDodge + defOverflowDodge + bonuses.evasion + buffDodge);
+}
+
+/** buff 提供的魔法抗性（T7 受擊魔抗，`07-affix-tier7.md`） */
+export function getBuffMagicResist(activeEffects: ActiveEffect[]): number {
+  return getBuffFlatBonus(activeEffects, 'magic_resist');
 }
 
 /** § 21.5：防禦減傷（含魔法）的總上限 */
@@ -429,7 +480,7 @@ export function getTotalMagicResist(
   activeEffects: ActiveEffect[] = [],
 ): number {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  return getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear);
+  return getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear) + getBuffMagicResist(activeEffects);
 }
 
 const BASE_ATTACK_INTERVAL_MS = 1200;
@@ -491,7 +542,8 @@ function getSkillSideValue(
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effINT = getEffectiveINT(attrs.INT);
   const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
-  const magicAttackPercent = getTotalMagicAttack(equippedGear) * MAGIC_ATTACK_PERCENT_PER_POINT;
+  const magicAttack = getTotalMagicAttack(equippedGear) + getBuffFlatBonus(activeEffects, 'magic_attack');
+  const magicAttackPercent = magicAttack * MAGIC_ATTACK_PERCENT_PER_POINT;
   return Math.floor(skillPower * (1 + magicAttackPercent / 100)) + intBonus;
 }
 
@@ -1004,9 +1056,10 @@ export function calculateMonsterAttack(
   monsterIdx: number = 0,
   /** 詠唱攻擊的傷害倍率，套在基礎傷害上（`25-monster-system.md` § 25.11） */
   damageMultiplier: number = 1,
+  /** 有給時以 id 查命中下降（跨 tick 穩定）；未給時退回 `monsterIdx` */
+  monsterId?: string,
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const effAGI = getEffectiveAGI(attrs.AGI);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   // 無敵：完全免疫傷害（§ 24.4.8）
@@ -1019,23 +1072,12 @@ export function calculateMonsterAttack(
     };
   }
 
-  // Player dodge
-  const baseDodge = char.className === 'thief' ? 10 : 5;
-  const agiDodge = Math.floor(effAGI / 3);
+  // § 21.6 迴避；命中下降（§ 7.9）以負值存在怪物身上，加在 35% 上限之後
   const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
-  const defOverflowDodge = finalDefense > 75 ? Math.floor((finalDefense - 75) / 5) : 0;
-  // Evasion buff bonus (e.g. Smoke Bomb +15%)
-  let evasionBuffBonus = 0;
-  for (const effect of activeEffects) {
-    if (effect.type === 'buff' && effect.target === 'player' && effect.modifiers) {
-      for (const mod of effect.modifiers) {
-        if (mod.stat === 'evasion') {
-          evasionBuffBonus += mod.isPercent ? mod.value : mod.value;
-        }
-      }
-    }
-  }
-  const dodgeRate = Math.min(35, baseDodge + agiDodge + defOverflowDodge + evasionBuffBonus);
+  const hitDown = monsterId !== undefined
+    ? getMonsterDebuffModifierById(activeEffects, monsterId, HIT_DOWN_STAT)
+    : getMonsterDebuffModifier(activeEffects, monsterIdx, HIT_DOWN_STAT);
+  const dodgeRate = getPlayerDodgeRate(char, equippedGear, activeEffects) - hitDown;
 
   const dodged = random() * 100 < dodgeRate;
   if (dodged) {
@@ -1062,7 +1104,7 @@ export function calculateMonsterAttack(
   const reductionRate = monster.attackType === 'magic'
     ? Math.min(
         getMagicDefenseContribution(finalDefense)
-          + getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear),
+          + getMagicResist(attrs.SPI) + getGearMagicResist(equippedGear) + getBuffMagicResist(activeEffects),
         DAMAGE_REDUCTION_CAP,
       )
     : Math.min(finalDefense, DAMAGE_REDUCTION_CAP);
@@ -1075,7 +1117,7 @@ export function calculateMonsterAttack(
   }
 
   // Block check (only with shield equipped, after defense reduction)
-  const totalBlockRate = getPlayerBlockRate(equippedGear);
+  const totalBlockRate = getPlayerBlockRate(equippedGear, activeEffects);
   const blocked = totalBlockRate > 0 && random() * 100 < totalBlockRate;
   if (blocked) {
     finalDamage = Math.max(1, Math.floor(finalDamage / 2));

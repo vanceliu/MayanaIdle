@@ -5,7 +5,7 @@ import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 import { isWeaponSlot, type EquipSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
 import type { EquipmentTierLevel } from '../models/equipmentTier';
-import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
+import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, rollDropAffixCount } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
 import { resolveArea } from '../models/mapData';
 import { rollClassSkillBookDrop } from './classSkillBookDrop';
@@ -120,15 +120,16 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(random() * candidates.length)];
       const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-      const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
+      const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), true, {
         weaponBaseDamage: getWeaponBaseDamage(template),
       });
+      const fields = rollNewInstanceFields(template);
       const dbRecord: Partial<EquipmentInstance> = {
         templateId: template.id!,
         slot: template.slot,
         quality: 0,
         enhancement: 0,
-        ...rollNewInstanceFields(template),
+        ...fields,
         affixes,
         ownerId,
         equipped: false,
@@ -143,7 +144,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         isTwoHanded: template.isTwoHanded,
         quality: 0,
         enhancement: 0,
-        ...rollNewInstanceFields(template),
+        ...fields,
         affixes,
         ownerId,
         equipped: false,
@@ -171,15 +172,16 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
         : undefined;
       if (template) {
         const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-        const affixes = generateAffixes(affixCategory, areaLevel, 4, true, {
+        const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), true, {
           weaponBaseDamage: getWeaponBaseDamage(template),
         });
+        const fields = rollNewInstanceFields(template);
         const dbRecord: Partial<EquipmentInstance> = {
           templateId: template.id!,
           slot: template.slot,
           quality: 0,
           enhancement: 0,
-          ...rollNewInstanceFields(template),
+          ...fields,
           affixes,
           ownerId,
           equipped: false,
@@ -194,7 +196,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           isTwoHanded: template.isTwoHanded,
           quality: 0,
           enhancement: 0,
-          ...rollNewInstanceFields(template),
+          ...fields,
           affixes,
           ownerId,
           equipped: false,
@@ -291,15 +293,16 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       }
       if (template) {
         const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-        const affixes = generateAffixes(affixCategory, areaLevel, 4, isBoss, {
+        const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), isBoss, {
           weaponBaseDamage: getWeaponBaseDamage(template),
         });
+        const fields = rollNewInstanceFields(template);
         const dbRecord: Partial<EquipmentInstance> = {
           templateId: template.id!,
           slot: template.slot,
           quality: 0,
           enhancement: 0,
-          ...rollNewInstanceFields(template),
+          ...fields,
           affixes,
           ownerId,
           equipped: false,
@@ -314,7 +317,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
           isTwoHanded: template.isTwoHanded,
           quality: 0,
           enhancement: 0,
-          ...rollNewInstanceFields(template),
+          ...fields,
           affixes,
           ownerId,
           equipped: false,

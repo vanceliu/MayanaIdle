@@ -6,6 +6,7 @@ import type { Appearance } from './appearance';
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS } from './attributes';
 import { collectAffixAttributes } from './affix';
+import { sumUniqueAffix } from './uniqueAffix';
 import { gameNow } from '../core/clock';
 
 export type ClassName = 'knight' | 'elf' | 'elementalist' | 'priest' | 'thief';
@@ -14,10 +15,11 @@ export type { Attributes } from './attributes';
 export { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from './attributes';
 
 /**
- * 已裝備部位提供的單一屬性加總（`20-attributes.md` § 20.10）。兩個來源：
+ * 已裝備部位提供的單一屬性加總（`20-attributes.md` § 20.10）。三個來源：
  *
  * - 模板的 `bonusAttributes` —— 武器、飾品、腰帶。`bonusStats` 只是顯示字串，不參與計算
  * - **額外屬性詞綴** —— 防具唯一的來源（`07-affix.md` § 7.3.1）
+ * - **T7 全屬性**（`07-affix-tier7.md`）—— 六項各加
  *
  * 傳進來的陣列必須已經套過素質需求的凍結（`systems/gear.ts` 的 `getEffectiveGear()`）：
  * 需求未滿足的件詞綴不生效，自然也不該貢獻屬性。
@@ -27,7 +29,7 @@ export function getGearAttributeBonus(
   attr: keyof Attributes,
 ): number {
   const fromAffixes = collectAffixAttributes(equippedGear.filter((g): g is EquipmentInstance => !!g));
-  let total = fromAffixes[attr] ?? 0;
+  let total = (fromAffixes[attr] ?? 0) + sumUniqueAffix(equippedGear, 'all_attributes');
   for (const item of equippedGear) {
     total += item?.bonusAttributes?.[attr] ?? 0;
   }

@@ -269,7 +269,7 @@ function ItemDetail({ name }: { name: string }) {
           <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
             用途（{formatMaterialUsage(item.id)}）
           </h3>
-          {/* 六種印記都有用途但不進裝備配方（`30-items.md` § 製作用途標記），故裝備清單是選擇性的 */}
+          {/* 八種印記都有用途但不進裝備配方（`30-items.md` § 製作用途標記），故裝備清單是選擇性的 */}
           {craftUsage && (
           <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
             此素材用於以下 {craftUsage.equipment.length} 件裝備的鐵匠鋪配方：

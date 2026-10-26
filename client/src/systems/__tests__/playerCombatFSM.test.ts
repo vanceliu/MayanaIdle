@@ -26,10 +26,10 @@ const openMap = createMap([
 ]);
 
 describe('getWeaponAttackConfig', () => {
-  it('bow is ranged 15', () => {
+  it('bow is ranged 10', () => {
     const config = getWeaponAttackConfig('bow');
     expect(config.attackType).toBe('ranged');
-    expect(config.range).toBe(15);
+    expect(config.range).toBe(10);
   });
 
   it('staff is melee 1.5', () => {

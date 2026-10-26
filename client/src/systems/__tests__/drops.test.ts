@@ -76,7 +76,10 @@ describe('drops system', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0].type).toBe('equipment');
       expect(result.items[0].equipmentInstance).toBeDefined();
-      expect(result.items[0].equipmentInstance!.affixes).toHaveLength(4);
+      // § 7.1 掉落 1~4 條
+      const count = result.items[0].equipmentInstance!.affixes.length;
+      expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBeLessThanOrEqual(4);
       expect(result.items[0].equipmentInstance!.quality).toBe(0);
     });
 

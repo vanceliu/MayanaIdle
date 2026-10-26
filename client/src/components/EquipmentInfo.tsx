@@ -1,11 +1,12 @@
 import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
-import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix } from '../models/affix';
+import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix } from '../models/affix';
+import { formatUniqueAffixDisplay } from '../models/uniqueAffix';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
 import { DEFENSE_BONUS_MAX } from '../models/equipment';
 import { useGameStore } from '../stores/gameStore';
-import { getEffectiveGearArray, getUnmetAttributes } from '../systems/gear';
+import { getEffectiveGearArray, getUnmetAttributes, isUniqueAffixSuppressed } from '../systems/gear';
 import { AttributeRequirement } from './AttributeRequirement';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
@@ -52,6 +53,15 @@ function useClassMismatch(requiredClass?: string[]): boolean {
   return !requiredClass.includes(className);
 }
 
+/** 這件已裝備的 T7 獨有詞綴是否因同類去重未生效（§ 7T.3）。沒有角色時一律 false */
+function useUniqueAffixSuppressed(item: EquipmentInstance): boolean {
+  const character = useGameStore(s => s.character);
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  if (!item.uniqueAffix || !character) return false;
+  return isUniqueAffixSuppressed(character, activeEffects, equippedGear, item);
+}
+
 interface EquipmentDetailProps {
   item: EquipmentInstance;
   hint?: string;
@@ -75,6 +85,34 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const unmet = useUnmetAttributes(item);
   const frozen = unmet.length > 0;
   const classMismatch = useClassMismatch(item.requiredClass);
+  const uniqueSuppressed = useUniqueAffixSuppressed(item);
+  // § 7.1 詞綴洞：新手裝沒有詞綴也不開洞，不列空洞
+  const affixCount = item.affixes?.length ?? 0;
+  const emptySockets = item.isStarterGear ? 0 : Math.max(0, getAffixSockets(item) - countSocketedAffixes(item.affixes));
+  // § 7.11.1 封印詞綴不佔洞，排在洞的下面
+  const socketed = (item.affixes ?? []).filter(a => !a.sealed);
+  const sealedAffixes = (item.affixes ?? []).filter(a => a.sealed);
+  const renderAffix = (affix: Affix, key: string) => (
+    // § 7.10.5 特殊詞綴：金色顯示、標記 [特殊]、無 Tier，且不吃品質加成
+    isSpecialAffixType(affix.type) ? (
+      <div key={key} className={`equip-detail-affix special${affix.sealed ? ' sealed' : ''}`} title="特殊詞綴，無法強化">
+        {formatAffixDisplay(affix)}
+      </div>
+    ) : (
+      // § 7.3.2 滾到該 Tier 上限的詞綴以粗體標示；額外屬性無 Tier，一律粗體
+      <div
+        key={key}
+        className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
+        title={
+          isTierlessAffixType(affix.type) ? '額外屬性無 Tier，印記只能重骰不能升階'
+            : isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined
+        }
+      >
+        {formatAffixDisplay(affix, item.quality)}
+      </div>
+    )
+  );
+  const brokenSockets = item.isStarterGear ? 0 : AFFIX_SOCKETS - getAffixSockets(item);
 
   return (
     <div className="equip-detail">
@@ -166,28 +204,31 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {!compact && frozen && (
         <div className="equip-detail-frozen">素質不足 · 詞綴未生效</div>
       )}
-      {!compact && item.affixes && item.affixes.length > 0 && (
+      {/* § 7T.7 T7 獨有詞綴：第一行、紫色，下方分隔線；同類去重落敗時劃線 */}
+      {!compact && item.uniqueAffix && (
+        <div className={`equip-detail-affixes equip-detail-unique${frozen ? ' is-frozen' : ''}`}>
+          <div
+            className={`equip-detail-affix unique${uniqueSuppressed ? ' suppressed' : ''}`}
+            title={uniqueSuppressed ? '同類獨有詞綴已由其他裝備生效' : 'T7 獨有詞綴，無法以印記變更'}
+          >
+            {formatUniqueAffixDisplay(item.uniqueAffix)}
+          </div>
+        </div>
+      )}
+      {!compact && (affixCount > 0 || emptySockets > 0 || brokenSockets > 0) && (
         <div className={`equip-detail-affixes${frozen ? ' is-frozen' : ''}`}>
-          {item.affixes.map((affix, i) => (
-            // § 7.10.5 特殊詞綴：金色顯示、標記 [特殊]、無 Tier，且不吃品質加成
-            isSpecialAffixType(affix.type) ? (
-              <div key={i} className="equip-detail-affix special" title="特殊詞綴，無法強化">
-                {formatAffixDisplay(affix)}
-              </div>
-            ) : (
-              // § 7.3.2 滾到該 Tier 上限的詞綴以粗體標示；額外屬性無 Tier，一律粗體
-              <div
-                key={i}
-                className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}`}
-                title={
-                  isTierlessAffixType(affix.type) ? '額外屬性無 Tier，印記只能重骰不能升階'
-                    : isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined
-                }
-              >
-                {formatAffixDisplay(affix, item.quality)}
-              </div>
-            )
+          {socketed.map((affix, i) => renderAffix(affix, `affix-${i}`))}
+          {Array.from({ length: emptySockets }, (_, i) => (
+            <div key={`empty-${i}`} className="equip-detail-affix empty-socket" title="空的詞綴洞，可用新增印記補一條">
+              空洞
+            </div>
           ))}
+          {Array.from({ length: brokenSockets }, (_, i) => (
+            <div key={`broken-${i}`} className="equip-detail-affix broken-socket" title="封印印記失敗毀壞的詞綴洞，無法再使用">
+              已毀壞
+            </div>
+          ))}
+          {sealedAffixes.map((affix, i) => renderAffix(affix, `sealed-${i}`))}
         </div>
       )}
       {hint && <div className="equip-detail-hint">{hint}</div>}

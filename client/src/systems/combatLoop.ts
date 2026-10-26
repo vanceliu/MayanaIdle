@@ -26,7 +26,8 @@ import {
   tickArpgEngine, applyManualTarget, queueManualSkill, syncMonsterContexts, tickMonsterEngines, isMonsterStunned,
   type MonsterAttackEvent,
 } from './arpgEngine';
-import { processPlayerAttack, processMonsterAttack, type DamageResult, type PlayerAttackResult } from './arpgEventHandler';
+import { processPlayerAttack, processMonsterAttack, applyUniqueAffixRestore, type DamageResult, type PlayerAttackResult } from './arpgEventHandler';
+import { sumUniqueAffix } from '../models/uniqueAffix';
 import { getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, getMonsterDebuffModifierById } from './combat';
 import { createMonsterFromTemplate } from './monsterSpawn';
 import { getEffectiveGearArray } from './gear';
@@ -568,6 +569,7 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
 
   const logs: CombatLog[] = [];
   const memberId = memberIdOf(session);
+  let kills = 0;
 
   for (const effect of dotEffects) {
     if (!effect.dot) continue;
@@ -592,10 +594,20 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
     });
 
     if (inst.currentHp <= 0) {
+      kills++;
       const monsterIdx = session.mapMonster.getState().monsters.findIndex(m => m.id === monsterId);
       handleMonsterDeath(inst, monsterIdx, monsterId, session);
       removeMonster(session, monsterId);
       stopTrainingIfNoDummiesLeft(session);
+    }
+  }
+
+  // § 7T.4 T7 擊殺回血：自己施加的 DoT 擊殺同樣判定
+  if (kills > 0) {
+    const s = session.game.getState();
+    if (s.character) {
+      const gear = getEffectiveGearArray(s.character, s.activeEffects, s.equippedGear);
+      logs.push(...applyUniqueAffixRestore(session, kills * sumUniqueAffix(gear, 'kill_heal'), 0));
     }
   }
 

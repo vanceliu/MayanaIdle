@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   AFFIX_DEFINITIONS,
+  AFFIX_SOCKETS,
   SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
   AFFIX_TIER_TABLES,
@@ -22,8 +23,12 @@ import {
   ENHANCE_SIGIL_RATES,
   ENHANCE_SIGIL_FAIL_TIER,
   POLISH_SIGIL_GOLD_COST,
+  CHAOS_SIGIL_MAX_TIER,
+  SEAL_SIGIL_SUCCESS_RATE,
+  MAX_SEALED_AFFIXES,
 } from '../../models/sigil';
 import '../components/WikiTable.css';
+import { UniqueAffixSection } from '../components/UniqueAffixTable';
 
 /**
  * 詞綴 wiki 頁。
@@ -192,15 +197,29 @@ export function AffixesPage() {
       <section style={sectionStyle}>
         <h3 style={headingStyle}>基本規則</h3>
         <ul style={{ ...noteStyle, marginTop: 0, paddingLeft: 20 }}>
-          <li>每件裝備最多 <strong>4 個詞綴插槽</strong>；同一件裝備不可插入相同種類的詞綴，不同裝備之間可以重複。</li>
+          <li>每件裝備有 <strong>{AFFIX_SOCKETS} 個詞綴洞</strong>；同一件裝備不可插入相同種類的詞綴，不同裝備之間可以重複。</li>
+          <li>
+            詞綴條數依取得管道：<strong>商店與鐵匠製作固定 {AFFIX_SOCKETS} 條</strong>；
+            <strong>怪物與 Boss 掉落（含 T7）為 1~{AFFIX_SOCKETS} 條均等</strong>，沒填滿的洞留空，裝備說明裡標成「空洞」。
+          </li>
+          <li>
+            空洞用<strong>新增印記</strong>補一條。<strong>封印印記</strong>成功時，那條詞綴移出洞外、原本的洞空出來；
+            失敗時，那條詞綴連同它的洞永久毀壞（標成「已毀壞」），之後不能再補。
+          </li>
+          <li>
+            <strong>封印詞綴</strong>名稱前標 <strong>(封)</strong>，<strong>不佔詞綴洞</strong>，列在詞綴洞下面：效果與原詞綴相同、吃品質，
+            但<strong>任何印記都動不了它</strong>（混沌重抽時保留，刺針／重刻／精鍊／突破不能指定）。一件最多 {MAX_SEALED_AFFIXES} 條，可與 T7 獨有詞綴並存
+            ——一件裝備最多 {AFFIX_SOCKETS} 條詞綴＋1 條 (封)＋T7 的 1 條 (獨)。
+          </li>
           <li>所有詞綴數值皆為百分比，並受裝備品質放大：實際效果 = floor(數值 × (1 + 品質% / 100))。</li>
           <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得或突破印記，T7 只有 Boss 掉落與突破印記。</li>
           <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過；鐵匠製作品為 T1~T{DEFAULT_MAX_AFFIX_TIER} 均等、固定 4 條、不會出特殊詞綴。</li>
           <li>特殊詞綴（免疫類）佔用一般詞綴插槽，無階級、不可強化，只從高等級區域掉落。</li>
+          <li>裝備階級 T7 另有第 5 條<strong>獨有詞綴</strong>，見下方〈T7 獨有詞綴〉。</li>
         </ul>
       </section>
 
-      <section style={sectionStyle}>
+      <section style={sectionStyle} data-testid="affix-list">
         <h3 style={headingStyle}>詞綴一覽</h3>
         <div className="wiki-filters">
           <select
@@ -328,7 +347,7 @@ export function AffixesPage() {
             </tbody>
           </table>
         </div>
-        <p style={noteStyle}>每個詞綴插槽獨立抽階級。鐵匠鋪製作的裝備固定 4 個詞綴、T1~T5 均等，不會出 T6／T7。</p>
+        <p style={noteStyle}>掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴、T1~T5 均等，不會出 T6／T7。</p>
       </section>
 
       <section>
@@ -361,7 +380,9 @@ export function AffixesPage() {
         </p>
       </section>
 
-      <section>
+      <UniqueAffixSection pools={['weapon', 'armor', 'accessory']} showFixed />
+
+      <section className="wiki-section">
         <h3 style={headingStyle}>印記</h3>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
@@ -394,8 +415,16 @@ export function AffixesPage() {
           {ENHANCE_SIGIL_RATES.map(r => `T${r.from}→T${r.from + 1} ${Math.round(r.rate * 100)}%`).join('、')}
           ，失敗該詞綴掉回 T{ENHANCE_SIGIL_FAIL_TIER}。
           <br />
-          混沌與刺針在城鎮使用，沒有區域等級可查，特殊詞綴改依<strong>角色等級</strong>套用上表的機率與門檻。
-          混沌／刺針／重刻／突破只在 Lv.31 以上區域的怪物與 Boss 掉落；精鍊與工藝印記走全區域掉落。
+          <strong>混沌印記</strong>不看原本有幾條，一律重抽到<strong>填滿所有詞綴洞</strong>（被毀壞的洞不算；封印詞綴不佔洞、原樣保留）。
+          <br />
+          <strong>新增印記</strong>在空洞補一條，必定成功，Tier 與混沌相同（T1~T{CHAOS_SIGIL_MAX_TIER} 均等，商店裝 T{SHOP_MAX_AFFIX_TIER}）；沒有空洞時不能用。
+          <br />
+          <strong>封印印記</strong>指定一條詞綴：{Math.round(SEAL_SIGIL_SUCCESS_RATE * 100)}% 移出詞綴洞封印成 (封)，原本的洞空出來可再補一條；
+          {100 - Math.round(SEAL_SIGIL_SUCCESS_RATE * 100)}% 失敗時那條詞綴<strong>連同詞綴洞一起毀壞</strong>（例：4 條變 3 條、洞也剩 3 個），印記照樣消耗。
+          特殊詞綴與額外屬性也能封印。
+          <br />
+          混沌、刺針與新增在城鎮使用，沒有區域等級可查，特殊詞綴改依<strong>角色等級</strong>套用上表的機率與門檻。
+          混沌／刺針／重刻／突破／新增／封印只在 Lv.31 以上區域的怪物與 Boss 掉落；精鍊與工藝印記走全區域掉落。
           <br />
           印記<strong>不佔背包格也不計負重</strong>，收在背包底部的「印記」抽屜裡，撿再多都不會擠到背包。
         </p>

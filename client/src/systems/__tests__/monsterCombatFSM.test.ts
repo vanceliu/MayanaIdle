@@ -45,6 +45,16 @@ describe('monsterCombatFSM', () => {
     expect(ctx.state).toBe('chasing');
   });
 
+  it('仇恨範圍 10 格：10 格激活、11 格不激活（`25-monster-system.md` § 25.8）', () => {
+    expect(createMonsterCombatContext().aggroRange).toBe(10);
+    const near = createMonsterCombatContext();
+    expect(tickMonsterCombat(near, { x: 0, y: 0 }, { x: 10, y: 0 }, DEFAULT_MONSTER_ATTACK_CONFIG, openMap, 16).action).toBe('chase');
+    expect(near.state).toBe('chasing');
+    const far = createMonsterCombatContext();
+    expect(tickMonsterCombat(far, { x: 0, y: 0 }, { x: 11, y: 0 }, DEFAULT_MONSTER_ATTACK_CONFIG, openMap, 16).action).toBe('none');
+    expect(far.state).toBe('roaming');
+  });
+
   it('transitions to attacking when in attack range', () => {
     const ctx = createMonsterCombatContext();
     ctx.state = 'chasing';

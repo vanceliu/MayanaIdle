@@ -3,6 +3,7 @@ import type { GameRepository } from '../db/repository';
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 import { isAccessorySlot, rollDefenseBonus, rollArmorStability, ARMOR_STABILITY_MIN } from '../models/equipment';
 import { getAccessoryStatMultiplier } from './enhancement';
+import { rollUniqueAffix, type UniqueAffix } from '../models/uniqueAffix';
 
 /** 飾品強化倍率作用的欄位（§ 6.10.1）——不含額外屬性 */
 const ACCESSORY_SCALED_FIELDS = ['bonusHp', 'bonusMp', 'hpRegen', 'mpRegen'] as const;
@@ -73,16 +74,21 @@ function resolveStability(template: EquipmentTemplate, instance: EquipmentInstan
  * | 商店防具 | 固定 4（下限） | 抽 |
  * | 製作與掉落的防具 | 抽 4~6 | 抽 |
  *
+ * T7 另抽獨有詞綴（`07-affix-tier7.md`）。每件只能呼叫一次：存檔與記憶體中的實例要用同一份結果。
+ *
  * **商店防具不抽安定值**：商店是最低階管道，詞綴也是硬上限 T3，
  * 抽得到 6 會讓商店貨的強化潛力贏過製作品與掉落品。
  */
 export function rollNewInstanceFields(
-  template: Pick<EquipmentTemplate, 'slot' | 'type' | 'stability' | 'acquireType'>,
-): { defenseBonus?: number; stability?: number } {
-  if (template.stability !== undefined) return { stability: template.stability };
+  template: Pick<EquipmentTemplate, 'id' | 'slot' | 'type' | 'stability' | 'acquireType' | 'tier'>,
+): { defenseBonus?: number; stability?: number; uniqueAffix?: UniqueAffix } {
+  const uniqueAffix = rollUniqueAffix(template);
+  const unique = uniqueAffix ? { uniqueAffix } : {};
+  if (template.stability !== undefined) return { stability: template.stability, ...unique };
   return {
     defenseBonus: rollDefenseBonus(),
     stability: template.acquireType === 'shop' ? ARMOR_STABILITY_MIN : rollArmorStability(),
+    ...unique,
   };
 }
 

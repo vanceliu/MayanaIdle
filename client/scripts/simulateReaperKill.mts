@@ -49,7 +49,14 @@ import type { ActiveEffect, StatModifier } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
 import { SKILL_CATALOG } from '../src/models/skill';
 import { CLASS_SKILLS } from '../src/models/classSkills';
-import { getErosion, getWeaponBaseDamage } from '../src/models/affix';
+import {
+  getErosion, getWeaponBaseDamage, getWeaponDebuffAffixes,
+  AFFIX_DEBUFF_CHANCE, AFFIX_DEBUFF_DURATION_MS, DEFENSE_DOWN_CATEGORY,
+} from '../src/models/affix';
+import {
+  UNIQUE_AFFIX_DEFINITIONS, UNIQUE_HIT_PROC_CHANCE, sumUniqueAffix, type UniqueAffixType,
+} from '../src/models/uniqueAffix';
+import { getEffectiveGear } from '../src/systems/gear';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
 
@@ -324,10 +331,25 @@ function makeReaper(): MonsterInstance {
 // ---------------------------------------------------------------- 裝備
 
 type AffixType = 'attack_power' | 'element_brand' | 'element_erosion' | 'skill_elemental' | 'crit_rate'
-  | 'crit_damage' | 'attack_speed' | 'cooldown_reduction' | 'defense' | 'max_hp' | 'max_mp';
+  | 'crit_damage' | 'attack_speed' | 'cooldown_reduction' | 'defense_down' | 'defense' | 'max_hp' | 'max_mp';
+
+/** T7 獨有詞綴一律取區間上限（`07-affix-tier7.md` § 7T.5），與一般詞綴取 T7 上限一致 */
+function uniqueMax(type: UniqueAffixType): number {
+  return UNIQUE_AFFIX_DEFINITIONS.find(d => d.type === type)?.range?.[1] ?? 0;
+}
+
+/**
+ * 木樁上有輸出價值的武器獨有詞綴：被動三種（爆擊傷害／爆擊率／攻擊速度）＋ 追加傷害。
+ * 回血、回魔、擊殺回血、命中暈眩對擊殺時間無貢獻（MP 不是瓶頸，§ 44.10）。
+ */
+const WEAPON_UNIQUE_OPTIONS: UniqueAffixType[] = UNIQUE_AFFIX_DEFINITIONS
+  .filter(d => d.pool === 'weapon' && (d.trigger === 'passive' || d.type === 'hit_bonus_damage'))
+  .map(d => d.type);
 
 /** T7 上限 20，品質 20% → getEffectiveAffixValue = floor(20 × 1.2) = 24 */
 const T7 = 20;
+/** 武器的一般詞綴條數（4 洞全滿）；其後再 1 條封印詞綴（`07-affix.md` § 7.1／§ 7.11.1） */
+const WEAPON_GENERAL_AFFIXES = 4;
 const QUALITY = 20;
 
 /**
@@ -338,6 +360,8 @@ const ARMOR_AFFIXES: AffixType[] = ['defense', 'max_hp', 'max_mp'];
 
 interface Loadout {
   label: string;
+  /** 武器的 T7 獨有詞綴；非 T7 武器為 null */
+  unique: UniqueAffixType | null;
   weaponName: string;
   weapon: EquipmentInstance;
   gear: (EquipmentInstance | null)[];
@@ -392,7 +416,7 @@ function erosionRollValue(base: number): number {
   return Math.max(1, Math.round((min + max) / 2));
 }
 
-function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[]): EquipmentInstance {
+function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[], unique: UniqueAffixType | null = null): EquipmentInstance {
   const bonusAttributes = tpl.bonusAttributes;
   /*
    * 裝備魔攻的「點數 → 百分比」匯率調整（`magicAttackMult`）。
@@ -415,13 +439,16 @@ function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[]
     : tpl.magicAttack;
   return {
     ...tpl, bonusAttributes, magicAttack, templateId: tpl.id!, quality: QUALITY, enhancement,
-    affixes: affixTypes.map(type => ({
+    // 第 5 條為封印詞綴（`07-affix.md` § 7.11.1）：效果與一般詞綴相同、吃品質
+    affixes: affixTypes.map((type, i) => ({
       type, tier: 7, value: T7,
+      ...(i === WEAPON_GENERAL_AFFIXES ? { sealed: true as const } : {}),
       ...(type === 'element_brand' || type === 'element_erosion' ? { element: BIS_BRAND_ELEMENT } : {}),
       // 侵蝕的每跳傷害（§ 7.4）。`--erosion=max` 取完美 roll（與其他詞綴一律取 T7 上限一致）；
       // `--erosion=mean` 取該範圍的期望值，代表實際掉落的平均水準。
       ...(type === 'element_erosion' ? { dotDamage: erosionRollValue(getWeaponBaseDamage(tpl)) } : {}),
     })),
+    ...(unique ? { uniqueAffix: { type: unique, value: uniqueMax(unique) } } : {}),
     ownerId: 1, equipped: true,
   } as EquipmentInstance;
 }
@@ -448,8 +475,10 @@ function buildSupportGear(cn: ClassName): EquipmentInstance[] {
   for (const slot of ARMOR_SLOTS) {
     const tpl = pickSupport(cn, t => t.slot === slot, slot);
     if (!tpl) continue;
-    out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES));
-    if (slot === 'ring1') out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES)); // 兩隻戒指
+    // T7 飾品帶全屬性（§ 7T.5）；同類只有一件生效，由 getEffectiveGear() 去重
+    const unique = tpl.tier === 7 && (slot === 'necklace' || slot === 'ring1') ? 'all_attributes' : null;
+    out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES, unique));
+    if (slot === 'ring1') out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES, unique)); // 兩隻戒指
   }
   return out;
 }
@@ -476,12 +505,19 @@ function buildLoadout(
   offhand: Template | null,
   weaponAffixes: AffixType[],
   support: EquipmentInstance[],
+  unique: UniqueAffixType | null = null,
 ): Loadout {
-  const w = instantiate(weapon, 9, weaponAffixes);
+  const w = instantiate(weapon, 9, weaponAffixes, unique);
   const gear: (EquipmentInstance | null)[] = [w];
   if (offhand) gear.push(instantiate(offhand, 9, ARMOR_AFFIXES));
   gear.push(...support);
-  return { label, weaponName: weapon.name, weapon: w, gear };
+  return { label, unique, weaponName: weapon.name, weapon: w, gear };
+}
+
+/** 套用素質需求凍結與獨有詞綴同類去重（`systems/gear.ts`），戰鬥一律吃這份 */
+function resolveLoadout(char: Character, effects: ActiveEffect[], loadout: Loadout): Loadout {
+  const gear = getEffectiveGear(char, effects, loadout.gear);
+  return { ...loadout, gear, weapon: gear[0] as EquipmentInstance };
 }
 
 // ---------------------------------------------------------------- Buff
@@ -836,6 +872,37 @@ function simulateOnce(
     }
   }
 
+  /**
+   * § 7.9 防禦下降：判定次數同 `arpgEventHandler.ts` —— 普攻依打擊數、技能一次；
+   * 只在有命中時判定；觸發後覆蓋並刷新時間。
+   */
+  const weaponDebuffs = getWeaponDebuffAffixes(loadout.weapon.affixes, loadout.weapon.quality ?? 0)
+    .filter(d => d.type === 'defense_down');
+  function tryDefenseDown(rolls: number) {
+    for (const proc of weaponDebuffs) {
+      let triggered = false;
+      for (let r = 0; r < rolls && !triggered; r++) {
+        if (Math.random() * 100 < AFFIX_DEBUFF_CHANCE) triggered = true;
+      }
+      if (!triggered) continue;
+      addTimed({
+        id: DEFENSE_DOWN_CATEGORY, sourceSkillId: 'defense_down', sourceSkillName: '防禦下降',
+        category: DEFENSE_DOWN_CATEGORY, type: 'debuff', target: 'monster', targetIdx: 0,
+        modifiers: [{ stat: 'defense', value: -proc.value, isPercent: true }],
+        startTime: 0, duration: Number.MAX_SAFE_INTEGER, tags: [], name: '防禦下降', description: '',
+      }, AFFIX_DEBUFF_DURATION_MS);
+    }
+  }
+  /** § 7T.4 追加傷害：每下命中 20% 機率，加在最終傷害 */
+  const bonusDamage = sumUniqueAffix(loadout.gear, 'hit_bonus_damage');
+  const rollBonus = (landedHits: number) => {
+    let extra = 0;
+    for (let h = 0; h < landedHits; h++) {
+      if (Math.random() * 100 < UNIQUE_HIT_PROC_CHANCE) extra += bonusDamage;
+    }
+    return extra;
+  };
+
   let now = 0;
   let nextAction = 0;
   // MP：戰鬥開始時全滿；`regen.ts` 每 6 秒回一次，戰鬥中減半
@@ -931,8 +998,9 @@ function simulateOnce(
         stats.hits++;
         stats.physHits++;
         if (res.isCritical) stats.crits++;
-        applyDamage(res.damage);
+        applyDamage(res.damage + rollBonus(res.hits.filter(h => !h.isMiss).length));
         tryErosion(now, erosionRolls);
+        tryDefenseDown(erosionRolls);
         // 淬毒：普攻命中觸發毒 DoT（快照制、存續期間不刷新）
         if (char.className === 'thief' && !dots.some(d => d.category === 'poisoned')) {
           const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
@@ -956,22 +1024,25 @@ function simulateOnce(
       currentMp -= entry.mpCost;
       stats.mpSpent += entry.mpCost;
       const fireEnchant = hasActiveFireEnchant(effects);
+      let landed = 0;
       for (let h = 0; h < (entry.hits ?? 1); h++) {
         const res = calculatePhysicalSkillHit(
           char, loadout.weapon, monster, loadout.gear, fireEnchant, entry.name, effects, 0,
           entry.ignoreDefensePercent ?? 0,
         );
         if (res.hit) {
+          landed++;
           stats.hits++;
           stats.physHits++;
           if (res.isCritical) stats.crits++;
-          applyDamage(res.damage);
+          applyDamage(res.damage + rollBonus(1));
           tryErosion(now, 1);
         } else {
           stats.misses++;
           stats.physMisses++;
         }
       }
+      if (landed > 0) tryDefenseDown(1);
       cooldowns[entry.id] = now + Math.floor(entry.cooldown * (1 - cdr / 100));
     } else {
       currentMp -= entry.mpCost;
@@ -991,8 +1062,9 @@ function simulateOnce(
           );
       stats.hits++;
       if (res.isCritical) stats.crits++;
-      applyDamage(res.damage);
+      applyDamage(res.damage + rollBonus(1));
       tryErosion(now, 1);
+      tryDefenseDown(1);
       // 魔力奪取：回復等同最終傷害的 MP（combat.ts:609 calculateMpRestored）
       if (mp.enabled && entry.mpDrainRatio) {
         currentMp = Math.min(mp.maxMp, currentMp + Math.floor(res.damage * entry.mpDrainRatio));
@@ -1070,6 +1142,7 @@ function runScenario(
   if (withSpeed) {
     effects.push(makeBuff(speed.name, 'speed', [{ stat: 'attack_speed', value: speed.percent, isPercent: true }]));
   }
+  loadout = resolveLoadout(char, effects, loadout);
 
   const effInt = designEffectiveInt(className, loadout.gear);
   const { order: rotation, scores } = calibrate(char, loadout, candidates, effects, effInt, seed + 500_000);
@@ -1148,87 +1221,131 @@ function runScenario(
 
 // ---------------------------------------------------------------- BiS 搜尋
 
-/** § 7.6 武器詞綴池（7 種），4 格不重複 → C(7,4) = 35 組 */
+/**
+ * § 7.6 武器詞綴池中對木樁有輸出價值的 9 種（命中下降只影響怪打人，不列入）。
+ * T7 單件最多 4 條一般詞綴 ＋ 1 條封印詞綴，互不重複 → C(9,5) = 126 組
+ */
 const WEAPON_AFFIX_POOL: AffixType[] = [
   'attack_power', 'element_brand', 'element_erosion', 'skill_elemental',
-  'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction',
+  'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction', 'defense_down',
 ];
 /** 粗排用的取樣數（全模擬另有 RUNS） */
 const PROXY_SAMPLES = 600;
 /**
  * 粗排後進入下一階段的組合數。可用 `--top=<n>` 放大。
- *
- * **粗排是「最佳單次動作 ÷ 攻擊間隔」，會高估長 CD 的大招。**
- * 試算魔攻類規則時特別明顯：盜賊的背刺走魔法公式（§ 21.4），
- * 魔攻匯率一放大，粗排就會把法杖排到爪類前面，爪類連全模擬都進不去，
- * 量出來的職業 DPS 因此整個失真。改規則組後若看到職業拿了不合理的武器，
- * 先用 `--top` 放大再判斷，不要直接採信。
  */
 const TOP_N_ARG = Number(process.argv.find(a => a.startsWith('--top='))?.split('=')[1]);
-const TOP_HANDS = Number.isFinite(TOP_N_ARG) && TOP_N_ARG > 0 ? TOP_N_ARG : 40;
+const TOP_HANDS = Number.isFinite(TOP_N_ARG) && TOP_N_ARG > 0 ? TOP_N_ARG : 20;
 const TOP_FINAL = TOP_HANDS;
 
 const SEED_AFFIXES: Record<ClassName, AffixType[]> = {
-  knight: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],
-  elf: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],
-  thief: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'],
-  elementalist: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage'],
-  priest: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage'],
+  knight: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed', 'defense_down'],
+  elf: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed', 'defense_down'],
+  thief: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed', 'defense_down'],
+  elementalist: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'],
+  priest: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'],
 };
 
-function choose4<T>(arr: T[]): T[][] {
+function chooseK<T>(arr: T[], k: number, from = 0): T[][] {
+  if (k === 0) return [[]];
   const out: T[][] = [];
-  for (let a = 0; a < arr.length; a++)
-    for (let b = a + 1; b < arr.length; b++)
-      for (let c = b + 1; c < arr.length; c++)
-        for (let d = c + 1; d < arr.length; d++)
-          out.push([arr[a], arr[b], arr[c], arr[d]]);
+  for (let i = from; i <= arr.length - k; i++) {
+    for (const rest of chooseK(arr, k - 1, i + 1)) out.push([arr[i], ...rest]);
+  }
   return out;
 }
 
+/** 武器的獨有詞綴候選：T7 武器逐一試 `WEAPON_UNIQUE_OPTIONS`，其餘不帶 */
+function uniqueOptions(weapon: Template): (UniqueAffixType | null)[] {
+  return weapon.tier === 7 ? WEAPON_UNIQUE_OPTIONS : [null];
+}
+
+const uniqueLabel = (u: UniqueAffixType | null) => (u ? `｜(獨)${u}` : '');
+
 /**
- * 粗排指標：**單次期望傷害最高的動作 ÷ 攻擊間隔**，少量取樣。
- *
- * 已知偏誤：「減少冷卻時間」對單次傷害沒有貢獻，只在輪替裡有價值，
- * 因此粗排會低估帶減CD 的組合 —— 這是前 K 名仍要跑全模擬的原因。
+ * 粗排指標：**輪替加權的每次行動期望傷害 ÷ 攻擊間隔**，少量取樣。
+ * 技能依「攻擊間隔 ÷ 冷卻（含減CD）」取代普攻的比例；不計 MP 與自身 buff 的行動佔用，
+ * 精確排序由前 K 名的全模擬決定。
  */
-function proxyDps(className: ClassName, loadout: Loadout, seed: number): number {
+function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number): number {
   const char = buildCharacter(className);
   const effects = preCombatBuffs(className);
+  const loadout = resolveLoadout(char, effects, rawLoadout);
   const effInt = designEffectiveInt(className, loadout.gear);
   const monster = makeReaper();
   const rotation = buildRotation(className);
-  let best = 0;
-  withSeed(seed, () => {
-    let sum = 0;
-    for (let i = 0; i < PROXY_SAMPLES; i++) {
-      const r = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, effects, 0);
-      sum += r.hit ? r.damage : 0;
-    }
-    best = sum / PROXY_SAMPLES;
-    for (const e of rotation) {
-      if (e.kind === 'self_buff') continue;
-      if (!meetsWeaponRequirement(e, loadout)) continue;
-      let s = 0;
-      for (let i = 0; i < PROXY_SAMPLES; i++) {
-        if (e.kind === 'physical_skill') {
-          const fire = hasActiveFireEnchant(effects);
-          for (let h = 0; h < (e.hits ?? 1); h++) {
-            const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
-            s += r.hit ? r.damage : 0;
-          }
-        } else if (e.physicalSnapshot) {
-          const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
-          s += r.damage;
-        } else {
-          const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
-          s += r.damage;
-        }
-      }
-      best = Math.max(best, s / PROXY_SAMPLES);
-    }
-  });
+  // § 7T.4 追加傷害的期望值：每下命中 × 觸發率 × 數值
+  const bonusPerHit = sumUniqueAffix(loadout.gear, 'hit_bonus_damage') * UNIQUE_HIT_PROC_CHANCE / 100;
+
   const intervalMs = getPlayerAttackInterval(loadout.gear, effects);
+  const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + intCooldownReduction(effInt));
+  const normalRolls = getWeaponHitCount(loadout.weapon);
+
+  /**
+   * 輪替加權的每次行動期望傷害。普攻為底，每招技能依「冷卻內可施放的比例」取代普攻，
+   * 依增益大小貪婪分配行動數；`rolls` 為每次行動平均的防禦下降判定次數。
+   */
+  function rotationAction(fx: ActiveEffect[]): { damage: number; rolls: number } {
+    let normal = 0;
+    const skills: { damage: number; cooldownMs: number }[] = [];
+    withSeed(seed, () => {
+      let sum = 0;
+      for (let i = 0; i < PROXY_SAMPLES; i++) {
+        const r = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, fx, 0);
+        if (r.hit) sum += r.damage + r.hits.filter(h => !h.isMiss).length * bonusPerHit;
+      }
+      normal = sum / PROXY_SAMPLES;
+      for (const e of rotation) {
+        if (e.kind === 'self_buff') continue;
+        if (!meetsWeaponRequirement(e, loadout)) continue;
+        let s = 0;
+        for (let i = 0; i < PROXY_SAMPLES; i++) {
+          if (e.kind === 'physical_skill') {
+            const fire = hasActiveFireEnchant(fx);
+            for (let h = 0; h < (e.hits ?? 1); h++) {
+              const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+              s += r.hit ? r.damage + bonusPerHit : 0;
+            }
+          } else if (e.physicalSnapshot) {
+            const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+            s += r.damage + bonusPerHit;
+          } else {
+            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+            s += r.damage + bonusPerHit;
+          }
+        }
+        skills.push({ damage: s / PROXY_SAMPLES, cooldownMs: e.cooldown * (1 - cdr / 100) });
+      }
+    });
+    let damage = normal;
+    let rolls = normalRolls;
+    let remaining = 1;
+    for (const k of skills.filter(k => k.damage > normal).sort((a, b) => b.damage - a.damage)) {
+      if (remaining <= 0) break;
+      const share = Math.min(remaining, k.cooldownMs > 0 ? intervalMs / k.cooldownMs : 1);
+      damage += share * (k.damage - normal);
+      rolls += share * (1 - normalRolls);
+      remaining -= share;
+    }
+    return { damage, rolls };
+  }
+
+  const plain = rotationAction(effects);
+  let best = plain.damage;
+  // § 7.9 防禦下降：穩態掛著的比例 = 1 − (1 − 觸發率)^(3 秒內的判定次數)，兩種狀態依比例加權
+  const defenseDown = getWeaponDebuffAffixes(loadout.weapon.affixes, loadout.weapon.quality ?? 0)
+    .find(d => d.type === 'defense_down');
+  if (defenseDown) {
+    const debuffed = rotationAction([...effects, {
+      id: DEFENSE_DOWN_CATEGORY, sourceSkillId: 'defense_down', sourceSkillName: '防禦下降',
+      category: DEFENSE_DOWN_CATEGORY, type: 'debuff', target: 'monster', targetIdx: 0,
+      modifiers: [{ stat: 'defense', value: -defenseDown.value, isPercent: true }],
+      startTime: 0, duration: Number.MAX_SAFE_INTEGER, tags: [], name: '防禦下降', description: '',
+    }]);
+    const rollsInWindow = plain.rolls * AFFIX_DEBUFF_DURATION_MS / intervalMs;
+    const uptime = 1 - Math.pow(1 - AFFIX_DEBUFF_CHANCE / 100, rollsInWindow);
+    best = (1 - uptime) * plain.damage + uptime * debuffed.damage;
+  }
   // § 7.4 元素侵蝕：粗排也要算進去，否則它永遠進不了前 3 名。
   // DoT 不吃防禦，穩態貢獻 = 佔用率 × 每跳傷害；佔用率 = 1 − e^(−每秒觸發次數 × 5s)
   const erosion = getErosion(loadout.weapon.affixes, loadout.weapon.quality ?? 0);
@@ -1252,23 +1369,45 @@ function searchBis(className: ClassName): { loadouts: Loadout[]; searched: numbe
   // （例：T5 星霜杖 10/10 曾因此排在 T7 星辰權杖 18/18 之前）。
   const PROXY_SEED = 777;
 
+  /*
+   * 獨有詞綴分段搜尋，粗排量維持在「手部 × 詞綴組」的量級：
+   * 1. 手部排名時每把 T7 武器試遍獨有詞綴，記下最佳者
+   * 2. 詞綴組合一律帶該武器的最佳獨有詞綴排名
+   * 3. 前 TOP_FINAL 名再把獨有詞綴逐一換過重排 —— 爆擊率與攻速、爆擊上限的交互會改變最佳解
+   */
+  let searched = 0;
   const rankedHands = hands
-    .map(h => ({ h, score: proxyDps(className, buildLoadout(h.label, h.weapon, h.offhand, seedSet, support), PROXY_SEED) }))
+    .map(h => {
+      let bestUnique: UniqueAffixType | null = null;
+      let score = -Infinity;
+      for (const u of uniqueOptions(h.weapon)) {
+        searched++;
+        const v = proxyDps(className, buildLoadout(h.label, h.weapon, h.offhand, seedSet, support, u), PROXY_SEED);
+        if (v > score) { score = v; bestUnique = u; }
+      }
+      return { h, score, bestUnique };
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, TOP_HANDS);
 
-  const affixSets = choose4(WEAPON_AFFIX_POOL);
-  const ranked = rankedHands
-    .flatMap(({ h }) => affixSets.map(set => {
-      const lo = buildLoadout(`${h.label}｜${set.join('+')}`, h.weapon, h.offhand, set, support);
-      return { lo, score: proxyDps(className, lo, PROXY_SEED) };
-    }))
-    .sort((a, b) => b.score - a.score);
-
-  return {
-    loadouts: ranked.slice(0, TOP_FINAL).map(r => r.lo),
-    searched: hands.length + rankedHands.length * affixSets.length,
+  const affixSets = chooseK(WEAPON_AFFIX_POOL, WEAPON_GENERAL_AFFIXES + 1);
+  const make = (h: (typeof hands)[number], set: AffixType[], u: UniqueAffixType | null) => {
+    searched++;
+    const lo = buildLoadout(`${h.label}｜${set.join('+')}${uniqueLabel(u)}`, h.weapon, h.offhand, set, support, u);
+    return { h, set, lo, score: proxyDps(className, lo, PROXY_SEED) };
   };
+  const stage2 = rankedHands
+    .flatMap(({ h, bestUnique }) => affixSets.map(set => make(h, set, bestUnique)))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, TOP_FINAL);
+  const ranked = [
+    ...stage2,
+    ...stage2.flatMap(c => uniqueOptions(c.h.weapon)
+      .filter(u => u !== c.lo.unique)
+      .map(u => make(c.h, c.set, u))),
+  ].sort((a, b) => b.score - a.score);
+
+  return { loadouts: ranked.slice(0, TOP_FINAL).map(r => r.lo), searched };
 }
 
 console.log('## BiS 自動選定（§ 44.5）\n');
@@ -1288,7 +1427,7 @@ if (TARGET_CLASSES.length === 0) {
 const SCENARIOS: { className: ClassName; loadouts: Loadout[] }[] = [];
 for (const cn of TARGET_CLASSES) {
   const { loadouts, searched } = searchBis(cn);
-  console.log(`- ${CLASS_NAMES_ZH[cn]}：粗排 ${searched} 組（手部 ${handCombos(cn).length} × 詞綴 ${choose4(WEAPON_AFFIX_POOL).length}），`
+  console.log(`- ${CLASS_NAMES_ZH[cn]}：粗排 ${searched} 組（手部 ${handCombos(cn).length} × 詞綴 ${chooseK(WEAPON_AFFIX_POOL, WEAPON_GENERAL_AFFIXES + 1).length} × T7 獨有詞綴 ${WEAPON_UNIQUE_OPTIONS.length}），`
     + `取前 ${loadouts.length} 名進全模擬 → ${loadouts.map(l => l.label).join(' / ')}`);
   SCENARIOS.push({ className: cn, loadouts });
 }

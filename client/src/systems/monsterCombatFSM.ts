@@ -51,7 +51,7 @@ export function createMonsterCombatContext(): MonsterCombatContext {
   return {
     state: 'roaming',
     attackTimer: 0,
-    aggroRange: 8,
+    aggroRange: 10,
     leashRange: 15,
     castTimer: 0,
     castTime: 0,

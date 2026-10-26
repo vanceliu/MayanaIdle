@@ -4,6 +4,7 @@ import type { MonsterInstance } from '../models/monster';
 import type { PlayerDebuffType } from '../models/playerDebuff';
 import { PLAYER_DEBUFF_DEFS, PLAYER_DEBUFF_TYPES } from '../models/playerDebuff';
 import { collectSpecialAffixTypes, type SpecialAffixType } from '../models/affix';
+import { hasUniqueAffix } from '../models/uniqueAffix';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
 
@@ -37,6 +38,9 @@ export function isMagicResistibleDebuff(type: PlayerDebuffType): boolean {
 
 /** 暈眩抵抗提供的時間減免（§ 7.10.4：50% 時間減免，不是免疫） */
 export const STUN_RESIST_DURATION_MULTIPLIER = 0.5;
+
+/** T7 全免疫（`07-affix-tier7.md`）涵蓋的 debuff：暈眩為完全免疫，不是暈眩抵抗的減時 */
+export const UNIQUE_IMMUNE_DEBUFFS: readonly PlayerDebuffType[] = ['poison', 'bleed', 'stun'];
 
 export function getEquippedSpecialAffixes(equippedGear: (EquipmentInstance | null)[]): Set<SpecialAffixType> {
   return collectSpecialAffixTypes(equippedGear.filter((g): g is EquipmentInstance => g != null));
@@ -174,10 +178,12 @@ export function rollMonsterDebuff(
   if (!monster.debuffs || monster.debuffs.length === 0) return none;
 
   const specials = getEquippedSpecialAffixes(equippedGear);
+  const immuneAll = hasUniqueAffix(equippedGear, 'immune_all');
 
   for (const ability of monster.debuffs) {
     const def = PLAYER_DEBUFF_DEFS[ability.type];
     if (!def) continue;
+    if (immuneAll && UNIQUE_IMMUNE_DEBUFFS.includes(ability.type)) continue;
 
     const immunity = getDebuffImmunityRate(ability.type, specials, activeEffects, now);
     const finalChance = ability.chance * (1 - immunity);

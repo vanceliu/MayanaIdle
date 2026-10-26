@@ -135,7 +135,9 @@ describe('EquipmentPanel', () => {
       expect(within(popup).getByText('腰帶')).toBeDefined();
       expect(within(popup).getByText('點擊選取')).toBeDefined();
       // 詞綴只在 tooltip 裡出現
-      expect(popup.querySelectorAll('.equip-detail-affix')).toHaveLength(2);
+      expect(popup.querySelectorAll('.equip-detail-affix:not(.empty-socket):not(.broken-socket)')).toHaveLength(2);
+      // § 7.1 沒填滿的洞列成空洞
+      expect(popup.querySelectorAll('.equip-detail-affix.empty-socket')).toHaveLength(2);
     });
 
     it('點一次只選取，點第二次才卸下', () => {

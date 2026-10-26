@@ -17,7 +17,7 @@ describe('affix model', () => {
   describe('getAffixPoolForSlot', () => {
     it('should return only weapon affixes for weapons', () => {
       const pool = getAffixPoolForSlot('weapon');
-      expect(pool.length).toBe(8);
+      expect(pool.length).toBe(10);
       pool.forEach(def => {
         expect(def.category).toContain('weapon');
       });
@@ -25,7 +25,7 @@ describe('affix model', () => {
 
     it('should return only armor affixes for armor', () => {
       const pool = getAffixPoolForSlot('armor');
-      expect(pool.length).toBe(12);
+      expect(pool.length).toBe(13);
       pool.forEach(def => {
         expect(def.category).toContain('armor');
       });
@@ -43,9 +43,9 @@ describe('affix model', () => {
     });
 
     it('should return armor + block_rate + magic_resist for shield', () => {
-      // 盾牌可選 11 種：防具 9 + 格擋率（盾牌專屬）+ 魔法抗性（飾品／盾牌專屬，§ 7.6）
+      // 盾牌可選 15 種：防具 13 + 格擋率（盾牌專屬）+ 魔法抗性（飾品／盾牌專屬，§ 7.6）
       const pool = getAffixPoolForSlot('shield');
-      expect(pool.length).toBe(14);
+      expect(pool.length).toBe(15);
       pool.forEach(def => {
         expect(def.category).toContain('shield');
       });
@@ -131,9 +131,9 @@ describe('affix model', () => {
     });
 
     it('should not exceed available pool size', () => {
-      // Weapon pool has 8 types, asking for 10 should cap at 8
-      const affixes = generateAffixes('weapon', 10, 10);
-      expect(affixes).toHaveLength(8);
+      // Weapon pool has 10 types, asking for 12 should cap at 10
+      const affixes = generateAffixes('weapon', 10, 12);
+      expect(affixes).toHaveLength(10);
     });
 
     it('should not have duplicate affix types on same equipment', () => {

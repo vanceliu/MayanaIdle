@@ -7,6 +7,7 @@ import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import '../components/WikiTable.css';
+import { UniqueAffixSection } from '../components/UniqueAffixTable';
 
 const TYPE_LABELS: Record<string, string> = {
   sword: '單手劍',
@@ -157,6 +158,7 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
         </table>
         {filtered.length === 0 && <p className="wiki-empty">無符合條件的武器</p>}
       </div>
+      <UniqueAffixSection pools={['weapon']} showFixed={false} />
     </div>
   );
 }

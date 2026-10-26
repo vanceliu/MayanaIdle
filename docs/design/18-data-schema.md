@@ -92,11 +92,15 @@
 - baseLargeMonsterDamage
 - defenseBonus（防具的隨機額外防禦 0~2，生成時抽）
 - stability（防具生成時抽 4~6；武器／飾品／腰帶沿用模板值）
+- uniqueAffix（T7 獨有詞綴 `{ type, value }`，生成時抽，之後不變；`07-affix-tier7.md`）
+- affixSlots（可用詞綴洞數，未設＝4；封印印記失敗時 −1，`07-affix.md` § 7.1）
 - durability，若未來需要
 - createdAt
 - updatedAt
 
 ## 18.4 詞綴實例應包含
+
+- sealed（封印詞綴，不佔洞；`affixes` 中排在佔洞詞綴之後，`07-affix.md` § 7.11.1）
 
 - equipmentInstanceId
 - affixId

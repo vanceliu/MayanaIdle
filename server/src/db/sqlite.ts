@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { WorldMode } from '../../../client/src/net/protocol';
+import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
+import { rollUniqueAffix } from '../../../client/src/models/uniqueAffix';
 
 export const DB_FILE = 'mayana.sqlite';
 
@@ -119,7 +121,25 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
       if (!columns.includes('recovery_hash')) db.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT');
     },
   },
+  {
+    /** 既有 T7 實例補抽獨有詞綴（`07-affix-tier7.md` § 7T.2）。已有的不重抽 */
+    version: 4,
+    up: backfillUniqueAffixes,
+  },
 ];
+
+export function backfillUniqueAffixes(db: DatabaseSync): void {
+  const t7 = new Map(EQUIPMENT_SEEDS.filter(t => t.tier === 7).map(t => [t.id!, t]));
+  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
+  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
+  for (const row of rows) {
+    const data = JSON.parse(row.data) as { templateId?: number; uniqueAffix?: unknown };
+    const template = data.templateId != null ? t7.get(data.templateId) : undefined;
+    if (!template || data.uniqueAffix) continue;
+    const uniqueAffix = rollUniqueAffix(template);
+    if (uniqueAffix) update.run(JSON.stringify({ ...data, uniqueAffix }), row.id);
+  }
+}
 
 export function openDatabase(path: string): DatabaseSync {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });

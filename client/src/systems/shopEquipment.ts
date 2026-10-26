@@ -39,7 +39,7 @@ export async function createShopEquipment(
         ...(isWeapon ? { weaponBaseDamage: getWeaponBaseDamage(template) } : {}),
       },
     );
-    return { template, affixes };
+    return { template, affixes, fields: rollNewInstanceFields(template) };
   });
 
   const ids = await repo.bulkAddEquipment(
@@ -48,7 +48,7 @@ export async function createShopEquipment(
       slot: d.template.slot,
       quality: 0,
       enhancement: 0,
-      ...rollNewInstanceFields(d.template),
+      ...d.fields,
       affixes: d.affixes,
       maxAffixTier: SHOP_MAX_AFFIX_TIER,
       ownerId,
@@ -65,7 +65,7 @@ export async function createShopEquipment(
     isTwoHanded: d.template.isTwoHanded,
     quality: 0,
     enhancement: 0,
-    ...rollNewInstanceFields(d.template),
+    ...d.fields,
     affixes: d.affixes,
     maxAffixTier: SHOP_MAX_AFFIX_TIER,
     ownerId,

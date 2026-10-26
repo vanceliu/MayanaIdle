@@ -5,6 +5,24 @@
   margin-bottom: 16px;
 }
 
+.wiki-section { margin-top: 32px; }
+.wiki-section-title {
+  color: var(--accent-gold);
+  font-family: var(--font-display);
+  margin-bottom: 12px;
+}
+.wiki-section-subtitle {
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  margin: 18px 0 6px;
+}
+.wiki-section-note {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  margin-top: 10px;
+}
+
 .wiki-filters {
   display: flex;
   flex-wrap: wrap;

@@ -479,8 +479,8 @@ const hundredPillar91_100: Region = {
   name: '百柱塔 91~100F',
   type: 'dungeon',
   group: HUNDRED_PILLAR_GROUP,
-  levelMin: 60,
-  levelMax: 60,
+  levelMin: 80,
+  levelMax: 80,
   zoneId: 'grey-ridge',
   entryScrollItemId: 143, // 百柱塔 91F 通行卷軸
   monsters: ['精靈王衛兵', '死之信徒', '精靈王射手', '精靈王魔導士', '死之執行者', '百柱死神'],

@@ -199,6 +199,16 @@ interface HotEffect {
 | `slow` | 減速 | 後者覆蓋前者 |
 | `stun` | 暈眩 | 獨立計時，不可刷新 |
 
+怪物身上另有詞綴施加的 category（`07-affix.md` § 7.9、`07-affix-tier7.md` § 7T.4）：
+
+| category | 效果 | 疊加 |
+|----------|------|------|
+| `affix-hit-down` | 命中下降（被該怪攻擊時角色迴避 +X，不受上限） | 後者覆蓋前者 |
+| `affix-def-down` | 防禦下降（怪物防禦 −X%） | 後者覆蓋前者 |
+| `t7-stun` | T7 命中暈眩 5 秒（tag `stunned`） | 獨立計時，不可刷新 |
+
+角色身上的 T7 受擊觸發 buff 以 `t7-<獨有詞綴種類>` 為 category，同種類刷新時間。
+
 - 不同 category 的 debuff 可同時存在（例：中毒 + 詛咒 + 減速 同時生效）
 - 同 category 的 debuff 依疊加規則處理
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AffixesPage } from '../../wiki/pages/AffixesPage';
 import { WikiHome } from '../../wiki/pages/WikiHome';
@@ -23,9 +23,12 @@ const CATEGORY_LABELS: Record<AffixCategory, string> = {
   accessory: '飾品',
 };
 
-/** 取得「第一欄為該詞綴名」的資料列（階級表的第一欄是 T1~T7，不會誤中） */
+/**
+ * 〈詞綴一覽〉裡「第一欄為該詞綴名」的資料列。
+ * 限定在該節內：T7 獨有詞綴表也有同名的爆擊率、迴避等列。
+ */
 function rowsFor(name: string): HTMLElement[] {
-  return screen
+  return within(screen.getByTestId('affix-list'))
     .getAllByRole('row')
     .filter(r => r.querySelector('td')?.textContent === name);
 }

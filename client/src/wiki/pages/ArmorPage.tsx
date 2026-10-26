@@ -7,6 +7,7 @@ import { getEquipmentTierColor } from '../../models/equipmentTier';
 import { isOffhandDefenseType } from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
 import '../components/WikiTable.css';
+import { UniqueAffixSection } from '../components/UniqueAffixTable';
 import { requirementText } from '../requirementText'
 
 const SLOT_LABELS: Record<string, string> = {
@@ -156,6 +157,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
         </table>
         {filtered.length === 0 && <p className="wiki-empty">無符合條件的防具</p>}
       </div>
+      <UniqueAffixSection pools={['armor', 'accessory']} showFixed />
     </div>
   );
 }
