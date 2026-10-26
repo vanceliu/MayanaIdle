@@ -113,7 +113,7 @@ function ScriptTemplateTabs() {
           aria-label="新增分頁"
           title={templatesFull ? `最多 ${MAX_SCRIPT_TEMPLATES} 個分頁` : '新增分頁'}
           disabled={templatesFull}
-          onClick={addScriptTemplate}
+          onClick={() => addScriptTemplate()}
         >＋</button>
       </div>
       <div className="template-actions">

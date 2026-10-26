@@ -25,7 +25,7 @@ export function DiscardConfirmModal() {
   const clamp = (n: number) => Math.max(1, Math.min(n, pending.maxAmount));
 
   return (
-    <div className="modal-overlay" onClick={cancelDiscard}>
+    <div className="modal-overlay" onClick={() => cancelDiscard()}>
       <div className="modal-content discard-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <span className="modal-title">丟棄物品</span>
@@ -67,7 +67,7 @@ export function DiscardConfirmModal() {
         </div>
 
         <div className="discard-actions">
-          <button className="btn-secondary" onClick={cancelDiscard}>取消</button>
+          <button className="btn-secondary" onClick={() => cancelDiscard()}>取消</button>
           <button className="btn-danger" onClick={() => confirmDiscard(amount)}>
             丟棄{stackable && amount > 1 ? ` ×${amount}` : ''}
           </button>
