@@ -5,6 +5,7 @@ import { useOnlineStore } from '../net/online';
 import {
   CLASS_BASE_ATTRIBUTES,
   CLASS_NAMES_ZH,
+  CREATION_ATTRIBUTE_CAP,
   getAvailablePoints,
   type ClassName,
   type Attributes,
@@ -58,7 +59,7 @@ export function CharacterCreate() {
 
   function addPoint(attr: keyof Attributes) {
     if (remaining <= 0) return;
-    if (baseAttrs[attr] + bonus[attr] >= 18) return;
+    if (baseAttrs[attr] + bonus[attr] >= CREATION_ATTRIBUTE_CAP) return;
     setBonus({ ...bonus, [attr]: bonus[attr] + 1 });
   }
 
@@ -157,7 +158,7 @@ export function CharacterCreate() {
                 <td><strong>{baseAttrs[attr] + bonus[attr]}</strong></td>
                 <td>
                   <button onClick={() => removePoint(attr)} disabled={bonus[attr] <= 0 || submitting}>-</button>
-                  <button onClick={() => addPoint(attr)} disabled={remaining <= 0 || baseAttrs[attr] + bonus[attr] >= 18 || submitting}>+</button>
+                  <button onClick={() => addPoint(attr)} disabled={remaining <= 0 || baseAttrs[attr] + bonus[attr] >= CREATION_ATTRIBUTE_CAP || submitting}>+</button>
                 </td>
               </tr>
             ))}

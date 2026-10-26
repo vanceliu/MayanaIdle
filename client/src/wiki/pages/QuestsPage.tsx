@@ -75,13 +75,13 @@ export function QuestsPage() {
             </thead>
             <tbody>
               <tr><td>D / C</td><td>—</td><td>—</td><td className="cell-number">8~12</td><td>金幣（印記賣價 × 數量 × 5）</td></tr>
-              <tr><td>B / A</td><td className="cell-number">8~12 : 1</td><td className="cell-number">4</td><td className="cell-number">8~48</td><td>混沌／刺針／重刻印記</td></tr>
+              <tr><td>B / A</td><td className="cell-number">8~12 : 1</td><td className="cell-number">4</td><td className="cell-number">8~48</td><td>混沌／刺針／重刻／新增／封印印記（隨機一種）</td></tr>
               <tr><td>S</td><td className="cell-number">45~60 : 1</td><td className="cell-number">2</td><td className="cell-number">45~120</td><td>突破印記</td></tr>
             </tbody>
           </table>
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 8 }}>
-          兌換率依掉率比訂定：精鍊／工藝印記 5~7%、混沌／刺針／重刻 1%、突破 0.1%。
+          兌換率依掉率比訂定：精鍊／工藝印記 5~7%、混沌／刺針／重刻／新增／封印 1%、突破 0.1%。
         </p>
       </section>
 
@@ -188,7 +188,7 @@ export function QuestsPage() {
               <tr><td>武器強化卷軸</td><td>1 張</td></tr>
               <tr><td>防具強化卷軸</td><td>1 張</td></tr>
               <tr><td>製作素材（B／B+ 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
-              <tr><td>詞綴印記（混沌/刺針/重刻隨機）</td><td>基準值 ÷ 1,000（最少 1 個）</td></tr>
+              <tr><td>詞綴印記（混沌/刺針/重刻/新增/封印隨機）</td><td>基準值 ÷ 1,000（最少 1 個）</td></tr>
               <tr><td>突破印記</td><td>1 個</td></tr>
             </tbody>
           </table>

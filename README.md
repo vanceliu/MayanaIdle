@@ -20,7 +20,7 @@ Web-based Idle ARPG — 持續戰鬥、隨機遇敵、裝備詞綴養成、陣�
 ```
 
 前端開發伺服器在 `http://localhost:5173/MayanaIdle/?server=ws://127.0.0.1:25580/ws`
-（`?server=` 讓 5173 的前端連到 25580 的 server）。
+（`?server=` 讓 5173 的前端連到 25580 的 server；只在開發版生效，正式 build 一律連同源）。
 
 ## 自架 server
 

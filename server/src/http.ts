@@ -2,6 +2,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname } from 'node:path';
 import type { StaticSource } from './staticFiles';
+import { log } from './log';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -40,14 +41,38 @@ export interface HttpOptions {
   apiHandler: (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<boolean>;
 }
 
+/** request URL 無法解析時回 null（§ 97.2 硬性要求：回 400） */
+export function parseRequestUrl(raw: string | undefined): URL | null {
+  try {
+    return new URL(raw ?? '/', 'http://localhost');
+  } catch {
+    return null;
+  }
+}
+
+/** 每個 HTTP 回應都帶的安全標頭（§ 97.2 硬性要求）：禁止被嵌入、不送 Referrer、不猜 MIME */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  'x-frame-options': 'DENY',
+  'content-security-policy': "frame-ancestors 'none'",
+  'referrer-policy': 'no-referrer',
+  'x-content-type-options': 'nosniff',
+};
+
 export function createHttpServer(options: HttpOptions) {
   return createServer(async (req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+    const url = parseRequestUrl(req.url);
+    if (!url) {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('bad request');
+      return;
+    }
     try {
       if (await options.apiHandler(req, res, url)) return;
     } catch (e) {
-      res.writeHead(500, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: (e as Error).message }));
+      log.error(`http ${url.pathname} failed`, e);
+      if (!res.headersSent) res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: '伺服器內部錯誤' }));
       return;
     }
     serveStatic(options, url.pathname, res);

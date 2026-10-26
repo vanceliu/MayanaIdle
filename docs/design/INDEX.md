@@ -44,7 +44,9 @@
 | **封印詞綴 `(封)`** | `07-affix.md` § 7.11.1、`46-sigil.md` § 46.12 | — |
 | **新增印記／封印印記** | `46-sigil.md` | § 46.11、§ 46.12 |
 | **印記（詞綴升階／重骰／品質）** | `46-sigil.md` | 全文 |
-| 印記掉落率 | `27-drop-table.md` | § 27.8 |
+| 印記掉落規則（適用區域／Boss） | `27-drop-table.md` | § 27.8 |
+| 印記逐區掉落值 | `27-drop-table.md` | § 27.3 |
+| 印記逐 Boss 掉落值 | `27-drop-table.md` | § 27.6 |
 | 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
@@ -140,8 +142,8 @@
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
 | **自架私服（單機＝本機 server／開放＝對外 bind）** | `97-selfhosted-server.md` | 全文（定案） |
-| **`server.properties`（設定鍵／生效時機／headless）／連線心跳（ping／閒置斷線／latency 訊息）／狀態同步（`frame` 訊息／欄位編碼）** | `97-selfhosted-server.md` | § 97.2 |
-| **帳號／host 帳號／session／同帳號重複進場／斷線重連回原角色／救援碼／登入嘗試限制** | `97-selfhosted-server.md` | § 97.5 |
+| **`server.properties`（設定鍵／生效時機／headless）／連線心跳（ping／閒置斷線／latency 訊息）／狀態同步（`frame` 訊息／欄位編碼）／遠端 action 允許清單／action 擁有權／價格與內容由 server 決定／參數驗證／天賦與撤退設定驗證／HTTP 安全標頭／機密檔案權限／tick 錯誤隔離／同連線訊息依序處理／錯誤訊息不終止 server（`bad_json`／`bad_message`／HTTP 400／未處理 rejection）** | `97-selfhosted-server.md` | § 97.2 |
+| **帳號／host 帳號／session／同帳號重複進場／斷線重連回原角色／救援碼／登入嘗試限制／註冊限制** | `97-selfhosted-server.md` | § 97.5 |
 | **決定性要求（seeded PRNG／tick 時間／純函數）** | `97-selfhosted-server.md` | § 97.6 |
 | **地圖實例／隊伍怪物上限／怪物目標／掉落經驗分配** | `97-selfhosted-server.md` | § 97.7.1 |
 | **聊天頻道** | `97-selfhosted-server.md` | § 97.7.2 |

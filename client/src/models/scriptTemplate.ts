@@ -19,6 +19,19 @@ export interface ScriptTemplate {
 /** 內建預設 template 的 id。這一份不可刪除，所以「至少留一個」自動成立 */
 export const DEFAULT_TEMPLATE_ID = 'default';
 
+/** 每角色最多幾份天賦配置（含預設，§ 3.14）。已超過者維持，只是不能再新增 */
+export const MAX_SCRIPT_TEMPLATES = 5;
+/** 配置名稱字數上限（§ 3.14） */
+export const TEMPLATE_NAME_MAX_LENGTH = 10;
+
+/** 合法的配置名稱：去頭尾空白後 1~10 字；不合法回 null */
+export function normalizeTemplateName(name: unknown): string | null {
+  if (typeof name !== 'string') return null;
+  const trimmed = name.trim();
+  const length = [...trimmed].length;
+  return length >= 1 && length <= TEMPLATE_NAME_MAX_LENGTH ? trimmed : null;
+}
+
 export function isDeletableTemplate(id: string): boolean {
   return id !== DEFAULT_TEMPLATE_ID;
 }

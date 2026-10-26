@@ -144,6 +144,11 @@ export async function claimMail(mailId: number, repo: GameRepository = defaultSe
   });
 }
 
+/** 信是否屬於該角色（領取、刪除前的擁有權檢查） */
+export async function isOwnMail(mailId: number, characterId: number, repo: GameRepository = defaultSession.repo): Promise<boolean> {
+  return (await repo.getMail(mailId))?.characterId === characterId;
+}
+
 /** 全部領取。回傳實際領到的封數 */
 export async function claimAll(characterId: number, repo: GameRepository = defaultSession.repo): Promise<number> {
   const mails = await repo.listMail(characterId);

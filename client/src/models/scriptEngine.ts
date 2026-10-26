@@ -339,6 +339,16 @@ export interface EmergencyRetreat {
   scrollTownId?: string;
 }
 
+/** 緊急撤退設定的格式（`03-combat.md` § 3.13）：HP 門檻 1~100、動作固定回城、城鎮為空或已定義的卷軸城鎮 */
+export function isValidEmergencyRetreat(value: unknown, townIds: ReadonlySet<string>): value is EmergencyRetreat {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.enabled === 'boolean'
+    && typeof v.hpThreshold === 'number' && Number.isFinite(v.hpThreshold) && v.hpThreshold >= 1 && v.hpThreshold <= 100
+    && v.action === 'flee_town'
+    && (v.scrollTownId === undefined || (typeof v.scrollTownId === 'string' && townIds.has(v.scrollTownId)));
+}
+
 export const DEFAULT_EMERGENCY_RETREAT: EmergencyRetreat = {
   enabled: true,
   hpThreshold: 15,

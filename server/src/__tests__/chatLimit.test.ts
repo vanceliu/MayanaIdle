@@ -136,11 +136,41 @@ describe('聊天頻率限制', () => {
     expect(limiter.isMuted(CHAR, 6000 + MUTE_MS + 1)).toBe(false);
   });
 
-  it('角色離線後清掉計數', () => {
+  it('角色離線：禁言中保留禁言，只清發話計數', () => {
     const limiter = new ChatLimiter();
     sendBurst(limiter, CHAT_RATE_MAX + 1, 1000);
-    limiter.forget(CHAR);
+    limiter.forget(CHAR, 1000);
 
-    expect(limiter.isMuted(CHAR, 1000)).toBe(false);
+    expect(limiter.isMuted(CHAR, 1000)).toBe(true);
+    expect(limiter.isMuted(CHAR, 1000 + MUTE_MS)).toBe(false);
+  });
+
+  it('角色離線：手動禁言也保留', () => {
+    const limiter = new ChatLimiter();
+    limiter.mute(CHAR, 50_000);
+    limiter.forget(CHAR, 1000);
+
+    expect(limiter.isMuted(CHAR, 49_999)).toBe(true);
+  });
+
+  it('角色離線：沒有禁言時清掉計數，重新上線從零算起', () => {
+    const limiter = new ChatLimiter();
+    for (let i = 0; i < CHAT_RATE_MAX; i++) expect(limiter.record(CHAR, 1000 + i)).toBe(false);
+    limiter.forget(CHAR, 2000);
+
+    expect(limiter.record(CHAR, 2001)).toBe(false);
+  });
+
+  it('禁言中離線再上線：累犯紀錄延續', () => {
+    const limiter = new ChatLimiter();
+    let t = 0;
+    for (let i = 0; i < MUTE_ESCALATE_AFTER; i++) {
+      sendBurst(limiter, CHAT_RATE_MAX + 1, t);
+      limiter.forget(CHAR, t);
+      t += MUTE_MS + 1;
+    }
+    sendBurst(limiter, CHAT_RATE_MAX + 1, t);
+
+    expect(limiter.mutedUntil(CHAR, t)).toBe(t + LONG_MUTE_MS);
   });
 });

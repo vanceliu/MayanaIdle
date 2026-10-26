@@ -10,7 +10,7 @@ import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
 import { TalentTypeEditor } from './TalentEditor';
 import { TalentFusion } from './TalentFusion';
-import { isDeletableTemplate } from '../models/scriptTemplate';
+import { isDeletableTemplate, MAX_SCRIPT_TEMPLATES, TEMPLATE_NAME_MAX_LENGTH } from '../models/scriptTemplate';
 
 type ScriptTab = 'combat' | 'persistent' | 'supply' | 'fusion';
 
@@ -61,6 +61,7 @@ function ScriptTemplateTabs() {
   const renameScriptTemplate = useGameStore(s => s.renameScriptTemplate);
   const removeScriptTemplate = useGameStore(s => s.removeScriptTemplate);
 
+  const templatesFull = templates.length >= MAX_SCRIPT_TEMPLATES;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
 
@@ -84,6 +85,7 @@ function ScriptTemplateTabs() {
               className="template-rename-input"
               aria-label="分頁名稱"
               autoFocus
+              maxLength={TEMPLATE_NAME_MAX_LENGTH}
               value={draftName}
               onChange={e => setDraftName(e.target.value)}
               onBlur={commitRename}
@@ -106,11 +108,22 @@ function ScriptTemplateTabs() {
             </button>
           )
         ))}
-        <button className="template-add" aria-label="新增分頁" title="新增分頁" onClick={addScriptTemplate}>＋</button>
+        <button
+          className="template-add"
+          aria-label="新增分頁"
+          title={templatesFull ? `最多 ${MAX_SCRIPT_TEMPLATES} 個分頁` : '新增分頁'}
+          disabled={templatesFull}
+          onClick={addScriptTemplate}
+        >＋</button>
       </div>
       <div className="template-actions">
         <button aria-label="更名" title="更名" onClick={startRename}>✎</button>
-        <button aria-label="複製分頁" title="複製分頁" onClick={() => duplicateScriptTemplate(active.id)}>⧉</button>
+        <button
+          aria-label="複製分頁"
+          title={templatesFull ? `最多 ${MAX_SCRIPT_TEMPLATES} 個分頁` : '複製分頁'}
+          disabled={templatesFull}
+          onClick={() => duplicateScriptTemplate(active.id)}
+        >⧉</button>
         <button
           aria-label="刪除分頁"
           title={isDeletableTemplate(active.id) ? '刪除分頁' : '預設分頁不可刪除'}

@@ -4,6 +4,7 @@ import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
+import { ATTRIBUTE_KEYS } from '../models/attributes';
 import type { Skill } from '../models/skill';
 import { rates } from '../core/rates';
 import { settleKillExp } from '../systems/globalRates';
@@ -51,7 +52,7 @@ import { getItemId, getItemById } from '../models/items';
 import type { BagSlotMap } from '../models/bagLayout';
 import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
-import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem } from '../models/bagItem';
+import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem, isPositiveCount } from '../models/bagItem';
 import { CLASS_SKILLS } from '../models/classSkills';
 import {
   LEARN_PRICES, SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, getRequiredBookId,
@@ -71,24 +72,25 @@ import { evaluatePersistentScript, evaluateEmergencyRetreat, skillMeetsWeaponReq
 import { pushSelfCastFx } from '../systems/selfCastFx';
 import type { ScriptRule, EmergencyRetreat } from '../models/scriptEngine';
 import {
-  DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT,
+  DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT, isValidEmergencyRetreat,
 } from '../models/scriptEngine';
 import type { ScriptTemplate } from '../models/scriptTemplate';
 import {
   DEFAULT_TEMPLATE_ID, createDefaultTemplate, createScriptTemplate,
   nextTemplateName, normalizeScriptTemplates, resolveActiveTemplate, isDeletableTemplate,
+  MAX_SCRIPT_TEMPLATES, normalizeTemplateName,
 } from '../models/scriptTemplate';
 import type { MapLocation } from '../models/area';
 import { getRegion, resolveArea, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
-import { resolveEquipment, rollNewInstanceFields, getCachedTemplates, getTemplateById } from '../systems/templateSync';
+import { resolveEquipment, rollNewInstanceFields, getTemplateById } from '../systems/templateSync';
 import { createShopEquipment } from '../systems/shopEquipment';
 import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
 import { generateCraftAffixes } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
-  canUseSigil, getSigilDefinition, type SigilContext, type SigilResult, type SigilType,
+  canUseSigil, getSigilDefinition, isSigilType, type SigilContext, type SigilResult, type SigilType,
 } from '../models/sigil';
 import {
   claimStarterGear as claimStarterGearFn, enhanceStarterGear as enhanceStarterGearFn, getStarterEnhanceCost, getStarterEnhanceState, persistStarterEnhance,
@@ -97,8 +99,7 @@ import { applyEnhanceScroll, getEnhanceScroll, type EnhanceOutcome } from '../sy
 import type { EquipSlot } from '../models/equipment';
 import { findScrollInBag, consumeTownScroll, getTownScrollByItemId, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import type { CharacterBagEntry, WarehouseEntry } from '../db/rowTypes';
-import { getItemSellPrice, getEquipmentSellTotal } from '../systems/shop';
-import { getItemBasePrice } from '../systems/shop';
+import { getItemSellPrice, getGeneralStorePrice, getTemplateSellPrice } from '../systems/shop';
 import { getCachedEquipmentTemplates } from '../db/equipmentTemplateCache';
 import type { HuntLocation } from '../models/villageScript';
 import {
@@ -298,6 +299,16 @@ export interface CharacterSummary {
   attributes: Attributes;
 }
 
+const EQUIP_SLOTS: ReadonlySet<string> = new Set(SLOT_ORDER);
+const SCROLL_TOWN_IDS: ReadonlySet<string> = new Set(Object.values(TOWN_SCROLL_CONFIG).map(s => s.townId));
+
+export type AfterCombatThresholdKey =
+  'afterCombatHpThreshold' | 'afterCombatMpThreshold' | 'afterCombatHpResumeThreshold' | 'afterCombatMpResumeThreshold';
+
+const AFTER_COMBAT_THRESHOLD_KEYS: ReadonlySet<string> = new Set<AfterCombatThresholdKey>([
+  'afterCombatHpThreshold', 'afterCombatMpThreshold', 'afterCombatHpResumeThreshold', 'afterCombatMpResumeThreshold',
+]);
+
 export interface GameState {
   phase: GamePhase;
   userId: number | null;
@@ -377,6 +388,7 @@ export interface GameState {
   stopRegen: () => void;
   /** 累積 elapsedMs，滿回復週期即回復一次（`29-regen.md`） */
   tickRegen: (elapsedMs: number) => void;
+  /** 只認自己背包裡同 id 的實例，傳入物件的其他欄位不採用 */
   equipItem: (item: EquipmentInstance) => void;
   unequipItem: (slot: keyof EquippedGear) => void;
   usePotion: () => void;
@@ -427,15 +439,13 @@ export interface GameState {
   discardBagItem: (itemId: number, amount?: number) => void;
   /** 賣掉背包道具，回傳獲得金幣（`39-batch-sell.md`；定價見 `systems/shop.ts`） */
   sellBagItems: (lines: { itemId: number; amount: number }[]) => number;
-  /** 買進背包道具，回傳花費金幣；金幣不足時不成交回 0 */
-  buyBagItems: (lines: { itemId: number; amount: number; unitPrice: number }[]) => number;
   /**
-   * 賣掉裝備實例，回傳獲得金幣。
-   * 模板要由呼叫端傳進來 —— 價格算不出來就等於 0 元成交，
-   * 讓依賴的模板從參數走，就不會有「快取還沒暖起來就白送」這種靜默失敗。
+   * 雜貨店購買，回傳花費金幣。單價由所在城鎮的貨架決定（`getGeneralStorePrice`）；
+   * 非貨架品、數量非正整數、金幣或背包格數不足時整筆不成交，回 0
    */
-  /** 模板省略時以快取為準（線上模式 client 只傳 id） */
-  sellEquipmentInstances: (ids: number[], templates?: EquipmentTemplate[]) => number;
+  buyBagItems: (lines: { itemId: number; amount: number }[]) => number;
+  /** 賣掉背包裡可販售的裝備實例，回傳獲得金幣。售價依 server 模板快取；新手裝與無售價者不賣 */
+  sellEquipmentInstances: (ids: number[]) => number;
   /** 商店購買：金幣與格數在 server 判定（`06-equipment-acquire.md` § 6A.2） */
   buyShopEquipment: (templateIds: number[]) => Promise<EquipmentInstance[]>;
   /** 鐵匠鋪製作（`06-equipment-acquire.md` § 6A.3） */
@@ -459,10 +469,7 @@ export interface GameState {
   /** 試驗場的免費補滿（`50-training-ground.md` § 50.5.3）；只在試驗場內有效 */
   restoreInTrainingGround: () => boolean;
   /** 戰鬥後的等待／恢復門檻（存在角色偏好，線上模式由 server 的迴圈讀取） */
-  setAfterCombatThreshold: (
-    key: 'afterCombatHpThreshold' | 'afterCombatMpThreshold' | 'afterCombatHpResumeThreshold' | 'afterCombatMpResumeThreshold',
-    value: number,
-  ) => void;
+  setAfterCombatThreshold: (key: AfterCombatThresholdKey, value: number) => void;
   claimStarterGear: () => Promise<string[]>;
   enhanceStarterGear: (itemId: number) => Promise<{ ok: boolean; message: string; enhancement?: number }>;
   /** 背包強化卷軸（`35-inventory-constraints.md` § 35.5.5） */
@@ -492,6 +499,8 @@ export interface GameState {
   /** § 36.6.3：花 50 貢獻重刷單一分頁 */
   rerollQuestBoard: (difficulty: AdventurerQuestDifficulty) => void;
   initQuestBoard: () => void;
+  /** 任務板不屬於目前城鎮時才重新產生（§ 36.6.3：同城重刷只能走 `rerollQuestBoard`） */
+  ensureQuestBoardForTown: () => void;
   /** 加入製作追蹤（§ 36.13.2）。滿 3 個或已追蹤同配方時不做事 */
   acceptCraftQuest: (templateId: number) => void;
   /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
@@ -1054,8 +1063,11 @@ export function createGameStore(session: Session) {
     }
   },
 
-  equipItem: (item) => {
+  equipItem: (requested) => {
     const state = get();
+    // 只認自己背包裡的實例（`97-selfhosted-server.md` § 97.2）：傳入的物件只取 id
+    const item = state.inventory.find(i => i.id != null && i.id === requested?.id);
+    if (!item) return;
 
     if (item.requiredClass && item.requiredClass.length > 0 && state.character) {
       if (!item.requiredClass.includes(state.character.className)) {
@@ -1126,6 +1138,7 @@ export function createGameStore(session: Session) {
   },
 
   unequipItem: (slot) => {
+    if (!EQUIP_SLOTS.has(slot)) return;
     const state = get();
     const gear = { ...state.equippedGear };
     const item = gear[slot];
@@ -1625,6 +1638,7 @@ export function createGameStore(session: Session) {
   },
 
   setEmergencyRetreat: (retreat) => {
+    if (!isValidEmergencyRetreat(retreat, SCROLL_TOWN_IDS)) return;
     updateActiveTemplate(set, get, t => ({ ...t, emergencyRetreat: retreat }), session);
   },
 
@@ -1638,6 +1652,7 @@ export function createGameStore(session: Session) {
 
   addScriptTemplate: () => {
     const templates = get().scriptTemplates;
+    if (templates.length >= MAX_SCRIPT_TEMPLATES) return;
     const created = createScriptTemplate(`tpl-${Date.now()}`, nextTemplateName(templates));
     set({ scriptTemplates: [...templates, created], activeTemplateId: created.id });
     get().startPersistentLoop();
@@ -1646,6 +1661,7 @@ export function createGameStore(session: Session) {
 
   duplicateScriptTemplate: (id) => {
     const templates = get().scriptTemplates;
+    if (templates.length >= MAX_SCRIPT_TEMPLATES) return;
     const source = templates.find(t => t.id === id);
     if (!source) return;
     const copy: ScriptTemplate = {
@@ -1659,7 +1675,7 @@ export function createGameStore(session: Session) {
   },
 
   renameScriptTemplate: (id, name) => {
-    const trimmed = name.trim();
+    const trimmed = normalizeTemplateName(name);
     if (!trimmed) return;
     set({
       scriptTemplates: get().scriptTemplates.map(t => (t.id === id ? { ...t, name: trimmed } : t)),
@@ -1912,9 +1928,7 @@ export function createGameStore(session: Session) {
       case 'buy_item': {
         const amount = getBuyAmount(action, ctx);
         if (amount <= 0 || action.itemId == null) return;
-        const spent = get().buyBagItems([
-          { itemId: action.itemId, amount, unitPrice: getItemBasePrice(action.itemId) },
-        ]);
+        const spent = get().buyBagItems([{ itemId: action.itemId, amount }]);
         if (spent > 0) {
           const name = getItemById(action.itemId)?.name ?? '道具';
           set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：購買${name} ×${amount}`, type: 'system' }) });
@@ -1931,7 +1945,7 @@ export function createGameStore(session: Session) {
       case 'sell_equipment': {
         const items = collectVillageSellEquipment(action, ctx);
         if (items.length === 0) return;
-        const gained = get().sellEquipmentInstances(items.map(i => i.id!), templates);
+        const gained = get().sellEquipmentInstances(items.map(i => i.id!));
         set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：販售裝備 ${items.length} 件，獲得 ${gained.toLocaleString()}G`, type: 'system' }) });
         break;
       }
@@ -2013,6 +2027,7 @@ export function createGameStore(session: Session) {
   },
 
   discardBagItem: (itemId, amount = 1) => {
+    if (!isPositiveCount(amount)) return;
     const bag = get().bagItems;
     const existing = bag.find(b => b.itemId === itemId);
     if (!existing) return;
@@ -2029,9 +2044,11 @@ export function createGameStore(session: Session) {
    */
 
   sellBagItems: (lines) => {
+    if (!get().character || !Array.isArray(lines)) return 0;
     let bag = get().bagItems;
     let gained = 0;
     for (const line of lines) {
+      if (!isPositiveCount(line?.amount)) continue;
       const held = bag.find(b => b.itemId === line.itemId);
       if (!held) continue;
       const actual = Math.min(line.amount, held.amount);
@@ -2049,14 +2066,21 @@ export function createGameStore(session: Session) {
   },
 
   buyBagItems: (lines) => {
-    const cost = lines.reduce((sum, l) => sum + l.unitPrice * l.amount, 0);
-    if (cost > (get().character?.gold ?? 0)) return 0;
-    let bag = get().bagItems;
+    const state = get();
+    const char = state.character;
+    if (!char || !Array.isArray(lines) || lines.length === 0) return 0;
+    let cost = 0;
+    let bag = state.bagItems;
     for (const line of lines) {
+      const price = getGeneralStorePrice(char.currentRegion, line?.itemId);
+      if (price === null || !Number.isSafeInteger(line.amount) || line.amount <= 0) return 0;
+      cost += price * line.amount;
       bag = addBagItem(bag, line.itemId, line.amount);
     }
+    if (!Number.isSafeInteger(cost) || cost > char.gold) return 0;
+    if (getBagUsedSlots(bag, state.inventory, state.equippedGear) > getBagMaxSlots(state.equippedGear)) return 0;
     set({
-      character: { ...get().character!, gold: get().character!.gold - cost },
+      character: { ...char, gold: char.gold - cost },
       bagItems: bag,
     });
     get().saveState();
@@ -2088,6 +2112,7 @@ export function createGameStore(session: Session) {
     }
 
     for (const line of materials) {
+      if (!isPositiveCount(line?.amount)) continue;
       const held = bag.find(b => b.itemId === line.itemId);
       if (!held) continue;
       const actual = Math.min(line.amount, held.amount);
@@ -2123,6 +2148,7 @@ export function createGameStore(session: Session) {
     }
 
     for (const line of materials) {
+      if (!isPositiveCount(line?.amount)) continue;
       const held = mats.find(m => m.itemId === line.itemId);
       if (!held) continue;
       const actual = Math.min(line.amount, held.amount);
@@ -2162,18 +2188,26 @@ export function createGameStore(session: Session) {
     return actual;
   },
 
-  sellEquipmentInstances: (ids, templatesArg) => {
-    const templates = templatesArg?.length ? templatesArg : getCachedTemplates();
-    if (ids.length === 0 || templates.length === 0) return 0;
+  sellEquipmentInstances: (ids) => {
+    const char = get().character;
+    if (!char || !Array.isArray(ids) || ids.length === 0) return 0;
     const idSet = new Set(ids);
     const inventory = get().inventory;
-    const selling = inventory.filter(i => i.id != null && idSet.has(i.id));
+    let gained = 0;
+    const selling: EquipmentInstance[] = [];
+    for (const item of inventory) {
+      if (item.id == null || !idSet.has(item.id) || item.isStarterGear) continue;
+      const price = getTemplateSellPrice(getTemplateById(item.templateId));
+      if (price <= 0) continue;
+      gained += price;
+      selling.push(item);
+    }
     if (selling.length === 0) return 0;
 
-    const gained = getEquipmentSellTotal(selling, templates);
+    const soldIds = new Set(selling.map(i => i.id));
     set({
-      character: { ...get().character!, gold: get().character!.gold + gained },
-      inventory: inventory.filter(i => i.id == null || !idSet.has(i.id)),
+      character: { ...char, gold: char.gold + gained },
+      inventory: inventory.filter(i => !soldIds.has(i.id)),
     });
     session.repo.bulkDeleteEquipment(selling.map(i => i.id!));
     get().saveState();
@@ -2182,19 +2216,34 @@ export function createGameStore(session: Session) {
 
   pendingDiscard: null,
 
-  requestDiscard: (req) => set({ pendingDiscard: req }),
+  /** 只接受自己背包裡的東西；名稱與數量上限以自己的資料為準（§ 97.2） */
+  requestDiscard: (req) => {
+    const state = get();
+    if (req?.kind === 'equipment') {
+      const item = state.inventory.find(i => i.id != null && i.id === req.equipmentId);
+      if (!item) return;
+      set({ pendingDiscard: { kind: 'equipment', name: item.name, maxAmount: 1, equipmentId: item.id } });
+      return;
+    }
+    if (req?.kind === 'bag') {
+      const entry = state.bagItems.find(b => b.itemId === req.itemId);
+      if (!entry) return;
+      set({ pendingDiscard: { kind: 'bag', name: entry.name, itemId: entry.itemId, maxAmount: entry.amount } });
+    }
+  },
 
   cancelDiscard: () => set({ pendingDiscard: null }),
 
+  /** 數量 0 或負數時丟 1 個；非整數不處理 */
   confirmDiscard: (amount) => {
     const req = get().pendingDiscard;
-    if (!req) return;
+    if (!req || !Number.isSafeInteger(amount)) return;
+    const dropped = req.kind === 'equipment' ? 1 : Math.max(1, Math.min(amount, req.maxAmount));
     if (req.kind === 'equipment') {
       if (req.equipmentId != null) get().discardInventoryItem(req.equipmentId);
     } else if (req.itemId != null) {
-      get().discardBagItem(req.itemId, amount);
+      get().discardBagItem(req.itemId, dropped);
     }
-    const dropped = req.kind === 'equipment' ? 1 : Math.max(1, Math.min(amount, req.maxAmount));
     set({
       pendingDiscard: null,
       combatLogs: addLog(get().combatLogs, {
@@ -2206,6 +2255,7 @@ export function createGameStore(session: Session) {
 
   discardInventoryItem: (id) => {
     const inv = get().inventory;
+    if (!inv.some(i => i.id != null && i.id === id)) return;
     set({ inventory: inv.filter(i => i.id !== id) });
     session.repo.deleteEquipment(id);
     saveGame(get(), session);
@@ -2213,7 +2263,7 @@ export function createGameStore(session: Session) {
 
   spendAttributePoint: (attr) => {
     const char = get().character;
-    if (!char || char.unspentAttributePoints <= 0) return;
+    if (!char || char.unspentAttributePoints <= 0 || !ATTRIBUTE_KEYS.includes(attr)) return;
     const total = getTotalAttributes(char);
     if (total[attr] >= ATTRIBUTE_CAP) return;
     const newBonus = { ...char.bonusAttributes, [attr]: char.bonusAttributes[attr] + 1 };
@@ -2261,8 +2311,11 @@ export function createGameStore(session: Session) {
     saveGame(get(), session);
   },
 
-  acceptAdventurerQuest: (quest) => {
+  /** 只取傳入任務的 id，從自己的任務板取任務（§ 97.2） */
+  acceptAdventurerQuest: (requested) => {
     const state = get();
+    const quest = Object.values(state.adventurerQuestBoard).flat().find(q => q.id === requested?.id);
+    if (!quest) return;
     const result = acceptAdvQuest(state.adventurerQuests, quest);
     if (!result) return;
     set({ adventurerQuests: result });
@@ -2396,6 +2449,12 @@ export function createGameStore(session: Session) {
     set({ adventurerQuestBoard: board, questBoardTownId: townId ?? null });
   },
 
+  ensureQuestBoardForTown: () => {
+    const state = get();
+    if (state.questBoardTownId === (state.character?.currentArea ?? null)) return;
+    state.initQuestBoard();
+  },
+
   pushSystemLog: (text: string) => {
     set(state => ({ combatLogs: addLog(state.combatLogs, { text, type: 'system' }) }));
   },
@@ -2498,6 +2557,10 @@ export function createGameStore(session: Session) {
       }
     }
     if (!item) return { ok: false, message: '沒有裝備' };
+    if (!isSigilType(sigilType)) return { ok: false, message: '印記不存在' };
+    if (affixIndex !== null && (!Number.isInteger(affixIndex) || affixIndex < 0 || affixIndex >= (item.affixes?.length ?? 0))) {
+      return { ok: false, message: '詞綴不存在' };
+    }
     const def = getSigilDefinition(sigilType);
     const count = getBagItemAmount(state.bagItems, def.itemId);
     if (count <= 0) return { ok: false, message: `背包裡沒有${def.name}` };
@@ -2566,7 +2629,9 @@ export function createGameStore(session: Session) {
   restAtInn: (mode) => {
     const state = get();
     const char = state.character;
-    if (!char) return false;
+    if (!char || (mode !== 'full' && mode !== 'hp' && mode !== 'mp')) return false;
+    // 旅館只在城鎮生效（`13-town.md` § 13.7）；其餘設施的位置限制只在介面
+    if (getRegion(char.currentRegion)?.type !== 'town') return false;
 
     const price = mode === 'full' ? INN_PRICES.full : mode === 'hp' ? INN_PRICES.hpOnly : INN_PRICES.mpOnly;
     if (char.gold < price) return false;
@@ -2688,6 +2753,7 @@ export function createGameStore(session: Session) {
   },
 
   setAfterCombatThreshold: (key, value) => {
+    if (!AFTER_COMBAT_THRESHOLD_KEYS.has(key) || typeof value !== 'number' || !Number.isFinite(value)) return;
     const clamped = Math.min(100, Math.max(0, Math.round(value)));
     set({ [key]: clamped } as Partial<GameState>);
     get().saveState();

@@ -101,8 +101,13 @@ export class ChatLimiter {
     state.sends = [];
   }
 
-  /** 角色離線後清掉，避免長期累積 */
-  forget(characterId: number): void {
+  /** 角色離線：清掉發話計數；未到期的禁言與累犯紀錄保留（§ 97.7.2），其餘整筆刪除 */
+  forget(characterId: number, now: number): void {
+    const state = this.byCharacter.get(characterId);
+    if (state && state.mutedUntil > now) {
+      state.sends = [];
+      return;
+    }
     this.byCharacter.delete(characterId);
   }
 }

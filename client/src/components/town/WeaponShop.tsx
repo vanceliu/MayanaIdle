@@ -94,7 +94,7 @@ export function WeaponShop() {
 
   function checkoutSell() {
     if (sellLines.length === 0) return;
-    useGameStore.getState().sellEquipmentInstances(sellLines.map(l => l.item.id!), allTemplates);
+    useGameStore.getState().sellEquipmentInstances(sellLines.map(l => l.item.id!));
     sellCart.clear();
   }
 
@@ -107,7 +107,7 @@ export function WeaponShop() {
 
   function executeBatchSell() {
     if (!char || batchSellWeapons.length === 0) return;
-    useGameStore.getState().sellEquipmentInstances(batchSellWeapons.map(i => i.id!), allTemplates);
+    useGameStore.getState().sellEquipmentInstances(batchSellWeapons.map(i => i.id!));
     setBatchTier(null);
   }
 

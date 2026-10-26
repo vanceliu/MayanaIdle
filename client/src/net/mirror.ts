@@ -155,14 +155,6 @@ const SPECIAL_GAME_ACTIONS: Record<string, (conn: GameConnection, args: unknown[
   uploadOwnStats: () => undefined,
 };
 
-/** 純介面用的 action 留在本機 */
-const LOCAL_GAME_ACTIONS = new Set(['setPhase', 'requestDiscard', 'cancelDiscard']);
-
-/** 這些 action 的部分參數在 server 端自己查（不傳整包模板） */
-const ARG_TRIM: Record<string, (args: unknown[]) => unknown[]> = {
-  sellEquipmentInstances: args => [args[0]],
-};
-
 export function installOnlineProxies(conn: GameConnection): void {
   // 時間一律跟著 server 走
   setClockSource(mirrorGameNow);
@@ -171,9 +163,10 @@ export function installOnlineProxies(conn: GameConnection): void {
   for (const [name, handler] of Object.entries(SPECIAL_GAME_ACTIONS)) {
     gamePatch[name] = async (...args: unknown[]) => handler(conn, args);
   }
+  // 不在允許清單的 game action 在線上模式留在本機執行。
+  // 丟棄確認（request／cancel／confirm）必須留在允許清單：`confirmDiscard` 在 server 讀 `pendingDiscard`
   for (const name of ACTION_ALLOWLIST.game) {
-    if (LOCAL_GAME_ACTIONS.has(name)) continue;
-    gamePatch[name] = (...args: unknown[]) => conn.rpc('game', name, (ARG_TRIM[name] ?? (a => a))(args));
+    gamePatch[name] = (...args: unknown[]) => conn.rpc('game', name, args);
   }
   // 本機時鐘與迴圈 action 在線上模式全部無效化
   for (const name of ['startRegen', 'stopRegen', 'tickRegen', 'startPersistentLoop', 'stopPersistentLoop', 'tickPersistent', 'runVillageScriptTick', 'startExploring', 'stopExploring']) {

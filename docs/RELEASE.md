@@ -322,7 +322,7 @@ node server/dist/server.js                    # 或在 server/ 執行 npm start
 | Node 版本 | 24 以上（`node:sqlite`） |
 | 前端來源 | 自動找 `client/dist`（桌面版找 `client-dist`）；`--static <dir>` 可指定。找不到就只提供 WebSocket 與 API |
 | `--data-dir` | 同 § 5.2；走 `npm start` 要寫成 `npm start -- --data-dir <path>` |
-| 前端熱重載 | `(cd client && npm run dev)`，開 `http://localhost:5173/MayanaIdle/?server=ws://127.0.0.1:25580/ws` |
+| 前端熱重載 | `(cd client && npm run dev)`，開 `http://localhost:5173/MayanaIdle/?server=ws://127.0.0.1:25580/ws`（`?server=` 只在開發版生效） |
 
 ---
 

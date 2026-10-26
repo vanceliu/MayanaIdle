@@ -3,7 +3,9 @@
  * 遷移必須冪等；失敗即中止啟動。
  */
 import { DatabaseSync } from 'node:sqlite';
+import { hashSessionToken } from '../auth';
 import { mkdirSync } from 'node:fs';
+import { restrictFile } from '../secretFile';
 import { dirname } from 'node:path';
 import type { WorldMode } from '../../../client/src/net/protocol';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
@@ -126,7 +128,20 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     version: 4,
     up: backfillUniqueAffixes,
   },
+  {
+    /** session token 改存 SHA-256（`97-selfhosted-server.md` § 97.5）：既有列原地雜湊，玩家不必重登；過期列刪除 */
+    version: 5,
+    up: hashExistingSessionTokens,
+  },
 ];
+
+export function hashExistingSessionTokens(db: DatabaseSync): void {
+  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+  const rows = db.prepare('SELECT token FROM sessions').all() as { token: string }[];
+  const update = db.prepare('UPDATE sessions SET token = ? WHERE token = ?');
+  for (const { token } of rows) update.run(hashSessionToken(token), token);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
+}
 
 export function backfillUniqueAffixes(db: DatabaseSync): void {
   const t7 = new Map(EQUIPMENT_SEEDS.filter(t => t.tier === 7).map(t => [t.id!, t]));
@@ -144,6 +159,8 @@ export function backfillUniqueAffixes(db: DatabaseSync): void {
 export function openDatabase(path: string): DatabaseSync {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
+  // 收緊權限要在建 WAL 之前：SQLite 建 -wal／-shm 時沿用主檔權限
+  if (path !== ':memory:') for (const file of [path, `${path}-wal`, `${path}-shm`]) restrictFile(file);
   db.exec('PRAGMA journal_mode = WAL');
   /*
    * WAL 下的常規設定：提交不再每次 fsync。

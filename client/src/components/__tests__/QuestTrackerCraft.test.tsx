@@ -89,4 +89,14 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     expect(state.craftQuests).toHaveLength(0);
     expect(state.guildProgress).toEqual({ rank: 'C', points: 2000 });
   });
+
+  it('配方已不存在：自動移除該筆追蹤（§ 36.13.5）', async () => {
+    useGameStore.setState({
+      craftQuests: [{ id: 'craft-999999', templateId: 999999 }, { id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }],
+    });
+    render(<QuestTrackerContent />);
+
+    await waitFor(() => expect(useGameStore.getState().craftQuests.map(q => q.templateId)).toEqual([RECIPE.id]));
+    expect(screen.getByText('鋼心劍')).toBeTruthy();
+  });
 });

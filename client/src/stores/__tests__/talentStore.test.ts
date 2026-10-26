@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+// 安裝時驗證天賦配置存在，需要 game store 掛上 session
+import '../gameStore';
 import { db } from '../../testing/testDb';
 import {
   useTalentStore,

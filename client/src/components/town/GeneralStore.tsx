@@ -11,33 +11,13 @@ import { QtyStepper } from '../common/QtyStepper';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 import { CraftUsageBadge } from '../common/CraftUsageBadge';
 import {
-  getItemSellPrice, isSellableItem,
+  GENERAL_STORE_ITEM_IDS, getItemSellPrice, isSellableItem,
   collectSellableMaterials, collectProtectedMaterials, getMaterialsSellTotal,
   MATERIAL_TIER_OPTIONS,
 } from '../../systems/shop';
 import { isSigilItemId } from '../../models/sigil';
 
 type ShopTab = 'buy' | 'sell';
-
-/**
- * 雜貨店貨架：**只列 id**。名稱、售價、說明一律由 `ITEM_DEFINITIONS` 反查 ——
- * 在這裡重抄一份必然與 seed drift（曾把綠色藥水的持續時間寫成 120／600 秒）。
- *
- * 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（`06-equipment.md` § 壞刀機制）。
- */
-const SHOP_ITEM_IDS = [
-  1,   // 紅色藥水
-  2,   // 橙色藥水
-  3,   // 白色藥水
-  133, // 綠色藥水
-  134, // 強化綠色藥水
-  144, // 解毒藥水
-  145, // 止血繃帶
-  146, // 淨化藥水
-  7,   // 武器強化卷軸
-  8,   // 防具強化卷軸
-  95,  // 百柱塔 1F 通行卷軸
-];
 
 /** 購買頁的一列商品（一般商品與當地回城卷軸共用同一種結構） */
 interface BuyEntry {
@@ -86,7 +66,7 @@ export function GeneralStore() {
   const region = getRegion(char.currentRegion);
   const scrollConfig = region ? TOWN_SCROLL_CONFIG[region.id] : null;
 
-  const buyEntries: BuyEntry[] = SHOP_ITEM_IDS
+  const buyEntries: BuyEntry[] = GENERAL_STORE_ITEM_IDS
     .map(id => getItemById(id))
     .filter((def): def is NonNullable<typeof def> => def != null)
     .map(def => ({
@@ -136,7 +116,7 @@ export function GeneralStore() {
   function checkoutBuy() {
     if (buyLines.length === 0 || buyHint) return;
     useGameStore.getState().buyBagItems(
-      buyLines.map(l => ({ itemId: l.item.itemId, amount: l.qty, unitPrice: l.item.price }))
+      buyLines.map(l => ({ itemId: l.item.itemId, amount: l.qty }))
     );
     buyCart.clear();
   }

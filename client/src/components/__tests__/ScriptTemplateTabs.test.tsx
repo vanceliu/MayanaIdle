@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ScriptEditorContent } from '../ScriptEditorPanel';
 import { useGameStore } from '../../stores/gameStore';
-import { createDefaultTemplate, DEFAULT_TEMPLATE_ID } from '../../models/scriptTemplate';
+import { createDefaultTemplate, DEFAULT_TEMPLATE_ID, MAX_SCRIPT_TEMPLATES } from '../../models/scriptTemplate';
 
 vi.mock('../CombatScriptEditor', () => ({ CombatScriptEditor: () => null }));
 vi.mock('../PersistentScriptEditor', () => ({ PersistentScriptEditor: () => null }));
@@ -86,5 +86,32 @@ describe('腳本 template 分頁列', () => {
 
     expect(useGameStore.getState().scriptTemplates).toHaveLength(2);
     expect(useGameStore.getState().activeTemplateId).not.toBe(DEFAULT_TEMPLATE_ID);
+  });
+
+  it(`最多 ${MAX_SCRIPT_TEMPLATES} 個分頁：滿了新增與複製都停用，也不會多出來`, () => {
+    render(<ScriptEditorContent />);
+    for (let i = 0; i < MAX_SCRIPT_TEMPLATES + 2; i++) fireEvent.click(screen.getByLabelText('新增分頁'));
+
+    expect(useGameStore.getState().scriptTemplates).toHaveLength(MAX_SCRIPT_TEMPLATES);
+    expect((screen.getByLabelText('新增分頁') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText('複製分頁') as HTMLButtonElement).disabled).toBe(true);
+
+    useGameStore.getState().duplicateScriptTemplate(DEFAULT_TEMPLATE_ID);
+    useGameStore.getState().addScriptTemplate();
+    expect(useGameStore.getState().scriptTemplates).toHaveLength(MAX_SCRIPT_TEMPLATES);
+  });
+
+  it('名稱超過 10 字或不是字串：不改名；輸入框限 10 字', () => {
+    render(<ScriptEditorContent />);
+    useGameStore.getState().renameScriptTemplate(DEFAULT_TEMPLATE_ID, '一二三四五六七八九十十');
+    useGameStore.getState().renameScriptTemplate(DEFAULT_TEMPLATE_ID, 123 as never);
+    useGameStore.getState().renameScriptTemplate(DEFAULT_TEMPLATE_ID, '   ');
+    expect(useGameStore.getState().scriptTemplates[0].name).toBe('預設');
+
+    useGameStore.getState().renameScriptTemplate(DEFAULT_TEMPLATE_ID, '  一二三四五六七八九十  ');
+    expect(useGameStore.getState().scriptTemplates[0].name).toBe('一二三四五六七八九十');
+
+    fireEvent.click(screen.getByLabelText('更名'));
+    expect((screen.getByLabelText('分頁名稱') as HTMLInputElement).maxLength).toBe(10);
   });
 });

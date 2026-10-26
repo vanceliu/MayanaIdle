@@ -5,6 +5,7 @@ import {
   claimAll as claimAllMail,
   claimMail,
   deleteClaimedMail,
+  isOwnMail,
   listMail,
   purgeClaimedMail,
   unclaimedCount,
@@ -46,6 +47,8 @@ export function createMailboxStore(_session: Session) {
   },
 
   claim: async mailId => {
+    const { characterId } = get();
+    if (characterId === null || !(await isOwnMail(mailId, characterId))) return false;
     const ok = await claimMail(mailId);
     if (ok) await get().refresh();
     return ok;
@@ -60,6 +63,8 @@ export function createMailboxStore(_session: Session) {
   },
 
   remove: async mailId => {
+    const { characterId } = get();
+    if (characterId === null || !(await isOwnMail(mailId, characterId))) return false;
     const ok = await deleteClaimedMail(mailId);
     if (ok) await get().refresh();
     return ok;

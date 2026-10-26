@@ -10,7 +10,8 @@ import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '../../
 import type { PlayerSession } from '../playerSession';
 
 /** 同帳號同時只能有一隻角色在遊戲中，後進場的贏（`97-selfhosted-server.md` § 97.5） */
-const ATTRS = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
+// 騎士可分配 4 點（`04-character.md` § 4.2）
+const ATTRS = { STR: 2, AGI: 2, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
 
 interface Client {
   session: PlayerSession;

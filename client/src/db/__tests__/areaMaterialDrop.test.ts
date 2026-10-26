@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, EQUIPMENT_SEEDS } from '../seed';
 import { getItemDefinition, getItemById } from '../../models/items';
 import { ITEM_DEFINITIONS } from '../seed';
+import { resolveArea } from '../../models/mapData';
+
+/** Lv.30 以下區域與試煉飛龍維持原掉率（`27-drop-table.md` § 27.7） */
+const LOW_LEVEL_MAX = 30;
+const LOW_LEVEL_BOSS = '試煉飛龍';
+const isLowArea = (area: string) => (resolveArea(area)?.levelMax ?? 0) <= LOW_LEVEL_MAX;
 
 function getDropItemName(drop: { itemTemplateId?: number }): string | undefined {
   if (!drop.itemTemplateId) return undefined;
@@ -149,14 +155,15 @@ describe('區域素材掉落系統', () => {
       }
     });
 
-    it('Boss 專屬素材掉落率為 30%（dropValue 300）', () => {
+    it('Boss 專屬素材掉落率：試煉飛龍 30%、其餘 15%', () => {
       const uniqueDrops = BOSS_DROP_TABLE_SEEDS.filter(d => {
         if (!d.itemTemplateId) return false;
         const name = getItemById(d.itemTemplateId)?.name;
         return name && BOSS_UNIQUE_MATERIALS.includes(name);
       });
+      expect(uniqueDrops.length).toBe(BOSS_UNIQUE_MATERIALS.length);
       for (const drop of uniqueDrops) {
-        expect(drop.dropValue).toBe(300);
+        expect(drop.dropValue, drop.bossName).toBe(drop.bossName === LOW_LEVEL_BOSS ? 300 : 150);
       }
     });
 
@@ -196,7 +203,7 @@ describe('區域素材掉落系統', () => {
   });
 
   describe('掉落率合理性', () => {
-    it('區域素材掉落率在 10~12% 範圍內（dropValue 100~120）', () => {
+    it('區域素材掉落率：Lv.30 以下 10~12%、Lv.31 以上 7~9%', () => {
       // 只驗證怪物掉落的區域素材（id 19~94），排除系統/製作/魔法書素材
       const areaMaterialIds = new Set(
         ITEM_DEFINITIONS
@@ -208,9 +215,20 @@ describe('區域素材掉落系統', () => {
         d => d.itemType === 'item' && d.itemTemplateId && areaMaterialIds.has(d.itemTemplateId)
       );
 
+      expect(areaMatDrops.length).toBeGreaterThan(0);
       for (const drop of areaMatDrops) {
-        expect(drop.dropValue).toBeGreaterThanOrEqual(100);
-        expect(drop.dropValue).toBeLessThanOrEqual(120);
+        const [min, max] = isLowArea(drop.area) ? [100, 120] : [70, 90];
+        expect(drop.dropValue, drop.area).toBeGreaterThanOrEqual(min);
+        expect(drop.dropValue, drop.area).toBeLessThanOrEqual(max);
+      }
+    });
+
+    it('Lv.31 以上區域的所有素材掉率在 1~9%', () => {
+      const highDrops = materialDrops.filter(d => !isLowArea(d.area));
+      expect(highDrops.length).toBeGreaterThan(0);
+      for (const drop of highDrops) {
+        expect(drop.dropValue, `${drop.area} #${drop.itemTemplateId}`).toBeGreaterThanOrEqual(10);
+        expect(drop.dropValue, `${drop.area} #${drop.itemTemplateId}`).toBeLessThanOrEqual(90);
       }
     });
 

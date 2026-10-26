@@ -94,7 +94,7 @@ export function ArmorShop() {
 
   function checkoutSell() {
     if (sellLines.length === 0) return;
-    useGameStore.getState().sellEquipmentInstances(sellLines.map(l => l.item.id!), allTemplates);
+    useGameStore.getState().sellEquipmentInstances(sellLines.map(l => l.item.id!));
     sellCart.clear();
   }
 
@@ -110,7 +110,7 @@ export function ArmorShop() {
 
   function executeBatchSell() {
     if (!char || batchSellArmors.length === 0) return;
-    useGameStore.getState().sellEquipmentInstances(batchSellArmors.map(i => i.id!), allTemplates);
+    useGameStore.getState().sellEquipmentInstances(batchSellArmors.map(i => i.id!));
     setBatchTier(null);
   }
 

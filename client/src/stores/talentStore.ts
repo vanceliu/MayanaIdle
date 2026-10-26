@@ -11,6 +11,8 @@ import { create } from 'zustand';
 import {
   FUSE_INPUT_COUNT,
   STARTING_SLOT_COUNT,
+  TALENT_INSTALL_MAX,
+  TALENT_TYPES,
   conditionSlotCount,
   emptyConditions,
   isSlotInstalled,
@@ -20,7 +22,7 @@ import {
   type TalentType,
 } from '../models/talent';
 import { STARTING_LAYOUT, getTalentRuleDef } from '../db/seed/talentSeeds';
-import { defaultParams } from '../models/talentParams';
+import { defaultParams, sanitizeParams } from '../models/talentParams';
 import { buildCombatRules, buildPersistentRules, buildVillageRules } from '../systems/talentRules';
 import type { CombatRule, PersistentRule } from '../models/scriptEngine';
 import type { VillageRule } from '../models/villageScript';
@@ -44,6 +46,11 @@ export interface TalentState {
   setEntryParams: (slotId: number, slotIndex: number | null, params: Record<string, unknown>) => Promise<void>;
 
   fuseSlots: (tier: TalentSlotTier) => Promise<TalentSlot | null>;
+}
+
+/** 格位編號：null ＝ 動作槽，否則為條件槽的非負整數索引 */
+function isSlotIndex(value: unknown): value is number | null {
+  return value === null || (Number.isSafeInteger(value) && (value as number) >= 0);
 }
 
 /** 完全沒安裝在任何天賦配置裡的天賦格。合成只能吃這一種（§ 51.5.2） */
@@ -151,11 +158,13 @@ export function createTalentStore(session: Session) {
    */
   installSlot: async (slotId, type, templateId) => {
     const { slots, characterId } = get();
-    if (characterId === null) return;
+    if (characterId === null || !TALENT_TYPES.includes(type)) return;
+    if (!session.game.getState().scriptTemplates.some(t => t.id === templateId)) return;
     const slot = slots.find(s => s.id === slotId);
     if (!slot) return;
 
     const sameType = slots.filter(s => s.assignedType === type && s.templateId === templateId);
+    if (sameType.filter(s => s.id !== slotId).length >= TALENT_INSTALL_MAX) return;
     const nextOrder = sameType.reduce((max, s) => Math.max(max, s.order ?? -1), -1) + 1;
 
     await session.repo.updateTalentSlot(slotId, {
@@ -172,8 +181,8 @@ export function createTalentStore(session: Session) {
    * 條件與動作不是實體，沒有東西需要退回，重新安裝到同類型即復原。
    */
   uninstallSlot: async slotId => {
-    const { characterId } = get();
-    if (characterId === null) return;
+    const { characterId, slots } = get();
+    if (characterId === null || !slots.some(s => s.id === slotId)) return;
     await session.repo.updateTalentSlot(slotId, { assignedType: null, templateId: null, order: null });
     await get().load(characterId);
   },
@@ -217,7 +226,7 @@ export function createTalentStore(session: Session) {
    */
   setEntry: async (slotId, slotIndex, ruleId) => {
     const { characterId, slots } = get();
-    if (characterId === null) return;
+    if (characterId === null || !isSlotIndex(slotIndex)) return;
     const slot = slots.find(s => s.id === slotId);
     if (!slot) return;
 
@@ -232,12 +241,14 @@ export function createTalentStore(session: Session) {
 
   setEntryParams: async (slotId, slotIndex, params) => {
     const { characterId, slots } = get();
-    if (characterId === null) return;
+    if (characterId === null || !isSlotIndex(slotIndex)) return;
     const slot = slots.find(s => s.id === slotId);
     if (!slot) return;
     const current = slotIndex === null ? slot.action : slot.conditions[slotIndex] ?? null;
     if (!current) return;
-    await session.repo.updateTalentSlot(slotId, withEntry(slot, slotIndex, { ...current, params }));
+    const clean = sanitizeParams(current.ruleId, params);
+    if (!clean) return;
+    await session.repo.updateTalentSlot(slotId, withEntry(slot, slotIndex, { ...current, params: clean }));
     await get().load(characterId);
   },
 

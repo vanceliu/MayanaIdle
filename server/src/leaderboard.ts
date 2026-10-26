@@ -1,5 +1,5 @@
 /**
- * 本服排行榜（`37-statistics.md` § 37.4）：收到請求時由 SQLite 即時計算，
+ * 本服排行榜（`37-statistics.md` § 37.4）：由 SQLite 計算，全服共用快照 1 分鐘（`createCachedLeaderboard`），
  * 回每個欄位 top-N 的聯集（去重），同分序 `value DESC, uuid ASC`。
  */
 import type { DatabaseSync } from 'node:sqlite';
@@ -11,7 +11,7 @@ import { normalizeStatistics, type CharacterStatistics } from '../../client/src/
 export const LEADERBOARD_DEFAULT_TOP = 20;
 export const LEADERBOARD_MAX_TOP = 100;
 
-interface Row {
+export interface Row {
   uuid: string;
   name: string;
   className: string;
@@ -67,4 +67,32 @@ export function buildSnapshot(rows: Row[], top: number): LeaderboardSnapshotView
 
 export function computeLeaderboard(db: DatabaseSync, top = LEADERBOARD_DEFAULT_TOP): LeaderboardSnapshotView {
   return buildSnapshot(loadRows(db), top);
+}
+
+/** 全服共用快照的有效期（`97-selfhosted-server.md` § 97.4） */
+export const LEADERBOARD_CACHE_MS = 60_000;
+
+/** 全服共用快照：有效期內讀表結果與各 top 的快照皆重用，過期才重算 */
+export function createCachedLeaderboard(
+  load: () => Row[],
+  now: () => number = Date.now,
+): (top?: number) => LeaderboardSnapshotView {
+  let loadedAt = -Infinity;
+  let rows: Row[] = [];
+  let byTop = new Map<number, LeaderboardSnapshotView>();
+  return (top = LEADERBOARD_DEFAULT_TOP) => {
+    const t = now();
+    if (t - loadedAt >= LEADERBOARD_CACHE_MS) {
+      rows = load();
+      byTop = new Map();
+      loadedAt = t;
+    }
+    const limit = Math.min(LEADERBOARD_MAX_TOP, Math.max(1, top));
+    let snapshot = byTop.get(limit);
+    if (!snapshot) {
+      snapshot = buildSnapshot(rows, limit);
+      byTop.set(limit, snapshot);
+    }
+    return snapshot;
+  };
 }

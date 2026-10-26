@@ -1,4 +1,5 @@
 import { REGIONS } from './mapData';
+import { getItemById } from './items';
 import { ELEMENT_LABELS, RACE_LABELS } from './monster';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine';
 
@@ -231,6 +232,40 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
 
 export function getParamFields(ruleId: string): readonly ParamField[] {
   return TALENT_PARAM_FIELDS[ruleId] ?? [];
+}
+
+function isValidParamValue(field: ParamField, value: unknown): boolean {
+  switch (field.kind) {
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value)
+        && (field.min === undefined || value >= field.min) && (field.max === undefined || value <= field.max);
+    case 'select':
+      return typeof value === 'string' && field.options.some(o => o.value === value);
+    case 'skill':
+      return typeof value === 'string';
+    case 'item':
+      return Number.isSafeInteger(value) && getItemById(value as number) !== undefined;
+    case 'boolean':
+      return typeof value === 'boolean';
+  }
+}
+
+/**
+ * 天賦參數驗證（`97-selfhosted-server.md` § 97.2）：只保留 `getParamFields` 宣告的欄位，
+ * 未定義欄位（含 `type`）丟棄；null／undefined 視為未設定；任一欄不合格回 null
+ */
+export function sanitizeParams(ruleId: string, params: unknown): Record<string, unknown> | null {
+  if (typeof params !== 'object' || params === null || Array.isArray(params)) return null;
+  const src = params as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const field of getParamFields(ruleId)) {
+    if (!Object.hasOwn(src, field.key)) continue;
+    const value = src[field.key];
+    if (value === undefined || value === null) continue;
+    if (!isValidParamValue(field, value)) return null;
+    out[field.key] = value;
+  }
+  return out;
 }
 
 /** 鑲入時先塞預設值，玩家不必為了「能跑」而逐格填一遍 */

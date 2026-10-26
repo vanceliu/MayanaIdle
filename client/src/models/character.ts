@@ -135,6 +135,39 @@ export function getAvailablePoints(className: ClassName): number {
   return CLASS_TOTAL_POINTS - total;
 }
 
+/** 建角時單項屬性（初始 + 加點）上限（`04-character.md` § 4.2） */
+export const CREATION_ATTRIBUTE_CAP = 18;
+
+export type BonusAttributesError = 'shape' | 'not_integer' | 'over_cap' | 'wrong_total';
+
+export const BONUS_ATTRIBUTES_ERROR_MESSAGES: Record<BonusAttributesError, string> = {
+  shape: '屬性分配格式不正確',
+  not_integer: '屬性加點必須是 0 以上的整數',
+  over_cap: `單項屬性不可超過 ${CREATION_ATTRIBUTE_CAP}`,
+  wrong_total: '屬性點數必須全部分配完',
+};
+
+/**
+ * 建角加點驗證（`04-character.md` § 4.2）：恰為六項非負整數、
+ * 初始 + 加點 ≤ `CREATION_ATTRIBUTE_CAP`、總和等於 `getAvailablePoints`。通過回傳 null。
+ */
+export function validateBonusAttributes(className: ClassName, bonus: unknown): BonusAttributesError | null {
+  if (typeof bonus !== 'object' || bonus === null || Array.isArray(bonus)) return 'shape';
+  const record = bonus as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length !== ATTRIBUTE_KEYS.length || !ATTRIBUTE_KEYS.every(k => Object.hasOwn(record, k))) return 'shape';
+
+  const base = CLASS_BASE_ATTRIBUTES[className];
+  let total = 0;
+  for (const key of ATTRIBUTE_KEYS) {
+    const value = record[key];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return 'not_integer';
+    if (base[key] + value > CREATION_ATTRIBUTE_CAP) return 'over_cap';
+    total += value;
+  }
+  return total === getAvailablePoints(className) ? null : 'wrong_total';
+}
+
 /**
  * 角色總屬性 = 建角基礎 + 配點 + **裝備額外屬性** + buff。
  *

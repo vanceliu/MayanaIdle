@@ -3224,8 +3224,10 @@ button.active {
 }
 
 .equip-detail-affixes {
+  /* 一條詞綴（含空洞、已毀壞、封印）一行，不並排 */
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
   margin-top: 2px;
 }
@@ -4802,6 +4804,19 @@ button.active {
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
+
+/*
+ * 浮動說明框裡的裝備：一條詞綴不折行，框依最長的一條撐寬，上限是視窗寬度；
+ * 其他道具維持固定寬度。商店／倉庫列表內嵌的裝備詳情不受影響，照常折行
+ */
+.bag-tooltip:has(.equip-detail),
+.tooltip-popup:has(.equip-detail) {
+  width: max-content;
+  min-width: 220px;
+  max-width: calc(100vw - 16px);
+}
+.bag-tooltip .equip-detail-affix,
+.tooltip-popup .equip-detail-affix { white-space: nowrap; }
 
 .bag-tooltip-content {
   display: flex;

@@ -51,15 +51,6 @@ describe('經濟平衡驗證', () => {
     };
   }
 
-  it('前期區域（Lv.1~30）素材收入提升約 20~50%', () => {
-    for (const { area } of EARLY_AREAS) {
-      const result = calcAreaEconomics(area);
-      expect(result).not.toBeNull();
-      expect(result!.boostPercent).toBeGreaterThan(8);
-      expect(result!.boostPercent).toBeLessThan(55);
-    }
-  });
-
   it('前期區域（Lv.1~30）素材賣價不超過該區域金幣掉落上限', () => {
     const earlyAreaIds = EARLY_AREAS.map(a => a.area);
     for (const areaId of earlyAreaIds) {

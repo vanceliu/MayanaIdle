@@ -5,7 +5,8 @@
  * 不做：改角色資料、改靜態模板、改資料目錄、由介面重啟（§ 97.8「不做」）。
  */
 import { copyFileSync, mkdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { restrictFile } from './secretFile';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 import type { Character } from '../../client/src/models/character';
@@ -154,6 +155,11 @@ export function createAdminHandler(deps: AdminDeps) {
     }
     return true;
   };
+}
+
+function isInsideDir(dir: string, target: string): boolean {
+  const rel = relative(resolve(dir), resolve(dir, target));
+  return !rel.startsWith('..') && !isAbsolute(rel);
 }
 
 function credentialOf(config: ServerConfig): string {
@@ -379,6 +385,7 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const file = join(dir, `mayana-${stamp}.sqlite`);
       copyFileSync(deps.dbPath, file);
+      restrictFile(file);
       json(res, 200, { ok: true, file, bytes: statSync(file).size });
     },
 
@@ -424,6 +431,10 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
         throw new AdminError(400, (e as Error).message);
       }
       const previous = deps.config();
+      // 經管理介面改備份目錄，只能指向資料目錄底下（§ 97.8）；既有設定不受影響
+      if (next.backupDir !== previous.backupDir && !isInsideDir(deps.dataDir, next.backupDir)) {
+        throw new AdminError(400, 'backup-dir 必須在資料目錄底下');
+      }
       saveConfig(deps.dataDir, next);
       deps.setConfig(next);
       // `restart` 的鍵改了要標示需重啟（§ 97.8 設定頁）

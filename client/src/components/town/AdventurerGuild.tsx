@@ -183,14 +183,14 @@ export function AdventurerGuild() {
   const abandonAdventurerQuest = useGameStore(s => s.abandonAdventurerQuest);
   const completeAdventurerQuest = useGameStore(s => s.completeAdventurerQuest);
   const questBoardTownId = useGameStore(s => s.questBoardTownId);
-  const initQuestBoard = useGameStore(s => s.initQuestBoard);
+  const ensureQuestBoardForTown = useGameStore(s => s.ensureQuestBoardForTown);
   const rerollQuestBoard = useGameStore(s => s.rerollQuestBoard);
 
   useEffect(() => {
     if (questBoardTownId !== townId) {
-      initQuestBoard();
+      ensureQuestBoardForTown();
     }
-  }, [initQuestBoard, townId, questBoardTownId]);
+  }, [ensureQuestBoardForTown, townId, questBoardTownId]);
 
   if (availableDifficulties.length > 0 && !availableDifficulties.includes(activeDifficulty)) {
     setActiveDifficulty(availableDifficulties[0]);

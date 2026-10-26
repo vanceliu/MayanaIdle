@@ -2,7 +2,8 @@
  * `server.properties`（`97-selfhosted-server.md` § 97.2）：server 的所有可調項目只有這一個來源。
  * `key=value`、UTF-8、`#` 為註解；缺鍵補預設寫回，非法值中止啟動，未知鍵忽略並警告。
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { writeSecretFile } from './secretFile';
 import { join } from 'node:path';
 
 export type Registration = 'open' | 'invite' | 'closed';
@@ -162,6 +163,8 @@ export function buildConfig(entries: Map<string, string>, dataDir: string): Load
       (config as unknown as Record<string, unknown>)[s.field] = s.default(dataDir);
       filled.push(s.key);
     } else {
+      // 值含換行會在寫回時變成另一個鍵（§ 97.2）
+      if (/[\r\n]/.test(raw)) throw new Error(`${s.key}: 不可包含換行`);
       (config as unknown as Record<string, unknown>)[s.field] = s.parse(raw, dataDir);
     }
   }
@@ -172,12 +175,12 @@ export function loadConfig(dataDir: string): LoadedConfig {
   const path = join(dataDir, CONFIG_FILE);
   const text = existsSync(path) ? readFileSync(path, 'utf-8') : '';
   const loaded = buildConfig(parseProperties(text), dataDir);
-  if (loaded.filled.length > 0) writeFileSync(path, formatProperties(loaded.config));
+  if (loaded.filled.length > 0) writeSecretFile(path, formatProperties(loaded.config));
   return loaded;
 }
 
 export function saveConfig(dataDir: string, config: ServerConfig): void {
-  writeFileSync(join(dataDir, CONFIG_FILE), formatProperties(config));
+  writeSecretFile(join(dataDir, CONFIG_FILE), formatProperties(config));
 }
 
 export function isLoopbackBind(bind: string): boolean {

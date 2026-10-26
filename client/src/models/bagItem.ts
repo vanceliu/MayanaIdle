@@ -41,6 +41,11 @@ export function makeBagItem(itemId: number, amount: number): BagItem | null {
 }
 
 /** 背包裡某道具的數量（沒有則 0） */
+/** 數量參數的合法值：正的安全整數（`97-selfhosted-server.md` § 97.2） */
+export function isPositiveCount(n: unknown): n is number {
+  return Number.isSafeInteger(n) && (n as number) > 0;
+}
+
 export function getBagItemAmount(bagItems: BagItem[], itemId: number): number {
   return bagItems.find(b => b.itemId === itemId)?.amount ?? 0;
 }

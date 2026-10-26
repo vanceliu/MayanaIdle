@@ -119,6 +119,12 @@ export const SIGIL_PANEL_ORDER: SigilType[] = [
 /** 打開印記師時預設選中的印記：必定成功、最常用的精鍊 */
 export const DEFAULT_PANEL_SIGIL: SigilType = 'temper';
 
+const SIGIL_TYPES: ReadonlySet<string> = new Set(SIGIL_DEFINITIONS.map(d => d.type));
+
+export function isSigilType(value: unknown): value is SigilType {
+  return typeof value === 'string' && SIGIL_TYPES.has(value);
+}
+
 export function getSigilDefinition(type: SigilType): SigilDefinition {
   return SIGIL_DEFINITIONS.find(d => d.type === type)!;
 }

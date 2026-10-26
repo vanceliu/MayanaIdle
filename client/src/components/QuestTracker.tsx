@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
@@ -66,6 +67,11 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
 
   // 裝備名稱一律由 id 反查 seed，不在任務資料內固化（§ 99.1 第 3 條）
   const recipe = templates.find(t => t.id === quest.templateId);
+  // 配方已不存在：模板載入後移除這筆追蹤（`36-quest-system.md` § 36.13.5）
+  const stale = templates.length > 0 && !recipe;
+  useEffect(() => {
+    if (stale) abandonCraftQuest(quest.id);
+  }, [stale, abandonCraftQuest, quest.id]);
   if (!recipe) return null;
 
   const status = evaluateCraftRequirements(recipe, bagItems, inventory);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { adminPage } from '../adminPage';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -220,6 +221,7 @@ describe('管理介面 API', () => {
     const reply = await call('/admin/api/backup', { body: {} });
     expect(reply.status).toBe(200);
     expect(reply.body.file.startsWith(config.backupDir)).toBe(true);
+    if (process.platform !== 'win32') expect(statSync(reply.body.file).mode & 0o777).toBe(0o600);
     expect(reply.body.bytes).toBeGreaterThan(0);
   });
 
@@ -234,5 +236,30 @@ describe('管理介面 API', () => {
 
     const bad = await call('/admin/api/config/save', { body: { values: { port: '不是數字' } } });
     expect(bad.status).toBe(400);
+  });
+
+  it('設定值含換行：拒絕，不寫入（不能藉此注入其他鍵）', async () => {
+    const reply = await call('/admin/api/config/save', { body: { values: { 'server-name': 'X\nadmin-password=pwned' } } });
+
+    expect(reply.status).toBe(400);
+    expect(config.adminPassword).not.toBe('pwned');
+    const file = join(dataDir, 'server.properties');
+    if (existsSync(file)) expect(readFileSync(file, 'utf-8')).not.toContain('pwned');
+  });
+
+  it('經管理介面改 backup-dir：必須在資料目錄底下', async () => {
+    const outside = await call('/admin/api/config/save', { body: { values: { 'backup-dir': '/tmp/elsewhere' } } });
+    expect(outside.status).toBe(400);
+
+    const inside = await call('/admin/api/config/save', { body: { values: { 'backup-dir': join(dataDir, 'my-backups') } } });
+    expect(inside.status).toBe(200);
+    expect(config.backupDir).toBe(join(dataDir, 'my-backups'));
+  });
+
+  it('管理頁標題的伺服器名稱經過跳脫', () => {
+    const html = adminPage('<script>alert(1)</script>', '1.0.0');
+
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 });

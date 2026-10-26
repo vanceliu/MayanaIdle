@@ -1,6 +1,7 @@
 import type { BagItem } from '../../models/bagItem';
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadTemplateCache } from '../../systems/templateSync';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { WeaponShop } from '../town/WeaponShop';
 import { useGameStore, BAG_BASE_SLOTS } from '../../stores/gameStore';
@@ -105,6 +106,8 @@ beforeEach(async () => {
   await db.equipmentTemplates.clear();
   await db.equipmentTemplates.bulkAdd(TEMPLATES);
   defaultSession.repo = repo;
+  // 售價一律查模板快取（server 啟動時載入）
+  await loadTemplateCache(repo);
   bulkAdd.mockClear();
   bulkDelete.mockClear();
   // 監看有沒有真的落地，但仍要真的寫進去 —— 背包內容是從 repository 讀回來的

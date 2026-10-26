@@ -4,9 +4,11 @@
  */
 import type { WebSocketServer } from 'ws';
 import type { GameRepository } from '../../client/src/db/repository';
-import type { ClassName, Attributes } from '../../client/src/models/character';
+import { BONUS_ATTRIBUTES_ERROR_MESSAGES, validateBonusAttributes, type ClassName, type Attributes } from '../../client/src/models/character';
+import { CHARACTER_NAME_ERROR_MESSAGES, validateCharacterName } from '../../client/src/models/characterIdentity';
 import { AuthError, type AuthService } from './auth';
 import { LoginThrottle } from './loginThrottle';
+import { RegistrationLimit } from './registrationLimit';
 import { clientAddress } from './clientAddress';
 import { isLoopbackBind, type ServerConfig } from './config';
 import { applyAutoMove, createPlayerSession, syncWorld, type PlayerSession } from './playerSession';
@@ -30,12 +32,24 @@ export interface GameServerDeps {
   leaderboard: (top: number) => LeaderboardSnapshotView;
 }
 
+/** 訊息的最低形狀（§ 97.2 硬性要求）：非陣列物件且 `t` 為字串，其餘欄位由各訊息自行驗證 */
+function isMessageShape(value: unknown): value is { t: string } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && typeof (value as { t?: unknown }).t === 'string';
+}
+
 function isLoopbackAddress(address: string): boolean {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 /** 同帳號另一處進場時，被踢一方收到的原因（§ 97.5） */
 export const DUPLICATE_ENTRY_REASON = '此帳號已在其他地方進入遊戲';
+
+/** 非預期錯誤回給 client 的固定字串；細節只寫 log（§ 97.2 硬性要求） */
+export const INTERNAL_ERROR_MESSAGE = '伺服器內部錯誤';
+
+/** tick 中該玩家的狀態出錯、被隔離踢除時收到的原因（§ 97.2 硬性要求） */
+export const TICK_FAULT_REASON = '角色狀態異常，已中斷連線';
 
 /** 改密碼或救援碼重設後，同帳號其他連線收到的原因（§ 97.5） */
 export const PASSWORD_CHANGED_REASON = '密碼已變更，請重新登入';
@@ -57,11 +71,14 @@ export class GameServer {
   /** 每個帳號的進場佇列尾端（§ 97.5 同帳號的進場依序執行） */
   private readonly entryQueues = new Map<number, Promise<void>>();
   private readonly throttle: LoginThrottle;
+  private readonly registrations: RegistrationLimit;
 
-  constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle()) {
+  constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle(), registrations: RegistrationLimit = new RegistrationLimit()) {
     this.deps = deps;
     this.throttle = throttle;
+    this.registrations = registrations;
     this.sessions = this.world.sessions;
+    this.world.onSessionFault = session => void this.kick(session, TICK_FAULT_REASON);
   }
 
   attach(wss: WebSocketServer): void {
@@ -80,21 +97,30 @@ export class GameServer {
       this.sessions.add(session);
       log.info(`connection #${session.connectionId} from ${session.clientAddress}${session.clientAddress === remote ? '' : ` via ${remote}`}`);
 
+      /** 同一連線的訊息依收到順序逐一處理（§ 97.2 硬性要求） */
+      let inbox: Promise<void> = Promise.resolve();
+
       socket.on('message', raw => {
-        let msg: ClientMessage;
+        let parsed: unknown;
         try {
-          msg = JSON.parse(raw.toString()) as ClientMessage;
+          parsed = JSON.parse(raw.toString());
         } catch {
           session.send({ t: 'error', code: 'bad_json', message: '訊息不是合法 JSON' });
           return;
         }
-        void this.handle(session, socket, msg).catch(e => {
-          const id = (msg as { id?: number }).id;
+        if (!isMessageShape(parsed)) {
+          session.send({ t: 'error', code: 'bad_message', message: '訊息格式不正確' });
+          return;
+        }
+        const msg = parsed as ClientMessage;
+        inbox = inbox.then(() => this.handle(session, socket, msg)).catch(e => {
+          const rawId = (msg as { id?: unknown }).id;
+          const id = typeof rawId === 'number' ? rawId : undefined;
           if (e instanceof AuthError) {
             session.send({ t: 'error', code: e.code, message: e.message, id });
           } else {
             log.error(`connection #${session.connectionId} ${msg.t} failed`, e);
-            session.send({ t: 'error', code: 'internal', message: (e as Error).message, id });
+            session.send({ t: 'error', code: 'internal', message: INTERNAL_ERROR_MESSAGE, id });
           }
         });
       });
@@ -156,13 +182,31 @@ export class GameServer {
     const ip = session.clientAddress;
     const locked = this.throttle.lockedFor(ip);
     if (locked > 0) throw new AuthError('rate_limited', `嘗試次數過多，請 ${Math.ceil(locked / 60_000)} 分鐘後再試`);
+    if (!this.throttle.begin(ip)) throw new AuthError('rate_limited', '嘗試次數過多，請稍後再試');
     try {
       const result = await attempt();
-      this.throttle.recordSuccess(ip);
+      this.throttle.finish(ip, 'success');
       return result;
     } catch (e) {
-      if (e instanceof AuthError && CREDENTIAL_FAILURES.has(e.code)) this.throttle.recordFailure(ip);
+      this.throttle.finish(ip, e instanceof AuthError && CREDENTIAL_FAILURES.has(e.code) ? 'failure' : 'neutral');
       throw e;
+    }
+  }
+
+  /** 註冊限制（§ 97.5）：名額在驗證帳密前取得，帳號實際建立才佔用 */
+  private async limitedRegistration<T>(session: PlayerSession, register: () => Promise<T>): Promise<T> {
+    const ip = session.clientAddress;
+    if (!this.registrations.begin(ip)) {
+      const wait = this.registrations.retryAfter(ip);
+      throw new AuthError('rate_limited', wait > 0 ? `註冊次數過多，請 ${Math.ceil(wait / 60_000)} 分鐘後再試` : '註冊次數過多，請稍後再試');
+    }
+    let created = false;
+    try {
+      const result = await register();
+      created = true;
+      return result;
+    } finally {
+      this.registrations.finish(ip, created);
     }
   }
 
@@ -224,7 +268,7 @@ export class GameServer {
           const host = this.deps.auth.findByUsername(this.deps.hostUsername);
           if (host) {
             const token = this.deps.auth.issueSession(host.id);
-            this.bindUser(session, host.id, host.username, token);
+            await this.bindUser(session, host.id, host.username, token);
             autoLogin = { token, username: host.username, userId: host.id, isHost: true };
           }
         }
@@ -234,11 +278,11 @@ export class GameServer {
       case 'register': {
         if (config.registration === 'closed') throw new AuthError('registration_closed', '本服未開放註冊');
         if (config.registration === 'invite' && (msg.inviteCode ?? '') !== config.inviteCode) throw new AuthError('bad_invite', '邀請碼錯誤');
-        const user = await this.deps.auth.register(msg.username, msg.password);
+        const user = await this.limitedRegistration(session, () => this.deps.auth.register(msg.username, msg.password));
         const recoveryCode = await this.deps.auth.issueRecoveryCode(user.id);
         this.assertCapacity();
         const token = this.deps.auth.issueSession(user.id);
-        this.bindUser(session, user.id, user.username, token);
+        await this.bindUser(session, user.id, user.username, token);
         session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, hasRecoveryCode: true, isHost: user.username === this.deps.hostUsername, recoveryCode });
         return;
       }
@@ -246,7 +290,7 @@ export class GameServer {
         const user = await this.throttled(session, () => this.deps.auth.login(msg.username, msg.password));
         this.assertCapacity();
         const token = this.deps.auth.issueSession(user.id);
-        this.bindUser(session, user.id, user.username, token);
+        await this.bindUser(session, user.id, user.username, token);
         session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: user.hasPassword, hasRecoveryCode: user.hasRecoveryCode, isHost: user.username === this.deps.hostUsername });
         return;
       }
@@ -255,7 +299,7 @@ export class GameServer {
         await this.kickOtherConnections(user.id, session, PASSWORD_CHANGED_REASON);
         this.assertCapacity();
         const token = this.deps.auth.issueSession(user.id);
-        this.bindUser(session, user.id, user.username, token);
+        await this.bindUser(session, user.id, user.username, token);
         session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, hasRecoveryCode: true, isHost: user.username === this.deps.hostUsername, recoveryCode });
         return;
       }
@@ -264,7 +308,7 @@ export class GameServer {
         if (!user) throw new AuthError('session_expired', '登入已過期');
         this.deps.auth.assertNotBanned(user);
         this.assertCapacity();
-        this.bindUser(session, user.id, user.username, msg.token);
+        await this.bindUser(session, user.id, user.username, msg.token);
         session.send({ t: 'auth_ok', token: msg.token, username: user.username, userId: user.id, hasPassword: user.hasPassword, hasRecoveryCode: user.hasRecoveryCode, isHost: user.username === this.deps.hostUsername });
         return;
       }
@@ -308,11 +352,17 @@ export class GameServer {
       }
       case 'create_character': {
         const userId = this.requireUser(session);
-        if (!CLASS_NAMES.has(msg.className)) throw new AuthError('bad_class', '職業不存在');
+        if (typeof msg.className !== 'string' || !CLASS_NAMES.has(msg.className)) throw new AuthError('bad_class', '職業不存在');
+        const className = msg.className as ClassName;
+        // 名稱格式（`19-account-character.md` § 19.4）與加點（`04-character.md` § 4.2）由 server 把關
+        const nameError = typeof msg.name === 'string' ? validateCharacterName(msg.name) : 'empty';
+        if (nameError) throw new AuthError('bad_character', CHARACTER_NAME_ERROR_MESSAGES[nameError]);
+        const bonusError = validateBonusAttributes(className, msg.bonusAttrs);
+        if (bonusError) throw new AuthError('bad_character', BONUS_ATTRIBUTES_ERROR_MESSAGES[bonusError]);
         // 角色名稱在本服唯一（`19-account-character.md` § 19.4）
         if (this.deps.repo.nameTaken(msg.name)) throw new AuthError('name_taken', `名稱「${msg.name}」已經有人用了`);
         await this.enterGame(session, userId, () =>
-          session.game.getState().createCharacter(msg.name, msg.className as ClassName, msg.bonusAttrs as unknown as Attributes, msg.appearance as never));
+          session.game.getState().createCharacter(msg.name, className, msg.bonusAttrs as unknown as Attributes, msg.appearance as never));
         flush(session);
         return;
       }
@@ -418,7 +468,12 @@ export class GameServer {
     }
   }
 
-  private bindUser(session: PlayerSession, userId: number, username: string, token: string): void {
+  /** 綁定帳號（§ 97.5）；同一連線換到別的帳號前先卸下目前角色（照常 flush），角色資料不跨帳號 */
+  private async bindUser(session: PlayerSession, userId: number, username: string, token: string): Promise<void> {
+    if (session.userId !== userId && session.game.getState().character) {
+      this.world.onCharacterLeave(session);
+      await session.game.getState().logout();
+    }
     session.userId = userId;
     session.username = username;
     session.token = token;

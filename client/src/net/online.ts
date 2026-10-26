@@ -1,6 +1,6 @@
 /**
  * 線上模式的連線狀態（`97-selfhosted-server.md`）。
- * 由同源 `/api/version` 或 `?server=ws://host:port` 決定是否連線 server；沒有 server 即現行單機版。
+ * 由同源 `/api/version`（開發版另可用 `?server=ws://host:port`）決定是否連線 server；沒有 server 即現行單機版。
  */
 import { create } from 'zustand';
 import type { VersionMismatchKind, WorldMode } from './protocol';
@@ -93,11 +93,15 @@ export function writeSessionToken(token: string | null): void {
   }
 }
 
-/** `?server=` 明確指定，否則探測同源 server；都沒有就是單機版 */
-export async function resolveServerWsUrl(): Promise<string | null> {
-  const params = new URLSearchParams(window.location.search);
-  const explicit = params.get('server');
-  if (explicit) return explicit;
+/**
+ * 連線位址（`97-selfhosted-server.md` § 97.2 硬性要求）：正式版只探測同源 server；
+ * `?server=` 明確指定僅開發版生效。都沒有就是單機版。
+ */
+export async function resolveServerWsUrl(devMode: boolean): Promise<string | null> {
+  if (devMode) {
+    const explicit = new URLSearchParams(window.location.search).get('server');
+    if (explicit) return explicit;
+  }
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 1500);

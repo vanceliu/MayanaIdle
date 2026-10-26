@@ -3,7 +3,7 @@
  * session 進出地圖時由 `playerSession.ts` 回呼 `place`／`remove`。
  */
 import { TICK_MS } from '../../client/src/core/clock';
-import { tickWorld } from '../../client/src/systems/worldTick';
+import { tickWorld, type TickFault } from '../../client/src/systems/worldTick';
 import type { CombatVisual } from '../../client/src/systems/combatLoop';
 import { memberIdOf, presentMembers, type MapInstance } from '../../client/src/systems/mapInstance';
 import type {
@@ -18,6 +18,11 @@ import type { ChatChannel, ChatMessageView } from '../../client/src/net/protocol
 import { getRegion } from '../../client/src/models/mapData';
 import type { PlayerSession } from './playerSession';
 import { ChatLimiter, CHAT_MAX_LENGTH, MUTED_MESSAGE, TOO_LONG_MESSAGE, chatTextLength } from './chatLimit';
+import { log } from './log';
+
+function isTrainingRegion(regionId: string): boolean {
+  return getRegion(regionId)?.type === 'training';
+}
 
 export interface PartyActionResult {
   ok: boolean;
@@ -46,6 +51,10 @@ export class World {
    * 名單本身不透露隊籍，邀出去被擋才知道 —— 沒邀過就看得到誰有隊伍等於白送情報。
    */
   private readonly knownInParty = new WeakMap<PlayerSession, Set<number>>();
+  /** tick 出錯、等待踢除的玩家（§ 97.2 硬性要求） */
+  private readonly faulted = new WeakSet<PlayerSession>();
+  /** tick 出錯的玩家交給連線層踢除；由 `GameServer` 接上 */
+  onSessionFault: (session: PlayerSession) => void = () => {};
 
   // ---------- 查詢 ----------
 
@@ -66,13 +75,18 @@ export class World {
     return party ? `party:${party.id}` : `solo:${id}`;
   }
 
+  /** 實例歸屬：試驗場一律個人（`50-training-ground.md` § 50.2），其餘依隊伍 */
+  private instanceOwnerKey(session: Session, regionId: string): string {
+    return isTrainingRegion(regionId) ? `solo:${memberIdOf(session)}` : this.partyKeyOf(session);
+  }
+
   // ---------- 進出地圖 ----------
 
   /** 角色所在地圖與隊籍決定實例鍵；`reason` 為 party 時切入既有隊伍實例要在入口重生 */
   place(session: PlayerSession, reason: 'map' | 'party'): void {
     const ch = session.game.getState().character;
     if (!ch || !session.mapControl.getState().currentMap) return;
-    const key = instanceKey(this.partyKeyOf(session), ch.currentRegion, ch.currentFloor);
+    const key = instanceKey(this.instanceOwnerKey(session, ch.currentRegion), ch.currentRegion, ch.currentFloor);
     const existing = this.instances.get(key);
     const respawn = reason === 'party' && !!existing && existing !== session.instance;
     const instance = this.instances.place(session, key, respawn);
@@ -92,7 +106,7 @@ export class World {
   onCharacterLeave(session: PlayerSession): void {
     const identity = this.identityOf(session);
     if (identity) {
-      this.chatLimit.forget(identity.characterId);
+      this.chatLimit.forget(identity.characterId, Date.now());
       this.parties.setOnline(identity.characterId, false);
       const dropped = this.trades.dropCharacter(identity.characterId);
       if (dropped) this.syncTradeViews(this.tradeSessions(dropped));
@@ -321,7 +335,7 @@ export class World {
     for (const s of this.sessions) {
       if (!s.game.getState().character || !s.mapControl.getState().currentMap) continue;
       const ch = s.game.getState().character!;
-      const key = instanceKey(this.partyKeyOf(s), ch.currentRegion, ch.currentFloor);
+      const key = instanceKey(this.instanceOwnerKey(s, ch.currentRegion), ch.currentRegion, ch.currentFloor);
       if (s.instance?.key !== key) this.place(s, reason);
     }
     this.instances.prune();
@@ -427,11 +441,25 @@ export class World {
 
   tick(): Map<Session, CombatVisual[]> {
     this.replaceAll('map');
-    const visuals = tickWorld(TICK_MS, this.sessions, this.instances.all());
+    const ticking = [...this.sessions].filter(s => !this.faulted.has(s));
+    const visuals = tickWorld(TICK_MS, ticking, this.instances.all(), fault => this.onTickFault(fault));
     this.instances.prune();
     this.syncPartyViews([...this.sessions]);
     this.syncTradeViews([...this.sessions]);
     return visuals;
+  }
+
+  /** tick 錯誤隔離（§ 97.2 硬性要求）：出錯的玩家不再進 tick，交給 `onSessionFault` 踢除 */
+  private onTickFault(fault: TickFault): void {
+    if (fault.kind === 'instance') {
+      log.error(`tick instance ${fault.instance.key} failed`, fault.error);
+      return;
+    }
+    const session = fault.session as PlayerSession;
+    log.error(`tick session #${session.connectionId} failed`, fault.error);
+    if (this.faulted.has(session)) return;
+    this.faulted.add(session);
+    this.onSessionFault(session);
   }
 
   /** 隊伍面板、邀請、隊友位置、同圖名單的快照 */
@@ -511,6 +539,8 @@ export class World {
 
   private onMapView(session: PlayerSession, regionId: string, floor: number | null): OnMapPlayerView[] {
     const out: OnMapPlayerView[] = [];
+    // 試驗場的在線名單不列任何人（`50-training-ground.md` § 50.2）
+    if (isTrainingRegion(regionId)) return out;
     for (const s of this.sessions) {
       if (s === session) continue;
       const ch = s.game.getState().character;

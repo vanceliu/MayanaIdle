@@ -2,6 +2,7 @@ import type { BagItem } from '../models/bagItem';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import type { EquipmentTierLevel } from '../models/equipmentTier';
 import { getItemById } from '../models/items';
+import { TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { getEquipmentInstanceTierLevel } from '../models/equipmentTier';
 import { hasMaterialUsage } from './craftMaterialUsage';
 
@@ -27,6 +28,35 @@ export const SHOP_SELL_RATE = 0.5;
 export const CRAFT_SELL_PRICE: Record<number, number> = { 4: 10000, 5: 20000, 6: 30000 };
 
 // === 道具（雜貨店） ===
+
+/**
+ * 雜貨店貨架：**只列 id**。名稱、售價、說明一律由 `ITEM_DEFINITIONS` 反查。各城另加當地回城卷軸。
+ * 磨刀石已下架：壞刀機制暫不實作，此道具無使用功能（`06-equipment.md` § 壞刀機制）。
+ */
+export const GENERAL_STORE_ITEM_IDS: readonly number[] = [
+  1,   // 紅色藥水
+  2,   // 橙色藥水
+  3,   // 白色藥水
+  133, // 綠色藥水
+  134, // 強化綠色藥水
+  144, // 解毒藥水
+  145, // 止血繃帶
+  146, // 淨化藥水
+  7,   // 武器強化卷軸
+  8,   // 防具強化卷軸
+  95,  // 百柱塔 1F 通行卷軸
+];
+
+const GENERAL_STORE_ITEM_SET: ReadonlySet<number> = new Set(GENERAL_STORE_ITEM_IDS);
+
+/** 該城雜貨店的單價；不在貨架上回 null。O(1) */
+export function getGeneralStorePrice(regionId: string | undefined, itemId: number): number | null {
+  const scroll = regionId && Object.hasOwn(TOWN_SCROLL_CONFIG, regionId) ? TOWN_SCROLL_CONFIG[regionId] : undefined;
+  const isScroll = scroll?.itemId === itemId;
+  if (!isScroll && !GENERAL_STORE_ITEM_SET.has(itemId)) return null;
+  const price = getItemById(itemId)?.buyPrice ?? (isScroll ? scroll!.price : 0);
+  return price > 0 ? price : null;
+}
 
 /** 道具的基準價（買價或標定的售價）。`noSell` 明確不可販售，不靠「沒填價格」來擋 */
 export function getItemBasePrice(itemId: number): number {
@@ -101,7 +131,11 @@ export function getEquipmentSellPrice(
   item: EquipmentInstance,
   templates: EquipmentTemplate[],
 ): number {
-  const template = templates.find(t => t.id === item.templateId);
+  return getTemplateSellPrice(templates.find(t => t.id === item.templateId));
+}
+
+/** 依模板的回收價；呼叫端自行以 O(1) 取模板（server 用 `getTemplateById`） */
+export function getTemplateSellPrice(template: EquipmentTemplate | undefined): number {
   if (template?.acquireType === 'starter') return 0;
   if (template?.buyPrice) return Math.floor(template.buyPrice * SHOP_SELL_RATE);
   if (template?.acquireType === 'craft') return CRAFT_SELL_PRICE[template.tier ?? 0] ?? 0;

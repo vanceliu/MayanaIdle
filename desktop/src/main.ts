@@ -15,6 +15,8 @@ import { join } from 'node:path';
 import { startServer, type RunningServer } from '../../server/src/index';
 import { CONFIG_SPECS } from '../../server/src/config';
 import { log } from '../../server/src/log';
+import { installRejectionGuard } from '../../server/src/processGuard';
+import { writeSecretFile } from '../../server/src/secretFile';
 import {
   parseAddress, gameUrl, rememberServer, forgetServer, renameServer, parseServerList,
   type ServerEntry,
@@ -66,7 +68,7 @@ function migrateLegacyOpenWorld(): void {
   const text = readFileSync(file, 'utf-8');
   const fixed = applyConfigEdits(text, { 'backup-dir': join(target, 'backups') });
   if (fixed['backup-dir'] !== text.match(/^backup-dir=(.*)$/m)?.[1]) {
-    writeFileSync(file, formatProperties(fixed), 'utf-8');
+    writeSecretFile(file, formatProperties(fixed));
   }
 }
 
@@ -93,7 +95,7 @@ function ensureSoloConfig(): void {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, 'server.properties');
   if (existsSync(file)) return;
-  writeFileSync(file, 'bind=127.0.0.1\nauto-open-browser=false\n', 'utf-8');
+  writeSecretFile(file, 'bind=127.0.0.1\nauto-open-browser=false\n');
 }
 
 const serverListFile = () => userDataPath('servers.json');
@@ -209,6 +211,8 @@ function buildMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+installRejectionGuard();
+
 app.whenReady().then(() => {
   buildMenu();
   createWindow();
@@ -286,7 +290,7 @@ ipcMain.handle('worlds:saveConfig', (_e, kind: WorldKind, id: string | undefined
 
   const current = existsSync(file) ? readFileSync(file, 'utf-8') : '';
   mkdirSync(dir, { recursive: true });
-  writeFileSync(file, formatProperties(applyConfigEdits(current, edits)), 'utf-8');
+  writeSecretFile(file, formatProperties(applyConfigEdits(current, edits)));
   return { ok: true };
 });
 
@@ -304,7 +308,7 @@ ipcMain.handle('worlds:create', async (_e, name: string, values: Record<string, 
   const dir = worldDir('open', id);
   mkdirSync(dir, { recursive: true });
   const props = buildWorldProperties({ ...values, 'server-name': trimmed });
-  writeFileSync(join(dir, 'server.properties'), formatProperties(props), 'utf-8');
+  writeSecretFile(join(dir, 'server.properties'), formatProperties(props));
   return { ok: true, id };
 });
 

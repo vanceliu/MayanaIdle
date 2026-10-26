@@ -196,6 +196,9 @@ export function slotTierBandFor(areaLevel: number): { min: TalentSlotTier; max: 
   return { min: band!.min, max: band!.max };
 }
 
+/** 同類型、同天賦配置最多安裝的天賦格數（§ 51.3.4）。已超過者維持，只是不能再裝 */
+export const TALENT_INSTALL_MAX = 20;
+
 /** 「購買道具至」「從倉庫取道具至」「依序補滿多個 buff」的組數上限（§ 51.4.11） */
 export const MULTI_GROUP_MAX = 3;
 

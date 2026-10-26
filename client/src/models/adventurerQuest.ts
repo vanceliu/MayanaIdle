@@ -25,7 +25,7 @@ export type QuestTownId = 'neutral-town' | 'elsarth-town' | 'varden-town' | 'gre
 export type RewardType =
   | 'gold' | 'potion' | 'quality-stone' | 'enhancement-stone'
   | 'weapon-scroll' | 'armor-scroll' | 'crafting-material'
-  /** 混沌／刺針／重刻印記，發放時隨機取一種（§ 36.5.1） */
+  /** 混沌／刺針／重刻／新增／封印印記，發放時隨機取一種（§ 36.5.1） */
   | 'affix-sigil'
   /** 突破印記，固定 1 個（§ 36.5.1） */
   | 'breakthrough-sigil';
@@ -165,7 +165,7 @@ export const DELIVER_VALUE_MULTIPLIER = 3;
 /** § 36.2.7：可交付的印記（工藝、精鍊），生成時隨機指定一種 */
 export const SIGIL_DELIVER_ITEM_IDS = [9, 10];
 /** § 36.2.7：報酬用的詞綴印記（混沌、刺針、重刻），發放時隨機一種 */
-export const AFFIX_SIGIL_ITEM_IDS = [147, 148, 149];
+export const AFFIX_SIGIL_ITEM_IDS = [147, 148, 149, 161, 162];
 /** § 36.5.1：工藝／精鍊印記獎勵的換算單價（金/個） */
 export const CRAFT_SIGIL_UNIT_VALUE = 1000;
 /** § 36.5.1：詞綴印記獎勵的換算單價（金/個） */

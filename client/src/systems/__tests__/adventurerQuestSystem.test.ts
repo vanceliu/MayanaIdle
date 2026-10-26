@@ -898,6 +898,15 @@ describe('adventurerQuestSystem', () => {
       }
     });
 
+    it('詞綴印記池是混沌／刺針／重刻／新增／封印，五種都抽得到', () => {
+      expect([...AFFIX_SIGIL_ITEM_IDS].sort((a, b) => a - b)).toEqual([147, 148, 149, 161, 162]);
+      const seen = new Set<number>();
+      for (let i = 0; i < 20 && seen.size < 5; i++) {
+        for (const q of [...sigilQuests('B'), ...sigilQuests('A')]) seen.add(q.reward.itemId!);
+      }
+      expect([...seen].sort((a, b) => a - b)).toEqual([147, 148, 149, 161, 162]);
+    });
+
     it('B／A 是 8~12 換 1 個詞綴印記，一張最多 4 個', () => {
       const quests = [...sigilQuests('B'), ...sigilQuests('A')];
       expect(quests.length).toBeGreaterThan(0);

@@ -67,7 +67,7 @@ function App() {
     async function init() {
       // 遊戲資料全在 server（`97-selfhosted-server.md`）：本機只留隨 bundle 發布的模板
       await loadTemplateCache();
-      const wsUrl = await resolveServerWsUrl();
+      const wsUrl = await resolveServerWsUrl(import.meta.env.DEV);
       if (!wsUrl) throw new Error('連不上遊戲 server');
       useOnlineStore.setState({ enabled: true });
       installOnlineProxies(connection);

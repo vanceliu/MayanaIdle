@@ -74,7 +74,7 @@ interface CharacterStatistics {
 - 統計與排行皆在 server（`97-selfhosted-server.md` § 97.4）；沒有上傳，沒有外部服務
 - 範圍為本服；單機形態即一人榜，不做特例
 - client 開啟統計中心時向 server 請求 snapshot，client 快取 10 分鐘；展開 Top 20、切換榜單不再請求
-- server 收到請求時從 SQLite 即時計算，回 § 37.1 每個欄位的 top-N 聯集（去重），N 預設 20、上限 100
+- server 從 SQLite 計算（全服共用快照，更新頻率見 `97-selfhosted-server.md` § 97.4），回 § 37.1 每個欄位的 top-N 聯集（去重），N 預設 20、上限 100
 
 ### 37.4.2 排名正確性
 

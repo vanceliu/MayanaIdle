@@ -19,9 +19,10 @@ import { diskStatic, isPackaged, seaStatic, type StaticSource } from './staticFi
 import { GameServer } from './ws';
 import { startHeartbeat } from './heartbeat';
 import { TickLoop } from './tick';
-import { computeLeaderboard } from './leaderboard';
+import { createCachedLeaderboard, loadRows } from './leaderboard';
 import { createAdminHandler } from './admin';
 import { log } from './log';
+import { installRejectionGuard } from './processGuard';
 
 declare const __APP_VERSION__: string;
 const VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
@@ -160,7 +161,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
     log.warn('server.properties 的 admin-password 是空的，管理介面無法登入（§ 97.8）');
   }
 
-  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: top => computeLeaderboard(db, top) });
+  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)) });
   const tickLoop = new TickLoop(gameServer.world);
   const staticSource = resolveStatic(options.staticDir ?? null);
 
@@ -257,6 +258,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
 }
 
 async function main(): Promise<void> {
+  installRejectionGuard();
   const { dataDir, staticDir } = parseArgs(process.argv.slice(2));
   const server = await startServer({ dataDir, staticDir });
 

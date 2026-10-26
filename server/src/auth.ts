@@ -1,7 +1,7 @@
 /**
  * 帳號與 session（`97-selfhosted-server.md` § 97.5）：username + password，argon2id；server 簽發 session token。
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { argon2id, argon2Verify } from 'hash-wasm';
 import { generateRecoveryCode, parseRecoveryCode } from './recoveryCode';
@@ -201,15 +201,18 @@ export class AuthService {
     if (user.bannedUntil !== null && user.bannedUntil > Date.now()) throw new AuthError('banned', '此帳號已被封鎖');
   }
 
+  /** 簽發 session；資料庫只存 token 的 SHA-256（§ 97.5），順手清掉過期列 */
   issueSession(userId: number): string {
     const token = randomBytes(32).toString('hex');
     const now = Date.now();
-    this.db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(token, userId, now, now + SESSION_TTL_MS);
+    this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
+    this.db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(hashSessionToken(token), userId, now, now + SESSION_TTL_MS);
     return token;
   }
 
   resolveSession(token: string): UserRecord | null {
-    const row = this.db.prepare('SELECT user_id, expires_at FROM sessions WHERE token = ?').get(token) as { user_id: number; expires_at: number } | undefined;
+    if (typeof token !== 'string') return null;
+    const row = this.db.prepare('SELECT user_id, expires_at FROM sessions WHERE token = ?').get(hashSessionToken(token)) as { user_id: number; expires_at: number } | undefined;
     if (!row) return null;
     if (row.expires_at < Date.now()) {
       this.revokeSession(token);
@@ -219,7 +222,7 @@ export class AuthService {
   }
 
   revokeSession(token: string): void {
-    this.db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    this.db.prepare('DELETE FROM sessions WHERE token = ?').run(hashSessionToken(token));
   }
 
   revokeAllSessions(userId: number): void {
@@ -227,8 +230,13 @@ export class AuthService {
   }
 
   revokeOtherSessions(userId: number, keepToken: string): void {
-    this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, keepToken);
+    this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, hashSessionToken(keepToken));
   }
+}
+
+/** session token 在資料庫中的形式（§ 97.5）：SHA-256 hex */
+export function hashSessionToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 function assertPasswordStrength(password: string): void {

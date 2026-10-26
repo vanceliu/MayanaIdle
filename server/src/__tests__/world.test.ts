@@ -8,6 +8,7 @@ import type { ServerMessage } from '../../../client/src/net/protocol';
 import type { MonsterInstance } from '../../../client/src/models/monster';
 import { handleMonsterDeath } from '../../../client/src/systems/combatLoop';
 import { waitForPendingDrops } from '../../../client/src/stores/gameStore';
+import { TRAINING_GROUND_REGION_ID } from '../../../client/src/models/trainingGround';
 
 /** § 97.7.1 隊伍實例：同隊同圖共用怪物與 Pressure，經驗平分、掉落給一人 */
 const ATTRS = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 } as never;
@@ -131,6 +132,37 @@ describe('World（隊伍與地圖實例）', () => {
     await party(a, b);
     const spawn = b.mapControl.getState().currentMap!.spawnPoint;
     expect(b.mapControl.getState().playerPosition).toEqual(spawn);
+  });
+
+  it('試驗場一律個人實例：組隊也看不到隊友，在線名單不列任何人（`50-training-ground.md` § 50.2）', async () => {
+    const a = await enter(1, 'A', TRAINING_GROUND_REGION_ID);
+    const b = await enter(2, 'B', TRAINING_GROUND_REGION_ID);
+    const c = await enter(3, 'C', TRAINING_GROUND_REGION_ID);
+    await party(a, b);
+    world.tick();
+
+    expect(a.instance).not.toBe(b.instance);
+    expect(a.instance.key.startsWith('solo:')).toBe(true);
+    expect(a.mapMonster).not.toBe(b.mapMonster);
+    for (const s of [a, b, c]) {
+      expect(s.party.getState().teammates).toEqual([]);
+      expect(s.party.getState().onMap).toEqual([]);
+    }
+    expect(a.party.getState().party?.members.map(m => m.characterId)).toEqual([1, 2]);
+  });
+
+  it('隊友離開試驗場回到一般地圖：回到隊伍實例', async () => {
+    const a = await enter(1, 'A', 'dawn-plains');
+    const b = await enter(2, 'B', TRAINING_GROUND_REGION_ID);
+    await party(a, b);
+    expect(b.instance.key.startsWith('solo:')).toBe(true);
+
+    b.game.setState({ character: { ...b.game.getState().character!, currentRegion: 'dawn-plains', currentArea: 'dawn-plains' } });
+    await syncWorld(b);
+    world.tick();
+
+    expect(b.instance).toBe(a.instance);
+    expect(b.instance.key.startsWith('party:')).toBe(true);
   });
 
   it('跨地圖：不同地圖的成員各自屬於不同實例', async () => {

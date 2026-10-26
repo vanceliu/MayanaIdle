@@ -273,8 +273,12 @@ window.doSaveConfig = () => guard(async () => {
 load();
 `;
 
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+}
+
 export function adminPage(serverName: string, version: string): string {
-  const title = `${serverName} 管理介面`;
+  const title = `${escapeHtml(serverName)} 管理介面`;
   return `<!doctype html>
 <html lang="zh-Hant">
 <head>
