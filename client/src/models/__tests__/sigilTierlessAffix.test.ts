@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   applyRecarveSigil,
   applyStingSigil,
@@ -9,6 +9,7 @@ import {
 import { isAttributeAffixType } from '../affix';
 import type { Affix } from '../affix';
 import type { SigilContext } from '../sigil';
+import { reseed, setRandomSource } from '../../core/rng';
 
 const attrAffix: Affix = { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' };
 const normal: Affix = { type: 'defense', tier: 3, value: 8 };
@@ -19,6 +20,8 @@ const check = { isStarterGear: false, quality: 0 };
 
 /** `46-sigil.md` § 46.9：額外屬性與特殊詞綴同屬「無 Tier」 */
 describe('額外屬性詞綴與印記', () => {
+  afterEach(() => setRandomSource(() => Math.random()));
+
   it('精鍊與突破都不受理', () => {
     for (const type of ['temper', 'enhance'] as const) {
       const r = canUseSigil(type, [attrAffix], 0, check);
@@ -48,9 +51,11 @@ describe('額外屬性詞綴與印記', () => {
   });
 
   it('刺針換成額外屬性時：無 Tier、值 +1、當下抽屬性', () => {
+    // 固定種子：結果不隨機，六種屬性一定都抽得到
+    reseed(20261026);
     const seen = new Set<string>();
     let hit = 0;
-    for (let i = 0; i < 800; i++) {
+    for (let i = 0; i < 3000; i++) {
       const out = applyStingSigil([normal], 0, ctx());
       const a = out.affixes[0];
       if (!isAttributeAffixType(a.type)) continue;
