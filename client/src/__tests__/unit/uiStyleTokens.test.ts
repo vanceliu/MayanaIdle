@@ -89,6 +89,38 @@ describe('文字對比（WCAG 4.5:1）', () => {
   });
 });
 
+describe('聊天頻道色（`97-selfhosted-server.md` § 97.7.2）', () => {
+  /** `var(--x)` 解開成 `:root` 裡的色碼 */
+  const resolveColor = (name: string): string => {
+    const v = token(name);
+    const ref = v.match(/^var\((--[\w-]+)\)$/);
+    return ref ? resolveColor(ref[1]) : v;
+  };
+
+  it('世界白、隊伍藍、城鎮咖啡、公會綠', () => {
+    expect(token('--chat-world')).toBe('var(--text-primary)');
+    expect(token('--chat-party')).toBe('var(--accent-mana)');
+    expect(token('--chat-town')).toBe('#C8935A');
+    expect(token('--chat-guild')).toBe('var(--accent-success)');
+  });
+
+  it('四色在卡片底上都過 4.5:1', () => {
+    for (const name of ['--chat-world', '--chat-party', '--chat-town', '--chat-guild']) {
+      expect(contrast(resolveColor(name), token('--bg-card')), name).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('密語不套頻道色（送出／收到兩色照舊）', () => {
+    expect(APP_CSS).not.toMatch(/\.chat-whisper[^{]*\{\s*color:\s*var\(--chat-/);
+  });
+});
+
+describe('公會成員列（`11-guild.md` § 11.7）', () => {
+  it('每人一行', () => {
+    expect(APP_CSS).toMatch(/\.party-row-main\.guild-member-line\s*\{[^}]*flex-direction:\s*row/);
+  });
+});
+
 describe('數量徽章', () => {
   it('底色不可是 --accent-primary —— 那是 .panel-dock-btn.active 的背景色', () => {
     expect(token('--badge-bg')).not.toContain('--accent-primary');
@@ -99,7 +131,7 @@ describe('數量徽章', () => {
   });
 
   it('字級吃 --fs-xs，不寫死 px（否則文字放大時只有它不變，違反 § 34.6）', () => {
-    const block = APP_CSS.match(/\.quest-tracker-btn \.quest-count-badge \{([^}]*)\}/);
+    const block = APP_CSS.match(/\n\.quest-count-badge \{([^}]*)\}/);
     expect(block).toBeTruthy();
     expect(block![1]).toContain('font-size: var(--fs-xs)');
   });

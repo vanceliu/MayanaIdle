@@ -106,7 +106,7 @@ function checkVillageCondition(condition: VillageCondition, ctx: VillageScriptCo
     case 'current_area_is':
       return condition.match !== undefined && ctx.currentArea === condition.match;
     case 'warehouse_gold_gte':
-      // 金幣只有共用倉庫有（`13-town.md` § 13.8）
+      // 金幣只有帳號倉庫有（`13-town.md` § 13.8）
       return ctx.warehouse.gold >= (condition.value ?? 0);
     case 'warehouse_item_gte': {
       if (condition.itemId == null) return false;
@@ -159,9 +159,9 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
   }
 }
 
-/** 倉庫類動作預設走共用倉庫（跨角色轉移的那一個） */
+/** 倉庫類動作預設走帳號倉庫（跨角色轉移的那一個）；補給天賦不碰公會倉庫 */
 export function getWarehouseKind(action: VillageAction): WarehouseKind {
-  return action.warehouse ?? 'shared';
+  return action.warehouse === 'personal' ? 'personal' : 'shared';
 }
 
 function warehouseSide(action: VillageAction, ctx: VillageScriptContext) {
@@ -204,7 +204,7 @@ export function getWithdrawAmount(action: VillageAction, ctx: VillageScriptConte
   return Math.min(missing, stored);
 }
 
-/** 存金幣：身上留下 keepGold，其餘存進共用倉庫 */
+/** 存金幣：身上留下 keepGold，其餘存進帳號倉庫 */
 export function getDepositGoldAmount(action: VillageAction, ctx: VillageScriptContext): number {
   return Math.max(0, ctx.gold - (action.keepGold ?? 0));
 }

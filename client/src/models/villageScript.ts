@@ -47,9 +47,9 @@ export type VillageActionType =
   | 'deposit_equipment'
   /** 從倉庫把指定道具補到目標數量 */
   | 'withdraw_item'
-  /** 金幣存進共用倉庫（留下 keepGold） */
+  /** 金幣存進帳號倉庫（留下 keepGold） */
   | 'deposit_gold'
-  /** 從共用倉庫領金幣，補到 targetAmount */
+  /** 從帳號倉庫領金幣，補到 targetAmount */
   | 'withdraw_gold'
   /** 回到上次掛機點。只有自動回城帶進城時才成立（§ 49.5 待返回旗標） */
   | 'return_to_hunt'
@@ -57,7 +57,7 @@ export type VillageActionType =
   /** 使用旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7） */
   | 'use_inn';
 
-/** 共用倉庫（帳號層級）或個人倉庫（角色層級），見 `13-town.md` § 13.8 */
+/** 帳號倉庫或個人倉庫（角色層級），見 `13-town.md` § 13.8 */
 export type WarehouseKind = 'shared' | 'personal';
 
 export interface VillageCondition {
@@ -67,7 +67,7 @@ export interface VillageCondition {
   itemId?: number;
   /** `in_town` 用：`'town'` 或 `'field'` */
   match?: string;
-  /** `warehouse_*` 用：共用或個人倉庫 */
+  /** `warehouse_*` 用：帳號或個人倉庫 */
   warehouse?: WarehouseKind;
 }
 

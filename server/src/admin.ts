@@ -4,6 +4,7 @@
  * 身分沿用 § 97.5 的帳號密碼與 session token，另驗 admin 旗標。
  * 不做：改角色資料、改靜態模板、改資料目錄、由介面重啟（§ 97.8「不做」）。
  */
+import { writeGateOf } from './db/writeGate';
 import { copyFileSync, mkdirSync, statSync } from 'node:fs';
 import { restrictFile } from './secretFile';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -244,8 +245,8 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       const userId = Number(body.userId);
       if (!auth.findById(userId)) throw new AdminError(404, '找不到這個帳號');
       const until = body.until === null || body.until === undefined ? null : Number(body.until);
-      auth.ban(userId, until);
-      auth.revokeAllSessions(userId);
+      await auth.ban(userId, until);
+      await auth.revokeAllSessions(userId);
       const kicked = await server.kickUser(userId, '此帳號已被封鎖');
       json(res, 200, { ok: true, kicked });
     },
@@ -273,7 +274,7 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       const body = await readBody(req);
       const userId = Number(body.userId);
       if (!auth.findById(userId)) throw new AdminError(404, '找不到這個帳號');
-      auth.unban(userId);
+      await auth.unban(userId);
       json(res, 200, { ok: true });
     },
 
@@ -355,19 +356,15 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
 
       // `sourceKey` 對 `characterId` 唯一，重複發放靠它擋（§ 52.7）
       const stmt = db.prepare('INSERT OR IGNORE INTO mailbox (character_id, source_key, data) VALUES (?, ?, ?)');
-      let sent = 0;
-      db.exec('BEGIN');
-      try {
+      const sent = await writeGateOf(db).atomic(() => {
+        let count = 0;
         for (const characterId of targets) {
           const mail: Mail = { characterId, sourceKey, title, items: [{ type: 'talent_slot', slotTier: tier as 1 | 2 | 3 | 4 }], createdAt: Date.now(), claimedAt: null };
           const { changes } = stmt.run(characterId, sourceKey, JSON.stringify({ ...mail, id: undefined }));
-          sent += Number(changes);
+          count += Number(changes);
         }
-        db.exec('COMMIT');
-      } catch (e) {
-        db.exec('ROLLBACK');
-        throw e;
-      }
+        return count;
+      });
       // 在線的收件者要立刻看到信：refresh 會經 patch 鏡像回 client
       for (const session of server.sessions) {
         const id = session.game.getState().character?.id;

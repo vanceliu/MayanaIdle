@@ -4,7 +4,7 @@
  */
 import type { TrainingDummySpec } from '../models/trainingGround';
 
-export type StoreKey = 'game' | 'mapControl' | 'mapMonster' | 'talent' | 'mailbox' | 'party' | 'trade';
+export type StoreKey = 'game' | 'mapControl' | 'mapMonster' | 'talent' | 'mailbox' | 'party' | 'trade' | 'guild';
 
 /** 聊天頻道（`97-selfhosted-server.md` § 97.7.2） */
 export type ChatChannel = 'world' | 'guild' | 'party' | 'town' | 'whisper';
@@ -144,37 +144,42 @@ export interface CombatInstanceView {
   isTrainingDummy?: boolean;
 }
 
-export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade';
+export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade' | 'guild';
 
 /** 每個 store 允許 client 呼叫的 action（其餘一律拒絕） */
 export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
   game: new Set([
     'setSearchMode',
     'equipItem', 'unequipItem', 'usePotionByType', 'useSpeedPotion',
-    'assignQuickSlot', 'setBagSlotMap', 'setTalentBagOrder', 'useQuickSlot', 'castQuickSlotSkill', 'castSelfSkill',
+    'assignQuickSlot', 'setBagSlotMap', 'setTalentBagOrder', 'useQuickSlot',
     'useTownScroll', 'useCureItem', 'navigateTo',
     'setEmergencyRetreat', 'setActiveTemplate', 'addScriptTemplate',
     'duplicateScriptTemplate', 'renameScriptTemplate', 'removeScriptTemplate',
-    'rememberHuntLocation',
     'discardBagItem', 'sellBagItems', 'buyBagItems', 'sellEquipmentInstances',
     'depositToWarehouse', 'withdrawFromWarehouse', 'depositWarehouseGold', 'withdrawWarehouseGold',
-    'discardInventoryItem', 'requestDiscard', 'cancelDiscard', 'confirmDiscard',
+    'discardInventoryItem', 'requestDiscard', 'requestDiscardBatch', 'cancelDiscard', 'confirmDiscard', 'confirmDiscardBatch',
     'spendAttributePoint', 'acceptQuest', 'completeQuest',
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
     'buyShopEquipment', 'craftEquipment', 'applySigil', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
-    'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'restoreInTrainingGround',
+    'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
     'setAfterCombatThreshold',
   ]),
-  mapControl: new Set(['moveToTarget', 'setAutoMove', 'stopMoving']),
-  // 試驗場木樁不經 server（`97-selfhosted-server.md` § 97.9）
+  mapControl: new Set(['moveToTarget', 'setAutoMove']),
+  // 試驗場木樁在 client 本機沙盒（`97-selfhosted-server.md` § 97.2）
   mapMonster: new Set(),
-  combatCommand: new Set(['requestTarget', 'requestSkill']),
+  combatCommand: new Set(['requestTarget']),
   talent: new Set(['installSlot', 'uninstallSlot', 'reorderSlot', 'toggleSlot', 'setEntry', 'setEntryParams', 'fuseSlots']),
-  mailbox: new Set(['refresh', 'claim', 'claimAll', 'remove', 'purgeClaimed']),
+  mailbox: new Set(['claim', 'claimAll', 'remove', 'purgeClaimed']),
   // 組隊（`97-selfhosted-server.md` § 97.7.3）：判定在 server 的 PartyManager
-  party: new Set(['invite', 'accept', 'decline', 'leave', 'kick', 'transferLeader', 'setDropMode']),
+  party: new Set(['invite', 'accept', 'decline', 'leave', 'kick', 'transferLeader', 'setDropMode', 'clearMessage']),
   chat: new Set(['send']),
   // 交易（§ 97.7 表）：判定在 server 的 TradeManager
   trade: new Set(['offer', 'accept', 'decline', 'setOffer', 'lock', 'confirm', 'cancel']),
+  // 公會（`11-guild.md`）：判定在 server 的 GuildManager；單機世界一律拒絕
+  guild: new Set([
+    'create', 'disband', 'invite', 'accept', 'decline', 'leave', 'kick', 'clearMessage',
+    // 公會倉庫（`11-guild.md` § 11.8）：開關分頁才送快照
+    'openWarehouse', 'closeWarehouse', 'depositWarehouse', 'withdrawWarehouse', 'depositWarehouseGold', 'withdrawWarehouseGold',
+  ]),
 };

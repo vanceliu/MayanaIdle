@@ -11,6 +11,7 @@ import { defaultSession } from '../../client/src/stores/session';
 import { loadTemplateCache } from '../../client/src/systems/templateSync';
 import { loadConfig, isLoopbackBind, type ServerConfig } from './config';
 import { openDatabase, migrate, assertSchemaIntact, resolveWorldMode, DB_FILE, type WorldMode } from './db/sqlite';
+import { SqliteGuildStorage } from './db/guildStorage';
 import { SqliteRepository } from './db/sqliteRepository';
 import { AuthService } from './auth';
 import { registerBundledMaps } from './maps';
@@ -156,12 +157,12 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
   const auth = new AuthService(db);
   // 單機世界只有一個玩家，開機自動登入這個帳號；開放世界人人自己註冊，不需要它
   const hostUsername = HOST_USERNAME;
-  if (mode === 'solo') auth.ensureHost(hostUsername);
+  if (mode === 'solo') await auth.ensureHost(hostUsername);
   if (!config.adminPassword) {
     log.warn('server.properties 的 admin-password 是空的，管理介面無法登入（§ 97.8）');
   }
 
-  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)) });
+  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)), guildStorage: new SqliteGuildStorage(db) });
   const tickLoop = new TickLoop(gameServer.world);
   const staticSource = resolveStatic(options.staticDir ?? null);
 

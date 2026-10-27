@@ -14,6 +14,7 @@ import {
 } from '../adventurerQuestSystem';
 import {
   AREA_POOLS,
+  MAX_ACTIVE_ADVENTURER_QUESTS,
   ENDURANCE_COUNT_RANGE,
   BOSS_COLLECT_DROP_RATE,
   COLLECT_DROP_RATE,
@@ -68,10 +69,10 @@ describe('adventurerQuestSystem', () => {
   });
 
   describe('generateQuestList', () => {
-    it('generates 5-8 quests for a given difficulty', () => {
+    it('generates 7-9 quests for a given difficulty', () => {
       const quests = generateQuestList('D', 'F');
-      expect(quests.length).toBeGreaterThanOrEqual(5);
-      expect(quests.length).toBeLessThanOrEqual(8);
+      expect(quests.length).toBeGreaterThanOrEqual(7);
+      expect(quests.length).toBeLessThanOrEqual(9);
     });
 
     it('all quests have the correct difficulty', () => {
@@ -105,8 +106,8 @@ describe('adventurerQuestSystem', () => {
       for (const difficulty of ['B+', 'A+', 'S+'] as const) {
         for (let i = 0; i < 30; i++) {
           const quests = generateQuestList(difficulty, 'S');
-          expect(quests.length).toBeGreaterThanOrEqual(5);
-          expect(quests.length).toBeLessThanOrEqual(8);
+          expect(quests.length).toBeGreaterThanOrEqual(7);
+          expect(quests.length).toBeLessThanOrEqual(9);
           for (const q of quests) {
             expect(['errandboss', 'collectboss']).toContain(q.type);
             expect(q.difficulty).toBe(difficulty);
@@ -231,13 +232,16 @@ describe('adventurerQuestSystem', () => {
       expect(result![0].status).toBe('active');
     });
 
-    it('returns null when at max capacity', () => {
-      const active = [
-        makeQuest({ id: 'q1', status: 'active' }),
-        makeQuest({ id: 'q2', status: 'active' }),
-        makeQuest({ id: 'q3', status: 'active' }),
-      ];
+    it('accepts the 4th quest (§ 36.6.2)', () => {
+      const active = ['q1', 'q2', 'q3'].map(id => makeQuest({ id, status: 'active' }));
       const result = acceptQuest(active, makeQuest({ id: 'q4' }));
+      expect(result!.length).toBe(4);
+    });
+
+    it('returns null when at max capacity', () => {
+      const active = Array.from({ length: MAX_ACTIVE_ADVENTURER_QUESTS }, (_, i) => makeQuest({ id: `q${i + 1}`, status: 'active' }));
+      expect(MAX_ACTIVE_ADVENTURER_QUESTS).toBe(4);
+      const result = acceptQuest(active, makeQuest({ id: 'q5' }));
       expect(result).toBeNull();
     });
 

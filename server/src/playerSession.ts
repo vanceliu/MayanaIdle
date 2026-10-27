@@ -12,12 +12,14 @@ import { createTalentStore } from '../../client/src/stores/talentStore';
 import { createMailboxStore } from '../../client/src/stores/mailboxStore';
 import { createPartyStore } from '../../client/src/stores/partyStore';
 import { createTradeStore } from '../../client/src/stores/tradeStore';
+import { createGuildStore } from '../../client/src/stores/guildStore';
 import { createCombatState, loadAreaTemplates, resetCombat } from '../../client/src/systems/combatLoop';
 import { attachInstance, createMapInstance } from '../../client/src/systems/mapInstance';
 import { getRegion, getFloor } from '../../client/src/models/mapData';
 import type { GameRepository } from '../../client/src/db/repository';
 import type { ServerMessage } from '../../client/src/net/protocol';
-import { createSyncState, type SyncState } from './sync';
+import { createSyncState, resetSync, type SyncState } from './sync';
+import { TRAINING_GROUND_REGION_ID } from '../../client/src/models/trainingGround';
 
 /** 世界層的回呼（`world.ts`）：進出地圖時安置到正確的實例 */
 export interface WorldHooks {
@@ -73,6 +75,7 @@ export function createPlayerSession(repo: GameRepository, remoteAddress: string,
   s.mailbox = createMailboxStore(s);
   s.party = createPartyStore(s);
   s.trade = createTradeStore(s);
+  s.guild = createGuildStore(s);
   attachInstance(s, createMapInstance(`private:${s.connectionId}`, s.mapMonster));
   return s;
 }
@@ -97,6 +100,8 @@ export async function syncWorld(session: PlayerSession): Promise<void> {
     return;
   }
   if (key === session.loadedWorldKey || session.worldLoading) return;
+  // 試驗場是 client 本機沙盒（§ 97.2）：離開時整份重送，蓋掉沙盒裡的狀態
+  if (session.loadedWorldKey?.startsWith(`${TRAINING_GROUND_REGION_ID}|`)) resetSync(session);
   session.worldLoading = true;
   try {
     const character = session.game.getState().character!;
@@ -130,11 +135,15 @@ export async function syncWorld(session: PlayerSession): Promise<void> {
   }
 }
 
-/** `searchMode === 'auto'` 且在探索中才自動移動；低於門檻先暫停等回復 */
+/**
+ * `searchMode === 'auto'` 且在探索中才自動移動；低於門檻先暫停等回復。
+ * 只在 `autoMove` 需切換時呼叫 `setAutoMove`：每個 action 後都會執行，重設會覆蓋 action 排好的路徑（`38-map-control.md` § 38.5）。
+ */
 export function applyAutoMove(session: PlayerSession): void {
   const gs = session.game.getState();
   const ch = gs.character;
-  if (!ch || !session.mapControl.getState().currentMap) return;
+  const map = session.mapControl.getState();
+  if (!ch || !map.currentMap) return;
   if (gs.searchMode === 'auto' && gs.phase === 'explore') {
     const effMaxHp = getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects);
     const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear, gs.activeEffects);
@@ -144,8 +153,9 @@ export function applyAutoMove(session: PlayerSession): void {
     if (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
       session.mapControl.getState().setPaused(true);
     }
-    session.mapControl.getState().setAutoMove(true);
-  } else if (gs.phase !== 'combat') {
+    // 城鎮由 `setAutoMove` 擋下自動移動（`13-town.md` § 13.2.1）；從野外回城時 `autoMove` 仍是 true
+    if (!map.autoMove || map.currentMap.theme === 'town') session.mapControl.getState().setAutoMove(true);
+  } else if (gs.phase !== 'combat' && map.autoMove) {
     session.mapControl.getState().setAutoMove(false);
   }
 }

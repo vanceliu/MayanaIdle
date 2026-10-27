@@ -37,6 +37,12 @@
 
   --area-tint: 0.35;
 
+  /* 聊天頻道色（`97-selfhosted-server.md` § 97.7.2）：頻道標與內文；密語另有送出／收到兩色 */
+  --chat-world: var(--text-primary);
+  --chat-party: var(--accent-mana);
+  --chat-town: #C8935A;
+  --chat-guild: var(--accent-success);
+
   --badge-bg: var(--accent-gold);
   --badge-fg: #0A0A1A;
   --area-char: var(--accent-primary);
@@ -328,6 +334,7 @@ a,
   font-size: var(--fs-md);
   text-align: center;
   letter-spacing: 0.05em;
+  -webkit-user-select: all;
   user-select: all;
   word-break: break-all;
 }
@@ -608,6 +615,12 @@ a,
   pointer-events: auto;
 }
 
+/* 設施列換行後盒子含按鈕間空白，只有按鈕收滑鼠事件（§ 32.3） */
+.town-header,
+.town-npc-bar {
+  pointer-events: none;
+}
+
 /* --- HUD 島的內容樣式 --- */
 
 /* 左上角色卡 */
@@ -670,7 +683,6 @@ a,
   border-bottom: none;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   cursor: move;
-  user-select: none;
   touch-action: none;
 }
 
@@ -701,10 +713,53 @@ a,
   font-weight: 600;
 }
 
+/* 數量徽章本體（§ 34.10），定位由各掛載處自訂 */
+.quest-count-badge {
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--bg-inset);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .log-tab .quest-count-badge {
   position: absolute;
   top: -6px;
-  right: -6px;
+  left: calc(100% - 8px);
+}
+
+/* 聊天分頁：只有一般頻道未讀時縮成灰點，不給數字 */
+.log-tab .quest-count-badge.is-dot {
+  min-width: 0;
+  width: 0.6em;
+  height: 0.6em;
+  padding: 0;
+  top: -3px;
+  left: calc(100% - 5px);
+  background: var(--text-secondary);
+}
+
+/* 聊天分頁：有未讀密語時徽章外圈呼吸光暈 */
+.log-tab .quest-count-badge.is-whisper {
+  white-space: nowrap;
+  animation: whisper-badge-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes whisper-badge-breathe {
+  0%, 100% { box-shadow: 0 0 0 2px var(--bg-inset), 0 0 0 0 color-mix(in srgb, var(--accent-gold) 70%, transparent); }
+  50%      { box-shadow: 0 0 0 2px var(--bg-inset), 0 0 6px 3px color-mix(in srgb, var(--accent-gold) 70%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-tab .quest-count-badge.is-whisper { animation: none; }
 }
 
 /* 視窗設定：標題列只放一顆 ⚙，選項全部收在下拉選單裡 */
@@ -1656,7 +1711,6 @@ button.active {
   font-size: 10px;
   color: var(--text-dim);
   opacity: 0.5;
-  user-select: none;
   cursor: default;
 }
 
@@ -2462,6 +2516,7 @@ button.active {
   background: var(--bg-card);
   border: var(--border-width) solid var(--outline-dark);
   cursor: pointer;
+  pointer-events: auto;
   transition: all var(--transition-fast);
   min-width: 52px;
 }
@@ -3450,6 +3505,13 @@ button.active {
 .storage-item button {
   padding: 3px 8px;
   font-size: var(--fs-xs);
+}
+
+.storage-equip-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
 }
 
 .storage-item-actions {
@@ -4742,6 +4804,15 @@ button.active {
   box-shadow: 0 0 0 1px var(--accent-gold), 0 0 10px rgba(245, 158, 11, 0.35);
 }
 
+/* § 35.1.5 多選：只動顏色，版面不位移 */
+.bag-cell.is-multi-selected,
+.bag-cell.equipment.is-multi-selected,
+.bag-cell.is-equipped.is-multi-selected {
+  border-color: var(--accent-gold);
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: inset 0 0 0 2px var(--accent-gold);
+}
+
 .bag-cell-icon {
   font-size: var(--fs-base);
   line-height: 1;
@@ -5247,7 +5318,6 @@ button.active {
   background: var(--bg-inset);
   border-bottom: 1px solid var(--border-subtle);
   cursor: move;
-  user-select: none;
   touch-action: none;
   flex-shrink: 0;
 }
@@ -6200,19 +6270,6 @@ button.active {
   top: 0;
   right: 0;
   transform: translate(40%, -40%);
-  min-width: 1.5em;
-  height: 1.5em;
-  padding: 0 0.35em;
-  border-radius: 999px;
-  background: var(--badge-bg);
-  color: var(--badge-fg);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 0 0 2px var(--bg-inset);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* 任務內容由 FloatingWindow 承載，只保留半透明修飾（§ 36.10.3） */
@@ -6616,6 +6673,24 @@ button.active {
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   text-align: center;
+}
+
+/* § 35.5.3 多項丟棄 */
+.discard-batch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.discard-batch-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .discard-warning {
@@ -8084,28 +8159,17 @@ button.active {
 /* === 系統信箱（`52-mailbox.md`） === */
 
 /* 徽章與任務鈕共用同一套（§ 34.10），只是掛在不同按鈕上 */
-.mailbox-btn {
+.mailbox-btn,
+.party-btn {
   position: relative;
 }
 
-.mailbox-btn .quest-count-badge {
+.mailbox-btn .quest-count-badge,
+.party-btn .quest-count-badge {
   position: absolute;
   top: 0;
   right: 0;
   transform: translate(40%, -40%);
-  min-width: 1.5em;
-  height: 1.5em;
-  padding: 0 0.35em;
-  border-radius: 999px;
-  background: var(--badge-bg);
-  color: var(--badge-fg);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 0 0 2px var(--bg-inset);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .mailbox-content {
@@ -8361,7 +8425,6 @@ button.active {
   color: var(--accent-gold);
   font-size: var(--fs-sm);
   cursor: help;
-  user-select: none;
 }
 
 /* 停用的整列淡掉，但仍看得到內容 —— 玩家要能確認「我關掉的是哪一條」 */
@@ -8380,7 +8443,6 @@ button.active {
 .talent-row-handle {
   cursor: grab;
   color: var(--text-dim);
-  user-select: none;
   touch-action: none;
   padding: 0 2px;
 }
@@ -9188,6 +9250,10 @@ button.active {
   color: var(--text-secondary);
 }
 
+.party-drop-mode-value {
+  color: var(--text-primary);
+}
+
 .party-drop-mode select {
   background: var(--bg-inset);
   color: var(--text-primary);
@@ -9644,6 +9710,16 @@ button.active {
   flex: 0 0 auto;
 }
 
+/* 頻道色（§ 97.7.2）：頻道標與內文同色，一眼分出是哪個頻道 */
+.chat-line.chat-world .chat-channel,
+.chat-line.chat-world .chat-text { color: var(--chat-world); }
+.chat-line.chat-party .chat-channel,
+.chat-line.chat-party .chat-text { color: var(--chat-party); }
+.chat-line.chat-town .chat-channel,
+.chat-line.chat-town .chat-text { color: var(--chat-town); }
+.chat-line.chat-guild .chat-channel,
+.chat-line.chat-guild .chat-text { color: var(--chat-guild); }
+
 /*
  * 密語在共用 log 裡換色。**送出與收到必須不同色** ——
  * 同色的話一來一往看起來像同一個人在自言自語。
@@ -9656,4 +9732,71 @@ button.active {
 .chat-line.chat-whisper.is-incoming .chat-text,
 .chat-line.chat-whisper.is-incoming .chat-name {
   color: var(--accent-gold);
+}
+
+/* 社群視窗（`97-selfhosted-server.md` § 97.7.5）：分頁列固定，分頁內容自己捲動 */
+.social-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.social-panel > .storage-tabs {
+  margin: 8px 10px 0;
+}
+
+.social-tab-badge {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-gold);
+  color: var(--bg-inset);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+/* 盟主（`11-guild.md` § 11.7）：金色 ♛ ＋ 金色名稱；隊長的 ★ 不共用 */
+.guild-leader-name {
+  color: var(--accent-gold);
+}
+
+.guild-leader-mark {
+  color: var(--accent-gold);
+  margin-right: 3px;
+}
+
+/* 懸停名稱的公會行（`11-guild.md` § 11.7）：兩行時置中堆疊，公會名在上、金色、小一號 */
+.entity-hover-guild,
+.entity-hover-name {
+  display: block;
+  text-align: center;
+}
+
+.entity-hover-guild {
+  color: var(--accent-gold);
+  font-size: 0.9em;
+}
+
+/* 公會成員列只佔一行（`11-guild.md` § 11.7）；離線靠 `.party-row.is-offline` 變暗，不寫字 */
+.party-row-main.guild-member-line {
+  flex-direction: row;
+  align-items: baseline;
+}
+
+.guild-kick-confirm {
+  flex: 0 0 auto;
+  color: var(--accent-danger);
+  font-size: var(--fs-xs);
+}
+
+/* 公會倉庫分頁（`11-guild.md` § 11.8）：沒有公會時變暗、不可點 */
+.storage-tabs button.is-unavailable {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.storage-capacity {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  margin: 4px 0;
 }

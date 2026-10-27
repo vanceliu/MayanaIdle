@@ -132,7 +132,7 @@ describe('救援碼與登入保護', () => {
 
   it('被封鎖的帳號不能重設', async () => {
     const reg = await register('dave', 'davepw12');
-    auth.ban(reg.userId, null);
+    await auth.ban(reg.userId, null);
     const err = await requestError(connect(), { t: 'recover', code: reg.recoveryCode!, password: 'davepw34' });
     expect(err.code).toBe('banned');
   });
@@ -172,15 +172,15 @@ describe('救援碼與登入保護', () => {
   });
 
   it('host 帳號不發救援碼', async () => {
-    const host = auth.ensureHost('host');
+    const host = await auth.ensureHost('host');
     const client = connect();
-    await request(client, { t: 'resume', token: auth.issueSession(host.id) }, 'auth_ok');
+    await request(client, { t: 'resume', token: await auth.issueSession(host.id) }, 'auth_ok');
     expect((await requestError(client, { t: 'regenerate_recovery_code', current: '' })).code).toBe('host_no_recovery');
   });
 
   it('改密碼撤銷其他 session 並踢除其他連線，保留目前這條', async () => {
     const reg = await register('gus', 'guspw123');
-    const otherToken = auth.issueSession(reg.userId);
+    const otherToken = await auth.issueSession(reg.userId);
     const current = connect();
     await request(current, { t: 'resume', token: reg.token }, 'auth_ok');
     const other = connect('5.6.7.8');
@@ -200,7 +200,7 @@ describe('救援碼與登入保護', () => {
     const current = connect();
     await request(current, { t: 'resume', token: reg.token }, 'auth_ok');
     const other = connect('5.6.7.8');
-    await request(other, { t: 'resume', token: auth.issueSession(reg.userId) }, 'auth_ok');
+    await request(other, { t: 'resume', token: await auth.issueSession(reg.userId) }, 'auth_ok');
 
     expect((await requestError(current, { t: 'set_password', id: 1, current: 'wrong123', password: 'kimpw456' })).code).toBe('invalid_credentials');
     expect(other.sent.some(m => m.t === 'kicked')).toBe(false);

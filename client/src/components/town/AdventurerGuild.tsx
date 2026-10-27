@@ -5,6 +5,9 @@ import { getNextRank, MAX_ACTIVE_ADVENTURER_QUESTS, getTownDifficulties, isBossD
 import { getPointsToNextRank, isDeliverQuestSatisfied } from '../../systems/adventurerQuestSystem';
 import { getItemById } from '../../models/items';
 import { getBagItemAmount } from '../../models/bagItem';
+import { ClassQuests } from './ClassQuests';
+
+type GuildTab = 'adventurer' | 'class';
 
 function QuestDescription({ description }: { description: string }) {
   const parts = description.split(/(\*\*[^*]+\*\*)/g);
@@ -185,6 +188,7 @@ export function AdventurerGuild() {
   const questBoardTownId = useGameStore(s => s.questBoardTownId);
   const ensureQuestBoardForTown = useGameStore(s => s.ensureQuestBoardForTown);
   const rerollQuestBoard = useGameStore(s => s.rerollQuestBoard);
+  const [tab, setTab] = useState<GuildTab>('adventurer');
 
   useEffect(() => {
     if (questBoardTownId !== townId) {
@@ -209,6 +213,19 @@ export function AdventurerGuild() {
     <div className="guild-panel">
       <p className="shop-greeting">「歡迎來到冒險者工會。有什麼任務想接嗎？」</p>
 
+      <div className="storage-tabs">
+        <button className={tab === 'adventurer' ? 'active' : ''} onClick={() => setTab('adventurer')}>冒險任務</button>
+        <button className={tab === 'class' ? 'active' : ''} onClick={() => setTab('class')}>職業任務</button>
+      </div>
+
+      {tab === 'class' && (
+        <div className="panel-scroll">
+          <ClassQuests />
+        </div>
+      )}
+
+      {tab === 'adventurer' && (
+      <>
       <div className="adventurer-guild-status">
         <span>等階：<strong>{guildProgress.rank}</strong></span>
         <span>貢獻：{guildProgress.points}</span>
@@ -276,6 +293,8 @@ export function AdventurerGuild() {
         ))}
       </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

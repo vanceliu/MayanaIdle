@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { useTradeStore, type TradeLine } from '../stores/tradeStore';
+import { useTradeStore, type TradeLine, type TradeOfferInput } from '../stores/tradeStore';
 import { usePanelWindowStore } from '../stores/panelWindowStore';
 import { TradeGrid } from './TradeGrid';
 import { TradeSourceGrid, type TradePutInput } from './TradeSourceGrid';
 import { TRADE_MAX_SLOTS } from '../systems/trade';
+import { useLatestSent } from '../hooks/useLatestSent';
 import type { BagGridItem } from './BagCell';
 
 /**
@@ -56,7 +57,7 @@ export function TradePanelContent() {
   }
 
   const editing = !!trade && !trade.me.locked;
-  /** 已放入的內容一律以 server 推回來的鏡像為準，本機不另外留一份 */
+  /** 畫面上已放入的內容以 server 推回來的鏡像為準 */
   const placedEquipmentIds = trade?.me.equipment.map(e => e.id!) ?? [];
   const placedItems: Record<number, number> = {};
   for (const line of trade?.me.items ?? []) placedItems[line.itemId] = line.amount;
@@ -68,11 +69,25 @@ export function TradePanelContent() {
    * server 本來就會在任一側改動時解除雙方的鎖定與確認，批次送出只換來
    * 「按下去才知道剛才放的是哪一件」。
    */
+  /** 下一次送出的基準：還有送出未回覆時是本機最後送出的內容，否則是鏡像（§ 97.7.4） */
+  const offer = useLatestSent<TradeOfferInput>(
+    { equipmentIds: placedEquipmentIds, items: trade?.me.items ?? [], gold: trade?.me.gold ?? 0 },
+    trade?.id,
+  );
+  const baseOffer = offer.latest;
+
   const send = (equipmentIds: number[], items: TradeLine[], nextGold = goldInput) => {
-    void setOffer({ equipmentIds, items, gold: Math.max(0, Math.floor(nextGold)) });
+    offer.send({ equipmentIds, items, gold: Math.max(0, Math.floor(nextGold)) }, setOffer);
   };
 
-  const currentItems = (): TradeLine[] => (trade?.me.items ?? []).map(l => ({ ...l }));
+  const currentItems = (): TradeLine[] => baseOffer().items.map(l => ({ ...l }));
+
+  /** 金幣只在與目前內容不同時送出：任何送出都會解除雙方的鎖定 */
+  const sendGold = () => {
+    const base = baseOffer();
+    if (base.gold === Math.max(0, Math.floor(goldInput))) return;
+    send(base.equipmentIds, currentItems());
+  };
 
   /** 輸入格什麼都打得進來（空字串、負號、超過持有量），一律夾回 0～持有量 */
   const clampGold = (raw: string): number => {
@@ -84,24 +99,24 @@ export function TradePanelContent() {
   const put = (input: TradePutInput) => {
     if (!trade) return;
     if (input.equipmentId != null) {
-      send([...placedEquipmentIds, input.equipmentId], currentItems());
+      send([...baseOffer().equipmentIds, input.equipmentId], currentItems());
       return;
     }
     const items = currentItems();
     const line = items.find(l => l.itemId === input.itemId);
     if (line) line.amount += input.amount;
     else items.push({ itemId: input.itemId!, amount: input.amount });
-    send(placedEquipmentIds, items);
+    send(baseOffer().equipmentIds, items);
   };
 
   /** 取出：整格拿回來（堆疊也是整格，要改數量就再放一次） */
   const take = (cell: BagGridItem) => {
     if (!trade) return;
     if (cell.equipment) {
-      send(placedEquipmentIds.filter(id => id !== cell.equipment!.id), currentItems());
+      send(baseOffer().equipmentIds.filter(id => id !== cell.equipment!.id), currentItems());
       return;
     }
-    send(placedEquipmentIds, currentItems().filter(l => l.itemId !== cell.itemId));
+    send(baseOffer().equipmentIds, currentItems().filter(l => l.itemId !== cell.itemId));
   };
 
   return (
@@ -162,9 +177,9 @@ export function TradePanelContent() {
                       value={goldInput}
                       aria-label="金幣"
                       onChange={e => setGoldInput(clampGold(e.target.value))}
-                      onPointerUp={() => send(placedEquipmentIds, currentItems())}
-                      onKeyUp={() => send(placedEquipmentIds, currentItems())}
-                      onBlur={() => send(placedEquipmentIds, currentItems())}
+                      onPointerUp={sendGold}
+                      onKeyUp={sendGold}
+                      onBlur={sendGold}
                     />
                     {/* 拉桿對不準確切的數字（25,256 裡的 5,000），所以同一個值再給一個輸入格 */}
                     <input
@@ -176,11 +191,11 @@ export function TradePanelContent() {
                       value={goldInput}
                       aria-label="金幣數量"
                       onChange={e => setGoldInput(clampGold(e.target.value))}
-                      onBlur={() => send(placedEquipmentIds, currentItems())}
+                      onBlur={sendGold}
                       onKeyDown={e => {
                         if (e.key !== 'Enter') return;
                         e.preventDefault();
-                        send(placedEquipmentIds, currentItems());
+                        sendGold();
                       }}
                     />
                   </label>

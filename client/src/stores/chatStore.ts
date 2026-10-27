@@ -35,11 +35,14 @@ export interface ChatState {
   input: ChatChannel;
   /** 密語對象：角色 ID 或角色名稱 */
   whisperTarget: string;
-  /** 面板沒開時收到的訊息數（徽章） */
+  /** 面板沒開時收到的訊息數 */
   unread: number;
+  /** 其中別人密給自己的則數（徽章數字） */
+  whisperUnread: number;
   panelOpen: boolean;
 
-  receive: (message: ChatMessageView) => void;
+  /** `myId`：自己的角色 ID，用來分辨收到的密語與自己送出的回顯 */
+  receive: (message: ChatMessageView, myId?: number) => void;
   toggleVisible: (channel: ChatChannel) => void;
   setInput: (channel: ChatChannel) => void;
   setWhisperTarget: (target: string) => void;
@@ -54,21 +57,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
   input: 'world',
   whisperTarget: '',
   unread: 0,
+  whisperUnread: 0,
   panelOpen: false,
 
-  receive: message => {
-    const { messages, panelOpen, unread } = get();
+  receive: (message, myId) => {
+    const { messages, panelOpen, unread, whisperUnread } = get();
+    const incomingWhisper = message.channel === 'whisper' && message.from.characterId !== myId;
     set({
       messages: [...messages, message].slice(-CHAT_BUFFER),
       unread: panelOpen ? 0 : unread + 1,
+      whisperUnread: panelOpen ? 0 : whisperUnread + (incomingWhisper ? 1 : 0),
     });
   },
   toggleVisible: channel => set(s => ({ visible: { ...s.visible, [channel]: !s.visible[channel] } })),
   setInput: channel => set({ input: channel }),
   setWhisperTarget: target => set({ whisperTarget: target }),
-  setPanelOpen: open => set({ panelOpen: open, unread: open ? 0 : get().unread }),
+  setPanelOpen: open => set(open
+    ? { panelOpen: true, unread: 0, whisperUnread: 0 }
+    : { panelOpen: false }),
   send: async () => false,
-  reset: () => set({ messages: [], unread: 0, whisperTarget: '' }),
+  reset: () => set({ messages: [], unread: 0, whisperUnread: 0, whisperTarget: '' }),
 }));
 
 /** 依分類鈕過濾出要畫的訊息 */

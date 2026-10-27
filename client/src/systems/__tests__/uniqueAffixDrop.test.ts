@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../../testing/testDb';
-import { rollBossDrops } from '../drops';
+import { rollBossDrops, persistDroppedEquipment } from '../drops';
 
 /*
  * T7 掉落帶獨有詞綴（`07-affix-tier7.md` § 7T.1），且存檔與記憶體中的實例是同一份抽取結果 ——
@@ -23,8 +23,9 @@ describe('T7 掉落的獨有詞綴', () => {
 
     for (let i = 0; i < 20; i++) {
       const result = await rollBossDrops('U', 77, 60);
-      const dropped = result.items.find(it => it.name === 'U-甲')?.equipmentInstance;
-      if (!dropped) continue;
+      const drop = result.items.find(it => it.name === 'U-甲');
+      if (!drop) continue;
+      const [dropped] = await persistDroppedEquipment([drop]);
       expect(dropped.uniqueAffix).toBeDefined();
       const stored = (await db.equipmentInstances.toArray()).find(r => r.id === dropped.id)!;
       expect(stored.uniqueAffix).toEqual(dropped.uniqueAffix);

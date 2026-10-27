@@ -407,8 +407,7 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
           if (!dmg.isMiss) recordMonsterDamage(targetingOf(instance, dmg.targetId), memberId, dmg.damage, now);
           if (dmg.killed) {
             const inst = monsterInstances.get(dmg.targetId);
-            const monsterIdx = monsterStore.monsters.findIndex(m => m.id === dmg.targetId);
-            if (inst) handleMonsterDeath(inst, monsterIdx, dmg.targetId, session);
+            if (inst) handleMonsterDeath(inst, dmg.targetId, session);
             removeMonster(session, dmg.targetId);
           }
         }
@@ -595,8 +594,7 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
 
     if (inst.currentHp <= 0) {
       kills++;
-      const monsterIdx = session.mapMonster.getState().monsters.findIndex(m => m.id === monsterId);
-      handleMonsterDeath(inst, monsterIdx, monsterId, session);
+      handleMonsterDeath(inst, monsterId, session);
       removeMonster(session, monsterId);
       stopTrainingIfNoDummiesLeft(session);
     }
@@ -660,7 +658,7 @@ function pickDropReceiver(instance: MapInstance, participants: Session[], killer
  * 怪物死亡的隊伍結算（§ 97.7.1）：參與者＝死亡時在線且在同一實例、活著的成員，不看傷害貢獻。
  * 經驗只在參與者之間平分；掉落隨機給一人。試驗場木樁零產出（`50-training-ground.md` § 50.4）。
  */
-export function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number, monsterId: string | undefined, session: Session = defaultSession) {
+export function handleMonsterDeath(monster: MonsterInstance, monsterId: string, session: Session = defaultSession) {
   const instance = ensureInstance(session);
   const killer = session.game.getState().character;
   if (!killer) return;
@@ -672,7 +670,7 @@ export function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number,
   const killArea = { regionId: killer.currentRegion, floor: killer.currentFloor, areaId: killer.currentArea };
 
   for (const p of participants) {
-    settleMemberKill(p, monster, monsterIdx, monsterId, {
+    settleMemberKill(p, monster, monsterId, {
       expDivisor: participants.length,
       withDrops: p === receiver,
       instanceKills: kills,
@@ -684,8 +682,7 @@ export function handleMonsterDeath(monster: MonsterInstance, monsterIdx: number,
 function settleMemberKill(
   session: Session,
   monster: MonsterInstance,
-  monsterIdx: number,
-  monsterId: string | undefined,
+  monsterId: string,
   options: MonsterDeathOptions,
 ) {
   const get = session.game.getState;
@@ -703,13 +700,9 @@ function settleMemberKill(
     combatLogs: result.logs.slice(-MAX_LOGS),
   });
 
-  // Clear debuffs on this monster (use ID if available, fallback to index)
+  // 清除這隻怪身上的 debuff（以怪物 id 對應，`24-buff-debuff.md`）
   const effects = get().activeEffects;
-  const cleaned = effects.filter(e => {
-    if (e.target !== 'monster') return true;
-    if (monsterId && e.targetMonsterId) return e.targetMonsterId !== monsterId;
-    return e.targetIdx !== monsterIdx;
-  });
+  const cleaned = effects.filter(e => e.target !== 'monster' || e.targetMonsterId !== monsterId);
   if (cleaned.length !== effects.length) {
     set({ activeEffects: cleaned });
   }

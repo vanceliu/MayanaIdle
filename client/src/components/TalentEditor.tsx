@@ -20,6 +20,8 @@ import { useIsDragOver, useIsDragging, useDragStore, hitTestDropTarget } from '.
 import { slotSkipReason, type SlotSkipReason } from '../systems/talentRules';
 import { PersistentSettings } from './PersistentSettings';
 import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
+import { useLatestSent } from '../hooks/useLatestSent';
+import { DraftNumberInput } from './DraftNumberInput';
 import { getParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
 import { getItemById } from '../models/items';
 import type { Skill } from '../models/skill';
@@ -58,34 +60,30 @@ export function RuleIcon({ def, size = 18 }: { def: TalentRuleDef; size?: number
  * 欄位由 `models/talentParams.ts` 依 `ruleId` 宣告，**一律玩家自訂、隨時可改**。
  */
 function ParamInput({
-  field, slotId, slotIndex, entry, slotType,
+  field, params, onWrite, slotType,
 }: {
   field: ParamField;
-  slotId: number;
-  slotIndex: number | null;
-  entry: TalentSlotEntry;
+  params: Record<string, unknown>;
+  onWrite: (key: string, value: unknown) => unknown;
   slotType: TalentType | null;
 }) {
-  const setEntryParams = useTalentStore(s => s.setEntryParams);
   const skills = useGameStore(s => s.skills);
   const bagItems = useGameStore(s => s.bagItems);
-  const params = entry.params ?? {};
 
   function write(value: unknown) {
-    void setEntryParams(slotId, slotIndex, { ...params, [field.key]: value });
+    return onWrite(field.key, value);
   }
 
   if (field.kind === 'number') {
     return (
       <label className="talent-param">
         <span>{field.label}</span>
-        <input
-          type="number"
-          value={(params[field.key] as number | undefined) ?? field.def ?? ''}
+        <DraftNumberInput
+          value={(params[field.key] as number | undefined) ?? field.def ?? undefined}
           placeholder={field.placeholder}
           min={field.min}
           max={field.max}
-          onChange={e => write(e.target.value === '' ? undefined : Number(e.target.value))}
+          onCommit={write}
           onClick={e => e.stopPropagation()}
         />
         {field.suffix && <span className="talent-param-suffix">{field.suffix}</span>}
@@ -203,6 +201,11 @@ function Slot({
   const wrapRef = useRef<HTMLDivElement>(null);
   useDismissOnOutside(wrapRef, picking, () => setPicking(false));
   const setEntry = useTalentStore(s => s.setEntry);
+  const setEntryParams = useTalentStore(s => s.setEntryParams);
+  // 參數整份覆寫：連續修改以本機最後送出的參數為基準（`97-selfhosted-server.md` § 97.2）
+  const params = useLatestSent<Record<string, unknown>>(entry?.params ?? {}, `${slot.id}:${slotIndex}:${entry?.ruleId}`);
+  const writeParam = (key: string, value: unknown) =>
+    params.send({ ...params.latest(), [key]: value }, next => setEntryParams(slot.id!, slotIndex, next));
   // 放置目標以 DOM 屬性宣告自己（`stores/dragStore.ts`），不必在 store 註冊
   const dropProps = {
     'data-drop-kind': 'talent-slot',
@@ -227,9 +230,8 @@ function Slot({
           <ParamInput
             key={f.key}
             field={f}
-            slotId={slot.id!}
-            slotIndex={slotIndex}
-            entry={entry}
+            params={params.latest()}
+            onWrite={writeParam}
             slotType={slot.assignedType}
           />
         ))}

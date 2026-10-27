@@ -15,6 +15,7 @@ import type { TalentState } from './talentStore';
 import type { MailboxState } from './mailboxStore';
 import type { PartyState } from './partyStore';
 import type { TradeState } from './tradeStore';
+import type { GuildState } from './guildStore';
 import { OccupationManager } from '../systems/occupationManager';
 import type { ArpgEngineState } from '../systems/arpgEngine';
 import type { MonsterInstance, MonsterTemplate } from '../models/monster';
@@ -105,6 +106,7 @@ export interface Session {
   mailbox: StoreApi<MailboxState>;
   party: StoreApi<PartyState>;
   trade: StoreApi<TradeState>;
+  guild: StoreApi<GuildState>;
   loop: LoopState;
   /** 持久層：正式路徑在 server（SQLite），測試由 `testing/testDb.ts` 登記記憶體實作 */
   repo: GameRepository;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { usePartyStore } from '../stores/partyStore';
+import { useGuildStore } from '../stores/guildStore';
 import { useChatStore, visibleMessages, CHAT_CHANNELS, CHAT_CHANNEL_LABELS } from '../stores/chatStore';
 import { useAutoScrollLog } from '../hooks/useAutoScrollLog';
 import { getRegion } from '../models/mapData';
@@ -38,6 +39,7 @@ export function ChatPanelContent() {
   const setWhisperTarget = useChatStore(s => s.setWhisperTarget);
   const send = useChatStore(s => s.send);
   const party = usePartyStore(s => s.party);
+  const guild = useGuildStore(s => s.guild);
   const myId = useGameStore(s => s.character?.id);
   const regionId = useGameStore(s => s.character?.currentRegion);
   const inTown = !!regionId && getRegion(regionId)?.type === 'town';
@@ -49,8 +51,7 @@ export function ChatPanelContent() {
   const canSend = (channel: ChatChannel): boolean => {
     if (channel === 'party') return !!party;
     if (channel === 'town') return inTown;
-    // 公會頻道要有公會才成立（`11-guild.md` § 11.1）；本版沒有公會資料
-    if (channel === 'guild') return false;
+    if (channel === 'guild') return !!guild;
     if (channel === 'whisper') return whisperTarget.trim().length > 0;
     return true;
   };

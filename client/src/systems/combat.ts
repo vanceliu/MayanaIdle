@@ -198,6 +198,13 @@ export function getMonsterDebuffModifierById(
   return percentMod;
 }
 
+/** 怪物身上的 debuff 修正：有 `targetId` 一律以 id 查（`24-buff-debuff.md`），未給時退回位置索引 */
+function monsterDebuff(activeEffects: ActiveEffect[], targetIdx: number, targetId: string | undefined, stat: string): number {
+  return targetId !== undefined
+    ? getMonsterDebuffModifierById(activeEffects, targetId, stat)
+    : getMonsterDebuffModifier(activeEffects, targetIdx, stat);
+}
+
 /** 無視防禦：直接扣減目標的減傷率 */
 function applyIgnoreDefense(reduction: number, ignorePercent: number): number {
   if (ignorePercent <= 0) return reduction;
@@ -666,7 +673,9 @@ export function calculatePlayerAttack(
   monster: MonsterInstance,
   equippedGear: (EquipmentInstance | null)[] = [],
   activeEffects: ActiveEffect[] = [],
-  targetIdx: number = 0
+  targetIdx: number = 0,
+  /** 目標怪物 id；有給時以 id 查怪物 debuff */
+  targetId?: string,
 ): { damage: number; hit: boolean; isCritical: boolean; hits: HitBreakdown[]; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
@@ -693,7 +702,7 @@ export function calculatePlayerAttack(
   const attackElement = brandElement ?? (hasFireEnchantActive ? 'fire' : undefined);
   const hasElement = !!brandElement || hasFireEnchantActive;
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const defDebuffPercent = monsterDebuff(activeEffects, targetIdx, targetId, 'defense');
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = Math.min(effectiveMonsterDef, 75);
 
@@ -769,6 +778,7 @@ export function calculatePhysicalSkillHit(
   activeEffects: ActiveEffect[] = [],
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
+  targetId?: string,
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
@@ -820,7 +830,7 @@ export function calculatePhysicalSkillHit(
   }
 
   // Monster defense reduction (last, with debuff)
-  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const defDebuffPercent = monsterDebuff(activeEffects, targetIdx, targetId, 'defense');
   const effectiveMonsterDef2 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef2, 75), ignoreDefensePercent);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
@@ -877,6 +887,7 @@ export function calculatePhysicalSnapshotSkill(
   activeEffects: ActiveEffect[] = [],
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
+  targetId?: string,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
@@ -889,7 +900,7 @@ export function calculatePhysicalSnapshotSkill(
     damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
   }
 
-  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const defDebuffPercent = monsterDebuff(activeEffects, targetIdx, targetId, 'defense');
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef, 75), ignoreDefensePercent);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
@@ -911,6 +922,7 @@ export function calculateSkillAttack(
   activeEffects: ActiveEffect[] = [],
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
+  targetId?: string,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
@@ -931,7 +943,7 @@ export function calculateSkillAttack(
   }
 
   // Monster defense reduction (last, with debuff)
-  const defDebuffPercent = getMonsterDebuffModifier(activeEffects, targetIdx, 'defense');
+  const defDebuffPercent = monsterDebuff(activeEffects, targetIdx, targetId, 'defense');
   const effectiveMonsterDef3 = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
   const monsterReduction = applyIgnoreDefense(Math.min(effectiveMonsterDef3, 75), ignoreDefensePercent);
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
@@ -1056,7 +1068,7 @@ export function calculateMonsterAttack(
   monsterIdx: number = 0,
   /** 詠唱攻擊的傷害倍率，套在基礎傷害上（`25-monster-system.md` § 25.11） */
   damageMultiplier: number = 1,
-  /** 有給時以 id 查命中下降（跨 tick 穩定）；未給時退回 `monsterIdx` */
+  /** 有給時以 id 查命中下降與攻擊下降（跨 tick 穩定）；未給時退回 `monsterIdx` */
   monsterId?: string,
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
@@ -1074,9 +1086,7 @@ export function calculateMonsterAttack(
 
   // § 21.6 迴避；命中下降（§ 7.9）以負值存在怪物身上，加在 35% 上限之後
   const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
-  const hitDown = monsterId !== undefined
-    ? getMonsterDebuffModifierById(activeEffects, monsterId, HIT_DOWN_STAT)
-    : getMonsterDebuffModifier(activeEffects, monsterIdx, HIT_DOWN_STAT);
+  const hitDown = monsterDebuff(activeEffects, monsterIdx, monsterId, HIT_DOWN_STAT);
   const dodgeRate = getPlayerDodgeRate(char, equippedGear, activeEffects) - hitDown;
 
   const dodged = random() * 100 < dodgeRate;
@@ -1094,7 +1104,7 @@ export function calculateMonsterAttack(
   if (damageMultiplier !== 1) {
     rawDamage = Math.max(1, Math.floor(rawDamage * damageMultiplier));
   }
-  const atkDebuffPercent = getMonsterDebuffModifier(activeEffects, monsterIdx, 'attack');
+  const atkDebuffPercent = monsterDebuff(activeEffects, monsterIdx, monsterId, 'attack');
   if (atkDebuffPercent !== 0) {
     rawDamage = Math.max(1, Math.floor(rawDamage * (100 + atkDebuffPercent) / 100));
   }

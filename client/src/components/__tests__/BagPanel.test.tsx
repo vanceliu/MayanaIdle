@@ -381,6 +381,37 @@ it('shows gold row when expanded', () => {
       expect(useGameStore.getState().bagSlotMap).toEqual({ 'equip-7': 0, 'potion-red': 1 });
     });
 
+    it('位置寫入回覆前：畫面與下一次移動以最後送出的位置為準（`97-selfhosted-server.md` § 97.2）', async () => {
+      const sent: unknown[] = [];
+      const original = useGameStore.getState().setBagSlotMap;
+      useGameStore.setState({
+        bagItems: [bagItem('紅色藥水', 3)],
+        inventory: [],
+        equippedGear: { rightHand: sword(7, '鐵劍', true) },
+        setBagSlotMap: ((m: unknown) => { sent.push(m); return new Promise(() => {}); }) as never,
+      });
+      vi.useFakeTimers();
+      try {
+        render(<BagPanel />);
+        fireEvent.click(screen.getByText('整理'));
+
+        const names = Array.from(document.querySelectorAll('.bag-cell:not(.empty) .bag-cell-name'))
+          .map(el => el.textContent);
+        expect(names).toEqual(['鐵劍', '紅色藥水']);
+
+        const cells = () => document.querySelectorAll('.bag-cell');
+        fireEvent.pointerDown(cells()[0], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+        await act(async () => { await vi.advanceTimersByTimeAsync(LONG_PRESS_MS + 20); });
+        fireEvent.click(screen.getByText('移動到其他格'));
+        fireEvent.pointerDown(cells()[6], { button: 0, clientX: 5, clientY: 5, pointerType: 'touch' });
+
+        expect(sent.at(-1)).toEqual({ 'equip-7': 6, 'potion-red': 1 });
+      } finally {
+        vi.useRealTimers();
+        useGameStore.setState({ setBagSlotMap: original });
+      }
+    });
+
     it('是單向動作 —— 再按一次不會還原', () => {
       useGameStore.setState({
         bagItems: [bagItem('紅色藥水', 3)],

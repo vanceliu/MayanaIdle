@@ -18,8 +18,8 @@ describe('session token 雜湊', () => {
 
   const storedTokens = () => (db.prepare('SELECT token FROM sessions').all() as { token: string }[]).map(r => r.token);
 
-  it('資料庫只存雜湊；明文 token 可登入，資料庫裡的值不能拿來登入', () => {
-    const token = auth.issueSession(userId);
+  it('資料庫只存雜湊；明文 token 可登入，資料庫裡的值不能拿來登入', async () => {
+    const token = await auth.issueSession(userId);
 
     expect(storedTokens()).toEqual([hashSessionToken(token)]);
     expect(storedTokens()).not.toContain(token);
@@ -27,22 +27,22 @@ describe('session token 雜湊', () => {
     expect(auth.resolveSession(storedTokens()[0])).toBeNull();
   });
 
-  it('撤銷與「保留目前這條」都以明文 token 操作', () => {
-    const keep = auth.issueSession(userId);
-    const other = auth.issueSession(userId);
+  it('撤銷與「保留目前這條」都以明文 token 操作', async () => {
+    const keep = await auth.issueSession(userId);
+    const other = await auth.issueSession(userId);
 
-    auth.revokeOtherSessions(userId, keep);
+    await auth.revokeOtherSessions(userId, keep);
     expect(auth.resolveSession(keep)?.id).toBe(userId);
     expect(auth.resolveSession(other)).toBeNull();
 
-    auth.revokeSession(keep);
+    await auth.revokeSession(keep);
     expect(auth.resolveSession(keep)).toBeNull();
   });
 
-  it('簽發時清掉過期列', () => {
+  it('簽發時清掉過期列', async () => {
     db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run('stale', userId, 0, 1);
 
-    auth.issueSession(userId);
+    await auth.issueSession(userId);
 
     expect(storedTokens()).not.toContain('stale');
   });

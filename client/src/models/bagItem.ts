@@ -3,7 +3,7 @@ import { getItemById, type ItemCategory } from './items';
 export type BagItemType = 'material' | 'potion' | 'scroll' | 'spellbook';
 
 /**
- * 背包／個人倉庫／共用倉庫的一格。
+ * 背包／個人倉庫／帳號倉庫的一格。
  *
  * **`itemId` 是唯一的鍵**（`99-ai-constraints.md` § 99.1）：所有比對、合併、扣除一律用它。
  * `name` 與 `type` 是**由 id 反查 seed 產生的顯示快取**，不是獨立資料：

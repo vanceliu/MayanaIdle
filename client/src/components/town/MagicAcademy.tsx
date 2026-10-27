@@ -4,9 +4,9 @@ import { useGameStore } from '../../stores/gameStore';
 import { SKILL_CATALOG } from '../../models/skill';
 import { canLearnBasicMagic, getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
 import { CLASS_NAMES_ZH } from '../../models/character';
-import { isClassMagic } from '../../models/classSkills';
+import { isClassMagic, CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
-import { getBagItemAmount } from '../../models/bagItem';
+import { getBagItemAmount, hasBagItem } from '../../models/bagItem';
 import {
   LEARN_PRICES, SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, getRequiredBookId,
 } from '../../models/magicAcademy';
@@ -15,7 +15,7 @@ function itemName(itemId: number): string {
   return getItemById(itemId)?.name ?? '未知道具';
 }
 
-type AcademyTab = 'learn' | 'craft';
+type AcademyTab = 'learn' | 'craft' | 'class';
 
 export function MagicAcademy() {
   const char = useGameStore(s => s.character);
@@ -24,6 +24,7 @@ export function MagicAcademy() {
   // 判定、扣款、消耗都在 store（線上模式轉成 RPC 交給 server）
   const learnBasicMagic = useGameStore(s => s.learnBasicMagic);
   const craftSpellbook = useGameStore(s => s.craftSpellbook);
+  const learnClassSkill = useGameStore(s => s.learnClassSkill);
   const [tab, setTab] = useState<AcademyTab>('learn');
 
   if (!char) return null;
@@ -48,6 +49,9 @@ export function MagicAcademy() {
     return canLearnBasicMagic(char.className, char.level, level, currentSkillCount);
   });
 
+  const myClassSkills = CLASS_SKILLS.filter(s => s.className === char.className);
+  const learnedClassSkills = skills.filter(s => myClassSkills.some(c => c.id === s.id));
+
   return (
     <div className="academy-panel">
       <p className="shop-greeting">「歡迎來到魔法學院。想學習什麼魔法呢？」</p>
@@ -70,6 +74,7 @@ export function MagicAcademy() {
       <div className="storage-tabs">
         <button className={tab === 'learn' ? 'active' : ''} onClick={() => setTab('learn')}>學習魔法</button>
         <button className={tab === 'craft' ? 'active' : ''} onClick={() => setTab('craft')}>製作魔法書</button>
+        <button className={tab === 'class' ? 'active' : ''} onClick={() => setTab('class')}>職業技能</button>
       </div>
 
       {/* 只有分頁內容會捲動，金幣與分頁固定在上方 */}
@@ -149,14 +154,69 @@ export function MagicAcademy() {
         </div>
       )}
 
-      <h4>已學習魔法</h4>
-      {learnedBasicSkills.length === 0 && <p className="empty-text">尚未學習任何魔法</p>}
-      {learnedBasicSkills.map(skill => (
-        <div key={skill.id} className="learned-skill">
-          <span>{skill.name}</span>
-          <span className="skill-meta">MP:{skill.mpCost} / {skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}{formatBuffDuration(skill) && ` / 持續:${formatBuffDuration(skill)}`}</span>
+      {tab === 'class' && (
+        <div className="academy-class-content">
+          <h4>職業技能（{CLASS_NAMES_ZH[char.className]}）</h4>
+          <div className="guild-skill-list">
+            {myClassSkills.map(def => {
+              const learned = skills.some(s => s.id === def.id);
+              const hasBook = hasBagItem(bagItems, def.bookItemId);
+              const levelOk = char.level >= def.requiredLevel;
+              const canLearn = !learned && hasBook && levelOk;
+
+              return (
+                <div key={def.id} className={`shop-item ${learned ? 'learned' : ''}`}>
+                  <div className="shop-item-info">
+                    <span className="shop-item-name">{def.name}</span>
+                    <span className="shop-item-desc">
+                      Lv.{def.requiredLevel} | {def.skill.type} | MP {def.skill.mpCost}
+                      {formatSkillRange(def.skill) && ` | 射程 ${formatSkillRange(def.skill)}`}
+                      {formatBuffDuration(def.skill) && ` | 持續 ${formatBuffDuration(def.skill)}`}
+                    </span>
+                  </div>
+                  <div className="shop-item-actions">
+                    {learned ? (
+                      <span className="guild-learned-tag">已學習</span>
+                    ) : (
+                      <button
+                        onClick={() => learnClassSkill(def.id)}
+                        disabled={!canLearn}
+                        title={!levelOk ? `需要等級 ${def.requiredLevel}` : !hasBook ? `需要 ${itemName(def.bookItemId)}` : ''}
+                      >
+                        學習
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      ))}
+      )}
+
+      {tab === 'class' ? (
+        <>
+          <h4>已學習職業技能</h4>
+          {learnedClassSkills.length === 0 && <p className="empty-text">尚未學習任何職業技能</p>}
+          {learnedClassSkills.map(skill => (
+            <div key={skill.id} className="learned-skill">
+              <span>{skill.name}</span>
+              <span className="skill-meta">MP:{skill.mpCost} / {skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}{formatBuffDuration(skill) && ` / 持續:${formatBuffDuration(skill)}`}</span>
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          <h4>已學習魔法</h4>
+          {learnedBasicSkills.length === 0 && <p className="empty-text">尚未學習任何魔法</p>}
+          {learnedBasicSkills.map(skill => (
+            <div key={skill.id} className="learned-skill">
+              <span>{skill.name}</span>
+              <span className="skill-meta">MP:{skill.mpCost} / {skill.type}{formatSkillRange(skill) && ` / 射程:${formatSkillRange(skill)}`}{formatBuffDuration(skill) && ` / 持續:${formatBuffDuration(skill)}`}</span>
+            </div>
+          ))}
+        </>
+      )}
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 /**
  * 帳號與 session（`97-selfhosted-server.md` § 97.5）：username + password，argon2id；server 簽發 session token。
  */
+import { log } from './log';
+import { writeGateOf, type WriteGate } from './db/writeGate';
 import { createHash, randomBytes } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { argon2id, argon2Verify } from 'hash-wasm';
@@ -82,9 +84,12 @@ function toRecord(row: UserRow): UserRecord {
 
 export class AuthService {
   private readonly db: DatabaseSync;
+  /** 寫入一律走關卡：交易開著時不得併入別人的交易（`db/writeGate.ts`） */
+  private readonly gate: WriteGate;
 
   constructor(db: DatabaseSync) {
     this.db = db;
+    this.gate = writeGateOf(db);
   }
 
   findByUsername(username: string): UserRecord | null {
@@ -109,10 +114,10 @@ export class AuthService {
    * 單機世界的 host 帳號：首次啟動自動建立，**不設密碼**。
    * 只有本機連得進來，而且單機世界永遠不會變成開放（§ 97.1），沒有密碼可保護的對象。
    */
-  ensureHost(username: string): UserRecord {
+  async ensureHost(username: string): Promise<UserRecord> {
     const existing = this.findByUsername(username);
     if (existing) return existing;
-    this.db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, NULL, ?)').run(username, Date.now());
+    await this.gate.write(() => this.db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, NULL, ?)').run(username, Date.now()));
     return this.findByUsername(username)!;
   }
 
@@ -121,7 +126,7 @@ export class AuthService {
     assertPasswordStrength(password);
     if (this.findByUsername(username)) throw new AuthError('username_taken', '帳號已存在');
     const hash = await hashPassword(password);
-    this.db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)').run(username, hash, Date.now());
+    await this.gate.write(() => this.db.prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)').run(username, hash, Date.now()));
     return this.findByUsername(username)!;
   }
 
@@ -137,14 +142,14 @@ export class AuthService {
   async setPassword(userId: number, password: string): Promise<void> {
     assertPasswordStrength(password);
     const hash = await hashPassword(password);
-    this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+    await this.gate.write(() => this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId));
   }
 
   /** 產生新救援碼並取代舊的（§ 97.5）。回傳只顯示這一次的明碼 */
   async issueRecoveryCode(userId: number): Promise<string> {
     const { code, secret } = generateRecoveryCode(userId);
     const hash = await hashPassword(secret);
-    this.db.prepare('UPDATE users SET recovery_hash = ? WHERE id = ?').run(hash, userId);
+    await this.gate.write(() => this.db.prepare('UPDATE users SET recovery_hash = ? WHERE id = ?').run(hash, userId));
     return code;
   }
 
@@ -184,17 +189,17 @@ export class AuthService {
     if (!(await verifyPassword(parsed.secret, row.recovery_hash))) throw new AuthError('invalid_recovery_code', '救援碼錯誤');
     this.assertNotBanned(toRecord(row));
     await this.setPassword(row.id, newPassword);
-    this.revokeAllSessions(row.id);
+    await this.revokeAllSessions(row.id);
     const recoveryCode = await this.issueRecoveryCode(row.id);
     return { user: this.findById(row.id)!, recoveryCode };
   }
 
-  ban(userId: number, until: number | null): void {
-    this.db.prepare('UPDATE users SET banned_until = ? WHERE id = ?').run(until ?? Number.MAX_SAFE_INTEGER, userId);
+  async ban(userId: number, until: number | null): Promise<void> {
+    await this.gate.write(() => this.db.prepare('UPDATE users SET banned_until = ? WHERE id = ?').run(until ?? Number.MAX_SAFE_INTEGER, userId));
   }
 
-  unban(userId: number): void {
-    this.db.prepare('UPDATE users SET banned_until = NULL WHERE id = ?').run(userId);
+  async unban(userId: number): Promise<void> {
+    await this.gate.write(() => this.db.prepare('UPDATE users SET banned_until = NULL WHERE id = ?').run(userId));
   }
 
   assertNotBanned(user: UserRecord): void {
@@ -202,11 +207,13 @@ export class AuthService {
   }
 
   /** 簽發 session；資料庫只存 token 的 SHA-256（§ 97.5），順手清掉過期列 */
-  issueSession(userId: number): string {
+  async issueSession(userId: number): Promise<string> {
     const token = randomBytes(32).toString('hex');
     const now = Date.now();
-    this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
-    this.db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(hashSessionToken(token), userId, now, now + SESSION_TTL_MS);
+    await this.gate.atomic(() => {
+      this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
+      this.db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(hashSessionToken(token), userId, now, now + SESSION_TTL_MS);
+    });
     return token;
   }
 
@@ -215,22 +222,22 @@ export class AuthService {
     const row = this.db.prepare('SELECT user_id, expires_at FROM sessions WHERE token = ?').get(hashSessionToken(token)) as { user_id: number; expires_at: number } | undefined;
     if (!row) return null;
     if (row.expires_at < Date.now()) {
-      this.revokeSession(token);
+      this.revokeSession(token).catch(e => log.error('revoke expired session failed', e));
       return null;
     }
     return this.findById(row.user_id);
   }
 
-  revokeSession(token: string): void {
-    this.db.prepare('DELETE FROM sessions WHERE token = ?').run(hashSessionToken(token));
+  async revokeSession(token: string): Promise<void> {
+    await this.gate.write(() => this.db.prepare('DELETE FROM sessions WHERE token = ?').run(hashSessionToken(token)));
   }
 
-  revokeAllSessions(userId: number): void {
-    this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  async revokeAllSessions(userId: number): Promise<void> {
+    await this.gate.write(() => this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId));
   }
 
-  revokeOtherSessions(userId: number, keepToken: string): void {
-    this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, hashSessionToken(keepToken));
+  async revokeOtherSessions(userId: number, keepToken: string): Promise<void> {
+    await this.gate.write(() => this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, hashSessionToken(keepToken)));
   }
 }
 

@@ -159,7 +159,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 143, name: '百柱塔 91F 通行卷軸', category: 'dungeon', description: '進入百柱塔 91F 所需', weight: 1, icon: 'items/tied-scroll', iconColor: '#A78BFA' },
 
   // === 任務素材 ===
-  { id: 96, name: '任務素材', category: 'material', noSell: true, description: '職業工會素材收集任務用', weight: 1, iconType: 'misc', iconTier: 2 },
+  { id: 96, name: '任務素材', category: 'material', noSell: true, description: '職業任務素材收集用', weight: 1, iconType: 'misc', iconTier: 2 },
 
   // === 魔法書 ===
   { id: 97, name: '基礎魔法書', category: 'spellbook', description: '學習 4~5 級魔法', weight: 10, icon: 'items/spell-book', iconColor: '#C4B5FD' },

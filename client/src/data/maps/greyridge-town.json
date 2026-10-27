@@ -708,9 +708,9 @@
       "y": 10
     },
     {
-      "facility": "class-guild",
-      "name": "職業工會",
-      "icon": "⚜️",
+      "facility": "guild",
+      "name": "公會",
+      "icon": "🏰",
       "x": 5,
       "y": 16
     },

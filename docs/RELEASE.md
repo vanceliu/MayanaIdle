@@ -13,7 +13,7 @@
 | 版本 | 位置 | 管什麼 | 改了會怎樣 |
 |---|---|---|---|
 | **發布版本** | `client/package.json` 的 `version` | 產物檔名、畫面左下角的版本標示，以及**版本協商的第二道**；前端、server 執行檔、桌面版**共用這一個** | 舊 client 連不上新 server，反之亦然 —— 這是刻意的 |
-| **協定版本** | `client/src/net/protocol.ts` 的 `PROTOCOL_VERSION`（目前 `'2'`） | 版本協商的第一道：訊息格式不相容就擋 | 所有舊 client 立刻連不上，不分發布版本 |
+| **協定版本** | `client/src/net/protocol.ts` 的 `PROTOCOL_VERSION`（目前 `'3'`） | 版本協商的第一道：訊息格式不相容就擋 | 所有舊 client 立刻連不上，不分發布版本 |
 | **DB schema 版本** | `server/src/db/sqlite.ts` 的 `MIGRATIONS` | SQLite 結構遷移，啟動時自動跑 | 執行對應的 `up()`，一次 |
 
 握手時**兩個版本都要完全相同**（§ 97.2），協定先判。client 送 `PROTOCOL_VERSION` 與

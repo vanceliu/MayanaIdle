@@ -11,11 +11,11 @@ export function QuestsPage() {
         </h3>
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
-            冒險者工會提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
+            冒險者工會面板分「冒險任務」與「職業任務」兩頁。「冒險任務」提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
             四個城鎮皆設有冒險者工會分部，各分部僅顯示與該城鎮相關區域的任務。<br />
             BOSS 任務獨立於 B+ / A+ / S+ 分頁，不與一般任務混在同一頁；
             該城鎮沒有對應難度的 BOSS 時該分頁不顯示。<br />
-            每個難度等級顯示 5~8 個隨機任務，最多同時接取 3 個。<br />
+            每個難度等級顯示 7~9 個隨機任務，最多同時接取 4 個。<br />
             任務列表每次登入時重新生成，已接取任務可隨時免費退出（扣除等量貢獻點數）。<br />
             也可花 50 貢獻按「重整」手動刷新目前分頁，貢獻不足 50 時無法使用。
           </p>
@@ -299,11 +299,11 @@ export function QuestsPage() {
 
       <section style={{ marginBottom: 32 }}>
         <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
-          職業工會任務
+          職業任務
         </h3>
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
-            職業工會提供職業技能書相關任務。與冒險者工會獨立計算，不共用接取上限。
+            冒險者工會的「職業任務」分頁提供職業技能書相關任務。與冒險任務獨立計算，不共用接取上限。取得的技能書到魔法學院「職業技能」分頁學習。
           </p>
         </div>
         <div className="wiki-table-wrap">

@@ -21,6 +21,7 @@
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
 | **強化入口（背包點卷軸／指定目標／機率視窗）** | `35-inventory-constraints.md` | § 35.5.5 |
+| **背包多選（Shift＋點擊／觸控「多選」）／多重移動／多項丟棄** | `35-inventory-constraints.md` § 35.1.5、§ 35.5.3 | — |
 | 裝備部位/左右手規則 | `06-equipment.md` | § 6.2~6.5 |
 | **上衣／斗篷（T4 起開放／件數／防禦階梯）** | `06-equipment.md` | § 6A.8.9 |
 | **防具路線（布／輕／重）／素質需求／件數** | `06-equipment.md` | § 6A.8.8 |
@@ -79,6 +80,7 @@
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
 | 職業魔法（5 職業各 5 級） | `23-class-magic.md` | 全文 |
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
+| 怪物身上效果的對應（以怪物 id，不以清單位置） | `24-buff-debuff.md` | § 24.3 |
 | 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩） | `24-buff-debuff.md` | § 24.4、§ 24.10 |
 | Debuff 解除手段（道具/免疫詞綴） | `24-buff-debuff.md` | § 24.10 |
 | **debuff tag 一覽（免疫詞綴／解除道具／控場免疫的查表 key）** | `24-buff-debuff.md` | § 24.4.1 |
@@ -119,10 +121,14 @@
 | **龍谷地間與遠古地監的產出分工（重疊等級帶）** | `09-dungeon.md` | § 9.10 |
 | HP/MP 自然回復 | `29-regen.md` | 全文 |
 | 陣營系統（暫不實作，見 `15-excluded.md` § 15.7） | `10-faction.md` | 全文 |
-| 公會系統 | `11-guild.md` | 全文 |
+| 公會系統（建立／名稱／人數上限／邀請／解散／顯示） | `11-guild.md` | 全文 |
+| **公會人數上限／一個角色只屬一個公會／盟主轉讓** | `11-guild.md` | § 11.5 |
+| **公會倉庫（200 格／全員存取／按需同步／解散消失）** | `11-guild.md` | § 11.8 |
 | 寵物系統 | `12-pet.md` | 全文 |
 | 成就/排行榜 | `14-endgame.md` | 全文（排行榜規格在 `37-statistics.md` § 37.4） |
-| 每日任務系統（冒險者工會） | `36-quest-system.md` | 全文 |
+| 每日任務系統（冒險者工會「冒險任務」分頁） | `36-quest-system.md` | 全文 |
+| **職業任務（冒險者工會「職業任務」分頁）／職業技能學習（魔法學院）** | `13-town.md` | § 13.9、§ 13.10 |
+| **公會 NPC 門面（開放世界才放 NPC）** | `13-town.md` | § 13.2.1 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
@@ -142,12 +148,13 @@
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
 | **自架私服（單機＝本機 server／開放＝對外 bind）** | `97-selfhosted-server.md` | 全文（定案） |
-| **`server.properties`（設定鍵／生效時機／headless）／連線心跳（ping／閒置斷線／latency 訊息）／狀態同步（`frame` 訊息／欄位編碼）／遠端 action 允許清單／action 擁有權／價格與內容由 server 決定／參數驗證／天賦與撤退設定驗證／HTTP 安全標頭／機密檔案權限／tick 錯誤隔離／同連線訊息依序處理／錯誤訊息不終止 server（`bad_json`／`bad_message`／HTTP 400／未處理 rejection）** | `97-selfhosted-server.md` | § 97.2 |
+| **`server.properties`（設定鍵／生效時機／headless）／連線心跳（ping／閒置斷線／latency 訊息）／狀態同步（`frame` 訊息／欄位編碼）／遠端 action 允許清單／client 端呼叫遠端 action（未連線／失敗提示／本機草稿）／試驗場本機沙盒／action 後套用搜尋模式／action 擁有權／價格與內容由 server 決定／參數驗證／天賦與撤退設定驗證／HTTP 安全標頭／機密檔案權限／tick 錯誤隔離／同連線訊息依序處理／錯誤訊息不終止 server（`bad_json`／`bad_message`／HTTP 400／未處理 rejection）** | `97-selfhosted-server.md` | § 97.2 |
 | **帳號／host 帳號／session／同帳號重複進場／斷線重連回原角色／救援碼／登入嘗試限制／註冊限制** | `97-selfhosted-server.md` | § 97.5 |
 | **決定性要求（seeded PRNG／tick 時間／純函數）** | `97-selfhosted-server.md` | § 97.6 |
-| **地圖實例／隊伍怪物上限／怪物目標／掉落經驗分配** | `97-selfhosted-server.md` | § 97.7.1 |
+| **地圖實例／換區載圖中／隊伍怪物上限／怪物目標／掉落經驗分配** | `97-selfhosted-server.md` | § 97.7.1 |
 | **聊天頻道** | `97-selfhosted-server.md` | § 97.7.2 |
 | **組隊（邀請／隊長／離線／跨地圖）** | `97-selfhosted-server.md` | § 97.7.3 |
+| **社群視窗（隊伍／公會／在線分頁、邀請徽章）** | `97-selfhosted-server.md` | § 97.7.5 |
 | **管理介面** | `97-selfhosted-server.md` | § 97.8 |
 | server 端資料表 | `18-data-schema.md` | § 18.12 |
 | 雲端全域架構（保留備查，不採用） | `98-online-architecture.md` | § 2 tick 對齊、§ 10 頻寬、§ 13 模板 |
@@ -157,8 +164,9 @@
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
 | 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
 | **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`） |
-| **數量徽章（配色／字級／自動天賦只顯示有無）** | `34-ui-guidelines.md` | § 34.10 |
+| **數量徽章（配色／字級／自動天賦只顯示有無／聊天分頁密語徽章）** | `34-ui-guidelines.md` | § 34.10 |
 | **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（由 `PanelDock.test.tsx` 把守） |
+| **文字選取白名單（預設不可選；紀錄／聊天／輸入格／Wiki／救援碼例外）** | `34-ui-guidelines.md` | § 34.14 |
 | 行動裝置適配（斷點/觸控互動/指標拖放/手機版面/PWA） | `47-mobile.md` | 全文（模組邊界見 `16-tech-frontend-architecture.md` § 32.17） |
 | 右下角 ⚙／連線延遲顯示（ping 值／分級顏色） | `47-mobile.md` | § 47.6 |
 | **特效（強化演出／印記師／戰鬥特效／CSS 與 Pixi 分工）** | `48-vfx.md` | 全文 |
@@ -259,7 +267,7 @@
        ↕      ←→ 97-selfhosted-server.md § 97.5
 18-data-schema.md
        ↕      ←→ 13-town.md
-       ↕      ←→ 35-inventory-constraints.md § 共用倉庫／§ 35.17
+       ↕      ←→ 35-inventory-constraints.md § 帳號倉庫／§ 35.17
        ↕      ←→ 16-tech-frontend-architecture.md
        ↕      ←→ 97-selfhosted-server.md § 97.4（§ 18.12）
 37-statistics.md § 37.4 ←→ 97-selfhosted-server.md § 97.4
@@ -278,11 +286,21 @@
   ←→ 35-inventory-constraints.md § 35.17
   ←→ 47-mobile.md § 47.6 / § 47.9
   ←→ 52-mailbox.md § 52.2.3 / § 52.2.4
+  ←→ 50-training-ground.md § 50.4（§ 97.2 試驗場本機沙盒）
   ←→ 15-excluded.md § 15.8 / 17-mvp-priority.md § 17.5
   ←  19-account-character.md § 19.9 全域倍率（§ 97.2 `server.properties`）
   ←  98-online-architecture.md § 2 / § 10 / § 13
-  ←  11-guild.md § 11.1（§ 97.7.2）
+  ←→ 11-guild.md（§ 97.1 單機不畫／§ 97.7.1 在線名單／§ 97.7.2 公會頻道／§ 97.7.5 社群視窗／§ 97.10 徽章）
   ✕  10-faction.md —— 陣營不做（15-excluded.md § 15.7）
+
+【公會】
+11-guild.md
+  ←→ 13-town.md § 13.2.1 / § 13.3（公會 NPC）
+  ←→ 18-data-schema.md § 18.12（`guilds`／`guild_members`）
+  ←→ 19-account-character.md § 19.4（名稱字元與比對鍵）
+  ←  20-attributes.md（魅力）
+  ←→ 34-ui-guidelines.md § 34.10（PanelDock）
+  ←→ 13-town.md § 13.8 / 35-inventory-constraints.md § 35.12（公會倉庫，§ 11.8）
 
 【背包／負重】
 35-inventory-constraints.md ←→ 20-attributes.md
@@ -307,10 +325,11 @@
        ↕
 47-mobile.md
   ←→ 34-ui-guidelines.md § 34.6 / § 34.9
-  ←→ 35-inventory-constraints.md § 35.1.3 / § 35.5.3
+  ←→ 35-inventory-constraints.md § 35.1.3 / § 35.1.5 / § 35.5.3
   ←→ 24-buff-debuff.md § 24.8.3
        ↕
 34-ui-guidelines.md § 34.10 ←→ § 34.1 / § 34.6 / § 34.8
+34-ui-guidelines.md § 34.14 ←→ 43-wiki-system.md / 97-selfhosted-server.md § 97.5（選取白名單）
 
 【任務／販售／村莊】
 36-quest-system.md ←→ 13-town.md ←→ 30-items.md
@@ -369,6 +388,7 @@
   ←→ 06-equipment.md § 6.11 ←→ 42-element-system.md
   ←→ 29-regen.md § 29.2
   ←→ 44-dps-prediction.md
+  ←→ 97-selfhosted-server.md § 97.2（線上模式本機沙盒）
   ✕  27-drop-table.md / 28-monster-stats.md / 37-statistics.md
 
 【新手指引】

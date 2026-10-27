@@ -69,7 +69,7 @@ describe('管理介面 API', () => {
     defaultSession.repo = repo;
     auth = new AuthService(db);
     config = { ...buildConfig(new Map(), dataDir).config, adminUser: 'ops', adminPassword: 'opspw123' };
-    auth.ensureHost('host');
+    await auth.ensureHost('host');
     server = new GameServer({ repo, auth, config: () => config, version: 'test', hostUsername: 'host', mode: 'open', leaderboard: () => ({ top: 20, count: 0, fields: [], rows: [] }) });
     handler = createAdminHandler({
       db, dataDir, dbPath: join(dataDir, DB_FILE), auth, server,
@@ -96,7 +96,7 @@ describe('管理介面 API', () => {
 
     // 遊戲帳號不是管理員：帳號密碼對也登不進管理介面（§ 97.8）
     const player = await auth.register('player', 'playerpw');
-    const playerToken = auth.issueSession(player.id);
+    const playerToken = await auth.issueSession(player.id);
     expect(await call('/admin/api/status', { token: playerToken })).toMatchObject({ status: 401 });
     expect((await call('/admin/api/login', { token: null, body: { username: 'player', password: 'playerpw' } })).status).toBe(401);
   });
@@ -147,7 +147,7 @@ describe('管理介面 API', () => {
 
   it('封鎖帳號會作廢 session 並解除封鎖', async () => {
     const user = await auth.register('bad', 'badpw123');
-    const userToken = auth.issueSession(user.id);
+    const userToken = await auth.issueSession(user.id);
     expect(await call('/admin/api/ban', { body: { userId: user.id } })).toMatchObject({ status: 200 });
     expect(auth.findById(user.id)!.bannedUntil).not.toBeNull();
     expect(auth.resolveSession(userToken)).toBeNull();

@@ -1,47 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { usePartyStore, isPartyLeader, PARTY_MAX_MEMBERS, type PartyMemberView } from '../stores/partyStore';
-import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore';
 import { useIsMobile } from '../hooks/useViewport';
 import { useDraggableIsland } from '../hooks/useDraggableIsland';
-import { useMultiplayer } from '../net/online';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { getRegion } from '../models/mapData';
-import { PanelDockFace } from './PanelDockFace';
 import { useTradeStore } from '../stores/tradeStore';
 import { useChatStore } from '../stores/chatStore';
+import { useGuildStore, isGuildLeader } from '../stores/guildStore';
 
 /**
  * 隊伍（`97-selfhosted-server.md` § 97.7.3）。判定全在 server，這裡只呈現鏡像與送出指令。
- * 單機形態沒有隊伍：按鈕與 HUD 都不出現。
+ * 隊伍與在線名單是社群視窗的兩個分頁（§ 97.7.5，`SocialPanel.tsx`）；單機形態都不出現。
  */
+
+const DROP_MODE_LABELS: Record<'all' | 'participants', string> = {
+  participants: '僅參與者',
+  all: '全隊',
+};
 
 function mapName(regionId: string, floor: number | null): string {
   const region = getRegion(regionId);
   const name = region?.name ?? regionId;
   return floor != null ? `${name} ${floor}F` : name;
-}
-
-/** 徽章＝待處理的邀請數（`34-ui-guidelines.md` § 34.10 數量徽章） */
-export function PartyButton() {
-  const online = useMultiplayer();
-  const invites = usePartyStore(s => s.invites.length);
-  const isOpen = usePanelWindowStore(s => s.open.party);
-  const toggle = usePanelWindowStore(s => s.toggle);
-  const isMobile = useIsMobile();
-  if (!online) return null;
-
-  return (
-    <button
-      className={`panel-dock-btn party-btn ${isOpen ? 'active' : ''}`}
-      aria-pressed={isOpen}
-      onClick={() => toggle('party', isMobile)}
-      {...panelButtonA11y('party')}
-    >
-      <PanelDockFace panelKey="party" />
-      {invites > 0 && <span className="quest-count-badge">{invites}</span>}
-    </button>
-  );
 }
 
 function MemberBars({ m }: { m: PartyMemberView }) {
@@ -104,16 +85,16 @@ export function PartyHud() {
 }
 
 /** 上一次操作的結果訊息只屬於那一次；關掉視窗再打開不該還掛著「已邀請 X」 */
-function useClearMessageOnOpen(): void {
-  const setMessage = usePartyStore(s => s.setMessage);
-  useEffect(() => setMessage(null), [setMessage]);
+export function useClearMessageOnOpen(): void {
+  const clearMessage = usePartyStore(s => s.clearMessage);
+  useEffect(() => { void clearMessage(); }, [clearMessage]);
 }
 
 /**
  * 以角色名稱邀請（§ 97.7.3）：名單上沒有的人（不同地圖、朋友）只能這樣邀。
  * 名稱在本服唯一（`19-account-character.md` § 19.4），所以輸入名稱即可指定。
  */
-function InviteByName({ invite, disabled }: { invite: (target: number | string) => Promise<boolean>; disabled: boolean }) {
+export function InviteByName({ invite, disabled }: { invite: (target: number | string) => Promise<boolean>; disabled: boolean }) {
   const [name, setName] = useState('');
 
   const submit = async (e: React.FormEvent) => {
@@ -207,17 +188,24 @@ export function PartyPanelContent() {
                 ))}
               </ul>
               <div className="party-controls">
-                <label className="party-drop-mode">
-                  掉落分配
-                  <select
-                    value={party.dropMode}
-                    disabled={!leader}
-                    onChange={e => void actions.setDropMode(e.target.value as 'all' | 'participants')}
-                  >
-                    <option value="participants">僅參與者</option>
-                    <option value="all">全隊</option>
-                  </select>
-                </label>
+                {/* 只有隊長能改（§ 97.7.3）：隊員只看到目前的模式，不畫選單 */}
+                {leader ? (
+                  <label className="party-drop-mode">
+                    掉落分配
+                    <select
+                      value={party.dropMode}
+                      onChange={e => void actions.setDropMode(e.target.value as 'all' | 'participants')}
+                    >
+                      <option value="participants">{DROP_MODE_LABELS.participants}</option>
+                      <option value="all">{DROP_MODE_LABELS.all}</option>
+                    </select>
+                  </label>
+                ) : (
+                  <span className="party-drop-mode">
+                    掉落分配
+                    <span className="party-drop-mode-value">{DROP_MODE_LABELS[party.dropMode]}</span>
+                  </span>
+                )}
                 <button className="party-action-btn is-danger" onClick={() => void actions.leave()}>離隊</button>
               </div>
             </>
@@ -230,32 +218,7 @@ export function PartyPanelContent() {
   );
 }
 
-/**
- * 本地圖的在線名單（§ 97.7.1：非隊友只出現在名單上，無座標、不佔格）。
- *
- * **與隊伍面板分開**：一個是自己的隊伍狀態、一個是別人的名單，
- * 兩者的更新頻率與使用時機都不一樣，擠在同一個視窗會互相推擠。
- */
-export function OnMapButton() {
-  const online = useMultiplayer();
-  const isOpen = usePanelWindowStore(s => s.open.onmap);
-  const toggle = usePanelWindowStore(s => s.toggle);
-  const isMobile = useIsMobile();
-  if (!online) return null;
-
-  return (
-    <button
-      className={`panel-dock-btn onmap-btn ${isOpen ? 'active' : ''}`}
-      aria-pressed={isOpen}
-      onClick={() => toggle('onmap', isMobile)}
-      {...panelButtonA11y('onmap')}
-    >
-      {/* 人數標在地圖選擇器的「目前:」上（§ 97.7.1），這裡不重複 */}
-      <PanelDockFace panelKey="onmap" />
-    </button>
-  );
-}
-
+/** 社群視窗「在線」分頁（§ 97.7.1：非隊友只出現在名單上，無座標、不佔格；§ 97.7.5） */
 export function OnMapPanelContent() {
   const onMap = usePartyStore(s => s.onMap);
   const party = usePartyStore(s => s.party);
@@ -268,6 +231,11 @@ export function OnMapPanelContent() {
   const leader = isPartyLeader(party, myId);
   const full = !!party && party.members.length >= PARTY_MAX_MEMBERS;
   const canInvite = !party || (leader && !full);
+  const guild = useGuildStore(s => s.guild);
+  const guildInvite = useGuildStore(s => s.invite);
+  const guildMessage = useGuildStore(s => s.message);
+  // 只有盟主能邀請、人數未滿、對象無公會（`11-guild.md` § 11.5、§ 11.6）
+  const canGuildInvite = isGuildLeader(guild, myId) && guild!.members.length < guild!.capacity;
   useClearMessageOnOpen();
 
   const whisper = (name: string) => {
@@ -290,6 +258,7 @@ export function OnMapPanelContent() {
                       {p.name}
                       <span className="party-row-class">{CLASS_NAMES_ZH[p.className]} Lv.{p.level}</span>
                     </span>
+                    {p.guildName && <span className="party-row-sub party-row-guild">{p.guildName}</span>}
                     {/* 名單不透露隊籍；這行只在邀請被回絕後才會出現（§ 97.7.1） */}
                     {p.inParty && <span className="party-row-sub">已有隊伍</span>}
                   </div>
@@ -298,12 +267,16 @@ export function OnMapPanelContent() {
                   {!p.inParty && (
                     <button className="party-action-btn" disabled={!canInvite} onClick={() => void invite(p.characterId)}>邀請</button>
                   )}
+                  {isGuildLeader(guild, myId) && !p.guildName && (
+                    <button className="party-action-btn" disabled={!canGuildInvite} title="邀請加入公會" onClick={() => void guildInvite(p.characterId)}>邀入公會</button>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </section>
         {message && <div className="party-message" role="status">{message}</div>}
+        {guildMessage && <div className="party-message" role="status">{guildMessage}</div>}
       </div>
     </div>
   );

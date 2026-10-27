@@ -67,6 +67,23 @@ describe('chatStore', () => {
     expect(useChatStore.getState().unread).toBe(0);
   });
 
+  it('未讀密語只算別人密給自己的，自己送出的回顯不算', () => {
+    const me = 1;
+    const incoming: ChatMessageView = { id: 1, channel: 'whisper', from: { characterId: 2, name: 'B' }, to: { characterId: me, name: 'A' }, text: 'hi', at: 1 };
+    const outgoing: ChatMessageView = { id: 2, channel: 'whisper', from: { characterId: me, name: 'A' }, to: { characterId: 2, name: 'B' }, text: 'yo', at: 2 };
+    useChatStore.getState().receive(incoming, me);
+    useChatStore.getState().receive(outgoing, me);
+    useChatStore.getState().receive(msg(3, 'world'), me);
+
+    expect(useChatStore.getState().unread).toBe(3);
+    expect(useChatStore.getState().whisperUnread).toBe(1);
+
+    useChatStore.getState().setPanelOpen(true);
+    expect(useChatStore.getState().whisperUnread).toBe(0);
+    useChatStore.getState().receive({ ...incoming, id: 4 }, me);
+    expect(useChatStore.getState().whisperUnread).toBe(0);
+  });
+
   it('共用 log 只留最後 300 則', () => {
     for (let i = 0; i < CHAT_BUFFER + 20; i++) useChatStore.getState().receive(msg(i));
     const list = useChatStore.getState().messages;

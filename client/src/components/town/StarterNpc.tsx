@@ -69,7 +69,7 @@ export function StarterNpc() {
     if (!result.ok) return;
     const enhanced = { ...item, enhancement: result.enhancement ?? item.enhancement };
     /*
-     * 新手裝強化**必定成功**（`13-town.md` § 13.10），所以只演安定值內那一段：
+     * 新手裝強化**必定成功**（`13-town.md` § 13.11），所以只演安定值內那一段：
      * 白閃 + `+N` 浮字，不放金色爆閃與碎裂（`48-vfx.md` § 48.4.2）。
      */
     playFx({ itemId: item.id!, label: `+${enhanced.enhancement}` });

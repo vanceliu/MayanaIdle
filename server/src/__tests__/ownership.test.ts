@@ -51,7 +51,7 @@ describe('擁有權檢查', () => {
     const session = [...server.sessions].at(-1)!;
     const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
     send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    send({ t: 'resume', token: auth.issueSession(user.id) });
+    send({ t: 'resume', token: await auth.issueSession(user.id) });
     send({ t: 'create_character', name, className: 'knight', bonusAttrs: KNIGHT_BONUS });
     await vi.waitFor(() => expect(session.game.getState().character?.name).toBe(name));
     let nextId = 1;
@@ -143,6 +143,46 @@ describe('擁有權檢查', () => {
       await player.act('game', 'confirmDiscard', 1);
 
       expect(row(own.id!)).toBeUndefined();
+    });
+
+    it('requestDiscardBatch 混入他人的裝備：只留自己的項目，名稱與上限以自己的資料為準', async () => {
+      const victim = await enter('Victim');
+      const attacker = await enter('Attacker');
+      const target = await unequippedArmor(victim);
+      const own = await unequippedArmor(attacker);
+      const potion = attacker.session.game.getState().bagItems[0];
+
+      await attacker.act('game', 'requestDiscardBatch', [
+        { kind: 'equipment', name: 'x', maxAmount: 1, equipmentId: target.id },
+        { kind: 'equipment', name: 'x', maxAmount: 1, equipmentId: own.id },
+        { kind: 'bag', name: '偽造', itemId: potion.itemId, maxAmount: 99999 },
+      ]);
+      expect(attacker.session.game.getState().pendingDiscardBatch).toEqual([
+        { kind: 'equipment', name: own.name, maxAmount: 1, equipmentId: own.id },
+        { kind: 'bag', name: potion.name, itemId: potion.itemId, maxAmount: potion.amount },
+      ]);
+
+      await attacker.act('game', 'confirmDiscardBatch', [1, 99999]);
+
+      expect(row(target.id!)).toBeDefined();
+      expect(row(own.id!)).toBeUndefined();
+      expect(attacker.session.game.getState().bagItems.some(b => b.itemId === potion.itemId)).toBe(false);
+      expect(attacker.session.game.getState().pendingDiscardBatch).toBeNull();
+    });
+
+    it('confirmDiscardBatch 數量非整數：整筆不丟棄', async () => {
+      const player = await enter('Player');
+      const own = await unequippedArmor(player);
+      const potion = player.session.game.getState().bagItems[0];
+
+      await player.act('game', 'requestDiscardBatch', [
+        { kind: 'equipment', name: own.name, maxAmount: 1, equipmentId: own.id },
+        { kind: 'bag', name: potion.name, itemId: potion.itemId, maxAmount: potion.amount },
+      ]);
+      await player.act('game', 'confirmDiscardBatch', [1, 1.5]);
+
+      expect(row(own.id!)).toBeDefined();
+      expect(player.session.game.getState().bagItems[0].amount).toBe(potion.amount);
     });
   });
 

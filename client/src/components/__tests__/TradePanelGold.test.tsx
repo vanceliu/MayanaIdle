@@ -95,6 +95,79 @@ describe('交易金幣', () => {
   });
 });
 
+/** 任何送出都會解除雙方的鎖定，所以金額沒變就不送（§ 97.7.4） */
+describe('交易金幣只在變動時送出', () => {
+  it('點一下拉桿或輸入格再離開（金額沒變）不送出', () => {
+    render(<TradePanelContent />);
+
+    fireEvent.blur(screen.getByLabelText('金幣'));
+    fireEvent.keyUp(screen.getByLabelText('金幣'), { key: 'Tab' });
+    fireEvent.blur(screen.getByLabelText('金幣數量'));
+
+    expect(setOffer).not.toHaveBeenCalled();
+  });
+
+  it('與 server 目前的金額相同不送出', () => {
+    useTradeStore.setState({ trade: { ...useTradeStore.getState().trade!, me: side({ gold: 300 }) } } as never);
+    render(<TradePanelContent />);
+    const input = screen.getByLabelText('金幣數量') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '300' } });
+    fireEvent.blur(input);
+
+    expect(setOffer).not.toHaveBeenCalled();
+  });
+
+  it('送出後、回覆前再離開輸入格不重送', () => {
+    setOffer.mockImplementation(() => new Promise(() => {}));
+    render(<TradePanelContent />);
+    const input = screen.getByLabelText('金幣數量') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '120' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+
+    expect(setOffer).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** 送出後、server 回覆前的下一次放入，以本機最後送出的內容為基準（§ 97.7.4） */
+describe('連續放入', () => {
+  const equipment = (id: number) => ({
+    id, templateId: 1, name: `劍${id}`, type: 'sword', slot: 'rightHand', isTwoHanded: false,
+    quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: false,
+  });
+
+  const tapCell = (container: HTMLElement, index: number) => {
+    const cell = container.querySelectorAll('.bag-cell:not(.empty)')[index];
+    fireEvent.pointerDown(cell, { button: 0, pointerType: 'mouse' });
+    fireEvent.pointerUp(cell, { button: 0, pointerType: 'mouse' });
+  };
+
+  it('回覆前連放兩件：第二次送出包含第一件', () => {
+    setOffer.mockImplementation(() => new Promise(() => {}));
+    useGameStore.setState({ inventory: [equipment(11), equipment(12)] } as never);
+    const { container } = render(<TradePanelContent />);
+
+    tapCell(container, 0);
+    tapCell(container, 1);
+
+    expect(setOffer).toHaveBeenLastCalledWith({ equipmentIds: [11, 12], items: [], gold: 0 });
+  });
+
+  it('回覆後以 server 推回來的內容為基準', async () => {
+    useGameStore.setState({ inventory: [equipment(11), equipment(12)] } as never);
+    const { container } = render(<TradePanelContent />);
+
+    tapCell(container, 0);
+    await act(async () => {});
+    // server 拒絕了第一件：鏡像仍是空的
+    tapCell(container, 1);
+
+    expect(setOffer).toHaveBeenLastCalledWith({ equipmentIds: [12], items: [], gold: 0 });
+  });
+});
+
 /**
  * 交易視窗沒有面板按鈕，開關完全跟著交易本身（§ 97.7.4）：
  * 取消之後留著一個寫「目前沒有交易」的空視窗，等於要玩家自己去關。

@@ -44,7 +44,7 @@ describe('create_character 參數驗證', () => {
     const session: PlayerSession = [...server.sessions].at(-1)!;
     const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
     send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    send({ t: 'resume', token: auth.issueSession(user.id) });
+    send({ t: 'resume', token: await auth.issueSession(user.id) });
     await vi.waitFor(() => expect(sent.some(m => m.t === 'auth_ok')).toBe(true));
     return { userId: user.id, session, sent, send };
   }

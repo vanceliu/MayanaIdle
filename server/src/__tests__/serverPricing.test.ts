@@ -60,7 +60,7 @@ describe('價格與任務內容由 server 決定', () => {
     const session = [...server.sessions].at(-1)!;
     const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
     send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    send({ t: 'resume', token: auth.issueSession(user.id) });
+    send({ t: 'resume', token: await auth.issueSession(user.id) });
     send({ t: 'create_character', name: 'Alice', className: 'knight', bonusAttrs: KNIGHT_BONUS });
     await vi.waitFor(() => expect(session.game.getState().character?.name).toBe('Alice'));
     let nextId = 1;

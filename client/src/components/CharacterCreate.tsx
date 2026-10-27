@@ -15,7 +15,7 @@ import { createDefaultAppearance, type Appearance } from '../models/appearance';
 import {
   CHARACTER_NAME_ALLOWED_SYMBOLS,
   CHARACTER_NAME_ERROR_MESSAGES,
-  CHARACTER_NAME_MAX_LENGTH,
+  CHARACTER_NAME_MAX_WIDTH,
   validateCharacterName,
 } from '../models/characterIdentity';
 
@@ -98,7 +98,7 @@ export function CharacterCreate() {
       default:
         return (
           <span className="name-hint">
-            中文、英文、數字，2~{CHARACTER_NAME_MAX_LENGTH} 個字；
+            中文最多 6 字、英數最多 12 字（中文算 2 格）；
             可使用符號 {CHARACTER_NAME_ALLOWED_SYMBOLS}，不可有空白
           </span>
         );
@@ -120,7 +120,7 @@ export function CharacterCreate() {
         <input
           value={name}
           onChange={e => setName(e.target.value)}
-          maxLength={CHARACTER_NAME_MAX_LENGTH}
+          maxLength={CHARACTER_NAME_MAX_WIDTH}
           placeholder="輸入名稱..."
           disabled={submitting}
         />

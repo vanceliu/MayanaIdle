@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore, processMonsterDeath, waitForPendingDrops } from '../gameStore';
+import { handleMonsterDeath } from '../../systems/combatLoop';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -145,6 +146,7 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       type: 'debuff' as const,
       target: 'monster' as const,
       targetIdx: 0,
+      targetMonsterId: 'm1',
       dot: { damage: 10, element: 'none' as const, interval: 1000, totalDuration: 5000 },
       startTime: Date.now(),
       duration: 5000,
@@ -159,16 +161,11 @@ describe('processMonsterDeath — DOT kill triggers drops', () => {
       activeEffects: [bleedEffect],
     });
 
-    const monsters = [deadMonster];
-    const get = () => useGameStore.getState();
-    const set = (s: any) => useGameStore.setState(s);
+    handleMonsterDeath(deadMonster, 'm1');
 
-    processMonsterDeath(get, set, monsters, 0, { ...char, currentArea: 'meadow', currentRegion: 'meadow' } as any, [], []);
-
-    // debuff 應被清除
+    // debuff 以怪物 id 清除（`24-buff-debuff.md` § 24.3）
     const afterEffects = useGameStore.getState().activeEffects;
-    const monsterDebuffs = afterEffects.filter(e => e.target === 'monster' && e.targetIdx === 0);
-    expect(monsterDebuffs.length).toBe(0);
+    expect(afterEffects.filter(e => e.target === 'monster' && e.targetMonsterId === 'm1')).toHaveLength(0);
   });
 
   it('should work for multiple dead monsters (AOE + DOT scenario)', async () => {

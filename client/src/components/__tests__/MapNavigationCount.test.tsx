@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MapNavigation } from '../MapNavigation';
-import { OnMapButton } from '../PartyPanel';
+import { SocialButton } from '../SocialPanel';
 import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore } from '../../stores/partyStore';
 import { useOnlineStore } from '../../net/online';
@@ -59,7 +59,7 @@ describe('地圖選擇器的在線人數', () => {
   it('面板按鈕不再標人數徽章（同一個數字不放兩處）', () => {
     useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
     usePartyStore.setState({ onMap: [person(2)] as never });
-    const { container } = render(<OnMapButton />);
+    const { container } = render(<SocialButton />);
 
     expect(container.querySelector('.quest-count-badge')).toBeNull();
   });

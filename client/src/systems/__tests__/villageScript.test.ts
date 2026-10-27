@@ -314,9 +314,14 @@ describe('倉庫存取', () => {
     expect(evaluateVillageScript([rule({ type: 'deposit_gold', keepGold: 0 })], c)).toBeNull();
   });
 
-  it('預設走共用倉庫', () => {
+  it('預設走帳號倉庫', () => {
     expect(getWarehouseKind({ type: 'withdraw_item' })).toBe('shared');
     expect(getWarehouseKind({ type: 'withdraw_item', warehouse: 'personal' })).toBe('personal');
+  });
+
+  it('存入可選個人倉庫；補給天賦沒有公會倉庫可選', () => {
+    expect(getWarehouseKind({ type: 'deposit_materials', warehouse: 'personal' })).toBe('personal');
+    expect(getWarehouseKind({ type: 'deposit_materials', warehouse: 'guild' as never })).toBe('shared');
   });
 });
 

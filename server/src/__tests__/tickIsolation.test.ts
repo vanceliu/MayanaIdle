@@ -54,7 +54,7 @@ describe('tick 錯誤隔離與訊息依序處理', () => {
     client.session = [...server.sessions].at(-1)!;
     client.send = msg => handlers.message(JSON.stringify(msg));
     client.send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    client.send({ t: 'resume', token: auth.issueSession(user.id) });
+    client.send({ t: 'resume', token: await auth.issueSession(user.id) });
     client.send({ t: 'create_character', name, className: 'knight', bonusAttrs: KNIGHT_BONUS });
     await vi.waitFor(() => expect(client.session.game.getState().character?.name).toBe(name));
     return client;
@@ -100,8 +100,7 @@ describe('tick 錯誤隔離與訊息依序處理', () => {
     const player = await enter('Mailer');
     const characterId = player.session.game.getState().character!.id!;
     await repo.bulkAddMail([{ characterId, sourceKey: 'test', title: 'test', items: [{ type: 'talent_slot', slotTier: 1 }], createdAt: Date.now(), claimedAt: null } as never]);
-    player.send({ t: 'action', store: 'mailbox', name: 'refresh', args: [], id: 1 });
-    await vi.waitFor(() => expect(player.sent.some(m => 'id' in m && m.id === 1)).toBe(true));
+    await player.session.mailbox.getState().refresh();
     const mail = (await repo.listMail(characterId)).find(m => m.sourceKey === 'test')!;
     const before = await repo.countTalentSlots(characterId);
 

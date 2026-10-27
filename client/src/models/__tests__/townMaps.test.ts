@@ -3,6 +3,7 @@ import { getMapForRegion, clearMapCache } from '../mapDataControl';
 import { TileType, isWalkableTile, type MapData } from '../mapControl';
 import { REGIONS } from '../mapData';
 import { useMapMonsterStore } from '../../stores/mapMonsterStore';
+import { visibleNpcs } from '../townNpc';
 
 /**
  * 逐鎮版面（§ 13.2.1）：`doorRows` 是門口列的 y，`perRow` 是每列幾個門面。
@@ -20,7 +21,7 @@ const TOWN_IDS = Object.keys(TOWN_LAYOUTS);
 /** TownView 認得的設施 ID：NPC 的 facility 必須落在這組裡 */
 const KNOWN_FACILITIES = new Set([
   'general-store', 'blacksmith', 'weapon-shop', 'armor-shop', 'inn', 'storage',
-  'magic-academy', 'class-guild', 'starter-npc', 'adventurer-guild', 'statistics-center',
+  'magic-academy', 'guild', 'starter-npc', 'adventurer-guild', 'statistics-center',
   'sigil-master', 'training-ground',
 ]);
 
@@ -106,6 +107,16 @@ describe('城鎮地圖（§ 13.2.1）', () => {
         expect(facilities.filter(n => n.y === y), `${map.id} 門口列 y=${y}`).toHaveLength(perRow);
       }
       expect(facilities, `${map.id} 設施總數`).toHaveLength(doorRows.length * perRow);
+    }
+  });
+
+  /** 公會 NPC 只在開放世界出現（§ 13.2.1、`97-selfhosted-server.md` § 97.1）：單機少一個 NPC，門面建築保留 */
+  it('單機世界不放公會 NPC，開放世界有', () => {
+    for (const map of towns) {
+      expect(visibleNpcs(map, true).some(n => n.facility === 'guild'), map.id).toBe(true);
+      const solo = visibleNpcs(map, false);
+      expect(solo.some(n => n.facility === 'guild'), map.id).toBe(false);
+      expect(solo, map.id).toHaveLength(map.npcs!.length - 1);
     }
   });
 

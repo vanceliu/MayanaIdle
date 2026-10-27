@@ -38,11 +38,42 @@ describe('常駐分頁的門檻設定（§ 3.13）', () => {
     expect(screen.queryByText('戰鬥後等待')).toBeNull();
   });
 
-  it('改門檻會寫回 store', () => {
+  it('改門檻：打字只改輸入格，離開輸入格才寫回 store', () => {
     render(<TalentTypeEditor type="persistent" />);
     const input = screen.getByDisplayValue('40');
     fireEvent.change(input, { target: { value: '55' } });
+    expect(useGameStore.getState().afterCombatHpThreshold).toBe(40);
+
+    fireEvent.blur(input);
     expect(useGameStore.getState().afterCombatHpThreshold).toBe(55);
+  });
+
+  it('改門檻：按 Enter 也寫回 store', () => {
+    render(<TalentTypeEditor type="persistent" />);
+    const input = screen.getByDisplayValue('30');
+    fireEvent.change(input, { target: { value: '25' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(useGameStore.getState().afterCombatMpThreshold).toBe(25);
+  });
+
+  it('遠端寫入未回覆前連續修改：緊急撤退的開關與門檻都保留', async () => {
+    const sent: unknown[] = [];
+    const original = useGameStore.getState().setEmergencyRetreat;
+    useGameStore.setState({ setEmergencyRetreat: ((r: unknown) => { sent.push(r); return new Promise(() => {}); }) as never });
+    try {
+      render(<TalentTypeEditor type="persistent" />);
+      const enabledBefore = useGameStore.getState().scriptTemplates
+        .find(t => t.id === useGameStore.getState().activeTemplateId)!.emergencyRetreat.enabled;
+
+      fireEvent.click(screen.getByRole('checkbox'));
+      const hp = screen.getByLabelText('緊急撤退 HP 門檻');
+      fireEvent.change(hp, { target: { value: '15' } });
+      fireEvent.blur(hp);
+
+      expect(sent.at(-1)).toMatchObject({ enabled: !enabledBefore, hpThreshold: 15 });
+    } finally {
+      useGameStore.setState({ setEmergencyRetreat: original });
+    }
   });
 
   it('緊急撤退可開關', () => {

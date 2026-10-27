@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/gameStore';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { BagItem } from '../../stores/gameStore';
 import { EquipmentDetail } from '../EquipmentInfo';
+import { Tooltip } from '../Tooltip';
 import { GameIcon } from '../GameIcon';
-import { resolveItemIcon } from '../../models/iconMap';
+import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
+import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
 import { getItemById } from '../../models/items';
 import { hasBagItem } from '../../models/bagItem';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
@@ -12,8 +14,11 @@ import { QtyStepper } from '../common/QtyStepper';
 import { roundWeight } from '../../systems/weight';
 import { isSigilItemId } from '../../models/sigil';
 import { useShopCart, cartLines, type CartLine, ShopCartFooter } from '../common/ShopCart';
+import { useGuildStore } from '../../stores/guildStore';
+import { useMultiplayer } from '../../net/online';
 
-type StorageTab = 'personal' | 'shared';
+/** 分頁順序：帳號 → 個人 → 公會（`13-town.md` § 13.8） */
+type StorageTab = 'shared' | 'personal' | 'guild';
 type ActionTab = 'deposit' | 'withdraw';
 
 /** 倉庫一次可以同時搬裝備與可堆疊物品，摘要要分開講清楚 */
@@ -39,7 +44,14 @@ export function Storage() {
   const personalStoredEquipment = useGameStore(s => s.personalStoredEquipment);
   const personalStoredMaterials = useGameStore(s => s.personalStoredMaterials);
   const character = useGameStore(s => s.character);
-  const warehouseGold = useGameStore(s => s.warehouseGold);
+  const accountGold = useGameStore(s => s.warehouseGold);
+  // 公會倉庫（`11-guild.md` § 11.8）：內容只在分頁開著時才有
+  const multiplayer = useMultiplayer();
+  const guild = useGuildStore(s => s.guild);
+  const guildWarehouse = useGuildStore(s => s.warehouse);
+  const guildMessage = useGuildStore(s => s.message);
+  const openGuildWarehouse = useGuildStore(s => s.openWarehouse);
+  const closeGuildWarehouse = useGuildStore(s => s.closeWarehouse);
   const [storageTab, setStorageTab] = useState<StorageTab>('shared');
   const [actionTab, setActionTab] = useState<ActionTab>('deposit');
   const [goldAmount, setGoldAmount] = useState('');
@@ -50,23 +62,38 @@ export function Storage() {
   const templates = useEquipmentTemplates();
 
   const isShared = storageTab === 'shared';
-  const currentEquipStored = isShared ? storedEquipment : personalStoredEquipment;
-  const currentMaterialStored = isShared ? storedMaterials : personalStoredMaterials;
+  const isGuild = storageTab === 'guild';
+  const hasGold = isShared || isGuild;
+  const warehouseGold = isGuild ? guildWarehouse?.gold ?? 0 : accountGold;
+  const currentEquipStored = isGuild ? guildWarehouse?.equipment ?? [] : isShared ? storedEquipment : personalStoredEquipment;
+  const currentMaterialStored = isGuild ? guildWarehouse?.items ?? [] : isShared ? storedMaterials : personalStoredMaterials;
 
-  // --- Gold (shared only) ---
+  // 打開公會分頁才向 server 要內容；切走或關掉倉庫就釋放（§ 11.8）
+  useEffect(() => {
+    if (!isGuild) return;
+    void openGuildWarehouse();
+    return () => { void closeGuildWarehouse(); };
+  }, [isGuild, openGuildWarehouse, closeGuildWarehouse]);
+
+  // 在公會分頁時被踢或公會解散：退回帳號倉庫
+  if (isGuild && !guild) setStorageTab('shared');
+
+  // --- Gold（帳號與公會倉庫才有） ---
   /** 空字串／非數字一律當 0，不可讓 NaN 進到餘額運算（會把兩邊的金幣一起洗成 NaN） */
   const goldInput = Number.parseInt(goldAmount, 10);
   const goldInputValid = Number.isFinite(goldInput) && goldInput > 0;
 
   function depositGold() {
     if (!goldInputValid) return;
-    useGameStore.getState().depositWarehouseGold(goldInput);
+    if (isGuild) void useGuildStore.getState().depositWarehouseGold(goldInput);
+    else useGameStore.getState().depositWarehouseGold(goldInput);
     setGoldAmount('');
   }
 
   function withdrawGold() {
     if (!goldInputValid) return;
-    useGameStore.getState().withdrawWarehouseGold(goldInput);
+    if (isGuild) void useGuildStore.getState().withdrawWarehouseGold(goldInput);
+    else useGameStore.getState().withdrawWarehouseGold(goldInput);
     setGoldAmount('');
   }
 
@@ -86,9 +113,14 @@ export function Storage() {
   const bagEquipment = depositableEquip.filter(i => matchesQuery(i.name));
   const potionItems = bagItems.filter(b => b.type === 'potion' && matchesQuery(b.name));
   const nonPotionItems = bagItems.filter(b => b.type !== 'potion' && matchesQuery(b.name));
+  // 印記獨立一區（§ 35.20），不與材料混列
+  const bagMaterials = nonPotionItems.filter(b => !isSigilItemId(b.itemId));
+  const bagSigils = nonPotionItems.filter(b => isSigilItemId(b.itemId));
   const storedEquipList = currentEquipStored.filter(i => matchesQuery(i.name));
   const storedPotions = currentMaterialStored.filter(s => s.type === 'potion' && matchesQuery(s.name));
   const storedNonPotions = currentMaterialStored.filter(s => s.type !== 'potion' && matchesQuery(s.name));
+  const storedMaterialList = storedNonPotions.filter(s => !isSigilItemId(s.itemId));
+  const storedSigils = storedNonPotions.filter(s => isSigilItemId(s.itemId));
 
   const freeSlots = getBagMaxSlots(equippedGear) - getBagUsedSlots(bagItems, inventory, equippedGear);
 
@@ -106,11 +138,12 @@ export function Storage() {
 
   function executeDeposit() {
     if (depositEquipLines.length === 0 && depositMaterialLines.length === 0) return;
-    useGameStore.getState().depositToWarehouse({
-      warehouse: storageTab,
+    const move = {
       equipmentIds: depositEquipLines.map(l => l.item.id!),
       materials: depositMaterialLines.map(l => ({ itemId: l.item.itemId, amount: l.qty })),
-    });
+    };
+    if (isGuild) void useGuildStore.getState().depositWarehouse(move);
+    else useGameStore.getState().depositToWarehouse({ warehouse: storageTab as 'shared' | 'personal', ...move });
     depositCart.clear();
   }
 
@@ -138,11 +171,12 @@ export function Storage() {
   function executeWithdraw() {
     if (withdrawEquipLines.length === 0 && withdrawMaterialLines.length === 0) return;
     if (withdrawHint) return;
-    useGameStore.getState().withdrawFromWarehouse({
-      warehouse: storageTab,
+    const move = {
       equipmentIds: withdrawEquipLines.map(l => l.item.id!),
       materials: withdrawMaterialLines.map(l => ({ itemId: l.item.itemId, amount: l.qty })),
-    });
+    };
+    if (isGuild) void useGuildStore.getState().withdrawWarehouse(move);
+    else useGameStore.getState().withdrawFromWarehouse({ warehouse: storageTab as 'shared' | 'personal', ...move });
     withdrawCart.clear();
   }
 
@@ -179,11 +213,18 @@ export function Storage() {
     );
   }
 
-  /** 裝備的一列：唯一實例，數量上限固定 1，介面與物品列一致 */
+  /** 裝備的一列：只印 icon + 名稱，完整內容走 hover tooltip；唯一實例，數量上限固定 1 */
   function equipRow(item: EquipmentInstance, cart: ReturnType<typeof useShopCart>) {
+    const tierColor = getEquipmentInstanceTierColor(item, templates);
+    const enhancement = item.enhancement ?? 0;
     return (
       <div key={item.id} className="storage-item">
-        <EquipmentDetail item={item} templates={templates} />
+        <Tooltip position="right" content={<EquipmentDetail item={item} templates={templates} />}>
+          <span className="storage-equip-name" style={{ color: tierColor }}>
+            <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color={tierColor} />
+            {item.name}{enhancement > 0 ? ` +${enhancement}` : ''}
+          </span>
+        </Tooltip>
         <div className="storage-item-actions">
           <QtyStepper
             label={`${item.name} #${item.id}`}
@@ -203,11 +244,27 @@ export function Storage() {
 
       <div className="storage-tabs">
         {/* 換倉庫等於換一份清單，已選數量不該跟著跑到另一個倉庫的同名物品上 */}
-        <button className={storageTab === 'shared' ? 'active' : ''} onClick={() => switchStorage('shared')}>共用倉庫</button>
+        <button className={storageTab === 'shared' ? 'active' : ''} onClick={() => switchStorage('shared')}>帳號倉庫</button>
         <button className={storageTab === 'personal' ? 'active' : ''} onClick={() => switchStorage('personal')}>個人倉庫</button>
+        {/* § 11.8：單機世界不顯示；沒有公會時變暗、點了沒反應 */}
+        {multiplayer && (
+          <button
+            className={`${isGuild ? 'active' : ''}${guild ? '' : ' is-unavailable'}`}
+            aria-disabled={!guild}
+            title={guild ? undefined : '加入公會後可使用'}
+            onClick={() => { if (guild) switchStorage('guild'); }}
+          >
+            公會倉庫
+          </button>
+        )}
       </div>
 
-      {isShared && (
+      {isGuild && guildWarehouse && (
+        <div className="storage-capacity">已用 {guildWarehouse.used} / {guildWarehouse.capacity} 格</div>
+      )}
+      {isGuild && guildMessage && <div className="party-message" role="status">{guildMessage}</div>}
+
+      {hasGold && (
         <div className="storage-gold-section">
           <span className="storage-gold-label">倉庫金幣：{warehouseGold} G</span>
           <span className="storage-gold-label">身上金幣：{character?.gold ?? 0} G</span>
@@ -265,8 +322,12 @@ export function Storage() {
           {potionItems.map(item => materialRow(item, depositCart))}
 
           <h4>背包材料</h4>
-          {nonPotionItems.length === 0 && <p className="empty-text">{emptyText('無材料可存入')}</p>}
-          {nonPotionItems.map(item => materialRow(item, depositCart))}
+          {bagMaterials.length === 0 && <p className="empty-text">{emptyText('無材料可存入')}</p>}
+          {bagMaterials.map(item => materialRow(item, depositCart))}
+
+          <h4>背包印記</h4>
+          {bagSigils.length === 0 && <p className="empty-text">{emptyText('無印記可存入')}</p>}
+          {bagSigils.map(item => materialRow(item, depositCart))}
         </div>
       )}
 
@@ -281,8 +342,12 @@ export function Storage() {
           {storedPotions.map(item => materialRow(item, withdrawCart))}
 
           <h4>倉庫材料</h4>
-          {storedNonPotions.length === 0 && <p className="empty-text">{emptyText('無材料')}</p>}
-          {storedNonPotions.map(item => materialRow(item, withdrawCart))}
+          {storedMaterialList.length === 0 && <p className="empty-text">{emptyText('無材料')}</p>}
+          {storedMaterialList.map(item => materialRow(item, withdrawCart))}
+
+          <h4>倉庫印記</h4>
+          {storedSigils.length === 0 && <p className="empty-text">{emptyText('無印記')}</p>}
+          {storedSigils.map(item => materialRow(item, withdrawCart))}
         </div>
       )}
       </div>

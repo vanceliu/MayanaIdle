@@ -15,8 +15,10 @@ import { FIELD_ENCODING, applyAppend, fromMonsterWire } from './syncCodec';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNoticeStore } from '../stores/noticeStore';
+import '../stores/guildStore';
 import { TICK_MS, setClockSource } from '../core/clock';
 import type { GameConnection } from './connection';
+import { afterServerFrame, applyingServerStores, beforeServerFrame, captureLocalActions, captureRemoteActions } from './trainingSandbox';
 
 /**
  * 上次收到 server tick 的時間（渲染插值用）。
@@ -108,8 +110,12 @@ function applyCombatDelta(delta: CombatDelta): void {
 }
 
 /** 狀態同步（`97-selfhosted-server.md` § 97.2「狀態同步」） */
-function applyFrame(frame: Extract<ServerMessage, { t: 'frame' }>): void {
-  for (const [key, delta] of Object.entries(frame.stores ?? {})) applyStoreDelta(key as StoreKey, delta);
+function applyFrame(received: Extract<ServerMessage, { t: 'frame' }>): void {
+  // 試驗場本機沙盒（§ 97.2）：沙盒中只套用非戰鬥執行期的欄位
+  const frame = beforeServerFrame(received);
+  applyingServerStores(() => {
+    for (const [key, delta] of Object.entries(frame.stores ?? {})) applyStoreDelta(key as StoreKey, delta);
+  });
   if (frame.now !== undefined) {
     // tick 推送是插值與對時的原點
     lastTickAt = performance.now();
@@ -118,6 +124,7 @@ function applyFrame(frame: Extract<ServerMessage, { t: 'frame' }>): void {
   }
   if (frame.combat) applyCombatDelta(frame.combat);
   if (frame.visuals) visualQueue.push(...(frame.visuals as CombatVisual[]));
+  afterServerFrame();
 }
 
 export function applyServerMessage(msg: ServerMessage): void {
@@ -126,7 +133,7 @@ export function applyServerMessage(msg: ServerMessage): void {
       applyFrame(msg);
       return;
     case 'chat':
-      useChatStore.getState().receive(msg.message);
+      useChatStore.getState().receive(msg.message, defaultSession.game.getState().character?.id);
       return;
     /*
      * server 公告（§ 97.8）：橫幅 ＋ 系統紀錄各留一份。
@@ -155,9 +162,18 @@ const SPECIAL_GAME_ACTIONS: Record<string, (conn: GameConnection, args: unknown[
   uploadOwnStats: () => undefined,
 };
 
+/** 遠端 action：失敗時寫一行本機系統訊息，錯誤照常拋給呼叫端（`97-selfhosted-server.md` § 97.2） */
+function remoteAction(conn: GameConnection, store: ActionStore, name: string, args: unknown[]): Promise<unknown> {
+  return conn.rpc(store, name, args).catch((e: unknown) => {
+    defaultSession.game.getState().pushSystemLog(e instanceof Error && e.message ? e.message : '操作失敗');
+    throw e;
+  });
+}
+
 export function installOnlineProxies(conn: GameConnection): void {
   // 時間一律跟著 server 走
   setClockSource(mirrorGameNow);
+  captureLocalActions();
   const game = defaultSession.game as unknown as StoreApi<Record<string, unknown>>;
   const gamePatch: Record<string, unknown> = {};
   for (const [name, handler] of Object.entries(SPECIAL_GAME_ACTIONS)) {
@@ -166,7 +182,7 @@ export function installOnlineProxies(conn: GameConnection): void {
   // 不在允許清單的 game action 在線上模式留在本機執行。
   // 丟棄確認（request／cancel／confirm）必須留在允許清單：`confirmDiscard` 在 server 讀 `pendingDiscard`
   for (const name of ACTION_ALLOWLIST.game) {
-    gamePatch[name] = (...args: unknown[]) => conn.rpc('game', name, args);
+    gamePatch[name] = (...args: unknown[]) => remoteAction(conn, 'game', name, args);
   }
   // 本機時鐘與迴圈 action 在線上模式全部無效化
   for (const name of ['startRegen', 'stopRegen', 'tickRegen', 'startPersistentLoop', 'stopPersistentLoop', 'tickPersistent', 'runVillageScriptTick', 'startExploring', 'stopExploring']) {
@@ -177,7 +193,7 @@ export function installOnlineProxies(conn: GameConnection): void {
   const proxyStore = (key: Exclude<ActionStore, 'game' | 'chat'>) => {
     const store = defaultSession[key] as unknown as StoreApi<Record<string, unknown>>;
     const patch: Record<string, unknown> = {};
-    for (const name of ACTION_ALLOWLIST[key]) patch[name] = (...args: unknown[]) => conn.rpc(key, name, args);
+    for (const name of ACTION_ALLOWLIST[key]) patch[name] = (...args: unknown[]) => remoteAction(conn, key, name, args);
     store.setState(patch);
   };
   proxyStore('mapControl');
@@ -187,7 +203,9 @@ export function installOnlineProxies(conn: GameConnection): void {
   proxyStore('mailbox');
   proxyStore('party');
   proxyStore('trade');
+  proxyStore('guild');
   // 聊天：送出走 RPC，收訊由 `applyServerMessage` 進 chatStore
   const chat = useChatStore as unknown as StoreApi<Record<string, unknown>>;
   chat.setState({ send: (channel: unknown, text: unknown, target?: unknown) => conn.rpc('chat', 'send', [channel, text, target]) });
+  captureRemoteActions();
 }

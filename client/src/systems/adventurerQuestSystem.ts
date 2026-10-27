@@ -468,7 +468,7 @@ export function generateQuestList(
   const townId = asQuestTown(rawTownId);
   // § 36.6.1：該城鎮該難度無可用 BOSS 時整個分頁不顯示，不產生降級後的殲滅任務
   if (isBossDifficulty(difficulty) && getBossPool(difficulty, townId).length === 0) return [];
-  const count = randomInt(5, 8);
+  const count = randomInt(7, 9);
   const quests: AdventurerQuest[] = [];
   for (let i = 0; i < count; i++) {
     quests.push(generateSingleQuest(difficulty, guildRank, i, townId));

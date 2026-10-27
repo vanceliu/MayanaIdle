@@ -9,10 +9,12 @@ import { ArmorShop } from './town/ArmorShop';
 import { WeaponShop } from './town/WeaponShop';
 import { Storage } from './town/Storage';
 import { MagicAcademy } from './town/MagicAcademy';
-import { ClassGuild } from './town/ClassGuild';
 import { TownBlacksmith } from './town/TownBlacksmith';
 import { StarterNpc } from './town/StarterNpc';
 import { AdventurerGuild } from './town/AdventurerGuild';
+import { GuildNpc } from './town/GuildNpc';
+import { useMultiplayer } from '../net/online';
+import { isFacilityVisible } from '../models/townNpc';
 import { StatisticsCenter } from './town/StatisticsCenter';
 import { SigilMaster } from './town/SigilMaster';
 import { TrainingGroundEntrance } from './town/TrainingGroundEntrance';
@@ -22,7 +24,7 @@ import { TrainingGroundEntrance } from './town/TrainingGroundEntrance';
  * 由 `TrainingGroundView` 渲染，不在城鎮裡（`50-training-ground.md` § 50.2~§ 50.3）。
  * 兩者共用 `townStore.facility` 這條開關。
  */
-export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'class-guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master' | 'training-ground' | 'training-dummy';
+export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master' | 'training-ground' | 'training-dummy';
 
 interface FacilityInfo {
   id: TownFacility;
@@ -32,7 +34,7 @@ interface FacilityInfo {
 
 /**
  * 順序＝城鎮地圖上的排列（`13-town.md` § 13.2.1）：
- * 上排六間商店／製作，下排六間服務／系統，各自由左至右。
+ * 上排六間商店／製作，下排服務／系統（含一間預留門面），各自由左至右。
  * 兩邊對齊之後，快捷列讀起來就等於在鎮上從左走到右。
  */
 const FACILITIES: FacilityInfo[] = [
@@ -44,7 +46,7 @@ const FACILITIES: FacilityInfo[] = [
   { id: 'inn', name: '旅館', icon: '🏨' },
   { id: 'storage', name: '倉庫', icon: '📦' },
   { id: 'magic-academy', name: '魔法學院', icon: '📖' },
-  { id: 'class-guild', name: '職業工會', icon: '⚜️' },
+  { id: 'guild', name: '公會', icon: '🏰' },
   { id: 'adventurer-guild', name: '冒險者工會', icon: '🏛️' },
   { id: 'statistics-center', name: '統計中心', icon: '📊' },
   { id: 'training-ground', name: '試驗場管理員', icon: '🎯' },
@@ -61,8 +63,8 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
     case 'inn': return <Inn />;
     case 'storage': return <Storage />;
     case 'magic-academy': return <MagicAcademy />;
-    case 'class-guild': return <ClassGuild />;
     case 'adventurer-guild': return <AdventurerGuild />;
+    case 'guild': return <GuildNpc />;
     case 'statistics-center': return <StatisticsCenter />;
     case 'sigil-master': return <SigilMaster />;
     case 'training-ground': return <TrainingGroundEntrance />;
@@ -87,13 +89,15 @@ export function TownView() {
    * 不必再收合，因此沒有展開狀態。
    */
   const isMobile = useIsMobile();
+  const multiplayer = useMultiplayer();
 
   if (!char) return null;
 
   const region = getRegion(char.currentRegion);
   const townName = region?.name ?? '城鎮';
   const isNeutralTown = char.currentRegion === 'neutral-town';
-  const visibleFacilities = isNeutralTown ? [...FACILITIES, STARTER_NPC_FACILITY] : FACILITIES;
+  const townFacilities = FACILITIES.filter(f => isFacilityVisible(f.id, multiplayer));
+  const visibleFacilities = isNeutralTown ? [...townFacilities, STARTER_NPC_FACILITY] : townFacilities;
   return (
     <div className="town-view" style={{ zIndex }} onPointerDown={() => focusWindow('town')}>
       {/*

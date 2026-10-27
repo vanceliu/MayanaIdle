@@ -305,6 +305,7 @@ export function processPlayerAttack(
         equippedGear,
         effectsForDamage,
         targetIdx,
+        targetId,
       );
       damage = result.damage;
       isCrit = result.isCritical;
@@ -336,6 +337,7 @@ export function processPlayerAttack(
             effectsForDamage,
             targetIdx,
             skill.ignoreDefensePercent ?? 0,
+            targetId,
           );
           damage += hitResult.damage;
           if (hitResult.isCritical) isCrit = true;
@@ -360,6 +362,7 @@ export function processPlayerAttack(
           effectsForDamage,
           targetIdx,
           skill.ignoreDefensePercent ?? 0,
+          targetId,
         );
         damage = result.damage;
         isCrit = result.isCritical;
@@ -376,6 +379,7 @@ export function processPlayerAttack(
           effectsForDamage,
           targetIdx,
           skill.ignoreDefensePercent ?? 0,
+          targetId,
         );
         damage = result.damage;
         isCrit = result.isCritical;

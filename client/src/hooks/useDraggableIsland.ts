@@ -35,6 +35,17 @@ function metrics(el: HTMLElement) {
   };
 }
 
+/** 可操作元件：按在上面是操作它，不是拖曳 */
+const INTERACTIVE = 'button, input, select, textarea, a, label';
+
+/**
+ * 按下的位置能不能開始拖曳：要在小島本身的 DOM 內（portal 出去的視窗事件仍會冒泡到這裡），
+ * 且不在可操作元件上（拖曳會捕捉指標，元件收不到 click）
+ */
+export function startsDrag(island: HTMLElement, target: EventTarget | null): boolean {
+  return target instanceof Element && island.contains(target) && target.closest(INTERACTIVE) === null;
+}
+
 export function useDraggableIsland(storageKey: string, disabled = false): DraggableIsland {
   const key = positionKey(storageKey);
   const ref = useRef<HTMLDivElement>(null);
@@ -69,7 +80,7 @@ export function useDraggableIsland(storageKey: string, disabled = false): Dragga
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (disabled || e.button !== 0) return;
     const el = ref.current;
-    if (!el) return;
+    if (!el || !startsDrag(el, e.target)) return;
     const box = el.getBoundingClientRect();
     const { scale } = metrics(el);
     dragOffset.current = { x: (e.clientX - box.left) / scale, y: (e.clientY - box.top) / scale };

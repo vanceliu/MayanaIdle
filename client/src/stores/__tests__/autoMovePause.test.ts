@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useMapControlStore } from '../mapControlStore';
 import { useMapMonsterStore } from '../mapMonsterStore';
 import type { MapData } from '../../models/mapControl';
@@ -90,6 +90,51 @@ describe('setAutoMove 與戰鬥後恢復等待', () => {
     // gameLoopTick 的 aboveResume 分支：解除暫停後重新啟動自動移動
     useMapControlStore.getState().setPaused(false);
     useMapControlStore.getState().setAutoMove(true);
+
+    expect(useMapControlStore.getState().isMoving).toBe(true);
+  });
+});
+
+/** 抵達後的延遲重選目標：期間點地圖、關閉自動移動或換圖就不執行（`38-map-control.md` § 38.5） */
+describe('抵達後延遲重選目標', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetStores(false);
+    useMapControlStore.setState({ autoMove: true, isMoving: true, currentPath: [{ x: 6, y: 5 }], pathIndex: 0 });
+    useMapControlStore.getState().tick(1000);
+    expect(useMapControlStore.getState().isMoving).toBe(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('等待期間點地圖：照點擊的目的地走，不被重選覆蓋', () => {
+    useMapControlStore.getState().moveToTarget({ x: 2, y: 2 });
+
+    vi.advanceTimersByTime(2000);
+
+    expect(useMapControlStore.getState().targetPosition).toEqual({ x: 2, y: 2 });
+  });
+
+  it('等待期間關閉自動移動：不再起步', () => {
+    useMapControlStore.getState().setAutoMove(false);
+
+    vi.advanceTimersByTime(2000);
+
+    expect(useMapControlStore.getState().isMoving).toBe(false);
+  });
+
+  it('等待期間換圖：不在新圖上起步', () => {
+    useMapControlStore.setState({ currentMap: { ...testMap, id: 'other-map' } });
+
+    vi.advanceTimersByTime(2000);
+
+    expect(useMapControlStore.getState().isMoving).toBe(false);
+  });
+
+  it('沒有任何變動：照常重選目標', () => {
+    vi.advanceTimersByTime(2000);
 
     expect(useMapControlStore.getState().isMoving).toBe(true);
   });

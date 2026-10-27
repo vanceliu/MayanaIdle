@@ -54,7 +54,7 @@ describe('遠端 action 允許清單', () => {
     const session = [...server.sessions].at(-1)!;
     const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
     send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    send({ t: 'resume', token: auth.issueSession(user.id) });
+    send({ t: 'resume', token: await auth.issueSession(user.id) });
     send({ t: 'create_character', name: 'Alice', className: 'knight', bonusAttrs: KNIGHT_BONUS });
     await vi.waitFor(() => expect(session.game.getState().character?.name).toBe('Alice'));
     let nextId = 1;
@@ -71,6 +71,17 @@ describe('遠端 action 允許清單', () => {
   it.each(REMOVED)('%s 不可遠端呼叫', async name => {
     const client = await enter();
     const reply = await client.act(name);
+
+    expect(reply).toMatchObject({ t: 'error', code: 'action_denied' });
+  });
+
+  it.each([
+    ['game', 'castQuickSlotSkill'], ['game', 'castSelfSkill'], ['game', 'rememberHuntLocation'],
+    ['mapControl', 'stopMoving'], ['combatCommand', 'requestSkill'], ['mailbox', 'refresh'],
+    ['game', 'restoreInTrainingGround'],
+  ])('client 未呼叫的 %s.%s 不可遠端呼叫', async (store, name) => {
+    const client = await enter();
+    const reply = await client.actIn(store, name);
 
     expect(reply).toMatchObject({ t: 'error', code: 'action_denied' });
   });

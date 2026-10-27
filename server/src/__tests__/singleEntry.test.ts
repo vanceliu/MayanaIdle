@@ -52,7 +52,7 @@ describe('同帳號單一角色在場', () => {
     client.session = [...server.sessions].at(-1)!;
     client.send = msg => handlers.message(JSON.stringify(msg));
     client.send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    client.send({ t: 'resume', token: auth.issueSession(userId) });
+    client.send({ t: 'resume', token: await auth.issueSession(userId) });
     await vi.waitFor(() => expect(client.sent.some(m => m.t === 'auth_ok')).toBe(true));
     return client;
   }
@@ -80,7 +80,7 @@ describe('同帳號單一角色在場', () => {
     await vi.waitFor(() => expect(character(client)).toBeNull());
   }
 
-  it('同帳號另一處進入不同角色：舊連線被踢除，共用倉庫讀到舊連線 flush 後的值', async () => {
+  it('同帳號另一處進入不同角色：舊連線被踢除，帳號倉庫讀到舊連線 flush 後的值', async () => {
     const user = await auth.register('alice', 'alicepw1');
     const setup = await connect(user.id);
     await create(setup, 'Alpha');

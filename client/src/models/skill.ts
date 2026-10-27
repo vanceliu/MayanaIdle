@@ -165,7 +165,7 @@ export const SKILL_WIND_BLADE: Skill = {
  * - 近身（1.5）直接寫「近身」，寫成「1.5 格」對玩家沒有資訊量
  * - 用詞固定為**射程**：介面上的「範圍」已經被 AOE 半徑佔用，兩者不可混用
  *
- * 顯示位置：技能面板 tooltip、Wiki 技能表、魔法學院、職業工會 —— 共用這一個函式，
+ * 顯示位置：技能面板 tooltip、Wiki 技能表、魔法學院 —— 共用這一個函式，
  * 避免四個地方各寫一套而說法不一致。
  */
 export function formatSkillRange(skill: Pick<Skill, 'type' | 'range'>): string {

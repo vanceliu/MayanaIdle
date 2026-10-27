@@ -14,6 +14,14 @@ import { getEffectiveMaxHp, getEffectiveMaxMp } from '../../client/src/stores/ga
 import { InstanceManager, instanceKey } from './instances';
 import { PartyError, PartyManager, type MemberIdentity, type Party } from './party';
 import { TradeError, TradeManager, type Trade } from './trade';
+import { GuildError, GuildManager, type Guild, type GuildIdentity } from './guild';
+import { MemoryGuildStorage, type GuildStorage } from './db/guildStorage';
+import {
+  GUILD_WAREHOUSE_FULL_MESSAGE, depositGoldToGuild, depositToGuild, withdrawFromGuild, withdrawGoldFromGuild,
+} from './guildWarehouse';
+import type { GuildInviteView } from '../../client/src/stores/guildStore';
+import { getTotalAttributes } from '../../client/src/models/character';
+import { getEffectiveGearArray } from '../../client/src/systems/gear';
 import type { ChatChannel, ChatMessageView } from '../../client/src/net/protocol';
 import { getRegion } from '../../client/src/models/mapData';
 import type { PlayerSession } from './playerSession';
@@ -42,7 +50,10 @@ export class World {
   readonly parties = new PartyManager();
   readonly instances = new InstanceManager();
   readonly trades = new TradeManager();
+  readonly guilds: GuildManager;
   private nextChatId = 1;
+  /** 上一次送出的公會分頁快照簽章，變了才 setState */
+  private readonly guildSignature = new WeakMap<PlayerSession, string>();
   private readonly tradeSignature = new WeakMap<PlayerSession, string>();
   /** 上一次送出的隊伍面板快照簽章，變了才 setState */
   private readonly partySignature = new WeakMap<PlayerSession, string>();
@@ -56,6 +67,10 @@ export class World {
   /** tick 出錯的玩家交給連線層踢除；由 `GameServer` 接上 */
   onSessionFault: (session: PlayerSession) => void = () => {};
 
+  constructor(guildStorage: GuildStorage = new MemoryGuildStorage()) {
+    this.guilds = new GuildManager(guildStorage);
+  }
+
   // ---------- 查詢 ----------
 
   sessionOf(characterId: number): PlayerSession | undefined {
@@ -67,6 +82,19 @@ export class World {
     const ch = session.game.getState().character;
     if (!ch?.id) return null;
     return { characterId: ch.id, name: ch.name, className: ch.className };
+  }
+
+  guildIdentityOf(session: Session): GuildIdentity | null {
+    const ch = session.game.getState().character;
+    if (!ch?.id) return null;
+    return { characterId: ch.id, name: ch.name, className: ch.className, level: ch.level };
+  }
+
+  /** 公會人數上限用的魅力：含裝備（已套素質需求凍結），不含 buff（`11-guild.md` § 11.5） */
+  chaOf(session: Session): number {
+    const gs = session.game.getState();
+    const ch = gs.character!;
+    return getTotalAttributes(ch, undefined, getEffectiveGearArray(ch, gs.activeEffects, gs.equippedGear)).CHA;
   }
 
   partyKeyOf(session: Session): string {
@@ -101,10 +129,21 @@ export class World {
   onCharacterEnter(session: PlayerSession): void {
     const identity = this.identityOf(session);
     if (identity) this.parties.setOnline(identity.characterId, true, identity);
+    this.refreshGuildMember(session);
+  }
+
+  /** 離線名單顯示的是最後一次在線時的名稱、職業、等級；盟主同時記下魅力 */
+  private refreshGuildMember(session: PlayerSession): void {
+    const me = this.guildIdentityOf(session);
+    if (!me) return;
+    this.guilds.refreshMember(me.characterId, me);
+    const guild = this.guilds.guildOf(me.characterId);
+    if (guild?.leaderId === me.characterId) this.guilds.noteLeaderCha(guild, this.chaOf(session));
   }
 
   onCharacterLeave(session: PlayerSession): void {
     const identity = this.identityOf(session);
+    this.refreshGuildMember(session);
     if (identity) {
       this.chatLimit.forget(identity.characterId, Date.now());
       this.parties.setOnline(identity.characterId, false);
@@ -114,6 +153,8 @@ export class World {
     this.remove(session);
     session.party.setState({ party: null, invites: [], teammates: [], onMap: [] });
     session.trade.setState({ trade: null, offers: [], message: null });
+    session.guild.setState({ guild: null, invites: [], warehouse: null, message: null });
+    this.guildSignature.delete(session);
     this.partySignature.delete(session);
     this.tradeSignature.delete(session);
     this.knownInParty.delete(session);
@@ -144,7 +185,7 @@ export class World {
     return { session };
   }
 
-  /** 依頻道路由；公會頻道沒有公會資料可查，一律拒絕 */
+  /** 依頻道路由 */
   handleChat(session: PlayerSession, channel: ChatChannel, rawText: unknown, rawTarget?: unknown): PartyActionResult {
     const me = this.identityOf(session);
     if (!me) return { ok: false, message: '尚未進入世界' };
@@ -182,8 +223,16 @@ export class World {
         recipients = [...this.sessions].filter(s => s.game.getState().character?.currentRegion === ch.currentRegion);
         break;
       }
-      case 'guild':
-        return { ok: false, message: '尚無公會' };
+      case 'guild': {
+        const guild = this.guilds.guildOf(me.characterId);
+        if (!guild) return { ok: false, message: '尚無公會' };
+        recipients = [];
+        for (const id of guild.members.keys()) {
+          const s = this.sessionOf(id);
+          if (s) recipients.push(s);
+        }
+        break;
+      }
       case 'whisper': {
         const found = this.findChatTarget(rawTarget);
         if ('error' in found) return { ok: false, message: found.error };
@@ -330,9 +379,10 @@ export class World {
     };
   }
 
-  /** 隊籍變動後把受影響的人放到正確的實例 */
+  /** 隊籍變動後把受影響的人放到正確的實例；載圖中的人由 `syncWorld` 載完後自行放入（§ 97.7.1） */
   private replaceAll(reason: 'map' | 'party'): void {
     for (const s of this.sessions) {
+      if (s.worldLoading) continue;
       if (!s.game.getState().character || !s.mapControl.getState().currentMap) continue;
       const ch = s.game.getState().character!;
       const key = instanceKey(this.instanceOwnerKey(s, ch.currentRegion), ch.currentRegion, ch.currentFloor);
@@ -404,6 +454,9 @@ export class World {
           this.afterPartyChange(party);
           return { ok: true };
         }
+        case 'clearMessage':
+          // 開啟隊伍面板時清除上一次操作的訊息（§ 97.7.3）；訊息由 `ws.ts` 依回傳值寫入
+          return { ok: true };
         default:
           return { ok: false, message: `未知的隊伍操作 ${name}` };
       }
@@ -441,11 +494,13 @@ export class World {
 
   tick(): Map<Session, CombatVisual[]> {
     this.replaceAll('map');
-    const ticking = [...this.sessions].filter(s => !this.faulted.has(s));
+    // 試驗場由 client 本機沙盒模擬（§ 97.2），server 不推進該玩家
+    const ticking = [...this.sessions].filter(s => !this.faulted.has(s) && !isTrainingRegion(s.game.getState().character?.currentRegion ?? ''));
     const visuals = tickWorld(TICK_MS, ticking, this.instances.all(), fault => this.onTickFault(fault));
     this.instances.prune();
     this.syncPartyViews([...this.sessions]);
     this.syncTradeViews([...this.sessions]);
+    this.syncGuildViews([...this.sessions]);
     return visuals;
   }
 
@@ -532,6 +587,7 @@ export class World {
         prevPosition: mc.prevPlayerPosition,
         hp: ch.hp,
         maxHp: getEffectiveMaxHp(ch, gs.equippedGear, gs.activeEffects),
+        ...this.guildNameField(ch.id!),
       });
     }
     return out;
@@ -550,9 +606,196 @@ export class World {
       out.push({
         characterId: ch.id, name: ch.name, className: ch.className, level: ch.level,
         inParty: known && !!this.parties.partyOf(ch.id),
+        ...this.guildNameField(ch.id),
       });
     }
     out.sort((a, b) => a.characterId - b.characterId);
     return out;
+  }
+
+  // ---------- 公會（`11-guild.md`） ----------
+
+  private guildNameField(characterId: number): { guildName?: string } {
+    const guild = this.guilds.guildOf(characterId);
+    return guild ? { guildName: guild.name } : {};
+  }
+
+  async handleGuildAction(session: PlayerSession, name: string, args: unknown[]): Promise<PartyActionResult> {
+    const me = this.guildIdentityOf(session);
+    if (!me) return { ok: false, message: '尚未進入世界' };
+    const now = Date.now();
+    const affected = new Set<PlayerSession>([session]);
+    /** 倉庫操作結束後（成功或失敗）都把最新內容送給這個人（§ 11.8） */
+    let warehouseTouched = false;
+    let saveNeeded = false;
+    const addMembers = (guild: Guild) => {
+      for (const id of guild.members.keys()) {
+        const s = this.sessionOf(id);
+        if (s) affected.add(s);
+      }
+    };
+    try {
+      switch (name) {
+        case 'create': {
+          // 建立與解散在公會 NPC（§ 11.3、§ 11.6），NPC 只站在城鎮
+          this.requireTown(session);
+          const guild = await this.guilds.create(me, this.chaOf(session), args[0], now);
+          return { ok: true, message: `已建立公會「${guild.name}」` };
+        }
+        case 'disband': {
+          this.requireTown(session);
+          const guild = await this.guilds.disband(me.characterId);
+          addMembers(guild);
+          for (const s of affected) s.game.getState().pushSystemLog(`公會「${guild.name}」已解散`);
+          return { ok: true };
+        }
+        case 'invite': {
+          // 名單上點的傳角色 id，手動輸入的傳角色名稱，兩種都收（§ 11.6）
+          const raw = args[0];
+          const byName = typeof raw === 'string' && !/^\d+$/.test(raw.trim());
+          const target = byName ? this.findOnlineByName(raw) : this.sessionOf(Number(raw));
+          const identity = target ? this.guildIdentityOf(target) : null;
+          if (!identity) {
+            throw new GuildError('target_offline', byName ? `找不到「${String(raw).trim()}」，或對方不在線上` : '對方不在線上');
+          }
+          this.guilds.invite(me.characterId, this.chaOf(session), identity, now);
+          affected.add(target!);
+          return { ok: true, message: `已邀請 ${identity.name}` };
+        }
+        case 'accept': {
+          const guild = await this.guilds.accept(String(args[0]), me, now);
+          addMembers(guild);
+          for (const s of affected) {
+            s.game.getState().pushSystemLog(s === session ? `已加入公會「${guild.name}」` : `${me.name} 加入了公會`);
+          }
+          return { ok: true };
+        }
+        case 'decline': {
+          const declined = this.guilds.decline(String(args[0]), me.characterId);
+          const from = declined ? this.sessionOf(declined.fromCharacterId) : undefined;
+          if (from) {
+            affected.add(from);
+            from.game.getState().pushSystemLog(`${me.name} 拒絕了你的公會邀請`);
+          }
+          return { ok: true };
+        }
+        case 'leave': {
+          const guild = await this.guilds.leave(me.characterId);
+          addMembers(guild);
+          session.game.getState().pushSystemLog(`已退出公會「${guild.name}」`);
+          return { ok: true };
+        }
+        case 'kick': {
+          const targetId = Number(args[0]);
+          const guild = await this.guilds.kick(me.characterId, targetId);
+          addMembers(guild);
+          const target = this.sessionOf(targetId);
+          if (target) {
+            affected.add(target);
+            target.game.getState().pushSystemLog(`你已被移出公會「${guild.name}」`);
+          }
+          return { ok: true };
+        }
+        case 'clearMessage':
+          // 開啟公會分頁時清除上一次操作的訊息；訊息由 `ws.ts` 依回傳值寫入
+          return { ok: true };
+        // ---------- 公會倉庫（§ 11.8）：只在打開分頁與自己存取後送內容 ----------
+        case 'openWarehouse':
+          this.requireTown(session);
+          if (!this.guilds.guildOf(me.characterId)) throw new GuildError('no_guild', '你沒有公會');
+          warehouseTouched = true;
+          return { ok: true };
+        case 'closeWarehouse':
+          session.guild.setState({ warehouse: null });
+          return { ok: true };
+        case 'depositWarehouse': {
+          this.requireTown(session);
+          warehouseTouched = true;
+          const result = await depositToGuild(this.guilds, session, args[0]);
+          saveNeeded = result.equipment + result.materials > 0;
+          return { ok: true, message: result.full ? GUILD_WAREHOUSE_FULL_MESSAGE : undefined };
+        }
+        case 'withdrawWarehouse':
+          this.requireTown(session);
+          warehouseTouched = true;
+          await withdrawFromGuild(this.guilds, session, args[0]);
+          saveNeeded = true;
+          return { ok: true };
+        case 'depositWarehouseGold':
+          this.requireTown(session);
+          warehouseTouched = true;
+          saveNeeded = (await depositGoldToGuild(this.guilds, session, args[0])) > 0;
+          return { ok: true };
+        case 'withdrawWarehouseGold':
+          this.requireTown(session);
+          warehouseTouched = true;
+          await withdrawGoldFromGuild(this.guilds, session, args[0]);
+          saveNeeded = true;
+          return { ok: true };
+        default:
+          return { ok: false, message: `未知的公會操作 ${name}` };
+      }
+    } catch (e) {
+      if (e instanceof GuildError) return { ok: false, message: e.message };
+      throw e;
+    } finally {
+      if (warehouseTouched) {
+        const guild = this.guilds.guildOf(me.characterId);
+        session.guild.setState({ warehouse: guild ? this.guilds.warehouseView(guild) : null });
+      }
+      // 倉庫那一側已落地，背包與金幣也要立刻落地（§ 11.8，同交易）
+      if (saveNeeded) await session.game.getState().flushSaveNow();
+      this.syncGuildViews([...affected]);
+    }
+  }
+
+  private requireTown(session: PlayerSession): void {
+    const region = session.game.getState().character?.currentRegion ?? '';
+    if (getRegion(region)?.type !== 'town') throw new GuildError('not_in_town', '請到城鎮的公會 NPC 操作');
+  }
+
+  /** 刪除角色（§ 11.6）：成員移出；盟主則公會解散並通知在線成員 */
+  async onCharacterDeleted(characterId: number): Promise<void> {
+    const { disbanded, left } = await this.guilds.removeCharacter(characterId);
+    const guild = disbanded ?? left;
+    if (!guild) return;
+    const affected: PlayerSession[] = [];
+    for (const id of guild.members.keys()) {
+      const s = this.sessionOf(id);
+      if (s) affected.push(s);
+    }
+    if (disbanded) for (const s of affected) s.game.getState().pushSystemLog(`公會「${disbanded.name}」已解散`);
+    this.syncGuildViews(affected);
+  }
+
+  /** 公會分頁與公會邀請的快照；盟主在線時順便更新最後已知魅力 */
+  syncGuildViews(targets: PlayerSession[]): void {
+    const now = Date.now();
+    const online = new Map<number, PlayerSession>();
+    for (const s of this.sessions) {
+      const id = s.game.getState().character?.id;
+      if (id) online.set(id, s);
+    }
+    for (const s of targets) {
+      const ch = s.game.getState().character;
+      if (!ch?.id) continue;
+      const guild = this.guilds.guildOf(ch.id);
+      if (guild?.leaderId === ch.id) this.guilds.noteLeaderCha(guild, this.chaOf(s));
+      const view = guild ? this.guilds.view(guild, id => {
+        const other = online.get(id)?.game.getState().character;
+        return other ? { online: true, level: other.level } : { online: false };
+      }) : null;
+      const invites: GuildInviteView[] = this.guilds.invitesFor(ch.id, now).flatMap(i => {
+        const g = this.guilds.guilds.get(i.guildId);
+        const from = g?.members.get(i.fromCharacterId);
+        return g ? [{ id: i.id, guildId: g.id, guildName: g.name, fromName: from?.name ?? '', expiresAt: i.expiresAt }] : [];
+      });
+      // 退出、被踢、解散後倉庫分頁不能留著舊內容
+      if (!guild && s.guild.getState().warehouse) s.guild.setState({ warehouse: null });
+      const signature = JSON.stringify([view, invites]);
+      if (this.guildSignature.get(s) === signature) continue;
+      this.guildSignature.set(s, signature);
+      s.guild.setState({ guild: view, invites });
+    }
   }
 }

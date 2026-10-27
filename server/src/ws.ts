@@ -16,6 +16,7 @@ import { resetSync } from './sync';
 import { flush } from './tick';
 import { ACTION_ALLOWLIST, PROTOCOL_VERSION, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
 import { World } from './world';
+import type { GuildStorage } from './db/guildStorage';
 import { log } from './log';
 
 const CLASS_NAMES: ReadonlySet<string> = new Set(['knight', 'elf', 'elementalist', 'priest', 'thief']);
@@ -30,7 +31,12 @@ export interface GameServerDeps {
   mode: WorldMode;
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4） */
   leaderboard: (top: number) => LeaderboardSnapshotView;
+  /** 公會持久層（`11-guild.md`）；未指定時只存記憶體 */
+  guildStorage?: GuildStorage;
 }
+
+/** 單機世界沒有公會（`97-selfhosted-server.md` § 97.1） */
+export const SOLO_NO_GUILD_MESSAGE = '單機世界沒有公會';
 
 /** 訊息的最低形狀（§ 97.2 硬性要求）：非陣列物件且 `t` 為字串，其餘欄位由各訊息自行驗證 */
 function isMessageShape(value: unknown): value is { t: string } {
@@ -63,7 +69,7 @@ export function shutdownNotice(seconds: number): string {
 }
 
 export class GameServer {
-  readonly world = new World();
+  readonly world: World;
   readonly sessions: Set<PlayerSession>;
   private readonly deps: GameServerDeps;
   private closing = false;
@@ -75,6 +81,7 @@ export class GameServer {
 
   constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle(), registrations: RegistrationLimit = new RegistrationLimit()) {
     this.deps = deps;
+    this.world = new World(deps.guildStorage);
     this.throttle = throttle;
     this.registrations = registrations;
     this.sessions = this.world.sessions;
@@ -267,7 +274,7 @@ export class GameServer {
         if (isLoopbackBind(config.bind) && isLoopbackAddress(session.remoteAddress)) {
           const host = this.deps.auth.findByUsername(this.deps.hostUsername);
           if (host) {
-            const token = this.deps.auth.issueSession(host.id);
+            const token = await this.deps.auth.issueSession(host.id);
             await this.bindUser(session, host.id, host.username, token);
             autoLogin = { token, username: host.username, userId: host.id, isHost: true };
           }
@@ -281,7 +288,7 @@ export class GameServer {
         const user = await this.limitedRegistration(session, () => this.deps.auth.register(msg.username, msg.password));
         const recoveryCode = await this.deps.auth.issueRecoveryCode(user.id);
         this.assertCapacity();
-        const token = this.deps.auth.issueSession(user.id);
+        const token = await this.deps.auth.issueSession(user.id);
         await this.bindUser(session, user.id, user.username, token);
         session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, hasRecoveryCode: true, isHost: user.username === this.deps.hostUsername, recoveryCode });
         return;
@@ -289,7 +296,7 @@ export class GameServer {
       case 'login': {
         const user = await this.throttled(session, () => this.deps.auth.login(msg.username, msg.password));
         this.assertCapacity();
-        const token = this.deps.auth.issueSession(user.id);
+        const token = await this.deps.auth.issueSession(user.id);
         await this.bindUser(session, user.id, user.username, token);
         session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: user.hasPassword, hasRecoveryCode: user.hasRecoveryCode, isHost: user.username === this.deps.hostUsername });
         return;
@@ -298,7 +305,7 @@ export class GameServer {
         const { user, recoveryCode } = await this.throttled(session, () => this.deps.auth.recover(msg.code, msg.password));
         await this.kickOtherConnections(user.id, session, PASSWORD_CHANGED_REASON);
         this.assertCapacity();
-        const token = this.deps.auth.issueSession(user.id);
+        const token = await this.deps.auth.issueSession(user.id);
         await this.bindUser(session, user.id, user.username, token);
         session.send({ t: 'auth_ok', token, username: user.username, userId: user.id, hasPassword: true, hasRecoveryCode: true, isHost: user.username === this.deps.hostUsername, recoveryCode });
         return;
@@ -317,7 +324,7 @@ export class GameServer {
         // host 不設密碼（§ 97.5）；單機世界要保護的只有管理介面，那是 admin-password
         if (session.username === this.deps.hostUsername) throw new AuthError('host_no_password', 'host 帳號不設密碼；管理介面的密碼請改 server.properties 的 admin-password');
         await this.throttled(session, () => this.deps.auth.changePassword(userId, msg.current, msg.password));
-        if (session.token) this.deps.auth.revokeOtherSessions(userId, session.token);
+        if (session.token) await this.deps.auth.revokeOtherSessions(userId, session.token);
         await this.kickOtherConnections(userId, session, PASSWORD_CHANGED_REASON);
         if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: true });
         return;
@@ -331,7 +338,7 @@ export class GameServer {
         return;
       }
       case 'logout': {
-        if (session.token) this.deps.auth.revokeSession(session.token);
+        if (session.token) await this.deps.auth.revokeSession(session.token);
         if (session.game.getState().character) {
           this.world.onCharacterLeave(session);
           await session.game.getState().logout();
@@ -379,6 +386,7 @@ export class GameServer {
         const owned = (await this.deps.repo.getCharacter(msg.id))?.userId === session.userId;
         if (!owned) throw new AuthError('not_owner', '不是你的角色');
         await session.game.getState().deleteCharacter(msg.id);
+        await this.world.onCharacterDeleted(msg.id);
         await session.game.getState().loadCharacterList();
         flush(session);
         return;
@@ -400,14 +408,23 @@ export class GameServer {
         if (!allow || !allow.has(msg.name)) throw new AuthError('action_denied', `不允許的操作 ${msg.store}.${msg.name}`);
         if (msg.store === 'party') {
           const result = await this.world.handlePartyAction(session, msg.name, msg.args ?? []);
-          if (result.message) session.party.setState({ message: result.message });
+          session.party.setState({ message: result.message ?? null });
           flush(session);
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
           return;
         }
         if (msg.store === 'trade') {
           const result = await this.world.handleTradeAction(session, msg.name, msg.args ?? []);
-          if (result.message) session.trade.setState({ message: result.message });
+          session.trade.setState({ message: result.message ?? null });
+          flush(session);
+          if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
+          return;
+        }
+        if (msg.store === 'guild') {
+          const result = this.deps.mode === 'solo'
+            ? { ok: false, message: SOLO_NO_GUILD_MESSAGE }
+            : await this.world.handleGuildAction(session, msg.name, msg.args ?? []);
+          session.guild.setState({ message: result.message ?? null });
           flush(session);
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
           return;

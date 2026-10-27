@@ -48,6 +48,13 @@ describe('CSS 規則', () => {
     expect(block?.[1]).toContain('pointer-events: auto');
   });
 
+  it('城鎮標題與設施列本身不吃滑鼠事件，只有設施按鈕收', () => {
+    const container = APP_CSS.match(/\.town-header,\s*\n\.town-npc-bar\s*\{([^}]*)\}/);
+    expect(container?.[1]).toContain('pointer-events: none');
+    const button = APP_CSS.match(/\n\.town-npc-btn\s*\{([^}]*)\}/);
+    expect(button?.[1]).toContain('pointer-events: auto');
+  });
+
   it('設施視窗的底部保留區讀量測值，不是寫死的數字', () => {
     const block = APP_CSS.match(/\.town-modal-overlay\s*\{([^}]*)\}/);
     expect(block?.[1]).toMatch(/padding:[^;]*var\(--hud-band-bottom/);

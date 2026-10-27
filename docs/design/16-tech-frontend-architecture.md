@@ -105,7 +105,9 @@ client/
 │   │       ├── ArmorShop.tsx
 │   │       ├── Inn.tsx
 │   │       ├── MagicAcademy.tsx
-│   │       ├── ClassGuild.tsx
+│   │       ├── AdventurerGuild.tsx
+│   │       ├── ClassQuests.tsx
+│   │       ├── GuildNpc.tsx
 │   │       ├── TownBlacksmith.tsx
 │   │       └── Storage.tsx
 │   ├── wiki/                 # 遊戲內建 Wiki 系統
@@ -202,6 +204,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 預設 | 不浮動，照原本的流排接在 buff 下方 |
 | 拖過之後 | 改為固定座標，buff 再長也推不到它 |
 | 位置記憶 | 各自一個 localStorage 鍵，夾在畫面內（`useDraggableIsland`） |
+| 拖曳起點 | 按在小島內的按鈕、輸入框、選單、連結、label 上不開始拖曳；小島以 portal 開出的視窗（如木樁設定）不屬於小島，按在裡面也不拖 |
 | 手機 | 不可拖（HUD 是一條全寬狀態列，`47-mobile.md`） |
 | 重設 | 設定的「重設視窗位置」會廣播，各視窗自己清掉自己的鍵並回到預設位置 |
 
@@ -212,6 +215,8 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 > 容器一律 `pointer-events: none`，只有裡面的按鈕／面板 `pointer-events: auto`。
 > **四個 `.hud-*` 島同樣適用**：島的盒子包含島內元素之間的空隙，以及城鎮那格
 > `visibility: hidden` 的 `ExploreBar` 佔位。
+> **城鎮設施列同樣適用**：`.town-header`、`.town-npc-bar` 不吃，只有 `.town-npc-btn` 收；
+> 設施列換行後盒子含按鈕間空白，城鎮又會被提到視窗堆疊最上層（§ 32.15）。
 > `LogDock` 雖然也掛 `.hud`，但它是實體視窗，不在此列。
 > 改完要用 `document.elementFromPoint()` 驗命中；不可用 `dispatchEvent` 直接對 canvas 派事件。
 
@@ -242,7 +247,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 | 預設分頁 | 戰鬥紀錄；分頁狀態不持久化 |
 | 單機形態 | 沒有聊天分頁，不畫分頁列，標題列顯示「戰鬥紀錄」 |
 | 緩衝與捲動 | 兩個分頁各自獨立（戰鬥 200 行、聊天 300 則） |
-| 未讀 | 聊天分頁沒顯示時累加，數字標在分頁鈕上（`34-ui-guidelines.md` § 34.10），切過去歸零 |
+| 未讀 | 聊天分頁沒顯示時累加，切過去歸零。有未讀密語（別人密給自己的，不含自己送出的回顯）時分頁鈕徽章顯示密語則數並呼吸光暈；只有一般頻道未讀時縮成灰點、不給數字（`34-ui-guidelines.md` § 34.10） |
 | 位置與透明度 | 整個視窗一份，鍵沿用 `mayana.combatLogPos`／`mayana.combatLogOpacity` |
 
 - **預設停在左下角、下方 HUD 帶之上**（`bottom` 由量測到的 `--hud-band-bottom` 決定）——
@@ -261,6 +266,8 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 #### § 32.3.2 實體懸停名稱
 
 滑鼠移到任何實體球體（玩家／怪物／NPC）上，頭上顯示名稱。
+
+- 自己與隊友有公會時多一行：上行金色、小一號的《公會名》，下行角色名（`11-guild.md` § 11.7，`EntityHoverText`）。
 
 - 名稱**釘在球體上並跟著它移動**，不跟游標跑。
 - 命中判定與標籤錨點都必須用**渲染時的小數座標**，不可取整到格子 ——
@@ -354,7 +361,7 @@ interface BagItem {
   - 魔法學院製作魔法書（`MagicAcademy.tsx`）
   - 倉庫取出（`Storage.tsx` `withdrawEquip` / `withdrawMaterial`）
   - 脫下裝備（`gameStore.ts` `unequipItem`）
-  - 職業工會任務獎勵技能書（`gameStore.ts` `completeQuest`）
+  - 職業任務獎勵技能書（`gameStore.ts` `completeQuest`）
 - 已有同名消耗品堆疊時不佔新格子，允許直接累加數量
 
 ### Store Actions
@@ -631,10 +638,11 @@ interface ScriptTemplate {
 | `WeaponShop` | 按武器類型分類購買武器（含類型篩選 tab） |
 | `ArmorShop` | 按部位購買防具 |
 | `Inn` | 休息回復 HP/MP（完全休息/HP/MP 三種選項） |
-| `MagicAcademy` | 兩個 tab：「學習魔法」（金幣學 1~3 級 / 魔法書學 4~10 級）、「製作魔法書」（碎片 + 材料合成） |
-| `ClassGuild` | 職業技能書學習（消耗背包中的技能書） |
+| `MagicAcademy` | 三個 tab：「學習魔法」（金幣學 1~3 級 / 魔法書學 4~10 級）、「製作魔法書」（碎片 + 材料合成）、「職業技能」（消耗背包中的職業技能書） |
+| `AdventurerGuild` | 兩個 tab：「冒險任務」（隨機任務與貢獻等階）、「職業任務」（`ClassQuests`，職業技能書任務） |
+| `GuildNpc` | 公會建立／解散（`11-guild.md`）；只在開放世界出現，顯示條件在 `models/townNpc.ts` |
 | `TownBlacksmith` | 裝備強化 / 製作 |
-| `Storage` | 裝備與素材倉庫（帳號共用） |
+| `Storage` | 裝備與素材倉庫（帳號共用）；裝備列只印 icon + 名稱，完整內容 hover tooltip |
 
 所有城鎮組件在 setState 後統一呼叫 `useGameStore.getState().saveState()` 確保持久化。
 
@@ -1038,6 +1046,8 @@ interface TooltipProps {
 | `skill` | 技能 | `SkillPanel` | 420px |
 | `quest` | 進行中的任務 | `QuestTrackerContent` | 320px |
 | `script` | 自動天賦 | `ScriptEditorContent` | 480px |
+| `social` | 社群 | `SocialPanelContent`（隊伍 `PartyPanelContent`／公會 `GuildPanelContent`／在線 `OnMapPanelContent`；`97-selfhosted-server.md` § 97.7.5） | 380px |
+| `trade` | 交易 | `TradePanelContent`（無按鈕，有交易或邀請時自動開窗） | 520px |
 
 內容組件本身不變（拖放、右鍵選單、tooltip 行為完全沿用）。
 

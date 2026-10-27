@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PartyPanelContent, OnMapPanelContent, PartyButton, OnMapButton } from '../PartyPanel';
+import { PartyPanelContent, OnMapPanelContent } from '../PartyPanel';
+import { SocialButton } from '../SocialPanel';
 import { usePartyStore } from '../../stores/partyStore';
 import { useGameStore } from '../../stores/gameStore';
 import { useOnlineStore, type OnlineState } from '../../net/online';
@@ -122,7 +123,7 @@ describe('隊伍面板：結果訊息在重新開啟時清掉', () => {
  * 單機世界沒有別的玩家，隊伍與在線名單的入口就不該存在（§ 97.1）。
  * 單機一樣是連著一個 server，所以判斷條件是世界形態而不是有沒有連線。
  */
-describe('單機世界隱藏隊伍與在線名單', () => {
+describe('單機世界隱藏社群視窗（§ 97.7.5）', () => {
   beforeEach(() => {
     usePartyStore.setState({ party: null, invites: [{ fromCharacterId: 2, fromName: 'Bob' }] as never });
     useGameStore.setState({ character: { id: 1, name: '我' } as never });
@@ -134,22 +135,46 @@ describe('單機世界隱藏隊伍與在線名單', () => {
   ];
 
   for (const [label, state] of cases) {
-    it(`${label}：兩個按鈕都不出現`, () => {
+    it(`${label}：社群按鈕不出現`, () => {
       useOnlineStore.setState(state as never);
-      const party = render(<PartyButton />);
-      const onmap = render(<OnMapButton />);
-
-      expect(party.container.querySelector('button')).toBeNull();
-      expect(onmap.container.querySelector('button')).toBeNull();
+      const social = render(<SocialButton />);
+      expect(social.container.querySelector('button')).toBeNull();
     });
   }
 
-  it('開放形態：兩個按鈕都在', () => {
+  it('開放形態：社群按鈕在', () => {
     useOnlineStore.setState({ enabled: true, status: 'authed', worldMode: 'open' });
-    const party = render(<PartyButton />);
-    const onmap = render(<OnMapButton />);
+    const social = render(<SocialButton />);
+    expect(social.container.querySelector('button')).toBeTruthy();
+  });
+});
 
-    expect(party.container.querySelector('button')).toBeTruthy();
-    expect(onmap.container.querySelector('button')).toBeTruthy();
+/** 掉落分配（`97-selfhosted-server.md` § 97.7.3）：只有隊長能改 */
+describe('隊伍面板：掉落分配', () => {
+  const member = (characterId: number, name: string) => ({
+    characterId, name, className: 'knight', level: 1, hp: 1, maxHp: 1, mp: 1, maxMp: 1,
+    regionId: 'neutral-town', floor: null, online: true, joinedAt: characterId,
+  });
+
+  beforeEach(() => {
+    usePartyStore.setState({
+      party: { id: 'p', leaderId: 1, dropMode: 'all', members: [member(1, '隊長'), member(2, '隊員')] } as never,
+      invites: [], teammates: [], onMap: [], message: null,
+    });
+  });
+
+  it('隊長：顯示可切換的選單，兩個選項', () => {
+    useGameStore.setState({ character: { id: 1, name: '隊長' } as never });
+    render(<PartyPanelContent />);
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect([...select.options].map(o => o.textContent)).toEqual(['僅參與者', '全隊']);
+    expect(select.value).toBe('all');
+  });
+
+  it('隊員：只顯示目前模式的文字，沒有選單', () => {
+    useGameStore.setState({ character: { id: 2, name: '隊員' } as never });
+    const { container } = render(<PartyPanelContent />);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(container.querySelector('.party-drop-mode-value')?.textContent).toBe('全隊');
   });
 });

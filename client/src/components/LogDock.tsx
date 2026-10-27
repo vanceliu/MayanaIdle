@@ -28,6 +28,7 @@ export function LogDock() {
   const online = useMultiplayer();
   const authed = useOnlineStore(s => s.status === 'authed');
   const unread = useChatStore(s => s.unread);
+  const whisperUnread = useChatStore(s => s.whisperUnread);
   const setPanelOpen = useChatStore(s => s.setPanelOpen);
   const [tab, setTab] = useState<LogTab>('combat');
   // 單機沒有聊天分頁；線上斷線時退回戰鬥分頁，才不會停在一個空白的分頁上
@@ -35,6 +36,8 @@ export function LogDock() {
   const active: LogTab = hasChat ? tab : 'combat';
 
   // 未讀只在聊天分頁沒顯示時累加（`chatStore` 以 `panelOpen` 判定）
+  const chatBadgeShown = active !== 'chat' && unread > 0;
+  const hasWhisper = chatBadgeShown && whisperUnread > 0;
   useEffect(() => {
     setPanelOpen(active === 'chat');
     return () => setPanelOpen(false);
@@ -53,9 +56,10 @@ export function LogDock() {
           onClick={() => setTab(key)}
         >
           {LOG_TAB_LABELS[key]}
-          {key === 'chat' && active !== 'chat' && unread > 0 && (
-            <span className="quest-count-badge">{unread}</span>
-          )}
+          {/* § 34.10：有未讀密語給數字並呼吸；只有一般頻道時縮成灰點 */}
+          {key === 'chat' && chatBadgeShown && (hasWhisper
+            ? <span className="quest-count-badge is-whisper" aria-label={`未讀密語 ${whisperUnread} 則`}>{whisperUnread}</span>
+            : <span className="quest-count-badge is-dot" aria-label="有未讀訊息" />)}
         </button>
       ))}
     </div>

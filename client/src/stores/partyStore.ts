@@ -53,6 +53,8 @@ export interface TeammateView {
   prevPosition: Position;
   hp: number;
   maxHp: number;
+  /** 所屬公會名稱；無公會不帶（`11-guild.md` § 11.7 懸停名稱） */
+  guildName?: string;
 }
 
 /** 同一張地圖的非隊友：只有名單，無座標（§ 97.7.1） */
@@ -63,6 +65,8 @@ export interface OnMapPlayerView {
   level: number;
   /** 只有自己邀請被回絕過的對象才為 true；名單本身不透露隊籍 */
   inParty: boolean;
+  /** 所屬公會名稱；無公會不帶（`11-guild.md` § 11.7） */
+  guildName?: string;
 }
 
 export interface PartyState {
@@ -82,6 +86,8 @@ export interface PartyState {
   transferLeader: (characterId: number) => Promise<boolean>;
   setDropMode: (mode: PartyDropMode) => Promise<boolean>;
   setMessage: (message: string | null) => void;
+  /** 清除上一次操作的訊息；線上模式由 server 清除（`97-selfhosted-server.md` § 97.7.3） */
+  clearMessage: () => void;
   reset: () => void;
 }
 
@@ -101,6 +107,7 @@ export function createPartyStore(_session?: Session) {
     transferLeader: async () => false,
     setDropMode: async () => false,
     setMessage: message => set({ message }),
+    clearMessage: () => set({ message: null }),
     reset: () => set({ party: null, invites: [], teammates: [], onMap: [], message: null }),
   }));
 }

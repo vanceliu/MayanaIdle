@@ -133,6 +133,47 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     version: 5,
     up: hashExistingSessionTokens,
   },
+  {
+    /** 公會（`11-guild.md`）。`guild_members.character_id` 為主鍵：一個角色只屬一個公會（§ 11.5） */
+    version: 6,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS guilds (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          name_key TEXT NOT NULL UNIQUE,
+          leader_character_id INTEGER NOT NULL,
+          leader_cha INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS guild_members (
+          character_id INTEGER PRIMARY KEY,
+          guild_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          class_name TEXT NOT NULL,
+          level INTEGER NOT NULL,
+          joined_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_guild_members_guild ON guild_members(guild_id);
+      `);
+    },
+  },
+  {
+    /** 公會倉庫（`11-guild.md` § 11.8）。裝備沿用 `equipment_instances`（`storageType = 'guild'`、`owner_id` 為公會 id） */
+    version: 7,
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(guilds)').all() as { name: string }[]).map(c => c.name);
+      if (!columns.includes('warehouse_gold')) db.exec('ALTER TABLE guilds ADD COLUMN warehouse_gold INTEGER NOT NULL DEFAULT 0');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS guild_warehouse_items (
+          guild_id INTEGER NOT NULL,
+          item_id INTEGER NOT NULL,
+          amount INTEGER NOT NULL,
+          PRIMARY KEY (guild_id, item_id)
+        );
+      `);
+    },
+  },
 ];
 
 export function hashExistingSessionTokens(db: DatabaseSync): void {

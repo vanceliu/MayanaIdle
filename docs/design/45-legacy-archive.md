@@ -40,7 +40,7 @@
 | 統計 | § 37.1 的所有計數器 + 貢獻度 |
 | 版本 | 淘汰當下的 `dataVersion` 與封存時間 |
 
-共用倉庫為**帳號層級**，不屬於任何角色，故另外以一筆 `type: 'sharedWarehouse'` 的紀錄封存。
+帳號倉庫為**帳號層級**，不屬於任何角色，故另外以一筆 `type: 'sharedWarehouse'` 的紀錄封存。
 
 ### 資料結構
 
@@ -50,7 +50,7 @@ interface LegacyArchive {
   userId: number;
   type: 'character' | 'sharedWarehouse';
   /** 顯示用摘要，列表頁不需解析 payload 即可呈現 */
-  label: string;          // 角色名稱，或「共用倉庫」
+  label: string;          // 角色名稱，或「帳號倉庫」
   className?: string;
   level?: number;
   /** 淘汰當下的資料版本 */

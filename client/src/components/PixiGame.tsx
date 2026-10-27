@@ -16,7 +16,11 @@ import type { TownFacility } from './TownView';
 import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } from '../pixi/utils/isometric';
 import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
 import { gameLoopTick } from '../systems/gameLoop';
-import { isOnline } from '../net/online';
+import { isOnline, isMultiplayer } from '../net/online';
+import { visibleNpcs } from '../models/townNpc';
+import { useGuildStore } from '../stores/guildStore';
+import { EntityHoverText } from './EntityHoverText';
+import { isTrainingSandbox } from '../net/trainingSandbox';
 import { mirrorLastTickAt, drainMirrorVisuals, mirrorCastProgress } from '../net/mirror';
 import { lerpPosition } from '../systems/tickDriver';
 import { TICK_MS } from '../core/clock';
@@ -60,7 +64,7 @@ export function PixiGame() {
    * 只有文字進 React state；位置每幀由 ticker 直接寫進 DOM ——
    * 名稱要跟著球體跑（怪物會動、鏡頭也會動），用 state 更新等於每幀 re-render。
    */
-  const [hoverText, setHoverText] = useState<string | null>(null);
+  const [hover, setHover] = useState<{ text: string; guild?: string } | null>(null);
   const hoverTargetRef = useRef<EntityHover['target'] | null>(null);
   const hoverLabelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,7 +138,8 @@ export function PixiGame() {
         // 線上模式：模擬在 server，這裡只在兩個 tick 之間插值並畫演出
         let alpha = 1;
         try {
-          if (isOnline()) {
+          // 試驗場本機沙盒（§ 97.2）照單機跑本機迴圈
+          if (isOnline() && !isTrainingSandbox()) {
             alpha = Math.min(1, (performance.now() - mirrorLastTickAt()) / TICK_MS);
             syncTeammates(usePartyStore.getState().teammates, map, scene!, teammateMapRef.current, delta, alpha);
             renderCombatVisuals(drainMirrorVisuals(), scene!.effectLayer, playerEntityRef.current, monsterMapRef.current, teammateMapRef.current);
@@ -177,7 +182,7 @@ export function PixiGame() {
         );
 
         /* 常駐腳本放的 buff／治癒在 store 那一層，只能靠佇列傳過來（線上模式由 server 以 `self_cast` 推送） */
-        if (!isOnline()) drainSelfCastFxInto(scene!.effectLayer, map, playerPos);
+        if (!isOnline() || isTrainingSandbox()) drainSelfCastFxInto(scene!.effectLayer, map, playerPos);
 
         /* 染色與暈眩標記跟著 debuff 存續，所以每幀對一次帳（§ 48.8.2、§ 48.8.3） */
         syncStatusFx(
@@ -403,17 +408,22 @@ export function PixiGame() {
         useMapMonsterStore.getState().monsters,
         defaultSession.combat.monsterInstances,
         usePartyStore.getState().teammates,
+        useGuildStore.getState().guild?.name,
       );
 
       hoverTargetRef.current = hit ? hit.target : null;
-      setHoverText(hit?.text ?? null);
+      setHover(prev => {
+        if (!hit) return null;
+        // 每次 mousemove 都會進來：內容沒變就沿用，不觸發 re-render
+        return prev && prev.text === hit.text && prev.guild === hit.guild ? prev : { text: hit.text, guild: hit.guild };
+      });
     };
 
     container.addEventListener('click', handleClick);
     container.addEventListener('mousemove', handleMove);
     container.addEventListener('mouseleave', () => {
       hoverTargetRef.current = null;
-      setHoverText(null);
+      setHover(null);
     });
     return () => {
       container.removeEventListener('click', handleClick);
@@ -434,8 +444,10 @@ export function PixiGame() {
     >
       {/* Pixi canvas 以 appendChild 掛入，需與 React 管理的節點分離 */}
       <div ref={containerRef} className="map-canvas-stage" />
-      {hoverText && (
-        <div ref={hoverLabelRef} className="entity-hover-label">{hoverText}</div>
+      {hover && (
+        <div ref={hoverLabelRef} className="entity-hover-label">
+          <EntityHoverText text={hover.text} guild={hover.guild} />
+        </div>
       )}
       {initError && (
         <div className="map-init-error">
@@ -985,7 +997,7 @@ function syncNpcs(map: MapData, scene: GameScene, entities: NpcEntity[]): void {
   }
   entities.length = 0;
 
-  for (const npc of map.npcs ?? []) {
+  for (const npc of visibleNpcs(map, isMultiplayer())) {
     // 點擊由 DOM 的 handleClick 依格子判斷，NPC 實體只負責顯示
     const entity = new NpcEntity(npc);
     scene.entityLayer.container.addChild(entity.container);
@@ -1002,10 +1014,11 @@ function syncNpcs(map: MapData, scene: GameScene, entities: NpcEntity[]): void {
  * 不能借用 `screenToMapTile`：那支對不可通行格回傳 null，而 NPC 站的格子正是不可通行的。
  */
 function findNpcAtScreen(map: MapData, screenX: number, screenY: number): MapNpc | null {
-  if (!map.npcs?.length) return null;
+  const npcs = visibleNpcs(map, isMultiplayer());
+  if (!npcs.length) return null;
   const world = screenToWorld(screenX, screenY + NPC_BODY_OFFSET, 0);
   const tile = { x: Math.round(world.x), y: Math.round(world.y) };
-  return map.npcs.find(npc => npc.x === tile.x && npc.y === tile.y) ?? null;
+  return npcs.find(npc => npc.x === tile.x && npc.y === tile.y) ?? null;
 }
 
 /** 實體球體的命中半徑（螢幕像素）；比實際圓點略大，滑過去就抓得到 */
@@ -1019,6 +1032,8 @@ function entityScreenPos(map: MapData, pos: Position): { sx: number; sy: number 
 
 export interface EntityHover {
   text: string;
+  /** 所屬公會（`11-guild.md` § 11.7）：只有自己與隊友會帶 */
+  guild?: string;
   /** 指到的是誰 —— 標籤要每幀跟著他的目前位置，不是停在懸停當下的座標 */
   target: { kind: 'npc' | 'monster' | 'player' | 'teammate'; id?: string; memberId?: number; pos?: Position };
 }
@@ -1039,6 +1054,7 @@ function findEntityAtScreen(
   monsters: MapMonster[],
   monsterInstances: Map<string, MonsterInstance>,
   teammates: TeammateView[] = [],
+  ownGuild?: string,
 ): EntityHover | null {
   const hits = (pos: Position): boolean => {
     // 用「原始小數座標」而不是取整到格子：玩家與怪物移動中畫在格子之間，
@@ -1049,7 +1065,7 @@ function findEntityAtScreen(
     return dx * dx + dy * dy <= ENTITY_HOVER_RADIUS * ENTITY_HOVER_RADIUS;
   };
 
-  for (const npc of map.npcs ?? []) {
+  for (const npc of visibleNpcs(map, isMultiplayer())) {
     if (hits(npc)) return { text: npc.name, target: { kind: 'npc', pos: { x: npc.x, y: npc.y } } };
   }
   for (const monster of monsters) {
@@ -1060,7 +1076,7 @@ function findEntityAtScreen(
     }
   }
   for (const t of teammates) {
-    if (hits(t.position)) return { text: t.name, target: { kind: 'teammate', memberId: t.characterId } };
+    if (hits(t.position)) return { text: t.name, guild: t.guildName, target: { kind: 'teammate', memberId: t.characterId } };
   }
-  return playerName && hits(playerPos) ? { text: playerName, target: { kind: 'player' } } : null;
+  return playerName && hits(playerPos) ? { text: playerName, guild: ownGuild, target: { kind: 'player' } } : null;
 }

@@ -13,7 +13,7 @@ import {
 /** `models/__tests__/townMaps.test.ts` 認得的設施 —— 每一個都要有外觀 */
 const FACILITIES = [
   'general-store', 'blacksmith', 'weapon-shop', 'armor-shop', 'inn', 'storage',
-  'magic-academy', 'class-guild', 'starter-npc', 'adventurer-guild',
+  'magic-academy', 'guild', 'starter-npc', 'adventurer-guild',
   'statistics-center', 'sigil-master',
 ];
 

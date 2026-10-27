@@ -44,7 +44,7 @@ describe('SqliteRepository（18 § 18.12）', () => {
     expect(await repo.getCharacter(id)).toBeUndefined();
   });
 
-  it('裝備實例依 ownerId 查、共用倉庫過濾', async () => {
+  it('裝備實例依 ownerId 查、帳號倉庫過濾', async () => {
     const a = await repo.addEquipment({ templateId: 1, ownerId: 7, equipped: false } as never);
     await repo.addEquipment({ templateId: 2, ownerId: 99, inStorage: true, storageType: 'shared' } as never);
     expect((await repo.listEquipmentByOwner(7)).map(e => e.id)).toEqual([a]);

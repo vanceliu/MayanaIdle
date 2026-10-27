@@ -25,7 +25,7 @@ export interface WarehouseEntry {
 }
 
 /**
- * 共用倉庫的金幣餘額，一個帳號一列（`18-data-schema.md` § 18.7：
+ * 帳號倉庫的金幣餘額，一個帳號一列（`18-data-schema.md` § 18.7：
  * 「倉庫另有獨立金幣存放欄位供跨角色轉移」）。
  *
  * 金幣是餘額不是物品：它沒有 `itemTemplateId`、不佔格數、不計重量，
@@ -33,7 +33,7 @@ export interface WarehouseEntry {
  * 與物品同表只能靠 `type` 字串區分，那三個性質一個都保證不了。
  */
 export interface WarehouseGoldEntry {
-  /** 主鍵。共用倉庫綁帳號層級，故一個 userId 只會有一列 */
+  /** 主鍵。帳號倉庫綁帳號層級，故一個 userId 只會有一列 */
   userId: number;
   amount: number;
 }

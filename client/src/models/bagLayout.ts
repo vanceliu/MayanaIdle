@@ -108,6 +108,42 @@ export function moveBagSlot<T extends BagSlotItem>(
   return next;
 }
 
+/**
+ * 多重移動（§ 35.1.5）：`fromIndexes` 的項目依原版面順序，從 `toIndex` 起連續排入；
+ * 範圍內原有的非選取項目依序換到空出的格子；放不下時起點往前退。
+ *
+ * 回傳的 `slotMap` 收錄版面上**所有**項目的位置，未記錄的項目不會因此重新流動。
+ */
+export function moveBagSlots<T extends BagSlotItem>(
+  layout: (T | null)[],
+  slotMap: BagSlotMap,
+  fromIndexes: readonly number[],
+  toIndex: number,
+): BagSlotMap {
+  const selected = [...new Set(fromIndexes)]
+    .filter(i => i >= 0 && i < layout.length && layout[i] != null)
+    .sort((a, b) => a - b);
+  if (selected.length === 0 || toIndex < 0 || toIndex >= layout.length) return slotMap;
+
+  const start = Math.min(toIndex, layout.length - selected.length);
+  const end = start + selected.length;
+  const selectedSet = new Set(selected);
+  const next = [...layout];
+
+  const vacated = selected.filter(i => i < start || i >= end);
+  const displaced: number[] = [];
+  for (let i = start; i < end; i++) {
+    if (!selectedSet.has(i) && layout[i]) displaced.push(i);
+  }
+  for (const i of vacated) next[i] = null;
+  displaced.forEach((from, k) => { next[vacated[k]] = layout[from]; });
+  selected.forEach((from, k) => { next[start + k] = layout[from]; });
+
+  const map: BagSlotMap = {};
+  next.forEach((item, idx) => { if (item) map[item.id] = idx; });
+  return map;
+}
+
 // ------------------------------------------------------------------ 整理
 
 /** § 35.8.1 的類型順位。裝備中的不看這張表，一律排在最前面 */

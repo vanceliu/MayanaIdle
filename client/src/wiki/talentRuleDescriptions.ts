@@ -106,7 +106,7 @@ export const VILLAGE_CONDITION_DESC: Record<string, string> = {
   bag_free_slots_lte: '背包剩餘格數。取東西前該看的是剩餘，不是已用',
   has_hunt_location: '有沒有可以走回去的地點。每次進入野外都會更新，只在城鎮待過的新角色沒有',
   weight_over: '負重百分比。快滿了就是該回村的時候',
-  warehouse_gold_gte: '共用倉庫的金幣餘額',
+  warehouse_gold_gte: '帳號倉庫的金幣餘額',
   warehouse_item_gte: '倉庫裡指定道具的存量',
 };
 
@@ -116,11 +116,11 @@ export const VILLAGE_ACTION_DESC: Record<string, string> = {
   sell_materials: '依顏色等級批量販售，可選擇保留進得了配方的素材',
   sell_equipment: '依顏色等級批量販售，可設保留條件',
   buy_item: '補到目標數量。買不起就只買買得起的量',
-  deposit_materials: '依顏色等級存進共用或個人倉庫',
+  deposit_materials: '依顏色等級存進帳號或個人倉庫',
   deposit_equipment: '把命中篩選條件的裝備存進倉庫。沒設條件就不存',
   withdraw_item: '從倉庫補到目標數量，受倉庫存量與背包格數限制',
-  deposit_gold: '身上留下指定金額，其餘存進共用倉庫',
-  withdraw_gold: '從共用倉庫領到目標金額',
+  deposit_gold: '身上留下指定金額，其餘存進帳號倉庫',
+  withdraw_gold: '從帳號倉庫領到目標金額',
   return_to_hunt: '回到最後待過的野外地點。只有被自動回城帶進城時才會觸發，玩家自己走回城鎮不會被傳走。需要通行卷軸的區域一樣要有卷軸',
 };
 

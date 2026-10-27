@@ -33,7 +33,7 @@ const SPECS: Record<string, NpcLookSpec> = {
   inn: { hair: 'bun', skin: '#f2d6b8', hairColor: '#c9a227', eyeColor: '#24506e', cloth: '#e3a45f', lash: true },
   storage: { hair: 'part', skin: '#dcb894', hairColor: '#c9c2b4', eyeColor: '#2a1a12', cloth: '#2f5d3a' },
   'magic-academy': { hair: 'long', skin: '#e8c9a0', hairColor: '#7b52a8', eyeColor: '#4a2f5e', cloth: '#b98ae0', lash: true },
-  'class-guild': { hair: 'braid', skin: '#c98f5e', hairColor: '#b03a2e', eyeColor: '#2f5d3a', cloth: '#b0546a', lash: true },
+  guild: { hair: 'braid', skin: '#c98f5e', hairColor: '#b03a2e', eyeColor: '#2f5d3a', cloth: '#b0546a', lash: true },
   'starter-npc': { hair: 'part', skin: '#f2d6b8', hairColor: '#4a3728', eyeColor: '#0b0b16', cloth: '#c9c2b4' },
   'adventurer-guild': { hair: 'pony', skin: '#dcb894', hairColor: '#e3c765', eyeColor: '#24506e', cloth: '#24506e', lash: true },
   'statistics-center': { hair: 'twinbun', skin: '#e8c9a0', hairColor: '#24506e', eyeColor: '#4a2a10', cloth: '#55505c', lash: true },

@@ -52,4 +52,31 @@ describe('試驗場 HUD', () => {
     expect(container.querySelector('.town-modal-overlay')).toBeNull();
     expect(document.body.querySelector('.town-modal-overlay')).toBeTruthy();
   });
+
+  /** 拖曳會捕捉指標，按鈕與 portal 出去的視窗就收不到 click（`16-tech-frontend-architecture.md` § 32.3） */
+  const press = (el: Element) => {
+    fireEvent.pointerDown(el, { button: 0, clientX: 10, clientY: 10, pointerId: 1 });
+    fireEvent.pointerMove(el, { clientX: 110, clientY: 210, pointerId: 1 });
+    fireEvent.pointerUp(el, { clientX: 110, clientY: 210, pointerId: 1 });
+  };
+
+  it('按在數據卡的按鈕上不拖曳', () => {
+    const { container, getByTitle } = render(<TrainingGroundView />);
+
+    press(getByTitle('木樁設定'));
+
+    expect(container.querySelector('.training-view')!.className).not.toContain('is-floating');
+  });
+
+  it('按在木樁設定視窗裡不拖曳數據卡，關閉鈕照常關閉', () => {
+    useTownStore.setState({ facility: 'training-dummy' } as never);
+    const { container } = render(<TrainingGroundView />);
+    const close = document.body.querySelector('.town-modal-close')!;
+
+    press(close);
+    fireEvent.click(close);
+
+    expect(container.querySelector('.training-view')!.className).not.toContain('is-floating');
+    expect(useTownStore.getState().facility).toBe('list');
+  });
 });

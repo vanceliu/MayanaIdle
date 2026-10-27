@@ -11,6 +11,11 @@ import { defaultSession } from '../stores/session';
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
 
+/** 連線未開啟時送出的請求 */
+export const NOT_CONNECTED_MESSAGE = '尚未連線，操作未送出';
+/** 等待回應期間斷線 */
+export const DISCONNECTED_MESSAGE = '連線中斷，操作結果未知';
+
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
 
@@ -44,11 +49,7 @@ export class GameConnection {
 
   /** 送 action 並等 server 回 `action_ok`；錯誤以 `error` 回來 */
   rpc(store: ActionStore, name: string, args: unknown[]): Promise<unknown> {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.send({ t: 'action', id, store, name, args });
-    });
+    return this.request(id => ({ t: 'action', id, store, name, args }));
   }
 
   /** 設定視窗改密碼（§ 97.5）；失敗以錯誤訊息 reject */
@@ -61,7 +62,9 @@ export class GameConnection {
     await this.request(id => ({ t: 'regenerate_recovery_code', id, current }));
   }
 
+  /** 連線未開啟時立即以 `NOT_CONNECTED_MESSAGE` 失敗，不登記等待（§ 97.2） */
   private request(build: (id: number) => ClientMessage): Promise<unknown> {
+    if (this.socket?.readyState !== WebSocket.OPEN) return Promise.reject(new Error(NOT_CONNECTED_MESSAGE));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -71,11 +74,7 @@ export class GameConnection {
 
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4） */
   requestLeaderboard(top = 20): Promise<LeaderboardSnapshotView> {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve: v => resolve(v as LeaderboardSnapshotView), reject });
-      this.send({ t: 'leaderboard', id, top });
-    });
+    return this.request(id => ({ t: 'leaderboard', id, top })) as Promise<LeaderboardSnapshotView>;
   }
 
   login(username: string, password: string): void {
@@ -122,7 +121,7 @@ export class GameConnection {
     socket.onclose = () => {
       if (this.socket !== socket) return;
       this.socket = null;
-      for (const p of this.pending.values()) p.reject(new Error('disconnected'));
+      for (const p of this.pending.values()) p.reject(new Error(DISCONNECTED_MESSAGE));
       this.pending.clear();
       useOnlineStore.setState({ latencyMs: null });
       const st = useOnlineStore.getState();

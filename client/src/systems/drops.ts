@@ -1,6 +1,6 @@
 import type { GameRepository } from '../db/repository';
 import { defaultSession } from '../stores/session';
-import type { EquipmentInstance } from '../models/equipment';
+import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 import { isWeaponSlot, type EquipSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
@@ -27,7 +27,10 @@ export interface DroppedItem {
   type: 'equipment' | InventoryItemType;
   itemTemplateId?: number;
   amount: number;
+  /** 掉落的裝備。**尚未寫入 DB**（`id` 為 undefined），收進背包時才由 `persistDroppedEquipment()` 寫入 */
   equipmentInstance?: EquipmentInstance;
+  /** `equipmentInstance` 對應的 DB 紀錄 */
+  equipmentRecord?: Partial<EquipmentInstance>;
   /**
    * 掉落物的裝備階級（`37-statistics.md` § 37.3 的 T7 計數用）。
    * 由此處帶出，呼叫端不必再查一次 DB。
@@ -50,6 +53,56 @@ export interface DropBonuses {
 }
 
 export const DROP_ROLL_MAX = 1000;
+
+/**
+ * 擲出一件裝備掉落。**不寫 DB**：背包滿時這件會被丟棄（`35-inventory-constraints.md` § 35.3.1），
+ * 寫入與否由呼叫端判定後交給 `persistDroppedEquipment()`。
+ */
+function rollDroppedEquipment(
+  template: EquipmentTemplate,
+  ownerId: number,
+  areaLevel: number,
+  isBoss: boolean,
+): DroppedItem {
+  const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
+  const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), isBoss, {
+    weaponBaseDamage: getWeaponBaseDamage(template),
+  });
+  const fields = rollNewInstanceFields(template);
+  const record: Partial<EquipmentInstance> = {
+    templateId: template.id!,
+    slot: template.slot,
+    quality: 0,
+    enhancement: 0,
+    ...fields,
+    affixes,
+    ownerId,
+    equipped: false,
+  };
+  return {
+    name: template.name,
+    type: 'equipment',
+    amount: 1,
+    equipmentRecord: record,
+    equipmentInstance: resolveEquipment({
+      ...record,
+      name: template.name,
+      type: template.type,
+      isTwoHanded: template.isTwoHanded,
+    } as EquipmentInstance),
+    equipmentTier: getEquipmentTierLevel(template),
+  };
+}
+
+/** 把收進背包的掉落裝備寫入 DB，回傳帶 id 的實例（順序同輸入） */
+export async function persistDroppedEquipment(
+  items: DroppedItem[],
+  repo: GameRepository = defaultSession.repo,
+): Promise<EquipmentInstance[]> {
+  if (items.length === 0) return [];
+  const ids = await repo.bulkAddEquipment(items.map(item => item.equipmentRecord!));
+  return items.map((item, i) => ({ ...item.equipmentInstance!, id: ids[i] }));
+}
 
 function getDropRateMultiplier(bonuses?: DropBonuses): number {
   return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1);
@@ -119,43 +172,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)));
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(random() * candidates.length)];
-      const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-      const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), true, {
-        weaponBaseDamage: getWeaponBaseDamage(template),
-      });
-      const fields = rollNewInstanceFields(template);
-      const dbRecord: Partial<EquipmentInstance> = {
-        templateId: template.id!,
-        slot: template.slot,
-        quality: 0,
-        enhancement: 0,
-        ...fields,
-        affixes,
-        ownerId,
-        equipped: false,
-      };
-      const id = await repo.addEquipment(dbRecord);
-      const instance: EquipmentInstance = resolveEquipment({
-        id,
-        templateId: template.id!,
-        name: template.name,
-        type: template.type,
-        slot: template.slot,
-        isTwoHanded: template.isTwoHanded,
-        quality: 0,
-        enhancement: 0,
-        ...fields,
-        affixes,
-        ownerId,
-        equipped: false,
-      });
-      items.push({
-        name: template.name,
-        type: 'equipment',
-        amount: 1,
-        equipmentInstance: instance,
-        equipmentTier: getEquipmentTierLevel(template),
-      });
+      items.push(rollDroppedEquipment(template, ownerId, areaLevel, true));
       continue;
     }
 
@@ -170,45 +187,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       const template = entry.equipmentTemplateId
         ? await repo.getEquipmentTemplate(entry.equipmentTemplateId)
         : undefined;
-      if (template) {
-        const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-        const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), true, {
-          weaponBaseDamage: getWeaponBaseDamage(template),
-        });
-        const fields = rollNewInstanceFields(template);
-        const dbRecord: Partial<EquipmentInstance> = {
-          templateId: template.id!,
-          slot: template.slot,
-          quality: 0,
-          enhancement: 0,
-          ...fields,
-          affixes,
-          ownerId,
-          equipped: false,
-        };
-        const id = await repo.addEquipment(dbRecord);
-        const instance: EquipmentInstance = resolveEquipment({
-          id,
-          templateId: template.id!,
-          name: template.name,
-          type: template.type,
-          slot: template.slot,
-          isTwoHanded: template.isTwoHanded,
-          quality: 0,
-          enhancement: 0,
-          ...fields,
-          affixes,
-          ownerId,
-          equipped: false,
-        });
-        items.push({
-          name: template.name,
-          type: 'equipment',
-          amount: 1,
-          equipmentInstance: instance,
-          equipmentTier: getEquipmentTierLevel(template),
-        });
-      }
+      if (template) items.push(rollDroppedEquipment(template, ownerId, areaLevel, true));
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
       if (itemDef) {
@@ -291,45 +270,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       } else if (entry.equipmentTemplateId) {
         template = await repo.getEquipmentTemplate(entry.equipmentTemplateId);
       }
-      if (template) {
-        const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
-        const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), isBoss, {
-          weaponBaseDamage: getWeaponBaseDamage(template),
-        });
-        const fields = rollNewInstanceFields(template);
-        const dbRecord: Partial<EquipmentInstance> = {
-          templateId: template.id!,
-          slot: template.slot,
-          quality: 0,
-          enhancement: 0,
-          ...fields,
-          affixes,
-          ownerId,
-          equipped: false,
-        };
-        const id = await repo.addEquipment(dbRecord);
-        const instance: EquipmentInstance = resolveEquipment({
-          id,
-          templateId: template.id!,
-          name: template.name,
-          type: template.type,
-          slot: template.slot,
-          isTwoHanded: template.isTwoHanded,
-          quality: 0,
-          enhancement: 0,
-          ...fields,
-          affixes,
-          ownerId,
-          equipped: false,
-        });
-        items.push({
-          name: template.name,
-          type: 'equipment',
-          amount: 1,
-          equipmentInstance: instance,
-          equipmentTier: getEquipmentTierLevel(template),
-        });
-      }
+      if (template) items.push(rollDroppedEquipment(template, ownerId, areaLevel, isBoss));
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
       if (itemDef) {

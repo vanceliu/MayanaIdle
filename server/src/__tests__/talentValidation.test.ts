@@ -51,7 +51,7 @@ describe('天賦與緊急撤退驗證', () => {
     const session = [...server.sessions].at(-1)!;
     const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
     send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    send({ t: 'resume', token: auth.issueSession(user.id) });
+    send({ t: 'resume', token: await auth.issueSession(user.id) });
     send({ t: 'create_character', name: 'Alice', className: 'knight', bonusAttrs: KNIGHT_BONUS });
     await vi.waitFor(() => expect(session.game.getState().character?.name).toBe('Alice'));
     const characterId = session.game.getState().character!.id!;

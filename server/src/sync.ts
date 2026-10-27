@@ -12,7 +12,7 @@ import type { MonsterInstance } from '../../client/src/models/monster';
 import type { MapMonster } from '../../client/src/stores/mapMonsterStore';
 import type { Session } from '../../client/src/stores/session';
 
-export const MIRRORED: StoreKey[] = ['game', 'mapControl', 'mapMonster', 'talent', 'mailbox', 'party', 'trade'];
+export const MIRRORED: StoreKey[] = ['game', 'mapControl', 'mapMonster', 'talent', 'mailbox', 'party', 'trade', 'guild'];
 
 export interface SyncState {
   /** 各 store 上次送出的頂層值（參照比對） */
@@ -35,7 +35,7 @@ export interface SyncedSession extends Session {
 
 export function createSyncState(): SyncState {
   return {
-    stores: { game: {}, mapControl: {}, mapMonster: {}, talent: {}, mailbox: {}, party: {}, trade: {} },
+    stores: { game: {}, mapControl: {}, mapMonster: {}, talent: {}, mailbox: {}, party: {}, trade: {}, guild: {} },
     wire: new Map(),
     combat: { started: false, monsters: new Map(), target: null, cast: '' },
   };

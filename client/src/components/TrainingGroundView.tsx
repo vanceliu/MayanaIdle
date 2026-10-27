@@ -120,7 +120,7 @@ export function TrainingGroundView() {
    */
   function restoreFull() {
     if (!char || !canRestore(useTrainingGroundStore.getState().measurement)) return;
-    // 補滿在 store（線上模式轉 RPC）：本機改角色狀態會被 server 推回來的蓋掉
+    // 補滿在 store；線上模式只補本機沙盒（`97-selfhosted-server.md` § 97.2）
     useGameStore.getState().restoreInTrainingGround();
   }
 

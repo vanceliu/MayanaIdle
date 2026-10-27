@@ -54,7 +54,7 @@ describe('冒險者工會 — 手動刷新（§ 36.6.3）', () => {
     const after = useGameStore.getState().adventurerQuestBoard;
     expect(after.C).toBe(otherTabBefore);
     expect(after.D.map(q => q.id)).not.toEqual(activeTabBefore.map(q => q.id));
-    expect(after.D.length).toBeGreaterThanOrEqual(5);
+    expect(after.D.length).toBeGreaterThanOrEqual(7);
     expect(useGameStore.getState().guildProgress.points).toBe(2000 - QUEST_BOARD_REFRESH_COST);
   });
 

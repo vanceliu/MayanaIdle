@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useGameStore } from '../stores/gameStore';
-import { buildBagLayout, moveBagSlot, sortBagLayout, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
+import { useGameStore, type PendingDiscard } from '../stores/gameStore';
+import { buildBagLayout, moveBagSlot, moveBagSlots, sortBagLayout, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
 import {
   buildTalentBagCells,
   sortTalentBag,
@@ -30,6 +30,7 @@ import {
 } from '../systems/enhanceScroll';
 import { EnhanceRateWindow } from './EnhanceRateWindow';
 import { useOneShotFx } from './town/useOneShotFx';
+import { useLatestSent } from '../hooks/useLatestSent';
 
 /**
  * 指定目標模式。`scroll` 是「點卷軸 → 點裝備」的強化，`rate` 是機率查詢。
@@ -57,6 +58,27 @@ interface BagEnhanceFx {
 }
 
 const SHARD_INDEXES = [1, 2, 3, 4, 5, 6];
+
+/**
+ * 一次按壓在多選（§ 35.1.5）下的意義。
+ * `multi-shift`：Shift＋按下已切換；`multi-toggle`：觸控多選中，放開才切換（長按要能開選單）；
+ * `multi-exit`：不按 Shift 按在已選格，放開＝回到該格單選、拖曳＝整組拖。
+ */
+type PressMode = 'normal' | 'multi-shift' | 'multi-toggle' | 'multi-exit';
+
+/** 多項丟棄的請求（§ 35.5.3）。裝備中不列入 */
+function discardEntriesOf(items: BagGridItem[]): PendingDiscard[] {
+  const entries: PendingDiscard[] = [];
+  for (const item of items) {
+    if (item.equippedSlot) continue;
+    if (item.equipment) {
+      entries.push({ kind: 'equipment', name: item.name, maxAmount: 1, equipmentId: item.equipment.id });
+    } else if (item.itemId != null) {
+      entries.push({ kind: 'bag', name: item.name, itemId: item.itemId, maxAmount: item.count ?? 1 });
+    }
+  }
+  return entries;
+}
 
 function isTownScroll(itemId: number): boolean {
   return getTownScrollByItemId(itemId) != null;
@@ -151,8 +173,10 @@ export function BagPanel() {
    * 天賦分頁的順序。整理一次性落位、位置持久化（§ 35.21.1）。
    * 存在角色資料裡（線上模式即 server），換角色時跟著角色一起載入。
    */
-  const talentOrder = useGameStore(s => s.talentBagOrder);
-  const setTalentOrder = useGameStore(s => s.setTalentBagOrder);
+  const setTalentBagOrder = useGameStore(s => s.setTalentBagOrder);
+  const talentOrderSent = useLatestSent(useGameStore(s => s.talentBagOrder), useGameStore(s => s.character?.id));
+  const talentOrder = talentOrderSent.latest();
+  const setTalentOrder = (next: BagSlotMap) => talentOrderSent.send(next, setTalentBagOrder);
   const talentSlots = useTalentStore(s => s.slots);
   const activeTemplateId = useGameStore(s => s.activeTemplateId);
 
@@ -163,15 +187,22 @@ export function BagPanel() {
     setTalentOrder(next);
   }
   const [tooltip, setTooltip] = useState<{ item: BagGridItem; anchor: AnchorRect } | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ item: BagGridItem; x: number; y: number } | null>(null);
+  /** `group`：在已選格開的選單（§ 35.1.5），開啟當下的已選格依版面順序；`touch`：由長按開啟 */
+  const [contextMenu, setContextMenu] = useState<{
+    item: BagGridItem; x: number; y: number; touch: boolean; group: BagGridItem[] | null;
+  } | null>(null);
   /**
-   * 「移動」模式選中的格子（`47-mobile.md`）。
+   * 「移動」模式選中的格子（`47-mobile.md`）。`group` 為多重移動（§ 35.1.5）。
    *
    * 觸控裝置**不做拖曳** —— 長按已經被次要選單佔走，再把拖曳疊上去只會互相誤觸，
    * 而背包格擠在一起、手指又比游標粗，拖錯格的成本比多點一下高。
    * 改成選單裡選「移動」→ 點目標格，兩下完成，滑鼠玩家照樣可以用。
    */
-  const [movingId, setMovingId] = useState<string | null>(null);
+  const [moving, setMoving] = useState<{ ids: string[]; group: boolean } | null>(null);
+  /** § 35.1.5 多選中的格子。非空＝多選中 */
+  const [multiIds, setMultiIds] = useState<string[]>([]);
+  /** 整組拖曳的來源索引；單格拖曳為 null */
+  const [dragGroup, setDragGroup] = useState<number[] | null>(null);
   /**
    * 指定目標模式：卷軸強化與機率查詢共用同一套（`35-inventory-constraints.md` § 35.5.5）。
    * 模式中所有點擊都被它接管，不會落到原本的使用／裝備／移動。
@@ -201,8 +232,9 @@ export function BagPanel() {
     /** 按住的是哪一格（長按開選單、拖曳起手都要知道） */
     item: BagGridItem;
     index: number;
-    /** 觸控不走拖曳（見 `movingId`），起手判定要分流 */
+    /** 觸控不走拖曳（見 `moving`），起手判定要分流 */
     touch: boolean;
+    mode: PressMode;
   } | null>(null);
 
   const character = useGameStore(s => s.character);
@@ -217,8 +249,12 @@ export function BagPanel() {
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const pushSystemLog = useGameStore(s => s.pushSystemLog);
   /** § 35.1.3：格子位置持久化在 store，拖曳與整理共用同一條寫入路徑 */
-  const slotMap = useGameStore(s => s.bagSlotMap);
-  const setSlotMap = useGameStore(s => s.setBagSlotMap);
+  const characterId = useGameStore(s => s.character?.id);
+  const setBagSlotMap = useGameStore(s => s.setBagSlotMap);
+  // 整份覆寫：送出後、回覆前的版面與下一次移動以本機最後送出的位置為準（`97-selfhosted-server.md` § 97.2）
+  const slotMapSent = useLatestSent(useGameStore(s => s.bagSlotMap), characterId);
+  const slotMap = slotMapSent.latest();
+  const setSlotMap = (next: BagSlotMap) => slotMapSent.send(next, setBagSlotMap);
   const quickSlots = useGameStore(s => s.quickSlots);
   const activeEffects = useGameStore(s => s.activeEffects);
   const templates = useEquipmentTemplates();
@@ -240,11 +276,25 @@ export function BagPanel() {
     return () => window.removeEventListener('keydown', onKey);
   }, [targeting]);
 
+  // Esc 結束多選
+  const multiActive = multiIds.length > 0;
+  useEffect(() => {
+    if (!multiActive) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMultiIds([]); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [multiActive]);
+
   // 選取的東西離開背包（用掉、穿上、賣掉、丟棄）後把選取狀態收掉。
   // 兩個分頁的格子都可能被選取，所以一起看。
   if (selectedId != null && ![...gridItems, ...sigilItems].some(i => i.id === selectedId)) {
     setSelectedId(null);
   }
+  const gridIds = new Set(gridItems.map(i => i.id));
+  if (multiIds.some(id => !gridIds.has(id))) {
+    setMultiIds(multiIds.filter(id => gridIds.has(id)));
+  }
+  const multiSet = new Set(multiIds);
 
   /*
    * § 35.17：剔除已不在版面上的位置（賣掉、存進倉庫、丟棄）。
@@ -260,7 +310,8 @@ export function BagPanel() {
       if (alive.has(id)) next[id] = slotMap[id];
     }
     setSlotMap(next);
-  }, [gridItems, slotMap, setSlotMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridItems, slotMap]);
 
   const usedSlots = gridItems.length;
   // § 35.1：背包格數 = 基礎 60 + 腰帶的 bonusBagSlots
@@ -275,6 +326,31 @@ export function BagPanel() {
     setSlotMap(moveBagSlot(layout, slotMap, fromIndex, toIndex));
   }
 
+  /** 多重移動（§ 35.1.5）。移動後多選保留 */
+  function moveGroupTo(fromIndexes: number[], toIndex: number) {
+    setSlotMap(moveBagSlots(layout, slotMap, fromIndexes, toIndex));
+  }
+
+  /** 多選中的格子，依版面順序 */
+  function multiSelectedCells(): BagGridItem[] {
+    return layout.filter((i): i is BagGridItem => i != null && multiSet.has(i.id));
+  }
+
+  /** 切換一格的多選；第一次切換時原本的單選格一併加入（§ 35.1.5） */
+  function toggleMulti(id: string) {
+    const carried = selectedId != null && selectedId !== id && gridIds.has(selectedId) ? selectedId : null;
+    setMultiIds(prev => {
+      const base = prev.length === 0 && carried ? [carried] : prev;
+      return base.includes(id) ? base.filter(x => x !== id) : [...base, id];
+    });
+    setSelectedId(null);
+  }
+
+  function requestGroupDiscard(items: BagGridItem[]) {
+    const entries = discardEntriesOf(items);
+    if (entries.length > 0) useGameStore.getState().requestDiscardBatch(entries);
+  }
+
   /** 這一格拖出去時要交給快捷格／地圖的描述（§ 35.5.3） */
   function dragPayloadOf(item: BagGridItem): BagDragPayload {
     return item.equipment
@@ -287,13 +363,22 @@ export function BagPanel() {
    * 快捷格綁定與丟棄都是全域 store action，來源這裡就做得完，
    * 不必讓每個目標各自去解析拖曳負載。
    */
-  function applyDrop(target: DropTarget | null, item: DragItem) {
+  function applyDrop(target: DropTarget | null, item: DragItem, group: number[] | null) {
     if (!target) return;
     /*
      * 技能拖曳由 `SkillPanel` 自己落地（§ 35.7.3）。這裡只會收到背包自己發起的拖曳，
      * 但型別上 payload 是聯集，早退比在下面每一處補 `?.` 清楚。
      */
     if (item.payload.kind === 'skill') return;
+    // § 35.1.5：整組拖曳。快捷格只綁拖起的那一格，走下方單格路徑
+    if (group && target.kind === 'bag-slot') {
+      moveGroupTo(group, target.index);
+      return;
+    }
+    if (group && target.kind === 'map') {
+      requestGroupDiscard(group.map(i => layout[i]).filter((i): i is BagGridItem => i != null));
+      return;
+    }
     if (target.kind === 'bag-slot') {
       moveTo(item.fromIndex, target.index);
       return;
@@ -331,7 +416,7 @@ export function BagPanel() {
    */
   function handleSort() {
     setSlotMap(sortBagLayout(gridItems, maxSlots));
-    setMovingId(null);
+    setMoving(null);
   }
 
   function showTooltipFor(el: HTMLElement, item: BagGridItem) {
@@ -347,15 +432,15 @@ export function BagPanel() {
     setTooltip(null);
   }
 
-  function openContextMenu(item: BagGridItem, x: number, y: number) {
+  function openContextMenu(item: BagGridItem, x: number, y: number, touch: boolean) {
     setTooltip(null);
-    setMovingId(null);
-    setContextMenu({ item, x, y });
+    setMoving(null);
+    setContextMenu({ item, x, y, touch, group: multiSet.has(item.id) ? multiSelectedCells() : null });
   }
 
   function handleContextMenu(e: React.MouseEvent, item: BagGridItem) {
     e.preventDefault();
-    openContextMenu(item, e.clientX, e.clientY);
+    openContextMenu(item, e.clientX, e.clientY, false);
   }
 
   /**
@@ -368,7 +453,7 @@ export function BagPanel() {
   const longPress = useLongPress(point => {
     const press = pressRef.current;
     if (!press) return;
-    openContextMenu(press.item, point.clientX, point.clientY);
+    openContextMenu(press.item, point.clientX, point.clientY, press.touch);
   });
 
   function handleAssignSlot(slotIdx: number) {
@@ -430,14 +515,18 @@ export function BagPanel() {
   function handlePanelPointerDown(e: React.PointerEvent) {
     // 只認主鍵：右鍵是快捷鍵選單，不該順手把選取清掉
     if (e.button !== 0) return;
+    // 操作選單（含關閉選單的遮罩）屬於選單本身，不是「點在別處」
+    if ((e.target as HTMLElement).closest?.('.bag-context-menu, .context-menu-overlay')) return;
     // 移動模式要能點到空格，所以只有「連格子都沒點到」才取消
     if (!(e.target as HTMLElement).closest?.('.bag-cell')) {
-      setMovingId(null);
+      setMoving(null);
       // 格子以外的地方（面板留白、標題列）點下去就退出指定目標
       cancelTargeting();
     }
     if (!(e.target as HTMLElement).closest?.('.bag-cell:not(.empty)')) {
       setSelectedId(null);
+      // 多重移動以空格為目標時多選保留（§ 35.1.5）
+      if (!(moving?.group && (e.target as HTMLElement).closest?.('.bag-cell'))) setMultiIds([]);
       // 觸控沒有 mouseleave，詳情要跟著取消選取一起收
       setTooltip(null);
     }
@@ -452,14 +541,26 @@ export function BagPanel() {
   function handleCellPointerDown(e: React.PointerEvent, item: BagGridItem, index: number) {
     if (e.button !== 0) return;
     longPress.onPointerDown(e);
-    const justSelected = selectedId !== item.id;
+    const touch = e.pointerType === 'touch';
+    let mode: PressMode = 'normal';
+    if (!touch && e.shiftKey) {
+      mode = 'multi-shift';
+      toggleMulti(item.id);
+    } else if (multiActive && touch) {
+      mode = 'multi-toggle';
+    } else if (multiActive && multiSet.has(item.id)) {
+      mode = 'multi-exit';
+    } else if (multiActive) {
+      setMultiIds([]);
+    }
+    const justSelected = mode === 'normal' && selectedId !== item.id;
     if (justSelected) setSelectedId(item.id);
     /*
      * 觸控沒有 hover，物品詳情本來只掛在 hover tooltip 上（`47-mobile.md`）——
      * 手機玩家會完全看不到重量、詞綴、用途。改成「選取的同時把詳情叫出來」：
      * 第一次點＝選取＋看詳情，第二次點＝使用，正好是既有的兩段式流程。
      */
-    if (e.pointerType === 'touch') showTooltipFor(e.currentTarget as HTMLElement, item);
+    if (touch && mode === 'normal') showTooltipFor(e.currentTarget as HTMLElement, item);
     pressRef.current = {
       id: item.id,
       x: e.clientX,
@@ -467,7 +568,8 @@ export function BagPanel() {
       justSelected,
       item,
       index,
-      touch: e.pointerType === 'touch',
+      touch,
+      mode,
     };
   }
 
@@ -492,8 +594,17 @@ export function BagPanel() {
 
     setTooltip(null);
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    // § 35.1.5：拖起的是已選格＝整組拖
+    const group = multiSet.has(press.item.id)
+      ? multiSelectedCells().map(i => layout.indexOf(i))
+      : null;
+    setDragGroup(group);
     useDragStore.getState().begin(
-      { fromIndex: press.index, payload: dragPayloadOf(press.item), label: press.item.name },
+      {
+        fromIndex: press.index,
+        payload: dragPayloadOf(press.item),
+        label: group ? `${group.length} 格` : press.item.name,
+      },
       e.clientX,
       e.clientY,
     );
@@ -512,9 +623,11 @@ export function BagPanel() {
     // 拖曳中：這一下是「放開」，不是點擊。落點由 dragStore 判定
     const dragging = useDragStore.getState().item;
     if (dragging) {
+      const group = dragGroup;
+      setDragGroup(null);
       (e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
       useDragStore.getState().move(e.clientX, e.clientY);
-      applyDrop(useDragStore.getState().drop(), dragging);
+      applyDrop(useDragStore.getState().drop(), dragging, group);
       return;
     }
 
@@ -523,6 +636,16 @@ export function BagPanel() {
     if (!press || press.id !== item.id) return;
     // 手一定會抖，給 8px 容忍；超過就當成拖曳的起手，不算點擊
     if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > CLICK_SLOP) return;
+    if (press.mode === 'multi-shift') return;
+    if (press.mode === 'multi-toggle') {
+      toggleMulti(item.id);
+      return;
+    }
+    if (press.mode === 'multi-exit') {
+      setMultiIds([]);
+      setSelectedId(item.id);
+      return;
+    }
     // 剛在這一下選起來的，放開不算「第二次點擊」
     if (press.justSelected) return;
 
@@ -533,20 +656,21 @@ export function BagPanel() {
 
   function handleCellPointerCancel(e: React.PointerEvent) {
     pressRef.current = null;
+    setDragGroup(null);
     longPress.onPointerCancel(e);
     useDragStore.getState().cancel();
   }
 
   /**
-   * 移動模式下點任何一格＝把來源搬過來（目標有東西就互換）。
+   * 移動模式下點任何一格＝把來源搬過來（目標有東西就互換；多重移動見 § 35.1.5）。
    * 回傳 true 代表這一下已經被移動模式吃掉，呼叫端不要再當成一般點擊。
    */
   function consumeMoveTap(toIndex: number): boolean {
-    if (movingId == null) return false;
-    const fromIndex = layout.findIndex(i => i?.id === movingId);
-    setMovingId(null);
-    if (fromIndex < 0) return true;
-    moveTo(fromIndex, toIndex);
+    if (moving == null) return false;
+    const fromIndexes = moving.ids.map(id => layout.findIndex(i => i?.id === id)).filter(i => i >= 0);
+    setMoving(null);
+    if (moving.group) moveGroupTo(fromIndexes, toIndex);
+    else if (fromIndexes.length > 0) moveTo(fromIndexes[0], toIndex);
     return true;
   }
 
@@ -668,7 +792,8 @@ export function BagPanel() {
     setSelectedId(null);
     setTooltip(null);
     setContextMenu(null);
-    setMovingId(null);
+    setMoving(null);
+    setMultiIds([]);
     setTargeting(null);
   }
 
@@ -701,7 +826,7 @@ export function BagPanel() {
 
   return (
     <div className="bag-panel" ref={panelRef} onPointerDown={handlePanelPointerDown}>
-      <BagTabs tab={bagTab} onChange={setBagTab}>
+      <BagTabs tab={bagTab} onChange={tab => { setBagTab(tab); setMultiIds([]); }}>
         <button className="bag-sort-toggle" onClick={handleSort}>整理</button>
         <button
           className="bag-rate-toggle"
@@ -717,7 +842,7 @@ export function BagPanel() {
         <span className="bag-gold-label">金幣</span>
         <span className="bag-gold-value">{character?.gold ?? 0}</span>
       </div>
-      {movingId && (
+      {moving && (
         <div className="bag-move-hint" role="status">
           選擇要移到的格子（點空白處取消）
         </div>
@@ -733,7 +858,7 @@ export function BagPanel() {
               return (
                 <div
                   key={`empty-${idx}`}
-                  className={`bag-cell empty${overClass}${movingId ? ' move-target' : ''}`}
+                  className={`bag-cell empty${overClass}${moving ? ' move-target' : ''}`}
                   {...dropProps}
                   onPointerDown={() => { if (!consumeTargetTap()) consumeMoveTap(idx); }}
                 />
@@ -743,9 +868,11 @@ export function BagPanel() {
               <div
                 key={item.id}
                 className={`bag-cell ${item.type}${overClass}${
-                  dragItem?.fromIndex === idx ? ' dragging' : ''
+                  dragItem && (dragGroup?.includes(idx) ?? dragItem.fromIndex === idx) ? ' dragging' : ''
                 }${item.equippedSlot ? ' is-equipped' : ''}${selectedId === item.id ? ' is-selected' : ''}${
-                  movingId === item.id ? ' is-moving' : movingId ? ' move-target' : ''
+                  multiSet.has(item.id) ? ' is-multi-selected' : ''
+                }${
+                  moving?.ids.includes(item.id) ? ' is-moving' : moving ? ' move-target' : ''
                 }${targeting ? (isTargetable(item) ? ' enh-target' : ' enh-target-off') : ''}`}
                 {...dropProps}
                 onMouseEnter={(e) => handleMouseEnter(e, item)}
@@ -866,6 +993,14 @@ export function BagPanel() {
             className="bag-context-menu"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
+            {contextMenu.group ? (
+              <GroupMenuItems
+                group={contextMenu.group}
+                onMove={ids => { setMoving({ ids, group: true }); setContextMenu(null); }}
+                onDiscard={items => { requestGroupDiscard(items); setContextMenu(null); }}
+              />
+            ) : (
+            <>
             {toQuickSlotEntry(
               contextMenu.item.equipment ? 'equipment' : 'bag',
               contextMenu.item.itemId ?? -1,
@@ -899,12 +1034,26 @@ export function BagPanel() {
             <button
               className="context-menu-item"
               onClick={() => {
-                setMovingId(contextMenu.item.id);
+                setMoving({ ids: [contextMenu.item.id], group: false });
                 setContextMenu(null);
               }}
             >
               移動到其他格
             </button>
+            {/* § 35.1.5：觸控沒有 Shift，多選由長按選單進入 */}
+            {contextMenu.touch && (
+              <button
+                className="context-menu-item"
+                onClick={() => {
+                  setMultiIds([contextMenu.item.id]);
+                  setSelectedId(null);
+                  setTooltip(null);
+                  setContextMenu(null);
+                }}
+              >
+                多選
+              </button>
+            )}
             {/* § 35.9：裝備中的不給丟棄，得先卸下來 */}
             {!contextMenu.item.equippedSlot && (
               <>
@@ -914,10 +1063,36 @@ export function BagPanel() {
                 </button>
               </>
             )}
+            </>
+            )}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+/** 已選格的選單（§ 35.1.5）。丟棄的件數不含裝備中，為 0 時不顯示 */
+function GroupMenuItems({ group, onMove, onDiscard }: {
+  group: BagGridItem[];
+  onMove: (ids: string[]) => void;
+  onDiscard: (items: BagGridItem[]) => void;
+}) {
+  const discardable = group.filter(i => !i.equippedSlot);
+  return (
+    <>
+      <button className="context-menu-item" onClick={() => onMove(group.map(i => i.id))}>
+        移動選取的 {group.length} 格
+      </button>
+      {discardable.length > 0 && (
+        <>
+          <div className="context-menu-divider" />
+          <button className="context-menu-item context-menu-danger" onClick={() => onDiscard(discardable)}>
+            丟棄選取的 {discardable.length} 項
+          </button>
+        </>
+      )}
+    </>
   );
 }
 

@@ -1,9 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateCharacterName,
+  nameWidth,
   characterNameKey,
   generateCharacterUuid,
 } from '../characterIdentity';
+
+describe('名稱寬度（§ 19.4）：中文 2、其餘 1，寬 2~12', () => {
+  it('單一個中文字寬 2，合格', () => {
+    expect(nameWidth('王')).toBe(2);
+    expect(validateCharacterName('王')).toBeNull();
+  });
+
+  it('中英混用照寬度加總', () => {
+    expect(nameWidth('勇者Hero12')).toBe(10);
+    expect(nameWidth('a-_~=.b')).toBe(7);
+  });
+});
 
 describe('validateCharacterName（§ 19.4）', () => {
   it('接受中文、英文、數字與混合', () => {
@@ -11,18 +24,22 @@ describe('validateCharacterName（§ 19.4）', () => {
     expect(validateCharacterName('Hero')).toBeNull();
     expect(validateCharacterName('Hero123')).toBeNull();
     expect(validateCharacterName('勇者A1')).toBeNull();
-    expect(validateCharacterName('十二個字的角色名稱剛好')).toBeNull();
+    expect(validateCharacterName('六個中文名字')).toBeNull();
+    expect(validateCharacterName('A'.repeat(12))).toBeNull();
+    expect(validateCharacterName('勇者HeroAB12')).toBeNull();
   });
 
   it('拒絕空字串與長度不足', () => {
     expect(validateCharacterName('')).toBe('empty');
     expect(validateCharacterName('A')).toBe('too_short');
-    expect(validateCharacterName('王')).toBe('too_short');
+    expect(validateCharacterName('-')).toBe('too_short');
   });
 
   it('拒絕超過 12 字', () => {
     expect(validateCharacterName('A'.repeat(13))).toBe('too_long');
     expect(validateCharacterName('超過十二個字的角色名稱範例')).toBe('too_long');
+    expect(validateCharacterName('七個中文的名字')).toBe('too_long');
+    expect(validateCharacterName('勇者HeroABC12')).toBe('too_long');
   });
 
   it('拒絕空白（含全形空白）', () => {

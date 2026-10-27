@@ -30,6 +30,111 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 公會倉庫＋共用倉庫改名帳號倉庫（`11-guild.md` § 11.8、`13-town.md` § 13.8、`35-inventory-constraints.md` § 35.12）
+
+規格：見 `11-guild.md` § 11.8。內容只在成員打開分頁或自己存取後送出，不隨他人變動推送。
+
+- [x] P1 文件：改名（13、19、35、49、18、Wiki）；11 § 11.8；18.12；INDEX
+- [x] P2 server：schema v7；`GuildManager` 倉庫（存取物品／裝備／金幣、200 格、依序執行、解散清空）；`openWarehouse`／`closeWarehouse` 按需快照；強制存檔；測試
+- [x] P3 client：倉庫面板改名＋公會倉庫分頁（無公會變暗、單機不顯示）；NPC 解散確認文字；測試
+- [x] P4 補給天賦：存入素材／裝備加「存到」選單（帳號／個人），不含公會倉庫；測試
+- [ ] P5 `npx tsc -b`、client／server／desktop vitest
+
+### SQLite 寫入關卡（`97-selfhosted-server.md` § 97.4「寫入策略」）
+
+規格：交易只併入同一呼叫鏈的巢狀呼叫（`AsyncLocalStorage`）；其他寫入在別人的交易開著時排在其後，否則立即執行。
+
+- [x] P1 `db/writeGate.ts`；`SqliteRepository` 交易與寫入方法改走關卡
+- [x] P2 `AuthService` 寫入改非同步走關卡；`ws.ts`／`admin.ts`／`index.ts` 呼叫點；`admin.ts` 寄信改走關卡
+- [x] P3 公會寫入走關卡、`GuildManager` 操作加鎖、寫入成功才改記憶體
+- [x] P4 測試：兩個呼叫鏈的交易同時進行一筆失敗不互相回滾；交易開著時外部寫入不被回滾；既有測試呼叫點
+- [x] P5 文件 97 § 97.4；`npx tsc -b`、client／server／desktop vitest
+
+### 公會系統（`11-guild.md`、`97-selfhosted-server.md` § 97.1／§ 97.7.2、`18-data-schema.md` § 18.12、`13-town.md` § 13.2.1）
+
+規格：見 `11-guild.md`。只在開放世界。
+
+- [x] P1 文件：11、13、18、34、97（含 § 97.7.5 社群視窗）、17、INDEX（待使用者審閱）
+- [x] P2 server：`guilds`／`guild_members` 與遷移；`guild.ts`（建立／解散／邀請／接受／踢人／退出、驗證）；ws 訊息與允許清單；公會頻道；刪除角色連動；測試
+- [x] P3 client：protocol、`guildStore`、公會 NPC（facility、外觀、四鎮地圖、單機不放）、社群視窗（`party`＋`onmap` 合併為一個 PanelKey，隊伍／公會／在線分頁、盟主標示、徽章合計）、在線分頁公會名與邀請；測試
+- [x] P4 公會名改為懸停名稱的上行《公會名》（不常駐）；`TeammateView.guildName`；測試
+- [ ] P5 `npx tsc -b`、client／server／desktop vitest
+
+### 職業工會併入冒險者工會（`13-town.md` § 13.2.1／§ 13.9／§ 13.10、`36-quest-system.md` § 36.6／§ 36.10）
+
+規格：冒險者工會面板分「冒險任務／職業任務」兩頁；職業技能學習移至魔法學院；原職業工會建築保留、無 NPC（預留公會 NPC）。
+接取上限分開計算：冒險任務 4 個、職業任務維持原規則。每個難度分頁 7~9 個任務。
+
+- [x] P1 `adventurerQuest.ts` 上限 4；`adventurerQuestSystem.ts` 分頁 7~9 個；測試
+- [x] P2 `AdventurerGuild.tsx` 兩分頁（職業任務區塊自 `ClassGuild` 移入）；`MagicAcademy.tsx` 加職業技能學習；`ClassGuild.tsx` 改為 `ClassQuests.tsx`、`TownView` 的 `class-guild`
+- [x] P3 四張城鎮地圖移除 `class-guild` NPC、`npcAppearance` 移除；測試改寫
+- [x] P4 文件與顯示文字同步（13、36、05、23、07、27、30、35、37、16、17、24、41、51、INDEX、Wiki、starterTips、itemSeeds）
+- [x] P5 `npx tsc -b`、client／server／desktop vitest
+
+### 怪物 debuff 以怪物 id 對應（`07-affix.md` § 7.9、`24-buff-debuff.md`、`21-combat-formula.md` § 21.5）
+
+規格：怪物身上的 debuff 一律以 `targetMonsterId` 查詢、去重與清除，不以怪物在清單中的位置。
+
+- [x] P1 `combat.ts` 玩家傷害四函式與 `calculateMonsterAttack` 以 id 查防禦／攻擊下降；`arpgEventHandler.ts` 傳 id
+- [x] P2 `gameStore.ts` `addEffect` 怪物 debuff 以 id 判斷重複；`processMonsterDeath` 移除以位置清 debuff（由 `combatLoop` 以 id 清除）
+- [x] P3 測試：怪物清單位移後防禦下降仍作用在原目標；死亡不清別隻怪的 debuff；不同怪可各自掛 DoT
+- [x] P4 文件；`npx tsc -b`、client／server／desktop vitest
+
+### 線上模式試驗場本機沙盒（`50-training-ground.md` § 50.4、`97-selfhosted-server.md` § 97.2／§ 97.9）
+
+規格：角色在試驗場時 client 以本機沙盒模擬戰鬥；改到角色本身狀態的操作（換裝、天賦、技能、屬性點、道具消耗、離開）送 server，
+其餘（移動、木樁、戰鬥、量測、HP／MP／buff／冷卻、回復滿血滿魔）只在本機。道具照常扣 server 庫存，效果套在沙盒。
+沙盒期間 server 推送的戰鬥執行期欄位不套用；離開試驗場時 server 整份重送。
+
+- [x] P1 `gameStore.ts` `consumeTrainingItems`（只在試驗場、整筆扣或不扣）＋允許清單；server 測試
+- [x] P2 `playerSession.ts` 離開試驗場時 `resetSync`；`world.ts` 不 tick 試驗場內的玩家；server 測試
+- [x] P3 `net/trainingSandbox.ts`：進出判定、推送過濾、本機 action 與迴圈、背包消耗同步
+- [x] P4 `PixiGame.tsx` 沙盒時跑本機迴圈；`TrainingGroundView.tsx` 回復走本機
+- [x] P5 client 測試
+- [x] P6 文件：50 § 50.4、97 § 97.2／§ 97.9、INDEX
+- [x] P7 `npx tsc -b`、client／server／desktop vitest
+- [x] P8 `useDraggableIsland.ts` 按在可操作元件或 portal 視窗上不拖曳（木樁設定的按鈕收不到 click）；測試；文件 16 § 32.3
+
+### 背包多選：多重移動／丟棄（`35-inventory-constraints.md` § 35.1.5、`47-mobile.md`）
+
+規格：一般分頁格子 Shift＋點擊（觸控：長按選單「多選」後點格）加入／移出多選；不按 Shift 點格、點空白、Esc、選取清空即結束；移動後多選保留。
+多重移動：拖曳已選格或選單「移動選取的 N 格」→ 點目標格；依原版面順序從目標格連續排，被佔格的物品依序換到空出格；超出範圍起點往前退。
+多重丟棄：拖到地圖或選單「丟棄選取的 N 項」→ 一個確認視窗，堆疊物品各一個數量選擇器、預設持有量；裝備中不列入；server 驗證擁有權與數量。
+
+- [x] P1 文件：35、47、97 § 97.2、INDEX
+- [x] P2 `bagLayout.ts` `moveBagSlots`；測試
+- [x] P3 `gameStore.ts` `requestDiscardBatch`／`confirmDiscardBatch`、`protocol.ts` 允許清單；測試（含 server 端偽造 id、數量越界）
+- [x] P4 `DiscardConfirmModal.tsx` 批次視窗；`BagPanel.tsx` 多選、多重移動、多重丟棄、觸控多選；測試
+- [x] P5 `npx tsc -b`、client／server／desktop vitest
+
+### 線上模式點地圖移動修正（`38-map-control.md` § 38.5、`97-selfhosted-server.md` § 97.2）
+
+規格：server 套用搜尋模式只在 `autoMove` 需切換時呼叫 `setAutoMove`，不覆蓋 action 已排好的路徑；自動搜尋中點地圖先走到點擊格，抵達後接回自動移動。
+
+- [x] P1 `playerSession.ts` `applyAutoMove` 只在狀態需切換時呼叫 `setAutoMove`
+- [x] P2 測試：手動／自動搜尋點地圖目的地不被覆蓋；`setSearchMode` 照常切換
+- [x] P3 `npx tsc -b`、client／server／desktop vitest
+- [x] P4 文件：38 § 38.5、97 § 97.2
+- [x] P5 自動搜尋中回城：城鎮一律經 `setAutoMove` 關閉自動移動；測試
+
+### 線上模式 client↔server 後續修正（`97-selfhosted-server.md` § 97.2／§ 97.7.1／§ 97.7.3）
+
+規格：載圖中的玩家不放進實例；交易金幣只在與目前內容不同時送出；連線未開啟時遠端 action 立即失敗；
+隊伍／交易訊息成功時清除、開啟隊伍面板由 server 清除；漫遊重試只在同圖且仍自動移動時執行；
+連續輸入以本機草稿為準（數字輸入離開焦點或 Enter 送出；交易與背包位置以本機最後送出內容為基準）；
+遠端 action 失敗寫一行本機系統訊息；允許清單移除 client 未呼叫的 action。
+
+- [x] P1 `world.ts` `replaceAll` 跳過載圖中玩家；測試
+- [x] P2 `TradePanel.tsx` 金幣拉桿只在變動時送出；測試
+- [x] P3 `connection.ts` 未開啟時 `rpc` 立即 reject；測試
+- [x] P4 隊伍／交易訊息：成功清除、開面板經 server 清除；測試
+- [x] P5 `mapControlStore.ts` 漫遊重試防護；測試
+- [x] P6 本機草稿：`PersistentSettings.tsx`、`TalentEditor.tsx`、`TradePanel.tsx` 放入／取出、`BagPanel.tsx` 位置；測試
+- [x] P7 遠端 action 失敗寫本機系統訊息；測試
+- [x] P8 允許清單移除 `castQuickSlotSkill`、`castSelfSkill`、`rememberHuntLocation`、`stopMoving`、`requestSkill`、`mailbox.refresh`；測試
+- [x] P9 文件：97 § 97.2／§ 97.7.3
+- [x] P10 `npx tsc -b`、client／server／desktop vitest
+
 ### 線上模式 client 端呼叫修正（`97-selfhosted-server.md` § 97.2、`35-inventory-constraints.md` § 35.21.1、`52-mailbox.md` § 52.4）
 
 規格：遠端 action 參數必須可 JSON 序列化；寫入持久層或連動其他 store 的後續處理寫在 store action 內，元件不自行串接。

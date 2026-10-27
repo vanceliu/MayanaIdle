@@ -1,3 +1,4 @@
+import type { WarehouseKind } from '../villageScript';
 import { describe, it, expect } from 'vitest';
 import { TALENT_PARAM_FIELDS, defaultParams, getParamFields } from '../talentParams';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from '../scriptEngine';
@@ -31,6 +32,8 @@ const MONSTER_TAGS = new Set<string>([
 
 const REGION_IDS = new Set(REGIONS.map(r => r.id));
 
+const DEPOSIT_WAREHOUSES = new Set<WarehouseKind>(['shared', 'personal']);
+
 /**
  * `ruleId.欄位` → 該欄位的合法值域。
  *
@@ -59,6 +62,9 @@ const VALUE_DOMAINS: Record<string, Set<string> | null> = {
   'target_distance.compare': null,
   'target_defense.compare': null,
   'target_level_diff.compare': null,
+  // 存入目的地＝`WarehouseKind`（`49-village-script.md` § 49.3）；補給天賦不碰公會倉庫
+  'deposit_materials.warehouse': DEPOSIT_WAREHOUSES,
+  'deposit_equipment.warehouse': DEPOSIT_WAREHOUSES,
 };
 
 describe('鑲材參數的選項值域', () => {

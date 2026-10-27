@@ -28,7 +28,7 @@ describe('同一連線換帳號', () => {
     server.attach({ on: (_ev: string, handler: typeof fire) => { fire = handler; } } as never);
   });
 
-  it('登入另一個帳號：原角色卸下，原角色的裝備不會存進新帳號的共用倉庫', async () => {
+  it('登入另一個帳號：原角色卸下，原角色的裝備不會存進新帳號的帳號倉庫', async () => {
     const alice = await auth.register('alice', 'password1');
     const bob = await auth.register('bobby', 'password1');
     const handlers: Record<string, (raw: unknown) => void> = {};
@@ -45,7 +45,7 @@ describe('同一連線換帳號', () => {
     const replied = (id: number) => vi.waitFor(() => expect(sent.some(m => 'id' in m && m.id === id)).toBe(true));
 
     send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
-    send({ t: 'resume', token: auth.issueSession(alice.id) });
+    send({ t: 'resume', token: await auth.issueSession(alice.id) });
     send({ t: 'create_character', name: 'Alice', className: 'knight', bonusAttrs: KNIGHT_BONUS });
     await vi.waitFor(() => expect(session.game.getState().character?.name).toBe('Alice'));
     const helmet = session.game.getState().equippedGear.helmet!;

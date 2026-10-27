@@ -18,7 +18,7 @@
 | armorEnhanceAttempts | 強化防具次數 | 防具強化嘗試次數（含成功與失敗） |
 | weaponsBroken | 武器爆掉次數 | 武器強化失敗導致消失的次數 |
 | armorsBroken | 防具爆掉次數 | 防具強化失敗導致消失的次數 |
-| questsCompleted | 任務完成數 | 累計完成任務次數（職業工會 + 冒險者工會） |
+| questsCompleted | 任務完成數 | 累計完成任務次數（冒險者工會的職業任務 + 冒險任務） |
 | totalGoldEarned | 金幣獲得總量 | 累計從掉落/任務獎勵獲得的金幣（不含商店賣出） |
 | tier7WeaponsLooted | T7 武器掉落數 | 累計掉落取得的 T7 武器數 |
 | tier7ArmorsLooted | T7 防具掉落數 | 累計掉落取得的 T7 防具數（含盾牌／魔導書／臂甲） |

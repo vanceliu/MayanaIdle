@@ -9,6 +9,21 @@ html, body, #root {
   width: 100%;
 }
 
+/* 文字選取白名單（`34-ui-guidelines.md` § 34.14）。input／textarea 必須明列：Safari 會讓繼承來的 none 擋掉輸入 */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+.combat-log,
+.wiki-layout {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Wiki 動態載入時的過場（見 main.tsx 的 Suspense fallback） */
 .wiki-loading {
   padding: 32px;

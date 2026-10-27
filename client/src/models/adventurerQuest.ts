@@ -64,7 +64,7 @@ export interface GuildProgress {
   points: number;
 }
 
-export const MAX_ACTIVE_ADVENTURER_QUESTS = 3;
+export const MAX_ACTIVE_ADVENTURER_QUESTS = 4;
 
 /** § 36.6.3：手動刷新單一分頁的貢獻代價 */
 export const QUEST_BOARD_REFRESH_COST = 50;

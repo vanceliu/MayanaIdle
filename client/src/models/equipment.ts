@@ -312,7 +312,7 @@ export interface EquipmentInstance {
   ownerId: number;
   equipped: boolean;
   inStorage?: boolean;
-  storageType?: 'personal' | 'shared';
+  storageType?: 'personal' | 'shared' | 'guild';
   isStarterGear?: boolean;
 }
 

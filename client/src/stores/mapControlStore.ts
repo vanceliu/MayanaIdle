@@ -32,7 +32,18 @@ export interface MapControlState {
 }
 
 export function createMapControlStore(session: Session) {
-  return create<MapControlState>((set, get) => ({
+  return create<MapControlState>((set, get) => {
+  /** 延遲後重新選目標；期間換圖、關閉自動移動、進入等待或已在移動（點地圖）就不執行（`38-map-control.md` § 38.5） */
+  const pickRandomTargetLater = (delayMs: number) => {
+    const map = get().currentMap;
+    setTimeout(() => {
+      const s = get();
+      if (!s.autoMove || s.paused || s.isMoving || s.currentMap !== map) return;
+      s.pickRandomTarget();
+    }, delayMs);
+  };
+
+  return {
   currentMap: null,
   playerPosition: { x: 0, y: 0 },
   prevPlayerPosition: { x: 0, y: 0 },
@@ -175,7 +186,7 @@ export function createMapControlStore(session: Session) {
     if (!target) return;
     const path = findPath(currentMap, snappedPos, target);
     if (!path || path.length === 0) {
-      setTimeout(() => get().pickRandomTarget(), 100);
+      pickRandomTargetLater(100);
       return;
     }
     set({
@@ -221,9 +232,7 @@ export function createMapControlStore(session: Session) {
         pathIndex: 0,
         targetPosition: null,
       });
-      if (state.autoMove) {
-        setTimeout(() => get().pickRandomTarget(), 500 + random() * 1000);
-      }
+      if (state.autoMove) pickRandomTargetLater(500 + random() * 1000);
     } else {
       set({ playerPosition: pos, pathIndex });
     }
@@ -239,7 +248,8 @@ export function createMapControlStore(session: Session) {
       playerPosition: { x: Math.round(playerPosition.x), y: Math.round(playerPosition.y) },
     });
   },
-}));
+  };
+  });
 }
 
 export const useMapControlStore = createMapControlStore(defaultSession);

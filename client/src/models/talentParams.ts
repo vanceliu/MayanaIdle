@@ -50,6 +50,15 @@ const COMPARE: ParamField = {
 };
 
 /** § 49.4 的保留條件。販售裝備（T3）與存入裝備（T4）共用同一組 */
+/** 存入動作的目的地（`49-village-script.md` § 49.3）；補給天賦不碰公會倉庫 */
+const DEPOSIT_WAREHOUSE = {
+  key: 'warehouse', kind: 'select', label: '存到', def: 'shared',
+  options: [
+    { value: 'shared', label: '帳號倉庫' },
+    { value: 'personal', label: '個人倉庫' },
+  ],
+} as const;
+
 const KEEP_FIELDS: ParamField[] = [
   { key: 'keepClassUsable', kind: 'boolean', label: '保留本角色穿得起的', def: true },
   { key: 'keepAffixTierAbove', kind: 'number', label: '詞綴 Tier 高於', min: 0, max: 7, def: 5 },
@@ -211,9 +220,12 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 6, def: 3 },
     ...KEEP_FIELDS,
   ],
-  deposit_materials: [{ key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 7 }],
+  deposit_materials: [
+    DEPOSIT_WAREHOUSE,
+    { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 7 },
+  ],
   // 保留條件是這個動作的判定依據，沒有就什麼都不存（`villageScriptRunner.ts`）
-  deposit_equipment: [...KEEP_FIELDS],
+  deposit_equipment: [DEPOSIT_WAREHOUSE, ...KEEP_FIELDS],
   deposit_gold: [{ key: 'keepGold', kind: 'number', label: '身上留', suffix: 'G', min: 0, max: 9_999_999, def: 50_000 }],
   withdraw_gold: [{ key: 'targetAmount', kind: 'number', label: '補到', suffix: 'G', min: 0, max: 9_999_999, def: 10_000 }],
   use_consumable: [{ key: 'itemId', kind: 'item', label: '道具' }],

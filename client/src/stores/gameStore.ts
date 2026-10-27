@@ -14,7 +14,7 @@ import { emptyConditions } from '../models/talent';
 import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
 import { talentPersistentRules, talentVillageRules } from './talentStore';
 import { BUILD_INFO } from '../buildInfo';
-import type { DropResult } from '../systems/drops';
+import type { DropResult, DroppedItem } from '../systems/drops';
 import type { ActiveEffect } from '../models/effect';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
 import { getStarterGearNames } from '../systems/starterNpc';
@@ -45,7 +45,7 @@ import { getWeightStatus, getWeightPercent } from '../systems/weight';
  * 進 state 會讓每 300ms 一次的取樣觸發整棵樹重繪。
  */
 const HP_SAMPLE_WINDOW_MS = 10_000;
-import { rollDrops, rollBossDrops } from '../systems/drops';
+import { rollDrops, rollBossDrops, persistDroppedEquipment } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { getItemId, getItemById } from '../models/items';
@@ -126,7 +126,7 @@ export interface WarehouseMove {
   materials?: { itemId: number; amount: number }[];
 }
 
-/** 共用／個人倉庫是兩組獨立欄位，寫哪一組由這裡決定 */
+/** 帳號／個人倉庫是兩組獨立欄位，寫哪一組由這裡決定 */
 function warehousePatch(shared: boolean, equip: EquipmentInstance[], materials: BagItem[]) {
   return shared
     ? { storedEquipment: equip, storedMaterials: materials }
@@ -251,6 +251,36 @@ export function isBagFull(
   return getBagUsedSlots(bagItems, inventory, gear) >= getBagMaxSlots(gear);
 }
 
+const BAG_DROP_TYPES: ReadonlySet<DroppedItem['type']> = new Set(['potion', 'material', 'scroll', 'spellbook']);
+
+/**
+ * 依掉落順序判定每一件收不收得下（§ 35.3.1、§ 35.3.2）。
+ * 裝備每件佔 1 格；印記不佔格；背包已有的堆疊品不佔新格；無法入包的掉落物一律 false。
+ */
+export function planDropIntake(
+  items: DroppedItem[],
+  bagItems: BagItem[],
+  inventory: EquipmentInstance[],
+  gear: EquippedGear,
+): boolean[] {
+  let free = getBagMaxSlots(gear) - getBagUsedSlots(bagItems, inventory, gear);
+  const kinds = new Set(bagItems.filter(b => b.amount > 0).map(b => b.itemId));
+  return items.map(item => {
+    if (item.equipmentInstance) {
+      if (free <= 0) return false;
+      free -= 1;
+      return true;
+    }
+    const id = item.itemTemplateId;
+    if (id == null || !BAG_DROP_TYPES.has(item.type)) return false;
+    if (isSigilItemId(id) || kinds.has(id)) return true;
+    if (free <= 0) return false;
+    free -= 1;
+    kinds.add(id);
+    return true;
+  });
+}
+
 /**
  * 換裝後背包是否會超出上限（§ 35.1）。
  *
@@ -283,6 +313,31 @@ export interface PendingDiscard {
   maxAmount: number;
   /** kind === 'equipment' 時的實例 id */
   equipmentId?: number;
+}
+
+/** 丟棄請求對應到自己背包的哪一項；名稱與上限以自己的資料為準，不屬於自己回 null（§ 97.2） */
+function resolveDiscardFrom(
+  inventory: ReadonlyMap<number, EquipmentInstance>,
+  bag: ReadonlyMap<number, BagItem>,
+  req: PendingDiscard | null | undefined,
+): PendingDiscard | null {
+  if (req?.kind === 'equipment') {
+    const item = req.equipmentId != null ? inventory.get(req.equipmentId) : undefined;
+    return item ? { kind: 'equipment', name: item.name, maxAmount: 1, equipmentId: item.id } : null;
+  }
+  if (req?.kind === 'bag') {
+    const entry = req.itemId != null ? bag.get(req.itemId) : undefined;
+    return entry ? { kind: 'bag', name: entry.name, itemId: entry.itemId, maxAmount: entry.amount } : null;
+  }
+  return null;
+}
+
+/** 丟棄請求的查表：裝備依實例 id、背包物品依道具 id */
+function discardLookup(inventory: EquipmentInstance[], bagItems: BagItem[]) {
+  return {
+    inventory: new Map(inventory.filter(i => i.id != null).map(i => [i.id!, i])),
+    bag: new Map(bagItems.map(b => [b.itemId, b])),
+  };
 }
 
 export type { BagItem } from '../models/bagItem';
@@ -468,6 +523,11 @@ export interface GameState {
   craftSpellbook: (bookItemId: number) => boolean;
   /** 試驗場的免費補滿（`50-training-ground.md` § 50.5.3）；只在試驗場內有效 */
   restoreInTrainingGround: () => boolean;
+  /**
+   * 試驗場沙盒的道具消耗（`97-selfhosted-server.md` § 97.2）：只扣庫存，效果由 client 沙盒套用。
+   * 只在試驗場內；任一行數量非正整數或庫存不足整筆不扣
+   */
+  consumeTrainingItems: (lines: { itemId: number; amount: number }[]) => boolean;
   /** 戰鬥後的等待／恢復門檻（存在角色偏好，線上模式由 server 的迴圈讀取） */
   setAfterCombatThreshold: (key: AfterCombatThresholdKey, value: number) => void;
   claimStarterGear: () => Promise<string[]>;
@@ -480,15 +540,20 @@ export interface GameState {
    */
   depositToWarehouse: (params: WarehouseMove) => void;
   withdrawFromWarehouse: (params: WarehouseMove) => void;
-  /** 共用倉庫金幣（跨角色轉移用）。回傳實際搬動的金額 */
+  /** 帳號倉庫金幣（跨角色轉移用）。回傳實際搬動的金額 */
   depositWarehouseGold: (amount: number) => number;
   withdrawWarehouseGold: (amount: number) => number;
   discardInventoryItem: (id: number) => void;
   /** § 35.5.3：拖出背包後等待確認的丟棄請求 */
   pendingDiscard: PendingDiscard | null;
   requestDiscard: (req: PendingDiscard) => void;
+  /** § 35.5.3「多項丟棄」：多選後等待確認的丟棄請求。與 `pendingDiscard` 同時只會有一個 */
+  pendingDiscardBatch: PendingDiscard[] | null;
+  requestDiscardBatch: (reqs: PendingDiscard[]) => void;
   cancelDiscard: () => void;
   confirmDiscard: (amount: number) => void;
+  /** `amounts` 與 `pendingDiscardBatch` 一一對應 */
+  confirmDiscardBatch: (amounts: number[]) => void;
   spendAttributePoint: (attr: keyof Attributes) => void;
   acceptQuest: (questId: string) => void;
   completeQuest: (questId: string) => void;
@@ -520,7 +585,7 @@ export interface GameState {
 const GOLD_NAN_REPAIR_AMOUNT = 2_379_024;
 const GOLD_NAN_REPAIR_KEY = 'mayana_gold_nan_repair';
 
-/** 帳號層級的共用倉庫（`19-account-character.md` § 19.7），選角與建角都要讀入 */
+/** 帳號倉庫（`19-account-character.md` § 19.7），選角與建角都要讀入 */
 async function loadSharedWarehouse(userId: number, session: Session) {
   const storedEquipment = (await session.repo.listSharedWarehouseEquipment(userId)).map(resolveEquipment);
   const storedMaterials: BagItem[] = [];
@@ -2010,9 +2075,10 @@ export function createGameStore(session: Session) {
       );
       set({ activeEffects: [...filtered, effect] });
     } else {
-      // Debuffs: DoT and stun cannot refresh while active
+      // Debuffs: DoT and stun cannot refresh while active；怪物身上的以怪物 id 對應
       const existing = activeEffects.find(
-        e => e.category === effect.category && e.target === effect.target && e.targetIdx === effect.targetIdx
+        e => e.category === effect.category && e.target === effect.target
+          && (effect.target !== 'monster' || e.targetMonsterId === effect.targetMonsterId)
       );
       if (existing) return;
       set({ activeEffects: [...activeEffects, effect] });
@@ -2092,7 +2158,7 @@ export function createGameStore(session: Session) {
   depositToWarehouse: ({ warehouse, equipmentIds = [], materials = [] }) => {
     const state = get();
     const shared = warehouse === 'shared';
-    // 共用倉庫的裝備要記 ownerId，沒有登入者就不搬裝備
+    // 帳號倉庫的裝備要記 ownerId，沒有登入者就不搬裝備
     const canMoveEquip = shared ? !!state.userId : !!state.character;
 
     let inv = state.inventory;
@@ -2217,24 +2283,35 @@ export function createGameStore(session: Session) {
   },
 
   pendingDiscard: null,
+  pendingDiscardBatch: null,
 
   /** 只接受自己背包裡的東西；名稱與數量上限以自己的資料為準（§ 97.2） */
   requestDiscard: (req) => {
     const state = get();
-    if (req?.kind === 'equipment') {
-      const item = state.inventory.find(i => i.id != null && i.id === req.equipmentId);
-      if (!item) return;
-      set({ pendingDiscard: { kind: 'equipment', name: item.name, maxAmount: 1, equipmentId: item.id } });
-      return;
-    }
-    if (req?.kind === 'bag') {
-      const entry = state.bagItems.find(b => b.itemId === req.itemId);
-      if (!entry) return;
-      set({ pendingDiscard: { kind: 'bag', name: entry.name, itemId: entry.itemId, maxAmount: entry.amount } });
-    }
+    const { inventory, bag } = discardLookup(state.inventory, state.bagItems);
+    const resolved = resolveDiscardFrom(inventory, bag, req);
+    if (resolved) set({ pendingDiscard: resolved, pendingDiscardBatch: null });
   },
 
-  cancelDiscard: () => set({ pendingDiscard: null }),
+  /** 不屬於自己的項目剔除、重複的合併；項目數超過背包格數整筆不受理 */
+  requestDiscardBatch: (reqs) => {
+    const state = get();
+    if (!Array.isArray(reqs) || reqs.length === 0 || reqs.length > getBagMaxSlots(state.equippedGear)) return;
+    const { inventory, bag } = discardLookup(state.inventory, state.bagItems);
+    const seen = new Set<string>();
+    const entries: PendingDiscard[] = [];
+    for (const req of reqs) {
+      const resolved = resolveDiscardFrom(inventory, bag, req);
+      if (!resolved) continue;
+      const key = resolved.kind === 'equipment' ? `e${resolved.equipmentId}` : `b${resolved.itemId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push(resolved);
+    }
+    if (entries.length > 0) set({ pendingDiscardBatch: entries, pendingDiscard: null });
+  },
+
+  cancelDiscard: () => set({ pendingDiscard: null, pendingDiscardBatch: null }),
 
   /** 數量 0 或負數時丟 1 個；非整數不處理 */
   confirmDiscard: (amount) => {
@@ -2253,6 +2330,38 @@ export function createGameStore(session: Session) {
         type: 'system',
       }),
     });
+  },
+
+  /** 每項數量夾在 1~持有量；任一數量非整數整筆不處理 */
+  confirmDiscardBatch: (amounts) => {
+    const entries = get().pendingDiscardBatch;
+    if (!entries || !Array.isArray(amounts) || amounts.length !== entries.length) return;
+    if (!amounts.every(a => Number.isSafeInteger(a))) return;
+    let bag = get().bagItems;
+    let logs = get().combatLogs;
+    const inventory = get().inventory;
+    const droppedIds = new Set<number>();
+    entries.forEach((req, i) => {
+      let dropped = 1;
+      if (req.kind === 'equipment') {
+        if (req.equipmentId == null || !inventory.some(it => it.id === req.equipmentId)) return;
+        droppedIds.add(req.equipmentId);
+      } else {
+        const held = bag.find(b => b.itemId === req.itemId);
+        if (!held) return;
+        dropped = Math.max(1, Math.min(amounts[i], req.maxAmount, held.amount));
+        bag = consumeBagItem(bag, held.itemId, dropped);
+      }
+      logs = addLog(logs, { text: `丟棄了 ${req.name}${dropped > 1 ? ` ×${dropped}` : ''}`, type: 'system' });
+    });
+    set({
+      pendingDiscardBatch: null,
+      bagItems: bag,
+      inventory: droppedIds.size > 0 ? inventory.filter(it => !droppedIds.has(it.id!)) : inventory,
+      combatLogs: logs,
+    });
+    if (droppedIds.size > 0) session.repo.bulkDeleteEquipment([...droppedIds]);
+    saveGame(get(), session);
   },
 
   discardInventoryItem: (id) => {
@@ -2738,6 +2847,21 @@ export function createGameStore(session: Session) {
     return true;
   },
 
+  consumeTrainingItems: (lines) => {
+    const state = get();
+    const char = state.character;
+    if (!char || getRegion(char.currentRegion)?.type !== 'training') return false;
+    if (!Array.isArray(lines) || lines.length === 0) return false;
+    let bag = state.bagItems;
+    for (const line of lines) {
+      if (!isPositiveCount(line?.amount) || !hasBagItem(bag, line.itemId, line.amount)) return false;
+      bag = consumeBagItem(bag, line.itemId, line.amount);
+    }
+    set({ bagItems: bag });
+    saveGame(get(), session);
+    return true;
+  },
+
   restoreInTrainingGround: () => {
     const state = get();
     const char = state.character;
@@ -2876,15 +3000,6 @@ export function processMonsterDeath(
 
   logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
 
-  // 清除死亡怪物身上的 debuff
-  const currentEffects = get().activeEffects;
-  const cleanedEffects = currentEffects.filter(
-    e => !(e.target === 'monster' && e.targetIdx === deadIdx)
-  );
-  if (cleanedEffects.length !== currentEffects.length) {
-    set({ activeEffects: cleanedEffects });
-  }
-
   // 實例累積擊殺數是 Pressure 的輸入（`26-spawn-pressure.md` § 26.3、§ 97.7.1 隊伍全體共計）。
   // 木樁在上面就 return 了，不會計入。
   const areaKills = options.instanceKills ?? (char.areaKills ?? 0) + 1;
@@ -2958,12 +3073,27 @@ export function processMonsterDeath(
       await session.talent.getState().load(char.id);
     }
 
+    // 裝備收得下才寫 DB（§ 35.3.1）：被丟棄的若留在 DB，重新載入角色時會全部回到背包
+    const beforePersist = get();
+    const plannedFits = planDropIntake(drops.items, beforePersist.bagItems, beforePersist.inventory, beforePersist.equippedGear);
+    const keptEquipment = drops.items.filter((item, i) => item.equipmentInstance && plannedFits[i]);
+    const persistedInstances = await persistDroppedEquipment(keptEquipment, session.repo);
+    const persisted = new Map(keptEquipment.map((item, i) => [item, persistedInstances[i]]));
+
     const state2 = get();
-    if (!state2.character) return;
+    if (!state2.character) {
+      await Promise.all(persistedInstances.map(inst => session.repo.deleteEquipment(inst.id!)));
+      return;
+    }
     let char2 = { ...state2.character };
     const logs2 = [...state2.combatLogs];
     let newBag = state2.bagItems.map(b => ({ ...b }));
     const newEquipInv = [...state2.inventory];
+    // 寫 DB 期間狀態可能被改動，以最新狀態重判；沒寫入的裝備不參與判定
+    const candidates = drops.items.filter(item => !item.equipmentInstance || persisted.has(item));
+    const candidateFits = planDropIntake(candidates, state2.bagItems, state2.inventory, state2.equippedGear);
+    const fits = new Map(candidates.map((item, i) => [item, candidateFits[i]]));
+    const orphanedEquipmentIds: number[] = [];
 
     for (const text of talentLogs) logs2.push({ text, type: 'loot' });
 
@@ -2973,19 +3103,18 @@ export function processMonsterDeath(
     }
     for (const item of drops.items) {
       if (item.equipmentInstance) {
-        if (getBagUsedSlots(newBag, newEquipInv, state2.equippedGear) >= getBagMaxSlots(state2.equippedGear)) {
-          logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
-        } else {
-          newEquipInv.push(item.equipmentInstance);
+        const instance = persisted.get(item);
+        if (instance && fits.get(item)) {
+          newEquipInv.push(instance);
           logs2.push({ text: `獲得 ${item.name}${item.amount > 1 ? ` ×${item.amount}` : ''}`, type: 'loot' });
+        } else {
+          if (instance) orphanedEquipmentIds.push(instance.id!);
+          logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         }
       } else if (item.type === 'potion' || item.type === 'material' || item.type === 'scroll' || item.type === 'spellbook') {
         if (item.itemTemplateId == null) {
           logs2.push({ text: `無法處理掉落物 ${item.name}（缺少道具 id）`, type: 'system' });
-        } else if (!isSigilItemId(item.itemTemplateId)
-          && !hasBagItem(newBag, item.itemTemplateId)
-          && getBagUsedSlots(newBag, newEquipInv, state2.equippedGear) >= getBagMaxSlots(state2.equippedGear)) {
-          // 印記不佔格（§ 35.20），背包再滿都收得下
+        } else if (!fits.get(item)) {
           logs2.push({ text: `背包已滿，${item.name} 被丟棄`, type: 'system' });
         } else {
           newBag = addBagItem(newBag, item.itemTemplateId, item.amount);
@@ -3041,6 +3170,7 @@ export function processMonsterDeath(
       adventurerQuests: advQuests,
       statistics: stats,
     });
+    await Promise.all(orphanedEquipmentIds.map(id => session.repo.deleteEquipment(id)));
   });
 
   return { char, logs };

@@ -8,7 +8,7 @@ import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, LEARN_PRICES } from '../../mo
 import type { Character } from '../../models/character';
 
 /**
- * 城鎮設施的動作（旅館、職業工會、魔法學院、試驗場）。
+ * 城鎮設施的動作（旅館、魔法學院、試驗場）。
  *
  * 這些判定一定要在 store：線上模式的角色狀態由 server 推回來，
  * 元件自己 `setState` 的結果會被蓋掉 —— 症狀是「血補滿了又掉回來、錢沒扣、書沒消耗」。
@@ -48,11 +48,14 @@ beforeEach(() => {
 describe('RPC 白名單', () => {
   it('城鎮設施的動作都在白名單裡（不在就等於還是本機自己算）', () => {
     for (const action of [
-      'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook',
-      'restoreInTrainingGround', 'setAfterCombatThreshold',
+      'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'setAfterCombatThreshold',
     ]) {
       expect(ACTION_ALLOWLIST.game.has(action), action).toBe(true);
     }
+  });
+
+  it('試驗場回復滿血滿魔只在本機沙盒（`97-selfhosted-server.md` § 97.2），不經 server', () => {
+    expect(ACTION_ALLOWLIST.game.has('restoreInTrainingGround')).toBe(false);
   });
 });
 

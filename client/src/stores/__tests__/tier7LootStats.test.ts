@@ -62,6 +62,15 @@ function makeInstance(overrides: Partial<EquipmentInstance>): EquipmentInstance 
   } as EquipmentInstance;
 }
 
+/** `rollDrops` 的裝備掉落格式：實例尚未寫入 DB（無 id），另附 DB 紀錄 */
+function droppedEquipment(instance: EquipmentInstance) {
+  const { id: _id, ...unsaved } = instance;
+  return {
+    equipmentInstance: unsaved as EquipmentInstance,
+    equipmentRecord: { templateId: instance.templateId, slot: instance.slot, ownerId: instance.ownerId, equipped: false },
+  };
+}
+
 const deadMonster = {
   templateId: 1,
   name: '不死殭屍王',
@@ -140,7 +149,7 @@ describe('T7 掉落統計', () => {
       gold: 0,
       items: [{
         name: '終焉巨劍', type: 'equipment', amount: 1, equipmentTier: 7,
-        equipmentInstance: makeInstance({ name: '終焉巨劍', type: 'twoHandSword', slot: 'rightHand', isTwoHanded: true }),
+        ...droppedEquipment(makeInstance({ name: '終焉巨劍', type: 'twoHandSword', slot: 'rightHand', isTwoHanded: true })),
       }],
     });
 
@@ -156,11 +165,11 @@ describe('T7 掉落統計', () => {
       gold: 0,
       items: [
         { name: 'T7 盾', type: 'equipment', amount: 1, equipmentTier: 7,
-          equipmentInstance: makeInstance({ id: 1, name: 'T7 盾', type: 'shield', slot: 'leftHand' }) },
+          ...droppedEquipment(makeInstance({ id: 1, name: 'T7 盾', type: 'shield', slot: 'leftHand' })) },
         { name: 'T7 魔導書', type: 'equipment', amount: 1, equipmentTier: 7,
-          equipmentInstance: makeInstance({ id: 2, name: 'T7 魔導書', type: 'magicBook', slot: 'leftHand' }) },
+          ...droppedEquipment(makeInstance({ id: 2, name: 'T7 魔導書', type: 'magicBook', slot: 'leftHand' })) },
         { name: 'T7 臂甲', type: 'equipment', amount: 1, equipmentTier: 7,
-          equipmentInstance: makeInstance({ id: 3, name: 'T7 臂甲', type: 'armGuard', slot: 'leftHand' }) },
+          ...droppedEquipment(makeInstance({ id: 3, name: 'T7 臂甲', type: 'armGuard', slot: 'leftHand' })) },
       ],
     });
 
@@ -176,7 +185,7 @@ describe('T7 掉落統計', () => {
       gold: 0,
       items: [{
         name: 'T7 鎧甲', type: 'equipment', amount: 1, equipmentTier: 7,
-        equipmentInstance: makeInstance({ name: 'T7 鎧甲', type: 'armor' as any, slot: 'chest' }),
+        ...droppedEquipment(makeInstance({ name: 'T7 鎧甲', type: 'armor' as any, slot: 'chest' })),
       }],
     });
 
@@ -190,7 +199,7 @@ describe('T7 掉落統計', () => {
       gold: 0,
       items: [{
         name: 'T6 劍', type: 'equipment', amount: 1, equipmentTier: 6,
-        equipmentInstance: makeInstance({ name: 'T6 劍' }),
+        ...droppedEquipment(makeInstance({ name: 'T6 劍' })),
       }],
     });
 
@@ -210,7 +219,7 @@ describe('T7 掉落統計', () => {
       gold: 0,
       items: [{
         name: '終焉巨劍', type: 'equipment', amount: 1, equipmentTier: 7,
-        equipmentInstance: makeInstance({ name: '終焉巨劍', type: 'twoHandSword', slot: 'rightHand', isTwoHanded: true }),
+        ...droppedEquipment(makeInstance({ name: '終焉巨劍', type: 'twoHandSword', slot: 'rightHand', isTwoHanded: true })),
       }],
     });
 

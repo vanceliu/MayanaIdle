@@ -47,12 +47,23 @@ describe('CharacterCreate', () => {
     expect(createCharacter).not.toHaveBeenCalled();
   });
 
-  it('名稱只有 1 個字時不可建立', async () => {
+  it('名稱寬度不足 2（1 個英數字）時不可建立', async () => {
     render(<CharacterCreate />);
     allocateAllPoints();
-    typeName('王');
+    typeName('A');
 
-    await waitFor(() => expect(screen.getByText('名稱至少 2 個字')).toBeDefined());
+    await waitFor(() => expect(screen.getByText(CHARACTER_NAME_ERROR_MESSAGES.too_short)).toBeDefined());
+
+    fireEvent.click(screen.getByText('開始冒險'));
+    expect(createCharacter).not.toHaveBeenCalled();
+  });
+
+  it('超過 6 個中文時不可建立', async () => {
+    render(<CharacterCreate />);
+    allocateAllPoints();
+    typeName('七個中文的名字');
+
+    await waitFor(() => expect(screen.getByText(CHARACTER_NAME_ERROR_MESSAGES.too_long)).toBeDefined());
 
     fireEvent.click(screen.getByText('開始冒險'));
     expect(createCharacter).not.toHaveBeenCalled();

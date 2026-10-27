@@ -30,7 +30,7 @@ export interface GameRepository {
   updateCharacter(id: number, changes: Partial<Character>): Promise<void>;
   deleteCharacter(id: number): Promise<void>;
 
-  /** `ownerId` 為角色 id 或帳號 id（共用倉庫） */
+  /** `ownerId` 為角色 id 或帳號 id（帳號倉庫） */
   listEquipmentByOwner(ownerId: number): Promise<EquipmentInstance[]>;
   listSharedWarehouseEquipment(userId: number): Promise<EquipmentInstance[]>;
   addEquipment(record: Partial<EquipmentInstance>): Promise<number>;
@@ -38,7 +38,7 @@ export interface GameRepository {
   updateEquipment(id: number, changes: Partial<EquipmentInstance>): Promise<void>;
   deleteEquipment(id: number): Promise<void>;
   bulkDeleteEquipment(ids: number[]): Promise<void>;
-  /** 該角色持有的全部裝備（共用倉庫的除外） */
+  /** 該角色持有的全部裝備（帳號倉庫的除外） */
   deleteCharacterEquipment(characterId: number): Promise<void>;
 
   listBag(characterId: number): Promise<CharacterBagEntry[]>;

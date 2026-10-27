@@ -111,6 +111,7 @@
 | 裝備欄浮動視窗（EquipmentPanel） | `EquipmentDetail` | `compact` | 資訊精簡，不顯示重量/部位/材質/職業/詞綴；完整內容走 hover tooltip |
 | 背包 tooltip（BagPanel） | `EquipmentDetail` | — | 完整顯示 |
 | 背包列表（Inventory） | `EquipmentDetail` | — | 完整顯示 |
+| 倉庫（Storage 存入／取出清單） | `EquipmentDetail` | — | 清單一列只印 icon + 名稱（含強化，Tier 色）；完整內容走 hover tooltip |
 | 武器店/防具店 | `EquipmentDetail` / `EquipmentTemplateDetail` | — | 完整顯示 |
 | 印記師（詞綴/品質） | 自訂兩行摘要 | — | **不用 `EquipmentDetail`**：詞綴在選取區已整條列出，再列一次是同一份資料印兩遍。只留品質%與精鍊上限（見 `13-town.md` § 13.13.1） |
 | 鐵匠鋪（製作） | 自訂摘要 ＋ `AttributeRequirement` | — | 配方資訊，非裝備實例；素質需求走共用元件 |
@@ -486,6 +487,15 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 - **字級一律 `var(--fs-xs)`，不可寫死 px**（§ 34.6）
 - 尺寸用 `em`，數字變兩位數時橫向長出去而不是擠成一團
 - 外圈 `box-shadow` 一圈底色，與加粗後的框線隔開
+- 本體樣式只寫在 `.quest-count-badge` 一處，各掛載處只寫定位
+
+**聊天分頁徽章**（紀錄視窗的「聊天」分頁鈕）：
+
+| 狀態 | 顯示 |
+|---|---|
+| 有未讀密語 | 金底徽章，數字＝未讀密語則數（一般頻道不算進去），外圈金色光暈呼吸（週期 1.6s、光暈 6px）；`prefers-reduced-motion` 時不呼吸 |
+| 只有一般頻道未讀 | 灰色小點（`--text-secondary`），不給數字 |
+| 無未讀／正在聊天分頁 | 不顯示 |
 
 **自動天賦只顯示「有沒有設規則」的指示點，不顯示數量。**
 數量回答不了玩家會問的問題（「現在有沒有在跑」），而且數量版本曾經漏算補給分頁。
@@ -500,6 +510,8 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 | 角色 | 詳細狀態 / 裝備欄 / 背包 / 技能 | 看你自己現在怎樣 |
 | 目標與自動化 | 任務 / 信箱 / 自動天賦 | 外部給的目標、你設定的行為 |
 | 系統 | ⚙（`GameToolbar`） | 跟遊戲無關 |
+
+開放世界另有「社群」鈕（隊伍／公會／在線三分頁，`97-selfhosted-server.md` § 97.7.5），接在第二組之後；單機不顯示。
 
 組內 `6px`、組間 `--dock-group-gap: 16px`，**間隔只在 >1200px 給** ——
 以下是圖示模式，空間已經緊到會把徽章擠出去（§ 34.8）。
@@ -601,3 +613,19 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 經 `resolveItemIcon()` 轉成 class，**不在元件裡硬寫道具 id**。
 背包格、快捷欄、倉庫、雜貨店、鐵匠鋪素材列與 Wiki 共用這一支。
 
+---
+
+## 34.14 文字選取
+
+預設**不可選取**（`html, body` 設 `user-select: none`），只有下列白名單可選：
+
+| 範圍 | 選取方式 | selector |
+|---|---|---|
+| 戰鬥紀錄、聊天內容 | 一般選取 | `.combat-log`（聊天的 `.chat-log` 共用此 class） |
+| 輸入格 | 一般選取 | `input`、`textarea`、`[contenteditable='true']` |
+| Wiki（`43-wiki-system.md`） | 一般選取 | `.wiki-layout` |
+| 救援碼（`97-selfhosted-server.md` § 97.5） | 點一下全選 | `.recovery-code-value`（`user-select: all`） |
+
+- 規則集中在 `client/src/index.css`，元件 CSS 不再個別寫 `user-select: none`。
+- 每條都要同時寫 `-webkit-user-select`（Safari）。
+- 新增可選範圍＝擴充本表與白名單，不在元件內另開例外。

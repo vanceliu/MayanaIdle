@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { rollDrops, rollBossDrops } from '../drops';
+import { rollDrops, rollBossDrops, persistDroppedEquipment } from '../drops';
 import { REGIONS } from '../../models/mapData';
 
 import { db, resetTestDb } from '../../testing/testDb';
@@ -81,6 +81,30 @@ describe('drops system', () => {
       expect(count).toBeGreaterThanOrEqual(1);
       expect(count).toBeLessThanOrEqual(4);
       expect(result.items[0].equipmentInstance!.quality).toBe(0);
+    });
+
+    // `35-inventory-constraints.md` § 35.3.1：背包滿時掉落被丟棄，擲出當下不可先寫 DB
+    it('掉落裝備擲出時不寫 DB，persistDroppedEquipment 才寫入', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      await db.equipmentInstances.clear();
+      await db.dropTables.bulkAdd([
+        { area: 'green-valley', itemType: 'equipment', equipmentTemplateId: 1, dropValue: 100 },
+      ] as never);
+      await db.equipmentTemplates.put({
+        id: 1, name: '木劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, requiredLevel: 1,
+      } as any as EquipmentTemplate);
+
+      const result = await rollDrops('green-valley', 7);
+
+      expect(result.items[0].equipmentInstance!.id).toBeUndefined();
+      expect(await db.equipmentInstances.toArray()).toHaveLength(0);
+
+      const [saved] = await persistDroppedEquipment(result.items);
+      const rows = await db.equipmentInstances.toArray();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe(saved.id);
+      expect(rows[0].ownerId).toBe(7);
+      expect(rows[0].affixes).toEqual(saved.affixes);
     });
 
     // `37-statistics.md` § 37.3：T7 計數靠這個欄位，掉落端不帶就得再查一次 DB

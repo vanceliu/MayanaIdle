@@ -86,6 +86,7 @@ describe('gameStore effect actions', () => {
         type: 'debuff',
         target: 'monster',
         targetIdx: 0,
+        targetMonsterId: 'm0',
         category: 'bleeding',
       });
       const bleedM1 = createEffect({
@@ -93,6 +94,7 @@ describe('gameStore effect actions', () => {
         type: 'debuff',
         target: 'monster',
         targetIdx: 1,
+        targetMonsterId: 'm1',
         category: 'bleeding',
       });
 

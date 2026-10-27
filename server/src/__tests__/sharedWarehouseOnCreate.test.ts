@@ -5,11 +5,11 @@ import { defaultSession } from '../../../client/src/stores/session';
 import { createPlayerSession, type PlayerSession } from '../playerSession';
 import { addBagItem } from '../../../client/src/models/bagItem';
 
-/** 建角與選角一樣讀入帳號的共用倉庫（`19-account-character.md` § 19.7） */
+/** 建角與選角一樣讀入帳號的帳號倉庫（`19-account-character.md` § 19.7） */
 const ATTRS = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 } as never;
 const USER_ID = 1;
 
-describe('建角讀入共用倉庫', () => {
+describe('建角讀入帳號倉庫', () => {
   let repo: SqliteRepository;
 
   beforeEach(() => {
@@ -33,7 +33,7 @@ describe('建角讀入共用倉庫', () => {
     await first.game.getState().logout();
   }
 
-  it('新連線建角，新角色看得到共用倉庫', async () => {
+  it('新連線建角，新角色看得到帳號倉庫', async () => {
     await seedSharedWarehouse();
 
     const s = freshConnection();
@@ -43,7 +43,7 @@ describe('建角讀入共用倉庫', () => {
     expect(s.game.getState().storedMaterials).toEqual(addBagItem([], 1, 7));
   });
 
-  it('新角色存檔後，共用倉庫內容不變', async () => {
+  it('新角色存檔後，帳號倉庫內容不變', async () => {
     await seedSharedWarehouse();
 
     const s = freshConnection();

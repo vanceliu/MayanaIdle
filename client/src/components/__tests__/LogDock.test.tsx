@@ -236,18 +236,37 @@ describe('LogDock 分頁', () => {
     expect(screen.queryByLabelText('聊天輸入')).toBeNull();
   });
 
-  it('停在戰鬥分頁時聊天累加未讀，切過去歸零', () => {
+  const badge = () => tab('聊天').querySelector('.quest-count-badge');
+
+  it('只有一般頻道未讀時是灰點、不給數字，切過去歸零', () => {
     render(<LogDock />);
     act(() => {
-      useChatStore.getState().receive({ id: 1, channel: 'world', from: { characterId: 2, name: 'A' }, text: '嗨', at: 1 });
-      useChatStore.getState().receive({ id: 2, channel: 'world', from: { characterId: 2, name: 'A' }, text: '在嗎', at: 2 });
+      useChatStore.getState().receive({ id: 1, channel: 'world', from: { characterId: 2, name: 'A' }, text: '嗨', at: 1 }, 1);
+      useChatStore.getState().receive({ id: 2, channel: 'world', from: { characterId: 2, name: 'A' }, text: '在嗎', at: 2 }, 1);
     });
 
-    expect(tab('聊天').textContent).toContain('2');
+    expect(badge()?.classList.contains('is-dot')).toBe(true);
+    expect(badge()?.textContent).toBe('');
 
     fireEvent.click(tab('聊天'));
     expect(useChatStore.getState().unread).toBe(0);
-    expect(tab('聊天').textContent).not.toContain('2');
+    expect(badge()).toBeNull();
+  });
+
+  it('有未讀密語時徽章顯示密語則數並呼吸，一般頻道不算進數字', () => {
+    render(<LogDock />);
+    act(() => {
+      useChatStore.getState().receive({ id: 1, channel: 'world', from: { characterId: 2, name: 'A' }, text: '嗨', at: 1 }, 1);
+      useChatStore.getState().receive({ id: 2, channel: 'whisper', from: { characterId: 2, name: 'A' }, to: { characterId: 1, name: '我' }, text: '在嗎', at: 2 }, 1);
+      useChatStore.getState().receive({ id: 3, channel: 'whisper', from: { characterId: 3, name: 'B' }, to: { characterId: 1, name: '我' }, text: '交易', at: 3 }, 1);
+    });
+
+    expect(badge()?.classList.contains('is-whisper')).toBe(true);
+    expect(badge()?.textContent).toBe('2');
+
+    fireEvent.click(tab('聊天'));
+    expect(useChatStore.getState().whisperUnread).toBe(0);
+    expect(badge()).toBeNull();
   });
 
   it('人在聊天分頁時不累加未讀', () => {

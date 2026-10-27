@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ClassGuild } from '../town/ClassGuild';
+import { MagicAcademy } from '../town/MagicAcademy';
+import { AdventurerGuild } from '../town/AdventurerGuild';
 import { useGameStore } from '../../stores/gameStore';
 import { bagItem } from '../../testing/bagFixtures';
 
@@ -8,7 +9,12 @@ import { bagItem } from '../../testing/bagFixtures';
  * @vitest-environment jsdom
  */
 
-describe('ClassGuild', () => {
+function renderClassSkillTab() {
+  render(<MagicAcademy />);
+  fireEvent.click(screen.getByText('職業技能'));
+}
+
+describe('魔法學院 — 職業技能分頁（§ 13.9）', () => {
   beforeEach(() => {
     useGameStore.setState({
       character: {
@@ -41,7 +47,7 @@ describe('ClassGuild', () => {
   });
 
   it('renders class skills for knight', () => {
-    render(<ClassGuild />);
+    renderClassSkillTab();
     expect(screen.getByText('盾擊')).toBeDefined();
     expect(screen.getByText('裂傷斬')).toBeDefined();
   });
@@ -50,7 +56,7 @@ describe('ClassGuild', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, level: 10 },
     });
-    render(<ClassGuild />);
+    renderClassSkillTab();
     const learnButtons = screen.getAllByText('學習');
     expect((learnButtons[0] as HTMLButtonElement).disabled).toBe(false);
   });
@@ -59,7 +65,7 @@ describe('ClassGuild', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, level: 5 },
     });
-    render(<ClassGuild />);
+    renderClassSkillTab();
     const learnButtons = screen.getAllByText('學習');
     expect((learnButtons[0] as HTMLButtonElement).disabled).toBe(true);
   });
@@ -69,7 +75,7 @@ describe('ClassGuild', () => {
       character: { ...useGameStore.getState().character!, level: 10 },
       bagItems: [],
     });
-    render(<ClassGuild />);
+    renderClassSkillTab();
     const learnButtons = screen.getAllByText('學習');
     expect((learnButtons[0] as HTMLButtonElement).disabled).toBe(true);
   });
@@ -78,7 +84,7 @@ describe('ClassGuild', () => {
     useGameStore.setState({
       character: { ...useGameStore.getState().character!, level: 10 },
     });
-    render(<ClassGuild />);
+    renderClassSkillTab();
     const learnButtons = screen.getAllByText('學習');
     fireEvent.click(learnButtons[0]);
 
@@ -92,7 +98,47 @@ describe('ClassGuild', () => {
       character: { ...useGameStore.getState().character!, level: 10 },
       skills: [{ id: 'shield-bash', name: '盾擊', level: 1, element: 'none', type: 'attack', target: 'single', power: 20, mpCost: 15, cooldown: 10000, lastUsedAt: 0 }],
     });
-    render(<ClassGuild />);
+    renderClassSkillTab();
     expect(screen.getByText('已學習')).toBeDefined();
+  });
+});
+
+describe('冒險者工會 — 冒險任務／職業任務分頁（§ 13.10）', () => {
+  beforeEach(() => {
+    useGameStore.setState({
+      character: { ...useGameStore.getState().character!, level: 10, quests: [] },
+      adventurerQuests: [],
+      guildProgress: { rank: 'F', points: 0 },
+      questBoardTownId: null,
+    });
+  });
+
+  it('預設顯示冒險任務，等階狀態只在冒險任務分頁', () => {
+    const { container } = render(<AdventurerGuild />);
+    expect(container.querySelector('.adventurer-guild-status')).not.toBeNull();
+    expect(screen.queryByText(/職業試煉/)).toBeNull();
+
+    fireEvent.click(screen.getByText('職業任務'));
+    expect(container.querySelector('.adventurer-guild-status')).toBeNull();
+  });
+
+  it('職業任務分頁可接取職業試煉', () => {
+    render(<AdventurerGuild />);
+    fireEvent.click(screen.getByText('職業任務'));
+    expect(screen.getByText(/職業試煉 — 實戰訓練/)).toBeDefined();
+
+    fireEvent.click(screen.getByText('接取'));
+    const quests = useGameStore.getState().character!.quests;
+    expect(quests).toHaveLength(1);
+    expect(quests[0].status).toBe('active');
+    expect(screen.getByText('進行中')).toBeDefined();
+  });
+
+  it('接取職業任務不佔冒險任務上限（§ 36.6.2）', () => {
+    render(<AdventurerGuild />);
+    fireEvent.click(screen.getByText('職業任務'));
+    fireEvent.click(screen.getByText('接取'));
+    fireEvent.click(screen.getByText('冒險任務'));
+    expect(screen.getByText(/已接取：0\//)).toBeDefined();
   });
 });

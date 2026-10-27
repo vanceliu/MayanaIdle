@@ -222,7 +222,7 @@ baseValue × (1 + qualityPercent / 100)
 - Warehouse 綁定 userId（帳號層級共用），可存放物品與金幣
 - Inventory / Equipment / Skills / Progress 綁定 characterId（角色獨立）
 - 金幣存於 Character，各角色獨立；倉庫另有獨立金幣存放欄位供跨角色轉移
-- 共用倉庫金幣**不與物品同表**：實作為獨立的 `warehouseGold`（主鍵 `userId`，一帳號一列）。
+- 帳號倉庫金幣**不與物品同表**：實作為獨立的 `warehouseGold`（主鍵 `userId`，一帳號一列）。
   金幣是餘額不是物品 —— 不佔格數、不計重量、沒有 `itemTemplateId`，
   且需要「不可為負」的原子扣減（交易前強制 flush，`97-selfhosted-server.md` § 97.4）
 
@@ -405,17 +405,20 @@ SQLite（WAL）。靜態模板隨程式碼發布，不進資料庫（§ 18.8）�
 | `users` | `id` | § 18.7 User。**沒有管理員欄位** —— 管理介面憑證在 `server.properties`（`97-selfhosted-server.md` § 97.8） |
 | `sessions` | `token` | `userId`、`createdAt`、`expiresAt`；登出即刪 |
 | `characters` | `id`、`uuid` 唯一、`nameKey` 唯一 | § 18.7 Character，含 `seasonId`、`pool`、統計欄位（`37-statistics.md` § 37.2）。`nameKey` 為名稱正規化後的比對鍵（`19-account-character.md` § 19.4） |
-| `equipment_instances` | `id` | § 18.3，`ownerId` 指向角色或帳號（共用倉庫） |
+| `equipment_instances` | `id` | § 18.3，`ownerId` 指向角色或帳號（帳號倉庫） |
 | `character_bag`、`character_storage` | `id` | § 18.1 背包／倉庫的鍵 |
-| `warehouses`、`warehouse_gold` | `id`／`userId` | § 18.7 共用倉庫 |
+| `warehouses`、`warehouse_gold` | `id`／`userId` | § 18.7 帳號倉庫 |
 | `talent_slots` | `id` | § 18.9 天賦格實例 |
 | `talent_configs` | `characterId` | § 18.9 天賦配置 |
 | `quick_slots` | `characterId` | 快捷欄 |
 | `bag_layouts` | `characterId` | `35-inventory-constraints.md` § 35.17 slotMap |
 | `talent_bag_layouts` | `characterId` | 天賦分頁的格子位置（`35-inventory-constraints.md` § 35.21.1）。與一般分頁分開一張表 |
 | `mailbox` | `id` | § 18.10 |
+| `guilds` | `id`、`nameKey` 唯一 | `name`、`leaderCharacterId`、`leaderCha`（盟主魅力最後已知值，盟主離線時人數上限照此計）、`warehouseGold`（公會倉庫金幣）、`createdAt`（`11-guild.md`） |
+| `guild_warehouse_items` | (`guildId`, `itemId`) | 公會倉庫的可堆疊道具與數量（`11-guild.md` § 11.8）；裝備放 `equipment_instances`，`storageType = 'guild'`、`ownerId` 為**負的**公會 id（角色、帳號、公會 id 各自遞增會撞號） |
+| `guild_members` | `characterId`（PK） | `guildId`、`joinedAt`、`name`／`className`／`level`（最後一次在線時的值，供離線名單顯示）；以 `characterId` 為主鍵保證一個角色只屬一個公會（`11-guild.md` § 11.5） |
 | `server_meta` | `key` | 世界層級的固定資訊，目前只有 `mode`（單機／開放，`97-selfhosted-server.md` § 97.1） |
 | `schema_version` | — | 遷移版本（`97-selfhosted-server.md` § 97.4） |
 
-- 隊伍、地圖實例、怪物、Pressure 為 server 記憶體狀態，不持久化；server 重啟即消失
+- 隊伍、地圖實例、怪物、Pressure、公會邀請為 server 記憶體狀態，不持久化；server 重啟即消失
 - 聊天訊息**不持久化**（`97-selfhosted-server.md` § 97.7.2）：只即時轉發，不進資料庫

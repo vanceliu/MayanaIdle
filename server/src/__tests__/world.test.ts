@@ -134,6 +134,40 @@ describe('World（隊伍與地圖實例）', () => {
     expect(b.mapControl.getState().playerPosition).toEqual(spawn);
   });
 
+  it('tick 中換區到隊友所在地圖：載圖期間不放進實例，不清掉隊友實例的怪物', async () => {
+    const a = await enter(1, 'A');
+    const b = await enter(2, 'B', 'neutral-town');
+    await party(a, b);
+    const shared = a.mapMonster;
+    let cleared = 0;
+    const clearAll = shared.getState().clearAll;
+    shared.setState({ clearAll: () => { cleared++; clearAll(); } });
+
+    b.game.setState({ character: { ...b.game.getState().character!, currentRegion: 'dawn-plains', currentArea: 'dawn-plains' } });
+    const loading = syncWorld(b);
+    world.tick();
+    await loading;
+
+    expect(cleared).toBe(0);
+    expect(b.instance).toBe(a.instance);
+  });
+
+  it('試驗場由 client 本機沙盒模擬：server 不推進該玩家（`97-selfhosted-server.md` § 97.2）', async () => {
+    const trainee = await enter(1, 'A', TRAINING_GROUND_REGION_ID);
+    const hunter = await enter(2, 'B');
+    const start = new Map<PlayerSession, { x: number; y: number }>();
+    for (const s of [trainee, hunter]) {
+      const p = s.mapControl.getState().playerPosition;
+      start.set(s, p);
+      s.mapControl.setState({ isMoving: true, currentPath: [{ x: p.x - 1, y: p.y }], pathIndex: 0, targetPosition: { x: p.x - 1, y: p.y } });
+    }
+
+    for (let i = 0; i < 5; i++) world.tick();
+
+    expect(trainee.mapControl.getState().playerPosition).toEqual(start.get(trainee));
+    expect(hunter.mapControl.getState().playerPosition).not.toEqual(start.get(hunter));
+  });
+
   it('試驗場一律個人實例：組隊也看不到隊友，在線名單不列任何人（`50-training-ground.md` § 50.2）', async () => {
     const a = await enter(1, 'A', TRAINING_GROUND_REGION_ID);
     const b = await enter(2, 'B', TRAINING_GROUND_REGION_ID);
@@ -228,7 +262,7 @@ describe('World（隊伍與地圖實例）', () => {
       exp: 100, race: 'normal', size: 'small', element: 'none', isBoss: false, attackType: 'melee', attackRange: 1.5, attackInterval: 1200,
     };
     const expBefore = [a, b, c].map(s => s.game.getState().character!.exp);
-    handleMonsterDeath(dead, 0, 'm1', a);
+    handleMonsterDeath(dead, 'm1', a);
     // 掉落佇列每個 session 一份（§ 97.6），要逐一等
     await Promise.all([a, b, c].map(s => waitForPendingDrops(s)));
     const gained = [a, b, c].map((s, i) => s.game.getState().character!.exp - expBefore[i]);
