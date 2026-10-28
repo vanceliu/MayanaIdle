@@ -11,7 +11,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   // === 狀態解除道具 ===
   { id: 144, name: '解毒藥水', category: 'potion', description: '立即解除中毒', weight: 2, buyPrice: 50, icon: 'items/potion-ball', iconColor: '#2DD4BF' },
   { id: 145, name: '止血繃帶', category: 'potion', description: '立即解除流血', weight: 2, buyPrice: 50, icon: 'items/sewing-string', iconColor: '#F87171' },
-  { id: 146, name: '淨化藥水', category: 'potion', description: '解除詛咒/虛弱（全解）', weight: 3, buyPrice: 500, icon: 'items/bubbling-flask', iconColor: '#A78BFA' },
+  { id: 146, name: '淨化藥水', category: 'potion', description: '解除詛咒/虛弱/沉默（全解）', weight: 3, buyPrice: 500, icon: 'items/bubbling-flask', iconColor: '#A78BFA' },
 
   // === 回城卷軸 ===
   { id: 4, name: '薄暮村回城卷軸', category: 'scroll', description: '使用後傳送至薄暮村', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },

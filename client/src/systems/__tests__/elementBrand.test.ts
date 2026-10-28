@@ -2,7 +2,7 @@
  * 元素刻印（`07-affix.md` § 7.4）。
  *
  * 武器元素的唯一來源。抽到刻印當下從六種元素均等隨機決定一個，之後不變；
- * 沒有刻印的武器是無屬性，既不吃刻印乘區，也不吃 § 42.2 的克制 +3。
+ * 沒有刻印的武器是無屬性，既不吃刻印乘區，§ 42.2 的元素克制也固定 +0。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
@@ -11,7 +11,7 @@ import {
 } from '../../models/affix';
 import { calculatePlayerAttack, calculateSkillAttack, getWeaponElement } from '../combat';
 import type { Character } from '../../models/character';
-import type { MonsterInstance } from '../../models/monster';
+import type { ElementType, MonsterInstance } from '../../models/monster';
 import type { EquipmentInstance } from '../../models/equipment';
 
 function char(): Character {
@@ -130,22 +130,20 @@ describe('刻印在普攻的效果', () => {
 
   it('有刻印就吃到乘區', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.1);
-    const m = dummy();
+    const m = dummy({ element: 'ice' }); // 冰克火：克制 +0，只看乘區
     const w = sword([brand(15, 'fire')]);
     // floor(27 × 1.15) = 31
     expect(calculatePlayerAttack(char(), w, m, [w]).damage).toBe(31);
   });
 
-  it('刻印的元素克制目標時額外 +3（§ 42.2）', () => {
+  it('刻印的元素克制 +5／無克制 +3／被克制 +0，都在乘區之前（§ 42.2）', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.1);
-    const wind = dummy({ element: 'wind' });   // 火克風
-    const ice = dummy({ element: 'ice' });     // 火不克冰
     const w = sword([brand(15, 'fire')]);
-    const countered = calculatePlayerAttack(char(), w, wind, [w]).damage;
-    const neutral = calculatePlayerAttack(char(), w, ice, [w]).damage;
-    // 克制的 +3 在乘區之前：floor((27 + 3) × 1.15) = 34 vs floor(27 × 1.15) = 31
-    expect(countered).toBe(34);
-    expect(neutral).toBe(31);
+    const hit = (element: ElementType) => calculatePlayerAttack(char(), w, dummy({ element }), [w]).damage;
+    expect(hit('wind')).toBe(36);  // 火克風：floor((27 + 5) × 1.15)
+    expect(hit('earth')).toBe(34); // 無克制：floor((27 + 3) × 1.15)
+    expect(hit('none')).toBe(34);  // 目標無屬性視為無克制
+    expect(hit('ice')).toBe(31);   // 冰克火：floor(27 × 1.15)
   });
 
   it('沒有刻印就拿不到克制加成', () => {

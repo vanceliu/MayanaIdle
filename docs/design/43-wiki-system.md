@@ -183,7 +183,7 @@ client/src/wiki/
 - **各項上限直接 import `systems/combat.ts` 的常數**（`DAMAGE_REDUCTION_CAP`、
   `MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP` 等），不再寫死數字
 - 物理與魔法減傷並列，明確標示裝備防禦對魔法只有一半效力（貢獻上限 37.5%）
-- 魔法抗性獨立成一節，說明「加進魔法減傷率」與「降低詛咒／虛弱／減速機率」兩個用途
+- 魔法抗性獨立成一節，說明「加進魔法減傷率」與「降低詛咒／虛弱／減速／沉默機率」兩個用途
 - 公式敘述本身仍為文字，變更公式時需人工同步（有測試檢查關鍵常數與區塊是否存在）
 
 ### 4.11 任務 (QuestsPage)

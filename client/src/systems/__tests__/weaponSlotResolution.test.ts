@@ -130,7 +130,7 @@ describe('普攻傷害不受 equippedGear 排列影響', () => {
     useGameStore.setState({ character: null, skills: [], equippedGear: {}, activeEffects: [] });
   });
 
-  it('妖精持獵人長弓＋火矢附魔打石像鬼：武器排最後仍為 31', () => {
+  it('妖精持獵人長弓＋火矢附魔打石像鬼：武器排最後仍為 36', () => {
     // 0.5：命中（50 < 命中率 88）且不暴擊（50 >= 爆擊率 5）
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
@@ -147,9 +147,9 @@ describe('普攻傷害不受 equippedGear 排列影響', () => {
       bow,
     ];
 
-    // 基礎 = 大怪基傷 7 + 額外攻擊 2 + STR加成 7 + 火矢 15 = 31
-    // → ×1.09 = 33 → ×1.09 = 35 → 防禦 10% → floor(35 × 0.9) = 31
-    expect(attackOnce(elfLv28(), gear, gargoyle(), [fireEnchant()])).toBe(31);
+    // 基礎 = 大怪基傷 7 + 額外攻擊 2 + STR加成 7 + 火矢 15 + 元素克制 3（火對地＝無克制）= 34
+    // → ×1.09 = 37 → ×1.09 = 40 → 防禦 10% → floor(40 × 0.9) = 36
+    expect(attackOnce(elfLv28(), gear, gargoyle(), [fireEnchant()])).toBe(36);
   });
 
   it('近戰（新手劍）武器排最後仍吃得到武器基傷', () => {

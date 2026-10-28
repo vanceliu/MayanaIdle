@@ -36,6 +36,7 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'curse': 'debuffs/skull-crossed-bones',
   'weaken': 'debuffs/weaken-arrow',
   'slow': 'debuffs/snail-slow',
+  'silence': 'debuffs/silenced',
 };
 
 export const ITEM_ICON_MAP: Record<string, string> = {

@@ -30,6 +30,33 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 角色 debuff 新增沉默（`24-buff-debuff.md` § 24.4／§ 24.10、`25-monster-system.md` § 25.8／§ 25.9）
+
+規格：沉默＝無法施展技能（普攻、道具不受影響），10s，不可刷新，tag `silenced`，category `silence`；魔抗可抵抗；淨化藥水可解；施加者為 12 筆 `attackType: 'magic'` seed，判定順序排最後，觸發率 Lv.33~36 10%／Lv.38~43 12%／Lv.49~59 13%／Lv.80 15%。
+
+- [x] P1 文件：24、25、30、13、03、07、20、16、43、48、INDEX
+- [x] P2 `playerDebuff.ts`、`playerDebuffSystem.ts`、`cureItem.ts`、`scriptEngine.ts`、seed、icon
+- [x] P3 技能施放阻擋：`scriptRunner.ts`、`arpgEngine.ts`、`gameStore.ts`
+- [x] P4 Wiki、新手提示
+- [x] P5 測試；`npx tsc -b`、client／server vitest
+
+### 元素克制三段化（`42-element-system.md` § 42.2、`21-combat-formula.md` § 21.15）
+
+規格：攻擊方無屬性 +0；克制（火→風→地→冰→火、光↔暗）+5；被克制（環狀反向）+0；其餘（目標無屬性、同屬性、無關係）+3。物理普攻與技能共用。
+
+- [x] P1 文件：42 § 42.2／§ 42.5、21 § 21.4／§ 21.4a／§ 21.11／§ 21.15、07 § 7.4
+- [x] P2 `combat.ts` `getElementCounterBonus()`；Wiki `CombatPage.tsx`
+- [x] P3 測試：`elementBrand.test.ts` 改寫＋全情況單元測試（物理／技能各一）
+- [x] P4 `npx tsc -b`、client／server vitest
+
+### 移除怪物金幣單次掉落上限（`27-drop-table.md` § 27.1）
+
+規格：怪物金幣 = floor(區間抽值 × (1 + gold_rate/100) × 全域金幣倍率)，無上限；Pressure 仍不作用於金幣；任務金幣上限不變。
+
+- [x] P1 `globalRates.ts` 移除 `GOLD_DROP_CAP`；`drops.ts` 註解；測試
+- [x] P2 文件 27 § 27.1／§ 27.7、26 § 26.3
+- [x] P3 `npx tsc -b`、client vitest
+
 ### 公會倉庫＋共用倉庫改名帳號倉庫（`11-guild.md` § 11.8、`13-town.md` § 13.8、`35-inventory-constraints.md` § 35.12）
 
 規格：見 `11-guild.md` § 11.8。內容只在成員打開分頁或自己存取後送出，不隨他人變動推送。

@@ -4,18 +4,15 @@
  */
 import { rates } from '../core/rates';
 
-/** `27-drop-table.md` § 27.1：金幣單次上限 500，上限與抽值同乘全域倍率 */
-export const GOLD_DROP_CAP = 500;
-
 /** `28-monster-stats.md` § 28.1：擊殺經驗結算倍率 ×3 */
 export const KILL_EXP_MULTIPLIER = 3;
 
 /** `26-spawn-pressure.md` § 26.4：Boss 生成基礎機率 */
 export const BOSS_SPAWN_BASE_CHANCE = 0.1;
 
-/** 怪物金幣掉落：min(抽值, 500) × 詞綴加成 × 全域倍率 */
+/** `27-drop-table.md` § 27.1：怪物金幣掉落 = 抽值 × 詞綴加成 × 全域倍率，無上限 */
 export function settleGoldDrop(baseGold: number, affixMultiplier: number, globalRate = rates.gold): number {
-  return Math.floor(Math.min(baseGold, GOLD_DROP_CAP) * affixMultiplier * globalRate);
+  return Math.floor(baseGold * affixMultiplier * globalRate);
 }
 
 /** `36-quest-system.md` § 36.5.1：任務金幣獎勵上限，在全域倍率之前套用 */

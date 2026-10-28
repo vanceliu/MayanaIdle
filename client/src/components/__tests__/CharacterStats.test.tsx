@@ -109,6 +109,45 @@ describe('CharacterStats', () => {
     });
   });
 
+  /** `34-ui-guidelines.md` § 34.3：掉落區塊只顯示裝備詞綴合計 */
+  describe('掉寶率／金幣獲得率', () => {
+    const gear = (over: Partial<EquipmentInstance>) => ({
+      templateId: 1, name: 'x', type: 'armor', slot: 'chest', isTwoHanded: false,
+      quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true, ...over,
+    }) as EquipmentInstance;
+    const rowValue = (label: string) =>
+      screen.getByText(label).closest('.stat-row')?.querySelector('.stat-value')?.textContent;
+
+    it('裸裝為 +0%', () => {
+      render(<CharacterStats />);
+      expect(rowValue('掉寶率')).toBe('+0%');
+      expect(rowValue('金幣獲得率')).toBe('+0%');
+    });
+
+    it('一般詞綴與 T7 獨有掉寶率加總', () => {
+      useGameStore.setState({
+        equippedGear: {
+          chest: gear({ affixes: [{ type: 'drop_rate', tier: 3, value: 10 }, { type: 'gold_rate', tier: 3, value: 15 }] }),
+          necklace: gear({ slot: 'necklace', uniqueAffix: { type: 'drop_rate', value: 60 } }),
+        },
+      });
+      render(<CharacterStats />);
+      expect(rowValue('掉寶率')).toBe('+70%');
+      expect(rowValue('金幣獲得率')).toBe('+15%');
+    });
+
+    it('素質需求未滿足：詞綴凍結不計入', () => {
+      useGameStore.setState({
+        equippedGear: {
+          chest: gear({ requiredAttributes: { STR: 99 }, affixes: [{ type: 'drop_rate', tier: 3, value: 10 }, { type: 'gold_rate', tier: 3, value: 15 }] }),
+        },
+      });
+      render(<CharacterStats />);
+      expect(rowValue('掉寶率')).toBe('+0%');
+      expect(rowValue('金幣獲得率')).toBe('+0%');
+    });
+  });
+
   it('returns null when no character', () => {
     useGameStore.setState({ character: null });
     const { container } = render(<CharacterStats />);

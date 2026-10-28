@@ -18,7 +18,7 @@ import { canUseSkill } from '../models/skill';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { PLAYER_DEBUFF_DEFS } from '../models/playerDebuff';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
-import { hasActivePlayerDebuff, isPlayerStunned } from './playerDebuffSystem';
+import { hasActivePlayerDebuff, isPlayerSilenced, isPlayerStunned } from './playerDebuffSystem';
 
 // === Combat Script ===
 
@@ -164,7 +164,7 @@ function hasSelfDebuff(
   debuffType: ScriptDebuffCondition | undefined, activeEffects: ActiveEffect[], now: number,
 ): boolean {
   if (!debuffType) return false;
-  // 合併條件（如「詛咒或虛弱」）只要其中一項成立即可
+  // 合併條件（如「詛咒、虛弱或沉默」）只要其中一項成立即可
   return SCRIPT_DEBUFF_TYPES[debuffType].some(
     t => hasActivePlayerDebuff(activeEffects, PLAYER_DEBUFF_DEFS[t].category, now),
   );
@@ -379,6 +379,8 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (!skill || skill.type !== 'attack') return false;
       if (!meetsWeaponRequirement(skill, ctx)) return false;
+      // 沉默中無法施展技能（§ 24.5.1a）
+      if (isPlayerSilenced(ctx.activeEffects ?? [], ctx.now)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'normal_attack':
@@ -558,12 +560,14 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
     case 'buff_skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (skill?.type !== 'buff') return false;
+      if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'heal_skill': {
       if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (skill?.type !== 'heal') return false;
+      if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
     }
     case 'cure_item': {
@@ -598,6 +602,7 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
     case 'close_in':
       return ctx.inCombat === true;
     case 'refill_all_buffs': {
+      if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
       const ids = [action.skillId, action.skillId2, action.skillId3]
         .filter((id): id is string => Boolean(id));
       return ids.some(id => {

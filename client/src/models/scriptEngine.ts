@@ -2,7 +2,7 @@ import type { PlayerDebuffType } from './playerDebuff';
 
 /**
  * 常駐腳本「狀態異常」條件的選項。
- * 詛咒與虛弱共用淨化藥水，因此合併為一項，避免腳本過長。
+ * 詛咒、虛弱、沉默共用淨化藥水，因此合併為一項，避免腳本過長。
  * 暈眩不列入：無解除道具，且暈眩中無法使用任何道具。
  */
 export type ScriptDebuffCondition = 'poison' | 'bleed' | 'curse_weaken' | 'slow';
@@ -11,14 +11,14 @@ export type ScriptDebuffCondition = 'poison' | 'bleed' | 'curse_weaken' | 'slow'
 export const SCRIPT_DEBUFF_TYPES: Record<ScriptDebuffCondition, PlayerDebuffType[]> = {
   poison: ['poison'],
   bleed: ['bleed'],
-  curse_weaken: ['curse', 'weaken'],
+  curse_weaken: ['curse', 'weaken', 'silence'],
   slow: ['slow'],
 };
 
 export const SCRIPT_DEBUFF_LABELS: Record<ScriptDebuffCondition, string> = {
   poison: '中毒',
   bleed: '流血',
-  curse_weaken: '詛咒或虛弱',
+  curse_weaken: '詛咒、虛弱或沉默',
   slow: '減速',
 };
 

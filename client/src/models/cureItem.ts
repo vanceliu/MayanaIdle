@@ -43,8 +43,9 @@ export const CURE_ITEMS: CureItemDefinition[] = [
     cures: [
       PLAYER_DEBUFF_DEFS.curse.category,
       PLAYER_DEBUFF_DEFS.weaken.category,
+      PLAYER_DEBUFF_DEFS.silence.category,
     ],
-    description: '解除詛咒/虛弱（全解）',
+    description: '解除詛咒/虛弱/沉默（全解）',
   },
 ];
 

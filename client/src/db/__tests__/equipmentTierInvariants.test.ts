@@ -278,3 +278,32 @@ describe('tier 素質單調遞增', () => {
     expect(violations).toEqual([]);
   });
 });
+
+describe('雙刀與鋼爪的走向（`06-equipment-requirement.md`）', () => {
+  const tiersOf = (type: string) => new Set(REAL.filter(t => t.type === type).map(t => t.tier!));
+  const sharedTiers = [...tiersOf('dualBlade')].filter(tier => tiersOf('claw').has(tier));
+  const ofTier = (type: string, tier: number) => REAL.filter(t => t.type === type && t.tier === tier);
+
+  it('同階的雙刀攻擊成功一律高於鋼爪', () => {
+    const violations = sharedTiers.filter(tier =>
+      Math.min(...ofTier('dualBlade', tier).map(t => t.attackSuccess ?? 0))
+        <= Math.max(...ofTier('claw', tier).map(t => t.attackSuccess ?? 0)));
+    expect(sharedTiers.length).toBeGreaterThan(0);
+    expect(violations).toEqual([]);
+  });
+
+  it('同階的鋼爪小怪與大怪傷害一律高於雙刀', () => {
+    const violations: string[] = [];
+    for (const tier of sharedTiers) {
+      for (const [axis, pick] of [
+        ['小怪', (t: EquipmentTemplate) => t.smallMonsterDamage ?? 0],
+        ['大怪', (t: EquipmentTemplate) => t.largeMonsterDamage ?? 0],
+      ] as const) {
+        if (Math.min(...ofTier('claw', tier).map(pick)) <= Math.max(...ofTier('dualBlade', tier).map(pick))) {
+          violations.push(`T${tier} ${axis}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+});

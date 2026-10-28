@@ -26,7 +26,7 @@ import {
   type QuickSlotEntry,
   type QuickSlots,
 } from '../models/quickSlot';
-import { isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
+import { isPlayerSilenced, isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
 import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
@@ -1441,6 +1441,10 @@ export function createGameStore(session: Session) {
      * 排隊會讓「按下去之後不知道何時會放」變成常態；說明原因是為了讓玩家
      * 分得出「還在轉 CD」與「這把武器放不出這招」——兩者的畫面都是灰的。
      */
+    if (isPlayerSilenced(state.activeEffects)) {
+      set({ combatLogs: addLog(state.combatLogs, { text: '沉默中，無法施展技能', type: 'system' }) });
+      return false;
+    }
     if (!skillMeetsWeaponRequirement(skill, weaponType)) {
       set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} 需要對應武器`, type: 'system' }) });
       return false;
@@ -1481,6 +1485,7 @@ export function createGameStore(session: Session) {
     const now = gameNow();
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
+    if (isPlayerSilenced(state.activeEffects, now)) return false;
     if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return false;
 
     const template = getSkillTemplate(skill.id);

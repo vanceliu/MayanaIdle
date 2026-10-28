@@ -4,7 +4,7 @@ import type { StatModifier } from './effect';
  * 角色 Debuff 系統
  * 設計來源：docs/design/24-buff-debuff.md § 24.4
  */
-export type PlayerDebuffType = 'poison' | 'bleed' | 'curse' | 'weaken' | 'slow' | 'stun';
+export type PlayerDebuffType = 'poison' | 'bleed' | 'curse' | 'weaken' | 'slow' | 'stun' | 'silence';
 
 export interface PlayerDebuffDefinition {
   type: PlayerDebuffType;
@@ -92,9 +92,18 @@ export const PLAYER_DEBUFF_DEFS: Record<PlayerDebuffType, PlayerDebuffDefinition
     stun: true,
     description: '無法行動，攻擊計時器暫停',
   },
+  silence: {
+    type: 'silence',
+    name: '沉默',
+    category: 'silence',
+    tag: 'silenced',
+    duration: 10000,
+    refreshable: false,
+    description: '無法施展技能',
+  },
 };
 
-export const PLAYER_DEBUFF_TYPES: PlayerDebuffType[] = ['poison', 'bleed', 'curse', 'weaken', 'slow', 'stun'];
+export const PLAYER_DEBUFF_TYPES: PlayerDebuffType[] = ['poison', 'bleed', 'curse', 'weaken', 'slow', 'stun', 'silence'];
 
 export const PLAYER_DEBUFF_CATEGORIES: string[] = PLAYER_DEBUFF_TYPES.map(t => PLAYER_DEBUFF_DEFS[t].category);
 

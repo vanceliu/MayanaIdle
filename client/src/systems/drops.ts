@@ -108,7 +108,7 @@ function getDropRateMultiplier(bonuses?: DropBonuses): number {
   return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1);
 }
 
-/** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率與 500 上限在 `settleGoldDrop` */
+/** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率在 `settleGoldDrop` */
 function getGoldAffixMultiplier(bonuses?: DropBonuses): number {
   return 1 + (bonuses?.gold_rate ?? 0) / 100;
 }

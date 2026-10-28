@@ -123,9 +123,9 @@ describe('詞綴 wiki 頁', () => {
     expect(rowsFor('防禦力')).toHaveLength(0);
   });
 
-  it('說明詛咒／虛弱／減速沒有免疫詞綴', () => {
+  it('說明詛咒／虛弱／減速／沉默沒有免疫詞綴', () => {
     render(<AffixesPage />);
-    expect(screen.getByText(/詛咒、虛弱、減速改由魔法抗性依機率抵抗/)).toBeTruthy();
+    expect(screen.getByText(/詛咒、虛弱、減速、沉默改由魔法抗性依機率抵抗/)).toBeTruthy();
     for (const name of ['詛咒免疫', '虛弱免疫', '減速免疫']) {
       expect(screen.queryByText(name), name).toBeNull();
     }

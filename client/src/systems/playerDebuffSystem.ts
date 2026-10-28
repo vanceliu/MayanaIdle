@@ -15,7 +15,7 @@ import { gameNow } from '../core/clock';
 
 /**
  * debuff 類型 → 對應免疫詞綴。
- * 詛咒／虛弱／減速改由魔法抗性抵抗（§ 24.4.2），已無免疫詞綴；暈眩僅有抵抗詞綴。
+ * 詛咒／虛弱／減速／沉默改由魔法抗性抵抗（§ 24.4.2），已無免疫詞綴；暈眩僅有抵抗詞綴。
  */
 export const IMMUNITY_AFFIX_BY_DEBUFF: Record<PlayerDebuffType, SpecialAffixType | null> = {
   poison: 'immune_poison',
@@ -24,13 +24,14 @@ export const IMMUNITY_AFFIX_BY_DEBUFF: Record<PlayerDebuffType, SpecialAffixType
   weaken: null,
   slow: null,
   stun: null,
+  silence: null,
 };
 
 /**
  * 受魔法抗性影響的 debuff 類型（§ 24.4.2）。
  * 中毒／流血（物理 DoT）與暈眩不受魔抗影響，仍只能靠免疫詞綴。
  */
-export const MAGIC_RESIST_DEBUFF_TYPES: PlayerDebuffType[] = ['curse', 'weaken', 'slow'];
+export const MAGIC_RESIST_DEBUFF_TYPES: PlayerDebuffType[] = ['curse', 'weaken', 'slow', 'silence'];
 
 export function isMagicResistibleDebuff(type: PlayerDebuffType): boolean {
   return MAGIC_RESIST_DEBUFF_TYPES.includes(type);
@@ -94,6 +95,11 @@ export function isPlayerStunned(activeEffects: ActiveEffect[], now: number = gam
   return activeEffects.some(
     e => e.type === 'debuff' && e.target === 'player' && e.stun && now < e.startTime + e.duration
   );
+}
+
+/** § 24.5.1a：沉默中無法施展任何技能 */
+export function isPlayerSilenced(activeEffects: ActiveEffect[], now: number = gameNow()): boolean {
+  return hasActivePlayerDebuff(activeEffects, PLAYER_DEBUFF_DEFS.silence.category, now);
 }
 
 export function getPlayerDebuffTags(activeEffects: ActiveEffect[], now: number = gameNow()): string[] {
@@ -191,7 +197,7 @@ export function rollMonsterDebuff(
 
     if (random() * 100 >= finalChance) continue;
 
-    // § 24.4.2：詛咒／虛弱／減速 命中後，再以魔法抗性判定是否被擋下。
+    // § 24.4.2：詛咒／虛弱／減速／沉默 命中後，再以魔法抗性判定是否被擋下。
     // 擋下仍消耗本次判定（§ 25.9.2 命中即停），與「免疫詞綴讓觸發率歸零、直接換下一種」不同。
     if (isMagicResistibleDebuff(ability.type) && magicResist > 0) {
       const resistChance = Math.min(magicResist, 100);

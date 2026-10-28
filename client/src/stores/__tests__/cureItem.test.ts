@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useGameStore, type BagItem } from '../gameStore';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
+import type { PlayerDebuffType } from '../../models/playerDebuff';
 import { createPlayerDebuffEffect } from '../../systems/playerDebuffSystem';
 import { CURE_ITEMS, getCureItem, hasCurableDebuff, isCureItem } from '../../models/cureItem';
 import { bagItem } from '../../testing/bagFixtures';
@@ -53,7 +54,7 @@ function testMonster(): MonsterInstance {
   };
 }
 
-function setupStore(bagItems: BagItem[], debuffTypes: ('poison' | 'bleed' | 'curse' | 'weaken' | 'slow' | 'stun')[]) {
+function setupStore(bagItems: BagItem[], debuffTypes: PlayerDebuffType[]) {
   useGameStore.setState({
     character: testCharacter(),
     bagItems,
@@ -75,7 +76,7 @@ describe('狀態解除道具定義（§ 24.10.1）', () => {
     expect(CURE_ITEMS).toHaveLength(3);
     expect(getCureItem(144)).toMatchObject({ price: 50, weight: 2, cures: ['dot-poison'] });
     expect(getCureItem(145)).toMatchObject({ price: 50, weight: 2, cures: ['dot-bleed'] });
-    expect(getCureItem(146)).toMatchObject({ price: 500, weight: 3, cures: ['curse', 'weaken'] });
+    expect(getCureItem(146)).toMatchObject({ price: 500, weight: 3, cures: ['curse', 'weaken', 'silence'] });
   });
 
   it('isCureItem 可辨識三種道具', () => {
@@ -111,8 +112,8 @@ describe('useCureItem', () => {
     expect(s.bagItems.find(b => b.name === '止血繃帶')).toBeUndefined();
   });
 
-  it('淨化藥水一次全解詛咒與虛弱，但不解減速', () => {
-    setupStore([bagItem('淨化藥水', 1)], ['curse', 'weaken', 'slow', 'poison']);
+  it('淨化藥水一次全解詛咒、虛弱與沉默，但不解減速', () => {
+    setupStore([bagItem('淨化藥水', 1)], ['curse', 'weaken', 'silence', 'slow', 'poison']);
     useGameStore.getState().useCureItem(146);
 
     const s = useGameStore.getState();

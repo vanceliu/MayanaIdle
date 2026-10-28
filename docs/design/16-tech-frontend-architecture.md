@@ -565,7 +565,7 @@ interface ScriptTemplate {
 | `buff_not_active` | skillId | 指定 buff 未激活 |
 | `speed_not_active` | — | 加速效果未激活 |
 | `skill_ready` | skillId | 指定技能冷卻完畢 |
-| `debuff_active` | debuffType | 指定狀態生效中（poison / bleed / curse_weaken / slow） |
+| `debuff_active` | debuffType | 指定狀態生效中（poison / bleed / curse_weaken / slow；curse_weaken 含沉默） |
 
 ### 常駐天賦動作類型
 

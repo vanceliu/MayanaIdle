@@ -81,7 +81,7 @@
 | 職業魔法（5 職業各 5 級） | `23-class-magic.md` | 全文 |
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
 | 怪物身上效果的對應（以怪物 id，不以清單位置） | `24-buff-debuff.md` | § 24.3 |
-| 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩） | `24-buff-debuff.md` | § 24.4、§ 24.10 |
+| 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩/沉默） | `24-buff-debuff.md` | § 24.4、§ 24.5、§ 24.10 |
 | Debuff 解除手段（道具/免疫詞綴） | `24-buff-debuff.md` | § 24.10 |
 | **debuff tag 一覽（免疫詞綴／解除道具／控場免疫的查表 key）** | `24-buff-debuff.md` | § 24.4.1 |
 | **技能施加於怪物的 debuff（效果與秒數走技能表，只有 tag 共用）** | `24-buff-debuff.md` | § 24.4.1 下半 |

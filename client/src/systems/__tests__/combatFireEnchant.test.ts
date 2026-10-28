@@ -167,8 +167,8 @@ describe('fire enchant combat', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.1);
       const withoutEnchant = calculatePlayerAttack(char, sword, monster, [], []);
 
-      // Non-bow should NOT get +15, but still gets elemental% (which is 0 without affix)
-      expect(withEnchant.damage).toBe(withoutEnchant.damage);
+      // 非弓不吃 +15；附魔只賦予火屬性 → 對無屬性目標為無克制 +3（§ 42.2）
+      expect(withEnchant.damage).toBe(withoutEnchant.damage + 3);
     });
 
     it('non-bow weapon still triggers element counter with fire enchant', () => {

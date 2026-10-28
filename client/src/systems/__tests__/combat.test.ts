@@ -251,8 +251,8 @@ describe('combat system', () => {
         affixes: [{ type: 'element_brand', tier: 3, value: 11, element: 'fire' }],
       });
       const r2 = calculatePlayerAttack(char, weaponBrand, monster, [weaponBrand]);
-      // base = 20 + 7 = 27, 刻印乘區: floor(27 * 1.11) = 29
-      expect(r2.damage).toBe(29);
+      // base = 20 + 7 + 元素克制 3（目標無屬性＝無克制）= 30, 刻印乘區: floor(30 * 1.11) = 33
+      expect(r2.damage).toBe(33);
     });
 
     it('should apply crit_rate and crit_damage affixes', () => {
@@ -303,8 +303,8 @@ describe('combat system', () => {
 
       // § 20.6：INT 每 2 點 +9.5% 技能威力
       // INT bonus = floor(10 × (18/2 × 9.5) / 100) = floor(8.55) = 8
-      // § 21.4：基礎魔攻 = floor(10 × 1.00) + 8 = 18（無裝備 → 魔攻乘區 ×1）
-      expect(result.damage).toBe(18);
+      // § 21.4：基礎魔攻 = floor(10 × 1.00) + 8 + 元素克制 3（目標無屬性）= 21（無裝備 → 魔攻乘區 ×1）
+      expect(result.damage).toBe(21);
     });
 
     it('should apply skill_elemental affix for elemental skill', () => {
@@ -317,8 +317,8 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [weapon], '火球術');
 
-      // 基礎魔攻 = 10 + 8 = 18（劍沒有魔攻），skill_elem: floor(18 * 1.10) = 19
-      expect(result.damage).toBe(19);
+      // 基礎魔攻 = 10 + 8 + 3 = 21（劍沒有魔攻），skill_elem: floor(21 * 1.10) = 23
+      expect(result.damage).toBe(23);
       expect(result.log.type).toBe('skill_hit');
     });
 
@@ -332,7 +332,7 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'none', monster, [weapon], '衝撞');
 
-      // 基礎魔攻 18（同上），無屬性 → 不吃技能元素% → 維持 18
+      // 基礎魔攻 10 + 8 = 18，無屬性 → 元素克制 0、不吃技能元素% → 維持 18
       expect(result.damage).toBe(18);
     });
 
@@ -344,8 +344,8 @@ describe('combat system', () => {
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
       expect(result.isCritical).toBe(true);
-      // 基礎魔攻 18（無武器），crit = floor(18 * 2.0) = 36
-      expect(result.damage).toBe(36);
+      // 基礎魔攻 21（無武器），crit = floor(21 * 2.0) = 42
+      expect(result.damage).toBe(42);
       expect(result.log.type).toBe('skill_crit');
     });
 
@@ -356,8 +356,8 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
-      // 基礎魔攻 18（無武器），defense 50%: floor(18 * 50 / 100) = 9
-      expect(result.damage).toBe(9);
+      // 基礎魔攻 21（無武器），defense 50%: floor(21 * 50 / 100) = 10
+      expect(result.damage).toBe(10);
     });
 
     it('should generate correct log message', () => {
@@ -367,7 +367,7 @@ describe('combat system', () => {
 
       const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
 
-      expect(result.log.message).toBe('火球術 對 火蜥蜴 造成 18 點傷害');
+      expect(result.log.message).toBe('火球術 對 火蜥蜴 造成 21 點傷害');
     });
   });
 

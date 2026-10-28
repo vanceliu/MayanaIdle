@@ -54,7 +54,8 @@ export function getMaterialRaceBonus(material: WeaponMaterial | undefined, monst
   return randomInt(entry.min, entry.max);
 }
 
-const ELEMENT_COUNTER: Record<string, string> = {
+/** 攻擊元素 → 被它克制的元素（§ 42.2）。 */
+export const ELEMENT_COUNTER: Record<string, string> = {
   fire: 'wind',
   wind: 'earth',
   earth: 'ice',
@@ -63,11 +64,18 @@ const ELEMENT_COUNTER: Record<string, string> = {
   dark: 'light',
 };
 
+/** 元素克制的固定額外攻擊（§ 42.2）：克制／無克制／被克制。攻擊方無屬性固定 0。 */
+export const ELEMENT_COUNTER_BONUS = {
+  advantage: 5,
+  neutral: 3,
+  disadvantage: 0,
+} as const;
+
 export function getElementCounterBonus(attackElement: string | undefined, monsterElement: string): number {
   if (!attackElement || attackElement === 'none') return 0;
-  if (monsterElement === 'none') return 0;
-  if (ELEMENT_COUNTER[attackElement] === monsterElement) return 3;
-  return 0;
+  if (ELEMENT_COUNTER[attackElement] === monsterElement) return ELEMENT_COUNTER_BONUS.advantage;
+  if (ELEMENT_COUNTER[monsterElement] === attackElement) return ELEMENT_COUNTER_BONUS.disadvantage;
+  return ELEMENT_COUNTER_BONUS.neutral;
 }
 
 export function getFireEnchantBonus(activeEffects: ActiveEffect[]): number {

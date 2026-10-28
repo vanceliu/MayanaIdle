@@ -89,6 +89,8 @@ export function CharacterStats() {
   const cooldownReduction = getSkillCooldownReduction(char, gearList, activeEffects);
   const healEffect = bonuses.heal_effect;
   const potionEffect = bonuses.potion_effect;
+  const dropRate = bonuses.drop_rate;
+  const goldRate = bonuses.gold_rate;
 
   const blockRate = getPlayerBlockRate(gearList, activeEffects);
 
@@ -173,7 +175,7 @@ export function CharacterStats() {
           <StatRow label="防禦值" value={shownDefense} tip={{ desc: '裝備提供的防禦總量。這是「數值」，不是百分比。', formula: `(逐件 基礎防禦+隨機額外+強化等級 的加總 + buff固定防禦) × (1 + 防禦力%詞綴) − ${-BASE_CHARACTER_DEFENSE}`, note: `角色自身防禦為 ${BASE_CHARACTER_DEFENSE}，在百分比之後才扣，所以裝備不足時這裡會是負數（負值不減傷，也不會讓你多受傷）。被詛咒時再 -20%。防禦值超過 ${DAMAGE_REDUCTION_CAP} 的部分會轉為迴避率` }} />
           <StatRow label="減傷率" value={<>{damageReduction}%</>} tip={{ desc: '受到「物理」傷害時實際減少的比例。', formula: `min(防禦值, ${DAMAGE_REDUCTION_CAP}) 與 buff減傷 類間乘算`, note: `上限 ${DAMAGE_REDUCTION_CAP}%` }} />
           <StatRow label="魔法減傷率" value={<>{magicDamageReduction}%</>} tip={{ desc: '受到「魔法」傷害時實際減少的比例。', formula: 'min(防禦值,75) × 0.5 + 魔法抗性，上限 75%，再與 buff減傷 乘算', note: '裝備防禦對魔法只有一半效力（最多貢獻 37.5%）' }} />
-          <StatRow label="魔法抗性" value={<>{magicResist}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速」的機率' }} />
+          <StatRow label="魔法抗性" value={<>{magicResist}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速／沉默」的機率' }} />
           <StatRow label="迴避率" value={<>{totalDodge}%</>} tip={{ desc: '完全閃避怪物攻擊的機率（傷害歸零）。物理與魔法皆可迴避。', formula: '基礎(一般 5%／盜賊 10%) + AGI每3點+1 + 防禦溢出((防禦-75)/5) + 迴避詞綴 + 迴避 buff', note: '上限 35%，已包含在顯示值內。命中下降另加在上限之後，只對被施加的怪物有效' }} />
           <StatRow label="命中率" value={<>{hitRate}%</>} tip={{ desc: '普通攻擊命中怪物的基準機率。', formula: '80 + AGI每3點+1 + 武器攻擊成功(含強化/2)', note: '實戰另計「等級差」與「怪物迴避率」，最終限縮在 5%~95%。技能必定命中' }} />
           <StatRow label="格擋率" value={<>{blockRate}%</>} tip={{ desc: '以盾牌或臂甲擋下攻擊的機率，成功時傷害減半。', formula: '副手基礎格擋率 + 格擋率詞綴 + 格擋 buff', note: '未裝備盾牌／臂甲時為 0。上限 50%。在防禦減傷之後才判定' }} />
@@ -191,6 +193,12 @@ export function CharacterStats() {
           <StatRow label="每次回魔" value={mpRegen} tip={{ desc: '每 6 秒自動回復的 MP 量。', formula: 'floor(有效SPI / 2) + 裝備回魔量加總（模板值 + 回魔詞綴）', note: '戰鬥中減半（最低 1）' }} />
           <StatRow label="補血效果" value={<>+{healEffect}%</>} tip={{ desc: '提升「治癒類技能」的回復量。', formula: '所有「補血效果」詞綴加總', note: '不影響藥水，也不影響自然回血與聖域的每秒回血' }} />
           <StatRow label="藥水效果" value={<>+{potionEffect}%</>} tip={{ desc: '提升「藥水」的回復量。', formula: '所有「藥水效果」詞綴加總', note: '不影響治癒技能' }} />
+        </div>
+
+        <div className="stat-group">
+          <div className="stat-group-title">掉落</div>
+          <StatRow label="掉寶率" value={<>+{dropRate}%</>} tip={{ desc: '提高怪物掉落物品的機率。', formula: '所有「掉寶率」詞綴加總' }} />
+          <StatRow label="金幣獲得率" value={<>+{goldRate}%</>} tip={{ desc: '提高怪物掉落的金幣量。', formula: '所有「金幣獲得率」詞綴加總' }} />
         </div>
 
         <div className="stat-group">

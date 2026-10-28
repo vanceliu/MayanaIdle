@@ -6,7 +6,6 @@ import {
   getWaveSize,
   getBossSpawnChance,
   scaleMonsterStat,
-  GOLD_DROP_CAP,
   QUEST_GOLD_REWARD_CAP,
 } from '../globalRates';
 
@@ -16,13 +15,14 @@ describe('全域倍率作用點（19 § 19.9）', () => {
       expect(settleGoldDrop(120, 1, 1)).toBe(120);
     });
 
-    it('上限 500 與抽值同乘全域倍率', () => {
-      expect(settleGoldDrop(500, 1, 2)).toBe(1000);
-      expect(settleGoldDrop(800, 1, 2)).toBe(GOLD_DROP_CAP * 2);
+    it('無單次上限：Boss 抽值超過 500 照原值入帳', () => {
+      expect(settleGoldDrop(1500, 1, 1)).toBe(1500);
+      expect(settleGoldDrop(800, 1, 2)).toBe(1600);
     });
 
-    it('詞綴加成在上限之後乘', () => {
-      expect(settleGoldDrop(500, 1.5, 1)).toBe(750);
+    it('詞綴加成與全域倍率相乘', () => {
+      expect(settleGoldDrop(1000, 1.5, 1)).toBe(1500);
+      expect(settleGoldDrop(1000, 1.5, 2)).toBe(3000);
     });
 
     it('結果向下取整', () => {

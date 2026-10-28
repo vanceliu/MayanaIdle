@@ -1,6 +1,8 @@
 import {
   BASE_CHARACTER_DEFENSE,
   DAMAGE_REDUCTION_CAP,
+  ELEMENT_COUNTER,
+  ELEMENT_COUNTER_BONUS,
   MAGIC_DEFENSE_EFFECTIVENESS,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
 } from '../../systems/combat';
@@ -14,6 +16,23 @@ const DODGE_CAP = 35;
 const BLOCK_RATE_CAP = 50;
 const BASE_ATTACK_INTERVAL_MS = 1200;
 const MIN_ATTACK_INTERVAL_MS = 300;
+
+const ELEMENT_LABELS: Record<string, string> = {
+  fire: '火', wind: '風', earth: '地', ice: '冰', light: '光', dark: '闇',
+};
+
+/** 克制／被克制關係由 `ELEMENT_COUNTER` 反推；光闇互克不算被克制。 */
+const ELEMENT_COUNTER_ROWS = Object.entries(ELEMENT_COUNTER).map(([attack, beats]) => ({
+  attack,
+  beats,
+  beatenBy: Object.keys(ELEMENT_COUNTER).find(
+    other => ELEMENT_COUNTER[other] === attack && other !== beats,
+  ),
+}));
+
+function ElementBadge({ element }: { element: string }) {
+  return <span className={`wiki-badge wiki-badge-${element}`}>{ELEMENT_LABELS[element]}</span>;
+}
 
 const sectionStyle = { marginBottom: 32 } as const;
 const headingStyle = {
@@ -201,7 +220,7 @@ export function CombatPage() {
         note={
           <>
             魔法抗性有兩個用途：一是加進上面的<strong>魔法減傷率</strong>；
-            二是降低怪物對你施加 <strong>詛咒／虛弱／減速</strong> 的機率
+            二是降低怪物對你施加 <strong>詛咒／虛弱／減速／沉默</strong> 的機率
             —— 怪物的基礎觸發率命中後，再以 min(魔法抗性, 100)% 判定是否抵抗。
             <br />
             中毒／流血／暈眩不受魔法抗性影響，只能靠免疫或抵抗詞綴。
@@ -272,22 +291,25 @@ export function CombatPage() {
             <thead>
               <tr>
                 <th>攻擊屬性</th>
-                <th>克制屬性</th>
-                <th>額外傷害</th>
+                <th>克制（+{ELEMENT_COUNTER_BONUS.advantage}）</th>
+                <th>被克制（+{ELEMENT_COUNTER_BONUS.disadvantage}）</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td><span className="wiki-badge wiki-badge-fire">火</span></td><td><span className="wiki-badge wiki-badge-wind">風</span></td><td className="cell-number">+3</td></tr>
-              <tr><td><span className="wiki-badge wiki-badge-wind">風</span></td><td><span className="wiki-badge wiki-badge-earth">地</span></td><td className="cell-number">+3</td></tr>
-              <tr><td><span className="wiki-badge wiki-badge-earth">地</span></td><td><span className="wiki-badge wiki-badge-ice">冰</span></td><td className="cell-number">+3</td></tr>
-              <tr><td><span className="wiki-badge wiki-badge-ice">冰</span></td><td><span className="wiki-badge wiki-badge-fire">火</span></td><td className="cell-number">+3</td></tr>
-              <tr><td><span className="wiki-badge wiki-badge-light">光</span></td><td><span className="wiki-badge wiki-badge-dark">闇</span></td><td className="cell-number">+3</td></tr>
-              <tr><td><span className="wiki-badge wiki-badge-dark">闇</span></td><td><span className="wiki-badge wiki-badge-light">光</span></td><td className="cell-number">+3</td></tr>
+              {ELEMENT_COUNTER_ROWS.map(row => (
+                <tr key={row.attack}>
+                  <td><ElementBadge element={row.attack} /></td>
+                  <td><ElementBadge element={row.beats} /></td>
+                  <td>{row.beatenBy ? <ElementBadge element={row.beatenBy} /> : '—'}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         <p style={{ ...noteStyle, marginTop: 10 }}>
-          克制成立時為固定 +3 傷害，加算至基礎傷害。攻擊方或目標任一方為無屬性時不計。
+          元素克制是固定的額外攻擊，加算至基礎傷害：克制 +{ELEMENT_COUNTER_BONUS.advantage}、
+          被克制 +{ELEMENT_COUNTER_BONUS.disadvantage}，其餘組合（同屬性、目標無屬性、無克制關係）
+          +{ELEMENT_COUNTER_BONUS.neutral}。攻擊方無屬性時一律 +0。
         </p>
       </section>
     </div>

@@ -52,6 +52,29 @@ describe('怪物 debuff seed 資料', () => {
     }
   });
 
+  it('§ 25.9.1 沉默：僅遠程魔法怪物施加，且每隻都有', () => {
+    for (const m of MONSTER_SEEDS) {
+      const hasSilence = (m.debuffs ?? []).some(d => d.type === 'silence');
+      expect(hasSilence, m.name).toBe(m.attackType === 'magic');
+    }
+  });
+
+  it('§ 25.9.1 沉默：判定順序排最後，觸發率依等級分級', () => {
+    const rateByLevel = (level: number): number => {
+      if (level >= 33 && level <= 36) return 10;
+      if (level >= 38 && level <= 43) return 12;
+      if (level >= 49 && level <= 59) return 13;
+      if (level === 80) return 15;
+      throw new Error(`未定義的施法怪等級 ${level}`);
+    };
+    for (const m of MONSTER_SEEDS.filter(x => x.attackType === 'magic')) {
+      const debuffs = m.debuffs ?? [];
+      const last = debuffs[debuffs.length - 1];
+      expect(last.type, m.name).toBe('silence');
+      expect(last.chance, `${m.name} Lv.${m.level}`).toBe(rateByLevel(m.level));
+    }
+  });
+
   it('§ 25.9.2 規則 5：暈眩僅 Boss、殘影系列、巨獸類可施加', () => {
     const offenders = MONSTER_SEEDS
       .filter(m => (m.debuffs ?? []).some(d => d.type === 'stun'))

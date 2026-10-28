@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { CombatPage } from '../../wiki/pages/CombatPage';
 import {
   DAMAGE_REDUCTION_CAP,
+  ELEMENT_COUNTER_BONUS,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
 } from '../../systems/combat';
 
@@ -25,6 +26,14 @@ describe('戰鬥計算 wiki 頁', () => {
     const { container } = render(<CombatPage />);
     const text = container.textContent ?? '';
     expect(text).toContain(`${MAGIC_DEFENSE_CONTRIBUTION_CAP}%`);
+  });
+
+  it('元素克制的三段數值引用實作常數', () => {
+    const { container } = render(<CombatPage />);
+    const text = container.textContent ?? '';
+    expect(text).toContain(`克制（+${ELEMENT_COUNTER_BONUS.advantage}）`);
+    expect(text).toContain(`被克制（+${ELEMENT_COUNTER_BONUS.disadvantage}）`);
+    expect(text).toContain(`+${ELEMENT_COUNTER_BONUS.neutral}。`);
   });
 
   it('涵蓋所有戰鬥區塊', () => {

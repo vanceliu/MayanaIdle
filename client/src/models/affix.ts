@@ -59,7 +59,7 @@ export interface SpecialAffixDefinition {
 /**
  * § 7.10.1 特殊詞綴清單。
  * 只涵蓋**魔法抗性擋不住**的 debuff：中毒／流血（物理 DoT）與暈眩。
- * 詛咒／虛弱／減速改由魔抗機率抵抗（§ 24.4.2），刻意不設免疫詞綴。
+ * 詛咒／虛弱／減速／沉默改由魔抗機率抵抗（§ 24.4.2），刻意不設免疫詞綴。
  */
 export const SPECIAL_AFFIX_DEFINITIONS: SpecialAffixDefinition[] = [
   { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
@@ -168,7 +168,7 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   // Shield exclusive (1)
   { type: 'block_rate', name: '格擋率', category: ['shield'], group: '盾牌專屬', description: '格擋率 +X%' },
   // 飾品／盾牌專屬 (1)
-  { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'], group: '飾品／盾牌專屬', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速的機率' },
+  { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'], group: '飾品／盾牌專屬', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速／沉默的機率' },
   // 受擊回復（2）—— X% 是觸發率，回復量另外抽（§ 7.4）
   { type: 'on_hit_hp', name: '受擊回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: `受到傷害時 X% 機率回復最大 HP 的 ${restoreRange('on_hit_hp')}` },
   { type: 'on_hit_mp', name: '受擊回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: `受到傷害時 X% 機率回復最大 MP 的 ${restoreRange('on_hit_mp')}` },

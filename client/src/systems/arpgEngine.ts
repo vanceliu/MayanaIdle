@@ -28,7 +28,7 @@ import { pickTargetBy, type TargetPickCandidate, type TargetStrategy } from './t
 import { isNonAttackAction } from '../models/scriptEngine';
 import { canUseSkill } from '../models/skill';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
-import { isPlayerStunned } from './playerDebuffSystem';
+import { isPlayerSilenced, isPlayerStunned } from './playerDebuffSystem';
 import { gameNow } from '../core/clock';
 
 export interface ArpgMonster {
@@ -194,7 +194,8 @@ export function tickArpgEngine(
    * 少了這一步，玩家指定一招射程比腳本更遠的技能時，角色會照腳本的射程走位，
    * 走到定位才發現要放的是另一招。
    */
-  const manualSkill = resolveManualAttackSkill(
+  // 沉默中無法施展技能（`24-buff-debuff.md` § 24.5.1a）
+  const manualSkill = isPlayerSilenced(activeEffects) ? null : resolveManualAttackSkill(
     engine.manualSkillId, skills, character.mp, gameNow(), cooldownReduction, weaponType,
   );
 
