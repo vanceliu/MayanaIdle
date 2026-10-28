@@ -49,7 +49,7 @@ import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../src/mod
 import type { MonsterInstance, MonsterTemplate } from '../src/models/monster';
 import type { ActiveEffect, StatModifier } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
-import { SKILL_CATALOG } from '../src/models/skill';
+import { SKILL_CATALOG, resolveDotDamagePercent } from '../src/models/skill';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
@@ -536,7 +536,8 @@ function preCombatBuffs(className: ClassName, level: number): ActiveEffect[] {
   return [...byCategory.values()];
 }
 
-function buildRotation(className: ClassName, level: number, weaponType: string): RotationEntry[] {
+function buildRotation(className: ClassName, level: number, weapon: EquipmentInstance): RotationEntry[] {
+  const weaponType = String(weapon.type);
   const r: RotationEntry[] = [];
 
   for (const cs of CLASS_SKILLS) {
@@ -563,10 +564,11 @@ function buildRotation(className: ClassName, level: number, weaponType: string):
       continue;
     }
     const entry = magicEntry(s);
-    if (s.applyDebuff?.dotDamagePercent) {
+    const dotPercent = s.applyDebuff && resolveDotDamagePercent(s.applyDebuff, weapon.isTwoHanded);
+    if (s.applyDebuff && dotPercent) {
       entry.dot = {
         category: s.applyDebuff.category,
-        percent: s.applyDebuff.dotDamagePercent,
+        percent: dotPercent,
         interval: s.applyDebuff.dotInterval ?? 1000,
         duration: s.applyDebuff.dotDuration ?? 5000,
       };
@@ -894,7 +896,7 @@ function run(stage: Stage, className: ClassName): Result {
   let bestTtk = Infinity;
   for (const tpl of weaponCandidatesByType(className, stage)) {
     const lo = buildLoadout(className, stage, tpl);
-    const rot = buildRotation(className, stage.level, String(lo.weapon.type));
+    const rot = buildRotation(className, stage.level, lo.weapon);
     const mp = effectiveMaxMp(char, lo.gear);
     const rg = getMpRegen(char, true, lo.gear, effects);
     const t = measureTTK(char, lo, rot, effects, normal, mp, rg, 11_000 + stage.level, probeRuns, true);
@@ -902,7 +904,7 @@ function run(stage: Stage, className: ClassName): Result {
   }
   if (!loadout) {
     loadout = buildLoadout(className, stage);
-    candidates = buildRotation(className, stage.level, String(loadout.weapon.type));
+    candidates = buildRotation(className, stage.level, loadout.weapon);
   }
 
   const boss = bossOf(stage);

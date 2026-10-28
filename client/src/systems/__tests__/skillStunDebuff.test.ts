@@ -6,6 +6,7 @@ import { getSkillTemplate } from '../../models/skillTemplate';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { Skill } from '../../models/skill';
+import type { EquipmentInstance } from '../../models/equipment';
 import type { MapMonster } from '../../stores/mapMonsterStore';
 import type { MapData } from '../../models/mapControl';
 
@@ -45,7 +46,14 @@ function target(overrides: Partial<MonsterInstance> = {}): MonsterInstance {
 const shieldBash = { ...getSkillTemplate('shield-bash')!, lastUsedAt: 0 } as Skill;
 const mapMonsters = [{ id: 'm1', position: { x: 1, y: 1 }, isBoss: false }] as unknown as MapMonster[];
 
-function castShieldBash(monster: MonsterInstance) {
+function hand(slot: 'rightHand' | 'leftHand', type: string): EquipmentInstance {
+  return { id: `${slot}-${type}`, slot, type } as unknown as EquipmentInstance;
+}
+
+const SHIELD = hand('leftHand', 'shield');
+const ONE_HAND_SWORD = hand('rightHand', 'sword');
+
+function castShieldBash(monster: MonsterInstance, equippedGear: EquipmentInstance[] = []) {
   const character = testCharacter();
   useGameStore.setState({ character, skills: [shieldBash], activeEffects: [], equippedGear: {}, combatLogs: [] });
   return processPlayerAttack(
@@ -57,13 +65,18 @@ function castShieldBash(monster: MonsterInstance) {
     },
     {
       character,
-      equippedGear: [],
+      equippedGear,
       activeEffects: [],
       skills: [shieldBash],
       monsterInstances: new Map([['m1', monster]]),
       mapMonsters,
     },
   );
+}
+
+function stunDurationWith(equippedGear: EquipmentInstance[]): number | undefined {
+  castShieldBash(target(), equippedGear);
+  return useGameStore.getState().activeEffects.find(e => e.category === 'stun')?.duration;
 }
 
 beforeEach(() => {
@@ -76,13 +89,39 @@ afterEach(() => {
 });
 
 describe('盾擊暈眩（23-class-magic.md 騎士 Lv.1）', () => {
-  it('技能定義帶有 2 秒暈眩', () => {
+  it('技能定義：未持盾 1.5 秒、持盾 3 秒', () => {
     expect(shieldBash.applyDebuff).toMatchObject({
       category: 'stun',
       stun: true,
-      duration: 2000,
+      duration: 1500,
+      shieldDuration: 3000,
       tags: ['stunned'],
     });
+  });
+
+  it('左手裝備盾牌時暈眩 3 秒', () => {
+    expect(stunDurationWith([ONE_HAND_SWORD, SHIELD])).toBe(3000);
+  });
+
+  it('雙手武器暈眩 1.5 秒', () => {
+    expect(stunDurationWith([hand('rightHand', 'twoHandSword')])).toBe(1500);
+  });
+
+  it('左手魔導書暈眩 1.5 秒', () => {
+    expect(stunDurationWith([ONE_HAND_SWORD, hand('leftHand', 'magicBook')])).toBe(1500);
+  });
+
+  it('臂甲不算盾牌，暈眩 1.5 秒', () => {
+    expect(stunDurationWith([hand('rightHand', 'twoHandSword'), hand('leftHand', 'armGuard')])).toBe(1500);
+  });
+
+  it('空手暈眩 1.5 秒', () => {
+    expect(stunDurationWith([])).toBe(1500);
+  });
+
+  it('戰鬥日誌顯示實際秒數', () => {
+    const result = castShieldBash(target(), [ONE_HAND_SWORD, SHIELD]);
+    expect(result.logs.some(l => l.text.includes('暈眩 3s'))).toBe(true);
   });
 
   it('命中後對怪物施加 stun 效果', () => {
@@ -94,7 +133,7 @@ describe('盾擊暈眩（23-class-magic.md 騎士 Lv.1）', () => {
     expect(stun?.stun).toBe(true);
     expect(stun?.target).toBe('monster');
     expect(stun?.targetMonsterId).toBe('m1');
-    expect(stun?.duration).toBe(2000);
+    expect(stun?.duration).toBe(1500);
   });
 
   it('暈眩期間不可重複施加（§ 24.3.3）', () => {

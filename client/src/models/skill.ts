@@ -9,14 +9,34 @@ export interface SkillDebuffDef {
   name: string;
   description: string;
   dotDamagePercent?: number;
+  /** 手持雙手武器時改用的 DoT 比例（§ 23.3 裂傷斬） */
+  twoHandedDotDamagePercent?: number;
   dotDamage?: number;
   dotInterval?: number;
   dotDuration?: number;
   dotElement?: string;
   duration?: number;
+  /** 左手裝備盾牌時改用的持續時間（ms）（§ 23.3 盾擊） */
+  shieldDuration?: number;
   modifiers?: { stat: string; value: number; isPercent: boolean }[];
   stun?: boolean;
   tags: string[];
+}
+
+/** 技能 debuff 的實際持續時間：有 `shieldDuration` 且裝備盾牌時用它，否則用 `duration` */
+export function resolveDebuffDuration(def: SkillDebuffDef, shieldEquipped: boolean): number | undefined {
+  return shieldEquipped && def.shieldDuration !== undefined ? def.shieldDuration : def.duration;
+}
+
+/** 技能 DoT 的實際比例：有 `twoHandedDotDamagePercent` 且手持雙手武器時用它，否則用 `dotDamagePercent` */
+export function resolveDotDamagePercent(def: SkillDebuffDef, twoHanded: boolean): number | undefined {
+  return twoHanded && def.twoHandedDotDamagePercent !== undefined ? def.twoHandedDotDamagePercent : def.dotDamagePercent;
+}
+
+/** 技能 debuff 秒數的顯示文字，例：`5s`、`1.5s／持盾 3s` */
+export function formatDebuffDuration(def: SkillDebuffDef): string {
+  const base = `${(def.dotDuration ?? def.duration ?? 0) / 1000}s`;
+  return def.shieldDuration !== undefined ? `${base}／持盾 ${def.shieldDuration / 1000}s` : base;
 }
 
 /**

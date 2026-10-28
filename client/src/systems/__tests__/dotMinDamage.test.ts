@@ -50,6 +50,14 @@ function sword(): EquipmentInstance {
   } as EquipmentInstance;
 }
 
+function twoHandSword(): EquipmentInstance {
+  return {
+    templateId: 3, name: '巨劍', type: 'twoHandSword', slot: 'rightHand', isTwoHanded: true,
+    smallMonsterDamage: 40, largeMonsterDamage: 36, defense: 0, quality: 0, enhancement: 0,
+    affixes: [], ownerId: 1, equipped: true,
+  } as EquipmentInstance;
+}
+
 function envenomBuff(): ActiveEffect {
   return {
     id: 'buff-envenom', sourceSkillId: 'envenom', sourceSkillName: '淬毒',
@@ -114,6 +122,17 @@ describe('裂傷斬 — 流血 DoT 快照（§ 23.3 / § 24.4.5）', () => {
     useGameStore.setState({ character: char });
     const expected = Math.floor(calculateBasePhysicalDamage(char, gear[0], gear, []) * 0.7);
     expect(expected).toBeGreaterThan(1); // 確保這條測的是公式而非最低值
+
+    castRend(gear, target());
+    expect(dotDamageOf('bleeding')).toBe(expected);
+  });
+
+  it('手持雙手武器時 DoT 為物理傷害的 85%', () => {
+    const gear = [twoHandSword()];
+    const char = testCharacter(20);
+    useGameStore.setState({ character: char });
+    const expected = Math.floor(calculateBasePhysicalDamage(char, gear[0], gear, []) * 0.85);
+    expect(expected).toBeGreaterThan(Math.floor(calculateBasePhysicalDamage(char, gear[0], gear, []) * 0.7));
 
     castRend(gear, target());
     expect(dotDamageOf('bleeding')).toBe(expected);

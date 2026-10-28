@@ -484,5 +484,18 @@ Lv.31 以上 Boss 專屬素材 30% → 15%。Lv.30 以下區域與試煉飛龍�
 - [x] F3 文件：27 § 27.1／§ 27.3／§ 27.6／§ 27.7、09（產出分工比值改為約 1.43 倍、移除 `dungeonYieldSplit.test.ts`，金幣不變）、22、26、30、INDEX 連動
 - [x] F4 `npx tsc -b`、client／server vitest
 
+### 盾擊／裂傷斬依手持裝備分段（`23-class-magic.md` § 23.3）
+
+規格：盾擊不限裝備；左手裝備盾牌（`type: 'shield'`）時暈眩 3s，否則 1.5s（雙手武器、魔導書、臂甲、空手）。
+裂傷斬流血：手持雙手武器（`isTwoHanded`）每秒 85% 物理傷害，否則 70%。
+
+- [x] S1 文件：23 § 23.3／§ 23.7.1、24 § 24.4.5／§ 24.8.5
+- [x] S2 `SkillDebuffDef.shieldDuration`／`twoHandedDotDamagePercent`；`arpgEventHandler` 依手持裝備取值
+- [x] S3 Wiki／技能面板 tooltip 顯示兩段秒數
+- [x] S4 測試：盾擊有盾 3s、雙手／魔導書／臂甲／空手 1.5s；裂傷斬單手 70%、雙手 85%
+- [x] S5 `calibrateTTK.mts`／`simulateReaperKill.mts` 依武器取 DoT 比例
+- [x] S6 44 § 44.7／§ 44.10 騎士重跑（`--class=knight`，預設 runs）
+- [x] S7 `npx tsc -b`、client vitest
+
 跨多次對話的實作**開工前**先在這裡寫下定案規格與分階段清單（見 `CLAUDE.md`）：
 中斷後靠它接續，全部完成並經使用者確認後刪除。

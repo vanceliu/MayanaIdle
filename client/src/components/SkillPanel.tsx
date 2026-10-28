@@ -8,7 +8,7 @@ import {
 import { getSkillDisplayIcon } from '../models/iconMap';
 import { calculateHealAmount } from '../systems/combat';
 import { GameIcon } from './GameIcon';
-import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration } from '../models/skill';
+import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration, formatDebuffDuration } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
 import { CLASS_MAGIC_RESTRICTIONS } from '../models/skillRestrictions';
 import type { ClassName } from '../models/character';
@@ -300,7 +300,7 @@ export function SkillPanel() {
             <div className="skill-tooltip-stat">效果: {tooltip.skill.description}</div>
           )}
           {tooltip.skill.applyDebuff && (
-            <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {(tooltip.skill.applyDebuff.dotDuration ?? tooltip.skill.applyDebuff.duration ?? 0) / 1000}s)</div>
+            <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {formatDebuffDuration(tooltip.skill.applyDebuff)})</div>
           )}
           {tooltip.skill.type === 'heal' && tooltip.skill.power > 0 && (
             /*

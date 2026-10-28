@@ -1,7 +1,7 @@
 import type { PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
-import type { Skill } from '../models/skill';
+import { resolveDebuffDuration, resolveDotDamagePercent, type Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
 import type { EquipmentInstance } from '../models/equipment';
 import type { MapMonster } from '../stores/mapMonsterStore';
@@ -13,6 +13,7 @@ import {
   calculateMonsterAttack,
   calculateBasePhysicalDamage,
   getEquippedWeapon,
+  isShieldEquipped,
   hasActiveFireEnchant,
   calculateMpRestored,
   absorbWithShield,
@@ -644,8 +645,9 @@ export function processPlayerAttack(
             // DoT debuff (snapshot damage at cast time)
             // § 23.3 裂傷斬：每秒 70% 物理傷害（快照制）— 基準為角色物理傷害，與 § 23.7 淬毒一致
             // § 24.4.5：DoT 傷害於施加當下快照，最低 1 點
-            const baseDmg = debuffDef.dotDamagePercent
-              ? Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuffDef.dotDamagePercent))
+            const dotPercent = resolveDotDamagePercent(debuffDef, weapon?.isTwoHanded === true);
+            const baseDmg = dotPercent
+              ? Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * dotPercent))
               : debuffDef.dotDamage ?? 0;
 
             const debuffEffect: ActiveEffect = {
@@ -668,6 +670,7 @@ export function processPlayerAttack(
             if (!alreadyActive) logs.push({ text: `${monster.name} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'debuff-enemy' });
           } else if (debuffDef.stun && debuffDef.duration) {
             // 控場 debuff（§ 24.5.1）
+            const stunDuration = resolveDebuffDuration(debuffDef, isShieldEquipped(equippedGear)) ?? debuffDef.duration;
             // § 24.6：Boss 被控場後 30 秒內免疫任何控場效果
             if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
               logs.push({ text: `${monster.name} 免疫控場！`, type: 'debuff-enemy' });
@@ -684,14 +687,14 @@ export function processPlayerAttack(
                 stun: true,
                 modifiers: debuffDef.modifiers,
                 startTime: now,
-                duration: debuffDef.duration,
+                duration: stunDuration,
                 tags: debuffDef.tags,
                 name: debuffDef.name,
                 description: debuffDef.description,
               };
               gs.addEffect(stunEffect);
               if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
-              if (!alreadyActive) logs.push({ text: `${skill.name} 命中！${monster.name} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'debuff-enemy' });
+              if (!alreadyActive) logs.push({ text: `${skill.name} 命中！${monster.name} ${debuffDef.name} ${stunDuration / 1000}s`, type: 'debuff-enemy' });
             }
           } else if (debuffDef.modifiers && debuffDef.duration) {
             // Stat modifier debuff

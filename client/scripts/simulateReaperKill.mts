@@ -47,7 +47,7 @@ import type { EquipmentInstance } from '../src/models/equipment';
 import type { MonsterInstance } from '../src/models/monster';
 import type { ActiveEffect, StatModifier } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
-import { SKILL_CATALOG } from '../src/models/skill';
+import { SKILL_CATALOG, resolveDotDamagePercent } from '../src/models/skill';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import {
   getErosion, getWeaponBaseDamage, getWeaponDebuffAffixes,
@@ -653,7 +653,7 @@ const BASIC_MAGIC_BUDGET: Record<ClassName, number> = {
   knight: 5, elf: 9, thief: 9, elementalist: 18, priest: 15,
 };
 
-function buildRotation(className: ClassName): RotationEntry[] {
+function buildRotation(className: ClassName, weapon: EquipmentInstance): RotationEntry[] {
   const r: RotationEntry[] = [];
 
   if (className === 'knight') {
@@ -670,7 +670,7 @@ function buildRotation(className: ClassName): RotationEntry[] {
       ...magicEntry(rend),
       dot: {
         category: bleed.category,
-        percent: bleed.dotDamagePercent!,
+        percent: resolveDotDamagePercent(bleed, weapon.isTwoHanded)!,
         interval: bleed.dotInterval!,
         duration: bleed.dotDuration!,
       },
@@ -1136,7 +1136,7 @@ function runScenario(
   seed: number,
 ): ScenarioReport {
   const char = buildCharacter(className);
-  const candidates = buildRotation(className);
+  const candidates = buildRotation(className, loadout.weapon);
   const effects = preCombatBuffs(className);
   const speed = SPEED_SOURCE[className];
   if (withSpeed) {
@@ -1273,7 +1273,7 @@ function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number): numb
   const loadout = resolveLoadout(char, effects, rawLoadout);
   const effInt = designEffectiveInt(className, loadout.gear);
   const monster = makeReaper();
-  const rotation = buildRotation(className);
+  const rotation = buildRotation(className, loadout.weapon);
   // § 7T.4 追加傷害的期望值：每下命中 × 觸發率 × 數值
   const bonusPerHit = sumUniqueAffix(loadout.gear, 'hit_bonus_damage') * UNIQUE_HIT_PROC_CHANCE / 100;
 

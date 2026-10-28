@@ -247,6 +247,11 @@ export function getEquippedWeapon(
     ?? null;
 }
 
+/** 左手是否裝備盾牌（雙手武器佔用左手，必為 false） */
+export function isShieldEquipped(equippedGear: (EquipmentInstance | null)[]): boolean {
+  return equippedGear.some(g => g?.slot === 'leftHand' && g.type === 'shield');
+}
+
 function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
   if (!gear) return 1;
   const base = monsterSize === 'small' ? gear.smallMonsterDamage : gear.largeMonsterDamage;
