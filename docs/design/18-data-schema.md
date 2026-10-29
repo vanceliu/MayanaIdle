@@ -94,6 +94,7 @@
 - stability（防具生成時抽 4~6；武器／飾品／腰帶沿用模板值）
 - uniqueAffix（T7 獨有詞綴 `{ type, value }`，生成時抽，之後不變；`07-affix-tier7.md`）
 - affixSlots（可用詞綴洞數，未設＝4；封印印記失敗時 −1，`07-affix.md` § 7.1）
+- isCraftedGear（鐵匠製作的實例為 true，顯示名稱加 `(鍛)`、不可使用印記；`06-equipment-acquire.md` § 6A.6）
 - durability，若未來需要
 - createdAt
 - updatedAt

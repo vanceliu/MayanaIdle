@@ -197,9 +197,14 @@ export interface SigilContext {
   weaponBaseDamage?: number;
   /** 新手裝（seed `acquireType: 'starter'`）—— 一律不可使用印記（§ 46.7） */
   isStarterGear?: boolean;
+  /** 鐵匠製作品（實例 `isCraftedGear`）—— 一律不可使用印記（§ 46.9） */
+  isCraftedGear?: boolean;
   /** 實例可用的詞綴洞數（`07-affix.md` § 7.1），未設＝4 */
   affixSlots?: number;
 }
+
+/** 製作品不受理印記時顯示的原因 */
+export const CRAFTED_GEAR_SIGIL_REASON = '(鍛) 製作品不可使用任何印記';
 
 export interface SigilCheck {
   ok: boolean;
@@ -232,9 +237,10 @@ export function canUseSigil(
   type: SigilType,
   affixes: Affix[] | undefined,
   affixIndex: number | undefined,
-  ctx: Pick<SigilContext, 'isStarterGear' | 'maxAffixTier' | 'quality' | 'affixSlots'>,
+  ctx: Pick<SigilContext, 'isStarterGear' | 'isCraftedGear' | 'maxAffixTier' | 'quality' | 'affixSlots'>,
 ): SigilCheck {
   if (ctx.isStarterGear) return { ok: false, reason: '新手裝沒有詞綴，無法使用印記' };
+  if (ctx.isCraftedGear) return { ok: false, reason: CRAFTED_GEAR_SIGIL_REASON };
 
   // § 46.11 新增印記看的是空洞，不看既有詞綴
   if (type === 'add') {

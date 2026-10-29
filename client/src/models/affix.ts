@@ -509,12 +509,25 @@ export const SHOP_MAX_AFFIX_TIER = 3;
 
 /** 一般裝備的詞綴強化上限（`07-affix.md` § 7.2）。T6/T7 只能靠掉落原生取得。 */
 export const DEFAULT_MAX_AFFIX_TIER = 5;
-/** 鐵匠製作品的詞綴 Tier 上限（§ 6A.6）。T6/T7 只能靠掉落原生 */
-export const CRAFT_MAX_AFFIX_TIER = 5;
+/** 鐵匠製作品的詞綴 Tier 範圍，依裝備階級（§ 6A.6）。範圍內均等 */
+export const CRAFT_AFFIX_TIER_RANGE: Readonly<Record<number, { min: number; max: number }>> = {
+  4: { min: 1, max: 5 },
+  5: { min: 2, max: 6 },
+  6: { min: 3, max: 6 },
+};
+
+/** 製作詞綴範圍的顯示文字，如「T4 製作品 T1~T5、T5 製作品 T2~T6」 */
+export function formatCraftAffixTierRanges(): string {
+  return Object.entries(CRAFT_AFFIX_TIER_RANGE)
+    .map(([tier, r]) => `T${tier} 製作品 T${r.min}~T${r.max}`)
+    .join('、');
+}
 
 export interface GenerateAffixOptions {
   /** Tier 硬上限。商店裝傳 `SHOP_MAX_AFFIX_TIER`；掉落／製作不傳。 */
   maxTier?: number;
+  /** 均等隨機時的 Tier 下限，未給＝1。製作品用（§ 6A.6） */
+  minTier?: number;
   /** 均等隨機 Tier（不查區域權重表）。商店與製作品用，掉落品不用。 */
   uniformTier?: boolean;
   /**
@@ -567,8 +580,9 @@ export function generateAffixes(
       continue;
     }
     const cap = options.maxTier ?? 7;
+    const floor = options.minTier ?? 1;
     const tier = options.uniformTier
-      ? 1 + Math.floor(random() * cap)
+      ? floor + Math.floor(random() * (cap - floor + 1))
       : Math.min(cap, rollAffixTier(areaLevel, isBoss));
     const value = rollAffixValue(tier, def.type);
     // § 7.4 元素刻印／元素侵蝕：抽到當下才決定屬性，六種均等隨機，兩條各自獨立抽

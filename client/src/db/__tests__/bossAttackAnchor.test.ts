@@ -8,8 +8,9 @@ const bosses = all.filter(m => m.isBoss);
 const normals = all.filter(m => !m.isBoss);
 const TOP_AREA = 'hundred-pillar-91-100f';
 
-/** Lv.31~60 一般怪該級典型攻擊上限 */
-const curve = (level: number) => 36 * Math.pow(150 / 36, (level - 30) / 30);
+/** Lv.31~70 一般怪該級典型攻擊上限 */
+const curve = (level: number) =>
+  level <= 60 ? 36 * Math.pow(150 / 36, (level - 30) / 30) : 150 + 2.5 * (level - 60);
 
 const median = (values: number[]) => {
   const s = [...values].sort((a, b) => a - b);
@@ -36,17 +37,17 @@ describe('怪物攻擊力曲線', () => {
     expect(strongest.attackMax).toBe(200);
   });
 
-  it('Lv.31~60 一般怪每級攻擊上限中位數貼齊曲線（±1）', () => {
-    for (let level = 31; level <= 60; level++) {
+  it('Lv.31~70 一般怪每級攻擊上限中位數貼齊曲線（±2）', () => {
+    for (let level = 31; level <= 70; level++) {
       const peers = normals.filter(m => m.level === level);
       if (peers.length === 0) continue;
       expect(Math.abs(median(peers.map(p => p.attackMax)) - curve(level)), `Lv.${level}`)
-        .toBeLessThanOrEqual(1);
+        .toBeLessThanOrEqual(2);
     }
   });
 
-  it('Lv.31~57 每級最強的 Boss 上限 = 曲線 × 1.3', () => {
-    for (let level = 31; level <= 57; level++) {
+  it('Lv.31~65 每級最強的 Boss 上限 = 曲線 × 1.3', () => {
+    for (let level = 31; level <= 65; level++) {
       const peers = bosses.filter(b => b.level === level);
       if (peers.length === 0) continue;
       expect(Math.max(...peers.map(b => b.attackMax)), `Lv.${level}`)

@@ -12,12 +12,12 @@ const NORMAL_BOUNDS: Record<number, [number, number]> = {
   2: [1, 10],
   3: [1, 10],
   4: [0.5, 5],
-  5: [0.1, 1],
-  6: [0.25, 0.5],
+  5: [0.5, 5],
+  6: [0.5, 1],
 };
 
 /** Boss 各階掉落值（/1000） */
-const BOSS_VALUE: Record<number, number> = { 4: 3, 5: 3, 6: 1, 7: 0.1 };
+const BOSS_VALUE: Record<number, number> = { 4: 10, 5: 10, 6: 5, 7: 0.1 };
 
 const equipmentEntries = DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment' && d.equipmentPool);
 
@@ -65,13 +65,79 @@ describe('一般怪裝備掉率依區域等級', () => {
     });
   }
 
-  it('遠古地監 1~9F 每層都掉 T6', () => {
-    for (let floor = 1; floor <= 9; floor++) {
-      const area = `ancient-dungeon-${floor}f`;
-      const t6 = equipmentEntries.filter(d => d.area === area && d.tier === 6);
-      expect(t6, area).toHaveLength(1);
-    }
+});
+
+/** 一般怪 T4~T6 掉落區域（`06-equipment-acquire.md` § 6A.1） */
+const floors = (dungeon: string, from: number, to: number) =>
+  Array.from({ length: to - from + 1 }, (_, i) => `${dungeon}-${from + i}f`);
+
+const NORMAL_TIER_AREAS: Record<number, string[]> = {
+  4: [
+    'snow-field', 'snow-field-deep', ...floors('ivory-tower', 1, 4),
+    'demon-forest', 'rotleaf-path', 'demon-altar',
+    'mirror-forest', 'glimmer-shore', 'shattered-mirror',
+    'dragon-valley-outskirts', 'dragon-valley-surface',
+  ],
+  5: [
+    ...floors('misty-cave', 1, 3), ...floors('underwater-prison', 1, 4), ...floors('dragon-valley', 1, 7),
+    'ivory-tower-5f', 'ancient-battlefield', ...floors('ancient-dungeon', 1, 6),
+    'hundred-pillar-1-10f', 'hundred-pillar-11-20f', 'hundred-pillar-21-30f',
+    'hundred-pillar-31-40f', 'hundred-pillar-41-50f',
+  ],
+  6: [
+    ...floors('ancient-dungeon', 7, 9),
+    'hundred-pillar-51-60f', 'hundred-pillar-61-70f', 'hundred-pillar-71-80f',
+    'hundred-pillar-81-90f', 'hundred-pillar-91-100f',
+  ],
+};
+
+describe('一般怪 T4~T6 掉落區域', () => {
+  for (const [tier, areas] of Object.entries(NORMAL_TIER_AREAS).map(([t, a]) => [Number(t), a] as const)) {
+    it(`T${tier} 區域與 seed 一致`, () => {
+      const actual = equipmentEntries.filter(d => d.tier === tier).map(d => d.area).sort();
+      expect(actual).toEqual([...areas].sort());
+    });
+  }
+});
+
+/** 各 Boss 掉落的裝備階級（`27-drop-table.md` § 27.5） */
+const BOSS_TIERS: Record<string, number[]> = {
+  試煉飛龍: [4],
+  雪地之主: [4],
+  象牙塔惡魔: [4],
+  朦朧蛇魔: [5],
+  深海獄王: [5],
+  安塔巨龍: [5],
+  遠古騎士: [6, 7],
+  毒之皇女: [5],
+  哥布林之王: [5],
+  暗影吸血鬼: [5],
+  不死殭屍王: [5, 6],
+  龍王約特勒: [5, 6],
+  冥王哈馬斯: [6, 7],
+  霜凍伊莉絲: [6, 7],
+  熔岩伊弗利特: [6, 7],
+  守護者之主: [6, 7],
+  百柱死神: [6, 7],
+};
+
+describe('Boss 裝備階級', () => {
+  const bossEquipment = BOSS_DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment');
+
+  it('只有表列 Boss 掉裝備', () => {
+    expect(new Set(bossEquipment.map(d => d.bossName))).toEqual(new Set(Object.keys(BOSS_TIERS)));
   });
+
+  for (const [boss, tiers] of Object.entries(BOSS_TIERS)) {
+    it(`${boss}：T${tiers.join('／T')}，每階武器與防具各一條`, () => {
+      const rows = bossEquipment.filter(d => d.bossName === boss);
+      for (const tier of tiers) {
+        const pools = rows.filter(d => d.tier === tier).map(d => d.equipmentPool).sort();
+        expect(pools, `T${tier}`).toEqual(['armor', 'weapon']);
+      }
+      expect(rows).toHaveLength(tiers.length * 2);
+    });
+  }
 });
 
 /** 強化卷軸掉落值（/1000）：普通卷軸與＋／－ 卷軸（`27-drop-table.md` § 27.1） */

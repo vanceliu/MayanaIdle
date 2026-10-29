@@ -15,7 +15,7 @@ import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
 import { talentPersistentRules, talentVillageRules } from './talentStore';
 import { BUILD_INFO } from '../buildInfo';
 import type { DropResult, DroppedItem } from '../systems/drops';
-import type { ActiveEffect } from '../models/effect';
+import { SPEED_POTION_ATTACK_SPEED_PERCENT, type ActiveEffect } from '../models/effect';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
 import { getStarterGearNames } from '../systems/starterNpc';
 import {
@@ -1306,12 +1306,12 @@ export function createGameStore(session: Session) {
       category: 'speed',
       type: 'buff',
       target: 'player',
-      modifiers: [{ stat: 'attack_speed', value: 33, isPercent: true }],
+      modifiers: [{ stat: 'attack_speed', value: SPEED_POTION_ATTACK_SPEED_PERCENT, isPercent: true }],
       startTime: gameNow(),
       duration: config.duration,
       tags: [],
       name: config.name,
-      description: '攻速+33%',
+      description: `攻速+${SPEED_POTION_ATTACK_SPEED_PERCENT}%`,
     };
 
     // 減速與加速互相抵銷（§ 24.4.6）
@@ -2638,11 +2638,12 @@ export function createGameStore(session: Session) {
       const fields = rollNewInstanceFields(recipe);
       const dbRecord: Partial<EquipmentInstance> = {
         templateId: recipe.id!, slot: recipe.slot, quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
+        isCraftedGear: true,
       };
       const finish = (id: number | undefined): CraftResult => {
         const newEquip = resolveEquipment({
           id, templateId: recipe.id!, name: recipe.name, type: recipe.type, slot: recipe.slot, isTwoHanded: recipe.isTwoHanded,
-          quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
+          quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false, isCraftedGear: true,
         } as EquipmentInstance);
         const s2 = get();
         set({
@@ -2653,7 +2654,7 @@ export function createGameStore(session: Session) {
           statistics: { ...s2.statistics, equipmentCrafted: s2.statistics.equipmentCrafted + 1 },
         });
         get().saveState();
-        return { ok: true, message: `製作成功！獲得 ${recipe.name}`, name: recipe.name };
+        return { ok: true, message: `製作成功！獲得 ${newEquip.name}`, name: newEquip.name };
       };
       return char.id ? session.repo.addEquipment(dbRecord).then(finish) : finish(undefined);
     };
@@ -2688,6 +2689,7 @@ export function createGameStore(session: Session) {
       weaponBaseDamage: getWeaponBaseDamage(item),
       // 新手裝名單只有 seed 一個來源（§ 99.1 第 4 條）
       isStarterGear: getTemplateById(item.templateId)?.acquireType === 'starter',
+      isCraftedGear: item.isCraftedGear,
       affixSlots: item.affixSlots,
     };
 

@@ -47,12 +47,13 @@ import { getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../src/models/sk
 import type { Attributes, Character, ClassName } from '../src/models/character';
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../src/models/equipment';
 import type { MonsterInstance, MonsterTemplate } from '../src/models/monster';
-import type { ActiveEffect, StatModifier } from '../src/models/effect';
+import { SPEED_POTION_ATTACK_SPEED_PERCENT, type ActiveEffect, type StatModifier } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
 import { SKILL_CATALOG, resolveDotDamagePercent } from '../src/models/skill';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
+import { CRAFT_AFFIX_TIER_RANGE, SHOP_MAX_AFFIX_TIER } from '../src/models/affix';
 
 // ---------------------------------------------------------------- RNG
 
@@ -133,7 +134,10 @@ interface Stage {
   acquire: 'shop' | 'craft';
   /** 裝備階級（`06-equipment-acquire.md` § 6A.1）。T1~T3 商店、T4~T7 鐵匠 */
   tier: number;
-  /** 該階梯裝備的詞綴 Tier 上限（商店 T3 為 `06-equipment-acquire.md` § 6A.1） */
+  /**
+   * 該階梯裝備可達的詞綴 Tier 上限（`06-equipment-acquire.md` § 6A.6）：
+   * 商店 T3（精鍊印記上限）；製作品不可使用印記，取 `CRAFT_AFFIX_TIER_RANGE` 的 max
+   */
   affixTier: number;
   /** 同級一般怪的等級帶（`--profile=base` 用） */
   monsterLevel: [number, number];
@@ -163,12 +167,12 @@ interface Stage {
  * 目前 Boss 等級上限為 Lv.60，故 craft-top 只能取同級中最硬的百柱死神。
  */
 const STAGES: Stage[] = [
-  { id: 'shop-low', label: '商店低階', level: 8, acquire: 'shop', tier: 1, affixTier: 3, monsterLevel: [6, 10], weakMonsterLevel: [1, 5], bossName: null, newbie: true },
-  { id: 'shop-mid', label: '商店中階', level: 18, acquire: 'shop', tier: 2, affixTier: 3, monsterLevel: [16, 20], weakMonsterLevel: [6, 10], bossName: null, newbie: true },
-  { id: 'shop-high', label: '商店高階', level: 28, acquire: 'shop', tier: 3, affixTier: 3, monsterLevel: [26, 30], weakMonsterLevel: [16, 20], bossName: '試煉飛龍' },      // Lv.30（+2，現有最低 Boss）
-  { id: 'craft-entry', label: '製作入門', level: 38, acquire: 'craft', tier: 4, affixTier: 5, monsterLevel: [34, 40], weakMonsterLevel: [26, 30], bossName: '象牙塔惡魔' }, // Lv.45（+7）
-  { id: 'craft-mid', label: '製作進階', level: 50, acquire: 'craft', tier: 5, affixTier: 5, monsterLevel: [46, 52], weakMonsterLevel: [34, 40], bossName: '不死殭屍王' },     // Lv.57（+7）
-  { id: 'craft-top', label: '製作頂級', level: 60, acquire: 'craft', tier: 6, affixTier: 5, monsterLevel: [56, 62], weakMonsterLevel: [46, 52], bossName: '百柱死神' },       // Lv.60（同級但最硬）
+  { id: 'shop-low', label: '商店低階', level: 8, acquire: 'shop', tier: 1, affixTier: SHOP_MAX_AFFIX_TIER, monsterLevel: [6, 10], weakMonsterLevel: [1, 5], bossName: null, newbie: true },
+  { id: 'shop-mid', label: '商店中階', level: 18, acquire: 'shop', tier: 2, affixTier: SHOP_MAX_AFFIX_TIER, monsterLevel: [16, 20], weakMonsterLevel: [6, 10], bossName: null, newbie: true },
+  { id: 'shop-high', label: '商店高階', level: 28, acquire: 'shop', tier: 3, affixTier: SHOP_MAX_AFFIX_TIER, monsterLevel: [26, 30], weakMonsterLevel: [16, 20], bossName: '試煉飛龍' },      // Lv.30（+2，現有最低 Boss）
+  { id: 'craft-entry', label: '製作入門', level: 38, acquire: 'craft', tier: 4, affixTier: CRAFT_AFFIX_TIER_RANGE[4].max, monsterLevel: [34, 40], weakMonsterLevel: [26, 30], bossName: '象牙塔惡魔' }, // Lv.45（+7）
+  { id: 'craft-mid', label: '製作進階', level: 50, acquire: 'craft', tier: 5, affixTier: CRAFT_AFFIX_TIER_RANGE[5].max, monsterLevel: [46, 52], weakMonsterLevel: [34, 40], bossName: '不死殭屍王' },     // Lv.57（+7）
+  { id: 'craft-top', label: '製作頂級', level: 60, acquire: 'craft', tier: 6, affixTier: CRAFT_AFFIX_TIER_RANGE[6].max, monsterLevel: [56, 62], weakMonsterLevel: [46, 52], bossName: '百柱死神' },       // Lv.60（同級但最硬）
 ];
 
 // ---------------------------------------------------------------- 角色
@@ -486,6 +490,8 @@ interface RotationEntry {
   hits?: number;
   /** § 21.4a 物理快照技能（盾擊／裂傷斬／挑釁怒吼） */
   physicalSnapshot?: boolean;
+  /** § 21.8 魔法公式的物理系技能（復仇之刃／背刺）保留爆擊 */
+  physicalDamage?: boolean;
   cooldown: number;
   mpCost: number;
   mpDrainRatio?: number;
@@ -497,7 +503,7 @@ interface RotationEntry {
 function magicEntry(s: Omit<Skill, 'lastUsedAt'>): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill',
-    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot,
+    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot, physicalDamage: s.physicalDamage,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
     mpCost: s.mpCost,
@@ -531,7 +537,7 @@ function preCombatBuffs(className: ClassName, level: number): ActiveEffect[] {
   // 神裝＝滿狀態：補上加速來源。加速術／強化加速術／綠色藥水同屬 category 'speed'，四者互斥，
   // 因此學不到加速術的職業（騎士 Lv.1 上限、盜賊 Lv.4 上限）改用綠色藥水 +33%（`30-items.md`）。
   if (IS_GOD && !byCategory.has('speed')) {
-    byCategory.set('speed', makeBuff('綠色藥水', 'speed', [{ stat: 'attack_speed', value: 33, isPercent: true }]));
+    byCategory.set('speed', makeBuff('綠色藥水', 'speed', [{ stat: 'attack_speed', value: SPEED_POTION_ATTACK_SPEED_PERCENT, isPercent: true }]));
   }
   return [...byCategory.values()];
 }
@@ -628,7 +634,7 @@ function orderRotation(
         } else {
           const r = e.physicalSnapshot
             ? calculatePhysicalSnapshotSkill(char, e.power ?? 0, e.element ?? 'none', loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0)
-            : calculateSkillAttack(char, e.power ?? 0, e.element ?? 'none', monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+            : calculateSkillAttack(char, e.power ?? 0, e.element ?? 'none', monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalDamage === true);
           s += r.damage;
         }
       }
@@ -759,7 +765,7 @@ function simulateOnce(
       if (entry.selfBuff) addTimed(makeBuff(entry.name, entry.selfBuff.category, entry.selfBuff.modifiers), entry.selfBuff.duration);
       const res = entry.physicalSnapshot
         ? calculatePhysicalSnapshotSkill(char, entry.power ?? 0, entry.element ?? 'none', loadout.weapon, monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0)
-        : calculateSkillAttack(char, entry.power ?? 0, entry.element ?? 'none', monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0);
+        : calculateSkillAttack(char, entry.power ?? 0, entry.element ?? 'none', monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0, undefined, entry.physicalDamage === true);
       hit(res.damage);
       if (entry.mpDrainRatio) currentMp = Math.min(maxMp, currentMp + Math.floor(res.damage * entry.mpDrainRatio));
       if (entry.dot && !dots.some(d => d.category === entry.dot!.category)) {

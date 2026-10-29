@@ -130,8 +130,8 @@ describe('普攻傷害不受 equippedGear 排列影響', () => {
     useGameStore.setState({ character: null, skills: [], equippedGear: {}, activeEffects: [] });
   });
 
-  it('妖精持獵人長弓＋火矢附魔打石像鬼：武器排最後仍為 36', () => {
-    // 0.5：命中（50 < 命中率 88）且不暴擊（50 >= 爆擊率 5）
+  it('妖精持獵人長弓＋火矢附魔打石像鬼：武器排最後仍為 33', () => {
+    // 0.5：命中（50 < 命中率 88）、不暴擊（50 >= 爆擊率 5）、武器基傷取範圍中段
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
     const bow = hunterBow([
@@ -147,17 +147,17 @@ describe('普攻傷害不受 equippedGear 排列影響', () => {
       bow,
     ];
 
-    // 基礎 = 大怪基傷 7 + 額外攻擊 2 + STR加成 7 + 火矢 15 + 元素克制 3（火對地＝無克制）= 34
-    // → ×1.09 = 37 → ×1.09 = 40 → 防禦 10% → floor(40 × 0.9) = 36
-    expect(attackOnce(elfLv28(), gear, gargoyle(), [fireEnchant()])).toBe(36);
+    // 基礎 = 武器基傷（大怪 3~7 擲出 5）+ 額外攻擊 2 + 屬性加成 7 + 火矢 15 + 元素克制 3（火對地＝無克制）= 32
+    // → ×1.09 = 34 → ×1.09 = 37 → 防禦 10% → floor(37 × 0.9) = 33
+    expect(attackOnce(elfLv28(), gear, gargoyle(), [fireEnchant()])).toBe(33);
   });
 
   it('近戰（新手劍）武器排最後仍吃得到武器基傷', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
     const gear = [armor('新手鎖甲', 'chest', 3), starterSword()];
-    // 基礎 = 大怪基傷 3 + 額外攻擊 0 + STR加成 7 = 10 → 防禦 10% → floor(10 × 0.9) = 9
-    expect(attackOnce(elfLv28(), gear, gargoyle())).toBe(9);
+    // 基礎 = 武器基傷（大怪 1~3 擲出 2）+ 額外攻擊 0 + STR加成 7 = 9 → 防禦 10% → floor(9 × 0.9) = 8
+    expect(attackOnce(elfLv28(), gear, gargoyle())).toBe(8);
   });
 
   it('武器排最後時不會退化成「無武器」的保底傷害', () => {

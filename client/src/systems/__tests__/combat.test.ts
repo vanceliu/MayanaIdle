@@ -140,8 +140,8 @@ describe('combat system', () => {
       const result = calculatePlayerAttack(char, weapon, monster);
 
       expect(result.hit).toBe(true);
-      // weaponDmg(20) + strBonus(7) = 27
-      expect(result.damage).toBe(27);
+      // weaponDmg roll(10~20, r=0.1) = 11 + strBonus(7) = 18
+      expect(result.damage).toBe(18);
     });
 
     it('should use largeMonsterDamage for large monsters', () => {
@@ -153,8 +153,8 @@ describe('combat system', () => {
       const result = calculatePlayerAttack(char, weapon, monster);
 
       expect(result.hit).toBe(true);
-      // weaponDmg(10) + strBonus(7) = 17
-      expect(result.damage).toBe(17);
+      // weaponDmg roll(5~10, r=0.1) = 5 + strBonus(7) = 12
+      expect(result.damage).toBe(12);
     });
 
     it('should double damage on critical hit', () => {
@@ -162,7 +162,8 @@ describe('combat system', () => {
       vi.spyOn(Math, 'random').mockImplementation(() => {
         callCount++;
         if (callCount === 1) return 0.1; // hit
-        if (callCount === 2) return 0.01; // crit
+        if (callCount === 2) return 0.999; // weapon roll → max
+        if (callCount === 3) return 0.01; // crit
         return 0.5;
       });
       const char = createTestCharacter();
@@ -186,9 +187,9 @@ describe('combat system', () => {
 
       const result = calculatePlayerAttack(char, weapon, monster);
 
-      // baseDmg(20+7=27) * (100-75)/100 = 27 * 0.25 = 6.75 → 6
+      // baseDmg(roll 11 + 7 = 18) * (100-75)/100 = 18 * 0.25 = 4.5 → 4
       expect(result.hit).toBe(true);
-      expect(result.damage).toBe(6);
+      expect(result.damage).toBe(4);
     });
 
     it('should deal 1 damage with no weapon (unarmed)', () => {
@@ -230,8 +231,8 @@ describe('combat system', () => {
 
       const result = calculatePlayerAttack(char, weapon, monster, [weapon]);
 
-      // base = 20 + 7 = 27, attack%: floor(27 * 1.12) = 30
-      expect(result.damage).toBe(30);
+      // base = roll 11 + 7 = 18, attack%: floor(18 * 1.12) = 20
+      expect(result.damage).toBe(20);
     });
 
     it('元素刻印的乘區只在刻印帶著屬性時生效', () => {
@@ -242,8 +243,8 @@ describe('combat system', () => {
       // 沒有刻印 → 無屬性，拿不到乘區
       const weaponNoBrand = createTestWeapon({ smallMonsterDamage: 20 });
       const r1 = calculatePlayerAttack(char, weaponNoBrand, monster, [weaponNoBrand]);
-      // base = 20 + 7 = 27
-      expect(r1.damage).toBe(27);
+      // base = roll(10~20, r=0.1) 11 + 7 = 18
+      expect(r1.damage).toBe(18);
 
       // 有刻印 → 賦予火屬性並吃到乘區
       const weaponBrand = createTestWeapon({
@@ -251,8 +252,8 @@ describe('combat system', () => {
         affixes: [{ type: 'element_brand', tier: 3, value: 11, element: 'fire' }],
       });
       const r2 = calculatePlayerAttack(char, weaponBrand, monster, [weaponBrand]);
-      // base = 20 + 7 + 元素克制 3（目標無屬性＝無克制）= 30, 刻印乘區: floor(30 * 1.11) = 33
-      expect(r2.damage).toBe(33);
+      // base = 11 + 7 + 元素克制 3（目標無屬性＝無克制）= 21, 刻印乘區: floor(21 * 1.11) = 23
+      expect(r2.damage).toBe(23);
     });
 
     it('should apply crit_rate and crit_damage affixes', () => {
@@ -260,7 +261,8 @@ describe('combat system', () => {
       vi.spyOn(Math, 'random').mockImplementation(() => {
         callCount++;
         if (callCount === 1) return 0.1; // hit
-        if (callCount === 2) return 0.14; // crit check: 14 < 5 + 10 = 15 → crit
+        if (callCount === 2) return 0.999; // weapon roll → max
+        if (callCount === 3) return 0.14; // crit check: 14 < 5 + 10 = 15 → crit
         return 0.5;
       });
       const char = createTestCharacter();
@@ -336,16 +338,32 @@ describe('combat system', () => {
       expect(result.damage).toBe(18);
     });
 
-    it('should apply crit on skill attack', () => {
+    it('魔法技能不判定爆擊，也不消耗亂數（§ 21.8）', () => {
+      const spy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
+      const char = createTestCharacter({ baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 18, CHA: 12 } });
+      const monster = createTestMonster({ defense: 0 });
+      const crit = { templateId: 9, name: '爆擊戒', type: 'armor', slot: 'ring1', isTwoHanded: false,
+        quality: 0, enhancement: 0, affixes: [{ type: 'crit_rate', tier: 7, value: 70 }], ownerId: 1, equipped: true } as EquipmentInstance;
+
+      const result = calculateSkillAttack(char, 10, 'fire', monster, [crit], '火球術');
+
+      expect(result.isCritical).toBe(false);
+      // 基礎魔攻 21（無武器）
+      expect(result.damage).toBe(21);
+      expect(result.log.type).toBe('skill_hit');
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('物理系技能（canCrit）照常爆擊（§ 21.8，復仇之刃／背刺）', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.01); // crit
       const char = createTestCharacter({ baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 18, CHA: 12 } });
       const monster = createTestMonster({ defense: 0 });
 
-      const result = calculateSkillAttack(char, 10, 'fire', monster, [], '火球術');
+      const result = calculateSkillAttack(char, 10, 'none', monster, [], '背刺', [], 0, 0, undefined, true);
 
       expect(result.isCritical).toBe(true);
-      // 基礎魔攻 21（無武器），crit = floor(21 * 2.0) = 42
-      expect(result.damage).toBe(42);
+      // 爆擊倍率 2.0：未爆擊結果 × 2
+      expect(result.damage).toBe(Math.floor(calculateSkillAttack(char, 10, 'none', monster, [], '背刺').damage * 2));
       expect(result.log.type).toBe('skill_crit');
     });
 

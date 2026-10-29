@@ -100,7 +100,7 @@ client/src/wiki/
 六個區塊：
 
 1. **基本規則**：詞綴洞數與各管道的詞綴條數（掉落 1~4 條）、空洞／毀壞的洞、封印詞綴、同件不可重複、品質放大公式、強化上限（`DEFAULT_MAX_AFFIX_TIER`）、
-   商店硬上限（`SHOP_MAX_AFFIX_TIER`）、特殊詞綴佔插槽。數字一律 import 常數，不寫死。
+   商店硬上限（`SHOP_MAX_AFFIX_TIER`）、`(鍛)` 製作品的詞綴範圍（`CRAFT_AFFIX_TIER_RANGE`）與不可使用印記、特殊詞綴佔插槽。數字一律 import 常數，不寫死。
 2. **詞綴一覽**：依 `07-affix.md` § 7.4 的分類小標分組（攻擊類／防禦類／補給類／掉落類／
    盾牌專屬／飾品盾牌專屬／特殊詞綴），每組一張 4 欄窄表：詞綴／適用部位／效果／數值區間。
    - 效果敘述與分類小標存在 `AFFIX_DEFINITIONS` 的 `description`／`group` 欄位，
@@ -168,6 +168,7 @@ client/src/wiki/
 
 ### 4.7 鐵匠鋪 (CraftingPage)
 - 製作配方列表：成品、所需材料與數量、材料來源區域連結
+- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍（`formatCraftAffixTierRanges()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）
 
 ### 4.8 經驗表 (ExpTablePage)
 - Lv.1~100 升級所需經驗、累計經驗

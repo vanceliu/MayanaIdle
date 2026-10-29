@@ -432,9 +432,9 @@ B 級以上任務可出現製作素材獎勵，素材種類依任務難度決定
 | dragon-valley-5f | 龍谷地間 5F | Lv.46-49 | 250 |
 | dragon-valley-6f | 龍谷地間 6F | Lv.46-49 | 250 |
 | dragon-valley-7f | 龍谷地間 7F | Lv.49-50 | 250 |
-| hundred-pillar-1-10f | 百柱塔 1-10F | Lv.45-52 | 275 |
-| hundred-pillar-11-20f | 百柱塔 11-20F | Lv.45-52 | 290 |
-| hundred-pillar-21-30f | 百柱塔 21-30F | Lv.45-52 | 300 |
+| hundred-pillar-1-10f | 百柱塔 1-10F | Lv.50-56 | 275 |
+| hundred-pillar-11-20f | 百柱塔 11-20F | Lv.50-56 | 290 |
+| hundred-pillar-21-30f | 百柱塔 21-30F | Lv.50-56 | 300 |
 | ancient-dungeon-1f | 遠古地監 1F | Lv.45-50 | 280 |
 | ancient-dungeon-2f | 遠古地監 2F | Lv.45-50 | 280 |
 | ancient-dungeon-3f | 遠古地監 3F | Lv.45-50 | 280 |
@@ -446,12 +446,12 @@ B 級以上任務可出現製作素材獎勵，素材種類依任務難度決定
 
 | 區域 ID | 名稱 | 等級範圍 | 平均金幣/隻 |
 |---------|------|---------|------------|
-| hundred-pillar-31-40f | 百柱塔 31-40F | Lv.52-57 | 350 |
-| hundred-pillar-41-50f | 百柱塔 41-50F | Lv.52-57 | 370 |
-| hundred-pillar-51-60f | 百柱塔 51-60F | Lv.52-57 | 390 |
-| hundred-pillar-61-70f | 百柱塔 61-70F | Lv.57-60 | 420 |
-| hundred-pillar-71-80f | 百柱塔 71-80F | Lv.57-60 | 430 |
-| hundred-pillar-81-90f | 百柱塔 81-90F | Lv.57-60 | 440 |
+| hundred-pillar-31-40f | 百柱塔 31-40F | Lv.56-63 | 350 |
+| hundred-pillar-41-50f | 百柱塔 41-50F | Lv.56-63 | 370 |
+| hundred-pillar-51-60f | 百柱塔 51-60F | Lv.56-63 | 390 |
+| hundred-pillar-61-70f | 百柱塔 61-70F | Lv.63-70 | 420 |
+| hundred-pillar-71-80f | 百柱塔 71-80F | Lv.63-70 | 430 |
+| hundred-pillar-81-90f | 百柱塔 81-90F | Lv.63-70 | 440 |
 | hundred-pillar-91-100f | 百柱塔 91-100F | Lv.80 | 450 |
 | ancient-dungeon-7f | 遠古地監 7F | Lv.55-60 | 400 |
 | ancient-dungeon-8f | 遠古地監 8F | Lv.55-60 | 400 |
@@ -496,19 +496,19 @@ BOSS 任務僅 B+ 級以上出現。殲滅 BOSS 任務擊殺 1~3 隻，BOSS 素�
 | B+ 級 | 雪地之主 (Lv.35) | snow-field-deep | 3,000 |
 | A+ 級 | 象牙塔惡魔 (Lv.45) | ivory-tower-5f | 4,000 |
 | A+ 級 | 安塔巨龍 (Lv.50) | dragon-valley-7f | 5,000 |
-| A+ 級 | 毒之皇女 (Lv.52) | hundred-pillar-1-10f | 4,500 |
-| A+ 級 | 哥布林之王 (Lv.52) | hundred-pillar-11-20f | 4,500 |
-| A+ 級 | 暗影吸血鬼 (Lv.52) | hundred-pillar-21-30f | 4,500 |
+| A+ 級 | 毒之皇女 (Lv.56) | hundred-pillar-1-10f | 4,500 |
+| A+ 級 | 哥布林之王 (Lv.56) | hundred-pillar-11-20f | 4,500 |
+| A+ 級 | 暗影吸血鬼 (Lv.56) | hundred-pillar-21-30f | 4,500 |
 | S+ 級 | 朦朧蛇魔 (Lv.50) | misty-cave-3f | 5,000 |
 | S+ 級 | 深海獄王 (Lv.50) | underwater-prison-4f | 5,000 |
-| S+ 級 | 不死殭屍王 (Lv.57) | hundred-pillar-31-40f | 7,000 |
-| S+ 級 | 龍王約特勒 (Lv.57) | hundred-pillar-41-50f | 7,000 |
-| S+ 級 | 冥王哈馬斯 (Lv.57) | hundred-pillar-51-60f | 7,000 |
-| S+ 級 | 霜凍伊莉絲 (Lv.60) | hundred-pillar-61-70f | 8,000 |
-| S+ 級 | 熔岩伊弗利特 (Lv.60) | hundred-pillar-71-80f | 8,000 |
-| S+ 級 | 守護者之主 (Lv.60) | hundred-pillar-81-90f | 8,500 |
+| S+ 級 | 不死殭屍王 (Lv.63) | hundred-pillar-31-40f | 7,000 |
+| S+ 級 | 龍王約特勒 (Lv.63) | hundred-pillar-41-50f | 7,000 |
+| S+ 級 | 冥王哈馬斯 (Lv.63) | hundred-pillar-51-60f | 7,000 |
+| S+ 級 | 霜凍伊莉絲 (Lv.70) | hundred-pillar-61-70f | 8,000 |
+| S+ 級 | 熔岩伊弗利特 (Lv.70) | hundred-pillar-71-80f | 8,000 |
+| S+ 級 | 守護者之主 (Lv.70) | hundred-pillar-81-90f | 8,500 |
 | S+ 級 | 百柱死神 (Lv.80) | hundred-pillar-91-100f | 9,000 |
-| S+ 級 | 遠古騎士 (Lv.60) | ancient-dungeon-9f | 7,500 |
+| S+ 級 | 遠古騎士 (Lv.65) | ancient-dungeon-9f | 7,500 |
 
 ---
 

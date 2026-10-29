@@ -22,6 +22,7 @@ import {
   SIGIL_PANEL_ORDER,
   DEFAULT_PANEL_SIGIL,
   canUseSigil,
+  CRAFTED_GEAR_SIGIL_REASON,
   getEnhanceSigilRate,
   getSigilDefinition,
   getUpgradeSigilFor,
@@ -141,6 +142,7 @@ export function SigilMaster() {
   /** 這件裝備所有印記都不受理，清單上直接標出來 */
   function inertReason(it: EquipmentInstance): string | null {
     if (isStarterGear(it)) return '新手裝';
+    if (it.isCraftedGear) return '製作品';
     // 沒有詞綴但還有空洞的，新增印記照樣能用（§ 46.11）
     if ((it.affixes?.length ?? 0) === 0 && getAffixSockets(it) === 0) return '無詞綴';
     return null;
@@ -151,6 +153,7 @@ export function SigilMaster() {
     if (!item) return { ok: false as const, reason: '沒有裝備' };
     return canUseSigil(sigilType, affixes, idx, {
       isStarterGear: isStarterGear(item),
+      isCraftedGear: item.isCraftedGear,
       maxAffixTier: item.maxAffixTier,
       quality: item.quality ?? 0,
       affixSlots: item.affixSlots,
@@ -267,8 +270,10 @@ export function SigilMaster() {
   /** 動作鈕停不下來的原因。判定順序＝玩家會先撞到的先講 */
   function blockReason(): string | null {
     if (!item) return '沒有裝備';
-    const starter = inertReason(item);
-    if (starter) return starter === '新手裝' ? '新手裝不可使用任何印記' : '這件裝備沒有詞綴也沒有詞綴洞';
+    const inert = inertReason(item);
+    if (inert === '新手裝') return '新手裝不可使用任何印記';
+    if (inert === '製作品') return CRAFTED_GEAR_SIGIL_REASON;
+    if (inert) return '這件裝備沒有詞綴也沒有詞綴洞';
     if (sigilCounts[sigilType] <= 0) return `背包裡沒有${display.name}`;
     if (def.target === 'affix' && affixIndex == null) return '請先選一條詞綴';
     const check = canUseSigil(sigilType, affixes, affixIndex ?? undefined, {
@@ -299,7 +304,7 @@ export function SigilMaster() {
           /*
            * 圖示與 Tier 色與背包／裝備欄同源（防具用部位、武器用類型；色取
            * `getEquipmentInstanceTierColor`），同一件裝備在三個地方不會長成三種樣子。
-           * 印記不受理的（新手裝／無詞綴）維持灰階不上色（`13-town.md` § 13.13）——
+           * 印記不受理的（新手裝／(鍛) 製作品／無詞綴）維持灰階不上色（`13-town.md` § 13.13）——
            * 上了 Tier 色就跟能操作的列看起來一樣了。
            */
           const tierColor = inert ? undefined : getEquipmentInstanceTierColor(e.item, allTemplates);

@@ -124,26 +124,26 @@ describe('刻印在普攻的效果', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // 必命中、不暴擊（爆率 5%）
     const m = dummy();
     const plain = sword();
-    // 基傷 20 + STR 加成 7 = 27
-    expect(calculatePlayerAttack(char(), plain, m, [plain]).damage).toBe(27);
+    // 武器基傷 10~20 在 r=0.1 擲出 11 + STR 加成 7 = 18
+    expect(calculatePlayerAttack(char(), plain, m, [plain]).damage).toBe(18);
   });
 
   it('有刻印就吃到乘區', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.1);
     const m = dummy({ element: 'ice' }); // 冰克火：克制 +0，只看乘區
     const w = sword([brand(15, 'fire')]);
-    // floor(27 × 1.15) = 31
-    expect(calculatePlayerAttack(char(), w, m, [w]).damage).toBe(31);
+    // floor(18 × 1.15) = 20
+    expect(calculatePlayerAttack(char(), w, m, [w]).damage).toBe(20);
   });
 
   it('刻印的元素克制 +5／無克制 +3／被克制 +0，都在乘區之前（§ 42.2）', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.1);
     const w = sword([brand(15, 'fire')]);
     const hit = (element: ElementType) => calculatePlayerAttack(char(), w, dummy({ element }), [w]).damage;
-    expect(hit('wind')).toBe(36);  // 火克風：floor((27 + 5) × 1.15)
-    expect(hit('earth')).toBe(34); // 無克制：floor((27 + 3) × 1.15)
-    expect(hit('none')).toBe(34);  // 目標無屬性視為無克制
-    expect(hit('ice')).toBe(31);   // 冰克火：floor(27 × 1.15)
+    expect(hit('wind')).toBe(26);  // 火克風：floor((18 + 5) × 1.15)
+    expect(hit('earth')).toBe(24); // 無克制：floor((18 + 3) × 1.15)
+    expect(hit('none')).toBe(24);  // 目標無屬性視為無克制
+    expect(hit('ice')).toBe(20);   // 冰克火：floor(18 × 1.15)
   });
 
   it('沒有刻印就拿不到克制加成', () => {

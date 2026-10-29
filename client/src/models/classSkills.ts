@@ -22,7 +22,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'taunt', name: '挑釁怒吼', className: 'knight', classLevel: 4, requiredLevel: 40, bookItemId: 105,
     skill: { id: 'taunt', name: '挑釁怒吼', level: 4, element: 'none', type: 'attack', target: 'single', power: 65, physicalSnapshot: true, mpCost: 25, cooldown: 20000, range: 3, applyDebuff: { category: 'atk-down', name: '挑釁', description: '攻擊力降低20%', duration: 10000, modifiers: [{ stat: 'attack', value: -20, isPercent: true }], tags: ['taunt'] } } },
   { id: 'vengeance', name: '復仇之刃', className: 'knight', classLevel: 5, requiredLevel: 50, bookItemId: 106,
-    skill: { id: 'vengeance', name: '復仇之刃', level: 5, element: 'none', type: 'attack', target: 'single', power: 84, mpCost: 50, cooldown: 25000, range: 1.5,
+    skill: { id: 'vengeance', name: '復仇之刃', level: 5, element: 'none', type: 'attack', target: 'single', power: 84, physicalDamage: true, mpCost: 50, cooldown: 25000, range: 1.5,
       selfBuff: { category: 'vengeance', name: '復仇', description: '依已損失血量提升攻擊力，最高 +50%',
         duration: 10000, scaleByMissingHp: { stat: 'attack_power', maxPercent: 50 } } } },
 
@@ -68,7 +68,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
   { id: 'precision-strike', name: '精準打擊', className: 'thief', classLevel: 4, requiredLevel: 40, bookItemId: 125,
     skill: { id: 'precision-strike', name: '精準打擊', level: 4, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 25, cooldown: 3000, range: 0, buffEffect: '命中+10,爆擊+10%', buffDuration: 300000, buffModifiers: [{ stat: 'hit', value: 10, isPercent: false }, { stat: 'crit_rate', value: 10, isPercent: true }], buffCategory: 'accuracy' } },
   { id: 'backstab', name: '背刺', className: 'thief', classLevel: 5, requiredLevel: 50, bookItemId: 126,
-    skill: { id: 'backstab', name: '背刺', level: 5, element: 'none', type: 'attack', target: 'single', power: 104, mpCost: 50, cooldown: 20000, range: 1.5,
+    skill: { id: 'backstab', name: '背刺', level: 5, element: 'none', type: 'attack', target: 'single', power: 104, physicalDamage: true, mpCost: 50, cooldown: 20000, range: 1.5,
       selfBuff: { category: 'backstab', name: '背刺', description: '攻擊力 +50%（×1.5）',
         duration: 5000, modifiers: [{ stat: 'attack_power', value: 50, isPercent: true }] } } },
 ];

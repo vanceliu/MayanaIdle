@@ -52,6 +52,7 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **製作材料分配規則／製作消耗** | `06-equipment-acquire.md` | § 6A.3 |
+| **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
 | 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
@@ -69,6 +70,8 @@
 | **武器普攻射程（弓 10 格，其餘近身）** | `41-arpg-combat.md` | § 3.1 |
 | **怪物仇恨範圍 10 格／脫離 15 格** | `41-arpg-combat.md` § 5.2、`25-monster-system.md` § 25.8 | — |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
+| **武器基傷擲骰（白字＋強化的 1/2~全值）** | `21-combat-formula.md` | § 21.3（快照技能／DoT 見 § 21.4a） |
+| **哪些傷害會爆擊（魔法技能不爆擊、物理系技能例外）** | `21-combat-formula.md` | § 21.8「適用範圍」 |
 | **遠程攻擊吃敏捷、近戰吃力量** | `21-combat-formula.md` § 21.3、`20-attributes.md` § 20.3 | — |
 | 角色職業/初始屬性 | `04-character.md` | § 4.2 |
 | 新手裝（T1，創角直接穿上） | `04-character.md` | § 4.3 |
@@ -226,6 +229,7 @@
   ← 04-character.md / 20-attributes.md / 21-combat-formula.md / 41-arpg-combat.md
   ← 06-equipment.md / 07-affix.md / 07-affix-tier7.md / 08-quality.md / 46-sigil.md § 46.12
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
+  ← 24-buff-debuff.md § 24.3 / 42-element-system.md § 42.2 / 51-auto-talent.md § 51.3
 
 【戰鬥／技能／Buff】
 03-combat.md ←→ 04-character.md ←→ 05-skill.md ←→ 20-attributes.md

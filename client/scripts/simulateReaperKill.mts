@@ -8,6 +8,8 @@
  *  - 目標「擺著不動」：不還手，因此不套用 詛咒／虛弱／暈眩，也不需計算玩家存活
  *  - MP 計入：消耗、每 6 秒的戰鬥中回魔、魔力奪取回魔都算；同時輸出「MP 無限」對照組
  *  - 長效 buff（≥300s）視為戰前已開好；短效 buff／攻擊技能進入輪替，佔用行動 tick
+ *  - 技能一律讀 `skill.ts`／`classSkills.ts`，可學範圍讀 `skillRestrictions.ts`；輪替最多佔 `TALENT_INSTALL_MAX` 格戰鬥天賦
+ *  - 技能降防（詛咒／護甲崩壞／極冰封印）照實施放；只降防的技能放不放由同種子試算決定
  *
  * 模型依據：
  *  - `playerCombatFSM.ts:96-99`：一個攻擊 tick 只能做一件事（放技能 or 普攻）
@@ -16,7 +18,7 @@
  *  - `gameLoop.ts` DOT_TICK_INTERVAL = 1000ms
  *  - `regen.ts` MP_REGEN_INTERVAL_MS = 6000ms（戰鬥中回魔減半）
  *
- * 用法：npx vite-node scripts/simulateReaperKill.mts
+ * 用法：npx vite-node scripts/simulateReaperKill.mts [--class=a,b] [--top=N] [--runs=N] [--no-skill-debuff]
  */
 import {
   calculatePlayerAttack,
@@ -45,9 +47,11 @@ import { getMpRegen, MP_REGEN_INTERVAL_MS } from '../src/systems/regen';
 import type { Attributes, Character, ClassName } from '../src/models/character';
 import type { EquipmentInstance } from '../src/models/equipment';
 import type { MonsterInstance } from '../src/models/monster';
-import type { ActiveEffect, StatModifier } from '../src/models/effect';
+import { SPEED_POTION_ATTACK_SPEED_PERCENT, type ActiveEffect, type StatModifier } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
 import { SKILL_CATALOG, resolveDotDamagePercent } from '../src/models/skill';
+import { CLASS_MAGIC_RESTRICTIONS, getLearnableMaxLevel } from '../src/models/skillRestrictions';
+import { TALENT_INSTALL_MAX } from '../src/models/talent';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import {
   getErosion, getWeaponBaseDamage, getWeaponDebuffAffixes,
@@ -150,6 +154,9 @@ const RULE_SETS: Record<string, Rules> = {
     classPowerMultBy: { elementalist: 0.8, priest: 0.8 },
   },
 };
+
+/** `--no-skill-debuff`：技能的降防 debuff 不施加（量測降防技能的貢獻用） */
+const NO_SKILL_DEBUFF = process.argv.includes('--no-skill-debuff');
 
 const RULES_ARG = process.argv.find(a => a.startsWith('--rules='))?.split('=')[1] ?? 'current';
 const RULES = RULE_SETS[RULES_ARG];
@@ -535,56 +542,195 @@ function makeBuff(id: string, category: string, modifiers: StatModifier[]): Acti
   };
 }
 
-/** 加速來源四者互斥（category: 'speed'）：各職業取可用的最強者 */
-const SPEED_SOURCE: Record<ClassName, { name: string; percent: number }> = {
-  knight: { name: '綠色藥水', percent: 33 },      // 基礎魔法只到 1 級，學不到加速術
-  thief: { name: '綠色藥水', percent: 33 },       // 基礎魔法只到 4 級
-  elf: { name: '加速術（Lv6）', percent: 33 },     // 與綠色藥水同值、互斥
-  elementalist: { name: '強化加速術（Lv8）', percent: 40 },
-  priest: { name: '強化加速術（Lv8）', percent: 40 },
+/** 掛在怪物身上的數值型 debuff（防禦下降詞綴、詛咒、護甲崩壞等），生效期間由本檔控制 */
+function makeMonsterDebuff(id: string, category: string, modifiers: StatModifier[]): ActiveEffect {
+  return {
+    id, sourceSkillId: id, sourceSkillName: id, category,
+    type: 'debuff', target: 'monster', targetIdx: 0, modifiers,
+    startTime: 0, duration: Number.MAX_SAFE_INTEGER,
+    tags: [], name: id, description: '',
+  };
+}
+
+// ---------------------------------------------------------------- 技能盤點
+
+/** § 44.1 的角色等級 */
+const CHAR_LEVEL = 75;
+/** § 44.1：持續時間達此值的 buff 視為戰前開好，不佔戰鬥中的行動 */
+const PRECOMBAT_MIN_DURATION_MS = 300_000;
+/** 只影響承傷的屬性：木樁不還手，這些 modifier 對輸出沒有作用 */
+const DEFENSIVE_STATS = new Set(['defense', 'damageReduction', 'shield_absorb', 'evasion']);
+/** 怪物 debuff 中會改變玩家輸出的屬性（防禦 → 減傷，`21-combat-formula.md` § 21.16） */
+const OUTPUT_MONSTER_DEBUFF_STATS = new Set(['defense']);
+const SPEED_CATEGORY = 'speed';
+const SPEED_POTION_NAME = '綠色藥水';
+
+type SkillDef = Omit<Skill, 'lastUsedAt'>;
+
+/**
+ * 技能在模擬中的處理方式：
+ * 加速來源／戰前開好／進輪替／被同類覆蓋／木樁量不到／超出學習上限
+ */
+type SkillHandling = 'speed' | 'precombat' | 'rotation' | 'superseded' | 'unmeasurable' | 'over_budget';
+
+const HANDLING_LABEL: Record<SkillHandling, string> = {
+  speed: '加速來源', precombat: '戰前', rotation: '輪替', superseded: '同類覆蓋',
+  unmeasurable: '量不到', over_budget: '超出學習上限',
 };
 
-/** 戰前開好的長效 buff（duration ≥ 300s，遠長於戰鬥時間） */
-function preCombatBuffs(className: ClassName): ActiveEffect[] {
-  const b: ActiveEffect[] = [];
-  switch (className) {
-    case 'knight':
-      // 基礎魔法上限 1 級：祝福武器（對不死命中 +5）、保護罩（防禦 +2）
-      b.push(makeBuff('祝福武器', 'weapon-bless', [{ stat: 'hit_undead', value: 5, isPercent: false }]));
-      b.push(makeBuff('保護罩', 'protect-shield', [{ stat: 'defense', value: 2, isPercent: false }]));
-      break;
-    case 'elf':
-      b.push(makeBuff('祝福魔法武器', 'weapon-bless', [
-        { stat: 'hit', value: 10, isPercent: false },
-        { stat: 'extra_attack', value: 5, isPercent: false },
-      ]));
-      b.push(makeBuff('鷹眼', 'accuracy', [
-        { stat: 'hit', value: 5, isPercent: false },
-        { stat: 'ranged_attack', value: 3, isPercent: false },
-      ]));
-      b.push(makeBuff('火矢附魔', 'fire-enchant', [{ stat: 'fire_damage', value: 15, isPercent: false }]));
-      b.push(makeBuff('力量提升', 'str-buff', [{ stat: 'str', value: 5, isPercent: false }]));
-      b.push(makeBuff('敏捷提升', 'agi-buff', [{ stat: 'agility', value: 5, isPercent: false }]));
-      break;
-    case 'thief':
-      b.push(makeBuff('精準打擊', 'accuracy', [
-        { stat: 'hit', value: 10, isPercent: false },
-        { stat: 'crit_rate', value: 10, isPercent: true },
-      ]));
-      b.push(makeBuff('敏捷提升', 'agi-buff', [{ stat: 'agility', value: 5, isPercent: false }]));
-      // 淬毒本身是 300s buff，毒 DoT 由普攻觸發（見 rotation）
-      break;
-    case 'elementalist':
-    case 'priest':
-      b.push(makeBuff('祝福魔法武器', 'weapon-bless', [
-        { stat: 'hit', value: 10, isPercent: false },
-        { stat: 'extra_attack', value: 5, isPercent: false },
-      ]));
-      b.push(makeBuff('力量提升', 'str-buff', [{ stat: 'str', value: 5, isPercent: false }]));
-      b.push(makeBuff('敏捷提升', 'agi-buff', [{ stat: 'agility', value: 5, isPercent: false }]));
-      break;
+interface SkillPlanItem {
+  skill: SkillDef;
+  isBasicMagic: boolean;
+  source: string;
+  handling: SkillHandling;
+  note: string;
+}
+
+/** 普攻命中觸發的 DoT（淬毒） */
+interface OnHitDot { category: string; percent: number; interval: number; duration: number }
+
+interface ClassSkillPlan {
+  items: SkillPlanItem[];
+  precombat: ActiveEffect[];
+  speed: { name: string; effect: ActiveEffect };
+  rotation: SkillPlanItem[];
+  onHitDot: OnHitDot | null;
+}
+
+const hasOutputModifier = (mods: StatModifier[] | undefined) => !!mods?.some(m => !DEFENSIVE_STATS.has(m.stat));
+
+/** 攻擊技能附帶的 debuff 是否會降低怪物防禦（會的話照實模擬） */
+function lowersMonsterDefense(s: SkillDef): boolean {
+  const d = s.applyDebuff;
+  return !!d && !d.stun && !!d.modifiers?.some(m => OUTPUT_MONSTER_DEBUFF_STATS.has(m.stat) && m.value < 0);
+}
+
+const speedPercentOf = (s: SkillDef) =>
+  s.buffModifiers?.find(m => m.stat === 'attack_speed')?.value ?? 0;
+
+/** buff／治療類技能在木樁上量不到的原因；量得到時回 null */
+function unmeasurableReason(s: SkillDef): string | null {
+  if (s.type === 'heal') return '治療，木樁不還手';
+  if (s.type !== 'buff') return null;
+  if (s.invincible) return '無敵，木樁不還手';
+  if (s.cleanse) return '淨化，木樁不施加負面狀態';
+  if (s.onHitDebuff) return null;
+  if (!hasOutputModifier(s.buffModifiers)) return '只影響承傷，木樁不還手';
+  return null;
+}
+
+/** 攻擊技能的附帶效果在模擬中如何處理 */
+function attackSideNote(s: SkillDef): string {
+  const notes: string[] = [];
+  const d = s.applyDebuff;
+  if (d) {
+    if (d.dotDamagePercent || d.dotDamage) notes.push(`${d.name} DoT 照實模擬`);
+    else if (lowersMonsterDefense(s)) notes.push(`${d.name}（${d.description}）照實模擬`);
+    else notes.push(`${d.name}量不到（目標不還手）`);
   }
-  return b;
+  if (s.selfBuff?.scaleByMissingHp) notes.push('殘血加成在滿血木樁上恆為 0');
+  if (s.selfBuff?.modifiers?.length) notes.push(`${s.selfBuff.name}自身增益照實模擬`);
+  if (s.lifestealPercent) notes.push('吸血量不到');
+  if (s.mpDrainRatio) notes.push('回魔技，MP 低於 30% 才放');
+  if (s.requiredWeaponType) notes.push(`需裝備${s.requiredWeaponType}`);
+  return notes.join('；');
+}
+
+function classifySkill(s: SkillDef, isBasicMagic: boolean, source: string): SkillPlanItem {
+  const item = (handling: SkillHandling, note: string): SkillPlanItem => ({ skill: s, isBasicMagic, source, handling, note });
+  if (s.type === 'buff' && s.buffCategory === SPEED_CATEGORY) return item('speed', `攻速 +${speedPercentOf(s)}%`);
+  const reason = unmeasurableReason(s);
+  if (reason) return item('unmeasurable', reason);
+  if (s.type === 'buff') {
+    if ((s.buffDuration ?? 0) >= PRECOMBAT_MIN_DURATION_MS) {
+      return item('precombat', s.onHitDebuff ? `普攻命中觸發${s.onHitDebuff.name}（${s.onHitDebuff.description}）` : (s.buffEffect ?? ''));
+    }
+    return item('rotation', `短效 buff（${s.buffEffect ?? ''}，${(s.buffDuration ?? 0) / 1000}s）`);
+  }
+  return item('rotation', attackSideNote(s));
+}
+
+/** 學習上限超出時的保留順序：加速 → 戰前 → 降防 → 其餘依技能攻擊力 */
+function learnPriority(i: SkillPlanItem): number {
+  if (i.handling === 'speed') return 0;
+  if (i.handling === 'precombat') return 1;
+  if (i.handling === 'rotation' && lowersMonsterDefense(i.skill)) return 2;
+  if (i.handling === 'rotation') return 3 + 1 / (1 + i.skill.power);
+  return 5;
+}
+
+/**
+ * 該職業 Lv.75 學得到的所有技能及其處理方式。
+ * 基礎魔法可學等級與學習數上限讀 `skillRestrictions.ts`；同 category 的戰前 buff 只留等級最高者。
+ */
+function buildSkillPlan(className: ClassName): ClassSkillPlan {
+  const items: SkillPlanItem[] = [];
+  for (const cs of CLASS_SKILLS) {
+    if (cs.className !== className || cs.requiredLevel > CHAR_LEVEL) continue;
+    items.push(classifySkill(cs.skill, false, `職業 ${cs.classLevel} 級`));
+  }
+  const maxBasicLevel = getLearnableMaxLevel(className, CHAR_LEVEL);
+  const basics = SKILL_CATALOG
+    .filter(s => s.level <= maxBasicLevel)
+    .map(s => classifySkill(s, true, `基礎 ${s.level} 級`))
+    .sort((a, b) => learnPriority(a) - learnPriority(b));
+  const basicBudget = CLASS_MAGIC_RESTRICTIONS[className].maxSkills;
+  basics.forEach((b, i) => {
+    if (i >= basicBudget) { b.handling = 'over_budget'; b.note = `學習上限 ${basicBudget} 個`; }
+  });
+  items.push(...basics);
+
+  const winners = new Map<string, SkillPlanItem>();
+  for (const i of items.filter(x => x.handling === 'precombat')) {
+    const category = i.skill.buffCategory ?? i.skill.id;
+    const cur = winners.get(category);
+    if (!cur || i.skill.level > cur.skill.level) winners.set(category, i);
+  }
+  for (const i of items.filter(x => x.handling === 'precombat')) {
+    const winner = winners.get(i.skill.buffCategory ?? i.skill.id)!;
+    if (winner !== i) { i.handling = 'superseded'; i.note = `被${winner.skill.name}覆蓋（同 category）`; }
+  }
+
+  const speedSkills = items.filter(x => x.handling === 'speed').sort((a, b) => speedPercentOf(b.skill) - speedPercentOf(a.skill));
+  const bestSpeedSkill = speedSkills[0];
+  const useSkillSpeed = !!bestSpeedSkill && speedPercentOf(bestSpeedSkill.skill) >= SPEED_POTION_ATTACK_SPEED_PERCENT;
+  for (const s of speedSkills) {
+    if (!useSkillSpeed || s !== bestSpeedSkill) {
+      s.handling = 'superseded';
+      s.note = `被${useSkillSpeed ? bestSpeedSkill.skill.name : SPEED_POTION_NAME}覆蓋（同 category）`;
+    }
+  }
+  const speed = useSkillSpeed
+    ? { name: bestSpeedSkill.skill.name, effect: makeBuff(bestSpeedSkill.skill.name, SPEED_CATEGORY, bestSpeedSkill.skill.buffModifiers!) }
+    : { name: SPEED_POTION_NAME, effect: makeBuff(SPEED_POTION_NAME, SPEED_CATEGORY, [{ stat: 'attack_speed', value: SPEED_POTION_ATTACK_SPEED_PERCENT, isPercent: true }]) };
+
+  const precombatItems = items.filter(x => x.handling === 'precombat');
+  const precombat = precombatItems.map(i => makeBuff(i.skill.name, i.skill.buffCategory ?? i.skill.id, i.skill.buffModifiers ?? []));
+  const poison = precombatItems.find(i => i.skill.onHitDebuff?.dotDamagePercent)?.skill.onHitDebuff;
+  const onHitDot = poison
+    ? { category: poison.category, percent: poison.dotDamagePercent!, interval: poison.dotInterval ?? DOT_TICK_MS, duration: poison.dotDuration ?? 5000 }
+    : null;
+
+  // 短效 buff 由等級高者先放（強化冷卻縮減先於冷卻縮減）；校準對 buff 之間維持這個順序
+  const rotationItems = items.filter(x => x.handling === 'rotation');
+  const rotation = [
+    ...rotationItems.filter(x => x.skill.type === 'buff').sort((a, b) => b.skill.level - a.skill.level),
+    ...rotationItems.filter(x => x.skill.type !== 'buff'),
+  ];
+
+  return { items, precombat, speed, rotation, onHitDot };
+}
+
+const SKILL_PLANS = new Map<ClassName, ClassSkillPlan>();
+function getSkillPlan(className: ClassName): ClassSkillPlan {
+  let plan = SKILL_PLANS.get(className);
+  if (!plan) { plan = buildSkillPlan(className); SKILL_PLANS.set(className, plan); }
+  return plan;
+}
+
+/** 戰前開好的長效 buff（每次回傳新陣列，呼叫端可自由 push） */
+function preCombatBuffs(className: ClassName): ActiveEffect[] {
+  return [...getSkillPlan(className).precombat];
 }
 
 // ---------------------------------------------------------------- 輪替
@@ -603,6 +749,8 @@ interface RotationEntry {
   hits?: number;
   /** § 21.4a 物理快照技能（盾擊／裂傷斬／挑釁怒吼）：基礎魔攻 + 基礎物理傷害 */
   physicalSnapshot?: boolean;
+  /** § 21.8 魔法公式的物理系技能（復仇之刃／背刺）保留爆擊 */
+  physicalDamage?: boolean;
   /** § 99.1 第 6 條：【需裝備弓】是實際限制，配裝不符時整招不可用 */
   requiredWeaponType?: string;
   /** 冷卻（ms，未套 CDR） */
@@ -615,16 +763,16 @@ interface RotationEntry {
   selfBuff?: { category: string; modifiers: StatModifier[]; duration: number };
   /** 施放後給怪的 DoT（裂傷斬流血），比例乘 calculateBasePhysicalDamage */
   dot?: { category: string; percent: number; interval: number; duration: number };
+  /** 命中後給怪的降防 debuff（詛咒／護甲崩壞／極冰封印），同 category 覆蓋並刷新 */
+  debuff?: { category: string; modifiers: StatModifier[]; duration: number };
+  /** 校準結果：直接傷害本身就勝過普攻，debuff 還掛著時照樣施放 */
+  debuffRecast?: boolean;
+  /** 校準結果：價值全在降防（直接傷害不如普攻），由 runScenario 試算放與不放 */
+  debuffOnly?: boolean;
   /** 純 buff 類（元素增幅／強化冷卻縮減／致命一擊） */
   buff?: { category: string; modifiers: StatModifier[]; duration: number };
   /** true = 基礎魔法，false = 職業魔法（決定套用哪個威力倍率） */
   isBasicMagic?: boolean;
-}
-
-function classSkill(id: string): Omit<Skill, 'lastUsedAt'> {
-  const s = CLASS_SKILLS.find(k => k.id === id);
-  if (!s) throw new Error(`找不到職業魔法：${id}`);
-  return s.skill;
 }
 
 /** § 99.1 第 6 條：配裝是否滿足技能的武器需求 */
@@ -632,10 +780,10 @@ function meetsWeaponRequirement(e: RotationEntry, loadout: Loadout): boolean {
   return !e.requiredWeaponType || loadout.weapon?.type === e.requiredWeaponType;
 }
 
-function magicEntry(s: Omit<Skill, 'lastUsedAt'>, isBasicMagic = false): RotationEntry {
+function magicEntry(s: SkillDef, isBasicMagic = false): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill', isBasicMagic,
-    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot,
+    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot, physicalDamage: s.physicalDamage,
     requiredWeaponType: s.requiredWeaponType,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
@@ -644,98 +792,41 @@ function magicEntry(s: Omit<Skill, 'lastUsedAt'>, isBasicMagic = false): Rotatio
   };
 }
 
-/**
- * 基礎魔法學習上限（skillRestrictions.ts）：
- *   騎士 1 級 / 盜賊 4 級 / 妖精 6 級 / 元素師 10 級 / 牧師 10 級
- * 學習次數：騎士 Lv50 起最多 5 個、妖精 floor(75/8)=9、盜賊 9、元素師 floor(75/4)=18、牧師 floor(75/5)=15
- */
-const BASIC_MAGIC_BUDGET: Record<ClassName, number> = {
-  knight: 5, elf: 9, thief: 9, elementalist: 18, priest: 15,
-};
+/** 盤點結果中「輪替」的技能 → 輪替項目。DoT／降防／自身增益一律讀技能定義（§ 44.9） */
+function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance): RotationEntry {
+  const s = item.skill;
+  if (s.type === 'buff') {
+    return {
+      id: s.id, name: s.name, kind: 'self_buff', cooldown: s.cooldown, mpCost: s.mpCost,
+      buff: { category: s.buffCategory ?? s.id, duration: s.buffDuration!, modifiers: s.buffModifiers! },
+    };
+  }
+  if (s.hits && s.hits > 1) {
+    return {
+      id: s.id, name: s.name, kind: 'physical_skill', hits: s.hits, cooldown: s.cooldown, mpCost: s.mpCost,
+      requiredWeaponType: s.requiredWeaponType, ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
+    };
+  }
+  const e = magicEntry(s, item.isBasicMagic);
+  const d = s.applyDebuff;
+  if (d?.dotDamagePercent) {
+    e.dot = {
+      category: d.category,
+      percent: resolveDotDamagePercent(d, weapon.isTwoHanded)!,
+      interval: d.dotInterval ?? DOT_TICK_MS,
+      duration: d.dotDuration ?? 5000,
+    };
+  } else if (d && lowersMonsterDefense(s) && !NO_SKILL_DEBUFF) {
+    e.debuff = { category: d.category, modifiers: d.modifiers!, duration: d.duration! };
+  }
+  if (s.selfBuff?.modifiers?.length) {
+    e.selfBuff = { category: s.selfBuff.category, modifiers: s.selfBuff.modifiers, duration: s.selfBuff.duration };
+  }
+  return e;
+}
 
 function buildRotation(className: ClassName, weapon: EquipmentInstance): RotationEntry[] {
-  const r: RotationEntry[] = [];
-
-  if (className === 'knight') {
-    const vengeance = classSkill('vengeance');
-    r.push({
-      ...magicEntry(vengeance),
-      // scaleByMissingHp：打木樁不掉血 → 加成 0%，不施加 buff（arpgEventHandler.ts:48-53）
-    });
-    const rend = classSkill('rend');
-    // DoT 一律讀技能定義（§ 44.9「腳本裡不得有任何手抄數字」）——
-    // 這裡原本寫死 percent 0.5，改了 `classSkills.ts` 的流血比例後量到的仍是舊值
-    const bleed = rend.applyDebuff!;
-    r.push({
-      ...magicEntry(rend),
-      dot: {
-        category: bleed.category,
-        percent: resolveDotDamagePercent(bleed, weapon.isTwoHanded)!,
-        interval: bleed.dotInterval!,
-        duration: bleed.dotDuration!,
-      },
-    });
-    r.push(magicEntry(classSkill('shield-bash')));
-    r.push(magicEntry(classSkill('taunt')));
-  }
-
-  if (className === 'elf') {
-    const triple = classSkill('triple-shot');
-    r.push({ id: triple.id, name: triple.name, kind: 'physical_skill', hits: triple.hits, cooldown: triple.cooldown, mpCost: triple.mpCost, requiredWeaponType: triple.requiredWeaponType });
-    r.push(magicEntry(classSkill('arrow-rain')));
-  }
-
-  if (className === 'thief') {
-    const backstab = classSkill('backstab');
-    r.push({
-      ...magicEntry(backstab),
-      selfBuff: { category: 'backstab', duration: 5000, modifiers: [{ stat: 'attack_power', value: 50, isPercent: true }] },
-    });
-    const deadly = classSkill('deadly-strike');
-    r.push({
-      id: deadly.id, name: deadly.name, kind: 'self_buff', cooldown: deadly.cooldown, mpCost: deadly.mpCost,
-      buff: { category: 'crit-buff', duration: deadly.buffDuration!, modifiers: deadly.buffModifiers! },
-    });
-  }
-
-  if (className === 'elementalist') {
-    const boost = classSkill('element-boost');
-    r.push({
-      id: boost.id, name: boost.name, kind: 'self_buff', cooldown: boost.cooldown, mpCost: boost.mpCost,
-      buff: { category: 'element-boost', duration: boost.buffDuration!, modifiers: boost.buffModifiers! },
-    });
-    const gcd = classSkill('greater-cd-reduce');
-    r.push({
-      id: gcd.id, name: gcd.name, kind: 'self_buff', cooldown: gcd.cooldown, mpCost: gcd.mpCost,
-      buff: { category: 'cd-reduction', duration: gcd.buffDuration!, modifiers: gcd.buffModifiers! },
-    });
-    r.push(magicEntry(classSkill('element-storm')));
-    r.push(magicEntry(classSkill('mana-drain')));
-  }
-
-  if (className === 'priest') {
-    r.push(magicEntry(classSkill('holy-judgment')));
-  }
-
-  // 基礎魔法：依威力排序取到學習上限（扣掉戰前 buff 佔用的學習次數）
-  const prebuffBasics: Record<ClassName, string[]> = {
-    knight: ['bless-weapon', 'protect-shield'],
-    elf: ['haste', 'bless-magic-weapon', 'strength-boost', 'agility-boost'],
-    thief: ['agility-boost'],
-    elementalist: ['greater-haste', 'bless-magic-weapon', 'strength-boost', 'agility-boost'],
-    priest: ['greater-haste', 'bless-magic-weapon', 'strength-boost', 'agility-boost'],
-  };
-  const maxLevel: Record<ClassName, number> = { knight: 1, thief: 4, elf: 6, elementalist: 10, priest: 10 };
-  const remaining = BASIC_MAGIC_BUDGET[className] - prebuffBasics[className].length;
-
-  const attackBasics = SKILL_CATALOG
-    .filter(s => s.type === 'attack' && s.level <= maxLevel[className] && (s.power ?? 0) > 0)
-    .sort((a, b) => b.power - a.power)
-    .slice(0, Math.max(0, remaining));
-
-  for (const s of attackBasics) r.push(magicEntry(s, true));
-
-  return r;
+  return getSkillPlan(className).rotation.map(i => toRotationEntry(i, weapon));
 }
 
 // ---------------------------------------------------------------- 校準
@@ -789,12 +880,27 @@ function calibrate(
           const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, char.className), e.element!, loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
           s += r.damage;
         } else {
-          const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, char.className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+          const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, char.className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalDamage === true);
           s += r.damage;
         }
       }
       let avg = s / CALIBRATION_SAMPLES;
       let note = '';
+      if (e.debuff) {
+        // 降防的價值 = 掛載期間每次普攻的增傷 × 期間內的行動數；直接傷害本身勝過普攻時，掛著也照放
+        const debuffed = [...effects, makeMonsterDebuff(e.name, e.debuff.category, e.debuff.modifiers)];
+        let sd = 0;
+        for (let i = 0; i < CALIBRATION_SAMPLES; i++) {
+          const r = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, debuffed, 0);
+          sd += r.hit ? r.damage : 0;
+        }
+        const gainPerAction = sd / CALIBRATION_SAMPLES - normalAvg;
+        const actions = Math.floor(e.debuff.duration / getPlayerAttackInterval(loadout.gear, effects));
+        e.debuffRecast = avg > normalAvg;
+        e.debuffOnly = !e.debuffRecast;
+        note = `直接 ${avg.toFixed(1)}＋降防 ${gainPerAction.toFixed(1)}×${actions}`;
+        avg += gainPerAction * actions;
+      }
       if (e.dot) {
         // DoT 直接扣血、不吃防禦（PixiGame.tsx:610），快照制
         const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
@@ -818,10 +924,18 @@ function calibrate(
       if (b.mpDrainRatio != null && a.mpDrainRatio == null) return -1;
       if (a.kind === 'self_buff' && b.kind !== 'self_buff') return -1;
       if (b.kind === 'self_buff' && a.kind !== 'self_buff') return 1;
+      if (a.kind === 'self_buff' && b.kind === 'self_buff') return 0;
       return (scoreOf.get(b.name) ?? 0) - (scoreOf.get(a.name) ?? 0);
     });
 
-  return { order, scores: scores.sort((a, b) => b.avg - a.avg) };
+  // 每招技能佔一格戰鬥天賦（`51-auto-talent.md` § 51.3.4 同類型最多 TALENT_INSTALL_MAX 格）；回魔技保留一格
+  const drain = order.filter(e => e.mpDrainRatio != null);
+  const capped = [
+    ...order.filter(e => e.mpDrainRatio == null).slice(0, TALENT_INSTALL_MAX - drain.length),
+    ...drain,
+  ];
+
+  return { order: capped, scores: scores.sort((a, b) => b.avg - a.avg) };
 }
 
 // ---------------------------------------------------------------- 模擬
@@ -848,6 +962,7 @@ function simulateOnce(
   effInt: number,
 ): number {
   const monster = makeReaper();
+  const onHitDot = getSkillPlan(char.className).onHitDot;
   const effects: ActiveEffect[] = [...baseEffects];
   const timedEffects: { effect: ActiveEffect; expiresAt: number }[] = [];
   const cooldowns: Record<string, number> = {};
@@ -885,12 +1000,10 @@ function simulateOnce(
         if (Math.random() * 100 < AFFIX_DEBUFF_CHANCE) triggered = true;
       }
       if (!triggered) continue;
-      addTimed({
-        id: DEFENSE_DOWN_CATEGORY, sourceSkillId: 'defense_down', sourceSkillName: '防禦下降',
-        category: DEFENSE_DOWN_CATEGORY, type: 'debuff', target: 'monster', targetIdx: 0,
-        modifiers: [{ stat: 'defense', value: -proc.value, isPercent: true }],
-        startTime: 0, duration: Number.MAX_SAFE_INTEGER, tags: [], name: '防禦下降', description: '',
-      }, AFFIX_DEBUFF_DURATION_MS);
+      addTimed(
+        makeMonsterDebuff('防禦下降', DEFENSE_DOWN_CATEGORY, [{ stat: 'defense', value: -proc.value, isPercent: true }]),
+        AFFIX_DEBUFF_DURATION_MS,
+      );
     }
   }
   /** § 7T.4 追加傷害：每下命中 20% 機率，加在最終傷害 */
@@ -980,6 +1093,10 @@ function simulateOnce(
         // § 24.3.2 DoT 存續期間不重複施加 —— 流血還在就不用這招
         return !dots.some(d => d.category === e.dot!.category);
       }
+      if (e.debuff && !e.debuffRecast) {
+        // 價值全在降防的技能：同 category 還掛著就不放
+        return !effects.some(x => x.target === 'monster' && x.category === e.debuff!.category);
+      }
       return true;
     });
 
@@ -1001,14 +1118,14 @@ function simulateOnce(
         applyDamage(res.damage + rollBonus(res.hits.filter(h => !h.isMiss).length));
         tryErosion(now, erosionRolls);
         tryDefenseDown(erosionRolls);
-        // 淬毒：普攻命中觸發毒 DoT（快照制、存續期間不刷新）
-        if (char.className === 'thief' && !dots.some(d => d.category === 'poisoned')) {
+        // 淬毒：普攻命中觸發毒 DoT（快照制、存續期間不刷新），比例讀技能定義
+        if (onHitDot && !dots.some(d => d.category === onHitDot.category)) {
           const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
           dots.push({
-            category: 'poisoned',
-            damage: Math.max(1, Math.floor(base * 0.3)),
-            nextTick: now + DOT_TICK_MS,
-            expiresAt: now + 5000,
+            category: onHitDot.category,
+            damage: Math.max(1, Math.floor(base * onHitDot.percent)),
+            nextTick: now + onHitDot.interval,
+            expiresAt: now + onHitDot.duration,
           });
         }
       } else {
@@ -1058,7 +1175,7 @@ function simulateOnce(
           )
         : calculateSkillAttack(
             char, ruledSkillPower(entry, effInt, char.className), entry.element!, monster, loadout.gear, entry.name, effects, 0,
-            entry.ignoreDefensePercent ?? 0,
+            entry.ignoreDefensePercent ?? 0, undefined, entry.physicalDamage === true,
           );
       stats.hits++;
       if (res.isCritical) stats.crits++;
@@ -1068,6 +1185,10 @@ function simulateOnce(
       // 魔力奪取：回復等同最終傷害的 MP（combat.ts:609 calculateMpRestored）
       if (mp.enabled && entry.mpDrainRatio) {
         currentMp = Math.min(mp.maxMp, currentMp + Math.floor(res.damage * entry.mpDrainRatio));
+      }
+      // § 24.3.1 數值型 debuff：命中後施加，同 category 覆蓋並刷新時間
+      if (entry.debuff) {
+        addTimed(makeMonsterDebuff(entry.name, entry.debuff.category, entry.debuff.modifiers), entry.debuff.duration);
       }
       if (entry.dot && !dots.some(d => d.category === entry.dot!.category)) {
         const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
@@ -1114,6 +1235,12 @@ interface ScenarioReport {
   actionMix: [string, number][];
   derived: Record<string, number | string>;
   scores: ActionScore[];
+  /** 實際進輪替的降防技能 */
+  debuffSkillsUsed: string[];
+  /** 試算後不放的降防技能（佔行動或 MP 得不償失） */
+  debuffSkillsDropped: string[];
+  /** 輪替佔用的戰鬥天賦格數 */
+  combatSlots: number;
 }
 
 /**
@@ -1138,19 +1265,48 @@ function runScenario(
   const char = buildCharacter(className);
   const candidates = buildRotation(className, loadout.weapon);
   const effects = preCombatBuffs(className);
-  const speed = SPEED_SOURCE[className];
-  if (withSpeed) {
-    effects.push(makeBuff(speed.name, 'speed', [{ stat: 'attack_speed', value: speed.percent, isPercent: true }]));
-  }
+  const speed = getSkillPlan(className).speed;
+  if (withSpeed) effects.push(speed.effect);
   loadout = resolveLoadout(char, effects, loadout);
 
   const effInt = designEffectiveInt(className, loadout.gear);
-  const { order: rotation, scores } = calibrate(char, loadout, candidates, effects, effInt, seed + 500_000);
+  const { order: calibrated, scores } = calibrate(char, loadout, candidates, effects, effInt, seed + 500_000);
 
   const maxMp = effectiveMaxMp(char, loadout.gear);
   // regen.ts：戰鬥中回魔減半，每 MP_REGEN_INTERVAL_MS 一次
   const regenPerTick = getMpRegen(char, true, loadout.gear, effects);
   const mp: MpModel = { enabled: mpEnabled, maxMp, regenPerTick };
+
+  /*
+   * 價值全在降防的技能要佔一次行動、花 MP —— 放不放由實測決定：
+   * 每種取捨組合以同一顆種子各跑 RUNS/5 次，取平均擊殺最快者
+   */
+  const debuffOnly = calibrated.filter(e => e.debuffOnly);
+  let rotation = calibrated;
+  if (debuffOnly.length > 0) {
+    const probeRuns = Math.max(20, Math.floor(RUNS / 5));
+    let bestMean = Infinity;
+    for (const subset of chooseAll(debuffOnly)) {
+      const rot = calibrated.filter(e => !e.debuffOnly || subset.includes(e));
+      const probeStats: SimStats = {
+        totalDamage: 0, hits: 0, misses: 0, crits: 0,
+        physHits: 0, physMisses: 0, mpSpent: 0, mpStarvedActions: 0,
+      };
+      let sum = 0;
+      let n = 0;
+      withSeed(seed + 900_000, () => {
+        for (let i = 0; i < probeRuns; i++) {
+          const t = simulateOnce(char, loadout, rot, effects, {}, probeStats, mp, effInt);
+          if (!Number.isNaN(t)) { sum += t; n++; }
+        }
+      });
+      const m = n > 0 ? sum / n : Infinity;
+      if (m < bestMean) { bestMean = m; rotation = rot; }
+    }
+  }
+  const debuffSkillsUsed = rotation.filter(e => e.debuff).map(e => e.name);
+  const combatSlots = rotation.length;
+  const debuffSkillsDropped = debuffOnly.filter(e => !rotation.includes(e)).map(e => e.name);
 
   const actionCounts: Record<string, number> = {};
   const stats: SimStats = {
@@ -1216,6 +1372,9 @@ function runScenario(
     actionMix,
     derived,
     scores,
+    debuffSkillsUsed,
+    debuffSkillsDropped,
+    combatSlots,
   };
 }
 
@@ -1245,6 +1404,11 @@ const SEED_AFFIXES: Record<ClassName, AffixType[]> = {
   elementalist: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'],
   priest: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'],
 };
+
+/** 所有子集合（含空集合） */
+function chooseAll<T>(arr: T[]): T[][] {
+  return arr.reduce<T[][]>((acc, x) => acc.concat(acc.map(sub => [...sub, x])), [[]]);
+}
 
 function chooseK<T>(arr: T[], k: number, from = 0): T[][] {
   if (k === 0) return [[]];
@@ -1310,7 +1474,7 @@ function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number): numb
             const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
             s += r.damage + bonusPerHit;
           } else {
-            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalDamage === true);
             s += r.damage + bonusPerHit;
           }
         }
@@ -1336,12 +1500,10 @@ function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number): numb
   const defenseDown = getWeaponDebuffAffixes(loadout.weapon.affixes, loadout.weapon.quality ?? 0)
     .find(d => d.type === 'defense_down');
   if (defenseDown) {
-    const debuffed = rotationAction([...effects, {
-      id: DEFENSE_DOWN_CATEGORY, sourceSkillId: 'defense_down', sourceSkillName: '防禦下降',
-      category: DEFENSE_DOWN_CATEGORY, type: 'debuff', target: 'monster', targetIdx: 0,
-      modifiers: [{ stat: 'defense', value: -defenseDown.value, isPercent: true }],
-      startTime: 0, duration: Number.MAX_SAFE_INTEGER, tags: [], name: '防禦下降', description: '',
-    }]);
+    const debuffed = rotationAction([
+      ...effects,
+      makeMonsterDebuff('防禦下降', DEFENSE_DOWN_CATEGORY, [{ stat: 'defense', value: -defenseDown.value, isPercent: true }]),
+    ]);
     const rollsInWindow = plain.rolls * AFFIX_DEBUFF_DURATION_MS / intervalMs;
     const uptime = 1 - Math.pow(1 - AFFIX_DEBUFF_CHANCE / 100, rollsInWindow);
     best = (1 - uptime) * plain.damage + uptime * debuffed.damage;
@@ -1434,6 +1596,18 @@ for (const cn of TARGET_CLASSES) {
 if (MISSING.length > 0) console.log(`\n⚠️ 缺件：${[...new Set(MISSING)].join('、')}`);
 console.log('');
 
+console.log('## 技能盤點（Lv.75 學得到的全部技能）\n');
+for (const cn of TARGET_CLASSES) {
+  const plan = getSkillPlan(cn);
+  console.log(`### ${CLASS_NAMES_ZH[cn]}（加速來源：${plan.speed.name}）\n`);
+  console.log('| 技能 | 來源 | 類型 | 處理 | 說明 |');
+  console.log('|---|---|---|---|---|');
+  for (const i of plan.items) {
+    console.log(`| ${i.skill.name} | ${i.source} | ${i.skill.type} | ${HANDLING_LABEL[i.handling]} | ${i.note || '—'} |`);
+  }
+  console.log('');
+}
+
 // ---------------------------------------------------------------- 執行
 
 function fmt(n: number, d = 1): string {
@@ -1445,6 +1619,7 @@ console.log(`# Lv.75 滿裝 vs 百柱死神 — ${RUNS.toLocaleString()} 次模�
 console.log(`目標：${REAPER_SEED.name} Lv.${REAPER_SEED.level} HP ${REAPER_SEED.hp} 防禦 ${REAPER_SEED.defense}`
   + `（減傷 ${Math.min(REAPER_SEED.defense, 75)}%）${REAPER_SEED.race}/${REAPER_SEED.size}/${REAPER_SEED.element}`);
 console.log(`屬性預算：${ATTRIBUTE_CAP_NOTE}`);
+if (NO_SKILL_DEBUFF) console.log('技能降防：**關閉**（--no-skill-debuff）');
 console.log(`元素侵蝕每跳傷害：**${EROSION_MODE === 'max' ? '完美 roll' : EROSION_MODE === 'low' ? '範圍下緣' : '範圍期望值'}**（--erosion=${EROSION_MODE}）`);
 console.log(`規則組：**${RULES.label}**（--rules=${RULES.name}）`
   + ` — INT 每 2 點 +${RULES.intDamagePer2}% 技能威力 / +${RULES.intCdrPer2}% 冷卻縮減；`
@@ -1491,6 +1666,13 @@ for (const r of ordered) {
     + `| ${fmt(r.dps)} | ${fmt(slowest / r.mean, 2)}x | ${fmt(r.mpStarvedPercent)}% |`);
 }
 
+console.log('\n## 各職業最佳解的行動分佈（計入 MP）\n');
+for (const r of ordered) {
+  console.log(`- ${CLASS_NAMES_ZH[r.className]}（戰鬥天賦 ${r.combatSlots} 格）：${r.actionMix.map(([k, v]) => `${k} ${v}%`).join('、')}`
+    + `${r.debuffSkillsUsed.length ? `｜降防進輪替：${r.debuffSkillsUsed.join('、')}` : ''}`
+    + `${r.debuffSkillsDropped.length ? `｜試算後不放：${r.debuffSkillsDropped.join('、')}` : ''}`);
+}
+
 console.log('\n## 各配置衍生數值與行動分佈（計入 MP）\n');
 for (const { limited: r } of pairs) {
   if (r.speedLabel === '無加速') continue;
@@ -1500,6 +1682,10 @@ for (const { limited: r } of pairs) {
   console.log('單次期望傷害（校準用，> 普通攻擊者才進輪替）：'
     + r.scores.filter(s => Number.isFinite(s.avg))
       .map(s => `${s.name} ${fmt(s.avg)}${s.note ? `（${s.note}）` : ''}`).join('、'));
+  console.log(`戰鬥天賦：${r.combatSlots}／${TALENT_INSTALL_MAX} 格`);
   console.log('實際行動分佈：' + r.actionMix.map(([k, v]) => `${k} ${v}%`).join('、'));
+  if (r.debuffSkillsUsed.length || r.debuffSkillsDropped.length) {
+    console.log(`降防技能：進輪替 ${r.debuffSkillsUsed.join('、') || '—'}／試算後不放 ${r.debuffSkillsDropped.join('、') || '—'}`);
+  }
   console.log('');
 }

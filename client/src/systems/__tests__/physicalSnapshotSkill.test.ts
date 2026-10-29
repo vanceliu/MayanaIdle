@@ -53,7 +53,7 @@ function book(overrides: Partial<EquipmentInstance> = {}): EquipmentInstance {
   } as EquipmentInstance;
 }
 
-/** 不暴擊 */
+/** 不暴擊；武器基傷擲出上限 */
 function noCrit() { vi.spyOn(Math, 'random').mockReturnValue(0.99); }
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -159,7 +159,8 @@ describe('§ 21.4a 結算規則', () => {
     const w = sword();
     const r = calculatePhysicalSnapshotSkill(char(), 10, 'none', w, dummy(), [w]);
     expect(r.isCritical).toBe(true);
-    expect(r.damage).toBe(62);
+    // 武器基傷 5~10 在 r=0.01 擲出 5 → 基礎物理傷害 12；(14 + 12) × 2 = 52
+    expect(r.damage).toBe(52);
     expect(r.log.type).toBe('skill_crit');
   });
 

@@ -63,7 +63,7 @@ describe('怪物 debuff seed 資料', () => {
     const rateByLevel = (level: number): number => {
       if (level >= 33 && level <= 36) return 10;
       if (level >= 38 && level <= 43) return 12;
-      if (level >= 49 && level <= 59) return 13;
+      if (level >= 49 && level <= 70) return 13;
       if (level === 80) return 15;
       throw new Error(`未定義的施法怪等級 ${level}`);
     };

@@ -22,6 +22,7 @@ import {
   getUnclampedDefense,
   BASE_CHARACTER_DEFENSE,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
+  getWeaponDamageRange,
 } from '../systems/combat';
 import { isRangedWeapon } from '../models/equipment';
 import { getEffectiveGearArray } from '../systems/gear';
@@ -74,9 +75,6 @@ export function CharacterStats() {
   // const effectiveINT = Math.floor(attrs.INT / 2) * 2;
 
   const weapon = equippedGear.rightHand;
-  const weaponSmall = weapon?.smallMonsterDamage ?? 0;
-  const weaponLarge = weapon?.largeMonsterDamage ?? 0;
-  const weaponEnhance = weapon?.enhancement ?? 0;
   const weaponExtraAttack = weapon?.extraAttack ?? 0;
 
   const bonuses = getCombatBonuses(gearList, activeEffects);
@@ -115,12 +113,17 @@ export function CharacterStats() {
   const weakenPercent = getPlayerDebuffModifier(activeEffects, 'attack');
   const flatAttackBuff = getBuffFlatBonus(activeEffects, 'extra_attack')
     + getRangedAttackBonus(weapon ?? null, activeEffects);
-  const applyAtk = (base: number) => Math.max(1, Math.floor(
-    Math.floor((base + weaponEnhance + weaponExtraAttack + flatAttackBuff + attackAttrBonus) * (1 + attackPower / 100))
+  const applyAtk = (weaponDamage: number) => Math.max(1, Math.floor(
+    Math.floor((weaponDamage + weaponExtraAttack + flatAttackBuff + attackAttrBonus) * (1 + attackPower / 100))
     * (100 + weakenPercent) / 100
   ));
-  const physicalSmall = applyAtk(weaponSmall);
-  const physicalLarge = applyAtk(weaponLarge);
+  // 武器基傷每下在 floor(W/2)~W 擲骰（§ 21.3），面板顯示整段範圍
+  const physicalRange = (basis: 'small' | 'large') => {
+    const { min, max } = getWeaponDamageRange(weapon ?? null, basis);
+    return `${applyAtk(min)}~${applyAtk(max)}`;
+  };
+  const physicalSmall = physicalRange('small');
+  const physicalLarge = physicalRange('large');
 
   // 減傷率：防禦減傷與 buff 減傷類間乘算（§ 21.5）
   const defenseReduction = Math.min(totalDefense, 75);
@@ -162,8 +165,8 @@ export function CharacterStats() {
 
         <div className="stat-group">
           <div className="stat-group-title">攻擊</div>
-          <StatRow label="物理(小怪)" value={physicalSmall} tip={{ desc: '對「小型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器小怪基傷 + 強化等級 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)`, note: '怪物體型分小型/大型，武器對兩者的基傷不同' }} />
-          <StatRow label="物理(大怪)" value={physicalLarge} tip={{ desc: '對「大型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器大怪基傷 + 強化等級 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)` }} />
+          <StatRow label="物理(小怪)" value={physicalSmall} tip={{ desc: '對「小型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器基傷 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)；武器基傷 = (小怪白字 + 強化) 的 1/2 ~ 全值`, note: '怪物體型分小型/大型，武器對兩者的基傷不同' }} />
+          <StatRow label="物理(大怪)" value={physicalLarge} tip={{ desc: '對「大型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器基傷 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)；武器基傷 = (大怪白字 + 強化) 的 1/2 ~ 全值` }} />
           <StatRow label="普攻元素" value={<>+{attackElemental}%</>} tip={{ desc: '普通攻擊的元素傷害加成，來自裝備詞綴。', formula: '所有「元素刻印」詞綴加總', note: '只在武器帶元素屬性（或火矢附魔生效）時才計入' }} />
           <StatRow label="技能元素" value={<>+{skillElemental}%</>} tip={{ desc: '元素技能的傷害加成，來自裝備詞綴與 buff。', formula: '「技能元素傷害」詞綴 + 元素增幅等 buff', note: '只對有元素屬性的技能生效' }} />
           <StatRow label="攻速加成" value={<>{attackSpeed >= 0 ? '+' : ''}{attackSpeed}%</>} tip={{ desc: '縮短普攻間隔。負值代表被減速。', formula: '攻擊間隔 = 1200ms / (1 + 攻速%)', note: '加速 buff 與減速 debuff 的百分比先相加再換算' }} />
@@ -183,7 +186,7 @@ export function CharacterStats() {
 
         <div className="stat-group">
           <div className="stat-group-title">爆擊</div>
-          <StatRow label="爆擊率" value={<>{critRate}%</>} tip={{ desc: '普攻與技能造成暴擊的機率。', formula: '基礎 5% + 爆擊率詞綴 + 精準打擊等 buff', note: '上限 75%，已包含在顯示值內' }} />
+          <StatRow label="爆擊率" value={<>{critRate}%</>} tip={{ desc: '普攻與物理系技能造成暴擊的機率。魔法技能不會爆擊（復仇之刃、背刺例外）。', formula: '基礎 5% + 爆擊率詞綴 + 精準打擊等 buff', note: '上限 75%，已包含在顯示值內' }} />
           <StatRow label="爆擊傷害" value={<>{critDamage}%</>} tip={{ desc: '暴擊時的傷害倍率。200% 代表兩倍傷害。', formula: '基礎 200% + 爆擊傷害詞綴 + 致命一擊等 buff', note: '在防禦減傷「之前」套用' }} />
         </div>
 

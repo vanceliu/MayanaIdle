@@ -381,6 +381,7 @@ export function processPlayerAttack(
           targetIdx,
           skill.ignoreDefensePercent ?? 0,
           targetId,
+          skill.physicalDamage === true,
         );
         damage = result.damage;
         isCrit = result.isCritical;
@@ -671,7 +672,7 @@ export function processPlayerAttack(
           } else if (debuffDef.stun && debuffDef.duration) {
             // 控場 debuff（§ 24.5.1）
             const stunDuration = resolveDebuffDuration(debuffDef, isShieldEquipped(equippedGear)) ?? debuffDef.duration;
-            // § 24.6：Boss 被控場後 30 秒內免疫任何控場效果
+            // § 24.6：Boss 被控場後 10 秒內免疫任何控場效果
             if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
               logs.push({ text: `${monster.name} 免疫控場！`, type: 'debuff-enemy' });
             } else {

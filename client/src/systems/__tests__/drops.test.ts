@@ -188,7 +188,7 @@ describe('drops system', () => {
             { area: 'hundred-pillar-1-10f', itemType: 'item', itemTemplateId: 135, dropValue: 50, minAmount: 1, maxAmount: 1 },
           ] as never);
 
-      const result = await rollDrops('hundred-pillar-1-10f', 1, undefined, false, 52);
+      const result = await rollDrops('hundred-pillar-1-10f', 1, undefined, false, 56);
       const scroll = result.items.find(item => item.itemTemplateId === 135);
 
       expect(scroll).toMatchObject({
@@ -319,12 +319,12 @@ describe('rollBossDrops', () => {
         ] as never);
 
     // Without bonus: roll=80, dropValue=80 → 80 >= 80 → no drop
-    const resultNoBonus = await rollBossDrops('遠古騎士', 1, 60);
+    const resultNoBonus = await rollBossDrops('遠古騎士', 1, 65);
     expect(resultNoBonus.items).toHaveLength(0);
 
     // With bonus: dropValue boosted to 80*1.5=120 → 80 < 120 → drop
     vi.spyOn(Math, 'random').mockReturnValue(0.08);
-    const resultWithBonus = await rollBossDrops('遠古騎士', 1, 60, { drop_rate: 50, gold_rate: 0 });
+    const resultWithBonus = await rollBossDrops('遠古騎士', 1, 65, { drop_rate: 50, gold_rate: 0 });
     expect(resultWithBonus.items).toHaveLength(1);
     expect(resultWithBonus.items[0].name).toBe('米索利碎片');
   });

@@ -5,11 +5,12 @@ import {
   isTierlessAffixType,
   SHOP_MAX_AFFIX_TIER,
   DEFAULT_MAX_AFFIX_TIER,
-  CRAFT_MAX_AFFIX_TIER,
+  CRAFT_AFFIX_TIER_RANGE,
   getTierWeights,
   getBossTierWeights,
   rollAffixTier,
 } from '../affix';
+import { generateCraftAffixes } from '../../systems/crafting';
 
 /**
  * 商店裝的詞綴 Tier 上限（`06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2）。
@@ -111,31 +112,38 @@ describe('詞綴強化上限', () => {
   });
 });
 
-describe('製作品的詞綴上限（§ 6A.6）', () => {
-  /**
-   * 製作版與掉落版的差別完全在詞綴：模板素質相同，
-   * 但掉落版可以帶 T6/T7 與特殊詞綴，製作版最高 T5、且不會有特殊詞綴。
-   * T6 開放部分製作之後這條差異仍成立（`06-equipment-acquire.md` § 6A.1）。
-   */
-  it('製作品的詞綴不超過 T5，也不會出特殊詞綴', () => {
-    for (let i = 0; i < 300; i++) {
-      const affixes = generateAffixes('weapon', 60, 4, false, {
-        maxTier: CRAFT_MAX_AFFIX_TIER, uniformTier: true, noSpecialAffix: true,
-      });
-      for (const a of affixes) {
-        expect(isSpecialAffixType(a.type), a.type).toBe(false);
-        expect(a.tier).toBeGreaterThanOrEqual(1);
-        expect(a.tier).toBeLessThanOrEqual(CRAFT_MAX_AFFIX_TIER);
+describe('製作品的詞綴 Tier 範圍（§ 6A.6）', () => {
+  const EXPECTED: Record<number, [number, number]> = { 4: [1, 5], 5: [2, 6], 6: [3, 6] };
+
+  for (const [tier, [min, max]] of Object.entries(EXPECTED)) {
+    it(`T${tier} 製作品：固定 4 條、Tier 均等落在 T${min}~T${max}、不出特殊詞綴`, () => {
+      expect(CRAFT_AFFIX_TIER_RANGE[Number(tier)]).toEqual({ min, max });
+      const seen = new Set<number>();
+      for (let i = 0; i < 400; i++) {
+        const affixes = generateCraftAffixes('weapon', { tier: Number(tier), smallMonsterDamage: 10, largeMonsterDamage: 10 });
+        expect(affixes).toHaveLength(4);
+        for (const a of affixes) {
+          expect(isSpecialAffixType(a.type), a.type).toBe(false);
+          if (isTierlessAffixType(a.type)) continue;
+          expect(a.tier).toBeGreaterThanOrEqual(min);
+          expect(a.tier).toBeLessThanOrEqual(max);
+          seen.add(a.tier);
+        }
       }
-    }
+      expect([...seen].sort()).toEqual(Array.from({ length: max - min + 1 }, (_, k) => min + k));
+    });
+  }
+
+  it('沒有製作範圍的階級直接報錯', () => {
+    expect(() => generateCraftAffixes('weapon', { tier: 3 })).toThrow();
   });
 
-  it('掉落品可以超過 T5（同一支產生器，只是不帶上限）', () => {
+  it('掉落品可以出到 T7（同一支產生器，不帶製作範圍）', () => {
     const tiers = new Set<number>();
     for (let i = 0; i < 500; i++) {
       for (const a of generateAffixes('weapon', 60, 4, true)) tiers.add(a.tier);
     }
-    expect([...tiers].some(t => t > CRAFT_MAX_AFFIX_TIER)).toBe(true);
+    expect(tiers.has(7)).toBe(true);
   });
 });
 

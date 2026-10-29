@@ -43,28 +43,40 @@ function weapon(overrides: Partial<EquipmentInstance> = {}): EquipmentInstance {
   };
 }
 
+/** 依序回傳指定亂數，用完後回傳 0.5 */
+function mockRandomSequence(...values: number[]) {
+  let i = 0;
+  vi.spyOn(Math, 'random').mockImplementation(() => values[i++] ?? 0.5);
+}
+
+/** 普攻亂數順序：命中 → 武器基傷擲骰 → 爆擊。0.999 擲出範圍上限 */
+const HIT_MAX_ROLL_NO_CRIT = [0.1, 0.999, 0.5];
+
 describe('武器強化基傷（06-equipment.md § 6.9）', () => {
-  it('每 +1 強化讓基礎物理傷害 +1', () => {
+  it('每 +1 強化讓基礎物理傷害上限 +1', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // 擲出範圍上限
     const c = char();
     const plain = calculateBasePhysicalDamage(c, weapon(), [weapon()], []);
     const plus6 = calculateBasePhysicalDamage(c, weapon({ enhancement: 6 }), [weapon({ enhancement: 6 })], []);
     expect(plus6 - plain).toBe(6);
   });
 
-  it('普攻對小怪的傷害隨強化等級線性提升', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5); // 命中（<95%）且不暴擊（≥5%）
+  it('普攻對小怪的傷害上限隨強化等級線性提升', () => {
     const c = char();
     const m = monster({ size: 'small', defense: 0 });
+    mockRandomSequence(...HIT_MAX_ROLL_NO_CRIT);
     const base = calculatePlayerAttack(c, weapon(), m, [weapon()]).damage;
+    mockRandomSequence(...HIT_MAX_ROLL_NO_CRIT);
     const enhanced = calculatePlayerAttack(c, weapon({ enhancement: 5 }), m, [weapon({ enhancement: 5 })]).damage;
     expect(enhanced - base).toBe(5);
   });
 
-  it('對大怪同樣每 +1 強化 +1', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  it('對大怪同樣每 +1 強化上限 +1', () => {
     const c = char();
     const m = monster({ size: 'large', defense: 0 });
+    mockRandomSequence(...HIT_MAX_ROLL_NO_CRIT);
     const base = calculatePlayerAttack(c, weapon(), m, [weapon()]).damage;
+    mockRandomSequence(...HIT_MAX_ROLL_NO_CRIT);
     const enhanced = calculatePlayerAttack(c, weapon({ enhancement: 3 }), m, [weapon({ enhancement: 3 })]).damage;
     expect(enhanced - base).toBe(3);
   });

@@ -1,3 +1,6 @@
+/** 綠色藥水／強化綠色藥水的攻速加成%（`30-items.md` § 30.4） */
+export const SPEED_POTION_ATTACK_SPEED_PERCENT = 33;
+
 export interface StatModifier {
   stat: string;
   value: number;

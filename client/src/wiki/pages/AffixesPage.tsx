@@ -8,6 +8,7 @@ import {
   isAttributeAffixType,
   isFlatAffixType,
   DEFAULT_MAX_AFFIX_TIER,
+  formatCraftAffixTierRanges,
   SHOP_MAX_AFFIX_TIER,
   getAffixPoolForSlot,
   getAffixTierTable,
@@ -27,6 +28,7 @@ import {
   SEAL_SIGIL_SUCCESS_RATE,
   MAX_SEALED_AFFIXES,
 } from '../../models/sigil';
+import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
 import '../components/WikiTable.css';
 import { UniqueAffixSection } from '../components/UniqueAffixTable';
 
@@ -213,7 +215,11 @@ export function AffixesPage() {
           </li>
           <li>所有詞綴數值皆為百分比，並受裝備品質放大：實際效果 = floor(數值 × (1 + 品質% / 100))。</li>
           <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得或突破印記，T7 只有 Boss 掉落與突破印記。</li>
-          <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過；鐵匠製作品為 T1~T{DEFAULT_MAX_AFFIX_TIER} 均等、固定 4 條、不會出特殊詞綴。</li>
+          <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過。</li>
+          <li>
+            鐵匠製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條、不會出特殊詞綴，Tier 依裝備階級均等（{formatCraftAffixTierRanges()}），
+            <strong>任何印記都不能使用</strong>。同一件模板由怪物掉落取得時沒有 {CRAFTED_GEAR_SUFFIX}，照常可用印記。
+          </li>
           <li>特殊詞綴（免疫類）佔用一般詞綴插槽，無階級、不可強化，只從高等級區域掉落。</li>
           <li>裝備階級 T7 另有第 5 條<strong>獨有詞綴</strong>，見下方〈T7 獨有詞綴〉。</li>
         </ul>
@@ -347,7 +353,7 @@ export function AffixesPage() {
             </tbody>
           </table>
         </div>
-        <p style={noteStyle}>掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴、T1~T5 均等，不會出 T6／T7。</p>
+        <p style={noteStyle}>掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴，Tier 依裝備階級均等（{formatCraftAffixTierRanges()}），不會出 T7。</p>
       </section>
 
       <section>
@@ -407,6 +413,7 @@ export function AffixesPage() {
         <p style={noteStyle}>
           印記在城鎮的<strong>印記師</strong>使用，詞綴的升階、重骰與裝備品質都在這裡，不影響強化等級（+N）；
           一次消耗印記 ×1，只有工藝印記另收 {POLISH_SIGIL_GOLD_COST.toLocaleString()}G。
+          新手裝與 {CRAFTED_GEAR_SUFFIX} 製作品不可使用任何印記。
           <br />
           升階的兩種印記在印記師是<strong>各自獨立的選項</strong>，守備範圍不重疊：
           取得管道上限以內用<strong>精鍊印記</strong>（必定成功），T5／T6 才輪到<strong>突破印記</strong>。

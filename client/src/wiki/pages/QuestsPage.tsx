@@ -136,19 +136,19 @@ export function QuestsPage() {
               <tr><td>B+ 級</td><td>雪地之主 (Lv.35)</td><td>雪原地帶深處</td></tr>
               <tr><td>A+ 級</td><td>象牙塔惡魔 (Lv.45)</td><td>象牙塔 5F</td></tr>
               <tr><td>A+ 級</td><td>安塔巨龍 (Lv.50)</td><td>龍谷地間 7F</td></tr>
-              <tr><td>A+ 級</td><td>毒之皇女 (Lv.52)</td><td>百柱塔 1-10F</td></tr>
-              <tr><td>A+ 級</td><td>哥布林之王 (Lv.52)</td><td>百柱塔 11-20F</td></tr>
-              <tr><td>A+ 級</td><td>暗影吸血鬼 (Lv.52)</td><td>百柱塔 21-30F</td></tr>
+              <tr><td>A+ 級</td><td>毒之皇女 (Lv.56)</td><td>百柱塔 1-10F</td></tr>
+              <tr><td>A+ 級</td><td>哥布林之王 (Lv.56)</td><td>百柱塔 11-20F</td></tr>
+              <tr><td>A+ 級</td><td>暗影吸血鬼 (Lv.56)</td><td>百柱塔 21-30F</td></tr>
               <tr><td>S+ 級</td><td>朦朧蛇魔 (Lv.50)</td><td>朦朧洞窟 3F</td></tr>
               <tr><td>S+ 級</td><td>深海獄王 (Lv.50)</td><td>水下監獄 4F</td></tr>
-              <tr><td>S+ 級</td><td>不死殭屍王 (Lv.57)</td><td>百柱塔 31-40F</td></tr>
-              <tr><td>S+ 級</td><td>龍王約特勒 (Lv.57)</td><td>百柱塔 41-50F</td></tr>
-              <tr><td>S+ 級</td><td>冥王哈馬斯 (Lv.57)</td><td>百柱塔 51-60F</td></tr>
-              <tr><td>S+ 級</td><td>霜凍伊莉絲 (Lv.60)</td><td>百柱塔 61-70F</td></tr>
-              <tr><td>S+ 級</td><td>熔岩伊弗利特 (Lv.60)</td><td>百柱塔 71-80F</td></tr>
-              <tr><td>S+ 級</td><td>守護者之主 (Lv.60)</td><td>百柱塔 81-90F</td></tr>
-              <tr><td>S+ 級</td><td>百柱死神 (Lv.60)</td><td>百柱塔 91-100F</td></tr>
-              <tr><td>S+ 級</td><td>遠古騎士 (Lv.60)</td><td>遠古地監 9F</td></tr>
+              <tr><td>S+ 級</td><td>不死殭屍王 (Lv.63)</td><td>百柱塔 31-40F</td></tr>
+              <tr><td>S+ 級</td><td>龍王約特勒 (Lv.63)</td><td>百柱塔 41-50F</td></tr>
+              <tr><td>S+ 級</td><td>冥王哈馬斯 (Lv.63)</td><td>百柱塔 51-60F</td></tr>
+              <tr><td>S+ 級</td><td>霜凍伊莉絲 (Lv.70)</td><td>百柱塔 61-70F</td></tr>
+              <tr><td>S+ 級</td><td>熔岩伊弗利特 (Lv.70)</td><td>百柱塔 71-80F</td></tr>
+              <tr><td>S+ 級</td><td>守護者之主 (Lv.70)</td><td>百柱塔 81-90F</td></tr>
+              <tr><td>S+ 級</td><td>百柱死神 (Lv.80)</td><td>百柱塔 91-100F</td></tr>
+              <tr><td>S+ 級</td><td>遠古騎士 (Lv.65)</td><td>遠古地監 9F</td></tr>
             </tbody>
           </table>
         </div>

@@ -745,8 +745,7 @@ Boss 層一律使用「空曠」密度，中央保留 **≥ 8×8 開闊空地**�
 
 - 仍必須通過 § 38.4 的**載入驗證**（外圍邊界、連通性、`spawnPoint`、NPC 檢查）
 - 不進 `MAP_DESIGN_PROFILES`，`validateMapSafety` 不檢查它們
-- 佈局用固定街區（中央十字大街 + 兩排房舍 + NPC 站門口），由
-  `client/scripts/makeTownMaps.mts` 產生；**改座標請改腳本後重跑**，不要手改 JSON
+- 佈局用固定街區（中央十字大街 + 兩排房舍 + NPC 站門口），以 `src/data/maps/*-town.json` 為準
 - `mapMonsterStore.spawnTick` 在 `theme === 'town'` 時直接返回，永遠不生怪
 
 ### 產出方式
@@ -769,7 +768,6 @@ Boss 層一律使用「空曠」密度，中央保留 **≥ 8×8 開闊空地**�
 | `inspectMap.mts <mapId>` | 載入驗證 + 安全檢查 + 設計指引，違規逐格標回 ASCII |
 | `repairDetours.mts <mapId>...` | 自動打通「兩格之隔要繞十幾格」的牆 |
 | `makeFallenPillars.mts <mapId> <n>` | 做出倒塌石柱，每補一格就重驗、退步就撤回 |
-| `surveyMaps.mts` | 全庫盤點 |
 | `checkSpawnRate.mts` | 各圖最壞情況的生怪失敗率 |
 
 #### 手繪時反覆踩到的坑

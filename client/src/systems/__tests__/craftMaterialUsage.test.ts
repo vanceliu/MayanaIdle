@@ -43,8 +43,8 @@ describe('craftMaterialUsage 反查', () => {
 
   it('跨階配方素材列出所有 tier，升冪不重複', () => {
     const usage = getCraftUsage(id('龍骨碎片'))!;
-    expect(usage.tiers).toEqual([4, 5, 6]);
-    expect(formatMaterialUsage(id('龍骨碎片'))).toBe('T4／T5／T6 配方');
+    expect(usage.tiers).toEqual([4, 5]);
+    expect(formatMaterialUsage(id('龍骨碎片'))).toBe('T4／T5 配方');
   });
 
   it('裝備清單依 tier 再依名稱排序，且與 seed 的實際配方相符', () => {

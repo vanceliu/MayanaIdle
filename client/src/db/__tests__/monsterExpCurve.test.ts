@@ -27,12 +27,13 @@ describe('怪物經驗曲線（`28-monster-stats.md` § 28.1）', () => {
     expect(split).toEqual([]);
   });
 
-  it('Lv60 以上經驗封頂 2,736；只有百柱塔 91~100F 超過 Lv60', () => {
+  it('Lv60 以上經驗封頂 2,736；超過 Lv60 的只有百柱塔與遠古騎士', () => {
     expect(baseExp(60)).toBe(2736);
+    expect(baseExp(70)).toBe(2736);
     expect(baseExp(80)).toBe(2736);
     const over60 = MONSTER_SEEDS.filter(m => m.level > 60);
     expect(over60.length).toBeGreaterThan(0);
-    for (const m of over60) expect(m.area, m.name).toBe('hundred-pillar-91-100f');
+    for (const m of over60.filter(m => m.name !== '遠古騎士')) expect(m.area, m.name).toMatch(/^hundred-pillar-/);
   });
 
   it('Boss 經驗倍率落在 x4.4~x6.4', () => {

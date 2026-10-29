@@ -91,6 +91,8 @@ export interface Skill {
    * 仍然必定命中，不做命中判定。目前只有盾擊／裂傷斬／挑釁怒吼。
    */
   physicalSnapshot?: boolean;
+  /** 走魔法公式但屬物理傷害（`23-class-magic.md` § 23.1.1 B 組），保留爆擊判定（`21-combat-formula.md` § 21.8） */
+  physicalDamage?: boolean;
   hotAmount?: number; // heal over time per second
   ignoreDefensePercent?: number; // 無視目標防禦的百分比（0~100）
   invincible?: boolean;

@@ -167,8 +167,8 @@ describe('裝備額外屬性在戰鬥中生效', () => {
     const plain = createItem();
     const buffed = createItem({ bonusAttributes: { STR: 2 } });
 
-    // 命中/暴擊固定：命中必中、不暴擊
-    const seq = [0, 0.99];
+    // 亂數順序：命中（必中）→ 武器基傷擲骰 → 爆擊（不暴擊）
+    const seq = [0, 0.99, 0.99];
     let i = 0;
     const orig = Math.random;
     Math.random = () => seq[i++ % seq.length];

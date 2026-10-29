@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useWeaponList, useArmorList, getWikiEquipmentPath, getEquipmentById } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
 import { getItemById } from '../../models/items';
+import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
+import { formatCraftAffixTierRanges } from '../../models/affix';
 import '../components/WikiTable.css';
 
 // `06-equipment-acquire.md` § 6A.1：製作品階級為 T4~T7（中階 T4~T5 / 高階 T6~T7）
@@ -11,6 +13,13 @@ const TIER_LABELS: Record<number, string> = {
   6: '裝備Tier 6（高階）',
   7: '裝備Tier 7（高階）',
 };
+
+const noteStyle = {
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--fs-sm)',
+  lineHeight: 1.7,
+  marginTop: 10,
+} as const;
 
 const TYPE_LABELS: Record<string, string> = {
   sword: '單手劍', dagger: '匕首', axe: '單手斧', mace: '鈍器',
@@ -41,6 +50,11 @@ export function CraftingPage() {
   return (
     <div>
       <h2 className="wiki-page-title">鐵匠鋪製作</h2>
+      <p style={noteStyle}>
+        製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條詞綴、不會出特殊詞綴，
+        Tier 依裝備階級均等（{formatCraftAffixTierRanges()}），<strong>不可使用任何印記</strong>。
+        製作不收金幣，必定成功。
+      </p>
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
           <option value="all">全部階級</option>

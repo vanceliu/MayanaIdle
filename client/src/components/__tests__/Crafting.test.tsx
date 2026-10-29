@@ -7,6 +7,7 @@ import { resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache } from '../../systems/templateSync';
 import { bagItemById } from '../../testing/bagFixtures';
 import { ATTRIBUTE_NAMES_ZH } from '../../models/attributes';
+import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
 
 /**
  * @vitest-environment jsdom
@@ -25,6 +26,8 @@ async function findRecipeTitle(name: string): Promise<HTMLElement> {
 
 /** 鋼心劍的配方是測試的固定對象；材料由 seed 決定，不寫死在測試裡（§ 6A.3 會重新分配） */
 const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
+/** 實例一律以 templateId 比對（§ 99.1 第 7 條）；製作品顯示名稱帶 `(鍛)` */
+const tid = (name: string) => EQUIPMENT_SEEDS.find(t => t.name === name)!.id!;
 const recipeBagFor = (name: string, amount: number) =>
   EQUIPMENT_SEEDS.find(t => t.name === name)!.craftMaterials!
     .map(m => bagItemById(m.itemId, amount));
@@ -197,7 +200,7 @@ describe('TownBlacksmith - Crafting', () => {
     const state = useGameStore.getState();
     // 製作不收金幣（§ 6A.3）
     expect(state.character!.gold).toBe(500000);
-    expect(state.inventory.some(i => i.name === '鋼心劍')).toBe(true);
+    expect(state.inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(true);
     for (const m of RECIPE.craftMaterials!) {
       expect(state.bagItems.find(b => b.itemId === m.itemId)?.amount, String(m.itemId)).toBe(10 - m.amount);
     }
@@ -211,7 +214,7 @@ describe('TownBlacksmith - Crafting', () => {
     fireEvent.click(enabledBtn);
 
     const state = useGameStore.getState();
-    const crafted = state.inventory.find(i => i.name === '鋼心劍')!;
+    const crafted = state.inventory.find(i => i.templateId === tid('鋼心劍'))!;
     // 素質對照 seed 而非寫死數字 —— 寫死會讓每次數值調整都要改測試，
     // 而這個測試要驗的是「製作出來的實例有正確繼承模板」，不是特定數值
     const template = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
@@ -239,7 +242,7 @@ describe('TownBlacksmith - Crafting', () => {
 
     const state = useGameStore.getState();
     expect(state.character!.gold).toBe(0);
-    expect(state.inventory.some(i => i.name === '鋼心劍')).toBe(true);
+    expect(state.inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(true);
   });
 
   it('disables craft button when not enough materials', async () => {
@@ -260,7 +263,7 @@ describe('TownBlacksmith - Crafting', () => {
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
 
-    expect(screen.getByText('製作成功！獲得 鋼心劍')).toBeDefined();
+    expect(screen.getByText(`製作成功！獲得 鋼心劍${CRAFTED_GEAR_SUFFIX}`)).toBeDefined();
   });
 
   it('製作品的安定值繼承自模板', async () => {
@@ -281,7 +284,7 @@ describe('TownBlacksmith - Crafting', () => {
 
     await waitFor(() => {
       const state = useGameStore.getState();
-      const crafted = state.inventory.find(i => i.name === '碎星劍')!;
+      const crafted = state.inventory.find(i => i.templateId === tid('碎星劍'))!;
       // 安定值已統一（武器 6／副手 4），不再有頂級 = 0 的特例；對照模板而非寫死
       const template = EQUIPMENT_SEEDS.find(t => t.name === '碎星劍')!;
       expect(crafted.stability).toBe(template.stability);
@@ -321,9 +324,9 @@ describe('TownBlacksmith - Crafting', () => {
 
     await waitFor(() => {
       const state = useGameStore.getState();
-      const crafted = state.inventory.find(i => i.name === '碎星劍');
+      const crafted = state.inventory.find(i => i.templateId === tid('碎星劍'));
       expect(crafted).toBeDefined();
-      expect(state.inventory.find(i => i.name === '霜紋劍')).toBeUndefined();
+      expect(state.inventory.find(i => i.templateId === tid('霜紋劍'))).toBeUndefined();
     });
   });
 
@@ -371,8 +374,8 @@ describe('TownBlacksmith - Crafting', () => {
 
     await waitFor(() => {
       const state = useGameStore.getState();
-      expect(state.inventory.find(i => i.name === '碎星劍')).toBeDefined();
-      expect(state.inventory.find(i => i.name === '鋼心劍（舊名）')).toBeUndefined();
+      expect(state.inventory.find(i => i.templateId === tid('碎星劍'))).toBeDefined();
+      expect(state.inventory.find(i => i.id === 9006)).toBeUndefined();
     });
   });
 
@@ -394,8 +397,8 @@ describe('TownBlacksmith - Crafting', () => {
 
     await waitFor(() => {
       const state = useGameStore.getState();
-      expect(state.inventory.find(i => i.name === '月牙雙刀')).toBeDefined();
-      expect(state.inventory.filter(i => i.name === '烈風連刃').length).toBe(1);
+      expect(state.inventory.find(i => i.templateId === tid('月牙雙刀'))).toBeDefined();
+      expect(state.inventory.filter(i => i.templateId === tid('烈風連刃')).length).toBe(1);
     });
   });
 
@@ -446,7 +449,7 @@ describe('TownBlacksmith - Crafting', () => {
       fireEvent.click(enabledBtn);
 
       await waitFor(() => {
-        expect(useGameStore.getState().inventory.some(i => i.name === '鋼心劍')).toBe(true);
+        expect(useGameStore.getState().inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(true);
       });
       expect(useGameStore.getState().craftQuests).toHaveLength(0);
     });
@@ -459,7 +462,7 @@ describe('TownBlacksmith - Crafting', () => {
       fireEvent.click(enabledBtn);
 
       await waitFor(() => {
-        expect(useGameStore.getState().inventory.some(i => i.name === '鋼心劍')).toBe(true);
+        expect(useGameStore.getState().inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(true);
       });
       expect(useGameStore.getState().craftQuests).toEqual([{ id: 'craft-999', templateId: 999 }]);
     });

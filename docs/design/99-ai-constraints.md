@@ -30,6 +30,59 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 魔法技能不爆擊（`21-combat-formula.md` § 21.4／§ 21.8／§ 21.11、`07-affix.md`、`23-class-magic.md`）
+
+規格：走魔法公式（§ 21.4，`calculateSkillAttack()`）的技能不判定爆擊、不消耗亂數；物理系技能（三連射、§ 21.4a 盾擊／裂傷斬／挑釁怒吼，整招）維持爆擊。物理職業學的基礎魔法同樣不爆擊。爆擊詞綴池不動。
+
+- [x] C1 文件：21、07、23、INDEX、Wiki `CombatPage.tsx`
+- [x] C2 `combat.ts` `calculateSkillAttack()`
+- [x] C3 測試：魔法技能亂數 0 不爆擊；三連射／盾擊仍爆擊；既有測試改寫
+- [x] C4 `npx tsc -b`、client／server／desktop vitest
+- [x] C5 重跑 `simulateReaperKill.mts`（全五職業 `--runs=600`），更新 44 表 1~4、§ 44.10
+
+### 武器基傷隨機化（`21-combat-formula.md` § 21.3／§ 21.4a／§ 21.11、`06-equipment.md` § 6.9）
+
+規格：武器基傷 = randomInt(floor(W / 2), W)，W = 白字（依體型取小怪／大怪）＋ 強化；額外攻擊等其餘加項不擲。§ 21.4a 快照的 W = floor((小怪 + 大怪) / 2) ＋ 強化，同樣擲骰；DoT 於施放時擲一次。雙持每下、三連射每箭各擲一次。未裝備武器固定 1。
+
+- [x] P1 文件：21、06、23、24、Wiki、INDEX（44 於 P5）
+- [x] P2 `combat.ts` `getWeaponDamage()`／`calculateBasePhysicalDamage()`；角色面板顯示範圍
+- [x] P3 測試：上下限、奇數捨去、強化併入、未裝備固定 1；既有測試改寫
+- [x] P4 `npx tsc -b`、client／server vitest
+- [x] P5 重跑 `simulateReaperKill.mts`／`calibrateTTK.mts`，更新 44 結果表
+
+### 百柱塔怪物強化（`28-monster-stats.md` § 28.1／§ 28.8、`09-dungeon.md`、`27-drop-table.md`）
+
+規格：1~30F Lv.50~56、31~60F Lv.56~63、61~90F Lv.63~70（段內舊等級線性對應，王＝段上限），91~100F Lv.80 不變。怪物等級上限 70（91~100F 例外）。
+小怪攻擊依 C(L) 等比（Lv.61~70：C(L) = 150 + 2.5 × (L − 60)）；HP／防禦依改動前 Lv.31~60 一般怪同級中位數等比，Lv.61~70 中位數由 Lv.60 線性接 Lv.80；經驗維持 Lv.60 封頂。同級攻擊中位數容許 ±2；百柱塔以外的怪不動（遠古騎士除外）。沉默觸發率 Lv.49~70 13%。
+王：Lv.31~63 攻擊上限 = round(C(L) × 1.3)，下限同比例；遠古騎士降為 163~195；Lv.70 王攻擊不變；HP／防禦／經驗維持對小怪與公式的現有倍率。
+金幣：1~60F 300~400、61~100F 400~500。T5／T6 掉率依新中位等級內插。
+
+- [x] H1 文件：28、27、09、04 § 4.9、30、36、INDEX
+- [x] H2 `mapData.ts` 等級；`monsterSeeds.ts` 重算（腳本）；`dropSeeds.ts` 金幣與掉率
+- [x] H3 任務／Wiki 等級文字
+- [x] H4 測試：Lv.61~70 攻擊曲線、Boss 曲線含 Lv.60~63、百柱塔等級範圍、經驗封頂適用 Lv.61~70
+- [x] H5 `npx tsc -b`、client／server vitest
+- [x] H6 遠古騎士 Lv.65（177~211，Boss 規則延伸到 Lv.65）；9F 區域等級不動；T7 門檻改 Lv.63
+
+### 製作品 (鍛)：不可用印記＋詞綴 Tier 依階級（`06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9）
+
+規格：鐵匠製作的實例帶製作標記，名稱顯示加 `(鍛)`；八種印記一律不受理（強化卷軸照常）；製作詞綴固定 4 條、均等抽：T4 製作品 T1~T5、T5 製作品 T2~T6、T6 製作品 T3~T6，不出特殊詞綴。改版前已製作的實例無標記，維持原狀。
+
+- [x] P1 文件：06-equipment-acquire、07-affix、46-sigil、13-town、18-data-schema、43-wiki、INDEX
+- [x] P2 實例欄位＋製作寫入＋詞綴 Tier 範圍
+- [x] P3 印記阻擋（client／server）＋顯示名稱 `(鍛)`
+- [x] P4 測試
+- [x] P5 `npx tsc -b`、client／server vitest
+
+### 製作材料來源區域重分配（`06-equipment-acquire.md` § 6A.3）
+
+規格：T4＝試煉高地／雪原地帶／象牙塔 1~4F／艾爾薩斯三區／瓦爾登三區／龍之谷外圍／龍之谷地表；T5＝朦朧洞窟／水下監獄／遠古戰場／遠古地監 1~5F／龍谷地監 1~7F；T6＝遠古地監 6~9F／百柱塔 1~30F／百柱塔 31~60F，每 3 份配方 1 份的鄰區材料取自百柱塔 61~100F。配方數、數量、前置不變。
+
+- [x] M1 `assignCraftMaterials.mts` 涵蓋 T4~T6，寫回 `equipmentSeeds.ts`
+- [x] M2 文件：§ 6A.3、武器／防具文件重產、`27-drop-table.md` 備註、`30-items.md` 製作用途
+- [x] M3 測試：配方材料來源區域符合階級
+- [x] M4 `npx tsc -b`、client／server vitest
+
 ### 角色 debuff 新增沉默（`24-buff-debuff.md` § 24.4／§ 24.10、`25-monster-system.md` § 25.8／§ 25.9）
 
 規格：沉默＝無法施展技能（普攻、道具不受影響），10s，不可刷新，tag `silenced`，category `silence`；魔抗可抵抗；淨化藥水可解；施加者為 12 筆 `attackType: 'magic'` seed，判定順序排最後，觸發率 Lv.33~36 10%／Lv.38~43 12%／Lv.49~59 13%／Lv.80 15%。
@@ -496,6 +549,19 @@ Lv.31 以上 Boss 專屬素材 30% → 15%。Lv.30 以下區域與試煉飛龍�
 - [x] S5 `calibrateTTK.mts`／`simulateReaperKill.mts` 依武器取 DoT 比例
 - [x] S6 44 § 44.7／§ 44.10 騎士重跑（`--class=knight`，預設 runs）
 - [x] S7 `npx tsc -b`、client vitest
+
+### DPS 預測翻修（`44-dps-prediction.md`）
+
+規格：腳本戰前 buff 讀 `SKILL_CATALOG`／`CLASS_SKILLS`（不手抄），學習預算讀 `skillRestrictions.ts`；
+降防禦技能（詛咒／護甲崩壞／極冰封印）進輪替，疊加照遊戲（不同 category 加算、同 category 覆蓋），由期望值決定是否施放；
+報告新增本版納入改動、狀態技能盤點、行動分佈；五職業以 `--top=20 --runs=600` 全重跑。執行時間不在本次範圍。
+
+- [x] P1 腳本：戰前 buff 讀技能定義、學習預算讀 `skillRestrictions.ts`
+- [x] P2 腳本：降防禦技能進輪替（校準以掛載期間增傷評價）
+- [x] P3 腳本：輸出狀態技能盤點與行動分佈
+- [x] P4 五職業全重跑
+- [x] P5 文件：44 全面翻修（納入改動、盤點、分佈、表 1~3、§ 44.6／§ 44.9／§ 44.10）
+- [x] P6 `npx tsc -b`、client vitest
 
 跨多次對話的實作**開工前**先在這裡寫下定案規格與分階段清單（見 `CLAUDE.md`）：
 中斷後靠它接續，全部完成並經使用者確認後刪除。

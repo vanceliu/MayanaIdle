@@ -252,12 +252,29 @@ export function isShieldEquipped(equippedGear: (EquipmentInstance | null)[]): bo
   return equippedGear.some(g => g?.slot === 'leftHand' && g.type === 'shield');
 }
 
-function getWeaponDamage(gear: EquipmentInstance | null, monsterSize: 'small' | 'large'): number {
-  if (!gear) return 1;
-  const base = monsterSize === 'small' ? gear.smallMonsterDamage : gear.largeMonsterDamage;
-  if (base == null) return 1;
-  // § 6.9：每 +1 強化 → smallMonsterDamage / largeMonsterDamage 各 +1
-  return base + (gear.enhancement ?? 0);
+/** 白字取哪一個：依怪物體型，或物理快照用的小怪大怪平均（§ 21.4a） */
+export type WeaponDamageBasis = 'small' | 'large' | 'average';
+
+/**
+ * 武器基傷擲骰範圍（`21-combat-formula.md` § 21.3）：floor(W / 2) ~ W，W = 白字 + 強化。
+ * 未裝備武器或無白字固定 1。
+ */
+export function getWeaponDamageRange(
+  gear: EquipmentInstance | null,
+  basis: WeaponDamageBasis,
+): { min: number; max: number } {
+  if (!gear) return { min: 1, max: 1 };
+  const white = basis === 'average'
+    ? Math.floor(((gear.smallMonsterDamage ?? 0) + (gear.largeMonsterDamage ?? 0)) / 2)
+    : basis === 'small' ? gear.smallMonsterDamage : gear.largeMonsterDamage;
+  if (white == null) return { min: 1, max: 1 };
+  const max = white + (gear.enhancement ?? 0);
+  return { min: Math.floor(max / 2), max };
+}
+
+export function rollWeaponDamage(gear: EquipmentInstance | null, basis: WeaponDamageBasis): number {
+  const { min, max } = getWeaponDamageRange(gear, basis);
+  return randomInt(min, max);
 }
 
 /**
@@ -663,16 +680,13 @@ export function calculateBasePhysicalDamage(
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
-  // § 6.9：強化同時提升小怪／大怪基傷，取平均後等同直接加上強化等級
-  const weaponDmg = weapon
-    ? ((weapon.smallMonsterDamage ?? 0) + (weapon.largeMonsterDamage ?? 0)) / 2 + (weapon.enhancement ?? 0)
-    : 1;
+  const weaponDmg = rollWeaponDamage(weapon, 'average');
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
   const isBow = weapon?.type === 'bow';
   const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
 
-  let damage = Math.floor(weaponDmg) + strBonus + (weapon?.extraAttack ?? 0) + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg;
+  let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
   // 虛弱作用於最終傷害（§ 21.3）——此函式不含防禦減傷，最末端即為最終值
   damage = applyWeaken(damage, activeEffects);
@@ -737,7 +751,7 @@ export function calculatePlayerAttack(
     let hitCrit = false;
 
     // Base damage (including race/element counter bonuses)
-    let damage = getWeaponDamage(weapon, monster.size) + strBonus + (weapon?.extraAttack ?? 0)
+    let damage = rollWeaponDamage(weapon, monster.size) + strBonus + (weapon?.extraAttack ?? 0)
       + getBuffFlatBonus(activeEffects, 'extra_attack') + getRangedAttackBonus(weapon, activeEffects)
       + fireEnchantDmg + getMaterialRaceBonus(weapon?.material, monster.race)
       + getElementCounterBonus(attackElement, monster.element);
@@ -818,7 +832,7 @@ export function calculatePhysicalSkillHit(
   }
 
   // Base damage (physical formula, including race/element counter bonuses + fire enchant)
-  const weaponDmg = getWeaponDamage(weapon, monster.size);
+  const weaponDmg = rollWeaponDamage(weapon, monster.size);
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const fireEnchantDmg = hasFireEnchant ? getFireEnchantBonus(activeEffects) : 0;
   const brandElement = getWeaponElement(weapon);
@@ -936,6 +950,8 @@ export function calculateSkillAttack(
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
   targetId?: string,
+  /** § 21.8：只有物理系技能（`Skill.physicalDamage`）判定爆擊 */
+  canCrit: boolean = false,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
@@ -947,12 +963,9 @@ export function calculateSkillAttack(
     damage = Math.floor(damage * (1 + bonuses.skill_elemental / 100));
   }
 
-  // Critical check
-  const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const isCritical = random() * 100 < critRate;
+  const isCritical = canCrit && random() * 100 < Math.min(75, 5 + bonuses.crit_rate);
   if (isCritical) {
-    const critMultiplier = 2.0 + bonuses.crit_damage / 100;
-    damage = Math.floor(damage * critMultiplier);
+    damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
   }
 
   // Monster defense reduction (last, with debuff)

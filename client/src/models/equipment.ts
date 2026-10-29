@@ -314,7 +314,15 @@ export interface EquipmentInstance {
   inStorage?: boolean;
   storageType?: 'personal' | 'shared' | 'guild';
   isStarterGear?: boolean;
+  /**
+   * 鐵匠鋪製作的實例（`06-equipment-acquire.md` § 6A.6）。製作時寫入 true；
+   * 顯示名稱加 `CRAFTED_GEAR_SUFFIX`，八種印記一律不受理（`46-sigil.md` § 46.9）。
+   */
+  isCraftedGear?: boolean;
 }
+
+/** 製作品的顯示名稱後綴（`06-equipment-acquire.md` § 6A.6） */
+export const CRAFTED_GEAR_SUFFIX = '(鍛)';
 
 /** 防具隨機額外防禦：實例生成時抽 0／1／2，均等（§ 6A.8.8） */
 export function rollDefenseBonus(): number {

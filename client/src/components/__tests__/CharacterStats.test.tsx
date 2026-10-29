@@ -55,6 +55,21 @@ describe('CharacterStats', () => {
     expect(critRow?.textContent).toContain('5%');
   });
 
+  it('物理攻擊顯示武器基傷擲骰的整段範圍（§ 21.3）', () => {
+    const sword = {
+      templateId: 1, name: '鐵劍', type: 'sword', slot: 'rightHand', isTwoHanded: false,
+      smallMonsterDamage: 15, largeMonsterDamage: 10, quality: 0, enhancement: 2,
+      affixes: [], ownerId: 1, equipped: true,
+    } as EquipmentInstance;
+    useGameStore.setState({ equippedGear: { rightHand: sword } });
+    render(<CharacterStats />);
+    const rowValue = (label: string) =>
+      screen.getByText(label).closest('.stat-row')?.querySelector('.stat-value')?.textContent;
+    // STR 18 → +9；小怪 W = 17 → 8~17、大怪 W = 12 → 6~12
+    expect(rowValue('物理(小怪)')).toBe('17~26');
+    expect(rowValue('物理(大怪)')).toBe('15~21');
+  });
+
   it('每個欄位的標籤都有 tooltip 觸發器（§ 34 詳細狀態面板）', () => {
     const { container } = render(<CharacterStats />);
     const rows = container.querySelectorAll('.stat-row');
