@@ -479,7 +479,7 @@ const hundredPillar91_100: Region = {
   name: '百柱塔 91~100F',
   type: 'dungeon',
   group: HUNDRED_PILLAR_GROUP,
-  levelMin: 80,
+  levelMin: 70,
   levelMax: 80,
   zoneId: 'grey-ridge',
   entryScrollItemId: 143, // 百柱塔 91F 通行卷軸

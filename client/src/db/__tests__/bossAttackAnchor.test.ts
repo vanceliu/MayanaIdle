@@ -19,22 +19,33 @@ const median = (values: number[]) => {
 };
 
 describe('怪物攻擊力曲線', () => {
-  it('百柱死神 Lv.80、攻擊 250~300，是全服攻擊力最高的怪物', () => {
+  it('百柱死神 Lv.80、攻擊 200~250，是全服攻擊力最高的怪物', () => {
     const reaper = bosses.find(b => b.name === '百柱死神')!;
     expect(reaper.level).toBe(80);
-    expect(reaper.attackMin).toBe(250);
-    expect(reaper.attackMax).toBe(300);
+    expect(reaper.attackMin).toBe(200);
+    expect(reaper.attackMax).toBe(250);
     const strongest = all.reduce((top, m) => (m.attackMax > top.attackMax ? m : top));
     expect(strongest.name).toBe('百柱死神');
   });
 
-  it('百柱塔 91~100F 一般怪全為 Lv.80，最強的死之執行者上限 200', () => {
+  it('Lv.70 Boss 攻擊 = 改動前 × 250/300', () => {
+    const expected: Record<string, [number, number]> = {
+      守護者之主: [203, 242],
+      霜凍伊莉絲: [194, 232],
+      熔岩伊弗利特: [194, 232],
+    };
+    const lv70 = bosses.filter(b => b.level === 70);
+    expect(lv70.map(b => b.name).sort()).toEqual(Object.keys(expected).sort());
+    for (const b of lv70) expect([b.attackMin, b.attackMax], b.name).toEqual(expected[b.name]);
+  });
+
+  it('百柱塔 91~100F 一般怪全為 Lv.70，最強的死之執行者上限 184', () => {
     const top = normals.filter(m => m.area === TOP_AREA);
     expect(top.length).toBeGreaterThan(0);
-    for (const m of top) expect(m.level, m.name).toBe(80);
+    for (const m of top) expect(m.level, m.name).toBe(70);
     const strongest = normals.reduce((a, m) => (m.attackMax > a.attackMax ? m : a));
     expect(strongest.name).toBe('死之執行者');
-    expect(strongest.attackMax).toBe(200);
+    expect(strongest.attackMax).toBe(184);
   });
 
   it('Lv.31~70 一般怪每級攻擊上限中位數貼齊曲線（±2）', () => {

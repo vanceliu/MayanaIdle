@@ -30,6 +30,37 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 素材 iconTier 依等級門檻重排（`30-items.md` § 素材 iconTier 對照、`39-batch-sell.md` § 39.3）
+
+規格：區域素材依可掉落區域中最低的 `resolveArea().levelMin` 定色：1 Lv1~20、2 Lv21~35、3 Lv36~39、4 Lv40~49、5 Lv50+。只由 Boss 掉落 = 6（死神碎魂 7）。例外：通用素材 N／N+1、魔法書材料依品名（基礎 2／中階 3／高階 4／稀有 5）、任務素材 2。共 44 筆改色。
+
+- [x] I1 `itemSeeds.ts` 44 筆 `iconTier`
+- [x] I2 文件：30、39、Wiki `ItemsPage.tsx` 圖例、INDEX
+- [x] I3 測試：門檻推算／Boss 6／例外清單；既有對照表測試
+- [x] I4 `npx tsc -b`、client／server／desktop vitest
+
+### 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3、`13-town.md` § 13.5）
+
+規格：只能拆 `acquireType: 'craft'` 模板的未裝備實例（製作品、掉落品皆可）；每種材料退 ceil(數量 × 0.5)；前置裝備不退；強化／品質／詞綴不影響；新材料堆疊放不下時拒絕，超重不擋；一次一件、需確認。
+
+- [x] D1 文件：06-equipment-acquire、13-town、INDEX（含連動）
+- [x] D2 `crafting.ts` `getDismantleYield()`；`gameStore.ts` `dismantleEquipment()`；`protocol.ts` 允許清單
+- [x] D3 `TownBlacksmith.tsx` 拆解分頁；Wiki
+- [x] D4 測試：退還量、製作品／掉落品、前置不退、裝備中不可拆、背包滿拒絕、server 允許清單
+- [x] D5 `npx tsc -b`、client／server vitest
+
+### 百柱塔 91~100F 小怪降 Lv.70 ＋ 百柱死神為 Boss 攻擊上限（`28-monster-stats.md` § 28.1／§ 28.8、`09-dungeon.md`）
+
+規格：91~100F 一般怪 Lv.80 → 70，攻擊上下限 × 175/190（Lv.70 攻擊中位數 = C(70)），HP／防禦／經驗不動；區域 Lv.70~80。
+百柱死神維持 Lv.80，攻擊 200~250＝全服 Boss 攻擊上限；Lv.70 Boss 攻擊 × 250/300（守護者之主 203~242、霜凍伊莉絲／熔岩伊弗利特 194~232）。
+精靈王魔導士沉默 15% → 13%。T6 裝備掉率不動（91~100F 固定為內插上限端點）。
+
+- [x] A1 `monsterSeeds.ts`、`mapData.ts`
+- [x] A2 測試：`hundredPillarLevels`、`bossAttackAnchor`、`equipmentDropRates`、沉默觸發率
+- [x] A3 文件：28、09、25、27、36、44、INDEX、06 § 6A.1
+- [x] A4 `npx tsc -b`、client／server vitest
+- [x] A5 44 只更新死神 seed 片段（模擬中死神不還手、等級不變，結果不受影響）
+
 ### 魔法技能不爆擊（`21-combat-formula.md` § 21.4／§ 21.8／§ 21.11、`07-affix.md`、`23-class-magic.md`）
 
 規格：走魔法公式（§ 21.4，`calculateSkillAttack()`）的技能不判定爆擊、不消耗亂數；物理系技能（三連射、§ 21.4a 盾擊／裂傷斬／挑釁怒吼，整招）維持爆擊。物理職業學的基礎魔法同樣不爆擊。爆擊詞綴池不動。
@@ -66,7 +97,7 @@
 
 ### 製作品 (鍛)：不可用印記＋詞綴 Tier 依階級（`06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9）
 
-規格：鐵匠製作的實例帶製作標記，名稱顯示加 `(鍛)`；八種印記一律不受理（強化卷軸照常）；製作詞綴固定 4 條、均等抽：T4 製作品 T1~T5、T5 製作品 T2~T6、T6 製作品 T3~T6，不出特殊詞綴。改版前已製作的實例無標記，維持原狀。
+規格：鐵匠製作的實例帶製作標記，名稱顯示加 `(鍛)`；八種印記一律不受理（強化卷軸照常）；製作詞綴固定 4 條、範圍內加權抽（T6 權重 0.7，其他 1）：T4 製作品 T1~T5、T5 製作品 T2~T6、T6 製作品 T3~T6，不出特殊詞綴。改版前已製作的實例無標記，維持原狀。
 
 - [x] P1 文件：06-equipment-acquire、07-affix、46-sigil、13-town、18-data-schema、43-wiki、INDEX
 - [x] P2 實例欄位＋製作寫入＋詞綴 Tier 範圍

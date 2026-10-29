@@ -86,7 +86,7 @@ import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment, rollNewInstanceFields, getTemplateById } from '../systems/templateSync';
 import { createShopEquipment } from '../systems/shopEquipment';
 import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
-import { generateCraftAffixes } from '../systems/crafting';
+import { generateCraftAffixes, getDismantleYield } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
@@ -506,6 +506,8 @@ export interface GameState {
   /** 鐵匠鋪製作（`06-equipment-acquire.md` § 6A.3） */
   /** 單機且模板已快取時同步結算；線上模式回 Promise */
   craftEquipment: (templateId: number) => CraftResult | Promise<CraftResult>;
+  /** 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3「拆解」）。線上模式回 Promise */
+  dismantleEquipment: (instanceId: number) => CraftResult | Promise<CraftResult>;
   /** 印記師（`46-sigil.md`） */
   /** 單機同步結算；線上模式回 Promise（server 判定） */
   applySigil: (itemId: number, sigilType: SigilType, affixIndex: number | null) => SigilApplyResult | Promise<SigilApplyResult>;
@@ -2659,6 +2661,28 @@ export function createGameStore(session: Session) {
       return char.id ? session.repo.addEquipment(dbRecord).then(finish) : finish(undefined);
     };
     return cached ? run(cached) : session.repo.findEquipmentTemplates(t => t.id === templateId).then(list => run(list[0]));
+  },
+
+  dismantleEquipment: (instanceId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return { ok: false, message: '沒有角色' };
+    // 只認背包裡未裝備的實例；`inventory` 不含身上裝備
+    const item = state.inventory.find(i => i.id != null && i.id === instanceId);
+    if (!item) return { ok: false, message: '沒有這件裝備' };
+    const yields = getDismantleYield(getTemplateById(item.templateId));
+    if (!yields) return { ok: false, message: '這件裝備沒有配方，無法拆解' };
+
+    const newKinds = yields.filter(m => getBagItemAmount(state.bagItems, m.itemId) <= 0).length;
+    const usedAfter = getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) - 1 + newKinds;
+    if (usedAfter > getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
+
+    const newBag = yields.reduce((bag, m) => addBagItem(bag, m.itemId, m.amount), state.bagItems);
+    if (char.id) void session.repo.deleteEquipment(item.id!);
+    set({ bagItems: newBag, inventory: state.inventory.filter(i => i.id !== item.id) });
+    get().saveState();
+    const gained = yields.map(m => `${getItemById(m.itemId)?.name ?? '未知素材'}×${m.amount}`).join('、');
+    return { ok: true, message: `拆解 ${item.name}，獲得 ${gained}`, name: item.name };
   },
 
   applySigil: (itemId, sigilType, affixIndex) => {

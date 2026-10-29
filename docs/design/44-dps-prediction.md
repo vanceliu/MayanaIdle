@@ -38,7 +38,7 @@
 `client/src/db/seed/monsterSeeds.ts` id 199：
 
 ```ts
-{ id: 199, name: '百柱死神', level: 80, hp: 3500, attackMin: 250, attackMax: 300, defense: 65,
+{ id: 199, name: '百柱死神', level: 80, hp: 3500, attackMin: 200, attackMax: 250, defense: 65,
   exp: 17478, race: 'undead', size: 'large', element: 'dark',
   area: 'hundred-pillar-91-100f', isBoss: true,
   debuffs: [{ curse 22% }, { weaken 22% }, { stun 22% }] }

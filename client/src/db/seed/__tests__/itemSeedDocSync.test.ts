@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ITEM_DEFINITIONS } from '../itemSeeds';
+import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../dropSeeds';
+import { resolveArea } from '../../../models/mapData';
+import { getRegionMaterialTier } from '../../../models/iconMap';
 
 /**
  * `30-items.md` 與 `itemSeeds.ts` 的防漂移測試。
@@ -105,5 +108,42 @@ describe('素材 iconTier 資料本身的合理性', () => {
   it('每個素材都有 iconTier，且落在 1~7', () => {
     const bad = MATERIALS.filter(m => !m.iconTier || m.iconTier < 1 || m.iconTier > 7);
     expect(bad.map(m => m.name)).toEqual([]);
+  });
+});
+
+/** `30-items.md` § 素材 iconTier 對照「定色規則」 */
+describe('素材 iconTier 定色規則', () => {
+  const GENERIC = ['銀礦石', '銀精華', '米索利碎片', '米索利礦石', '龍骨碎片', '龍心結晶', '奧里哈魯根碎片', '奧里哈魯根精華'];
+  const SPELLBOOK: Record<string, number> = {
+    '魔法書材料（基礎）': 2, '魔法書材料（中階）': 3, '魔法書材料（高階）': 4, '魔法書材料（稀有）': 5,
+  };
+
+  function expectedTier(id: number, name: string): number | null {
+    if (GENERIC.includes(name)) return null;
+    if (name in SPELLBOOK) return SPELLBOOK[name];
+    if (name === '任務素材') return 2;
+    const areaLevels = DROP_TABLE_SEEDS
+      .filter(d => d.itemType === 'item' && d.itemTemplateId === id)
+      .map(d => resolveArea(d.area)?.levelMin);
+    if (areaLevels.length > 0) {
+      expect(areaLevels.every(l => l !== undefined), `${name} 有解析不到的掉落區域`).toBe(true);
+      return getRegionMaterialTier(Math.min(...(areaLevels as number[])));
+    }
+    const fromBoss = BOSS_DROP_TABLE_SEEDS.some(d => d.itemType === 'item' && d.itemTemplateId === id);
+    expect(fromBoss, `${name} 沒有任何掉落來源`).toBe(true);
+    return name === '死神碎魂' ? 7 : 6;
+  }
+
+  it('每個素材的 iconTier 符合定色規則', () => {
+    const problems: string[] = [];
+    for (const m of MATERIALS) {
+      const expected = expectedTier(m.id, m.name);
+      if (expected !== null && m.iconTier !== expected) problems.push(`${m.name}: seed ${m.iconTier} / 規則 ${expected}`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('門檻邊界', () => {
+    expect([1, 20, 21, 35, 36, 39, 40, 49, 50, 80].map(getRegionMaterialTier)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
   });
 });

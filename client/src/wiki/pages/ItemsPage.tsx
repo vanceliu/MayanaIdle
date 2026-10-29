@@ -5,7 +5,7 @@ import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db
 import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevel } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
-import { resolveItemIcon, MATERIAL_TIER_COLORS } from '../../models/iconMap';
+import { resolveItemIcon, MATERIAL_TIER_COLORS, formatRegionMaterialTierRange } from '../../models/iconMap';
 import type { ItemDefinition } from '../../models/items';
 import { formatMaterialUsage, hasMaterialUsage, getCraftUsage } from '../../systems/craftMaterialUsage';
 import { isSigilItemId } from '../../models/sigil';
@@ -34,11 +34,11 @@ function displayCategory(item: ItemDefinition): string {
 
 /** 素材顏色圖例，語意依 `39-batch-sell.md` § 39.3，色碼取自 MATERIAL_TIER_COLORS。 */
 const MATERIAL_TIER_LEGEND = [
-  { tier: 1, label: '純販售素材（新手區域）' },
-  { tier: 2, label: '入門區域素材' },
-  { tier: 3, label: '中等區域素材' },
-  { tier: 4, label: '進階區域素材' },
-  { tier: 5, label: '高階區域素材' },
+  { tier: 1, label: `新手區域素材（${formatRegionMaterialTierRange(1)}）` },
+  { tier: 2, label: `入門區域素材（${formatRegionMaterialTierRange(2)}）` },
+  { tier: 3, label: `中等區域素材（${formatRegionMaterialTierRange(3)}）` },
+  { tier: 4, label: `進階區域素材（${formatRegionMaterialTierRange(4)}）` },
+  { tier: 5, label: `高階區域素材（${formatRegionMaterialTierRange(5)}）` },
   { tier: 6, label: 'Boss 素材' },
   { tier: 7, label: '最終 Boss 素材' },
 ].map(t => ({ ...t, color: MATERIAL_TIER_COLORS[t.tier] }));

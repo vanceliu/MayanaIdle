@@ -92,7 +92,7 @@ describe('mapData', () => {
 
     it('last segment has highest level', () => {
       const seg = getRegion('hundred-pillar-91-100f');
-      expect(seg!.levelMin).toBe(80);
+      expect(seg!.levelMin).toBe(70);
       expect(seg!.levelMax).toBe(80);
     });
   });

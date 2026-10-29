@@ -509,18 +509,41 @@ export const SHOP_MAX_AFFIX_TIER = 3;
 
 /** 一般裝備的詞綴強化上限（`07-affix.md` § 7.2）。T6/T7 只能靠掉落原生取得。 */
 export const DEFAULT_MAX_AFFIX_TIER = 5;
-/** 鐵匠製作品的詞綴 Tier 範圍，依裝備階級（§ 6A.6）。範圍內均等 */
+/** 鐵匠製作品的詞綴 Tier 範圍，依裝備階級（§ 6A.6）。範圍內依 `CRAFT_AFFIX_TIER_WEIGHT` 加權 */
 export const CRAFT_AFFIX_TIER_RANGE: Readonly<Record<number, { min: number; max: number }>> = {
   4: { min: 1, max: 5 },
   5: { min: 2, max: 6 },
   6: { min: 3, max: 6 },
 };
 
+/** 製作品詞綴的 Tier 相對權重（§ 6A.6），未列的階級＝1 */
+export const CRAFT_AFFIX_TIER_WEIGHT: Readonly<Record<number, number>> = { 6: 0.7 };
+
 /** 製作詞綴範圍的顯示文字，如「T4 製作品 T1~T5、T5 製作品 T2~T6」 */
 export function formatCraftAffixTierRanges(): string {
   return Object.entries(CRAFT_AFFIX_TIER_RANGE)
     .map(([tier, r]) => `T${tier} 製作品 T${r.min}~T${r.max}`)
     .join('、');
+}
+
+/** 製作詞綴權重的顯示文字，如「T6 權重為其他階級的 70%」 */
+export function formatCraftAffixTierWeights(): string {
+  return Object.entries(CRAFT_AFFIX_TIER_WEIGHT)
+    .map(([tier, w]) => `T${tier} 權重為其他階級的 ${Math.round(w * 100)}%`)
+    .join('、');
+}
+
+/** 在 `floor`~`cap` 間依相對權重抽 Tier，未列的階級＝1 */
+function rollRangeTier(floor: number, cap: number, weights: Readonly<Record<number, number>>): number {
+  const weightOf = (tier: number) => weights[tier] ?? 1;
+  let total = 0;
+  for (let t = floor; t <= cap; t++) total += weightOf(t);
+  let roll = random() * total;
+  for (let t = floor; t <= cap; t++) {
+    roll -= weightOf(t);
+    if (roll < 0) return t;
+  }
+  return cap;
 }
 
 export interface GenerateAffixOptions {
@@ -530,6 +553,8 @@ export interface GenerateAffixOptions {
   minTier?: number;
   /** 均等隨機 Tier（不查區域權重表）。商店與製作品用，掉落品不用。 */
   uniformTier?: boolean;
+  /** `uniformTier` 時各 Tier 的相對權重，未列＝1。製作品用（§ 6A.6） */
+  tierWeights?: Readonly<Record<number, number>>;
   /**
    * 禁止特殊詞綴（免疫類）。§ 6A.6：商店品與製作品都不會出現特殊詞綴，
    * 只有掉落品依 § 7.10.3 的機率生成。
@@ -582,7 +607,7 @@ export function generateAffixes(
     const cap = options.maxTier ?? 7;
     const floor = options.minTier ?? 1;
     const tier = options.uniformTier
-      ? floor + Math.floor(random() * (cap - floor + 1))
+      ? rollRangeTier(floor, cap, options.tierWeights ?? {})
       : Math.min(cap, rollAffixTier(areaLevel, isBoss));
     const value = rollAffixValue(tier, def.type);
     // § 7.4 元素刻印／元素侵蝕：抽到當下才決定屬性，六種均等隨機，兩條各自獨立抽

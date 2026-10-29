@@ -6,11 +6,14 @@ import {
   SHOP_MAX_AFFIX_TIER,
   DEFAULT_MAX_AFFIX_TIER,
   CRAFT_AFFIX_TIER_RANGE,
+  CRAFT_AFFIX_TIER_WEIGHT,
+  formatCraftAffixTierWeights,
   getTierWeights,
   getBossTierWeights,
   rollAffixTier,
 } from '../affix';
 import { generateCraftAffixes } from '../../systems/crafting';
+import { reseed } from '../../core/rng';
 
 /**
  * 商店裝的詞綴 Tier 上限（`06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2）。
@@ -116,7 +119,7 @@ describe('製作品的詞綴 Tier 範圍（§ 6A.6）', () => {
   const EXPECTED: Record<number, [number, number]> = { 4: [1, 5], 5: [2, 6], 6: [3, 6] };
 
   for (const [tier, [min, max]] of Object.entries(EXPECTED)) {
-    it(`T${tier} 製作品：固定 4 條、Tier 均等落在 T${min}~T${max}、不出特殊詞綴`, () => {
+    it(`T${tier} 製作品：固定 4 條、Tier 落在 T${min}~T${max}、不出特殊詞綴`, () => {
       expect(CRAFT_AFFIX_TIER_RANGE[Number(tier)]).toEqual({ min, max });
       const seen = new Set<number>();
       for (let i = 0; i < 400; i++) {
@@ -133,6 +136,45 @@ describe('製作品的詞綴 Tier 範圍（§ 6A.6）', () => {
       expect([...seen].sort()).toEqual(Array.from({ length: max - min + 1 }, (_, k) => min + k));
     });
   }
+
+  it('T6 權重為其他階級的 70%', () => {
+    expect(CRAFT_AFFIX_TIER_WEIGHT).toEqual({ 6: 0.7 });
+    expect(formatCraftAffixTierWeights()).toBe('T6 權重為其他階級的 70%');
+  });
+
+  const T6_SHARE: Record<number, number> = { 5: 0.7 / 4.7, 6: 0.7 / 3.7 };
+  for (const [tier, expected] of Object.entries(T6_SHARE)) {
+    it(`T${tier} 製作品每條出 T6 ≈ ${(expected * 100).toFixed(1)}%，其他階級均等`, () => {
+      reseed(20261029);
+      const { min, max } = CRAFT_AFFIX_TIER_RANGE[Number(tier)];
+      const counts = new Map<number, number>();
+      let total = 0;
+      for (let i = 0; i < 5000; i++) {
+        for (const a of generateCraftAffixes('weapon', { tier: Number(tier), smallMonsterDamage: 10, largeMonsterDamage: 10 })) {
+          if (isTierlessAffixType(a.type)) continue;
+          counts.set(a.tier, (counts.get(a.tier) ?? 0) + 1);
+          total++;
+        }
+      }
+      expect(Math.abs((counts.get(6) ?? 0) / total - expected)).toBeLessThan(0.01);
+      const otherShare = (1 - expected) / (max - min);
+      for (let t = min; t < max; t++) expect(Math.abs((counts.get(t) ?? 0) / total - otherShare)).toBeLessThan(0.01);
+    });
+  }
+
+  it('T4 製作品不受 T6 權重影響：T1~T5 均等', () => {
+    reseed(20261029);
+    const counts = new Map<number, number>();
+    let total = 0;
+    for (let i = 0; i < 5000; i++) {
+      for (const a of generateCraftAffixes('weapon', { tier: 4, smallMonsterDamage: 10, largeMonsterDamage: 10 })) {
+        if (isTierlessAffixType(a.type)) continue;
+        counts.set(a.tier, (counts.get(a.tier) ?? 0) + 1);
+        total++;
+      }
+    }
+    for (let t = 1; t <= 5; t++) expect(Math.abs((counts.get(t) ?? 0) / total - 0.2)).toBeLessThan(0.01);
+  });
 
   it('沒有製作範圍的階級直接報錯', () => {
     expect(() => generateCraftAffixes('weapon', { tier: 3 })).toThrow();

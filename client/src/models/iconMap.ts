@@ -77,6 +77,26 @@ export const MATERIAL_TIER_COLORS: Record<number, string> = {
   7: '#A855F7',
 };
 
+/** 區域素材定色門檻（`30-items.md` § 素材 iconTier 對照）：可掉落區域中最低的起始等級落在哪一段 */
+export const MATERIAL_REGION_TIER_THRESHOLDS: readonly { tier: number; minLevel: number }[] = [
+  { tier: 1, minLevel: 1 },
+  { tier: 2, minLevel: 21 },
+  { tier: 3, minLevel: 36 },
+  { tier: 4, minLevel: 40 },
+  { tier: 5, minLevel: 50 },
+];
+
+export function getRegionMaterialTier(regionLevelMin: number): number {
+  return MATERIAL_REGION_TIER_THRESHOLDS.filter(t => regionLevelMin >= t.minLevel).at(-1)!.tier;
+}
+
+/** 門檻的顯示文字，例：`Lv21~35`、`Lv50 以上` */
+export function formatRegionMaterialTierRange(tier: number): string {
+  const i = MATERIAL_REGION_TIER_THRESHOLDS.findIndex(t => t.tier === tier);
+  const next = MATERIAL_REGION_TIER_THRESHOLDS[i + 1];
+  return next ? `Lv${MATERIAL_REGION_TIER_THRESHOLDS[i].minLevel}~${next.minLevel - 1}` : `Lv${MATERIAL_REGION_TIER_THRESHOLDS[i].minLevel} 以上`;
+}
+
 export function getMaterialIcon(iconType?: MaterialIconType): string {
   return iconType ? MATERIAL_ICON_MAP[iconType] : ITEM_ICON_MAP['material'];
 }

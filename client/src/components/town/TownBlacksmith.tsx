@@ -10,11 +10,14 @@ import { getItemById } from '../../models/items';
 import { getBagItemAmount } from '../../models/bagItem';
 import { evaluateCraftRequirements, hasCraftQuestFor } from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
+import { getDismantleYield } from '../../systems/crafting';
+import type { EquipmentInstance } from '../../models/equipment';
 
-import { getEquipmentTierColor } from '../../models/equipmentTier';
+import { getEquipmentTierColor, getEquipmentInstanceTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 
+type BlacksmithTab = 'craft' | 'dismantle';
 
 export function TownBlacksmith() {
   const char = useGameStore(s => s.character);
@@ -26,6 +29,7 @@ export function TownBlacksmith() {
   const [selectedRecipe, setSelectedRecipe] = useState<EquipmentTemplate | null>(null);
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [tab, setTab] = useState<BlacksmithTab>('craft');
   const allTemplates = useEquipmentTemplates();
   const craftTemplates = useMemo(
     () => allTemplates.filter(t => t.acquireType === 'craft').sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0)),
@@ -60,6 +64,18 @@ export function TownBlacksmith() {
     }
   }
 
+  // 拆解清單：背包中未裝備且模板有配方的實例（§ 6A.3「拆解」）
+  const dismantlable = inventory
+    .map(item => ({ item, yields: getDismantleYield(allTemplates.find(t => t.id === item.templateId)) }))
+    .filter((e): e is { item: EquipmentInstance; yields: NonNullable<typeof e.yields> } => e.yields !== null);
+
+  async function handleDismantle(item: EquipmentInstance) {
+    const warning = item.enhancement > 0 ? `\n強化 +${item.enhancement} 不會退還任何東西。` : '';
+    if (!window.confirm(`確定要拆解 ${item.name}？裝備會消失，只退還一半材料。${warning}`)) return;
+    const result = await useGameStore.getState().dismantleEquipment(item.id!);
+    setResultMsg(result.message);
+  }
+
   return (
     <div className="shop-panel blacksmith-panel">
       <p className="shop-greeting">「想打什麼裝備？材料備齊了就開工。」</p>
@@ -69,8 +85,52 @@ export function TownBlacksmith() {
       </div>
 
 
+      <div className="shop-tabs">
+        <button className={tab === 'craft' ? 'active' : ''} onClick={() => { setTab('craft'); setResultMsg(null); }}>裝備製作</button>
+        <button className={tab === 'dismantle' ? 'active' : ''} onClick={() => { setTab('dismantle'); setResultMsg(null); }}>裝備拆解</button>
+      </div>
+
       {resultMsg && <p className="bs-result">{resultMsg}</p>}
 
+      {tab === 'dismantle' && (
+        <div className="panel-scroll">
+          <p className="shop-item-desc">只能拆有配方的裝備，退還配方材料的一半（無條件進位），前置裝備不退還。身上穿的裝備不能拆。</p>
+          {dismantlable.length === 0 && <p className="shop-item-desc">背包裡沒有可拆解的裝備</p>}
+          <div className="shop-items">
+            {dismantlable.map(({ item, yields }) => {
+              const color = getEquipmentInstanceTierColor(item, allTemplates);
+              return (
+                <div key={item.id} className="shop-item bs-shop-item">
+                  <div className="shop-item-info">
+                    <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color={color} />
+                      {item.name}{item.enhancement > 0 ? ` +${item.enhancement}` : ''}
+                    </span>
+                    <span className="shop-item-desc bs-craft-materials">
+                      {yields.map(m => {
+                        const def = getItemById(m.itemId);
+                        const { icon, color: matColor, glowClass } = resolveItemIcon(def, 'material');
+                        return (
+                          <span key={m.itemId} className="bs-craft-mat">
+                            <GameIcon name={icon} size={14} color={matColor} className={glowClass} />
+                            <span className="bs-craft-mat-name" style={{ color: matColor }}>{def?.name ?? '未知素材'}</span>
+                            <span className="bs-craft-mat-count">×{m.amount}</span>
+                          </span>
+                        );
+                      })}
+                    </span>
+                  </div>
+                  <div className="shop-item-actions">
+                    <button className="btn-danger" aria-label={`拆解 ${item.name}`} onClick={() => handleDismantle(item)}>拆解</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === 'craft' && (<>
       {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨配方清單捲動 */}
       <div className="bs-craft-categories">
           {[
@@ -235,6 +295,7 @@ export function TownBlacksmith() {
           ))}
       </div>
       </div>
+      </>)}
     </div>
   );
 }

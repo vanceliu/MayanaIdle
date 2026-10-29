@@ -3,7 +3,8 @@ import { useWeaponList, useArmorList, getWikiEquipmentPath, getEquipmentById } f
 import { Link } from 'react-router-dom';
 import { getItemById } from '../../models/items';
 import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
-import { formatCraftAffixTierRanges } from '../../models/affix';
+import { formatCraftAffixTierRanges, formatCraftAffixTierWeights } from '../../models/affix';
+import { DISMANTLE_RETURN_RATE } from '../../systems/crafting';
 import '../components/WikiTable.css';
 
 // `06-equipment-acquire.md` § 6A.1：製作品階級為 T4~T7（中階 T4~T5 / 高階 T6~T7）
@@ -52,8 +53,12 @@ export function CraftingPage() {
       <h2 className="wiki-page-title">鐵匠鋪製作</h2>
       <p style={noteStyle}>
         製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條詞綴、不會出特殊詞綴，
-        Tier 依裝備階級均等（{formatCraftAffixTierRanges()}），<strong>不可使用任何印記</strong>。
+        Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），<strong>不可使用任何印記</strong>。
         製作不收金幣，必定成功。
+      </p>
+      <p style={noteStyle}>
+        <strong>拆解</strong>：有配方的裝備（製作品或同款掉落品）可在鐵匠鋪拆回材料，
+        每種材料退還 {DISMANTLE_RETURN_RATE * 100}%（無條件進位），前置武器不退還。
       </p>
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={tierFilter} onChange={e => setTierFilter(e.target.value)}>

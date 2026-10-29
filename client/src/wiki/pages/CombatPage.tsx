@@ -3,6 +3,8 @@ import {
   DAMAGE_REDUCTION_CAP,
   ELEMENT_COUNTER,
   ELEMENT_COUNTER_BONUS,
+  INT_SKILL_DAMAGE_PERCENT_PER_2,
+  MAGIC_ATTACK_PERCENT_PER_POINT,
   MAGIC_DEFENSE_EFFECTIVENESS,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
 } from '../../systems/combat';
@@ -116,9 +118,9 @@ export function CombatPage() {
         title="技能攻擊（魔法）"
         formula={
           <>
-            INT加成 = floor(技能攻擊力 × (有效INT / 2 × 0.08))
+            INT加成 = floor(技能攻擊力 × (有效INT / 2 × {INT_SKILL_DAMAGE_PERCENT_PER_2 / 100}))
             <br />
-            基礎傷害 = floor(技能攻擊力 × (1 + 裝備魔法攻擊/100)) + INT加成 + 元素克制
+            基礎傷害 = floor(技能攻擊力 × (1 + 裝備魔法攻擊 × {MAGIC_ATTACK_PERCENT_PER_POINT}/100)) + INT加成 + 元素克制
             <br />
             傷害 = floor(基礎傷害 × (1 + 技能元素%/100))　※ 技能有元素時
             <br />
@@ -127,7 +129,7 @@ export function CombatPage() {
         }
         note={
           <>
-            技能<strong>必定命中</strong>，不做命中判定。魔法技能<strong>不會爆擊</strong>（復仇之刃、背刺例外）。裝備魔法攻擊是<strong>乘在技能攻擊力上的乘區</strong>（魔攻 19 → ×1.19），不進 INT 倍率；
+            技能<strong>必定命中</strong>，不做命中判定。魔法技能<strong>不會爆擊</strong>（復仇之刃、背刺例外）。裝備魔法攻擊是<strong>乘在技能攻擊力上的乘區</strong>（每 1 點 +{MAGIC_ATTACK_PERCENT_PER_POINT}%，魔攻 15 → ×{1 + 15 * MAGIC_ATTACK_PERCENT_PER_POINT / 100}），不進 INT 倍率；
             攻擊力%與元素刻印%詞綴不影響魔法傷害。
             技能傷害不受虛弱影響（虛弱只作用於依物理公式計算的傷害）。
           </>
@@ -138,7 +140,7 @@ export function CombatPage() {
         title="技能攻擊（物理快照）"
         formula={
           <>
-            基礎傷害 = floor(技能攻擊力 × (1 + 裝備魔法攻擊/100)) + INT加成 + 元素克制　※ 與上一節相同
+            基礎傷害 = floor(技能攻擊力 × (1 + 裝備魔法攻擊 × {MAGIC_ATTACK_PERCENT_PER_POINT}/100)) + INT加成 + 元素克制　※ 與上一節相同
             <br />
             武器傷害 = 隨機 floor(W/2) ~ W，W = floor((小怪傷害 + 大怪傷害) / 2) + 強化　※ 每次施放擲一次
             <br />
@@ -156,7 +158,7 @@ export function CombatPage() {
             適用技能：<strong>盾擊、裂傷斬、挑釁怒吼</strong>（騎士）。
             <br />
             <strong>不吃</strong>：元素刻印%、武器材質種族克制。
-            與魔法技能相同<strong>必定命中</strong>，之後照常判定爆擊與怪物防禦減傷。
+            與魔法技能相同<strong>必定命中</strong>；與魔法技能不同，<strong>會爆擊</strong>（整招套用爆擊倍率），之後套用怪物防禦減傷。
             虛弱 debuff 只作用於基礎物理傷害那一段。
           </>
         }

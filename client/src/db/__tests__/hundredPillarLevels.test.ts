@@ -7,7 +7,7 @@ const SECTIONS: { floors: string[]; levelMin: number; levelMax: number }[] = [
   { floors: ['1-10', '11-20', '21-30'], levelMin: 50, levelMax: 56 },
   { floors: ['31-40', '41-50', '51-60'], levelMin: 56, levelMax: 63 },
   { floors: ['61-70', '71-80', '81-90'], levelMin: 63, levelMax: 70 },
-  { floors: ['91-100'], levelMin: 80, levelMax: 80 },
+  { floors: ['91-100'], levelMin: 70, levelMax: 80 },
 ];
 
 describe('百柱塔怪物等級', () => {
@@ -28,8 +28,8 @@ describe('百柱塔怪物等級', () => {
     }
   }
 
-  it('怪物等級上限 70，只有百柱塔 91~100F 例外', () => {
-    for (const m of MONSTER_SEEDS.filter(m => m.area !== 'hundred-pillar-91-100f')) {
+  it('怪物等級上限 70，只有百柱死神例外', () => {
+    for (const m of MONSTER_SEEDS.filter(m => m.name !== '百柱死神')) {
       expect(m.level, m.name).toBeLessThanOrEqual(70);
     }
   });

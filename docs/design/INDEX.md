@@ -52,6 +52,7 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **製作材料分配規則／製作消耗** | `06-equipment-acquire.md` | § 6A.3 |
+| **裝備拆解（鐵匠鋪，退一半材料）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
@@ -113,10 +114,11 @@
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
 | 怪物經驗公式與結算倍率 | `28-monster-stats.md` | § 28.1 |
-| **怪物攻擊力曲線（一般怪／Boss）／怪物等級上限與百柱塔 91~100F Lv.80 例外** | `28-monster-stats.md` | § 28.1 |
+| **怪物攻擊力曲線（一般怪／Boss）／怪物等級上限與百柱死神 Lv.80 例外** | `28-monster-stats.md` | § 28.1 |
 | **回鍋經驗加倍（離線存量）** | `04-character.md` | § 4.11 |
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
 | 道具定義（藥水/卷軸/材料） | `30-items.md` | 全文 |
+| **素材圖示顏色（iconTier）定色規則與等級門檻** | `30-items.md` | § 素材 iconTier 對照（色碼見 `39-batch-sell.md` § 39.3） |
 | 城鎮設施（雜貨店/鐵匠/旅館等） | `13-town.md` | § 13.3~13.10 |
 | 回城卷軸/死亡機制 | `13-town.md` | § 13.8 |
 | 新手 NPC（新手裝備/強化/領取限制） | `13-town.md` | § 13.11 |

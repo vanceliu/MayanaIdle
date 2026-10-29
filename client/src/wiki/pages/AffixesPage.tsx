@@ -9,6 +9,7 @@ import {
   isFlatAffixType,
   DEFAULT_MAX_AFFIX_TIER,
   formatCraftAffixTierRanges,
+  formatCraftAffixTierWeights,
   SHOP_MAX_AFFIX_TIER,
   getAffixPoolForSlot,
   getAffixTierTable,
@@ -217,7 +218,7 @@ export function AffixesPage() {
           <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得或突破印記，T7 只有 Boss 掉落與突破印記。</li>
           <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過。</li>
           <li>
-            鐵匠製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條、不會出特殊詞綴，Tier 依裝備階級均等（{formatCraftAffixTierRanges()}），
+            鐵匠製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條、不會出特殊詞綴，Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），
             <strong>任何印記都不能使用</strong>。同一件模板由怪物掉落取得時沒有 {CRAFTED_GEAR_SUFFIX}，照常可用印記。
           </li>
           <li>特殊詞綴（免疫類）佔用一般詞綴插槽，無階級、不可強化，只從高等級區域掉落。</li>
@@ -353,7 +354,7 @@ export function AffixesPage() {
             </tbody>
           </table>
         </div>
-        <p style={noteStyle}>掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴，Tier 依裝備階級均等（{formatCraftAffixTierRanges()}），不會出 T7。</p>
+        <p style={noteStyle}>掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴，Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），不會出 T7。</p>
       </section>
 
       <section>

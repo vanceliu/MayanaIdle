@@ -452,7 +452,7 @@ B 級以上任務可出現製作素材獎勵，素材種類依任務難度決定
 | hundred-pillar-61-70f | 百柱塔 61-70F | Lv.63-70 | 420 |
 | hundred-pillar-71-80f | 百柱塔 71-80F | Lv.63-70 | 430 |
 | hundred-pillar-81-90f | 百柱塔 81-90F | Lv.63-70 | 440 |
-| hundred-pillar-91-100f | 百柱塔 91-100F | Lv.80 | 450 |
+| hundred-pillar-91-100f | 百柱塔 91-100F | Lv.70-80 | 450 |
 | ancient-dungeon-7f | 遠古地監 7F | Lv.55-60 | 400 |
 | ancient-dungeon-8f | 遠古地監 8F | Lv.55-60 | 400 |
 | ancient-dungeon-9f | 遠古地監 9F | Lv.55-60 | 400 |

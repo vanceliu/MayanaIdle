@@ -161,7 +161,7 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'spendAttributePoint', 'acceptQuest', 'completeQuest',
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
-    'buyShopEquipment', 'craftEquipment', 'applySigil', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
+    'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'applySigil', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
     'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
     'setAfterCombatThreshold',
   ]),

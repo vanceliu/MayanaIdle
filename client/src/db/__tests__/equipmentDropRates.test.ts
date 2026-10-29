@@ -21,7 +21,11 @@ const BOSS_VALUE: Record<number, number> = { 4: 10, 5: 10, 6: 5, 7: 0.1 };
 
 const equipmentEntries = DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment' && d.equipmentPool);
 
+/** 中位等級固定值的區域（§ 6A.1） */
+const FIXED_MID_LEVEL: Record<string, number> = { 'hundred-pillar-91-100f': 80 };
+
 function midLevel(area: string): number {
+  if (FIXED_MID_LEVEL[area] !== undefined) return FIXED_MID_LEVEL[area];
   const resolved = resolveArea(area);
   if (!resolved) throw new Error(`area 無法解析：${area}`);
   return (resolved.levelMin + resolved.levelMax) / 2;
