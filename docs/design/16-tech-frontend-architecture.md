@@ -147,7 +147,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 
 | Phase | 渲染內容 |
 |---|---|
-| `title` | 標題畫面 |
+| `title` | 起始畫面（`19-account-character.md` § 19.3） |
 | `characterSelect` | 角色選擇畫面（最多 4 格位） |
 | `create` | 角色建立（職業選擇 + 屬性配點） |
 | `explore` / `combat` / `dead` | 單欄全寬遊戲主畫面 |

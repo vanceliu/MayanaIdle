@@ -9,24 +9,27 @@ export const MAX_RECENT_SERVERS = 20;
 
 export const DEFAULT_PORT = 25580;
 
-export interface ServerEntry {
-  /** 顯示用名稱；沒取名就用位址 */
-  name: string;
+export type Scheme = 'http' | 'https';
+
+export interface ServerAddress {
+  scheme: Scheme;
   host: string;
   port: number;
+}
+
+export interface ServerEntry extends ServerAddress {
+  /** 顯示用名稱；沒取名就用位址 */
+  name: string;
   lastUsedAt: number;
 }
 
-export interface ParsedAddress {
-  host: string;
-  port: number;
-}
+export type ParsedAddress = ServerAddress;
 
 /**
- * 把使用者打的東西正規化成 host + port。
+ * 把使用者打的東西正規化成協定 + host + port。
  *
- * 接受 `1.2.3.4`、`1.2.3.4:25580`、`http://1.2.3.4:25580/MayanaIdle/`、`example.com`。
- * 沒寫埠就用預設值 —— 多數人不會記得埠號，而私服的預設埠只有一個。
+ * 接受 `1.2.3.4`、`1.2.3.4:25580`、`http://1.2.3.4:25580/MayanaIdle/`、`https://example.com`、`example.com`。
+ * `https://`／`wss://` 為 https，其餘為 http。沒寫埠：沒寫協定用預設埠，http 用 80，https 用 443。
  */
 export function parseAddress(raw: string): ParsedAddress | { error: string } {
   const text = raw.trim();
@@ -34,8 +37,8 @@ export function parseAddress(raw: string): ParsedAddress | { error: string } {
 
   let host = text;
   let port: number | null = null;
+  let scheme: Scheme = 'http';
 
-  // 貼整條網址進來是最常見的用法（對方直接把瀏覽器網址列複製給你）
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) {
     let url: URL;
     try {
@@ -44,10 +47,11 @@ export function parseAddress(raw: string): ParsedAddress | { error: string } {
       return { error: '看不懂這個位址' };
     }
     if (url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== 'ws:' && url.protocol !== 'wss:') {
-      return { error: '只支援 http／ws 位址' };
+      return { error: '只支援 http／https／ws／wss 位址' };
     }
-    host = url.hostname;
-    port = url.port ? Number(url.port) : (url.protocol === 'https:' || url.protocol === 'wss:' ? 443 : 80);
+    scheme = url.protocol === 'https:' || url.protocol === 'wss:' ? 'https' : 'http';
+    host = url.hostname.replace(/^\[(.*)\]$/, '$1');
+    port = url.port ? Number(url.port) : (scheme === 'https' ? 443 : 80);
   } else {
     // IPv6 要用 [::1]:port 的寫法，否則冒號分不清是位址還是埠
     const bracket = /^\[(.+)\](?::(\d+))?$/.exec(text);
@@ -72,40 +76,61 @@ export function parseAddress(raw: string): ParsedAddress | { error: string } {
     return { error: '埠號必須是 1~65535' };
   }
 
-  return { host, port: port ?? DEFAULT_PORT };
+  return { scheme, host, port: port ?? DEFAULT_PORT };
 }
 
-/** 遊戲頁的網址；`basePath` 與 server 的 `BASE_PATH` 一致 */
-export function gameUrl(address: ParsedAddress): string {
+function originOf(address: ServerAddress): string {
   const host = address.host.includes(':') ? `[${address.host}]` : address.host;
-  return `http://${host}:${address.port}/MayanaIdle/`;
+  return `${address.scheme}://${host}:${address.port}`;
 }
 
-function sameServer(a: { host: string; port: number }, b: { host: string; port: number }): boolean {
-  return a.host.toLowerCase() === b.host.toLowerCase() && a.port === b.port;
+/** 遊戲頁的網址（`basePath` 與 server 的 `BASE_PATH` 一致）；協定預設埠省略 */
+export function gameUrl(address: ServerAddress): string {
+  return new URL('/MayanaIdle/', originOf(address)).href;
+}
+
+/** 連線前確認對方是本遊戲 server 的端點 */
+export function versionUrl(address: ServerAddress): string {
+  return new URL('/api/version', originOf(address)).href;
+}
+
+/** 打包時注入的官方 server 位址；未設定或解析失敗為 null */
+export function parseOfficialServer(raw: string | undefined): ServerAddress | null {
+  if (!raw) return null;
+  const parsed = parseAddress(raw);
+  return 'error' in parsed ? null : parsed;
+}
+
+/** 協定＋host（不分大小寫）＋埠全同才是同一台 */
+export function sameServer(a: ServerAddress, b: ServerAddress): boolean {
+  return a.scheme === b.scheme && a.host.toLowerCase() === b.host.toLowerCase() && a.port === b.port;
+}
+
+function addressOf(entry: ServerAddress): ServerAddress {
+  return { scheme: entry.scheme, host: entry.host, port: entry.port };
 }
 
 /**
  * 把一次連線記進清單：同一台就更新時間並移到最前面，不重複建列。
  * 名稱留空時沿用舊名，沒有舊名就用位址。
  */
-export function rememberServer(list: ServerEntry[], entry: { host: string; port: number; name?: string }, now: number): ServerEntry[] {
+export function rememberServer(list: ServerEntry[], entry: ServerAddress & { name?: string }, now: number): ServerEntry[] {
   const existing = list.find(e => sameServer(e, entry));
   const name = entry.name?.trim() || existing?.name || `${entry.host}:${entry.port}`;
-  const next: ServerEntry = { name, host: entry.host, port: entry.port, lastUsedAt: now };
+  const next: ServerEntry = { ...addressOf(entry), name, lastUsedAt: now };
   return [next, ...list.filter(e => !sameServer(e, entry))].slice(0, MAX_RECENT_SERVERS);
 }
 
-export function forgetServer(list: ServerEntry[], target: { host: string; port: number }): ServerEntry[] {
+export function forgetServer(list: ServerEntry[], target: ServerAddress): ServerEntry[] {
   return list.filter(e => !sameServer(e, target));
 }
 
-export function renameServer(list: ServerEntry[], target: { host: string; port: number }, name: string): ServerEntry[] {
+export function renameServer(list: ServerEntry[], target: ServerAddress, name: string): ServerEntry[] {
   const trimmed = name.trim();
   return list.map(e => (sameServer(e, target) ? { ...e, name: trimmed || `${e.host}:${e.port}` } : e));
 }
 
-/** 讀存檔：壞掉的列直接丟掉，不讓一筆爛資料害整份清單消失 */
+/** 讀存檔：壞掉的列直接丟掉；沒有協定欄位的舊資料視為 http */
 export function parseServerList(raw: unknown): ServerEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: ServerEntry[] = [];
@@ -114,10 +139,12 @@ export function parseServerList(raw: unknown): ServerEntry[] {
     const e = item as Partial<ServerEntry>;
     if (typeof e.host !== 'string' || !e.host) continue;
     if (typeof e.port !== 'number' || !Number.isInteger(e.port) || e.port < 1 || e.port > 65535) continue;
+    if (e.scheme !== undefined && e.scheme !== 'http' && e.scheme !== 'https') continue;
     out.push({
-      name: typeof e.name === 'string' && e.name.trim() ? e.name : `${e.host}:${e.port}`,
+      scheme: e.scheme ?? 'http',
       host: e.host,
       port: e.port,
+      name: typeof e.name === 'string' && e.name.trim() ? e.name : `${e.host}:${e.port}`,
       lastUsedAt: typeof e.lastUsedAt === 'number' ? e.lastUsedAt : 0,
     });
   }

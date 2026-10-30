@@ -16,6 +16,7 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     min-height: 100vh;
@@ -30,23 +31,28 @@
   }
   h1 { margin: 0; font-size: 30px; letter-spacing: 2px; }
   .version { color: var(--dim); font-size: 13px; margin-top: -20px; }
-  .modes { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
-  .mode {
-    width: 260px;
-    padding: 20px;
+  .menu { display: flex; flex-direction: column; gap: 10px; width: min(360px, 90vw); }
+  .menu-btn {
+    padding: 12px 16px;
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    text-align: left;
+    border-radius: 8px;
     color: var(--text);
-    cursor: pointer;
     font: inherit;
+    font-size: 16px;
+    cursor: pointer;
     transition: background .12s, border-color .12s;
   }
-  .mode:hover:not(:disabled) { background: var(--card-hi); border-color: var(--accent); }
-  .mode:disabled { opacity: .5; cursor: default; }
-  .mode-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
-  .mode-desc { color: var(--dim); font-size: 13px; line-height: 1.5; }
+  .menu-btn:hover:not(:disabled) { background: var(--card-hi); border-color: var(--accent); }
+  .menu-btn:disabled { opacity: .5; cursor: default; }
+  li.official { border-color: var(--accent); }
+  li.official .name { color: var(--accent); }
+  .credits-list { max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 6px; }
+  .credits-list details { background: #0f1430; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .credits-list summary { cursor: pointer; }
+  .credits-list .name { font-weight: 600; }
+  .credits-list .meta { color: var(--dim); font-size: 13px; margin-left: 8px; }
+  .credits-list pre { margin: 8px 0 0; white-space: pre-wrap; color: var(--dim); font-size: 12px; line-height: 1.5; }
   .panel {
     width: 100%;
     max-width: 820px;
@@ -128,8 +134,6 @@
   .form label .key { color: var(--text); font-weight: 600; }
   .world-port { color: var(--dim); font-size: 13px; }
   .world-warn { color: var(--danger); font-size: 12px; }
-  .mode-config { display: inline-block; margin-top: 10px; font-size: 12px; }
-  .mode-config:hover { text-decoration: underline; }
   .message { min-height: 20px; color: var(--danger); font-size: 13px; }
   .busy { color: var(--dim); }
 </style>
@@ -139,16 +143,18 @@
   <div class="version" id="version"></div>
 
 
-  <div class="modes" id="home-modes">
-    <button class="mode" id="solo">
-      <div class="mode-title">單機開始</div>
-      <div class="mode-desc">只有自己，資料存在這台電腦。不開放連線。</div>
-      <span class="link mode-config" id="solo-config">設定</span>
-    </button>
-    <button class="mode" id="open">
-      <div class="mode-title">開放（開站）</div>
-      <div class="mode-desc">在這台電腦開一台 server，同網路的人可以連進來。</div>
-    </button>
+  <div class="menu" id="home-view">
+    <button class="menu-btn" id="solo">單機</button>
+    <button class="menu-btn" id="multi">多人</button>
+    <button class="menu-btn" id="solo-config">單機世界設定</button>
+    <button class="menu-btn" id="credits">Credits</button>
+    <button class="menu-btn" id="quit">結束</button>
+  </div>
+
+  <div class="menu" id="multi-view" hidden>
+    <button class="menu-btn" id="open">開放（開站）</button>
+    <button class="menu-btn" id="connect-mode">連線到別人的 server</button>
+    <button class="menu-btn" id="multi-back">返回</button>
   </div>
 
   <!-- 開放：先選已建立的世界，或走建立流程；不會偷偷用預設值建一個 -->
@@ -178,16 +184,29 @@
     </div>
   </div>
 
-  <div class="panel" id="connect-view">
-    <h2>連線到別人的 server</h2>
+  <div class="panel" id="connect-view" hidden>
+    <div class="panel-head">
+      <h2>連線到別人的 server</h2>
+      <button class="link" id="connect-back">← 返回</button>
+    </div>
     <div class="row">
       <input id="address" placeholder="192.168.1.10:25580 或直接貼網址" autocomplete="off" />
       <button class="go" id="connect">連線</button>
     </div>
-    <div class="message" id="message"></div>
     <ul id="recent"></ul>
     <div class="empty" id="empty" hidden>還沒有連過任何 server</div>
   </div>
+
+  <div class="panel" id="credits-view" hidden>
+    <div class="panel-head">
+      <h2>Credits</h2>
+      <button class="link" id="credits-back">← 返回</button>
+    </div>
+    <p class="hint">本程式使用下列第三方軟體，依各自授權條款散布。點選可展開授權全文。</p>
+    <div class="credits-list" id="credits-list"></div>
+  </div>
+
+  <div class="message" id="message"></div>
 
 <script>
   const api = window.launcher;
@@ -215,56 +234,101 @@
   }
 
   function setButtons(disabled) {
-    for (const id of ['solo', 'open', 'connect']) $(id).disabled = disabled;
+    for (const id of ['solo', 'multi', 'solo-config', 'credits', 'quit', 'open', 'connect-mode', 'connect']) $(id).disabled = disabled;
+  }
+
+  /** 最近連線一筆的連線位址：帶協定，http 與 https 是不同的兩台 */
+  function entryAddress(entry) {
+    const host = entry.host.includes(':') ? `[${entry.host}]` : entry.host;
+    return `${entry.scheme}://${host}:${entry.port}`;
+  }
+
+  function entryTarget(entry) {
+    return { scheme: entry.scheme, host: entry.host, port: entry.port };
+  }
+
+  function serverRow(nameText, addrText, buttons, className) {
+    const li = document.createElement('li');
+    if (className) li.className = className;
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = nameText;
+    const addr = document.createElement('span');
+    addr.className = 'addr';
+    addr.textContent = addrText;
+    const spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    li.append(name, addr, spacer, ...buttons);
+    return li;
+  }
+
+  function rowButton(text, onclick, className) {
+    const button = document.createElement('button');
+    button.textContent = text;
+    if (className) button.className = className;
+    button.onclick = onclick;
+    return button;
   }
 
   async function renderRecent() {
-    const list = await api.listServers();
+    const [official, list] = await Promise.all([api.officialServer(), api.listServers()]);
     const ul = $('recent');
     ul.replaceChildren();
-    $('empty').hidden = list.length > 0;
+    $('empty').hidden = list.length > 0 || official !== null;
+
+    if (official) {
+      ul.append(serverRow('★ 官方 server', official.url, [rowButton('連線', () => void connect(official.url))], 'official'));
+    }
 
     for (const entry of list) {
-      const li = document.createElement('li');
-      const name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = entry.name;
-      const addr = document.createElement('span');
-      addr.className = 'addr';
-      addr.textContent = `${entry.host}:${entry.port}`;
-      const spacer = document.createElement('span');
-      spacer.className = 'spacer';
-
-      const go = document.createElement('button');
-      go.textContent = '連線';
-      go.onclick = () => connect(`${entry.host}:${entry.port}`);
-
-      const rename = document.createElement('button');
-      rename.textContent = '改名';
-      rename.onclick = async () => {
+      const rename = rowButton('改名', async () => {
         const next = prompt('這台 server 的名稱', entry.name);
         if (next === null) return;
-        await api.renameServer({ host: entry.host, port: entry.port }, next);
+        await api.renameServer(entryTarget(entry), next);
         void renderRecent();
-      };
-
-      const remove = document.createElement('button');
-      remove.className = 'remove';
-      remove.textContent = '移除';
-      remove.onclick = async () => {
-        await api.forgetServer({ host: entry.host, port: entry.port });
+      });
+      const remove = rowButton('移除', async () => {
+        await api.forgetServer(entryTarget(entry));
         void renderRecent();
-      };
-
-      li.append(name, addr, spacer, go, rename, remove);
-      ul.append(li);
+      }, 'remove');
+      const go = rowButton('連線', () => void connect(entryAddress(entry)));
+      ul.append(serverRow(entry.name, `${entry.host}:${entry.port}`, [go, rename, remove]));
     }
   }
 
-  function show(view) {
-    for (const id of ['home-modes', 'connect-view', 'open-view', 'create-view']) {
-      $(id).hidden = id !== view && !(view === 'home' && (id === 'home-modes' || id === 'connect-view'));
+  async function renderCredits() {
+    const list = await api.credits();
+    const box = $('credits-list');
+    box.replaceChildren();
+    for (const entry of list) {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = entry.name;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = `${entry.version}・${entry.license}`;
+      summary.append(name, meta);
+      const text = document.createElement('pre');
+      text.textContent = entry.text ?? `授權：${entry.license}${entry.homepage ? `\n${entry.homepage}` : ''}`;
+      details.append(summary, text);
+      box.append(details);
     }
+  }
+
+  async function connect(address = $('address').value, name) {
+    setButtons(true);
+    setBusy('連線中…');
+    const result = await api.connect(address, name);
+    if (!result.ok) fail(result.message);
+  }
+
+  function show(view) {
+    for (const id of ['home-view', 'multi-view', 'open-view', 'create-view', 'connect-view', 'credits-view']) {
+      $(id).hidden = id !== view;
+    }
+    setBusy(null);
   }
 
   async function start(kind, id) {
@@ -435,22 +499,28 @@
   }
 
   $('solo').onclick = () => void start('solo');
+  $('multi').onclick = () => show('multi-view');
+  $('multi-back').onclick = () => show('home-view');
   $('open').onclick = async () => { show('open-view'); await renderWorlds(); };
-  $('open-back').onclick = () => show('home');
+  $('open-back').onclick = () => show('multi-view');
+  $('connect-mode').onclick = async () => { show('connect-view'); await renderRecent(); };
+  $('connect-back').onclick = () => show('multi-view');
   $('world-new').onclick = () => void openCreateForm();
   $('create-back').onclick = async () => {
-    if (formMode.kind === 'solo') return show('home');
+    if (formMode.kind === 'solo') return show('home-view');
     show('open-view');
     await renderWorlds();
   };
   $('create-submit').onclick = () => void submitForm();
   $('create-folder').onclick = () => api.openDataDir(formMode.kind, formMode.id ?? undefined);
-  $('solo-config').onclick = e => { e.stopPropagation(); void openEditForm('solo'); };
+  $('solo-config').onclick = () => void openEditForm('solo');
+  $('quit').onclick = () => api.quit();
+  $('credits').onclick = async () => { show('credits-view'); await renderCredits(); };
+  $('credits-back').onclick = () => show('home-view');
   $('connect').onclick = () => void connect();
   $('address').addEventListener('keydown', e => { if (e.key === 'Enter') void connect(); });
 
   api.appInfo().then(info => { $('version').textContent = `v${info.version}`; });
-  void renderRecent();
 </script>
 </body>
 </html>

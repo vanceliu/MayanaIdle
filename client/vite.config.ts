@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -20,6 +20,12 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 export default defineConfig({
   plugins: [react()],
   base: '/MayanaIdle/',
+  server: {
+    fs: {
+      /** `demo/title-screen.html` 載入桌面啟動器頁面與 credits 清單 */
+      allow: [searchForWorkspaceRoot(process.cwd()), '../desktop/ui', '../desktop/dist/credits.json'],
+    },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_COMMIT__: JSON.stringify(gitCommit()),

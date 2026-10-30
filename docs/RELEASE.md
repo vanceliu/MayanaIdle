@@ -18,7 +18,7 @@
 
 握手時**兩個版本都要完全相同**（§ 97.2），協定先判。client 送 `PROTOCOL_VERSION` 與
 `BUILD_INFO.version`，server 比自己的兩個；拒連訊息帶 `kind`（`protocol`／`release`），
-登入畫面依此顯示不同文案。
+起始畫面依此顯示不同文案。
 
 發布版本這道不可省：格式相同但版本不同的 client 同時在線，行為差異極難追查。
 
@@ -53,9 +53,12 @@
 所以不必在本機處理跨平台那堆麻煩，也不會在硬碟上堆幾 GB 的產物。
 
 ```bash
-# 版本號改在 client/package.json，commit 之後打 tag（純版本號，不加 v）
+# 版本號改在 client/package.json，同一個 commit 在 client/src/db/seed/patchNotes.ts 最前面加這版的更新公告、刪掉最舊一筆
+# commit 之後打 tag（純版本號，不加 v）
 git tag 0.7.1 && git push origin 0.7.1
 ```
+
+更新公告最新一筆的版本號與 `client/package.json` 不同，或超過 5 筆時，client 測試失敗（`design/52-mailbox.md` § 52.6）。
 
 推 tag 會跑兩條並行的 job：**核對 tag 與 `client/package.json` 版本** → 型別檢查 → 三個 workspace 的測試；
 以及三平台打包。兩者都成功才建立 GitHub Release。基底版本對不上即判失敗、不建 Release（產物的版本號取自
@@ -135,6 +138,8 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 |---|---|
 | server 從哪來 | 打進主行程的 bundle 裡，**不另外帶一份 server 執行檔** —— Electron 的 Node 有 `node:sqlite` |
 | 前端從哪來 | 打包前把 `client/dist` 複製成 `desktop/client-dist`，隨 app 一起包進 asar |
+| Credits | build 時由 `desktop/scripts/genCredits.mjs` 掃 client、server 的 production 相依與 Electron，寫成 `desktop/dist/credits.json`；需先在 client、server、desktop 各自 `npm install` |
+| 官方 server 位址 | 打包時讀環境變數 `OFFICIAL_SERVER_URL` 寫進主行程 bundle；CI 取自同名的 repository variable，本機打包未設定則啟動器不出官方入口（`97-selfhosted-server.md` § 97.2 桌面啟動器） |
 | 壓縮等級 | 封存檔（zip、tar.gz）一律等級 6，由 `desktop/scripts/package.mjs` 以 `ELECTRON_BUILDER_COMPRESSION_LEVEL` 指定（本機與 CI 相同） |
 | 為什麼要各平台原生打 | Windows 的 exe 資源編輯要 wine、Linux 的格式要對應環境；跨平台雖然出得來，但只有原生打的才是能簽章、能裝的正常產物 |
 
@@ -263,7 +268,7 @@ sudo systemctl start mayana
 | 形態 | 條件 | 行為 |
 |---|---|---|
 | 開放 | `bind` 是非回送位址（**預設** `0.0.0.0`） | 每個人自己註冊、自己設密碼 |
-| 單機 | `bind` 是回送位址（`127.0.0.1`） | 自動建立並登入 `host` 帳號，不顯示登入畫面 |
+| 單機 | `bind` 是回送位址（`127.0.0.1`） | 自動建立並登入 `host` 帳號，起始畫面不顯示登入表單 |
 
 server 執行檔是給開站的人用的，所以預設開放。只想自己玩，在**首次啟動前**先建好資料目錄裡的
 `server.properties` 並寫入 `bind=127.0.0.1`，或改用桌面版。
@@ -284,7 +289,7 @@ macOS 首次開啟會被 Gatekeeper 擋（未經 Apple 公證）：
 `xattr -dr com.apple.quarantine /Applications/MayanaIdle.app`，
 或在「系統設定 → 隱私權與安全性」按「仍要打開」。
 
-啟動器有三個入口：單機開始、開放（開站）、連線到別人的 server。
+啟動器先選「單機」或「多人」；「多人」再選開放（開站）或連線到別人的 server；另有單機世界設定、Credits、結束（`design/97-selfhosted-server.md` § 97.2 桌面啟動器）。
 
 資料目錄的根（`userData`）依平台不同，底下結構相同：
 

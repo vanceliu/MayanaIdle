@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeCredits } from './genCredits.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -24,6 +25,7 @@ const common = {
     __APP_VERSION__: JSON.stringify(clientPkg.version),
     __BUILD_COMMIT__: JSON.stringify('desktop'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __OFFICIAL_SERVER_URL__: JSON.stringify(process.env.OFFICIAL_SERVER_URL ?? ''),
     'import.meta.url': '__mayanaModuleUrl',
     'import.meta.dirname': '__dirname',
   },
@@ -58,3 +60,6 @@ if (!existsSync(join(clientDist, 'index.html'))) {
 rmSync(bundledClient, { recursive: true, force: true });
 cpSync(clientDist, bundledClient, { recursive: true });
 console.log('  client-dist  已同步');
+
+const credits = writeCredits(join(here, '..', 'dist', 'credits.json'));
+console.log(`  credits      ${credits.length} 個套件`);

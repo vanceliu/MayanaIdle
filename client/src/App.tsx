@@ -18,7 +18,7 @@ import { TownView } from './components/TownView';
 import { TrainingGroundView } from './components/TrainingGroundView';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
-import { LoginScreen } from './components/LoginScreen';
+import { StartScreen, useTitleView } from './components/StartScreen';
 import { useOnlineStore, resolveServerWsUrl } from './net/online';
 import { connection } from './net/connection';
 import { installOnlineProxies } from './net/mirror';
@@ -47,10 +47,8 @@ export function describeInitError(error: unknown): string {
 
 function App() {
   const phase = useGameStore(s => s.phase);
-  const setPhase = useGameStore(s => s.setPhase);
   const currentRegion = useGameStore(s => s.character?.currentRegion);
-  const onlineEnabled = useOnlineStore(s => s.enabled);
-  const onlineStatus = useOnlineStore(s => s.status);
+  const titleView = useTitleView();
   const [initError, setInitError] = useState<string | null>(null);
 
   const region = currentRegion ? getRegion(currentRegion) : null;
@@ -91,22 +89,7 @@ function App() {
     );
   }
 
-  if (onlineEnabled && onlineStatus !== 'authed') {
-    return <LoginScreen />;
-  }
-
-  if (phase === 'title') {
-    return (
-      <div className="app title-screen">
-        <h1>瑪雅那 Idle</h1>
-        <p>放置型 ARPG</p>
-        <button className="btn-primary" onClick={() => setPhase('characterSelect')}>
-          進入遊戲
-        </button>
-        <BuildLabel />
-      </div>
-    );
-  }
+  if (titleView) return <StartScreen view={titleView} />;
 
   if (phase === 'characterSelect') {
     return (

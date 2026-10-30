@@ -32,6 +32,8 @@ export interface OnlineState {
   requiredVersion: string | null;
   /** 最近一次心跳量到的往返時間（ms）；尚未量到或已斷線為 null（§ 97.2） */
   latencyMs: number | null;
+  /** 已登入、停在起始畫面等玩家按「進入」（`19-account-character.md` § 19.3） */
+  awaitingEnter: boolean;
 }
 
 export const useOnlineStore = create<OnlineState>(() => ({
@@ -53,6 +55,7 @@ export const useOnlineStore = create<OnlineState>(() => ({
   mismatchKind: null,
   requiredVersion: null,
   latencyMs: null,
+  awaitingEnter: false,
 }));
 
 export function isOnline(): boolean {

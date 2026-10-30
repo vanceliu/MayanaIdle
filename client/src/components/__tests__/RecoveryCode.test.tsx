@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { LoginScreen } from '../LoginScreen';
+import { StartScreen } from '../StartScreen';
 import { RecoveryCodeModal } from '../RecoveryCodeModal';
 import { AccountSettings } from '../AccountSettings';
 import { useOnlineStore } from '../../net/online';
@@ -18,9 +18,9 @@ describe('救援碼', () => {
     vi.restoreAllMocks();
   });
 
-  it('登入畫面的「忘記密碼」送出救援碼與新密碼', () => {
+  it('起始畫面登入表單的「忘記密碼」送出救援碼與新密碼', () => {
     const recover = vi.spyOn(connection, 'recover').mockImplementation(() => {});
-    render(<LoginScreen />);
+    render(<StartScreen view={{ kind: 'loginForm' }} />);
 
     fireEvent.click(screen.getByRole('button', { name: '忘記密碼？' }));
     fireEvent.change(screen.getByLabelText('救援碼'), { target: { value: '3-ABCD-EFGH-JKMN-PQRS' } });
@@ -32,7 +32,7 @@ describe('救援碼', () => {
 
   it('註冊關閉時仍有「忘記密碼」；返回登入回到登入表單', () => {
     useOnlineStore.setState({ registration: 'closed' });
-    render(<LoginScreen />);
+    render(<StartScreen view={{ kind: 'loginForm' }} />);
 
     fireEvent.click(screen.getByRole('button', { name: '忘記密碼？' }));
     fireEvent.click(screen.getByRole('button', { name: '返回登入' }));

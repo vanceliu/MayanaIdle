@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>起始畫面／桌面啟動器 調校 — MayanaIdle</title>
+<!--
+  起始畫面（`19-account-character.md` § 19.3）與桌面啟動器兩層（`97-selfhosted-server.md` § 97.2）的調校頁。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/title-screen.html
+
+  - 起始畫面：掛 `src/components/TitleScreen.tsx`，狀態由上方按鈕切換，動作只寫進右側紀錄
+  - 桌面啟動器：iframe 載入 `desktop/ui/launcher.html` 原檔，`window.launcher` 換成本機假後端
+  - Credits 讀 `desktop/dist/credits.json`，先跑 `node desktop/scripts/genCredits.mjs` 產生
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0;
+  padding: 20px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 16px; line-height: 1.8; }
+.demo-note code { color: var(--text-primary, #E2E8F0); }
+.demo-section { margin-bottom: 40px; }
+.demo-controls { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 12px; font-size: 13px; }
+.demo-controls button { font: inherit; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  background: var(--bg-elevated, #1a1a33); color: var(--text-primary, #E2E8F0); border: 1px solid var(--outline-dark, #2A2A4A); }
+.demo-controls button.is-active { border-color: var(--accent-primary, #A78BFA); color: var(--accent-primary, #A78BFA); }
+.demo-controls label { display: inline-flex; gap: 4px; align-items: center; color: var(--text-secondary, #94A3B8); }
+.demo-row { display: flex; gap: 16px; align-items: stretch; }
+.demo-frame { flex: 1; position: relative; height: 640px; overflow: hidden;
+  border: 1px solid var(--outline-dark, #2A2A4A); border-radius: 8px; background: var(--bg-deepest, #0A0A1A); }
+.demo-frame > .app { min-height: 100%; height: 100%; }
+.demo-frame .build-label { position: absolute; }
+.demo-frame iframe { width: 100%; height: 100%; border: 0; }
+.demo-frame .title-notes { max-height: 560px; }
+.demo-log { width: 280px; height: 640px; overflow-y: auto; margin: 0; padding: 10px; font-size: 12px; line-height: 1.6;
+  background: var(--bg-panel, #141428); border: 1px solid var(--outline-dark, #2A2A4A); border-radius: 8px;
+  color: var(--text-secondary, #94A3B8); white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<section class="demo-section">
+  <h1 class="demo-title">起始畫面</h1>
+  <p class="demo-note">
+    正式元件 <code>src/components/TitleScreen.tsx</code>。上排切狀態；登入／註冊／進入／切換帳號只寫進右側紀錄，不會真的連線。
+  </p>
+  <div id="title-root"></div>
+</section>
+
+<section class="demo-section">
+  <h1 class="demo-title">桌面啟動器</h1>
+  <p class="demo-note">
+    iframe 載入 <code>desktop/ui/launcher.html</code> 原檔，後端換成假的。位址含 <code>fail</code> 會連線失敗；
+    「官方 server」可切換有無（模擬打包時有沒有設定 <code>OFFICIAL_SERVER_URL</code>）。
+  </p>
+  <div id="launcher-root"></div>
+</section>
+
+<script type="module" src="./titleScreenDemo.tsx"></script>
+
+</body>
+</html>

@@ -52,6 +52,7 @@ function enterWorld(conn: GameConnection): FakeSocket {
   const socket = latestSocket();
   socket.serverOpens();
   socket.receive(HELLO_HOST);
+  conn.enterFromTitle();
   return socket;
 }
 
@@ -68,6 +69,8 @@ function dropAndReconnect(socket: FakeSocket): FakeSocket {
 function sentAfterHello(socket: FakeSocket): ClientMessage[] {
   return socket.sent.filter(m => m.t !== 'hello');
 }
+
+const LOGIN: ClientMessage = { t: 'login', username: 'u', password: 'p' };
 
 /** `97-selfhosted-server.md` § 97.5 斷線重連 */
 describe('斷線重連回到原角色', () => {
@@ -168,9 +171,10 @@ describe('斷線重連回到原角色', () => {
 
     const second = dropAndReconnect(first);
     conn.logout();
+    conn.login('u', 'p');
     second.receive(AUTH_OK);
 
-    expect(sentAfterHello(second)).toEqual([{ t: 'logout' }, { t: 'characters' }]);
+    expect(sentAfterHello(second)).toEqual([{ t: 'logout' }, LOGIN, { t: 'characters' }]);
     conn.disconnect();
   });
 
@@ -181,9 +185,95 @@ describe('斷線重連回到原角色', () => {
 
     const second = dropAndReconnect(first);
     second.receive({ t: 'error', code: 'session_expired', message: '登入已過期' });
+    conn.login('u', 'p');
     second.receive(AUTH_OK);
 
-    expect(sentAfterHello(second)).toEqual([{ t: 'characters' }]);
+    expect(sentAfterHello(second)).toEqual([LOGIN, { t: 'characters' }]);
+    conn.disconnect();
+  });
+});
+
+/** `19-account-character.md` § 19.3 起始畫面 */
+describe('起始畫面', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', FakeSocket);
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    FakeSocket.instances = [];
+    useOnlineStore.setState({ status: 'offline', error: null, kickedReason: null, awaitingEnter: false });
+    defaultSession.game.setState({ character: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function open(conn: GameConnection): FakeSocket {
+    conn.connect('ws://test/ws');
+    const socket = latestSocket();
+    socket.serverOpens();
+    return socket;
+  }
+
+  it('開頁自動登入停在起始畫面，按「進入」才要角色清單', () => {
+    const conn = new GameConnection();
+    const socket = open(conn);
+    socket.receive(HELLO_HOST);
+
+    expect(sentAfterHello(socket)).toEqual([]);
+    expect(useOnlineStore.getState().awaitingEnter).toBe(true);
+
+    conn.enterFromTitle();
+    expect(sentAfterHello(socket)).toEqual([{ t: 'characters' }]);
+    expect(useOnlineStore.getState().awaitingEnter).toBe(false);
+    conn.disconnect();
+  });
+
+  it('開頁 session 續登同樣停在起始畫面', () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'tok', setItem: () => {}, removeItem: () => {} });
+    const conn = new GameConnection();
+    const socket = open(conn);
+    socket.receive({ t: 'hello_ok', version: '3', serverName: 's', registration: 'open', mode: 'open' });
+    socket.receive(AUTH_OK);
+
+    expect(sentAfterHello(socket)).toEqual([{ t: 'resume', token: 'tok' }]);
+    expect(useOnlineStore.getState().awaitingEnter).toBe(true);
+    conn.disconnect();
+  });
+
+  it('表單登入成功直接進角色選擇', () => {
+    const conn = new GameConnection();
+    const socket = open(conn);
+    socket.receive({ t: 'hello_ok', version: '3', serverName: 's', registration: 'open', mode: 'open' });
+    conn.login('u', 'p');
+    socket.receive(AUTH_OK);
+
+    expect(sentAfterHello(socket)).toEqual([LOGIN, { t: 'characters' }]);
+    expect(useOnlineStore.getState().awaitingEnter).toBe(false);
+    conn.disconnect();
+  });
+
+  it('停在起始畫面時斷線，重連後仍停在起始畫面', () => {
+    const conn = new GameConnection();
+    const first = open(conn);
+    first.receive(HELLO_HOST);
+
+    const second = dropAndReconnect(first);
+    second.receive(HELLO_HOST);
+
+    expect(sentAfterHello(second)).toEqual([]);
+    expect(useOnlineStore.getState().awaitingEnter).toBe(true);
+    conn.disconnect();
+  });
+
+  it('切換帳號（登出）後回到登入表單，不再等「進入」', () => {
+    const conn = new GameConnection();
+    const socket = open(conn);
+    socket.receive(HELLO_HOST);
+    conn.logout();
+
+    expect(useOnlineStore.getState()).toMatchObject({ status: 'login', awaitingEnter: false });
     conn.disconnect();
   });
 });

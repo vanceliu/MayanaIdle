@@ -30,6 +30,8 @@ export class GameConnection {
   private rejoinCharacterId: number | null = null;
   /** 自動選回已送出、尚未收到結果 */
   private rejoinPending = false;
+  /** 已離開起始畫面（按「進入」或以表單登入）；為 false 時自動登入停在起始畫面（`19-account-character.md` § 19.3） */
+  private entered = false;
 
   connect(url: string): void {
     this.url = url;
@@ -78,25 +80,35 @@ export class GameConnection {
   }
 
   login(username: string, password: string): void {
+    this.entered = true;
     useOnlineStore.setState({ error: null });
     this.send({ t: 'login', username, password });
   }
 
   recover(code: string, password: string): void {
+    this.entered = true;
     useOnlineStore.setState({ error: null });
     this.send({ t: 'recover', code, password });
   }
 
   register(username: string, password: string, inviteCode?: string): void {
+    this.entered = true;
     useOnlineStore.setState({ error: null });
     this.send({ t: 'register', username, password, inviteCode });
   }
 
   logout(): void {
     this.rejoinCharacterId = null;
+    this.entered = false;
     this.send({ t: 'logout' });
     writeSessionToken(null);
-    useOnlineStore.setState({ status: 'login', username: null, userId: null, hasRecoveryCode: false, recoveryCode: null });
+    useOnlineStore.setState({ status: 'login', username: null, userId: null, hasRecoveryCode: false, recoveryCode: null, awaitingEnter: false });
+  }
+
+  /** 起始畫面的「進入」 */
+  enterFromTitle(): void {
+    this.entered = true;
+    this.enterAfterAuth();
   }
 
   private open(): void {
@@ -133,8 +145,15 @@ export class GameConnection {
     };
   }
 
-  /** 登入後：有斷線前的角色就直接選回，否則進角色選擇 */
+  /** 登入後：尚未離開起始畫面就停著等「進入」，否則照 `enterAfterAuth` 往下走 */
+  private afterAuth(): void {
+    if (this.entered) this.enterAfterAuth();
+    else useOnlineStore.setState({ awaitingEnter: true });
+  }
+
+  /** 有斷線前的角色就直接選回，否則進角色選擇 */
   private enterAfterAuth(): void {
+    useOnlineStore.setState({ awaitingEnter: false });
     const id = this.rejoinCharacterId;
     this.rejoinCharacterId = null;
     this.rejoinPending = id !== null;
@@ -148,7 +167,7 @@ export class GameConnection {
         if (msg.autoLogin) {
           writeSessionToken(msg.autoLogin.token);
           useOnlineStore.setState({ status: 'authed', username: msg.autoLogin.username, userId: msg.autoLogin.userId, hasPassword: false, hasRecoveryCode: false, isHost: msg.autoLogin.isHost });
-          this.enterAfterAuth();
+          this.afterAuth();
           return;
         }
         const token = readSessionToken();
@@ -165,7 +184,7 @@ export class GameConnection {
           status: 'authed', username: msg.username, userId: msg.userId, hasPassword: msg.hasPassword, hasRecoveryCode: msg.hasRecoveryCode, isHost: msg.isHost, error: null,
           ...(msg.recoveryCode ? { recoveryCode: msg.recoveryCode } : {}),
         });
-        this.enterAfterAuth();
+        this.afterAuth();
         return;
       case 'recovery_code':
         useOnlineStore.setState({ recoveryCode: msg.code, hasRecoveryCode: true });
@@ -182,8 +201,9 @@ export class GameConnection {
         if (msg.code === 'session_expired') {
           writeSessionToken(null);
           this.rejoinCharacterId = null;
-          // 改密碼撤銷了這條 session 時，回登入畫面要看得到原因（§ 97.5）
-          useOnlineStore.setState({ status: 'login', error: useOnlineStore.getState().kickedReason, kickedReason: null });
+          this.entered = false;
+          // 改密碼撤銷了這條 session 時，回登入表單要看得到原因（§ 97.5）
+          useOnlineStore.setState({ status: 'login', error: useOnlineStore.getState().kickedReason, kickedReason: null, awaitingEnter: false });
           return;
         }
         if (this.rejoinPending) {

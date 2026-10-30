@@ -110,6 +110,7 @@
 | 補給天賦（原村莊腳本：自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
 | **裝備篩選條件（販售保留／存入命中）／「本角色穿得起的」判定基準** | `49-village-script.md` | § 49.4 |
 | **系統信箱／更新公告（發放與領取）** | `52-mailbox.md` | 全文 |
+| 起始畫面改版資訊（只留最新 5 版） | `52-mailbox.md` § 52.6 | 版面見 `19-account-character.md` § 19.3 |
 | **補償的版本範圍（單版／到某版之前／全版本）** | `52-mailbox.md` | § 52.2.4 |
 | **補償寄送紀錄記在角色身上** | `52-mailbox.md` | § 52.2.4.2 |
 | **新增補償前必須先問使用者範圍** | `52-mailbox.md` | § 52.2.4.3 |
@@ -155,7 +156,7 @@
 | **試驗場（木樁／DPS 量測）** | `50-training-ground.md` | 全文 |
 | 木樁可調參數（防禦/血量/等級/體型/元素/數量） | `50-training-ground.md` | § 50.4.2 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
-| 帳號與多角色系統（角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文（帳號規則在 `97-selfhosted-server.md` § 97.5） |
+| 帳號與多角色系統（起始畫面/角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文（帳號規則在 `97-selfhosted-server.md` § 97.5） |
 | 角色識別（uuid） | `19-account-character.md` | § 19.4 |
 | 資料版本與遷移 | `19-account-character.md` § 19.9、`97-selfhosted-server.md` § 97.4 | — |
 | **全域倍率（金幣／掉落／經驗／Pressure／生成隻數／怪物血量／怪物攻擊力／Boss 生成）** | `19-account-character.md` § 19.9 | 作用位置：`27-drop-table.md` § 27.1、`36-quest-system.md` § 36.3、`28-monster-stats.md` § 28.1、`26-spawn-pressure.md` § 26.2~26.4、`04-character.md` § 4.11 |
@@ -389,6 +390,7 @@
   ←  04-character.md § 4.9
        ↕
 52-mailbox.md
+  ←→ 19-account-character.md § 19.3（§ 52.6 起始畫面改版資訊）
   ←→ 51-auto-talent.md § 51.3.3~51.3.4
   ←→ 35-inventory-constraints.md § 35.21
   ←→ 19-account-character.md § 19.9

@@ -18,8 +18,8 @@ import { log } from '../../server/src/log';
 import { installRejectionGuard } from '../../server/src/processGuard';
 import { writeSecretFile } from '../../server/src/secretFile';
 import {
-  parseAddress, gameUrl, rememberServer, forgetServer, renameServer, parseServerList,
-  type ServerEntry,
+  parseAddress, gameUrl, versionUrl, rememberServer, forgetServer, renameServer, parseServerList,
+  parseOfficialServer, sameServer, type ServerAddress, type ServerEntry,
 } from './servers';
 import {
   applyConfigEdits, buildWorldProperties, formatProperties, isValidWorldId, mergeConfigValues,
@@ -232,15 +232,22 @@ app.on('before-quit', event => {
   void stopServer().finally(() => app.quit());
 });
 
+declare const __OFFICIAL_SERVER_URL__: string;
+
+/** 打包時以 `OFFICIAL_SERVER_URL` 注入（`97-selfhosted-server.md` § 97.2 桌面啟動器） */
+const officialServer = parseOfficialServer(typeof __OFFICIAL_SERVER_URL__ !== 'undefined' ? __OFFICIAL_SERVER_URL__ : undefined);
+
 ipcMain.handle('servers:list', () => loadServers());
 
-ipcMain.handle('servers:forget', (_e, target: { host: string; port: number }) => {
+ipcMain.handle('servers:official', () => (officialServer ? { url: gameUrl(officialServer) } : null));
+
+ipcMain.handle('servers:forget', (_e, target: ServerAddress) => {
   const next = forgetServer(loadServers(), target);
   saveServers(next);
   return next;
 });
 
-ipcMain.handle('servers:rename', (_e, target: { host: string; port: number }, name: string) => {
+ipcMain.handle('servers:rename', (_e, target: ServerAddress, name: string) => {
   const next = renameServer(loadServers(), target, name);
   saveServers(next);
   return next;
@@ -354,7 +361,7 @@ ipcMain.handle('world:connect', async (_e, raw: string, name?: string) => {
   const url = gameUrl(parsed);
   try {
     // 先確認那台真的是 MayanaIdle server，否則會載入一片空白讓人以為程式壞了
-    const res = await fetch(`http://${parsed.host}:${parsed.port}/api/version`, {
+    const res = await fetch(versionUrl(parsed), {
       signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) throw new Error(`server 回應 ${res.status}`);
@@ -362,7 +369,9 @@ ipcMain.handle('world:connect', async (_e, raw: string, name?: string) => {
     if (typeof body.version !== 'string') throw new Error('對方不是 MayanaIdle server');
 
     await stopServer();
-    saveServers(rememberServer(loadServers(), { ...parsed, name: name || body.serverName }, Date.now()));
+    if (!officialServer || !sameServer(officialServer, parsed)) {
+      saveServers(rememberServer(loadServers(), { ...parsed, name: name || body.serverName }, Date.now()));
+    }
     win.setTitle(`瑪雅那 Idle — ${body.serverName ?? parsed.host}`);
     await win.loadURL(url);
     return { ok: true, url };
@@ -385,3 +394,14 @@ ipcMain.handle('app:info', () => ({
   version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : app.getVersion(),
   userData: app.getPath('userData'),
 }));
+
+ipcMain.handle('app:quit', () => app.quit());
+
+/** 第三方套件授權清單，build 時由 `scripts/genCredits.mjs` 產生 */
+ipcMain.handle('app:credits', () => {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, 'credits.json'), 'utf-8')) as unknown[];
+  } catch {
+    return [];
+  }
+});

@@ -257,6 +257,125 @@ a,
   margin-bottom: 2.5rem;
 }
 
+/* --- 起始畫面（`19-account-character.md` § 19.3） --- */
+.title-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  width: 100%;
+  padding: 24px;
+}
+
+.title-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title-notes {
+  width: min(360px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 16px 18px;
+  text-align: left;
+  background: var(--bg-panel);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: 10px;
+}
+
+.title-notes h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--accent-primary);
+}
+
+.title-note + .title-note {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--outline-dark);
+}
+
+.title-note h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: var(--fs-md);
+}
+
+.title-note-version {
+  color: var(--text-primary);
+}
+
+.title-note-date {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: normal;
+}
+
+.title-note ul {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.title-hero {
+  margin-bottom: 2rem;
+}
+
+.title-screen .title-tagline {
+  margin-bottom: 0;
+}
+
+.title-screen .title-server {
+  margin: 0.75rem 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  letter-spacing: 1px;
+}
+
+.title-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(360px, 90vw);
+  padding: 24px 20px;
+  background: var(--bg-panel);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: 10px;
+}
+
+.title-panel .login-form {
+  width: 100%;
+  margin: 0;
+}
+
+.title-screen .title-status,
+.title-screen .title-account {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+}
+
+.title-screen .title-status-error {
+  color: var(--accent-danger);
+}
+
+.title-account strong {
+  color: var(--text-primary);
+}
+
+.title-enter {
+  min-width: 160px;
+}
+
 /* --- 登入畫面（開放形態，`97-selfhosted-server.md` § 97.5） --- */
 .login-form {
   display: flex;
@@ -7328,6 +7447,16 @@ button.active {
   /* 標題／選角／建角三頁：桌機的固定寬卡片在 393px 會溢出 */
   .title-screen h1 {
     font-size: 2.2rem;
+  }
+
+  /* 起始畫面：改版資訊排到主區塊下方 */
+  .title-layout {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .title-notes {
+    max-height: none;
   }
 
   .character-select-screen,

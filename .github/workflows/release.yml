@@ -107,6 +107,8 @@ jobs:
 
       - run: npm run package -- ${{ matrix.desktop }}
         working-directory: desktop
+        env:
+          OFFICIAL_SERVER_URL: ${{ vars.OFFICIAL_SERVER_URL }}
 
       # 先收成一層平的：upload-artifact 會保留共同上層路徑，
       # 直接上傳兩個目錄的話，下載回來是 `server/release/...` 的巢狀結構，
