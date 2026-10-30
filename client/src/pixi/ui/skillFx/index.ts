@@ -11,12 +11,13 @@ export {
   tilesToGroundRadius, lighten,
   hitShakeOffset,
   HIT_REACTION_ART, hitFlashAlpha, deathFadeState,
+  DASH_ART, dashTotalMs, dashRemaining, dashFrame, dashOffset, dashAfterimages,
 } from './geometry';
 export type {
   SkillFxPrototype, SkillFxArt, MarkKind, ShieldKind, EmblemKind,
   CastParams, TravelParams, ImpactParams, BurstParams, NovaParams,
   DropParams, HealParams, AuraParams, MarkParams, DotTickParams, ShieldParams,
-  EmblemParams, HitReactionArt,
+  EmblemParams, HitReactionArt, DashArt, DashFrame,
 } from './geometry';
 
 export {

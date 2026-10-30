@@ -29,6 +29,8 @@ export interface SkillFxInput {
   buffCategory?: string;
   /** 多段判定的段數（`23-class-magic.md` § 23.1.1 的三連射） */
   hits?: number;
+  /** 突進技能：射程再遠也是近戰揮擊（`41-arpg-combat.md` § 3.6） */
+  dash?: boolean;
   /** 命中時附加的 debuff。決定命中要點綴什麼顏色（§ 48.7.4.3） */
   applyDebuff?: { tags: string[] };
   /**
@@ -401,6 +403,11 @@ function derivePlan(skill: SkillFxInput, ctx: SkillFxContext): SkillFxPlan {
     return { ...base, delivery: 'none', landing: 'heal' };
   }
 
+  /* 被動不會被施放；比照 buff 給一個 aura，讓所有技能都判定得出原型 */
+  if (skill.type === 'passive') {
+    return { ...base, delivery: 'none', landing: 'aura', color: BUFF_AURA_COLOR };
+  }
+
   /*
    * 多段的普攻型技能 —— 目前只有三連射（`23-class-magic.md` § 23.1.1）。
    *
@@ -453,7 +460,7 @@ function derivePlan(skill: SkillFxInput, ctx: SkillFxContext): SkillFxPlan {
       : { ...base, delivery: 'travel', landing: 'burst', radiusTiles };
   }
 
-  if (MELEE_FX_SKILL_IDS.includes(skill.id) || (skill.range ?? 0) <= MELEE_FX_RANGE) {
+  if (MELEE_FX_SKILL_IDS.includes(skill.id) || skill.dash || (skill.range ?? 0) <= MELEE_FX_RANGE) {
     /* 近戰沿用 § 48.6 的武器揮擊，不另做動作；起手環會擋住揮擊的前搖，所以不演 */
     return { ...base, cast: false, delivery: 'melee', landing: 'impact', weapon: 'swing' };
   }

@@ -24,8 +24,10 @@ export interface StatusFxTarget {
   tags: readonly string[];
 }
 
-/** 暈眩的 tag（`24-buff-debuff.md` § 24.4.1）。標記只給它 */
+/** 暈眩的 tag（`24-buff-debuff.md` § 24.4.1） */
 export const STUN_TAG = 'stunned';
+/** 定身的 tag（`24-buff-debuff.md` § 24.5.1b） */
+export const ROOT_TAG = 'rooted';
 
 /**
  * 這個目標頭上該不該有標記，有的話是哪一種。
@@ -34,7 +36,9 @@ export const STUN_TAG = 'stunned';
  * 每種 debuff 都配一個標記的話，十隻怪各掛三個就是三十個小圖形。
  */
 export function resolveStatusMark(tags: readonly string[]): MarkKind | null {
-  return tags.includes(STUN_TAG) ? 'stun' : null;
+  /* 同時暈眩與定身時顯示暈眩：暈眩連攻擊都停了，是較強的那個 */
+  if (tags.includes(STUN_TAG)) return 'stun';
+  return tags.includes(ROOT_TAG) ? 'root' : null;
 }
 
 /** 這個目標的 sprite 該染成什麼色。`null` ＝ 不染 */

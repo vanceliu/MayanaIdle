@@ -8,6 +8,11 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'cd-reduction': 'buffs/lightning-helix',
   'element-boost': 'buffs/embrassed-energy',
   'holy-shield': 'buffs/holy-symbol',
+  'mana-shield': 'buffs/magic-shield',
+  'mana-spring': 'buffs/lightning-frequency',
+  'blood-mana': 'buffs/heart-drop',
+  'spirit-gathering': 'buffs/magic-swirl',
+  'root': 'skills/thorny-vine',
   'evasion': 'buffs/dodging',
   'poison-enchant': 'buffs/vile-fluid',
   'atk-debuff': 'buffs/fire-shield',
@@ -210,10 +215,14 @@ export const SKILL_ID_ICON_MAP: Record<string, string> = {
   'shield-bash': 'skills/shield-bash',
   'rend': 'skills/serrated-slash',
   'taunt': 'skills/sonic-shout',
+  'charge': 'skills/charging-bull',
+  'blood-curse': 'skills/sword-wound',
   'vengeance': 'skills/bloody-sword',
 
   // --- 職業魔法 · 妖精 ---
   'triple-shot': 'skills/arrow-cluster',
+  'binding-arrow': 'skills/thorny-vine',
+  'leap-shot': 'skills/jump-across',
   'arrow-rain': 'skills/split-arrows',
 
   // --- 職業魔法 · 元素師 ---
@@ -222,11 +231,13 @@ export const SKILL_ID_ICON_MAP: Record<string, string> = {
 
   // --- 職業魔法 · 牧師 ---
   'holy-judgment': 'skills/sunbeams',
-  'high-heal': 'skills/heart-plus',
+  'holy-smite': 'skills/winged-sword',
   'group-heal': 'skills/prayer',
 
   // --- 職業魔法 · 盜賊 ---
   'backstab': 'skills/backstab',
+  'poison-mist': 'skills/poison-cloud',
+  'dodge-counter': 'skills/sword-spin',
 };
 
 export function getEffectIcon(category: string): string {

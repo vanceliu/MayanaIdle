@@ -37,7 +37,7 @@ import type { DamageType } from '../pixi/ui/CombatVisualEvent';
 import type { EffectLayer } from '../pixi/layers/EffectLayer';
 import { getMonsterProjectileStyle } from '../pixi/ui/projectileStyle';
 import {
-  HIT_LIFT, playSkillFx, resolveAttackFxContext,
+  HIT_LIFT, DASH_ART, dashTotalMs, playSkillFx, resolveAttackFxContext,
   resolveMonsterAttackFxPlan, resolveMuzzleOffset, resolvePlayerAttackFxPlan,
   resolveAuraColor, resolveSkillFxPlan, resolveStatusTint, StatusMarkTracker,
   type SkillFxPlan, type SkillFxTarget, type StatusFxTarget,
@@ -596,6 +596,8 @@ function playPlayerAttackFx(o: {
   activeEffects: ActiveEffect[];
   /** 攻速決定武器演出播多快，進而決定「打到」是第幾毫秒 */
   attackIntervalMs: number;
+  /** 突進技能等位移演完才出手（`48-vfx.md` § 48.7.8） */
+  startDelayMs?: number;
 }): void {
   const { effectLayer, map, playerPos, result } = o;
   const fx = effectLayer.skillFx;
@@ -646,6 +648,11 @@ function playPlayerAttackFx(o: {
       x: sx, y,
       crit: dmg.isCrit,
       onLandHit: dmg.hits.map((hit, i) => () => {
+        /* 只上毒的技能（毒霧，§ 23.7）沒有直接傷害：不跳 0、不彈 */
+        if (skill?.dotOnly) {
+          entity?.releaseHit(0);
+          return;
+        }
         effectLayer.spawnDamageNumber(
           sx, y, hit.damage,
           hit.isMiss ? 'miss' : resolveHitDamageType(hit, damageType),
@@ -697,6 +704,7 @@ function playPlayerAttackFx(o: {
     toX: main.sx, toY: main.sy - HIT_LIFT,
     targets,
     speed: PLAYER_PROJECTILE_SPEED,
+    startDelayMs: o.startDelayMs,
     onWeaponAction: () => {
       if (!o.player || !isPawnWeaponType(shownWeapon)) return;
       o.player.playAttack(playerPos, target, {
@@ -745,6 +753,8 @@ function renderCombatVisuals(
   const map = useMapControlStore.getState().currentMap;
   if (!map) return;
   const gs = useGameStore.getState();
+  /** 本批有突進的成員：同一批的出手要等位移演完 */
+  const dashDelayMs = new Map<number, number>();
 
   for (const v of visuals) {
     const actor = resolveVisualActor(v.memberId, player, teammates);
@@ -753,6 +763,13 @@ function renderCombatVisuals(
     switch (v.kind) {
       case 'face': {
         actor.entity?.faceToward(actor.pos, v.target);
+        break;
+      }
+      case 'dash': {
+        const from = mapPositionToScreen(map, v.from);
+        const to = mapPositionToScreen(map, v.to);
+        actor.entity?.playDash(from.sx - to.sx, from.sy - to.sy);
+        dashDelayMs.set(v.memberId, dashTotalMs(DASH_ART));
         break;
       }
       case 'player_attack': {
@@ -770,6 +787,7 @@ function renderCombatVisuals(
           weaponMaterial: v.weapon?.material ?? null,
           activeEffects: gs.activeEffects,
           attackIntervalMs: v.attackIntervalMs,
+          startDelayMs: dashDelayMs.get(v.memberId),
         });
         break;
       }

@@ -1,7 +1,7 @@
 import type { PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
-import { resolveDebuffDuration, resolveDotDamagePercent, type Skill } from '../models/skill';
+import { resolveDebuffDuration, resolveDotDamagePercent, resolveMpAfterSelfCast, resolveSelfHpCost, type Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
 import type { EquipmentInstance } from '../models/equipment';
 import type { MapMonster } from '../stores/mapMonsterStore';
@@ -17,6 +17,9 @@ import {
   hasActiveFireEnchant,
   calculateMpRestored,
   absorbWithShield,
+  absorbWithManaShield,
+  getSkillSideValue,
+  consumeEvadeCharge,
   getTotalMagicResist,
   getWeaponHitCount,
   calculateHealAmount,
@@ -191,6 +194,27 @@ export interface MonsterAttackResult {
   restoreLogs?: CombatLog[];
 }
 
+/**
+ * 這次出手依序打誰。一般技能＝目標清單照順序各一下；
+ * 隨機多擊（`41-arpg-combat.md` § 3.4）＝每下從**還活著**的候選中取後放回抽 1 隻，
+ * 候選全死就提前結束。
+ */
+export function* attackSequence(
+  candidates: string[],
+  skill: Pick<Skill, 'randomHits'> | undefined,
+  monsterInstances: Map<string, MonsterInstance>,
+): Generator<string> {
+  if (!skill?.randomHits) {
+    yield* candidates;
+    return;
+  }
+  for (let i = 0; i < skill.randomHits; i++) {
+    const alive = candidates.filter(id => (monsterInstances.get(id)?.currentHp ?? 0) > 0);
+    if (alive.length === 0) return;
+    yield alive[Math.floor(random() * alive.length)];
+  }
+}
+
 export function processPlayerAttack(
   event: PlayerAttackEvent,
   ctx: ArpgEventContext,
@@ -216,7 +240,13 @@ export function processPlayerAttack(
     if (skill.type === 'buff') {
       const template = getSkillTemplate(skill.id);
       const buffDuration = template?.buffDuration ?? skill.buffDuration;
-      const newChar = { ...character, mp: character.mp - skill.mpCost };
+      // 自身 HP 消耗（`23-class-magic.md` § 23.5 魔力湧泉）：穿透減傷與護盾，最低留 1
+      const hpCost = resolveSelfHpCost(skill, character.hp, getEffectiveMaxHp(character, gs.equippedGear, gs.activeEffects));
+      if (hpCost > 0) logs.push({ text: `${skill.name} 消耗 ${hpCost} HP`, type: 'player' });
+      const effMaxMp = getEffectiveMaxMp(character, gs.equippedGear, gs.activeEffects);
+      const mpAfter = resolveMpAfterSelfCast(skill, character.mp, effMaxMp);
+      if (skill.mpRestorePercent) logs.push({ text: `${skill.name} 回復 ${mpAfter - Math.max(0, character.mp - skill.mpCost)} MP`, type: 'player' });
+      const newChar = { ...character, mp: mpAfter, hp: character.hp - hpCost };
       const newSkills = [...gs.skills];
       if (skillIdx >= 0) newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
 
@@ -239,8 +269,15 @@ export function processPlayerAttack(
         if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
         if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
         if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
+        const evadeCharges = template?.evadeCharges ?? skill.evadeCharges;
+        if (evadeCharges) buffEffect.evadeCharges = evadeCharges;
         const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
-        if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
+        const shieldPower = template?.shieldPower ?? skill.shieldPower;
+        if (shieldMod) {
+          buffEffect.shieldRemaining = shieldMod.value + (shieldPower
+            ? getSkillSideValue(character, shieldPower, getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear), gs.activeEffects)
+            : 0);
+        }
 
         if (skill.cleanse) {
           const cleansed = gs.activeEffects.filter(e => !(e.type === 'debuff' && e.target === 'player'));
@@ -275,7 +312,7 @@ export function processPlayerAttack(
   }
 
   // 攻擊技能附帶的自身 buff（復仇之刃、背刺）——
-  // 於傷害結算「前」施加，本次攻擊也吃得到加成。
+  // 於傷害結算「前」施加；技能公式不讀攻擊力%，本次技能不受加成（§ 23.1.1 B 組）。
   let effectsForDamage = activeEffects;
   if (skill?.selfBuff) {
     const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects);
@@ -286,7 +323,21 @@ export function processPlayerAttack(
     }
   }
 
-  for (const targetId of event.targetMonsterIds) {
+  // 自身 HP 消耗（`23-class-magic.md` § 23.3 血濺咒殺）：不是受到傷害，穿透減傷與護盾，最低留 1
+  if (skill?.selfHpCostPercent) {
+    const gs = session.game.getState();
+    const self = gs.character!;
+    const cost = resolveSelfHpCost(skill, self.hp, getEffectiveMaxHp(self, gs.equippedGear, gs.activeEffects));
+    if (cost > 0) {
+      session.game.setState({ character: { ...self, hp: self.hp - cost } });
+      logs.push({ text: `${skill.name} 消耗 ${cost} HP`, type: 'player' });
+    }
+  }
+
+  /** 只上毒的技能（毒霧）沒有「命中」：不觸發追加傷害、元素侵蝕、武器 debuff、T7 命中類 */
+  const procs = !skill?.dotOnly;
+
+  for (const targetId of attackSequence(event.targetMonsterIds, skill, ctx.monsterInstances)) {
     const monster = ctx.monsterInstances.get(targetId);
     if (!monster || monster.currentHp <= 0) continue;
 
@@ -313,7 +364,10 @@ export function processPlayerAttack(
       isMiss = !result.hit;
       hits = result.hits;
     } else if (skill) {
-      if (skill.hits) {
+      if (skill.dotOnly) {
+        // § 23.7 毒霧：不造成直接傷害，只施加 `applyDebuff`
+        damage = 0;
+      } else if (skill.hits) {
         /**
          * 多段物理技能（目前只有三連射）。
          *
@@ -351,7 +405,7 @@ export function processPlayerAttack(
         }
         isMiss = !anyHit;
       } else if (skill.physicalSnapshot) {
-        // § 21.4a：技能攻擊力 + 當下基礎物理傷害（盾擊／裂傷斬／挑釁怒吼），仍然必定命中
+        // § 21.4a：技能攻擊力 + 當下基礎物理傷害，仍然必定命中；不吃火矢附魔（`23-class-magic.md` § 23.1.1）
         const result = calculatePhysicalSnapshotSkill(
           character,
           skill.power,
@@ -398,7 +452,7 @@ export function processPlayerAttack(
 
     // § 7T.4 T7 追加傷害：每下命中各擲一次，加在該下最終傷害
     const bonusDamage = sumUniqueAffix(equippedGear, 'hit_bonus_damage');
-    if (bonusDamage > 0 && !isMiss) {
+    if (bonusDamage > 0 && !isMiss && procs) {
       hits = hits.map(h => (!h.isMiss && random() * 100 < UNIQUE_HIT_PROC_CHANCE
         ? { ...h, damage: h.damage + bonusDamage }
         : h));
@@ -462,7 +516,7 @@ export function processPlayerAttack(
 
     // § 7.4 元素侵蝕：命中後依觸發率上 DoT。普攻與魔法命中都判定；
     // 雙持武器一次攻擊打兩下，因此判定兩次（同淬毒的兩次判定，§ 23.7）。
-    if (!isMiss && !killed) {
+    if (!isMiss && !killed && procs) {
       const erosion = getErosion(weapon?.affixes, weapon?.quality ?? 0);
       if (erosion) {
         const now = gameNow();
@@ -511,7 +565,7 @@ export function processPlayerAttack(
     }
 
     // § 7.9 命中下降／防禦下降：判定次數同元素侵蝕；同一隻怪後施放覆蓋並刷新時間
-    if (!isMiss && !killed) {
+    if (!isMiss && !killed && procs) {
       const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
       for (const proc of getWeaponDebuffAffixes(weapon?.affixes, weapon?.quality ?? 0)) {
         let triggered = false;
@@ -551,12 +605,12 @@ export function processPlayerAttack(
     }
 
     // § 7T.4 T7 命中類：每下命中判定一次
-    if (!isMiss) {
+    if (!isMiss && procs) {
       uniqueHpGain += landedHits * sumUniqueAffix(equippedGear, 'hit_heal');
       uniqueMpGain += landedHits * sumUniqueAffix(equippedGear, 'hit_mana');
       if (killed) uniqueHpGain += sumUniqueAffix(equippedGear, 'kill_heal');
     }
-    if (!isMiss && !killed && hasUniqueAffix(equippedGear, 'hit_stun')) {
+    if (!isMiss && !killed && procs && hasUniqueAffix(equippedGear, 'hit_stun')) {
       let triggered = false;
       for (let r = 0; r < landedHits && !triggered; r++) {
         if (random() * 100 < UNIQUE_HIT_PROC_CHANCE) triggered = true;
@@ -602,7 +656,7 @@ export function processPlayerAttack(
      * 擠成一行會變成一串加號，而且爆擊只能標在整行上 ——
      * 分開之後哪一下爆、哪一下沒中，一眼就看得到。
      */
-    for (const h of hits) {
+    for (const h of procs ? hits : []) {
       logs.push(h.isMiss
         ? { text: `${actionName} ${monster.name} MISS！`, type: 'miss' }
         : {
@@ -632,7 +686,7 @@ export function processPlayerAttack(
 
         // § 24.3.1：純數值修正的 debuff 同 category 由後施放覆蓋前者（刷新時間）
         // DoT（§ 24.3.2）與控場（§ 24.3.3）維持「存續期間不可重新施加」
-        const isRefreshable = !debuffDef.dotDamage && !debuffDef.dotDamagePercent && !debuffDef.stun;
+        const isRefreshable = !debuffDef.dotDamage && !debuffDef.dotDamagePercent && !debuffDef.stun && !debuffDef.root;
         if (alreadyActive && isRefreshable) {
           session.game.setState({
             activeEffects: gs.activeEffects.filter(
@@ -669,8 +723,8 @@ export function processPlayerAttack(
             };
             gs.addEffect(debuffEffect);
             if (!alreadyActive) logs.push({ text: `${monster.name} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'debuff-enemy' });
-          } else if (debuffDef.stun && debuffDef.duration) {
-            // 控場 debuff（§ 24.5.1）
+          } else if ((debuffDef.stun || debuffDef.root) && debuffDef.duration) {
+            // 控場 debuff：暈眩（§ 24.5.1）、定身（§ 24.5.1b）
             const stunDuration = resolveDebuffDuration(debuffDef, isShieldEquipped(equippedGear)) ?? debuffDef.duration;
             // § 24.6：Boss 被控場後 10 秒內免疫任何控場效果
             if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
@@ -685,7 +739,7 @@ export function processPlayerAttack(
                 target: 'monster',
                 targetIdx,
                 targetMonsterId: targetId,
-                stun: true,
+                ...(debuffDef.stun ? { stun: true } : { root: true }),
                 modifiers: debuffDef.modifiers,
                 startTime: now,
                 duration: stunDuration,
@@ -776,7 +830,7 @@ export function processMonsterAttack(
   const { character, equippedGear, activeEffects } = ctx;
   const monsterIdx = ctx.mapMonsters.findIndex(m => m.id === event.monsterId);
 
-  const result = calculateMonsterAttack(
+  let result = calculateMonsterAttack(
     monster,
     character,
     equippedGear,
@@ -786,6 +840,15 @@ export function processMonsterAttack(
     event.damageMultiplier ?? 1,
     event.monsterId,
   );
+
+  // 煙霧彈的絕對迴避（`23-class-magic.md` § 23.7）：本來會受傷的一擊改為 MISS，用掉一次
+  if (!result.dodged && result.damage > 0) {
+    const remaining = consumeEvadeCharge(session.game.getState().activeEffects);
+    if (remaining) {
+      session.game.setState({ activeEffects: remaining });
+      result = { ...result, dodged: true, hit: false, damage: 0 };
+    }
+  }
 
   // 護盾吸收（§ 24.4.9）：在所有減傷之後、實際扣血之前
   let actualDamage = result.damage;
@@ -799,6 +862,16 @@ export function processMonsterAttack(
       shieldLog = shield.broken
         ? { text: `聖光護盾吸收 ${shield.absorbed} 傷害後破裂`, type: 'system' }
         : { text: `聖光護盾吸收 ${shield.absorbed} 傷害`, type: 'system' };
+    }
+
+    // 魔力護盾（`23-class-magic.md` § 23.5）：聖光護盾之後，剩餘傷害的 30% 改扣 MP
+    const mana = absorbWithManaShield(actualDamage, character.mp, session.game.getState().activeEffects);
+    if (mana.mpUsed > 0 || mana.broken) {
+      actualDamage = mana.damage;
+      character.mp -= mana.mpUsed;
+      if (mana.broken) session.game.setState({ activeEffects: mana.effects });
+      const text = `魔力護盾承擔 ${mana.mpUsed} 傷害${mana.broken ? '，MP 耗盡護盾解除' : ''}`;
+      shieldLog = shieldLog ? { ...shieldLog, text: `${shieldLog.text}；${text}` } : { text, type: 'system' };
     }
   }
 

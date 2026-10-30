@@ -46,7 +46,7 @@ export function matchesSkillFilter(
     case 'heal': return skill.type === 'heal';
     case 'buff': return skill.type === 'buff';
     case 'byTalentType':
-      return slotType === 'combat' ? skill.type === 'attack' : skill.type !== 'attack';
+      return slotType === 'combat' ? skill.type === 'attack' : skill.type === 'buff' || skill.type === 'heal';
   }
 }
 

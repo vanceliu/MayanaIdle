@@ -64,10 +64,12 @@ describe('技能資料的射程完整性', () => {
 });
 
 describe('武器射程', () => {
-  it('需裝備弓的技能射程與弓普攻相同（10 格）', () => {
+  it('需裝備弓的技能射程與弓普攻相同（10 格），後躍射擊例外為 8 格（§ 23.4）', () => {
     const bowSkills = CLASS_SKILLS.filter(d => d.skill.requiredWeaponType === 'bow');
-    expect(bowSkills.map(d => d.skill.id).sort()).toEqual(['arrow-rain', 'triple-shot']);
-    for (const d of bowSkills) expect(d.skill.range, d.skill.name).toBe(getWeaponRange('bow'));
+    expect(bowSkills.map(d => d.skill.id).sort()).toEqual(['arrow-rain', 'binding-arrow', 'leap-shot', 'triple-shot']);
+    for (const d of bowSkills) {
+      expect(d.skill.range, d.skill.name).toBe(d.skill.id === 'leap-shot' ? 8 : getWeaponRange('bow'));
+    }
   });
 
   it('弓是唯一的遠程武器，其餘一律近戰', () => {

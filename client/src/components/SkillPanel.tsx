@@ -8,14 +8,13 @@ import {
 import { getSkillDisplayIcon } from '../models/iconMap';
 import { calculateHealAmount } from '../systems/combat';
 import { GameIcon } from './GameIcon';
-import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration, formatDebuffDuration } from '../models/skill';
+import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration, formatDebuffDuration, formatSelfBuff } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
 import { CLASS_MAGIC_RESTRICTIONS } from '../models/skillRestrictions';
 import type { ClassName } from '../models/character';
 import { getEffectiveGearArray } from '../systems/gear';
 
 const GRID_COLUMNS = 5;
-const CLASS_MAGIC_SLOTS = GRID_COLUMNS;
 
 /** 技能格顯示用的模板（未習得的格子沒有 `lastUsedAt`） */
 type SkillTemplate = Omit<Skill, 'lastUsedAt'>;
@@ -25,7 +24,7 @@ function gridColumnsStyle(columns: number) {
   return { '--skill-cols': columns } as React.CSSProperties;
 }
 
-/** 職業魔法一律以 `CLASS_SKILLS` 為單一來源，依職業等級（1~5）對位到格子（§ 23.1） */
+/** 職業魔法一律以 `CLASS_SKILLS` 為單一來源，依職業等級（1~7）對位到格子（§ 23.1） */
 function classSkillByLevel(className: ClassName, classLevel: number) {
   return CLASS_SKILLS.find(d => d.className === className && d.classLevel === classLevel);
 }
@@ -156,6 +155,7 @@ export function SkillPanel() {
   const basicMagicSlots = restriction.maxSkills;
 
   const learnedBasicSkills = skills.filter(s => SKILL_CATALOG.some(c => c.id === s.id));
+  const classMagicSlots = CLASS_SKILLS.filter(d => d.className === className).length;
   const learnedClassSkills = skills.filter(
     s => CLASS_SKILLS.some(d => d.className === className && d.id === s.id),
   );
@@ -237,14 +237,16 @@ export function SkillPanel() {
         <div className="skill-section-header">
           <span className="skill-section-title">職業魔法</span>
           <span className="skill-section-meta">
-            {learnedClassSkills.length}/{CLASS_MAGIC_SLOTS}
+            {learnedClassSkills.length}/{classMagicSlots}
           </span>
         </div>
-        <div className="skill-grid-with-labels" style={gridColumnsStyle(CLASS_MAGIC_SLOTS)}>
-          <div className="skill-grid-row">
+        <div className="skill-grid-with-labels" style={gridColumnsStyle(GRID_COLUMNS)}>
+          {Array.from({ length: Math.ceil(classMagicSlots / GRID_COLUMNS) }).map((_, rowIdx) => (
+          <div key={`class-row-${rowIdx}`} className="skill-grid-row">
             <span className="skill-row-label"></span>
-            {Array.from({ length: CLASS_MAGIC_SLOTS }).map((_, idx) => {
+            {Array.from({ length: GRID_COLUMNS }).map((_, colIdx) => {
               // 第 N 格固定對應職業魔法第 N 級，不隨已習得數量位移
+              const idx = rowIdx * GRID_COLUMNS + colIdx;
               const def = classSkillByLevel(className, idx + 1);
               if (!def) {
                 return <div key={`class-empty-${idx}`} className="skill-cell empty" />;
@@ -257,7 +259,7 @@ export function SkillPanel() {
                   className={`skill-cell ${learnedSkill ? 'learned' : 'locked'}`}
                   onMouseEnter={(e) => handleMouseEnter(e, skill, Boolean(learnedSkill))}
                   onMouseLeave={handleMouseLeave}
-                  {...(learnedSkill ? skillCellHandlers(def.id, skill.name) : {})}
+                  {...(learnedSkill && skill.type !== 'passive' ? skillCellHandlers(def.id, skill.name) : {})}
                 >
                   <GameIcon
                     name={getSkillDisplayIcon(skill)}
@@ -270,6 +272,7 @@ export function SkillPanel() {
               );
             })}
           </div>
+          ))}
         </div>
       </div>
 
@@ -302,6 +305,9 @@ export function SkillPanel() {
           {tooltip.skill.applyDebuff && (
             <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {formatDebuffDuration(tooltip.skill.applyDebuff)})</div>
           )}
+          {tooltip.skill.selfBuff && (
+            <div className="skill-tooltip-stat">自身增益: {formatSelfBuff(tooltip.skill)}</div>
+          )}
           {tooltip.skill.type === 'heal' && tooltip.skill.power > 0 && (
             /*
              * § 21.4c：治癒量隨智力與裝備魔攻變動，沒有固定值可標。
@@ -317,10 +323,16 @@ export function SkillPanel() {
           {formatBuffDuration(tooltip.skill) && (
             <div className="skill-tooltip-stat">持續: {formatBuffDuration(tooltip.skill)}</div>
           )}
-          <div className="skill-tooltip-stat">MP: {tooltip.skill.mpCost}</div>
-          <div className="skill-tooltip-stat">冷卻: {tooltip.skill.cooldown / 1000}s</div>
+          {tooltip.skill.type === 'passive' ? (
+            <div className="skill-tooltip-stat">被動（學會即生效，不需施放）</div>
+          ) : (
+            <>
+              <div className="skill-tooltip-stat">MP: {tooltip.skill.mpCost}</div>
+              <div className="skill-tooltip-stat">冷卻: {tooltip.skill.cooldown / 1000}s</div>
+            </>
+          )}
           {tooltip.skill.target === 'aoe' && (
-            <div className="skill-tooltip-stat">範圍: 半徑 {tooltip.skill.aoeRadius} 格{tooltip.skill.maxTargets ? ` / 最多 ${tooltip.skill.maxTargets} 隻` : '（無上限）'}</div>
+            <div className="skill-tooltip-stat">範圍: 半徑 {tooltip.skill.aoeRadius} 格{tooltip.skill.randomHits ? ` / 隨機 ${tooltip.skill.randomHits} 下（可重複命中）` : tooltip.skill.maxTargets ? ` / 最多 ${tooltip.skill.maxTargets} 隻` : '（無上限）'}</div>
           )}
           <div className={`skill-tooltip-status ${tooltip.learned ? 'learned' : 'locked'}`}>
             {tooltip.learned ? '已習得' : '未習得'}

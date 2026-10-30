@@ -541,6 +541,102 @@ export function deathFadeState(
 }
 
 /**
+ * 突進位移的演出（`48-vfx.md` § 48.7.8）。
+ *
+ * 判定是瞬間跳到落點（`41-arpg-combat.md` § 3.6），畫面落後一段把路程演出來：
+ * 實體畫在「落點 ＋ 剩餘位移」，剩餘位移由 1 收到 0。
+ */
+export interface DashArt {
+  /** 起手：原地往後縮的時間（ms） */
+  windupMs: number;
+  /** 起手往後縮多少 px（反向於突進方向） */
+  windupPullPx: number;
+  /** 路程演出長度（ms） */
+  travelMs: number;
+  /** ease-out 指數。1 = 等速，越大越早到、末段越慢 */
+  easePower: number;
+  /** 路程中段離地多高（px）。0 = 貼地滑行 */
+  hopPx: number;
+  /** 殘影數量 */
+  afterimageCount: number;
+  /** 相鄰殘影落後多少 ms */
+  afterimageGapMs: number;
+  /** 第一個殘影的不透明度，往後遞減 */
+  afterimageAlpha: number;
+}
+
+export const DASH_ART: DashArt = {
+  windupMs: 60,
+  windupPullPx: 4,
+  travelMs: 140,
+  easePower: 3,
+  hopPx: 0,
+  afterimageCount: 4,
+  afterimageGapMs: 22,
+  afterimageAlpha: 0.35,
+};
+
+/** 突進演出全長（ms）。命中回饋掛在這個時間點 */
+export function dashTotalMs(p: DashArt): number {
+  return p.windupMs + p.travelMs;
+}
+
+/** 剩餘位移比例：1 = 還在起點，0 = 已到落點 */
+export function dashRemaining(elapsedMs: number, p: DashArt): number {
+  if (elapsedMs <= p.windupMs) return 1;
+  const t = clamp01((elapsedMs - p.windupMs) / p.travelMs);
+  return Math.pow(1 - t, p.easePower);
+}
+
+export interface DashFrame {
+  /** 剩餘位移比例（0–1） */
+  remaining: number;
+  /** 往起點方向額外退後的 px（起手後縮，路程中隨剩餘位移收掉） */
+  pullPx: number;
+  /** 離地高度 px */
+  liftPx: number;
+}
+
+export function dashFrame(elapsedMs: number, p: DashArt): DashFrame {
+  const remaining = dashRemaining(elapsedMs, p);
+  const pullPx = elapsedMs < p.windupMs
+    ? easeOutQuad(elapsedMs / p.windupMs) * p.windupPullPx
+    : p.windupPullPx * remaining;
+  const progress = 1 - remaining;
+  return { remaining, pullPx, liftPx: 4 * p.hopPx * progress * remaining };
+}
+
+/**
+ * 突進此刻相對落點的螢幕位移。`fromSx/fromSy` = 起點減落點（螢幕 px）。
+ * 起點與落點重合時不位移。
+ */
+export function dashOffset(
+  elapsedMs: number, fromSx: number, fromSy: number, p: DashArt,
+): { x: number; y: number } {
+  const len = Math.hypot(fromSx, fromSy);
+  if (len === 0) return { x: 0, y: 0 };
+  const f = dashFrame(elapsedMs, p);
+  const back = f.remaining + f.pullPx / len;
+  return { x: fromSx * back, y: fromSy * back - f.liftPx };
+}
+
+/**
+ * 此刻要畫的殘影，由新到舊。只在路程中出現：
+ * 還在起點（起手中）或已經疊在落點的殘影不畫。
+ */
+export function dashAfterimages(
+  elapsedMs: number, p: DashArt,
+): { elapsedMs: number; alpha: number }[] {
+  const out: { elapsedMs: number; alpha: number }[] = [];
+  for (let k = 1; k <= p.afterimageCount; k++) {
+    const at = elapsedMs - k * p.afterimageGapMs;
+    if (at <= p.windupMs || at >= dashTotalMs(p)) continue;
+    out.push({ elapsedMs: at, alpha: p.afterimageAlpha * (1 - (k - 1) / p.afterimageCount) });
+  }
+  return out;
+}
+
+/**
  * 命中抖動此刻的位移（px）。回傳正值，方向由呼叫端決定。
  *
  * 調校頁與遊戲共用同一份：遊戲中抖的是 `MonsterEntity` 的 sprite。
@@ -621,9 +717,24 @@ export interface MarkParams {
   stars: number;
   starR: number;
   orbitR: number;
+  /** 一個循環的長度（ms）：暈眩星星繞一圈、定身藤蔓脈動一次 */
   orbitMs: number;
   /** 星星掛在頭頂多高（px，往上為負） */
   starY: number;
+  /** 定身：腳下地面環的水平半徑（px），垂直半徑為一半 */
+  rootRingR: number;
+  /** 定身：環與藤蔓的線寬 */
+  rootLineW: number;
+  /** 定身：藤蔓根數 */
+  rootVines: number;
+  /** 定身：藤蔓往上纏的高度（px） */
+  rootVineH: number;
+  /** 定身：藤蔓往內收的比例（0＝直立，1＝收到中心） */
+  rootCurl: number;
+  /** 定身：脈動時藤蔓高度的起伏比例 */
+  rootPulse: number;
+  /** 定身：整體不透明度 */
+  rootAlpha: number;
 }
 
 /**
@@ -869,6 +980,13 @@ export const SKILL_FX_ART: SkillFxArt = {
     orbitR: 9,
     orbitMs: 900,
     starY: -30,
+    rootRingR: 12,
+    rootLineW: 1.6,
+    rootVines: 5,
+    rootVineH: 14,
+    rootCurl: 0.45,
+    rootPulse: 0.12,
+    rootAlpha: 0.85,
   },
   shield: {
     durationMs: 760,
@@ -928,7 +1046,7 @@ export function resolveDebuffAccent(tags: Iterable<string> | undefined): number 
 }
 
 /** 頭頂標記只有暈眩一種（§ 48.8.3） */
-export const MARK_KINDS = ['stun'] as const;
+export const MARK_KINDS = ['stun', 'root'] as const;
 export type MarkKind = (typeof MARK_KINDS)[number];
 
 /**
@@ -953,6 +1071,7 @@ export const BUFF_SHIELD_BY_CATEGORY: Record<string, ShieldKind> = {
   'protect-shield': 'shield',   // 保護罩（防禦三階的第一階）
   'defense-buff': 'shield',     // 魔法盔甲、高級魔法盔甲、鋼鐵護盾
   'holy-shield': 'shield',      // 聖光護盾（吸收傷害，§ 24.4.9）
+  'mana-shield': 'shield',      // 魔力護盾（傷害改由 MP 承擔，`23-class-magic.md` § 23.5）
   sanctuary: 'shield',          // 聖域、神聖領域（減傷）
   invincible: 'invincible',     // 絕對屏障（§ 24.4.8）
 };
@@ -964,6 +1083,7 @@ export function resolveBuffShield(buffCategory: string | undefined): ShieldKind 
 
 export const MARK_COLORS: Record<MarkKind | ShieldKind, number> = {
   stun: 0xffd94a,
+  root: 0x6fcf4a,
   shield: 0x66aaff,
   invincible: 0xffffff,
 };

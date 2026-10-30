@@ -26,7 +26,8 @@ import type { MonsterAttackType } from '../models/monster';
 import { evaluateCombatScript, skillMeetsWeaponRequirement, type CombatScriptContext, type ScriptMonsterView, type HpSample } from './scriptRunner';
 import { pickTargetBy, type TargetPickCandidate, type TargetStrategy } from './targeting';
 import { isNonAttackAction } from '../models/scriptEngine';
-import { canUseSkill } from '../models/skill';
+import { canUseSkill, isSkillHpBlocked } from '../models/skill';
+import { planDash, planRetreat } from './dash';
 import { getPlayerAttackInterval, getSkillCooldownReduction, getMonsterDebuffModifierById, getEquippedWeapon } from './combat';
 import { isPlayerSilenced, isPlayerStunned } from './playerDebuffSystem';
 import { gameNow } from '../core/clock';
@@ -88,6 +89,7 @@ function resolveManualAttackSkill(
   skillId: string | null,
   skills: Skill[],
   mp: number,
+  hp: number,
   now: number,
   cooldownReduction: number,
   weaponType: string | undefined,
@@ -96,6 +98,7 @@ function resolveManualAttackSkill(
   const skill = skills.find(s => s.id === skillId);
   if (!skill || skill.type !== 'attack') return null;
   if (!skillMeetsWeaponRequirement(skill, weaponType)) return null;
+  if (isSkillHpBlocked(skill, hp)) return null;
   return canUseSkill(skill, mp, now, cooldownReduction) ? skill : null;
 }
 
@@ -119,6 +122,8 @@ export interface ArpgTickInput {
   hpHistory?: HpSample[];
   /** 多人實例：怪物 FSM 由實例層以 `tickMonsterEngines` 推進，這裡只跑玩家 */
   skipMonsters?: boolean;
+  /** 排除自己之後的佔位表（`x,y`），突進落點用（`41-arpg-combat.md` § 3.6） */
+  occupied?: Set<string>;
 }
 
 export interface PlayerAttackEvent {
@@ -127,6 +132,8 @@ export interface PlayerAttackEvent {
   targetMonsterIds: string[];
   skill?: Skill;
   attackType?: MonsterAttackType;
+  /** 突進落點（`41-arpg-combat.md` § 3.6）。目標已在相鄰格時不帶 */
+  dashTo?: Position;
 }
 
 export interface MonsterAttackEvent {
@@ -196,7 +203,7 @@ export function tickArpgEngine(
    */
   // 沉默中無法施展技能（`24-buff-debuff.md` § 24.5.1a）
   const manualSkill = isPlayerSilenced(activeEffects) ? null : resolveManualAttackSkill(
-    engine.manualSkillId, skills, character.mp, gameNow(), cooldownReduction, weaponType,
+    engine.manualSkillId, skills, character.mp, character.hp, gameNow(), cooldownReduction, weaponType,
   );
 
   let hasExecutableAction = true;
@@ -217,6 +224,8 @@ export function tickArpgEngine(
       effectiveMaxMp,
       weightPercent,
       hpHistory,
+      map,
+      occupied: input.occupied,
     };
     const nextAction: CombatAction | null = manualSkill
       ? { type: 'skill', skillId: manualSkill.id }
@@ -226,7 +235,8 @@ export function tickArpgEngine(
       const skill = skills.find(s => s.id === nextAction.skillId);
       if (skill && skill.type === 'attack' && skill.range && skill.range > attackConfig.range) {
         attackConfig.range = skill.range;
-        attackConfig.attackType = 'ranged';
+        // 突進是走過去打，不是遠程（§ 3.6）
+        if (!skill.dash) attackConfig.attackType = 'ranged';
       }
     }
   }
@@ -285,6 +295,8 @@ export function tickArpgEngine(
       effectiveMaxMp,
       weightPercent,
       hpHistory,
+      map,
+      occupied: input.occupied,
     };
 
     /*
@@ -335,15 +347,24 @@ export function tickArpgEngine(
           skill,
           attackType: attackConfig.attackType,
         });
+      } else if (skill?.dash) {
+        const event = resolveDashAttack(engine, action, skills, skill, playerPos, map, input.occupied);
+        if (event) events.push(event);
       } else {
         const targetIds = resolveTargets(engine, action, skills, playerPos, skill?.range ?? weaponRange);
         if (targetIds.length > 0) {
+          // 後退：射程與視線已用施放前的位置判定，落點找不到就原地出手（§ 3.6）
+          const target = skill?.retreat ? engine.monsters.get(targetIds[0]) : undefined;
+          const retreatTo = skill?.retreat && target
+            ? planRetreat(map, playerPos, target.mapMonster.position, skill.retreat, input.occupied)
+            : null;
           events.push({
             type: 'player_attack',
             action,
             targetMonsterIds: targetIds,
             skill,
             attackType: attackConfig.attackType,
+            ...(retreatTo ? { dashTo: retreatTo } : {}),
           });
         }
       }
@@ -387,6 +408,13 @@ export interface MonsterTargetInfo {
 export function isMonsterStunned(activeEffects: ActiveEffect[], monsterId: string): boolean {
   return activeEffects.some(
     e => e.type === 'debuff' && e.target === 'monster' && e.stun && e.targetMonsterId === monsterId,
+  );
+}
+
+/** 怪物這一 tick 不能移動：暈眩或定身（`24-buff-debuff.md` § 24.5.1／§ 24.5.1b） */
+export function isMonsterImmobile(activeEffects: ActiveEffect[], monsterId: string): boolean {
+  return activeEffects.some(
+    e => e.type === 'debuff' && e.target === 'monster' && (e.stun || e.root) && e.targetMonsterId === monsterId,
   );
 }
 
@@ -519,6 +547,34 @@ function resolveTargets(
     skills,
     maxRange,
   });
+}
+
+/**
+ * 突進出手（`41-arpg-combat.md` § 3.6）：主目標 ＋ 落點。沒有落點就不出手。
+ */
+function resolveDashAttack(
+  engine: ArpgEngineState,
+  action: CombatAction,
+  skills: Skill[],
+  skill: Skill,
+  playerPos: Position,
+  map: MapData,
+  occupied: Set<string> | undefined,
+): PlayerAttackEvent | null {
+  const range = skill.range ?? 0;
+  const [targetId] = resolveTargets(engine, action, skills, playerPos, range);
+  const target = targetId ? engine.monsters.get(targetId) : undefined;
+  if (!targetId || !target) return null;
+  const plan = planDash(map, playerPos, target.mapMonster.position, range, occupied);
+  if (!plan) return null;
+  return {
+    type: 'player_attack',
+    action,
+    targetMonsterIds: [targetId],
+    skill,
+    attackType: 'melee',
+    ...(plan.moves ? { dashTo: plan.landing } : {}),
+  };
 }
 
 /** 切換目標／走位動作的實際效果（`51-auto-talent.md` § 51.4.9） */

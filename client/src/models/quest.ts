@@ -37,7 +37,7 @@ export const CLASS_SKILL_BOOK_NAMES: Record<ClassName, { level1: string; level2:
   knight: { level1: '盾擊技能書', level2: '裂傷斬技能書' },
   elf: { level1: '精準射擊技能書', level2: '火矢附魔技能書' },
   elementalist: { level1: '冷卻縮減技能書', level2: '魔力奪取技能書' },
-  priest: { level1: '聖光護盾技能書', level2: '高階治癒技能書' },
+  priest: { level1: '聖光護盾技能書', level2: '精神匯聚技能書' },
   thief: { level1: '淬毒技能書', level2: '致命一擊技能書' },
 };
 

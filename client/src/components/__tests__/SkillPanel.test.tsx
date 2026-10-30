@@ -51,10 +51,16 @@ function learn(id: string): Skill {
 
 const cells = () => document.querySelectorAll('.skill-cell');
 
-/** 職業魔法的 5 格永遠排在基礎魔法格之後，起點依職業的基礎魔法上限而異 */
+/** 職業魔法格永遠排在基礎魔法格之後，起點依職業的基礎魔法上限而異；每列 5 格，補位的空格不算 */
 function classCells(className: ClassName) {
-  return Array.from(cells()).slice(CLASS_MAGIC_RESTRICTIONS[className].maxSkills);
+  return Array.from(cells())
+    .slice(CLASS_MAGIC_RESTRICTIONS[className].maxSkills)
+    .filter(c => !c.classList.contains('empty'));
 }
+
+/** 職業魔法佔幾格（含補滿一列的空格） */
+const classGridCells = (className: ClassName) =>
+  Math.ceil(CLASS_SKILLS.filter(d => d.className === className).length / 5) * 5;
 
 describe('SkillPanel 技能格全開顯示', () => {
   beforeEach(() => {
@@ -63,9 +69,9 @@ describe('SkillPanel 技能格全開顯示', () => {
 
   it('沒學任何技能時，可學範圍內的格子全部畫出來且全為 locked', () => {
     render(<SkillPanel />);
-    // 妖精基礎魔法上限 6 級 = 30 格，加上 5 格職業魔法
-    expect(cells().length).toBe(35);
-    expect(document.querySelectorAll('.skill-cell.locked').length).toBe(35);
+    // 妖精基礎魔法上限 6 級 = 30 格，加上 7 格職業魔法（每列 5 格，第二列補 3 個空格）
+    expect(cells().length).toBe(30 + classGridCells('elf'));
+    expect(document.querySelectorAll('.skill-cell.locked').length).toBe(37);
     expect(document.querySelectorAll('.skill-cell.learned').length).toBe(0);
   });
 
@@ -83,7 +89,7 @@ describe('SkillPanel 技能格全開顯示', () => {
     const learned = document.querySelectorAll('.skill-cell.learned');
     expect(learned.length).toBe(1);
     expect(learned[0].textContent).toContain(target.name);
-    expect(document.querySelectorAll('.skill-cell.locked').length).toBe(34);
+    expect(document.querySelectorAll('.skill-cell.locked').length).toBe(36);
   });
 
   it('職業魔法第 N 格固定對應第 N 級，不隨已習得數量位移', () => {
@@ -91,7 +97,7 @@ describe('SkillPanel 技能格全開顯示', () => {
     render(<SkillPanel />);
     const cellsOfClass = classCells('elf');
     expect(cellsOfClass.map(c => c.textContent)).toEqual([
-      '精準射擊', '火矢附魔', '三連射', '鷹眼', '穿透箭雨',
+      '精準射擊', '火矢附魔', '三連射', '鷹眼', '束縛箭', '後躍射擊', '穿透箭雨',
     ]);
     expect(cellsOfClass[2].className).toContain('learned');
     expect(cellsOfClass[0].className).toContain('locked');
@@ -114,7 +120,7 @@ describe('SkillPanel 技能格全開顯示', () => {
   it('未習得的格子 hover 也會顯示完整 tooltip，狀態為未習得', () => {
     render(<SkillPanel />);
     const cellsOfClass = classCells('elf');
-    fireEvent.mouseEnter(cellsOfClass[4]); // 穿透箭雨（未習得）
+    fireEvent.mouseEnter(cellsOfClass[6]); // 穿透箭雨（未習得）
     const tooltip = document.querySelector('.skill-tooltip');
     expect(tooltip).not.toBeNull();
     expect(tooltip!.textContent).toContain('穿透箭雨');
@@ -136,7 +142,7 @@ describe('SkillPanel 技能格全開顯示', () => {
     setup('elf', [learn(SKILL_CATALOG[0].id), learn('precise-shot')]);
     render(<SkillPanel />);
     expect(screen.getByText('1/30')).toBeDefined();
-    expect(screen.getByText('1/5')).toBeDefined();
+    expect(screen.getByText('1/7')).toBeDefined();
   });
 });
 
@@ -160,7 +166,7 @@ describe('SkillPanel 基礎魔法依職業上限顯示（§ 5.3）', () => {
       expect(labels).toEqual(
         Array.from({ length: maxLevel }, (_, i) => `Lv${i + 1}`),
       );
-      expect(cells().length).toBe(maxSkills + 5);
+      expect(cells().length).toBe(maxSkills + classGridCells(className));
       unmount();
     });
   }

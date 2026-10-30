@@ -48,8 +48,8 @@ describe('設定表引用的道具 id 都存在於 seed', () => {
     }
   });
 
-  it('職業技能書（25 本）與任務素材', () => {
-    expect(CLASS_SKILLS.length).toBe(25);
+  it('職業技能書（35 本）與任務素材', () => {
+    expect(CLASS_SKILLS.length).toBe(35);
     for (const def of CLASS_SKILLS) {
       expect(getItemById(def.bookItemId), def.name).toBeDefined();
     }

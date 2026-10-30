@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { absorbWithShield } from '../combat';
+import { absorbWithShield, getSkillSideValue } from '../combat';
 import { processMonsterAttack, processPlayerAttack } from '../arpgEventHandler';
 import { useGameStore } from '../../stores/gameStore';
 import { getSkillTemplate } from '../../models/skillTemplate';
@@ -118,18 +118,27 @@ describe('absorbWithShield', () => {
 });
 
 describe('聖光護盾實戰', () => {
-  it('施放後 buff 帶有 shieldRemaining 100', () => {
+  it('施放後吸收量＝100＋技能攻擊力 10 的技能側數值（§ 23.6）', () => {
     const skill = { ...getSkillTemplate('holy-shield')!, lastUsedAt: 0 } as Skill;
     useGameStore.setState({ skills: [skill] });
+    const char = useGameStore.getState().character!;
     processPlayerAttack(
       { type: 'player_attack', action: { type: 'skill', skillId: 'holy-shield' }, targetMonsterIds: [], skill },
       {
-        character: useGameStore.getState().character!, equippedGear: [], activeEffects: [],
+        character: char, equippedGear: [], activeEffects: [],
         skills: [skill], monsterInstances: new Map(), mapMonsters: [] as unknown as MapMonster[],
       },
     );
     const buff = useGameStore.getState().activeEffects.find(e => e.category === 'holy-shield');
-    expect(buff?.shieldRemaining).toBe(100);
+    // INT 20 → INT 加成 floor(10 × 10 × 0.095) = 9；無魔攻裝 → 100 ＋ 10 ＋ 9
+    expect(buff?.shieldRemaining).toBe(100 + getSkillSideValue(char, 10, [], []));
+    expect(buff?.shieldRemaining).toBe(119);
+  });
+
+  it('INT 越高吸收量越多', () => {
+    const low = getSkillSideValue({ ...character(), baseAttributes: { ...character().baseAttributes, INT: 10 } }, 10, [], []);
+    const high = getSkillSideValue({ ...character(), baseAttributes: { ...character().baseAttributes, INT: 40 } }, 10, [], []);
+    expect(high).toBeGreaterThan(low);
   });
 
   it('怪物攻擊被護盾吸收，角色不掉血', () => {

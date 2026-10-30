@@ -4,7 +4,7 @@ import type {
   ScriptDebuffCondition,
 } from '../models/scriptEngine';
 import { SCRIPT_DEBUFF_TYPES, DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
-import type { Position } from '../models/mapControl';
+import type { MapData, Position } from '../models/mapControl';
 import { resolveActionTargets, resolvePrimaryTarget, type TargetCandidate } from './targeting';
 import { getDistance } from './lineOfSight';
 import type { Character } from '../models/character';
@@ -14,7 +14,8 @@ import type { ActiveEffect } from '../models/effect';
 import type { BagItem } from '../models/bagItem';
 import { hasBagItem, getBagItemAmount } from '../models/bagItem';
 import { getPotionCount, SPEED_POTION_CONFIG, POTION_CONFIG } from '../stores/gameStore';
-import { canUseSkill } from '../models/skill';
+import { canUseSkill, isSkillHpBlocked } from '../models/skill';
+import { planDash } from './dash';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { PLAYER_DEBUFF_DEFS } from '../models/playerDebuff';
 import { getCureItem, hasCurableDebuff } from '../models/cureItem';
@@ -58,6 +59,10 @@ export interface CombatScriptContext {
   effectiveMaxMp?: number;
   /** `hp_dropped_recently` 用：短期 HP 取樣 */
   hpHistory?: HpSample[];
+  /** 突進技能的落點判定用（`41-arpg-combat.md` § 3.6）。未帶＝不判定落點 */
+  map?: MapData;
+  /** 排除自己之後的佔位表（`x,y`） */
+  occupied?: Set<string>;
 }
 
 /** HP 取樣點。`hp_dropped_recently` 要看的是「掉多快」，單一數值答不了 */
@@ -204,7 +209,10 @@ function checkCombatCondition(
         skills,
         maxRange: Infinity,
       });
-      return hits.length >= (condition.value ?? 1);
+      // 隨機多擊取 min(候選數, N)（`41-arpg-combat.md` § 3.4）
+      const randomHits = action.type === 'skill' ? skills.find(s => s.id === action.skillId)?.randomHits : undefined;
+      const count = randomHits ? Math.min(hits.length, randomHits) : hits.length;
+      return count >= (condition.value ?? 1);
     }
     case 'monster_hp_below': {
       const target = getPrimaryTarget(ctx);
@@ -224,7 +232,8 @@ function checkCombatCondition(
       const skill = skills.find(s => s.id === condition.skillId);
       if (!skill) return false;
       if (!meetsWeaponRequirement(skill, ctx)) return false;
-      return canUseSkill(skill, ctx.character.mp, now, ctx.cooldownReduction ?? 0);
+      if (isSkillHpBlocked(skill, ctx.character.hp)) return false;
+      return canUseSkill(skill, ctx.character.mp, now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
 
     // === 共用條件（§ 51.4.5）===
@@ -373,6 +382,19 @@ function hasActiveShield(
   });
 }
 
+/**
+ * 突進技能此刻選不選得上（`41-arpg-combat.md` § 3.6）。
+ * 主目標在射程外時照常選上（先追擊）；進入射程後必須有落點，否則落到下一條規則。
+ */
+function isDashExecutable(skill: Skill, ctx: CombatScriptContext): boolean {
+  if (!ctx.map) return true;
+  const target = getPrimaryTarget(ctx);
+  if (!target) return false;
+  const range = skill.range ?? 0;
+  if (getDistance(ctx.playerPos, target.position) > range) return true;
+  return planDash(ctx.map, ctx.playerPos, target.position, range, ctx.occupied) !== null;
+}
+
 function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext): boolean {
   switch (action.type) {
     case 'skill': {
@@ -381,7 +403,9 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
       if (!meetsWeaponRequirement(skill, ctx)) return false;
       // 沉默中無法施展技能（§ 24.5.1a）
       if (isPlayerSilenced(ctx.activeEffects ?? [], ctx.now)) return false;
-      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+      if (isSkillHpBlocked(skill, ctx.character.hp)) return false;
+      if (skill.dash && !isDashExecutable(skill, ctx)) return false;
+      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'normal_attack':
       return true;
@@ -476,7 +500,7 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);
       if (!skill) return false;
-      return canUseSkill(skill, character.mp, now, ctx.cooldownReduction ?? 0);
+      return canUseSkill(skill, character.mp, now, ctx.cooldownReduction ?? 0, character.hp);
     }
     case 'debuff_active':
       return hasSelfDebuff(condition.debuffType, activeEffects, now);
@@ -561,14 +585,14 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (skill?.type !== 'buff') return false;
       if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
-      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'heal_skill': {
       if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (skill?.type !== 'heal') return false;
       if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
-      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'cure_item': {
       // 暈眩中無法使用任何道具（§ 24.10.1）
@@ -608,7 +632,7 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       return ids.some(id => {
         const skill = ctx.skills.find(sk => sk.id === id);
         if (!skill) return false;
-        return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+        return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
       });
     }
     default:
@@ -701,7 +725,7 @@ function checkLegacyCondition(rule: ScriptRule, ctx: ScriptContext): boolean {
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);
       if (!skill) return false;
-      return canUseSkill(skill, character.mp, now, ctx.cooldownReduction ?? 0);
+      return canUseSkill(skill, character.mp, now, ctx.cooldownReduction ?? 0, character.hp);
     }
     default:
       return false;
@@ -713,7 +737,7 @@ function canExecuteLegacyAction(action: ScriptAction, ctx: ScriptContext): boole
     case 'skill': {
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (!skill) return false;
-      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0);
+      return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'potion': {
       if (ctx.character.hp >= ctx.character.maxHp) return false;

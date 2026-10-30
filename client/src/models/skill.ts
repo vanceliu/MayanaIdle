@@ -1,7 +1,8 @@
 import type { StatModifier } from './effect';
 
 export type SkillTarget = 'single' | 'aoe';
-export type SkillType = 'attack' | 'heal' | 'buff';
+/** `passive`：學會即生效，不可施放、不進快捷列與天賦（`23-class-magic.md` § 23.7 閃避反擊） */
+export type SkillType = 'attack' | 'heal' | 'buff' | 'passive';
 export type SkillElement = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark' | 'none';
 
 export interface SkillDebuffDef {
@@ -20,6 +21,8 @@ export interface SkillDebuffDef {
   shieldDuration?: number;
   modifiers?: { stat: string; value: number; isPercent: boolean }[];
   stun?: boolean;
+  /** 定身（`24-buff-debuff.md` § 24.5.1b）。與暈眩同屬控場：不可刷新、Boss 控場免疫 */
+  root?: boolean;
   tags: string[];
 }
 
@@ -41,7 +44,7 @@ export function formatDebuffDuration(def: SkillDebuffDef): string {
 
 /**
  * 攻擊技能附帶的「對自身 buff」。
- * 於傷害結算前施加，因此本次攻擊也吃得到加成。
+ * 於傷害結算前施加；技能公式不讀攻擊力%，加成只作用於之後的物理傷害（§ 23.1.1 B 組）。
  */
 export interface SkillSelfBuff {
   category: string;
@@ -99,6 +102,24 @@ export interface Skill {
   /** buff 生效期間免疫所有負面狀態（§ 23.6 神聖領域） */
   immuneDebuff?: boolean;
   requiredWeaponType?: string;
+  /** 突進至主目標相鄰格後結算（`41-arpg-combat.md` § 3.6） */
+  dash?: boolean;
+  /** 出手前往主目標反方向後退的格數；退不了照常出手（§ 3.6 後退） */
+  retreat?: number;
+  /** 自身中心隨機多擊：N 下逐下從 `aoeRadius` 內活著的怪取後放回抽 1 隻（§ 3.4） */
+  randomHits?: number;
+  /** 施放時扣自身有效最大 HP 的百分比，最低留 1；HP 為 1 時不可施放（`23-class-magic.md` § 23.3） */
+  selfHpCostPercent?: number;
+  /** 護盾 buff：吸收量另加這個技能攻擊力的技能側數值（INT 加成、魔攻乘區，`21-combat-formula.md` § 21.4；§ 23.6 聖光護盾） */
+  shieldPower?: number;
+  /** buff：持續期間絕對迴避怪物攻擊 N 次，用完即消失（`23-class-magic.md` § 23.7 煙霧彈） */
+  evadeCharges?: number;
+  /** 攻擊技能只施加 `applyDebuff`，不造成直接傷害、不觸發命中類效果（§ 23.7 毒霧） */
+  dotOnly?: boolean;
+  /** 被動：近戰怪物攻擊 MISS 且在武器射程內時，反擊一次普攻（§ 23.7 閃避反擊） */
+  counterOnDodge?: boolean;
+  /** 施放時瞬間回復有效最大 MP 的百分比（無條件捨去，不超過上限；`23-class-magic.md` § 23.6） */
+  mpRestorePercent?: number;
   applyDebuff?: SkillDebuffDef;
   onHitDebuff?: SkillDebuffDef;
   selfBuff?: SkillSelfBuff;
@@ -218,12 +239,42 @@ export function formatBuffDuration(
   return `${seconds} 秒`;
 }
 
+/** 攻擊技能附帶自身 buff 的簡述；無 `selfBuff` 回傳空字串 */
+export function formatSelfBuff(skill: Pick<Skill, 'selfBuff'>): string {
+  const def = skill.selfBuff;
+  if (!def) return '';
+  return `${def.name}（施放後 ${def.duration / 1000} 秒，${def.description}）`;
+}
+
 export function isSkillReady(skill: Skill, now: number, cooldownReductionPercent: number = 0): boolean {
   const effectiveCooldown = Math.floor(skill.cooldown * (1 - Math.min(cooldownReductionPercent, 50) / 100));
   return now - skill.lastUsedAt >= effectiveCooldown;
 }
 
-export function canUseSkill(skill: Skill, mp: number, now: number, cooldownReductionPercent: number = 0): boolean {
+/** 有自身 HP 消耗的技能在 HP ≤ 1 時不可施放（原因「血量不足」） */
+export function isSkillHpBlocked(skill: Pick<Skill, 'selfHpCostPercent'>, hp: number): boolean {
+  return (skill.selfHpCostPercent ?? 0) > 0 && hp <= 1;
+}
+
+/** 自身 HP 消耗量：`floor(有效最大HP × %)`，扣完最低留 1 */
+export function resolveSelfHpCost(skill: Pick<Skill, 'selfHpCostPercent'>, hp: number, effectiveMaxHp: number): number {
+  const percent = skill.selfHpCostPercent ?? 0;
+  if (percent <= 0) return 0;
+  const cost = Math.floor(effectiveMaxHp * percent / 100);
+  return Math.max(0, Math.min(cost, hp - 1));
+}
+
+/** 施放後的 MP：扣消耗、加瞬間回復，夾在 0 與有效最大 MP 之間 */
+export function resolveMpAfterSelfCast(
+  skill: Pick<Skill, 'mpCost' | 'mpRestorePercent'>, mp: number, effectiveMaxMp: number,
+): number {
+  const restore = Math.floor(effectiveMaxMp * (skill.mpRestorePercent ?? 0) / 100);
+  return Math.min(effectiveMaxMp, Math.max(0, mp - skill.mpCost) + restore);
+}
+
+/** `hp` 有給時一併檢查自身 HP 消耗的「血量不足」 */
+export function canUseSkill(skill: Skill, mp: number, now: number, cooldownReductionPercent: number = 0, hp?: number): boolean {
+  if (hp !== undefined && isSkillHpBlocked(skill, hp)) return false;
   return mp >= skill.mpCost && isSkillReady(skill, now, cooldownReductionPercent);
 }
 

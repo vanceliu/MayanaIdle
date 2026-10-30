@@ -30,6 +30,73 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 百柱死神實戰模擬（`44-dps-prediction.md`）
+
+規格：新腳本 `client/scripts/simulateReaperFight.mts`，死神會攻擊（真實 `tickMonsterCombat`／`calculateMonsterAttack`／`rollMonsterDebuff`），角色負面狀態影響輸出；橙色藥水 20 瓶（共用冷卻 900ms）；治癒與防守 buff 照常駐天賦立即施放、不佔攻擊次數；騎士維持 HP 50% 上下，其他職業缺血量 ≥ 該次可補量才補，防守 buff 到期即重放；死亡算失敗、列死亡率。舊木樁腳本保留。
+
+- [x] S1 共用部分抽成 `client/scripts/reaperShared.mts`，舊腳本改引用；輸出與抽取前逐字相同
+- [x] S2 舊腳本補新技能（K1b）：血濺咒殺自扣 HP 對復仇之刃、魔力湧泉／血魔轉換回魔、毒霧上毒等
+- [x] S3 新腳本：死神攻擊、角色負面狀態、回血、藥水、施放規則、死亡
+- [x] S4 兩支腳本跑完，更新 `44`（新增實戰模擬一節、結論）
+
+### 盜賊職業魔法改版與擴充為 7 級（`23-class-magic.md` § 23.7）
+
+規格：煙霧彈改絕對迴避 1 次；背刺射程 8 並突進（仍 5 級）；6 級毒霧（自身 5 格上毒，70%/10s，同淬毒 category）；7 級閃避反擊（被動，近戰 MISS 且在武器射程內反擊一次普攻）。
+
+- [x] T1 文件：23、21、24、30、41、INDEX
+- [x] T2 程式：`evadeCharges`／`consumeEvadeCharge()`、背刺 `dash`、`dotOnly`、`type: 'passive'`／`counterOnDodge`／`tryDodgeCounter()`、出手結算抽成 `resolvePlayerStrike()`、技能書 171、172、圖示
+- [x] T3 驗證：測試、`npx tsc -b`、client／server vitest
+
+### 牧師職業魔法擴充為 7 級（`23-class-magic.md` § 23.6）
+
+規格：牧師 5 級血魔轉換（HP 10% → MP 6%）、6 級神聖懲擊（光屬 53，吸血 30%）、7 級神聖領域（自 5 級移入，已學會者保留）。
+
+- [x] P1 文件：23、30、41、INDEX
+- [x] P2 程式：`mpRestorePercent`／`resolveMpAfterSelfCast()`（兩條 buff 施放路徑）、`classSkills.ts` 兩招、神聖領域改 7 級、技能書 169、170、圖示
+- [x] P3 驗證：測試、`npx tsc -b`、client／server vitest
+
+### 元素師職業魔法擴充為 7 級（`23-class-magic.md` § 23.5）
+
+規格：元素師 5 級魔力護盾（傷害 30% 改扣 MP）、6 級魔力湧泉（回魔 +40，消耗 MP 5%、HP 10%）、7 級元素風暴（自 5 級移入，已學會者保留）。
+
+- [x] M1 文件：23、24、29、30、48、INDEX
+- [x] M2 引擎：`absorbWithManaShield()`（怪物攻擊、DoT）、回魔 buff（最大 MP%，`MP_REGEN_MAX_PERCENT_STAT`）、buff 的自身 HP 消耗
+- [x] M3 資料：`classSkills.ts` 兩招、元素風暴改 7 級、技能書 167、168、buff 圖示、球形罩
+- [x] M4 介面與驗證：tooltip／魔法學院／Wiki MP 顯示、測試、`npx tsc -b`、client／server vitest
+
+### 妖精職業魔法擴充為 7 級（`23-class-magic.md` § 23.4）
+
+規格：妖精 5 級束縛箭（新，定身 5s）、6 級後躍射擊（新，後退 2 格再射）、7 級穿透箭雨（自 5 級移入，已學會者保留）。怪物暈眩改為也不移動。後躍動作沿用 `DASH_ART`。
+
+- [x] E1 文件：23、24、30、41、43、48、INDEX
+- [x] E2 定身標記 demo：`mark` 原型新增 `root` 造型（`MarkParams` 的 `root*` 欄位、`drawRootMark()`），`client/demo/skill-fx.html` 的「標記種類」切換；使用者確認沿用預設值
+- [x] E3 引擎：怪物定身與暈眩停止移動、定身不可重上與 Boss 免疫、後退落點與跳位
+- [x] E4 資料：`classSkills.ts` 兩招、穿透箭雨改 7 級、2 本技能書（165、166）
+- [x] E5 介面：tooltip、Wiki 妖精規則、技能圖示、場上定身標記
+- [x] E6 驗證：unit／整合測試；`npx tsc -b`、client／server vitest
+
+### 騎士職業魔法擴充為 7 級（`23-class-magic.md` § 23.1／§ 23.3）
+
+規格：職業魔法改 7 級（Lv10~70）。騎士 5 級衝鋒突進（新）、6 級血濺咒殺（新）、7 級復仇之刃（自 5 級移入，已學會者保留）。技能書依區域 `levelMax` 各級獨立判定：3 級 31~40、4 級 36~45、5 級 41~50、6 級 51~70、7 級 61~80。其他職業 6、7 級另案。
+
+- [x] K1 文件：23、05、07、13、21、24、26、27、30、03、35、41、43、48、INDEX
+- [ ] K1b `44` 重跑 DPS：延後到其他職業 6、7 級完成後一併處理（模擬需納入血濺咒殺自扣 HP 對復仇之刃的加成）
+- [x] K2 衝鋒 demo 調校頁：`client/demo/dash.html`、`DASH_ART`／`dashOffset()`／`dashAfterimages()`（`skillFx/geometry.ts`），使用者確認沿用預設值
+- [x] K3 引擎：突進位移（落點／佔位／清路徑／怪物重算路徑／渲染跳位／冷卻中不停在 8 格）、自身 HP 消耗（穿透減傷、最低 1、HP=1 不可施放）、自身範圍隨機可重複 4 擊
+- [x] K4 資料：`classSkills.ts` 兩招＋復仇之刃改 7 級、2 本新技能書、`classSkillBookDrop.ts` 新區間與逐級判定、舊存檔保留復仇之刃
+- [x] K5 介面：技能 tooltip、Wiki、魔法學院、快捷列「血量不足」、天賦
+- [x] K6 驗證：unit test；`npx tsc -b`、client／server vitest（看 exit code 與 Errors 行）
+
+### 復仇之刃說明釐清＋自身增益顯示（`23-class-magic.md` § 23.3）
+
+規格：復仇之刃的攻擊力% 增益不作用於本次技能，作用於之後的普攻、盾擊／裂傷斬／挑釁怒吼物理段、裂傷斬流血快照。技能 tooltip、Wiki 效果欄顯示 `selfBuff`（簡述）；Wiki 騎士段另寫詳細規則（含無條件捨去）。
+
+- [x] V1 文件：23 § 23.3 效果欄與補充規則、43 § 4.6
+- [x] V2 程式註解：`skill.ts` `SkillSelfBuff`、`arpgEventHandler.ts` selfBuff 段
+- [x] V3 `formatSelfBuff()`；`SkillPanel` tooltip、Wiki `SkillsPage` 效果欄＋騎士詳細說明
+- [x] V4 測試：`formatSelfBuff` 文字；Wiki 效果欄顯示復仇／背刺
+- [x] V5 `npx tsc -b`、client vitest
+
 ### 素材 iconTier 依等級門檻重排（`30-items.md` § 素材 iconTier 對照、`39-batch-sell.md` § 39.3）
 
 規格：區域素材依可掉落區域中最低的 `resolveArea().levelMin` 定色：1 Lv1~20、2 Lv21~35、3 Lv36~39、4 Lv40~49、5 Lv50+。只由 Boss 掉落 = 6（死神碎魂 7）。例外：通用素材 N／N+1、魔法書材料依品名（基礎 2／中階 3／高階 4／稀有 5）、任務素材 2。共 44 筆改色。

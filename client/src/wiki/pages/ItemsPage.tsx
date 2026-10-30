@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ITEM_DEFINITIONS } from '../../db/seed';
 import { useDropSourceForItem, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db/seed';
-import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevel } from '../../systems/classSkillBookDrop';
+import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevels } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { resolveItemIcon, MATERIAL_TIER_COLORS, formatRegionMaterialTierRange } from '../../models/iconMap';
@@ -193,13 +193,13 @@ function ItemDetail({ name }: { name: string }) {
       if (region.type === 'town') continue;
       if (region.floors && region.floors.length > 0) {
         for (const floor of region.floors) {
-          if (getSkillBookLevel(floor.levelMax) === bookLevel) {
+          if (getSkillBookLevels(floor.levelMax).includes(bookLevel)) {
             const areaId = `${region.id}-${floor.floor}f`;
             matchedAreas.add(areaId);
             sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: '基礎 0.05%' });
           }
         }
-      } else if (getSkillBookLevel(region.levelMax) === bookLevel) {
+      } else if (getSkillBookLevels(region.levelMax).includes(bookLevel)) {
         matchedAreas.add(region.id);
         sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: '基礎 0.05%' });
       }

@@ -332,7 +332,7 @@ export function QuestsPage() {
               <tr><td>騎士</td><td>盾擊技能書</td><td>裂傷斬技能書</td></tr>
               <tr><td>妖精</td><td>精準射擊技能書</td><td>火矢附魔技能書</td></tr>
               <tr><td>元素師</td><td>冷卻縮減技能書</td><td>魔力奪取技能書</td></tr>
-              <tr><td>牧師</td><td>聖光護盾技能書</td><td>高階治癒技能書</td></tr>
+              <tr><td>牧師</td><td>聖光護盾技能書</td><td>精神匯聚技能書</td></tr>
               <tr><td>盜賊</td><td>淬毒技能書</td><td>致命一擊技能書</td></tr>
             </tbody>
           </table>

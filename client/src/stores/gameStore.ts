@@ -32,9 +32,9 @@ import { generateCharacterUuid } from '../models/characterIdentity';
 import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
 import { calculatePressure, getPressureDropMultiplier } from '../systems/pressure';
 import { accrueRestedExp, getRestedExpMultiplier } from '../systems/restedExp';
-import { SKILL_WIND_BLADE, canUseSkill } from '../models/skill';
+import { SKILL_WIND_BLADE, canUseSkill, isSkillHpBlocked, resolveMpAfterSelfCast, resolveSelfHpCost } from '../models/skill';
 import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
-import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount } from '../systems/combat';
+import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount, getSkillSideValue } from '../systems/combat';
 import { getEffectiveGearArray } from '../systems/gear';
 import { getWeightStatus, getWeightPercent } from '../systems/weight';
 
@@ -1431,7 +1431,7 @@ export function createGameStore(session: Session) {
     if (!char) return false;
 
     const skill = state.skills.find(s => s.id === skillId);
-    if (!skill) return false;
+    if (!skill || skill.type === 'passive') return false;
 
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const weapon = getEquippedWeapon(allGear);
@@ -1439,7 +1439,7 @@ export function createGameStore(session: Session) {
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
 
     /*
-     * § 3.6.2：CD 中／MP 不足／武器不符一律**當場拒絕並說明原因**，不排隊等待。
+     * § 3.6.2：CD 中／MP 不足／武器不符／血量不足一律**當場拒絕並說明原因**，不排隊等待。
      * 排隊會讓「按下去之後不知道何時會放」變成常態；說明原因是為了讓玩家
      * 分得出「還在轉 CD」與「這把武器放不出這招」——兩者的畫面都是灰的。
      */
@@ -1453,6 +1453,10 @@ export function createGameStore(session: Session) {
     }
     if (char.mp < skill.mpCost) {
       set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} MP 不足`, type: 'system' }) });
+      return false;
+    }
+    if (isSkillHpBlocked(skill, char.hp)) {
+      set({ combatLogs: addLog(state.combatLogs, { text: `${skill.name} 血量不足`, type: 'system' }) });
       return false;
     }
     if (!canUseSkill(skill, char.mp, gameNow(), cooldownReduction)) {
@@ -1488,7 +1492,9 @@ export function createGameStore(session: Session) {
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
     if (isPlayerSilenced(state.activeEffects, now)) return false;
-    if (!canUseSkill(skill, char.mp, now, cooldownReduction)) return false;
+    const effMaxMp = getEffectiveMaxMp(char, state.equippedGear, state.activeEffects);
+    if (!canUseSkill(skill, char.mp, now, cooldownReduction, char.hp)) return false;
+    const mpCost = skill.mpCost;
 
     const template = getSkillTemplate(skill.id);
     const newSkills = [...state.skills];
@@ -1501,7 +1507,7 @@ export function createGameStore(session: Session) {
       const effectiveHeal = calculateHealAmount(char, skill.power, allGear, state.activeEffects);
       const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
       set({
-        character: { ...char, hp: char.hp + healed, mp: char.mp - skill.mpCost },
+        character: { ...char, hp: char.hp + healed, mp: char.mp - mpCost },
         skills: newSkills,
         combatLogs: addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' }),
       });
@@ -1510,8 +1516,19 @@ export function createGameStore(session: Session) {
       return true;
     }
 
-    const newChar = { ...char, mp: char.mp - skill.mpCost };
-    const logs = addLog(state.combatLogs, { text: `施放 ${skill.name}`, type: 'player' });
+    // 自身 HP 消耗（`23-class-magic.md` § 23.5 魔力湧泉）：穿透減傷與護盾，最低留 1
+    const hpCost = resolveSelfHpCost(skill, char.hp, getEffectiveMaxHp(char, state.equippedGear, state.activeEffects));
+    const mpAfter = resolveMpAfterSelfCast(skill, char.mp, effMaxMp);
+    const mpRestored = mpAfter - (char.mp - mpCost);
+    const newChar = { ...char, mp: mpAfter, hp: char.hp - hpCost };
+    const parts = [
+      hpCost > 0 ? `消耗 ${hpCost} HP` : '',
+      mpRestored > 0 ? `回復 ${mpRestored} MP` : '',
+    ].filter(Boolean);
+    const logs = addLog(state.combatLogs, {
+      text: parts.length > 0 ? `施放 ${skill.name}，${parts.join('，')}` : `施放 ${skill.name}`,
+      type: 'player',
+    });
     const buffDuration = template?.buffDuration ?? skill.buffDuration;
 
     if (buffDuration) {
@@ -1533,8 +1550,13 @@ export function createGameStore(session: Session) {
       if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
       if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
       if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
+      const evadeCharges = template?.evadeCharges ?? skill.evadeCharges;
+      if (evadeCharges) buffEffect.evadeCharges = evadeCharges;
       const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
-      if (shieldMod) buffEffect.shieldRemaining = shieldMod.value;
+      const shieldPower = template?.shieldPower ?? skill.shieldPower;
+      if (shieldMod) {
+        buffEffect.shieldRemaining = shieldMod.value + (shieldPower ? getSkillSideValue(char, shieldPower, allGear, state.activeEffects) : 0);
+      }
       const applied = applyPlayerBuff(get().activeEffects, buffEffect);
       const buffLogs = applied.cancelledSlow
         ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })

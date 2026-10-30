@@ -29,6 +29,7 @@ export class PawnSprite {
   private readonly flash: Sprite;
   /** 武器：平常不畫，只在出手的那一次演出中出現（`48-vfx.md` § 48.6） */
   private readonly weapon: WeaponSprite;
+  private readonly ghosts: Sprite[] = [];
   private look: PawnLook;
   private facing: PawnDirectionId;
   private lastX: number | null = null;
@@ -183,6 +184,28 @@ export class PawnSprite {
     this.attackFacing = null;
     this.lastX = x;
     this.lastY = y;
+  }
+
+  /**
+   * 突進殘影（`48-vfx.md` § 48.7.8）。座標相對於容器原點，沿用當下的剪影；
+   * 傳空陣列＝全部隱藏。殘影排在最底層。
+   */
+  setGhosts(list: readonly { x: number; y: number; alpha: number }[]): void {
+    while (this.ghosts.length < list.length) {
+      const ghost = new Sprite(this.sprite.texture);
+      ghost.anchor.copyFrom(this.sprite.anchor);
+      ghost.scale.copyFrom(this.sprite.scale);
+      this.container.addChildAt(ghost, 0);
+      this.ghosts.push(ghost);
+    }
+    this.ghosts.forEach((ghost, i) => {
+      const g = list[i];
+      ghost.visible = g !== undefined;
+      if (!g) return;
+      ghost.texture = this.sprite.texture;
+      ghost.position.set(g.x, g.y);
+      ghost.alpha = g.alpha;
+    });
   }
 
   destroy(): void {

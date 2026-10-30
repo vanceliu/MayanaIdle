@@ -260,6 +260,7 @@ textarea {
       <div class="row" style="margin-top:10px"><label>元素色</label><select id="elem"></select></div>
       <div class="row"><label>半徑 格</label><input type="range" id="radius" min="1" max="10" step="1" value="4"><span class="val">4</span></div>
       <div class="row"><label class="toggles" style="flex:1"><input type="checkbox" id="crit"> 暴擊強調（只作用在命中點）</label></div>
+      <div class="row"><label>標記種類</label><select id="markKind"><option value="stun">暈眩（頭頂星星）</option><option value="root">定身（腳下藤蔓）</option></select></div>
     </div>
 
     <div class="demo-card">
@@ -336,6 +337,7 @@ let proto = 'cast';
 let elem = 'fire';
 let radius = 4;
 let crit = false;
+let markKind = 'stun';
 let playing = true;
 let loop = true;
 let speed = 1;
@@ -363,7 +365,7 @@ const PROTO_HINT = {
   bolt: '連鎖用的電弧。整條一次出現、抖一下就沒 —— 慢慢長出去讀起來是雷射。用圓形彈丸在兩隻怪之間飛則會讀成球在跳，不是電。',
   aura: 'Buff／Debuff 施加的那一下。顏色只有藍與紅，不吃技能元素。',
   emblem: 'Buff 徽記：頭上浮一個符號說明「上的是哪一類」。與藍環同時起跑但停久一點 —— 環只要讀出有東西上身，符號要讀得出是什麼。目前只有武器祝福（weapon-bless）有。',
-  mark: '暈眩的頭頂星星。星星繞的是橢圓 —— 正圓在等距畫面上會讀成立起來的圈。',
+  mark: '常駐標記，「標記種類」切換：暈眩＝頭頂星星（繞的是橢圓）；定身＝腳下藤蔓纏腳（參數名稱以「定身：」開頭）。',
   shield: '護盾／無敵掛上去的那一下。球長出來 → 停一下 → 撐大淡掉，一次性，不留常駐的球。圓外框＋2:1 赤道＋貼地底環三件一組。',
   dotTick: 'DoT 每跳的小粒子。傷害數字一律粉紅（§ 42.3），不歸這裡管。',
 };
@@ -560,7 +562,7 @@ $('resetAllOv').addEventListener('click', () => {
 const PROTO_LABEL = {
   cast: '起手', travel: '投射', impact: '命中', burst: '範圍爆', nova: '自身爆',
   drop: '落下', heal: '治癒', aura: '施加', bolt: '電弧', crack: '地裂', pillar: '火柱',
-  emblem: '徽記', mark: '暈眩',
+  emblem: '徽記', mark: '暈眩／定身',
   shield: '護盾球', dotTick: 'DoT 跳',
 };
 
@@ -592,6 +594,7 @@ function playProto(extra = {}) {
     color: ELEMENT_COLORS[elem],
     radiusTiles: radius,
     crit,
+    markKind,
     ...extra,
   });
   playing = true;
@@ -657,6 +660,11 @@ for (const el of Object.keys(ELEMENT_LABEL)) {
 }
 $('elem').value = elem;
 $('elem').addEventListener('change', () => { elem = $('elem').value; playProto(); });
+$('markKind').addEventListener('change', () => {
+  markKind = $('markKind').value;
+  if (proto !== 'mark') selectProto('mark');
+  else playProto();
+});
 
 /* 武器刻印與附魔：只改顏色，不改原型（§ 42.4） */
 function elementSelect(id, noneLabel, apply) {

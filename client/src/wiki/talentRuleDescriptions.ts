@@ -69,7 +69,7 @@ export const PERSISTENT_CONDITION_DESC: Record<string, string> = {
   speed_not_active: '沒有任何加速效果（藥水與加速術互斥，共用同一格）',
   skill_ready: '指定技能冷卻完成且 MP 足夠',
   debuff_active: `身上有指定狀態：${Object.values(SCRIPT_DEBUFF_LABELS).join('／')}。暈眩不列入，暈眩中無法使用任何道具`,
-  monsters_near_self_gte: '以角色為圓心、指定格數內的怪物數，用來判斷是不是被圍住了',
+  monsters_near_self_gte: COMBAT_CONDITION_DESC.monsters_near_self_gte,
   weapon_type_is: '手持武器的類型',
   area_dwell_gte: '在本區停留的分鐘數',
   weight_over: '負重百分比。超重無法攻擊或施法',

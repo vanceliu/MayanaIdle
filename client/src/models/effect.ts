@@ -34,6 +34,10 @@ export interface ActiveEffect {
   dot?: DotEffect;
   hot?: HotEffect;
   stun?: boolean;
+  /** 定身：怪物不移動，攻擊照常（`24-buff-debuff.md` § 24.5.1b） */
+  root?: boolean;
+  /** 剩餘絕對迴避次數（煙霧彈），歸 0 即移除 */
+  evadeCharges?: number;
   /** 無敵：完全免疫傷害（絕對屏障） */
   invincible?: boolean;
   /** 免疫所有負面狀態（§ 23.6 神聖領域） */

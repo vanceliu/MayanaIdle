@@ -25,11 +25,13 @@
 | fire-shield.svg | Lorc | https://game-icons.net/1x1/lorc/fire-shield.html |
 | flaming-arrow.svg | Lorc | https://game-icons.net/1x1/lorc/flaming-arrow.html |
 | freedom-dove.svg | Lorc | https://game-icons.net/1x1/lorc/freedom-dove.html |
+| heart-drop.svg | Lorc | https://game-icons.net/1x1/lorc/heart-drop.html |
 | holy-grail.svg | Lorc | https://game-icons.net/1x1/lorc/holy-grail.html |
 | holy-symbol.svg | Lorc | https://game-icons.net/1x1/lorc/holy-symbol.html |
 | lightning-frequency.svg | Lorc | https://game-icons.net/1x1/lorc/lightning-frequency.html |
 | lightning-helix.svg | Lorc | https://game-icons.net/1x1/lorc/lightning-helix.html |
 | magic-shield.svg | Lorc | https://game-icons.net/1x1/lorc/magic-shield.html |
+| magic-swirl.svg | Lorc | https://game-icons.net/1x1/lorc/magic-swirl.html |
 | muscle-up.svg | Lorc | https://game-icons.net/1x1/lorc/muscle-up.html |
 | on-target.svg | Lorc | https://game-icons.net/1x1/lorc/on-target.html |
 | poison-bottle.svg | Lorc | https://game-icons.net/1x1/lorc/poison-bottle.html |
@@ -105,6 +107,7 @@
 | burning-blobs.svg | Lorc | https://game-icons.net/1x1/lorc/burning-blobs.html |
 | burning-embers.svg | Lorc | https://game-icons.net/1x1/lorc/burning-embers.html |
 | burning-meteor.svg | Lorc | https://game-icons.net/1x1/lorc/burning-meteor.html |
+| charging-bull.svg | Delapouite | https://game-icons.net/1x1/delapouite/charging-bull.html |
 | cursed-star.svg | Lorc | https://game-icons.net/1x1/lorc/cursed-star.html |
 | earth-crack.svg | Lorc | https://game-icons.net/1x1/lorc/earth-crack.html |
 | explosion-rays.svg | Lorc | https://game-icons.net/1x1/lorc/explosion-rays.html |
@@ -128,11 +131,13 @@
 | ice-shield.svg | Lorc | https://game-icons.net/1x1/lorc/ice-shield.html |
 | icicles-aura.svg | Lorc | https://game-icons.net/1x1/lorc/icicles-aura.html |
 | icicles-fence.svg | Lorc | https://game-icons.net/1x1/lorc/icicles-fence.html |
+| jump-across.svg | Delapouite | https://game-icons.net/1x1/delapouite/jump-across.html |
 | life-support.svg | Lorc | https://game-icons.net/1x1/lorc/life-support.html |
 | life-tap.svg | Lorc | https://game-icons.net/1x1/lorc/life-tap.html |
 | lightning-arc.svg | Lorc | https://game-icons.net/1x1/lorc/lightning-arc.html |
 | lightning-slashes.svg | Lorc | https://game-icons.net/1x1/lorc/lightning-slashes.html |
 | marrow-drain.svg | Lorc | https://game-icons.net/1x1/lorc/marrow-drain.html |
+| poison-cloud.svg | Sbed | https://game-icons.net/1x1/sbed/poison-cloud.html |
 | prayer.svg | Lorc | https://game-icons.net/1x1/lorc/prayer.html |
 | quake-stomp.svg | Lorc | https://game-icons.net/1x1/lorc/quake-stomp.html |
 | quick-slash.svg | Lorc | https://game-icons.net/1x1/lorc/quick-slash.html |
@@ -152,8 +157,11 @@
 | sunbeams.svg | Lorc | https://game-icons.net/1x1/lorc/sunbeams.html |
 | surrounded-shield.svg | Lorc | https://game-icons.net/1x1/lorc/surrounded-shield.html |
 | sword-clash.svg | Lorc | https://game-icons.net/1x1/lorc/sword-clash.html |
+| sword-spin.svg | Lorc | https://game-icons.net/1x1/lorc/sword-spin.html |
 | sword-wound.svg | Lorc | https://game-icons.net/1x1/lorc/sword-wound.html |
+| thorny-vine.svg | Lorc | https://game-icons.net/1x1/lorc/thorny-vine.html |
 | thunder-struck.svg | Lorc | https://game-icons.net/1x1/lorc/thunder-struck.html |
 | tornado.svg | Lorc | https://game-icons.net/1x1/lorc/tornado.html |
 | whirlwind.svg | Lorc | https://game-icons.net/1x1/lorc/whirlwind.html |
 | wind-slap.svg | Lorc | https://game-icons.net/1x1/lorc/wind-slap.html |
+| winged-sword.svg | Lorc | https://game-icons.net/1x1/lorc/winged-sword.html |

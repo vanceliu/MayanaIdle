@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>突進位移 Dash Demo — MayanaIdle</title>
+<!--
+  突進位移調校頁（騎士 5 級衝鋒突進）—— 只看動作，不接遊戲邏輯。
+
+  用 Vite dev server 開：`npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/dash.html
+
+  判定是瞬間跳到落點（`41-arpg-combat.md` § 3.6），畫面落後演出路程（`48-vfx.md` § 48.7.8）。
+  演出函式與數字在 `client/src/pixi/ui/skillFx/geometry.ts`（`DASH_ART`、`dashOffset()`、`dashAfterimages()`），
+  遊戲跑同一份。「匯出參數」的 JSON 即 `DASH_ART` 的定案值。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest, #0A0A1A);
+  color: var(--text-primary, #E2E8F0);
+  font-family: var(--font-body, sans-serif);
+}
+.demo-title { font-family: var(--font-display, sans-serif); color: var(--accent-primary, #A78BFA); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim, #64748B); font-size: 13px; margin: 0 0 20px; line-height: 1.8; }
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 320px; }
+.demo-card {
+  background: var(--bg-panel, #12122B);
+  border: 1px solid var(--border-subtle, #1E1E4A);
+  border-radius: 8px; padding: 14px; margin-bottom: 16px;
+}
+.demo-card h2 { font-family: var(--font-display, sans-serif); font-size: 15px; margin: 0 0 8px; color: var(--accent-primary, #A78BFA); }
+canvas { display: block; width: 100%; border-radius: 6px; background: #0d0d20; }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.row > label { flex: 0 0 106px; color: var(--text-dim, #64748B); }
+.row > input[type=range] { flex: 1; min-width: 0; }
+.row > .val { flex: 0 0 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.row > select { flex: 1; min-width: 0; }
+.toggles { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-dim, #64748B); cursor: pointer; }
+button {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  background: var(--accent-primary-dim, #7C3AED); color: #fff;
+  border: none; border-radius: 5px; padding: 7px 14px;
+}
+button.ghost { background: none; border: 1px solid var(--border-subtle, #1E1E4A); color: var(--text-dim, #64748B); }
+textarea {
+  width: 100%; box-sizing: border-box; height: 180px; margin-top: 8px;
+  background: #0d0d20; color: var(--text-primary, #E2E8F0);
+  border: 1px solid var(--border-subtle, #1E1E4A); border-radius: 5px;
+  font-family: ui-monospace, monospace; font-size: 11px; padding: 8px;
+}
+</style>
+</head>
+<body>
+
+<h1 class="demo-title">突進位移 Dash Demo</h1>
+<p class="demo-note">
+  騎士 5 級<b>衝鋒突進</b>：射程 8 格，突進到目標相鄰格後造成傷害。<br>
+  判定在出手那一刻就已經在落點；畫面落後一段演出「起手 → 路程 → 到點」，命中回饋掛在到點的那一刻。<br>
+  黃框＝落點格、紅框＝目標格。<b>調到滿意後按「匯出參數」。</b>
+</p>
+
+<div class="demo-layout">
+  <div class="demo-main">
+    <div class="demo-card">
+      <h2>場景</h2>
+      <canvas id="scene" height="520"></canvas>
+      <div class="row" style="margin-top:10px">
+        <label>時間軸 ms</label>
+        <input type="range" id="timeline" min="0" step="1"><span class="val" id="tv"></span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <button id="play">暫停</button>
+        <button class="ghost" id="once">播一次</button>
+        <label class="toggles"><input type="checkbox" id="tLoop" checked> 循環</label>
+        <label class="toggles"><input type="checkbox" id="tSnap"> 對照：直接跳位（無演出）</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-side">
+    <div class="demo-card">
+      <h2>場景設定</h2>
+      <div class="row"><label>突進距離（格）</label><input type="range" id="dist" min="1" max="8" step="1"><span class="val"></span></div>
+      <div class="row"><label>方向</label><select id="dir"></select></div>
+      <div class="row"><label>角色造型</label><select id="preset"></select></div>
+      <div class="row"><label>播放速度</label><input type="range" id="speed" min="0.1" max="2" step="0.05"><span class="val"></span></div>
+      <div class="row"><label>場景縮放</label><input type="range" id="zoom" min="60" max="250" step="10"><span class="val"></span></div>
+      <div class="row"><label>演出全長</label><span class="val" id="total" style="flex:1; text-align:left"></span></div>
+    </div>
+
+    <div class="demo-card">
+      <h2>動作參數（DASH_ART）</h2>
+      <div id="artRows"></div>
+      <div style="display:flex; gap:8px; margin-top:6px">
+        <button id="export">匯出參數</button>
+        <button class="ghost" id="reset">還原預設</button>
+      </div>
+      <textarea id="out" readonly placeholder="按「匯出參數」把目前的數字倒出來"></textarea>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { TILE_W, TILE_H, PRESETS, drawPawn, drawTile } from './pawnDemo.ts';
+import { PAWN_DIRECTION_BY_ID } from '../src/pixi/entities/pawn/geometry';
+import { facingFromScreen } from '../src/pixi/entities/pawn/facing';
+import {
+  DASH_ART, dashTotalMs, dashOffset, dashAfterimages,
+  HIT_REACTION_ART, SKILL_FX_ART, hitFlashAlpha, hitShakeOffset,
+} from '../src/pixi/ui/skillFx';
+
+const ART_META = {
+  windupMs: { label: '起手 ms', min: 0, max: 200, step: 5 },
+  windupPullPx: { label: '起手後縮 px', min: 0, max: 16, step: 0.5 },
+  travelMs: { label: '路程 ms', min: 40, max: 400, step: 5 },
+  easePower: { label: 'ease-out 指數', min: 1, max: 6, step: 0.1 },
+  hopPx: { label: '離地高度 px', min: 0, max: 30, step: 1 },
+  afterimageCount: { label: '殘影數量', min: 0, max: 8, step: 1 },
+  afterimageGapMs: { label: '殘影間隔 ms', min: 5, max: 60, step: 1 },
+  afterimageAlpha: { label: '殘影不透明度', min: 0, max: 1, step: 0.05 },
+};
+
+/** 世界格的八個方向 */
+const DIRECTIONS = [
+  { label: '東', dx: 1, dy: 0 }, { label: '東南', dx: 1, dy: 1 },
+  { label: '南', dx: 0, dy: 1 }, { label: '西南', dx: -1, dy: 1 },
+  { label: '西', dx: -1, dy: 0 }, { label: '西北', dx: -1, dy: -1 },
+  { label: '北', dx: 0, dy: -1 }, { label: '東北', dx: 1, dy: -1 },
+];
+
+/** 出手前與到點後各停多久（ms），只為了看清楚 */
+const LEAD_MS = 400;
+const HOLD_MS = 700;
+
+const art = structuredClone(DASH_ART);
+let dist = 6;
+let dirIdx = 0;
+let presetIdx = 0;
+let speed = 1;
+let zoom = 130;
+let playing = true;
+let loop = true;
+let snap = false;
+let t = 0;
+
+const $ = (id) => document.getElementById(id);
+const cycleMs = () => LEAD_MS + dashTotalMs(art) + HOLD_MS;
+const toScreen = (x, y) => ({ sx: (x - y) * (TILE_W / 2), sy: (x + y) * (TILE_H / 2) });
+
+/** 起點 (0,0)；目標在 dist 格外；落點是目標朝起點那側的相鄰格 */
+function layout() {
+  const d = DIRECTIONS[dirIdx];
+  const target = { x: d.dx * dist, y: d.dy * dist };
+  const landing = { x: target.x - d.dx, y: target.y - d.dy };
+  return { start: { x: 0, y: 0 }, target, landing };
+}
+
+const DESIGN_H = new WeakMap();
+function fit(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  if (!DESIGN_H.has(canvas)) DESIGN_H.set(canvas, Number(canvas.getAttribute('height')));
+  const h = DESIGN_H.get(canvas);
+  const w = canvas.clientWidth;
+  canvas.style.height = `${h}px`;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h, dpr };
+}
+
+function outlineTile(ctx, gx, gy, color) {
+  ctx.beginPath();
+  ctx.moveTo(gx, gy - TILE_H / 2);
+  ctx.lineTo(gx + TILE_W / 2, gy);
+  ctx.lineTo(gx, gy + TILE_H / 2);
+  ctx.lineTo(gx - TILE_W / 2, gy);
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+/** 目標怪：簡化成暗紅橢圓，吃命中白閃與抖動 */
+function drawMonster(ctx, gx, gy, flash) {
+  const r = TILE_H * 0.45;
+  ctx.beginPath();
+  ctx.ellipse(gx, gy - r, r, r, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#9b2c2c';
+  ctx.fill();
+  if (flash > 0) {
+    ctx.globalAlpha = flash;
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function render() {
+  const { ctx, w, h, dpr } = fit($('scene'));
+  const z = zoom / 100;
+  const { start, target, landing } = layout();
+  const S = toScreen(start.x, start.y);
+  const T = toScreen(target.x, target.y);
+  const L = toScreen(landing.x, landing.y);
+  const cx = w / 2 - ((S.sx + T.sx) / 2) * z;
+  const cy = h / 2 - ((S.sy + T.sy) / 2) * z + 20;
+  ctx.setTransform(z * dpr, 0, 0, z * dpr, cx * dpr, cy * dpr);
+
+  for (let y = -9; y <= 9; y++) {
+    for (let x = -9; x <= 9; x++) {
+      const p = toScreen(x, y);
+      drawTile(ctx, p.sx, p.sy, (x + y) % 2 === 0 ? '#191933' : '#16162d', true);
+    }
+  }
+  outlineTile(ctx, L.sx, L.sy, '#facc15');
+  outlineTile(ctx, T.sx, T.sy, '#ef4444');
+
+  const elapsed = t - LEAD_MS;
+  const total = dashTotalMs(art);
+  const fromSx = S.sx - L.sx;
+  const fromSy = S.sy - L.sy;
+  const facing = facingFromScreen(L.sx - S.sx, L.sy - S.sy) ?? facingFromScreen(T.sx - S.sx, T.sy - S.sy) ?? 'front';
+  const dir = PAWN_DIRECTION_BY_ID[facing];
+  const look = PRESETS[presetIdx];
+
+  /* 命中回饋從到點那一刻起算 */
+  const sinceHit = elapsed - (snap ? 0 : total);
+  const flash = sinceHit >= 0 ? hitFlashAlpha(sinceHit, HIT_REACTION_ART) : 0;
+  const shake = sinceHit >= 0 ? hitShakeOffset(sinceHit, SKILL_FX_ART.impact) : 0;
+  const hitLen = Math.hypot(T.sx - L.sx, T.sy - L.sy) || 1;
+  const mx = T.sx + ((T.sx - L.sx) / hitLen) * shake;
+  const my = T.sy + ((T.sy - L.sy) / hitLen) * shake;
+
+  const drawPlayer = () => {
+    if (elapsed < 0) { drawPawn(ctx, S.sx, S.sy, dir, look); return; }
+    if (snap) { drawPawn(ctx, L.sx, L.sy, dir, look); return; }
+    /* drawPawn 會自己重設 globalAlpha，殘影先畫到暫存畫布再整張疊上去 */
+    const ghosts = dashAfterimages(elapsed, art).reverse();
+    if (ghosts.length > 0) {
+      const off = document.createElement('canvas');
+      off.width = ctx.canvas.width;
+      off.height = ctx.canvas.height;
+      const octx = off.getContext('2d');
+      for (const ghost of ghosts) {
+        const o = dashOffset(ghost.elapsedMs, fromSx, fromSy, art);
+        octx.setTransform(1, 0, 0, 1, 0, 0);
+        octx.clearRect(0, 0, off.width, off.height);
+        octx.setTransform(ctx.getTransform());
+        drawPawn(octx, L.sx + o.x, L.sy + o.y, dir, look);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = ghost.alpha;
+        ctx.drawImage(off, 0, 0);
+        ctx.restore();
+      }
+    }
+    const o = dashOffset(elapsed, fromSx, fromSy, art);
+    drawPawn(ctx, L.sx + o.x, L.sy + o.y, dir, look);
+  };
+
+  /* 深度：螢幕 y 較小的先畫 */
+  if (T.sy < L.sy) { drawMonster(ctx, mx, my, flash); drawPlayer(); }
+  else { drawPlayer(); drawMonster(ctx, mx, my, flash); }
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  $('timeline').max = String(cycleMs());
+  $('timeline').value = String(Math.round(t));
+  $('tv').textContent = String(Math.round(t));
+  $('total').textContent = `${total}ms（起手 ${art.windupMs} ＋ 路程 ${art.travelMs}）`;
+}
+
+function buildArtRows() {
+  const host = $('artRows');
+  host.textContent = '';
+  for (const key of Object.keys(ART_META)) {
+    const m = ART_META[key];
+    const row = document.createElement('div');
+    row.className = 'row';
+    const label = document.createElement('label');
+    label.textContent = m.label;
+    const input = document.createElement('input');
+    Object.assign(input, { type: 'range', min: String(m.min), max: String(m.max), step: String(m.step), value: String(art[key]) });
+    const val = document.createElement('span');
+    val.className = 'val';
+    val.textContent = String(art[key]);
+    input.addEventListener('input', () => {
+      art[key] = Number(input.value);
+      val.textContent = input.value;
+      render();
+    });
+    row.append(label, input, val);
+    host.append(row);
+  }
+}
+
+function simpleSlider(id, get, set) {
+  const el = $(id);
+  const val = el.parentElement.querySelector('.val');
+  el.value = String(get());
+  val.textContent = String(get());
+  el.addEventListener('input', () => {
+    set(Number(el.value));
+    val.textContent = el.value;
+    render();
+  });
+}
+
+DIRECTIONS.forEach((d, i) => {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = d.label;
+  $('dir').append(o);
+});
+PRESETS.slice(0, 5).forEach((p, i) => {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = p.label;
+  $('preset').append(o);
+});
+$('dir').addEventListener('change', () => { dirIdx = Number($('dir').value); render(); });
+$('preset').addEventListener('change', () => { presetIdx = Number($('preset').value); render(); });
+simpleSlider('dist', () => dist, (v) => { dist = v; });
+simpleSlider('speed', () => speed, (v) => { speed = v; });
+simpleSlider('zoom', () => zoom, (v) => { zoom = v; });
+
+$('timeline').addEventListener('input', () => {
+  playing = false;
+  $('play').textContent = '播放';
+  t = Number($('timeline').value);
+  render();
+});
+$('play').addEventListener('click', () => {
+  playing = !playing;
+  $('play').textContent = playing ? '暫停' : '播放';
+});
+$('once').addEventListener('click', () => {
+  t = 0;
+  playing = true;
+  loop = false;
+  $('tLoop').checked = false;
+  $('play').textContent = '暫停';
+});
+$('tLoop').addEventListener('change', () => { loop = $('tLoop').checked; });
+$('tSnap').addEventListener('change', () => { snap = $('tSnap').checked; render(); });
+$('export').addEventListener('click', () => { $('out').value = JSON.stringify({ DASH_ART: art }, null, 2); });
+$('reset').addEventListener('click', () => {
+  Object.assign(art, structuredClone(DASH_ART));
+  buildArtRows();
+  render();
+});
+
+buildArtRows();
+
+let last = performance.now();
+function frame(now) {
+  const dt = now - last;
+  last = now;
+  if (playing) {
+    t += dt * speed;
+    if (t > cycleMs()) {
+      if (loop) t = 0;
+      else { t = cycleMs(); playing = false; $('play').textContent = '播放'; }
+    }
+    render();
+  }
+  requestAnimationFrame(frame);
+}
+render();
+requestAnimationFrame(frame);
+window.addEventListener('resize', render);
+</script>
+
+</body>
+</html>

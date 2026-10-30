@@ -196,6 +196,6 @@ describe('§ 23.3 走本公式的技能', () => {
 
   it('沒有其他技能誤標', () => {
     const marked = CLASS_SKILLS.filter(s => s.skill.physicalSnapshot).map(s => s.id);
-    expect(marked.sort()).toEqual(['rend', 'shield-bash', 'taunt']);
+    expect(marked.sort()).toEqual(['binding-arrow', 'charge', 'leap-shot', 'rend', 'shield-bash', 'taunt']);
   });
 });

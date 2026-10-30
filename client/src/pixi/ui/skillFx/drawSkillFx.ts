@@ -813,11 +813,40 @@ function drawStatGlyph(
  */
 export function drawMark(g: Graphics, p: MarkParams, kind: MarkKind, t: number): void {
   const color = MARK_COLORS[kind];
+  if (kind === 'root') {
+    drawRootMark(g, p, color, t);
+    return;
+  }
   for (let i = 0; i < p.stars; i++) {
     const ang = t * Math.PI * 2 + (i / p.stars) * Math.PI * 2;
     /* 星星繞的是橢圓，不是正圓 */
     g.star(Math.cos(ang) * p.orbitR, p.starY + Math.sin(ang) * p.orbitR * 0.4, 4, p.starR, p.starR * 0.4)
       .fill({ color, alpha: 0.75 + 0.25 * Math.sin(ang) });
+  }
+}
+
+/**
+ * 定身的腳下藤蔓（§ 48.8.3）：貼地的 2:1 環，環上長出幾根往內收的藤蔓纏住腳。
+ * 原點是腳底。高度每個循環（`orbitMs`）微微起伏一次，讀起來是「還纏著」而不是一張貼圖。
+ */
+function drawRootMark(g: Graphics, p: MarkParams, color: number, t: number): void {
+  const pulse = 1 + p.rootPulse * Math.sin(t * Math.PI * 2);
+  const rx = p.rootRingR;
+  const ry = rx * 0.5;
+  g.ellipse(0, 0, rx, ry).stroke({ width: p.rootLineW, color, alpha: p.rootAlpha * 0.7 });
+
+  const h = p.rootVineH * pulse;
+  for (let i = 0; i < p.rootVines; i++) {
+    const ang = (i / p.rootVines) * Math.PI * 2 + Math.PI / p.rootVines;
+    const bx = Math.cos(ang) * rx;
+    const by = Math.sin(ang) * ry;
+    const tx = bx * (1 - p.rootCurl);
+    const ty = by * (1 - p.rootCurl) - h;
+    /* 控制點往外推，藤蔓先向外鼓再收進來 —— 直線讀起來是柵欄 */
+    g.moveTo(bx, by)
+      .quadraticCurveTo(bx * 1.25, by - h * 0.55, tx, ty)
+      .stroke({ width: p.rootLineW, color, alpha: p.rootAlpha, cap: 'round' });
+    g.circle(tx, ty, p.rootLineW * 0.9).fill({ color, alpha: p.rootAlpha });
   }
 }
 

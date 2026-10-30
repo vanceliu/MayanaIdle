@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate, getDropItemName, getWikiEquipmentPath } from '../hooks/useWikiData';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
-import { getSkillBookLevel, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
+import { getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { SLOT_DROP_RATE_BOSS, slotTierBandFor } from '../../models/talent';
 import '../components/WikiTable.css';
@@ -440,14 +440,14 @@ function TalentDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] })
 
 function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
   const maxAreaLevel = useMaxAreaLevel(areas);
-  const bookLevel = getSkillBookLevel(maxAreaLevel);
+  const bookLevels = getSkillBookLevels(maxAreaLevel);
 
-  if (bookLevel === null) return null;
+  if (bookLevels.length === 0) return null;
 
   const dropRate = isBoss
     ? `${(SKILL_BOOK_BOSS_DROP_RATE * 100).toFixed(0)}%`
     : `${(SKILL_BOOK_NORMAL_DROP_RATE * 100).toFixed(2)}%`;
-  const books = CLASS_SKILLS.filter(s => s.classLevel === bookLevel);
+  const books = CLASS_SKILLS.filter(s => bookLevels.includes(s.classLevel));
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -455,7 +455,7 @@ function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[]
         職業技能書掉落（{isBoss ? 'Boss' : '一般怪物'} 基礎 {dropRate}）
       </h4>
       <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-        實際掉落率受角色掉寶率與全域倍率影響。
+        實際掉落率受角色掉寶率與全域倍率影響。{bookLevels.length > 1 ? '多個階級各自獨立判定。' : ''}
       </p>
       <div className="wiki-table-wrap">
         <table className="wiki-table">

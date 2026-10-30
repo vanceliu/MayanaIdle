@@ -19,6 +19,7 @@ import { hasLineOfSight, isWithinAttackRange } from './lineOfSight';
 import { gameNow, advanceMs, TICK_MS } from '../core/clock';
 import { playerOccupantId } from '../models/unit';
 import type { OccupationManager } from './occupationManager';
+import { isMonsterImmobile } from './arpgEngine';
 import {
   ensureInstance, instanceElapsedMinutes, memberIdOf, monsterTargetPosition, presentMembers, type MapInstance,
 } from './mapInstance';
@@ -161,6 +162,8 @@ export function tickInstanceWorld(deltaMs: number, instance: MapInstance): void 
     deltaMs, map,
     m => monsterTargetPosition(instance, m.id, m.position),
     instance.mapMonster.getState(), occupation,
+    // 控場來自任一成員的效果
+    id => members.some(m => isMonsterImmobile(m.game.getState().activeEffects, id)),
   );
 }
 
@@ -326,6 +329,8 @@ export function moveMonstersSafe(
   targetPosOf: (monster: MapMonster) => Position | null,
   monsterStore: MapMonsterState,
   occupation: OccupationManager,
+  /** 暈眩或定身中的怪不移動（`24-buff-debuff.md` § 24.5.1／§ 24.5.1b） */
+  isImmobile: (monsterId: string) => boolean = () => false,
 ) {
   if (monsterStore.monsters.length === 0) return;
 
@@ -336,6 +341,10 @@ export function moveMonstersSafe(
   const PLAYER_MOVE_THRESHOLD = 2;
 
   for (const monster of monsterStore.monsters) {
+    if (isImmobile(monster.id)) {
+      updated.push(monster);
+      continue;
+    }
     const playerPos = targetPosOf(monster);
     if (!playerPos) {
       updated.push(monster);

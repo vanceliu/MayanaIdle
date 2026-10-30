@@ -79,6 +79,11 @@ export interface PlaySkillFxOpts {
    * 火柱才落在腳邊而不是浮在半空。
    */
   groundLift?: number;
+  /**
+   * 整段演出往後延多久（ms）。突進技能等位移演完才出手（`48-vfx.md` § 48.7.8）；
+   * 武器揮擊的延後由 `PlayerEntity` 自己處理。
+   */
+  startDelayMs?: number;
 }
 
 /**
@@ -115,11 +120,11 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
   const muzzleX = o.muzzleX ?? fromX;
   const muzzleY = o.muzzleY ?? fromY;
 
-  let cursor = 0;
+  let cursor = o.startDelayMs ?? 0;
 
   if (plan.cast) {
-    fx.spawn({ prototype: 'cast', x: fromX, y: fromY, color: plan.color, delayMs: 0 });
-    cursor = art.cast.durationMs * CAST_LEAD;
+    fx.spawn({ prototype: 'cast', x: fromX, y: fromY, color: plan.color, delayMs: cursor });
+    cursor += art.cast.durationMs * CAST_LEAD;
   }
 
   /*

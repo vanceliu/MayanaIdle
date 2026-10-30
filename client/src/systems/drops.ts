@@ -8,7 +8,7 @@ import type { EquipmentTierLevel } from '../models/equipmentTier';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, rollDropAffixCount } from '../models/affix';
 import type { AffixCategory } from '../models/affix';
 import { resolveArea } from '../models/mapData';
-import { rollClassSkillBookDrop } from './classSkillBookDrop';
+import { rollClassSkillBookDrops } from './classSkillBookDrop';
 import { getItemById } from '../models/items';
 import { rates } from '../core/rates';
 import { settleGoldDrop } from './globalRates';
@@ -201,9 +201,8 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
     }
   }
 
-  // Class skill book drop (boss 5%)
-  const skillBookDrop = rollClassSkillBookDrop(areaLevel, true, dropRateMultiplier);
-  if (skillBookDrop) {
+  // 職業技能書：依區域等級逐級獨立判定（`23-class-magic.md` § 23.1）
+  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, true, dropRateMultiplier)) {
     items.push({
       name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',
@@ -284,9 +283,8 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
     }
   }
 
-  // Class skill book drop (dynamic, based on area level)
-  const skillBookDrop = rollClassSkillBookDrop(areaLevel, isBoss, dropRateMultiplier);
-  if (skillBookDrop) {
+  // 職業技能書：依區域等級逐級獨立判定（`23-class-magic.md` § 23.1）
+  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, isBoss, dropRateMultiplier)) {
     items.push({
       name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',

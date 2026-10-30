@@ -570,7 +570,7 @@ export const MAGIC_ATTACK_PERCENT_PER_POINT = 6.5;
  * 治癒則換上治癒效果%乘區（`calculateHealAmount()`）。
  * **兩邊不可各自展開這段算式**：任何一次係數調整都必須同時反映在傷害與治癒上。
  */
-function getSkillSideValue(
+export function getSkillSideValue(
   char: Character,
   skillPower: number,
   equippedGear: (EquipmentInstance | null)[],
@@ -675,7 +675,9 @@ export function calculateBasePhysicalDamage(
   char: Character,
   weapon: EquipmentInstance | null,
   equippedGear: (EquipmentInstance | null)[],
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  /** 火矢附魔 +15 只作用於普攻（`23-class-magic.md` § 23.4）；A 組技能傳 false */
+  includeFireEnchant = true,
 ): number {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
@@ -684,7 +686,7 @@ export function calculateBasePhysicalDamage(
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
   const isBow = weapon?.type === 'bow';
-  const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
+  const fireEnchantDmg = isBow && includeFireEnchant ? rawFireEnchantDmg : 0;
 
   let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -919,7 +921,7 @@ export function calculatePhysicalSnapshotSkill(
   const bonuses = getCombatBonuses(equippedGear, activeEffects);
 
   let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects)
-    + calculateBasePhysicalDamage(char, weapon, equippedGear, activeEffects);
+    + calculateBasePhysicalDamage(char, weapon, equippedGear, activeEffects, false);
 
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
   const isCritical = random() * 100 < critRate;
@@ -1049,6 +1051,60 @@ export function absorbWithShield(
   }
 
   return { damage: remaining, absorbed, effects, broken };
+}
+
+export interface ManaShieldResult {
+  /** 扣除 MP 承擔後仍要扣 HP 的傷害 */
+  damage: number;
+  /** 本次扣掉的 MP */
+  mpUsed: number;
+  /** 更新後的效果清單（MP 歸 0 時魔力護盾已移除） */
+  effects: ActiveEffect[];
+  /** 魔力護盾是否因 MP 歸 0 解除 */
+  broken: boolean;
+}
+
+/**
+ * 魔力護盾（`23-class-magic.md` § 23.5）：聖光護盾吸收之後，剩餘傷害的 X%（無條件捨去）
+ * 改扣 MP，1 點傷害扣 1 MP；MP 不足的部分照扣 HP。MP 歸 0 時護盾解除。
+ */
+export function absorbWithManaShield(
+  damage: number,
+  mp: number,
+  activeEffects: ActiveEffect[],
+  now: number = gameNow(),
+): ManaShieldResult {
+  const shield = activeEffects.find(e => e.type === 'buff' && e.target === 'player'
+    && now < e.startTime + e.duration
+    && e.modifiers?.some(m => m.stat === MANA_SHIELD_STAT));
+  if (!shield || damage <= 0) return { damage, mpUsed: 0, effects: activeEffects, broken: false };
+
+  const percent = shield.modifiers!.find(m => m.stat === MANA_SHIELD_STAT)!.value;
+  const mpUsed = Math.min(Math.floor(damage * percent / 100), Math.max(0, mp));
+  const broken = mp - mpUsed <= 0;
+  return {
+    damage: damage - mpUsed,
+    mpUsed,
+    effects: broken ? activeEffects.filter(e => e !== shield) : activeEffects,
+    broken,
+  };
+}
+
+/** 魔力護盾的 buff 修正值 stat：傷害改由 MP 承擔的百分比 */
+export const MANA_SHIELD_STAT = 'mana_shield';
+
+/**
+ * 煙霧彈的絕對迴避（`23-class-magic.md` § 23.7）：有剩餘次數就扣 1，歸 0 移除該 buff。
+ * 回 null ＝ 沒有可用的次數。
+ */
+export function consumeEvadeCharge(activeEffects: ActiveEffect[], now: number = gameNow()): ActiveEffect[] | null {
+  const idx = activeEffects.findIndex(e => e.type === 'buff' && e.target === 'player'
+    && (e.evadeCharges ?? 0) > 0 && now < e.startTime + e.duration);
+  if (idx < 0) return null;
+  const left = activeEffects[idx].evadeCharges! - 1;
+  return left > 0
+    ? activeEffects.map((e, i) => (i === idx ? { ...e, evadeCharges: left } : e))
+    : activeEffects.filter((_, i) => i !== idx);
 }
 
 /** 是否處於無敵狀態（絕對屏障）：完全免疫傷害 */

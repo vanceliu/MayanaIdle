@@ -34,6 +34,7 @@ export const MONSTER_DEBUFF_TAG_LABELS: Record<string, string> = {
   cursed: '詛咒',
   slowed: '減速',
   stunned: '暈眩',
+  rooted: '定身',
   'armor-break': '護甲崩壞',
   'defense-down': '防禦下降',
   taunt: '挑釁',
@@ -196,7 +197,7 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
 /** 條件的補充說明，滑鼠移上去看得到（`03-combat.md` § 3.12） */
 export const COMBAT_CONDITION_HINTS: Partial<Record<CombatConditionType, string>> = {
   monster_count_gte: '以這條規則自己的射程為半徑：技能用技能射程，普通攻擊用武器射程',
-  monsters_near_self_gte: '以角色為圓心、指定格數內的活怪數，用來判斷是不是被圍住了',
+  monsters_near_self_gte: '以角色為圓心、指定格數內的活怪數，用來判斷是不是被圍住了。數量填 1＝最近的怪在指定格數內',
   aoe_hit_count_gte: '照這條規則要放的技能實算命中幾隻。範圍技怪沒聚在一起就不放，單體技與普攻永遠是 1',
 };
 

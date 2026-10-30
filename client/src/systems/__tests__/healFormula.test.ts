@@ -47,10 +47,10 @@ describe('治癒的校準點（§ 21.4c）', () => {
    */
   const CALIBRATION: Record<string, number> = {
     'heal': 35, 'mid-heal': 70, 'great-heal': 150, 'full-heal': 500,
-    'high-heal': 400, 'group-heal': 200,
+    'group-heal': 200,
   };
 
-  it('有效 INT 18、無裝備魔攻時，六招回復量持平改版前的固定值', () => {
+  it('有效 INT 18、無裝備魔攻時，五招回復量持平改版前的固定值', () => {
     for (const [id, expected] of Object.entries(CALIBRATION)) {
       expect(calculateHealAmount(char(18), powerOf(id), []), id).toBe(expected);
     }
@@ -97,10 +97,10 @@ describe('治癒與傷害共用技能側計算', () => {
 });
 
 describe('治癒技能的資料一致性', () => {
-  it('六招治癒都有 power，且沒有殘留的固定回復量欄位', () => {
+  it('五招治癒都有 power，且沒有殘留的固定回復量欄位', () => {
     const heals = [...SKILL_CATALOG, ...CLASS_SKILLS.map(c => c.skill)]
       .filter(s => s.type === 'heal');
-    expect(heals).toHaveLength(6);
+    expect(heals).toHaveLength(5);
     for (const s of heals) {
       expect(s.power, s.id).toBeGreaterThan(0);
       expect('healAmount' in s, s.id).toBe(false);

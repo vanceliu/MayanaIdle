@@ -6,6 +6,7 @@ import { getEquipIcon, getItemIcon, getSkillIcon, getSkillDisplayIcon, resolveIt
 import type { Skill } from '../models/skill';
 import { getEquippedWeapon, getSkillCooldownReduction } from '../systems/combat';
 import { skillMeetsWeaponRequirement } from '../systems/scriptRunner';
+import { isSkillHpBlocked } from '../models/skill';
 import { getItemById } from '../models/items';
 import { getBagItemAmount } from '../models/bagItem';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
@@ -121,7 +122,7 @@ export function QuickSlotBar() {
   }
 
   /**
-   * 這個技能此刻能不能按。三種不可用原因分開回報，供 tooltip 區分。
+   * 這個技能此刻能不能按。不可用原因分開回報，供 tooltip 區分。
    *
    * **冷卻不在這裡讀時間**：`gameNow()` 不純，不可放進 render。
    * 冷卻中的格子由下面那支 rAF 維護成 `cdSlots`，render 只讀結果。
@@ -129,6 +130,7 @@ export function QuickSlotBar() {
   function skillBlockReason(skill: Skill, idx: number): string | null {
     if (!skillMeetsWeaponRequirement(skill, weaponType)) return '需要對應武器';
     if ((character?.mp ?? 0) < skill.mpCost) return 'MP 不足';
+    if (isSkillHpBlocked(skill, character?.hp ?? 0)) return '血量不足';
     if (cdSlots.includes(idx)) return '冷卻中';
     return null;
   }

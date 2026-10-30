@@ -11,7 +11,7 @@ import type { MapData } from '../../models/mapControl';
 function instanceWithMember(): MapInstance {
   const instance = createMapInstance('test', useMapMonsterStore);
   const member = {
-    game: { getState: () => ({ character: { id: 1, hp: 100 } }) },
+    game: { getState: () => ({ character: { id: 1, hp: 100 }, activeEffects: [] }) },
     mapControl: useMapControlStore,
   } as unknown as Session;
   instance.members.push(member);

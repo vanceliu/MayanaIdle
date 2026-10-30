@@ -10,7 +10,7 @@ interface SkillBookEntry {
 }
 
 /**
- * 25 本職業技能書的共同掉落池。
+ * 職業技能書的掉落池（每級一池，`23-class-magic.md` § 23.1）。
  *
  * **由 `CLASS_SKILLS` 反推，不另維護一份清單** —— 兩份名單必然漂移，
  * 曾經就是靠人工同步技能與技能書。
@@ -24,25 +24,33 @@ export const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = CLASS_SKILLS.map(s => ({
 export const SKILL_BOOK_BOSS_DROP_RATE = 0.05;
 export const SKILL_BOOK_NORMAL_DROP_RATE = 0.0005;
 
-export function getSkillBookLevel(areaLevel: number): number | null {
-  if (areaLevel >= 46) return 5;
-  if (areaLevel >= 43) return 4;
-  if (areaLevel >= 35) return 3;
-  return null;
+/** 各級技能書對應的區域 `levelMax` 區間（`23-class-magic.md` § 23.1） */
+export const SKILL_BOOK_LEVEL_RANGES: readonly { level: number; min: number; max: number }[] = [
+  { level: 3, min: 31, max: 40 },
+  { level: 4, min: 36, max: 45 },
+  { level: 5, min: 41, max: 50 },
+  { level: 6, min: 51, max: 70 },
+  { level: 7, min: 61, max: 80 },
+];
+
+/** 該區域掉哪幾級的技能書。區間重疊時回傳多級，由小到大 */
+export function getSkillBookLevels(areaLevel: number): number[] {
+  return SKILL_BOOK_LEVEL_RANGES
+    .filter(r => areaLevel >= r.min && areaLevel <= r.max)
+    .map(r => r.level);
 }
 
-/** 回傳掉落的技能書 `ITEM_DEFINITIONS` id，沒掉則 null */
-export function rollClassSkillBookDrop(areaLevel: number, isBoss: boolean, dropRateMultiplier: number = 1): number | null {
-  const bookLevel = getSkillBookLevel(areaLevel);
-  if (bookLevel === null) return null;
-
+/** 回傳掉落的技能書 `ITEM_DEFINITIONS` id；每個符合的級數各擲一次，可同時掉多本 */
+export function rollClassSkillBookDrops(areaLevel: number, isBoss: boolean, dropRateMultiplier: number = 1): number[] {
   const baseDropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
   const dropRate = Math.min(baseDropRate * dropRateMultiplier, 1);
-  if (random() >= dropRate) return null;
+  const drops: number[] = [];
 
-  const pool = ALL_CLASS_SKILL_BOOKS.filter(b => b.level === bookLevel);
-  if (pool.length === 0) return null;
-
-  const idx = Math.floor(random() * pool.length);
-  return pool[idx].itemId;
+  for (const bookLevel of getSkillBookLevels(areaLevel)) {
+    const pool = ALL_CLASS_SKILL_BOOKS.filter(b => b.level === bookLevel);
+    if (pool.length === 0) continue;
+    if (random() >= dropRate) continue;
+    drops.push(pool[Math.floor(random() * pool.length)].itemId);
+  }
+  return drops;
 }

@@ -333,13 +333,13 @@ describe('rollBossDrops', () => {
     await db.bossDropTables.clear();
     vi.spyOn(Math, 'random').mockReturnValue(0.06);
 
-    const resultNoBonus = await rollBossDrops('測試 Boss', 1, 44);
+    const resultNoBonus = await rollBossDrops('測試 Boss', 1, 48);
     expect(resultNoBonus.items).toHaveLength(0);
 
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0.06)
       .mockReturnValueOnce(0);
-    const resultWithBonus = await rollBossDrops('測試 Boss', 1, 44, { drop_rate: 50, gold_rate: 0 });
+    const resultWithBonus = await rollBossDrops('測試 Boss', 1, 48, { drop_rate: 50, gold_rate: 0 });
     expect(resultWithBonus.items).toEqual([
       expect.objectContaining({ type: 'spellbook', amount: 1 }),
     ]);

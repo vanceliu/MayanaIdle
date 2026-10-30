@@ -286,7 +286,8 @@ describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
 
   it('所有職業攻擊魔法與基礎魔法同步縮放（§ 23.7.1）', () => {
     const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill.power;
-    expect(power('mana-drain')).toBe(13);
+    // 魔力奪取於縮放後另行調為 30（§ 23.5 現行值）
+    expect(power('mana-drain')).toBe(30);
     expect(power('element-storm')).toBe(53);
     expect(power('holy-judgment')).toBe(37);
     expect(power('arrow-rain')).toBe(37);

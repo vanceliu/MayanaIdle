@@ -7,6 +7,7 @@ import { PawnSprite } from './pawn/PawnSprite';
 import { toPawnLook } from './pawn/pawnTexture';
 import { weaponAimFromDelta, type WeaponAttack } from './pawn/weaponGeometry';
 import { HitReaction } from './hitReaction';
+import { DASH_ART, dashAfterimages, dashOffset, dashTotalMs } from '../ui/skillFx';
 
 /** 地面標記沿用原本圓點的藍 —— 剪影本身沒有敵我資訊，那個區分不能消失 */
 const PLAYER_MARKER = 0x4dabf7;
@@ -22,6 +23,13 @@ export class PlayerEntity {
   private pawn: PawnSprite;
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
   private readonly hitReaction = new HitReaction();
+  /** 突進演出走到第幾毫秒（§ 48.7.8）。`Infinity` ＝ 沒在演 */
+  private dashElapsed = Infinity;
+  /** 起點減落點的螢幕位移 */
+  private dashFromX = 0;
+  private dashFromY = 0;
+  /** 突進途中收到的出手，到點才揮 */
+  private pendingAttack: WeaponAttack | null = null;
 
   constructor(appearance: Appearance = createDefaultAppearance(), marker: number = PLAYER_MARKER) {
     this.container = new Container();
@@ -55,7 +63,26 @@ export class PlayerEntity {
       this.faceToward(from, to);
       return;
     }
+    if (this.dashing) {
+      this.faceToward(from, to);
+      this.pendingAttack = { ...weapon, aim };
+      return;
+    }
     this.pawn.attack({ ...weapon, aim });
+  }
+
+  /**
+   * 突進（`48-vfx.md` § 48.7.8）。判定已在落點，畫面從起點演過去。
+   * `fromSx/fromSy` ＝ 起點減落點的螢幕位移。
+   */
+  playDash(fromSx: number, fromSy: number): void {
+    this.dashFromX = fromSx;
+    this.dashFromY = fromSy;
+    this.dashElapsed = 0;
+  }
+
+  private get dashing(): boolean {
+    return this.dashElapsed < dashTotalMs(DASH_ART);
   }
 
   /** Debuff 染色（§ 48.8.2）。`null` ＝ 恢復原色 */
@@ -72,6 +99,14 @@ export class PlayerEntity {
 
   /** 每幀推進武器演出與受擊反應 */
   update(deltaMs: number): void {
+    if (this.dashElapsed !== Infinity) {
+      this.dashElapsed += deltaMs;
+      if (!this.dashing) {
+        this.dashElapsed = Infinity;
+        if (this.pendingAttack) this.pawn.attack(this.pendingAttack);
+        this.pendingAttack = null;
+      }
+    }
     this.pawn.update(deltaMs);
     this.hitReaction.update(deltaMs);
     this.pawn.setFlash(this.hitReaction.flashAlpha);
@@ -79,8 +114,15 @@ export class PlayerEntity {
 
   updatePosition(pos: Position, elevation = 0): void {
     const { sx, sy } = worldToScreen(pos.x, pos.y, elevation);
-    this.container.x = sx + this.hitReaction.offsetX;
-    this.container.y = sy + this.hitReaction.offsetY;
+    const dash = this.dashElapsed === Infinity
+      ? { x: 0, y: 0 }
+      : dashOffset(this.dashElapsed, this.dashFromX, this.dashFromY, DASH_ART);
+    this.container.x = sx + this.hitReaction.offsetX + dash.x;
+    this.container.y = sy + this.hitReaction.offsetY + dash.y;
+    this.pawn.setGhosts(this.dashElapsed === Infinity ? [] : dashAfterimages(this.dashElapsed, DASH_ART).map(g => {
+      const o = dashOffset(g.elapsedMs, this.dashFromX, this.dashFromY, DASH_ART);
+      return { x: o.x - dash.x, y: o.y - dash.y, alpha: g.alpha };
+    }));
     this.container.zIndex = getEntityDepth(pos, elevation);
     this.pawn.updateFacingFrom(pos.x, pos.y);
   }

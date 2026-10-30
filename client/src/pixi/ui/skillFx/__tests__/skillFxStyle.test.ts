@@ -28,8 +28,8 @@ const byId = (id: string) => {
 };
 
 describe('resolveSkillFxPlan：每個技能都要有演出', () => {
-  it('全部 75 個技能都判定得出原型，沒有人掉出規則之外', () => {
-    expect(ALL_SKILLS.length).toBe(75);
+  it('全部 85 個技能都判定得出原型，沒有人掉出規則之外', () => {
+    expect(ALL_SKILLS.length).toBe(85);
     for (const skill of ALL_SKILLS) {
       const plan = resolveSkillFxPlan(skill);
       expect(plan.landing, skill.name).toBeTruthy();
@@ -561,7 +561,7 @@ describe('§ 48.8 Buff／Debuff 的顏色', () => {
  * 同一種狀態在兩邊必須是同一個字。
  */
 const DEBUFF_TAGS_24_4_1 = [
-  'poisoned', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned',
+  'poisoned', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned', 'rooted',
   'armor-break', 'defense-down', 'taunt',
 ] as const;
 

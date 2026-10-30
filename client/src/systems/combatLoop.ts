@@ -12,23 +12,28 @@ import type { Position } from '../models/mapControl';
 import type { MonsterInstance, MonsterAttackType, ElementType } from '../models/monster';
 import { isRangedAttackType } from '../models/monster';
 import type { EquipmentInstance } from '../models/equipment';
+import type { Character } from '../models/character';
+import type { ActiveEffect } from '../models/effect';
+import type { Skill } from '../models/skill';
 import type { CombatLog } from '../stores/gameStore';
-import { getWeightPercent } from './weight';
+import { getWeightPercent, getWeightStatus } from './weight';
+import { isPlayerStunned } from './playerDebuffSystem';
+import { getWeaponRange } from '../models/equipment';
 import { getEffectiveMaxHp, getEffectiveMaxMp, processMonsterDeath, waitForPendingDrops, type GameState, type MonsterDeathOptions } from '../stores/gameStore';
 import { talentCombatRules } from '../stores/talentStore';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { defaultSession, type Session } from '../stores/session';
 import { getNearestTown } from '../models/mapData';
-import { hasProjectilePath } from './lineOfSight';
+import { hasProjectilePath, isWithinAttackRange } from './lineOfSight';
 import { consumeDotTick } from './gameLoop';
 import { findAttackPosition, findNearestWalkable, isAttackPosition } from './pathfinding';
 import {
   tickArpgEngine, applyManualTarget, queueManualSkill, syncMonsterContexts, tickMonsterEngines, isMonsterStunned,
-  type MonsterAttackEvent,
+  type MonsterAttackEvent, type PlayerAttackEvent,
 } from './arpgEngine';
 import { processPlayerAttack, processMonsterAttack, applyUniqueAffixRestore, type DamageResult, type PlayerAttackResult } from './arpgEventHandler';
 import { sumUniqueAffix } from '../models/uniqueAffix';
-import { getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, getMonsterDebuffModifierById } from './combat';
+import { getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, absorbWithManaShield, getMonsterDebuffModifierById } from './combat';
 import { createMonsterFromTemplate } from './monsterSpawn';
 import { getEffectiveGearArray } from './gear';
 import { gameNow } from '../core/clock';
@@ -50,6 +55,8 @@ export { createCombatState };
  */
 export type CombatVisual =
   | { kind: 'face'; memberId: number; target: Position }
+  /** 突進／後退位移（`48-vfx.md` § 48.7.8）：判定已在 `to`，畫面從 `from` 演過去 */
+  | { kind: 'dash'; memberId: number; from: Position; to: Position }
   | {
       kind: 'player_attack';
       memberId: number;
@@ -258,6 +265,8 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
       element: monsterInstances.get(event.monsterId)?.element,
     });
 
+    if (result.isDodged) tryDodgeCounter(session, instance, event, visuals);
+
     const updatedChar = session.game.getState().character;
     if (updatedChar && updatedChar.hp <= 0) {
       handlePlayerDeath(session);
@@ -266,7 +275,138 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
   return visuals;
 }
 
+/**
+ * 閃避反擊（`23-class-magic.md` § 23.7）：學會被動、近戰怪的攻擊 MISS、
+ * 該怪在武器射程內時，立刻對牠打一次普攻。不佔用也不重置自己的攻擊計時器。
+ * 暈眩或超重時不能出手，也就不反擊（`24-buff-debuff.md` § 24.5.1、`20-attributes.md` § 20.7）。
+ */
+function tryDodgeCounter(session: Session, instance: MapInstance, event: MonsterAttackEvent, visuals: CombatVisual[]): void {
+  const gs = session.game.getState();
+  const character = gs.character;
+  if (!character || character.hp <= 0) return;
+  if (!gs.skills.some(s => s.counterOnDodge)) return;
+  if ((event.attackType ?? 'melee') !== 'melee') return;
+  if (isPlayerStunned(gs.activeEffects)) return;
+
+  const monster = session.mapMonster.getState().monsters.find(m => m.id === event.monsterId);
+  const inst = instance.monsterInstances.get(event.monsterId);
+  if (!monster || !inst || inst.currentHp <= 0) return;
+
+  const allGear = getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear);
+  const weapon = getEquippedWeapon(allGear);
+  const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
+  const playerPos = session.mapControl.getState().playerPosition;
+  if (!isWithinAttackRange(playerPos, monster.position, getWeaponRange(weaponType))) return;
+  if (getWeightStatus(character, allGear, gs.bagItems).overweight) return;
+
+  const logs: CombatLog[] = [{ text: '閃避反擊！', type: 'player' }];
+  resolvePlayerStrike({
+    session, instance,
+    event: {
+      type: 'player_attack', action: { type: 'normal_attack' }, targetMonsterIds: [event.monsterId],
+      attackType: weaponType === 'bow' ? 'ranged' : 'melee',
+    },
+    attackerPos: playerPos, character, allGear, activeEffects: gs.activeEffects, skills: gs.skills,
+    visuals, logs, now: gameNow(),
+  });
+  appendLogs(session, logs);
+}
+
+/**
+ * 一次玩家出手的結算與演出：轉向、傷害、演出事件、仇恨、擊殺。
+ * 主動出手與閃避反擊（`23-class-magic.md` § 23.7）共用。
+ */
+function resolvePlayerStrike(o: {
+  session: Session;
+  instance: MapInstance;
+  event: PlayerAttackEvent;
+  attackerPos: Position;
+  character: Character;
+  allGear: (EquipmentInstance | null)[];
+  activeEffects: ActiveEffect[];
+  skills: Skill[];
+  visuals: CombatVisual[];
+  logs: CombatLog[];
+  now: number;
+}): void {
+  const { session, instance, event, attackerPos, character, allGear, activeEffects, skills, visuals, logs, now } = o;
+  const memberId = memberIdOf(session);
+  const monsterStore = session.mapMonster.getState();
+  const monsterInstances = instance.monsterInstances;
+
+  // 轉向被打的那隻：攻擊方向與角色朝向必須一致。多目標時以第一個為準。
+  const facingTarget = monsterStore.monsters.find(
+    m => m.id === event.targetMonsterIds[0],
+  );
+  /**
+   * 武器一律用 `getEquippedWeapon()` 取（`99-ai-constraints.md` § 99.1 第 5 條）——
+   * `equippedGear` 是插入順序不是部位順序，用索引會靜默取到防具。
+   */
+  const held = getEquippedWeapon(allGear);
+
+  // 轉向要在演出之前、而且不管這一招碰不碰武器都要轉（§ 48.6.1）
+  if (facingTarget) visuals.push({ kind: 'face', memberId, target: facingTarget.position });
+
+  const result = processPlayerAttack(event, {
+    session,
+    character: character,
+    equippedGear: allGear,
+    activeEffects: activeEffects,
+    skills: skills,
+    monsterInstances,
+    mapMonsters: monsterStore.monsters,
+  });
+  logs.push(...result.logs);
+
+  /* 座標要在**移除死怪之前**抄下來，這是致命一擊唯一還查得到位置的時機 */
+  const targetPositions: Record<string, Position> = {};
+  for (const dmg of result.damages) {
+    const target = monsterStore.monsters.find(m => m.id === dmg.targetId);
+    if (target) targetPositions[dmg.targetId] = { ...target.position };
+  }
+
+  visuals.push({
+    kind: 'player_attack',
+    memberId,
+    result,
+    ranged: isRangedAttackType(event.attackType),
+    weapon: held,
+    playerPos: attackerPos,
+    targetPositions,
+    attackIntervalMs: getPlayerAttackInterval(allGear, activeEffects),
+  });
+
+  for (const dmg of result.damages) {
+    recordTrainingHits(monsterInstances.get(dmg.targetId), dmg);
+    if (!dmg.isMiss) recordMonsterDamage(targetingOf(instance, dmg.targetId), memberId, dmg.damage, now);
+    if (dmg.killed) {
+      const inst = monsterInstances.get(dmg.targetId);
+      if (inst) handleMonsterDeath(inst, dmg.targetId, session);
+      removeMonster(session, dmg.targetId);
+    }
+  }
+  stopTrainingIfNoDummiesLeft(session);
+}
+
 /** 玩家層：手動指令、玩家 FSM 與腳本、出手結算、追擊走位、DoT */
+/**
+ * 突進落地（`41-arpg-combat.md` § 3.6）：佔位表換格、清掉走到一半的路徑，
+ * 前一 tick 位置一併設成落點，畫面不做內插（演出由 `dash` 視覺負責）。
+ */
+function applyDash(session: Session, memberId: number, to: Position): void {
+  const from = session.mapControl.getState().playerPosition;
+  const occupation = session.loop.occupation;
+  occupation.unregister({ x: Math.round(from.x), y: Math.round(from.y) });
+  occupation.register({ x: Math.round(to.x), y: Math.round(to.y) }, 'player', playerOccupantId(memberId));
+  session.mapControl.setState({
+    playerPosition: { ...to },
+    prevPlayerPosition: { ...to },
+    currentPath: [],
+    pathIndex: 0,
+    isMoving: false,
+  });
+}
+
 export function tickMemberCombat(deltaMs: number, session: Session): CombatVisual[] {
   const visuals: CombatVisual[] = [];
   const instance = ensureInstance(session);
@@ -318,6 +458,10 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
     deltaMs,
     // 怪物 FSM 由實例層推進（§ 97.7.1）
     skipMonsters: true,
+    // 只有學了突進／後退技能才需要佔位表（§ 3.6）
+    occupied: gameState.skills.some(s => s.dash || s.retreat)
+      ? session.loop.occupation.getOccupiedSet(playerOccupantId(memberId))
+      : undefined,
   });
 
   // If player FSM is idle and autoMove (not paused), find next target
@@ -360,57 +504,19 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
           : event;
         if (isRangedAttackType(event.attackType) && event.targetMonsterIds.length > 0 && attackEvent.targetMonsterIds.length === 0) break;
 
-        // 轉向被打的那隻：攻擊方向與角色朝向必須一致。多目標時以第一個為準。
-        const facingTarget = monsterStore.monsters.find(
-          m => m.id === attackEvent.targetMonsterIds[0],
-        );
-        /**
-         * 武器一律用 `getEquippedWeapon()` 取（`99-ai-constraints.md` § 99.1 第 5 條）——
-         * `equippedGear` 是插入順序不是部位順序，用索引會靜默取到防具。
-         */
-        const held = getEquippedWeapon(allGear);
-
-        // 轉向要在演出之前、而且不管這一招碰不碰武器都要轉（§ 48.6.1）
-        if (facingTarget) visuals.push({ kind: 'face', memberId, target: facingTarget.position });
-
-        const result = processPlayerAttack(attackEvent, {
-          session,
-          character: gameState.character,
-          equippedGear: allGear,
-          activeEffects: gameState.activeEffects,
-          skills: gameState.skills,
-          monsterInstances,
-          mapMonsters: monsterStore.monsters,
-        });
-        logs.push(...result.logs);
-
-        /* 座標要在**移除死怪之前**抄下來，這是致命一擊唯一還查得到位置的時機 */
-        const targetPositions: Record<string, Position> = {};
-        for (const dmg of result.damages) {
-          const target = monsterStore.monsters.find(m => m.id === dmg.targetId);
-          if (target) targetPositions[dmg.targetId] = { ...target.position };
+        // 突進／後退：先落地再結算（`41-arpg-combat.md` § 3.6）
+        let attackerPos = playerPos;
+        if (event.dashTo) {
+          applyDash(session, memberId, event.dashTo);
+          visuals.push({ kind: 'dash', memberId, from: playerPos, to: event.dashTo });
+          attackerPos = event.dashTo;
         }
 
-        visuals.push({
-          kind: 'player_attack',
-          memberId,
-          result,
-          ranged: isRangedAttackType(event.attackType),
-          weapon: held,
-          playerPos,
-          targetPositions,
-          attackIntervalMs: getPlayerAttackInterval(allGear, gameState.activeEffects),
+        resolvePlayerStrike({
+          session, instance, event: attackEvent, attackerPos,
+          character: gameState.character, allGear, activeEffects: gameState.activeEffects, skills: gameState.skills,
+          visuals, logs, now,
         });
-
-        for (const dmg of result.damages) {
-          recordTrainingHits(monsterInstances.get(dmg.targetId), dmg);
-          if (!dmg.isMiss) recordMonsterDamage(targetingOf(instance, dmg.targetId), memberId, dmg.damage, now);
-          if (dmg.killed) {
-            const inst = monsterInstances.get(dmg.targetId);
-            if (inst) handleMonsterDeath(inst, dmg.targetId, session);
-            removeMonster(session, dmg.targetId);
-          }
-        }
         stopTrainingIfNoDummiesLeft(session);
         break;
       }
@@ -528,6 +634,7 @@ function processPlayerDotTick(session: Session, visuals: CombatVisual[]) {
 
   const logs: CombatLog[] = [];
   let hp = char.hp;
+  let mp = char.mp;
   let effects = gs.activeEffects;
   const memberId = memberIdOf(session);
   for (const effect of dotEffects) {
@@ -538,7 +645,14 @@ function processPlayerDotTick(session: Session, visuals: CombatVisual[]) {
     if (shield.absorbed > 0) {
       logs.push({ text: `聖光護盾吸收 ${shield.absorbed} 傷害${shield.broken ? '後破裂' : ''}`, type: 'system' });
     }
-    const dmg = shield.damage;
+    // 魔力護盾同樣承擔 DoT 的 30%（`23-class-magic.md` § 23.5）
+    const mana = absorbWithManaShield(shield.damage, mp, effects, now);
+    effects = mana.effects;
+    mp -= mana.mpUsed;
+    if (mana.mpUsed > 0 || mana.broken) {
+      logs.push({ text: `魔力護盾承擔 ${mana.mpUsed} 傷害${mana.broken ? '，MP 耗盡護盾解除' : ''}`, type: 'system' });
+    }
+    const dmg = mana.damage;
     if (dmg <= 0) continue;
     hp = Math.max(0, hp - dmg);
     logs.push({ text: `${effect.name} 造成 ${dmg} 傷害`, type: 'debuff-self' });
@@ -547,7 +661,7 @@ function processPlayerDotTick(session: Session, visuals: CombatVisual[]) {
   }
 
   session.game.setState({
-    character: { ...session.game.getState().character!, hp },
+    character: { ...session.game.getState().character!, hp, mp },
     activeEffects: effects,
   });
   appendLogs(session, logs);
