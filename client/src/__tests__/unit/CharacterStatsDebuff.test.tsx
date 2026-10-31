@@ -121,18 +121,18 @@ describe('角色狀態面板反映 debuff', () => {
   it('減速使攻速加成下降 30%', () => {
     setup([]);
     const { unmount } = render(<CharacterStats />);
-    expect(statValue('攻速加成')).toBe('+0%');
+    expect(statValue('攻速加成')).toBe('+0.0%');
     unmount();
 
     setup(['slow']);
     render(<CharacterStats />);
-    expect(statValue('攻速加成')).toBe('-30%');
+    expect(statValue('攻速加成')).toBe('-30.0%');
   });
 
   it('沒有 debuff 時數值不受影響', () => {
     setup([]);
     render(<CharacterStats />);
     expect(Number(statValue('防禦值'))).toBe(50);
-    expect(statValue('攻速加成')).toBe('+0%');
+    expect(statValue('攻速加成')).toBe('+0.0%');
   });
 });

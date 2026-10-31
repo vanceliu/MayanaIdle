@@ -186,6 +186,46 @@ describe('數值、鍵名、列舉參數驗證', () => {
     });
   });
 
+  describe('exchangeSigils（`46-sigil.md` § 46.13）', () => {
+    const CHAOS = 147;
+    const TEMPER = 10;
+    const POLISH = 9;
+    function stock(c: Client) {
+      c.session.game.setState({
+        bagItems: [makeBagItem(SEAL_SIGIL, 5)!, makeBagItem(TEMPER, 30)!, makeBagItem(POLISH, 30)!],
+      });
+    }
+
+    it('合法參數：扣材料與手續費、加 1 個目標', async () => {
+      const c = await enter();
+      stock(c);
+
+      const reply = await c.act('exchangeSigils', 'chaos', { seal: 5 }, { temper: 30, polish: 20 });
+
+      expect(reply).toMatchObject({ t: 'action_ok', result: { ok: true } });
+      expect([held(c, SEAL_SIGIL), held(c, TEMPER), held(c, POLISH), held(c, CHAOS)]).toEqual([0, 0, 10, 1]);
+    });
+
+    it.each([
+      ['目標為精鍊', 'temper', { seal: 5 }, { temper: 50 }],
+      ['目標不存在', 'zzz', { seal: 5 }, { temper: 50 }],
+      ['材料含 __proto__ 鍵', 'chaos', JSON.parse('{"__proto__": 5}'), { temper: 30, polish: 20 }],
+      ['材料為小數', 'chaos', { seal: 2.5, sting: 2.5 }, { temper: 30, polish: 20 }],
+      ['材料為負數', 'chaos', { seal: 6, sting: -1 }, { temper: 30, polish: 20 }],
+      ['材料為陣列', 'chaos', [5], { temper: 30, polish: 20 }],
+      ['手續費為 null', 'chaos', { seal: 5 }, null],
+      ['手續費含材料印記', 'chaos', { seal: 5 }, { temper: 30, sting: 20 }],
+    ])('%s：回失敗、不扣任何印記', async (_label, target, inputs, fee) => {
+      const c = await enter();
+      stock(c);
+
+      const reply = await c.act('exchangeSigils', target, inputs, fee);
+
+      expect(reply).toMatchObject({ t: 'action_ok', result: { ok: false } });
+      expect([held(c, SEAL_SIGIL), held(c, TEMPER), held(c, POLISH), held(c, CHAOS)]).toEqual([5, 30, 30, 0]);
+    });
+  });
+
   it('spendAttributePoint 非屬性鍵：不寫入、點數不扣', async () => {
     const c = await enter();
     c.session.game.setState({ character: { ...state(c).character!, unspentAttributePoints: 1 } });

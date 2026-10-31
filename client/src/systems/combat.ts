@@ -6,7 +6,7 @@ import { isAccessorySlot, enhancementCountsAsDefense, isRangedWeapon } from '../
 import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
-import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, HIT_DOWN_STAT, type AffixBonuses, type BrandElement } from '../models/affix';
+import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, HIT_DOWN_STAT, EVASION_POINTS_PER_PERCENT, roundAffixTenth, type AffixBonuses, type BrandElement } from '../models/affix';
 import { sumUniqueAffix, type UniqueAffixType } from '../models/uniqueAffix';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
@@ -450,18 +450,17 @@ export function getPlayerBlockRate(
       }
     }
   }
-  return Math.min(BLOCK_RATE_CAP, blockRate);
+  return Math.min(BLOCK_RATE_CAP, roundAffixTenth(blockRate));
 }
 
 /** § 21.6 迴避率上限 */
 export const DODGE_RATE_CAP = 35;
 
 /**
- * 迴避率（§ 21.6）：基礎 + AGI + 防禦溢出 + 迴避詞綴（一般與 T7）+ 迴避 buff，上限 35%。
+ * 未封頂迴避率（§ 21.6）：基礎 + AGI + 防禦溢出 + 迴避值 ÷ 100（一般與 T7）+ 迴避 buff，保留小數。
  * 命中下降不在此列 —— 它只對施加對象生效，且加在上限之後（`calculateMonsterAttack()`）。
- * 戰鬥與狀態面板共用。
  */
-export function getPlayerDodgeRate(
+export function getUncappedPlayerDodgeRate(
   char: Character,
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
@@ -473,7 +472,16 @@ export function getPlayerDodgeRate(
   const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
   const defOverflowDodge = finalDefense > DAMAGE_REDUCTION_CAP ? Math.floor((finalDefense - DAMAGE_REDUCTION_CAP) / 5) : 0;
   const buffDodge = getBuffPercentBonus(activeEffects, 'evasion') + getBuffFlatBonus(activeEffects, 'evasion');
-  return Math.min(DODGE_RATE_CAP, baseDodge + agiDodge + defOverflowDodge + bonuses.evasion + buffDodge);
+  return baseDodge + agiDodge + defOverflowDodge + bonuses.evasion / EVASION_POINTS_PER_PERCENT + buffDodge;
+}
+
+/** 迴避率（§ 21.6），上限 35%。戰鬥與狀態面板共用 */
+export function getPlayerDodgeRate(
+  char: Character,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  return Math.min(DODGE_RATE_CAP, getUncappedPlayerDodgeRate(char, equippedGear, activeEffects));
 }
 
 /** buff 提供的魔法抗性（T7 受擊魔抗，`07-affix-tier7.md`） */
@@ -483,17 +491,16 @@ export function getBuffMagicResist(activeEffects: ActiveEffect[]): number {
 
 /** § 21.5：防禦減傷（含魔法）的總上限 */
 export const DAMAGE_REDUCTION_CAP = 75;
-/** § 21.16：裝備防禦對魔法傷害只有一半效力 */
-export const MAGIC_DEFENSE_EFFECTIVENESS = 0.5;
-/** § 21.16：因此裝備防禦對魔法的減傷貢獻上限為物理上限的一半（75 × 0.5 = 37.5%） */
-export const MAGIC_DEFENSE_CONTRIBUTION_CAP = DAMAGE_REDUCTION_CAP * MAGIC_DEFENSE_EFFECTIVENESS;
+/** § 21.16：裝備防禦對魔法傷害每 10 點給 1%（照比例不取整） */
+export const MAGIC_DEFENSE_PER_PERCENT = 10;
+/** § 21.16：魔法減傷計入的防禦上限，與物理的 `DAMAGE_REDUCTION_CAP` 分開 */
+export const MAGIC_DEFENSE_CAP = 100;
+/** § 21.16：裝備防禦對魔法的減傷貢獻上限（100 / 10 = 10%） */
+export const MAGIC_DEFENSE_CONTRIBUTION_CAP = MAGIC_DEFENSE_CAP / MAGIC_DEFENSE_PER_PERCENT;
 
-/**
- * 裝備防禦對魔法傷害的減傷貢獻（§ 21.16）：先套物理上限，再取一半。
- * 等價於 `min(最終防禦 / 2, 37.5)`。
- */
+/** 裝備防禦對魔法傷害的減傷貢獻（§ 21.16）：`min(最終防禦, 100) / 10`；用除法避免 `× 0.1` 的浮點誤差 */
 export function getMagicDefenseContribution(finalDefense: number): number {
-  return Math.min(finalDefense, DAMAGE_REDUCTION_CAP) * MAGIC_DEFENSE_EFFECTIVENESS;
+  return Math.min(finalDefense, MAGIC_DEFENSE_CAP) / MAGIC_DEFENSE_PER_PERCENT;
 }
 
 /**
@@ -1192,7 +1199,7 @@ export function calculateMonsterAttack(
   }
 
   // Player defense reduction（§ 21.5 物理／§ 21.16 魔法）
-  // 魔法：裝備防禦只有一半效力（貢獻上限 37.5%），不足部分由魔法抗性補，總上限同樣 75%
+  // 魔法：裝備防禦每 10 點 1%（貢獻上限 10%），不足部分由魔法抗性補，總上限同樣 75%
   const reductionRate = monster.attackType === 'magic'
     ? Math.min(
         getMagicDefenseContribution(finalDefense)

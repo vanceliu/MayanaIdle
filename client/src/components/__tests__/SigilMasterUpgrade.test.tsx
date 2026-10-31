@@ -385,20 +385,20 @@ describe('印記師 — 詞綴列 tooltip（§ 13.13.1）', () => {
 
   it('整列 title 是詞綴說明，數值與列上一致（不吃品質）', () => {
     setup(gear([{ type: 'attack_power', tier: 4, value: 12 }], { quality: 20 }), []);
-    expect(rowOf('攻擊力 T4').getAttribute('title')).toBe('攻擊力 +12%');
-    expect(within(rowOf('攻擊力 T4')).getByText('+12%')).toBeTruthy();
+    expect(rowOf('攻擊力 T4').getAttribute('title')).toBe('攻擊力 +12.0%');
+    expect(within(rowOf('攻擊力 T4')).getByText('+12.0%')).toBeTruthy();
   });
 
-  it('滿值詞綴下一行接「此詞綴為該 Tier 最大值」，名稱標籤不再另掛 title', () => {
+  it('滿值詞綴的 title 只有說明（滿值靠粗體標示），名稱標籤不另掛 title', () => {
     setup(gear([{ type: 'attack_power', tier: 4, value: 13 }]), []);
     const row = rowOf('攻擊力 T4');
-    expect(row.getAttribute('title')).toBe('攻擊力 +13%\n此詞綴為該 Tier 最大值');
+    expect(row.getAttribute('title')).toBe('攻擊力 +13.0%');
     expect(screen.getByText('攻擊力 T4').getAttribute('title')).toBeNull();
   });
 
   it('受擊回血的回復比例代入該條抽到的值', () => {
     setup(gear([{ type: 'on_hit_hp', tier: 3, value: 8, restorePercent: 3 }], { slot: 'body', type: 'armor' } as never), []);
-    expect(rowOf('受擊回血 T3').getAttribute('title')).toBe('受到傷害時 8% 機率回復最大 HP 的 3%');
+    expect(rowOf('受擊回血 T3').getAttribute('title')).toBe('受到傷害時 8.0% 機率回復最大 HP 的 3%');
   });
 
   it('不能選的詞綴列同樣有 title', () => {
@@ -407,5 +407,31 @@ describe('印記師 — 詞綴列 tooltip（§ 13.13.1）', () => {
     const row = rowOf('[特殊] 毒免疫');
     expect(row.getAttribute('aria-disabled')).toBe('true');
     expect(row.getAttribute('title')).toBe('免疫中毒（100%）');
+  });
+});
+
+describe('印記師 — Tier 區間位置條（§ 13.13.1）', () => {
+  const rowOf = (label: string) => screen.getByText(label).closest('button')!;
+
+  it('兩端為該 Tier 上下限，填色為原始值在區間中的位置（不吃品質）', () => {
+    setup(gear([{ type: 'attack_power', tier: 4, value: 12 }], { quality: 20 }), []);
+    const bar = rowOf('攻擊力 T4').querySelector('.sigil-range-bar')!;
+    expect(bar.className).toContain('tier-4');
+    expect([...bar.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['11.1', '13.0']);
+    expect((bar.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('47.4%'); // (12.0 − 11.1) ÷ 1.9
+  });
+
+  it('固定值與迴避值端點為整數；滿值填滿', () => {
+    setup(gear([{ type: 'max_hp', tier: 5, value: 70 }, { type: 'evasion', tier: 7, value: 235 }]), []);
+    const hp = rowOf('最大 HP T5').querySelector('.sigil-range-bar')!;
+    expect([...hp.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['62', '70']);
+    expect((hp.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('100%');
+    const eva = rowOf('迴避 T7').querySelector('.sigil-range-bar')!;
+    expect((eva.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('0%');
+  });
+
+  it('無 Tier 的詞綴不顯示位置條', () => {
+    setup(gear([{ type: 'immune_poison', tier: 0, value: 0 }]), []);
+    expect(rowOf('[特殊] 毒免疫').querySelector('.sigil-range-bar')).toBeNull();
   });
 });

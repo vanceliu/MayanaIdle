@@ -2536,13 +2536,13 @@ button.active {
   border: 1px solid rgba(255,255,255,0.06);
 }
 
-.affix-tag.tier-1 { color: #6B7280; border-color: rgba(107,114,128,0.2); }
-.affix-tag.tier-2 { color: #9CA3AF; border-color: rgba(156,163,175,0.2); }
-.affix-tag.tier-3 { color: #4ADE80; border-color: rgba(74,222,128,0.2); }
-.affix-tag.tier-4 { color: #FACC15; border-color: rgba(250,204,21,0.2); }
-.affix-tag.tier-5 { color: #FB923C; border-color: rgba(251,146,60,0.2); }
-.affix-tag.tier-6 { color: #EF4444; border-color: rgba(239,68,68,0.2); }
-.affix-tag.tier-7 { color: #A855F7; border-color: rgba(168,85,247,0.2); text-shadow: 0 0 6px rgba(168,85,247,0.3); }
+.affix-tag.tier-1, .sigil-range-bar.tier-1 { color: #6B7280; border-color: rgba(107,114,128,0.2); }
+.affix-tag.tier-2, .sigil-range-bar.tier-2 { color: #9CA3AF; border-color: rgba(156,163,175,0.2); }
+.affix-tag.tier-3, .sigil-range-bar.tier-3 { color: #4ADE80; border-color: rgba(74,222,128,0.2); }
+.affix-tag.tier-4, .sigil-range-bar.tier-4 { color: #FACC15; border-color: rgba(250,204,21,0.2); }
+.affix-tag.tier-5, .sigil-range-bar.tier-5 { color: #FB923C; border-color: rgba(251,146,60,0.2); }
+.affix-tag.tier-6, .sigil-range-bar.tier-6 { color: #EF4444; border-color: rgba(239,68,68,0.2); }
+.affix-tag.tier-7, .sigil-range-bar.tier-7 { color: #A855F7; border-color: rgba(168,85,247,0.2); text-shadow: 0 0 6px rgba(168,85,247,0.3); }
 .affix-tag.special { color: #FFD700; border-color: rgba(255,215,0,0.3); text-shadow: 0 0 6px rgba(255,215,0,0.3); font-weight: 700; }
 /* § 7.3.2 滾到該 Tier 上限的詞綴：粗體 */
 .affix-tag.max-roll { font-weight: 700; }
@@ -3753,6 +3753,11 @@ button.active {
   font-family: var(--font-display);
 }
 
+/* 迴避率超過上限時的實際值（`34-ui-guidelines.md`） */
+.stat-overflow {
+  color: var(--accent-warning, #F59E0B);
+}
+
 /* --- 詳細狀態 tooltip --- */
 .stat-tip-title {
   color: var(--accent-primary);
@@ -4254,6 +4259,35 @@ button.active {
   text-align: right;
 }
 
+/* § 13.13.1 Tier 區間位置條：顏色走 `.affix-tag.tier-N` 同一組 Tier 色 */
+.sigil-range-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: calc(var(--fs-xs) * 0.9);
+  font-family: var(--font-mono);
+}
+.sigil-range-track {
+  position: relative;
+  flex: 1;
+  min-width: 40px;
+  height: 4px;
+  background: var(--bg-deepest);
+  border-radius: 2px;
+}
+.sigil-range-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
 /* 混沌／工藝的對象是整件裝備，詞綴欄整區停用（原因寫在下方的 `.sigil-cost`） */
 .sigil-affixes.is-item-target { opacity: 0.4; pointer-events: none; }
 
@@ -4365,6 +4399,55 @@ button.active {
 
 .sigil-apply:hover:not(:disabled) { background: var(--accent-primary); }
 .sigil-apply:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 分頁列與面板間距由 `.sigil-panel` 的 gap 負責 */
+.sigil-tabs { margin-bottom: 0; }
+
+/* ── 兌換分頁（`13-town.md` § 13.13.2） ─────────────────────────── */
+.sigil-exchange-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sigil-exchange-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sigil-exchange-row {
+  --sigil-color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.sigil-exchange-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sigil-exchange-row button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.sigil-exchange-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sigil-exchange-amount { min-width: 2ch; text-align: center; font-family: var(--font-display); color: var(--sigil-color); }
 
 .bs-craft-categories {
   display: flex;
@@ -6989,6 +7072,7 @@ button.active {
   /* 疊成上下後清單不能再吃滿高度，否則下面的詞綴與印記整個被推出畫面 */
   .sigil-picker { flex: none; max-height: 150px; }
   .sigil-apply { width: 100%; }
+  .sigil-exchange-counts { grid-template-columns: 1fr; }
   .sigil-footer-msg { flex-basis: 100%; }
 
   /*

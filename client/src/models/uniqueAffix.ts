@@ -98,7 +98,7 @@ export const UNIQUE_AFFIX_DEFINITIONS: UniqueAffixDefinition[] = [
   { type: 'struck_spi', name: '受擊精神', pool: 'armor', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率精神 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.SPI) },
   { type: 'struck_vit', name: '受擊體質', pool: 'armor', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率體質 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.VIT) },
   { type: 'extra_defense', name: '額外防禦', pool: 'armor', trigger: 'passive', range: [3, 10], unit: '', description: '額外防禦 +X' },
-  { type: 'evasion', name: '迴避', pool: 'armor', trigger: 'passive', range: [7, 10], unit: '%', description: '迴避率 +X%' },
+  { type: 'evasion', name: '迴避', pool: 'armor', trigger: 'passive', range: [700, 1000], unit: '', description: '迴避值 +X' },
   { type: 'drop_rate', name: '掉寶率', pool: 'armor', trigger: 'passive', range: [50, 100], unit: '%', description: '掉寶率 +X%' },
 
   { type: 'struck_magic_resist', name: '受擊魔抗', pool: 'accessory', trigger: 'struck', range: [5, 20], unit: '%', description: '受擊 10% 機率魔法抗性 +X%，持續 5 秒', buffModifiers: flat('magic_resist') },

@@ -75,18 +75,26 @@ describe('抽取', () => {
   it('數值落在定義的整數區間，兩端都抽得到', () => {
     for (const def of UNIQUE_AFFIX_DEFINITIONS) {
       if (!def.range) continue;
-      const seen = new Set<number>();
       const template = def.pool === 'fixed'
         ? T7.find(t => UNIQUE_AFFIX_BY_TEMPLATE[t.id!] === def.type)!
         : T7.find(t => getUniqueAffixPool(t).includes(def.type))!;
-      for (let i = 0; i < 4000; i++) {
-        const a = rollUniqueAffix(template)!;
-        if (a.type === def.type) seen.add(a.value);
-      }
+      const pool = getUniqueAffixPool(template);
+      const pick = (pool.indexOf(def.type) + 0.5) / pool.length;
+      const rollAt = (r: number) => {
+        vi.spyOn(Math, 'random').mockReturnValueOnce(pick).mockReturnValueOnce(r);
+        return rollUniqueAffix(template)!;
+      };
       const [min, max] = def.range;
-      expect(Math.min(...seen), def.type).toBe(min);
-      expect(Math.max(...seen), def.type).toBe(max);
-      for (const v of seen) expect(Number.isInteger(v)).toBe(true);
+      expect(rollAt(0), def.type).toEqual({ type: def.type, value: min });
+      expect(rollAt(0.999999), def.type).toEqual({ type: def.type, value: max });
+      for (let i = 0; i < 50; i++) {
+        const a = rollUniqueAffix(template)!;
+        if (a.type !== def.type) continue;
+        expect(Number.isInteger(a.value)).toBe(true);
+        expect(a.value).toBeGreaterThanOrEqual(min);
+        expect(a.value).toBeLessThanOrEqual(max);
+      }
+      vi.restoreAllMocks();
     }
   });
 
@@ -111,7 +119,7 @@ describe('數值定義（§ 7T.5）', () => {
       hit_heal: [10, 15], hit_mana: [10, 15], hit_bonus_damage: [10, 20], hit_stun: null,
       kill_heal: [30, 50], crit_damage: [25, 50], crit_rate: [20, 25], attack_speed: [20, 25],
       struck_defense: [10, 15], struck_spi: [2, 4], struck_vit: [2, 4], extra_defense: [3, 10],
-      evasion: [7, 10], drop_rate: [50, 100],
+      evasion: [700, 1000], drop_rate: [50, 100],
       struck_magic_resist: [5, 20], struck_all_attributes: [2, 4], magic_resist: [5, 15],
       all_attributes: [1, 2], immune_all: null,
       struck_str: [2, 4], struck_int: [2, 4], struck_agi: [2, 4],

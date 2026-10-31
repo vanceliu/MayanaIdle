@@ -18,6 +18,7 @@ import {
   getAffixBonusesFromGear,
   getTotalDefense,
   getPlayerDodgeRate,
+  getUncappedPlayerDodgeRate,
   getPlayerBlockRate,
   getTotalMagicResist,
   DODGE_RATE_CAP,
@@ -136,24 +137,37 @@ describe('常駐數值接入', () => {
     const weapon = item('rightHand', { type: 'crit_rate', value: 22 }, { affixes: [{ type: 'crit_rate', tier: 5, value: 15 }] });
     const helmet = item('helmet', { type: 'drop_rate', value: 80 }, { affixes: [{ type: 'drop_rate', tier: 1, value: 3 }] });
     const ring = item('ring1', { type: 'magic_resist', value: 12 });
-    const chest = item('chest', { type: 'evasion', value: 9 }, { affixes: [{ type: 'evasion', tier: 7, value: 7 }] });
+    const chest = item('chest', { type: 'evasion', value: 900 }, { affixes: [{ type: 'evasion', tier: 7, value: 250 }] });
     const b = getAffixBonusesFromGear([weapon, helmet, ring, chest]);
     expect(b.crit_rate).toBe(37);
     expect(b.drop_rate).toBe(83);
     expect(b.magic_resist).toBe(12);
-    expect(b.evasion).toBe(16);
+    expect(b.evasion).toBe(1150);
   });
 
   it('額外防禦計入裝備防禦', () => {
     expect(getTotalDefense([item('chest', { type: 'extra_defense', value: 7 }, { defense: 10 })])).toBe(17);
   });
 
-  it('迴避：詞綴與 buff 進迴避率，上限 35%', () => {
+  it('迴避：迴避值 ÷ 100 與 buff 進迴避率，上限 35%', () => {
     const c = char(); // 騎士基礎 5、AGI 0
-    expect(getPlayerDodgeRate(c, [item('chest', { type: 'evasion', value: 10 })])).toBe(15);
-    expect(getPlayerDodgeRate(c, [item('chest', undefined, { affixes: [{ type: 'evasion', tier: 4, value: 4 }] })])).toBe(9);
+    expect(getPlayerDodgeRate(c, [item('chest', { type: 'evasion', value: 1000 })])).toBe(15);
+    expect(getPlayerDodgeRate(c, [item('chest', undefined, { affixes: [{ type: 'evasion', tier: 7, value: 273 }] })])).toBeCloseTo(7.73);
     expect(getPlayerDodgeRate(c, [], [buff('evasion', 10, true)])).toBe(15);
-    expect(getPlayerDodgeRate(c, [item('chest', { type: 'evasion', value: 10 })], [buff('evasion', 40, true)])).toBe(DODGE_RATE_CAP);
+    expect(getPlayerDodgeRate(c, [item('chest', { type: 'evasion', value: 1000 })], [buff('evasion', 40, true)])).toBe(DODGE_RATE_CAP);
+  });
+
+  it('迴避詞綴吃品質後才換算', () => {
+    const c = char();
+    const chest = item('chest', undefined, { quality: 20, affixes: [{ type: 'evasion', tier: 7, value: 273 }] });
+    expect(getPlayerDodgeRate(c, [chest])).toBeCloseTo(5 + 327 / 100); // floor(273 × 1.2) = 327
+  });
+
+  it('未封頂迴避率保留超出上限的部分', () => {
+    const c = char();
+    const gear = [item('chest', { type: 'evasion', value: 1000 }, { affixes: [{ type: 'evasion', tier: 7, value: 273 }] })];
+    expect(getUncappedPlayerDodgeRate(c, gear, [buff('evasion', 20, true)])).toBeCloseTo(5 + 12.73 + 20);
+    expect(getPlayerDodgeRate(c, gear, [buff('evasion', 20, true)])).toBe(DODGE_RATE_CAP);
   });
 
   it('格擋：buff 加在副手格擋上，上限 50%', () => {

@@ -15,6 +15,14 @@ import {
   isFlatAffixType,
   type AffixCategory,
 } from '../../models/affix';
+import {
+  CHAOS_SIGIL_BONUS_TIER,
+  CHAOS_SIGIL_T6_ANY_RATE,
+  CHAOS_SIGIL_T6_MIN_LEVEL,
+  CHAOS_SIGIL_T6_RATE,
+  SIGIL_EXCHANGE_FEE_COUNT,
+  SIGIL_EXCHANGE_INPUT_COUNT,
+} from '../../models/sigil';
 
 const CATEGORY_LABELS: Record<AffixCategory, string> = {
   weapon: '武器',
@@ -62,7 +70,8 @@ describe('詞綴 wiki 頁', () => {
       }
       const tiers = getAffixTierTable(def.type);
       const unit = isFlatAffixType(def.type) ? '' : '%';
-      expect(range, `${def.name} 區間`).toBe(`${tiers[0].min}${unit} ~ ${tiers[tiers.length - 1].max}${unit}`);
+      const fmt = (v: number) => (isFlatAffixType(def.type) ? String(v) : v.toFixed(1));
+      expect(range, `${def.name} 區間`).toBe(`${fmt(tiers[0].min)}${unit} ~ ${fmt(tiers[tiers.length - 1].max)}${unit}`);
     }
   });
 
@@ -105,11 +114,11 @@ describe('詞綴 wiki 頁', () => {
     AFFIX_TIERS.forEach((t, i) => {
       const cells = rows[i].querySelectorAll('td');
       expect(cells[0].textContent).toBe(`T${t.tier}`);
-      expect(cells[1].textContent).toBe(`${t.min}~${t.max}%`);
+      expect(cells[1].textContent).toBe(`${t.min.toFixed(1)}~${t.max.toFixed(1)}%`);
       AFFIX_TIER_TABLES.forEach((o, col) => {
         const row = o.tiers[i];
-        const unit = o.flat ? '' : '%';
-        expect(cells[2 + col].textContent, `T${t.tier} ${o.label}`).toBe(`${row.min}~${row.max}${unit}`);
+        const range = o.flat ? `${row.min}~${row.max}` : `${row.min.toFixed(1)}~${row.max.toFixed(1)}%`;
+        expect(cells[2 + col].textContent, `T${t.tier} ${o.label}`).toBe(range);
       });
     });
     // T6/T7 只能靠掉落取得
@@ -129,6 +138,23 @@ describe('詞綴 wiki 頁', () => {
     for (const name of ['詛咒免疫', '虛弱免疫', '減速免疫']) {
       expect(screen.queryByText(name), name).toBeNull();
     }
+  });
+
+  it('印記節說明混沌／新增的 T6 機率（引用實作常數）', () => {
+    const { container } = render(<AffixesPage />);
+    const text = container.textContent ?? '';
+    const pct = `${(CHAOS_SIGIL_T6_RATE * 100).toFixed(2)}% 為 T${CHAOS_SIGIL_BONUS_TIER}`;
+    expect(text).toContain(pct);
+    expect(text).toContain(`至少 1 條 T${CHAOS_SIGIL_BONUS_TIER} 的機率為 ${CHAOS_SIGIL_T6_ANY_RATE * 100}%`);
+    expect(text).toContain(`T${CHAOS_SIGIL_BONUS_TIER} 需角色 Lv.${CHAOS_SIGIL_T6_MIN_LEVEL} 以上`);
+  });
+
+  it('印記節說明印記兌換的數量（引用實作常數）', () => {
+    const { container } = render(<AffixesPage />);
+    const text = container.textContent ?? '';
+    expect(text).toContain('印記兌換');
+    expect(text).toContain(`任意混搭 ${SIGIL_EXCHANGE_INPUT_COUNT} 個`);
+    expect(text).toContain(`合計 ${SIGIL_EXCHANGE_FEE_COUNT} 個`);
   });
 
   it('已登錄於 wiki 首頁導覽', () => {

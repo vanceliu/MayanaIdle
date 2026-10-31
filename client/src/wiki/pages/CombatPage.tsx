@@ -5,10 +5,12 @@ import {
   ELEMENT_COUNTER_BONUS,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
   MAGIC_ATTACK_PERCENT_PER_POINT,
-  MAGIC_DEFENSE_EFFECTIVENESS,
+  MAGIC_DEFENSE_CAP,
+  MAGIC_DEFENSE_PER_PERCENT,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
 } from '../../systems/combat';
 import { ACCESSORY_MAGIC_RESIST_PER_LEVEL } from '../../systems/enhancement';
+import { EVASION_POINTS_PER_PERCENT } from '../../models/affix';
 import '../components/WikiTable.css';
 
 /** 減傷／迴避等上限直接引用 `systems/combat.ts` 的常數，避免與實作 drift。 */
@@ -189,7 +191,7 @@ export function CombatPage() {
             <br />
             物理減傷率 = min(最終防禦, {DAMAGE_REDUCTION_CAP})
             <br />
-            魔法減傷率 = min( min(最終防禦, {DAMAGE_REDUCTION_CAP}) × {MAGIC_DEFENSE_EFFECTIVENESS} +
+            魔法減傷率 = min( min(最終防禦, {MAGIC_DEFENSE_CAP}) ÷ {MAGIC_DEFENSE_PER_PERCENT} +
             魔法抗性, {DAMAGE_REDUCTION_CAP} )
             <br />
             <br />
@@ -200,7 +202,7 @@ export function CombatPage() {
         }
         note={
           <>
-            <strong>裝備防禦對魔法只有一半效力</strong>，最多貢獻 {MAGIC_DEFENSE_CONTRIBUTION_CAP}%（＝物理上限的一半），
+            <strong>裝備防禦對魔法每 {MAGIC_DEFENSE_PER_PERCENT} 點只給 1%</strong>，防禦 {MAGIC_DEFENSE_CAP} 封頂、最多貢獻 {MAGIC_DEFENSE_CONTRIBUTION_CAP}%，
             不足的部分要靠魔法抗性補。物理與魔法的總減傷上限相同，都是 {DAMAGE_REDUCTION_CAP}%。
             <br />
             <strong>角色初始防禦為 {BASE_CHARACTER_DEFENSE}</strong>，前 {Math.abs(BASE_CHARACTER_DEFENSE)} 點裝備防禦形同填坑。
@@ -242,7 +244,9 @@ export function CombatPage() {
             <br />
             防禦溢出迴避 = (總防禦 - {DAMAGE_REDUCTION_CAP}) / 5　※ 總防禦 &gt; {DAMAGE_REDUCTION_CAP} 時
             <br />
-            迴避率 = 基礎迴避 + AGI迴避 + 防禦溢出迴避
+            迴避詞綴 = 迴避值合計 / {EVASION_POINTS_PER_PERCENT}　※ {EVASION_POINTS_PER_PERCENT} 迴避值 = 1%
+            <br />
+            迴避率 = 基礎迴避 + AGI迴避 + 防禦溢出迴避 + 迴避詞綴 + 迴避 buff
             <br />
             迴避率上限：{DODGE_CAP}%
           </>

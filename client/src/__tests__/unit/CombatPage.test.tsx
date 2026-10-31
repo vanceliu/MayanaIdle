@@ -5,6 +5,8 @@ import { CombatPage } from '../../wiki/pages/CombatPage';
 import {
   DAMAGE_REDUCTION_CAP,
   ELEMENT_COUNTER_BONUS,
+  MAGIC_DEFENSE_CAP,
+  MAGIC_DEFENSE_PER_PERCENT,
   MAGIC_DEFENSE_CONTRIBUTION_CAP,
 } from '../../systems/combat';
 
@@ -22,9 +24,11 @@ describe('戰鬥計算 wiki 頁', () => {
     expect(screen.getByText(/魔法減傷率 = min/)).toBeTruthy();
   });
 
-  it('標明裝備防禦對魔法只有一半效力，貢獻上限為實作值', () => {
+  it('標明裝備防禦對魔法每 10 點 1%，防禦上限與貢獻上限為實作值', () => {
     const { container } = render(<CombatPage />);
     const text = container.textContent ?? '';
+    expect(text).toContain(`每 ${MAGIC_DEFENSE_PER_PERCENT} 點只給 1%`);
+    expect(text).toContain(`防禦 ${MAGIC_DEFENSE_CAP} 封頂`);
     expect(text).toContain(`${MAGIC_DEFENSE_CONTRIBUTION_CAP}%`);
   });
 

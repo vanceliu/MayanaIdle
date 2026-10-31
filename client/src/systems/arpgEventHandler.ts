@@ -595,10 +595,10 @@ export function processPlayerAttack(
           duration: AFFIX_DEBUFF_DURATION_MS,
           tags: [],
           name: def.name,
-          description: `${def.name} ${proc.value}%`,
+          description: `${def.name} ${proc.value.toFixed(1)}%`,
         });
         logs.push({
-          text: `${def.name}觸發！${monster.name} ${def.name} ${proc.value}% ${AFFIX_DEBUFF_DURATION_MS / 1000}s`,
+          text: `${def.name}觸發！${monster.name} ${def.name} ${proc.value.toFixed(1)}% ${AFFIX_DEBUFF_DURATION_MS / 1000}s`,
           type: 'debuff-enemy',
         });
       }

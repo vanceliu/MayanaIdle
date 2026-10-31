@@ -167,14 +167,14 @@ describe('刻印不進魔法公式（§ 21.4）', () => {
 
 describe('顯示', () => {
   it('刻印的名稱帶出屬性', () => {
-    expect(formatAffixDisplay(brand(15, 'fire'))).toBe('元素刻印（火） +15% (T5)');
+    expect(formatAffixDisplay(brand(15, 'fire'))).toBe('元素刻印（火） +15.0% (T5)');
   });
 
   it('品質放大刻印數值', () => {
-    expect(formatAffixDisplay(brand(20, 'dark'), 20)).toBe('元素刻印（暗） +24% (T5)');
+    expect(formatAffixDisplay(brand(20, 'dark'), 20)).toBe('元素刻印（暗） +24.0% (T5)');
   });
 
   it('其他詞綴不顯示屬性', () => {
-    expect(formatAffixDisplay({ type: 'attack_power', tier: 5, value: 15 })).toBe('攻擊力 +15% (T5)');
+    expect(formatAffixDisplay({ type: 'attack_power', tier: 5, value: 15 })).toBe('攻擊力 +15.0% (T5)');
   });
 });

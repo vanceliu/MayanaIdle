@@ -52,7 +52,7 @@ export interface SigilDefinition {
 export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   {
     type: 'chaos', itemId: 147, name: '混沌印記', target: 'item',
-    description: '重抽詞綴直到填滿所有詞綴洞（封印詞綴不佔洞、原樣保留），Tier 上限 T5，商店裝 T3 且不出特殊詞綴',
+    description: '重抽詞綴直到填滿所有詞綴洞（封印詞綴不佔洞、原樣保留），Tier T1~T5 均等；角色 Lv.31+ 時每條約 1.27% 為 T6（4 洞至少 1 條 T6 為 5%）；商店裝 T1~T3 且不出特殊詞綴',
   },
   {
     type: 'sting', itemId: 148, name: '刺針印記', target: 'affix',
@@ -76,7 +76,7 @@ export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   },
   {
     type: 'add', itemId: 161, name: '新增印記', target: 'item',
-    description: '在空的詞綴洞新增一條詞綴，必定成功，Tier T1~T5 均等（商店裝 T3）',
+    description: '在空的詞綴洞新增一條詞綴，必定成功，Tier 同混沌印記（T1~T5 均等；角色 Lv.31+ 時約 1.27% 為 T6；商店裝 T1~T3）',
   },
   {
     type: 'seal', itemId: 162, name: '封印印記', target: 'affix',
@@ -146,8 +146,18 @@ export function isSigilItemId(itemId: number): boolean {
   return SIGIL_ITEM_IDS.has(itemId);
 }
 
-/** § 46.3 混沌印記（與 § 46.11 新增印記）的 Tier 上限（商店裝另受 `maxAffixTier` 夾住） */
+/** § 46.3 混沌印記（與 § 46.11 新增印記）均等抽的 Tier 上限（商店裝另受 `maxAffixTier` 夾住） */
 export const CHAOS_SIGIL_MAX_TIER = 5;
+/** § 46.3 一般裝備另可抽到的 Tier */
+export const CHAOS_SIGIL_BONUS_TIER = 6;
+/** § 46.3 可抽到 T6 的最低角色等級 */
+export const CHAOS_SIGIL_T6_MIN_LEVEL = 31;
+/** § 46.3 4 洞重抽時至少 1 條 T6 的機率 */
+export const CHAOS_SIGIL_T6_ANY_RATE = 0.05;
+/** § 46.3 每條詞綴是 T6 的機率：1 − (1 − 5%)^(1/4) ≈ 1.274% */
+export const CHAOS_SIGIL_T6_RATE = 1 - (1 - CHAOS_SIGIL_T6_ANY_RATE) ** (1 / 4);
+/** T6 相對 T1~T5（各權重 1）的權重，使 T6 佔 `CHAOS_SIGIL_T6_RATE` */
+const CHAOS_SIGIL_T6_WEIGHT = (CHAOS_SIGIL_MAX_TIER * CHAOS_SIGIL_T6_RATE) / (1 - CHAOS_SIGIL_T6_RATE);
 /** § 46.12 封印印記的成功率；失敗時該詞綴連同洞毀壞 */
 export const SEAL_SIGIL_SUCCESS_RATE = 0.7;
 /** § 46.12 一件裝備最多封印的條數 */
@@ -321,26 +331,30 @@ function affixName(type: AnyAffixType): string {
 }
 
 /**
- * 混沌與新增印記抽詞綴的方式（§ 46.3、§ 46.11）：Tier **均等隨機**（不查 § 7.7 的區域權重表），
- * 特殊詞綴機率改查角色等級；商店裝改吃 T1~T3 且完全不出特殊詞綴。
+ * 混沌與新增印記抽詞綴的方式（§ 46.3、§ 46.11）：不查 § 7.7 的區域權重表。
+ * 一般裝備且角色 Lv.31+ 時每條 T6 機率 `CHAOS_SIGIL_T6_RATE`、T1~T5 均分其餘；
+ * 否則 T1~T5 均等。商店裝 T1~T3 均等且不出特殊詞綴。
+ * 特殊詞綴機率改查角色等級。回傳的 `cap` 是均等抽的上限（不含 T6）。
  */
 function rollTownAffixes(
   ctx: SigilContext,
   count: number,
   excludeTypes: AnyAffixType[],
-): { affixes: Affix[]; cap: number } {
+): { affixes: Affix[]; cap: number; bonusTier: boolean } {
   const shop = isShopGear(ctx.maxAffixTier);
+  const bonusTier = !shop && ctx.charLevel >= CHAOS_SIGIL_T6_MIN_LEVEL;
   const cap = shop
     ? Math.min(ctx.maxAffixTier ?? SHOP_MAX_AFFIX_TIER, CHAOS_SIGIL_MAX_TIER)
     : CHAOS_SIGIL_MAX_TIER;
   const affixes = generateAffixes(ctx.category, ctx.charLevel, count, false, {
-    maxTier: cap,
+    maxTier: bonusTier ? CHAOS_SIGIL_BONUS_TIER : cap,
     uniformTier: true,
+    ...(bonusTier ? { tierWeights: { [CHAOS_SIGIL_BONUS_TIER]: CHAOS_SIGIL_T6_WEIGHT } } : {}),
     noSpecialAffix: shop,
     excludeTypes,
     ...(ctx.weaponBaseDamage != null ? { weaponBaseDamage: ctx.weaponBaseDamage } : {}),
   });
-  return { affixes, cap };
+  return { affixes, cap, bonusTier };
 }
 
 /**
@@ -349,8 +363,9 @@ function rollTownAffixes(
  */
 export function applyChaosSigil(affixes: Affix[], ctx: SigilContext): SigilResult {
   const sealed = affixes.filter(a => a.sealed);
-  const { affixes: rolled, cap } = rollTownAffixes(ctx, ctx.affixSlots ?? AFFIX_SOCKETS, sealed.map(a => a.type));
-  return { affixes: [...rolled, ...sealed], success: true, message: `混沌印記：詞綴重抽填滿（上限 T${cap}）` };
+  const { affixes: rolled, cap, bonusTier } = rollTownAffixes(ctx, ctx.affixSlots ?? AFFIX_SOCKETS, sealed.map(a => a.type));
+  const range = bonusTier ? `T1~T${cap}，小機率 T${CHAOS_SIGIL_BONUS_TIER}` : `上限 T${cap}`;
+  return { affixes: [...rolled, ...sealed], success: true, message: `混沌印記：詞綴重抽填滿（${range}）` };
 }
 
 /** § 46.11 新增印記：在空洞新增一條詞綴，必定成功。洞滿由 `canUseSigil` 擋 */
@@ -563,4 +578,67 @@ export function applyPolishSigil(quality: number): { quality: number; success: b
   }
   const next = quality + POLISH_SIGIL_QUALITY_STEP;
   return { quality: next, success: true, message: `工藝印記：品質提升至 ${next}%` };
+}
+
+/** § 46.13 印記兌換：可當材料與目標的印記，順序同面板（去掉精鍊與工藝） */
+export const SIGIL_EXCHANGE_TYPES: SigilType[] = SIGIL_PANEL_ORDER.filter(t => t !== 'temper' && t !== 'polish');
+/** § 46.13 手續費只收這兩種 */
+export const SIGIL_EXCHANGE_FEE_TYPES: SigilType[] = ['temper', 'polish'];
+/** § 46.13 材料合計 */
+export const SIGIL_EXCHANGE_INPUT_COUNT = 5;
+/** § 46.13 手續費合計 */
+export const SIGIL_EXCHANGE_FEE_COUNT = 50;
+
+export type SigilCounts = Partial<Record<SigilType, number>>;
+
+export type SigilExchangeCheck =
+  | { ok: true; target: SigilType; cost: SigilCounts }
+  | { ok: false; reason: string };
+
+/** 只認 `allowed` 內的鍵、非負整數；其餘（含 `__proto__`）一律不合法 */
+function parseCounts(raw: unknown, allowed: readonly SigilType[]): SigilCounts | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const counts: SigilCounts = {};
+  for (const [key, n] of Object.entries(raw)) {
+    if (!allowed.includes(key as SigilType)) return null;
+    if (!Number.isSafeInteger(n) || (n as number) < 0) return null;
+    if ((n as number) > 0) counts[key as SigilType] = n as number;
+  }
+  return counts;
+}
+
+function sumCounts(counts: SigilCounts): number {
+  return Object.values(counts).reduce((a, b) => a + (b ?? 0), 0);
+}
+
+/**
+ * § 46.13 兌換判定。UI 與 store 都走這裡；參數來自遠端 action，型別一律當未知值驗。
+ * `held` 為各印記持有數。不合格原因依序：目標、材料合計、手續費合計、持有不足。
+ */
+export function checkSigilExchange(
+  target: unknown,
+  inputs: unknown,
+  fee: unknown,
+  held: Record<SigilType, number>,
+): SigilExchangeCheck {
+  if (!SIGIL_EXCHANGE_TYPES.includes(target as SigilType)) return { ok: false, reason: '不能兌換這種印記' };
+  const inputCounts = parseCounts(inputs, SIGIL_EXCHANGE_TYPES);
+  if (!inputCounts) return { ok: false, reason: '材料不正確' };
+  const feeCounts = parseCounts(fee, SIGIL_EXCHANGE_FEE_TYPES);
+  if (!feeCounts) return { ok: false, reason: '手續費不正確' };
+
+  const inputTotal = sumCounts(inputCounts);
+  if (inputTotal !== SIGIL_EXCHANGE_INPUT_COUNT) {
+    return { ok: false, reason: `材料需剛好 ${SIGIL_EXCHANGE_INPUT_COUNT} 個（目前 ${inputTotal}）` };
+  }
+  const feeTotal = sumCounts(feeCounts);
+  if (feeTotal !== SIGIL_EXCHANGE_FEE_COUNT) {
+    return { ok: false, reason: `手續費需剛好 ${SIGIL_EXCHANGE_FEE_COUNT} 個（目前 ${feeTotal}）` };
+  }
+
+  const cost: SigilCounts = { ...inputCounts, ...feeCounts };
+  for (const [type, n] of Object.entries(cost) as [SigilType, number][]) {
+    if ((held[type] ?? 0) < n) return { ok: false, reason: `${getSigilDefinition(type).name}不足` };
+  }
+  return { ok: true, target: target as SigilType, cost };
 }

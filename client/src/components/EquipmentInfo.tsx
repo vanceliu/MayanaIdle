@@ -1,6 +1,6 @@
 import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
-import { formatAffixDisplay, isMaxRollAffix, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix } from '../models/affix';
+import { formatAffixDisplay, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix } from '../models/affix';
 import { formatUniqueAffixDisplay } from '../models/uniqueAffix';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
@@ -103,10 +103,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       <div
         key={key}
         className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
-        title={
-          isTierlessAffixType(affix.type) ? '額外屬性無 Tier，印記只能重骰不能升階'
-            : isMaxRollAffix(affix) ? '此詞綴為該 Tier 最大值' : undefined
-        }
+        title={isTierlessAffixType(affix.type) ? '額外屬性無 Tier，印記只能重骰不能升階' : undefined}
       >
         {formatAffixDisplay(affix, item.quality)}
       </div>

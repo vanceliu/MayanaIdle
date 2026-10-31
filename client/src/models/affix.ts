@@ -92,18 +92,20 @@ export function getSpecialAffixChance(areaLevel: number, isBoss: boolean = false
 
 export interface AffixTier {
   tier: number; // 1~7
-  min: number;  // percentage
-  max: number;  // percentage
+  /** 百分比詞綴以 0.1 為單位（§ 7.3）；固定值與迴避值為整數 */
+  min: number;
+  max: number;
 }
 
+/** § 7.3 通用階級表（百分比，0.1 單位） */
 export const AFFIX_TIERS: AffixTier[] = [
-  { tier: 1, min: 3, max: 5 },
-  { tier: 2, min: 6, max: 8 },
-  { tier: 3, min: 9, max: 11 },
-  { tier: 4, min: 12, max: 13 },
-  { tier: 5, min: 14, max: 15 },
-  { tier: 6, min: 16, max: 18 },
-  { tier: 7, min: 19, max: 20 },
+  { tier: 1, min: 3.1, max: 5 },
+  { tier: 2, min: 5.1, max: 8 },
+  { tier: 3, min: 8.1, max: 11 },
+  { tier: 4, min: 11.1, max: 13 },
+  { tier: 5, min: 13.1, max: 15 },
+  { tier: 6, min: 15.1, max: 18 },
+  { tier: 7, min: 18.1, max: 20 },
 ];
 
 /** § 7.4 的詞綴分類小標。順序即 `AFFIX_DEFINITIONS` 的排列順序。 */
@@ -160,7 +162,7 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'hp_regen', name: '回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回血 +X（固定值）' },
   { type: 'mp_regen', name: '回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回魔 +X（固定值）' },
   { type: 'bonus_attribute', name: '額外屬性', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '六大屬性之一 +1，roll 時均等決定是哪一個。無 Tier' },
-  { type: 'evasion', name: '迴避', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '迴避率 +X%' },
+  { type: 'evasion', name: '迴避', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '迴避值 +X' },
   { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '技能補血效果 +X%' },
   { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '藥水效果 +X%' },
   { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '掉寶率 +X%（影響一般怪與 Boss 主掉落表、3~5 級職業技能書；工會任務收集物不受影響）' },
@@ -226,10 +228,10 @@ export function rollDropAffixCount(): number {
 }
 
 /**
- * 固定值型詞綴（§ 7.1）：數值不是百分比，走各自的階級表。
+ * 固定值型詞綴（§ 7.1）：數值不是百分比，走各自的階級表。迴避為迴避值（§ 7.3.1）。
  * 額外屬性不在此列 —— 它無 Tier 也無數值區間，固定 +1。
  */
-export const FLAT_AFFIX_TYPES = new Set<AnyAffixType>(['max_hp', 'max_mp', 'hp_regen', 'mp_regen']);
+export const FLAT_AFFIX_TYPES = new Set<AnyAffixType>(['max_hp', 'max_mp', 'hp_regen', 'mp_regen', 'evasion']);
 
 export function isFlatAffixType(type: AnyAffixType): boolean {
   return FLAT_AFFIX_TYPES.has(type);
@@ -400,20 +402,20 @@ export function getBossTierWeights(level: number): number[] {
 }
 
 /**
- * 防具池**百分比詞綴**的專屬階級表（§ 7.3.1），約為通用表的 82%。
+ * 防具池**百分比詞綴**的專屬階級表（§ 7.3.1，0.1 單位），約為通用表的 82%。
  *
  * 防具池的詞綴欄位是 11 個部位 ×4 = 44 條，武器池只有右手 4 條。
  * 兩池共用同一張表的話，防具池那些會隨部位數一起膨脹。
  * 固定值型（最大 HP／MP、回血／回魔）走各自的表，不在此列。
  */
 export const ARMOR_POOL_TIERS: AffixTier[] = [
-  { tier: 1, min: 3, max: 4 },
-  { tier: 2, min: 5, max: 6 },
-  { tier: 3, min: 7, max: 9 },
-  { tier: 4, min: 10, max: 11 },
-  { tier: 5, min: 12, max: 13 },
-  { tier: 6, min: 14, max: 15 },
-  { tier: 7, min: 16, max: 17 },
+  { tier: 1, min: 3.1, max: 4 },
+  { tier: 2, min: 4.1, max: 6 },
+  { tier: 3, min: 6.1, max: 9 },
+  { tier: 4, min: 9.1, max: 11 },
+  { tier: 5, min: 11.1, max: 13 },
+  { tier: 6, min: 13.1, max: 15 },
+  { tier: 7, min: 15.1, max: 17 },
 ];
 
 /**
@@ -447,29 +449,32 @@ export const FLAT_REGEN_TIERS: AffixTier[] = [
 ];
 
 /**
- * 魔法抗性的專屬階級表（§ 7.3.1）。區間明顯低於通用表：
+ * 魔法抗性的專屬階級表（§ 7.3.1，0.1 單位）。區間明顯低於通用表：
  * 它可同時出現在項鍊／戒指 ×2／盾牌共 4 個部位，套用通用表會過快頂到 75% 減傷上限。
  */
 export const MAGIC_RESIST_TIERS: AffixTier[] = [
-  { tier: 1, min: 1, max: 2 },
-  { tier: 2, min: 3, max: 4 },
-  { tier: 3, min: 5, max: 6 },
-  { tier: 4, min: 7, max: 8 },
-  { tier: 5, min: 9, max: 10 },
-  { tier: 6, min: 11, max: 15 },
-  { tier: 7, min: 16, max: 20 },
+  { tier: 1, min: 1.1, max: 2 },
+  { tier: 2, min: 2.1, max: 4 },
+  { tier: 3, min: 4.1, max: 6 },
+  { tier: 4, min: 6.1, max: 8 },
+  { tier: 5, min: 8.1, max: 10 },
+  { tier: 6, min: 10.1, max: 15 },
+  { tier: 7, min: 15.1, max: 20 },
 ];
 
-/** 迴避的專屬階級表（§ 7.3.1）：每階單一數值 */
+/** 迴避的專屬階級表（§ 7.3.1），單位為迴避值 */
 export const EVASION_TIERS: AffixTier[] = [
-  { tier: 1, min: 1, max: 1 },
-  { tier: 2, min: 2, max: 2 },
-  { tier: 3, min: 3, max: 3 },
-  { tier: 4, min: 4, max: 4 },
-  { tier: 5, min: 5, max: 5 },
-  { tier: 6, min: 6, max: 6 },
-  { tier: 7, min: 7, max: 7 },
+  { tier: 1, min: 1, max: 39 },
+  { tier: 2, min: 40, max: 78 },
+  { tier: 3, min: 79, max: 117 },
+  { tier: 4, min: 118, max: 156 },
+  { tier: 5, min: 157, max: 195 },
+  { tier: 6, min: 196, max: 234 },
+  { tier: 7, min: 235, max: 273 },
 ];
+
+/** § 7.3.1 迴避值換算：100 迴避值 = 1% 迴避率 */
+export const EVASION_POINTS_PER_PERCENT = 100;
 
 /**
  * 專屬階級表（§ 7.3.1）與其涵蓋的詞綴。未列出的詞綴一律套用通用 `AFFIX_TIERS` ——
@@ -486,7 +491,7 @@ export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: Affi
   { label: '最大 HP／MP', tiers: FLAT_HP_MP_TIERS, types: ['max_hp', 'max_mp'], flat: true },
   { label: '回血／回魔', tiers: FLAT_REGEN_TIERS, types: ['hp_regen', 'mp_regen'], flat: true },
   { label: '魔法抗性', tiers: MAGIC_RESIST_TIERS, types: ['magic_resist'] },
-  { label: '迴避', tiers: EVASION_TIERS, types: ['evasion'] },
+  { label: '迴避值', tiers: EVASION_TIERS, types: ['evasion'], flat: true },
 ];
 
 export const AFFIX_TIER_OVERRIDES: Partial<Record<AffixType, AffixTier[]>> =
@@ -496,9 +501,41 @@ export function getAffixTierTable(type?: AffixType): AffixTier[] {
   return (type && AFFIX_TIER_OVERRIDES[type]) || AFFIX_TIERS;
 }
 
+/** § 7.3 百分比詞綴的數值單位是 0.1%；固定值型、迴避值、額外屬性、特殊詞綴為整數 */
+export function isDecimalAffixType(type: AnyAffixType): boolean {
+  return !isFlatAffixType(type) && !isTierlessAffixType(type);
+}
+
+const toTenths = (v: number) => Math.round(v * 10);
+
+/** 四捨五入到小數一位（§ 7.3 加總規則） */
+export function roundAffixTenth(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
 export function rollAffixValue(tier: number, type?: AffixType): number {
   const t = getAffixTierTable(type)[tier - 1];
-  return Math.floor(random() * (t.max - t.min + 1)) + t.min;
+  if (type && !isDecimalAffixType(type)) return Math.floor(random() * (t.max - t.min + 1)) + t.min;
+  const lo = toTenths(t.min);
+  return (lo + Math.floor(random() * (toTenths(t.max) - lo + 1))) / 10;
+}
+
+/** 這條詞綴所屬 Tier 的區間（§ 7.3／§ 7.3.1）；無 Tier 的詞綴回 null */
+export function getAffixTierRange(affix: Affix): AffixTier | null {
+  if (isTierlessAffixType(affix.type)) return null;
+  return getAffixTierTable(affix.type as AffixType)[affix.tier - 1] ?? null;
+}
+
+/** 區間端點的顯示字串：百分比詞綴帶一位小數，不帶單位 */
+export function formatAffixBound(type: AnyAffixType, value: number): string {
+  return isDecimalAffixType(type) ? value.toFixed(1) : String(value);
+}
+
+/** § 7.3 數值夾回所屬 Tier 的區間（舊存檔遷移用） */
+export function clampAffixValueToTier(affix: Affix): number {
+  const t = getAffixTierTable(affix.type as AffixType)[affix.tier - 1];
+  if (!t || isTierlessAffixType(affix.type)) return affix.value;
+  return Math.min(t.max, Math.max(t.min, affix.value));
 }
 
 /**
@@ -507,7 +544,7 @@ export function rollAffixValue(tier: number, type?: AffixType): number {
  */
 export const SHOP_MAX_AFFIX_TIER = 3;
 
-/** 一般裝備的詞綴強化上限（`07-affix.md` § 7.2）。T6/T7 只能靠掉落原生取得。 */
+/** 一般裝備的精鍊印記升階上限（`07-affix.md` § 7.2）。 */
 export const DEFAULT_MAX_AFFIX_TIER = 5;
 /** 鐵匠製作品的詞綴 Tier 範圍，依裝備階級（§ 6A.6）。範圍內依 `CRAFT_AFFIX_TIER_WEIGHT` 加權 */
 export const CRAFT_AFFIX_TIER_RANGE: Readonly<Record<number, { min: number; max: number }>> = {
@@ -637,7 +674,15 @@ export function generateAffixes(
 export function getEffectiveAffixValue(affix: Affix, quality: number): number {
   // § 7.3.1 額外屬性固定 +1，不受品質放大（否則會突破「額外屬性最多 +2」）
   if (isAttributeAffixType(affix.type)) return affix.value;
+  // § 7.3 百分比詞綴取到小數一位
+  if (isDecimalAffixType(affix.type)) return Math.floor(toTenths(affix.value) * (100 + quality) / 100) / 10;
   return Math.floor(affix.value * (1 + quality / 100));
+}
+
+/** 詞綴有效數值的顯示字串（不含正負號與單位）：百分比詞綴帶一位小數 */
+function formatEffectiveValue(affix: Affix, quality: number): string {
+  const v = getEffectiveAffixValue(affix, quality);
+  return isDecimalAffixType(affix.type) ? v.toFixed(1) : String(v);
 }
 
 /**
@@ -696,7 +741,7 @@ function formatBaseAffixName(affix: Affix): string {
 export function formatAffixValue(affix: Affix, quality: number = 0): string {
   if (isSpecialAffixType(affix.type)) return '';
   const unit = isFlatAffixType(affix.type) || isAttributeAffixType(affix.type) ? '' : '%';
-  return `+${getEffectiveAffixValue(affix, quality)}${unit}`;
+  return `+${formatEffectiveValue(affix, quality)}${unit}`;
 }
 
 /**
@@ -708,7 +753,7 @@ export function formatAffixDescription(affix: Affix, quality: number = 0): strin
     ? getSpecialAffixDefinition(affix.type)?.description
     : AFFIX_DEFINITIONS.find(d => d.type === affix.type)?.description;
   if (!description) return '';
-  const value = String(getEffectiveAffixValue(affix, quality));
+  const value = formatEffectiveValue(affix, quality);
   const text = description.replace(/^X% 是觸發率：/, '').replace(/X/g, value);
   if ((affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') && affix.restorePercent != null) {
     return text.replace(restoreRange(affix.type), `${restorePercentWithQuality(affix, quality)}%`);
@@ -732,15 +777,15 @@ function formatBaseAffixDisplay(affix: Affix, quality: number): string {
     // 名稱已含「受擊」，回復量的「最大 HP／MP 百分比」省略成「回血／回魔 X%」（§ 7.4）
     const pct = restorePercentWithQuality(affix, quality);
     const what = affix.type === 'on_hit_hp' ? '回血' : '回魔';
-    return `受擊 ${getEffectiveAffixValue(affix, quality)}% 觸發${what} ${pct}% (T${affix.tier})`;
+    return `受擊 ${formatEffectiveValue(affix, quality)}% 觸發${what} ${pct}% (T${affix.tier})`;
   }
   if (affix.type === 'element_erosion') {
     const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));
-    return `${name} ${getEffectiveAffixValue(affix, quality)}% 觸發／每秒 ${dot} (T${affix.tier})`;
+    return `${name} ${formatEffectiveValue(affix, quality)}% 觸發／每秒 ${dot} (T${affix.tier})`;
   }
   // § 7.9 X% 是效果強度，觸發率固定
   if (affix.type === 'hit_down' || affix.type === 'defense_down') {
-    return `${name} ${getEffectiveAffixValue(affix, quality)}%／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`;
+    return `${name} ${formatEffectiveValue(affix, quality)}%／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`;
   }
   return `${name} ${formatAffixValue(affix, quality)} (T${affix.tier})`;
 }
@@ -813,6 +858,8 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
       bonuses[affix.type] += getEffectiveAffixValue(affix, quality);
     }
   }
+  // § 7.3 同種加總四捨五入到小數一位
+  for (const key of Object.keys(bonuses) as (keyof AffixBonuses)[]) bonuses[key] = roundAffixTenth(bonuses[key]);
 
   return bonuses;
 }

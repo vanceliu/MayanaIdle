@@ -4,6 +4,8 @@ import { render, screen } from '@testing-library/react';
 import { CharacterStats } from '../CharacterStats';
 import { useGameStore } from '../../stores/gameStore';
 import type { EquipmentInstance } from '../../models/equipment';
+import type { ActiveEffect } from '../../models/effect';
+import { BASE_CHARACTER_DEFENSE } from '../../systems/combat';
 
 describe('CharacterStats', () => {
   beforeEach(() => {
@@ -52,7 +54,7 @@ describe('CharacterStats', () => {
     // 基礎爆擊率 5%（§ 21.8）。「5%」可能同時出現在其他列（例如魔法減傷率），
     // 因此鎖定爆擊率所在的那一列比對，而非全頁搜尋。
     const critRow = screen.getByText('爆擊率').closest('.stat-row');
-    expect(critRow?.textContent).toContain('5%');
+    expect(critRow?.textContent).toContain('5.0%');
   });
 
   it('物理攻擊顯示武器基傷擲骰的整段範圍（§ 21.3）', () => {
@@ -84,6 +86,24 @@ describe('CharacterStats', () => {
     render(<CharacterStats />);
     expect(screen.getByText('魔法抗性')).toBeDefined();
     expect(screen.getByText('魔法減傷率')).toBeDefined();
+  });
+
+  it.each([
+    // [最終防禦, 魔法減傷率]：防禦每 10 點 1%、防禦 100 封頂，加 SPI 10 的魔抗 5（`21-combat-formula.md` § 21.16）
+    [60, '11.0%'],
+    [100, '15.0%'],
+    [150, '15.0%'],
+  ])('最終防禦 %i：魔法減傷率 %s', (defense, expected) => {
+    const chest = {
+      templateId: 2, name: '測試甲', type: 'armor', slot: 'chest', isTwoHanded: false,
+      defense: defense - BASE_CHARACTER_DEFENSE, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
+    } as EquipmentInstance;
+    useGameStore.setState({ equippedGear: { chest } });
+    render(<CharacterStats />);
+    const rowValue = (label: string) =>
+      screen.getByText(label).closest('.stat-row')?.querySelector('.stat-value')?.textContent;
+    expect(rowValue('防禦值')).toBe(String(defense));
+    expect(rowValue('魔法減傷率')).toBe(expected);
   });
 
   /** `29-regen.md` § 29.1~29.2：面板與自然回復 tick 同一套 */
@@ -135,8 +155,8 @@ describe('CharacterStats', () => {
 
     it('裸裝為 +0%', () => {
       render(<CharacterStats />);
-      expect(rowValue('掉寶率')).toBe('+0%');
-      expect(rowValue('金幣獲得率')).toBe('+0%');
+      expect(rowValue('掉寶率')).toBe('+0.0%');
+      expect(rowValue('金幣獲得率')).toBe('+0.0%');
     });
 
     it('一般詞綴與 T7 獨有掉寶率加總', () => {
@@ -147,8 +167,8 @@ describe('CharacterStats', () => {
         },
       });
       render(<CharacterStats />);
-      expect(rowValue('掉寶率')).toBe('+70%');
-      expect(rowValue('金幣獲得率')).toBe('+15%');
+      expect(rowValue('掉寶率')).toBe('+70.0%');
+      expect(rowValue('金幣獲得率')).toBe('+15.0%');
     });
 
     it('素質需求未滿足：詞綴凍結不計入', () => {
@@ -158,8 +178,40 @@ describe('CharacterStats', () => {
         },
       });
       render(<CharacterStats />);
-      expect(rowValue('掉寶率')).toBe('+0%');
-      expect(rowValue('金幣獲得率')).toBe('+0%');
+      expect(rowValue('掉寶率')).toBe('+0.0%');
+      expect(rowValue('金幣獲得率')).toBe('+0.0%');
+    });
+  });
+
+  describe('迴避率（§ 21.6、§ 34）', () => {
+    const rowValue = (label: string) =>
+      screen.getByText(label).closest('.stat-row')?.querySelector('.stat-value')?.textContent;
+    const helmet = {
+      templateId: 1, name: '頭盔', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 0,
+      quality: 0, enhancement: 0, affixes: [{ type: 'evasion', tier: 7, value: 273 }], ownerId: 1, equipped: true,
+    } as EquipmentInstance;
+    const evasionBuff = (value: number): ActiveEffect => ({
+      id: 'eva', sourceSkillId: 'eva', sourceSkillName: 'eva', category: 'eva', type: 'buff', target: 'player',
+      modifiers: [{ stat: 'evasion', value, isPercent: true }], startTime: Date.now(), duration: 60_000,
+      tags: [], name: 'eva', description: '',
+    });
+
+    it('迴避值 ÷ 100 換算，顯示小數一位', () => {
+      useGameStore.setState({ equippedGear: { helmet } });
+      render(<CharacterStats />);
+      // 騎士基礎 5 + AGI 14（有效 12）→ 4 + 273 迴避值 → 2.73
+      expect(rowValue('迴避率')).toBe('11.7%');
+    });
+
+    it('超過上限時括號標示實際值', () => {
+      useGameStore.setState({ activeEffects: [evasionBuff(30)] });
+      render(<CharacterStats />);
+      expect(rowValue('迴避率')).toBe('35.0%（39.0%）');
+    });
+
+    it('未超過上限不加括號', () => {
+      render(<CharacterStats />);
+      expect(rowValue('迴避率')).toBe('9.0%');
     });
   });
 

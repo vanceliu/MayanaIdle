@@ -10,6 +10,10 @@ import {
 import { getItemById } from '../items';
 import {
   CHAOS_SIGIL_MAX_TIER,
+  CHAOS_SIGIL_BONUS_TIER,
+  CHAOS_SIGIL_T6_RATE,
+  CHAOS_SIGIL_T6_ANY_RATE,
+  CHAOS_SIGIL_T6_MIN_LEVEL,
   MAX_SEALED_AFFIXES,
   SEAL_SIGIL_SUCCESS_RATE,
   ENHANCE_SIGIL_FAIL_TIER,
@@ -80,7 +84,7 @@ describe('印記系統（§ 46）', () => {
   });
 
   describe('混沌印記（§ 46.3）', () => {
-    it('掉落／製作品：4 條詞綴、Tier 落在 T1~T5、種類不重複', () => {
+    it('掉落品：4 條詞綴、Tier 落在 T1~T6、種類不重複', () => {
       for (let run = 0; run < 200; run++) {
         const { affixes } = applyChaosSigil(FOUR, dropCtx());
         expect(affixes).toHaveLength(FOUR.length);
@@ -88,9 +92,59 @@ describe('印記系統（§ 46）', () => {
         for (const a of affixes) {
           if (isTierlessAffixType(a.type)) continue;
           expect(a.tier).toBeGreaterThanOrEqual(1);
-          expect(a.tier).toBeLessThanOrEqual(CHAOS_SIGIL_MAX_TIER);
+          expect(a.tier).toBeLessThanOrEqual(CHAOS_SIGIL_BONUS_TIER);
         }
       }
+    });
+
+    it('T6 機率：每條獨立，4 洞至少 1 條 T6 = 5%', () => {
+      expect(CHAOS_SIGIL_BONUS_TIER).toBe(6);
+      expect(CHAOS_SIGIL_T6_ANY_RATE).toBe(0.05);
+      expect(1 - (1 - CHAOS_SIGIL_T6_RATE) ** 4).toBeCloseTo(0.05, 12);
+      expect(CHAOS_SIGIL_T6_RATE).toBeCloseTo(0.012741, 6);
+    });
+
+    it('混沌／新增的說明文字與 T6 機率一致', () => {
+      const pct = `${(CHAOS_SIGIL_T6_RATE * 100).toFixed(2)}% 為 T${CHAOS_SIGIL_BONUS_TIER}`;
+      for (const type of ['chaos', 'add'] as const) {
+        expect(SIGIL_DEFINITIONS.find(d => d.type === type)!.description).toContain(pct);
+      }
+      expect(getItemById(SIGIL_DEFINITIONS.find(d => d.type === 'chaos')!.itemId)!.description).toContain(pct);
+    });
+
+    /*
+     * Tier 抽取把 [0, 1) 切成 T1~T5 各 (1 − p)/5、T6 佔最後的 p。
+     * random 固定在 T6 區段起點的兩側，驗證切點就是 1 − p；兩個值都高於特殊詞綴機率，不會出特殊詞綴。
+     */
+    it.each([
+      ['剛好低於 T6 區段：T5', 1 - CHAOS_SIGIL_T6_RATE - 1e-9, CHAOS_SIGIL_MAX_TIER],
+      ['剛好進入 T6 區段：T6', 1 - CHAOS_SIGIL_T6_RATE + 1e-9, CHAOS_SIGIL_BONUS_TIER],
+    ])('%s', (_label, roll, tier) => {
+      mockRandom([roll]);
+      const { affixes } = applyChaosSigil(FOUR, dropCtx());
+      for (const a of affixes) {
+        expect(isSpecialAffixType(a.type)).toBe(false);
+        expect(a.tier).toBe(tier);
+        const t = getAffixTierTable(a.type as never)[tier - 1];
+        expect(a.value).toBeGreaterThanOrEqual(t.min);
+        expect(a.value).toBeLessThanOrEqual(t.max);
+      }
+    });
+
+    it.each([
+      [CHAOS_SIGIL_T6_MIN_LEVEL - 1, CHAOS_SIGIL_MAX_TIER],
+      [CHAOS_SIGIL_T6_MIN_LEVEL, CHAOS_SIGIL_BONUS_TIER],
+    ])('角色 Lv.%i：random 落在 T6 區段時為 T%i', (charLevel, tier) => {
+      expect(CHAOS_SIGIL_T6_MIN_LEVEL).toBe(31);
+      mockRandom([0.999999]);
+      const { affixes } = applyChaosSigil(FOUR, dropCtx({ charLevel }));
+      for (const a of affixes) expect(a.tier).toBe(tier);
+    });
+
+    it('商店裝：random 落在 T6 區段也只到 T3', () => {
+      mockRandom([0.999999]);
+      const { affixes } = applyChaosSigil(FOUR, shopCtx());
+      for (const a of affixes) expect(a.tier).toBe(SHOP_MAX_AFFIX_TIER);
     });
 
     it('商店裝：Tier 不超過 T3，且完全不出特殊詞綴', () => {
@@ -433,15 +487,30 @@ describe('印記系統（§ 46）', () => {
       expect(canUseSigil('add', FOUR.slice(0, 3), undefined, { affixSlots: 3 }).ok).toBe(false);
     });
 
-    it('新增一條、種類不重複、Tier T1~T5', () => {
+    it('新增一條、種類不重複、Tier T1~T6', () => {
       for (let run = 0; run < 300; run++) {
         const { affixes, success } = applyAddSigil(FOUR.slice(0, 3), dropCtx());
         expect(success).toBe(true);
         expect(affixes).toHaveLength(4);
         expect(new Set(affixes.map(a => a.type)).size).toBe(4);
         const added = affixes[3];
-        if (!isTierlessAffixType(added.type)) expect(added.tier).toBeLessThanOrEqual(CHAOS_SIGIL_MAX_TIER);
+        if (!isTierlessAffixType(added.type)) expect(added.tier).toBeLessThanOrEqual(CHAOS_SIGIL_BONUS_TIER);
       }
+    });
+
+    it.each([
+      ['剛好低於 T6 區段：T5', 1 - CHAOS_SIGIL_T6_RATE - 1e-9, CHAOS_SIGIL_MAX_TIER],
+      ['剛好進入 T6 區段：T6', 1 - CHAOS_SIGIL_T6_RATE + 1e-9, CHAOS_SIGIL_BONUS_TIER],
+    ])('T6 切點同混沌：%s', (_label, roll, tier) => {
+      mockRandom([roll]);
+      const added = applyAddSigil(FOUR.slice(0, 3), dropCtx()).affixes[3];
+      expect(added.tier).toBe(tier);
+    });
+
+    it('角色 Lv.30 以下不出 T6', () => {
+      mockRandom([0.999999]);
+      const added = applyAddSigil(FOUR.slice(0, 3), dropCtx({ charLevel: CHAOS_SIGIL_T6_MIN_LEVEL - 1 })).affixes[3];
+      expect(added.tier).toBe(CHAOS_SIGIL_MAX_TIER);
     });
 
     it('商店裝 T3 上限且不出特殊詞綴', () => {

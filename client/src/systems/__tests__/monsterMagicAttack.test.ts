@@ -79,42 +79,44 @@ describe('怪物魔法攻擊減傷（§ 21.16）', () => {
     expect(r.damage).toBe(Math.floor(100 * (100 - 60) / 100));
   });
 
-  it('魔法：裝備防禦只有一半效力', () => {
+  it('魔法：裝備防禦每 10 點 1%', () => {
     noRandom();
-    // 防禦 60 → 貢獻 30；魔抗 9 → 總減傷 39%
+    // 防禦 60 → 貢獻 6；魔抗 9 → 總減傷 15%
     const r = calculateMonsterAttack(monster('magic', 100), char(18), [armor(60)], []);
-    expect(r.damage).toBe(Math.floor(100 * (100 - 39) / 100));
+    expect(r.damage).toBe(85);
   });
 
-  it('魔法：低防禦同樣只算一半', () => {
+  it('魔法：不滿 10 點照比例計', () => {
     noRandom();
-    // 防禦 30 → 貢獻 15；魔抗 9 → 24%
-    const r = calculateMonsterAttack(monster('magic', 100), char(18), [armor(30)], []);
-    expect(r.damage).toBe(Math.floor(100 * (100 - 24) / 100));
+    // 防禦 45 → 貢獻 4.5；魔抗 9 → 13.5%
+    const r = calculateMonsterAttack(monster('magic', 100), char(18), [armor(45)], []);
+    expect(r.damage).toBe(Math.floor(100 * (100 - 13.5) / 100));
   });
 
-  it('裝備防禦的貢獻上限為 37.5%（物理上限的一半）', () => {
-    expect(MAGIC_DEFENSE_CONTRIBUTION_CAP).toBe(37.5);
-    expect(getMagicDefenseContribution(75)).toBe(37.5);
-    expect(getMagicDefenseContribution(200)).toBe(37.5);   // 先套物理上限再折半
-    expect(getMagicDefenseContribution(60)).toBe(30);
+  it('裝備防禦的貢獻上限為 10%（防禦 100 封頂）', () => {
+    expect(MAGIC_DEFENSE_CONTRIBUTION_CAP).toBe(10);
+    expect(getMagicDefenseContribution(100)).toBe(10);
+    expect(getMagicDefenseContribution(200)).toBe(10);
+    expect(getMagicDefenseContribution(75)).toBe(7.5);
+    expect(getMagicDefenseContribution(60)).toBe(6);
+    expect(getMagicDefenseContribution(45)).toBe(4.5);
     expect(getMagicDefenseContribution(0)).toBe(0);
   });
 
   it('魔法：總減傷上限仍為 75%', () => {
     noRandom();
-    // 防禦 200 → 貢獻 37.5；SPI 80 → 魔抗 40；合計 77.5 → clamp 至 75
-    const r = calculateMonsterAttack(monster('magic', 100), char(80), [armor(200)], []);
+    // 防禦 200 → 貢獻 10；SPI 140 → 魔抗 70；合計 80 → clamp 至 75
+    const r = calculateMonsterAttack(monster('magic', 100), char(140), [armor(200)], []);
     expect(r.damage).toBe(Math.floor(100 * (100 - DAMAGE_REDUCTION_CAP) / 100));
   });
 
-  it('魔抗為 0 時，魔法減傷恰為物理的一半', () => {
+  it('魔抗為 0 時，魔法減傷只剩防禦貢獻', () => {
     noRandom();
     const gear = [armor(70)];
     const phys = calculateMonsterAttack(monster('melee', 100), char(0), gear, []).damage;
     const magic = calculateMonsterAttack(monster('magic', 100), char(0), gear, []).damage;
     expect(phys).toBe(Math.floor(100 * (100 - 70) / 100));
-    expect(magic).toBe(Math.floor(100 * (100 - 35) / 100));
+    expect(magic).toBe(93);
     expect(magic).toBeGreaterThan(phys);
   });
 

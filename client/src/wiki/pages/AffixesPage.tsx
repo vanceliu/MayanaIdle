@@ -5,8 +5,10 @@ import {
   SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
   AFFIX_TIER_TABLES,
+  EVASION_POINTS_PER_PERCENT,
   isAttributeAffixType,
   isFlatAffixType,
+  isDecimalAffixType,
   DEFAULT_MAX_AFFIX_TIER,
   formatCraftAffixTierRanges,
   formatCraftAffixTierWeights,
@@ -26,8 +28,17 @@ import {
   ENHANCE_SIGIL_FAIL_TIER,
   POLISH_SIGIL_GOLD_COST,
   CHAOS_SIGIL_MAX_TIER,
+  CHAOS_SIGIL_BONUS_TIER,
+  CHAOS_SIGIL_T6_RATE,
+  CHAOS_SIGIL_T6_ANY_RATE,
+  CHAOS_SIGIL_T6_MIN_LEVEL,
   SEAL_SIGIL_SUCCESS_RATE,
   MAX_SEALED_AFFIXES,
+  SIGIL_EXCHANGE_TYPES,
+  SIGIL_EXCHANGE_FEE_TYPES,
+  SIGIL_EXCHANGE_INPUT_COUNT,
+  SIGIL_EXCHANGE_FEE_COUNT,
+  getSigilDefinition,
 } from '../../models/sigil';
 import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
 import '../components/WikiTable.css';
@@ -115,7 +126,8 @@ function tierRange(type: AffixType): string {
   if (isAttributeAffixType(type)) return '固定 +1 · 無 Tier';
   const t = getAffixTierTable(type);
   const unit = isFlatAffixType(type) ? '' : '%';
-  return `${t[0].min}${unit} ~ ${t[t.length - 1].max}${unit}`;
+  const fmt = (v: number) => (isDecimalAffixType(type) ? v.toFixed(1) : String(v));
+  return `${fmt(t[0].min)}${unit} ~ ${fmt(t[t.length - 1].max)}${unit}`;
 }
 
 function categoryText(categories: AffixCategory[]): string {
@@ -215,7 +227,7 @@ export function AffixesPage() {
             ——一件裝備最多 {AFFIX_SOCKETS} 條詞綴＋1 條 (封)＋T7 的 1 條 (獨)。
           </li>
           <li>所有詞綴數值皆為百分比，並受裝備品質放大：實際效果 = floor(數值 × (1 + 品質% / 100))。</li>
-          <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 只能靠一般怪掉落原生取得或突破印記，T7 只有 Boss 掉落與突破印記。</li>
+          <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 來自一般怪掉落原生、突破印記，以及混沌／新增印記的小機率；T7 只有 Boss 掉落與突破印記。</li>
           <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過。</li>
           <li>
             鐵匠製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條、不會出特殊詞綴，Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），
@@ -259,9 +271,13 @@ export function AffixesPage() {
         <p style={noteStyle}>
           「數值區間」為 T1 下限到 T7 上限的完整範圍，各階明細見下方〈階級數值〉。
           <br />
+          百分比詞綴以 0.1% 為單位，各階區間連續不重疊；品質放大後取到小數一位。
+          <br />
           魔法抗性使用專屬階級表，每一階都低於其他詞綴（它可同時出現在項鍊、戒指 ×2、盾牌共 4 個部位）。
           <br />
           最大 HP／MP 與回血／回魔是<strong>固定值</strong>，不是百分比；額外屬性無 Tier，一律 +1。
+          <br />
+          迴避是<strong>迴避值</strong>，{EVASION_POINTS_PER_PERCENT} 迴避值 = 1% 迴避率。
         </p>
       </section>
 
@@ -286,14 +302,14 @@ export function AffixesPage() {
                     <span className={`affix-tag tier-${t.tier}`}>T{t.tier}</span>
                   </td>
                   <td className="cell-number">
-                    {t.min}~{t.max}%
+                    {t.min.toFixed(1)}~{t.max.toFixed(1)}%
                   </td>
                   {AFFIX_TIER_TABLES.map(o => {
                     const row = o.tiers[t.tier - 1];
-                    const unit = o.flat ? '' : '%';
+                    const range = o.flat ? `${row.min}~${row.max}` : `${row.min.toFixed(1)}~${row.max.toFixed(1)}%`;
                     return (
                       <td key={o.label} className="cell-number">
-                        <span className={`affix-tag tier-${t.tier}`}>{row.min}~{row.max}{unit}</span>
+                        <span className={`affix-tag tier-${t.tier}`}>{range}</span>
                       </td>
                     );
                   })}
@@ -309,7 +325,7 @@ export function AffixesPage() {
           <strong style={{ fontWeight: 700 }}>粗體</strong>顯示（顏色仍為該階級的 Tier 色）。
           <br />
           判定看的是<strong>未加品質的原始數值</strong>：品質對每條詞綴等比放大，不改變這次是否滾到滿值。
-          例如品質 20% 的 T4 12%（顯示 14%）不算滿值。特殊詞綴沒有階級與數值，不參與判定，但一律以粗體顯示。
+          例如品質 20% 的 T4 12.0%（顯示 14.4%）不算滿值。特殊詞綴沒有階級與數值，不參與判定，但一律以粗體顯示。
         </p>
       </section>
 
@@ -419,13 +435,16 @@ export function AffixesPage() {
           升階的兩種印記在印記師是<strong>各自獨立的選項</strong>，守備範圍不重疊：
           取得管道上限以內用<strong>精鍊印記</strong>（必定成功），T5／T6 才輪到<strong>突破印記</strong>。
           <br />
-          突破印記是 T6／T7 詞綴在掉落之外的唯一來源：
+          突破印記是 T7 詞綴在掉落之外的唯一來源，也是唯一能指定詞綴升到 T6 的方式：
           {ENHANCE_SIGIL_RATES.map(r => `T${r.from}→T${r.from + 1} ${Math.round(r.rate * 100)}%`).join('、')}
           ，失敗該詞綴掉回 T{ENHANCE_SIGIL_FAIL_TIER}。
           <br />
           <strong>混沌印記</strong>不看原本有幾條，一律重抽到<strong>填滿所有詞綴洞</strong>（被毀壞的洞不算；封印詞綴不佔洞、原樣保留）。
+          每條詞綴有 {(CHAOS_SIGIL_T6_RATE * 100).toFixed(2)}% 為 T{CHAOS_SIGIL_BONUS_TIER}、其餘由 T1~T{CHAOS_SIGIL_MAX_TIER} 均分（4 洞時至少 1 條 T{CHAOS_SIGIL_BONUS_TIER} 的機率為 {CHAOS_SIGIL_T6_ANY_RATE * 100}%）；
+          T{CHAOS_SIGIL_BONUS_TIER} 需角色 <strong>Lv.{CHAOS_SIGIL_T6_MIN_LEVEL} 以上</strong>，以下只有 T1~T{CHAOS_SIGIL_MAX_TIER} 均等；
+          商店裝只到 T{SHOP_MAX_AFFIX_TIER}、不出 T{CHAOS_SIGIL_BONUS_TIER}。
           <br />
-          <strong>新增印記</strong>在空洞補一條，必定成功，Tier 與混沌相同（T1~T{CHAOS_SIGIL_MAX_TIER} 均等，商店裝 T{SHOP_MAX_AFFIX_TIER}）；沒有空洞時不能用。
+          <strong>新增印記</strong>在空洞補一條，必定成功，Tier 與混沌相同（{(CHAOS_SIGIL_T6_RATE * 100).toFixed(2)}% 為 T{CHAOS_SIGIL_BONUS_TIER}、其餘由 T1~T{CHAOS_SIGIL_MAX_TIER} 均分，同樣需 Lv.{CHAOS_SIGIL_T6_MIN_LEVEL} 以上；商店裝 T1~T{SHOP_MAX_AFFIX_TIER}）；沒有空洞時不能用。
           <br />
           <strong>封印印記</strong>指定一條詞綴：{Math.round(SEAL_SIGIL_SUCCESS_RATE * 100)}% 移出詞綴洞封印成 (封)，原本的洞空出來可再補一條；
           {100 - Math.round(SEAL_SIGIL_SUCCESS_RATE * 100)}% 失敗時那條詞綴<strong>連同詞綴洞一起毀壞</strong>（例：4 條變 3 條、洞也剩 3 個），印記照樣消耗。
@@ -433,6 +452,11 @@ export function AffixesPage() {
           <br />
           混沌、刺針與新增在城鎮使用，沒有區域等級可查，特殊詞綴改依<strong>角色等級</strong>套用上表的機率與門檻。
           混沌／刺針／重刻／突破／新增／封印只在 Lv.31 以上區域的怪物與 Boss 掉落；精鍊與工藝印記走全區域掉落。
+          <br />
+          <strong>印記兌換</strong>（印記師「兌換印記」分頁）：
+          {SIGIL_EXCHANGE_TYPES.map(t => getSigilDefinition(t).name).join('／')}任意混搭 {SIGIL_EXCHANGE_INPUT_COUNT} 個，
+          加上手續費{SIGIL_EXCHANGE_FEE_TYPES.map(t => getSigilDefinition(t).name).join('＋')}合計 {SIGIL_EXCHANGE_FEE_COUNT} 個，
+          換指定的 1 個，必定成功、不收金幣。
           <br />
           印記<strong>不佔背包格也不計負重</strong>，收在背包底部的「印記」抽屜裡，撿再多都不會擠到背包。
         </p>

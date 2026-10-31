@@ -11,6 +11,9 @@ import {
   SPECIAL_AFFIX_DEFINITIONS,
   AFFIX_TIERS,
   AFFIX_DEFINITIONS,
+  ARMOR_POOL_TIERS,
+  isDecimalAffixType,
+  clampAffixValueToTier,
 } from '../affix';
 
 describe('affix model', () => {
@@ -68,9 +71,12 @@ describe('affix model', () => {
       }
     });
 
-    it('should have T1 range 3-5 and T7 range 19-20', () => {
-      expect(AFFIX_TIERS[0]).toEqual({ tier: 1, min: 3, max: 5 });
-      expect(AFFIX_TIERS[6]).toEqual({ tier: 7, min: 19, max: 20 });
+    it('should have T1 range 3.1-5.0 and T7 range 18.1-20.0（§ 7.3 連續不重疊）', () => {
+      expect(AFFIX_TIERS[0]).toEqual({ tier: 1, min: 3.1, max: 5 });
+      expect(AFFIX_TIERS[6]).toEqual({ tier: 7, min: 18.1, max: 20 });
+      for (let i = 1; i < AFFIX_TIERS.length; i++) {
+        expect(Math.round(AFFIX_TIERS[i].min * 10)).toBe(Math.round(AFFIX_TIERS[i - 1].max * 10) + 1);
+      }
     });
   });
 
@@ -185,8 +191,8 @@ describe('affix model', () => {
 
     it('should increase value with quality', () => {
       const affix = { type: 'attack_power' as const, tier: 3, value: 12 };
-      // quality 10%: floor(12 * 1.10) = floor(13.2) = 13
-      expect(getEffectiveAffixValue(affix, 10)).toBe(13);
+      // quality 10%: floor(12 * 1.10 * 10) / 10 = 13.2
+      expect(getEffectiveAffixValue(affix, 10)).toBe(13.2);
     });
 
     it('should apply max quality (20%)', () => {
@@ -197,8 +203,8 @@ describe('affix model', () => {
 
     it('should floor the result', () => {
       const affix = { type: 'crit_rate' as const, tier: 1, value: 7 };
-      // quality 5%: floor(7 * 1.05) = floor(7.35) = 7
-      expect(getEffectiveAffixValue(affix, 5)).toBe(7);
+      // quality 5%: floor(7 * 1.05 * 10) / 10 = floor(73.5) / 10 = 7.3
+      expect(getEffectiveAffixValue(affix, 5)).toBe(7.3);
     });
   });
 
@@ -246,8 +252,8 @@ describe('affix model', () => {
         },
       ];
       const bonuses = collectAffixBonuses(gear);
-      // floor(12 * 1.10) = 13
-      expect(bonuses.attack_power).toBe(13);
+      // floor(12 * 1.10 * 10) / 10 = 13.2
+      expect(bonuses.attack_power).toBe(13.2);
     });
 
     it('should handle gear with no affixes', () => {
@@ -295,7 +301,7 @@ describe('affix model', () => {
     it('should ignore quality (raw roll decides)', () => {
       // 品質放大後的顯示值超過上限，仍不算滿 roll
       const affix = { type: 'attack_power' as const, tier: 4, value: 12 };
-      expect(getEffectiveAffixValue(affix, 20)).toBe(14);
+      expect(getEffectiveAffixValue(affix, 20)).toBe(14.4);
       expect(isMaxRollAffix(affix)).toBe(false);
     });
 
@@ -310,8 +316,8 @@ describe('affix model', () => {
 
   describe('formatAffixDescription（§ 7.4）', () => {
     it('百分比型：X 代入數值', () => {
-      expect(formatAffixDescription({ type: 'attack_power', tier: 4, value: 12 })).toBe('攻擊力 +12%');
-      expect(formatAffixDescription({ type: 'cooldown_reduction', tier: 2, value: 5 })).toBe('技能冷卻時間 -5%');
+      expect(formatAffixDescription({ type: 'attack_power', tier: 4, value: 12 })).toBe('攻擊力 +12.0%');
+      expect(formatAffixDescription({ type: 'cooldown_reduction', tier: 2, value: 5 })).toBe('技能冷卻時間 -5.0%');
     });
 
     it('固定值型：X 代入數值，保留「固定值」字樣', () => {
@@ -320,9 +326,9 @@ describe('affix model', () => {
 
     it('觸發率型：去掉「X% 是觸發率：」開頭，其餘 X 全部代入', () => {
       expect(formatAffixDescription({ type: 'element_erosion', tier: 3, value: 8, element: 'fire', dotDamage: 10 }))
-        .toBe('命中後有 8% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒');
+        .toBe('命中後有 8.0% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒');
       expect(formatAffixDescription({ type: 'on_hit_hp', tier: 3, value: 9, restorePercent: 3 }))
-        .toBe('受到傷害時 9% 機率回復最大 HP 的 3%');
+        .toBe('受到傷害時 9.0% 機率回復最大 HP 的 3%');
     });
 
     it('受擊回血／回魔：回復比例代入該條抽到的值；定義本身寫範圍（Wiki 用）', () => {
@@ -331,13 +337,13 @@ describe('affix model', () => {
       expect(AFFIX_DEFINITIONS.find(d => d.type === 'on_hit_mp')!.description)
         .toBe('受到傷害時 X% 機率回復最大 MP 的 2~5%');
       expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 6, restorePercent: 5 }))
-        .toBe('受到傷害時 6% 機率回復最大 MP 的 5%');
+        .toBe('受到傷害時 6.0% 機率回復最大 MP 的 5%');
       expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 6, restorePercent: 5 }, 20))
-        .toBe('受到傷害時 7% 機率回復最大 MP 的 6%');
+        .toBe('受到傷害時 7.2% 機率回復最大 MP 的 6%');
     });
 
     it('品質參數放大代入值', () => {
-      expect(formatAffixDescription({ type: 'attack_power', tier: 4, value: 12 }, 20)).toBe('攻擊力 +14%');
+      expect(formatAffixDescription({ type: 'attack_power', tier: 4, value: 12 }, 20)).toBe('攻擊力 +14.4%');
     });
 
     it('特殊詞綴：照原文', () => {
@@ -350,5 +356,59 @@ describe('affix model', () => {
         expect(formatAffixDescription({ type: def.type, tier: 1, value: 3 })).not.toMatch(/X/);
       }
     });
+  });
+});
+
+/** `07-affix.md` § 7.3：百分比詞綴以 0.1% 為單位、各階連續不重疊 */
+describe('百分比詞綴小數規則（§ 7.3）', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('防具池表 T1~T7 為 3.1~4.0 … 15.1~17.0', () => {
+    expect(ARMOR_POOL_TIERS.map(t => [t.min, t.max])).toEqual(
+      [[3.1, 4], [4.1, 6], [6.1, 9], [9.1, 11], [11.1, 13], [13.1, 15], [15.1, 17]],
+    );
+  });
+
+  it('只有百分比詞綴是小數；固定值、迴避值、額外屬性、特殊詞綴為整數', () => {
+    expect(isDecimalAffixType('attack_power')).toBe(true);
+    expect(isDecimalAffixType('defense')).toBe(true);
+    expect(isDecimalAffixType('magic_resist')).toBe(true);
+    for (const t of ['max_hp', 'hp_regen', 'evasion', 'bonus_attribute', 'immune_poison'] as const) {
+      expect(isDecimalAffixType(t), t).toBe(false);
+    }
+  });
+
+  it('抽值以 0.1 為單位，兩端都抽得到', () => {
+    for (const [type, table] of [['attack_power', AFFIX_TIERS], ['defense', ARMOR_POOL_TIERS]] as const) {
+      for (const t of table) {
+        vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
+        expect(rollAffixValue(t.tier, type)).toBe(t.min);
+        expect(rollAffixValue(t.tier, type)).toBe(t.max);
+        vi.restoreAllMocks();
+        for (let i = 0; i < 30; i++) {
+          const v = rollAffixValue(t.tier, type);
+          expect(Math.round(v * 10) / 10).toBe(v);
+          expect(v).toBeGreaterThanOrEqual(t.min);
+          expect(v).toBeLessThanOrEqual(t.max);
+        }
+      }
+    }
+  });
+
+  it('同種加總四捨五入到小數一位', () => {
+    const b = collectAffixBonuses([
+      { affixes: [{ type: 'crit_rate', tier: 1, value: 3.1 }] },
+      { affixes: [{ type: 'crit_rate', tier: 2, value: 5.2 }] },
+      { affixes: [{ type: 'crit_rate', tier: 1, value: 4.7 }] },
+    ]);
+    expect(b.crit_rate).toBe(13);
+  });
+
+  it('舊值夾回所屬 Tier 的新區間，區間內不變', () => {
+    expect(clampAffixValueToTier({ type: 'attack_power', tier: 1, value: 3 })).toBe(3.1);
+    expect(clampAffixValueToTier({ type: 'defense', tier: 1, value: 3 })).toBe(3.1);
+    expect(clampAffixValueToTier({ type: 'magic_resist', tier: 1, value: 1 })).toBe(1.1);
+    expect(clampAffixValueToTier({ type: 'attack_power', tier: 2, value: 6 })).toBe(6);
+    expect(clampAffixValueToTier({ type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' })).toBe(1);
   });
 });

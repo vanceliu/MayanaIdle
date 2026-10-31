@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  EVASION_POINTS_PER_PERCENT,
+  EVASION_TIERS,
+  rollAffixValue,
   FLAT_HP_MP_TIERS,
   FLAT_REGEN_TIERS,
   formatAffixDisplay,
@@ -43,7 +46,7 @@ describe('固定值型詞綴（§ 7.3.1）', () => {
   it('拆開輸出的數值同樣不帶百分號，百分比型才帶', () => {
     expect(formatAffixValue({ type: 'max_hp', tier: 7, value: 95 })).toBe('+95');
     expect(formatAffixValue({ type: 'mp_regen', tier: 5, value: 8 })).toBe('+8');
-    expect(formatAffixValue({ type: 'attack_power', tier: 5, value: 12 })).toBe('+12%');
+    expect(formatAffixValue({ type: 'attack_power', tier: 5, value: 12 })).toBe('+12.0%');
     expect(formatAffixName({ type: 'max_hp', tier: 7, value: 95 })).toBe('最大 HP');
   });
 
@@ -53,12 +56,42 @@ describe('固定值型詞綴（§ 7.3.1）', () => {
     expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 99 })).toBe(false);
   });
 
-  it('分類正確：只有四種是固定值型', () => {
-    for (const t of ['max_hp', 'max_mp', 'hp_regen', 'mp_regen'] as const) {
+  it('分類正確：只有五種是固定值型', () => {
+    for (const t of ['max_hp', 'max_mp', 'hp_regen', 'mp_regen', 'evasion'] as const) {
       expect(isFlatAffixType(t)).toBe(true);
     }
     expect(isFlatAffixType('defense')).toBe(false);
     expect(isFlatAffixType('bonus_attribute')).toBe(false);
+  });
+});
+
+describe('迴避值（§ 7.3.1）', () => {
+  it('T1~T7 為 1~39 … 235~273，各階連續不重疊', () => {
+    expect(EVASION_TIERS.map(t => [t.min, t.max])).toEqual(
+      [[1, 39], [40, 78], [79, 117], [118, 156], [157, 195], [196, 234], [235, 273]],
+    );
+    for (let i = 1; i < EVASION_TIERS.length; i++) {
+      expect(EVASION_TIERS[i].min).toBe(EVASION_TIERS[i - 1].max + 1);
+    }
+    expect(getAffixTierTable('evasion')).toBe(EVASION_TIERS);
+    expect(EVASION_POINTS_PER_PERCENT).toBe(100);
+  });
+
+  it('顯示為迴避值、不帶百分號；吃品質；滿值判定照常', () => {
+    expect(formatAffixDisplay({ type: 'evasion', tier: 7, value: 250 })).toBe('迴避 +250 (T7)');
+    expect(formatAffixValue({ type: 'evasion', tier: 7, value: 273 }, 20)).toBe('+327');
+    expect(isMaxRollAffix({ type: 'evasion', tier: 7, value: 273 })).toBe(true);
+    expect(isMaxRollAffix({ type: 'evasion', tier: 7, value: 272 })).toBe(false);
+  });
+
+  it('數值依 Tier 區間抽', () => {
+    for (let tier = 1; tier <= 7; tier++) {
+      for (let i = 0; i < 50; i++) {
+        const v = rollAffixValue(tier, 'evasion');
+        expect(v).toBeGreaterThanOrEqual(EVASION_TIERS[tier - 1].min);
+        expect(v).toBeLessThanOrEqual(EVASION_TIERS[tier - 1].max);
+      }
+    }
   });
 });
 

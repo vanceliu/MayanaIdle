@@ -13,10 +13,14 @@ import {
   getTotalAttackSpeedPercent,
   getWeaponAttackSuccess,
   DAMAGE_REDUCTION_CAP,
+  MAGIC_DEFENSE_CAP,
+  MAGIC_DEFENSE_PER_PERCENT,
+  MAGIC_DEFENSE_CONTRIBUTION_CAP,
   getMagicDefenseContribution,
   getTotalMagicResist,
   getPlayerBlockRate,
-  getPlayerDodgeRate,
+  getUncappedPlayerDodgeRate,
+  DODGE_RATE_CAP,
   getSkillCooldownReduction,
   getWeaponAttributeBonus,
   getUnclampedDefense,
@@ -25,6 +29,7 @@ import {
   getWeaponDamageRange,
 } from '../systems/combat';
 import { isRangedWeapon } from '../models/equipment';
+import { EVASION_POINTS_PER_PERCENT, roundAffixTenth } from '../models/affix';
 import { getEffectiveGearArray } from '../systems/gear';
 import { getHpRegen, getMpRegen } from '../systems/regen';
 
@@ -57,6 +62,9 @@ function StatRow({ label, value, tip }: { label: string; value: ReactNode; tip: 
     </div>
   );
 }
+
+/** 含百分比詞綴的欄位顯示一位小數（`34-ui-guidelines.md`、`07-affix.md` § 7.3） */
+const pct = (v: number) => roundAffixTenth(v).toFixed(1);
 
 export function CharacterStats() {
   const char = useGameStore(s => s.character);
@@ -129,17 +137,16 @@ export function CharacterStats() {
   const defenseReduction = Math.min(totalDefense, 75);
   const buffReduction = getBuffDamageReduction(activeEffects);
   const damageReduction = Math.round(100 - (100 - defenseReduction) * (100 - buffReduction) / 100);
-  // 魔法減傷（§ 21.16）：裝備防禦貢獻上限 50%，其餘靠魔法抗性，總上限 75%
+  // 魔法減傷（§ 21.16）：裝備防禦貢獻上限 10%，其餘靠魔法抗性，總上限 75%
   const magicResist = getTotalMagicResist(char, gearList, activeEffects);
   const magicDefenseReduction = Math.min(
     getMagicDefenseContribution(totalDefense) + magicResist,
     DAMAGE_REDUCTION_CAP,
   );
-  const magicDamageReduction = Math.round(
-    100 - (100 - magicDefenseReduction) * (100 - buffReduction) / 100
-  );
+  const magicDamageReduction = 100 - (100 - magicDefenseReduction) * (100 - buffReduction) / 100;
 
-  const totalDodge = getPlayerDodgeRate(char, gearList, activeEffects);
+  const uncappedDodge = getUncappedPlayerDodgeRate(char, gearList, activeEffects);
+  const totalDodge = Math.min(DODGE_RATE_CAP, uncappedDodge);
 
   // 與 systems/combat.ts 的命中判定同一套：基礎命中 80 + AGI加成 + 武器攻擊成功（含強化 /2）
   const hitRate = 80 + agiBonus + getWeaponAttackSuccess(weapon ?? null);
@@ -167,41 +174,41 @@ export function CharacterStats() {
           <div className="stat-group-title">攻擊</div>
           <StatRow label="物理(小怪)" value={physicalSmall} tip={{ desc: '對「小型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器基傷 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)；武器基傷 = (小怪白字 + 強化) 的 1/2 ~ 全值`, note: '怪物體型分小型/大型，武器對兩者的基傷不同' }} />
           <StatRow label="物理(大怪)" value={physicalLarge} tip={{ desc: '對「大型」怪物的每次普攻傷害（未計怪物防禦與爆擊）。', formula: `(武器基傷 + 額外攻擊 + ${ranged ? 'AGI' : 'STR'}加成) × (1 + 攻擊力%)；武器基傷 = (大怪白字 + 強化) 的 1/2 ~ 全值` }} />
-          <StatRow label="普攻元素" value={<>+{attackElemental}%</>} tip={{ desc: '普通攻擊的元素傷害加成，來自裝備詞綴。', formula: '所有「元素刻印」詞綴加總', note: '只在武器帶元素屬性（或火矢附魔生效）時才計入' }} />
-          <StatRow label="技能元素" value={<>+{skillElemental}%</>} tip={{ desc: '元素技能的傷害加成，來自裝備詞綴與 buff。', formula: '「技能元素傷害」詞綴 + 元素增幅等 buff', note: '只對有元素屬性的技能生效' }} />
-          <StatRow label="攻速加成" value={<>{attackSpeed >= 0 ? '+' : ''}{attackSpeed}%</>} tip={{ desc: '縮短普攻間隔。負值代表被減速。', formula: '攻擊間隔 = 1200ms / (1 + 攻速%)', note: '加速 buff 與減速 debuff 的百分比先相加再換算' }} />
-          <StatRow label="冷卻縮減" value={<>+{cooldownReduction}%</>} tip={{ desc: '縮短所有技能的冷卻時間。', formula: '「減少冷卻時間」詞綴 + 冷卻縮減類 buff + 智力（每 2 點 +1%）', note: '上限 50%，已包含在顯示值內' }} />
+          <StatRow label="普攻元素" value={<>+{pct(attackElemental)}%</>} tip={{ desc: '普通攻擊的元素傷害加成，來自裝備詞綴。', formula: '所有「元素刻印」詞綴加總', note: '只在武器帶元素屬性（或火矢附魔生效）時才計入' }} />
+          <StatRow label="技能元素" value={<>+{pct(skillElemental)}%</>} tip={{ desc: '元素技能的傷害加成，來自裝備詞綴與 buff。', formula: '「技能元素傷害」詞綴 + 元素增幅等 buff', note: '只對有元素屬性的技能生效' }} />
+          <StatRow label="攻速加成" value={<>{attackSpeed >= 0 ? '+' : ''}{pct(attackSpeed)}%</>} tip={{ desc: '縮短普攻間隔。負值代表被減速。', formula: '攻擊間隔 = 1200ms / (1 + 攻速%)', note: '加速 buff 與減速 debuff 的百分比先相加再換算' }} />
+          <StatRow label="冷卻縮減" value={<>+{pct(cooldownReduction)}%</>} tip={{ desc: '縮短所有技能的冷卻時間。', formula: '「減少冷卻時間」詞綴 + 冷卻縮減類 buff + 智力（每 2 點 +1%）', note: '上限 50%，已包含在顯示值內' }} />
         </div>
 
         <div className="stat-group">
           <div className="stat-group-title">防禦</div>
           <StatRow label="防禦值" value={shownDefense} tip={{ desc: '裝備提供的防禦總量。這是「數值」，不是百分比。', formula: `(逐件 基礎防禦+隨機額外+強化等級 的加總 + buff固定防禦) × (1 + 防禦力%詞綴) − ${-BASE_CHARACTER_DEFENSE}`, note: `角色自身防禦為 ${BASE_CHARACTER_DEFENSE}，在百分比之後才扣，所以裝備不足時這裡會是負數（負值不減傷，也不會讓你多受傷）。被詛咒時再 -20%。防禦值超過 ${DAMAGE_REDUCTION_CAP} 的部分會轉為迴避率` }} />
           <StatRow label="減傷率" value={<>{damageReduction}%</>} tip={{ desc: '受到「物理」傷害時實際減少的比例。', formula: `min(防禦值, ${DAMAGE_REDUCTION_CAP}) 與 buff減傷 類間乘算`, note: `上限 ${DAMAGE_REDUCTION_CAP}%` }} />
-          <StatRow label="魔法減傷率" value={<>{magicDamageReduction}%</>} tip={{ desc: '受到「魔法」傷害時實際減少的比例。', formula: 'min(防禦值,75) × 0.5 + 魔法抗性，上限 75%，再與 buff減傷 乘算', note: '裝備防禦對魔法只有一半效力（最多貢獻 37.5%）' }} />
-          <StatRow label="魔法抗性" value={<>{magicResist}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速／沉默」的機率' }} />
-          <StatRow label="迴避率" value={<>{totalDodge}%</>} tip={{ desc: '完全閃避怪物攻擊的機率（傷害歸零）。物理與魔法皆可迴避。', formula: '基礎(一般 5%／盜賊 10%) + AGI每3點+1 + 防禦溢出((防禦-75)/5) + 迴避詞綴 + 迴避 buff', note: '上限 35%，已包含在顯示值內。命中下降另加在上限之後，只對被施加的怪物有效' }} />
+          <StatRow label="魔法減傷率" value={<>{pct(magicDamageReduction)}%</>} tip={{ desc: '受到「魔法」傷害時實際減少的比例。', formula: `min(防禦值,${MAGIC_DEFENSE_CAP}) ÷ ${MAGIC_DEFENSE_PER_PERCENT} + 魔法抗性，上限 ${DAMAGE_REDUCTION_CAP}%，再與 buff減傷 乘算`, note: `裝備防禦對魔法每 ${MAGIC_DEFENSE_PER_PERCENT} 點只給 1%（最多貢獻 ${MAGIC_DEFENSE_CONTRIBUTION_CAP}%）` }} />
+          <StatRow label="魔法抗性" value={<>{pct(magicResist)}%</>} tip={{ desc: '魔法減傷率的來源之一，會直接加進上面那一列。', formula: 'SPI 每 2 點 +1% ＋ 項鍊/戒指強化每 +1 給 2% ＋ 魔法抗性詞綴', note: '另有第二個用途：降低怪物對你施加「詛咒／虛弱／減速／沉默」的機率' }} />
+          <StatRow label="迴避率" value={<>{totalDodge.toFixed(1)}%{uncappedDodge.toFixed(1) !== totalDodge.toFixed(1) && <span className="stat-overflow">（{uncappedDodge.toFixed(1)}%）</span>}</>} tip={{ desc: '完全閃避怪物攻擊的機率（傷害歸零）。物理與魔法皆可迴避。', formula: `基礎(一般 5%／盜賊 10%) + AGI每3點+1 + 防禦溢出((防禦-75)/5) + 迴避值÷${EVASION_POINTS_PER_PERCENT} + 迴避 buff`, note: `上限 ${DODGE_RATE_CAP}%，已包含在顯示值內；括號內為未封頂的實際值，超出上限的部分可把迴避詞綴換成其他詞綴。命中下降另加在上限之後，只對被施加的怪物有效` }} />
           <StatRow label="命中率" value={<>{hitRate}%</>} tip={{ desc: '普通攻擊命中怪物的基準機率。', formula: '80 + AGI每3點+1 + 武器攻擊成功(含強化/2)', note: '實戰另計「等級差」與「怪物迴避率」，最終限縮在 5%~95%。技能必定命中' }} />
-          <StatRow label="格擋率" value={<>{blockRate}%</>} tip={{ desc: '以盾牌或臂甲擋下攻擊的機率，成功時傷害減半。', formula: '副手基礎格擋率 + 格擋率詞綴 + 格擋 buff', note: '未裝備盾牌／臂甲時為 0。上限 50%。在防禦減傷之後才判定' }} />
+          <StatRow label="格擋率" value={<>{pct(blockRate)}%</>} tip={{ desc: '以盾牌或臂甲擋下攻擊的機率，成功時傷害減半。', formula: '副手基礎格擋率 + 格擋率詞綴 + 格擋 buff', note: '未裝備盾牌／臂甲時為 0。上限 50%。在防禦減傷之後才判定' }} />
         </div>
 
         <div className="stat-group">
           <div className="stat-group-title">爆擊</div>
-          <StatRow label="爆擊率" value={<>{critRate}%</>} tip={{ desc: '普攻與物理系技能造成暴擊的機率。魔法技能不會爆擊（復仇之刃、背刺例外）。', formula: '基礎 5% + 爆擊率詞綴 + 精準打擊等 buff', note: '上限 75%，已包含在顯示值內' }} />
-          <StatRow label="爆擊傷害" value={<>{critDamage}%</>} tip={{ desc: '暴擊時的傷害倍率。200% 代表兩倍傷害。', formula: '基礎 200% + 爆擊傷害詞綴 + 致命一擊等 buff', note: '在防禦減傷「之前」套用' }} />
+          <StatRow label="爆擊率" value={<>{pct(critRate)}%</>} tip={{ desc: '普攻與物理系技能造成暴擊的機率。魔法技能不會爆擊（復仇之刃、背刺例外）。', formula: '基礎 5% + 爆擊率詞綴 + 精準打擊等 buff', note: '上限 75%，已包含在顯示值內' }} />
+          <StatRow label="爆擊傷害" value={<>{pct(critDamage)}%</>} tip={{ desc: '暴擊時的傷害倍率。200% 代表兩倍傷害。', formula: '基礎 200% + 爆擊傷害詞綴 + 致命一擊等 buff', note: '在防禦減傷「之前」套用' }} />
         </div>
 
         <div className="stat-group">
           <div className="stat-group-title">回復</div>
           <StatRow label="每次回血" value={hpRegen} tip={{ desc: '每 5 秒自動回復的 HP 量。', formula: 'floor(有效VIT / 2) + 裝備回血量加總（模板值 + 回血詞綴）', note: '戰鬥中減半（最低 1）' }} />
           <StatRow label="每次回魔" value={mpRegen} tip={{ desc: '每 6 秒自動回復的 MP 量。', formula: 'floor(有效SPI / 2) + 裝備回魔量加總（模板值 + 回魔詞綴）', note: '戰鬥中減半（最低 1）' }} />
-          <StatRow label="補血效果" value={<>+{healEffect}%</>} tip={{ desc: '提升「治癒類技能」的回復量。', formula: '所有「補血效果」詞綴加總', note: '不影響藥水，也不影響自然回血與聖域的每秒回血' }} />
-          <StatRow label="藥水效果" value={<>+{potionEffect}%</>} tip={{ desc: '提升「藥水」的回復量。', formula: '所有「藥水效果」詞綴加總', note: '不影響治癒技能' }} />
+          <StatRow label="補血效果" value={<>+{pct(healEffect)}%</>} tip={{ desc: '提升「治癒類技能」的回復量。', formula: '所有「補血效果」詞綴加總', note: '不影響藥水，也不影響自然回血與聖域的每秒回血' }} />
+          <StatRow label="藥水效果" value={<>+{pct(potionEffect)}%</>} tip={{ desc: '提升「藥水」的回復量。', formula: '所有「藥水效果」詞綴加總', note: '不影響治癒技能' }} />
         </div>
 
         <div className="stat-group">
           <div className="stat-group-title">掉落</div>
-          <StatRow label="掉寶率" value={<>+{dropRate}%</>} tip={{ desc: '提高怪物掉落物品的機率。', formula: '所有「掉寶率」詞綴加總' }} />
-          <StatRow label="金幣獲得率" value={<>+{goldRate}%</>} tip={{ desc: '提高怪物掉落的金幣量。', formula: '所有「金幣獲得率」詞綴加總' }} />
+          <StatRow label="掉寶率" value={<>+{pct(dropRate)}%</>} tip={{ desc: '提高怪物掉落物品的機率。', formula: '所有「掉寶率」詞綴加總' }} />
+          <StatRow label="金幣獲得率" value={<>+{pct(goldRate)}%</>} tip={{ desc: '提高怪物掉落的金幣量。', formula: '所有「金幣獲得率」詞綴加總' }} />
         </div>
 
         <div className="stat-group">

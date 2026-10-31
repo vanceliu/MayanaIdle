@@ -10,6 +10,7 @@ import { dirname } from 'node:path';
 import type { WorldMode } from '../../../client/src/net/protocol';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
 import { rollUniqueAffix } from '../../../client/src/models/uniqueAffix';
+import { rollAffixValue, clampAffixValueToTier, isDecimalAffixType, EVASION_POINTS_PER_PERCENT, type Affix } from '../../../client/src/models/affix';
 
 export const DB_FILE = 'mayana.sqlite';
 
@@ -174,6 +175,16 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
       `);
     },
   },
+  {
+    /** 迴避改迴避值（`07-affix.md` § 7.3.1）：一般迴避詞綴依 tier 重骰，T7 獨有迴避 ×100 */
+    version: 8,
+    up: convertEvasionToPoints,
+  },
+  {
+    /** 百分比詞綴改小數連續區間（`07-affix.md` § 7.3）：保留原值，超出所屬 Tier 新區間者夾回 */
+    version: 9,
+    up: clampAffixValuesToTiers,
+  },
 ];
 
 export function hashExistingSessionTokens(db: DatabaseSync): void {
@@ -194,6 +205,46 @@ export function backfillUniqueAffixes(db: DatabaseSync): void {
     if (!template || data.uniqueAffix) continue;
     const uniqueAffix = rollUniqueAffix(template);
     if (uniqueAffix) update.run(JSON.stringify({ ...data, uniqueAffix }), row.id);
+  }
+}
+
+type StoredAffix = { type?: string; tier?: number; value?: number };
+
+export function convertEvasionToPoints(db: DatabaseSync): void {
+  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
+  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
+  for (const row of rows) {
+    const data = JSON.parse(row.data) as { affixes?: StoredAffix[]; uniqueAffix?: StoredAffix };
+    let changed = false;
+    const affixes = data.affixes?.map(a => {
+      if (a.type !== 'evasion' || a.tier == null) return a;
+      changed = true;
+      return { ...a, value: rollAffixValue(a.tier, 'evasion') };
+    });
+    let uniqueAffix = data.uniqueAffix;
+    if (uniqueAffix?.type === 'evasion' && uniqueAffix.value != null) {
+      changed = true;
+      uniqueAffix = { ...uniqueAffix, value: uniqueAffix.value * EVASION_POINTS_PER_PERCENT };
+    }
+    if (changed) update.run(JSON.stringify({ ...data, affixes, uniqueAffix }), row.id);
+  }
+}
+
+export function clampAffixValuesToTiers(db: DatabaseSync): void {
+  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
+  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
+  for (const row of rows) {
+    const data = JSON.parse(row.data) as { affixes?: Affix[] };
+    if (!data.affixes) continue;
+    let changed = false;
+    const affixes = data.affixes.map(a => {
+      if (!isDecimalAffixType(a.type)) return a;
+      const value = clampAffixValueToTier(a);
+      if (value === a.value) return a;
+      changed = true;
+      return { ...a, value };
+    });
+    if (changed) update.run(JSON.stringify({ ...data, affixes }), row.id);
   }
 }
 

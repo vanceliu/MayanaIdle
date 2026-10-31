@@ -45,7 +45,7 @@ client/src/wiki/
 |-----------|---------|
 | 武器 | `EQUIPMENT_SEEDS`（`isWeaponEquipment(slot, type)`） |
 | 防具 | `EQUIPMENT_SEEDS`（`isArmorEquipment(slot, type)`，含盾牌／魔導書／臂甲） |
-| 戰鬥計算 | `BASE_CHARACTER_DEFENSE`、`DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
+| 戰鬥計算 | `BASE_CHARACTER_DEFENSE`、`DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_CAP`、`MAGIC_DEFENSE_PER_PERCENT`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
 | 詞綴 | `AFFIX_DEFINITIONS`、`SPECIAL_AFFIX_DEFINITIONS`、`AFFIX_TIERS`、`AFFIX_TIER_OVERRIDES`、`getTierWeights`／`getBossTierWeights`、`getSpecialAffixChance`（`models/affix`） |
 | 怪物 | `MONSTER_SEEDS` |
 | 地圖 | `ZONES`、`REGIONS`（`models/mapData`） |
@@ -105,18 +105,18 @@ client/src/wiki/
    盾牌專屬／飾品盾牌專屬／特殊詞綴），每組一張 4 欄窄表：詞綴／適用部位／效果／數值區間。
    - 效果敘述與分類小標存在 `AFFIX_DEFINITIONS` 的 `description`／`group` 欄位，
      **不在 Wiki 端另寫一份**
-   - 數值區間 = `getAffixTierTable(type)` 的 T1 下限 ~ T7 上限，魔法抗性自動顯示 § 7.3.1 的專屬區間
+   - 數值區間 = `getAffixTierTable(type)` 的 T1 下限 ~ T7 上限，專屬階級表（§ 7.3.1）自動套用；單位同 `formatAffixValue`（百分比帶一位小數；迴避值、固定值不帶 %）；節末註明迴避值換算
    - 特殊詞綴同表列出，數值欄改顯示「固定效果 · Lv.N+ 掉落」
    - 附「適用部位」下拉篩選；選定部位時同時顯示該部位的可選詞綴數（`getAffixPoolForSlot`），
      取代舊版的 ✓／— 矩陣表
    - 分類對應的裝備欄位以文字說明：**魔導書與臂甲雖佔左手欄位，走的是防具詞綴池**
      （§ 7.6、`getAffixCategoryForSlot`），不可寫成武器
-3. **階級數值**：T1~T7 的通用區間 + `AFFIX_TIER_OVERRIDES` 專屬區間（目前為魔法抗性）+ 取得方式。
+3. **階級數值**：T1~T7 的通用區間 + `AFFIX_TIER_TABLES` 專屬區間 + 取得方式（百分比區間帶一位小數）。
    節末附滿值粗體顯示的說明（§ 7.3.2）：判定看未加品質的原始數值、特殊詞綴一律粗體
 4. **掉落機率**：Tier 權重（一般怪物／Boss 對照，權重換算百分比）與特殊詞綴出現機率（含 Boss ×2）
 5. **T7 獨有詞綴**：依武器／防具／飾品／腰帶／左手分組列出名稱、效果、數值（`07-affix-tier7.md`），
    一律 import `UNIQUE_AFFIX_DEFINITIONS`（`models/uniqueAffix.ts`）。節首附通用規則與同類去重說明
-6. **印記**：八種印記的作用與限制（`46-sigil.md`），節末說明混沌填滿洞、新增補空洞、封印的成功率與失敗代價。表格一律 import `SIGIL_DEFINITIONS`
+6. **印記**：八種印記的作用與限制（`46-sigil.md`），節末說明混沌填滿洞與 T6 機率（import `CHAOS_SIGIL_T6_RATE`）、新增補空洞、封印的成功率與失敗代價、印記兌換（§ 46.13，數量 import 兌換常數）。表格一律 import `SIGIL_DEFINITIONS`
    與 `ENHANCE_SIGIL_RATES`（`models/sigil.ts`），不在 Wiki 端重寫規則或機率。
    印記本身的重量／賣價／掉落率走道具頁（§ 4.5）與掉落頁，不在此重列
 
@@ -185,9 +185,10 @@ client/src/wiki/
 迴避率、爆擊、格擋、攻擊速度、元素克制關係。
 
 - **各項上限直接 import `systems/combat.ts` 的常數**（`DAMAGE_REDUCTION_CAP`、
-  `MAGIC_DEFENSE_EFFECTIVENESS`、`MAGIC_DEFENSE_CONTRIBUTION_CAP` 等），不再寫死數字
-- 物理與魔法減傷並列，明確標示裝備防禦對魔法只有一半效力（貢獻上限 37.5%）
+  `MAGIC_DEFENSE_CAP`、`MAGIC_DEFENSE_PER_PERCENT`、`MAGIC_DEFENSE_CONTRIBUTION_CAP` 等），不再寫死數字
+- 物理與魔法減傷並列，明確標示裝備防禦對魔法每 10 點只給 1%（貢獻上限 10%）
 - 魔法抗性獨立成一節，說明「加進魔法減傷率」與「降低詛咒／虛弱／減速／沉默機率」兩個用途
+- 迴避率一節列出迴避詞綴與迴避 buff，標明迴避值 ÷ 100 換算（`21-combat-formula.md` § 21.6）
 - 公式敘述本身仍為文字，變更公式時需人工同步（有測試檢查關鍵常數與區塊是否存在）
 
 ### 4.11 任務 (QuestsPage)

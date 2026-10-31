@@ -121,7 +121,7 @@ describe('store：封印印記', () => {
 
   it('封印詞綴吃品質，顯示 (封)', () => {
     const sealed: Affix = { type: 'attack_power', tier: 4, value: 12, sealed: true };
-    expect(formatAffixDisplay(sealed, 10)).toBe('(封) 攻擊力 +13% (T4)');
+    expect(formatAffixDisplay(sealed, 10)).toBe('(封) 攻擊力 +13.2% (T4)');
   });
 });
 
@@ -129,11 +129,11 @@ describe('畫面', () => {
   it('裝備說明：詞綴洞（含空洞、已毀壞）在前，封印詞綴不佔洞、排在最後', () => {
     const item = sword([FOUR[1], { ...FOUR[0], sealed: true }], { affixSlots: 3 });
     const { container } = render(<EquipmentDetail item={item} />);
-    expect(screen.getByText('(封) 攻擊力 +13% (T4)').className).toContain('sealed');
+    expect(screen.getByText('(封) 攻擊力 +13.2% (T4)').className).toContain('sealed');
     expect(container.querySelectorAll('.empty-socket')).toHaveLength(2);
     expect(container.querySelectorAll('.broken-socket')).toHaveLength(1);
     const rows = [...container.querySelectorAll('.equip-detail-affix')].map(el => el.textContent);
-    expect(rows).toEqual(['爆擊率 +11% (T3)', '空洞', '空洞', '已毀壞', '(封) 攻擊力 +13% (T4)']);
+    expect(rows).toEqual(['爆擊率 +11.0% (T3)', '空洞', '空洞', '已毀壞', '(封) 攻擊力 +13.2% (T4)']);
   });
 
   it('印記師：詞綴洞列在前，封印詞綴排在洞下面，且不可再被指定', () => {

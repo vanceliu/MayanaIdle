@@ -30,11 +30,11 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   // === 印記（`46-sigil.md`）===
   // 詞綴專用消耗品，只在印記師使用。歸 scroll 而非 material —— 它們不是製作原料，
   // 也不該被雜貨店的「Tier N 以下批量販售」（只掃 material）掃掉。
-  { id: 147, name: '混沌印記', category: 'scroll', description: '重抽填滿所有詞綴洞，封印詞綴不佔洞、保留（上限 T5，商店裝 T3）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#A855F7' },
+  { id: 147, name: '混沌印記', category: 'scroll', description: '重抽填滿所有詞綴洞，封印詞綴不佔洞、保留（T1~T5；角色 Lv.31+ 時每條約 1.27% 為 T6；商店裝 T3）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#A855F7' },
   { id: 148, name: '刺針印記', category: 'scroll', description: '指定一條詞綴換成同池的另一條，Tier 不變', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#2DD4BF' },
   { id: 149, name: '重刻印記', category: 'scroll', description: '指定一條詞綴的數值重骰，種類與 Tier 不變', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#60A5FA' },
   { id: 150, name: '突破印記', category: 'scroll', description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
-  { id: 161, name: '新增印記', category: 'scroll', description: '在空的詞綴洞新增一條詞綴，必定成功', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#4ADE80' },
+  { id: 161, name: '新增印記', category: 'scroll', description: '在空的詞綴洞新增一條詞綴，必定成功（Tier 同混沌）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#4ADE80' },
   { id: 162, name: '封印印記', category: 'scroll', description: '指定一條詞綴 70% 移出洞外封印（洞空出來）、30% 連同詞綴洞毀壞', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#F472B6' },
   // 精鍊與工藝走全區域掉落（§ 30.2 印記），故賣價 50G 與其他印記不同；
   // 八種印記重量一律 0（不計負重），圖示同為 millenium-key，只用顏色區分

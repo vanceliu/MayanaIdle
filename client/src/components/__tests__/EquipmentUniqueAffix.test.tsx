@@ -42,7 +42,7 @@ describe('裝備 tooltip 的 T7 獨有詞綴（§ 7T.7）', () => {
     const line = screen.getByText('(獨) 額外防禦 +10');
     expect(line.className).toContain('unique');
     expect(line.className).not.toContain('suppressed');
-    const normal = screen.getByText(/防禦力 \+17% \(T7\)/);
+    const normal = screen.getByText(/防禦力 \+17\.0% \(T7\)/);
     expect(line.compareDocumentPosition(normal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

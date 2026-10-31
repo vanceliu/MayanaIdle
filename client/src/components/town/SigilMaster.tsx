@@ -12,6 +12,8 @@ import {
   formatAffixName,
   formatAffixValue,
   formatAffixDescription,
+  formatAffixBound,
+  getAffixTierRange,
   type Affix,
 } from '../../models/affix';
 import {
@@ -29,14 +31,17 @@ import {
   type SigilType,
 } from '../../models/sigil';
 import { getBagItemAmount } from '../../models/bagItem';
-import { getItemById } from '../../models/items';
-import { resolveItemIcon, getEquipIcon } from '../../models/iconMap';
+import { getEquipIcon } from '../../models/iconMap';
 import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
 import { GameIcon } from '../GameIcon';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { useOneShotFx, FX_DURATION_MS } from './useOneShotFx';
+import { sigilDisplay } from './sigilDisplay';
+import { SigilExchange } from './SigilExchange';
 
 type Entry = { item: EquipmentInstance; source: 'equipped' | 'bag'; slot?: EquipSlot };
+/** 面板頂端分頁（`13-town.md` § 13.13.1） */
+type SigilTab = 'use' | 'exchange';
 
 /**
  * 印記演出的總長度（`48-vfx.md` § 48.5）。
@@ -71,10 +76,9 @@ interface SigilFx {
   label?: string;
 }
 
-/** 詞綴列 tooltip（§ 13.13.1）：說明的數值與列上一致（不吃品質），滿值另起一行 */
+/** 詞綴列 tooltip（§ 13.13.1）：說明的數值與列上一致（不吃品質） */
 function affixRowTitle(affix: Affix): string {
-  const description = formatAffixDescription(affix);
-  return isMaxRollAffix(affix) ? `${description}\n此詞綴為該 Tier 最大值` : description;
+  return formatAffixDescription(affix);
 }
 
 /** 名稱與 Tier。名稱走 `formatAffixName`，無 Tier 的（特殊、額外屬性）不接 T 標 */
@@ -83,15 +87,21 @@ function affixLabel(affix: Affix): string {
   return isTierlessAffixType(affix.type) ? name : `${name} T${affix.tier}`;
 }
 
-/**
- * 印記的顯示名稱與顏色一律由 `itemId` 反查 seed（§ 99.1：設定表存 id，名稱只用於顯示）。
- * 介面不另建 label 表與色表 —— 道具改名或改色時這裡自動跟上，
- * 玩家在背包看到的是哪個顏色的圖示，到印記師就是同一個顏色。
- */
-function sigilDisplay(type: SigilType): { name: string; color?: string } {
-  const def = getSigilDefinition(type);
-  const item = getItemById(def.itemId);
-  return { name: item?.name ?? def.name, color: resolveItemIcon(item, 'scroll').color };
+/** § 13.13.1 Tier 區間位置條：左右端為該 Tier 上下限，填色 = 未吃品質的數值在區間中的位置 */
+function renderTierRangeBar(affix: Affix) {
+  const range = getAffixTierRange(affix);
+  if (!range) return null;
+  const ratio = range.max === range.min ? 1 : (affix.value - range.min) / (range.max - range.min);
+  const percent = Math.round(Math.min(100, Math.max(0, ratio * 100)) * 10) / 10;
+  return (
+    <span className={`sigil-range-bar tier-${affix.tier}`}>
+      <span className="sigil-range-bound">{formatAffixBound(affix.type, range.min)}</span>
+      <span className="sigil-range-track">
+        <span className="sigil-range-fill" style={{ width: `${percent}%` }} />
+      </span>
+      <span className="sigil-range-bound">{formatAffixBound(affix.type, range.max)}</span>
+    </span>
+  );
 }
 
 export function SigilMaster() {
@@ -101,6 +111,7 @@ export function SigilMaster() {
   const bagItems = useGameStore(s => s.bagItems);
   const allTemplates = useEquipmentTemplates();
 
+  const [tab, setTab] = useState<SigilTab>('use');
   /** 選裝備 → 選詞綴 → 選印記 → 右下角一顆按鈕執行（`13-town.md` § 13.13） */
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [affixIndex, setAffixIndex] = useState<number | null>(null);
@@ -433,7 +444,8 @@ export function SigilMaster() {
         >
           {formatAffixValue(affix)}
         </span>
-        {/* 列上只放「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
+        {renderTierRangeBar(affix)}
+        {/* 列上只放區間位置條與「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
         {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}
         {rowFx && renderFxLayer(rowFx)}
       </button>
@@ -452,6 +464,14 @@ export function SigilMaster() {
         <span className="sigil-gold">金幣 {char.gold.toLocaleString()}G</span>
       </div>
 
+      <div className="shop-tabs sigil-tabs">
+        <button className={tab === 'use' ? 'active' : ''} onClick={() => setTab('use')}>使用印記</button>
+        <button className={tab === 'exchange' ? 'active' : ''} onClick={() => setTab('exchange')}>兌換印記</button>
+      </div>
+
+      {tab === 'exchange' && <SigilExchange />}
+
+      {tab === 'use' && (<>
       <div className="sigil-body">
         {/* 左欄：裝備清單。身上與背包同一份，用分組標題分開 */}
         <div className="sigil-col">
@@ -559,6 +579,7 @@ export function SigilMaster() {
           使用{display.name}
         </button>
       </div>
+      </>)}
     </div>
   );
 }

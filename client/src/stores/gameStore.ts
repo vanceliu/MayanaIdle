@@ -90,7 +90,7 @@ import { generateCraftAffixes, getDismantleYield } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
-  canUseSigil, getSigilDefinition, isSigilType, type SigilContext, type SigilResult, type SigilType,
+  canUseSigil, checkSigilExchange, getSigilDefinition, isSigilType, SIGIL_DEFINITIONS, type SigilContext, type SigilCounts, type SigilResult, type SigilType,
 } from '../models/sigil';
 import {
   claimStarterGear as claimStarterGearFn, enhanceStarterGear as enhanceStarterGearFn, getStarterEnhanceCost, getStarterEnhanceState, persistStarterEnhance,
@@ -511,6 +511,8 @@ export interface GameState {
   /** 印記師（`46-sigil.md`） */
   /** 單機同步結算；線上模式回 Promise（server 判定） */
   applySigil: (itemId: number, sigilType: SigilType, affixIndex: number | null) => SigilApplyResult | Promise<SigilApplyResult>;
+  /** 印記兌換（`46-sigil.md` § 46.13）。線上模式回 Promise */
+  exchangeSigils: (target: SigilType, inputs: SigilCounts, fee: SigilCounts) => CraftResult | Promise<CraftResult>;
   /** 新手 NPC：領取新手裝（`13-town.md` § 13.11）；回傳領到的名稱 */
   /**
    * 旅館休息（`13-town.md` § 13.7）。判定在這裡，元件不可自己改 store ——
@@ -2788,6 +2790,23 @@ export function createGameStore(session: Session) {
       ok: true, message: `${item.name}｜${message}`, success,
       affixes: updatedItem.affixes, quality: updatedItem.quality, affixSlots: updatedItem.affixSlots,
     };
+  },
+
+  exchangeSigils: (target, inputs, fee) => {
+    const state = get();
+    if (!state.character) return { ok: false, message: '沒有角色' };
+    const held = Object.fromEntries(
+      SIGIL_DEFINITIONS.map(d => [d.type, getBagItemAmount(state.bagItems, d.itemId)]),
+    ) as Record<SigilType, number>;
+    const check = checkSigilExchange(target, inputs, fee, held);
+    if (!check.ok) return { ok: false, message: check.reason };
+
+    const gained = getSigilDefinition(check.target);
+    const spent = (Object.entries(check.cost) as [SigilType, number][])
+      .reduce((bag, [type, n]) => consumeBagItem(bag, getSigilDefinition(type).itemId, n), state.bagItems);
+    set({ bagItems: addBagItem(spent, gained.itemId, 1) });
+    get().saveState();
+    return { ok: true, message: `兌換成功，獲得 ${gained.name} ×1`, name: gained.name };
   },
 
   restAtInn: (mode) => {
