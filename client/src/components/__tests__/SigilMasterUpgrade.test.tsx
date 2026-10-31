@@ -127,7 +127,7 @@ describe('印記師 — 精鍊印記（§ 46.6）', () => {
 
     const row = screen.getByText('攻擊力 T5').closest('button')!;
     expect(row.getAttribute('aria-disabled')).toBe('true');
-    expect(row.textContent).toContain('突破印記');
+    expect(row.getAttribute('title')).toContain('突破印記');
   });
 
   it('商店裝到 T3 就沒有印記可用（§ 6A.6 硬上限）', () => {
@@ -406,7 +406,7 @@ describe('印記師 — 詞綴列 tooltip（§ 13.13.1）', () => {
     pickSigil('精鍊印記');
     const row = rowOf('[特殊] 毒免疫');
     expect(row.getAttribute('aria-disabled')).toBe('true');
-    expect(row.getAttribute('title')).toBe('免疫中毒（100%）');
+    expect(row.getAttribute('title')).toBe('免疫中毒（100%）\n特殊詞綴沒有 Tier，無法升階');
   });
 });
 
@@ -433,5 +433,31 @@ describe('印記師 — Tier 區間位置條（§ 13.13.1）', () => {
   it('無 Tier 的詞綴不顯示位置條', () => {
     setup(gear([{ type: 'immune_poison', tier: 0, value: 0 }]), []);
     expect(rowOf('[特殊] 毒免疫').querySelector('.sigil-range-bar')).toBeNull();
+  });
+});
+
+describe('印記師 — 不能選的原因在 tooltip（§ 13.13.1）', () => {
+  const rowOf = (label: string) => screen.getByText(label).closest('button')!;
+
+  it('不能選的列：說明下一行接原因，列上不另寫文字', () => {
+    setup(gear([{ type: 'attack_power', tier: 5, value: 14 }]), [{ name: '精鍊印記', amount: 1 }]);
+    pickSigil('精鍊印記');
+    const row = rowOf('攻擊力 T5');
+    expect(row.getAttribute('aria-disabled')).toBe('true');
+    expect(row.getAttribute('title')).toBe('攻擊力 +14.0%\n下一階由突破印記受理');
+    expect(row.textContent).not.toContain('受理');
+  });
+
+  it('可選的列 title 只有說明', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }]), [{ name: '精鍊印記', amount: 1 }]);
+    pickSigil('精鍊印記');
+    expect(rowOf('攻擊力 T3').getAttribute('title')).toBe('攻擊力 +9.0%');
+  });
+
+  it('空洞列的提示放在 tooltip', () => {
+    setup(gear([{ type: 'attack_power', tier: 3, value: 9 }], { affixSlots: 2 }), []);
+    const empty = screen.getByText('空洞').closest('.sigil-affix-row')!;
+    expect(empty.getAttribute('title')).toBe('可用新增印記補一條');
+    expect(empty.textContent).toBe('空洞');
   });
 });

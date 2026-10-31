@@ -16,6 +16,7 @@ import {
   SIGIL_EXCHANGE_INPUT_COUNT,
   SIGIL_EXCHANGE_TYPES,
   checkSigilExchange,
+  getDefaultSigilExchangeFee,
   getSigilDefinition,
   type SigilType,
 } from '../../models/sigil';
@@ -96,6 +97,18 @@ describe('checkSigilExchange', () => {
   });
 });
 
+describe('getDefaultSigilExchangeFee（§ 13.13.2）', () => {
+  it('先填精鍊、不足再填工藝，合計 50', () => {
+    expect(getDefaultSigilExchangeFee({ temper: 1104, polish: 1092 })).toEqual({ temper: 50 });
+    expect(getDefaultSigilExchangeFee({ temper: 30, polish: 40 })).toEqual({ temper: 30, polish: 20 });
+  });
+
+  it('兩者不足 50 時全填', () => {
+    expect(getDefaultSigilExchangeFee({ temper: 10, polish: 5 })).toEqual({ temper: 10, polish: 5 });
+    expect(getDefaultSigilExchangeFee({})).toEqual({});
+  });
+});
+
 describe('exchangeSigils（store）', () => {
   it('扣材料與手續費、加 1 個目標', async () => {
     setup([['seal', 3], ['sting', 2], ['temper', 40], ['polish', 15]]);
@@ -137,24 +150,54 @@ describe('兌換分頁', () => {
     expect(screen.queryByRole('button', { name: '兌換' })).toBeNull();
   });
 
-  it('湊滿材料與手續費後兌換：背包更新、數量清零、顯示結果', async () => {
-    setup([['seal', 5], ['temper', 50]]);
+  const feeAmount = (type: SigilType) =>
+    screen.getByTestId(`sigil-exchange-row-${type}`).querySelector('.sigil-exchange-amount')!.textContent;
+
+  it('手續費預設填好；湊滿材料後兌換：背包更新、材料清零、手續費重新填好', async () => {
+    setup([['seal', 5], ['temper', 70], ['polish', 40]]);
     openTab();
     fireEvent.click(screen.getByRole('button', { name: /^突破印記/ }));
-    expect(exchangeBtn().disabled).toBe(true);
+    expect(screen.getByText('手續費（已選 50 / 50）')).toBeTruthy();
+    expect([feeAmount('temper'), feeAmount('polish')]).toEqual(['50', '0']);
     expect(screen.getByText('材料需剛好 5 個（目前 0）')).toBeTruthy();
 
     for (let i = 0; i < 5; i++) plus('封印印記');
-    expect(screen.getByText('手續費需剛好 50 個（目前 0）')).toBeTruthy();
-    for (let i = 0; i < 50; i++) plus('精鍊印記');
     expect(exchangeBtn().disabled).toBe(false);
-
     fireEvent.click(exchangeBtn());
 
     await waitFor(() => expect(screen.getByText('兌換成功，獲得 突破印記 ×1')).toBeTruthy());
-    expect([amount('seal'), amount('temper'), amount('enhance')]).toEqual([0, 0, 1]);
+    expect([amount('seal'), amount('temper'), amount('polish'), amount('enhance')]).toEqual([0, 20, 40, 1]);
     expect(screen.getByText('材料（已選 0 / 5）')).toBeTruthy();
-    expect(screen.getByText('手續費（已選 0 / 50）')).toBeTruthy();
+    // 剩精鍊 20：先填 20、工藝補 30
+    expect([feeAmount('temper'), feeAmount('polish')]).toEqual(['20', '30']);
+  });
+
+  it('手續費 ±10 夾在 0 與上限之間，填滿補到合計 50，按鈕有 tooltip', () => {
+    setup([['temper', 70], ['polish', 8]]);
+    openTab();
+    const btn = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+
+    fireEvent.click(btn('減少 10 個精鍊印記'));
+    expect(feeAmount('temper')).toBe('40');
+    fireEvent.click(btn('用工藝印記填滿'));
+    expect(feeAmount('polish')).toBe('8'); // 持有只有 8
+    fireEvent.click(btn('用精鍊印記填滿'));
+    expect([feeAmount('temper'), feeAmount('polish')]).toEqual(['42', '8']);
+    expect(btn('增加 10 個精鍊印記').disabled).toBe(true);
+
+    for (let i = 0; i < 5; i++) fireEvent.click(btn('減少 10 個精鍊印記'));
+    expect(feeAmount('temper')).toBe('0');
+    expect(btn('減少 10 個精鍊印記').disabled).toBe(true);
+
+    expect(btn('用精鍊印記填滿').title).toBe('用精鍊印記補到合計 50 個（持有不足時補到持有數為止）');
+    expect(btn('增加 10 個精鍊印記').title).toBe('精鍊印記 +10');
+  });
+
+  it('材料區沒有 ±10 與填滿', () => {
+    setup([['seal', 9]]);
+    openTab();
+    expect(screen.queryByRole('button', { name: '增加 10 個封印印記' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '用封印印記填滿' })).toBeNull();
   });
 
   it('＋ 在持有用完或合計已滿時停用', () => {

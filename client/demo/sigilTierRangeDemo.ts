@@ -1,50 +1,53 @@
 /**
- * 印記師詞綴列 Tier 區間的四種版面（`sigil-tier-range.html`）。
- * 區間、數值、名稱一律讀 `src/models/affix.ts`。
+ * 印記師詞綴列定案版（`sigil-tier-range.html`，`13-town.md` § 13.13.1）：
+ * 標籤＋數值＋Tier 區間位置條；不能選的原因在整列 tooltip。
+ * 資料重現實際畫面：盜賊皮衣與風鳴弓（商店裝）、選精鍊印記，含不能選的列。
+ * 區間、數值、名稱讀 `src/models/affix.ts`，樣式用 App.css 的 `.sigil-*`。
  */
 import {
+  formatAffixBound,
   formatAffixDescription,
   formatAffixName,
   formatAffixValue,
-  getAffixTierTable,
-  isDecimalAffixType,
+  getAffixTierRange,
   isMaxRollAffix,
   isSpecialAffixType,
   isTierlessAffixType,
   type Affix,
-  type AffixType,
 } from '../src/models/affix';
 
-const SAMPLE: Affix[] = [
-  { type: 'attack_power', tier: 4, value: 12.3 },
-  { type: 'crit_rate', tier: 7, value: 20 },
-  { type: 'magic_resist', tier: 6, value: 12.5 },
-  { type: 'on_hit_hp', tier: 3, value: 8, restorePercent: 3 },
-  { type: 'max_hp', tier: 5, value: 66 },
-  { type: 'evasion', tier: 7, value: 250 },
-  { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' },
-  { type: 'immune_poison', tier: 0, value: 0 },
+type Row = { affix: Affix; reason?: string };
+
+const SAMPLES: { title: string; rows: Row[] }[] = [
+  {
+    title: '盜賊皮衣（精鍊上限 T5）',
+    rows: [
+      { affix: { type: 'drop_rate', tier: 5, value: 13 }, reason: '下一階由突破印記受理' },
+      { affix: { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'SPI' }, reason: '額外屬性沒有 Tier，無法升階' },
+      { affix: { type: 'max_hp', tier: 5, value: 69 }, reason: '下一階由突破印記受理' },
+      { affix: { type: 'on_hit_hp', tier: 5, value: 12, restorePercent: 3 }, reason: '下一階由突破印記受理' },
+    ],
+  },
+  {
+    title: '風鳴弓（商店裝，精鍊上限 T3）',
+    rows: [
+      { affix: { type: 'skill_elemental', tier: 2, value: 8 } },
+      { affix: { type: 'element_brand', tier: 1, value: 4, element: 'wind' } },
+      { affix: { type: 'defense_down', tier: 1, value: 3.1 } },
+      { affix: { type: 'element_erosion', tier: 3, value: 9, element: 'dark', dotDamage: 10 }, reason: 'T3 已是上限，無法再升階' },
+    ],
+  },
 ];
-
-function tierRange(affix: Affix): { min: number; max: number; text: string } | null {
-  if (isTierlessAffixType(affix.type)) return null;
-  const t = getAffixTierTable(affix.type as AffixType)[affix.tier - 1];
-  const decimal = isDecimalAffixType(affix.type);
-  const unit = decimal ? '%' : '';
-  const fmt = (v: number) => (decimal ? v.toFixed(1) : String(v));
-  return { min: t.min, max: t.max, text: `${fmt(t.min)}~${fmt(t.max)}${unit}` };
-}
-
-function label(affix: Affix): string {
-  if (isTierlessAffixType(affix.type)) return formatAffixName(affix);
-  return `${formatAffixName(affix)} T${affix.tier}`;
-}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text) node.textContent = text;
   return node;
+}
+
+function label(affix: Affix): string {
+  return isTierlessAffixType(affix.type) ? formatAffixName(affix) : `${formatAffixName(affix)} T${affix.tier}`;
 }
 
 function tagEl(affix: Affix): HTMLSpanElement {
@@ -58,108 +61,50 @@ function valueEl(affix: Affix): HTMLSpanElement {
   return el('span', `sigil-affix-value${isMaxRollAffix(affix) ? ' max-roll' : ''}`, formatAffixValue(affix));
 }
 
-function rowEl(affix: Affix, title: string): HTMLButtonElement {
-  const row = el('button', 'sigil-affix-row');
-  row.type = 'button';
-  row.title = title;
-  return row;
+/** 同 `SigilMaster.tsx` 的 `renderTierRangeBar` */
+function rangeBarEl(affix: Affix): HTMLSpanElement | null {
+  const r = getAffixTierRange(affix);
+  if (!r) return null;
+  const ratio = r.max === r.min ? 1 : (affix.value - r.min) / (r.max - r.min);
+  const bar = el('span', `sigil-range-bar tier-${affix.tier}`);
+  const track = el('span', 'sigil-range-track');
+  const fill = el('span', 'sigil-range-fill');
+  fill.style.width = `${Math.round(Math.min(100, Math.max(0, ratio * 100)) * 10) / 10}%`;
+  track.append(fill);
+  bar.append(
+    el('span', 'sigil-range-bound', formatAffixBound(affix.type, r.min)),
+    track,
+    el('span', 'sigil-range-bound', formatAffixBound(affix.type, r.max)),
+  );
+  return bar;
 }
 
-function baseTitle(affix: Affix): string {
-  const desc = formatAffixDescription(affix);
-  return desc;
+function rowEl(row: Row): HTMLButtonElement {
+  const btn = el('button', 'sigil-affix-row');
+  btn.type = 'button';
+  if (row.reason) btn.setAttribute('aria-disabled', 'true');
+  const description = formatAffixDescription(row.affix);
+  btn.title = row.reason ? `${description}\n${row.reason}` : description;
+  btn.append(tagEl(row.affix), valueEl(row.affix));
+  const bar = rangeBarEl(row.affix);
+  if (bar) btn.append(bar);
+  return btn;
 }
 
-type Variant = { name: string; note: string; render: (affix: Affix) => HTMLButtonElement };
-
-const VARIANTS: Variant[] = [
-  {
-    name: 'A：數值後接區間（同一列）',
-    note: '一眼看到數值與區間，不增加列高。',
-    render: affix => {
-      const row = rowEl(affix, baseTitle(affix));
-      row.append(tagEl(affix));
-      if (affix.value || !isTierlessAffixType(affix.type)) row.append(valueEl(affix));
-      const r = tierRange(affix);
-      if (r) row.append(el('span', 'sigil-range-inline', `（${r.text}）`));
-      return row;
-    },
-  },
-  {
-    name: 'B：數值下方第二行',
-    note: '數值仍是主角，區間退到小字；每列多半行高度。',
-    render: affix => {
-      const row = rowEl(affix, baseTitle(affix));
-      row.append(tagEl(affix));
-      const stack = el('span', 'sigil-range-stack');
-      if (affix.value || !isTierlessAffixType(affix.type)) stack.append(valueEl(affix));
-      const r = tierRange(affix);
-      if (r) stack.append(el('span', 'sigil-range-sub', `T${affix.tier} 區間 ${r.text}`));
-      row.append(stack);
-      return row;
-    },
-  },
-  {
-    name: 'C：位置條',
-    note: '條的長度＝數值在區間中的位置，重刻好壞最直觀；佔用剩餘寬度。',
-    render: affix => {
-      const row = rowEl(affix, baseTitle(affix));
-      row.append(tagEl(affix));
-      if (affix.value || !isTierlessAffixType(affix.type)) row.append(valueEl(affix));
-      const r = tierRange(affix);
-      if (r) {
-        const bar = el('span', `sigil-range-bar tier-${affix.tier}`);
-        const track = el('span', 'sigil-range-track');
-        const fill = el('span', 'sigil-range-fill');
-        const ratio = r.max === r.min ? 1 : (affix.value - r.min) / (r.max - r.min);
-        fill.style.width = `${Math.max(4, ratio * 100)}%`;
-        track.append(fill);
-        const decimal = isDecimalAffixType(affix.type);
-        const fmt = (v: number) => (decimal ? v.toFixed(1) : String(v));
-        bar.append(el('span', '', fmt(r.min)), track, el('span', '', fmt(r.max)));
-        bar.style.color = tierColor.get(affix.tier) ?? '';
-        row.append(bar);
-      }
-      return row;
-    },
-  },
-  {
-    name: 'D：只放在 tooltip',
-    note: '列上維持現狀，滑過才看到區間；手機上看不到。',
-    render: affix => {
-      const r = tierRange(affix);
-      const title = r ? `${baseTitle(affix)}\nT${affix.tier} 區間 ${r.text}` : baseTitle(affix);
-      const row = rowEl(affix, title);
-      row.append(tagEl(affix));
-      if (affix.value || !isTierlessAffixType(affix.type)) row.append(valueEl(affix));
-      return row;
-    },
-  },
-];
-
-function renderGrid(): void {
+function render(): void {
   const grid = document.getElementById('grid')!;
   grid.replaceChildren();
-  for (const v of VARIANTS) {
+  for (const sample of SAMPLES) {
     const card = el('section', 'demo-card');
-    card.append(el('h2', '', v.name), el('p', '', v.note));
+    card.append(el('h2', '', sample.title));
     const list = el('div', 'sigil-affixes');
-    for (const affix of SAMPLE) list.append(v.render(affix));
+    for (const row of sample.rows) list.append(rowEl(row));
     card.append(list);
     grid.append(card);
   }
 }
 
-/* C 的位置條顏色取 Tier 色（沿用 App.css 的 `.affix-tag.tier-N`） */
-const tierColor = new Map<number, string>();
-for (let tier = 1; tier <= 7; tier++) {
-  const tag = el('span', `affix-tag tier-${tier}`);
-  document.body.append(tag);
-  tierColor.set(tier, getComputedStyle(tag).color);
-  tag.remove();
-}
-
-renderGrid();
+render();
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-width]')) {
   btn.addEventListener('click', () => {
@@ -167,4 +112,3 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-width]')) 
     document.getElementById('grid')!.classList.toggle('mobile', btn.dataset.width === 'mobile');
   });
 }
-

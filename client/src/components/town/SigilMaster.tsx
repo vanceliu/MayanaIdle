@@ -76,9 +76,10 @@ interface SigilFx {
   label?: string;
 }
 
-/** 詞綴列 tooltip（§ 13.13.1）：說明的數值與列上一致（不吃品質） */
-function affixRowTitle(affix: Affix): string {
-  return formatAffixDescription(affix);
+/** 詞綴列 tooltip（§ 13.13.1）：說明的數值與列上一致（不吃品質）；不能選時下一行接原因 */
+function affixRowTitle(affix: Affix, reason?: string): string {
+  const description = formatAffixDescription(affix);
+  return reason ? `${description}\n${reason}` : description;
 }
 
 /** 名稱與 Tier。名稱走 `formatAffixName`，無 Tier 的（特殊、額外屬性）不接 T 標 */
@@ -417,7 +418,7 @@ export function SigilMaster() {
           + `${rowFx?.mode === 'break-fail' ? ' enh-shake' : ''}`
         }
         aria-disabled={!check.ok}
-        title={affixRowTitle(affix)}
+        title={affixRowTitle(affix, check.ok ? undefined : check.reason)}
         onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
       >
         <span
@@ -444,9 +445,8 @@ export function SigilMaster() {
         >
           {formatAffixValue(affix)}
         </span>
+        {/* 列上只放區間位置條；不能選的原因在 tooltip，消耗與成功率是整次操作共通的，收在下方 */}
         {renderTierRangeBar(affix)}
-        {/* 列上只放區間位置條與「不能選的原因」；消耗與成功率是整次操作共通的，收在下方 */}
-        {!check.ok && <span className="sigil-affix-reason">{check.reason}</span>}
         {rowFx && renderFxLayer(rowFx)}
       </button>
     );
@@ -531,9 +531,8 @@ export function SigilMaster() {
             {affixes.map((affix, i) => (affix.sealed ? null : renderAffixRow(affix, i)))}
             {/* § 7.1 空洞與毀壞的洞各佔一列，不可選 */}
             {item && inertReason(item) !== '新手裝' && Array.from({ length: emptySockets }, (_, i) => (
-              <div key={`empty-${i}`} className="sigil-affix-row sigil-socket-empty" aria-disabled="true">
+              <div key={`empty-${i}`} className="sigil-affix-row sigil-socket-empty" aria-disabled="true" title="可用新增印記補一條">
                 <span className="affix-tag">空洞</span>
-                <span className="sigil-affix-reason">可用新增印記補一條</span>
               </div>
             ))}
             {item && inertReason(item) !== '新手裝' && Array.from({ length: brokenSockets }, (_, i) => (

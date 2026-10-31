@@ -303,7 +303,7 @@ export function canUseSigil(
     if (!next) return { ok: false, reason: `T${affix.tier} 已是上限，無法再升階` };
     if (next.type !== type) {
       const wanted = getSigilDefinition(next.type).name;
-      // Tier 寫在同一列的標籤上（`13-town.md` § 13.13.1：列上只放不能選的原因）
+      // Tier 寫在同一列的標籤上（`13-town.md` § 13.13.1：原因只寫印記名）
       return { ok: false, reason: `下一階由${wanted}受理` };
     }
   }
@@ -590,6 +590,18 @@ export const SIGIL_EXCHANGE_INPUT_COUNT = 5;
 export const SIGIL_EXCHANGE_FEE_COUNT = 50;
 
 export type SigilCounts = Partial<Record<SigilType, number>>;
+
+/** `13-town.md` § 13.13.2 手續費預設：依 `SIGIL_EXCHANGE_FEE_TYPES` 順序（精鍊 → 工藝）填到合計 50 */
+export function getDefaultSigilExchangeFee(held: Partial<Record<SigilType, number>>): SigilCounts {
+  const fee: SigilCounts = {};
+  let left = SIGIL_EXCHANGE_FEE_COUNT;
+  for (const type of SIGIL_EXCHANGE_FEE_TYPES) {
+    const n = Math.min(left, held[type] ?? 0);
+    if (n > 0) fee[type] = n;
+    left -= n;
+  }
+  return fee;
+}
 
 export type SigilExchangeCheck =
   | { ok: true; target: SigilType; cost: SigilCounts }
