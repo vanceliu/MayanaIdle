@@ -154,7 +154,7 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 | 來源 | 內容 |
 |---|---|
 | **Release 附檔** | 平放的單一檔案，直接下載 |
-| **Actions artifacts** | 每個 runner 一包 zip（`mayana-macos-14`、`mayana-windows-latest`、`mayana-ubuntu-latest`），要先解 GitHub 自動加的那一層 |
+| **Actions artifacts** | 每個 runner 一包 zip（`mayana-macos-15`、`mayana-windows-latest`、`mayana-ubuntu-latest`），要先解 GitHub 自動加的那一層 |
 
 | 關卡 | 影響誰 | 處理 |
 |---|---|---|
