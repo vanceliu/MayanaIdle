@@ -24,7 +24,7 @@ export interface SyncState {
 
 interface CombatSyncState {
   started: boolean;
-  monsters: Map<string, { currentHp: number; maxHp: number }>;
+  monsters: Map<string, { currentHp: number; maxHp: number; shieldRemaining: number }>;
   target: string | null;
   cast: string;
 }
@@ -132,6 +132,7 @@ function instanceView(id: string, inst: MonsterInstance): CombatInstanceView {
     id, name: inst.name, level: inst.level, currentHp: inst.currentHp, maxHp: inst.maxHp,
     isBoss: inst.isBoss, element: inst.element, attackType: inst.attackType,
     isTrainingDummy: inst.isTrainingDummy,
+    affixes: inst.affixes, venom: inst.venom, shieldMax: inst.shieldMax, shieldRemaining: inst.shieldRemaining,
   };
 }
 
@@ -151,14 +152,16 @@ export function collectCombatDelta(session: SyncedSession): CombatDelta | null {
 
   for (const [id, inst] of monsterInstances) {
     const prev = sent.monsters.get(id);
+    const shieldRemaining = inst.shieldRemaining ?? 0;
     if (!prev || prev.maxHp !== inst.maxHp) {
       (delta.add ??= []).push(instanceView(id, inst));
-    } else if (prev.currentHp !== inst.currentHp) {
-      (delta.hp ??= {})[id] = inst.currentHp;
+    } else if (prev.currentHp !== inst.currentHp || prev.shieldRemaining !== shieldRemaining) {
+      if (prev.currentHp !== inst.currentHp) (delta.hp ??= {})[id] = inst.currentHp;
+      if (prev.shieldRemaining !== shieldRemaining) (delta.shield ??= {})[id] = shieldRemaining;
     } else {
       continue;
     }
-    sent.monsters.set(id, { currentHp: inst.currentHp, maxHp: inst.maxHp });
+    sent.monsters.set(id, { currentHp: inst.currentHp, maxHp: inst.maxHp, shieldRemaining });
     changed = true;
   }
   for (const id of [...sent.monsters.keys()]) {

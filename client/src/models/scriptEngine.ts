@@ -77,6 +77,9 @@ export type CombatConditionType =
   | 'hp_dropped_recently'
   | 'target_has_debuff'
   | 'target_lacks_debuff'
+  /** 目標帶有／沒有指定強化詞綴（`25-monster-system.md` § 25.12.6） */
+  | 'target_has_affix'
+  | 'target_lacks_affix'
   /** 場上存在指定種族／元素的怪（§ 51.4.6 T6） */
   | 'field_has_race'
   /** 場上怪物平均 HP 低於 X%（§ 51.4.6 T6） */
@@ -99,6 +102,7 @@ export type CombatActionType =
   | 'switch_target_farthest'
   | 'switch_target_by_kind'
   | 'switch_target_by_debuff'
+  | 'switch_target_by_affix'
   | 'lock_target'
   | 'keep_distance'
   | 'close_in';
@@ -112,7 +116,7 @@ export type CombatActionType =
 export const NON_ATTACK_ACTIONS: readonly CombatActionType[] = [
   'wait',
   'switch_target_lowest_hp', 'switch_target_highest_hp', 'switch_target_farthest',
-  'switch_target_by_kind', 'switch_target_by_debuff', 'lock_target',
+  'switch_target_by_kind', 'switch_target_by_debuff', 'switch_target_by_affix', 'lock_target',
   'keep_distance', 'close_in',
 ];
 
@@ -137,9 +141,9 @@ export interface CombatCondition {
 export interface CombatAction {
   type: CombatActionType;
   skillId?: string;
-  /** `switch_target_by_kind`（種族／元素）／`switch_target_by_debuff`（tag）用 */
+  /** `switch_target_by_kind`（種族／元素）／`switch_target_by_debuff`（tag）／`switch_target_by_affix`（強化詞綴 id）用 */
   match?: string;
-  /** `switch_target_by_debuff` 用：true＝挑**沒有**該 debuff 的 */
+  /** `switch_target_by_debuff`／`switch_target_by_affix` 用：true＝挑**沒有**的 */
   invert?: boolean;
   /** `keep_distance`／`close_in` 用：目標距離（格）。未帶時用武器射程 */
   distance?: number;
@@ -189,6 +193,8 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
   field_avg_hp_below: '場上怪物平均 HP 低於',
   target_has_debuff: '目標身上有指定 debuff',
   target_lacks_debuff: '目標身上沒有指定 debuff',
+  target_has_affix: '目標帶有指定強化詞綴',
+  target_lacks_affix: '目標沒有指定強化詞綴',
   target_cc_immune: '目標控場免疫中',
   target_shielded: '目標無敵中／帶護盾',
   target_casting: '目標正在詠唱',
@@ -210,6 +216,7 @@ export const COMBAT_ACTION_LABELS: Record<CombatActionType, string> = {
   switch_target_farthest: '切換目標：最遠',
   switch_target_by_kind: '切換目標：指定種族／元素',
   switch_target_by_debuff: '切換目標：帶／不帶指定 debuff',
+  switch_target_by_affix: '切換目標：帶／不帶指定強化詞綴',
   lock_target: '鎖定目標（目標死前不換）',
   keep_distance: '保持距離',
   close_in: '進逼',

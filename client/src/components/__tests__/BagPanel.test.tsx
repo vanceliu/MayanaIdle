@@ -604,7 +604,7 @@ describe('印記抽屜（§ 35.20）', () => {
     render(<BagPanel />);
 
     fireEvent.click(toggle());
-    expect(screen.getByText('還沒有任何印記')).toBeDefined();
+    expect(screen.getByText('沒有印記')).toBeDefined();
   });
 
   it('開合時把選取收掉 —— 抽屜蓋上去後那一格就看不到了', () => {

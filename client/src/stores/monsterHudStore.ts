@@ -12,6 +12,11 @@ export interface MonsterHudEntry {
   currentHp: number;
   maxHp: number;
   isBoss: boolean;
+  /** 強化詞綴顯示名（`25-monster-system.md` § 25.12.5），依詞綴表順序；無詞綴為空陣列 */
+  affixLabels: string[];
+  /** 護盾詞綴：初始與剩餘吸收量；無護盾詞綴為 0 */
+  shieldMax: number;
+  shieldRemaining: number;
 }
 
 export interface MonsterHudState {
@@ -29,7 +34,11 @@ function isSameEntry(a: MonsterHudEntry, b: MonsterHudEntry): boolean {
     a.name === b.name &&
     a.currentHp === b.currentHp &&
     a.maxHp === b.maxHp &&
-    a.isBoss === b.isBoss
+    a.isBoss === b.isBoss &&
+    a.shieldMax === b.shieldMax &&
+    a.shieldRemaining === b.shieldRemaining &&
+    a.affixLabels.length === b.affixLabels.length &&
+    a.affixLabels.every((label, i) => label === b.affixLabels[i])
   );
 }
 

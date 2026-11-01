@@ -90,8 +90,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               <span className="settings-value">{percent(uiScale)}</span>
             </div>
             <p className="settings-hint">
-              狀態卡、快捷格、面板與城鎮視窗的整體大小。遊戲畫面不受影響
-              {linkScales ? '；目前文字會一起變動。' : '，文字大小也不受影響。'}
+              介面整體大小，不影響遊戲畫面。
             </p>
           </div>
 
@@ -119,7 +118,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               <span className="settings-value">{percent(fontScale)}</span>
             </div>
             <p className="settings-hint">
-              {linkScales ? '已與介面大小連動，拉任一條兩邊一起變。' : '只放大文字，介面尺寸不變。'}
+              {linkScales ? '與介面大小連動。' : '只改文字，不改介面大小。'}
             </p>
           </div>
 
@@ -131,11 +130,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               </button>
             </div>
             <p className="settings-hint">
-              視窗位置會自動記住；換到不同大小的瀏覽器視窗時按比例還原。
+              視窗位置會自動記住。
             </p>
           </div>
 
-          <p className="settings-note">設定會立即生效並自動記住，同一台裝置的所有角色共用。</p>
+          <p className="settings-note">立即生效，本裝置所有角色共用。</p>
         </div>
         )}
 

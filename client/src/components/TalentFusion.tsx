@@ -42,7 +42,7 @@ export function TalentFusion() {
           })}
         </div>
         <p className="fusion-note">
-          只吃沒有安裝的天賦格 —— 裝在任何一份天賦配置上的都不會被吃掉。
+          只使用未安裝的天賦格。
         </p>
       </section>
     </div>

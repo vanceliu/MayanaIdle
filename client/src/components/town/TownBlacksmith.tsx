@@ -70,15 +70,15 @@ export function TownBlacksmith() {
     .filter((e): e is { item: EquipmentInstance; yields: NonNullable<typeof e.yields> } => e.yields !== null);
 
   async function handleDismantle(item: EquipmentInstance) {
-    const warning = item.enhancement > 0 ? `\n強化 +${item.enhancement} 不會退還任何東西。` : '';
-    if (!window.confirm(`確定要拆解 ${item.name}？裝備會消失，只退還一半材料。${warning}`)) return;
+    const warning = item.enhancement > 0 ? `\n強化 +${item.enhancement} 不退還。` : '';
+    if (!window.confirm(`確定拆解 ${item.name}？只退還一半材料。${warning}`)) return;
     const result = await useGameStore.getState().dismantleEquipment(item.id!);
     setResultMsg(result.message);
   }
 
   return (
     <div className="shop-panel blacksmith-panel">
-      <p className="shop-greeting">「想打什麼裝備？材料備齊了就開工。」</p>
+      <p className="shop-greeting">「想打什麼裝備？」</p>
       <div className="bs-resources">
         <span>金幣: {char.gold.toLocaleString()}G</span>
         <span>製作任務: {craftQuests.length}/{MAX_ACTIVE_CRAFT_QUESTS}</span>
@@ -94,7 +94,7 @@ export function TownBlacksmith() {
 
       {tab === 'dismantle' && (
         <div className="panel-scroll">
-          <p className="shop-item-desc">只能拆有配方的裝備，退還配方材料的一半（無條件進位），前置裝備不退還。身上穿的裝備不能拆。</p>
+          <p className="shop-item-desc">退還一半材料，前置裝備不退；身上的裝備不能拆。</p>
           {dismantlable.length === 0 && <p className="shop-item-desc">背包裡沒有可拆解的裝備</p>}
           <div className="shop-items">
             {dismantlable.map(({ item, yields }) => {

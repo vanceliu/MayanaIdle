@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { SLOT_NAMES, SLOT_ORDER, type EquipSlot, type EquipmentInstance } from '../models/equipment';
-import { getFrozenGear } from '../systems/gear';
+import { getEffectiveGearArray, getFrozenGear } from '../systems/gear';
+import { summarizeAffixes } from '../systems/affixSummary';
+import { useSettingsStore } from '../stores/settingsStore';
 import { EquipmentDetail } from './EquipmentInfo';
 import { Tooltip } from './Tooltip';
 import { GameIcon } from './GameIcon';
@@ -26,6 +28,39 @@ const SLOT_ICON_MAP: Record<EquipSlot, string> = {
   ring1: 'ring',
   ring2: 'ring',
 };
+
+/** 裝備欄詞綴加總（`34-ui-guidelines.md`）：兩欄條列、可收合，展開狀態存本機 */
+function AffixSummary() {
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const character = useGameStore(s => s.character);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  const open = useSettingsStore(s => s.equipAffixSummaryOpen);
+  const setOpen = useSettingsStore(s => s.setEquipAffixSummaryOpen);
+  const rows = useMemo(
+    () => (character ? summarizeAffixes(getEffectiveGearArray(character, activeEffects, equippedGear)) : []),
+    [character, activeEffects, equippedGear],
+  );
+  return (
+    <div className="affix-sum">
+      <div className="affix-sum-title">
+        詞綴加總（{rows.length}）
+        <button type="button" className="affix-sum-toggle" onClick={() => setOpen(!open)}>
+          {open ? '收合 ▲' : '展開 ▼'}
+        </button>
+      </div>
+      {open && (rows.length > 0 ? (
+        <div className="affix-sum-cols">
+          {rows.map(row => (
+            <div key={row.name} className="affix-sum-row">
+              <span>{row.name}</span>
+              <b>{row.value}</b>
+            </div>
+          ))}
+        </div>
+      ) : <div className="affix-sum-empty">沒有生效的詞綴</div>)}
+    </div>
+  );
+}
 
 export function EquipmentPanel() {
   const equippedGear = useGameStore(s => s.equippedGear);
@@ -145,6 +180,7 @@ export function EquipmentPanel() {
           );
         })}
       </div>
+      <AffixSummary />
     </div>
   );
 }

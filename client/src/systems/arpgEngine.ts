@@ -604,10 +604,13 @@ function applyNonAttackAction(
       debuffTags: activeEffects
         .filter(e => e.target === 'monster' && e.targetMonsterId === m.id && now - e.startTime < e.duration)
         .flatMap(e => e.tags),
+      affixes: m.instance.affixes ?? [],
     }));
-    const resolved: TargetStrategy = strategy === 'by_debuff' && action.invert
-      ? 'by_lacking_debuff'
-      : strategy;
+    const resolved: TargetStrategy = !action.invert
+      ? strategy
+      : strategy === 'by_debuff' ? 'by_lacking_debuff'
+        : strategy === 'by_affix' ? 'by_lacking_affix'
+          : strategy;
     const picked = pickTargetBy(resolved, candidates, playerPos, action.match);
     // 挑不到就維持原目標 —— 切不成不該讓角色變成沒有目標
     if (picked) {
@@ -630,4 +633,5 @@ const TARGET_STRATEGY_OF: Partial<Record<string, TargetStrategy>> = {
   switch_target_by_kind: 'by_kind',
   // `invert` 決定切到「帶著的」還是「沒有的」（§ 51.4.9 T6）
   switch_target_by_debuff: 'by_debuff',
+  switch_target_by_affix: 'by_affix',
 };

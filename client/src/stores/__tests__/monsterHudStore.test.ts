@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useMonsterHudStore, type MonsterHudEntry } from '../monsterHudStore';
 
 function entry(overrides: Partial<MonsterHudEntry> = {}): MonsterHudEntry {
-  return { id: 'm_1', name: '石像鬼', currentHp: 30, maxHp: 60, isBoss: false, ...overrides };
+  return {
+    id: 'm_1', name: '石像鬼', currentHp: 30, maxHp: 60, isBoss: false,
+    affixLabels: [], shieldMax: 0, shieldRemaining: 0, ...overrides,
+  };
 }
 
 describe('monsterHudStore', () => {
@@ -63,5 +66,15 @@ describe('monsterHudStore', () => {
     const before = useMonsterHudStore.getState().entries;
     useMonsterHudStore.getState().clear();
     expect(useMonsterHudStore.getState().entries).toBe(before);
+  });
+
+  it('護盾或詞綴變動時視為新快照', () => {
+    useMonsterHudStore.getState().publish([entry({ shieldMax: 20, shieldRemaining: 20 })], null);
+    const before = useMonsterHudStore.getState().entries;
+    useMonsterHudStore.getState().publish([entry({ shieldMax: 20, shieldRemaining: 12 })], null);
+    expect(useMonsterHudStore.getState().entries).not.toBe(before);
+    const afterShield = useMonsterHudStore.getState().entries;
+    useMonsterHudStore.getState().publish([entry({ shieldMax: 20, shieldRemaining: 12, affixLabels: ['護盾'] })], null);
+    expect(useMonsterHudStore.getState().entries).not.toBe(afterShield);
   });
 });

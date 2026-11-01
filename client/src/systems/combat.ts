@@ -1,4 +1,5 @@
 import type { Character } from '../models/character';
+import { monsterLogName } from '../models/monsterAffix';
 import type { Attributes } from '../models/attributes';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, WeaponMaterial } from '../models/equipment';
@@ -420,6 +421,11 @@ const UNIQUE_AFFIX_BONUS_STATS: [keyof AffixBonuses, UniqueAffixType][] = [
   ['evasion', 'evasion'],
 ];
 
+/** 這種獨有詞綴是否已併入同名加成欄位（裝備欄詞綴加總據此決定另列與否） */
+export function isUniqueAffixMergedIntoBonuses(type: UniqueAffixType): boolean {
+  return UNIQUE_AFFIX_BONUS_STATS.some(([, unique]) => unique === type);
+}
+
 /** 一般詞綴與 T7 獨有詞綴的合計。傳入的裝備須已過 `getEffectiveGear()`（凍結與同類去重） */
 export function getAffixBonusesFromGear(equippedGear: (EquipmentInstance | null)[]): AffixBonuses {
   const validGear = equippedGear.filter((g): g is EquipmentInstance => g != null);
@@ -798,8 +804,8 @@ export function calculatePlayerAttack(
 
   const prefix = hitCount > 1 ? '雙擊！' : '';
   const log: CombatLog = anyCrit
-    ? { type: 'player_crit', message: `${prefix}暴擊！對 ${monster.name} 造成 ${total} 點傷害` }
-    : { type: 'player_hit', message: `${prefix}對 ${monster.name} 造成 ${total} 點傷害` };
+    ? { type: 'player_crit', message: `${prefix}暴擊！對 ${monsterLogName(monster)} 造成 ${total} 點傷害` }
+    : { type: 'player_hit', message: `${prefix}對 ${monsterLogName(monster)} 造成 ${total} 點傷害` };
 
   return { damage: total, hit: true, isCritical: anyCrit, hits, log };
 }
@@ -875,8 +881,8 @@ export function calculatePhysicalSkillHit(
   damage = applyWeaken(damage, activeEffects);
 
   const log: CombatLog = isCritical
-    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
-    : { type: 'skill_hit', message: `${skillName} 對 ${monster.name} 造成 ${damage} 點傷害` };
+    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monsterLogName(monster)} 造成 ${damage} 點傷害` }
+    : { type: 'skill_hit', message: `${skillName} 對 ${monsterLogName(monster)} 造成 ${damage} 點傷害` };
 
   return { damage, hit: true, isCritical, log };
 }
@@ -942,8 +948,8 @@ export function calculatePhysicalSnapshotSkill(
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
-    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
-    : { type: 'skill_hit', message: `${skillName} 對 ${monster.name} 造成 ${damage} 點傷害` };
+    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monsterLogName(monster)} 造成 ${damage} 點傷害` }
+    : { type: 'skill_hit', message: `${skillName} 對 ${monsterLogName(monster)} 造成 ${damage} 點傷害` };
 
   return { damage, isCritical, log };
 }
@@ -984,8 +990,8 @@ export function calculateSkillAttack(
   damage = Math.max(1, Math.floor(damage * (100 - monsterReduction) / 100));
 
   const log: CombatLog = isCritical
-    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monster.name} 造成 ${damage} 點傷害` }
-    : { type: 'skill_hit', message: `${skillName} 對 ${monster.name} 造成 ${damage} 點傷害` };
+    ? { type: 'skill_crit', message: `${skillName} 暴擊！對 ${monsterLogName(monster)} 造成 ${damage} 點傷害` }
+    : { type: 'skill_hit', message: `${skillName} 對 ${monsterLogName(monster)} 造成 ${damage} 點傷害` };
 
   return { damage, isCritical, log };
 }
@@ -1169,7 +1175,7 @@ export function calculateMonsterAttack(
       damage: 0,
       hit: false,
       dodged: false,
-      log: { type: 'player_dodged', message: `無敵！完全擋下 ${monster.name} 的攻擊` },
+      log: { type: 'player_dodged', message: `無敵！完全擋下 ${monsterLogName(monster)} 的攻擊` },
     };
   }
 
@@ -1184,7 +1190,7 @@ export function calculateMonsterAttack(
       damage: 0,
       hit: false,
       dodged: true,
-      log: { type: 'player_dodged', message: `迴避了 ${monster.name} 的攻擊` },
+      log: { type: 'player_dodged', message: `迴避了 ${monsterLogName(monster)} 的攻擊` },
     };
   }
 
@@ -1224,7 +1230,7 @@ export function calculateMonsterAttack(
       damage: finalDamage,
       hit: true,
       dodged: false,
-      log: { type: 'monster_hit', message: `格擋！${monster.name} 對你造成 ${finalDamage} 點傷害` },
+      log: { type: 'monster_hit', message: `格擋！${monsterLogName(monster)} 對你造成 ${finalDamage} 點傷害` },
     };
   }
 
@@ -1232,8 +1238,28 @@ export function calculateMonsterAttack(
     damage: finalDamage,
     hit: true,
     dodged: false,
-    log: { type: 'monster_hit', message: `${monster.name} 對你造成 ${finalDamage} 點傷害` },
+    log: { type: 'monster_hit', message: `${monsterLogName(monster)} 對你造成 ${finalDamage} 點傷害` },
   };
+}
+
+/**
+ * 荊棘反彈對角色的傷害（`25-monster-system.md` § 25.12.3）：
+ * 依 § 21.5 傷害結算順序步驟 1、3、4（無敵、物理防禦減傷、buff 減傷），不迴避、不格擋。
+ * 護盾吸收（步驟 6）由呼叫端處理。
+ */
+export function calculateThornsDamage(
+  base: number,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+): number {
+  if (base <= 0 || isPlayerInvincible(activeEffects)) return 0;
+  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
+  const reductionRate = Math.min(finalDefense, DAMAGE_REDUCTION_CAP);
+  let damage = Math.max(1, Math.floor(base * (100 - reductionRate) / 100));
+  const buffReduction = getBuffDamageReduction(activeEffects);
+  if (buffReduction > 0) damage = Math.max(1, Math.floor(damage * (100 - buffReduction) / 100));
+  return damage;
 }
 
 export function processCombatRound(

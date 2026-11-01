@@ -946,7 +946,7 @@ export function BagPanel() {
       {sigilOpen && (
         <div className="bag-sigil-drawer" role="group" aria-label="印記">
           {sigilItems.length === 0 ? (
-            <div className="bag-sigil-empty">還沒有任何印記</div>
+            <div className="bag-sigil-empty">沒有印記</div>
           ) : (
             <BagGrid>
               {/*

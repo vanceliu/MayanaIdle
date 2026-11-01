@@ -327,8 +327,8 @@ export function QuickSlotBar() {
             aria-disabled={!canUse}
             title={entry
               ? `${getQuickSlotItemName(entry)}${blockReason ? `（${blockReason}）` : ''}`
-                + `（${selectedIndex === idx ? '再點一次使用' : '點一次選取'}，右鍵或長按清除）`
-              : '空（從背包或技能面板拖曳，或用它們的選單指定）'}
+                + `（${selectedIndex === idx ? '再點一次使用' : '點一次選取'}）`
+              : '空格：從背包或技能面板拖入'}
           >
             <span className="quick-slot-key">{quickSlotLabel(idx)}</span>
             {entry && (

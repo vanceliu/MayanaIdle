@@ -12,7 +12,7 @@ function c(
 ): TargetPickCandidate {
   return {
     id, position: { x, y: 0 }, hpPercent,
-    race: 'normal', element: 'fire', debuffTags: [],
+    race: 'normal', element: 'fire', debuffTags: [], affixes: [],
     ...over,
   };
 }
@@ -52,6 +52,16 @@ describe('目標選擇策略', () => {
   it('沒有指定 debuff 的 —— 讓 DoT 鋪滿場，而不是重複疊同一隻', () => {
     const pool2 = [c('poisoned', 1, 50, { debuffTags: ['poison'] }), c('clean', 4, 50)];
     expect(pickTargetBy('by_lacking_debuff', pool2, P, 'poison')).toBe('clean');
+  });
+
+  it('帶指定強化詞綴的（25 § 25.12.6）', () => {
+    const pool2 = [c('plain', 1, 50), c('thorny', 4, 50, { affixes: ['thorns'] })];
+    expect(pickTargetBy('by_affix', pool2, P, 'thorns')).toBe('thorny');
+  });
+
+  it('沒有指定強化詞綴的 —— 避開荊棘怪', () => {
+    const pool2 = [c('thorny', 1, 50, { affixes: ['thorns', 'giant'] }), c('plain', 4, 50, { affixes: ['giant'] })];
+    expect(pickTargetBy('by_lacking_affix', pool2, P, 'thorns')).toBe('plain');
   });
 
   it('候選為空時回 null，呼叫端維持原目標', () => {

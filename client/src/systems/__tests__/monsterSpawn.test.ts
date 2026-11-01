@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMonsterFromTemplate, createTrainingDummy } from '../monsterSpawn';
 import { DUMMY_INFINITE_HP } from '../../models/trainingGround';
 import type { MonsterTemplate } from '../../models/monster';
@@ -12,6 +12,20 @@ const template = (over: Partial<MonsterTemplate> = {}): MonsterTemplate => ({
   attackMin: 8, attackMax: 12, defense: 3, exp: 40,
   race: 'beast', size: 'small', element: 'none', isBoss: false, ...over,
 } as MonsterTemplate);
+
+/** 預設亂數落在強化詞綴區段之外（25 § 25.12.1），素質斷言才固定 */
+beforeEach(() => {
+  vi.spyOn(Math, 'random').mockReturnValue(0.99);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function mockRolls(...values: number[]) {
+  let i = 0;
+  vi.spyOn(Math, 'random').mockImplementation(() => values[Math.min(i++, values.length - 1)]);
+}
 
 /**
  * 回村再回地圖時，第一批怪會在模板從 IndexedDB 讀回來之前就要求實例。
@@ -92,5 +106,31 @@ describe('全域怪物血量與攻擊力倍率（28 § 28.1）', () => {
     )!;
     expect(inst.maxHp).toBe(100);
     expect(inst.attackMax).toBe(0);
+  });
+});
+
+describe('強化詞綴（25 § 25.12）', () => {
+  it('擲中 1 詞綴：屬性加成作用在全域倍率之後', () => {
+    // 模板 → 詞綴數 r=0.01（1 個）→ 詞綴池 index 4（巨大）
+    mockRolls(0, 0.01, 0.4);
+    const inst = createMonsterFromTemplate(mapMonster(), [template()], { hp: 2, attack: 1 })!;
+    expect(inst.affixes).toEqual(['giant']);
+    expect(inst.maxHp).toBe(288);
+    expect(inst.currentHp).toBe(288);
+  });
+
+  it('沒擲中時沒有詞綴，素質不變', () => {
+    const inst = createMonsterFromTemplate(mapMonster(), [template()])!;
+    expect(inst.affixes).toBeUndefined();
+    expect(inst.maxHp).toBe(120);
+  });
+
+  it('木樁不擲詞綴', () => {
+    mockRolls(0);
+    const inst = createMonsterFromTemplate(
+      mapMonster({ dummy: { hp: 100, defense: 0, level: 60, size: 'small', element: 'none' } as never }),
+      [],
+    )!;
+    expect(inst.affixes).toBeUndefined();
   });
 });

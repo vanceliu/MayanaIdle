@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { getExpToNextLevel } from '../../systems/levelUp';
+import { RESTED_EXP_ACCRUAL_RATIO, RESTED_EXP_CAP_MS, RESTED_EXP_MULTIPLIER } from '../../systems/restedExp';
 import '../components/WikiTable.css';
 
 export function ExpTablePage() {
@@ -29,6 +30,9 @@ export function ExpTablePage() {
         <code style={{ color: 'var(--accent-info)', fontFamily: 'var(--font-mono)' }}>
           Lv ≥ 65：k = 74 + 0.73529 × (Lv - 65)
         </code>
+      </p>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
+        回鍋加倍：離線每 1 分鐘累積 {60 * RESTED_EXP_ACCRUAL_RATIO} 秒擊殺經驗 ×{RESTED_EXP_MULTIPLIER}，存量上限 {RESTED_EXP_CAP_MS / 3_600_000} 小時。
       </p>
       <div className="wiki-table-wrap">
         <table className="wiki-table">

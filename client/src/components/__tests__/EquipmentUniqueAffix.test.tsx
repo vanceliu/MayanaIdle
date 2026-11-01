@@ -53,7 +53,7 @@ describe('裝備 tooltip 的 T7 獨有詞綴（§ 7T.7）', () => {
     const { unmount } = render(<EquipmentDetail item={chest} />);
     const loser = screen.getByText('(獨) 額外防禦 +6');
     expect(loser.className).toContain('suppressed');
-    expect(loser.getAttribute('title')).toBe('同類獨有詞綴已由其他裝備生效');
+    expect(loser.getAttribute('title')).toBe('同類已由其他裝備生效');
     unmount();
 
     render(<EquipmentDetail item={helmet} />);

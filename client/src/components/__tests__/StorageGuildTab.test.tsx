@@ -115,6 +115,6 @@ describe('公會 NPC 解散確認', () => {
   it('註明倉庫會一併消失', () => {
     render(<GuildNpc />);
     fireEvent.click(screen.getByRole('button', { name: '解散公會' }));
-    expect(screen.getByText(/公會倉庫內物品與金幣會一併消失/)).toBeTruthy();
+    expect(screen.getByText(/公會倉庫的物品與金幣會一併消失/)).toBeTruthy();
   });
 });

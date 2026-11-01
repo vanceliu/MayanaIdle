@@ -138,7 +138,7 @@ export function TradePanelContent() {
         )}
 
         {!trade && offers.length === 0 && (
-          <div className="party-empty">目前沒有交易。從隊伍面板的玩家名單發起交易。</div>
+          <div className="party-empty">從隊伍面板的玩家名單發起交易</div>
         )}
 
         {trade && (

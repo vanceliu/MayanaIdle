@@ -16,7 +16,7 @@ export function Inn() {
 
   return (
     <div className="inn-panel">
-      <p className="shop-greeting">「旅途辛苦了，要休息一下嗎？」</p>
+      <p className="shop-greeting">「要休息一下嗎？」</p>
       <div className="shop-gold">持有金幣: {char.gold}G</div>
       {/* 只有內容會捲動，問候語與金幣固定在上方 */}
       <div className="panel-scroll">

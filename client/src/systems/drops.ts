@@ -50,6 +50,8 @@ export interface DropBonuses {
    * 選填、預設 1 —— 不帶就是沒有 Pressure 加成，既有呼叫端不受影響。
    */
   pressure_mult?: number;
+  /** 怪物強化詞綴獎勵倍率（`25-monster-system.md` § 25.12.4），同時乘在掉寶倍率與金幣。預設 1 */
+  affix_mult?: number;
 }
 
 export const DROP_ROLL_MAX = 1000;
@@ -105,12 +107,12 @@ export async function persistDroppedEquipment(
 }
 
 function getDropRateMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1);
+  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1) * (bonuses?.affix_mult ?? 1);
 }
 
 /** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率在 `settleGoldDrop` */
 function getGoldAffixMultiplier(bonuses?: DropBonuses): number {
-  return 1 + (bonuses?.gold_rate ?? 0) / 100;
+  return (1 + (bonuses?.gold_rate ?? 0) / 100) * (bonuses?.affix_mult ?? 1);
 }
 
 /**

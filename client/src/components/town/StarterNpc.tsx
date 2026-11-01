@@ -151,7 +151,7 @@ export function StarterNpc() {
 
   return (
     <div className="starter-npc-panel">
-      <p className="shop-greeting">「歡迎來到薄暮村！我是新手指導員，讓我來幫助你開始冒險吧。」</p>
+      <p className="shop-greeting">「歡迎來到薄暮村！」</p>
       <div className="shop-gold">持有金幣: {char.gold.toLocaleString()}G</div>
 
       <div className="shop-tabs">
@@ -168,11 +168,9 @@ export function StarterNpc() {
         <div className="starter-talk">
           {/* 三句是同一段對白，收成一張說話卡，不要各自浮在頁面上 */}
           <div className="starter-dialogue">
-            <p>「身為一名{CLASS_NAMES_ZH[char.className as ClassName]}，你需要合適的裝備才能踏上冒險之路。」</p>
-            <p>「我可以提供你一套新手裝備，還能幫你強化它們。」</p>
-            <p>「不過要注意，這些裝備是特製的，不能存入倉庫或販售，只能穿在身上或丟棄。」</p>
+            <p>「身為{CLASS_NAMES_ZH[char.className as ClassName]}，先來領一套新手裝備吧，我也能幫你強化。」</p>
           </div>
-          {!canClaim && <p className="starter-warning">「你的等級已超過 30，無法再領取新手裝備了。」</p>}
+          {!canClaim && <p className="starter-warning">等級超過 30，無法領取新手裝備。</p>}
 
           {/* 前期知識：條列說明，預設收合，玩家自行點開需要的主題 */}
           <div className="starter-tips">
@@ -210,7 +208,7 @@ export function StarterNpc() {
               <div className="starter-info-card">
                 <p>可領取裝備（{CLASS_NAMES_ZH[char.className as ClassName]}套裝）</p>
                 <p className="starter-note">
-                  {missingCount === 0 ? '這一套你都拿齊了。' : `尚缺 ${missingCount} 件。`}
+                  {missingCount === 0 ? '已全部擁有' : `尚缺 ${missingCount} 件`}
                 </p>
               </div>
               <div className="shop-items">
@@ -249,10 +247,7 @@ export function StarterNpc() {
       {tab === 'enhance' && (
         <div className="starter-enhance">
           <div className="starter-info-card">
-            <p><strong>{getStarterEnhanceCost().toLocaleString()}G</strong> / 次，不需要卷軸</p>
-            <p className="starter-note">
-              上限為安定值（武器 +6、防具 +4），安定值內<strong>必定成功</strong>，不會失敗消失。
-            </p>
+            <p><strong>{getStarterEnhanceCost().toLocaleString()}G</strong> / 次，不需卷軸，強化到安定值為止<strong>必定成功</strong></p>
           </div>
           {renderEnhanceList()}
         </div>

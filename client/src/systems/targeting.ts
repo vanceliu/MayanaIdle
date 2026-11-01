@@ -115,11 +115,13 @@ export interface TargetPickCandidate extends TargetCandidate {
   element: string;
   /** 身上有哪些 debuff tag */
   debuffTags: string[];
+  /** 強化詞綴 id（`25-monster-system.md` § 25.12） */
+  affixes: string[];
 }
 
 export type TargetStrategy =
   | 'lowest_hp' | 'highest_hp' | 'farthest'
-  | 'by_kind' | 'by_debuff' | 'by_lacking_debuff';
+  | 'by_kind' | 'by_debuff' | 'by_lacking_debuff' | 'by_affix' | 'by_lacking_affix';
 
 /**
  * 依策略挑一個目標，挑不到回 null（呼叫端維持原目標）。
@@ -151,6 +153,12 @@ export function pickTargetBy(
     case 'by_lacking_debuff': {
       const want = strategy === 'by_debuff';
       const hit = candidates.filter(c => (match ? c.debuffTags.includes(match) : c.debuffTags.length > 0) === want);
+      return minBy(hit, c => getDistance(playerPos, c.position))?.id ?? null;
+    }
+    case 'by_affix':
+    case 'by_lacking_affix': {
+      const want = strategy === 'by_affix';
+      const hit = candidates.filter(c => (match ? c.affixes.includes(match) : c.affixes.length > 0) === want);
       return minBy(hit, c => getDistance(playerPos, c.position))?.id ?? null;
     }
     default:

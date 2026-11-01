@@ -103,7 +103,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       <div
         key={key}
         className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
-        title={isTierlessAffixType(affix.type) ? '額外屬性無 Tier，印記只能重骰不能升階' : undefined}
+        title={isTierlessAffixType(affix.type) ? '印記只能重骰，不能升階' : undefined}
       >
         {formatAffixDisplay(affix, item.quality)}
       </div>
@@ -206,7 +206,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         <div className={`equip-detail-affixes equip-detail-unique${frozen ? ' is-frozen' : ''}`}>
           <div
             className={`equip-detail-affix unique${uniqueSuppressed ? ' suppressed' : ''}`}
-            title={uniqueSuppressed ? '同類獨有詞綴已由其他裝備生效' : 'T7 獨有詞綴，無法以印記變更'}
+            title={uniqueSuppressed ? '同類已由其他裝備生效' : '印記無法變更'}
           >
             {formatUniqueAffixDisplay(item.uniqueAffix)}
           </div>
@@ -216,12 +216,12 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         <div className={`equip-detail-affixes${frozen ? ' is-frozen' : ''}`}>
           {socketed.map((affix, i) => renderAffix(affix, `affix-${i}`))}
           {Array.from({ length: emptySockets }, (_, i) => (
-            <div key={`empty-${i}`} className="equip-detail-affix empty-socket" title="空的詞綴洞，可用新增印記補一條">
+            <div key={`empty-${i}`} className="equip-detail-affix empty-socket" title="可用新增印記補一條">
               空洞
             </div>
           ))}
           {Array.from({ length: brokenSockets }, (_, i) => (
-            <div key={`broken-${i}`} className="equip-detail-affix broken-socket" title="封印印記失敗毀壞的詞綴洞，無法再使用">
+            <div key={`broken-${i}`} className="equip-detail-affix broken-socket" title="已毀壞，無法使用">
               已毀壞
             </div>
           ))}

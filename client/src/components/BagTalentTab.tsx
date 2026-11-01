@@ -87,7 +87,7 @@ export function BagTalentTab({ rows, order, onReorder }: {
         <div className="tooltip-stat">階級: T{cell.tier}</div>
         <div className="tooltip-stat">條件槽 {cell.tier} ＋ 動作槽 1</div>
         <div className="tooltip-count">數量: {cell.count}</div>
-        <div className="tooltip-hint">拖到天賦面板即可安裝</div>
+        <div className="tooltip-hint">拖到天賦面板安裝</div>
       </div>
     );
   }

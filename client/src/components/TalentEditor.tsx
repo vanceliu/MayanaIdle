@@ -170,7 +170,7 @@ function RuleMenu({
 
   return (
     <ul className="talent-slot-menu">
-      {defs.length === 0 && <li className="talent-slot-menu-empty">這個類型沒有可選項目</li>}
+      {defs.length === 0 && <li className="talent-slot-menu-empty">沒有可選項目</li>}
       {TALENT_GROUPS.filter(g => byGroup.has(g)).map(group => (
         <li key={group} className="talent-slot-menu-group">
           <span className="talent-slot-menu-group-label">{TALENT_GROUP_LABELS[group]}</span>
@@ -238,7 +238,7 @@ function Slot({
         <button
           className="talent-slot-remove"
           onClick={() => setEntry(slot.id!, slotIndex, null)}
-          title="清空（免費、無損）"
+          title="清空"
           aria-label="清空"
         >
           ✕
@@ -252,7 +252,7 @@ function Slot({
       <button
         className={`talent-slot is-empty${isOver ? ' drag-over' : ''}${dragging ? ' can-drop' : ''}`}
         onClick={() => setPicking(v => !v)}
-        title="點一下從清單選"
+        title="從清單選擇"
         {...dropProps}
       >
         {slotIndex === null ? '＋ 動作' : '＋ 條件'}
@@ -269,8 +269,8 @@ function Slot({
 }
 
 const SKIP_HINT: Record<SlotSkipReason, string> = {
-  'no-action': '動作槽是空的，這一列不進判定',
-  unresolved: '技能／道具還沒選定，這一列不進判定',
+  'no-action': '未設定動作，不執行',
+  unresolved: '未選定技能／道具，不執行',
 };
 
 function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
@@ -314,7 +314,7 @@ function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
       {/* 順序決定判定優先權：由上往下取第一個成立的（§ 3.12） */}
       <span
         className="talent-row-handle"
-        title="拖曳調整順序。判定由上往下，先成立的先執行"
+        title="拖曳調整順序（由上往下判定）"
         onPointerDown={startDrag}
         onPointerMove={e => moveDrag(e.clientX, e.clientY)}
         onPointerUp={finishDrag}
@@ -347,7 +347,7 @@ function SlotRow({ slot, order }: { slot: TalentSlot; order: number }) {
       <button
         className="talent-row-uninstall"
         onClick={() => uninstallSlot(slot.id!)}
-        title="拆下天賦格。設定會原樣保留，裝回同類型即復原"
+        title="拆下天賦格（設定保留）"
       >
         拆下
       </button>
@@ -386,7 +386,7 @@ export function TalentTypeEditor({ type }: { type: TalentType }) {
       data-talent-type={type}
     >
       {mine.length === 0 && (
-        <div className="talent-empty">這個類型還沒有安裝天賦格</div>
+        <div className="talent-empty">尚未安裝天賦格</div>
       )}
       <ul className="talent-list">
         {mine.map((slot, i) => <SlotRow key={slot.id} slot={slot} order={i} />)}
@@ -404,7 +404,7 @@ export function TalentTypeEditor({ type }: { type: TalentType }) {
               data-drop-kind="talent-install"
               data-drop-index="-1"
               onClick={() => setAdding(v => !v)}
-              title={`安裝天賦格到「${TALENT_TYPE_LABELS[type]}」。也可以從背包拖過來`}
+              title={`安裝天賦格到「${TALENT_TYPE_LABELS[type]}」`}
             >
               ＋
               <span className="talent-add-count">{spare.length}</span>

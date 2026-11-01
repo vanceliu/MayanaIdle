@@ -27,7 +27,7 @@ export function GuildNpc() {
     if (!isGuildLeader(guild, char.id)) {
       return (
         <div className="guild-npc-panel">
-          <p className="shop-greeting">「你是公會「{guild.name}」的成員。要退出請到社群視窗的公會分頁。」</p>
+          <p className="shop-greeting">「你是「{guild.name}」的成員。退出請到社群視窗。」</p>
           {message && <div className="party-message" role="status">{message}</div>}
         </div>
       );
@@ -40,7 +40,7 @@ export function GuildNpc() {
           <button className="party-action-btn is-danger" onClick={() => setConfirming(true)}>解散公會</button>
         ) : (
           <div className="guild-npc-confirm">
-            <span>確定要解散「{guild.name}」？全體成員會立即變為無公會，公會倉庫內物品與金幣會一併消失。</span>
+            <span>確定解散「{guild.name}」？公會倉庫的物品與金幣會一併消失。</span>
             <button className="party-action-btn is-danger" onClick={() => { setConfirming(false); void disband(); }}>確定解散</button>
             <button className="party-action-btn is-secondary" onClick={() => setConfirming(false)}>取消</button>
           </div>
@@ -63,7 +63,7 @@ export function GuildNpc() {
 
   return (
     <div className="guild-npc-panel">
-      <p className="shop-greeting">「想建立自己的公會嗎？取個響亮的名字吧。」</p>
+      <p className="shop-greeting">「想建立公會嗎？」</p>
       {!levelOk && <p className="restriction-warning">需要等級 {GUILD_CREATE_MIN_LEVEL} 才能建立公會</p>}
       <form className="party-invite-row" onSubmit={submit}>
         <input

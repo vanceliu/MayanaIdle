@@ -19,6 +19,9 @@ function createEntry(overrides: Partial<MonsterHudEntry> = {}): MonsterHudEntry 
     currentHp: 30,
     maxHp: 60,
     isBoss: false,
+    affixLabels: [],
+    shieldMax: 0,
+    shieldRemaining: 0,
     ...overrides,
   };
 }
@@ -112,6 +115,48 @@ describe('MonsterListOverlay（§ 24.8.3 怪物列表）', () => {
     const { container } = render(<MonsterListOverlay />);
     const fill = container.querySelector('.monster-card-hp-fill') as HTMLElement;
     expect(fill.style.width).toBe('0%');
+  });
+
+  it('強化詞綴：名稱依詞綴數上色，下一行列出詞綴（25 § 25.12.5）', () => {
+    useMonsterHudStore.setState({
+      entries: [
+        createEntry({ id: 'm_1' }),
+        createEntry({ id: 'm_2', affixLabels: ['嗜血', '狂暴'] }),
+        createEntry({ id: 'm_3', isBoss: true, affixLabels: ['巨大', '堅硬', '再生', '荊棘'] }),
+      ],
+    });
+
+    const { container } = render(<MonsterListOverlay />);
+    const names = container.querySelectorAll('.monster-card-name');
+    expect(names[0].className).toBe('monster-card-name');
+    expect(names[1].classList.contains('monster-affix-2')).toBe(true);
+    expect(names[2].classList.contains('monster-affix-4')).toBe(true);
+    const affixes = screen.getAllByTestId('monster-card-affixes').map(e => e.textContent);
+    expect(affixes).toEqual(['嗜血 狂暴', '巨大 堅硬 再生 荊棘']);
+  });
+
+  it('護盾詞綴：條長＝最大 HP＋初始護盾，護盾段接在 HP 之後', () => {
+    useMonsterHudStore.setState({
+      entries: [createEntry({ currentHp: 100, maxHp: 100, shieldMax: 25, shieldRemaining: 10, affixLabels: ['護盾'] })],
+    });
+
+    const { container } = render(<MonsterListOverlay />);
+    const hp = container.querySelector('.monster-card-hp-fill') as HTMLElement;
+    const shield = screen.getByTestId('monster-card-shield');
+    expect(hp.style.width).toBe('80%');
+    expect(shield.style.left).toBe('80%');
+    expect(shield.style.width).toBe('8%');
+  });
+
+  it('護盾破了之後 HP 段照固定比例縮短，不重算', () => {
+    useMonsterHudStore.setState({
+      entries: [createEntry({ currentHp: 50, maxHp: 100, shieldMax: 25, shieldRemaining: 0, affixLabels: ['護盾'] })],
+    });
+
+    const { container } = render(<MonsterListOverlay />);
+    const hp = container.querySelector('.monster-card-hp-fill') as HTMLElement;
+    expect(hp.style.width).toBe('40%');
+    expect(screen.queryByTestId('monster-card-shield')).toBeNull();
   });
 
   it('顯示該怪身上的 debuff icon 與剩餘秒數', () => {

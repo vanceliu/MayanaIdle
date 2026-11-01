@@ -2,6 +2,7 @@
  * client 與 server 共用的 WebSocket 訊息（JSON）。版本協商見 `97-selfhosted-server.md` § 97.2。
  * 唯一出處；server 以相對路徑引用。
  */
+import type { MonsterAffixId, VenomDebuff } from '../models/monsterAffix';
 import type { TrainingDummySpec } from '../models/trainingGround';
 
 export type StoreKey = 'game' | 'mapControl' | 'mapMonster' | 'talent' | 'mailbox' | 'party' | 'trade' | 'guild';
@@ -125,6 +126,8 @@ export interface CombatDelta {
   add?: CombatInstanceView[];
   /** 目前血量有變動的怪物 */
   hp?: Record<string, number>;
+  /** 護盾詞綴剩餘量有變動的怪物（`25-monster-system.md` § 25.12.3） */
+  shield?: Record<string, number>;
   remove?: string[];
   /** 有此鍵才更新 */
   target?: string | null;
@@ -142,6 +145,11 @@ export interface CombatInstanceView {
   element: string;
   attackType: string;
   isTrainingDummy?: boolean;
+  /** 強化詞綴（`25-monster-system.md` § 25.12） */
+  affixes?: MonsterAffixId[];
+  venom?: VenomDebuff;
+  shieldMax?: number;
+  shieldRemaining?: number;
 }
 
 export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade' | 'guild';

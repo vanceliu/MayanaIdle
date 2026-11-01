@@ -80,12 +80,12 @@ function OnlineAccount() {
           />
           <button className="btn-transfer" type="submit">{hasRecoveryCode ? '重新產生救援碼' : '產生救援碼'}</button>
           <span className="settings-recovery-state">
-            {hasRecoveryCode ? '已有救援碼。換新的要輸入目前這組，舊的立即失效；遺失請找管理員' : '尚未產生救援碼'}
+            {hasRecoveryCode ? '已有救援碼；換新後舊的立即失效' : '尚未產生救援碼'}
           </span>
         </form>
       )}
       {isHost && (
-        <p className="settings-hint">單機世界只有你一個玩家，本機連線自動登入，不需要密碼。管理介面的帳號密碼在 server.properties。</p>
+        <p className="settings-hint">單機世界自動登入，不需密碼；管理介面帳密在 server.properties。</p>
       )}
       {message && <p className="settings-hint settings-password-msg" role="status">{message}</p>}
     </div>
@@ -120,7 +120,7 @@ export function AccountSettings({ onClose }: { onClose: () => void }) {
             開啟 Wiki
           </a>
         </div>
-        <p className="settings-hint">裝備、怪物、詞綴與掉落表的完整查詢。會開新分頁。</p>
+        <p className="settings-hint">裝備、怪物、詞綴與掉落表查詢。</p>
       </div>
 
       <div className="settings-row">
@@ -134,8 +134,8 @@ export function AccountSettings({ onClose }: { onClose: () => void }) {
         </div>
         <p className="settings-hint">
           {canLogoutAccount
-            ? '回到角色清單：換角色，帳號保持登入。登出帳號：這台裝置回到登入畫面，下次要重新輸入帳號密碼。進度都會自動存檔。'
-            : '回到角色選擇畫面，進度會自動存檔。'}
+            ? '回到角色清單會保持登入；登出帳號後需重新登入。'
+            : '進度會自動存檔。'}
         </p>
       </div>
 

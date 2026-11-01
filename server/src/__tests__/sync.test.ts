@@ -100,6 +100,18 @@ describe('狀態同步', () => {
     expect(collectCombatDelta(session)).toEqual({ remove: ['m1'], target: 'm2' });
   });
 
+  it('強化詞綴：新怪帶詞綴與護盾，之後只送護盾剩餘量的變動（25 § 25.12）', () => {
+    resetSync(session);
+    session.combat.monsterInstances.set('m1', {
+      ...instance(100), affixes: ['shield', 'thorns'], shieldMax: 20, shieldRemaining: 20,
+    } as MonsterInstance);
+    const first = collectCombatDelta(session)!;
+    expect(first.add?.[0]).toEqual(expect.objectContaining({ affixes: ['shield', 'thorns'], shieldMax: 20, shieldRemaining: 20 }));
+
+    session.combat.monsterInstances.get('m1')!.shieldRemaining = 5;
+    expect(collectCombatDelta(session)).toEqual({ shield: { m1: 5 } });
+  });
+
   it('tick 推送有角色時必送並帶 now；操作回應的推送沒有變動就不送', () => {
     expect(buildFrame(session, null)).toBeNull();
     const tick = buildFrame(session, { visuals: [] });

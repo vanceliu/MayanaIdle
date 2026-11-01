@@ -162,7 +162,7 @@ describe('印記師 — 突破印記（§ 46.7）', () => {
     pickAffix('攻擊力 T5');
 
     expect(costText()).toContain('成功率 10%（T5 → T6）');
-    expect(costText()).toContain('失敗時該詞綴掉回 T1');
+    expect(costText()).toContain('失敗掉回 T1');
     fireEvent.click(applyBtn('突破印記'));
 
     expect(useGameStore.getState().inventory[0].affixes![0].tier).toBe(6);
@@ -302,7 +302,7 @@ describe('印記師 — 選取流程（§ 13.13）', () => {
     pickSigil('混沌印記');
 
     expect(applyBtn('混沌印記').disabled).toBe(true);
-    expect(footerText()).toBe('這件裝備沒有詞綴也沒有詞綴洞');
+    expect(footerText()).toBe('沒有詞綴也沒有詞綴洞');
   });
 
   it('沒有詞綴但還有洞時，混沌與新增印記可用，空洞列出來且不可選', () => {

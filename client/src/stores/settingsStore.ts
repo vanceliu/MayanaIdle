@@ -20,6 +20,7 @@ export const SCALE_DEFAULT = 1;
 const UI_SCALE_KEY = 'mayana_ui_scale';
 const FONT_SCALE_KEY = 'mayana_font_scale';
 const LINK_SCALES_KEY = 'mayana_scale_linked';
+const EQUIP_AFFIX_SUMMARY_OPEN_KEY = 'mayana_equip_affix_summary_open';
 
 /** 夾到 [0.8, 1.5] 並對齊 5% 級距；非數值一律回預設 */
 export function normalizeScale(value: unknown): number {
@@ -73,6 +74,9 @@ interface SettingsState {
   fontScale: number;
   /** 連動模式：介面與文字同一個倍率一起變（見 `34-ui-guidelines.md` § 34.6） */
   linkScales: boolean;
+  /** 裝備欄詞綴加總是否展開（`34-ui-guidelines.md`「裝備欄詞綴加總」） */
+  equipAffixSummaryOpen: boolean;
+  setEquipAffixSummaryOpen: (open: boolean) => void;
   setUiScale: (value: number) => void;
   setFontScale: (value: number) => void;
   setLinkScales: (linked: boolean) => void;
@@ -83,6 +87,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   uiScale: readStored(UI_SCALE_KEY),
   fontScale: readStored(FONT_SCALE_KEY),
   linkScales: readStoredFlag(LINK_SCALES_KEY),
+  equipAffixSummaryOpen: readStoredFlag(EQUIP_AFFIX_SUMMARY_OPEN_KEY),
+
+  setEquipAffixSummaryOpen(open) {
+    set({ equipAffixSummaryOpen: open });
+    writeStored(EQUIP_AFFIX_SUMMARY_OPEN_KEY, open);
+  },
 
   setUiScale(value) {
     const uiScale = normalizeScale(value);

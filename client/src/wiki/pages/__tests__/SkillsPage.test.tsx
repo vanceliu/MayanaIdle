@@ -18,7 +18,7 @@ describe('formatSelfBuff', () => {
   });
 
   it('背刺：名稱、持續秒數、說明', () => {
-    expect(formatSelfBuff(skill('backstab'))).toBe('背刺（施放後 5 秒，攻擊力 +50%（×1.5））');
+    expect(formatSelfBuff(skill('backstab'))).toBe('背刺（施放後 5 秒，攻擊力 +50%）');
   });
 
   it('沒有 selfBuff 回傳空字串', () => {

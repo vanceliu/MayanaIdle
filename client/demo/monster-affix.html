@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>怪物強化詞綴 Demo — MayanaIdle</title>
+<!--
+  怪物強化詞綴的顯示（`25-monster-system.md` § 25.12.5、`34-ui-guidelines.md`「怪物強化詞綴顏色」）。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/monster-affix.html
+
+  .demo-* 只是這頁的排版；「提案樣式」區塊確認後移入 App.css，其餘樣式來自 App.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 提案樣式（確認後移入 App.css） ═══════════ */
+.monster-affix-1,
+.monster-card .monster-card-name.monster-affix-1 { color: #60A5FA; }
+.monster-affix-2,
+.monster-card .monster-card-name.monster-affix-2 { color: #FACC15; }
+.monster-affix-3,
+.monster-card .monster-card-name.monster-affix-3 { color: #FB923C; }
+.monster-affix-4,
+.monster-card .monster-card-name.monster-affix-4 { color: #EF4444; }
+
+.monster-card .monster-card-name[class*="monster-affix-"] { font-weight: 600; }
+
+.monster-card-affixes {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: normal;
+}
+
+/* 帶護盾詞綴的怪：條長 = 最大 HP + 初始護盾（固定不重算）；護盾段接在 HP 之後 */
+.monster-card-hp { position: relative; }
+.monster-card-shield-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #7DD3FC, #FFFFFF);
+  transition: width 0.15s linear;
+}
+
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 20px; font-size: var(--fs-sm);
+}
+.demo-section { margin-bottom: 28px; }
+.demo-section h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 10px; }
+.demo-map {
+  position: relative; min-height: 220px; padding: 12px;
+  background: #1c2b1c; border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+/* 這頁不疊在地圖上，改用一般排版 */
+.demo-map .monster-list-overlay { position: static; transform: none; max-width: none; justify-content: flex-start; }
+.demo-mobile { width: 393px; }
+.demo-mobile .monster-list-overlay { flex-direction: column; align-items: flex-end; gap: 4px; }
+.demo-mobile .monster-card { width: 118px; padding: 4px 7px 5px; border-radius: var(--radius-sm); }
+.demo-mobile .monster-card-name { font-size: var(--fs-xs); }
+.demo-mobile .monster-card-hp { height: 6px; margin-top: 3px; }
+.demo-mobile .monster-card-affixes { font-size: 9px; }
+
+.demo-log { max-width: 520px; height: auto; }
+</style>
+</head>
+<body>
+<h1 class="demo-title">怪物強化詞綴</h1>
+<p class="demo-note">
+  名稱依詞綴數上色：1 藍、2 黃、3 橙、4 紅；名稱下一行小字列出詞綴；帶護盾的怪：條長 = 最大 HP + 初始護盾，滿血滿盾為 100%；先扣白段，破盾後紅條直接往下扣，不重算比例。<br>
+  範例：野狼受擊中（護盾剩 9%）、暗影刺客已破盾，其餘帶護盾者未受擊。Boss 卡片維持紫底。<br>
+  戰鬥日誌寫「詞綴 原名」，不上色；整行顏色依訊息類型。
+</p>
+
+<div class="demo-bar">
+  <label><input type="checkbox" id="opt-bold" checked> 名稱加粗</label>
+  <button id="opt-reroll" type="button">重擲詞綴</button>
+</div>
+
+<div class="demo-section">
+  <h2>怪物列表（桌機）</h2>
+  <div class="demo-map" id="map-desktop"><div class="monster-list-overlay"></div></div>
+</div>
+
+<div class="demo-section">
+  <h2>怪物列表（手機）</h2>
+  <div class="demo-map demo-mobile" id="map-mobile"><div class="monster-list-overlay"></div></div>
+</div>
+
+<div class="demo-section">
+  <h2>戰鬥日誌</h2>
+  <div class="combat-log demo-log" id="log"></div>
+</div>
+
+<script type="module">
+const AFFIXES = ['嗜血', '狂暴', '迅捷', '劇毒', '巨大', '堅硬', '再生', '護盾', '疾風', '荊棘'];
+const ORDER = ['嗜血', '狂暴', '迅捷', '劇毒', '撕裂', '巨大', '堅硬', '再生', '護盾', '疾風', '荊棘'];
+
+function rollAffixes(count) {
+  const pool = [...AFFIXES];
+  const picked = [];
+  while (picked.length < count) {
+    const name = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    picked.push(name === '劇毒' && Math.random() < 0.5 ? '撕裂' : name);
+  }
+  if (count >= 2 && !picked.includes('護盾')) picked[picked.length - 1] = '護盾';
+  if (count < 2) return picked.filter(a => a !== '護盾').length === picked.length ? picked : rollAffixes(count);
+  return picked.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+}
+
+// shield：剩餘護盾佔最大 HP 的 %。20 = 未受擊；0 = 已破盾
+const MONSTERS = [
+  { name: '哥布林', count: 0, hp: 100, shield: 0, target: false },
+  { name: '哥布林', count: 1, hp: 72, shield: 0, target: false },
+  { name: '野狼', count: 2, hp: 100, shield: 9, target: true, note: '受擊中' },
+  { name: '高階骷髏鬥士', count: 3, hp: 100, shield: 20, target: false },
+  { name: '暗影刺客', count: 4, hp: 63, shield: 0, target: false, note: '已破盾' },
+  { name: '暗影吸血鬼', count: 2, hp: 100, shield: 20, target: false, boss: true },
+  { name: '百柱死神', count: 4, hp: 100, shield: 20, target: false, boss: true },
+];
+
+function affixClass(count) { return count > 0 ? ` monster-affix-${count}` : ''; }
+
+function renderCards(container) {
+  container.innerHTML = MONSTERS.map(m => {
+    const hasShieldAffix = m.affixes.includes('護盾');
+    const shield = hasShieldAffix ? m.shield : 0;
+    const hp = shield > 0 ? 100 : m.hp;
+    // 條長以「最大 HP + 初始護盾 20%」為 100%
+    const scale = hasShieldAffix ? 120 : 100;
+    const hpWidth = hp / scale * 100;
+    const shieldWidth = shield / scale * 100;
+    return `
+    <div class="monster-card${m.boss ? ' is-boss' : ''}${m.target ? ' is-target' : ''}">
+      <div class="monster-card-name${affixClass(m.count)}">${m.name}</div>
+      ${m.count > 0 ? `<div class="monster-card-affixes">${m.affixes.join(' ')}</div>` : ''}
+      <div class="monster-card-hp">
+        <div class="monster-card-hp-fill" style="width:${hpWidth}%"></div>
+        ${shield ? `<div class="monster-card-shield-fill" style="left:${hpWidth}%;width:${shieldWidth}%"></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function nameSpan(m) {
+  return m.count === 0 ? m.name : `${m.affixes.join(' ')} ${m.name}`;
+}
+
+function renderLog() {
+  const [plain, one, two, three, four] = MONSTERS;
+  const lines = [
+    ['player', `對 ${nameSpan(plain)} 造成 31 點傷害`],
+    ['player', `對 ${nameSpan(one)} 造成 28 點傷害`],
+    ['monster', `${nameSpan(one)} 對你造成 12 點傷害`],
+    ['player', `暴擊！對 ${nameSpan(two)} 造成 64 點傷害`],
+    ['monster', `${nameSpan(two)} 反彈 19 點傷害`],
+    ['player', `火球術 對 ${nameSpan(three)} 造成 88 點傷害`],
+    ['monster', `${nameSpan(three)} 對你造成 40 點傷害`],
+    ['player', `迴避了 ${nameSpan(four)} 的攻擊`],
+    ['monster', `${nameSpan(four)} 對你造成 57 點傷害`],
+    ['loot', '獲得 金幣 ×231'],
+  ];
+  document.getElementById('log').innerHTML =
+    lines.map(([type, html]) => `<div class="log-entry log-${type}">${html}</div>`).join('');
+}
+
+function reroll() {
+  for (const m of MONSTERS) {
+    m.affixes = rollAffixes(m.count);
+  }
+  render();
+}
+
+function render() {
+  renderCards(document.querySelector('#map-desktop .monster-list-overlay'));
+  renderCards(document.querySelector('#map-mobile .monster-list-overlay'));
+  renderLog();
+}
+
+const boldStyle = document.createElement('style');
+document.head.appendChild(boldStyle);
+document.getElementById('opt-bold').addEventListener('change', e => {
+  boldStyle.textContent = e.target.checked ? '' : '[class*="monster-affix-"] { font-weight: inherit !important; }';
+});
+
+document.getElementById('opt-reroll').addEventListener('click', reroll);
+
+reroll();
+</script>
+</body>
+</html>

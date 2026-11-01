@@ -5,6 +5,9 @@ import { getItemById } from '../../models/items';
 import { getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { SLOT_DROP_RATE_BOSS, slotTierBandFor } from '../../models/talent';
+import {
+  MONSTER_AFFIX_COUNT_TABLE, MONSTER_AFFIX_DESCRIPTIONS, MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER, MONSTER_AFFIX_REWARD,
+} from '../../models/monsterAffix';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -136,7 +139,68 @@ function MonsterList() {
         </table>
         {filtered.length === 0 && <p className="wiki-empty">無符合條件的怪物</p>}
       </div>
+      <MonsterAffixSection />
     </div>
+  );
+}
+
+const AFFIX_COUNT_COLOR_NAMES: Record<number, string> = { 1: '藍', 2: '黃', 3: '橙', 4: '紅' };
+
+/** 怪物強化詞綴（`25-monster-system.md` § 25.12），數值一律讀 `models/monsterAffix.ts` */
+function MonsterAffixSection() {
+  return (
+    <section data-testid="wiki-monster-affix" style={{ marginTop: 24 }}>
+      <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
+        怪物強化詞綴
+      </h3>
+      <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+        怪物生成時有機率帶強化詞綴，一般怪與 Boss 都會出現。詞綴數越多越強，掉落、金幣與經驗也越多。
+        怪物列表卡片的名稱依詞綴數上色，名稱下方列出詞綴；戰鬥日誌寫成「詞綴 原名」。
+      </p>
+      <div className="wiki-table-wrap" style={{ marginBottom: 16 }}>
+        <table className="wiki-table">
+          <thead>
+            <tr><th>詞綴數</th><th>出現機率</th><th>怪物等級</th><th>名稱顏色</th><th>掉落／金幣／經驗</th></tr>
+          </thead>
+          <tbody>
+            {MONSTER_AFFIX_COUNT_TABLE.map((row, i) => (
+              <tr key={row.count}>
+                <td>{row.count}</td>
+                <td>{row.cumulative - (MONSTER_AFFIX_COUNT_TABLE[i - 1]?.cumulative ?? 0)}%</td>
+                <td>{row.minLevel <= 1 ? '全部' : `Lv.${row.minLevel} 以上`}</td>
+                <td>{AFFIX_COUNT_COLOR_NAMES[row.count]}</td>
+                <td>×{MONSTER_AFFIX_REWARD[row.count].toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ul style={{ color: 'var(--text-secondary)', margin: '0 0 16px', paddingLeft: 20, lineHeight: 1.8 }}>
+        <li>怪物等級不到的詞綴數不會出現，該段機率直接作廢（不會改成較少詞綴）。</li>
+        <li>同一隻怪的詞綴不重複，從所有詞綴中等機率抽。</li>
+        <li>屬性加成在全域倍率之後計算；護盾量以套用巨大後的最大 HP 計算。</li>
+        <li>劇毒／撕裂排在怪物原本的負面效果之後判定，每次攻擊最多觸發一種。</li>
+        <li>帶護盾的怪，HP 條長度＝最大 HP＋護盾，傷害先扣淺藍色的護盾段。</li>
+      </ul>
+      <div className="wiki-table-wrap">
+        <table className="wiki-table">
+          <thead>
+            <tr><th>詞綴</th><th>效果</th></tr>
+          </thead>
+          <tbody>
+            {MONSTER_AFFIX_ORDER.map(id => (
+              <tr key={id}>
+                <td>{MONSTER_AFFIX_LABELS[id]}</td>
+                <td>{MONSTER_AFFIX_DESCRIPTIONS[id]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0' }}>
+        自動天賦可用「目標帶有／沒有指定強化詞綴」偵測，再用「切換目標：帶／不帶指定強化詞綴」避開或集火。
+      </p>
+    </section>
   );
 }
 

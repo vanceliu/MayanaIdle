@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { EquipmentPanel } from '../EquipmentPanel';
 import { useGameStore } from '../../stores/gameStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import type { EquipmentInstance } from '../../models/equipment';
 
 vi.mock('../GameIcon', () => ({
@@ -210,5 +211,53 @@ describe('EquipmentPanel', () => {
       fireEvent.mouseLeave(trigger);
       expect(document.querySelector('.tooltip-popup')).toBeNull();
     });
+  });
+});
+
+describe('EquipmentPanel — 詞綴加總（34-ui-guidelines）', () => {
+  const helmet = {
+    id: 9, templateId: 1, name: '頭盔', type: 'armor', slot: 'helmet', isTwoHanded: false, defense: 0,
+    quality: 0, enhancement: 0, affixes: [{ type: 'defense', tier: 3, value: 7.2 }, { type: 'max_hp', tier: 3, value: 40 }],
+    ownerId: 1, equipped: true,
+  } as EquipmentInstance;
+  const character = {
+    name: 'T', className: 'knight', level: 60, exp: 0, expToNext: 1, hp: 1, maxHp: 1, mp: 1, maxMp: 1,
+    baseAttributes: { STR: 10, AGI: 10, VIT: 10, SPI: 10, INT: 10, CHA: 10 },
+    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+  } as never;
+
+  beforeEach(() => {
+    localStorage.clear();
+    useSettingsStore.setState({ equipAffixSummaryOpen: false });
+    useGameStore.setState({ character, equippedGear: { helmet }, activeEffects: [] });
+  });
+
+  it('預設收合，只顯示項目數', () => {
+    const { container } = render(<EquipmentPanel />);
+    expect(screen.getByText('詞綴加總（2）')).toBeTruthy();
+    expect(container.querySelector('.affix-sum-cols')).toBeNull();
+  });
+
+  it('展開後兩欄條列，狀態存本機', () => {
+    const { container } = render(<EquipmentPanel />);
+    fireEvent.click(screen.getByRole('button', { name: '展開 ▼' }));
+    const rows = [...container.querySelectorAll('.affix-sum-row')].map(r => r.textContent);
+    expect(rows).toEqual(['防禦力+7.2%', '最大 HP+40']);
+    expect(localStorage.getItem('mayana_equip_affix_summary_open')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '收合 ▲' }));
+    expect(localStorage.getItem('mayana_equip_affix_summary_open')).toBe('false');
+  });
+
+  it('素質不足凍結的裝備不計', () => {
+    useGameStore.setState({ equippedGear: { helmet: { ...helmet, requiredAttributes: { STR: 99 } } } });
+    render(<EquipmentPanel />);
+    expect(screen.getByText('詞綴加總（0）')).toBeTruthy();
+  });
+
+  it('沒有詞綴時展開顯示提示', () => {
+    useGameStore.setState({ equippedGear: {} });
+    useSettingsStore.setState({ equipAffixSummaryOpen: true });
+    render(<EquipmentPanel />);
+    expect(screen.getByText('沒有生效的詞綴')).toBeTruthy();
   });
 });

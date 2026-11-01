@@ -29,12 +29,11 @@ export function TrainingGroundEntrance() {
 
   return (
     <div className="training-entrance-panel">
-      <p className="shop-greeting">「想知道自己那身裝備到底打得動什麼？進來打幾下木樁就知道了。」</p>
+      <p className="shop-greeting">「來打木樁試試身手吧。」</p>
       <div className="panel-scroll">
         <ul className="training-entrance-notes">
-          <li>木樁的防禦、血量、等級、體型、元素、數量都可以自己調。</li>
-          <li>可以量測 DPS、命中率、總傷害與 MP 淨消耗。</li>
-          <li><strong>沒有任何獎勵</strong>：木樁不掉東西、不給經驗、不給金幣。</li>
+          <li>可自訂木樁，量測 DPS、命中率、傷害與 MP 消耗。</li>
+          <li><strong>沒有任何獎勵</strong>。</li>
         </ul>
         <button className="inn-btn" onClick={enter} disabled={!target}>
           進入試驗場

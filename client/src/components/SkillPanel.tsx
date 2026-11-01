@@ -297,7 +297,7 @@ export function SkillPanel() {
             <div className="skill-tooltip-stat">射程: {formatSkillRange(tooltip.skill)}</div>
           )}
           {tooltip.skill.hits && (
-            <div className="skill-tooltip-stat">{tooltip.skill.hits} 連擊（每擊獨立判定）</div>
+            <div className="skill-tooltip-stat">{tooltip.skill.hits} 連擊</div>
           )}
           {tooltip.skill.description && (
             <div className="skill-tooltip-stat">效果: {tooltip.skill.description}</div>
@@ -324,7 +324,7 @@ export function SkillPanel() {
             <div className="skill-tooltip-stat">持續: {formatBuffDuration(tooltip.skill)}</div>
           )}
           {tooltip.skill.type === 'passive' ? (
-            <div className="skill-tooltip-stat">被動（學會即生效，不需施放）</div>
+            <div className="skill-tooltip-stat">被動</div>
           ) : (
             <>
               <div className="skill-tooltip-stat">MP: {tooltip.skill.mpCost}</div>

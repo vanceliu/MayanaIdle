@@ -98,11 +98,16 @@ function applyCombatDelta(delta: CombatDelta): void {
       attackMin: 0, attackMax: 0, defense: 0, exp: 0, race: 'normal', size: 'small',
       element: v.element, isBoss: v.isBoss, attackType: v.attackType, attackRange: 1.5, attackInterval: 1200,
       isTrainingDummy: v.isTrainingDummy,
+      affixes: v.affixes, venom: v.venom, shieldMax: v.shieldMax, shieldRemaining: v.shieldRemaining,
     } as MonsterInstance);
   }
   for (const [id, hp] of Object.entries(delta.hp ?? {})) {
     const existing = combat.monsterInstances.get(id);
     if (existing) existing.currentHp = hp;
+  }
+  for (const [id, shield] of Object.entries(delta.shield ?? {})) {
+    const existing = combat.monsterInstances.get(id);
+    if (existing) existing.shieldRemaining = shield;
   }
   for (const id of delta.remove ?? []) combat.monsterInstances.delete(id);
   if (delta.target !== undefined) combat.engine.playerCtx.targetMonsterId = delta.target;

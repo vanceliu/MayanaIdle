@@ -1,4 +1,5 @@
 import { REGIONS } from './mapData';
+import { MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER } from './monsterAffix';
 import { getItemById } from './items';
 import { ELEMENT_LABELS, RACE_LABELS } from './monster';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine';
@@ -84,6 +85,9 @@ const DEBUFF_OPTIONS = (Object.entries(SCRIPT_DEBUFF_LABELS) as [string, string]
 const MONSTER_DEBUFF_OPTIONS = (Object.entries(MONSTER_DEBUFF_TAG_LABELS) as [string, string][])
   .map(([value, label]) => ({ value, label }));
 
+/** 怪物強化詞綴：值為詞綴 id（`25-monster-system.md` § 25.12.2） */
+const MONSTER_AFFIX_OPTIONS = MONSTER_AFFIX_ORDER.map(id => ({ value: id, label: MONSTER_AFFIX_LABELS[id] }));
+
 /** 區域：值為 `character.currentArea` 存的 region id */
 const REGION_OPTIONS = REGIONS.map(r => ({ value: r.id, label: r.name }));
 
@@ -158,6 +162,8 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   }],
   target_has_debuff: [{ key: 'match', kind: 'select', label: '狀態', options: MONSTER_DEBUFF_OPTIONS, def: 'poisoned' }],
   target_lacks_debuff: [{ key: 'match', kind: 'select', label: '狀態', options: MONSTER_DEBUFF_OPTIONS, def: 'poisoned' }],
+  target_has_affix: [{ key: 'match', kind: 'select', label: '詞綴', options: MONSTER_AFFIX_OPTIONS, def: 'thorns' }],
+  target_lacks_affix: [{ key: 'match', kind: 'select', label: '詞綴', options: MONSTER_AFFIX_OPTIONS, def: 'thorns' }],
 
   // === 補給條件 ===
   in_town: [{
@@ -201,6 +207,13 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     { key: 'match', kind: 'select', label: '狀態', options: MONSTER_DEBUFF_OPTIONS, def: 'poisoned' },
     {
       key: 'invert', kind: 'select', label: '挑', def: '',
+      options: [{ value: '', label: '帶著的' }, { value: '1', label: '沒有的' }],
+    },
+  ],
+  switch_target_by_affix: [
+    { key: 'match', kind: 'select', label: '詞綴', options: MONSTER_AFFIX_OPTIONS, def: 'thorns' },
+    {
+      key: 'invert', kind: 'select', label: '挑', def: '1',
       options: [{ value: '', label: '帶著的' }, { value: '1', label: '沒有的' }],
     },
   ],

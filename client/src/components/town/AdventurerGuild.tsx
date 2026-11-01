@@ -211,7 +211,7 @@ export function AdventurerGuild() {
 
   return (
     <div className="guild-panel">
-      <p className="shop-greeting">「歡迎來到冒險者工會。有什麼任務想接嗎？」</p>
+      <p className="shop-greeting">「有什麼任務想接嗎？」</p>
 
       <div className="storage-tabs">
         <button className={tab === 'adventurer' ? 'active' : ''} onClick={() => setTab('adventurer')}>冒險任務</button>

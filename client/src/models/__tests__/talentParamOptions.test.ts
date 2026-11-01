@@ -8,6 +8,7 @@ import { SKILL_CATALOG } from '../skill';
 import { CLASS_SKILLS, isClassMagic } from '../classSkills';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { TALENT_RULE_DEFS } from '../../db/seed/talentSeeds';
+import { MONSTER_AFFIX_ORDER } from '../monsterAffix';
 
 /**
  * 鑲材選項的**值域**（`51-auto-talent.md` § 51.4.1）。
@@ -32,6 +33,9 @@ const MONSTER_TAGS = new Set<string>([
 
 const REGION_IDS = new Set(REGIONS.map(r => r.id));
 
+/** 怪物強化詞綴 id（`25-monster-system.md` § 25.12.2） */
+const MONSTER_AFFIX_IDS = new Set<string>(MONSTER_AFFIX_ORDER);
+
 const DEPOSIT_WAREHOUSES = new Set<WarehouseKind>(['shared', 'personal']);
 
 /**
@@ -48,6 +52,10 @@ const VALUE_DOMAINS: Record<string, Set<string> | null> = {
   'target_lacks_debuff.match': MONSTER_TAGS,
   'switch_target_by_debuff.match': MONSTER_TAGS,
   'switch_target_by_debuff.invert': null,
+  'target_has_affix.match': MONSTER_AFFIX_IDS,
+  'target_lacks_affix.match': MONSTER_AFFIX_IDS,
+  'switch_target_by_affix.match': MONSTER_AFFIX_IDS,
+  'switch_target_by_affix.invert': null,
   'target_race.match': new Set(Object.keys(RACE_LABELS)),
   'target_element.match': new Set(Object.keys(ELEMENT_LABELS)),
   'field_has_race.match': new Set([...Object.keys(RACE_LABELS), ...Object.keys(ELEMENT_LABELS)]),

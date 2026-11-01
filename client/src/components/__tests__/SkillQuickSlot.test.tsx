@@ -241,8 +241,8 @@ describe('怪物列表點擊切目標（§ 3.6.1）', () => {
     setup([]);
     useMonsterHudStore.setState({
       entries: [
-        { id: 'm1', name: '史萊姆', currentHp: 10, maxHp: 10, isBoss: false },
-        { id: 'm2', name: '哥布林', currentHp: 20, maxHp: 20, isBoss: false },
+        { id: 'm1', name: '史萊姆', currentHp: 10, maxHp: 10, isBoss: false, affixLabels: [], shieldMax: 0, shieldRemaining: 0 },
+        { id: 'm2', name: '哥布林', currentHp: 20, maxHp: 20, isBoss: false, affixLabels: [], shieldMax: 0, shieldRemaining: 0 },
       ],
       targetId: 'm1',
     });

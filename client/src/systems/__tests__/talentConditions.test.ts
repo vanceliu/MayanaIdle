@@ -173,6 +173,16 @@ describe('接線項：目標狀態與 HP 歷程（§ 51.4.10、階段 7）', () 
     expect(check({ type: 'target_has_debuff', match: 'poison' }, expired)).toBe(false);
   });
 
+  it('目標帶有／沒有指定強化詞綴（25 § 25.12.6）', () => {
+    const thorny = ctx({ monsters: [{ id: 'm1', instance: monster({ affixes: ['thorns'] }), position: { x: 1, y: 0 } }] });
+    expect(check({ type: 'target_has_affix', match: 'thorns' }, thorny)).toBe(true);
+    expect(check({ type: 'target_lacks_affix', match: 'thorns' }, thorny)).toBe(false);
+    expect(check({ type: 'target_has_affix', match: 'regen' }, thorny)).toBe(false);
+
+    const plain = ctx({ monsters: [{ id: 'm1', instance: monster(), position: { x: 1, y: 0 } }] });
+    expect(check({ type: 'target_lacks_affix', match: 'thorns' }, plain)).toBe(true);
+  });
+
   it('目標控場免疫中 —— 免疫窗內放控場技是純浪費 MP', () => {
     const immune = ctx({
       monsters: [{ id: 'm1', instance: monster({ ccImmuneUntil: 70_000 }), position: { x: 1, y: 0 } }],

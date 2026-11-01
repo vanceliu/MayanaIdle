@@ -155,7 +155,7 @@ describe('畫面', () => {
     fireEvent.click(screen.getAllByRole('button').find(b => b.textContent?.includes('爆擊率'))!);
     fireEvent.click(screen.getByRole('button', { name: '使用封印印記' }));
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(confirm.mock.calls[0][0]).toContain('連同詞綴洞一起毀壞');
+    expect(confirm.mock.calls[0][0]).toContain('連同詞綴洞毀壞');
     expect(stored().affixes).toEqual(FOUR);
     expect(getBagItemAmount(useGameStore.getState().bagItems, SEAL_SIGIL)).toBe(1);
   });

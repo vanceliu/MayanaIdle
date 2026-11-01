@@ -30,6 +30,27 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 裝備欄詞綴加總（`34-ui-guidelines.md`，demo `client/demo/equip-affix-summary.html`）
+
+規格：裝備欄格子下方「詞綴加總（N）」，兩欄條列、可收合，預設收合，展開狀態存本機（同裝置共用）。
+只算生效詞綴（凍結件不計、同類獨有去重）；順序依詞綴定義，其後額外屬性、特殊詞綴、未併入加總的 T7 獨有詞綴；數值 0 不列。
+
+- [x] E1 文件：34、INDEX
+- [x] E2 `systems/affixSummary.ts`；`combat.ts` 匯出獨有詞綴併入判定；`settingsStore` 展開狀態
+- [x] E3 `EquipmentPanel.tsx`、App.css
+- [x] E4 測試；`npx tsc -b`、client vitest
+
+### GUI 文字精簡（`34-ui-guidelines.md` 撰寫原則）
+
+規格：玩家看得到的介面文字（tooltip、說明、提示、道具／技能／任務敘述）每段一句、只寫結論；機制解說、例外、建議移到 Wiki。NPC 台詞不動；規則與數值不變。
+
+- [x] G0 詳細狀態（`CharacterStats.tsx`）
+- [x] G1 城鎮設施：`components/town/*`、`common/ShopCart`
+- [x] G2 背包／裝備／交易：`Bag*`、`Equipment*`、`Trade*`、道具與裝備 seed 敘述
+- [x] G3 技能／天賦／戰鬥介面：`SkillPanel`、`QuickSlotBar`、`BuffBar`、`Talent*`、`ScriptEditorPanel`、技能 seed 敘述
+- [x] G4 其他面板與任務：帳號／設定／起始畫面／創角／隊伍／公會／聊天／信箱／任務追蹤與任務 seed
+- [x] G5 文件同步、測試；`npx tsc -b`、client vitest
+
 ### 百柱死神實戰模擬（`44-dps-prediction.md`）
 
 規格：新腳本 `client/scripts/simulateReaperFight.mts`，死神會攻擊（真實 `tickMonsterCombat`／`calculateMonsterAttack`／`rollMonsterDebuff`），角色負面狀態影響輸出；橙色藥水 20 瓶（共用冷卻 900ms）；治癒與防守 buff 照常駐天賦立即施放、不佔攻擊次數；騎士維持 HP 50% 上下，其他職業缺血量 ≥ 該次可補量才補，防守 buff 到期即重放；死亡算失敗、列死亡率。舊木樁腳本保留。

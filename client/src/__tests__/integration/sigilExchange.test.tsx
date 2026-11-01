@@ -189,7 +189,7 @@ describe('兌換分頁', () => {
     expect(feeAmount('temper')).toBe('0');
     expect(btn('減少 10 個精鍊印記').disabled).toBe(true);
 
-    expect(btn('用精鍊印記填滿').title).toBe('用精鍊印記補到合計 50 個（持有不足時補到持有數為止）');
+    expect(btn('用精鍊印記填滿').title).toBe('用精鍊印記補到合計 50 個');
     expect(btn('增加 10 個精鍊印記').title).toBe('精鍊印記 +10');
   });
 

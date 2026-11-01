@@ -181,7 +181,7 @@ server → client 的遊戲狀態一律走 `frame` 訊息（`net/protocol.ts`）
 | store 變動 | 各 store 頂層欄位以參照比對，只送變動的欄位；`merge`／`append` 欄位改與上次送出時的淺拷貝比對（遊戲邏輯會就地改寫角色欄位） |
 | 欄位編碼 | 預設整值取代（`set`）。`game.character` 只送變動的子欄位（`merge`）；`game.combatLogs` 只送尾端新增的筆數並附總筆數（`append`）。不符合條件（子欄位被移除、陣列整份換掉）時改送整值 |
 | 怪物位置 | `mapMonster.monsters` 只送 `id`、`position`、`isBoss`、`attackRange`、`dummy`，內容不變不送。`prevPosition` 由 client 以上一次收到的位置推得；tick 推送沒有怪物更新時，client 把 `prevPosition` 對齊目前位置 |
-| 怪物戰鬥 | 新出現或最大血量變動的怪物送完整資料；之後只送變動的目前血量、移除的 id；目標與詠唱進度只在變動時送。session 的第一則帶 `full`，client 先清空再套用 |
+| 怪物戰鬥 | 新出現或最大血量變動的怪物送完整資料（含強化詞綴與護盾，`25-monster-system.md` § 25.12）；之後只送變動的目前血量、護盾剩餘量、移除的 id；目標與詠唱進度只在變動時送。session 的第一則帶 `full`，client 先清空再套用 |
 | 重送完整狀態 | 登出時清掉該 session 的已送紀錄，下一則推送送完整狀態；重連是新 session，同樣從完整狀態開始 |
 
 ---

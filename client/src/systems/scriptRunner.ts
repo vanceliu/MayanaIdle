@@ -3,6 +3,7 @@ import type {
   PersistentRule, PersistentCondition, PersistentAction, EmergencyRetreat,
   ScriptDebuffCondition,
 } from '../models/scriptEngine';
+import type { MonsterAffixId } from '../models/monsterAffix';
 import { SCRIPT_DEBUFF_TYPES, DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
 import type { MapData, Position } from '../models/mapControl';
 import { resolveActionTargets, resolvePrimaryTarget, type TargetCandidate } from './targeting';
@@ -345,6 +346,14 @@ function checkCombatCondition(
         && (condition.match ? e.tags.includes(condition.match) : true));
       return condition.type === 'target_has_debuff' ? has : !has;
     }
+    case 'target_has_affix':
+    case 'target_lacks_affix': {
+      const target = getPrimaryTarget(ctx);
+      if (!target) return false;
+      const affixes = target.instance.affixes ?? [];
+      const has = condition.match ? affixes.includes(condition.match as MonsterAffixId) : affixes.length > 0;
+      return condition.type === 'target_has_affix' ? has : !has;
+    }
     case 'target_cc_immune': {
       const target = getPrimaryTarget(ctx);
       // § 24.6：被控場後 10 秒內免疫。免疫窗內放控場技是純浪費 MP
@@ -417,6 +426,7 @@ function canExecuteCombatAction(action: CombatAction, ctx: CombatScriptContext):
     case 'switch_target_farthest':
     case 'switch_target_by_kind':
     case 'switch_target_by_debuff':
+    case 'switch_target_by_affix':
       return ctx.monsters.length > 0;
     // 鎖定目標：要先有目標才鎖得住
     case 'lock_target':

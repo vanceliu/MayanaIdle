@@ -54,7 +54,7 @@ export function MagicAcademy() {
 
   return (
     <div className="academy-panel">
-      <p className="shop-greeting">「歡迎來到魔法學院。想學習什麼魔法呢？」</p>
+      <p className="shop-greeting">「想學什麼魔法？」</p>
       <div className="shop-gold">持有金幣: {char.gold}G</div>
       <div className="academy-restriction">
         <span>職業: {CLASS_NAMES_ZH[char.className]}</span>

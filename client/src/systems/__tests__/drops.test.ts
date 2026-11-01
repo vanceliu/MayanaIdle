@@ -42,6 +42,23 @@ describe('drops system', () => {
       expect(boosted.items[0].itemTemplateId).toBe(147);
     });
 
+    it('強化詞綴獎勵倍率乘在掉寶倍率與金幣（25 § 25.12.4）', async () => {
+      // 基礎 1%（掉落值 10）；roll 固定 10.4 → 無加成不掉，×1.05 = 10.5 就掉
+      vi.spyOn(Math, 'random').mockReturnValue(0.0104);
+      await db.dropTables.bulkAdd([
+        { area: 'snow-field', itemType: 'item', itemTemplateId: 147, dropValue: 10 },
+        { area: 'snow-field', itemType: 'gold', dropValue: 1000, minAmount: 100, maxAmount: 100 },
+      ] as never);
+
+      const plain = await rollDrops('snow-field', 1, { drop_rate: 0, gold_rate: 0 });
+      expect(plain.items).toHaveLength(0);
+      expect(plain.gold).toBe(100);
+
+      const boosted = await rollDrops('snow-field', 1, { drop_rate: 0, gold_rate: 0, affix_mult: 1.05 });
+      expect(boosted.items).toHaveLength(1);
+      expect(boosted.gold).toBe(105);
+    });
+
     it('should drop gold at face value (no multiplier)', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       await db.dropTables.bulkAdd([

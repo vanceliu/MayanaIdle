@@ -116,7 +116,7 @@ export function ArmorShop() {
 
   return (
     <div className="shop-panel">
-      <p className="shop-greeting">「需要防具嗎？這裡有最好的裝甲。」</p>
+      <p className="shop-greeting">「需要防具嗎？」</p>
       <div className="shop-gold">持有金幣: {char.gold.toLocaleString()}G</div>
 
       <div className="shop-tabs">

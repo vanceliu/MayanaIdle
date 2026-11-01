@@ -81,7 +81,7 @@ export function GeneralStore() {
       itemId: scrollConfig.itemId,
       name: scrollDef?.name ?? scrollConfig.name,
       price: scrollDef?.buyPrice ?? scrollConfig.price,
-      description: scrollDef?.description ?? `使用後傳送至${scrollConfig.townName}`,
+      description: scrollDef?.description ?? `傳送至${scrollConfig.townName}`,
     });
   }
 
@@ -151,7 +151,7 @@ export function GeneralStore() {
 
   return (
     <div className="shop-panel">
-      <p className="shop-greeting">「歡迎光臨！需要什麼嗎？」</p>
+      <p className="shop-greeting">「歡迎光臨！」</p>
       <div className="shop-gold">持有金幣: {char.gold.toLocaleString()}G</div>
 
       <div className="shop-tabs">

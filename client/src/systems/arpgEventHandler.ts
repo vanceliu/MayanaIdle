@@ -1,4 +1,5 @@
 import type { PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
+import { applyDamageToMonster, bloodthirstHeal, monsterLogName } from '../models/monsterAffix';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import { resolveDebuffDuration, resolveDotDamagePercent, resolveMpAfterSelfCast, resolveSelfHpCost, type Skill } from '../models/skill';
@@ -462,7 +463,7 @@ export function processPlayerAttack(
 
     // Apply damage
     if (!isMiss && damage > 0) {
-      monster.currentHp = Math.max(0, monster.currentHp - damage);
+      applyDamageToMonster(monster, damage);
       if (skill?.mpDrainRatio) drainDamage += damage;
     }
 
@@ -508,7 +509,7 @@ export function processPlayerAttack(
               description: `每秒 ${dotDmg} 傷害`,
             };
             gs.addEffect(poisonEffect);
-            logs.push({ text: `淬毒觸發！${monster.name} ${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'debuff-enemy' });
+            logs.push({ text: `淬毒觸發！${monsterLogName(monster)} ${debuff.name} ${debuff.dotDuration! / 1000}s（每秒 ${dotDmg}）`, type: 'debuff-enemy' });
           }
         }
       }
@@ -556,7 +557,7 @@ export function processPlayerAttack(
               description: `每秒 ${erosion.damage} 傷害`,
             });
             logs.push({
-              text: `元素侵蝕觸發！${monster.name} 受侵蝕 ${EROSION_DURATION_MS / 1000}s（每秒 ${erosion.damage}）`,
+              text: `元素侵蝕觸發！${monsterLogName(monster)} 受侵蝕 ${EROSION_DURATION_MS / 1000}s（每秒 ${erosion.damage}）`,
               type: 'debuff-enemy',
             });
           }
@@ -598,7 +599,7 @@ export function processPlayerAttack(
           description: `${def.name} ${proc.value.toFixed(1)}%`,
         });
         logs.push({
-          text: `${def.name}觸發！${monster.name} ${def.name} ${proc.value.toFixed(1)}% ${AFFIX_DEBUFF_DURATION_MS / 1000}s`,
+          text: `${def.name}觸發！${monsterLogName(monster)} ${def.name} ${proc.value.toFixed(1)}% ${AFFIX_DEBUFF_DURATION_MS / 1000}s`,
           type: 'debuff-enemy',
         });
       }
@@ -622,7 +623,7 @@ export function processPlayerAttack(
       if (triggered && !alreadyStunned) {
         // § 24.6 Boss 控場免疫冷卻
         if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
-          logs.push({ text: `${monster.name} 免疫控場！`, type: 'debuff-enemy' });
+          logs.push({ text: `${monsterLogName(monster)} 免疫控場！`, type: 'debuff-enemy' });
         } else {
           gs.addEffect({
             id: `debuff-${UNIQUE_STUN_CATEGORY}-${targetId}-${now}`,
@@ -641,7 +642,7 @@ export function processPlayerAttack(
             description: '無法行動',
           });
           if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
-          logs.push({ text: `命中暈眩觸發！${monster.name} 暈眩 ${UNIQUE_STUN_DURATION_MS / 1000}s`, type: 'debuff-enemy' });
+          logs.push({ text: `命中暈眩觸發！${monsterLogName(monster)} 暈眩 ${UNIQUE_STUN_DURATION_MS / 1000}s`, type: 'debuff-enemy' });
         }
       }
     }
@@ -658,9 +659,9 @@ export function processPlayerAttack(
      */
     for (const h of procs ? hits : []) {
       logs.push(h.isMiss
-        ? { text: `${actionName} ${monster.name} MISS！`, type: 'miss' }
+        ? { text: `${actionName} ${monsterLogName(monster)} MISS！`, type: 'miss' }
         : {
-            text: `${actionName} 對 ${monster.name} 造成 ${h.damage} 傷害${h.isCrit ? '（暴擊）' : ''}`,
+            text: `${actionName} 對 ${monsterLogName(monster)} 造成 ${h.damage} 傷害${h.isCrit ? '（暴擊）' : ''}`,
             type: 'player',
           });
     }
@@ -668,7 +669,7 @@ export function processPlayerAttack(
     /* 每一下都沒中就沒有後續 —— 擊敗、debuff、吸血都不該發生 */
     if (!isMiss) {
       if (killed) {
-        logs.push({ text: `${monster.name} 被擊敗！`, type: 'system' });
+        logs.push({ text: `${monsterLogName(monster)} 被擊敗！`, type: 'system' });
       }
 
       // Apply skill debuff on hit (DoT or stat modifier)
@@ -722,13 +723,13 @@ export function processPlayerAttack(
               description: `每秒 ${baseDmg} 傷害`,
             };
             gs.addEffect(debuffEffect);
-            if (!alreadyActive) logs.push({ text: `${monster.name} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'debuff-enemy' });
+            if (!alreadyActive) logs.push({ text: `${monsterLogName(monster)} ${debuffDef.name} ${(debuffDef.dotDuration ?? 5000) / 1000}s（每秒 ${baseDmg}）`, type: 'debuff-enemy' });
           } else if ((debuffDef.stun || debuffDef.root) && debuffDef.duration) {
             // 控場 debuff：暈眩（§ 24.5.1）、定身（§ 24.5.1b）
             const stunDuration = resolveDebuffDuration(debuffDef, isShieldEquipped(equippedGear)) ?? debuffDef.duration;
             // § 24.6：Boss 被控場後 10 秒內免疫任何控場效果
             if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
-              logs.push({ text: `${monster.name} 免疫控場！`, type: 'debuff-enemy' });
+              logs.push({ text: `${monsterLogName(monster)} 免疫控場！`, type: 'debuff-enemy' });
             } else {
               const stunEffect: ActiveEffect = {
                 id: `debuff-${debuffDef.category}-${targetId}-${now}`,
@@ -749,7 +750,7 @@ export function processPlayerAttack(
               };
               gs.addEffect(stunEffect);
               if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
-              if (!alreadyActive) logs.push({ text: `${skill.name} 命中！${monster.name} ${debuffDef.name} ${stunDuration / 1000}s`, type: 'debuff-enemy' });
+              if (!alreadyActive) logs.push({ text: `${skill.name} 命中！${monsterLogName(monster)} ${debuffDef.name} ${stunDuration / 1000}s`, type: 'debuff-enemy' });
             }
           } else if (debuffDef.modifiers && debuffDef.duration) {
             // Stat modifier debuff
@@ -770,7 +771,7 @@ export function processPlayerAttack(
               description: debuffDef.description,
             };
             gs.addEffect(debuffEffect);
-            if (!alreadyActive) logs.push({ text: `${monster.name} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'debuff-enemy' });
+            if (!alreadyActive) logs.push({ text: `${monsterLogName(monster)} ${debuffDef.name} ${debuffDef.duration / 1000}s`, type: 'debuff-enemy' });
           }
         }
       }
@@ -877,14 +878,17 @@ export function processMonsterAttack(
 
   // Apply damage to player
   if (!result.dodged && actualDamage > 0) {
+    const before = character.hp;
     character.hp = Math.max(0, character.hp - actualDamage);
+    // 嗜血詞綴（`25-monster-system.md` § 25.12.3）：以實際扣到的 HP 計
+    bloodthirstHeal(monster, before - character.hp);
   }
 
   let logText: string;
   if (result.dodged) {
-    logText = `${monster.name} 的攻擊被閃避！`;
+    logText = `${monsterLogName(monster)} 的攻擊被閃避！`;
   } else {
-    logText = `${monster.name} 造成 ${actualDamage} 傷害`;
+    logText = `${monsterLogName(monster)} 造成 ${actualDamage} 傷害`;
   }
 
   // § 7.4 受擊回血／受擊回魔：**受到傷害**時判定（被迴避就不算）。
@@ -923,13 +927,13 @@ export function processMonsterAttack(
     const magicResist = getTotalMagicResist(character, equippedGear, gs.activeEffects);
     const roll = rollMonsterDebuff(monster, equippedGear, gs.activeEffects, gameNow(), magicResist);
     if (roll.resisted) {
-      debuffLog = { text: `魔法抗性擋下了 ${monster.name} 的負面效果`, type: 'debuff-self' };
+      debuffLog = { text: `魔法抗性擋下了 ${monsterLogName(monster)} 的負面效果`, type: 'debuff-self' };
     } else if (roll.effect) {
       const applied = applyPlayerDebuff(gs.activeEffects, roll.effect);
       session.game.setState({ activeEffects: applied.effects });
       debuffLog = applied.cancelledSpeedBuff
-        ? { text: `${monster.name} 的減速抵銷了你的加速效果`, type: 'debuff-self' }
-        : { text: `${monster.name} 使你 ${roll.effect.name} ${roll.effect.duration / 1000}s`, type: 'debuff-self' };
+        ? { text: `${monsterLogName(monster)} 的減速抵銷了你的加速效果`, type: 'debuff-self' }
+        : { text: `${monsterLogName(monster)} 使你 ${roll.effect.name} ${roll.effect.duration / 1000}s`, type: 'debuff-self' };
     }
   }
 

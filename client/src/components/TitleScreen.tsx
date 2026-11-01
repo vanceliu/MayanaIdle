@@ -135,7 +135,7 @@ function LoginForm({ registration, error, actions }: Pick<TitleScreenProps, 'reg
   if (mode === 'recover') {
     return (
       <form className="login-form" onSubmit={submit}>
-        <p className="login-hint">輸入註冊時拿到的救援碼與新密碼。重設後其他裝置的登入會失效，並換發一組新救援碼。</p>
+        <p className="login-hint">輸入救援碼與新密碼；重設後會換發新救援碼。</p>
         <label>
           救援碼
           <input value={recoveryCode} onChange={e => setRecoveryCode(e.target.value)} autoComplete="off" spellCheck={false} placeholder="12-XXXX-XXXX-XXXX-XXXX" />

@@ -48,9 +48,15 @@ export function MonsterListOverlay() {
   return (
     <div className="monster-list-overlay" data-testid="monster-list-overlay">
       {entries.map(entry => {
-        const hpPercent = entry.maxHp > 0
-          ? Math.max(0, Math.min(100, (entry.currentHp / entry.maxHp) * 100))
+        // 護盾詞綴：條長 = 最大 HP + 初始護盾，固定不重算（`25-monster-system.md` § 25.12.5）
+        const barTotal = entry.maxHp + entry.shieldMax;
+        const hpPercent = barTotal > 0
+          ? Math.max(0, Math.min(100, (entry.currentHp / barTotal) * 100))
           : 0;
+        const shieldPercent = barTotal > 0
+          ? Math.max(0, Math.min(100 - hpPercent, (entry.shieldRemaining / barTotal) * 100))
+          : 0;
+        const affixCount = entry.affixLabels.length;
         const debuffs = activeEffects.filter(
           e => e.type === 'debuff' && e.target === 'monster' && e.targetMonsterId === entry.id
         );
@@ -77,9 +83,19 @@ export function MonsterListOverlay() {
               }
             }}
           >
-            <div className="monster-card-name">{entry.name}</div>
+            <div className={`monster-card-name${affixCount > 0 ? ` monster-affix-${affixCount}` : ''}`}>{entry.name}</div>
+            {affixCount > 0 && (
+              <div className="monster-card-affixes" data-testid="monster-card-affixes">{entry.affixLabels.join(' ')}</div>
+            )}
             <div className="monster-card-hp">
               <div className="monster-card-hp-fill" style={{ width: `${hpPercent}%` }} />
+              {shieldPercent > 0 && (
+                <div
+                  className="monster-card-shield-fill"
+                  data-testid="monster-card-shield"
+                  style={{ left: `${hpPercent}%`, width: `${shieldPercent}%` }}
+                />
+              )}
             </div>
             {debuffs.length > 0 && (
               <div className="monster-card-debuffs">

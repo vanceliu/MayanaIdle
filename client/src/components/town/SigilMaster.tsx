@@ -180,9 +180,9 @@ export function SigilMaster() {
     const affix = affixes[idx];
     const rate = getUpgradeSigilFor(affix, item!.maxAffixTier)?.rate ?? 0;
     return window.confirm(
-      `確定要對「${item!.name}」的 ${affixLabel(affix)} 使用突破印記嗎？\n\n`
+      `對「${item!.name}」的 ${affixLabel(affix)} 使用突破印記？\n\n`
       + `成功率 ${Math.round(rate * 100)}%（T${affix.tier} → T${affix.tier + 1}）\n`
-      + `失敗時該詞綴會掉回 T1 並重骰數值，印記照樣消耗。`,
+      + `失敗掉回 T1，印記照樣消耗。`,
     );
   }
 
@@ -191,9 +191,9 @@ export function SigilMaster() {
     const affix = affixes[idx];
     const success = Math.round(SEAL_SIGIL_SUCCESS_RATE * 100);
     return window.confirm(
-      `確定要對「${item!.name}」的 ${affixLabel(affix)} 使用封印印記嗎？\n\n`
-      + `成功率 ${success}%：這條詞綴移出詞綴洞變成 (封)，原本的洞空出來，之後任何印記都動不了它\n`
-      + `失敗 ${100 - success}%：這條詞綴連同詞綴洞一起毀壞（剩 ${sockets - 1} 洞），印記照樣消耗。`,
+      `對「${item!.name}」的 ${affixLabel(affix)} 使用封印印記？\n\n`
+      + `成功 ${success}%：變成 (封)，空出一個洞\n`
+      + `失敗 ${100 - success}%：連同詞綴洞毀壞（剩 ${sockets - 1} 洞）`,
     );
   }
 
@@ -249,7 +249,7 @@ export function SigilMaster() {
       ? `${display.name} ×1 ＋ ${POLISH_SIGIL_GOLD_COST.toLocaleString()}G`
       : `${display.name} ×1`;
     const parts: string[] = [`消耗：${cost}`];
-    if (def.target === 'item') parts.push('對象是整件裝備，不需指定詞綴');
+    if (def.target === 'item') parts.push('對象是整件裝備');
     if (sigilType === 'temper' || sigilType === 'add') parts.push('必定成功');
     if (sigilType === 'add') parts.push(`空洞 ${emptySockets}`);
 
@@ -259,7 +259,7 @@ export function SigilMaster() {
       return (
         <>
           {parts.join('　')}
-          <span className="sigil-cost-warn">　失敗（{100 - success}%）時該詞綴連同詞綴洞一起毀壞，印記照樣消耗</span>
+          <span className="sigil-cost-warn">　失敗（{100 - success}%）連同詞綴洞毀壞</span>
         </>
       );
     }
@@ -274,7 +274,7 @@ export function SigilMaster() {
     return (
       <>
         {parts.join('　')}
-        <span className="sigil-cost-warn">　失敗時該詞綴掉回 T1，印記照樣消耗</span>
+        <span className="sigil-cost-warn">　失敗掉回 T1</span>
       </>
     );
   }
@@ -283,9 +283,9 @@ export function SigilMaster() {
   function blockReason(): string | null {
     if (!item) return '沒有裝備';
     const inert = inertReason(item);
-    if (inert === '新手裝') return '新手裝不可使用任何印記';
+    if (inert === '新手裝') return '新手裝不可使用印記';
     if (inert === '製作品') return CRAFTED_GEAR_SIGIL_REASON;
-    if (inert) return '這件裝備沒有詞綴也沒有詞綴洞';
+    if (inert) return '沒有詞綴也沒有詞綴洞';
     if (sigilCounts[sigilType] <= 0) return `背包裡沒有${display.name}`;
     if (def.target === 'affix' && affixIndex == null) return '請先選一條詞綴';
     const check = canUseSigil(sigilType, affixes, affixIndex ?? undefined, {
@@ -459,7 +459,7 @@ export function SigilMaster() {
     <div className="shop-panel sigil-panel">
       <div className="sigil-head">
         <p className="sigil-greeting">
-          「詞綴不合意？印記能重新刻過 —— 但別怪我沒提醒，運氣不好會更糟。」
+          「詞綴不合意？印記能重新刻過。」
         </p>
         <span className="sigil-gold">金幣 {char.gold.toLocaleString()}G</span>
       </div>

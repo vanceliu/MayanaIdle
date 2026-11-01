@@ -1,4 +1,5 @@
 import type { PlayerDebuffType } from './playerDebuff';
+import type { MonsterAffixId, VenomDebuff } from './monsterAffix';
 
 export type MonsterSize = 'small' | 'large';
 export type ElementType = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark' | 'none';
@@ -76,6 +77,16 @@ export interface MonsterInstance {
   debuffs?: MonsterDebuffAbility[];
   /** § 24.6 Boss 控場免疫：被控場後 10 秒內免疫任何控場效果（時間戳 ms） */
   ccImmuneUntil?: number;
+  /** 強化詞綴（`25-monster-system.md` § 25.12），依詞綴表順序 */
+  affixes?: MonsterAffixId[];
+  /** 劇毒／撕裂附加的 debuff */
+  venom?: VenomDebuff;
+  /** 護盾詞綴的初始吸收量 */
+  shieldMax?: number;
+  /** 護盾詞綴的剩餘吸收量 */
+  shieldRemaining?: number;
+  /** 再生詞綴未滿 1000ms 的累積時間 */
+  regenElapsedMs?: number;
   /**
    * 試驗場木樁（`50-training-ground.md` § 50.4.1）。
    *

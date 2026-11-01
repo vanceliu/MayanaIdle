@@ -50,7 +50,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   // 三類型共用：不同區域回不同城，補給也用得到
   { ruleId: 'current_area_is', kind: 'condition', appliesTo: ['combat', 'persistent', 'supply'], group: 'location' },
 
-  // === 戰鬥專屬條件：22 筆 ===
+  // === 戰鬥專屬條件：24 筆 ===
   { ruleId: 'monster_hp_below', kind: 'condition', appliesTo: COMBAT, group: 'target_hp' },
   { ruleId: 'monster_hp_above', kind: 'condition', appliesTo: COMBAT, group: 'target_hp' },
   { ruleId: 'target_attack_type', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
@@ -63,6 +63,8 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'target_range_gt', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
   { ruleId: 'target_has_debuff', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_lacks_debuff', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
+  { ruleId: 'target_has_affix', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
+  { ruleId: 'target_lacks_affix', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_cc_immune', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_shielded', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
   { ruleId: 'target_casting', kind: 'condition', appliesTo: COMBAT, group: 'target_state' },
@@ -90,7 +92,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'warehouse_gold_gte', kind: 'condition', appliesTo: SUPPLY, group: 'gold' },
   { ruleId: 'warehouse_item_gte', kind: 'condition', appliesTo: SUPPLY, group: 'gold' },
 
-  // === 戰鬥專屬動作：13 筆 ===
+  // === 戰鬥專屬動作：14 筆 ===
   { ruleId: 'normal_attack', kind: 'action', appliesTo: COMBAT, group: 'attack' },
   { ruleId: 'wait', kind: 'action', appliesTo: COMBAT, group: 'attack' },
   // 原「指定一招 → 指定系別 → 職業魔法 → 全部」四階塌成完整版（§ 51.4.9）
@@ -102,6 +104,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'switch_target_farthest', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
   { ruleId: 'switch_target_by_kind', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
   { ruleId: 'switch_target_by_debuff', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
+  { ruleId: 'switch_target_by_affix', kind: 'action', appliesTo: COMBAT, group: 'targeting' },
   // 怪物沒有召喚機制，§ 51.4.4 成對原則擋住
   { ruleId: 'switch_target_summoner', kind: 'action', appliesTo: COMBAT, group: 'targeting', blocked: true, blockedReason: 'monster' },
   { ruleId: 'lock_target', kind: 'action', appliesTo: COMBAT, group: 'targeting' },

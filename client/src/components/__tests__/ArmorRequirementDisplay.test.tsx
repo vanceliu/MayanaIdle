@@ -115,7 +115,7 @@ describe('額外屬性詞綴的顯示', () => {
     })} />);
     const el = screen.getByText('敏捷 +1');
     expect(el.className).toContain('max-roll');
-    expect(el.getAttribute('title')).toContain('無 Tier');
+    expect(el.getAttribute('title')).toBe('印記只能重骰，不能升階');
   });
 });
 

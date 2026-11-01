@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { monsterLogName, monsterRewardMultiplier } from '../models/monsterAffix';
 import { normalizeAppearance, type Appearance } from '../models/appearance';
 import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
@@ -3070,7 +3071,7 @@ export function processMonsterDeath(
    */
   if (dead.isTrainingDummy) return { char, logs };
 
-  logs.push({ text: `${dead.name} 被擊敗！`, type: 'system' });
+  logs.push({ text: `${monsterLogName(dead)} 被擊敗！`, type: 'system' });
 
   // 實例累積擊殺數是 Pressure 的輸入（`26-spawn-pressure.md` § 26.3、§ 97.7.1 隊伍全體共計）。
   // 木樁在上面就 return 了，不會計入。
@@ -3079,7 +3080,9 @@ export function processMonsterDeath(
   char = { ...char, areaKills };
 
   // 基礎 ×3（`28-monster-stats.md` § 28.1）× 回鍋加倍（`04-character.md` § 4.11）× 全域經驗倍率；隊伍在參與者之間平分
-  const expGained = settleKillExp(dead.exp / expDivisor, getRestedExpMultiplier(char));
+  // 強化詞綴獎勵倍率（`25-monster-system.md` § 25.12.4）同時作用於經驗、掉寶倍率、金幣
+  const rewardMult = monsterRewardMultiplier(dead);
+  const expGained = settleKillExp(dead.exp * rewardMult / expDivisor, getRestedExpMultiplier(char));
   const prevLevel = char.level;
   char = addExp(char, expGained);
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
@@ -3121,8 +3124,8 @@ export function processMonsterDeath(
     const drops = !withDrops
       ? noDrops
       : monsterIsBoss
-        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult })
-        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult }, false, dead.level);
+        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_mult: rewardMult })
+        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_mult: rewardMult }, false, dead.level);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）

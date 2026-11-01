@@ -26,7 +26,7 @@ export function RecoveryCodeModal() {
           <button className="modal-close" onClick={close} aria-label="關閉">✕</button>
         </div>
         <div className="modal-body">
-          <p className="recovery-code-hint">忘記密碼時，在登入畫面用這組救援碼重設密碼。救援碼只顯示這一次，請抄下或存好。</p>
+          <p className="recovery-code-hint">忘記密碼時用來重設。只顯示這一次，請存好。</p>
           <code className="recovery-code-value" data-testid="recovery-code">{code}</code>
           <p className="recovery-code-hint">產生新的救援碼後，這組會失效。</p>
           <div className="recovery-code-actions">

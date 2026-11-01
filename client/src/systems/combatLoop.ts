@@ -33,8 +33,14 @@ import {
 } from './arpgEngine';
 import { processPlayerAttack, processMonsterAttack, applyUniqueAffixRestore, type DamageResult, type PlayerAttackResult } from './arpgEventHandler';
 import { sumUniqueAffix } from '../models/uniqueAffix';
-import { getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, absorbWithManaShield, getMonsterDebuffModifierById } from './combat';
+import {
+  getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, absorbWithManaShield, getMonsterDebuffModifierById,
+  calculateThornsDamage,
+} from './combat';
 import { createMonsterFromTemplate } from './monsterSpawn';
+import {
+  applyDamageToMonster, GALE_SPEED_MULTIPLIER, hasMonsterAffix, monsterLogName, thornsReflectBase, tickMonsterRegen,
+} from '../models/monsterAffix';
 import { getEffectiveGearArray } from './gear';
 import { gameNow } from '../core/clock';
 import { pick } from '../core/rng';
@@ -163,8 +169,11 @@ export function tickInstanceCombat(deltaMs: number, instance: MapInstance): Mons
       if (mm.attackRange !== inst.attackRange) {
         monsterStore.setMonsterAttackRange(mm.id, inst.attackRange);
       }
+      if (hasMonsterAffix(inst, 'gale')) monsterStore.setMonsterSpeed(mm.id, mm.speed * GALE_SPEED_MULTIPLIER);
     }
   }
+  // 再生詞綴（`25-monster-system.md` § 25.12.3）
+  for (const inst of monsterInstances.values()) tickMonsterRegen(inst, deltaMs);
   const activeIds = new Set(monsterStore.monsters.map(m => m.id));
   for (const id of monsterInstances.keys()) {
     if (!activeIds.has(id)) monsterInstances.delete(id);
@@ -377,6 +386,11 @@ function resolvePlayerStrike(o: {
   });
 
   for (const dmg of result.damages) {
+    const inst = monsterInstances.get(dmg.targetId);
+    if (inst && !dmg.isMiss) applyThorns(session, inst, dmg, logs, visuals);
+  }
+
+  for (const dmg of result.damages) {
     recordTrainingHits(monsterInstances.get(dmg.targetId), dmg);
     if (!dmg.isMiss) recordMonsterDamage(targetingOf(instance, dmg.targetId), memberId, dmg.damage, now);
     if (dmg.killed) {
@@ -386,6 +400,42 @@ function resolvePlayerStrike(o: {
     }
   }
   stopTrainingIfNoDummiesLeft(session);
+
+  const after = session.game.getState().character;
+  if (after && after.hp <= 0) handlePlayerDeath(session);
+}
+
+/**
+ * 荊棘反彈（`25-monster-system.md` § 25.12.3）：每下命中各反彈一次；
+ * 物理減傷後先扣聖光護盾、再分攤魔力護盾，可致死（死亡由呼叫端在擊殺結算後處理）。
+ */
+function applyThorns(session: Session, inst: MonsterInstance, dmg: DamageResult, logs: CombatLog[], visuals: CombatVisual[]): void {
+  const bases = dmg.hits.filter(h => !h.isMiss).map(h => thornsReflectBase(inst, h.damage)).filter(b => b > 0);
+  if (bases.length === 0) return;
+
+  const now = gameNow();
+  let total = 0;
+  for (const base of bases) {
+    const gs = session.game.getState();
+    const character = gs.character;
+    if (!character || character.hp <= 0) break;
+    const allGear = getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear);
+    const reduced = calculateThornsDamage(base, allGear, gs.activeEffects);
+    if (reduced <= 0) continue;
+    const shield = absorbWithShield(reduced, gs.activeEffects, now);
+    const mana = absorbWithManaShield(shield.damage, character.mp, shield.effects, now);
+    session.game.setState({
+      activeEffects: mana.effects,
+      character: { ...character, hp: Math.max(0, character.hp - mana.damage), mp: character.mp - mana.mpUsed },
+    });
+    total += mana.damage;
+  }
+  if (total <= 0) return;
+  logs.push({ text: `${monsterLogName(inst)} 反彈 ${total} 點傷害`, type: 'monster' });
+  visuals.push({
+    kind: 'dot', memberId: memberIdOf(session), target: 'player', damage: total, tags: [],
+    position: { ...session.mapControl.getState().playerPosition },
+  });
 }
 
 /** 玩家層：手動指令、玩家 FSM 與腳本、出手結算、追擊走位、DoT */
@@ -693,14 +743,14 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
     const inst = monsterInstances.get(monsterId);
     if (!inst || inst.currentHp <= 0) continue;
 
-    inst.currentHp = Math.max(0, inst.currentHp - effect.dot.damage);
+    applyDamageToMonster(inst, effect.dot.damage);
     const dotTarget = session.mapMonster.getState().monsters.find(m => m.id === monsterId);
     recordMonsterDamage(targetingOf(instance, monsterId), memberId, effect.dot.damage, now);
     // DoT 不判定命中，所以只累加傷害、不動命中率的分子分母（§ 50.5.2）
     if (inst.isTrainingDummy) {
       useTrainingGroundStore.getState().recordDamage(effect.dot.damage, 0, 0);
     }
-    logs.push({ text: `${effect.name} 對 ${inst.name} 造成 ${effect.dot.damage} 傷害`, type: 'debuff-enemy' });
+    logs.push({ text: `${effect.name} 對 ${monsterLogName(inst)} 造成 ${effect.dot.damage} 傷害`, type: 'debuff-enemy' });
     visuals.push({
       kind: 'dot', memberId, target: 'monster', monsterId, damage: effect.dot.damage, tags: effect.tags ?? [],
       position: dotTarget ? { ...dotTarget.position } : session.mapControl.getState().playerPosition,

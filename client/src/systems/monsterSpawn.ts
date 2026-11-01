@@ -9,6 +9,7 @@ import type { MonsterInstance, MonsterTemplate } from '../models/monster';
 import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
 import { defaultMonsterStatRates, scaleMonsterStat, type MonsterStatRates } from './globalRates';
 import { random } from '../core/rng';
+import { applyMonsterAffixes, rollMonsterAffixes } from '../models/monsterAffix';
 
 /**
  * 由區域模板建怪物實例。**模板還沒載入時回 `null`，不生假怪。**
@@ -40,7 +41,7 @@ export function createMonsterFromTemplate(
 
   // 全域怪物血量與攻擊力倍率（`28-monster-stats.md` § 28.1）；木樁在上面就回傳了，不套用
   const maxHp = scaleMonsterStat(template.hp, rates.hp);
-  return {
+  const base: MonsterInstance = {
     templateId: template.id!,
     name: template.name,
     level: template.level,
@@ -60,6 +61,9 @@ export function createMonsterFromTemplate(
     projectileSpeed: template.projectileSpeed,
     debuffs: template.debuffs,
   };
+  // 強化詞綴在全域倍率之後（`25-monster-system.md` § 25.12.2）
+  const roll = rollMonsterAffixes(template.level, (template.debuffs ?? []).map(d => d.type), random);
+  return applyMonsterAffixes(base, roll);
 }
 
 export function createTrainingDummy(spec: TrainingDummySpec): MonsterInstance {

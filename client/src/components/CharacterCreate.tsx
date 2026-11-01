@@ -98,8 +98,7 @@ export function CharacterCreate() {
       default:
         return (
           <span className="name-hint">
-            中文最多 6 字、英數最多 12 字（中文算 2 格）；
-            可使用符號 {CHARACTER_NAME_ALLOWED_SYMBOLS}，不可有空白
+            中文最多 6 字、英數最多 12 字；可用符號 {CHARACTER_NAME_ALLOWED_SYMBOLS}，不可有空白
           </span>
         );
     }
@@ -170,7 +169,7 @@ export function CharacterCreate() {
 
         <div className="create-col">
           <div className="form-group">
-            <label>外觀（體型只有一種，不可調整）</label>
+            <label>外觀</label>
             <AppearancePicker value={appearance} onChange={setAppearance} disabled={submitting} />
           </div>
         </div>

@@ -169,7 +169,7 @@ export function TrainingGroundView() {
           <dt>MP/秒</dt>
           <dd>{readout.mpPerSecond === null ? '—' : readout.mpPerSecond.toFixed(1)}</dd>
         </dl>
-        <p className="training-hint">建議量測 30 秒以上，短時間會低估 DPS。</p>
+        <p className="training-hint">建議量測 30 秒以上。</p>
       </div>
 
       {facility === 'training-dummy' && createPortal((
@@ -190,8 +190,7 @@ export function TrainingGroundView() {
                 </label>
                 {overflowDodge > 0 && (
                   <p className="training-warning">
-                    防禦超過 {DEFENSE_OVERFLOW_THRESHOLD} 的部分會轉成迴避：
-                    這隻木樁有 {overflowDodge}% 迴避率，命中率會因此下降。
+                    防禦超過 {DEFENSE_OVERFLOW_THRESHOLD}：木樁迴避 {overflowDodge}%，命中會下降。
                   </p>
                 )}
 
@@ -210,7 +209,7 @@ export function TrainingGroundView() {
                     type="checkbox" checked={infiniteHp}
                     onChange={e => setSpec({ hp: e.target.checked ? null : 10000 })}
                   />
-                  <span>無限血量（木樁不會死，量測由「停止」結束）</span>
+                  <span>無限血量</span>
                 </label>
 
                 <label className="training-field">
@@ -245,12 +244,12 @@ export function TrainingGroundView() {
 
                 <button className="inn-btn" onClick={summon}>召喚木樁</button>
                 <button className="inn-btn" onClick={restoreFull} disabled={measurement.running}>
-                  回復滿血滿魔（免費）
+                  回復滿血滿魔
                 </button>
                 <p className="training-hint">
                   {measurement.running
-                    ? '量測中不能回復 —— 中途補 MP 會讓「MP/秒」變成負數。先按停止。'
-                    : '木樁不會移動也不會攻擊，且不掉落物品、不給經驗與金幣。'}
+                    ? '量測中無法回復，請先停止。'
+                    : '木樁不移動、不攻擊，不給經驗、金幣與掉落。'}
                 </p>
               </div>
             </div>

@@ -71,7 +71,7 @@ function RestedExpRow({ remainingMs }: { remainingMs: number }) {
             <div className="buff-tooltip-name rested">回鍋加倍</div>
             <div className="buff-tooltip-desc">擊殺經驗 ×2</div>
             <div className="buff-tooltip-time">剩餘: {formatTime(remainingMs)}</div>
-            <div className="buff-tooltip-source">來源: 離線 1 分鐘累積 30 秒，上限 12 小時</div>
+            <div className="buff-tooltip-source">來源: 離線累積</div>
           </div>
         }
       >

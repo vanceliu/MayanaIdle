@@ -11,35 +11,35 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   // === 狀態解除道具 ===
   { id: 144, name: '解毒藥水', category: 'potion', description: '立即解除中毒', weight: 2, buyPrice: 50, icon: 'items/potion-ball', iconColor: '#2DD4BF' },
   { id: 145, name: '止血繃帶', category: 'potion', description: '立即解除流血', weight: 2, buyPrice: 50, icon: 'items/sewing-string', iconColor: '#F87171' },
-  { id: 146, name: '淨化藥水', category: 'potion', description: '解除詛咒/虛弱/沉默（全解）', weight: 3, buyPrice: 500, icon: 'items/bubbling-flask', iconColor: '#A78BFA' },
+  { id: 146, name: '淨化藥水', category: 'potion', description: '解除詛咒、虛弱、沉默', weight: 3, buyPrice: 500, icon: 'items/bubbling-flask', iconColor: '#A78BFA' },
 
   // === 回城卷軸 ===
-  { id: 4, name: '薄暮村回城卷軸', category: 'scroll', description: '使用後傳送至薄暮村', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
-  { id: 5, name: '艾爾薩斯回城卷軸', category: 'scroll', description: '使用後傳送至艾爾薩斯城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
-  { id: 6, name: '瓦爾登回城卷軸', category: 'scroll', description: '使用後傳送至瓦爾登城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
-  { id: 156, name: '灰脊回城卷軸', category: 'scroll', description: '使用後傳送至灰脊城鎮', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
+  { id: 4, name: '薄暮村回城卷軸', category: 'scroll', description: '傳送至薄暮村', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
+  { id: 5, name: '艾爾薩斯回城卷軸', category: 'scroll', description: '傳送至艾爾薩斯', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
+  { id: 6, name: '瓦爾登回城卷軸', category: 'scroll', description: '傳送至瓦爾登', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
+  { id: 156, name: '灰脊回城卷軸', category: 'scroll', description: '傳送至灰脊', weight: 1, buyPrice: 500, icon: 'items/tied-scroll', iconColor: '#FBBF24' },
 
   // === 強化卷軸 ===
-  { id: 7, name: '武器強化卷軸', category: 'scroll', description: '點擊後指定背包武器強化', weight: 1, buyPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6' },
-  { id: 8, name: '防具強化卷軸', category: 'scroll', description: '點擊後指定背包防具強化', weight: 1, buyPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA' },
-  { id: 157, name: '武器強化卷軸＋', category: 'scroll', description: '點擊後指定背包武器強化，隨機 +1~3', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'gold' },
-  { id: 158, name: '防具強化卷軸＋', category: 'scroll', description: '點擊後指定背包防具強化，隨機 +1~3', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'gold' },
+  { id: 7, name: '武器強化卷軸', category: 'scroll', description: '武器強化等級 +1', weight: 1, buyPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6' },
+  { id: 8, name: '防具強化卷軸', category: 'scroll', description: '防具強化等級 +1', weight: 1, buyPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA' },
+  { id: 157, name: '武器強化卷軸＋', category: 'scroll', description: '武器強化等級隨機 +1~3', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'gold' },
+  { id: 158, name: '防具強化卷軸＋', category: 'scroll', description: '防具強化等級隨機 +1~3', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'gold' },
   { id: 159, name: '武器強化卷軸－', category: 'scroll', description: '武器強化等級 -1，必定成功', weight: 1, sellPrice: 100000, icon: 'items/scroll-unfurled', iconColor: '#F472B6', iconGlow: 'red' },
   { id: 160, name: '防具強化卷軸－', category: 'scroll', description: '防具強化等級 -1，必定成功', weight: 1, sellPrice: 50000, icon: 'items/scroll-unfurled', iconColor: '#60A5FA', iconGlow: 'red' },
 
   // === 印記（`46-sigil.md`）===
   // 詞綴專用消耗品，只在印記師使用。歸 scroll 而非 material —— 它們不是製作原料，
   // 也不該被雜貨店的「Tier N 以下批量販售」（只掃 material）掃掉。
-  { id: 147, name: '混沌印記', category: 'scroll', description: '重抽填滿所有詞綴洞，封印詞綴不佔洞、保留（T1~T5；角色 Lv.31+ 時每條約 1.27% 為 T6；商店裝 T3）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#A855F7' },
-  { id: 148, name: '刺針印記', category: 'scroll', description: '指定一條詞綴換成同池的另一條，Tier 不變', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#2DD4BF' },
-  { id: 149, name: '重刻印記', category: 'scroll', description: '指定一條詞綴的數值重骰，種類與 Tier 不變', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#60A5FA' },
-  { id: 150, name: '突破印記', category: 'scroll', description: '指定一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
-  { id: 161, name: '新增印記', category: 'scroll', description: '在空的詞綴洞新增一條詞綴，必定成功（Tier 同混沌）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#4ADE80' },
-  { id: 162, name: '封印印記', category: 'scroll', description: '指定一條詞綴 70% 移出洞外封印（洞空出來）、30% 連同詞綴洞毀壞', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#F472B6' },
+  { id: 147, name: '混沌印記', category: 'scroll', description: '重抽所有詞綴，封印詞綴保留（T1~T5；Lv.31+ 每條 1.27% 為 T6；商店裝 T3）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#A855F7' },
+  { id: 148, name: '刺針印記', category: 'scroll', description: '一條詞綴換成同池另一條，Tier 不變', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#2DD4BF' },
+  { id: 149, name: '重刻印記', category: 'scroll', description: '一條詞綴數值重骰，種類與 Tier 不變', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#60A5FA' },
+  { id: 150, name: '突破印記', category: 'scroll', description: '一條詞綴 T5→T6（10%）／T6→T7（2%），失敗回 T1', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#FB923C' },
+  { id: 161, name: '新增印記', category: 'scroll', description: '在空洞新增一條詞綴，必定成功（Tier 同混沌）', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#4ADE80' },
+  { id: 162, name: '封印印記', category: 'scroll', description: '一條詞綴 70% 封印（洞空出）、30% 連洞毀壞', weight: 0, sellPrice: 500, icon: 'items/millenium-key', iconColor: '#F472B6' },
   // 精鍊與工藝走全區域掉落（§ 30.2 印記），故賣價 50G 與其他印記不同；
   // 八種印記重量一律 0（不計負重），圖示同為 millenium-key，只用顏色區分
   { id: 9, name: '工藝印記', category: 'scroll', description: '整件裝備品質 +1%（上限 20%），另收 5,000G', weight: 0, sellPrice: 50, icon: 'items/millenium-key', iconColor: '#FACC15' },
-  { id: 10, name: '精鍊印記', category: 'scroll', description: '指定一條詞綴 Tier +1，必定成功，最高 T5（商店裝 T3）', weight: 0, sellPrice: 50, icon: 'items/millenium-key', iconColor: '#F1F5F9' },
+  { id: 10, name: '精鍊印記', category: 'scroll', description: '一條詞綴 Tier +1，必定成功，最高 T5（商店裝 T3）', weight: 0, sellPrice: 50, icon: 'items/millenium-key', iconColor: '#F1F5F9' },
 
   // === 製作用素材 ===
   { id: 11, name: '銀礦石', category: 'material', description: '銀材質裝備製作素材', weight: 5, sellPrice: 50, iconType: 'ore', iconTier: 2 },

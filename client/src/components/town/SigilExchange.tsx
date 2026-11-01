@@ -39,7 +39,7 @@ function stepLabel(step: Step, name: string): string {
 }
 
 function stepTitle(step: Step, name: string, required: number): string {
-  if (step.delta === 'fill') return `用${name}補到合計 ${required} 個（持有不足時補到持有數為止）`;
+  if (step.delta === 'fill') return `用${name}補到合計 ${required} 個`;
   return step.delta > 0 ? `${name} +${step.delta}` : `${name} −${-step.delta}`;
 }
 
@@ -148,9 +148,7 @@ export function SigilExchange() {
         {renderCountGroup('手續費', SIGIL_EXCHANGE_FEE_TYPES, fee, setFee, SIGIL_EXCHANGE_FEE_COUNT, FEE_STEPS)}
 
         <p className="sigil-cost">
-          消耗：材料 ×{SIGIL_EXCHANGE_INPUT_COUNT}（{SIGIL_EXCHANGE_TYPES.map(t => sigilDisplay(t).name).join('／')} 任意混搭）
-          ＋ 手續費 ×{SIGIL_EXCHANGE_FEE_COUNT}（{SIGIL_EXCHANGE_FEE_TYPES.map(t => sigilDisplay(t).name).join('＋')} 合計）
-          　獲得：{sigilDisplay(target).name} ×1　必定成功
+          消耗：材料 ×{SIGIL_EXCHANGE_INPUT_COUNT} ＋ 手續費 ×{SIGIL_EXCHANGE_FEE_COUNT}　獲得：{sigilDisplay(target).name} ×1
         </p>
       </div>
 

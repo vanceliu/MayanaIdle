@@ -168,7 +168,7 @@ export function AppearancePicker({ value, onChange, disabled }: Props) {
         </div>
 
         <div className="form-group">
-          <label>微調（這個髮型專屬）</label>
+          <label>微調</label>
           {HAIR_TUNABLES.map((t) => (
             <div className="slider-row" key={t.key}>
               <span>{t.label}</span>
@@ -196,7 +196,7 @@ export function AppearancePicker({ value, onChange, disabled }: Props) {
               onChange={(e) => patch({ lash: { ...value.lash, on: e.target.checked ? 1 : 0 } })}
               disabled={disabled}
             />
-            顯示睫毛（與髮型無關，任何髮型都能配）
+            顯示睫毛
           </label>
           {/* 沒有睫毛時那幾根滑桿調什麼都不會有反應，留著只會讓人以為壞了 */}
           {!!value.lash.on && LASH_TUNABLES.map((t) => (
@@ -223,7 +223,7 @@ export function AppearancePicker({ value, onChange, disabled }: Props) {
           onPick={(c) => patch({ skin: c })} disabled={disabled}
         />
         <div className="form-group">
-          <label>顏色（眼色同時是睫毛的顏色）</label>
+          <label>顏色（眼色也是睫毛色）</label>
           <div className="color-targets">
             {COLOR_TARGETS.map((t) => (
               <button
@@ -261,8 +261,8 @@ export function AppearancePicker({ value, onChange, disabled }: Props) {
         {/* 對比在放大的預覽上還看得出來，縮到遊戲內的 1～2 px 就沒了，所以用算的 */}
         <p className={eyeTooDim ? 'appearance-hint warn' : 'appearance-hint'}>
           {eyeTooDim
-            ? `這個眼色在目前膚色上幾乎看不見（對比 ${contrast.toFixed(1)}）—— 深膚選亮眼、淺膚選深眼。`
-            : `眼色與膚色的對比 ${contrast.toFixed(1)}，縮到遊戲內尺寸仍看得出眼睛。`}
+            ? `眼色對比 ${contrast.toFixed(1)}，遊戲中幾乎看不見`
+            : `眼色對比 ${contrast.toFixed(1)}，遊戲中仍看得出眼睛`}
         </p>
         </>}
 

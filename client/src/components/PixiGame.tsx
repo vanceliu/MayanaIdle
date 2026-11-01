@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import { monsterAffixLabels } from '../models/monsterAffix';
 import { useMapControlStore } from '../stores/mapControlStore';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { useMonsterHudStore, type MonsterHudEntry } from '../stores/monsterHudStore';
@@ -476,6 +477,9 @@ function publishMonsterHud(
       currentHp: inst.currentHp,
       maxHp: inst.maxHp,
       isBoss: inst.isBoss,
+      affixLabels: monsterAffixLabels(inst),
+      shieldMax: inst.shieldMax ?? 0,
+      shieldRemaining: inst.shieldRemaining ?? 0,
     });
   }
   useMonsterHudStore.getState().publish(entries, targetId);

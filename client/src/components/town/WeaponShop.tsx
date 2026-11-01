@@ -113,7 +113,7 @@ export function WeaponShop() {
 
   return (
     <div className="shop-panel">
-      <p className="shop-greeting">「好劍配好手！來看看我的貨色。」</p>
+      <p className="shop-greeting">「來看看我的貨色。」</p>
       <div className="shop-gold">持有金幣: {char.gold.toLocaleString()}G</div>
 
       <div className="shop-tabs">

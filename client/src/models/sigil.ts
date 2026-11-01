@@ -52,7 +52,7 @@ export interface SigilDefinition {
 export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   {
     type: 'chaos', itemId: 147, name: '混沌印記', target: 'item',
-    description: '重抽詞綴直到填滿所有詞綴洞（封印詞綴不佔洞、原樣保留），Tier T1~T5 均等；角色 Lv.31+ 時每條約 1.27% 為 T6（4 洞至少 1 條 T6 為 5%）；商店裝 T1~T3 且不出特殊詞綴',
+    description: '重抽詞綴填滿所有詞綴洞（封印詞綴保留）；Tier T1~T5，Lv.31+ 每條約 1.27% 為 T6',
   },
   {
     type: 'sting', itemId: 148, name: '刺針印記', target: 'affix',
@@ -64,7 +64,7 @@ export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   },
   {
     type: 'temper', itemId: 10, name: '精鍊印記', target: 'affix',
-    description: '指定一條詞綴 Tier +1，必定成功，最高推到該裝備的取得管道上限（一般 T5、商店裝 T3）',
+    description: '指定一條詞綴 Tier +1，必定成功，最高到精鍊上限',
   },
   {
     type: 'enhance', itemId: 150, name: '突破印記', target: 'affix',
@@ -76,11 +76,11 @@ export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   },
   {
     type: 'add', itemId: 161, name: '新增印記', target: 'item',
-    description: '在空的詞綴洞新增一條詞綴，必定成功，Tier 同混沌印記（T1~T5 均等；角色 Lv.31+ 時約 1.27% 為 T6；商店裝 T1~T3）',
+    description: '在空洞新增一條詞綴，必定成功；Tier T1~T5，Lv.31+ 約 1.27% 為 T6',
   },
   {
     type: 'seal', itemId: 162, name: '封印印記', target: 'affix',
-    description: '指定一條詞綴：70% 移出詞綴洞變成 (封)，原本的洞空出來，之後任何印記都動不了它；30% 該詞綴連同詞綴洞一起毀壞。每件最多封印 1 條',
+    description: '指定一條詞綴：70% 變成 (封) 並空出洞，30% 連同詞綴洞毀壞；每件最多 1 條',
   },
 ];
 

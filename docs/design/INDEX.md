@@ -36,6 +36,7 @@
 | 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
 | **百分比詞綴小數規則（0.1% 單位／品質取小數一位／顯示）** | `07-affix.md` | § 7.3 |
 | **印記師詞綴列 Tier 區間位置條** | `13-town.md` | § 13.13.1 |
+| **裝備欄詞綴加總（可收合）** | `34-ui-guidelines.md` | 裝備欄 |
 | **固定值型詞綴（最大 HP／MP／回血／回魔的 range）** | `07-affix.md` | § 7.3.1 |
 | **額外屬性詞綴（無 Tier、固定 +1、印記不可升階）** | `07-affix.md` § 7.3.1、`46-sigil.md` § 46.9 | — |
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
@@ -124,6 +125,9 @@
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
 | 怪物 Debuff 能力 | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | **怪物詠唱（前搖攻擊）** | `25-monster-system.md` | § 25.11 |
+| **怪物強化詞綴（詞綴數機率／詞綴表／規則／獎勵／顯示）** | `25-monster-system.md` | § 25.12 |
+| **怪物強化詞綴名稱顏色** | `34-ui-guidelines.md` | 怪物強化詞綴顏色 |
+| **Wiki 怪物強化詞綴說明** | `43-wiki-system.md` | § 4.3 |
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
@@ -271,6 +275,8 @@
                                                   06-equipment-acquire.md
 28-monster-stats.md § 28.1 → 04-character.md § 4.9 ←→ 09-dungeon.md
 26-spawn-pressure.md § 26.3（掉落倍率）→ 27-drop-table.md
+25-monster-system.md § 25.12（強化詞綴）→ 26 § 26.5 / 27 § 27.1 / 28 § 28.1 / 21 § 21.5、§ 21.11
+  / 24 § 24.4.2、§ 24.4.9、§ 24.8.3 / 34「怪物強化詞綴顏色」/ 43 § 4.3 / 51 § 51.4.4、§ 51.4.6、§ 51.4.9
 04-character.md § 4.11（回鍋經驗加倍）
   ✕  26-spawn-pressure.md —— 經驗軸與 Pressure 刻意不相接，見 § 4.11 連動注意
   ←→ 18-data-schema.md § 18.11
