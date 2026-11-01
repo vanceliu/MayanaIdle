@@ -99,6 +99,7 @@ interface HotEffect {
 | `vengeance` | 復仇之刃（騎士 7，依殘血給自身攻擊力加成） |
 | `backstab` | 背刺（盜賊 5，自身攻擊力 +50%） |
 | `invincible` | 絕對屏障（基礎 10，無敵 10s） |
+| `mp-regen-potion`／`crit-potion`／`hp-regen-potion`／`focus-potion` | 回魔藥水／爆擊藥水／回血藥水／慎重藥水（`30-items.md` § 30.4a），四者各自獨立 |
 | （無 category） | 敏捷提升（基礎 4）、力量提升（基礎 6）—— 不互斥，可與任何 buff 並存 |
 
 ### 24.3.2 DoT（獨立計時，不可刷新）

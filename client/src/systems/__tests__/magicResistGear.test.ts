@@ -7,6 +7,7 @@ import {
   generateAffixes,
   AFFIX_TIERS,
   ARMOR_POOL_TIERS,
+  DEFENSE_TIERS,
 } from '../../models/affix';
 import {
   getAccessoryMagicResist,
@@ -102,9 +103,9 @@ describe('魔抗詞綴專屬階級表（§ 7.3.1）', () => {
     }
   });
 
-  it('防具池 9 種走自己的專屬表，其餘套用通用區間', () => {
-    // 防具詞綴欄位是 11 部位 ×4，武器池只有 4 條 —— 兩池共表會讓防具那 9 種膨脹
-    expect(getAffixTierTable('defense')).toBe(ARMOR_POOL_TIERS);
+  it('防具池走自己的專屬表、防禦力另有專屬表，其餘套用通用區間', () => {
+    // 防具詞綴欄位是 11 部位 ×4，武器池只有 4 條 —— 兩池共表會讓防具那幾種膨脹
+    expect(getAffixTierTable('defense')).toBe(DEFENSE_TIERS);
     expect(getAffixTierTable('drop_rate')).toBe(ARMOR_POOL_TIERS);
     // 格擋率只出現在盾牌一個部位，不隨部位數膨脹
     expect(getAffixTierTable('block_rate')).toBe(AFFIX_TIERS);

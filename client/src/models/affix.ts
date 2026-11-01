@@ -418,6 +418,17 @@ export const ARMOR_POOL_TIERS: AffixTier[] = [
   { tier: 7, min: 15.1, max: 17 },
 ];
 
+/** 防禦力的專屬階級表（§ 7.3.1，0.1 單位） */
+export const DEFENSE_TIERS: AffixTier[] = [
+  { tier: 1, min: 0.1, max: 0.5 },
+  { tier: 2, min: 0.6, max: 1 },
+  { tier: 3, min: 1.1, max: 1.5 },
+  { tier: 4, min: 1.6, max: 2 },
+  { tier: 5, min: 2.1, max: 2.5 },
+  { tier: 6, min: 2.6, max: 3.5 },
+  { tier: 7, min: 3.6, max: 5 },
+];
+
 /**
  * 最大 HP／最大 MP 的固定值階級表（§ 7.3.1）。單位是點數，不是百分比。
  *
@@ -485,9 +496,10 @@ export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: Affi
   {
     label: '防具池',
     tiers: ARMOR_POOL_TIERS,
-    types: ['defense', 'heal_effect', 'potion_effect',
+    types: ['heal_effect', 'potion_effect',
       'drop_rate', 'gold_rate', 'on_hit_hp', 'on_hit_mp'],
   },
+  { label: '防禦力', tiers: DEFENSE_TIERS, types: ['defense'] },
   { label: '最大 HP／MP', tiers: FLAT_HP_MP_TIERS, types: ['max_hp', 'max_mp'], flat: true },
   { label: '回血／回魔', tiers: FLAT_REGEN_TIERS, types: ['hp_regen', 'mp_regen'], flat: true },
   { label: '魔法抗性', tiers: MAGIC_RESIST_TIERS, types: ['magic_resist'] },

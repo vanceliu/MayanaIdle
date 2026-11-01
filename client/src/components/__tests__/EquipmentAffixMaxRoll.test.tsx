@@ -33,13 +33,13 @@ describe('EquipmentDetail 詞綴滿值標示', () => {
     render(
       <EquipmentDetail
         item={instanceWithAffixes([
-          { type: 'defense', tier: 4, value: 11 },   // 防具池表 T4 = 9.1~11.0 → 滿值
+          { type: 'heal_effect', tier: 4, value: 11 }, // 防具池表 T4 = 9.1~11.0 → 滿值
           { type: 'drop_rate', tier: 4, value: 10 }, // 同 Tier 非滿值
         ])}
       />,
     );
 
-    const maxed = screen.getByText(/防禦力 \+11\.0% \(T4\)/);
+    const maxed = screen.getByText(/補血效果 \+11\.0% \(T4\)/);
     expect(maxed.className).toContain('max-roll');
     const notMaxed = screen.getByText(/掉寶率 \+10\.0% \(T4\)/);
     expect(notMaxed.className).not.toContain('max-roll');
@@ -48,12 +48,12 @@ describe('EquipmentDetail 詞綴滿值標示', () => {
   it('judges by the raw roll, not the quality-boosted display value', () => {
     render(
       <EquipmentDetail
-        item={instanceWithAffixes([{ type: 'defense', tier: 4, value: 10 }], 20)}
+        item={instanceWithAffixes([{ type: 'heal_effect', tier: 4, value: 10 }], 20)}
       />,
     );
 
     // 品質 20% 讓顯示值變 12.0（超過 T4 上限 11.0），仍不算滿 roll
-    const affix = screen.getByText(/防禦力 \+12\.0% \(T4\)/);
+    const affix = screen.getByText(/補血效果 \+12\.0% \(T4\)/);
     expect(affix.className).not.toContain('max-roll');
   });
 

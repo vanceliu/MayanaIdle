@@ -1,4 +1,5 @@
 import type { GameRepository } from '../db/repository';
+import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../models/buffPotion';
 import { defaultSession } from '../stores/session';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
@@ -50,8 +51,10 @@ export interface DropBonuses {
    * 選填、預設 1 —— 不帶就是沒有 Pressure 加成，既有呼叫端不受影響。
    */
   pressure_mult?: number;
-  /** 怪物強化詞綴獎勵倍率（`25-monster-system.md` § 25.12.4），同時乘在掉寶倍率與金幣。預設 1 */
-  affix_mult?: number;
+  /** 怪物強化詞綴掉落倍率（`25-monster-system.md` § 25.12.4），乘在掉寶倍率。預設 1 */
+  affix_drop_mult?: number;
+  /** 怪物強化詞綴金幣與經驗倍率（§ 25.12.4），乘在金幣。預設 1 */
+  affix_gold_mult?: number;
 }
 
 export const DROP_ROLL_MAX = 1000;
@@ -107,12 +110,12 @@ export async function persistDroppedEquipment(
 }
 
 function getDropRateMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1) * (bonuses?.affix_mult ?? 1);
+  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1) * (bonuses?.affix_drop_mult ?? 1);
 }
 
 /** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率在 `settleGoldDrop` */
 function getGoldAffixMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.gold_rate ?? 0) / 100) * (bonuses?.affix_mult ?? 1);
+  return (1 + (bonuses?.gold_rate ?? 0) / 100) * (bonuses?.affix_gold_mult ?? 1);
 }
 
 /**
@@ -211,6 +214,13 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       itemTemplateId: skillBookDrop,
       amount: 1,
     });
+  }
+
+  // 增益藥水：所有 Boss 共通，每種各自判定（`27-drop-table.md` § 27.6）
+  const potionDropValue = Math.min(BUFF_POTION_BOSS_DROP_VALUE * dropRateMultiplier, DROP_ROLL_MAX);
+  for (const itemId of BUFF_POTION_ITEM_IDS) {
+    if (random() * DROP_ROLL_MAX >= potionDropValue) continue;
+    items.push({ name: getItemById(itemId)?.name ?? '藥水', type: 'potion', itemTemplateId: itemId, amount: 1 });
   }
 
   return { gold, items };

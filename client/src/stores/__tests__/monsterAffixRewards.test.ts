@@ -1,6 +1,6 @@
 /**
  * 怪物強化詞綴的擊殺獎勵（`25-monster-system.md` § 25.12.4）：
- * 獎勵倍率同時乘在經驗、掉寶倍率與金幣；日誌怪物名寫「詞綴 原名」。
+ * 掉落倍率乘在掉寶倍率；金幣與經驗倍率乘在金幣與經驗；日誌怪物名寫「詞綴 原名」。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { resetTestDb } from '../../testing/testDb';
@@ -74,7 +74,7 @@ describe('強化詞綴的擊殺獎勵', () => {
     await waitForPendingDrops();
   });
 
-  it('經驗乘上獎勵倍率', async () => {
+  it('經驗乘上金幣與經驗倍率', async () => {
     const plain = expGained((await kill(makeMonster())).logs);
     const affixed = expGained((await kill(makeMonster({ affixes: ['giant', 'regen', 'gale', 'thorns'] }))).logs);
     expect(affixed).toBe(Math.floor(plain * 1.1));
@@ -82,9 +82,11 @@ describe('強化詞綴的擊殺獎勵', () => {
 
   it('掉寶與金幣倍率帶給掉落擲骰', async () => {
     await kill(makeMonster({ affixes: ['giant'] }));
-    expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_mult: 1.05 }));
+    expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_drop_mult: 1.25, affix_gold_mult: 1.05 }));
+    await kill(makeMonster({ affixes: ['giant', 'regen', 'gale', 'thorns'] }));
+    expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_drop_mult: 2, affix_gold_mult: 1.1 }));
     await kill(makeMonster());
-    expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_mult: 1 }));
+    expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_drop_mult: 1, affix_gold_mult: 1 }));
   });
 
   it('擊敗日誌寫「詞綴 原名」', async () => {

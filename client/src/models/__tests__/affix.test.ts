@@ -12,6 +12,8 @@ import {
   AFFIX_TIERS,
   AFFIX_DEFINITIONS,
   ARMOR_POOL_TIERS,
+  DEFENSE_TIERS,
+  getAffixTierTable,
   isDecimalAffixType,
   clampAffixValueToTier,
 } from '../affix';
@@ -369,6 +371,13 @@ describe('百分比詞綴小數規則（§ 7.3）', () => {
     );
   });
 
+  it('防禦力專屬表 T1~T7 為 0.1~0.5 … 3.6~5.0（§ 7.3.1）', () => {
+    expect(DEFENSE_TIERS.map(t => [t.min, t.max])).toEqual(
+      [[0.1, 0.5], [0.6, 1], [1.1, 1.5], [1.6, 2], [2.1, 2.5], [2.6, 3.5], [3.6, 5]],
+    );
+    expect(getAffixTierTable('defense')).toBe(DEFENSE_TIERS);
+  });
+
   it('只有百分比詞綴是小數；固定值、迴避值、額外屬性、特殊詞綴為整數', () => {
     expect(isDecimalAffixType('attack_power')).toBe(true);
     expect(isDecimalAffixType('defense')).toBe(true);
@@ -379,7 +388,7 @@ describe('百分比詞綴小數規則（§ 7.3）', () => {
   });
 
   it('抽值以 0.1 為單位，兩端都抽得到', () => {
-    for (const [type, table] of [['attack_power', AFFIX_TIERS], ['defense', ARMOR_POOL_TIERS]] as const) {
+    for (const [type, table] of [['attack_power', AFFIX_TIERS], ['heal_effect', ARMOR_POOL_TIERS], ['defense', DEFENSE_TIERS]] as const) {
       for (const t of table) {
         vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
         expect(rollAffixValue(t.tier, type)).toBe(t.min);
@@ -406,7 +415,8 @@ describe('百分比詞綴小數規則（§ 7.3）', () => {
 
   it('舊值夾回所屬 Tier 的新區間，區間內不變', () => {
     expect(clampAffixValueToTier({ type: 'attack_power', tier: 1, value: 3 })).toBe(3.1);
-    expect(clampAffixValueToTier({ type: 'defense', tier: 1, value: 3 })).toBe(3.1);
+    expect(clampAffixValueToTier({ type: 'heal_effect', tier: 1, value: 3 })).toBe(3.1);
+    expect(clampAffixValueToTier({ type: 'defense', tier: 1, value: 3 })).toBe(0.5);
     expect(clampAffixValueToTier({ type: 'magic_resist', tier: 1, value: 1 })).toBe(1.1);
     expect(clampAffixValueToTier({ type: 'attack_power', tier: 2, value: 6 })).toBe(6);
     expect(clampAffixValueToTier({ type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' })).toBe(1);

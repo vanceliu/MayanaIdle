@@ -16,6 +16,11 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'evasion': 'buffs/dodging',
   'poison-enchant': 'buffs/vile-fluid',
   'atk-debuff': 'buffs/fire-shield',
+  // 增益藥水（`30-items.md` § 30.4a）
+  'mp-regen-potion': 'buffs/lightning-frequency',
+  'crit-potion': 'buffs/crosshair',
+  'hp-regen-potion': 'buffs/heart-drop',
+  'focus-potion': 'buffs/embrassed-energy',
   // 以下原本沒有 category 對應，一律落在通用的 concentration-orb，這裡給它們各自的圖示。
   // `agility-boost` / `strength-boost` / `holy-light` 三招沒有 buffCategory，
   // 效果的 category 會退回 skill.id（見 `gameStore.castSelfSkill`），所以用 id 當 key。

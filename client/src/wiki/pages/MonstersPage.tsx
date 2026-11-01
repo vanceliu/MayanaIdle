@@ -6,7 +6,8 @@ import { getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_R
 import { Link, useParams } from 'react-router-dom';
 import { SLOT_DROP_RATE_BOSS, slotTierBandFor } from '../../models/talent';
 import {
-  MONSTER_AFFIX_COUNT_TABLE, MONSTER_AFFIX_DESCRIPTIONS, MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER, MONSTER_AFFIX_REWARD,
+  MONSTER_AFFIX_COUNT_TABLE, MONSTER_AFFIX_DESCRIPTIONS, MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER,
+  MONSTER_AFFIX_DROP_REWARD, MONSTER_AFFIX_GOLD_EXP_REWARD,
 } from '../../models/monsterAffix';
 import '../components/WikiTable.css';
 
@@ -160,7 +161,7 @@ function MonsterAffixSection() {
       <div className="wiki-table-wrap" style={{ marginBottom: 16 }}>
         <table className="wiki-table">
           <thead>
-            <tr><th>詞綴數</th><th>出現機率</th><th>怪物等級</th><th>名稱顏色</th><th>掉落／金幣／經驗</th></tr>
+            <tr><th>詞綴數</th><th>出現機率</th><th>怪物等級</th><th>名稱顏色</th><th>物品掉落</th><th>金幣／經驗</th></tr>
           </thead>
           <tbody>
             {MONSTER_AFFIX_COUNT_TABLE.map((row, i) => (
@@ -169,7 +170,8 @@ function MonsterAffixSection() {
                 <td>{row.cumulative - (MONSTER_AFFIX_COUNT_TABLE[i - 1]?.cumulative ?? 0)}%</td>
                 <td>{row.minLevel <= 1 ? '全部' : `Lv.${row.minLevel} 以上`}</td>
                 <td>{AFFIX_COUNT_COLOR_NAMES[row.count]}</td>
-                <td>×{MONSTER_AFFIX_REWARD[row.count].toFixed(2)}</td>
+                <td>×{MONSTER_AFFIX_DROP_REWARD[row.count]}</td>
+                <td>×{MONSTER_AFFIX_GOLD_EXP_REWARD[row.count].toFixed(2)}</td>
               </tr>
             ))}
           </tbody>

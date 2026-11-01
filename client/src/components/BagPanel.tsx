@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { getBuffPotionType } from '../models/buffPotion';
 import { useGameStore, type PendingDiscard } from '../stores/gameStore';
 import { buildBagLayout, moveBagSlot, moveBagSlots, sortBagLayout, type BagDragPayload, type BagSlotMap } from '../models/bagLayout';
 import {
@@ -122,6 +123,7 @@ function buildBagCells(
         itemId: item.itemId,
         count: item.amount,
         speedPotionType: spt,
+        buffPotionType: getBuffPotionType(item.itemId),
         cureItemId: isCureItem(item.itemId) ? item.itemId : undefined,
       });
     }
@@ -491,6 +493,8 @@ export function BagPanel() {
       applyCureItem(item.cureItemId);
     } else if (item.speedPotionType) {
       useGameStore.getState().useSpeedPotion(item.speedPotionType);
+    } else if (item.buffPotionType) {
+      useGameStore.getState().useBuffPotion(item.buffPotionType);
     } else if (item.equippedSlot) {
       // § 35.9.2：裝備中的格子第二下是卸下（容量／腰帶溢出保護在 store 內）
       unequipItem(item.equippedSlot);
@@ -748,7 +752,7 @@ export function BagPanel() {
   /** 操作提示是背包自己的事（點一次選取、再點一次執行）；數值區與交易共用 */
   function tooltipHint(item: BagGridItem) {
     const selected = selectedId === item.id;
-    if (item.potionType || item.speedPotionType) {
+    if (item.potionType || item.speedPotionType || item.buffPotionType) {
       return <div className="tooltip-hint">{selected ? '再點一次使用' : '點擊選取'} / 右鍵設為快捷鍵</div>;
     }
     if (item.cureItemId != null) {

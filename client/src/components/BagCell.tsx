@@ -7,6 +7,7 @@
  *
  * **操作提示不在這裡**：「再點一次使用」之類的字是各面板自己的事，由 `hint` 傳進來。
  */
+import type { BuffPotionType } from '../models/buffPotion';
 import type { ReactNode } from 'react';
 import { GameIcon } from './GameIcon';
 import { getShortName } from './BagGrid';
@@ -31,6 +32,8 @@ export interface BagGridItem {
   count?: number;
   potionType?: PotionType;
   speedPotionType?: SpeedPotionType;
+  /** 增益藥水（`30-items.md` § 30.4a） */
+  buffPotionType?: BuffPotionType;
   cureItemId?: number;
   equipment?: EquipmentInstance;
   /**

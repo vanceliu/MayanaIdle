@@ -185,6 +185,11 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     version: 9,
     up: clampAffixValuesToTiers,
   },
+  {
+    /** 防禦力詞綴專屬階級表（`07-affix.md` § 7.3.1）：既有防禦力詞綴依 tier 在新區間重骰 */
+    version: 10,
+    up: rerollDefenseAffixes,
+  },
 ];
 
 export function hashExistingSessionTokens(db: DatabaseSync): void {
@@ -227,6 +232,19 @@ export function convertEvasionToPoints(db: DatabaseSync): void {
       uniqueAffix = { ...uniqueAffix, value: uniqueAffix.value * EVASION_POINTS_PER_PERCENT };
     }
     if (changed) update.run(JSON.stringify({ ...data, affixes, uniqueAffix }), row.id);
+  }
+}
+
+export function rerollDefenseAffixes(db: DatabaseSync): void {
+  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
+  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
+  for (const row of rows) {
+    const data = JSON.parse(row.data) as { affixes?: StoredAffix[] };
+    if (!data.affixes?.some(a => a.type === 'defense' && a.tier != null)) continue;
+    const affixes = data.affixes.map(a => (a.type === 'defense' && a.tier != null
+      ? { ...a, value: rollAffixValue(a.tier, 'defense') }
+      : a));
+    update.run(JSON.stringify({ ...data, affixes }), row.id);
   }
 }
 

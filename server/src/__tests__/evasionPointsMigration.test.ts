@@ -11,7 +11,7 @@ describe('迴避值遷移', () => {
     const insert = db.prepare('INSERT INTO equipment_instances (owner_id, data) VALUES (?, ?)');
     insert.run(1, JSON.stringify({
       templateId: 1, quality: 10,
-      affixes: [{ type: 'evasion', tier: 7, value: 7 }, { type: 'defense', tier: 3, value: 8 }, { type: 'evasion', tier: 2, value: 2, sealed: true }],
+      affixes: [{ type: 'evasion', tier: 7, value: 7 }, { type: 'heal_effect', tier: 3, value: 8 }, { type: 'evasion', tier: 2, value: 2, sealed: true }],
     }));
     insert.run(1, JSON.stringify({ templateId: 2, affixes: [], uniqueAffix: { type: 'evasion', value: 9 } }));
     insert.run(1, JSON.stringify({ templateId: 3, affixes: [{ type: 'crit_rate', tier: 7, value: 20 }], uniqueAffix: { type: 'crit_rate', value: 22 } }));
@@ -26,13 +26,13 @@ describe('迴避值遷移', () => {
     const db = seededAtV7();
     expect(migrate(db)).toEqual({ from: 7, to: LATEST_SCHEMA_VERSION });
     const [gear] = rows(db);
-    const [t7, defense, sealed] = gear.affixes;
+    const [t7, healEffect, sealed] = gear.affixes;
     expect(t7.value).toBeGreaterThanOrEqual(EVASION_TIERS[6].min);
     expect(t7.value).toBeLessThanOrEqual(EVASION_TIERS[6].max);
     expect(sealed.value).toBeGreaterThanOrEqual(EVASION_TIERS[1].min);
     expect(sealed.value).toBeLessThanOrEqual(EVASION_TIERS[1].max);
     expect(sealed.sealed).toBe(true);
-    expect(defense).toEqual({ type: 'defense', tier: 3, value: 8 });
+    expect(healEffect).toEqual({ type: 'heal_effect', tier: 3, value: 8 });
     expect(gear.quality).toBe(10);
   });
 

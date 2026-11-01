@@ -207,11 +207,13 @@ describe('荊棘（戰鬥迴圈）', () => {
 });
 
 describe('再生（戰鬥迴圈）', () => {
-  it('每秒回最大 HP 的 2%', () => {
+  it('每 6 秒回最大 HP 的 2%', () => {
     const inst = monster({ currentHp: 500, maxHp: 1000, attackInterval: 100_000, affixes: ['regen'] });
     setupField(inst);
     // 只推進實例層（怪物），玩家不出手
-    tickInstanceCombat(1000, ensureInstance(defaultSession));
+    tickInstanceCombat(5999, ensureInstance(defaultSession));
+    expect(inst.currentHp).toBe(500);
+    tickInstanceCombat(1, ensureInstance(defaultSession));
     expect(inst.currentHp).toBe(520);
   });
 });

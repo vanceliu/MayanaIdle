@@ -32,8 +32,10 @@ export const MONSTER_AFFIX_COUNT_TABLE: readonly { count: number; cumulative: nu
   { count: 4, cumulative: 14, minLevel: 50 },
 ];
 
-/** § 25.12.1 獎勵倍率（依詞綴數） */
-export const MONSTER_AFFIX_REWARD: Record<number, number> = { 1: 1.05, 2: 1.07, 3: 1.09, 4: 1.10 };
+/** § 25.12.1 掉落倍率（依詞綴數） */
+export const MONSTER_AFFIX_DROP_REWARD: Record<number, number> = { 1: 1.25, 2: 1.5, 3: 1.75, 4: 2 };
+/** § 25.12.1 金幣與經驗倍率（依詞綴數） */
+export const MONSTER_AFFIX_GOLD_EXP_REWARD: Record<number, number> = { 1: 1.05, 2: 1.07, 3: 1.09, 4: 1.10 };
 
 export const BLOODTHIRST_PERCENT = 20;
 export const FRENZY_PERCENT = 10;
@@ -42,7 +44,7 @@ export const VENOM_CHANCE = 15;
 export const GIANT_PERCENT = 20;
 export const HARDENED_PERCENT = 20;
 export const REGEN_PERCENT = 2;
-export const REGEN_INTERVAL_MS = 1000;
+export const REGEN_INTERVAL_MS = 6000;
 export const SHIELD_PERCENT = 20;
 export const GALE_SPEED_MULTIPLIER = 1.1;
 export const THORNS_PERCENT = 30;
@@ -55,7 +57,7 @@ export const MONSTER_AFFIX_DESCRIPTIONS: Record<MonsterAffixId, string> = {
   venom: `攻擊附加中毒（劇毒）或流血（撕裂），觸發率 ${VENOM_CHANCE}%；原本有中毒給流血、原本有流血給中毒`,
   giant: `最大 HP +${GIANT_PERCENT}%`,
   hardened: `防禦 +${HARDENED_PERCENT}%`,
-  regen: `每秒回復最大 HP 的 ${REGEN_PERCENT}%（最少 1）`,
+  regen: `每 ${REGEN_INTERVAL_MS / 1000} 秒回復最大 HP 的 ${REGEN_PERCENT}%（最少 1）`,
   shield: `生成時帶護盾，吸收量為最大 HP 的 ${SHIELD_PERCENT}%；傷害先扣護盾，破了不回復`,
   gale: `移動速度 +${Math.round((GALE_SPEED_MULTIPLIER - 1) * 100)}%`,
   thorns: `反彈角色每下命中傷害的 ${THORNS_PERCENT}%，吃物理防禦減傷、不可迴避或格擋、可致死；DoT 不反彈`,
@@ -149,9 +151,14 @@ export function monsterLogName(inst: Pick<MonsterInstance, 'name' | 'affixes' | 
   return labels.length > 0 ? `${labels.join(' ')} ${inst.name}` : inst.name;
 }
 
-/** § 25.12.4 掉落值／金幣／經驗倍率；無詞綴為 1 */
-export function monsterRewardMultiplier(inst: Pick<MonsterInstance, 'affixes'>): number {
-  return MONSTER_AFFIX_REWARD[inst.affixes?.length ?? 0] ?? 1;
+/** § 25.12.4 物品掉落倍率；無詞綴為 1 */
+export function monsterDropMultiplier(inst: Pick<MonsterInstance, 'affixes'>): number {
+  return MONSTER_AFFIX_DROP_REWARD[inst.affixes?.length ?? 0] ?? 1;
+}
+
+/** § 25.12.4 金幣與經驗倍率；無詞綴為 1 */
+export function monsterGoldExpMultiplier(inst: Pick<MonsterInstance, 'affixes'>): number {
+  return MONSTER_AFFIX_GOLD_EXP_REWARD[inst.affixes?.length ?? 0] ?? 1;
 }
 
 /**
@@ -184,7 +191,7 @@ export function bloodthirstHeal(inst: MonsterInstance, hpLost: number): number {
   return healMonster(inst, Math.floor(hpLost * BLOODTHIRST_PERCENT / 100));
 }
 
-/** 再生：累積 deltaMs，每滿 1000ms 回 `max(1, floor(最大 HP × 2%))`。回傳本次回復量 */
+/** 再生：累積 deltaMs，每滿 6000ms 回 `max(1, floor(最大 HP × 2%))`。回傳本次回復量 */
 export function tickMonsterRegen(inst: MonsterInstance, deltaMs: number): number {
   if (!hasMonsterAffix(inst, 'regen') || inst.currentHp <= 0) return 0;
   inst.regenElapsedMs = (inst.regenElapsedMs ?? 0) + deltaMs;

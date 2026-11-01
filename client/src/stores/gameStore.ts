@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { monsterLogName, monsterRewardMultiplier } from '../models/monsterAffix';
+import { BUFF_POTION_CONFIG, BUFF_POTION_DURATION_MS, getBuffPotionType, type BuffPotionType } from '../models/buffPotion';
+import { monsterDropMultiplier, monsterGoldExpMultiplier, monsterLogName } from '../models/monsterAffix';
 import { normalizeAppearance, type Appearance } from '../models/appearance';
 import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
@@ -450,6 +451,8 @@ export interface GameState {
   usePotion: () => void;
   usePotionByType: (type: PotionType) => void;
   useSpeedPotion: (type: SpeedPotionType) => void;
+  /** 增益藥水（`30-items.md` § 30.4a） */
+  useBuffPotion: (type: BuffPotionType) => void;
   assignQuickSlot: (slotIdx: number, entry: QuickSlotEntry | null) => void;
   /** § 35.1.3：寫入背包格子位置（拖曳與整理共用），同時持久化到本機 */
   setBagSlotMap: (slotMap: BagSlotMap) => void;
@@ -1334,6 +1337,36 @@ export function createGameStore(session: Session) {
     get().saveState();
   },
 
+  useBuffPotion: (type) => {
+    const state = get();
+    if (!state.character) return;
+    if (blockedByStun(state, set)) return;
+    const config = BUFF_POTION_CONFIG[type];
+    if (!hasBagItem(state.bagItems, config.itemId)) return;
+    const name = getItemById(config.itemId)?.name ?? type;
+    const now = gameNow();
+    const buff: ActiveEffect = {
+      id: `buff-${config.category}-${now}`,
+      sourceSkillId: config.category,
+      sourceSkillName: name,
+      category: config.category,
+      type: 'buff',
+      target: 'player',
+      modifiers: [config.modifier],
+      startTime: now,
+      duration: BUFF_POTION_DURATION_MS,
+      tags: [],
+      name,
+      description: config.description,
+    };
+    set({
+      activeEffects: applyPlayerBuff(state.activeEffects, buff, now).effects,
+      bagItems: consumeBagItem(state.bagItems, config.itemId),
+      combatLogs: addLog(state.combatLogs, { text: `使用${name}（${config.description}）`, type: 'system' }),
+    });
+    get().saveState();
+  },
+
   assignQuickSlot: (slotIdx, entry) => {
     if (slotIdx < 0 || slotIdx >= QUICK_SLOT_COUNT) return;
     const slots = [...get().quickSlots];
@@ -1383,6 +1416,9 @@ export function createGameStore(session: Session) {
         return;
       case 'speedPotion':
         get().useSpeedPotion(action.speedType);
+        return;
+      case 'buffPotion':
+        get().useBuffPotion(action.buffType);
         return;
       case 'cure':
         get().useCureItem(action.itemId);
@@ -3080,9 +3116,10 @@ export function processMonsterDeath(
   char = { ...char, areaKills };
 
   // 基礎 ×3（`28-monster-stats.md` § 28.1）× 回鍋加倍（`04-character.md` § 4.11）× 全域經驗倍率；隊伍在參與者之間平分
-  // 強化詞綴獎勵倍率（`25-monster-system.md` § 25.12.4）同時作用於經驗、掉寶倍率、金幣
-  const rewardMult = monsterRewardMultiplier(dead);
-  const expGained = settleKillExp(dead.exp * rewardMult / expDivisor, getRestedExpMultiplier(char));
+  // 強化詞綴獎勵（`25-monster-system.md` § 25.12.4）：掉落倍率作用於掉寶倍率；金幣與經驗倍率作用於金幣與經驗
+  const affixDropMult = monsterDropMultiplier(dead);
+  const affixGoldExpMult = monsterGoldExpMultiplier(dead);
+  const expGained = settleKillExp(dead.exp * affixGoldExpMult / expDivisor, getRestedExpMultiplier(char));
   const prevLevel = char.level;
   char = addExp(char, expGained);
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
@@ -3124,8 +3161,8 @@ export function processMonsterDeath(
     const drops = !withDrops
       ? noDrops
       : monsterIsBoss
-        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_mult: rewardMult })
-        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_mult: rewardMult }, false, dead.level);
+        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult })
+        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, false, dead.level);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
@@ -3344,6 +3381,9 @@ function consumeItemById(get: () => GameState, itemId: number): void {
   const speed = (Object.entries(SPEED_POTION_CONFIG) as [SpeedPotionType, { itemId: number }][])
     .find(([, c]) => c.itemId === itemId);
   if (speed) { get().useSpeedPotion(speed[0]); return; }
+
+  const buffPotion = getBuffPotionType(itemId);
+  if (buffPotion) { get().useBuffPotion(buffPotion); return; }
 
   if (getTownScrollByItemId(itemId)) { get().useTownScroll(itemId); return; }
 

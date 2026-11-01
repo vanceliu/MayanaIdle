@@ -158,7 +158,7 @@ export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand'
 export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
   game: new Set([
     'setSearchMode',
-    'equipItem', 'unequipItem', 'usePotionByType', 'useSpeedPotion',
+    'equipItem', 'unequipItem', 'usePotionByType', 'useSpeedPotion', 'useBuffPotion',
     'assignQuickSlot', 'setBagSlotMap', 'setTalentBagOrder', 'useQuickSlot',
     'useTownScroll', 'useCureItem', 'navigateTo',
     'setEmergencyRetreat', 'setActiveTemplate', 'addScriptTemplate',

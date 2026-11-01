@@ -2,7 +2,7 @@ import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveVIT, getEffectiveSPI } from '../models/character';
-import { getAffixBonusesFromGear } from './combat';
+import { getAffixBonusesFromGear, getBuffFlatBonus } from './combat';
 import { gameNow } from '../core/clock';
 
 /** 回魔 buff 的修正值 stat：每次回魔另加有效最大 MP 的 X%，戰鬥中不減半（`23-class-magic.md` § 23.5 魔力湧泉） */
@@ -24,8 +24,9 @@ export function getHpRegen(char: Character, inCombat: boolean, gear: (EquipmentI
   const effVIT = getEffectiveVIT(attrs.VIT);
   const base = Math.floor(effVIT / 2);
   // 模板值（飾品／腰帶）＋「回血」詞綴（防具唯一來源，`07-affix.md` § 7.3.1）
+  // 回血藥水（`30-items.md` § 30.4a）同裝備，戰鬥中隨總量減半
   const equipBonus = gear.reduce((sum, g) => sum + (g?.hpRegen ?? 0), 0)
-    + getAffixBonusesFromGear(gear).hp_regen;
+    + getAffixBonusesFromGear(gear).hp_regen + getBuffFlatBonus(activeEffects, 'hp_regen');
   const total = base + equipBonus;
   if (total <= 0) return 0;
   if (inCombat) return Math.max(1, Math.floor(total / 2));
@@ -37,7 +38,7 @@ export function getMpRegen(char: Character, inCombat: boolean, gear: (EquipmentI
   const effSPI = getEffectiveSPI(attrs.SPI);
   const base = Math.floor(effSPI / 2);
   const equipBonus = gear.reduce((sum, g) => sum + (g?.mpRegen ?? 0), 0)
-    + getAffixBonusesFromGear(gear).mp_regen;
+    + getAffixBonusesFromGear(gear).mp_regen + getBuffFlatBonus(activeEffects, 'mp_regen');
   const total = base + equipBonus;
   const regen = total <= 0 ? 0 : inCombat ? Math.max(1, Math.floor(total / 2)) : total;
   const percent = getMpRegenMaxPercent(activeEffects);

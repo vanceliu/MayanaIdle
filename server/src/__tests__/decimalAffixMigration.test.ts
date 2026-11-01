@@ -6,7 +6,7 @@ describe('百分比詞綴小數區間遷移', () => {
   const OLD_AFFIXES = [
     { type: 'attack_power', tier: 1, value: 3 },
     { type: 'crit_rate', tier: 7, value: 19 },
-    { type: 'defense', tier: 1, value: 3 },
+    { type: 'heal_effect', tier: 1, value: 3 },
     { type: 'magic_resist', tier: 1, value: 1, sealed: true },
     { type: 'max_hp', tier: 1, value: 15 },
     { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' },
@@ -33,7 +33,7 @@ describe('百分比詞綴小數區間遷移', () => {
     expect(gear.affixes).toEqual([
       { type: 'attack_power', tier: 1, value: 3.1 },
       { type: 'crit_rate', tier: 7, value: 19 },
-      { type: 'defense', tier: 1, value: 3.1 },
+      { type: 'heal_effect', tier: 1, value: 3.1 },
       { type: 'magic_resist', tier: 1, value: 1.1, sealed: true },
       { type: 'max_hp', tier: 1, value: 15 },
       { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' },

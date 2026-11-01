@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyDamageToMonster, applyMonsterAffixes, bloodthirstHeal, MONSTER_AFFIX_ORDER, monsterAffixLabels, monsterLogName,
-  monsterRewardMultiplier, pickVenomDebuff, rollMonsterAffixCount, rollMonsterAffixes, thornsReflectBase, tickMonsterRegen,
+  monsterDropMultiplier, monsterGoldExpMultiplier, pickVenomDebuff, rollMonsterAffixCount, rollMonsterAffixes, thornsReflectBase, tickMonsterRegen,
 } from '../monsterAffix';
 import type { MonsterInstance } from '../monster';
 
@@ -114,13 +114,13 @@ describe('戰鬥效果（25 § 25.12.3）', () => {
     expect(bloodthirstHeal(monster({ currentHp: 500 }), 100)).toBe(0);
   });
 
-  it('再生：每滿 1000ms 回 2%，最少 1', () => {
+  it('再生：每滿 6000ms 回 2%，最少 1', () => {
     const inst = monster({ affixes: ['regen'], currentHp: 500 });
-    expect(tickMonsterRegen(inst, 600)).toBe(0);
-    expect(tickMonsterRegen(inst, 600)).toBe(20);
+    expect(tickMonsterRegen(inst, 5999)).toBe(0);
+    expect(tickMonsterRegen(inst, 1)).toBe(20);
     expect(inst.currentHp).toBe(520);
     const tiny = monster({ affixes: ['regen'], currentHp: 10, maxHp: 30 });
-    expect(tickMonsterRegen(tiny, 1000)).toBe(1);
+    expect(tickMonsterRegen(tiny, 6000)).toBe(1);
   });
 
   it('再生：死亡後不回復', () => {
@@ -143,11 +143,19 @@ describe('顯示與獎勵（25 § 25.12.4、§ 25.12.5）', () => {
     expect(monsterAffixLabels(monster({ affixes: ['venom', 'shield'], venom: 'poison' }))).toEqual(['劇毒', '護盾']);
   });
 
-  it('獎勵倍率依詞綴數', () => {
-    expect(monsterRewardMultiplier(monster())).toBe(1);
-    expect(monsterRewardMultiplier(monster({ affixes: ['giant'] }))).toBe(1.05);
-    expect(monsterRewardMultiplier(monster({ affixes: ['giant', 'regen'] }))).toBe(1.07);
-    expect(monsterRewardMultiplier(monster({ affixes: ['giant', 'regen', 'gale'] }))).toBe(1.09);
-    expect(monsterRewardMultiplier(monster({ affixes: ['giant', 'regen', 'gale', 'thorns'] }))).toBe(1.1);
+  it('掉落倍率依詞綴數', () => {
+    expect(monsterDropMultiplier(monster())).toBe(1);
+    expect(monsterDropMultiplier(monster({ affixes: ['giant'] }))).toBe(1.25);
+    expect(monsterDropMultiplier(monster({ affixes: ['giant', 'regen'] }))).toBe(1.5);
+    expect(monsterDropMultiplier(monster({ affixes: ['giant', 'regen', 'gale'] }))).toBe(1.75);
+    expect(monsterDropMultiplier(monster({ affixes: ['giant', 'regen', 'gale', 'thorns'] }))).toBe(2);
+  });
+
+  it('金幣與經驗倍率依詞綴數', () => {
+    expect(monsterGoldExpMultiplier(monster())).toBe(1);
+    expect(monsterGoldExpMultiplier(monster({ affixes: ['giant'] }))).toBe(1.05);
+    expect(monsterGoldExpMultiplier(monster({ affixes: ['giant', 'regen'] }))).toBe(1.07);
+    expect(monsterGoldExpMultiplier(monster({ affixes: ['giant', 'regen', 'gale'] }))).toBe(1.09);
+    expect(monsterGoldExpMultiplier(monster({ affixes: ['giant', 'regen', 'gale', 'thorns'] }))).toBe(1.1);
   });
 });

@@ -1,4 +1,5 @@
 import { CURE_ITEMS } from './cureItem';
+import { getBuffPotionType, type BuffPotionType } from './buffPotion';
 import { ALL_TOWN_SCROLLS } from './townScroll';
 import { REGIONS } from './mapData';
 import { getItemById, getItemId } from './items';
@@ -81,6 +82,7 @@ export function getEntryScrollRegion(itemId: number): string | undefined {
 export type QuickSlotAction =
   | { type: 'potion'; potionType: BasicPotionType }
   | { type: 'speedPotion'; speedType: 'green' | 'enhanced-green' }
+  | { type: 'buffPotion'; buffType: BuffPotionType }
   | { type: 'cure'; itemId: number }
   | { type: 'townScroll'; itemId: number }
   | { type: 'travel'; regionId: string; scrollItemId: number }
@@ -112,6 +114,8 @@ export function resolveQuickSlotAction(entry: QuickSlotEntry | null): QuickSlotA
   const { itemId } = entry;
   if (BASIC_POTION_IDS[itemId]) return { type: 'potion', potionType: BASIC_POTION_IDS[itemId] };
   if (SPEED_POTION_IDS[itemId]) return { type: 'speedPotion', speedType: SPEED_POTION_IDS[itemId] };
+  const buffType = getBuffPotionType(itemId);
+  if (buffType) return { type: 'buffPotion', buffType };
   if (CURE_ITEM_IDS.has(itemId)) return { type: 'cure', itemId };
   if (TOWN_SCROLL_IDS.has(itemId)) return { type: 'townScroll', itemId };
 
