@@ -54,11 +54,11 @@ export function CraftingPage() {
       <p style={noteStyle}>
         製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條詞綴、不會出特殊詞綴，
         Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），<strong>不可使用任何印記</strong>。
-        製作不收金幣，必定成功。
+        製作費依階級（見下表），必定成功。
       </p>
       <p style={noteStyle}>
         <strong>拆解</strong>：有配方的裝備（製作品或同款掉落品）可在鐵匠鋪拆回材料，
-        每種材料退還 {DISMANTLE_RETURN_RATE * 100}%（無條件進位），前置武器不退還。
+        每種材料退還 {DISMANTLE_RETURN_RATE * 100}%（無條件進位），前置武器與製作費不退還。
       </p>
       <div className="wiki-filters">
         <select className="wiki-filter-select" value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
@@ -82,6 +82,7 @@ export function CraftingPage() {
               <th>成品</th>
               <th>類型</th>
               <th>階級</th>
+              <th>製作費</th>
               <th>前置武器</th>
               <th>所需材料</th>
             </tr>
@@ -108,6 +109,7 @@ function CraftRow({ item }: { item: ReturnType<typeof useWeaponList>[number] }) 
       </td>
       <td>{TYPE_LABELS[item.type] || item.type}</td>
       <td>{item.tier != null ? TIER_LABELS[item.tier] ?? `裝備Tier ${item.tier}` : '-'}</td>
+      <td>{(item.craftGold ?? 0).toLocaleString()}G</td>
       <td>
         {item.craftPrerequisiteWeapon
           ? (() => {

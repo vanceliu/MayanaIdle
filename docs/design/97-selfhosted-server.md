@@ -54,7 +54,7 @@
 | 試驗場本機沙盒 | 角色在試驗場（`50-training-ground.md`）時由 client 本機模擬：移動、木樁、戰鬥、天賦判定、量測、HP／MP／buff／冷卻、回復滿血滿魔只在本機（`restoreInTrainingGround` 不在允許清單）。改到角色本身狀態的操作照常送 server：換裝、天賦、技能、屬性點、道具消耗、離開。本機的道具消耗以 `consumeTrainingItems` 扣 server 庫存（只在試驗場內；任一行數量非正整數或庫存不足整筆不扣），效果套在沙盒。沙盒期間 client 不套用 server 推送的 `mapMonster`、戰鬥 delta、演出、`mapControl` 的位置／路徑／移動狀態，以及 `game` 的 `character.hp`／`character.mp`、`activeEffects`、`skills`、藥水冷卻；本機存檔一律丟棄；server 不 tick 該玩家。離開試驗場（含登出）時結束沙盒，server 整份重送狀態 |
 | action 後套用搜尋模式 | 每個 action 處理完依 `searchMode` 與 `phase` 套用自動移動，只在 `autoMove` 需切換時呼叫 `setAutoMove`，不覆蓋 action 已排好的路徑（`38-map-control.md` § 38.5）；所在地圖為城鎮時一律經 `setAutoMove` 關閉自動移動（`13-town.md` § 13.2.1） |
 | action 擁有權 | 以 id 指定對象的 action（裝備、丟棄、天賦格、信件），對象必須屬於自己，否則不處理。傳入完整物件的 action 只取其 id，從自己的資料取實例，其餘欄位不採用 |
-| 價格與內容由 server 決定 | 雜貨店購買只收道具 id 與數量，單價依所在城鎮貨架（`13-town.md` § 13.4）；非貨架品、數量非正整數、金幣或背包格數不足整筆不成交。裝備回收價只依 server 模板快取，新手裝與無回收價者不賣。接冒險者任務只取 id，任務內容取自自己的任務板 |
+| 價格與內容由 server 決定 | 雜貨店購買只收道具 id 與數量，單價依所在城鎮貨架（`13-town.md` § 13.4）；非貨架品、數量非正整數、金幣或背包格數不足整筆不成交。裝備回收價只依 server 模板快取，新手裝與無回收價者不賣。接冒險者任務只取 id，任務內容取自自己的任務板。簽懸賞契約只取契約 id 與是否加購，價格依契約的定價等級（`53-bounty-contract.md` § 53.2） |
 | 參數驗證 | 數量參數一律正的安全整數（丟棄確認例外：0 或負數丟 1 個，非整數不處理；多項丟棄見 `35-inventory-constraints.md` § 35.5.3）；裝備欄位限 `SLOT_ORDER`；屬性鍵限六屬性；印記類型限已定義的種類、詞綴編號為 null 或範圍內整數；旅館 mode 限 full／hp／mp，且只在地區類型為城鎮時生效。不合格不處理 |
 | 天賦與撤退設定驗證 | 天賦參數依該規則的參數定義逐欄位驗證（數字在範圍內、選項在清單內、道具存在、開關為布林），未定義欄位（含 `type`）丟棄，任一欄不合格整筆不寫；格位編號為 null 或非負整數；安裝類型限三種、天賦配置須存在、數量上限見 `51-auto-talent.md` § 51.3.4。緊急撤退：HP 門檻 1~100、動作固定回城、城鎮為空或已定義的卷軸城鎮（`03-combat.md` § 3.13） |
 | HTTP 安全標頭 | 每個回應都帶 `X-Frame-Options: DENY`、`Content-Security-Policy: frame-ancestors 'none'`、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff` |

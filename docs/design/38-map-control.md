@@ -295,7 +295,7 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 
 | 色槽 | 用途 |
 |---|---|
-| `ground` / `groundAlt` | 標準地面，依 `(x + y) % 2` 交錯，形成棋盤紋理 |
+| `ground` / `groundAlt` | 標準地面。第一代依 `(x + y) % 2` 交錯成棋盤；第二代整片只用 `ground` |
 | `grid` | 地板格線 |
 | `boundaryTop` / `boundaryLeft` / `boundaryRight` | 立體塊的頂面/左面/右面 |
 | `obstacle` | 牆壁頂面、岩石、柱子 |
@@ -310,6 +310,32 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 | 怪物（一般） | `#ff4444`（紅） |
 | 怪物（Boss） | `#cc00cc`（紫），帶角裝飾 `#880088` |
 | 移動路徑 | `rgba(68,136,255,0.25)` |
+
+### 背景 render 代別
+
+由程式常數 `BACKGROUND_RENDER_GENERATION`（`client/src/pixi/backgroundRender.ts`）切換，**現行為第二代**。
+兩代程式碼並存，改常數即回到前一代；接入新一代時不可覆蓋舊一代。調校頁：`client/demo/map-outline.html`。
+
+| 項目 | 第一代 | 第二代 |
+|---|---|---|
+| 地板 | `FloorLayer`：`ground` / `groundAlt` 棋盤交錯 | `FloorLayerGen2`：整片 `ground` 單色 |
+| 水／岩漿／深淵／草地／沙地／地毯 | 各自色槽 | 同第一代 |
+| 地板格線（`grid`，寬 0.5、不透明度 0.35） | 固定顯示 | 預設不顯示，玩家設定「顯示地板格線」切換（`34-ui-guidelines.md` § 34.6） |
+| 背景物（牆／邊界／樹／岩石／石柱／雜物） | 無外框 | 外框 1.5 px |
+| 牆／邊界接縫 | — | 外框合併成一片，相鄰方塊之間不畫線 |
+| 怪物 | 無外框 | 球體與 Boss 角外框 1.5 px；血條整條（含空血段）外框 0.75 px |
+| 水／岩漿／深淵邊線 | 無 | 與非這三種的格子（可走格、障礙物、地圖外）之間畫整圈邊線，三種彼此相鄰不畫；1.5 px、不透明度 0.6 |
+| 玩家、NPC | 無外框 | 無外框 |
+
+第二代外框與邊線一律黑色（`#000000`），數值在 `GEN2_STYLE`。
+
+第二代實作限制：
+
+- 外框＝共用原圖形 GraphicsContext 的剪影，塗外框色後往 8 方向各偏移外框粗細；
+  剪影必須在原圖形銷毀前先銷毀（`ObjectOutlineLayer.clear()` 先於 `WallLayer` 重建）
+- 牆／邊界的外框放在地板之上、`EntityLayer` 之下的合併層；其餘物件的外框放進 `EntityLayer`，深度＝本體 − 0.001。
+  牆擋在實體前方時，牆與該實體交界處沒有外框
+- 地形邊線是封閉折線，一次 stroke 帶不透明度，不用 filter
 
 ### 地形繪製方式
 
@@ -384,12 +410,13 @@ Boss 紅點以紫色 `#cc00cc` 標示並帶角裝飾。
 
 - 牆壁與實體（玩家、怪物）共用同一個 `EntityLayer`，依 `x + y` 深度排序（`sortableChildren`）
 - 實體深度加 `+0.5` 偏移，確保站在同一行牆壁前方時正確顯示
+- 第二代背景 render 的物件外框深度為本體 − 0.001，牆／邊界外框在 `EntityLayer` 之下（見「背景 render 代別」）
 - 移動路徑繪於 `PathLayer`，位於地板之上、實體之下
 
 ### 動畫
 
 - 玩家與怪物移動皆為 per-frame 平滑插值
-- PixiJS Ticker 驅動（取代舊的手動 `requestAnimationFrame` loop）
+- PixiJS Ticker 驅動（取代舊的手動 `requestAnimationFrame` loop）；畫面有變化才 render（`34-ui-guidelines.md` § 34.9.1）
 - 地板為靜態 Graphics，只在地圖載入時建置一次
 
 ## 38.10 地圖清單與尺寸規範

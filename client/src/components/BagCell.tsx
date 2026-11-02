@@ -113,7 +113,7 @@ export function BagItemTooltipBody({ item, templates, activeEffects = [], hint }
         <div className="tooltip-stat">回復 {config.healMin}~{config.healMax} HP</div>
         <div className="tooltip-stat">冷卻 {config.cooldown}ms</div>
         <div className="tooltip-stat">重量: {totalItemWeight(item)}</div>
-        <div className="tooltip-count">數量: {item.count}</div>
+        {item.count != null && <div className="tooltip-count">數量: {item.count}</div>}
         {hint}
       </div>
     );
@@ -127,19 +127,19 @@ export function BagItemTooltipBody({ item, templates, activeEffects = [], hint }
         <div className="tooltip-name">{item.name}</div>
         <div className="tooltip-stat">{def?.description ?? itemDef(item)?.description ?? ''}</div>
         <div className="tooltip-stat">重量: {totalItemWeight(item)}</div>
-        <div className="tooltip-count">數量: {item.count}</div>
+        {item.count != null && <div className="tooltip-count">數量: {item.count}</div>}
         {curable === false && hint === undefined ? null : hint}
       </div>
     );
   }
 
-  if (item.speedPotionType) {
+  if (item.speedPotionType || item.buffPotionType) {
     return (
       <div className="bag-tooltip-content">
         <div className="tooltip-name">{item.name}</div>
         <div className="tooltip-stat">{itemDef(item)?.description ?? ''}</div>
         <div className="tooltip-stat">重量: {totalItemWeight(item)}</div>
-        <div className="tooltip-count">數量: {item.count}</div>
+        {item.count != null && <div className="tooltip-count">數量: {item.count}</div>}
         {hint}
       </div>
     );

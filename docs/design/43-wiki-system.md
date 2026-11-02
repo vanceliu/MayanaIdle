@@ -24,7 +24,7 @@ client/src/wiki/
 │   ├── WikiHome.css
 │   ├── WeaponsPage.tsx   — 武器列表 + 單件詳細
 │   ├── ArmorPage.tsx     — 防具列表 + 單件詳細
-│   ├── AffixesPage.tsx   — 詞綴適用部位、階級數值、掉落權重
+│   ├── AffixesPage.tsx   — 詞綴適用部位、階級數值、掉落機率
 │   ├── MonstersPage.tsx  — 怪物列表 + 單隻詳細（含掉落）
 │   ├── MapsPage.tsx      — 地圖/區域結構
 │   ├── ItemsPage.tsx     — 道具列表 + 單件詳細
@@ -100,7 +100,7 @@ client/src/wiki/
 六個區塊：
 
 1. **基本規則**：詞綴洞數與各管道的詞綴條數（掉落 1~4 條）、空洞／毀壞的洞、封印詞綴、同件不可重複、品質放大公式、強化上限（`DEFAULT_MAX_AFFIX_TIER`）、
-   商店硬上限（`SHOP_MAX_AFFIX_TIER`）、`(鍛)` 製作品的詞綴範圍與權重（`CRAFT_AFFIX_TIER_RANGE`、`CRAFT_AFFIX_TIER_WEIGHT`）與不可使用印記、特殊詞綴佔插槽。數字一律 import 常數，不寫死。
+   商店硬上限（`SHOP_MAX_AFFIX_TIER`）、`(鍛)` 製作品的詞綴範圍與 T6 機率（`CRAFT_AFFIX_TIER_RANGE`、`CRAFT_AFFIX_T6_RATE`）與不可使用印記、特殊詞綴佔插槽。數字一律 import 常數，不寫死。
 2. **詞綴一覽**：依 `07-affix.md` § 7.4 的分類小標分組（攻擊類／防禦類／補給類／掉落類／
    盾牌專屬／飾品盾牌專屬／特殊詞綴），每組一張 4 欄窄表：詞綴／適用部位／效果／數值區間。
    - 效果敘述與分類小標存在 `AFFIX_DEFINITIONS` 的 `description`／`group` 欄位，
@@ -113,7 +113,7 @@ client/src/wiki/
      （§ 7.6、`getAffixCategoryForSlot`），不可寫成武器
 3. **階級數值**：T1~T7 的通用區間 + `AFFIX_TIER_TABLES` 專屬區間 + 取得方式（百分比區間帶一位小數）。
    節末附滿值粗體顯示的說明（§ 7.3.2）：判定看未加品質的原始數值、特殊詞綴一律粗體
-4. **掉落機率**：Tier 權重（一般怪物／Boss 對照，權重換算百分比）與特殊詞綴出現機率（含 Boss ×2）
+4. **掉落機率**：Tier 機率（一般怪物／Boss 對照；T6／T7 為整件至少一條的機率，T1~T5 為其餘條的階級比例，`07-affix.md` § 7.7）與特殊詞綴出現機率（含 Boss ×2）
 5. **T7 獨有詞綴**：依武器／防具／飾品／腰帶／左手分組列出名稱、效果、數值（`07-affix-tier7.md`），
    一律 import `UNIQUE_AFFIX_DEFINITIONS`（`models/uniqueAffix.ts`）。節首附通用規則與同類去重說明
 6. **印記**：八種印記的作用與限制（`46-sigil.md`），節末說明混沌填滿洞與 T6 機率（import `CHAOS_SIGIL_T6_RATE`）、新增補空洞、封印的成功率與失敗代價、印記兌換（§ 46.13，數量 import 兌換常數）。表格一律 import `SIGIL_DEFINITIONS`
@@ -173,8 +173,8 @@ client/src/wiki/
 - 範圍欄：隨機多擊技能顯示「隨機 N 下」
 
 ### 4.7 鐵匠鋪 (CraftingPage)
-- 製作配方列表：成品、所需材料與數量、材料來源區域連結
-- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與權重（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例（`06-equipment-acquire.md` § 6A.3「拆解」）
+- 製作配方列表：成品、製作費（`craftGold`）、所需材料與數量、材料來源區域連結
+- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與 T6 機率（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例、製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）
 
 ### 4.8 經驗表 (ExpTablePage)
 - Lv.1~100 升級所需經驗、累計經驗
@@ -197,6 +197,7 @@ client/src/wiki/
 
 ### 4.11 任務 (QuestsPage)
 - 冒險者工會等階、任務類型、獎勵
+- 懸賞契約：價格級距、效果、裝備比較條件（`53-bounty-contract.md`）
 
 ### 4.12 自動天賦 (TalentsPage)
 - **天賦格**：階級對應的條件槽數、取得管道（創角／每 5 級信箱／Boss 掉落／合成）、

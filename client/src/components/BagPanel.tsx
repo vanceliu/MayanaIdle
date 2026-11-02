@@ -844,7 +844,7 @@ export function BagPanel() {
       </BagTabs>
       <div className="bag-gold-row">
         <span className="bag-gold-label">金幣</span>
-        <span className="bag-gold-value">{character?.gold ?? 0}</span>
+        <span className="bag-gold-value">{(character?.gold ?? 0).toLocaleString()}</span>
       </div>
       {moving && (
         <div className="bag-move-hint" role="status">

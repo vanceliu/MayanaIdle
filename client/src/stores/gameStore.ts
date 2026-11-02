@@ -64,9 +64,18 @@ import { isClassMagic } from '../models/classSkills';
 import { SKILL_CATALOG } from '../models/skill';
 import type { AdventurerQuest, GuildProgress, AdventurerQuestDifficulty, QuestTownId } from '../models/adventurerQuest';
 import { generateQuestList, generateSingleQuest as generateAdvSingleQuest, acceptQuest as acceptAdvQuest, abandonQuest as abandonAdvQuest, updateQuestProgress as updateAdvQuestProgress, updateCollectQuestProgress as updateAdvCollectProgress, rollCollectMaterialDrop as rollAdvCollectDrop, completeQuest as completeAdvQuest } from '../systems/adventurerQuestSystem';
-import { getTownDifficulties, QUEST_DIFFICULTY_ORDER, createEmptyQuestBoard, QUEST_BOARD_REFRESH_COST, getRankForPoints } from '../models/adventurerQuest';
+import { getTownDifficulties, QUEST_DIFFICULTY_ORDER, createEmptyQuestBoard, QUEST_BOARD_REFRESH_COST, getRankForPoints, QUEST_TOWN_IDS } from '../models/adventurerQuest';
 import type { CraftQuest } from '../models/craftQuest';
 import { acceptCraftQuest as acceptCraftQuestFn, abandonCraftQuest as abandonCraftQuestFn } from '../systems/craftQuestSystem';
+import {
+  findBountyFor, generateBountyBoard, getBountyAreaName, getBountySignBlock, getBountyTotalPrice,
+  isBountyBoardStale, recordBountyKill, BOUNTY_SIGN_BLOCK_TEXT,
+  type BountyBoards, type SignedBounty,
+} from '../models/bounty';
+import {
+  defaultBountyCompareSettings, normalizeBountyCompareSettings, pickBetterBountyEquipment,
+  type BountyCompareSettings,
+} from '../models/bountyCompare';
 import type { CharacterStatistics } from '../models/statistics';
 import { createDefaultStatistics, normalizeStatistics } from '../models/statistics';
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
@@ -83,7 +92,7 @@ import {
   MAX_SCRIPT_TEMPLATES, normalizeTemplateName,
 } from '../models/scriptTemplate';
 import type { MapLocation } from '../models/area';
-import { getRegion, resolveArea, ZONES } from '../models/mapData';
+import { getRegion, resolveArea, resolveDropAreaId, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment, rollNewInstanceFields, getTemplateById } from '../systems/templateSync';
 import { createShopEquipment } from '../systems/shopEquipment';
@@ -426,6 +435,10 @@ export interface GameState {
   guildProgress: GuildProgress;
   /** 製作任務（§ 36.13）。上限與冒險者工會分開計算 */
   craftQuests: CraftQuest[];
+  /** 懸賞契約（`53-bounty-contract.md`）：各城鎮清單、已簽契約、裝備比較設定 */
+  bountyBoards: BountyBoards;
+  bountyContracts: SignedBounty[];
+  bountyCompare: BountyCompareSettings;
   statistics: CharacterStatistics;
 
   setPhase: (phase: GamePhase) => void;
@@ -578,6 +591,13 @@ export interface GameState {
   acceptCraftQuest: (templateId: number) => void;
   /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
   abandonCraftQuest: (questId: string) => void;
+  /** 過了更新時刻的懸賞清單重新生成（§ 53.4）；未過時刻不做事 */
+  ensureBountyBoards: () => void;
+  /** 簽目前城鎮清單上的契約（§ 53.3）；價格由定價等級查表 */
+  signBounty: (contractId: string, takeBetter: boolean) => void;
+  /** 放棄已簽契約，不退款（§ 53.3） */
+  abandonBounty: (contractId: string) => void;
+  setBountyCompare: (settings: BountyCompareSettings) => void;
   saveState: () => void;
   /** 強制把 dirty 狀態寫進持久層（§ 97.4） */
   flushSaveNow: () => Promise<void>;
@@ -739,6 +759,9 @@ export function createGameStore(session: Session) {
   questBoardTownId: null,
   guildProgress: { rank: 'F', points: 0 },
   craftQuests: [],
+  bountyBoards: {},
+  bountyContracts: [],
+  bountyCompare: defaultBountyCompareSettings(),
   statistics: createDefaultStatistics(),
 
   setPhase: (phase) => set({ phase }),
@@ -826,6 +849,9 @@ export function createGameStore(session: Session) {
     const adventurerQuests = prefs?.adventurerQuests ?? [];
     const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
     const craftQuests = prefs?.craftQuests ?? [];
+    const bountyBoards = prefs?.bountyBoards ?? {};
+    const bountyContracts = prefs?.bountyContracts ?? [];
+    const bountyCompare = normalizeBountyCompareSettings(prefs?.bountyCompare);
     // 舊存檔缺少後來新增的統計欄位，補上預設值
     const statistics = normalizeStatistics(prefs?.statistics);
 
@@ -880,12 +906,16 @@ export function createGameStore(session: Session) {
       adventurerQuests,
       guildProgress,
       craftQuests,
+      bountyBoards,
+      bountyContracts,
+      bountyCompare,
       statistics,
       phase: 'explore',
     });
     get().startRegen();
     get().startPersistentLoop();
     get().initQuestBoard();
+    get().ensureBountyBoards();
 
     startTalentAndMailboxInit(char.id!, char.level, session);
     const region = getRegion(char.currentRegion);
@@ -940,6 +970,9 @@ export function createGameStore(session: Session) {
   questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
       craftQuests: [],
+      bountyBoards: {},
+      bountyContracts: [],
+      bountyCompare: defaultBountyCompareSettings(),
     });
     // 天賦與信箱是獨立 store，不跟著 set 清掉的話會留著上一隻角色的資料
     session.talent.getState().reset();
@@ -1047,6 +1080,9 @@ export function createGameStore(session: Session) {
   questBoardTownId: null,
       guildProgress: { rank: 'F', points: 0 },
       craftQuests: [],
+      bountyBoards: {},
+      bountyContracts: [],
+      bountyCompare: defaultBountyCompareSettings(),
       phase: 'explore',
     });
     get().startRegen();
@@ -2591,6 +2627,61 @@ export function createGameStore(session: Session) {
     saveGame(get(), session);
   },
 
+  ensureBountyBoards: () => {
+    const state = get();
+    const now = Date.now();
+    let boards: BountyBoards | null = null;
+    for (const town of QUEST_TOWN_IDS) {
+      if (!isBountyBoardStale(state.bountyBoards[town], now)) continue;
+      boards ??= { ...state.bountyBoards };
+      boards[town] = generateBountyBoard(town, random, now);
+    }
+    if (!boards) return;
+    set({ bountyBoards: boards });
+    saveGame(get(), session);
+  },
+
+  signBounty: (contractId, takeBetter) => {
+    if (typeof contractId !== 'string') return;
+    const withAddon = takeBetter === true;
+    get().ensureBountyBoards();
+    const state = get();
+    const char = state.character;
+    const town = char?.currentArea as QuestTownId | undefined;
+    if (!char || !town || !QUEST_TOWN_IDS.includes(town)) return;
+    const board = state.bountyBoards[town];
+    const slotIndex = board?.slots.findIndex(c => c?.id === contractId) ?? -1;
+    const contract = slotIndex >= 0 ? board!.slots[slotIndex] : null;
+    if (!board || !contract) return;
+    const block = getBountySignBlock(contract, withAddon, state.bountyContracts, char.gold);
+    if (block) {
+      get().pushSystemLog(`無法簽約：${BOUNTY_SIGN_BLOCK_TEXT[block]}`);
+      return;
+    }
+    const price = getBountyTotalPrice(contract.priceLevel, withAddon)!;
+    const slots = board.slots.map((c, i) => (i === slotIndex ? null : c));
+    set({
+      character: { ...char, gold: char.gold - price },
+      bountyBoards: { ...state.bountyBoards, [town]: { ...board, slots } },
+      bountyContracts: [...state.bountyContracts, { ...contract, kills: 0, takeBetter: withAddon }],
+      combatLogs: addLog(state.combatLogs, { text: `簽下懸賞契約：${contract.monsterName}（-${price.toLocaleString()} 金幣）`, type: 'system' }),
+    });
+    saveGame(get(), session);
+  },
+
+  abandonBounty: (contractId) => {
+    if (typeof contractId !== 'string') return;
+    const state = get();
+    if (!state.bountyContracts.some(c => c.id === contractId)) return;
+    set({ bountyContracts: state.bountyContracts.filter(c => c.id !== contractId) });
+    saveGame(get(), session);
+  },
+
+  setBountyCompare: (settings) => {
+    set({ bountyCompare: normalizeBountyCompareSettings(settings) });
+    saveGame(get(), session);
+  },
+
   refreshQuestBoard: (difficulty) => {
     const state = get();
     const townId = state.character?.currentArea as QuestTownId | undefined;
@@ -2674,7 +2765,8 @@ export function createGameStore(session: Session) {
       if (!char) return { ok: false, message: '沒有角色' };
       if (!recipe || recipe.acquireType !== 'craft' || !recipe.craftMaterials?.length) return { ok: false, message: '無此配方' };
       const state = get();
-      if (!evaluateCraftRequirements(recipe, state.bagItems, state.inventory).ready) return { ok: false, message: '材料不足' };
+      const requirements = evaluateCraftRequirements(recipe, state.bagItems, state.inventory, char.gold);
+      if (!requirements.ready) return { ok: false, message: requirements.gold.enough ? '材料不足' : '金幣不足' };
       if (getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
 
       let newBag = [...state.bagItems];
@@ -2710,6 +2802,7 @@ export function createGameStore(session: Session) {
         } as EquipmentInstance);
         const s2 = get();
         set({
+          character: { ...s2.character!, gold: s2.character!.gold - requirements.gold.need },
           bagItems: newBag,
           inventory: [...inv, newEquip],
           // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
@@ -3080,6 +3173,8 @@ export interface MonsterDeathOptions {
   instanceKills?: number;
   /** 擊殺發生的區域；接收者可能在別張地圖（掉落模式「全隊」） */
   killArea?: { regionId: string; floor: number | null; areaId: string };
+  /** 懸賞契約是否生效：一人隊伍才生效（`53-bounty-contract.md` § 53.5.1）。省略視為生效 */
+  bountyActive?: boolean;
 }
 
 export function processMonsterDeath(
@@ -3150,10 +3245,23 @@ export function processMonsterDeath(
   const killArea = options.killArea ?? { regionId: char.currentRegion, floor: char.currentFloor, areaId: char.currentArea };
   session.loop.dropQueue = session.loop.dropQueue.then(async () => {
     const dropRegion = getRegion(killArea.regionId);
-    const dropHasFloors = dropRegion?.floors && dropRegion.floors.length > 0;
-    const dropAreaId = dropHasFloors && killArea.floor != null
-      ? `${killArea.regionId}-${killArea.floor}f`
-      : killArea.areaId;
+    const dropAreaId = resolveDropAreaId(killArea.regionId, killArea.floor, killArea.areaId);
+    // 懸賞契約（`53-bounty-contract.md` § 53.5）：對象判定在擲掉落前，加購者掉兩次取比較好
+    const bountyActive = options.bountyActive ?? true;
+    const bounty = bountyActive ? findBountyFor(get().bountyContracts, dropAreaId, defeatedMonsterName, monsterIsBoss) : undefined;
+    const takeBetter = bounty?.takeBetter
+      ? {
+        pickEquipment: (first: EquipmentInstance, second: EquipmentInstance) => {
+          const st = get();
+          return st.character
+            ? pickBetterBountyEquipment(first, second, {
+              settings: st.bountyCompare,
+              subject: { className: st.character.className, selfAttributes: getTotalAttributes(st.character) },
+            })
+            : first;
+        },
+      }
+      : undefined;
     // Boss 掉落的區域等級也走 area id 解析：副本要取**該樓層**的等級，
     // 不是整座副本的（`27-drop-table.md` § 27.3 的掉落表本來就是逐層列的）
     const areaLevel = resolveArea(dropAreaId)?.levelMax ?? dropRegion?.levelMax ?? dead.level;
@@ -3161,8 +3269,8 @@ export function processMonsterDeath(
     const drops = !withDrops
       ? noDrops
       : monsterIsBoss
-        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult })
-        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, false, dead.level);
+        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, session.repo, takeBetter)
+        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, false, dead.level, session.repo, takeBetter);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
@@ -3258,6 +3366,14 @@ export function processMonsterDeath(
       advQuests = updateAdvCollectProgress(advQuests, defeatedMonsterName, 1);
     }
 
+    // 懸賞契約擊殺數（§ 53.5.4）；達標即移除
+    const bountyResult = bountyActive
+      ? recordBountyKill(state2.bountyContracts, dropAreaId, defeatedMonsterName, monsterIsBoss)
+      : { signed: state2.bountyContracts, completed: [] };
+    for (const done of bountyResult.completed) {
+      logs2.push({ text: `懸賞契約完成：${getBountyAreaName(done.areaId)} ${done.monsterName} ${done.kills}/${done.targetKills}`, type: 'system' });
+    }
+
     // 統計計數
     const stats = { ...state2.statistics };
     stats.monstersKilled += 1;
@@ -3280,6 +3396,7 @@ export function processMonsterDeath(
       inventory: newEquipInv,
       bagItems: newBag,
       adventurerQuests: advQuests,
+      bountyContracts: bountyResult.signed,
       statistics: stats,
     });
     await Promise.all(orphanedEquipmentIds.map(id => session.repo.deleteEquipment(id)));
@@ -3496,6 +3613,9 @@ function saveLocalPreferences(characterId: number, state: GameState, session: Se
     adventurerQuests: state.adventurerQuests,
     guildProgress: state.guildProgress,
     craftQuests: state.craftQuests,
+    bountyBoards: state.bountyBoards,
+    bountyContracts: state.bountyContracts,
+    bountyCompare: state.bountyCompare,
     statistics: state.statistics,
   };
   void session.repo.putCharacterPrefs(characterId, data);
@@ -3554,6 +3674,9 @@ interface LoadedPreferences {
   adventurerQuests: AdventurerQuest[];
   guildProgress: GuildProgress;
   craftQuests: CraftQuest[];
+  bountyBoards: BountyBoards;
+  bountyContracts: SignedBounty[];
+  bountyCompare: BountyCompareSettings;
   statistics: CharacterStatistics;
 }
 
@@ -3611,6 +3734,9 @@ async function loadLocalPreferences(characterId: number, session: Session): Prom
       adventurerQuests: data.adventurerQuests ?? [],
       guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
       craftQuests: data.craftQuests ?? [],
+      bountyBoards: data.bountyBoards ?? {},
+      bountyContracts: data.bountyContracts ?? [],
+      bountyCompare: normalizeBountyCompareSettings(data.bountyCompare),
       statistics: normalizeStatistics(data.statistics),
     };
   } catch {

@@ -612,6 +612,12 @@ export function resolveArea(areaId: string): ResolvedArea | undefined {
   return { region, floor, levelMin: floor.levelMin, levelMax: floor.levelMax };
 }
 
+/** 掉落表與任務判定用的區域 id：有樓層的副本為 `<regionId>-<floor>f` */
+export function resolveDropAreaId(regionId: string, floor: number | null, areaId: string): string {
+  const region = getRegion(regionId);
+  return region?.floors && region.floors.length > 0 && floor != null ? `${regionId}-${floor}f` : areaId;
+}
+
 export function getFloor(regionId: string, floorNum: number): Floor | undefined {
   const region = getRegion(regionId);
   if (!region?.floors) return undefined;

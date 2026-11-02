@@ -161,6 +161,7 @@ baseValue × (1 + qualityPercent / 100)
 | 天賦配置 | 天賦格列表 — 自動戰鬥的條件/動作（見 § 18.9）；server 執行，必須在 server |
 | 快捷欄配置 | QuickSlot 綁定 |
 | 背包格子排列（slotMap） | `35-inventory-constraints.md` § 35.17 |
+| 懸賞契約 | 各城鎮清單、已簽契約、裝備比較設定（`53-bounty-contract.md` § 53.8），存 `character_prefs` |
 
 ### 瀏覽器 localStorage（純 client）
 
@@ -284,7 +285,7 @@ server 端維持同一設計：單一資料表 + 型別欄位，不做 polymorph
 | acquireType | enum | shop / craft / drop_only |
 | buyPrice | number? | 商店價格（shop 時必填） |
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
-| craftGold | number? | 製作金幣，一律 0（製作不收費，見 `06-equipment-acquire.md` § 6A.3） |
+| craftGold | number? | 製作費（craft 時必填，依階級，見 `06-equipment-acquire.md` § 6A.3） |
 | craftMaterials | json? | 製作素材 `[{itemId, amount}]`（craft 時必填；同配方 itemId 不重複，見 `06-equipment-acquire.md` § 6A.3） |
 | craftPrerequisiteWeapon | json? | 前置武器需求 `{templateId, quantity}`（高級進階以上製作品）。**存 templateId 不存名稱**，見 `99-ai-constraints.md` § 99.1 第 3 條 |
 

@@ -227,7 +227,7 @@ export function AffixesPage() {
             ——一件裝備最多 {AFFIX_SOCKETS} 條詞綴＋1 條 (封)＋T7 的 1 條 (獨)。
           </li>
           <li>所有詞綴數值皆為百分比，並受裝備品質放大：實際效果 = floor(數值 × (1 + 品質% / 100))。</li>
-          <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 來自一般怪掉落原生、突破印記，以及混沌／新增印記的小機率；T7 只有 Boss 掉落與突破印記。</li>
+          <li>精鍊印記的升階上限為 <strong>T{DEFAULT_MAX_AFFIX_TIER}</strong>；T6 來自一般怪掉落原生、T5／T6 製作品、突破印記，以及混沌／新增印記的小機率；T7 只有 Boss 掉落與突破印記。</li>
           <li>商店購買的裝備 Tier 硬上限 <strong>T{SHOP_MAX_AFFIX_TIER}</strong>，用精鍊印記也升不過。</li>
           <li>
             鐵匠製作品名稱後標 <strong>{CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條、不會出特殊詞綴，Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），
@@ -330,7 +330,7 @@ export function AffixesPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h3 style={headingStyle}>掉落階級權重</h3>
+        <h3 style={headingStyle}>掉落階級機率</h3>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
@@ -346,31 +346,28 @@ export function AffixesPage() {
               {TIER_LEVEL_BANDS.map(band => {
                 const normal = getTierWeights(band.level);
                 const boss = getBossTierWeights(band.level);
-                const total = (w: number[]) => w.reduce((s, v) => s + v, 0);
+                // T6／T7：整件至少一條的機率；T1~T5：其餘機率的分配比例（§ 7.7）
+                const cell = (w: number[], i: number) => {
+                  if (w[i] === 0) return '—';
+                  const base = i >= 5 ? w : w.slice(0, 5);
+                  return `${Math.round((w[i] / base.reduce((s, v) => s + v, 0)) * 100)}%`;
+                };
                 return [
                   <tr key={`${band.label}-n`}>
                     <td rowSpan={2}>{band.label}</td>
                     <td>一般怪物</td>
-                    {normal.map((w, i) => (
-                      <td key={i} className="cell-number">
-                        {w === 0 ? '—' : `${Math.round((w / total(normal)) * 100)}%`}
-                      </td>
-                    ))}
+                    {normal.map((_, i) => <td key={i} className="cell-number">{cell(normal, i)}</td>)}
                   </tr>,
                   <tr key={`${band.label}-b`}>
                     <td>Boss</td>
-                    {boss.map((w, i) => (
-                      <td key={i} className="cell-number">
-                        {w === 0 ? '—' : `${Math.round((w / total(boss)) * 100)}%`}
-                      </td>
-                    ))}
+                    {boss.map((_, i) => <td key={i} className="cell-number">{cell(boss, i)}</td>)}
                   </tr>,
                 ];
               })}
             </tbody>
           </table>
         </div>
-        <p style={noteStyle}>掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴，Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），不會出 T7。</p>
+        <p style={noteStyle}>T6、T7 是<strong>整件裝備至少一條</strong>的機率，不論詞綴幾條都一樣；T1~T5 是其餘詞綴的階級比例。掉落時先抽條數（1~{AFFIX_SOCKETS} 條均等），每條獨立抽階級，仍可能出現 2 條以上 T6。鐵匠鋪製作的裝備固定 {AFFIX_SOCKETS} 個詞綴，Tier 依裝備階級（{formatCraftAffixTierRanges()}；{formatCraftAffixTierWeights()}），不會出 T7。</p>
       </section>
 
       <section>

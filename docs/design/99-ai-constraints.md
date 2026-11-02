@@ -30,6 +30,80 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 懸賞契約（`53-bounty-contract.md`）
+
+規格：冒險者工會新增「懸賞」分頁，每城鎮 5 張（4 普通怪＋1 Boss），存檔，每天 0／6／12／18 點更新、簽走留空；簽約付金幣（依等級級距），可加購「掉兩次取比較好」（第二次不乘 Pressure）；契約對象生成時保證至少 1 個強化詞綴；擊殺數到達即結束；同時 3 張、同對象禁止重複、可放棄不退款、組隊時暫停。
+
+- [x] B1 設計文件：53 新檔；13、25、26、27、36、18、97、16-tech-frontend、43、INDEX → 使用者確認
+- [x] B2 demo（懸賞分頁、比較設定、追蹤視窗的契約列）→ 使用者確認
+- [x] B3 model：契約生成、定價、同對象檢查、裝備比較器（純函數）
+- [x] B4 server：簽約／放棄 action、定時更新（允許清單、server 定價）、生成時保證詞綴、擊殺計數、掉兩次取比較好、組隊暫停
+- [x] B5 client：`AdventurerGuild` 懸賞分頁、比較設定、`QuestTracker` 契約列
+- [x] B6 測試；`npx tsc -b`、client／server vitest
+- [x] B7 Wiki 任務頁
+
+### 地圖有變化才重畫（`34-ui-guidelines.md` § 34.9.1、`38-map-control.md` § 38.9「動畫」）
+
+規格：關掉 Pixi 每幀自動 render，主迴圈結尾判斷：鏡頭移動（差距 < 0.5px 直接定位）、實體位置變動或有進行中動畫、特效層非空、事件主動要求（換圖／縮放／設定／hover／選目標／怪物增減）任一成立才畫；最長 1 秒強制畫一次。
+
+- [x] R1 `PixiApp` 渲染開關＋`requestRender`；`Camera` 收斂定位
+- [x] R2 場景變動改讀 Pixi render group 佇列（不逐實體判斷）；1 秒保險
+- [x] R3 測試；`npx tsc -b`、client vitest
+- [x] R4 實測 CPU（城鎮：每幀畫約 40% → 約 20%；野外戰鬥照常每幀畫，約 72%）
+- [x] R5 文件：34、38、INDEX
+
+### 防具隨機額外防禦與安定值改加權（`06-equipment.md` § 6.10／§ 6A.8.8）
+
+規格：隨機額外防禦 +0／+1／+2 = 80%／15%／5%（平均 +0.25）；安定值 4／5／6 = 80%／15%／5%（平均 4.25）；商店固定 4 不變；既有實例不重抽。全套防禦目標改用平均隨機 +0.25、平均強化 +4.25 重算，seed 基礎防禦不動。
+
+- [x] W1 `rollDefenseBonus`／`rollArmorStability` 改加權（權重常數）
+- [x] W2 `armorDefenseTargets.test.ts` 平均值、目標、強化占比範圍
+- [x] W3 新增分布測試；`npx tsc -b`、client／server vitest
+- [x] W4 文件：06、INDEX（06-equipment-armor／21／18 只寫範圍，不需改）
+
+### 鐵匠鋪製作收金幣（`06-equipment-acquire.md` § 6A.3，demo `client/demo/craft-gold.html`）
+
+規格：製作費 T4 20,000／T5 50,000／T6 80,000，存 seed `craftGold`；製作按鈕與製作追蹤共用判定，素材＋前置裝備＋金幣皆足才可製作；成功時扣款；拆解不退金幣。配方卡片與追蹤視窗多一行「金幣 持有/需要」，不足標紅；Wiki 製作頁列費用。
+
+- [x] G1 demo（配方卡片＋追蹤視窗金幣行）→ 使用者確認
+- [x] G2 seed：`weaponSeedSpec.ts` 依階級、重跑 `generateWeaponSeeds.mts`；防具／飾品 seed
+- [x] G3 `evaluateCraftRequirements` 加金幣、`craftEquipment` 扣款
+- [x] G4 `TownBlacksmith`、`QuestTracker`、Wiki `CraftingPage`
+- [x] G5 測試；`npx tsc -b`、client／server vitest
+- [x] G6 文件：06、13、18、34、35、36、43、INDEX
+- [x] G7 背包金幣千分位（`BagPanel`、`35-inventory-constraints.md` § 35.15.4）
+
+### 商店清單改名稱列＋tooltip（`34-ui-guidelines.md` 使用場景表、`13-town.md` § 13.4，demo `client/demo/shop-list.html`）
+
+規格：武器店／防具店／雜貨店的購買與出售清單，一列只印 icon＋名稱（裝備含強化、Tier 色）＋價格＋數量；詳細內容走 hover tooltip。裝備購買用 `EquipmentTemplateDetail`、裝備出售用 `EquipmentDetail`、雜貨店用 `BagItemTooltipBody`。批量販售預覽不動。
+
+- [x] S1 demo `shop-list.html`（掛正式元件＋假資料）→ 使用者確認
+- [x] S2 共用列元件（倉庫 `equipRow` 抽出），`WeaponShop`／`ArmorShop`／`GeneralStore` 改用
+- [x] S3 測試；`npx tsc -b`、client vitest
+- [x] S4 文件：34、13、35、INDEX
+
+### 第二代背景 render（`38-map-control.md` § 38.9，demo `client/demo/map-outline.html`）
+
+規格：`BACKGROUND_RENDER_GENERATION`（`1 | 2`）程式常數切換，第一代程式碼保留。第二代：地板單色（特殊地形保留各自色）、格線預設關（設定可開）；背景物外框黑 1.5，牆／邊界外框合併；怪物球體與 Boss 角外框 1.5、血條外框 0.75；水／岩漿／深淵整圈邊線黑 1.5、不透明度 0.6。
+
+- [x] R1 文件：38、34、25、40、INDEX
+- [x] R2 `backgroundRender.ts`（常數、樣式、剪影外框）、`terrainOutline.ts`（邊線迴圈）
+- [x] R3 `FloorLayerGen2`、`ObjectOutlineLayer`、`WallLayer` 提供物件與 role、`GameScene` 依代別組裝
+- [x] R4 `MonsterEntity`／`HealthBar` 外框
+- [x] R5 設定「顯示地板格線」：`settingsStore`、`SettingsModal`、`PixiGame` 訂閱
+- [x] R6 demo 改用遊戲模組
+- [x] R7 測試；`npx tsc -b`、client vitest
+
+### 怪物球大小依體型（`25-monster-system.md` § 25.2，demo `client/demo/monster-size.html`）
+
+規格：小型半徑 `TILE_H × 0.45`、大型 `TILE_H × 0.75`，不看 Boss。Boss 角、血條、詠唱條與球頂距離維持現況；目標環依半徑比例縮放；血條寬度不變。懸停名稱標籤跟著球頂；懸停判定、技能命中點、怪物投射物發射點與傷害數字跟著球心上移。
+
+- [x] Z1 文件：25、INDEX
+- [x] Z2 `CombatInstanceView` 帶 `size`，client 實例不再寫死 `small`
+- [x] Z3 `MonsterEntity` 依體型畫，可後補體型
+- [x] Z4 `PixiGame` 懸停、名稱標籤、命中點、傷害數字
+- [x] Z5 測試；`npx tsc -b`、client／server vitest
+
 ### 增益藥水（`30-items.md`）
 
 規格：雜貨店新增回魔藥水（回魔量 +15）、爆擊藥水（爆擊率 +10%）、回血藥水（回血量 +15）、慎重藥水（裝備魔攻 +8）；皆 300 秒、5,000G、重量 5；所有 Boss 各 3% 掉落。各自獨立 category，同種再喝刷新時間。回血／回魔同裝備，戰鬥中隨總量減半。
@@ -206,7 +280,7 @@
 
 ### 製作品 (鍛)：不可用印記＋詞綴 Tier 依階級（`06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9）
 
-規格：鐵匠製作的實例帶製作標記，名稱顯示加 `(鍛)`；八種印記一律不受理（強化卷軸照常）；製作詞綴固定 4 條、範圍內加權抽（T6 權重 0.7，其他 1）：T4 製作品 T1~T5、T5 製作品 T2~T6、T6 製作品 T3~T6，不出特殊詞綴。改版前已製作的實例無標記，維持原狀。
+規格：鐵匠製作的實例帶製作標記，名稱顯示加 `(鍛)`；八種印記一律不受理（強化卷軸照常）；製作詞綴固定 4 條、範圍內抽（每條 T6 機率 10%，其餘階級均分）：T4 製作品 T1~T5、T5 製作品 T2~T6、T6 製作品 T3~T6，不出特殊詞綴。改版前已製作的實例無標記，維持原狀。
 
 - [x] P1 文件：06-equipment-acquire、07-affix、46-sigil、13-town、18-data-schema、43-wiki、INDEX
 - [x] P2 實例欄位＋製作寫入＋詞綴 Tier 範圍

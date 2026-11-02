@@ -23,7 +23,7 @@ describe('client 套用 frame', () => {
   const frame = (f: Omit<Extract<ServerMessage, { t: 'frame' }>, 't'>): ServerMessage => ({ t: 'frame', ...f });
   const log = (message: string) => ({ message }) as unknown as CombatLog;
   const view = (id: string, currentHp: number): CombatInstanceView => ({
-    id, name: '史萊姆', level: 3, currentHp, maxHp: 100, isBoss: false, element: 'none', attackType: 'melee',
+    id, name: '史萊姆', level: 3, currentHp, maxHp: 100, isBoss: false, size: 'small', element: 'none', attackType: 'melee',
   });
 
   it('戰鬥日誌接上新增的筆數並保留最後 length 筆', () => {
@@ -66,5 +66,11 @@ describe('client 套用 frame', () => {
     expect([...defaultSession.combat.monsterInstances.keys()]).toEqual(['m2']);
     expect(defaultSession.combat.engine.playerCtx.targetMonsterId).toBe('m2');
     expect(mirrorCastProgress('m2')).toBe(0.5);
+  });
+
+  it('怪物實例照 server 送來的體型還原（25 § 25.2.1）', () => {
+    applyServerMessage(frame({ now: 300, combat: { full: true, add: [{ ...view('big', 100), size: 'large' }, view('small', 100)] } }));
+    expect(defaultSession.combat.monsterInstances.get('big')?.size).toBe('large');
+    expect(defaultSession.combat.monsterInstances.get('small')?.size).toBe('small');
   });
 });

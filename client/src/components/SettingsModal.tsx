@@ -9,6 +9,7 @@ import {
   SCALE_DEFAULT,
 } from '../stores/settingsStore';
 import { usePanelWindowStore } from '../stores/panelWindowStore';
+import { BACKGROUND_RENDER_GENERATION } from '../pixi/backgroundRender';
 
 /**
  * 系統設定（`34-ui-guidelines.md` § 34.6 / `47-mobile.md`）
@@ -40,6 +41,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const setLinkScales = useSettingsStore(s => s.setLinkScales);
   const resetDisplaySettings = useSettingsStore(s => s.resetDisplaySettings);
   const resetPositions = usePanelWindowStore(s => s.resetPositions);
+  const showFloorGrid = useSettingsStore(s => s.showFloorGrid);
+  const setShowFloorGrid = useSettingsStore(s => s.setShowFloorGrid);
 
   const isDefault = uiScale === SCALE_DEFAULT && fontScale === SCALE_DEFAULT;
 
@@ -121,6 +124,17 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               {linkScales ? '與介面大小連動。' : '只改文字，不改介面大小。'}
             </p>
           </div>
+
+          {BACKGROUND_RENDER_GENERATION === 2 && (
+            <label className="settings-link">
+              <input
+                type="checkbox"
+                checked={showFloorGrid}
+                onChange={e => setShowFloorGrid(e.target.checked)}
+              />
+              <span>顯示地板格線</span>
+            </label>
+          )}
 
           <div className="settings-row">
             <span className="settings-label">浮動視窗位置</span>

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { setRandomSource } from '../../core/rng';
 import {
   ARMOR_REQUIREMENT_LADDER,
   areAffixesActive,
@@ -8,6 +9,8 @@ import {
   resolveActiveGear,
   rollArmorStability,
   rollDefenseBonus,
+  DEFENSE_BONUS_WEIGHTS,
+  ARMOR_STABILITY_WEIGHTS,
 } from '../equipment';
 import type { EquipmentInstance } from '../equipment';
 import type { Attributes } from '../character';
@@ -104,15 +107,30 @@ describe('防禦的三段組成（§ 6A.8.8）', () => {
     expect(getItemDefense({ defense: 0, defenseBonus: 1, enhancement: 4 })).toBe(5);
   });
 
-  it('隨機額外落在 0~2，安定值落在 4~6', () => {
-    const bonuses = new Set<number>();
-    const stabilities = new Set<number>();
-    for (let i = 0; i < 500; i++) {
-      bonuses.add(rollDefenseBonus());
-      stabilities.add(rollArmorStability());
-    }
-    expect([...bonuses].sort()).toEqual([0, 1, 2]);
-    expect([...stabilities].sort()).toEqual([4, 5, 6]);
+});
+
+/** `06-equipment.md` § 6.10／§ 6A.8.8：80%／15%／5% */
+describe('隨機額外防禦與安定值的機率', () => {
+  afterEach(() => setRandomSource(() => Math.random()));
+  const withRandom = <T>(r: number, roll: () => T): T => { setRandomSource(() => r); return roll(); };
+
+  it('權重為 80／15／5，加總 100', () => {
+    expect(DEFENSE_BONUS_WEIGHTS).toEqual([80, 15, 5]);
+    expect(ARMOR_STABILITY_WEIGHTS).toEqual([80, 15, 5]);
+  });
+
+  it('隨機額外：前 80% 為 +0、接著 15% 為 +1、最後 5% 為 +2', () => {
+    expect(withRandom(0.7999, rollDefenseBonus)).toBe(0);
+    expect(withRandom(0.8, rollDefenseBonus)).toBe(1);
+    expect(withRandom(0.9499, rollDefenseBonus)).toBe(1);
+    expect(withRandom(0.95, rollDefenseBonus)).toBe(2);
+  });
+
+  it('安定值：前 80% 為 4、接著 15% 為 5、最後 5% 為 6', () => {
+    expect(withRandom(0.7999, rollArmorStability)).toBe(4);
+    expect(withRandom(0.8, rollArmorStability)).toBe(5);
+    expect(withRandom(0.9499, rollArmorStability)).toBe(5);
+    expect(withRandom(0.95, rollArmorStability)).toBe(6);
   });
 });
 

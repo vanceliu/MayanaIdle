@@ -2,7 +2,7 @@
  * 鐵匠鋪製作品的詞綴（`06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2）：
  * 與商店／掉落同一支 `generateAffixes`，固定 4 條、Tier 依裝備階級範圍加權、無特殊詞綴。
  */
-import { generateAffixes, getWeaponBaseDamage, CRAFT_AFFIX_TIER_RANGE, CRAFT_AFFIX_TIER_WEIGHT, type AffixCategory, type Affix } from '../models/affix';
+import { generateAffixes, getWeaponBaseDamage, CRAFT_AFFIX_TIER_RANGE, getCraftAffixTierWeights, type AffixCategory, type Affix } from '../models/affix';
 import type { CraftMaterial, EquipmentTemplate } from '../models/equipment';
 
 export function generateCraftAffixes(
@@ -15,7 +15,7 @@ export function generateCraftAffixes(
     minTier: range.min,
     maxTier: range.max,
     uniformTier: true,
-    tierWeights: CRAFT_AFFIX_TIER_WEIGHT,
+    tierWeights: getCraftAffixTierWeights(range),
     noSpecialAffix: true,
     weaponBaseDamage: getWeaponBaseDamage(tpl),
   });

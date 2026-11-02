@@ -21,10 +21,7 @@ import { hasMaterialUsage } from './craftMaterialUsage';
 /** 商店回收價一律為買價的一半 */
 export const SHOP_SELL_RATE = 0.5;
 
-/**
- * 製作品的賣店價依階級固定（`06-equipment-acquire.md` § 6A.4）。
- * 製作不收金幣，賣價不能再由製作費推算。
- */
+/** 製作品的賣店價依階級固定（`06-equipment-acquire.md` § 6A.4），不由製作費推算 */
 export const CRAFT_SELL_PRICE: Record<number, number> = { 4: 10000, 5: 20000, 6: 30000 };
 
 // === 道具（雜貨店） ===

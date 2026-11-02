@@ -1,4 +1,16 @@
 import '../components/WikiTable.css';
+import {
+  getBountyPrice, BOUNTY_BOSS_KILLS, BOUNTY_MONSTER_KILLS, BOUNTY_REFRESH_HOURS, MAX_SIGNED_BOUNTIES,
+} from '../../models/bounty';
+import { BOUNTY_COMPARE_CRITERIA, BOUNTY_COMPARE_LABELS } from '../../models/bountyCompare';
+
+/** § 53.2 價格級距：取各級下限查表 */
+const BOUNTY_PRICE_ROWS = [
+  { label: '30～39', level: 30 },
+  { label: '40～49', level: 40 },
+  { label: '50～59', level: 50 },
+  { label: '60～80', level: 60 },
+];
 
 export function QuestsPage() {
   return (
@@ -11,7 +23,7 @@ export function QuestsPage() {
         </h3>
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
-            冒險者工會面板分「冒險任務」與「職業任務」兩頁。「冒險任務」提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
+            冒險者工會面板分「冒險任務」「職業任務」「懸賞」三頁。「冒險任務」提供可重複接取的隨機任務，獎勵為金幣、藥水、強化材料等實用物品。<br />
             四個城鎮皆設有冒險者工會分部，各分部僅顯示與該城鎮相關區域的任務。<br />
             BOSS 任務獨立於 B+ / A+ / S+ 分頁，不與一般任務混在同一頁；
             該城鎮沒有對應難度的 BOSS 時該分頁不顯示。<br />
@@ -334,6 +346,54 @@ export function QuestsPage() {
               <tr><td>元素師</td><td>冷卻縮減技能書</td><td>魔力奪取技能書</td></tr>
               <tr><td>牧師</td><td>聖光護盾技能書</td><td>精神匯聚技能書</td></tr>
               <tr><td>盜賊</td><td>淬毒技能書</td><td>致命一擊技能書</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
+          懸賞
+        </h3>
+        <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
+          <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
+            付金幣簽約，契約期間指定對象生成時<strong>保證至少 1 個強化詞綴</strong>，掉落、金幣、經驗跟著詞綴數提高。打滿擊殺數即結束，沒有完成獎勵。<br />
+            每個分部 5 張：普通怪 4 張（指定區域的一種怪物，{BOUNTY_MONSTER_KILLS.min}～{BOUNTY_MONSTER_KILLS.max} 隻）、Boss 1 張（{BOUNTY_BOSS_KILLS.min}～{BOUNTY_BOSS_KILLS.max} 隻）。
+            每天 {BOUNTY_REFRESH_HOURS.map(h => `${h}`).join('／')} 點換新清單，簽走的格子留空到下次更新。<br />
+            同時最多 {MAX_SIGNED_BOUNTIES} 張，相同對象不能同時簽兩張；可隨時放棄，不退款。組隊期間契約暫停。<br />
+            加購「掉兩次取比較好」：契約對象的掉落每項擲兩次、任一次中就掉（第二次不吃 Pressure），金幣取較高的那次；
+            掉到裝備時生成兩件，依「比較設定」的順序留一件。天賦格不適用。
+          </p>
+        </div>
+        <div className="wiki-table-wrap">
+          <table className="wiki-table">
+            <thead>
+              <tr><th>等級（普通怪取區域最低等級、Boss 取 Boss 等級）</th><th>契約價格</th><th>加購「掉兩次取比較好」</th></tr>
+            </thead>
+            <tbody>
+              {BOUNTY_PRICE_ROWS.map(row => {
+                const price = getBountyPrice(row.level)!;
+                return (
+                  <tr key={row.label}>
+                    <td>{row.label}</td>
+                    <td className="cell-number">{price.base.toLocaleString()}</td>
+                    <td className="cell-number">{price.takeBetter.toLocaleString()}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="wiki-table-wrap" style={{ marginTop: 12 }}>
+          <table className="wiki-table">
+            <thead>
+              <tr><th>預設順序</th><th>裝備比較條件</th></tr>
+            </thead>
+            <tbody>
+              {BOUNTY_COMPARE_CRITERIA.map((key, i) => (
+                <tr key={key}><td className="cell-number">{i + 1}</td><td>{BOUNTY_COMPARE_LABELS[key]}</td></tr>
+              ))}
+              <tr><td>—</td><td>全部相同時留第一件。順序與開關可在懸賞分頁的「比較設定」調整；無 Tier 的詞綴視為 T5</td></tr>
             </tbody>
           </table>
         </div>

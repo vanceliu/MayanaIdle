@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商店清單 Demo — MayanaIdle</title>
+<!--
+  武器店／防具店／雜貨店清單改為名稱列＋hover tooltip（`34-ui-guidelines.md` 使用場景表、`13-town.md` § 13.4）。
+  列元件為 `src/components/common/ItemListRow.tsx`，資料取自 seed。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/shop-list.html
+
+  .demo-* 是這頁的排版；列樣式來自 App.css 的 `.item-list-*`。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+/* 寬度＝遊戲裡城鎮設施視窗（`.town-modal` 600px） */
+.demo-card {
+  width: 600px; height: 560px; display: flex; flex-direction: column;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px;
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+.demo-card .shop-panel { flex: 1; min-height: 0; }
+
+</style>
+</head>
+<body>
+  <h1 class="demo-title">商店清單：名稱列＋tooltip</h1>
+  <p class="demo-note">
+    一列只放 icon、名稱、價格、數量；滑過名稱看完整內容（裝備用與倉庫同一套詳情，道具用背包的 tooltip）。<br>
+    購買／出售分頁照正式介面切換；批量販售區不在這次範圍，demo 省略。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./shopListDemo.tsx"></script>
+</body>
+</html>

@@ -45,7 +45,7 @@ beforeEach(() => {
 });
 
 function buyOne(itemName: string) {
-  const row = screen.getByText(itemName).closest('.shop-item') as HTMLElement;
+  const row = screen.getByText(itemName).closest('.item-list-row') as HTMLElement;
   // 購物車模式：先在該列選 1 個，再按底部唯一的結帳鈕
   fireEvent.change(within(row).getByLabelText(`${itemName} 數量`), { target: { value: '1' } });
   const footer = document.querySelector('.shop-cart-footer') as HTMLElement;

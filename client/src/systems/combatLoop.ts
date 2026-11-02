@@ -23,7 +23,9 @@ import { getEffectiveMaxHp, getEffectiveMaxMp, processMonsterDeath, waitForPendi
 import { talentCombatRules } from '../stores/talentStore';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { defaultSession, type Session } from '../stores/session';
-import { getNearestTown } from '../models/mapData';
+import { getNearestTown, resolveDropAreaId } from '../models/mapData';
+import { isBountyTarget } from '../models/bounty';
+import type { MonsterTemplate } from '../models/monster';
 import { hasProjectilePath, isWithinAttackRange } from './lineOfSight';
 import { consumeDotTick } from './gameLoop';
 import { findAttackPosition, findNearestWalkable, isAttackPosition } from './pathfinding';
@@ -137,6 +139,15 @@ export function tickCombat(deltaMs: number, session: Session = defaultSession): 
   return visuals;
 }
 
+/** 懸賞契約只在一人隊伍時生效（`53-bounty-contract.md` § 53.5.1）；回傳生成時的對象判定 */
+function bountyTargetPredicate(instance: MapInstance, members: Session[]): ((t: MonsterTemplate) => boolean) | undefined {
+  if (instance.party || members.length !== 1) return undefined;
+  const { character, bountyContracts } = members[0].game.getState();
+  if (!character || bountyContracts.length === 0) return undefined;
+  const areaId = resolveDropAreaId(character.currentRegion, character.currentFloor, character.currentArea);
+  return t => bountyContracts.some(c => isBountyTarget(c, areaId, t.name, t.isBoss));
+}
+
 /** 這隻怪的目標選擇狀態；沒有就建 */
 function targetingOf(instance: MapInstance, monsterId: string) {
   let state = instance.targeting.get(monsterId);
@@ -159,9 +170,10 @@ export function tickInstanceCombat(deltaMs: number, instance: MapInstance): Mons
   const { monsterInstances, areaTemplates, engineMonsters, targeting } = instance;
 
   // Ensure monster instances exist
+  const bountyTarget = bountyTargetPredicate(instance, members);
   for (const mm of monsterStore.monsters) {
     if (!monsterInstances.has(mm.id)) {
-      const inst = createMonsterFromTemplate(mm, areaTemplates);
+      const inst = createMonsterFromTemplate(mm, areaTemplates, undefined, bountyTarget);
       // 模板未載入 → 這個 tick 先不建實例，下一個 tick 再試（不生假怪）
       if (!inst) continue;
       monsterInstances.set(mm.id, inst);
@@ -839,6 +851,7 @@ export function handleMonsterDeath(monster: MonsterInstance, monsterId: string, 
       withDrops: p === receiver,
       instanceKills: kills,
       killArea,
+      bountyActive: instance.party === null,
     });
   }
 }

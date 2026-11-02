@@ -3,14 +3,13 @@ import { useGameStore, getBagUsedSlots, getBagMaxSlots } from '../../stores/game
 import type { EquipmentInstance } from '../../models/equipment';
 import type { BagItem } from '../../stores/gameStore';
 import { EquipmentDetail } from '../EquipmentInfo';
-import { Tooltip } from '../Tooltip';
 import { GameIcon } from '../GameIcon';
-import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
-import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
+import { resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
 import { hasBagItem } from '../../models/bagItem';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import { QtyStepper } from '../common/QtyStepper';
+import { ItemListRow, EquipmentInstanceLabel } from '../common/ItemListRow';
 import { roundWeight } from '../../systems/weight';
 import { isSigilItemId } from '../../models/sigil';
 import { useShopCart, cartLines, type CartLine, ShopCartFooter } from '../common/ShopCart';
@@ -215,26 +214,20 @@ export function Storage() {
 
   /** 裝備的一列：只印 icon + 名稱，完整內容走 hover tooltip；唯一實例，數量上限固定 1 */
   function equipRow(item: EquipmentInstance, cart: ReturnType<typeof useShopCart>) {
-    const tierColor = getEquipmentInstanceTierColor(item, templates);
-    const enhancement = item.enhancement ?? 0;
     return (
-      <div key={item.id} className="storage-item">
-        <Tooltip position="right" content={<EquipmentDetail item={item} templates={templates} />}>
-          <span className="storage-equip-name" style={{ color: tierColor }}>
-            <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color={tierColor} />
-            {item.name}{enhancement > 0 ? ` +${enhancement}` : ''}
-          </span>
-        </Tooltip>
-        <div className="storage-item-actions">
-          <QtyStepper
-            label={`${item.name} #${item.id}`}
-            value={cart.raw(`eq:${item.id}`)}
-            max={1}
-            min={0}
-            onChange={next => cart.set(`eq:${item.id}`, next)}
-          />
-        </div>
-      </div>
+      <ItemListRow
+        key={item.id}
+        label={<EquipmentInstanceLabel item={item} templates={templates} />}
+        tooltip={<EquipmentDetail item={item} templates={templates} />}
+      >
+        <QtyStepper
+          label={`${item.name} #${item.id}`}
+          value={cart.raw(`eq:${item.id}`)}
+          max={1}
+          min={0}
+          onChange={next => cart.set(`eq:${item.id}`, next)}
+        />
+      </ItemListRow>
     );
   }
 

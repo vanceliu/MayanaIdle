@@ -96,11 +96,15 @@ screenY = (worldX + worldY) * (TILE_H / 2)
 client/src/
 ├── pixi/
 │   ├── PixiApp.ts              # PixiJS Application 初始化與生命週期（async destroy）
-│   ├── GameScene.ts            # 主場景，管理所有 layer
+│   ├── GameScene.ts            # 主場景，管理所有 layer（依背景 render 代別組裝）
+│   ├── backgroundRender.ts     # 背景 render 代別常數、第二代樣式 `GEN2_STYLE`、剪影外框
+│   ├── terrainOutline.ts       # 水／岩漿／深淵整圈邊線（封閉折線）
 │   ├── camera/
 │   │   └── Camera.ts           # 攝影機 lerp 追蹤邏輯
 │   ├── layers/
-│   │   ├── FloorLayer.ts       # 地板 tile 繪製
+│   │   ├── FloorLayer.ts       # 地板 tile 繪製（第一代背景 render）
+│   │   ├── FloorLayerGen2.ts   # 地板（第二代背景 render：單色、格線圖層、地形邊線）
+│   │   ├── ObjectOutlineLayer.ts # 背景物外框（第二代背景 render）
 │   │   ├── WallLayer.ts        # 牆壁繪製（buildInto EntityLayer container）
 │   │   ├── PathLayer.ts        # 路徑顯示
 │   │   ├── EntityLayer.ts      # 實體容器（sortableChildren, 含牆壁）
@@ -187,13 +191,13 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 | 風險 | 對策 |
 |------|------|
 | PixiJS 與 React 生命週期衝突 | async destroy + destroyed flag 防止重複初始化 |
-| 等角地圖大量 tile 效能 | FloorLayer 一次性繪製，未來可快取為 RenderTexture |
+| 等角地圖大量 tile 效能 | FloorLayer 一次性繪製；畫面有變化才 render（`34-ui-guidelines.md` § 34.9.1） |
 | 手機 WebGL 相容性 | PixiJS 內建 Canvas fallback |
 | 美術資源尚未準備 | 先用幾何圖形（圓形/菱形），與舊版一致 |
 
 ## 12. 後續待做
 
-- [ ] FloorLayer 快取為 RenderTexture（大地圖優化）
+- 不做：FloorLayer 快取為貼圖（效益小、手機貼圖尺寸受限）
 - [x] 傷害數字飄動動畫
 - [x] 怪物血條跟隨
 - [x] 技能特效預留（架構可擴展）

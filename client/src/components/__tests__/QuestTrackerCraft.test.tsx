@@ -13,9 +13,10 @@ import { bagItemById } from '../../testing/bagFixtures';
  * 製作任務在追蹤視窗的顯示（`36-quest-system.md` § 36.13.4）
  *
  * 配方固定用鋼心劍，但材料一律由 seed 反查 —— § 6A.3 重新分配材料時
- * 這組測試不該變紅。製作不收金幣，角色金幣一律 0。
+ * 這組測試不該變紅。製作費同樣由 seed 讀（§ 6A.3）。
  */
 const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
+const CRAFT_GOLD = RECIPE.craftGold!;
 const recipeBag = (amount: number) => RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, amount));
 
 function setChar(gold: number) {
@@ -38,7 +39,7 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     resetTestDb();
     await loadTemplateCache();
 
-    setChar(0);
+    setChar(CRAFT_GOLD);
     useGameStore.setState({
       equippedGear: {},
       inventory: [],
@@ -56,10 +57,10 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     for (const mat of RECIPE.craftMaterials!) {
       expect(screen.getByText(getItemById(mat.itemId)!.name)).toBeTruthy();
     }
-    expect(screen.queryByText('金幣')).toBeNull();
+    expect(screen.getByText(`${CRAFT_GOLD.toLocaleString()}/${CRAFT_GOLD.toLocaleString()}`)).toBeTruthy();
   });
 
-  it('素材滿足時套用 completable 外框並標示可製作（金幣為 0 也一樣）', async () => {
+  it('素材與金幣滿足時套用 completable 外框並標示可製作', async () => {
     const { container } = render(<QuestTrackerContent />);
 
     await screen.findByText('[製作]');
@@ -76,6 +77,18 @@ describe('QuestTracker — 製作任務（§ 36.13.4）', () => {
     await screen.findByText('[製作]');
     expect(container.querySelector('.quest-tracker-item.completable')).toBeNull();
     expect(container.querySelectorAll('.tracker-craft-req.lacking').length).toBeGreaterThan(0);
+    expect(screen.queryByText('可製作')).toBeNull();
+  });
+
+  it('金幣不足製作費時不亮框，金幣行標為缺料（§ 6A.3）', async () => {
+    setChar(CRAFT_GOLD - 1);
+    const { container } = render(<QuestTrackerContent />);
+
+    await screen.findByText('[製作]');
+    expect(container.querySelector('.quest-tracker-item.completable')).toBeNull();
+    const goldRow = Array.from(container.querySelectorAll('.tracker-craft-req')).find(el => el.textContent?.startsWith('金幣'))!;
+    expect(goldRow.classList.contains('lacking')).toBe(true);
+    expect(goldRow.textContent).toBe(`金幣 ${(CRAFT_GOLD - 1).toLocaleString()}/${CRAFT_GOLD.toLocaleString()}`);
     expect(screen.queryByText('可製作')).toBeNull();
   });
 

@@ -81,13 +81,23 @@
 
 | 面板 | 根 class | 額外 class | 特殊元素 |
 |---|---|---|---|
-| 雜貨店 | `.shop-panel` | — | 數量步進器 + 底部「購買／賣出」動作列 |
-| 武器店 | `.shop-panel` | — | `<EquipmentTemplateDetail>` / `<EquipmentDetail>`；步進器上限 1 + 底部「購買／出售」動作列 |
+| 雜貨店 | `.shop-panel` | `.item-list-row` | 清單列 + 數量步進器 + 底部「購買／賣出」動作列 |
+| 武器店 | `.shop-panel` | `.item-list-row` | 清單列；出售步進器上限 1 + 底部「購買／出售」動作列 |
 | 防具店 | `.shop-panel` | — | 同武器店 |
-| 鐵匠鋪 | `.shop-panel .blacksmith-panel` | `.bs-shop-item` | 資源列、製作分類篩選器、列內製作按鈕（不套購物車） |
+| 鐵匠鋪 | `.shop-panel .blacksmith-panel` | `.bs-shop-item` | 資源列、製作分類篩選器、需求列（金幣 → 前置裝備 → 素材，`have/need`，不足標紅）、列內製作按鈕（不套購物車） |
 | 旅館 | `.shop-panel .inn-panel` | — | — |
-| 倉庫 | `.shop-panel .storage-panel` | — | 數量步進器 + 底部「存入／取出」動作列；金幣存取另有獨立輸入列 |
+| 倉庫 | `.shop-panel .storage-panel` | `.item-list-row`（裝備） | 裝備用清單列；數量步進器 + 底部「存入／取出」動作列；金幣存取另有獨立輸入列 |
 | 新手 NPC | `.starter-npc-panel` | `.starter-row` | 強化進度格、已擁有／未擁有 badge（列內動作） |
+
+### 清單列（`ItemListRow`）
+
+武器店、防具店、雜貨店的購買／出售清單與倉庫裝備列共用：一列 icon＋名稱＋價格＋數量步進器，完整內容走 hover tooltip（裝備用的元件見 § 34.2 使用場景）。
+
+- class：`.storage-item.item-list-row`；名稱 `.item-list-name`、價格 `.item-list-price`
+- 裝備名稱含強化等級，用 Tier 色
+- 名稱區不足 140px 時步進器換到第二行；仍放不下只截名稱（…），數量與 ⚒ 標記保留
+- 雜貨店 tooltip 用背包的 `BagItemTooltipBody`；卷軸與素材另補一行道具說明；購買列不顯示數量
+- 雜貨店出售列的用途標記只放 ⚒，用途文字在 tooltip
 
 ### 頁籤樣式
 
@@ -111,8 +121,8 @@
 | 裝備欄浮動視窗（EquipmentPanel） | `EquipmentDetail` | `compact` | 資訊精簡，不顯示重量/部位/材質/職業/詞綴；完整內容走 hover tooltip |
 | 背包 tooltip（BagPanel） | `EquipmentDetail` | — | 完整顯示 |
 | 背包列表（Inventory） | `EquipmentDetail` | — | 完整顯示 |
-| 倉庫（Storage 存入／取出清單） | `EquipmentDetail` | — | 清單一列只印 icon + 名稱（含強化，Tier 色）；完整內容走 hover tooltip |
-| 武器店/防具店 | `EquipmentDetail` / `EquipmentTemplateDetail` | — | 完整顯示 |
+| 倉庫（Storage 存入／取出清單） | `EquipmentDetail` | — | 清單列（§ 34.1）；完整內容走 hover tooltip |
+| 武器店/防具店 | 購買 `EquipmentTemplateDetail`／出售 `EquipmentDetail` | — | 清單列（§ 34.1）；完整內容走 hover tooltip |
 | 印記師（詞綴/品質） | 自訂兩行摘要 | — | **不用 `EquipmentDetail`**：詞綴在選取區已整條列出，再列一次是同一份資料印兩遍。只留品質%與精鍊上限（見 `13-town.md` § 13.13.1） |
 | 鐵匠鋪（製作） | 自訂摘要 ＋ `AttributeRequirement` | — | 配方資訊，非裝備實例；素質需求走共用元件 |
 
@@ -351,6 +361,12 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 - 設定存 localStorage 全域 key（`mayana_ui_scale`／`mayana_font_scale`／`mayana_scale_linked`），
   與角色無關，換角色不必重設。
 
+### 地板格線
+
+顯示分頁的「顯示地板格線」勾選，預設不勾，立即生效。只在第二代背景 render 出現
+（`38-map-control.md` § 38.9「背景 render 代別」）；第一代格線固定顯示，不出現此選項。
+存 localStorage 全域 key `mayana_floor_grid`。
+
 ### 浮動視窗位置
 
 設定視窗另有「重設視窗位置」——浮動面板的座標會自動記住
@@ -433,10 +449,14 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 
 ### 34.9.1 每幀重繪的通則
 
-上限之外，逐幀執行的繪製要自己守住兩件事：
+上限之外，逐幀執行的繪製要自己守住三件事：
+
+- **有變化才畫**：Pixi 不自動每幀 render；遊戲邏輯跑完後，場景有變動（位移／透明度／顯示、圖形重畫、增減子物件）
+  或有 `requestRender()` 才畫，最長 1 秒強制畫一次（`pixi/renderOnDemand.ts`）。
+  場景佇列看不到的變化（視窗縮放）要呼叫 `requestRender()`；鏡頭離目標 < 0.5px 直接定位，不可無限緩動
 
 - **狀態沒變就不重建幾何**：`Graphics.clear()` 後重畫是重建頂點，
-  每幀每個實體各做一次會直接吃掉 CPU。血條之類的元件必須先比對數值再決定畫不畫
+  每幀每個實體各做一次會直接吃掉 CPU，也會讓場景永遠算「有變動」、每幀都重畫。血條之類的元件必須先比對數值再決定畫不畫
 - **快取鍵不可每幀重算字串**：store 內以整份取代（非原地修改）的陣列，
   一律用**參照比對**當快取鍵，不要逐項組字串
 ---

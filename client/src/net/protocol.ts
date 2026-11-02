@@ -2,6 +2,7 @@
  * client 與 server 共用的 WebSocket 訊息（JSON）。版本協商見 `97-selfhosted-server.md` § 97.2。
  * 唯一出處；server 以相對路徑引用。
  */
+import type { MonsterSize } from '../models/monster';
 import type { MonsterAffixId, VenomDebuff } from '../models/monsterAffix';
 import type { TrainingDummySpec } from '../models/trainingGround';
 
@@ -142,6 +143,8 @@ export interface CombatInstanceView {
   currentHp: number;
   maxHp: number;
   isBoss: boolean;
+  /** 體型，決定地圖上的球大小（`25-monster-system.md` § 25.2.1） */
+  size: MonsterSize;
   element: string;
   attackType: string;
   isTrainingDummy?: boolean;
@@ -169,6 +172,7 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'spendAttributePoint', 'acceptQuest', 'completeQuest',
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
+    'ensureBountyBoards', 'signBounty', 'abandonBounty', 'setBountyCompare',
     'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
     'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
     'setAfterCombatThreshold',

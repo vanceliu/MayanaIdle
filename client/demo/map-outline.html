@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>背景 render Demo — MayanaIdle</title>
+<!--
+  背景 render 調校頁（`docs/design/38-map-control.md` § 38.9）。
+  第一代：`FloorLayer` / `WallLayer`；第二代：`FloorLayerGen2` / `ObjectOutlineLayer` / `MonsterEntity` 外框。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/map-outline.html
+
+  接法見 `mapOutlineDemo.ts`；「匯出參數」的 JSON = `src/pixi/backgroundRender.ts` 的 `GEN2_STYLE`。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 320px; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; font-size: var(--fs-sm);
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 10px; }
+.demo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.demo-row label { flex: 0 0 96px; }
+.demo-row input[type="range"], .demo-row select { flex: 1; min-width: 0; }
+.demo-row output { flex: 0 0 48px; text-align: right; font-variant-numeric: tabular-nums; }
+.demo-check { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.demo-compare { font-weight: bold; color: var(--accent-gold); }
+#stage { width: 100%; height: 680px; border: 1px solid var(--border); border-radius: var(--radius-md); display: block; cursor: grab; touch-action: none; }
+#export { width: 100%; height: 150px; font-family: monospace; font-size: 12px; background: var(--bg-deepest); color: var(--text-primary); border: 1px solid var(--border-subtle); }
+</style>
+</head>
+<body>
+<h1 class="demo-title">背景 render</h1>
+<p class="demo-note">
+  第二代：背景物、怪物、怪物血條加外框；地板單色；水／岩漿／深淵畫整圈邊線。遊戲採用的值是 <code>GEN2_STYLE</code>。<br>
+  第一代：棋盤磚地板＋格線、無外框。拖曳畫面可平移；勾「第一代」切回比較。
+</p>
+<div class="demo-layout">
+  <div class="demo-main">
+    <canvas id="stage"></canvas>
+  </div>
+  <div class="demo-side">
+    <div class="demo-card">
+      <h2>地圖</h2>
+      <div class="demo-row"><label for="mapId">地圖</label><select id="mapId"></select></div>
+      <div class="demo-row"><label for="theme">主題</label><select id="theme"><option value="">地圖預設</option></select></div>
+      <div class="demo-row">
+        <label for="zoom">畫面縮放</label>
+        <input id="zoom" type="range" min="0.5" max="2.5" step="0.25" value="1">
+        <output id="zoom-out"></output>
+      </div>
+      <label class="demo-check demo-compare"><input id="showGen1" type="checkbox">第一代背景 render</label>
+      <label class="demo-check"><input id="showActors" type="checkbox">顯示角色與怪物</label>
+      <label class="demo-check"><input id="floorGrid" type="checkbox">地板格線（遊戲內為玩家設定）</label>
+    </div>
+    <div class="demo-card">
+      <h2>外框</h2>
+      <div class="demo-row"><label for="outlineColor">顏色</label><input id="outlineColor" type="color"></div>
+      <div class="demo-row">
+        <label for="objectOutlineWidth">背景物／怪物</label>
+        <input id="objectOutlineWidth" type="range" min="0.5" max="3" step="0.25">
+        <output id="objectOutlineWidth-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="hpBarOutlineWidth">怪物血條</label>
+        <input id="hpBarOutlineWidth" type="range" min="0.25" max="2" step="0.25">
+        <output id="hpBarOutlineWidth-out"></output>
+      </div>
+    </div>
+    <div class="demo-card">
+      <h2>水／岩漿／深淵邊線</h2>
+      <div class="demo-row">
+        <label for="terrainEdgeWidth">粗細</label>
+        <input id="terrainEdgeWidth" type="range" min="0.5" max="4" step="0.25">
+        <output id="terrainEdgeWidth-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="terrainEdgeAlpha">不透明度</label>
+        <input id="terrainEdgeAlpha" type="range" min="0.1" max="1" step="0.05">
+        <output id="terrainEdgeAlpha-out"></output>
+      </div>
+    </div>
+    <div class="demo-card">
+      <h2>匯出參數</h2>
+      <textarea id="export" readonly></textarea>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { MapOutlineStage, MAP_IDS, THEMES, loadMap } from './mapOutlineDemo.ts';
+
+const canvas = document.getElementById('stage');
+const stage = new MapOutlineStage();
+const zoomInput = document.getElementById('zoom');
+const mapSelect = document.getElementById('mapId');
+const themeSelect = document.getElementById('theme');
+const size = () => [canvas.clientWidth, canvas.clientHeight];
+
+await stage.init(canvas, ...size());
+
+for (const id of MAP_IDS) mapSelect.add(new Option(id, id));
+for (const theme of THEMES) themeSelect.add(new Option(theme, theme));
+mapSelect.value = MAP_IDS.includes('dragon-valley-1f') ? 'dragon-valley-1f' : MAP_IDS[0];
+
+let baseMap = null;
+async function changeMap() {
+  baseMap = await loadMap(mapSelect.value);
+  applyTheme();
+}
+function applyTheme() {
+  stage.setMap(themeSelect.value ? { ...baseMap, theme: themeSelect.value } : baseMap);
+}
+
+const sliders = ['objectOutlineWidth', 'hpBarOutlineWidth', 'terrainEdgeWidth', 'terrainEdgeAlpha'];
+const checks = ['showGen1', 'showActors', 'floorGrid'];
+const values = ['outlineColor'];
+
+function sync() {
+  for (const key of sliders) document.getElementById(`${key}-out`).textContent = String(stage.params[key]);
+  document.getElementById('zoom-out').textContent = `×${zoomInput.value}`;
+  document.getElementById('export').value = stage.exportJson();
+}
+
+for (const key of sliders) {
+  const input = document.getElementById(key);
+  input.value = stage.params[key];
+  input.addEventListener('input', () => { stage.params[key] = Number(input.value); stage.apply(); sync(); });
+}
+for (const key of checks) {
+  const input = document.getElementById(key);
+  input.checked = stage.params[key];
+  input.addEventListener('change', () => { stage.params[key] = input.checked; stage.apply(); sync(); });
+}
+for (const key of values) {
+  const input = document.getElementById(key);
+  input.value = stage.params[key];
+  input.addEventListener('input', () => { stage.params[key] = input.value; stage.apply(); sync(); });
+}
+mapSelect.addEventListener('change', changeMap);
+themeSelect.addEventListener('change', applyTheme);
+zoomInput.addEventListener('input', () => { stage.layout(...size(), Number(zoomInput.value)); sync(); });
+window.addEventListener('resize', () => stage.layout(...size(), Number(zoomInput.value)));
+
+await changeMap();
+sync();
+</script>
+</body>
+</html>

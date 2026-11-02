@@ -25,6 +25,7 @@ export function createMonsterFromTemplate(
   mm: MapMonster,
   templates: MonsterTemplate[],
   rates: MonsterStatRates = defaultMonsterStatRates(),
+  isBountyTarget?: (template: MonsterTemplate) => boolean,
 ): MonsterInstance | null {
   // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
   if (mm.dummy) return createTrainingDummy(mm.dummy);
@@ -62,7 +63,9 @@ export function createMonsterFromTemplate(
     debuffs: template.debuffs,
   };
   // 強化詞綴在全域倍率之後（`25-monster-system.md` § 25.12.2）
-  const roll = rollMonsterAffixes(template.level, (template.debuffs ?? []).map(d => d.type), random);
+  // 懸賞契約對象保證至少 1 個強化詞綴（`53-bounty-contract.md` § 53.5.3）
+  const minAffixes = isBountyTarget?.(template) ? 1 : 0;
+  const roll = rollMonsterAffixes(template.level, (template.debuffs ?? []).map(d => d.type), random, minAffixes);
   return applyMonsterAffixes(base, roll);
 }
 

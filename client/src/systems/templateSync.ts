@@ -40,7 +40,7 @@ export function isTemplateCacheReady(): boolean {
 /**
  * 每次載入都從模板覆蓋回實例的欄位 —— 模板改了數值，舊實例跟著改。
  *
- * **`stability` 不在此列**：防具的安定值是實例屬性（逐件抽 4~6，§ 6.10），
+ * **`stability` 不在此列**：防具的安定值是實例屬性（逐件加權抽 4~6，§ 6.10），
  * 模板沒有這個欄位，照抄會把抽好的值洗成 undefined。武器與飾品仍走模板，
  * 由下方的 `resolveStability()` 分流。
  * `defenseBonus` 同理，它只存在於實例上。

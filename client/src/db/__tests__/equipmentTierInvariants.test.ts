@@ -141,9 +141,12 @@ describe('T6/T7 掉落限定', () => {
     expect(bad).toEqual([]);
   });
 
-  it('製作品一律不收金幣（`06-equipment-acquire.md` § 6A.3）', () => {
-    const charged = REAL.filter(t => t.acquireType === 'craft' && t.craftGold).map(t => t.name);
-    expect(charged).toEqual([]);
+  it('製作費依階級：T4 20,000／T5 50,000／T6 80,000（`06-equipment-acquire.md` § 6A.3）', () => {
+    const expected: Record<number, number> = { 4: 20_000, 5: 50_000, 6: 80_000 };
+    const wrong = REAL
+      .filter(t => t.acquireType === 'craft' && t.craftGold !== expected[t.tier ?? 0])
+      .map(t => `${t.name} T${t.tier} ${t.craftGold}`);
+    expect(wrong).toEqual([]);
   });
 
   it('同一份配方的材料不重複（`06-equipment-acquire.md` § 6A.3）', () => {

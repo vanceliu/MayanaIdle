@@ -40,16 +40,26 @@ export function getSkillBookLevels(areaLevel: number): number[] {
     .map(r => r.level);
 }
 
-/** 回傳掉落的技能書 `ITEM_DEFINITIONS` id；每個符合的級數各擲一次，可同時掉多本 */
-export function rollClassSkillBookDrops(areaLevel: number, isBoss: boolean, dropRateMultiplier: number = 1): number[] {
+/**
+ * 回傳掉落的技能書 `ITEM_DEFINITIONS` id；每個符合的級數各擲一次，可同時掉多本。
+ * `secondDropRateMultiplier` 有值時每級再擲第二次，任一次命中即掉（`53-bounty-contract.md` § 53.5.5）。
+ */
+export function rollClassSkillBookDrops(
+  areaLevel: number,
+  isBoss: boolean,
+  dropRateMultiplier: number = 1,
+  secondDropRateMultiplier?: number,
+): number[] {
   const baseDropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
   const dropRate = Math.min(baseDropRate * dropRateMultiplier, 1);
+  const secondDropRate = secondDropRateMultiplier === undefined ? undefined : Math.min(baseDropRate * secondDropRateMultiplier, 1);
   const drops: number[] = [];
 
   for (const bookLevel of getSkillBookLevels(areaLevel)) {
     const pool = ALL_CLASS_SKILL_BOOKS.filter(b => b.level === bookLevel);
     if (pool.length === 0) continue;
-    if (random() >= dropRate) continue;
+    const hit = random() < dropRate || (secondDropRate !== undefined && random() < secondDropRate);
+    if (!hit) continue;
     drops.push(pool[Math.floor(random() * pool.length)].itemId);
   }
   return drops;

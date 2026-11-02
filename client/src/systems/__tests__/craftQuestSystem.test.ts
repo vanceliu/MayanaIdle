@@ -24,7 +24,7 @@ const RECIPE: EquipmentTemplate = {
   slot: 'rightHand',
   isTwoHanded: false,
   buyPrice: 0,
-  craftGold: 0,
+  craftGold: 20_000,
   craftMaterials: [
     { itemId: 11, amount: 4 },
     { itemId: 12, amount: 3 },
@@ -39,6 +39,7 @@ const RECIPE_WITH_PREREQ: EquipmentTemplate = {
 };
 
 const fullBag = () => [bagItemById(11, 10), bagItemById(12, 10)];
+const ENOUGH_GOLD = 20_000;
 
 function equipInstance(templateId: number, id: number): EquipmentInstance {
   return { id, templateId, name: 'x', type: 'sword', slot: 'rightHand', isTwoHanded: false } as EquipmentInstance;
@@ -48,7 +49,7 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
   it('素材與前置皆滿足時 ready 為 true', () => {
     const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [
       equipInstance(9001, 1), equipInstance(9001, 2),
-    ]);
+    ], ENOUGH_GOLD);
 
     expect(status.ready).toBe(true);
     expect(status.materials.every(m => m.enough)).toBe(true);
@@ -56,7 +57,7 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
   });
 
   it('素材不足時 ready 為 false，且逐項標出缺哪一種', () => {
-    const status = evaluateCraftRequirements(RECIPE, [bagItemById(11, 10), bagItemById(12, 1)], []);
+    const status = evaluateCraftRequirements(RECIPE, [bagItemById(11, 10), bagItemById(12, 1)], [], ENOUGH_GOLD);
 
     expect(status.ready).toBe(false);
     expect(status.materials.find(m => m.itemId === 11)!.enough).toBe(true);
@@ -66,15 +67,22 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
     expect(lacking.need).toBe(3);
   });
 
-  it('製作不收金幣：素材與前置齊了就 ready（§ 6A.3）', () => {
-    const status = evaluateCraftRequirements(RECIPE, fullBag(), []);
+  it('金幣不足製作費時 ready 為 false，並標出持有與需要（§ 6A.3）', () => {
+    const status = evaluateCraftRequirements(RECIPE, fullBag(), [], ENOUGH_GOLD - 1);
 
-    expect(RECIPE.craftGold).toBe(0);
+    expect(status.ready).toBe(false);
+    expect(status.gold).toEqual({ have: ENOUGH_GOLD - 1, need: 20_000, enough: false });
+  });
+
+  it('金幣剛好等於製作費即可製作', () => {
+    const status = evaluateCraftRequirements(RECIPE, fullBag(), [], ENOUGH_GOLD);
+
+    expect(status.gold.enough).toBe(true);
     expect(status.ready).toBe(true);
   });
 
   it('前置裝備不足時 ready 為 false', () => {
-    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [equipInstance(9001, 1)]);
+    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [equipInstance(9001, 1)], ENOUGH_GOLD);
 
     expect(status.ready).toBe(false);
     expect(status.prerequisite).toEqual({ templateId: 9001, have: 1, need: 2, enough: false });
@@ -83,14 +91,14 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
   it('前置以 templateId 比對，同名但不同模板不算數（§ 99.1 第 3 條）', () => {
     const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [
       equipInstance(8888, 1), equipInstance(8888, 2),
-    ]);
+    ], ENOUGH_GOLD);
 
     expect(status.prerequisite!.have).toBe(0);
     expect(status.ready).toBe(false);
   });
 
   it('沒有前置需求的配方，prerequisite 為 null 且不影響 ready', () => {
-    const status = evaluateCraftRequirements(RECIPE, fullBag(), []);
+    const status = evaluateCraftRequirements(RECIPE, fullBag(), [], ENOUGH_GOLD);
 
     expect(status.prerequisite).toBeNull();
     expect(status.ready).toBe(true);
@@ -98,7 +106,7 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
 
   it('不可製作的模板（無 craftMaterials）永遠 ready 為 false', () => {
     const notCraftable = { id: 9003, name: '掉落劍', buyPrice: 0 } as EquipmentTemplate;
-    const status = evaluateCraftRequirements(notCraftable, fullBag(), []);
+    const status = evaluateCraftRequirements(notCraftable, fullBag(), [], ENOUGH_GOLD);
 
     expect(status.ready).toBe(false);
   });

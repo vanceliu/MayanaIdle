@@ -4,12 +4,11 @@ import { getRegion } from '../../models/mapData';
 import { TOWN_SCROLL_CONFIG } from '../../models/townScroll';
 import { getItemById } from '../../models/items';
 import { hasBagItem } from '../../models/bagItem';
-import { GameIcon } from '../GameIcon';
-import { resolveItemIcon } from '../../models/iconMap';
 import { MATERIAL_TIER_COLORS } from '../../models/iconMap';
 import { QtyStepper } from '../common/QtyStepper';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 import { CraftUsageBadge } from '../common/CraftUsageBadge';
+import { ItemListRow, ItemLabel, ItemTooltip } from '../common/ItemListRow';
 import {
   GENERAL_STORE_ITEM_IDS, getItemSellPrice, isSellableItem,
   collectSellableMaterials, collectProtectedMaterials, getMaterialsSellTotal,
@@ -85,13 +84,6 @@ export function GeneralStore() {
     });
   }
 
-  function getShopItemIcon(itemId: number): { icon: string; color?: string; glowClass: string } {
-    // 顯示方式一律以 item 定義為準，與背包共用同一份資料
-    const def = getItemById(itemId);
-    return resolveItemIcon(def, def?.category === 'scroll' || def?.category === 'dungeon' ? 'scroll' : 'material');
-  }
-
-
   // --- 購買頁購物車 ---
   const buyLines = cartLines(buyCart, buyEntries, {
     keyOf: e => String(e.itemId),
@@ -164,29 +156,22 @@ export function GeneralStore() {
       {tab === 'buy' && (
         <div className="shop-items">
           {buyEntries.map(entry => {
-            const { icon, color, glowClass } = getShopItemIcon(entry.itemId);
-            const affordable = Math.floor(gold / entry.price);
             const cartKey = String(entry.itemId);
             return (
-            <div key={entry.itemId} className="shop-item">
-              <div className="shop-item-info">
-                <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <GameIcon name={icon} size={16} color={color} className={glowClass} />
-                  {entry.name}
-                </span>
-                <span className="shop-item-desc">{entry.description} | 重量: {getItemById(entry.itemId)?.weight ?? 0}</span>
-                <span className="shop-item-price">{entry.price.toLocaleString()}G</span>
-              </div>
-              <div className="shop-item-actions">
+              <ItemListRow
+                key={entry.itemId}
+                label={<ItemLabel itemId={entry.itemId} name={entry.name} />}
+                tooltip={<ItemTooltip itemId={entry.itemId} />}
+                price={`${entry.price.toLocaleString()}G`}
+              >
                 <QtyStepper
                   label={entry.name}
                   value={buyCart.raw(cartKey)}
-                  max={affordable}
+                  max={Math.floor(gold / entry.price)}
                   min={0}
                   onChange={next => buyCart.set(cartKey, next)}
                 />
-              </div>
-            </div>
+              </ItemListRow>
             );
           })}
         </div>
@@ -255,32 +240,25 @@ export function GeneralStore() {
           <hr className="batch-sell-divider" />
 
           {sellableItems.length === 0 && <p className="empty-text">沒有可出售的物品</p>}
-          {sellableItems.map(item => {
-            const sellPrice = unitSellPrice(item.itemId);
-            return (
-              <div key={item.itemId} className="shop-item">
-                <div className="shop-item-info">
-                  <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {(() => { const { icon, color, glowClass } = getShopItemIcon(item.itemId); return <GameIcon name={icon} size={16} color={color} className={glowClass} />; })()}
-                    {item.name} ×{item.amount}
-                    <CraftUsageBadge itemId={item.itemId} />
-                  </span>
-                  <span className="shop-item-price sell-price">+{sellPrice}G/個</span>
-                </div>
-                <div className="shop-item-actions">
-                  <QtyStepper
-                    label={item.name}
-                    value={sellCart.raw(String(item.itemId))}
-                    max={item.amount}
-                    min={0}
-                    hardCap={Infinity}
-                    showMax
-                    onChange={next => sellCart.set(String(item.itemId), next)}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {sellableItems.map(item => (
+            <ItemListRow
+              key={item.itemId}
+              label={<ItemLabel itemId={item.itemId} name={item.name} suffix={<> ×{item.amount}<CraftUsageBadge itemId={item.itemId} compact /></>} />}
+              tooltip={<ItemTooltip itemId={item.itemId} count={item.amount} />}
+              price={`+${unitSellPrice(item.itemId)}G/個`}
+              priceClassName="sell-price"
+            >
+              <QtyStepper
+                label={item.name}
+                value={sellCart.raw(String(item.itemId))}
+                max={item.amount}
+                min={0}
+                hardCap={Infinity}
+                showMax
+                onChange={next => sellCart.set(String(item.itemId), next)}
+              />
+            </ItemListRow>
+          ))}
         </div>
       )}
       </div>

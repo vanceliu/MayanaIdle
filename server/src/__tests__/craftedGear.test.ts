@@ -76,6 +76,7 @@ describe('(鍛) 製作品（遠端 action）', () => {
     const c = await enter();
     const game = c.session.game;
     game.setState({
+      character: { ...game.getState().character!, gold: RECIPE.craftGold! },
       bagItems: [
         ...RECIPE.craftMaterials!.map(m => makeBagItem(m.itemId, 99)!),
         makeBagItem(ADD_SIGIL, 1)!,
@@ -84,6 +85,8 @@ describe('(鍛) 製作品（遠端 action）', () => {
 
     const crafted = await c.act('craftEquipment', RECIPE.id);
     expect(crafted).toMatchObject({ t: 'action_ok', result: { ok: true } });
+    // 製作費由 server 的 seed 決定並扣款（`06-equipment-acquire.md` § 6A.3）
+    expect(game.getState().character!.gold).toBe(0);
     const item = game.getState().inventory.find(i => i.templateId === RECIPE.id)!;
     expect(item.name).toBe(`${RECIPE.name}${CRAFTED_GEAR_SUFFIX}`);
 

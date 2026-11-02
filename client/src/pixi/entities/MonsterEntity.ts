@@ -1,16 +1,32 @@
 import { Graphics, Container } from 'pixi.js';
 import { worldToScreen, getEntityDepth, TILE_H, TILE_W } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
+import type { MonsterSize } from '../../models/monster';
 import { CastBar } from '../ui/CastBar';
 import { HealthBar } from '../ui/HealthBar';
 import { HIT_REACTION_ART } from '../ui/skillFx';
 import { HitReaction } from './hitReaction';
+import { BACKGROUND_RENDER_GENERATION, GEN2_STYLE, outlineInPlace, type Gen2Style } from '../backgroundRender';
 
 const MONSTER_COLOR = 0xff6b6b;
 const BOSS_COLOR = 0xcc00cc;
 const GLOW_COLOR = 0xff8888;
 const BOSS_GLOW_COLOR = 0xff00ff;
-const RADIUS = TILE_H * 0.45;
+/** 球半徑依體型（`25-monster-system.md` § 25.2.1） */
+export const MONSTER_RADIUS: Record<MonsterSize, number> = {
+  small: TILE_H * 0.45,
+  large: TILE_H * 0.75,
+};
+
+/** 球頂比小型高出多少 px。頭上的角、血條、詠唱條一起上移這麼多 */
+export function monsterTopLift(size: MonsterSize): number {
+  return 2 * (MONSTER_RADIUS[size] - MONSTER_RADIUS.small);
+}
+
+/** 球心比小型高出多少 px。命中點、懸停判定跟著球心走 */
+export function monsterCenterLift(size: MonsterSize): number {
+  return MONSTER_RADIUS[size] - MONSTER_RADIUS.small;
+}
 /** 目標環用暖白：怪物是紅、Boss 是紫，兩者都不會與它混淆 */
 const TARGET_RING_COLOR = 0xffe9a8;
 
@@ -22,6 +38,9 @@ export class MonsterEntity {
   /** 當前目標的地面環（`03-combat.md` § 3.6.1） */
   private targetRing: Graphics;
   private flash: Graphics;
+  /** 頭上的角、血條、詠唱條；整組跟著球頂上移 */
+  private overhead: Container;
+  private horns: Graphics | null = null;
   private healthBar: HealthBar;
   private castBar: CastBar;
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
@@ -35,13 +54,20 @@ export class MonsterEntity {
   private pendingDamage = 0;
   /** 判死之後等了多久（ms），用來觸發保險絲 */
   private graceMs = 0;
+  private readonly isBoss: boolean;
+  private size: MonsterSize;
 
-  constructor(id: string, isBoss = false) {
+  /** `outline`：球體、Boss 角、血條的外框樣式；`null` 不畫（第一代背景 render） */
+  constructor(
+    id: string,
+    isBoss = false,
+    size: MonsterSize = 'small',
+    outline: Readonly<Gen2Style> | null = BACKGROUND_RENDER_GENERATION === 2 ? GEN2_STYLE : null,
+  ) {
     this.id = id;
+    this.isBoss = isBoss;
+    this.size = size;
     this.container = new Container();
-
-    const glowColor = isBoss ? BOSS_GLOW_COLOR : GLOW_COLOR;
-    const bodyColor = isBoss ? BOSS_COLOR : MONSTER_COLOR;
 
     /*
      * 目標環畫在**腳下**而不是球體上：球體本身已經用顏色區分 Boss 與一般怪，
@@ -49,16 +75,9 @@ export class MonsterEntity {
      * 所以是壓扁的橢圓（TILE_H / TILE_W = 1/2），畫成正圓會浮在半空中。
      */
     this.targetRing = new Graphics();
-    this.targetRing
-      .ellipse(0, 0, TILE_W * 0.34, TILE_H * 0.34)
-      .stroke({ color: TARGET_RING_COLOR, width: 2, alpha: 0.95 });
     this.targetRing.visible = false;
-
     this.glow = new Graphics();
-    this.glow.circle(0, -RADIUS, RADIUS + 2).fill({ color: glowColor, alpha: 0.3 });
-
     this.body = new Graphics();
-    this.body.circle(0, -RADIUS, RADIUS).fill({ color: bodyColor });
 
     /*
      * 受擊白閃（§ 48.7.6）：同一顆球的白色副本，用**加算混色**疊上去。
@@ -66,7 +85,6 @@ export class MonsterEntity {
      * 而怪物有一整群（§ 48.2）。加算是繪製狀態，不是 pass。
      */
     this.flash = new Graphics();
-    this.flash.circle(0, -RADIUS, RADIUS).fill({ color: 0xffffff });
     this.flash.blendMode = 'add';
     this.flash.alpha = 0;
 
@@ -76,24 +94,63 @@ export class MonsterEntity {
     this.container.addChild(this.body);
     this.container.addChild(this.flash);
 
+    this.overhead = new Container();
     if (isBoss) {
-      this.drawBossHorns();
+      this.horns = new Graphics();
+      this.overhead.addChild(this.horns);
     }
-
     this.healthBar = new HealthBar(isBoss);
-    this.container.addChild(this.healthBar.container);
+    this.overhead.addChild(this.healthBar.container);
     this.castBar = new CastBar();
-    this.container.addChild(this.castBar.container);
+    this.overhead.addChild(this.castBar.container);
+    this.container.addChild(this.overhead);
+
+    this.drawBody();
+    if (outline) {
+      outlineInPlace(this.body, outline.objectOutlineWidth, outline.outlineColor);
+      if (this.horns) outlineInPlace(this.horns, outline.objectOutlineWidth, outline.outlineColor);
+      this.healthBar.addOutline(outline.hpBarOutlineWidth, outline.outlineColor);
+    }
   }
 
-  private drawBossHorns(): void {
-    const horns = new Graphics();
-    horns
-      .poly([-6, -RADIUS * 2, -3, -RADIUS * 2 - 8, 0, -RADIUS * 2])
+  /** 依體型重畫球、光暈、白閃、目標環與角，並把頭上元件移到球頂 */
+  private drawBody(): void {
+    const r = MONSTER_RADIUS[this.size];
+    const ringScale = r / MONSTER_RADIUS.small;
+    const glowColor = this.isBoss ? BOSS_GLOW_COLOR : GLOW_COLOR;
+    const bodyColor = this.isBoss ? BOSS_COLOR : MONSTER_COLOR;
+
+    this.targetRing.clear()
+      .ellipse(0, 0, TILE_W * 0.34 * ringScale, TILE_H * 0.34 * ringScale)
+      .stroke({ color: TARGET_RING_COLOR, width: 2, alpha: 0.95 });
+    this.glow.clear().circle(0, -r, r + 2).fill({ color: glowColor, alpha: 0.3 });
+    this.body.clear().circle(0, -r, r).fill({ color: bodyColor });
+    this.flash.clear().circle(0, -r, r).fill({ color: 0xffffff });
+
+    /* 角畫在小型球頂，整組靠 `overhead.y` 上移 */
+    const top = -MONSTER_RADIUS.small * 2;
+    this.horns?.clear()
+      .poly([-6, top, -3, top - 8, 0, top])
       .fill({ color: BOSS_COLOR })
-      .poly([0, -RADIUS * 2, 3, -RADIUS * 2 - 8, 6, -RADIUS * 2])
+      .poly([0, top, 3, top - 8, 6, top])
       .fill({ color: BOSS_COLOR });
-    this.container.addChild(horns);
+    this.overhead.y = -monsterTopLift(this.size);
+  }
+
+  /** 體型。實體可能比怪物實例先建出來，拿到實例後才補上 */
+  setSize(size: MonsterSize): void {
+    if (size === this.size) return;
+    this.size = size;
+    this.drawBody();
+  }
+
+  get monsterSize(): MonsterSize {
+    return this.size;
+  }
+
+  /** 球半徑（px） */
+  get radius(): number {
+    return MONSTER_RADIUS[this.size];
   }
 
   /**

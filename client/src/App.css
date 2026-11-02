@@ -3692,6 +3692,44 @@ button.active {
   flex-shrink: 0;
 }
 
+/* 倉庫／商店清單列（ItemListRow）：名稱區不足 140px 時數量選擇器換到第二行；只截名稱，數量與 ⚒ 保留 */
+.item-list-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.item-list-row > .tooltip-trigger {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.item-list-row .storage-equip-name {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.item-list-row .storage-equip-name > * {
+  flex-shrink: 0;
+}
+
+.item-list-row .storage-equip-name > .item-list-name {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-list-price {
+  margin: 0 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.item-list-row > .storage-item-actions {
+  margin-left: auto;
+}
+
 /* 倉庫名稱搜尋列 */
 .storage-search {
   position: relative;
@@ -6497,6 +6535,175 @@ button.active {
 
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.25);
+}
+
+/* 懸賞契約（`53-bounty-contract.md` § 53.7） */
+.bounty-kind-tag {
+  font-size: var(--fs-xs);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.bounty-kind-tag.is-boss {
+  color: #c084fc;
+}
+
+.bounty-price {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--accent-gold);
+  margin-top: 2px;
+}
+
+.bounty-price.lacking {
+  color: #ef4444;
+}
+
+.bounty-addon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.bounty-addon input {
+  margin: 0;
+}
+
+.bounty-addon-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: var(--fs-xs);
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-gold);
+}
+
+.bounty-paused-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: var(--fs-xs);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--text-dim);
+}
+
+.bounty-block-reason {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.bounty-empty-slot {
+  padding: 12px;
+  border: var(--border-width) dashed var(--outline-dark);
+  border-radius: var(--radius-md);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.bounty-next-refresh {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.shop-item-actions .bounty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bounty-back-btn {
+  margin-bottom: 8px;
+}
+
+.bounty-settings h4 {
+  margin: 12px 0 6px;
+}
+
+.bounty-settings h4:first-child {
+  margin-top: 0;
+}
+
+.bounty-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  margin: 0 0 6px;
+}
+
+.bounty-criteria {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bounty-criterion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.bounty-criterion.is-off {
+  opacity: 0.45;
+}
+
+.bounty-criterion-rank {
+  width: 1.5em;
+  color: var(--accent-primary);
+  font-weight: 600;
+  text-align: right;
+}
+
+.bounty-criterion-name {
+  flex: 1;
+}
+
+.bounty-criterion button {
+  padding: 1px 6px;
+  font-size: var(--fs-xs);
+}
+
+.bounty-criterion.is-fixed {
+  color: var(--text-dim);
+}
+
+.bounty-affix-group {
+  margin-bottom: 6px;
+}
+
+.bounty-affix-group-title {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.bounty-affix-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.bounty-affix-list label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.bounty-affix-list input {
+  margin: 0;
 }
 
 .shop-item.completable {

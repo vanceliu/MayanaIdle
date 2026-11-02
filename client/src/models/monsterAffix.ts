@@ -83,13 +83,17 @@ export function pickVenomDebuff(nativeDebuffs: readonly PlayerDebuffType[], rng:
   return rng() < 0.5 ? 'poison' : 'bleed';
 }
 
-/** § 25.12.2：等機率抽、不重複，依詞綴表順序回傳 */
+/**
+ * § 25.12.2：等機率抽、不重複，依詞綴表順序回傳。
+ * `minCount`：懸賞契約對象擲到不強化時改為 1 個（`53-bounty-contract.md` § 53.5.3）。
+ */
 export function rollMonsterAffixes(
   level: number,
   nativeDebuffs: readonly PlayerDebuffType[],
   rng: () => number,
+  minCount: number = 0,
 ): MonsterAffixRoll {
-  const count = rollMonsterAffixCount(level, rng);
+  const count = Math.max(minCount, rollMonsterAffixCount(level, rng));
   if (count === 0) return { affixes: [] };
   const pool = [...MONSTER_AFFIX_ORDER];
   const picked = new Set<MonsterAffixId>();

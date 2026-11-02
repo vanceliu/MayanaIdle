@@ -15,6 +15,8 @@ import { isDeliverQuestType } from '../models/adventurerQuest';
 import { isDeliverQuestSatisfied } from '../systems/adventurerQuestSystem';
 import type { BagItem } from '../models/bagItem';
 import { getBagItemAmount } from '../models/bagItem';
+import { getBountyAreaName } from '../models/bounty';
+import { usePartyStore } from '../stores/partyStore';
 
 /**
  * 任務追蹤（§ 36.10.3）
@@ -26,6 +28,7 @@ export function QuestTrackerButton() {
   const character = useGameStore(s => s.character);
   const adventurerQuests = useGameStore(s => s.adventurerQuests);
   const craftQuests = useGameStore(s => s.craftQuests);
+  const bountyContracts = useGameStore(s => s.bountyContracts);
   const isOpen = usePanelWindowStore(s => s.open.quest);
   const toggle = usePanelWindowStore(s => s.toggle);
   const isMobile = useIsMobile();
@@ -35,7 +38,7 @@ export function QuestTrackerButton() {
   const classQuests = character.quests.filter(
     (q: Quest) => q.status === 'active' || q.status === 'completable'
   );
-  const totalQuests = classQuests.length + adventurerQuests.length + craftQuests.length;
+  const totalQuests = classQuests.length + adventurerQuests.length + craftQuests.length + bountyContracts.length;
 
   return (
     <button
@@ -56,12 +59,13 @@ export function QuestTrackerButton() {
 /**
  * 製作任務的單張卡片（§ 36.13.4）
  *
- * 需求沒有累積進度，每次 render 都由當下的背包重算 ——
- * 賣掉素材或前置裝備，「可製作」就會即時消失。
+ * 需求沒有累積進度，每次 render 都由當下的背包與金幣重算 ——
+ * 賣掉素材、前置裝備或花掉金幣，「可製作」就會即時消失。
  */
 function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   const bagItems = useGameStore(s => s.bagItems);
   const inventory = useGameStore(s => s.inventory);
+  const gold = useGameStore(s => s.character?.gold ?? 0);
   const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
   const templates = useEquipmentTemplates();
 
@@ -74,7 +78,7 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   }, [stale, abandonCraftQuest, quest.id]);
   if (!recipe) return null;
 
-  const status = evaluateCraftRequirements(recipe, bagItems, inventory);
+  const status = evaluateCraftRequirements(recipe, bagItems, inventory, gold);
   const prereqName = status.prerequisite
     ? templates.find(t => t.id === status.prerequisite!.templateId)?.name ?? `#${status.prerequisite.templateId}`
     : null;
@@ -86,6 +90,9 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
         {recipe.name}
       </div>
       <div className="tracker-craft-reqs">
+        <span className={`tracker-craft-req ${status.gold.enough ? '' : 'lacking'}`}>
+          金幣 <strong>{status.gold.have.toLocaleString()}/{status.gold.need.toLocaleString()}</strong>
+        </span>
         {status.prerequisite && (
           <span className={`tracker-craft-req ${status.prerequisite.enough ? '' : 'lacking'}`}>
             {prereqName} <strong>{status.prerequisite.have}/{status.prerequisite.need}</strong>
@@ -146,15 +153,18 @@ export function QuestTrackerContent() {
   const character = useGameStore(s => s.character);
   const adventurerQuests = useGameStore(s => s.adventurerQuests);
   const craftQuests = useGameStore(s => s.craftQuests);
+  const bountyContracts = useGameStore(s => s.bountyContracts);
   const abandonAdventurerQuest = useGameStore(s => s.abandonAdventurerQuest);
+  const abandonBounty = useGameStore(s => s.abandonBounty);
   const bagItems = useGameStore(s => s.bagItems);
+  const bountyPaused = usePartyStore(s => s.party !== null);
 
   if (!character) return null;
 
   const classQuests = character.quests.filter(
     (q: Quest) => q.status === 'active' || q.status === 'completable'
   );
-  const totalQuests = classQuests.length + adventurerQuests.length + craftQuests.length;
+  const totalQuests = classQuests.length + adventurerQuests.length + craftQuests.length + bountyContracts.length;
 
   return (
     <div className="quest-tracker-content">
@@ -214,6 +224,23 @@ export function QuestTrackerContent() {
 
       {craftQuests.map(quest => (
         <CraftQuestItem key={quest.id} quest={quest} />
+      ))}
+
+      {/* 懸賞契約（`53-bounty-contract.md` § 53.7）：放棄不退款 */}
+      {bountyContracts.map(contract => (
+        <div key={contract.id} className="quest-tracker-item">
+          <div className="tracker-title">
+            <span className="tracker-source">[懸賞]</span>
+            {contract.monsterName}
+            {contract.takeBetter && <span className="bounty-addon-tag">掉兩次取較好</span>}
+            {bountyPaused && <span className="bounty-paused-tag">暫停</span>}
+          </div>
+          <div className="tracker-area">{contract.kind === 'boss' ? 'BOSS' : getBountyAreaName(contract.areaId)}</div>
+          <div className="tracker-progress">擊殺：<strong>{contract.kills}/{contract.targetKills}</strong></div>
+          <div className="tracker-actions">
+            <button className="btn-danger tracker-cancel" onClick={() => abandonBounty(contract.id)}>放棄</button>
+          </div>
+        </div>
       ))}
     </div>
   );

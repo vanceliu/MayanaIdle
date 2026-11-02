@@ -371,15 +371,32 @@ export function getAffixPoolForSlot(category: AffixCategory): AffixDefinition[] 
   return AFFIX_DEFINITIONS.filter(d => d.category.includes(category));
 }
 
-export function rollAffixTier(areaLevel: number, isBoss: boolean = false): number {
+/**
+ * § 7.7 掉落時每條詞綴的 Tier 機率（T1~T7）。
+ * T6／T7 欄是**整件至少一條**的機率：每條機率 = 1 − (1 − 整件機率)^(1 ÷ 有 Tier 的條數)；
+ * T1~T5 依權重分配其餘機率。
+ */
+export function getDropTierProbabilities(areaLevel: number, isBoss: boolean, tieredCount: number): number[] {
   const weights = isBoss ? getBossTierWeights(areaLevel) : getTierWeights(areaLevel);
   const total = weights.reduce((s, w) => s + w, 0);
-  let roll = random() * total;
-  for (let i = 0; i < weights.length; i++) {
-    roll -= weights[i];
-    if (roll <= 0) return i + 1;
+  const count = Math.max(1, tieredCount);
+  const perSlot = (itemChance: number) => (itemChance <= 0 ? 0 : 1 - Math.pow(1 - itemChance, 1 / count));
+  const t6 = perSlot(weights[5] / total);
+  const t7 = perSlot(weights[6] / total);
+  const low = weights.slice(0, 5);
+  const lowTotal = low.reduce((s, w) => s + w, 0);
+  const rest = 1 - t6 - t7;
+  return [...low.map(w => (rest * w) / lowTotal), t6, t7];
+}
+
+export function rollAffixTier(areaLevel: number, isBoss: boolean = false, tieredCount: number = 1): number {
+  const probabilities = getDropTierProbabilities(areaLevel, isBoss, tieredCount);
+  let roll = random();
+  for (let i = 0; i < probabilities.length; i++) {
+    roll -= probabilities[i];
+    if (roll < 0) return i + 1;
   }
-  return 1;
+  return probabilities.findLastIndex(p => p > 0) + 1;
 }
 
 /** § 7.7 一般怪物掉落的 Tier 權重（wiki 直接引用，避免另抄一份） */
@@ -558,15 +575,22 @@ export const SHOP_MAX_AFFIX_TIER = 3;
 
 /** 一般裝備的精鍊印記升階上限（`07-affix.md` § 7.2）。 */
 export const DEFAULT_MAX_AFFIX_TIER = 5;
-/** 鐵匠製作品的詞綴 Tier 範圍，依裝備階級（§ 6A.6）。範圍內依 `CRAFT_AFFIX_TIER_WEIGHT` 加權 */
+/** 鐵匠製作品的詞綴 Tier 範圍，依裝備階級（§ 6A.6）。範圍含 T6 時每條 T6 機率 `CRAFT_AFFIX_T6_RATE`，其餘階級均分 */
 export const CRAFT_AFFIX_TIER_RANGE: Readonly<Record<number, { min: number; max: number }>> = {
   4: { min: 1, max: 5 },
   5: { min: 2, max: 6 },
   6: { min: 3, max: 6 },
 };
 
-/** 製作品詞綴的 Tier 相對權重（§ 6A.6），未列的階級＝1 */
-export const CRAFT_AFFIX_TIER_WEIGHT: Readonly<Record<number, number>> = { 6: 0.7 };
+/** 製作品每條詞綴出 T6 的機率（§ 6A.6） */
+export const CRAFT_AFFIX_T6_RATE = 0.1;
+
+/** 製作品的 Tier 相對權重：其他階級各 1，T6 的權重使其佔 `CRAFT_AFFIX_T6_RATE` */
+export function getCraftAffixTierWeights(range: { min: number; max: number }): Record<number, number> {
+  if (range.max < 6 || range.min > 6) return {};
+  const others = range.max - range.min;
+  return { 6: (others * CRAFT_AFFIX_T6_RATE) / (1 - CRAFT_AFFIX_T6_RATE) };
+}
 
 /** 製作詞綴範圍的顯示文字，如「T4 製作品 T1~T5、T5 製作品 T2~T6」 */
 export function formatCraftAffixTierRanges(): string {
@@ -575,11 +599,9 @@ export function formatCraftAffixTierRanges(): string {
     .join('、');
 }
 
-/** 製作詞綴權重的顯示文字，如「T6 權重為其他階級的 70%」 */
+/** 製作詞綴機率的顯示文字，如「每條 T6 機率 10%，其餘階級均分」 */
 export function formatCraftAffixTierWeights(): string {
-  return Object.entries(CRAFT_AFFIX_TIER_WEIGHT)
-    .map(([tier, w]) => `T${tier} 權重為其他階級的 ${Math.round(w * 100)}%`)
-    .join('、');
+  return `每條 T6 機率 ${Math.round(CRAFT_AFFIX_T6_RATE * 100)}%，其餘階級均分`;
 }
 
 /** 在 `floor`~`cap` 間依相對權重抽 Tier，未列的階級＝1 */
@@ -634,30 +656,42 @@ export function generateAffixes(
   const specialChance = getSpecialAffixChance(areaLevel, isBoss);
   const affixes: Affix[] = [];
 
+  // 先決定每格的種類：§ 7.7 每條 Tier 機率依「有 Tier 的條數」而定，要先知道有幾條
   const actualSlots = Math.min(slotCount, available.length);
+  const picks: (Affix | AffixDefinition)[] = [];
   for (let i = 0; i < actualSlots; i++) {
     // § 7.10.3 特殊詞綴取代一個一般詞綴位置
     if (specialAvailable.length > 0 && random() * 100 < specialChance) {
       const sIdx = Math.floor(random() * specialAvailable.length);
       const sDef = specialAvailable.splice(sIdx, 1)[0];
-      affixes.push({ type: sDef.type, tier: 0, value: 0 });
+      picks.push({ type: sDef.type, tier: 0, value: 0 });
       continue;
     }
     const idx = Math.floor(random() * available.length);
     const def = available.splice(idx, 1)[0];
     // § 7.3.1 額外屬性：無 Tier、無數值區間，固定 +1，只決定加在哪個屬性
     if (def.type === 'bonus_attribute') {
-      affixes.push({
+      picks.push({
         type: def.type, tier: 0, value: BONUS_ATTRIBUTE_VALUE,
         attribute: ATTRIBUTE_KEYS[Math.floor(random() * ATTRIBUTE_KEYS.length)],
       });
       continue;
     }
+    picks.push(def);
+  }
+  const tieredCount = picks.filter(p => !('tier' in p)).length;
+
+  for (const pick of picks) {
+    if ('tier' in pick) {
+      affixes.push(pick);
+      continue;
+    }
+    const def = pick;
     const cap = options.maxTier ?? 7;
     const floor = options.minTier ?? 1;
     const tier = options.uniformTier
       ? rollRangeTier(floor, cap, options.tierWeights ?? {})
-      : Math.min(cap, rollAffixTier(areaLevel, isBoss));
+      : Math.min(cap, rollAffixTier(areaLevel, isBoss, tieredCount));
     const value = rollAffixValue(tier, def.type);
     // § 7.4 元素刻印／元素侵蝕：抽到當下才決定屬性，六種均等隨機，兩條各自獨立抽
     const needsElement = def.type === 'element_brand' || def.type === 'element_erosion';

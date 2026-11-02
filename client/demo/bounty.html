@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>懸賞契約 Demo — MayanaIdle</title>
+<!--
+  懸賞契約（`53-bounty-contract.md`）：冒險者工會「懸賞」分頁、裝備比較設定、任務追蹤視窗的 [懸賞] 列。
+  版面樣本：class 與 App.css 相同，區域與怪物名稱取自設計文件，契約為假資料。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/bounty.html
+  .demo-* 是這頁的排版；.bounty-* 在 App.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 16px; font-size: var(--fs-sm); }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px;
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+/* 寬度＝遊戲裡城鎮設施視窗（`.town-modal` 600px） */
+.demo-guild { width: 600px; height: 640px; display: flex; flex-direction: column; }
+.demo-guild .guild-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.demo-tracker { width: 320px; }
+
+</style>
+</head>
+<body>
+  <h1 class="demo-title">懸賞契約</h1>
+  <p class="demo-note">
+    冒險者工會第三個分頁。左邊是懸賞分頁（按「比較設定」在同一個分頁內切到設定頁），右邊是任務追蹤視窗的 [懸賞] 列。<br>
+    清單每天 0／6／12／18 點更新，簽走的格子留空到下次更新；「模擬到達更新時刻」直接換新清單。<br>
+    簽約、放棄、勾選加購都能操作；用下方拉桿與開關看金幣不足、組隊暫停的樣子。
+  </p>
+  <div class="demo-bar">
+    <label>持有金幣 <input id="gold" type="range" min="0" max="1500000" step="10000" value="800000"></label>
+    <span id="gold-label"></span>
+    <label><input id="party" type="checkbox"> 組隊中</label>
+  </div>
+  <div id="root"></div>
+  <script type="module" src="./bountyDemo.tsx"></script>
+</body>
+</html>

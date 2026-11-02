@@ -73,7 +73,10 @@ describe('拆解（遠端 action）', () => {
   it('拆解製作品：資料庫刪除實例、背包加入一半材料', async () => {
     const c = await enter();
     const game = c.session.game;
-    game.setState({ bagItems: RECIPE.craftMaterials!.map(m => makeBagItem(m.itemId, m.amount)!) });
+    game.setState({
+      character: { ...game.getState().character!, gold: RECIPE.craftGold! },
+      bagItems: RECIPE.craftMaterials!.map(m => makeBagItem(m.itemId, m.amount)!),
+    });
     await c.act('craftEquipment', RECIPE.id);
     const item = game.getState().inventory.find(i => i.templateId === RECIPE.id)!;
 
@@ -85,6 +88,8 @@ describe('拆解（遠端 action）', () => {
     expect((await repo.listEquipmentByOwner(charId)).some(i => i.id === item.id)).toBe(false);
     const bag = game.getState().bagItems;
     for (const m of getDismantleYield(RECIPE)!) expect(bag.find(b => b.itemId === m.itemId)?.amount).toBe(m.amount);
+    // 製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）
+    expect(game.getState().character!.gold).toBe(0);
   });
 
   it('不在自己背包的實例 id 不受理', async () => {

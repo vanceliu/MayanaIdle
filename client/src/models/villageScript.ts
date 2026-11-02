@@ -196,7 +196,7 @@ export interface EquipmentFilterSubject {
  * 這件裝備這個角色穿不穿得起（§ 49.4）：職業 **AND** 素質，兩者都要通過。
  * 無 `requiredClass` ＝ 全職業；無 `requiredAttributes` ＝ 無素質門檻。
  */
-function isEquippableBy(item: EquipmentInstance, subject: EquipmentFilterSubject): boolean {
+export function isEquippableBy(item: EquipmentInstance, subject: EquipmentFilterSubject): boolean {
   if (item.requiredClass?.length && !item.requiredClass.includes(subject.className)) return false;
   const req = item.requiredAttributes;
   if (!req) return true;

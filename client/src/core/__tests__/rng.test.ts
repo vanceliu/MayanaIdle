@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { createSeededSource, reseed, random, randomInt, chance, chancePercent, pick, setRandomSource } from '../rng';
+import { createSeededSource, reseed, random, randomInt, chance, chancePercent, pick, pickWeightedIndex, setRandomSource } from '../rng';
 
 describe('core/rng（97 § 97.6 seeded PRNG）', () => {
   afterEach(() => setRandomSource(() => Math.random()));
@@ -48,5 +48,20 @@ describe('core/rng（97 § 97.6 seeded PRNG）', () => {
     expect(chancePercent(30)).toBe(true);
     expect(chancePercent(20)).toBe(false);
     expect(pick(['a', 'b', 'c', 'd'])).toBe('b');
+  });
+
+  it('pickWeightedIndex 依權重區間取索引，邊界歸下一格', () => {
+    const at = (r: number) => { setRandomSource(() => r); return pickWeightedIndex([80, 15, 5]); };
+    expect(at(0)).toBe(0);
+    expect(at(0.7999)).toBe(0);
+    expect(at(0.8)).toBe(1);
+    expect(at(0.9499)).toBe(1);
+    expect(at(0.95)).toBe(2);
+    expect(at(0.9999)).toBe(2);
+  });
+
+  it('pickWeightedIndex 權重不必加總為 1', () => {
+    setRandomSource(() => 0.5);
+    expect(pickWeightedIndex([1, 1])).toBe(1);
   });
 });

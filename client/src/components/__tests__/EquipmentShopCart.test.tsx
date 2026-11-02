@@ -74,7 +74,7 @@ async function setup(gold: number, inventory: EquipmentInstance[] = [], bagItems
 }
 
 function row(name: string): HTMLElement {
-  const rows = Array.from(document.querySelectorAll('.shop-item')) as HTMLElement[];
+  const rows = Array.from(document.querySelectorAll('.item-list-row')) as HTMLElement[];
   const found = rows.find(r => r.textContent?.includes(name));
   if (!found) throw new Error(`找不到列: ${name}`);
   return found;

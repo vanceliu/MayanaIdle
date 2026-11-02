@@ -11,10 +11,10 @@ import type { ClassName } from '../../models/character';
  * 全套防禦目標＝「該階能穿到的防具**全部強化到平均值**」的期望總和。
  * 一件的實際防禦是三段：基礎固定值 + 隨機額外(+0~+2) + 強化等級，
  * 後兩段在實例生成時決定，seed 只有基礎。因此驗算時要補回
- * 「平均隨機 +1／件」與「平均強化 +5／件」（安定值抽 4~6）。
+ * 「平均隨機 +0.25／件」與「平均強化 +4.25／件」（＝安定值期望值，§ 6.10）。
  */
-const AVG_DEFENSE_BONUS = 1;
-const AVG_ENHANCE = 5;
+const AVG_DEFENSE_BONUS = 0.25;
+const AVG_ENHANCE = 4.25;
 const NEW_SLOT_MIN_TIER = 4;
 /** T4 起開放的兩個部位（§ 6A.8.9） */
 const NEW_SLOTS: EquipSlot[] = ['shirt', 'cloak'];
@@ -27,9 +27,9 @@ const TIERS = [2, 3, 4, 5, 6, 7];
 const ARMOR_MIN_TIER = 2;
 
 const SUIT_TARGET: Record<ArmorLine, number[]> = {
-  heavy: [42, 50, 62, 69, 76, 82],
-  light: [41, 49, 60, 66, 71, 76],
-  robe: [40, 47, 57, 62, 66, 71],
+  heavy: [34.5, 42.5, 51.5, 58.5, 65.5, 71.5],
+  light: [33.5, 41.5, 49.5, 55.5, 60.5, 65.5],
+  robe: [32.5, 39.5, 46.5, 51.5, 55.5, 60.5],
 };
 
 const REAL = EQUIPMENT_SEEDS.filter(t => t.acquireType !== 'starter' && t.tier);
@@ -62,14 +62,14 @@ describe('防具全套防禦目標（§ 6A.8.8）', () => {
     expect(bad).toEqual([]);
   });
 
-  // 強化的貢獻是常數（T2~T3 五件 25、T4 起七件 35），所以占比隨階級遞減。
-  // 底部落在 T7 重甲的 35/82，頂部在 T2 布甲的 25/40。
-  it('強化在全套目標裡的占比落在 42%~63%', () => {
+  // 強化的貢獻是常數（T2~T3 五件 21.25、T4 起七件 29.75），所以占比隨階級遞減。
+  // 底部落在 T7 重甲的 29.75/71.5，頂部在 T2 布甲的 21.25/32.5。
+  it('強化在全套目標裡的占比落在 41%~66%', () => {
     for (const line of LINES) {
       TIERS.forEach((tier, i) => {
         const share = wearableSlots(tier).length * AVG_ENHANCE / SUIT_TARGET[line][i];
-        expect(share).toBeGreaterThanOrEqual(0.42);
-        expect(share).toBeLessThanOrEqual(0.63);
+        expect(share).toBeGreaterThanOrEqual(0.41);
+        expect(share).toBeLessThanOrEqual(0.66);
       });
     }
   });

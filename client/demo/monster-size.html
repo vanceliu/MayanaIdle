@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>怪物體型球大小 Demo — MayanaIdle</title>
+<!--
+  怪物體型（`25-monster-system.md` § 25.2 小型／大型）在地圖上的球大小。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/monster-size.html
+
+  畫法與 `src/pixi/entities/MonsterEntity.ts` 相同，只多了半徑參數；接法見 `monsterSizeDemo.ts`。
+  「匯出參數」的 JSON = 正式實作要用的常數。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 300px; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; font-size: var(--fs-sm);
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 10px; }
+.demo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.demo-row label { flex: 0 0 120px; }
+.demo-row input[type="range"] { flex: 1; }
+.demo-row output { flex: 0 0 96px; text-align: right; font-variant-numeric: tabular-nums; }
+.demo-check { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+#stage { width: 100%; height: 560px; border: 1px solid var(--border); border-radius: var(--radius-md); display: block; }
+#export { width: 100%; height: 130px; font-family: monospace; font-size: 12px; background: var(--bg-deepest); color: var(--text-primary); border: 1px solid var(--border-subtle); }
+</style>
+</head>
+<body>
+<h1 class="demo-title">怪物體型球大小</h1>
+<p class="demo-note">
+  上排：玩家剪影（比例參考）、小型、大型、小型 Boss、大型 Boss；下排：玩家被混編怪群圍住，看相鄰格的重疊與遮擋。<br>
+  目前遊戲全部怪物同一半徑 <code>TILE_H × 0.45</code>（約 14.4 px）；勾「對照組」可切回現況比較。
+</p>
+<div class="demo-layout">
+  <div class="demo-main">
+    <canvas id="stage"></canvas>
+  </div>
+  <div class="demo-side">
+    <div class="demo-card">
+      <h2>半徑（× TILE_H）</h2>
+      <div class="demo-row">
+        <label for="smallK">小型</label>
+        <input id="smallK" type="range" min="0.30" max="0.60" step="0.01">
+        <output id="smallK-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="largeK">大型</label>
+        <input id="largeK" type="range" min="0.45" max="0.95" step="0.01">
+        <output id="largeK-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="zoom">畫面縮放</label>
+        <input id="zoom" type="range" min="1" max="2.5" step="0.25" value="1.5">
+        <output id="zoom-out"></output>
+      </div>
+    </div>
+    <div class="demo-card">
+      <h2>附屬元件</h2>
+      <label class="demo-check"><input id="barsFollowTop" type="checkbox">血條／詠唱條跟著球頂移動</label>
+      <label class="demo-check"><input id="ringScales" type="checkbox">目標環依體型縮放</label>
+      <label class="demo-check"><input id="barWidthScales" type="checkbox">血條寬度依體型縮放</label>
+      <label class="demo-check"><input id="showCurrent" type="checkbox">對照組（目前遊戲）</label>
+    </div>
+    <div class="demo-card">
+      <h2>匯出參數</h2>
+      <textarea id="export" readonly></textarea>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { MonsterSizeStage } from './monsterSizeDemo.ts';
+
+const canvas = document.getElementById('stage');
+const stage = new MonsterSizeStage();
+const zoomInput = document.getElementById('zoom');
+const size = () => [canvas.clientWidth, canvas.clientHeight];
+
+await stage.init(canvas, ...size());
+
+const sliders = ['smallK', 'largeK'];
+const checks = ['barsFollowTop', 'ringScales', 'barWidthScales', 'showCurrent'];
+
+function sync() {
+  for (const key of sliders) {
+    const r = TILE_H_PX * stage.params[key];
+    document.getElementById(`${key}-out`).textContent = `${stage.params[key].toFixed(2)}／${r.toFixed(1)}px`;
+  }
+  document.getElementById('zoom-out').textContent = `×${zoomInput.value}`;
+  document.getElementById('export').value = stage.exportJson();
+}
+const TILE_H_PX = 32;
+
+for (const key of sliders) {
+  const input = document.getElementById(key);
+  input.value = stage.params[key];
+  input.addEventListener('input', () => { stage.params[key] = Number(input.value); stage.apply(); sync(); });
+}
+for (const key of checks) {
+  const input = document.getElementById(key);
+  input.checked = stage.params[key];
+  input.addEventListener('change', () => { stage.params[key] = input.checked; stage.apply(); sync(); });
+}
+zoomInput.addEventListener('input', () => { stage.layout(...size(), Number(zoomInput.value)); sync(); });
+window.addEventListener('resize', () => stage.layout(...size(), Number(zoomInput.value)));
+sync();
+</script>
+</body>
+</html>

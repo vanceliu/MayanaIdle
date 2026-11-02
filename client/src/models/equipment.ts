@@ -4,7 +4,7 @@ import type { UniqueAffix } from './uniqueAffix';
 import { sumUniqueAffix } from './uniqueAffix';
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS } from './attributes';
-import { random } from '../core/rng';
+import { pickWeightedIndex } from '../core/rng';
 
 export type EquipSlot =
   | 'rightHand'
@@ -125,13 +125,17 @@ export const ARMOR_REQUIREMENT_LADDER: { primary: number; secondary: number }[] 
   { primary: 24, secondary: 18 }, // T7
 ];
 
-/** 防具隨機額外防禦的範圍（§ 6A.8.8）：實例生成時抽，0／1／2 均等 */
+/** 防具隨機額外防禦的範圍（§ 6A.8.8）：實例生成時抽 */
 export const DEFENSE_BONUS_MIN = 0;
 export const DEFENSE_BONUS_MAX = 2;
+/** 隨機額外防禦 +0／+1／+2 的機率（%） */
+export const DEFENSE_BONUS_WEIGHTS: readonly number[] = [80, 15, 5];
 
-/** 防具安定值的抽取範圍（§ 6.10）：實例生成時抽，4／5／6 均等 */
+/** 防具安定值的抽取範圍（§ 6.10）：實例生成時抽 */
 export const ARMOR_STABILITY_MIN = 4;
 export const ARMOR_STABILITY_MAX = 6;
+/** 安定值 4／5／6 的機率（%） */
+export const ARMOR_STABILITY_WEIGHTS: readonly number[] = [80, 15, 5];
 
 export type AcquireType = 'shop' | 'craft' | 'drop_only' | 'starter';
 
@@ -243,7 +247,7 @@ export interface EquipmentTemplate {
   shopTier?: ShopTier;
   /** @deprecated 由 `tier` 取代 */
   craftTier?: CraftTier;
-  /** 製作費，一律 0 —— 製作不收金幣（`06-equipment-acquire.md` § 6A.3） */
+  /** 製作費，依階級（`06-equipment-acquire.md` § 6A.3） */
   craftGold?: number;
   craftMaterials?: CraftMaterial[];
   craftPrerequisiteWeapon?: CraftPrerequisiteWeapon;
@@ -291,7 +295,7 @@ export interface EquipmentInstance {
   /** 素質需求（§ 6A.8.8），由模板複製而來 */
   requiredAttributes?: Partial<Attributes>;
   /**
-   * 隨機額外防禦（§ 6A.8.8）。**實例生成時抽 0~2，均等**，之後不變。
+   * 隨機額外防禦（§ 6A.8.8）。**實例生成時依 `DEFENSE_BONUS_WEIGHTS` 抽 0~2**，之後不變。
    * 與基礎防禦、強化等級三段相加才是這件的實際防禦（`21-combat-formula.md` § 21.5）。
    */
   defenseBonus?: number;
@@ -324,14 +328,14 @@ export interface EquipmentInstance {
 /** 製作品的顯示名稱後綴（`06-equipment-acquire.md` § 6A.6） */
 export const CRAFTED_GEAR_SUFFIX = '(鍛)';
 
-/** 防具隨機額外防禦：實例生成時抽 0／1／2，均等（§ 6A.8.8） */
+/** 防具隨機額外防禦：實例生成時依 `DEFENSE_BONUS_WEIGHTS` 抽 0／1／2（§ 6A.8.8） */
 export function rollDefenseBonus(): number {
-  return DEFENSE_BONUS_MIN + Math.floor(random() * (DEFENSE_BONUS_MAX - DEFENSE_BONUS_MIN + 1));
+  return DEFENSE_BONUS_MIN + pickWeightedIndex(DEFENSE_BONUS_WEIGHTS);
 }
 
-/** 防具安定值：實例生成時抽 4／5／6，均等（§ 6.10） */
+/** 防具安定值：實例生成時依 `ARMOR_STABILITY_WEIGHTS` 抽 4／5／6（§ 6.10） */
 export function rollArmorStability(): number {
-  return ARMOR_STABILITY_MIN + Math.floor(random() * (ARMOR_STABILITY_MAX - ARMOR_STABILITY_MIN + 1));
+  return ARMOR_STABILITY_MIN + pickWeightedIndex(ARMOR_STABILITY_WEIGHTS);
 }
 
 /**

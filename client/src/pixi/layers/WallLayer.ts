@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import type { MapData, MapTheme } from '../../models/mapControl';
+import type { MapData, MapTheme, TileVisualRole } from '../../models/mapControl';
 import { createMapRenderPlan } from '../mapRenderPlan';
 import { TileType, getTileDefinition } from '../../models/mapControl';
 import { getFallenPillarAxis } from '../../models/mapDesignRules';
@@ -38,8 +38,20 @@ export function tileVariance(x: number, y: number, salt = 0): number {
   return ((h ^ h >>> 15) >>> 0) / 4294967296;
 }
 
+/** 已放進容器的一個物件圖形與它的 role */
+export interface PlacedObject {
+  graphic: Graphics;
+  role: TileVisualRole;
+}
+
 export class WallLayer {
   private graphics: Container[] = [];
+  private placed: PlacedObject[] = [];
+
+  /** 最近一次 `buildInto` 放進容器的物件，順序同繪製順序 */
+  get objects(): readonly PlacedObject[] {
+    return this.placed;
+  }
 
   buildInto(container: Container, mapData: MapData): void {
     this.removeFrom(container);
@@ -73,6 +85,7 @@ export class WallLayer {
       }
       graphic.zIndex = getDepth(item, item.elevation);
       this.graphics.push(graphic);
+      this.placed.push({ graphic, role: item.role });
       container.addChild(graphic);
     }
   }
@@ -83,6 +96,7 @@ export class WallLayer {
       graphic.destroy();
     }
     this.graphics = [];
+    this.placed = [];
   }
 
   private drawBlock(sx: number, sy: number, top: number, left: number, right: number): Graphics {
@@ -284,5 +298,6 @@ export class WallLayer {
   destroy(): void {
     for (const graphic of this.graphics) graphic.destroy();
     this.graphics = [];
+    this.placed = [];
   }
 }

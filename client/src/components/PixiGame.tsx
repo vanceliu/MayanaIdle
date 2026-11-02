@@ -10,9 +10,10 @@ import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity, TEAMMATE_MARKER } from '../pixi/entities/PlayerEntity';
 import { usePartyStore, type TeammateView } from '../stores/partyStore';
-import { MonsterEntity } from '../pixi/entities/MonsterEntity';
+import { MonsterEntity, monsterCenterLift, monsterTopLift } from '../pixi/entities/MonsterEntity';
 import { NpcEntity, NPC_BODY_OFFSET } from '../pixi/entities/NpcEntity';
 import { useTownStore } from '../stores/townStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import type { TownFacility } from './TownView';
 import { mapPositionToScreen, screenToMapTile, screenToWorld, worldToScreen } from '../pixi/utils/isometric';
 import { getRenderedElevation, type MapData, type MapNpc, type Position } from '../models/mapControl';
@@ -98,9 +99,12 @@ export function PixiGame() {
       if (destroyed) return;
 
       container.appendChild(pixiApp.canvas);
+      // Pixi DevTools 以 `__PIXI_APP__` 找畫布；只在開發版掛
+      if (import.meta.env.DEV) (globalThis as { __PIXI_APP__?: unknown }).__PIXI_APP__ = pixiApp.app;
 
       const scene = new GameScene(pixiApp);
       sceneRef.current = scene;
+      scene.setFloorGrid(useSettingsStore.getState().showFloorGrid);
 
       // 玩家的外觀存在角色列上（`04-character.md` § 4.10）；
       // 舊角色沒有這個欄位，PlayerEntity 內部會退回預設
@@ -217,9 +221,14 @@ export function PixiGame() {
           if (pos) {
             const anchor = entityScreenPos(map, pos);
             const offset = pixiApp.camera.getOffset();
+            /* 怪物名稱跟著球頂（`25-monster-system.md` § 25.2.1） */
+            const size = hoverTarget.kind === 'monster'
+              ? defaultSession.combat.monsterInstances.get(hoverTarget.id ?? '')?.size
+              : undefined;
+            const lift = size ? monsterTopLift(size) : 0;
             // 用 transform 而不是 left/top：後者每幀都會觸發 layout，transform 走合成層
             hoverEl.style.transform =
-              `translate3d(${anchor.sx + offset.x}px, ${anchor.sy - NPC_BODY_OFFSET + offset.y}px, 0) translate(-50%, -160%)`;
+              `translate3d(${anchor.sx + offset.x}px, ${anchor.sy - NPC_BODY_OFFSET - lift + offset.y}px, 0) translate(-50%, -160%)`;
           }
         }
 
@@ -319,6 +328,11 @@ export function PixiGame() {
     });
     return unsubscribe;
   }, []);
+
+  // 地板格線設定（`34-ui-guidelines.md` § 34.6）
+  useEffect(() => useSettingsStore.subscribe((state, prev) => {
+    if (state.showFloorGrid !== prev.showFloorGrid) sceneRef.current?.setFloorGrid(state.showFloorGrid);
+  }), []);
 
   // Click handler
   useEffect(() => {
@@ -626,12 +640,14 @@ function playPlayerAttackFx(o: {
    */
   const targets: SkillFxTarget[] = [];
   let firstTarget: Position | null = null;
+  let firstTargetId: string | null = null;
   for (const dmg of result.damages) {
     const targetPos = o.targetPositions[dmg.targetId];
     if (!targetPos) continue;
     const { sx, sy } = mapPositionToScreen(map, targetPos);
-    const y = sy - HIT_LIFT;
+    const y = sy - monsterHitLift(o.monsterEntities, dmg.targetId);
     firstTarget ??= targetPos;
+    firstTargetId ??= dmg.targetId;
     const damageType = resolveDamageType(dmg, skill);
     /*
      * 先把這隻怪保留住。**判定與演出是兩條時間線** ——
@@ -705,7 +721,7 @@ function playPlayerAttackFx(o: {
     muzzleX: from.sx + muzzle.x,
     muzzleY: from.sy + muzzle.y,
     /* AoE 的落點是圓心，也就是主目標；單體時兩者相同 */
-    toX: main.sx, toY: main.sy - HIT_LIFT,
+    toX: main.sx, toY: main.sy - monsterHitLift(o.monsterEntities, firstTargetId),
     targets,
     speed: PLAYER_PROJECTILE_SPEED,
     startDelayMs: o.startDelayMs,
@@ -744,6 +760,12 @@ function resolveVisualActor(
   const view = usePartyStore.getState().teammates.find(t => t.characterId === memberId);
   if (!view) return null;
   return { entity: teammates.get(memberId) ?? null, pos: view.position };
+}
+
+/** 打在怪物身上的高度：跟著球心（`25-monster-system.md` § 25.2.1）。實體已拿掉時視為小型 */
+function monsterHitLift(monsterEntities: Map<string, MonsterEntity>, id: string | null | undefined): number {
+  const size = id ? monsterEntities.get(id)?.monsterSize : undefined;
+  return HIT_LIFT + (size ? monsterCenterLift(size) : 0);
 }
 
 function renderCombatVisuals(
@@ -808,7 +830,7 @@ function renderCombatVisuals(
         playSkillFx(effectLayer.skillFx, {
           plan: resolveMonsterAttackFxPlan({ ranged: v.ranged, shape, color }),
           fromX: from.sx, fromY: from.sy,
-          muzzleX: from.sx, muzzleY: from.sy - HIT_LIFT,
+          muzzleX: from.sx, muzzleY: from.sy - monsterHitLift(monsterEntities, v.monsterId),
           toX: sx, toY: sy - HIT_LIFT,
           targets: [{
             x: sx, y: sy - HIT_LIFT,
@@ -840,7 +862,8 @@ function renderCombatVisuals(
         const foot = mapPositionToScreen(map, v.position);
         /* 粒子色走 debuff 的染色，數字一律粉紅（§ 48.8.4） */
         spawnDotTickFx(effectLayer, foot.sx, foot.sy, v.tags);
-        effectLayer.spawnDamageNumber(foot.sx, foot.sy - HIT_LIFT, v.damage, 'dot');
+        const lift = v.target === 'monster' ? monsterHitLift(monsterEntities, v.monsterId) : HIT_LIFT;
+        effectLayer.spawnDamageNumber(foot.sx, foot.sy - lift, v.damage, 'dot');
         break;
       }
       case 'heal': {
@@ -959,8 +982,9 @@ function syncMonsters(
 
   for (const monster of monsters) {
     let entity = existingMap.get(monster.id);
+    const inst = monsterInstances.get(monster.id);
     if (!entity) {
-      entity = new MonsterEntity(monster.id, monster.isBoss);
+      entity = new MonsterEntity(monster.id, monster.isBoss, inst?.size);
       existingMap.set(monster.id, entity);
       scene.entityLayer.container.addChild(entity.container);
     }
@@ -969,8 +993,8 @@ function syncMonsters(
     entity.updatePosition(shown, getRenderedElevation(map, shown));
     entity.setTargeted(monster.id === targetId);
 
-    const inst = monsterInstances.get(monster.id);
     if (inst) {
+      entity.setSize(inst.size);
       entity.updateHp(inst.currentHp, inst.maxHp);
     }
   }
@@ -1063,8 +1087,8 @@ export interface EntityHover {
 /**
  * 找出滑鼠指到的實體（§ 13.2.1）。
  *
- * 玩家／怪物／NPC 都是畫在格子中心正上方的圓點（偏移 `NPC_BODY_OFFSET`，三者相同），
- * 所以用同一套螢幕距離判定：NPC → 怪物 → 玩家，先找到的先贏。
+ * 玩家／怪物／NPC 都是畫在格子中心正上方的圓點（偏移 `NPC_BODY_OFFSET`；
+ * 大型怪的球心再高 `monsterCenterLift`，`25-monster-system.md` § 25.2.1），所以用同一套螢幕距離判定：NPC → 怪物 → 玩家，先找到的先贏。
  * 回傳實體本身的位置，讓名稱固定釘在他頭上 —— 跟著游標跑會很難讀。
  */
 function findEntityAtScreen(
@@ -1078,12 +1102,12 @@ function findEntityAtScreen(
   teammates: TeammateView[] = [],
   ownGuild?: string,
 ): EntityHover | null {
-  const hits = (pos: Position): boolean => {
+  const hits = (pos: Position, lift = 0): boolean => {
     // 用「原始小數座標」而不是取整到格子：玩家與怪物移動中畫在格子之間，
     // 取整會讓錨點跟畫面上的球體差到半格（32px），怎麼滑都碰不到。
     const { sx, sy } = entityScreenPos(map, pos);
     const dx = screenX - sx;
-    const dy = screenY - (sy - NPC_BODY_OFFSET);
+    const dy = screenY - (sy - NPC_BODY_OFFSET - lift);
     return dx * dx + dy * dy <= ENTITY_HOVER_RADIUS * ENTITY_HOVER_RADIUS;
   };
 
@@ -1093,7 +1117,7 @@ function findEntityAtScreen(
   for (const monster of monsters) {
     // 還沒建出實例的怪不給 hover —— 名字要等模板載入才知道
     const inst = monsterInstances.get(monster.id);
-    if (inst && hits(monster.position)) {
+    if (inst && hits(monster.position, monsterCenterLift(inst.size))) {
       return { text: inst.name, target: { kind: 'monster', id: monster.id } };
     }
   }

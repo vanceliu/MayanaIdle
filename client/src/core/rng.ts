@@ -59,3 +59,14 @@ export function chancePercent(percent: number): boolean {
 export function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(random() * arr.length)];
 }
+
+/** 依權重抽索引；權重不必加總為 1 */
+export function pickWeightedIndex(weights: readonly number[]): number {
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  let r = random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r < 0) return i;
+  }
+  return weights.length - 1;
+}

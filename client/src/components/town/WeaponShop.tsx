@@ -9,6 +9,7 @@ import {
   collectBatchSellEquipment, getEquipmentSellTotal, EQUIPMENT_TIER_OPTIONS,
 } from '../../systems/shop';
 import { QtyStepper } from '../common/QtyStepper';
+import { ItemListRow, EquipmentInstanceLabel, EquipmentTemplateLabel } from '../common/ItemListRow';
 import { useShopCart, cartLines, cartSummary, ShopCartFooter } from '../common/ShopCart';
 
 type ShopTab = 'buy' | 'sell';
@@ -146,22 +147,21 @@ export function WeaponShop() {
           {templates
             .filter(t => category === 'all' || t.type === category)
             .map(t => (
-            <div key={t.name} className="shop-item">
-              <div className="shop-item-info">
-                <EquipmentTemplateDetail template={t} />
-                <span className="shop-item-price">{t.buyPrice.toLocaleString()}G</span>
-              </div>
-              <div className="shop-item-actions">
-                {/* 上限同時看金幣與背包空格 —— 每件都是獨立實例，各佔一格 */}
-                <QtyStepper
-                  label={t.name}
-                  value={buyCart.raw(`tpl:${t.id}`)}
-                  max={Math.floor(char.gold / Math.max(1, t.buyPrice ?? 1))}
-                  min={0}
-                  onChange={next => buyCart.set(`tpl:${t.id}`, next)}
-                />
-              </div>
-            </div>
+            <ItemListRow
+              key={t.name}
+              label={<EquipmentTemplateLabel template={t} />}
+              tooltip={<EquipmentTemplateDetail template={t} />}
+              price={`${t.buyPrice.toLocaleString()}G`}
+            >
+              {/* 上限同時看金幣與背包空格 —— 每件都是獨立實例，各佔一格 */}
+              <QtyStepper
+                label={t.name}
+                value={buyCart.raw(`tpl:${t.id}`)}
+                max={Math.floor(char.gold / Math.max(1, t.buyPrice ?? 1))}
+                min={0}
+                onChange={next => buyCart.set(`tpl:${t.id}`, next)}
+              />
+            </ItemListRow>
           ))}
         </div>
       )}
@@ -214,26 +214,23 @@ export function WeaponShop() {
           <hr className="batch-sell-divider" />
 
           {weaponsInBag.length === 0 && <p className="empty-text">沒有可出售的武器</p>}
-          {weaponsInBag.map(item => {
-            const sellPrice = getSellPrice(item);
-            return (
-              <div key={item.id} className="shop-item">
-                <div className="shop-item-info">
-                  <EquipmentDetail item={item} templates={allTemplates} />
-                  <span className="shop-item-price sell-price">+{sellPrice.toLocaleString()}G</span>
-                </div>
-                <div className="shop-item-actions">
-                  <QtyStepper
-                    label={`${item.name} #${item.id}`}
-                    value={sellCart.raw(`eq:${item.id}`)}
-                    max={1}
-                    min={0}
-                    onChange={next => sellCart.set(`eq:${item.id}`, next)}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {weaponsInBag.map(item => (
+            <ItemListRow
+              key={item.id}
+              label={<EquipmentInstanceLabel item={item} templates={allTemplates} />}
+              tooltip={<EquipmentDetail item={item} templates={allTemplates} />}
+              price={`+${getSellPrice(item).toLocaleString()}G`}
+              priceClassName="sell-price"
+            >
+              <QtyStepper
+                label={`${item.name} #${item.id}`}
+                value={sellCart.raw(`eq:${item.id}`)}
+                max={1}
+                min={0}
+                onChange={next => sellCart.set(`eq:${item.id}`, next)}
+              />
+            </ItemListRow>
+          ))}
         </div>
       )}
       </div>

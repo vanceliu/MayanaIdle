@@ -95,7 +95,7 @@ function applyCombatDelta(delta: CombatDelta): void {
   for (const v of delta.add ?? []) {
     combat.monsterInstances.set(v.id, {
       templateId: 0, name: v.name, level: v.level, currentHp: v.currentHp, maxHp: v.maxHp,
-      attackMin: 0, attackMax: 0, defense: 0, exp: 0, race: 'normal', size: 'small',
+      attackMin: 0, attackMax: 0, defense: 0, exp: 0, race: 'normal', size: v.size,
       element: v.element, isBoss: v.isBoss, attackType: v.attackType, attackRange: 1.5, attackInterval: 1200,
       isTrainingDummy: v.isTrainingDummy,
       affixes: v.affixes, venom: v.venom, shieldMax: v.shieldMax, shieldRemaining: v.shieldRemaining,

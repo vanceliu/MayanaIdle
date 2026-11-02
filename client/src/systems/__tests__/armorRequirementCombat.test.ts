@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { setRandomSource } from '../../core/rng';
 import { getTotalDefense, getWeaponAttributeBonus, getAffixBonusesFromGear } from '../combat';
 import { getEffectiveGear, getEffectiveGearArray, getFrozenGear, isGearRequirementMet } from '../gear';
 import { rollNewInstanceFields } from '../templateSync';
@@ -161,21 +162,21 @@ describe('凍結的連鎖', () => {
 
 /** `06-equipment.md` § 6.10 */
 describe('安定值的取得管道分流', () => {
+  afterEach(() => setRandomSource(() => Math.random()));
   const armorTpl = (acquireType: string) =>
     ({ slot: 'chest', type: 'armor', acquireType } as never);
+  /** 亂數固定在最後 5% 區間：會抽的欄位一律抽到最大值 */
+  const rollAtTop = (acquireType: string) => {
+    setRandomSource(() => 0.99);
+    return rollNewInstanceFields(armorTpl(acquireType));
+  };
 
   it('商店防具固定 4，不抽', () => {
-    const seen = new Set<number>();
-    for (let i = 0; i < 300; i++) seen.add(rollNewInstanceFields(armorTpl('shop')).stability!);
-    expect([...seen]).toEqual([4]);
+    expect(rollAtTop('shop').stability).toBe(4);
   });
 
-  it('製作與掉落的防具抽 4~6', () => {
-    for (const src of ['craft', 'drop_only']) {
-      const seen = new Set<number>();
-      for (let i = 0; i < 300; i++) seen.add(rollNewInstanceFields(armorTpl(src)).stability!);
-      expect([...seen].sort()).toEqual([4, 5, 6]);
-    }
+  it('製作與掉落的防具依機率抽 4~6', () => {
+    for (const src of ['craft', 'drop_only']) expect(rollAtTop(src).stability).toBe(6);
   });
 
   it('模板有安定值就照抄，也不給隨機額外防禦（武器／飾品／腰帶／新手裝）', () => {
@@ -185,12 +186,8 @@ describe('安定值的取得管道分流', () => {
       .toEqual({ stability: -1 });
   });
 
-  it('防具的隨機額外防禦一律抽 0~2，不分管道', () => {
-    for (const src of ['shop', 'craft', 'drop_only']) {
-      const seen = new Set<number>();
-      for (let i = 0; i < 300; i++) seen.add(rollNewInstanceFields(armorTpl(src)).defenseBonus!);
-      expect([...seen].sort()).toEqual([0, 1, 2]);
-    }
+  it('防具的隨機額外防禦一律照機率抽，不分管道', () => {
+    for (const src of ['shop', 'craft', 'drop_only']) expect(rollAtTop(src).defenseBonus).toBe(2);
   });
 });
 

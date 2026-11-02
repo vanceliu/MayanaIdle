@@ -21,6 +21,7 @@ const UI_SCALE_KEY = 'mayana_ui_scale';
 const FONT_SCALE_KEY = 'mayana_font_scale';
 const LINK_SCALES_KEY = 'mayana_scale_linked';
 const EQUIP_AFFIX_SUMMARY_OPEN_KEY = 'mayana_equip_affix_summary_open';
+const FLOOR_GRID_KEY = 'mayana_floor_grid';
 
 /** 夾到 [0.8, 1.5] 並對齊 5% 級距；非數值一律回預設 */
 export function normalizeScale(value: unknown): number {
@@ -77,6 +78,9 @@ interface SettingsState {
   /** 裝備欄詞綴加總是否展開（`34-ui-guidelines.md`「裝備欄詞綴加總」） */
   equipAffixSummaryOpen: boolean;
   setEquipAffixSummaryOpen: (open: boolean) => void;
+  /** 地圖地板格線（`34-ui-guidelines.md` § 34.6；第二代背景 render 才有作用） */
+  showFloorGrid: boolean;
+  setShowFloorGrid: (visible: boolean) => void;
   setUiScale: (value: number) => void;
   setFontScale: (value: number) => void;
   setLinkScales: (linked: boolean) => void;
@@ -88,10 +92,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   fontScale: readStored(FONT_SCALE_KEY),
   linkScales: readStoredFlag(LINK_SCALES_KEY),
   equipAffixSummaryOpen: readStoredFlag(EQUIP_AFFIX_SUMMARY_OPEN_KEY),
+  showFloorGrid: readStoredFlag(FLOOR_GRID_KEY),
 
   setEquipAffixSummaryOpen(open) {
     set({ equipAffixSummaryOpen: open });
     writeStored(EQUIP_AFFIX_SUMMARY_OPEN_KEY, open);
+  },
+
+  setShowFloorGrid(visible) {
+    set({ showFloorGrid: visible });
+    writeStored(FLOOR_GRID_KEY, visible);
   },
 
   setUiScale(value) {

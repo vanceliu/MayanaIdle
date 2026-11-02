@@ -6,8 +6,9 @@ import { getPointsToNextRank, isDeliverQuestSatisfied } from '../../systems/adve
 import { getItemById } from '../../models/items';
 import { getBagItemAmount } from '../../models/bagItem';
 import { ClassQuests } from './ClassQuests';
+import { BountyTab } from './BountyTab';
 
-type GuildTab = 'adventurer' | 'class';
+type GuildTab = 'adventurer' | 'class' | 'bounty';
 
 function QuestDescription({ description }: { description: string }) {
   const parts = description.split(/(\*\*[^*]+\*\*)/g);
@@ -216,7 +217,10 @@ export function AdventurerGuild() {
       <div className="storage-tabs">
         <button className={tab === 'adventurer' ? 'active' : ''} onClick={() => setTab('adventurer')}>冒險任務</button>
         <button className={tab === 'class' ? 'active' : ''} onClick={() => setTab('class')}>職業任務</button>
+        <button className={tab === 'bounty' ? 'active' : ''} onClick={() => setTab('bounty')}>懸賞</button>
       </div>
+
+      {tab === 'bounty' && <BountyTab townId={townId} townName={TOWN_NAMES[townId]} />}
 
       {tab === 'class' && (
         <div className="panel-scroll">

@@ -1,4 +1,5 @@
 import { Graphics, Container } from 'pixi.js';
+import { outlineInPlace } from '../backgroundRender';
 
 const BAR_WIDTH = 40;
 const BAR_HEIGHT = 4;
@@ -30,6 +31,11 @@ export class HealthBar {
     this.bar.clear();
     this.bar.rect(-BAR_WIDTH / 2, -BAR_HEIGHT / 2, BAR_WIDTH * ratio, BAR_HEIGHT);
     this.bar.fill(this.barColor);
+  }
+
+  /** 整條血條（含空血段）加外框（`38-map-control.md` § 38.9 第二代背景 render） */
+  addOutline(width: number, color: number): void {
+    outlineInPlace(this.bg, width, color);
   }
 
   /** 這一刻畫出來的血量比例（0–1）。測試用來確認血條跟的是演出而不是判定 */

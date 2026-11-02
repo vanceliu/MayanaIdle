@@ -96,6 +96,18 @@ describe('SettingsModal', () => {
     expect(useSettingsStore.getState().uiScale).toBe(SCALE_DEFAULT);
   });
 
+  it('顯示地板格線：預設不勾，勾選寫入 store 並存到 localStorage', () => {
+    useSettingsStore.getState().setShowFloorGrid(false);
+    render(<SettingsModal onClose={() => {}} />);
+
+    const grid = screen.getByLabelText('顯示地板格線') as HTMLInputElement;
+    expect(grid.checked).toBe(false);
+
+    fireEvent.click(grid);
+    expect(useSettingsStore.getState().showFloorGrid).toBe(true);
+    expect(localStorage.getItem('mayana_floor_grid')).toBe('true');
+  });
+
   it('點遮罩或完成都會關閉，點視窗內部不會', () => {
     const onClose = vi.fn();
     // 彈窗掛在 body（portal），不在 render container 裡

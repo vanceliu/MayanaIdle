@@ -28,7 +28,7 @@
 | **素質需求未滿足＝可裝備但詞綴凍結** | `06-equipment.md` | § 6A.8.8 |
 | **需求判定的最小固定點（裝備屬性算不算）** | `06-equipment.md` § 6A.8.8、`20-attributes.md` § 20.10 | — |
 | **防禦三段組成（基礎＋隨機 +0~+2＋強化）／全套防禦目標** | `06-equipment.md` | § 6A.8.8 |
-| **防具安定值逐件抽 4~6** | `06-equipment.md` | § 6.10 |
+| **防具安定值逐件抽 4~6（80／15／5%）** | `06-equipment.md` | § 6.10 |
 | 武器類型/職業限制 | `06-equipment.md` | § 6.6~6.7 |
 | 武器屬性結構 | `06-equipment.md` | § 6.8 |
 | 武器傷害（小怪/大怪） | `06-equipment.md` | § 6.11 |
@@ -58,7 +58,7 @@
 | 印記師 NPC | `13-town.md` | § 13.13 |
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
-| **製作材料分配規則／製作消耗** | `06-equipment-acquire.md` | § 6A.3 |
+| **製作材料分配規則／製作消耗（製作費依階級）** | `06-equipment-acquire.md` | § 6A.3 |
 | **裝備拆解（鐵匠鋪，退一半材料）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
@@ -124,6 +124,7 @@
 | **防重複發放看角色身上的計數，不看信箱** | `52-mailbox.md` | § 52.2.3 |
 | **增益藥水（回魔／爆擊／回血／慎重，雜貨店與 Boss 共通掉落）** | `30-items.md` | § 30.4a |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
+| **怪物球大小依體型（地圖顯示）** | `25-monster-system.md` | § 25.2.1 |
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
 | 怪物 Debuff 能力 | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | **怪物詠唱（前搖攻擊）** | `25-monster-system.md` | § 25.11 |
@@ -156,11 +157,17 @@
 | **職業任務（冒險者工會「職業任務」分頁）／職業技能學習（魔法學院）** | `13-town.md` | § 13.9、§ 13.10 |
 | **公會 NPC 門面（開放世界才放 NPC）** | `13-town.md` | § 13.2.1 |
 | **製作任務（鐵匠鋪「製作追蹤」）** | `36-quest-system.md` | § 36.13 |
+| **懸賞契約（冒險者工會「懸賞」分頁）** | `53-bounty-contract.md` | 全文 |
+| **懸賞價格級距／定價等級** | `53-bounty-contract.md` | § 53.2 |
+| **懸賞保證強化詞綴／掉兩次取比較好** | `53-bounty-contract.md` | § 53.5 |
+| **懸賞裝備比較條件（偏好詞綴／順序與開關）** | `53-bounty-contract.md` | § 53.6 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` § 37.4.9、`45-legacy-archive.md` § 45.4.1 | — |
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
+| **背景 render 代別（第一代／第二代切換、外框、地形邊線）** | `38-map-control.md` | § 38.9「背景 render 代別」 |
+| **地板格線設定** | `34-ui-guidelines.md` | § 34.6「地板格線」 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（結論見 § 44.7、§ 44.10） |
 | 實戰模擬（死神會攻擊）/ 職業生存與補血策略 | `44-dps-prediction.md` | § 44.12 |
@@ -188,8 +195,9 @@
 | Pixi 渲染（分層／theme palette／RenderTexture） | `40-pixijs-migration.md` | 全文 |
 | In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
+| **商店／倉庫清單列（名稱＋hover tooltip／窄版折行）** | `34-ui-guidelines.md` | § 34.1「清單列」 |
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
-| 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則 | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
+| 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則（有變化才畫） | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
 | **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`） |
 | **數量徽章（配色／字級／自動天賦只顯示有無／聊天分頁密語徽章）** | `34-ui-guidelines.md` | § 34.10 |
 | **面板按鈕分組與順序（PanelDock）** | `34-ui-guidelines.md` | § 34.10（由 `PanelDock.test.tsx` 把守） |
@@ -262,6 +270,7 @@
        ↕                                                        ↕
 24-buff-debuff.md § 24.4.1 ←→ 25-monster-system.md § 25.8~25.9
 25-monster-system.md § 25.11 ←→ 48-vfx.md § 48.7a ←→ 51-auto-talent.md § 51.4.6
+25-monster-system.md § 25.2.1（球大小）←→ 03-combat.md § 3.6.1（目標環）/ 48-vfx.md § 48.7a（詠唱條）
        ↕                                                        ↕
 07-affix.md § 7.10 ←→ 30-items.md ←→ 13-town.md ←→ 27-drop-table.md
        ↕
@@ -366,6 +375,17 @@
        ↕
 27-drop-table.md / 28-monster-stats.md ←→ 09-dungeon.md
        ↕
+53-bounty-contract.md
+  ←→ 36-quest-system.md § 36.10.3 / § 36.11 / § 36.12
+  ←→ 13-town.md § 13.10
+  ←→ 25-monster-system.md § 25.12.1
+  ←→ 27-drop-table.md § 27.1 / § 27.5
+  ←→ 26-spawn-pressure.md § 26.3（第二次判定不乘 Pressure）
+  ←  49-village-script.md § 49.4（穿得起的判定）
+  ←  13-town.md § 13.13.1（區間位置公式）
+  ←→ 18-data-schema.md § 18.6 / 97-selfhosted-server.md § 97.2 / § 97.7.1
+  ←→ 43-wiki-system.md § 4.11
+       ↕
 36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
        ↕                    ←  06-equipment-acquire.md § 6A.3
        ↕                    ←  18-data-schema.md § 18.8
@@ -386,6 +406,7 @@
 26-spawn-pressure.md   09-dungeon.md
        ↕                    ↕
 40-pixijs-migration.md ←→ 16-tech-frontend-architecture.md
+38-map-control.md § 38.9（背景 render 代別）←→ 34-ui-guidelines.md § 34.6（地板格線）/ 25-monster-system.md § 25.2.1（怪物外框）
 
 【自動天賦／信箱】
 51-auto-talent.md

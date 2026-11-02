@@ -48,10 +48,10 @@ function setup(gold: number, bagItems: BagItem[] = []) {
 }
 
 function row(itemName: string): HTMLElement {
-  // 出售頁的名稱會帶上「×數量」，因此以前綴比對而非完整字串
-  const rows = Array.from(document.querySelectorAll('.shop-item')) as HTMLElement[];
+  // 出售頁的「×數量」在名稱之外，名稱本身完整比對
+  const rows = Array.from(document.querySelectorAll('.item-list-row')) as HTMLElement[];
   const found = rows.find(r =>
-    r.querySelector('.shop-item-name')?.textContent?.startsWith(itemName)
+    r.querySelector('.item-list-name')?.textContent === itemName
   );
   if (!found) throw new Error(`找不到商品列: ${itemName}`);
   return found;

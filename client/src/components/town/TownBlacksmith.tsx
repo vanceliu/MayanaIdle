@@ -49,7 +49,7 @@ export function TownBlacksmith() {
    */
   function canCraftRecipe(recipe: EquipmentTemplate): boolean {
     if (!char) return false;
-    return evaluateCraftRequirements(recipe, bagItems, inventory).ready;
+    return evaluateCraftRequirements(recipe, bagItems, inventory, char.gold).ready;
   }
 
   async function handleCraft() {
@@ -228,6 +228,18 @@ export function TownBlacksmith() {
                 {/* § 6A.8.8 素質需求：做得出來不等於穿得動，未達標的屬性標紅 */}
                 <AttributeRequirement requirement={recipe.requiredAttributes} className="shop-item-desc" />
                 <span className="shop-item-desc bs-craft-materials">
+                  {/* 製作費（§ 6A.3） */}
+                  {(() => {
+                    const need = recipe.craftGold ?? 0;
+                    const enough = char.gold >= need;
+                    return (
+                      <span className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
+                        <GameIcon name="items/cut-diamond" size={14} color="var(--accent-gold)" />
+                        <span className="bs-craft-mat-name" style={enough ? { color: 'var(--accent-gold)' } : undefined}>金幣</span>
+                        <span className="bs-craft-mat-count">{char.gold.toLocaleString()}/{need.toLocaleString()}</span>
+                      </span>
+                    );
+                  })()}
                   {recipe.craftPrerequisiteWeapon && (() => {
                     const { templateId, quantity } = recipe.craftPrerequisiteWeapon!;
                     const have = inventory.filter(i => i.templateId === templateId).length;

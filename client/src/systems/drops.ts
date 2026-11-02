@@ -60,6 +60,26 @@ export interface DropBonuses {
 export const DROP_ROLL_MAX = 1000;
 
 /**
+ * 懸賞契約「掉兩次取比較好」（`53-bounty-contract.md` § 53.5.5）：
+ * 每個條目擲兩次、任一次命中即掉；第二次不乘 Pressure；金幣數量取高；裝備實例生成兩次留一件。
+ */
+export interface TakeBetterOptions {
+  pickEquipment: (first: EquipmentInstance, second: EquipmentInstance) => EquipmentInstance;
+}
+
+/** 掉落判定；`secondMultiplier` 有值時再擲第二次，任一次命中即成立 */
+function rollHit(dropValue: number, multiplier: number, secondMultiplier?: number): boolean {
+  if (random() * DROP_ROLL_MAX < Math.min(dropValue * multiplier, DROP_ROLL_MAX)) return true;
+  if (secondMultiplier === undefined) return false;
+  return random() * DROP_ROLL_MAX < Math.min(dropValue * secondMultiplier, DROP_ROLL_MAX);
+}
+
+function rollGoldAmount(min: number, max: number, takeBetter: boolean): number {
+  const first = randomInt(min, max);
+  return takeBetter ? Math.max(first, randomInt(min, max)) : first;
+}
+
+/**
  * 擲出一件裝備掉落。**不寫 DB**：背包滿時這件會被丟棄（`35-inventory-constraints.md` § 35.3.1），
  * 寫入與否由呼叫端判定後交給 `persistDroppedEquipment()`。
  */
@@ -99,6 +119,19 @@ function rollDroppedEquipment(
   };
 }
 
+function rollDroppedEquipmentTakeBetter(
+  template: EquipmentTemplate,
+  ownerId: number,
+  areaLevel: number,
+  isBoss: boolean,
+  takeBetter?: TakeBetterOptions,
+): DroppedItem {
+  const first = rollDroppedEquipment(template, ownerId, areaLevel, isBoss);
+  if (!takeBetter) return first;
+  const second = rollDroppedEquipment(template, ownerId, areaLevel, isBoss);
+  return takeBetter.pickEquipment(first.equipmentInstance!, second.equipmentInstance!) === first.equipmentInstance ? first : second;
+}
+
 /** 把收進背包的掉落裝備寫入 DB，回傳帶 id 的實例（順序同輸入） */
 export async function persistDroppedEquipment(
   items: DroppedItem[],
@@ -110,7 +143,11 @@ export async function persistDroppedEquipment(
 }
 
 function getDropRateMultiplier(bonuses?: DropBonuses): number {
-  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.pressure_mult ?? 1) * (bonuses?.affix_drop_mult ?? 1);
+  return getDropRateMultiplierWithoutPressure(bonuses) * (bonuses?.pressure_mult ?? 1);
+}
+
+function getDropRateMultiplierWithoutPressure(bonuses?: DropBonuses): number {
+  return (1 + (bonuses?.drop_rate ?? 0) / 100) * rates.drop * (bonuses?.affix_drop_mult ?? 1);
 }
 
 /** 金幣**不吃** `pressure_mult`（`26-spawn-pressure.md` § 26.3）；全域倍率在 `settleGoldDrop` */
@@ -149,11 +186,19 @@ export function scaleDropValue(
   return Math.min(max, Math.floor(base + (max - base) * progress));
 }
 
-export async function rollBossDrops(bossName: string, ownerId: number, areaLevel: number, bonuses?: DropBonuses, repo: GameRepository = defaultSession.repo): Promise<DropResult> {
+export async function rollBossDrops(
+  bossName: string,
+  ownerId: number,
+  areaLevel: number,
+  bonuses?: DropBonuses,
+  repo: GameRepository = defaultSession.repo,
+  takeBetter?: TakeBetterOptions,
+): Promise<DropResult> {
   const entries = await repo.listBossDropTable(bossName);
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
+  const secondMultiplier = takeBetter ? getDropRateMultiplierWithoutPressure(bonuses) : undefined;
   const goldAffixMultiplier = getGoldAffixMultiplier(bonuses);
   /*
    * 同一個 tier 的武器／防具是**一組連動條目**，只擲一次再 50/50 決定給哪一種
@@ -167,9 +212,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
       const tierKey = entry.tier ?? 4;
       if (rolledTiers.has(tierKey)) continue;
       rolledTiers.add(tierKey);
-      const roll = random() * DROP_ROLL_MAX;
-      const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
-      if (roll >= boostedDropValue) continue;
+      if (!rollHit(entry.dropValue, dropRateMultiplier, secondMultiplier)) continue;
       const pickWeapon = random() < 0.5;
       // `06-equipment-acquire.md` § 6A.1：掉落池以裝備階級 tier 比對（取代舊的 craftTier）
       const tier = entry.tier ?? 4;
@@ -177,22 +220,20 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
           && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)));
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(random() * candidates.length)];
-      items.push(rollDroppedEquipment(template, ownerId, areaLevel, true));
+      items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, true, takeBetter));
       continue;
     }
 
-    const roll = random() * DROP_ROLL_MAX;
-    const boostedDropValue = Math.min(entry.dropValue * dropRateMultiplier, DROP_ROLL_MAX);
-    if (roll >= boostedDropValue) continue;
+    if (!rollHit(entry.dropValue, dropRateMultiplier, secondMultiplier)) continue;
 
     if (entry.itemType === 'gold') {
-      const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
+      const baseGold = rollGoldAmount(entry.minAmount ?? 1, entry.maxAmount ?? 1, takeBetter !== undefined);
       gold += settleGoldDrop(baseGold, goldAffixMultiplier);
     } else if (entry.itemType === 'equipment') {
       const template = entry.equipmentTemplateId
         ? await repo.getEquipmentTemplate(entry.equipmentTemplateId)
         : undefined;
-      if (template) items.push(rollDroppedEquipment(template, ownerId, areaLevel, true));
+      if (template) items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, true, takeBetter));
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
       if (itemDef) {
@@ -207,7 +248,7 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   }
 
   // 職業技能書：依區域等級逐級獨立判定（`23-class-magic.md` § 23.1）
-  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, true, dropRateMultiplier)) {
+  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, true, dropRateMultiplier, secondMultiplier)) {
     items.push({
       name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',
@@ -217,16 +258,23 @@ export async function rollBossDrops(bossName: string, ownerId: number, areaLevel
   }
 
   // 增益藥水：所有 Boss 共通，每種各自判定（`27-drop-table.md` § 27.6）
-  const potionDropValue = Math.min(BUFF_POTION_BOSS_DROP_VALUE * dropRateMultiplier, DROP_ROLL_MAX);
   for (const itemId of BUFF_POTION_ITEM_IDS) {
-    if (random() * DROP_ROLL_MAX >= potionDropValue) continue;
+    if (!rollHit(BUFF_POTION_BOSS_DROP_VALUE, dropRateMultiplier, secondMultiplier)) continue;
     items.push({ name: getItemById(itemId)?.name ?? '藥水', type: 'potion', itemTemplateId: itemId, amount: 1 });
   }
 
   return { gold, items };
 }
 
-export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropBonuses, isBoss: boolean = false, monsterLevel?: number, repo: GameRepository = defaultSession.repo): Promise<DropResult> {
+export async function rollDrops(
+  areaId: string,
+  ownerId: number,
+  bonuses?: DropBonuses,
+  isBoss: boolean = false,
+  monsterLevel?: number,
+  repo: GameRepository = defaultSession.repo,
+  takeBetter?: TakeBetterOptions,
+): Promise<DropResult> {
   const entries = await repo.listDropTable(areaId);
   // 副本樓層的 area id 是 `<regionId>-<floor>f`，不是 region id ——
   // 一律走 `resolveArea`，直接 `getRegion(areaId)` 會讓整座副本的區域等級退化成 1
@@ -237,6 +285,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   let gold = 0;
   const items: DroppedItem[] = [];
   const dropRateMultiplier = getDropRateMultiplier(bonuses);
+  const secondMultiplier = takeBetter ? getDropRateMultiplierWithoutPressure(bonuses) : undefined;
   const goldAffixMultiplier = getGoldAffixMultiplier(bonuses);
 
   for (const entry of entries) {
@@ -255,12 +304,10 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
         );
       }
     }
-    const roll = random() * DROP_ROLL_MAX;
-    const boostedDropValue = Math.min(effectiveDropValue * dropRateMultiplier, DROP_ROLL_MAX);
-    if (roll >= boostedDropValue) continue;
+    if (!rollHit(effectiveDropValue, dropRateMultiplier, secondMultiplier)) continue;
 
     if (entry.itemType === 'gold') {
-      const baseGold = randomInt(entry.minAmount ?? 1, entry.maxAmount ?? 1);
+      const baseGold = rollGoldAmount(entry.minAmount ?? 1, entry.maxAmount ?? 1, takeBetter !== undefined);
       gold += settleGoldDrop(baseGold, goldAffixMultiplier);
     } else if (entry.itemType === 'equipment') {
       let template;
@@ -281,7 +328,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
       } else if (entry.equipmentTemplateId) {
         template = await repo.getEquipmentTemplate(entry.equipmentTemplateId);
       }
-      if (template) items.push(rollDroppedEquipment(template, ownerId, areaLevel, isBoss));
+      if (template) items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, isBoss, takeBetter));
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
       if (itemDef) {
@@ -296,7 +343,7 @@ export async function rollDrops(areaId: string, ownerId: number, bonuses?: DropB
   }
 
   // 職業技能書：依區域等級逐級獨立判定（`23-class-magic.md` § 23.1）
-  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, isBoss, dropRateMultiplier)) {
+  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, isBoss, dropRateMultiplier, secondMultiplier)) {
     items.push({
       name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',

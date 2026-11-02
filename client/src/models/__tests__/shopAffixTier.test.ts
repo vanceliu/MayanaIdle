@@ -6,7 +6,7 @@ import {
   SHOP_MAX_AFFIX_TIER,
   DEFAULT_MAX_AFFIX_TIER,
   CRAFT_AFFIX_TIER_RANGE,
-  CRAFT_AFFIX_TIER_WEIGHT,
+  CRAFT_AFFIX_T6_RATE,
   formatCraftAffixTierWeights,
   getTierWeights,
   getBossTierWeights,
@@ -137,12 +137,12 @@ describe('製作品的詞綴 Tier 範圍（§ 6A.6）', () => {
     });
   }
 
-  it('T6 權重為其他階級的 70%', () => {
-    expect(CRAFT_AFFIX_TIER_WEIGHT).toEqual({ 6: 0.7 });
-    expect(formatCraftAffixTierWeights()).toBe('T6 權重為其他階級的 70%');
+  it('每條 T6 機率 10%', () => {
+    expect(CRAFT_AFFIX_T6_RATE).toBe(0.1);
+    expect(formatCraftAffixTierWeights()).toBe('每條 T6 機率 10%，其餘階級均分');
   });
 
-  const T6_SHARE: Record<number, number> = { 5: 0.7 / 4.7, 6: 0.7 / 3.7 };
+  const T6_SHARE: Record<number, number> = { 5: 0.1, 6: 0.1 };
   for (const [tier, expected] of Object.entries(T6_SHARE)) {
     it(`T${tier} 製作品每條出 T6 ≈ ${(expected * 100).toFixed(1)}%，其他階級均等`, () => {
       reseed(20261029);

@@ -130,7 +130,7 @@ export function collectStoreDeltas(session: SyncedSession): Partial<Record<Store
 function instanceView(id: string, inst: MonsterInstance): CombatInstanceView {
   return {
     id, name: inst.name, level: inst.level, currentHp: inst.currentHp, maxHp: inst.maxHp,
-    isBoss: inst.isBoss, element: inst.element, attackType: inst.attackType,
+    isBoss: inst.isBoss, size: inst.size, element: inst.element, attackType: inst.attackType,
     isTrainingDummy: inst.isTrainingDummy,
     affixes: inst.affixes, venom: inst.venom, shieldMax: inst.shieldMax, shieldRemaining: inst.shieldRemaining,
   };

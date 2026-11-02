@@ -112,6 +112,12 @@ describe('狀態同步', () => {
     expect(collectCombatDelta(session)).toEqual({ shield: { m1: 5 } });
   });
 
+  it('新怪帶體型，client 依此決定球大小（25 § 25.2.1）', () => {
+    resetSync(session);
+    session.combat.monsterInstances.set('m1', { ...instance(100), size: 'large' } as MonsterInstance);
+    expect(collectCombatDelta(session)!.add?.[0]).toEqual(expect.objectContaining({ id: 'm1', size: 'large' }));
+  });
+
   it('tick 推送有角色時必送並帶 now；操作回應的推送沒有變動就不送', () => {
     expect(buildFrame(session, null)).toBeNull();
     const tick = buildFrame(session, { visuals: [] });

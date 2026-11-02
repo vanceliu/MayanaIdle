@@ -1,5 +1,6 @@
-import { Application, Container } from 'pixi.js';
+import { Application, Container, UPDATE_PRIORITY } from 'pixi.js';
 import { Camera } from './camera/Camera';
+import { isSceneDirty, shouldRender } from './renderOnDemand';
 
 /** 實際採用的渲染解析度：`devicePixelRatio` 夾在上限之內 */
 export function renderResolution(maxResolution?: number): number {
@@ -32,6 +33,10 @@ export class PixiApp {
 
   private _initialized = false;
   private _initPromise: Promise<void> | null = null;
+  private renderRequested = true;
+  private lastRenderAt = 0;
+  /** 實際畫了幾幀（量測與測試用） */
+  public renderCount = 0;
 
   constructor() {
     this.app = new Application();
@@ -48,10 +53,14 @@ export class PixiApp {
     this.app.stage.addChild(this.worldContainer);
     // Pixi 的 0 代表不限速；初始化失敗重試會換掉 app，所以要在 init 之後才設
     this.app.ticker.maxFPS = options.maxFPS ?? 0;
+    // 有變化才畫（`34-ui-guidelines.md` § 34.9.1）：拿掉 Pixi 每幀自動 render，改在遊戲邏輯之後判斷
+    this.app.ticker.remove(this.app.render, this.app);
+    this.app.ticker.add(this.renderIfNeeded, this, UPDATE_PRIORITY.LOW);
     this._initialized = true;
 
     this.app.renderer.on('resize', (width: number, height: number) => {
       this.camera.setViewport(width, height);
+      this.requestRender();
     });
 
     const { width, height } = this.app.renderer;
@@ -85,6 +94,25 @@ export class PixiApp {
       this.app = new Application();
       await this.app.init({ ...baseOptions, antialias: false });
     }
+  }
+
+  /** 下一幀一定要畫（場景佇列看不到的變化用） */
+  requestRender(): void {
+    this.renderRequested = true;
+  }
+
+  private renderIfNeeded(): void {
+    const now = performance.now();
+    const render = shouldRender({
+      dirty: isSceneDirty(this.app.stage.renderGroup),
+      requested: this.renderRequested,
+      sinceLastRenderMs: now - this.lastRenderAt,
+    });
+    if (!render) return;
+    this.renderRequested = false;
+    this.lastRenderAt = now;
+    this.renderCount++;
+    this.app.render();
   }
 
   get canvas(): HTMLCanvasElement {

@@ -107,6 +107,7 @@ client/
 │   │       ├── MagicAcademy.tsx
 │   │       ├── AdventurerGuild.tsx
 │   │       ├── ClassQuests.tsx
+│   │       ├── BountyTab.tsx       # 冒險者工會「懸賞」分頁（`53-bounty-contract.md`）
 │   │       ├── GuildNpc.tsx
 │   │       ├── TownBlacksmith.tsx
 │   │       └── Storage.tsx
@@ -616,6 +617,7 @@ interface ScriptTemplate {
 | `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作。**兩欄部位格**（2×5）：格子只印部位名 + 裝備名（Tier 色與背包同源），數值／詞綴／材質／職業一律 hover tooltip；空部位畫虛線框；選取用金色外框，與 `.bag-cell.is-selected` 同一套 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
+| `ItemListRow` | 商店／倉庫清單列：icon＋名稱＋價格＋數量步進器，完整內容走 hover tooltip（`34-ui-guidelines.md` § 34.1「清單列」） |
 | `BagPanel` | 背包 grid（無收合），格數 = 60 + 腰帶擴充，支援拖放自由擺放（位置持久化於本機，不隨角色匯出），底部「印記」抽屜，GameIcon + tooltip + 右鍵選單，數量 badge 右上角 |
 | `Inventory` | 裝備背包列表元件 |
 | `CombatScriptEditor` | 戰鬥天賦格編輯（僅攻擊技能/普攻） |
@@ -639,7 +641,7 @@ interface ScriptTemplate {
 | `ArmorShop` | 按部位購買防具 |
 | `Inn` | 休息回復 HP/MP（完全休息/HP/MP 三種選項） |
 | `MagicAcademy` | 三個 tab：「學習魔法」（金幣學 1~3 級 / 魔法書學 4~10 級）、「製作魔法書」（碎片 + 材料合成）、「職業技能」（消耗背包中的職業技能書） |
-| `AdventurerGuild` | 兩個 tab：「冒險任務」（隨機任務與貢獻等階）、「職業任務」（`ClassQuests`，職業技能書任務） |
+| `AdventurerGuild` | 三個 tab：「冒險任務」（隨機任務與貢獻等階）、「職業任務」（`ClassQuests`，職業技能書任務）、「懸賞」（`53-bounty-contract.md`） |
 | `GuildNpc` | 公會建立／解散（`11-guild.md`）；只在開放世界出現，顯示條件在 `models/townNpc.ts` |
 | `TownBlacksmith` | 裝備強化 / 製作 |
 | `Storage` | 裝備與素材倉庫（帳號共用）；裝備列只印 icon + 名稱，完整內容 hover tooltip |

@@ -99,8 +99,8 @@ function acquireOf(tier: number, idx: number): AcquireType {
 function needsPrerequisite(tier: number, idx: number): boolean {
   return tier === 5 || (tier === 6 && idx === 0);
 }
-/** 製作費一律 0（`06-equipment-acquire.md` § 6A.3） */
-const CRAFT_GOLD = 0;
+/** 製作費依階級（`06-equipment-acquire.md` § 6A.3） */
+const CRAFT_GOLD: Record<number, number> = { 4: 20_000, 5: 50_000, 6: 80_000 };
 /** `06-equipment-acquire.md` § 6A.1：米索利與奧里哈魯根只出現在 T4 以上 */
 const MAT_LOW: WeaponMaterial[] = ['iron', 'silver', 'wood', 'dragon'];
 const MAT_HIGH: WeaponMaterial[] = ['mithril', 'orichalcum', 'dragon', 'silver', 'wood', 'iron'];
@@ -212,7 +212,7 @@ export function buildWeaponSeeds(existing: readonly EquipmentTemplate[]): Equipm
           acquireType,
           tier: tier as EquipmentTier,
           ...(acquireType === 'craft' && {
-            craftGold: CRAFT_GOLD,
+            craftGold: CRAFT_GOLD[tier],
             craftMaterials: (prev?.craftMaterials ?? []).map(m => ({ ...m })),
             ...(needsPrerequisite(tier, i) && prereqId != null && {
               craftPrerequisiteWeapon: { templateId: prereqId, quantity: 1 },

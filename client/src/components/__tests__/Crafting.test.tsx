@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { TownBlacksmith } from '../town/TownBlacksmith';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { useGameStore } from '../../stores/gameStore';
@@ -198,8 +198,8 @@ describe('TownBlacksmith - Crafting', () => {
     fireEvent.click(enabledBtn);
 
     const state = useGameStore.getState();
-    // 製作不收金幣（§ 6A.3）
-    expect(state.character!.gold).toBe(500000);
+    // 製作費依 seed 扣款（§ 6A.3）
+    expect(state.character!.gold).toBe(500000 - RECIPE.craftGold!);
     expect(state.inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(true);
     for (const m of RECIPE.craftMaterials!) {
       expect(state.bagItems.find(b => b.itemId === m.itemId)?.amount, String(m.itemId)).toBe(10 - m.amount);
@@ -229,20 +229,32 @@ describe('TownBlacksmith - Crafting', () => {
     expect(Array.isArray(crafted.affixes)).toBe(true);
   });
 
-  it('金幣為 0 一樣做得出來（製作不收費，§ 6A.3）', async () => {
+  it('金幣不足製作費時製作鈕停用，金幣需求標為缺料（§ 6A.3）', async () => {
     useGameStore.setState({
-      character: { ...useGameStore.getState().character!, gold: 0 },
+      character: { ...useGameStore.getState().character!, gold: RECIPE.craftGold! - 1 },
     });
     render(<TownBlacksmith />);
-    fireEvent.click(await findRecipeTitle('鋼心劍'));
+    const row = (await findRecipeTitle('鋼心劍')).closest('.shop-item') as HTMLElement;
+    fireEvent.click(row);
 
-    const craftBtns = screen.getAllByText('製作');
-    const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
-    fireEvent.click(enabledBtn);
+    expect((within(row).getByText('製作') as HTMLButtonElement).disabled).toBe(true);
+    const goldChip = within(row).getByText('金幣').closest('.bs-craft-mat')!;
+    expect(goldChip.classList.contains('lacking')).toBe(true);
+    expect(goldChip.textContent).toContain(`${(RECIPE.craftGold! - 1).toLocaleString()}/${RECIPE.craftGold!.toLocaleString()}`);
+  });
 
+  it('金幣不足時 store 拒絕製作且不扣素材', async () => {
+    useGameStore.setState({
+      character: { ...useGameStore.getState().character!, gold: RECIPE.craftGold! - 1 },
+    });
+    const before = useGameStore.getState().bagItems;
+    const result = await useGameStore.getState().craftEquipment(tid('鋼心劍'));
+
+    expect(result).toEqual({ ok: false, message: '金幣不足' });
     const state = useGameStore.getState();
-    expect(state.character!.gold).toBe(0);
-    expect(state.inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(true);
+    expect(state.character!.gold).toBe(RECIPE.craftGold! - 1);
+    expect(state.bagItems).toEqual(before);
+    expect(state.inventory.some(i => i.templateId === tid('鋼心劍'))).toBe(false);
   });
 
   it('disables craft button when not enough materials', async () => {
