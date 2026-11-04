@@ -30,6 +30,16 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 啟動器 API 只限啟動器頁呼叫（`97-selfhosted-server.md` § 97.2 桌面啟動器）
+
+規格：main 行程每個 IPC handler 先檢查 `event.senderFrame` 的網址，轉成檔案路徑後必須與 `ui/launcher.html` 相同（Windows 不分大小寫），否則拒絕並記警告；preload 只在 `file:` 頁面暴露 `window.launcher`。
+
+- [x] L1 `desktop/src/ipcGuard.ts`（`isLauncherUrl`）＋測試
+- [x] L2 `main.ts` 全部 handler 經檢查註冊；`preload.ts` 限 `file:`
+- [x] L3 文件：97、INDEX
+- [x] L4 desktop `npm run typecheck`、`npm test`
+- [ ] L5 使用者實機確認（單機、開站、連線、編輯設定、Credits、回到啟動器）
+
 ### 懸賞契約（`53-bounty-contract.md`）
 
 規格：冒險者工會新增「懸賞」分頁，每城鎮 5 張（4 普通怪＋1 Boss），存檔，每天 0／6／12／18 點更新、簽走留空；簽約付金幣（依等級級距），可加購「掉兩次取比較好」（第二次不乘 Pressure）；契約對象生成時保證至少 1 個強化詞綴；擊殺數到達即結束；同時 3 張、同對象禁止重複、可放棄不退款、組隊時暫停。

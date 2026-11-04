@@ -8,7 +8,7 @@
  * 單機與開放各自一個資料目錄：形態一經建立即固定（§ 97.1），
  * 共用一個目錄等於讓「單機世界改成開放」從側門溜進來。
  */
-import { app, BrowserWindow, Menu, ipcMain, shell, dialog } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, shell, dialog, type IpcMainInvokeEvent } from 'electron';
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +26,7 @@ import {
   portTaken, summarize, uniqueWorldId, validateConfigValues, worldIdFromName,
   type ConfigField, type WorldSummary,
 } from './worlds';
+import { isLauncherUrl } from './ipcGuard';
 
 type WorldKind = 'solo' | 'open';
 
@@ -121,6 +122,18 @@ async function stopServer(): Promise<void> {
 
 function launcherFile(): string {
   return join(__dirname, '..', 'ui', 'launcher.html');
+}
+
+/** 啟動器 API 只接受啟動器頁的呼叫；遠端遊戲頁呼叫一律拒絕（§ 97.2） */
+function handleLauncher(channel: string, listener: (event: IpcMainInvokeEvent, ...args: never[]) => unknown): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    const sender = event.senderFrame?.url;
+    if (!isLauncherUrl(sender, launcherFile())) {
+      log.warn(`拒絕非啟動器頁面的呼叫 ${channel}：${sender ?? '(無)'}`);
+      throw new Error('只有啟動器頁面可以呼叫');
+    }
+    return listener(event, ...(args as never[]));
+  });
 }
 
 /**
@@ -237,23 +250,23 @@ declare const __OFFICIAL_SERVER_URL__: string;
 /** 打包時以 `OFFICIAL_SERVER_URL` 注入（`97-selfhosted-server.md` § 97.2 桌面啟動器） */
 const officialServer = parseOfficialServer(typeof __OFFICIAL_SERVER_URL__ !== 'undefined' ? __OFFICIAL_SERVER_URL__ : undefined);
 
-ipcMain.handle('servers:list', () => loadServers());
+handleLauncher('servers:list', () => loadServers());
 
-ipcMain.handle('servers:official', () => (officialServer ? { url: gameUrl(officialServer) } : null));
+handleLauncher('servers:official', () => (officialServer ? { url: gameUrl(officialServer) } : null));
 
-ipcMain.handle('servers:forget', (_e, target: ServerAddress) => {
+handleLauncher('servers:forget', (_e, target: ServerAddress) => {
   const next = forgetServer(loadServers(), target);
   saveServers(next);
   return next;
 });
 
-ipcMain.handle('servers:rename', (_e, target: ServerAddress, name: string) => {
+handleLauncher('servers:rename', (_e, target: ServerAddress, name: string) => {
   const next = renameServer(loadServers(), target, name);
   saveServers(next);
   return next;
 });
 
-ipcMain.handle('worlds:list', () => listOpenWorlds());
+handleLauncher('worlds:list', () => listOpenWorlds());
 
 /** 表單欄位由 server 的 `CONFIG_SPECS` 產生，鍵、型別與預設值只有那一份 */
 function configFields(dataDir: string): ConfigField[] {
@@ -264,10 +277,10 @@ function configFields(dataDir: string): ConfigField[] {
 }
 
 
-ipcMain.handle('worlds:fields', () => configFields(join('<資料目錄>')));
+handleLauncher('worlds:fields', () => configFields(join('<資料目錄>')));
 
 /** 既有世界的設定：檔案裡有的用檔案的，其餘補預設 */
-ipcMain.handle('worlds:config', (_e, kind: WorldKind, id?: string) => {
+handleLauncher('worlds:config', (_e, kind: WorldKind, id?: string) => {
   const dir = kind === 'solo' ? worldDir('solo') : worldDir('open', id);
   const file = join(dir, 'server.properties');
   const text = existsSync(file) ? readFileSync(file, 'utf-8') : '';
@@ -278,7 +291,7 @@ ipcMain.handle('worlds:config', (_e, kind: WorldKind, id?: string) => {
   };
 });
 
-ipcMain.handle('worlds:saveConfig', (_e, kind: WorldKind, id: string | undefined, name: string, values: Record<string, string>) => {
+handleLauncher('worlds:saveConfig', (_e, kind: WorldKind, id: string | undefined, name: string, values: Record<string, string>) => {
   const dir = kind === 'solo' ? worldDir('solo') : worldDir('open', id);
   const file = join(dir, 'server.properties');
 
@@ -301,7 +314,7 @@ ipcMain.handle('worlds:saveConfig', (_e, kind: WorldKind, id: string | undefined
   return { ok: true };
 });
 
-ipcMain.handle('worlds:create', async (_e, name: string, values: Record<string, string>) => {
+handleLauncher('worlds:create', async (_e, name: string, values: Record<string, string>) => {
   const worlds = listOpenWorlds();
   const trimmed = (name ?? '').trim();
   if (!trimmed) return { ok: false, message: '請填 server 名稱' };
@@ -319,7 +332,7 @@ ipcMain.handle('worlds:create', async (_e, name: string, values: Record<string, 
   return { ok: true, id };
 });
 
-ipcMain.handle('worlds:delete', async (_e, id: string) => {
+handleLauncher('worlds:delete', async (_e, id: string) => {
   const dir = worldDir('open', id);
   const { response } = await dialog.showMessageBox({
     type: 'warning',
@@ -334,7 +347,7 @@ ipcMain.handle('worlds:delete', async (_e, id: string) => {
   return error ? { ok: false, message: error } : { ok: true };
 });
 
-ipcMain.handle('world:start', async (_e, kind: WorldKind, id?: string) => {
+handleLauncher('world:start', async (_e, kind: WorldKind, id?: string) => {
   if (!win) return { ok: false, message: '視窗不存在' };
   const dir = kind === 'solo' ? worldDir('solo') : worldDir('open', id);
   try {
@@ -353,7 +366,7 @@ ipcMain.handle('world:start', async (_e, kind: WorldKind, id?: string) => {
   }
 });
 
-ipcMain.handle('world:connect', async (_e, raw: string, name?: string) => {
+handleLauncher('world:connect', async (_e, raw: string, name?: string) => {
   if (!win) return { ok: false, message: '視窗不存在' };
   const parsed = parseAddress(raw);
   if ('error' in parsed) return { ok: false, message: parsed.error };
@@ -381,7 +394,7 @@ ipcMain.handle('world:connect', async (_e, raw: string, name?: string) => {
   }
 });
 
-ipcMain.handle('world:openDataDir', async (_e, kind: WorldKind, id?: string) => {
+handleLauncher('world:openDataDir', async (_e, kind: WorldKind, id?: string) => {
   const dir = kind === 'solo' ? worldDir('solo') : worldDir('open', id);
   mkdirSync(dir, { recursive: true });
   await shell.openPath(dir);
@@ -389,16 +402,16 @@ ipcMain.handle('world:openDataDir', async (_e, kind: WorldKind, id?: string) => 
 
 declare const __APP_VERSION__: string;
 
-ipcMain.handle('app:info', () => ({
+handleLauncher('app:info', () => ({
   // 顯示的是**遊戲**版本（與 server、前端同一個），不是 Electron 殼的版本
   version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : app.getVersion(),
   userData: app.getPath('userData'),
 }));
 
-ipcMain.handle('app:quit', () => app.quit());
+handleLauncher('app:quit', () => app.quit());
 
 /** 第三方套件授權清單，build 時由 `scripts/genCredits.mjs` 產生 */
-ipcMain.handle('app:credits', () => {
+handleLauncher('app:credits', () => {
   try {
     return JSON.parse(readFileSync(join(__dirname, 'credits.json'), 'utf-8')) as unknown[];
   } catch {

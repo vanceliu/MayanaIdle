@@ -2,7 +2,8 @@
  * 啟動器頁面唯一能碰到主行程的入口。
  *
  * `contextIsolation` 開著、`nodeIntegration` 關著：頁面拿不到 Node，
- * 只能透過這裡列出的幾支動作 —— 遊戲頁面本身是遠端內容，不該有更多權力。
+ * 只能透過這裡列出的幾支動作。遊戲頁與啟動器共用視窗，這支在遠端頁面上也會跑：
+ * 只在 `file:` 頁面暴露 API，呼叫者的實際檢查在主行程（`ipcGuard.ts`）。
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -28,6 +29,6 @@ const api = {
   credits: () => ipcRenderer.invoke('app:credits'),
 };
 
-contextBridge.exposeInMainWorld('launcher', api);
+if (location.protocol === 'file:') contextBridge.exposeInMainWorld('launcher', api);
 
 export type LauncherApi = typeof api;
