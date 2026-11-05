@@ -4,7 +4,7 @@
  * 製作品與同模板掉落品都可拆、前置不退、裝備中與無配方不可拆、背包格數判定。
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useGameStore, BAG_BASE_SLOTS } from '../../stores/gameStore';
 import { resetTestDb } from '../../testing/testDb';
 import { loadTemplateCache, resolveEquipment } from '../../systems/templateSync';
@@ -13,6 +13,7 @@ import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { getBagItemAmount } from '../../models/bagItem';
 import { getDismantleYield } from '../../systems/crafting';
+import { formatAffixDisplay, type Affix } from '../../models/affix';
 import { TownBlacksmith } from '../../components/town/TownBlacksmith';
 
 vi.mock('../../components/GameIcon', () => ({
@@ -127,6 +128,34 @@ describe('鐵匠鋪拆解分頁', () => {
     expect(confirm).toHaveBeenCalled();
     expect(useGameStore.getState().inventory.map(i => i.id)).toEqual([8]);
     confirm.mockRestore();
+  });
+
+  const FIRST_AFFIX: Affix = { type: 'crit_rate', tier: 2, value: 7 };
+  const SECOND_AFFIX: Affix = { type: 'crit_rate', tier: 3, value: 11 };
+
+  it('hover 名稱顯示該件裝備詳情，同名兩件各自顯示自己的詞綴', () => {
+    vi.useFakeTimers();
+    setup([
+      instance(T4, 7, { affixes: [FIRST_AFFIX] }),
+      instance(T4, 8, { affixes: [SECOND_AFFIX] }),
+    ], { craftQuests: [] });
+    render(<TownBlacksmith />);
+    fireEvent.click(screen.getByRole('button', { name: '裝備拆解' }));
+
+    const triggers = document.querySelectorAll('.bs-shop-item .tooltip-trigger');
+    expect(triggers).toHaveLength(2);
+    const popupFor = (trigger: Element) => {
+      fireEvent.mouseEnter(trigger);
+      act(() => { vi.advanceTimersByTime(300); });
+      const popup = document.querySelector('.tooltip-popup') as HTMLElement;
+      expect(popup.querySelector('.equip-detail')).not.toBeNull();
+      const affixes = Array.from(popup.querySelectorAll('.equip-detail-affix:not(.empty-socket)'), el => el.textContent);
+      fireEvent.mouseLeave(trigger);
+      return affixes;
+    };
+    expect(popupFor(triggers[0])).toEqual([formatAffixDisplay(FIRST_AFFIX)]);
+    expect(popupFor(triggers[1])).toEqual([formatAffixDisplay(SECOND_AFFIX)]);
+    vi.useRealTimers();
   });
 
   it('取消確認不拆', () => {

@@ -125,6 +125,7 @@
 | 武器店/防具店 | 購買 `EquipmentTemplateDetail`／出售 `EquipmentDetail` | — | 清單列（§ 34.1）；完整內容走 hover tooltip |
 | 印記師（詞綴/品質） | 自訂兩行摘要 | — | **不用 `EquipmentDetail`**：詞綴在選取區已整條列出，再列一次是同一份資料印兩遍。只留品質%與精鍊上限（見 `13-town.md` § 13.13.1） |
 | 鐵匠鋪（製作） | 自訂摘要 ＋ `AttributeRequirement` | — | 配方資訊，非裝備實例；素質需求走共用元件 |
+| 鐵匠鋪（拆解） | `EquipmentDetail` | — | 列上只印名稱（含強化）與退還材料；完整內容走名稱的 hover tooltip |
 
 ### 裝備顯示欄位（EquipmentDetail）
 

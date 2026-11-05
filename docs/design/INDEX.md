@@ -196,6 +196,7 @@
 | In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | **商店／倉庫清單列（名稱＋hover tooltip／窄版折行）** | `34-ui-guidelines.md` | § 34.1「清單列」 |
+| **各介面的裝備詳情元件（含鐵匠鋪拆解 hover）** | `34-ui-guidelines.md` | § 34.2「使用場景」 |
 | 技能面板顯示規則（格子全開/暗亮態/依職業裁切） | `34-ui-guidelines.md` | § 34.7（上限數值見 `05-skill.md` § 5.3） |
 | 幀率與渲染解析度上限（桌機／手持）、每幀重繪通則（有變化才畫） | `34-ui-guidelines.md` | § 34.9（`47-mobile.md` § 47.8 只留指標） |
 | **線條粗細／描邊色／彩度倍率／分區色相／對比預算** | `34-ui-guidelines.md` | § 34.10（地圖色在 `pixi/mapThemes.ts`） |

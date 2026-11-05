@@ -5,6 +5,8 @@ import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { AttributeRequirement } from '../AttributeRequirement';
 import { GameIcon } from '../GameIcon';
+import { Tooltip } from '../Tooltip';
+import { EquipmentDetail } from '../EquipmentInfo';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
 import { getBagItemAmount } from '../../models/bagItem';
@@ -102,10 +104,12 @@ export function TownBlacksmith() {
               return (
                 <div key={item.id} className="shop-item bs-shop-item">
                   <div className="shop-item-info">
-                    <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color={color} />
-                      {item.name}{item.enhancement > 0 ? ` +${item.enhancement}` : ''}
-                    </span>
+                    <Tooltip position="right" content={<EquipmentDetail item={item} />}>
+                      <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <GameIcon name={getEquipIcon(item.type === 'armor' ? item.slot : item.type)} size={16} color={color} />
+                        {item.name}{item.enhancement > 0 ? ` +${item.enhancement}` : ''}
+                      </span>
+                    </Tooltip>
                     <span className="shop-item-desc bs-craft-materials">
                       {yields.map(m => {
                         const def = getItemById(m.itemId);
