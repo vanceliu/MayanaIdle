@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { applyAbilityToSkill } from '../models/abilitySkill';
+import { SkillTooltipBody } from './SkillTooltipBody';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import {
@@ -8,7 +10,7 @@ import {
 import { getSkillDisplayIcon } from '../models/iconMap';
 import { calculateHealAmount } from '../systems/combat';
 import { GameIcon } from './GameIcon';
-import { SKILL_CATALOG, WEAPON_TYPE_LABELS, type Skill, formatSkillRange, formatBuffDuration, formatDebuffDuration, formatSelfBuff } from '../models/skill';
+import { SKILL_CATALOG, type Skill } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
 import { CLASS_MAGIC_RESTRICTIONS } from '../models/skillRestrictions';
 import type { ClassName } from '../models/character';
@@ -283,57 +285,12 @@ export function SkillPanel() {
         >
           <div className="skill-tooltip-name">{tooltip.name}</div>
           <div className="skill-tooltip-level">等級 {tooltip.level}</div>
-          {tooltip.skill.requiredWeaponType && (
-            <div className="skill-tooltip-stat skill-tooltip-req">
-              【需{WEAPON_TYPE_LABELS[tooltip.skill.requiredWeaponType] ?? tooltip.skill.requiredWeaponType}】
-            </div>
-          )}
-          {tooltip.skill.type === 'attack' && (
-            <div className="skill-tooltip-stat">
-              威力: {tooltip.skill.power}{tooltip.skill.physicalSnapshot && ' + 物理傷害'}
-            </div>
-          )}
-          {formatSkillRange(tooltip.skill) && (
-            <div className="skill-tooltip-stat">射程: {formatSkillRange(tooltip.skill)}</div>
-          )}
-          {tooltip.skill.hits && (
-            <div className="skill-tooltip-stat">{tooltip.skill.hits} 連擊</div>
-          )}
-          {tooltip.skill.description && (
-            <div className="skill-tooltip-stat">效果: {tooltip.skill.description}</div>
-          )}
-          {tooltip.skill.applyDebuff && (
-            <div className="skill-tooltip-stat">附加: {tooltip.skill.applyDebuff.name} ({tooltip.skill.applyDebuff.description}, {formatDebuffDuration(tooltip.skill.applyDebuff)})</div>
-          )}
-          {tooltip.skill.selfBuff && (
-            <div className="skill-tooltip-stat">自身增益: {formatSelfBuff(tooltip.skill)}</div>
-          )}
-          {tooltip.skill.type === 'heal' && tooltip.skill.power > 0 && (
-            /*
-             * § 21.4c：治癒量隨智力與裝備魔攻變動，沒有固定值可標。
-             * 這裡直接算「這名角色現在放會回多少」—— 比印一個與實際不符的常數有用。
-             */
-            <div className="skill-tooltip-stat">
-              回復: {calculateHealAmount(character, tooltip.skill.power, equippedGearList, activeEffects)}
-            </div>
-          )}
-          {tooltip.skill.buffEffect && (
-            <div className="skill-tooltip-stat">效果: {tooltip.skill.buffEffect}</div>
-          )}
-          {formatBuffDuration(tooltip.skill) && (
-            <div className="skill-tooltip-stat">持續: {formatBuffDuration(tooltip.skill)}</div>
-          )}
-          {tooltip.skill.type === 'passive' ? (
-            <div className="skill-tooltip-stat">被動</div>
-          ) : (
-            <>
-              <div className="skill-tooltip-stat">MP: {tooltip.skill.mpCost}</div>
-              <div className="skill-tooltip-stat">冷卻: {tooltip.skill.cooldown / 1000}s</div>
-            </>
-          )}
-          {tooltip.skill.target === 'aoe' && (
-            <div className="skill-tooltip-stat">範圍: 半徑 {tooltip.skill.aoeRadius} 格{tooltip.skill.randomHits ? ` / 隨機 ${tooltip.skill.randomHits} 下（可重複命中）` : tooltip.skill.maxTargets ? ` / 最多 ${tooltip.skill.maxTargets} 隻` : '（無上限）'}</div>
-          )}
+          {/* § 7S.7：套用職業池隨機技能後的數值，被改動的數字標黃 */}
+          <SkillTooltipBody
+            base={tooltip.skill}
+            shown={applyAbilityToSkill({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character?.className)}
+            healOf={power => calculateHealAmount(character, power, equippedGearList, activeEffects)}
+          />
           <div className={`skill-tooltip-status ${tooltip.learned ? 'learned' : 'locked'}`}>
             {tooltip.learned ? '已習得' : '未習得'}
           </div>

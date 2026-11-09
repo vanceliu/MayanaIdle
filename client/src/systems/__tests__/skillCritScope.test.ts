@@ -1,22 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { CLASS_SKILLS } from '../../models/classSkills';
-import { SKILL_CATALOG } from '../../models/skill';
 
-/** `21-combat-formula.md` § 21.8「適用範圍」：魔法公式技能中只有物理系（§ 23.1.1 B 組）判定爆擊 */
-describe('魔法公式技能的爆擊標記', () => {
+/** `23-class-magic.md` § 23.1.1 A 組：走快照物理的職業技能 */
+describe('A 組快照物理技能', () => {
   const classSkills = CLASS_SKILLS.map(c => c.skill);
 
-  it('復仇之刃與背刺標記為物理系', () => {
-    const marked = classSkills.filter(s => s.physicalDamage).map(s => s.id).sort();
-    expect(marked).toEqual(['backstab', 'vengeance']);
+  it('名單與文件一致（含復仇之刃、背刺）', () => {
+    const marked = classSkills.filter(s => s.physicalSnapshot).map(s => s.id).sort();
+    expect(marked).toEqual(['backstab', 'binding-arrow', 'charge', 'leap-shot', 'rend', 'shield-bash', 'taunt', 'vengeance']);
   });
 
-  it('基礎魔法一律不帶物理系標記', () => {
-    expect(SKILL_CATALOG.filter(s => s.physicalDamage)).toEqual([]);
-  });
-
-  it('物理快照與多段技能不需要標記（走各自的物理函式）', () => {
-    const physicalFormula = classSkills.filter(s => s.physicalSnapshot || (s.hits ?? 0) > 1);
-    expect(physicalFormula.every(s => !s.physicalDamage)).toBe(true);
+  it('復仇之刃 36、背刺 69（§ 23.3／§ 23.7）', () => {
+    expect(classSkills.find(s => s.id === 'vengeance')!.power).toBe(36);
+    expect(classSkills.find(s => s.id === 'backstab')!.power).toBe(69);
   });
 });

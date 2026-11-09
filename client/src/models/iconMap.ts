@@ -8,6 +8,9 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'cd-reduction': 'buffs/lightning-helix',
   'element-boost': 'buffs/embrassed-energy',
   'holy-shield': 'buffs/holy-symbol',
+  // 飾品隨機技能（`07-affix-ability.md` § 7S.5）
+  'ability-rage': 'buffs/fire-shield',
+  'ability-calm': 'buffs/magic-swirl',
   'mana-shield': 'buffs/magic-shield',
   'mana-spring': 'buffs/lightning-frequency',
   'blood-mana': 'buffs/heart-drop',
@@ -314,6 +317,7 @@ export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
   speed_not_active: 'buffs/sprint',
   debuff_active: 'debuffs/poison-gas',
   self_shielded: 'buffs/magic-shield',
+  ability_meter: 'buffs/fire-shield',
   buff_remaining_below: 'items/hourglass',
   potion_cooldown_ready: 'items/standing-potion',
   weight_over: 'items/swap-bag',

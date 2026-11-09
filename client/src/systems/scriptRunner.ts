@@ -16,6 +16,8 @@ import type { BagItem } from '../models/bagItem';
 import { hasBagItem, getBagItemAmount } from '../models/bagItem';
 import { getPotionCount, SPEED_POTION_CONFIG, POTION_CONFIG } from '../stores/gameStore';
 import { canUseSkill, isSkillHpBlocked } from '../models/skill';
+import { getAbilityMeterValue, ABILITY_CALM_CATEGORY } from '../models/abilityMeter';
+import { ABILITY_RAGE_CATEGORY } from './abilityCombat';
 import { planDash } from './dash';
 import { findScrollInBag, TOWN_SCROLL_CONFIG } from '../models/townScroll';
 import { PLAYER_DEBUFF_DEFS } from '../models/playerDebuff';
@@ -258,6 +260,8 @@ function checkCombatCondition(
       return (ctx.weightPercent ?? 0) > (condition.value ?? 0);
     case 'self_shielded':
       return hasActiveShield(ctx.activeEffects ?? [], now, 'player');
+    case 'ability_meter':
+      return compareValue(abilityMeter(ctx.activeEffects ?? [], condition.match, now), condition.value ?? 0, condition.compare);
     /*
      * 共用條件（§ 51.4.5）判定的是**自身**狀態，與常駐版完全同一套邏輯。
      * 兩邊各寫一份會走鐘，所以抽成共用函式。
@@ -373,6 +377,13 @@ function checkCombatCondition(
   }
 }
 
+/** 怒氣／平靜的當下數值（`07-affix-ability.md` § 7S.5）；沒有對應 buff 時為 0 */
+function abilityMeter(activeEffects: ActiveEffect[], meter: string | undefined, now: number): number {
+  const category = meter === 'calm' ? ABILITY_CALM_CATEGORY : ABILITY_RAGE_CATEGORY;
+  const effect = activeEffects.find(e => e.category === category && now - e.startTime < e.duration);
+  return effect ? getAbilityMeterValue(effect, now) ?? 0 : 0;
+}
+
 /** `compare` 沒帶時當作 `gt` —— 舊資料與手寫測試不必每次都填 */
 function compareValue(actual: number, threshold: number, mode?: 'gt' | 'lt'): boolean {
   return mode === 'lt' ? actual < threshold : actual > threshold;
@@ -396,7 +407,7 @@ function hasActiveShield(
  * 主目標在射程外時照常選上（先追擊）；進入射程後必須有落點，否則落到下一條規則。
  */
 function isDashExecutable(skill: Skill, ctx: CombatScriptContext): boolean {
-  if (!ctx.map) return true;
+  if (!ctx.map || skill.dashOptional) return true;
   const target = getPrimaryTarget(ctx);
   if (!target) return false;
   const range = skill.range ?? 0;
@@ -533,6 +544,8 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
         e.target === 'player'
         && now - e.startTime < e.duration
         && (e.invincible === true || (e.shieldRemaining ?? 0) > 0));
+    case 'ability_meter':
+      return compareValue(abilityMeter(activeEffects, condition.match, now), condition.value ?? 0, condition.compare);
     case 'hp_dropped_recently': {
       if (!ctx.hpHistory) return false;
       return hpDropInWindow(ctx.hpHistory, now, condition.radius ?? 3) > (condition.value ?? 0);

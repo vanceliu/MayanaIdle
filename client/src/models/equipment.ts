@@ -1,6 +1,7 @@
 import type { Affix } from './affix';
 import { collectAffixAttributes } from './affix';
 import type { UniqueAffix } from './uniqueAffix';
+import type { Ability } from './ability';
 import { sumUniqueAffix } from './uniqueAffix';
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS } from './attributes';
@@ -310,6 +311,8 @@ export interface EquipmentInstance {
   affixes: Affix[]; // up to 4 affix slots
   /** T7 獨有詞綴（`07-affix-tier7.md`）。生成時抽，之後不變；非 T7 為 undefined */
   uniqueAffix?: UniqueAffix;
+  /** 隨機技能（`07-affix-ability.md`）。生成時決定，之後不變 */
+  ability?: Ability;
   /** 可用詞綴洞數（`07-affix.md` § 7.1）。未設＝4；封印印記失敗時 −1 */
   affixSlots?: number;
   requiredClass?: string[];

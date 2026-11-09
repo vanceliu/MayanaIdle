@@ -18,6 +18,7 @@ import { ACTION_ALLOWLIST, PROTOCOL_VERSION, type ClientMessage, type Leaderboar
 import { World } from './world';
 import type { GuildStorage } from './db/guildStorage';
 import { log } from './log';
+import { rates } from '../../client/src/core/rates';
 
 const CLASS_NAMES: ReadonlySet<string> = new Set(['knight', 'elf', 'elementalist', 'priest', 'thief']);
 
@@ -215,6 +216,11 @@ export class GameServer {
     } finally {
       this.registrations.finish(ip, created);
     }
+  }
+
+  /** 倍率即時生效後，把探索列顯示用的 Pressure 倍率推給在線 session */
+  refreshPressureRate(): void {
+    for (const session of this.sessions) session.game.setState({ pressureRate: rates.pressure });
   }
 
   /** 全服公告（§ 97.8）。玩家頻道會被聊天洗掉，公告自己一條路 */

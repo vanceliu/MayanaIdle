@@ -9,7 +9,7 @@ const BASE_MAX_MONSTERS = 3;
 const MAX_MONSTERS_CAP = 10;
 
 /** Pressure 起算的累積擊殺數，見 `26-spawn-pressure.md` § 26.3 */
-const PRESSURE_KILL_BASE = 480;
+const PRESSURE_KILL_BASE = 140;
 /** 每推進 1 級 Pressure 所需的擊殺數 */
 const PRESSURE_KILL_STEP = 160;
 /** 掉落倍率的 Pressure 計算上限（maxMonsters 與生成間隔不套用） */
@@ -26,6 +26,12 @@ export function calculatePressure(areaKills: number, globalRate = rates.pressure
   const maxMonsters = Math.min(MAX_MONSTERS_CAP, BASE_MAX_MONSTERS + pressure);
 
   return { pressure, maxMonsters };
+}
+
+/** 推進到下一級 Pressure 所需的累積擊殺數；全域倍率 ≤ 0 時 Pressure 恆為 0，回傳 null */
+export function getNextPressureKills(pressure: number, globalRate = rates.pressure): number | null {
+  if (globalRate <= 0) return null;
+  return Math.ceil((PRESSURE_KILL_BASE + (pressure + 1) * PRESSURE_KILL_STEP) / globalRate);
 }
 
 /** 隊伍實例的怪物上限（`97-selfhosted-server.md` § 97.7.1）：一人時等於 § 26.2 */

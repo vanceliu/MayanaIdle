@@ -137,6 +137,11 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   monster_hp_above: [PERCENT('高於', 70)],
   field_avg_hp_below: [PERCENT('低於', 30)],
   can_kill_count_gte: [COUNT('至少', 2)],
+  ability_meter: [
+    { key: 'match', kind: 'select', label: '數值', def: 'rage', options: [{ value: 'rage', label: '怒氣' }, { value: 'calm', label: '平靜' }] },
+    COMPARE,
+    { key: 'value', kind: 'number', label: '門檻', min: 0, max: 100, def: 50 },
+  ],
   target_distance: [COMPARE, { key: 'value', kind: 'number', label: '距離', suffix: '格', min: 1, max: 20, def: 5 }],
   target_defense: [COMPARE, { key: 'value', kind: 'number', label: '防禦', min: 0, max: 200, def: 40 }],
   target_level_diff: [COMPARE, { key: 'value', kind: 'number', label: '等級差', min: -50, max: 50, def: 0 }],

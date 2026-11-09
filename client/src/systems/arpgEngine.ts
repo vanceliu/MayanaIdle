@@ -566,14 +566,15 @@ function resolveDashAttack(
   const target = targetId ? engine.monsters.get(targetId) : undefined;
   if (!targetId || !target) return null;
   const plan = planDash(map, playerPos, target.mapMonster.position, range, occupied);
-  if (!plan) return null;
+  // 找不到落點：可選突進的技能原地施放（`07-affix-ability.md` § 7S.5 神聖懲擊強化）
+  if (!plan && !skill.dashOptional) return null;
   return {
     type: 'player_attack',
     action,
     targetMonsterIds: [targetId],
     skill,
     attackType: 'melee',
-    ...(plan.moves ? { dashTo: plan.landing } : {}),
+    ...(plan?.moves ? { dashTo: plan.landing } : {}),
   };
 }
 

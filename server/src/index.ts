@@ -178,6 +178,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
       config = next;
       // `live` 的鍵即時生效：倍率立刻換掉，其餘由 `config()` 的呼叫端自然讀到
       applyRates(config);
+      gameServer.refreshPressureRate();
     },
     version: VERSION,
   });

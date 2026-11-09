@@ -45,7 +45,10 @@ import {
 } from '../models/monsterAffix';
 import { getEffectiveGearArray } from './gear';
 import { gameNow } from '../core/clock';
-import { pick } from '../core/rng';
+import { pick, random } from '../core/rng';
+import { applyAbilityToSkills } from '../models/abilitySkill';
+import { syncCalmEffect } from './abilityCombat';
+import { findClassSkillAbility } from '../models/ability';
 import { abortCast } from './monsterCombatFSM';
 import {
   createCombatState, ensureInstance, findMember, leaveInstance, memberIdOf, memberPosition, presentMembers,
@@ -288,6 +291,13 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
 
     if (result.isDodged) tryDodgeCounter(session, instance, event, visuals);
 
+    // § 7S.5 荊棘反彈的擊殺照常結算
+    if (result.thorns?.killed) {
+      const inst = monsterInstances.get(event.monsterId);
+      if (inst) handleMonsterDeath(inst, event.monsterId, session);
+      removeMonster(session, event.monsterId);
+    }
+
     const updatedChar = session.game.getState().character;
     if (updatedChar && updatedChar.hp <= 0) {
       handlePlayerDeath(session);
@@ -330,6 +340,22 @@ function tryDodgeCounter(session: Session, instance: MapInstance, event: Monster
     attackerPos: playerPos, character, allGear, activeEffects: gs.activeEffects, skills: gs.skills,
     visuals, logs, now: gameNow(),
   });
+
+  // § 7S.5 閃避反擊強化：X% 機率再追加 1 次普攻
+  const extra = findClassSkillAbility(allGear, character.className, 'dodge-counter');
+  const after = session.game.getState();
+  if (extra && inst.currentHp > 0 && after.character && after.character.hp > 0 && random() * 100 < extra.params.chance) {
+    logs.push({ text: '閃避反擊追加！', type: 'player' });
+    resolvePlayerStrike({
+      session, instance,
+      event: {
+        type: 'player_attack', action: { type: 'normal_attack' }, targetMonsterIds: [event.monsterId],
+        attackType: weaponType === 'bow' ? 'ranged' : 'melee',
+      },
+      attackerPos: playerPos, character: after.character, allGear, activeEffects: after.activeEffects, skills: after.skills,
+      visuals, logs, now: gameNow(),
+    });
+  }
   appendLogs(session, logs);
 }
 
@@ -399,7 +425,7 @@ function resolvePlayerStrike(o: {
 
   for (const dmg of result.damages) {
     const inst = monsterInstances.get(dmg.targetId);
-    if (inst && !dmg.isMiss) applyThorns(session, inst, dmg, logs, visuals);
+    if (inst && !dmg.isMiss && !dmg.splash) applyThorns(session, inst, dmg, logs, visuals);
   }
 
   for (const dmg of result.damages) {
@@ -483,6 +509,11 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
   const playerPos = mapStore.playerPosition;
   const currentMap = mapStore.currentMap;
   const allGear = getEffectiveGearArray(gameState.character!, gameState.activeEffects, gameState.equippedGear);
+  // § 7S.5 職業池隨機技能：引擎與天賦判定看改寫後的冷卻、MP、突進
+  const skills = applyAbilityToSkills(gameState.skills, allGear, gameState.character.className);
+  // § 7S.5 平靜的狀態列 buff：只在需要變動時寫入
+  const calmEffects = syncCalmEffect(session.loop, allGear, gameState.activeEffects, gameState.character.areaEnteredAt, gameNow());
+  if (calmEffects) session.game.setState({ activeEffects: calmEffects });
 
   /*
    * 手動介入指令（§ 3.6）。**必須在 `tickArpgEngine` 之前消費**：
@@ -503,7 +534,7 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
   const events = tickArpgEngine(engine, {
     playerPos,
     character: gameState.character,
-    skills: gameState.skills,
+    skills,
     activeEffects: gameState.activeEffects,
     equippedGear: allGear,
     // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
@@ -521,7 +552,7 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
     // 怪物 FSM 由實例層推進（§ 97.7.1）
     skipMonsters: true,
     // 只有學了突進／後退技能才需要佔位表（§ 3.6）
-    occupied: gameState.skills.some(s => s.dash || s.retreat)
+    occupied: skills.some(s => s.dash || s.retreat)
       ? session.loop.occupation.getOccupiedSet(playerOccupantId(memberId))
       : undefined,
   });
@@ -576,7 +607,7 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
 
         resolvePlayerStrike({
           session, instance, event: attackEvent, attackerPos,
-          character: gameState.character, allGear, activeEffects: gameState.activeEffects, skills: gameState.skills,
+          character: gameState.character, allGear, activeEffects: gameState.activeEffects, skills,
           visuals, logs, now,
         });
         stopTrainingIfNoDummiesLeft(session);

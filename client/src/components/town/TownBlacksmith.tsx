@@ -18,6 +18,10 @@ import type { EquipmentInstance } from '../../models/equipment';
 import { getEquipmentTierColor, getEquipmentInstanceTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
+import {
+  craftRequiresAbility, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, rollAbility,
+  formatAbilityEffect, type AbilityType,
+} from '../../models/ability';
 
 type BlacksmithTab = 'craft' | 'dismantle';
 
@@ -32,6 +36,8 @@ export function TownBlacksmith() {
   const [craftCategory, setCraftCategory] = useState<string>('sword');
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<BlacksmithTab>('craft');
+  /** 各配方指定的隨機技能（`07-affix-ability.md` § 7S.6） */
+  const [abilityChoices, setAbilityChoices] = useState<Record<number, AbilityType>>({});
   const allTemplates = useEquipmentTemplates();
   const craftTemplates = useMemo(
     () => allTemplates.filter(t => t.acquireType === 'craft').sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0)),
@@ -54,10 +60,22 @@ export function TownBlacksmith() {
     return evaluateCraftRequirements(recipe, bagItems, inventory, char.gold).ready;
   }
 
+  /** 該配方指定的隨機技能；不在本角色可選範圍內時視為未指定 */
+  function chosenAbility(recipe: EquipmentTemplate): AbilityType | undefined {
+    const chosen = abilityChoices[recipe.id!];
+    if (!chosen || !char) return undefined;
+    const options = [...getAbilityCommonPool(recipe), ...getAbilityClassPool(recipe, char.className)];
+    return options.includes(chosen) ? chosen : undefined;
+  }
+
+  function isAbilityReady(recipe: EquipmentTemplate): boolean {
+    return !craftRequiresAbility(recipe) || chosenAbility(recipe) !== undefined;
+  }
+
   async function handleCraft() {
     if (!selectedRecipe || !char) return;
-    if (!canCraftRecipe(selectedRecipe)) return;
-    const settled = useGameStore.getState().craftEquipment(selectedRecipe.id!);
+    if (!canCraftRecipe(selectedRecipe) || !isAbilityReady(selectedRecipe)) return;
+    const settled = useGameStore.getState().craftEquipment(selectedRecipe.id!, chosenAbility(selectedRecipe));
     // 單機同步、線上模式 Promise；訊息在同一個 click 內就要出現（單機）
     if (settled && typeof (settled as Promise<unknown>).then === 'function') {
       setResultMsg((await (settled as Promise<CraftResult>)).message);
@@ -231,6 +249,41 @@ export function TownBlacksmith() {
                 </span>
                 {/* § 6A.8.8 素質需求：做得出來不等於穿得動，未達標的屬性標紅 */}
                 <AttributeRequirement requirement={recipe.requiredAttributes} className="shop-item-desc" />
+                {/* § 7S.6 武器必須指定隨機技能，數值取最弱值 */}
+                {craftRequiresAbility(recipe) && (() => {
+                  const chosen = chosenAbility(recipe);
+                  const classPool = getAbilityClassPool(recipe, char.className);
+                  const preview = chosen ? rollAbility(recipe, { channel: 'craft', className: char.className, chosen }) : undefined;
+                  return (
+                    <span className={`shop-item-desc bs-ability-row ${chosen ? '' : 'lacking'}`}>
+                      <span className="bs-ability-label">隨機技能</span>
+                      <select
+                        aria-label="隨機技能"
+                        value={chosen ?? ''}
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => {
+                          const value = e.target.value as AbilityType | '';
+                          setAbilityChoices(prev => {
+                            const next = { ...prev };
+                            if (value) next[recipe.id!] = value; else delete next[recipe.id!];
+                            return next;
+                          });
+                        }}
+                      >
+                        <option value="">請選擇</option>
+                        <optgroup label="共通">
+                          {getAbilityCommonPool(recipe).map(t => <option key={t} value={t}>{getAbilityDefinition(t)!.name}</option>)}
+                        </optgroup>
+                        {classPool.length > 0 && (
+                          <optgroup label={CLASS_NAMES_ZH[char.className]}>
+                            {classPool.map(t => <option key={t} value={t}>{getAbilityDefinition(t)!.name}</option>)}
+                          </optgroup>
+                        )}
+                      </select>
+                      {preview && <span className="bs-ability-preview">{formatAbilityEffect(preview)}</span>}
+                    </span>
+                  );
+                })()}
                 <span className="shop-item-desc bs-craft-materials">
                   {/* 製作費（§ 6A.3） */}
                   {(() => {
@@ -278,7 +331,7 @@ export function TownBlacksmith() {
               <div className="shop-item-actions">
                 <button
                   onClick={(e) => { e.stopPropagation(); handleCraft(); }}
-                  disabled={!canCraftRecipe(recipe) || selectedRecipe?.id !== recipe.id}
+                  disabled={!canCraftRecipe(recipe) || !isAbilityReady(recipe) || selectedRecipe?.id !== recipe.id}
                 >
                   製作
                 </button>

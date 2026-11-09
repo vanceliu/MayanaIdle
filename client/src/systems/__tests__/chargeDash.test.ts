@@ -118,3 +118,50 @@ describe('衝鋒突進', () => {
     expect(gs.skills[0].lastUsedAt).toBeGreaterThan(0);
   });
 });
+
+describe('神聖懲擊強化（`07-affix-ability.md` § 7S.5）', () => {
+  function setupSmite(): void {
+    setup();
+    const smite = { ...getSkillTemplate('holy-smite')!, lastUsedAt: 0 };
+    const staff = {
+      id: 9, templateId: 1019, name: '杖', type: 'staff', slot: 'rightHand', isTwoHanded: false,
+      smallMonsterDamage: 10, largeMonsterDamage: 10, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
+      ability: { type: 'holy_smite_boost', params: { stun: 1500 } },
+    };
+    useGameStore.setState({ character: { ...character(), className: 'priest' }, skills: [smite], equippedGear: { rightHand: staff } as never });
+  }
+
+  function castSmite(): CombatVisual[] {
+    for (let i = 0; i < 6; i++) {
+      defaultSession.combatCommand.getState().requestSkill('holy-smite');
+      const visuals = tickCombat(300, defaultSession);
+      if (visuals.some(v => v.kind === 'player_attack')) return visuals;
+    }
+    return [];
+  }
+
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    setupSmite();
+  });
+
+  it('突進到相鄰格並暈眩 X 秒', () => {
+    const visuals = castSmite();
+    expect(visuals.some(v => v.kind === 'dash')).toBe(true);
+    expect(useMapControlStore.getState().playerPosition).toEqual({ x: 7, y: 5 });
+    const stun = useGameStore.getState().activeEffects.find(e => e.stun && e.targetMonsterId === 'm1');
+    expect(stun?.duration).toBe(1500);
+  });
+
+  it('找不到落點時原地施放', () => {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx || dy) defaultSession.loop.occupation.register({ x: MONSTER_POS.x + dx, y: MONSTER_POS.y + dy }, 'monster', `block-${dx}-${dy}`);
+      }
+    }
+    const visuals = castSmite();
+    expect(visuals.some(v => v.kind === 'player_attack')).toBe(true);
+    expect(visuals.some(v => v.kind === 'dash')).toBe(false);
+    expect(useMapControlStore.getState().playerPosition).toEqual({ x: 2, y: 5 });
+  });
+});

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { applyAbilityToSkills } from '../models/abilitySkill';
 import { useGameStore } from '../stores/gameStore';
 import { getPotionCount } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
@@ -50,7 +51,7 @@ export function QuickSlotBar() {
   const triggerQuickSlot = useGameStore(s => s.useQuickSlot);
   const assignQuickSlot = useGameStore(s => s.assignQuickSlot);
   const templates = useEquipmentTemplates();
-  const skills = useGameStore(s => s.skills);
+  const learnedSkills = useGameStore(s => s.skills);
   /** 只為了在喝藥後重啟 rAF 迴圈；實際數值在迴圈內走 `getState()` 取最新 */
   const lastPotionUsedAt = useGameStore(s => s.lastPotionUsedAt);
   const character = useGameStore(s => s.character);
@@ -60,6 +61,12 @@ export function QuickSlotBar() {
   const weapon = getEquippedWeapon(allGear);
   const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const cooldownReduction = character ? getSkillCooldownReduction(character, allGear, activeEffects) : 0;
+  // § 7S.5 職業池隨機技能：MP 與冷卻顯示改寫後的值（`07-affix-ability.md`）
+  const skills = useMemo(
+    () => (character ? applyAbilityToSkills(learnedSkills, allGear, character.className) : learnedSkills),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learnedSkills, equippedGear, activeEffects, character?.className],
+  );
   /*
    * 快捷格只是**放置目標**：它以 `data-drop-*` 宣告自己，實際的綁定由拖曳來源
    * （背包）在放開時執行（`47-mobile.md`）。這裡只讀 hover 狀態畫外框。

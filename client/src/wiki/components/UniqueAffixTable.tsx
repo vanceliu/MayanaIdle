@@ -15,6 +15,11 @@ const UNIQUE_POOL_LABELS: Record<Exclude<UniqueAffixPool, 'fixed'>, string> = {
   accessory: '飾品（項鍊／戒指）',
 };
 
+/** 數值欄：有數值時黃色標示，無數值（`—`）照常 */
+function UniqueRange({ text }: { text: string }) {
+  return /\d/.test(text) ? <span className="wiki-range">{text}</span> : <>{text}</>;
+}
+
 /** 一個隨機池的清單：詞綴／效果／數值 */
 export function UniqueAffixPoolTable({ pool }: { pool: Exclude<UniqueAffixPool, 'fixed'> }) {
   const rows = UNIQUE_AFFIX_DEFINITIONS.filter(d => d.pool === pool);
@@ -33,7 +38,7 @@ export function UniqueAffixPoolTable({ pool }: { pool: Exclude<UniqueAffixPool, 
             <tr key={d.type}>
               <td>{d.name}</td>
               <td>{d.description}</td>
-              <td className="cell-number">{formatUniqueAffixRange(d)}</td>
+              <td className="cell-number"><UniqueRange text={formatUniqueAffixRange(d)} /></td>
             </tr>
           ))}
         </tbody>
@@ -66,7 +71,7 @@ export function UniqueAffixFixedTable() {
               <td>{r.name}</td>
               <td>{r.def.name}</td>
               <td>{r.def.description}</td>
-              <td className="cell-number">{formatUniqueAffixRange(r.def)}</td>
+              <td className="cell-number"><UniqueRange text={formatUniqueAffixRange(r.def)} /></td>
             </tr>
           ))}
         </tbody>

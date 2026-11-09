@@ -8,6 +8,7 @@ import { isOffhandDefenseType } from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
 import '../components/WikiTable.css';
 import { UniqueAffixSection } from '../components/UniqueAffixTable';
+import { AbilitySection } from '../components/AbilityTable';
 import { requirementText } from '../requirementText'
 
 const SLOT_LABELS: Record<string, string> = {
@@ -158,6 +159,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
         {filtered.length === 0 && <p className="wiki-empty">無符合條件的防具</p>}
       </div>
       <UniqueAffixSection pools={['armor', 'accessory']} showFixed />
+      <AbilitySection groups={['accessory']} />
     </div>
   );
 }

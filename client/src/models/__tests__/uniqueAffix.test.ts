@@ -37,11 +37,11 @@ describe('池的分派（§ 7T.5）', () => {
     }
   });
 
-  it('右手武器走武器池（8 種）', () => {
+  it('右手武器走武器池（6 種）', () => {
     const weapons = T7.filter(t => t.slot === 'rightHand');
     expect(weapons).toHaveLength(19);
     for (const t of weapons) expect(getUniqueAffixPool(t)).toEqual(typesOf('weapon'));
-    expect(typesOf('weapon')).toHaveLength(8);
+    expect(typesOf('weapon')).toHaveLength(6);
   });
 
   it('頭盔／胸甲／上衣／斗篷／手套／鞋子走防具池（6 種）', () => {
@@ -99,9 +99,9 @@ describe('抽取', () => {
   });
 
   it('無數值的詞綴存 0', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.4); // 武器池第 4 條＝命中暈眩
-    const sword = T7.find(t => t.slot === 'rightHand')!;
-    expect(rollUniqueAffix(sword)).toEqual({ type: 'hit_stun', value: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.9); // 飾品池第 5 條＝全免疫
+    const necklace = T7.find(t => t.slot === 'necklace')!;
+    expect(rollUniqueAffix(necklace)).toEqual({ type: 'immune_all', value: 0 });
   });
 
   it('實例生成欄位只在 T7 帶獨有詞綴', () => {
@@ -116,7 +116,7 @@ describe('數值定義（§ 7T.5）', () => {
   it('與規格表一致', () => {
     const ranges = Object.fromEntries(UNIQUE_AFFIX_DEFINITIONS.map(d => [d.type, d.range]));
     expect(ranges).toEqual({
-      hit_heal: [10, 15], hit_mana: [10, 15], hit_bonus_damage: [10, 20], hit_stun: null,
+      hit_heal: [10, 15], hit_mana: [10, 15],
       kill_heal: [30, 50], crit_damage: [25, 50], crit_rate: [20, 25], attack_speed: [20, 25],
       struck_defense: [10, 15], struck_spi: [2, 4], struck_vit: [2, 4], extra_defense: [3, 10],
       evasion: [700, 1000], drop_rate: [50, 100],
@@ -131,14 +131,13 @@ describe('數值定義（§ 7T.5）', () => {
 describe('顯示（§ 7T.7）', () => {
   it('以 (獨) 開頭接效果敘述', () => {
     expect(formatUniqueAffixDisplay({ type: 'extra_defense', value: 10 })).toBe('(獨) 額外防禦 +10');
-    expect(formatUniqueAffixDisplay({ type: 'hit_bonus_damage', value: 15 })).toBe('(獨) 命中 20% 機率總體增加 15 傷害');
     expect(formatUniqueAffixDisplay({ type: 'immune_all', value: 0 })).toBe('(獨) 免疫中毒、流血、暈眩');
   });
 
   it('Wiki 數值欄', () => {
     expect(formatUniqueAffixRange(getUniqueAffixDefinition('crit_damage'))).toBe('25~50%');
     expect(formatUniqueAffixRange(getUniqueAffixDefinition('struck_block'))).toBe('固定 10%');
-    expect(formatUniqueAffixRange(getUniqueAffixDefinition('hit_stun'))).toBe('—');
+    expect(formatUniqueAffixRange(getUniqueAffixDefinition('immune_all'))).toBe('—');
   });
 });
 

@@ -35,7 +35,7 @@ import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/le
 import { calculatePressure, getPressureDropMultiplier } from '../systems/pressure';
 import { accrueRestedExp, getRestedExpMultiplier } from '../systems/restedExp';
 import { SKILL_WIND_BLADE, canUseSkill, isSkillHpBlocked, resolveMpAfterSelfCast, resolveSelfHpCost } from '../models/skill';
-import { instantiateFromTemplate, getSkillTemplate } from '../models/skillTemplate';
+import { instantiateFromTemplate } from '../models/skillTemplate';
 import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount, getSkillSideValue } from '../systems/combat';
 import { getEffectiveGearArray } from '../systems/gear';
 import { getWeightStatus, getWeightPercent } from '../systems/weight';
@@ -96,6 +96,8 @@ import { getRegion, resolveArea, resolveDropAreaId, ZONES } from '../models/mapD
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment, rollNewInstanceFields, getTemplateById } from '../systems/templateSync';
 import { createShopEquipment } from '../systems/shopEquipment';
+import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus } from '../models/abilitySkill';
+import { craftRequiresAbility, getCraftAbilityOptions, isAbilityType, type AbilityType } from '../models/ability';
 import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
 import { generateCraftAffixes, getDismantleYield } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
@@ -409,6 +411,8 @@ export interface GameState {
   /** 村莊腳本上次判定的時間戳。它會花錢與存檔，不需要跟常駐腳本一樣快 */
   lastVillageTickAt: number;
   searchMode: SearchMode;
+  /** 全域 Pressure 倍率（`19-account-character.md` § 19.9），探索列顯示用；server 改倍率時由 `GameServer.refreshPressureRate` 更新 */
+  pressureRate: number;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
   afterCombatHpResumeThreshold: number;
@@ -522,7 +526,8 @@ export interface GameState {
   buyShopEquipment: (templateIds: number[]) => Promise<EquipmentInstance[]>;
   /** 鐵匠鋪製作（`06-equipment-acquire.md` § 6A.3） */
   /** 單機且模板已快取時同步結算；線上模式回 Promise */
-  craftEquipment: (templateId: number) => CraftResult | Promise<CraftResult>;
+  /** `abilityType`：武器必須指定隨機技能（`07-affix-ability.md` § 7S.6） */
+  craftEquipment: (templateId: number, abilityType?: AbilityType) => CraftResult | Promise<CraftResult>;
   /** 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3「拆解」）。線上模式回 Promise */
   dismantleEquipment: (instanceId: number) => CraftResult | Promise<CraftResult>;
   /** 印記師（`46-sigil.md`） */
@@ -741,6 +746,7 @@ export function createGameStore(session: Session) {
   huntReturnPending: false,
   lastVillageTickAt: 0,
   searchMode: 'auto',
+  pressureRate: rates.pressure,
   afterCombatHpThreshold: 30,
   afterCombatMpThreshold: 20,
   afterCombatHpResumeThreshold: 60,
@@ -1505,10 +1511,12 @@ export function createGameStore(session: Session) {
     const char = state.character;
     if (!char) return false;
 
-    const skill = state.skills.find(s => s.id === skillId);
-    if (!skill || skill.type === 'passive') return false;
+    const baseSkill = state.skills.find(s => s.id === skillId);
+    if (!baseSkill || baseSkill.type === 'passive') return false;
 
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
+    // § 7S.5 職業池隨機技能：MP、冷卻等以施放當下的武器為準
+    const skill = applyAbilityToSkill(baseSkill, allGear, char.className);
     const weapon = getEquippedWeapon(allGear);
     const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
@@ -1560,20 +1568,21 @@ export function createGameStore(session: Session) {
 
     const skillIdx = state.skills.findIndex(s => s.id === skillId);
     if (skillIdx < 0) return false;
-    const skill = state.skills[skillIdx];
-    if (skill.type !== 'buff' && skill.type !== 'heal') return false;
+    const baseSkill = state.skills[skillIdx];
+    if (baseSkill.type !== 'buff' && baseSkill.type !== 'heal') return false;
 
     const now = gameNow();
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
+    // § 7S.5 職業池隨機技能：數值以施放當下的武器為準，存回的仍是原技能
+    const skill = applyAbilityToSkill(baseSkill, allGear, char.className);
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
     if (isPlayerSilenced(state.activeEffects, now)) return false;
     const effMaxMp = getEffectiveMaxMp(char, state.equippedGear, state.activeEffects);
     if (!canUseSkill(skill, char.mp, now, cooldownReduction, char.hp)) return false;
     const mpCost = skill.mpCost;
 
-    const template = getSkillTemplate(skill.id);
     const newSkills = [...state.skills];
-    newSkills[skillIdx] = { ...skill, lastUsedAt: now };
+    newSkills[skillIdx] = { ...baseSkill, lastUsedAt: now };
 
     if (skill.type === 'heal') {
       if (!skill.power) return false;
@@ -1604,39 +1613,36 @@ export function createGameStore(session: Session) {
       text: parts.length > 0 ? `施放 ${skill.name}，${parts.join('，')}` : `施放 ${skill.name}`,
       type: 'player',
     });
-    const buffDuration = template?.buffDuration ?? skill.buffDuration;
+    const buffDuration = skill.buffDuration;
 
     if (buffDuration) {
       const buffEffect: ActiveEffect = {
         id: `buff-${skill.id}-${now}`,
         sourceSkillId: skill.id,
         sourceSkillName: skill.name,
-        category: template?.buffCategory ?? skill.buffCategory ?? skill.id,
+        category: skill.buffCategory ?? skill.id,
         type: 'buff',
         target: 'player',
-        modifiers: template?.buffModifiers ?? skill.buffModifiers ?? [],
+        modifiers: skill.buffModifiers ?? [],
         startTime: now,
         duration: buffDuration,
         tags: [],
         name: skill.name,
-        description: template?.buffEffect ?? skill.buffEffect ?? '',
+        description: skill.buffEffect ?? '',
       };
-      const hotAmount = template?.hotAmount ?? skill.hotAmount;
-      if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
-      if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
-      if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
-      const evadeCharges = template?.evadeCharges ?? skill.evadeCharges;
-      if (evadeCharges) buffEffect.evadeCharges = evadeCharges;
+      if (skill.hotAmount) buffEffect.hot = { amount: skill.hotAmount, interval: 1000 };
+      if (skill.invincible) buffEffect.invincible = true;
+      if (skill.immuneDebuff) buffEffect.immuneDebuff = true;
+      if (skill.evadeCharges) buffEffect.evadeCharges = skill.evadeCharges;
       const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
-      const shieldPower = template?.shieldPower ?? skill.shieldPower;
       if (shieldMod) {
-        buffEffect.shieldRemaining = shieldMod.value + (shieldPower ? getSkillSideValue(char, shieldPower, allGear, state.activeEffects) : 0);
+        buffEffect.shieldRemaining = shieldMod.value + (skill.shieldPower ? getSkillSideValue(char, skill.shieldPower, allGear, state.activeEffects) : 0);
       }
       const applied = applyPlayerBuff(get().activeEffects, buffEffect);
       const buffLogs = applied.cancelledSlow
         ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })
         : logs;
-      set({ character: newChar, skills: newSkills, combatLogs: buffLogs, activeEffects: applied.effects });
+      set({ character: newChar, skills: newSkills, combatLogs: buffLogs, activeEffects: withNextAttackBonus(applied.effects, skill, now) });
     } else {
       set({ character: newChar, skills: newSkills, combatLogs: logs });
     }
@@ -1896,7 +1902,8 @@ export function createGameStore(session: Session) {
 
     const ctx: PersistentScriptContext = {
       character: char,
-      skills: state.skills,
+      // § 7S.5 職業池隨機技能：就緒判定看改寫後的冷卻與 MP，與戰鬥天賦一致
+      skills: applyAbilityToSkills(state.skills, allGear, char.className),
       bagItems: state.bagItems,
       lastPotionUsedAt: state.lastPotionUsedAt,
       lastPotionCooldown: state.lastPotionCooldown,
@@ -2747,7 +2754,7 @@ export function createGameStore(session: Session) {
     if (total > char.gold) return [];
     const freeSlots = getBagMaxSlots(state.equippedGear) - getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear);
     if (templates.length > freeSlots) return [];
-    const instances = await createShopEquipment(templates, char.level, char.id, session.repo);
+    const instances = await createShopEquipment(templates, char.level, char.id, session.repo, char.className);
     const s2 = get();
     set({
       character: { ...s2.character!, gold: s2.character!.gold - total },
@@ -2757,7 +2764,7 @@ export function createGameStore(session: Session) {
     return instances;
   },
 
-  craftEquipment: (templateId) => {
+  craftEquipment: (templateId, abilityType) => {
     // 快取命中時整段同步結算（無 id 的角色不持久化，與舊鐵匠鋪流程相同）；線上模式回 Promise
     const cached = getTemplateById(templateId);
     const run = (recipe: EquipmentTemplate | undefined): CraftResult | Promise<CraftResult> => {
@@ -2768,6 +2775,11 @@ export function createGameStore(session: Session) {
       const requirements = evaluateCraftRequirements(recipe, state.bagItems, state.inventory, char.gold);
       if (!requirements.ready) return { ok: false, message: requirements.gold.enough ? '材料不足' : '金幣不足' };
       if (getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
+      const chosenAbility = craftRequiresAbility(recipe) ? abilityType : undefined;
+      if (craftRequiresAbility(recipe)
+        && (!isAbilityType(chosenAbility) || !getCraftAbilityOptions(recipe, char.className).includes(chosenAbility))) {
+        return { ok: false, message: '請選擇隨機技能' };
+      }
 
       let newBag = [...state.bagItems];
       for (const mat of recipe.craftMaterials) {
@@ -2790,7 +2802,7 @@ export function createGameStore(session: Session) {
       }
       const affixCategory = getAffixCategoryForSlot(recipe.slot, recipe.type);
       const affixes = generateCraftAffixes(affixCategory, recipe);
-      const fields = rollNewInstanceFields(recipe);
+      const fields = rollNewInstanceFields(recipe, { channel: 'craft', className: char.className, chosen: chosenAbility });
       const dbRecord: Partial<EquipmentInstance> = {
         templateId: recipe.id!, slot: recipe.slot, quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
         isCraftedGear: true,
@@ -3269,8 +3281,8 @@ export function processMonsterDeath(
     const drops = !withDrops
       ? noDrops
       : monsterIsBoss
-        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, session.repo, takeBetter)
-        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, false, dead.level, session.repo, takeBetter);
+        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, session.repo, takeBetter, char.className)
+        : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, false, dead.level, session.repo, takeBetter, char.className);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）

@@ -76,11 +76,11 @@ describe('Map Control Phase 3 - Pressure Integration', () => {
       expect(p0).toBe(0);
       expect(3 + p0).toBe(3);
 
-      const { pressure: p1 } = calculatePressure(640);
+      const { pressure: p1 } = calculatePressure(300);
       expect(p1).toBe(1);
       expect(3 + p1).toBe(4);
 
-      const { pressure: p3 } = calculatePressure(960);
+      const { pressure: p3 } = calculatePressure(620);
       expect(p3).toBe(3);
       expect(3 + p3).toBe(6);
     });

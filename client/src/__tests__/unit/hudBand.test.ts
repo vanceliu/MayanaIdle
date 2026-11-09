@@ -193,15 +193,14 @@ describe('行動版 HUD 帶量測（47-mobile）', () => {
   });
 
   /**
-   * 橫排會沿著角色卡的寬度往右伸，效果一多就整片橫在畫面上方、吃掉地圖上緣。
-   * 手機更明顯：狀態卡只剩半個螢幕寬，第五顆就伸進右半邊壓住地圖選擇器與怪物卡。
-   * **桌機與手機一致**，規則寫在基底。
+   * BuffBar 直向排兩欄（`24-buff-debuff.md` § 24.8.1），桌機與手機一致，規則寫在基底。
+   * 每欄格數由量測寫進 inline `grid-template-rows`，基底只負責量不到時的單欄。
    */
-  it('buff 往下疊，不往右長（桌機與手機一致）', () => {
+  it('buff 直向排列，量不到格數時單欄（桌機與手機一致）', () => {
     const base = APP_CSS.slice(0, APP_CSS.indexOf('@media (max-width: 1200px)'));
-    const block = base.match(/\n\.buff-row\s*\{([^}]*)\}/);
-    expect(block?.[1]).toContain('flex-direction: column');
-    expect(block?.[1]).toContain('flex-wrap: nowrap');
+    const block = base.match(/\n\.buff-bar\s*\{([^}]*)\}/);
+    expect(block?.[1]).toContain('display: grid');
+    expect(block?.[1]).toContain('grid-auto-flow: row');
   });
 
   /**

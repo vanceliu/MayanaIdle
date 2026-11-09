@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { SLOT_NAMES, SLOT_ORDER, type EquipSlot, type EquipmentInstance } from '../models/equipment';
 import { getEffectiveGearArray, getFrozenGear } from '../systems/gear';
-import { summarizeAffixes } from '../systems/affixSummary';
+import { summarizeAffixes, summarizeAbilities } from '../systems/affixSummary';
 import { useSettingsStore } from '../stores/settingsStore';
 import { EquipmentDetail } from './EquipmentInfo';
 import { Tooltip } from './Tooltip';
@@ -36,10 +36,12 @@ function AffixSummary() {
   const activeEffects = useGameStore(s => s.activeEffects);
   const open = useSettingsStore(s => s.equipAffixSummaryOpen);
   const setOpen = useSettingsStore(s => s.setEquipAffixSummaryOpen);
-  const rows = useMemo(
-    () => (character ? summarizeAffixes(getEffectiveGearArray(character, activeEffects, equippedGear)) : []),
-    [character, activeEffects, equippedGear],
-  );
+  const rows = useMemo(() => {
+    if (!character) return [];
+    const gear = getEffectiveGearArray(character, activeEffects, equippedGear);
+    // § 7S.7 隨機技能排在最後、淺綠、只列效果
+    return [...summarizeAffixes(gear), ...summarizeAbilities(gear).map(r => ({ ...r, ability: true }))];
+  }, [character, activeEffects, equippedGear]);
   return (
     <div className="affix-sum">
       <div className="affix-sum-title">
@@ -51,7 +53,7 @@ function AffixSummary() {
       {open && (rows.length > 0 ? (
         <div className="affix-sum-cols">
           {rows.map(row => (
-            <div key={row.name} className="affix-sum-row">
+            <div key={row.name} className={`affix-sum-row${'ability' in row ? ' ability' : ''}`}>
               <span>{row.name}</span>
               <b>{row.value}</b>
             </div>

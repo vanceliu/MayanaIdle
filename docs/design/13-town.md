@@ -178,7 +178,7 @@ MayanaIdle 不需要城鎮建設。
 
 功能：
 
-- 裝備製作（素材 + 前置裝備 + 製作費，100% 成功，詳見 `06-equipment-acquire.md` § 6A.3）
+- 裝備製作（素材 + 前置裝備 + 製作費，100% 成功，詳見 `06-equipment-acquire.md` § 6A.3）；武器、項鍊、戒指須指定隨機技能（`07-affix-ability.md` § 7S.6）
 - 製作追蹤（把配方需求釘進任務追蹤視窗，詳見 `36-quest-system.md` § 36.13）
 - 裝備拆解（有配方的裝備退一半材料，詳見 `06-equipment-acquire.md` § 6A.3「拆解」）
 

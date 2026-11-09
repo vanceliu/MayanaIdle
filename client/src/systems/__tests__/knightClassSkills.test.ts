@@ -91,7 +91,6 @@ describe('騎士 5～7 級定義', () => {
       aoeCenter: 'self', aoeRadius: 4, randomHits: 4, selfHpCostPercent: 15,
     });
     expect(skill.physicalSnapshot).toBeUndefined();
-    expect(skill.physicalDamage).toBeUndefined();
     expect(skill.applyDebuff).toMatchObject({
       category: 'slow', duration: 5000, modifiers: [{ stat: 'attack_speed', value: -10, isPercent: true }],
     });

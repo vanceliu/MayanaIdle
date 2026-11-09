@@ -2,6 +2,7 @@ import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment'
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { formatAffixDisplay, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix } from '../models/affix';
 import { formatUniqueAffixDisplay } from '../models/uniqueAffix';
+import { formatAbilityDisplay } from '../models/ability';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
 import { DEFENSE_BONUS_MAX } from '../models/equipment';
@@ -201,7 +202,13 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {!compact && frozen && (
         <div className="equip-detail-frozen">素質不足 · 詞綴未生效</div>
       )}
-      {/* § 7T.7 T7 獨有詞綴：第一行、紫色，下方分隔線；同類去重落敗時劃線 */}
+      {/* § 7S.7 隨機技能：所有詞綴最上面、淺綠色 */}
+      {!compact && item.ability && (
+        <div className={`equip-detail-affixes equip-detail-ability${frozen ? ' is-frozen' : ''}`}>
+          <div className="equip-detail-affix ability" title="印記無法變更">{formatAbilityDisplay(item.ability)}</div>
+        </div>
+      )}
+      {/* § 7T.7 T7 獨有詞綴：紫色、下方分隔線；同類去重落敗時劃線 */}
       {!compact && item.uniqueAffix && (
         <div className={`equip-detail-affixes equip-detail-unique${frozen ? ' is-frozen' : ''}`}>
           <div

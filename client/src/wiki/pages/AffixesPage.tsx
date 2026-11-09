@@ -43,6 +43,7 @@ import {
 import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
 import '../components/WikiTable.css';
 import { UniqueAffixSection } from '../components/UniqueAffixTable';
+import { AbilitySection } from '../components/AbilityTable';
 
 /**
  * 詞綴 wiki 頁。
@@ -164,7 +165,9 @@ function AffixGroupTable({
                 </td>
                 <td style={{ color: 'var(--text-secondary)' }}>{categoryText(row.categories)}</td>
                 <td>{row.description}</td>
-                <td className="cell-number">{row.range}</td>
+                <td className="cell-number">
+                  {row.range.includes('~') ? <span className="wiki-range">{row.range}</span> : row.range}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -401,6 +404,7 @@ export function AffixesPage() {
       </section>
 
       <UniqueAffixSection pools={['weapon', 'armor', 'accessory']} showFixed />
+      <AbilitySection groups={['weapon', 'accessory']} />
 
       <section className="wiki-section">
         <h3 style={headingStyle}>印記</h3>

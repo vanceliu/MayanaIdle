@@ -46,6 +46,10 @@
 | **命中下降／防禦下降／迴避詞綴** | `07-affix.md` | § 7.4、§ 7.9（迴避階級表 § 7.3.1） |
 | **迴避值（迴避詞綴單位與換算）** | `07-affix.md` | § 7.3.1 |
 | **T7 獨有詞綴（清單／觸發／同類去重／印記不可動）** | `07-affix-tier7.md` | 全文 |
+| **隨機技能（T3+ 武器／項鍊／戒指，各管道機率／清單／觸發）** | `07-affix-ability.md` | 全文 |
+| **隨機技能分武器池（攻擊）／飾品池（防禦）；共通／職業池 2 選 1、職業技能強化（五職業）** | `07-affix-ability.md` § 7S.2、§ 7S.5 | — |
+| **飾品隨機技能：低血低魔回復、荊棘反彈、怒氣、平靜** | `07-affix-ability.md` § 7S.5、`29-regen.md`、`51-auto-talent.md` § 51.4.5（怒氣／平靜條件） | — |
+| **鐵匠鋪製作指定隨機技能（武器／項鍊／戒指必選、數值最弱）** | `07-affix-ability.md` § 7S.6、`06-equipment-acquire.md` § 6A.3 | — |
 | **詞綴洞／掉落詞綴條數（1~4 條）** | `07-affix.md` | § 7.1 |
 | **封印詞綴 `(封)`** | `07-affix.md` § 7.11.1、`46-sigil.md` § 46.12 | — |
 | **新增印記／封印印記** | `46-sigil.md` | § 46.11、§ 46.12 |
@@ -100,6 +104,7 @@
 | **被動技能（不可施放、不進快捷列與天賦）／閃避反擊** | `23-class-magic.md` | § 23.7 |
 | **絕對迴避次數（煙霧彈）** | `23-class-magic.md` § 23.7、`21-combat-formula.md` § 21.6 | — |
 | Buff/Debuff 系統（疊加/控場/DoT/UI） | `24-buff-debuff.md` | 全文 |
+| **角色 BuffBar 排列（兩欄、換欄界線、`+N`、手機 icon 尺寸）** | `24-buff-debuff.md` | § 24.8.1 |
 | 怪物身上效果的對應（以怪物 id，不以清單位置） | `24-buff-debuff.md` | § 24.3 |
 | 角色 Debuff（中毒/流血/詛咒/虛弱/減速/暈眩/沉默） | `24-buff-debuff.md` | § 24.4、§ 24.5、§ 24.10 |
 | Debuff 解除手段（道具/免疫詞綴） | `24-buff-debuff.md` | § 24.10 |
@@ -134,6 +139,7 @@
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
+| **探索列 Pressure 顯示（P 值／擊殺數提示）** | `16-tech-frontend-architecture.md` | § 32.3 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
 | 怪物經驗公式與結算倍率 | `28-monster-stats.md` | § 28.1 |
 | **怪物攻擊力曲線（一般怪／Boss）／怪物等級上限與百柱死神 Lv.80 例外** | `28-monster-stats.md` | § 28.1 |
@@ -244,6 +250,13 @@
 06-equipment-requirement.md
        ↕
 07-affix-tier7.md ←→ 07-affix.md § 7.12
+07-affix-ability.md ←→ 07-affix.md § 7.13 ←→ 07-affix-tier7.md
+  ←→ 06-equipment-acquire.md § 6A.3／§ 6A.6 ←→ 13-town.md § 13.5
+  ←→ 21-combat-formula.md § 21.4b／§ 21.8 ←→ 23-class-magic.md § 23.3~§ 23.7 ←→ 24-buff-debuff.md § 24.4.3
+  ←→ 24-buff-debuff.md § 24.4.9 ←→ 18-data-schema.md § 18.3 ←→ 46-sigil.md § 46.9 ←→ 53-bounty-contract.md
+  ←→ 34-ui-guidelines.md ←→ 43-wiki-system.md § 4.1／§ 4.2.1
+  ←→ 25-monster-system.md § 25.12.3（荊棘不反彈擴散）
+  ←→ 29-regen.md § 29.1／§ 29.2（低血／低魔回復）
   ←→ 21-combat-formula.md § 21.5／§ 21.6／§ 21.16 ←→ 24-buff-debuff.md § 24.4.3
   ←→ 18-data-schema.md § 18.3 ←→ 97-selfhosted-server.md § 97.4
   ←→ 43-wiki-system.md § 4.1／§ 4.2／§ 4.2.1
@@ -260,7 +273,7 @@
   ← 07-affix.md / 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
 44-dps-prediction.md（驗算腳本）
   ← 04-character.md / 20-attributes.md / 21-combat-formula.md / 41-arpg-combat.md
-  ← 06-equipment.md / 07-affix.md / 07-affix-tier7.md / 08-quality.md / 46-sigil.md § 46.12
+  ← 06-equipment.md / 07-affix.md / 07-affix-tier7.md / 07-affix-ability.md / 08-quality.md / 46-sigil.md § 46.12
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
   ← 24-buff-debuff.md § 24.3 / 42-element-system.md § 42.2 / 51-auto-talent.md § 51.3
 
@@ -287,6 +300,7 @@
                                                   06-equipment-acquire.md
 28-monster-stats.md § 28.1 → 04-character.md § 4.9 ←→ 09-dungeon.md
 26-spawn-pressure.md § 26.3（掉落倍率）→ 27-drop-table.md
+26-spawn-pressure.md § 26.3（公式）→ 16-tech-frontend-architecture.md § 32.3（探索列 Pressure 顯示）
 25-monster-system.md § 25.12（強化詞綴）→ 26 § 26.5 / 27 § 27.1 / 28 § 28.1 / 21 § 21.5、§ 21.11
   / 24 § 24.4.2、§ 24.4.9、§ 24.8.3 / 34「怪物強化詞綴顏色」/ 43 § 4.3 / 51 § 51.4.4、§ 51.4.6、§ 51.4.9
 04-character.md § 4.11（回鍋經驗加倍）
@@ -366,7 +380,7 @@
 47-mobile.md
   ←→ 34-ui-guidelines.md § 34.6 / § 34.9
   ←→ 35-inventory-constraints.md § 35.1.3 / § 35.1.5 / § 35.5.3
-  ←→ 24-buff-debuff.md § 24.8.3
+  ←→ 24-buff-debuff.md § 24.8.1 / § 24.8.3
        ↕
 34-ui-guidelines.md § 34.10 ←→ § 34.1 / § 34.6 / § 34.8
 34-ui-guidelines.md § 34.14 ←→ 43-wiki-system.md / 97-selfhosted-server.md § 97.5（選取白名單）

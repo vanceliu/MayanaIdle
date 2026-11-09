@@ -83,7 +83,7 @@ describe('(鍛) 製作品（遠端 action）', () => {
       ],
     });
 
-    const crafted = await c.act('craftEquipment', RECIPE.id);
+    const crafted = await c.act('craftEquipment', RECIPE.id, 'bonus_damage');
     expect(crafted).toMatchObject({ t: 'action_ok', result: { ok: true } });
     // 製作費由 server 的 seed 決定並扣款（`06-equipment-acquire.md` § 6A.3）
     expect(game.getState().character!.gold).toBe(0);

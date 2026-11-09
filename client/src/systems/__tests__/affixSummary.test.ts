@@ -1,6 +1,6 @@
 /** 裝備欄詞綴加總（`34-ui-guidelines.md`「裝備欄詞綴加總」） */
 import { describe, it, expect } from 'vitest';
-import { summarizeAffixes } from '../affixSummary';
+import { summarizeAffixes, summarizeAbilities } from '../affixSummary';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { Affix } from '../../models/affix';
 import type { UniqueAffix } from '../../models/uniqueAffix';
@@ -55,5 +55,15 @@ describe('summarizeAffixes', () => {
 
   it('沒有詞綴回空陣列', () => {
     expect(summarizeAffixes([item('helmet', [])])).toEqual([]);
+  });
+});
+
+describe('summarizeAbilities（`07-affix-ability.md` § 7S.7）', () => {
+  it('只列效果，沒帶技能的裝備不列', () => {
+    const rows = summarizeAbilities([
+      item('rightHand', [], { type: 'sword', ability: { type: 'bonus_damage', params: { chance: 8, damage: 12 } } }),
+      item('helmet', []),
+    ]);
+    expect(rows).toEqual([{ name: '命中 8% 機率追加 12 傷害', value: '' }]);
   });
 });

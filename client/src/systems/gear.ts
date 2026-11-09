@@ -41,7 +41,7 @@ function freezeUnmetGear(
   const self = getTotalAttributes(char, activeEffects);
   const active = resolveActiveGear(equippedGear, self);
   if (equippedGear.every(g => areAffixesActive(g, active) || !g)) return equippedGear;
-  return equippedGear.map(g => (!g || areAffixesActive(g, active) ? g : { ...g, affixes: [], uniqueAffix: undefined }));
+  return equippedGear.map(g => (!g || areAffixesActive(g, active) ? g : { ...g, affixes: [], uniqueAffix: undefined, ability: undefined }));
 }
 
 /** 同值時的部位順序（§ 7T.3）；部位相同再比 instance id */

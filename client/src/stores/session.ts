@@ -16,6 +16,7 @@ import type { MailboxState } from './mailboxStore';
 import type { PartyState } from './partyStore';
 import type { TradeState } from './tradeStore';
 import type { GuildState } from './guildStore';
+import type { AbilityComboState } from '../systems/abilityCombat';
 import { OccupationManager } from '../systems/occupationManager';
 import type { ArpgEngineState } from '../systems/arpgEngine';
 import type { MonsterInstance, MonsterTemplate } from '../models/monster';
@@ -62,6 +63,12 @@ export interface LoopState {
   saveAcc: number;
   /** 各表上次寫進去的內容簽章：一樣就不重寫（§ 97.4 只寫有變的表） */
   savedSig: Record<string, string>;
+  /** 隨機技能追打的出手計數（`07-affix-ability.md` § 7S.5），不存檔 */
+  abilityCombo?: AbilityComboState;
+  /** 怒氣與平靜（§ 7S.5），不存檔 */
+  abilityRage?: number;
+  abilityRageAt?: number;
+  abilityCalmSince?: number;
 }
 
 export function createLoopState(): LoopState {

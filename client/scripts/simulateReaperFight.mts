@@ -75,6 +75,11 @@ const MAP: MapData = {
  * `--proxy-samples=N` 可覆寫。
  */
 const PROXY_SAMPLES_ARG = Number(process.argv.find(a => a.startsWith('--proxy-samples='))?.split('=')[1]);
+/** 印出落敗場次的種子與最後的戰鬥紀錄 */
+const TRACE_DEATHS = process.argv.includes('--trace-deaths');
+/** 武器不帶隨機技能（對照用） */
+const NO_ABILITY = process.argv.includes('--no-ability');
+const TRACE_LOG_LINES = 40;
 setProxySamples(Number.isFinite(PROXY_SAMPLES_ARG) && PROXY_SAMPLES_ARG > 0 ? PROXY_SAMPLES_ARG : 200);
 
 const ORANGE_POTIONS = 20;
@@ -229,6 +234,8 @@ function buildSetup(className: ClassName, raw: Loadout, seed: number, manaShield
 interface FightResult {
   won: boolean;
   died: boolean;
+  /** `--trace-deaths`：落敗場次的最後戰鬥紀錄（含時間與 HP） */
+  deathLog?: string[];
   ms: number;
   minHpPercent: number;
   damageTaken: number;
@@ -287,6 +294,7 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
     };
     const maxMp = getEffectiveMaxMp(character, setup.gear, setup.effects);
     let lowMpTicks = 0;
+    const trace: string[] = [];
     while (r.ms < FIGHT_TIMEOUT_MS) {
       useGameStore.setState({ combatLogs: [] });
       const visuals: CombatVisual[] = tickWorld(TICK_MS, [defaultSession], [instance], f => { throw f.error; })
@@ -307,11 +315,16 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
         const steal = LIFESTEAL_LOG.exec(log.text);
         if (steal) r.lifesteal += Number(steal[1]);
         if (log.text === '閃避反擊！') r.counters++;
+        if (TRACE_DEATHS) {
+          trace.push(`${(r.ms / 1000).toFixed(1)}s HP ${useGameStore.getState().character!.hp} MP ${useGameStore.getState().character!.mp}｜${log.text}`);
+          if (trace.length > TRACE_LOG_LINES) trace.shift();
+        }
       }
       const gs = useGameStore.getState();
       if (gs.statistics.deathCount > 0) {
         r.died = true;
         r.minHpPercent = 0;
+        if (TRACE_DEATHS) r.deathLog = trace;
         break;
       }
       r.minHpPercent = Math.min(r.minHpPercent, (gs.character!.hp / maxHp) * 100);
@@ -346,7 +359,10 @@ interface Row {
 const rows: Row[] = [];
 let seed = 20261101;
 for (const cn of TARGET_CLASSES) {
-  const { loadouts } = searchBis(cn);
+  const { loadouts: found } = searchBis(cn);
+  const loadouts = NO_ABILITY
+    ? found.map(l => ({ ...l, ability: null, weapon: { ...l.weapon, ability: undefined }, gear: l.gear.map(g => (g === l.weapon ? { ...g, ability: undefined } : g)) }))
+    : found;
   const hasManaShield = getSkillPlan(cn).items.some(i => i.handling !== 'over_budget' && i.skill.buffCategory === MANA_SHIELD_CATEGORY);
   const policies: ManaShieldPolicy[] = hasManaShield ? ['always', 'danger'] : ['always'];
   for (const policy of policies) {
@@ -384,5 +400,16 @@ for (const row of rows) {
   console.log(`- 行動分佈：${Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${fmt((v / sum) * 100)}%`).join('、')}`);
   for (const rule of row.setup.rules) console.log(`- ${rule}`);
   console.log('');
+}
+if (TRACE_DEATHS) {
+  console.log('## 落敗場次\n');
+  for (const row of rows) {
+    row.results.forEach((r, i) => {
+      if (!r.died) return;
+      console.log(`### ${row.name} 第 ${i} 場（${(r.ms / 1000).toFixed(1)}s）`);
+      for (const line of r.deathLog ?? []) console.log(`- ${line}`);
+      console.log('');
+    });
+  }
 }
 console.log(`總耗時 ${fmt((performance.now() - t0) / 1000)}s`);

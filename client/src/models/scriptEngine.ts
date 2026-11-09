@@ -59,6 +59,8 @@ export type CombatConditionType =
   | 'area_dwell_gte'
   | 'weight_over'
   | 'self_shielded'
+  // 飾品隨機技能的怒氣／平靜（`07-affix-ability.md` § 7S.5）
+  | 'ability_meter'
   | 'current_area_is'
   /** 共用條件（戰鬥 ∪ 常駐，§ 51.4.5）：判定的是**自身**的 buff／加速／狀態異常 */
   | 'buff_not_active'
@@ -132,7 +134,7 @@ export interface CombatCondition {
   radius?: number;
   /** `target_distance`／`target_defense`／`target_level_diff` 用 */
   compare?: CompareMode;
-  /** `weapon_type_is`／`target_attack_type`／`target_race`／`target_element`／`target_size`／`current_area_is` 用 */
+  /** `weapon_type_is`／`target_attack_type`／`target_race`／`target_element`／`target_size`／`current_area_is`／`ability_meter` 用 */
   match?: string;
   /** `debuff_active` 用：自身狀態異常條件（§ 51.4.5） */
   debuffType?: ScriptDebuffCondition;
@@ -175,6 +177,7 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
   area_dwell_gte: '在本區停留超過',
   weight_over: '負重超過',
   self_shielded: '自身無敵中／帶護盾',
+  ability_meter: '怒氣／平靜',
   current_area_is: '所在區域 ＝',
   buff_not_active: 'Buff 未激活',
   speed_not_active: '加速未激活',
@@ -243,6 +246,8 @@ export type PersistentConditionType =
   | 'area_dwell_gte'
   | 'weight_over'
   | 'self_shielded'
+  // 飾品隨機技能的怒氣／平靜（`07-affix-ability.md` § 7S.5）
+  | 'ability_meter'
   | 'current_area_is'
   // 補給 T1，適用擴大到常駐（§ 51.2.1 的唯一交集）
   | 'item_count_below'
@@ -265,8 +270,10 @@ export interface PersistentCondition {
   debuffType?: ScriptDebuffCondition;
   /** `monsters_near_self_gte` 用：以角色為圓心的半徑（格） */
   radius?: number;
-  /** `weapon_type_is`／`current_area_is` 用 */
+  /** `weapon_type_is`／`current_area_is`／`ability_meter` 用 */
   match?: string;
+  /** `ability_meter` 用 */
+  compare?: CompareMode;
   /** `item_count_below`／`potion_cooldown_ready` 用。存 id 不存名稱（§ 99.1.7） */
   itemId?: number;
   /** `potion_cooldown_ready` 用 */
@@ -314,6 +321,7 @@ export const PERSISTENT_CONDITION_LABELS: Record<PersistentConditionType, string
   area_dwell_gte: '在本區停留超過',
   weight_over: '負重超過',
   self_shielded: '自身無敵中／帶護盾',
+  ability_meter: '怒氣／平靜',
   current_area_is: '所在區域 ＝',
   item_count_below: '道具數量少於',
   buff_remaining_below: 'Buff 剩餘時間少於',

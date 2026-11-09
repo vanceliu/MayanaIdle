@@ -162,3 +162,6 @@
   padding: 40px;
   font-size: var(--fs-base);
 }
+
+/* 詞綴、T7 獨有詞綴、隨機技能的數值區間（`43-wiki-system.md` § 4.2.1） */
+.wiki-range { color: #FACC15; font-weight: 700; }

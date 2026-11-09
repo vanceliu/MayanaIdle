@@ -32,7 +32,7 @@ const PERSISTENT: TalentType[] = ['persistent'];
 const SUPPLY: TalentType[] = ['supply'];
 
 export const TALENT_RULE_DEFS: TalentRuleDef[] = [
-  // === 共用條件（戰鬥 ∪ 常駐）：15 筆 ===
+  // === 共用條件（戰鬥 ∪ 常駐）：16 筆 ===
   { ruleId: 'hp_below', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
   { ruleId: 'hp_above', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
   { ruleId: 'mp_below', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'vitals' },
@@ -43,6 +43,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'speed_not_active', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
   { ruleId: 'debuff_active', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
   { ruleId: 'self_shielded', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
+  { ruleId: 'ability_meter', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'self' },
   { ruleId: 'weapon_type_is', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'gear' },
   { ruleId: 'weight_over', kind: 'condition', appliesTo: ['combat', 'persistent', 'supply'], group: 'gear' },
   { ruleId: 'monsters_near_self_gte', kind: 'condition', appliesTo: COMBAT_PERSISTENT, group: 'surroundings' },

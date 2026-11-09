@@ -2,6 +2,7 @@ import type { GameRepository } from '../db/repository';
 import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../models/buffPotion';
 import { defaultSession } from '../stores/session';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
+import type { ClassName } from '../models/character';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 import { isWeaponSlot, type EquipSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
@@ -88,12 +89,13 @@ function rollDroppedEquipment(
   ownerId: number,
   areaLevel: number,
   isBoss: boolean,
+  ownerClass?: ClassName,
 ): DroppedItem {
   const affixCategory: AffixCategory = getAffixCategoryForSlot(template.slot, template.type);
   const affixes = generateAffixes(affixCategory, areaLevel, rollDropAffixCount(), isBoss, {
     weaponBaseDamage: getWeaponBaseDamage(template),
   });
-  const fields = rollNewInstanceFields(template);
+  const fields = rollNewInstanceFields(template, { channel: 'drop', className: ownerClass });
   const record: Partial<EquipmentInstance> = {
     templateId: template.id!,
     slot: template.slot,
@@ -125,10 +127,11 @@ function rollDroppedEquipmentTakeBetter(
   areaLevel: number,
   isBoss: boolean,
   takeBetter?: TakeBetterOptions,
+  ownerClass?: ClassName,
 ): DroppedItem {
-  const first = rollDroppedEquipment(template, ownerId, areaLevel, isBoss);
+  const first = rollDroppedEquipment(template, ownerId, areaLevel, isBoss, ownerClass);
   if (!takeBetter) return first;
-  const second = rollDroppedEquipment(template, ownerId, areaLevel, isBoss);
+  const second = rollDroppedEquipment(template, ownerId, areaLevel, isBoss, ownerClass);
   return takeBetter.pickEquipment(first.equipmentInstance!, second.equipmentInstance!) === first.equipmentInstance ? first : second;
 }
 
@@ -193,6 +196,8 @@ export async function rollBossDrops(
   bonuses?: DropBonuses,
   repo: GameRepository = defaultSession.repo,
   takeBetter?: TakeBetterOptions,
+  /** 取得者職業，決定隨機技能的職業池（`07-affix-ability.md` § 7S.2） */
+  ownerClass?: ClassName,
 ): Promise<DropResult> {
   const entries = await repo.listBossDropTable(bossName);
   let gold = 0;
@@ -220,7 +225,7 @@ export async function rollBossDrops(
           && (pickWeapon ? isWeaponSlot(t.slot) : !isWeaponSlot(t.slot)));
       if (candidates.length === 0) continue;
       const template = candidates[Math.floor(random() * candidates.length)];
-      items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, true, takeBetter));
+      items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, true, takeBetter, ownerClass));
       continue;
     }
 
@@ -233,7 +238,7 @@ export async function rollBossDrops(
       const template = entry.equipmentTemplateId
         ? await repo.getEquipmentTemplate(entry.equipmentTemplateId)
         : undefined;
-      if (template) items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, true, takeBetter));
+      if (template) items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, true, takeBetter, ownerClass));
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
       if (itemDef) {
@@ -274,6 +279,8 @@ export async function rollDrops(
   monsterLevel?: number,
   repo: GameRepository = defaultSession.repo,
   takeBetter?: TakeBetterOptions,
+  /** 取得者職業，決定隨機技能的職業池（`07-affix-ability.md` § 7S.2） */
+  ownerClass?: ClassName,
 ): Promise<DropResult> {
   const entries = await repo.listDropTable(areaId);
   // 副本樓層的 area id 是 `<regionId>-<floor>f`，不是 region id ——
@@ -328,7 +335,7 @@ export async function rollDrops(
       } else if (entry.equipmentTemplateId) {
         template = await repo.getEquipmentTemplate(entry.equipmentTemplateId);
       }
-      if (template) items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, isBoss, takeBetter));
+      if (template) items.push(rollDroppedEquipmentTakeBetter(template, ownerId, areaLevel, isBoss, takeBetter, ownerClass));
     } else {
       const itemDef = entry.itemTemplateId ? getItemById(entry.itemTemplateId) : undefined;
       if (itemDef) {

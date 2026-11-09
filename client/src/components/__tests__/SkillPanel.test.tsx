@@ -129,6 +129,21 @@ describe('SkillPanel 技能格全開顯示', () => {
     expect(document.querySelector('.skill-tooltip-status.locked')).not.toBeNull();
   });
 
+  it('武器帶職業池隨機技能時，tooltip 顯示強化後的 MP 與冷卻（`07-affix-ability.md` § 7S.5）', () => {
+    setup('elf', [learn('binding-arrow')]);
+    const bow = {
+      id: 9, templateId: 1019, name: '弓', type: 'bow', slot: 'rightHand', isTwoHanded: true,
+      smallMonsterDamage: 10, largeMonsterDamage: 10, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
+      ability: { type: 'binding_arrow_boost', params: { cooldown: 1500, root: 1000 } },
+    };
+    useGameStore.setState({ equippedGear: { rightHand: bow } as never, activeEffects: [] });
+    render(<SkillPanel />);
+    fireEvent.mouseEnter(classCells('elf')[4]); // 束縛箭
+    const tooltip = document.querySelector('.skill-tooltip')!;
+    expect(tooltip.textContent).toContain('冷卻: 8.5s');
+    expect(tooltip.textContent).toContain('MP: 20');
+  });
+
   it('已習得的格子 hover 顯示已習得狀態', () => {
     setup('elf', [learn('precise-shot')]);
     render(<SkillPanel />);

@@ -189,13 +189,13 @@ describe('§ 23.3 走本公式的技能', () => {
     expect(power('taunt').power).toBe(65);
   });
 
-  it('復仇之刃與背刺不標記（維持技能傷害公式）', () => {
-    expect(power('vengeance').physicalSnapshot).toBeUndefined();
-    expect(power('backstab').physicalSnapshot).toBeUndefined();
+  it('復仇之刃 36、背刺 69 走本公式（`23-class-magic.md` § 23.1.1 A 組）', () => {
+    expect(power('vengeance')).toMatchObject({ power: 36, physicalSnapshot: true });
+    expect(power('backstab')).toMatchObject({ power: 69, physicalSnapshot: true });
   });
 
   it('沒有其他技能誤標', () => {
     const marked = CLASS_SKILLS.filter(s => s.skill.physicalSnapshot).map(s => s.id);
-    expect(marked.sort()).toEqual(['binding-arrow', 'charge', 'leap-shot', 'rend', 'shield-bash', 'taunt']);
+    expect(marked.sort()).toEqual(['backstab', 'binding-arrow', 'charge', 'leap-shot', 'rend', 'shield-bash', 'taunt', 'vengeance']);
   });
 });

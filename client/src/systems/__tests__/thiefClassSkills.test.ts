@@ -227,4 +227,18 @@ describe('閃避反擊', () => {
     applyMonsterAttacks(instance, [{ type: 'monster_attack', monsterId: 'm1', attackType: 'melee' }]);
     expect(inst.currentHp).toBe(99999);
   });
+
+  it('閃避反擊強化（`07-affix-ability.md` § 7S.5）：擲中時再追加 1 次普攻', () => {
+    const { instance } = setup('melee');
+    const sword = {
+      id: 9, templateId: 1019, name: '劍', type: 'sword', slot: 'rightHand', isTwoHanded: false,
+      smallMonsterDamage: 10, largeMonsterDamage: 10, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
+      ability: { type: 'dodge_counter_boost', params: { chance: 10 } },
+    };
+    useGameStore.setState({ equippedGear: { rightHand: sword } as never });
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const visuals = applyMonsterAttacks(instance, [{ type: 'monster_attack', monsterId: 'm1', attackType: 'melee' }]);
+    expect(visuals.filter(v => v.kind === 'player_attack')).toHaveLength(2);
+    expect(useGameStore.getState().combatLogs.some(l => l.text === '閃避反擊追加！')).toBe(true);
+  });
 });

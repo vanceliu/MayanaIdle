@@ -70,6 +70,9 @@ const VALUE_DOMAINS: Record<string, Set<string> | null> = {
   'target_distance.compare': null,
   'target_defense.compare': null,
   'target_level_diff.compare': null,
+  // 怒氣／平靜（`07-affix-ability.md` § 7S.5），對應 buff category `ability-rage`／`ability-calm`
+  'ability_meter.match': new Set(['rage', 'calm']),
+  'ability_meter.compare': null,
   // 存入目的地＝`WarehouseKind`（`49-village-script.md` § 49.3）；補給天賦不碰公會倉庫
   'deposit_materials.warehouse': DEPOSIT_WAREHOUSES,
   'deposit_equipment.warehouse': DEPOSIT_WAREHOUSES,

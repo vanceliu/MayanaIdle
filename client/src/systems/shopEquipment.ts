@@ -9,6 +9,7 @@
 import type { GameRepository } from '../db/repository';
 import { defaultSession } from '../stores/session';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
+import type { ClassName } from '../models/character';
 import { generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, SHOP_MAX_AFFIX_TIER } from '../models/affix';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 
@@ -21,6 +22,8 @@ export async function createShopEquipment(
   charLevel: number,
   ownerId: number,
   repo: GameRepository = defaultSession.repo,
+  /** 購買者職業，決定隨機技能的職業池（`07-affix-ability.md` § 7S.2） */
+  ownerClass?: ClassName,
 ): Promise<EquipmentInstance[]> {
   if (templates.length === 0) return [];
 
@@ -39,7 +42,7 @@ export async function createShopEquipment(
         ...(isWeapon ? { weaponBaseDamage: getWeaponBaseDamage(template) } : {}),
       },
     );
-    return { template, affixes, fields: rollNewInstanceFields(template) };
+    return { template, affixes, fields: rollNewInstanceFields(template, { channel: 'shop', className: ownerClass }) };
   });
 
   const ids = await repo.bulkAddEquipment(

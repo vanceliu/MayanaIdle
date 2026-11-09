@@ -14,6 +14,7 @@ import {
 } from '../models/affix';
 import { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from '../models/attributes';
 import { formatUniqueAffixEffect } from '../models/uniqueAffix';
+import { formatAbilityEffect } from '../models/ability';
 import type { EquipmentInstance } from '../models/equipment';
 import { getAffixBonusesFromGear, isUniqueAffixMergedIntoBonuses } from './combat';
 
@@ -59,4 +60,9 @@ export function summarizeAffixes(gear: EquipmentInstance[]): AffixSummaryRow[] {
     }
   }
   return rows;
+}
+
+/** 隨機技能的效果列（§ 7S.7），排在 `summarizeAffixes()` 之後；傳入的裝備須已過 `getEffectiveGear()` */
+export function summarizeAbilities(gear: EquipmentInstance[]): AffixSummaryRow[] {
+  return gear.filter(g => g.ability).map(g => ({ name: formatAbilityEffect(g.ability!), value: '' }));
 }

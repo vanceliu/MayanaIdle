@@ -56,3 +56,15 @@ describe('多下判定的傷害數字', () => {
     m.destroy();
   });
 });
+
+describe('追打的傷害數字（`07-affix-ability.md` § 7S.7）', () => {
+  it('只顯示數字，以顏色與字級區分', () => {
+    const m = new DamageNumberManager();
+    m.spawn(0, 0, 63, 'combo');
+    const text = m.container.children.find(c => (c as { text?: string }).text === '63') as { style: { fill: unknown; fontSize: number } } | undefined;
+    expect(text).toBeDefined();
+    expect(text!.style.fill).toBe(0xfef08a);
+    expect(text!.style.fontSize).toBe(14);
+    m.destroy();
+  });
+});

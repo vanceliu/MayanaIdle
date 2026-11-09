@@ -40,9 +40,14 @@ import {
   AFFIX_DEBUFF_CHANCE, AFFIX_DEBUFF_DURATION_MS, DEFENSE_DOWN_CATEGORY,
 } from '../src/models/affix';
 import {
-  UNIQUE_AFFIX_DEFINITIONS, UNIQUE_HIT_PROC_CHANCE, sumUniqueAffix, type UniqueAffixType,
+  UNIQUE_AFFIX_DEFINITIONS, type UniqueAffixType,
 } from '../src/models/uniqueAffix';
 import { getEffectiveGear } from '../src/systems/gear';
+import {
+  ABILITY_BURN_DURATION_MS, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, getAbilityWeaponValue, formatAbilityDisplay,
+  type Ability, type AbilityType,
+} from '../src/models/ability';
+import { applyAbilityToSkill } from '../src/models/abilitySkill';
 import { setRandomSource } from '../src/core/rng';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
@@ -337,7 +342,7 @@ export function uniqueMax(type: UniqueAffixType): number {
  * 回血、回魔、擊殺回血、命中暈眩對擊殺時間無貢獻（MP 不是瓶頸，§ 44.10）。
  */
 export const WEAPON_UNIQUE_OPTIONS: UniqueAffixType[] = UNIQUE_AFFIX_DEFINITIONS
-  .filter(d => d.pool === 'weapon' && (d.trigger === 'passive' || d.type === 'hit_bonus_damage'))
+  .filter(d => d.pool === 'weapon' && d.trigger === 'passive')
   .map(d => d.type);
 
 /** T7 上限 20，品質 20% → getEffectiveAffixValue = floor(20 × 1.2) = 24 */
@@ -356,6 +361,8 @@ export interface Loadout {
   label: string;
   /** 武器的 T7 獨有詞綴；非 T7 武器為 null */
   unique: UniqueAffixType | null;
+  /** 武器的隨機技能（`07-affix-ability.md`）；所有參數取最佳端 */
+  ability: Ability | null;
   weaponName: string;
   weapon: EquipmentInstance;
   gear: (EquipmentInstance | null)[];
@@ -410,7 +417,9 @@ export function erosionRollValue(base: number): number {
   return Math.max(1, Math.round((min + max) / 2));
 }
 
-export function instantiate(tpl: Template, enhancement: number, affixTypes: AffixType[], unique: UniqueAffixType | null = null): EquipmentInstance {
+export function instantiate(
+  tpl: Template, enhancement: number, affixTypes: AffixType[], unique: UniqueAffixType | null = null, ability: Ability | null = null,
+): EquipmentInstance {
   const bonusAttributes = tpl.bonusAttributes;
   /*
    * 裝備魔攻的「點數 → 百分比」匯率調整（`magicAttackMult`）。
@@ -443,6 +452,7 @@ export function instantiate(tpl: Template, enhancement: number, affixTypes: Affi
       ...(type === 'element_erosion' ? { dotDamage: erosionRollValue(getWeaponBaseDamage(tpl)) } : {}),
     })),
     ...(unique ? { uniqueAffix: { type: unique, value: uniqueMax(unique) } } : {}),
+    ...(ability ? { ability } : {}),
     ownerId: 1, equipped: true,
   } as EquipmentInstance;
 }
@@ -500,12 +510,13 @@ export function buildLoadout(
   weaponAffixes: AffixType[],
   support: EquipmentInstance[],
   unique: UniqueAffixType | null = null,
+  ability: Ability | null = null,
 ): Loadout {
-  const w = instantiate(weapon, 9, weaponAffixes, unique);
+  const w = instantiate(weapon, 9, weaponAffixes, unique, ability);
   const gear: (EquipmentInstance | null)[] = [w];
   if (offhand) gear.push(instantiate(offhand, 9, ARMOR_AFFIXES));
   gear.push(...support);
-  return { label, unique, weaponName: weapon.name, weapon: w, gear };
+  return { label, unique, ability, weaponName: weapon.name, weapon: w, gear };
 }
 
 /** 套用素質需求凍結與獨有詞綴同類去重（`systems/gear.ts`），戰鬥一律吃這份 */
@@ -745,8 +756,6 @@ export interface RotationEntry {
   hits?: number;
   /** § 21.4a 物理快照技能（盾擊／裂傷斬／挑釁怒吼）：基礎魔攻 + 基礎物理傷害 */
   physicalSnapshot?: boolean;
-  /** § 21.8 魔法公式的物理系技能（復仇之刃／背刺）保留爆擊 */
-  physicalDamage?: boolean;
   /** § 99.1 第 6 條：【需裝備弓】是實際限制，配裝不符時整招不可用 */
   requiredWeaponType?: string;
   /** 冷卻（ms，未套 CDR） */
@@ -759,6 +768,12 @@ export interface RotationEntry {
   randomHits?: number;
   /** 只上 DoT，不造成直接傷害（毒霧） */
   dotOnly?: boolean;
+  /** 隨機技能：直接傷害 ×(1 + X%)（魔力奪取／元素風暴強化） */
+  abilityDamagePercent?: number;
+  /** 隨機技能：DoT 一次打出 N 跳（毒霧強化），每跳 = 基礎物理傷害 × percent */
+  instantDot?: { percent: number; ticks: number };
+  /** 隨機技能：施放後下一次攻擊技能 +X%（精神匯聚強化，self_buff 用） */
+  nextAttackBonusPercent?: number;
   /** 自扣有效最大 HP 的百分比（血濺咒殺），最低留 1 */
   selfHpCostPercent?: number;
   /** 施放後給自己的 buff（背刺）；`scaleByMissingHp` 依當下殘血決定加成（復仇之刃） */
@@ -788,7 +803,7 @@ export function meetsWeaponRequirement(e: RotationEntry, loadout: Loadout): bool
 export function magicEntry(s: SkillDef, isBasicMagic = false): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill', isBasicMagic,
-    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot, physicalDamage: s.physicalDamage,
+    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot,
     requiredWeaponType: s.requiredWeaponType,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
@@ -801,23 +816,28 @@ export function magicEntry(s: SkillDef, isBasicMagic = false): RotationEntry {
 }
 
 /** 盤點結果中「輪替」的技能 → 輪替項目。DoT／降防／自身增益一律讀技能定義（§ 44.9） */
-export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance): RotationEntry {
-  const s = item.skill;
+export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance, className?: ClassName): RotationEntry {
+  // 武器的職業池隨機技能改寫技能數值（`07-affix-ability.md` § 7S.5）
+  const s = className ? applyAbilityToSkill({ ...item.skill, lastUsedAt: 0 } as Skill, [weapon], className) : item.skill;
   if (s.type === 'buff') {
     return {
       id: s.id, name: s.name, kind: 'self_buff', cooldown: s.cooldown, mpCost: s.mpCost,
       buff: { category: s.buffCategory ?? s.id, duration: s.buffDuration!, modifiers: s.buffModifiers! },
+      ...(s.nextAttackBonusPercent ? { nextAttackBonusPercent: s.nextAttackBonusPercent } : {}),
     };
   }
-  if (s.hits && s.hits > 1) {
+  if (s.hits && (s.hits > 1 || !s.power)) {
     return {
       id: s.id, name: s.name, kind: 'physical_skill', hits: s.hits, cooldown: s.cooldown, mpCost: s.mpCost,
       requiredWeaponType: s.requiredWeaponType, ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     };
   }
   const e = magicEntry(s, item.isBasicMagic);
+  if (s.abilityDamagePercent) e.abilityDamagePercent = s.abilityDamagePercent;
   const d = s.applyDebuff;
-  if (d?.dotDamagePercent) {
+  if (s.instantDotTicks && d?.dotDamagePercent) {
+    e.instantDot = { percent: d.dotDamagePercent, ticks: s.instantDotTicks };
+  } else if (d?.dotDamagePercent) {
     e.dot = {
       category: d.category,
       percent: resolveDotDamagePercent(d, weapon.isTwoHanded)!,
@@ -837,8 +857,25 @@ export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance):
 }
 
 export function buildRotation(className: ClassName, weapon: EquipmentInstance): RotationEntry[] {
-  return getSkillPlan(className).rotation.map(i => toRotationEntry(i, weapon));
+  return getSkillPlan(className).rotation.map(i => toRotationEntry(i, weapon, className));
 }
+
+/** 武器隨機技能的候選（共通池＋該職業的武器職業池），參數一律取最佳端（§ 44.1） */
+export function abilityOptions(className: ClassName, weapon: Template): (Ability | null)[] {
+  const types = [...getAbilityCommonPool(weapon), ...getAbilityClassPool(weapon, className)];
+  return [null, ...types.map(type => bestAbility(type, weapon))];
+}
+
+export function bestAbility(type: AbilityType, weapon: Template): Ability {
+  const params: Record<string, number> = {};
+  for (const p of getAbilityDefinition(type)!.params) {
+    const max = p.max === 'weaponValue' ? Math.max(p.min, getAbilityWeaponValue(weapon)) : p.max;
+    params[p.key] = p.lowerIsBetter ? p.min : max;
+  }
+  return { type, params };
+}
+
+export const abilityLabel = (a: Ability | null) => (a ? `｜(技)${formatAbilityDisplay(a)}` : '');
 
 // ---------------------------------------------------------------- 校準
 
@@ -892,7 +929,7 @@ export function calibrate(
           s += r.damage;
         } else if (!e.dotOnly) {
           for (let h = 0; h < (e.randomHits ?? 1); h++) {
-            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, char.className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalDamage === true);
+            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, char.className), e.element!, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
             s += r.damage;
           }
         }
@@ -1042,8 +1079,9 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
   const effInt = designEffectiveInt(className, loadout.gear);
   const monster = makeReaper();
   const rotation = buildRotation(className, loadout.weapon);
-  // § 7T.4 追加傷害的期望值：每下命中 × 觸發率 × 數值
-  const bonusPerHit = sumUniqueAffix(loadout.gear, 'hit_bonus_damage') * UNIQUE_HIT_PROC_CHANCE / 100;
+  // 隨機技能（`07-affix-ability.md` § 7S.5）的期望值
+  const ability = loadout.weapon.ability;
+  const bonusPerHit = ability?.type === 'bonus_damage' ? ability.params.chance / 100 * ability.params.damage : 0;
 
   const intervalMs = getPlayerAttackInterval(loadout.gear, effects);
   const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + intCooldownReduction(effInt));
@@ -1074,12 +1112,15 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
               const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
               s += r.hit ? r.damage + bonusPerHit : 0;
             }
+          } else if (e.instantDot) {
+            const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, fx);
+            s += Math.max(1, Math.floor(base * e.instantDot.percent)) * e.instantDot.ticks;
           } else if (e.physicalSnapshot) {
             const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
-            s += r.damage + bonusPerHit;
+            s += Math.floor(r.damage * (100 + (e.abilityDamagePercent ?? 0)) / 100) + bonusPerHit;
           } else {
-            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalDamage === true);
-            s += r.damage + bonusPerHit;
+            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+            s += Math.floor(r.damage * (100 + (e.abilityDamagePercent ?? 0)) / 100) + bonusPerHit;
           }
         }
         skills.push({ damage: s / PROXY_SAMPLES, cooldownMs: e.cooldown * (1 - cdr / 100) });
@@ -1122,7 +1163,16 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
     const procsPerSec = perAttack / (intervalMs / 1000);
     erosionDps = (1 - Math.exp(-procsPerSec * (EROSION_MS / 1000))) * erosion.damage;
   }
-  return best / intervalMs * 1000 + erosionDps;
+  // 追打：平均每次出手的直接傷害 ×(1 + M% ÷ N)
+  if (ability?.type === 'combo_strike') best *= 1 + ability.params.bonus / 100 / ability.params.every;
+  // 命中燃燒：佔用率 = 1 − e^(−每秒觸發次數 × 10s)，同元素侵蝕
+  let burnDps = 0;
+  if (ability?.type === 'hit_burn') {
+    const perAttack = 1 - Math.pow(1 - ability.params.chance / 100, normalRolls);
+    const procsPerSec = perAttack / (intervalMs / 1000);
+    burnDps = (1 - Math.exp(-procsPerSec * (ABILITY_BURN_DURATION_MS / 1000))) * ability.params.damage;
+  }
+  return best / intervalMs * 1000 + erosionDps + burnDps;
 }
 
 /** 依 § 44.5 自動選出該職業的前 TOP_FINAL 名配置 */
@@ -1157,9 +1207,9 @@ export function searchBis(className: ClassName): { loadouts: Loadout[]; searched
     .slice(0, TOP_HANDS);
 
   const affixSets = chooseK(WEAPON_AFFIX_POOL, WEAPON_GENERAL_AFFIXES + 1);
-  const make = (h: (typeof hands)[number], set: AffixType[], u: UniqueAffixType | null) => {
+  const make = (h: (typeof hands)[number], set: AffixType[], u: UniqueAffixType | null, a: Ability | null = null) => {
     searched++;
-    const lo = buildLoadout(`${h.label}｜${set.join('+')}${uniqueLabel(u)}`, h.weapon, h.offhand, set, support, u);
+    const lo = buildLoadout(`${h.label}｜${set.join('+')}${uniqueLabel(u)}${abilityLabel(a)}`, h.weapon, h.offhand, set, support, u, a);
     return { h, set, lo, score: proxyDps(className, lo, PROXY_SEED) };
   };
   const stage2 = rankedHands
@@ -1173,7 +1223,16 @@ export function searchBis(className: ClassName): { loadouts: Loadout[]; searched
       .map(u => make(c.h, c.set, u))),
   ].sort((a, b) => b.score - a.score);
 
-  return { loadouts: ranked.slice(0, TOP_FINAL).map(r => r.lo), searched };
+  // 4. 前 TOP_FINAL 名逐一試武器隨機技能（`07-affix-ability.md`，§ 44.1）
+  const top = ranked.slice(0, TOP_FINAL);
+  const withAbility = [
+    ...top,
+    ...top.flatMap(c => abilityOptions(className, c.h.weapon)
+      .filter((a): a is Ability => a !== null)
+      .map(a => make(c.h, c.set, c.lo.unique, a))),
+  ].sort((a, b) => b.score - a.score);
+
+  return { loadouts: withAbility.slice(0, TOP_FINAL).map(r => r.lo), searched };
 }
 
 /**

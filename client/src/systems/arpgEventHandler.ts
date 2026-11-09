@@ -23,6 +23,7 @@ import {
   consumeEvadeCharge,
   getTotalMagicResist,
   getWeaponHitCount,
+  getSkillCooldownReduction,
   calculateHealAmount,
   type HitBreakdown,
 } from './combat';
@@ -38,12 +39,15 @@ import {
 } from '../models/affix';
 import {
   sumUniqueAffix,
-  hasUniqueAffix,
   rollUniqueStruckBuffs,
-  UNIQUE_HIT_PROC_CHANCE,
-  UNIQUE_STUN_CATEGORY,
-  UNIQUE_STUN_DURATION_MS,
 } from '../models/uniqueAffix';
+import { findAbility, sumAbilityParam, ABILITY_BURN_CATEGORY, ABILITY_SPLASH_RADIUS } from '../models/ability';
+import {
+  advanceCombo, applyComboBonus, comboKey, isBasicAttackClass, isDirectDamageSkill, isSingleTargetSkill,
+  consumeCalm, gainRage, makeBurnEffect, rollBurn, shortenCooldown, splashDamage,
+} from './abilityCombat';
+import { getDistance } from './lineOfSight';
+import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
 import { getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { defaultSession, type Session } from '../stores/session';
 import { getSkillTemplate } from '../models/skillTemplate';
@@ -95,6 +99,35 @@ export function applyUniqueAffixRestore(session: Session, hpGain: number, mpGain
 export interface SelfBuffApplyResult {
   effects: ActiveEffect[];
   description: string;
+}
+
+/** 平靜（§ 7S.5）：冷卻中技能的剩餘冷卻縮短 X%；有任何技能被縮短時回 true */
+function shortenCoolingSkills(session: Session, gear: (EquipmentInstance | null)[], percent: number, now: number): boolean {
+  const gs = session.game.getState();
+  const character = gs.character;
+  if (!character) return false;
+  const cdr = getSkillCooldownReduction(character, gear, gs.activeEffects);
+  const effective = applyAbilityToSkills(gs.skills, gear, character.className);
+  let changed = false;
+  const skills = gs.skills.map((s, i) => {
+    const cooldown = Math.floor(effective[i].cooldown * (1 - Math.min(cdr, 50) / 100));
+    const lastUsedAt = shortenCooldown(s.lastUsedAt, cooldown, percent, now);
+    if (lastUsedAt === s.lastUsedAt) return s;
+    changed = true;
+    return { ...s, lastUsedAt };
+  });
+  if (changed) session.game.setState({ skills });
+  return changed;
+}
+
+/** 取出並移除生效中的「下一次攻擊技能」加成%；沒有時回 0 */
+function consumeNextAttackBonus(session: Session): number {
+  const now = gameNow();
+  const { activeEffects } = session.game.getState();
+  const effect = activeEffects.find(e => e.category === NEXT_ATTACK_BONUS_CATEGORY && now < e.startTime + e.duration);
+  if (!effect) return 0;
+  session.game.setState({ activeEffects: activeEffects.filter(e => e !== effect) });
+  return effect.modifiers?.find(m => m.stat === NEXT_ATTACK_BONUS_STAT)?.value ?? 0;
 }
 
 /**
@@ -172,6 +205,8 @@ export interface DamageResult {
    * （`48-vfx.md` § 48.7.3）—— 只有合計的話，「第二下 MISS」表現不出來。
    */
   hits: HitBreakdown[];
+  /** 隨機技能的擴散傷害（`07-affix-ability.md` § 7S.4）：不觸發荊棘反彈 */
+  splash?: boolean;
 }
 
 export interface PlayerAttackResult {
@@ -193,6 +228,8 @@ export interface MonsterAttackResult {
   shieldLog?: CombatLog;
   /** § 7.4 受擊回復觸發的日誌 */
   restoreLogs?: CombatLog[];
+  /** 飾品隨機技能荊棘反彈（`07-affix-ability.md` § 7S.5） */
+  thorns?: { damage: number; killed: boolean };
 }
 
 /**
@@ -230,7 +267,8 @@ export function processPlayerAttack(
   let uniqueHpGain = 0;
   let uniqueMpGain = 0;
 
-  const skill = event.skill;
+  // § 7S.5 職業池：以施放當下的武器改寫技能數值（呼叫端已改寫時結果相同）
+  const skill = event.skill ? applyAbilityToSkill(event.skill, equippedGear, character.className) : undefined;
 
   // Handle buff/heal skills — these target the player, not monsters
   if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
@@ -239,8 +277,7 @@ export function processPlayerAttack(
     const skillIdx = gs.skills.findIndex(s => s.id === skill.id);
 
     if (skill.type === 'buff') {
-      const template = getSkillTemplate(skill.id);
-      const buffDuration = template?.buffDuration ?? skill.buffDuration;
+      const buffDuration = skill.buffDuration;
       // 自身 HP 消耗（`23-class-magic.md` § 23.5 魔力湧泉）：穿透減傷與護盾，最低留 1
       const hpCost = resolveSelfHpCost(skill, character.hp, getEffectiveMaxHp(character, gs.equippedGear, gs.activeEffects));
       if (hpCost > 0) logs.push({ text: `${skill.name} 消耗 ${hpCost} HP`, type: 'player' });
@@ -256,24 +293,22 @@ export function processPlayerAttack(
           id: `buff-${skill.id}-${now}`,
           sourceSkillId: skill.id,
           sourceSkillName: skill.name,
-          category: template?.buffCategory ?? skill.buffCategory ?? skill.id,
+          category: skill.buffCategory ?? skill.id,
           type: 'buff',
           target: 'player',
-          modifiers: template?.buffModifiers ?? skill.buffModifiers ?? [],
+          modifiers: skill.buffModifiers ?? [],
           startTime: now,
           duration: buffDuration,
           tags: [],
           name: skill.name,
-          description: template?.buffEffect ?? skill.buffEffect ?? '',
+          description: skill.buffEffect ?? '',
         };
-        const hotAmount = template?.hotAmount ?? skill.hotAmount;
-        if (hotAmount) buffEffect.hot = { amount: hotAmount, interval: 1000 };
-        if (template?.invincible ?? skill.invincible) buffEffect.invincible = true;
-        if (template?.immuneDebuff ?? skill.immuneDebuff) buffEffect.immuneDebuff = true;
-        const evadeCharges = template?.evadeCharges ?? skill.evadeCharges;
-        if (evadeCharges) buffEffect.evadeCharges = evadeCharges;
+        if (skill.hotAmount) buffEffect.hot = { amount: skill.hotAmount, interval: 1000 };
+        if (skill.invincible) buffEffect.invincible = true;
+        if (skill.immuneDebuff) buffEffect.immuneDebuff = true;
+        if (skill.evadeCharges) buffEffect.evadeCharges = skill.evadeCharges;
         const shieldMod = buffEffect.modifiers?.find(m => m.stat === 'shield_absorb');
-        const shieldPower = template?.shieldPower ?? skill.shieldPower;
+        const shieldPower = skill.shieldPower;
         if (shieldMod) {
           buffEffect.shieldRemaining = shieldMod.value + (shieldPower
             ? getSkillSideValue(character, shieldPower, getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear), gs.activeEffects)
@@ -285,7 +320,8 @@ export function processPlayerAttack(
           session.game.setState({ character: newChar, skills: newSkills, activeEffects: cleansed });
         } else {
           const applied = applyPlayerBuff(gs.activeEffects, buffEffect);
-          session.game.setState({ character: newChar, skills: newSkills, activeEffects: applied.effects });
+          const effects = withNextAttackBonus(applied.effects, skill, now);
+          session.game.setState({ character: newChar, skills: newSkills, activeEffects: effects });
           if (applied.cancelledSlow) logs.push({ text: `${skill.name} 解除了減速`, type: 'debuff-self' });
         }
       } else {
@@ -312,17 +348,11 @@ export function processPlayerAttack(
     return { damages: [], logs, skillUsed: skill };
   }
 
-  // 攻擊技能附帶的自身 buff（復仇之刃、背刺）——
-  // 於傷害結算「前」施加；技能公式不讀攻擊力%，本次技能不受加成（§ 23.1.1 B 組）。
-  let effectsForDamage = activeEffects;
-  if (skill?.selfBuff) {
-    const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects);
-    if (applied) {
-      session.game.setState({ activeEffects: applied.effects });
-      effectsForDamage = applied.effects;
-      logs.push({ text: `${skill.name}：${applied.description}`, type: 'player' });
-    }
-  }
+  const effectsForDamage = activeEffects;
+
+  // § 7S.5 精神匯聚強化：下一次攻擊技能的傷害加成，本次施放即消耗
+  const nextAttackBonus = skill && isDirectDamageSkill(skill) ? consumeNextAttackBonus(session) : 0;
+  const damagePercent = (skill?.abilityDamagePercent ?? 0) + nextAttackBonus;
 
   // 自身 HP 消耗（`23-class-magic.md` § 23.3 血濺咒殺）：不是受到傷害，穿透減傷與護盾，最低留 1
   if (skill?.selfHpCostPercent) {
@@ -335,8 +365,16 @@ export function processPlayerAttack(
     }
   }
 
-  /** 只上毒的技能（毒霧）沒有「命中」：不觸發追加傷害、元素侵蝕、武器 debuff、T7 命中類 */
-  const procs = !skill?.dotOnly;
+  /** 只上毒的技能（毒霧，含強化後的立即傷害）沒有「命中」：不觸發追加傷害、元素侵蝕、武器 debuff、T7 命中類 */
+  const procs = !skill?.dotOnly && !skill?.instantDotTicks;
+
+  // § 7S.5 追打：普攻類每一下計 1；技能類每施放一次計 1，觸發時該次施放的全部目標加成
+  const comboAbility = findAbility(equippedGear, 'combo_strike');
+  const comboStateKey = comboKey(weapon, character);
+  const basicAttackClass = isBasicAttackClass(event, skill);
+  const castComboBonus = comboAbility && !basicAttackClass && isDirectDamageSkill(skill)
+    ? advanceCombo(session.loop, comboAbility, comboStateKey)
+    : 0;
 
   for (const targetId of attackSequence(event.targetMonsterIds, skill, ctx.monsterInstances)) {
     const monster = ctx.monsterInstances.get(targetId);
@@ -368,6 +406,11 @@ export function processPlayerAttack(
       if (skill.dotOnly) {
         // § 23.7 毒霧：不造成直接傷害，只施加 `applyDebuff`
         damage = 0;
+      } else if (skill.instantDotTicks && skill.applyDebuff?.dotDamagePercent) {
+        // § 7S.5 毒霧強化：DoT 快照值 × 跳數一次打出，不吃防禦、不爆擊
+        const perTick = Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * skill.applyDebuff.dotDamagePercent));
+        damage = perTick * skill.instantDotTicks;
+        isMiss = false;
       } else if (skill.hits) {
         /**
          * 多段物理技能（目前只有三連射）。
@@ -436,7 +479,6 @@ export function processPlayerAttack(
           targetIdx,
           skill.ignoreDefensePercent ?? 0,
           targetId,
-          skill.physicalDamage === true,
         );
         damage = result.damage;
         isCrit = result.isCritical;
@@ -451,11 +493,26 @@ export function processPlayerAttack(
      */
     if (hits.length === 0) hits = [{ damage, isCrit, isMiss }];
 
-    // § 7T.4 T7 追加傷害：每下命中各擲一次，加在該下最終傷害
-    const bonusDamage = sumUniqueAffix(equippedGear, 'hit_bonus_damage');
-    if (bonusDamage > 0 && !isMiss && procs) {
-      hits = hits.map(h => (!h.isMiss && random() * 100 < UNIQUE_HIT_PROC_CHANCE
-        ? { ...h, damage: h.damage + bonusDamage }
+    if (damagePercent > 0 && !isMiss) {
+      hits = hits.map(h => (h.isMiss ? h : { ...h, damage: applyComboBonus(h.damage, damagePercent) }));
+      damage = hits.reduce((sum, h) => sum + h.damage, 0);
+    }
+
+    if (comboAbility && !isMiss && procs) {
+      hits = hits.map(h => {
+        if (h.isMiss) return h;
+        const bonus = basicAttackClass ? advanceCombo(session.loop, comboAbility, comboStateKey) : castComboBonus;
+        if (bonus > 0) logs.push({ text: `追打！傷害 +${bonus}%`, type: 'player' });
+        return bonus > 0 ? { ...h, damage: applyComboBonus(h.damage, bonus), combo: true } : h;
+      });
+      damage = hits.reduce((sum, h) => sum + h.damage, 0);
+    }
+
+    // § 7S.5 追加傷害：每下命中各擲一次，加在該下最終傷害
+    const bonusDamage = findAbility(equippedGear, 'bonus_damage');
+    if (bonusDamage && !isMiss && procs) {
+      hits = hits.map(h => (!h.isMiss && random() * 100 < bonusDamage.params.chance
+        ? { ...h, damage: h.damage + bonusDamage.params.damage }
         : h));
       damage = hits.reduce((sum, h) => sum + h.damage, 0);
     }
@@ -490,7 +547,10 @@ export function processPlayerAttack(
             let dotDmg = debuff.dotDamage ?? 0;
             if (debuff.dotDamagePercent) {
               // § 24.4.5：DoT 傷害於施加當下快照，最低 1 點
-              dotDmg = Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * debuff.dotDamagePercent));
+              // § 7S.5 淬毒強化：加成在施放淬毒時寫進 buff
+              const boost = poisonBuff.modifiers?.find(m => m.stat === ENVENOM_DOT_BONUS_STAT)?.value ?? 0;
+              const percent = debuff.dotDamagePercent * (100 + boost) / 100;
+              dotDmg = Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * percent));
             }
             const poisonEffect: ActiveEffect = {
               id: `debuff-${debuff.category}-${targetId}-${now}`,
@@ -565,6 +625,18 @@ export function processPlayerAttack(
       }
     }
 
+    // § 7S.5 命中燃燒：每下命中各擲一次；燃燒中不再施加、不刷新
+    if (!isMiss && !killed && procs) {
+      const now = gameNow();
+      const gs = session.game.getState();
+      const burning = gs.activeEffects.some(e => e.category === ABILITY_BURN_CATEGORY && isActiveOnMonster(e, targetId, now));
+      const burn = rollBurn(equippedGear, landedHits, burning);
+      if (burn) {
+        gs.addEffect(makeBurnEffect(burn, targetId, targetIdx, now));
+        logs.push({ text: `命中燃燒觸發！${monsterLogName(monster)} 燃燒（每秒 ${burn.params.damage}）`, type: 'debuff-enemy' });
+      }
+    }
+
     // § 7.9 命中下降／防禦下降：判定次數同元素侵蝕；同一隻怪後施放覆蓋並刷新時間
     if (!isMiss && !killed && procs) {
       const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
@@ -611,42 +683,6 @@ export function processPlayerAttack(
       uniqueMpGain += landedHits * sumUniqueAffix(equippedGear, 'hit_mana');
       if (killed) uniqueHpGain += sumUniqueAffix(equippedGear, 'kill_heal');
     }
-    if (!isMiss && !killed && procs && hasUniqueAffix(equippedGear, 'hit_stun')) {
-      let triggered = false;
-      for (let r = 0; r < landedHits && !triggered; r++) {
-        if (random() * 100 < UNIQUE_HIT_PROC_CHANCE) triggered = true;
-      }
-      const now = gameNow();
-      const gs = session.game.getState();
-      // § 24.3.3 暈眩中不可再上
-      const alreadyStunned = gs.activeEffects.some(e => e.stun && isActiveOnMonster(e, targetId, now));
-      if (triggered && !alreadyStunned) {
-        // § 24.6 Boss 控場免疫冷卻
-        if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
-          logs.push({ text: `${monsterLogName(monster)} 免疫控場！`, type: 'debuff-enemy' });
-        } else {
-          gs.addEffect({
-            id: `debuff-${UNIQUE_STUN_CATEGORY}-${targetId}-${now}`,
-            sourceSkillId: UNIQUE_STUN_CATEGORY,
-            sourceSkillName: '命中暈眩',
-            category: UNIQUE_STUN_CATEGORY,
-            type: 'debuff',
-            target: 'monster',
-            targetIdx,
-            targetMonsterId: targetId,
-            stun: true,
-            startTime: now,
-            duration: UNIQUE_STUN_DURATION_MS,
-            tags: ['stunned'],
-            name: '暈眩',
-            description: '無法行動',
-          });
-          if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
-          logs.push({ text: `命中暈眩觸發！${monsterLogName(monster)} 暈眩 ${UNIQUE_STUN_DURATION_MS / 1000}s`, type: 'debuff-enemy' });
-        }
-      }
-    }
-
     damages.push({ targetId, damage, isCrit, isMiss, killed, hits });
 
     // Build log
@@ -673,7 +709,7 @@ export function processPlayerAttack(
       }
 
       // Apply skill debuff on hit (DoT or stat modifier)
-      if (!killed && skill?.applyDebuff) {
+      if (!killed && skill?.applyDebuff && !skill.instantDotTicks) {
         const debuffDef = skill.applyDebuff;
         const now = gameNow();
         const gs = session.game.getState();
@@ -775,6 +811,34 @@ export function processPlayerAttack(
           }
         }
       }
+    }
+  }
+
+  // 攻擊技能附帶的自身 buff（復仇之刃、背刺）：傷害結算後才施加，不作用於本次技能（`23-class-magic.md` § 23.1.1）
+  if (skill?.selfBuff) {
+    const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects);
+    if (applied) {
+      session.game.setState({ activeEffects: applied.effects });
+      logs.push({ text: `${skill.name}：${applied.description}`, type: 'player' });
+    }
+  }
+
+  // § 7S.5 單體技能擴散：主目標 3 格內其他怪受該下最終傷害 X%；計入回復、不觸發命中類效果
+  const splash = findAbility(equippedGear, 'skill_splash');
+  const primary = damages[0];
+  if (splash && isSingleTargetSkill(skill) && damages.length === 1 && !primary.isMiss && primary.damage > 0) {
+    const center = ctx.mapMonsters.find(m => m.id === primary.targetId)?.position;
+    const amount = splashDamage(primary.damage, splash);
+    for (const other of center && amount > 0 ? ctx.mapMonsters : []) {
+      if (other.id === primary.targetId || getDistance(center!, other.position) > ABILITY_SPLASH_RADIUS) continue;
+      const inst = ctx.monsterInstances.get(other.id);
+      if (!inst || inst.currentHp <= 0) continue;
+      applyDamageToMonster(inst, amount);
+      if (skill?.mpDrainRatio) drainDamage += amount;
+      const killed = inst.currentHp <= 0;
+      damages.push({ targetId: other.id, damage: amount, isCrit: false, isMiss: false, killed, hits: [{ damage: amount, isCrit: false, isMiss: false }], splash: true });
+      logs.push({ text: `擴散對 ${monsterLogName(inst)} 造成 ${amount} 傷害`, type: 'player' });
+      if (killed) logs.push({ text: `${monsterLogName(inst)} 被擊敗！`, type: 'system' });
     }
   }
 
@@ -884,6 +948,27 @@ export function processMonsterAttack(
     bloodthirstHeal(monster, before - character.hp);
   }
 
+  // § 7S.5 飾品隨機技能：被命中（迴避不算）時荊棘反彈、累積怒氣、消耗平靜
+  let thorns: { damage: number; killed: boolean } | undefined;
+  const abilityLogs: CombatLog[] = [];
+  if (!result.dodged && result.damage > 0) {
+    const now = gameNow();
+    const percent = sumAbilityParam(equippedGear, 'thorns', 'percent');
+    const reflect = Math.floor(result.damage * percent / 100);
+    if (reflect > 0 && monster.currentHp > 0) {
+      applyDamageToMonster(monster, reflect);
+      thorns = { damage: reflect, killed: monster.currentHp <= 0 };
+      abilityLogs.push({ text: `荊棘反彈對 ${monsterLogName(monster)} 造成 ${reflect} 傷害`, type: 'player' });
+      if (thorns.killed) abilityLogs.push({ text: `${monsterLogName(monster)} 被擊敗！`, type: 'system' });
+    }
+    const rage = gainRage(session.loop, equippedGear, result.damage, now);
+    if (rage) session.game.setState({ activeEffects: applyPlayerBuff(session.game.getState().activeEffects, rage, now).effects });
+    const calm = consumeCalm(session.loop, equippedGear, character.areaEnteredAt, now);
+    if (calm > 0 && shortenCoolingSkills(session, equippedGear, calm, now)) {
+      abilityLogs.push({ text: `平靜 ${calm}：冷卻中的技能縮短 ${calm}%`, type: 'system' });
+    }
+  }
+
   let logText: string;
   if (result.dodged) {
     logText = `${monsterLogName(monster)} 的攻擊被閃避！`;
@@ -951,6 +1036,7 @@ export function processMonsterAttack(
     }
   }
 
+  restoreLogs.push(...abilityLogs);
   return {
     monsterId: event.monsterId,
     damage: actualDamage,
@@ -960,5 +1046,6 @@ export function processMonsterAttack(
     debuffLog,
     shieldLog,
     ...(restoreLogs.length ? { restoreLogs } : {}),
+    ...(thorns ? { thorns } : {}),
   };
 }

@@ -67,9 +67,10 @@ describe('製作寫入 (鍛) 標記', () => {
       bagItems: RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, 99)),
       craftQuests: [],
     });
-    const result = await useGameStore.getState().craftEquipment(RECIPE.id!);
+    const result = await useGameStore.getState().craftEquipment(RECIPE.id!, 'bonus_damage');
     expect(result.ok).toBe(true);
     const made = useGameStore.getState().inventory[0];
+    expect(made.ability).toEqual({ type: 'bonus_damage', params: { chance: 5, damage: 5 } });
     expect(made.isCraftedGear).toBe(true);
     expect(made.name).toBe(`${RECIPE.name}${CRAFTED_GEAR_SUFFIX}`);
     expect(result.message).toContain(made.name);
@@ -79,6 +80,27 @@ describe('製作寫入 (鍛) 標記', () => {
       expect(a.tier).toBeGreaterThanOrEqual(min);
       expect(a.tier).toBeLessThanOrEqual(max);
     }
+  });
+
+  it('武器未指定或指定可選範圍外的隨機技能時拒絕，不扣素材（§ 7S.6）', async () => {
+    const bag = RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, 99));
+    useGameStore.setState({ character: character(), equippedGear: {}, inventory: [], bagItems: bag, craftQuests: [] });
+    for (const chosen of [undefined, 'backstab_boost', 'hit_stun'] as const) {
+      const result = await useGameStore.getState().craftEquipment(RECIPE.id!, chosen as never);
+      expect(result).toEqual({ ok: false, message: '請選擇隨機技能' });
+    }
+    expect(useGameStore.getState().inventory).toEqual([]);
+    expect(useGameStore.getState().bagItems).toEqual(bag);
+  });
+
+  it('騎士可指定騎士職業池', async () => {
+    useGameStore.setState({
+      character: character(), equippedGear: {}, inventory: [],
+      bagItems: RECIPE.craftMaterials!.map(m => bagItemById(m.itemId, 99)), craftQuests: [],
+    });
+    const result = await useGameStore.getState().craftEquipment(RECIPE.id!, 'rend_boost');
+    expect(result.ok).toBe(true);
+    expect(useGameStore.getState().inventory[0].ability).toEqual({ type: 'rend_boost', params: { percent: 10 } });
   });
 
   it('重複 resolve 不會疊後綴；同模板的掉落品沒有後綴', () => {

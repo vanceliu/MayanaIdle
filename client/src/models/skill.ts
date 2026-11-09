@@ -91,11 +91,9 @@ export interface Skill {
   /**
    * 走「技能攻擊力 + 當下基礎物理傷害」結算（`21-combat-formula.md` § 21.4a）。
    * `power` 是技能攻擊力，物理部分取 `calculateBasePhysicalDamage()`。
-   * 仍然必定命中，不做命中判定。目前只有盾擊／裂傷斬／挑釁怒吼。
+   * 仍然必定命中，不做命中判定（`23-class-magic.md` § 23.1.1 A 組）。
    */
   physicalSnapshot?: boolean;
-  /** 走魔法公式但屬物理傷害（`23-class-magic.md` § 23.1.1 B 組），保留爆擊判定（`21-combat-formula.md` § 21.8） */
-  physicalDamage?: boolean;
   hotAmount?: number; // heal over time per second
   ignoreDefensePercent?: number; // 無視目標防禦的百分比（0~100）
   invincible?: boolean;
@@ -104,6 +102,14 @@ export interface Skill {
   requiredWeaponType?: string;
   /** 突進至主目標相鄰格後結算（`41-arpg-combat.md` § 3.6） */
   dash?: boolean;
+  /** 找不到突進落點時原地施放（`07-affix-ability.md` § 7S.5 神聖懲擊強化） */
+  dashOptional?: boolean;
+  /** 直接傷害 ×(1 + X%)，作用於最終傷害（§ 7S.5 職業池） */
+  abilityDamagePercent?: number;
+  /** 施放後下一次攻擊技能傷害 +X%（§ 7S.5 精神匯聚強化） */
+  nextAttackBonusPercent?: number;
+  /** `applyDebuff` 的 DoT 改為施放當下一次打出 N 跳（§ 7S.5 毒霧強化）：不吃防禦、不爆擊 */
+  instantDotTicks?: number;
   /** 出手前往主目標反方向後退的格數；退不了照常出手（§ 3.6 後退） */
   retreat?: number;
   /** 自身中心隨機多擊：N 下逐下從 `aoeRadius` 內活著的怪取後放回抽 1 隻（§ 3.4） */

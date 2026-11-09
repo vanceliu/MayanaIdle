@@ -9,6 +9,7 @@ import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
 import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, HIT_DOWN_STAT, EVASION_POINTS_PER_PERCENT, roundAffixTenth, type AffixBonuses, type BrandElement } from '../models/affix';
 import { sumUniqueAffix, type UniqueAffixType } from '../models/uniqueAffix';
+import { FIRE_ENCHANT_ANY_WEAPON_STAT } from '../models/abilitySkill';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
 
@@ -77,6 +78,11 @@ export function getElementCounterBonus(attackElement: string | undefined, monste
   if (ELEMENT_COUNTER[attackElement] === monsterElement) return ELEMENT_COUNTER_BONUS.advantage;
   if (ELEMENT_COUNTER[monsterElement] === attackElement) return ELEMENT_COUNTER_BONUS.disadvantage;
   return ELEMENT_COUNTER_BONUS.neutral;
+}
+
+/** 火矢附魔的 +15 只給弓；火矢附魔強化（`07-affix-ability.md` § 7S.5）時任何武器都給 */
+export function fireEnchantApplies(weapon: EquipmentInstance | null, activeEffects: ActiveEffect[]): boolean {
+  return weapon?.type === 'bow' || getBuffFlatBonus(activeEffects, FIRE_ENCHANT_ANY_WEAPON_STAT) > 0;
 }
 
 export function getFireEnchantBonus(activeEffects: ActiveEffect[]): number {
@@ -295,6 +301,8 @@ export interface HitBreakdown {
   damage: number;
   isCrit: boolean;
   isMiss: boolean;
+  /** 隨機技能追打觸發的那一下（`07-affix-ability.md` § 7S.7） */
+  combo?: boolean;
 }
 
 export function getWeaponHitCount(weapon: EquipmentInstance | null): number {
@@ -698,8 +706,7 @@ export function calculateBasePhysicalDamage(
   const weaponDmg = rollWeaponDamage(weapon, 'average');
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
-  const isBow = weapon?.type === 'bow';
-  const fireEnchantDmg = isBow && includeFireEnchant ? rawFireEnchantDmg : 0;
+  const fireEnchantDmg = includeFireEnchant && fireEnchantApplies(weapon, activeEffects) ? rawFireEnchantDmg : 0;
 
   let damage = weaponDmg + strBonus + (weapon?.extraAttack ?? 0) + getRangedAttackBonus(weapon, activeEffects) + fireEnchantDmg;
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
@@ -737,8 +744,7 @@ export function calculatePlayerAttack(
   const hitCount = getWeaponHitCount(weapon);
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
-  const isBow = weapon?.type === 'bow';
-  const fireEnchantDmg = isBow ? rawFireEnchantDmg : 0;
+  const fireEnchantDmg = fireEnchantApplies(weapon, activeEffects) ? rawFireEnchantDmg : 0;
   const hasFireEnchantActive = rawFireEnchantDmg > 0;
   const brandElement = getWeaponElement(weapon);
   const attackElement = brandElement ?? (hasFireEnchantActive ? 'fire' : undefined);

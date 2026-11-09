@@ -83,7 +83,7 @@ client/
 │   │   ├── QuestTracker.tsx  # 任務按鈕（PanelDock）+ 任務內容（浮動視窗，§ 36.10.3）
 │   │   ├── CharacterStats.tsx
 │   │   ├── BattleView.tsx
-│   │   ├── ExploreBar.tsx    # 探索控制列（自動/手動搜尋、探索/戰鬥指示、停留時間）
+│   │   ├── ExploreBar.tsx    # 探索控制列（自動/手動搜尋、Pressure、探索/戰鬥指示、停留時間）
 │   │   ├── EquipmentPanel.tsx
 │   │   ├── EquipmentInfo.tsx    # 統一裝備資訊顯示元件
 │   │   ├── BagPanel.tsx
@@ -230,8 +230,12 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 不可改用「城鎮不渲染 ExploreBar」的寫法。
 
 **停留時間：** 探索控制列最右端顯示待在目前地圖的時間，格式 `5:07`，滿一小時進位為 `1:05:07`。
-時鐘基準是 `character.areaEnteredAt`，與生怪壓力（`26-spawn-pressure.md` § 26.4）同源 ——
-畫面上的數字即壓力累積進度。該欄位在選角進入遊戲時重設，故顯示的是本次上線後的停留時間。
+時鐘基準是 `character.areaEnteredAt`，與一波隻數分布、Boss 生成門檻（`26-spawn-pressure.md` § 26.2／§ 26.4）同源。
+該欄位在選角進入遊戲時重設，故顯示的是本次上線後的停留時間。
+
+**Pressure：** 「自動／手動搜尋」右邊顯示 `P{Pressure}`（0 也顯示），滑鼠提示 `累積擊殺數/下一級所需擊殺數`（千分位，例 `1,000/1,100`）；
+全域 Pressure 倍率 0 時提示只顯示累積擊殺數。數值以 `character.areaKills`（組隊時為實例擊殺數）與 game store 的 `pressureRate` 依 `26-spawn-pressure.md` § 26.3 計算；
+`pressureRate` 取 server 的全域倍率，倍率即時變更時推給在線 session（`GameServer.refreshPressureRate`）。
 
 #### § 32.3.1 紀錄視窗（LogDock）
 
@@ -606,14 +610,14 @@ interface ScriptTemplate {
 | `CharacterSelect` | 角色選擇畫面（最多 4 格位、建立/刪除/選擇） |
 | `CharacterCreate` | 職業選擇、屬性配點、角色命名 |
 | `StatusPanel` | 左上角浮動 HUD：角色名/職業/等級一列，HP/MP/EXP/負重＋防禦 四條由上往下堆疊 |
-| `BuffBar` | 角色 buff/debuff icon 垂直欄，浮於 `.stage-area` 左上，每秒刷新倒數，hover tooltip |
+| `BuffBar` | 角色 buff/debuff icon 直向兩欄，浮於 `.stage-area` 左上，每秒刷新倒數，hover tooltip |
 | `FloatingWindow` | 通用可拖曳浮動視窗（標題列拖曳、點擊置頂、✕ 關閉、無遮罩） |
 | `PanelDock` | 底部面板按鈕列（詳細狀態/裝備欄/背包/技能 + 自動天賦觸發鈕） |
 | `PanelWindows` | 依 `panelWindowStore` 渲染六個面板的浮動視窗 |
 | `QuestTracker` | `QuestTrackerButton`（PanelDock 內，帶任務數量 badge）+ `QuestTrackerContent`（浮動視窗內容） |
 | `CharacterStats` | 六大屬性詳細數值、戰鬥數據（含詞綴 + buff + 裝備 regen 加成） |
 | `BattleView` | Pixi 地圖容器、戰鬥日誌（含 log 大小切換） |
-| `ExploreBar` | 探索控制（自動/手動搜尋）、探索/戰鬥指示、停留時間、死亡橫幅；位於頂部 HUD |
+| `ExploreBar` | 探索控制（自動/手動搜尋）、Pressure、探索/戰鬥指示、停留時間、死亡橫幅；位於頂部 HUD |
 | `MonsterListOverlay` | 地圖 canvas 上方置中浮動怪物列表：每隻怪一張卡片（名稱 + HP 條 + debuff icon 列），Boss 特殊底色，攻擊目標金框高亮（§ 24.8.3） |
 | `EquipmentPanel` | 10 格裝備欄位顯示、穿脫操作。**兩欄部位格**（2×5）：格子只印部位名 + 裝備名（Tier 色與背包同源），數值／詞綴／材質／職業一律 hover tooltip；空部位畫虛線框；選取用金色外框，與 `.bag-cell.is-selected` 同一套 |
 | `EquipmentInfo` | 統一裝備資訊顯示元件（名稱、攻擊/防禦、材質、品質、詞綴、職業），供商店/倉庫/背包共用 |
@@ -966,14 +970,11 @@ interface TooltipProps {
 
 ### 位置
 
-`.stage-area` 左上角絕對定位，垂直往下延伸（見 `24-buff-debuff.md` § 24.8.1）。
+`.stage-area` 左上角絕對定位，直向兩欄（排列、換欄界線、尺寸見 `24-buff-debuff.md` § 24.8.1）。
 探索與城鎮共用同一容器，因此兩種情境下 buff 位置一致。
 容器 `pointer-events: none` 不擋地圖點擊，icon 自身開啟 hover tooltip。
 
-**icon 一律往下疊，不往右長**（`.buff-row` 是 `flex-direction: column`，桌機與手機一致）。
-橫排會沿著角色卡的寬度往右伸，效果一多就整片橫在畫面上方、把地圖的上緣整條吃掉；
-往下長則只佔左邊一條 44px 的窄帶。手機更明顯 —— 狀態卡只剩半個螢幕寬（`47-mobile.md`），
-橫排到第五顆就會伸進右半邊壓住地圖選擇器與怪物卡。
+`.buff-bar` 是 grid：量到每欄格數時寫進 inline `grid-auto-flow: column`＋`grid-template-rows`，量不到時單欄。
 
 ### 行為
 
@@ -985,8 +986,8 @@ interface TooltipProps {
 
 | 條件 | 顯示 |
 |---|---|
-| buff 數量 ≤ 8 | 全部顯示 |
-| buff 數量 > 8 | 顯示前 8 個 + `+N` 計數 badge |
+| 兩欄排得下 | 全部顯示 |
+| 兩欄排不下 | 最後一格改成 `+N` 計數 badge（§ 24.8.1） |
 | 剩餘 < 5s | icon 閃爍（`animation: blink 0.5s infinite`） |
 | 剩餘 ≥ 60s | 格式 `M:SS`（如 `4:58`） |
 | 剩餘 < 60s | 格式 `Ns`（如 `42s`） |

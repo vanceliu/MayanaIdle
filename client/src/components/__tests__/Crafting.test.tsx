@@ -24,6 +24,13 @@ async function findRecipeTitle(name: string): Promise<HTMLElement> {
   return title;
 }
 
+/** 每張武器配方都指定共通池的追加傷害（§ 7S.6：未指定不可製作） */
+function pickAllAbilities(type = 'bonus_damage') {
+  for (const select of screen.queryAllByRole('combobox', { name: '隨機技能' })) {
+    fireEvent.change(select, { target: { value: type } });
+  }
+}
+
 /** 鋼心劍的配方是測試的固定對象；材料由 seed 決定，不寫死在測試裡（§ 6A.3 會重新分配） */
 const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
 /** 實例一律以 templateId 比對（§ 99.1 第 7 條）；製作品顯示名稱帶 `(鍛)` */
@@ -184,15 +191,40 @@ describe('TownBlacksmith - Crafting', () => {
   it('shows recipe detail when selected', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(await findRecipeTitle('鋼心劍'));
+    pickAllAbilities();
     // 需求只有素材與前置，配方卡片不顯示金幣（§ 6A.3）
     for (const m of RECIPE.craftMaterials!) {
       expect(screen.getAllByText(`10/${m.amount}`).length).toBeGreaterThan(0);
     }
   });
 
+  it('武器未指定隨機技能時製作鈕停用；指定後顯示最弱值效果（§ 7S.6）', async () => {
+    render(<TownBlacksmith />);
+    const row = (await findRecipeTitle('鋼心劍')).closest('.shop-item') as HTMLElement;
+    fireEvent.click(row);
+    const button = within(row).getByText('製作') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(row.querySelector('.bs-ability-row')!.classList.contains('lacking')).toBe(true);
+
+    fireEvent.change(within(row).getByRole('combobox', { name: '隨機技能' }), { target: { value: 'bonus_damage' } });
+    expect(button.disabled).toBe(false);
+    expect(within(row).getByText('命中 5% 機率追加 5 傷害')).toBeDefined();
+  });
+
+  it('選單列出共通池與本角色的職業池（§ 7S.6）', async () => {
+    render(<TownBlacksmith />);
+    const row = (await findRecipeTitle('鋼心劍')).closest('.shop-item') as HTMLElement;
+    const select = within(row).getByRole('combobox', { name: '隨機技能' });
+    const groups = Array.from(select.querySelectorAll('optgroup')).map(g => g.label);
+    expect(groups[0]).toBe('共通');
+    expect(groups).toHaveLength(2);
+    expect(within(select).getByText('追打傷害')).toBeDefined();
+  });
+
   it('crafts item successfully when materials available', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(await findRecipeTitle('鋼心劍'));
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -209,6 +241,7 @@ describe('TownBlacksmith - Crafting', () => {
   it('crafted item has correct stats', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(await findRecipeTitle('鋼心劍'));
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -263,6 +296,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click(await findRecipeTitle('鋼心劍'));
+    pickAllAbilities();
 
     const craftBtns = screen.getAllByText('製作');
     expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
@@ -271,6 +305,7 @@ describe('TownBlacksmith - Crafting', () => {
   it('shows success message after crafting', async () => {
     render(<TownBlacksmith />);
     fireEvent.click(await findRecipeTitle('鋼心劍'));
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -290,6 +325,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -313,6 +349,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+    pickAllAbilities();
 
     const craftBtns = screen.getAllByText('製作');
     expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
@@ -330,6 +367,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -358,6 +396,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+    pickAllAbilities();
 
     const craftBtns = screen.getAllByText('製作');
     expect(craftBtns.every(btn => (btn as HTMLButtonElement).disabled)).toBe(true);
@@ -380,6 +419,7 @@ describe('TownBlacksmith - Crafting', () => {
     });
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -403,6 +443,7 @@ describe('TownBlacksmith - Crafting', () => {
     render(<TownBlacksmith />);
     fireEvent.click(await screen.findByText('雙刀'));
     fireEvent.click((await screen.findAllByText('月牙雙刀'))[0]);
+    pickAllAbilities();
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -419,6 +460,7 @@ describe('TownBlacksmith - Crafting', () => {
     it('加入追蹤後任務只存 templateId，按鈕改為取消追蹤', async () => {
       render(<TownBlacksmith />);
       fireEvent.click(await findRecipeTitle('鋼心劍'));
+      pickAllAbilities();
 
       fireEvent.click(screen.getAllByText('製作追蹤')[0]);
 
@@ -457,6 +499,7 @@ describe('TownBlacksmith - Crafting', () => {
       useGameStore.setState({ craftQuests: [{ id: `craft-${RECIPE.id}`, templateId: RECIPE.id! }] });
       render(<TownBlacksmith />);
       fireEvent.click(await findRecipeTitle('鋼心劍'));
+      pickAllAbilities();
       const enabledBtn = screen.getAllByText('製作').find(btn => !(btn as HTMLButtonElement).disabled)!;
       fireEvent.click(enabledBtn);
 
@@ -470,6 +513,7 @@ describe('TownBlacksmith - Crafting', () => {
       useGameStore.setState({ craftQuests: [{ id: 'craft-999', templateId: 999 }] });
       render(<TownBlacksmith />);
       fireEvent.click(await findRecipeTitle('鋼心劍'));
+      pickAllAbilities();
       const enabledBtn = screen.getAllByText('製作').find(btn => !(btn as HTMLButtonElement).disabled)!;
       fireEvent.click(enabledBtn);
 

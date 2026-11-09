@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>隨機技能演出 Demo — MayanaIdle</title>
+<!--
+  隨機技能（`07-affix-ability.md` § 7S.5／§ 7S.7）：追打的浮動數字、怒氣與平靜在狀態列的數值。
+  浮動數字用正式的 `DamageNumberManager`；狀態列用正式的 buff-icon class。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/ability-fx.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; }
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; font-size: var(--fs-sm); }
+.demo-buff-bar { position: static; display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">隨機技能演出</h1>
+  <p class="demo-note">
+    追打觸發的那一下：淺黃色、一般字級；同時爆擊時照爆擊顯示（黃色放大）。<br>
+    怒氣、平靜：狀態列的圖示下方顯示當下數值（取代倒數秒數），滑鼠移上去看說明。拉桿模擬經過時間。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./abilityFxDemo.tsx"></script>
+</body>
+</html>

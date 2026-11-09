@@ -20,6 +20,8 @@
  *
  * 用法：npx vite-node scripts/simulateReaperKill.mts [--class=a,b] [--top=N] [--runs=N] [--no-skill-debuff]
  */
+import { ABILITY_BURN_CATEGORY } from '../src/systems/abilityCombat';
+import { ABILITY_BURN_DURATION_MS } from '../src/models/ability';
 import {
   calculatePlayerAttack,
   calculateSkillAttack,
@@ -58,7 +60,7 @@ import {
   AFFIX_DEBUFF_CHANCE, AFFIX_DEBUFF_DURATION_MS, DEFENSE_DOWN_CATEGORY,
 } from '../src/models/affix';
 import {
-  UNIQUE_AFFIX_DEFINITIONS, UNIQUE_HIT_PROC_CHANCE, sumUniqueAffix, type UniqueAffixType,
+  UNIQUE_AFFIX_DEFINITIONS, type UniqueAffixType,
 } from '../src/models/uniqueAffix';
 import { getEffectiveGear } from '../src/systems/gear';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
@@ -241,15 +243,39 @@ function simulateOnce(
       );
     }
   }
-  /** § 7T.4 追加傷害：每下命中 20% 機率，加在最終傷害 */
-  const bonusDamage = sumUniqueAffix(loadout.gear, 'hit_bonus_damage');
+  // 隨機技能（`07-affix-ability.md` § 7S.5）
+  const ability = loadout.weapon.ability;
+  /** 追加傷害：每下命中各擲一次 */
   const rollBonus = (landedHits: number) => {
+    if (ability?.type !== 'bonus_damage') return 0;
     let extra = 0;
-    for (let h = 0; h < landedHits; h++) {
-      if (Math.random() * 100 < UNIQUE_HIT_PROC_CHANCE) extra += bonusDamage;
-    }
+    for (let h = 0; h < landedHits; h++) if (Math.random() * 100 < ability.params.chance) extra += ability.params.damage;
     return extra;
   };
+  /** 追打：計一次出手，第 N 次回傳加成%並歸零 */
+  let comboCount = 0;
+  const advanceCombo = () => {
+    if (ability?.type !== 'combo_strike') return 0;
+    comboCount++;
+    if (comboCount < ability.params.every) return 0;
+    comboCount = 0;
+    return ability.params.bonus;
+  };
+  const withPercent = (dmg: number, percent: number) => (percent > 0 ? Math.floor(dmg * (100 + percent) / 100) : dmg);
+  /** 命中燃燒：每下命中各擲一次，燃燒中不再上 */
+  function tryBurn(now: number, landedHits: number) {
+    if (ability?.type !== 'hit_burn' || dots.some(d => d.category === ABILITY_BURN_CATEGORY)) return;
+    for (let h = 0; h < landedHits; h++) {
+      if (Math.random() * 100 < ability.params.chance) {
+        dots.push({ category: ABILITY_BURN_CATEGORY, damage: ability.params.damage, nextTick: now + DOT_TICK_MS, expiresAt: now + ABILITY_BURN_DURATION_MS });
+        return;
+      }
+    }
+  }
+  /** 精神匯聚強化：下一次攻擊技能的加成% */
+  let pendingNextAttack = 0;
+  /** 淬毒強化：毒傷比例 ×(1 + X%) */
+  const envenomBoost = ability?.type === 'envenom_boost' && char.className === 'thief' ? ability.params.percent : 0;
 
   let now = 0;
   let nextAction = 0;
@@ -369,7 +395,9 @@ function simulateOnce(
         stats.hits++;
         stats.physHits++;
         if (res.isCritical) stats.crits++;
-        applyDamage(res.damage + rollBonus(res.hits.filter(h => !h.isMiss).length));
+        const landedHits = res.hits.filter(h => !h.isMiss);
+        applyDamage(landedHits.reduce((sum, h) => sum + withPercent(h.damage, advanceCombo()), 0) + rollBonus(landedHits.length));
+        tryBurn(now, landedHits.length);
         tryErosion(now, erosionRolls);
         tryDefenseDown(erosionRolls);
         // 淬毒：普攻命中觸發毒 DoT（快照制、存續期間不刷新），比例讀技能定義
@@ -377,7 +405,7 @@ function simulateOnce(
           const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
           dots.push({
             category: onHitDot.category,
-            damage: Math.max(1, Math.floor(base * onHitDot.percent)),
+            damage: Math.max(1, Math.floor(base * onHitDot.percent * (100 + envenomBoost) / 100)),
             nextTick: now + onHitDot.interval,
             expiresAt: now + onHitDot.duration,
           });
@@ -391,6 +419,7 @@ function simulateOnce(
       currentMp -= cost;
       stats.mpSpent += cost;
       addTimed(makeBuff(entry.name, entry.buff!.category, entry.buff!.modifiers), entry.buff!.duration);
+      if (entry.nextAttackBonusPercent) pendingNextAttack = entry.nextAttackBonusPercent;
       cooldowns[entry.id] = now + Math.floor(entry.cooldown * (1 - cdr / 100));
     } else if (entry.kind === 'physical_skill') {
       currentMp -= entry.mpCost;
@@ -407,7 +436,8 @@ function simulateOnce(
           stats.hits++;
           stats.physHits++;
           if (res.isCritical) stats.crits++;
-          applyDamage(res.damage + rollBonus(1));
+          applyDamage(withPercent(res.damage, advanceCombo()) + rollBonus(1));
+          tryBurn(now, 1);
           tryErosion(now, 1);
         } else {
           stats.misses++;
@@ -421,18 +451,20 @@ function simulateOnce(
       stats.mpSpent += entry.mpCost;
       // 自扣 HP（血濺咒殺）：最低留 1
       if (entry.selfHpCostPercent) hp -= Math.min(Math.floor(maxHp * entry.selfHpCostPercent / 100), hp - 1);
-      // 攻擊技能自身 buff 於傷害結算「前」施加（arpgEventHandler.ts `applySkillSelfBuff`）
-      if (entry.selfBuff) {
-        const scale = entry.selfBuff.scaleByMissingHp;
-        const modifiers = scale
-          ? [{ stat: scale.stat, value: Math.floor(Math.min(scale.maxPercent, Math.max(0, (1 - hp / maxHp) * 100))), isPercent: true }]
-            .filter(m => m.value > 0)
-          : entry.selfBuff.modifiers;
-        if (modifiers.length > 0) addTimed(makeBuff(entry.name, entry.selfBuff.category, modifiers), entry.selfBuff.duration);
-      }
       // 只上毒的技能（毒霧）沒有直接傷害；隨機多擊（血濺咒殺）在單一目標上全中
       let res = { damage: 0, isCritical: false };
-      for (let h = 0; h < (entry.dotOnly ? 0 : entry.randomHits ?? 1); h++) {
+      // 隨機技能：追打（每次施放計 1）、傷害加成、精神匯聚的下一次加成
+      const direct = !entry.dotOnly;
+      const castPercent = direct ? (entry.abilityDamagePercent ?? 0) + pendingNextAttack : 0;
+      const castCombo = direct ? advanceCombo() : 0;
+      if (direct) pendingNextAttack = 0;
+      if (entry.instantDot) {
+        // 毒霧強化：DoT 快照值 × 跳數一次打出，不吃防禦、不爆擊、不觸發命中類
+        const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
+        res = { damage: Math.max(1, Math.floor(base * entry.instantDot.percent)) * entry.instantDot.ticks, isCritical: false };
+        applyDamage(withPercent(res.damage, castCombo));
+      }
+      for (let h = 0; h < (entry.dotOnly || entry.instantDot ? 0 : entry.randomHits ?? 1); h++) {
         res = entry.physicalSnapshot
           ? calculatePhysicalSnapshotSkill(
               char, ruledSkillPower(entry, effInt, char.className), entry.element!, loadout.weapon, monster, loadout.gear, entry.name, effects, 0,
@@ -440,13 +472,24 @@ function simulateOnce(
             )
           : calculateSkillAttack(
               char, ruledSkillPower(entry, effInt, char.className), entry.element!, monster, loadout.gear, entry.name, effects, 0,
-              entry.ignoreDefensePercent ?? 0, undefined, entry.physicalDamage === true,
+              entry.ignoreDefensePercent ?? 0,
             );
+        res = { ...res, damage: withPercent(withPercent(res.damage, castPercent), castCombo) };
         stats.hits++;
         if (res.isCritical) stats.crits++;
         applyDamage(res.damage + rollBonus(1));
+        tryBurn(now, 1);
         tryErosion(now, 1);
         tryDefenseDown(1);
+      }
+      // 攻擊技能自身 buff 於傷害結算「後」施加，不作用於本次（`23-class-magic.md` § 23.1.1）
+      if (entry.selfBuff) {
+        const scale = entry.selfBuff.scaleByMissingHp;
+        const modifiers = scale
+          ? [{ stat: scale.stat, value: Math.floor(Math.min(scale.maxPercent, Math.max(0, (1 - hp / maxHp) * 100))), isPercent: true }]
+            .filter(m => m.value > 0)
+          : entry.selfBuff.modifiers;
+        if (modifiers.length > 0) addTimed(makeBuff(entry.name, entry.selfBuff.category, modifiers), entry.selfBuff.duration);
       }
       // 魔力奪取：回復等同最終傷害的 MP（combat.ts:609 calculateMpRestored）
       if (mp.enabled && entry.mpDrainRatio) {

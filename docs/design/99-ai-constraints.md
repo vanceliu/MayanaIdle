@@ -787,5 +787,17 @@ Lv.31 以上 Boss 專屬素材 30% → 15%。Lv.30 以下區域與試煉飛龍�
 - [x] P5 文件：44 全面翻修（納入改動、盤點、分佈、表 1~3、§ 44.6／§ 44.9／§ 44.10）
 - [x] P6 `npx tsc -b`、client vitest
 
+### 探索列顯示 Pressure（`26-spawn-pressure.md` § 26.3、`16-tech-frontend-architecture.md` § 32.3）
+
+規格：Pressure 公式改為 300 隻進 P1、之後每 160 隻 +1（起算值 140）。探索列「自動／手動搜尋」右邊顯示 `P{Pressure}`（0 也顯示）；滑鼠提示 `{累積擊殺數}/{下一級所需擊殺數}`（千分位）；
+全域 Pressure 倍率 0 時提示只顯示累積擊殺數。數值取 `character.areaKills`（組隊時即實例擊殺數）。
+
+- [x] P1 demo：`client/demo/pressure.html`，使用者確認版面
+- [x] P2 `systems/pressure.ts` `getNextPressureKills`；`ExploreBar.tsx` 顯示；`App.css` 樣式；game store `pressureRate`（server 改倍率時 `GameServer.refreshPressureRate` 推送）
+- [x] P3 測試：門檻函式（含倍率 0／非 1）、ExploreBar 顯示與提示、server 倍率推送
+- [x] P4 `npx tsc -b`、client／server vitest
+- [x] P4.5 Pressure 公式改版：`PRESSURE_KILL_BASE` 140，測試跟著改
+- [x] P5 文件：26 § 26.3（移除「隱藏數值」、公式與對照表）、03 § 3.10、16 § 32.3、INDEX
+
 跨多次對話的實作**開工前**先在這裡寫下定案規格與分階段清單（見 `CLAUDE.md`）：
 中斷後靠它接續，全部完成並經使用者確認後刪除。

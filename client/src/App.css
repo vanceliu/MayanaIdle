@@ -1497,6 +1497,14 @@ button.active {
 }
 
 /* 停留時間靠右，等寬數字避免每秒跳動時左右抖動 */
+.pressure-badge {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+
 .area-elapsed {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -2462,6 +2470,7 @@ button.active {
 .affix-sum-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
 .affix-sum-row { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; color: var(--text-secondary); }
 .affix-sum-row b { color: var(--text-primary); font-weight: 400; font-family: var(--font-display); white-space: nowrap; }
+.affix-sum-row.ability span { color: #86EFAC; }
 .affix-sum-empty { color: var(--text-dim); }
 
 .equip-slot {
@@ -3486,6 +3495,19 @@ button.active {
 .equip-detail-unique { padding-bottom: 4px; border-bottom: 1px solid var(--border); }
 .equip-detail-affix.unique { color: #A855F7; text-shadow: 0 0 6px rgba(168,85,247,0.3); font-weight: 700; }
 .equip-detail-affix.unique.suppressed { text-decoration: line-through; opacity: 0.5; }
+
+/* § 7S.7 隨機技能：淺綠、排在所有詞綴最上面 */
+.equip-detail-ability { padding-bottom: 4px; }
+.equip-detail-affix.ability { color: #86EFAC; text-shadow: 0 0 6px rgba(134,239,172,0.3); font-weight: 700; }
+
+/* § 7S.6 鐵匠鋪隨機技能選擇列：未指定時標紅 */
+.bs-ability-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bs-ability-row select {
+  background: var(--bg-deepest); color: var(--text-primary);
+  border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); padding: 2px 4px; font-size: var(--fs-sm);
+}
+.bs-ability-row .bs-ability-preview { color: #86EFAC; }
+.bs-ability-row.lacking .bs-ability-label { color: var(--accent-danger); }
 
 /* § 6A.8.8 素質需求：未達標的屬性標紅，該件的詞綴整組凍結 */
 .equip-detail-unmet { color: var(--accent-danger); }
@@ -5463,6 +5485,9 @@ button.active {
   line-height: 1.5;
 }
 
+/* § 7S.7 被職業池隨機技能改動的數字（只標數字） */
+.stat-changed { color: #FACC15; font-weight: 700; }
+
 .skill-tooltip-status {
   margin-top: 4px;
   font-size: var(--fs-xs);
@@ -5866,31 +5891,18 @@ button.active {
   animation: fadeIn 100ms ease;
 }
 
-/* --- BuffBar：stage 左上，buff 一列、debuff 一列（§ 24.8.1 / § 24.8.2） --- */
+/* --- BuffBar：stage 左上，回鍋加倍 → buff → debuff 直向排兩欄（§ 24.8.1 / § 24.8.2） --- */
 /* 接在左上角色卡下面（HUD 島自己負責定位，這裡不再絕對定位） */
+/* 每欄格數由 `useBuffRowsPerColumn` 量測後寫進 inline `grid-template-rows`；量不到時單欄 */
 .buff-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: grid;
+  grid-auto-flow: row;
+  justify-content: start;
+  justify-items: start;
+  align-items: start;
   gap: 6px;
   /* 容器不吃滑鼠事件，避免擋住地圖點擊移動；icon 自行開啟 hover */
   pointer-events: none;
-}
-
-/*
- * 一組一列：上組 buff、下組 debuff，**兩組都往下疊，不往右長**。
- *
- * 原本是橫排換行。橫排會沿著角色卡的寬度往右伸，效果一多就整片橫在畫面上方，
- * 把地圖的上緣整條吃掉；往下長則只佔左邊一條 44px 的窄帶，
- * 地圖中央永遠是乾淨的。手機更明顯 —— 狀態卡只剩半個螢幕寬，
- * 橫排到第五顆就會伸進右半邊壓住地圖選擇器與怪物卡。
- */
-.buff-row {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  gap: 6px;
 }
 
 .buff-icon {
@@ -5967,6 +5979,8 @@ button.active {
 }
 
 .buff-overflow {
+  align-self: center;
+  justify-self: center;
   font-size: var(--fs-xs);
   color: var(--text-dim);
   padding: 2px 6px;
@@ -7402,9 +7416,21 @@ button.active {
     min-width: 0;
   }
 
-  /* 直排本身寫在基底（桌機也一樣往下長），手機只收緊間距 */
-  .buff-row {
+  /* 手機圖示 28px（`BUFF_ICON_SIZE_MOBILE`），外框與秒數跟著縮 */
+  .buff-bar {
     gap: 4px;
+  }
+
+  .buff-icon {
+    width: 36px;
+  }
+
+  .buff-icon.is-rested {
+    min-width: 36px;
+  }
+
+  .buff-timer {
+    font-size: calc(11px * var(--font-scale) / var(--ui-scale));
   }
 
   /*

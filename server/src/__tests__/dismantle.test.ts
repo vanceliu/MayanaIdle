@@ -77,7 +77,7 @@ describe('拆解（遠端 action）', () => {
       character: { ...game.getState().character!, gold: RECIPE.craftGold! },
       bagItems: RECIPE.craftMaterials!.map(m => makeBagItem(m.itemId, m.amount)!),
     });
-    await c.act('craftEquipment', RECIPE.id);
+    await c.act('craftEquipment', RECIPE.id, 'bonus_damage');
     const item = game.getState().inventory.find(i => i.templateId === RECIPE.id)!;
 
     const reply = await c.act('dismantleEquipment', item.id);

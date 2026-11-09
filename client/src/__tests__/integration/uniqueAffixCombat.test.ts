@@ -3,7 +3,6 @@
  *
  * 規則（`07-affix-tier7.md` § 7T.4、`07-affix.md` § 7.9）：
  *  - 命中類每一下命中判定一次；雙持一次攻擊兩下
- *  - 追加傷害加在最終傷害；命中暈眩 5 秒、暈眩中不可再上、Boss 受控場免疫冷卻約束
  *  - 擊殺回血每擊殺一隻判定一次
  *  - 受擊觸發只在受到傷害時判定；同種類刷新時間
  *  - 命中下降／防禦下降 10% 觸發、3 秒、同一隻怪後施放覆蓋；命中下降加在 35% 迴避上限之後
@@ -14,7 +13,7 @@ import { calculateMonsterAttack } from '../../systems/combat';
 import {
   HIT_DOWN_CATEGORY, DEFENSE_DOWN_CATEGORY, HIT_DOWN_STAT, AFFIX_DEBUFF_DURATION_MS, type Affix,
 } from '../../models/affix';
-import { UNIQUE_STUN_CATEGORY, UNIQUE_STUN_DURATION_MS, type UniqueAffix } from '../../models/uniqueAffix';
+import type { UniqueAffix } from '../../models/uniqueAffix';
 import { getTotalAttributes } from '../../models/character';
 import { useGameStore } from '../../stores/gameStore';
 import type { Character } from '../../models/character';
@@ -133,18 +132,6 @@ describe('武器命中類', () => {
     expect(useGameStore.getState().character!.hp).toBe(100);
   });
 
-  it('追加傷害加在每一下的最終傷害', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const base = attack([weapon()], monster()).damages[0];
-    const boosted = attack([weapon({ type: 'hit_bonus_damage', value: 15 })], monster()).damages[0];
-    expect(boosted.damage - base.damage).toBe(15);
-    expect(boosted.hits[0].damage - base.hits[0].damage).toBe(15);
-
-    const dualBase = attack([weapon(undefined, [], 'dualBlade')], monster()).damages[0];
-    const dualBoost = attack([weapon({ type: 'hit_bonus_damage', value: 15 }, [], 'dualBlade')], monster()).damages[0];
-    expect(dualBoost.damage - dualBase.damage).toBe(30);
-  });
-
   it('擊殺回血：擊殺才回', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     attack([weapon({ type: 'kill_heal', value: 40 })], monster());
@@ -154,37 +141,6 @@ describe('武器命中類', () => {
     expect(useGameStore.getState().character!.hp).toBe(140);
   });
 
-  it('命中暈眩 5 秒；暈眩中不再上', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    attack([weapon({ type: 'hit_stun', value: 0 })], monster());
-    const [stun] = effectsOf(UNIQUE_STUN_CATEGORY);
-    expect(stun.stun).toBe(true);
-    expect(stun.duration).toBe(UNIQUE_STUN_DURATION_MS);
-    expect(stun.targetMonsterId).toBe('m1');
-
-    attack([weapon({ type: 'hit_stun', value: 0 })], monster());
-    expect(effectsOf(UNIQUE_STUN_CATEGORY)).toHaveLength(1);
-  });
-
-  it('Boss 在控場免疫冷卻中不吃暈眩；成功時設定冷卻', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const boss = monster({ isBoss: true, ccImmuneUntil: NOW + 1000 });
-    const r = attack([weapon({ type: 'hit_stun', value: 0 })], boss);
-    expect(effectsOf(UNIQUE_STUN_CATEGORY)).toHaveLength(0);
-    expect(r.logs.some(l => l.text.includes('免疫控場'))).toBe(true);
-
-    const fresh = monster({ isBoss: true });
-    attack([weapon({ type: 'hit_stun', value: 0 })], fresh);
-    expect(effectsOf(UNIQUE_STUN_CATEGORY)).toHaveLength(1);
-    expect(fresh.ccImmuneUntil).toBeGreaterThan(NOW);
-  });
-
-  it('沒擲中 20% 就不暈', () => {
-    // 0.25：命中、但高於 20% 觸發率
-    vi.spyOn(Math, 'random').mockReturnValue(0.25);
-    attack([weapon({ type: 'hit_stun', value: 0 })], monster());
-    expect(effectsOf(UNIQUE_STUN_CATEGORY)).toHaveLength(0);
-  });
 });
 
 describe('命中下降／防禦下降（§ 7.9）', () => {

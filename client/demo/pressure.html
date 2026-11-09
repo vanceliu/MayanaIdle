@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pressure 顯示 Demo — MayanaIdle</title>
+<!--
+  探索列顯示 Pressure（`26-spawn-pressure.md` § 26.3）：「自動／手動搜尋」右邊的 `P{n}`，滑鼠提示累積擊殺數／下一級門檻。
+  版面樣本：class 與 App.css 相同。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/pressure.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; font-size: var(--fs-sm);
+}
+.demo-stage { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.demo-stage h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0; }
+.demo-desktop { width: 560px; }
+.demo-mobile { width: 393px; }
+.demo-desktop .explore-bar,
+.demo-mobile .explore-bar { background: rgba(var(--glass-rgb), 0.82); }
+.demo-mobile .explore-bar { padding: 4px 6px; }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">Pressure 顯示</h1>
+  <p class="demo-note">
+    「自動／手動搜尋」右邊顯示 <code>P{Pressure}</code>，0 也顯示；滑鼠移到 P 上看「累積擊殺數/下一級所需擊殺數」。<br>
+    拉桿調整累積擊殺數，下拉切換全域 Pressure 倍率與狀態。倍率 0 時 Pressure 恆為 0，提示只顯示擊殺數。
+  </p>
+  <div class="demo-bar">
+    <label>累積擊殺數 <input id="kills" type="range" min="0" max="2400" step="10" value="500"></label>
+    <span id="kills-label"></span>
+    <label>全域 Pressure 倍率
+      <select id="rate">
+        <option value="1" selected>1.0</option>
+        <option value="2">2.0</option>
+        <option value="0.5">0.5</option>
+        <option value="0">0</option>
+      </select>
+    </label>
+    <label>狀態
+      <select id="phase">
+        <option value="explore" selected>自動・探索中</option>
+        <option value="combat">戰鬥中</option>
+        <option value="manual">手動</option>
+      </select>
+    </label>
+  </div>
+  <div id="root"></div>
+  <script type="module" src="./pressureDemo.tsx"></script>
+</body>
+</html>

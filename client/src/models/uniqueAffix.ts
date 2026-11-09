@@ -14,8 +14,6 @@ export type UniqueAffixType =
   // 武器（§ 7T.5）
   | 'hit_heal'
   | 'hit_mana'
-  | 'hit_bonus_damage'
-  | 'hit_stun'
   | 'kill_heal'
   | 'crit_damage'
   | 'crit_rate'
@@ -44,7 +42,7 @@ export type UniqueAffixType =
 
 export interface UniqueAffix {
   type: UniqueAffixType;
-  /** 無數值的詞綴（命中暈眩、全免疫）固定 0 */
+  /** 無數值的詞綴（全免疫）固定 0 */
   value: number;
 }
 
@@ -71,11 +69,6 @@ export interface UniqueAffixDefinition {
 /** 受擊觸發的機率與 buff 持續（§ 7T.4） */
 export const UNIQUE_STRUCK_CHANCE = 10;
 export const UNIQUE_STRUCK_DURATION_MS = 5000;
-/** 武器命中類的機率（追加傷害、命中暈眩） */
-export const UNIQUE_HIT_PROC_CHANCE = 20;
-export const UNIQUE_STUN_DURATION_MS = 5000;
-/** 怪物身上 T7 命中暈眩的 category（`24-buff-debuff.md` § 24.4.3） */
-export const UNIQUE_STUN_CATEGORY = 't7-stun';
 
 const flat = (stat: string) => (value: number): StatModifier[] => [{ stat, value, isPercent: false }];
 
@@ -87,8 +80,6 @@ const ATTRIBUTE_BUFF_STAT: Record<keyof Attributes, string> = {
 export const UNIQUE_AFFIX_DEFINITIONS: UniqueAffixDefinition[] = [
   { type: 'hit_heal', name: '命中回血', pool: 'weapon', trigger: 'hit', range: [10, 15], unit: '', description: '每下命中回復 X HP' },
   { type: 'hit_mana', name: '命中回魔', pool: 'weapon', trigger: 'hit', range: [10, 15], unit: '', description: '每下命中回復 X MP' },
-  { type: 'hit_bonus_damage', name: '追加傷害', pool: 'weapon', trigger: 'hit', range: [10, 20], unit: '', description: `命中 ${UNIQUE_HIT_PROC_CHANCE}% 機率總體增加 X 傷害` },
-  { type: 'hit_stun', name: '命中暈眩', pool: 'weapon', trigger: 'hit', range: null, unit: '', description: `命中 ${UNIQUE_HIT_PROC_CHANCE}% 機率使敵方暈眩 ${UNIQUE_STUN_DURATION_MS / 1000} 秒` },
   { type: 'kill_heal', name: '擊殺回血', pool: 'weapon', trigger: 'kill', range: [30, 50], unit: '', description: '擊殺回復 X HP' },
   { type: 'crit_damage', name: '爆擊傷害', pool: 'weapon', trigger: 'passive', range: [25, 50], unit: '%', description: '爆擊傷害 +X%' },
   { type: 'crit_rate', name: '爆擊率', pool: 'weapon', trigger: 'passive', range: [20, 25], unit: '%', description: '爆擊率 +X%' },

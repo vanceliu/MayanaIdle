@@ -519,8 +519,10 @@ function resolveDamageType(dmg: DamageResult, skill: Skill | undefined): DamageT
  * 用整筆的 `isCrit` 會讓沒爆的那一下也染成爆擊色。
  * 元素／技能色不分下數，沿用整筆的。
  */
-function resolveHitDamageType(hit: { isCrit: boolean }, whole: DamageType): DamageType {
+function resolveHitDamageType(hit: { isCrit: boolean; combo?: boolean }, whole: DamageType): DamageType {
   if (hit.isCrit) return 'crit';
+  // 追打（`07-affix-ability.md` § 7S.7）：淺黃；同時爆擊時照爆擊
+  if (hit.combo) return 'combo';
   return whole === 'crit' ? 'normal' : whole;
 }
 
