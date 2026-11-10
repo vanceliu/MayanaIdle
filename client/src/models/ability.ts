@@ -6,6 +6,7 @@
  */
 import type { ClassName } from './character';
 import { random } from '../core/rng';
+import type { DisplayPart } from './affix';
 
 export type AbilityType =
   // 武器共通池（§ 7S.5）
@@ -90,7 +91,7 @@ export interface AbilityDefinition {
 }
 
 /** 商店／掉落的出現機率（§ 7S.2） */
-export const ABILITY_CHANCE = 10;
+export const ABILITY_CHANCE = 30;
 export const ABILITY_MIN_TIER = 3;
 /** 「5~武器值」的下限，武器值 ≤ 此值時固定為此值 */
 export const ABILITY_WEAPON_VALUE_MIN = 5;
@@ -426,6 +427,29 @@ export function formatAbilityEffect(ability: Ability): string {
 export function formatAbilityDisplay(ability: Ability): string {
   const def = DEFINITION_BY_TYPE.get(ability.type);
   return def ? `${def.name}：${formatAbilityEffect(ability)}` : '';
+}
+
+/** 這件裝備上該參數的區間：`(5 ~ 10%)`、`(1.5 ~ 3.0 秒)` */
+function formatParamRange(def: AbilityParamDef, template: AbilityTemplate): string {
+  const [min, max] = resolveParamRange(def, template);
+  return `(${formatParam(def, min)} ~ ${formatParam(def, max)})`.replace(/ 秒 ~/, ' ~').replace(/% ~/, ' ~');
+}
+
+/** tooltip 一行的顯示片段：每個參數值後接一段區間；非區間片段串起來即 `formatAbilityDisplay()` */
+export function formatAbilityDisplayParts(ability: Ability, template: AbilityTemplate): DisplayPart[] {
+  const def = DEFINITION_BY_TYPE.get(ability.type);
+  if (!def) return [];
+  const parts: DisplayPart[] = [{ text: `${def.name}：` }];
+  for (const piece of def.description.split(/(\{[a-zA-Z]+\})/)) {
+    const param = def.params.find(p => `{${p.key}}` === piece);
+    if (!param) {
+      if (piece) parts.push({ text: piece });
+      continue;
+    }
+    parts.push({ text: formatParam(param, ability.params[param.key] ?? 0) });
+    parts.push({ text: formatParamRange(param, template), range: true });
+  }
+  return parts;
 }
 
 /** Wiki 用的數值欄：`A 5~10%、B 5~武器值`；無參數為 `—` */

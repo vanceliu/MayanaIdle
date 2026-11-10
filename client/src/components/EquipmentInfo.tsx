@@ -1,12 +1,13 @@
 import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
-import { formatAffixDisplay, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix } from '../models/affix';
+import { formatAffixDisplay, formatAffixDisplayParts, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix, type DisplayPart } from '../models/affix';
 import { formatUniqueAffixDisplay } from '../models/uniqueAffix';
-import { formatAbilityDisplay } from '../models/ability';
+import { formatAbilityDisplayParts } from '../models/ability';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
 import { DEFENSE_BONUS_MAX } from '../models/equipment';
 import { useGameStore } from '../stores/gameStore';
+import { useAltHeld } from '../hooks/useAltHeld';
 import { getEffectiveGearArray, getUnmetAttributes, isUniqueAffixSuppressed } from '../systems/gear';
 import { AttributeRequirement } from './AttributeRequirement';
 import { GameIcon } from './GameIcon';
@@ -63,6 +64,18 @@ function useUniqueAffixSuppressed(item: EquipmentInstance): boolean {
   return isUniqueAffixSuppressed(character, activeEffects, equippedGear, item);
 }
 
+/** 顯示片段；區間（`.stat-range`）只在按住 Alt 時印出（`34-ui-guidelines.md` § 34.2） */
+function DisplayParts({ parts, showRange }: { parts: DisplayPart[]; showRange: boolean }) {
+  if (!showRange) return <>{parts.filter(p => !p.range).map(p => p.text).join('')}</>;
+  return (
+    <>
+      {parts.map((p, i) => p.range
+        ? <span key={i}>{' '}<span className="stat-range">{p.text}</span></span>
+        : <span key={i}>{p.text}</span>)}
+    </>
+  );
+}
+
 interface EquipmentDetailProps {
   item: EquipmentInstance;
   hint?: string;
@@ -87,6 +100,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const frozen = unmet.length > 0;
   const classMismatch = useClassMismatch(item.requiredClass);
   const uniqueSuppressed = useUniqueAffixSuppressed(item);
+  const showRange = useAltHeld();
   // § 7.1 詞綴洞：新手裝沒有詞綴也不開洞，不列空洞
   const affixCount = item.affixes?.length ?? 0;
   const emptySockets = item.isStarterGear ? 0 : Math.max(0, getAffixSockets(item) - countSocketedAffixes(item.affixes));
@@ -106,7 +120,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
         title={isTierlessAffixType(affix.type) ? '印記只能重骰，不能升階' : undefined}
       >
-        {formatAffixDisplay(affix, item.quality)}
+        <DisplayParts parts={formatAffixDisplayParts(affix, item.quality)} showRange={showRange} />
       </div>
     )
   );
@@ -205,7 +219,9 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {/* § 7S.7 隨機技能：所有詞綴最上面、淺綠色 */}
       {!compact && item.ability && (
         <div className={`equip-detail-affixes equip-detail-ability${frozen ? ' is-frozen' : ''}`}>
-          <div className="equip-detail-affix ability" title="印記無法變更">{formatAbilityDisplay(item.ability)}</div>
+          <div className="equip-detail-affix ability" title="印記無法變更">
+            <DisplayParts parts={formatAbilityDisplayParts(item.ability, item)} showRange={showRange} />
+          </div>
         </div>
       )}
       {/* § 7T.7 T7 獨有詞綴：紫色、下方分隔線；同類去重落敗時劃線 */}

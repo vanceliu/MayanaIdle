@@ -35,10 +35,18 @@ function renderDetail(name: string) {
 
 /** 從列表中取出某道具的資料列 */
 function getRow(name: string): HTMLElement {
-  const cell = screen.getByRole('link', { name });
-  const row = cell.closest('tr');
-  expect(row).not.toBeNull();
+  const row = rowsByName(document.body).get(name);
+  expect(row, name).toBeDefined();
   return row as HTMLElement;
+}
+
+/** 列表全部資料列，依道具名稱索引。全表逐項比對用：逐一 `getByRole` 的耗時隨道具數平方成長 */
+function rowsByName(container: HTMLElement): Map<string, HTMLElement> {
+  const rows = new Map<string, HTMLElement>();
+  for (const link of container.querySelectorAll<HTMLAnchorElement>('tr a')) {
+    rows.set(link.textContent ?? '', link.closest('tr') as HTMLElement);
+  }
+  return rows;
 }
 
 function getIcon(row: HTMLElement): HTMLElement {
@@ -64,10 +72,12 @@ describe('Wiki 道具頁 — 圖示取自 seed', () => {
   });
 
   it('每個有 icon 欄位的道具，列表圖示與顏色都等於 seed', () => {
-    renderList();
+    const rows = rowsByName(renderList().container);
     const mismatched = ITEM_DEFINITIONS.filter(def => {
       if (!def.icon) return false;
-      const icon = getIcon(getRow(def.name));
+      const row = rows.get(def.name);
+      if (!row) return true;
+      const icon = getIcon(row);
       return icon.getAttribute('data-icon') !== def.icon
         || icon.getAttribute('data-icon-color') !== def.iconColor;
     }).map(d => d.name);
@@ -75,11 +85,13 @@ describe('Wiki 道具頁 — 圖示取自 seed', () => {
   });
 
   it('素材圖示走 iconType / iconTier，顏色為對應 tier 色', () => {
-    renderList();
+    const rows = rowsByName(renderList().container);
     const mismatched = ITEM_DEFINITIONS.filter(def => {
       if (def.icon || !def.iconType) return false;
       const expected = resolveItemIcon(def, 'material');
-      const icon = getIcon(getRow(def.name));
+      const row = rows.get(def.name);
+      if (!row) return true;
+      const icon = getIcon(row);
       return icon.getAttribute('data-icon') !== expected.icon
         || icon.getAttribute('data-icon-color') !== expected.color;
     }).map(d => d.name);
@@ -111,11 +123,11 @@ describe('Wiki 道具頁 — 價格取自 seed', () => {
   });
 
   it('每個有 sellPrice 的道具在列表中都看得到售價', () => {
-    renderList();
+    const rows = rowsByName(renderList().container);
     const missing = ITEM_DEFINITIONS.filter(def => {
       if (!def.sellPrice || def.noSell) return false;
-      const row = getRow(def.name);
-      return within(row).queryByText(`${def.sellPrice.toLocaleString()} G`) === null;
+      const row = rows.get(def.name);
+      return !row || within(row).queryByText(`${def.sellPrice.toLocaleString()} G`) === null;
     }).map(d => d.name);
     expect(missing).toEqual([]);
   });

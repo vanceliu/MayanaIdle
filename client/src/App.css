@@ -5487,6 +5487,8 @@ button.active {
 
 /* § 7S.7 被職業池隨機技能改動的數字（只標數字） */
 .stat-changed { color: #FACC15; font-weight: 700; }
+/* 裝備 tooltip 按住 Alt 的數值區間（34-ui-guidelines § 34.2） */
+.stat-range { color: #FACC15; font-weight: 700; }
 
 .skill-tooltip-status {
   margin-top: 4px;

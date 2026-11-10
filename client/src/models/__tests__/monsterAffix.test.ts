@@ -68,7 +68,7 @@ describe('詞綴抽取（25 § 25.12.2）', () => {
 });
 
 describe('屬性加成（25 § 25.12.2）', () => {
-  it('狂暴、迅捷、巨大、堅硬、護盾', () => {
+  it('狂暴、迅捷、強命、堅硬、護盾', () => {
     const inst = applyMonsterAffixes(monster(), { affixes: ['frenzy', 'swift', 'giant', 'hardened', 'shield'] });
     expect(inst.attackMin).toBe(110);
     expect(inst.attackMax).toBe(166);
@@ -76,7 +76,7 @@ describe('屬性加成（25 § 25.12.2）', () => {
     expect(inst.maxHp).toBe(1200);
     expect(inst.currentHp).toBe(1200);
     expect(inst.defense).toBe(39);
-    // 護盾以套用巨大後的最大 HP 計
+    // 護盾以套用強命後的最大 HP 計
     expect(inst.shieldMax).toBe(240);
     expect(inst.shieldRemaining).toBe(240);
   });

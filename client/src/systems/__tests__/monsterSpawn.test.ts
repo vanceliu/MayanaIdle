@@ -111,7 +111,7 @@ describe('全域怪物血量與攻擊力倍率（28 § 28.1）', () => {
 
 describe('強化詞綴（25 § 25.12）', () => {
   it('擲中 1 詞綴：屬性加成作用在全域倍率之後', () => {
-    // 模板 → 詞綴數 r=0.01（1 個）→ 詞綴池 index 4（巨大）
+    // 模板 → 詞綴數 r=0.01（1 個）→ 詞綴池 index 4（強命）
     mockRolls(0, 0.01, 0.4);
     const inst = createMonsterFromTemplate(mapMonster(), [template()], { hp: 2, attack: 1 })!;
     expect(inst.affixes).toEqual(['giant']);

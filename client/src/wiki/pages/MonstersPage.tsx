@@ -180,7 +180,7 @@ function MonsterAffixSection() {
       <ul style={{ color: 'var(--text-secondary)', margin: '0 0 16px', paddingLeft: 20, lineHeight: 1.8 }}>
         <li>怪物等級不到的詞綴數不會出現，該段機率直接作廢（不會改成較少詞綴）。</li>
         <li>同一隻怪的詞綴不重複，從所有詞綴中等機率抽。</li>
-        <li>屬性加成在全域倍率之後計算；護盾量以套用巨大後的最大 HP 計算。</li>
+        <li>屬性加成在全域倍率之後計算；護盾量以套用強命後的最大 HP 計算。</li>
         <li>劇毒／撕裂排在怪物原本的負面效果之後判定，每次攻擊最多觸發一種。</li>
         <li>帶護盾的怪，HP 條長度＝最大 HP＋護盾，傷害先扣淺藍色的護盾段。</li>
       </ul>

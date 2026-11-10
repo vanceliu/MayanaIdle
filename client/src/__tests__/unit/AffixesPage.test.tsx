@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AffixesPage } from '../../wiki/pages/AffixesPage';
 import { WikiHome } from '../../wiki/pages/WikiHome';
@@ -35,9 +35,9 @@ const CATEGORY_LABELS: Record<AffixCategory, string> = {
  * 〈詞綴一覽〉裡「第一欄為該詞綴名」的資料列。
  * 限定在該節內：T7 獨有詞綴表也有同名的爆擊率、迴避等列。
  */
+/** 直接查 DOM：迴圈內逐一 `getAllByRole('row')` 的耗時隨列數平方成長 */
 function rowsFor(name: string): HTMLElement[] {
-  return within(screen.getByTestId('affix-list'))
-    .getAllByRole('row')
+  return Array.from(screen.getByTestId('affix-list').querySelectorAll<HTMLElement>('tr'))
     .filter(r => r.querySelector('td')?.textContent === name);
 }
 

@@ -122,7 +122,7 @@ describe('MonsterListOverlay（§ 24.8.3 怪物列表）', () => {
       entries: [
         createEntry({ id: 'm_1' }),
         createEntry({ id: 'm_2', affixLabels: ['嗜血', '狂暴'] }),
-        createEntry({ id: 'm_3', isBoss: true, affixLabels: ['巨大', '堅硬', '再生', '荊棘'] }),
+        createEntry({ id: 'm_3', isBoss: true, affixLabels: ['強命', '堅硬', '再生', '荊棘'] }),
       ],
     });
 
@@ -132,7 +132,7 @@ describe('MonsterListOverlay（§ 24.8.3 怪物列表）', () => {
     expect(names[1].classList.contains('monster-affix-2')).toBe(true);
     expect(names[2].classList.contains('monster-affix-4')).toBe(true);
     const affixes = screen.getAllByTestId('monster-card-affixes').map(e => e.textContent);
-    expect(affixes).toEqual(['嗜血 狂暴', '巨大 堅硬 再生 荊棘']);
+    expect(affixes).toEqual(['嗜血 狂暴', '強命 堅硬 再生 荊棘']);
   });
 
   it('護盾詞綴：條長＝最大 HP＋初始護盾，護盾段接在 HP 之後', () => {

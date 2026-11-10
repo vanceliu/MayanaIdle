@@ -808,32 +808,56 @@ export function formatAffixDescription(affix: Affix, quality: number = 0): strin
 }
 
 export function formatAffixDisplay(affix: Affix, quality: number = 0): string {
-  const text = formatBaseAffixDisplay(affix, quality);
-  return affix.sealed ? `(封) ${text}` : text;
+  return formatAffixDisplayParts(affix, quality).filter(p => !p.range).map(p => p.text).join('');
 }
 
-function formatBaseAffixDisplay(affix: Affix, quality: number): string {
-  if (isSpecialAffixType(affix.type)) return formatBaseAffixName(affix);
+/** 顯示片段；`range: true` 為緊接在前一個數值後的區間（`34-ui-guidelines.md` § 34.2「Alt 顯示區間」） */
+export interface DisplayPart {
+  text: string;
+  range?: true;
+}
+
+/** 詞綴顯示片段：非區間片段串起來即 `formatAffixDisplay()` */
+export function formatAffixDisplayParts(affix: Affix, quality: number = 0): DisplayPart[] {
+  const parts = formatBaseAffixDisplayParts(affix, quality);
+  return affix.sealed ? [{ text: '(封) ' }, ...parts] : parts;
+}
+
+/** 同 Tier 區間乘品質：`(4.0 ~ 6.0%)`；無 Tier 的詞綴回 null */
+export function formatAffixRange(affix: Affix, quality: number = 0): string | null {
+  const t = getAffixTierRange(affix);
+  if (!t) return null;
+  const lo = formatEffectiveValue({ ...affix, value: t.min }, quality);
+  const hi = formatEffectiveValue({ ...affix, value: t.max }, quality);
+  const unit = isFlatAffixType(affix.type) ? '' : '%';
+  return `(${lo} ~ ${hi}${unit})`;
+}
+
+function formatBaseAffixDisplayParts(affix: Affix, quality: number): DisplayPart[] {
+  if (isSpecialAffixType(affix.type)) return [{ text: formatBaseAffixName(affix) }];
   if (isAttributeAffixType(affix.type)) {
-    return `${formatBaseAffixName(affix)} ${formatAffixValue(affix, quality)}`;
+    return [{ text: `${formatBaseAffixName(affix)} ${formatAffixValue(affix, quality)}` }];
   }
   const name = formatBaseAffixName(affix);
+  const range = formatAffixRange(affix, quality);
+  const withRange = (head: string, tail: string): DisplayPart[] =>
+    range ? [{ text: head }, { text: range, range: true }, { text: tail }] : [{ text: head + tail }];
   // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
   if (affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') {
     // 名稱已含「受擊」，回復量的「最大 HP／MP 百分比」省略成「回血／回魔 X%」（§ 7.4）
     const pct = restorePercentWithQuality(affix, quality);
     const what = affix.type === 'on_hit_hp' ? '回血' : '回魔';
-    return `受擊 ${formatEffectiveValue(affix, quality)}% 觸發${what} ${pct}% (T${affix.tier})`;
+    return withRange(`受擊 ${formatEffectiveValue(affix, quality)}%`, ` 觸發${what} ${pct}% (T${affix.tier})`);
   }
   if (affix.type === 'element_erosion') {
     const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));
-    return `${name} ${formatEffectiveValue(affix, quality)}% 觸發／每秒 ${dot} (T${affix.tier})`;
+    return withRange(`${name} ${formatEffectiveValue(affix, quality)}%`, ` 觸發／每秒 ${dot} (T${affix.tier})`);
   }
   // § 7.9 X% 是效果強度，觸發率固定
   if (affix.type === 'hit_down' || affix.type === 'defense_down') {
-    return `${name} ${formatEffectiveValue(affix, quality)}%／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`;
+    return withRange(`${name} ${formatEffectiveValue(affix, quality)}%`, `／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`);
   }
-  return `${name} ${formatAffixValue(affix, quality)} (T${affix.tier})`;
+  return withRange(`${name} ${formatAffixValue(affix, quality)}`, ` (T${affix.tier})`);
 }
 
 export interface AffixBonuses {

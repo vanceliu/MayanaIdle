@@ -70,7 +70,7 @@ describe('適用部位與階級（§ 7S.1）', () => {
 });
 
 describe('抽取（§ 7S.2）', () => {
-  it('商店／掉落：10% 才出', () => {
+  it('商店／掉落：30% 才出', () => {
     vi.spyOn(Math, 'random').mockReturnValue(ABILITY_CHANCE / 100);
     expect(rollAbility(T5_SWORD, { channel: 'drop', className: 'knight' })).toBeUndefined();
     vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -213,5 +213,32 @@ describe('Wiki 數值區間標示', () => {
     expect(formatAbilityTemplateParts(getAbilityDefinition('bonus_damage')!)).toEqual([
       { text: '命中 ' }, { text: '5~10%', range: true }, { text: ' 機率追加 ' }, { text: '5~武器值', range: true }, { text: ' 傷害' },
     ]);
+  });
+});
+
+describe('tooltip Alt 數值區間（34-ui-guidelines § 34.2）', () => {
+  it('每個參數值後接區間；武器值上限依該件模板', async () => {
+    const { formatAbilityDisplayParts } = await import('../ability');
+    const ability: Ability = { type: 'bonus_damage', params: { chance: 8, damage: 12 } };
+    expect(formatAbilityDisplayParts(ability, T5_SWORD)).toEqual([
+      { text: '追加傷害：' }, { text: '命中 ' }, { text: '8%' }, { text: '(5 ~ 10%)', range: true },
+      { text: ' 機率追加 ' }, { text: '12' }, { text: '(5 ~ 14)', range: true }, { text: ' 傷害' },
+    ]);
+  });
+
+  it('秒數參數只在上限帶單位', async () => {
+    const { formatAbilityDisplayParts } = await import('../ability');
+    const ranges = formatAbilityDisplayParts({ type: 'binding_arrow_boost', params: { cooldown: 1500, root: 2000 } }, T5_SWORD)
+      .filter(p => p.range).map(p => p.text);
+    expect(ranges).toEqual(['(1.0 ~ 2.0 秒)', '(1.0 ~ 3.0 秒)']);
+  });
+
+  it('非區間片段串起來等於 formatAbilityDisplay', async () => {
+    const { formatAbilityDisplayParts } = await import('../ability');
+    for (const def of ABILITY_DEFINITIONS) {
+      const ability: Ability = { type: def.type, params: Object.fromEntries(def.params.map(p => [p.key, p.min])) };
+      const text = formatAbilityDisplayParts(ability, T5_SWORD).filter(p => !p.range).map(p => p.text).join('');
+      expect(text).toBe(formatAbilityDisplay(ability));
+    }
   });
 });

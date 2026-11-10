@@ -30,6 +30,17 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 裝備 tooltip 按住 Alt 顯示數值區間（`34-ui-guidelines.md` § 34.2，demo `client/demo/alt-range.html`）
+
+規格：所有 `EquipmentDetail` tooltip 按住 Alt 時，詞綴數值後加同 Tier 區間（乘品質），隨機技能每個參數後加區間（依該件模板，含武器值上限），黃色 `#FACC15`；放開或視窗失焦即收起。特殊詞綴、額外屬性、印記類、T7 獨有詞綴、空洞、已毀壞不顯示。
+
+- [x] A1 model：`formatAffixDisplayParts`（affix.ts）、`formatAbilityDisplayParts`（ability.ts）＋測試
+- [x] A2 demo（按 Alt 前後的 tooltip）→ 使用者確認
+- [x] A3 `useAltHeld` hook；`EquipmentDetail` 印 `.stat-range`
+- [x] A4 測試；`npx tsc -b`、client vitest
+- [x] A5 文件：34、07-affix-ability § 7S.7、INDEX
+- [ ] A6 使用者實機確認（背包、裝備欄、倉庫、商店出售、鐵匠鋪拆解；Windows／桌面版 Alt 不跳選單列）
+
 ### 啟動器 API 只限啟動器頁呼叫（`97-selfhosted-server.md` § 97.2 桌面啟動器）
 
 規格：main 行程每個 IPC handler 先檢查 `event.senderFrame` 的網址，轉成檔案路徑後必須與 `ui/launcher.html` 相同（Windows 不分大小寫），否則拒絕並記警告；preload 只在 `file:` 頁面暴露 `window.launcher`。

@@ -108,7 +108,7 @@ export interface MapMonsterState {
   setMaxMonsters: (max: number) => void;
   /** 建實例時回填射程，移動邏輯才停得在射程上 */
   setMonsterAttackRange: (id: string, attackRange: number) => void;
-  /** 移動速度（格／秒）回填；疾風詞綴用（`25-monster-system.md` § 25.12.3） */
+  /** 移動速度（格／秒）回填；疾走詞綴用（`25-monster-system.md` § 25.12.3） */
   setMonsterSpeed: (id: string, speed: number) => void;
   setHasBossInPool: (has: boolean) => void;
 }

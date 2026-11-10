@@ -18,8 +18,8 @@ export const MONSTER_AFFIX_ORDER: readonly MonsterAffixId[] = [
 ];
 
 export const MONSTER_AFFIX_LABELS: Record<MonsterAffixId, string> = {
-  bloodthirst: '嗜血', frenzy: '狂暴', swift: '迅捷', venom: '劇毒／撕裂', giant: '巨大',
-  hardened: '堅硬', regen: '再生', shield: '護盾', gale: '疾風', thorns: '荊棘',
+  bloodthirst: '嗜血', frenzy: '狂暴', swift: '迅捷', venom: '劇毒／撕裂', giant: '強命',
+  hardened: '堅硬', regen: '再生', shield: '護盾', gale: '疾走', thorns: '荊棘',
 };
 
 const VENOM_LABELS: Record<VenomDebuff, string> = { poison: '劇毒', bleed: '撕裂' };
@@ -108,7 +108,7 @@ export function rollMonsterAffixes(
 
 /**
  * § 25.12.2：屬性加成，作用在等級公式與全域倍率之後。回傳新實例。
- * 護盾吸收量以套用巨大後的最大 HP 計算。
+ * 護盾吸收量以套用強命後的最大 HP 計算。
  */
 export function applyMonsterAffixes(inst: MonsterInstance, roll: MonsterAffixRoll): MonsterInstance {
   if (roll.affixes.length === 0) return inst;
