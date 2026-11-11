@@ -37,12 +37,12 @@ describe('PartyManager', () => {
     expect(pm.partyOf(2)).toBe(party);
   });
 
-  it('對方已在隊伍或隊伍滿 5 人不可邀請', () => {
+  it('對方已在隊伍或隊伍滿 4 人不可邀請', () => {
     form(A, B);
     expect(() => pm.invite(C, B, now)).toThrow(PartyError);
-    form(A, C, D, E);
-    expect(pm.partyOf(1)!.members.size).toBe(5);
-    expect(() => pm.invite(A, F, now)).toThrow(/已滿/);
+    form(A, C, D);
+    expect(pm.partyOf(1)!.members.size).toBe(4);
+    expect(() => pm.invite(A, E, now)).toThrow(/已滿/);
   });
 
   it('只有隊長可以邀請', () => {

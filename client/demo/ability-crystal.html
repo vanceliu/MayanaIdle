@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>技能結晶與技能更換 Demo — MayanaIdle</title>
+<!--
+  技能結晶與技能更換（`07-affix-ability.md` § 7S.8、`06-equipment-acquire.md` § 6A.3「拆解」）。
+  版面樣本：class 與 App.css 相同，裝備取自 seed，換算走 `models/abilityCrystal.ts`。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/ability-crystal.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; font-size: var(--fs-sm); }
+.demo-swap-grid { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: start; }
+.demo-col-left { position: sticky; top: 0; }
+.demo-card {
+  width: 640px; background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px;
+}
+</style>
+</head>
+<body>
+  <h1 class="demo-title">技能結晶與技能更換</h1>
+  <p class="demo-note">
+    角色：騎士。拆解掉落品會把隨機技能存成結晶（製作品、商店裝不會）；同種類每個參數各留較好的位置。<br>
+    「技能更換」分頁：左邊選結晶（hover 看效果），右邊選裝備，費用 1,500,000 × 目標階級，原本的技能消失。按鈕會真的改這頁的資料，重新整理即還原。
+  </p>
+  <div class="demo-bar">
+    <label>持有金幣 <input id="gold" type="range" min="0" max="12000000" step="500000" value="8000000"></label>
+    <span id="gold-label"></span>
+  </div>
+  <div id="root"></div>
+  <script type="module" src="./abilityCrystalDemo.tsx"></script>
+</body>
+</html>

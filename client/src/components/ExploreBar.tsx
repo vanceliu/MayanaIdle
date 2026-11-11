@@ -18,7 +18,8 @@ export function ExploreBar() {
   const elapsedMs = useAreaElapsed();
   const areaKills = useGameStore(s => s.character?.areaKills ?? 0);
   const pressureRate = useGameStore(s => s.pressureRate);
-  const { pressure } = calculatePressure(areaKills, pressureRate);
+  const pressureMembers = useGameStore(s => s.pressureMembers);
+  const { pressure } = calculatePressure(areaKills, pressureRate, pressureMembers);
 
   /*
    * 只有模式切換，沒有「搜尋」按鈕：遭遇改由地圖紅點碰撞觸發
@@ -32,7 +33,7 @@ export function ExploreBar() {
           <button className={searchMode === 'auto' ? 'active' : ''} onClick={() => setSearchMode('auto')}>自動搜尋</button>
           <button className={searchMode === 'manual' ? 'active' : ''} onClick={() => setSearchMode('manual')}>手動搜尋</button>
         </div>
-        <span className="pressure-badge" title={formatPressureTitle(areaKills, getNextPressureKills(pressure, pressureRate))}>
+        <span className="pressure-badge" title={formatPressureTitle(areaKills, getNextPressureKills(pressure, pressureRate, pressureMembers))}>
           P{pressure}
         </span>
         {searchMode === 'auto' && phase === 'explore' && (

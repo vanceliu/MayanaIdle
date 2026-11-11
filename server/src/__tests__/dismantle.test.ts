@@ -10,6 +10,7 @@ import { loadTemplateCache } from '../../../client/src/systems/templateSync';
 import { makeBagItem } from '../../../client/src/models/bagItem';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
 import { getDismantleYield } from '../../../client/src/systems/crafting';
+import { getAbilityWeaponValue } from '../../../client/src/models/ability';
 import { PROTOCOL_VERSION, type ServerMessage } from '../../../client/src/net/protocol';
 import type { PlayerSession } from '../playerSession';
 
@@ -99,5 +100,35 @@ describe('拆解（遠端 action）', () => {
     expect(reply).toMatchObject({ t: 'action_ok', result: { ok: false } });
     expect(c.session.game.getState().bagItems).toEqual(before.bagItems);
     expect(c.session.game.getState().inventory).toEqual(before.inventory);
+  });
+
+  it('掉落品拆出技能結晶存進 character_prefs，技能更換寫回裝備並扣金幣（§ 7S.8）', async () => {
+    const c = await enter();
+    const game = c.session.game;
+    const charId = game.getState().character!.id!;
+    const best = { type: 'bonus_damage' as const, params: { chance: 10, damage: getAbilityWeaponValue(RECIPE) } };
+    const drop = await repo.addEquipment({
+      templateId: RECIPE.id!, name: RECIPE.name, type: RECIPE.type, slot: RECIPE.slot, isTwoHanded: RECIPE.isTwoHanded,
+      quality: 0, enhancement: 0, affixes: [], ownerId: charId, equipped: false, ability: best,
+    } as never);
+    const target = await repo.addEquipment({
+      templateId: RECIPE.id!, name: RECIPE.name, type: RECIPE.type, slot: RECIPE.slot, isTwoHanded: RECIPE.isTwoHanded,
+      quality: 0, enhancement: 0, affixes: [], ownerId: charId, equipped: false,
+    } as never);
+    const [dropItem, targetItem] = (await repo.listEquipmentByOwner(charId)).filter(i => i.id === drop || i.id === target);
+    game.setState({ inventory: [dropItem, targetItem], character: { ...game.getState().character!, gold: 7_000_000 } });
+
+    expect(await c.act('dismantleEquipment', drop)).toMatchObject({ t: 'action_ok', result: { ok: true } });
+    const crystals = [{ type: 'bonus_damage', positions: { chance: 1, damage: 1 } }];
+    expect(game.getState().abilityCrystals).toEqual(crystals);
+    await game.getState().flushSaveNow();
+    expect(((await repo.getCharacterPrefs(charId)) as { abilityCrystals?: unknown }).abilityCrystals).toEqual(crystals);
+
+    expect(await c.act('applyAbilityCrystal', target, 'bonus_damage')).toMatchObject({ t: 'action_ok', result: { ok: true } });
+    expect(game.getState().character!.gold).toBe(7_000_000 - 1_500_000 * RECIPE.tier!);
+    await vi.waitFor(async () => {
+      const saved = (await repo.listEquipmentByOwner(charId)).find(i => i.id === target);
+      expect(saved?.ability).toEqual(best);
+    });
   });
 });

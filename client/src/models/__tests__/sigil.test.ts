@@ -270,12 +270,13 @@ describe('印記系統（§ 46）', () => {
       expect(next[0].dotDamage).toBeLessThanOrEqual(80);
     });
 
-    it('受擊回血：回復比例重骰在 2~4%', () => {
-      const affixes: Affix[] = [{ type: 'on_hit_hp', tier: 5, value: 14, restorePercent: 2 }];
+    it('受擊回血：只重骰觸發率，不另外帶回復比例（隨觸發率，07-affix § 7.9）', () => {
+      const affixes: Affix[] = [{ type: 'on_hit_hp', tier: 5, value: 5 }];
       for (let run = 0; run < 100; run++) {
         const { affixes: next } = applyRecarveSigil(affixes, 0, dropCtx());
-        expect(next[0].restorePercent).toBeGreaterThanOrEqual(2);
-        expect(next[0].restorePercent).toBeLessThanOrEqual(4);
+        expect('restorePercent' in next[0]).toBe(false);
+        expect(next[0].value).toBeGreaterThanOrEqual(4.5);
+        expect(next[0].value).toBeLessThanOrEqual(5.3);
       }
     });
 

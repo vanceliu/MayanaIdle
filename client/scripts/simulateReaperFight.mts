@@ -3,7 +3,7 @@
  *
  * 直接驅動遊戲的 `tickWorld()`（server 同一套，每 tick `TICK_MS`）：死神走過來攻擊、詠唱、上負面狀態，
  * 角色依戰鬥天賦出手、依常駐天賦補血／喝藥／補 buff。傷害、迴避、護盾、反擊、位移全走遊戲本身的程式。
- * 配裝（木樁 BiS 第一名）、技能盤點與輪替排序共用 `reaperShared.mts`。
+ * 配裝（木樁 BiS 第一名）、技能盤點與輪替排序共用 `reaperShared.mts`，天賦配置共用 `fightSetup.mts`。
  *
  * 前提：
  *  - 一場一隻死神，背包 20 瓶橙色藥水
@@ -20,7 +20,6 @@ import { tickWorld } from '../src/systems/worldTick';
 import { createMapInstance, attachInstance } from '../src/systems/mapInstance';
 import { createMonsterFromTemplate } from '../src/systems/monsterSpawn';
 import { createMonsterCombatContext } from '../src/systems/monsterCombatFSM';
-import { calculateHealAmount, getTotalDefense } from '../src/systems/combat';
 import { defaultSession } from '../src/stores/session';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, POTION_CONFIG, getPotionCount } from '../src/stores/gameStore';
 import { useMapControlStore } from '../src/stores/mapControlStore';
@@ -29,19 +28,15 @@ import { useTalentStore } from '../src/stores/talentStore';
 import { setGameNow, TICK_MS } from '../src/core/clock';
 import { makeBagItem } from '../src/models/bagItem';
 import { TileType, type MapData } from '../src/models/mapControl';
-import { CLASS_NAMES_ZH, type Character, type ClassName } from '../src/models/character';
-import type { TalentSlot, TalentSlotEntry } from '../src/models/talent';
+import { CLASS_NAMES_ZH, type ClassName } from '../src/models/character';
 import type { MonsterTemplate } from '../src/models/monster';
-import type { EquipmentInstance, EquippedGear, EquipSlot } from '../src/models/equipment';
-import type { ActiveEffect } from '../src/models/effect';
-import type { Skill } from '../src/models/skill';
 import type { CombatVisual } from '../src/systems/combatLoop';
 import {
-  buildCharacter, buildRotation, calibrate, designEffectiveInt, getSkillPlan, percentile, preCombatBuffs,
-  resolveLoadout, searchBis, setProxySamples, withSeed, REAPER_SEED, RUNS, TARGET_CLASSES,
-  type Loadout, type RotationEntry,
+  getSkillPlan, percentile, searchBis, setProxySamples, withSeed, REAPER_SEED, RUNS, TARGET_CLASSES,
 } from './reaperShared.mts';
-import { TALENT_INSTALL_MAX } from '../src/models/talent';
+import {
+  buildSetup, fmt, KNIGHT_HP_TARGET, MANA_SHIELD_CATEGORY, type FightSetup, type ManaShieldPolicy,
+} from './fightSetup.mts';
 import { MemoryRepository } from '../src/db/memoryRepository';
 
 /** 擊殺後的掉寶與存檔走記憶體資料庫（同測試）；偏好設定寫的 `localStorage` 以記憶體代替 */
@@ -77,157 +72,20 @@ const MAP: MapData = {
 const PROXY_SAMPLES_ARG = Number(process.argv.find(a => a.startsWith('--proxy-samples='))?.split('=')[1]);
 /** 印出落敗場次的種子與最後的戰鬥紀錄 */
 const TRACE_DEATHS = process.argv.includes('--trace-deaths');
+/** `--heal-scale=X`：補血技能（`type: 'heal'`）威力乘 X，吸血不變（對照用） */
+const HEAL_SCALE = Number(process.argv.find(a => a.startsWith('--heal-scale='))?.split('=')[1] ?? 1);
+/** `--heal-power=full-heal:80,great-heal:53`：指定補血技能的威力（優先於 `--heal-scale`） */
+const HEAL_POWER = new Map((process.argv.find(a => a.startsWith('--heal-power='))?.split('=')[1] ?? '')
+  .split(',').filter(Boolean).map(kv => [kv.split(':')[0], Number(kv.split(':')[1])] as const));
+const healPower = (s: { id: string; power: number }) => HEAL_POWER.get(s.id) ?? Math.round(s.power * HEAL_SCALE);
 /** 武器不帶隨機技能（對照用） */
 const NO_ABILITY = process.argv.includes('--no-ability');
 const TRACE_LOG_LINES = 40;
 setProxySamples(Number.isFinite(PROXY_SAMPLES_ARG) && PROXY_SAMPLES_ARG > 0 ? PROXY_SAMPLES_ARG : 200);
 
 const ORANGE_POTIONS = 20;
-const KNIGHT_HP_TARGET = 50;
-/** 技能補血與高耗魔防守技的門檻：HP 低於這個百分比才放（藥水不花 MP，另依可補量喝） */
-const DANGER_HP = 50;
-/** 高耗魔、持續短的防守技：只在危險時放 */
-const DANGER_ONLY_CATEGORIES = new Set(['invincible', 'sanctuary']);
-const MANA_SHIELD_CATEGORY = 'mana-shield';
-
-/** 魔力護盾的施放策略：常駐（到期重放）或危險時才開 */
-type ManaShieldPolicy = 'always' | 'danger';
 /** 單場上限：超過算未擊殺 */
 const FIGHT_TIMEOUT_MS = 180_000;
-/** 防守／續航類 buff：效果結束就由常駐天賦重放 */
-const SUSTAIN_BUFF_CATEGORIES = new Set([
-  'mana-shield', 'mana-spring', 'defense-buff', 'protect-shield', 'holy-shield', 'sanctuary', 'evasion', 'invincible',
-]);
-
-function fmt(n: number, d = 1): string {
-  return n.toFixed(d);
-}
-
-// ---------------------------------------------------------------- 天賦格
-
-let slotSeq = 0;
-
-function entry(ruleId: string, params: Record<string, unknown> | null = null): TalentSlotEntry {
-  return { ruleId, params } as TalentSlotEntry;
-}
-
-function slot(type: 'combat' | 'persistent', action: TalentSlotEntry, conditions: TalentSlotEntry[] = []): TalentSlot {
-  slotSeq++;
-  return {
-    id: slotSeq, characterId: 1, tier: 3, assignedType: type, templateId: 'default', order: slotSeq, enabled: true,
-    conditions: [...conditions, null, null, null].slice(0, 3), action,
-  } as TalentSlot;
-}
-
-/** 缺血量 ≥ 補量才補 → 「HP 低於 (1 − 補量／上限)」 */
-function refillThreshold(amount: number, maxHp: number): number {
-  return Math.max(1, Math.floor((1 - amount / maxHp) * 100));
-}
-
-interface FightSetup {
-  className: ClassName;
-  loadout: Loadout;
-  character: Character;
-  gear: EquippedGear;
-  skills: Skill[];
-  effects: ActiveEffect[];
-  slots: TalentSlot[];
-  rules: string[];
-}
-
-function toEquipped(gear: (EquipmentInstance | null)[]): EquippedGear {
-  const out: EquippedGear = {};
-  gear.forEach((g, i) => {
-    if (!g) return;
-    const item = { ...g, id: i + 1 };
-    const slotKey = (g.slot === ('ring' as EquipSlot) ? 'ring1' : g.slot) as EquipSlot;
-    out[slotKey] = item;
-  });
-  return out;
-}
-
-function buildSetup(className: ClassName, raw: Loadout, seed: number, manaShield: ManaShieldPolicy = 'always'): FightSetup {
-  slotSeq = 0;
-  const plan = getSkillPlan(className);
-  const effects = [...preCombatBuffs(className), plan.speed.effect];
-  const character = { ...buildCharacter(className), id: 1 };
-  const loadout = resolveLoadout(character, effects, raw);
-  const effInt = designEffectiveInt(className, loadout.gear);
-  const { order } = calibrate(character, loadout, buildRotation(className, loadout.weapon), effects, effInt, seed);
-
-  const learned = plan.items.filter(i => i.handling !== 'over_budget').map(i => i.skill);
-  const skills: Skill[] = learned.map(s => ({ ...s, lastUsedAt: -1e9 }) as Skill);
-  const gear = toEquipped(loadout.gear);
-  const maxHp = getEffectiveMaxHp(character, gear, effects);
-  const rules: string[] = [
-    `有效最大 HP ${maxHp}／MP ${getEffectiveMaxMp(character, gear, effects)}／裝備防禦 ${getTotalDefense(loadout.gear)}`,
-  ];
-  const isKnight = className === 'knight';
-
-  // 戰鬥：輪替（攻擊技能依校準排序）→ 普攻
-  const combat: TalentSlot[] = [];
-  const persistent: TalentSlot[] = [];
-  const attackEntries = order.filter((e: RotationEntry) => e.kind !== 'self_buff');
-  for (const e of attackEntries.slice(0, TALENT_INSTALL_MAX - 1)) {
-    const selfHpCost = learned.find(x => x.id === e.id)?.selfHpCostPercent;
-    const conds = isKnight && selfHpCost ? [entry('hp_above', { value: KNIGHT_HP_TARGET })] : [];
-    combat.push(slot('combat', entry('skill', { skillId: e.id }), conds));
-  }
-  // 位移、控場、只上毒、自扣血的技能，價值不在直接傷害（木樁校準會篩掉），實戰照樣施放
-  for (const s of learned) {
-    if (s.type !== 'attack' || combat.length >= TALENT_INSTALL_MAX - 1) continue;
-    if (!(s.dash || s.retreat || s.applyDebuff?.root || s.dotOnly || s.selfHpCostPercent)) continue;
-    if (combat.some(c => (c.action?.params as { skillId?: string })?.skillId === s.id)) continue;
-    const conds = isKnight && s.selfHpCostPercent ? [entry('hp_above', { value: KNIGHT_HP_TARGET })] : [];
-    combat.push(slot('combat', entry('skill', { skillId: s.id }), conds));
-  }
-  combat.push(slot('combat', entry('normal_attack')));
-  const nameOf = (id: string | undefined) => (id ? learned.find(s => s.id === id)?.name ?? id : '普攻');
-  rules.push(`戰鬥：${combat.map(c => nameOf((c.action?.params as { skillId?: string } | null)?.skillId)).join(' → ')}`);
-
-  // 常駐：補血（危險時、每點 MP 補最多的一招）→ 藥水 → 回魔 → 防守／續航 buff → 輸出 buff
-  const heal = learned
-    .filter(s => s.type === 'heal' && s.power > 0)
-    .map(s => ({ s, amount: calculateHealAmount(character, s.power, loadout.gear, effects) }))
-    .sort((a, b) => b.amount / Math.max(1, b.s.mpCost) - a.amount / Math.max(1, a.s.mpCost) || b.amount - a.amount)[0];
-  if (heal) {
-    persistent.push(slot('persistent', entry('heal_skill', { skillId: heal.s.id }), [entry('hp_below', { value: DANGER_HP })]));
-    rules.push(`${heal.s.name}（每 MP 補 ${fmt(heal.amount / Math.max(1, heal.s.mpCost))}）：HP 低於 ${DANGER_HP}%`);
-  }
-  const potionThreshold = isKnight ? KNIGHT_HP_TARGET : refillThreshold(POTION_CONFIG.orange.healMax, maxHp);
-  persistent.push(slot('persistent', entry('potion', { potionType: 'orange' }), [entry('hp_below', { value: potionThreshold })]));
-  rules.push(`橙色藥水：HP 低於 ${potionThreshold}%`);
-
-  // 同 category 的 buff 互相覆蓋（`24-buff-debuff.md` § 24.3.1），只放等級最高的那個
-  const bestOfCategory = new Map<string, Skill>();
-  for (const s of learned) {
-    if (s.type !== 'buff' || !s.buffCategory) continue;
-    const cur = bestOfCategory.get(s.buffCategory);
-    if (!cur || s.level > cur.level) bestOfCategory.set(s.buffCategory, s as Skill);
-  }
-  for (const s of learned) {
-    if (s.type !== 'buff') continue;
-    if (s.buffCategory && bestOfCategory.get(s.buffCategory)?.id !== s.id) continue;
-    if (s.mpRestorePercent) {
-      const mpThreshold = Math.floor(100 - s.mpRestorePercent);
-      persistent.push(slot('persistent', entry('buff_skill', { skillId: s.id }),
-        [entry('mp_below', { value: mpThreshold }), entry('hp_above', { value: 50 })]));
-      rules.push(`${s.name}：MP 低於 ${mpThreshold}% 且 HP 高於 50%`);
-      continue;
-    }
-    const isSustain = SUSTAIN_BUFF_CATEGORIES.has(s.buffCategory ?? '');
-    const isRotationBuff = order.some((e: RotationEntry) => e.kind === 'self_buff' && e.id === s.id);
-    if (!isSustain && !isRotationBuff) continue;
-    const dangerOnly = DANGER_ONLY_CATEGORIES.has(s.buffCategory ?? '')
-      || (s.buffCategory === MANA_SHIELD_CATEGORY && manaShield === 'danger');
-    const conds = [entry('buff_not_active', { skillId: s.id })];
-    if (dangerOnly) conds.unshift(entry('hp_below', { value: DANGER_HP }));
-    persistent.push(slot('persistent', entry('buff_skill', { skillId: s.id }), conds));
-    rules.push(dangerOnly ? `${s.name}：HP 低於 ${DANGER_HP}% 且效果不在時` : `${s.name}：效果結束就重放`);
-  }
-
-  return { className, loadout, character, gear, skills, effects, slots: [...combat, ...persistent], rules };
-}
 
 // ---------------------------------------------------------------- 單場
 
@@ -274,7 +132,8 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
     const maxHp = getEffectiveMaxHp(character, setup.gear, setup.effects);
     character.hp = maxHp;
     useGameStore.setState({
-      character, skills: setup.skills.map(s => ({ ...s })), equippedGear: setup.gear, inventory: [],
+      character, equippedGear: setup.gear, inventory: [],
+      skills: setup.skills.map(s => (s.type === 'heal' ? { ...s, power: healPower(s) } : { ...s })),
       bagItems: [makeBagItem(POTION_CONFIG.orange.itemId, ORANGE_POTIONS)!], combatLogs: [],
       activeEffects: setup.effects.map(e => ({ ...e })),
       lastPotionUsedAt: -1e9,
@@ -346,7 +205,8 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
 const t0 = performance.now();
 console.log(`# Lv.75 滿裝 vs 會攻擊的百柱死神 — ${RUNS.toLocaleString()} 場／職業`);
 console.log(`目標：${REAPER_SEED.name} Lv.${REAPER_SEED.level} HP ${REAPER_SEED.hp} 攻擊 ${REAPER_SEED.attackMin}~${REAPER_SEED.attackMax} 防禦 ${REAPER_SEED.defense}`);
-console.log(`背包：橙色藥水 ${ORANGE_POTIONS} 瓶｜騎士 HP 維持 ${KNIGHT_HP_TARGET}%｜單場上限 ${FIGHT_TIMEOUT_MS / 1000}s\n`);
+console.log(`背包：橙色藥水 ${ORANGE_POTIONS} 瓶｜騎士 HP 維持 ${KNIGHT_HP_TARGET}%｜單場上限 ${FIGHT_TIMEOUT_MS / 1000}s`
+  + `${HEAL_SCALE !== 1 ? `｜補血技能威力 ×${HEAL_SCALE}` : ''}\n`);
 
 interface Row {
   className: ClassName;

@@ -396,9 +396,9 @@ describe('印記師 — 詞綴列 tooltip（§ 13.13.1）', () => {
     expect(screen.getByText('攻擊力 T4').getAttribute('title')).toBeNull();
   });
 
-  it('受擊回血的回復比例代入該條抽到的值', () => {
-    setup(gear([{ type: 'on_hit_hp', tier: 3, value: 8, restorePercent: 3 }], { slot: 'body', type: 'armor' } as never), []);
-    expect(rowOf('受擊回血 T3').getAttribute('title')).toBe('受到傷害時 8.0% 機率回復最大 HP 的 3%');
+  it('受擊回血的回復比例代入觸發率換算的值', () => {
+    setup(gear([{ type: 'on_hit_hp', tier: 3, value: 3 }], { slot: 'body', type: 'armor' } as never), []);
+    expect(rowOf('受擊回血 T3').getAttribute('title')).toBe('受到傷害時 3.0% 機率回復最大 HP 的 2.7%');
   });
 
   it('不能選的詞綴列同樣有 title', () => {

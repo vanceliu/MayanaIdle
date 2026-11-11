@@ -121,11 +121,7 @@ export interface AffixDefinition {
   description: string;
 }
 
-/**
- * 受擊回復的**回復比例**（§ 7.4）：回血 2~4%、回魔 2~5% 的最大值。
- *
- * **Tier 只決定觸發率**（走通用表），回復比例與 Tier 無關，另外抽。
- */
+/** 受擊回復的回復比例範圍（§ 7.9）：回血 2.0~4.0%、回魔 2.0~5.0%，依觸發率換算 */
 export const ON_HIT_RESTORE_PERCENT: Record<'on_hit_hp' | 'on_hit_mp', [number, number]> = {
   on_hit_hp: [2, 4],
   on_hit_mp: [2, 5],
@@ -141,7 +137,7 @@ export const DEFENSE_DOWN_CATEGORY = 'affix-def-down';
 export const HIT_DOWN_STAT = 'monster_hit';
 
 const restoreRange = (type: 'on_hit_hp' | 'on_hit_mp') =>
-  `${ON_HIT_RESTORE_PERCENT[type][0]}~${ON_HIT_RESTORE_PERCENT[type][1]}%`;
+  `${ON_HIT_RESTORE_PERCENT[type][0].toFixed(1)}~${ON_HIT_RESTORE_PERCENT[type][1].toFixed(1)}%（觸發率越高越多）`;
 
 export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   // Weapon affixes (10) —— § 7.4 攻擊類
@@ -192,11 +188,6 @@ export interface Affix {
    * **之後不再隨機**：同一把武器每次觸發都是這個數字。其他詞綴一律 undefined。
    */
   dotDamage?: number;
-  /**
-   * 受擊回血／受擊回魔每次觸發回復的**比例**（§ 7.4，單位為最大 HP／MP 的百分比）。
-   * 抽到當下決定，之後不變 —— 回血 2~4、回魔 2~5。其他詞綴一律 undefined。
-   */
-  restorePercent?: number;
   /**
    * 額外屬性詞綴（§ 7.3.1）加到哪個屬性。抽到當下六種均等決定，之後不變。
    * 其他詞綴一律 undefined。
@@ -250,15 +241,33 @@ export function isTierlessAffixType(type: AnyAffixType): type is SpecialAffixTyp
 /** 額外屬性詞綴固定給 +1（§ 7.3.1），不受品質放大 */
 export const BONUS_ATTRIBUTE_VALUE = 1;
 
-/** 受擊回復比例：抽到當下在該範圍內決定後固定不變（單位為百分比）。 */
-export function rollRestorePercent(type: 'on_hit_hp' | 'on_hit_mp'): number {
+type OnHitRestoreType = 'on_hit_hp' | 'on_hit_mp';
+
+const isOnHitRestoreType = (type: AnyAffixType): type is OnHitRestoreType =>
+  type === 'on_hit_hp' || type === 'on_hit_mp';
+
+/**
+ * 受擊回復比例（未吃品質，§ 7.9）：觸發率在階級表 T1 下限～T7 上限間的位置，
+ * 線性換算到 `ON_HIT_RESTORE_PERCENT`，取到小數一位。
+ */
+export function getRestorePercent(type: OnHitRestoreType, chance: number): number {
+  const table = getAffixTierTable(type);
+  const lo = table[0].min;
+  const hi = table[table.length - 1].max;
   const [min, max] = ON_HIT_RESTORE_PERCENT[type];
-  return min + Math.floor(random() * (max - min + 1));
+  const ratio = Math.min(1, Math.max(0, (chance - lo) / (hi - lo)));
+  return roundAffixTenth(min + ratio * (max - min));
 }
 
-/** 回復比例套上裝備品質後的實際值（單位仍為百分比） */
+/** 回復比例套上裝備品質（§ 7.3 小數規則，單位為百分比） */
+function restoreWithQuality(percent: number, quality: number): number {
+  return Math.floor(toTenths(percent) * (100 + quality) / 100) / 10;
+}
+
+/** 這條受擊回復詞綴的實際回復比例（單位為百分比） */
 export function restorePercentWithQuality(affix: Affix, quality: number): number {
-  return Math.max(1, Math.floor((affix.restorePercent ?? 0) * (1 + quality / 100)));
+  if (!isOnHitRestoreType(affix.type)) return 0;
+  return restoreWithQuality(getRestorePercent(affix.type, affix.value), quality);
 }
 
 /**
@@ -272,7 +281,7 @@ export function getOnHitRestore(
   const out: { chance: number; percent: number }[] = [];
   for (const g of gear ?? []) {
     for (const a of g?.affixes ?? []) {
-      if (a.type !== type || !a.restorePercent) continue;
+      if (a.type !== type) continue;
       const q = g?.quality ?? 0;
       out.push({ chance: getEffectiveAffixValue(a, q), percent: restorePercentWithQuality(a, q) });
     }
@@ -435,6 +444,17 @@ export const ARMOR_POOL_TIERS: AffixTier[] = [
   { tier: 7, min: 15.1, max: 17 },
 ];
 
+/** 受擊回血／受擊回魔觸發率的專屬階級表（§ 7.3.1，0.1 單位） */
+export const ON_HIT_TIERS: AffixTier[] = [
+  { tier: 1, min: 1, max: 1.4 },
+  { tier: 2, min: 1.5, max: 2.3 },
+  { tier: 3, min: 2.4, max: 3.5 },
+  { tier: 4, min: 3.6, max: 4.4 },
+  { tier: 5, min: 4.5, max: 5.3 },
+  { tier: 6, min: 5.4, max: 6.1 },
+  { tier: 7, min: 6.2, max: 7 },
+];
+
 /** 防禦力的專屬階級表（§ 7.3.1，0.1 單位） */
 export const DEFENSE_TIERS: AffixTier[] = [
   { tier: 1, min: 0.1, max: 0.5 },
@@ -513,9 +533,9 @@ export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: Affi
   {
     label: '防具池',
     tiers: ARMOR_POOL_TIERS,
-    types: ['heal_effect', 'potion_effect',
-      'drop_rate', 'gold_rate', 'on_hit_hp', 'on_hit_mp'],
+    types: ['heal_effect', 'potion_effect', 'drop_rate', 'gold_rate'],
   },
+  { label: '受擊回復', tiers: ON_HIT_TIERS, types: ['on_hit_hp', 'on_hit_mp'] },
   { label: '防禦力', tiers: DEFENSE_TIERS, types: ['defense'] },
   { label: '最大 HP／MP', tiers: FLAT_HP_MP_TIERS, types: ['max_hp', 'max_mp'], flat: true },
   { label: '回血／回魔', tiers: FLAT_REGEN_TIERS, types: ['hp_regen', 'mp_regen'], flat: true },
@@ -702,15 +722,10 @@ export function generateAffixes(
     const dotDamage = def.type === 'element_erosion'
       ? rollErosionDamage(options.weaponBaseDamage ?? 1)
       : undefined;
-    // § 7.4 受擊回復：回復比例在抽到當下決定，之後固定；與 Tier 無關
-    const restorePercent = def.type === 'on_hit_hp' || def.type === 'on_hit_mp'
-      ? rollRestorePercent(def.type)
-      : undefined;
     affixes.push({
       type: def.type, tier, value,
       ...(element ? { element } : {}),
       ...(dotDamage ? { dotDamage } : {}),
-      ...(restorePercent ? { restorePercent } : {}),
     });
   }
 
@@ -801,8 +816,8 @@ export function formatAffixDescription(affix: Affix, quality: number = 0): strin
   if (!description) return '';
   const value = formatEffectiveValue(affix, quality);
   const text = description.replace(/^X% 是觸發率：/, '').replace(/X/g, value);
-  if ((affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') && affix.restorePercent != null) {
-    return text.replace(restoreRange(affix.type), `${restorePercentWithQuality(affix, quality)}%`);
+  if (isOnHitRestoreType(affix.type)) {
+    return text.replace(restoreRange(affix.type), `${restorePercentWithQuality(affix, quality).toFixed(1)}%`);
   }
   return text;
 }
@@ -817,9 +832,12 @@ export interface DisplayPart {
   range?: true;
 }
 
-/** 詞綴顯示片段：非區間片段串起來即 `formatAffixDisplay()` */
-export function formatAffixDisplayParts(affix: Affix, quality: number = 0): DisplayPart[] {
-  const parts = formatBaseAffixDisplayParts(affix, quality);
+/**
+ * 詞綴顯示片段：非區間片段串起來即 `formatAffixDisplay()`。
+ * `weaponBaseDamage` 為所在武器的平均基傷，有給才印元素侵蝕每秒傷害的區間（§ 7.9）。
+ */
+export function formatAffixDisplayParts(affix: Affix, quality: number = 0, weaponBaseDamage?: number): DisplayPart[] {
+  const parts = formatBaseAffixDisplayParts(affix, quality, weaponBaseDamage);
   return affix.sealed ? [{ text: '(封) ' }, ...parts] : parts;
 }
 
@@ -833,31 +851,64 @@ export function formatAffixRange(affix: Affix, quality: number = 0): string | nu
   return `(${lo} ~ ${hi}${unit})`;
 }
 
-function formatBaseAffixDisplayParts(affix: Affix, quality: number): DisplayPart[] {
+/** 受擊回復比例在同 Tier 觸發率上下限的換算區間，乘品質：`(2.4 ~ 2.8%)` */
+function formatRestoreRange(affix: Affix, type: OnHitRestoreType, quality: number): string | null {
+  const t = getAffixTierRange(affix);
+  if (!t) return null;
+  const lo = restoreWithQuality(getRestorePercent(type, t.min), quality);
+  const hi = restoreWithQuality(getRestorePercent(type, t.max), quality);
+  return `(${lo.toFixed(1)} ~ ${hi.toFixed(1)}%)`;
+}
+
+const erosionWithQuality = (damage: number, quality: number) => Math.max(1, Math.floor(damage * (1 + quality / 100)));
+
+/** 元素侵蝕每秒傷害的抽取區間（同 `rollErosionDamage`），乘品質：`(9 ~ 18)` */
+function formatErosionRange(weaponBaseDamage: number, quality: number): string {
+  const max = Math.max(1, Math.floor(weaponBaseDamage));
+  const min = Math.max(1, Math.floor(max / 2));
+  return `(${erosionWithQuality(min, quality)} ~ ${erosionWithQuality(max, quality)})`;
+}
+
+function formatBaseAffixDisplayParts(affix: Affix, quality: number, weaponBaseDamage?: number): DisplayPart[] {
   if (isSpecialAffixType(affix.type)) return [{ text: formatBaseAffixName(affix) }];
   if (isAttributeAffixType(affix.type)) {
     return [{ text: `${formatBaseAffixName(affix)} ${formatAffixValue(affix, quality)}` }];
   }
   const name = formatBaseAffixName(affix);
   const range = formatAffixRange(affix, quality);
-  const withRange = (head: string, tail: string): DisplayPart[] =>
-    range ? [{ text: head }, { text: range, range: true }, { text: tail }] : [{ text: head + tail }];
-  // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
-  if (affix.type === 'on_hit_hp' || affix.type === 'on_hit_mp') {
+  // 片段依序為文字與區間交錯；區間為 null 時併入前一段文字
+  const join = (...pieces: (string | { range: string | null })[]): DisplayPart[] => {
+    const out: DisplayPart[] = [];
+    for (const piece of pieces) {
+      if (typeof piece !== 'string') {
+        if (piece.range) out.push({ text: piece.range, range: true });
+      } else if (out.length > 0 && !out[out.length - 1].range) {
+        out[out.length - 1] = { text: out[out.length - 1].text + piece };
+      } else {
+        out.push({ text: piece });
+      }
+    }
+    return out;
+  };
+  const value = formatEffectiveValue(affix, quality);
+  if (isOnHitRestoreType(affix.type)) {
     // 名稱已含「受擊」，回復量的「最大 HP／MP 百分比」省略成「回血／回魔 X%」（§ 7.4）
-    const pct = restorePercentWithQuality(affix, quality);
+    const pct = restorePercentWithQuality(affix, quality).toFixed(1);
     const what = affix.type === 'on_hit_hp' ? '回血' : '回魔';
-    return withRange(`受擊 ${formatEffectiveValue(affix, quality)}%`, ` 觸發${what} ${pct}% (T${affix.tier})`);
+    return join(`受擊 ${value}%`, { range }, ` 觸發${what} ${pct}%`,
+      { range: formatRestoreRange(affix, affix.type, quality) }, ` (T${affix.tier})`);
   }
+  // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
   if (affix.type === 'element_erosion') {
-    const dot = Math.max(1, Math.floor((affix.dotDamage ?? 0) * (1 + quality / 100)));
-    return withRange(`${name} ${formatEffectiveValue(affix, quality)}%`, ` 觸發／每秒 ${dot} (T${affix.tier})`);
+    const dot = erosionWithQuality(affix.dotDamage ?? 0, quality);
+    const dotRange = weaponBaseDamage != null ? formatErosionRange(weaponBaseDamage, quality) : null;
+    return join(`${name} ${value}%`, { range }, ` 觸發／每秒 ${dot}`, { range: dotRange }, ` (T${affix.tier})`);
   }
   // § 7.9 X% 是效果強度，觸發率固定
   if (affix.type === 'hit_down' || affix.type === 'defense_down') {
-    return withRange(`${name} ${formatEffectiveValue(affix, quality)}%`, `／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`);
+    return join(`${name} ${value}%`, { range }, `／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`);
   }
-  return withRange(`${name} ${formatAffixValue(affix, quality)}`, ` (T${affix.tier})`);
+  return join(`${name} ${formatAffixValue(affix, quality)}`, { range }, ` (T${affix.tier})`);
 }
 
 export interface AffixBonuses {

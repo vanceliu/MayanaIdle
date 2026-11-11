@@ -191,3 +191,13 @@ describe('Wiki 道具頁 — 印記自成一個顯示類型', () => {
     expect(screen.getByText('印記')).toBeDefined();
   });
 });
+
+describe('Wiki 道具頁 — 魔法書的 Boss 掉落（`27-drop-table.md` § 27.6）', () => {
+  it.each(['基礎魔法書', '中階魔法書', '高階魔法書', '稀有魔法書（上）', '稀有魔法書（下）'])('%s 列出象牙塔惡魔的掉率', name => {
+    renderDetail(name);
+
+    const row = screen.getByRole('cell', { name: '象牙塔惡魔' }).closest('tr') as HTMLElement;
+    expect(within(row).getAllByRole('cell')[1].textContent).toBe('0.01%');
+    expect(screen.queryByText(/無掉落資料/)).toBeNull();
+  });
+});

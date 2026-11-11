@@ -78,7 +78,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
       buffEffect: '每次回魔另加最大 MP 5%', buffDuration: 300000,
       buffModifiers: [{ stat: 'mp_regen_max_percent', value: 5, isPercent: true }], buffCategory: 'spirit-gathering' } },
   { id: 'group-heal', name: '群體治癒', className: 'priest', classLevel: 3, requiredLevel: 30, bookItemId: 119,
-    skill: { id: 'group-heal', name: '群體治癒', level: 3, element: 'none', type: 'heal', target: 'aoe', power: 108, mpCost: 60, cooldown: 15000, range: 0 } },
+    skill: { id: 'group-heal', name: '群體治癒', level: 3, element: 'none', type: 'heal', target: 'aoe', power: 53, mpCost: 60, cooldown: 15000, range: 0 } },
   { id: 'holy-judgment', name: '聖光審判', className: 'priest', classLevel: 4, requiredLevel: 40, bookItemId: 120,
     skill: { id: 'holy-judgment', name: '聖光審判', level: 4, element: 'light', type: 'attack', target: 'aoe', power: 37, mpCost: 60, cooldown: 15000, range: 10, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6 } },
   { id: 'blood-mana', name: '血魔轉換', className: 'priest', classLevel: 5, requiredLevel: 50, bookItemId: 169,

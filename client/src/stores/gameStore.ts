@@ -97,7 +97,11 @@ import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment, rollNewInstanceFields, getTemplateById } from '../systems/templateSync';
 import { createShopEquipment } from '../systems/shopEquipment';
 import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus } from '../models/abilitySkill';
-import { craftRequiresAbility, getCraftAbilityOptions, isAbilityType, type AbilityType } from '../models/ability';
+import { craftRequiresAbility, formatAbilityDisplay, getAbilityDefinition, getCraftAbilityOptions, isAbilityType, type AbilityType } from '../models/ability';
+import {
+  abilityToCrystal, addCrystal, crystalToAbility, getCrystalApplyBlock, getCrystalApplyCost, normalizeAbilityCrystals,
+  yieldsAbilityCrystal, CRYSTAL_APPLY_BLOCK_TEXT, type AbilityCrystal,
+} from '../models/abilityCrystal';
 import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
 import { generateCraftAffixes, getDismantleYield } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
@@ -413,6 +417,8 @@ export interface GameState {
   searchMode: SearchMode;
   /** 全域 Pressure 倍率（`19-account-character.md` § 19.9），探索列顯示用；server 改倍率時由 `GameServer.refreshPressureRate` 更新 */
   pressureRate: number;
+  /** 實例在場人數（`26-spawn-pressure.md` § 26.3）；由 `mapInstance.ts` 掛入／移除成員時更新 */
+  pressureMembers: number;
   afterCombatHpThreshold: number;
   afterCombatMpThreshold: number;
   afterCombatHpResumeThreshold: number;
@@ -443,6 +449,8 @@ export interface GameState {
   bountyBoards: BountyBoards;
   bountyContracts: SignedBounty[];
   bountyCompare: BountyCompareSettings;
+  /** 技能結晶（`07-affix-ability.md` § 7S.8） */
+  abilityCrystals: AbilityCrystal[];
   statistics: CharacterStatistics;
 
   setPhase: (phase: GamePhase) => void;
@@ -530,6 +538,8 @@ export interface GameState {
   craftEquipment: (templateId: number, abilityType?: AbilityType) => CraftResult | Promise<CraftResult>;
   /** 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3「拆解」）。線上模式回 Promise */
   dismantleEquipment: (instanceId: number) => CraftResult | Promise<CraftResult>;
+  /** 鐵匠鋪技能更換（`07-affix-ability.md` § 7S.8）。線上模式回 Promise */
+  applyAbilityCrystal: (instanceId: number, crystalType: AbilityType) => CraftResult | Promise<CraftResult>;
   /** 印記師（`46-sigil.md`） */
   /** 單機同步結算；線上模式回 Promise（server 判定） */
   applySigil: (itemId: number, sigilType: SigilType, affixIndex: number | null) => SigilApplyResult | Promise<SigilApplyResult>;
@@ -747,6 +757,7 @@ export function createGameStore(session: Session) {
   lastVillageTickAt: 0,
   searchMode: 'auto',
   pressureRate: rates.pressure,
+  pressureMembers: 1,
   afterCombatHpThreshold: 30,
   afterCombatMpThreshold: 20,
   afterCombatHpResumeThreshold: 60,
@@ -768,6 +779,7 @@ export function createGameStore(session: Session) {
   bountyBoards: {},
   bountyContracts: [],
   bountyCompare: defaultBountyCompareSettings(),
+  abilityCrystals: [],
   statistics: createDefaultStatistics(),
 
   setPhase: (phase) => set({ phase }),
@@ -858,6 +870,7 @@ export function createGameStore(session: Session) {
     const bountyBoards = prefs?.bountyBoards ?? {};
     const bountyContracts = prefs?.bountyContracts ?? [];
     const bountyCompare = normalizeBountyCompareSettings(prefs?.bountyCompare);
+    const abilityCrystals = prefs?.abilityCrystals ?? [];
     // 舊存檔缺少後來新增的統計欄位，補上預設值
     const statistics = normalizeStatistics(prefs?.statistics);
 
@@ -915,6 +928,7 @@ export function createGameStore(session: Session) {
       bountyBoards,
       bountyContracts,
       bountyCompare,
+      abilityCrystals,
       statistics,
       phase: 'explore',
     });
@@ -979,6 +993,7 @@ export function createGameStore(session: Session) {
       bountyBoards: {},
       bountyContracts: [],
       bountyCompare: defaultBountyCompareSettings(),
+      abilityCrystals: [],
     });
     // 天賦與信箱是獨立 store，不跟著 set 清掉的話會留著上一隻角色的資料
     session.talent.getState().reset();
@@ -1089,6 +1104,7 @@ export function createGameStore(session: Session) {
       bountyBoards: {},
       bountyContracts: [],
       bountyCompare: defaultBountyCompareSettings(),
+      abilityCrystals: [],
       phase: 'explore',
     });
     get().startRegen();
@@ -2836,8 +2852,11 @@ export function createGameStore(session: Session) {
     // 只認背包裡未裝備的實例；`inventory` 不含身上裝備
     const item = state.inventory.find(i => i.id != null && i.id === instanceId);
     if (!item) return { ok: false, message: '沒有這件裝備' };
-    const yields = getDismantleYield(getTemplateById(item.templateId));
-    if (!yields) return { ok: false, message: '這件裝備沒有配方，無法拆解' };
+    const template = getTemplateById(item.templateId);
+    const yields = getDismantleYield(template) ?? [];
+    // 掉落品的隨機技能存成結晶（`07-affix-ability.md` § 7S.8）；無配方者只得結晶
+    const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
+    if (yields.length === 0 && !crystal) return { ok: false, message: '這件裝備無法拆解' };
 
     const newKinds = yields.filter(m => getBagItemAmount(state.bagItems, m.itemId) <= 0).length;
     const usedAfter = getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) - 1 + newKinds;
@@ -2845,10 +2864,43 @@ export function createGameStore(session: Session) {
 
     const newBag = yields.reduce((bag, m) => addBagItem(bag, m.itemId, m.amount), state.bagItems);
     if (char.id) void session.repo.deleteEquipment(item.id!);
-    set({ bagItems: newBag, inventory: state.inventory.filter(i => i.id !== item.id) });
+    set({
+      bagItems: newBag,
+      inventory: state.inventory.filter(i => i.id !== item.id),
+      ...(crystal ? { abilityCrystals: addCrystal(state.abilityCrystals, crystal) } : {}),
+    });
     get().saveState();
-    const gained = yields.map(m => `${getItemById(m.itemId)?.name ?? '未知素材'}×${m.amount}`).join('、');
+    const gained = [
+      ...yields.map(m => `${getItemById(m.itemId)?.name ?? '未知素材'}×${m.amount}`),
+      ...(crystal ? [`技能結晶「${getAbilityDefinition(crystal.type)!.name}」`] : []),
+    ].join('、');
     return { ok: true, message: `拆解 ${item.name}，獲得 ${gained}`, name: item.name };
+  },
+
+  applyAbilityCrystal: (instanceId, crystalType) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return { ok: false, message: '沒有角色' };
+    const item = state.inventory.find(i => i.id != null && i.id === instanceId);
+    if (!item) return { ok: false, message: '沒有這件裝備' };
+    const crystal = state.abilityCrystals.find(c => c.type === crystalType);
+    if (!crystal) return { ok: false, message: '沒有這顆技能結晶' };
+    const template = getTemplateById(item.templateId);
+    if (!template) return { ok: false, message: '沒有這件裝備' };
+    const block = getCrystalApplyBlock(crystal, item, template);
+    if (block) return { ok: false, message: CRYSTAL_APPLY_BLOCK_TEXT[block] };
+    const cost = getCrystalApplyCost(template.tier ?? 0);
+    if (char.gold < cost) return { ok: false, message: '金幣不足' };
+    const ability = crystalToAbility(crystal, template)!;
+
+    const updatedItem = { ...item, ability };
+    if (item.id) void session.repo.updateEquipment(item.id, { ability });
+    set({
+      character: { ...char, gold: char.gold - cost },
+      inventory: state.inventory.map(i => (i.id === item.id ? updatedItem : i)),
+    });
+    get().saveState();
+    return { ok: true, message: `${item.name} 的隨機技能換成「${formatAbilityDisplay(ability)}」`, name: item.name };
   },
 
   applySigil: (itemId, sigilType, affixIndex) => {
@@ -3250,7 +3302,7 @@ export function processMonsterDeath(
   const dropBonuses = getAffixBonusesFromGear(allGear);
   // Pressure 掉落倍率是掉寶倍率的一個因子（`26-spawn-pressure.md` § 26.3）
   const pressureDropMult = getPressureDropMultiplier(
-    calculatePressure(char.areaKills ?? 0).pressure,
+    calculatePressure(char.areaKills ?? 0, undefined, get().pressureMembers).pressure,
   );
   const defeatedMonsterName = dead.name;
   const monsterIsBoss = dead.isBoss;
@@ -3628,6 +3680,7 @@ function saveLocalPreferences(characterId: number, state: GameState, session: Se
     bountyBoards: state.bountyBoards,
     bountyContracts: state.bountyContracts,
     bountyCompare: state.bountyCompare,
+    abilityCrystals: state.abilityCrystals,
     statistics: state.statistics,
   };
   void session.repo.putCharacterPrefs(characterId, data);
@@ -3689,6 +3742,7 @@ interface LoadedPreferences {
   bountyBoards: BountyBoards;
   bountyContracts: SignedBounty[];
   bountyCompare: BountyCompareSettings;
+  abilityCrystals: AbilityCrystal[];
   statistics: CharacterStatistics;
 }
 
@@ -3749,6 +3803,7 @@ async function loadLocalPreferences(characterId: number, session: Session): Prom
       bountyBoards: data.bountyBoards ?? {},
       bountyContracts: data.bountyContracts ?? [],
       bountyCompare: normalizeBountyCompareSettings(data.bountyCompare),
+      abilityCrystals: normalizeAbilityCrystals(data.abilityCrystals),
       statistics: normalizeStatistics(data.statistics),
     };
   } catch {

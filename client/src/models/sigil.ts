@@ -5,7 +5,7 @@
  * 詞綴的升階、重骰與品質全部走這裡，強化等級（+N）走背包卷軸，兩套互不影響。
  *
  * 這裡的四支 `apply*` 一律走 `models/affix.ts` 的既有 roll 函式
- * （`generateAffixes` / `rollAffixValue` / `rollErosionDamage` / `rollRestorePercent`），
+ * （`generateAffixes` / `rollAffixValue` / `rollErosionDamage`），
  * **不另寫一份詞綴生成邏輯** —— 兩份實作只要有一邊改動就會靜默走鐘。
  */
 
@@ -25,7 +25,6 @@ import {
   BONUS_ATTRIBUTE_VALUE,
   rollAffixValue,
   rollErosionDamage,
-  rollRestorePercent,
   formatAffixName,
   type Affix,
   type AffixCategory,
@@ -464,8 +463,6 @@ export function applyStingSigil(
     ...(needsElement ? { element: rollElement() } : {}),
     ...(type === 'element_erosion'
       ? { dotDamage: rollErosionDamage(ctx.weaponBaseDamage ?? 1) } : {}),
-    ...(type === 'on_hit_hp' || type === 'on_hit_mp'
-      ? { restorePercent: rollRestorePercent(type) } : {}),
   };
 
   return {
@@ -478,7 +475,7 @@ export function applyStingSigil(
 /**
  * § 46.5 重刻印記：種類與 Tier 不變，把這條詞綴「抽出來的隨機數值」整組重骰。
  *
- * 含觸發率型詞綴的觸發率、元素侵蝕的每跳傷害、受擊回復的回復比例。
+ * 含觸發率型詞綴的觸發率、元素侵蝕的每跳傷害（受擊回復的回復比例隨觸發率）。
  * **元素不重骰** —— 元素不是數值。
  */
 export function applyRecarveSigil(
@@ -498,8 +495,6 @@ export function applyRecarveSigil(
     value: rollAffixValue(old.tier, type),
     ...(type === 'element_erosion'
       ? { dotDamage: rollErosionDamage(ctx.weaponBaseDamage ?? 1) } : {}),
-    ...(type === 'on_hit_hp' || type === 'on_hit_mp'
-      ? { restorePercent: rollRestorePercent(type) } : {}),
   };
 
   return {
@@ -512,7 +507,7 @@ export function applyRecarveSigil(
 /**
  * § 46.6 精鍊印記：Tier +1，**必定成功**，推到取得管道上限為止（商店裝 T3、其餘 T5）。
  *
- * 升階後以新 Tier 的區間重骰百分比數值；元素、每跳傷害、回復比例與 Tier 無關，**不動**。
+ * 升階後以新 Tier 的區間重骰百分比數值；元素、每跳傷害與 Tier 無關，**不動**；回復比例隨新觸發率。
  */
 export function applyTemperSigil(
   affixes: Affix[],
@@ -541,7 +536,7 @@ export function applyTemperSigil(
  * § 46.7 突破印記：只受理 T5→T6（10%）與 T6→T7（2%）。
  *
  * 失敗時該詞綴掉回 T1；成功與失敗都以新 Tier 的區間重骰百分比數值。
- * 元素侵蝕的每跳傷害與受擊回復的回復比例與 Tier 無關，**不動**。
+ * 元素侵蝕的每跳傷害與 Tier 無關，**不動**；受擊回復的回復比例隨新觸發率。
  */
 export function applyEnhanceSigil(
   affixes: Affix[],

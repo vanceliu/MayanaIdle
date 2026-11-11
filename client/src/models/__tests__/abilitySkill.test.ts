@@ -94,7 +94,7 @@ describe('牧師', () => {
     const shield = apply('holy-shield', 'priest', 'holy_shield_boost', { absorb: 50, duration: 3000 });
     expect(shield.buffModifiers).toEqual([{ stat: 'shield_absorb', value: 150, isPercent: false }]);
     expect(shield.buffDuration).toBe(23000);
-    expect(apply('group-heal', 'priest', 'group_heal_boost', { mp: 10, power: 20 })).toMatchObject({ mpCost: 50, power: Math.floor(108 * 1.2) });
+    expect(apply('group-heal', 'priest', 'group_heal_boost', { mp: 10, power: 20 })).toMatchObject({ mpCost: 50, power: Math.floor(53 * 1.2) });
     expect(apply('holy-judgment', 'priest', 'holy_judgment_boost', { targets: 2, power: 10 })).toMatchObject({ maxTargets: 8, power: Math.floor(37 * 1.1) });
   });
 

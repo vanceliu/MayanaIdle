@@ -44,12 +44,14 @@
 | 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
 | 免疫詞綴（特殊詞綴） | `07-affix.md` | § 7.10 |
 | **命中下降／防禦下降／迴避詞綴** | `07-affix.md` | § 7.4、§ 7.9（迴避階級表 § 7.3.1） |
+| **受擊回血／回魔（回復比例隨觸發率換算）、元素侵蝕每跳傷害** | `07-affix.md` | § 7.9 |
 | **迴避值（迴避詞綴單位與換算）** | `07-affix.md` | § 7.3.1 |
 | **T7 獨有詞綴（清單／觸發／同類去重／印記不可動）** | `07-affix-tier7.md` | 全文 |
 | **隨機技能（T3+ 武器／項鍊／戒指，各管道機率／清單／觸發）** | `07-affix-ability.md` | 全文 |
 | **隨機技能分武器池（攻擊）／飾品池（防禦）；共通／職業池 2 選 1、職業技能強化（五職業）** | `07-affix-ability.md` § 7S.2、§ 7S.5 | — |
 | **飾品隨機技能：低血低魔回復、荊棘反彈、怒氣、平靜** | `07-affix-ability.md` § 7S.5、`29-regen.md`、`51-auto-talent.md` § 51.4.5（怒氣／平靜條件） | — |
 | **鐵匠鋪製作指定隨機技能（武器／項鍊／戒指必選、數值最弱）** | `07-affix-ability.md` § 7S.6、`06-equipment-acquire.md` § 6A.3 | — |
+| **技能結晶（拆解掉落品保留隨機技能）、鐵匠鋪技能更換** | `07-affix-ability.md` § 7S.8、`06-equipment-acquire.md` § 6A.3「拆解」 | — |
 | **詞綴洞／掉落詞綴條數（1~4 條）** | `07-affix.md` | § 7.1 |
 | **封印詞綴 `(封)`** | `07-affix.md` § 7.11.1、`46-sigil.md` § 46.12 | — |
 | **新增印記／封印印記** | `46-sigil.md` | § 46.11、§ 46.12 |
@@ -63,7 +65,7 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **製作材料分配規則／製作消耗（製作費依階級）** | `06-equipment-acquire.md` | § 6A.3 |
-| **裝備拆解（鐵匠鋪，退一半材料）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
+| **裝備拆解（鐵匠鋪，退一半材料；掉落品技能存成結晶）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
@@ -139,6 +141,7 @@
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
+| **Pressure 依組隊人數縮放（門檻 × 在場人數、人數變動時擊殺數同比例縮放）** | `26-spawn-pressure.md` § 26.3「人數變動」、`97-selfhosted-server.md` § 97.7.1 | — |
 | **探索列 Pressure 顯示（P 值／擊殺數提示）** | `16-tech-frontend-architecture.md` | § 32.3 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
 | 怪物經驗公式與結算倍率 | `28-monster-stats.md` | § 28.1 |
@@ -167,6 +170,7 @@
 | **懸賞價格級距／定價等級** | `53-bounty-contract.md` | § 53.2 |
 | **懸賞保證強化詞綴／掉兩次取比較好** | `53-bounty-contract.md` | § 53.5 |
 | **懸賞裝備比較條件（偏好詞綴／順序與開關）** | `53-bounty-contract.md` | § 53.6 |
+| **競技場（未實作：段位入場費、波次、票券場、結算、排行榜）** | `55-arena.md` | 全文 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` § 37.4.9、`45-legacy-archive.md` § 45.4.1 | — |
@@ -177,6 +181,7 @@
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（結論見 § 44.7、§ 44.10） |
 | 實戰模擬（死神會攻擊）/ 職業生存與補血策略 | `44-dps-prediction.md` | § 44.12 |
+| 競技場波次模擬 / 各段位能掛多久 | `44-dps-prediction.md` | § 44.13 |
 | **試驗場（木樁／DPS 量測）** | `50-training-ground.md` | 全文 |
 | 木樁可調參數（防禦/血量/等級/體型/元素/數量） | `50-training-ground.md` | § 50.4.2 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
@@ -277,6 +282,7 @@
   ← 06-equipment.md / 07-affix.md / 07-affix-tier7.md / 07-affix-ability.md / 08-quality.md / 46-sigil.md § 46.12
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
   ← 24-buff-debuff.md § 24.3 / 42-element-system.md § 42.2 / 51-auto-talent.md § 51.3
+  ← 25-monster-system.md § 25.12 / 27-drop-table.md § 27.5（競技場模擬）
 
 【戰鬥／技能／Buff】
 03-combat.md ←→ 04-character.md ←→ 05-skill.md ←→ 20-attributes.md
@@ -401,6 +407,14 @@
   ←  13-town.md § 13.13.1（區間位置公式）
   ←→ 18-data-schema.md § 18.6 / 97-selfhosted-server.md § 97.2 / § 97.7.1
   ←→ 43-wiki-system.md § 4.11
+       ↕
+55-arena.md（未實作）
+  ←  27-drop-table.md § 27.5 / § 27.6（入場材料、王名單）
+  ←  25-monster-system.md § 25.12（強化詞綴）
+  ←  53-bounty-contract.md § 53.4（重置時刻）
+  ←  03-combat.md § 3.13 / 97-selfhosted-server.md § 97.7.1
+  ←→ 37-statistics.md § 37.1 / § 37.5（死亡統計、排行榜）
+  ←→ 44-dps-prediction.md § 44.13（波次模擬）
        ↕
 36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
        ↕                    ←  06-equipment-acquire.md § 6A.3

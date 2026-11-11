@@ -22,14 +22,17 @@ import {
   craftRequiresAbility, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, rollAbility,
   formatAbilityEffect, type AbilityType,
 } from '../../models/ability';
+import { abilityToCrystal, crystalImproves, yieldsAbilityCrystal, type AbilityCrystal } from '../../models/abilityCrystal';
+import { BlacksmithAbilitySwap } from './BlacksmithAbilitySwap';
 
-type BlacksmithTab = 'craft' | 'dismantle';
+type BlacksmithTab = 'craft' | 'dismantle' | 'swap';
 
 export function TownBlacksmith() {
   const char = useGameStore(s => s.character);
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
   const craftQuests = useGameStore(s => s.craftQuests);
+  const abilityCrystals = useGameStore(s => s.abilityCrystals);
   const acceptCraftQuest = useGameStore(s => s.acceptCraftQuest);
   const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
   const [selectedRecipe, setSelectedRecipe] = useState<EquipmentTemplate | null>(null);
@@ -84,14 +87,19 @@ export function TownBlacksmith() {
     }
   }
 
-  // 拆解清單：背包中未裝備且模板有配方的實例（§ 6A.3「拆解」）
+  // 拆解清單：背包中未裝備、模板有配方或帶隨機技能的掉落品（§ 6A.3「拆解」、§ 7S.8）
   const dismantlable = inventory
-    .map(item => ({ item, yields: getDismantleYield(allTemplates.find(t => t.id === item.templateId)) }))
-    .filter((e): e is { item: EquipmentInstance; yields: NonNullable<typeof e.yields> } => e.yields !== null);
+    .map(item => {
+      const template = allTemplates.find(t => t.id === item.templateId);
+      const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
+      return { item, yields: getDismantleYield(template), crystal };
+    })
+    .filter(e => e.yields !== null || e.crystal !== undefined);
 
-  async function handleDismantle(item: EquipmentInstance) {
+  async function handleDismantle(item: EquipmentInstance, hasYields: boolean, crystal: AbilityCrystal | undefined) {
     const warning = item.enhancement > 0 ? `\n強化 +${item.enhancement} 不退還。` : '';
-    if (!window.confirm(`確定拆解 ${item.name}？只退還一半材料。${warning}`)) return;
+    const crystalLine = crystal ? `\n隨機技能「${getAbilityDefinition(crystal.type)!.name}」會存成技能結晶。` : '';
+    if (!window.confirm(`確定拆解 ${item.name}？${hasYields ? '只退還一半材料。' : '不退材料。'}${crystalLine}${warning}`)) return;
     const result = await useGameStore.getState().dismantleEquipment(item.id!);
     setResultMsg(result.message);
   }
@@ -108,17 +116,19 @@ export function TownBlacksmith() {
       <div className="shop-tabs">
         <button className={tab === 'craft' ? 'active' : ''} onClick={() => { setTab('craft'); setResultMsg(null); }}>裝備製作</button>
         <button className={tab === 'dismantle' ? 'active' : ''} onClick={() => { setTab('dismantle'); setResultMsg(null); }}>裝備拆解</button>
+        <button className={tab === 'swap' ? 'active' : ''} onClick={() => { setTab('swap'); setResultMsg(null); }}>技能更換</button>
       </div>
 
       {resultMsg && <p className="bs-result">{resultMsg}</p>}
 
       {tab === 'dismantle' && (
         <div className="panel-scroll">
-          <p className="shop-item-desc">退還一半材料，前置裝備不退；身上的裝備不能拆。</p>
+          <p className="shop-item-desc">有配方的退還一半材料，前置裝備不退；掉落品的隨機技能會存成技能結晶。身上的裝備不能拆。</p>
           {dismantlable.length === 0 && <p className="shop-item-desc">背包裡沒有可拆解的裝備</p>}
           <div className="shop-items">
-            {dismantlable.map(({ item, yields }) => {
+            {dismantlable.map(({ item, yields, crystal }) => {
               const color = getEquipmentInstanceTierColor(item, allTemplates);
+              const existing = crystal && abilityCrystals.find(c => c.type === crystal.type);
               return (
                 <div key={item.id} className="shop-item bs-shop-item">
                   <div className="shop-item-info">
@@ -129,7 +139,8 @@ export function TownBlacksmith() {
                       </span>
                     </Tooltip>
                     <span className="shop-item-desc bs-craft-materials">
-                      {yields.map(m => {
+                      {!yields && <span className="bs-dim">不退材料</span>}
+                      {yields?.map(m => {
                         const def = getItemById(m.itemId);
                         const { icon, color: matColor, glowClass } = resolveItemIcon(def, 'material');
                         return (
@@ -141,9 +152,18 @@ export function TownBlacksmith() {
                         );
                       })}
                     </span>
+                    {crystal && (
+                      <span className="shop-item-desc">
+                        <span className="bs-ability-text">技能結晶：{getAbilityDefinition(crystal.type)!.name}</span>
+                        {crystalImproves(existing, crystal) && <span className="bs-crystal-mark">{existing ? '（更新）' : '（新）'}</span>}
+                      </span>
+                    )}
+                    {!crystal && item.ability && item.isCraftedGear && (
+                      <span className="shop-item-desc bs-dim">製作品的隨機技能不會留下結晶</span>
+                    )}
                   </div>
                   <div className="shop-item-actions">
-                    <button className="btn-danger" aria-label={`拆解 ${item.name}`} onClick={() => handleDismantle(item)}>拆解</button>
+                    <button className="btn-danger" aria-label={`拆解 ${item.name}`} onClick={() => handleDismantle(item, yields !== null, crystal)}>拆解</button>
                   </div>
                 </div>
               );
@@ -151,6 +171,8 @@ export function TownBlacksmith() {
           </div>
         </div>
       )}
+
+      {tab === 'swap' && <BlacksmithAbilitySwap templates={allTemplates} onResult={setResultMsg} />}
 
       {tab === 'craft' && (<>
       {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨配方清單捲動 */}

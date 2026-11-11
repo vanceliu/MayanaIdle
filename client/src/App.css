@@ -3500,6 +3500,26 @@ button.active {
 .equip-detail-ability { padding-bottom: 4px; }
 .equip-detail-affix.ability { color: #86EFAC; text-shadow: 0 0 6px rgba(134,239,172,0.3); font-weight: 700; }
 
+/* § 7S.8 技能結晶：拆解清單標記、技能更換分頁（左欄結晶／右欄裝備） */
+.bs-ability-text { color: #86EFAC; }
+.bs-dim { color: var(--text-dim); }
+.bs-crystal-mark { color: var(--accent-gold); }
+.bs-block-reason { color: var(--accent-danger); }
+.bs-swap-grid { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 12px; align-items: start; }
+.bs-crystal-column { position: sticky; top: 0; display: flex; flex-direction: column; gap: 8px; }
+.bs-crystal-group { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.bs-crystal-group-title { color: var(--accent-gold); font-size: var(--fs-sm); }
+.bs-crystal {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  background: var(--bg-inset); border: var(--border-width) solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; font-size: var(--fs-sm);
+}
+.bs-crystal.selected { border-color: var(--accent-primary); }
+.bs-crystal-name { color: #86EFAC; font-weight: 700; }
+.bs-crystal-pool { color: var(--text-dim); }
+.bs-crystal-tooltip { max-width: 320px; font-size: var(--fs-sm); line-height: 1.6; }
+.bs-crystal-value { color: #EF4444; font-weight: 700; }
+
 /* § 7S.6 鐵匠鋪隨機技能選擇列：未指定時標紅 */
 .bs-ability-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .bs-ability-row select {

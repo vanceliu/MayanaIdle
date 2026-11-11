@@ -5,11 +5,12 @@ import { ExploreBar, formatPressureTitle } from '../ExploreBar';
 import { useGameStore } from '../../stores/gameStore';
 
 /** 探索列的 Pressure 顯示（`26-spawn-pressure.md` § 26.3） */
-function setAreaKills(areaKills: number, pressureRate = 1) {
+function setAreaKills(areaKills: number, pressureRate = 1, pressureMembers = 1) {
   useGameStore.setState({
     phase: 'explore',
     searchMode: 'auto',
     pressureRate,
+    pressureMembers,
     character: {
       name: 'TestHero',
       className: 'knight',
@@ -54,19 +55,25 @@ describe('ExploreBar Pressure', () => {
   it('顯示 P 值與擊殺數提示', () => {
     setAreaKills(1000);
     render(<ExploreBar />);
-    expect(screen.getByText('P5').getAttribute('title')).toBe('1,000/1,100');
+    expect(screen.getByText('P10').getAttribute('title')).toBe('1,000/1,100');
   });
 
   it('Pressure 0 也顯示', () => {
-    setAreaKills(200);
+    setAreaKills(50);
     render(<ExploreBar />);
-    expect(screen.getByText('P0').getAttribute('title')).toBe('200/300');
+    expect(screen.getByText('P0').getAttribute('title')).toBe('50/100');
   });
 
   it('依 store 的全域倍率計算', () => {
     setAreaKills(400, 2);
     render(<ExploreBar />);
-    expect(screen.getByText('P4').getAttribute('title')).toBe('400/470');
+    expect(screen.getByText('P8').getAttribute('title')).toBe('400/450');
+  });
+
+  it('組隊時門檻乘以在場人數', () => {
+    setAreaKills(400, 1, 2);
+    render(<ExploreBar />);
+    expect(screen.getByText('P2').getAttribute('title')).toBe('400/600');
   });
 
   it('倍率 0 時恆為 P0，提示只有擊殺數', () => {

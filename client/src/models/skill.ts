@@ -168,7 +168,7 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   { id: 'gale-storm', name: '狂風暴', level: 5, element: 'wind', type: 'attack', target: 'aoe', power: 18, mpCost: 30, cooldown: 8000, range: 12, aoeCenter: 'target', aoeRadius: 5, maxTargets: 5 },
   { id: 'hellfire', name: '業火', level: 5, element: 'fire', type: 'attack', target: 'aoe', power: 20, mpCost: 35, cooldown: 8000, range: 12, aoeCenter: 'target', aoeRadius: 5, maxTargets: 5 },
   { id: 'ice-ring', name: '冰環', level: 5, element: 'ice', type: 'attack', target: 'aoe', power: 18, mpCost: 30, cooldown: 8000, range: 12, aoeCenter: 'target', aoeRadius: 5, maxTargets: 5, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
-  { id: 'great-heal', name: '大治癒', level: 5, element: 'none', type: 'heal', target: 'single', power: 81, mpCost: 40, cooldown: 10000, range: 0 },
+  { id: 'great-heal', name: '大治癒', level: 5, element: 'none', type: 'heal', target: 'single', power: 53, mpCost: 40, cooldown: 10000, range: 0 },
   { id: 'holy-light', name: '聖光術', level: 5, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 20, cooldown: 3000, range: 0, buffEffect: '淨化負面狀態', buffDuration: 0, cleanse: true },
   // Level 6
   { id: 'strength-boost', name: '力量提升', level: 6, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 40, cooldown: 3000, range: 0, buffEffect: '力量+5', buffDuration: 600000, buffModifiers: [{ stat: 'str', value: 5, isPercent: false }] },
@@ -186,7 +186,7 @@ export const SKILL_CATALOG: Omit<Skill, 'lastUsedAt'>[] = [
   { id: 'chain-lightning', name: '閃電鎖鏈', level: 8, element: 'wind', type: 'attack', target: 'aoe', power: 25, mpCost: 55, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 7, maxTargets: 7 },
   { id: 'purgatory', name: '煉獄火', level: 8, element: 'fire', type: 'attack', target: 'aoe', power: 37, mpCost: 60, cooldown: 12000, range: 12, aoeCenter: 'target', aoeRadius: 7, maxTargets: 7 },
   { id: 'blizzard', name: '冰暴', level: 8, element: 'ice', type: 'attack', target: 'aoe', power: 27, mpCost: 45, cooldown: 10000, range: 12, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6, applyDebuff: { category: 'slow', name: '減速', description: '攻擊速度降低30%', duration: 6000, modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['slowed'] } },
-  { id: 'full-heal', name: '完全治癒', level: 8, element: 'none', type: 'heal', target: 'single', power: 270, mpCost: 80, cooldown: 15000, range: 0 },
+  { id: 'full-heal', name: '完全治癒', level: 8, element: 'none', type: 'heal', target: 'single', power: 80, mpCost: 80, cooldown: 15000, range: 0 },
   { id: 'greater-haste', name: '強化加速術', level: 8, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 60, cooldown: 100000, range: 0, buffEffect: '攻速+40%', buffDuration: 600000, buffModifiers: [{ stat: 'attack_speed', value: 40, isPercent: true }], buffCategory: 'speed' },
   // Level 9
   { id: 'greater-magic-armor', name: '高級魔法盔甲', level: 9, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 70, cooldown: 12000, range: 0, buffEffect: '防禦+10', buffDuration: 600000, buffModifiers: [{ stat: 'defense', value: 10, isPercent: false }], buffCategory: 'defense-buff' },

@@ -32,11 +32,23 @@ describe('詞綴 Alt 區間', () => {
     expect(rangeOf({ type: 'max_hp', tier: 7, value: 95 }, 10)).toEqual(['(99 ~ 110)']);
   });
 
-  it('受擊回復的區間接在觸發率後', () => {
-    const affix: Affix = { type: 'on_hit_hp', tier: 1, value: getAffixTierTable('on_hit_hp')[0].min, restorePercent: 3 };
-    const parts = formatAffixDisplayParts(affix);
-    expect(parts[1].range).toBe(true);
-    expect(parts[2].text).toMatch(/^ 觸發回血 3%/);
+  it('受擊回復：觸發率與回復%各接一段區間；回復%區間為該 Tier 觸發率上下限的換算', () => {
+    expect(formatAffixDisplayParts({ type: 'on_hit_hp', tier: 3, value: 3 })).toEqual([
+      { text: '受擊 3.0%' }, { text: '(2.4 ~ 3.5%)', range: true },
+      { text: ' 觸發回血 2.7%' }, { text: '(2.5 ~ 2.8%)', range: true },
+      { text: ' (T3)' },
+    ]);
+  });
+
+  it('受擊回復的區間乘品質', () => {
+    expect(rangeOf({ type: 'on_hit_hp', tier: 3, value: 3 }, 10)).toEqual(['(2.6 ~ 3.8%)', '(2.7 ~ 3.0%)']);
+  });
+
+  it('元素侵蝕：有武器基傷時每秒傷害接「平均基傷一半 ~ 平均基傷」乘品質', () => {
+    const affix: Affix = { type: 'element_erosion', tier: 3, value: 9, element: 'fire', dotDamage: 12 };
+    expect(rangeOf(affix)).toEqual(['(8.1 ~ 11.0%)']);
+    expect(formatAffixDisplayParts(affix, 0, 18).filter(p => p.range).map(p => p.text)).toEqual(['(8.1 ~ 11.0%)', '(9 ~ 18)']);
+    expect(formatAffixDisplayParts(affix, 10, 18).filter(p => p.range).map(p => p.text)[1]).toBe('(9 ~ 19)');
   });
 
   it('特殊詞綴、額外屬性沒有區間', () => {

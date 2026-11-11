@@ -41,7 +41,7 @@ const ITEMS: DemoItem[] = [
     ability: { type: 'rage', params: { decay: 9 } },
     affixes: [
       { type: 'max_hp', tier: 7, value: 95 },
-      { type: 'on_hit_hp', tier: 3, value: mid('on_hit_hp', 3), restorePercent: 3 },
+      { type: 'on_hit_hp', tier: 3, value: mid('on_hit_hp', 3) },
       { type: 'bonus_attribute', tier: 1, value: 1, attribute: 'STR' },
       { type: 'immune_poison', tier: 1, value: 0 },
     ],

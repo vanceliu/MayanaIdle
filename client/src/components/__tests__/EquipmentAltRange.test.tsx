@@ -65,6 +65,18 @@ describe('裝備 tooltip Alt 數值區間', () => {
     expect(down.defaultPrevented).toBe(true);
   });
 
+  it('受擊回血：回復%也顯示區間', () => {
+    const armor = {
+      id: 2, templateId: 90, name: '測試胸甲', type: 'armor', slot: 'chest', isTwoHanded: false,
+      defense: 20, quality: 0, enhancement: 0, ownerId: 1, equipped: true,
+      affixes: [{ type: 'on_hit_hp', tier: 3, value: 3 }],
+    } as EquipmentInstance;
+    const { container } = render(<EquipmentDetail item={armor} />);
+    expect(screen.getByText('受擊 3.0% 觸發回血 2.7% (T3)')).toBeTruthy();
+    act(() => { fireEvent.keyDown(window, { key: 'Alt', altKey: true }); });
+    expect(ranges(container)).toEqual(['(2.4 ~ 3.5%)', '(2.5 ~ 2.8%)']);
+  });
+
   it('compact 沒有詞綴與隨機技能，按 Alt 也不顯示', () => {
     const { container } = render(<EquipmentDetail item={sword()} compact />);
     act(() => { fireEvent.keyDown(window, { key: 'Alt', altKey: true }); });

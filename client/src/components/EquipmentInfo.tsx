@@ -1,6 +1,6 @@
 import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
-import { formatAffixDisplay, formatAffixDisplayParts, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix, type DisplayPart } from '../models/affix';
+import { formatAffixDisplay, formatAffixDisplayParts, getWeaponBaseDamage, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix, type DisplayPart } from '../models/affix';
 import { formatUniqueAffixDisplay } from '../models/uniqueAffix';
 import { formatAbilityDisplayParts } from '../models/ability';
 import { CLASS_NAMES_ZH } from '../models/character';
@@ -101,6 +101,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const classMismatch = useClassMismatch(item.requiredClass);
   const uniqueSuppressed = useUniqueAffixSuppressed(item);
   const showRange = useAltHeld();
+  const weaponBaseDamage = isWeapon ? getWeaponBaseDamage(item) : undefined;
   // § 7.1 詞綴洞：新手裝沒有詞綴也不開洞，不列空洞
   const affixCount = item.affixes?.length ?? 0;
   const emptySockets = item.isStarterGear ? 0 : Math.max(0, getAffixSockets(item) - countSocketedAffixes(item.affixes));
@@ -120,7 +121,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
         className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
         title={isTierlessAffixType(affix.type) ? '印記只能重骰，不能升階' : undefined}
       >
-        <DisplayParts parts={formatAffixDisplayParts(affix, item.quality)} showRange={showRange} />
+        <DisplayParts parts={formatAffixDisplayParts(affix, item.quality, weaponBaseDamage)} showRange={showRange} />
       </div>
     )
   );

@@ -9,6 +9,7 @@ import type { MonsterInstance } from '../../../client/src/models/monster';
 import { handleMonsterDeath } from '../../../client/src/systems/combatLoop';
 import { waitForPendingDrops } from '../../../client/src/stores/gameStore';
 import { TRAINING_GROUND_REGION_ID } from '../../../client/src/models/trainingGround';
+import { calculatePressure } from '../../../client/src/systems/pressure';
 
 /** § 97.7.1 隊伍實例：同隊同圖共用怪物與 Pressure，經驗平分、掉落給一人 */
 const ATTRS = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 } as never;
@@ -217,7 +218,9 @@ describe('World（隊伍與地圖實例）', () => {
     await world.handlePartyAction(b, 'leave', []);
     expect(a.party.getState().party).toBeNull();
     expect(a.instance).toBe(shared);
-    expect(a.instance.kills).toBe(700);
+    // 人數 2 → 1：擊殺數同比例縮回，Pressure 不變（`26-spawn-pressure.md` § 26.3「人數變動」）
+    expect(a.instance.kills).toBe(350);
+    expect(calculatePressure(a.instance.kills, 1, 1).pressure).toBe(calculatePressure(700, 1, 2).pressure);
     expect(a.instance.key.startsWith('solo:')).toBe(true);
     expect(b.instance).not.toBe(shared);
     expect(b.instance.members).toEqual([b]);

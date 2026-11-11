@@ -277,7 +277,7 @@ export function getAbilityWeaponValue(template: AbilityTemplate): number {
   return Math.round((s + l) / 2);
 }
 
-function resolveParamRange(def: AbilityParamDef, template: AbilityTemplate): [number, number] {
+export function resolveParamRange(def: AbilityParamDef, template: AbilityTemplate): [number, number] {
   if (def.max !== 'weaponValue') return [def.min, def.max];
   return [def.min, Math.max(def.min, getAbilityWeaponValue(template))];
 }
@@ -404,7 +404,7 @@ export function minAbilityParam(gear: readonly GearLike[], type: AbilityType, ke
   return best;
 }
 
-function formatParam(def: AbilityParamDef, value: number): string {
+export function formatParam(def: AbilityParamDef, value: number): string {
   if (def.unit === '%') return `${value}%`;
   if (def.unit === 's') {
     const seconds = value / 1000;

@@ -173,7 +173,7 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
     'ensureBountyBoards', 'signBounty', 'abandonBounty', 'setBountyCompare',
-    'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
+    'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'applyAbilityCrystal', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
     'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
     'setAfterCombatThreshold',
   ]),

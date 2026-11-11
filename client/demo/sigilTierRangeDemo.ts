@@ -25,7 +25,7 @@ const SAMPLES: { title: string; rows: Row[] }[] = [
       { affix: { type: 'drop_rate', tier: 5, value: 13 }, reason: '下一階由突破印記受理' },
       { affix: { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'SPI' }, reason: '額外屬性沒有 Tier，無法升階' },
       { affix: { type: 'max_hp', tier: 5, value: 69 }, reason: '下一階由突破印記受理' },
-      { affix: { type: 'on_hit_hp', tier: 5, value: 12, restorePercent: 3 }, reason: '下一階由突破印記受理' },
+      { affix: { type: 'on_hit_hp', tier: 5, value: 5 }, reason: '下一階由突破印記受理' },
     ],
   },
   {

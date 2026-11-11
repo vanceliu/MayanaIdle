@@ -3,15 +3,15 @@
  * 生成詞綴 → 裝備 → 被怪打 → 觸發 → HP／MP 實際回復。
  *
  * 規則：
- *  - 詞綴的 % 是**觸發率**（走通用 Tier 表），回復比例另外抽：回血 2~4%、回魔 2~5%
- *  - 回復比例抽到當下決定後固定，**與 Tier 無關**
+ *  - 詞綴的 % 是**觸發率**；回復比例由觸發率線性換算（§ 7.9）：回血 2.0~4.0%、回魔 2.0~5.0%
+ *  - 回復比例不存在裝備上，舊存檔的 `restorePercent` 不採用
  *  - 觸發率與回復比例**都吃裝備品質**
  *  - **受到傷害**才判定：被迴避不算；同一條詞綴出現在多個部位時各自判定
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { processMonsterAttack } from '../../systems/arpgEventHandler';
 import {
-  generateAffixes, getOnHitRestore, rollRestorePercent,
+  generateAffixes, getOnHitRestore, getRestorePercent, getAffixTierTable,
   ON_HIT_RESTORE_PERCENT, formatAffixDisplay, type Affix,
 } from '../../models/affix';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../../stores/gameStore';
@@ -60,10 +60,12 @@ function chest(affixes: Affix[], quality = 0): EquipmentInstance {
   } as EquipmentInstance;
 }
 
-const onHitHp = (chance: number, pct: number): Affix =>
-  ({ type: 'on_hit_hp', tier: 7, value: chance, restorePercent: pct });
-const onHitMp = (chance: number, pct: number): Affix =>
-  ({ type: 'on_hit_mp', tier: 7, value: chance, restorePercent: pct });
+/** T7 上限 7% → 回血 4.0%、回魔 5.0% */
+const T7_MAX = 7;
+/** 觸發判定必中；換算比例夾在上限（回血 4.0%、回魔 5.0%） */
+const ALWAYS = 100;
+const onHitHp = (chance = T7_MAX): Affix => ({ type: 'on_hit_hp', tier: 7, value: chance });
+const onHitMp = (chance = T7_MAX): Affix => ({ type: 'on_hit_mp', tier: 7, value: chance });
 
 const mapMonsters = [{ id: 'm1', position: { x: 1, y: 1 }, isBoss: false }] as unknown as MapMonster[];
 
@@ -85,43 +87,45 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); });
 
-describe('生成', () => {
-  it('回血抽 2~4%、回魔抽 2~5%', () => {
-    const hp = new Set<number>(), mp = new Set<number>();
-    for (let i = 0; i < 500; i++) {
-      hp.add(rollRestorePercent('on_hit_hp'));
-      mp.add(rollRestorePercent('on_hit_mp'));
-    }
-    expect([...hp].sort()).toEqual([2, 3, 4]);
-    expect([...mp].sort()).toEqual([2, 3, 4, 5]);
+describe('回復比例隨觸發率（§ 7.9）', () => {
+  it('範圍：回血 2.0~4.0%、回魔 2.0~5.0%', () => {
     expect(ON_HIT_RESTORE_PERCENT.on_hit_hp).toEqual([2, 4]);
     expect(ON_HIT_RESTORE_PERCENT.on_hit_mp).toEqual([2, 5]);
   });
 
-  it('生成防具詞綴時一定帶回復比例，且落在各自範圍', () => {
-    for (let i = 0; i < 1000; i++) {
-      for (const a of generateAffixes('armor', 60, 4, false)) {
-        if (a.type === 'on_hit_hp') {
-          expect(a.restorePercent).toBeGreaterThanOrEqual(2);
-          expect(a.restorePercent).toBeLessThanOrEqual(4);
-        } else if (a.type === 'on_hit_mp') {
-          expect(a.restorePercent).toBeGreaterThanOrEqual(2);
-          expect(a.restorePercent).toBeLessThanOrEqual(5);
-        } else {
-          expect(a.restorePercent).toBeUndefined();
-        }
+  it('整張表線性換算：T1 下限 → 下限、T7 上限 → 上限，取到小數一位', () => {
+    const table = getAffixTierTable('on_hit_hp');
+    expect([table[0].min, table[6].max]).toEqual([1, 7]);
+    expect(getRestorePercent('on_hit_hp', 1)).toBe(2);
+    expect(getRestorePercent('on_hit_hp', 3)).toBe(2.7);
+    expect(getRestorePercent('on_hit_hp', 5.5)).toBe(3.5);
+    expect(getRestorePercent('on_hit_hp', 7)).toBe(4);
+    expect(getRestorePercent('on_hit_mp', 1)).toBe(2);
+    expect(getRestorePercent('on_hit_mp', 7)).toBe(5);
+  });
+
+  it('觸發率越高回復越多（T1~T7 每 0.1% 不遞減）', () => {
+    for (const type of ['on_hit_hp', 'on_hit_mp'] as const) {
+      let prev = 0;
+      for (let tenths = 10; tenths <= 70; tenths++) {
+        const v = getRestorePercent(type, tenths / 10);
+        expect(v).toBeGreaterThanOrEqual(prev);
+        prev = v;
       }
     }
   });
 
-  it('比例與 Tier 無關（低階也抽得到滿值）', () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < 3000; i++) {
-      const a = generateAffixes('armor', 5, 4, false, { maxTier: 2, uniformTier: true })
-        .find(x => x.type === 'on_hit_hp');
-      if (a?.restorePercent) seen.add(`${a.tier}-${a.restorePercent}`);
+  it('生成的詞綴不帶回復比例欄位', () => {
+    for (let i = 0; i < 300; i++) {
+      for (const a of generateAffixes('armor', 60, 4, false)) {
+        expect('restorePercent' in a).toBe(false);
+      }
     }
-    expect([...seen].some(k => k.endsWith('-4'))).toBe(true);
+  });
+
+  it('舊存檔的 restorePercent 不採用，一律依觸發率', () => {
+    const legacy = { ...onHitHp(1), restorePercent: 4 } as Affix;
+    expect(getOnHitRestore([chest([legacy])], 'on_hit_hp')).toEqual([{ chance: 1, percent: 2 }]);
   });
 
   it('武器池沒有這兩條（它們是防禦詞綴）', () => {
@@ -132,22 +136,22 @@ describe('生成', () => {
     }
   });
 
-  it('觸發率與回復比例都吃品質', () => {
-    expect(getOnHitRestore([chest([onHitHp(20, 4)], 0)], 'on_hit_hp')).toEqual([{ chance: 20, percent: 4 }]);
-    expect(getOnHitRestore([chest([onHitHp(20, 4)], 20)], 'on_hit_hp')).toEqual([{ chance: 24, percent: 4 }]);
-    expect(getOnHitRestore([chest([onHitMp(20, 5)], 50)], 'on_hit_mp')).toEqual([{ chance: 30, percent: 7 }]);
+  it('觸發率與回復比例都吃品質（§ 7.3 小數規則）', () => {
+    expect(getOnHitRestore([chest([onHitHp()], 0)], 'on_hit_hp')).toEqual([{ chance: 7, percent: 4 }]);
+    expect(getOnHitRestore([chest([onHitHp()], 20)], 'on_hit_hp')).toEqual([{ chance: 8.4, percent: 4.8 }]);
+    expect(getOnHitRestore([chest([onHitMp()], 50)], 'on_hit_mp')).toEqual([{ chance: 10.5, percent: 7.5 }]);
   });
 
   it('顯示文字寫出觸發率與回復比例', () => {
-    expect(formatAffixDisplay(onHitHp(20, 4))).toBe('受擊 20.0% 觸發回血 4% (T7)');
-    expect(formatAffixDisplay(onHitMp(20, 5), 20)).toBe('受擊 24.0% 觸發回魔 6% (T7)');
+    expect(formatAffixDisplay(onHitHp())).toBe('受擊 7.0% 觸發回血 4.0% (T7)');
+    expect(formatAffixDisplay(onHitMp(), 20)).toBe('受擊 8.4% 觸發回魔 6.0% (T7)');
   });
 });
 
 describe('觸發', () => {
   it('受到傷害且抽中時回復最大 HP 的對應比例', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.10); // 10：高於角色迴避率、低於 20% 觸發率
-    const gear = [chest([onHitHp(20, 4)])];
+    vi.spyOn(Math, 'random').mockReturnValue(0.10); // 10：高於角色迴避率
+    const gear = [chest([onHitHp(ALWAYS)])];
     useGameStore.setState({ equippedGear: { chest: gear[0] } as never });
     const maxHp = getEffectiveMaxHp(useGameStore.getState().character!, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
@@ -159,7 +163,7 @@ describe('觸發', () => {
 
   it('回魔同樣依最大 MP 計算', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.10);
-    const gear = [chest([onHitMp(20, 5)])];
+    const gear = [chest([onHitMp(ALWAYS)])];
     useGameStore.setState({ equippedGear: { chest: gear[0] } as never });
     const maxMp = getEffectiveMaxMp(useGameStore.getState().character!, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
@@ -169,8 +173,8 @@ describe('觸發', () => {
   });
 
   it('沒抽中就不回復', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9); // 90 > 20% 觸發率
-    const gear = [chest([onHitHp(20, 4)])];
+    vi.spyOn(Math, 'random').mockReturnValue(0.9); // 90 > 7% 觸發率
+    const gear = [chest([onHitHp()])];
     const before = useGameStore.getState().character!.hp;
     const r = getHit(gear)!;
     expect(useGameStore.getState().character!.hp).toBe(before - r.damage);
@@ -188,8 +192,8 @@ describe('觸發', () => {
 
   it('多個部位各自判定，效果相加', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.10);
-    const a = chest([onHitHp(20, 4)]);
-    const b = { ...chest([onHitHp(20, 4)]), slot: 'gloves', templateId: 91 } as EquipmentInstance;
+    const a = chest([onHitHp(ALWAYS)]);
+    const b = { ...chest([onHitHp(ALWAYS)]), slot: 'gloves', templateId: 91 } as EquipmentInstance;
     useGameStore.setState({ equippedGear: { chest: a, gloves: b } as never });
     const maxHp = getEffectiveMaxHp(useGameStore.getState().character!, useGameStore.getState().equippedGear, useGameStore.getState().activeEffects);
 
@@ -199,7 +203,7 @@ describe('觸發', () => {
 
   it('回復不會超過上限', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.10);
-    const gear = [chest([onHitHp(100, 4), onHitMp(100, 5)])];
+    const gear = [chest([onHitHp(100), onHitMp(100)])];
     useGameStore.setState({
       character: { ...knight(), hp: 1000, mp: 400 },
       equippedGear: { chest: gear[0] } as never,

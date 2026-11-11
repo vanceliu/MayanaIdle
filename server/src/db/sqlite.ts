@@ -10,7 +10,7 @@ import { dirname } from 'node:path';
 import type { WorldMode } from '../../../client/src/net/protocol';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
 import { rollUniqueAffix } from '../../../client/src/models/uniqueAffix';
-import { rollAffixValue, clampAffixValueToTier, isDecimalAffixType, EVASION_POINTS_PER_PERCENT, type Affix } from '../../../client/src/models/affix';
+import { rollAffixValue, clampAffixValueToTier, isDecimalAffixType, roundAffixTenth, EVASION_POINTS_PER_PERCENT, ON_HIT_TIERS, type Affix } from '../../../client/src/models/affix';
 
 export const DB_FILE = 'mayana.sqlite';
 
@@ -190,6 +190,11 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     version: 10,
     up: rerollDefenseAffixes,
   },
+  {
+    /** 受擊回復專屬階級表（`07-affix.md` § 7.3.1）：既有受擊回復詞綴等比例換到新表同 Tier */
+    version: 11,
+    up: rescaleOnHitAffixes,
+  },
 ];
 
 export function hashExistingSessionTokens(db: DatabaseSync): void {
@@ -244,6 +249,36 @@ export function rerollDefenseAffixes(db: DatabaseSync): void {
     const affixes = data.affixes.map(a => (a.type === 'defense' && a.tier != null
       ? { ...a, value: rollAffixValue(a.tier, 'defense') }
       : a));
+    update.run(JSON.stringify({ ...data, affixes }), row.id);
+  }
+}
+
+/** v11 之前受擊回復使用的階級表（防具池表），只供遷移換算 */
+const LEGACY_ON_HIT_TIERS: ReadonlyArray<{ min: number; max: number }> = [
+  { min: 3.1, max: 4 }, { min: 4.1, max: 6 }, { min: 6.1, max: 9 }, { min: 9.1, max: 11 },
+  { min: 11.1, max: 13 }, { min: 13.1, max: 15 }, { min: 15.1, max: 17 },
+];
+
+/** 舊表 Tier 內位置等比例換到新表同 Tier，取到小數一位 */
+export function rescaleOnHitValue(tier: number, value: number): number {
+  const from = LEGACY_ON_HIT_TIERS[tier - 1];
+  const to = ON_HIT_TIERS[tier - 1];
+  if (!from || !to) return value;
+  const ratio = Math.min(1, Math.max(0, (value - from.min) / (from.max - from.min)));
+  return roundAffixTenth(to.min + ratio * (to.max - to.min));
+}
+
+export function rescaleOnHitAffixes(db: DatabaseSync): void {
+  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
+  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
+  for (const row of rows) {
+    const data = JSON.parse(row.data) as { affixes?: (StoredAffix & { restorePercent?: number })[] };
+    if (!data.affixes?.some(a => a.type === 'on_hit_hp' || a.type === 'on_hit_mp')) continue;
+    const affixes = data.affixes.map(a => {
+      if (a.type !== 'on_hit_hp' && a.type !== 'on_hit_mp') return a;
+      const { restorePercent: _legacy, ...rest } = a;
+      return a.tier != null && a.value != null ? { ...rest, value: rescaleOnHitValue(a.tier, a.value) } : rest;
+    });
     update.run(JSON.stringify({ ...data, affixes }), row.id);
   }
 }

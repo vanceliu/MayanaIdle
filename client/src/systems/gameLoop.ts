@@ -147,7 +147,7 @@ export function tickInstanceWorld(deltaMs: number, instance: MapInstance): void 
   // === Spawn monsters：任一在場成員不在恢復等待中就生 ===
   const anyActive = members.some(m => !m.mapControl.getState().paused);
   if (anyActive) {
-    const { pressure } = calculatePressure(instance.kills);
+    const { pressure } = calculatePressure(instance.kills, undefined, instance.members.length);
     const maxMonsters = partyMaxMonsters(pressure, members.length);
     // 一波的隻數分布與 Boss 門檻都以停留時間為輸入（`26-spawn-pressure.md` § 26.2、§ 26.4）
     const elapsedMinutes = instanceElapsedMinutes(instance);

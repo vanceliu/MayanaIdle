@@ -15,6 +15,7 @@ import { createArpgEngine, type ArpgMonster } from './arpgEngine';
 import { createPlayerCombatContext } from './playerCombatFSM';
 import type { MonsterTargetState } from './monsterTargeting';
 import { gameNow } from '../core/clock';
+import { rescalePressureKills } from './pressure';
 
 export type PartyDropMode = 'all' | 'participants';
 
@@ -75,14 +76,33 @@ export function clearInstance(instance: MapInstance): void {
   instance.createdAt = gameNow();
 }
 
-/** 把 session 掛進實例：加入成員並把共用物件設成別名。第一位成員以自己的 `areaKills` 起算擊殺數 */
+/** 寫回成員的累積擊殺數與在場人數（探索列與掉落倍率用） */
+function setMemberPressure(session: Session, kills: number, members: number): void {
+  const game = session.game;
+  const char = game?.getState().character;
+  if (!game) return;
+  game.setState(char ? { character: { ...char, areaKills: kills }, pressureMembers: members } : { pressureMembers: members });
+}
+
+function syncInstancePressure(instance: MapInstance): void {
+  for (const m of instance.members) setMemberPressure(m, instance.kills, instance.members.length);
+}
+
+/**
+ * 把 session 掛進實例：加入成員並把共用物件設成別名。第一位成員以自己的 `areaKills` 起算擊殺數；
+ * 之後的成員加入時擊殺數依人數同比例放大（`26-spawn-pressure.md` § 26.3「人數變動」）
+ */
 export function attachInstance(session: Session, instance: MapInstance): void {
   if (!session.combat) session.combat = createCombatState();
   if (instance.members.length === 0) {
     instance.kills = session.game?.getState().character?.areaKills ?? 0;
     instance.createdAt = session.game?.getState().character?.areaEnteredAt ?? gameNow();
   }
-  if (!instance.members.includes(session)) instance.members.push(session);
+  if (!instance.members.includes(session)) {
+    instance.kills = rescalePressureKills(instance.kills, instance.members.length, instance.members.length + 1);
+    instance.members.push(session);
+    syncInstancePressure(instance);
+  }
   session.instance = instance;
   session.mapMonster = instance.mapMonster;
   session.combat.monsterInstances = instance.monsterInstances;
@@ -91,13 +111,26 @@ export function attachInstance(session: Session, instance: MapInstance): void {
   session.loop.occupation = instance.occupation;
 }
 
-/** 從實例移除；最後一位離開時清空實例。session 的別名仍指向它，直到下一次 attach */
+/**
+ * 從實例移除；最後一位離開時清空實例。session 的別名仍指向它，直到下一次 attach。
+ * 離開者自己的擊殺數換算成一人比例（換圖、死亡已先歸零者維持 0），
+ * 留下的人依新人數縮放（`26-spawn-pressure.md` § 26.3「人數變動」）
+ */
 export function detachInstance(session: Session): void {
   const instance = session.instance;
   if (!instance) return;
   const idx = instance.members.indexOf(session);
-  if (idx >= 0) instance.members.splice(idx, 1);
-  if (instance.members.length === 0) clearInstance(instance);
+  if (idx < 0) return;
+  const before = instance.members.length;
+  instance.members.splice(idx, 1);
+  const ownKills = session.game?.getState().character?.areaKills ?? 0;
+  setMemberPressure(session, rescalePressureKills(ownKills, before, 1), 1);
+  if (instance.members.length === 0) {
+    clearInstance(instance);
+    return;
+  }
+  instance.kills = rescalePressureKills(instance.kills, before, instance.members.length);
+  syncInstancePressure(instance);
 }
 
 /**

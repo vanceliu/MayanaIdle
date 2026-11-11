@@ -88,10 +88,10 @@ describe('dismantleEquipment', () => {
     expect(useGameStore.getState().bagItems).toHaveLength(0);
   });
 
-  it('無配方的裝備不可拆', async () => {
+  it('無配方且沒有隨機技能的裝備不可拆', async () => {
     setup([instance(SHOP, 7)]);
     const result = await useGameStore.getState().dismantleEquipment(7);
-    expect(result).toMatchObject({ ok: false, message: '這件裝備沒有配方，無法拆解' });
+    expect(result).toMatchObject({ ok: false, message: '這件裝備無法拆解' });
     expect(useGameStore.getState().inventory).toHaveLength(1);
   });
 

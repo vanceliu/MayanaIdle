@@ -525,6 +525,14 @@ export function resolveLoadout(char: Character, effects: ActiveEffect[], loadout
   return { ...loadout, gear, weapon: gear[0] as EquipmentInstance };
 }
 
+/** 非 Lv.75 死神情境（`simulateArena.mts`）：角色、等級、目標怪物與有效 INT。省略時為 Lv.75 對百柱死神 */
+export interface SimContext {
+  character: Character;
+  level: number;
+  monster: MonsterInstance;
+  effectiveInt: (gear: (EquipmentInstance | null)[]) => number;
+}
+
 // ---------------------------------------------------------------- Buff
 
 /**
@@ -667,16 +675,16 @@ export function learnPriority(i: SkillPlanItem): number {
 }
 
 /**
- * 該職業 Lv.75 學得到的所有技能及其處理方式。
+ * 該職業在 `level` 學得到的所有技能及其處理方式。
  * 基礎魔法可學等級與學習數上限讀 `skillRestrictions.ts`；同 category 的戰前 buff 只留等級最高者。
  */
-export function buildSkillPlan(className: ClassName): ClassSkillPlan {
+export function buildSkillPlan(className: ClassName, level: number = CHAR_LEVEL): ClassSkillPlan {
   const items: SkillPlanItem[] = [];
   for (const cs of CLASS_SKILLS) {
-    if (cs.className !== className || cs.requiredLevel > CHAR_LEVEL) continue;
+    if (cs.className !== className || cs.requiredLevel > level) continue;
     items.push(classifySkill(cs.skill, false, `職業 ${cs.classLevel} 級`));
   }
-  const maxBasicLevel = getLearnableMaxLevel(className, CHAR_LEVEL);
+  const maxBasicLevel = getLearnableMaxLevel(className, level);
   const basics = SKILL_CATALOG
     .filter(s => s.level <= maxBasicLevel)
     .map(s => classifySkill(s, true, `基礎 ${s.level} 級`))
@@ -728,16 +736,17 @@ export function buildSkillPlan(className: ClassName): ClassSkillPlan {
   return { items, precombat, speed, rotation, onHitDot };
 }
 
-export const SKILL_PLANS = new Map<ClassName, ClassSkillPlan>();
-export function getSkillPlan(className: ClassName): ClassSkillPlan {
-  let plan = SKILL_PLANS.get(className);
-  if (!plan) { plan = buildSkillPlan(className); SKILL_PLANS.set(className, plan); }
+export const SKILL_PLANS = new Map<string, ClassSkillPlan>();
+export function getSkillPlan(className: ClassName, level: number = CHAR_LEVEL): ClassSkillPlan {
+  const key = `${className}@${level}`;
+  let plan = SKILL_PLANS.get(key);
+  if (!plan) { plan = buildSkillPlan(className, level); SKILL_PLANS.set(key, plan); }
   return plan;
 }
 
 /** 戰前開好的長效 buff（每次回傳新陣列，呼叫端可自由 push） */
-export function preCombatBuffs(className: ClassName): ActiveEffect[] {
-  return [...getSkillPlan(className).precombat];
+export function preCombatBuffs(className: ClassName, level: number = CHAR_LEVEL): ActiveEffect[] {
+  return [...getSkillPlan(className, level).precombat];
 }
 
 // ---------------------------------------------------------------- 輪替
@@ -856,8 +865,8 @@ export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance, 
   return e;
 }
 
-export function buildRotation(className: ClassName, weapon: EquipmentInstance): RotationEntry[] {
-  return getSkillPlan(className).rotation.map(i => toRotationEntry(i, weapon, className));
+export function buildRotation(className: ClassName, weapon: EquipmentInstance, level: number = CHAR_LEVEL): RotationEntry[] {
+  return getSkillPlan(className, level).rotation.map(i => toRotationEntry(i, weapon, className));
 }
 
 /** 武器隨機技能的候選（共通池＋該職業的武器職業池），參數一律取最佳端（§ 44.1） */
@@ -894,11 +903,11 @@ export function calibrate(
   effects: ActiveEffect[],
   effInt: number,
   seed: number,
+  monster: MonsterInstance = makeReaper(),
 ): { order: RotationEntry[]; scores: ActionScore[] } {
   // § 99.1 第 6 條：requiredWeaponType 是實際限制（scriptRunner 的 meetsWeaponRequirement 會擋），
   // 配裝不帶弓時三連射／穿透箭雨整招不可用，不可讓它們照樣進校準。
   const rotation = allEntries.filter(e => meetsWeaponRequirement(e, loadout));
-  const monster = makeReaper();
   const scores: ActionScore[] = [];
   let normalAvg = 0;
 
@@ -1072,13 +1081,13 @@ export const uniqueLabel = (u: UniqueAffixType | null) => (u ? `｜(獨)${u}` : 
  * 技能依「攻擊間隔 ÷ 冷卻（含減CD）」取代普攻的比例；不計 MP 與自身 buff 的行動佔用，
  * 精確排序由前 K 名的全模擬決定。
  */
-export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number): number {
-  const char = buildCharacter(className);
-  const effects = preCombatBuffs(className);
+export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number, ctx?: SimContext): number {
+  const char = ctx?.character ?? buildCharacter(className);
+  const effects = preCombatBuffs(className, ctx?.level);
   const loadout = resolveLoadout(char, effects, rawLoadout);
-  const effInt = designEffectiveInt(className, loadout.gear);
-  const monster = makeReaper();
-  const rotation = buildRotation(className, loadout.weapon);
+  const effInt = ctx ? ctx.effectiveInt(loadout.gear) : designEffectiveInt(className, loadout.gear);
+  const monster = ctx?.monster ?? makeReaper();
+  const rotation = buildRotation(className, loadout.weapon, ctx?.level);
   // 隨機技能（`07-affix-ability.md` § 7S.5）的期望值
   const ability = loadout.weapon.ability;
   const bonusPerHit = ability?.type === 'bonus_damage' ? ability.params.chance / 100 * ability.params.damage : 0;

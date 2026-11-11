@@ -163,6 +163,7 @@ baseValue × (1 + qualityPercent / 100)
 | 快捷欄配置 | QuickSlot 綁定 |
 | 背包格子排列（slotMap） | `35-inventory-constraints.md` § 35.17 |
 | 懸賞契約 | 各城鎮清單、已簽契約、裝備比較設定（`53-bounty-contract.md` § 53.8），存 `character_prefs` |
+| 技能結晶 | 種類與各參數位置（`07-affix-ability.md` § 7S.8），存 `character_prefs` |
 
 ### 瀏覽器 localStorage（純 client）
 

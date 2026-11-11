@@ -329,19 +329,19 @@ describe('affix model', () => {
     it('觸發率型：去掉「X% 是觸發率：」開頭，其餘 X 全部代入', () => {
       expect(formatAffixDescription({ type: 'element_erosion', tier: 3, value: 8, element: 'fire', dotDamage: 10 }))
         .toBe('命中後有 8.0% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒');
-      expect(formatAffixDescription({ type: 'on_hit_hp', tier: 3, value: 9, restorePercent: 3 }))
-        .toBe('受到傷害時 9.0% 機率回復最大 HP 的 3%');
+      expect(formatAffixDescription({ type: 'on_hit_hp', tier: 3, value: 3 }))
+        .toBe('受到傷害時 3.0% 機率回復最大 HP 的 2.7%');
     });
 
-    it('受擊回血／回魔：回復比例代入該條抽到的值；定義本身寫範圍（Wiki 用）', () => {
+    it('受擊回血／回魔：回復比例代入觸發率換算的值；定義本身寫範圍（Wiki 用）', () => {
       expect(AFFIX_DEFINITIONS.find(d => d.type === 'on_hit_hp')!.description)
-        .toBe('受到傷害時 X% 機率回復最大 HP 的 2~4%');
+        .toBe('受到傷害時 X% 機率回復最大 HP 的 2.0~4.0%（觸發率越高越多）');
       expect(AFFIX_DEFINITIONS.find(d => d.type === 'on_hit_mp')!.description)
-        .toBe('受到傷害時 X% 機率回復最大 MP 的 2~5%');
-      expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 6, restorePercent: 5 }))
-        .toBe('受到傷害時 6.0% 機率回復最大 MP 的 5%');
-      expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 6, restorePercent: 5 }, 20))
-        .toBe('受到傷害時 7.2% 機率回復最大 MP 的 6%');
+        .toBe('受到傷害時 X% 機率回復最大 MP 的 2.0~5.0%（觸發率越高越多）');
+      expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 2 }))
+        .toBe('受到傷害時 2.0% 機率回復最大 MP 的 2.5%');
+      expect(formatAffixDescription({ type: 'on_hit_mp', tier: 2, value: 2 }, 20))
+        .toBe('受到傷害時 2.4% 機率回復最大 MP 的 3.0%');
     });
 
     it('品質參數放大代入值', () => {

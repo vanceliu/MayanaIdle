@@ -233,7 +233,7 @@ GamePhase = 'title' | 'characterSelect' | 'create' | 'explore' | 'combat' | 'res
 時鐘基準是 `character.areaEnteredAt`，與一波隻數分布、Boss 生成門檻（`26-spawn-pressure.md` § 26.2／§ 26.4）同源。
 該欄位在選角進入遊戲時重設，故顯示的是本次上線後的停留時間。
 
-**Pressure：** 「自動／手動搜尋」右邊顯示 `P{Pressure}`（0 也顯示），滑鼠提示 `累積擊殺數/下一級所需擊殺數`（千分位，例 `1,000/1,100`）；
+**Pressure：** 「自動／手動搜尋」右邊顯示 `P{Pressure}`（0 也顯示），滑鼠提示 `累積擊殺數/下一級所需擊殺數`（千分位，例 `1,000/1,100`；組隊時下一級門檻依在場人數）；
 全域 Pressure 倍率 0 時提示只顯示累積擊殺數。數值以 `character.areaKills`（組隊時為實例擊殺數）與 game store 的 `pressureRate` 依 `26-spawn-pressure.md` § 26.3 計算；
 `pressureRate` 取 server 的全域倍率，倍率即時變更時推給在線 session（`GameServer.refreshPressureRate`）。
 

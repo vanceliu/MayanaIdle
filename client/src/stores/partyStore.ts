@@ -11,7 +11,7 @@ import type { ClassName } from '../models/character';
 import type { PartyDropMode } from '../systems/mapInstance';
 import { defaultSession, type Session } from './session';
 
-export const PARTY_MAX_MEMBERS = 5;
+export const PARTY_MAX_MEMBERS = 4;
 
 export interface PartyMemberView {
   characterId: number;

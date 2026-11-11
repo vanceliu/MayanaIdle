@@ -30,6 +30,23 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 高階治癒下修（`22-basic-magic.md`、`23-class-magic.md` § 23.6、`21-combat-formula.md` § 21.4c）
+
+規格：技能攻擊力 完全治癒 270→80、大治癒 81→53、群體治癒 108→53；治癒、中治癒、神聖懲擊吸血不變。校準點（有效 INT 18、裝備魔攻 0）回復量：治癒 35／中治癒 70／大治癒 98／完全治癒 148／群體治癒 98。
+
+- [x] H1 `skill.ts`、`classSkills.ts` 改 power；`healFormula.test.ts`、`abilitySkill.test.ts` 改期望值
+- [x] H2 文件：21 § 21.4c、22、23 § 23.6
+- [x] H3 `npx tsc -b`、client／server vitest
+- [x] H4 重跑死神實戰（全職業）與競技場模擬，更新 44 § 44.12、§ 44.13
+
+### 競技場波次模擬（`44-dps-prediction.md`）
+
+規格：新腳本 `client/scripts/simulateArena.mts`，驅動真實 `tickWorld`；段位 T4～T7 × 5 職業，每場上限依 `--minutes`（預設 60 分鐘遊戲時間）。一般波 3 隻，第 10 的倍數波只出 2 隻王；王依段位名單由 Boss 等級低到高（同級依 HP），輪完固定出最強者；上一波清完立刻出下一波；強化詞綴數量 `min(4, floor((波次 − 1) / 10))`；橙色藥水 600 瓶。角色：T4 Lv.38／T5 Lv.50／T6 Lv.60 穿該階製作裝備、每件強化到自身安定值；T7 Lv.80、T7 武器 +8、其餘 T6 防具 +9／飾品 +8、詞綴 T6、含封印詞綴與武器隨機技能；品質一律 20%。一般怪：T4 Lv.34～40、T5 46～52、T6 56～62、T7 百柱塔 91～100F。輸出：波次、是否撐滿 60 分鐘、死亡波次、一般波／王波平均秒數、藥水用量。
+
+- [x] R1 腳本：角色與配裝、波次生成、強化詞綴強制數量、結算
+- [x] R2 跑完，`44` 新增競技場模擬一節（§ 44.13）
+- [ ] R3 使用者依結果決定波次、藥水、段位參數，必要時重跑
+
 ### 裝備 tooltip 按住 Alt 顯示數值區間（`34-ui-guidelines.md` § 34.2，demo `client/demo/alt-range.html`）
 
 規格：所有 `EquipmentDetail` tooltip 按住 Alt 時，詞綴數值後加同 Tier 區間（乘品質），隨機技能每個參數後加區間（依該件模板，含武器值上限），黃色 `#FACC15`；放開或視窗失焦即收起。特殊詞綴、額外屬性、印記類、T7 獨有詞綴、空洞、已毀壞不顯示。
@@ -40,6 +57,45 @@
 - [x] A4 測試；`npx tsc -b`、client vitest
 - [x] A5 文件：34、07-affix-ability § 7S.7、INDEX
 - [ ] A6 使用者實機確認（背包、裝備欄、倉庫、商店出售、鐵匠鋪拆解；Windows／桌面版 Alt 不跳選單列）
+
+### 受擊回復比例隨觸發率（`07-affix.md` § 7.9）
+
+規格：回復% = 下限 + (X − 防具池 T1 下限) ÷ (T7 上限 − T1 下限) × (上限 − 下限)，四捨五入到小數一位；回血 2.0~4.0%、回魔 2.0~5.0%；X 為未吃品質的觸發率；品質依 § 7.3 小數規則。不再存 `restorePercent`，舊裝備依觸發率重算。Alt 區間補回復%（該 Tier 觸發率上下限換算）與元素侵蝕每秒傷害（武器平均基傷一半～平均基傷，乘品質）。
+
+- [x] H1 文件：07-affix § 7.4／§ 7.9、46-sigil、13-town、34、INDEX
+- [x] H2 model：`getRestorePercent`、品質、`getOnHitRestore`、說明與顯示片段、Alt 區間；移除 `restorePercent` 與 `rollRestorePercent`；sigil 不再抽回復比例
+- [x] H3 測試；`npx tsc -b`、client／server vitest
+- [ ] H4 使用者確認
+
+### 受擊回復觸發率專屬階級表（`07-affix.md` § 7.3.1）
+
+規格：受擊回血／回魔改用專屬表 T1 1.0~1.4／T2 1.5~2.3／T3 2.4~3.5／T4 3.6~4.4／T5 4.5~5.3／T6 5.4~6.1／T7 6.2~7.0（%），其餘防具池詞綴不變；回復%換算端點隨表（1.0／7.0）。server schema v11：既有受擊回復詞綴依舊表（防具池）Tier 內位置等比例換到新表同 Tier，取到小數一位，並移除 `restorePercent`。
+
+- [x] K1 文件：07-affix § 7.3.1／§ 7.9、34、97 § 97.4
+- [x] K2 model：`ON_HIT_TIERS`、`AFFIX_TIER_TABLES`
+- [x] K3 server 遷移 v11＋測試
+- [x] K4 測試；`npx tsc -b`、client／server vitest
+- [ ] K5 使用者確認
+
+### Pressure 依人數縮放（`26-spawn-pressure.md` § 26.3、`97-selfhosted-server.md` § 97.7.1）
+
+規格：Pressure = floor(累積擊殺數 × 全域倍率 ÷ (100 × 人數))；人數為實例的在場成員數（同地圖在線隊員，單人為 1）。人數變動時實例擊殺數 × 新人數 ÷ 舊人數（無條件捨去），P 值不變；離開實例者的擊殺數換算回一人比例後帶走。怪物上限、掉落倍率、探索列提示一律用此公式；人數同步到 game store `pressureMembers`。
+
+- [x] R1 文件：26 § 26.3、97 § 97.7.1、16 § 32.3、INDEX
+- [x] R2 `pressure.ts` 公式與縮放函式；`mapInstance.ts` 掛入／移除時縮放並同步成員；gameLoop、擊殺結算、ExploreBar 帶人數
+- [x] R3 測試；`npx tsc -b`、client／server vitest
+- [ ] R4 使用者確認
+
+### 技能結晶與技能更換（`07-affix-ability.md`、`06-equipment-acquire.md` § 6A.3，demo `client/demo/ability-crystal.html`）
+
+規格：拆解掉落品（非 (鍛)、非商店裝）時，隨機技能存成角色的技能結晶（存 character_prefs、不佔背包、無上限、每種技能一顆、無限次使用），記每個參數在區間內的位置（最弱 0%～最好 100%，↓ 參數反向）；同種類再拆到時每個參數各取較好位置。沒配方的掉落品若帶技能也可拆（只得結晶）。鐵匠鋪新增「技能更換」分頁：目標為背包中未裝備、T3+ 的武器（右手）／項鍊／戒指，非 (鍛)；武器池只套武器、飾品池只套項鍊／戒指；職業技能需目標該職業可裝備；數值依結晶位置換算到目標區間；費用 1,500,000 × 目標階級；目標原技能消失。
+
+- [x] C1 model：位置換算、合併、套用驗證與費用＋測試
+- [x] C2 demo（技能更換分頁、拆解的結晶提示）→ 使用者確認
+- [x] C3 文件：07-affix-ability § 7S.8、06 § 6A.3、13 § 13.5、34 § 34.2、18（character_prefs）、INDEX
+- [x] C4 store 動作（拆解出結晶、技能更換）、線上協定白名單、character_prefs 存檔＋測試
+- [x] C5 鐵匠鋪 UI；測試、`npx tsc -b`、client／server vitest
+- [ ] C6 使用者實機確認（拆解掉落品得結晶／更新、製作品與商店裝不出、技能更換扣金幣、重登後結晶仍在）
 
 ### 啟動器 API 只限啟動器頁呼叫（`97-selfhosted-server.md` § 97.2 桌面啟動器）
 

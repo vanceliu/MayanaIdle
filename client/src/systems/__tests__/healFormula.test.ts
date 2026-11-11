@@ -11,7 +11,7 @@ import type { MonsterInstance } from '../../models/monster';
  *
  * 治癒與傷害**共用同一段技能側計算**，差別只有「沒有元素克制」與
  * 「最後的乘區是治癒效果% 而非技能元素傷害%」。這一份把兩件事釘住：
- * 1. 校準點（有效 INT 18、裝備魔攻 0）確實持平改版前的固定回復量
+ * 1. 校準點（有效 INT 18、裝備魔攻 0）的回復量符合 § 21.4c
  * 2. 治癒與傷害不會各自漂移 —— 兩者在同條件下必須算出同一個技能側數值
  */
 
@@ -42,15 +42,14 @@ const powerOf = (id: string) =>
 
 describe('治癒的校準點（§ 21.4c）', () => {
   /**
-   * 改版前六招是固定回復量，改版後以「有效 INT 18、裝備魔攻 0」為校準點持平。
-   * 這些數字若動了，代表 INT 係數或魔攻匯率被改過而沒有重新縮 power 表。
+   * § 21.4c 的校準點回復量。對不上代表 INT 係數或魔攻匯率被改過而沒有重新縮 power 表。
    */
   const CALIBRATION: Record<string, number> = {
-    'heal': 35, 'mid-heal': 70, 'great-heal': 150, 'full-heal': 500,
-    'group-heal': 200,
+    'heal': 35, 'mid-heal': 70, 'great-heal': 98, 'full-heal': 148,
+    'group-heal': 98,
   };
 
-  it('有效 INT 18、無裝備魔攻時，五招回復量持平改版前的固定值', () => {
+  it('有效 INT 18、無裝備魔攻時，五招回復量符合校準點', () => {
     for (const [id, expected] of Object.entries(CALIBRATION)) {
       expect(calculateHealAmount(char(18), powerOf(id), []), id).toBe(expected);
     }
