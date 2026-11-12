@@ -3,14 +3,12 @@
  * 遷移必須冪等；失敗即中止啟動。
  */
 import { DatabaseSync } from 'node:sqlite';
-import { hashSessionToken } from '../auth';
 import { mkdirSync } from 'node:fs';
 import { restrictFile } from '../secretFile';
 import { dirname } from 'node:path';
 import type { WorldMode } from '../../../client/src/net/protocol';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
-import { rollUniqueAffix } from '../../../client/src/models/uniqueAffix';
-import { rollAffixValue, clampAffixValueToTier, isDecimalAffixType, roundAffixTenth, EVASION_POINTS_PER_PERCENT, ON_HIT_TIERS, type Affix } from '../../../client/src/models/affix';
+import { getAbilityDefinition, getAbilityWeaponValue, resolveParamRange, type AbilityTemplate } from '../../../client/src/models/ability';
 
 export const DB_FILE = 'mayana.sqlite';
 
@@ -24,7 +22,9 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
           username TEXT NOT NULL UNIQUE,
           password_hash TEXT,
           banned_until INTEGER,
-          created_at INTEGER NOT NULL
+          created_at INTEGER NOT NULL,
+          -- 救援碼雜湊（97-selfhosted-server.md § 97.5）。null ＝ 未產生
+          recovery_hash TEXT
         );
         CREATE TABLE IF NOT EXISTS sessions (
           token TEXT PRIMARY KEY,
@@ -33,6 +33,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
           expires_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
         CREATE TABLE IF NOT EXISTS characters (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER NOT NULL,
@@ -92,6 +93,11 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
           character_id INTEGER PRIMARY KEY,
           data TEXT NOT NULL
         );
+        -- 天賦分頁的格子位置（35-inventory-constraints.md § 35.21.1），與一般分頁分開
+        CREATE TABLE IF NOT EXISTS talent_bag_layouts (
+          character_id INTEGER PRIMARY KEY,
+          data TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS mail_purge (
           character_id INTEGER PRIMARY KEY,
           version TEXT NOT NULL
@@ -101,51 +107,15 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
         );
-      `);
-    },
-  },
-  {
-    /** 天賦分頁的格子位置（`35-inventory-constraints.md` § 35.21.1）。與一般分頁分開一張表 */
-    version: 2,
-    up: (db) => {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS talent_bag_layouts (
-          character_id INTEGER PRIMARY KEY,
-          data TEXT NOT NULL
-        );
-      `);
-    },
-  },
-  {
-    /** 救援碼雜湊（`97-selfhosted-server.md` § 97.5）。null ＝ 未產生 */
-    version: 3,
-    up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
-      if (!columns.includes('recovery_hash')) db.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT');
-    },
-  },
-  {
-    /** 既有 T7 實例補抽獨有詞綴（`07-affix-tier7.md` § 7T.2）。已有的不重抽 */
-    version: 4,
-    up: backfillUniqueAffixes,
-  },
-  {
-    /** session token 改存 SHA-256（`97-selfhosted-server.md` § 97.5）：既有列原地雜湊，玩家不必重登；過期列刪除 */
-    version: 5,
-    up: hashExistingSessionTokens,
-  },
-  {
-    /** 公會（`11-guild.md`）。`guild_members.character_id` 為主鍵：一個角色只屬一個公會（§ 11.5） */
-    version: 6,
-    up: (db) => {
-      db.exec(`
+        -- 公會（11-guild.md）。guild_members.character_id 為主鍵：一個角色只屬一個公會（§ 11.5）
         CREATE TABLE IF NOT EXISTS guilds (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           name_key TEXT NOT NULL UNIQUE,
           leader_character_id INTEGER NOT NULL,
           leader_cha INTEGER NOT NULL,
-          created_at INTEGER NOT NULL
+          created_at INTEGER NOT NULL,
+          warehouse_gold INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS guild_members (
           character_id INTEGER PRIMARY KEY,
@@ -156,16 +126,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
           joined_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_guild_members_guild ON guild_members(guild_id);
-      `);
-    },
-  },
-  {
-    /** 公會倉庫（`11-guild.md` § 11.8）。裝備沿用 `equipment_instances`（`storageType = 'guild'`、`owner_id` 為公會 id） */
-    version: 7,
-    up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(guilds)').all() as { name: string }[]).map(c => c.name);
-      if (!columns.includes('warehouse_gold')) db.exec('ALTER TABLE guilds ADD COLUMN warehouse_gold INTEGER NOT NULL DEFAULT 0');
-      db.exec(`
+        -- 公會倉庫（11-guild.md § 11.8）。裝備沿用 equipment_instances（storageType = 'guild'、owner_id 為公會 id）
         CREATE TABLE IF NOT EXISTS guild_warehouse_items (
           guild_id INTEGER NOT NULL,
           item_id INTEGER NOT NULL,
@@ -176,128 +137,96 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     },
   },
   {
-    /** 迴避改迴避值（`07-affix.md` § 7.3.1）：一般迴避詞綴依 tier 重骰，T7 獨有迴避 ×100 */
-    version: 8,
-    up: convertEvasionToPoints,
+    /** 追加傷害新區間（`07-affix-ability.md` § 7S.5）：既有追加傷害依舊區間內的位置換到新區間 */
+    version: 12,
+    up: rescaleBonusDamageAbilities,
   },
   {
-    /** 百分比詞綴改小數連續區間（`07-affix.md` § 7.3）：保留原值，超出所屬 Tier 新區間者夾回 */
-    version: 9,
-    up: clampAffixValuesToTiers,
-  },
-  {
-    /** 防禦力詞綴專屬階級表（`07-affix.md` § 7.3.1）：既有防禦力詞綴依 tier 在新區間重骰 */
-    version: 10,
-    up: rerollDefenseAffixes,
-  },
-  {
-    /** 受擊回復專屬階級表（`07-affix.md` § 7.3.1）：既有受擊回復詞綴等比例換到新表同 Tier */
-    version: 11,
-    up: rescaleOnHitAffixes,
+    /** 命中燃燒改為專注打擊（`07-affix-ability.md` § 7S.5）：裝備與技能結晶換成專注打擊，位置取燃燒兩參數較高者 */
+    version: 13,
+    up: convertBurnToFocus,
   },
 ];
 
-export function hashExistingSessionTokens(db: DatabaseSync): void {
-  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
-  const rows = db.prepare('SELECT token FROM sessions').all() as { token: string }[];
-  const update = db.prepare('UPDATE sessions SET token = ? WHERE token = ?');
-  for (const { token } of rows) update.run(hashSessionToken(token), token);
-  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
+/** v12 之前追加傷害的區間：A 5~10、B 5~武器值（上限 ≤ 5 時固定 5） */
+function legacyBonusDamageRange(key: string, template: AbilityTemplate): [number, number] {
+  return key === 'chance' ? [5, 10] : [5, Math.max(5, getAbilityWeaponValue(template))];
 }
 
-export function backfillUniqueAffixes(db: DatabaseSync): void {
-  const t7 = new Map(EQUIPMENT_SEEDS.filter(t => t.tier === 7).map(t => [t.id!, t]));
+/** 舊區間內的位置換到新區間，依參數單位四捨五入；舊區間寬度 0 時位置為 0 */
+export function rescaleBonusDamageParams(params: Record<string, number>, template: AbilityTemplate): Record<string, number> {
+  const out = { ...params };
+  for (const def of getAbilityDefinition('bonus_damage')!.params) {
+    const value = params[def.key];
+    if (value == null) continue;
+    const [fromMin, fromMax] = legacyBonusDamageRange(def.key, template);
+    const [toMin, toMax] = resolveParamRange(def, template);
+    const ratio = fromMax > fromMin ? Math.min(1, Math.max(0, (value - fromMin) / (fromMax - fromMin))) : 0;
+    const step = def.step ?? 1;
+    out[def.key] = toMin + Math.round((ratio * (toMax - toMin)) / step) * step;
+  }
+  return out;
+}
+
+export function rescaleBonusDamageAbilities(db: DatabaseSync): void {
+  const templates = new Map(EQUIPMENT_SEEDS.map(t => [t.id!, t]));
   const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
   const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
   for (const row of rows) {
-    const data = JSON.parse(row.data) as { templateId?: number; uniqueAffix?: unknown };
-    const template = data.templateId != null ? t7.get(data.templateId) : undefined;
-    if (!template || data.uniqueAffix) continue;
-    const uniqueAffix = rollUniqueAffix(template);
-    if (uniqueAffix) update.run(JSON.stringify({ ...data, uniqueAffix }), row.id);
+    const data = JSON.parse(row.data) as { templateId?: number; ability?: { type?: string; params?: Record<string, number> } };
+    if (data.ability?.type !== 'bonus_damage' || !data.ability.params) continue;
+    const template = data.templateId != null ? templates.get(data.templateId) : undefined;
+    if (!template) continue;
+    const params = rescaleBonusDamageParams(data.ability.params, template);
+    update.run(JSON.stringify({ ...data, ability: { ...data.ability, params } }), row.id);
   }
 }
 
-type StoredAffix = { type?: string; tier?: number; value?: number };
+/** 命中燃燒的區間：A 5~10、B 5~武器值（上限 ≤ 5 時固定 5） */
+function legacyBurnRange(key: string, template: AbilityTemplate): [number, number] {
+  return key === 'chance' ? [5, 10] : [5, Math.max(5, getAbilityWeaponValue(template))];
+}
 
-export function convertEvasionToPoints(db: DatabaseSync): void {
-  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
-  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
-  for (const row of rows) {
-    const data = JSON.parse(row.data) as { affixes?: StoredAffix[]; uniqueAffix?: StoredAffix };
-    let changed = false;
-    const affixes = data.affixes?.map(a => {
-      if (a.type !== 'evasion' || a.tier == null) return a;
-      changed = true;
-      return { ...a, value: rollAffixValue(a.tier, 'evasion') };
-    });
-    let uniqueAffix = data.uniqueAffix;
-    if (uniqueAffix?.type === 'evasion' && uniqueAffix.value != null) {
-      changed = true;
-      uniqueAffix = { ...uniqueAffix, value: uniqueAffix.value * EVASION_POINTS_PER_PERCENT };
-    }
-    if (changed) update.run(JSON.stringify({ ...data, affixes, uniqueAffix }), row.id);
+/** 燃燒兩參數在原區間內位置的較高者；區間寬度 0 時位置為 0 */
+export function burnPosition(params: Record<string, number>, template: AbilityTemplate): number {
+  let best = 0;
+  for (const key of ['chance', 'damage']) {
+    const value = params[key];
+    if (value == null) continue;
+    const [min, max] = legacyBurnRange(key, template);
+    if (max > min) best = Math.max(best, Math.min(1, Math.max(0, (value - min) / (max - min))));
   }
+  return best;
 }
 
-export function rerollDefenseAffixes(db: DatabaseSync): void {
-  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
-  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
-  for (const row of rows) {
-    const data = JSON.parse(row.data) as { affixes?: StoredAffix[] };
-    if (!data.affixes?.some(a => a.type === 'defense' && a.tier != null)) continue;
-    const affixes = data.affixes.map(a => (a.type === 'defense' && a.tier != null
-      ? { ...a, value: rollAffixValue(a.tier, 'defense') }
-      : a));
-    update.run(JSON.stringify({ ...data, affixes }), row.id);
+/** 位置換到專注打擊的區間，依 0.1% 單位四捨五入 */
+export function focusParamsAt(position: number): Record<string, number> {
+  const def = getAbilityDefinition('focus_strike')!.params[0];
+  const [min, max] = [def.min, def.max as number];
+  return { [def.key]: min + Math.round(position * (max - min)) };
+}
+
+export function convertBurnToFocus(db: DatabaseSync): void {
+  const templates = new Map(EQUIPMENT_SEEDS.map(t => [t.id!, t]));
+  const gear = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
+  const updateGear = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
+  for (const row of gear) {
+    const data = JSON.parse(row.data) as { templateId?: number; ability?: { type?: string; params?: Record<string, number> } };
+    if (data.ability?.type !== 'hit_burn') continue;
+    const template = data.templateId != null ? templates.get(data.templateId) : undefined;
+    const position = template && data.ability.params ? burnPosition(data.ability.params, template) : 0;
+    updateGear.run(JSON.stringify({ ...data, ability: { type: 'focus_strike', params: focusParamsAt(position) } }), row.id);
   }
-}
 
-/** v11 之前受擊回復使用的階級表（防具池表），只供遷移換算 */
-const LEGACY_ON_HIT_TIERS: ReadonlyArray<{ min: number; max: number }> = [
-  { min: 3.1, max: 4 }, { min: 4.1, max: 6 }, { min: 6.1, max: 9 }, { min: 9.1, max: 11 },
-  { min: 11.1, max: 13 }, { min: 13.1, max: 15 }, { min: 15.1, max: 17 },
-];
-
-/** 舊表 Tier 內位置等比例換到新表同 Tier，取到小數一位 */
-export function rescaleOnHitValue(tier: number, value: number): number {
-  const from = LEGACY_ON_HIT_TIERS[tier - 1];
-  const to = ON_HIT_TIERS[tier - 1];
-  if (!from || !to) return value;
-  const ratio = Math.min(1, Math.max(0, (value - from.min) / (from.max - from.min)));
-  return roundAffixTenth(to.min + ratio * (to.max - to.min));
-}
-
-export function rescaleOnHitAffixes(db: DatabaseSync): void {
-  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
-  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
-  for (const row of rows) {
-    const data = JSON.parse(row.data) as { affixes?: (StoredAffix & { restorePercent?: number })[] };
-    if (!data.affixes?.some(a => a.type === 'on_hit_hp' || a.type === 'on_hit_mp')) continue;
-    const affixes = data.affixes.map(a => {
-      if (a.type !== 'on_hit_hp' && a.type !== 'on_hit_mp') return a;
-      const { restorePercent: _legacy, ...rest } = a;
-      return a.tier != null && a.value != null ? { ...rest, value: rescaleOnHitValue(a.tier, a.value) } : rest;
-    });
-    update.run(JSON.stringify({ ...data, affixes }), row.id);
-  }
-}
-
-export function clampAffixValuesToTiers(db: DatabaseSync): void {
-  const rows = db.prepare('SELECT id, data FROM equipment_instances').all() as { id: number; data: string }[];
-  const update = db.prepare('UPDATE equipment_instances SET data = ? WHERE id = ?');
-  for (const row of rows) {
-    const data = JSON.parse(row.data) as { affixes?: Affix[] };
-    if (!data.affixes) continue;
-    let changed = false;
-    const affixes = data.affixes.map(a => {
-      if (!isDecimalAffixType(a.type)) return a;
-      const value = clampAffixValueToTier(a);
-      if (value === a.value) return a;
-      changed = true;
-      return { ...a, value };
-    });
-    if (changed) update.run(JSON.stringify({ ...data, affixes }), row.id);
+  const prefs = db.prepare('SELECT character_id, data FROM character_prefs').all() as { character_id: number; data: string }[];
+  const updatePrefs = db.prepare('UPDATE character_prefs SET data = ? WHERE character_id = ?');
+  for (const row of prefs) {
+    const data = JSON.parse(row.data) as { abilityCrystals?: { type?: string; positions?: Record<string, number> }[] };
+    if (!data.abilityCrystals?.some(c => c.type === 'hit_burn')) continue;
+    const abilityCrystals = data.abilityCrystals.map(c => (c.type === 'hit_burn'
+      ? { type: 'focus_strike', positions: { percent: Math.max(0, c.positions?.chance ?? 0, c.positions?.damage ?? 0) } }
+      : c));
+    updatePrefs.run(JSON.stringify({ ...data, abilityCrystals }), row.character_id);
   }
 }
 

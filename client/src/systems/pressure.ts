@@ -10,6 +10,8 @@ const MAX_MONSTERS_CAP = 10;
 
 /** 單人每推進 1 級 Pressure 所需的擊殺數；組隊時乘以在場人數（`26-spawn-pressure.md` § 26.3） */
 const PRESSURE_KILL_STEP = 100;
+/** P0 多涵蓋的級數：單人 0～199 為 P0，200 起每 100 隻 +1 */
+const PRESSURE_GRACE_STEPS = 1;
 /** 掉落倍率的 Pressure 計算上限（maxMonsters 與生成間隔不套用） */
 export const PRESSURE_DROP_CAP = 7;
 
@@ -21,7 +23,8 @@ export const PRESSURE_DROP_CAP = 7;
  */
 export function calculatePressure(areaKills: number, globalRate = rates.pressure, members = 1): PressureState {
   // 累積擊殺數 × 全域 Pressure 倍率再套門檻；倍率 0 時 Pressure 恆為 0
-  const pressure = Math.max(0, Math.floor((areaKills * globalRate) / (PRESSURE_KILL_STEP * Math.max(1, members))));
+  const steps = Math.floor((areaKills * globalRate) / (PRESSURE_KILL_STEP * Math.max(1, members)));
+  const pressure = Math.max(0, steps - PRESSURE_GRACE_STEPS);
   const maxMonsters = Math.min(MAX_MONSTERS_CAP, BASE_MAX_MONSTERS + pressure);
 
   return { pressure, maxMonsters };
@@ -30,7 +33,7 @@ export function calculatePressure(areaKills: number, globalRate = rates.pressure
 /** 推進到下一級 Pressure 所需的累積擊殺數；全域倍率 ≤ 0 時 Pressure 恆為 0，回傳 null */
 export function getNextPressureKills(pressure: number, globalRate = rates.pressure, members = 1): number | null {
   if (globalRate <= 0) return null;
-  return Math.ceil(((pressure + 1) * PRESSURE_KILL_STEP * Math.max(1, members)) / globalRate);
+  return Math.ceil(((pressure + 1 + PRESSURE_GRACE_STEPS) * PRESSURE_KILL_STEP * Math.max(1, members)) / globalRate);
 }
 
 /** 人數變動時的累積擊殺數：× 新人數 ÷ 舊人數，無條件捨去（`26-spawn-pressure.md` § 26.3「人數變動」） */

@@ -6,7 +6,7 @@
  */
 import type { ClassName } from './character';
 import {
-  getAbilityDefinition, isAbilitySlot, resolveParamRange, formatParam,
+  getAbilityDefinition, isAbilitySlot, resolveParamRange, formatParam, formatParamMax,
   type Ability, type AbilityParamDef, type AbilityTemplate, type AbilityType,
 } from './ability';
 
@@ -17,7 +17,7 @@ export interface AbilityCrystal {
 }
 
 /** 技能更換費用：每階 */
-export const ABILITY_CRYSTAL_COST_PER_TIER = 1_500_000;
+export const ABILITY_CRYSTAL_COST_PER_TIER = 500_000;
 
 /** 位置的儲存精度（小數位數） */
 const POSITION_DIGITS = 4;
@@ -148,7 +148,7 @@ export const CRYSTAL_APPLY_BLOCK_TEXT: Readonly<Record<CrystalApplyBlock, string
   classCannotEquip: '該職業無法裝備這件裝備',
 };
 
-/** 技能更換費用：1,500,000 × 目標階級 */
+/** 技能更換費用：500,000 × 目標階級 */
 export function getCrystalApplyCost(tier: number): number {
   return ABILITY_CRYSTAL_COST_PER_TIER * tier;
 }
@@ -160,10 +160,9 @@ export interface CrystalEffectPart {
   range?: true;
 }
 
-/** 參數區間：`(5 ~ 10%)`、`(1.0 ~ 2.0 秒)`、`(5 ~ 武器值)` */
+/** 參數區間：`(5 ~ 10%)`、`(1.0 ~ 2.0 秒)`、`(5 ~ 武器值×1.5)` */
 function formatCrystalParamRange(def: AbilityParamDef): string {
-  const max = def.max === 'weaponValue' ? '武器值' : formatParam(def, def.max);
-  return `(${formatParam(def, def.min)} ~ ${max})`.replace(/ 秒 ~/, ' ~').replace(/% ~/, ' ~');
+  return `(${formatParam(def, def.min)} ~ ${formatParamMax(def)})`.replace(/ 秒 ~/, ' ~').replace(/% ~/, ' ~');
 }
 
 /** 結晶清單的效果敘述片段：每個參數代入數值後接區間；上限為武器值的參數以位置 % 表示 */

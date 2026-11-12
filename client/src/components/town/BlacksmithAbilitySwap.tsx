@@ -106,7 +106,7 @@ export function BlacksmithAbilitySwap({ templates, onResult }: {
 
   return (
     <div className="panel-scroll">
-      <p className="shop-item-desc">左邊選結晶（滑鼠移上去看效果），右邊選要更換的裝備；原本的技能會消失，結晶不會用掉。費用 1,500,000 × 裝備階級。製作品與身上的裝備不能更換。</p>
+      <p className="shop-item-desc">左邊選結晶（滑鼠移上去看效果），右邊選要更換的裝備；原本的技能會消失，結晶不會用掉。費用 500,000 × 裝備階級。製作品與身上的裝備不能更換。</p>
       {crystals.length === 0 && <p className="shop-item-desc">還沒有技能結晶：拆解帶隨機技能的掉落品即可取得</p>}
       <div className="bs-swap-grid">
         <CrystalColumn crystals={crystals} selected={selectedCrystal} onSelect={setSelectedCrystal} />

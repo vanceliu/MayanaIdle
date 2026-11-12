@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
-import { openDatabase, migrate, hashExistingSessionTokens } from '../db/sqlite';
+import { openDatabase, migrate } from '../db/sqlite';
 import { AuthService, hashSessionToken } from '../auth';
 
 /** session token 只存 SHA-256（`97-selfhosted-server.md` § 97.5） */
@@ -49,16 +49,5 @@ describe('session token 雜湊', () => {
 
   it('非字串 token：不拋錯，回 null', () => {
     expect(auth.resolveSession(123 as never)).toBeNull();
-  });
-
-  it('v5 遷移：既有明文 token 原地雜湊，原 token 照常登入；過期列刪除', () => {
-    const insert = db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)');
-    insert.run('legacy-plain', userId, Date.now(), Date.now() + 60_000);
-    insert.run('legacy-expired', userId, 0, 1);
-
-    hashExistingSessionTokens(db);
-
-    expect(storedTokens()).toEqual([hashSessionToken('legacy-plain')]);
-    expect(auth.resolveSession('legacy-plain')?.id).toBe(userId);
   });
 });

@@ -53,7 +53,7 @@ describe('參數 schema', () => {
   it('技能與道具欄位不給預設 —— 那要看角色學了什麼、背包有什麼', () => {
     // 硬給一個 id 會在別的職業變成指向沒學會的技能
     expect(defaultParams('skill')).toEqual({});
-    expect(defaultParams('buy_item')).toEqual({ targetAmount: 100 });
+    expect(defaultParams('buy_item')).toEqual({ targetAmount: 100, targetAmount2: 100, targetAmount3: 100 });
   });
 
   it('預設值落在 min/max 之內', () => {

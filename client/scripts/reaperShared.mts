@@ -44,7 +44,7 @@ import {
 } from '../src/models/uniqueAffix';
 import { getEffectiveGear } from '../src/systems/gear';
 import {
-  ABILITY_BURN_DURATION_MS, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, getAbilityWeaponValue, formatAbilityDisplay,
+  ABILITY_FOCUS_MAX_PERCENT, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, resolveParamRange, formatAbilityDisplay,
   type Ability, type AbilityType,
 } from '../src/models/ability';
 import { applyAbilityToSkill } from '../src/models/abilitySkill';
@@ -878,7 +878,7 @@ export function abilityOptions(className: ClassName, weapon: Template): (Ability
 export function bestAbility(type: AbilityType, weapon: Template): Ability {
   const params: Record<string, number> = {};
   for (const p of getAbilityDefinition(type)!.params) {
-    const max = p.max === 'weaponValue' ? Math.max(p.min, getAbilityWeaponValue(weapon)) : p.max;
+    const [, max] = resolveParamRange(p, weapon);
     params[p.key] = p.lowerIsBetter ? p.min : max;
   }
   return { type, params };
@@ -1174,14 +1174,21 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
   }
   // 追打：平均每次出手的直接傷害 ×(1 + M% ÷ N)
   if (ability?.type === 'combo_strike') best *= 1 + ability.params.bonus / 100 / ability.params.every;
-  // 命中燃燒：佔用率 = 1 − e^(−每秒觸發次數 × 10s)，同元素侵蝕
-  let burnDps = 0;
-  if (ability?.type === 'hit_burn') {
-    const perAttack = 1 - Math.pow(1 - ability.params.chance / 100, normalRolls);
-    const procsPerSec = perAttack / (intervalMs / 1000);
-    burnDps = (1 - Math.exp(-procsPerSec * (ABILITY_BURN_DURATION_MS / 1000))) * ability.params.damage;
+  // 專注打擊：打死目標所需下數內，各下加成 min(100%, 層數 × X%) 的平均
+  if (ability?.type === 'focus_strike') best *= focusAverageMultiplier(monster.maxHp, best / Math.max(1, plain.rolls), ability.params.percent / 10);
+  return best / intervalMs * 1000 + erosionDps;
+}
+
+/** 專注打擊：每下 `perHit` 傷害打 `hp` 血的目標，打完所需各下的平均倍率 */
+export function focusAverageMultiplier(hp: number, perHit: number, percentPerStack: number): number {
+  if (perHit <= 0) return 1;
+  let dealt = 0;
+  let hits = 0;
+  while (dealt < hp && hits < 100_000) {
+    dealt += perHit * (1 + Math.min(ABILITY_FOCUS_MAX_PERCENT, hits * percentPerStack) / 100);
+    hits++;
   }
-  return best / intervalMs * 1000 + erosionDps + burnDps;
+  return dealt / (hits * perHit);
 }
 
 /** 依 § 44.5 自動選出該職業的前 TOP_FINAL 名配置 */

@@ -398,6 +398,9 @@ export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
   sell_equipment: 'items/gem-pendant',
   deposit_materials: 'items/swap-bag',
   deposit_equipment: 'items/swap-bag',
+  deposit_items: 'items/swap-bag',
+  dismantle_equipment: 'items/crystal-cluster',
+  discard_equipment: 'items/crossed-bones',
   deposit_gold: 'items/cut-diamond',
   withdraw_gold: 'items/cut-diamond',
 };

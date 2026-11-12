@@ -7,8 +7,8 @@ import {
   getCrystalApplyBlock, getCrystalApplyCost, formatCrystalEffect, normalizeAbilityCrystals,
 } from '../abilityCrystal';
 
-const T5_SWORD = { slot: 'rightHand', tier: 5, smallMonsterDamage: 20, largeMonsterDamage: 18 }; // 武器值 19
-const T7_SWORD = { slot: 'rightHand', tier: 7, smallMonsterDamage: 34, largeMonsterDamage: 32 }; // 武器值 33
+const T5_SWORD = { slot: 'rightHand', tier: 5, smallMonsterDamage: 20, largeMonsterDamage: 18 }; // 武器值 19，追加傷害上限 29
+const T7_SWORD = { slot: 'rightHand', tier: 7, smallMonsterDamage: 34, largeMonsterDamage: 32 }; // 武器值 33，追加傷害上限 50
 const T5_RING = { slot: 'ring1', tier: 5 };
 const ELF_BOW = { slot: 'rightHand', tier: 5, smallMonsterDamage: 10, largeMonsterDamage: 10, requiredClass: ['elf'] };
 
@@ -24,7 +24,7 @@ describe('可拆出結晶', () => {
 
 describe('位置換算', () => {
   it('最弱 0、最好 1；↓ 參數反向', () => {
-    expect(abilityToCrystal({ type: 'bonus_damage', params: { chance: 5, damage: 19 } }, T5_SWORD)!.positions)
+    expect(abilityToCrystal({ type: 'bonus_damage', params: { chance: 5, damage: 29 } }, T5_SWORD)!.positions)
       .toEqual({ chance: 0, damage: 1 });
     expect(abilityToCrystal({ type: 'combo_strike', params: { every: 5, bonus: 30 } }, T5_SWORD)!.positions)
       .toEqual({ every: 1, bonus: 0.5 });
@@ -38,9 +38,9 @@ describe('位置換算', () => {
   });
 
   it('武器值參數依目標的武器值換算', () => {
-    const crystal = abilityToCrystal({ type: 'bonus_damage', params: { chance: 10, damage: 12 } }, T5_SWORD)!;
-    expect(crystal.positions.damage).toBe(0.5);
-    expect(crystalToAbility(crystal, T7_SWORD)!.params).toEqual({ chance: 10, damage: 19 });
+    const crystal = abilityToCrystal({ type: 'bonus_damage', params: { chance: 10, damage: 17 } }, T5_SWORD)!;
+    expect(crystal.positions).toEqual({ chance: 0.5, damage: 0.5 });
+    expect(crystalToAbility(crystal, T7_SWORD)!.params).toEqual({ chance: 10, damage: 28 });
   });
 
   it('無參數技能', () => {
@@ -94,16 +94,16 @@ describe('套用限制與費用', () => {
     expect(getCrystalApplyBlock(knightWeapon, {}, ELF_BOW)).toBe('classCannotEquip');
   });
 
-  it('費用 1,500,000 × 階級', () => {
-    expect(getCrystalApplyCost(3)).toBe(4_500_000);
-    expect(getCrystalApplyCost(7)).toBe(10_500_000);
+  it('費用 500,000 × 階級', () => {
+    expect(getCrystalApplyCost(3)).toBe(1_500_000);
+    expect(getCrystalApplyCost(7)).toBe(3_500_000);
   });
 });
 
 describe('結晶敘述', () => {
   it('固定區間代入數值，武器值參數顯示位置', () => {
     expect(formatCrystalEffect({ type: 'bonus_damage', positions: { chance: 0.6, damage: 0.5 } }))
-      .toBe('命中 8% (5 ~ 10%) 機率追加 50% (5 ~ 武器值) 傷害');
+      .toBe('命中 11% (5 ~ 15%) 機率追加 50% (5 ~ 武器值×1.5) 傷害');
   });
 });
 

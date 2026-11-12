@@ -12,7 +12,7 @@ import { getItemById } from '../../models/items';
 import { getBagItemAmount } from '../../models/bagItem';
 import { evaluateCraftRequirements, hasCraftQuestFor } from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
-import { getDismantleYield } from '../../systems/crafting';
+import { getDismantleOutcome } from '../../systems/crafting';
 import type { EquipmentInstance } from '../../models/equipment';
 
 import { getEquipmentTierColor, getEquipmentInstanceTierColor } from '../../models/equipmentTier';
@@ -22,7 +22,7 @@ import {
   craftRequiresAbility, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, rollAbility,
   formatAbilityEffect, type AbilityType,
 } from '../../models/ability';
-import { abilityToCrystal, crystalImproves, yieldsAbilityCrystal, type AbilityCrystal } from '../../models/abilityCrystal';
+import { crystalImproves, type AbilityCrystal } from '../../models/abilityCrystal';
 import { BlacksmithAbilitySwap } from './BlacksmithAbilitySwap';
 
 type BlacksmithTab = 'craft' | 'dismantle' | 'swap';
@@ -91,8 +91,7 @@ export function TownBlacksmith() {
   const dismantlable = inventory
     .map(item => {
       const template = allTemplates.find(t => t.id === item.templateId);
-      const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
-      return { item, yields: getDismantleYield(template), crystal };
+      return { item, ...getDismantleOutcome(item, template) };
     })
     .filter(e => e.yields !== null || e.crystal !== undefined);
 

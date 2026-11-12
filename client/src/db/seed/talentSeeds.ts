@@ -1,7 +1,7 @@
 import type { TalentRuleDef, TalentSlotEntry, TalentType } from '../../models/talent';
 
 /**
- * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 81 筆，**全部內建**。
+ * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 93 筆，**全部內建**。
  *
  * **`ruleId` 是唯一的鍵**（§ 99.1 第 3、7 條）：天賦格存的就是它，不可用名稱查。
  * 能力階梯塌成完整版之後 `ruleId` 不再重複（§ 51.4.1）——
@@ -122,7 +122,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'use_town_scroll', kind: 'action', appliesTo: PERSISTENT, group: 'consumables' },
   { ruleId: 'use_consumable', kind: 'action', appliesTo: PERSISTENT, group: 'consumables' },
 
-  // === 補給動作：11 筆 ===
+  // === 補給動作：14 筆 ===
   { ruleId: 'return_town', kind: 'action', appliesTo: SUPPLY, group: 'travel' },
   { ruleId: 'return_to_hunt', kind: 'action', appliesTo: SUPPLY, group: 'travel' },
   { ruleId: 'use_inn', kind: 'action', appliesTo: SUPPLY, group: 'travel' },
@@ -135,6 +135,9 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'sell_equipment', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
   { ruleId: 'deposit_materials', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
   { ruleId: 'deposit_equipment', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'deposit_items', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'dismantle_equipment', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
+  { ruleId: 'discard_equipment', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
   { ruleId: 'deposit_gold', kind: 'action', appliesTo: SUPPLY, group: 'clearout' },
 ];
 

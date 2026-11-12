@@ -22,7 +22,8 @@ import { PersistentSettings } from './PersistentSettings';
 import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 import { useLatestSent } from '../hooks/useLatestSent';
 import { DraftNumberInput } from './DraftNumberInput';
-import { getParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
+import { TalentMultiParam } from './TalentMultiParam';
+import { getParamFields, visibleParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
 import { getItemById } from '../models/items';
 import type { Skill } from '../models/skill';
 import { ruleLabel, ruleLabelOf } from '../models/talentLabels';
@@ -138,6 +139,17 @@ function ParamInput({
     );
   }
 
+  if (field.kind === 'multi') {
+    return (
+      <TalentMultiParam
+        label={field.label}
+        source={field.source}
+        value={params[field.key] as (string | number)[] | undefined}
+        onWrite={write}
+      />
+    );
+  }
+
   // item：從背包現有的道具挑，存 id 不存名稱（§ 99.1 第 7 條）
   return (
     <label className="talent-param">
@@ -218,7 +230,7 @@ function Slot({
   if (entry) {
     const def = selectableRules(slot.assignedType!, slotIndex === null ? 'action' : 'condition')
       .find(d => d.ruleId === entry.ruleId);
-    const fields = getParamFields(entry.ruleId);
+    const fields = visibleParamFields(getParamFields(entry.ruleId), params.latest());
     return (
       <div
         className={`talent-slot is-filled${isOver ? ' drag-over' : ''}${dragging ? ' can-drop' : ''}`}

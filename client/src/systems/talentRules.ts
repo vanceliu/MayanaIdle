@@ -22,6 +22,10 @@ interface BuiltRule {
   action: Record<string, unknown>;
 }
 
+const KEEP_PARAM_KEYS = [
+  'keepClassUsable', 'keepAffixTierAbove', 'keepAffixTypes', 'keepEquipTypes', 'keepTemplateIds',
+] as const;
+
 /**
  * 把槽位攤平成 `{ type, ...params }`。
  *
@@ -32,17 +36,24 @@ function toRulePart(entry: TalentSlotEntry): Record<string, unknown> | null {
   if (!def || def.blocked) return null;
 
   const part: Record<string, unknown> = { type: def.ruleId, ...(entry.params ?? {}) };
+  // 沒存過的欄位照編輯器顯示的預設值判定（boolean 不寫進槽位，見 `defaultParams`）
+  for (const f of getParamFields(def.ruleId)) {
+    if (part[f.key] !== undefined || !('def' in f) || f.def === null) continue;
+    part[f.key] = f.def;
+  }
   /*
    * `keep` 是巢狀物件，但槽位的 params 是平的，所以用 `keepXxx` 前綴宣告再組回來
-   * （§ 49.4 的保留條件）。
+   * （§ 49.4 的保留條件）。「本角色穿得起的」兼總開關，沒勾＝沒有保留條件。
    */
-  if ('keepClassUsable' in part || 'keepAffixTierAbove' in part) {
-    part.keep = {
-      classUsable: part.keepClassUsable === true,
+  if ('keepClassUsable' in part) {
+    part.keep = part.keepClassUsable !== true ? undefined : {
+      classUsable: true,
       affixTierAbove: typeof part.keepAffixTierAbove === 'number' ? part.keepAffixTierAbove : undefined,
+      affixTypes: part.keepAffixTypes as string[] | undefined,
+      equipTypes: part.keepEquipTypes as string[] | undefined,
+      templateIds: part.keepTemplateIds as number[] | undefined,
     };
-    delete part.keepClassUsable;
-    delete part.keepAffixTierAbove;
+    for (const key of KEEP_PARAM_KEYS) delete part[key];
   }
   return part;
 }

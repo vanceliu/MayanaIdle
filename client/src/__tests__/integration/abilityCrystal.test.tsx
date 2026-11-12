@@ -11,7 +11,7 @@ import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { getBagItemAmount } from '../../models/bagItem';
 import { getDismantleYield } from '../../systems/crafting';
-import { getAbilityWeaponValue, type Ability } from '../../models/ability';
+import { getAbilityDefinition, resolveParamRange, type Ability, type AbilityTemplate } from '../../models/ability';
 import type { AbilityCrystal } from '../../models/abilityCrystal';
 import { TownBlacksmith } from '../../components/town/TownBlacksmith';
 
@@ -26,7 +26,10 @@ const T5_RING = EQUIPMENT_SEEDS.find(t => t.tier === 5 && t.slot === 'ring1')!;
 const ELF_BOW = EQUIPMENT_SEEDS.find(t => t.tier === 5 && t.type === 'bow' && !!t.requiredClass?.length && !t.requiredClass.includes('knight'))!;
 const SHOP_SWORD = EQUIPMENT_SEEDS.find(t => t.acquireType === 'shop' && t.tier === 3 && t.slot === 'rightHand')!;
 
-const BEST_BONUS: Ability = { type: 'bonus_damage', params: { chance: 10, damage: getAbilityWeaponValue(T7_SWORD) } };
+const bestBonus = (t: AbilityTemplate): Ability['params'] => Object.fromEntries(
+  getAbilityDefinition('bonus_damage')!.params.map(p => [p.key, resolveParamRange(p, t)[1]]),
+);
+const BEST_BONUS: Ability = { type: 'bonus_damage', params: bestBonus(T7_SWORD) };
 
 const character = (gold = 0) => ({
   name: 'T', className: 'knight', level: 60, exp: 0, expToNext: 1, hp: 1, maxHp: 1, mp: 1, maxMp: 1,
@@ -88,7 +91,7 @@ describe('拆解出技能結晶', () => {
 
   it('同種類每個參數各取較好的位置', async () => {
     const existing: AbilityCrystal = { type: 'bonus_damage', positions: { chance: 0, damage: 1 } };
-    setup([instance(T7_SWORD, 7, { ability: { type: 'bonus_damage', params: { chance: 10, damage: 5 } } })], {
+    setup([instance(T7_SWORD, 7, { ability: { type: 'bonus_damage', params: { chance: 15, damage: 5 } } })], {
       abilityCrystals: [existing],
     });
     await useGameStore.getState().dismantleEquipment(7);
@@ -98,14 +101,14 @@ describe('拆解出技能結晶', () => {
 
 describe('applyAbilityCrystal', () => {
   const BEST: AbilityCrystal = { type: 'bonus_damage', positions: { chance: 1, damage: 1 } };
-  const COST_T4 = 6_000_000;
+  const COST_T4 = 2_000_000;
 
   it('換算到目標區間、扣金幣、結晶不消耗', async () => {
     setup([instance(T4_SWORD, 7)], { character: character(COST_T4 + 1), abilityCrystals: [BEST] });
     const result = await useGameStore.getState().applyAbilityCrystal(7, 'bonus_damage');
     expect(result.ok).toBe(true);
     const s = useGameStore.getState();
-    expect(s.inventory[0].ability).toEqual({ type: 'bonus_damage', params: { chance: 10, damage: getAbilityWeaponValue(T4_SWORD) } });
+    expect(s.inventory[0].ability).toEqual({ type: 'bonus_damage', params: bestBonus(T4_SWORD) });
     expect(s.character!.gold).toBe(1);
     expect(s.abilityCrystals).toEqual([BEST]);
   });

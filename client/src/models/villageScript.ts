@@ -45,6 +45,12 @@ export type VillageActionType =
   | 'deposit_materials'
   /** 把符合篩選條件的裝備存進倉庫 */
   | 'deposit_equipment'
+  /** 指定道具存進倉庫，身上留下 N 個（最多 3 組） */
+  | 'deposit_items'
+  /** 依門檻與保留條件批次拆解裝備（§ 49.4.1） */
+  | 'dismantle_equipment'
+  /** 依門檻、可否販售與保留條件批次丟棄裝備，不限城鎮（§ 49.4.2） */
+  | 'discard_equipment'
   /** 從倉庫把指定道具補到目標數量 */
   | 'withdraw_item'
   /** 金幣存進帳號倉庫（留下 keepGold） */
@@ -56,6 +62,12 @@ export type VillageActionType =
   // === `51-auto-talent.md` § 51.4.11 新增 ===
   /** 使用旅館：恢復 HP／MP ＋ 解除異常狀態（`13-town.md` § 13.7） */
   | 'use_inn';
+
+/** `dismantle_equipment` 遇到會出結晶的裝備：新或更強才拆／照拆／不拆（§ 49.4.1） */
+export type DismantleCrystalMode = 'improve' | 'always' | 'never';
+
+/** `discard_equipment` 丟哪些：賣不掉的／賣得掉的／都丟（§ 49.4.2） */
+export type DiscardScope = 'unsellable' | 'sellable' | 'all';
 
 /** 帳號倉庫或個人倉庫（角色層級），見 `13-town.md` § 13.8 */
 export type WarehouseKind = 'shared' | 'personal';
@@ -97,11 +109,11 @@ export interface VillageAction {
   itemId?: number;
   /** `buy_item`：補到幾個 */
   targetAmount?: number;
-  /** `sell_materials` / `sell_equipment`：顏色等級門檻 */
+  /** `sell_materials` / `sell_equipment` / `dismantle_equipment` / `discard_equipment`：等級門檻 */
   maxTier?: number;
   /** `sell_materials`：跳過進得了配方的素材（預設 true） */
   skipCraftMaterials?: boolean;
-  /** `sell_equipment` 的保留條件 */
+  /** `sell_equipment` / `dismantle_equipment` / `discard_equipment` 的保留條件 */
   keep?: EquipmentKeepFilter;
   /** `return_town`：指定卷軸城鎮；未指定為任意卷軸 */
   scrollTownId?: string;
@@ -116,11 +128,24 @@ export interface VillageAction {
    * 正在做任務時被門檻掃掉就是實質損失（`51-auto-talent.md` § 51.4.11）。
    */
   keepItemIds?: number[];
-  /**
-   * `buy_item`／`withdraw_item`：多組「道具＋目標數量」。
-   * T1 的池型版只能設 1 組，T4 的自選版最多 3 組（§ 51.4.11）。
-   */
-  groups?: { itemId: number; targetAmount: number }[];
+  /** 多組道具動作（`buy_item`／`withdraw_item`／`deposit_items`，最多 3 組）的第 2、3 組道具 */
+  itemId2?: number;
+  itemId3?: number;
+  /** `buy_item`／`withdraw_item`：第 2、3 組補到幾個 */
+  targetAmount2?: number;
+  targetAmount3?: number;
+  /** `deposit_items`：第 1~3 組身上留下數量 */
+  keepAmount?: number;
+  keepAmount2?: number;
+  keepAmount3?: number;
+  /** `dismantle_equipment`：拆無配方、只出結晶的掉落品 */
+  includeDropOnly?: boolean;
+  /** `dismantle_equipment`：拆製作品 (鍛) */
+  includeCrafted?: boolean;
+  /** `dismantle_equipment`：會出結晶的裝備怎麼處理，未設＝`improve` */
+  crystalMode?: DismantleCrystalMode;
+  /** `discard_equipment`：丟哪些，未設＝`unsellable` */
+  discardScope?: DiscardScope;
 }
 
 export interface VillageRule {
@@ -165,6 +190,9 @@ export const VILLAGE_ACTION_LABELS: Record<VillageActionType, string> = {
   buy_item: '購買道具至',
   deposit_materials: '存入素材',
   deposit_equipment: '存入裝備',
+  deposit_items: '存入指定道具',
+  dismantle_equipment: '拆解裝備',
+  discard_equipment: '丟棄裝備',
   withdraw_item: '從倉庫取道具至',
   deposit_gold: '存入金幣（身上留下）',
   withdraw_gold: '從倉庫領金幣至',

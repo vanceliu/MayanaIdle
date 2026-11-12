@@ -3,7 +3,7 @@
  *
  *  - 追加傷害：每下命中各擲一次，加在最終傷害
  *  - 追打：普攻類每一下計 1、技能類每施放一次計 1；換武器或重新進圖歸零
- *  - 命中燃燒：燃燒中不再施加
+ *  - 專注打擊：同一隻怪逐下加層，結算後才加；上限 +100%；換地圖清除、怪死清除
  *  - 單體技能擴散：3 格內其他怪受主目標最終傷害 X%，計入回魔，範圍技能不擴散
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -11,7 +11,7 @@ import { processPlayerAttack, processMonsterAttack } from '../../systems/arpgEve
 import { gainRage, consumeCalm, syncCalmEffect } from '../../systems/abilityCombat';
 import { getHpRegen, getMpRegen } from '../../systems/regen';
 import { getSkillCooldownReduction } from '../../systems/combat';
-import { ABILITY_BURN_CATEGORY, ABILITY_BURN_DURATION_MS, type Ability } from '../../models/ability';
+import type { Ability } from '../../models/ability';
 import { instantiateSkill, type Skill } from '../../models/skill';
 import { instantiateFromTemplate } from '../../models/skillTemplate';
 import { useGameStore } from '../../stores/gameStore';
@@ -64,14 +64,14 @@ function weapon(ability?: Ability, id = 1, type = 'sword'): EquipmentInstance {
 
 const POSITIONS: Record<string, { x: number; y: number }> = { m1: { x: 5, y: 5 }, m2: { x: 7, y: 5 }, m3: { x: 9, y: 5 } };
 
-function run(gear: EquipmentInstance[], targets: Record<string, MonsterInstance>, skill?: Skill) {
+function run(gear: EquipmentInstance[], targets: Record<string, MonsterInstance>, skill?: Skill, targetIds = ['m1']) {
   const gs = useGameStore.getState();
   const mapMonsters = Object.keys(targets).map(id => ({ id, position: POSITIONS[id], isBoss: false })) as unknown as MapMonster[];
   return processPlayerAttack(
     {
       type: 'player_attack',
       action: skill ? { type: 'skill', skillId: skill.id } : { type: 'normal_attack' },
-      targetMonsterIds: ['m1'],
+      targetMonsterIds: targetIds,
       ...(skill ? { skill } : {}),
     },
     {
@@ -86,6 +86,7 @@ const effectsOf = (category: string) => useGameStore.getState().activeEffects.fi
 beforeEach(() => {
   useGameStore.setState({ character: knight(), skills: [], activeEffects: [], equippedGear: {} });
   defaultSession.loop.abilityCombo = undefined;
+  defaultSession.loop.abilityFocus = undefined;
   vi.spyOn(Date, 'now').mockReturnValue(NOW);
 });
 afterEach(() => { vi.restoreAllMocks(); });
@@ -162,23 +163,65 @@ describe('追打傷害', () => {
   });
 });
 
-describe('命中燃燒', () => {
-  const burn: Ability = { type: 'hit_burn', params: { chance: 10, damage: 9 } };
+describe('專注打擊', () => {
+  const focus: Ability = { type: 'focus_strike', params: { percent: 15 } };
+  const withStacks = (stacks: Record<string, number>, key = String(NOW)) => {
+    defaultSession.loop.abilityFocus = { key, stacks: new Map(Object.entries(stacks)) };
+  };
+  const stacksOf = (id: string) => defaultSession.loop.abilityFocus?.stacks.get(id);
 
-  it('擲中時施加 10 秒、每秒固定傷害；燃燒中不再上', () => {
+  it('第 1 下無加成，結算後加 1 層；之後依層數 ×(1 + 層數 × X%)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    run([weapon(burn)], { m1: monster() });
-    const [effect] = effectsOf(ABILITY_BURN_CATEGORY);
-    expect(effect.dot).toEqual({ damage: 9, element: 'fire', interval: 1000, totalDuration: ABILITY_BURN_DURATION_MS });
-    expect(effect.targetMonsterId).toBe('m1');
-    run([weapon(burn)], { m1: monster() });
-    expect(effectsOf(ABILITY_BURN_CATEGORY)).toHaveLength(1);
+    const base = run([weapon()], { m1: monster() }).damages[0].damage;
+    expect(run([weapon(focus)], { m1: monster() }).damages[0].damage).toBe(base);
+    expect(stacksOf('m1')).toBe(1);
+    withStacks({ m1: 20 });
+    expect(run([weapon(focus)], { m1: monster() }).damages[0].damage).toBe(Math.floor(base * 1.3));
+    expect(stacksOf('m1')).toBe(21);
   });
 
-  it('沒擲中不上', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    run([weapon(burn)], { m1: monster() });
-    expect(effectsOf(ABILITY_BURN_CATEGORY)).toHaveLength(0);
+  it('雙持一次攻擊逐下加層', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const base = run([weapon(undefined, 1, 'dualBlade')], { m1: monster() }).damages[0].hits.map(h => h.damage);
+    withStacks({ m1: 20 });
+    const hits = run([weapon(focus, 1, 'dualBlade')], { m1: monster() }).damages[0].hits.map(h => h.damage);
+    expect(hits).toEqual([Math.floor(base[0] * 1.3), Math.floor(base[1] * 1.315)]);
+    expect(stacksOf('m1')).toBe(22);
+  });
+
+  it('加成上限 +100%', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const base = run([weapon()], { m1: monster() }).damages[0].damage;
+    withStacks({ m1: 1000 });
+    expect(run([weapon(focus)], { m1: monster() }).damages[0].damage).toBe(base * 2);
+  });
+
+  it('範圍技能每隻怪各自記層數', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const fireball = instantiateSkill('fireball')!;
+    const both = ['m1', 'm2'];
+    const base = run([weapon()], { m1: monster(), m2: monster() }, fireball, both).damages.map(d => d.damage);
+    withStacks({ m1: 20 });
+    const dealt = run([weapon(focus)], { m1: monster(), m2: monster() }, fireball, both).damages.map(d => d.damage);
+    expect(dealt).toEqual([Math.floor(base[0] * 1.3), base[1]]);
+    expect([stacksOf('m1'), stacksOf('m2')]).toEqual([21, 1]);
+  });
+
+  it('換地圖（進入地圖時間改變）全部清除；怪死清除該怪', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    withStacks({ m1: 20, m2: 5 }, String(NOW - 1));
+    run([weapon(focus)], { m1: monster() });
+    expect([stacksOf('m1'), stacksOf('m2')]).toEqual([1, undefined]);
+    const r = run([weapon(focus)], { m1: monster({ currentHp: 1 }) });
+    expect(r.damages[0].killed).toBe(true);
+    expect(stacksOf('m1')).toBeUndefined();
+  });
+
+  it('未命中不加層、不歸零', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    withStacks({ m1: 20 });
+    expect(run([weapon(focus)], { m1: monster() }).damages[0].isMiss).toBe(true);
+    expect(stacksOf('m1')).toBe(20);
   });
 });
 

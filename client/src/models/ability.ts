@@ -13,7 +13,7 @@ export type AbilityType =
   | 'bonus_damage'
   | 'skill_splash'
   | 'combo_strike'
-  | 'hit_burn'
+  | 'focus_strike'
   // 騎士
   | 'shield_bash_boost'
   | 'rend_boost'
@@ -56,7 +56,7 @@ export type AbilityType =
   | 'rage'
   | 'calm';
 
-/** 參數值以整數儲存；秒數以毫秒儲存 */
+/** 參數值以整數儲存；秒數以毫秒儲存；`tenths` 參數以 0.1% 儲存 */
 export interface Ability {
   type: AbilityType;
   params: Record<string, number>;
@@ -66,16 +66,20 @@ export type AbilityPool = 'common' | ClassName;
 /** 武器組（攻擊）／飾品組（防禦，項鍊與戒指共用）（§ 7S.5） */
 export type AbilityGroup = 'weapon' | 'accessory';
 
-/** `weaponValue`：區間上限為武器值（§ 7S.2「數值單位」） */
+/** `weaponValue`：區間上限為武器值 × `weaponValueScale`（§ 7S.2「數值單位」） */
 export interface AbilityParamDef {
   key: string;
   min: number;
   max: number | 'weaponValue';
+  /** `max: 'weaponValue'` 的倍數，預設 1；乘完四捨五入 */
+  weaponValueScale?: number;
   /** 抽取單位，預設 1；秒數參數為 100（0.1 秒）或 1000（1 秒） */
   step?: number;
   unit: '%' | 's' | '';
   /** 數值越小越好（§ 7S.2「最弱值」標 ↓） */
   lowerIsBetter?: boolean;
+  /** 以 0.1% 為單位（儲存值 ÷ 10 為 %） */
+  tenths?: boolean;
 }
 
 export interface AbilityDefinition {
@@ -93,13 +97,12 @@ export interface AbilityDefinition {
 /** 商店／掉落的出現機率（§ 7S.2） */
 export const ABILITY_CHANCE = 30;
 export const ABILITY_MIN_TIER = 3;
-/** 「5~武器值」的下限，武器值 ≤ 此值時固定為此值 */
+/** 「5~武器值」的下限，上限 ≤ 此值時固定為此值 */
 export const ABILITY_WEAPON_VALUE_MIN = 5;
 /** 擴散半徑（格） */
 export const ABILITY_SPLASH_RADIUS = 3;
-/** 命中燃燒持續 */
-export const ABILITY_BURN_DURATION_MS = 10_000;
-export const ABILITY_BURN_CATEGORY = 'ability-burn';
+/** 專注打擊的加成上限（%） */
+export const ABILITY_FOCUS_MAX_PERCENT = 100;
 /** 火矢附魔強化：非弓的附加火傷害 */
 export const ABILITY_FIRE_ARROW_BONUS = 15;
 /** 毒霧強化：一次打出的秒數 */
@@ -118,7 +121,10 @@ const ms = (key: string, minSec: number, maxSec: number, stepSec: number): Abili
 
 export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
   { type: 'bonus_damage', name: '追加傷害', group: 'weapon', pool: 'common',
-    params: [{ key: 'chance', min: 5, max: 10, unit: '%' }, { key: 'damage', min: 5, max: 'weaponValue', unit: '' }],
+    params: [
+      { key: 'chance', min: 5, max: 15, unit: '%' },
+      { key: 'damage', min: 5, max: 'weaponValue', weaponValueScale: 1.5, unit: '' },
+    ],
     description: '命中 {chance} 機率追加 {damage} 傷害' },
   { type: 'skill_splash', name: '單體技能擴散', group: 'weapon', pool: 'common',
     params: [{ key: 'percent', min: 15, max: 25, unit: '%' }],
@@ -126,9 +132,9 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
   { type: 'combo_strike', name: '追打傷害', group: 'weapon', pool: 'common',
     params: [{ key: 'every', min: 5, max: 10, unit: '', lowerIsBetter: true }, { key: 'bonus', min: 10, max: 50, unit: '%' }],
     description: '每第 {every} 次出手傷害 +{bonus}' },
-  { type: 'hit_burn', name: '命中燃燒', group: 'weapon', pool: 'common',
-    params: [{ key: 'chance', min: 5, max: 10, unit: '%' }, { key: 'damage', min: 5, max: 'weaponValue', unit: '' }],
-    description: `命中 {chance} 機率燃燒 ${ABILITY_BURN_DURATION_MS / 1000} 秒，每秒 {damage} 傷害` },
+  { type: 'focus_strike', name: '專注打擊', group: 'weapon', pool: 'common',
+    params: [{ key: 'percent', min: 5, max: 15, unit: '%', tenths: true }],
+    description: `對同一隻怪每命中 1 下，之後對牠的傷害 +{percent}（上限 +${ABILITY_FOCUS_MAX_PERCENT}%）` },
 
   { type: 'shield_bash_boost', name: '盾擊強化', group: 'accessory', pool: 'knight', skillId: 'shield-bash',
     params: [{ key: 'percent', min: 20, max: 30, unit: '%' }], description: '盾擊暈眩時間 +{percent}' },
@@ -279,7 +285,13 @@ export function getAbilityWeaponValue(template: AbilityTemplate): number {
 
 export function resolveParamRange(def: AbilityParamDef, template: AbilityTemplate): [number, number] {
   if (def.max !== 'weaponValue') return [def.min, def.max];
-  return [def.min, Math.max(def.min, getAbilityWeaponValue(template))];
+  return [def.min, Math.max(def.min, Math.round(getAbilityWeaponValue(template) * (def.weaponValueScale ?? 1)))];
+}
+
+/** 區間上限的文字：數值，或 `武器值`／`武器值×1.5` */
+export function formatParamMax(def: AbilityParamDef): string {
+  if (def.max !== 'weaponValue') return formatParam(def, def.max);
+  return def.weaponValueScale && def.weaponValueScale !== 1 ? `武器值×${def.weaponValueScale}` : '武器值';
 }
 
 export type AbilityRollMode = 'weakest' | 'random';
@@ -405,7 +417,7 @@ export function minAbilityParam(gear: readonly GearLike[], type: AbilityType, ke
 }
 
 export function formatParam(def: AbilityParamDef, value: number): string {
-  if (def.unit === '%') return `${value}%`;
+  if (def.unit === '%') return def.tenths ? `${(value / 10).toFixed(1)}%` : `${value}%`;
   if (def.unit === 's') {
     const seconds = value / 1000;
     return `${(def.step ?? 1000) < 1000 ? seconds.toFixed(1) : seconds} 秒`;
@@ -452,11 +464,11 @@ export function formatAbilityDisplayParts(ability: Ability, template: AbilityTem
   return parts;
 }
 
-/** Wiki 用的數值欄：`A 5~10%、B 5~武器值`；無參數為 `—` */
+/** Wiki 用的數值欄：`A 5~15%、B 5~武器值×1.5`；無參數為 `—` */
 export function formatAbilityRange(def: AbilityDefinition): string {
   if (def.params.length === 0) return '—';
   return def.params.map(p => {
-    const max = p.max === 'weaponValue' ? '武器值' : formatParam(p, p.max);
+    const max = formatParamMax(p);
     const min = formatParam(p, p.min);
     return `${min}~${max}`.replace(/ 秒~/, '~').replace(/%~/, '~');
   }).join('、');
@@ -471,15 +483,14 @@ export function formatAbilityTemplateParts(def: AbilityDefinition): { text: stri
       if (piece) parts.push({ text: piece });
       continue;
     }
-    const max = param.max === 'weaponValue' ? '武器值' : formatParam(param, param.max);
-    const range = `${formatParam(param, param.min)}~${max}`.replace(/ 秒~/, '~').replace(/%~/, '~');
+    const range = `${formatParam(param, param.min)}~${formatParamMax(param)}`.replace(/ 秒~/, '~').replace(/%~/, '~');
     parts.push({ text: range, range: true });
     if (param.lowerIsBetter) parts.push({ text: '（越小越好）' });
   }
   return parts;
 }
 
-/** Wiki 用的效果敘述：參數以區間代入（例：`命中 5~10% 機率追加 5~武器值 傷害`） */
+/** Wiki 用的效果敘述：參數以區間代入（例：`命中 5~15% 機率追加 5~武器值×1.5 傷害`） */
 export function formatAbilityTemplate(def: AbilityDefinition): string {
   return formatAbilityTemplateParts(def).map(p => p.text).join('');
 }

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>保留條件編輯 Demo — MayanaIdle</title>
+<!--
+  補給天賦保留條件的五種欄位（`49-village-script.md` § 49.4）：新增帶有指定詞綴、指定裝備類型、白名單三個多選欄位。
+  版面樣本：天賦格列的 class 與 App.css 相同；新欄位樣式在本檔 <style>。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/keep-filter.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-stage { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; }
+.demo-stage h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0; }
+.demo-desktop { width: 760px; }
+.demo-mobile { width: 393px; }
+.demo-result { font-size: var(--fs-xs); color: var(--text-dim); margin: 4px 0 0; }
+
+/* === 新增：多選欄位（摘要鈕＋下拉勾選面板） === */
+.talent-param-multi { position: relative; display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); color: var(--text-dim); }
+.talent-param-multi-btn {
+  padding: 1px 6px; max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid var(--outline-dark); border-radius: var(--radius-sm);
+  background: var(--bg-inset); color: var(--accent-gold); font-size: var(--fs-xs); font-weight: 600; cursor: pointer;
+}
+.talent-param-multi-btn.is-empty { color: var(--text-dim); font-weight: 400; }
+.talent-param-multi-panel {
+  position: absolute; z-index: 5; top: 100%; left: 0; margin-top: 2px;
+  width: 240px; max-height: 280px; display: flex; flex-direction: column;
+  padding: 6px; background: var(--bg-panel);
+  border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); box-shadow: var(--shadow-panel);
+}
+.talent-param-multi-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.talent-param-multi-head input {
+  flex: 1; min-width: 0; padding: 2px 6px; font-size: var(--fs-xs);
+  border: 1px solid var(--outline-dark); border-radius: var(--radius-sm); background: var(--bg-inset); color: var(--text-primary);
+}
+.talent-param-multi-clear { margin-left: auto; border: 0; background: transparent; color: var(--text-dim); font-size: var(--fs-xs); cursor: pointer; }
+.talent-param-multi-clear:hover { color: var(--accent-danger); }
+.talent-param-multi-list { overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.talent-param-multi-group { margin: 4px 0 2px; color: var(--text-dim); font-size: var(--fs-xs); }
+.talent-param-multi-list label {
+  display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: var(--radius-sm);
+  color: var(--text-primary); font-size: var(--fs-xs); cursor: pointer;
+}
+.talent-param-multi-list label:hover { background: var(--bg-inset); }
+.talent-param-multi-tier { margin-left: auto; color: var(--text-dim); }
+.talent-param-multi-more { padding: 2px 4px; color: var(--text-dim); font-size: var(--fs-xs); }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">保留條件編輯</h1>
+  <p class="demo-note">
+    販售裝備、拆解裝備、存入裝備共用的保留條件（§ 49.4）。<br>
+    「保留本角色穿得起的」兼總開關：勾了才顯示詞綴 Tier 高於、帶有詞綴、裝備類型、白名單；沒勾＝沒有保留條件。存入裝備的字樣為「存入」。<br>
+    多選欄位是一顆摘要鈕（未選／前兩項名稱／共 N 項），點開勾選面板；白名單可搜尋名稱、依裝備階級上色，最多列 50 筆。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./keepFilterDemo.tsx"></script>
+</body>
+</html>

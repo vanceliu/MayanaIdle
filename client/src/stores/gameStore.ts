@@ -99,11 +99,11 @@ import { createShopEquipment } from '../systems/shopEquipment';
 import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus } from '../models/abilitySkill';
 import { craftRequiresAbility, formatAbilityDisplay, getAbilityDefinition, getCraftAbilityOptions, isAbilityType, type AbilityType } from '../models/ability';
 import {
-  abilityToCrystal, addCrystal, crystalToAbility, getCrystalApplyBlock, getCrystalApplyCost, normalizeAbilityCrystals,
-  yieldsAbilityCrystal, CRYSTAL_APPLY_BLOCK_TEXT, type AbilityCrystal,
+  addCrystal, crystalToAbility, getCrystalApplyBlock, getCrystalApplyCost, normalizeAbilityCrystals,
+  CRYSTAL_APPLY_BLOCK_TEXT, type AbilityCrystal,
 } from '../models/abilityCrystal';
 import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
-import { generateCraftAffixes, getDismantleYield } from '../systems/crafting';
+import { generateCraftAffixes, getDismantleOutcome } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
@@ -120,10 +120,11 @@ import { getItemSellPrice, getGeneralStorePrice, getTemplateSellPrice } from '..
 import { getCachedEquipmentTemplates } from '../db/equipmentTemplateCache';
 import type { HuntLocation } from '../models/villageScript';
 import {
-  evaluateVillageScript, findReturnScroll, getBuyAmount, getWarehouseKind,
+  evaluateVillageScript, findReturnScroll, collectBuyItems, getWarehouseKind,
   collectVillageSellMaterials, collectVillageSellEquipment,
-  collectDepositMaterials, collectDepositEquipment,
-  getWithdrawAmount, getDepositGoldAmount, getWithdrawGoldAmount,
+  collectDepositMaterials, collectDepositEquipment, collectDepositItems, collectVillageDismantle, collectDiscardEquipment,
+  type VillageDismantlePick,
+  collectWithdrawItems, getDepositGoldAmount, getWithdrawGoldAmount,
   type VillageScriptContext,
 } from '../systems/villageScriptRunner';
 import { random } from '../core/rng';
@@ -2092,6 +2093,7 @@ export function createGameStore(session: Session) {
         return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
       })(),
       // 旅館有沒有事情可做（`13-town.md` § 13.7）。全滿又沒異常狀態時為 false。
+      abilityCrystals: state.abilityCrystals,
       needsInn: char.hp < getEffectiveMaxHp(char, state.equippedGear, state.activeEffects)
         || char.mp < getEffectiveMaxMp(char, state.equippedGear, state.activeEffects)
         || state.activeEffects.some(e => e.type === 'debuff' && e.target === 'player'),
@@ -2120,13 +2122,10 @@ export function createGameStore(session: Session) {
         break;
       }
       case 'buy_item': {
-        const amount = getBuyAmount(action, ctx);
-        if (amount <= 0 || action.itemId == null) return;
-        const spent = get().buyBagItems([{ itemId: action.itemId, amount }]);
-        if (spent > 0) {
-          const name = getItemById(action.itemId)?.name ?? '道具';
-          set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：購買${name} ×${amount}`, type: 'system' }) });
-        }
+        // 逐組下單：一組不在貨架上不影響其他組
+        const bought = collectBuyItems(action, ctx).filter(line => get().buyBagItems([line]) > 0);
+        if (bought.length === 0) return;
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：購買${formatItemLines(bought)}`, type: 'system' }) });
         break;
       }
       case 'sell_materials': {
@@ -2153,6 +2152,30 @@ export function createGameStore(session: Session) {
         set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：存入素材 ${items.length} 種`, type: 'system' }) });
         break;
       }
+      case 'deposit_items': {
+        const items = collectDepositItems(action, ctx);
+        if (items.length === 0) return;
+        get().depositToWarehouse({ warehouse: getWarehouseKind(action), materials: items });
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：存入道具 ${items.length} 種`, type: 'system' }) });
+        break;
+      }
+      case 'dismantle_equipment': {
+        const picks = collectVillageDismantle(action, ctx);
+        if (picks.length === 0) return;
+        commitDismantle(session, get, set, picks);
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：拆解裝備 ${picks.length} 件，獲得 ${formatDismantleGain(picks)}`, type: 'system' }) });
+        break;
+      }
+      case 'discard_equipment': {
+        const items = collectDiscardEquipment(action, ctx);
+        if (items.length === 0) return;
+        const removed = new Set(items.map(i => i.id));
+        if (char.id) for (const item of items) void session.repo.deleteEquipment(item.id!);
+        set({ inventory: get().inventory.filter(i => !removed.has(i.id)) });
+        get().saveState();
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：丟棄裝備 ${items.length} 件`, type: 'system' }) });
+        break;
+      }
       case 'deposit_equipment': {
         const items = collectDepositEquipment(action, ctx);
         if (items.length === 0) return;
@@ -2164,14 +2187,10 @@ export function createGameStore(session: Session) {
         break;
       }
       case 'withdraw_item': {
-        const amount = getWithdrawAmount(action, ctx);
-        if (amount <= 0 || action.itemId == null) return;
-        get().withdrawFromWarehouse({
-          warehouse: getWarehouseKind(action),
-          materials: [{ itemId: action.itemId, amount }],
-        });
-        const name = getItemById(action.itemId)?.name ?? '道具';
-        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：從倉庫取出${name} ×${amount}`, type: 'system' }) });
+        const lines = collectWithdrawItems(action, ctx);
+        if (lines.length === 0) return;
+        get().withdrawFromWarehouse({ warehouse: getWarehouseKind(action), materials: lines });
+        set({ combatLogs: addLog(get().combatLogs, { text: `村莊腳本：從倉庫取出${formatItemLines(lines)}`, type: 'system' }) });
         break;
       }
       case 'deposit_gold': {
@@ -2852,29 +2871,17 @@ export function createGameStore(session: Session) {
     // 只認背包裡未裝備的實例；`inventory` 不含身上裝備
     const item = state.inventory.find(i => i.id != null && i.id === instanceId);
     if (!item) return { ok: false, message: '沒有這件裝備' };
-    const template = getTemplateById(item.templateId);
-    const yields = getDismantleYield(template) ?? [];
     // 掉落品的隨機技能存成結晶（`07-affix-ability.md` § 7S.8）；無配方者只得結晶
-    const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
-    if (yields.length === 0 && !crystal) return { ok: false, message: '這件裝備無法拆解' };
+    const { yields, crystal } = getDismantleOutcome(item, getTemplateById(item.templateId));
+    if (!yields && !crystal) return { ok: false, message: '這件裝備無法拆解' };
+    const pick: VillageDismantlePick = { item, yields: yields ?? [], crystal };
 
-    const newKinds = yields.filter(m => getBagItemAmount(state.bagItems, m.itemId) <= 0).length;
+    const newKinds = pick.yields.filter(m => getBagItemAmount(state.bagItems, m.itemId) <= 0).length;
     const usedAfter = getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) - 1 + newKinds;
     if (usedAfter > getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
 
-    const newBag = yields.reduce((bag, m) => addBagItem(bag, m.itemId, m.amount), state.bagItems);
-    if (char.id) void session.repo.deleteEquipment(item.id!);
-    set({
-      bagItems: newBag,
-      inventory: state.inventory.filter(i => i.id !== item.id),
-      ...(crystal ? { abilityCrystals: addCrystal(state.abilityCrystals, crystal) } : {}),
-    });
-    get().saveState();
-    const gained = [
-      ...yields.map(m => `${getItemById(m.itemId)?.name ?? '未知素材'}×${m.amount}`),
-      ...(crystal ? [`技能結晶「${getAbilityDefinition(crystal.type)!.name}」`] : []),
-    ].join('、');
-    return { ok: true, message: `拆解 ${item.name}，獲得 ${gained}`, name: item.name };
+    commitDismantle(session, get, set, [pick]);
+    return { ok: true, message: `拆解 ${item.name}，獲得 ${formatDismantleGain([pick])}`, name: item.name };
   },
 
   applyAbilityCrystal: (instanceId, crystalType) => {
@@ -3239,6 +3246,43 @@ export interface MonsterDeathOptions {
   killArea?: { regionId: string; floor: number | null; areaId: string };
   /** 懸賞契約是否生效：一人隊伍才生效（`53-bounty-contract.md` § 53.5.1）。省略視為生效 */
   bountyActive?: boolean;
+}
+
+/** 拆解結算（`06-equipment-acquire.md` § 6A.3「拆解」）：刪實例、退材料、存結晶，一次寫回 */
+function commitDismantle(
+  session: Session,
+  get: () => GameState,
+  set: (s: Partial<GameState>) => void,
+  picks: readonly VillageDismantlePick[],
+): void {
+  const state = get();
+  const removed = new Set(picks.map(p => p.item.id));
+  let bagItems = state.bagItems;
+  let abilityCrystals = state.abilityCrystals;
+  for (const { item, yields, crystal } of picks) {
+    bagItems = yields.reduce((bag, m) => addBagItem(bag, m.itemId, m.amount), bagItems);
+    if (crystal) abilityCrystals = addCrystal(abilityCrystals, crystal);
+    if (state.character?.id) void session.repo.deleteEquipment(item.id!);
+  }
+  set({ bagItems, abilityCrystals, inventory: state.inventory.filter(i => !removed.has(i.id)) });
+  get().saveState();
+}
+
+/** 日誌用：「名稱 ×數量」以頓號串接 */
+function formatItemLines(lines: readonly { itemId: number; amount: number }[]): string {
+  return lines.map(l => `${getItemById(l.itemId)?.name ?? '道具'} ×${l.amount}`).join('、');
+}
+
+/** 拆解獲得：材料依種類加總，結晶列名稱 */
+function formatDismantleGain(picks: readonly VillageDismantlePick[]): string {
+  const totals = new Map<number, number>();
+  for (const { yields } of picks) {
+    for (const m of yields) totals.set(m.itemId, (totals.get(m.itemId) ?? 0) + m.amount);
+  }
+  return [
+    ...[...totals].map(([itemId, amount]) => `${getItemById(itemId)?.name ?? '未知素材'}×${amount}`),
+    ...picks.flatMap(p => (p.crystal ? [`技能結晶「${getAbilityDefinition(p.crystal.type)!.name}」`] : [])),
+  ].join('、');
 }
 
 export function processMonsterDeath(

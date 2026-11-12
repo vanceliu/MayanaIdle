@@ -41,10 +41,10 @@ import {
   sumUniqueAffix,
   rollUniqueStruckBuffs,
 } from '../models/uniqueAffix';
-import { findAbility, sumAbilityParam, ABILITY_BURN_CATEGORY, ABILITY_SPLASH_RADIUS } from '../models/ability';
+import { findAbility, sumAbilityParam, ABILITY_SPLASH_RADIUS } from '../models/ability';
 import {
   advanceCombo, applyComboBonus, comboKey, isBasicAttackClass, isDirectDamageSkill, isSingleTargetSkill,
-  consumeCalm, gainRage, makeBurnEffect, rollBurn, shortenCooldown, splashDamage,
+  applyFocusStrike, clearFocusTarget, focusKey, consumeCalm, gainRage, shortenCooldown, splashDamage,
 } from './abilityCombat';
 import { getDistance } from './lineOfSight';
 import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
@@ -371,6 +371,8 @@ export function processPlayerAttack(
   // § 7S.5 追打：普攻類每一下計 1；技能類每施放一次計 1，觸發時該次施放的全部目標加成
   const comboAbility = findAbility(equippedGear, 'combo_strike');
   const comboStateKey = comboKey(weapon, character);
+  const focusAbility = findAbility(equippedGear, 'focus_strike');
+  const focusStateKey = focusKey(character);
   const basicAttackClass = isBasicAttackClass(event, skill);
   const castComboBonus = comboAbility && !basicAttackClass && isDirectDamageSkill(skill)
     ? advanceCombo(session.loop, comboAbility, comboStateKey)
@@ -508,6 +510,14 @@ export function processPlayerAttack(
       damage = hits.reduce((sum, h) => sum + h.damage, 0);
     }
 
+    // § 7S.5 專注打擊：逐下套用該怪的層數加成，結算後加層
+    if (focusAbility && !isMiss && procs) {
+      const boosted = applyFocusStrike(session.loop, focusAbility, focusStateKey, targetId, hits,
+        id => (ctx.monsterInstances.get(id)?.currentHp ?? 0) > 0);
+      hits = hits.map((h, i) => ({ ...h, damage: boosted[i] }));
+      damage = hits.reduce((sum, h) => sum + h.damage, 0);
+    }
+
     // § 7S.5 追加傷害：每下命中各擲一次，加在該下最終傷害
     const bonusDamage = findAbility(equippedGear, 'bonus_damage');
     if (bonusDamage && !isMiss && procs) {
@@ -525,6 +535,7 @@ export function processPlayerAttack(
     }
 
     const killed = monster.currentHp <= 0;
+    if (killed) clearFocusTarget(session.loop, targetId);
 
     // On-hit poison trigger (normal attack + Envenom buff active)
     if (event.action.type === 'normal_attack' && !isMiss && !killed) {
@@ -622,18 +633,6 @@ export function processPlayerAttack(
             });
           }
         }
-      }
-    }
-
-    // § 7S.5 命中燃燒：每下命中各擲一次；燃燒中不再施加、不刷新
-    if (!isMiss && !killed && procs) {
-      const now = gameNow();
-      const gs = session.game.getState();
-      const burning = gs.activeEffects.some(e => e.category === ABILITY_BURN_CATEGORY && isActiveOnMonster(e, targetId, now));
-      const burn = rollBurn(equippedGear, landedHits, burning);
-      if (burn) {
-        gs.addEffect(makeBurnEffect(burn, targetId, targetIdx, now));
-        logs.push({ text: `命中燃燒觸發！${monsterLogName(monster)} 燃燒（每秒 ${burn.params.damage}）`, type: 'debuff-enemy' });
       }
     }
 
@@ -816,7 +815,7 @@ export function processPlayerAttack(
 
   // 攻擊技能附帶的自身 buff（復仇之刃、背刺）：傷害結算後才施加，不作用於本次技能（`23-class-magic.md` § 23.1.1）
   if (skill?.selfBuff) {
-    const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects);
+    const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects, gameNow(), session);
     if (applied) {
       session.game.setState({ activeEffects: applied.effects });
       logs.push({ text: `${skill.name}：${applied.description}`, type: 'player' });

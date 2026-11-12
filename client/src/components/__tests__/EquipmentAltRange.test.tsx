@@ -44,7 +44,7 @@ describe('裝備 tooltip Alt 數值區間', () => {
   it('按住 Alt：詞綴區間乘品質、隨機技能參數依模板；額外屬性不顯示', () => {
     const { container } = render(<EquipmentDetail item={sword()} />);
     act(() => { fireEvent.keyDown(window, { key: 'Alt', altKey: true }); });
-    expect(ranges(container)).toEqual(['(5 ~ 10%)', '(5 ~ 19)', '(99 ~ 110)']);
+    expect(ranges(container)).toEqual(['(5 ~ 15%)', '(5 ~ 29)', '(99 ~ 110)']);
     expect(screen.getByText('力量 +1')).toBeTruthy();
   });
 

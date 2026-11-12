@@ -11,6 +11,7 @@ import {
   getAbilityClassPool,
   getCraftAbilityOptions,
   getAbilityWeaponValue,
+  resolveParamRange,
   rollAbility,
   findClassSkillAbility,
   formatAbilityDisplay,
@@ -39,7 +40,7 @@ describe('適用部位與階級（§ 7S.1）', () => {
   });
 
   it('武器組：共通 4 種、各職業 3 種；飾品組：共通 5 種、職業 2~4 種（§ 7S.5）', () => {
-    expect(typesOf('common')).toEqual(['bonus_damage', 'skill_splash', 'combo_strike', 'hit_burn']);
+    expect(typesOf('common')).toEqual(['bonus_damage', 'skill_splash', 'combo_strike', 'focus_strike']);
     for (const cls of ['knight', 'elf', 'elementalist', 'priest', 'thief']) expect(typesOf(cls), cls).toHaveLength(3);
     expect(typesOf('common', 'accessory')).toEqual(['low_hp_regen', 'low_mp_regen', 'thorns', 'rage', 'calm']);
     expect(typesOf('knight', 'accessory')).toEqual(['shield_bash_boost', 'iron_shield_boost']);
@@ -93,7 +94,7 @@ describe('抽取（§ 7S.2）', () => {
       if (!a) continue;
       const def = getAbilityDefinition(a.type)!;
       for (const p of def.params) {
-        const max = p.max === 'weaponValue' ? Math.max(p.min, getAbilityWeaponValue(T5_SWORD)) : p.max;
+        const [, max] = resolveParamRange(p, T5_SWORD);
         expect(a.params[p.key]).toBeGreaterThanOrEqual(p.min);
         expect(a.params[p.key]).toBeLessThanOrEqual(max);
         expect((a.params[p.key] - p.min) % (p.step ?? 1)).toBe(0);
@@ -119,15 +120,14 @@ describe('抽取（§ 7S.2）', () => {
     expect(getCraftAbilityOptions(KNIGHT_ONLY, 'knight')).toEqual([...typesOf('common'), ...typesOf('knight')]);
   });
 
-  it('武器值 ≤ 5 時「5~武器值」固定 5', () => {
-    const weak = { slot: 'rightHand', tier: 3, smallMonsterDamage: 4, largeMonsterDamage: 3 };
-    for (let i = 0; i < 50; i++) {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0);
-      const a = rollAbility(weak, { channel: 'drop' });
-      expect(a?.type).toBe('bonus_damage');
-      expect(a!.params.damage).toBe(5);
-      vi.restoreAllMocks();
-    }
+  it('追加傷害上限為武器值×1.5 四捨五入；上限 ≤ 5 時固定 5', () => {
+    const range = (t: object) =>
+      resolveParamRange(getAbilityDefinition('bonus_damage')!.params.find(p => p.key === 'damage')!, { slot: 'rightHand', tier: 3, ...t });
+    expect(getAbilityWeaponValue(T5_SWORD)).toBe(14);
+    expect(range(T5_SWORD)).toEqual([5, 21]);
+    expect(range({ smallMonsterDamage: 18, largeMonsterDamage: 16 })).toEqual([5, 26]);
+    expect(range({ smallMonsterDamage: 4, largeMonsterDamage: 3 })).toEqual([5, 6]);
+    expect(range({ smallMonsterDamage: 3, largeMonsterDamage: 3 })).toEqual([5, 5]);
   });
 
   it('seed 中所有 T3+ 右手武器都有共通池', () => {
@@ -178,6 +178,8 @@ describe('職業技能生效（§ 7S.3）', () => {
 
 describe('顯示（§ 7S.7）', () => {
   it('名稱：效果，參數代入', () => {
+    expect(formatAbilityDisplay({ type: 'focus_strike', params: { percent: 12 } }))
+      .toBe('專注打擊：對同一隻怪每命中 1 下，之後對牠的傷害 +1.2%（上限 +100%）');
     expect(formatAbilityDisplay({ type: 'bonus_damage', params: { chance: 8, damage: 12 } })).toBe('追加傷害：命中 8% 機率追加 12 傷害');
     expect(formatAbilityDisplay({ type: 'binding_arrow_boost', params: { cooldown: 1500, root: 2000 } }))
       .toBe('束縛箭強化：束縛箭冷卻 −1.5 秒、定身 +2.0 秒');
@@ -186,7 +188,8 @@ describe('顯示（§ 7S.7）', () => {
   });
 
   it('Wiki 數值欄', () => {
-    expect(formatAbilityRange(getAbilityDefinition('bonus_damage')!)).toBe('5~10%、5~武器值');
+    expect(formatAbilityRange(getAbilityDefinition('bonus_damage')!)).toBe('5~15%、5~武器值×1.5');
+    expect(formatAbilityRange(getAbilityDefinition('focus_strike')!)).toBe('0.5~1.5%');
     expect(formatAbilityRange(getAbilityDefinition('binding_arrow_boost')!)).toBe('1.0~2.0 秒、1.0~3.0 秒');
     expect(formatAbilityRange(getAbilityDefinition('smoke_bomb_boost')!)).toBe('—');
   });
@@ -200,7 +203,8 @@ describe('顯示（§ 7S.7）', () => {
 describe('Wiki 效果敘述', () => {
   it('參數以區間代入，越小越好的參數加註', async () => {
     const { formatAbilityTemplate } = await import('../ability');
-    expect(formatAbilityTemplate(getAbilityDefinition('bonus_damage')!)).toBe('命中 5~10% 機率追加 5~武器值 傷害');
+    expect(formatAbilityTemplate(getAbilityDefinition('bonus_damage')!)).toBe('命中 5~15% 機率追加 5~武器值×1.5 傷害');
+    expect(formatAbilityTemplate(getAbilityDefinition('focus_strike')!)).toBe('對同一隻怪每命中 1 下，之後對牠的傷害 +0.5~1.5%（上限 +100%）');
     expect(formatAbilityTemplate(getAbilityDefinition('combo_strike')!)).toBe('每第 5~10（越小越好） 次出手傷害 +10~50%');
     expect(formatAbilityTemplate(getAbilityDefinition('binding_arrow_boost')!)).toBe('束縛箭冷卻 −1.0~2.0 秒、定身 +1.0~3.0 秒');
   });
@@ -211,7 +215,7 @@ describe('Wiki 數值區間標示', () => {
     const { formatAbilityTemplateParts } = await import('../ability');
     expect(formatAbilityTemplateParts(getAbilityDefinition('rage')!).filter(p => p.range).map(p => p.text)).toEqual(['5~15']);
     expect(formatAbilityTemplateParts(getAbilityDefinition('bonus_damage')!)).toEqual([
-      { text: '命中 ' }, { text: '5~10%', range: true }, { text: ' 機率追加 ' }, { text: '5~武器值', range: true }, { text: ' 傷害' },
+      { text: '命中 ' }, { text: '5~15%', range: true }, { text: ' 機率追加 ' }, { text: '5~武器值×1.5', range: true }, { text: ' 傷害' },
     ]);
   });
 });
@@ -221,8 +225,8 @@ describe('tooltip Alt 數值區間（34-ui-guidelines § 34.2）', () => {
     const { formatAbilityDisplayParts } = await import('../ability');
     const ability: Ability = { type: 'bonus_damage', params: { chance: 8, damage: 12 } };
     expect(formatAbilityDisplayParts(ability, T5_SWORD)).toEqual([
-      { text: '追加傷害：' }, { text: '命中 ' }, { text: '8%' }, { text: '(5 ~ 10%)', range: true },
-      { text: ' 機率追加 ' }, { text: '12' }, { text: '(5 ~ 14)', range: true }, { text: ' 傷害' },
+      { text: '追加傷害：' }, { text: '命中 ' }, { text: '8%' }, { text: '(5 ~ 15%)', range: true },
+      { text: ' 機率追加 ' }, { text: '12' }, { text: '(5 ~ 21)', range: true }, { text: ' 傷害' },
     ]);
   });
 

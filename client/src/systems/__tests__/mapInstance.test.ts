@@ -53,15 +53,15 @@ describe('MapInstance', () => {
 
   it('人數變動時 Pressure 不變；離開者帶走一人比例的擊殺數', () => {
     const inst = createMapInstance('k');
-    const [a, b, c] = [fakeSession(1, 250), fakeSession(2), fakeSession(3)];
+    const [a, b, c] = [fakeSession(1, 350), fakeSession(2), fakeSession(3)];
     attachInstance(a, inst);
     attachInstance(b, inst);
     attachInstance(c, inst);
-    expect(inst.kills).toBe(750);
+    expect(inst.kills).toBe(1050);
     expect(calculatePressure(inst.kills, 1, 3).pressure).toBe(2);
     detachInstance(c);
-    expect(inst.kills).toBe(500);
-    expect(c.game.getState().character!.areaKills).toBe(250);
+    expect(inst.kills).toBe(700);
+    expect(c.game.getState().character!.areaKills).toBe(350);
     expect(c.game.getState().pressureMembers).toBe(1);
     expect(a.game.getState().pressureMembers).toBe(2);
     expect(calculatePressure(inst.kills, 1, 2).pressure).toBe(2);

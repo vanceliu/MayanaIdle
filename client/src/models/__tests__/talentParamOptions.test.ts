@@ -1,4 +1,4 @@
-import type { WarehouseKind } from '../villageScript';
+import type { DiscardScope, DismantleCrystalMode, WarehouseKind } from '../villageScript';
 import { describe, it, expect } from 'vitest';
 import { TALENT_PARAM_FIELDS, defaultParams, getParamFields } from '../talentParams';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from '../scriptEngine';
@@ -76,6 +76,11 @@ const VALUE_DOMAINS: Record<string, Set<string> | null> = {
   // 存入目的地＝`WarehouseKind`（`49-village-script.md` § 49.3）；補給天賦不碰公會倉庫
   'deposit_materials.warehouse': DEPOSIT_WAREHOUSES,
   'deposit_equipment.warehouse': DEPOSIT_WAREHOUSES,
+  'deposit_items.warehouse': DEPOSIT_WAREHOUSES,
+  'withdraw_item.warehouse': DEPOSIT_WAREHOUSES,
+  // 拆解遇到會出結晶的裝備（`49-village-script.md` § 49.4.1）
+  'dismantle_equipment.crystalMode': new Set<DismantleCrystalMode>(['improve', 'always', 'never']),
+  'discard_equipment.discardScope': new Set<DiscardScope>(['unsellable', 'sellable', 'all']),
 };
 
 describe('鑲材參數的選項值域', () => {

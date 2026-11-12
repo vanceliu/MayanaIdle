@@ -20,8 +20,7 @@
  *
  * 用法：npx vite-node scripts/simulateReaperKill.mts [--class=a,b] [--top=N] [--runs=N] [--no-skill-debuff]
  */
-import { ABILITY_BURN_CATEGORY } from '../src/systems/abilityCombat';
-import { ABILITY_BURN_DURATION_MS } from '../src/models/ability';
+import { ABILITY_FOCUS_MAX_PERCENT } from '../src/models/ability';
 import {
   calculatePlayerAttack,
   calculateSkillAttack,
@@ -262,16 +261,14 @@ function simulateOnce(
     return ability.params.bonus;
   };
   const withPercent = (dmg: number, percent: number) => (percent > 0 ? Math.floor(dmg * (100 + percent) / 100) : dmg);
-  /** 命中燃燒：每下命中各擲一次，燃燒中不再上 */
-  function tryBurn(now: number, landedHits: number) {
-    if (ability?.type !== 'hit_burn' || dots.some(d => d.category === ABILITY_BURN_CATEGORY)) return;
-    for (let h = 0; h < landedHits; h++) {
-      if (Math.random() * 100 < ability.params.chance) {
-        dots.push({ category: ABILITY_BURN_CATEGORY, damage: ability.params.damage, nextTick: now + DOT_TICK_MS, expiresAt: now + ABILITY_BURN_DURATION_MS });
-        return;
-      }
-    }
-  }
+  /** 專注打擊：該下套用層數加成後加 1 層 */
+  let focusStacks = 0;
+  const focus = (dmg: number) => {
+    if (ability?.type !== 'focus_strike') return dmg;
+    const bonus = Math.min(ABILITY_FOCUS_MAX_PERCENT, focusStacks * ability.params.percent / 10);
+    focusStacks++;
+    return withPercent(dmg, bonus);
+  };
   /** 精神匯聚強化：下一次攻擊技能的加成% */
   let pendingNextAttack = 0;
   /** 淬毒強化：毒傷比例 ×(1 + X%) */
@@ -396,8 +393,7 @@ function simulateOnce(
         stats.physHits++;
         if (res.isCritical) stats.crits++;
         const landedHits = res.hits.filter(h => !h.isMiss);
-        applyDamage(landedHits.reduce((sum, h) => sum + withPercent(h.damage, advanceCombo()), 0) + rollBonus(landedHits.length));
-        tryBurn(now, landedHits.length);
+        applyDamage(landedHits.reduce((sum, h) => sum + withPercent(focus(h.damage), advanceCombo()), 0) + rollBonus(landedHits.length));
         tryErosion(now, erosionRolls);
         tryDefenseDown(erosionRolls);
         // 淬毒：普攻命中觸發毒 DoT（快照制、存續期間不刷新），比例讀技能定義
@@ -436,8 +432,7 @@ function simulateOnce(
           stats.hits++;
           stats.physHits++;
           if (res.isCritical) stats.crits++;
-          applyDamage(withPercent(res.damage, advanceCombo()) + rollBonus(1));
-          tryBurn(now, 1);
+          applyDamage(withPercent(focus(res.damage), advanceCombo()) + rollBonus(1));
           tryErosion(now, 1);
         } else {
           stats.misses++;
@@ -474,11 +469,10 @@ function simulateOnce(
               char, ruledSkillPower(entry, effInt, char.className), entry.element!, monster, loadout.gear, entry.name, effects, 0,
               entry.ignoreDefensePercent ?? 0,
             );
-        res = { ...res, damage: withPercent(withPercent(res.damage, castPercent), castCombo) };
+        res = { ...res, damage: withPercent(withPercent(focus(res.damage), castPercent), castCombo) };
         stats.hits++;
         if (res.isCritical) stats.crits++;
         applyDamage(res.damage + rollBonus(1));
-        tryBurn(now, 1);
         tryErosion(now, 1);
         tryDefenseDown(1);
       }

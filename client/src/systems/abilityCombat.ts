@@ -1,7 +1,7 @@
 /**
  * 隨機技能的戰鬥觸發（`07-affix-ability.md` § 7S.4／§ 7S.5 共通池）。
  *
- * 追打計數、怒氣、平靜放在 `session.loop`，不進 store：不存檔、不同步給 client。
+ * 追打計數、專注打擊層數、怒氣、平靜放在 `session.loop`，不進 store：不存檔、不同步給 client。
  */
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
@@ -9,12 +9,11 @@ import type { ActiveEffect } from '../models/effect';
 import type { Skill } from '../models/skill';
 import type { PlayerAttackEvent } from './arpgEngine';
 import {
-  ABILITY_BURN_CATEGORY, ABILITY_BURN_DURATION_MS, ABILITY_CALM_MAX,
+  ABILITY_CALM_MAX, ABILITY_FOCUS_MAX_PERCENT,
   ABILITY_RAGE_DEFENSE, ABILITY_RAGE_MAGIC_RESIST, ABILITY_RAGE_MAX,
-  findAbility, maxAbilityParam, minAbilityParam, type Ability,
+  maxAbilityParam, minAbilityParam, type Ability,
 } from '../models/ability';
 import { ABILITY_CALM_CATEGORY, CALM_RATE_STAT, RAGE_DECAY_STAT } from '../models/abilityMeter';
-import { random } from '../core/rng';
 
 export interface AbilityComboState {
   /** 武器實例 id 與進入地圖時間；任一改變即歸零（換武器、換地圖、死亡、回城） */
@@ -65,38 +64,50 @@ export function applyComboBonus(damage: number, bonusPercent: number): number {
   return bonusPercent > 0 ? Math.floor(damage * (100 + bonusPercent) / 100) : damage;
 }
 
-/** 命中燃燒：每下命中各擲一次，任一成功即施加；燃燒中不再施加（§ 7S.5） */
-export function rollBurn(
-  gear: readonly (EquipmentInstance | null)[],
-  landedHits: number,
-  alreadyBurning: boolean,
-): Ability | undefined {
-  const burn = findAbility(gear, 'hit_burn');
-  if (!burn || alreadyBurning || landedHits <= 0) return undefined;
-  for (let i = 0; i < landedHits; i++) {
-    if (random() * 100 < burn.params.chance) return burn;
-  }
-  return undefined;
+export interface AbilityFocusState {
+  /** 進入地圖時間；改變即全部清除（換地圖、死亡、回城） */
+  key: string;
+  /** 怪物 id → 層數 */
+  stacks: Map<string, number>;
 }
 
-export function makeBurnEffect(burn: Ability, targetId: string, targetIdx: number, now: number): ActiveEffect {
-  const damage = burn.params.damage;
-  return {
-    id: `debuff-${ABILITY_BURN_CATEGORY}-${targetId}-${now}`,
-    sourceSkillId: 'hit_burn',
-    sourceSkillName: '命中燃燒',
-    category: ABILITY_BURN_CATEGORY,
-    type: 'debuff',
-    target: 'monster',
-    targetIdx,
-    targetMonsterId: targetId,
-    dot: { damage, element: 'fire', interval: 1000, totalDuration: ABILITY_BURN_DURATION_MS },
-    startTime: now,
-    duration: ABILITY_BURN_DURATION_MS,
-    tags: ['burning'],
-    name: '燃燒',
-    description: `每秒 ${damage} 傷害`,
-  };
+export function focusKey(character: Character): string {
+  return String(character.areaEnteredAt);
+}
+
+/** 層數表超過此數時，清掉已不在場的怪 */
+const FOCUS_PRUNE_SIZE = 32;
+
+/**
+ * 專注打擊（§ 7S.5）：逐下套用加成後才加層。回傳加成後的各下傷害；未命中的下不變、不加層。
+ * `alive` 用於層數表過大時清掉已不在場的怪。
+ */
+export function applyFocusStrike(
+  holder: { abilityFocus?: AbilityFocusState },
+  ability: Ability | undefined,
+  key: string,
+  targetId: string,
+  hits: readonly { damage: number; isMiss: boolean }[],
+  alive: (monsterId: string) => boolean,
+): number[] {
+  if (!ability) return hits.map(h => h.damage);
+  if (holder.abilityFocus?.key !== key) holder.abilityFocus = { key, stacks: new Map() };
+  const { stacks } = holder.abilityFocus;
+  let count = stacks.get(targetId) ?? 0;
+  const out = hits.map(h => {
+    if (h.isMiss) return h.damage;
+    const bonus = Math.min(ABILITY_FOCUS_MAX_PERCENT, count * ability.params.percent / 10);
+    count++;
+    return bonus > 0 ? Math.floor(h.damage * (100 + bonus) / 100) : h.damage;
+  });
+  stacks.set(targetId, count);
+  if (stacks.size > FOCUS_PRUNE_SIZE) for (const id of stacks.keys()) if (!alive(id)) stacks.delete(id);
+  return out;
+}
+
+/** 該怪死亡時清除層數 */
+export function clearFocusTarget(holder: { abilityFocus?: AbilityFocusState }, targetId: string): void {
+  holder.abilityFocus?.stacks.delete(targetId);
 }
 
 /** 擴散傷害：主目標該下最終傷害 × X%（§ 7S.5），不足 1 不擴散 */

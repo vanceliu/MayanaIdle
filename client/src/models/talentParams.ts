@@ -3,6 +3,8 @@ import { MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER } from './monsterAffix';
 import { getItemById } from './items';
 import { ELEMENT_LABELS, RACE_LABELS } from './monster';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine';
+import { AFFIX_DEFINITIONS, SPECIAL_AFFIX_DEFINITIONS } from './affix';
+import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 
 /**
  * 條件與動作的可調參數（`51-auto-talent.md` § 51.4.1）。
@@ -10,12 +12,15 @@ import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine'
  * 「參數一律由玩家自訂、隨時可改」—— 這裡宣告**每個 `ruleId` 要玩家填什麼**，
  * 編輯器照著渲染。值存在天賦格的槽位上（§ 18.9），跟著那一格走。
  *
- * **不逐筆列 81 個**：沒有參數的（普通攻擊、不動作、在城鎮…）根本不進這張表。
+ * **不逐筆列全部條件與動作**：沒有參數的（普通攻擊、不動作、在城鎮…）根本不進這張表。
  */
 
 export type ParamSkillFilter = 'attack' | 'heal' | 'buff' | 'byTalentType';
 
-export type ParamField =
+/** 多選欄位的選項來源：詞綴種類／裝備類型／裝備模板（`49-village-script.md` § 49.4） */
+export type ParamMultiSource = 'affix' | 'equipType' | 'template';
+
+export type ParamField = (
   /** `def` 為 null ＝ 不寫入預設值，留空由判定引擎決定 */
   | {
       key: string; kind: 'number'; label: string; suffix?: string;
@@ -37,7 +42,13 @@ export type ParamField =
   | { key: string; kind: 'skill'; label: string; filter: ParamSkillFilter; optional?: boolean }
   /** 從背包挑道具。存 id 不存名稱（§ 99.1 第 7 條） */
   | { key: string; kind: 'item'; label: string; optional?: boolean }
-  | { key: string; kind: 'boolean'; label: string; def: boolean };
+  | { key: string; kind: 'boolean'; label: string; def: boolean }
+  /** 多選：值為 `source` 值域內不重複的陣列；模板存 id */
+  | { key: string; kind: 'multi'; label: string; source: ParamMultiSource }
+) & {
+  /** 只在這個 boolean 欄位為 true 時顯示 */
+  showIf?: string;
+};
 
 const PERCENT = (label: string, def: number): ParamField =>
   ({ key: 'value', kind: 'number', label, suffix: '%', min: 0, max: 100, def });
@@ -50,7 +61,6 @@ const COMPARE: ParamField = {
   options: [{ value: 'gt', label: '大於' }, { value: 'lt', label: '小於' }],
 };
 
-/** § 49.4 的保留條件。販售裝備（T3）與存入裝備（T4）共用同一組 */
 /** 存入動作的目的地（`49-village-script.md` § 49.3）；補給天賦不碰公會倉庫 */
 const DEPOSIT_WAREHOUSE = {
   key: 'warehouse', kind: 'select', label: '存到', def: 'shared',
@@ -60,9 +70,59 @@ const DEPOSIT_WAREHOUSE = {
   ],
 } as const;
 
-const KEEP_FIELDS: ParamField[] = [
-  { key: 'keepClassUsable', kind: 'boolean', label: '保留本角色穿得起的', def: true },
-  { key: 'keepAffixTierAbove', kind: 'number', label: '詞綴 Tier 高於', min: 0, max: 7, def: 5 },
+const WEAPON_TYPE_OPTIONS = [
+  { value: 'sword', label: '單手劍' }, { value: 'twoHandSword', label: '雙手劍' },
+  { value: 'axe', label: '單手斧' }, { value: 'twoHandAxe', label: '雙手斧' },
+  { value: 'mace', label: '鈍器' }, { value: 'staff', label: '法杖' },
+  { value: 'twoHandStaff', label: '雙手法杖' }, { value: 'bow', label: '弓' },
+  { value: 'claw', label: '拳套' }, { value: 'dualBlade', label: '雙刀' },
+] as const;
+
+/** 保留條件「裝備類型」：`EquipmentInstance.type`，飾品歸在 `armor` */
+export const EQUIP_TYPE_OPTIONS: readonly { value: string; label: string }[] = [
+  ...WEAPON_TYPE_OPTIONS,
+  { value: 'shield', label: '盾牌' }, { value: 'magicBook', label: '魔法書' },
+  { value: 'armGuard', label: '臂甲' }, { value: 'armor', label: '防具（含飾品）' },
+];
+
+/** 保留條件「帶有詞綴」：一般詞綴依分組，特殊詞綴另成一組 */
+export const AFFIX_TYPE_OPTIONS: readonly { value: string; label: string; group: string }[] = [
+  ...AFFIX_DEFINITIONS.map(a => ({ value: a.type, label: a.name, group: a.group })),
+  ...SPECIAL_AFFIX_DEFINITIONS.map(a => ({ value: a.type, label: a.name, group: '特殊詞綴' })),
+];
+
+/** 保留條件「白名單」可選的模板：新手裝以外 */
+export const KEEP_TEMPLATE_IDS: ReadonlySet<number> = new Set(
+  EQUIPMENT_SEEDS.filter(t => t.acquireType !== 'starter' && t.id != null).map(t => t.id!),
+);
+
+const MULTI_DOMAINS: Record<ParamMultiSource, ReadonlySet<string | number>> = {
+  affix: new Set(AFFIX_TYPE_OPTIONS.map(o => o.value)),
+  equipType: new Set(EQUIP_TYPE_OPTIONS.map(o => o.value)),
+  template: KEEP_TEMPLATE_IDS,
+};
+
+/**
+ * § 49.4 的保留條件：「本角色穿得起的」兼總開關，勾了才顯示其餘四種，沒勾＝沒有保留條件。
+ * 販售／拆解為「保留」，存入裝備為「存入」
+ */
+const keepFields = (word: '保留' | '存入'): ParamField[] => [
+  { key: 'keepClassUsable', kind: 'boolean', label: `${word}本角色穿得起的`, def: true },
+  { key: 'keepAffixTierAbove', kind: 'number', label: '詞綴 Tier 高於', min: 0, max: 7, def: 5, showIf: 'keepClassUsable' },
+  { key: 'keepAffixTypes', kind: 'multi', label: '帶有詞綴', source: 'affix', showIf: 'keepClassUsable' },
+  { key: 'keepEquipTypes', kind: 'multi', label: '裝備類型', source: 'equipType', showIf: 'keepClassUsable' },
+  { key: 'keepTemplateIds', kind: 'multi', label: '白名單', source: 'template', showIf: 'keepClassUsable' },
+];
+const KEEP_FIELDS = keepFields('保留');
+
+/** 購買／從倉庫取的「道具＋補到 N 個」×3 組 */
+const TARGET_GROUPS: ParamField[] = [
+  { key: 'itemId', kind: 'item', label: '道具 1' },
+  { key: 'targetAmount', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
+  { key: 'itemId2', kind: 'item', label: '道具 2', optional: true },
+  { key: 'targetAmount2', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
+  { key: 'itemId3', kind: 'item', label: '道具 3', optional: true },
+  { key: 'targetAmount3', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
 ];
 
 const POTION_OPTIONS = [
@@ -114,13 +174,7 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   debuff_active: [{ key: 'debuffType', kind: 'select', label: '狀態', options: DEBUFF_OPTIONS, def: 'poison' }],
   weapon_type_is: [{
     key: 'match', kind: 'select', label: '武器', def: 'sword',
-    options: [
-      { value: 'sword', label: '單手劍' }, { value: 'twoHandSword', label: '雙手劍' },
-      { value: 'axe', label: '單手斧' }, { value: 'twoHandAxe', label: '雙手斧' },
-      { value: 'mace', label: '鈍器' }, { value: 'staff', label: '法杖' },
-      { value: 'twoHandStaff', label: '雙手法杖' }, { value: 'bow', label: '弓' },
-      { value: 'claw', label: '拳套' }, { value: 'dualBlade', label: '雙刀' },
-    ],
+    options: WEAPON_TYPE_OPTIONS,
   }],
 
   // 三類型共用（§ 51.4.5）：值為 region id，與 `character.currentArea` 同一個字
@@ -222,14 +276,9 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
       options: [{ value: '', label: '帶著的' }, { value: '1', label: '沒有的' }],
     },
   ],
-  buy_item: [
-    { key: 'itemId', kind: 'item', label: '道具' },
-    { key: 'targetAmount', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
-  ],
-  withdraw_item: [
-    { key: 'itemId', kind: 'item', label: '道具' },
-    { key: 'targetAmount', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
-  ],
+  // 第 2、3 組選填（`49-village-script.md` § 49.3）
+  buy_item: TARGET_GROUPS,
+  withdraw_item: [{ ...DEPOSIT_WAREHOUSE, label: '從' }, ...TARGET_GROUPS],
   sell_materials: [
     { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 },
     { key: 'skipCraftMaterials', kind: 'boolean', label: '保留有用途的素材', def: true },
@@ -243,7 +292,43 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 7 },
   ],
   // 保留條件是這個動作的判定依據，沒有就什麼都不存（`villageScriptRunner.ts`）
-  deposit_equipment: [DEPOSIT_WAREHOUSE, ...KEEP_FIELDS],
+  deposit_equipment: [DEPOSIT_WAREHOUSE, ...keepFields('存入')],
+  // 第 2、3 組選填（`49-village-script.md` § 49.3）
+  deposit_items: [
+    DEPOSIT_WAREHOUSE,
+    { key: 'itemId', kind: 'item', label: '道具 1' },
+    { key: 'keepAmount', kind: 'number', label: '身上留', suffix: '個', min: 0, max: 999, def: 0 },
+    { key: 'itemId2', kind: 'item', label: '道具 2', optional: true },
+    { key: 'keepAmount2', kind: 'number', label: '身上留', suffix: '個', min: 0, max: 999, def: 0 },
+    { key: 'itemId3', kind: 'item', label: '道具 3', optional: true },
+    { key: 'keepAmount3', kind: 'number', label: '身上留', suffix: '個', min: 0, max: 999, def: 0 },
+  ],
+  discard_equipment: [
+    { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 3 },
+    {
+      key: 'discardScope', kind: 'select', label: '丟棄', def: 'unsellable',
+      options: [
+        { value: 'unsellable', label: '賣不掉的' },
+        { value: 'sellable', label: '賣得掉的' },
+        { value: 'all', label: '都丟' },
+      ],
+    },
+    ...KEEP_FIELDS,
+  ],
+  dismantle_equipment: [
+    { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 4, max: 7, def: 4 },
+    { key: 'includeDropOnly', kind: 'boolean', label: '含帶技能的掉落品', def: false },
+    {
+      key: 'crystalMode', kind: 'select', label: '會出結晶的', def: 'improve',
+      options: [
+        { value: 'improve', label: '新或更強才拆' },
+        { value: 'always', label: '照拆' },
+        { value: 'never', label: '不拆' },
+      ],
+    },
+    { key: 'includeCrafted', kind: 'boolean', label: '含製作品 (鍛)', def: false },
+    ...KEEP_FIELDS,
+  ],
   deposit_gold: [{ key: 'keepGold', kind: 'number', label: '身上留', suffix: 'G', min: 0, max: 9_999_999, def: 50_000 }],
   withdraw_gold: [{ key: 'targetAmount', kind: 'number', label: '補到', suffix: 'G', min: 0, max: 9_999_999, def: 10_000 }],
   use_consumable: [{ key: 'itemId', kind: 'item', label: '道具' }],
@@ -264,6 +349,16 @@ export function getParamFields(ruleId: string): readonly ParamField[] {
   return TALENT_PARAM_FIELDS[ruleId] ?? [];
 }
 
+/** `showIf` 指向的 boolean 欄位（含預設值）為 true 才顯示 */
+export function visibleParamFields(fields: readonly ParamField[], params: Record<string, unknown>): ParamField[] {
+  return fields.filter(f => {
+    if (!f.showIf) return true;
+    const gate = fields.find(g => g.key === f.showIf);
+    const value = params[f.showIf] ?? (gate?.kind === 'boolean' ? gate.def : undefined);
+    return value === true;
+  });
+}
+
 function isValidParamValue(field: ParamField, value: unknown): boolean {
   switch (field.kind) {
     case 'number':
@@ -277,6 +372,12 @@ function isValidParamValue(field: ParamField, value: unknown): boolean {
       return Number.isSafeInteger(value) && getItemById(value as number) !== undefined;
     case 'boolean':
       return typeof value === 'boolean';
+    case 'multi': {
+      const domain = MULTI_DOMAINS[field.source];
+      return Array.isArray(value)
+        && new Set(value).size === value.length
+        && value.every(v => domain.has(v as string | number));
+    }
   }
 }
 

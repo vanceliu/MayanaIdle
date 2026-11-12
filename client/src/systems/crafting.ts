@@ -3,7 +3,8 @@
  * 與商店／掉落同一支 `generateAffixes`，固定 4 條、Tier 依裝備階級範圍加權、無特殊詞綴。
  */
 import { generateAffixes, getWeaponBaseDamage, CRAFT_AFFIX_TIER_RANGE, getCraftAffixTierWeights, type AffixCategory, type Affix } from '../models/affix';
-import type { CraftMaterial, EquipmentTemplate } from '../models/equipment';
+import type { CraftMaterial, EquipmentInstance, EquipmentTemplate } from '../models/equipment';
+import { abilityToCrystal, yieldsAbilityCrystal, type AbilityCrystal } from '../models/abilityCrystal';
 
 export function generateCraftAffixes(
   category: AffixCategory,
@@ -30,4 +31,15 @@ export function getDismantleYield(
 ): CraftMaterial[] | null {
   if (!tpl || tpl.acquireType !== 'craft' || !tpl.craftMaterials?.length) return null;
   return tpl.craftMaterials.map(m => ({ itemId: m.itemId, amount: Math.ceil(m.amount * DISMANTLE_RETURN_RATE) }));
+}
+
+/** 拆解產出（§ 6A.3「拆解」、`07-affix-ability.md` § 7S.8）。兩者皆無＝不可拆 */
+export interface DismantleOutcome {
+  yields: CraftMaterial[] | null;
+  crystal?: AbilityCrystal;
+}
+
+export function getDismantleOutcome(item: EquipmentInstance, template: EquipmentTemplate | undefined): DismantleOutcome {
+  const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
+  return { yields: getDismantleYield(template), crystal };
 }

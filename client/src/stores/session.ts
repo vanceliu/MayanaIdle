@@ -16,7 +16,7 @@ import type { MailboxState } from './mailboxStore';
 import type { PartyState } from './partyStore';
 import type { TradeState } from './tradeStore';
 import type { GuildState } from './guildStore';
-import type { AbilityComboState } from '../systems/abilityCombat';
+import type { AbilityComboState, AbilityFocusState } from '../systems/abilityCombat';
 import { OccupationManager } from '../systems/occupationManager';
 import type { ArpgEngineState } from '../systems/arpgEngine';
 import type { MonsterInstance, MonsterTemplate } from '../models/monster';
@@ -65,6 +65,8 @@ export interface LoopState {
   savedSig: Record<string, string>;
   /** 隨機技能追打的出手計數（`07-affix-ability.md` § 7S.5），不存檔 */
   abilityCombo?: AbilityComboState;
+  /** 隨機技能專注打擊的層數（§ 7S.5），不存檔；斷線時隨 session 一併消失 */
+  abilityFocus?: AbilityFocusState;
   /** 怒氣與平靜（§ 7S.5），不存檔 */
   abilityRage?: number;
   abilityRageAt?: number;

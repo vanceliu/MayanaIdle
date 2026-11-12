@@ -1,6 +1,6 @@
 import type { VillageRule, VillageCondition, VillageAction } from '../models/villageScript';
 import type { BagItem } from '../models/bagItem';
-import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
+import type { CraftMaterial, EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import type { HuntLocation } from '../models/villageScript';
 import { getBagItemAmount } from '../models/bagItem';
 import type { WarehouseKind } from '../models/villageScript';
@@ -12,10 +12,13 @@ import {
   collectMaterialsByTier,
   collectSellableMaterials,
   collectBatchSellEquipment,
+  getTemplateSellPrice,
   isSellableEquipment,
   getItemBasePrice,
 } from './shop';
-import type { EquipmentTierLevel } from '../models/equipmentTier';
+import { getEquipmentTierLevel, type EquipmentTierLevel } from '../models/equipmentTier';
+import { addCrystal, crystalImproves, type AbilityCrystal } from '../models/abilityCrystal';
+import { getDismantleOutcome } from './crafting';
 
 /**
  * 村莊腳本判定（`49-village-script.md`）。
@@ -63,6 +66,8 @@ export interface VillageScriptContext {
   needsInn?: boolean;
   /** `weight_over` 用：當前負重百分比。未帶＝當作 0 */
   weightPercent?: number;
+  /** `dismantle_equipment` 用：已有的技能結晶。未帶＝沒有 */
+  abilityCrystals?: readonly AbilityCrystal[];
 }
 
 export function evaluateVillageScript(
@@ -131,11 +136,7 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
     case 'return_to_hunt':
       return ctx.inTown && ctx.lastHuntLocation !== null && ctx.huntReturnPending;
     case 'buy_item': {
-      if (!ctx.inTown || action.itemId == null) return false;
-      const price = getItemBasePrice(action.itemId);
-      if (price <= 0) return false;
-      if (getBuyAmount(action, ctx) <= 0) return false;
-      return ctx.gold >= price;
+      return ctx.inTown && collectBuyItems(action, ctx).length > 0;
     }
     case 'sell_materials':
       return ctx.inTown && collectVillageSellMaterials(action, ctx).length > 0;
@@ -148,8 +149,14 @@ export function canExecuteVillageAction(action: VillageAction, ctx: VillageScrip
       return ctx.inTown && collectDepositMaterials(action, ctx).length > 0;
     case 'deposit_equipment':
       return ctx.inTown && collectDepositEquipment(action, ctx).length > 0;
+    case 'deposit_items':
+      return ctx.inTown && collectDepositItems(action, ctx).length > 0;
+    case 'dismantle_equipment':
+      return ctx.inTown && collectVillageDismantle(action, ctx).length > 0;
+    case 'discard_equipment':
+      return collectDiscardEquipment(action, ctx).length > 0;
     case 'withdraw_item':
-      return ctx.inTown && getWithdrawAmount(action, ctx) > 0;
+      return ctx.inTown && collectWithdrawItems(action, ctx).length > 0;
     case 'deposit_gold':
       return ctx.inTown && getDepositGoldAmount(action, ctx) > 0;
     case 'withdraw_gold':
@@ -192,16 +199,108 @@ export function collectDepositEquipment(
   );
 }
 
-/** 從倉庫取道具：補到目標數量，受倉庫存量與背包格數限制 */
-export function getWithdrawAmount(action: VillageAction, ctx: VillageScriptContext): number {
-  if (action.itemId == null) return 0;
-  const missing = (action.targetAmount ?? 0) - getBagItemAmount(ctx.bagItems, action.itemId);
-  if (missing <= 0) return 0;
-  const stored = getBagItemAmount(warehouseSide(action, ctx).materials, action.itemId);
-  if (stored <= 0) return 0;
-  // 背包沒有這個品項時要一個新格子；已經有就併進同一格
-  if (!ctx.bagItems.some(b => b.itemId === action.itemId) && ctx.bagFreeSlots <= 0) return 0;
-  return Math.min(missing, stored);
+export interface ItemLine {
+  itemId: number;
+  amount: number;
+}
+
+/** 多組道具動作的各組（§ 49.3 最多 3 組）：未選道具的組略過，同一道具只取第一組；數量未設為 0 */
+function getItemGroups(action: VillageAction, amountKey: 'targetAmount' | 'keepAmount'): ItemLine[] {
+  const raw: [number | undefined, number | undefined][] = amountKey === 'targetAmount'
+    ? [[action.itemId, action.targetAmount], [action.itemId2, action.targetAmount2], [action.itemId3, action.targetAmount3]]
+    : [[action.itemId, action.keepAmount], [action.itemId2, action.keepAmount2], [action.itemId3, action.keepAmount3]];
+  const groups: ItemLine[] = [];
+  for (const [itemId, amount] of raw) {
+    if (itemId == null || groups.some(g => g.itemId === itemId)) continue;
+    groups.push({ itemId, amount: amount ?? 0 });
+  }
+  return groups;
+}
+
+/** 存入指定道具：每組存「身上數量 − 留下數量」 */
+export function collectDepositItems(action: VillageAction, ctx: VillageScriptContext): ItemLine[] {
+  return getItemGroups(action, 'keepAmount')
+    .map(g => ({ itemId: g.itemId, amount: getBagItemAmount(ctx.bagItems, g.itemId) - g.amount }))
+    .filter(line => line.amount > 0);
+}
+
+export interface VillageDismantlePick {
+  item: EquipmentInstance;
+  yields: CraftMaterial[];
+  crystal?: AbilityCrystal;
+}
+
+/**
+ * 這一輪要拆的裝備（§ 49.4.1），依背包順序。
+ * 「新或更強」與背包格數都計入同一輪前面已拆的；放不下的那件跳過。
+ */
+export function collectVillageDismantle(action: VillageAction, ctx: VillageScriptContext): VillageDismantlePick[] {
+  if (action.maxTier == null) return [];
+  const crystalMode = action.crystalMode ?? 'improve';
+  const templates = new Map(ctx.templates.map(t => [t.id, t]));
+  const heldKinds = new Set(ctx.bagItems.filter(b => b.amount > 0).map(b => b.itemId));
+  let crystals = ctx.abilityCrystals ?? [];
+  let usedSlots = ctx.bagUsedSlots;
+  const picks: VillageDismantlePick[] = [];
+
+  for (const item of ctx.inventory) {
+    if (item.id == null || ctx.equippedIds.has(item.id) || item.isStarterGear) continue;
+    const template = templates.get(item.templateId);
+    if (!template || getEquipmentTierLevel(template) > action.maxTier) continue;
+    const { yields, crystal } = getDismantleOutcome(item, template);
+    if (!yields && !crystal) continue;
+    if (!yields && !action.includeDropOnly) continue;
+    if (item.isCraftedGear && !action.includeCrafted) continue;
+    if (crystal) {
+      if (crystalMode === 'never') continue;
+      if (crystalMode === 'improve' && !crystalImproves(crystals.find(c => c.type === crystal.type), crystal)) continue;
+    }
+    if (matchesEquipmentFilter(item, action.keep, ctx)) continue;
+
+    const newKinds = (yields ?? []).filter(m => !heldKinds.has(m.itemId));
+    if (usedSlots - 1 + newKinds.length > ctx.bagMaxSlots) continue;
+    usedSlots += newKinds.length - 1;
+    for (const m of newKinds) heldKinds.add(m.itemId);
+    if (crystal) crystals = addCrystal(crystals, crystal);
+    picks.push({ item, yields: yields ?? [], crystal });
+  }
+  return picks;
+}
+
+/** 要丟的裝備（§ 49.4.2）：Tier 門檻以下、符合「丟哪些」、不符合保留條件；已裝備與新手裝不丟 */
+export function collectDiscardEquipment(action: VillageAction, ctx: VillageScriptContext): EquipmentInstance[] {
+  if (action.maxTier == null) return [];
+  const scope = action.discardScope ?? 'unsellable';
+  const templates = new Map(ctx.templates.map(t => [t.id, t]));
+  return ctx.inventory.filter(item => {
+    if (item.id == null || ctx.equippedIds.has(item.id) || item.isStarterGear) return false;
+    // 創角直接穿上的新手裝沒有 `isStarterGear` 旗標，要看模板
+    const template = templates.get(item.templateId);
+    if (!template || template.acquireType === 'starter') return false;
+    if (getEquipmentTierLevel(template) > action.maxTier!) return false;
+    const sellable = getTemplateSellPrice(template) > 0;
+    if (scope === 'unsellable' && sellable) return false;
+    if (scope === 'sellable' && !sellable) return false;
+    return !matchesEquipmentFilter(item, action.keep, ctx);
+  });
+}
+
+/** 從倉庫取道具：每組補到目標數量，受倉庫存量限制；新品項佔新格，依組的順序扣剩餘格數 */
+export function collectWithdrawItems(action: VillageAction, ctx: VillageScriptContext): ItemLine[] {
+  const stored = warehouseSide(action, ctx).materials;
+  let freeSlots = ctx.bagFreeSlots;
+  const lines: ItemLine[] = [];
+  for (const { itemId, amount: target } of getItemGroups(action, 'targetAmount')) {
+    const missing = target - getBagItemAmount(ctx.bagItems, itemId);
+    const available = getBagItemAmount(stored, itemId);
+    if (missing <= 0 || available <= 0) continue;
+    if (!ctx.bagItems.some(b => b.itemId === itemId)) {
+      if (freeSlots <= 0) continue;
+      freeSlots--;
+    }
+    lines.push({ itemId, amount: Math.min(missing, available) });
+  }
+  return lines;
 }
 
 /** 存金幣：身上留下 keepGold，其餘存進帳號倉庫 */
@@ -231,18 +330,22 @@ export function findReturnScroll(
 }
 
 /**
- * 這次要買幾個：補到目標數量，且不超過買得起的量。
+ * 這次要買的：每組補到目標數量，不超過買得起的量；金幣依組的順序扣。
  * 用「補到 N 個」而不是「買 N 個」—— 後者搭配「少於 M 個就買」的條件會每輪都再買一次。
  */
-export function getBuyAmount(action: VillageAction, ctx: VillageScriptContext): number {
-  if (action.itemId == null) return 0;
-  const target = action.targetAmount ?? 0;
-  const held = getBagItemAmount(ctx.bagItems, action.itemId);
-  const missing = target - held;
-  if (missing <= 0) return 0;
-  const price = getItemBasePrice(action.itemId);
-  if (price <= 0) return 0;
-  return Math.min(missing, Math.floor(ctx.gold / price));
+export function collectBuyItems(action: VillageAction, ctx: VillageScriptContext): ItemLine[] {
+  let gold = ctx.gold;
+  const lines: ItemLine[] = [];
+  for (const { itemId, amount: target } of getItemGroups(action, 'targetAmount')) {
+    const missing = target - getBagItemAmount(ctx.bagItems, itemId);
+    const price = getItemBasePrice(itemId);
+    if (missing <= 0 || price <= 0) continue;
+    const amount = Math.min(missing, Math.floor(gold / price));
+    if (amount <= 0) continue;
+    gold -= amount * price;
+    lines.push({ itemId, amount });
+  }
+  return lines;
 }
 
 export function collectVillageSellMaterials(action: VillageAction, ctx: VillageScriptContext): BagItem[] {

@@ -122,7 +122,8 @@
 | 戰鬥天賦 / 常駐天賦的條件與動作規格 | `03-combat.md` | § 3.12、§ 3.13（＋緊急撤退）。天賦格取得見 `51-auto-talent.md` |
 | 天賦配置（原腳本 Template，分頁切換） | `03-combat.md` | § 3.14 |
 | 補給天賦（原村莊腳本：自動買賣／返回掛機點） | `49-village-script.md` | 全文 |
-| **裝備篩選條件（販售保留／存入命中）／「本角色穿得起的」判定基準** | `49-village-script.md` | § 49.4 |
+| **裝備篩選條件（販售與拆解保留／存入命中）／「本角色穿得起的」判定基準** | `49-village-script.md` | § 49.4 |
+| **補給天賦自動拆解裝備（參數與預設）** | `49-village-script.md` | § 49.4.1 |
 | **系統信箱／更新公告（發放與領取）** | `52-mailbox.md` | 全文 |
 | 起始畫面改版資訊（只留最新 5 版） | `52-mailbox.md` § 52.6 | 版面見 `19-account-character.md` § 19.3 |
 | **補償的版本範圍（單版／到某版之前／全版本）** | `52-mailbox.md` | § 52.2.4 |
@@ -263,6 +264,7 @@
   ←→ 34-ui-guidelines.md ←→ 43-wiki-system.md § 4.1／§ 4.2.1
   ←→ 25-monster-system.md § 25.12.3（荊棘不反彈擴散）
   ←→ 29-regen.md § 29.1／§ 29.2（低血／低魔回復）
+  ←→ 97-selfhosted-server.md § 97.4（v12 追加傷害換算、v13 燃燒改專注打擊）
   ←→ 21-combat-formula.md § 21.5／§ 21.6／§ 21.16 ←→ 24-buff-debuff.md § 24.4.3
   ←→ 18-data-schema.md § 18.3 ←→ 97-selfhosted-server.md § 97.4
   ←→ 43-wiki-system.md § 4.1／§ 4.2／§ 4.2.1

@@ -113,12 +113,12 @@ describe('Integration: Exploration and Pressure', () => {
     const early = calculatePressure(10);
     expect(early.maxMonsters).toBe(3);
 
-    const later = calculatePressure(200); // 200 kills → pressure 2
+    const later = calculatePressure(300); // 300 kills → pressure 2
     expect(later.maxMonsters).toBe(5);
   });
 
   it('should reset pressure on area change', () => {
-    const oldAreaPressure = calculatePressure(300); // 300 kills → pressure 3
+    const oldAreaPressure = calculatePressure(400); // 400 kills → pressure 3
     expect(oldAreaPressure.pressure).toBeGreaterThan(0);
 
     // 切圖時 areaKills 歸零（`26-spawn-pressure.md` § 26.3）
@@ -127,7 +127,7 @@ describe('Integration: Exploration and Pressure', () => {
   });
 
   it('should cap maxMonsters at 10', () => {
-    const result = calculatePressure(2400); // 2400 kills → pressure 24
+    const result = calculatePressure(2500); // 2500 kills → pressure 24
     expect(result.maxMonsters).toBe(10);
   });
 });

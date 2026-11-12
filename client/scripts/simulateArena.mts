@@ -43,7 +43,7 @@ import {
   MONSTER_AFFIX_ORDER, applyMonsterAffixes, pickVenomDebuff, rollMonsterAffixes, type MonsterAffixId, type MonsterAffixRoll,
 } from '../src/models/monsterAffix';
 import {
-  getAbilityClassPool, getAbilityCommonPool, getAbilityDefinition, getAbilityWeaponValue, formatAbilityDisplay,
+  getAbilityClassPool, getAbilityCommonPool, getAbilityDefinition, resolveParamRange, formatAbilityDisplay,
   type Ability, type AbilityParamDef,
 } from '../src/models/ability';
 import { UNIQUE_AFFIX_DEFINITIONS, type UniqueAffixType } from '../src/models/uniqueAffix';
@@ -325,7 +325,7 @@ function uniqueMid(type: UniqueAffixType): number {
 }
 
 function rollParam(p: AbilityParamDef, weapon: Template, roll: 'worst' | 'mid'): number {
-  const max = p.max === 'weaponValue' ? Math.max(p.min, getAbilityWeaponValue(weapon)) : p.max;
+  const [, max] = resolveParamRange(p, weapon);
   if (roll === 'worst') return p.lowerIsBetter ? max : p.min;
   const step = p.step ?? 1;
   return p.min + Math.round((max - p.min) / 2 / step) * step;

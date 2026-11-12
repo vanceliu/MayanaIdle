@@ -266,7 +266,7 @@ describe('救援碼與登入保護', () => {
     expect((await requestError(client, { t: 'characters' })).code).toBe('unauthenticated');
   });
 
-  it('schema v3 遷移補上 recovery_hash 欄位', () => {
+  it('users 表有 recovery_hash 欄位', () => {
     const columns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
     expect(columns).toContain('recovery_hash');
   });

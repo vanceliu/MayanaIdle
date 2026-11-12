@@ -1,16 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   evaluateVillageScript,
-  getBuyAmount,
+  collectBuyItems,
   collectVillageSellEquipment,
   collectDepositMaterials,
   collectDepositEquipment,
-  getWithdrawAmount,
+  collectWithdrawItems,
   getDepositGoldAmount,
   getWithdrawGoldAmount,
   getWarehouseKind,
   type VillageScriptContext,
 } from '../villageScriptRunner';
+import { getItemBasePrice } from '../shop';
 import { matchesEquipmentFilter, normalizeVillageRules, DEFAULT_VILLAGE_SCRIPT } from '../../models/villageScript';
 import type { VillageRule, EquipmentFilterSubject } from '../../models/villageScript';
 import type { Attributes } from '../../models/attributes';
@@ -158,24 +159,42 @@ describe('村莊腳本判定', () => {
 
     it('補到目標數量，不是每次都買一整批', () => {
       const c = ctx({ bagItems: [makeBagItem(RED_POTION, 80)] as BagItem[] });
-      expect(getBuyAmount(action, c)).toBe(20);
+      expect(collectBuyItems(action, c)).toEqual([{ itemId: RED_POTION, amount: 20 }]);
     });
 
     it('已經達標就不買（不會每輪重複下單）', () => {
       const c = ctx({ bagItems: [makeBagItem(RED_POTION, 100)] as BagItem[] });
-      expect(getBuyAmount(action, c)).toBe(0);
+      expect(collectBuyItems(action, c)).toEqual([]);
       expect(evaluateVillageScript([rule(action)], c)).toBeNull();
     });
 
     it('金幣不夠就只買買得起的量', () => {
       // 紅色藥水 25G，身上 200G → 只買得起 8 個
       const c = ctx({ gold: 200, bagItems: [] });
-      expect(getBuyAmount(action, c)).toBe(8);
+      expect(collectBuyItems(action, c)).toEqual([{ itemId: RED_POTION, amount: 8 }]);
     });
 
     it('一個都買不起時規則不成立', () => {
       const c = ctx({ gold: 10, bagItems: [] });
       expect(evaluateVillageScript([rule(action)], c)).toBeNull();
+    });
+
+    it('多組：各自補到目標，金幣依組的順序扣', () => {
+      // 紅色藥水 25G：第 1 組補 20 個花 500G，剩 100G 只夠第 2 組買 4 個
+      const multi = { type: 'buy_item' as const, itemId: RED_POTION, targetAmount: 20, itemId2: TOWN_SCROLL, targetAmount2: 10 };
+      const price = getItemBasePrice(TOWN_SCROLL);
+      const c = ctx({ gold: 500 + price * 4, bagItems: [] });
+      expect(collectBuyItems(multi, c)).toEqual([
+        { itemId: RED_POTION, amount: 20 },
+        { itemId: TOWN_SCROLL, amount: 4 },
+      ]);
+    });
+
+    it('多組：第 1 組已達標時第 2 組照樣成立', () => {
+      const multi = { type: 'buy_item' as const, itemId: RED_POTION, targetAmount: 20, itemId2: TOWN_SCROLL, targetAmount2: 1 };
+      const c = ctx({ bagItems: [makeBagItem(RED_POTION, 20)] as BagItem[] });
+      expect(collectBuyItems(multi, c)).toEqual([{ itemId: TOWN_SCROLL, amount: 1 }]);
+      expect(evaluateVillageScript([rule(multi)], c)?.type).toBe('buy_item');
     });
   });
 
@@ -275,7 +294,7 @@ describe('倉庫存取', () => {
       bagItems: [makeBagItem(RED_POTION, 10)] as BagItem[],
       warehouse: stored([makeBagItem(RED_POTION, 25)] as BagItem[]),
     });
-    expect(getWithdrawAmount(action, c)).toBe(25);
+    expect(collectWithdrawItems(action, c)).toEqual([{ itemId: RED_POTION, amount: 25 }]);
   });
 
   it('取出道具：已達標就不取', () => {
@@ -284,7 +303,7 @@ describe('倉庫存取', () => {
       bagItems: [makeBagItem(RED_POTION, 50)] as BagItem[],
       warehouse: stored([makeBagItem(RED_POTION, 25)] as BagItem[]),
     });
-    expect(getWithdrawAmount(action, c)).toBe(0);
+    expect(collectWithdrawItems(action, c)).toEqual([]);
   });
 
   it('取出道具：背包沒空格又是新品項時取不出來', () => {
@@ -294,7 +313,37 @@ describe('倉庫存取', () => {
       bagFreeSlots: 0,
       warehouse: stored([makeBagItem(RED_POTION, 25)] as BagItem[]),
     });
-    expect(getWithdrawAmount(action, c)).toBe(0);
+    expect(collectWithdrawItems(action, c)).toEqual([]);
+  });
+
+  it('取出道具：選個人倉庫時只看個人倉庫的存量', () => {
+    const action = { type: 'withdraw_item' as const, warehouse: 'personal' as const, itemId: RED_POTION, targetAmount: 50 };
+    const c = ctx({
+      warehouse: {
+        shared: { materials: [makeBagItem(RED_POTION, 40)] as BagItem[], equipment: [] },
+        personal: { materials: [makeBagItem(RED_POTION, 7)] as BagItem[], equipment: [] },
+        gold: 0,
+      },
+    });
+    expect(collectWithdrawItems(action, c)).toEqual([{ itemId: RED_POTION, amount: 7 }]);
+  });
+
+  it('取出道具多組：新品項依組的順序扣剩餘格數，已有的品項不佔新格', () => {
+    const action = {
+      type: 'withdraw_item' as const,
+      itemId: RED_POTION, targetAmount: 50,
+      itemId2: TUSK, targetAmount2: 10,
+      itemId3: TOWN_SCROLL, targetAmount3: 3,
+    };
+    const c = ctx({
+      bagItems: [makeBagItem(TOWN_SCROLL, 1)] as BagItem[],
+      bagFreeSlots: 1,
+      warehouse: stored([makeBagItem(RED_POTION, 25), makeBagItem(TUSK, 30), makeBagItem(TOWN_SCROLL, 5)] as BagItem[]),
+    });
+    expect(collectWithdrawItems(action, c)).toEqual([
+      { itemId: RED_POTION, amount: 25 },
+      { itemId: TOWN_SCROLL, amount: 2 },
+    ]);
   });
 
   it('存金幣：身上留下指定金額，其餘存入', () => {

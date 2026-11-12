@@ -30,6 +30,28 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 命中燃燒改為專注打擊（`07-affix-ability.md` § 7S.2／§ 7S.4／§ 7S.5）
+
+規格：武器共通池的命中燃燒移除，改為專注打擊 `focus_strike`（X 0.5~1.5%，0.1% 為單位，加成上限 +100%）：對同一隻怪每命中 1 下加 1 層，直接傷害 ×(1 + 層數 × X%)；層數於該下結算後才加；每個角色、每隻怪各自記，換目標不清除，怪死即清；換地圖、死亡、回城、斷線時全部清除；未命中不加層不歸零；追加傷害、擴散、持續傷害不吃不加層；擴散依含加成的主目標傷害；與追打相乘。server schema v13：裝備與結晶的命中燃燒換成專注打擊，位置取燃燒兩參數較高者。
+
+- [x] F1 文件：07-affix-ability、21、24、97 § 97.4 → 使用者確認
+- [x] F2 model：`focus_strike` 定義（0.1% 單位的參數、顯示）、移除 `hit_burn` 與燃燒效果
+- [x] F3 戰鬥：層數存放（session.loop，依怪物 id）、加成套用、怪死清除；腳本與粗排
+- [x] F4 server 遷移 v13（裝備、character_prefs 結晶）＋測試
+- [x] F5 測試；`npx tsc -b`、client／server vitest
+- [x] F5a server 遷移 v2～v11 併入 v1／移除（使用者指示），對應測試與 97 § 97.4 同步
+- [ ] F6 使用者確認
+
+### 追加傷害加強、命中燃燒縮短（`07-affix-ability.md` § 7S.2／§ 7S.5）
+
+規格：追加傷害 A 5~15%、B 5~武器值×1.5（`武器值 × 1.5` 四捨五入，≤ 5 時固定 5）；命中燃燒持續 10→8 秒，其餘不變。server schema v12：既有追加傷害依舊區間（A 5~10、B 5~武器值）內的位置換到新區間，依參數單位四捨五入；舊區間寬度 0 時位置為 0。技能結晶存的是位置，不需遷移。
+
+- [x] D1 文件：07-affix-ability § 7S.2／§ 7S.5／§ 7S.8、24、34、97 § 97.4、INDEX
+- [x] D2 model：參數上限「武器值 × 倍數」、Wiki／Alt／結晶區間文字；燃燒 8 秒；腳本改用 `resolveParamRange`
+- [x] D3 server 遷移 v12＋測試
+- [x] D4 測試；`npx tsc -b`、client／server vitest
+- [ ] D5 使用者確認
+
 ### 高階治癒下修（`22-basic-magic.md`、`23-class-magic.md` § 23.6、`21-combat-formula.md` § 21.4c）
 
 規格：技能攻擊力 完全治癒 270→80、大治癒 81→53、群體治癒 108→53；治癒、中治癒、神聖懲擊吸血不變。校準點（有效 INT 18、裝備魔攻 0）回復量：治癒 35／中治癒 70／大治癒 98／完全治癒 148／群體治癒 98。
@@ -79,7 +101,7 @@
 
 ### Pressure 依人數縮放（`26-spawn-pressure.md` § 26.3、`97-selfhosted-server.md` § 97.7.1）
 
-規格：Pressure = floor(累積擊殺數 × 全域倍率 ÷ (100 × 人數))；人數為實例的在場成員數（同地圖在線隊員，單人為 1）。人數變動時實例擊殺數 × 新人數 ÷ 舊人數（無條件捨去），P 值不變；離開實例者的擊殺數換算回一人比例後帶走。怪物上限、掉落倍率、探索列提示一律用此公式；人數同步到 game store `pressureMembers`。
+規格：Pressure = max(0, floor(累積擊殺數 × 全域倍率 ÷ (100 × 人數)) − 1)；人數為實例的在場成員數（同地圖在線隊員，單人為 1）。人數變動時實例擊殺數 × 新人數 ÷ 舊人數（無條件捨去），P 值不變；離開實例者的擊殺數換算回一人比例後帶走。怪物上限、掉落倍率、探索列提示一律用此公式；人數同步到 game store `pressureMembers`。
 
 - [x] R1 文件：26 § 26.3、97 § 97.7.1、16 § 32.3、INDEX
 - [x] R2 `pressure.ts` 公式與縮放函式；`mapInstance.ts` 掛入／移除時縮放並同步成員；gameLoop、擊殺結算、ExploreBar 帶人數
@@ -88,7 +110,7 @@
 
 ### 技能結晶與技能更換（`07-affix-ability.md`、`06-equipment-acquire.md` § 6A.3，demo `client/demo/ability-crystal.html`）
 
-規格：拆解掉落品（非 (鍛)、非商店裝）時，隨機技能存成角色的技能結晶（存 character_prefs、不佔背包、無上限、每種技能一顆、無限次使用），記每個參數在區間內的位置（最弱 0%～最好 100%，↓ 參數反向）；同種類再拆到時每個參數各取較好位置。沒配方的掉落品若帶技能也可拆（只得結晶）。鐵匠鋪新增「技能更換」分頁：目標為背包中未裝備、T3+ 的武器（右手）／項鍊／戒指，非 (鍛)；武器池只套武器、飾品池只套項鍊／戒指；職業技能需目標該職業可裝備；數值依結晶位置換算到目標區間；費用 1,500,000 × 目標階級；目標原技能消失。
+規格：拆解掉落品（非 (鍛)、非商店裝）時，隨機技能存成角色的技能結晶（存 character_prefs、不佔背包、無上限、每種技能一顆、無限次使用），記每個參數在區間內的位置（最弱 0%～最好 100%，↓ 參數反向）；同種類再拆到時每個參數各取較好位置。沒配方的掉落品若帶技能也可拆（只得結晶）。鐵匠鋪新增「技能更換」分頁：目標為背包中未裝備、T3+ 的武器（右手）／項鍊／戒指，非 (鍛)；武器池只套武器、飾品池只套項鍊／戒指；職業技能需目標該職業可裝備；數值依結晶位置換算到目標區間；費用 500,000 × 目標階級；目標原技能消失。
 
 - [x] C1 model：位置換算、合併、套用驗證與費用＋測試
 - [x] C2 demo（技能更換分頁、拆解的結晶提示）→ 使用者確認
@@ -865,6 +887,47 @@ Lv.31 以上 Boss 專屬素材 30% → 15%。Lv.30 以下區域與試煉飛龍�
 - [x] P4 `npx tsc -b`、client／server vitest
 - [x] P4.5 Pressure 公式改版：`PRESSURE_KILL_BASE` 140，測試跟著改
 - [x] P5 文件：26 § 26.3（移除「隱藏數值」、公式與對照表）、03 § 3.10、16 § 32.3、INDEX
+
+### 復仇之刃加成在 server 只算基礎 HP（`23-class-magic.md`「復仇之刃補充規則」）
+
+規格：`applySkillSelfBuff` 的有效最大 HP 取自出招者的 session（裝備、buff），不可退回 `defaultSession`。
+
+- [x] P1 `arpgEventHandler.ts` 呼叫 `applySkillSelfBuff` 傳入 `session`；盤點其他技能路徑有無同類漏傳
+- [x] P2 server 測試：非 `defaultSession` 的會話、裝備帶 HP，加成依有效最大 HP
+- [x] P3 `npx tsc -b`、client／server vitest
+
+### 補給天賦：拆解裝備、存入指定道具（`49-village-script.md` § 49.3）
+
+規格（拆解裝備 `dismantle_equipment`）：可執行＝在城鎮＋有符合的裝備＋背包放得下；一輪拆完所有符合者，放不下的跳過。
+已裝備、新手裝不拆。參數：Tier 以下（4~7，預設 4，看 `template.tier`）；含帶技能的掉落品（無配方者，預設關）；
+會出結晶的（新或更強才拆／照拆／不拆，預設新或更強，同一輪依序與最新結晶清單比）；含製作品 (鍛)（預設關）；§ 49.4 保留條件（命中不拆）。
+規格（存入指定道具 `deposit_items`）：每組＝道具＋身上留 N 個，最多 3 組（第 2、3 組選填）；倉庫帳號／個人；可執行＝在城鎮＋任一組身上超過 N。
+
+- [x] P1 文件：49 § 49.3／§ 49.4.1／§ 49.8、51 § 51.4.11、06 § 6A.3「拆解」、13 § 13.5、INDEX
+- [x] P2 程式：`villageScript.ts`、`talentParams.ts`、`talentSeeds.ts`、`villageScriptRunner.ts`、gameStore 執行、拆解結果抽共用（`getDismantleOutcome`）、Wiki 說明、icon
+- [x] P3 測試：runner 篩選（門檻、保留、兩開關、三種結晶模式、同輪結晶比較、背包格數）、存入數量、gameStore 執行
+- [x] P4 `npx tsc -b`、client／server vitest
+
+### 補給天賦：購買／從倉庫取道具補到 3 組、保留條件補齊（`49-village-script.md` § 49.3／§ 49.4）
+
+規格：購買道具至、從倉庫取道具至的參數比照存入指定道具（`itemId2`／`targetAmount2`、`itemId3`／`targetAmount3`，第 2、3 組選填）；
+一輪處理全部組，金幣與背包格數依組的順序扣；同一道具重複只算第一組。保留條件編輯器補上帶有指定詞綴、指定裝備類型、白名單（需新多選欄位）。
+
+- [x] P1 程式：`villageScript.ts`、`talentParams.ts`、`villageScriptRunner.ts`（`collectBuyItems`／`collectWithdrawItems`）、gameStore 執行
+- [x] P2 測試：多組購買（金幣依序扣）、多組取出（背包格數依序扣）、單組行為不變；`npx tsc -b`、client／server vitest
+- [x] P3 文件：49 § 49.3
+- [x] P4 保留條件三種多選欄位：demo 給使用者確認版面（定案：「本角色穿得起的」兼總開關，勾了才顯示其餘四種；存入裝備為「存入本角色穿得起的」）
+- [x] P5 保留條件接進遊戲（`talentParams.ts` 多選欄位與 `showIf`、`talentRules.ts` 組回 `keep` 並補欄位預設、`TalentMultiParam.tsx`、App.css）與測試、文件 49 § 49.4
+- [x] P6 從倉庫取道具至：編輯器補「從」帳號／個人倉庫（預設帳號），測試與值域登記
+
+### 補給天賦：丟棄裝備（`49-village-script.md` § 49.3）
+
+規格：`discard_equipment`，任何地方可執行；可執行＝有符合的裝備。參數：Tier 以下（1~7，預設 3）；丟哪些（賣不掉的／賣得掉的／都丟，預設賣不掉的；
+賣得掉＝售價 > 0）；§ 49.4 保留條件。已裝備、新手裝不丟。一輪丟完所有符合者。推翻 § 49.8「丟棄一律玩家手動」。
+
+- [x] P1 文件：49 § 49.3／§ 49.4／§ 49.4.2／§ 49.8、51 § 51.4.11、35 § 35.5.3／§ 35.18
+- [x] P2 程式：`villageScript.ts`、`talentParams.ts`、`talentSeeds.ts`、`villageScriptRunner.ts`、gameStore 執行、Wiki 說明、icon
+- [x] P3 測試與 `npx tsc -b`、client／server vitest
 
 跨多次對話的實作**開工前**先在這裡寫下定案規格與分階段清單（見 `CLAUDE.md`）：
 中斷後靠它接續，全部完成並經使用者確認後刪除。
