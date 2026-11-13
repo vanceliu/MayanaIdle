@@ -14,7 +14,7 @@ import { checkDetourDistance } from '../src/models/mapDesignRules';
 const WALKABLE = new Set<number>([TileType.Ground, TileType.Decoration, TileType.Grass, TileType.Sand, TileType.Carpet]);
 
 for (const id of process.argv.slice(2)) {
-  const path = `src/data/maps/${id}.json`;
+  const path = `src/maps/${id}.json`;
   const map = JSON.parse(readFileSync(path, 'utf8')) as MapData;
   let punched = 0;
 

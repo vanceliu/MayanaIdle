@@ -4,12 +4,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const mapsDir = join(here, '..', '..', 'client', 'src', 'data', 'maps');
+const mapsDir = join(here, '..', '..', 'client', 'src', 'maps');
 const outDir = join(here, '..', 'src', 'generated');
 const ids = readdirSync(mapsDir).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)).sort();
 
 const lines = ['// 由 scripts/genMapsIndex.mjs 產生，勿手改', "import type { MapData } from '../../../client/src/models/mapControl';", ''];
-ids.forEach((id, i) => lines.push(`import m${i} from '../../../client/src/data/maps/${id}.json';`));
+ids.forEach((id, i) => lines.push(`import m${i} from '../../../client/src/maps/${id}.json';`));
 lines.push('', 'export const MAPS: Record<string, MapData> = {');
 ids.forEach((id, i) => lines.push(`  '${id}': m${i} as unknown as MapData,`));
 lines.push('};', '');

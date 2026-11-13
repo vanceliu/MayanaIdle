@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import type { MapData } from '../src/models/mapControl';
 
 const id = process.argv[2];
-const map = JSON.parse(readFileSync(`src/data/maps/${id}.json`, 'utf8')) as MapData;
+const map = JSON.parse(readFileSync(`src/maps/${id}.json`, 'utf8')) as MapData;
 
 const GLYPH: Record<number, string> = { 0: '.', 1: '#', 3: 'W', 4: 'd', 10: 'T', 11: 'R', 12: 'P', 13: '~', 14: 'L', 15: 'C', 16: 'g', 17: 's', 18: 'c' };
 // 載入驗證要先跑：spawnPoint 必須落在「可生成格」(Ground)，

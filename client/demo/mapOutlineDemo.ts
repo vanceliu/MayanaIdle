@@ -20,7 +20,7 @@ import type { PawnLook } from '../src/pixi/entities/pawn/drawPawn';
 import { PawnSprite } from '../src/pixi/entities/pawn/PawnSprite';
 import { worldToScreen } from '../src/pixi/utils/isometric';
 
-const mapModules = import.meta.glob<MapData>('../src/data/maps/*.json', { import: 'default' });
+const mapModules = import.meta.glob<MapData>('../src/maps/*.json', { import: 'default' });
 
 export const MAP_IDS: string[] = Object.keys(mapModules)
   .map(path => path.slice(path.lastIndexOf('/') + 1, -5))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import arenaMapJson from '../../data/maps/arena.json';
+import arenaMapJson from '../../maps/arena.json';
 import type { MapData } from '../../models/mapControl';
 import { ARENA_REGION_ID, arenaWaveSize, type ArenaCharacterRun } from '../../models/arena';
 import { addBagItem, getBagItemAmount, type BagItem } from '../../models/bagItem';

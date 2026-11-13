@@ -25,7 +25,7 @@ function healthy(map: MapData): boolean {
 for (let i = 2; i < process.argv.length; i += 2) {
   const id = process.argv[i];
   const want = Number(process.argv[i + 1]);
-  const path = `src/data/maps/${id}.json`;
+  const path = `src/maps/${id}.json`;
   const map = JSON.parse(readFileSync(path, 'utf8')) as MapData;
   if (!healthy(map)) { console.log(`${id.padEnd(22)} 原本就不健康，跳過`); continue; }
 

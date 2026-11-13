@@ -4,11 +4,11 @@ import { hasLineOfSight, getDistance, isWithinAttackRange } from '../lineOfSight
 import { isWalkableTile } from '../../models/mapControl';
 import { MELEE_WEAPON_RANGE } from '../../models/equipment';
 import type { MapData, Position } from '../../models/mapControl';
-import hundredPillar1 from '../../data/maps/hundred-pillar-1-10f.json';
-import hundredPillar2 from '../../data/maps/hundred-pillar-11-20f.json';
-import hundredPillar3 from '../../data/maps/hundred-pillar-21-30f.json';
-import ancientBattlefield from '../../data/maps/ancient-battlefield.json';
-import mistyCave from '../../data/maps/misty-cave-1f.json';
+import hundredPillar1 from '../../maps/hundred-pillar-1-10f.json';
+import hundredPillar2 from '../../maps/hundred-pillar-11-20f.json';
+import hundredPillar3 from '../../maps/hundred-pillar-21-30f.json';
+import ancientBattlefield from '../../maps/ancient-battlefield.json';
+import mistyCave from '../../maps/misty-cave-1f.json';
 
 /**
  * 近戰死角回歸（`41-arpg-combat.md` § 3.1）。

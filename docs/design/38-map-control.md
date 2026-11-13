@@ -125,7 +125,7 @@ type MapTheme =
 interface Position { x: number; y: number; }
 ```
 
-- 靜態 JSON 放在 `client/src/data/maps/<id>.json`，以 `import.meta.glob` 動態載入並快取
+- 靜態 JSON 放在 `client/src/maps/<id>.json`，以 `import.meta.glob` 動態載入並快取
 - 檔名（去除 `.json`）必須等於 JSON 內的 `id`
 - 區域對應：無樓層者用 `regionId`，有樓層者用 `${regionId}-${floor}f`；查不到樓層地圖時退回區域地圖
 
@@ -772,7 +772,7 @@ Boss 層一律使用「空曠」密度，中央保留 **≥ 8×8 開闊空地**�
 
 - 仍必須通過 § 38.4 的**載入驗證**（外圍邊界、連通性、`spawnPoint`、NPC 檢查）
 - 不進 `MAP_DESIGN_PROFILES`，`validateMapSafety` 不檢查它們
-- 佈局用固定街區（中央十字大街 + 兩排房舍 + NPC 站門口），以 `src/data/maps/*-town.json` 為準
+- 佈局用固定街區（中央十字大街 + 兩排房舍 + NPC 站門口），以 `src/maps/*-town.json` 為準
 - `mapMonsterStore.spawnTick` 在 `theme === 'town'` 時直接返回，永遠不生怪
 
 ### 產出方式

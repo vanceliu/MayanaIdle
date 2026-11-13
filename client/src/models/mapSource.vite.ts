@@ -1,8 +1,8 @@
-/** client 的地圖來源：Vite glob 延遲載入 `data/maps/*.json`。只在瀏覽器與 vitest 使用。 */
+/** client 的地圖來源：Vite glob 延遲載入 `maps/*.json`。只在瀏覽器與 vitest 使用。 */
 import type { MapData } from './mapControl';
 import { registerMapSource } from './mapSource';
 
-const mapModules = import.meta.glob<MapData>('../data/maps/*.json', { eager: false, import: 'default' });
+const mapModules = import.meta.glob<MapData>('../maps/*.json', { eager: false, import: 'default' });
 
 function idOf(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1, -5);

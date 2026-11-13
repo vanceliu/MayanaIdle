@@ -19,8 +19,8 @@ const MIN_SPAWN_DISTANCE = 5;
 const ATTEMPTS = 20;
 const rows: { id: string; spawnable: number; worst: number; fail: number }[] = [];
 
-for (const file of readdirSync('src/data/maps').filter(f => f.endsWith('.json')).sort()) {
-  const map = JSON.parse(readFileSync(`src/data/maps/${file}`, 'utf8')) as MapData;
+for (const file of readdirSync('src/maps').filter(f => f.endsWith('.json')).sort()) {
+  const map = JSON.parse(readFileSync(`src/maps/${file}`, 'utf8')) as MapData;
   const spawnable: { x: number; y: number }[] = [];
   const stands: { x: number; y: number }[] = [];
   for (let y = 0; y < map.height; y++) {
