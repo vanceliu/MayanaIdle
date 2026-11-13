@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>城鎮競技場建築 Demo — MayanaIdle</title>
+<!--
+  城鎮新增競技場建築（`13-town.md` § 13.2.1、`55-arena.md`）。用遊戲的第二代背景 render 畫四個城鎮，
+  左右切換「現行／加上競技場」比較。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/arena-town.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px 16px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 900px; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; font-size: var(--fs-sm); }
+.demo-bar button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+#stage { width: min(1000px, 100%); height: 640px; border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-md); display: block; }
+</style>
+</head>
+<body>
+<h1 class="demo-title">城鎮競技場建築</h1>
+<p class="demo-note">
+  薄暮村、艾爾薩斯、瓦爾登：廣場右側新增一間（建築 x 19-21／y 8-9，NPC 站在門口 (20, 10)）。<br>
+  灰脊：第二、三階之間新增一間（建築 x 19-22／y 11-12，NPC 站在門口 (20, 13)）。出生點、水池、新手指導員都不動。<br>
+  「現行」與「加上競技場」切換比較；NPC 站位以門口地磚表示。拖曳可平移。
+</p>
+<div class="demo-bar" id="towns"></div>
+<div class="demo-bar">
+  <button id="before">現行</button><button id="after" class="active">加上競技場</button>
+  <label>縮放 <input id="zoom" type="range" min="0.4" max="1.6" step="0.05" value="0.8"></label>
+</div>
+<canvas id="stage"></canvas>
+<script type="module">
+import { MapOutlineStage, loadMap } from './mapOutlineDemo.ts';
+import { TOWN_PATCHES, patchTown } from './arenaTownDemo.ts';
+
+const canvas = document.getElementById('stage');
+const stage = new MapOutlineStage();
+const size = () => [canvas.clientWidth, canvas.clientHeight];
+await stage.init(canvas, ...size());
+stage.params.showActors = false;
+
+let town = 'neutral-town';
+let patched = true;
+const names = { 'neutral-town': '薄暮村', 'elsarth-town': '艾爾薩斯', 'varden-town': '瓦爾登', 'greyridge-town': '灰脊' };
+const bar = document.getElementById('towns');
+for (const id of Object.keys(TOWN_PATCHES)) {
+  const b = document.createElement('button');
+  b.textContent = names[id];
+  b.dataset.id = id;
+  b.addEventListener('click', () => { town = id; render(); });
+  bar.appendChild(b);
+}
+async function render() {
+  const base = await loadMap(town);
+  stage.setMap(patched ? patchTown(base) : base);
+  stage.layout(...size(), Number(document.getElementById('zoom').value));
+  for (const b of bar.children) b.classList.toggle('active', b.dataset.id === town);
+  document.getElementById('before').classList.toggle('active', !patched);
+  document.getElementById('after').classList.toggle('active', patched);
+}
+document.getElementById('before').addEventListener('click', () => { patched = false; render(); });
+document.getElementById('after').addEventListener('click', () => { patched = true; render(); });
+document.getElementById('zoom').addEventListener('input', e => stage.layout(...size(), Number(e.target.value)));
+render();
+</script>
+</body>
+</html>

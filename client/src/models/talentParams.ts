@@ -15,6 +15,9 @@ import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
  * **不逐筆列全部條件與動作**：沒有參數的（普通攻擊、不動作、在城鎮…）根本不進這張表。
  */
 
+/** 道具參數的選項範圍：`any` 任意道具、`shop` 雜貨店貨架、`cure` 狀態解除道具、`consumable` 可直接使用的道具 */
+export type TalentItemPool = 'any' | 'shop' | 'cure' | 'consumable';
+
 export type ParamSkillFilter = 'attack' | 'heal' | 'buff' | 'byTalentType';
 
 /** 多選欄位的選項來源：詞綴種類／裝備類型／裝備模板（`49-village-script.md` § 49.4） */
@@ -40,8 +43,8 @@ export type ParamField = (
    * `optional` ＝ 留空不算「沒選定」，規則照樣進判定（§ 51.3.1）。
    */
   | { key: string; kind: 'skill'; label: string; filter: ParamSkillFilter; optional?: boolean }
-  /** 從背包挑道具。存 id 不存名稱（§ 99.1 第 7 條） */
-  | { key: string; kind: 'item'; label: string; optional?: boolean }
+  /** 挑道具，選項依 `pool`（預設任意道具，`systems/talentItemOptions.ts`）。存 id 不存名稱（§ 99.1 第 7 條） */
+  | { key: string; kind: 'item'; label: string; pool?: TalentItemPool; optional?: boolean }
   | { key: string; kind: 'boolean'; label: string; def: boolean }
   /** 多選：值為 `source` 值域內不重複的陣列；模板存 id */
   | { key: string; kind: 'multi'; label: string; source: ParamMultiSource }
@@ -116,12 +119,12 @@ const keepFields = (word: '保留' | '存入'): ParamField[] => [
 const KEEP_FIELDS = keepFields('保留');
 
 /** 購買／從倉庫取的「道具＋補到 N 個」×3 組 */
-const TARGET_GROUPS: ParamField[] = [
-  { key: 'itemId', kind: 'item', label: '道具 1' },
+const targetGroups = (pool?: TalentItemPool): ParamField[] => [
+  { key: 'itemId', kind: 'item', label: '道具 1', pool },
   { key: 'targetAmount', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
-  { key: 'itemId2', kind: 'item', label: '道具 2', optional: true },
+  { key: 'itemId2', kind: 'item', label: '道具 2', pool, optional: true },
   { key: 'targetAmount2', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
-  { key: 'itemId3', kind: 'item', label: '道具 3', optional: true },
+  { key: 'itemId3', kind: 'item', label: '道具 3', pool, optional: true },
   { key: 'targetAmount3', kind: 'number', label: '補到', suffix: '個', min: 1, max: 999, def: 100 },
 ];
 
@@ -280,8 +283,8 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     },
   ],
   // 第 2、3 組選填（`49-village-script.md` § 49.3）
-  buy_item: TARGET_GROUPS,
-  withdraw_item: [{ ...DEPOSIT_WAREHOUSE, label: '從' }, ...TARGET_GROUPS],
+  buy_item: targetGroups('shop'),
+  withdraw_item: [{ ...DEPOSIT_WAREHOUSE, label: '從' }, ...targetGroups()],
   sell_materials: [
     { key: 'maxTier', kind: 'number', label: 'Tier 以下', min: 1, max: 7, def: 2 },
     { key: 'skipCraftMaterials', kind: 'boolean', label: '保留有用途的素材', def: true },
@@ -334,8 +337,8 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   ],
   deposit_gold: [{ key: 'keepGold', kind: 'number', label: '身上留', suffix: 'G', min: 0, max: 9_999_999, def: 50_000 }],
   withdraw_gold: [{ key: 'targetAmount', kind: 'number', label: '補到', suffix: 'G', min: 0, max: 9_999_999, def: 10_000 }],
-  use_consumable: [{ key: 'itemId', kind: 'item', label: '道具' }],
-  cure_item: [{ key: 'cureItemId', kind: 'item', label: '解除道具' }],
+  use_consumable: [{ key: 'itemId', kind: 'item', label: '道具', pool: 'consumable' }],
+  cure_item: [{ key: 'cureItemId', kind: 'item', label: '解除道具', pool: 'cure' }],
   refill_to_percent: [
     { key: 'potionType', kind: 'select', label: '藥水', options: POTION_OPTIONS, def: 'red' },
     PERCENT('補到', 80),

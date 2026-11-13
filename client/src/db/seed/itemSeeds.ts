@@ -13,6 +13,19 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 177, name: '減重紅色藥水', category: 'potion', description: '回復 20~25 HP', weight: 1, buyPrice: 50, healMin: 20, healMax: 25, cooldown: 600, icon: 'items/standing-potion', iconColor: '#DC2626' },
   { id: 178, name: '減重橙色藥水', category: 'potion', description: '回復 40~55 HP', weight: 2.5, buyPrice: 160, healMin: 40, healMax: 55, cooldown: 900, icon: 'items/bubbling-flask', iconColor: '#F59E0B' },
   { id: 179, name: '減重白色藥水', category: 'potion', description: '回復 70~100 HP', weight: 5, buyPrice: 400, healMin: 70, healMax: 100, cooldown: 1500, icon: 'items/potion-ball', iconColor: '#E2E8F0' },
+  // === 競技場（`55-arena.md` § 55.8／§ 55.9） ===
+  { id: 180, name: 'T4 競技場票券', shortName: 'T4票券', category: 'other', description: '到競技場 NPC 兌換 T4 兌換箱', weight: 0, noSell: true, bound: true, icon: 'items/paper-ticket', iconColor: '#FACC15' },
+  { id: 181, name: 'T5 競技場票券', shortName: 'T5票券', category: 'other', description: '到競技場 NPC 兌換 T5 兌換箱', weight: 0, noSell: true, bound: true, icon: 'items/paper-ticket', iconColor: '#FB923C' },
+  { id: 182, name: 'T6 競技場票券', shortName: 'T6票券', category: 'other', description: '到競技場 NPC 兌換 T6 兌換箱', weight: 0, noSell: true, bound: true, icon: 'items/paper-ticket', iconColor: '#EF4444' },
+  { id: 183, name: 'T4 武器兌換箱', shortName: 'T4武器箱', category: 'other', description: '使用後開出 1 件 T4 武器', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#FACC15' },
+  { id: 184, name: 'T4 防具兌換箱', shortName: 'T4防具箱', category: 'other', description: '使用後開出 1 件 T4 防具', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#FACC15' },
+  { id: 185, name: 'T4 飾品兌換箱', shortName: 'T4飾品箱', category: 'other', description: '使用後開出 1 件 T4 飾品', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#FACC15' },
+  { id: 186, name: 'T5 武器兌換箱', shortName: 'T5武器箱', category: 'other', description: '使用後開出 1 件 T5 武器', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#FB923C' },
+  { id: 187, name: 'T5 防具兌換箱', shortName: 'T5防具箱', category: 'other', description: '使用後開出 1 件 T5 防具', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#FB923C' },
+  { id: 188, name: 'T5 飾品兌換箱', shortName: 'T5飾品箱', category: 'other', description: '使用後開出 1 件 T5 飾品', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#FB923C' },
+  { id: 189, name: 'T6 武器兌換箱', shortName: 'T6武器箱', category: 'other', description: '使用後開出 1 件 T6 武器', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#EF4444' },
+  { id: 190, name: 'T6 防具兌換箱', shortName: 'T6防具箱', category: 'other', description: '使用後開出 1 件 T6 防具', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#EF4444' },
+  { id: 191, name: 'T6 飾品兌換箱', shortName: 'T6飾品箱', category: 'other', description: '使用後開出 1 件 T6 飾品', weight: 1, noSell: true, bound: true, icon: 'items/swap-bag', iconColor: '#EF4444' },
   { id: 176, name: '慎重藥水', category: 'potion', description: '魔攻+8（300秒）', weight: 5, buyPrice: 5000, icon: 'items/bubbling-flask', iconColor: '#A855F7' },
   
   // === 狀態解除道具 ===

@@ -4,7 +4,7 @@
  */
 import { PROTOCOL_VERSION } from './protocol';
 import { BUILD_INFO } from '../buildInfo';
-import type { ClientMessage, ServerMessage, ActionStore, LeaderboardSnapshotView } from './protocol';
+import type { ClientMessage, ServerMessage, ActionStore, LeaderboardSnapshotView, ArenaRankingQuery, ArenaRankingRow } from './protocol';
 import { useOnlineStore, readSessionToken, writeSessionToken } from './online';
 import { applyServerMessage } from './mirror';
 import { defaultSession } from '../stores/session';
@@ -77,6 +77,11 @@ export class GameConnection {
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4） */
   requestLeaderboard(top = 20): Promise<LeaderboardSnapshotView> {
     return this.request(id => ({ t: 'leaderboard', id, top })) as Promise<LeaderboardSnapshotView>;
+  }
+
+  /** 競技場排行榜（`55-arena.md` § 55.7） */
+  requestArenaRanking(query: ArenaRankingQuery): Promise<ArenaRankingRow[]> {
+    return this.request(id => ({ t: 'arena_ranking', id, query })) as Promise<ArenaRankingRow[]>;
   }
 
   login(username: string, password: string): void {
@@ -228,6 +233,15 @@ export class GameConnection {
         if (p) {
           this.pending.delete(msg.id);
           p.resolve(msg.snapshot);
+        }
+        return;
+      }
+      case 'arena_ranking': {
+        if (msg.id === undefined) return;
+        const p = this.pending.get(msg.id);
+        if (p) {
+          this.pending.delete(msg.id);
+          p.resolve(msg.rows);
         }
         return;
       }

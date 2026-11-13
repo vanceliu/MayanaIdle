@@ -24,8 +24,8 @@ import type { Attributes, ClassName } from '../src/models/character';
 export const ARMOR_AFFIX_SLOTS = 4;
 export const ARMOR_OFFENSE_SLOTS = 2;
 
-/** 武器池裡有輸出價值的攻擊詞綴（命中下降、普攻回血、技能回血不增加輸出，不列入） */
-const WEAPON_NON_OFFENSE = new Set<AffixType>(['hit_down', 'attack_lifesteal', 'skill_lifesteal']);
+/** 武器池裡有輸出價值的攻擊詞綴（命中下降、普攻回血、技能回血、最大 HP／MP、回血、回魔不增加輸出，不列入） */
+const WEAPON_NON_OFFENSE = new Set<AffixType>(['hit_down', 'attack_lifesteal', 'skill_lifesteal', 'max_hp', 'max_mp', 'hp_regen', 'mp_regen']);
 export const WEAPON_OFFENSE_AFFIXES: AffixType[] = (Object.keys(AFFIX_POOLS.weapon) as AffixType[])
   .filter(t => !WEAPON_NON_OFFENSE.has(t));
 

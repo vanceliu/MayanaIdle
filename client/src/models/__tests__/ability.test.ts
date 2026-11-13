@@ -39,9 +39,10 @@ describe('適用部位與階級（§ 7S.1）', () => {
     expect(getAbilityCommonPool(T5_RING)).toEqual(typesOf('common', 'accessory'));
   });
 
-  it('武器組：共通 4 種、各職業 3 種；飾品組：共通 5 種、職業 2~4 種（§ 7S.5）', () => {
+  it('武器組：共通 4 種、騎士 4 種、其他職業 3 種；飾品組：共通 5 種、職業 2~4 種（§ 7S.5）', () => {
     expect(typesOf('common')).toEqual(['bonus_damage', 'skill_splash', 'combo_strike', 'focus_strike']);
-    for (const cls of ['knight', 'elf', 'elementalist', 'priest', 'thief']) expect(typesOf(cls), cls).toHaveLength(3);
+    expect(typesOf('knight')).toEqual(['rend_boost', 'blood_curse_boost', 'blood_slash', 'vengeance_boost']);
+    for (const cls of ['elf', 'elementalist', 'priest', 'thief']) expect(typesOf(cls), cls).toHaveLength(3);
     expect(typesOf('common', 'accessory')).toEqual(['low_hp_regen', 'low_mp_regen', 'thorns', 'rage', 'calm']);
     expect(typesOf('knight', 'accessory')).toEqual(['shield_bash_boost', 'iron_shield_boost']);
     expect(typesOf('elf', 'accessory')).toEqual(['fire_arrow_boost', 'hawk_eye_boost', 'leap_shot_boost']);

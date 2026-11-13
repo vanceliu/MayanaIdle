@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>競技場場地 Demo — MayanaIdle</title>
+<!--
+  競技場場地候選（`55-arena.md`）：三種 30×30 版面，用遊戲的第二代背景 render 繪製。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/arena-map.html
+  .demo-* 只是這頁的排版。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px 16px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 860px; }
+.demo-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+#stage { width: min(900px, 100%); height: 620px; border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-md); display: block; }
+.demo-side { width: 260px; display: flex; flex-direction: column; gap: 12px; }
+.demo-card { background: var(--bg-panel); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-md); padding: 12px; }
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+.demo-layouts { display: flex; flex-direction: column; gap: 6px; }
+.demo-layouts button { text-align: left; }
+.demo-layouts button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+.demo-row { display: flex; gap: 8px; align-items: center; font-size: var(--fs-sm); margin-bottom: 6px; }
+.demo-row select, .demo-row input[type="range"] { flex: 1; min-width: 0; }
+.demo-meta { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.7; }
+</style>
+</head>
+<body>
+<h1 class="demo-title">競技場場地</h1>
+<p class="demo-note">
+  三種 30×30 候選版面，外圍為邊界、中央為出生點；怪物依模擬規則生在角色周圍 6～8 格的可走格。<br>
+  拖曳畫面可平移；「顯示角色與怪物」是示意位置，不是實際出怪。主題只換地板與障礙物的配色。
+</p>
+<div class="demo-layout">
+  <canvas id="stage"></canvas>
+  <div class="demo-side">
+    <div class="demo-card">
+      <h2>版面</h2>
+      <div class="demo-layouts" id="layouts"></div>
+      <p class="demo-meta" id="note"></p>
+      <p class="demo-meta" id="reach"></p>
+    </div>
+    <div class="demo-card">
+      <h2>顯示</h2>
+      <div class="demo-row"><label for="theme">主題</label><select id="theme"></select></div>
+      <div class="demo-row"><label for="zoom">縮放</label><input id="zoom" type="range" min="0.4" max="1.6" step="0.05" value="0.75"></div>
+      <label class="demo-row"><input id="showActors" type="checkbox" checked>顯示角色與怪物</label>
+      <label class="demo-row"><input id="floorGrid" type="checkbox">地板格線</label>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { MapOutlineStage, THEMES } from './mapOutlineDemo.ts';
+import { LAYOUTS, buildArenaMap, reachability } from './arenaMapDemo.ts';
+
+const canvas = document.getElementById('stage');
+const stage = new MapOutlineStage();
+const size = () => [canvas.clientWidth, canvas.clientHeight];
+await stage.init(canvas, ...size());
+
+const themeSelect = document.getElementById('theme');
+for (const t of THEMES) themeSelect.add(new Option(t, t));
+themeSelect.value = 'battlefield';
+
+let layoutId = LAYOUTS[0].id;
+const box = document.getElementById('layouts');
+for (const l of LAYOUTS) {
+  const b = document.createElement('button');
+  b.textContent = l.name;
+  b.dataset.id = l.id;
+  b.addEventListener('click', () => { layoutId = l.id; render(); });
+  box.appendChild(b);
+}
+
+function render() {
+  const map = buildArenaMap(layoutId, themeSelect.value);
+  stage.setMap(map);
+  stage.layout(...size(), Number(document.getElementById('zoom').value));
+  for (const b of box.children) b.classList.toggle('active', b.dataset.id === layoutId);
+  document.getElementById('note').textContent = LAYOUTS.find(l => l.id === layoutId).note;
+  const r = reachability(map);
+  document.getElementById('reach').textContent = `可走格 ${r.walkable}，出生點可到 ${r.reachable}（${(100 * r.reachable / r.walkable).toFixed(0)}%）`;
+}
+
+for (const id of ['showActors', 'floorGrid']) {
+  const input = document.getElementById(id);
+  stage.params[id] = input.checked;
+  input.addEventListener('change', () => { stage.params[id] = input.checked; stage.apply(); });
+}
+themeSelect.addEventListener('change', render);
+document.getElementById('zoom').addEventListener('input', e => stage.layout(...size(), Number(e.target.value)));
+window.addEventListener('resize', () => stage.layout(...size(), Number(document.getElementById('zoom').value)));
+render();
+</script>
+</body>
+</html>

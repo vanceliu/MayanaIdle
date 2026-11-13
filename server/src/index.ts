@@ -12,6 +12,7 @@ import { loadTemplateCache } from '../../client/src/systems/templateSync';
 import { loadConfig, isLoopbackBind, type ServerConfig } from './config';
 import { openDatabase, migrate, assertSchemaIntact, resolveWorldMode, DB_FILE, type WorldMode } from './db/sqlite';
 import { SqliteGuildStorage } from './db/guildStorage';
+import { SqliteArenaRecords } from './db/arenaRecords';
 import { SqliteRepository } from './db/sqliteRepository';
 import { AuthService } from './auth';
 import { registerBundledMaps } from './maps';
@@ -162,7 +163,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
     log.warn('server.properties 的 admin-password 是空的，管理介面無法登入（§ 97.8）');
   }
 
-  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)), guildStorage: new SqliteGuildStorage(db) });
+  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)), guildStorage: new SqliteGuildStorage(db), arenaRecords: new SqliteArenaRecords(db) });
   const tickLoop = new TickLoop(gameServer.world);
   const staticSource = resolveStatic(options.staticDir ?? null);
 

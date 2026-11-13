@@ -150,7 +150,7 @@ describe('製作品的詞綴 Tier 範圍（§ 6A.6）', () => {
       const { min, max } = CRAFT_AFFIX_TIER_RANGE[Number(tier)];
       const counts = new Map<number, number>();
       let total = 0;
-      for (let i = 0; i < 5000; i++) {
+      for (let i = 0; i < 20000; i++) {
         for (const a of generateCraftAffixes('weapon', { tier: Number(tier), smallMonsterDamage: 10, largeMonsterDamage: 10 })) {
           if (isTierlessAffixType(a.type)) continue;
           counts.set(a.tier, (counts.get(a.tier) ?? 0) + 1);

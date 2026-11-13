@@ -17,6 +17,10 @@ export interface ItemDefinition {
    * 不可販售。專用材料（魔法書材料等）即使沒有 `sellPrice` 也**必須明確標記**。
    */
   noSell?: boolean;
+  /** 背包格顯示的短名稱（未給時取名稱前 4 字，`35-inventory-constraints.md` § 35.6） */
+  shortName?: string;
+  /** 綁角色：不可交易、不可存倉庫（`55-arena.md` § 55.8） */
+  bound?: true;
   healMin?: number;
   healMax?: number;
   cooldown?: number;
@@ -70,4 +74,9 @@ export function getItemDescription(name: string): string {
 
 export function getItemBuyPrice(name: string): number {
   return ITEM_MAP.get(name)?.buyPrice ?? 0;
+}
+
+/** 綁角色的道具（`55-arena.md` § 55.8） */
+export function isBoundItem(itemId: number): boolean {
+  return !!getItemById(itemId)?.bound;
 }

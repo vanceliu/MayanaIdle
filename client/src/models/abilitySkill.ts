@@ -75,6 +75,11 @@ const TRANSFORMS: Partial<Record<Ability['type'], Transform>> = {
       description: `扣自身最大 HP ${s.selfHpCostPercent}%，對 ${s.aoeRadius} 格內隨機打 ${hits} 下（可重複命中）`,
     };
   },
+  /** 走普攻公式：每下一發，獨立判定命中與爆擊，屬性取武器元素（`arpgEventHandler` 的多段物理分支） */
+  blood_slash: s => ({
+    ...s, hits: 1, power: 0, element: 'none',
+    description: `扣自身最大 HP ${s.selfHpCostPercent}%，對 ${s.aoeRadius} 格內隨機打 ${s.randomHits} 下（可重複命中），走普攻公式`,
+  }),
   vengeance_boost: (s, p) => (s.selfBuff ? {
     ...s,
     selfBuff: {

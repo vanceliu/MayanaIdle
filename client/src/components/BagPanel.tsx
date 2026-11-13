@@ -21,6 +21,7 @@ import { getTownScrollByItemId } from '../models/townScroll';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { isSigilItemId } from '../models/sigil';
+import { getArenaBox, isArenaTicketItemId } from '../systems/arenaBox';
 import { BagTalentTab } from './BagTalentTab';
 import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
 import { BagCellVisual, BagItemTooltipBody, type BagGridItem } from './BagCell';
@@ -91,7 +92,7 @@ function buildBagCells(
   bagItems: BagItem[],
   equippedGear: EquippedGear,
   inventory: EquipmentInstance[],
-): { gridItems: BagGridItem[]; sigilItems: BagGridItem[] } {
+): { gridItems: BagGridItem[]; sigilItems: BagGridItem[]; ticketItems: BagGridItem[] } {
   const gridItems: BagGridItem[] = [];
 
   const basicPotionIds = new Set(Object.values(POTION_CONFIG).map(c => c.itemId));
@@ -127,11 +128,14 @@ function buildBagCells(
    * 格數、整理、拖曳位置都不該看到它。
    */
   const sigilItems: BagGridItem[] = [];
+  /** § 35.20.5：競技場票券同樣不佔格，收在印記旁的票券抽屜 */
+  const ticketItems: BagGridItem[] = [];
 
   for (const item of bagItems) {
     if (item.type === 'potion') continue;
     const cell: BagGridItem = { id: `bag-${item.itemId}`, type: item.type, name: item.name, itemId: item.itemId, count: item.amount };
     if (isSigilItemId(item.itemId)) sigilItems.push(cell);
+    else if (isArenaTicketItemId(item.itemId)) ticketItems.push(cell);
     else gridItems.push(cell);
   }
 
@@ -156,12 +160,12 @@ function buildBagCells(
     gridItems.push({ id: `equip-${item.id}`, type: 'equipment', name: item.name, equipment: item, equippedSlot: slot });
   }
 
-  return { gridItems, sigilItems };
+  return { gridItems, sigilItems, ticketItems };
 }
 
 export function BagPanel() {
-  /** § 35.20：印記抽屜的開合。不持久化，重開回到收合 */
-  const [sigilOpen, setSigilOpen] = useState(false);
+  /** § 35.20／§ 35.20.5：底部抽屜（印記／票券），同時只開一個。不持久化，重開回到收合 */
+  const [drawer, setDrawer] = useState<'sigil' | 'ticket' | null>(null);
   /** § 35.21 背包分頁。不持久化：切分頁是當下的動作，不是設定 */
   const [bagTab, setBagTab] = useState<'normal' | 'talent'>('normal');
   /**
@@ -254,7 +258,7 @@ export function BagPanel() {
   const activeEffects = useGameStore(s => s.activeEffects);
   const templates = useEquipmentTemplates();
 
-  const { gridItems, sigilItems } = useMemo(
+  const { gridItems, sigilItems, ticketItems } = useMemo(
     () => buildBagCells(bagItems, equippedGear, inventory),
     [bagItems, equippedGear, inventory],
   );
@@ -282,7 +286,7 @@ export function BagPanel() {
 
   // 選取的東西離開背包（用掉、穿上、賣掉、丟棄）後把選取狀態收掉。
   // 兩個分頁的格子都可能被選取，所以一起看。
-  if (selectedId != null && ![...gridItems, ...sigilItems].some(i => i.id === selectedId)) {
+  if (selectedId != null && ![...gridItems, ...sigilItems, ...ticketItems].some(i => i.id === selectedId)) {
     setSelectedId(null);
   }
   const gridIds = new Set(gridItems.map(i => i.id));
@@ -495,6 +499,9 @@ export function BagPanel() {
       equipItem(item.equipment);
     } else if (item.type === 'scroll' && item.itemId != null && isTownScroll(item.itemId)) {
       readTownScroll(item.itemId);
+    } else if (item.itemId != null && getArenaBox(item.itemId)) {
+      // 失敗訊息由 store／遠端 action 寫進系統訊息
+      void Promise.resolve(useGameStore.getState().openArenaBox(item.itemId)).catch(() => undefined);
     } else {
       // 強化卷軸不直接生效，第二下是「進入指定目標模式」（§ 35.5.5）
       enterScrollTargeting(item);
@@ -763,6 +770,9 @@ export function BagPanel() {
     if (item.type === 'scroll' && item.name.includes('回城卷軸')) {
       return <div className="tooltip-hint">{selected ? '再點一次傳送至城鎮' : '點擊選取'}</div>;
     }
+    if (item.itemId != null && getArenaBox(item.itemId)) {
+      return <div className="tooltip-hint">{selected ? '再點一次開箱' : '點擊選取'}</div>;
+    }
     if (getEnhanceScroll(item.itemId)) {
       return <div className="tooltip-hint">{selected ? '再點一次選擇強化目標' : '點擊選取'}</div>;
     }
@@ -784,8 +794,8 @@ export function BagPanel() {
    * 開合抽屜時把殘留的互動狀態收掉：選取、tooltip、右鍵選單、移動模式
    * 都是「當前那一格」的事，抽屜一蓋上去或收起來就指向看不到的格子了。
    */
-  function toggleSigilDrawer() {
-    setSigilOpen(open => !open);
+  function toggleDrawer(kind: 'sigil' | 'ticket') {
+    setDrawer(open => (open === kind ? null : kind));
     setSelectedId(null);
     setTooltip(null);
     setContextMenu(null);
@@ -940,18 +950,18 @@ export function BagPanel() {
       {rateTarget && <EnhanceRateWindow item={rateTarget} onClose={() => setRateTarget(null)} />}
 
       <div className="bag-sigil-dock">
-      {sigilOpen && (
-        <div className="bag-sigil-drawer" role="group" aria-label="印記">
-          {sigilItems.length === 0 ? (
-            <div className="bag-sigil-empty">沒有印記</div>
+      {drawer && (
+        <div className="bag-sigil-drawer" role="group" aria-label={drawer === 'sigil' ? '印記' : '票券'}>
+          {(drawer === 'sigil' ? sigilItems : ticketItems).length === 0 ? (
+            <div className="bag-sigil-empty">{drawer === 'sigil' ? '沒有印記' : '沒有票券'}</div>
           ) : (
             <BagGrid>
               {/*
-                § 35.20.3：印記格不做拖曳重排、不進 slotMap、不吃整理 ——
-                種類固定且只有八種，位置管理沒有意義。點一下只選取（沒有可執行的動作），
+                § 35.20.3：抽屜格不做拖曳重排、不進 slotMap、不吃整理 ——
+                種類固定，位置管理沒有意義。點一下只選取（沒有可執行的動作），
                 選起來是為了讓觸控裝置也看得到 tooltip（§ 35.5.4）。
               */}
-              {sigilItems.map(item => (
+              {(drawer === 'sigil' ? sigilItems : ticketItems).map(item => (
                 <div
                   key={item.id}
                   className={`bag-cell ${item.type}${selectedId === item.id ? ' is-selected' : ''}`}
@@ -968,13 +978,18 @@ export function BagPanel() {
         </div>
       )}
 
-      <button
-        className={`bag-sigil-toggle${sigilOpen ? ' active' : ''}`}
-        aria-expanded={sigilOpen}
-        onClick={toggleSigilDrawer}
-      >
-        印記 {sigilOpen ? '▾' : '▴'}
-      </button>
+      <div className="bag-drawer-toggles">
+        {([['sigil', '印記'], ['ticket', '票券']] as const).map(([kind, label]) => (
+          <button
+            key={kind}
+            className={`bag-sigil-toggle${drawer === kind ? ' active' : ''}`}
+            aria-expanded={drawer === kind}
+            onClick={() => toggleDrawer(kind)}
+          >
+            {label} {drawer === kind ? '▾' : '▴'}
+          </button>
+        ))}
+      </div>
       </div>
 
       {tooltip && (

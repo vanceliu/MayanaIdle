@@ -114,11 +114,12 @@ export function crystalToAbility(crystal: AbilityCrystal, template: AbilityTempl
 export type CrystalApplyBlock =
   | 'notAbilitySlot'
   | 'crafted'
+  | 'mimic'
   | 'equipped'
   | 'wrongGroup'
   | 'classCannotEquip';
 
-type CrystalTarget = { equipped?: boolean; isCraftedGear?: boolean };
+type CrystalTarget = { equipped?: boolean; isCraftedGear?: boolean; isMimicGear?: boolean };
 
 const SLOT_GROUP: Readonly<Record<string, 'weapon' | 'accessory'>> = {
   rightHand: 'weapon', necklace: 'accessory', ring1: 'accessory', ring2: 'accessory',
@@ -130,6 +131,7 @@ export function getCrystalApplyBlock(
 ): CrystalApplyBlock | null {
   if (!isAbilitySlot(template)) return 'notAbilitySlot';
   if (target.isCraftedGear) return 'crafted';
+  if (target.isMimicGear) return 'mimic';
   if (target.equipped) return 'equipped';
   const def = getAbilityDefinition(crystal.type);
   if (!def || def.group !== SLOT_GROUP[template.slot]) return 'wrongGroup';
@@ -143,6 +145,7 @@ export function getCrystalApplyBlock(
 export const CRYSTAL_APPLY_BLOCK_TEXT: Readonly<Record<CrystalApplyBlock, string>> = {
   notAbilitySlot: '只能套用到 T3 以上的武器、項鍊、戒指',
   crafted: '製作品不能套用',
+  mimic: '擬態品不能套用',
   equipped: '身上的裝備不能套用',
   wrongGroup: '武器技能只能套用到武器，飾品技能只能套用到項鍊或戒指',
   classCannotEquip: '該職業無法裝備這件裝備',

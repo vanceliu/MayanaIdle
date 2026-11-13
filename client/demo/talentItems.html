@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自動天賦道具選單 Demo — MayanaIdle</title>
+<!--
+  自動天賦的道具參數選單（`51-auto-talent.md` § 51.4.10~§ 51.4.11）：單選、依類別分組、各組可收合。
+  元件為 `src/components/TalentItemSelect.tsx`，樣式來自 App.css；.demo-* 只是這頁的排版。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/talentItems.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px 16px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 900px; }
+.demo-card {
+  width: min(560px, 100%); box-sizing: border-box; min-height: 420px;
+  background: var(--bg-panel); border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.demo-row { display: flex; align-items: center; gap: 8px; }
+.demo-rule { font-size: var(--fs-sm); min-width: 8em; }
+
+</style>
+</head>
+<body>
+  <h1 class="demo-title">自動天賦道具選單</h1>
+  <p class="demo-note">
+    點選單打開，類別預設收合，點類別標題展開／收合；已選道具所在的類別打開時自動展開，只有一個類別時直接展開。<br>
+    上方搜尋欄輸入名稱即篩選，只列有結果的類別並全部展開；清空搜尋回到收合狀態。<br>
+    「購買」預設白色藥水、「道具數量少於」預設試煉飛龍之鱗（材料），用來看展開已選類別的效果；點道具即選定並關閉，「清除」改回未選擇。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./talentItemsDemo.tsx"></script>
+</body>
+</html>

@@ -31,6 +31,8 @@ export interface MapMonster {
    * `createMonsterFromTemplate` 看到這欄就照它建實例。
    */
   dummy?: TrainingDummySpec;
+  /** 競技場出波指定的模板與強化詞綴數（`55-arena.md` § 55.2）；server 端用，不上線 */
+  arenaSpawn?: { templateId: number; affixCount: number };
 }
 
 const BASE_MAX_MONSTERS = 3;

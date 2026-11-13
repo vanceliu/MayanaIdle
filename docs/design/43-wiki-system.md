@@ -217,6 +217,10 @@ client/src/wiki/
 - **未開放的項目另立一區**，照 `blockedReason` 說明原因（`monster`／`pending`），
   不與可用的混列
 
+### 4.12.1 競技場 (ArenaPage)
+- 段位（等級、一般怪、王的出場順序、入場材料、金幣）、組隊數量、強化詞綴數、票券場、離場規則、排行榜位置、兌換箱與 (擬) 規則（來源：`55-arena.md`）
+- 數值取 `models/arena.ts`、`systems/arenaBox.ts` 常數；規則敘述為硬編碼文字
+
 ### 4.13 掉落 (DropsPage)
 - 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）
 
@@ -257,6 +261,7 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/combat       → CombatPage
 /wiki/quests       → QuestsPage
 /wiki/talents      → TalentsPage
+/wiki/arena        → ArenaPage
 /wiki/scripts      → 轉址至 /wiki/talents（改名前的舊路徑）
 /wiki/drops        → DropsPage
 /wiki/credits      → CreditsPage

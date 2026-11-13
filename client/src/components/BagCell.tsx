@@ -78,7 +78,7 @@ export function BagCellVisual({ item, templates }: { item: BagGridItem; template
           return <GameIcon name={icon} size={24} color={color} className={glowClass} />;
         })()
       )}
-      <span className="bag-cell-name">{getShortName(item.name)}</span>
+      <span className="bag-cell-name">{itemDef(item)?.shortName ?? getShortName(item.name)}</span>
       {item.equippedSlot && (
         <span className="bag-cell-equipped" aria-label={`裝備中：${SLOT_NAMES[item.equippedSlot]}`}>
           裝備中

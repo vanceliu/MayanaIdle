@@ -513,6 +513,9 @@ export const FLAT_HP_MP_TIERS: AffixTier[] = [
   { tier: 7, min: 90, max: 100 },
 ];
 
+/** § 7.3.1 武器的最大 HP／MP：防具表 × 2 */
+export const WEAPON_HP_MP_TIERS: AffixTier[] = FLAT_HP_MP_TIERS.map(t => ({ tier: t.tier, min: t.min * 2, max: t.max * 2 }));
+
 /** 迴避的專屬階級表（§ 7.3.1），單位為迴避值 */
 export const EVASION_TIERS: AffixTier[] = [
   { tier: 1, min: 1, max: 39 },
@@ -537,7 +540,7 @@ function equalWidthTiers(width: number, unit: number): AffixTier[] {
 }
 
 /** § 7.3／§ 7.3.1 階級表代號 */
-export type AffixTierTableKey = 'P1' | 'P2' | 'P3' | 'P5' | 'P6' | 'P7' | 'N2' | 'onHit' | 'evasion' | 'hpMp';
+export type AffixTierTableKey = 'P1' | 'P2' | 'P3' | 'P5' | 'P6' | 'P7' | 'N2' | 'N4' | 'onHit' | 'evasion' | 'hpMp' | 'hpMpWeapon';
 
 export const AFFIX_TIER_TABLES: Record<AffixTierTableKey, AffixTier[]> = {
   P1: equalWidthTiers(1, 0.1),
@@ -547,9 +550,11 @@ export const AFFIX_TIER_TABLES: Record<AffixTierTableKey, AffixTier[]> = {
   P6: equalWidthTiers(6, 0.1),
   P7: equalWidthTiers(7, 0.1),
   N2: equalWidthTiers(2, 1),
+  N4: equalWidthTiers(4, 1),
   onHit: ON_HIT_TIERS,
   evasion: EVASION_TIERS,
   hpMp: FLAT_HP_MP_TIERS,
+  hpMpWeapon: WEAPON_HP_MP_TIERS,
 };
 
 /** 詞綴池的一格：階級表代號；額外屬性無 Tier 為 null */
@@ -567,10 +572,11 @@ export const SHARED_AFFIX_TYPES = Object.keys(SHARED_POOL) as AffixType[];
 export const AFFIX_POOLS: Record<AffixCategory, PoolEntries> = {
   weapon: {
     attack_power: 'P3', element_brand: 'P3', element_erosion: 'P3', hit_down: 'P3', defense_down: 'P3', element_down: 'P3',
-    attack_splash: 'P5', crit_damage: 'P5', attack_speed: 'P1', attack_lifesteal: 'P6', skill_lifesteal: 'P2',
+    attack_splash: 'P5', crit_damage: 'P5', attack_lifesteal: 'P6', skill_lifesteal: 'P2',
+    max_hp: 'hpMpWeapon', max_mp: 'hpMpWeapon', hp_regen: 'N4', mp_regen: 'N4',
   },
   helmChest: { defense: 'P1', on_hit_hp: 'onHit', on_hit_mp: 'onHit', evasion: 'evasion', bonus_attribute: null, ...SHARED_POOL },
-  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, ...SHARED_POOL },
+  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, magic_resist: 'P1', ...SHARED_POOL },
   gloves: {
     attack_splash: 'P2', crit_rate: 'P2', crit_damage: 'P2', attack_speed: 'P1',
     skill_elemental: 'P2', cooldown_reduction: 'P2', ...SHARED_POOL,
@@ -579,15 +585,15 @@ export const AFFIX_POOLS: Record<AffixCategory, PoolEntries> = {
   belt: { bonus_attribute: null, evasion: 'evasion', cooldown_reduction: 'P1', crit_damage: 'P2', ...SHARED_POOL },
   offhand: {
     block_rate: 'P3', skill_elemental: 'P1', defense: 'P1', thorns: 'P7',
-    on_hit_hp: 'onHit', on_hit_mp: 'onHit', magic_resist: 'P3', ...SHARED_POOL,
+    on_hit_hp: 'onHit', on_hit_mp: 'onHit', magic_resist: 'P2', ...SHARED_POOL,
   },
   necklace: {
-    magic_resist: 'P3', cooldown_reduction: 'P1', evasion: 'evasion', bonus_attribute: null,
+    magic_resist: 'P1', cooldown_reduction: 'P1', evasion: 'evasion', bonus_attribute: null,
     crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', ...SHARED_POOL,
   },
   ring: {
-    magic_resist: 'P3', evasion: 'evasion', bonus_attribute: null,
-    crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', ...SHARED_POOL,
+    magic_resist: 'P1', evasion: 'evasion', bonus_attribute: null,
+    crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', attack_speed: 'P1', ...SHARED_POOL,
   },
 };
 

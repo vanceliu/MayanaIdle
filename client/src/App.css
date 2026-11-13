@@ -756,6 +756,39 @@ a,
   gap: 6px;
 }
 
+/* 競技場場內 HUD（`55-arena.md`） */
+.arena-hud {
+  width: 260px;
+  box-sizing: border-box;
+  background: rgba(var(--glass-rgb), 0.82);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(6px);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-sm);
+}
+.arena-hud-title { font-family: var(--font-display); color: var(--accent-primary); }
+.arena-hud-row { display: flex; justify-content: space-between; }
+.arena-hud-boss { color: var(--accent-gold); }
+
+/* 競技場 NPC（`55-arena.md`） */
+.arena-tier-closed { opacity: 0.5; }
+.arena-closed-tag {
+  margin-left: 8px; padding: 0 6px; font-size: var(--fs-xs);
+  border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); color: var(--text-dim);
+}
+.arena-wave-note { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.7; margin: 6px 0; }
+.arena-message { font-size: var(--fs-sm); color: var(--accent-gold); margin: 4px 0; }
+
+/* 統計中心「競技場」分頁 */
+.arena-rank-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.arena-rank-filters button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+.arena-rank-sep { width: 12px; }
+
 /* 右上：地圖選擇器。寬度必須跟下拉選單一致（340px），
    否則兩者接縫對不齊，選單還會頂出視窗右緣。 */
 .hud-topright .map-selector {
@@ -4899,7 +4932,14 @@ button.active {
   flex-shrink: 0;
 }
 
+/* § 35.20.5：印記與票券兩顆抽屜按鈕並排 */
+.bag-drawer-toggles {
+  display: flex;
+  gap: 4px;
+}
+
 .bag-sigil-toggle {
+  flex: 1;
   width: 100%;
   padding: 4px 8px;
   font-size: var(--fs-xs);
@@ -9272,6 +9312,64 @@ button.active {
 .talent-param-multi-tier {
   margin-left: auto;
   color: var(--text-dim);
+}
+
+/* 道具單選（`TalentItemSelect`）：類別可收合 */
+.talent-item-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.talent-item-group:hover {
+  background: var(--bg-inset);
+}
+
+.talent-item-group-arrow {
+  color: var(--accent-primary);
+  font-size: 0.8em;
+}
+
+.talent-item-group-count {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+.talent-item-options {
+  margin: 0 0 2px;
+  padding: 0 0 0 14px;
+  list-style: none;
+}
+
+.talent-item-option {
+  display: block;
+  width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.talent-item-option:hover {
+  background: var(--bg-inset);
+}
+
+.talent-item-option.is-selected {
+  color: var(--accent-gold);
+  font-weight: 600;
 }
 
 .talent-param-multi-more {

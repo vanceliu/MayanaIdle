@@ -24,7 +24,8 @@ import { getEffectiveMaxHp, getEffectiveMaxMp, processMonsterDeath, waitForPendi
 import { talentCombatRules } from '../stores/talentStore';
 import { useTrainingGroundStore } from '../stores/trainingGroundStore';
 import { defaultSession, type Session } from '../stores/session';
-import { getNearestTown, resolveDropAreaId } from '../models/mapData';
+import { getNearestTown, getRegion, resolveDropAreaId } from '../models/mapData';
+import { leaveArenaRun } from './arenaRun';
 import { isBountyTarget } from '../models/bounty';
 import type { MonsterTemplate } from '../models/monster';
 import { hasProjectilePath, isWithinAttackRange } from './lineOfSight';
@@ -896,7 +897,8 @@ export function handleMonsterDeath(monster: MonsterInstance, monsterId: string, 
   for (const p of participants) {
     settleMemberKill(p, monster, monsterId, {
       expDivisor: participants.length,
-      withDrops: p === receiver,
+      // 競技場無掉落（`55-arena.md` § 55.3）
+      withDrops: p === receiver && !instance.arena,
       instanceKills: kills,
       killArea,
       bountyActive: instance.party === null,
@@ -946,6 +948,20 @@ export function handlePlayerDeath(session: Session = defaultSession) {
   const gs = session.game.getState();
   const char = gs.character;
   if (!char) return;
+
+  // 競技場內死亡（`55-arena.md` § 55.5）：收回一半票券、回進場前的城鎮、不計 deathCount
+  if (getRegion(char.currentRegion)?.type === 'arena') {
+    const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear, gs.activeEffects);
+    session.game.setState({ character: { ...char, hp: Math.floor(effMaxHp * 0.5) } });
+    ensureInstance(session);
+    leaveArenaRun(session, 'death');
+    const town = getRegion(session.game.getState().character!.currentRegion);
+    session.game.getState().pushSystemLog(`你在競技場倒下了...傳送至${town?.name ?? '城鎮'}`);
+    resetPlayerCombat(session);
+    leaveInstance(session);
+    void session.game.getState().flushSaveNow();
+    return;
+  }
 
   const nearestTown = getNearestTown(char.currentRegion);
 

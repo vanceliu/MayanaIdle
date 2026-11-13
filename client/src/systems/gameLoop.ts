@@ -6,6 +6,7 @@
  *
  * `gameLoopTick` 是本機（一人實例）的組合入口；server 由 `systems/worldTick.ts` 逐層呼叫。
  */
+import { tickArenaRun } from './arenaRun';
 import type { Position, MapData } from '../models/mapControl';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import { MAX_TRACK_DISTANCE, DESPAWN_DISTANCE } from '../stores/mapMonsterStore';
@@ -146,9 +147,11 @@ export function tickInstanceWorld(deltaMs: number, instance: MapInstance): void 
     occupation.register({ x: Math.round(m.position.x), y: Math.round(m.position.y) }, 'monster', m.id);
   }
 
-  // === Spawn monsters：任一在場成員不在恢復等待中就生 ===
+  // === Spawn monsters：競技場依波次出怪（`55-arena.md` § 55.2，無 Pressure）；其餘任一在場成員不在恢復等待中就生 ===
   const anyActive = members.some(m => !m.mapControl.getState().paused);
-  if (anyActive) {
+  if (instance.arena) {
+    tickArenaRun(deltaMs, instance, map);
+  } else if (anyActive) {
     const { pressure } = calculatePressure(instance.kills, undefined, instance.members.length);
     const maxMonsters = partyMaxMonsters(pressure, members.length);
     // 一波的隻數分布與 Boss 門檻都以停留時間為輸入（`26-spawn-pressure.md` § 26.2、§ 26.4）

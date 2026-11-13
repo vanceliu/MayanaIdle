@@ -176,7 +176,7 @@
 | **懸賞價格級距／定價等級** | `53-bounty-contract.md` | § 53.2 |
 | **懸賞保證強化詞綴／掉兩次取比較好** | `53-bounty-contract.md` | § 53.5 |
 | **懸賞裝備比較條件（偏好詞綴／順序與開關）** | `53-bounty-contract.md` | § 53.6 |
-| **競技場（未實作：段位入場費、波次、票券場、結算、排行榜）** | `55-arena.md` | 全文 |
+| **競技場（T4～T6 開放、T7 未開放：段位入場費、波次、一般怪池、票券場、結算、排行榜）** | `55-arena.md` | 全文 |
 | 任務追蹤視窗／進行中任務取消 | `36-quest-system.md` | § 36.10.3 |
 | 角色統計數據（成就計數） | `37-statistics.md` | 全文 |
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` § 37.4.9、`45-legacy-archive.md` § 45.4.1 | — |
@@ -419,10 +419,10 @@
   ←→ 18-data-schema.md § 18.6 / 97-selfhosted-server.md § 97.2 / § 97.7.1
   ←→ 43-wiki-system.md § 4.11
        ↕
-55-arena.md（未實作）
+55-arena.md（T4～T6 已實作）
   ←  27-drop-table.md § 27.5 / § 27.6（入場材料、王名單）
   ←  25-monster-system.md § 25.12（強化詞綴）
-  ←  53-bounty-contract.md § 53.4（重置時刻）
+  ←→ 13-town.md § 13.2.1（競技場建築）
   ←  03-combat.md § 3.13 / 97-selfhosted-server.md § 97.7.1
   ←→ 37-statistics.md § 37.1 / § 37.5（死亡統計、排行榜）
   ←→ 44-dps-prediction.md § 44.5（波次模擬）

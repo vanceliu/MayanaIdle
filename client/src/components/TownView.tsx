@@ -18,13 +18,14 @@ import { isFacilityVisible } from '../models/townNpc';
 import { StatisticsCenter } from './town/StatisticsCenter';
 import { SigilMaster } from './town/SigilMaster';
 import { TrainingGroundEntrance } from './town/TrainingGroundEntrance';
+import { ArenaNpc } from './town/ArenaNpc';
 
 /**
  * `training-ground` 是城鎮側的試驗場入口；`training-dummy` 是**場內**管理員的面板，
  * 由 `TrainingGroundView` 渲染，不在城鎮裡（`50-training-ground.md` § 50.2~§ 50.3）。
  * 兩者共用 `townStore.facility` 這條開關。
  */
-export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master' | 'training-ground' | 'training-dummy';
+export type TownFacility = 'list' | 'general-store' | 'blacksmith' | 'weapon-shop' | 'armor-shop' | 'inn' | 'storage' | 'magic-academy' | 'guild' | 'starter-npc' | 'adventurer-guild' | 'statistics-center' | 'sigil-master' | 'training-ground' | 'training-dummy' | 'arena';
 
 interface FacilityInfo {
   id: TownFacility;
@@ -34,7 +35,7 @@ interface FacilityInfo {
 
 /**
  * 順序＝城鎮地圖上的排列（`13-town.md` § 13.2.1）：
- * 上排六間商店／製作，下排服務／系統（含一間預留門面），各自由左至右。
+ * 上排六間商店／製作，下排服務／系統（含一間預留門面），各自由左至右；不在排內的競技場排最後。
  * 兩邊對齊之後，快捷列讀起來就等於在鎮上從左走到右。
  */
 const FACILITIES: FacilityInfo[] = [
@@ -50,6 +51,7 @@ const FACILITIES: FacilityInfo[] = [
   { id: 'adventurer-guild', name: '冒險者工會', icon: '🏛️' },
   { id: 'statistics-center', name: '統計中心', icon: '📊' },
   { id: 'training-ground', name: '試驗場管理員', icon: '🎯' },
+  { id: 'arena', name: '競技場', icon: '🏟️' },
 ];
 
 const STARTER_NPC_FACILITY: FacilityInfo = { id: 'starter-npc', name: '新手指導員', icon: '🧭' };
@@ -68,6 +70,7 @@ function FacilityContent({ facility }: { facility: TownFacility }) {
     case 'statistics-center': return <StatisticsCenter />;
     case 'sigil-master': return <SigilMaster />;
     case 'training-ground': return <TrainingGroundEntrance />;
+    case 'arena': return <ArenaNpc />;
     case 'starter-npc': return <StarterNpc />;
     default: return null;
   }

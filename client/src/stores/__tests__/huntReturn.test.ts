@@ -122,6 +122,18 @@ describe('返回掛機點', () => {
     expect(state.huntReturnPending).toBe(false);
   });
 
+  it('從競技場回城不設旗標，不會被送回進場前的掛機點（`55-arena.md` § 55.5）', () => {
+    goHunt();
+    const char = useGameStore.getState().character!;
+    useGameStore.setState({ character: { ...char, currentRegion: 'arena', currentArea: 'arena' } });
+
+    setSupplyAction({ ruleId: 'return_town', params: {} });
+    useGameStore.getState().runVillageScriptTick();
+
+    expect(useGameStore.getState().character!.currentRegion).toBe(NEUTRAL_TOWN);
+    expect(useGameStore.getState().huntReturnPending).toBe(false);
+  });
+
   it('手動 navigateTo 換掛機點後位置更新、旗標清空', () => {
     goHunt();
     setSupplyAction({ ruleId: 'return_town', params: {} });

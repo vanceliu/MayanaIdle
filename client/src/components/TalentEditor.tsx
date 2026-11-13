@@ -24,7 +24,7 @@ import { useLatestSent } from '../hooks/useLatestSent';
 import { DraftNumberInput } from './DraftNumberInput';
 import { TalentMultiParam } from './TalentMultiParam';
 import { getParamFields, visibleParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
-import { getItemById } from '../models/items';
+import { TalentItemSelect } from './TalentItemSelect';
 import type { Skill } from '../models/skill';
 import { ruleLabel, ruleLabelOf } from '../models/talentLabels';
 
@@ -69,7 +69,6 @@ function ParamInput({
   slotType: TalentType | null;
 }) {
   const skills = useGameStore(s => s.skills);
-  const bagItems = useGameStore(s => s.bagItems);
 
   function write(value: unknown) {
     return onWrite(field.key, value);
@@ -150,21 +149,14 @@ function ParamInput({
     );
   }
 
-  // item：從背包現有的道具挑，存 id 不存名稱（§ 99.1 第 7 條）
+  // item：選項依 `field.pool`，與背包有無無關；存 id 不存名稱（§ 99.1 第 7 條）
   return (
-    <label className="talent-param">
-      <span>{field.label}</span>
-      <select
-        value={String((params[field.key] as number | undefined) ?? '')}
-        onChange={e => write(e.target.value ? Number(e.target.value) : undefined)}
-        onClick={e => e.stopPropagation()}
-      >
-        <option value="">未選擇</option>
-        {bagItems.map(b => (
-          <option key={b.itemId} value={b.itemId}>{getItemById(b.itemId)?.name ?? b.name}</option>
-        ))}
-      </select>
-    </label>
+    <TalentItemSelect
+      label={field.label}
+      pool={field.pool}
+      value={params[field.key] as number | undefined}
+      onWrite={write}
+    />
   );
 }
 

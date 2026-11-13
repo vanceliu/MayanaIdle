@@ -1,8 +1,8 @@
 /**
  * `training` 是試驗場（`50-training-ground.md`）。它不屬於任何 Zone，
- * 因此不會出現在地圖導覽選單裡 —— 唯一入口是城鎮 NPC。
+ * 因此不會出現在地圖導覽選單裡 —— 唯一入口是城鎮 NPC。`arena` 是競技場（`55-arena.md`），同樣只從城鎮 NPC 進入。
  */
-export type RegionType = 'field' | 'dungeon' | 'town' | 'training';
+export type RegionType = 'field' | 'dungeon' | 'town' | 'training' | 'arena';
 
 export interface Floor {
   floor: number;

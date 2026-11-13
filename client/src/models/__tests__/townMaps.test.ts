@@ -6,15 +6,18 @@ import { useMapMonsterStore } from '../../stores/mapMonsterStore';
 import { visibleNpcs } from '../townNpc';
 
 /**
- * 逐鎮版面（§ 13.2.1）：`doorRows` 是門口列的 y，`perRow` 是每列幾個門面。
+ * 逐鎮版面（§ 13.2.1）：`doorRows` 是門口列的 y，`perRow` 是每列幾個門面，`arenaDoor` 是獨立一間的競技場門口。
  * 舊三鎮兩排各六間，灰脊城鎮是三階梯各四間。
  */
-const TOWN_LAYOUTS: Record<string, { doorRows: number[]; perRow: number }> = {
-  'neutral-town': { doorRows: [6, 15], perRow: 6 },
-  'elsarth-town': { doorRows: [6, 15], perRow: 6 },
-  'varden-town': { doorRows: [6, 15], perRow: 6 },
-  'greyridge-town': { doorRows: [4, 10, 16], perRow: 4 },
+const TOWN_LAYOUTS: Record<string, { doorRows: number[]; perRow: number; arenaDoor: { x: number; y: number } }> = {
+  'neutral-town': { doorRows: [6, 15], perRow: 6, arenaDoor: { x: 20, y: 10 } },
+  'elsarth-town': { doorRows: [6, 15], perRow: 6, arenaDoor: { x: 20, y: 10 } },
+  'varden-town': { doorRows: [6, 15], perRow: 6, arenaDoor: { x: 20, y: 10 } },
+  'greyridge-town': { doorRows: [4, 10, 16], perRow: 4, arenaDoor: { x: 20, y: 13 } },
 };
+
+/** 不在門口列的設施 */
+const OFF_ROW_FACILITIES = new Set(['starter-npc', 'arena']);
 
 const TOWN_IDS = Object.keys(TOWN_LAYOUTS);
 
@@ -22,7 +25,7 @@ const TOWN_IDS = Object.keys(TOWN_LAYOUTS);
 const KNOWN_FACILITIES = new Set([
   'general-store', 'blacksmith', 'weapon-shop', 'armor-shop', 'inn', 'storage',
   'magic-academy', 'guild', 'starter-npc', 'adventurer-guild', 'statistics-center',
-  'sigil-master', 'training-ground',
+  'sigil-master', 'training-ground', 'arena',
 ]);
 
 describe('城鎮地圖（§ 13.2.1）', () => {
@@ -87,10 +90,11 @@ describe('城鎮地圖（§ 13.2.1）', () => {
    */
   it('每個設施 NPC 都站在門口（正上方兩格是建築），只有新手指導員例外', () => {
     for (const map of towns) {
-      const { doorRows } = TOWN_LAYOUTS[map.id];
+      const { doorRows, arenaDoor } = TOWN_LAYOUTS[map.id];
       for (const npc of map.npcs!) {
         if (npc.facility === 'starter-npc') continue; // 迎新的人站廣場，不佔門面
-        expect(doorRows, `${map.id} 的 ${npc.name} 不在門口列`).toContain(npc.y);
+        if (npc.facility === 'arena') expect({ x: npc.x, y: npc.y }, map.id).toEqual(arenaDoor);
+        else expect(doorRows, `${map.id} 的 ${npc.name} 不在門口列`).toContain(npc.y);
         for (const dy of [1, 2]) {
           const tile = map.tiles[npc.y - dy][npc.x];
           expect(tile, `${map.id} 的 ${npc.name} 頭上沒有建築`).toBe(TileType.Wall);
@@ -102,7 +106,8 @@ describe('城鎮地圖（§ 13.2.1）', () => {
   it('每個門口列的門面數量與該鎮版面一致，且四鎮設施總數相同', () => {
     for (const map of towns) {
       const { doorRows, perRow } = TOWN_LAYOUTS[map.id];
-      const facilities = map.npcs!.filter(n => n.facility !== 'starter-npc');
+      const facilities = map.npcs!.filter(n => !OFF_ROW_FACILITIES.has(n.facility));
+      expect(map.npcs!.filter(n => n.facility === 'arena'), `${map.id} 競技場`).toHaveLength(1);
       for (const y of doorRows) {
         expect(facilities.filter(n => n.y === y), `${map.id} 門口列 y=${y}`).toHaveLength(perRow);
       }

@@ -40,6 +40,8 @@ export interface DismantleOutcome {
 }
 
 export function getDismantleOutcome(item: EquipmentInstance, template: EquipmentTemplate | undefined): DismantleOutcome {
+  // 競技場擬態品不可拆（`55-arena.md` § 55.9）
+  if (item.isMimicGear) return { yields: null };
   const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
   return { yields: getDismantleYield(template), crystal };
 }

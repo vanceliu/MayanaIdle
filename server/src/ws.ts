@@ -14,9 +14,10 @@ import { isLoopbackBind, type ServerConfig } from './config';
 import { applyAutoMove, createPlayerSession, syncWorld, type PlayerSession } from './playerSession';
 import { resetSync } from './sync';
 import { flush } from './tick';
-import { ACTION_ALLOWLIST, PROTOCOL_VERSION, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
+import { ACTION_ALLOWLIST, ARENA_RANKING_LIMIT, PROTOCOL_VERSION, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
 import { World } from './world';
 import type { GuildStorage } from './db/guildStorage';
+import { MemoryArenaRecords, type ArenaRecordStorage } from './db/arenaRecords';
 import { log } from './log';
 import { rates } from '../../client/src/core/rates';
 
@@ -34,6 +35,8 @@ export interface GameServerDeps {
   leaderboard: (top: number) => LeaderboardSnapshotView;
   /** 公會持久層（`11-guild.md`）；未指定時只存記憶體 */
   guildStorage?: GuildStorage;
+  /** 競技場排行榜（`55-arena.md` § 55.7）；未指定時只存記憶體 */
+  arenaRecords?: ArenaRecordStorage;
 }
 
 /** 單機世界沒有公會（`97-selfhosted-server.md` § 97.1） */
@@ -71,6 +74,7 @@ export function shutdownNotice(seconds: number): string {
 
 export class GameServer {
   readonly world: World;
+  private readonly arenaRecords: ArenaRecordStorage;
   readonly sessions: Set<PlayerSession>;
   private readonly deps: GameServerDeps;
   private closing = false;
@@ -83,6 +87,8 @@ export class GameServer {
   constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle(), registrations: RegistrationLimit = new RegistrationLimit()) {
     this.deps = deps;
     this.world = new World(deps.guildStorage);
+    this.arenaRecords = deps.arenaRecords ?? new MemoryArenaRecords();
+    this.world.onArenaExit = record => { void this.arenaRecords.save(record, Date.now()); };
     this.throttle = throttle;
     this.registrations = registrations;
     this.sessions = this.world.sessions;
@@ -435,6 +441,16 @@ export class GameServer {
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
           return;
         }
+        if (msg.store === 'arena') {
+          const { result, affected } = this.world.handleArenaAction(session, msg.name, msg.args ?? []);
+          for (const s of affected) {
+            await syncWorld(s);
+            if (s !== session) flush(s);
+          }
+          flush(session);
+          if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result });
+          return;
+        }
         if (msg.store === 'chat') {
           const [channel, text, target] = msg.args ?? [];
           const result = this.world.handleChat(session, channel as never, text, target);
@@ -452,6 +468,13 @@ export class GameServer {
         applyAutoMove(session);
         flush(session);
         if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result === undefined ? null : result });
+        return;
+      }
+      case 'arena_ranking': {
+        this.requireUser(session);
+        const q = msg.query ?? { tier: 4, party: false };
+        const rows = this.arenaRecords.top({ tier: Number(q.tier), party: !!q.party, className: q.className || undefined }, ARENA_RANKING_LIMIT);
+        session.send({ t: 'arena_ranking', id: msg.id, rows });
         return;
       }
       case 'leaderboard': {

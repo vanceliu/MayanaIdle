@@ -96,9 +96,9 @@ describe('元素刻印的生成', () => {
     expect(getAffixPoolForSlot('weapon').map(d => d.type)).toContain('element_brand');
   });
 
-  it('取代了舊的「普攻元素傷害」，武器詞綴為 11 種（含刻印＋侵蝕＋元素下降，§ 7.6）', () => {
+  it('取代了舊的「普攻元素傷害」，武器詞綴為 14 種（含刻印＋侵蝕＋元素下降，§ 7.6）', () => {
     const weaponAffixes = getAffixPoolForSlot('weapon');
-    expect(weaponAffixes).toHaveLength(11);
+    expect(weaponAffixes).toHaveLength(14);
     const types = weaponAffixes.map(d => d.type);
     expect(types).not.toContain('attack_elemental');
     expect(types).toContain('element_brand');

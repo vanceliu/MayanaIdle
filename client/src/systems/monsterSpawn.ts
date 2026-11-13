@@ -9,7 +9,8 @@ import type { MonsterInstance, MonsterTemplate } from '../models/monster';
 import { DUMMY_INFINITE_HP, type TrainingDummySpec } from '../models/trainingGround';
 import { defaultMonsterStatRates, scaleMonsterStat, type MonsterStatRates } from './globalRates';
 import { random } from '../core/rng';
-import { applyMonsterAffixes, rollMonsterAffixes } from '../models/monsterAffix';
+import { applyMonsterAffixes, rollMonsterAffixes, rollMonsterAffixesOfCount } from '../models/monsterAffix';
+import { MONSTER_SEEDS } from '../db/seed';
 
 /**
  * 由區域模板建怪物實例。**模板還沒載入時回 `null`，不生假怪。**
@@ -30,13 +31,15 @@ export function createMonsterFromTemplate(
   // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
   if (mm.dummy) return createTrainingDummy(mm.dummy);
 
-  // Pick a template matching boss/non-boss
+  // 競技場出波指定模板（`55-arena.md` § 55.2）；其餘依 boss／一般從區域模板抽
   const pool = mm.isBoss
     ? templates.filter(t => t.isBoss)
     : templates.filter(t => !t.isBoss);
-  const template = pool.length > 0
-    ? pool[Math.floor(random() * pool.length)]
-    : templates[Math.floor(random() * templates.length)];
+  const template = mm.arenaSpawn
+    ? MONSTER_SEEDS.find(t => t.id === mm.arenaSpawn!.templateId)
+    : pool.length > 0
+      ? pool[Math.floor(random() * pool.length)]
+      : templates[Math.floor(random() * templates.length)];
 
   if (!template) return null;
 
@@ -64,8 +67,12 @@ export function createMonsterFromTemplate(
   };
   // 強化詞綴在全域倍率之後（`25-monster-system.md` § 25.12.2）
   // 懸賞契約對象保證至少 1 個強化詞綴（`53-bounty-contract.md` § 53.5.3）
+  // 競技場的強化詞綴數依波次固定（§ 55.2）
   const minAffixes = isBountyTarget?.(template) ? 1 : 0;
-  const roll = rollMonsterAffixes(template.level, (template.debuffs ?? []).map(d => d.type), random, minAffixes);
+  const nativeDebuffs = (template.debuffs ?? []).map(d => d.type);
+  const roll = mm.arenaSpawn
+    ? rollMonsterAffixesOfCount(mm.arenaSpawn.affixCount, nativeDebuffs, random)
+    : rollMonsterAffixes(template.level, nativeDebuffs, random, minAffixes);
   return applyMonsterAffixes(base, roll);
 }
 

@@ -16,6 +16,7 @@ import { ExploreBar } from './components/ExploreBar';
 import { MapNavigation } from './components/MapNavigation';
 import { TownView } from './components/TownView';
 import { TrainingGroundView } from './components/TrainingGroundView';
+import { ArenaHud } from './components/ArenaHud';
 import { QuickSlotBar } from './components/QuickSlotBar';
 import { PanelDock } from './components/PanelDock';
 import { StartScreen, useTitleView } from './components/StartScreen';
@@ -150,6 +151,7 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
           <StatusPanel />
           <BuffBar />
           <PartyHud />
+          <ArenaHud />
           {/* 試驗場的按鈕與數據卡：接在 buff 下面，跟隊伍 HUD 一樣可以拖走 */}
           {isInTrainingGround && <TrainingGroundView />}
         </div>

@@ -57,10 +57,10 @@ describe('飾品與副手詞綴分類（§ 7.5／§ 7.6）', () => {
     for (const b of offhands) expect(getAffixCategoryForSlot(b.slot, b.type), b.name).toBe('offhand');
   });
 
-  it('魔抗詞綴只出現在副手、項鍊、戒指', () => {
+  it('魔抗詞綴只出現在上衣／斗篷、副手、項鍊、戒指', () => {
     const has = (c: AffixCategory) => getAffixPoolForSlot(c).some(d => d.type === 'magic_resist');
-    for (const c of ['offhand', 'necklace', 'ring'] as const) expect(has(c), c).toBe(true);
-    for (const c of ['weapon', 'helmChest', 'shirtCloak', 'gloves', 'boots', 'belt'] as const) expect(has(c), c).toBe(false);
+    for (const c of ['shirtCloak', 'offhand', 'necklace', 'ring'] as const) expect(has(c), c).toBe(true);
+    for (const c of ['weapon', 'helmChest', 'gloves', 'boots', 'belt'] as const) expect(has(c), c).toBe(false);
   });
 
   it('格擋率只出現在副手', () => {
@@ -71,22 +71,23 @@ describe('飾品與副手詞綴分類（§ 7.5／§ 7.6）', () => {
     }
   });
 
-  it('項鍊 15 種、戒指 14 種、副手 15 種', () => {
+  it('項鍊 15 種、戒指 15 種、副手 15 種', () => {
     expect(getAffixPoolForSlot('necklace')).toHaveLength(15);
-    expect(getAffixPoolForSlot('ring')).toHaveLength(14);
+    expect(getAffixPoolForSlot('ring')).toHaveLength(15);
     expect(getAffixPoolForSlot('offhand')).toHaveLength(15);
   });
 });
 
-describe('魔抗詞綴階級表（§ 7.6：副手／項鍊／戒指皆為 P3）', () => {
-  it('T1~T7 為 0.1~3.0 / 3.1~6.0 / … / 18.1~21.0', () => {
-    for (const cat of ['offhand', 'necklace', 'ring'] as const) {
+describe('魔抗詞綴階級表（§ 7.6：上衣／斗篷、項鍊、戒指為 P1，副手為 P2）', () => {
+  it('上衣／斗篷、項鍊、戒指 T7 6.1~7.0；副手 T7 12.1~14.0', () => {
+    for (const cat of ['shirtCloak', 'necklace', 'ring'] as const) {
       const table = getAffixTierTable('magic_resist', cat);
-      expect(table, cat).toBe(AFFIX_TIER_TABLES.P3);
-      expect(table.map(t => [t.min, t.max])).toEqual([
-        [0.1, 3], [3.1, 6], [6.1, 9], [9.1, 12], [12.1, 15], [15.1, 18], [18.1, 21],
-      ]);
+      expect(table, cat).toBe(AFFIX_TIER_TABLES.P1);
+      expect(table[6], cat).toMatchObject({ min: 6.1, max: 7 });
     }
+    const offhand = getAffixTierTable('magic_resist', 'offhand');
+    expect(offhand).toBe(AFFIX_TIER_TABLES.P2);
+    expect(offhand[6]).toMatchObject({ min: 12.1, max: 14 });
   });
 
   it('rollAffixValue 依分類查表，落在該階級區間內', () => {

@@ -123,6 +123,7 @@ export class SqliteRepository implements GameRepository {
   async deleteCharacter(id: number) {
     return this.gate.write(() => {
       this.db.prepare('DELETE FROM characters WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM arena_records WHERE character_id = ?').run(id);
     });
   }
 

@@ -21,8 +21,8 @@ export const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = CLASS_SKILLS.map(s => ({
   level: s.classLevel,
 }));
 
-export const SKILL_BOOK_BOSS_DROP_RATE = 0.05;
-export const SKILL_BOOK_NORMAL_DROP_RATE = 0.0005;
+export const SKILL_BOOK_BOSS_DROP_RATE = 0.025;
+export const SKILL_BOOK_NORMAL_DROP_RATE = 0.00025;
 
 /** 各級技能書對應的區域 `levelMax` 區間（`23-class-magic.md` § 23.1） */
 export const SKILL_BOOK_LEVEL_RANGES: readonly { level: number; min: number; max: number }[] = [

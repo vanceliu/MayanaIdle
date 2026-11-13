@@ -5,6 +5,7 @@
  * 累積擊殺數（Pressure 輸入）、目標選擇表。成員 session 透過 `attachInstance`
  * 取得這些物件的別名；本機永遠只有一個一人實例。
  */
+import type { ArenaRunState } from './arenaRun';
 import type { StoreApi } from 'zustand';
 import type { Position } from '../models/mapControl';
 import type { MonsterInstance, MonsterTemplate } from '../models/monster';
@@ -40,6 +41,10 @@ export interface MapInstance {
   /** 建立時刻（遊戲時間），生成隻數分布與 Boss 門檻的停留時間由此起算 */
   createdAt: number;
   party: InstancePartyHook | null;
+  /** 競技場場次（`55-arena.md`）；有值時取代一般生成 */
+  arena?: ArenaRunState;
+  /** 本實例已生出的波次；與 `arena.wave` 不同時要生（含實例重建後重打，§ 55.6） */
+  arenaSpawnedWave?: number;
 }
 
 let nextPrivateId = 1;

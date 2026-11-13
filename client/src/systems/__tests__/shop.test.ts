@@ -13,6 +13,8 @@ import {
   isWeaponInstance,
   collectBatchSellEquipment,
   getEquipmentSellTotal,
+  getTemplateSellPrice,
+  CRAFT_SELL_PRICE,
 } from '../shop';
 import { makeBagItem } from '../../models/bagItem';
 import type { BagItem } from '../../models/bagItem';
@@ -133,6 +135,13 @@ describe('裝備定價與可賣判定', () => {
 
   it('製作裝備依階級固定賣價，與製作費無關', () => {
     expect(getEquipmentSellPrice(instance(3), TEMPLATES)).toBe(20000);
+  });
+
+  it('T6 以前的純掉落品依階級固定賣價，T7 不能賣', () => {
+    const drop = (tier: number) => ({ id: 90 + tier, name: `掉落${tier}`, acquireType: 'drop_only', tier } as unknown as EquipmentTemplate);
+    expect(getTemplateSellPrice(drop(6))).toBe(CRAFT_SELL_PRICE[6]);
+    expect(getTemplateSellPrice(drop(4))).toBe(CRAFT_SELL_PRICE[4]);
+    expect(getTemplateSellPrice(drop(7))).toBe(0);
   });
 
   it('新手裝不能賣（靠模板的 acquireType，不是靠實例旗標）', () => {

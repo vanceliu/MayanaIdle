@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { rollDrops, rollBossDrops, persistDroppedEquipment } from '../drops';
+import { SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../classSkillBookDrop';
 import { REGIONS } from '../../models/mapData';
 
 import { db, resetTestDb } from '../../testing/testDb';
@@ -234,13 +235,13 @@ describe('drops system', () => {
 
     it('should apply drop_rate bonus to normal monster skill books', async () => {
       await db.dropTables.clear();
-      vi.spyOn(Math, 'random').mockReturnValue(0.00075);
+      vi.spyOn(Math, 'random').mockReturnValue(SKILL_BOOK_NORMAL_DROP_RATE * 1.5);
 
       const resultNoBonus = await rollDrops('hundred-pillar-1-10f', 1);
       expect(resultNoBonus.items).toHaveLength(0);
 
       vi.spyOn(Math, 'random')
-        .mockReturnValueOnce(0.00075)
+        .mockReturnValueOnce(SKILL_BOOK_NORMAL_DROP_RATE * 1.5)
         .mockReturnValueOnce(0);
       const resultWithBonus = await rollDrops('hundred-pillar-1-10f', 1, { drop_rate: 100, gold_rate: 0 });
       expect(resultWithBonus.items).toEqual([
@@ -348,13 +349,15 @@ describe('rollBossDrops', () => {
 
   it('should apply drop_rate bonus to boss skill books', async () => {
     await db.bossDropTables.clear();
-    vi.spyOn(Math, 'random').mockReturnValue(0.06);
+    vi.spyOn(Math, 'random').mockReturnValue(SKILL_BOOK_BOSS_DROP_RATE * 1.2);
 
     const resultNoBonus = await rollBossDrops('測試 Boss', 1, 48);
     expect(resultNoBonus.items).toHaveLength(0);
 
+    // 第一級判定落在「無加成不中、加成後中」之間，其後的判定一律不中
     vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0.06)
+      .mockReturnValue(0.99)
+      .mockReturnValueOnce(SKILL_BOOK_BOSS_DROP_RATE * 1.2)
       .mockReturnValueOnce(0);
     const resultWithBonus = await rollBossDrops('測試 Boss', 1, 48, { drop_rate: 50, gold_rate: 0 });
     expect(resultWithBonus.items).toEqual([

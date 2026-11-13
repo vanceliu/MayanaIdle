@@ -18,7 +18,7 @@ function sword(): EquipmentInstance {
     id: 1, templateId: 1019, name: '終焉之刃', type: 'sword', slot: 'rightHand', isTwoHanded: false,
     smallMonsterDamage: 19, largeMonsterDamage: 18, quality: 10, enhancement: 0,
     affixes: [
-      { type: 'max_hp', tier: 7, value: 95 },
+      { type: 'max_hp', tier: 7, value: 190 },
       { type: 'bonus_attribute', tier: 1, value: 1, attribute: 'STR' },
     ],
     ownerId: 1, equipped: true,
@@ -38,13 +38,13 @@ describe('裝備 tooltip Alt 數值區間', () => {
   it('未按 Alt 不顯示區間', () => {
     const { container } = render(<EquipmentDetail item={sword()} />);
     expect(ranges(container)).toEqual([]);
-    expect(screen.getByText('最大 HP +104 (T7)')).toBeTruthy();
+    expect(screen.getByText('最大 HP +209 (T7)')).toBeTruthy();
   });
 
   it('按住 Alt：詞綴區間乘品質、隨機技能參數依模板；額外屬性不顯示', () => {
     const { container } = render(<EquipmentDetail item={sword()} />);
     act(() => { fireEvent.keyDown(window, { key: 'Alt', altKey: true }); });
-    expect(ranges(container)).toEqual(['(5 ~ 15%)', '(5 ~ 29)', '(99 ~ 110)']);
+    expect(ranges(container)).toEqual(['(5 ~ 15%)', '(5 ~ 29)', '(198 ~ 220)']);
     expect(screen.getByText('力量 +1')).toBeTruthy();
   });
 

@@ -171,6 +171,7 @@ export function SigilMaster() {
   function inertReason(it: EquipmentInstance): string | null {
     if (isStarterGear(it)) return '新手裝';
     if (it.isCraftedGear) return '製作品';
+    if (it.isMimicGear) return '擬態品';
     // 沒有詞綴但還有空洞的，新增印記照樣能用（§ 46.11）
     if ((it.affixes?.length ?? 0) === 0 && getAffixSockets(it) === 0) return '無詞綴';
     return null;
@@ -183,6 +184,7 @@ export function SigilMaster() {
       category: category!,
       isStarterGear: isStarterGear(item),
       isCraftedGear: item.isCraftedGear,
+      isMimicGear: item.isMimicGear,
       maxAffixTier: item.maxAffixTier,
       quality: item.quality ?? 0,
       affixSlots: item.affixSlots,

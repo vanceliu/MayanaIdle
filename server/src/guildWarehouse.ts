@@ -6,6 +6,7 @@ import type { Session } from '../../client/src/stores/session';
 import type { EquipmentInstance } from '../../client/src/models/equipment';
 import { addBagItem, consumeBagItem, getBagItemAmount, isPositiveCount } from '../../client/src/models/bagItem';
 import { isSigilItemId } from '../../client/src/models/sigil';
+import { isBoundItem } from '../../client/src/models/items';
 import { getBagMaxSlots, getBagUsedSlots } from '../../client/src/stores/gameStore';
 import {
   GUILD_WAREHOUSE_CAPACITY, GUILD_WAREHOUSE_FULL_MESSAGE, GUILD_WAREHOUSE_TAKEN_MESSAGE,
@@ -72,6 +73,8 @@ export function depositToGuild(guilds: GuildManager, session: Session, rawMove: 
     const totals = new Map<number, number>();
     const taken = new Map<number, number>();
     for (const { itemId, amount } of move.materials) {
+      // 綁角色的道具不可存倉庫（`55-arena.md` § 55.8）
+      if (isBoundItem(itemId)) continue;
       const actual = Math.min(amount, getBagItemAmount(gs.bagItems, itemId));
       if (actual <= 0) continue;
       const before = totals.get(itemId) ?? stored.items.get(itemId) ?? 0;

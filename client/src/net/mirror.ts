@@ -195,7 +195,7 @@ export function installOnlineProxies(conn: GameConnection): void {
   }
   game.setState(gamePatch as Partial<GameState>);
 
-  const proxyStore = (key: Exclude<ActionStore, 'game' | 'chat'>) => {
+  const proxyStore = (key: Exclude<ActionStore, 'game' | 'chat' | 'arena'>) => {
     const store = defaultSession[key] as unknown as StoreApi<Record<string, unknown>>;
     const patch: Record<string, unknown> = {};
     for (const name of ACTION_ALLOWLIST[key]) patch[name] = (...args: unknown[]) => remoteAction(conn, key, name, args);

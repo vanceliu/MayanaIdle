@@ -27,9 +27,15 @@ import { getRegion } from '../../client/src/models/mapData';
 import type { PlayerSession } from './playerSession';
 import { ChatLimiter, CHAT_MAX_LENGTH, MUTED_MESSAGE, TOO_LONG_MESSAGE, chatTextLength } from './chatLimit';
 import { log } from './log';
+import { ArenaRegistry } from './arena';
+import type { ArenaExitRecord } from '../../client/src/systems/arenaRun';
 
 function isTrainingRegion(regionId: string): boolean {
   return getRegion(regionId)?.type === 'training';
+}
+
+function isArenaRegion(regionId: string): boolean {
+  return getRegion(regionId)?.type === 'arena';
 }
 
 export interface PartyActionResult {
@@ -66,6 +72,13 @@ export class World {
   private readonly faulted = new WeakSet<PlayerSession>();
   /** tick 出錯的玩家交給連線層踢除；由 `GameServer` 接上 */
   onSessionFault: (session: PlayerSession) => void = () => {};
+  /** 競技場隊員離場的紀錄交給連線層寫排行榜；由 `GameServer` 接上 */
+  onArenaExit: (record: ArenaExitRecord) => void = () => {};
+  /** 競技場場次（`55-arena.md`），只存記憶體 */
+  readonly arena = new ArenaRegistry(
+    record => this.onArenaExit(record),
+    (characterId, runKey) => this.sessionOf(characterId)?.game.getState().arenaRun?.runKey === runKey,
+  );
 
   constructor(guildStorage: GuildStorage = new MemoryGuildStorage()) {
     this.guilds = new GuildManager(guildStorage);
@@ -103,9 +116,11 @@ export class World {
     return party ? `party:${party.id}` : `solo:${id}`;
   }
 
-  /** 實例歸屬：試驗場一律個人（`50-training-ground.md` § 50.2），其餘依隊伍 */
+  /** 實例歸屬：試驗場一律個人（`50-training-ground.md` § 50.2）、競技場依場次（`55-arena.md`），其餘依隊伍 */
   private instanceOwnerKey(session: Session, regionId: string): string {
-    return isTrainingRegion(regionId) ? `solo:${memberIdOf(session)}` : this.partyKeyOf(session);
+    if (isTrainingRegion(regionId)) return `solo:${memberIdOf(session)}`;
+    if (isArenaRegion(regionId)) return this.arena.ownerKeyOf(session);
+    return this.partyKeyOf(session);
   }
 
   // ---------- 進出地圖 ----------
@@ -114,11 +129,16 @@ export class World {
   place(session: PlayerSession, reason: 'map' | 'party'): void {
     const ch = session.game.getState().character;
     if (!ch || !session.mapControl.getState().currentMap) return;
+    // 場次已不存在（重啟）或已結束：作廢並送回城鎮，下一次 `syncWorld` 載城鎮（§ 55.6）
+    if (isArenaRegion(ch.currentRegion) && !this.arena.attach(session, null)) return;
+    // 人已不在競技場卻還帶著場次（存檔中途中斷）：清掉，否則再也進不了場
+    if (!isArenaRegion(ch.currentRegion)) this.arena.clearStale(session);
     const key = instanceKey(this.instanceOwnerKey(session, ch.currentRegion), ch.currentRegion, ch.currentFloor);
     const existing = this.instances.get(key);
     const respawn = reason === 'party' && !!existing && existing !== session.instance;
     const instance = this.instances.place(session, key, respawn);
     this.bindPartyHook(instance);
+    if (isArenaRegion(ch.currentRegion)) this.arena.attach(session, instance);
   }
 
   remove(session: PlayerSession): void {
@@ -386,9 +406,29 @@ export class World {
       if (!s.game.getState().character || !s.mapControl.getState().currentMap) continue;
       const ch = s.game.getState().character!;
       const key = instanceKey(this.instanceOwnerKey(s, ch.currentRegion), ch.currentRegion, ch.currentFloor);
-      if (s.instance?.key !== key) this.place(s, reason);
+      // 離隊者已被移出成員：實例鍵不隨隊籍變（競技場）時也要放回去
+      if (s.instance?.key !== key || !s.instance.members.includes(s)) this.place(s, reason);
     }
     this.instances.prune();
+  }
+
+  // ---------- 競技場（`55-arena.md`） ----------
+
+  /**
+   * 進場：組隊時只有隊長能帶隊，全隊在線隊員一起進場、隊長付費（§ 55.1）。
+   * 回傳受影響的人，呼叫端替他們 `syncWorld` 載圖。
+   */
+  handleArenaAction(session: PlayerSession, name: string, args: unknown[]): { result: PartyActionResult; affected: PlayerSession[] } {
+    const me = this.identityOf(session);
+    if (!me) return { result: { ok: false, message: '尚未進入世界' }, affected: [] };
+    if (name !== 'enter') return { result: { ok: false, message: '未知的競技場操作' }, affected: [] };
+    const party = this.parties.partyOf(me.characterId);
+    if (party && party.leaderId !== me.characterId) return { result: { ok: false, message: '組隊時由隊長帶隊進場' }, affected: [] };
+    const members = party
+      ? [...party.members.keys()].map(id => this.sessionOf(id)).filter((s): s is PlayerSession => !!s?.game.getState().character)
+      : [session];
+    const result = this.arena.enter(members, session, args[0]);
+    return { result, affected: result.ok ? members : [] };
   }
 
   // ---------- 隊伍操作（§ 97.7.3） ----------
@@ -571,7 +611,7 @@ export class World {
 
   private teammatesView(session: PlayerSession): TeammateView[] {
     const instance = session.instance;
-    if (!instance || !instance.key.startsWith('party:')) return [];
+    if (!instance || !(instance.key.startsWith('party:') || instance.key.startsWith('arena:'))) return [];
     const out: TeammateView[] = [];
     for (const m of presentMembers(instance)) {
       if (m === session) continue;
@@ -601,6 +641,8 @@ export class World {
       if (s === session) continue;
       const ch = s.game.getState().character;
       if (!ch?.id || ch.currentRegion !== regionId || (ch.currentFloor ?? null) !== (floor ?? null)) continue;
+      // 競技場每場各自一個實例（`55-arena.md`）：只列同一場的人
+      if (isArenaRegion(regionId) && s.instance !== session.instance) continue;
       // 隊籍只對「邀請過而被擋下」的對象揭露，且對方離隊後就不再標記
       const known = this.knownInParty.get(session)?.has(ch.id) ?? false;
       out.push({
@@ -756,6 +798,7 @@ export class World {
 
   /** 刪除角色（§ 11.6）：成員移出；盟主則公會解散並通知在線成員 */
   async onCharacterDeleted(characterId: number): Promise<void> {
+    this.arena.forgetCharacter(characterId);
     const { disbanded, left } = await this.guilds.removeCharacter(characterId);
     const guild = disbanded ?? left;
     if (!guild) return;

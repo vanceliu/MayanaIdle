@@ -15,6 +15,7 @@ const CATEGORIES = [
   { path: '/wiki/combat', label: '戰鬥計算', desc: '攻擊力、技能、命中、防禦公式' },
   { path: '/wiki/quests', label: '任務', desc: '冒險者工會（冒險任務／職業任務）、貢獻等階' },
   { path: '/wiki/talents', label: '自動天賦', desc: '天賦格、三種天賦的條件與實作、掉落與升級' },
+  { path: '/wiki/arena', label: '競技場', desc: '段位與入場費、波次、票券場、兌換箱' },
   { path: '/wiki/credits', label: '素材來源', desc: '第三方素材的作者、授權與來源網址' },
 ];
 

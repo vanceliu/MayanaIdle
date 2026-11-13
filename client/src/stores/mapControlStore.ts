@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { Position, MapData } from '../models/mapControl';
 import { isWalkableTile } from '../models/mapControl';
-import { getMapForRegion } from '../models/mapDataControl';
+import { getMapForRegion, MAP_THEMES } from '../models/mapDataControl';
+import { ARENA_REGION_ID } from '../models/arena';
 import { findPath, findNearestWalkable, findAdjacentWalkable, getRandomWalkablePosition } from '../systems/pathfinding';
 import { random } from '../core/rng';
 import { defaultSession, type Session } from './session';
@@ -67,9 +68,12 @@ export function createMapControlStore(session: Session) {
       : map.spawnPoint;
 
     session.mapMonster.getState().clearAll();
+    // 競技場每場的地形主題（`55-arena.md` 場地）
+    const arenaTheme = regionId === ARENA_REGION_ID ? session.game.getState().arenaRun?.theme : undefined;
+    const theme = MAP_THEMES.find(t => t === arenaTheme);
 
     set({
-      currentMap: { ...map },
+      currentMap: theme ? { ...map, theme } : { ...map },
       playerPosition: { ...startPos },
       prevPlayerPosition: { ...startPos },
       targetPosition: null,

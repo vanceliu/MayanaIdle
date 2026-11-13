@@ -127,7 +127,7 @@ describe('詞綴 wiki 頁', () => {
     expect(container.querySelectorAll('#affix-tiers thead th').length).toBe(7);
     keys.forEach((key, i) => {
       const cells = [...rows[i].querySelectorAll('td')].map(td => td.textContent);
-      const percent = !['N2', 'evasion', 'hpMp'].includes(key);
+      const percent = !['N2', 'N4', 'evasion', 'hpMp', 'hpMpWeapon'].includes(key);
       expect(cells, key).toEqual(AFFIX_TIER_TABLES[key].map(t =>
         percent ? `${t.min.toFixed(1)}~${t.max.toFixed(1)}%` : `${t.min}~${t.max}`));
     });

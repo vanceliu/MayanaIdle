@@ -7,6 +7,7 @@
 import type { EquipmentInstance } from '../models/equipment';
 import type { BagItem } from '../models/bagItem';
 import { addBagItem, consumeBagItem, getBagItemAmount } from '../models/bagItem';
+import { getItemById, isBoundItem } from '../models/items';
 import type { Session } from '../stores/session';
 import { getBagMaxSlots, getBagUsedSlots, type GameState } from '../stores/gameStore';
 import type { TradeLine, TradeOfferInput } from '../stores/tradeStore';
@@ -45,6 +46,7 @@ export function validateOffer(state: GameState, input: TradeOfferInput): TradeVa
     seenItems.add(line.itemId);
     if (!Number.isInteger(line.amount) || line.amount <= 0) return { ok: false, message: '道具數量不合法' };
     if (getBagItemAmount(state.bagItems, line.itemId) < line.amount) return { ok: false, message: '道具數量不足' };
+    if (isBoundItem(line.itemId)) return { ok: false, message: `${getItemById(line.itemId)?.name ?? '道具'} 綁定角色，不可交易` };
   }
   return { ok: true };
 }

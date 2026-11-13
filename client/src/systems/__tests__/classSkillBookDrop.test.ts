@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getSkillBookLevels, rollClassSkillBookDrops } from '../classSkillBookDrop';
+import { getSkillBookLevels, rollClassSkillBookDrops, SKILL_BOOK_NORMAL_DROP_RATE } from '../classSkillBookDrop';
 import { getItemId } from '../../models/items';
 
 /** 掉落回傳的是道具 id；測試以名稱書寫，這裡一次換算 */
@@ -81,11 +81,11 @@ describe('rollClassSkillBookDrops', () => {
   });
 
   it('掉寶倍率作用在一般怪', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.00075);
+    vi.spyOn(Math, 'random').mockReturnValue(SKILL_BOOK_NORMAL_DROP_RATE * 1.5);
     expect(rollClassSkillBookDrops(33, false)).toEqual([]);
 
     vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0.00075)
+      .mockReturnValueOnce(SKILL_BOOK_NORMAL_DROP_RATE * 1.5)
       .mockReturnValueOnce(0);
     expect(rollClassSkillBookDrops(33, false, 2)).toEqual([LEVEL_3_BOOKS[0]]);
   });

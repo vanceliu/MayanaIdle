@@ -51,7 +51,8 @@ export type ClientMessage =
   | { t: 'leave_character' }
   | { t: 'action'; id?: number; store: ActionStore; name: string; args?: unknown[] }
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4）；`top` 預設 20、上限 100 */
-  | { t: 'leaderboard'; id?: number; top?: number };
+  | { t: 'leaderboard'; id?: number; top?: number }
+  | { t: 'arena_ranking'; id?: number; query: ArenaRankingQuery };
 
 /**
  * 單條聊天訊息的字數上限（`97-selfhosted-server.md` § 97.7.2）。
@@ -81,6 +82,7 @@ export type ServerMessage =
   | { t: 'action_ok'; id: number; result: unknown }
   | { t: 'chat'; message: ChatMessageView }
   | { t: 'leaderboard'; id?: number; snapshot: LeaderboardSnapshotView }
+  | { t: 'arena_ranking'; id?: number; rows: ArenaRankingRow[] }
   /** server 公告（`97-selfhosted-server.md` § 97.8）：關服倒數這類全服訊息，不走聊天頻道 */
   | { t: 'notice'; text: string }
   /** 連線心跳量到的往返時間（`97-selfhosted-server.md` § 97.2），毫秒 */
@@ -88,6 +90,22 @@ export type ServerMessage =
   | { t: 'kicked'; reason: string };
 
 /** 與 `services/leaderboardService.ts` 的 columnar 格式相同 */
+/** 競技場排行榜查詢（`55-arena.md` § 55.7）：段位 × 單人／組隊 × 職業（省略＝綜合） */
+export interface ArenaRankingQuery {
+  tier: number;
+  party: boolean;
+  className?: string;
+}
+
+export interface ArenaRankingRow {
+  name: string;
+  className: string;
+  wave: number;
+  timeMs: number;
+}
+
+export const ARENA_RANKING_LIMIT = 50;
+
 export interface LeaderboardSnapshotView {
   top: number;
   count: number;
@@ -155,7 +173,7 @@ export interface CombatInstanceView {
   shieldRemaining?: number;
 }
 
-export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade' | 'guild';
+export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade' | 'guild' | 'arena';
 
 /** 每個 store 允許 client 呼叫的 action（其餘一律拒絕） */
 export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
@@ -173,7 +191,7 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
     'ensureBountyBoards', 'signBounty', 'abandonBounty', 'setBountyCompare',
-    'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'applyAbilityCrystal', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
+    'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'exchangeArenaBox', 'openArenaBox', 'applyAbilityCrystal', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
     'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
     'setAfterCombatThreshold',
   ]),
@@ -186,6 +204,8 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
   // 組隊（`97-selfhosted-server.md` § 97.7.3）：判定在 server 的 PartyManager
   party: new Set(['invite', 'accept', 'decline', 'leave', 'kick', 'transferLeader', 'setDropMode', 'clearMessage']),
   chat: new Set(['send']),
+  /** 競技場進場（`55-arena.md`）：隊伍層級的判定在 server `World` */
+  arena: new Set(['enter']),
   // 交易（§ 97.7 表）：判定在 server 的 TradeManager
   trade: new Set(['offer', 'accept', 'decline', 'setOffer', 'lock', 'confirm', 'cancel']),
   // 公會（`11-guild.md`）：判定在 server 的 GuildManager；單機世界一律拒絕

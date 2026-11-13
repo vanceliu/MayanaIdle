@@ -19,6 +19,7 @@ export type AbilityType =
   | 'rend_boost'
   | 'iron_shield_boost'
   | 'blood_curse_boost'
+  | 'blood_slash'
   | 'vengeance_boost'
   // 妖精
   | 'fire_arrow_boost'
@@ -144,6 +145,8 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
     params: [{ key: 'reduction', min: 42, max: 50, unit: '%' }], description: '鋼鐵護盾減傷改為 {reduction}' },
   { type: 'blood_curse_boost', name: '血濺咒殺強化', group: 'weapon', pool: 'knight', skillId: 'blood-curse',
     params: [{ key: 'hits', min: 1, max: 4, unit: '' }], description: '血濺咒殺打擊次數 +{hits}' },
+  { type: 'blood_slash', name: '血濺斬擊', group: 'weapon', pool: 'knight', skillId: 'blood-curse',
+    params: [], description: '血濺咒殺改走普攻公式' },
   { type: 'vengeance_boost', name: '復仇之刃強化', group: 'weapon', pool: 'knight', skillId: 'vengeance',
     params: [{ key: 'percent', min: 10, max: 20, unit: '%' }], description: '復仇之刃增益改為固定攻擊力 +{percent}' },
 
@@ -319,6 +322,8 @@ export interface AbilityRollContext {
   className?: ClassName;
   /** 鐵匠製作指定的技能（§ 7S.6） */
   chosen?: AbilityType;
+  /** 必定帶（不擲 `ABILITY_CHANCE`）：競技場擬態武器（`55-arena.md` § 55.9） */
+  guaranteed?: boolean;
 }
 
 /**
@@ -334,7 +339,7 @@ export function rollAbility(template: AbilityTemplate, ctx: AbilityRollContext):
     return { type: ctx.chosen, params: rollParams(DEFINITION_BY_TYPE.get(ctx.chosen)!, template, 'weakest') };
   }
 
-  if (random() * 100 >= ABILITY_CHANCE) return undefined;
+  if (!ctx.guaranteed && random() * 100 >= ABILITY_CHANCE) return undefined;
   const classPool = getAbilityClassPool(template, ctx.className);
   const pool = classPool.length > 0 && random() < 0.5 ? classPool : common;
   const type = pool[Math.floor(random() * pool.length)];

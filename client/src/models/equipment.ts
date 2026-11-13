@@ -326,10 +326,16 @@ export interface EquipmentInstance {
    * 顯示名稱加 `CRAFTED_GEAR_SUFFIX`，八種印記一律不受理（`46-sigil.md` § 46.9）。
    */
   isCraftedGear?: boolean;
+  /**
+   * 競技場兌換箱開出的擬態品（`55-arena.md` § 55.9）。顯示名稱加 `MIMIC_GEAR_SUFFIX`；
+   * 不受理任何印記與技能更換、不可拆解，可照模板售價賣出。
+   */
+  isMimicGear?: boolean;
 }
 
 /** 製作品的顯示名稱後綴（`06-equipment-acquire.md` § 6A.6） */
 export const CRAFTED_GEAR_SUFFIX = '(鍛)';
+export const MIMIC_GEAR_SUFFIX = '(擬)';
 
 /** 防具隨機額外防禦：實例生成時依 `DEFENSE_BONUS_WEIGHTS` 抽 0／1／2（§ 6A.8.8） */
 export function rollDefenseBonus(): number {

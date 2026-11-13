@@ -50,6 +50,13 @@ describe('騎士', () => {
     expect(v.modifiers).toEqual([{ stat: 'attack_power', value: 15, isPercent: true }]);
     expect(v.duration).toBe(10000);
   });
+
+  it('血濺斬擊：血濺咒殺改走普攻公式，仍 4 下隨機目標、HP 消耗與減速照舊', () => {
+    const base = skill('blood-curse');
+    const s = apply('blood-curse', 'knight', 'blood_slash');
+    expect(s).toMatchObject({ hits: 1, power: 0, element: 'none', randomHits: base.randomHits, selfHpCostPercent: base.selfHpCostPercent });
+    expect(s.applyDebuff).toEqual(base.applyDebuff);
+  });
 });
 
 describe('妖精', () => {

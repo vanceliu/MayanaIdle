@@ -31,14 +31,15 @@ export class InstanceManager {
    *
    * | 情況 | 行為 |
    * |---|---|
-   * | 已在該實例 | 不動 |
+   * | 已在該實例（且仍是成員） | 不動 |
    * | 該鍵已有實例 | 切入（`respawn` 時於地圖入口重生）；原實例只剩自己則銷毀 |
    * | 該鍵沒有實例，原實例只有自己 | 原實例直接改鍵（位置、怪物、Pressure 不變） |
+   * | 該鍵沒有實例，原實例只有自己但掛著競技場場次 | 離開原實例，新建（場次與波次不帶出場，`55-arena.md`） |
    * | 該鍵沒有實例，原實例還有別人 | 離開原實例，新建 |
    */
   place(session: Session, key: string, respawn: boolean): MapInstance {
     const current = session.instance;
-    if (current && current.key === key && this.byKey.get(key) === current) return current;
+    if (current && current.key === key && this.byKey.get(key) === current && current.members.includes(session)) return current;
 
     const existing = this.byKey.get(key);
     if (existing) {
@@ -48,7 +49,7 @@ export class InstanceManager {
       return existing;
     }
 
-    if (current && current.members.length === 1 && current.members[0] === session) {
+    if (current && !current.arena && current.members.length === 1 && current.members[0] === session) {
       if (this.byKey.get(current.key) === current) this.byKey.delete(current.key);
       current.key = key;
       this.byKey.set(key, current);

@@ -50,7 +50,7 @@ describe('參數 schema', () => {
     }
   });
 
-  it('技能與道具欄位不給預設 —— 那要看角色學了什麼、背包有什麼', () => {
+  it('技能與道具欄位不給預設 —— 技能看角色學了什麼、道具由玩家指定', () => {
     // 硬給一個 id 會在別的職業變成指向沒學會的技能
     expect(defaultParams('skill')).toEqual({});
     expect(defaultParams('buy_item')).toEqual({ targetAmount: 100, targetAmount2: 100, targetAmount3: 100 });

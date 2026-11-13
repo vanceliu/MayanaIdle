@@ -423,9 +423,10 @@ describe('印記師 — Tier 區間位置條（§ 13.13.1）', () => {
   });
 
   it('固定值與迴避值端點為整數；滿值填滿', () => {
-    setup(gear([{ type: 'max_hp', tier: 5, value: 70 }, { type: 'evasion', tier: 7, value: 235 }]), []);
+    // 武器的最大 HP 走 `HP×2` 表（`07-affix.md` § 7.3.1）
+    setup(gear([{ type: 'max_hp', tier: 5, value: 140 }, { type: 'evasion', tier: 7, value: 235 }]), []);
     const hp = rowOf('最大 HP T5').querySelector('.sigil-range-bar')!;
-    expect([...hp.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['62', '70']);
+    expect([...hp.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['124', '140']);
     expect((hp.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('100%');
     const eva = rowOf('迴避 T7').querySelector('.sigil-range-bar')!;
     expect((eva.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('0%');

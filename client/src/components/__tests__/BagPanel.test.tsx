@@ -632,3 +632,42 @@ describe('印記抽屜（§ 35.20）', () => {
     expect(Object.keys(map)).toEqual(['potion-red']);
   });
 });
+
+describe('票券抽屜（§ 35.20.5）', () => {
+  beforeEach(() => {
+    useGameStore.setState({ bagSlotMap: {}, inventory: [], equippedGear: {} });
+  });
+
+  const ticketToggle = () => screen.getByRole('button', { name: /票券/ });
+  const sigilToggle = () => screen.getByRole('button', { name: /印記/ });
+  const drawerNames = () =>
+    Array.from(document.querySelectorAll('.bag-sigil-drawer .bag-cell .bag-cell-name')).map(el => el.textContent);
+
+  it('票券不出現在背包格、不算格數，收在印記旁的票券抽屜', () => {
+    useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3), bagItem('T4 競技場票券', 12), bagItem('工藝印記', 2)] });
+    render(<BagPanel />);
+
+    expect(screen.getByText('1/60')).toBeDefined();
+    fireEvent.click(ticketToggle());
+    expect(drawerNames()).toEqual(['T4票券']);
+  });
+
+  it('同時只開一個抽屜：開印記會收起票券', () => {
+    useGameStore.setState({ bagItems: [bagItem('T4 競技場票券', 12), bagItem('工藝印記', 2)] });
+    render(<BagPanel />);
+
+    fireEvent.click(ticketToggle());
+    expect(ticketToggle().getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(sigilToggle());
+    expect(ticketToggle().getAttribute('aria-expanded')).toBe('false');
+    expect(drawerNames()).toEqual(['工藝印記']);
+  });
+
+  it('沒有票券時顯示空狀態', () => {
+    useGameStore.setState({ bagItems: [bagItem('紅色藥水', 3)] });
+    render(<BagPanel />);
+
+    fireEvent.click(ticketToggle());
+    expect(screen.getByText('沒有票券')).toBeDefined();
+  });
+});

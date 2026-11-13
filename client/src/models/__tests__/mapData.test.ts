@@ -130,7 +130,7 @@ describe('mapData', () => {
         expect(regions.slice(0, towns.length).every(r => r.type === 'town'), zone.id).toBe(true);
 
         const rest = regions.slice(towns.length).map(r => r.id);
-        const declared = REGIONS.filter(r => r.zoneId === zone.id && r.type !== 'town' && r.type !== 'training').map(r => r.id);
+        const declared = REGIONS.filter(r => r.zoneId === zone.id && r.type !== 'town' && r.type !== 'training' && r.type !== 'arena').map(r => r.id);
         expect(rest, zone.id).toEqual(declared);
       }
     });

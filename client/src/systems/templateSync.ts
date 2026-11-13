@@ -1,7 +1,7 @@
 import type { EquipmentTemplate, EquipmentInstance } from '../models/equipment';
 import type { GameRepository } from '../db/repository';
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
-import { isAccessorySlot, rollDefenseBonus, rollArmorStability, ARMOR_STABILITY_MIN, CRAFTED_GEAR_SUFFIX } from '../models/equipment';
+import { isAccessorySlot, rollDefenseBonus, rollArmorStability, ARMOR_STABILITY_MIN, CRAFTED_GEAR_SUFFIX, MIMIC_GEAR_SUFFIX } from '../models/equipment';
 import { getAccessoryStatMultiplier } from './enhancement';
 import { rollUniqueAffix, type UniqueAffix } from '../models/uniqueAffix';
 import { rollAbility, type Ability, type AbilityRollContext } from '../models/ability';
@@ -108,6 +108,7 @@ export function resolveEquipment(instance: EquipmentInstance): EquipmentInstance
     resolvedFields[field] = templateFields[field];
   }
   if (instance.isCraftedGear) resolved.name = `${template.name}${CRAFTED_GEAR_SUFFIX}`;
+  if (instance.isMimicGear) resolved.name = `${template.name}${MIMIC_GEAR_SUFFIX}`;
   resolved.stability = resolveStability(template, instance);
   if (!resolved.slot) {
     resolved.slot = template.slot;
@@ -135,9 +136,9 @@ export function resolveEquipmentList(instances: EquipmentInstance[]): EquipmentI
 }
 
 export function toStorableInstance(instance: EquipmentInstance): Record<string, unknown> {
-  const { id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage, isStarterGear, isCraftedGear } = instance;
+  const { id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage, isStarterGear, isCraftedGear, isMimicGear } = instance;
   return {
     id, templateId, quality, enhancement, affixes, element, ownerId, equipped, inStorage,
-    ...(isStarterGear ? { isStarterGear } : {}), ...(isCraftedGear ? { isCraftedGear } : {}),
+    ...(isStarterGear ? { isStarterGear } : {}), ...(isCraftedGear ? { isCraftedGear } : {}), ...(isMimicGear ? { isMimicGear } : {}),
   };
 }

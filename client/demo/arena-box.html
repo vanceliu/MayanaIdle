@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>競技場兌換箱 Demo — MayanaIdle</title>
+<!--
+  競技場兌換箱（`55-arena.md` § 55.9）：直接呼叫遊戲的開箱邏輯（`systems/arenaBox.ts`），
+  裝備說明用遊戲的 EquipmentDetail；統計列對照規格機率。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/arena-box.html
+  .demo-* 只是這頁的排版。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px 16px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 900px; }
+.demo-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-card { background: var(--bg-panel); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-md); padding: 12px; box-sizing: border-box; }
+.demo-card h2, .demo-card h3 { font-family: var(--font-display); color: var(--accent-gold); margin: 0 0 8px; font-size: var(--fs-md); }
+.demo-card h3 { margin-top: 12px; }
+.demo-controls { width: min(460px, 100%); }
+.demo-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: var(--fs-sm); }
+.demo-row button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+.demo-meta { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.7; }
+.demo-stats { width: 100%; font-size: var(--fs-sm); }
+.demo-items { flex: 1; min-width: 300px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.demo-item { font-size: var(--fs-sm); }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">競技場兌換箱</h1>
+  <p class="demo-note">
+    選段位與種類後開箱。每件都用遊戲實際的開箱邏輯生成：1/2 擬態品 (擬)（4 條一般詞綴＋封印詞綴、武器與飾品必帶最低端隨機技能）、
+    非擬態品 10% 帶封印詞綴、隨機技能依掉落 30%；詞綴階級依野外 Boss 掉落、可出 T7。<br>
+    右邊是最近開出的裝備說明（同遊戲的裝備 tooltip），左下是累計統計與規格對照。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./arenaBoxDemo.tsx"></script>
+</body>
+</html>

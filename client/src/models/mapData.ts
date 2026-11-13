@@ -1,6 +1,7 @@
 import type { Zone, Region, Floor } from './area';
 import { getItemId } from './items';
 import { TRAINING_GROUND_REGION_ID } from './trainingGround';
+import { ARENA_REGION_ID } from './arena';
 
 // ============================================================
 // Zones
@@ -148,6 +149,19 @@ const trainingGround: Region = {
   id: TRAINING_GROUND_REGION_ID,
   name: '試驗場',
   type: 'training',
+  levelMin: 1,
+  levelMax: 99,
+  zoneId: 'newbie-neutral',
+};
+
+/**
+ * 競技場（`55-arena.md`）。隊伍專屬實例，出怪由波次決定（不走一般生成）；
+ * `zoneId` 掛新手中立區只為讓 `getNearestTown` 有得退，**不列進任何 Zone 的 `regions`**。
+ */
+const arena: Region = {
+  id: ARENA_REGION_ID,
+  name: '競技場',
+  type: 'arena',
   levelMin: 1,
   levelMax: 99,
   zoneId: 'newbie-neutral',
@@ -521,6 +535,7 @@ export const REGIONS: Region[] = [
   neutralTown,
   // 試驗場（不屬於任何 Zone，只在這裡登記讓 getRegion 查得到）
   trainingGround,
+  arena,
   // 象牙塔
   snowField,
   snowFieldDeep,
@@ -576,7 +591,7 @@ export function getRegion(regionId: string): Region | undefined {
  * **城鎮排最前**，其餘維持宣告順序（`16-tech-frontend-architecture.md` § 32.3）。
  */
 export function getRegionsByZone(zoneId: string): Region[] {
-  const regions = REGIONS.filter(r => r.zoneId === zoneId && r.type !== 'training');
+  const regions = REGIONS.filter(r => r.zoneId === zoneId && r.type !== 'training' && r.type !== 'arena');
   return [...regions.filter(r => r.type === 'town'), ...regions.filter(r => r.type !== 'town')];
 }
 

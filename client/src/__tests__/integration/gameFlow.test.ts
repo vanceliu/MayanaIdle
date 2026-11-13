@@ -4,7 +4,7 @@ import { calculatePlayerAttack } from '../../systems/combat';
 import { addExp, getExpToNextLevel } from '../../systems/levelUp';
 import { getHpRegen, getMpRegen } from '../../systems/regen';
 import { calculatePressure } from '../../systems/pressure';
-import { generateAffixes, getEffectiveAffixValue } from '../../models/affix';
+import { generateAffixes, getAffixPoolForSlot, getEffectiveAffixValue } from '../../models/affix';
 import { getTotalAttributes, getAvailablePoints, CLASS_BASE_ATTRIBUTES } from '../../models/character';
 import { INITIAL_HP, INITIAL_MP } from '../../systems/levelUp';
 import type { Character, ClassName } from '../../models/character';
@@ -200,16 +200,13 @@ describe('Integration: Equipment → Affix → Stats', () => {
   });
 
   it('should differentiate weapon and helmet/chest affixes', () => {
-    // 武器與頭盔／胸甲的詞綴池沒有交集（§ 7.6）
-    const weaponAffixes = generateAffixes('weapon', 15, 4);
-    const armorAffixes = generateAffixes('helmChest', 15, 4);
+    // 武器與頭盔／胸甲的詞綴池只在最大 HP／MP、回血、回魔重疊（§ 7.6）
+    const shared = new Set(['max_hp', 'max_mp', 'hp_regen', 'mp_regen']);
+    const weaponTypes = new Set(getAffixPoolForSlot('weapon').map(d => d.type));
+    const armorTypes = new Set(getAffixPoolForSlot('helmChest').map(d => d.type));
 
-    const weaponTypes = new Set(weaponAffixes.map(a => a.type));
-    const armorTypes = new Set(armorAffixes.map(a => a.type));
-
-    // No overlap between weapon and armor affix types
     weaponTypes.forEach(t => {
-      expect(armorTypes.has(t)).toBe(false);
+      expect(armorTypes.has(t), t).toBe(shared.has(t));
     });
   });
 });

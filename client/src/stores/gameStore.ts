@@ -50,7 +50,7 @@ const HP_SAMPLE_WINDOW_MS = 10_000;
 import { rollDrops, rollBossDrops, persistDroppedEquipment } from '../systems/drops';
 import { updateErrandProgress, rollQuestMaterialDrop, updateCollectProgress, acceptQuest as acceptQuestAction, completeQuest as completeQuestAction } from '../systems/questSystem';
 import { QUEST_MATERIAL_NAME } from '../models/quest';
-import { getItemId, getItemById } from '../models/items';
+import { getItemId, getItemById, isBoundItem } from '../models/items';
 import { isBagSlotMap, type BagSlotMap } from '../models/bagLayout';
 import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
@@ -94,7 +94,10 @@ import {
 import type { MapLocation } from '../models/area';
 import { getRegion, resolveArea, resolveDropAreaId, ZONES } from '../models/mapData';
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
-import { resolveEquipment, rollNewInstanceFields, getTemplateById } from '../systems/templateSync';
+import { resolveEquipment, rollNewInstanceFields, getTemplateById, getCachedTemplates } from '../systems/templateSync';
+import { arenaBoxCandidates, getArenaBox, isArenaTicketItemId, rollArenaBoxEquipment } from '../systems/arenaBox';
+import { leaveArenaRun } from '../systems/arenaRun';
+import { EMPTY_ARENA_SLOTS, normalizeArenaRun, normalizeArenaSlots, type ArenaCharacterRun, type ArenaSlotUsage } from '../models/arena';
 import { createShopEquipment } from '../systems/shopEquipment';
 import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus } from '../models/abilitySkill';
 import { craftRequiresAbility, formatAbilityDisplay, getAbilityDefinition, getCraftAbilityOptions, isAbilityType, type AbilityType } from '../models/ability';
@@ -263,8 +266,16 @@ export function getBagUsedSlots(
   inventory: EquipmentInstance[],
   gear: EquippedGear,
 ): number {
-  const countable = bagItems.filter(b => !isSigilItemId(b.itemId)).length;
+  // 印記與競技場票券不佔格（§ 35.20、`55-arena.md` § 55.8）
+  const countable = bagItems.filter(b => !isSigilItemId(b.itemId) && !isArenaTicketItemId(b.itemId)).length;
   return countable + inventory.length + getEquippedCount(gear);
+}
+
+/** 競技場只能由 NPC 進場、只能用回城卷軸離開（`55-arena.md` § 55.5）；可移動時回 null */
+export function arenaNavigationBlock(fromRegion: string, toRegion: string): string | null {
+  if (getRegion(toRegion)?.type === 'arena') return '競技場只能從城鎮的競技場 NPC 進入';
+  if (getRegion(fromRegion)?.type === 'arena') return '競技場內只能使用回城卷軸離開';
+  return null;
 }
 
 export function isBagFull(
@@ -297,7 +308,7 @@ export function planDropIntake(
     }
     const id = item.itemTemplateId;
     if (id == null || !BAG_DROP_TYPES.has(item.type)) return false;
-    if (isSigilItemId(id) || kinds.has(id)) return true;
+    if (isSigilItemId(id) || isArenaTicketItemId(id) || kinds.has(id)) return true;
     if (free <= 0) return false;
     free -= 1;
     kinds.add(id);
@@ -456,6 +467,9 @@ export interface GameState {
   bountyBoards: BountyBoards;
   bountyContracts: SignedBounty[];
   bountyCompare: BountyCompareSettings;
+  /** 競技場（`55-arena.md`）：進行中的場次與票券場使用紀錄 */
+  arenaRun: ArenaCharacterRun | null;
+  arenaSlots: ArenaSlotUsage;
   /** 技能結晶（`07-affix-ability.md` § 7S.8） */
   abilityCrystals: AbilityCrystal[];
   statistics: CharacterStatistics;
@@ -545,6 +559,10 @@ export interface GameState {
   craftEquipment: (templateId: number, abilityType?: AbilityType) => CraftResult | Promise<CraftResult>;
   /** 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3「拆解」）。線上模式回 Promise */
   dismantleEquipment: (instanceId: number) => CraftResult | Promise<CraftResult>;
+  /** 競技場 NPC：以票券兌換兌換箱（`55-arena.md` § 55.9） */
+  exchangeArenaBox: (boxItemId: number) => CraftResult;
+  /** 使用兌換箱，開出 1 件裝備（`55-arena.md` § 55.9） */
+  openArenaBox: (boxItemId: number) => CraftResult | Promise<CraftResult>;
   /** 鐵匠鋪技能更換（`07-affix-ability.md` § 7S.8）。線上模式回 Promise */
   applyAbilityCrystal: (instanceId: number, crystalType: AbilityType) => CraftResult | Promise<CraftResult>;
   /** 印記師（`46-sigil.md`） */
@@ -786,6 +804,8 @@ export function createGameStore(session: Session) {
   bountyBoards: {},
   bountyContracts: [],
   bountyCompare: defaultBountyCompareSettings(),
+  arenaRun: null,
+  arenaSlots: EMPTY_ARENA_SLOTS,
   abilityCrystals: [],
   statistics: createDefaultStatistics(),
 
@@ -877,6 +897,8 @@ export function createGameStore(session: Session) {
     const bountyBoards = prefs?.bountyBoards ?? {};
     const bountyContracts = prefs?.bountyContracts ?? [];
     const bountyCompare = normalizeBountyCompareSettings(prefs?.bountyCompare);
+    const arenaRun = normalizeArenaRun(prefs?.arenaRun);
+    const arenaSlots = normalizeArenaSlots(prefs?.arenaSlots);
     const abilityCrystals = prefs?.abilityCrystals ?? [];
     // 舊存檔缺少後來新增的統計欄位，補上預設值
     const statistics = normalizeStatistics(prefs?.statistics);
@@ -935,6 +957,8 @@ export function createGameStore(session: Session) {
       bountyBoards,
       bountyContracts,
       bountyCompare,
+      arenaRun,
+      arenaSlots,
       abilityCrystals,
       statistics,
       phase: 'explore',
@@ -1000,6 +1024,8 @@ export function createGameStore(session: Session) {
       bountyBoards: {},
       bountyContracts: [],
       bountyCompare: defaultBountyCompareSettings(),
+      arenaRun: null,
+      arenaSlots: EMPTY_ARENA_SLOTS,
       abilityCrystals: [],
     });
     // 天賦與信箱是獨立 store，不跟著 set 清掉的話會留著上一隻角色的資料
@@ -1111,6 +1137,8 @@ export function createGameStore(session: Session) {
       bountyBoards: {},
       bountyContracts: [],
       bountyCompare: defaultBountyCompareSettings(),
+      arenaRun: null,
+      arenaSlots: EMPTY_ARENA_SLOTS,
       abilityCrystals: [],
       phase: 'explore',
     });
@@ -1724,6 +1752,11 @@ export function createGameStore(session: Session) {
     if (!scrollInfo) return;
 
     if (!hasBagItem(state.bagItems, scrollItemId)) return;
+    // 競技場撤退（`55-arena.md` § 55.5）：票券全留、寫排行榜，傳送照回城卷軸；不觸發「返回上次掛機點」
+    if (getRegion(state.character.currentRegion)?.type === 'arena') {
+      leaveArenaRun(session, 'retreat');
+      set({ huntReturnPending: false });
+    }
 
     const newBag = consumeTownScroll(state.bagItems, scrollItemId);
     const char = { ...state.character };
@@ -1750,6 +1783,11 @@ export function createGameStore(session: Session) {
   changeArea: (areaId) => {
     const state = get();
     if (!state.character) return;
+    const arenaBlock = arenaNavigationBlock(state.character.currentRegion, areaId);
+    if (arenaBlock) {
+      set({ combatLogs: addLog(state.combatLogs, { text: arenaBlock, type: 'system' }) });
+      return;
+    }
     const region = getRegion(areaId);
 
     if (region?.entryScrollItemId) {
@@ -1788,6 +1826,11 @@ export function createGameStore(session: Session) {
   navigateTo: (location) => {
     const state = get();
     if (!state.character) return;
+    const arenaBlock = arenaNavigationBlock(state.character.currentRegion, location.regionId);
+    if (arenaBlock) {
+      set({ combatLogs: addLog(state.combatLogs, { text: arenaBlock, type: 'system' }) });
+      return;
+    }
 
     const result = canNavigateTo(location, state.bagItems);
     if (!result.success) {
@@ -2334,6 +2377,8 @@ export function createGameStore(session: Session) {
 
     for (const line of materials) {
       if (!isPositiveCount(line?.amount)) continue;
+      // 綁角色的道具不可存倉庫（`55-arena.md` § 55.8）
+      if (isBoundItem(line.itemId)) continue;
       const held = bag.find(b => b.itemId === line.itemId);
       if (!held) continue;
       const actual = Math.min(line.amount, held.amount);
@@ -2871,6 +2916,63 @@ export function createGameStore(session: Session) {
     return cached ? run(cached) : session.repo.findEquipmentTemplates(t => t.id === templateId).then(list => run(list[0]));
   },
 
+  exchangeArenaBox: (boxItemId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return { ok: false, message: '沒有角色' };
+    const box = getArenaBox(boxItemId);
+    if (!box) return { ok: false, message: '沒有這種兌換箱' };
+    if (getRegion(char.currentRegion)?.type !== 'town') return { ok: false, message: '只能在城鎮的競技場兌換' };
+    if (getBagItemAmount(state.bagItems, box.ticketItemId) < box.price) return { ok: false, message: '票券不足' };
+    if (getBagItemAmount(state.bagItems, box.itemId) <= 0 && isBagFull(state.bagItems, state.inventory, state.equippedGear)) {
+      return { ok: false, message: '背包已滿' };
+    }
+    const bag = addBagItem(consumeBagItem(state.bagItems, box.ticketItemId, box.price), box.itemId, 1);
+    if (char.id) {
+      void session.repo.setBagItemAmount(char.id, box.ticketItemId, getBagItemAmount(bag, box.ticketItemId));
+      void session.repo.setBagItemAmount(char.id, box.itemId, getBagItemAmount(bag, box.itemId));
+    }
+    set({ bagItems: bag });
+    get().saveState();
+    const name = getItemById(box.itemId)?.name ?? '兌換箱';
+    return { ok: true, message: `兌換成功！獲得 ${name}`, name };
+  },
+
+  openArenaBox: (boxItemId) => {
+    const state = get();
+    const char = state.character;
+    if (!char) return { ok: false, message: '沒有角色' };
+    // 結果寫系統訊息：背包開箱沒有自己的訊息欄
+    const fail = (message: string): CraftResult => {
+      get().pushSystemLog(message);
+      return { ok: false, message };
+    };
+    const box = getArenaBox(boxItemId);
+    if (!box) return fail('沒有這種兌換箱');
+    if (getBagItemAmount(state.bagItems, box.itemId) <= 0) return fail('背包裡沒有這個兌換箱');
+    // 開箱扣掉最後一個箱子會空出一格
+    const freesSlot = getBagItemAmount(state.bagItems, box.itemId) === 1;
+    if (!freesSlot && isBagFull(state.bagItems, state.inventory, state.equippedGear)) return fail('背包已滿');
+    const candidates = arenaBoxCandidates(box, getCachedTemplates());
+    if (candidates.length === 0) return fail('兌換箱內容不存在');
+    const template = candidates[Math.floor(random() * candidates.length)];
+    const record = rollArenaBoxEquipment(box, template, char.id!, char.className);
+    // 先扣箱子再等 DB：等待期間的重複請求看得到已扣的數量
+    const bag = consumeBagItem(state.bagItems, box.itemId, 1);
+    set({ bagItems: bag });
+    if (char.id) void session.repo.setBagItemAmount(char.id, box.itemId, getBagItemAmount(bag, box.itemId));
+    const finish = (id: number | undefined): CraftResult => {
+      const item = resolveEquipment({
+        ...record, id, name: template.name, type: template.type, isTwoHanded: template.isTwoHanded,
+      } as EquipmentInstance);
+      set({ inventory: [...get().inventory, item] });
+      get().pushSystemLog(`開箱獲得 ${item.name}`);
+      get().saveState();
+      return { ok: true, message: `開箱獲得 ${item.name}`, name: item.name };
+    };
+    return char.id ? session.repo.addEquipment(record).then(finish) : finish(undefined);
+  },
+
   dismantleEquipment: (instanceId) => {
     const state = get();
     const char = state.character;
@@ -2946,6 +3048,7 @@ export function createGameStore(session: Session) {
       // 新手裝名單只有 seed 一個來源（§ 99.1 第 4 條）
       isStarterGear: getTemplateById(item.templateId)?.acquireType === 'starter',
       isCraftedGear: item.isCraftedGear,
+      isMimicGear: item.isMimicGear,
       affixSlots: item.affixSlots,
     };
 
@@ -3460,11 +3563,15 @@ export function processMonsterDeath(
       }
     }
 
+    // 競技場的擊殺不計任務與懸賞進度（`55-arena.md` § 55.3）
+    // 以擊殺當下的位置判定：同一 tick 死亡已被傳回城鎮時仍算競技場
+    const inArena = dropRegion?.type === 'arena';
+
     // 任務進度：跑腿（擊殺數）
-    char2 = updateErrandProgress(char2, dropAreaId, 1);
+    if (!inArena) char2 = updateErrandProgress(char2, dropAreaId, 1);
 
     // 任務進度：收集（素材掉落）
-    if (rollQuestMaterialDrop(char2, defeatedMonsterName)) {
+    if (!inArena && rollQuestMaterialDrop(char2, defeatedMonsterName)) {
       const questMaterialId = getItemId(QUEST_MATERIAL_NAME);
       if (questMaterialId != null
         && (hasBagItem(newBag, questMaterialId)
@@ -3476,13 +3583,13 @@ export function processMonsterDeath(
     }
 
     // 冒險者工會任務進度
-    let advQuests = updateAdvQuestProgress(state2.adventurerQuests, dropAreaId, defeatedMonsterName, 1);
-    if (rollAdvCollectDrop(state2.adventurerQuests, defeatedMonsterName)) {
+    let advQuests = inArena ? state2.adventurerQuests : updateAdvQuestProgress(state2.adventurerQuests, dropAreaId, defeatedMonsterName, 1);
+    if (!inArena && rollAdvCollectDrop(state2.adventurerQuests, defeatedMonsterName)) {
       advQuests = updateAdvCollectProgress(advQuests, defeatedMonsterName, 1);
     }
 
     // 懸賞契約擊殺數（§ 53.5.4）；達標即移除
-    const bountyResult = bountyActive
+    const bountyResult = bountyActive && !inArena
       ? recordBountyKill(state2.bountyContracts, dropAreaId, defeatedMonsterName, monsterIsBoss)
       : { signed: state2.bountyContracts, completed: [] };
     for (const done of bountyResult.completed) {
@@ -3731,6 +3838,8 @@ function saveLocalPreferences(characterId: number, state: GameState, session: Se
     bountyBoards: state.bountyBoards,
     bountyContracts: state.bountyContracts,
     bountyCompare: state.bountyCompare,
+    arenaRun: state.arenaRun,
+    arenaSlots: state.arenaSlots,
     abilityCrystals: state.abilityCrystals,
     statistics: state.statistics,
   };
@@ -3793,6 +3902,8 @@ interface LoadedPreferences {
   bountyBoards: BountyBoards;
   bountyContracts: SignedBounty[];
   bountyCompare: BountyCompareSettings;
+  arenaRun: ArenaCharacterRun | null;
+  arenaSlots: ArenaSlotUsage;
   abilityCrystals: AbilityCrystal[];
   statistics: CharacterStatistics;
 }
@@ -3844,6 +3955,8 @@ async function loadLocalPreferences(characterId: number, session: Session): Prom
       lastHuntLocation: data.lastHuntLocation ?? null,
       huntReturnPending: data.huntReturnPending ?? false,
       quickSlots: normalizeQuickSlots(data.quickSlots),
+      arenaRun: normalizeArenaRun(data.arenaRun),
+      arenaSlots: normalizeArenaSlots(data.arenaSlots),
       afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
       afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
       afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,

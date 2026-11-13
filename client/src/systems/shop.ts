@@ -142,8 +142,8 @@ export function getEquipmentSellPrice(
 export function getTemplateSellPrice(template: EquipmentTemplate | undefined): number {
   if (template?.acquireType === 'starter') return 0;
   if (template?.buyPrice) return Math.floor(template.buyPrice * SHOP_SELL_RATE);
-  if (template?.acquireType === 'craft') return CRAFT_SELL_PRICE[template.tier ?? 0] ?? 0;
-  return 0;
+  // 製作品與 T6 以前的純掉落品依階級固定（`06-equipment-acquire.md` § 6A.2）；T7 不可賣
+  return CRAFT_SELL_PRICE[template?.tier ?? 0] ?? 0;
 }
 
 /** 出售清單的共同條件：賣得掉、不是新手裝、沒穿在身上 */

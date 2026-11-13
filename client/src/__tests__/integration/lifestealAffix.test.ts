@@ -100,6 +100,14 @@ describe('詞綴池與階級表', () => {
     expect(getAffixTierTable('skill_lifesteal', 'weapon')[6]).toMatchObject({ min: 12.1, max: 14 });
   });
 
+  it('武器池：最大 HP／MP 走防具 HP 表 × 2（T7 180~200），回血／回魔走 N4（T7 25~28）', () => {
+    expect(getAffixTierTable('max_hp', 'weapon')[6]).toMatchObject({ min: 180, max: 200 });
+    expect(getAffixTierTable('max_mp', 'weapon')[0]).toMatchObject({ min: 30, max: 40 });
+    expect(getAffixTierTable('hp_regen', 'weapon')[0]).toMatchObject({ min: 1, max: 4 });
+    expect(getAffixTierTable('mp_regen', 'weapon')[6]).toMatchObject({ min: 25, max: 28 });
+    expect(getAffixTierTable('max_hp', 'helmChest')[6]).toMatchObject({ min: 90, max: 100 });
+  });
+
   it('T7 獨有詞綴命中回血／命中回魔為 10~25', () => {
     expect(getUniqueAffixDefinition('hit_heal')!.range).toEqual([10, 25]);
     expect(getUniqueAffixDefinition('hit_mana')!.range).toEqual([10, 25]);
@@ -151,6 +159,18 @@ describe('技能回血', () => {
     expect(heal).toBeGreaterThan(0);
     expect(hpNow()).toBe(100 + heal);
     expect(r.logs.some(l => l.text === `技能回血回復 ${heal} HP`)).toBe(true);
+  });
+
+  it('血濺斬擊後的血濺咒殺走普攻公式、吃普攻回血（§ 7S.4 普攻類）', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const skill = { ...CLASS_SKILLS.find(s => s.id === 'blood-curse')!.skill, lastUsedAt: 0 } as Skill;
+    const w = { ...weapon([attackLs(40), skillLs(14)]), ability: { type: 'blood_slash' as const, params: {} } };
+    const r = attack([w], ['m1'], skill);
+    const strikes = r.damages.flatMap(d => d.hits);
+    expect(strikes).toHaveLength(skill.randomHits!);
+    const heal = expected(r.damages, 40);
+    expect(heal).toBeGreaterThan(0);
+    expect(r.logs.some(l => l.text === `普攻回血回復 ${heal} HP`)).toBe(true);
   });
 
   it('單體技能用技能回血', () => {

@@ -146,6 +146,26 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     version: 13,
     up: convertBurnToFocus,
   },
+  {
+    /** 競技場排行榜（`55-arena.md` § 55.7）：每角色每段位 × 單人／組隊一筆最佳紀錄 */
+    version: 14,
+    up: db => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS arena_records (
+          character_id INTEGER NOT NULL,
+          tier INTEGER NOT NULL,
+          party INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          class_name TEXT NOT NULL,
+          wave INTEGER NOT NULL,
+          time_ms INTEGER NOT NULL,
+          achieved_at INTEGER NOT NULL,
+          PRIMARY KEY (character_id, tier, party)
+        );
+        CREATE INDEX IF NOT EXISTS idx_arena_records_board ON arena_records(tier, party, wave DESC, time_ms);
+      `);
+    },
+  },
 ];
 
 /** v12 之前追加傷害的區間：A 5~10、B 5~武器值（上限 ≤ 5 時固定 5） */

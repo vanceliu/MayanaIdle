@@ -35,9 +35,10 @@ describe('affix model', () => {
       }
     });
 
-    it('武器池不含共用詞綴，其他分類都含（§ 7.6）', () => {
+    it('武器池只含共用詞綴中的最大 HP／MP、回血、回魔，其他分類都含（§ 7.6）', () => {
       const weapon = getAffixPoolForSlot('weapon').map(d => d.type);
-      for (const t of SHARED_AFFIX_TYPES) expect(weapon, t).not.toContain(t);
+      const weaponShared = ['max_hp', 'max_mp', 'hp_regen', 'mp_regen'];
+      for (const t of SHARED_AFFIX_TYPES) expect(weapon.includes(t), t).toBe(weaponShared.includes(t));
       for (const cat of (Object.keys(AFFIX_POOLS) as AffixCategory[]).filter(c => c !== 'weapon')) {
         const types = getAffixPoolForSlot(cat).map(d => d.type);
         for (const t of SHARED_AFFIX_TYPES) expect(types, `${cat} ${t}`).toContain(t);
@@ -116,9 +117,9 @@ describe('affix model', () => {
     });
 
     it('should not exceed available pool size', () => {
-      // 武器池 11 種（§ 7.6），要 12 條只會給 11 條
-      const affixes = generateAffixes('weapon', 10, 12);
-      expect(affixes).toHaveLength(11);
+      // 武器池 14 種（§ 7.6），要 16 條只會給 14 條
+      const affixes = generateAffixes('weapon', 10, 16);
+      expect(affixes).toHaveLength(14);
     });
 
     it('should not have duplicate affix types on same equipment', () => {
@@ -384,7 +385,7 @@ describe('百分比詞綴小數規則（§ 7.3）', () => {
     expect(clampAffixValueToTier({ type: 'attack_power', tier: 1, value: 3.5 }, 'weapon')).toBe(3);
     expect(clampAffixValueToTier({ type: 'heal_effect', tier: 1, value: 3 }, 'helmChest')).toBe(2);
     expect(clampAffixValueToTier({ type: 'defense', tier: 1, value: 3 }, 'helmChest')).toBe(1);
-    expect(clampAffixValueToTier({ type: 'magic_resist', tier: 1, value: 4 }, 'necklace')).toBe(3);
+    expect(clampAffixValueToTier({ type: 'magic_resist', tier: 1, value: 4 }, 'necklace')).toBe(1);
     // 不在池內的舊詞綴走舊表（手套上的防禦力 T1 = 0.1~0.5）
     expect(clampAffixValueToTier({ type: 'defense', tier: 1, value: 3 }, 'gloves')).toBe(0.5);
     expect(clampAffixValueToTier({ type: 'attack_power', tier: 2, value: 4 }, 'weapon')).toBe(4);
@@ -400,10 +401,11 @@ const SHARED: Partial<Record<AffixType, AffixTierTableKey>> = {
 const SPEC_POOLS: Record<AffixCategory, Partial<Record<AffixType, AffixTierTableKey | null>>> = {
   weapon: {
     attack_power: 'P3', element_brand: 'P3', element_erosion: 'P3', hit_down: 'P3', defense_down: 'P3', element_down: 'P3',
-    attack_splash: 'P5', crit_damage: 'P5', attack_speed: 'P1', attack_lifesteal: 'P6', skill_lifesteal: 'P2',
+    attack_splash: 'P5', crit_damage: 'P5', attack_lifesteal: 'P6', skill_lifesteal: 'P2',
+    max_hp: 'hpMpWeapon', max_mp: 'hpMpWeapon', hp_regen: 'N4', mp_regen: 'N4',
   },
   helmChest: { defense: 'P1', on_hit_hp: 'onHit', on_hit_mp: 'onHit', evasion: 'evasion', bonus_attribute: null, ...SHARED },
-  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, ...SHARED },
+  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, magic_resist: 'P1', ...SHARED },
   gloves: {
     attack_splash: 'P2', crit_rate: 'P2', crit_damage: 'P2', attack_speed: 'P1',
     skill_elemental: 'P2', cooldown_reduction: 'P2', ...SHARED,
@@ -412,15 +414,15 @@ const SPEC_POOLS: Record<AffixCategory, Partial<Record<AffixType, AffixTierTable
   belt: { crit_damage: 'P2', cooldown_reduction: 'P1', evasion: 'evasion', bonus_attribute: null, ...SHARED },
   offhand: {
     skill_elemental: 'P1', defense: 'P1', on_hit_hp: 'onHit', on_hit_mp: 'onHit',
-    block_rate: 'P3', thorns: 'P7', magic_resist: 'P3', ...SHARED,
+    block_rate: 'P3', thorns: 'P7', magic_resist: 'P2', ...SHARED,
   },
   necklace: {
     crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', cooldown_reduction: 'P1',
-    evasion: 'evasion', bonus_attribute: null, magic_resist: 'P3', ...SHARED,
+    evasion: 'evasion', bonus_attribute: null, magic_resist: 'P1', ...SHARED,
   },
   ring: {
-    crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2',
-    evasion: 'evasion', bonus_attribute: null, magic_resist: 'P3', ...SHARED,
+    crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', attack_speed: 'P1',
+    evasion: 'evasion', bonus_attribute: null, magic_resist: 'P1', ...SHARED,
   },
 };
 
@@ -432,10 +434,10 @@ describe('詞綴池（§ 7.6）', () => {
     expect(Object.keys(AFFIX_POOLS).sort()).toEqual(Object.keys(SPEC_POOLS).sort());
   });
 
-  it('種類數：武器 11、頭盔胸甲 13、上衣斗篷 11、手套 14、鞋子 12、腰帶 12、副手 15、項鍊 15、戒指 14', () => {
+  it('種類數：武器 14、頭盔胸甲 13、上衣斗篷 12、手套 14、鞋子 12、腰帶 12、副手 15、項鍊 15、戒指 15', () => {
     const counts = Object.fromEntries((Object.keys(AFFIX_POOLS) as AffixCategory[]).map(c => [c, getAffixPoolForSlot(c).length]));
     expect(counts).toEqual({
-      weapon: 11, helmChest: 13, shirtCloak: 11, gloves: 14, boots: 12, belt: 12, offhand: 15, necklace: 15, ring: 14,
+      weapon: 14, helmChest: 13, shirtCloak: 12, gloves: 14, boots: 12, belt: 12, offhand: 15, necklace: 15, ring: 15,
     });
   });
 

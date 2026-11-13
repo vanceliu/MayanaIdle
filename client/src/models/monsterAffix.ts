@@ -93,7 +93,15 @@ export function rollMonsterAffixes(
   rng: () => number,
   minCount: number = 0,
 ): MonsterAffixRoll {
-  const count = Math.max(minCount, rollMonsterAffixCount(level, rng));
+  return rollMonsterAffixesOfCount(Math.max(minCount, rollMonsterAffixCount(level, rng)), nativeDebuffs, rng);
+}
+
+/** § 25.12.2：指定數量（競技場依波次，`55-arena.md` § 55.2），不受等級開放限制 */
+export function rollMonsterAffixesOfCount(
+  count: number,
+  nativeDebuffs: readonly PlayerDebuffType[],
+  rng: () => number,
+): MonsterAffixRoll {
   if (count === 0) return { affixes: [] };
   const pool = [...MONSTER_AFFIX_ORDER];
   const picked = new Set<MonsterAffixId>();

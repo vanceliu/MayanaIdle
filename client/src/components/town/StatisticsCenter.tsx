@@ -10,6 +10,7 @@ import {
   type LeaderboardSnapshot,
 } from '../../services/leaderboardService';
 import { connection } from '../../net/connection';
+import { ArenaRanking } from './ArenaRanking';
 
 /** snapshot 由本服 server 即時計算，client 快取 10 分鐘（`37-statistics.md` § 37.4.1） */
 let onlineCache: { fetchedAt: number; snapshot: LeaderboardSnapshot } | null = null;
@@ -46,7 +47,7 @@ export function StatisticsCenter() {
   const [loading, setLoading] = useState(() => readOnlineCache() === null);
   const [expandedField, setExpandedField] = useState<LeaderboardField | null>(null);
   const [message, setMessage] = useState('');
-  const [tab, setTab] = useState<'leaderboard' | 'my-stats'>('leaderboard');
+  const [tab, setTab] = useState<'leaderboard' | 'arena' | 'my-stats'>('leaderboard');
   const syncingRef = useRef(false);
 
   const myUuid = character?.uuid ?? null;
@@ -106,6 +107,12 @@ export function StatisticsCenter() {
           onClick={showLeaderboard}
         >
           排行榜
+        </button>
+        <button
+          className={`stats-tab ${tab === 'arena' ? 'active' : ''}`}
+          onClick={() => setTab('arena')}
+        >
+          競技場
         </button>
         <button
           className={`stats-tab ${tab === 'my-stats' ? 'active' : ''}`}
@@ -191,6 +198,8 @@ export function StatisticsCenter() {
           </div>
         </div>
       )}
+
+      {tab === 'arena' && <ArenaRanking />}
 
       {tab === 'my-stats' && statistics && (
         <div className="stats-my">
