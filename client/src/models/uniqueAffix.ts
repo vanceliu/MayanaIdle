@@ -46,8 +46,8 @@ export interface UniqueAffix {
   value: number;
 }
 
-/** 抽取來源：三個隨機池，或由模板 id 指定 */
-export type UniqueAffixPool = 'weapon' | 'armor' | 'accessory' | 'fixed';
+/** 抽取來源：依部位的隨機池（§ 7T.5），或由模板 id 指定 */
+export type UniqueAffixPool = 'weapon' | 'helmChest' | 'shirtCloak' | 'gloves' | 'boots' | 'accessory' | 'fixed';
 
 /** § 7T.4 的觸發類型；`passive` 為常駐 */
 export type UniqueAffixTrigger = 'passive' | 'hit' | 'kill' | 'struck';
@@ -55,7 +55,6 @@ export type UniqueAffixTrigger = 'passive' | 'hit' | 'kill' | 'struck';
 export interface UniqueAffixDefinition {
   type: UniqueAffixType;
   name: string;
-  pool: UniqueAffixPool;
   trigger: UniqueAffixTrigger;
   /** 數值區間；固定值為 min === max；無數值為 null */
   range: [number, number] | null;
@@ -78,36 +77,36 @@ const ATTRIBUTE_BUFF_STAT: Record<keyof Attributes, string> = {
 };
 
 export const UNIQUE_AFFIX_DEFINITIONS: UniqueAffixDefinition[] = [
-  { type: 'hit_heal', name: '命中回血', pool: 'weapon', trigger: 'hit', range: [10, 15], unit: '', description: '每下命中回復 X HP' },
-  { type: 'hit_mana', name: '命中回魔', pool: 'weapon', trigger: 'hit', range: [10, 15], unit: '', description: '每下命中回復 X MP' },
-  { type: 'kill_heal', name: '擊殺回血', pool: 'weapon', trigger: 'kill', range: [30, 50], unit: '', description: '擊殺回復 X HP' },
-  { type: 'crit_damage', name: '爆擊傷害', pool: 'weapon', trigger: 'passive', range: [25, 50], unit: '%', description: '爆擊傷害 +X%' },
-  { type: 'crit_rate', name: '爆擊率', pool: 'weapon', trigger: 'passive', range: [20, 25], unit: '%', description: '爆擊率 +X%' },
-  { type: 'attack_speed', name: '攻擊速度', pool: 'weapon', trigger: 'passive', range: [20, 25], unit: '%', description: '攻擊速度 +X%' },
+  { type: 'hit_heal', name: '命中回血', trigger: 'hit', range: [10, 25], unit: '', description: '每下命中回復 X HP' },
+  { type: 'hit_mana', name: '命中回魔', trigger: 'hit', range: [10, 25], unit: '', description: '每下命中回復 X MP' },
+  { type: 'kill_heal', name: '擊殺回血', trigger: 'kill', range: [30, 50], unit: '', description: '擊殺回復 X HP' },
+  { type: 'crit_damage', name: '爆擊傷害', trigger: 'passive', range: [25, 50], unit: '%', description: '爆擊傷害 +X%' },
+  { type: 'crit_rate', name: '爆擊率', trigger: 'passive', range: [20, 25], unit: '%', description: '爆擊率 +X%' },
+  { type: 'attack_speed', name: '攻擊速度', trigger: 'passive', range: [20, 25], unit: '%', description: '攻擊速度 +X%' },
 
-  { type: 'struck_defense', name: '受擊防禦', pool: 'armor', trigger: 'struck', range: [10, 15], unit: '', description: '受擊 10% 機率防禦 +X，持續 5 秒', buffModifiers: flat('defense') },
-  { type: 'struck_spi', name: '受擊精神', pool: 'armor', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率精神 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.SPI) },
-  { type: 'struck_vit', name: '受擊體質', pool: 'armor', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率體質 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.VIT) },
-  { type: 'extra_defense', name: '額外防禦', pool: 'armor', trigger: 'passive', range: [3, 10], unit: '', description: '額外防禦 +X' },
-  { type: 'evasion', name: '迴避', pool: 'armor', trigger: 'passive', range: [700, 1000], unit: '', description: '迴避值 +X' },
-  { type: 'drop_rate', name: '掉寶率', pool: 'armor', trigger: 'passive', range: [50, 100], unit: '%', description: '掉寶率 +X%' },
+  { type: 'struck_defense', name: '受擊防禦', trigger: 'struck', range: [10, 15], unit: '', description: '受擊 10% 機率防禦 +X，持續 5 秒', buffModifiers: flat('defense') },
+  { type: 'struck_spi', name: '受擊精神', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率精神 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.SPI) },
+  { type: 'struck_vit', name: '受擊體質', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率體質 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.VIT) },
+  { type: 'extra_defense', name: '額外防禦', trigger: 'passive', range: [3, 10], unit: '', description: '額外防禦 +X' },
+  { type: 'evasion', name: '迴避', trigger: 'passive', range: [700, 1000], unit: '', description: '迴避值 +X' },
+  { type: 'drop_rate', name: '掉寶率', trigger: 'passive', range: [50, 100], unit: '%', description: '掉寶率 +X%' },
 
-  { type: 'struck_magic_resist', name: '受擊魔抗', pool: 'accessory', trigger: 'struck', range: [5, 20], unit: '%', description: '受擊 10% 機率魔法抗性 +X%，持續 5 秒', buffModifiers: flat('magic_resist') },
+  { type: 'struck_magic_resist', name: '受擊魔抗', trigger: 'struck', range: [5, 20], unit: '%', description: '受擊 10% 機率魔法抗性 +X%，持續 5 秒', buffModifiers: flat('magic_resist') },
   {
-    type: 'struck_all_attributes', name: '受擊全屬性', pool: 'accessory', trigger: 'struck', range: [2, 4], unit: '',
+    type: 'struck_all_attributes', name: '受擊全屬性', trigger: 'struck', range: [2, 4], unit: '',
     description: '受擊 10% 機率六大屬性各 +X，持續 5 秒',
     buffModifiers: value => ATTRIBUTE_KEYS.map(k => ({ stat: ATTRIBUTE_BUFF_STAT[k], value, isPercent: false })),
   },
-  { type: 'magic_resist', name: '魔法抗性', pool: 'accessory', trigger: 'passive', range: [5, 15], unit: '%', description: '魔法抗性 +X%' },
-  { type: 'all_attributes', name: '全屬性', pool: 'accessory', trigger: 'passive', range: [1, 2], unit: '', description: '六大屬性各 +X' },
-  { type: 'immune_all', name: '全免疫', pool: 'accessory', trigger: 'passive', range: null, unit: '', description: '免疫中毒、流血、暈眩' },
+  { type: 'magic_resist', name: '魔法抗性', trigger: 'passive', range: [5, 15], unit: '%', description: '魔法抗性 +X%' },
+  { type: 'all_attributes', name: '全屬性', trigger: 'passive', range: [1, 2], unit: '', description: '六大屬性各 +X' },
+  { type: 'immune_all', name: '全免疫', trigger: 'passive', range: null, unit: '', description: '免疫中毒、流血、暈眩' },
 
-  { type: 'struck_str', name: '受擊力量', pool: 'fixed', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率力量 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.STR) },
-  { type: 'struck_int', name: '受擊智力', pool: 'fixed', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率智力 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.INT) },
-  { type: 'struck_agi', name: '受擊敏捷', pool: 'fixed', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率敏捷 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.AGI) },
-  { type: 'struck_block', name: '受擊格擋', pool: 'fixed', trigger: 'struck', range: [10, 10], unit: '%', description: '受擊 10% 機率格擋率 +X%，持續 5 秒', buffModifiers: flat('block_rate') },
-  { type: 'struck_magic_attack', name: '受擊魔攻', pool: 'fixed', trigger: 'struck', range: [5, 10], unit: '', description: '受擊 10% 機率魔法攻擊 +X，持續 5 秒', buffModifiers: flat('magic_attack') },
-  { type: 'struck_evasion', name: '受擊迴避', pool: 'fixed', trigger: 'struck', range: [10, 10], unit: '%', description: '受擊 10% 機率迴避率 +X%，持續 5 秒', buffModifiers: value => [{ stat: 'evasion', value, isPercent: true }] },
+  { type: 'struck_str', name: '受擊力量', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率力量 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.STR) },
+  { type: 'struck_int', name: '受擊智力', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率智力 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.INT) },
+  { type: 'struck_agi', name: '受擊敏捷', trigger: 'struck', range: [2, 4], unit: '', description: '受擊 10% 機率敏捷 +X，持續 5 秒', buffModifiers: flat(ATTRIBUTE_BUFF_STAT.AGI) },
+  { type: 'struck_block', name: '受擊格擋', trigger: 'struck', range: [10, 10], unit: '%', description: '受擊 10% 機率格擋率 +X%，持續 5 秒', buffModifiers: flat('block_rate') },
+  { type: 'struck_magic_attack', name: '受擊魔攻', trigger: 'struck', range: [5, 10], unit: '', description: '受擊 10% 機率魔法攻擊 +X，持續 5 秒', buffModifiers: flat('magic_attack') },
+  { type: 'struck_evasion', name: '受擊迴避', trigger: 'struck', range: [10, 10], unit: '%', description: '受擊 10% 機率迴避率 +X%，持續 5 秒', buffModifiers: value => [{ stat: 'evasion', value, isPercent: true }] },
 ];
 
 const DEFINITION_BY_TYPE = new Map(UNIQUE_AFFIX_DEFINITIONS.map(d => [d.type, d]));
@@ -126,19 +125,36 @@ export const UNIQUE_AFFIX_BY_TEMPLATE: Readonly<Record<number, UniqueAffixType>>
   1186: 'struck_evasion',
 };
 
-const ARMOR_POOL_SLOTS = new Set(['helmet', 'chest', 'shirt', 'cloak', 'gloves', 'boots']);
-const ACCESSORY_POOL_SLOTS = new Set(['necklace', 'ring1', 'ring2']);
+/** § 7T.5 各隨機池；同一種類可出現在多個池（同類去重見 § 7T.3） */
+export const UNIQUE_AFFIX_POOLS: Record<Exclude<UniqueAffixPool, 'fixed'>, UniqueAffixType[]> = {
+  weapon: ['hit_heal', 'hit_mana', 'kill_heal', 'crit_damage', 'crit_rate', 'attack_speed'],
+  helmChest: ['struck_defense', 'struck_vit', 'extra_defense'],
+  shirtCloak: ['evasion', 'struck_spi', 'drop_rate'],
+  gloves: ['crit_damage', 'crit_rate', 'attack_speed'],
+  boots: ['evasion', 'extra_defense', 'drop_rate'],
+  accessory: ['struck_magic_resist', 'struck_all_attributes', 'magic_resist', 'all_attributes', 'immune_all'],
+};
+
+const UNIQUE_POOL_BY_SLOT: Readonly<Record<string, Exclude<UniqueAffixPool, 'fixed'>>> = {
+  rightHand: 'weapon',
+  helmet: 'helmChest',
+  chest: 'helmChest',
+  shirt: 'shirtCloak',
+  cloak: 'shirtCloak',
+  gloves: 'gloves',
+  boots: 'boots',
+  necklace: 'accessory',
+  ring1: 'accessory',
+  ring2: 'accessory',
+};
 
 /** 這個 T7 模板可抽到的獨有詞綴。非 T7 或無對應池時為空陣列 */
 export function getUniqueAffixPool(template: { id?: number; slot: string; tier?: number }): UniqueAffixType[] {
   if (template.tier !== 7) return [];
   const fixed = template.id != null ? UNIQUE_AFFIX_BY_TEMPLATE[template.id] : undefined;
   if (fixed) return [fixed];
-  const pool: UniqueAffixPool | undefined = template.slot === 'rightHand' ? 'weapon'
-    : ARMOR_POOL_SLOTS.has(template.slot) ? 'armor'
-    : ACCESSORY_POOL_SLOTS.has(template.slot) ? 'accessory'
-    : undefined;
-  return pool ? UNIQUE_AFFIX_DEFINITIONS.filter(d => d.pool === pool).map(d => d.type) : [];
+  const pool = UNIQUE_POOL_BY_SLOT[template.slot];
+  return pool ? UNIQUE_AFFIX_POOLS[pool] : [];
 }
 
 /** 實例生成時抽一條（§ 7T.2）。非 T7 回 undefined */

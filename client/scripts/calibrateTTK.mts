@@ -53,7 +53,8 @@ import { SKILL_CATALOG, resolveDotDamagePercent } from '../src/models/skill';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
-import { CRAFT_AFFIX_TIER_RANGE, SHOP_MAX_AFFIX_TIER } from '../src/models/affix';
+import { CRAFT_AFFIX_TIER_RANGE, SHOP_MAX_AFFIX_TIER, getAffixCategoryOf, type AffixType } from '../src/models/affix';
+import { armorAffixTypes, buildAffixes } from './affixLoadout.mts';
 
 // ---------------------------------------------------------------- RNG
 
@@ -326,31 +327,42 @@ function bossOf(stage: Stage): MonsterInstance | null {
 
 // ---------------------------------------------------------------- 裝備
 
-type AffixType = 'attack_power' | 'element_brand' | 'skill_elemental' | 'crit_rate'
-  | 'crit_damage' | 'attack_speed' | 'cooldown_reduction' | 'defense' | 'max_hp' | 'max_mp';
+/**
+ * 詞綴依所屬分類池（`affixLoadout.mts`），數值取該階級的上限。
+ * 武器固定 4 條直接加成的攻擊詞綴（本腳本不模擬命中觸發類詞綴）；其他部位 2 條攻擊 ＋ 2 條生存。
+ */
+const WEAPON_AFFIXES: AffixType[] = ['attack_power', 'crit_damage', 'attack_speed', 'element_brand'];
+/** 刻印元素固定為火（各段對照怪的元素不一，只影響元素克制的 +0／+3／+5） */
+const BRAND_ELEMENT = 'fire' as const;
+const MAIN_STAT_OF: Record<ClassName, keyof Attributes> = {
+  knight: 'STR', elf: 'AGI', thief: 'STR', elementalist: 'INT', priest: 'INT',
+};
+/** 非武器部位攻擊詞綴的排名：沿用死神實戰量到的各職業排名（`44-dps-prediction.md` § 44.2） */
+const OFFENSE_RANKING: Record<ClassName, AffixType[]> = {
+  knight: ['crit_rate', 'attack_speed', 'cooldown_reduction', 'crit_damage'],
+  elf: ['crit_rate', 'attack_speed', 'cooldown_reduction', 'crit_damage'],
+  thief: ['crit_rate', 'attack_speed', 'crit_damage'],
+  elementalist: ['skill_elemental', 'cooldown_reduction', 'attack_speed', 'crit_rate'],
+  priest: ['skill_elemental', 'cooldown_reduction', 'attack_speed'],
+};
 
-/** 攻擊型詞綴（武器池）；防具／飾品／魔導書走 armor 池，沒有攻擊詞綴（`07-affix.md` § 7.6） */
-const WEAPON_AFFIXES: AffixType[] = ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed'];
-const ARMOR_AFFIXES: AffixType[] = ['defense', 'max_hp', 'max_mp'];
-
-/** 取該 Tier 的數值上緣（`07-affix.md` § 7.3 通用表）。校準取上緣＝該階梯的理論最佳解。 */
-const TIER_MAX: Record<number, number> = { 1: 5, 2: 8, 3: 11, 4: 13, 5: 15, 6: 18, 7: 20 };
-/** 防具池 9 種走專屬階級表（§ 7.3.1），數值低於通用表 */
-const TIER_MAX_ARMOR: Record<number, number> = { 1: 4, 2: 6, 3: 9, 4: 11, 5: 13, 6: 15, 7: 17 };
-const tierMax = (type: AffixType, tier: number) =>
-  (ARMOR_AFFIXES.includes(type) ? TIER_MAX_ARMOR : TIER_MAX)[tier];
-
-function makeItem(tpl: EquipmentTemplate, affixTypes: AffixType[], affixTier: number, enhancement: number): EquipmentInstance {
+function makeItem(
+  tpl: EquipmentTemplate, affixTypes: AffixType[], affixTier: number, enhancement: number, className: ClassName,
+): EquipmentInstance {
   return {
     ...tpl,
     templateId: tpl.id!,
     quality: 0,
     enhancement,
-    affixes: affixTypes.map(type => ({ type, tier: affixTier, value: tierMax(type, affixTier) })),
+    affixes: buildAffixes(tpl, affixTypes, affixTier, { element: BRAND_ELEMENT, mainStat: MAIN_STAT_OF[className] }),
     ownerId: 1,
     equipped: true,
   } as EquipmentInstance;
 }
+
+/** 非武器部位的詞綴（2 攻 2 守） */
+const armorAffixesOf = (tpl: EquipmentTemplate, className: ClassName) =>
+  armorAffixTypes(getAffixCategoryOf(tpl), OFFENSE_RANKING[className], className);
 
 const canUse = (t: EquipmentTemplate, c: ClassName) => !t.requiredClass || t.requiredClass.includes(c);
 
@@ -396,8 +408,12 @@ function pickWeapon(className: ClassName, stage: Stage): EquipmentTemplate {
   return any.sort((a, b) => score(b) - score(a))[0];
 }
 
+/** 防具路線依主攻屬性（`06-equipment-armor.md`）；沒有路線的模板不受限 */
+const LINE_OF: Partial<Record<keyof Attributes, string>> = { STR: 'heavy', AGI: 'light', INT: 'robe' };
+const onLine = (t: EquipmentTemplate, className: ClassName) => !t.line || t.line === LINE_OF[MAIN_STAT_OF[className]];
+
 function pickSlot(className: ClassName, stage: Stage, slot: EquipSlot, key: (t: EquipmentTemplate) => number): EquipmentTemplate | null {
-  const cands = EQUIPMENT_SEEDS.filter(t => t.slot === slot && canUse(t, className) && inStage(t, stage));
+  const cands = EQUIPMENT_SEEDS.filter(t => t.slot === slot && canUse(t, className) && onLine(t, className) && inStage(t, stage));
   if (cands.length === 0) return null;
   return cands.sort((a, b) => key(b) - key(a))[0];
 }
@@ -437,7 +453,7 @@ function weaponCandidatesByType(className: ClassName, stage: Stage): EquipmentTe
 function buildLoadout(className: ClassName, stage: Stage, forced?: EquipmentTemplate): Loadout {
   const missing: string[] = [];
   const wTpl = forced ?? pickWeapon(className, stage);
-  const weapon = makeItem(wTpl, WEAPON_AFFIXES, stage.affixTier, ENHANCE);
+  const weapon = makeItem(wTpl, WEAPON_AFFIXES, stage.affixTier, ENHANCE, className);
   const gear: (EquipmentInstance | null)[] = [weapon];
 
   let offhandName = wTpl.isTwoHanded ? '（雙手佔用）' : '無';
@@ -447,18 +463,22 @@ function buildLoadout(className: ClassName, stage: Stage, forced?: EquipmentTemp
     const off = pickSlot(className, stage, 'leftHand',
       t => (isCaster ? (t.magicAttack ?? 0) * 10 : 0) + (t.defense ?? 0));
     if (off) {
-      gear.push(makeItem(off, ARMOR_AFFIXES, stage.affixTier, ENHANCE));
+      gear.push(makeItem(off, armorAffixesOf(off, className), stage.affixTier, ENHANCE, className));
       offhandName = off.name;
     } else {
       missing.push('副手');
     }
   }
 
-  const armorSlots: EquipSlot[] = ['helmet', 'chest', 'gloves', 'boots', 'belt', 'necklace', 'ring1', 'ring1'];
+  // 上衣、斗篷 T4 起才有（`06-equipment.md` § 6A.8.9）
+  const armorSlots: EquipSlot[] = [
+    'helmet', 'chest', ...(stage.tier >= 4 ? ['shirt', 'cloak'] as EquipSlot[] : []),
+    'gloves', 'boots', 'belt', 'necklace', 'ring1', 'ring1',
+  ];
   for (const slot of armorSlots) {
     const tpl = pickSlot(className, stage, slot, t => (t.defense ?? 0) + (t.bonusHp ?? 0) / 10 + (t.bonusMp ?? 0) / 10);
     if (tpl) {
-      gear.push(makeItem(tpl, ARMOR_AFFIXES, stage.affixTier, ENHANCE));
+      gear.push(makeItem(tpl, armorAffixesOf(tpl, className), stage.affixTier, ENHANCE, className));
     } else {
       missing.push(slot);
     }

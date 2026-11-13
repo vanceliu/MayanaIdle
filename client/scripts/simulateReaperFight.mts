@@ -31,9 +31,16 @@ import { TileType, type MapData } from '../src/models/mapControl';
 import { CLASS_NAMES_ZH, type ClassName } from '../src/models/character';
 import type { MonsterTemplate } from '../src/models/monster';
 import type { CombatVisual } from '../src/systems/combatLoop';
+import type { EquipmentInstance } from '../src/models/equipment';
+import { formatAffixDisplay } from '../src/models/affix';
+import { readFileSync } from 'node:fs';
 import {
-  getSkillPlan, percentile, searchBis, setProxySamples, withSeed, REAPER_SEED, RUNS, TARGET_CLASSES,
+  bestAbility, buildLoadout, buildSupportGear, getSkillPlan, percentile, searchBis, setProxySamples, withGlovesUnique, withSeed,
+  REAPER_SEED, RUNS, TARGET_CLASSES, type AffixType, type Loadout, type SupportPlan,
 } from './reaperShared.mts';
+import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
+import type { AbilityType } from '../src/models/ability';
+import type { UniqueAffixType } from '../src/models/uniqueAffix';
 import {
   buildSetup, fmt, KNIGHT_HP_TARGET, MANA_SHIELD_CATEGORY, type FightSetup, type ManaShieldPolicy,
 } from './fightSetup.mts';
@@ -199,6 +206,41 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
   });
 }
 
+// ---------------------------------------------------------------- 重播
+
+/** `--replay=<json>` 的一個職業：武器、副手、武器詞綴（依序，第 5 條為封印）、獨有詞綴、隨機技能、防具攻擊詞綴排名、手套獨有詞綴 */
+interface ReplayEntry {
+  weapon: string;
+  offhand?: string;
+  affixes: AffixType[];
+  unique?: UniqueAffixType;
+  ability?: AbilityType;
+  ranking: AffixType[];
+  glovesUnique?: UniqueAffixType;
+}
+
+/** `--replay=<json>`：照檔案重建配裝（數值依現行模板與階級表），不做配裝搜尋 */
+const REPLAY_ARG = process.argv.find(a => a.startsWith('--replay='))?.split('=')[1];
+const REPLAY: Partial<Record<ClassName, ReplayEntry>> = REPLAY_ARG ? JSON.parse(readFileSync(REPLAY_ARG, 'utf8')) : {};
+
+function replayLoadout(cn: ClassName): { loadouts: Loadout[]; plan: SupportPlan } | null {
+  const r = REPLAY[cn];
+  if (!r) return null;
+  const tplOf = (name: string) => {
+    const t = EQUIPMENT_SEEDS.find(x => x.name === name);
+    if (!t) throw new Error(`重播：找不到模板 ${name}`);
+    return t;
+  };
+  const weapon = tplOf(r.weapon);
+  const offhand = r.offhand ? tplOf(r.offhand) : null;
+  const plan: SupportPlan = { cn, ranking: r.ranking, glovesUnique: null };
+  const label = `${weapon.name}+9${offhand ? ` ＋ ${offhand.name}` : '（雙手）'}｜${r.affixes.join('+')}（重播）`;
+  let lo = buildLoadout(label, weapon, offhand, r.affixes, buildSupportGear(plan), r.unique ?? null,
+    r.ability ? bestAbility(r.ability, weapon) : null, plan);
+  if (r.glovesUnique) lo = withGlovesUnique(lo, r.glovesUnique);
+  return { loadouts: [lo], plan };
+}
+
 // ---------------------------------------------------------------- 執行
 
 
@@ -215,11 +257,13 @@ interface Row {
   label: string;
   setup: FightSetup;
   results: FightResult[];
+  ranking: string[];
+  gear: (EquipmentInstance | null)[];
 }
 const rows: Row[] = [];
 let seed = 20261101;
 for (const cn of TARGET_CLASSES) {
-  const { loadouts: found } = searchBis(cn);
+  const { loadouts: found, plan } = replayLoadout(cn) ?? searchBis(cn);
   const loadouts = NO_ABILITY
     ? found.map(l => ({ ...l, ability: null, weapon: { ...l.weapon, ability: undefined }, gear: l.gear.map(g => (g === l.weapon ? { ...g, ability: undefined } : g)) }))
     : found;
@@ -230,7 +274,7 @@ for (const cn of TARGET_CLASSES) {
     const results: FightResult[] = [];
     for (let i = 0; i < RUNS; i++) results.push(fightOnce(setup, seed * 1000 + i));
     const suffix = hasManaShield ? (policy === 'always' ? '（魔力護盾常駐）' : '（魔力護盾危險時）') : '';
-    rows.push({ className: cn, name: `${CLASS_NAMES_ZH[cn]}${suffix}`, label: loadouts[0].label, setup, results });
+    rows.push({ className: cn, name: `${CLASS_NAMES_ZH[cn]}${suffix}`, label: loadouts[0].label, setup, results, ranking: plan.ranking, gear: loadouts[0].gear });
   }
   seed++;
 }
@@ -258,6 +302,12 @@ for (const row of rows) {
   for (const r of row.results) for (const [k, v] of Object.entries(r.actions)) totals[k] = (totals[k] ?? 0) + v;
   const sum = Object.values(totals).reduce((a, b) => a + b, 0) || 1;
   console.log(`- 行動分佈：${Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${fmt((v / sum) * 100)}%`).join('、')}`);
+  console.log(`- 非武器部位攻擊詞綴排名：${row.ranking.join(' > ') || '（無）'}`);
+  for (const g of row.gear) {
+    if (!g) continue;
+    const affixes = (g.affixes ?? []).map(a => formatAffixDisplay(a, g.quality ?? 0)).join('、');
+    console.log(`  - ${g.name}+${g.enhancement ?? 0}：${affixes}${g.uniqueAffix ? `｜(獨)${g.uniqueAffix.type} ${g.uniqueAffix.value}` : ''}`);
+  }
   for (const rule of row.setup.rules) console.log(`- ${rule}`);
   console.log('');
 }

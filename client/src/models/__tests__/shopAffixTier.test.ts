@@ -51,7 +51,7 @@ describe('商店裝詞綴 Tier 上限', () => {
   it('商店生成的 T1~T3 都出得來（均等隨機，非全部壓在 T1）', () => {
     const seen = new Set<number>();
     for (let i = 0; i < 300; i++) {
-      for (const affix of generateAffixes('armor', 10, 4, false, SHOP_OPTIONS)) {
+      for (const affix of generateAffixes('helmChest', 10, 4, false, SHOP_OPTIONS)) {
         // 額外屬性無 Tier（§ 7.3.1），不參與 Tier 分佈
         if (isTierlessAffixType(affix.type)) continue;
         seen.add(affix.tier);
@@ -62,7 +62,8 @@ describe('商店裝詞綴 Tier 上限', () => {
 
   it('商店生成的詞綴不會出現特殊詞綴（免疫類）', () => {
     for (let i = 0; i < 300; i++) {
-      for (const affix of generateAffixes('shield', 60, 4, true, SHOP_OPTIONS)) {
+      // 上衣／斗篷、腰帶才有特殊詞綴（§ 7.10.1），用它們驗證商店裝不出
+      for (const affix of [...generateAffixes('shirtCloak', 60, 4, true, SHOP_OPTIONS), ...generateAffixes('belt', 60, 4, true, SHOP_OPTIONS)]) {
         expect(isSpecialAffixType(affix.type)).toBe(false);
       }
     }

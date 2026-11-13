@@ -506,3 +506,8 @@ export function enhancementCountsAsDefense(item: { slot: EquipSlot; type: string
 }
 
 export type EquippedGear = Partial<Record<EquipSlot, EquipmentInstance | null>>;
+
+/** 魔攻顯示：法杖為 0.1 單位，帶一位小數；整數不補小數（`21-combat-formula.md` § 21.4） */
+export function formatMagicAttack(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}

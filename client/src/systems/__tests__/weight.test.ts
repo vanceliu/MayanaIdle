@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getCarryCapacity, getCarriedWeight, getWeightStatus, getOverweightMessage, roundWeight } from '../weight';
 import type { Character } from '../../models/character';
 import type { EquipmentInstance } from '../../models/equipment';
+import type { ActiveEffect } from '../../models/effect';
 
 import { getItemId } from '../../models/items';
 /**
@@ -27,16 +28,32 @@ describe('負重上限', () => {
   it('= (力量 + 體質) × 100 + 裝備負重加成', () => {
     // § 20.7 的範例：力量 10、體質 10、皮腰帶（負重+1000）→ 3000
     const belt = gear({ bonusWeight: 1000 });
-    expect(getCarryCapacity(makeChar(10, 10), [belt])).toBe(3000);
+    expect(getCarryCapacity(makeChar(10, 10), [belt], [])).toBe(3000);
   });
 
   it('沒有腰帶時只算屬性', () => {
-    expect(getCarryCapacity(makeChar(14, 16), [])).toBe(3000);
+    expect(getCarryCapacity(makeChar(14, 16), [], [])).toBe(3000);
   });
 
   it('裝備的屬性加成會算進上限', () => {
     const ring = gear({ bonusAttributes: { STR: 1, AGI: 0, VIT: 1, SPI: 0, INT: 0, CHA: 0 } });
-    expect(getCarryCapacity(makeChar(10, 10), [ring])).toBe(2200);
+    expect(getCarryCapacity(makeChar(10, 10), [ring], [])).toBe(2200);
+  });
+
+  it('屬性取原始值，奇數不取偶', () => {
+    expect(getCarryCapacity(makeChar(11, 11), [], [])).toBe(2200);
+  });
+
+  it('buff 的力量／體質會算進上限，過期的不算', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const buff = (start: number): ActiveEffect => ({
+      id: 'str-up', sourceSkillId: 'str-up', sourceSkillName: '力量提升', category: 'str-up', type: 'buff', target: 'player',
+      modifiers: [{ stat: 'str', value: 3, isPercent: false }, { stat: 'vit', value: 2, isPercent: false }],
+      startTime: start, duration: 5_000, tags: [], name: '力量提升', description: '',
+    });
+    expect(getCarryCapacity(makeChar(10, 10), [], [buff(8_000)])).toBe(2500);
+    expect(getCarryCapacity(makeChar(10, 10), [], [buff(1_000)])).toBe(2000);
+    vi.restoreAllMocks();
   });
 });
 
@@ -64,19 +81,19 @@ describe('目前負重', () => {
 
 describe('超重判定', () => {
   it('剛好等於上限不算超重', () => {
-    const s = getWeightStatus(makeChar(10, 10), [gear({ weight: 2000 })], []);
+    const s = getWeightStatus(makeChar(10, 10), [gear({ weight: 2000 })], [], []);
     expect(s.carried).toBe(2000);
     expect(s.capacity).toBe(2000);
     expect(s.overweight).toBe(false);
   });
 
   it('超過一點就算超重', () => {
-    const s = getWeightStatus(makeChar(10, 10), [gear({ weight: 2001 })], []);
+    const s = getWeightStatus(makeChar(10, 10), [gear({ weight: 2001 })], [], []);
     expect(s.overweight).toBe(true);
   });
 
   it('訊息帶出目前負重與上限，玩家才知道差多少', () => {
-    const s = getWeightStatus(makeChar(10, 10), [gear({ weight: 2500 })], []);
+    const s = getWeightStatus(makeChar(10, 10), [gear({ weight: 2500 })], [], []);
     const msg = getOverweightMessage(s);
     expect(msg).toContain('2500');
     expect(msg).toContain('2000');

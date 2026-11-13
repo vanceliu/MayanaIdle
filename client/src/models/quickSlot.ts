@@ -13,8 +13,8 @@ import { getSkillTemplate } from './skillTemplate';
 
 export const QUICK_SLOT_COUNT = 10;
 
-/** 紅／橙／白三種基礎藥水沿用既有的 `PotionType` */
-export type BasicPotionType = 'red' | 'orange' | 'white';
+/** 基礎藥水（紅／橙／白與減重版）沿用既有的 `PotionType` */
+export type BasicPotionType = 'red' | 'orange' | 'white' | 'light-red' | 'light-orange' | 'light-white';
 
 /**
  * 快捷鍵格內容。
@@ -51,12 +51,18 @@ export function emptyQuickSlots(): QuickSlots {
   return Array.from({ length: QUICK_SLOT_COUNT }, () => null);
 }
 
-/** 基礎藥水 id（紅 1／橙 2／白 3）→ `PotionType`。id 與 seed 的一致性由測試把關 */
+/** 基礎藥水 id → `PotionType`。id 與 seed 的一致性由測試把關 */
 const BASIC_POTION_IDS: Record<number, BasicPotionType> = {
   1: 'red',
   2: 'orange',
   3: 'white',
+  177: 'light-red',
+  178: 'light-orange',
+  179: 'light-white',
 };
+
+const isBasicPotionType = (v: string): v is BasicPotionType =>
+  Object.values(BASIC_POTION_IDS).includes(v as BasicPotionType);
 
 const SPEED_POTION_IDS: Record<number, 'green' | 'enhanced-green'> = {
   [getItemId('綠色藥水')!]: 'green',
@@ -226,7 +232,7 @@ export function normalizeQuickSlots(
     const e = v as Partial<QuickSlotEntry> & { kind?: string };
     if (e.kind === 'potion' && (e as { potionType?: string }).potionType) {
       const pt = (e as { potionType: string }).potionType;
-      if (pt === 'red' || pt === 'orange' || pt === 'white') {
+      if (isBasicPotionType(pt)) {
         out[i] = { kind: 'potion', potionType: pt };
       }
     } else if (e.kind === 'bagItem') {

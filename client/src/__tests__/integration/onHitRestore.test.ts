@@ -94,7 +94,7 @@ describe('回復比例隨觸發率（§ 7.9）', () => {
   });
 
   it('整張表線性換算：T1 下限 → 下限、T7 上限 → 上限，取到小數一位', () => {
-    const table = getAffixTierTable('on_hit_hp');
+    const table = getAffixTierTable('on_hit_hp', 'helmChest');
     expect([table[0].min, table[6].max]).toEqual([1, 7]);
     expect(getRestorePercent('on_hit_hp', 1)).toBe(2);
     expect(getRestorePercent('on_hit_hp', 3)).toBe(2.7);
@@ -117,7 +117,7 @@ describe('回復比例隨觸發率（§ 7.9）', () => {
 
   it('生成的詞綴不帶回復比例欄位', () => {
     for (let i = 0; i < 300; i++) {
-      for (const a of generateAffixes('armor', 60, 4, false)) {
+      for (const a of generateAffixes('helmChest', 60, 4, false)) {
         expect('restorePercent' in a).toBe(false);
       }
     }

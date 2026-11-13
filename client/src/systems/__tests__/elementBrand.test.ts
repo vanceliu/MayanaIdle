@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   BRAND_ELEMENTS, generateAffixes, formatAffixDisplay,
-  AFFIX_DEFINITIONS, getAffixPoolForSlot, type Affix,
+  getAffixPoolForSlot, type Affix,
 } from '../../models/affix';
 import { calculatePlayerAttack, calculateSkillAttack, getWeaponElement } from '../combat';
 import type { Character } from '../../models/character';
@@ -70,11 +70,13 @@ describe('元素刻印的生成', () => {
     expect(seen.has('none')).toBe(false);
   });
 
-  it('只有元素刻印與元素侵蝕帶 element 欄位', () => {
+  it('只有元素刻印、元素侵蝕與元素下降帶 element 欄位，三者都必帶', () => {
     for (let i = 0; i < 200; i++) {
       for (const a of generateAffixes('weapon', 60, 4, false)) {
-        if (a.type !== 'element_brand' && a.type !== 'element_erosion') {
+        if (a.type !== 'element_brand' && a.type !== 'element_erosion' && a.type !== 'element_down') {
           expect(a.element).toBeUndefined();
+        } else {
+          expect(a.element).toBeDefined();
         }
       }
     }
@@ -87,16 +89,16 @@ describe('元素刻印的生成', () => {
     }
   });
 
-  it('刻印是武器專屬，防具／盾牌／飾品的池裡沒有', () => {
-    for (const cat of ['armor', 'shield', 'accessory'] as const) {
+  it('刻印是武器專屬，其他分類的池裡沒有（§ 7.6）', () => {
+    for (const cat of ['helmChest', 'shirtCloak', 'gloves', 'boots', 'belt', 'offhand', 'necklace', 'ring'] as const) {
       expect(getAffixPoolForSlot(cat).map(d => d.type)).not.toContain('element_brand');
     }
     expect(getAffixPoolForSlot('weapon').map(d => d.type)).toContain('element_brand');
   });
 
-  it('取代了舊的「普攻元素傷害」，武器詞綴為 10 種（刻印＋侵蝕）', () => {
-    const weaponAffixes = AFFIX_DEFINITIONS.filter(d => d.category.includes('weapon'));
-    expect(weaponAffixes).toHaveLength(10);
+  it('取代了舊的「普攻元素傷害」，武器詞綴為 11 種（含刻印＋侵蝕＋元素下降，§ 7.6）', () => {
+    const weaponAffixes = getAffixPoolForSlot('weapon');
+    expect(weaponAffixes).toHaveLength(11);
     const types = weaponAffixes.map(d => d.type);
     expect(types).not.toContain('attack_elemental');
     expect(types).toContain('element_brand');

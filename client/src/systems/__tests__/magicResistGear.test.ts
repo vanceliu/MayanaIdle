@@ -5,9 +5,8 @@ import {
   getAffixTierTable,
   rollAffixValue,
   generateAffixes,
-  AFFIX_TIERS,
-  ARMOR_POOL_TIERS,
-  DEFENSE_TIERS,
+  AFFIX_TIER_TABLES,
+  type AffixCategory,
 } from '../../models/affix';
 import {
   getAccessoryMagicResist,
@@ -21,113 +20,81 @@ import type { Character } from '../../models/character';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { MonsterInstance } from '../../models/monster';
 
-describe('飾品詞綴分類（§ 7.6）', () => {
-  it('項鍊／戒指走 accessory 分類', () => {
-    expect(getAffixCategoryForSlot('necklace', 'armor')).toBe('accessory');
-    expect(getAffixCategoryForSlot('ring1', 'armor')).toBe('accessory');
-    expect(getAffixCategoryForSlot('ring2', 'armor')).toBe('accessory');
+describe('飾品與副手詞綴分類（§ 7.5／§ 7.6）', () => {
+  it('項鍊走 necklace、戒指走 ring', () => {
+    expect(getAffixCategoryForSlot('necklace', 'armor')).toBe('necklace');
+    expect(getAffixCategoryForSlot('ring1', 'armor')).toBe('ring');
+    expect(getAffixCategoryForSlot('ring2', 'armor')).toBe('ring');
   });
 
-  it('飾品詞綴池不含防禦力', () => {
-    expect(getAffixPoolForSlot('accessory').map(d => d.type)).not.toContain('defense');
-
-    // 實際生成 200 件飾品也不該出現防禦力（Lv.60 Boss 掉落）
-    for (let i = 0; i < 200; i++) {
-      for (const affix of generateAffixes('accessory', 60, 4, true)) {
-        expect(affix.type).not.toBe('defense');
+  it('項鍊／戒指的詞綴池不含防禦力', () => {
+    for (const cat of ['necklace', 'ring'] as const) {
+      expect(getAffixPoolForSlot(cat).map(d => d.type), cat).not.toContain('defense');
+      // 實際生成 200 件也不該出現防禦力（Lv.60 Boss 掉落）
+      for (let i = 0; i < 200; i++) {
+        for (const affix of generateAffixes(cat, 60, 4, true)) expect(affix.type).not.toBe('defense');
       }
     }
   });
 
-  it('魔導書的詞綴池不含任何攻擊詞綴（§ 7.6）', () => {
+  it('副手（含魔導書）的攻擊類詞綴只有技能元素傷害（§ 7.6）', () => {
     const OFFENSIVE = [
-      'attack_power', 'element_brand', 'skill_elemental',
-      'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction',
+      'attack_power', 'element_brand', 'element_erosion', 'attack_splash',
+      'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction', 'hit_down', 'defense_down',
     ];
     const category = getAffixCategoryForSlot('leftHand', 'magicBook');
     const pool = getAffixPoolForSlot(category).map(d => d.type);
     expect(pool.filter(t => OFFENSIVE.includes(t))).toEqual([]);
-
-    // 實際生成 200 件也不該出現攻擊詞綴（Lv.60 Boss 掉落，Tier 權重最高的情境）
+    expect(pool).toContain('skill_elemental');
     for (let i = 0; i < 200; i++) {
-      for (const affix of generateAffixes(category, 60, 4, true)) {
-        expect(OFFENSIVE).not.toContain(affix.type);
-      }
+      for (const affix of generateAffixes(category, 60, 4, true)) expect(OFFENSIVE).not.toContain(affix.type);
     }
   });
 
-  it('所有 magicBook 模板都解析成防具池', () => {
-    const books = EQUIPMENT_SEEDS.filter(t => t.type === 'magicBook');
-    expect(books.length).toBeGreaterThan(0);
-    for (const b of books) {
-      expect(getAffixCategoryForSlot(b.slot, b.type), b.name).toBe('armor');
+  it('所有魔導書、盾牌、臂甲模板都解析成副手', () => {
+    const offhands = EQUIPMENT_SEEDS.filter(t => ['magicBook', 'shield', 'armGuard'].includes(t.type));
+    expect(offhands.length).toBeGreaterThan(0);
+    for (const b of offhands) expect(getAffixCategoryForSlot(b.slot, b.type), b.name).toBe('offhand');
+  });
+
+  it('魔抗詞綴只出現在副手、項鍊、戒指', () => {
+    const has = (c: AffixCategory) => getAffixPoolForSlot(c).some(d => d.type === 'magic_resist');
+    for (const c of ['offhand', 'necklace', 'ring'] as const) expect(has(c), c).toBe(true);
+    for (const c of ['weapon', 'helmChest', 'shirtCloak', 'gloves', 'boots', 'belt'] as const) expect(has(c), c).toBe(false);
+  });
+
+  it('格擋率只出現在副手', () => {
+    const has = (c: AffixCategory) => getAffixPoolForSlot(c).some(d => d.type === 'block_rate');
+    expect(has('offhand')).toBe(true);
+    for (const c of ['weapon', 'helmChest', 'shirtCloak', 'gloves', 'boots', 'belt', 'necklace', 'ring'] as const) {
+      expect(has(c), c).toBe(false);
     }
   });
 
-  it('一般防具走 armor、盾牌走 shield、手部走 weapon', () => {
-    expect(getAffixCategoryForSlot('chest', 'armor')).toBe('armor');
-    expect(getAffixCategoryForSlot('belt', 'armor')).toBe('armor');
-    expect(getAffixCategoryForSlot('leftHand', 'shield')).toBe('shield');
-    expect(getAffixCategoryForSlot('rightHand', 'sword')).toBe('weapon');
-    // 魔導書是副手裝備，走防具池（§ 7.6）
-    expect(getAffixCategoryForSlot('leftHand', 'magicBook')).toBe('armor');
-  });
-
-  it('魔抗詞綴只出現在飾品與盾牌', () => {
-    const has = (c: any) => getAffixPoolForSlot(c).some(d => d.type === 'magic_resist');
-    expect(has('accessory')).toBe(true);
-    expect(has('shield')).toBe(true);
-    expect(has('armor')).toBe(false);
-    expect(has('weapon')).toBe(false);
-  });
-
-  it('飾品可選 13 種、一般防具 13 種、盾牌 15 種', () => {
-    expect(getAffixPoolForSlot('accessory')).toHaveLength(13);
-    expect(getAffixPoolForSlot('armor')).toHaveLength(13);
-    expect(getAffixPoolForSlot('shield')).toHaveLength(15);
+  it('項鍊 15 種、戒指 14 種、副手 15 種', () => {
+    expect(getAffixPoolForSlot('necklace')).toHaveLength(15);
+    expect(getAffixPoolForSlot('ring')).toHaveLength(14);
+    expect(getAffixPoolForSlot('offhand')).toHaveLength(15);
   });
 });
 
-describe('魔抗詞綴專屬階級表（§ 7.3.1）', () => {
-  it('T1~T7 為 1.1~2.0 / 2.1~4.0 / 4.1~6.0 / 6.1~8.0 / 8.1~10.0 / 10.1~15.0 / 15.1~20.0', () => {
-    const table = getAffixTierTable('magic_resist');
-    expect(table.map(t => [t.min, t.max])).toEqual([
-      [1.1, 2], [2.1, 4], [4.1, 6], [6.1, 8], [8.1, 10], [10.1, 15], [15.1, 20],
-    ]);
-  });
-
-  it('每一階都低於通用表，避免 4 個部位堆滿就頂到 75% 上限', () => {
-    const table = getAffixTierTable('magic_resist');
-    for (let i = 0; i < table.length; i++) {
-      expect(table[i].max, `T${i + 1}`).toBeLessThanOrEqual(AFFIX_TIERS[i].max);
+describe('魔抗詞綴階級表（§ 7.6：副手／項鍊／戒指皆為 P3）', () => {
+  it('T1~T7 為 0.1~3.0 / 3.1~6.0 / … / 18.1~21.0', () => {
+    for (const cat of ['offhand', 'necklace', 'ring'] as const) {
+      const table = getAffixTierTable('magic_resist', cat);
+      expect(table, cat).toBe(AFFIX_TIER_TABLES.P3);
+      expect(table.map(t => [t.min, t.max])).toEqual([
+        [0.1, 3], [3.1, 6], [6.1, 9], [9.1, 12], [12.1, 15], [15.1, 18], [18.1, 21],
+      ]);
     }
   });
 
-  it('防具池走自己的專屬表、防禦力另有專屬表，其餘套用通用區間', () => {
-    // 防具詞綴欄位是 11 部位 ×4，武器池只有 4 條 —— 兩池共表會讓防具那幾種膨脹
-    expect(getAffixTierTable('defense')).toBe(DEFENSE_TIERS);
-    expect(getAffixTierTable('drop_rate')).toBe(ARMOR_POOL_TIERS);
-    // 格擋率只出現在盾牌一個部位，不隨部位數膨脹
-    expect(getAffixTierTable('block_rate')).toBe(AFFIX_TIERS);
-    expect(getAffixTierTable('attack_power')).toBe(AFFIX_TIERS);
-    expect(getAffixTierTable(undefined)).toBe(AFFIX_TIERS);
-  });
-
-  it('防具池專屬表各階不重疊且遞增（約通用表的 82%）', () => {
-    for (let i = 0; i < ARMOR_POOL_TIERS.length; i++) {
-      const t = ARMOR_POOL_TIERS[i];
-      expect(t.min, `T${t.tier}`).toBeLessThanOrEqual(t.max);
-      expect(t.max, `T${t.tier} 低於通用表`).toBeLessThan(AFFIX_TIERS[i].max);
-      if (i > 0) expect(t.min, `T${t.tier} 不與前一階重疊`).toBeGreaterThan(ARMOR_POOL_TIERS[i - 1].max);
-    }
-  });
-
-  it('rollAffixValue 依詞綴類型查表，落在該階級區間內', () => {
-    const table = getAffixTierTable('magic_resist');
+  it('rollAffixValue 依分類查表，落在該階級區間內', () => {
+    const table = getAffixTierTable('magic_resist', 'ring');
     for (let tier = 1; tier <= 7; tier++) {
       const { min, max } = table[tier - 1];
       for (let i = 0; i < 30; i++) {
-        const v = rollAffixValue(tier, 'magic_resist');
+        const v = rollAffixValue(tier, 'magic_resist', 'ring');
         expect(v, `T${tier}`).toBeGreaterThanOrEqual(min);
         expect(v, `T${tier}`).toBeLessThanOrEqual(max);
       }

@@ -88,10 +88,10 @@ describe('詞綴顯示（`34-ui-guidelines.md` § 34.2）', () => {
    * 只粗體其中一個會變成同一條詞綴一半粗一半不粗。
    */
   it('滿值詞綴的名稱與數值都掛 max-roll', () => {
-    // T3 的上限是 11（`affix.ts` AFFIX_TIERS），T5 上限 15
+    // 武器攻擊力走 P3（`07-affix.md` § 7.6）：T3 上限 9.0，T5 上限 15.0
     setup(
       gear([
-        { type: 'attack_power', tier: 3, value: 11 },  // 滿值
+        { type: 'attack_power', tier: 3, value: 9 },  // 滿值
         { type: 'attack_power', tier: 5, value: 14 },  // 非滿值
       ]),
       [{ name: '精鍊印記', amount: 1 }],

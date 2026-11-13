@@ -1,5 +1,5 @@
 import {
-  UNIQUE_AFFIX_DEFINITIONS,
+  UNIQUE_AFFIX_POOLS,
   UNIQUE_AFFIX_BY_TEMPLATE,
   getUniqueAffixDefinition,
   formatUniqueAffixRange,
@@ -9,9 +9,12 @@ import { EQUIPMENT_SEEDS } from '../../db/seed';
 import './WikiTable.css';
 
 /** 隨機池的適用部位文字（`07-affix-tier7.md` § 7T.5） */
-const UNIQUE_POOL_LABELS: Record<Exclude<UniqueAffixPool, 'fixed'>, string> = {
+export const UNIQUE_POOL_LABELS: Record<Exclude<UniqueAffixPool, 'fixed'>, string> = {
   weapon: '武器（右手）',
-  armor: '防具（頭盔／胸甲／上衣／斗篷／手套／鞋子）',
+  helmChest: '頭盔／胸甲',
+  shirtCloak: '上衣／斗篷',
+  gloves: '手套',
+  boots: '鞋子',
   accessory: '飾品（項鍊／戒指）',
 };
 
@@ -22,7 +25,7 @@ function UniqueRange({ text }: { text: string }) {
 
 /** 一個隨機池的清單：詞綴／效果／數值 */
 export function UniqueAffixPoolTable({ pool }: { pool: Exclude<UniqueAffixPool, 'fixed'> }) {
-  const rows = UNIQUE_AFFIX_DEFINITIONS.filter(d => d.pool === pool);
+  const rows = UNIQUE_AFFIX_POOLS[pool].map(getUniqueAffixDefinition);
   return (
     <div className="wiki-table-wrap">
       <table className="wiki-table">
@@ -82,7 +85,7 @@ export function UniqueAffixFixedTable() {
 
 /**
  * T7 獨有詞綴整節（`43-wiki-system.md`）：通用規則 + 指定的隨機池 + 選擇性附上腰帶／左手指定表。
- * 詞綴頁列全部，武器頁只列武器池，防具頁列防具／飾品池與指定表。
+ * 詞綴頁只列規則（清單在各分類分頁），武器頁只列武器池，防具頁列各防具分類池、飾品池與指定表。
  */
 export function UniqueAffixSection({
   pools,

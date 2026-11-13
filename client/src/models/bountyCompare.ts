@@ -1,7 +1,7 @@
 /**
  * 懸賞「掉兩次取比較好」的裝備比較（`53-bounty-contract.md` § 53.6）。
  */
-import { getAffixTierRange, isTierlessAffixType, type Affix } from './affix';
+import { getAffixCategoryOf, getAffixTierRange, isTierlessAffixType, type Affix, type AffixCategory } from './affix';
 import type { EquipmentInstance } from './equipment';
 import { isEquippableBy, type EquipmentFilterSubject } from './villageScript';
 
@@ -58,8 +58,8 @@ function affixTier(a: Affix): number {
   return isTierlessAffixType(a.type) ? TIERLESS_AS_TIER : a.tier;
 }
 
-function rangePosition(a: Affix): number {
-  const range = getAffixTierRange(a);
+function rangePosition(a: Affix, category: AffixCategory): number {
+  const range = getAffixTierRange(a, category);
   if (!range || range.max <= range.min) return 0;
   return (a.value - range.min) / (range.max - range.min);
 }
@@ -94,7 +94,8 @@ function compareBy(key: BountyCompareCriterion, a: EquipmentInstance, b: Equipme
       return diff !== 0 ? diff : (a.defenseBonus ?? 0) - (b.defenseBonus ?? 0);
     }
     case 'rangePos':
-      return affA.reduce((s, x) => s + rangePosition(x), 0) - affB.reduce((s, x) => s + rangePosition(x), 0);
+      return affA.reduce((s, x) => s + rangePosition(x, getAffixCategoryOf(a)), 0)
+        - affB.reduce((s, x) => s + rangePosition(x, getAffixCategoryOf(b)), 0);
   }
 }
 

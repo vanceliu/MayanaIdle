@@ -2,12 +2,26 @@ import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from './attributes';
 import { random } from '../core/rng';
 
-/**
- * 詞綴適用分類。
- * `accessory` = 項鍊／戒指 —— 它們的 `type` 同為 `'armor'`，
- * 需要獨立分類才能限定飾品可帶魔法抗性、不帶防禦力（§ 7.6）。
- */
-export type AffixCategory = 'weapon' | 'armor' | 'shield' | 'accessory';
+/** 詞綴分類（`07-affix.md` § 7.5）。每類有自己的詞綴池與階級表（§ 7.6） */
+export type AffixCategory =
+  | 'weapon' | 'helmChest' | 'shirtCloak' | 'gloves' | 'boots' | 'belt' | 'offhand' | 'necklace' | 'ring';
+
+/** § 7.5 分類的顯示名稱與部位；順序即 Wiki 分頁順序 */
+export const AFFIX_CATEGORIES: { key: AffixCategory; name: string; parts: string }[] = [
+  { key: 'weapon', name: '武器', parts: '右手武器；左手持武器時同' },
+  { key: 'helmChest', name: '頭盔·胸甲', parts: '頭盔、胸甲' },
+  { key: 'shirtCloak', name: '上衣·斗篷', parts: '上衣、斗篷' },
+  { key: 'gloves', name: '手套', parts: '手套' },
+  { key: 'boots', name: '鞋子', parts: '鞋子' },
+  { key: 'belt', name: '腰帶', parts: '腰帶' },
+  { key: 'offhand', name: '副手', parts: '盾牌、魔導書、臂甲' },
+  { key: 'necklace', name: '項鍊', parts: '項鍊' },
+  { key: 'ring', name: '戒指', parts: '戒指 ×2' },
+];
+
+export function getAffixCategoryName(category: AffixCategory): string {
+  return AFFIX_CATEGORIES.find(c => c.key === category)!.name;
+}
 
 export type AffixType =
   | 'attack_power'
@@ -34,7 +48,13 @@ export type AffixType =
   | 'hp_regen'
   | 'mp_regen'
   | 'bonus_attribute'
-  | 'evasion';
+  | 'evasion'
+  | 'attack_splash'
+  | 'thorns'
+  | 'move_speed'
+  | 'element_down'
+  | 'attack_lifesteal'
+  | 'skill_lifesteal';
 
 /**
  * 特殊詞綴（免疫詞綴）— docs/design/07-affix.md § 7.10
@@ -62,9 +82,9 @@ export interface SpecialAffixDefinition {
  * 詛咒／虛弱／減速／沉默改由魔抗機率抵抗（§ 24.4.2），刻意不設免疫詞綴。
  */
 export const SPECIAL_AFFIX_DEFINITIONS: SpecialAffixDefinition[] = [
-  { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
-  { type: 'immune_bleed', name: '流血免疫', description: '免疫流血（100%）', category: ['armor', 'shield', 'accessory'], minAreaLevel: 31 },
-  { type: 'resist_stun', name: '暈眩抵抗', description: '暈眩時間 -50%', category: ['armor', 'shield', 'accessory'], minAreaLevel: 41 },
+  { type: 'immune_poison', name: '毒免疫', description: '免疫中毒（100%）', category: ['shirtCloak', 'belt'], minAreaLevel: 31 },
+  { type: 'immune_bleed', name: '流血免疫', description: '免疫流血（100%）', category: ['shirtCloak', 'belt'], minAreaLevel: 31 },
+  { type: 'resist_stun', name: '暈眩抵抗', description: '暈眩時間 -50%', category: ['shirtCloak', 'belt'], minAreaLevel: 41 },
 ];
 
 const SPECIAL_AFFIX_TYPE_SET = new Set<string>(SPECIAL_AFFIX_DEFINITIONS.map(d => d.type));
@@ -97,8 +117,8 @@ export interface AffixTier {
   max: number;
 }
 
-/** § 7.3 通用階級表（百分比，0.1 單位） */
-export const AFFIX_TIERS: AffixTier[] = [
+/** § 7.3.3 舊通用階級表：只用於不在所屬分類池內的舊詞綴（顯示與滿值判定） */
+export const LEGACY_GENERAL_TIERS: AffixTier[] = [
   { tier: 1, min: 3.1, max: 5 },
   { tier: 2, min: 5.1, max: 8 },
   { tier: 3, min: 8.1, max: 11 },
@@ -109,13 +129,12 @@ export const AFFIX_TIERS: AffixTier[] = [
 ];
 
 /** § 7.4 的詞綴分類小標。順序即 `AFFIX_DEFINITIONS` 的排列順序。 */
-export type AffixGroup = '攻擊類' | '防禦類' | '補給類' | '掉落類' | '盾牌專屬' | '飾品／盾牌專屬';
+export type AffixGroup = '攻擊類' | '防禦類' | '補給類' | '掉落類' | '移動類';
 
 export interface AffixDefinition {
   type: AffixType;
   name: string;
-  category: AffixCategory[];
-  /** § 7.4 的分類小標，Wiki 用來分組與篩選 */
+  /** § 7.4 的分類小標，Wiki 用來分組 */
   group: AffixGroup;
   /** § 7.4 的效果敘述，X 代表詞綴滾出的數值 */
   description: string;
@@ -130,46 +149,68 @@ export const ON_HIT_RESTORE_PERCENT: Record<'on_hit_hp' | 'on_hit_mp', [number, 
 /** 命中下降／防禦下降的觸發率與持續（§ 7.9）。X% 是效果強度，觸發率固定 */
 export const AFFIX_DEBUFF_CHANCE = 10;
 export const AFFIX_DEBUFF_DURATION_MS = 3000;
+/** 普攻擴散的範圍：主目標周圍格數（§ 7.9） */
+export const ATTACK_SPLASH_RADIUS = 3;
 /** 怪物身上的 category（`24-buff-debuff.md` § 24.4.3） */
 export const HIT_DOWN_CATEGORY = 'affix-hit-down';
 export const DEFENSE_DOWN_CATEGORY = 'affix-def-down';
 /** 怪物 debuff 的 stat 鍵：命中下降以負值存，戰鬥端轉成角色迴避加成 */
 export const HIT_DOWN_STAT = 'monster_hit';
+/** 元素下降的 stat 鍵（§ 7.9）：正值，加算進同元素攻擊的元素乘區 */
+export const ELEMENT_DOWN_STAT = 'element_down';
+
+/** 元素下降在怪物身上的 category，依元素各一（`24-buff-debuff.md` § 24.4.3） */
+export function elementDownCategory(element: string): string {
+  return `${ELEMENT_DOWN_CATEGORY_PREFIX}${element}`;
+}
+
+const ELEMENT_DOWN_CATEGORY_PREFIX = 'affix-element-down-';
+
+export function isElementDownCategory(category: string | undefined): boolean {
+  return !!category?.startsWith(ELEMENT_DOWN_CATEGORY_PREFIX);
+}
+
+/** 武器詞綴施加在怪物身上、全隊共用的 debuff：命中下降、防禦下降、元素下降（§ 7.9）。同 category 以最後施放為準 */
+export function isPartySharedAffixDebuff(category: string | undefined): boolean {
+  return category === HIT_DOWN_CATEGORY || category === DEFENSE_DOWN_CATEGORY || isElementDownCategory(category);
+}
 
 const restoreRange = (type: 'on_hit_hp' | 'on_hit_mp') =>
   `${ON_HIT_RESTORE_PERCENT[type][0].toFixed(1)}~${ON_HIT_RESTORE_PERCENT[type][1].toFixed(1)}%（觸發率越高越多）`;
 
+/** § 7.4 詞綴種類；順序即各分組內的顯示順序 */
 export const AFFIX_DEFINITIONS: AffixDefinition[] = [
-  // Weapon affixes (10) —— § 7.4 攻擊類
-  { type: 'attack_power', name: '攻擊力', category: ['weapon'], group: '攻擊類', description: '攻擊力 +X%' },
-  { type: 'element_brand', name: '元素刻印', category: ['weapon'], group: '攻擊類', description: '賦予武器一個元素（火／冰／風／地／光／暗），並使普攻傷害 +X%' },
-  { type: 'element_erosion', name: '元素侵蝕', category: ['weapon'], group: '攻擊類', description: 'X% 是觸發率：命中後有 X% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒' },
-  { type: 'skill_elemental', name: '技能元素傷害', category: ['weapon'], group: '攻擊類', description: '施放技能時元素傷害（火、冰、風、地、光、暗）+X%' },
-  { type: 'crit_rate', name: '爆擊率', category: ['weapon'], group: '攻擊類', description: '爆擊率 +X%' },
-  { type: 'crit_damage', name: '爆擊傷害', category: ['weapon'], group: '攻擊類', description: '爆擊傷害 +X%' },
-  { type: 'attack_speed', name: '攻擊速度', category: ['weapon'], group: '攻擊類', description: '攻擊速度 +X%' },
-  { type: 'cooldown_reduction', name: '減少冷卻時間', category: ['weapon'], group: '攻擊類', description: '技能冷卻時間 -X%' },
-  { type: 'hit_down', name: '命中下降', category: ['weapon'], group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方命中下降 X%，持續 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒` },
-  { type: 'defense_down', name: '防禦下降', category: ['weapon'], group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方防禦下降 X%，持續 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒` },
-  // Armor affixes (13) —— 一般防具、盾牌皆可出現；飾品不含防禦力（§ 7.6）
-  { type: 'defense', name: '防禦力', category: ['armor', 'shield'], group: '防禦類', description: '防禦力 +X%' },
-  { type: 'max_hp', name: '最大 HP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 HP +X（固定值）' },
-  { type: 'max_mp', name: '最大 MP', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '最大 MP +X（固定值）' },
-  { type: 'hp_regen', name: '回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回血 +X（固定值）' },
-  { type: 'mp_regen', name: '回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '每次自然回魔 +X（固定值）' },
-  { type: 'bonus_attribute', name: '額外屬性', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '六大屬性之一 +1，roll 時均等決定是哪一個。無 Tier' },
-  { type: 'evasion', name: '迴避', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: '迴避值 +X' },
-  { type: 'heal_effect', name: '補血效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '技能補血效果 +X%' },
-  { type: 'potion_effect', name: '藥水效果', category: ['armor', 'shield', 'accessory'], group: '補給類', description: '藥水效果 +X%' },
-  { type: 'drop_rate', name: '掉寶率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '掉寶率 +X%（影響一般怪與 Boss 主掉落表、3~5 級職業技能書；工會任務收集物不受影響）' },
-  { type: 'gold_rate', name: '金幣獲得率', category: ['armor', 'shield', 'accessory'], group: '掉落類', description: '金幣獲得率 +X%' },
-  // Shield exclusive (1)
-  { type: 'block_rate', name: '格擋率', category: ['shield'], group: '盾牌專屬', description: '格擋率 +X%' },
-  // 飾品／盾牌專屬 (1)
-  { type: 'magic_resist', name: '魔法抗性', category: ['accessory', 'shield'], group: '飾品／盾牌專屬', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速／沉默的機率' },
-  // 受擊回復（2）—— X% 是觸發率，回復量另外抽（§ 7.4）
-  { type: 'on_hit_hp', name: '受擊回血', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: `受到傷害時 X% 機率回復最大 HP 的 ${restoreRange('on_hit_hp')}` },
-  { type: 'on_hit_mp', name: '受擊回魔', category: ['armor', 'shield', 'accessory'], group: '防禦類', description: `受到傷害時 X% 機率回復最大 MP 的 ${restoreRange('on_hit_mp')}` },
+  { type: 'attack_power', name: '攻擊力', group: '攻擊類', description: '攻擊力 +X%' },
+  { type: 'element_brand', name: '元素刻印', group: '攻擊類', description: '賦予武器一個元素（火／冰／風／地／光／暗），並使普攻傷害 +X%' },
+  { type: 'element_erosion', name: '元素侵蝕', group: '攻擊類', description: 'X% 是觸發率：命中後有 X% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒' },
+  { type: 'attack_splash', name: '普攻擴散', group: '攻擊類', description: `普攻命中時，主目標 ${ATTACK_SPLASH_RADIUS} 格內的其他怪受到主目標該下傷害 × X%` },
+  { type: 'skill_elemental', name: '技能元素傷害', group: '攻擊類', description: '施放技能時元素傷害（火、冰、風、地、光、暗）+X%' },
+  { type: 'crit_rate', name: '爆擊率', group: '攻擊類', description: '爆擊率 +X%' },
+  { type: 'crit_damage', name: '爆擊傷害', group: '攻擊類', description: '爆擊傷害 +X%' },
+  { type: 'attack_speed', name: '攻擊速度', group: '攻擊類', description: '攻擊速度 +X%' },
+  { type: 'cooldown_reduction', name: '減少冷卻時間', group: '攻擊類', description: '技能冷卻時間 -X%' },
+  { type: 'hit_down', name: '命中下降', group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方命中下降 X%，持續 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒` },
+  { type: 'defense_down', name: '防禦下降', group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方防禦下降 X%，持續 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒` },
+  { type: 'element_down', name: '元素下降', group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方的一種元素下降 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒：該元素的攻擊對牠的元素乘區 +X%` },
+  { type: 'attack_lifesteal', name: '普攻回血', group: '攻擊類', description: '普攻每下命中回復該下最終傷害 × X% 的 HP' },
+  { type: 'skill_lifesteal', name: '技能回血', group: '攻擊類', description: '技能每下命中回復該下最終傷害 × X% 的 HP' },
+  { type: 'defense', name: '防禦力', group: '防禦類', description: '防禦力 +X%' },
+  { type: 'max_hp', name: '最大 HP', group: '防禦類', description: '最大 HP +X（固定值）' },
+  { type: 'max_mp', name: '最大 MP', group: '防禦類', description: '最大 MP +X（固定值）' },
+  { type: 'hp_regen', name: '回血', group: '防禦類', description: '每次自然回血 +X（固定值）' },
+  { type: 'mp_regen', name: '回魔', group: '防禦類', description: '每次自然回魔 +X（固定值）' },
+  { type: 'bonus_attribute', name: '額外屬性', group: '防禦類', description: '六大屬性之一 +1，roll 時均等決定是哪一個。無 Tier' },
+  { type: 'evasion', name: '迴避', group: '防禦類', description: '迴避值 +X' },
+  { type: 'on_hit_hp', name: '受擊回血', group: '防禦類', description: `受到傷害時 X% 機率回復最大 HP 的 ${restoreRange('on_hit_hp')}` },
+  { type: 'on_hit_mp', name: '受擊回魔', group: '防禦類', description: `受到傷害時 X% 機率回復最大 MP 的 ${restoreRange('on_hit_mp')}` },
+  { type: 'block_rate', name: '格擋率', group: '防禦類', description: '格擋率 +X%' },
+  { type: 'magic_resist', name: '魔法抗性', group: '防禦類', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速／沉默的機率' },
+  { type: 'thorns', name: '荊棘傷害', group: '防禦類', description: '被命中時，對攻擊者造成實際受到的傷害 × X%' },
+  { type: 'heal_effect', name: '補血效果', group: '補給類', description: '技能補血效果 +X%' },
+  { type: 'potion_effect', name: '藥水效果', group: '補給類', description: '藥水效果 +X%' },
+  { type: 'drop_rate', name: '掉寶率', group: '掉落類', description: '掉寶率 +X%（影響一般怪與 Boss 主掉落表、3~5 級職業技能書；工會任務收集物不受影響）' },
+  { type: 'gold_rate', name: '金幣獲得率', group: '掉落類', description: '金幣獲得率 +X%' },
+  { type: 'move_speed', name: '跑速', group: '移動類', description: '移動速度 +X%' },
 ];
 
 export interface Affix {
@@ -251,7 +292,7 @@ const isOnHitRestoreType = (type: AnyAffixType): type is OnHitRestoreType =>
  * 線性換算到 `ON_HIT_RESTORE_PERCENT`，取到小數一位。
  */
 export function getRestorePercent(type: OnHitRestoreType, chance: number): number {
-  const table = getAffixTierTable(type);
+  const table = ON_HIT_TIERS;
   const lo = table[0].min;
   const hi = table[table.length - 1].max;
   const [min, max] = ON_HIT_RESTORE_PERCENT[type];
@@ -321,18 +362,27 @@ export function getErosion(
   };
 }
 
+/** 抽到當下要決定元素的詞綴：元素刻印、元素侵蝕、元素下降（§ 7.9） */
+export function isElementAffixType(type: AnyAffixType): type is 'element_brand' | 'element_erosion' | 'element_down' {
+  return type === 'element_brand' || type === 'element_erosion' || type === 'element_down';
+}
+
+export type WeaponDebuffAffixType = 'hit_down' | 'defense_down' | 'element_down';
+
 /**
- * 武器上的命中下降／防禦下降（§ 7.9），X 吃品質。沒有時回空陣列。
- * 觸發率固定 `AFFIX_DEBUFF_CHANCE`，由呼叫端逐下判定。
+ * 武器上的命中下降／防禦下降／元素下降（§ 7.9），X 吃品質。沒有時回空陣列。
+ * 觸發率固定 `AFFIX_DEBUFF_CHANCE`，由呼叫端逐下判定。元素下降另帶元素。
  */
 export function getWeaponDebuffAffixes(
   affixes: Affix[] | undefined,
   quality: number = 0,
-): { type: 'hit_down' | 'defense_down'; value: number }[] {
-  const out: { type: 'hit_down' | 'defense_down'; value: number }[] = [];
+): { type: WeaponDebuffAffixType; value: number; element?: BrandElement }[] {
+  const out: { type: WeaponDebuffAffixType; value: number; element?: BrandElement }[] = [];
   for (const a of affixes ?? []) {
     if (a.type === 'hit_down' || a.type === 'defense_down') {
       out.push({ type: a.type, value: getEffectiveAffixValue(a, quality) });
+    } else if (a.type === 'element_down' && a.element) {
+      out.push({ type: a.type, value: getEffectiveAffixValue(a, quality), element: a.element });
     }
   }
   return out;
@@ -357,27 +407,36 @@ export function getWeaponBaseDamage(
   return Math.max(1, Math.round((s + l) / 2));
 }
 
-/**
- * 依裝備部位與類型決定詞綴分類（§ 7.6）。
- * 飾品（項鍊／戒指）雖然 `type` 為 `'armor'`，但擁有獨立的詞綴池。
- */
+/** 依裝備部位與類型決定詞綴分類（§ 7.5）。魔導書、臂甲佔左手但不是武器，走副手 */
 export function getAffixCategoryForSlot(
   slot: string,
   type: string,
 ): AffixCategory {
-  if (type === 'shield') return 'shield';
-  // 魔導書是副手裝備，不是武器：走防具池，避免元素師／牧師拿到兩份武器詞綴
-  // （8 格攻擊詞綴 vs 其他職業 4 格，見 `44-dps-prediction.md` § 44.5）
-  if (type === 'magicBook') return 'armor';
-  // 臂甲是盜賊的左手防具（雙刀／鋼爪佔雙手時無法裝備），同樣走防具池
-  if (type === 'armGuard') return 'armor';
+  if (type === 'shield' || type === 'magicBook' || type === 'armGuard') return 'offhand';
   if (slot === 'rightHand' || slot === 'leftHand') return 'weapon';
-  if (slot === 'necklace' || slot === 'ring1' || slot === 'ring2') return 'accessory';
-  return 'armor';
+  if (slot === 'helmet' || slot === 'chest') return 'helmChest';
+  if (slot === 'shirt' || slot === 'cloak') return 'shirtCloak';
+  if (slot === 'gloves') return 'gloves';
+  if (slot === 'boots') return 'boots';
+  if (slot === 'belt') return 'belt';
+  if (slot === 'necklace') return 'necklace';
+  return 'ring';
 }
 
+/** 實例或模板的詞綴分類 */
+export function getAffixCategoryOf(item: { slot: string; type: string }): AffixCategory {
+  return getAffixCategoryForSlot(item.slot, item.type);
+}
+
+/** 這個分類的詞綴池（§ 7.6），依 `AFFIX_DEFINITIONS` 順序 */
 export function getAffixPoolForSlot(category: AffixCategory): AffixDefinition[] {
-  return AFFIX_DEFINITIONS.filter(d => d.category.includes(category));
+  return AFFIX_DEFINITIONS.filter(d => d.type in AFFIX_POOLS[category]);
+}
+
+/** 這種詞綴是否在該分類的詞綴池內（§ 7.6；特殊詞綴看 § 7.10.1） */
+export function isAffixInPool(type: AnyAffixType, category: AffixCategory): boolean {
+  if (isSpecialAffixType(type)) return getSpecialAffixDefinition(type)!.category.includes(category);
+  return type in AFFIX_POOLS[category];
 }
 
 /**
@@ -427,23 +486,6 @@ export function getBossTierWeights(level: number): number[] {
   return [1, 2, 5, 15, 30, 32, 15];
 }
 
-/**
- * 防具池**百分比詞綴**的專屬階級表（§ 7.3.1，0.1 單位），約為通用表的 82%。
- *
- * 防具池的詞綴欄位是 11 個部位 ×4 = 44 條，武器池只有右手 4 條。
- * 兩池共用同一張表的話，防具池那些會隨部位數一起膨脹。
- * 固定值型（最大 HP／MP、回血／回魔）走各自的表，不在此列。
- */
-export const ARMOR_POOL_TIERS: AffixTier[] = [
-  { tier: 1, min: 3.1, max: 4 },
-  { tier: 2, min: 4.1, max: 6 },
-  { tier: 3, min: 6.1, max: 9 },
-  { tier: 4, min: 9.1, max: 11 },
-  { tier: 5, min: 11.1, max: 13 },
-  { tier: 6, min: 13.1, max: 15 },
-  { tier: 7, min: 15.1, max: 17 },
-];
-
 /** 受擊回血／受擊回魔觸發率的專屬階級表（§ 7.3.1，0.1 單位） */
 export const ON_HIT_TIERS: AffixTier[] = [
   { tier: 1, min: 1, max: 1.4 },
@@ -453,17 +495,6 @@ export const ON_HIT_TIERS: AffixTier[] = [
   { tier: 5, min: 4.5, max: 5.3 },
   { tier: 6, min: 5.4, max: 6.1 },
   { tier: 7, min: 6.2, max: 7 },
-];
-
-/** 防禦力的專屬階級表（§ 7.3.1，0.1 單位） */
-export const DEFENSE_TIERS: AffixTier[] = [
-  { tier: 1, min: 0.1, max: 0.5 },
-  { tier: 2, min: 0.6, max: 1 },
-  { tier: 3, min: 1.1, max: 1.5 },
-  { tier: 4, min: 1.6, max: 2 },
-  { tier: 5, min: 2.1, max: 2.5 },
-  { tier: 6, min: 2.6, max: 3.5 },
-  { tier: 7, min: 3.6, max: 5 },
 ];
 
 /**
@@ -482,34 +513,6 @@ export const FLAT_HP_MP_TIERS: AffixTier[] = [
   { tier: 7, min: 90, max: 100 },
 ];
 
-/**
- * 回血／回魔的固定值階級表（§ 7.3.1）。加算至 `29-regen.md` 的裝備回復加總。
- * **防具模板不再提供回血回魔**，此詞綴是防具側的唯一來源。
- */
-export const FLAT_REGEN_TIERS: AffixTier[] = [
-  { tier: 1, min: 1, max: 2 },
-  { tier: 2, min: 2, max: 3 },
-  { tier: 3, min: 3, max: 5 },
-  { tier: 4, min: 5, max: 6 },
-  { tier: 5, min: 7, max: 8 },
-  { tier: 6, min: 9, max: 10 },
-  { tier: 7, min: 11, max: 12 },
-];
-
-/**
- * 魔法抗性的專屬階級表（§ 7.3.1，0.1 單位）。區間明顯低於通用表：
- * 它可同時出現在項鍊／戒指 ×2／盾牌共 4 個部位，套用通用表會過快頂到 75% 減傷上限。
- */
-export const MAGIC_RESIST_TIERS: AffixTier[] = [
-  { tier: 1, min: 1.1, max: 2 },
-  { tier: 2, min: 2.1, max: 4 },
-  { tier: 3, min: 4.1, max: 6 },
-  { tier: 4, min: 6.1, max: 8 },
-  { tier: 5, min: 8.1, max: 10 },
-  { tier: 6, min: 10.1, max: 15 },
-  { tier: 7, min: 15.1, max: 20 },
-];
-
 /** 迴避的專屬階級表（§ 7.3.1），單位為迴避值 */
 export const EVASION_TIERS: AffixTier[] = [
   { tier: 1, min: 1, max: 39 },
@@ -524,30 +527,96 @@ export const EVASION_TIERS: AffixTier[] = [
 /** § 7.3.1 迴避值換算：100 迴避值 = 1% 迴避率 */
 export const EVASION_POINTS_PER_PERCENT = 100;
 
-/**
- * 專屬階級表（§ 7.3.1）與其涵蓋的詞綴。未列出的詞綴一律套用通用 `AFFIX_TIERS` ——
- * 格擋率只出現在盾牌一個部位，不隨部位數膨脹，維持通用表。
- * Wiki 依此列欄，共用同一張表的詞綴合成一欄。
- */
-export const AFFIX_TIER_TABLES: { label: string; tiers: AffixTier[]; types: AffixType[]; flat?: boolean }[] = [
-  {
-    label: '防具池',
-    tiers: ARMOR_POOL_TIERS,
-    types: ['heal_effect', 'potion_effect', 'drop_rate', 'gold_rate'],
+/** § 7.3 等寬表：每階寬 `width`，`Tn = (n − 1) × width + unit ~ n × width` */
+function equalWidthTiers(width: number, unit: number): AffixTier[] {
+  return Array.from({ length: 7 }, (_, i) => ({
+    tier: i + 1,
+    min: roundAffixTenth(i * width + unit),
+    max: roundAffixTenth((i + 1) * width),
+  }));
+}
+
+/** § 7.3／§ 7.3.1 階級表代號 */
+export type AffixTierTableKey = 'P1' | 'P2' | 'P3' | 'P5' | 'P6' | 'P7' | 'N2' | 'onHit' | 'evasion' | 'hpMp';
+
+export const AFFIX_TIER_TABLES: Record<AffixTierTableKey, AffixTier[]> = {
+  P1: equalWidthTiers(1, 0.1),
+  P2: equalWidthTiers(2, 0.1),
+  P3: equalWidthTiers(3, 0.1),
+  P5: equalWidthTiers(5, 0.1),
+  P6: equalWidthTiers(6, 0.1),
+  P7: equalWidthTiers(7, 0.1),
+  N2: equalWidthTiers(2, 1),
+  onHit: ON_HIT_TIERS,
+  evasion: EVASION_TIERS,
+  hpMp: FLAT_HP_MP_TIERS,
+};
+
+/** 詞綴池的一格：階級表代號；額外屬性無 Tier 為 null */
+type PoolEntries = Partial<Record<AffixType, AffixTierTableKey | null>>;
+
+/** § 7.6 武器以外各分類共用的詞綴 */
+const SHARED_POOL: PoolEntries = {
+  max_hp: 'hpMp', max_mp: 'hpMp', hp_regen: 'N2', mp_regen: 'N2',
+  heal_effect: 'P2', potion_effect: 'P2', drop_rate: 'P3', gold_rate: 'P3',
+};
+
+export const SHARED_AFFIX_TYPES = Object.keys(SHARED_POOL) as AffixType[];
+
+/** § 7.6 詞綴池：分類 → 詞綴 → 階級表 */
+export const AFFIX_POOLS: Record<AffixCategory, PoolEntries> = {
+  weapon: {
+    attack_power: 'P3', element_brand: 'P3', element_erosion: 'P3', hit_down: 'P3', defense_down: 'P3', element_down: 'P3',
+    attack_splash: 'P5', crit_damage: 'P5', attack_speed: 'P1', attack_lifesteal: 'P6', skill_lifesteal: 'P2',
   },
-  { label: '受擊回復', tiers: ON_HIT_TIERS, types: ['on_hit_hp', 'on_hit_mp'] },
-  { label: '防禦力', tiers: DEFENSE_TIERS, types: ['defense'] },
-  { label: '最大 HP／MP', tiers: FLAT_HP_MP_TIERS, types: ['max_hp', 'max_mp'], flat: true },
-  { label: '回血／回魔', tiers: FLAT_REGEN_TIERS, types: ['hp_regen', 'mp_regen'], flat: true },
-  { label: '魔法抗性', tiers: MAGIC_RESIST_TIERS, types: ['magic_resist'] },
-  { label: '迴避值', tiers: EVASION_TIERS, types: ['evasion'], flat: true },
+  helmChest: { defense: 'P1', on_hit_hp: 'onHit', on_hit_mp: 'onHit', evasion: 'evasion', bonus_attribute: null, ...SHARED_POOL },
+  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, ...SHARED_POOL },
+  gloves: {
+    attack_splash: 'P2', crit_rate: 'P2', crit_damage: 'P2', attack_speed: 'P1',
+    skill_elemental: 'P2', cooldown_reduction: 'P2', ...SHARED_POOL,
+  },
+  boots: { move_speed: 'P2', evasion: 'evasion', cooldown_reduction: 'P2', defense: 'P1', ...SHARED_POOL },
+  belt: { bonus_attribute: null, evasion: 'evasion', cooldown_reduction: 'P1', crit_damage: 'P2', ...SHARED_POOL },
+  offhand: {
+    block_rate: 'P3', skill_elemental: 'P1', defense: 'P1', thorns: 'P7',
+    on_hit_hp: 'onHit', on_hit_mp: 'onHit', magic_resist: 'P3', ...SHARED_POOL,
+  },
+  necklace: {
+    magic_resist: 'P3', cooldown_reduction: 'P1', evasion: 'evasion', bonus_attribute: null,
+    crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', ...SHARED_POOL,
+  },
+  ring: {
+    magic_resist: 'P3', evasion: 'evasion', bonus_attribute: null,
+    crit_rate: 'P1', crit_damage: 'P2', skill_elemental: 'P2', ...SHARED_POOL,
+  },
+};
+
+/** § 7.3.3 舊防禦力階級表：只用於不在所屬分類池內的舊詞綴 */
+export const LEGACY_DEFENSE_TIERS: AffixTier[] = [
+  { tier: 1, min: 0.1, max: 0.5 },
+  { tier: 2, min: 0.6, max: 1 },
+  { tier: 3, min: 1.1, max: 1.5 },
+  { tier: 4, min: 1.6, max: 2 },
+  { tier: 5, min: 2.1, max: 2.5 },
+  { tier: 6, min: 2.6, max: 3.5 },
+  { tier: 7, min: 3.6, max: 5 },
 ];
 
-export const AFFIX_TIER_OVERRIDES: Partial<Record<AffixType, AffixTier[]>> =
-  Object.fromEntries(AFFIX_TIER_TABLES.flatMap(t => t.types.map(type => [type, t.tiers])));
+/** § 7.3.3 不在所屬分類池內的舊詞綴；未列出的走舊通用表 */
+const LEGACY_TIER_TABLES: Partial<Record<AffixType, AffixTier[]>> = {
+  defense: LEGACY_DEFENSE_TIERS,
+  on_hit_hp: ON_HIT_TIERS,
+  on_hit_mp: ON_HIT_TIERS,
+  evasion: EVASION_TIERS,
+  max_hp: FLAT_HP_MP_TIERS,
+  max_mp: FLAT_HP_MP_TIERS,
+};
 
-export function getAffixTierTable(type?: AffixType): AffixTier[] {
-  return (type && AFFIX_TIER_OVERRIDES[type]) || AFFIX_TIERS;
+/** 這種詞綴在該分類的階級表（§ 7.6）；不在池內的舊詞綴走 § 7.3.3 */
+export function getAffixTierTable(type: AffixType, category: AffixCategory): AffixTier[] {
+  const key = AFFIX_POOLS[category][type];
+  if (key) return AFFIX_TIER_TABLES[key];
+  return LEGACY_TIER_TABLES[type] ?? LEGACY_GENERAL_TIERS;
 }
 
 /** § 7.3 百分比詞綴的數值單位是 0.1%；固定值型、迴避值、額外屬性、特殊詞綴為整數 */
@@ -562,17 +631,17 @@ export function roundAffixTenth(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
-export function rollAffixValue(tier: number, type?: AffixType): number {
-  const t = getAffixTierTable(type)[tier - 1];
-  if (type && !isDecimalAffixType(type)) return Math.floor(random() * (t.max - t.min + 1)) + t.min;
+export function rollAffixValue(tier: number, type: AffixType, category: AffixCategory): number {
+  const t = getAffixTierTable(type, category)[tier - 1];
+  if (!isDecimalAffixType(type)) return Math.floor(random() * (t.max - t.min + 1)) + t.min;
   const lo = toTenths(t.min);
   return (lo + Math.floor(random() * (toTenths(t.max) - lo + 1))) / 10;
 }
 
-/** 這條詞綴所屬 Tier 的區間（§ 7.3／§ 7.3.1）；無 Tier 的詞綴回 null */
-export function getAffixTierRange(affix: Affix): AffixTier | null {
+/** 這條詞綴所屬 Tier 的區間（依所屬分類，§ 7.6）；無 Tier 的詞綴回 null */
+export function getAffixTierRange(affix: Affix, category: AffixCategory): AffixTier | null {
   if (isTierlessAffixType(affix.type)) return null;
-  return getAffixTierTable(affix.type as AffixType)[affix.tier - 1] ?? null;
+  return getAffixTierTable(affix.type as AffixType, category)[affix.tier - 1] ?? null;
 }
 
 /** 區間端點的顯示字串：百分比詞綴帶一位小數，不帶單位 */
@@ -580,9 +649,17 @@ export function formatAffixBound(type: AnyAffixType, value: number): string {
   return isDecimalAffixType(type) ? value.toFixed(1) : String(value);
 }
 
+/** 該分類階級表在 `fromTier`～`toTier` 的區間文字：`4.1~6.0%`、`15~100`；額外屬性為 `+1` */
+export function formatAffixTierSpan(type: AffixType, category: AffixCategory, fromTier: number = 1, toTier: number = 7): string {
+  if (isAttributeAffixType(type)) return `+${BONUS_ATTRIBUTE_VALUE}`;
+  const t = getAffixTierTable(type, category);
+  const unit = isFlatAffixType(type) ? '' : '%';
+  return `${formatAffixBound(type, t[fromTier - 1].min)}~${formatAffixBound(type, t[toTier - 1].max)}${unit}`;
+}
+
 /** § 7.3 數值夾回所屬 Tier 的區間（舊存檔遷移用） */
-export function clampAffixValueToTier(affix: Affix): number {
-  const t = getAffixTierTable(affix.type as AffixType)[affix.tier - 1];
+export function clampAffixValueToTier(affix: Affix, category: AffixCategory): number {
+  const t = getAffixTierTable(affix.type as AffixType, category)[affix.tier - 1];
   if (!t || isTierlessAffixType(affix.type)) return affix.value;
   return Math.min(t.max, Math.max(t.min, affix.value));
 }
@@ -712,9 +789,9 @@ export function generateAffixes(
     const tier = options.uniformTier
       ? rollRangeTier(floor, cap, options.tierWeights ?? {})
       : Math.min(cap, rollAffixTier(areaLevel, isBoss, tieredCount));
-    const value = rollAffixValue(tier, def.type);
-    // § 7.4 元素刻印／元素侵蝕：抽到當下才決定屬性，六種均等隨機，兩條各自獨立抽
-    const needsElement = def.type === 'element_brand' || def.type === 'element_erosion';
+    const value = rollAffixValue(tier, def.type, category);
+    // § 7.9 元素刻印／元素侵蝕／元素下降：抽到當下才決定屬性，六種均等隨機，各自獨立抽
+    const needsElement = isElementAffixType(def.type);
     const element = needsElement
       ? BRAND_ELEMENTS[Math.floor(random() * BRAND_ELEMENTS.length)]
       : undefined;
@@ -753,9 +830,9 @@ function formatEffectiveValue(affix: Affix, quality: number): string {
  * 不影響「這次 roll 在該 Tier 內是否完美」這件事。
  * 特殊詞綴與額外屬性無 Tier 也無數值，一律 false —— 它們改由 `shouldBoldAffix()` 一律粗體。
  */
-export function isMaxRollAffix(affix: Affix): boolean {
+export function isMaxRollAffix(affix: Affix, category: AffixCategory): boolean {
   if (isTierlessAffixType(affix.type)) return false;
-  const t = getAffixTierTable(affix.type)[affix.tier - 1];
+  const t = getAffixTierTable(affix.type, category)[affix.tier - 1];
   return !!t && affix.value === t.max;
 }
 
@@ -763,8 +840,8 @@ export function isMaxRollAffix(affix: Affix): boolean {
  * UI 是否以粗體顯示這條詞綴（§ 7.3.2）：滾到 Tier 上限的一般詞綴，
  * 加上無 Tier 的特殊詞綴與額外屬性（兩者一律粗體）。
  */
-export function shouldBoldAffix(affix: Affix): boolean {
-  return isTierlessAffixType(affix.type) || isMaxRollAffix(affix);
+export function shouldBoldAffix(affix: Affix, category: AffixCategory): boolean {
+  return isTierlessAffixType(affix.type) || isMaxRollAffix(affix, category);
 }
 
 /**
@@ -834,16 +911,21 @@ export interface DisplayPart {
 
 /**
  * 詞綴顯示片段：非區間片段串起來即 `formatAffixDisplay()`。
- * `weaponBaseDamage` 為所在武器的平均基傷，有給才印元素侵蝕每秒傷害的區間（§ 7.9）。
+ * `category` 有給才印 Tier 區間；`weaponBaseDamage` 為所在武器的平均基傷，有給才印元素侵蝕每秒傷害的區間（§ 7.9）。
  */
-export function formatAffixDisplayParts(affix: Affix, quality: number = 0, weaponBaseDamage?: number): DisplayPart[] {
-  const parts = formatBaseAffixDisplayParts(affix, quality, weaponBaseDamage);
+export function formatAffixDisplayParts(
+  affix: Affix,
+  quality: number = 0,
+  weaponBaseDamage?: number,
+  category?: AffixCategory,
+): DisplayPart[] {
+  const parts = formatBaseAffixDisplayParts(affix, quality, weaponBaseDamage, category);
   return affix.sealed ? [{ text: '(封) ' }, ...parts] : parts;
 }
 
 /** 同 Tier 區間乘品質：`(4.0 ~ 6.0%)`；無 Tier 的詞綴回 null */
-export function formatAffixRange(affix: Affix, quality: number = 0): string | null {
-  const t = getAffixTierRange(affix);
+export function formatAffixRange(affix: Affix, quality: number, category: AffixCategory): string | null {
+  const t = getAffixTierRange(affix, category);
   if (!t) return null;
   const lo = formatEffectiveValue({ ...affix, value: t.min }, quality);
   const hi = formatEffectiveValue({ ...affix, value: t.max }, quality);
@@ -852,8 +934,8 @@ export function formatAffixRange(affix: Affix, quality: number = 0): string | nu
 }
 
 /** 受擊回復比例在同 Tier 觸發率上下限的換算區間，乘品質：`(2.4 ~ 2.8%)` */
-function formatRestoreRange(affix: Affix, type: OnHitRestoreType, quality: number): string | null {
-  const t = getAffixTierRange(affix);
+function formatRestoreRange(affix: Affix, type: OnHitRestoreType, quality: number, category: AffixCategory): string | null {
+  const t = getAffixTierRange(affix, category);
   if (!t) return null;
   const lo = restoreWithQuality(getRestorePercent(type, t.min), quality);
   const hi = restoreWithQuality(getRestorePercent(type, t.max), quality);
@@ -869,13 +951,18 @@ function formatErosionRange(weaponBaseDamage: number, quality: number): string {
   return `(${erosionWithQuality(min, quality)} ~ ${erosionWithQuality(max, quality)})`;
 }
 
-function formatBaseAffixDisplayParts(affix: Affix, quality: number, weaponBaseDamage?: number): DisplayPart[] {
+function formatBaseAffixDisplayParts(
+  affix: Affix,
+  quality: number,
+  weaponBaseDamage?: number,
+  category?: AffixCategory,
+): DisplayPart[] {
   if (isSpecialAffixType(affix.type)) return [{ text: formatBaseAffixName(affix) }];
   if (isAttributeAffixType(affix.type)) {
     return [{ text: `${formatBaseAffixName(affix)} ${formatAffixValue(affix, quality)}` }];
   }
   const name = formatBaseAffixName(affix);
-  const range = formatAffixRange(affix, quality);
+  const range = category ? formatAffixRange(affix, quality, category) : null;
   // 片段依序為文字與區間交錯；區間為 null 時併入前一段文字
   const join = (...pieces: (string | { range: string | null })[]): DisplayPart[] => {
     const out: DisplayPart[] = [];
@@ -896,7 +983,7 @@ function formatBaseAffixDisplayParts(affix: Affix, quality: number, weaponBaseDa
     const pct = restorePercentWithQuality(affix, quality).toFixed(1);
     const what = affix.type === 'on_hit_hp' ? '回血' : '回魔';
     return join(`受擊 ${value}%`, { range }, ` 觸發${what} ${pct}%`,
-      { range: formatRestoreRange(affix, affix.type, quality) }, ` (T${affix.tier})`);
+      { range: category ? formatRestoreRange(affix, affix.type, quality, category) : null }, ` (T${affix.tier})`);
   }
   // 元素侵蝕的% 是觸發率、不是傷害%，另外把每跳固定傷害寫出來
   if (affix.type === 'element_erosion') {
@@ -905,7 +992,7 @@ function formatBaseAffixDisplayParts(affix: Affix, quality: number, weaponBaseDa
     return join(`${name} ${value}%`, { range }, ` 觸發／每秒 ${dot}`, { range: dotRange }, ` (T${affix.tier})`);
   }
   // § 7.9 X% 是效果強度，觸發率固定
-  if (affix.type === 'hit_down' || affix.type === 'defense_down') {
+  if (affix.type === 'hit_down' || affix.type === 'defense_down' || affix.type === 'element_down') {
     return join(`${name} ${value}%`, { range }, `／${AFFIX_DEBUFF_CHANCE}% 觸發 (T${affix.tier})`);
   }
   return join(`${name} ${formatAffixValue(affix, quality)}`, { range }, ` (T${affix.tier})`);
@@ -939,6 +1026,12 @@ export interface AffixBonuses {
   /** 額外屬性詞綴的加總不放這裡，改走 `collectAffixAttributes()` */
   bonus_attribute: number;
   evasion: number;
+  attack_splash: number;
+  thorns: number;
+  move_speed: number;
+  element_down: number;
+  attack_lifesteal: number;
+  skill_lifesteal: number;
 }
 
 export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number }[]): AffixBonuses {
@@ -968,6 +1061,12 @@ export function collectAffixBonuses(gear: { affixes?: Affix[]; quality?: number 
     mp_regen: 0,
     bonus_attribute: 0,
     evasion: 0,
+    attack_splash: 0,
+    thorns: 0,
+    move_speed: 0,
+    element_down: 0,
+    attack_lifesteal: 0,
+    skill_lifesteal: 0,
   };
 
   for (const item of gear) {

@@ -158,7 +158,7 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
         </table>
         {filtered.length === 0 && <p className="wiki-empty">無符合條件的防具</p>}
       </div>
-      <UniqueAffixSection pools={['armor', 'accessory']} showFixed />
+      <UniqueAffixSection pools={['helmChest', 'shirtCloak', 'gloves', 'boots', 'accessory']} showFixed />
       <AbilitySection groups={['accessory']} />
     </div>
   );

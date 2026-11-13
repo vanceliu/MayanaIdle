@@ -131,7 +131,7 @@ export function CombatPage() {
         }
         note={
           <>
-            技能<strong>必定命中</strong>，不做命中判定。魔法技能<strong>不會爆擊</strong>（復仇之刃、背刺例外）。裝備魔法攻擊是<strong>乘在技能攻擊力上的乘區</strong>（每 1 點 +{MAGIC_ATTACK_PERCENT_PER_POINT}%，魔攻 15 → ×{1 + 15 * MAGIC_ATTACK_PERCENT_PER_POINT / 100}），不進 INT 倍率；
+            技能<strong>必定命中</strong>，不做命中判定。魔法技能<strong>不會爆擊</strong>（復仇之刃、背刺例外）。裝備魔法攻擊是<strong>乘在技能攻擊力上的乘區</strong>（每 1 點 +{MAGIC_ATTACK_PERCENT_PER_POINT}%，魔攻 39 → ×{1 + 39 * MAGIC_ATTACK_PERCENT_PER_POINT / 100}）；法杖是魔攻的主要來源，不進 INT 倍率；
             攻擊力%與元素刻印%詞綴不影響魔法傷害。
             技能傷害不受虛弱影響（虛弱只作用於依物理公式計算的傷害）。
           </>

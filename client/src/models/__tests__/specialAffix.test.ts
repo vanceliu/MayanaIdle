@@ -15,13 +15,11 @@ afterEach(() => {
 });
 
 describe('特殊詞綴定義（§ 7.10.1）', () => {
-  it('共 3 個免疫/抵抗詞綴，全部僅限防具、盾牌與飾品（不含武器）', () => {
+  it('共 3 個免疫/抵抗詞綴，只出現在上衣／斗篷、腰帶（§ 7.10.1）', () => {
     // 詛咒／虛弱／減速改由魔抗抵抗（§ 24.4.2），對應免疫詞綴已移除
     expect(SPECIAL_AFFIX_DEFINITIONS).toHaveLength(3);
     for (const def of SPECIAL_AFFIX_DEFINITIONS) {
-      // 飾品拆出 `accessory` 分類後一併納入，維持「飾品可帶免疫詞綴」的既有行為
-      expect(def.category).toEqual(['armor', 'shield', 'accessory']);
-      expect(def.category).not.toContain('weapon');
+      expect(def.category).toEqual(['shirtCloak', 'belt']);
     }
   });
 
@@ -56,27 +54,29 @@ describe('特殊詞綴掉落權重（§ 7.10.3）', () => {
   });
 
   it('Lv.31 以下的區域無特殊詞綴可掉', () => {
-    expect(getSpecialAffixPoolForSlot('armor', 30)).toHaveLength(0);
-    expect(getSpecialAffixPoolForSlot('armor', 31)).toHaveLength(2);
-    expect(getSpecialAffixPoolForSlot('armor', 41)).toHaveLength(3);
+    expect(getSpecialAffixPoolForSlot('shirtCloak', 30)).toHaveLength(0);
+    expect(getSpecialAffixPoolForSlot('shirtCloak', 31)).toHaveLength(2);
+    expect(getSpecialAffixPoolForSlot('belt', 41)).toHaveLength(3);
   });
 
-  it('武器不會出現特殊詞綴', () => {
-    expect(getSpecialAffixPoolForSlot('weapon', 60)).toHaveLength(0);
+  it('上衣／斗篷、腰帶以外的分類不會出現特殊詞綴', () => {
+    for (const cat of ['weapon', 'helmChest', 'gloves', 'boots', 'offhand', 'necklace', 'ring'] as const) {
+      expect(getSpecialAffixPoolForSlot(cat, 60), cat).toHaveLength(0);
+    }
   });
 });
 
 describe('generateAffixes 產出特殊詞綴', () => {
   it('低等級區域不產生特殊詞綴', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const affixes = generateAffixes('armor', 10, 4);
+    const affixes = generateAffixes('shirtCloak', 10, 4);
     expect(affixes.every(a => !isSpecialAffixType(a.type))).toBe(true);
   });
 
   it('骰中特殊詞綴時取代一個一般詞綴位置，tier 為 0', () => {
     // random=0 → 一律小於 specialChance，且每次都取 pool 第一個
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const affixes = generateAffixes('armor', 51, 4);
+    const affixes = generateAffixes('belt', 51, 4);
     expect(affixes).toHaveLength(4);
     // 特殊詞綴池只剩 3 種且不可重複，第 4 格必然退回一般詞綴
     const specials = affixes.filter(a => isSpecialAffixType(a.type));
@@ -86,15 +86,24 @@ describe('generateAffixes 產出特殊詞綴', () => {
 
   it('同一件裝備不會出現重複的特殊詞綴（§ 7.10.2）', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const affixes = generateAffixes('armor', 51, 4);
+    const affixes = generateAffixes('shirtCloak', 51, 4);
     const types = affixes.map(a => a.type);
     expect(new Set(types).size).toBe(types.length);
   });
 
   it('未骰中特殊詞綴時產出一般詞綴', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const affixes = generateAffixes('armor', 51, 4);
+    const affixes = generateAffixes('shirtCloak', 51, 4);
     expect(affixes.every(a => !isSpecialAffixType(a.type))).toBe(true);
+  });
+});
+
+describe('其他分類即使骰中特殊詞綴判定也不會出現', () => {
+  it('random=0（判定必中）時頭盔／胸甲、手套、項鍊仍只有一般詞綴', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    for (const cat of ['helmChest', 'gloves', 'necklace'] as const) {
+      expect(generateAffixes(cat, 60, 4, true).every(a => !isSpecialAffixType(a.type)), cat).toBe(true);
+    }
   });
 });
 

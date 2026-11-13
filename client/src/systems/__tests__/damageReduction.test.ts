@@ -72,13 +72,13 @@ describe('getBuffDamageReduction', () => {
   });
 
   it('讀取各技能的減傷值', () => {
-    expect(getBuffDamageReduction([buffFrom('iron-shield')])).toBe(20);
+    expect(getBuffDamageReduction([buffFrom('iron-shield')])).toBe(40);
     expect(getBuffDamageReduction([buffFrom('sanctuary')])).toBe(25);
     expect(getBuffDamageReduction([buffFrom('holy-domain')])).toBe(30);
   });
 
   it('多個減傷 buff 同類加算', () => {
-    expect(getBuffDamageReduction([buffFrom('iron-shield'), buffFrom('holy-domain')])).toBe(50);
+    expect(getBuffDamageReduction([buffFrom('iron-shield'), buffFrom('holy-domain')])).toBe(70);
   });
 
   it('過期的 buff 不計入', () => {
@@ -93,23 +93,23 @@ describe('getBuffDamageReduction', () => {
 });
 
 describe('§ 21.5 減傷：防禦與 buff 類間乘算', () => {
-  it('無防禦時，鋼鐵護盾 20% 直接減兩成', () => {
+  it('無防禦時，鋼鐵護盾 40% 直接減四成', () => {
     const char = character();
     const base = calculateMonsterAttack(monster(), char, [], [], 0);
     const buffed = calculateMonsterAttack(monster(), char, [], [buffFrom('iron-shield')], 0);
 
     expect(base.damage).toBe(100);
-    expect(buffed.damage).toBe(80);
+    expect(buffed.damage).toBe(60);
   });
 
-  it('防禦 50% 搭配鋼鐵護盾 20% → 承受 50% × 80% = 40%', () => {
+  it('防禦 50% 搭配鋼鐵護盾 40% → 承受 50% × 60% = 30%', () => {
     const char = character();
     const gear = [armor(50)];
     const base = calculateMonsterAttack(monster(), char, gear, [], 0);
     const buffed = calculateMonsterAttack(monster(), char, gear, [buffFrom('iron-shield')], 0);
 
     expect(base.damage).toBe(50);
-    expect(buffed.damage).toBe(40);
+    expect(buffed.damage).toBe(30);
   });
 
   it('防禦達上限 75% 時 buff 減傷仍完整生效（不被上限排擠）', () => {

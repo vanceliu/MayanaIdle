@@ -108,7 +108,7 @@ describe('增益藥水', () => {
     useGameStore.getState().useBuffPotion('focus');
     const effects = useGameStore.getState().activeEffects;
     expect(getCombatBonuses([], effects).crit_rate).toBe(baseCrit + 10);
-    expect(getSkillSideValue(char, 100, [], effects) - baseSkill).toBe(Math.floor(100 * (1 + 8 * 6.5 / 100)) - 100);
+    expect(getSkillSideValue(char, 100, [], effects) - baseSkill).toBe(Math.floor(100 * (1 + 8 * 2.5 / 100)) - 100);
   });
 });
 

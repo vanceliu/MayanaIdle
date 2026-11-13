@@ -1,6 +1,6 @@
 /**
  * 百柱死神模擬的共用部分：角色建構、配裝、技能盤點與輪替、校準、BiS 搜尋（`44-dps-prediction.md`）。
- * `simulateReaperKill.mts`（木樁）與 `simulateReaperFight.mts`（實戰）共用。
+ * `simulateReaperFight.mts`（實戰）與 `simulateArena.mts`（競技場）共用；詞綴配裝規則在 `affixLoadout.mts`。
  */
 import {
   calculatePlayerAttack,
@@ -36,13 +36,18 @@ import { CLASS_MAGIC_RESTRICTIONS, getLearnableMaxLevel } from '../src/models/sk
 import { TALENT_INSTALL_MAX } from '../src/models/talent';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import {
-  getErosion, getWeaponBaseDamage, getWeaponDebuffAffixes,
-  AFFIX_DEBUFF_CHANCE, AFFIX_DEBUFF_DURATION_MS, DEFENSE_DOWN_CATEGORY,
+  getErosion, getWeaponBaseDamage, getWeaponDebuffAffixes, getAffixCategoryOf, elementDownCategory,
+  AFFIX_DEBUFF_CHANCE, AFFIX_DEBUFF_DURATION_MS, DEFENSE_DOWN_CATEGORY, ELEMENT_DOWN_STAT,
+  type AffixType as GameAffixType, type BrandElement,
 } from '../src/models/affix';
 import {
-  UNIQUE_AFFIX_DEFINITIONS, type UniqueAffixType,
+  UNIQUE_AFFIX_DEFINITIONS, UNIQUE_AFFIX_POOLS, getUniqueAffixDefinition, type UniqueAffixType,
 } from '../src/models/uniqueAffix';
-import { getEffectiveGear } from '../src/systems/gear';
+import {
+  ARMOR_OFFENSE_AFFIXES, ARMOR_UNIQUE, GLOVES_UNIQUE_OPTIONS, WEAPON_OFFENSE_AFFIXES,
+  armorAffixTypes, armorOffenseProbeValue, buildAffixes,
+} from './affixLoadout.mts';
+import { getEffectiveGear, getFrozenGear } from '../src/systems/gear';
 import {
   ABILITY_FOCUS_MAX_PERCENT, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, resolveParamRange, formatAbilityDisplay,
   type Ability, type AbilityType,
@@ -329,8 +334,7 @@ export function makeReaper(): MonsterInstance {
 
 // ---------------------------------------------------------------- 裝備
 
-export type AffixType = 'attack_power' | 'element_brand' | 'element_erosion' | 'skill_elemental' | 'crit_rate'
-  | 'crit_damage' | 'attack_speed' | 'cooldown_reduction' | 'defense_down' | 'defense' | 'max_hp' | 'max_mp';
+export type AffixType = GameAffixType;
 
 /** T7 獨有詞綴一律取區間上限（`07-affix-tier7.md` § 7T.5），與一般詞綴取 T7 上限一致 */
 export function uniqueMax(type: UniqueAffixType): number {
@@ -341,21 +345,21 @@ export function uniqueMax(type: UniqueAffixType): number {
  * 木樁上有輸出價值的武器獨有詞綴：被動三種（爆擊傷害／爆擊率／攻擊速度）＋ 追加傷害。
  * 回血、回魔、擊殺回血、命中暈眩對擊殺時間無貢獻（MP 不是瓶頸，§ 44.10）。
  */
-export const WEAPON_UNIQUE_OPTIONS: UniqueAffixType[] = UNIQUE_AFFIX_DEFINITIONS
-  .filter(d => d.pool === 'weapon' && d.trigger === 'passive')
-  .map(d => d.type);
+export const WEAPON_UNIQUE_OPTIONS: UniqueAffixType[] = UNIQUE_AFFIX_POOLS.weapon
+  .filter(t => getUniqueAffixDefinition(t).trigger === 'passive');
 
-/** T7 上限 20，品質 20% → getEffectiveAffixValue = floor(20 × 1.2) = 24 */
-export const T7 = 20;
 /** 武器的一般詞綴條數（4 洞全滿）；其後再 1 條封印詞綴（`07-affix.md` § 7.1／§ 7.11.1） */
 export const WEAPON_GENERAL_AFFIXES = 4;
 export const QUALITY = 20;
+/** 死神配裝的詞綴階級 */
+export const BIS_AFFIX_TIER = 7;
 
-/**
- * 防具／飾品／**魔導書**完全沒有攻擊詞綴（`affix.ts` § 7.6），對本戰只影響防禦與 MP 池。
- * 魔導書走 armor 池是遊戲規則，不是本腳本的假設。
- */
-export const ARMOR_AFFIXES: AffixType[] = ['defense', 'max_hp', 'max_mp'];
+/** 防具／飾品／副手的詞綴規劃：攻擊詞綴排名與手套的 T7 獨有詞綴（`affixLoadout.mts`） */
+export interface SupportPlan {
+  cn: ClassName;
+  ranking: AffixType[];
+  glovesUnique: UniqueAffixType | null;
+}
 
 export interface Loadout {
   label: string;
@@ -375,7 +379,7 @@ export type Template = (typeof EQUIPMENT_SEEDS)[number];
 /** 缺件報告。找不到部位時累積在這裡，最後印出來 —— 不 throw（§ 44.9） */
 export const MISSING: string[] = [];
 
-export const ARMOR_SLOTS = ['helmet', 'chest', 'gloves', 'boots', 'belt', 'necklace', 'ring1'] as const;
+export const ARMOR_SLOTS = ['helmet', 'chest', 'shirt', 'cloak', 'gloves', 'boots', 'belt', 'necklace', 'ring1'] as const;
 export const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
 /**
  * 各職業的主攻屬性。**妖精是敏捷** —— 弓走遠程公式，基礎攻擊力吃 AGI 加成
@@ -384,6 +388,11 @@ export const OFFHAND_TYPES = new Set(['shield', 'magicBook', 'armGuard']);
 export const MAIN_STAT: Record<ClassName, keyof Attributes> = {
   knight: 'STR', elf: 'AGI', thief: 'STR', elementalist: 'INT', priest: 'INT',
 };
+
+/** 防具路線依主攻屬性（`06-equipment-armor.md`：每部位每階布／輕／重各一件，不限職業） */
+export const LINE_BY_MAIN_STAT: Partial<Record<keyof Attributes, string>> = { STR: 'heavy', AGI: 'light', INT: 'robe' };
+/** 沒有路線的模板（武器、飾品、腰帶等）不受限 */
+export const onLine = (cn: ClassName, t: Template) => !t.line || t.line === LINE_BY_MAIN_STAT[MAIN_STAT[cn]];
 
 export function usableBy(t: Template, cn: ClassName): boolean {
   return !t.requiredClass || t.requiredClass.length === 0 || t.requiredClass.includes(cn);
@@ -404,7 +413,7 @@ export function enhancementFor(slot: string): number {
 export const BRAND_COUNTER: Record<string, string> = {
   wind: 'fire', earth: 'wind', ice: 'earth', fire: 'ice', dark: 'light', light: 'dark',
 };
-export const BIS_BRAND_ELEMENT = BRAND_COUNTER[REAPER_SEED.element] ?? 'fire';
+export const BIS_BRAND_ELEMENT = (BRAND_COUNTER[REAPER_SEED.element] ?? 'fire') as BrandElement;
 
 /** `--erosion=max|mean`：侵蝕每跳傷害取完美 roll 或範圍期望值 */
 export const EROSION_MODE = process.argv.find(a => a.startsWith('--erosion='))?.split('=')[1] ?? 'max';
@@ -419,6 +428,7 @@ export function erosionRollValue(base: number): number {
 
 export function instantiate(
   tpl: Template, enhancement: number, affixTypes: AffixType[], unique: UniqueAffixType | null = null, ability: Ability | null = null,
+  mainStat: keyof Attributes = 'INT', affixTier: number = BIS_AFFIX_TIER,
 ): EquipmentInstance {
   const bonusAttributes = tpl.bonusAttributes;
   /*
@@ -437,20 +447,20 @@ export function instantiate(
   const enhanceMagic = (tpl.type === 'staff' || tpl.type === 'twoHandStaff')
     ? Math.floor(enhancement / 2)
     : 0;
+  // 法杖魔攻是 0.1 單位（§ 21.4），換算後保留小數一位
   const magicAttack = (tpl.magicAttack != null || enhanceMagic > 0)
-    ? Math.round((tpl.magicAttack ?? 0) * mult + enhanceMagic * (mult - 1))
+    ? Math.round(((tpl.magicAttack ?? 0) * mult + enhanceMagic * (mult - 1)) * 10) / 10
     : tpl.magicAttack;
   return {
     ...tpl, bonusAttributes, magicAttack, templateId: tpl.id!, quality: QUALITY, enhancement,
-    // 第 5 條為封印詞綴（`07-affix.md` § 7.11.1）：效果與一般詞綴相同、吃品質
-    affixes: affixTypes.map((type, i) => ({
-      type, tier: 7, value: T7,
-      ...(i === WEAPON_GENERAL_AFFIXES ? { sealed: true as const } : {}),
-      ...(type === 'element_brand' || type === 'element_erosion' ? { element: BIS_BRAND_ELEMENT } : {}),
-      // 侵蝕的每跳傷害（§ 7.4）。`--erosion=max` 取完美 roll（與其他詞綴一律取 T7 上限一致）；
-      // `--erosion=mean` 取該範圍的期望值，代表實際掉落的平均水準。
-      ...(type === 'element_erosion' ? { dotDamage: erosionRollValue(getWeaponBaseDamage(tpl)) } : {}),
-    })),
+    // 數值取所屬分類階級表的上限（`affixLoadout.mts`）；第 5 條為封印詞綴（§ 7.11.1）。
+    // 侵蝕的每跳傷害：`--erosion=max` 取完美 roll，`--erosion=mean` 取範圍期望值。
+    affixes: buildAffixes(tpl, affixTypes, affixTier, {
+      element: BIS_BRAND_ELEMENT,
+      erosionDamage: erosionRollValue(getWeaponBaseDamage(tpl)),
+      mainStat,
+      ...(affixTypes.length > WEAPON_GENERAL_AFFIXES ? { sealedIndex: WEAPON_GENERAL_AFFIXES } : {}),
+    }),
     ...(unique ? { uniqueAffix: { type: unique, value: uniqueMax(unique) } } : {}),
     ...(ability ? { ability } : {}),
     ownerId: 1, equipped: true,
@@ -473,22 +483,52 @@ export function pickSupport(cn: ClassName, pred: (t: Template) => boolean, what:
   return pool.reduce((a, b) => (scoreSupportPiece(b, cn) > scoreSupportPiece(a, cn) ? b : a));
 }
 
-/** 防具與飾品（不含手部）—— 每個職業只需算一次 */
-export function buildSupportGear(cn: ClassName): EquipmentInstance[] {
-  const out: EquipmentInstance[] = [];
-  for (const slot of ARMOR_SLOTS) {
-    const tpl = pickSupport(cn, t => t.slot === slot, slot);
-    if (!tpl) continue;
-    // T7 飾品帶全屬性（§ 7T.5）；同類只有一件生效，由 getEffectiveGear() 去重
-    const unique = tpl.tier === 7 && (slot === 'necklace' || slot === 'ring1') ? 'all_attributes' : null;
-    out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES, unique));
-    if (slot === 'ring1') out.push(instantiate(tpl, enhancementFor(slot), ARMOR_AFFIXES, unique)); // 兩隻戒指
+/** T7 防具的獨有詞綴（`affixLoadout.mts`）；非 T7 為 null */
+export function armorUnique(tpl: Template, plan: SupportPlan): UniqueAffixType | null {
+  if (tpl.tier !== 7) return null;
+  const category = getAffixCategoryOf(tpl);
+  return category === 'gloves' ? plan.glovesUnique : ARMOR_UNIQUE[category] ?? null;
+}
+
+/**
+ * 防具與飾品（不含手部）：每件 2 條攻擊 ＋ 2 條生存（`affixLoadout.mts`）。
+ * 防具限主攻屬性的路線；素質需求以遊戲的 `getFrozenGear` 判定，被凍結的件排除後重選，直到整套都生效。
+ */
+export function buildSupportGear(plan: SupportPlan, affixTier: number = BIS_AFFIX_TIER): EquipmentInstance[] {
+  const { cn } = plan;
+  const char = buildCharacter(cn);
+  const effects = preCombatBuffs(cn);
+  const excluded = new Set<string>();
+  let out: EquipmentInstance[] = [];
+  for (let guard = 0; guard < 50; guard++) {
+    out = [];
+    for (const slot of ARMOR_SLOTS) {
+      const tpl = pickSupport(cn, t => t.slot === slot && onLine(cn, t) && !excluded.has(t.name), slot);
+      if (!tpl) continue;
+      // 同類 T7 獨有詞綴只有一件生效，由 getEffectiveGear() 去重（§ 7T.3）
+      const make = () => instantiate(tpl, enhancementFor(slot), armorAffixTypes(getAffixCategoryOf(tpl), plan.ranking, cn),
+        armorUnique(tpl, plan), null, MAIN_STAT[cn], affixTier);
+      out.push(make());
+      if (slot === 'ring1') out.push(make()); // 兩隻戒指
+    }
+    const frozen = getFrozenGear(char, effects, out);
+    if (frozen.size === 0) break;
+    for (const g of frozen) excluded.add(g.name);
   }
   return out;
 }
 
+/** 副手的詞綴：依副手池 2 攻 2 守 */
+export function offhandAffixes(plan: SupportPlan): AffixType[] {
+  return armorAffixTypes('offhand', plan.ranking, plan.cn);
+}
+
+/** 最佳副手：限主攻屬性的路線，且單獨穿上時素質需求滿足 */
 export function bestOffhand(cn: ClassName): Template | null {
-  return pickSupport(cn, t => OFFHAND_TYPES.has(t.type as string), '副手');
+  const char = buildCharacter(cn);
+  const effects = preCombatBuffs(cn);
+  const wearable = (t: Template) => getFrozenGear(char, effects, [instantiate(t, 0, [])]).size === 0;
+  return pickSupport(cn, t => OFFHAND_TYPES.has(t.type as string) && onLine(cn, t) && wearable(t), '副手');
 }
 
 /** 候選手部組合：雙手武器，以及「單手武器 ＋ 該職業最佳副手」 */
@@ -509,12 +549,13 @@ export function buildLoadout(
   offhand: Template | null,
   weaponAffixes: AffixType[],
   support: EquipmentInstance[],
-  unique: UniqueAffixType | null = null,
-  ability: Ability | null = null,
+  unique: UniqueAffixType | null,
+  ability: Ability | null,
+  plan: SupportPlan,
 ): Loadout {
-  const w = instantiate(weapon, 9, weaponAffixes, unique, ability);
+  const w = instantiate(weapon, 9, weaponAffixes, unique, ability, MAIN_STAT[plan.cn]);
   const gear: (EquipmentInstance | null)[] = [w];
-  if (offhand) gear.push(instantiate(offhand, 9, ARMOR_AFFIXES));
+  if (offhand) gear.push(instantiate(offhand, 9, offhandAffixes(plan), null, null, MAIN_STAT[plan.cn]));
   gear.push(...support);
   return { label, unique, ability, weaponName: weapon.name, weapon: w, gear };
 }
@@ -549,10 +590,13 @@ export function makeBuff(id: string, category: string, modifiers: StatModifier[]
 }
 
 /** 掛在怪物身上的數值型 debuff（防禦下降詞綴、詛咒、護甲崩壞等），生效期間由本檔控制 */
+/** 粗排（`proxyDps`）的目標 id：元素下降以怪物 id 查（§ 7.9） */
+export const PROXY_TARGET_ID = 'proxy-target';
+
 export function makeMonsterDebuff(id: string, category: string, modifiers: StatModifier[]): ActiveEffect {
   return {
     id, sourceSkillId: id, sourceSkillName: id, category,
-    type: 'debuff', target: 'monster', targetIdx: 0, modifiers,
+    type: 'debuff', target: 'monster', targetIdx: 0, targetMonsterId: PROXY_TARGET_ID, modifiers,
     startTime: 0, duration: Number.MAX_SAFE_INTEGER,
     tags: [], name: id, description: '',
   };
@@ -1026,13 +1070,10 @@ export function effectiveMaxHp(char: Character, gear: (EquipmentInstance | null)
 // ---------------------------------------------------------------- BiS 搜尋
 
 /**
- * § 7.6 武器詞綴池中對木樁有輸出價值的 9 種（命中下降只影響怪打人，不列入）。
- * T7 單件最多 4 條一般詞綴 ＋ 1 條封印詞綴，互不重複 → C(9,5) = 126 組
+ * § 7.6 武器詞綴池中有輸出價值的 8 種（命中下降只影響怪打人，不列入）。
+ * T7 單件最多 4 條一般詞綴 ＋ 1 條封印詞綴，互不重複 → C(8,5) = 56 組
  */
-export const WEAPON_AFFIX_POOL: AffixType[] = [
-  'attack_power', 'element_brand', 'element_erosion', 'skill_elemental',
-  'crit_rate', 'crit_damage', 'attack_speed', 'cooldown_reduction', 'defense_down',
-];
+export const WEAPON_AFFIX_POOL: AffixType[] = WEAPON_OFFENSE_AFFIXES;
 /** 粗排用的取樣數（全模擬另有 RUNS） */
 export let PROXY_SAMPLES = 600;
 
@@ -1047,12 +1088,13 @@ export const TOP_N_ARG = Number(process.argv.find(a => a.startsWith('--top='))?.
 export const TOP_HANDS = Number.isFinite(TOP_N_ARG) && TOP_N_ARG > 0 ? TOP_N_ARG : 20;
 export const TOP_FINAL = TOP_HANDS;
 
+/** 手部排名用的起始武器詞綴（之後窮舉 `WEAPON_AFFIX_POOL`）。法系的普攻與爆擊幾乎無用，以降防與元素下降為主 */
 export const SEED_AFFIXES: Record<ClassName, AffixType[]> = {
-  knight: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed', 'defense_down'],
-  elf: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed', 'defense_down'],
-  thief: ['attack_power', 'crit_rate', 'crit_damage', 'attack_speed', 'defense_down'],
-  elementalist: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'],
-  priest: ['attack_power', 'skill_elemental', 'crit_rate', 'crit_damage', 'attack_speed'],
+  knight: ['attack_power', 'crit_damage', 'attack_speed', 'element_brand', 'defense_down'],
+  elf: ['attack_power', 'crit_damage', 'attack_speed', 'element_brand', 'defense_down'],
+  thief: ['attack_power', 'crit_damage', 'attack_speed', 'element_brand', 'defense_down'],
+  elementalist: ['element_down', 'defense_down', 'element_erosion', 'attack_power', 'element_brand'],
+  priest: ['element_down', 'defense_down', 'element_erosion', 'attack_power', 'element_brand'],
 };
 
 /** 所有子集合（含空集合） */
@@ -1081,7 +1123,11 @@ export const uniqueLabel = (u: UniqueAffixType | null) => (u ? `｜(獨)${u}` : 
  * 技能依「攻擊間隔 ÷ 冷卻（含減CD）」取代普攻的比例；不計 MP 與自身 buff 的行動佔用，
  * 精確排序由前 K 名的全模擬決定。
  */
-export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number, ctx?: SimContext): number {
+export function proxyDps(
+  className: ClassName, rawLoadout: Loadout, seed: number, ctx?: SimContext,
+  /** 只算普攻（普攻擴散的邊際估計用） */
+  opts: { normalOnly?: boolean } = {},
+): number {
   const char = ctx?.character ?? buildCharacter(className);
   const effects = preCombatBuffs(className, ctx?.level);
   const loadout = resolveLoadout(char, effects, rawLoadout);
@@ -1106,11 +1152,11 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
     withSeed(seed, () => {
       let sum = 0;
       for (let i = 0; i < PROXY_SAMPLES; i++) {
-        const r = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, fx, 0);
+        const r = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, fx, 0, PROXY_TARGET_ID);
         if (r.hit) sum += r.damage + r.hits.filter(h => !h.isMiss).length * bonusPerHit;
       }
       normal = sum / PROXY_SAMPLES;
-      for (const e of rotation) {
+      for (const e of opts.normalOnly ? [] : rotation) {
         if (e.kind === 'self_buff') continue;
         if (!meetsWeaponRequirement(e, loadout)) continue;
         let s = 0;
@@ -1118,17 +1164,17 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
           if (e.kind === 'physical_skill') {
             const fire = hasActiveFireEnchant(fx);
             for (let h = 0; h < (e.hits ?? 1); h++) {
-              const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+              const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID);
               s += r.hit ? r.damage + bonusPerHit : 0;
             }
           } else if (e.instantDot) {
             const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, fx);
             s += Math.max(1, Math.floor(base * e.instantDot.percent)) * e.instantDot.ticks;
           } else if (e.physicalSnapshot) {
-            const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+            const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID);
             s += Math.floor(r.damage * (100 + (e.abilityDamagePercent ?? 0)) / 100) + bonusPerHit;
           } else {
-            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0);
+            const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID);
             s += Math.floor(r.damage * (100 + (e.abilityDamagePercent ?? 0)) / 100) + bonusPerHit;
           }
         }
@@ -1150,17 +1196,26 @@ export function proxyDps(className: ClassName, rawLoadout: Loadout, seed: number
 
   const plain = rotationAction(effects);
   let best = plain.damage;
-  // § 7.9 防禦下降：穩態掛著的比例 = 1 − (1 − 觸發率)^(3 秒內的判定次數)，兩種狀態依比例加權
-  const defenseDown = getWeaponDebuffAffixes(loadout.weapon.affixes, loadout.weapon.quality ?? 0)
-    .find(d => d.type === 'defense_down');
-  if (defenseDown) {
-    const debuffed = rotationAction([
-      ...effects,
-      makeMonsterDebuff('防禦下降', DEFENSE_DOWN_CATEGORY, [{ stat: 'defense', value: -defenseDown.value, isPercent: true }]),
-    ]);
+  /*
+   * § 7.9 防禦下降／元素下降：穩態掛著的比例 = 1 − (1 − 觸發率)^(3 秒內的判定次數)。
+   * 兩者各自獨立判定，四種狀態（都沒掛／只掛一種／都掛）依佔用率加權
+   */
+  const procs = getWeaponDebuffAffixes(loadout.weapon.affixes, loadout.weapon.quality ?? 0);
+  const debuffs = procs
+    .filter(d => d.type === 'defense_down' || d.type === 'element_down')
+    .map(d => d.type === 'defense_down'
+      ? makeMonsterDebuff('防禦下降', DEFENSE_DOWN_CATEGORY, [{ stat: 'defense', value: -d.value, isPercent: true }])
+      : makeMonsterDebuff('元素下降', elementDownCategory(d.element!), [{ stat: ELEMENT_DOWN_STAT, value: d.value, isPercent: true }]));
+  if (debuffs.length > 0) {
     const rollsInWindow = plain.rolls * AFFIX_DEBUFF_DURATION_MS / intervalMs;
     const uptime = 1 - Math.pow(1 - AFFIX_DEBUFF_CHANCE / 100, rollsInWindow);
-    best = (1 - uptime) * plain.damage + uptime * debuffed.damage;
+    best = 0;
+    for (let mask = 0; mask < 1 << debuffs.length; mask++) {
+      const active = debuffs.filter((_, i) => mask & (1 << i));
+      const weight = debuffs.reduce((w, _, i) => w * (mask & (1 << i) ? uptime : 1 - uptime), 1);
+      if (weight === 0) continue;
+      best += weight * (active.length === 0 ? plain.damage : rotationAction([...effects, ...active]).damage);
+    }
   }
   // § 7.4 元素侵蝕：粗排也要算進去，否則它永遠進不了前 3 名。
   // DoT 不吃防禦，穩態貢獻 = 佔用率 × 每跳傷害；佔用率 = 1 − e^(−每秒觸發次數 × 5s)
@@ -1191,41 +1246,91 @@ export function focusAverageMultiplier(hp: number, perHit: number, percentPerSta
   return dealt / (hits * perHit);
 }
 
-/** 依 § 44.5 自動選出該職業的前 TOP_FINAL 名配置 */
-export function searchBis(className: ClassName): { loadouts: Loadout[]; searched: number } {
-  const support = buildSupportGear(className);
+/**
+ * 非武器部位攻擊詞綴的邊際輸出排名（`affixLoadout.mts`）：在基準配裝上多掛一條該詞綴（取非武器部位的最高 T7 值），
+ * 量粗排輸出的增量；不增加輸出的詞綴不列入。
+ * 普攻擴散不能在單一目標上量，以「普攻輸出 × X% × 額外目標數」估計。
+ */
+export function rankArmorOffense(
+  className: ClassName, base: Loadout, seed: number, ctx?: SimContext, splashTargets = 0,
+): AffixType[] {
+  const baseScore = proxyDps(className, base, seed, ctx);
+  const normalOnly = splashTargets > 0 ? proxyDps(className, base, seed, ctx, { normalOnly: true }) : 0;
+  const probe = (type: AffixType): EquipmentInstance => ({
+    id: -1, templateId: -1, name: '（邊際量測）', type: 'armor', slot: 'probe', isTwoHanded: false,
+    quality: QUALITY, enhancement: 0, ownerId: 1, equipped: true,
+    affixes: [{
+      type, tier: BIS_AFFIX_TIER, value: armorOffenseProbeValue(type),
+      ...(type === 'bonus_attribute' ? { attribute: MAIN_STAT[className] } : {}),
+    }],
+  } as unknown as EquipmentInstance);
+  const scored = ARMOR_OFFENSE_AFFIXES.map(type => {
+    if (type === 'attack_splash') {
+      const value = armorOffenseProbeValue(type) * (1 + QUALITY / 100);
+      return { type, gain: Math.min(normalOnly, baseScore) * value / 100 * splashTargets };
+    }
+    const gain = proxyDps(className, { ...base, gear: [...base.gear, probe(type)] }, seed, ctx) - baseScore;
+    return { type, gain };
+  });
+  return scored.filter(s => s.gain > 1e-6).sort((a, b) => b.gain - a.gain).map(s => s.type);
+}
+
+/** 實例的裝備階級（實例由模板展開，帶著 `tier`） */
+const tierOf = (g: EquipmentInstance): number | undefined => (g as EquipmentInstance & { tier?: number }).tier;
+
+/** 把手套換上指定的 T7 獨有詞綴（手套池與武器池同類，§ 7T.3 去重） */
+export function withGlovesUnique(lo: Loadout, u: UniqueAffixType): Loadout {
+  const gear = lo.gear.map(g => (g && g.slot === 'gloves' && tierOf(g) === 7
+    ? { ...g, uniqueAffix: { type: u, value: uniqueMax(u) } } : g));
+  return { ...lo, label: `${lo.label}｜(手套獨)${u}`, gear };
+}
+
+/**
+ * 依 § 44.2 自動選出該職業的前 TOP_FINAL 名配置。
+ * `splashTargets`：普攻擴散的額外目標數（死神 0；競技場依波次怪數）
+ */
+export function searchBis(className: ClassName, splashTargets = 0): { loadouts: Loadout[]; searched: number; plan: SupportPlan } {
   const hands = handCombos(className);
   const seedSet = SEED_AFFIXES[className];
   // **所有候選共用同一顆種子**：粗排是要比武器素質，不是比運氣。
   // 每個候選各給一顆種子時，暴擊擲骰的雜訊（±數點）會蓋過候選之間的真實差距
   // （例：T5 星霜杖 10/10 曾因此排在 T7 星辰權杖 18/18 之前）。
   const PROXY_SEED = 777;
+  let searched = 0;
 
   /*
-   * 獨有詞綴分段搜尋，粗排量維持在「手部 × 詞綴組」的量級：
-   * 1. 手部排名時每把 T7 武器試遍獨有詞綴，記下最佳者
-   * 2. 詞綴組合一律帶該武器的最佳獨有詞綴排名
-   * 3. 前 TOP_FINAL 名再把獨有詞綴逐一換過重排 —— 爆擊率與攻速、爆擊上限的交互會改變最佳解
+   * 1. 防具先只帶生存詞綴，以起始武器詞綴排手部，取第一名當基準量非武器部位攻擊詞綴的邊際排名
+   * 2. 依排名組出「2 攻 2 守」的防具，再排一次手部（每把 T7 武器試遍獨有詞綴）
+   * 3. 前 TOP_HANDS 名窮舉武器詞綴組合，前 TOP_FINAL 名再換獨有詞綴、手套獨有詞綴、隨機技能重排
    */
-  let searched = 0;
-  const rankedHands = hands
+  const rankHands = (plan: SupportPlan, support: EquipmentInstance[]) => hands
     .map(h => {
       let bestUnique: UniqueAffixType | null = null;
       let score = -Infinity;
       for (const u of uniqueOptions(h.weapon)) {
         searched++;
-        const v = proxyDps(className, buildLoadout(h.label, h.weapon, h.offhand, seedSet, support, u), PROXY_SEED);
+        const v = proxyDps(className, buildLoadout(h.label, h.weapon, h.offhand, seedSet, support, u, null, plan), PROXY_SEED);
         if (v > score) { score = v; bestUnique = u; }
       }
       return { h, score, bestUnique };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP_HANDS);
+    .sort((a, b) => b.score - a.score);
+
+  const survivalPlan: SupportPlan = { cn: className, ranking: [], glovesUnique: null };
+  const survivalSupport = buildSupportGear(survivalPlan);
+  const baseHand = rankHands(survivalPlan, survivalSupport)[0];
+  const baseLoadout = buildLoadout(baseHand.h.label, baseHand.h.weapon, baseHand.h.offhand, seedSet,
+    survivalSupport, baseHand.bestUnique, null, survivalPlan);
+  const ranking = rankArmorOffense(className, baseLoadout, PROXY_SEED, undefined, splashTargets);
+  const plan: SupportPlan = { cn: className, ranking, glovesUnique: null };
+  const support = buildSupportGear(plan);
+  const rankedHands = rankHands(plan, support).slice(0, TOP_HANDS);
 
   const affixSets = chooseK(WEAPON_AFFIX_POOL, WEAPON_GENERAL_AFFIXES + 1);
-  const make = (h: (typeof hands)[number], set: AffixType[], u: UniqueAffixType | null, a: Ability | null = null) => {
+  type Candidate = { h: (typeof hands)[number]; set: AffixType[]; lo: Loadout; score: number };
+  const make = (h: (typeof hands)[number], set: AffixType[], u: UniqueAffixType | null, a: Ability | null = null): Candidate => {
     searched++;
-    const lo = buildLoadout(`${h.label}｜${set.join('+')}${uniqueLabel(u)}${abilityLabel(a)}`, h.weapon, h.offhand, set, support, u, a);
+    const lo = buildLoadout(`${h.label}｜${set.join('+')}${uniqueLabel(u)}${abilityLabel(a)}`, h.weapon, h.offhand, set, support, u, a, plan);
     return { h, set, lo, score: proxyDps(className, lo, PROXY_SEED) };
   };
   const stage2 = rankedHands
@@ -1239,16 +1344,29 @@ export function searchBis(className: ClassName): { loadouts: Loadout[]; searched
       .map(u => make(c.h, c.set, u))),
   ].sort((a, b) => b.score - a.score);
 
-  // 4. 前 TOP_FINAL 名逐一試武器隨機技能（`07-affix-ability.md`，§ 44.1）
+  // 4. 前 TOP_FINAL 名逐一試武器隨機技能（`07-affix-ability.md`）
   const top = ranked.slice(0, TOP_FINAL);
   const withAbility = [
     ...top,
     ...top.flatMap(c => abilityOptions(className, c.h.weapon)
       .filter((a): a is Ability => a !== null)
       .map(a => make(c.h, c.set, c.lo.unique, a))),
-  ].sort((a, b) => b.score - a.score);
+  ].sort((a, b) => b.score - a.score).slice(0, TOP_FINAL);
 
-  return { loadouts: withAbility.slice(0, TOP_FINAL).map(r => r.lo), searched };
+  // 5. T7 手套的獨有詞綴依武器的選擇擇優（同類只有一件生效）
+  const hasT7Gloves = support.some(g => g.slot === 'gloves' && tierOf(g) === 7);
+  const final = !hasT7Gloves ? withAbility : withAbility.map(c => {
+    let best = c;
+    for (const u of GLOVES_UNIQUE_OPTIONS) {
+      searched++;
+      const lo = withGlovesUnique(c.lo, u);
+      const score = proxyDps(className, lo, PROXY_SEED);
+      if (score > best.score) best = { ...c, lo, score };
+    }
+    return best;
+  }).sort((a, b) => b.score - a.score);
+
+  return { loadouts: final.map(r => r.lo), searched, plan };
 }
 
 /**

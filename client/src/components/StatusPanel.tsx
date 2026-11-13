@@ -33,7 +33,7 @@ export function StatusPanel() {
    * 做成進度條是刻意的：**條快滿了＝該回村了**，這是玩家熟悉的讀法。
    * 再依比例變色，讓「還很空／快滿了／滿了」不必讀數字就分得出來。
    */
-  const weight = getWeightStatus(char, allGear, bagItems);
+  const weight = getWeightStatus(char, allGear, bagItems, activeEffects as ActiveEffect[]);
   const weightPercent = Math.min(100, Math.floor((weight.carried / Math.max(1, weight.capacity)) * 100));
   const weightLevel = weight.overweight ? 'over'
     : weightPercent >= 90 ? 'critical'

@@ -101,7 +101,7 @@ export function CharacterStats() {
   const attackSpeed = getTotalAttackSpeedPercent(gearList, activeEffects);
 
   // 負重（§ 20.7）。超重會擋下攻擊與魔法，所以要看得到自己差多少
-  const weight = getWeightStatus(char, gearList, bagItems);
+  const weight = getWeightStatus(char, gearList, bagItems, activeEffects);
 
   // 防禦：含 buff 固定防禦與詛咒 -20%
   const totalDefense = getEffectiveDefense(gearList, activeEffects, bonuses.defense);

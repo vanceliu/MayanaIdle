@@ -30,6 +30,9 @@ const POTION_COLORS: Record<BasicPotionType, string> = {
   red: '#DC2626',
   orange: '#F59E0B',
   white: '#E2E8F0',
+  'light-red': '#DC2626',
+  'light-orange': '#F59E0B',
+  'light-white': '#E2E8F0',
 };
 
 /** 與 `SkillPanel` 同一份元素配色（§ 35.7.6） */

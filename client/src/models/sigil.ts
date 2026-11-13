@@ -22,10 +22,13 @@ import {
   isSpecialAffixType,
   isTierlessAffixType,
   isAttributeAffixType,
+  isElementAffixType,
   BONUS_ATTRIBUTE_VALUE,
   rollAffixValue,
   rollErosionDamage,
   formatAffixName,
+  getAffixCategoryName,
+  isAffixInPool,
   type Affix,
   type AffixCategory,
   type AffixType,
@@ -55,7 +58,7 @@ export const SIGIL_DEFINITIONS: SigilDefinition[] = [
   },
   {
     type: 'sting', itemId: 148, name: '刺針印記', target: 'affix',
-    description: '指定一條詞綴換成同部位詞綴池的另一條，Tier 不變',
+    description: '指定一條詞綴換成所屬分類詞綴池的另一條，Tier 不變',
   },
   {
     type: 'recarve', itemId: 149, name: '重刻印記', target: 'affix',
@@ -212,6 +215,11 @@ export interface SigilContext {
   affixSlots?: number;
 }
 
+/** § 7.11.2 不在所屬分類池內的舊詞綴：精鍊／突破／重刻不受理的原因 */
+export function legacyAffixReason(category: AffixCategory): string {
+  return `已不在${getAffixCategoryName(category)}的詞綴池，只能用刺針或混沌換掉`;
+}
+
 /** 製作品不受理印記時顯示的原因 */
 export const CRAFTED_GEAR_SIGIL_REASON = '(鍛) 製作品不可使用任何印記';
 
@@ -246,7 +254,7 @@ export function canUseSigil(
   type: SigilType,
   affixes: Affix[] | undefined,
   affixIndex: number | undefined,
-  ctx: Pick<SigilContext, 'isStarterGear' | 'isCraftedGear' | 'maxAffixTier' | 'quality' | 'affixSlots'>,
+  ctx: Pick<SigilContext, 'category' | 'isStarterGear' | 'isCraftedGear' | 'maxAffixTier' | 'quality' | 'affixSlots'>,
 ): SigilCheck {
   if (ctx.isStarterGear) return { ok: false, reason: '新手裝沒有詞綴，無法使用印記' };
   if (ctx.isCraftedGear) return { ok: false, reason: CRAFTED_GEAR_SIGIL_REASON };
@@ -295,6 +303,11 @@ export function canUseSigil(
       return { ok: false, reason: `${what}沒有 Tier，無法升階` };
     }
     return { ok: true };
+  }
+
+  // § 7.11.2 不在所屬分類池內的舊詞綴：只能用刺針或混沌換掉
+  if ((type === 'temper' || type === 'enhance' || type === 'recarve') && !isAffixInPool(affix.type, ctx.category)) {
+    return { ok: false, reason: legacyAffixReason(ctx.category) };
   }
 
   if (type === 'temper' || type === 'enhance') {
@@ -402,7 +415,7 @@ export function applySealSigil(
 }
 
 /**
- * § 46.4 刺針印記：把一條詞綴換成同部位詞綴池的另一條，**Tier 不變**。
+ * § 46.4 刺針印記：把一條詞綴換成所屬分類詞綴池的另一條，**Tier 不變**。
  *
  * 池 = 一般詞綴 ＋ 該部位可用的特殊詞綴（門檻改看角色等級），**合併後均等抽**；
  * 同件裝備已有的詞綴不列入（§ 7.6 不可重複）。商店裝的池不含特殊詞綴。
@@ -454,12 +467,12 @@ export function applyStingSigil(
     ? Math.min(STING_SPECIAL_REPLACEMENT_TIER, ctx.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER)
     : old.tier;
   const type = picked as AffixType;
-  const needsElement = type === 'element_brand' || type === 'element_erosion';
+  const needsElement = isElementAffixType(type);
 
   next[affixIndex] = {
     type,
     tier,
-    value: rollAffixValue(tier, type),
+    value: rollAffixValue(tier, type, ctx.category),
     ...(needsElement ? { element: rollElement() } : {}),
     ...(type === 'element_erosion'
       ? { dotDamage: rollErosionDamage(ctx.weaponBaseDamage ?? 1) } : {}),
@@ -487,12 +500,13 @@ export function applyRecarveSigil(
   if (isTierlessAffixType(old.type)) {
     return { affixes, success: false, message: '重刻印記只受理有數值的詞綴' };
   }
+  if (!isAffixInPool(old.type, ctx.category)) return { affixes, success: false, message: legacyAffixReason(ctx.category) };
   const type = old.type as AffixType;
   const next = [...affixes];
 
   next[affixIndex] = {
     ...old,
-    value: rollAffixValue(old.tier, type),
+    value: rollAffixValue(old.tier, type, ctx.category),
     ...(type === 'element_erosion'
       ? { dotDamage: rollErosionDamage(ctx.weaponBaseDamage ?? 1) } : {}),
   };
@@ -512,18 +526,19 @@ export function applyRecarveSigil(
 export function applyTemperSigil(
   affixes: Affix[],
   affixIndex: number,
-  ctx: Pick<SigilContext, 'maxAffixTier'>,
+  ctx: Pick<SigilContext, 'category' | 'maxAffixTier'>,
 ): SigilResult {
   const old = affixes[affixIndex];
   const cap = ctx.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER;
   if (isTierlessAffixType(old.type) || old.tier >= cap) {
     return { affixes, success: false, message: `精鍊印記只受理 T${cap} 以下的一般詞綴` };
   }
+  if (!isAffixInPool(old.type, ctx.category)) return { affixes, success: false, message: legacyAffixReason(ctx.category) };
 
   const tier = old.tier + 1;
   const type = old.type as AffixType;
   const next = [...affixes];
-  next[affixIndex] = { ...old, tier, value: rollAffixValue(tier, type) };
+  next[affixIndex] = { ...old, tier, value: rollAffixValue(tier, type, ctx.category) };
 
   return {
     affixes: next,
@@ -541,18 +556,20 @@ export function applyTemperSigil(
 export function applyEnhanceSigil(
   affixes: Affix[],
   affixIndex: number,
+  ctx: Pick<SigilContext, 'category'>,
 ): SigilResult {
   const old = affixes[affixIndex];
   const rate = getEnhanceSigilRate(old.tier);
   if (rate === undefined) {
     return { affixes, success: false, message: '突破印記只受理 T5／T6 的詞綴' };
   }
+  if (!isAffixInPool(old.type, ctx.category)) return { affixes, success: false, message: legacyAffixReason(ctx.category) };
 
   const success = random() < rate;
   const tier = success ? old.tier + 1 : ENHANCE_SIGIL_FAIL_TIER;
   const type = old.type as AffixType;
   const next = [...affixes];
-  next[affixIndex] = { ...old, tier, value: rollAffixValue(tier, type) };
+  next[affixIndex] = { ...old, tier, value: rollAffixValue(tier, type, ctx.category) };
 
   return {
     affixes: next,

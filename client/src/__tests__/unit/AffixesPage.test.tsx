@@ -5,10 +5,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { AffixesPage } from '../../wiki/pages/AffixesPage';
 import { WikiHome } from '../../wiki/pages/WikiHome';
 import {
+  AFFIX_CATEGORIES,
   AFFIX_DEFINITIONS,
-  AFFIX_TIERS,
+  AFFIX_POOLS,
   AFFIX_TIER_TABLES,
+  SHARED_AFFIX_TYPES,
   SPECIAL_AFFIX_DEFINITIONS,
+  formatAffixBound,
+  formatAffixTierSpan,
   getAffixPoolForSlot,
   getAffixTierTable,
   isAttributeAffixType,
@@ -24,112 +28,109 @@ import {
   SIGIL_EXCHANGE_INPUT_COUNT,
 } from '../../models/sigil';
 
-const CATEGORY_LABELS: Record<AffixCategory, string> = {
-  weapon: '武器',
-  armor: '一般防具',
-  shield: '盾牌',
-  accessory: '飾品',
-};
-
-/**
- * 〈詞綴一覽〉裡「第一欄為該詞綴名」的資料列。
- * 限定在該節內：T7 獨有詞綴表也有同名的爆擊率、迴避等列。
- */
-/** 直接查 DOM：迴圈內逐一 `getAllByRole('row')` 的耗時隨列數平方成長 */
-function rowsFor(name: string): HTMLElement[] {
-  return Array.from(screen.getByTestId('affix-list').querySelectorAll<HTMLElement>('tr'))
-    .filter(r => r.querySelector('td')?.textContent === name);
+/** 〈詞綴一覽〉目前分頁裡的資料列；名稱取第一欄的第一個文字節點（後面可能接「共用」標籤） */
+function listRows(): HTMLElement[] {
+  return Array.from(screen.getByTestId('affix-list').querySelectorAll<HTMLElement>('tbody tr'));
 }
 
-function cellsOf(name: string): string[] {
-  const row = rowsFor(name)[0];
-  return Array.from(row.querySelectorAll('td')).map(td => td.textContent ?? '');
+function nameOf(row: HTMLElement): string {
+  return row.querySelector('td')?.childNodes[0]?.textContent ?? '';
 }
+
+function rowFor(name: string): HTMLElement | undefined {
+  return listRows().find(r => nameOf(r) === name && r.classList.contains('affix-cat-row'));
+}
+
+const openTab = (category: AffixCategory) =>
+  fireEvent.click(screen.getByRole('tab', { name: AFFIX_CATEGORIES.find(c => c.key === category)!.name }));
 
 describe('詞綴 wiki 頁', () => {
-  it('列出所有一般詞綴與特殊詞綴，且每條只出現一次', () => {
+  it('分頁依序為各分類加總覽，預設武器', () => {
     render(<AffixesPage />);
-    for (const def of [...AFFIX_DEFINITIONS, ...SPECIAL_AFFIX_DEFINITIONS]) {
-      expect(rowsFor(def.name).length, def.name).toBe(1);
+    const tabs = screen.getAllByRole('tab').map(t => t.textContent);
+    expect(tabs).toEqual([...AFFIX_CATEGORIES.map(c => c.name), '總覽']);
+    expect(screen.getByRole('tab', { name: '武器' }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('每個分類分頁列出該分類的詞綴池、效果與 T1~T7 區間，共用詞綴標「共用」', () => {
+    render(<AffixesPage />);
+    for (const c of AFFIX_CATEGORIES) {
+      openTab(c.key);
+      const rows = listRows().filter(r => r.classList.contains('affix-cat-row'));
+      const pool = getAffixPoolForSlot(c.key);
+      // 依 § 7.4 分組顯示，組內照定義順序
+      const groups = [...new Set(AFFIX_DEFINITIONS.map(d => d.group))];
+      const expected = groups.flatMap(g => pool.filter(d => d.group === g));
+      expect(rows.map(nameOf), c.key).toEqual(expected.map(d => d.name));
+      for (const def of expected) {
+        const cells = [...rowFor(def.name)!.querySelectorAll('td')].map(td => td.textContent ?? '');
+        expect(cells[1], `${c.key} ${def.name} 效果`).toBe(def.description);
+        const range = isAttributeAffixType(def.type) ? '固定 +1 · 無 Tier' : formatAffixTierSpan(def.type, c.key);
+        expect(cells[2], `${c.key} ${def.name} 區間`).toBe(range);
+        const shared = c.key !== 'weapon' && SHARED_AFFIX_TYPES.includes(def.type);
+        expect(!!rowFor(def.name)!.querySelector('.affix-cat-shared'), `${c.key} ${def.name} 共用`).toBe(shared);
+      }
+      expect(screen.getByTestId('affix-list').textContent).toContain(`一般詞綴 ${pool.length} 種`);
     }
   });
 
-  it('每條詞綴列出適用部位、效果敘述與數值區間', () => {
+  it('點詞綴列展開該分類的 T1~T7 各階數值', () => {
     render(<AffixesPage />);
+    openTab('gloves');
+    fireEvent.click(rowFor('爆擊率')!);
+    const chips = [...screen.getByTestId('affix-list').querySelectorAll('.affix-cat-tiers .affix-tag')].map(e => e.textContent);
+    const table = getAffixTierTable('crit_rate', 'gloves');
+    expect(chips).toEqual(table.map(t => `T${t.tier} ${formatAffixBound('crit_rate', t.min)}~${formatAffixBound('crit_rate', t.max)}%`));
+  });
+
+  it('免疫詞綴表只出現在上衣·斗篷與腰帶，列出最低掉落區域等級', () => {
+    render(<AffixesPage />);
+    for (const c of AFFIX_CATEGORIES) {
+      openTab(c.key);
+      for (const def of SPECIAL_AFFIX_DEFINITIONS) {
+        const row = listRows().find(r => r.querySelector('.affix-tag.special')?.textContent === def.name);
+        expect(!!row, `${c.key} ${def.name}`).toBe(def.category.includes(c.key));
+        if (row) expect(row.textContent).toContain(`Lv.${def.minAreaLevel}+`);
+      }
+    }
+  });
+
+  it('總覽矩陣：格內為 T7 上限，種類數列與詞綴池一致，點欄位標題切到該分類', () => {
+    render(<AffixesPage />);
+    fireEvent.click(screen.getByRole('tab', { name: '總覽' }));
+    const rows = listRows();
     for (const def of AFFIX_DEFINITIONS) {
-      const [, categories, description, range] = cellsOf(def.name);
-      expect(categories, `${def.name} 部位`).toBe(
-        def.category.map(c => CATEGORY_LABELS[c]).join('、')
-      );
-      expect(description, `${def.name} 效果`).toBe(def.description);
-
-      // 額外屬性無 Tier；固定值型不帶百分號（`07-affix.md` § 7.3.1）
-      if (isAttributeAffixType(def.type)) {
-        expect(range, `${def.name} 區間`).toBe('固定 +1 · 無 Tier');
-        continue;
-      }
-      const tiers = getAffixTierTable(def.type);
-      const unit = isFlatAffixType(def.type) ? '' : '%';
-      const fmt = (v: number) => (isFlatAffixType(def.type) ? String(v) : v.toFixed(1));
-      expect(range, `${def.name} 區間`).toBe(`${fmt(tiers[0].min)}${unit} ~ ${fmt(tiers[tiers.length - 1].max)}${unit}`);
+      const row = rows.find(r => r.querySelector('td')?.textContent === def.name)!;
+      const cells = [...row.querySelectorAll('td')].slice(1).map(td => td.textContent);
+      AFFIX_CATEGORIES.forEach((c, i) => {
+        const expected = !(def.type in AFFIX_POOLS[c.key])
+          ? '—'
+          : isAttributeAffixType(def.type)
+            ? '+1'
+            : `${formatAffixBound(def.type, getAffixTierTable(def.type, c.key)[6].max)}${isFlatAffixType(def.type) ? '' : '%'}`;
+        expect(cells[i], `${def.name} / ${c.key}`).toBe(expected);
+      });
     }
+    const countRow = rows.find(r => r.querySelector('td')?.textContent === '種類數')!;
+    expect([...countRow.querySelectorAll('td')].slice(1).map(td => td.textContent))
+      .toEqual(AFFIX_CATEGORIES.map(c => String(getAffixPoolForSlot(c.key).length)));
+
+    fireEvent.click(screen.getByRole('columnheader', { name: '手套' }));
+    expect(screen.getByRole('tab', { name: '手套' }).getAttribute('aria-selected')).toBe('true');
   });
 
-  it('特殊詞綴列出效果與最低掉落區域等級', () => {
-    render(<AffixesPage />);
-    for (const def of SPECIAL_AFFIX_DEFINITIONS) {
-      const [, categories, description, range] = cellsOf(def.name);
-      expect(categories, `${def.name} 部位`).toBe(
-        def.category.map(c => CATEGORY_LABELS[c]).join('、')
-      );
-      expect(description, `${def.name} 效果`).toBe(def.description);
-      expect(range, `${def.name} 取得`).toContain(`Lv.${def.minAreaLevel}+`);
-    }
-  });
-
-  it('依適用部位篩選後只留下該部位可帶的詞綴', () => {
-    render(<AffixesPage />);
-    const listed = () => AFFIX_DEFINITIONS.filter(d => rowsFor(d.name).length > 0).map(d => d.type);
-
-    expect(listed()).toEqual(AFFIX_DEFINITIONS.map(d => d.type));
-
-    for (const cat of ['weapon', 'armor', 'shield', 'accessory'] as AffixCategory[]) {
-      fireEvent.change(screen.getByLabelText('適用部位篩選'), { target: { value: cat } });
-      expect(listed(), cat).toEqual(getAffixPoolForSlot(cat).map(d => d.type));
-      expect(screen.getByText(`${CATEGORY_LABELS[cat]}可選 ${getAffixPoolForSlot(cat).length} 種一般詞綴`)).toBeTruthy();
-      // 武器不會出現特殊詞綴（免疫類只上防具／盾牌／飾品）
-      for (const s of SPECIAL_AFFIX_DEFINITIONS) {
-        expect(rowsFor(s.name).length > 0, `${cat} / ${s.name}`).toBe(s.category.includes(cat));
-      }
-    }
-  });
-
-  it('階級數值表列出通用區間、每張專屬表與取得方式', () => {
+  it('階級數值表每張表一列、T1~T7 七欄，不放表名欄', () => {
     const { container } = render(<AffixesPage />);
     const rows = container.querySelectorAll('#affix-tiers tbody tr');
-    expect(rows.length).toBe(AFFIX_TIERS.length);
-
-    // 欄位：階級、通用、每張專屬表各一欄、取得方式
-    const acquireCol = 2 + AFFIX_TIER_TABLES.length;
-    AFFIX_TIERS.forEach((t, i) => {
-      const cells = rows[i].querySelectorAll('td');
-      expect(cells[0].textContent).toBe(`T${t.tier}`);
-      expect(cells[1].textContent).toBe(`${t.min.toFixed(1)}~${t.max.toFixed(1)}%`);
-      AFFIX_TIER_TABLES.forEach((o, col) => {
-        const row = o.tiers[i];
-        const range = o.flat ? `${row.min}~${row.max}` : `${row.min.toFixed(1)}~${row.max.toFixed(1)}%`;
-        expect(cells[2 + col].textContent, `T${t.tier} ${o.label}`).toBe(range);
-      });
+    const keys = Object.keys(AFFIX_TIER_TABLES) as (keyof typeof AFFIX_TIER_TABLES)[];
+    expect(rows.length).toBe(keys.length);
+    expect(container.querySelectorAll('#affix-tiers thead th').length).toBe(7);
+    keys.forEach((key, i) => {
+      const cells = [...rows[i].querySelectorAll('td')].map(td => td.textContent);
+      const percent = !['N2', 'evasion', 'hpMp'].includes(key);
+      expect(cells, key).toEqual(AFFIX_TIER_TABLES[key].map(t =>
+        percent ? `${t.min.toFixed(1)}~${t.max.toFixed(1)}%` : `${t.min}~${t.max}`));
     });
-    // T6/T7 只能靠掉落取得
-    expect(rows[5].querySelectorAll('td')[acquireCol].textContent).toBe('怪物掉落');
-    expect(rows[6].querySelectorAll('td')[acquireCol].textContent).toBe('Boss 限定掉落');
-  });
-
-  it('篩選飾品時不列出防禦力', () => {
-    render(<AffixesPage />);
-    fireEvent.change(screen.getByLabelText('適用部位篩選'), { target: { value: 'accessory' } });
-    expect(rowsFor('防禦力')).toHaveLength(0);
   });
 
   it('說明詛咒／虛弱／減速／沉默沒有免疫詞綴', () => {

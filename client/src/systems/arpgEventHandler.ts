@@ -25,6 +25,7 @@ import {
   getWeaponHitCount,
   getSkillCooldownReduction,
   calculateHealAmount,
+  getAffixBonusesFromGear,
   type HitBreakdown,
 } from './combat';
 import {
@@ -36,6 +37,12 @@ import {
   HIT_DOWN_CATEGORY,
   DEFENSE_DOWN_CATEGORY,
   HIT_DOWN_STAT,
+  ATTACK_SPLASH_RADIUS,
+  BRAND_ELEMENT_ZH,
+  ELEMENT_DOWN_STAT,
+  elementDownCategory,
+  type BrandElement,
+  type WeaponDebuffAffixType,
 } from '../models/affix';
 import {
   sumUniqueAffix,
@@ -64,11 +71,17 @@ export const EROSION_CATEGORY = 'dot-erosion';
 export const EROSION_TICK_MS = 1000;
 export const EROSION_DURATION_MS = 5000;
 
-/** 命中下降／防禦下降在怪物身上的 debuff 定義（`07-affix.md` § 7.9） */
-const WEAPON_DEBUFF_AFFIX = {
-  hit_down: { category: HIT_DOWN_CATEGORY, stat: HIT_DOWN_STAT, name: '命中下降' },
-  defense_down: { category: DEFENSE_DOWN_CATEGORY, stat: 'defense', name: '防禦下降' },
-} as const;
+/** 命中下降／防禦下降／元素下降在怪物身上的 debuff 定義（`07-affix.md` § 7.9）；元素下降依元素各一個 category */
+function weaponDebuffDef(type: WeaponDebuffAffixType, element?: BrandElement): { category: string; stat: string; name: string; sign: 1 | -1 } {
+  if (type === 'hit_down') return { category: HIT_DOWN_CATEGORY, stat: HIT_DOWN_STAT, name: '命中下降', sign: -1 };
+  if (type === 'defense_down') return { category: DEFENSE_DOWN_CATEGORY, stat: 'defense', name: '防禦下降', sign: -1 };
+  return { category: elementDownCategory(element!), stat: ELEMENT_DOWN_STAT, name: `${BRAND_ELEMENT_ZH[element!]}屬性下降`, sign: 1 };
+}
+
+/** 併入隊友施加的全隊共用詞綴 debuff（`07-affix.md` § 7.9）；只含怪物身上的 debuff，不影響角色自身的判定 */
+function withPartyAffixDebuffs(activeEffects: ActiveEffect[], ctx: ArpgEventContext): ActiveEffect[] {
+  return ctx.partyAffixDebuffs?.length ? [...activeEffects, ...ctx.partyAffixDebuffs] : activeEffects;
+}
 
 function isActiveOnMonster(e: ActiveEffect, targetId: string, now: number): boolean {
   return e.type === 'debuff' && e.target === 'monster' && e.targetMonsterId === targetId
@@ -94,6 +107,28 @@ export function applyUniqueAffixRestore(session: Session, hpGain: number, mpGain
   if (hp > c.hp) logs.push({ text: `獨有詞綴回復 ${hp - c.hp} HP`, type: 'system' });
   if (mp > c.mp) logs.push({ text: `獨有詞綴回復 ${mp - c.mp} MP`, type: 'system' });
   return logs;
+}
+
+/** § 7.9 普攻回血／技能回血：每個目標每一下命中各回 `floor(該下最終傷害 × X%)` */
+export function lifestealAmount(damages: DamageResult[], percent: number): number {
+  if (percent <= 0) return 0;
+  let total = 0;
+  for (const d of damages) {
+    for (const h of d.hits) if (!h.isMiss && h.damage > 0) total += Math.floor(h.damage * percent / 100);
+  }
+  return total;
+}
+
+/** 把普攻回血／技能回血加回角色（不超過有效最大 HP；角色已死亡時不回），回傳日誌 */
+function applyAffixLifesteal(session: Session, amount: number, name: string): CombatLog[] {
+  if (amount <= 0) return [];
+  const gs = session.game.getState();
+  const c = gs.character;
+  if (!c || c.hp <= 0) return [];
+  const hp = Math.min(getEffectiveMaxHp(c, gs.equippedGear, gs.activeEffects), c.hp + amount);
+  if (hp <= c.hp) return [];
+  session.game.setState({ character: { ...c, hp } });
+  return [{ text: `${name}回復 ${hp - c.hp} HP`, type: 'player' }];
 }
 
 export interface SelfBuffApplyResult {
@@ -190,6 +225,8 @@ export interface ArpgEventContext {
   skills: Skill[];
   monsterInstances: Map<string, MonsterInstance>;
   mapMonsters: MapMonster[];
+  /** 同地圖隊友施加在怪物身上的命中下降／防禦下降／元素下降（`07-affix.md` § 7.9），併入判定 */
+  partyAffixDebuffs?: ActiveEffect[];
 }
 
 export interface DamageResult {
@@ -348,7 +385,7 @@ export function processPlayerAttack(
     return { damages: [], logs, skillUsed: skill };
   }
 
-  const effectsForDamage = activeEffects;
+  const effectsForDamage = withPartyAffixDebuffs(activeEffects, ctx);
 
   // § 7S.5 精神匯聚強化：下一次攻擊技能的傷害加成，本次施放即消耗
   const nextAttackBonus = skill && isDirectDamageSkill(skill) ? consumeNextAttackBonus(session) : 0;
@@ -636,7 +673,7 @@ export function processPlayerAttack(
       }
     }
 
-    // § 7.9 命中下降／防禦下降：判定次數同元素侵蝕；同一隻怪後施放覆蓋並刷新時間
+    // § 7.9 命中下降／防禦下降／元素下降：判定次數同元素侵蝕；同一隻怪同 category 後施放覆蓋並刷新時間
     if (!isMiss && !killed && procs) {
       const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
       for (const proc of getWeaponDebuffAffixes(weapon?.affixes, weapon?.quality ?? 0)) {
@@ -645,7 +682,7 @@ export function processPlayerAttack(
           if (random() * 100 < AFFIX_DEBUFF_CHANCE) triggered = true;
         }
         if (!triggered) continue;
-        const def = WEAPON_DEBUFF_AFFIX[proc.type];
+        const def = weaponDebuffDef(proc.type, proc.element);
         const now = gameNow();
         const gs = session.game.getState();
         session.game.setState({
@@ -662,7 +699,7 @@ export function processPlayerAttack(
           target: 'monster',
           targetIdx,
           targetMonsterId: targetId,
-          modifiers: [{ stat: def.stat, value: -proc.value, isPercent: true }],
+          modifiers: [{ stat: def.stat, value: def.sign * proc.value, isPercent: true }],
           startTime: now,
           duration: AFFIX_DEBUFF_DURATION_MS,
           tags: [],
@@ -841,6 +878,40 @@ export function processPlayerAttack(
     }
   }
 
+  // § 7.9 普攻擴散：主目標每一下最終傷害（含爆擊）× X%；必定命中、不爆擊、不扣防禦、不觸發命中類效果
+  const attackSplash = event.action.type === 'normal_attack' ? getAffixBonusesFromGear(equippedGear).attack_splash : 0;
+  const struck = damages[0];
+  if (attackSplash > 0 && struck && !struck.isMiss) {
+    const amounts = struck.hits
+      .filter(h => !h.isMiss && h.damage > 0)
+      .map(h => Math.floor(h.damage * attackSplash / 100))
+      .filter(a => a > 0);
+    const center = ctx.mapMonsters.find(m => m.id === struck.targetId)?.position;
+    for (const other of center && amounts.length > 0 ? ctx.mapMonsters : []) {
+      if (other.id === struck.targetId || getDistance(center!, other.position) > ATTACK_SPLASH_RADIUS) continue;
+      const inst = ctx.monsterInstances.get(other.id);
+      if (!inst || inst.currentHp <= 0) continue;
+      const hits: HitBreakdown[] = [];
+      for (const amount of amounts) {
+        if (inst.currentHp <= 0) break;
+        applyDamageToMonster(inst, amount);
+        hits.push({ damage: amount, isCrit: false, isMiss: false });
+      }
+      const total = hits.reduce((sum, h) => sum + h.damage, 0);
+      const killed = inst.currentHp <= 0;
+      damages.push({ targetId: other.id, damage: total, isCrit: false, isMiss: false, killed, hits, splash: true });
+      logs.push({ text: `普攻擴散對 ${monsterLogName(inst)} 造成 ${total} 傷害`, type: 'player' });
+      if (killed) logs.push({ text: `${monsterLogName(inst)} 被擊敗！`, type: 'system' });
+    }
+  }
+
+  // § 7.9 普攻回血／技能回血：含擴散、追加傷害、追打、專注打擊，依本次招式歸類
+  if (procs) {
+    const affixBonuses = getAffixBonusesFromGear(equippedGear);
+    const percent = basicAttackClass ? affixBonuses.attack_lifesteal : affixBonuses.skill_lifesteal;
+    logs.push(...applyAffixLifesteal(session, lifestealAmount(damages, percent), basicAttackClass ? '普攻回血' : '技能回血'));
+  }
+
   logs.push(...applyUniqueAffixRestore(session, uniqueHpGain, uniqueMpGain));
 
   // Update skill cooldown in store
@@ -898,7 +969,7 @@ export function processMonsterAttack(
     monster,
     character,
     equippedGear,
-    activeEffects,
+    withPartyAffixDebuffs(activeEffects, ctx),
     monsterIdx,
     // 詠唱攻擊帶倍率，瞬發不帶（`25-monster-system.md` § 25.11）
     event.damageMultiplier ?? 1,
@@ -952,7 +1023,8 @@ export function processMonsterAttack(
   const abilityLogs: CombatLog[] = [];
   if (!result.dodged && result.damage > 0) {
     const now = gameNow();
-    const percent = sumAbilityParam(equippedGear, 'thorns', 'percent');
+    // 荊棘反彈與荊棘傷害詞綴的 X 相加（`07-affix.md` § 7.9）
+    const percent = sumAbilityParam(equippedGear, 'thorns', 'percent') + getAffixBonusesFromGear(equippedGear).thorns;
     const reflect = Math.floor(result.damage * percent / 100);
     if (reflect > 0 && monster.currentHp > 0) {
       applyDamageToMonster(monster, reflect);

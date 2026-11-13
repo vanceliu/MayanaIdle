@@ -11,7 +11,7 @@ import { BagTooltip, anchorOf, type AnchorRect } from './BagTooltip';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import { toQuickSlotEntry, isSameQuickSlotEntry, quickSlotLabel, QUICK_SLOT_COUNT } from '../models/quickSlot';
-import { POTION_CONFIG, SPEED_POTION_CONFIG, getPotionName, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
+import { POTION_CONFIG, POTION_TYPES, SPEED_POTION_CONFIG, getPotionName, type SpeedPotionType, getPotionCount, getBagMaxSlots } from '../stores/gameStore';
 import { SLOT_ORDER, type EquipmentInstance, type EquippedGear, type EquipSlot } from '../models/equipment';
 import type { BagItem } from '../models/bagItem';
 import { GameIcon } from './GameIcon';
@@ -94,20 +94,13 @@ function buildBagCells(
 ): { gridItems: BagGridItem[]; sigilItems: BagGridItem[] } {
   const gridItems: BagGridItem[] = [];
 
-  const redCount = getPotionCount(bagItems, 'red');
-  const orangeCount = getPotionCount(bagItems, 'orange');
-  const whiteCount = getPotionCount(bagItems, 'white');
-
   const basicPotionIds = new Set(Object.values(POTION_CONFIG).map(c => c.itemId));
 
-  if (redCount > 0) {
-    gridItems.push({ id: 'potion-red', type: 'potion', name: getPotionName('red'), itemId: POTION_CONFIG.red.itemId, count: redCount, potionType: 'red' });
-  }
-  if (orangeCount > 0) {
-    gridItems.push({ id: 'potion-orange', type: 'potion', name: getPotionName('orange'), itemId: POTION_CONFIG.orange.itemId, count: orangeCount, potionType: 'orange' });
-  }
-  if (whiteCount > 0) {
-    gridItems.push({ id: 'potion-white', type: 'potion', name: getPotionName('white'), itemId: POTION_CONFIG.white.itemId, count: whiteCount, potionType: 'white' });
+  for (const potionType of POTION_TYPES) {
+    const count = getPotionCount(bagItems, potionType);
+    if (count > 0) {
+      gridItems.push({ id: `potion-${potionType}`, type: 'potion', name: getPotionName(potionType), itemId: POTION_CONFIG[potionType].itemId, count, potionType });
+    }
   }
 
   for (const item of bagItems) {

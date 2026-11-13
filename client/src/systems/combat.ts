@@ -7,7 +7,7 @@ import { isAccessorySlot, enhancementCountsAsDefense, isRangedWeapon } from '../
 import { getAccessoryMagicResist } from './enhancement';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, getMagicResist } from '../models/character';
-import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, HIT_DOWN_STAT, EVASION_POINTS_PER_PERCENT, roundAffixTenth, type AffixBonuses, type BrandElement } from '../models/affix';
+import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, elementDownCategory, isPartySharedAffixDebuff, ELEMENT_DOWN_STAT, HIT_DOWN_STAT, EVASION_POINTS_PER_PERCENT, roundAffixTenth, type AffixBonuses, type BrandElement } from '../models/affix';
 import { sumUniqueAffix, type UniqueAffixType } from '../models/uniqueAffix';
 import { FIRE_ENCHANT_ANY_WEAPON_STAT } from '../models/abilitySkill';
 import { random } from '../core/rng';
@@ -151,19 +151,39 @@ export function getRaceHitBonus(activeEffects: ActiveEffect[], monsterRace: stri
   return bonus;
 }
 
-export function getMonsterDebuffModifier(activeEffects: ActiveEffect[], targetIdx: number, stat: string): number {
+/**
+ * 怪物身上某 stat 的 debuff 百分比修正合計。
+ * 全隊共用的武器詞綴 debuff（`07-affix.md` § 7.9）同 category 只取最後施放的一筆 ——
+ * 隊友各自施加的同種 debuff 會同時出現在合併後的清單裡。
+ */
+function sumMonsterDebuff(activeEffects: ActiveEffect[], onTarget: (e: ActiveEffect) => boolean, stat: string): number {
   const now = gameNow();
   let percentMod = 0;
+  const latestShared = new Map<string, ActiveEffect>();
   for (const effect of activeEffects) {
     if (effect.type !== 'debuff' || effect.target !== 'monster') continue;
-    if (effect.targetIdx !== targetIdx) continue;
+    if (!onTarget(effect)) continue;
     if (now - effect.startTime >= effect.duration) continue;
     if (!effect.modifiers) continue;
+    if (isPartySharedAffixDebuff(effect.category)) {
+      const prev = latestShared.get(effect.category!);
+      if (!prev || effect.startTime >= prev.startTime) latestShared.set(effect.category!, effect);
+      continue;
+    }
     for (const mod of effect.modifiers) {
       if (mod.stat === stat && mod.isPercent) percentMod += mod.value;
     }
   }
+  for (const effect of latestShared.values()) {
+    for (const mod of effect.modifiers!) {
+      if (mod.stat === stat && mod.isPercent) percentMod += mod.value;
+    }
+  }
   return percentMod;
+}
+
+export function getMonsterDebuffModifier(activeEffects: ActiveEffect[], targetIdx: number, stat: string): number {
+  return sumMonsterDebuff(activeEffects, e => e.targetIdx === targetIdx, stat);
 }
 
 /**
@@ -199,18 +219,28 @@ export function getMonsterDebuffModifierById(
   monsterId: string,
   stat: string,
 ): number {
+  return sumMonsterDebuff(activeEffects, e => e.targetMonsterId === monsterId, stat);
+}
+
+/**
+ * 目標身上與這次攻擊同元素的元素下降%（`07-affix.md` § 7.9）。
+ * 同元素以最後施放的一筆為準（含隊友施加的，呼叫端併入 `activeEffects`）；無屬性攻擊為 0。
+ */
+export function getElementDownPercent(
+  activeEffects: ActiveEffect[],
+  targetId: string | undefined,
+  element: string | undefined,
+): number {
+  if (targetId === undefined || !element || element === 'none') return 0;
   const now = gameNow();
-  let percentMod = 0;
-  for (const effect of activeEffects) {
-    if (effect.type !== 'debuff' || effect.target !== 'monster') continue;
-    if (effect.targetMonsterId !== monsterId) continue;
-    if (now - effect.startTime >= effect.duration) continue;
-    if (!effect.modifiers) continue;
-    for (const mod of effect.modifiers) {
-      if (mod.stat === stat && mod.isPercent) percentMod += mod.value;
-    }
+  const category = elementDownCategory(element);
+  let latest: ActiveEffect | undefined;
+  for (const e of activeEffects) {
+    if (e.type !== 'debuff' || e.target !== 'monster' || e.category !== category || e.targetMonsterId !== targetId) continue;
+    if (now - e.startTime >= e.duration) continue;
+    if (!latest || e.startTime >= latest.startTime) latest = e;
   }
-  return percentMod;
+  return latest?.modifiers?.find(m => m.stat === ELEMENT_DOWN_STAT)?.value ?? 0;
 }
 
 /** 怪物身上的 debuff 修正：有 `targetId` 一律以 id 查（`24-buff-debuff.md`），未給時退回位置索引 */
@@ -310,9 +340,9 @@ export function getWeaponHitCount(weapon: EquipmentInstance | null): number {
 }
 
 /**
- * 裝備提供的魔法攻擊固定值。
- * 基底 `magicAttack` + 法杖／雙手法杖／魔導書的強化加成（§ 6.9 每 +2 強化 → 魔攻 +1）。
- * 依 `21-combat-formula.md` § 21.4 以固定值加算進基礎魔攻，不受 INT 倍率與攻擊力%詞綴影響。
+ * 裝備提供的魔法攻擊。
+ * 基底 `magicAttack`（法杖為 0.1 單位）+ 法杖／雙手法杖的強化加成（§ 6.9 每 +2 強化 → 魔攻 +1），
+ * 加總後取到小數一位（`21-combat-formula.md` § 21.4）。不受 INT 倍率與攻擊力%詞綴影響。
  */
 export function getTotalMagicAttack(equippedGear: (EquipmentInstance | null)[]): number {
   let total = 0;
@@ -323,7 +353,7 @@ export function getTotalMagicAttack(equippedGear: (EquipmentInstance | null)[]):
       total += Math.floor((g.enhancement ?? 0) / 2);
     }
   }
-  return total;
+  return roundAffixTenth(total);
 }
 
 /**
@@ -568,7 +598,7 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
  *
  * 9.5 ＝ 每 2 點 +9.5%，即 `INT加成 = floor(技能攻擊力 × (有效INT / 2 × 0.095))`（§ 21.4）。
  * 這個值與 `MAGIC_ATTACK_PERCENT_PER_POINT` 共同決定基礎魔攻的組成 ——
- * 滿裝法系（有效INT 42、裝備魔攻 15）為 智力 50%／技能攻擊力 25%／裝備魔攻 25%。
+ * 滿裝法系（有效INT 42、裝備魔攻 39）為 智力 50%／技能攻擊力 25%／裝備魔攻 25%。
  * 技能攻擊力表已依此係數縮放（§ 22.4、§ 23.7.1），**改係數就要重新縮表**。
  */
 export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 9.5;
@@ -576,13 +606,13 @@ export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 9.5;
 /**
  * § 21.4：裝備魔攻每 1 點換算的技能威力%。
  *
- * 6.5 ＝ 滿裝魔攻 15 點給 +97.5%，讓裝備魔攻與技能攻擊力本體在基礎魔攻裡各佔約 25%。
+ * 2.5 ＝ 滿裝魔攻 39 點（T7 法杖 35 ＋ 強化 4）給 +97.5%，讓裝備魔攻與技能攻擊力本體在基礎魔攻裡各佔約 25%。
  * 它是**乘在技能攻擊力上的乘區**，不是加項 —— 同一件魔攻裝備在高階魔法上給的絕對值更大。
  *
- * 與 `INT_SKILL_DAMAGE_PERCENT_PER_2` 是一組的：兩者任一改動都會讓 50:25:25 跑掉，
- * 也都需要重新縮技能攻擊力表並重跑 `scripts/simulateReaperKill.mts` 驗證。
+ * 與 `INT_SKILL_DAMAGE_PERCENT_PER_2`、法杖魔攻錨點（`weaponSeedSpec.ts`）是一組的：任一改動都會讓 50:25:25 跑掉，
+ * 也都需要重跑 `scripts/simulateReaperFight.mts` 驗證。
  */
-export const MAGIC_ATTACK_PERCENT_PER_POINT = 6.5;
+export const MAGIC_ATTACK_PERCENT_PER_POINT = 2.5;
 
 /**
  * § 21.4 的「技能側」：`floor(技能攻擊力 × (1 + 裝備魔攻%)) + INT加成`。
@@ -600,9 +630,9 @@ export function getSkillSideValue(
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effINT = getEffectiveINT(attrs.INT);
   const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
-  const magicAttack = getTotalMagicAttack(equippedGear) + getBuffFlatBonus(activeEffects, 'magic_attack');
-  const magicAttackPercent = magicAttack * MAGIC_ATTACK_PERCENT_PER_POINT;
-  return Math.floor(skillPower * (1 + magicAttackPercent / 100)) + intBonus;
+  // 魔攻以 0.1 為單位（§ 21.4）：換成整數十分位計算，避免小數誤差讓 floor 少 1
+  const magicTenths = Math.round((getTotalMagicAttack(equippedGear) + getBuffFlatBonus(activeEffects, 'magic_attack')) * 10);
+  return Math.floor(skillPower * (1000 + magicTenths * MAGIC_ATTACK_PERCENT_PER_POINT) / 1000) + intBonus;
 }
 
 /**
@@ -749,6 +779,7 @@ export function calculatePlayerAttack(
   const brandElement = getWeaponElement(weapon);
   const attackElement = brandElement ?? (hasFireEnchantActive ? 'fire' : undefined);
   const hasElement = !!brandElement || hasFireEnchantActive;
+  const elementDown = getElementDownPercent(activeEffects, targetId, attackElement);
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
   const defDebuffPercent = monsterDebuff(activeEffects, targetIdx, targetId, 'defense');
   const effectiveMonsterDef = Math.max(0, Math.floor(monster.defense * (100 + defDebuffPercent) / 100));
@@ -780,9 +811,9 @@ export function calculatePlayerAttack(
     // Apply attack% multiplier
     damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
 
-    // Apply attack elemental% multiplier (weapon element OR fire enchant)
+    // 普攻元素乘區：元素刻印% ＋ 目標身上同元素的元素下降%（§ 21.3）
     if (hasElement) {
-      damage = Math.floor(damage * (1 + bonuses.element_brand / 100));
+      damage = Math.floor(damage * (1 + (bonuses.element_brand + elementDown) / 100));
     }
 
     // Critical check
@@ -863,10 +894,11 @@ export function calculatePhysicalSkillHit(
   // Apply attack% multiplier
   damage = Math.floor(damage * (1 + bonuses.attack_power / 100));
 
-  // Apply attack elemental% multiplier (weapon element OR fire enchant)
+  // 普攻元素乘區：元素刻印% ＋ 目標身上同元素的元素下降%（§ 21.3）
   const hasElement = !!brandElement || hasFireEnchant;
   if (hasElement) {
-    damage = Math.floor(damage * (1 + bonuses.element_brand / 100));
+    const elementDown = getElementDownPercent(activeEffects, targetId, attackElement);
+    damage = Math.floor(damage * (1 + (bonuses.element_brand + elementDown) / 100));
   }
 
   // Critical check
@@ -979,9 +1011,10 @@ export function calculateSkillAttack(
   // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻 + 元素克制
   let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects);
 
-  // Apply skill elemental% multiplier (only if skill has element)
+  // 技能元素乘區：技能元素傷害% ＋ 目標身上同元素的元素下降%（§ 21.4）；無屬性技能不吃
   if (skillElement && skillElement !== 'none') {
-    damage = Math.floor(damage * (1 + bonuses.skill_elemental / 100));
+    const elementDown = getElementDownPercent(activeEffects, targetId, skillElement);
+    damage = Math.floor(damage * (1 + (bonuses.skill_elemental + elementDown) / 100));
   }
 
   const isCritical = canCrit && random() * 100 < Math.min(75, 5 + bonuses.crit_rate);

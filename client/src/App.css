@@ -4485,6 +4485,36 @@ button.active {
 /* 突破印記的失敗代價不可逆，這一段要跳出來 */
 .sigil-cost .sigil-cost-warn { color: var(--accent-danger); }
 
+/* 右欄內容超過高度時整欄捲動，各區塊不壓縮（`13-town.md` § 13.13.1） */
+.sigil-col-detail > * { flex-shrink: 0; }
+
+/* 不在所屬分類詞綴池的舊詞綴（`07-affix.md` § 7.11.2） */
+.sigil-affix-legacy {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* 可抽到的詞綴（`13-town.md` § 13.13.1） */
+.sigil-pool {
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+}
+.sigil-pool > summary { cursor: pointer; padding: 6px 10px; color: var(--text-secondary); list-style: none; }
+.sigil-pool > summary::-webkit-details-marker { display: none; }
+.sigil-pool > summary::before { content: '▸ '; color: var(--text-dim); }
+.sigil-pool[open] > summary::before { content: '▾ '; }
+.sigil-pool > summary strong { color: var(--text-primary); }
+.sigil-pool-list { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 0 10px 8px; }
+.sigil-pool-list .is-owned { color: var(--text-dim); }
+.sigil-pool-range { color: #FACC15; font-family: var(--font-mono, monospace); text-align: right; white-space: nowrap; }
+.sigil-pool-note { grid-column: 1 / -1; color: var(--text-dim); margin-top: 4px; }
+
 /* ── 底部：結果訊息 + 唯一的動作鈕（§ 34.1） ──────────────────── */
 .sigil-footer {
   display: flex;

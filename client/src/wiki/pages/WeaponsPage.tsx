@@ -1,5 +1,4 @@
-import { getWeaponRange, isRangedWeapon, type EquipmentTemplate
-} from '../../models/equipment';
+import { formatMagicAttack, getWeaponRange, isRangedWeapon, type EquipmentTemplate } from '../../models/equipment';
 import { useState, useMemo } from 'react';
 import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
@@ -171,7 +170,7 @@ function WeaponEffects({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>
   if (w.bonusMp) effects.push(`MP+${w.bonusMp}`);
   if (w.hpRegen) effects.push(`回血+${w.hpRegen}`);
   if (w.mpRegen) effects.push(`回魔+${w.mpRegen}`);
-  if (w.magicAttack) effects.push(`魔攻+${w.magicAttack}`);
+  if (w.magicAttack) effects.push(`魔攻+${formatMagicAttack(w.magicAttack)}`);
   if (w.bonusStats) effects.push(w.bonusStats);
   if (!effects.length) return <span>-</span>;
   return <span style={{ color: '#fff' }}>{effects.join(', ')}</span>;

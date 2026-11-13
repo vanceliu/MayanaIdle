@@ -84,14 +84,14 @@ describe('治癒與傷害共用技能側計算', () => {
     }
   });
 
-  it('裝備魔攻的乘區對治癒同樣生效（每 1 點 +6.5%）', () => {
+  it('裝備魔攻的乘區對治癒同樣生效（每 1 點 +2.5%）', () => {
     const c = char(18);
     const p = powerOf('full-heal');
     const without = calculateHealAmount(c, p, []);
     const withBook = calculateHealAmount(c, p, [book(15)]);
-    // 魔攻 15 → 技能攻擊力那一段 ×1.975；INT 加成不吃乘區，所以總量不會剛好 ×1.975
+    // 魔攻 15 → 技能攻擊力那一段 ×1.375；INT 加成不吃乘區，所以總量不會剛好 ×1.375
     expect(withBook).toBeGreaterThan(without);
-    expect(withBook - without).toBe(Math.floor(p * 1.975) - p);
+    expect(withBook - without).toBe(Math.floor(p * 1.375) - p);
   });
 });
 

@@ -14,7 +14,15 @@ import {
   formatAffixDescription,
   formatAffixBound,
   getAffixTierRange,
+  getAffixCategoryOf,
+  getAffixCategoryName,
+  getAffixPoolForSlot,
+  isAffixInPool,
+  formatAffixTierSpan,
+  SHOP_MAX_AFFIX_TIER,
+  SPECIAL_AFFIX_DEFINITIONS,
   type Affix,
+  type AffixCategory,
 } from '../../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST,
@@ -28,6 +36,12 @@ import {
   getEnhanceSigilRate,
   getSigilDefinition,
   getUpgradeSigilFor,
+  isShopGear,
+  CHAOS_SIGIL_MAX_TIER,
+  CHAOS_SIGIL_BONUS_TIER,
+  CHAOS_SIGIL_T6_RATE,
+  CHAOS_SIGIL_T6_MIN_LEVEL,
+  STING_SPECIAL_REPLACEMENT_TIER,
   type SigilType,
 } from '../../models/sigil';
 import { getBagItemAmount } from '../../models/bagItem';
@@ -89,8 +103,8 @@ function affixLabel(affix: Affix): string {
 }
 
 /** § 13.13.1 Tier 區間位置條：左右端為該 Tier 上下限，填色 = 未吃品質的數值在區間中的位置 */
-function renderTierRangeBar(affix: Affix) {
-  const range = getAffixTierRange(affix);
+function renderTierRangeBar(affix: Affix, category: AffixCategory) {
+  const range = getAffixTierRange(affix, category);
   if (!range) return null;
   const ratio = range.max === range.min ? 1 : (affix.value - range.min) / (range.max - range.min);
   const percent = Math.round(Math.min(100, Math.max(0, ratio * 100)) * 10) / 10;
@@ -137,6 +151,8 @@ export function SigilMaster() {
   // 選中的裝備可能被別處換掉（換裝、賣掉），失效就退回第一件
   const entry = allEntries.find(e => e.item.id === selectedItemId) ?? allEntries[0];
   const item = entry?.item;
+  /** § 7.5 選中裝備的詞綴分類 */
+  const category = item ? getAffixCategoryOf(item) : null;
 
   const def = getSigilDefinition(sigilType);
   const display = sigilDisplay(sigilType);
@@ -164,6 +180,7 @@ export function SigilMaster() {
   function checkAffix(idx: number) {
     if (!item) return { ok: false as const, reason: '沒有裝備' };
     return canUseSigil(sigilType, affixes, idx, {
+      category: category!,
       isStarterGear: isStarterGear(item),
       isCraftedGear: item.isCraftedGear,
       maxAffixTier: item.maxAffixTier,
@@ -289,6 +306,7 @@ export function SigilMaster() {
     if (sigilCounts[sigilType] <= 0) return `背包裡沒有${display.name}`;
     if (def.target === 'affix' && affixIndex == null) return '請先選一條詞綴';
     const check = canUseSigil(sigilType, affixes, affixIndex ?? undefined, {
+      category: category!,
       isStarterGear: false,
       maxAffixTier: item.maxAffixTier,
       quality: item.quality ?? 0,
@@ -404,10 +422,89 @@ export function SigilMaster() {
     );
   }
 
+  /**
+   * 可抽到的詞綴（§ 13.13.1）：選中裝備所屬分類的詞綴池，內容依選到的印記。
+   * 刺針／新增扣掉同件已有的種類；刺針選了詞綴時只列該 Tier 的區間。
+   */
+  function renderPool() {
+    if (!item || !category || inertReason(item) === '新手裝') return null;
+    const shop = isShopGear(item.maxAffixTier);
+    const rollCap = shop ? Math.min(item.maxAffixTier ?? SHOP_MAX_AFFIX_TIER, CHAOS_SIGIL_MAX_TIER) : CHAOS_SIGIL_MAX_TIER;
+    const t6Note = shop
+      ? null
+      : `每條約 ${(CHAOS_SIGIL_T6_RATE * 100).toFixed(2)}% 為 T${CHAOS_SIGIL_BONUS_TIER}（角色 Lv.${CHAOS_SIGIL_T6_MIN_LEVEL}+）`;
+    const owned = new Set(affixes.map(a => a.type));
+    const selected = affixIndex != null ? affixes[affixIndex] : undefined;
+
+    let title = '可抽到的詞綴';
+    let from = 1;
+    let to = 7;
+    let excludeOwned = false;
+    let markOwned = false;
+    let note: string | null = null;
+    let open = true;
+    if (sigilType === 'sting') {
+      excludeOwned = true;
+      if (selected) {
+        const tierless = isTierlessAffixType(selected.type);
+        from = to = tierless
+          ? Math.min(STING_SPECIAL_REPLACEMENT_TIER, item.maxAffixTier ?? DEFAULT_MAX_AFFIX_TIER)
+          : selected.tier;
+        title = tierless ? `刺針可換成（T${from}）` : `刺針可換成（T${from}，Tier 不變）`;
+      } else {
+        to = rollCap;
+        title = '刺針可換成';
+        note = '選一條詞綴後顯示該 Tier 的區間';
+      }
+    } else if (sigilType === 'add') {
+      excludeOwned = true;
+      to = rollCap;
+      title = '新增可抽到';
+      note = t6Note;
+    } else if (sigilType === 'chaos') {
+      to = rollCap;
+      title = '混沌重抽範圍';
+      note = [t6Note, '同一件不重複'].filter(Boolean).join('；');
+    } else {
+      markOwned = true;
+      open = false;
+    }
+
+    const rows = [
+      ...getAffixPoolForSlot(category)
+        .filter(d => !excludeOwned || !owned.has(d.type))
+        .map(d => ({ key: d.type, name: d.name, description: d.description, range: formatAffixTierSpan(d.type, category, from, to) })),
+      // 特殊詞綴：商店裝不會出現（§ 6A.6）
+      ...(shop ? [] : SPECIAL_AFFIX_DEFINITIONS)
+        .filter(d => d.category.includes(category) && (!excludeOwned || !owned.has(d.type)))
+        .map(d => ({ key: d.type, name: d.name, description: d.description, range: `Lv.${d.minAreaLevel}+` })),
+    ];
+
+    return (
+      <details key={`${sigilType}-${item.id}`} className="sigil-pool" open={open}>
+        <summary>{title} · <strong>{getAffixCategoryName(category)}</strong> {rows.length} 種</summary>
+        <div className="sigil-pool-list">
+          {rows.map(r => (
+            <div key={r.key} style={{ display: 'contents' }}>
+              <span className={markOwned && owned.has(r.key) ? 'is-owned' : undefined} title={r.description}>
+                {r.name}{markOwned && owned.has(r.key) ? '（已有）' : ''}
+              </span>
+              <span className="sigil-pool-range">{r.range}</span>
+            </div>
+          ))}
+          {note && <span className="sigil-pool-note">{note}</span>}
+        </div>
+      </details>
+    );
+  }
+
   /** 一條詞綴的列。`i` 是 `affixes` 的原始索引，印記一律以它指定 */
   function renderAffixRow(affix: Affix, i: number) {
     const check = checkAffix(i);
     const rowFx = fxForRow(i);
+    const cat = category!;
+    // § 7.11.2 不在所屬分類詞綴池的舊詞綴
+    const legacyNote = isAffixInPool(affix.type, cat) ? undefined : `已不在${getAffixCategoryName(cat)}的詞綴池`;
     return (
       <button
         key={i}
@@ -418,7 +515,7 @@ export function SigilMaster() {
           + `${rowFx?.mode === 'break-fail' ? ' enh-shake' : ''}`
         }
         aria-disabled={!check.ok}
-        title={affixRowTitle(affix, check.ok ? undefined : check.reason)}
+        title={affixRowTitle(affix, check.ok ? legacyNote : check.reason)}
         onClick={() => { if (check.ok) { setAffixIndex(i); setResultMsg(null); } }}
       >
         <span
@@ -426,13 +523,14 @@ export function SigilMaster() {
           className={
             (isSpecialAffixType(affix.type)
               ? 'affix-tag special'
-              : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix) ? ' max-roll' : ''}`)
+              : `affix-tag tier-${affix.tier}${isMaxRollAffix(affix, cat) ? ' max-roll' : ''}`)
             + tagFxClass(rowFx)
           }
           style={fx?.mode === 'chaos' ? ({ '--i': i } as React.CSSProperties) : undefined}
         >
           {affixLabel(affix)}
         </span>
+        {legacyNote && <span className="sigil-affix-legacy">舊</span>}
         {/*
           * 滿值詞綴整條變粗，與背包 tooltip 一致（`34-ui-guidelines.md` § 34.2）——
           * 這裡把名稱與數值拆成兩個元素，只粗體標籤的話同一條詞綴會一半粗一半不粗。
@@ -440,13 +538,13 @@ export function SigilMaster() {
         <span
           key={`value-${rowFx?.token ?? 0}`}
           className={
-            `sigil-affix-value${isMaxRollAffix(affix) ? ' max-roll' : ''}${valueFxClass(rowFx)}`
+            `sigil-affix-value${isMaxRollAffix(affix, cat) ? ' max-roll' : ''}${valueFxClass(rowFx)}`
           }
         >
           {formatAffixValue(affix)}
         </span>
         {/* 列上只放區間位置條；不能選的原因在 tooltip，消耗與成功率是整次操作共通的，收在下方 */}
-        {renderTierRangeBar(affix)}
+        {renderTierRangeBar(affix, cat)}
         {rowFx && renderFxLayer(rowFx)}
       </button>
     );
@@ -483,8 +581,8 @@ export function SigilMaster() {
           </div>
         </div>
 
-        {/* 右欄：裝備摘要 → 詞綴 → 印記 */}
-        <div className="sigil-col">
+        {/* 右欄：裝備摘要 → 詞綴 → 印記 → 可抽到的詞綴 */}
+        <div className="sigil-col sigil-col-detail">
           {item && (
             <div className="sigil-summary">
               {fx?.mode === 'polish' && renderFxLayer(fx)}
@@ -519,6 +617,9 @@ export function SigilMaster() {
                   詞綴 {countSocketedAffixes(affixes)} / {sockets} 洞{brokenSockets > 0 ? `（毀壞 ${brokenSockets}）` : ''}
                   {affixes.length > countSocketedAffixes(affixes) ? '＋封印 1 條' : ''}
                 </span>
+                {category && inertReason(item) !== '新手裝' && (
+                  <span>詞綴池 {getAffixCategoryName(category)} {getAffixPoolForSlot(category).length} 種</span>
+                )}
               </div>
             </div>
           )}
@@ -567,6 +668,7 @@ export function SigilMaster() {
           </div>
           <p className="sigil-desc">{def.description}</p>
           <p className="sigil-cost">{renderCost()}</p>
+          {renderPool()}
         </div>
       </div>
 

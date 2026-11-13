@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { getTierGroup } from '../src/models/equipmentTier';
 import { getItemById } from '../src/models/items';
-import type { EquipmentTemplate, EquipmentTier, WeaponType } from '../src/models/equipment';
+import { formatMagicAttack, type EquipmentTemplate, type EquipmentTier, type WeaponType } from '../src/models/equipment';
 
 const DOCS = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/design');
 
@@ -115,12 +115,15 @@ function renderType(type: WeaponType, items: EquipmentTemplate[]): string {
     } else {
       const d1 = largeFirst ? '大怪傷害' : '小怪傷害';
       const d2 = largeFirst ? '小怪傷害' : '大怪傷害';
-      out.push(`| 武器名稱 | ${d1} | ${d2} | 攻擊成功 | 額外攻擊 | 安定值 | 適用職業 | 材質 | 重量 | 附加 | 價格／製作 |`);
-      out.push('|---|---|---|---|---|---|---|---|---|---|---|');
+      // 法杖帶魔攻（`06-equipment-requirement.md`「法杖魔攻」），多一欄
+      const magic = list.some(t => t.magicAttack != null);
+      out.push(`| 武器名稱 | ${d1} | ${d2} | ${magic ? '魔法攻擊 | ' : ''}攻擊成功 | 額外攻擊 | 安定值 | 適用職業 | 材質 | 重量 | 附加 | 價格／製作 |`);
+      out.push(`|---|---|---|${magic ? '---|' : ''}---|---|---|---|---|---|---|---|`);
       for (const t of list) {
         const a = largeFirst ? t.largeMonsterDamage : t.smallMonsterDamage;
         const b = largeFirst ? t.smallMonsterDamage : t.largeMonsterDamage;
-        out.push(`| ${t.name} | ${a ?? 0} | ${b ?? 0} | ${t.attackSuccess ?? 0} | ${t.extraAttack ?? 0} | `
+        const magicCell = magic ? `${formatMagicAttack(t.magicAttack ?? 0)} | ` : '';
+        out.push(`| ${t.name} | ${a ?? 0} | ${b ?? 0} | ${magicCell}${t.attackSuccess ?? 0} | ${t.extraAttack ?? 0} | `
           + `${t.stability ?? 0} | ${classesOf(t)} | ${MATERIAL_ZH[t.material ?? ''] ?? '—'} | ${t.weight ?? 0} | ${bonusOf(t)} | `
           + `${t.buyPrice ? `${t.buyPrice.toLocaleString()}G` : craftOf(t)} |`);
       }

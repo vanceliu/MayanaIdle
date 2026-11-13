@@ -6,6 +6,7 @@ import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import {
   UNIQUE_AFFIX_DEFINITIONS,
   UNIQUE_AFFIX_BY_TEMPLATE,
+  UNIQUE_AFFIX_POOLS,
   UNIQUE_STRUCK_CHANCE,
   UNIQUE_STRUCK_DURATION_MS,
   getUniqueAffixPool,
@@ -22,7 +23,6 @@ import { rollNewInstanceFields } from '../../systems/templateSync';
 afterEach(() => { vi.restoreAllMocks(); });
 
 const T7 = EQUIPMENT_SEEDS.filter(t => t.tier === 7);
-const typesOf = (pool: string) => UNIQUE_AFFIX_DEFINITIONS.filter(d => d.pool === pool).map(d => d.type);
 
 describe('池的分派（§ 7T.5）', () => {
   it('49 件 T7 全部有獨有詞綴池', () => {
@@ -37,25 +37,32 @@ describe('池的分派（§ 7T.5）', () => {
     }
   });
 
-  it('右手武器走武器池（6 種）', () => {
-    const weapons = T7.filter(t => t.slot === 'rightHand');
-    expect(weapons).toHaveLength(19);
-    for (const t of weapons) expect(getUniqueAffixPool(t)).toEqual(typesOf('weapon'));
-    expect(typesOf('weapon')).toHaveLength(6);
+  it('各隨機池的種類與 § 7T.5 一致', () => {
+    expect(UNIQUE_AFFIX_POOLS).toEqual({
+      weapon: ['hit_heal', 'hit_mana', 'kill_heal', 'crit_damage', 'crit_rate', 'attack_speed'],
+      helmChest: ['struck_defense', 'struck_vit', 'extra_defense'],
+      shirtCloak: ['evasion', 'struck_spi', 'drop_rate'],
+      gloves: ['crit_damage', 'crit_rate', 'attack_speed'],
+      boots: ['evasion', 'extra_defense', 'drop_rate'],
+      accessory: ['struck_magic_resist', 'struck_all_attributes', 'magic_resist', 'all_attributes', 'immune_all'],
+    });
   });
 
-  it('頭盔／胸甲／上衣／斗篷／手套／鞋子走防具池（6 種）', () => {
-    const armor = T7.filter(t => ['helmet', 'chest', 'shirt', 'cloak', 'gloves', 'boots'].includes(t.slot));
-    expect(armor).toHaveLength(18);
-    for (const t of armor) expect(getUniqueAffixPool(t)).toEqual(typesOf('armor'));
-    expect(typesOf('armor')).toHaveLength(6);
+  it.each([
+    ['右手武器', ['rightHand'], 'weapon', 19],
+    ['頭盔／胸甲', ['helmet', 'chest'], 'helmChest', 6],
+    ['上衣／斗篷', ['shirt', 'cloak'], 'shirtCloak', 6],
+    ['手套', ['gloves'], 'gloves', 3],
+    ['鞋子', ['boots'], 'boots', 3],
+    ['項鍊／戒指', ['necklace', 'ring1', 'ring2'], 'accessory', 6],
+  ] as const)('%s走對應的池', (_label, slots, pool, count) => {
+    const items = T7.filter(t => (slots as readonly string[]).includes(t.slot));
+    expect(items).toHaveLength(count);
+    for (const t of items) expect(getUniqueAffixPool(t), t.name).toEqual(UNIQUE_AFFIX_POOLS[pool]);
   });
 
-  it('項鍊／戒指走飾品池（5 種）', () => {
-    const acc = T7.filter(t => ['necklace', 'ring1', 'ring2'].includes(t.slot));
-    expect(acc).toHaveLength(6);
-    for (const t of acc) expect(getUniqueAffixPool(t)).toEqual(typesOf('accessory'));
-    expect(typesOf('accessory')).toHaveLength(5);
+  it('手套與武器的爆擊傷害／爆擊率／攻擊速度為同一種類，數值同武器池', () => {
+    for (const type of UNIQUE_AFFIX_POOLS.gloves) expect(UNIQUE_AFFIX_POOLS.weapon).toContain(type);
   });
 
   it('腰帶與左手依模板 id 指定', () => {
@@ -75,7 +82,7 @@ describe('抽取', () => {
   it('數值落在定義的整數區間，兩端都抽得到', () => {
     for (const def of UNIQUE_AFFIX_DEFINITIONS) {
       if (!def.range) continue;
-      const template = def.pool === 'fixed'
+      const template = Object.values(UNIQUE_AFFIX_BY_TEMPLATE).includes(def.type)
         ? T7.find(t => UNIQUE_AFFIX_BY_TEMPLATE[t.id!] === def.type)!
         : T7.find(t => getUniqueAffixPool(t).includes(def.type))!;
       const pool = getUniqueAffixPool(template);
@@ -116,7 +123,7 @@ describe('數值定義（§ 7T.5）', () => {
   it('與規格表一致', () => {
     const ranges = Object.fromEntries(UNIQUE_AFFIX_DEFINITIONS.map(d => [d.type, d.range]));
     expect(ranges).toEqual({
-      hit_heal: [10, 15], hit_mana: [10, 15],
+      hit_heal: [10, 25], hit_mana: [10, 25],
       kill_heal: [30, 50], crit_damage: [25, 50], crit_rate: [20, 25], attack_speed: [20, 25],
       struck_defense: [10, 15], struck_spi: [2, 4], struck_vit: [2, 4], extra_defense: [3, 10],
       evasion: [700, 1000], drop_rate: [50, 100],

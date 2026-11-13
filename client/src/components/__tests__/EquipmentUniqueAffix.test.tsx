@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { useGameStore } from '../../stores/gameStore';
 import { AffixesPage } from '../../wiki/pages/AffixesPage';
-import { UNIQUE_AFFIX_DEFINITIONS } from '../../models/uniqueAffix';
+import { UNIQUE_AFFIX_DEFINITIONS, UNIQUE_AFFIX_POOLS } from '../../models/uniqueAffix';
+import { AFFIX_CATEGORIES } from '../../models/affix';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { UniqueAffix } from '../../models/uniqueAffix';
 import type { Character } from '../../models/character';
@@ -66,15 +67,29 @@ describe('裝備 tooltip 的 T7 獨有詞綴（§ 7T.7）', () => {
   });
 });
 
-describe('Wiki 詞綴頁的 T7 獨有詞綴節', () => {
-  it('列出每一條獨有詞綴的效果，腰帶／左手標出指定的裝備', () => {
+describe('Wiki 詞綴頁的 T7 獨有詞綴', () => {
+  const t7Names = () => [...screen.getByTestId('affix-list').querySelectorAll('.affix-tag.tier-7')].map(e => e.textContent ?? '');
+  const FIXED = { 腰帶: ['天龍腰帶', '星辰腰帶', '幻影腰帶'], 副手: ['不朽壁壘', '創世之書', '終焉臂甲'] } as Record<string, string[]>;
+
+  it('節首只放通用規則；各分類分頁列出該分類的獨有詞綴，腰帶／副手標出指定的裝備', () => {
     render(<MemoryRouter><AffixesPage /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'T7 獨有詞綴' })).toBeTruthy();
-    for (const def of UNIQUE_AFFIX_DEFINITIONS) {
-      expect(screen.getAllByText(def.description).length, def.type).toBeGreaterThan(0);
+    const pools: Record<string, keyof typeof UNIQUE_AFFIX_POOLS> = {
+      武器: 'weapon', '頭盔·胸甲': 'helmChest', '上衣·斗篷': 'shirtCloak', 手套: 'gloves', 鞋子: 'boots', 項鍊: 'accessory', 戒指: 'accessory',
+    };
+    const seen = new Set<string>();
+    for (const c of AFFIX_CATEGORIES) {
+      fireEvent.click(screen.getByRole('tab', { name: c.name }));
+      const names = t7Names();
+      if (FIXED[c.name]) {
+        expect(names, c.name).toEqual(FIXED[c.name]);
+      } else {
+        const expected = UNIQUE_AFFIX_POOLS[pools[c.name]].map(t => UNIQUE_AFFIX_DEFINITIONS.find(d => d.type === t)!.name);
+        expect(names, c.name).toEqual(expected);
+        expected.forEach(n => seen.add(n));
+      }
     }
-    for (const name of ['天龍腰帶', '星辰腰帶', '幻影腰帶', '不朽壁壘', '創世之書', '終焉臂甲']) {
-      expect(screen.getByText(name)).toBeTruthy();
-    }
+    const fixedTypes = new Set(['struck_str', 'struck_int', 'struck_agi', 'struck_block', 'struck_magic_attack', 'struck_evasion']);
+    expect([...seen].sort()).toEqual(UNIQUE_AFFIX_DEFINITIONS.filter(d => !fixedTypes.has(d.type)).map(d => d.name).sort());
   });
 });

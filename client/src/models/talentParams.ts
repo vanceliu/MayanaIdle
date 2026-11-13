@@ -129,6 +129,9 @@ const POTION_OPTIONS = [
   { value: 'red', label: '紅色藥水' },
   { value: 'orange', label: '橙色藥水' },
   { value: 'white', label: '白色藥水' },
+  { value: 'light-red', label: '減重紅色藥水' },
+  { value: 'light-orange', label: '減重橙色藥水' },
+  { value: 'light-white', label: '減重白色藥水' },
 ] as const;
 
 const ELEMENT_OPTIONS = (Object.entries(ELEMENT_LABELS) as [string, string][])

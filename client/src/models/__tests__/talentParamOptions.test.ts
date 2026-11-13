@@ -9,6 +9,7 @@ import { CLASS_SKILLS, isClassMagic } from '../classSkills';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { TALENT_RULE_DEFS } from '../../db/seed/talentSeeds';
 import { MONSTER_AFFIX_ORDER } from '../monsterAffix';
+import { POTION_TYPES } from '../../stores/gameStore';
 
 /**
  * 鑲材選項的**值域**（`51-auto-talent.md` § 51.4.1）。
@@ -63,9 +64,9 @@ const VALUE_DOMAINS: Record<string, Set<string> | null> = {
   'target_attack_type.match': new Set(['melee', 'ranged', 'magic']),
   'target_size.match': new Set(['small', 'large']),
   'in_town.match': new Set(['town', 'field']),
-  'potion.potionType': new Set(['red', 'orange', 'white']),
-  'refill_to_percent.potionType': new Set(['red', 'orange', 'white']),
-  'potion_cooldown_ready.potionType': new Set(['red', 'orange', 'white']),
+  'potion.potionType': new Set(POTION_TYPES),
+  'refill_to_percent.potionType': new Set(POTION_TYPES),
+  'potion_cooldown_ready.potionType': new Set(POTION_TYPES),
   'speed_potion.speedPotionType': new Set(['green', 'enhanced-green']),
   'target_distance.compare': null,
   'target_defense.compare': null,

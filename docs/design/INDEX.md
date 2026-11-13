@@ -35,10 +35,15 @@
 | 裝備品質提升（印記師） | `08-quality.md` | 全文 |
 | 詞綴系統（Tier/數值/pool） | `07-affix.md` | 全文 |
 | **百分比詞綴小數規則（0.1% 單位／品質取小數一位／顯示）** | `07-affix.md` | § 7.3 |
-| **印記師詞綴列 Tier 區間位置條** | `13-town.md` | § 13.13.1 |
+| **印記師詞綴列 Tier 區間位置條／可抽到的詞綴／舊詞綴標示** | `13-town.md` | § 13.13.1 |
 | **裝備欄詞綴加總（可收合）** | `34-ui-guidelines.md` | 裝備欄 |
-| **固定值型詞綴（最大 HP／MP／回血／回魔的 range）** | `07-affix.md` | § 7.3.1 |
-| **防禦力詞綴階級表（專屬，T7 最高 5%）** | `07-affix.md` | § 7.3.1 |
+| **固定值型詞綴（最大 HP／MP／回血／回魔的 range）** | `07-affix.md` | § 7.3／§ 7.3.1 |
+| **詞綴分類與部位（武器／頭盔·胸甲／上衣·斗篷／手套／鞋子／腰帶／副手／項鍊／戒指）** | `07-affix.md` | § 7.5 |
+| **各分類詞綴池與階級表（等寬表代號、共用詞綴）** | `07-affix.md` | § 7.6、§ 7.3 |
+| **舊詞綴（不在所屬分類池：精鍊／突破／重刻不受理、舊階級表）** | `07-affix.md` | § 7.11.2、§ 7.3.3 |
+| **普攻擴散／荊棘傷害／跑速詞綴** | `07-affix.md` | § 7.4、§ 7.9 |
+| **元素下降詞綴（觸發／疊加／併入元素乘區）** | `07-affix.md` § 7.9、`21-combat-formula.md` § 21.3／§ 21.4、`24-buff-debuff.md` § 24.4.3 | — |
+| **普攻回血／技能回血詞綴（逐下逐目標、擴散歸類）** | `07-affix.md` | § 7.9 |
 | **額外屬性詞綴（無 Tier、固定 +1、印記不可升階）** | `07-affix.md` § 7.3.1、`46-sigil.md` § 46.9 | — |
 | 裝備掉落/詞綴生成 | `07-affix.md` | § 7.3 |
 | 詞綴滿值粗體顯示 | `07-affix.md` | § 7.3.2 |
@@ -69,7 +74,7 @@
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
-| 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.7 |
+| 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.6 |
 | 武器模板清單 | `06-equipment-weapons.md` | 索引頁（連結各子文件） |
 | 防具模板清單 | `06-equipment-armor.md` | 全文 |
 | **防具逐件防禦與素質需求** | `06-equipment-armor.md` | 逐件清單 |
@@ -180,9 +185,9 @@
 | **背景 render 代別（第一代／第二代切換、外框、地形邊線）** | `38-map-control.md` | § 38.9「背景 render 代別」 |
 | **地板格線設定** | `34-ui-guidelines.md` | § 34.6「地板格線」 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
-| DPS 預測 / 職業輸出平衡健檢 | `44-dps-prediction.md` | 全文（結論見 § 44.7、§ 44.10） |
-| 實戰模擬（死神會攻擊）/ 職業生存與補血策略 | `44-dps-prediction.md` | § 44.12 |
-| 競技場波次模擬 / 各段位能掛多久 | `44-dps-prediction.md` | § 44.13 |
+| 平衡模擬 / 職業輸出平衡健檢（配裝規則見 § 44.2） | `44-dps-prediction.md` | 全文（結論見 § 44.8） |
+| 實戰模擬（死神會攻擊）/ 職業生存與補血策略 | `44-dps-prediction.md` | § 44.4 |
+| 競技場波次模擬 / 各段位能掛多久 | `44-dps-prediction.md` | § 44.5 |
 | **試驗場（木樁／DPS 量測）** | `50-training-ground.md` | 全文 |
 | 木樁可調參數（防禦/血量/等級/體型/元素/數量） | `50-training-ground.md` | § 50.4.2 |
 | 遺產系統（舊角色唯讀封存） | `45-legacy-archive.md` | 全文 |
@@ -257,6 +262,9 @@
 06-equipment-requirement.md
        ↕
 07-affix-tier7.md ←→ 07-affix.md § 7.12
+07-affix.md § 7.9（跑速）←→ 38-map-control.md「移動規則」
+07-affix.md § 7.9（荊棘傷害）←→ 07-affix-ability.md § 7S.5（荊棘反彈）
+07-affix.md § 7.6（格擋率）←→ 21-combat-formula.md § 21.9
 07-affix-ability.md ←→ 07-affix.md § 7.13 ←→ 07-affix-tier7.md
   ←→ 06-equipment-acquire.md § 6A.3／§ 6A.6 ←→ 13-town.md § 13.5
   ←→ 21-combat-formula.md § 21.4b／§ 21.8 ←→ 23-class-magic.md § 23.3~§ 23.7 ←→ 24-buff-debuff.md § 24.4.3
@@ -285,6 +293,7 @@
   ← 22-basic-magic.md / 23-class-magic.md / 28-monster-stats.md
   ← 24-buff-debuff.md § 24.3 / 42-element-system.md § 42.2 / 51-auto-talent.md § 51.3
   ← 25-monster-system.md § 25.12 / 27-drop-table.md § 27.5（競技場模擬）
+  ← 06-equipment-requirement.md（法杖魔攻）/ 06-equipment-armor.md（防具路線與素質需求）
 
 【戰鬥／技能／Buff】
 03-combat.md ←→ 04-character.md ←→ 05-skill.md ←→ 20-attributes.md
@@ -416,7 +425,7 @@
   ←  53-bounty-contract.md § 53.4（重置時刻）
   ←  03-combat.md § 3.13 / 97-selfhosted-server.md § 97.7.1
   ←→ 37-statistics.md § 37.1 / § 37.5（死亡統計、排行榜）
-  ←→ 44-dps-prediction.md § 44.13（波次模擬）
+  ←→ 44-dps-prediction.md § 44.5（波次模擬）
        ↕
 36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
        ↕                    ←  06-equipment-acquire.md § 6A.3

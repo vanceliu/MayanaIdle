@@ -136,9 +136,9 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const m = monster({ defense: 0 });
     const without = calculateSkillAttack(c, 20, 'none', m, []).damage;
     const withBook = calculateSkillAttack(c, 20, 'none', m, [book({ magicAttack: 30 })]).damage;
-    // § 21.4：每 1 點魔攻 → +6.5%。魔攻 30 → +195%
-    // 技能攻擊力 20 × 2.95 = 59 → 多 39 點
-    expect(withBook - without).toBe(39);
+    // § 21.4：每 1 點魔攻 → +2.5%。魔攻 30 → +75%
+    // 技能攻擊力 20 × 1.75 = 35 → 多 15 點
+    expect(withBook - without).toBe(15);
   });
 
   it('技能攻擊力越高，同一件魔攻裝備給的絕對值越大', () => {
@@ -148,9 +148,9 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const gain = (power: number) =>
       calculateSkillAttack(c, power, 'none', m, [book({ magicAttack: 50 })]).damage
       - calculateSkillAttack(c, power, 'none', m, []).damage;
-    // 魔攻 50 → +325%，即 ×4.25 的乘區：威力 10 → +32、威力 40 → +130
-    expect(gain(10)).toBe(32);
-    expect(gain(40)).toBe(130);
+    // 魔攻 50 → +125%，即 ×2.25 的乘區：威力 10 → +12、威力 40 → +50
+    expect(gain(10)).toBe(12);
+    expect(gain(40)).toBe(50);
   });
 
   it('裝備魔攻不進 INT 倍率（只乘技能攻擊力那一段）', () => {
@@ -163,8 +163,8 @@ describe('裝備魔法攻擊（21-combat-formula.md § 21.4）', () => {
     const deltaHigh = calculateSkillAttack(highInt, 20, 'none', m, [book({ magicAttack: 30 })]).damage
       - calculateSkillAttack(highInt, 20, 'none', m, []).damage;
     // 高低 INT 的增量相同 → 魔攻沒有被 INT 放大
-    expect(deltaLow).toBe(39);
-    expect(deltaHigh).toBe(39);
+    expect(deltaLow).toBe(15);
+    expect(deltaHigh).toBe(15);
   });
 });
 

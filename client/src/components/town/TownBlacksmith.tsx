@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useGameStore, type CraftResult } from '../../stores/gameStore';
 import type { EquipmentTemplate } from '../../models/equipment';
-import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX } from '../../models/equipment';
+import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX, formatMagicAttack } from '../../models/equipment';
 import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
 import { AttributeRequirement } from '../AttributeRequirement';
 import { GameIcon } from '../GameIcon';
@@ -243,7 +243,7 @@ export function TownBlacksmith() {
                 <span className="shop-item-desc">
                   {recipe.smallMonsterDamage ? `攻擊: ${recipe.smallMonsterDamage}/${recipe.largeMonsterDamage}` : ''}
                   {recipe.defense ? `防禦: ${recipe.defense}` : ''}
-                  {recipe.magicAttack ? ` | 魔攻+${recipe.magicAttack}` : ''}
+                  {recipe.magicAttack ? ` | 魔攻+${formatMagicAttack(recipe.magicAttack)}` : ''}
                   {recipe.blockRate ? ` | 格擋${recipe.blockRate}%` : ''}
                   {recipe.attackSuccess ? ` | 命中+${recipe.attackSuccess}` : ''}
                   {recipe.extraAttack ? ` | 額攻+${recipe.extraAttack}` : ''}

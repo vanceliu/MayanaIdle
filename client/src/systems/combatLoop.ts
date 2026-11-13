@@ -8,6 +8,7 @@
  *
  * `tickCombat` 是本機（一人實例）的組合入口；server 由 `systems/worldTick.ts` 逐層呼叫。
  */
+import { isPartySharedAffixDebuff } from '../models/affix';
 import type { Position } from '../models/mapControl';
 import type { MonsterInstance, MonsterAttackType, ElementType } from '../models/monster';
 import { isRangedAttackType } from '../models/monster';
@@ -234,6 +235,18 @@ export function tickInstanceCombat(deltaMs: number, instance: MapInstance): Mons
   });
 }
 
+/** 同地圖隊友施加在怪物身上的命中下降／防禦下降／元素下降（`07-affix.md` § 7.9 全隊共用） */
+function collectPartyAffixDebuffs(instance: MapInstance, self: Session): ActiveEffect[] {
+  const out: ActiveEffect[] = [];
+  for (const m of presentMembers(instance)) {
+    if (m === self) continue;
+    for (const e of m.game.getState().activeEffects) {
+      if (e.target === 'monster' && isPartySharedAffixDebuff(e.category)) out.push(e);
+    }
+  }
+  return out;
+}
+
 /** 怪物攻擊結算：對目標成員的 session 判定，演出給實例全體 */
 export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttackEvent[]): CombatVisual[] {
   const visuals: CombatVisual[] = [];
@@ -261,6 +274,7 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
       skills: gameState.skills,
       monsterInstances,
       mapMonsters: monsterStore.monsters,
+      partyAffixDebuffs: collectPartyAffixDebuffs(instance, session),
     });
     if (!result) continue;
 
@@ -328,7 +342,7 @@ function tryDodgeCounter(session: Session, instance: MapInstance, event: Monster
   const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const playerPos = session.mapControl.getState().playerPosition;
   if (!isWithinAttackRange(playerPos, monster.position, getWeaponRange(weaponType))) return;
-  if (getWeightStatus(character, allGear, gs.bagItems).overweight) return;
+  if (getWeightStatus(character, allGear, gs.bagItems, gs.activeEffects).overweight) return;
 
   const logs: CombatLog[] = [{ text: '閃避反擊！', type: 'player' }];
   resolvePlayerStrike({
@@ -394,6 +408,8 @@ function resolvePlayerStrike(o: {
   // 轉向要在演出之前、而且不管這一招碰不碰武器都要轉（§ 48.6.1）
   if (facingTarget) visuals.push({ kind: 'face', memberId, target: facingTarget.position });
 
+  const partyAffixDebuffs = collectPartyAffixDebuffs(instance, session);
+
   const result = processPlayerAttack(event, {
     session,
     character: character,
@@ -402,6 +418,7 @@ function resolvePlayerStrike(o: {
     skills: skills,
     monsterInstances,
     mapMonsters: monsterStore.monsters,
+    partyAffixDebuffs,
   });
   logs.push(...result.logs);
 
@@ -542,7 +559,7 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
     effectiveMaxHp: getEffectiveMaxHp(gameState.character, gameState.equippedGear, gameState.activeEffects),
     effectiveMaxMp: getEffectiveMaxMp(gameState.character, gameState.equippedGear, gameState.activeEffects),
     // 共用條件（§ 51.4.5）與常駐天賦吃同一份來源
-    weightPercent: getWeightPercent(gameState.character, allGear, gameState.bagItems),
+    weightPercent: getWeightPercent(gameState.character, allGear, gameState.bagItems, gameState.activeEffects),
     hpHistory: session.loop.hpSamples,
     mapMonsters: monsterStore.monsters,
     monsterInstances,

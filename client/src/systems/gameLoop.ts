@@ -20,6 +20,8 @@ import { gameNow, advanceMs, TICK_MS } from '../core/clock';
 import { playerOccupantId } from '../models/unit';
 import type { OccupationManager } from './occupationManager';
 import { isMonsterImmobile } from './arpgEngine';
+import { getEffectiveGearArray } from './gear';
+import { collectAffixBonuses } from '../models/affix';
 import {
   ensureInstance, instanceElapsedMinutes, memberIdOf, monsterTargetPosition, presentMembers, type MapInstance,
 } from './mapInstance';
@@ -253,6 +255,34 @@ export function consumeDotTick(session: Session = defaultSession): boolean {
   return false;
 }
 
+interface MoveSpeedCache {
+  gear: unknown;
+  effects: unknown;
+  base: unknown;
+  bonus: unknown;
+  multiplier: number;
+}
+
+const moveSpeedCache = new WeakMap<Session, MoveSpeedCache>();
+
+/** 跑速詞綴的移速倍率（`07-affix.md` § 7.9）。裝備、效果或配點變動時才重算 */
+export function getMoveSpeedMultiplier(session: Session): number {
+  const { character, equippedGear, activeEffects } = session.game.getState();
+  if (!character) return 1;
+  const hit = moveSpeedCache.get(session);
+  if (hit && hit.gear === equippedGear && hit.effects === activeEffects
+    && hit.base === character.baseAttributes && hit.bonus === character.bonusAttributes) {
+    return hit.multiplier;
+  }
+  const bonus = collectAffixBonuses(getEffectiveGearArray(character, activeEffects, equippedGear)).move_speed;
+  const multiplier = 1 + bonus / 100;
+  moveSpeedCache.set(session, {
+    gear: equippedGear, effects: activeEffects,
+    base: character.baseAttributes, bonus: character.bonusAttributes, multiplier,
+  });
+  return multiplier;
+}
+
 function movePlayerSafe(deltaMs: number, session: Session) {
   const occupation = session.loop.occupation;
   const store = session.mapControl.getState();
@@ -268,7 +298,7 @@ function movePlayerSafe(deltaMs: number, session: Session) {
     return;
   }
 
-  const moveDistance = (moveSpeed * deltaMs) / 1000;
+  const moveDistance = (moveSpeed * getMoveSpeedMultiplier(session) * deltaMs) / 1000;
   let remaining = moveDistance;
   let pos = { ...playerPosition };
   let idx = pathIndex;

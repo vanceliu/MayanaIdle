@@ -141,7 +141,7 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
   { type: 'rend_boost', name: '裂傷斬強化', group: 'weapon', pool: 'knight', skillId: 'rend',
     params: [{ key: 'percent', min: 10, max: 30, unit: '%' }], description: '裂傷斬流血傷害 +{percent}' },
   { type: 'iron_shield_boost', name: '鋼鐵護盾強化', group: 'accessory', pool: 'knight', skillId: 'iron-shield',
-    params: [{ key: 'reduction', min: 21, max: 25, unit: '%' }], description: '鋼鐵護盾減傷改為 {reduction}' },
+    params: [{ key: 'reduction', min: 42, max: 50, unit: '%' }], description: '鋼鐵護盾減傷改為 {reduction}' },
   { type: 'blood_curse_boost', name: '血濺咒殺強化', group: 'weapon', pool: 'knight', skillId: 'blood-curse',
     params: [{ key: 'hits', min: 1, max: 4, unit: '' }], description: '血濺咒殺打擊次數 +{hits}' },
   { type: 'vengeance_boost', name: '復仇之刃強化', group: 'weapon', pool: 'knight', skillId: 'vengeance',

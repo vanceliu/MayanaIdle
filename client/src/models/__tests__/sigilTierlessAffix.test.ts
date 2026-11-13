@@ -13,10 +13,11 @@ import { reseed, setRandomSource } from '../../core/rng';
 
 const attrAffix: Affix = { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' };
 const normal: Affix = { type: 'defense', tier: 3, value: 8 };
+/** 頭盔／胸甲：池內有額外屬性與防禦力（§ 7.6），且沒有特殊詞綴 */
 const ctx = (over: Partial<SigilContext> = {}): SigilContext => ({
-  category: 'armor', charLevel: 60, quality: 0, ...over,
+  category: 'helmChest', charLevel: 60, quality: 0, ...over,
 } as SigilContext);
-const check = { isStarterGear: false, quality: 0 };
+const check = { category: 'helmChest' as const, isStarterGear: false, quality: 0 };
 
 /** `46-sigil.md` § 46.9：額外屬性與特殊詞綴同屬「無 Tier」 */
 describe('額外屬性詞綴與印記', () => {
@@ -40,7 +41,7 @@ describe('額外屬性詞綴與印記', () => {
   it('apply 端自己也擋，不只靠 canUseSigil', () => {
     expect(applyRecarveSigil([attrAffix], 0, ctx()).success).toBe(false);
     expect(applyRecarveSigil([attrAffix], 0, ctx()).affixes).toEqual([attrAffix]);
-    expect(applyTemperSigil([attrAffix], 0, {}).success).toBe(false);
+    expect(applyTemperSigil([attrAffix], 0, { category: 'helmChest' }).success).toBe(false);
   });
 
   it('刺針換得掉', () => {

@@ -397,7 +397,7 @@ describe('印記師 — 詞綴列 tooltip（§ 13.13.1）', () => {
   });
 
   it('受擊回血的回復比例代入觸發率換算的值', () => {
-    setup(gear([{ type: 'on_hit_hp', tier: 3, value: 3 }], { slot: 'body', type: 'armor' } as never), []);
+    setup(gear([{ type: 'on_hit_hp', tier: 3, value: 3 }], { slot: 'chest', type: 'armor' }), []);
     expect(rowOf('受擊回血 T3').getAttribute('title')).toBe('受到傷害時 3.0% 機率回復最大 HP 的 2.7%');
   });
 
@@ -414,11 +414,12 @@ describe('印記師 — Tier 區間位置條（§ 13.13.1）', () => {
   const rowOf = (label: string) => screen.getByText(label).closest('button')!;
 
   it('兩端為該 Tier 上下限，填色為原始值在區間中的位置（不吃品質）', () => {
-    setup(gear([{ type: 'attack_power', tier: 4, value: 12 }], { quality: 20 }), []);
+    // 武器攻擊力 P3 的 T4 = 9.1~12.0（`07-affix.md` § 7.6）
+    setup(gear([{ type: 'attack_power', tier: 4, value: 10.5 }], { quality: 20 }), []);
     const bar = rowOf('攻擊力 T4').querySelector('.sigil-range-bar')!;
     expect(bar.className).toContain('tier-4');
-    expect([...bar.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['11.1', '13.0']);
-    expect((bar.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('47.4%'); // (12.0 − 11.1) ÷ 1.9
+    expect([...bar.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['9.1', '12.0']);
+    expect((bar.querySelector('.sigil-range-fill') as HTMLElement).style.width).toBe('48.3%'); // (10.5 − 9.1) ÷ 2.9
   });
 
   it('固定值與迴避值端點為整數；滿值填滿', () => {
@@ -459,5 +460,78 @@ describe('印記師 — 不能選的原因在 tooltip（§ 13.13.1）', () => {
     const empty = screen.getByText('空洞').closest('.sigil-affix-row')!;
     expect(empty.getAttribute('title')).toBe('可用新增印記補一條');
     expect(empty.textContent).toBe('空洞');
+  });
+});
+
+describe('印記師 — 詞綴分類（§ 13.13.1、`07-affix.md` § 7.6／§ 7.11.2）', () => {
+  const rowOf = (label: string) => screen.getByText(label).closest('button')!;
+  const gloves = (affixes: Affix[]) => gear(affixes, { name: '疾風手套', type: 'armor', slot: 'gloves' });
+  const poolRows = () => [...document.querySelectorAll('.sigil-pool-list > div')].map(d => d.textContent ?? '');
+  const poolTitle = () => document.querySelector('.sigil-pool > summary')!.textContent ?? '';
+
+  it('摘要列出所屬分類與詞綴池種類數', () => {
+    setup(gloves([{ type: 'crit_rate', tier: 3, value: 5.2 }]), []);
+    expect(document.querySelector('.sigil-summary-sub')!.textContent).toContain('詞綴池 手套 14 種');
+  });
+
+  it('不在所屬分類池的舊詞綴標「舊」，精鍊／突破／重刻不受理，刺針照常', () => {
+    setup(gloves([{ type: 'defense', tier: 4, value: 1.8 }, { type: 'crit_rate', tier: 3, value: 5.2 }]), [
+      { name: '精鍊印記', amount: 1 },
+      { name: '重刻印記', amount: 1 },
+      { name: '刺針印記', amount: 1 },
+    ]);
+    const legacy = rowOf('防禦力 T4');
+    expect(legacy.querySelector('.sigil-affix-legacy')?.textContent).toBe('舊');
+    expect(rowOf('爆擊率 T3').querySelector('.sigil-affix-legacy')).toBeNull();
+    // 舊詞綴的位置條走舊防禦力表 T4 = 1.6~2.0（§ 7.3.3）
+    expect([...legacy.querySelectorAll('.sigil-range-bound')].map(e => e.textContent)).toEqual(['1.6', '2.0']);
+
+    for (const sigil of ['精鍊印記', '重刻印記']) {
+      pickSigil(sigil);
+      expect(rowOf('防禦力 T4').getAttribute('aria-disabled'), sigil).toBe('true');
+      expect(rowOf('防禦力 T4').getAttribute('title'), sigil).toBe('防禦力 +1.8%\n已不在手套的詞綴池，只能用刺針或混沌換掉');
+    }
+    pickSigil('刺針印記');
+    expect(rowOf('防禦力 T4').getAttribute('aria-disabled')).toBe('false');
+    expect(rowOf('防禦力 T4').getAttribute('title')).toBe('防禦力 +1.8%\n已不在手套的詞綴池');
+  });
+
+  it('刺針選了詞綴：列出可換成的詞綴與同 Tier 區間，扣掉同件已有的種類', () => {
+    setup(gloves([{ type: 'crit_rate', tier: 3, value: 5.2 }, { type: 'max_hp', tier: 5, value: 66 }]), [
+      { name: '刺針印記', amount: 1 },
+    ]);
+    pickSigil('刺針印記');
+    pickAffix('爆擊率 T3');
+    expect(poolTitle()).toBe('刺針可換成（T3，Tier 不變） · 手套 12 種');
+    const rows = poolRows();
+    expect(rows).toContain('普攻擴散4.1~6.0%');
+    expect(rows).toContain('攻擊速度2.1~3.0%');
+    expect(rows).toContain('最大 MP38~46');
+    expect(rows.some(r => r.startsWith('爆擊率'))).toBe(false);
+    expect(rows.some(r => r.startsWith('最大 HP'))).toBe(false);
+  });
+
+  it('其他印記預設收合，列整個池並標出已有的種類', () => {
+    setup(gloves([{ type: 'crit_rate', tier: 3, value: 5.2 }]), [{ name: '精鍊印記', amount: 1 }]);
+    pickSigil('精鍊印記');
+    const details = document.querySelector('.sigil-pool') as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(poolTitle()).toBe('可抽到的詞綴 · 手套 14 種');
+    expect(poolRows()).toContain('爆擊率（已有）0.1~14.0%');
+  });
+
+  it('上衣／斗篷的池含免疫詞綴；商店裝不列', () => {
+    setup(gear([], { name: '布衣', type: 'armor', slot: 'shirt' }), [{ name: '新增印記', amount: 1 }]);
+    pickSigil('新增印記');
+    expect(poolRows()).toContain('毒免疫Lv.31+');
+  });
+
+  it('商店裝的新增範圍只到 T3，且不列免疫詞綴', () => {
+    setup(gear([], { name: '布衣', type: 'armor', slot: 'shirt', maxAffixTier: 3 }), [{ name: '新增印記', amount: 1 }]);
+    pickSigil('新增印記');
+    const rows = poolRows();
+    // 上衣防禦力 P1 的 T1~T3 = 0.1~3.0
+    expect(rows).toContain('防禦力0.1~3.0%');
+    expect(rows.some(r => r.startsWith('毒免疫'))).toBe(false);
   });
 });

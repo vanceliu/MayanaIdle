@@ -325,7 +325,7 @@ export function tickArpgEngine(
 
     // 超重時無法攻擊也無法施放魔法（§ 20.7）。攻擊冷卻照樣走完才判定，
     // 所以訊息的頻率等同出手頻率，不會每個 frame 洗版。
-    const weight = getWeightStatus(character, equippedGear, input.bagItems ?? []);
+    const weight = getWeightStatus(character, equippedGear, input.bagItems ?? [], activeEffects);
     if (action && isNonAttackAction(action.type) && action.type !== 'wait') {
       /*
        * 切換目標與走位（§ 51.4.9）。**消耗這次出手機會**，與「不動作」同性質 ——

@@ -1,4 +1,5 @@
 import type { PlayerDebuffType } from './playerDebuff';
+import type { BasicPotionType } from './quickSlot';
 
 /**
  * 常駐腳本「狀態異常」條件的選項。
@@ -277,12 +278,12 @@ export interface PersistentCondition {
   /** `item_count_below`／`potion_cooldown_ready` 用。存 id 不存名稱（§ 99.1.7） */
   itemId?: number;
   /** `potion_cooldown_ready` 用 */
-  potionType?: 'red' | 'orange' | 'white';
+  potionType?: BasicPotionType;
 }
 
 export interface PersistentAction {
   type: PersistentActionType;
-  potionType?: 'red' | 'orange' | 'white';
+  potionType?: BasicPotionType;
   speedPotionType?: 'green' | 'enhanced-green';
   skillId?: string;
   /** cure_item 用：狀態解除道具的 `ITEM_DEFINITIONS` id（存 id，不存名稱） */
@@ -452,7 +453,7 @@ export interface ScriptCondition {
 export interface ScriptAction {
   type: ActionType;
   skillId?: string;
-  potionType?: 'red' | 'orange' | 'white';
+  potionType?: BasicPotionType;
   scrollTownId?: string;
 }
 

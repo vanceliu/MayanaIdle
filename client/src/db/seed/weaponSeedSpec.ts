@@ -29,6 +29,49 @@ interface Spec {
   hitBonus?: number;
   twoHanded: boolean;
   weight: number;
+  /** 法杖：魔攻錨點（T1~T7，null＝該階沒有）與依走向的普攻倍率（`06-equipment-requirement.md`「法杖魔攻」） */
+  magic?: { anchor: (number | null)[]; dmg: Record<StaffRole, number> };
+}
+
+/** 法杖的走向排序，魔攻由高到低：攻擊型／智力型 → 第 4 把 → 輔助型 → 物理型 */
+type StaffRole = 'top' | 'fourth' | 'support' | 'str';
+const STAFF_ROLE_ORDER: StaffRole[] = ['top', 'fourth', 'support', 'str'];
+const STAFF_MAGIC_RATIO: Record<StaffRole, number> = { top: 1, fourth: 33.5 / 35, support: 32 / 35, str: 30 / 35 };
+
+function staffRoleOf(variant: Variant, idx: number): StaffRole {
+  if (idx === 3) return 'fourth';
+  if (variant === 'str') return 'str';
+  if (variant === 'spi' || variant === 'support') return 'support';
+  return 'top';
+}
+
+/**
+ * 法杖一階的普攻與魔攻：普攻依走向倍率，物理型最高、往攻擊型遞減，每一名至少比前一名少 1；
+ * 魔攻 = 錨點 × 走向比例，取到小數一位。
+ */
+function staffTierStats(sp: Spec, tier: number, n: number): { dmg: number; magicAttack: number }[] {
+  const magic = sp.magic!;
+  const anchor = magic.anchor[tier - 1]!;
+  const base = lerpGeo(sp.anchor.t2[0], sp.anchor.t7[0], tier);
+  const roles = Array.from({ length: n }, (_, i) => staffRoleOf(sp.variants[i % sp.variants.length], i));
+  const out = roles.map(role => ({
+    dmg: Math.max(1, Math.round(base * magic.dmg[role])),
+    magicAttack: Math.round(anchor * STAFF_MAGIC_RATIO[role] * 10) / 10,
+  }));
+  const byPhysical = roles.map((role, i) => ({ role, i }))
+    .sort((a, b) => STAFF_ROLE_ORDER.indexOf(b.role) - STAFF_ROLE_ORDER.indexOf(a.role));
+  let prev = Infinity;
+  for (const { i } of byPhysical) {
+    out[i].dmg = Math.max(1, Math.min(out[i].dmg, prev - 1));
+    prev = out[i].dmg;
+  }
+  return out;
+}
+
+/** 錨點三值（小怪、大怪、額外攻擊）同乘 `scale`（`06-equipment-requirement.md` 弓／雙刀／鋼爪） */
+function scaleAnchor(anchor: Spec['anchor'], scale: number): Spec['anchor'] {
+  const mul = (v: [number, number, number]) => v.map(x => x * scale) as [number, number, number];
+  return { t2: mul(anchor.t2), t7: mul(anchor.t7) };
 }
 
 export const WEAPON_SPEC: Spec[] = [
@@ -43,10 +86,14 @@ export const WEAPON_SPEC: Spec[] = [
     anchor: { t2: [3, 6, 2], t7: [14, 19, 5] }, twoHanded: false, weight: 36 },
   { type: 'staff', counts: [1, 2, 3, 4, 4, 3, 3], variants: ['int', 'spi', 'str'],
     caps: { knight: 3, elf: 3, thief: 3, elementalist: 7, priest: 7 },
-    anchor: { t2: [4, 4, 1], t7: [19, 19, 5] }, twoHanded: false, weight: 16 },
+    anchor: { t2: [4, 4, 1], t7: [19, 19, 5] }, twoHanded: false, weight: 16,
+    magic: {
+      anchor: [1.6, 9.6, 11.2, 14.4, 16.0, 17.6, 24.0],
+      dmg: { top: 0.90, fourth: 0.925, support: 0.95, str: 1.00 },
+    } },
   { type: 'bow', counts: [1, 2, 2, 4, 3, 4, 3], variants: ['attack', 'support', 'int'],
     caps: { knight: 4, elf: 7, thief: 6, elementalist: 4, priest: 4 },
-    anchor: { t2: [7, 6, 3], t7: [23, 20, 9] }, twoHanded: true, weight: 20 },
+    anchor: scaleAnchor({ t2: [7, 6, 3], t7: [23, 20, 9] }, 0.81), twoHanded: true, weight: 20 },
   { type: 'twoHandSword', counts: [0, 1, 2, 3, 2, 2, 1], variants: ['attack', 'spi'],
     caps: { knight: 7, elf: 4, thief: 4, elementalist: 3, priest: 3 },
     anchor: { t2: [12, 10, 2], t7: [31, 28, 9] }, twoHanded: true, weight: 60 },
@@ -55,13 +102,17 @@ export const WEAPON_SPEC: Spec[] = [
     anchor: { t2: [8, 13, 2], t7: [24, 31, 7] }, twoHanded: true, weight: 70 },
   { type: 'twoHandStaff', counts: [0, 2, 3, 4, 4, 3, 3], variants: ['attack', 'support', 'str'],
     caps: { knight: 3, elf: 3, thief: 3, elementalist: 7, priest: 6 },
-    anchor: { t2: [7, 7, 1], t7: [26, 26, 9] }, twoHanded: true, weight: 30 },
+    anchor: { t2: [7, 7, 1], t7: [26, 26, 9] }, twoHanded: true, weight: 30,
+    magic: {
+      anchor: [null, 13.6, 16.2, 20.4, 23.0, 25.6, 35.0],
+      dmg: { top: 0.90, fourth: 0.93, support: 0.96, str: 1.00 },
+    } },
   { type: 'dualBlade', counts: [1, 1, 2, 2, 2, 2, 2], variants: ['str', 'agi'],
     caps: { knight: 0, elf: 6, thief: 7, elementalist: 0, priest: 0 },
-    anchor: { t2: [5, 4, 1], t7: [15, 13, 5] }, hitBonus: 3, twoHanded: true, weight: 19 },
+    anchor: scaleAnchor({ t2: [5, 4, 1], t7: [15, 13, 5] }, 0.64), hitBonus: 3, twoHanded: true, weight: 19 },
   { type: 'claw', counts: [0, 1, 2, 2, 2, 2, 1], variants: ['str', 'int'],
     caps: { knight: 0, elf: 0, thief: 7, elementalist: 0, priest: 0 },
-    anchor: { t2: [7, 5, 1], t7: [17, 15, 5] }, twoHanded: true, weight: 14 },
+    anchor: scaleAnchor({ t2: [7, 5, 1], t7: [17, 15, 5] }, 0.64), twoHanded: true, weight: 14 },
 ];
 
 /** 第一把武器的 id，之後依 SPEC 順序連號 */
@@ -182,6 +233,7 @@ export function buildWeaponSeeds(existing: readonly EquipmentTemplate[]): Equipm
         ? (STARTER[sp.type]?.classes ?? [])
         : ALL_CLASSES.filter(c => sp.caps[c] >= tier);
       if (classes.length === 0) continue;
+      const staffStats = sp.magic ? staffTierStats(sp, tier, n) : null;
       for (let i = 0; i < n; i++) {
         const id = nextId++;
         const mod = VARIANT[sp.variants[i % sp.variants.length]];
@@ -195,10 +247,11 @@ export function buildWeaponSeeds(existing: readonly EquipmentTemplate[]): Equipm
         // 欄位順序即 seed 檔的書寫順序
         out.push({
           id, name, type: sp.type, slot: 'rightHand', isTwoHanded: sp.twoHanded,
-          smallMonsterDamage: Math.max(1, Math.round(lerpGeo(s2, s7, tier) * mod.dmg)),
-          largeMonsterDamage: Math.max(1, Math.round(lerpGeo(l2, l7, tier) * mod.dmg)),
+          smallMonsterDamage: staffStats ? staffStats[i].dmg : Math.max(1, Math.round(lerpGeo(s2, s7, tier) * mod.dmg)),
+          largeMonsterDamage: staffStats ? staffStats[i].dmg : Math.max(1, Math.round(lerpGeo(l2, l7, tier) * mod.dmg)),
           attackSuccess: Math.max(0, Math.round(tier / 2) + mod.hit + (sp.hitBonus ?? 0)),
           extraAttack: Math.max(0, lerpLin(x2, x7, tier)),
+          ...(staffStats && { magicAttack: staffStats[i].magicAttack }),
           ...(mod.stat && {
             bonusStats: `${mod.stat[1]}+${statAmount}`,
             bonusAttributes: { [mod.stat[0]]: statAmount },
@@ -223,5 +276,18 @@ export function buildWeaponSeeds(existing: readonly EquipmentTemplate[]): Equipm
       }
     }
   }
+  clawAboveDualBlade(out);
   return out;
+}
+
+/** 同階鋼爪的小怪／大怪傷害至少比該階雙刀最高值多 1（`06-equipment-requirement.md` 鋼爪） */
+function clawAboveDualBlade(weapons: EquipmentTemplate[]): void {
+  const fields = ['smallMonsterDamage', 'largeMonsterDamage'] as const;
+  for (const claw of weapons.filter(w => w.type === 'claw')) {
+    const duals = weapons.filter(w => w.type === 'dualBlade' && w.tier === claw.tier);
+    for (const f of fields) {
+      const floor = Math.max(0, ...duals.map(d => d[f] ?? 0)) + 1;
+      if ((claw[f] ?? 0) < floor) claw[f] = floor;
+    }
+  }
 }

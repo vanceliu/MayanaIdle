@@ -199,9 +199,10 @@ describe('Integration: Equipment → Affix → Stats', () => {
     expect(maxValue).toBeGreaterThanOrEqual(upgradedValue);
   });
 
-  it('should differentiate weapon and armor affixes', () => {
+  it('should differentiate weapon and helmet/chest affixes', () => {
+    // 武器與頭盔／胸甲的詞綴池沒有交集（§ 7.6）
     const weaponAffixes = generateAffixes('weapon', 15, 4);
-    const armorAffixes = generateAffixes('armor', 15, 4);
+    const armorAffixes = generateAffixes('helmChest', 15, 4);
 
     const weaponTypes = new Set(weaponAffixes.map(a => a.type));
     const armorTypes = new Set(armorAffixes.map(a => a.type));

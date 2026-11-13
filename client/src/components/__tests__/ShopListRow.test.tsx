@@ -134,7 +134,7 @@ describe('雜貨店清單', () => {
     render(<GeneralStore />);
 
     const popup = hover(rowOf('紅色藥水'));
-    expect(popup.textContent).toContain('回復 10~15 HP');
+    expect(popup.textContent).toContain('回復 20~25 HP');
     expect(popup.textContent).not.toContain('數量');
   });
 

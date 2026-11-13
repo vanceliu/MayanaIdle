@@ -14,8 +14,9 @@
  *  - 防具路線依主攻屬性（力量→重、敏捷→輕、智力→布）；配點先補該階防具的素質需求，其餘照 § 44.4
  *  - 素質需求依遊戲的凍結判定：被凍結的部位降一階重選，直到整套詞綴都生效
  *
- * 用法：npx vite-node scripts/simulateArena.mts [--tier=4,5] [--class=a,b] [--runs=N] [--minutes=N]
+ * 用法：npx vite-node scripts/simulateArena.mts [--tier=4,5] [--class=a,b] [--runs=N] [--minutes=N] [--lifesteal=attack|skill|both]
  */
+import { readFileSync } from 'node:fs';
 import { tickWorld } from '../src/systems/worldTick';
 import { createMapInstance, attachInstance } from '../src/systems/mapInstance';
 import { createMonsterCombatContext } from '../src/systems/monsterCombatFSM';
@@ -38,7 +39,7 @@ import {
 } from '../src/models/character';
 import type { MonsterInstance, MonsterTemplate } from '../src/models/monster';
 import type { ArmorLine, EquipmentInstance, EquipSlot } from '../src/models/equipment';
-import { BONUS_ATTRIBUTE_VALUE, getAffixTierTable, type AffixType as GameAffixType } from '../src/models/affix';
+import { getAffixCategoryOf, getWeaponBaseDamage } from '../src/models/affix';
 import {
   MONSTER_AFFIX_ORDER, applyMonsterAffixes, pickVenomDebuff, rollMonsterAffixes, type MonsterAffixId, type MonsterAffixRoll,
 } from '../src/models/monsterAffix';
@@ -53,10 +54,12 @@ import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
 import { MemoryRepository } from '../src/db/memoryRepository';
 import type { CombatVisual } from '../src/systems/combatLoop';
 import {
-  CREATION_ATTRIBUTES, LEVELUP_ALLOCATION, MAIN_STAT, OFFHAND_TYPES, SEED_AFFIXES, TARGET_CLASSES, WEAPON_UNIQUE_OPTIONS,
-  percentile, preCombatBuffs, proxyDps, scoreSupportPiece, usableBy, withSeed,
+  BIS_BRAND_ELEMENT, CREATION_ATTRIBUTES, LEVELUP_ALLOCATION, MAIN_STAT, OFFHAND_TYPES, SEED_AFFIXES, TARGET_CLASSES,
+  WEAPON_AFFIX_POOL, WEAPON_GENERAL_AFFIXES, WEAPON_UNIQUE_OPTIONS,
+  chooseK, erosionRollValue, percentile, preCombatBuffs, proxyDps, rankArmorOffense, scoreSupportPiece, usableBy, withSeed,
   type AffixType, type Loadout, type SimContext, type Template,
 } from './reaperShared.mts';
+import { armorAffixTypes, buildAffixes } from './affixLoadout.mts';
 import { buildSetup, fmt, slot as talentSlot, entry as talentEntry, type FightSetup } from './fightSetup.mts';
 
 defaultSession.repo = new MemoryRepository();
@@ -93,6 +96,15 @@ const healPower = (s: { id: string; power: number }) => HEAL_POWER.get(s.id) ?? 
 const NO_BOSS = process.argv.includes('--no-boss');
 /** 印出每格的裝備明細、凍結檢查、實際防禦／迴避、行動分佈、受傷與補血來源 */
 const DETAIL = process.argv.includes('--detail');
+/**
+ * 對照：武器帶回血詞綴（`07-affix.md` § 7.9）。`attack`／`skill` 換 1 條、`both` 換 2 條，
+ * 換掉的是武器一般詞綴裡邊際輸出最小的攻擊詞綴（封印詞綴不動）
+ */
+const LIFESTEAL_ARG = argOf('lifesteal');
+const LIFESTEAL_TYPES: AffixType[] = LIFESTEAL_ARG === 'attack' ? ['attack_lifesteal']
+  : LIFESTEAL_ARG === 'skill' ? ['skill_lifesteal']
+  : LIFESTEAL_ARG === 'both' ? ['attack_lifesteal', 'skill_lifesteal']
+  : [];
 /** 每 N 秒印出角色與場上怪物的狀態（除錯用） */
 const TRACE_SEC = Number(argOf('trace') ?? 0);
 const LIMIT_MS = Number(argOf('minutes') ?? 60) * 60_000;
@@ -252,32 +264,17 @@ const lineOf = (cn: ClassName) => LINE_BY_MAIN_STAT[MAIN_STAT[cn]];
 const onLine = (cn: ClassName, t: Template) => !t.line || t.line === lineOf(cn);
 const ACCESSORY_SLOTS: EquipSlot[] = ['necklace', 'ring1', 'ring2'];
 /**
- * 防具與飾品詞綴依職業（使用者提供的掛機配置為範本，不帶掉寶率）：
- *  - 防具 4 條：防禦力、職業項（妖精盜賊迴避；騎士最大 HP；法系最大 MP）、回復類依部位輪流、
- *    第 4 條妖精盜賊為主攻屬性 +1，騎士與法系依部位輪流迴避／主攻屬性 +1
- *  - 飾品 4 條：魔法抗性、回魔、受擊回血（法系為最大 MP）、受擊回魔
+ * 普攻擴散的額外目標數（`affixLoadout.mts` 的攻擊詞綴排名用）：一般波 3 隻，假設平均 1 隻在主目標 3 格內
  */
-type ArmorAffix = GameAffixType | 'bonus_attribute';
+const ARENA_SPLASH_TARGETS = 1;
+
 const isCasterClass = (cn: ClassName) => cn === 'elementalist' || cn === 'priest';
-const isAgileClass = (cn: ClassName) => cn === 'elf' || cn === 'thief';
-function armorAffixes(cn: ClassName, slotIndex: number): ArmorAffix[] {
-  const sustain: GameAffixType[] = isCasterClass(cn)
-    ? ['mp_regen', 'hp_regen', 'mp_regen', 'potion_effect']
-    : ['hp_regen', 'mp_regen', 'potion_effect'];
-  const classAffix: GameAffixType = isAgileClass(cn) ? 'evasion' : isCasterClass(cn) ? 'max_mp' : 'max_hp';
-  const fourth: ArmorAffix = isAgileClass(cn) || slotIndex % 2 === 1 ? 'bonus_attribute' : 'evasion';
-  return ['defense', classAffix, sustain[slotIndex % sustain.length], fourth];
-}
-function accessoryAffixes(cn: ClassName): ArmorAffix[] {
-  return isCasterClass(cn)
-    ? ['magic_resist', 'mp_regen', 'max_mp', 'on_hit_mp']
-    : ['magic_resist', 'mp_regen', 'on_hit_hp', 'on_hit_mp'];
-}
 
 /**
  * 各段位的配裝規則：
  *  - T4~T6：該階製作裝備（該部位無製作品時取該階掉落品），武器 +6（安定值）、防具 +5、飾品 +0；製作品詞綴取製作範圍上限
  *  - T7：T7 武器 +8，其餘 T6 防具 +9、飾品 +8；詞綴 T6，武器含封印詞綴
+ *  - 詞綴依所屬分類池（`affixLoadout.mts`）：武器窮舉攻擊詞綴組合，其他部位 2 條攻擊 ＋ 2 條生存
  */
 interface GearRule {
   weaponTier: number;
@@ -299,20 +296,18 @@ const GEAR_RULES: Record<ArenaTier, GearRule> = {
   7: { weaponTier: 7, gearTier: 6, preferCraft: false, affixTier: 6, weaponEnhance: 8, armorEnhance: 9, accessoryEnhance: 8, sealed: true, abilityRoll: 'mid' },
 };
 
-const affixMax = (type: GameAffixType, tier: number) => getAffixTierTable(type)[tier - 1].max;
-
 function makeItem(
-  tpl: Template, enhancement: number, affixTypes: (AffixType | ArmorAffix)[], affixTier: number, sealed: boolean,
-  unique: UniqueAffixType | null = null, ability: Ability | null = null, bonusAttribute?: keyof Attributes,
+  tpl: Template, enhancement: number, affixTypes: AffixType[], affixTier: number, sealed: boolean, cn: ClassName,
+  unique: UniqueAffixType | null = null, ability: Ability | null = null,
 ): EquipmentInstance {
   return {
     ...tpl, templateId: tpl.id!, quality: QUALITY, enhancement: tpl.slot === 'belt' ? 0 : enhancement, defenseBonus: 0,
-    affixes: affixTypes.map((type, i) => ({
-      ...(type === 'bonus_attribute'
-        ? { type, tier: 0, value: BONUS_ATTRIBUTE_VALUE, attribute: bonusAttribute }
-        : { type, tier: affixTier, value: affixMax(type as GameAffixType, affixTier) }),
-      ...(sealed && i === affixTypes.length - 1 ? { sealed: true as const } : {}),
-    })),
+    affixes: buildAffixes(tpl, affixTypes, affixTier, {
+      element: BIS_BRAND_ELEMENT,
+      erosionDamage: erosionRollValue(getWeaponBaseDamage(tpl)),
+      mainStat: MAIN_STAT[cn],
+      ...(sealed && affixTypes.length > WEAPON_GENERAL_AFFIXES ? { sealedIndex: WEAPON_GENERAL_AFFIXES } : {}),
+    }),
     ...(unique ? { uniqueAffix: { type: unique, value: uniqueMid(unique) } } : {}),
     ...(ability ? { ability } : {}),
     ownerId: 1, equipped: true,
@@ -354,24 +349,22 @@ function pickAt(
   return null;
 }
 
-function weaponAffixes(cn: ClassName, rule: GearRule): AffixType[] {
-  return SEED_AFFIXES[cn].slice(0, rule.sealed ? 5 : 4);
-}
+/** 武器詞綴條數：4 條，T7 段另加 1 條封印 */
+const weaponAffixCount = (rule: GearRule) => WEAPON_GENERAL_AFFIXES + (rule.sealed ? 1 : 0);
 
 interface ArenaLoadout extends Loadout { missing: string[] }
 
-interface SupportSet { items: EquipmentInstance[]; keys: string[]; offhand: Template | null }
+interface SupportSet { items: EquipmentInstance[]; keys: string[]; offhand: Template | null; ranking: AffixType[] }
 
 function assemble(
-  cn: ClassName, rule: GearRule, weapon: Template, support: SupportSet,
+  cn: ClassName, rule: GearRule, weapon: Template, support: SupportSet, weaponSet: AffixType[],
   unique: UniqueAffixType | null, ability: Ability | null, missing: string[],
 ): ArenaLoadout {
-  const w = makeItem(weapon, rule.weaponEnhance, weaponAffixes(cn, rule), rule.affixTier, rule.sealed, unique, ability);
+  const w = makeItem(weapon, rule.weaponEnhance, weaponSet, rule.affixTier, rule.sealed, cn, unique, ability);
   const gear: (EquipmentInstance | null)[] = [w];
   const off = support.offhand && !weapon.isTwoHanded ? support.offhand : null;
   if (off) {
-    gear.push(makeItem(off, rule.armorEnhance, armorAffixes(cn, ARMOR_SLOTS.length), rule.affixTier, false,
-      null, null, MAIN_STAT[cn]));
+    gear.push(makeItem(off, rule.armorEnhance, armorAffixTypes('offhand', support.ranking, cn), rule.affixTier, false, cn));
   }
   gear.push(...support.items);
   const label = `${weapon.name}+${rule.weaponEnhance}${off ? ` ＋ ${off.name}` : ''}`
@@ -380,6 +373,37 @@ function assemble(
 }
 
 const isWeapon = (t: Template) => t.smallMonsterDamage != null && !OFFHAND_TYPES.has(t.type as string);
+
+/** `--replay=<json>` 的一件：部位、模板名、強化、詞綴（依序，`sealed` 為第 5 條封印）、獨有詞綴、隨機技能 */
+interface ReplayPiece {
+  slot: string;
+  name: string;
+  enhancement: number;
+  affixes: AffixType[];
+  sealed?: boolean;
+  unique?: UniqueAffixType;
+  ability?: string;
+}
+
+/** `--replay=<json>`（鍵 `T{段位}|{職業}`）：照檔案重建配裝（數值依現行模板與階級表），不做配裝搜尋 */
+const REPLAY_ARG = argOf('replay');
+const REPLAY: Record<string, ReplayPiece[]> = REPLAY_ARG ? JSON.parse(readFileSync(REPLAY_ARG, 'utf8')) : {};
+
+function replayLoadout(cn: ClassName, tier: ArenaTier): ArenaLoadout | null {
+  const pieces = REPLAY[`T${tier}|${cn}`];
+  if (!pieces) return null;
+  const rule = GEAR_RULES[tier];
+  const gear = pieces.map(p => {
+    const tpl = EQUIPMENT_SEEDS.find(t => t.name === p.name);
+    if (!tpl) throw new Error(`重播：找不到模板 ${p.name}`);
+    const ability = p.ability ? abilityCandidates(cn, tpl, rule.abilityRoll).find(a => a.type === p.ability) ?? null : null;
+    const item = makeItem(tpl, p.enhancement, p.affixes, rule.affixTier, !!p.sealed, cn, p.unique ?? null, ability);
+    return p.slot === 'rightHand' || p.slot === 'leftHand' ? item : { ...item, slot: p.slot as EquipSlot };
+  });
+  const w = gear[0];
+  const label = `${w.name}+${w.enhancement}（重播）${w.ability ? `｜(技)${formatAbilityDisplay(w.ability)}` : ''}`;
+  return { label, unique: w.uniqueAffix?.type ?? null, ability: w.ability ?? null, weaponName: w.name, weapon: w, gear, missing: [] };
+}
 
 /**
  * 防具與飾品依 `scoreSupportPiece` 逐部位取；武器、獨有詞綴、隨機技能依粗排 DPS（對該段代表一般怪）選。
@@ -394,7 +418,7 @@ function chooseLoadout(cn: ClassName, tier: ArenaTier, ctx: SimContext): ArenaLo
   const predOf = (key: string) => (key === 'offhand'
     ? (t: Template) => OFFHAND_TYPES.has(t.type as string) && onLine(cn, t)
     : (t: Template) => t.slot === (key === 'ring2' ? 'ring1' : key) && onLine(cn, t));
-  const buildSupport = (): SupportSet & { tiers: Map<string, number> } => {
+  const buildSupport = (ranking: AffixType[]): SupportSet & { tiers: Map<string, number> } => {
     const items: EquipmentInstance[] = [];
     const keys: string[] = [];
     const tiers = new Map<string, number>();
@@ -406,13 +430,13 @@ function chooseLoadout(cn: ClassName, tier: ArenaTier, ctx: SimContext): ArenaLo
       if (key === 'offhand') { offhand = got.tpl; continue; }
       const accessory = (ACCESSORY_SLOTS as string[]).includes(key);
       const item = makeItem(got.tpl, accessory ? rule.accessoryEnhance : rule.armorEnhance,
-        accessory ? accessoryAffixes(cn) : armorAffixes(cn, (ARMOR_SLOTS as string[]).indexOf(key)), rule.affixTier, false,
-        null, null, MAIN_STAT[cn]);
+        armorAffixTypes(getAffixCategoryOf(got.tpl), ranking, cn), rule.affixTier, false, cn);
       items.push({ ...item, slot: key as EquipSlot });
       keys.push(key);
     }
-    return { items, keys, offhand, tiers };
+    return { items, keys, offhand, tiers, ranking };
   };
+  const seedSet = SEED_AFFIXES[cn].slice(0, weaponAffixCount(rule));
   const weaponPool = () => {
     const first = pickAt(cn, rule.weaponTier, rule.preferCraft, isWeapon, excluded);
     if (!first) return [];
@@ -422,13 +446,13 @@ function chooseLoadout(cn: ClassName, tier: ArenaTier, ctx: SimContext): ArenaLo
     return rule.preferCraft && craft.length > 0 ? craft : all;
   };
 
-  let support = buildSupport();
+  let support = buildSupport([]);
   let weapons: Template[] = [];
   for (let guard = 0; guard < 200; guard++) {
     weapons = weaponPool();
     if (weapons.length === 0) throw new Error(`${CLASS_NAMES_ZH[cn]} 沒有武器`);
     const fit = weapons.filter(w => {
-      const lo = assemble(cn, rule, w, support, null, null, []);
+      const lo = assemble(cn, rule, w, support, seedSet, null, null, []);
       return !getFrozenGear(ctx.character, effects, lo.gear).has(lo.weapon);
     });
     if (fit.length === 0) {
@@ -436,12 +460,12 @@ function chooseLoadout(cn: ClassName, tier: ArenaTier, ctx: SimContext): ArenaLo
       continue;
     }
     weapons = fit;
-    const probe = assemble(cn, rule, weapons[0], support, null, null, []);
+    const probe = assemble(cn, rule, weapons[0], support, seedSet, null, null, []);
     const frozen = getFrozenGear(ctx.character, effects, probe.gear);
     const frozenSupport = probe.gear.filter((g, i): g is EquipmentInstance => !!g && i > 0 && frozen.has(g));
     if (frozenSupport.length === 0) break;
     for (const g of frozenSupport) excluded.add(g.name);
-    support = buildSupport();
+    support = buildSupport([]);
   }
 
   const missing: string[] = [];
@@ -457,19 +481,50 @@ function chooseLoadout(cn: ClassName, tier: ArenaTier, ctx: SimContext): ArenaLo
   const SEED = 777;
   const score = (lo: Loadout) => proxyDps(cn, lo, SEED, ctx);
   const uniques = (w: Template): (UniqueAffixType | null)[] => (w.tier === 7 ? WEAPON_UNIQUE_OPTIONS : [null]);
+
+  // 非武器部位的攻擊詞綴排名：以生存配裝的第一名武器為基準量邊際輸出，再組 2 攻 2 守（素質判定不受詞綴影響）
+  const base = weapons
+    .map(w => assemble(cn, rule, w, support, seedSet, null, null, missing))
+    .map(lo => ({ lo, s: score(lo) }))
+    .sort((a, b) => b.s - a.s)[0].lo;
+  const tiers = support.tiers;
+  support = { ...buildSupport(rankArmorOffense(cn, base, SEED, ctx, ARENA_SPLASH_TARGETS)), tiers };
+
   const ranked = weapons
-    .flatMap(w => uniques(w).map(u => assemble(cn, rule, w, support, u, null, missing)))
+    .flatMap(w => uniques(w).map(u => assemble(cn, rule, w, support, seedSet, u, null, missing)))
     .map(lo => ({ lo, s: score(lo) }))
     .sort((a, b) => b.s - a.s)
-    .slice(0, 3);
+    .slice(0, 3)
+    .map(({ lo }) => {
+      // 武器詞綴：窮舉武器池的攻擊詞綴組合
+      const w = weapons.find(t => t.name === lo.weaponName)!;
+      return chooseK(WEAPON_AFFIX_POOL, weaponAffixCount(rule))
+        .map(set => assemble(cn, rule, w, support, set, lo.unique, null, missing))
+        .map(c => ({ lo: c, s: score(c) }))
+        .sort((a, b) => b.s - a.s)[0];
+    });
+  const setOf = (lo: Loadout) => lo.weapon.affixes!.map(a => a.type as AffixType);
   const withAbility = ranked.flatMap(({ lo }) => {
     const w = weapons.find(t => t.name === lo.weaponName)!;
     return abilityCandidates(cn, w, rule.abilityRoll)
-      .map(a => assemble(cn, rule, w, support, lo.unique, a, missing));
+      .map(a => assemble(cn, rule, w, support, setOf(lo), lo.unique, a, missing));
   });
   const all = [...ranked.map(r => r.lo), ...withAbility].map(lo => ({ lo, s: score(lo) }));
   // 製作的武器必帶隨機技能（`06-equipment-acquire.md` § 6A.3）；T7 角色條件也是有隨機技能
-  return all.filter(c => c.lo.ability).sort((a, b) => b.s - a.s)[0]?.lo ?? all.sort((a, b) => b.s - a.s)[0].lo;
+  const best = all.filter(c => c.lo.ability).sort((a, b) => b.s - a.s)[0]?.lo ?? all.sort((a, b) => b.s - a.s)[0].lo;
+  if (LIFESTEAL_TYPES.length === 0) return best;
+
+  const w = weapons.find(t => t.name === best.weaponName)!;
+  let set = setOf(best);
+  for (const ls of LIFESTEAL_TYPES) {
+    const swaps = set.slice(0, WEAPON_GENERAL_AFFIXES)
+      .map((t, i) => (LIFESTEAL_TYPES.includes(t) ? null : set.map((x, j) => (j === i ? ls : x))))
+      .filter((c): c is AffixType[] => c != null)
+      .map(c => ({ c, s: score(assemble(cn, rule, w, support, c, best.unique, best.ability, missing)) }))
+      .sort((a, b) => b.s - a.s);
+    set = swaps[0].c;
+  }
+  return assemble(cn, rule, w, support, set, best.unique, best.ability, missing);
 }
 
 // ---------------------------------------------------------------- 怪物
@@ -551,6 +606,8 @@ function healSource(text: string): string {
   if (text.startsWith('施放')) return '技能';
   if (text.includes('吸血')) return '吸血';
   if (text.includes('受擊回血')) return '受擊回血';
+  if (text.startsWith('普攻回血')) return '普攻回血';
+  if (text.startsWith('技能回血')) return '技能回血';
   if (text.includes('獨有詞綴')) return '獨有詞綴';
   return '其他';
 }
@@ -721,9 +778,9 @@ for (const tier of TIERS) {
   for (const cn of TARGET_CLASSES) {
     const character = buildArenaCharacter(cn, spec.level, gearRequirement(cn, tier));
     const ctx: SimContext = { character, level: spec.level, monster: baseMonster(rep), effectiveInt: effectiveIntOf(character) };
-    const loadout = chooseLoadout(cn, tier, ctx);
+    const loadout = replayLoadout(cn, tier) ?? chooseLoadout(cn, tier, ctx);
     const setup = withKeepDistance(cn, buildSetup(cn, loadout, 20261111 + tier, 'always', ctx, false));
-    const w = getWeightStatus(setup.character, Object.values(setup.gear), [makeBagItem(POTION_CONFIG.orange.itemId, POTION_BUDGET)!]);
+    const w = getWeightStatus(setup.character, Object.values(setup.gear), [makeBagItem(POTION_CONFIG.orange.itemId, POTION_BUDGET)!], setup.effects);
     const bagSize = w.overweight ? POTION_BAG : POTION_BUDGET;
     const results: RunResult[] = [];
     for (let i = 0; i < RUNS; i++) results.push(runOnce(setup, spec, tier * 1_000_000 + i, bagSize));

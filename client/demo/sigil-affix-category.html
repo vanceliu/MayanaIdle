@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>印記師詞綴分類 Demo — MayanaIdle</title>
+<!--
+  印記師配合詞綴分類（`07-affix.md` § 7.5／§ 7.6／§ 7.11.2、`13-town.md` § 13.13.1）。
+  資料寫死（`affixCategoryData.ts`），不接遊戲邏輯；印記名稱、顏色、說明讀正式 model。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/sigil-affix-category.html
+
+  .demo-* 只是這頁的排版；.sigil-pool*、.sigil-affix-legacy 為新增樣式；其餘來自 App.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px 16px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 760px; }
+/* 寬度與高度 ≈ 遊戲裡的設施視窗（`.town-modal` 600px） */
+.demo-frame {
+  width: min(600px, 100%); height: 820px; box-sizing: border-box;
+  background: rgba(var(--glass-rgb), 0.94); border: var(--border-width) solid var(--accent-primary);
+  border-radius: var(--radius-lg); padding: 12px 16px; display: flex; flex-direction: column;
+}
+
+/* ═══════════ 新增樣式（進 App.css） ═══════════ */
+/* 右欄內容超過高度時改為捲動，不壓縮各區塊 */
+.sigil-col > * { flex-shrink: 0; }
+.sigil-affix-legacy {
+  font-size: var(--fs-xs); color: var(--text-dim);
+  border: 1px solid var(--border-subtle); border-radius: 3px; padding: 0 4px; white-space: nowrap;
+}
+.sigil-pool {
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+}
+.sigil-pool > summary {
+  cursor: pointer; padding: 6px 10px; color: var(--text-secondary); list-style: none;
+}
+.sigil-pool > summary::before { content: '▸ '; color: var(--text-dim); }
+.sigil-pool[open] > summary::before { content: '▾ '; }
+.sigil-pool > summary strong { color: var(--text-primary); }
+.sigil-pool-list { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 0 10px 8px; }
+.sigil-pool-list .is-owned { color: var(--text-dim); }
+.sigil-pool-range { color: #FACC15; font-family: var(--font-mono, monospace); text-align: right; white-space: nowrap; }
+.sigil-pool-note { grid-column: 1 / -1; color: var(--text-dim); margin-top: 4px; }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">印記師：詞綴分類</h1>
+  <p class="demo-note">
+    1. 摘要多一項「詞綴池 部位 N 種」。<br>
+    2. 不在該部位詞綴池的舊詞綴標「舊」，精鍊／突破／重刻不受理（滑過看原因），刺針／混沌可換掉；位置條用舊表。<br>
+    3. 印記說明下方多一塊「可抽到的詞綴」：刺針列出可換成的詞綴與該 Tier 的區間；新增列出還沒有的詞綴；混沌列出整個池；其他印記列出整個池並標「已有」。
+  </p>
+  <div class="demo-frame"><div id="root" style="display:flex;flex-direction:column;flex:1;min-height:0"></div></div>
+  <script type="module" src="./sigilAffixCategoryDemo.tsx"></script>
+</body>
+</html>

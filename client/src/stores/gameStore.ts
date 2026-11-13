@@ -185,7 +185,7 @@ export interface CombatLog {
 }
 
 export type CombatLowHpAction = 'town' | 'teleport';
-export type PotionType = 'red' | 'orange' | 'white';
+export type PotionType = 'red' | 'orange' | 'white' | 'light-red' | 'light-orange' | 'light-white';
 export type SpeedPotionType = 'green' | 'enhanced-green';
 
 /**
@@ -197,10 +197,16 @@ export type SpeedPotionType = 'green' | 'enhanced-green';
 export const INN_PRICES = { full: 50, hpOnly: 30, mpOnly: 20 } as const;
 
 export const POTION_CONFIG: Record<PotionType, { itemId: number; healMin: number; healMax: number; cooldown: number; name: string }> = {
-  red: { itemId: 1, healMin: 10, healMax: 15, cooldown: 600, name: '紅色藥水' },
-  orange: { itemId: 2, healMin: 30, healMax: 45, cooldown: 900, name: '橙色藥水' },
-  white: { itemId: 3, healMin: 60, healMax: 90, cooldown: 1500, name: '白色藥水' },
+  red: { itemId: 1, healMin: 20, healMax: 25, cooldown: 600, name: '紅色藥水' },
+  orange: { itemId: 2, healMin: 40, healMax: 55, cooldown: 900, name: '橙色藥水' },
+  white: { itemId: 3, healMin: 70, healMax: 100, cooldown: 1500, name: '白色藥水' },
+  'light-red': { itemId: 177, healMin: 20, healMax: 25, cooldown: 600, name: '減重紅色藥水' },
+  'light-orange': { itemId: 178, healMin: 40, healMax: 55, cooldown: 900, name: '減重橙色藥水' },
+  'light-white': { itemId: 179, healMin: 70, healMax: 100, cooldown: 1500, name: '減重白色藥水' },
 };
+
+/** 基礎藥水的顯示順序：一般版紅橙白、減重版紅橙白 */
+export const POTION_TYPES = Object.keys(POTION_CONFIG) as PotionType[];
 
 export const SPEED_POTION_CONFIG: Record<SpeedPotionType, { itemId: number; duration: number; name: string }> = {
   green: { itemId: 133, duration: 180000, name: '綠色藥水' },
@@ -1937,7 +1943,7 @@ export function createGameStore(session: Session) {
       monsterPositions: session.mapMonster.getState().monsters.map(m => m.position),
       weaponType: getEquippedWeapon(allGear)?.type,
       hpHistory: hpSamples,
-      weightPercent: getWeightPercent(char, allGear, state.bagItems),
+      weightPercent: getWeightPercent(char, allGear, state.bagItems, state.activeEffects),
     };
 
     // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列
@@ -2089,6 +2095,7 @@ export function createGameStore(session: Session) {
           char,
           getEffectiveGearArray(char, state.activeEffects, state.equippedGear),
           state.bagItems,
+          state.activeEffects,
         );
         return w.capacity > 0 ? (w.carried / w.capacity) * 100 : 0;
       })(),
@@ -2968,7 +2975,7 @@ export function createGameStore(session: Session) {
       else if (sigilType === 'sting') result = applyStingSigil(item.affixes!, affixIndex, ctx);
       else if (sigilType === 'recarve') result = applyRecarveSigil(item.affixes!, affixIndex, ctx);
       else if (sigilType === 'temper') result = applyTemperSigil(item.affixes!, affixIndex, ctx);
-      else result = applyEnhanceSigil(item.affixes!, affixIndex);
+      else result = applyEnhanceSigil(item.affixes!, affixIndex, ctx);
       // 池抽空之類的「沒有東西可換」不消耗印記
       if (result.affixes === affixes) return { ok: false, message: result.message };
       patch = { affixes: result.affixes, ...(result.affixSlots != null ? { affixSlots: result.affixSlots } : {}) };

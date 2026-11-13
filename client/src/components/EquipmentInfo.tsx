@@ -1,6 +1,6 @@
-import { getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
+import { formatMagicAttack, getWeaponRange, isRangedWeapon, SLOT_NAMES } from '../models/equipment';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
-import { formatAffixDisplay, formatAffixDisplayParts, getWeaponBaseDamage, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix, type DisplayPart } from '../models/affix';
+import { formatAffixDisplay, formatAffixDisplayParts, getAffixCategoryOf, getWeaponBaseDamage, isSpecialAffixType, isTierlessAffixType, shouldBoldAffix, AFFIX_SOCKETS, getAffixSockets, countSocketedAffixes, type Affix, type DisplayPart } from '../models/affix';
 import { formatUniqueAffixDisplay } from '../models/uniqueAffix';
 import { formatAbilityDisplayParts } from '../models/ability';
 import { CLASS_NAMES_ZH } from '../models/character';
@@ -88,6 +88,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const enhancement = item.enhancement ?? 0;
   const enhanceAttackSuccess = Math.floor(enhancement / 2);
   const enhanceMagicAttack = isStaff(item.type) ? Math.floor(enhancement / 2) : 0;
+  const totalMagicAttack = Math.round(((item.magicAttack ?? 0) + enhanceMagicAttack) * 10) / 10;
   const baseAttackSuccess = item.attackSuccess ?? 0;
   const baseExtraAttack = item.extraAttack ?? 0;
   const totalAttackSuccess = baseAttackSuccess + enhanceAttackSuccess;
@@ -102,6 +103,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const uniqueSuppressed = useUniqueAffixSuppressed(item);
   const showRange = useAltHeld();
   const weaponBaseDamage = isWeapon ? getWeaponBaseDamage(item) : undefined;
+  const affixCategory = getAffixCategoryOf(item);
   // § 7.1 詞綴洞：新手裝沒有詞綴也不開洞，不列空洞
   const affixCount = item.affixes?.length ?? 0;
   const emptySockets = item.isStarterGear ? 0 : Math.max(0, getAffixSockets(item) - countSocketedAffixes(item.affixes));
@@ -118,10 +120,10 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       // § 7.3.2 滾到該 Tier 上限的詞綴以粗體標示；額外屬性無 Tier，一律粗體
       <div
         key={key}
-        className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
+        className={`equip-detail-affix tier-${affix.tier}${shouldBoldAffix(affix, affixCategory) ? ' max-roll' : ''}${affix.sealed ? ' sealed' : ''}`}
         title={isTierlessAffixType(affix.type) ? '印記只能重骰，不能升階' : undefined}
       >
-        <DisplayParts parts={formatAffixDisplayParts(affix, item.quality, weaponBaseDamage)} showRange={showRange} />
+        <DisplayParts parts={formatAffixDisplayParts(affix, item.quality, weaponBaseDamage, affixCategory)} showRange={showRange} />
       </div>
     )
   );
@@ -168,11 +170,9 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {isWeapon && baseExtraAttack > 0 && (
         <div className="equip-detail-stat">額外攻擊: +{baseExtraAttack}</div>
       )}
-      {isWeapon && enhanceMagicAttack > 0 && (
-        <div className="equip-detail-stat">魔法攻擊: +{enhanceMagicAttack}</div>
-      )}
-      {!isWeapon && (item.magicAttack ?? 0) > 0 && (
-        <div className="equip-detail-stat">魔法攻擊: +{item.magicAttack}</div>
+      {/* 法杖：基底魔攻＋強化加成（§ 6.9）；其他裝備只有基底 */}
+      {totalMagicAttack > 0 && (
+        <div className="equip-detail-stat">魔法攻擊: +{formatMagicAttack(totalMagicAttack)}</div>
       )}
       {(item.bonusHp ?? 0) > 0 && (
         <div className="equip-detail-stat">HP+{item.bonusHp}</div>
@@ -299,7 +299,7 @@ export function EquipmentTemplateDetail({ template, hint }: EquipmentTemplateDet
         <div className="equip-detail-stat">額外攻擊: +{baseExtraAttack}</div>
       )}
       {(template.magicAttack ?? 0) > 0 && (
-        <div className="equip-detail-stat">魔法攻擊: +{template.magicAttack}</div>
+        <div className="equip-detail-stat">魔法攻擊: +{formatMagicAttack(template.magicAttack!)}</div>
       )}
       {(template.bonusHp ?? 0) > 0 && (
         <div className="equip-detail-stat">HP+{template.bonusHp}</div>

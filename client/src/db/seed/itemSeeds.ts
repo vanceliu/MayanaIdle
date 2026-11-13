@@ -2,14 +2,17 @@ import type { ItemDefinition } from '../../models/items';
 
 export const ITEM_DEFINITIONS: ItemDefinition[] = [
   // === 藥水 ===
-  { id: 1, name: '紅色藥水', category: 'potion', description: '回復 10~15 HP', weight: 2, buyPrice: 25, healMin: 10, healMax: 15, cooldown: 600, icon: 'items/standing-potion', iconColor: '#DC2626' },
-  { id: 2, name: '橙色藥水', category: 'potion', description: '回復 30~45 HP', weight: 5, buyPrice: 80, healMin: 30, healMax: 45, cooldown: 900, icon: 'items/bubbling-flask', iconColor: '#F59E0B' },
-  { id: 3, name: '白色藥水', category: 'potion', description: '回復 60~90 HP', weight: 10, buyPrice: 200, healMin: 60, healMax: 90, cooldown: 1500, icon: 'items/potion-ball', iconColor: '#E2E8F0' },
+  { id: 1, name: '紅色藥水', category: 'potion', description: '回復 20~25 HP', weight: 2, buyPrice: 25, healMin: 20, healMax: 25, cooldown: 600, icon: 'items/standing-potion', iconColor: '#DC2626' },
+  { id: 2, name: '橙色藥水', category: 'potion', description: '回復 40~55 HP', weight: 5, buyPrice: 80, healMin: 40, healMax: 55, cooldown: 900, icon: 'items/bubbling-flask', iconColor: '#F59E0B' },
+  { id: 3, name: '白色藥水', category: 'potion', description: '回復 70~100 HP', weight: 10, buyPrice: 200, healMin: 70, healMax: 100, cooldown: 1500, icon: 'items/potion-ball', iconColor: '#E2E8F0' },
   { id: 133, name: '綠色藥水', category: 'potion', description: '攻速+33%（180秒）', weight: 5, buyPrice: 200, icon: 'items/standing-potion', iconColor: '#4ADE80' },
   { id: 134, name: '強化綠色藥水', category: 'potion', description: '攻速+33%（900秒）', weight: 10, buyPrice: 1000, icon: 'items/bubbling-flask', iconColor: '#4ADE80' },
   { id: 173, name: '回魔藥水', category: 'potion', description: '回魔量+15（300秒）', weight: 5, buyPrice: 5000, icon: 'items/bubbling-flask', iconColor: '#60A5FA' },
   { id: 174, name: '爆擊藥水', category: 'potion', description: '爆擊率+10%（300秒）', weight: 5, buyPrice: 5000, icon: 'items/bubbling-flask', iconColor: '#FB923C' },
   { id: 175, name: '回血藥水', category: 'potion', description: '回血量+15（300秒）', weight: 5, buyPrice: 5000, icon: 'items/bubbling-flask', iconColor: '#F472B6' },
+  { id: 177, name: '減重紅色藥水', category: 'potion', description: '回復 20~25 HP', weight: 1, buyPrice: 50, healMin: 20, healMax: 25, cooldown: 600, icon: 'items/standing-potion', iconColor: '#DC2626' },
+  { id: 178, name: '減重橙色藥水', category: 'potion', description: '回復 40~55 HP', weight: 2.5, buyPrice: 160, healMin: 40, healMax: 55, cooldown: 900, icon: 'items/bubbling-flask', iconColor: '#F59E0B' },
+  { id: 179, name: '減重白色藥水', category: 'potion', description: '回復 70~100 HP', weight: 5, buyPrice: 400, healMin: 70, healMax: 100, cooldown: 1500, icon: 'items/potion-ball', iconColor: '#E2E8F0' },
   { id: 176, name: '慎重藥水', category: 'potion', description: '魔攻+8（300秒）', weight: 5, buyPrice: 5000, icon: 'items/bubbling-flask', iconColor: '#A855F7' },
   
   // === 狀態解除道具 ===

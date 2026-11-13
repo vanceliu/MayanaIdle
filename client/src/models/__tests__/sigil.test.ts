@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-  AFFIX_DEFINITIONS,
+  AFFIX_POOLS,
   SHOP_MAX_AFFIX_TIER,
   getAffixTierTable,
   isSpecialAffixType,
@@ -48,8 +48,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** canUseSigil／精鍊／突破的最小 ctx。上衣／斗篷：FOUR 全在池內，且含特殊詞綴（§ 7.6、§ 7.10.1） */
+const C = { category: 'shirtCloak' as const };
+const W = { category: 'weapon' as const };
+
 const dropCtx = (over: Partial<SigilContext> = {}): SigilContext => ({
-  category: 'armor',
+  category: 'shirtCloak',
   charLevel: 60,
   weaponBaseDamage: 40,
   ...over,
@@ -125,7 +129,7 @@ describe('印記系統（§ 46）', () => {
       for (const a of affixes) {
         expect(isSpecialAffixType(a.type)).toBe(false);
         expect(a.tier).toBe(tier);
-        const t = getAffixTierTable(a.type as never)[tier - 1];
+        const t = getAffixTierTable(a.type as never, 'shirtCloak')[tier - 1];
         expect(a.value).toBeGreaterThanOrEqual(t.min);
         expect(a.value).toBeLessThanOrEqual(t.max);
       }
@@ -172,7 +176,7 @@ describe('印記系統（§ 46）', () => {
 
     it('武器裝備重骰後不會出現防具詞綴', () => {
       const weaponTypes = new Set(
-        AFFIX_DEFINITIONS.filter(d => d.category.includes('weapon')).map(d => d.type),
+        Object.keys(AFFIX_POOLS.weapon),
       );
       const { affixes } = applyChaosSigil(
         [{ type: 'attack_power', tier: 3, value: 10 }, { type: 'crit_rate', tier: 3, value: 10 }],
@@ -211,7 +215,7 @@ describe('印記系統（§ 46）', () => {
         if (isTierlessAffixType(affixes[0].type)) continue;
         checked++;
         expect(affixes[0].tier).toBe(STING_SPECIAL_REPLACEMENT_TIER);
-        const table = getAffixTierTable(affixes[0].type as never);
+        const table = getAffixTierTable(affixes[0].type as never, 'shirtCloak');
         const t5 = table.find(t => t.tier === STING_SPECIAL_REPLACEMENT_TIER)!;
         expect(affixes[0].value).toBeGreaterThanOrEqual(t5.min);
         expect(affixes[0].value).toBeLessThanOrEqual(t5.max);
@@ -253,7 +257,7 @@ describe('印記系統（§ 46）', () => {
       const { affixes: next } = applyRecarveSigil(affixes, 0, dropCtx());
       expect(next[0].type).toBe('defense');
       expect(next[0].tier).toBe(6);
-      const t6 = getAffixTierTable('defense').find(t => t.tier === 6)!;
+      const t6 = getAffixTierTable('defense', 'shirtCloak').find(t => t.tier === 6)!;
       expect(next[0].value).toBeGreaterThanOrEqual(t6.min);
       expect(next[0].value).toBeLessThanOrEqual(t6.max);
     });
@@ -273,7 +277,7 @@ describe('印記系統（§ 46）', () => {
     it('受擊回血：只重骰觸發率，不另外帶回復比例（隨觸發率，07-affix § 7.9）', () => {
       const affixes: Affix[] = [{ type: 'on_hit_hp', tier: 5, value: 5 }];
       for (let run = 0; run < 100; run++) {
-        const { affixes: next } = applyRecarveSigil(affixes, 0, dropCtx());
+        const { affixes: next } = applyRecarveSigil(affixes, 0, dropCtx({ category: 'helmChest' }));
         expect('restorePercent' in next[0]).toBe(false);
         expect(next[0].value).toBeGreaterThanOrEqual(4.5);
         expect(next[0].value).toBeLessThanOrEqual(5.3);
@@ -282,7 +286,7 @@ describe('印記系統（§ 46）', () => {
 
     it('特殊詞綴沒有數值，不受理', () => {
       const affixes: Affix[] = [{ type: 'immune_bleed', tier: 0, value: 0 }];
-      expect(canUseSigil('recarve', affixes, 0, {}).ok).toBe(false);
+      expect(canUseSigil('recarve', affixes, 0, C).ok).toBe(false);
     });
   });
 
@@ -315,28 +319,28 @@ describe('印記系統（§ 46）', () => {
 
     it('Tier +1 必定成功，數值以新 Tier 的區間重骰', () => {
       mockRandom([0.99]);
-      const { affixes, success } = applyTemperSigil([{ type: 'defense', tier: 3, value: 9 }], 0, {});
+      const { affixes, success } = applyTemperSigil([{ type: 'defense', tier: 3, value: 9 }], 0, C);
       expect(success).toBe(true);
       expect(affixes[0].tier).toBe(4);
-      const t4 = getAffixTierTable('defense').find(t => t.tier === 4)!;
+      const t4 = getAffixTierTable('defense', 'shirtCloak').find(t => t.tier === 4)!;
       expect(affixes[0].value).toBeGreaterThanOrEqual(t4.min);
       expect(affixes[0].value).toBeLessThanOrEqual(t4.max);
     });
 
     it('推到取得管道上限後不再受理', () => {
       const t5: Affix[] = [{ type: 'defense', tier: 5, value: 15 }];
-      expect(applyTemperSigil(t5, 0, {}).success).toBe(false);
-      expect(canUseSigil('temper', t5, 0, {}).ok).toBe(false);
+      expect(applyTemperSigil(t5, 0, C).success).toBe(false);
+      expect(canUseSigil('temper', t5, 0, C).ok).toBe(false);
       // 商店裝 T3 就是頂
       const t3: Affix[] = [{ type: 'defense', tier: 3, value: 11 }];
-      expect(canUseSigil('temper', t3, 0, { maxAffixTier: SHOP_MAX_AFFIX_TIER }).ok).toBe(false);
-      expect(canUseSigil('temper', t3, 0, {}).ok).toBe(true);
+      expect(canUseSigil('temper', t3, 0, { ...C, maxAffixTier: SHOP_MAX_AFFIX_TIER }).ok).toBe(false);
+      expect(canUseSigil('temper', t3, 0, C).ok).toBe(true);
     });
 
     it('元素與每跳傷害不動', () => {
       mockRandom([0.5]);
       const { affixes } = applyTemperSigil(
-        [{ type: 'element_erosion', tier: 2, value: 7, element: 'fire', dotDamage: 21 }], 0, {},
+        [{ type: 'element_erosion', tier: 2, value: 7, element: 'fire', dotDamage: 21 }], 0, W,
       );
       expect(affixes[0].dotDamage).toBe(21);
       expect(affixes[0].element).toBe('fire');
@@ -344,8 +348,8 @@ describe('印記系統（§ 46）', () => {
 
     it('特殊詞綴無 Tier，不受理', () => {
       const special: Affix[] = [{ type: 'immune_poison', tier: 0, value: 0 }];
-      expect(canUseSigil('temper', special, 0, {}).ok).toBe(false);
-      expect(applyTemperSigil(special, 0, {}).success).toBe(false);
+      expect(canUseSigil('temper', special, 0, C).ok).toBe(false);
+      expect(applyTemperSigil(special, 0, C).success).toBe(false);
     });
   });
 
@@ -362,9 +366,9 @@ describe('印記系統（§ 46）', () => {
 
     it('品質已滿或裝備無詞綴時不受理', () => {
       const affixes: Affix[] = [{ type: 'defense', tier: 3, value: 11 }];
-      expect(canUseSigil('polish', affixes, undefined, { quality: 0 }).ok).toBe(true);
-      expect(canUseSigil('polish', affixes, undefined, { quality: POLISH_SIGIL_QUALITY_MAX }).ok).toBe(false);
-      expect(canUseSigil('polish', [], undefined, { quality: 0 }).ok).toBe(false);
+      expect(canUseSigil('polish', affixes, undefined, { ...C, quality: 0 }).ok).toBe(true);
+      expect(canUseSigil('polish', affixes, undefined, { ...C, quality: POLISH_SIGIL_QUALITY_MAX }).ok).toBe(false);
+      expect(canUseSigil('polish', [], undefined, { ...C, quality: 0 }).ok).toBe(false);
     });
   });
 
@@ -377,31 +381,31 @@ describe('印記系統（§ 46）', () => {
 
       const t4: Affix[] = [{ type: 'defense', tier: 4, value: 12 }];
       const t7: Affix[] = [{ type: 'defense', tier: 7, value: 20 }];
-      expect(canUseSigil('enhance', t4, 0, {}).ok).toBe(false);
-      expect(canUseSigil('enhance', t7, 0, {}).ok).toBe(false);
-      expect(canUseSigil('enhance', [{ type: 'defense', tier: 5, value: 15 }], 0, {}).ok).toBe(true);
+      expect(canUseSigil('enhance', t4, 0, C).ok).toBe(false);
+      expect(canUseSigil('enhance', t7, 0, C).ok).toBe(false);
+      expect(canUseSigil('enhance', [{ type: 'defense', tier: 5, value: 15 }], 0, C).ok).toBe(true);
     });
 
     it('T5 → T6：擲點低於 10% 時成功', () => {
       mockRandom([0.05, 0.5]);
-      const { affixes, success } = applyEnhanceSigil([{ type: 'defense', tier: 5, value: 15 }], 0);
+      const { affixes, success } = applyEnhanceSigil([{ type: 'defense', tier: 5, value: 15 }], 0, C);
       expect(success).toBe(true);
       expect(affixes[0].tier).toBe(6);
     });
 
     it('T6 → T7：擲點低於 2% 時成功', () => {
       mockRandom([0.01, 0.5]);
-      const { affixes, success } = applyEnhanceSigil([{ type: 'defense', tier: 6, value: 17 }], 0);
+      const { affixes, success } = applyEnhanceSigil([{ type: 'defense', tier: 6, value: 17 }], 0, C);
       expect(success).toBe(true);
       expect(affixes[0].tier).toBe(7);
     });
 
     it('失敗時掉回 T1，數值以 T1 區間重骰', () => {
       mockRandom([0.9, 0.5]);
-      const { affixes, success } = applyEnhanceSigil([{ type: 'defense', tier: 6, value: 18 }], 0);
+      const { affixes, success } = applyEnhanceSigil([{ type: 'defense', tier: 6, value: 18 }], 0, C);
       expect(success).toBe(false);
       expect(affixes[0].tier).toBe(ENHANCE_SIGIL_FAIL_TIER);
-      const t1 = getAffixTierTable('defense').find(t => t.tier === ENHANCE_SIGIL_FAIL_TIER)!;
+      const t1 = getAffixTierTable('defense', 'shirtCloak').find(t => t.tier === ENHANCE_SIGIL_FAIL_TIER)!;
       expect(affixes[0].value).toBeGreaterThanOrEqual(t1.min);
       expect(affixes[0].value).toBeLessThanOrEqual(t1.max);
     });
@@ -411,14 +415,14 @@ describe('印記系統（§ 46）', () => {
       const affixes: Affix[] = [
         { type: 'element_erosion', tier: 5, value: 14, element: 'ice', dotDamage: 33 },
       ];
-      const { affixes: next } = applyEnhanceSigil(affixes, 0);
+      const { affixes: next } = applyEnhanceSigil(affixes, 0, W);
       expect(next[0].dotDamage).toBe(33);
       expect(next[0].element).toBe('ice');
     });
 
     it('特殊詞綴無 Tier，不受理', () => {
       const affixes: Affix[] = [{ type: 'resist_stun', tier: 0, value: 0 }];
-      expect(canUseSigil('enhance', affixes, 0, {}).ok).toBe(false);
+      expect(canUseSigil('enhance', affixes, 0, C).ok).toBe(false);
     });
   });
 
@@ -427,24 +431,24 @@ describe('印記系統（§ 46）', () => {
 
     it('新手裝一律不可使用', () => {
       for (const sigil of SIGIL_DEFINITIONS) {
-        expect(canUseSigil(sigil.type, affixes, 0, { isStarterGear: true }).ok).toBe(false);
+        expect(canUseSigil(sigil.type, affixes, 0, { ...C, isStarterGear: true }).ok).toBe(false);
       }
     });
 
     it('沒有詞綴時，刺針／重刻／精鍊／突破／工藝／封印不受理，新增與混沌可用', () => {
-      expect(canUseSigil('sting', [], undefined, {}).ok).toBe(false);
-      expect(canUseSigil('recarve', undefined, undefined, {}).ok).toBe(false);
-      expect(canUseSigil('temper', [], 0, {}).ok).toBe(false);
-      expect(canUseSigil('enhance', [], 0, {}).ok).toBe(false);
-      expect(canUseSigil('polish', [], undefined, {}).ok).toBe(false);
-      expect(canUseSigil('chaos', [], undefined, {}).ok).toBe(true);
-      expect(canUseSigil('seal', [], 0, {}).ok).toBe(false);
-      expect(canUseSigil('add', [], undefined, {}).ok).toBe(true);
+      expect(canUseSigil('sting', [], undefined, C).ok).toBe(false);
+      expect(canUseSigil('recarve', undefined, undefined, C).ok).toBe(false);
+      expect(canUseSigil('temper', [], 0, C).ok).toBe(false);
+      expect(canUseSigil('enhance', [], 0, C).ok).toBe(false);
+      expect(canUseSigil('polish', [], undefined, C).ok).toBe(false);
+      expect(canUseSigil('chaos', [], undefined, C).ok).toBe(true);
+      expect(canUseSigil('seal', [], 0, C).ok).toBe(false);
+      expect(canUseSigil('add', [], undefined, C).ok).toBe(true);
     });
 
     it('刺針可以把特殊詞綴換掉', () => {
       const special: Affix[] = [{ type: 'immune_poison', tier: 0, value: 0 }];
-      expect(canUseSigil('sting', special, 0, {}).ok).toBe(true);
+      expect(canUseSigil('sting', special, 0, C).ok).toBe(true);
     });
   });
 
@@ -470,22 +474,22 @@ describe('印記系統（§ 46）', () => {
 
     it('沒有任何洞時不受理；沒有詞綴但有洞照常受理', () => {
       const only: Affix[] = [{ type: 'defense', tier: 1, value: 3, sealed: true }];
-      expect(canUseSigil('chaos', only, undefined, { affixSlots: 1 }).ok).toBe(true);
-      expect(canUseSigil('chaos', only, undefined, { affixSlots: 0 }).ok).toBe(false);
-      expect(canUseSigil('chaos', [], undefined, {}).ok).toBe(true);
-      expect(canUseSigil('chaos', [], undefined, { affixSlots: 0 }).ok).toBe(false);
+      expect(canUseSigil('chaos', only, undefined, { ...C, affixSlots: 1 }).ok).toBe(true);
+      expect(canUseSigil('chaos', only, undefined, { ...C, affixSlots: 0 }).ok).toBe(false);
+      expect(canUseSigil('chaos', [], undefined, C).ok).toBe(true);
+      expect(canUseSigil('chaos', [], undefined, { ...C, affixSlots: 0 }).ok).toBe(false);
     });
   });
 
   describe('新增印記（§ 46.11）', () => {
     it('有空洞才受理；被毀壞的洞不算；封印詞綴不佔洞', () => {
       const sealedLast: Affix[] = [...FOUR, { type: 'heal_effect', tier: 1, value: 3, sealed: true }];
-      expect(canUseSigil('add', sealedLast, undefined, {}).ok).toBe(false);
-      expect(canUseSigil('add', sealedLast.slice(1), undefined, {}).ok).toBe(true);
-      expect(canUseSigil('add', FOUR.slice(0, 3), undefined, {}).ok).toBe(true);
-      expect(canUseSigil('add', [], undefined, {}).ok).toBe(true);
-      expect(canUseSigil('add', FOUR, undefined, {}).ok).toBe(false);
-      expect(canUseSigil('add', FOUR.slice(0, 3), undefined, { affixSlots: 3 }).ok).toBe(false);
+      expect(canUseSigil('add', sealedLast, undefined, C).ok).toBe(false);
+      expect(canUseSigil('add', sealedLast.slice(1), undefined, C).ok).toBe(true);
+      expect(canUseSigil('add', FOUR.slice(0, 3), undefined, C).ok).toBe(true);
+      expect(canUseSigil('add', [], undefined, C).ok).toBe(true);
+      expect(canUseSigil('add', FOUR, undefined, C).ok).toBe(false);
+      expect(canUseSigil('add', FOUR.slice(0, 3), undefined, { ...C, affixSlots: 3 }).ok).toBe(false);
     });
 
     it('新增一條、種類不重複、Tier T1~T6', () => {
@@ -533,7 +537,7 @@ describe('印記系統（§ 46）', () => {
     });
 
     it('新手裝不受理', () => {
-      expect(canUseSigil('add', [], undefined, { isStarterGear: true }).ok).toBe(false);
+      expect(canUseSigil('add', [], undefined, { ...C, isStarterGear: true }).ok).toBe(false);
     });
   });
 
@@ -545,7 +549,7 @@ describe('印記系統（§ 46）', () => {
       expect(r.affixes).toEqual([FOUR[0], FOUR[2], FOUR[3], { ...FOUR[1], sealed: true }]);
       expect(r.affixSlots).toBeUndefined();
       // 空出來的洞可以用新增印記補
-      expect(canUseSigil('add', r.affixes, undefined, {}).ok).toBe(true);
+      expect(canUseSigil('add', r.affixes, undefined, C).ok).toBe(true);
     });
 
     it('失敗：該詞綴與洞一起毀壞（4 條變 3 條、洞 4→3）', () => {
@@ -560,9 +564,9 @@ describe('印記系統（§ 46）', () => {
 
     it(`一件最多封 ${MAX_SEALED_AFFIXES} 條；已封印的不受理`, () => {
       const one: Affix[] = [{ ...FOUR[0], sealed: true }, FOUR[1]];
-      expect(canUseSigil('seal', one, 1, {}).ok).toBe(false);
-      expect(canUseSigil('seal', one, 0, {}).ok).toBe(false);
-      expect(canUseSigil('seal', FOUR, 0, {}).ok).toBe(true);
+      expect(canUseSigil('seal', one, 1, C).ok).toBe(false);
+      expect(canUseSigil('seal', one, 0, C).ok).toBe(false);
+      expect(canUseSigil('seal', FOUR, 0, C).ok).toBe(true);
     });
 
     it('特殊詞綴與額外屬性也可封印', () => {
@@ -570,18 +574,114 @@ describe('印記系統（§ 46）', () => {
         { type: 'immune_poison', tier: 0, value: 0 },
         { type: 'bonus_attribute', tier: 0, value: 1, attribute: 'STR' },
       ];
-      expect(canUseSigil('seal', list, 0, {}).ok).toBe(true);
-      expect(canUseSigil('seal', list, 1, {}).ok).toBe(true);
+      expect(canUseSigil('seal', list, 0, C).ok).toBe(true);
+      expect(canUseSigil('seal', list, 1, C).ok).toBe(true);
     });
 
     it('封印詞綴：刺針／重刻／精鍊／突破都不受理', () => {
       const list: Affix[] = [{ type: 'defense', tier: 5, value: 12, sealed: true }];
       for (const type of ['sting', 'recarve', 'temper', 'enhance'] as const) {
-        const check = canUseSigil(type, list, 0, {});
+        const check = canUseSigil(type, list, 0, C);
         expect(check.ok, type).toBe(false);
         expect(check.reason).toBe('封印詞綴無法變更');
       }
-      expect(canUseSigil('polish', list, undefined, { quality: 0 }).ok).toBe(true);
+      expect(canUseSigil('polish', list, undefined, { ...C, quality: 0 }).ok).toBe(true);
     });
+  });
+
+  describe('舊詞綴（`07-affix.md` § 7.11.2）', () => {
+    // 武器上的爆擊率、手套上的防禦力：不在所屬分類池內
+    const weaponLegacy: Affix[] = [{ type: 'crit_rate', tier: 3, value: 9 }, { type: 'attack_power', tier: 3, value: 8 }];
+    const glovesLegacy: Affix[] = [{ type: 'defense', tier: 5, value: 2.3 }];
+
+    it('精鍊／突破／重刻不受理，原因寫出分類', () => {
+      for (const type of ['temper', 'recarve'] as const) {
+        const check = canUseSigil(type, weaponLegacy, 0, W);
+        expect(check.ok, type).toBe(false);
+        expect(check.reason).toBe('已不在武器的詞綴池，只能用刺針或混沌換掉');
+      }
+      const enhance = canUseSigil('enhance', glovesLegacy, 0, { category: 'gloves' });
+      expect(enhance.ok).toBe(false);
+      expect(enhance.reason).toBe('已不在手套的詞綴池，只能用刺針或混沌換掉');
+    });
+
+    it('同件池內的詞綴照常受理', () => {
+      expect(canUseSigil('temper', weaponLegacy, 1, W).ok).toBe(true);
+      expect(canUseSigil('recarve', weaponLegacy, 1, W).ok).toBe(true);
+    });
+
+    it('刺針與混沌照常受理，換出來的是池內詞綴', () => {
+      expect(canUseSigil('sting', weaponLegacy, 0, W).ok).toBe(true);
+      expect(canUseSigil('chaos', weaponLegacy, undefined, W).ok).toBe(true);
+      for (let run = 0; run < 100; run++) {
+        const stung = applyStingSigil(weaponLegacy, 0, dropCtx({ category: 'weapon' })).affixes[0];
+        expect(stung.type in AFFIX_POOLS.weapon, stung.type).toBe(true);
+        expect(stung.tier).toBe(3);
+        for (const a of applyChaosSigil(weaponLegacy, dropCtx({ category: 'weapon' })).affixes) {
+          expect(a.type in AFFIX_POOLS.weapon, a.type).toBe(true);
+        }
+      }
+    });
+
+    it('池內的舊數值升階後走新表（升階跳新表數值）', () => {
+      // 胸甲防禦力 P1：T5 = 4.1~5.0
+      const { affixes } = applyTemperSigil([{ type: 'defense', tier: 4, value: 1.8 }], 0, { category: 'helmChest' });
+      expect(affixes[0].tier).toBe(5);
+      expect(affixes[0].value).toBeGreaterThanOrEqual(4.1);
+      expect(affixes[0].value).toBeLessThanOrEqual(5);
+    });
+  });
+
+  describe('數值依所屬分類的階級表', () => {
+    it('刺針換成爆擊率：手套走 P2、項鍊走 P1（Tier 不變）', () => {
+      const base: Affix[] = [{ type: 'max_hp', tier: 4, value: 55 }];
+      for (const [category, lo, hi] of [['gloves', 6.1, 8], ['necklace', 3.1, 4]] as const) {
+        let seen = 0;
+        for (let run = 0; run < 300; run++) {
+          const next = applyStingSigil(base, 0, dropCtx({ category, charLevel: 30 })).affixes[0];
+          if (next.type !== 'crit_rate') continue;
+          seen++;
+          expect(next.value).toBeGreaterThanOrEqual(lo);
+          expect(next.value).toBeLessThanOrEqual(hi);
+        }
+        expect(seen, category).toBeGreaterThan(0);
+      }
+    });
+
+    it('混沌／新增只抽所屬分類的池', () => {
+      for (const category of Object.keys(AFFIX_POOLS) as (keyof typeof AFFIX_POOLS)[]) {
+        for (let run = 0; run < 30; run++) {
+          for (const a of applyChaosSigil([], dropCtx({ category, charLevel: 30 })).affixes) {
+            expect(a.type in AFFIX_POOLS[category], `${category} ${a.type}`).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('特殊詞綴只會在上衣／斗篷、腰帶被抽到', () => {
+      for (const category of Object.keys(AFFIX_POOLS) as (keyof typeof AFFIX_POOLS)[]) {
+        let special = false;
+        for (let run = 0; run < 200; run++) {
+          mockRandom([0]);
+          special ||= applyChaosSigil([], dropCtx({ category, charLevel: 60 })).affixes.some(a => isSpecialAffixType(a.type));
+          vi.restoreAllMocks();
+        }
+        expect(special, category).toBe(category === 'shirtCloak' || category === 'belt');
+      }
+    });
+  });
+});
+
+describe('舊詞綴：apply 端同樣不受理精鍊／突破／重刻（`07-affix.md` § 7.11.2）', () => {
+  it('武器上的爆擊率原樣保留並回傳原因', async () => {
+    const { applyTemperSigil, applyEnhanceSigil, applyRecarveSigil, legacyAffixReason } = await import('../sigil');
+    const ctx = { category: 'weapon' as const, charLevel: 50 };
+    const t3 = [{ type: 'crit_rate' as const, tier: 3, value: 9 }];
+    const t5 = [{ type: 'crit_rate' as const, tier: 5, value: 14 }];
+    for (const r of [applyTemperSigil(t3, 0, ctx), applyRecarveSigil(t3, 0, ctx), applyEnhanceSigil(t5, 0, ctx)]) {
+      expect(r.success).toBe(false);
+      expect(r.message).toBe(legacyAffixReason('weapon'));
+    }
+    expect(applyTemperSigil(t3, 0, ctx).affixes).toBe(t3);
   });
 });

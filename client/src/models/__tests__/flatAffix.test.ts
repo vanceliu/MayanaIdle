@@ -4,7 +4,7 @@ import {
   EVASION_TIERS,
   rollAffixValue,
   FLAT_HP_MP_TIERS,
-  FLAT_REGEN_TIERS,
+  AFFIX_TIER_TABLES,
   formatAffixDisplay,
   formatAffixName,
   formatAffixValue,
@@ -25,15 +25,16 @@ describe('固定值型詞綴（§ 7.3.1）', () => {
     expect(FLAT_HP_MP_TIERS.map(t => [t.min, t.max])).toEqual(
       [[15, 20], [25, 32], [38, 46], [50, 58], [62, 70], [75, 84], [90, 100]],
     );
-    expect(getAffixTierTable('max_hp')).toBe(FLAT_HP_MP_TIERS);
-    expect(getAffixTierTable('max_mp')).toBe(FLAT_HP_MP_TIERS);
+    expect(getAffixTierTable('max_hp', 'helmChest')).toBe(FLAT_HP_MP_TIERS);
+    expect(getAffixTierTable('max_mp', 'ring')).toBe(FLAT_HP_MP_TIERS);
   });
 
-  it('回血／回魔的 T1~T7 為 1~2 … 11~12', () => {
-    expect(FLAT_REGEN_TIERS.map(t => [t.min, t.max])).toEqual(
-      [[1, 2], [2, 3], [3, 5], [5, 6], [7, 8], [9, 10], [11, 12]],
+  it('回血／回魔走 N2 等寬表：T1~T7 為 1~2 … 13~14（§ 7.3／§ 7.6）', () => {
+    expect(AFFIX_TIER_TABLES.N2.map(t => [t.min, t.max])).toEqual(
+      [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14]],
     );
-    expect(getAffixTierTable('hp_regen')).toBe(FLAT_REGEN_TIERS);
+    expect(getAffixTierTable('hp_regen', 'belt')).toBe(AFFIX_TIER_TABLES.N2);
+    expect(getAffixTierTable('mp_regen', 'offhand')).toBe(AFFIX_TIER_TABLES.N2);
   });
 
   it('顯示不帶百分號，仍標 Tier', () => {
@@ -52,8 +53,8 @@ describe('固定值型詞綴（§ 7.3.1）', () => {
 
   it('仍受品質放大，也仍參與滿值判定', () => {
     expect(getEffectiveAffixValue({ type: 'max_hp', tier: 7, value: 90 }, 20)).toBe(108);
-    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 100 })).toBe(true);
-    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 99 })).toBe(false);
+    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 100 }, 'boots')).toBe(true);
+    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 99 }, 'boots')).toBe(false);
   });
 
   it('分類正確：只有五種是固定值型', () => {
@@ -73,21 +74,21 @@ describe('迴避值（§ 7.3.1）', () => {
     for (let i = 1; i < EVASION_TIERS.length; i++) {
       expect(EVASION_TIERS[i].min).toBe(EVASION_TIERS[i - 1].max + 1);
     }
-    expect(getAffixTierTable('evasion')).toBe(EVASION_TIERS);
+    expect(getAffixTierTable('evasion', 'shirtCloak')).toBe(EVASION_TIERS);
     expect(EVASION_POINTS_PER_PERCENT).toBe(100);
   });
 
   it('顯示為迴避值、不帶百分號；吃品質；滿值判定照常', () => {
     expect(formatAffixDisplay({ type: 'evasion', tier: 7, value: 250 })).toBe('迴避 +250 (T7)');
     expect(formatAffixValue({ type: 'evasion', tier: 7, value: 273 }, 20)).toBe('+327');
-    expect(isMaxRollAffix({ type: 'evasion', tier: 7, value: 273 })).toBe(true);
-    expect(isMaxRollAffix({ type: 'evasion', tier: 7, value: 272 })).toBe(false);
+    expect(isMaxRollAffix({ type: 'evasion', tier: 7, value: 273 }, 'necklace')).toBe(true);
+    expect(isMaxRollAffix({ type: 'evasion', tier: 7, value: 272 }, 'necklace')).toBe(false);
   });
 
   it('數值依 Tier 區間抽', () => {
     for (let tier = 1; tier <= 7; tier++) {
       for (let i = 0; i < 50; i++) {
-        const v = rollAffixValue(tier, 'evasion');
+        const v = rollAffixValue(tier, 'evasion', 'boots');
         expect(v).toBeGreaterThanOrEqual(EVASION_TIERS[tier - 1].min);
         expect(v).toBeLessThanOrEqual(EVASION_TIERS[tier - 1].max);
       }
@@ -105,8 +106,8 @@ describe('額外屬性詞綴（§ 7.3.1）', () => {
 
   it('顯示成「力量 +1」，不參與滿值判定但一律粗體', () => {
     expect(formatAffixDisplay(a)).toBe('力量 +1');
-    expect(isMaxRollAffix(a)).toBe(false);
-    expect(shouldBoldAffix(a)).toBe(true);
+    expect(isMaxRollAffix(a, 'belt')).toBe(false);
+    expect(shouldBoldAffix(a, 'belt')).toBe(true);
   });
 
   it('與特殊詞綴同屬「無 Tier」，印記的升階／重刻不受理', () => {
@@ -118,7 +119,7 @@ describe('額外屬性詞綴（§ 7.3.1）', () => {
   it('生成時六種屬性都出得來，值恆為 1、Tier 恆為 0', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 800; i++) {
-      for (const affix of generateAffixes('armor', 60, 4, false, { noSpecialAffix: true })) {
+      for (const affix of generateAffixes('helmChest', 60, 4, false, { noSpecialAffix: true })) {
         if (!isAttributeAffixType(affix.type)) continue;
         expect(affix.tier).toBe(0);
         expect(affix.value).toBe(1);

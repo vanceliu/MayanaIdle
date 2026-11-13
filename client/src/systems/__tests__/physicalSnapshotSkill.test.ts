@@ -139,9 +139,9 @@ describe('§ 21.4a 吃哪些來源', () => {
     const w = sword();
     const a = calculatePhysicalSnapshotSkill(char(), 10, 'none', w, dummy(), [w]).damage;
     const b = calculatePhysicalSnapshotSkill(char(), 10, 'none', w, dummy(), [w, book({ magicAttack: 50 })]).damage;
-    // § 21.4 每 1 點魔攻 → +6.5%：魔攻 50 → +325%
-    // 技能攻擊力 10 × 4.25 = 42 → 多 32 點
-    expect(b - a).toBe(32);
+    // § 21.4 每 1 點魔攻 → +2.5%：魔攻 50 → +125%
+    // 技能攻擊力 10 × 2.25 = 22 → 多 12 點
+    expect(b - a).toBe(12);
   });
 });
 
