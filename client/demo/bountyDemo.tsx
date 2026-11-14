@@ -294,6 +294,7 @@ function App() {
                   <span className="bounty-next-refresh">下次更新 {nextRefreshLabel(new Date())}</span>
                   <button onClick={refresh} title="demo 用">模擬到達更新時刻</button>
                 </div>
+                <p className="bounty-hint">懸賞只在單人時生效；組隊期間暫停（不計擊殺、不保證詞綴、不掉兩次），離隊後恢復，進度保留。</p>
                 <div className="shop-items">
                   {board.map((c, i) => c
                     ? <BoardCard key={c.id} c={c} gold={gold} signed={signed} onSign={sign} />

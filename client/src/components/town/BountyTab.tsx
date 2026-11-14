@@ -12,6 +12,9 @@ import {
 } from '../../models/bountyCompare';
 import { AFFIX_DEFINITIONS, SPECIAL_AFFIX_DEFINITIONS } from '../../models/affix';
 
+/** § 53.5.1 */
+export const BOUNTY_SOLO_HINT = '懸賞只在單人時生效；組隊期間暫停（不計擊殺、不保證詞綴、不掉兩次），離隊後恢復，進度保留。';
+
 function KindTag({ kind }: { kind: BountyContract['kind'] }) {
   return <span className={`bounty-kind-tag ${kind === 'boss' ? 'is-boss' : ''}`}>[{kind === 'boss' ? 'BOSS懸賞' : '懸賞'}]</span>;
 }
@@ -187,6 +190,7 @@ export function BountyTab({ townId, townName }: { townId: QuestTownId; townName:
           <button onClick={() => setView('settings')}>比較設定</button>
           <span className="bounty-next-refresh">下次更新 {formatRefreshTime(nextRefresh)}</span>
         </div>
+        <p className="bounty-hint">{BOUNTY_SOLO_HINT}</p>
         <div className="shop-items">
           {slots.length === 0 && <p className="empty-text">目前沒有可用的懸賞</p>}
           {slots.map((c, i) => c
