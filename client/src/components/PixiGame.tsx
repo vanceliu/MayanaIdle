@@ -11,6 +11,7 @@ import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity, TEAMMATE_MARKER } from '../pixi/entities/PlayerEntity';
 import { usePartyStore, type TeammateView } from '../stores/partyStore';
 import { MonsterEntity, monsterCenterLift } from '../pixi/entities/MonsterEntity';
+import { monsterFacingTarget } from '../pixi/entities/monster/monsterFacing';
 import { NpcEntity, NPC_BODY_OFFSET } from '../pixi/entities/NpcEntity';
 import { useTownStore } from '../stores/townStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -183,6 +184,7 @@ export function PixiGame() {
           useMapMonsterStore.getState().monsters, map, scene!,
           monsterMapRef.current, defaultSession.combat.monsterInstances, delta,
           defaultSession.combat.engine.playerCtx.targetMonsterId,
+          [playerPos, ...usePartyStore.getState().teammates.map(t => t.position)],
           alpha,
         );
 
@@ -967,6 +969,8 @@ function syncMonsters(
   deltaMs: number,
   /** 玩家目前的目標，畫地面環用（§ 3.6.1）。null＝沒有目標 */
   targetId: string | null,
+  /** 玩家與同實例隊友的位置；在攻擊距離內的怪物面向最近的一位（`25-monster-system.md` § 25.2.2「朝向判定」） */
+  members: readonly Position[],
   /** 兩個模擬 tick 之間的插值比例；單機為 1 */
   alpha = 1,
 ) {
@@ -998,6 +1002,8 @@ function syncMonsters(
     entity.update(deltaMs);
     const shown = lerpPosition(monster.prevPosition, monster.position, alpha) as Position;
     entity.updatePosition(shown, getRenderedElevation(map, shown));
+    const facingTarget = monsterFacingTarget(monster.position, monster.attackRange, members);
+    if (facingTarget) entity.faceToward(facingTarget);
     entity.setTargeted(monster.id === targetId);
 
     if (inst) {
