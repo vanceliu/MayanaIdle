@@ -23,7 +23,7 @@ describe('client 套用 frame', () => {
   const frame = (f: Omit<Extract<ServerMessage, { t: 'frame' }>, 't'>): ServerMessage => ({ t: 'frame', ...f });
   const log = (message: string) => ({ message }) as unknown as CombatLog;
   const view = (id: string, currentHp: number): CombatInstanceView => ({
-    id, name: '史萊姆', level: 3, currentHp, maxHp: 100, isBoss: false, size: 'small', element: 'none', attackType: 'melee',
+    id, templateId: 3, name: '史萊姆', level: 3, currentHp, maxHp: 100, isBoss: false, size: 'small', element: 'none', attackType: 'melee',
   });
 
   it('戰鬥日誌接上新增的筆數並保留最後 length 筆', () => {
@@ -72,5 +72,10 @@ describe('client 套用 frame', () => {
     applyServerMessage(frame({ now: 300, combat: { full: true, add: [{ ...view('big', 100), size: 'large' }, view('small', 100)] } }));
     expect(defaultSession.combat.monsterInstances.get('big')?.size).toBe('large');
     expect(defaultSession.combat.monsterInstances.get('small')?.size).toBe('small');
+  });
+
+  it('怪物實例帶 server 送來的模板 id，地圖才對得到怪物圖（25 § 25.2.2）', () => {
+    applyServerMessage(frame({ now: 300, combat: { full: true, add: [{ ...view('boss', 100), templateId: 151 }] } }));
+    expect(defaultSession.combat.monsterInstances.get('boss')?.templateId).toBe(151);
   });
 });

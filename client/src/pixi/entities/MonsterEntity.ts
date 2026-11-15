@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Sprite } from 'pixi.js';
 import { worldToScreen, getEntityDepth, TILE_H, TILE_W } from '../utils/isometric';
 import type { Position } from '../../models/mapControl';
 import type { MonsterSize } from '../../models/monster';
@@ -6,7 +6,33 @@ import { CastBar } from '../ui/CastBar';
 import { HealthBar } from '../ui/HealthBar';
 import { HIT_REACTION_ART } from '../ui/skillFx';
 import { HitReaction } from './hitReaction';
-import { BACKGROUND_RENDER_GENERATION, GEN2_STYLE, outlineInPlace, type Gen2Style } from '../backgroundRender';
+import { GEN2_STYLE, outlineInPlace, type Gen2Style } from '../backgroundRender';
+import {
+  MONSTER_ART_SHADOW,
+  MONSTER_ART_SIZE_RATIO,
+  MONSTER_VIEW_BY_DIRECTION,
+  monsterArtOutlineColor,
+  monsterArtOverheadLift,
+  monsterArtScale,
+  monsterArtSize,
+  monsterShadowRadius,
+  type MonsterView,
+} from './monster/monsterArt';
+import { loadMonsterArt, monsterArtKey, type MonsterArtImages } from './monster/monsterArtAssets';
+import { monsterArtTexture } from './monster/monsterArtTextures';
+import { facingFromDelta } from './pawn/facing';
+import type { PawnDirectionId } from './pawn/geometry';
+
+const ART_VIEWS: MonsterView[] = ['front', 'side', 'back'];
+
+/** 怪物圖（`25-monster-system.md` § 25.2.2）：取代球體的 sprite、受擊白閃副本、腳下影子 */
+interface MonsterArtState {
+  images: MonsterArtImages;
+  color: string;
+  sprite: Sprite;
+  flashSprite: Sprite;
+  shadow: Graphics;
+}
 
 const MONSTER_COLOR = 0xff6b6b;
 const BOSS_COLOR = 0xcc00cc;
@@ -41,6 +67,17 @@ export class MonsterEntity {
   /** 頭上的角、血條、詠唱條；整組跟著球頂上移 */
   private overhead: Container;
   private horns: Graphics | null = null;
+  /** 有怪物圖時藏起來的球體層（光暈、球、白閃與外框）與 Boss 角層 */
+  private readonly ballLayers: Container[] = [];
+  private readonly hornLayers: Container[] = [];
+  private art: MonsterArtState | null = null;
+  /** 畫面版本為第三代才顯示怪物圖（`34-ui-guidelines.md` § 34.6「畫面版本」）；第二代一律畫球 */
+  private artEnabled = true;
+  /** 已要求的素材與外框色；相同就不重載 */
+  private artRequest: string | null = null;
+  private destroyed = false;
+  private facing: PawnDirectionId = 'front';
+  private lastPos: Position | null = null;
   private healthBar: HealthBar;
   private castBar: CastBar;
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
@@ -57,12 +94,12 @@ export class MonsterEntity {
   private readonly isBoss: boolean;
   private size: MonsterSize;
 
-  /** `outline`：球體、Boss 角、血條的外框樣式；`null` 不畫（第一代背景 render） */
+  /** `outline`：球體、Boss 角、血條的外框樣式 */
   constructor(
     id: string,
     isBoss = false,
     size: MonsterSize = 'small',
-    outline: Readonly<Gen2Style> | null = BACKGROUND_RENDER_GENERATION === 2 ? GEN2_STYLE : null,
+    outline: Readonly<Gen2Style> = GEN2_STYLE,
   ) {
     this.id = id;
     this.isBoss = isBoss;
@@ -106,11 +143,13 @@ export class MonsterEntity {
     this.container.addChild(this.overhead);
 
     this.drawBody();
-    if (outline) {
-      outlineInPlace(this.body, outline.objectOutlineWidth, outline.outlineColor);
-      if (this.horns) outlineInPlace(this.horns, outline.objectOutlineWidth, outline.outlineColor);
-      this.healthBar.addOutline(outline.hpBarOutlineWidth, outline.outlineColor);
+    const bodyOutline = outlineInPlace(this.body, outline.objectOutlineWidth, outline.outlineColor);
+    this.ballLayers.push(this.glow, this.body, this.flash, ...(bodyOutline ? [bodyOutline] : []));
+    if (this.horns) {
+      const hornOutline = outlineInPlace(this.horns, outline.objectOutlineWidth, outline.outlineColor);
+      this.hornLayers.push(this.horns, ...(hornOutline ? [hornOutline] : []));
     }
+    this.healthBar.addOutline(outline.hpBarOutlineWidth, outline.outlineColor);
   }
 
   /** 依體型重畫球、光暈、白閃、目標環與角，並把頭上元件移到球頂 */
@@ -142,6 +181,89 @@ export class MonsterEntity {
     if (size === this.size) return;
     this.size = size;
     this.drawBody();
+    if (this.hasArt) this.refreshArt();
+  }
+
+  /**
+   * 換成怪物圖（`25-monster-system.md` § 25.2.2）。實體可能比怪物實例先建出來，拿到實例後才補上；
+   * 沒有素材或載入失敗時維持球體。外框色依強化詞綴數。
+   */
+  setArt(templateId: number, affixCount: number, load: (key: string) => Promise<MonsterArtImages> = loadMonsterArt): void {
+    if (!this.artEnabled) return;
+    const key = monsterArtKey(templateId);
+    if (!key) return;
+    const color = monsterArtOutlineColor(affixCount);
+    const request = `${key}|${color}`;
+    if (request === this.artRequest) return;
+    this.artRequest = request;
+    load(key).then(images => {
+      if (this.destroyed || this.artRequest !== request) return;
+      this.applyArt(images, color);
+    }).catch(() => { /* 載入失敗維持球體 */ });
+  }
+
+  /**
+   * 開關怪物圖（畫面版本）。關掉時改畫球；打開時已載入的怪物圖立刻換回，
+   * 還沒載入的等下一次 `setArt()`。
+   */
+  setArtEnabled(enabled: boolean): void {
+    if (enabled === this.artEnabled) return;
+    this.artEnabled = enabled;
+    if (!enabled) this.artRequest = null;
+    this.showLayers();
+  }
+
+  /** 是否正顯示怪物圖 */
+  get hasArt(): boolean {
+    return this.art !== null && this.artEnabled;
+  }
+
+  /** 頭頂物件（血條、詠唱條、懸停名稱）相對球體時小型球頂的上移量（px） */
+  get overheadLift(): number {
+    return monsterTopLift(this.size) + (this.hasArt ? monsterArtOverheadLift(this.size) : 0);
+  }
+
+  /** 依是否顯示怪物圖切換球體／Boss 角與怪物圖、影子，並重設頭頂物件位置 */
+  private showLayers(): void {
+    const showArt = this.hasArt;
+    for (const layer of [...this.ballLayers, ...this.hornLayers]) layer.visible = !showArt;
+    if (this.art) for (const layer of [this.art.sprite, this.art.flashSprite, this.art.shadow]) layer.visible = showArt;
+    if (showArt) this.refreshArt();
+    else this.overhead.y = -monsterTopLift(this.size);
+  }
+
+  private applyArt(images: MonsterArtImages, color: string): void {
+    if (!this.art) {
+      const shadow = new Graphics();
+      const sprite = new Sprite();
+      const flashSprite = new Sprite();
+      flashSprite.blendMode = 'add';
+      flashSprite.alpha = this.flash.alpha;
+      this.container.addChildAt(shadow, this.container.getChildIndex(this.targetRing) + 1);
+      this.container.addChildAt(sprite, this.container.getChildIndex(this.overhead));
+      this.container.addChildAt(flashSprite, this.container.getChildIndex(this.overhead));
+      sprite.tint = this.body.tint;
+      this.art = { images, color, sprite, flashSprite, shadow };
+    }
+    this.art.images = images;
+    this.art.color = color;
+    this.showLayers();
+  }
+
+  /** 依體型、朝向、外框色重設怪物圖、影子與頭頂物件位置 */
+  private refreshArt(): void {
+    const art = this.art!;
+    const scale = monsterArtScale(ART_VIEWS.map(v => art.images[v]), monsterArtSize(this.size, MONSTER_ART_SIZE_RATIO[this.size]));
+    const { view, mirrored } = MONSTER_VIEW_BY_DIRECTION[this.facing];
+    const { texture, layout } = monsterArtTexture(art.images[view], scale, art.color);
+    for (const sprite of [art.sprite, art.flashSprite]) {
+      sprite.texture = texture;
+      sprite.anchor.set(layout.anchorX, layout.anchorY);
+      sprite.scale.set(mirrored ? -layout.spriteScale : layout.spriteScale, layout.spriteScale);
+    }
+    const { rx, ry } = monsterShadowRadius(art.images[view].width * scale, MONSTER_ART_SHADOW.widthRatio);
+    art.shadow.clear().ellipse(0, 0, rx, ry).fill({ color: 0x000000, alpha: MONSTER_ART_SHADOW.alpha });
+    this.overhead.y = -this.overheadLift;
   }
 
   get monsterSize(): MonsterSize {
@@ -170,6 +292,7 @@ export class MonsterEntity {
   update(deltaMs: number): void {
     this.hitReaction.update(deltaMs);
     this.flash.alpha = this.hitReaction.flashAlpha;
+    if (this.art) this.art.flashSprite.alpha = this.flash.alpha;
     this.container.alpha = this.hitReaction.alpha;
     this.container.x = this.baseX + this.hitReaction.offsetX;
     this.container.y = this.baseY + this.hitReaction.offsetY;
@@ -245,11 +368,20 @@ export class MonsterEntity {
     this.graceMs = 0;
     this.hitReaction.reset();
     this.flash.alpha = 0;
+    if (this.art) this.art.flashSprite.alpha = 0;
     this.container.alpha = 1;
     this.healthBar.update(1, 1);
   }
 
   updatePosition(pos: Position, elevation = 0): void {
+    if (this.lastPos) {
+      const facing = facingFromDelta(pos.x - this.lastPos.x, pos.y - this.lastPos.y);
+      if (facing && facing !== this.facing) {
+        this.facing = facing;
+        if (this.hasArt) this.refreshArt();
+      }
+    }
+    this.lastPos = { x: pos.x, y: pos.y };
     const { sx, sy } = worldToScreen(pos.x, pos.y, elevation);
     this.baseX = sx;
     this.baseY = sy;
@@ -285,9 +417,11 @@ export class MonsterEntity {
     const value = tint ?? 0xffffff;
     this.body.tint = value;
     this.glow.tint = value;
+    if (this.art) this.art.sprite.tint = value;
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.healthBar.destroy();
     this.castBar.destroy();
     this.container.destroy({ children: true });

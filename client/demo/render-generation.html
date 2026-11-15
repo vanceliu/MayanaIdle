@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>畫面版本設定 — MayanaIdle</title>
+<!--
+  設定「顯示」分頁的「畫面版本」（`34-ui-guidelines.md` § 34.6）。直接掛遊戲的 `SettingsModal`。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/render-generation.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="./renderGenerationDemo.tsx"></script>
+</body>
+</html>

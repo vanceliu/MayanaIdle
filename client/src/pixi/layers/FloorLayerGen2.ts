@@ -1,6 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 import type { MapData, TileVisualRole } from '../../models/mapControl';
 import { GEN2_STYLE, type Gen2Style } from '../backgroundRender';
+import { drawFloorGrid } from '../floorGrid';
 import { createMapRenderPlan, type TerrainDrawItem } from '../mapRenderPlan';
 import { MAP_THEME_PALETTES, type MapThemePalette } from '../mapThemes';
 import { traceTerrainOutlines } from '../terrainOutline';
@@ -48,7 +49,7 @@ export class FloorLayerGen2 {
 
     this.container.addChild(
       this.drawSurfaces(mapData, plan, palette),
-      this.grid = this.drawGrid(plan, palette),
+      this.grid = drawFloorGrid(plan, palette),
       this.drawTerrainEdges(mapData),
     );
     this.grid.visible = this.gridVisible;
@@ -85,16 +86,6 @@ export class FloorLayerGen2 {
           sx, sy + TILE_H / 2 + LEVEL_HEIGHT, sx + TILE_W / 2, sy + LEVEL_HEIGHT,
         ]).fill({ color: palette.boundaryRight });
       }
-    }
-    return graphics;
-  }
-
-  private drawGrid(plan: TerrainDrawItem[], palette: MapThemePalette): Graphics {
-    const graphics = new Graphics();
-    for (const item of plan) {
-      if (item.role === 'boundary' || item.role === 'wall') continue;
-      const { sx, sy } = worldToScreen(item.x, item.y, item.elevation);
-      graphics.poly(diamond(sx, sy)).stroke({ color: palette.grid, width: 0.5, alpha: 0.35 });
     }
     return graphics;
   }

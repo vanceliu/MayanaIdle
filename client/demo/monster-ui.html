@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>怪物美術接入版面 — MayanaIdle</title>
+<!--
+  怪物美術接進遊戲前的版面比較（`docs/design/25-monster-system.md` § 25.2.2）：
+  地圖 Boss 標示、怪物卡片、Wiki 怪物詳細頁。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/monster-ui.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<link rel="stylesheet" href="../src/wiki/components/WikiTable.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-section { margin-bottom: 32px; }
+.demo-section h2 { font-family: var(--font-display); color: var(--accent-gold); font-size: var(--fs-lg); margin: 0 0 8px; }
+.demo-variants { display: flex; flex-wrap: wrap; gap: 16px; }
+.demo-variant {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px;
+}
+.demo-variant h3 { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0 0 8px; }
+.demo-cards { display: flex; flex-wrap: wrap; gap: 8px; background: #2c3d22; padding: 10px; border-radius: var(--radius-sm); }
+.demo-cards + .demo-cards { margin-top: 8px; }
+.demo-mobile .monster-card { width: 118px; padding: 4px 7px 5px; border-radius: var(--radius-sm); }
+.demo-mobile .monster-card-name { font-size: var(--fs-xs); }
+.demo-mobile .monster-card-affixes { font-size: 9px; }
+.demo-mobile .monster-card-hp { height: 6px; }
+.card-row { display: flex; align-items: center; gap: 6px; }
+.card-row > .card-body { flex: 1; min-width: 0; }
+.card-art { flex: none; display: flex; justify-content: center; align-items: flex-end; }
+.card-head {
+  flex: none; overflow: hidden; border-radius: 50%;
+  border: 1px solid var(--outline-dark); background: var(--bg-inset);
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.wiki-views { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px; }
+.wiki-view { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--text-dim); }
+.wiki-hero { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1 class="demo-title">怪物美術接入版面</h1>
+<p class="demo-note">
+  外框 1 px、不裁腿。地圖用遊戲的怪物實體（血條、Boss 角位置與遊戲一致），只把球換成怪物圖；卡片與 Wiki 用遊戲的 CSS。<br>
+  請各區選一個版本。
+</p>
+
+<section class="demo-section">
+  <h2>1. 遊戲實際接入（已定案：Boss 不另標示、外框色依強化詞綴數、血條在頭頂上方）</h2>
+  <p class="demo-note">直接呼叫遊戲的 <code>MonsterEntity.setArt()</code>，走正式的圖集載入（<code>src/assets/monsters/</code>）與烤外框貼圖。</p>
+  <canvas id="game"></canvas>
+</section>
+
+<section class="demo-section">
+  <h2>（參考）Boss 標示比較</h2>
+  <p class="demo-note">已選 D。</p>
+  <canvas id="map"></canvas>
+</section>
+
+<section class="demo-section">
+  <h2>2. 畫面上方的怪物卡片</h2>
+  <div class="demo-variants" id="cards"></div>
+</section>
+
+<section class="demo-section">
+  <h2>3. Wiki 怪物詳細頁</h2>
+  <div class="demo-variants" id="wiki"></div>
+</section>
+
+<script type="module">
+import { loadMonsters, outlinedImage, renderGameEntities, renderMapMarks } from './monsterUiDemo.ts';
+
+await renderGameEntities(document.getElementById('game'), 2);
+
+const monsters = await loadMonsters();
+await renderMapMarks(document.getElementById('map'), monsters, 2);
+
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+};
+
+/* ---- 卡片 ---- */
+const cardMonsters = [
+  { m: monsters[0], target: true, hp: 64, affixes: [] },
+  { m: monsters[4], target: false, hp: 90, affixes: ['堅硬'] },
+  { m: monsters[5], target: false, hp: 35, affixes: [] },
+];
+const CARD_VARIANTS = [
+  { key: 'none', label: '現狀（無圖）' },
+  { key: 'full', label: 'A 左側全身小圖' },
+  { key: 'head', label: 'B 左側圓形頭像' },
+];
+function card({ m, target, hp, affixes }, variant, mobile) {
+  const t = m.template;
+  const node = el('div', `monster-card${t.isBoss ? ' is-boss' : ''}${target ? ' is-target' : ''}`);
+  const body = el('div', 'card-body');
+  const name = el('div', `monster-card-name${affixes.length ? ` monster-affix-${affixes.length}` : ''}`, t.name);
+  body.append(name);
+  if (affixes.length) body.append(el('div', 'monster-card-affixes', affixes.join(' ')));
+  const bar = el('div', 'monster-card-hp');
+  const fill = el('div', 'monster-card-hp-fill');
+  fill.style.width = `${hp}%`;
+  bar.append(fill);
+  body.append(bar);
+  if (variant === 'none') { node.append(...body.childNodes); return node; }
+  const row = el('div', 'card-row');
+  if (variant === 'full') {
+    const art = el('div', 'card-art');
+    art.append(outlinedImage(m.images.front, mobile ? 26 : 36));
+    row.append(art);
+  } else {
+    const size = mobile ? 24 : 32;
+    const head = el('div', 'card-head');
+    head.style.width = head.style.height = `${size}px`;
+    const img = outlinedImage(m.images.front, size * 1.9);
+    img.style.marginTop = `${size * 0.04}px`;
+    head.append(img);
+    row.append(head);
+  }
+  row.append(body);
+  node.append(row);
+  return node;
+}
+const cardsRoot = document.getElementById('cards');
+for (const v of CARD_VARIANTS) {
+  const box = el('div', 'demo-variant');
+  box.append(el('h3', null, v.label));
+  for (const mobile of [false, true]) {
+    const row = el('div', `demo-cards${mobile ? ' demo-mobile' : ''}`);
+    for (const c of cardMonsters) row.append(card(c, v.key, mobile));
+    box.append(el('div', 'demo-note', mobile ? '手機' : '桌機'), row);
+  }
+  cardsRoot.append(box);
+}
+
+/* ---- Wiki ---- */
+const WIKI_VARIANTS = [
+  { key: 'none', label: '現狀（無圖）' },
+  { key: 'views', label: 'A 標題下四方向圖' },
+  { key: 'hero', label: 'B 標題旁正面大圖' },
+];
+function wikiTable(t) {
+  const wrap = el('div', 'wiki-table-wrap');
+  const table = el('table', 'wiki-table');
+  const head = el('tr');
+  for (const h of ['出沒區域', '等級', 'HP', '攻擊', '防禦', '經驗', '體型']) head.append(el('th', null, h));
+  const row = el('tr');
+  for (const v of [t.area, t.level, t.hp, `${t.attackMin}~${t.attackMax}`, t.defense, t.exp, t.size === 'large' ? '大型' : '小型']) row.append(el('td', null, String(v)));
+  const thead = el('thead'); thead.append(head);
+  const tbody = el('tbody'); tbody.append(row);
+  table.append(thead, tbody);
+  wrap.append(table);
+  return wrap;
+}
+function wikiTitle(t) {
+  const title = el('h2', 'wiki-page-title', t.name);
+  if (t.isBoss) {
+    const star = el('span', null, '★ Boss');
+    star.style.color = 'var(--accent-gold)';
+    star.style.marginLeft = '8px';
+    title.append(star);
+  }
+  return title;
+}
+const wikiRoot = document.getElementById('wiki');
+for (const v of WIKI_VARIANTS) {
+  const box = el('div', 'demo-variant');
+  box.style.width = '640px';
+  box.append(el('h3', null, v.label));
+  const t = monsters[0].template;
+  if (v.key === 'none') {
+    box.append(wikiTitle(t), wikiTable(t));
+  } else if (v.key === 'views') {
+    box.append(wikiTitle(t));
+    const views = el('div', 'wiki-views');
+    const im = monsters[0].images;
+    for (const [label, img, mirrored] of [['正面', im.front, false], ['右', im.side, false], ['背面', im.back, false], ['左', im.side, true]]) {
+      const cell = el('div', 'wiki-view');
+      cell.append(outlinedImage(img, 96, undefined, mirrored), el('span', null, label));
+      views.append(cell);
+    }
+    box.append(views, wikiTable(t));
+  } else {
+    const hero = el('div', 'wiki-hero');
+    hero.append(outlinedImage(monsters[0].images.front, 112));
+    const title = wikiTitle(t);
+    title.style.marginBottom = '4px';
+    hero.append(title);
+    box.append(hero, wikiTable(t));
+  }
+  wikiRoot.append(box);
+}
+</script>
+</body>
+</html>

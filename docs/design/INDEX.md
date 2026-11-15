@@ -138,6 +138,7 @@
 | **增益藥水（回魔／爆擊／回血／慎重，雜貨店與 Boss 共通掉落）** | `30-items.md` | § 30.4a |
 | 怪物種族/體型/元素 | `25-monster-system.md` | 全文 |
 | **怪物球大小依體型（地圖顯示）** | `25-monster-system.md` | § 25.2.1 |
+| **怪物美術（AI 四方向素材、人形用角色剪影底圖、產圖與打包腳本、外框與外框色、頭頂物件位置、Wiki 正面圖、demo）** | `25-monster-system.md` | § 25.2.2 |
 | 怪物攻擊型別（近戰／遠程物理／遠程魔法） | `25-monster-system.md` | § 25.8「攻擊型別」 |
 | 怪物 Debuff 能力 | `25-monster-system.md` | § 25.8（能力值）、§ 25.9（原則/規則） |
 | **怪物詠唱（前搖攻擊）** | `25-monster-system.md` | § 25.11 |
@@ -182,8 +183,10 @@
 | 刪除角色 / 清除線上紀錄 | `37-statistics.md` § 37.4.9、`45-legacy-archive.md` § 45.4.1 | — |
 | 地圖控制系統（俯瞰視角/移動/紅點生成/環境主題） | `38-map-control.md` | 全文，地形 catalog 見 § 38.4 |
 | 地圖設計（主題地形配方/佈局原型/硬性約束） | `38-map-control.md` | § 38.11~§ 38.12 |
-| **背景 render 代別（第一代／第二代切換、外框、地形邊線）** | `38-map-control.md` | § 38.9「背景 render 代別」 |
+| **背景 render 代別（代別切換、第二代外框、地形邊線、第三代 AI 素材接入）** | `38-map-control.md` | § 38.9「背景 render 代別」 |
+| **AI 產地圖素材（ComfyUI、產圖清單、地板／物件後處理、池／沙地／地毯烘焙、砌石牆、倒柱）** | `38-map-control.md` | § 38.9「素材來源」 |
 | **地板格線設定** | `34-ui-guidelines.md` | § 34.6「地板格線」 |
+| **畫面版本設定（第二代球體／第三代素材＋怪物圖）** | `34-ui-guidelines.md` | § 34.6「畫面版本」 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | 平衡模擬 / 職業輸出平衡健檢（配裝規則見 § 44.2） | `44-dps-prediction.md` | 全文（結論見 § 44.8） |
 | 實戰模擬（死神會攻擊）/ 職業生存與補血策略 | `44-dps-prediction.md` | § 44.4 |
@@ -303,6 +306,7 @@
 24-buff-debuff.md § 24.4.1 ←→ 25-monster-system.md § 25.8~25.9
 25-monster-system.md § 25.11 ←→ 48-vfx.md § 48.7a ←→ 51-auto-talent.md § 51.4.6
 25-monster-system.md § 25.2.1（球大小）←→ 03-combat.md § 3.6.1（目標環）/ 48-vfx.md § 48.7a（詠唱條）
+25-monster-system.md § 25.2.2（怪物圖外框色）←→ § 25.12.5 ←→ 34-ui-guidelines.md「怪物強化詞綴顏色」
        ↕                                                        ↕
 07-affix.md § 7.10 ←→ 30-items.md ←→ 13-town.md ←→ 27-drop-table.md
        ↕
@@ -448,6 +452,8 @@
        ↕                    ↕
 40-pixijs-migration.md ←→ 16-tech-frontend-architecture.md
 38-map-control.md § 38.9（背景 render 代別）←→ 34-ui-guidelines.md § 34.6（地板格線）/ 25-monster-system.md § 25.2.1（怪物外框）
+38-map-control.md § 38.9（素材來源）←→ 25-monster-system.md § 25.2.2（怪物美術，共用 ComfyUI 腳本與後處理）
+04-character.md § 4.10（角色剪影比例）→ 25-monster-system.md § 25.2.2（人形怪物底圖）
 
 【自動天賦／信箱】
 51-auto-talent.md

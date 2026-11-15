@@ -156,6 +156,8 @@ export interface CombatDelta {
 
 export interface CombatInstanceView {
   id: string;
+  /** 怪物模板 id，決定地圖上的怪物圖（`25-monster-system.md` § 25.2.2） */
+  templateId: number;
   name: string;
   level: number;
   currentHp: number;

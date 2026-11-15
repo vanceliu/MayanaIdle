@@ -3,7 +3,8 @@ import { outlineInPlace } from '../backgroundRender';
 
 const BAR_WIDTH = 40;
 const BAR_HEIGHT = 4;
-const BAR_OFFSET_Y = -20;
+/** 血條中心相對頭頂物件原點的 y（px） */
+export const HEALTH_BAR_OFFSET_Y = -20;
 
 export class HealthBar {
   readonly container = new Container();
@@ -15,7 +16,7 @@ export class HealthBar {
 
   constructor(isBoss: boolean) {
     this.barColor = isBoss ? 0xaa44ff : 0xff3333;
-    this.container.y = BAR_OFFSET_Y;
+    this.container.y = HEALTH_BAR_OFFSET_Y;
 
     this.bg.rect(-BAR_WIDTH / 2, -BAR_HEIGHT / 2, BAR_WIDTH, BAR_HEIGHT);
     this.bg.fill(0x333333);

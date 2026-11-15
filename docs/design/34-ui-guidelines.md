@@ -217,7 +217,7 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 
 ### 怪物強化詞綴顏色
 
-怪物列表卡片的怪物名稱依強化詞綴數上色並加粗（`25-monster-system.md` § 25.12.5）。戰鬥日誌不上色。
+怪物列表卡片的怪物名稱依強化詞綴數上色並加粗；地圖上怪物圖的外框用同一組顏色（`25-monster-system.md` § 25.12.5、§ 25.2.2）。戰鬥日誌不上色。
 
 | 詞綴數 | 顏色 | CSS class |
 |---|---|---|
@@ -379,9 +379,19 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 
 ### 地板格線
 
-顯示分頁的「顯示地板格線」勾選，預設不勾，立即生效。只在第二代背景 render 出現
-（`38-map-control.md` § 38.9「背景 render 代別」）；第一代格線固定顯示，不出現此選項。
+顯示分頁的「顯示地板格線」勾選，預設不勾，立即生效。控制第二、三代背景 render 的格線圖層
+（`38-map-control.md` § 38.9「背景 render 代別」）。
 存 localStorage 全域 key `mayana_floor_grid`。
+
+### 畫面版本
+
+顯示分頁「顯示地板格線」下方的單選列，切換當下立即生效（不重新整理）。
+存 localStorage 全域 key `mayana_render_generation`。
+
+| 選項 | 畫面 | 選取時的說明文字 |
+|---|---|---|
+| 第三代（預設） | 地圖素材（`38-map-control.md` § 38.9「背景 render 代別」）＋怪物圖（`25-monster-system.md` § 25.2.2） | 地圖素材與怪物圖。 |
+| 第二代 | 無地圖素材，怪物顯示為球（§ 25.2.1） | 沒有地圖素材，怪物顯示為球，較省資源。 |
 
 ### 浮動視窗位置
 

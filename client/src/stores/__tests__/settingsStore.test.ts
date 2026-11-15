@@ -8,6 +8,7 @@ import {
   SCALE_MIN,
   SCALE_MAX,
   SCALE_DEFAULT,
+  RENDER_GENERATION_DEFAULT,
 } from '../settingsStore';
 
 describe('normalizeScale', () => {
@@ -115,5 +116,22 @@ describe('getElementScale', () => {
     Object.defineProperty(el, 'offsetWidth', { value: 200 });
     el.getBoundingClientRect = () => ({ width: 250, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => ({}) });
     expect(getElementScale(el)).toBe(1.25);
+  });
+});
+
+describe('畫面版本（34 § 34.6「畫面版本」）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useSettingsStore.setState({ renderGeneration: RENDER_GENERATION_DEFAULT });
+  });
+
+  it('預設第三代', () => {
+    expect(RENDER_GENERATION_DEFAULT).toBe(3);
+  });
+
+  it('切換後存進 localStorage', () => {
+    useSettingsStore.getState().setRenderGeneration(2);
+    expect(useSettingsStore.getState().renderGeneration).toBe(2);
+    expect(localStorage.getItem('mayana_render_generation')).toBe('2');
   });
 });

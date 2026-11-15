@@ -98,7 +98,7 @@ export class TickDemoStage {
   async init(container: HTMLElement): Promise<void> {
     await this.pixiApp.init({ resizeTo: container });
     container.appendChild(this.pixiApp.canvas);
-    this.scene = new GameScene(this.pixiApp);
+    this.scene = new GameScene(this.pixiApp, 3);
     this.player = new PlayerEntity();
     this.scene.entityLayer.container.addChild(this.player.container);
 

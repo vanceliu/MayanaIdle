@@ -34,7 +34,7 @@ describe('狀態同步', () => {
   }
 
   function instance(currentHp: number, maxHp = 100): MonsterInstance {
-    return { name: '史萊姆', level: 3, currentHp, maxHp, isBoss: false, element: 'none', attackType: 'melee' } as MonsterInstance;
+    return { templateId: 3, name: '史萊姆', level: 3, currentHp, maxHp, isBoss: false, element: 'none', attackType: 'melee' } as MonsterInstance;
   }
 
   it('戰鬥日誌只送尾端新增的筆數', () => {
@@ -86,6 +86,7 @@ describe('狀態同步', () => {
     const first = collectCombatDelta(session)!;
     expect(first.full).toBe(true);
     expect(first.add?.map(v => v.id)).toEqual(['m1']);
+    expect(first.add?.[0].templateId).toBe(3);
     expect(first).toHaveProperty('target', null);
     expect(first).toHaveProperty('cast', {});
 

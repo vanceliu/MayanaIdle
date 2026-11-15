@@ -14,12 +14,6 @@ function silhouetteOffset(outline: Container): number {
 }
 
 describe('怪物外框', () => {
-  it('不給樣式時不畫外框（第一代背景 render）', () => {
-    const m = new MonsterEntity('m', true, 'small', null);
-    expect(outlinesIn(m.container)).toHaveLength(0);
-    m.destroy();
-  });
-
   it('球體外框插在球體正下方，粗細同背景物', () => {
     const m = new MonsterEntity('m', false, 'small', GEN2_STYLE);
     const [outline] = outlinesIn(m.container);

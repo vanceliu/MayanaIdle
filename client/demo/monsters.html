@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 怪物美術 Demo — MayanaIdle</title>
+<!--
+  AI 怪物美術（`docs/design/25-monster-system.md` § 25.2.2）。
+  素材：`node scripts/comfy/genMonsters.mjs` 產到 `assets-src/monsters/`。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/monsters.html
+
+  接法見 `monstersDemo.ts`；「匯出參數」的 JSON = 接進遊戲要用的常數。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 300px; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; font-size: var(--fs-sm);
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 10px; }
+.demo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.demo-row label { flex: 0 0 96px; }
+.demo-row input[type="range"] { flex: 1; }
+.demo-row output { flex: 0 0 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.demo-check { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+#stage { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md); display: block; }
+#export { width: 100%; height: 170px; font-family: monospace; font-size: 12px; background: var(--bg-deepest); color: var(--text-primary); border: 1px solid var(--border-subtle); }
+</style>
+</head>
+<body>
+<h1 class="demo-title">AI 怪物美術</h1>
+<p class="demo-note">
+  ComfyUI <code>z_image_turbo</code> 一張圖畫正面／側面／背面，左＝右鏡像；靜態四方向，腿由後處理裁掉；人形以角色剪影為底圖。<br>
+  大小：高度＝怪物球直徑 × 倍率（取三視圖中最高的一張；小型／大型沿用球的大小），最寬的一張超過寬度上限時整體縮到上限寬。小型、大型倍率分開調。外框依顯示大小另畫，大小怪同寬。上方：正面、右、背面、左；下方：怪物在玩家周圍遊走（實際比例，移動時不起伏）。
+</p>
+<div class="demo-layout">
+  <div class="demo-main">
+    <canvas id="stage"></canvas>
+  </div>
+  <div class="demo-side">
+    <div class="demo-card">
+      <h2>批次</h2>
+      <select id="group" style="width: 100%"></select>
+    </div>
+    <div class="demo-card">
+      <h2>造型</h2>
+      <label class="demo-check"><input id="trimmed" type="checkbox">裁腿（取消＝原圖的腿）</label>
+      <label class="demo-check"><input id="showBall" type="checkbox">旁邊畫現行怪物球對照</label>
+      <div class="demo-row">
+        <label for="sizeRatioSmall">小型倍率</label>
+        <input id="sizeRatioSmall" type="range" min="0.6" max="2.5" step="0.05">
+        <output id="sizeRatioSmall-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="sizeRatioLarge">大型倍率</label>
+        <input id="sizeRatioLarge" type="range" min="0.6" max="2.5" step="0.05">
+        <output id="sizeRatioLarge-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="maxWidthTiles">寬度上限（格）</label>
+        <input id="maxWidthTiles" type="range" min="0.75" max="3" step="0.05">
+        <output id="maxWidthTiles-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="outlinePx">外框 px</label>
+        <input id="outlinePx" type="range" min="0" max="3" step="0.25">
+        <output id="outlinePx-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="zoom">畫面縮放</label>
+        <input id="zoom" type="range" min="1" max="3" step="0.25" value="2">
+        <output id="zoom-out"></output>
+      </div>
+    </div>
+    <div class="demo-card">
+      <h2>影子</h2>
+      <label class="demo-check"><input id="shadow" type="checkbox">腳下影子</label>
+      <div class="demo-row">
+        <label for="shadowWidth">寬度</label>
+        <input id="shadowWidth" type="range" min="0.3" max="1.5" step="0.05">
+        <output id="shadowWidth-out"></output>
+      </div>
+      <div class="demo-row">
+        <label for="shadowAlpha">濃度</label>
+        <input id="shadowAlpha" type="range" min="0" max="0.6" step="0.05">
+        <output id="shadowAlpha-out"></output>
+      </div>
+    </div>
+    <div class="demo-card">
+      <h2>匯出參數</h2>
+      <textarea id="export" readonly></textarea>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { MonsterArtStage } from './monstersDemo.ts';
+const canvas = document.getElementById('stage');
+const stage = new MonsterArtStage();
+const zoomInput = document.getElementById('zoom');
+await stage.init(canvas, canvas.clientWidth);
+const groupSelect = document.getElementById('group');
+for (const group of stage.groups) groupSelect.add(new Option(group, group));
+groupSelect.value = stage.groups[stage.groups.length - 1];
+const showGroup = () => stage.show(groupSelect.value, canvas.clientWidth, Number(zoomInput.value));
+groupSelect.addEventListener('change', showGroup);
+showGroup();
+const sliders = ['sizeRatioSmall', 'sizeRatioLarge', 'maxWidthTiles', 'outlinePx', 'shadowWidth', 'shadowAlpha'];
+const checks = ['trimmed', 'showBall', 'shadow'];
+function sync() {
+  for (const key of sliders) document.getElementById(`${key}-out`).textContent = stage.params[key].toFixed(2);
+  document.getElementById('zoom-out').textContent = `×${zoomInput.value}`;
+  document.getElementById('export').value = stage.exportJson();
+}
+for (const key of sliders) {
+  const input = document.getElementById(key);
+  input.value = stage.params[key];
+  input.addEventListener('input', () => { stage.params[key] = Number(input.value); stage.apply(); sync(); });
+}
+for (const key of checks) {
+  const input = document.getElementById(key);
+  input.checked = stage.params[key];
+  input.addEventListener('change', () => { stage.params[key] = input.checked; stage.apply(); sync(); });
+}
+zoomInput.addEventListener('input', () => { stage.layout(canvas.clientWidth, Number(zoomInput.value)); sync(); });
+window.addEventListener('resize', () => stage.layout(canvas.clientWidth, Number(zoomInput.value)));
+sync();
+</script>
+</body>
+</html>

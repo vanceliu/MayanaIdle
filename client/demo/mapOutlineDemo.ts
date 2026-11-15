@@ -1,8 +1,7 @@
 /**
  * 背景 render 調校頁（`38-map-control.md` § 38.9）。
  *
- * 繪製本體都在 `client/src/pixi/`：第一代＝`FloorLayer` / `WallLayer`，
- * 第二代＝`FloorLayerGen2` / `ObjectOutlineLayer` / `MonsterEntity` 的外框參數。
+ * 繪製本體都在 `client/src/pixi/`：第二代＝`FloorLayerGen2` / `ObjectOutlineLayer` / `WallLayer` / `MonsterEntity` 的外框參數。
  * 本頁只把滑桿值組成 `Gen2Style` 傳進去；遊戲採用的值是 `GEN2_STYLE`。
  */
 import { Application, Container } from 'pixi.js';
@@ -10,7 +9,6 @@ import { DEFAULT_LASH } from '../src/models/appearance';
 import { getTileDefinition, type MapData, type MapTheme } from '../src/models/mapControl';
 import { GEN2_STYLE, type Gen2Style } from '../src/pixi/backgroundRender';
 import { MAP_THEME_PALETTES } from '../src/pixi/mapThemes';
-import { FloorLayer } from '../src/pixi/layers/FloorLayer';
 import { FloorLayerGen2 } from '../src/pixi/layers/FloorLayerGen2';
 import { ObjectOutlineLayer } from '../src/pixi/layers/ObjectOutlineLayer';
 import { WallLayer, tileVariance } from '../src/pixi/layers/WallLayer';
@@ -35,8 +33,6 @@ export async function loadMap(id: string): Promise<MapData> {
 }
 
 export interface MapOutlineParams {
-  /** 顯示第一代背景 render */
-  showGen1: boolean;
   showActors: boolean;
   /** 第二代地板格線（遊戲內由設定切換） */
   floorGrid: boolean;
@@ -48,7 +44,6 @@ export interface MapOutlineParams {
 }
 
 export const DEFAULT_PARAMS: MapOutlineParams = {
-  showGen1: false,
   showActors: true,
   floorGrid: false,
   outlineColor: `#${GEN2_STYLE.outlineColor.toString(16).padStart(6, '0')}`,
@@ -75,7 +70,7 @@ export class MapOutlineStage {
   private readonly floor = new Container();
   private readonly merged = new Container();
   private readonly sorted = new Container();
-  private floorLayer: FloorLayer | FloorLayerGen2 | null = null;
+  private floorLayer: FloorLayerGen2 | null = null;
   private outlineLayer: ObjectOutlineLayer | null = null;
   private wallLayer: WallLayer | null = null;
   private actors: { destroy(): void }[] = [];
@@ -117,6 +112,7 @@ export class MapOutlineStage {
     this.app.renderer.resize(width, height);
     this.world.scale.set(zoom);
     this.center();
+    this.app.render();
   }
 
   center(): void {
@@ -143,21 +139,15 @@ export class MapOutlineStage {
     const map = this.map;
     if (!map) return;
     this.clear();
-    const style = this.params.showGen1 ? null : this.style;
+    const style = this.style;
 
-    if (style) {
-      const floor = new FloorLayerGen2(style);
-      floor.setGridVisible(this.params.floorGrid);
-      floor.buildFromMap(map);
-      this.floorLayer = floor;
-      this.outlineLayer = new ObjectOutlineLayer(style);
-      this.merged.addChild(this.outlineLayer.mergedContainer);
-    } else {
-      const floor = new FloorLayer();
-      floor.buildFromMap(map);
-      this.floorLayer = floor;
-    }
-    this.floor.addChild(this.floorLayer.container);
+    const floor = new FloorLayerGen2(style);
+    floor.setGridVisible(this.params.floorGrid);
+    floor.buildFromMap(map);
+    this.floorLayer = floor;
+    this.outlineLayer = new ObjectOutlineLayer(style);
+    this.merged.addChild(this.outlineLayer.mergedContainer);
+    this.floor.addChild(floor.container);
 
     this.wallLayer = new WallLayer();
     this.wallLayer.buildInto(this.sorted, map);
@@ -167,7 +157,7 @@ export class MapOutlineStage {
   }
 
   exportJson(): string {
-    const { showGen1: _, showActors: __, floorGrid: ___, ...rest } = this.params;
+    const { showActors: _, floorGrid: __, ...rest } = this.params;
     return JSON.stringify(rest, null, 2);
   }
 
@@ -185,7 +175,7 @@ export class MapOutlineStage {
     this.sorted.removeChildren();
   }
 
-  private placeActors(map: MapData, style: Gen2Style | null): void {
+  private placeActors(map: MapData, style: Gen2Style): void {
     const player = new PawnSprite(DEMO_LOOK, 0x4dabf7, 'front');
     const { sx, sy } = worldToScreen(map.spawnPoint.x, map.spawnPoint.y);
     player.container.position.set(sx, sy);

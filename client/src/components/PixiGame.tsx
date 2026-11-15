@@ -10,7 +10,7 @@ import { PixiApp } from '../pixi/PixiApp';
 import { GameScene } from '../pixi/GameScene';
 import { PlayerEntity, TEAMMATE_MARKER } from '../pixi/entities/PlayerEntity';
 import { usePartyStore, type TeammateView } from '../stores/partyStore';
-import { MonsterEntity, monsterCenterLift, monsterTopLift } from '../pixi/entities/MonsterEntity';
+import { MonsterEntity, monsterCenterLift } from '../pixi/entities/MonsterEntity';
 import { NpcEntity, NPC_BODY_OFFSET } from '../pixi/entities/NpcEntity';
 import { useTownStore } from '../stores/townStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -102,7 +102,7 @@ export function PixiGame() {
       // Pixi DevTools 以 `__PIXI_APP__` 找畫布；只在開發版掛
       if (import.meta.env.DEV) (globalThis as { __PIXI_APP__?: unknown }).__PIXI_APP__ = pixiApp.app;
 
-      const scene = new GameScene(pixiApp);
+      const scene = new GameScene(pixiApp, useSettingsStore.getState().renderGeneration);
       sceneRef.current = scene;
       scene.setFloorGrid(useSettingsStore.getState().showFloorGrid);
 
@@ -221,11 +221,10 @@ export function PixiGame() {
           if (pos) {
             const anchor = entityScreenPos(map, pos);
             const offset = pixiApp.camera.getOffset();
-            /* 怪物名稱跟著球頂（`25-monster-system.md` § 25.2.1） */
-            const size = hoverTarget.kind === 'monster'
-              ? defaultSession.combat.monsterInstances.get(hoverTarget.id ?? '')?.size
-              : undefined;
-            const lift = size ? monsterTopLift(size) : 0;
+            /* 怪物名稱跟著頭頂物件（`25-monster-system.md` § 25.2.1、§ 25.2.2「頭頂物件」） */
+            const lift = hoverTarget.kind === 'monster'
+              ? monsterMapRef.current.get(hoverTarget.id ?? '')?.overheadLift ?? 0
+              : 0;
             // 用 transform 而不是 left/top：後者每幀都會觸發 layout，transform 走合成層
             hoverEl.style.transform =
               `translate3d(${anchor.sx + offset.x}px, ${anchor.sy - NPC_BODY_OFFSET - lift + offset.y}px, 0) translate(-50%, -160%)`;
@@ -329,9 +328,13 @@ export function PixiGame() {
     return unsubscribe;
   }, []);
 
-  // 地板格線設定（`34-ui-guidelines.md` § 34.6）
+  // 地板格線、畫面版本設定（`34-ui-guidelines.md` § 34.6）
   useEffect(() => useSettingsStore.subscribe((state, prev) => {
     if (state.showFloorGrid !== prev.showFloorGrid) sceneRef.current?.setFloorGrid(state.showFloorGrid);
+    if (state.renderGeneration !== prev.renderGeneration) {
+      sceneRef.current?.setGeneration(state.renderGeneration);
+      monsterMapRef.current.forEach(m => m.setArtEnabled(state.renderGeneration === 3));
+    }
   }), []);
 
   // Click handler
@@ -987,6 +990,7 @@ function syncMonsters(
     const inst = monsterInstances.get(monster.id);
     if (!entity) {
       entity = new MonsterEntity(monster.id, monster.isBoss, inst?.size);
+      entity.setArtEnabled(useSettingsStore.getState().renderGeneration === 3);
       existingMap.set(monster.id, entity);
       scene.entityLayer.container.addChild(entity.container);
     }
@@ -997,6 +1001,7 @@ function syncMonsters(
 
     if (inst) {
       entity.setSize(inst.size);
+      entity.setArt(inst.templateId, inst.affixes?.length ?? 0);
       entity.updateHp(inst.currentHp, inst.maxHp);
     }
   }

@@ -7,9 +7,9 @@ import {
   SCALE_MAX,
   SCALE_STEP,
   SCALE_DEFAULT,
+  type RenderGeneration,
 } from '../stores/settingsStore';
 import { usePanelWindowStore } from '../stores/panelWindowStore';
-import { BACKGROUND_RENDER_GENERATION } from '../pixi/backgroundRender';
 
 /**
  * 系統設定（`34-ui-guidelines.md` § 34.6 / `47-mobile.md`）
@@ -22,6 +22,11 @@ import { BACKGROUND_RENDER_GENERATION } from '../pixi/backgroundRender';
  */
 
 type SettingsTab = 'display' | 'account';
+
+const RENDER_GENERATION_OPTIONS: { value: RenderGeneration; label: string; hint: string }[] = [
+  { value: 3, label: '第三代', hint: '地圖素材與怪物圖。' },
+  { value: 2, label: '第二代', hint: '沒有地圖素材，怪物顯示為球，較省資源。' },
+];
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -43,6 +48,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const resetPositions = usePanelWindowStore(s => s.resetPositions);
   const showFloorGrid = useSettingsStore(s => s.showFloorGrid);
   const setShowFloorGrid = useSettingsStore(s => s.setShowFloorGrid);
+  const renderGeneration = useSettingsStore(s => s.renderGeneration);
+  const setRenderGeneration = useSettingsStore(s => s.setRenderGeneration);
 
   const isDefault = uiScale === SCALE_DEFAULT && fontScale === SCALE_DEFAULT;
 
@@ -125,16 +132,34 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </p>
           </div>
 
-          {BACKGROUND_RENDER_GENERATION === 2 && (
-            <label className="settings-link">
-              <input
-                type="checkbox"
-                checked={showFloorGrid}
-                onChange={e => setShowFloorGrid(e.target.checked)}
-              />
-              <span>顯示地板格線</span>
-            </label>
-          )}
+          <label className="settings-link">
+            <input
+              type="checkbox"
+              checked={showFloorGrid}
+              onChange={e => setShowFloorGrid(e.target.checked)}
+            />
+            <span>顯示地板格線</span>
+          </label>
+
+          <div className="settings-row" role="radiogroup" aria-labelledby="setting-render-generation">
+            <span id="setting-render-generation" className="settings-label">畫面版本</span>
+            <div className="settings-control settings-choices">
+              {RENDER_GENERATION_OPTIONS.map(option => (
+                <label key={option.value} className="settings-link">
+                  <input
+                    type="radio"
+                    name="render-generation"
+                    checked={renderGeneration === option.value}
+                    onChange={() => setRenderGeneration(option.value)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="settings-hint">
+              {RENDER_GENERATION_OPTIONS.find(option => option.value === renderGeneration)!.hint}
+            </p>
+          </div>
 
           <div className="settings-row">
             <span className="settings-label">浮動視窗位置</span>

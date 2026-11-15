@@ -1,9 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 
-/** 背景 render 代別（`38-map-control.md` § 38.9）：1＝第一代、2＝第二代 */
-export type BackgroundRenderGeneration = 1 | 2;
-
-export const BACKGROUND_RENDER_GENERATION: BackgroundRenderGeneration = 2;
+/** 背景 render 代別（`38-map-control.md` § 38.9）：2＝第二代、3＝第三代；由設定「畫面版本」決定（`34-ui-guidelines.md` § 34.6） */
+export type BackgroundRenderGeneration = 2 | 3;
 
 /** 第二代背景 render 的外框與邊線樣式（`38-map-control.md` § 38.9） */
 export interface Gen2Style {

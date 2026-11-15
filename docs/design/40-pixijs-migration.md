@@ -98,13 +98,23 @@ client/src/
 │   ├── PixiApp.ts              # PixiJS Application 初始化與生命週期（async destroy）
 │   ├── GameScene.ts            # 主場景，管理所有 layer（依背景 render 代別組裝）
 │   ├── backgroundRender.ts     # 背景 render 代別常數、第二代樣式 `GEN2_STYLE`、剪影外框
+│   ├── gen3/                   # 第三代背景 render 繪製邏輯（與 demo ai-tiles 共用）
+│   │   ├── themeAssets.ts      # 主題圖集載入、frame 切出、記憶體快取
+│   │   ├── floorBake.ts        # 地板烘焙（純函式）
+│   │   ├── floorBake.worker.ts # 地板烘焙 Worker
+│   │   ├── floorBakeClient.ts  # 地板烘焙排程（同時一份、新請求中止舊的）
+│   │   ├── objectPlan.ts       # 物件、牆塊、斷柱配置（純函式）
+│   │   ├── wallPaint.ts        # 牆塊、斷柱柱基 Canvas 繪製
+│   │   └── mapAtlas.ts         # 地圖專用圖集（牆塊、斷柱）
 │   ├── terrainOutline.ts       # 水／岩漿／深淵整圈邊線（封閉折線）
+│   ├── floorGrid.ts            # 地板格線（第二、三代共用）
 │   ├── camera/
 │   │   └── Camera.ts           # 攝影機 lerp 追蹤邏輯
 │   ├── layers/
-│   │   ├── FloorLayer.ts       # 地板 tile 繪製（第一代背景 render）
 │   │   ├── FloorLayerGen2.ts   # 地板（第二代背景 render：單色、格線圖層、地形邊線）
 │   │   ├── ObjectOutlineLayer.ts # 背景物外框（第二代背景 render）
+│   │   ├── FloorLayerGen3.ts   # 地板（第三代背景 render：烘焙分塊貼圖、格線圖層）
+│   │   ├── ObjectLayerGen3.ts  # 背景物 Sprite（第三代背景 render）
 │   │   ├── WallLayer.ts        # 牆壁繪製（buildInto EntityLayer container）
 │   │   ├── PathLayer.ts        # 路徑顯示
 │   │   ├── EntityLayer.ts      # 實體容器（sortableChildren, 含牆壁）
@@ -191,13 +201,13 @@ PixiJS v8，支援 WebGL2 + WebGPU fallback。
 | 風險 | 對策 |
 |------|------|
 | PixiJS 與 React 生命週期衝突 | async destroy + destroyed flag 防止重複初始化 |
-| 等角地圖大量 tile 效能 | FloorLayer 一次性繪製；畫面有變化才 render（`34-ui-guidelines.md` § 34.9.1） |
+| 等角地圖大量 tile 效能 | FloorLayerGen2 一次性繪製；畫面有變化才 render（`34-ui-guidelines.md` § 34.9.1） |
 | 手機 WebGL 相容性 | PixiJS 內建 Canvas fallback |
 | 美術資源尚未準備 | 先用幾何圖形（圓形/菱形），與舊版一致 |
 
 ## 12. 後續待做
 
-- 不做：FloorLayer 快取為貼圖（效益小、手機貼圖尺寸受限）
+- 不做：FloorLayerGen2 快取為貼圖（效益小、手機貼圖尺寸受限）
 - [x] 傷害數字飄動動畫
 - [x] 怪物血條跟隨
 - [x] 技能特效預留（架構可擴展）

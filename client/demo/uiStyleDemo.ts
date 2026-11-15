@@ -192,7 +192,6 @@ export function renderScene(canvas: HTMLCanvasElement, mapTune: Tune = NO_TUNE):
   const p = MAP_THEME_PALETTES.town;
   const c = {
     ground: tuneColor(numToHex(p.ground), mapTune),
-    groundAlt: tuneColor(numToHex(p.groundAlt), mapTune),
     grass: tuneColor(numToHex(p.grass), mapTune),
     obstacle: tuneColor(numToHex(p.obstacle), mapTune),
     water: tuneColor(numToHex(p.water), mapTune),
@@ -200,13 +199,13 @@ export function renderScene(canvas: HTMLCanvasElement, mapTune: Tune = NO_TUNE):
 
   const o: Origin = { x: ROWS * (TILE_W / 2), y: 48 };
 
-  // 地板：石板棋盤，最外圈換草地，中央一格水井
+  // 地板：石板，最外圈換草地，中央一格水井
   for (let gy = 0; gy < ROWS; gy++) {
     for (let gx = 0; gx < COLS; gx++) {
       const { x, y } = iso(gx, gy, o);
       const edge = gx === 0 || gy === ROWS - 1;
       const well = gx === 4 && gy === 3;
-      const fill = well ? c.water : edge ? c.grass : (gx + gy) % 2 ? c.ground : c.groundAlt;
+      const fill = well ? c.water : edge ? c.grass : c.ground;
       drawTile(ctx, x, y, fill, true);
     }
   }

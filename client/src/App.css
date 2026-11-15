@@ -6473,9 +6473,15 @@ button.active {
   cursor: pointer;
 }
 
-.settings-link input[type='checkbox'] {
+.settings-link input[type='checkbox'],
+.settings-link input[type='radio'] {
   accent-color: var(--accent-primary);
   cursor: pointer;
+}
+
+/* 單選列（畫面版本，§ 34.6） */
+.settings-choices {
+  gap: 16px;
 }
 
 .settings-hint,

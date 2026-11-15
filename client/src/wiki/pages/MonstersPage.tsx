@@ -9,6 +9,7 @@ import {
   MONSTER_AFFIX_COUNT_TABLE, MONSTER_AFFIX_DESCRIPTIONS, MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER,
   MONSTER_AFFIX_DROP_REWARD, MONSTER_AFFIX_GOLD_EXP_REWARD,
 } from '../../models/monsterAffix';
+import { MonsterPortrait } from '../components/MonsterPortrait';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -223,10 +224,13 @@ function MonsterDetail({ name }: { name: string }) {
         ← 返回怪物列表
       </Link>
 
-      <h2 className="wiki-page-title">
-        {first.name}
-        {first.isBoss && <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>★ Boss</span>}
-      </h2>
+      <div className="wiki-monster-hero">
+        {first.id !== undefined && <MonsterPortrait templateId={first.id} />}
+        <h2 className="wiki-page-title">
+          {first.name}
+          {first.isBoss && <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>★ Boss</span>}
+        </h2>
+      </div>
 
       <div className="wiki-table-wrap" style={{ marginBottom: 24 }}>
         <table className="wiki-table">

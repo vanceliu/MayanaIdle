@@ -22,6 +22,19 @@ const FONT_SCALE_KEY = 'mayana_font_scale';
 const LINK_SCALES_KEY = 'mayana_scale_linked';
 const EQUIP_AFFIX_SUMMARY_OPEN_KEY = 'mayana_equip_affix_summary_open';
 const FLOOR_GRID_KEY = 'mayana_floor_grid';
+const RENDER_GENERATION_KEY = 'mayana_render_generation';
+
+/** 畫面版本（`34-ui-guidelines.md` § 34.6「畫面版本」）：2＝第二代（無地圖素材、怪物球體）、3＝第三代（地圖素材＋怪物圖） */
+export type RenderGeneration = 2 | 3;
+export const RENDER_GENERATION_DEFAULT: RenderGeneration = 3;
+
+function readRenderGeneration(): RenderGeneration {
+  try {
+    return localStorage.getItem(RENDER_GENERATION_KEY) === '2' ? 2 : RENDER_GENERATION_DEFAULT;
+  } catch {
+    return RENDER_GENERATION_DEFAULT;
+  }
+}
 
 /** 夾到 [0.8, 1.5] 並對齊 5% 級距；非數值一律回預設 */
 export function normalizeScale(value: unknown): number {
@@ -81,6 +94,9 @@ interface SettingsState {
   /** 地圖地板格線（`34-ui-guidelines.md` § 34.6；第二代背景 render 才有作用） */
   showFloorGrid: boolean;
   setShowFloorGrid: (visible: boolean) => void;
+  /** 畫面版本（`34-ui-guidelines.md` § 34.6「畫面版本」） */
+  renderGeneration: RenderGeneration;
+  setRenderGeneration: (generation: RenderGeneration) => void;
   setUiScale: (value: number) => void;
   setFontScale: (value: number) => void;
   setLinkScales: (linked: boolean) => void;
@@ -93,6 +109,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   linkScales: readStoredFlag(LINK_SCALES_KEY),
   equipAffixSummaryOpen: readStoredFlag(EQUIP_AFFIX_SUMMARY_OPEN_KEY),
   showFloorGrid: readStoredFlag(FLOOR_GRID_KEY),
+  renderGeneration: readRenderGeneration(),
 
   setEquipAffixSummaryOpen(open) {
     set({ equipAffixSummaryOpen: open });
@@ -102,6 +119,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setShowFloorGrid(visible) {
     set({ showFloorGrid: visible });
     writeStored(FLOOR_GRID_KEY, visible);
+  },
+
+  setRenderGeneration(generation) {
+    if (generation === get().renderGeneration) return;
+    set({ renderGeneration: generation });
+    writeStored(RENDER_GENERATION_KEY, generation);
   },
 
   setUiScale(value) {

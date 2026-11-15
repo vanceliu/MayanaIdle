@@ -5,6 +5,7 @@ import { TileType, getTileDefinition } from '../../models/mapControl';
 import { getFallenPillarAxis } from '../../models/mapDesignRules';
 import { MAP_THEME_PALETTES } from '../mapThemes';
 import { TILE_W, TILE_H, WALL_HEIGHT, getDepth, worldToScreen } from '../utils/isometric';
+import { tileVariance } from '../utils/tileVariance';
 
 /**
  * 人造建築主題：塔、遺跡、監獄。這些地方**不會有天然巨石**——
@@ -29,14 +30,7 @@ export function isRubbleSite(mapData: MapData, x: number, y: number): boolean {
   return false;
 }
 
-/**
- * 由格座標算出 0~1 的變化量。同一格永遠得到同一個值，
- * 地圖重繪或視角移動時石頭不會跳動。
- */
-export function tileVariance(x: number, y: number, salt = 0): number {
-  const h = Math.imul(x * 73856093 ^ y * 19349663 ^ salt * 83492791, 0x45d9f3b);
-  return ((h ^ h >>> 15) >>> 0) / 4294967296;
-}
+export { tileVariance };
 
 /** 已放進容器的一個物件圖形與它的 role */
 export interface PlacedObject {

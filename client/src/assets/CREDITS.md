@@ -10,6 +10,8 @@
 > 本文件保留為候選名單與授權研究紀錄；選型需求見 `docs/design/38-map-control.md` § 38.9。
 >
 > 仍在使用的素材只剩 game-icons.net 的 UI 圖示（`client/src/assets/icons/`）。
+>
+> 地圖素材改為 AI 產出（ComfyUI `z_image_turbo`，自有產出、無第三方授權），規格見 `38-map-control.md` § 38.9「素材來源」。
 
 
 地圖渲染（isometric，`TILE_W=64` / `TILE_H=32`，見 `client/src/pixi/utils/isometric.ts`）使用的地形素材來源與授權。

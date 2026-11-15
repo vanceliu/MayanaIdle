@@ -6,7 +6,7 @@
 <title>背景 render Demo — MayanaIdle</title>
 <!--
   背景 render 調校頁（`docs/design/38-map-control.md` § 38.9）。
-  第一代：`FloorLayer` / `WallLayer`；第二代：`FloorLayerGen2` / `ObjectOutlineLayer` / `MonsterEntity` 外框。
+  第二代：`FloorLayerGen2` / `ObjectOutlineLayer` / `WallLayer` / `MonsterEntity` 外框。
 
   用 Vite dev server 開：`npm run dev` 後開
   http://localhost:5173/MayanaIdle/demo/map-outline.html
@@ -34,7 +34,6 @@ body {
 .demo-row input[type="range"], .demo-row select { flex: 1; min-width: 0; }
 .demo-row output { flex: 0 0 48px; text-align: right; font-variant-numeric: tabular-nums; }
 .demo-check { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.demo-compare { font-weight: bold; color: var(--accent-gold); }
 #stage { width: 100%; height: 680px; border: 1px solid var(--border); border-radius: var(--radius-md); display: block; cursor: grab; touch-action: none; }
 #export { width: 100%; height: 150px; font-family: monospace; font-size: 12px; background: var(--bg-deepest); color: var(--text-primary); border: 1px solid var(--border-subtle); }
 </style>
@@ -43,7 +42,7 @@ body {
 <h1 class="demo-title">背景 render</h1>
 <p class="demo-note">
   第二代：背景物、怪物、怪物血條加外框；地板單色；水／岩漿／深淵畫整圈邊線。遊戲採用的值是 <code>GEN2_STYLE</code>。<br>
-  第一代：棋盤磚地板＋格線、無外框。拖曳畫面可平移；勾「第一代」切回比較。
+  拖曳畫面可平移。
 </p>
 <div class="demo-layout">
   <div class="demo-main">
@@ -59,7 +58,6 @@ body {
         <input id="zoom" type="range" min="0.5" max="2.5" step="0.25" value="1">
         <output id="zoom-out"></output>
       </div>
-      <label class="demo-check demo-compare"><input id="showGen1" type="checkbox">第一代背景 render</label>
       <label class="demo-check"><input id="showActors" type="checkbox">顯示角色與怪物</label>
       <label class="demo-check"><input id="floorGrid" type="checkbox">地板格線（遊戲內為玩家設定）</label>
     </div>
@@ -122,7 +120,7 @@ function applyTheme() {
 }
 
 const sliders = ['objectOutlineWidth', 'hpBarOutlineWidth', 'terrainEdgeWidth', 'terrainEdgeAlpha'];
-const checks = ['showGen1', 'showActors', 'floorGrid'];
+const checks = ['showActors', 'floorGrid'];
 const values = ['outlineColor'];
 
 function sync() {
