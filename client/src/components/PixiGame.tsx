@@ -823,6 +823,7 @@ function renderCombatVisuals(
         break;
       }
       case 'monster_attack': {
+        monsterEntities.get(v.monsterId)?.faceToward(v.victimPos);
         /* 被打的成員位置同樣走事件：他可能在這一擊之後就被傳回城鎮 */
         const victim = mapPositionToScreen(map, v.victimPos);
         const { sx, sy } = victim;

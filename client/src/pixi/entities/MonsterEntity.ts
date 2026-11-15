@@ -373,6 +373,15 @@ export class MonsterEntity {
     this.healthBar.update(1, 1);
   }
 
+  /** 出手時轉向被打的對象（`25-monster-system.md` § 25.2.2「朝向判定」）；之後沒移動就維持這個朝向 */
+  faceToward(target: Position): void {
+    if (!this.lastPos) return;
+    const facing = facingFromDelta(target.x - this.lastPos.x, target.y - this.lastPos.y);
+    if (!facing || facing === this.facing) return;
+    this.facing = facing;
+    if (this.hasArt) this.refreshArt();
+  }
+
   updatePosition(pos: Position, elevation = 0): void {
     if (this.lastPos) {
       const facing = facingFromDelta(pos.x - this.lastPos.x, pos.y - this.lastPos.y);

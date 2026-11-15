@@ -135,3 +135,19 @@ describe('MonsterEntity 畫面版本切換', () => {
     m.destroy();
   });
 });
+
+describe('MonsterEntity 出手轉向', () => {
+  it('攻擊時轉向被打的對象，之後沒移動就維持', async () => {
+    const m = new MonsterEntity('f', false, 'small');
+    await withArt(m);
+    m.updatePosition({ x: 5, y: 5 });
+    m.updatePosition({ x: 6, y: 4 });
+    const before = sprites(m)[0].scale.x;
+    m.faceToward({ x: 5, y: 5 });
+    const after = sprites(m)[0].scale.x;
+    expect(Math.sign(after)).toBe(-Math.sign(before));
+    m.updatePosition({ x: 6, y: 4 });
+    expect(sprites(m)[0].scale.x).toBe(after);
+    m.destroy();
+  });
+});
