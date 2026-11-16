@@ -14,6 +14,7 @@ import { getSkillCooldownReduction } from '../../systems/combat';
 import type { Ability } from '../../models/ability';
 import { instantiateSkill, type Skill } from '../../models/skill';
 import { instantiateFromTemplate } from '../../models/skillTemplate';
+import { applyAbilityToSkill } from '../../models/abilitySkill';
 import { useGameStore } from '../../stores/gameStore';
 import { defaultSession } from '../../stores/session';
 import type { Character } from '../../models/character';
@@ -64,8 +65,10 @@ function weapon(ability?: Ability, id = 1, type = 'sword'): EquipmentInstance {
 
 const POSITIONS: Record<string, { x: number; y: number }> = { m1: { x: 5, y: 5 }, m2: { x: 7, y: 5 }, m3: { x: 9, y: 5 } };
 
-function run(gear: EquipmentInstance[], targets: Record<string, MonsterInstance>, skill?: Skill, targetIds = ['m1']) {
+/** 同引擎：事件帶的技能已套用職業池（§ 7S.5） */
+function run(gear: EquipmentInstance[], targets: Record<string, MonsterInstance>, baseSkill?: Skill, targetIds = ['m1']) {
   const gs = useGameStore.getState();
+  const skill = baseSkill && applyAbilityToSkill(baseSkill, gear, gs.character!.className);
   const mapMonsters = Object.keys(targets).map(id => ({ id, position: POSITIONS[id], isBoss: false })) as unknown as MapMonster[];
   return processPlayerAttack(
     {
@@ -347,6 +350,14 @@ describe('職業池（§ 7S.5）', () => {
     run(boosted, {}, fire);
     const withBonus = run(boosted, { m1: monster({ element: 'none' as never }) }).damages[0].damage;
     expect(withBonus).toBeGreaterThan(plain);
+  });
+
+  it('血濺咒殺強化 +3：打 7 下，事件已改寫的技能不再疊加', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const curse = classSkill('blood-curse');
+    useGameStore.setState({ character: { ...knight(), hp: 1000 }, skills: [curse] });
+    const r = run([weapon({ type: 'blood_curse_boost', params: { hits: 3 } })], { m1: monster() }, curse);
+    expect(r.damages).toHaveLength(7);
   });
 });
 

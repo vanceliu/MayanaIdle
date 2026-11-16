@@ -7,6 +7,7 @@ import { AFFIX_POOLS, getAffixTierTable, type Affix } from '../../models/affix';
 import { getUniqueAffixDefinition } from '../../models/uniqueAffix';
 import { instantiateSkill, type Skill } from '../../models/skill';
 import { CLASS_SKILLS } from '../../models/classSkills';
+import { applyAbilityToSkill } from '../../models/abilitySkill';
 import { useGameStore } from '../../stores/gameStore';
 import { defaultSession } from '../../stores/session';
 import type { Character } from '../../models/character';
@@ -60,8 +61,10 @@ const skillLs = (value: number): Affix => ({ type: 'skill_lifesteal', tier: 7, v
 /** m2 在 m1 的 2 格內 */
 const POSITIONS: Record<string, { x: number; y: number }> = { m1: { x: 5, y: 5 }, m2: { x: 7, y: 5 } };
 
-function attack(gear: EquipmentInstance[], targetIds: string[], skill?: Skill, extra: string[] = []) {
+/** 同引擎：事件帶的技能已套用職業池（§ 7S.5） */
+function attack(gear: EquipmentInstance[], targetIds: string[], baseSkill?: Skill, extra: string[] = []) {
   const gs = useGameStore.getState();
+  const skill = baseSkill && applyAbilityToSkill(baseSkill, gear, gs.character!.className);
   const ids = [...targetIds, ...extra];
   const mapMonsters = ids.map(id => ({ id, position: POSITIONS[id], isBoss: false })) as unknown as MapMonster[];
   return processPlayerAttack(

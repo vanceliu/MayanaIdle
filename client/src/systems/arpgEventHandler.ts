@@ -54,7 +54,7 @@ import {
   applyFocusStrike, clearFocusTarget, focusKey, consumeCalm, gainRage, shortenCooldown, splashDamage,
 } from './abilityCombat';
 import { getDistance } from './lineOfSight';
-import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
+import { applyAbilityToSkills, withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
 import { getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { defaultSession, type Session } from '../stores/session';
 import { getSkillTemplate } from '../models/skillTemplate';
@@ -304,8 +304,8 @@ export function processPlayerAttack(
   let uniqueHpGain = 0;
   let uniqueMpGain = 0;
 
-  // § 7S.5 職業池：以施放當下的武器改寫技能數值（呼叫端已改寫時結果相同）
-  const skill = event.skill ? applyAbilityToSkill(event.skill, equippedGear, character.className) : undefined;
+  // § 7S.5 職業池：event.skill 由引擎發出時已改寫，不可再套用（改寫多為累加，套兩次會疊兩倍）
+  const skill = event.skill;
 
   // Handle buff/heal skills — these target the player, not monsters
   if (skill && (skill.type === 'buff' || skill.type === 'heal')) {
