@@ -7,7 +7,10 @@
 import type { ClassName } from './character';
 import type { Skill, SkillDebuffDef } from './skill';
 import type { ActiveEffect, StatModifier } from './effect';
-import { ABILITY_DEFINITIONS, ABILITY_FIRE_ARROW_BONUS, ABILITY_POISON_MIST_TICKS, findClassSkillAbility, type Ability } from './ability';
+import {
+  ABILITY_DEFINITIONS, ABILITY_FIRE_ARROW_BONUS, ABILITY_GREATER_CDR_DURATION_MS, ABILITY_POISON_MIST_TICKS, ABILITY_SPLASH_RADIUS,
+  findClassSkillAbility, type Ability,
+} from './ability';
 
 type GearLike = { ability?: Ability } | null | undefined;
 
@@ -67,6 +70,11 @@ const TRANSFORMS: Partial<Record<Ability['type'], Transform>> = {
     buffModifiers: setModifier(s.buffModifiers, 'damageReduction', () => p.reduction),
     buffEffect: `減傷${p.reduction}%`,
   }),
+  taunt_spread: s => ({
+    ...s,
+    debuffSpreadRadius: ABILITY_SPLASH_RADIUS,
+    applyDebuff: scaleDebuff(s.applyDebuff, d => ({ ...d, description: `${d.description}，主目標 ${ABILITY_SPLASH_RADIUS} 格內同時套用` })),
+  }),
   blood_curse_boost: (s, p) => {
     const hits = (s.randomHits ?? 0) + p.hits;
     return {
@@ -114,6 +122,7 @@ const TRANSFORMS: Partial<Record<Ability['type'], Transform>> = {
 
   mana_drain_boost: (s, p) => ({ ...s, abilityDamagePercent: p.percent }),
   element_boost_boost: (s, p) => ({ ...s, cooldown: lessCooldown(s, p.cooldown) }),
+  greater_cd_reduce_boost: s => ({ ...s, buffDuration: ABILITY_GREATER_CDR_DURATION_MS }),
   mana_shield_boost: (s, p) => ({
     ...s,
     buffEffect: `${s.buffEffect ?? ''}，減傷 ${p.reduction}%`,

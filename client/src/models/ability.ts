@@ -14,10 +14,14 @@ export type AbilityType =
   | 'skill_splash'
   | 'combo_strike'
   | 'focus_strike'
+  | 'corpse_explosion'
+  | 'kill_cooldown'
+  | 'freezing_strike'
   // 騎士
   | 'shield_bash_boost'
   | 'rend_boost'
   | 'iron_shield_boost'
+  | 'taunt_spread'
   | 'blood_curse_boost'
   | 'blood_slash'
   | 'vengeance_boost'
@@ -31,6 +35,7 @@ export type AbilityType =
   // 元素師
   | 'mana_drain_boost'
   | 'element_boost_boost'
+  | 'greater_cd_reduce_boost'
   | 'mana_shield_boost'
   | 'mana_spring_boost'
   | 'element_storm_boost'
@@ -55,7 +60,9 @@ export type AbilityType =
   | 'low_mp_regen'
   | 'thorns'
   | 'rage'
-  | 'calm';
+  | 'calm'
+  | 'dodge_heal'
+  | 'adversity';
 
 /** 參數值以整數儲存；秒數以毫秒儲存；`tenths` 參數以 0.1% 儲存 */
 export interface Ability {
@@ -100,8 +107,15 @@ export const ABILITY_CHANCE = 30;
 export const ABILITY_MIN_TIER = 3;
 /** 「5~武器值」的下限，上限 ≤ 此值時固定為此值 */
 export const ABILITY_WEAPON_VALUE_MIN = 5;
-/** 擴散半徑（格） */
+/** 擴散、屍爆、挑釁怒吼擴散的半徑（格） */
 export const ABILITY_SPLASH_RADIUS = 3;
+/** 凍結打擊：減速幅度（攻擊速度 %）與持續 */
+export const ABILITY_FREEZE_SLOW_PERCENT = 30;
+export const ABILITY_FREEZE_DURATION_MS = 5000;
+/** 逆境計數的角色 debuff（依 tag，`24-buff-debuff.md` § 24.4.1） */
+export const ABILITY_ADVERSITY_TAGS: readonly string[] = ['poisoned', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned', 'silenced'];
+/** 強化冷卻縮減強化：buff 持續 */
+export const ABILITY_GREATER_CDR_DURATION_MS = 180_000;
 /** 專注打擊的加成上限（%） */
 export const ABILITY_FOCUS_MAX_PERCENT = 100;
 /** 火矢附魔強化：非弓的附加火傷害 */
@@ -136,6 +150,15 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
   { type: 'focus_strike', name: '專注打擊', group: 'weapon', pool: 'common',
     params: [{ key: 'percent', min: 5, max: 15, unit: '%', tenths: true }],
     description: `對同一隻怪每命中 1 下，之後對牠的傷害 +{percent}（上限 +${ABILITY_FOCUS_MAX_PERCENT}%）` },
+  { type: 'corpse_explosion', name: '屍爆', group: 'weapon', pool: 'common',
+    params: [{ key: 'percent', min: 1, max: 5, unit: '%' }],
+    description: `擊殺時，${ABILITY_SPLASH_RADIUS} 格內其他怪受到被擊殺怪最大 HP {percent} 的傷害` },
+  { type: 'kill_cooldown', name: '擊殺縮冷', group: 'weapon', pool: 'common',
+    params: [ms('cooldown', 1, 10, 0.1)],
+    description: '擊殺時，冷卻中的技能剩餘冷卻 −{cooldown}' },
+  { type: 'freezing_strike', name: '凍結打擊', group: 'weapon', pool: 'common',
+    params: [{ key: 'chance', min: 1, max: 10, unit: '%' }],
+    description: `命中 {chance} 機率使目標減速（攻擊速度 −${ABILITY_FREEZE_SLOW_PERCENT}%）${ABILITY_FREEZE_DURATION_MS / 1000} 秒` },
 
   { type: 'shield_bash_boost', name: '盾擊強化', group: 'accessory', pool: 'knight', skillId: 'shield-bash',
     params: [{ key: 'percent', min: 20, max: 30, unit: '%' }], description: '盾擊暈眩時間 +{percent}' },
@@ -143,6 +166,8 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
     params: [{ key: 'percent', min: 10, max: 30, unit: '%' }], description: '裂傷斬流血傷害 +{percent}' },
   { type: 'iron_shield_boost', name: '鋼鐵護盾強化', group: 'accessory', pool: 'knight', skillId: 'iron-shield',
     params: [{ key: 'reduction', min: 42, max: 50, unit: '%' }], description: '鋼鐵護盾減傷改為 {reduction}' },
+  { type: 'taunt_spread', name: '挑釁怒吼擴散', group: 'accessory', pool: 'knight', skillId: 'taunt',
+    params: [], description: `挑釁同時套到主目標 ${ABILITY_SPLASH_RADIUS} 格內的所有怪` },
   { type: 'blood_curse_boost', name: '血濺咒殺強化', group: 'weapon', pool: 'knight', skillId: 'blood-curse',
     params: [{ key: 'hits', min: 1, max: 4, unit: '' }], description: '血濺咒殺打擊次數 +{hits}' },
   { type: 'blood_slash', name: '血濺斬擊', group: 'weapon', pool: 'knight', skillId: 'blood-curse',
@@ -167,6 +192,8 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
     params: [{ key: 'percent', min: 10, max: 30, unit: '%' }], description: '魔力奪取傷害 +{percent}' },
   { type: 'element_boost_boost', name: '元素增幅強化', group: 'weapon', pool: 'elementalist', skillId: 'element-boost',
     params: [ms('cooldown', 1, 10, 1)], description: '元素增幅冷卻 −{cooldown}' },
+  { type: 'greater_cd_reduce_boost', name: '強化冷卻縮減強化', group: 'accessory', pool: 'elementalist', skillId: 'greater-cd-reduce',
+    params: [], description: `強化冷卻縮減持續時間改為 ${ABILITY_GREATER_CDR_DURATION_MS / 1000} 秒` },
   { type: 'mana_shield_boost', name: '魔力護盾強化', group: 'accessory', pool: 'elementalist', skillId: 'mana-shield',
     params: [{ key: 'reduction', min: 5, max: 15, unit: '%' }], description: '魔力護盾期間減傷 +{reduction}' },
   { type: 'mana_spring_boost', name: '魔力湧泉強化', group: 'accessory', pool: 'elementalist', skillId: 'mana-spring',
@@ -226,6 +253,12 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
   { type: 'calm', name: '平靜', group: 'accessory', pool: 'common',
     params: [{ key: 'rate', min: 5, max: 10, unit: '' }],
     description: `未被命中時每秒累積平靜 {rate}（上限 ${ABILITY_CALM_MAX}）；被命中時消耗全部平靜，冷卻中的技能剩餘冷卻縮短同等 %` },
+  { type: 'dodge_heal', name: '閃避回復', group: 'accessory', pool: 'common',
+    params: [{ key: 'heal', min: 30, max: 60, unit: '' }],
+    description: '迴避成功時回復 {heal} HP' },
+  { type: 'adversity', name: '逆境', group: 'accessory', pool: 'common',
+    params: [{ key: 'reduction', min: 3, max: 5, unit: '%' }],
+    description: '身上每有一種負面狀態，減傷 +{reduction}' },
 ];
 
 const DEFINITION_BY_TYPE = new Map(ABILITY_DEFINITIONS.map(d => [d.type, d]));
@@ -396,14 +429,25 @@ function betterAbility(
   return a.order < b.order;
 }
 
-/** 數值類技能的參數加總（§ 7S.3：低血／低魔回復、荊棘反彈） */
-export function sumAbilityParam(gear: readonly GearLike[], type: AbilityType, key: string): number {
-  let total = 0;
-  for (const g of gear) if (g?.ability?.type === type) total += g.ability.params[key] ?? 0;
-  return total;
+/** 同種類多件時未生效的那些件（§ 7S.3：只有一件生效，比第一個參數，同值依部位順序） */
+export function getSuppressedAbilityGear<T extends GearLike>(gear: readonly T[]): Set<T> {
+  const winners = new Map<AbilityType, { item: T; ability: Ability; def: AbilityDefinition; order: number }>();
+  for (const g of gear) {
+    const def = g?.ability ? DEFINITION_BY_TYPE.get(g.ability.type) : undefined;
+    if (!def) continue;
+    const candidate = { item: g, ability: g!.ability!, def, order: ABILITY_SLOT_ORDER.indexOf(g!.slot ?? '') };
+    const current = winners.get(def.type);
+    if (!current || betterAbility(candidate, current)) winners.set(def.type, candidate);
+  }
+  const losers = new Set<T>();
+  for (const g of gear) {
+    const winner = g?.ability ? winners.get(g.ability.type) : undefined;
+    if (winner && winner.item !== g) losers.add(g);
+  }
+  return losers;
 }
 
-/** 越大越好的參數取最大值（平靜累積，§ 7S.3）；沒有時回 0 */
+/** 越大越好的參數取最大值（§ 7S.3：同種類只有一件生效）；沒有時回 0 */
 export function maxAbilityParam(gear: readonly GearLike[], type: AbilityType, key: string): number {
   let best = 0;
   for (const g of gear) if (g?.ability?.type === type) best = Math.max(best, g.ability.params[key] ?? 0);

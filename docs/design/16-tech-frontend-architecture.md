@@ -122,7 +122,6 @@ client/
 │   │       ├── AttributesPage.tsx
 │   │       ├── CombatPage.tsx
 │   │       ├── CraftingPage.tsx
-│   │       ├── DropsPage.tsx
 │   │       ├── ExpTablePage.tsx
 │   │       ├── ItemsPage.tsx
 │   │       ├── MapsPage.tsx
@@ -662,7 +661,6 @@ interface ScriptTemplate {
 | `AttributesPage` | 屬性說明 |
 | `CombatPage` | 戰鬥系統說明 |
 | `CraftingPage` | 製作系統資料 |
-| `DropsPage` | 掉落表查詢 |
 | `ExpTablePage` | 經驗值表 |
 | `ItemsPage` | 道具資料查詢 |
 | `MapsPage` | 地圖資料查詢 |

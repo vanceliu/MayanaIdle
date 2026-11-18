@@ -30,6 +30,56 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 星盤第一版（`56-star-chart.md`）
+
+規格見 `56-star-chart.md`；第一版盤面與數值為暫定，只在 demo 測試，遊戲程式不動。
+
+- [x] S1 文件：`56-star-chart.md`、INDEX 查找列與連動
+- [x] S2 demo：`client/demo/star-chart.html`（職業切換、配點／退點、洗點費用、加成合計）
+- [x] S3 使用者試玩確認盤面與手感（2026-11-18：盤面先這樣）
+- [x] S4 整合計畫（下列 I0～I8）
+
+#### 星盤整合（每階段：改文件 → 改程式 → 補測試 → `npx tsc -b` 與 vitest 全綠）
+
+- [ ] I0 前置：使用者 commit 目前工作區
+- [ ] I1 星盤資料與純函式：`client/src/models/starChart.ts`（盤面、點數、配點／退點、效果加總），由 demo 資料移入
+- [ ] I2 屬性與 HP/MP：拿掉 Lv51 自由屬性點（`character.ts`、`levelUp.ts`、`spendAttributePoint`、`AttributeUpModal`）；HP/MP 改公式即時計算；星盤屬性計入 `getTotalAttributes` 與上限 35；等級上限 120；文件 20、04
+- [ ] I3 技能等級與弱化：施放時轉換（同 `applyAbilityToSkills`，隨機技能先套），職業技能與基礎魔法三系；所有施放路徑（`arpgEventHandler`、`combatLoop`、`arpgEngine`、`gameStore` 手動施放、`scriptRunner`、`QuickSlotBar`）不可重複套用；數值節點與命星效果；文件 05、21、22、23、24、07-affix-ability
+- [ ] I4 存檔與 server：`Character` 新增星盤欄位並加入 `writeSave` 白名單；配點／退點／重置 action 加入 `ACTION_ALLOWLIST` 並自驗參數與金幣；server 測試
+- [ ] I5 介面：星盤面板（依 demo）與入口、技能說明羅馬數字與黃色數字、角色屬性面板；面板入口位置先出 demo 確認
+- [ ] I6 遺產系統與清檔：SQLite migration 建 `legacy_archives`、封存後清空（`45-legacy-archive.md` § 45.1）；角色選擇的遺產入口與唯讀頁；migration 測試
+- [ ] I7 Wiki：屬性、技能、新手、經驗表頁，新增星盤頁
+- [ ] I8 全面驗證：client 與 server 測試、型別檢查，逐步看 exit code
+
+### Wiki 全面核對（使用者 2026-11-17：與遊戲不一致一律以遊戲為準，含設計文件；只限這次）
+
+- [x] V1 裝備／詞綴／製作：WeaponsPage、ArmorPage、AffixesPage、CraftingPage、AbilityTable、43 § 4.1／§ 4.2
+- [x] V2 怪物／道具／技能／地圖：MonstersPage、ItemsPage、SkillsPage、MapsPage、DropsPage（未掛路由，刪除）、Credits
+- [x] V3 公式頁：AttributesPage、CombatPage、ExpTablePage、StartPage
+- [x] V4 任務／天賦／競技場：QuestsPage、TalentsPage、talentRuleDescriptions、ArenaPage
+- [x] V5 設計文件同步；測試；`npx tsc -b`、client vitest
+- [ ] V6 使用者確認
+
+### 文件與程式不一致整理（使用者 2026-11-17 裁決）
+
+規格：陣營不做（刪 13 § 13.2、09 § 9.3 的陣營門檻）；怪物生成以 26 波次制為準（03 § 3.9／§ 3.11、38 § 38.6）；試煉高地 Lv21～25（23 § 23.1、13 § 13.10）；曙光草原（13 § 13.11）；技能在城鎮魔法學院學（09 § 9.3）；技能書規則以程式為準（05 § 5.4）；QuestsPage 印記除數取程式常數；MapsPage 不列試驗場與競技場；皮腰帶負重 +1700（20 § 20.7）；超重時停止自然回血回魔（29 § 29.3、20 § 20.7、35 § 35.2.2）。CraftingPage T7 篩選維持。
+
+- [x] D1 文件：03、05、09、13、20、23、29、35、38
+- [x] D2 Wiki：QuestsPage、MapsPage、StartPage（超重不回復）
+- [x] D3 程式：`tickRegen` 超重跳過；測試
+- [x] D4 `npx tsc -b`、client／server vitest
+- [ ] D5 使用者確認
+
+### Wiki 新手開始頁（`43-wiki-system.md`）
+
+規格：新增 `/wiki/start`「開始」頁，左側選單排在首頁之後，Wiki 首頁加卡片。一頁到底、頂端章節目錄；章節：建立角色與選職業（推薦妖精）、薄暮村與新手指導員、第一次出城（自動戰鬥／地圖控制／回復與藥水）、遊戲機制、任務、裝備成長（掉落／詞綴／強化）、鐵匠鋪製作、換地圖、技能與自動天賦、之後可以玩什麼。每章講做什麼與為什麼，細節連到既有 Wiki 頁；數值取 seed／常數。與遊戲內 `STARTER_TIPS` 各自獨立。
+
+- [x] W1 蒐集各章內容來源（設計文件章節、可引用常數）
+- [x] W2 文件：43 § 2／§ 4／§ 6、INDEX
+- [x] W3 頁面：`StartPage.tsx`、路由、選單、首頁卡片
+- [x] W4 測試：`StartPage.test.tsx`；`npx tsc -b`、client vitest
+- [ ] W5 使用者確認
+
 ### AI 怪物美術：新手區 11 隻 demo（`25-monster-system.md` § 25.2.2，demo `client/demo/monsters.html`）
 
 規格：ComfyUI `z_image_turbo` 一張圖畫正面／側面／背面三視圖，左＝右鏡像；類 RimWorld 平塗粗外框；靜態四方向無跑步動作，腿由後處理裁掉。範圍：曙光草原～迷霧沼澤（id 1～11）。demo 確認後才接進遊戲。
@@ -133,6 +183,17 @@
 - [x] R7a 發版時 patchNotes 補競技場（0.8.21）
 - [x] R7b 實機驗證（進場、出波、王波發票、撤退、兌換、開箱、排行榜；死亡與組隊只有自動測試）
 - [x] R8 Wiki 頁
+
+### 隨機技能擴充（`07-affix-ability.md` § 7S.4／§ 7S.5）
+
+規格：武器共通池新增屍爆 `corpse_explosion`（X 1~5%：擊殺時被擊殺怪 3 格內其他怪受到「被擊殺怪最大 HP × X%」傷害，不判定命中／爆擊／防禦，屍爆擊殺不再觸發屍爆）、擊殺縮冷 `kill_cooldown`（X 1.0~10.0 秒：擊殺時冷卻中技能剩餘冷卻 −X 秒，每隻各算）、凍結打擊 `freezing_strike`（A 1~10%：每下命中判定，目標減速 攻擊速度 −30%、5 秒，category `slow` 後施放覆蓋）。擊殺含 DoT、擴散、普攻擴散、荊棘反彈、屍爆。飾品共通池新增閃避回復 `dodge_heal`（X 30~60：迴避成功時回 HP，含絕對迴避）、逆境 `adversity`（X 3~5%：角色身上每有一種 debuff〔中毒／流血／詛咒／虛弱／減速／暈眩／沉默〕buff 減傷 +X%，併入 buff 減傷上限 100%）；兩者多件只有一份、取最大。騎士飾品池新增挑釁怒吼擴散 `taunt_spread`（挑釁 debuff 同時套到主目標 3 格內所有怪）；元素師飾品池新增強化冷卻縮減強化 `greater_cd_reduce_boost`（持續 30 → 180 秒）。同種類多件一律只有一件生效（低血回復、低魔回復、荊棘反彈也不再加總）；裝備 tooltip：未生效的隨機技能劃線。
+
+- [x] X1 文件：07-affix-ability § 7S.3／§ 7S.4／§ 7S.5／§ 7S.7、21 § 21.5／§ 21.8、23 § 23.3／§ 23.5、24 § 24.4.1、INDEX（Wiki 由定義 import，不需改）
+- [x] X2 model：`ability.ts` 定義；`abilitySkill.ts` 挑釁擴散、強化冷卻縮減
+- [x] X3 戰鬥：擊殺觸發（普攻／技能、擴散、荊棘、DoT）、凍結打擊、閃避回復、逆境減傷、挑釁擴散
+- [x] X4 測試（`abilityExpansion.test.ts`、`ability.test.ts` 池數量）；`npx tsc -b`、client／server vitest
+- [x] X4a 同種類多件一律取一件（含低血回復、低魔回復、荊棘反彈；29-regen 同步）；tooltip 未生效劃線（`EquipmentAbility.test.tsx`）；重跑驗證
+- [ ] X5 使用者確認
 
 ### 命中燃燒改為專注打擊（`07-affix-ability.md` § 7S.2／§ 7S.4／§ 7S.5）
 
@@ -913,7 +974,7 @@ Lv.80 怪經驗不變（2,736／17,478）。91~100F 區域等級 80。
 30% 失敗該詞綴與洞永久毀壞；一件最多封一條；特殊詞綴與額外屬性也可封。
 混沌不看既有條數，重抽到填滿所有可用洞（封印詞綴不佔洞、保留）。兩種印記掉率同刺針（Lv.31+ 一般 1%／Boss 5%）、500G、重量 0。舊存檔視為 4 洞，不遷移。
 
-- [x] S1 文件：07、46、27 § 27.8、30、06-equipment-acquire、18、13 § 13.13、35、43、INDEX
+- [ ] S1 文件：07、46、27 § 27.8、30、06-equipment-acquire、18、13 § 13.13、35、43、INDEX
 - [x] S2 模型：`affixSlots`／`sealed`、掉落條數、`generateAffixes` 排除種類、顯示 `(封)`
 - [x] S3 印記：新增／封印的判定與結算、混沌保留封印、其他印記擋封印詞綴；store `applySigil`
 - [x] S4 資料：道具 161／162、Lv.31+ 49 區與 16 隻 Boss 的掉落條目
@@ -959,7 +1020,7 @@ Lv.31 以上 Boss 專屬素材 30% → 15%。Lv.30 以下區域與試煉飛龍�
 規格：盾擊不限裝備；左手裝備盾牌（`type: 'shield'`）時暈眩 3s，否則 1.5s（雙手武器、魔導書、臂甲、空手）。
 裂傷斬流血：手持雙手武器（`isTwoHanded`）每秒 85% 物理傷害，否則 70%。
 
-- [x] S1 文件：23 § 23.3／§ 23.7.1、24 § 24.4.5／§ 24.8.5
+- [ ] S1 文件：23 § 23.3／§ 23.7.1、24 § 24.4.5／§ 24.8.5
 - [x] S2 `SkillDebuffDef.shieldDuration`／`twoHandedDotDamagePercent`；`arpgEventHandler` 依手持裝備取值
 - [x] S3 Wiki／技能面板 tooltip 顯示兩段秒數
 - [x] S4 測試：盾擊有盾 3s、雙手／魔導書／臂甲／空手 1.5s；裂傷斬單手 70%、雙手 85%

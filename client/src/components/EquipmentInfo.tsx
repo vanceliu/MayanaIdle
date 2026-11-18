@@ -8,7 +8,7 @@ import { ATTRIBUTE_NAMES_ZH } from '../models/attributes';
 import { DEFENSE_BONUS_MAX } from '../models/equipment';
 import { useGameStore } from '../stores/gameStore';
 import { useAltHeld } from '../hooks/useAltHeld';
-import { getEffectiveGearArray, getUnmetAttributes, isUniqueAffixSuppressed } from '../systems/gear';
+import { getEffectiveGearArray, getUnmetAttributes, isAbilitySuppressed, isUniqueAffixSuppressed } from '../systems/gear';
 import { AttributeRequirement } from './AttributeRequirement';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
@@ -64,6 +64,15 @@ function useUniqueAffixSuppressed(item: EquipmentInstance): boolean {
   return isUniqueAffixSuppressed(character, activeEffects, equippedGear, item);
 }
 
+/** 這件已裝備的隨機技能是否因同種類多件只取一件而未生效（`07-affix-ability.md` § 7S.3）。沒有角色時一律 false */
+function useAbilitySuppressed(item: EquipmentInstance): boolean {
+  const character = useGameStore(s => s.character);
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const activeEffects = useGameStore(s => s.activeEffects);
+  if (!item.ability || !character) return false;
+  return isAbilitySuppressed(character, activeEffects, equippedGear, item);
+}
+
 /** 顯示片段；區間（`.stat-range`）只在按住 Alt 時印出（`34-ui-guidelines.md` § 34.2） */
 function DisplayParts({ parts, showRange }: { parts: DisplayPart[]; showRange: boolean }) {
   if (!showRange) return <>{parts.filter(p => !p.range).map(p => p.text).join('')}</>;
@@ -101,6 +110,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
   const frozen = unmet.length > 0;
   const classMismatch = useClassMismatch(item.requiredClass);
   const uniqueSuppressed = useUniqueAffixSuppressed(item);
+  const abilitySuppressed = useAbilitySuppressed(item);
   const showRange = useAltHeld();
   const weaponBaseDamage = isWeapon ? getWeaponBaseDamage(item) : undefined;
   const affixCategory = getAffixCategoryOf(item);
@@ -220,7 +230,10 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
       {/* § 7S.7 隨機技能：所有詞綴最上面、淺綠色 */}
       {!compact && item.ability && (
         <div className={`equip-detail-affixes equip-detail-ability${frozen ? ' is-frozen' : ''}`}>
-          <div className="equip-detail-affix ability" title="印記無法變更">
+          <div
+            className={`equip-detail-affix ability${abilitySuppressed ? ' suppressed' : ''}`}
+            title={abilitySuppressed ? '同種類已由其他裝備生效' : '印記無法變更'}
+          >
             <DisplayParts parts={formatAbilityDisplayParts(item.ability, item)} showRange={showRange} />
           </div>
         </div>

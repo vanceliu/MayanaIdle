@@ -2,21 +2,23 @@
 
 > **用途**：因版本淘汰而消失的角色，其完整狀態以唯讀形式保留供玩家憑弔
 >
-> 狀態：**無觸發來源，實作已移除**。server 模式廢止 `CURRENT_DATA_VERSION`
-> （`97-selfhosted-server.md` § 97.5），沒有東西會被淘汰，原本存在 IndexedDB 的封存表
-> 也隨 client 資料庫一併移除。規格保留在此，是否隨賽季制重啟見 § 97.10 ——
-> 屆時存儲層改為 server 端 SQLite，不再是瀏覽器。
+> 狀態：觸發來源為星盤大改版（`56-star-chart.md` § 56.8），存於 server 端 SQLite；遊戲尚未實作。
 
 ---
 
 ## 45.1 目的與觸發
 
-提高 `CURRENT_DATA_VERSION` 會淘汰所有舊版本角色（見 `19-account-character.md` § 19.9）。
-直接刪除會讓玩家長期累積的成果毫無痕跡地消失，因此淘汰流程改為：
+觸發：星盤大改版上線時的一次性 server 資料遷移。
 
 ```
-掃描過期角色 → 產生完整文字快照 → 寫入 legacyArchives → 刪除原始資料
+所有角色與帳號倉庫產生完整文字快照 → 寫入 legacy_archives → 清空遊玩資料
 ```
+
+| 項目 | 規則 |
+|---|---|
+| 清空 | 角色、個人倉庫、帳號倉庫、公會、信箱、競技場、統計與排行榜、交易掛單 |
+| 保留 | 帳號（登入、救援碼、設定）與 `legacy_archives` |
+| 角色名稱 | 清空後可重新使用 |
 
 快照是**純文字**（JSON 字串），與遊玩中的資料結構完全脫鉤。
 日後改動 `Character`、`EquipmentInstance` 等型別都不會弄壞既有的遺產紀錄。
@@ -25,22 +27,28 @@
 
 ## 45.2 快照內容
 
-快照為角色的**完整狀態**：
+快照為角色的**完整狀態**，依 server SQLite 資料表收集：
 
-| 區塊 | 內容 |
+| 區塊 | 來源 |
 |---|---|
-| 基本資料 | 名稱、職業、等級、經驗、HP/MP、金幣、所在區域、建立時間 |
-| 外觀 | `appearance`（見 `04-character.md` § 4.10）—— 遺產頁要畫出那隻角色就得帶著 |
-| 屬性 | 六大屬性的基礎值與加成值、未分配點數 |
-| 裝備欄 | 各部位裝備，含詞綴、品質、強化值、雙手佔用狀態 |
-| 背包 | 道具（含數量）與背包內的裝備實例 |
-| 個人倉庫 | 道具與裝備實例 |
-| **技能** | 已學習的所有技能與等級 |
-| 任務 | 進行中與已完成的任務紀錄 |
-| 統計 | § 37.1 的所有計數器 + 貢獻度 |
-| 版本 | 淘汰當下的 `dataVersion` 與封存時間 |
+| 角色資料 | `characters.data` 整份原樣保存（基本資料、外觀、屬性、技能、任務、統計、自動腳本等；日後新增的欄位自動涵蓋） |
+| 裝備 | `equipment_instances`：裝備欄、背包、個人倉庫內的裝備實例 |
+| 背包 | `character_bag` |
+| 個人倉庫 | `warehouses`（個人） |
+| 天賦 | `talent_slots` |
+| 信箱 | `mailbox`（含未領附件） |
+| 公會 | 所屬公會名稱與職位 |
+| 競技場 | `arena_records` |
+| 版本 | 封存時的 server schema 版本與封存時間 |
 
-帳號倉庫為**帳號層級**，不屬於任何角色，故另外以一筆 `type: 'sharedWarehouse'` 的紀錄封存。
+另以獨立紀錄封存：
+
+| type | 歸屬帳號 | 內容 |
+|---|---|---|
+| `sharedWarehouse` | 該帳號 | 帳號倉庫道具、裝備、倉庫金幣（`warehouse_gold`） |
+| `guild` | 會長的帳號 | 公會名稱、建立時間、成員名單、公會倉庫道具／裝備／金幣 |
+
+不封存：`character_prefs`、`bag_layouts`、`talent_bag_layouts` 等介面設定。
 
 ### 資料結構
 
@@ -48,12 +56,12 @@
 interface LegacyArchive {
   id?: number;
   userId: number;
-  type: 'character' | 'sharedWarehouse';
+  type: 'character' | 'sharedWarehouse' | 'guild';
   /** 顯示用摘要，列表頁不需解析 payload 即可呈現 */
-  label: string;          // 角色名稱，或「帳號倉庫」
+  label: string;          // 角色名稱、「帳號倉庫」或公會名稱
   className?: string;
   level?: number;
-  /** 淘汰當下的資料版本 */
+  /** 封存時的 server schema 版本 */
   dataVersion: number;
   archivedAt: number;
   /** JSON 字串，結構見 § 45.2 */
@@ -110,4 +118,4 @@ interface LegacyArchive {
 
 - 遺產永久保留，不設數量上限（純文字快照體積極小）
 - 遺產不隨角色匯出檔帶走（匯出的是可遊玩角色，見 `19-account-character.md` § 19.9）
-- 遺產不上傳伺服端，純本機資料
+- 存於 server 端 SQLite `legacy_archives` 表，與遊玩資料分開

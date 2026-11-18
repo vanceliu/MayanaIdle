@@ -16,7 +16,7 @@
 
 地圖渲染（isometric，`TILE_W=64` / `TILE_H=32`，見 `client/src/pixi/utils/isometric.ts`）使用的地形素材來源與授權。
 
-## 採用決定
+## 採用決定（已全數移除，以下為當時紀錄）
 
 像素風路線定案。地板用 **Isometric Stone Soup**，植物／樹／石柱用 **DCSS**，岩石／灌木用 **LPC**。
 
@@ -50,7 +50,7 @@ Stone Soup 沒有可判定方向的水岸磚，因此保留 Kenney 的 `waterBea
 
 ---
 
-## 1. game-icons.net（已移除，保留紀錄供復原）
+## 1. game-icons.net 地形裝飾（已移除，保留紀錄供復原；UI 圖示仍在使用，見 `icons/CREDITS.md`）
 
 - 網站：https://game-icons.net
 - 原始庫：https://github.com/game-icons/icons

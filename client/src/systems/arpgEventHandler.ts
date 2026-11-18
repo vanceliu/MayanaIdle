@@ -48,10 +48,14 @@ import {
   sumUniqueAffix,
   rollUniqueStruckBuffs,
 } from '../models/uniqueAffix';
-import { findAbility, sumAbilityParam, ABILITY_SPLASH_RADIUS } from '../models/ability';
+import {
+  findAbility, maxAbilityParam, ABILITY_SPLASH_RADIUS, ABILITY_FREEZE_DURATION_MS, ABILITY_FREEZE_SLOW_PERCENT,
+  type Ability,
+} from '../models/ability';
 import {
   advanceCombo, applyComboBonus, comboKey, isBasicAttackClass, isDirectDamageSkill, isSingleTargetSkill,
   applyFocusStrike, clearFocusTarget, focusKey, consumeCalm, gainRage, shortenCooldown, splashDamage,
+  corpseExplosionDamage, reduceCooldown,
 } from './abilityCombat';
 import { getDistance } from './lineOfSight';
 import { applyAbilityToSkills, withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
@@ -86,6 +90,101 @@ function withPartyAffixDebuffs(activeEffects: ActiveEffect[], ctx: ArpgEventCont
 function isActiveOnMonster(e: ActiveEffect, targetId: string, now: number): boolean {
   return e.type === 'debuff' && e.target === 'monster' && e.targetMonsterId === targetId
     && now < e.startTime + e.duration;
+}
+
+/** 怪物身上的數值 debuff：同 category 後施放覆蓋並刷新時間（§ 24.3.1） */
+function refreshMonsterDebuff(session: Session, effect: ActiveEffect, now: number): void {
+  const gs = session.game.getState();
+  session.game.setState({
+    activeEffects: gs.activeEffects.filter(e => !(e.category === effect.category && isActiveOnMonster(e, effect.targetMonsterId!, now))),
+  });
+  session.game.getState().addEffect(effect);
+}
+
+/** 凍結打擊的減速（`07-affix-ability.md` § 7S.5）：與技能減速同 category／tag */
+function freezingSlowEffect(targetId: string, targetIdx: number, now: number): ActiveEffect {
+  return {
+    id: `debuff-slow-${targetId}-${now}`,
+    sourceSkillId: 'freezing_strike',
+    sourceSkillName: '凍結打擊',
+    category: 'slow',
+    type: 'debuff',
+    target: 'monster',
+    targetIdx,
+    targetMonsterId: targetId,
+    modifiers: [{ stat: 'attack_speed', value: -ABILITY_FREEZE_SLOW_PERCENT, isPercent: true }],
+    startTime: now,
+    duration: ABILITY_FREEZE_DURATION_MS,
+    tags: ['slowed'],
+    name: '減速',
+    description: `攻擊速度降低${ABILITY_FREEZE_SLOW_PERCENT}%`,
+  };
+}
+
+/** 擊殺觸發（§ 7S.4「擊殺」）需要的被擊殺怪資訊；在移除死怪之前取得 */
+export interface KillInfo {
+  id: string;
+  maxHp: number;
+  position: { x: number; y: number };
+}
+
+export function killInfoOf(id: string, inst: MonsterInstance | undefined, mapMonsters: readonly MapMonster[]): KillInfo | undefined {
+  const position = mapMonsters.find(m => m.id === id)?.position;
+  return inst && position ? { id, maxHp: inst.maxHp, position } : undefined;
+}
+
+/**
+ * 屍爆（§ 7S.5）：每隻被擊殺怪 3 格內活著的其他怪受最大 HP × X%；不判定命中、爆擊、防禦。
+ * 回傳的傷害標 `splash`（不觸發荊棘）；屍爆造成的擊殺不再爆開。
+ */
+export function applyCorpseExplosion(
+  gear: readonly (EquipmentInstance | null)[],
+  monsterInstances: Map<string, MonsterInstance>,
+  mapMonsters: readonly MapMonster[],
+  kills: readonly KillInfo[],
+): { damages: DamageResult[]; logs: CombatLog[] } {
+  const damages: DamageResult[] = [];
+  const logs: CombatLog[] = [];
+  const ability = findAbility(gear, 'corpse_explosion');
+  if (!ability) return { damages, logs };
+  for (const kill of kills) {
+    const amount = corpseExplosionDamage(kill.maxHp, ability);
+    if (amount <= 0) continue;
+    for (const other of mapMonsters) {
+      if (other.id === kill.id || getDistance(kill.position, other.position) > ABILITY_SPLASH_RADIUS) continue;
+      const inst = monsterInstances.get(other.id);
+      if (!inst || inst.currentHp <= 0) continue;
+      applyDamageToMonster(inst, amount);
+      const killed = inst.currentHp <= 0;
+      damages.push({ targetId: other.id, damage: amount, isCrit: false, isMiss: false, killed, hits: [{ damage: amount, isCrit: false, isMiss: false }], splash: true });
+      logs.push({ text: `屍爆對 ${monsterLogName(inst)} 造成 ${amount} 傷害`, type: 'player' });
+      if (killed) logs.push({ text: `${monsterLogName(inst)} 被擊敗！`, type: 'system' });
+    }
+  }
+  return { damages, logs };
+}
+
+/** 擊殺縮冷（§ 7S.5）：冷卻中技能的剩餘冷卻每擊殺一隻 −X 秒 */
+export function applyKillCooldown(session: Session, gear: (EquipmentInstance | null)[], kills: number, now: number): CombatLog[] {
+  const ability: Ability | undefined = findAbility(gear, 'kill_cooldown');
+  if (!ability || kills <= 0) return [];
+  const gs = session.game.getState();
+  const character = gs.character;
+  if (!character) return [];
+  const cdr = getSkillCooldownReduction(character, gear, gs.activeEffects);
+  const effective = applyAbilityToSkills(gs.skills, gear, character.className);
+  const ms = ability.params.cooldown * kills;
+  let changed = false;
+  const skills = gs.skills.map((s, i) => {
+    const cooldown = Math.floor(effective[i].cooldown * (1 - Math.min(cdr, 50) / 100));
+    const lastUsedAt = reduceCooldown(s.lastUsedAt, cooldown, ms, now);
+    if (lastUsedAt === s.lastUsedAt) return s;
+    changed = true;
+    return { ...s, lastUsedAt };
+  });
+  if (!changed) return [];
+  session.game.setState({ skills });
+  return [{ text: `擊殺縮冷：冷卻中的技能縮短 ${(ms / 1000).toFixed(1)} 秒`, type: 'system' }];
 }
 
 /**
@@ -267,6 +366,8 @@ export interface MonsterAttackResult {
   restoreLogs?: CombatLog[];
   /** 飾品隨機技能荊棘反彈（`07-affix-ability.md` § 7S.5） */
   thorns?: { damage: number; killed: boolean };
+  /** 荊棘反彈擊殺引發的屍爆傷害（§ 7S.5）；擊殺由呼叫端結算 */
+  explosionDamages?: DamageResult[];
 }
 
 /**
@@ -410,6 +511,7 @@ export function processPlayerAttack(
   const comboStateKey = comboKey(weapon, character);
   const focusAbility = findAbility(equippedGear, 'focus_strike');
   const focusStateKey = focusKey(character);
+  const freezingAbility = findAbility(equippedGear, 'freezing_strike');
   const basicAttackClass = isBasicAttackClass(event, skill);
   const castComboBonus = comboAbility && !basicAttackClass && isDirectDamageSkill(skill)
     ? advanceCombo(session.loop, comboAbility, comboStateKey)
@@ -713,6 +815,19 @@ export function processPlayerAttack(
       }
     }
 
+    // § 7S.5 凍結打擊：每下命中判定一次，成功即止
+    if (freezingAbility && !isMiss && !killed && procs) {
+      let triggered = false;
+      for (let r = 0; r < landedHits && !triggered; r++) {
+        if (random() * 100 < freezingAbility.params.chance) triggered = true;
+      }
+      if (triggered) {
+        const now = gameNow();
+        refreshMonsterDebuff(session, freezingSlowEffect(targetId, targetIdx, now), now);
+        logs.push({ text: `凍結打擊觸發！${monsterLogName(monster)} 減速 ${ABILITY_FREEZE_DURATION_MS / 1000}s`, type: 'debuff-enemy' });
+      }
+    }
+
     // § 7T.4 T7 命中類：每下命中判定一次
     if (!isMiss && procs) {
       uniqueHpGain += landedHits * sumUniqueAffix(equippedGear, 'hit_heal');
@@ -850,6 +965,37 @@ export function processPlayerAttack(
     }
   }
 
+  // § 7S.5 挑釁怒吼擴散：主目標命中後，debuff 同時套到主目標 N 格內的其他怪（主目標被擊殺照樣套用）
+  const spreadDef = skill?.applyDebuff;
+  const spreadFrom = damages[0];
+  if (skill?.debuffSpreadRadius && spreadDef?.modifiers && spreadDef.duration && spreadFrom && !spreadFrom.isMiss) {
+    const center = ctx.mapMonsters.find(m => m.id === spreadFrom.targetId)?.position;
+    const now = gameNow();
+    let spread = 0;
+    for (const other of center ? ctx.mapMonsters : []) {
+      if (other.id === spreadFrom.targetId || getDistance(center!, other.position) > skill.debuffSpreadRadius) continue;
+      if ((ctx.monsterInstances.get(other.id)?.currentHp ?? 0) <= 0) continue;
+      refreshMonsterDebuff(session, {
+        id: `debuff-${spreadDef.category}-${other.id}-${now}`,
+        sourceSkillId: skill.id,
+        sourceSkillName: skill.name,
+        category: spreadDef.category,
+        type: 'debuff',
+        target: 'monster',
+        targetIdx: ctx.mapMonsters.indexOf(other),
+        targetMonsterId: other.id,
+        modifiers: spreadDef.modifiers,
+        startTime: now,
+        duration: spreadDef.duration,
+        tags: spreadDef.tags,
+        name: spreadDef.name,
+        description: spreadDef.description,
+      }, now);
+      spread++;
+    }
+    if (spread > 0) logs.push({ text: `${skill.name} 擴散：周圍 ${spread} 隻怪物 ${spreadDef.name} ${spreadDef.duration / 1000}s`, type: 'debuff-enemy' });
+  }
+
   // 攻擊技能附帶的自身 buff（復仇之刃、背刺）：傷害結算後才施加，不作用於本次技能（`23-class-magic.md` § 23.1.1）
   if (skill?.selfBuff) {
     const applied = applySkillSelfBuff(skill, character, session.game.getState().activeEffects, gameNow(), session);
@@ -914,6 +1060,16 @@ export function processPlayerAttack(
 
   logs.push(...applyUniqueAffixRestore(session, uniqueHpGain, uniqueMpGain));
 
+  // § 7S.5 屍爆：本次所有擊殺（含擴散）各自爆開
+  const kills = damages.filter(d => d.killed)
+    .map(d => killInfoOf(d.targetId, ctx.monsterInstances.get(d.targetId), ctx.mapMonsters))
+    .filter((k): k is KillInfo => !!k);
+  const explosion = applyCorpseExplosion(equippedGear, ctx.monsterInstances, ctx.mapMonsters, kills);
+  damages.push(...explosion.damages);
+  logs.push(...explosion.logs);
+
+  let result: PlayerAttackResult = { damages, logs, skillUsed: skill };
+
   // Update skill cooldown in store
   if (skill) {
     const now = gameNow();
@@ -947,11 +1103,13 @@ export function processPlayerAttack(
       if (hpRestored > 0) {
         logs.push({ text: `${skill.name} 吸血回復 ${hpRestored} HP`, type: 'player' });
       }
-      return { damages, logs, skillUsed: skill, mpRestored, hpRestored };
+      result = { damages, logs, skillUsed: skill, mpRestored, hpRestored };
     }
   }
 
-  return { damages, logs, skillUsed: skill };
+  // § 7S.5 擊殺縮冷：本次施放的技能已進入冷卻，一併縮短
+  logs.push(...applyKillCooldown(session, equippedGear, damages.filter(d => d.killed).length, gameNow()));
+  return result;
 }
 
 export function processMonsterAttack(
@@ -1020,23 +1178,43 @@ export function processMonsterAttack(
 
   // § 7S.5 飾品隨機技能：被命中（迴避不算）時荊棘反彈、累積怒氣、消耗平靜
   let thorns: { damage: number; killed: boolean } | undefined;
+  let explosionDamages: DamageResult[] = [];
   const abilityLogs: CombatLog[] = [];
   if (!result.dodged && result.damage > 0) {
     const now = gameNow();
     // 荊棘反彈與荊棘傷害詞綴的 X 相加（`07-affix.md` § 7.9）
-    const percent = sumAbilityParam(equippedGear, 'thorns', 'percent') + getAffixBonusesFromGear(equippedGear).thorns;
+    const percent = maxAbilityParam(equippedGear, 'thorns', 'percent') + getAffixBonusesFromGear(equippedGear).thorns;
     const reflect = Math.floor(result.damage * percent / 100);
     if (reflect > 0 && monster.currentHp > 0) {
       applyDamageToMonster(monster, reflect);
       thorns = { damage: reflect, killed: monster.currentHp <= 0 };
       abilityLogs.push({ text: `荊棘反彈對 ${monsterLogName(monster)} 造成 ${reflect} 傷害`, type: 'player' });
-      if (thorns.killed) abilityLogs.push({ text: `${monsterLogName(monster)} 被擊敗！`, type: 'system' });
+      if (thorns.killed) {
+        abilityLogs.push({ text: `${monsterLogName(monster)} 被擊敗！`, type: 'system' });
+        const kill = killInfoOf(event.monsterId, monster, ctx.mapMonsters);
+        const explosion = applyCorpseExplosion(equippedGear, ctx.monsterInstances, ctx.mapMonsters, kill ? [kill] : []);
+        explosionDamages = explosion.damages;
+        abilityLogs.push(...explosion.logs);
+        const kills = 1 + explosionDamages.filter(d => d.killed).length;
+        abilityLogs.push(...applyKillCooldown(session, equippedGear, kills, now));
+      }
     }
     const rage = gainRage(session.loop, equippedGear, result.damage, now);
     if (rage) session.game.setState({ activeEffects: applyPlayerBuff(session.game.getState().activeEffects, rage, now).effects });
     const calm = consumeCalm(session.loop, equippedGear, character.areaEnteredAt, now);
     if (calm > 0 && shortenCoolingSkills(session, equippedGear, calm, now)) {
       abilityLogs.push({ text: `平靜 ${calm}：冷卻中的技能縮短 ${calm}%`, type: 'system' });
+    }
+  }
+
+  // § 7S.5 閃避回復：迴避成功（含絕對迴避）時回 HP
+  if (result.dodged && character.hp > 0) {
+    const heal = maxAbilityParam(equippedGear, 'dodge_heal', 'heal');
+    if (heal > 0) {
+      const gs = session.game.getState();
+      const before = character.hp;
+      character.hp = Math.min(getEffectiveMaxHp(character, gs.equippedGear, gs.activeEffects), character.hp + heal);
+      if (character.hp > before) abilityLogs.push({ text: `閃避回復 ${character.hp - before} HP`, type: 'system' });
     }
   }
 
@@ -1118,5 +1296,6 @@ export function processMonsterAttack(
     shieldLog,
     ...(restoreLogs.length ? { restoreLogs } : {}),
     ...(thorns ? { thorns } : {}),
+    ...(explosionDamages.length ? { explosionDamages } : {}),
   };
 }

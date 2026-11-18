@@ -189,12 +189,10 @@ interface Position { x: number; y: number; }
 
 | 項目 | 規則 |
 |---|---|
-| 判定間隔 | `1000ms ÷ (1 + Pressure × 0.2)` |
-| 生成機率 | 每次判定 15% |
-| 生成數量 | 每次成功生成 1~3 隻，機率依停留時間，見 `26-spawn-pressure.md` § 26.2 |
+| 生成時機 | 波次：場上還有怪就不生，清空的當下立刻生下一波，見 `26-spawn-pressure.md` § 26.1／§ 26.2 |
+| 一波隻數 | 停留時間擲出的 1~3 隻 ＋ Pressure，見 `26-spawn-pressure.md` § 26.2 |
 | 生成位置 | 隨機**可生成格**，距玩家 ≥ 5 格；最多嘗試 20 次，失敗則放棄本次生成 |
 | 同時存在上限 | `min(10, 3 + Pressure)`，見 `26-spawn-pressure.md` |
-| 清場補位 | 場上怪物數為 0 時立即判定且必定成功，見 `26-spawn-pressure.md` § 26.2 |
 | 暫停條件 | HP/MP 低於門檻且玩家處於閒置（附近無怪）時停止生成 |
 
 Pressure 公式、上限表與生成數量分布一律以 `26-spawn-pressure.md` 為準，本文件不重複定義。

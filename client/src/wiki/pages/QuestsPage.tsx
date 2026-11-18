@@ -3,6 +3,11 @@ import {
   getBountyPrice, BOUNTY_BOSS_KILLS, BOUNTY_MONSTER_KILLS, BOUNTY_REFRESH_HOURS, MAX_SIGNED_BOUNTIES,
 } from '../../models/bounty';
 import { BOUNTY_COMPARE_CRITERIA, BOUNTY_COMPARE_LABELS } from '../../models/bountyCompare';
+import {
+  AFFIX_SIGIL_UNIT_VALUE, BOSS_QUEST_POTION_REWARD_CAP, CRAFT_SIGIL_UNIT_VALUE, QUEST_CRAFTING_MATERIAL_REWARD_CAP,
+  QUEST_POTION_REWARD_CAP, QUEST_SIGIL_REWARD_CAP,
+} from '../../models/adventurerQuest';
+import { QUEST_GOLD_REWARD_CAP } from '../../systems/globalRates';
 
 /** § 53.2 價格級距：取各級下限查表 */
 const BOUNTY_PRICE_ROWS = [
@@ -28,7 +33,7 @@ export function QuestsPage() {
             BOSS 任務獨立於 B+ / A+ / S+ 分頁，不與一般任務混在同一頁；
             該城鎮沒有對應難度的 BOSS 時該分頁不顯示。<br />
             每個難度等級顯示 7~9 個隨機任務，最多同時接取 4 個。<br />
-            任務列表每次登入時重新生成，已接取任務可隨時免費退出（扣除等量貢獻點數）。<br />
+            任務列表在每次登入、以及到另一個城鎮開啟工會面板時重新生成，已接取的任務不受影響。已接取任務可隨時退出，退出時進度歸零、扣除該任務等量的貢獻點數，該欄位換成新任務。<br />
             也可花 50 貢獻按「重整」手動刷新目前分頁，貢獻不足 50 時無法使用。
           </p>
         </div>
@@ -93,7 +98,7 @@ export function QuestsPage() {
           </table>
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 8 }}>
-          兌換率依掉率比訂定：精鍊／工藝印記 5~7%、混沌／刺針／重刻／新增／封印 1%、突破 0.1%。
+          兌換率依掉率比訂定：精鍊／工藝印記 5~7%、混沌／刺針／重刻／新增／封印 1%、突破 1%。
         </p>
       </section>
 
@@ -193,14 +198,14 @@ export function QuestsPage() {
               <tr><th>獎勵</th><th>計算方式</th></tr>
             </thead>
             <tbody>
-              <tr><td>金幣</td><td>基準值 ×2</td></tr>
-              <tr><td>藥水（紅/橙/白/綠/強化綠隨機）</td><td>基準值 ÷ 藥水單價（最少 1 個）</td></tr>
-              <tr><td>工藝印記</td><td>基準值 ÷ 100（個）</td></tr>
-              <tr><td>精鍊印記</td><td>基準值 ÷ 100（個）</td></tr>
+              <tr><td>金幣</td><td>min(基準值 ×2, {QUEST_GOLD_REWARD_CAP.toLocaleString()}) × 伺服器金幣倍率</td></tr>
+              <tr><td>藥水（紅/橙/白/綠/強化綠隨機）</td><td>基準值 ÷ 藥水單價（1～{QUEST_POTION_REWARD_CAP} 個；BOSS 分頁 1～{BOSS_QUEST_POTION_REWARD_CAP} 個）</td></tr>
+              <tr><td>工藝印記</td><td>基準值 ÷ {CRAFT_SIGIL_UNIT_VALUE.toLocaleString()}（1～{QUEST_SIGIL_REWARD_CAP} 個）</td></tr>
+              <tr><td>精鍊印記</td><td>基準值 ÷ {CRAFT_SIGIL_UNIT_VALUE.toLocaleString()}（1～{QUEST_SIGIL_REWARD_CAP} 個）</td></tr>
               <tr><td>武器強化卷軸</td><td>1 張</td></tr>
               <tr><td>防具強化卷軸</td><td>1 張</td></tr>
-              <tr><td>製作素材（B／B+ 級以上）</td><td>基準值 ÷ (素材售價 × 3)（最少 1 個）</td></tr>
-              <tr><td>詞綴印記（混沌/刺針/重刻/新增/封印隨機）</td><td>基準值 ÷ 1,000（最少 1 個）</td></tr>
+              <tr><td>製作素材</td><td>基準值 ÷ (素材售價 × 3)（1～{QUEST_CRAFTING_MATERIAL_REWARD_CAP} 個）</td></tr>
+              <tr><td>詞綴印記（混沌/刺針/重刻/新增/封印隨機）</td><td>基準值 ÷ {AFFIX_SIGIL_UNIT_VALUE.toLocaleString()}（1～{QUEST_SIGIL_REWARD_CAP} 個）</td></tr>
               <tr><td>突破印記</td><td>1 個</td></tr>
             </tbody>
           </table>
@@ -219,13 +224,17 @@ export function QuestsPage() {
             <tbody>
               <tr><td>F ~ D</td><td>金幣、藥水、工藝印記、精鍊印記</td></tr>
               <tr><td>C</td><td>同上（工藝印記/精鍊印記權重提升）</td></tr>
-              <tr><td>B</td><td>+ 防具強化卷軸、製作素材（銀礦石、銀精華）、詞綴印記</td></tr>
-              <tr><td>A</td><td>+ 武器強化卷軸、製作素材升級（米索利碎片、米索利礦石）</td></tr>
-              <tr><td>S ~ SS</td><td>卷軸權重提高、製作素材升級（龍骨、奧里哈魯根）、+ 突破印記</td></tr>
+              <tr><td>B</td><td>+ 防具強化卷軸、製作素材、詞綴印記</td></tr>
+              <tr><td>A</td><td>+ 武器強化卷軸</td></tr>
+              <tr><td>S ~ SS</td><td>卷軸權重提高、+ 突破印記</td></tr>
               <tr><td>US</td><td>與 S ~ SS 相同（等階只影響獎勵種類權重，不給數量倍率）</td></tr>
             </tbody>
           </table>
         </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 8 }}>
+          製作素材的種類看任務難度，不看等階：D／C／B 級出銀礦石、銀精華；A 級出米索利碎片、米索利礦石；
+          S 級出龍骨碎片、龍心結晶、奧里哈魯根碎片、奧里哈魯根精華（BOSS 分頁依對應難度）。
+        </p>
       </section>
 
       <section style={{ marginBottom: 32 }}>
@@ -255,7 +264,7 @@ export function QuestsPage() {
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             等階：F → E → D → C → B → A → S → SS → US（共 9 階）<br />
-            公式：最終貢獻 = 基底貢獻 + floor(區域平均金幣 / 10)<br />
+            公式：最終貢獻 = 基底貢獻 + floor(區域平均金幣 / 10)；BOSS 任務以該 Boss 的平均金幣計，交付型以該難度區域池的平均值計<br />
             完成任務獲得貢獻點數，累積到門檻自動升階。<br />
             退出任務扣除等量貢獻點數，可能降階。<br />
             大部分玩家會卡在 A 階，S/SS/US 為長期目標。等階只影響獎勵種類的權重，不影響數量。

@@ -95,11 +95,11 @@ export function CombatPage() {
             <br />
             基礎傷害 = 武器傷害 + 屬性加成(近戰 有效STR/2、弓 有效AGI/2) + 額外攻擊
             <br />
-            　　　　　+ 材質種族克制 + 元素克制 + 火矢附魔(弓限定)
+            　　　　　+ 材質種族克制 + 元素克制 + 火矢附魔(弓；帶火矢附魔強化時任何武器)
             <br />
             傷害 = floor(基礎傷害 × (1 + 攻擊力%/100))
             <br />
-            傷害 = floor(傷害 × (1 + 普攻元素%/100))　※ 武器有元素或火矢附魔時
+            傷害 = floor(傷害 × (1 + (普攻元素% + 目標元素下降%)/100))　※ 武器有元素或火矢附魔時
             <br />
             傷害 = floor(傷害 × (2.0 + 爆擊傷害%/100))　※ 爆擊時
             <br />
@@ -124,14 +124,14 @@ export function CombatPage() {
             <br />
             基礎傷害 = floor(技能攻擊力 × (1 + 裝備魔法攻擊 × {MAGIC_ATTACK_PERCENT_PER_POINT}/100)) + INT加成 + 元素克制
             <br />
-            傷害 = floor(基礎傷害 × (1 + 技能元素%/100))　※ 技能有元素時
+            傷害 = floor(基礎傷害 × (1 + (技能元素% + 目標元素下降%)/100))　※ 技能有元素時
             <br />
             最終傷害 = max(1, floor(傷害 × (100 - 怪物減傷) / 100))
           </>
         }
         note={
           <>
-            技能<strong>必定命中</strong>，不做命中判定。魔法技能<strong>不會爆擊</strong>（復仇之刃、背刺例外）。裝備魔法攻擊是<strong>乘在技能攻擊力上的乘區</strong>（每 1 點 +{MAGIC_ATTACK_PERCENT_PER_POINT}%，魔攻 39 → ×{1 + 39 * MAGIC_ATTACK_PERCENT_PER_POINT / 100}）；法杖是魔攻的主要來源，不進 INT 倍率；
+            技能<strong>必定命中</strong>，不做命中判定。魔法技能<strong>不會爆擊</strong>（物理快照技能見下一節）。裝備魔法攻擊是<strong>乘在技能攻擊力上的乘區</strong>（每 1 點 +{MAGIC_ATTACK_PERCENT_PER_POINT}%，魔攻 39 → ×{1 + 39 * MAGIC_ATTACK_PERCENT_PER_POINT / 100}）；法杖是魔攻的主要來源，不進 INT 倍率；
             攻擊力%與元素刻印%詞綴不影響魔法傷害。
             技能傷害不受虛弱影響（虛弱只作用於依物理公式計算的傷害）。
           </>
@@ -157,7 +157,7 @@ export function CombatPage() {
         }
         note={
           <>
-            適用技能：<strong>盾擊、裂傷斬、挑釁怒吼</strong>（騎士）。
+            適用技能：<strong>盾擊、裂傷斬、挑釁怒吼、衝鋒突進、復仇之刃</strong>（騎士）、<strong>束縛箭、後躍射擊</strong>（妖精）、<strong>背刺</strong>（盜賊）。
             <br />
             <strong>不吃</strong>：元素刻印%、武器材質種族克制。
             與魔法技能相同<strong>必定命中</strong>；與魔法技能不同，<strong>會爆擊</strong>（整招套用爆擊倍率），之後套用怪物防禦減傷。
@@ -172,7 +172,7 @@ export function CombatPage() {
           <>
             命中率 = 80 + AGI加成(有效AGI/3) + 武器攻擊成功 + 等級差(玩家Lv - 怪物Lv)
             <br />
-            　　　　+ 種族命中buff - 怪物迴避
+            　　　　+ 種族命中buff + 命中buff - 怪物迴避(固定 5)
             <br />
             武器攻擊成功 = 武器基礎值 + floor(強化等級 / 2)
             <br />
@@ -185,8 +185,7 @@ export function CombatPage() {
         title="玩家防禦減傷"
         formula={
           <>
-            最終防禦 = max(0, floor(裝備防禦合計 × (1 + 防禦力%/100)) + {BASE_CHARACTER_DEFENSE})
-            　※ 詛咒中則再 -20%
+            最終防禦 = max(0, floor((裝備防禦合計 + buff 防禦) × (1 + 防禦力%/100) × (1 - 詛咒%/100)) + {BASE_CHARACTER_DEFENSE})
             <br />
             <br />
             物理減傷率 = min(最終防禦, {DAMAGE_REDUCTION_CAP})
@@ -220,7 +219,7 @@ export function CombatPage() {
             <br />
             　　　　　+ 飾品強化等級 × {ACCESSORY_MAGIC_RESIST_PER_LEVEL}　※ 項鍊／戒指，每 +1 給 {ACCESSORY_MAGIC_RESIST_PER_LEVEL}%
             <br />
-            　　　　　+ 魔法抗性詞綴　　　　　　　　　※ 項鍊／戒指／盾牌限定
+            　　　　　+ 魔法抗性詞綴　　　　　　　　　※ 項鍊／戒指／上衣／斗篷／副手
           </>
         }
         note={
@@ -269,19 +268,19 @@ export function CombatPage() {
             爆擊倍率 = 2.0 + 爆擊傷害% / 100
           </>
         }
-        note={<>爆擊在防禦減傷「之前」套用。會爆擊的有：普攻、三連射、盾擊／裂傷斬／挑釁怒吼、復仇之刃、背刺，共用同一組爆擊數值；其餘魔法技能不爆擊。</>}
+        note={<>爆擊在防禦減傷「之前」套用。會爆擊的有：普攻、三連射、物理快照技能（盾擊、裂傷斬、挑釁怒吼、衝鋒突進、復仇之刃、束縛箭、後躍射擊、背刺），共用同一組爆擊數值；其餘魔法技能不爆擊。</>}
       />
 
       <Section
         title="格擋"
         formula={
           <>
-            格擋率 = min({BLOCK_RATE_CAP}, 盾牌基礎格擋 + 格擋率詞綴)
+            格擋率 = min({BLOCK_RATE_CAP}, 副手基礎格擋 + 格擋率詞綴 + 格擋 buff)
             <br />
             格擋時傷害減半
           </>
         }
-        note={<>未裝備盾牌時格擋率為 0。格擋在防禦減傷「之後」才判定。</>}
+        note={<>副手基礎格擋來自盾牌與臂甲。格擋在防禦減傷「之後」才判定。</>}
       />
 
       <Section

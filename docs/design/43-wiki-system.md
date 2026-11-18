@@ -22,6 +22,7 @@ client/src/wiki/
 ├── pages/
 │   ├── WikiHome.tsx      — 首頁（分類卡片導覽）
 │   ├── WikiHome.css
+│   ├── StartPage.tsx     — 新手開始（依遊玩順序的教學）
 │   ├── WeaponsPage.tsx   — 武器列表 + 單件詳細
 │   ├── ArmorPage.tsx     — 防具列表 + 單件詳細
 │   ├── AffixesPage.tsx   — 詞綴適用部位、階級數值、掉落機率
@@ -35,7 +36,6 @@ client/src/wiki/
 │   ├── CombatPage.tsx    — 戰鬥計算公式
 │   ├── QuestsPage.tsx    — 任務系統
 │   ├── TalentsPage.tsx   — 自動天賦（三種類型的條件／動作、天賦格與合成）
-│   ├── DropsPage.tsx     — 掉落總覽
 │   └── CreditsPage.tsx   — 第三方素材來源與授權
 ```
 
@@ -43,6 +43,7 @@ client/src/wiki/
 
 | Wiki 頁面 | 資料來源 |
 |-----------|---------|
+| 新手開始 | `CLASS_BASE_ATTRIBUTES`／`getAvailablePoints`（`models/character`）、`getRegionsByZone`／`ZONES`（`models/mapData`）、預設天賦（`models/scriptEngine`）等 model 常數；說明文字硬編碼 |
 | 武器 | `EQUIPMENT_SEEDS`（`isWeaponEquipment(slot, type)`） |
 | 防具 | `EQUIPMENT_SEEDS`（`isArmorEquipment(slot, type)`，含盾牌／魔導書／臂甲） |
 | 戰鬥計算 | `BASE_CHARACTER_DEFENSE`、`DAMAGE_REDUCTION_CAP`、`MAGIC_DEFENSE_CAP`、`MAGIC_DEFENSE_PER_PERCENT`、`MAGIC_DEFENSE_CONTRIBUTION_CAP`（`systems/combat`）、`ACCESSORY_MAGIC_RESIST_PER_LEVEL`（`systems/enhancement`） |
@@ -75,21 +76,33 @@ client/src/wiki/
 
 ## 4. 頁面功能
 
+### 4.0 新手開始 (StartPage)
+- 左側選單排在「首頁」之後，標籤「開始」；Wiki 首頁有「新手開始」卡片
+- 一頁到底，頂端章節目錄（按鈕捲動到該章）
+- 章節依序：建立角色與選擇職業、薄暮村與新手指導員、第一次出城、遊戲機制、任務、裝備成長、鐵匠鋪製作、換地圖、技能與自動天賦、之後可以玩什麼
+- 新手推薦職業：**妖精**（職業表標「（推薦）」）
+- 每章只講做什麼與為什麼，細節以連結導到對應 Wiki 頁；數值取 model 常數，不寫死
+- 與遊戲內新手指引（`13-town.md` § 13.11 `STARTER_TIPS`）各自獨立，不互相引用
+- 只介紹已實作的系統；`15-excluded.md` 的排除項目不出現
+
 ### 4.1 武器頁 (WeaponsPage)
-- 列表模式：名稱、類型、對小怪／對大怪、**射程**、命中、額攻、材質、安定值、雙手、附加效果、職業限制、取得方式、掉落來源
+- 列表模式：名稱、類型、對小怪／對大怪、**射程**、命中、額攻、材質、安定值、雙手、附加效果、職業限制、取得方式
 - 詳細模式：`/wiki/weapons/:name`，含完整屬性、強化資訊
 - 列表下方附〈T7 獨有詞綴〉節：武器池（`UniqueAffixSection`，`wiki/components/UniqueAffixTable.tsx`）
 - 列表下方附〈隨機技能〉節：武器共通池與各職業池（`07-affix-ability.md`）
-- 篩選：武器類型、材質、取得方式、關鍵字
-- 排序：攻擊力、安定值、等級
+- 篩選：武器類型、材質、裝備階級、關鍵字
+- 排序：名稱、類型、對小怪、對大怪
 - **不含盾牌／魔導書／臂甲**：三者分類是防具（`06-equipment.md` § 副手裝備），列在防具頁
 
+- 取得方式（武器頁與防具頁共用，`wiki/acquireLabel.ts`）：`starter`「新手裝」、`shop`「商店／掉落」、`craft`「製作／掉落」、其餘「掉落」；商店裝與製作裝也依階級進掉落池（`06-equipment-acquire.md` § 6A.1）
+
 ### 4.2 防具頁 (ArmorPage)
-- 列表模式：名稱、部位、防禦力、格擋率、**魔攻**、**材質**、安定值、附加屬性、職業限制、取得方式、掉落來源
+- 列表模式：名稱、部位、防禦力、格擋率、**魔攻**、**材質**、安定值、附加屬性、職業限制、素質需求、取得方式
 - 詳細模式：`/wiki/armor/:name`
 - 列表下方附〈T7 獨有詞綴〉節：各防具分類池、飾品池、腰帶／左手指定表（`07-affix-tier7.md` § 7T.5）
 - 列表下方附〈隨機技能〉節：飾品共通池與各職業池（`07-affix-ability.md`）
-- 篩選：部位、取得方式、關鍵字
+- 篩選：部位、裝備階級、關鍵字
+- 防禦力與安定值：模板未定安定值的件顯示實例生成的區間（隨機額外防禦 `DEFENSE_BONUS_MIN`～`MAX`；安定值商店固定 `ARMOR_STABILITY_MIN`，其餘 `MIN`～`MAX`）
 - 含左手三種副手防具；「部位」欄對副手不顯示 `leftHand`，而是分成盾牌／魔導書／臂甲三類，
   篩選與排序同樣以此三類為單位
 
@@ -221,9 +234,6 @@ client/src/wiki/
 - 段位（等級、一般怪、王的出場順序、入場材料、金幣）、組隊數量、強化詞綴數、票券場、離場規則、排行榜位置、兌換箱與 (擬) 規則（來源：`55-arena.md`）
 - 數值取 `models/arena.ts`、`systems/arenaBox.ts` 常數；規則敘述為硬編碼文字
 
-### 4.13 掉落 (DropsPage)
-- 全區域掉落一覽（導航用，主要透過怪物/地圖頁查看）
-
 ### 4.14 素材來源 (CreditsPage)
 - 列出版庫中收錄的**第三方素材**：用途、素材名稱、作者、授權、來源 URL、版庫路徑
 - 授權與來源皆為可點擊外部連結（`target="_blank"` + `rel="noopener noreferrer"`）
@@ -243,6 +253,7 @@ Wiki 路由掛載於主應用 Router 下：
 
 ```
 /wiki              → WikiHome
+/wiki/start        → StartPage
 /wiki/weapons      → WeaponsPage (list)
 /wiki/weapons/:name → WeaponsPage (detail)
 /wiki/armor        → ArmorPage (list)
@@ -263,7 +274,6 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/talents      → TalentsPage
 /wiki/arena        → ArenaPage
 /wiki/scripts      → 轉址至 /wiki/talents（改名前的舊路徑）
-/wiki/drops        → DropsPage
 /wiki/credits      → CreditsPage
 ```
 
@@ -280,6 +290,7 @@ Wiki 頁面直接 import seed 常數與 model 定義，**不存在複製資料**
 
 | 頁面 | 硬編碼內容 | 對應實作 |
 |------|-----------|---------|
+| StartPage | 職業定位與主屬性、屬性作用、負面狀態解法、裝備階級來源、各章說明文字 | `04-character.md`、`20-attributes.md`、`24-buff-debuff.md`、`06-equipment-acquire.md` |
 | AttributesPage | 屬性效果公式描述、初始屬性表 | `models/character.ts`、`systems/combat.ts` |
 | CombatPage | 公式敘述文字（各項上限已改為 import 常數） | `systems/combat.ts` |
 | SkillsPage | 職業學習條件文字 | `models/skillRestrictions.ts` |

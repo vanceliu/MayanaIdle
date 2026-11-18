@@ -16,6 +16,7 @@ import { QuestsPage } from './pages/QuestsPage'
 import { TalentsPage } from './pages/TalentsPage'
 import { ArenaPage } from './pages/ArenaPage'
 import { CreditsPage } from './pages/CreditsPage'
+import { StartPage } from './pages/StartPage'
 
 /**
  * Wiki 的整棵路由樹，由 `main.tsx` 以 `React.lazy` 動態載入。
@@ -31,6 +32,7 @@ export default function WikiRoutes() {
     <Routes>
       <Route path="/" element={<WikiLayout />}>
         <Route index element={<WikiHome />} />
+        <Route path="start" element={<StartPage />} />
         <Route path="weapons" element={<WeaponsPage />} />
         <Route path="weapons/:name" element={<WeaponsPage />} />
         <Route path="armor" element={<ArmorPage />} />

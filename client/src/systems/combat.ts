@@ -10,6 +10,7 @@ import { getTotalAttributes, getEffectiveSTR, getEffectiveAGI, getEffectiveINT, 
 import { collectAffixBonuses, getEffectiveAffixValue, getBrandElement, elementDownCategory, isPartySharedAffixDebuff, ELEMENT_DOWN_STAT, HIT_DOWN_STAT, EVASION_POINTS_PER_PERCENT, roundAffixTenth, type AffixBonuses, type BrandElement } from '../models/affix';
 import { sumUniqueAffix, type UniqueAffixType } from '../models/uniqueAffix';
 import { FIRE_ENCHANT_ANY_WEAPON_STAT } from '../models/abilitySkill';
+import { ABILITY_ADVERSITY_TAGS, maxAbilityParam } from '../models/ability';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
 
@@ -1166,9 +1167,22 @@ export function isPlayerInvincible(activeEffects: ActiveEffect[], now: number = 
   );
 }
 
-export function getBuffDamageReduction(activeEffects: ActiveEffect[]): number {
+/** 逆境（`07-affix-ability.md` § 7S.5）：身上每種 debuff（依 tag）× X% */
+export function getAdversityReduction(gear: readonly (EquipmentInstance | null)[], activeEffects: ActiveEffect[], now: number = gameNow()): number {
+  const percent = maxAbilityParam(gear, 'adversity', 'reduction');
+  if (percent <= 0) return 0;
+  const tags = new Set<string>();
+  for (const e of activeEffects) {
+    if (e.type !== 'debuff' || e.target !== 'player' || now >= e.startTime + e.duration) continue;
+    for (const tag of e.tags ?? []) if (ABILITY_ADVERSITY_TAGS.includes(tag)) tags.add(tag);
+  }
+  return tags.size * percent;
+}
+
+/** buff 減傷%（§ 21.5），上限 100；給 `gear` 時含逆境 */
+export function getBuffDamageReduction(activeEffects: ActiveEffect[], gear?: readonly (EquipmentInstance | null)[]): number {
   const now = gameNow();
-  let reduction = 0;
+  let reduction = gear ? getAdversityReduction(gear, activeEffects, now) : 0;
   for (const effect of activeEffects) {
     if (effect.type !== 'buff' || effect.target !== 'player') continue;
     if (now - effect.startTime >= effect.duration) continue;
@@ -1255,7 +1269,7 @@ export function calculateMonsterAttack(
   let finalDamage = Math.max(1, Math.floor(rawDamage * (100 - reductionRate) / 100));
 
   // buff 減傷與防禦減傷為類間乘算（§ 21.5）
-  const buffReduction = getBuffDamageReduction(activeEffects);
+  const buffReduction = getBuffDamageReduction(activeEffects, equippedGear);
   if (buffReduction > 0) {
     finalDamage = Math.max(1, Math.floor(finalDamage * (100 - buffReduction) / 100));
   }
@@ -1296,7 +1310,7 @@ export function calculateThornsDamage(
   const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
   const reductionRate = Math.min(finalDefense, DAMAGE_REDUCTION_CAP);
   let damage = Math.max(1, Math.floor(base * (100 - reductionRate) / 100));
-  const buffReduction = getBuffDamageReduction(activeEffects);
+  const buffReduction = getBuffDamageReduction(activeEffects, equippedGear);
   if (buffReduction > 0) damage = Math.max(1, Math.floor(damage * (100 - buffReduction) / 100));
   return damage;
 }

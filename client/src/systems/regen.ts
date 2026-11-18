@@ -4,7 +4,7 @@ import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveVIT, getEffectiveSPI } from '../models/character';
 import { getAffixBonusesFromGear, getBuffFlatBonus } from './combat';
 import { gameNow } from '../core/clock';
-import { ABILITY_LOW_RESOURCE_PERCENT, sumAbilityParam } from '../models/ability';
+import { ABILITY_LOW_RESOURCE_PERCENT, maxAbilityParam } from '../models/ability';
 
 /** 回魔 buff 的修正值 stat：每次回魔另加有效最大 MP 的 X%，戰鬥中不減半（`23-class-magic.md` § 23.5 魔力湧泉） */
 export const MP_REGEN_MAX_PERCENT_STAT = 'mp_regen_max_percent';
@@ -24,10 +24,10 @@ function liveGear(gear: (EquipmentInstance | null)[]): EquipmentInstance[] {
   return gear.filter((g): g is EquipmentInstance => g != null);
 }
 
-/** 低血／低魔回復（`07-affix-ability.md` § 7S.5）：低於有效最大值 50% 時才加，多件加總 */
+/** 低血／低魔回復（`07-affix-ability.md` § 7S.5）：低於有效最大值 50% 時才加，多件取最大 */
 function lowResourceBonus(current: number, max: number, gear: (EquipmentInstance | null)[], type: 'low_hp_regen' | 'low_mp_regen'): number {
   if (max <= 0 || current * 100 >= max * ABILITY_LOW_RESOURCE_PERCENT) return 0;
-  return sumAbilityParam(gear, type, 'regen');
+  return maxAbilityParam(gear, type, 'regen');
 }
 
 export function getHpRegen(char: Character, inCombat: boolean, gear: (EquipmentInstance | null)[] = [], activeEffects: ActiveEffect[] = []): number {

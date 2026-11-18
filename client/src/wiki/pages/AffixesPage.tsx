@@ -27,7 +27,7 @@ import {
   SIGIL_EXCHANGE_FEE_COUNT,
   getSigilDefinition,
 } from '../../models/sigil';
-import { CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
+import { CRAFTED_GEAR_SUFFIX, MIMIC_GEAR_SUFFIX } from '../../models/equipment';
 import '../components/WikiTable.css';
 import { UniqueAffixSection } from '../components/UniqueAffixTable';
 import { AffixCategoryList, AffixTierTables } from '../components/AffixCategoryView';
@@ -125,7 +125,7 @@ export function AffixesPage() {
         <h3 style={headingStyle}>階級數值</h3>
         <AffixTierTables />
         <p style={noteStyle}>
-          T1~T{DEFAULT_MAX_AFFIX_TIER} 由精鍊印記升階；T6 為怪物掉落；T7 為 Boss 限定掉落。滑過一列看使用它的詞綴。
+          T1~T{DEFAULT_MAX_AFFIX_TIER} 由精鍊印記升階；T6 來自掉落、T5／T6 製作品、突破印記與混沌／新增印記；T7 只有 Boss 掉落與突破印記。滑過一列看使用它的詞綴。
           <br />
           同一種詞綴在不同分類可能用不同的表（例：爆擊率在手套每階 2.0%、在項鍊與戒指每階 1.0%），以〈詞綴一覽〉各分類為準。
           <br />
@@ -236,7 +236,7 @@ export function AffixesPage() {
         <p style={noteStyle}>
           印記在城鎮的<strong>印記師</strong>使用，詞綴的升階、重骰與裝備品質都在這裡，不影響強化等級（+N）；
           一次消耗印記 ×1，只有工藝印記另收 {POLISH_SIGIL_GOLD_COST.toLocaleString()}G。
-          新手裝與 {CRAFTED_GEAR_SUFFIX} 製作品不可使用任何印記。
+          新手裝、{CRAFTED_GEAR_SUFFIX} 製作品與 {MIMIC_GEAR_SUFFIX} 擬態品不可使用任何印記。
           <br />
           升階的兩種印記在印記師是<strong>各自獨立的選項</strong>，守備範圍不重疊：
           取得管道上限以內用<strong>精鍊印記</strong>（必定成功），T5／T6 才輪到<strong>突破印記</strong>。

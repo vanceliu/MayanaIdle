@@ -44,7 +44,7 @@ export const COMBAT_CONDITION_DESC: Record<string, string> = {
   target_lacks_affix: '當前目標沒有指定的強化詞綴',
   target_cc_immune: '當前目標處於控場免疫窗內。這時放控場技是純浪費 MP',
   target_shielded: '當前目標有無敵效果或還有護盾量',
-  target_casting: '當前目標正在讀條施法。詠唱不可打斷，走出射程才會中止',
+  target_casting: '當前目標正在讀條施法。詠唱不可打斷，走出射程或擋住視線才會中止',
 };
 
 export const COMBAT_ACTION_DESC: Record<string, string> = {
@@ -52,13 +52,13 @@ export const COMBAT_ACTION_DESC: Record<string, string> = {
   normal_attack: '物理攻擊當前目標',
   wait: '這次攻擊機會跳過，角色原地等待',
   skill_class_only: '只放該職業的職業魔法，不含基礎魔法',
-  switch_target_lowest_hp: '改打場上血量百分比最低的一隻。補刀用',
-  switch_target_highest_hp: '改打血量百分比最高的一隻',
-  switch_target_farthest: '改打距離最遠的一隻',
-  switch_target_by_kind: '改打指定種族或元素的一隻，同類取最近的',
-  switch_target_by_debuff: '改打帶著（或沒有）指定 debuff 的一隻',
-  switch_target_by_affix: '改打帶著（或沒有）指定強化詞綴的一隻',
-  lock_target: '釘住當前目標，牠死掉或離場前不再改挑最近的',
+  switch_target_lowest_hp: '改打場上血量百分比最低的一隻。補刀用。消耗這次出手機會',
+  switch_target_highest_hp: '改打血量百分比最高的一隻。消耗這次出手機會',
+  switch_target_farthest: '改打距離最遠的一隻。消耗這次出手機會',
+  switch_target_by_kind: '改打指定種族或元素的一隻，同類取最近的。消耗這次出手機會',
+  switch_target_by_debuff: '改打帶著（或沒有）指定 debuff 的一隻。消耗這次出手機會',
+  switch_target_by_affix: '改打帶著（或沒有）指定強化詞綴的一隻。消耗這次出手機會',
+  lock_target: '釘住當前目標，牠死掉或離場前不再改挑最近的。消耗這次出手機會',
   keep_distance: '退到指定距離外。留空時退到武器射程邊緣',
   close_in: '貼近目標到指定距離',
 };

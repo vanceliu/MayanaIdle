@@ -2,11 +2,16 @@ import { useMemo } from 'react';
 import { useZones, useRegions, useMonstersByArea } from '../hooks/useWikiData';
 import { MONSTER_SEEDS } from '../../db/seed';
 import { Link, useParams } from 'react-router-dom';
-import type { Floor } from '../../models/area';
+import type { Floor, Region } from '../../models/area';
+import { getItemById } from '../../models/items';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
   fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
+};
+
+const REGION_TYPE_LABELS: Record<Region['type'], string> = {
+  field: '野外', dungeon: '地城', town: '城鎮', training: '試驗場', arena: '競技場',
 };
 
 export function MapsPage() {
@@ -36,7 +41,7 @@ export function MapsPage() {
     <div>
       <h2 className="wiki-page-title">地圖總覽</h2>
       {zones.map(zone => {
-        const zoneRegions = regions.filter(r => r.zoneId === zone.id);
+        const zoneRegions = regions.filter(r => r.zoneId === zone.id && r.type !== 'training' && r.type !== 'arena');
         return (
           <div key={zone.id} style={{ marginBottom: 24 }}>
             <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 8 }}>
@@ -77,7 +82,7 @@ export function MapsPage() {
                         <td>
                           <Link className="wiki-link" to={`/wiki/maps/${r.id}`}>{r.name}</Link>
                         </td>
-                        <td>{r.type === 'town' ? '城鎮' : r.type === 'dungeon' ? '地城' : '野外'}</td>
+                        <td>{REGION_TYPE_LABELS[r.type]}</td>
                         <td className="cell-number">
                           {r.levelMin && r.levelMax ? `${r.levelMin}~${r.levelMax}` : '-'}
                         </td>
@@ -133,8 +138,9 @@ function AreaDetail({ areaId }: { areaId: string }) {
     <div>
       <h2 className="wiki-page-title">{region!.name}</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
-        {region!.type === 'town' ? '城鎮' : region!.type === 'dungeon' ? '地城' : '野外'}
+        {REGION_TYPE_LABELS[region!.type]}
         {region!.levelMin && region!.levelMax && ` | Lv.${region!.levelMin}~${region!.levelMax}`}
+        {region!.entryScrollItemId && ` | 進入消耗 ${getItemById(region!.entryScrollItemId)?.name ?? '通行卷軸'} ×1`}
       </p>
 
       <Link className="wiki-link" to="/wiki/maps" style={{ marginBottom: 16, display: 'inline-block' }}>

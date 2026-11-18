@@ -5,7 +5,7 @@ import { defaultSession } from '../stores/session';
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 
-const STARTER_MAX_LEVEL = 30;
+export const STARTER_MAX_LEVEL = 30;
 const STARTER_ENHANCE_COST = 500;
 
 /**

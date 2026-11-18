@@ -23,6 +23,8 @@ vi.mock('../../hooks/useWikiData', () => ({
   ],
   getAreaDisplayName: (a: string) => a,
   getDropRate: () => '0%',
+  getAreaDropRateText: () => '0%',
+  formatRatePercent: () => '0%',
   getDropItemName: () => '',
   getWikiEquipmentPath: () => '',
 }));

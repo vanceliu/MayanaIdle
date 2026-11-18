@@ -1,11 +1,12 @@
 import { formatMagicAttack, getWeaponRange, isRangedWeapon, type EquipmentTemplate } from '../../models/equipment';
 import { useState, useMemo } from 'react';
-import { useWeaponList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
+import { useWeaponList } from '../hooks/useWikiData';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import { getEquipmentTierColor } from '../../models/equipmentTier';
 import '../components/WikiTable.css';
+import { getAcquireLabel } from '../acquireLabel';
 import { UniqueAffixSection } from '../components/UniqueAffixTable';
 import { AbilitySection } from '../components/AbilityTable';
 
@@ -147,7 +148,6 @@ function WeaponList({ initialSearch }: { initialSearch?: string }) {
               <th>附加效果</th>
               <th>職業限制</th>
               <th>取得方式</th>
-              <th>掉落來源</th>
             </tr>
           </thead>
           <tbody>
@@ -177,8 +177,7 @@ function WeaponEffects({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>
 }
 
 function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[number] }) {
-  const dropSources = useDropSourceForItem(w.name);
-  const acquireLabel = w.acquireType === 'shop' ? '商店' : w.acquireType === 'craft' ? '製作' : '掉落';
+  const acquireLabel = getAcquireLabel(w);
   const tierColor = getEquipmentTierColor(w as EquipmentTemplate);
 
   return (
@@ -207,15 +206,6 @@ function WeaponRow({ weapon: w }: { weapon: ReturnType<typeof useWeaponList>[num
           : '全職業'}
       </td>
       <td>{acquireLabel}</td>
-      <td>
-        {dropSources.length > 0
-          ? dropSources.map(d => (
-              <Link key={d.area} className="wiki-link" to={`/wiki/maps/${d.area}`} style={{ marginRight: 4 }}>
-                {getAreaDisplayName(d.area)}
-              </Link>
-            ))
-          : '-'}
-      </td>
     </tr>
   );
 }

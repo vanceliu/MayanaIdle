@@ -122,10 +122,11 @@ export function ArenaPage() {
           <p style={CARD_TEXT}>
             票券場每 {ARENA_SLOT_HOURS} 小時重置（server 時間 {SLOT_HOURS.join('、')}），每個時段、每個段位各 1 場，進場即用掉。
             用掉之後仍可進場，但不收入場費、不給票券。<br />
-            <strong>撤退</strong>：使用回城卷軸（手動或緊急撤退），已得票券全留。<br />
+            <strong>撤退</strong>：使用回城卷軸（手動、緊急撤退或補給天賦回城），已得票券全留；補給天賦的「返回上次掛機點」不會帶回競技場。<br />
             <strong>死亡</strong>：回城鎮，收回本場已得票券的一半（無條件捨去）；不計入死亡統計。<br />
             <strong>打完第 {ARENA_MAX_WAVE} 波</strong>：發完票券後強制離場，票券全留。<br />
-            斷線時保留該場、計時暫停，回來後當前波次重打。server 重啟時未結束的場次作廢，已得票券保留，該時段的票券場次數歸還。<br />
+            斷線時保留該場、計時暫停，回來後當前波次重打；在場的人全部離場時，斷線未回的人一併清掉該場，之後上線送回進場前的城鎮，已得票券保留、該時段次數不歸還。server 重啟時未結束的場次作廢，已得票券保留，該時段的票券場次數歸還。<br />
+            競技場內的擊殺不計入冒險任務、職業任務與懸賞的進度。<br />
             排行榜在統計中心「競技場」分頁：段位 × 單人／組隊 × 職業，波次高者在前，同波次時間短者在前。
           </p>
         </div>
@@ -161,7 +162,7 @@ export function ArenaPage() {
               <tr><td>詞綴階級</td><td colSpan={2}>依野外 Boss 掉落的機率，可出 T7</td></tr>
               <tr><td>封印詞綴</td><td>必定帶</td><td>{percent(ARENA_SEALED_CHANCE)}</td></tr>
               <tr><td>隨機技能</td><td>武器、項鍊、戒指必定帶，數值最低</td><td>依 Boss 掉落 {ABILITY_CHANCE}%</td></tr>
-              <tr><td>限制</td><td>不可使用印記、不可拆解；可販售</td><td>—</td></tr>
+              <tr><td>限制</td><td>不可使用印記、不可拆解、不可套用技能結晶；可販售</td><td>—</td></tr>
             </tbody>
           </table>
         </div>

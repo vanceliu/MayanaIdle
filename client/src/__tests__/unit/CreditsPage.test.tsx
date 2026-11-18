@@ -66,7 +66,7 @@ describe('CreditsPage', () => {
   it('呈現 CC BY 3.0 要求的 game-icons.net 標注文字', () => {
     render(<CreditsPage />);
     expect(
-      screen.getByText(/Icons made by Lorc & Delapouite\. Available on https:\/\/game-icons\.net/),
+      screen.getByText(/Icons made by Lorc, Delapouite, Sbed & Zeromancer\. Available on https:\/\/game-icons\.net/),
     ).toBeTruthy();
   });
 

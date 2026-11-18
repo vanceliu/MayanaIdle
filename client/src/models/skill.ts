@@ -110,6 +110,8 @@ export interface Skill {
   nextAttackBonusPercent?: number;
   /** `applyDebuff` 的 DoT 改為施放當下一次打出 N 跳（§ 7S.5 毒霧強化）：不吃防禦、不爆擊 */
   instantDotTicks?: number;
+  /** `applyDebuff` 同時套到主目標 N 格內的其他怪（§ 7S.5 挑釁怒吼擴散） */
+  debuffSpreadRadius?: number;
   /** 出手前往主目標反方向後退的格數；退不了照常出手（§ 3.6 後退） */
   retreat?: number;
   /** 自身中心隨機多擊：N 下逐下從 `aoeRadius` 內活著的怪取後放回抽 1 隻（§ 3.4） */

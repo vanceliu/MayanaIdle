@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react';
-import { useArmorList, useDropSourceForItem, getAreaDisplayName } from '../hooks/useWikiData';
+import { useArmorList } from '../hooks/useWikiData';
 import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { getEquipIcon } from '../../models/iconMap';
 import { getEquipmentTierColor } from '../../models/equipmentTier';
-import { isOffhandDefenseType } from '../../models/equipment';
+import {
+  ARMOR_STABILITY_MAX, ARMOR_STABILITY_MIN, DEFENSE_BONUS_MAX, DEFENSE_BONUS_MIN, isOffhandDefenseType,
+} from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
 import '../components/WikiTable.css';
+import { getAcquireLabel } from '../acquireLabel';
 import { UniqueAffixSection } from '../components/UniqueAffixTable';
 import { AbilitySection } from '../components/AbilityTable';
 import { requirementText } from '../requirementText'
@@ -147,7 +150,6 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
               <th>職業限制</th>
               <th>素質需求</th>
               <th>取得方式</th>
-              <th>掉落來源</th>
             </tr>
           </thead>
           <tbody>
@@ -164,9 +166,26 @@ function ArmorList({ initialSearch }: { initialSearch?: string }) {
   );
 }
 
+/**
+ * 模板沒定安定值的件，實例生成時另抽隨機額外防禦與安定值（§ 6A.8.8、§ 6.10）；商店貨安定值固定最低值
+ */
+function rollsInstanceFields(a: Pick<EquipmentTemplate, 'stability'>): boolean {
+  return a.stability === undefined;
+}
+
+function formatDefense(a: Pick<EquipmentTemplate, 'defense' | 'stability'>): string {
+  if (a.defense === undefined) return '-';
+  if (!rollsInstanceFields(a)) return String(a.defense);
+  return `${a.defense + DEFENSE_BONUS_MIN}～${a.defense + DEFENSE_BONUS_MAX}`;
+}
+
+function formatStability(a: Pick<EquipmentTemplate, 'stability' | 'acquireType'>): string {
+  if (!rollsInstanceFields(a)) return String(a.stability);
+  return a.acquireType === 'shop' ? String(ARMOR_STABILITY_MIN) : `${ARMOR_STABILITY_MIN}～${ARMOR_STABILITY_MAX}`;
+}
+
 function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number] }) {
-  const dropSources = useDropSourceForItem(a.name);
-  const acquireLabel = a.acquireType === 'shop' ? '商店' : a.acquireType === 'craft' ? '製作' : '掉落';
+  const acquireLabel = getAcquireLabel(a);
   const tierColor = getEquipmentTierColor(a as EquipmentTemplate);
   const categoryKey = getCategoryKey(a);
 
@@ -188,11 +207,11 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
         </Link>
       </td>
       <td>{SLOT_LABELS[categoryKey] || categoryKey}</td>
-      <td className="cell-number">{a.defense ?? '-'}</td>
+      <td className="cell-number">{formatDefense(a)}</td>
       <td className="cell-number">{a.blockRate ? `${a.blockRate}%` : '-'}</td>
       <td className="cell-number">{a.magicAttack ?? '-'}</td>
       <td>{a.material ? MATERIAL_LABELS[a.material] || a.material : '-'}</td>
-      <td className="cell-number">{a.stability ?? '-'}</td>
+      <td className="cell-number">{formatStability(a)}</td>
       <td>{extras.length > 0 ? extras.join(', ') : '-'}</td>
       <td>
         {a.requiredClass
@@ -201,15 +220,6 @@ function ArmorRow({ armor: a }: { armor: ReturnType<typeof useArmorList>[number]
       </td>
       <td>{requirementText(a.requiredAttributes)}</td>
       <td>{acquireLabel}</td>
-      <td>
-        {dropSources.length > 0
-          ? dropSources.map(d => (
-              <Link key={d.area} className="wiki-link" to={`/wiki/maps/${d.area}`} style={{ marginRight: 4 }}>
-                {getAreaDisplayName(d.area)}
-              </Link>
-            ))
-          : '-'}
-      </td>
     </tr>
   );
 }

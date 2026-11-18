@@ -378,13 +378,13 @@ describe('飾品共通池（§ 7S.5）', () => {
     );
   }
 
-  it('荊棘反彈：實際受到的傷害 × X%，多件加總', () => {
+  it('荊棘反彈：實際受到的傷害 × X%，多件取最大', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const target = monster({ currentHp: 1000 });
     const gear = [ring({ type: 'thorns', params: { percent: 20 } }), ring({ type: 'thorns', params: { percent: 30 } }, 'ring2')];
     const r = hitBy(gear, target)!;
     expect(r.isDodged).toBe(false);
-    expect(r.thorns!.damage).toBe(Math.floor(r.damage * 0.5));
+    expect(r.thorns!.damage).toBe(Math.floor(r.damage * 0.3));
     expect(target.currentHp).toBe(1000 - r.thorns!.damage);
 
   });
@@ -438,13 +438,13 @@ describe('飾品共通池（§ 7S.5）', () => {
     expect(after).toBe(bolt.lastUsedAt - Math.floor(remainingBefore * 0.5));
   });
 
-  it('低血回復：HP 低於 50% 才加、戰鬥中減半；多件加總', () => {
+  it('低血回復：HP 低於 50% 才加、戰鬥中減半；多件取最大', () => {
     const gear = [ring({ type: 'low_hp_regen', params: { regen: 10 } }), ring({ type: 'low_hp_regen', params: { regen: 20 } }, 'ring2')];
     const low = { ...knight(), hp: 400 };
     const high = { ...knight(), hp: 600 };
-    expect(getHpRegen(low, false, gear) - getHpRegen(low, false, [])).toBe(30);
+    expect(getHpRegen(low, false, gear) - getHpRegen(low, false, [])).toBe(20);
     expect(getHpRegen(high, false, gear)).toBe(getHpRegen(high, false, []));
-    expect(getHpRegen(low, true, gear)).toBe(Math.floor((getHpRegen(low, false, [])  + 30) / 2));
+    expect(getHpRegen(low, true, gear)).toBe(Math.floor((getHpRegen(low, false, [])  + 20) / 2));
   });
 
   it('低魔回復：MP 低於 50% 才加', () => {

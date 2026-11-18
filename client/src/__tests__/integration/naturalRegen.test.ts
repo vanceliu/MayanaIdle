@@ -4,6 +4,7 @@
  *  - 詞綴吃品質加成
  *  - 素質需求未滿足的件只凍結詞綴，模板值照算
  *  - 戰鬥中總量減半
+ *  - 超重時停止（§ 29.3）
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useGameStore } from '../../stores/gameStore';
@@ -43,7 +44,7 @@ const chest = (over: Partial<EquipmentInstance> = {}) => item({
 });
 
 function equip(gear: Record<string, EquipmentInstance>, phase: 'explore' | 'combat' = 'explore') {
-  useGameStore.setState({ character: character(), equippedGear: gear, activeEffects: [], phase });
+  useGameStore.setState({ character: character(), equippedGear: gear, activeEffects: [], bagItems: [], phase });
 }
 
 /** 跑一次回血與回魔 tick，回傳各自的回復量 */
@@ -95,5 +96,13 @@ describe('自然回復 tick 計入裝備模板值與詞綴', () => {
   it('戰鬥中總量減半', () => {
     equip({ necklace: necklace(), chest: chest() }, 'combat');
     expect(tickOnce()).toEqual({ hp: Math.floor(13 / 2), mp: Math.floor(16 / 2) });
+  });
+
+  it('超重時停止，剛好等於上限照常回復', () => {
+    // 力量 10 + 體質 10 → 負重上限 2000
+    equip({ necklace: necklace(), chest: chest({ weight: 2000.1 }) });
+    expect(tickOnce()).toEqual({ hp: 0, mp: 0 });
+    equip({ necklace: necklace(), chest: chest({ weight: 2000 }) });
+    expect(tickOnce()).toEqual({ hp: 5 + 2 + 6, mp: 5 + 3 + 8 });
   });
 });

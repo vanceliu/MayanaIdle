@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { ITEM_DEFINITIONS } from '../../db/seed';
-import { useDropSourceForItem, useRegions, getAreaDisplayName, getDropRate } from '../hooks/useWikiData';
+import { useDropSourceForItem, useRegions, getAreaDisplayName, getAreaDropRateText, getDropRate, formatRatePercent } from '../hooks/useWikiData';
+import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../../models/buffPotion';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db/seed';
-import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevels } from '../../systems/classSkillBookDrop';
+import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { resolveItemIcon, MATERIAL_TIER_COLORS, formatRegionMaterialTierRange } from '../../models/iconMap';
@@ -196,19 +197,19 @@ function ItemDetail({ name }: { name: string }) {
           if (getSkillBookLevels(floor.levelMax).includes(bookLevel)) {
             const areaId = `${region.id}-${floor.floor}f`;
             matchedAreas.add(areaId);
-            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: '基礎 0.05%' });
+            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: `基礎 ${formatRatePercent(SKILL_BOOK_NORMAL_DROP_RATE)}` });
           }
         }
       } else if (getSkillBookLevels(region.levelMax).includes(bookLevel)) {
         matchedAreas.add(region.id);
-        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: '基礎 0.05%' });
+        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: `基礎 ${formatRatePercent(SKILL_BOOK_NORMAL_DROP_RATE)}` });
       }
     }
 
-    // 那些區域中的 Boss → 5%
+    // 那些區域中的 Boss
     const bossMonsters = MONSTER_SEEDS.filter(m => m.isBoss && matchedAreas.has(m.area));
     for (const boss of bossMonsters) {
-      sources.push({ label: `${boss.name}（Boss）`, area: boss.area, rate: '基礎 5.0%' });
+      sources.push({ label: `${boss.name}（Boss）`, area: boss.area, rate: `基礎 ${formatRatePercent(SKILL_BOOK_BOSS_DROP_RATE)}` });
     }
 
     return sources;
@@ -298,6 +299,12 @@ function ItemDetail({ name }: { name: string }) {
         </p>
       ) : null}
 
+      {BUFF_POTION_ITEM_IDS.includes(item.id) && (
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+          Boss 掉落：所有 Boss 共通，每種各自判定（{getDropRate(BUFF_POTION_BOSS_DROP_VALUE)}）
+        </p>
+      )}
+
       {isAllAreas ? (
         <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
           怪物掉落：所有區域怪物皆可掉落（{getDropRate(dropSources[0].dropValue)}）
@@ -322,7 +329,7 @@ function ItemDetail({ name }: { name: string }) {
                         {getAreaDisplayName(d.area)}
                       </Link>
                     </td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">{getAreaDropRateText(d)}</td>
                     <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '1'}</td>
                   </tr>
                 ))}
@@ -362,7 +369,7 @@ function ItemDetail({ name }: { name: string }) {
             </table>
           </div>
           <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-xs)', marginTop: 4 }}>
-            不區分職業，25 本共同池隨機
+            不區分職業，從該級的共同池隨機一本；區域可掉多個級別時各級獨立判定
           </p>
         </>
       )}

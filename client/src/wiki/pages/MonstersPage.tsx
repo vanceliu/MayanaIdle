@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getDropRate, getDropItemName, getWikiEquipmentPath } from '../hooks/useWikiData';
+import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions, getAreaDisplayName, getAreaDropRateText, getDropRate, getDropItemName, getWikiEquipmentPath, formatRatePercent } from '../hooks/useWikiData';
+import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../../models/buffPotion';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
 import { getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
@@ -157,7 +158,8 @@ function MonsterAffixSection() {
       </h3>
       <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
         怪物生成時有機率帶強化詞綴，一般怪與 Boss 都會出現。詞綴數越多越強，掉落、金幣與經驗也越多。
-        怪物列表卡片的名稱依詞綴數上色，名稱下方列出詞綴；戰鬥日誌寫成「詞綴 原名」。
+        地圖上的怪物外框與怪物列表卡片的名稱依詞綴數上色，名稱下方列出詞綴；戰鬥日誌寫成「詞綴 原名」。
+        懸賞契約的對象至少帶 1 個詞綴；競技場的詞綴數依波次固定，不看下表的機率與等級。
       </p>
       <div className="wiki-table-wrap" style={{ marginBottom: 16 }}>
         <table className="wiki-table">
@@ -311,7 +313,9 @@ function BossDropSection({ bossName }: { bossName: string }) {
           <tbody>
             {drops.flatMap((d, i) => {
               const isEquip = d.itemType === 'equipment';
-              if (isEquip && d.equipmentPool === 'all') {
+              // 同階級的裝備池條目只擲一次，命中後武器／防具各半（`27-drop-table.md` § 27.6）
+              if (isEquip && d.equipmentPool) {
+                if (drops.findIndex(o => o.itemType === 'equipment' && o.equipmentPool && (o.tier ?? 4) === (d.tier ?? 4)) !== i) return [];
                 // `06-equipment-acquire.md` § 6A.1：掉落池以裝備階級 tier 表示
                 const tierParam = String(d.tier ?? '');
                 const tierLabel = d.tier != null ? `裝備Tier ${d.tier}` : '';
@@ -319,13 +323,13 @@ function BossDropSection({ bossName }: { bossName: string }) {
                   <tr key={`${d.itemType}-${i}-weapon`}>
                     <td><Link className="wiki-link" to={`/wiki/weapons?tier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
                     <td>裝備</td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">{getDropRate(d.dropValue / 2)}</td>
                     <td className="cell-number">-</td>
                   </tr>,
                   <tr key={`${d.itemType}-${i}-armor`}>
                     <td><Link className="wiki-link" to={`/wiki/armor?tier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
                     <td>裝備</td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">{getDropRate(d.dropValue / 2)}</td>
                     <td className="cell-number">-</td>
                   </tr>
                 ];
@@ -360,6 +364,14 @@ function BossDropSection({ bossName }: { bossName: string }) {
                 </tr>
               )];
             })}
+            {BUFF_POTION_ITEM_IDS.map(id => (
+              <tr key={`buff-potion-${id}`}>
+                <td>{getItemById(id)?.name ?? id}</td>
+                <td>道具</td>
+                <td className="cell-number">{getDropRate(BUFF_POTION_BOSS_DROP_VALUE)}</td>
+                <td className="cell-number">1</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -398,13 +410,13 @@ function AreaDropSection({ area }: { area: string }) {
                   <tr key={`${d.itemType}-${i}-weapon`}>
                     <td><Link className="wiki-link" to={`/wiki/weapons?tier=${tierParam}`}>{tierLabel}武器（隨機）</Link></td>
                     <td>裝備</td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">{getDropRate(d.dropValue / 2)}</td>
                     <td className="cell-number">-</td>
                   </tr>,
                   <tr key={`${d.itemType}-${i}-armor`}>
                     <td><Link className="wiki-link" to={`/wiki/armor?tier=${tierParam}`}>{tierLabel}防具（隨機）</Link></td>
                     <td>裝備</td>
-                    <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                    <td className="cell-number">{getDropRate(d.dropValue / 2)}</td>
                     <td className="cell-number">-</td>
                   </tr>
                 ];
@@ -434,7 +446,7 @@ function AreaDropSection({ area }: { area: string }) {
                     ) : name}
                   </td>
                   <td>{d.itemType === 'gold' ? '金幣' : d.itemType === 'equipment' ? '裝備' : '道具'}</td>
-                  <td className="cell-number">{getDropRate(d.dropValue)}</td>
+                  <td className="cell-number">{getAreaDropRateText(d)}</td>
                   <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '-'}</td>
                 </tr>
               )];
@@ -514,9 +526,7 @@ function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[]
 
   if (bookLevels.length === 0) return null;
 
-  const dropRate = isBoss
-    ? `${(SKILL_BOOK_BOSS_DROP_RATE * 100).toFixed(0)}%`
-    : `${(SKILL_BOOK_NORMAL_DROP_RATE * 100).toFixed(2)}%`;
+  const dropRate = formatRatePercent(isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE);
   const books = CLASS_SKILLS.filter(s => bookLevels.includes(s.classLevel));
 
   return (
@@ -525,7 +535,7 @@ function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[]
         職業技能書掉落（{isBoss ? 'Boss' : '一般怪物'} 基礎 {dropRate}）
       </h4>
       <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-        實際掉落率受角色掉寶率與全域倍率影響。{bookLevels.length > 1 ? '多個階級各自獨立判定。' : ''}
+        實際掉落率受角色掉寶率、Pressure、怪物強化詞綴與全域倍率影響。{bookLevels.length > 1 ? '多個階級各自獨立判定。' : ''}
       </p>
       <div className="wiki-table-wrap">
         <table className="wiki-table">

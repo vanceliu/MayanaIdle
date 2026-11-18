@@ -59,6 +59,8 @@ export interface DropBonuses {
 }
 
 export const DROP_ROLL_MAX = 1000;
+/** 百柱塔卷軸隨進度提高後的掉率上限（§ 27.1） */
+export const DUNGEON_SCROLL_DROP_VALUE_CAP = 100;
 
 /**
  * 懸賞契約「掉兩次取比較好」（`53-bounty-contract.md` § 53.5.5）：
@@ -303,7 +305,7 @@ export async function rollDrops(
         // 百柱塔卷軸：越高層機率越高（§ 27.1）
         const levelRange = Math.max(1, areaLevelMax - areaLevelMin);
         const levelProgress = Math.min(1, (monsterLevel - areaLevelMin) / levelRange);
-        effectiveDropValue = Math.min(100, Math.floor(entry.dropValue * (1 + levelProgress)));
+        effectiveDropValue = Math.min(DUNGEON_SCROLL_DROP_VALUE_CAP, Math.floor(entry.dropValue * (1 + levelProgress)));
       } else {
         // 文件以「50~100」標示範圍者，依 dropValueMax 線性遞增（§ 27.3）
         effectiveDropValue = scaleDropValue(

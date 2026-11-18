@@ -20,6 +20,13 @@ function knight(): Character {
   };
 }
 
+function accessory(id: number, slot: 'necklace' | 'ring1' | 'ring2', ability: EquipmentInstance['ability']): EquipmentInstance {
+  return {
+    id, templateId: 3001, name: '戒指', type: 'armor', slot,
+    isTwoHanded: false, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true, ability,
+  } as EquipmentInstance;
+}
+
 function t7Sword(): EquipmentInstance {
   return {
     id: 1, templateId: 1019, name: '終焉之刃', type: 'sword', slot: 'rightHand', isTwoHanded: false,
@@ -46,5 +53,53 @@ describe('裝備 tooltip 的隨機技能（§ 7S.7）', () => {
   it('compact 不顯示', () => {
     render(<EquipmentDetail item={t7Sword()} compact />);
     expect(screen.queryByText(/追加傷害：/)).toBeNull();
+  });
+});
+
+describe('同種類多件未生效的隨機技能劃線（§ 7S.3／§ 7S.7）', () => {
+  const line = (item: EquipmentInstance, name: string) => {
+    const { unmount } = render(<EquipmentDetail item={item} />);
+    const el = screen.getByText(new RegExp(`^${name}：`));
+    const result = { suppressed: el.className.includes('suppressed'), title: el.getAttribute('title') };
+    unmount();
+    return result;
+  };
+
+  it('取最大的件生效，其餘劃線', () => {
+    const r1 = accessory(11, 'ring1', { type: 'adversity', params: { reduction: 3 } });
+    const r2 = accessory(12, 'ring2', { type: 'adversity', params: { reduction: 5 } });
+    useGameStore.setState({ equippedGear: { ring1: r1, ring2: r2 } });
+    expect(line(r1, '逆境')).toEqual({ suppressed: true, title: '同種類已由其他裝備生效' });
+    expect(line(r2, '逆境').suppressed).toBe(false);
+  });
+
+  it('同值依部位順序：項鍊優先', () => {
+    const neck = accessory(21, 'necklace', { type: 'dodge_heal', params: { heal: 40 } });
+    const r1 = accessory(22, 'ring1', { type: 'dodge_heal', params: { heal: 40 } });
+    useGameStore.setState({ equippedGear: { necklace: neck, ring1: r1 } });
+    expect(line(neck, '閃避回復').suppressed).toBe(false);
+    expect(line(r1, '閃避回復').suppressed).toBe(true);
+  });
+
+  it('越小越好的參數取小（怒氣衰減）', () => {
+    const r1 = accessory(31, 'ring1', { type: 'rage', params: { decay: 12 } });
+    const r2 = accessory(32, 'ring2', { type: 'rage', params: { decay: 6 } });
+    useGameStore.setState({ equippedGear: { ring1: r1, ring2: r2 } });
+    expect(line(r1, '怒氣').suppressed).toBe(true);
+    expect(line(r2, '怒氣').suppressed).toBe(false);
+  });
+
+  it('荊棘反彈同樣只取一件', () => {
+    const r1 = accessory(41, 'ring1', { type: 'thorns', params: { percent: 3 } });
+    const r2 = accessory(42, 'ring2', { type: 'thorns', params: { percent: 5 } });
+    useGameStore.setState({ equippedGear: { ring1: r1, ring2: r2 } });
+    expect(line(r1, '荊棘反彈').suppressed).toBe(true);
+    expect(line(r2, '荊棘反彈').suppressed).toBe(false);
+  });
+
+  it('未裝備的件不劃線', () => {
+    const r2 = accessory(52, 'ring2', { type: 'adversity', params: { reduction: 5 } });
+    useGameStore.setState({ equippedGear: { ring2: r2 } });
+    expect(line(accessory(51, 'ring1', { type: 'adversity', params: { reduction: 3 } }), '逆境').suppressed).toBe(false);
   });
 });

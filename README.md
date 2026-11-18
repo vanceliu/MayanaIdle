@@ -106,7 +106,7 @@ server 與 desktop 用 `npm run typecheck`（會先產生 build 產物 `src/gene
 
 ## 發布
 
-兩種產物（server 執行檔、桌面版），三平台都出；server 執行檔另出 Linux arm64（樹莓派），流程見 `docs/RELEASE.md`。
+兩種產物（server 執行檔、桌面版），三平台都出，流程見 `docs/RELEASE.md`。
 **正式發布一律推版本號 tag 走 CI**，三個 runner 各自原生打包自己的平台：
 
 ```bash

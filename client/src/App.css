@@ -3529,9 +3529,10 @@ button.active {
 .equip-detail-affix.unique { color: #A855F7; text-shadow: 0 0 6px rgba(168,85,247,0.3); font-weight: 700; }
 .equip-detail-affix.unique.suppressed { text-decoration: line-through; opacity: 0.5; }
 
-/* § 7S.7 隨機技能：淺綠、排在所有詞綴最上面 */
+/* § 7S.7 隨機技能：淺綠、排在所有詞綴最上面；同種類多件未生效者劃線 */
 .equip-detail-ability { padding-bottom: 4px; }
 .equip-detail-affix.ability { color: #86EFAC; text-shadow: 0 0 6px rgba(134,239,172,0.3); font-weight: 700; }
+.equip-detail-affix.ability.suppressed { text-decoration: line-through; opacity: 0.5; }
 
 /* § 7S.8 技能結晶：拆解清單標記、技能更換分頁（左欄結晶／右欄裝備） */
 .bs-ability-text { color: #86EFAC; }

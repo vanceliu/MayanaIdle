@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import './WikiHome.css';
 
 const CATEGORIES = [
+  { path: '/wiki/start', label: '新手開始', desc: '選職業、出城、任務、製作、換地圖與遊戲機制，依遊玩順序介紹' },
   { path: '/wiki/weapons', label: '武器', desc: '所有武器模板、材質、安定值、強化資訊' },
   { path: '/wiki/armor', label: '防具', desc: '防具列表、部位、安定值、強化資訊' },
   { path: '/wiki/affixes', label: '詞綴', desc: '各部位可帶的詞綴、階級數值、掉落機率' },

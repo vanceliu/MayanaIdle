@@ -1,4 +1,5 @@
 import '../components/WikiTable.css';
+import { COOLDOWN_REDUCTION_CAP, INT_SKILL_DAMAGE_PERCENT_PER_2 } from '../../systems/combat';
 
 export function AttributesPage() {
   return (
@@ -24,37 +25,37 @@ export function AttributesPage() {
                 <td>力量</td>
                 <td>STR</td>
                 <td className="cell-number">floor(STR / 2) × 2</td>
-                <td>物理傷害加成：有效STR / 2</td>
+                <td>近戰傷害加成：有效STR / 2；負重：STR × 100（原始值）</td>
               </tr>
               <tr>
                 <td>敏捷</td>
                 <td>AGI</td>
                 <td className="cell-number">floor(AGI / 3) × 3</td>
-                <td>命中加成：有效AGI / 3；迴避加成：有效AGI / 3</td>
+                <td>遠程（弓）傷害加成：有效AGI / 2；命中加成：有效AGI / 3；迴避加成：有效AGI / 3</td>
               </tr>
               <tr>
                 <td>體質</td>
                 <td>VIT</td>
                 <td className="cell-number">floor(VIT / 2) × 2</td>
-                <td>升級時 HP 成長：random(VIT-6, VIT-3)</td>
+                <td>升級時 HP 成長：random(VIT-6, VIT-3)；回血：有效VIT / 2；負重：VIT × 100（原始值）</td>
               </tr>
               <tr>
                 <td>精神</td>
                 <td>SPI</td>
                 <td className="cell-number">floor(SPI / 2) × 2</td>
-                <td>升級時 MP 成長：random(SPI-6, SPI-3)</td>
+                <td>升級時 MP 成長：random(SPI-6, SPI-3)；回魔：有效SPI / 2；魔法抗性：有效SPI / 2</td>
               </tr>
               <tr>
                 <td>智力</td>
                 <td>INT</td>
                 <td className="cell-number">floor(INT / 2) × 2</td>
-                <td>技能傷害加成：skillPower × (有效INT / 2 × 0.08)；冷卻縮減：有效INT / 2 × 1%</td>
+                <td>技能傷害與治癒加成：skillPower × (有效INT / 2 × {INT_SKILL_DAMAGE_PERCENT_PER_2 / 100})；冷卻縮減：有效INT / 2 × 1%（與詞綴、buff 合計上限 {COOLDOWN_REDUCTION_CAP}%）</td>
               </tr>
               <tr>
                 <td>魅力</td>
                 <td>CHA</td>
                 <td>—</td>
-                <td>NPC 互動（未來擴展用）</td>
+                <td>目前沒有作用</td>
               </tr>
             </tbody>
           </table>

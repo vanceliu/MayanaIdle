@@ -1203,7 +1203,9 @@ export function createGameStore(session: Session) {
         if (state.character.hp < effMaxHp) {
           const inCombat = state.phase === 'combat' || isInArpgCombat(session);
           const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-          const regen = getHpRegen(state.character, inCombat, allGear, state.activeEffects);
+          // 超重時停止自然回復（`29-regen.md` § 29.3）
+          const overweight = getWeightStatus(state.character, allGear, state.bagItems, state.activeEffects).overweight;
+          const regen = overweight ? 0 : getHpRegen(state.character, inCombat, allGear, state.activeEffects);
           if (regen > 0) {
             const newHp = Math.min(effMaxHp, state.character.hp + regen);
             set({ character: { ...state.character, hp: newHp } });
@@ -1219,7 +1221,8 @@ export function createGameStore(session: Session) {
         if (state.character.mp < effMaxMp) {
           const inCombat = state.phase === 'combat' || isInArpgCombat(session);
           const allGearMp = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-          const regen = getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
+          const overweight = getWeightStatus(state.character, allGearMp, state.bagItems, state.activeEffects).overweight;
+          const regen = overweight ? 0 : getMpRegen(state.character, inCombat, allGearMp, state.activeEffects);
           if (regen > 0) {
             const newMp = Math.min(effMaxMp, state.character.mp + regen);
             set({ character: { ...state.character, mp: newMp } });

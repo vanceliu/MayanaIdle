@@ -115,6 +115,18 @@ export function splashDamage(primaryDamage: number, ability: Ability): number {
   return Math.floor(primaryDamage * ability.params.percent / 100);
 }
 
+/** 屍爆傷害：被擊殺怪最大 HP × X%（§ 7S.5） */
+export function corpseExplosionDamage(maxHp: number, ability: Ability): number {
+  return Math.floor(maxHp * ability.params.percent / 100);
+}
+
+/** 冷卻中技能的剩餘冷卻 −ms（擊殺縮冷，§ 7S.5）：把 `lastUsedAt` 往前推，最多推到冷卻結束 */
+export function reduceCooldown(lastUsedAt: number, effectiveCooldown: number, ms: number, now: number): number {
+  const remaining = lastUsedAt + effectiveCooldown - now;
+  if (remaining <= 0 || ms <= 0) return lastUsedAt;
+  return lastUsedAt - Math.min(remaining, ms);
+}
+
 /** 怒氣狀態 buff 的 category（§ 7S.5） */
 export const ABILITY_RAGE_CATEGORY = 'ability-rage';
 

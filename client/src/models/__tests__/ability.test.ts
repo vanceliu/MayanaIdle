@@ -39,14 +39,14 @@ describe('適用部位與階級（§ 7S.1）', () => {
     expect(getAbilityCommonPool(T5_RING)).toEqual(typesOf('common', 'accessory'));
   });
 
-  it('武器組：共通 4 種、騎士 4 種、其他職業 3 種；飾品組：共通 5 種、職業 2~4 種（§ 7S.5）', () => {
-    expect(typesOf('common')).toEqual(['bonus_damage', 'skill_splash', 'combo_strike', 'focus_strike']);
+  it('武器組：共通 7 種、騎士 4 種、其他職業 3 種；飾品組：共通 7 種、職業 3~4 種（§ 7S.5）', () => {
+    expect(typesOf('common')).toEqual(['bonus_damage', 'skill_splash', 'combo_strike', 'focus_strike', 'corpse_explosion', 'kill_cooldown', 'freezing_strike']);
     expect(typesOf('knight')).toEqual(['rend_boost', 'blood_curse_boost', 'blood_slash', 'vengeance_boost']);
     for (const cls of ['elf', 'elementalist', 'priest', 'thief']) expect(typesOf(cls), cls).toHaveLength(3);
-    expect(typesOf('common', 'accessory')).toEqual(['low_hp_regen', 'low_mp_regen', 'thorns', 'rage', 'calm']);
-    expect(typesOf('knight', 'accessory')).toEqual(['shield_bash_boost', 'iron_shield_boost']);
+    expect(typesOf('common', 'accessory')).toEqual(['low_hp_regen', 'low_mp_regen', 'thorns', 'rage', 'calm', 'dodge_heal', 'adversity']);
+    expect(typesOf('knight', 'accessory')).toEqual(['shield_bash_boost', 'iron_shield_boost', 'taunt_spread']);
     expect(typesOf('elf', 'accessory')).toEqual(['fire_arrow_boost', 'hawk_eye_boost', 'leap_shot_boost']);
-    expect(typesOf('elementalist', 'accessory')).toEqual(['mana_shield_boost', 'mana_spring_boost']);
+    expect(typesOf('elementalist', 'accessory')).toEqual(['greater_cd_reduce_boost', 'mana_shield_boost', 'mana_spring_boost']);
     expect(typesOf('priest', 'accessory')).toHaveLength(4);
     expect(typesOf('thief', 'accessory')).toEqual(['deadly_strike_boost', 'smoke_bomb_boost', 'precision_strike_boost', 'dodge_counter_boost']);
   });
@@ -106,7 +106,7 @@ describe('抽取（§ 7S.2）', () => {
   it('商店：每個參數取最弱值（↓ 取上限）', () => {
     const seq = (values: number[]) => { let i = 0; vi.spyOn(Math, 'random').mockImplementation(() => values[i++] ?? 0); };
     // 共通池第 3 條＝追打傷害（N ↓）
-    seq([0, 0.6, 0.5]);
+    seq([0, 0.6, 0.3]);
     expect(rollAbility(T5_SWORD, { channel: 'shop', className: 'knight' })).toEqual({ type: 'combo_strike', params: { every: 10, bonus: 10 } });
   });
 
@@ -133,7 +133,7 @@ describe('抽取（§ 7S.2）', () => {
 
   it('seed 中所有 T3+ 右手武器都有共通池', () => {
     for (const t of EQUIPMENT_SEEDS.filter(t => t.slot === 'rightHand' && (t.tier ?? 0) >= 3)) {
-      expect(getAbilityCommonPool(t).length, t.name).toBe(4);
+      expect(getAbilityCommonPool(t).length, t.name).toBe(7);
     }
   });
 });
@@ -153,8 +153,8 @@ describe('同技能多件（§ 7S.3）', () => {
     expect(findClassSkillAbility(mana, 'priest', 'blood-mana')).toBe(mana[1].ability);
   });
 
-  it('數值類加總；平靜取最大、怒氣衰減取最小', async () => {
-    const { sumAbilityParam, maxAbilityParam, minAbilityParam } = await import('../ability');
+  it('同種類只有一件生效：數值取最大、怒氣衰減取最小', async () => {
+    const { maxAbilityParam, minAbilityParam } = await import('../ability');
     const gear: { slot: string; ability: Ability }[] = [
       { slot: 'ring1', ability: { type: 'thorns', params: { percent: 30 } } },
       { slot: 'ring2', ability: { type: 'thorns', params: { percent: 40 } } },
@@ -162,7 +162,7 @@ describe('同技能多件（§ 7S.3）', () => {
       { slot: 'ring1', ability: { type: 'rage', params: { decay: 12 } } },
       { slot: 'ring2', ability: { type: 'rage', params: { decay: 6 } } },
     ];
-    expect(sumAbilityParam(gear, 'thorns', 'percent')).toBe(70);
+    expect(maxAbilityParam(gear, 'thorns', 'percent')).toBe(40);
     expect(maxAbilityParam(gear, 'calm', 'rate')).toBe(7);
     expect(minAbilityParam(gear, 'rage', 'decay')).toBe(6);
   });

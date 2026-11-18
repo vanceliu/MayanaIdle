@@ -80,9 +80,8 @@ git tag 0.7.0-rc1 && git push origin 0.7.0-rc1
 | macOS（arm64） | `MayanaIdle-<版本>-mac-arm64.dmg` / `.zip` | `mayana-server-macos-arm64.tar.gz` |
 | Windows（x64） | `MayanaIdle-<版本>-win-x64.zip` | `mayana-server-win-x64.exe` |
 | Linux（x64） | `MayanaIdle-<版本>-linux-x64.tar.gz` | `mayana-server-linux-x64.tar.gz` |
-| Linux（arm64，樹莓派） | — | `mayana-server-linux-arm64.tar.gz` |
 
-Linux arm64 只出 server 執行檔，由 Linux runner 交叉打包（§ 4）。
+Linux arm64（`mayana-server-linux-arm64.tar.gz`）CI 暫停發布，`release.yml` 的交叉打包步驟已註解；需要時用本機 `./scripts/release.sh --all-servers` 打包。
 
 macOS 與 Linux 的 server 執行檔以 **tar.gz** 散布 —— 裸檔經 artifact zip 或 HTTP 下載一律掉
 Unix 權限位。Windows 沒有執行權限位，維持裸 `.exe`。
@@ -126,7 +125,7 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 |---|---|
 | 為什麼是 CJS | **SEA 只支援 CommonJS**。`server/scripts/build.mjs` 因此出兩份 bundle：`server.js`（ESM，原始碼執行用）與 `server.cjs`（打包用，相依全部內嵌） |
 | 前端怎麼進去 | `client/dist` 的每個檔案都是一個 SEA 資產，鍵是 `client/<相對路徑>`；`server/src/staticFiles.ts` 在 SEA 模式改讀資產，從原始碼跑則讀磁碟 |
-| 跨平台 | 目標平台的 node 由 `nodejs.org/dist` 下載並快取在 `server/.node-cache/`。CI 上每個 runner 打自己的平台；唯一例外是 Linux runner 另外交叉打包 `linux-arm64`（沒有對應的 runner） |
+| 跨平台 | 目標平台的 node 由 `nodejs.org/dist` 下載並快取在 `server/.node-cache/`。CI 上每個 runner 打自己的平台；`linux-arm64` 沒有對應的 runner，只能交叉打包（CI 暫停） |
 | ARM | 只出 64 位元（`linux-arm64`）。Node 24 官方沒有 32 位元 ARM（armv7l）版，32 位元系統跑不起來 |
 | macOS 簽章 | 注入會破壞既有簽章，打包腳本會 `codesign --remove-signature` 再 ad-hoc 重簽。**在非 macOS 上打包的 macOS 執行檔無法簽章**，對方會被 Gatekeeper 擋下 |
 | Windows 簽章 | postject 會印 `The signature seems corrupted!` —— node.exe 的 Authenticode 簽章因注入而失效，屬預期。未簽章的執行檔仍可執行，但 SmartScreen 會警告 |
@@ -201,7 +200,7 @@ tar -xzf mayana-server-linux-x64.tar.gz
 
 **Linux（arm64，樹莓派）**
 
-只支援 **64 位元**系統（Pi 3B+／4／5 裝 64 位元 Raspberry Pi OS）。先確認：
+CI 暫停發布此平台（§ 3），執行檔用本機 `./scripts/release.sh --all-servers` 打包。只支援 **64 位元**系統（Pi 3B+／4／5 裝 64 位元 Raspberry Pi OS）。先確認：
 
 ```bash
 uname -m        # 必須是 aarch64；armv7l 是 32 位元系統，跑不起來（§ 4）

@@ -24,6 +24,7 @@ import {
   SLOT_TIER_BAND,
   SLOT_GRANT_LEVEL_INTERVAL,
   STARTING_SLOT_COUNT,
+  TALENT_INSTALL_MAX,
   conditionSlotCount,
   type TalentType,
   type TalentSlotTier,
@@ -126,7 +127,7 @@ export function TalentsPage() {
           </table>
         </div>
         <p style={noteStyle}>
-          天賦格<strong>不綁類型</strong>：同一個格子安裝到戰鬥、常駐或補給都可以。
+          天賦格<strong>不綁類型</strong>：同一個格子安裝到戰鬥、常駐或補給都可以；同一份配置每種類型最多安裝 {TALENT_INSTALL_MAX} 格。
           要換類型就拆下再到目標分頁安裝，設定會原樣保留，裝回同類型即復原。
         </p>
 
@@ -134,7 +135,7 @@ export function TalentsPage() {
         <ul style={noteStyle}>
           <li>創角給 {STARTING_SLOT_COUNT} 個 T1 天賦格，全部已經裝好可以直接打</li>
           <li>每 {SLOT_GRANT_LEVEL_INTERVAL} 級由信箱發 1 個 T1 天賦格，要自己領、自己安裝</li>
-          <li>高階天賦格只有 Boss 會掉（{SLOT_DROP_RATE_BOSS}%），或用低階 ×{FUSE_INPUT_COUNT} 合成</li>
+          <li>高階天賦格只有 Boss 會掉（{SLOT_DROP_RATE_BOSS}% × 伺服器掉落倍率），或用低階 ×{FUSE_INPUT_COUNT} 合成</li>
           <li>條件與動作<strong>不掉落、不合成</strong> —— 一律內建</li>
         </ul>
 
@@ -276,7 +277,7 @@ export function TalentsPage() {
 #2 如果 紅色藥水 少於 20   → 回城
 #3 永遠                    → 存入裝備（詞綴 Tier 高於 5）到帳號倉庫
 #4 永遠                    → 販售素材（Tier 2 以下，保留有用途的素材）
-#5 永遠                    → 販售裝備（商店中階以下，保留本角色穿得起的）
+#5 永遠                    → 販售裝備（Tier 3 以下，保留本角色穿得起的）
 #6 如果 紅色藥水 少於 100  → 購買紅色藥水至 100
 #7 如果 金幣多於 50000     → 存入金幣（身上留下 50000）
 #8 永遠                    → 返回上次掛機點`}</pre>
@@ -313,7 +314,7 @@ export function TalentFusionTable() {
       </table>
       <h4>Boss 掉落的天賦格</h4>
       <p>
-        掉率固定 {SLOT_DROP_RATE_BOSS}%，<strong>只有 Boss 會掉</strong>。
+        掉率 {SLOT_DROP_RATE_BOSS}% × 伺服器掉落倍率（不吃掉寶率詞綴與 Pressure），<strong>只有 Boss 會掉</strong>。
         T1 格不掉落，只從角色等級取得。
       </p>
       <table className="wiki-table">

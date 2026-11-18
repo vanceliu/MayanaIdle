@@ -100,10 +100,10 @@ jobs:
       # server 執行檔：打這台 runner 的平台（三個 runner 合起來就是三平台）
       - run: node scripts/package.mjs
         working-directory: server
-      # Linux arm64（樹莓派）沒有自己的 runner，由 Linux runner 交叉打包：下載同版本的 arm64 node 再注入
-      - run: node scripts/package.mjs --target linux-arm64
-        if: runner.os == 'Linux'
-        working-directory: server
+      # Linux arm64 暫停發布（正式站為 linux-x64）。恢復時取消註解：Linux runner 下載同版本的 arm64 node 交叉打包
+      # - run: node scripts/package.mjs --target linux-arm64
+      #   if: runner.os == 'Linux'
+      #   working-directory: server
 
       - run: npm run package -- ${{ matrix.desktop }}
         working-directory: desktop

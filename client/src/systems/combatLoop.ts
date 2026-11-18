@@ -35,7 +35,10 @@ import {
   tickArpgEngine, applyManualTarget, queueManualSkill, syncMonsterContexts, tickMonsterEngines, isMonsterStunned,
   type MonsterAttackEvent, type PlayerAttackEvent,
 } from './arpgEngine';
-import { processPlayerAttack, processMonsterAttack, applyUniqueAffixRestore, type DamageResult, type PlayerAttackResult } from './arpgEventHandler';
+import {
+  processPlayerAttack, processMonsterAttack, applyUniqueAffixRestore, applyCorpseExplosion, applyKillCooldown, killInfoOf,
+  type DamageResult, type KillInfo, type PlayerAttackResult,
+} from './arpgEventHandler';
 import { sumUniqueAffix } from '../models/uniqueAffix';
 import {
   getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, absorbWithManaShield, getMonsterDebuffModifierById,
@@ -312,6 +315,7 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
       if (inst) handleMonsterDeath(inst, event.monsterId, session);
       removeMonster(session, event.monsterId);
     }
+    settleExplosionDamages(session, result.explosionDamages ?? [], visuals);
 
     const updatedChar = session.game.getState().character;
     if (updatedChar && updatedChar.hp <= 0) {
@@ -794,6 +798,7 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
   const logs: CombatLog[] = [];
   const memberId = memberIdOf(session);
   let kills = 0;
+  const killInfos: KillInfo[] = [];
 
   for (const effect of dotEffects) {
     if (!effect.dot) continue;
@@ -819,6 +824,8 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
 
     if (inst.currentHp <= 0) {
       kills++;
+      const info = killInfoOf(monsterId, inst, session.mapMonster.getState().monsters);
+      if (info) killInfos.push(info);
       handleMonsterDeath(inst, monsterId, session);
       removeMonster(session, monsterId);
       stopTrainingIfNoDummiesLeft(session);
@@ -826,15 +833,42 @@ function processDotTick(session: Session, visuals: CombatVisual[]) {
   }
 
   // § 7T.4 T7 擊殺回血：自己施加的 DoT 擊殺同樣判定
+  // § 7S.5 屍爆、擊殺縮冷：DoT 擊殺同樣觸發
   if (kills > 0) {
     const s = session.game.getState();
     if (s.character) {
       const gear = getEffectiveGearArray(s.character, s.activeEffects, s.equippedGear);
       logs.push(...applyUniqueAffixRestore(session, kills * sumUniqueAffix(gear, 'kill_heal'), 0));
+      const explosion = applyCorpseExplosion(gear, monsterInstances, session.mapMonster.getState().monsters, killInfos);
+      logs.push(...explosion.logs);
+      settleExplosionDamages(session, explosion.damages, visuals);
+      logs.push(...applyKillCooldown(session, gear, kills + explosion.damages.filter(d => d.killed).length, now));
     }
   }
 
   appendLogs(session, logs);
+}
+
+/** 攻擊結算以外的屍爆傷害（荊棘、DoT 擊殺引發）：浮動數字、仇恨與擊殺結算 */
+function settleExplosionDamages(session: Session, damages: DamageResult[], visuals: CombatVisual[]): void {
+  if (damages.length === 0) return;
+  const instance = ensureInstance(session);
+  const memberId = memberIdOf(session);
+  const now = gameNow();
+  for (const dmg of damages) {
+    const inst = instance.monsterInstances.get(dmg.targetId);
+    const target = session.mapMonster.getState().monsters.find(m => m.id === dmg.targetId);
+    visuals.push({
+      kind: 'dot', memberId, target: 'monster', monsterId: dmg.targetId, damage: dmg.damage, tags: [],
+      position: target ? { ...target.position } : session.mapControl.getState().playerPosition,
+    });
+    recordMonsterDamage(targetingOf(instance, dmg.targetId), memberId, dmg.damage, now);
+    if (dmg.killed) {
+      if (inst) handleMonsterDeath(inst, dmg.targetId, session);
+      removeMonster(session, dmg.targetId);
+    }
+  }
+  stopTrainingIfNoDummiesLeft(session);
 }
 
 /**

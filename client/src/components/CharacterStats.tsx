@@ -131,7 +131,7 @@ export function CharacterStats() {
 
   // 減傷率：防禦減傷與 buff 減傷類間乘算（§ 21.5）
   const defenseReduction = Math.min(totalDefense, 75);
-  const buffReduction = getBuffDamageReduction(activeEffects);
+  const buffReduction = getBuffDamageReduction(activeEffects, gearList);
   const damageReduction = Math.round(100 - (100 - defenseReduction) * (100 - buffReduction) / 100);
   // 魔法減傷（§ 21.16）：裝備防禦貢獻上限 10%，其餘靠魔法抗性，總上限 75%
   const magicResist = getTotalMagicResist(char, gearList, activeEffects);

@@ -13,7 +13,7 @@ const ELEMENT_LABELS: Record<string, string> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  attack: '攻擊', heal: '治療', buff: '增益', move: '移動',
+  attack: '攻擊', heal: '治療', buff: '增益', move: '移動', passive: '被動',
 };
 
 const CLASS_LABELS: Record<string, string> = {
@@ -24,7 +24,7 @@ const CLASS_LABELS: Record<string, string> = {
 const CLASS_SKILL_NOTES: Partial<Record<string, ReactNode>> = {
   knight: (
     <>
-      <strong>盾擊、裂傷斬、挑釁怒吼、衝鋒突進</strong>：傷害 = 技能威力（吃智力與魔攻）＋當下基礎物理傷害（吃武器、力量、攻擊力%），必定命中、可爆擊。
+      <strong>盾擊、裂傷斬、挑釁怒吼、衝鋒突進、復仇之刃</strong>：傷害 = 技能威力（吃智力與魔攻）＋當下基礎物理傷害（吃武器、力量、攻擊力%），必定命中、可爆擊。
       <br />
       <strong>暈眩</strong>：無法行動，攻擊計時器暫停。
       <br />
@@ -35,7 +35,7 @@ const CLASS_SKILL_NOTES: Partial<Record<string, ReactNode>> = {
       再對自身 4 格內隨機打 4 下（同一隻可被打多下），每下附加減速 10%（5 秒，與其他減速後施放覆蓋）。
       4 格內沒有怪物或 HP 只剩 1 時不可施放。
       <br />
-      <strong>復仇之刃</strong>：傷害走技能公式（只吃智力與魔攻），必定命中、可爆擊。
+      <strong>復仇之刃</strong>：傷害同上（技能威力＋當下基礎物理傷害），必定命中、可爆擊。
       施放時依當下血量給自身「復仇」增益：攻擊力 +floor(min(50, (1 − 當前HP ÷ 最大HP) × 100))%，持續 10 秒；
       血量剩一半以下即達 +50%，滿血不給增益，重複施放以新值覆蓋。
       <br />
@@ -204,7 +204,7 @@ export function SkillsPage() {
                       <td className="cell-number">{s.requiredLevel}</td>
                       <td>{TYPE_LABELS[s.skill.type]}</td>
                       <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
-                      <td>{s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius ?? '?'}格/${s.skill.randomHits ? `隨機${s.skill.randomHits}下` : s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
+                      <td>{s.skill.target === 'aoe' && s.skill.aoeRadius === undefined ? '全隊' : s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius}格/${s.skill.randomHits ? `隨機${s.skill.randomHits}下` : s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
                       <td>{formatSkillRange(s.skill) || '-'}</td>
                       <td className="cell-number">
                         {s.skill.physicalSnapshot ? `${s.skill.power} + 物理` : (s.skill.power || '-')}

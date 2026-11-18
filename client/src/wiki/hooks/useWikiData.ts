@@ -1,6 +1,6 @@
 import { MONSTER_SEEDS, EQUIPMENT_SEEDS, DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, ITEM_DEFINITIONS } from '../../db/seed';
 import { ZONES, REGIONS } from '../../models/mapData';
-import { DROP_ROLL_MAX } from '../../systems/drops';
+import { DROP_ROLL_MAX, DUNGEON_SCROLL_DROP_VALUE_CAP } from '../../systems/drops';
 import type { MonsterTemplate } from '../../models/monster';
 import { isArmorEquipment } from '../../models/equipment';
 import type { EquipmentTemplate } from '../../models/equipment';
@@ -106,6 +106,27 @@ export function getDropRate(dropValue: number): string {
   // 極稀有掉落（T6 一般怪 0.001%、T7 Boss 0.001%）用 toFixed(2) 會顯示成 0.00%
   if (percent >= 0.01) return `${percent.toFixed(2)}%`;
   return `${percent.toFixed(3)}%`;
+}
+
+/** 機率（0～1）顯示成百分比，去掉多餘的 0（0.025 → 2.5%、0.00025 → 0.025%） */
+export function formatRatePercent(rate: number): string {
+  return `${parseFloat((rate * 100).toFixed(4))}%`;
+}
+
+/**
+ * 一般怪掉落表的掉率文字（`27-drop-table.md` § 27.1／§ 27.3）：
+ * 百柱塔卷軸依怪物等級在區域內的進度 ×(1 + 進度)，最多 10%；其餘有 `dropValueMax` 的道具線性遞增到該值
+ */
+export function getAreaDropRateText(entry: Pick<DropTableEntry, 'itemType' | 'itemTemplateId' | 'dropValue' | 'dropValueMax'>): string {
+  if (entry.itemType !== 'item') return getDropRate(entry.dropValue);
+  if (entry.itemTemplateId && getItemById(entry.itemTemplateId)?.category === 'dungeon') {
+    const max = Math.min(DUNGEON_SCROLL_DROP_VALUE_CAP, entry.dropValue * 2);
+    return max > entry.dropValue ? `${getDropRate(entry.dropValue)}～${getDropRate(max)}` : getDropRate(entry.dropValue);
+  }
+  if (entry.dropValueMax !== undefined && entry.dropValueMax > entry.dropValue) {
+    return `${getDropRate(entry.dropValue)}～${getDropRate(entry.dropValueMax)}`;
+  }
+  return getDropRate(entry.dropValue);
 }
 
 export function getAreaDisplayName(areaId: string): string {

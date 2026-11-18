@@ -12,6 +12,7 @@ import { getTotalAttributes, getGearAttributeBonus } from '../models/character';
 import { ATTRIBUTE_KEYS } from '../models/attributes';
 import type { Attributes } from '../models/attributes';
 import { areAffixesActive, resolveActiveGear, SLOT_ORDER } from '../models/equipment';
+import { getSuppressedAbilityGear } from '../models/ability';
 import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { ActiveEffect } from '../models/effect';
@@ -101,6 +102,26 @@ export function isUniqueAffixSuppressed(
   const self = frozen[idx];
   if (!self?.uniqueAffix) return false;
   return getSuppressedUniqueGear(frozen).has(self);
+}
+
+/**
+ * 這件已裝備的隨機技能是否因同種類多件只取一件而未生效（`07-affix-ability.md` § 7S.3，UI 劃線用）。
+ * 未裝備、沒有隨機技能、或已被素質需求凍結時回 false。
+ */
+export function isAbilitySuppressed(
+  char: Character,
+  activeEffects: ActiveEffect[],
+  gear: Record<string, EquipmentInstance | null | undefined>,
+  item: EquipmentInstance,
+): boolean {
+  if (!item.ability) return false;
+  const list = Object.values(gear).filter((g): g is EquipmentInstance => !!g);
+  const idx = list.findIndex(g => g === item || (item.id != null && g.id === item.id));
+  if (idx < 0) return false;
+  const frozen = freezeUnmetGear(char, activeEffects, list);
+  const self = frozen[idx];
+  if (!self?.ability) return false;
+  return getSuppressedAbilityGear(frozen).has(self);
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "client",
   "private": true,
-  "version": "0.8.23",
+  "version": "0.8.24",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "pack:tiles": "node scripts/packTiles.mjs"
+    "pack:tiles": "node scripts/packTiles.mjs",
+    "demo:star-chart": "vite build --config demo/star-chart.vite.config.ts"
   },
   "dependencies": {
     "pixi.js": "^8.19.0",

@@ -15,7 +15,7 @@ export interface AssetCredit {
 
 /** CC BY 3.0 要求的標注文字，需原樣呈現 */
 export const GAME_ICONS_ATTRIBUTION =
-  'Icons made by Lorc & Delapouite. Available on https://game-icons.net';
+  'Icons made by Lorc, Delapouite, Sbed & Zeromancer. Available on https://game-icons.net';
 
 /**
  * **目前實際使用中**的第三方素材。此頁只列還在用的東西，不列候選。
@@ -29,7 +29,7 @@ export const ASSET_CREDITS: readonly AssetCredit[] = [
   {
     usage: '遊戲圖示（技能、道具、裝備、增益／減益）',
     name: 'game-icons.net',
-    authors: 'Lorc、Delapouite',
+    authors: 'Lorc、Delapouite、Sbed、Zeromancer',
     license: 'CC BY 3.0',
     licenseUrl: 'https://creativecommons.org/licenses/by/3.0/',
     sourceUrl: 'https://game-icons.net',

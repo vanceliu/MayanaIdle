@@ -17,7 +17,7 @@
 | 背包系統限制（容量/負重/互動/顯示） | `35-inventory-constraints.md` | 全文 |
 | **裝備中的裝備仍留在背包並佔格（基礎 60 格）** | `35-inventory-constraints.md` § 35.1、§ 35.9 | — |
 | **印記不佔格也不計重（走底部抽屜）** | `35-inventory-constraints.md` § 35.20、`30-items.md` § 30.2 | — |
-| **負重上限與超重懲罰（無法攻擊/施法）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
+| **負重上限與超重懲罰（無法攻擊/施法、停止自然回復）** | `20-attributes.md` § 20.7、`35-inventory-constraints.md` § 35.2 | — |
 | 武器強化 | `06-equipment.md` | § 6.9 |
 | 防具強化 | `06-equipment.md` | § 6.10 |
 | **強化入口（背包點卷軸／指定目標／機率視窗）** | `35-inventory-constraints.md` | § 35.5.5 |
@@ -55,6 +55,8 @@
 | **隨機技能（T3+ 武器／項鍊／戒指，各管道機率／清單／觸發）** | `07-affix-ability.md` | 全文 |
 | **隨機技能分武器池（攻擊）／飾品池（防禦）；共通／職業池 2 選 1、職業技能強化（五職業）** | `07-affix-ability.md` § 7S.2、§ 7S.5 | — |
 | **飾品隨機技能：低血低魔回復、荊棘反彈、怒氣、平靜** | `07-affix-ability.md` § 7S.5、`29-regen.md`、`51-auto-talent.md` § 51.4.5（怒氣／平靜條件） | — |
+| **武器隨機技能的擊殺觸發（屍爆、擊殺縮冷）與凍結打擊減速；擊殺／迴避成功的定義** | `07-affix-ability.md` § 7S.4、§ 7S.5 | — |
+| **飾品隨機技能：閃避回復、逆境（依身上 debuff 種類加 buff 減傷）** | `07-affix-ability.md` § 7S.5、`21-combat-formula.md` § 21.5 | — |
 | **鐵匠鋪製作指定隨機技能（武器／項鍊／戒指必選、數值最弱）** | `07-affix-ability.md` § 7S.6、`06-equipment-acquire.md` § 6A.3 | — |
 | **技能結晶（拆解掉落品保留隨機技能）、鐵匠鋪技能更換** | `07-affix-ability.md` § 7S.8、`06-equipment-acquire.md` § 6A.3「拆解」 | — |
 | **詞綴洞／掉落詞綴條數（1~4 條）** | `07-affix.md` | § 7.1 |
@@ -92,6 +94,8 @@
 | **定身（怪物不移動、仍攻擊；暈眩也不移動）** | `24-buff-debuff.md` § 24.5.1／§ 24.5.1b | — |
 | **自身中心隨機多擊（取後放回）** | `41-arpg-combat.md` | § 3.4 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
+| **星盤（點數／節點分層／跨職業／洗點，第一版只有 demo）** | `56-star-chart.md` | 全文 |
+| **技能等級（職業技能弱化與強化冷卻、基礎魔法三系、羅馬數字後綴、與隨機技能的關係）** | `56-star-chart.md` | § 56.5 |
 | **武器基傷擲骰（白字＋強化的 1/2~全值）** | `21-combat-formula.md` | § 21.3（快照技能／DoT 見 § 21.4a） |
 | **哪些傷害會爆擊（魔法技能不爆擊、物理系技能例外）** | `21-combat-formula.md` | § 21.8「適用範圍」 |
 | **遠程攻擊吃敏捷、近戰吃力量** | `21-combat-formula.md` § 21.3、`20-attributes.md` § 20.3 | — |
@@ -214,6 +218,7 @@
 | 雲端全域架構（保留備查，不採用） | `98-online-architecture.md` | § 2 tick 對齊、§ 10 頻寬、§ 13 模板 |
 | Pixi 渲染（分層／theme palette／RenderTexture） | `40-pixijs-migration.md` | 全文 |
 | In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
+| **Wiki 新手開始頁（章節、推薦職業）** | `43-wiki-system.md` | § 4.0 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | **商店／倉庫清單列（名稱＋hover tooltip／窄版折行）** | `34-ui-guidelines.md` | § 34.1「清單列」 |
 | **各介面的裝備詳情元件（含鐵匠鋪拆解 hover）** | `34-ui-guidelines.md` | § 34.2「使用場景」 |
@@ -275,6 +280,7 @@
   ←→ 34-ui-guidelines.md ←→ 43-wiki-system.md § 4.1／§ 4.2.1
   ←→ 25-monster-system.md § 25.12.3（荊棘不反彈擴散）
   ←→ 29-regen.md § 29.1／§ 29.2（低血／低魔回復）
+  ←→ 24-buff-debuff.md § 24.4.1（凍結打擊減速、挑釁怒吼擴散）←→ 21-combat-formula.md § 21.5（逆境）
   ←→ 97-selfhosted-server.md § 97.4（v12 追加傷害換算、v13 燃燒改專注打擊）
   ←→ 21-combat-formula.md § 21.5／§ 21.6／§ 21.16 ←→ 24-buff-debuff.md § 24.4.3
   ←→ 18-data-schema.md § 18.3 ←→ 97-selfhosted-server.md § 97.4
@@ -311,6 +317,10 @@
 07-affix.md § 7.10 ←→ 30-items.md ←→ 13-town.md ←→ 27-drop-table.md
        ↕
 16-tech-frontend-architecture.md（Icon 系統 / BuffBar / 浮動面板視窗 / Tooltip）
+56-star-chart.md（第一版只有 demo）
+  ←→ 20-attributes.md § 20.4／§ 20.5／§ 20.9 ←→ 04-character.md § 4.9
+  ←→ 05-skill.md § 5.3 / 22-basic-magic.md / 23-class-magic.md
+  ←→ 21-combat-formula.md § 21.3／§ 21.4／§ 21.4a／§ 21.4b／§ 21.4c ←→ 07-affix-ability.md § 7S.5 ←→ 24-buff-debuff.md（聖光護盾）
 
 【怪物／元素／掉落】
 25-monster-system.md ←→ 26-spawn-pressure.md ←→ 28-monster-stats.md
@@ -347,7 +357,7 @@
        ↕      ←→ 16-tech-frontend-architecture.md
        ↕      ←→ 97-selfhosted-server.md § 97.4（§ 18.12）
 37-statistics.md § 37.4 ←→ 97-selfhosted-server.md § 97.4
-45-legacy-archive.md ←  97-selfhosted-server.md § 97.5（無觸發來源）
+45-legacy-archive.md ←→ 56-star-chart.md § 56.8（觸發：大改版清檔）
 
 【自架私服】
 97-selfhosted-server.md
@@ -498,4 +508,10 @@
   ← 06-equipment.md § 6.1 / § 6.8~6.10
   ← 35-inventory-constraints.md § 35.2 / 20-attributes.md § 20.7
   ← 36-quest-system.md / 43-wiki-system.md
+
+【Wiki 新手開始】
+43-wiki-system.md § 4.0（StartPage 硬編碼說明）
+  ← 04-character.md § 4.4~4.8 / 20-attributes.md / 24-buff-debuff.md § 24.4.1
+  ← 06-equipment-acquire.md § 6A.1 / § 6A.3 / 13-town.md § 13.3 / § 13.11
+  ← 36-quest-system.md / 51-auto-talent.md / 15-excluded.md
 ```
