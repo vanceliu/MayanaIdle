@@ -30,6 +30,17 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 同 IP 同時在場上限（`97-selfhosted-server.md` § 97.5「同 IP 同時在場」、§ 97.8）
+
+規格（使用者 2026-11-19）：同 IP 同時在遊戲中最多 2 個帳號；第 3 個拒絕進場；管理介面放行名單存 SQLite、名單上不限；註冊限制不變。
+
+- [x] P1 文件：§ 97.5 新增一節、§ 97.8 帳號管理與操作規則、INDEX 查找列
+- [x] P2 demo：管理介面帳號管理分頁加放行名單（`client/demo/`），使用者確認
+- [x] P3 server：`ipEntryLimit.ts`（計數與並行保留）、`db/ipAllowlist.ts`（Sqlite／Memory）＋ migration、`ws.ts` `enterGame` 判定、`admin.ts` 列出／新增／移除 API、`adminPage.ts` 依 demo
+- [x] P4 client：`ip_limit` 在角色選擇畫面顯示訊息
+- [x] P5 測試：第 3 個帳號被拒且不踢人、卸下或斷線後釋出、同帳號重複進場不佔名額、並行進場不超限、放行名單不限且重啟仍在、admin API、client 顯示；`npx tsc -b`、server／client vitest
+- [ ] P6 使用者確認後刪除本段
+
 ### 武器 +10 起三種結果（`06-equipment.md` § 6.9／§ 6.12、`35-inventory-constraints.md` § 35.5.5、`48-vfx.md` § 48.4，demo `client/demo/enhance-fx.html`）
 
 規格（使用者 2026-11-19）：安定值 6；+7～+9 為 1/3 成功、2/3 消失；目標 +10 起每一級 1/5 成功、2/5 無變化（維持原等級）、2/5 消失。無變化照扣卷軸、計入強化次數、不計損毀。＋卷軸照 § 6.12 依使用前等級的下一格判定；－卷軸不變；既有 +10 以上武器不追溯。無變化另做專用演出。

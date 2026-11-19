@@ -27,6 +27,8 @@ export interface OnlineState {
   error: string | null;
   /** 被 server 踢除的原因；重連後保留，選角或建角時清除（§ 97.5） */
   kickedReason: string | null;
+  /** 進場被拒的原因（§ 97.5 同 IP 同時在場）；選角或建角時清除 */
+  entryNotice: string | null;
   /** 版本協商擋在哪一關；尚未被擋為 null */
   mismatchKind: VersionMismatchKind | null;
   requiredVersion: string | null;
@@ -52,6 +54,7 @@ export const useOnlineStore = create<OnlineState>(() => ({
   isHost: false,
   error: null,
   kickedReason: null,
+  entryNotice: null,
   mismatchKind: null,
   requiredVersion: null,
   latencyMs: null,

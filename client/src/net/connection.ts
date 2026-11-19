@@ -223,6 +223,7 @@ export class GameConnection {
           useOnlineStore.setState({ status: 'login', error: useOnlineStore.getState().kickedReason, kickedReason: null, awaitingEnter: false });
           return;
         }
+        if (msg.code === 'ip_limit') useOnlineStore.setState({ entryNotice: msg.message });
         if (this.rejoinPending) {
           this.rejoinPending = false;
           this.send({ t: 'characters' });

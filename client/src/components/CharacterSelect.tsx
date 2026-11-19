@@ -32,8 +32,9 @@ export function CharacterSelect() {
   const deleteCharacter = useGameStore(s => s.deleteCharacter);
   const setPhase = useGameStore(s => s.setPhase);
   const kickedReason = useOnlineStore(s => s.kickedReason);
+  const entryNotice = useOnlineStore(s => s.entryNotice);
   const emptySlots = MAX_CHARACTERS - characterList.length;
-  const clearKicked = () => useOnlineStore.setState({ kickedReason: null });
+  const clearKicked = () => useOnlineStore.setState({ kickedReason: null, entryNotice: null });
 
   // 遺產紀錄（`45-legacy-archive.md` § 45.3）：有紀錄才顯示入口
   const [legacy, setLegacy] = useState<LegacyArchiveSummary[]>([]);
@@ -61,6 +62,7 @@ export function CharacterSelect() {
     <div className="character-select-screen">
       <h2>選擇角色</h2>
       {kickedReason && <div className="select-notice" role="alert">{kickedReason}</div>}
+      {entryNotice && <div className="select-notice" role="alert">{entryNotice}</div>}
       <div className="character-slots">
         {characterList.map(char => (
           <div key={char.id} className="character-slot filled">

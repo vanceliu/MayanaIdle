@@ -14,6 +14,7 @@ import type { Character } from '../../client/src/models/character';
 import type { Mail } from '../../client/src/models/mailbox';
 import { normalizeStatistics } from '../../client/src/models/statistics';
 import { randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
 import type { AuthService } from './auth';
 import { CONFIG_SPECS, buildConfig, saveConfig, type ServerConfig } from './config';
 import type { GameServer } from './ws';
@@ -306,6 +307,27 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       if (!user) throw new AdminError(404, '找不到這個帳號');
       if (!user.hasPassword) throw new AdminError(400, 'host 帳號不使用救援碼');
       json(res, 200, { code: await auth.issueRecoveryCode(user.id) });
+    },
+
+    /** 同 IP 放行名單（§ 97.5「同 IP 同時在場」、§ 97.8） */
+    '/admin/api/ip-allowlist': async ({ res }) => {
+      json(res, 200, { entries: server.ipAllowlist.list() });
+    },
+
+    '/admin/api/ip-allowlist/add': async ({ req, res }) => {
+      const body = await readBody(req);
+      const ip = String(body.ip ?? '').trim();
+      if (isIP(ip) === 0) throw new AdminError(400, 'IP 格式不正確');
+      await server.ipAllowlist.add(ip, String(body.note ?? '').trim(), Date.now());
+      json(res, 200, { ok: true });
+    },
+
+    /** 移除後已在遊戲中的帳號不踢除 */
+    '/admin/api/ip-allowlist/remove': async ({ req, res }) => {
+      const body = await readBody(req);
+      const ip = String(body.ip ?? '');
+      if (!await server.ipAllowlist.remove(ip)) throw new AdminError(404, '名單上沒有這個 IP');
+      json(res, 200, { ok: true });
     },
 
     // ---------- 角色查詢（唯讀） ----------

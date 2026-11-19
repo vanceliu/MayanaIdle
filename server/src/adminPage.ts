@@ -34,6 +34,7 @@ body {
   padding: 16px;
 }
 h1 { font-size: 18px; margin-bottom: 4px; }
+h2 { font-size: 15px; margin: 16px 0 6px; }
 .sub { color: var(--text-dim); font-size: 12px; margin-bottom: 12px; }
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
 .tab, button {
@@ -108,6 +109,7 @@ async function load() {
     if (S.tab === 'status') S.data.status = await api('status');
     if (S.tab === 'players') S.data.players = (await api('players')).players;
     if (S.tab === 'users' || S.tab === 'mail') S.data.users = await api('users');
+    if (S.tab === 'users') S.data.allowlist = (await api('ip-allowlist')).entries;
     if (S.tab === 'characters' || S.tab === 'mail') S.data.characters = (await api('characters')).characters;
     if (S.tab === 'config') S.data.config = (await api('config')).keys;
     render();
@@ -165,6 +167,8 @@ function body() {
       ['open', 'invite', 'closed'].map(v => '<option value="' + v + '"' + (d.registration === v ? ' selected' : '') + '>' + v + '</option>').join('') +
       '</select><button onclick="doRegistration()">儲存</button>' +
       '<span class="hint">與設定頁的 registration 是同一個鍵</span></div>' +
+      allowlistSection() +
+      '<h2>帳號</h2>' +
       '<table><tr><th>ID</th><th>帳號</th><th>角色數</th><th>狀態</th><th></th></tr>' +
       d.users.map(u => '<tr><td>' + u.id + '</td><td>' + esc(u.username) + '</td>' +
         '<td>' + u.characters + '</td>' +
@@ -216,6 +220,19 @@ function body() {
   return '';
 }
 
+function allowlistSection() {
+  const list = S.data.allowlist || [];
+  return '<h2>同 IP 放行名單</h2>' +
+    '<div class="hint" style="margin-bottom:6px">同一 IP 同時在遊戲中最多 2 個帳號；名單上的 IP 不受限。IP 寫法同玩家管理的「來源」欄。</div>' +
+    '<div class="row"><input id="aip" placeholder="IP（例：203.0.113.24）"><input id="anote" placeholder="備註"><button onclick="doAddAllow()">新增</button></div>' +
+    (list.length
+      ? '<table><tr><th>IP</th><th>備註</th><th>加入時間</th><th></th></tr>' +
+        list.map((a, i) => '<tr><td>' + esc(a.ip) + '</td><td>' + esc(a.note || '-') + '</td>' +
+          '<td>' + new Date(a.addedAt).toLocaleString('zh-TW', { hour12: false }) + '</td>' +
+          '<td><button class="danger" onclick="doRemoveAllow(' + i + ')">移除</button></td></tr>').join('') + '</table>'
+      : '<div class="hint">名單是空的</div>');
+}
+
 function render() {
   el('#app').innerHTML = view() + (S.msg ? '<div class="msg' + (S.err ? ' err' : '') + '">' + esc(S.msg) + '</div>' : '');
 }
@@ -247,7 +264,19 @@ window.doRegistration = () => guard(async () => {
   await api('config/save', { values: { registration: el('#reg').value } });
   say('已更新註冊開關'); load();
 });
-window.doSearch = () => guard(async () => { S.data.characters = (await api('characters?q=' + encodeURIComponent(el('#q').value))).characters; render(); });
+window.doAddAllow = () => guard(async () => {
+  const ip = el('#aip').value.trim();
+  const existed = (S.data.allowlist || []).some(a => a.ip === ip);
+  await api('ip-allowlist/add', { ip, note: el('#anote').value });
+  say(existed ? '已更新 ' + ip + ' 的備註' : '已放行 ' + ip); load();
+});
+window.doRemoveAllow = (i) => guard(async () => {
+  const ip = S.data.allowlist[i].ip;
+  if (!confirm('從放行名單移除 ' + ip + '？已在遊戲中的帳號不會被踢除。')) return;
+  await api('ip-allowlist/remove', { ip });
+  say('已移除 ' + ip); load();
+});
+window.doSearch =() => guard(async () => { S.data.characters = (await api('characters?q=' + encodeURIComponent(el('#q').value))).characters; render(); });
 window.doDetail = (id) => guard(async () => { S.data.character = await api('character?id=' + id); render(); });
 window.doSendMail = () => guard(async () => {
   const target = el('#mtarget').value;

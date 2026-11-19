@@ -17,7 +17,7 @@ describe('CharacterSelect', () => {
       characterList: [],
       phase: 'characterSelect',
     });
-    useOnlineStore.setState({ kickedReason: null });
+    useOnlineStore.setState({ kickedReason: null, entryNotice: null });
   });
 
   afterEach(() => {
@@ -95,6 +95,33 @@ describe('CharacterSelect', () => {
     render(<CharacterSelect />);
     const deleteBtn = screen.getByText('刪除');
     expect(deleteBtn).toBeDefined();
+  });
+
+  /** 同 IP 同時在場上限擋下進場（`97-selfhosted-server.md` § 97.5） */
+  describe('進場被拒的原因', () => {
+    const NOTICE = '此 IP 同時在遊戲中的帳號已達上限';
+
+    it('顯示原因，選角後清除', () => {
+      useOnlineStore.setState({ entryNotice: NOTICE });
+      useGameStore.setState({
+        characterList: [{ id: 7, name: 'Hero', className: 'knight', level: 1, attributes: ATTRS }],
+        selectCharacter: vi.fn(),
+      } as never);
+      render(<CharacterSelect />);
+
+      expect(screen.getByRole('alert').textContent).toBe(NOTICE);
+      fireEvent.click(screen.getByText('Hero'));
+      expect(useOnlineStore.getState().entryNotice).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('進入建角畫面也清除', () => {
+      useOnlineStore.setState({ entryNotice: NOTICE });
+      render(<CharacterSelect />);
+
+      fireEvent.click(screen.getAllByText('建立新角色')[0]);
+      expect(useOnlineStore.getState().entryNotice).toBeNull();
+    });
   });
 
   /** 同帳號另一處進場而被踢除（`97-selfhosted-server.md` § 97.5） */

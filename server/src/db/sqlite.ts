@@ -172,6 +172,19 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
     version: LEGACY_RESET_VERSION,
     up: db => archiveAndResetForStarChart(db, LEGACY_RESET_VERSION - 1, 0),
   },
+  {
+    /** 同 IP 放行名單（`97-selfhosted-server.md` § 97.5「同 IP 同時在場」） */
+    version: LEGACY_RESET_VERSION + 1,
+    up: db => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ip_allowlist (
+          ip TEXT PRIMARY KEY,
+          note TEXT NOT NULL,
+          added_at INTEGER NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 /** v12 之前追加傷害的區間：A 5~10、B 5~武器值（上限 ≤ 5 時固定 5） */

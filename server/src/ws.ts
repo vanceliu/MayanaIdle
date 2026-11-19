@@ -9,6 +9,8 @@ import { CHARACTER_NAME_ERROR_MESSAGES, validateCharacterName } from '../../clie
 import { AuthError, type AuthService } from './auth';
 import { LoginThrottle } from './loginThrottle';
 import { RegistrationLimit } from './registrationLimit';
+import { IpEntryLimit } from './ipEntryLimit';
+import { MemoryIpAllowlist, type IpAllowlist } from './db/ipAllowlist';
 import { clientAddress } from './clientAddress';
 import { isLoopbackBind, type ServerConfig } from './config';
 import { applyAutoMove, createPlayerSession, syncWorld, type PlayerSession } from './playerSession';
@@ -37,6 +39,8 @@ export interface GameServerDeps {
   guildStorage?: GuildStorage;
   /** 競技場排行榜（`55-arena.md` § 55.7）；未指定時只存記憶體 */
   arenaRecords?: ArenaRecordStorage;
+  /** 同 IP 放行名單（§ 97.5「同 IP 同時在場」）；未指定時只存記憶體 */
+  ipAllowlist?: IpAllowlist;
 }
 
 /** 單機世界沒有公會（`97-selfhosted-server.md` § 97.1） */
@@ -64,6 +68,9 @@ export const TICK_FAULT_REASON = '角色狀態異常，已中斷連線';
 /** 改密碼或救援碼重設後，同帳號其他連線收到的原因（§ 97.5） */
 export const PASSWORD_CHANGED_REASON = '密碼已變更，請重新登入';
 
+/** 同 IP 同時在遊戲中的帳號達上限時，進場被拒的原因（§ 97.5「同 IP 同時在場」） */
+export const IP_LIMIT_MESSAGE = '此 IP 同時在遊戲中的帳號已達上限';
+
 /** 計入登入嘗試限制的失敗（§ 97.5） */
 const CREDENTIAL_FAILURES: ReadonlySet<string> = new Set(['invalid_credentials', 'invalid_recovery_code']);
 
@@ -83,6 +90,8 @@ export class GameServer {
   private readonly entryQueues = new Map<number, Promise<void>>();
   private readonly throttle: LoginThrottle;
   private readonly registrations: RegistrationLimit;
+  private readonly ipEntries = new IpEntryLimit();
+  readonly ipAllowlist: IpAllowlist;
 
   constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle(), registrations: RegistrationLimit = new RegistrationLimit()) {
     this.deps = deps;
@@ -91,6 +100,7 @@ export class GameServer {
     this.world.onArenaExit = record => { void this.arenaRecords.save(record, Date.now()); };
     this.throttle = throttle;
     this.registrations = registrations;
+    this.ipAllowlist = deps.ipAllowlist ?? new MemoryIpAllowlist();
     this.sessions = this.world.sessions;
     this.world.onSessionFault = session => void this.kick(session, TICK_FAULT_REASON);
   }
@@ -506,10 +516,27 @@ export class GameServer {
   }
 
   /**
-   * 進入遊戲（§ 97.5）：同帳號其他在場的連線先踢除並 flush，才讀角色。
+   * 進入遊戲（§ 97.5）：先過同 IP 同時在場上限，再踢除同帳號其他在場的連線並 flush，才讀角色。
    * 同帳號的進場排成佇列依序執行，同時送出的兩次進場只會留下後到的那條。
    */
   private async enterGame(session: PlayerSession, userId: number, load: () => Promise<unknown>): Promise<void> {
+    const ip = session.clientAddress;
+    const limited = !this.ipAllowlist.has(ip);
+    if (limited && !this.ipEntries.begin(ip, userId, this.inGameUserIds(ip))) throw new AuthError('ip_limit', IP_LIMIT_MESSAGE);
+    try {
+      await this.enterQueued(session, userId, load);
+    } finally {
+      if (limited) this.ipEntries.finish(ip, userId);
+    }
+  }
+
+  private *inGameUserIds(ip: string): Iterable<number> {
+    for (const s of this.sessions) {
+      if (s.clientAddress === ip && s.userId !== null && s.game.getState().character) yield s.userId;
+    }
+  }
+
+  private async enterQueued(session: PlayerSession, userId: number, load: () => Promise<unknown>): Promise<void> {
     const previous = this.entryQueues.get(userId) ?? Promise.resolve();
     const entry = previous.then(async () => {
       for (const other of [...this.sessions]) {

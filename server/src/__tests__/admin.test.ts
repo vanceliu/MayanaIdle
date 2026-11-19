@@ -179,6 +179,22 @@ describe('管理介面 API', () => {
     expect((await call('/admin/api/issue-recovery-code', { body: { userId: 999 } })).status).toBe(404);
   });
 
+  it('同 IP 放行名單：新增、重複新增只更新備註、移除；IP 格式不對回 400（§ 97.8）', async () => {
+    expect((await call('/admin/api/ip-allowlist/add', { body: { ip: '203.0.113.24', note: '宿舍' } })).status).toBe(200);
+    expect((await call('/admin/api/ip-allowlist/add', { body: { ip: '::ffff:203.0.113.25' } })).status).toBe(200);
+    expect((await call('/admin/api/ip-allowlist/add', { body: { ip: '203.0.113.24', note: '宿舍 3 人' } })).status).toBe(200);
+    expect((await call('/admin/api/ip-allowlist/add', { body: { ip: '203.0.113.0/24' } })).status).toBe(400);
+    expect((await call('/admin/api/ip-allowlist/add', { body: { ip: '' } })).status).toBe(400);
+
+    const list = (await call('/admin/api/ip-allowlist')).body.entries;
+    expect(list.map((e: { ip: string; note: string }) => [e.ip, e.note])).toEqual([['203.0.113.24', '宿舍 3 人'], ['::ffff:203.0.113.25', '']]);
+    expect(server.ipAllowlist.has('203.0.113.24')).toBe(true);
+
+    expect((await call('/admin/api/ip-allowlist/remove', { body: { ip: '203.0.113.24' } })).status).toBe(200);
+    expect((await call('/admin/api/ip-allowlist/remove', { body: { ip: '203.0.113.24' } })).status).toBe(404);
+    expect(server.ipAllowlist.has('203.0.113.24')).toBe(false);
+  });
+
   it('角色查詢是唯讀的：列表、搜尋、明細', async () => {
     db.prepare('INSERT INTO characters (user_id, uuid, name_key, data) VALUES (?, ?, ?, ?)')
       .run(1, 'uuid-1', '測試角', JSON.stringify({ name: '測試角', className: 'knight', level: 7, gold: 123, currentRegion: 'dawn-plains', createdAt: 1 }));

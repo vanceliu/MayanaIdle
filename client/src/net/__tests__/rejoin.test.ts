@@ -78,7 +78,7 @@ describe('斷線重連回到原角色', () => {
     vi.useFakeTimers();
     vi.stubGlobal('WebSocket', FakeSocket);
     FakeSocket.instances = [];
-    useOnlineStore.setState({ status: 'offline', error: null, kickedReason: null });
+    useOnlineStore.setState({ status: 'offline', error: null, kickedReason: null, entryNotice: null });
     defaultSession.game.setState({ character: null });
   });
 
@@ -146,6 +146,30 @@ describe('斷線重連回到原角色', () => {
 
     expect(sentAfterHello(second)).toEqual([{ t: 'select_character', id: 7 }, { t: 'characters' }]);
     expect(useOnlineStore.getState().error).toBeNull();
+    conn.disconnect();
+  });
+
+  it('選回被同 IP 上限擋下：改進角色選擇並顯示原因（§ 97.5 同 IP 同時在場）', () => {
+    const conn = new GameConnection();
+    const first = enterWorld(conn);
+    defaultSession.game.setState({ character: { id: 7 } as Character });
+
+    const second = dropAndReconnect(first);
+    second.receive(HELLO_HOST);
+    second.receive({ t: 'error', code: 'ip_limit', message: '此 IP 同時在遊戲中的帳號已達上限' });
+
+    expect(sentAfterHello(second)).toEqual([{ t: 'select_character', id: 7 }, { t: 'characters' }]);
+    expect(useOnlineStore.getState().entryNotice).toBe('此 IP 同時在遊戲中的帳號已達上限');
+    conn.disconnect();
+  });
+
+  it('手動選角被同 IP 上限擋下：顯示原因', () => {
+    const conn = new GameConnection();
+    const socket = enterWorld(conn);
+    socket.receive({ t: 'error', code: 'ip_limit', message: '此 IP 同時在遊戲中的帳號已達上限' });
+
+    expect(useOnlineStore.getState().entryNotice).toBe('此 IP 同時在遊戲中的帳號已達上限');
+    expect(useOnlineStore.getState().error).toBe('此 IP 同時在遊戲中的帳號已達上限');
     conn.disconnect();
   });
 
