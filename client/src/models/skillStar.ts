@@ -187,10 +187,13 @@ function applyBloodPact(skill: Skill, owner: StarOwner): Skill {
   return { ...skill, hpCost: (skill.hpCost ?? 0) + skill.mpCost, mpCost: 0 };
 }
 
-/** 燃魔之星：技能耗魔 ×2，在血契之前套用（`56-star-chart.md` § 56.6） */
+/** 燃魔之星的耗魔加成 %（`56-star-chart.md` § 56.6） */
+export const MANA_BURN_PERCENT = 30;
+
+/** 燃魔之星：技能耗魔 +30%（floor），在血契之前套用 */
 function applyManaBurn(skill: Skill, owner: StarOwner): Skill {
   if (skill.mpCost <= 0 || !starTotalsOf(owner.starChart, owner.className).flags.has('manaBurn')) return skill;
-  return { ...skill, mpCost: skill.mpCost * 2 };
+  return { ...skill, mpCost: Math.floor(skill.mpCost * (100 + MANA_BURN_PERCENT) / 100) };
 }
 
 /** 魔法節約等 buff 的耗魔減免 stat（`23-class-magic.md` § 23.5） */

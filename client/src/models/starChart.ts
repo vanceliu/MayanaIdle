@@ -11,7 +11,7 @@ import { CLASS_SKILLS } from './classSkills';
 
 export type StarNodeKind = 'start' | 'point' | 'constellation' | 'keystone';
 /** 命星的規則效果（不是數值，不加總） */
-export type StarFlag = 'bloodPact' | 'manaBurn' | 'noHpRegen';
+export type StarFlag = 'bloodPact' | 'manaBurn';
 
 /** 可加總的效果；同 key 相加（§ 56.4） */
 export interface StarEffect {
@@ -37,8 +37,7 @@ export interface StarNode {
 
 export const STAR_FLAG_LABEL: Record<StarFlag, string> = {
   bloodPact: '技能耗魔改扣等量 HP',
-  manaBurn: '技能耗魔 ×2',
-  noHpRegen: '每秒回血歸零',
+  manaBurn: '技能耗魔 +30%',
 };
 
 
@@ -157,29 +156,29 @@ const CENTER_KEYSTONES: { angle: number; name: string; path: StarEffect; effects
     angle: 120, name: '均衡之星', path: hp(),
     effects: [...(['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'] as const).map(a => attr(a, 2)), hp(-5), mp(-5)],
   },
-  { angle: 240, name: '堅忍之星', path: def(), effects: [hp(12), effect('evasionRatePct', '迴避率', -25, '%')] },
+  { angle: 240, name: '堅忍之星', path: def(), effects: [hp(12), effect('evasionRatePct', '迴避率', -25, '%'), def(-10)] },
 ];
 
 /** 職業交界的命星，依 STAR_CLASS_ORDER 相鄰順序（騎士・盜賊起）；每個交界 1～2 顆（§ 56.6） */
 const JUNCTION_KEYSTONES: { name: string; effects: StarEffect[]; flags?: StarFlag[] }[][] = [
   [
     { name: '狂戰之星', effects: [atk(20), effect('damageTakenPct', '受到傷害', 15, '%')] },
-    { name: '背水之星', effects: [effect('lowHpPowerPct', 'HP 低於 35% 時攻擊力、魔法攻擊', 30, '%'), hp(-10)] },
+    { name: '背水之星', effects: [effect('lowHpPowerPct', 'HP 低於 50% 時攻擊力、魔法攻擊', 30, '%'), hp(-10)] },
   ],
   [
-    { name: '孤注之星', effects: [effect('critDmgPct', '爆擊傷害', 40, '%'), def(-30)] },
+    { name: '孤注之星', effects: [effect('critDmgPct', '爆擊傷害', 40, '%'), def(-15)] },
     { name: '獨行之星', effects: [effect('soloDmgPct', '未組隊時造成傷害', 15, '%'), effect('partyDmgPct', '組隊時造成傷害', -10, '%')] },
   ],
   [
     { name: '疾風之星', effects: [effect('attackSpeedPct', '攻速', 15, '%'), hp(-15)] },
   ],
   [
-    { name: '碎玉之星', effects: [matk(20), hp(-25)] },
+    { name: '碎玉之星', effects: [matk(20), hp(-20)] },
     { name: '燃魔之星', effects: [effect('skillDmgPct', '技能造成傷害', 15, '%')], flags: ['manaBurn'] },
   ],
   [
-    { name: '嗜血之星', effects: [effect('lifestealPct', '攻擊吸血', 3, '%'), effect('potionPct', '藥水效果', -50, '%')], flags: ['noHpRegen'] },
-    { name: '貪婪之星', effects: [effect('dropPct', '掉寶率', 20, '%'), effect('goldPct', '金幣', 20, '%'), atk(-15), matk(-15)] },
+    { name: '嗜血之星', effects: [effect('attackLifestealPct', '普攻回血', 5, '%'), effect('skillLifestealPct', '技能回血', 5, '%'), effect('potionPct', '藥水效果', -20, '%')] },
+    { name: '貪婪之星', effects: [effect('dropPct', '掉寶率', 20, '%'), effect('goldPct', '金幣', 20, '%'), atk(-12), matk(-12)] },
   ],
 ];
 

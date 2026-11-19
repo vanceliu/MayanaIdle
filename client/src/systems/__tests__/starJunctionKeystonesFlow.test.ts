@@ -51,14 +51,22 @@ describe('交界命星：實際流程', () => {
     expect(getPlayerAttackInterval([], [], char([]))).toBe(1200);
   });
 
-  it('嗜血：普攻命中後依傷害 3% 回血', () => {
+  it('嗜血：普攻命中後依傷害 5% 回血', () => {
     const c = char([ks(4, 0)], { hp: 100 }, 'priest');
     const r = attack(c);
     const dealt = r.damages[0].damage;
-    expect(useGameStore.getState().character!.hp).toBe(100 + Math.floor(dealt * 0.03));
+    expect(useGameStore.getState().character!.hp).toBe(100 + Math.floor(dealt * 0.05));
   });
 
-  it('嗜血：喝藥水回復量減半', () => {
+  it('嗜血：技能命中後依傷害 5% 回血', () => {
+    const fireball = instantiateFromTemplate('fireball', 0)!;
+    const c = char([ks(4, 0)], { hp: 100 }, 'elementalist');
+    const r = attack(c, fireball);
+    const dealt = r.damages[0].damage;
+    expect(useGameStore.getState().character!.hp).toBe(100 - (fireball.hpCost ?? 0) + Math.floor(dealt * 0.05));
+  });
+
+  it('嗜血：喝藥水回復量 -20%', () => {
     const drink = (starChart: string[]) => {
       useGameStore.setState({
         character: char(starChart, { hp: 1 }, 'priest'), activeEffects: [], equippedGear: {},
@@ -70,10 +78,10 @@ describe('交界命星：實際流程', () => {
     };
     const plain = drink([]);
     expect(plain).toBeGreaterThan(0);
-    expect(drink([ks(4, 0)])).toBe(Math.floor(plain / 2));
+    expect(drink([ks(4, 0)])).toBe(Math.floor(plain * 0.8));
   });
 
-  it('嗜血：聖域的每秒回血不回', () => {
+  it('嗜血：聖域的每秒回血照常', () => {
     const tickWith = (starChart: string[]) => {
       const c = char(starChart, { hp: 50 }, 'priest');
       const sanctuary: ActiveEffect = {
@@ -87,7 +95,7 @@ describe('交界命星：實際流程', () => {
       return useGameStore.getState().character!.hp;
     };
     expect(tickWith([])).toBeGreaterThan(50);
-    expect(tickWith([ks(4, 0)])).toBe(50);
+    expect(tickWith([ks(4, 0)])).toBe(tickWith([]));
   });
 
   it('燃魔：施放技能的傷害 ×1.15', () => {

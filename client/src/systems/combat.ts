@@ -419,7 +419,8 @@ function addStarBonuses(bonuses: AffixBonuses, char: Pick<Character, 'className'
   bonuses.attack_power += (t.get('atkPct') ?? 0) + (bow ? t.get('rangedAtkPct') ?? 0 : 0) + starLowHpPowerPct(char, equippedGear);
   bonuses.crit_rate += t.get('critPct') ?? 0;
   bonuses.crit_damage += t.get('critDmgPct') ?? 0;
-  bonuses.attack_lifesteal += t.get('lifestealPct') ?? 0;
+  bonuses.attack_lifesteal += t.get('attackLifestealPct') ?? 0;
+  bonuses.skill_lifesteal += t.get('skillLifestealPct') ?? 0;
   bonuses.potion_effect += t.get('potionPct') ?? 0;
   bonuses.drop_rate += t.get('dropPct') ?? 0;
   bonuses.gold_rate += t.get('goldPct') ?? 0;
@@ -429,8 +430,8 @@ function addStarBonuses(bonuses: AffixBonuses, char: Pick<Character, 'className'
   bonuses.move_speed += t.get('moveSpeedPct') ?? 0;
 }
 
-/** 背水之星：HP 低於有效最大 HP 35% 時的攻擊力%／魔法攻擊% 加成（`56-star-chart.md` § 56.6） */
-export const LOW_HP_POWER_THRESHOLD = 0.35;
+/** 背水之星：HP 低於有效最大 HP 50% 時的攻擊力%／魔法攻擊% 加成（`56-star-chart.md` § 56.6） */
+export const LOW_HP_POWER_THRESHOLD = 0.5;
 export function starLowHpPowerPct(char: Pick<Character, 'className' | 'starChart'>, equippedGear: (EquipmentInstance | null)[]): number {
   const pct = starStat(char, 'lowHpPowerPct');
   if (pct === 0 || !('hp' in char) || !('baseAttributes' in char)) return 0;
@@ -445,7 +446,7 @@ export function starDamageDealtFactor(char: Pick<Character, 'className' | 'starC
   return (1 + party / 100) * (1 + skill / 100);
 }
 
-/** 星盤命星的規則旗標（血契、燃魔、嗜血） */
+/** 星盤命星的規則旗標（血契、燃魔） */
 export function hasStarFlag(char: Pick<Character, 'className' | 'starChart'>, flag: Parameters<ReturnType<typeof starTotalsOf>['flags']['has']>[0]): boolean {
   return !!char.starChart?.length && starTotalsOf(char.starChart, char.className).flags.has(flag);
 }

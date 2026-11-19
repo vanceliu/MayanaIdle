@@ -31,18 +31,18 @@ describe('職業交界命星', () => {
     expect(starStat(c, 'damageTakenPct')).toBe(15);
   });
 
-  it('背水：HP 低於最大 HP 35% 時攻擊力、魔攻 +30%；最大 HP -10%', () => {
+  it('背水：HP 低於最大 HP 50% 時攻擊力、魔攻 +30%；最大 HP -10%', () => {
     const base = char([ks(0, 1)]);
     const maxHp = getMaxHp(base, []);
-    expect(starLowHpPowerPct(char([ks(0, 1)], { hp: Math.floor(maxHp * 0.3) }), [])).toBe(30);
+    expect(starLowHpPowerPct(char([ks(0, 1)], { hp: Math.floor(maxHp * 0.45) }), [])).toBe(30);
     expect(starLowHpPowerPct(char([ks(0, 1)], { hp: maxHp }), [])).toBe(0);
     expect(getCombatBonuses([], [], char([ks(0, 1)], { hp: 1 })).attack_power).toBe(30);
     expect(starStat(base, 'hpPct')).toBe(-10);
   });
 
-  it('孤注：爆擊傷害 +40%、防禦 -30%', () => {
+  it('孤注：爆擊傷害 +40%、防禦 -15%', () => {
     const b = getCombatBonuses([], [], char([ks(1, 0)]));
-    expect([b.crit_damage, b.defense]).toEqual([40, -30]);
+    expect([b.crit_damage, b.defense]).toEqual([40, -15]);
   });
 
   it('獨行：未組隊造成傷害 ×1.15、組隊 ×0.9', () => {
@@ -57,33 +57,34 @@ describe('職業交界命星', () => {
     expect(starStat(c, 'hpPct')).toBe(-15);
   });
 
-  it('碎玉：魔法攻擊 +20%、最大 HP -25%', () => {
+  it('碎玉：魔法攻擊 +20%、最大 HP -20%', () => {
     const c = char([ks(3, 0)], {}, 'elementalist');
-    expect([starStat(c, 'matkPct'), starStat(c, 'hpPct')]).toEqual([20, -25]);
+    expect([starStat(c, 'matkPct'), starStat(c, 'hpPct')]).toEqual([20, -20]);
   });
 
-  it('燃魔：技能傷害 ×1.15（普攻不算）；技能耗魔 ×2，血契扣加倍後的耗魔', () => {
+  it('燃魔：技能傷害 ×1.15（普攻不算）；技能耗魔 +30%（floor），血契扣加成後的耗魔', () => {
     const c = char([ks(3, 1)], {}, 'elementalist');
     expect(starDamageDealtFactor(c, true, false)).toBeCloseTo(1.15);
     expect(starDamageDealtFactor(c, false, false)).toBe(1);
     const fireball = instantiateFromTemplate('fireball', 0)!;
-    expect(resolveSkill(fireball, [], c).mpCost).toBe(fireball.mpCost * 2);
+    const burned = Math.floor(fireball.mpCost * 1.3);
+    expect(burned).toBeGreaterThan(fireball.mpCost);
+    expect(resolveSkill(fireball, [], c).mpCost).toBe(burned);
     const withPact = resolveSkill(fireball, [], char([ks(3, 1), 'center-0-k'], {}, 'elementalist'));
-    expect([withPact.mpCost, withPact.hpCost]).toEqual([0, fireball.mpCost * 2]);
+    expect([withPact.mpCost, withPact.hpCost]).toEqual([0, burned]);
   });
 
-  it('嗜血：攻擊吸血 +3%、藥水效果 -50%、每秒回血歸零', () => {
+  it('嗜血：普攻回血、技能回血各 +5%、藥水效果 -20%；自然回血照常', () => {
     const c = char([ks(4, 0)], { hp: 1 }, 'priest');
     const b = getCombatBonuses([], [], c);
-    expect([b.attack_lifesteal, b.potion_effect]).toEqual([3, -50]);
-    expect(getHpRegen(c, false)).toBe(0);
-    expect(getHpRegen(char([], { hp: 1 }, 'priest'), false)).toBeGreaterThan(0);
+    expect([b.attack_lifesteal, b.skill_lifesteal, b.potion_effect]).toEqual([5, 5, -20]);
+    expect(getHpRegen(c, false)).toBe(getHpRegen(char([], { hp: 1 }, 'priest'), false));
   });
 
-  it('貪婪：掉寶率、金幣 +20%；攻擊力、魔攻 -15%', () => {
+  it('貪婪：掉寶率、金幣 +20%；攻擊力、魔攻 -12%', () => {
     const c = char([ks(4, 1)], {}, 'priest');
     const b = getCombatBonuses([], [], c);
-    expect([b.drop_rate, b.gold_rate, b.attack_power, starStat(c, 'matkPct')]).toEqual([20, 20, -15, -15]);
+    expect([b.drop_rate, b.gold_rate, b.attack_power, starStat(c, 'matkPct')]).toEqual([20, 20, -12, -12]);
   });
 });
 

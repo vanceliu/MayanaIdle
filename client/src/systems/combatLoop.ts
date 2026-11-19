@@ -41,7 +41,7 @@ import {
 } from './arpgEventHandler';
 import { sumUniqueAffix } from '../models/uniqueAffix';
 import {
-  getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, reduceWithManaShield, hasStarFlag, getMonsterDebuffModifierById,
+  getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, reduceWithManaShield, getMonsterDebuffModifierById,
   calculateThornsDamage,
 } from './combat';
 import { createMonsterFromTemplate } from './monsterSpawn';
@@ -717,8 +717,6 @@ function processPlayerHotTick(session: Session, visuals: CombatVisual[]) {
 
   const char = gs.character;
   if (!char || char.hp <= 0) return;
-  // 嗜血之星：每秒回血歸零，含聖域的每秒回血（`56-star-chart.md` § 56.6）
-  if (hasStarFlag(char, 'noHpRegen')) return;
 
   const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear, gs.activeEffects);
   if (char.hp >= effMaxHp) return;

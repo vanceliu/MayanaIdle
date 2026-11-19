@@ -113,6 +113,23 @@
 - [x] R3 新機制：背水（HP 條件）、燃魔（技能傷害、耗魔 ×2 先於血契）、獨行（組隊判定）
 - [x] R4 測試（`starJunctionKeystones.test.ts`）、`npx tsc -b`、client／server vitest
 
+#### 嗜血之星調整（`56-star-chart.md` § 56.6；使用者 2026-11-19）
+
+規格：普攻回血、技能回血各 +5%；藥水效果 -20%；自然回血恢復（移除 `noHpRegen`）。
+
+- [x] S1 文件：56 § 56.6 命星表與規則
+- [x] S2 程式：`starChart.ts` 效果與旗標、`combat.ts` 星盤加成、移除 `regen.ts`／`combatLoop.ts` 的 `noHpRegen`
+- [x] S3 測試（`starJunctionKeystones.test.ts`、`starJunctionKeystonesFlow.test.ts`）、`npx tsc -b`、client vitest
+- [x] S4 堅忍之星代價加防禦 -10%（`starChart.ts`、`starCombat.test.ts`）
+
+#### 交界命星代價調整（`56-star-chart.md` § 56.6；使用者 2026-11-20）
+
+規格：燃魔技能耗魔 +30%（floor）；孤注防禦 -15%；貪婪攻擊力、魔法攻擊各 -12%；碎玉最大 HP -20%；背水門檻 HP 低於 50%；獨行不變。
+
+- [x] K1 文件：56 § 56.6 命星表、燃魔規則、命星平衡原則
+- [x] K2 程式：`starChart.ts`、`skillStar.ts` 燃魔、`combat.ts` 背水門檻
+- [x] K3 測試、`npx tsc -b`、client vitest
+
 ### Wiki 全面核對（使用者 2026-11-17：與遊戲不一致一律以遊戲為準，含設計文件；只限這次）
 
 - [x] V1 裝備／詞綴／製作：WeaponsPage、ArmorPage、AffixesPage、CraftingPage、AbilityTable、43 § 4.1／§ 4.2

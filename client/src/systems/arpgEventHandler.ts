@@ -1077,7 +1077,7 @@ export function processPlayerAttack(
 
   // § 7.9 普攻回血／技能回血：含擴散、追加傷害、追打、專注打擊，依本次招式歸類
   if (procs) {
-    // 嗜血之星的攻擊吸血與詞綴相加（`56-star-chart.md` § 56.6）
+    // 嗜血之星的普攻回血、技能回血與詞綴相加（`56-star-chart.md` § 56.6）
     const affixBonuses = getCombatBonuses(equippedGear, [], character);
     const percent = basicAttackClass ? affixBonuses.attack_lifesteal : affixBonuses.skill_lifesteal;
     logs.push(...applyAffixLifesteal(session, lifestealAmount(damages, percent), basicAttackClass ? '普攻回血' : '技能回血'));

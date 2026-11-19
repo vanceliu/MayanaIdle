@@ -63,9 +63,10 @@ describe('魔法攻擊%：與裝備魔攻同格相加，只給傷害', () => {
 });
 
 describe('命星的規則類效果', () => {
-  it('堅忍之星：迴避率合計 ×0.75', () => {
+  it('堅忍之星：迴避率合計 ×0.75、防禦 -10%', () => {
     const plain = getUncappedPlayerDodgeRate(char('knight'), [], []);
     expect(getUncappedPlayerDodgeRate(char('knight', ['center-240-k']), [], [])).toBeCloseTo(plain * 0.75, 6);
+    expect(getCombatBonuses([], [], char('knight', ['center-240-k'])).defense).toBe(-10);
   });
 
   it('不屈之星：受到傷害 −5% 併入 buff 減傷', () => {

@@ -2,7 +2,7 @@ import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { ActiveEffect } from '../models/effect';
 import { getTotalAttributes, getEffectiveVIT, getEffectiveSPI } from '../models/character';
-import { getAffixBonusesFromGear, getBuffFlatBonus, hasStarFlag } from './combat';
+import { getAffixBonusesFromGear, getBuffFlatBonus } from './combat';
 import { gameNow } from '../core/clock';
 import { getMaxHp, getMaxMp } from './maxHpMp';
 import { ABILITY_LOW_RESOURCE_PERCENT, maxAbilityParam } from '../models/ability';
@@ -28,8 +28,6 @@ function lowResourceBonus(current: number, max: number, gear: (EquipmentInstance
 }
 
 export function getHpRegen(char: Character, inCombat: boolean, gear: (EquipmentInstance | null)[] = [], activeEffects: ActiveEffect[] = []): number {
-  // 嗜血之星：每秒回血歸零（`56-star-chart.md` § 56.6）
-  if (hasStarFlag(char, 'noHpRegen')) return 0;
   const attrs = getTotalAttributes(char, activeEffects, gear);
   const effVIT = getEffectiveVIT(attrs.VIT);
   const base = Math.floor(effVIT / 2);
