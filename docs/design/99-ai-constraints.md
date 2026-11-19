@@ -30,6 +30,14 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 發布拆成 server 與桌面版兩條 Action（`docs/RELEASE.md` § 3；使用者 2026-11-20）
+
+規格：`release-server.yml` 由純版本號 tag 觸發，只打 linux-x64 server，Release 標 latest；`release-desktop.yml` 由 `desktop-<版本>` tag 觸發，打三平台桌面版與 macOS／Windows server，獨立 Release、不標 latest；兩者共用 `test.yml`（`workflow_call`）。
+
+- [x] A1 workflow：`test.yml`、`release-server.yml`、`release-desktop.yml`，刪 `release.yml`
+- [x] A2 文件：`docs/RELEASE.md`、`docs/reference/DEPLOY.md`、`desktop/scripts/package.mjs` 註解
+- [x] A3 驗證：YAML 解析、job 相依核對
+
 ### 同 IP 同時在場上限（`97-selfhosted-server.md` § 97.5「同 IP 同時在場」、§ 97.8）
 
 規格（使用者 2026-11-19）：同 IP 同時在遊戲中最多 2 個帳號；第 3 個拒絕進場；管理介面放行名單存 SQLite、名單上不限；註冊限制不變。

@@ -2,7 +2,7 @@
  * 桌面版打包（`docs/RELEASE.md` § 3）。
  *
  * **預設只打這台機器的平台**：跨平台打出來的東西在本機用不到，還佔上百 MB。
- * 三平台由 GitHub Actions 各自的 runner 原生打包（`.github/workflows/release.yml`）。
+ * 三平台由 GitHub Actions 各自的 runner 原生打包（`.github/workflows/release-desktop.yml`）。
  *
  * 版本號一律取自 `client/package.json` —— 執行檔、前端、桌面版是同一個版本
  * （連線時比對的就是它，見 § 97.2 版本協商）。`desktop/package.json` 的

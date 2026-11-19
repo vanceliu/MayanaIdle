@@ -1,0 +1,83 @@
+# 發布 server（docs/RELEASE.md § 3.1）：正式站用的 linux-x64 執行檔。
+# Release 標 latest：scripts/deploy.sh 預設下載 latest。
+name: Release Server
+
+on:
+  push:
+    # 純版本號，例如 0.9.1、0.9.1-rc1
+    tags: ['[0-9]*']
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    name: 打包 server (Linux x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - run: npm ci
+        working-directory: client
+      - run: npm ci
+        working-directory: server
+
+      # server 執行檔內含前端，client 先 build
+      - run: npm run build
+        working-directory: client
+      - run: npm run build
+        working-directory: server
+
+      - run: node scripts/package.mjs
+        working-directory: server
+      # Linux arm64 暫停發布。恢復時取消註解：下載同版本的 arm64 node 交叉打包
+      # - run: node scripts/package.mjs --target linux-arm64
+      #   working-directory: server
+
+      # tar.gz 保留 Unix 執行權限位（artifact zip 與 HTTP 下載的裸檔會變 644）
+      - name: 收齊要發布的檔案
+        run: |
+          mkdir -p dist-out
+          for name in mayana-server-linux-x64 mayana-server-linux-arm64; do
+            [ -f "server/release/$name" ] || continue
+            tar -czf "dist-out/$name.tar.gz" -C server/release "$name"
+          done
+          ls -lh dist-out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mayana-server
+          if-no-files-found: error
+          path: dist-out/*
+
+  release:
+    name: 建立 Release
+    needs: [test, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      # 帶後綴的 tag 標 pre-release；同一個 tag 重跑時沿用既有 Release，附檔以 --clobber 覆蓋
+      - run: |
+          set -eu
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            case "$GITHUB_REF_NAME" in
+              *-*) flag="--prerelease" ;;
+              *) flag="--latest" ;;
+            esac
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes "$flag"
+          fi
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

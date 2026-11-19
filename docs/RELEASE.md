@@ -49,39 +49,47 @@
 
 ### 3.1 正式發布：GitHub Actions
 
-**發布一律靠 CI**（`.github/workflows/release.yml`）。三個 runner 各自原生打包自己的平台，
-所以不必在本機處理跨平台那堆麻煩，也不會在硬碟上堆幾 GB 的產物。
+**發布一律靠 CI**，分兩條，各自用 tag 觸發，產物進各自的 GitHub Release：
+
+| workflow | tag | 產物 | Release |
+|---|---|---|---|
+| `.github/workflows/release-server.yml` | 純版本號（`0.9.1`） | Linux x64 server 執行檔（正式站用） | 標 latest（`scripts/deploy.sh` 預設下載 latest） |
+| `.github/workflows/release-desktop.yml` | `desktop-` 加版本號（`desktop-0.9.1`） | 三平台桌面版、macOS／Windows server 執行檔 | 獨立 Release「桌面版 <版本>」，不標 latest |
+
+兩條都先跑共用的 `.github/workflows/test.yml`：**核對 tag 與 `client/package.json` 版本**（tag 去掉 `desktop-` 前綴後比對）→ 型別檢查 → 三個 workspace 的測試；
+與打包並行，兩者都成功才建立 Release。基底版本對不上即判失敗、不建 Release；測試失敗時打包產物仍留在 Actions artifacts，不得當正式版散布。
 
 ```bash
 # 版本號改在 client/package.json，同一個 commit 在 client/src/db/seed/patchNotes.ts 最前面加這版的更新公告、刪掉最舊一筆
-# commit 之後打 tag（純版本號，不加 v）
-git tag 0.7.1 && git push origin 0.7.1
+# commit 之後打 tag（不加 v）
+git tag 0.9.1 && git push origin 0.9.1                  # server
+git tag desktop-0.9.1 && git push origin desktop-0.9.1  # 桌面版（需要時）
 ```
 
 更新公告最新一筆的版本號與 `client/package.json` 不同，或超過 5 筆時，client 測試失敗（`design/52-mailbox.md` § 52.6）。
 
-推 tag 會跑兩條並行的 job：**核對 tag 與 `client/package.json` 版本** → 型別檢查 → 三個 workspace 的測試；
-以及三平台打包。兩者都成功才建立 GitHub Release。基底版本對不上即判失敗、不建 Release（產物的版本號取自
-`package.json` 而不是 tag，不擋就會發出名不副實的一包）；測試失敗時打包產物仍留在 Actions artifacts，不得當正式版散布。
+**只發 server 就能更新官方 server 上的玩家**：桌面版連線時載入的是該 server 的遊戲頁（`design/97-selfhosted-server.md` § 97.2）。
+桌面版只在啟動器或單機／開放世界（內建 client 與 server）要更新時才發。
 
 想先試跑就用預發布後綴，不必改 `package.json`：
 
 ```bash
-git tag 0.7.0-rc1 && git push origin 0.7.0-rc1
+git tag 0.9.1-rc1 && git push origin 0.9.1-rc1
+git tag desktop-0.9.1-rc1 && git push origin desktop-0.9.1-rc1
 ```
 
-`0.7.0-rc1` 的基底版本是 `0.7.0`，檢查放行；建出來的 Release 會標成 pre-release。
+基底版本是 `0.9.1`，檢查放行；建出來的 Release 會標成 pre-release。
 想先看產物不發布，就到 Actions 頁手動觸發（`workflow_dispatch`），檔案在該次執行的 artifacts。
 
-每個平台一份桌面版、一份 server 執行檔（macOS 桌面版另出 `.zip`）：
+產物（macOS 桌面版另出 `.zip`）：
 
-| 平台 | 桌面版 | server 執行檔 |
+| 平台 | 桌面版（`release-desktop.yml`） | server 執行檔 |
 |---|---|---|
-| macOS（arm64） | `MayanaIdle-<版本>-mac-arm64.dmg` / `.zip` | `mayana-server-macos-arm64.tar.gz` |
-| Windows（x64） | `MayanaIdle-<版本>-win-x64.zip` | `mayana-server-win-x64.exe` |
-| Linux（x64） | `MayanaIdle-<版本>-linux-x64.tar.gz` | `mayana-server-linux-x64.tar.gz` |
+| macOS（arm64） | `MayanaIdle-<版本>-mac-arm64.dmg` / `.zip` | `mayana-server-macos-arm64.tar.gz`（`release-desktop.yml`） |
+| Windows（x64） | `MayanaIdle-<版本>-win-x64.zip` | `mayana-server-win-x64.exe`（`release-desktop.yml`） |
+| Linux（x64） | `MayanaIdle-<版本>-linux-x64.tar.gz` | `mayana-server-linux-x64.tar.gz`（`release-server.yml`） |
 
-Linux arm64（`mayana-server-linux-arm64.tar.gz`）CI 暫停發布，`release.yml` 的交叉打包步驟已註解；需要時用本機 `./scripts/release.sh --all-servers` 打包。
+Linux arm64（`mayana-server-linux-arm64.tar.gz`）CI 暫停發布，`release-server.yml` 的交叉打包步驟已註解；需要時用本機 `./scripts/release.sh --all-servers` 打包。
 
 macOS 與 Linux 的 server 執行檔以 **tar.gz** 散布 —— 裸檔經 artifact zip 或 HTTP 下載一律掉
 Unix 權限位。Windows 沒有執行權限位，維持裸 `.exe`。
@@ -129,7 +137,7 @@ Node SEA（Single Executable Application）：把 server 的 CJS bundle 與整�
 | ARM | 只出 64 位元（`linux-arm64`）。Node 24 官方沒有 32 位元 ARM（armv7l）版，32 位元系統跑不起來 |
 | macOS 簽章 | 注入會破壞既有簽章，打包腳本會 `codesign --remove-signature` 再 ad-hoc 重簽。**在非 macOS 上打包的 macOS 執行檔無法簽章**，對方會被 Gatekeeper 擋下 |
 | Windows 簽章 | postject 會印 `The signature seems corrupted!` —— node.exe 的 Authenticode 簽章因注入而失效，屬預期。未簽章的執行檔仍可執行，但 SmartScreen 會警告 |
-| node 版本 | 取自打包機的 `process.versions.node`；CI 三個 runner 都用 workflow 的 `NODE_VERSION`（完整版本號，只寫 major 會沿用 runner 快取的舊版）。低於 `server/scripts/package.mjs` 的 `MIN_NODE_VERSION` 拒絕打包；Node 出安全更新時兩處一起調高 |
+| node 版本 | 取自打包機的 `process.versions.node`；CI 一律用 repo 根目錄 `.node-version`（完整版本號，只寫 major 會沿用 runner 快取的舊版）。低於 `server/scripts/package.mjs` 的 `MIN_NODE_VERSION` 拒絕打包；Node 出安全更新時兩處一起調高 |
 
 ### 桌面版（Electron）
 
