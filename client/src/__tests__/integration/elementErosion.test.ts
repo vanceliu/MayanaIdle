@@ -5,7 +5,7 @@
  * 規則：
  *  - 詞綴的 % 是**觸發率**，每跳傷害在抽到當下由 `武器平均基傷的一半 ~ 滿值` 決定，之後固定
  *  - 觸發率與每跳傷害**都吃裝備品質**
- *  - 普攻與魔法命中都判定；雙持武器一次攻擊打兩下，判定兩次
+ *  - 普攻與魔法命中都判定；每次攻擊判定一次
  *  - DoT 每秒一跳、持續 5 秒、存續期間不可刷新、不吃怪物防禦
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -37,12 +37,12 @@ const NOW = 500_000;
 function knight(): Character {
   return {
     name: 'Tester', className: 'knight', level: 40, exp: 0, expToNext: 100,
-    hp: 300, maxHp: 300, mp: 200, maxMp: 200,
+    hp: 300, mp: 200, 
     baseAttributes: { STR: 20, AGI: 20, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -193,12 +193,12 @@ describe('觸發：命中後依機率上 DoT', () => {
   });
 });
 
-describe('雙持一次攻擊判定兩次', () => {
+describe('判定次數＝實際打擊下數（雙刀／鋼爪 30% 打兩下）', () => {
   /**
    * 用真實亂數統計，不靠特定擲骰序列 —— 攻擊本身也會消耗 Math.random，
    * 寫死序列只會測到「第幾次呼叫」而不是「判定幾次」。
    *
-   * 觸發率 20% 時：單手 20%、雙持 1 − 0.8² = 36%。
+   * 觸發率 20% 時：單手 20%；雙刀／鋼爪 0.7 × 20% ＋ 0.3 ×（1 − 0.8²）≈ 24.8%。
    * 各跑 4000 次，用寬鬆區間避免偶發失敗。
    */
   function procRate(type: string, chance: number, runs = 4000): number {
@@ -211,21 +211,17 @@ describe('雙持一次攻擊判定兩次', () => {
     return hits / runs;
   }
 
-  it('單手 ≈ 觸發率，雙持 ≈ 1 −（1 − 觸發率）²', () => {
-    const single = procRate('sword', 20);
-    const dual = procRate('dualBlade', 20);
-    expect(single).toBeGreaterThan(0.16);
-    expect(single).toBeLessThan(0.24);
-    expect(dual).toBeGreaterThan(0.31);
-    expect(dual).toBeLessThan(0.41);
-    expect(dual).toBeGreaterThan(single);
+  it('單手 ≈ 觸發率，雙刀／鋼爪 ≈ 24.8%', () => {
+    const sword = procRate('sword', 20);
+    expect(sword).toBeGreaterThan(0.16);
+    expect(sword).toBeLessThan(0.24);
+    for (const type of ['dualBlade', 'claw']) {
+      const rate = procRate(type, 20);
+      expect(rate, type).toBeGreaterThan(0.21);
+      expect(rate, type).toBeLessThan(0.29);
+    }
   });
 
-  it('鋼爪與雙刀同樣判定兩次', () => {
-    const claw = procRate('claw', 20, 2000);
-    expect(claw).toBeGreaterThan(0.29);
-    expect(claw).toBeLessThan(0.43);
-  });
 });
 
 describe('魔法命中也會觸發', () => {
@@ -247,7 +243,7 @@ describe('魔法命中也會觸發', () => {
     expect(erosionEffects()[0].dot!.damage).toBe(12);
   });
 
-  it('魔法只判定一次（不套雙持的兩次）', () => {
+  it('魔法只判定一次', () => {
     let hits = 0;
     const skill = { ...getSkillTemplate('fireball')!, lastUsedAt: 0 } as Skill;
     useGameStore.setState({ skills: [skill] });
@@ -266,7 +262,7 @@ describe('魔法命中也會觸發', () => {
     }
     const rate = hits / 3000;
     expect(rate).toBeGreaterThan(0.15);
-    expect(rate).toBeLessThan(0.26); // 若誤套雙持兩次會落在 0.36 附近
+    expect(rate).toBeLessThan(0.26);
   });
 });
 

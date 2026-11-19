@@ -7,13 +7,25 @@
 /** 防具超出安定值後仍維持 1/2 的最高目標等級（§ 6.10 表格「安定值 0」欄 +1~+4 皆為 1/2） */
 export const ARMOR_ENHANCE_FLAT_RATE_MAX_LEVEL = 4;
 
+/** 一次強化判定的三種結果機率，三者合計 1 */
+export interface EnhanceOdds {
+  success: number;
+  /** 等級維持、裝備保留 */
+  noChange: number;
+  destroy: number;
+}
+
+/** 武器目標等級達此值起改為 1/5 成功、2/5 無變化、2/5 消失（§ 6.9） */
+export const WEAPON_NO_CHANGE_START_LEVEL = 10;
+
 /**
- * 武器強化成功率（§ 6.9）。
- * 安定值內必定成功；超出後固定 1/3 成功、2/3 武器消失。
+ * 武器強化結果機率（§ 6.9）。
+ * 安定值內必定成功；超出後 1/3 成功、2/3 消失；目標 +10 起 1/5 成功、2/5 無變化、2/5 消失。
  */
-export function getWeaponEnhanceRate(targetLevel: number, stability: number): number {
-  if (targetLevel <= stability) return 1.0;
-  return 1 / 3;
+export function getWeaponEnhanceOdds(targetLevel: number, stability: number): EnhanceOdds {
+  if (targetLevel <= stability) return { success: 1, noChange: 0, destroy: 0 };
+  if (targetLevel >= WEAPON_NO_CHANGE_START_LEVEL) return { success: 1 / 5, noChange: 2 / 5, destroy: 2 / 5 };
+  return { success: 1 / 3, noChange: 0, destroy: 2 / 3 };
 }
 
 /**

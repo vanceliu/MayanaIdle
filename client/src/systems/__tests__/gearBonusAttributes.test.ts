@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ATTRIBUTE_CAP,
   ATTRIBUTE_KEYS,
   getGearAttributeBonus,
   getTotalAttributes,
@@ -9,7 +8,7 @@ import type { Attributes, Character } from '../../models/character';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { MonsterInstance } from '../../models/monster';
 import { calculatePlayerAttack, calculateSkillAttack, getSkillCooldownReduction, COOLDOWN_REDUCTION_CAP } from '../combat';
-import { tryLevelUp } from '../levelUp';
+import { getMaxHp } from '../maxHpMp';
 import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_SKILLS } from '../../models/classSkills';
@@ -22,12 +21,12 @@ const ZH_TO_KEY: Record<string, keyof Attributes> = {
 function createCharacter(overrides: Partial<Character> = {}): Character {
   return {
     name: 'T', className: 'knight', level: 50, exp: 0, expToNext: 1_000_000,
-    hp: 500, maxHp: 500, mp: 100, maxMp: 100,
+    hp: 500, mp: 100, 
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+    quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
     ...overrides,
   };
 }
@@ -121,20 +120,17 @@ describe('getTotalAttributes 的裝備來源', () => {
     expect(getTotalAttributes(char, [], gear).STR).toBe(16);
   });
 
-  it('不傳裝備時維持原本行為（配點上限檢查與升級成長依賴此點）', () => {
+  it('不傳裝備時不含裝備屬性', () => {
     const char = createCharacter();
     expect(getTotalAttributes(char).STR).toBe(14);
     expect(getTotalAttributes(char, []).STR).toBe(14);
   });
 
-  it('裝備額外屬性不受 35 點上限限制', () => {
-    const char = createCharacter({
-      baseAttributes: { STR: 18, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
-      bonusAttributes: { STR: 17, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    });
-    expect(getTotalAttributes(char).STR).toBe(ATTRIBUTE_CAP);
+  it('星盤屬性計入總屬性，與裝備相加（`20-attributes.md` § 20.10）', () => {
+    const char = createCharacter({ starChart: ['knight-start', 'knight-r360'] });
+    expect(getTotalAttributes(char).STR).toBe(17);
     const gear = [createItem({ bonusAttributes: { STR: 2 } })];
-    expect(getTotalAttributes(char, [], gear).STR).toBe(ATTRIBUTE_CAP + 2);
+    expect(getTotalAttributes(char, [], gear).STR).toBe(19);
   });
 
   it('與 buff 相加，不互相取代', () => {
@@ -205,17 +201,12 @@ describe('裝備額外屬性在戰鬥中生效', () => {
   });
 });
 
-describe('裝備額外屬性不影響升級成長', () => {
-  it('升級 HP/MP 成長只看 baseAttributes + bonusAttributes', () => {
-    // VIT 16 → 成長 random(10, 13)，穿 +2 VIT 裝也不該變成 random(12, 15)
-    const char = createCharacter({ level: 50, exp: 10, expToNext: 10 });
-    const results = new Set<number>();
-    for (let i = 0; i < 300; i++) {
-      const before = createCharacter({ level: 50, exp: 10, expToNext: 10 });
-      results.add(tryLevelUp(before).maxHp - before.maxHp);
-    }
-    expect(Math.min(...results)).toBeGreaterThanOrEqual(char.baseAttributes.VIT - 6);
-    expect(Math.max(...results)).toBeLessThanOrEqual(char.baseAttributes.VIT - 3);
+describe('裝備額外屬性計入最大 HP（`20-attributes.md` § 20.4）', () => {
+  it('穿 +2 體質裝，最大 HP 依新體質算', () => {
+    const char = createCharacter({ level: 50 });
+    const gear = [createItem({ bonusAttributes: { VIT: 2 } })];
+    // 騎士體質 16 → 18：floor(50×18×0.7)=630 + 19
+    expect(getMaxHp(char, gear)).toBe(649);
   });
 });
 
@@ -266,8 +257,6 @@ describe('§ 20.6 INT 的兩個作用', () => {
 
 describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
   it('基礎魔法的攻擊技能威力皆為調整後的值', () => {
-    // INT 係數 9.5%／2 點 ＋ 魔攻匯率 6.5%／點，技能攻擊力表配合縮放至
-    // 「智力 50%／技能 25%／魔攻 25%」（§ 21.4）。倍率 ×0.7128，取整用 floor
     const expected: Record<string, number> = {
       'wind-blade': 7, 'ice-bolt': 7, 'flame-arrow': 13, 'holy-bolt': 13,
       'ice-lance': 27, 'flame-pillar': 27, 'meteor-shower': 44,
@@ -284,28 +273,18 @@ describe('§ 22 / § 23 技能威力調整後的資料一致性', () => {
     expect(Math.max(...powers)).toBe(57);
   });
 
-  it('所有職業攻擊魔法與基礎魔法同步縮放（§ 23.7.1）', () => {
+  it('職業攻擊魔法的技能攻擊力（§ 23.5～§ 23.6）', () => {
     const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill.power;
-    // 魔力奪取於縮放後另行調為 30（§ 23.5 現行值）
     expect(power('mana-drain')).toBe(30);
-    expect(power('element-storm')).toBe(53);
-    expect(power('holy-judgment')).toBe(37);
+    expect(power('element-storm')).toBe(55);
+    expect(power('holy-judgment')).toBe(45);
     expect(power('arrow-rain')).toBe(37);
-    /*
-     * 騎士與盜賊的職業魔法**豁免縮放**（§ 23.7.1）：他們裝備魔攻為 0、有效 INT 只有 10，
-     * 吃不到被放大的魔攻乘區與 INT 加成，跟著縮表是純削弱。
-     * 復仇之刃與背刺之後改走 A 組快照物理，數值另由 `physicalSnapshotSkill.test.ts` 把守。
-     */
   });
 
-  it('物理快照三招也同步縮放（§ 21.4a）', () => {
+  it('物理快照技能的技能攻擊力（§ 21.4a）', () => {
     const power = (id: string) => CLASS_SKILLS.find(s => s.id === id)!.skill.power;
     expect(power('shield-bash')).toBe(32);
     expect(power('taunt')).toBe(65);
-    // 裂傷斬同樣豁免 § 23.7.1 的縮放，但**後續另行調整為 50／流血 70%**
-    // （技能攻擊力是常數、流血跟著裝備成長，81 在低等級占即時傷害八成）。
-    // 這條測的是「有沒有被縮表」，不是現行值 —— 現行值由
-    // `physicalSnapshotSkill.test.ts` 把守。
     expect(power('rend')).toBe(50);
   });
 });

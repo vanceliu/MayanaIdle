@@ -10,7 +10,6 @@ import { TradeAutoOpen } from './components/TradePanel';
 import { DiscardConfirmModal } from './components/DiscardConfirmModal';
 import { BuffBar } from './components/BuffBar';
 import { PartyHud } from './components/PartyPanel';
-import { AttributeUpModal } from './components/AttributeUpModal';
 import { BattleView } from './components/BattleView';
 import { ExploreBar } from './components/ExploreBar';
 import { MapNavigation } from './components/MapNavigation';
@@ -196,7 +195,6 @@ export function GameLayout({ isInTown, isInTrainingGround = false }: { isInTown:
       <PanelWindows />
       {/* 交易沒有面板按鈕：有邀請或交易成立時自動開窗 */}
       <TradeAutoOpen />
-      <AttributeUpModal />
       <DiscardConfirmModal />
       {/* 指標拖曳的殘影（`47-mobile.md`）。掛在最外層，任何面板拖出來的東西都畫得到 */}
       <DragGhost />

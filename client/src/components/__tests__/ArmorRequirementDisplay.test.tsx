@@ -12,8 +12,8 @@ const attrs = (p: Partial<Attributes> = {}): Attributes =>
 
 const character = (a: Partial<Attributes>): Character => ({
   id: 1, userId: 1, name: 'T', className: 'knight', level: 60, exp: 0, expToNext: 0,
-  hp: 100, maxHp: 100, mp: 50, maxMp: 50,
-  baseAttributes: attrs(a), bonusAttributes: attrs(), unspentAttributePoints: 0,
+  hp: 100, mp: 50,
+  baseAttributes: attrs(a), bonusAttributes: attrs(),
 } as Character);
 
 const item = (over: Partial<EquipmentInstance> = {}): EquipmentInstance => ({

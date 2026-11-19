@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { processPlayerAttack } from '../arpgEventHandler';
+import { getSkillCooldownReduction } from '../combat';
 import { getMpRegen } from '../regen';
 import { getEffectiveMaxHp, getEffectiveMaxMp, useGameStore } from '../../stores/gameStore';
 import { getSkillTemplate } from '../../models/skillTemplate';
@@ -26,12 +27,12 @@ const NOW = 900_000;
 function priest(overrides: Partial<Character> = {}): Character {
   return {
     name: 'Priest', className: 'priest', level: 70, exp: 0, expToNext: 100,
-    hp: 600, maxHp: 600, mp: 100, maxMp: 400,
+    hp: 600, mp: 100, 
     baseAttributes: { STR: 10, AGI: 10, VIT: 18, SPI: 22, INT: 25, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
     ...overrides,
   };
 }
@@ -63,19 +64,29 @@ describe('牧師 5～7 級定義', () => {
     expect(getSkillTemplate('blood-mana')!.buffDuration).toBeUndefined();
   });
 
-  it('神聖懲擊：光屬性、技能攻擊力 53、MP 30、冷卻 10s、射程 10、單體、吸血 30%', () => {
+  it('神聖懲擊：光屬性、技能攻擊力 53、MP 30、冷卻 10s、射程 10、單體、吸血 10%', () => {
     expect(getSkillTemplate('holy-smite')).toMatchObject({
-      type: 'attack', target: 'single', element: 'light', power: 53, mpCost: 30, cooldown: 10000, range: 10, lifestealPercent: 30,
+      type: 'attack', target: 'single', element: 'light', power: 53, mpCost: 30, cooldown: 10000, range: 10, lifestealPercent: 10,
     });
   });
 });
 
 describe('精神匯聚（取代高階治癒，沿用 id high-heal）', () => {
-  it('MP 10、冷卻 60s、持續 300s、每次回魔另加最大 MP 5%', () => {
+  it('MP 10、冷卻 60s、持續 300s、每次回魔另加最大 MP 5%、冷卻 -20%', () => {
     expect(getSkillTemplate('high-heal')).toMatchObject({
       name: '精神匯聚', type: 'buff', mpCost: 10, cooldown: 60000, buffDuration: 300000, buffCategory: 'spirit-gathering',
-      buffModifiers: [{ stat: 'mp_regen_max_percent', value: 5, isPercent: true }],
+      buffModifiers: [{ stat: 'mp_regen_max_percent', value: 5, isPercent: true }, { stat: 'cooldown_reduction', value: 20, isPercent: true }],
     });
+  });
+
+  it('精神匯聚的冷卻 -20% 計入冷卻縮減', () => {
+    const t = getSkillTemplate('high-heal')!;
+    const buff = {
+      id: 'b', sourceSkillId: 'high-heal', sourceSkillName: t.name, category: t.buffCategory!, type: 'buff' as const, target: 'player' as const,
+      modifiers: t.buffModifiers!, startTime: Date.now() - 1, duration: 300000, tags: [], name: t.name, description: '',
+    };
+    const c = { ...useGameStore.getState().character!, baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: 1, CHA: 1 }, bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 } };
+    expect(getSkillCooldownReduction(c, [], [buff]) - getSkillCooldownReduction(c, [], [])).toBe(20);
   });
 
   it('回魔加成為有效最大 MP 5%，戰鬥中不減半', () => {
@@ -91,8 +102,9 @@ describe('精神匯聚（取代高階治癒，沿用 id high-heal）', () => {
 });
 
 describe('血魔轉換', () => {
-  it('扣有效最大 HP 20%，回復有效最大 MP 20%', () => {
-    const char = priest();
+  it('等級 III：扣有效最大 HP 20%，回復有效最大 MP 20%', () => {
+    // 血魔轉換兩個等級節點（`56-star-chart.md` § 56.5）
+    const char = { ...priest(), starChart: ['priest-magic4-level0', 'priest-magic4-level1'] };
     useGameStore.setState({ character: char, skills: [skillOf('blood-mana')] });
     const maxHp = getEffectiveMaxHp(char, {}, []);
     const maxMp = getEffectiveMaxMp(char, {}, []);
@@ -119,7 +131,7 @@ describe('血魔轉換', () => {
 });
 
 describe('神聖懲擊', () => {
-  it('回復最終傷害 30% 的 HP', () => {
+  it('回復最終傷害 10% 的 HP', () => {
     const skill = skillOf('holy-smite');
     const character = priest({ hp: 300 });
     const target: MonsterInstance = {
@@ -137,7 +149,7 @@ describe('神聖懲擊', () => {
     const dealt = r.damages[0].damage;
     expect(dealt).toBeGreaterThan(0);
     expect(r.damages[0].isCrit).toBe(false);
-    expect(r.hpRestored).toBe(Math.floor(dealt * 0.3));
-    expect(useGameStore.getState().character!.hp).toBe(300 + Math.floor(dealt * 0.3));
+    expect(r.hpRestored).toBe(Math.floor(dealt * 0.1));
+    expect(useGameStore.getState().character!.hp).toBe(300 + Math.floor(dealt * 0.1));
   });
 });

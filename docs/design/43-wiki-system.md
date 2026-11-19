@@ -30,6 +30,7 @@ client/src/wiki/
 │   ├── MapsPage.tsx      — 地圖/區域結構
 │   ├── ItemsPage.tsx     — 道具列表 + 單件詳細
 │   ├── SkillsPage.tsx    — 通用魔法 + 職業專屬技能
+│   ├── StarChartPage.tsx — 星盤規則、節點數值、命星、配點模擬
 │   ├── CraftingPage.tsx  — 鐵匠鋪配方
 │   ├── ExpTablePage.tsx  — 等級經驗表
 │   ├── AttributesPage.tsx— 屬性公式說明
@@ -184,19 +185,27 @@ client/src/wiki/
 - 職業專屬技能（按職業分組）：含需求武器、技能書名稱；效果欄含自身增益（`formatSelfBuff()`）
 - 騎士表下方詳細規則：物理系技能傷害組成、暈眩效果、衝鋒突進施放條件、血濺咒殺 HP 消耗與隨機多擊、復仇之刃加成公式與作用範圍（`23-class-magic.md` § 23.1.1／§ 23.3）
 - 妖精表下方詳細規則：三連射命中判定、束縛箭／後躍射擊的傷害組成、定身規則、後退落點（§ 23.1.1／§ 23.4）
-- 元素師／牧師／盜賊表下方詳細規則：魔力護盾、魔力湧泉、精神匯聚、血魔轉換、毒霧、閃避反擊的完整條件（§ 23.5～§ 23.7）
+- 元素師／牧師／盜賊表下方詳細規則：魔力護盾、魔力湧泉、精神匯聚、血魔轉換、冰霧、閃避反擊的完整條件（§ 23.5～§ 23.7）
 - 範圍欄：隨機多擊技能顯示「隨機 N 下」
+- 星盤等級（`56-star-chart.md` § 56.5）：職業技能的威力列出等級 I／II／III，冷卻列出強化 0→1→2，變動數字黃色；基礎魔法沒有等級
+
+### 4.6.1 星盤 (StarChartPage)
+- 概要：點數、開放等級、跨職業、草稿確認與洗點費（`56-star-chart.md` § 56.1、§ 56.7）
+- 星點數值表、星座與節點顏色（§ 56.6）；技能等級倍率與冷卻（§ 56.5）
+- 命星表：名稱、位置（中央／職業／職業交界）、效果與代價，讀 `models/starChart.ts`；註明全盤最多同時點 3 顆
+- 配點模擬：`StarChartPlanner`（任選職業與等級，不存檔；與 `demo/star-chart.html` 同一元件）
 
 ### 4.7 鐵匠鋪 (CraftingPage)
 - 製作配方列表：成品、製作費（`craftGold`）、所需材料與數量、材料來源區域連結
 - 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與 T6 機率（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例、製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）
 
 ### 4.8 經驗表 (ExpTablePage)
-- Lv.1~100 升級所需經驗、累計經驗
+- Lv.1～119 升級所需經驗、累計經驗；等級上限讀 `LEVEL_CAP`（`04-character.md` § 4.9）
 - 回鍋加倍的累積比例與上限（讀 `systems/restedExp.ts` 常數，`04-character.md` § 4.11）
 
 ### 4.9 屬性公式 (AttributesPage)
-- STR/DEX/CON/INT/WIS 各屬性效果公式文字說明
+- 六屬性各自的效果公式文字說明
+- 最大 HP／MP 公式與各職業比值、加成（讀 `systems/maxHpMp.ts` 的 `CLASS_HP_MP_FORMULA`，`20-attributes.md` § 20.4、§ 20.5）
 
 ### 4.10 戰鬥計算 (CombatPage)
 
@@ -266,6 +275,7 @@ Wiki 路由掛載於主應用 Router 下：
 /wiki/items        → ItemsPage (list)
 /wiki/items/:name  → ItemsPage (detail)
 /wiki/skills       → SkillsPage
+/wiki/star-chart   → StarChartPage
 /wiki/crafting     → CraftingPage
 /wiki/exp-table    → ExpTablePage
 /wiki/attributes   → AttributesPage

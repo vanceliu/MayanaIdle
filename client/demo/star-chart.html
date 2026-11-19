@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>星盤 Demo — MayanaIdle</title>
 <!--
-  星盤第一版（`56-star-chart.md`）：盤面與數值全部暫定，取自 `starChartData.ts`。
+  星盤第一版（`56-star-chart.md`）：盤面與規則取自遊戲的 `src/models/starChart.ts`。
 
   用 Vite dev server 開：`npm run dev` 後開
   http://localhost:5173/MayanaIdle/demo/star-chart.html
   單檔版（JS／CSS 內嵌，可離線雙擊開啟）：`npm run demo:star-chart` → `dist-demo/star-chart.html`。
-  .demo-*、.star-* 是這頁的排版；按鈕 class 在 App.css。
+  .demo-* 是這頁的排版；盤面與按鈕樣式在 App.css。
 -->
 <link rel="stylesheet" href="../src/App.css">
 <style>
@@ -26,69 +26,8 @@ body {
 }
 .demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
 
-.star-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-.star-board {
-  position: relative; flex: 1 1 640px; min-width: 0;
-  height: min(85vh, 960px);
-  background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.star-board svg { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; user-select: none; }
-.star-tooltip {
-  position: absolute; z-index: 2; pointer-events: none;
-  width: max-content; max-width: 260px; padding: 8px 12px;
-  background: var(--bg-panel); border: 1px solid var(--border-glow);
-  border-radius: var(--radius-md); box-shadow: var(--shadow-panel);
-}
-.star-tooltip h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 4px; }
-.star-zoom { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
-.star-side { flex: 0 1 320px; display: flex; flex-direction: column; gap: 12px; min-width: 260px; }
-
-.star-edge { stroke: var(--text-dim); stroke-opacity: 0.45; stroke-width: 3; }
-.star-edge.is-allocated, .star-edge.is-path, .star-edge.is-removing { stroke-opacity: 1; }
-.star-edge.is-allocated { stroke: var(--accent-gold); stroke-width: 5; }
-.star-edge.is-path { stroke: var(--accent-info); stroke-width: 5; }
-.star-edge.is-removing { stroke: var(--accent-danger); stroke-width: 5; }
-
-:root {
-  --star-str: #ff4d4d; --star-agi: #3ccf6e; --star-int: #3d6bff;
-  --star-spi: #8fd3ff; --star-vit: #ff8fc8; --star-other: #f2f2f7;
-}
-.star-node { cursor: pointer; }
-.star-node circle { fill-opacity: 0.6; stroke: var(--text-dim); stroke-width: 2.5; }
-.star-node.kind-constellation circle { stroke-width: 3.5; }
-.star-node.kind-keystone circle { stroke: var(--accent-mana); stroke-width: 4; }
-.star-node-halo { fill: none !important; stroke: var(--accent-mana) !important; stroke-width: 1.5 !important; stroke-dasharray: 4 4; }
-.star-node.kind-start circle { stroke: var(--text-dim); stroke-width: 4; }
-.star-node.is-own-start circle { stroke: var(--accent-primary); }
-.star-node.is-reachable circle { stroke: var(--accent-primary); }
-.star-node.is-path circle { fill-opacity: 0.75; stroke: var(--accent-info); stroke-width: 4; }
-.star-node.is-allocated circle { fill-opacity: 1; stroke: var(--accent-gold); stroke-width: 4; }
-.star-node.is-removing circle { fill-opacity: 0.75; stroke: var(--accent-danger); stroke-width: 4; }
-.star-node:hover circle { stroke: var(--text-primary); }
-.star-node-label {
-  fill: var(--text-secondary); font-size: 19px; text-anchor: middle; pointer-events: none;
-  paint-order: stroke; stroke: var(--bg-inset); stroke-width: 4px;
-}
-.star-node.kind-keystone .star-node-label { fill: var(--accent-mana); }
-.star-node.kind-start .star-node-label { fill: var(--text-primary); font-size: 22px; }
-
-.star-class-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
-.star-level { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); margin-bottom: 8px; }
-.star-points { font-size: var(--fs-sm); margin: 4px 0; }
-.star-warn { color: var(--accent-danger); }
-.star-changed { color: #FACC15; }
-.star-msg { font-size: var(--fs-sm); color: var(--accent-info); margin: 8px 0 0; }
-.star-kind { font-size: var(--fs-xs); color: var(--text-dim); margin-left: 8px; font-family: var(--font-body); }
-.star-status { font-size: var(--fs-sm); color: var(--text-dim); margin: 8px 0 0; }
-.star-sum-title { font-size: var(--fs-sm); color: var(--text-secondary); margin: 8px 0 4px; }
-.star-sum-list { margin: 0; padding-left: 18px; font-size: var(--fs-sm); line-height: 1.7; }
-.star-sum-list .is-inert { color: var(--text-dim); text-decoration: line-through; }
-
 @media (max-width: 720px) {
   body { padding: 16px; }
-  .star-board { flex-basis: 100%; height: 70vh; }
-  .star-side { flex-basis: 100%; }
 }
 </style>
 </head>

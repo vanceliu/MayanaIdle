@@ -32,12 +32,12 @@ afterEach(() => { vi.restoreAllMocks(); });
 function char(over: Partial<Character> = {}): Character {
   return {
     name: 'T', className: 'knight', level: 60, exp: 0, expToNext: 1,
-    hp: 500, maxHp: 500, mp: 100, maxMp: 100,
+    hp: 500, mp: 100, 
     baseAttributes: { STR: 10, AGI: 0, VIT: 10, SPI: 0, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+    quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
     ...over,
   };
 }

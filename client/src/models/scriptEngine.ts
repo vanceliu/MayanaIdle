@@ -31,6 +31,7 @@ export const SCRIPT_DEBUFF_LABELS: Record<ScriptDebuffCondition, string> = {
  */
 export const MONSTER_DEBUFF_TAG_LABELS: Record<string, string> = {
   poisoned: '中毒',
+  frostbite: '凍傷',
   bleeding: '流血',
   cursed: '詛咒',
   slowed: '減速',

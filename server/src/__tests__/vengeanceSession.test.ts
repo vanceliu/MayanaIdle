@@ -14,12 +14,12 @@ import type { MapMonster } from '../../../client/src/stores/mapMonsterStore';
 function knight(hp: number): Character {
   return {
     name: 'Tester', className: 'knight', level: 70, exp: 0, expToNext: 100,
-    hp, maxHp: 1000, mp: 400, maxMp: 400,
+    hp, mp: 400,
     baseAttributes: { STR: 20, AGI: 0, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+    quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
   };
 }
 
@@ -53,9 +53,9 @@ describe('復仇之刃：server 會話的有效最大 HP', () => {
     session = createPlayerSession(repo, '127.0.0.1', () => {});
   });
 
-  it('裝備 HP 計入最大 HP：基礎 1000＋裝備 1000、剩 1000 → +50%', () => {
+  it('裝備 HP 計入最大 HP：公式 754＋裝備 1000、剩 877 → +50%', () => {
     const vengeance = instantiateFromTemplate('vengeance')!;
-    const character = knight(1000);
+    const character = knight(877);
     const gear = [weapon, armor];
     session.game.setState({
       character, skills: [vengeance], activeEffects: [],

@@ -8,7 +8,7 @@ import type { ClassName } from './character';
 import type { Skill, SkillDebuffDef } from './skill';
 import type { ActiveEffect, StatModifier } from './effect';
 import {
-  ABILITY_DEFINITIONS, ABILITY_FIRE_ARROW_BONUS, ABILITY_GREATER_CDR_DURATION_MS, ABILITY_POISON_MIST_TICKS, ABILITY_SPLASH_RADIUS,
+  ABILITY_DEADLY_STRIKE_CRIT_DAMAGE, ABILITY_DEFINITIONS, ABILITY_FIRE_ARROW_BONUS, ABILITY_GREATER_CDR_DURATION_MS, ABILITY_POISON_MIST_TICKS, ABILITY_SPLASH_RADIUS,
   findClassSkillAbility, type Ability,
 } from './ability';
 
@@ -177,7 +177,13 @@ const TRANSFORMS: Partial<Record<Ability['type'], Transform>> = {
     buffEffect: `普攻附毒，物理傷害${num(scale((s.onHitDebuff?.dotDamagePercent ?? 0) * 100, p.percent))}%每秒持續${(s.onHitDebuff?.dotDuration ?? 0) / 1000}s`,
     buffModifiers: [...(s.buffModifiers ?? []), { stat: ENVENOM_DOT_BONUS_STAT, value: p.percent, isPercent: true }],
   }),
-  deadly_strike_boost: (s, p) => ({ ...s, ...(s.buffDuration !== undefined ? { buffDuration: s.buffDuration + p.duration } : {}) }),
+  deadly_strike_boost: (s, p) => ({
+    ...s,
+    selfBuff: {
+      category: 'crit-buff', name: '致命一擊', description: `爆傷 +${ABILITY_DEADLY_STRIKE_CRIT_DAMAGE}%`, duration: p.duration,
+      modifiers: [{ stat: 'crit_damage', value: ABILITY_DEADLY_STRIKE_CRIT_DAMAGE, isPercent: true }],
+    },
+  }),
   smoke_bomb_boost: s => {
     const evadeCharges = (s.evadeCharges ?? 0) + 1;
     return { ...s, evadeCharges, buffEffect: `絕對迴避怪物攻擊 ${evadeCharges} 次` };
@@ -195,7 +201,7 @@ const TRANSFORMS: Partial<Record<Ability['type'], Transform>> = {
     ...s,
     dotOnly: false,
     instantDotTicks: ABILITY_POISON_MIST_TICKS,
-    description: `對自身 ${s.aoeRadius} 格內的怪物立即造成 ${ABILITY_POISON_MIST_TICKS} 秒份毒傷（每秒 ${num((s.applyDebuff?.dotDamagePercent ?? 0) * 100)}% 物理傷害）`,
+    description: `對自身 ${s.aoeRadius} 格內的怪物立即造成 ${ABILITY_POISON_MIST_TICKS} 秒份凍傷傷害（每秒 ${num((s.applyDebuff?.dotDamagePercent ?? 0) * 100)}% 物理傷害）`,
   }),
   dodge_counter_boost: (s, p) => ({ ...s, description: `${s.description ?? ''}，${p.chance}% 機率再追加 1 次` }),
 };

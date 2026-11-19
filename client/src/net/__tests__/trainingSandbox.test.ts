@@ -35,7 +35,9 @@ function map(id: string): MapData {
 
 const character = (overrides: Partial<Character> = {}) => ({
   ...(useGameStore.getState().character ?? {}),
-  id: 1, name: '測試', className: 'knight', level: 10, hp: 50, mp: 20, maxHp: 100, maxMp: 50,
+  id: 1, name: '測試', className: 'knight', level: 10, hp: 50, mp: 20,
+  baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
+  bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
   currentRegion: 'neutral-town', currentArea: 'neutral-town', currentFloor: null, ...overrides,
 }) as Character;
 
@@ -196,7 +198,7 @@ describe('沙盒中的戰鬥與量測', () => {
     enterTraining();
     useGameStore.setState({
       character: {
-        ...character({ currentRegion: TRAINING_GROUND_REGION_ID, currentArea: TRAINING_GROUND_REGION_ID, hp: 200, maxHp: 200, mp: 50 }),
+        ...character({ currentRegion: TRAINING_GROUND_REGION_ID, currentArea: TRAINING_GROUND_REGION_ID, hp: 200, mp: 50 }),
         exp: 0, expToNext: 1_000_000,
         baseAttributes: { STR: 30, AGI: 20, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
         bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },

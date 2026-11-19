@@ -31,10 +31,10 @@ const NOW = 50_000;
 function character(over: Partial<Character> = {}): Character {
   return {
     userId: 1, id: 1, name: '測試', className: 'knight', level: 40,
-    exp: 0, expToNext: 1_000_000, hp: 500, maxHp: 500, mp: 100, maxMp: 100,
+    exp: 0, expToNext: 1_000_000, hp: 500, mp: 100, 
     baseAttributes: { STR: 30, AGI: 10, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 0,
+    gold: 0,
     currentArea: 'dawn-plains', currentZone: 'newbie-neutral', currentRegion: 'dawn-plains', currentFloor: null,
     skills: [], quests: [], areaEnteredAt: NOW, createdAt: NOW,
     ...over,
@@ -159,7 +159,7 @@ function setupField(inst: MonsterInstance, hp = 500) {
     currentPath: [], pathIndex: 0, isMoving: false, autoMove: false, paused: false,
   });
   useGameStore.setState({
-    character: character({ hp, maxHp: 500 }), equippedGear: {}, inventory: [], bagItems: [],
+    character: character({ hp, }), equippedGear: {}, inventory: [], bagItems: [],
     activeEffects: [], combatLogs: [], skills: [],
   });
   useTalentStore.setState({ slots: [NORMAL_ATTACK_SLOT] });

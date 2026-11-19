@@ -16,11 +16,11 @@ import type { EquipmentInstance } from '../../models/equipment';
 function character(): Character {
   return {
     name: 'Regen', className: 'knight', level: 30, exp: 0, expToNext: 1000,
-    hp: 1, maxHp: 500, mp: 0, maxMp: 500,
+    hp: 1, mp: 0, 
     baseAttributes: { STR: 10, AGI: 10, VIT: 10, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral', currentRegion: 'dawn-plains',
-    currentFloor: null, skills: [], unspentAttributePoints: 0, quests: [],
+    currentFloor: null, skills: [], quests: [],
     areaEnteredAt: Date.now(), createdAt: Date.now(), userId: 1,
   };
 }

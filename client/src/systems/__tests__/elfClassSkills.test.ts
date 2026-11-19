@@ -34,12 +34,12 @@ const W = TileType.Wall;
 function elf(): Character {
   return {
     name: 'Elf', className: 'elf', level: 70, exp: 0, expToNext: 100,
-    hp: 800, maxHp: 800, mp: 300, maxMp: 300,
+    hp: 800, mp: 300, 
     baseAttributes: { STR: 12, AGI: 25, VIT: 14, SPI: 12, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 

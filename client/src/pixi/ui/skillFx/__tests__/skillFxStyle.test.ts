@@ -127,7 +127,7 @@ describe('resolveSkillFxPlan：每個技能都要有演出', () => {
       /* 齊射沒有圓心爆，就不該留半徑 —— 留著會讓下游以為要畫地面環 */
       expect(plan.radiusTiles, id).toBe(0);
     }
-    /* 火球與冰霧是「丟三顆」，不是「炸一片」 */
+    /* 火球與冰霜是「丟三顆」，不是「炸一片」 */
     expect(resolveSkillFxPlan(byId('fireball')).volley).toBe(true);
     expect(resolveSkillFxPlan(byId('ice-fog')).volley).toBe(true);
   });
@@ -186,11 +186,9 @@ describe('resolveSkillFxPlan：每個技能都要有演出', () => {
     expect(resolveSkillFxPlan(a).color).toBe(BUFF_AURA_COLOR);
   });
 
-  it('淬毒是綠水滴、致命一擊是 X，同樣吃 buffCategory 推導', () => {
+  it('淬毒是綠水滴，吃 buffCategory 推導', () => {
     expect(byId('envenom').buffCategory).toBe('poison-enchant');
-    expect(byId('deadly-strike').buffCategory).toBe('crit-buff');
     expect(resolveSkillFxPlan(byId('envenom')).emblem).toBe('poison');
-    expect(resolveSkillFxPlan(byId('deadly-strike')).emblem).toBe('crit');
   });
 
   it('火矢附魔頭上是火焰，顏色直接吃 § 42.4 的火色', () => {
@@ -561,7 +559,7 @@ describe('§ 48.8 Buff／Debuff 的顏色', () => {
  * 同一種狀態在兩邊必須是同一個字。
  */
 const DEBUFF_TAGS_24_4_1 = [
-  'poisoned', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned', 'rooted',
+  'poisoned', 'frostbite', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned', 'rooted',
   'armor-break', 'defense-down', 'taunt',
 ] as const;
 

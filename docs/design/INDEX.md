@@ -94,8 +94,8 @@
 | **定身（怪物不移動、仍攻擊；暈眩也不移動）** | `24-buff-debuff.md` § 24.5.1／§ 24.5.1b | — |
 | **自身中心隨機多擊（取後放回）** | `41-arpg-combat.md` | § 3.4 |
 | 角色屬性（六大屬性/換算） | `20-attributes.md` | 全文 |
-| **星盤（點數／節點分層／跨職業／洗點，第一版只有 demo）** | `56-star-chart.md` | 全文 |
-| **技能等級（職業技能弱化與強化冷卻、基礎魔法三系、羅馬數字後綴、與隨機技能的關係）** | `56-star-chart.md` | § 56.5 |
+| **星盤（點數／節點分層／跨職業／洗點／數值節點與命星的計入位置）** | `56-star-chart.md` | 全文 |
+| **技能等級（職業技能弱化與強化冷卻、盜賊倍率、基礎魔法無等級與分類、羅馬數字後綴、與隨機技能的關係）** | `56-star-chart.md` | § 56.5 |
 | **武器基傷擲骰（白字＋強化的 1/2~全值）** | `21-combat-formula.md` | § 21.3（快照技能／DoT 見 § 21.4a） |
 | **哪些傷害會爆擊（魔法技能不爆擊、物理系技能例外）** | `21-combat-formula.md` | § 21.8「適用範圍」 |
 | **遠程攻擊吃敏捷、近戰吃力量** | `21-combat-formula.md` § 21.3、`20-attributes.md` § 20.3 | — |
@@ -110,7 +110,7 @@
 | 職業魔法（5 職業各 7 級） | `23-class-magic.md` | 全文 |
 | **職業技能書掉落（依區域 levelMax 分級、逐級獨立判定）** | `23-class-magic.md` | § 23.1 |
 | **自身 HP 消耗（穿透減傷、最低 1、血量不足）** | `23-class-magic.md` | § 23.3 血濺咒殺 |
-| **魔力護盾（傷害改扣 MP、與聖光護盾的順序）** | `23-class-magic.md` § 23.5、`24-buff-debuff.md` § 24.4.9 | — |
+| **魔力護盾（依 MP 比例減傷、與聖光護盾的順序）** | `23-class-magic.md` § 23.5、`24-buff-debuff.md` § 24.4.9 | — |
 | **回魔 buff（每次回魔另加最大 MP%）** | `23-class-magic.md` § 23.5、`29-regen.md` § 29.2 | — |
 | **被動技能（不可施放、不進快捷列與天賦）／閃避反擊** | `23-class-magic.md` | § 23.7 |
 | **絕對迴避次數（煙霧彈）** | `23-class-magic.md` § 23.7、`21-combat-formula.md` § 21.6 | — |
@@ -191,6 +191,7 @@
 | **AI 產地圖素材（ComfyUI、產圖清單、地板／物件後處理、池／沙地／地毯烘焙、砌石牆、倒柱）** | `38-map-control.md` | § 38.9「素材來源」 |
 | **地板格線設定** | `34-ui-guidelines.md` | § 34.6「地板格線」 |
 | **畫面版本設定（第二代球體／第三代素材＋怪物圖）** | `34-ui-guidelines.md` | § 34.6「畫面版本」 |
+| **設定「回饋」頁籤（Google 表單預填欄位／只限開放形態／桌面版開系統瀏覽器）** | `34-ui-guidelines.md` | § 34.6「回饋」 |
 | 批量販售（依等級一鍵販售/裝備顏色等級） | `39-batch-sell.md` | 全文 |
 | 平衡模擬 / 職業輸出平衡健檢（配裝規則見 § 44.2） | `44-dps-prediction.md` | 全文（結論見 § 44.8） |
 | 實戰模擬（死神會攻擊）/ 職業生存與補血策略 | `44-dps-prediction.md` | § 44.4 |
@@ -317,7 +318,7 @@
 07-affix.md § 7.10 ←→ 30-items.md ←→ 13-town.md ←→ 27-drop-table.md
        ↕
 16-tech-frontend-architecture.md（Icon 系統 / BuffBar / 浮動面板視窗 / Tooltip）
-56-star-chart.md（第一版只有 demo）
+56-star-chart.md
   ←→ 20-attributes.md § 20.4／§ 20.5／§ 20.9 ←→ 04-character.md § 4.9
   ←→ 05-skill.md § 5.3 / 22-basic-magic.md / 23-class-magic.md
   ←→ 21-combat-formula.md § 21.3／§ 21.4／§ 21.4a／§ 21.4b／§ 21.4c ←→ 07-affix-ability.md § 7S.5 ←→ 24-buff-debuff.md（聖光護盾）

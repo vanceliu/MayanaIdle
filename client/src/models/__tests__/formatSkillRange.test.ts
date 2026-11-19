@@ -28,9 +28,9 @@ describe('formatSkillRange', () => {
     expect(formatSkillRange({ type: 'buff', range: 10 })).toBe('');
   });
 
-  it('range 為 0 或未填的攻擊技能不顯示（對自身，無距離判定）', () => {
+  it('range 為 0 的攻擊技能不顯示（對自身）；未填為武器射程', () => {
     expect(formatSkillRange({ type: 'attack', range: 0 })).toBe('');
-    expect(formatSkillRange({ type: 'attack', range: undefined })).toBe('');
+    expect(formatSkillRange({ type: 'attack', range: undefined })).toBe('武器射程');
   });
 });
 
@@ -42,9 +42,9 @@ describe('技能資料的射程完整性', () => {
     expect(missing).toEqual([]);
   });
 
-  it('每個職業攻擊技能都有 range', () => {
+  it('每個職業攻擊技能都有 range；只有致命一擊用武器射程（不填）', () => {
     const missing = CLASS_SKILLS
-      .filter(d => d.skill.type === 'attack' && !d.skill.range)
+      .filter(d => d.skill.type === 'attack' && !d.skill.range && d.id !== 'deadly-strike')
       .map(d => d.name);
     expect(missing).toEqual([]);
   });

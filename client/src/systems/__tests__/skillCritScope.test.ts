@@ -7,7 +7,7 @@ describe('A 組快照物理技能', () => {
 
   it('名單與文件一致（含復仇之刃、背刺）', () => {
     const marked = classSkills.filter(s => s.physicalSnapshot).map(s => s.id).sort();
-    expect(marked).toEqual(['backstab', 'binding-arrow', 'charge', 'leap-shot', 'rend', 'shield-bash', 'taunt', 'vengeance']);
+    expect(marked).toEqual(['backstab', 'binding-arrow', 'charge', 'deadly-strike', 'leap-shot', 'rend', 'shield-bash', 'taunt', 'vengeance']);
   });
 
   it('復仇之刃 36、背刺 69（§ 23.3／§ 23.7）', () => {

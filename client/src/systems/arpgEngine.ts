@@ -242,7 +242,7 @@ export function tickArpgEngine(
   }
 
   // Update player attack cooldown from gear
-  engine.playerCtx.attackCooldown = getPlayerAttackInterval(equippedGear, activeEffects);
+  engine.playerCtx.attackCooldown = getPlayerAttackInterval(equippedGear, activeEffects, character);
 
   // Build monster info for player FSM
   const monsterInfos: MonsterInfo[] = [];

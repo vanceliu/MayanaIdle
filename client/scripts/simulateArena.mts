@@ -14,16 +14,22 @@
  *  - 防具路線依主攻屬性（力量→重、敏捷→輕、智力→布）；配點先補該階防具的素質需求，其餘照 § 44.4
  *  - 素質需求依遊戲的凍結判定：被凍結的部位降一階重選，直到整套詞綴都生效
  *
- * 用法：npx vite-node scripts/simulateArena.mts [--tier=4,5] [--class=a,b] [--runs=N] [--minutes=N] [--lifesteal=attack|skill|both]
+ * 星盤配法由 `--star` 指定（逐職業 `--star=knight:stats-first,...`，取 TTK 校準／死神實戰選出的配法），預設攻擊技能優先
+ *
+ * 用法：npx vite-node scripts/simulateArena.mts [--star=...] [--tier=4,5] [--class=a,b] [--runs=N] [--minutes=N] [--lifesteal=attack|skill|both]
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { tickWorld } from '../src/systems/worldTick';
 import { createMapInstance, attachInstance } from '../src/systems/mapInstance';
 import { createMonsterCombatContext } from '../src/systems/monsterCombatFSM';
 import { defaultMonsterStatRates, scaleMonsterStat } from '../src/systems/globalRates';
 import { getWeightStatus } from '../src/systems/weight';
 import { getFrozenGear } from '../src/systems/gear';
-import { calculateHealAmount, getCombatBonuses, getEffectiveDefense, getPlayerDodgeRate } from '../src/systems/combat';
+import { calculateHealAmount, getAffixBonusesFromGear, getCombatBonuses, getEffectiveDefense, getPlayerDodgeRate, manaShieldPercent, MANA_SHIELD_STAT } from '../src/systems/combat';
+import { MP_REGEN_INTERVAL_MS } from '../src/systems/regen';
+import { resolveSkill } from '../src/models/skillStar';
+import { getEffectiveSPI, getTotalAttributes } from '../src/models/character';
+import type { ActiveEffect } from '../src/models/effect';
 import { defaultSession } from '../src/stores/session';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp, POTION_CONFIG, getPotionCount } from '../src/stores/gameStore';
 import { useMapControlStore } from '../src/stores/mapControlStore';
@@ -34,7 +40,7 @@ import { setRates } from '../src/core/rates';
 import { makeBagItem } from '../src/models/bagItem';
 import { TileType, type MapData } from '../src/models/mapControl';
 import {
-  ATTRIBUTE_CAP, ATTRIBUTE_KEYS, CLASS_BASE_ATTRIBUTES, CLASS_NAMES_ZH, CLASS_TOTAL_POINTS, CREATION_ATTRIBUTE_CAP,
+  ATTRIBUTE_KEYS, CLASS_BASE_ATTRIBUTES, CLASS_NAMES_ZH, CLASS_TOTAL_POINTS, CREATION_ATTRIBUTE_CAP,
   getEffectiveINT, type Attributes, type Character, type ClassName,
 } from '../src/models/character';
 import type { MonsterInstance, MonsterTemplate } from '../src/models/monster';
@@ -48,18 +54,17 @@ import {
   type Ability, type AbilityParamDef,
 } from '../src/models/ability';
 import { UNIQUE_AFFIX_DEFINITIONS, type UniqueAffixType } from '../src/models/uniqueAffix';
-import { getExpToNextLevel, INITIAL_HP, INITIAL_MP, tryLevelUp } from '../src/systems/levelUp';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
 import { MemoryRepository } from '../src/db/memoryRepository';
 import type { CombatVisual } from '../src/systems/combatLoop';
 import {
-  BIS_BRAND_ELEMENT, CREATION_ATTRIBUTES, LEVELUP_ALLOCATION, MAIN_STAT, OFFHAND_TYPES, SEED_AFFIXES, TARGET_CLASSES,
+  BIS_BRAND_ELEMENT, CREATION_ATTRIBUTES, MAIN_STAT, OFFHAND_TYPES, SEED_AFFIXES, TARGET_CLASSES,
   WEAPON_AFFIX_POOL, WEAPON_GENERAL_AFFIXES, WEAPON_UNIQUE_OPTIONS,
-  chooseK, erosionRollValue, percentile, preCombatBuffs, proxyDps, rankArmorOffense, scoreSupportPiece, usableBy, withSeed,
+  arenaStarCandidates, buildCharacter, chooseK, erosionRollValue, setStarPolicy, starAttribute, starPolicyOf, starSummary, STAR_POLICY_LABEL, percentile, preCombatBuffs, proxyDps, rankArmorOffense, scoreSupportPiece, usableBy, withSeed,
   type AffixType, type Loadout, type SimContext, type Template,
 } from './reaperShared.mts';
-import { armorAffixTypes, buildAffixes } from './affixLoadout.mts';
+import { armorAffixTypes, buildAffixes, probeAffixGear, rankedWeaponAffixes, rankedWeaponUnique, removeAffixGear, setAffixContext } from './affixLoadout.mts';
 import { buildSetup, fmt, slot as talentSlot, entry as talentEntry, type FightSetup } from './fightSetup.mts';
 
 defaultSession.repo = new MemoryRepository();
@@ -108,6 +113,7 @@ const LIFESTEAL_TYPES: AffixType[] = LIFESTEAL_ARG === 'attack' ? ['attack_lifes
 /** 每 N 秒印出角色與場上怪物的狀態（除錯用） */
 const TRACE_SEC = Number(argOf('trace') ?? 0);
 const LIMIT_MS = Number(argOf('minutes') ?? 60) * 60_000;
+import type { StarPolicy } from './starAllocation.mts';
 const ALL_TIERS = [4, 5, 6, 7] as const;
 type ArenaTier = (typeof ALL_TIERS)[number];
 const TIERS: ArenaTier[] = process.argv.includes('--map') ? [7] : argOf('tier')
@@ -171,23 +177,14 @@ function normalPool(spec: TierSpec): MonsterTemplate[] {
 // ---------------------------------------------------------------- 角色
 
 /**
- * 配點：建角自由點數與 Lv.51 起的升級點數**先補該階防具的素質需求**，
- * 剩下的照 `44-dps-prediction.md` § 44.4 —— 建角往 `CREATION_ATTRIBUTES` 補（主攻屬性優先），升級點主攻推到 35、其餘投次要屬性。
- * 回傳建角後屬性與升級點的投放順序（第 n 級後取前 n − 50 項）。
+ * 建角配點：自由點數**先補該階防具的素質需求**，剩下的往 `CREATION_ATTRIBUTES` 補（主攻屬性優先）；
+ * 之後的屬性只來自星盤（`starAllocation.mts`）
  */
-function planAttributes(className: ClassName, level: number, req: Partial<Attributes>): { base: Attributes; levelOrder: (keyof Attributes)[] } {
+function planAttributes(className: ClassName, req: Partial<Attributes>): Attributes {
   const base = { ...CLASS_BASE_ATTRIBUTES[className] };
   let free = CLASS_TOTAL_POINTS - ATTRIBUTE_KEYS.reduce((sum, k) => sum + base[k], 0);
-  const levelOrder: (keyof Attributes)[] = [];
-  let levelPoints = Math.max(0, level - 50);
-  const total = (k: keyof Attributes) => base[k] + levelOrder.filter(x => x === k).length;
-
   for (const k of ATTRIBUTE_KEYS) {
-    while (total(k) < (req[k] ?? 0)) {
-      if (free > 0 && base[k] < CREATION_ATTRIBUTE_CAP) { base[k]++; free--; continue; }
-      if (levelPoints > 0 && total(k) < ATTRIBUTE_CAP) { levelOrder.push(k); levelPoints--; continue; }
-      break;
-    }
+    while (base[k] < (req[k] ?? 0) && free > 0 && base[k] < CREATION_ATTRIBUTE_CAP) { base[k]++; free--; }
   }
   const main = MAIN_STAT[className];
   const target = CREATION_ATTRIBUTES[className];
@@ -197,37 +194,15 @@ function planAttributes(className: ClassName, level: number, req: Partial<Attrib
   for (const k of [main, ...ATTRIBUTE_KEYS.filter(x => x !== main)]) {
     while (free > 0 && base[k] < CREATION_ATTRIBUTE_CAP) { base[k]++; free--; }
   }
-  const secondary = (Object.keys(LEVELUP_ALLOCATION[className]) as (keyof Attributes)[]).find(k => k !== main)!;
-  while (levelPoints > 0) {
-    levelOrder.push(total(main) < ATTRIBUTE_CAP ? main : secondary);
-    levelPoints--;
-  }
-  return { base, levelOrder };
-}
-
-function pointsOf(order: (keyof Attributes)[]): Attributes {
-  const out: Attributes = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
-  for (const k of order) out[k]++;
-  return out;
+  return base;
 }
 
 function buildArenaCharacter(className: ClassName, level: number, req: Partial<Attributes>): Character {
-  const { base, levelOrder } = planAttributes(className, level, req);
-  let char = {
-    name: `Lv${level}-${className}`, className, level: 1, exp: 0, expToNext: getExpToNextLevel(1),
-    hp: INITIAL_HP, maxHp: INITIAL_HP, mp: INITIAL_MP, maxMp: INITIAL_MP,
-    baseAttributes: base,
-    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    gold: 0, currentArea: 'arena', currentZone: 'arena', currentRegion: 'arena', currentFloor: null,
-    skills: [], unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
-  } as unknown as Character;
-  withSeed(1234, () => {
-    while (char.level < level) {
-      char = tryLevelUp({ ...char, exp: char.expToNext });
-      if (char.level > 50) char = { ...char, bonusAttributes: pointsOf(levelOrder.slice(0, char.level - 50)) };
-    }
-  });
-  return { ...char, exp: 0, expToNext: 1, hp: char.maxHp, mp: char.maxMp, unspentAttributePoints: 0 } as Character;
+  return {
+    ...buildCharacter(className, level, planAttributes(className, req)),
+    // 不用遊戲的競技場區域 id：那裡死亡不計 deathCount、直接送回城鎮（`55-arena.md` § 55.5），模擬要以死亡結束
+    currentArea: 'arena-sim', currentZone: 'arena-sim', currentRegion: 'arena-sim', currentFloor: null,
+  };
 }
 
 /** 該階各防具部位（含副手）首選模板的素質需求，逐項取最大 */
@@ -249,7 +224,7 @@ function gearRequirement(cn: ClassName, tier: ArenaTier): Partial<Attributes> {
 
 function effectiveIntOf(char: Character) {
   return (gear: (EquipmentInstance | null)[]) => getEffectiveINT(
-    char.baseAttributes.INT + char.bonusAttributes.INT
+    char.baseAttributes.INT + char.bonusAttributes.INT + starAttribute(char.className, char.starChart, 'INT')
     + gear.reduce((s, g) => s + (g?.bonusAttributes?.INT ?? 0), 0),
   );
 }
@@ -388,6 +363,68 @@ interface ReplayPiece {
 /** `--replay=<json>`（鍵 `T{段位}|{職業}`）：照檔案重建配裝（數值依現行模板與階級表），不做配裝搜尋 */
 const REPLAY_ARG = argOf('replay');
 const REPLAY: Record<string, ReplayPiece[]> = REPLAY_ARG ? JSON.parse(readFileSync(REPLAY_ARG, 'utf8')) : {};
+
+/** `--dump-replay=<json>`：把選出的配裝寫成 `--replay` 格式 */
+const DUMP_REPLAY = argOf('dump-replay');
+const DUMPED: Record<string, ReplayPiece[]> = {};
+function dumpLoadout(cn: ClassName, tier: ArenaTier, lo: ArenaLoadout): void {
+  DUMPED[`T${tier}|${cn}`] = lo.gear.filter((g): g is EquipmentInstance => !!g).map(g => ({
+    slot: g.slot, name: g.name, enhancement: g.enhancement ?? 0,
+    affixes: (g.affixes ?? []).map(a => a.type as AffixType),
+    ...((g.affixes ?? []).some(a => a.sealed) ? { sealed: true } : {}),
+    ...(g.uniqueAffix ? { unique: g.uniqueAffix.type } : {}),
+    ...(g.ability ? { ability: g.ability.type } : {}),
+  }));
+}
+
+/**
+ * 邊際量測（§ 44.2）：`--probe-affix=<type>` 加在最多 3 件防具／飾品，`--probe-weapon=<type>` 加在武器，
+ * `--probe-unique=<type>` 把 T7 武器的獨有詞綴換成指定的（中間值）
+ */
+const PROBE_AFFIX = argOf('probe-affix') as AffixType | undefined;
+const PROBE_WEAPON = argOf('probe-weapon') as AffixType | undefined;
+const PROBE_UNIQUE = argOf('probe-unique') as UniqueAffixType | undefined;
+/** `--probe-remove=<type>`：移除所有裝備上的該詞綴（已帶詞綴的移除損失） */
+const PROBE_REMOVE = argOf('probe-remove') as AffixType | undefined;
+function probeLoadout(cn: ClassName, lo: ArenaLoadout, tier: ArenaTier): ArenaLoadout {
+  const rule = GEAR_RULES[tier];
+  let out = lo;
+  if (PROBE_REMOVE) {
+    const p = removeAffixGear(out.gear, out.weapon, PROBE_REMOVE);
+    out = { ...out, gear: p.gear, weapon: p.weapon, label: `${out.label}｜移除 ${PROBE_REMOVE}×${p.removed}` };
+  }
+  for (const [type, target] of [[PROBE_AFFIX, 'armor'], [PROBE_WEAPON, 'weapon']] as const) {
+    if (!type) continue;
+    const ctx = { element: BIS_BRAND_ELEMENT, erosionDamage: erosionRollValue(getWeaponBaseDamage(out.weapon)), mainStat: MAIN_STAT[cn] };
+    const p = probeAffixGear(out.gear, out.weapon, type, rule.affixTier, ctx, target);
+    out = { ...out, gear: p.gear, weapon: p.weapon, label: `${out.label}｜量測 ${type}×${p.added}` };
+  }
+  if (PROBE_UNIQUE && ((out.weapon as { tier?: number }).tier ?? 0) === 7) out = withUnique(out, PROBE_UNIQUE);
+  return out;
+}
+
+function withUnique(lo: ArenaLoadout, unique: UniqueAffixType): ArenaLoadout {
+  const weapon = { ...lo.weapon, uniqueAffix: { type: unique, value: uniqueMid(unique) } } as EquipmentInstance;
+  return { ...lo, unique, weapon, gear: lo.gear.map(g => (g === lo.weapon ? weapon : g)), label: `${lo.label}｜(獨)${unique}` };
+}
+
+/** 實測排名有武器詞綴時，武器改用排名前 4 條（T7 另加第 5 條封印）；T7 獨有詞綴改用排名最高者 */
+function withRankedWeapon(cn: ClassName, lo: ArenaLoadout, tier: ArenaTier): ArenaLoadout {
+  const rule = GEAR_RULES[tier];
+  const types = rankedWeaponAffixes(cn, rule.sealed ? WEAPON_GENERAL_AFFIXES + 1 : WEAPON_GENERAL_AFFIXES);
+  let out = lo;
+  if (types) {
+    const affixes = buildAffixes(lo.weapon, types, rule.affixTier, {
+      element: BIS_BRAND_ELEMENT, erosionDamage: erosionRollValue(getWeaponBaseDamage(lo.weapon)), mainStat: MAIN_STAT[cn],
+      ...(rule.sealed ? { sealedIndex: WEAPON_GENERAL_AFFIXES } : {}),
+    });
+    const weapon = { ...lo.weapon, affixes } as EquipmentInstance;
+    out = { ...lo, weapon, gear: lo.gear.map(g => (g === lo.weapon ? weapon : g)) };
+  }
+  const unique = rankedWeaponUnique(cn);
+  if (unique && ((out.weapon as { tier?: number }).tier ?? 0) === 7) out = withUnique(out, unique);
+  return out;
+}
 
 function replayLoadout(cn: ClassName, tier: ArenaTier): ArenaLoadout | null {
   const pieces = REPLAY[`T${tier}|${cn}`];
@@ -578,6 +615,13 @@ function spawnPosition(player: { x: number; y: number }): { x: number; y: number
 
 interface WaveRecord { wave: number; boss: boolean; ms: number }
 
+interface MpBudget {
+  spent: Record<string, { casts: number; mp: number }>;
+  natural: number; equip: number; percent: number; bloodMana: number; drain: number;
+  /** MP 實際變化 ＋ 耗魔 − 已知回魔：受擊回魔、命中回魔等 */
+  other: number;
+}
+
 interface RunResult {
   died: boolean;
   /** 清完的波數 */
@@ -587,6 +631,14 @@ interface RunResult {
   ms: number;
   waves: WaveRecord[];
   potionsUsed: number;
+  /** MP 低於有效上限 10% 的時間（ms）與第一次低於 10% 的時間（ms，沒發生為 null） */
+  lowMpMs: number;
+  mpLowAt: number | null;
+  /** 受到攻擊（未迴避）當下的魔力護盾減傷 % 合計與次數 */
+  shieldPctSum: number;
+  shieldHits: number;
+  /** `--detail`：MP 收支（耗魔依技能；回魔分自然、詞綴、回魔％ buff、血魔轉換、魔力奪取、其他） */
+  mpBudget?: MpBudget;
   /** 藥水全部喝完的時間（ms）；沒喝完為 null */
   potionsOutAt: number | null;
   /** 出手次數（技能名／普攻） */
@@ -612,7 +664,48 @@ function healSource(text: string): string {
   return '其他';
 }
 
-function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: number): RunResult {
+/** 每 tick 的 MP 收支（`--detail`）；自然回魔每 `MP_REGEN_INTERVAL_MS` 依 `getMpRegen` 的組成拆分（戰鬥中減半） */
+function accountMp(
+  b: MpBudget, setup: FightSetup, gear: EquipmentInstance[], char: Character, effects: ActiveEffect[],
+  visuals: CombatVisual[], mpBefore: number, maxMp: number, ms: number,
+): void {
+  let spent = 0;
+  let known = 0;
+  const add = (name: string, mp: number) => {
+    const e = (b.spent[name] ??= { casts: 0, mp: 0 });
+    e.casts++; e.mp += mp; spent += mp;
+  };
+  for (const v of visuals) {
+    if (v.kind === 'player_attack' && v.result.skillUsed) {
+      const sk = v.result.skillUsed;
+      add(sk.name, sk.mpCost ?? 0);
+      if (sk.mpDrainRatio) {
+        const drained = Math.floor(v.result.damages.reduce((sum, d) => sum + (d.isMiss ? 0 : d.damage), 0) * sk.mpDrainRatio);
+        b.drain += drained; known += drained;
+      }
+    }
+    if (v.kind === 'self_cast') {
+      const raw = setup.skills.find(x => x.id === v.skillId);
+      if (!raw) continue;
+      const sk = resolveSkill(raw, gear, char, effects);
+      add(sk.name, sk.mpCost ?? 0);
+      if (sk.mpRestorePercent) {
+        const restored = Math.floor(maxMp * sk.mpRestorePercent / 100);
+        b.bloodMana += restored; known += restored;
+      }
+    }
+  }
+  if (ms % MP_REGEN_INTERVAL_MS < TICK_MS && mpBefore < maxMp) {
+    const effSPI = getEffectiveSPI(getTotalAttributes(char, effects, gear).SPI);
+    const equip = gear.reduce((sum, g) => sum + (g.mpRegen ?? 0), 0) + getAffixBonusesFromGear(gear).mp_regen;
+    const pct = effects.filter(e => e.type === 'buff' && e.target === 'player')
+      .reduce((sum, e) => sum + (e.modifiers ?? []).filter(m => m.stat === 'mp_regen_max_percent').reduce((x, m) => x + m.value, 0), 0);
+    b.natural += Math.floor(effSPI / 2) / 2; b.equip += equip / 2; b.percent += Math.floor(maxMp * pct / 100);
+  }
+  b.other += (char.mp - mpBefore) + spent - known;
+}
+
+function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: number, limitMs = LIMIT_MS): RunResult {
   const normals = normalPool(spec);
   const bosses = bossOrder(spec.bosses);
   return withSeed(seed, () => {
@@ -651,7 +744,7 @@ function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: numbe
     let waveIds: string[] = [];
     let waveStart = 0;
     const r: RunResult = {
-      died: false, cleared: 0, deathWave: null, ms: 0, waves: [], potionsUsed: 0, potionsOutAt: null,
+      died: false, cleared: 0, deathWave: null, ms: 0, waves: [], potionsUsed: 0, potionsOutAt: null, lowMpMs: 0, mpLowAt: null, shieldPctSum: 0, shieldHits: 0,
       actions: {}, monsterHits: 0, dodges: 0, damageTaken: 0, heals: {}, bossAtDeath: null,
     };
 
@@ -689,12 +782,17 @@ function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: numbe
     };
 
     if (!MAP_MODE) spawnWave();
-    while (r.ms < LIMIT_MS) {
+    const mpb: MpBudget | undefined = DETAIL ? { spent: {}, natural: 0, equip: 0, percent: 0, bloodMana: 0, drain: 0, other: 0 } : undefined;
+    if (mpb) r.mpBudget = mpb;
+    const gearArr = Object.values(setup.gear).filter((g): g is EquipmentInstance => !!g);
+    while (r.ms < limitMs) {
       useGameStore.setState({ combatLogs: [] });
+      const mpBefore = useGameStore.getState().character?.mp ?? 0;
       const visuals: CombatVisual[] = tickWorld(TICK_MS, [defaultSession], [instance], f => { throw f.error; })
         .get(defaultSession) ?? [];
       r.ms += TICK_MS;
       const gs = useGameStore.getState();
+      if (mpb && gs.character) accountMp(mpb, setup, gearArr, gs.character, gs.activeEffects, visuals, mpBefore, character.mp, r.ms);
       for (const v of visuals) {
         if (v.kind === 'player_attack') {
           const name = v.result.skillUsed?.name ?? '普攻';
@@ -702,7 +800,13 @@ function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: numbe
         }
         if (v.kind !== 'monster_attack') continue;
         if (v.isDodged) r.dodges++;
-        else { r.monsterHits++; r.damageTaken += v.damage; }
+        else {
+          r.monsterHits++; r.damageTaken += v.damage;
+          const shield = gs.activeEffects.find(e => e.type === 'buff' && e.target === 'player' && e.modifiers?.some(m => m.stat === MANA_SHIELD_STAT));
+          const maxPct = shield?.modifiers?.find(m => m.stat === MANA_SHIELD_STAT)?.value ?? 0;
+          r.shieldPctSum += shield ? manaShieldPercent(maxPct, mpBefore, character.mp) : 0;
+          r.shieldHits++;
+        }
       }
       for (const log of gs.combatLogs) {
         const m = HEAL_LOG.exec(log.text);
@@ -723,6 +827,10 @@ function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: numbe
         r.deathWave = wave;
         r.bossAtDeath = [...instance.monsterInstances.values()].find(m => m.isBoss && m.currentHp > 0)?.name ?? null;
         break;
+      }
+      if (gs.character && gs.character.mp < character.mp * 0.1) {
+        r.lowMpMs += TICK_MS;
+        if (r.mpLowAt == null) r.mpLowAt = r.ms;
       }
       const inBag = getPotionCount(gs.bagItems, 'orange');
       if (inBag === 0 && reserve === 0 && r.potionsOutAt == null) r.potionsOutAt = r.ms;
@@ -771,29 +879,76 @@ interface Row {
   weight: string; overweight: boolean;
 }
 const rows: Row[] = [];
+/** 星盤配法篩選的短時限 */
+const ARENA_STAR_SCREEN_MS = Number(argOf("screen-minutes") ?? 20) * 60_000;
+const starSelections: string[] = [];
+const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : NaN);
+/** 回魔來源占比（`--detail`）：自然、詞綴、回魔％ buff（魔力湧泉／精神匯聚）、血魔轉換、魔力奪取、其他 */
+function mpShares(r: RunResult): string {
+  const b = r.mpBudget;
+  if (!b) return '';
+  const regen = b.natural + b.equip + b.percent;
+  const parts: [string, number][] = [['自然', b.natural], ['詞綴', b.equip], ['回魔％', b.percent], ['血魔', b.bloodMana], ['奪取', b.drain], ['其他', Math.max(0, b.other - regen)]];
+  const total = parts.reduce((x, [, v]) => x + v, 0) || 1;
+  return `／回魔 ${fmt(total / (r.ms / 1000), 1)}/s（${parts.filter(([, v]) => v > 0).map(([k, v]) => `${k} ${fmt(v / total * 100, 0)}%`).join('、')}）`;
+}
+const median = (xs: number[]) => (xs.length ? percentile([...xs].sort((a, b) => a - b), 0.5) : NaN);
 for (const tier of TIERS) {
   const spec = TIER_SPECS[tier];
   const pool = normalPool(spec);
   const rep = pool[Math.floor(pool.length / 2)];
   for (const cn of TARGET_CLASSES) {
-    const character = buildArenaCharacter(cn, spec.level, gearRequirement(cn, tier));
-    const ctx: SimContext = { character, level: spec.level, monster: baseMonster(rep), effectiveInt: effectiveIntOf(character) };
-    const loadout = replayLoadout(cn, tier) ?? chooseLoadout(cn, tier, ctx);
-    const setup = withKeepDistance(cn, buildSetup(cn, loadout, 20261111 + tier, 'always', ctx, false));
-    const w = getWeightStatus(setup.character, Object.values(setup.gear), [makeBagItem(POTION_CONFIG.orange.itemId, POTION_BUDGET)!], setup.effects);
-    const bagSize = w.overweight ? POTION_BAG : POTION_BUDGET;
-    const results: RunResult[] = [];
-    for (let i = 0; i < RUNS; i++) results.push(runOnce(setup, spec, tier * 1_000_000 + i, bagSize));
-    rows.push({ tier, cn, setup, loadout, results, weight: `${w.carried}/${w.capacity}`, overweight: w.overweight });
+    const build = () => {
+      const character = buildArenaCharacter(cn, spec.level, gearRequirement(cn, tier));
+      const ctx: SimContext = { character, level: spec.level, monster: baseMonster(rep), effectiveInt: effectiveIntOf(character) };
+      setAffixContext(tier >= 7 ? 'arena7' : 'arena6');
+      const chosen = replayLoadout(cn, tier) ?? withRankedWeapon(cn, chooseLoadout(cn, tier, ctx), tier);
+      if (DUMP_REPLAY) dumpLoadout(cn, tier, chosen);
+      const loadout = PROBE_AFFIX || PROBE_WEAPON || PROBE_UNIQUE || PROBE_REMOVE ? probeLoadout(cn, chosen, tier) : chosen;
+      const setup = withKeepDistance(cn, buildSetup(cn, loadout, 20261111 + tier, 'always', ctx, false));
+      const w = getWeightStatus(setup.character, Object.values(setup.gear), [makeBagItem(POTION_CONFIG.orange.itemId, POTION_BUDGET)!], setup.effects);
+      return { loadout, setup, w, bagSize: w.overweight ? POTION_BAG : POTION_BUDGET };
+    };
+    const runAll = (b: ReturnType<typeof build>) => Array.from({ length: RUNS }, (_, i) => runOnce(b.setup, spec, tier * 1_000_000 + i, b.bagSize));
+    const score = (rs: RunResult[]) => median(rs.map(r => r.cleared)) * 1e6 + median(rs.map(r => r.ms)) / 1000;
+    // 星盤配法依競技場成績選（§ 44.2）：每種配法 1 場短時限篩選，前 2 種跑完整場次，取清完波數中位（同分取存活時間）最高者
+    const candidates = arenaStarCandidates(cn, spec.level);
+    let pick: { policy: StarPolicy; b: ReturnType<typeof build>; results: RunResult[] } | null = null;
+    if (candidates.length === 1) {
+      setStarPolicy(cn, candidates[0]);
+      const b = build();
+      pick = { policy: candidates[0], b, results: runAll(b) };
+    } else {
+      const screened = candidates.map(policy => {
+        setStarPolicy(cn, policy);
+        const b = build();
+        return { policy, b, s: runOnce(b.setup, spec, tier * 1_000_000, b.bagSize, ARENA_STAR_SCREEN_MS) };
+      }).sort((a, z) => z.s.cleared - a.s.cleared || z.s.ms - a.s.ms);
+      const notes: string[] = [];
+      for (const c of screened.slice(0, 2)) {
+        setStarPolicy(cn, c.policy);
+        const results = runAll(c.b);
+        notes.push(`${STAR_POLICY_LABEL[c.policy]} ${median(results.map(r => r.cleared))} 波／存活 ${fmt(median(results.map(r => r.ms)) / 60_000)} 分`
+          + `／MP<10% ${fmt(avg(results.map(r => r.lowMpMs / Math.max(1, r.ms))) * 100)}%${mpShares(results[0])}`);
+        if (!pick || score(results) > score(pick.results)) pick = { policy: c.policy, b: c.b, results };
+      }
+      starSelections.push(`- T${tier} ${CLASS_NAMES_ZH[cn]}：${STAR_POLICY_LABEL[pick!.policy]}｜篩選 ${ARENA_STAR_SCREEN_MS / 60_000} 分 1 場：`
+        + screened.map(c => `${STAR_POLICY_LABEL[c.policy]} ${c.s.cleared} 波／存活 ${fmt(c.s.ms / 60_000)} 分／MP<10% ${fmt(c.s.lowMpMs / Math.max(1, c.s.ms) * 100)}%${mpShares(c.s)}`
+          + `（${starSummary(cn, c.b.setup.character.starChart)}）`).join('；')
+        + `｜完整 ${RUNS} 場：${notes.join('；')}`);
+      setStarPolicy(cn, pick!.policy);
+    }
+    const { b, results } = pick!;
+    rows.push({ tier, cn, setup: b.setup, loadout: b.loadout, results, weight: `${b.w.carried}/${b.w.capacity}`, overweight: b.w.overweight });
     console.error(`T${tier} ${CLASS_NAMES_ZH[cn]} 完成（${fmt((performance.now() - t0) / 1000)}s）`);
   }
 }
 
-const median = (xs: number[]) => (xs.length ? percentile([...xs].sort((a, b) => a - b), 0.5) : NaN);
-const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : NaN);
+if (DUMP_REPLAY) writeFileSync(DUMP_REPLAY, JSON.stringify(DUMPED, null, 1));
+if (starSelections.length) console.log(`## 星盤配法篩選\n\n${starSelections.join('\n')}\n`);
 
-console.log(`| 段位 | 職業 | 撐滿 ${LIMIT_MS / 60_000} 分 | 存活時間中位 | 清完波數（中位／最少～最多） | 死亡波次 | 一般波平均 | 王波平均 | 藥水用量中位 | 藥水用完時間中位 |`);
-console.log('|---|---|---|---|---|---|---|---|---|---|');
+console.log(`| 段位 | 職業 | 撐滿 ${LIMIT_MS / 60_000} 分 | 存活時間中位 | 清完波數（中位／最少～最多） | 死亡波次 | 一般波平均 | 王波平均 | 藥水用量中位 | 藥水用完時間中位 | MP<10% 時間 | MP 首次 <10% 中位 | 受到傷害／分 | 魔力護盾平均減傷 |`);
+console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const row of rows) {
   const n = row.results.length;
   const cleared = row.results.map(r => r.cleared);
@@ -809,7 +964,11 @@ for (const row of rows) {
       : (deaths.length ? deaths.join('、') : '—')} `
     + `| ${normalMs.length ? `${fmt(avg(normalMs) / 1000)}s` : '—'} | ${bossMs.length ? `${fmt(avg(bossMs) / 1000)}s` : '—'} `
     + `| ${median(row.results.map(r => r.potionsUsed))} `
-    + `| ${outAt.length ? `${fmt(median(outAt) / 60_000)} 分（${outAt.length}/${n} 場用完）` : '—'} |`);
+    + `| ${outAt.length ? `${fmt(median(outAt) / 60_000)} 分（${outAt.length}/${n} 場用完）` : '—'} `
+    + `| ${fmt(avg(row.results.map(r => r.lowMpMs / Math.max(1, r.ms))) * 100)}% `
+    + `| ${(() => { const at = row.results.filter(r => r.mpLowAt != null).map(r => r.mpLowAt!); return at.length ? `${fmt(median(at) / 1000, 0)}s` : '—'; })()} `
+    + `| ${fmt(avg(row.results.map(r => r.damageTaken / Math.max(1, r.ms / 60_000))), 0)} `
+    + `| ${fmt(avg(row.results.map(r => (r.shieldHits ? r.shieldPctSum / r.shieldHits : 0))), 1)}% |`);
 }
 
 console.log('\n## 各段位角色與配裝\n');
@@ -820,8 +979,8 @@ for (const tier of TIERS) {
     console.log(`- ${CLASS_NAMES_ZH[row.cn]}：${row.loadout.label}｜600 瓶時負重 ${row.weight}${row.overweight ? '（超重，改背包 20 瓶補充）' : ''}`
       + `${row.loadout.missing.length ? `｜${row.loadout.missing.join(' ').replace('： ', '：')}` : ''}`);
     const a = row.setup.character;
-    const attrs = ATTRIBUTE_KEYS.map(k => `${k} ${a.baseAttributes[k] + a.bonusAttributes[k]}`).join(' ');
-    console.log(`  - 屬性 ${attrs}；${row.setup.rules.join('；')}`);
+    const attrs = ATTRIBUTE_KEYS.map(k => `${k} ${a.baseAttributes[k] + a.bonusAttributes[k] + starAttribute(a.className, a.starChart, k)}`).join(' ');
+    console.log(`  - 屬性 ${attrs}；星盤（${STAR_POLICY_LABEL[starPolicyOf(row.cn)]}）${starSummary(row.cn, a.starChart)}；${row.setup.rules.join('；')}`);
     if (DETAIL) printDetail(row);
   }
   console.log('');
@@ -837,7 +996,7 @@ function printDetail(row: Row): void {
     console.log(`    - ${g.slot} ${g.name}+${g.enhancement} 防${g.defense ?? 0}｜${affixes}${g.uniqueAffix ? `｜獨 ${g.uniqueAffix.type} ${g.uniqueAffix.value}` : ''}`
       + `${g.ability ? `｜技 ${g.ability.type}` : ''}${frozen.has(g) ? '｜**凍結**' : ''}`);
   }
-  const bonuses = getCombatBonuses(gear, setup.effects);
+  const bonuses = getCombatBonuses(gear, setup.effects, setup.character);
   const def = getEffectiveDefense(gear, setup.effects, bonuses.defense);
   console.log(`    - 實際防禦 ${def}（物理減傷 ${Math.min(def, 75)}%）、迴避率 ${fmt(getPlayerDodgeRate(setup.character, gear, setup.effects))}%`
     + `、藥水效果 +${fmt(bonuses.potion_effect ?? 0)}%、戰前 buff：${setup.effects.map(e => e.name).join('、') || '無'}`);
@@ -849,6 +1008,19 @@ function printDetail(row: Row): void {
   }
   const r = row.results[0];
   const min = r.ms / 60_000;
+  if (r.mpBudget) {
+    const b = r.mpBudget;
+    const sec = r.ms / 1000;
+    const regen = b.natural + b.equip + b.percent;
+    const top = Object.entries(b.spent).sort((x, y) => y[1].mp - x[1].mp).slice(0, 3)
+      .map(([k, v]) => `${k} 每次 ${fmt(v.mp / v.casts, 0)}、每分 ${fmt(v.casts / min)} 次`).join('；');
+    const a = setup.character;
+    console.log(`    - MP 收支（第 1 場 ${fmt(min)} 分）：有效最大 MP ${getEffectiveMaxMp(a, setup.gear, setup.effects)}、精神 ${getTotalAttributes(a, setup.effects, gear).SPI}`
+      + `、首次 <10% ${r.mpLowAt != null ? `${fmt(r.mpLowAt / 1000, 0)}s` : '—'}`);
+    console.log(`    - 耗魔每秒 ${fmt(Object.values(b.spent).reduce((x, v) => x + v.mp, 0) / sec, 2)}；前三：${top}`);
+    console.log(`    - 回魔每秒：自然 ${fmt(b.natural / sec, 2)}、詞綴 ${fmt(b.equip / sec, 2)}、回魔％ buff ${fmt(b.percent / sec, 2)}、`
+      + `血魔轉換 ${fmt(b.bloodMana / sec, 2)}、魔力奪取 ${fmt(b.drain / sec, 2)}、其他（受擊／命中回魔等） ${fmt((b.other - regen) / sec, 2)}`);
+  }
   const acts = Object.entries(r.actions).sort((a, b) => b[1] - a[1]);
   const total = acts.reduce((sum, [, n]) => sum + n, 0) || 1;
   console.log(`    - 第 1 場 ${fmt(min)} 分：行動 ${acts.map(([k, n]) => `${k} ${fmt((n / total) * 100, 0)}%`).join('、')}`);

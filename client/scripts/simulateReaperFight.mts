@@ -14,7 +14,9 @@
  *  - 學得到魔力護盾的職業，「常駐」與「危險時才開」兩種策略各跑一組
  *  - 死亡算失敗；擊殺時間只計存活場次
  *
- * 用法：npx vite-node scripts/simulateReaperFight.mts [--class=a,b] [--runs=N] [--proxy-samples=N]
+ * 星盤：逐一試三種配法（`starAllocation.mts`），各打 `STAR_SELECT_RUNS` 場取勝率最高、擊殺中位最快者，再打滿 `--runs`
+ *
+ * 用法：npx vite-node scripts/simulateReaperFight.mts [--class=a,b] [--runs=N] [--proxy-samples=N] [--star=<policy>]
  */
 import { tickWorld } from '../src/systems/worldTick';
 import { createMapInstance, attachInstance } from '../src/systems/mapInstance';
@@ -35,16 +37,35 @@ import type { EquipmentInstance } from '../src/models/equipment';
 import { formatAffixDisplay } from '../src/models/affix';
 import { readFileSync } from 'node:fs';
 import {
-  bestAbility, buildLoadout, buildSupportGear, getSkillPlan, percentile, searchBis, setProxySamples, withGlovesUnique, withSeed,
-  REAPER_SEED, RUNS, TARGET_CLASSES, type AffixType, type Loadout, type SupportPlan,
+  bestAbility, buildLoadout, buildSupportGear, getSkillPlan, percentile, searchBis, setProxySamples, setStarOverride, setStarPolicy, starPolicyCandidates,
+  starSummary, withGlovesUnique, withSeed, CHAR_LEVEL, REAPER_SEED, RUNS, STAR_POLICY_LABEL, TARGET_CLASSES,
+  BIS_AFFIX_TIER, BIS_BRAND_ELEMENT, MAIN_STAT, erosionRollValue,
+  type AffixType, type Loadout, type SupportPlan,
 } from './reaperShared.mts';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import type { AbilityType } from '../src/models/ability';
+import type { StarPolicy } from './starAllocation.mts';
+import { tweakWeapon } from './starTweaks.mts';
+import { probeAffixGear, rankedWeaponAffixes, rankedWeaponUnique, removeAffixGear, setAffixContext } from './affixLoadout.mts';
+import { getWeaponBaseDamage, type AffixType as GameAffixType } from '../src/models/affix';
+
+setAffixContext('reaper');
+/** 邊際量測（§ 44.2）：`--probe-affix=<type>` 加在最多 3 件防具／飾品，`--probe-weapon=<type>` 加在武器 */
+const PROBE_ARMOR = process.argv.find(a => a.startsWith('--probe-affix='))?.split('=')[1] as GameAffixType | undefined;
+const PROBE_WEAPON = process.argv.find(a => a.startsWith('--probe-weapon='))?.split('=')[1] as GameAffixType | undefined;
+const PROBE_UNIQUE = process.argv.find(a => a.startsWith('--probe-unique='))?.split('=')[1] as UniqueAffixType | undefined;
+/** `--probe-remove=<type>`：移除所有裝備上的該詞綴（已帶詞綴的移除損失） */
+const PROBE_REMOVE = process.argv.find(a => a.startsWith('--probe-remove='))?.split('=')[1] as GameAffixType | undefined;
 import type { UniqueAffixType } from '../src/models/uniqueAffix';
 import {
   buildSetup, fmt, KNIGHT_HP_TARGET, MANA_SHIELD_CATEGORY, type FightSetup, type ManaShieldPolicy,
 } from './fightSetup.mts';
 import { MemoryRepository } from '../src/db/memoryRepository';
+import { CLASS_SKILLS } from '../src/models/classSkills';
+
+const CLASS_SKILL_NAMES = new Set(CLASS_SKILLS.map(c => c.skill.name));
+/** DoT 依 debuff 標籤分組（傷害來源統計） */
+const DOT_GROUP: Record<string, string> = { frostbite: '冰霧凍傷', poisoned: '淬毒中毒', bleeding: '裂傷斬流血' };
 
 /** 擊殺後的掉寶與存檔走記憶體資料庫（同測試）；偏好設定寫的 `localStorage` 以記憶體代替 */
 defaultSession.repo = new MemoryRepository();
@@ -113,6 +134,8 @@ interface FightResult {
   actions: Record<string, number>;
   /** MP 低於有效上限 10% 的時間比例 */
   lowMpRatio: number;
+  /** 直接傷害依來源（普攻／技能名） */
+  damageBy: Record<string, number>;
 }
 
 const MANA_SHIELD_LOG = /魔力護盾承擔 (\d+) 傷害/;
@@ -138,6 +161,7 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
     const character = { ...setup.character };
     const maxHp = getEffectiveMaxHp(character, setup.gear, setup.effects);
     character.hp = maxHp;
+    character.mp = getEffectiveMaxMp(character, setup.gear, setup.effects);
     useGameStore.setState({
       character, equippedGear: setup.gear, inventory: [],
       skills: setup.skills.map(s => (s.type === 'heal' ? { ...s, power: healPower(s) } : { ...s })),
@@ -156,25 +180,38 @@ function fightOnce(setup: FightSetup, seed: number): FightResult {
 
     const r: FightResult = {
       won: false, died: false, ms: 0, minHpPercent: 100, damageTaken: 0, potionsUsed: 0,
-      dodges: 0, manaShieldAbsorbed: 0, counters: 0, lifesteal: 0, actions: {}, lowMpRatio: 0,
+      dodges: 0, manaShieldAbsorbed: 0, counters: 0, lifesteal: 0, actions: {}, lowMpRatio: 0, damageBy: {},
     };
+    const reaperHpBefore = () => reaper.currentHp;
     const maxMp = getEffectiveMaxMp(character, setup.gear, setup.effects);
     let lowMpTicks = 0;
     const trace: string[] = [];
     while (r.ms < FIGHT_TIMEOUT_MS) {
       useGameStore.setState({ combatLogs: [] });
+      const hpBefore = reaperHpBefore();
       const visuals: CombatVisual[] = tickWorld(TICK_MS, [defaultSession], [instance], f => { throw f.error; })
         .get(defaultSession) ?? [];
       r.ms += TICK_MS;
+      let direct = 0;
       for (const v of visuals) {
         if (v.kind === 'player_attack') {
           const name = v.result.skillUsed?.name ?? '普攻';
           r.actions[name] = (r.actions[name] ?? 0) + 1;
+          const dealt = v.result.damages.filter(d => d.targetId === 'reaper' && !d.isMiss).reduce((sum, d) => sum + d.damage, 0);
+          r.damageBy[name] = (r.damageBy[name] ?? 0) + dealt;
+          direct += dealt;
+        }
+        if (v.kind === 'dot' && v.target === 'monster' && v.monsterId === 'reaper') {
+          const name = `DoT:${v.tags[0] ?? ''}`;
+          r.damageBy[name] = (r.damageBy[name] ?? 0) + v.damage;
+          direct += v.damage;
         }
         if (v.kind !== 'monster_attack') continue;
         if (v.isDodged) r.dodges++;
         else r.damageTaken += v.damage;
       }
+      const lost = Math.max(0, hpBefore - Math.max(0, reaper.currentHp));
+      if (lost > direct) r.damageBy['DoT／其他'] = (r.damageBy['DoT／其他'] ?? 0) + (lost - direct);
       for (const log of useGameStore.getState().combatLogs) {
         const shield = MANA_SHIELD_LOG.exec(log.text);
         if (shield) r.manaShieldAbsorbed += Number(shield[1]);
@@ -235,9 +272,23 @@ function replayLoadout(cn: ClassName): { loadouts: Loadout[]; plan: SupportPlan 
   const offhand = r.offhand ? tplOf(r.offhand) : null;
   const plan: SupportPlan = { cn, ranking: r.ranking, glovesUnique: null };
   const label = `${weapon.name}+9${offhand ? ` ＋ ${offhand.name}` : '（雙手）'}｜${r.affixes.join('+')}（重播）`;
-  let lo = buildLoadout(label, weapon, offhand, r.affixes, buildSupportGear(plan), r.unique ?? null,
+  const weaponAffixes = rankedWeaponAffixes(cn, r.affixes.length) ?? r.affixes;
+  const unique = PROBE_UNIQUE ?? rankedWeaponUnique(cn) ?? r.unique ?? null;
+  let lo = buildLoadout(label, weapon, offhand, weaponAffixes, buildSupportGear(plan), unique,
     r.ability ? bestAbility(r.ability, weapon) : null, plan);
   if (r.glovesUnique) lo = withGlovesUnique(lo, r.glovesUnique);
+  if (PROBE_REMOVE) {
+    const p = removeAffixGear(lo.gear, lo.weapon, PROBE_REMOVE);
+    lo = { ...lo, gear: p.gear, weapon: p.weapon, label: `${lo.label}｜移除 ${PROBE_REMOVE}×${p.removed}` };
+  }
+  for (const [type, target] of [[PROBE_ARMOR, 'armor'], [PROBE_WEAPON, 'weapon']] as const) {
+    if (!type) continue;
+    const ctx = { element: BIS_BRAND_ELEMENT, erosionDamage: erosionRollValue(getWeaponBaseDamage(lo.weapon)), mainStat: MAIN_STAT[cn] };
+    const p = probeAffixGear(lo.gear, lo.weapon, type, BIS_AFFIX_TIER, ctx, target);
+    lo = { ...lo, gear: p.gear, weapon: p.weapon, label: `${lo.label}｜量測 ${type}×${p.added}` };
+  }
+  const weaponT = tweakWeapon(lo.weapon);
+  if (weaponT !== lo.weapon) lo = { ...lo, weapon: weaponT, gear: lo.gear.map(g => (g === lo.weapon ? weaponT : g)) };
   return { loadouts: [lo], plan };
 }
 
@@ -260,23 +311,56 @@ interface Row {
   ranking: string[];
   gear: (EquipmentInstance | null)[];
 }
+/** 星盤配法的篩選場數 */
+const STAR_SELECT_RUNS = 100;
+/** `--star-override=<json>`：分析用，`{ 職業: 節點 id[] }` 直接指定星盤 */
+const STAR_OVERRIDE_ARG = process.argv.find(a => a.startsWith('--star-override='))?.split('=')[1];
+const STAR_OVERRIDE: Partial<Record<ClassName, string[]>> = STAR_OVERRIDE_ARG ? JSON.parse(readFileSync(STAR_OVERRIDE_ARG, 'utf8')) : {};
+for (const [cn, chart] of Object.entries(STAR_OVERRIDE)) setStarOverride(cn as ClassName, chart);
 const rows: Row[] = [];
+const starNotes: string[] = [];
 let seed = 20261101;
 for (const cn of TARGET_CLASSES) {
-  const { loadouts: found, plan } = replayLoadout(cn) ?? searchBis(cn);
-  const loadouts = NO_ABILITY
-    ? found.map(l => ({ ...l, ability: null, weapon: { ...l.weapon, ability: undefined }, gear: l.gear.map(g => (g === l.weapon ? { ...g, ability: undefined } : g)) }))
-    : found;
-  const hasManaShield = getSkillPlan(cn).items.some(i => i.handling !== 'over_budget' && i.skill.buffCategory === MANA_SHIELD_CATEGORY);
-  const policies: ManaShieldPolicy[] = hasManaShield ? ['always', 'danger'] : ['always'];
-  for (const policy of policies) {
-    const setup = buildSetup(cn, loadouts[0], seed, policy);
+  /** 擊殺中位（勝率不足 100% 的配法排在後面） */
+  const score = (rs: FightResult[]) => {
+    const wins = rs.filter(r => r.won).map(r => r.ms).sort((a, b) => a - b);
+    return (rs.length - wins.length) * 1e9 + (wins.length ? percentile(wins, 0.5) : 0);
+  };
+  let best: { policy: StarPolicy; loadout: Loadout; plan: SupportPlan; score: number } | null = null;
+  const tried: string[] = [];
+  for (const starPolicy of starPolicyCandidates(cn, CHAR_LEVEL)) {
+    setStarPolicy(cn, starPolicy);
+    const { loadouts: found, plan } = replayLoadout(cn) ?? searchBis(cn);
+    const loadout = NO_ABILITY
+      ? { ...found[0], ability: null, weapon: { ...found[0].weapon, ability: undefined }, gear: found[0].gear.map(g => (g === found[0].weapon ? { ...g, ability: undefined } : g)) }
+      : found[0];
+    let sc = 0;
+    if (starPolicyCandidates(cn, CHAR_LEVEL).length > 1) {
+      for (const policy of manaShieldPolicies(cn)) {
+        const setup = buildSetup(cn, loadout, seed, policy);
+        sc += score(Array.from({ length: STAR_SELECT_RUNS }, (_, i) => fightOnce(setup, seed * 1000 + i)));
+      }
+      tried.push(`${STAR_POLICY_LABEL[starPolicy]} ${fmt(sc / manaShieldPolicies(cn).length / 1000, 2)}s`);
+    }
+    if (!best || sc < best.score) best = { policy: starPolicy, loadout, plan, score: sc };
+  }
+  setStarPolicy(cn, best!.policy);
+  starNotes.push(`- ${CLASS_NAMES_ZH[cn]}：${STAR_POLICY_LABEL[best!.policy]}（${starSummary(cn, getSkillPlan(cn).starChart)}）`
+    + (tried.length ? `；篩選 ${STAR_SELECT_RUNS} 場擊殺中位：${tried.join('、')}` : ''));
+  for (const policy of manaShieldPolicies(cn)) {
+    const setup = buildSetup(cn, best!.loadout, seed, policy);
     const results: FightResult[] = [];
     for (let i = 0; i < RUNS; i++) results.push(fightOnce(setup, seed * 1000 + i));
-    const suffix = hasManaShield ? (policy === 'always' ? '（魔力護盾常駐）' : '（魔力護盾危險時）') : '';
-    rows.push({ className: cn, name: `${CLASS_NAMES_ZH[cn]}${suffix}`, label: loadouts[0].label, setup, results, ranking: plan.ranking, gear: loadouts[0].gear });
+    const suffix = manaShieldPolicies(cn).length > 1 ? (policy === 'always' ? '（魔力護盾常駐）' : '（魔力護盾危險時）') : '';
+    rows.push({ className: cn, name: `${CLASS_NAMES_ZH[cn]}${suffix}`, label: best!.loadout.label, setup, results, ranking: best!.plan.ranking, gear: best!.loadout.gear });
   }
   seed++;
+}
+
+function manaShieldPolicies(cn: ClassName): ManaShieldPolicy[] {
+  // 魔力護盾依 MP 比例減傷、不扣 MP（`23-class-magic.md` § 23.5）：一律常駐
+  void cn;
+  return ['always'];
 }
 
 console.log('| 職業 | 勝率 | 死亡率 | 擊殺中位 | P10 | P90 | 最低 HP 中位 | MP<10% 時間 | 受到傷害/場 | 藥水/場 | 迴避/場 | 魔力護盾承擔/場 | 閃避反擊/場 | 吸血/場 |');
@@ -295,6 +379,9 @@ for (const row of rows) {
     + `| ${fmt(avg(r => r.manaShieldAbsorbed), 0)} | ${fmt(avg(r => r.counters))} | ${fmt(avg(r => r.lifesteal), 0)} |`);
 }
 
+console.log('\n## 星盤配法\n');
+for (const line of starNotes) console.log(line);
+
 console.log('\n## 各職業設定與行動分佈\n');
 for (const row of rows) {
   console.log(`### ${row.name} — ${row.label}`);
@@ -302,6 +389,17 @@ for (const row of rows) {
   for (const r of row.results) for (const [k, v] of Object.entries(r.actions)) totals[k] = (totals[k] ?? 0) + v;
   const sum = Object.values(totals).reduce((a, b) => a + b, 0) || 1;
   console.log(`- 行動分佈：${Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${fmt((v / sum) * 100)}%`).join('、')}`);
+  const dmg: Record<string, number> = {};
+  for (const r of row.results) for (const [k, v] of Object.entries(r.damageBy)) {
+    const group = k === '普攻' || k === 'DoT／其他' ? k : k.startsWith('DoT:') ? (DOT_GROUP[k.slice(4)] ?? 'DoT／其他')
+      : CLASS_SKILL_NAMES.has(k) ? '職業技能' : '基礎魔法';
+    dmg[group] = (dmg[group] ?? 0) + v;
+  }
+  const dmgSum = Object.values(dmg).reduce((a, b) => a + b, 0) || 1;
+  const winMs = row.results.filter(r => r.won).map(r => r.ms);
+  console.log(`- 擊殺平均：${fmt(winMs.reduce((a, b) => a + b, 0) / Math.max(1, winMs.length) / 1000, 3)}s`);
+  console.log(`- 傷害來源：${['普攻', '職業技能', '基礎魔法', 'DoT／其他'].map(k => `${k} ${fmt(((dmg[k] ?? 0) / dmgSum) * 100)}%`).join('、')}`
+    + `${Object.values(DOT_GROUP).filter(k => dmg[k]).map(k => `、${k} ${fmt((dmg[k] / dmgSum) * 100)}%`).join('')}`);
   console.log(`- 非武器部位攻擊詞綴排名：${row.ranking.join(' > ') || '（無）'}`);
   for (const g of row.gear) {
     if (!g) continue;

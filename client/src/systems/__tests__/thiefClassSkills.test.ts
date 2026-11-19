@@ -1,5 +1,5 @@
 /**
- * 盜賊職業魔法（`23-class-magic.md` § 23.7）：煙霧彈改版、背刺突進、毒霧、閃避反擊。
+ * 盜賊職業魔法（`23-class-magic.md` § 23.7）：煙霧彈改版、背刺突進、冰霧、閃避反擊。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { consumeEvadeCharge } from '../combat';
@@ -32,12 +32,12 @@ const NOW = 950_000;
 function thief(): Character {
   return {
     userId: 1, id: 1, name: 'Thief', className: 'thief', level: 70, exp: 0, expToNext: 1_000_000,
-    hp: 800, maxHp: 800, mp: 300, maxMp: 300,
+    hp: 800, mp: 300, 
     baseAttributes: { STR: 18, AGI: 25, VIT: 14, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW,
   };
 }
 
@@ -90,10 +90,13 @@ describe('盜賊技能定義', () => {
     expect(getSkillTemplate('backstab')).toMatchObject({ range: 8, dash: true, level: 5 });
   });
 
-  it('毒霧：MP 30、冷卻 30s、自身 5 格、每秒 70% 物理、10 秒、與淬毒同一種毒', () => {
+  it('冰霧：MP 30、冷卻 30s、自身 5 格、冰屬性每秒 70% 物理＋攻速 -30%、10 秒、與淬毒不同類', () => {
     expect(getSkillTemplate('poison-mist')).toMatchObject({
-      mpCost: 30, cooldown: 30000, aoeCenter: 'self', aoeRadius: 5, dotOnly: true,
-      applyDebuff: { category: 'poisoned', dotDamagePercent: 0.7, dotInterval: 1000, dotDuration: 10000 },
+      name: '冰霧', element: 'ice', mpCost: 30, cooldown: 30000, aoeCenter: 'self', aoeRadius: 5, dotOnly: true,
+      applyDebuff: {
+        category: 'frostbite', dotDamagePercent: 0.7, dotInterval: 1000, dotDuration: 10000, dotElement: 'ice',
+        modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }], tags: ['frostbite', 'slowed'],
+      },
     });
     expect(getSkillTemplate('envenom')!.onHitDebuff!.category).toBe('poisoned');
   });
@@ -134,7 +137,7 @@ describe('煙霧彈絕對迴避', () => {
   });
 });
 
-describe('毒霧', () => {
+describe('冰霧', () => {
   function cast(activeEffects: ActiveEffect[] = []) {
     const skill = skillOf('poison-mist');
     const character = thief();
@@ -147,26 +150,38 @@ describe('毒霧', () => {
     return { r, target };
   }
 
-  it('沒有直接傷害，只上 10 秒的毒', () => {
+  it('沒有直接傷害，只上 10 秒的凍傷（DoT＋減速）', () => {
     const { r, target } = cast();
     expect(r.damages[0].damage).toBe(0);
     expect(target.currentHp).toBe(99999);
-    const poison = useGameStore.getState().activeEffects.filter(e => e.category === 'poisoned' && e.targetMonsterId === 'm1');
-    expect(poison).toHaveLength(1);
-    expect(poison[0].duration).toBe(10000);
-    expect(poison[0].dot!.damage).toBeGreaterThan(0);
+    const frost = useGameStore.getState().activeEffects.filter(e => e.category === 'frostbite' && e.targetMonsterId === 'm1');
+    expect(frost).toHaveLength(1);
+    expect(frost[0].duration).toBe(10000);
+    expect(frost[0].dot!.damage).toBeGreaterThan(0);
+    expect(frost[0].modifiers).toEqual([{ stat: 'attack_speed', value: -30, isPercent: true }]);
   });
 
-  it('已中毒的怪不再施加、不刷新時間', () => {
+  it('已中淬毒的怪仍會上凍傷，兩者並存', () => {
     const existing: ActiveEffect = {
       id: 'old', sourceSkillId: 'envenom', sourceSkillName: '淬毒', category: 'poisoned', type: 'debuff',
       target: 'monster', targetMonsterId: 'm1', dot: { damage: 3, element: 'none', interval: 1000, totalDuration: 5000 },
       startTime: NOW, duration: 5000, tags: ['poisoned'], name: '中毒', description: '',
     };
     cast([existing]);
-    const poison = useGameStore.getState().activeEffects.filter(e => e.category === 'poisoned' && e.targetMonsterId === 'm1');
-    expect(poison).toHaveLength(1);
-    expect(poison[0].id).toBe('old');
+    const effects = useGameStore.getState().activeEffects.filter(e => e.targetMonsterId === 'm1');
+    expect(effects.map(e => e.category).sort()).toEqual(['frostbite', 'poisoned']);
+  });
+
+  it('已凍傷的怪不再施加、不刷新時間', () => {
+    const existing: ActiveEffect = {
+      id: 'old', sourceSkillId: 'poison-mist', sourceSkillName: '冰霧', category: 'frostbite', type: 'debuff',
+      target: 'monster', targetMonsterId: 'm1', dot: { damage: 3, element: 'ice', interval: 1000, totalDuration: 10000 },
+      startTime: NOW, duration: 10000, tags: ['frostbite', 'slowed'], name: '凍傷', description: '',
+    };
+    cast([existing]);
+    const frost = useGameStore.getState().activeEffects.filter(e => e.category === 'frostbite' && e.targetMonsterId === 'm1');
+    expect(frost).toHaveLength(1);
+    expect(frost[0].id).toBe('old');
   });
 });
 
@@ -240,5 +255,30 @@ describe('閃避反擊', () => {
     const visuals = applyMonsterAttacks(instance, [{ type: 'monster_attack', monsterId: 'm1', attackType: 'melee' }]);
     expect(visuals.filter(v => v.kind === 'player_attack')).toHaveLength(2);
     expect(useGameStore.getState().combatLogs.some(l => l.text === '閃避反擊追加！')).toBe(true);
+  });
+});
+
+describe('淬毒的毒傷吃星盤等級（`56-star-chart.md` § 56.5）', () => {
+  function poisonDamage(starChart: string[]): number {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const character = { ...thief(), starChart };
+    const envenom = getSkillTemplate('envenom')!;
+    const buff: ActiveEffect = {
+      id: 'buff-envenom', sourceSkillId: 'envenom', sourceSkillName: envenom.name, category: envenom.buffCategory!,
+      type: 'buff', target: 'player', modifiers: [], startTime: NOW, duration: envenom.buffDuration!,
+      tags: [], name: envenom.name, description: '',
+    };
+    useGameStore.setState({ character, activeEffects: [buff], combatLogs: [] });
+    processPlayerAttack(
+      { type: 'player_attack', action: { type: 'normal_attack' }, targetMonsterIds: ['m1'] },
+      { character, equippedGear: [], activeEffects: [buff], skills: [], monsterInstances: new Map([['m1', monster()]]), mapMonsters },
+    );
+    return useGameStore.getState().activeEffects.find(e => e.category === 'poisoned')!.dot!.damage;
+  }
+
+  it('III 的毒傷高於 I', () => {
+    const levelI = poisonDamage(['thief-start']);
+    const levelIII = poisonDamage(['thief-start', 'thief-magic0-level0', 'thief-magic0-level1']);
+    expect(levelIII).toBeGreaterThan(levelI);
   });
 });

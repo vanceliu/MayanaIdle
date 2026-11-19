@@ -77,7 +77,8 @@ describe('消耗品與自我施法的存檔', () => {
     characterId = char.id!;
 
     useGameStore.setState({
-      character: { ...char, hp: START_HP, mp: MP_POOL, maxMp: MP_POOL },
+      // Lv30 的最大 MP 才裝得下 MP_POOL（`20-attributes.md` § 20.5）
+      character: { ...char, level: 30, hp: START_HP, mp: MP_POOL },
       bagItems: [
         makeBagItem(POTION_CONFIG.red.itemId, STOCK)!,
         makeBagItem(POTION_CONFIG.white.itemId, STOCK)!,

@@ -7,7 +7,7 @@ import { EQUIPMENT_SEEDS } from '../../db/seed/equipmentSeeds';
 import {
   WEAPON_ENHANCE_SCROLL_ID, ARMOR_ENHANCE_SCROLL_ID,
   WEAPON_ENHANCE_PLUS_SCROLL_ID, WEAPON_ENHANCE_MINUS_SCROLL_ID,
-  applyEnhanceScroll, canScrollTarget, getEnhanceScroll, getEnhanceRate, isEnhanceable,
+  applyEnhanceScroll, canScrollTarget, getEnhanceScroll, getEnhanceOdds, isEnhanceable,
 } from '../enhanceScroll';
 import type { EquipmentInstance } from '../../models/equipment';
 
@@ -65,10 +65,14 @@ describe('強化卷軸的目標判定', () => {
     expect(canScrollTarget(minusScroll(), sword({ enhancement: 1 }))).toBe(true);
   });
 
-  it('武器安定值內必成，超出後固定 1/3（§ 6.9）', () => {
-    expect(getEnhanceRate(sword(), 6)).toBe(1);
-    expect(getEnhanceRate(sword(), 7)).toBeCloseTo(1 / 3);
-    expect(getEnhanceRate(sword(), 10)).toBeCloseTo(1 / 3);
+  it('武器安定值內必成，+7~+9 為 1/3，+10 起 1/5 且有無變化（§ 6.9）', () => {
+    expect(getEnhanceOdds(sword(), 6).success).toBe(1);
+    expect(getEnhanceOdds(sword(), 9).success).toBeCloseTo(1 / 3);
+    expect(getEnhanceOdds(sword(), 10)).toEqual({ success: 1 / 5, noChange: 2 / 5, destroy: 2 / 5 });
+  });
+
+  it('防具沒有無變化（§ 6.10）', () => {
+    expect(getEnhanceOdds(sword({ smallMonsterDamage: 0, stability: 4 }), 12).noChange).toBe(0);
   });
 });
 
@@ -105,6 +109,66 @@ describe('強化卷軸的結算', () => {
     expect(outcome?.ghost?.name).toBe('鋼心劍');
     expect(inv()).toHaveLength(0);
     expect(useGameStore.getState().statistics.weaponsBroken).toBe(before + 1);
+  });
+
+  it('+9 衝 +10 無變化：等級維持、裝備保留、扣卷軸、計入強化次數不計損毀', () => {
+    setup(sword({ enhancement: 9 }));
+    const stats = useGameStore.getState().statistics;
+    const before = { attempts: stats.weaponEnhanceAttempts, broken: stats.weaponsBroken };
+    // 0.2 ≤ roll < 0.6 為無變化
+    const outcome = applyEnhanceScroll(weaponScroll(), { item: inv()[0] }, () => 0.5);
+
+    expect(outcome?.fx).toBe('still');
+    expect(outcome?.success).toBe(false);
+    expect(outcome?.nextLevel).toBe(9);
+    expect(outcome?.ghost).toBeUndefined();
+    expect(inv()[0].enhancement).toBe(9);
+    expect(bagAmount(WEAPON_ENHANCE_SCROLL_ID)).toBe(2);
+    expect(useGameStore.getState().statistics.weaponEnhanceAttempts).toBe(before.attempts + 1);
+    expect(useGameStore.getState().statistics.weaponsBroken).toBe(before.broken);
+  });
+
+  it('+9 衝 +10 的三個區間：< 0.2 成功、0.6 以上消失', () => {
+    setup(sword({ enhancement: 9 }));
+    expect(applyEnhanceScroll(weaponScroll(), { item: inv()[0] }, () => 0.19)?.fx).toBe('success');
+    expect(inv()[0].enhancement).toBe(10);
+
+    setup(sword({ enhancement: 9 }));
+    expect(applyEnhanceScroll(weaponScroll(), { item: inv()[0] }, () => 0.7)?.fx).toBe('fail');
+    expect(inv()).toHaveLength(0);
+  });
+
+  it('+8 衝 +9 沒有無變化：0.5 落在消失', () => {
+    setup(sword({ enhancement: 8 }));
+    expect(applyEnhanceScroll(weaponScroll(), { item: inv()[0] }, () => 0.5)?.fx).toBe('fail');
+  });
+
+  it('＋卷軸自 +9 判 +10 那一格：無變化維持 +9（§ 6.12）', () => {
+    setup(sword({ enhancement: 9 }), [bagItemById(WEAPON_ENHANCE_PLUS_SCROLL_ID, 1)]);
+    const rolls = [0.9, 0.5];
+    const outcome = applyEnhanceScroll(plusScroll(), { item: inv()[0] }, () => rolls.shift()!);
+
+    expect(outcome?.fx).toBe('still');
+    expect(inv()[0].enhancement).toBe(9);
+    expect(bagAmount(WEAPON_ENHANCE_PLUS_SCROLL_ID)).toBe(0);
+  });
+
+  it('＋卷軸自 +9 成功時跳到 +10~+12', () => {
+    setup(sword({ enhancement: 9 }), [bagItemById(WEAPON_ENHANCE_PLUS_SCROLL_ID, 1)]);
+    const rolls = [0.9, 0.1];
+    applyEnhanceScroll(plusScroll(), { item: inv()[0] }, () => rolls.shift()!);
+
+    expect(inv()[0].enhancement).toBe(12);
+  });
+
+  it('身上裝備無變化時仍留在 equippedGear', () => {
+    const item = sword({ enhancement: 10 });
+    setup(item);
+    useGameStore.setState({ inventory: [], equippedGear: { rightHand: item } as never });
+
+    applyEnhanceScroll(weaponScroll(), { item, slot: 'rightHand' }, () => 0.5);
+
+    expect(useGameStore.getState().equippedGear.rightHand?.enhancement).toBe(10);
   });
 
   it('卷軸不足時不結算、不消耗', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateCombatScript } from '../scriptRunner';
+import { getMaxMp } from '../maxHpMp';
 import type { CombatRule } from '../../models/scriptEngine';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
@@ -14,9 +15,7 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
     exp: 0,
     expToNext: 100,
     hp: 100,
-    maxHp: 100,
     mp: 50,
-    maxMp: 50,
     baseAttributes: { STR: 10, AGI: 10, VIT: 10, SPI: 10, INT: 18, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0,
@@ -25,7 +24,6 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
     currentRegion: 'dawn-plains',
     currentFloor: null,
     skills: [],
-    unspentAttributePoints: 0,
     quests: [],
     areaEnteredAt: Date.now(),
     createdAt: Date.now(),
@@ -360,7 +358,7 @@ describe('evaluateCombatScript', () => {
       ];
       const monsters = [mon({ x: 5, y: 0 }), mon({ x: 6, y: 0 }), mon({ x: 5, y: 2 })];
       // MP 50/50 = 100% > 80 → 兩條都成立
-      const ok = createCombatContext({ monsters, skills: [createFireball()] });
+      const ok = createCombatContext({ monsters, skills: [createFireball()], effectiveMaxMp: 50 });
       expect(evaluateCombatScript(rules, ok)).toEqual({ type: 'skill', skillId: 'fireball' });
 
       // 怪聚在一起但 MP 只有 60% → 整條規則不成立
@@ -368,6 +366,7 @@ describe('evaluateCombatScript', () => {
         monsters,
         skills: [createFireball()],
         character: createTestCharacter({ mp: 30 }),
+        effectiveMaxMp: 50,
       });
       expect(evaluateCombatScript(rules, lowMp)).toEqual({ type: 'normal_attack' });
     });
@@ -388,8 +387,9 @@ describe('evaluateCombatScript', () => {
       expect(evaluateCombatScript(rules('mp_below', 60), ctx)).toEqual({ type: 'normal_attack' });
     });
 
-    it('未帶 effectiveMaxMp 時退回 character.maxMp', () => {
-      const ctx = createCombatContext({ character: createTestCharacter({ mp: 40 }) });
+    it('未帶 effectiveMaxMp 時退回不含裝備的公式值', () => {
+      const base = createTestCharacter();
+      const ctx = createCombatContext({ character: { ...base, mp: getMaxMp(base, []) } });
       expect(evaluateCombatScript(rules('mp_above', 60), ctx)).toEqual({ type: 'normal_attack' });
     });
   });

@@ -9,15 +9,15 @@ import { resolveArea } from '../../models/mapData';
 
 /** 一般怪各階掉落值區間 [下限, 上限]（/1000） */
 const NORMAL_BOUNDS: Record<number, [number, number]> = {
-  2: [1, 10],
-  3: [1, 10],
-  4: [0.5, 5],
-  5: [0.5, 5],
-  6: [0.5, 1],
+  2: [0.5, 5],
+  3: [0.5, 5],
+  4: [0.2, 1],
+  5: [0.2, 1],
+  6: [0.2, 0.5],
 };
 
 /** Boss 各階掉落值（/1000） */
-const BOSS_VALUE: Record<number, number> = { 4: 10, 5: 10, 6: 5, 7: 0.1 };
+const BOSS_VALUE: Record<number, number> = { 4: 5, 5: 5, 6: 1, 7: 0.1 };
 
 const equipmentEntries = DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment' && d.equipmentPool);
 

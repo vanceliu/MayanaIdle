@@ -2,6 +2,7 @@
  * 百柱死神模擬的共用部分：角色建構、配裝、技能盤點與輪替、校準、BiS 搜尋（`44-dps-prediction.md`）。
  * `simulateReaperFight.mts`（實戰）與 `simulateArena.mts`（競技場）共用；詞綴配裝規則在 `affixLoadout.mts`。
  */
+import { applySupportScale } from './starTweaks.mts';
 import {
   calculatePlayerAttack,
   calculateSkillAttack,
@@ -14,8 +15,7 @@ import {
   getTotalDefense,
   getWeaponAttackSuccess,
   hasActiveFireEnchant,
-  getAffixBonusesFromGear,
-  getWeaponHitCount,
+  DUAL_STRIKE_CHANCE,
   COOLDOWN_REDUCTION_CAP,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
   INT_COOLDOWN_PERCENT_PER_2,
@@ -24,7 +24,7 @@ import {
   ATTRIBUTE_KEYS, CLASS_NAMES_ZH,
   getEffectiveAGI, getEffectiveINT, getEffectiveSTR, getTotalAttributes,
 } from '../src/models/character';
-import { getExpToNextLevel, INITIAL_HP, INITIAL_MP, tryLevelUp } from '../src/systems/levelUp';
+import { getMaxHp, getMaxMp } from '../src/systems/maxHpMp';
 import { getMpRegen, MP_REGEN_INTERVAL_MS } from '../src/systems/regen';
 import type { Attributes, Character, ClassName } from '../src/models/character';
 import type { EquipmentInstance } from '../src/models/equipment';
@@ -52,7 +52,10 @@ import {
   ABILITY_FOCUS_MAX_PERCENT, getAbilityCommonPool, getAbilityClassPool, getAbilityDefinition, resolveParamRange, formatAbilityDisplay,
   type Ability, type AbilityType,
 } from '../src/models/ability';
-import { applyAbilityToSkill } from '../src/models/abilitySkill';
+import { resolveSkill } from '../src/models/skillStar';
+import { withNextAttackBonus } from '../src/models/abilitySkill';
+import { starTotalsOf } from '../src/models/starChart';
+import { simStarChart, type StarPolicy, type StarTarget } from './starAllocation.mts';
 import { setRandomSource } from '../src/core/rng';
 import { EQUIPMENT_SEEDS } from '../src/db/seed/equipmentSeeds';
 import { MONSTER_SEEDS } from '../src/db/seed/monsterSeeds';
@@ -188,14 +191,11 @@ export const EROSION_MS = 5000;
 /** 打不死就中止（避免無限迴圈） */
 export const TIMEOUT_MS = 10 * 60 * 1000;
 
-export const ATTRIBUTE_CAP_NOTE = '建角 80 點（單項上限 18）+ Lv.51~75 每級 1 點 = 105 點';
+export const ATTRIBUTE_CAP_NOTE = '建角 80 點（單項上限 18）＋星盤屬性';
 
 // ---------------------------------------------------------------- 角色
 
-/**
- * § 44.4：建角 80 點的最終分配（單項上限 18）。
- * SPI 在建角後就不再變動 —— 升級點全投主攻屬性與次要屬性，因此 MP 曲線可精確重現。
- */
+/** § 44.4：建角 80 點的最終分配（單項上限 18）；之後的屬性只來自星盤與裝備 */
 export const CREATION_ATTRIBUTES: Record<ClassName, Attributes> = {
   knight: { STR: 18, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
   // 妖精用弓，普攻吃敏捷不吃力量（`21-combat-formula.md` § 21.3）—— 建角把敏捷推到 18
@@ -205,9 +205,73 @@ export const CREATION_ATTRIBUTES: Record<ClassName, Attributes> = {
   thief: { STR: 18, AGI: 18, VIT: 12, SPI: 10, INT: 12, CHA: 10 },
 };
 
-/** 各職業「設計上」的有效 INT（配點 + 裝備），用於 INT 冷卻縮減與表頭顯示 */
-export function designEffectiveInt(className: ClassName, gear: (EquipmentInstance | null)[]): number {
-  const raw = CREATION_ATTRIBUTES[className].INT + (LEVELUP_ALLOCATION[className].INT ?? 0);
+export const STAR_POLICIES: StarPolicy[] = ['attack-first', 'skills-first', 'stats-first'];
+/**
+ * `--star=<policy>` 全職業同一配法，`--star=knight:attack-first,elf:stats-first` 逐職業指定；
+ * 沒指定的職業由各腳本逐一試 `STAR_POLICIES` 取最佳（`starAllocation.mts`）
+ */
+const STAR_ARG = process.argv.find(a => a.startsWith('--star='))?.split('=')[1];
+const STAR_POLICY_BY_CLASS = new Map<ClassName, StarPolicy>(
+  STAR_ARG?.includes(':') ? STAR_ARG.split(',').map(kv => kv.split(':') as [ClassName, StarPolicy]) : [],
+);
+/** 命令列指定的配法；沒指定回 null */
+export function fixedStarPolicy(className: ClassName): StarPolicy | null {
+  return STAR_POLICY_BY_CLASS.get(className) ?? (STAR_ARG && !STAR_ARG.includes(':') ? STAR_ARG as StarPolicy : null);
+}
+const activePolicy = new Map<ClassName, StarPolicy>();
+/** 之後建立的角色、技能盤點改用這個配法 */
+export function setStarPolicy(className: ClassName, policy: StarPolicy): void {
+  activePolicy.set(className, policy);
+}
+export function starPolicyOf(className: ClassName): StarPolicy {
+  return fixedStarPolicy(className) ?? activePolicy.get(className) ?? 'attack-first';
+}
+/** 競技場要試的配法（含續航優先）；星盤節點相同的配法只留一個 */
+export function arenaStarCandidates(className: ClassName, level: number): StarPolicy[] {
+  const fixed = fixedStarPolicy(className);
+  if (fixed) return [fixed];
+  if (level < 30) return ['attack-first'];
+  const seen = new Set<string>();
+  return (['attack-first', 'skills-first', 'stats-first', 'sustain-first'] as StarPolicy[]).filter(p => {
+    setStarPolicy(className, p);
+    const key = [...getSkillPlan(className, level).starChart].sort().join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** 要試的配法：命令列有指定就只試那一個 */
+export function starPolicyCandidates(className: ClassName, level: number): StarPolicy[] {
+  const fixed = fixedStarPolicy(className);
+  return fixed ? [fixed] : level < 30 ? ['attack-first'] : STAR_POLICIES;
+}
+
+export const STAR_POLICY_LABEL: Record<StarPolicy, string> = {
+  'attack-first': '攻擊技能優先', 'skills-first': '職業技能全點', 'stats-first': '屬性優先', 'sustain-first': '續航優先',
+  none: '全空', 'attr-only': '只點主攻屬性', 'offense-only': '只點輸出%', 'skills-only': '只點職業技能',
+};
+
+/** 星盤摘要：技能等級分佈與主要數值 */
+export function starSummary(className: ClassName, starChart: readonly string[] | undefined): string {
+  const totals = starTotalsOf(starChart as string[] | undefined, className).totals;
+  const levels = [...totals.entries()].filter(([k]) => /^skill:.+:level$/.test(k)).map(([, v]) => 1 + v);
+  const parts = [
+    `職業技能 III×${levels.filter(l => l === 3).length}／II×${levels.filter(l => l === 2).length}`,
+    ...['atkPct', 'matkPct', 'hpPct', 'mpPct', 'defPct', 'hit', 'evasion'].filter(k => totals.get(k)).map(k => `${k} ${totals.get(k)}`),
+    ...ATTRIBUTE_KEYS.filter(k => totals.get(`attr:${k}`)).map(k => `${k} +${totals.get(`attr:${k}`)}`),
+  ];
+  return parts.join('、');
+}
+
+/** 星盤給的屬性點 */
+export function starAttribute(className: ClassName, starChart: readonly string[] | undefined, key: keyof Attributes): number {
+  return starTotalsOf(starChart as string[] | undefined, className).totals.get(`attr:${key}`) ?? 0;
+}
+
+/** 各職業「設計上」的有效 INT（建角 + 星盤 + 裝備），用於 INT 冷卻縮減與表頭顯示 */
+export function designEffectiveInt(className: ClassName, gear: (EquipmentInstance | null)[], level: number = CHAR_LEVEL): number {
+  const raw = CREATION_ATTRIBUTES[className].INT + starAttribute(className, getSkillPlan(className, level).starChart, 'INT');
   const fromGear = gear.reduce((sum, g) => sum + (GEAR_INT_BONUS.get(g?.name ?? '') ?? 0), 0);
   return getEffectiveINT(raw + fromGear);
 }
@@ -217,92 +281,33 @@ export const GEAR_INT_BONUS = new Map<string, number>(
   EQUIPMENT_SEEDS.filter(t => t.bonusAttributes?.INT).map(t => [t.name, t.bonusAttributes!.INT!]),
 );
 
-/** § 44.4：Lv.51~75 的 25 點升級配點（主攻屬性 17 點推到 35，餘 8 點） */
-export const LEVELUP_ALLOCATION: Record<ClassName, Partial<Attributes>> = {
-  knight: { STR: 17, VIT: 8 },
-  elf: { AGI: 17, STR: 8 },
-  elementalist: { INT: 17, VIT: 8 },
-  priest: { INT: 17, VIT: 8 },
-  thief: { STR: 17, AGI: 8 },
-};
-
-/** 依配點順序（主攻屬性優先）取前 n 點的 bonusAttributes 快照 */
-export function partialAllocation(full: Attributes, n: number): Attributes {
-  const out: Attributes = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
-  let left = n;
-  for (const key of ATTRIBUTE_KEYS) {
-    if (full[key] <= 0) continue;
-    const take = Math.min(full[key], left);
-    out[key] = take;
-    left -= take;
-    if (left <= 0) break;
-  }
-  return out;
-}
-
-/**
- * 用真實的 `tryLevelUp()` 把角色從 Lv.1 練到 Lv.75，取得實際的 maxHp / maxMp。
- * 升級成長只看 baseAttributes + bonusAttributes（`levelUp.ts:30` 不傳 gear）。
- */
-export function levelTo75(base: Attributes, bonus: Attributes): { maxHp: number; maxMp: number } {
-  let char = {
-    name: 'sim', className: 'knight', level: 1, exp: 0, expToNext: getExpToNextLevel(1),
-    hp: INITIAL_HP, maxHp: INITIAL_HP, mp: INITIAL_MP, maxMp: INITIAL_MP,
-    baseAttributes: base,
-    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    gold: 0, currentArea: '', currentZone: '', currentRegion: '', currentFloor: null,
-    skills: [], unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
-  } as unknown as Character;
-
-  while (char.level < 75) {
-    char = tryLevelUp({ ...char, exp: char.expToNext });
-    if (char.level > 50) {
-      // Lv.51 起每級 +1 點，立刻配掉（下一級的成長才吃得到）
-      char = { ...char, bonusAttributes: partialAllocation(bonus, char.level - 50) };
-    }
-  }
-  return { maxHp: char.maxHp, maxMp: char.maxMp };
-}
-
-export function buildCharacter(className: ClassName): Character {
-  const raw = CREATION_ATTRIBUTES[className];
-  const base = { ...raw }; // INT 交給 combat.ts 原生處理（§ 21.4 的乘區無法在腳本側先折算）
-  const alloc = LEVELUP_ALLOCATION[className];
-  const bonus: Attributes = {
-    STR: alloc.STR ?? 0, AGI: alloc.AGI ?? 0, VIT: alloc.VIT ?? 0,
-    SPI: alloc.SPI ?? 0, INT: alloc.INT ?? 0, CHA: alloc.CHA ?? 0,
-  };
-  const spent = ATTRIBUTE_KEYS.reduce((s, k) => s + bonus[k], 0);
-  if (spent !== 25) throw new Error(`${className} 升級配點應為 25 點，實得 ${spent}`);
-  const creationTotal = ATTRIBUTE_KEYS.reduce((s, k) => s + raw[k], 0);
+/** 模擬角色：建角配點、模擬星盤（`starAllocation.mts`），HP／MP 為不含裝備的上限 */
+export function buildCharacter(className: ClassName, level: number = CHAR_LEVEL, base: Attributes = CREATION_ATTRIBUTES[className]): Character {
+  const creationTotal = ATTRIBUTE_KEYS.reduce((s, k) => s + base[k], 0);
   if (creationTotal !== 80) throw new Error(`${className} 建角配點應為 80 點，實得 ${creationTotal}`);
-
-  const { maxHp, maxMp } = withSeed(1234, () => levelTo75(base, bonus));
-
-  return {
-    name: `Lv75-${className}`,
+  const char = {
+    name: `Lv${level}-${className}`,
     className,
-    level: 75,
+    level,
     exp: 0,
     expToNext: 1,
-    hp: maxHp,
-    maxHp,
-    mp: maxMp,
-    maxMp,
-    baseAttributes: base,
-    bonusAttributes: bonus,
+    hp: 0,
+    mp: 0,
+    baseAttributes: { ...base },
+    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+    starChart: getSkillPlan(className, level).starChart,
     gold: 0,
     currentArea: 'hundred-pillar-91-100f',
     currentZone: 'hundred-pillar',
     currentRegion: 'hundred-pillar',
     currentFloor: 100,
     skills: [],
-    unspentAttributePoints: 0,
     quests: [],
     areaEnteredAt: 0,
     createdAt: 0,
     userId: 1,
   } as Character;
+  return { ...char, hp: getMaxHp(char, []), mp: getMaxMp(char, []) };
 }
 
 // ---------------------------------------------------------------- 怪物
@@ -645,6 +650,11 @@ export interface ClassSkillPlan {
   speed: { name: string; effect: ActiveEffect };
   rotation: SkillPlanItem[];
   onHitDot: OnHitDot | null;
+  /** 戰前 buff 與加速技能（由 `preCombatBuffs`／`speedBuff` 依裝備解析） */
+  precombatSkills: SkillDef[];
+  speedSkill: SkillDef | null;
+  /** 模擬星盤配點（§ 44.2） */
+  starChart: string[];
 }
 
 export const hasOutputModifier = (mods: StatModifier[] | undefined) => !!mods?.some(m => !DEFENSIVE_STATS.has(m.stat));
@@ -750,9 +760,15 @@ export function buildSkillPlan(className: ClassName, level: number = CHAR_LEVEL)
     if (winner !== i) { i.handling = 'superseded'; i.note = `被${winner.skill.name}覆蓋（同 category）`; }
   }
 
-  const speedSkills = items.filter(x => x.handling === 'speed').sort((a, b) => speedPercentOf(b.skill) - speedPercentOf(a.skill));
+  const starChart = planStarChart(className, level, items);
+  applySupportScale(className, starChart);
+  const owner = { className, starChart };
+  const resolved = (sk: SkillDef): SkillDef => resolveSkill({ ...sk, lastUsedAt: 0 } as Skill, [], owner);
+
+  const speedSkills = items.filter(x => x.handling === 'speed')
+    .sort((a, b) => speedPercentOf(resolved(b.skill)) - speedPercentOf(resolved(a.skill)));
   const bestSpeedSkill = speedSkills[0];
-  const useSkillSpeed = !!bestSpeedSkill && speedPercentOf(bestSpeedSkill.skill) >= SPEED_POTION_ATTACK_SPEED_PERCENT;
+  const useSkillSpeed = !!bestSpeedSkill && speedPercentOf(resolved(bestSpeedSkill.skill)) >= SPEED_POTION_ATTACK_SPEED_PERCENT;
   for (const s of speedSkills) {
     if (!useSkillSpeed || s !== bestSpeedSkill) {
       s.handling = 'superseded';
@@ -760,12 +776,13 @@ export function buildSkillPlan(className: ClassName, level: number = CHAR_LEVEL)
     }
   }
   const speed = useSkillSpeed
-    ? { name: bestSpeedSkill.skill.name, effect: makeBuff(bestSpeedSkill.skill.name, SPEED_CATEGORY, bestSpeedSkill.skill.buffModifiers!) }
+    ? { name: bestSpeedSkill.skill.name, effect: makeBuff(bestSpeedSkill.skill.name, SPEED_CATEGORY, resolved(bestSpeedSkill.skill).buffModifiers!) }
     : { name: SPEED_POTION_NAME, effect: makeBuff(SPEED_POTION_NAME, SPEED_CATEGORY, [{ stat: 'attack_speed', value: SPEED_POTION_ATTACK_SPEED_PERCENT, isPercent: true }]) };
 
   const precombatItems = items.filter(x => x.handling === 'precombat');
-  const precombat = precombatItems.map(i => makeBuff(i.skill.name, i.skill.buffCategory ?? i.skill.id, i.skill.buffModifiers ?? []));
-  const poison = precombatItems.find(i => i.skill.onHitDebuff?.dotDamagePercent)?.skill.onHitDebuff;
+  const precombat = precombatItems.map(i => makeBuff(i.skill.name, i.skill.buffCategory ?? i.skill.id, resolved(i.skill).buffModifiers ?? []));
+  const poisonSkill = precombatItems.find(i => i.skill.onHitDebuff?.dotDamagePercent)?.skill;
+  const poison = poisonSkill ? resolved(poisonSkill).onHitDebuff : undefined;
   const onHitDot = poison
     ? { category: poison.category, percent: poison.dotDamagePercent!, interval: poison.dotInterval ?? DOT_TICK_MS, duration: poison.dotDuration ?? 5000 }
     : null;
@@ -777,20 +794,74 @@ export function buildSkillPlan(className: ClassName, level: number = CHAR_LEVEL)
     ...rotationItems.filter(x => x.skill.type !== 'buff'),
   ];
 
-  return { items, precombat, speed, rotation, onHitDot };
+  return {
+    items, precombat, speed, rotation, onHitDot, starChart,
+    precombatSkills: precombatItems.map(i => i.skill), speedSkill: useSkillSpeed ? bestSpeedSkill.skill : null,
+  };
+}
+
+/** 續航類職業技能（`sustain-first` 先點）：治療、回魔、護盾、減傷、回血 */
+const SUSTAIN_STATS = new Set(['mp_regen', 'mp_regen_max_percent', 'hp_regen', 'damageReduction', 'shield_absorb', 'defense']);
+export function isSustainSkill(s: SkillDef): boolean {
+  return s.type === 'heal' || !!s.mpRestorePercent || !!s.shieldPower || !!s.evadeCharges || !!s.invincible
+    || !!s.buffModifiers?.some(m => SUSTAIN_STATS.has(m.stat)) || s.buffCategory === 'mana-shield';
+}
+
+/** 星盤配點的目標：實際用到的職業技能（攻擊技依威力 → 輪替 buff → 其餘） */
+/** 分析用：直接指定星盤節點（`analyzeStarMarginal.mts`） */
+const STAR_OVERRIDE = new Map<ClassName, string[]>();
+export function setStarOverride(className: ClassName, chart: string[] | null): void {
+  if (chart) STAR_OVERRIDE.set(className, chart); else STAR_OVERRIDE.delete(className);
+}
+
+function planStarChart(className: ClassName, level: number, items: SkillPlanItem[]): string[] {
+  const override = STAR_OVERRIDE.get(className);
+  if (override) return override;
+  const used = items.filter(i => i.handling !== 'over_budget' && i.handling !== 'superseded');
+  const group = (i: SkillPlanItem) => (i.handling === 'rotation' && i.skill.type === 'attack' ? 'attack'
+    : i.handling === 'rotation' ? 'buff' : 'other') as 'attack' | 'buff' | 'other';
+  const skills: StarTarget[] = used.filter(i => !i.isBasicMagic)
+    .sort((a, b) => (b.skill.power ?? 0) - (a.skill.power ?? 0))
+    .map(i => ({ skill: i.skill.id, group: group(i), sustain: isSustainSkill(i.skill) }));
+  const caster = className === 'elementalist' || className === 'priest';
+  return simStarChart({
+    className, level, targets: skills, mainStat: MAIN_STAT[className],
+    offenseKey: caster ? 'matkPct' : 'atkPct', policy: starPolicyOf(className),
+  });
 }
 
 export const SKILL_PLANS = new Map<string, ClassSkillPlan>();
 export function getSkillPlan(className: ClassName, level: number = CHAR_LEVEL): ClassSkillPlan {
-  const key = `${className}@${level}`;
+  const key = `${className}@${level}@${starPolicyOf(className)}@${STAR_OVERRIDE.get(className)?.join('|') ?? ''}`;
   let plan = SKILL_PLANS.get(key);
   if (!plan) { plan = buildSkillPlan(className, level); SKILL_PLANS.set(key, plan); }
+  applySupportScale(className, plan.starChart);
   return plan;
 }
 
-/** 戰前開好的長效 buff（每次回傳新陣列，呼叫端可自由 push） */
-export function preCombatBuffs(className: ClassName, level: number = CHAR_LEVEL): ActiveEffect[] {
-  return [...getSkillPlan(className, level).precombat];
+/**
+ * 戰前開好的長效 buff（每次回傳新陣列，呼叫端可自由 push）。
+ * `gear` 給實際裝備時依武器／飾品的隨機技能解析（淬毒強化、精神匯聚強化等，`07-affix-ability.md` § 7S.5）；
+ * 精神匯聚強化的「下一次攻擊技能」加成在開戰時掛一次
+ */
+export function preCombatBuffs(className: ClassName, level: number = CHAR_LEVEL, gear: readonly (EquipmentInstance | null)[] = []): ActiveEffect[] {
+  const plan = getSkillPlan(className, level);
+  const owner = { className, starChart: plan.starChart };
+  let effects: ActiveEffect[] = [];
+  for (const raw of plan.precombatSkills) {
+    const s = resolveSkill({ ...raw, lastUsedAt: 0 } as Skill, gear as EquipmentInstance[], owner);
+    effects.push(makeBuff(s.name, s.buffCategory ?? s.id, s.buffModifiers ?? []));
+    effects = withNextAttackBonus(effects, s, 0);
+  }
+  return effects;
+}
+
+/** 加速來源（技能依裝備解析，學不到或不如綠色藥水時為綠色藥水） */
+export function speedBuff(className: ClassName, level: number = CHAR_LEVEL, gear: readonly (EquipmentInstance | null)[] = []): ActiveEffect {
+  const plan = getSkillPlan(className, level);
+  if (!plan.speedSkill) return plan.speed.effect;
+  const s = resolveSkill({ ...plan.speedSkill, lastUsedAt: 0 } as Skill, gear as EquipmentInstance[], { className, starChart: plan.starChart });
+  return makeBuff(s.name, SPEED_CATEGORY, s.buffModifiers ?? []);
 }
 
 // ---------------------------------------------------------------- 輪替
@@ -813,17 +884,21 @@ export interface RotationEntry {
   requiredWeaponType?: string;
   /** 冷卻（ms，未套 CDR） */
   cooldown: number;
+  /** 星盤技能等級的物理倍率（三連射、物理快照技能） */
+  physicalScale?: number;
+  /** 必定爆擊（致命一擊） */
+  guaranteedCrit?: boolean;
   /** MP 消耗（`canUseSkill` 會擋） */
   mpCost: number;
   /** 回復等同最終傷害的 MP（魔力奪取 = 1） */
   mpDrainRatio?: number;
   /** 單一目標時連打幾下（血濺咒殺的隨機多擊全落在死神身上） */
   randomHits?: number;
-  /** 只上 DoT，不造成直接傷害（毒霧） */
+  /** 只上 DoT，不造成直接傷害（冰霧） */
   dotOnly?: boolean;
   /** 隨機技能：直接傷害 ×(1 + X%)（魔力奪取／元素風暴強化） */
   abilityDamagePercent?: number;
-  /** 隨機技能：DoT 一次打出 N 跳（毒霧強化），每跳 = 基礎物理傷害 × percent */
+  /** 隨機技能：DoT 一次打出 N 跳（冰霧強化），每跳 = 基礎物理傷害 × percent */
   instantDot?: { percent: number; ticks: number };
   /** 隨機技能：施放後下一次攻擊技能 +X%（精神匯聚強化，self_buff 用） */
   nextAttackBonusPercent?: number;
@@ -842,7 +917,7 @@ export interface RotationEntry {
   debuffRecast?: boolean;
   /** 校準結果：價值全在降防（直接傷害不如普攻），由 runScenario 試算放與不放 */
   debuffOnly?: boolean;
-  /** 純 buff 類（元素增幅／強化冷卻縮減／致命一擊） */
+  /** 純 buff 類（元素增幅／強化冷卻縮減） */
   buff?: { category: string; modifiers: StatModifier[]; duration: number };
   /** true = 基礎魔法，false = 職業魔法（決定套用哪個威力倍率） */
   isBasicMagic?: boolean;
@@ -860,6 +935,8 @@ export function magicEntry(s: SkillDef, isBasicMagic = false): RotationEntry {
     requiredWeaponType: s.requiredWeaponType,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
+    physicalScale: s.physicalScale,
+    guaranteedCrit: s.guaranteedCrit,
     mpCost: s.mpCost,
     mpDrainRatio: s.mpDrainRatio,
     randomHits: s.randomHits,
@@ -869,9 +946,9 @@ export function magicEntry(s: SkillDef, isBasicMagic = false): RotationEntry {
 }
 
 /** 盤點結果中「輪替」的技能 → 輪替項目。DoT／降防／自身增益一律讀技能定義（§ 44.9） */
-export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance, className?: ClassName): RotationEntry {
-  // 武器的職業池隨機技能改寫技能數值（`07-affix-ability.md` § 7S.5）
-  const s = className ? applyAbilityToSkill({ ...item.skill, lastUsedAt: 0 } as Skill, [weapon], className) : item.skill;
+export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance, className: ClassName, starChart: string[]): RotationEntry {
+  // 星盤冷卻 → 武器隨機技能（`07-affix-ability.md` § 7S.5）→ 星盤等級，同遊戲施放（`skillStar.ts`）
+  const s = resolveSkill({ ...item.skill, lastUsedAt: 0 } as Skill, [weapon], { className, starChart });
   if (s.type === 'buff') {
     return {
       id: s.id, name: s.name, kind: 'self_buff', cooldown: s.cooldown, mpCost: s.mpCost,
@@ -881,7 +958,7 @@ export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance, 
   }
   if (s.hits && (s.hits > 1 || !s.power)) {
     return {
-      id: s.id, name: s.name, kind: 'physical_skill', hits: s.hits, cooldown: s.cooldown, mpCost: s.mpCost,
+      id: s.id, name: s.name, kind: 'physical_skill', hits: s.hits, cooldown: s.cooldown, mpCost: s.mpCost, physicalScale: s.physicalScale,
       requiredWeaponType: s.requiredWeaponType, ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     };
   }
@@ -910,7 +987,8 @@ export function toRotationEntry(item: SkillPlanItem, weapon: EquipmentInstance, 
 }
 
 export function buildRotation(className: ClassName, weapon: EquipmentInstance, level: number = CHAR_LEVEL): RotationEntry[] {
-  return getSkillPlan(className, level).rotation.map(i => toRotationEntry(i, weapon, className));
+  const plan = getSkillPlan(className, level);
+  return plan.rotation.map(i => toRotationEntry(i, weapon, className, plan.starChart));
 }
 
 /** 武器隨機技能的候選（共通池＋該職業的武器職業池），參數一律取最佳端（§ 44.1） */
@@ -974,11 +1052,11 @@ export function calibrate(
         if (e.kind === 'physical_skill') {
           const fire = hasActiveFireEnchant(effects);
           for (let h = 0; h < (e.hits ?? 1); h++) {
-            const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+            const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalScale);
             s += r.hit ? r.damage : 0;
           }
         } else if (e.physicalSnapshot) {
-          const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, char.className), e.element!, loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+          const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, char.className), e.element!, loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalScale, e.guaranteedCrit);
           s += r.damage;
         } else if (!e.dotOnly) {
           for (let h = 0; h < (e.randomHits ?? 1); h++) {
@@ -1047,24 +1125,14 @@ export function percentile(sorted: number[], p: number): number {
   return sorted[i];
 }
 
-/**
- * 有效最大 MP。公式與 `gameStore.ts` 的 `getEffectiveMaxMp` 相同（最大 MP 詞綴為固定值），
- * 但該函式吃 `EquippedGear` record 且住在 store 裡（會拉進 Dexie/zustand），
- * 腳本改用同一組聚合函式重算。修改 gameStore 的公式時此處要同步。
- */
+/** 有效最大 MP（`maxHpMp.ts`） */
 export function effectiveMaxMp(char: Character, gear: (EquipmentInstance | null)[]): number {
-  const items = gear.filter((g): g is EquipmentInstance => g != null);
-  const bonuses = getAffixBonusesFromGear(items);
-  const flatMp = items.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0);
-  return char.maxMp + flatMp + bonuses.max_mp;
+  return getMaxMp(char, gear);
 }
 
-/** 有效最大 HP。公式同 `gameStore.ts` 的 `getEffectiveMaxHp`（最大 HP 詞綴為固定值） */
+/** 有效最大 HP（`maxHpMp.ts`） */
 export function effectiveMaxHp(char: Character, gear: (EquipmentInstance | null)[]): number {
-  const items = gear.filter((g): g is EquipmentInstance => g != null);
-  const bonuses = getAffixBonusesFromGear(items);
-  const flatHp = items.reduce((sum, g) => sum + (g.bonusHp ?? 0), 0);
-  return char.maxHp + flatHp + bonuses.max_hp;
+  return getMaxHp(char, gear);
 }
 
 // ---------------------------------------------------------------- BiS 搜尋
@@ -1129,7 +1197,7 @@ export function proxyDps(
   opts: { normalOnly?: boolean } = {},
 ): number {
   const char = ctx?.character ?? buildCharacter(className);
-  const effects = preCombatBuffs(className, ctx?.level);
+  const effects = preCombatBuffs(className, ctx?.level, rawLoadout.gear);
   const loadout = resolveLoadout(char, effects, rawLoadout);
   const effInt = ctx ? ctx.effectiveInt(loadout.gear) : designEffectiveInt(className, loadout.gear);
   const monster = ctx?.monster ?? makeReaper();
@@ -1140,7 +1208,7 @@ export function proxyDps(
 
   const intervalMs = getPlayerAttackInterval(loadout.gear, effects);
   const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + intCooldownReduction(effInt));
-  const normalRolls = getWeaponHitCount(loadout.weapon);
+  const normalRolls = expectedHitCount(loadout.weapon);
 
   /**
    * 輪替加權的每次行動期望傷害。普攻為底，每招技能依「冷卻內可施放的比例」取代普攻，
@@ -1164,14 +1232,14 @@ export function proxyDps(
           if (e.kind === 'physical_skill') {
             const fire = hasActiveFireEnchant(fx);
             for (let h = 0; h < (e.hits ?? 1); h++) {
-              const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID);
+              const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID, e.physicalScale);
               s += r.hit ? r.damage + bonusPerHit : 0;
             }
           } else if (e.instantDot) {
             const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, fx);
             s += Math.max(1, Math.floor(base * e.instantDot.percent)) * e.instantDot.ticks;
           } else if (e.physicalSnapshot) {
-            const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID);
+            const r = calculatePhysicalSnapshotSkill(char, ruledSkillPower(e, effInt, className), e.element!, loadout.weapon, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID, e.physicalScale, e.guaranteedCrit);
             s += Math.floor(r.damage * (100 + (e.abilityDamagePercent ?? 0)) / 100) + bonusPerHit;
           } else {
             const r = calculateSkillAttack(char, ruledSkillPower(e, effInt, className), e.element!, monster, loadout.gear, e.name, fx, 0, e.ignoreDefensePercent ?? 0, PROXY_TARGET_ID);
@@ -1222,8 +1290,8 @@ export function proxyDps(
   const erosion = getErosion(loadout.weapon.affixes, loadout.weapon.quality ?? 0);
   let erosionDps = 0;
   if (erosion) {
-    const rolls = getWeaponHitCount(loadout.weapon);
-    const perAttack = 1 - Math.pow(1 - erosion.chance / 100, rolls);
+    const perAttack = hitDistribution(loadout.weapon)
+      .reduce((sum, [hits, p]) => sum + p * (1 - Math.pow(1 - erosion.chance / 100, hits)), 0);
     const procsPerSec = perAttack / (intervalMs / 1000);
     erosionDps = (1 - Math.exp(-procsPerSec * (EROSION_MS / 1000))) * erosion.damage;
   }
@@ -1233,6 +1301,14 @@ export function proxyDps(
   if (ability?.type === 'focus_strike') best *= focusAverageMultiplier(monster.maxHp, best / Math.max(1, plain.rolls), ability.params.percent / 10);
   return best / intervalMs * 1000 + erosionDps;
 }
+
+/** 每次普攻的下數分佈：雙刀／鋼爪 `DUAL_STRIKE_CHANCE`% 打兩下（`combat.ts` `getWeaponHitCount`） */
+export function hitDistribution(weapon: EquipmentInstance | null): [number, number][] {
+  const dual = weapon?.type === 'dualBlade' || weapon?.type === 'claw';
+  return dual ? [[1, 1 - DUAL_STRIKE_CHANCE / 100], [2, DUAL_STRIKE_CHANCE / 100]] : [[1, 1]];
+}
+export const expectedHitCount = (weapon: EquipmentInstance | null): number =>
+  hitDistribution(weapon).reduce((sum, [hits, p]) => sum + hits * p, 0);
 
 /** 專注打擊：每下 `perHit` 傷害打 `hp` 血的目標，打完所需各下的平均倍率 */
 export function focusAverageMultiplier(hp: number, perHit: number, percentPerStack: number): number {

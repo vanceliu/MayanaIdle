@@ -5,6 +5,7 @@ import { Tooltip } from './Tooltip';
 import { getTotalAttributes } from '../models/character';
 import {
   getCombatBonuses,
+  starStat,
   getEffectiveDefense,
   getBuffFlatBonus,
   getRangedAttackBonus,
@@ -82,7 +83,7 @@ export function CharacterStats() {
   const weapon = equippedGear.rightHand;
   const weaponExtraAttack = weapon?.extraAttack ?? 0;
 
-  const bonuses = getCombatBonuses(gearList, activeEffects);
+  const bonuses = getCombatBonuses(gearList, activeEffects, char);
 
   const critRate0 = 5 + bonuses.crit_rate;
   const critDamage = 200 + bonuses.crit_damage;
@@ -98,7 +99,7 @@ export function CharacterStats() {
   const blockRate = getPlayerBlockRate(gearList, activeEffects);
 
   // 攻速：詞綴 + buff + 減速 debuff（與 getPlayerAttackInterval 同一套）
-  const attackSpeed = getTotalAttackSpeedPercent(gearList, activeEffects);
+  const attackSpeed = getTotalAttackSpeedPercent(gearList, activeEffects, char);
 
   // 負重（§ 20.7）。超重會擋下攻擊與魔法，所以要看得到自己差多少
   const weight = getWeightStatus(char, gearList, bagItems, activeEffects);
@@ -145,7 +146,7 @@ export function CharacterStats() {
   const totalDodge = Math.min(DODGE_RATE_CAP, uncappedDodge);
 
   // 與 systems/combat.ts 的命中判定同一套：基礎命中 80 + AGI加成 + 武器攻擊成功（含強化 /2）
-  const hitRate = 80 + agiBonus + getWeaponAttackSuccess(weapon ?? null);
+  const hitRate = 80 + agiBonus + getWeaponAttackSuccess(weapon ?? null) + starStat(char, 'hit');
 
   // 非戰鬥狀態的回復量，與自然回復 tick 同一支（`29-regen.md`）
   const hpRegen = getHpRegen(char, false, gearList, activeEffects);

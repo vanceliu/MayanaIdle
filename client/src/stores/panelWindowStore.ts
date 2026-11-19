@@ -4,7 +4,7 @@ import { emitWindowPositionReset } from './windowPositionReset';
 /**
  * 浮動面板視窗狀態（16-tech-frontend-architecture.md § 32.15）
  *
- * 六個面板（詳細狀態 / 裝備欄 / 背包 / 技能 / 任務 / 自動腳本）改為可拖曳浮動視窗：
+ * 面板（詳細狀態 / 裝備欄 / 背包 / 技能 / 星盤 / 任務 / 自動腳本 …）為可拖曳浮動視窗：
  * 可同時開啟多個、無遮罩、點擊置頂。
  *
  * **位置持久化於 localStorage**（開關狀態與 z 順序只存在於當下 session）。
@@ -12,16 +12,16 @@ import { emitWindowPositionReset } from './windowPositionReset';
  *
  * 存的同時記下**當時的視窗尺寸**，換到不同大小的視窗時按比例換算回來。
  */
-export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'quest' | 'mail' | 'script' | 'social' | 'trade';
+export type PanelKey = 'stats' | 'equipment' | 'bag' | 'skill' | 'star' | 'quest' | 'mail' | 'script' | 'social' | 'trade';
 
-export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'quest', 'mail', 'script', 'social', 'trade'];
+export const PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'star', 'quest', 'mail', 'script', 'social', 'trade'];
 
 /**
  * PanelDock 以泛用按鈕渲染的面板。
  * `quest`／`mail`／`script` 不在此列 —— 三者的按鈕要顯示指示，
  * 由 `QuestTrackerButton` / `MailboxButton` / `ScriptEditorButton` 自行渲染。
  */
-export const DOCK_PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill'];
+export const DOCK_PANEL_KEYS: readonly PanelKey[] = ['stats', 'equipment', 'bag', 'skill', 'star'];
 
 /**
  * 只在線上模式出現的面板（`97-selfhosted-server.md`）；單機形態不畫按鈕。
@@ -35,6 +35,8 @@ export const PANEL_TITLES: Record<PanelKey, string> = {
   equipment: '裝備欄',
   bag: '背包',
   skill: '技能',
+  /** 星盤（`56-star-chart.md`） */
+  star: '星盤',
   quest: '進行中的任務',
   mail: '信箱',
   script: '自動天賦',
@@ -60,6 +62,8 @@ export const PANEL_ICONS: Record<PanelKey, string> = {
   equipment: '🧥',
   bag: '👜',
   skill: '✨',
+  /** 不可與城鎮設施撞號（見上）：🌌 目前沒有設施在用 */
+  star: '🌌',
   quest: '📋',
   /** 不可與城鎮設施撞號（見上）：✉️ 目前沒有設施在用 */
   mail: '✉️',
@@ -94,6 +98,8 @@ export const PANEL_WIDTHS: Record<PanelKey, number> = {
   equipment: 280,
   bag: 420,
   skill: 420,
+  // 盤面 ＋ 加成合計欄（`56-star-chart.md`）
+  star: 860,
   quest: 320,
   mail: 360,
   script: 480,
@@ -115,6 +121,7 @@ const DEFAULT_POSITIONS: Record<PanelKey, PanelPosition> = {
   equipment: { x: 396, y: 120 },
   bag: { x: 780, y: 120 },
   skill: { x: 1224, y: 120 },
+  star: { x: 160, y: 72 },
   // 任務預設落在 stage 右上角（小螢幕會被 FloatingWindow 夾回可視範圍）
   quest: { x: 1576, y: 128 },
   mail: { x: 1230, y: 128 },

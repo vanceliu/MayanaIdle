@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星盤未點點數 Demo — MayanaIdle</title>
+<!--
+  底部面板列星盤按鈕的未點點數徽章（`56-star-chart.md` § 56.7）。用遊戲元件 `PanelDock`。
+  `npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/star-badge.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 24px; }
+.demo-controls label { display: flex; gap: 8px; align-items: center; }
+.demo-dock { padding-top: 12px; }
+@media (max-width: 720px) { body { padding: 16px; } }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">星盤未點點數（介面確認）</h1>
+  <p class="demo-note">Lv30 起有未點的星點時，底部「星盤」按鈕右上角顯示數量（樣式同信箱徽章）；全部點完或未滿 Lv30 不顯示。</p>
+  <div id="root"></div>
+  <script type="module" src="./starBadgeDemo.tsx"></script>
+</body>
+</html>

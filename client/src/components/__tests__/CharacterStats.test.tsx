@@ -17,9 +17,7 @@ describe('CharacterStats', () => {
         exp: 0,
         expToNext: 1000,
         hp: 100,
-        maxHp: 100,
         mp: 30,
-        maxMp: 30,
         baseAttributes: { STR: 18, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
         bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
         gold: 1000,
@@ -28,7 +26,6 @@ describe('CharacterStats', () => {
         currentRegion: 'dawn-plains',
         currentFloor: null,
         skills: [],
-        unspentAttributePoints: 0,
         quests: [],
         areaEnteredAt: Date.now(),
         createdAt: Date.now(),
@@ -157,6 +154,16 @@ describe('CharacterStats', () => {
       render(<CharacterStats />);
       expect(rowValue('掉寶率')).toBe('+0.0%');
       expect(rowValue('金幣獲得率')).toBe('+0.0%');
+    });
+
+    it('交界命星的加成顯示在面板（孤注爆傷、疾風攻速、貪婪掉寶）', () => {
+      const c = useGameStore.getState().character!;
+      useGameStore.setState({ character: { ...c, starChart: ['risk1-keystone0', 'risk2-keystone0', 'risk4-keystone1'] } });
+      render(<CharacterStats />);
+      expect(rowValue('爆擊傷害')).toBe('240.0%');
+      expect(rowValue('攻速加成')).toBe('+15.0%');
+      expect(rowValue('掉寶率')).toBe('+20.0%');
+      expect(rowValue('金幣獲得率')).toBe('+20.0%');
     });
 
     it('一般詞綴與 T7 獨有掉寶率加總', () => {

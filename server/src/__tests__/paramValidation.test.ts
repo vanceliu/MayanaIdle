@@ -226,16 +226,20 @@ describe('數值、鍵名、列舉參數驗證', () => {
     });
   });
 
-  it('spendAttributePoint 非屬性鍵：不寫入、點數不扣', async () => {
+  it('星盤動作（`56-star-chart.md` § 56.7）：非法參數不改配點；合法配點寫進資料庫', async () => {
     const c = await enter();
-    c.session.game.setState({ character: { ...state(c).character!, unspentAttributePoints: 1 } });
-    const bonus = state(c).character!.bonusAttributes;
+    c.session.game.setState({ character: { ...state(c).character!, level: 40, starChart: ['knight-start'] } });
 
-    await c.act('spendAttributePoint', 'constructor');
-    await c.act('spendAttributePoint', '__proto__');
+    for (const bad of ['__proto__', 42, null, { length: 1 }, ['knight-r360'], ['knight-start', '__proto__']]) {
+      expect(await c.act('applyStarChart', bad)).toMatchObject({ t: 'action_ok', result: false });
+    }
+    expect(state(c).character!.starChart).toEqual(['knight-start']);
 
-    expect(state(c).character!.bonusAttributes).toEqual(bonus);
-    expect(state(c).character!.unspentAttributePoints).toBe(1);
+    expect(await c.act('applyStarChart', ['knight-start', 'knight-r360', 'knight-r300'])).toMatchObject({ t: 'action_ok', result: true });
+    expect(state(c).character!.starChart).toEqual(['knight-start', 'knight-r360', 'knight-r300']);
+    await state(c).flushSaveNow();
+    const saved = await c.session.repo.getCharacter(state(c).character!.id!);
+    expect(saved!.starChart).toEqual(['knight-start', 'knight-r360', 'knight-r300']);
   });
 
   it('restAtInn 在野外：不收錢、不回復（`13-town.md` § 13.7）', async () => {

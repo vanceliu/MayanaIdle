@@ -10,8 +10,13 @@ import type { EquipmentInstance, EquippedGear, EquipSlot } from '../src/models/e
 import type { ActiveEffect } from '../src/models/effect';
 import type { Skill } from '../src/models/skill';
 import { TALENT_INSTALL_MAX } from '../src/models/talent';
+import { resolveSkill } from '../src/models/skillStar';
+import { intervalTweak } from './starTweaks.mts';
+import { CLASS_SKILLS } from '../src/models/classSkills';
+
+const CLASS_SKILL_IDS = new Set(CLASS_SKILLS.map(c => c.skill.id));
 import {
-  buildCharacter, buildRotation, calibrate, designEffectiveInt, getSkillPlan, preCombatBuffs, resolveLoadout,
+  buildCharacter, buildRotation, calibrate, designEffectiveInt, getSkillPlan, preCombatBuffs, resolveLoadout, speedBuff,
   type Loadout, type RotationEntry, type SimContext,
 } from './reaperShared.mts';
 
@@ -23,6 +28,14 @@ export const DANGER_HP = 50;
 /** 高耗魔、持續短的防守技：只在危險時放 */
 export const DANGER_ONLY_CATEGORIES = new Set(['invincible', 'sanctuary']);
 export const MANA_SHIELD_CATEGORY = 'mana-shield';
+/** 法系標準施法：MP 低於 50% 時不放 6～10 級基礎攻擊魔法與元素風暴（§ 44.2）；`--mp-reserve=N` 改門檻，0 為有魔就放 */
+const MP_RESERVE_ARG = process.argv.find(a => a.startsWith('--mp-reserve='))?.split('=')[1];
+export const DEFAULT_CASTER_MP_RESERVE = 50;
+export function mpReserveOf(cn: ClassName): number {
+  if (MP_RESERVE_ARG !== undefined) return Number(MP_RESERVE_ARG);
+  return cn === 'elementalist' || cn === 'priest' ? DEFAULT_CASTER_MP_RESERVE : 0;
+}
+const isReserveGated = (s: Skill) => s.id === 'element-storm' || (s.type === 'attack' && !CLASS_SKILL_IDS.has(s.id) && s.level >= 6);
 
 /** 魔力護盾的施放策略：常駐（到期重放）或危險時才開 */
 
@@ -86,9 +99,12 @@ export function buildSetup(
 ): FightSetup {
   slotSeq = 0;
   const plan = getSkillPlan(className, ctx?.level);
-  const effects = [...preCombatBuffs(className, ctx?.level), plan.speed.effect];
+  const effects = [...preCombatBuffs(className, ctx?.level, raw.gear), speedBuff(className, ctx?.level, raw.gear)];
   const character = { ...(ctx?.character ?? buildCharacter(className)), id: 1 };
-  const loadout = resolveLoadout(character, effects, raw);
+  const resolved = resolveLoadout(character, effects, raw);
+  const tweakedGear = intervalTweak(resolved.gear, effects);
+  const loadout = tweakedGear === resolved.gear ? resolved
+    : { ...resolved, gear: tweakedGear, weapon: tweakedGear.find(g => g?.slot === 'rightHand') ?? resolved.weapon };
   const effInt = ctx ? ctx.effectiveInt(loadout.gear) : designEffectiveInt(className, loadout.gear);
   const { order } = calibrate(
     character, loadout, buildRotation(className, loadout.weapon, ctx?.level), effects, effInt, seed, ctx?.monster,
@@ -108,8 +124,11 @@ export function buildSetup(
   const persistent: TalentSlot[] = [];
   const attackEntries = order.filter((e: RotationEntry) => e.kind !== 'self_buff');
   for (const e of attackEntries.slice(0, TALENT_INSTALL_MAX - 1)) {
-    const selfHpCost = learned.find(x => x.id === e.id)?.selfHpCostPercent;
+    const learnedSkill = learned.find(x => x.id === e.id);
+    const selfHpCost = learnedSkill?.selfHpCostPercent;
     const conds = isKnight && selfHpCost ? [entry('hp_above', { value: KNIGHT_HP_TARGET })] : [];
+    const reserve = mpReserveOf(className);
+    if (reserve > 0 && learnedSkill && isReserveGated(learnedSkill as Skill)) conds.push(entry('mp_above', { value: reserve }));
     combat.push(slot('combat', entry('skill', { skillId: e.id }), conds));
   }
   // 位移、控場、只上毒、自扣血的技能，價值不在直接傷害（木樁校準會篩掉），實戰照樣施放
@@ -127,7 +146,7 @@ export function buildSetup(
   // 常駐：補血（危險時、每點 MP 補最多的一招）→ 藥水 → 回魔 → 防守／續航 buff → 輸出 buff
   const heal = learned
     .filter(s => s.type === 'heal' && s.power > 0)
-    .map(s => ({ s, amount: calculateHealAmount(character, s.power, loadout.gear, effects) }))
+    .map(s => ({ s, amount: calculateHealAmount(character, resolveSkill(s as Skill, loadout.gear, character).power, loadout.gear, effects) }))
     .sort((a, b) => b.amount / Math.max(1, b.s.mpCost) - a.amount / Math.max(1, a.s.mpCost) || b.amount - a.amount)[0];
   if (heal) {
     persistent.push(slot('persistent', entry('heal_skill', { skillId: heal.s.id }), [entry('hp_below', { value: DANGER_HP })]));
@@ -147,8 +166,9 @@ export function buildSetup(
   for (const s of learned) {
     if (s.type !== 'buff') continue;
     if (s.buffCategory && bestOfCategory.get(s.buffCategory)?.id !== s.id) continue;
-    if (s.mpRestorePercent) {
-      const mpThreshold = Math.floor(100 - s.mpRestorePercent);
+    const restore = resolveSkill(s as Skill, loadout.gear, character).mpRestorePercent;
+    if (restore) {
+      const mpThreshold = Math.floor(100 - restore);
       persistent.push(slot('persistent', entry('buff_skill', { skillId: s.id }),
         [entry('mp_below', { value: mpThreshold }), entry('hp_above', { value: 50 })]));
       rules.push(`${s.name}：MP 低於 ${mpThreshold}% 且 HP 高於 50%`);

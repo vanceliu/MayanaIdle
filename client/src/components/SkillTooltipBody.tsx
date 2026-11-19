@@ -1,10 +1,12 @@
 /**
- * 技能 tooltip 的數值列。`shown` 是套用職業池隨機技能後的技能（`models/abilitySkill.ts`），
- * 與 `base` 不同的數字以黃色標出（`07-affix-ability.md` § 7S.7）。
+ * 技能 tooltip 的數值列。`shown` 是套用星盤等級與職業池隨機技能後的技能（`models/skillStar.ts`），
+ * 與 `base` 不同的數字以黃色標出（`07-affix-ability.md` § 7S.7、`56-star-chart.md` § 56.5）。
  */
 import type { Skill } from '../models/skill';
 import { WEAPON_TYPE_LABELS, formatSkillRange, formatBuffDuration, formatDebuffDuration, formatSelfBuff } from '../models/skill';
 import { ChangedNumbers } from './ChangedNumbers';
+import { skillCategoryLabel, starLevelSuffix } from '../models/skillStar';
+import type { Character } from '../models/character';
 
 type SkillLike = Omit<Skill, 'lastUsedAt'>;
 
@@ -15,9 +17,31 @@ function rangeText(s: SkillLike): string {
   return `半徑 ${s.aoeRadius} 格${tail}`;
 }
 
+/** 星盤技能等級的物理段倍率（`56-star-chart.md` § 56.5）；1 倍不顯示 */
+function physicalScaleText(s: SkillLike): string {
+  const scale = s.physicalScale ?? 1;
+  return scale === 1 ? '' : ` ×${Number(scale.toFixed(2))}`;
+}
+
 function debuffText(s: SkillLike): string {
   const d = s.applyDebuff;
   return d ? `${d.name} (${d.description}, ${formatDebuffDuration(d)})` : '';
+}
+
+/** tooltip 標頭：名稱與星盤等級、分類、習得等級 */
+export function SkillTooltipHeader({ name, skill, level, character }: {
+  name: string;
+  skill: SkillLike;
+  level: number;
+  character: Pick<Character, 'className' | 'starChart'> | null;
+}) {
+  return (
+    <>
+      <div className="skill-tooltip-name">{name}{character ? starLevelSuffix(skill, character) : ''}</div>
+      <div className="skill-tooltip-category">{skillCategoryLabel(skill as Skill)}</div>
+      <div className="skill-tooltip-level">等級 {level}</div>
+    </>
+  );
 }
 
 export function SkillTooltipBody({ base, shown, healOf }: {
@@ -38,9 +62,9 @@ export function SkillTooltipBody({ base, shown, healOf }: {
       )}
       {shown.type === 'attack' && line('威力: ',
         `${base.power}${base.physicalSnapshot ? ' + 物理傷害' : ''}`,
-        `${shown.power}${shown.physicalSnapshot ? ' + 物理傷害' : ''}`)}
+        `${shown.power}${shown.physicalSnapshot ? ` + 物理傷害${physicalScaleText(shown)}` : ''}`)}
       {line('射程: ', formatSkillRange(base), formatSkillRange(shown))}
-      {shown.hits ? line('', `${base.hits ?? 0} 連擊`, `${shown.hits} 連擊`) : null}
+      {shown.hits ? line('', `${base.hits ?? 0} 連擊`, `${shown.hits} 連擊${physicalScaleText(shown)}`) : null}
       {line('效果: ', base.description ?? '', shown.description ?? '')}
       {!shown.instantDotTicks && line('附加: ', debuffText(base), debuffText(shown))}
       {line('傷害加成: ', '', shown.abilityDamagePercent ? `+${shown.abilityDamagePercent}%` : '')}

@@ -827,6 +827,7 @@ const EFFECT_ICON_MAP: Record<string, string> = {
   'speed': 'buffs/sprint',
   'crit-buff': 'buffs/crosshair',
   'cd-reduction': 'buffs/lightning-helix',
+  'mana-saving': 'buffs/lightning-helix',
   'element-boost': 'buffs/embrassed-energy',
   'holy-shield': 'buffs/holy-symbol',
   'evasion': 'buffs/dodging',

@@ -3,6 +3,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PanelDock } from '../../components/PanelDock';
 import { usePanelWindowStore, PANEL_KEYS, DOCK_PANEL_KEYS } from '../../stores/panelWindowStore';
+import { useGameStore } from '../../stores/gameStore';
+import { starStartNodeId } from '../../models/starChart';
+import type { Character } from '../../models/character';
 
 vi.mock('../../components/ScriptEditorPanel', () => ({
   ScriptEditorButton: () => <button className="panel-dock-btn script-panel-trigger">自動天賦</button>,
@@ -39,15 +42,15 @@ describe('PanelDock', () => {
   });
 
   /**
-   * § 34.10 的分組：角色四顆一組，任務／信箱／自動天賦一組。
+   * § 34.10 的分組：角色五顆一組（含星盤），任務／信箱／自動天賦一組。
    * 間隔掛在 `.quest-tracker-btn` 自己的 class 上，所以**任務鈕必須是第二組的第一顆** ——
    * 順序被改時間隔會落在錯的位置，而且不會有任何錯誤訊息。
    */
-  it('按鈕順序＝分組：角色四顆在前，任務／信箱／自動天賦在後', () => {
+  it('按鈕順序＝分組：角色五顆（含星盤）在前，任務／信箱／自動天賦在後', () => {
     render(<PanelDock />);
     const names = [...document.querySelectorAll<HTMLElement>('.panel-dock > button')]
       .map(b => b.getAttribute('aria-label') ?? b.textContent);
-    expect(names).toEqual(['詳細狀態', '裝備欄', '背包', '技能', '📋 任務', '✉️ 信箱', '自動天賦']);
+    expect(names).toEqual(['詳細狀態', '裝備欄', '背包', '技能', '星盤', '📋 任務', '✉️ 信箱', '自動天賦']);
   });
 
   it('任務／信箱／自動天賦不在泛用按鈕清單內（按鈕由各自組件渲染以帶指示）', () => {
@@ -91,5 +94,22 @@ describe('PanelDock', () => {
 
     expect(btn.className).toContain('active');
     expect(btn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('星盤按鈕右上角顯示未點星點數；點完或未滿 Lv30 不顯示', () => {
+    const setChar = (level: number, starChart: string[]) =>
+      useGameStore.setState({ character: { className: 'elf', level, starChart, quests: [] } as unknown as Character });
+    const badge = () => dockButton('星盤').querySelector('.quest-count-badge')?.textContent ?? null;
+
+    setChar(33, [starStartNodeId('elf')]);
+    const { rerender } = render(<PanelDock />);
+    expect(badge()).toBe('3');
+    setChar(30, [starStartNodeId('elf')]);
+    rerender(<PanelDock />);
+    expect(badge()).toBeNull();
+    setChar(20, []);
+    rerender(<PanelDock />);
+    expect(badge()).toBeNull();
+    useGameStore.setState({ character: null });
   });
 });

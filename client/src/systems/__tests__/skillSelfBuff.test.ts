@@ -3,20 +3,23 @@ import { applySkillSelfBuff } from '../arpgEventHandler';
 import { getDebuffImmunityRate, hasDebuffImmunityBuff } from '../playerDebuffSystem';
 import { getSkillTemplate } from '../../models/skillTemplate';
 import type { Character } from '../../models/character';
+import { getMaxHp } from '../maxHpMp';
 import type { ActiveEffect } from '../../models/effect';
 import type { Skill } from '../../models/skill';
 
+/** HP 為「有效最大 HP × hp / maxHp」，最大 HP 由公式算（`20-attributes.md` § 20.4） */
 function char(hp: number, maxHp: number): Character {
-  return {
+  const c: Character = {
     name: 'T', className: 'knight', level: 50, exp: 0, expToNext: 100,
-    hp, maxHp, mp: 100, maxMp: 100,
+    hp: 0, mp: 100,
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [],
+    quests: [],
     areaEnteredAt: 0, createdAt: 0, userId: 1,
   };
+  return { ...c, hp: Math.floor(getMaxHp(c, []) * hp / maxHp) };
 }
 
 const withLastUsed = (id: string): Skill => ({ ...getSkillTemplate(id)!, lastUsedAt: 0 });

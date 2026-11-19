@@ -102,13 +102,13 @@ describe('牧師', () => {
     expect(shield.buffModifiers).toEqual([{ stat: 'shield_absorb', value: 150, isPercent: false }]);
     expect(shield.buffDuration).toBe(23000);
     expect(apply('group-heal', 'priest', 'group_heal_boost', { mp: 10, power: 20 })).toMatchObject({ mpCost: 50, power: Math.floor(53 * 1.2) });
-    expect(apply('holy-judgment', 'priest', 'holy_judgment_boost', { targets: 2, power: 10 })).toMatchObject({ maxTargets: 8, power: Math.floor(37 * 1.1) });
+    expect(apply('holy-judgment', 'priest', 'holy_judgment_boost', { targets: 2, power: 10 })).toMatchObject({ maxTargets: 8, power: Math.floor(45 * 1.1) });
   });
 
   it('血魔轉換扣血改為 X%；神聖懲擊突進＋暈眩；神聖領域', () => {
     expect(apply('blood-mana', 'priest', 'blood_mana_boost', { hpCost: 10 }).selfHpCostPercent).toBe(10);
     const smite = apply('holy-smite', 'priest', 'holy_smite_boost', { stun: 1500 });
-    expect(smite).toMatchObject({ dash: true, dashOptional: true, lifestealPercent: 30 });
+    expect(smite).toMatchObject({ dash: true, dashOptional: true, lifestealPercent: 10 });
     expect(smite.applyDebuff).toMatchObject({ stun: true, duration: 1500 });
     expect(apply('holy-domain', 'priest', 'holy_domain_boost', { mp: 15, cooldown: 15000 })).toMatchObject({ mpCost: 75, cooldown: 75000 });
   });
@@ -124,9 +124,11 @@ describe('牧師', () => {
 });
 
 describe('盜賊', () => {
-  it('淬毒加成寫進 buff；致命一擊／背刺持續；煙霧彈次數；精準打擊', () => {
+  it('淬毒加成寫進 buff；致命一擊施放後爆傷 buff；背刺持續；煙霧彈次數；精準打擊', () => {
     expect(apply('envenom', 'thief', 'envenom_boost', { percent: 60 }).buffModifiers).toContainEqual({ stat: ENVENOM_DOT_BONUS_STAT, value: 60, isPercent: true });
-    expect(apply('deadly-strike', 'thief', 'deadly_strike_boost', { duration: 3000 }).buffDuration).toBe(18000);
+    expect(apply('deadly-strike', 'thief', 'deadly_strike_boost', { duration: 4000 }).selfBuff).toMatchObject({
+      category: 'crit-buff', duration: 4000, modifiers: [{ stat: 'crit_damage', value: 50, isPercent: true }],
+    });
     expect(apply('backstab', 'thief', 'backstab_boost', { duration: 4000 }).selfBuff!.duration).toBe(9000);
     expect(apply('smoke-bomb', 'thief', 'smoke_bomb_boost').evadeCharges).toBe(2);
     const p = apply('precision-strike', 'thief', 'precision_strike_boost', { defense: 3, crit: 5 });
@@ -134,7 +136,7 @@ describe('盜賊', () => {
     expect(p.buffModifiers).toContainEqual({ stat: 'defense', value: 3, isPercent: false });
   });
 
-  it('毒霧改立即傷害', () => {
+  it('冰霧強化改立即傷害', () => {
     expect(apply('poison-mist', 'thief', 'poison_mist_boost')).toMatchObject({ dotOnly: false, instantDotTicks: 10 });
   });
 });

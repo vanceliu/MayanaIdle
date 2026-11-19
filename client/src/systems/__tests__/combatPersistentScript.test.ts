@@ -12,12 +12,12 @@ import { bagItem } from '../../testing/bagFixtures';
 function createChar(overrides: Partial<Character> = {}): Character {
   return {
     name: 'Test', className: 'knight', level: 5, exp: 0, expToNext: 100,
-    hp: 100, maxHp: 100, mp: 30, maxMp: 30,
+    hp: 100, mp: 30, 
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [],
+    quests: [],
     areaEnteredAt: Date.now(), createdAt: Date.now(), userId: 1,
     ...overrides,
   };
@@ -126,7 +126,7 @@ describe('evaluatePersistentScript', () => {
     const rules: PersistentRule[] = [
       { id: 'r1', enabled: true, conditions: [{ type: 'hp_below', value: 50 }], action: { type: 'potion', potionType: 'red' } },
     ];
-    const ctx = createCtx({ character: createChar({ hp: 30, maxHp: 100 }) });
+    const ctx = createCtx({ character: createChar({ hp: 30, }) });
     expect(evaluatePersistentScript(rules, ctx)).toEqual({ type: 'potion', potionType: 'red' });
   });
 
@@ -134,7 +134,7 @@ describe('evaluatePersistentScript', () => {
     const rules: PersistentRule[] = [
       { id: 'r1', enabled: true, conditions: [{ type: 'hp_below', value: 50 }], action: { type: 'potion', potionType: 'red' } },
     ];
-    const ctx = createCtx({ character: createChar({ hp: 80, maxHp: 100 }) });
+    const ctx = createCtx({ character: createChar({ hp: 80, }) });
     expect(evaluatePersistentScript(rules, ctx)).toBeNull();
   });
 
@@ -142,7 +142,7 @@ describe('evaluatePersistentScript', () => {
     const rules: PersistentRule[] = [
       { id: 'r1', enabled: true, conditions: [{ type: 'always' }], action: { type: 'potion', potionType: 'red' } },
     ];
-    const ctx = createCtx({ character: createChar({ hp: 100, maxHp: 100 }) });
+    const ctx = createCtx({ character: createChar({ hp: 100, }) });
     expect(evaluatePersistentScript(rules, ctx)).toBeNull();
   });
 
@@ -220,19 +220,19 @@ describe('evaluateEmergencyRetreat', () => {
 
   it('returns null when disabled', () => {
     const retreat = { ...defaultRetreat, enabled: false };
-    const ctx = createCtx({ character: createChar({ hp: 5, maxHp: 100 }) });
+    const ctx = createCtx({ character: createChar({ hp: 5, }) });
     expect(evaluateEmergencyRetreat(retreat, ctx)).toBeNull();
   });
 
   it('returns null when not in combat', () => {
-    const ctx = createCtx({ character: createChar({ hp: 5, maxHp: 100 }), inCombat: false });
+    const ctx = createCtx({ character: createChar({ hp: 5, }), inCombat: false });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toBeNull();
   });
 
   it('HP 門檻以有效最大 HP 計算（含 +maxHp 詞綴）', () => {
     // 基礎 maxHp 100、有效 200：HP 25 為 12.5%，低於 15% 門檻
     const ctx = createCtx({
-      character: createChar({ hp: 25, maxHp: 100 }),
+      character: createChar({ hp: 25, }),
       effectiveMaxHp: 200,
       bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
@@ -240,20 +240,20 @@ describe('evaluateEmergencyRetreat', () => {
 
     // 若誤用基礎 maxHp，25% 會高於門檻而不撤退
     const wrong = createCtx({
-      character: createChar({ hp: 25, maxHp: 100 }),
+      character: createChar({ hp: 25, }),
       bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, wrong)).toBeNull();
   });
 
   it('returns null when HP is above threshold', () => {
-    const ctx = createCtx({ character: createChar({ hp: 50, maxHp: 100 }) });
+    const ctx = createCtx({ character: createChar({ hp: 50, }) });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toBeNull();
   });
 
   it('returns retreat when HP below threshold and scroll available', () => {
     const ctx = createCtx({
-      character: createChar({ hp: 10, maxHp: 100 }),
+      character: createChar({ hp: 10, }),
       bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toEqual(defaultRetreat);
@@ -261,7 +261,7 @@ describe('evaluateEmergencyRetreat', () => {
 
   it('returns null for flee_town when no scroll available', () => {
     const ctx = createCtx({
-      character: createChar({ hp: 10, maxHp: 100 }),
+      character: createChar({ hp: 10, }),
       bagItems: [],
     });
     expect(evaluateEmergencyRetreat(defaultRetreat, ctx)).toBeNull();
@@ -270,7 +270,7 @@ describe('evaluateEmergencyRetreat', () => {
   it('checks specific town scroll when scrollTownId is set', () => {
     const retreat: EmergencyRetreat = { ...defaultRetreat, scrollTownId: 'neutral-town' };
     const ctx = createCtx({
-      character: createChar({ hp: 10, maxHp: 100 }),
+      character: createChar({ hp: 10, }),
       bagItems: [bagItem('薄暮村回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(retreat, ctx)).toEqual(retreat);
@@ -279,7 +279,7 @@ describe('evaluateEmergencyRetreat', () => {
   it('returns null when specific town scroll is not in bag', () => {
     const retreat: EmergencyRetreat = { ...defaultRetreat, scrollTownId: 'neutral-town' };
     const ctx = createCtx({
-      character: createChar({ hp: 10, maxHp: 100 }),
+      character: createChar({ hp: 10, }),
       bagItems: [bagItem('艾爾薩斯回城卷軸', 1)],
     });
     expect(evaluateEmergencyRetreat(retreat, ctx)).toBeNull();

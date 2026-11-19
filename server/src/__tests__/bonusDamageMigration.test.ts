@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { openDatabase, migrate, rescaleBonusDamageParams, LATEST_SCHEMA_VERSION } from '../db/sqlite';
+import { openDatabase, migrate, rescaleBonusDamageParams } from '../db/sqlite';
+import { LEGACY_RESET_VERSION } from '../db/legacyReset';
+
+/** 停在清檔遷移之前，遷移後的資料才留得住 */
+const BEFORE_RESET = LEGACY_RESET_VERSION - 1;
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
 import { getAbilityWeaponValue } from '../../../client/src/models/ability';
 
@@ -20,7 +24,7 @@ describe('追加傷害遷移', () => {
 
   function seededAtV11() {
     const db = openDatabase(':memory:');
-    migrate(db);
+    migrate(db, BEFORE_RESET);
     db.prepare('DELETE FROM schema_version WHERE version >= 12').run();
     db.prepare('INSERT INTO schema_version (version) VALUES (11)').run();
     const insert = db.prepare('INSERT INTO equipment_instances (owner_id, data) VALUES (?, ?)');
@@ -36,7 +40,7 @@ describe('追加傷害遷移', () => {
 
   it('只換算追加傷害，其他技能與欄位不動', () => {
     const db = seededAtV11();
-    expect(migrate(db)).toEqual({ from: 11, to: LATEST_SCHEMA_VERSION });
+    expect(migrate(db, BEFORE_RESET)).toEqual({ from: 11, to: BEFORE_RESET });
     const [bonus, combo, plain] = rows(db);
     expect(bonus).toEqual({ templateId: sword.id, quality: 10, ability: { type: 'bonus_damage', params: { chance: 15, damage: 45 } } });
     expect(combo.ability).toEqual({ type: 'combo_strike', params: { every: 5, bonus: 50 } });
@@ -45,9 +49,9 @@ describe('追加傷害遷移', () => {
 
   it('冪等：再跑一次不變', () => {
     const db = seededAtV11();
-    migrate(db);
+    migrate(db, BEFORE_RESET);
     const first = rows(db);
-    expect(migrate(db)).toEqual({ from: LATEST_SCHEMA_VERSION, to: LATEST_SCHEMA_VERSION });
+    expect(migrate(db, BEFORE_RESET)).toEqual({ from: BEFORE_RESET, to: BEFORE_RESET });
     expect(rows(db)).toEqual(first);
   });
 });

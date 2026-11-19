@@ -34,12 +34,12 @@ const NOW = 700_000;
 function knight(hp = 500, mp = 200): Character {
   return {
     name: 'Tester', className: 'knight', level: 75, exp: 0, expToNext: 100,
-    hp, maxHp: 1000, mp, maxMp: 400,
+    hp, mp, 
     baseAttributes: { STR: 20, AGI: 10, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 

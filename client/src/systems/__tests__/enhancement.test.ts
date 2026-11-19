@@ -1,20 +1,34 @@
 import { describe, it, expect } from 'vitest';
-import { getWeaponEnhanceRate, getArmorEnhanceRate } from '../enhancement';
+import { getWeaponEnhanceOdds, getArmorEnhanceRate } from '../enhancement';
 
 describe('武器強化成功率（06-equipment.md § 6.9）', () => {
-  it('安定值 6：+1~+6 必定成功，+7 起 1/3', () => {
-    for (let lv = 1; lv <= 6; lv++) expect(getWeaponEnhanceRate(lv, 6)).toBe(1.0);
-    expect(getWeaponEnhanceRate(7, 6)).toBeCloseTo(1 / 3);
-    expect(getWeaponEnhanceRate(10, 6)).toBeCloseTo(1 / 3);
+  it('安定值 6：+1~+6 必定成功', () => {
+    for (let lv = 1; lv <= 6; lv++) expect(getWeaponEnhanceOdds(lv, 6)).toEqual({ success: 1, noChange: 0, destroy: 0 });
   });
 
-  it('安定值 0：從 +1 起就是 1/3', () => {
-    expect(getWeaponEnhanceRate(1, 0)).toBeCloseTo(1 / 3);
-    expect(getWeaponEnhanceRate(5, 0)).toBeCloseTo(1 / 3);
+  it('+7~+9：1/3 成功、2/3 消失，沒有無變化', () => {
+    for (const lv of [7, 8, 9]) {
+      const odds = getWeaponEnhanceOdds(lv, 6);
+      expect(odds.success).toBeCloseTo(1 / 3);
+      expect(odds.noChange).toBe(0);
+      expect(odds.destroy).toBeCloseTo(2 / 3);
+    }
   });
 
-  it('武器成功率不隨等級遞減（與防具是兩套獨立系統）', () => {
-    expect(getWeaponEnhanceRate(8, 6)).toBe(getWeaponEnhanceRate(20, 6));
+  it('+10 起每一級：1/5 成功、2/5 無變化、2/5 消失', () => {
+    for (const lv of [10, 11, 20]) {
+      const odds = getWeaponEnhanceOdds(lv, 6);
+      expect(odds.success).toBeCloseTo(1 / 5);
+      expect(odds.noChange).toBeCloseTo(2 / 5);
+      expect(odds.destroy).toBeCloseTo(2 / 5);
+    }
+  });
+
+  it('三種結果合計為 1', () => {
+    for (let lv = 1; lv <= 15; lv++) {
+      const { success, noChange, destroy } = getWeaponEnhanceOdds(lv, 6);
+      expect(success + noChange + destroy).toBeCloseTo(1);
+    }
   });
 });
 

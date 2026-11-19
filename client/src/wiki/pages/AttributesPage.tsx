@@ -1,5 +1,9 @@
 import '../components/WikiTable.css';
 import { COOLDOWN_REDUCTION_CAP, INT_SKILL_DAMAGE_PERCENT_PER_2 } from '../../systems/combat';
+import { CLASS_HP_MP_FORMULA } from '../../systems/maxHpMp';
+import { CLASS_NAMES_ZH, type ClassName } from '../../models/character';
+
+const HP_MP_CLASS_ORDER: ClassName[] = ['knight', 'elf', 'thief', 'elementalist', 'priest'];
 
 export function AttributesPage() {
   return (
@@ -37,13 +41,13 @@ export function AttributesPage() {
                 <td>體質</td>
                 <td>VIT</td>
                 <td className="cell-number">floor(VIT / 2) × 2</td>
-                <td>升級時 HP 成長：random(VIT-6, VIT-3)；回血：有效VIT / 2；負重：VIT × 100（原始值）</td>
+                <td>最大 HP（原始值，見下方公式）；回血：有效VIT / 2；負重：VIT × 100（原始值）</td>
               </tr>
               <tr>
                 <td>精神</td>
                 <td>SPI</td>
                 <td className="cell-number">floor(SPI / 2) × 2</td>
-                <td>升級時 MP 成長：random(SPI-6, SPI-3)；回魔：有效SPI / 2；魔法抗性：有效SPI / 2</td>
+                <td>最大 MP（原始值，見下方公式）；回魔：有效SPI / 2；魔法抗性：有效SPI / 2</td>
               </tr>
               <tr>
                 <td>智力</td>
@@ -57,6 +61,38 @@ export function AttributesPage() {
                 <td>—</td>
                 <td>目前沒有作用</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 }}>
+          最大 HP／MP
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
+          最大 HP ＝（等級 × VIT × 職業 HP 比值 ＋ 職業 HP 加成 ＋ 裝備固定 HP）×（1 ＋ 星盤最大 HP%）<br />
+          最大 MP ＝（等級 × SPI × 職業 MP 比值 ＋ 職業 MP 加成 ＋ 裝備固定 MP）×（1 ＋ 星盤最大 MP%）<br />
+          VIT／SPI 取原始值，含建角配點、星盤與裝備，不含 buff；升級時 HP／MP 回滿。
+        </p>
+        <div className="wiki-table-wrap">
+          <table className="wiki-table">
+            <thead>
+              <tr><th>職業</th><th>HP 比值</th><th>HP 加成</th><th>MP 比值</th><th>MP 加成</th></tr>
+            </thead>
+            <tbody>
+              {HP_MP_CLASS_ORDER.map(c => {
+                const f = CLASS_HP_MP_FORMULA[c];
+                return (
+                  <tr key={c}>
+                    <td>{CLASS_NAMES_ZH[c]}</td>
+                    <td className="cell-number">{f.hpRatio}</td>
+                    <td className="cell-number">{f.hpBonus}</td>
+                    <td className="cell-number">{f.mpRatio}</td>
+                    <td className="cell-number">{f.mpBonus}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -90,7 +126,7 @@ export function AttributesPage() {
           </table>
         </div>
         <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: 'var(--fs-sm)' }}>
-          建角屬性上限：18 | 總配點上限：80 | Lv.51+ 每級 +1 自由屬性點，屬性上限提升至 35
+          建角屬性上限：18 | 總配點上限：80 | 建角後屬性來自星盤、裝備與 buff，沒有上限
         </p>
       </section>
 

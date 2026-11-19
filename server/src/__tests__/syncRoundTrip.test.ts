@@ -30,7 +30,7 @@ it('野外戰鬥 200 tick：client 還原的日誌、角色、怪物、怪物血
   world.sessions.add(s);
   await s.game.getState().createCharacter('往返', 'knight', { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 } as never);
   const ch = s.game.getState().character!;
-  s.game.setState({ character: { ...ch, currentRegion: 'dawn-plains', currentArea: 'dawn-plains', level: 30, hp: 5000, maxHp: 5000 } });
+  s.game.setState({ character: { ...ch, currentRegion: 'dawn-plains', currentArea: 'dawn-plains', level: 30, hp: 5000, mp: 5000 } });
   await s.game.getState().saveState();
   await syncWorld(s);
   world.onCharacterEnter(s);

@@ -37,12 +37,12 @@ const NOW = 900_000;
 function character(className: Character['className'] = 'knight'): Character {
   return {
     name: 'Tester', className, level: 60, exp: 0, expToNext: 100,
-    hp: 100, maxHp: 1000, mp: 400, maxMp: 400,
+    hp: 100, mp: 400, 
     baseAttributes: { STR: 20, AGI: 0, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 

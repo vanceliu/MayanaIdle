@@ -9,6 +9,7 @@ import type { EquipmentInstance, EquipmentTemplate } from '../../../client/src/m
 import type { MonsterTemplate } from '../../../client/src/models/monster';
 import type { TalentSlot } from '../../../client/src/models/talent';
 import type { Mail } from '../../../client/src/models/mailbox';
+import type { LegacyArchive, LegacyArchiveSummary, LegacyArchiveType } from '../../../client/src/models/legacyArchive';
 import type {
   UserEntry, WarehouseEntry, DropTableEntry, BossDropTableEntry, CharacterBagEntry,
 } from '../../../client/src/db/rowTypes';
@@ -369,4 +370,32 @@ export class SqliteRepository implements GameRepository {
     return this.gate.transaction(fn);
   }
 
+  // ---------- 遺產系統（`45-legacy-archive.md`） ----------
+  async listLegacyArchives(userId: number): Promise<LegacyArchiveSummary[]> {
+    const rows = this.db.prepare(`SELECT id, type, label, class_name, level, data_version, season, archived_at
+      FROM legacy_archives WHERE user_id = ? ORDER BY season DESC, id`).all(userId) as Record<string, unknown>[];
+    return rows.map(toLegacySummary);
+  }
+  async getLegacyArchive(id: number, userId: number): Promise<LegacyArchive | undefined> {
+    const row = this.db.prepare(`SELECT id, type, label, class_name, level, data_version, season, archived_at, payload
+      FROM legacy_archives WHERE id = ? AND user_id = ?`).get(id, userId) as Record<string, unknown> | undefined;
+    return row ? { ...toLegacySummary(row), payload: String(row.payload) } : undefined;
+  }
+  async deleteLegacyArchive(id: number, userId: number): Promise<boolean> {
+    return this.gate.write(() => this.db.prepare('DELETE FROM legacy_archives WHERE id = ? AND user_id = ?').run(id, userId).changes > 0);
+  }
+
+}
+
+function toLegacySummary(row: Record<string, unknown>): LegacyArchiveSummary {
+  return {
+    id: Number(row.id),
+    type: row.type as LegacyArchiveType,
+    label: String(row.label),
+    ...(row.class_name != null ? { className: String(row.class_name) } : {}),
+    ...(row.level != null ? { level: Number(row.level) } : {}),
+    dataVersion: Number(row.data_version),
+    season: Number(row.season),
+    archivedAt: Number(row.archived_at),
+  };
 }

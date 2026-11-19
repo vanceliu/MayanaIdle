@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCombatBonuses, getSkillCooldownReduction, calculatePlayerAttack, calculateSkillAttack } from '../combat';
 import { getSkillTemplate } from '../../models/skillTemplate';
+import { resolveSkill } from '../../models/skillStar';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { EquipmentInstance } from '../../models/equipment';
@@ -12,12 +13,12 @@ const NOW = 400_000;
 function character(): Character {
   return {
     name: 'Tester', className: 'thief', level: 40, exp: 0, expToNext: 100,
-    hp: 300, maxHp: 300, mp: 200, maxMp: 200,
+    hp: 300, mp: 200, 
     baseAttributes: { STR: 15, AGI: 15, VIT: 15, SPI: 10, INT: 20, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -36,6 +37,14 @@ function gearWith(affixes: Affix[]): EquipmentInstance {
     smallMonsterDamage: 30, largeMonsterDamage: 25, defense: 0, quality: 0, enhancement: 0,
     affixes, ownerId: 1, equipped: true,
   } as EquipmentInstance;
+}
+
+/** 致命一擊強化施放後的自身爆傷 buff（`07-affix-ability.md` § 7S.5） */
+function critDamageBuff(): ActiveEffect {
+  return {
+    id: 'buff-crit', sourceSkillId: 'deadly-strike', sourceSkillName: '致命一擊', category: 'crit-buff', type: 'buff', target: 'player',
+    modifiers: [{ stat: 'crit_damage', value: 50, isPercent: true }], startTime: NOW, duration: 5000, tags: [], name: '致命一擊', description: '',
+  };
 }
 
 function buffFrom(skillId: string): ActiveEffect {
@@ -68,9 +77,9 @@ describe('§ 21.3 詞綴與 buff 合流', () => {
     expect(getCombatBonuses(gear, [buffFrom('precision-strike')]).crit_rate).toBe(22);
   });
 
-  it('爆擊傷害：詞綴 + 致命一擊 buff 加總', () => {
+  it('爆擊傷害：詞綴 + 致命一擊強化的爆傷 buff 加總', () => {
     const gear = [gearWith([{ type: 'crit_damage', tier: 2, value: 9 }])];
-    expect(getCombatBonuses(gear, [buffFrom('deadly-strike')]).crit_damage).toBe(59);
+    expect(getCombatBonuses(gear, [critDamageBuff()]).crit_damage).toBe(59);
   });
 
   it('技能元素傷害：詞綴 + 元素增幅 buff 加總', () => {
@@ -80,8 +89,9 @@ describe('§ 21.3 詞綴與 buff 合流', () => {
 
   it('冷卻縮減：詞綴 + 冷卻縮減 buff + 智力加總，上限仍為 50%', () => {
     // character() 的 INT 20 → 有效 20 → 20 / 2 × 1% = 10%（§ 20.6）
-    const gear = [gearWith([{ type: 'cooldown_reduction', tier: 4, value: 15 }])];
-    expect(getSkillCooldownReduction(character(), gear, [buffFrom('cd-reduce')])).toBe(45);
+    const gear = [gearWith([{ type: 'cooldown_reduction', tier: 4, value: 10 }])];
+    expect(getSkillCooldownReduction(character(), gear, [buffFrom('cd-reduce')])).toBe(50);
+    expect(getSkillCooldownReduction(character(), [gearWith([])], [buffFrom('cd-reduce')])).toBe(40);
 
     const heavy = [gearWith([{ type: 'cooldown_reduction', tier: 7, value: 40 }])];
     expect(getSkillCooldownReduction(character(), heavy, [buffFrom('cd-reduce')])).toBe(50);
@@ -94,20 +104,20 @@ describe('§ 21.3 詞綴與 buff 合流', () => {
   });
 
   it('怪物身上的 debuff 不會被誤算成角色 buff', () => {
-    const monsterBuff: ActiveEffect = { ...buffFrom('deadly-strike'), target: 'monster' };
+    const monsterBuff: ActiveEffect = { ...critDamageBuff(), target: 'monster' };
     expect(getCombatBonuses([gearWith([])], [monsterBuff]).crit_damage).toBe(0);
   });
 });
 
 describe('buff 加成實際影響傷害', () => {
-  it('致命一擊提高爆擊倍率', () => {
+  it('爆傷 buff 提高爆擊倍率', () => {
     // random 0.01：命中且必定爆擊
     vi.spyOn(Math, 'random').mockReturnValue(0.01);
     const char = character();
     const gear = [gearWith([])];
 
     const base = calculatePlayerAttack(char, gear[0], monster(), gear, [], 0);
-    const buffed = calculatePlayerAttack(char, gear[0], monster(), gear, [buffFrom('deadly-strike')], 0);
+    const buffed = calculatePlayerAttack(char, gear[0], monster(), gear, [critDamageBuff()], 0);
 
     expect(base.isCritical).toBe(true);
     expect(buffed.isCritical).toBe(true);
@@ -137,24 +147,24 @@ describe('buff 加成實際影響傷害', () => {
   });
 });
 
-describe('強化冷卻縮減（元素師 4，取代連鎖詠唱）', () => {
-  it('定義為冷卻 -40% / 30s，與冷卻縮減同 category 互斥', () => {
+describe('魔法節約（元素師 4）', () => {
+  it('定義為魔法消耗 -30% / 30s、冷卻 60s、MP 40，與冷卻縮減不同類', () => {
     const s = getSkillTemplate('greater-cd-reduce')!;
-    expect(s).toMatchObject({ name: '強化冷卻縮減', level: 4, type: 'buff', mpCost: 40, cooldown: 90_000, buffDuration: 30_000 });
-    expect(s.buffModifiers).toEqual([{ stat: 'cooldown_reduction', value: 40, isPercent: true }]);
-    expect(s.buffCategory).toBe(getSkillTemplate('cd-reduce')!.buffCategory);
+    expect(s).toMatchObject({ name: '魔法節約', level: 4, type: 'buff', mpCost: 40, cooldown: 60_000, buffDuration: 30_000 });
+    expect(s.buffModifiers).toEqual([{ stat: 'mp_cost_reduction', value: 30, isPercent: true }]);
+    expect(s.buffCategory).not.toBe(getSkillTemplate('cd-reduce')!.buffCategory);
   });
 
   it('連鎖詠唱已移除', () => {
     expect(getSkillTemplate('chain-cast')).toBeNull();
   });
 
-  it('冷卻縮減效果生效且受 50% 上限', () => {
-    // character() 的 INT 20 貢獻 10%（§ 20.6）
-    const gear = [gearWith([])];
-    expect(getSkillCooldownReduction(character(), gear, [buffFrom('greater-cd-reduce')])).toBe(50);
-
-    const withAffix = [gearWith([{ type: 'cooldown_reduction', tier: 4, value: 15 }])];
-    expect(getSkillCooldownReduction(character(), withAffix, [buffFrom('greater-cd-reduce')])).toBe(50);
+  it('生效期間所有技能耗魔 ×0.7（無條件捨去），過期恢復', () => {
+    const fireball = { ...getSkillTemplate('fireball')!, lastUsedAt: 0 };
+    const c = character();
+    const saving = buffFrom('greater-cd-reduce');
+    expect(resolveSkill(fireball, [], c, [saving]).mpCost).toBe(Math.floor(fireball.mpCost * 0.7));
+    expect(resolveSkill(fireball, [], c, [{ ...saving, startTime: NOW - 40_000 }]).mpCost).toBe(fireball.mpCost);
   });
 });
+

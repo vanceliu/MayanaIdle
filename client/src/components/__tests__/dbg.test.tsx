@@ -16,7 +16,7 @@ describe('dbg', () => {
     await db.equipmentTemplates.bulkAdd(TEMPLATES);
     defaultSession.repo = repo;
     useGameStore.setState({
-      character: { id: 1, userId: 1, name: 'S', className: 'knight', level: 40, gold: 100000, hp: 1, maxHp: 1, mp: 1, maxMp: 1 } as Character,
+      character: { id: 1, userId: 1, name: 'S', className: 'knight', level: 40, gold: 100000, hp: 1, mp: 1 } as Character,
       inventory: [], bagItems: [], equippedGear: {},
     } as never);
   });

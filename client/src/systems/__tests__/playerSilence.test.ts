@@ -45,10 +45,10 @@ function caster(overrides: Partial<MonsterInstance> = {}): MonsterInstance {
 function character(overrides: Partial<Character> = {}): Character {
   return {
     userId: 1, name: '元素師', className: 'elementalist', level: 30, exp: 0, expToNext: 100,
-    hp: 500, maxHp: 500, mp: 500, maxMp: 500,
+    hp: 500, mp: 500, 
     baseAttributes: { STR: 8, AGI: 8, VIT: 10, SPI: 14, INT: 18, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 0,
+    gold: 0,
     currentArea: 'ivory-tower-1f', currentZone: 'ivory-tower', currentRegion: 'ivory-tower', currentFloor: 1,
     skills: [], quests: [], areaEnteredAt: NOW, createdAt: NOW,
     ...overrides,

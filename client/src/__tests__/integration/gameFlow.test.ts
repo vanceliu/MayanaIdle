@@ -6,7 +6,7 @@ import { getHpRegen, getMpRegen } from '../../systems/regen';
 import { calculatePressure } from '../../systems/pressure';
 import { generateAffixes, getAffixPoolForSlot, getEffectiveAffixValue } from '../../models/affix';
 import { getTotalAttributes, getAvailablePoints, CLASS_BASE_ATTRIBUTES } from '../../models/character';
-import { INITIAL_HP, INITIAL_MP } from '../../systems/levelUp';
+import { getMaxHp, getMaxMp } from '../../systems/maxHpMp';
 import type { Character, ClassName } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
 import type { EquipmentInstance } from '../../models/equipment';
@@ -15,16 +15,14 @@ import type { ScriptRule } from '../../models/scriptEngine';
 
 function createCharacter(className: ClassName, bonusAttrs: Partial<Record<string, number>> = {}): Character {
   const base = CLASS_BASE_ATTRIBUTES[className];
-  return {
+  const char: Character = {
     name: 'Hero',
     className,
     level: 1,
     exp: 0,
     expToNext: getExpToNextLevel(1),
-    hp: INITIAL_HP,
-    maxHp: INITIAL_HP,
-    mp: INITIAL_MP,
-    maxMp: INITIAL_MP,
+    hp: 0,
+    mp: 0,
     baseAttributes: { ...base },
     bonusAttributes: {
       STR: (bonusAttrs as any).STR ?? 0,
@@ -40,12 +38,12 @@ function createCharacter(className: ClassName, bonusAttrs: Partial<Record<string
     currentRegion: 'dawn-plains',
     currentFloor: null,
     skills: [],
-    unspentAttributePoints: 0,
     quests: [],
     areaEnteredAt: Date.now(),
     createdAt: Date.now(),
     userId: 1,
   };
+  return { ...char, hp: getMaxHp(char, []), mp: getMaxMp(char, []) };
 }
 
 function createMonster(overrides: Partial<MonsterInstance> = {}): MonsterInstance {
@@ -77,10 +75,8 @@ describe('Integration: Character Creation Flow', () => {
     expect(char.level).toBe(1);
     expect(char.exp).toBe(0);
     expect(char.expToNext).toBe(100);
-    expect(char.hp).toBe(INITIAL_HP);
-    expect(char.maxHp).toBe(INITIAL_HP);
-    expect(char.mp).toBe(INITIAL_MP);
-    expect(char.maxMp).toBe(INITIAL_MP);
+    expect(char.hp).toBe(30);
+    expect(char.mp).toBe(10);
     expect(char.gold).toBe(0);
     expect(char.currentArea).toBe('dawn-plains');
   });
@@ -141,9 +137,7 @@ describe('Integration: Combat → Level Up', () => {
     const afterExp = addExp(char, expNeeded);
 
     expect(afterExp.level).toBe(2);
-    expect(afterExp.hp).toBe(afterExp.maxHp);
-    expect(afterExp.mp).toBe(afterExp.maxMp);
-    expect(afterExp.maxHp).toBeGreaterThan(char.maxHp);
+    expect(getMaxHp(afterExp, [])).toBeGreaterThan(getMaxHp(char, []));
     vi.restoreAllMocks();
   });
 
@@ -153,7 +147,6 @@ describe('Integration: Combat → Level Up', () => {
     const result = addExp(char, 500);
 
     expect(result.level).toBeGreaterThan(2);
-    expect(result.hp).toBe(result.maxHp);
     vi.restoreAllMocks();
   });
 
@@ -218,9 +211,7 @@ describe('Integration: Script Engine Automation', () => {
       { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
     ];
     const char = createCharacter('knight');
-    char.hp = 20; // 66% of 30 → but 20/30 = 66.7% which is > 30. Need to adjust.
-    char.maxHp = 100;
-    char.hp = 25; // 25% of 100
+    char.hp = Math.floor(getMaxHp(char, []) * 0.25);
 
     const result = evaluateScript(rules, {
       character: char,
@@ -241,8 +232,7 @@ describe('Integration: Script Engine Automation', () => {
       { id: 'r3', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
     ];
     const char = createCharacter('knight');
-    char.maxHp = 100;
-    char.hp = 10; // 10% HP
+    char.hp = Math.floor(getMaxHp(char, []) * 0.1);
 
     const result = evaluateScript(rules, {
       character: char,
@@ -271,7 +261,6 @@ describe('Integration: Script Engine Automation', () => {
     ];
     const char = createCharacter('elementalist');
     char.mp = 30;
-    char.maxMp = 30;
 
     // Skill ready
     const result1 = evaluateScript(rules, {
@@ -304,8 +293,7 @@ describe('Integration: Script Engine Automation', () => {
       { id: 'r3', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
     ];
     const char = createCharacter('knight');
-    char.maxHp = 100;
-    char.hp = 20;
+    char.hp = Math.floor(getMaxHp(char, []) * 0.2);
 
     const result = evaluateScript(rules, {
       character: char,
@@ -388,9 +376,7 @@ describe('Integration: Regen during exploration', () => {
   it('should regenerate HP/MP out of combat', () => {
     const char = createCharacter('knight');
     char.hp = 20;
-    char.maxHp = 100;
     char.mp = 5;
-    char.maxMp = 30;
 
     const hpRegen = getHpRegen(char, false);
     const mpRegen = getMpRegen(char, false);
@@ -399,8 +385,8 @@ describe('Integration: Regen during exploration', () => {
     expect(mpRegen).toBeGreaterThan(0);
 
     // Simulate regen ticks
-    char.hp = Math.min(char.maxHp, char.hp + hpRegen);
-    char.mp = Math.min(char.maxMp, char.mp + mpRegen);
+    char.hp = Math.min(getMaxHp(char, []), char.hp + hpRegen);
+    char.mp = Math.min(getMaxMp(char, []), char.mp + mpRegen);
 
     expect(char.hp).toBeGreaterThan(20);
     expect(char.mp).toBeGreaterThan(5);

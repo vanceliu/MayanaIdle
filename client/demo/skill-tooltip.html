@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>技能分類 Demo — MayanaIdle</title>
+<!--
+  技能 tooltip 的分類列（`56-star-chart.md` § 56.7）。用遊戲元件 `SkillTooltipHeader`／`SkillTooltipBody`。
+  `npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/skill-tooltip.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-grid .skill-tooltip { position: static; }
+.demo-caption { font-size: var(--fs-xs); color: var(--text-dim); margin-bottom: 6px; }
+@media (max-width: 720px) { body { padding: 16px; } }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">技能 tooltip 分類（介面確認）</h1>
+  <p class="demo-note">名稱下方加一行分類：職業技能、基礎攻擊魔法、基礎回復魔法、基礎護盾增益魔法；不屬任何一系的基礎魔法（聖光術）顯示「基礎魔法」。示範角色為牧師，星盤等級如各卡標示。</p>
+  <div id="root"></div>
+  <script type="module" src="./skillTooltipDemo.tsx"></script>
+</body>
+</html>

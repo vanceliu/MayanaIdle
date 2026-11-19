@@ -5,6 +5,7 @@
  * （`97-selfhosted-server.md` § 97.5 廢止清單）。這一份給測試用：
  * 語意對齊 SQLite 實作 —— 自增 id 由 1 起跳、查詢回插入順序、`transaction` 失敗即整批回捲。
  */
+import type { LegacyArchive, LegacyArchiveSummary } from '../models/legacyArchive';
 import type { GameRepository } from './repository';
 import type { Character } from '../models/character';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
@@ -270,6 +271,24 @@ export class MemoryRepository implements GameRepository {
     localStorage.removeItem(bagLayoutStorageKey(characterId));
     localStorage.removeItem(talentBagOrderStorageKey(characterId));
     localStorage.removeItem(mailPurgeStorageKey(characterId));
+  }
+
+  /** 遺產紀錄：client 沒有封存來源，測試以 `legacyArchives` 直接放資料 */
+  readonly legacyArchives: (LegacyArchive & { userId: number })[] = [];
+  async listLegacyArchives(userId: number): Promise<LegacyArchiveSummary[]> {
+    return this.legacyArchives.filter(a => a.userId === userId).map(({ payload: _payload, userId: _userId, ...summary }) => summary);
+  }
+  async getLegacyArchive(id: number, userId: number): Promise<LegacyArchive | undefined> {
+    const hit = this.legacyArchives.find(a => a.id === id && a.userId === userId);
+    if (!hit) return undefined;
+    const { userId: _userId, ...archive } = hit;
+    return archive;
+  }
+  async deleteLegacyArchive(id: number, userId: number): Promise<boolean> {
+    const idx = this.legacyArchives.findIndex(a => a.id === id && a.userId === userId);
+    if (idx < 0) return false;
+    this.legacyArchives.splice(idx, 1);
+    return true;
   }
 
   /** 失敗即回捲：先拍快照，拋錯就整批還原 */

@@ -98,7 +98,7 @@ export function QuestsPage() {
           </table>
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 8 }}>
-          兌換率依掉率比訂定：精鍊／工藝印記 5~7%、混沌／刺針／重刻／新增／封印 1%、突破 1%。
+          兌換率依掉率比訂定：精鍊／工藝印記 2~2.8%、混沌／刺針／重刻／新增／封印 0.5%、突破 0.5%。
         </p>
       </section>
 

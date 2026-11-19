@@ -114,13 +114,15 @@ export const ABILITY_FREEZE_SLOW_PERCENT = 30;
 export const ABILITY_FREEZE_DURATION_MS = 5000;
 /** 逆境計數的角色 debuff（依 tag，`24-buff-debuff.md` § 24.4.1） */
 export const ABILITY_ADVERSITY_TAGS: readonly string[] = ['poisoned', 'bleeding', 'cursed', 'weakened', 'slowed', 'stunned', 'silenced'];
-/** 強化冷卻縮減強化：buff 持續 */
+/** 魔法節約強化：buff 持續 */
 export const ABILITY_GREATER_CDR_DURATION_MS = 180_000;
 /** 專注打擊的加成上限（%） */
 export const ABILITY_FOCUS_MAX_PERCENT = 100;
 /** 火矢附魔強化：非弓的附加火傷害 */
 export const ABILITY_FIRE_ARROW_BONUS = 15;
-/** 毒霧強化：一次打出的秒數 */
+/** 致命一擊強化：施放後自身爆傷 +X% */
+export const ABILITY_DEADLY_STRIKE_CRIT_DAMAGE = 50;
+/** 冰霧強化：一次打出的秒數 */
 export const ABILITY_POISON_MIST_TICKS = 10;
 /** 怒氣上限與怒氣狀態的加成（§ 7S.5） */
 export const ABILITY_RAGE_MAX = 100;
@@ -192,8 +194,8 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
     params: [{ key: 'percent', min: 10, max: 30, unit: '%' }], description: '魔力奪取傷害 +{percent}' },
   { type: 'element_boost_boost', name: '元素增幅強化', group: 'weapon', pool: 'elementalist', skillId: 'element-boost',
     params: [ms('cooldown', 1, 10, 1)], description: '元素增幅冷卻 −{cooldown}' },
-  { type: 'greater_cd_reduce_boost', name: '強化冷卻縮減強化', group: 'accessory', pool: 'elementalist', skillId: 'greater-cd-reduce',
-    params: [], description: `強化冷卻縮減持續時間改為 ${ABILITY_GREATER_CDR_DURATION_MS / 1000} 秒` },
+  { type: 'greater_cd_reduce_boost', name: '魔法節約強化', group: 'accessory', pool: 'elementalist', skillId: 'greater-cd-reduce',
+    params: [], description: `魔法節約持續時間改為 ${ABILITY_GREATER_CDR_DURATION_MS / 1000} 秒` },
   { type: 'mana_shield_boost', name: '魔力護盾強化', group: 'accessory', pool: 'elementalist', skillId: 'mana-shield',
     params: [{ key: 'reduction', min: 5, max: 15, unit: '%' }], description: '魔力護盾期間減傷 +{reduction}' },
   { type: 'mana_spring_boost', name: '魔力湧泉強化', group: 'accessory', pool: 'elementalist', skillId: 'mana-spring',
@@ -225,7 +227,7 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
   { type: 'envenom_boost', name: '淬毒強化', group: 'weapon', pool: 'thief', skillId: 'envenom',
     params: [{ key: 'percent', min: 50, max: 80, unit: '%' }], description: '淬毒毒傷害 +{percent}' },
   { type: 'deadly_strike_boost', name: '致命一擊強化', group: 'accessory', pool: 'thief', skillId: 'deadly-strike',
-    params: [ms('duration', 1, 5, 1)], description: '致命一擊持續 +{duration}' },
+    params: [ms('duration', 3, 6, 1)], description: `致命一擊施放後自身爆傷 +${ABILITY_DEADLY_STRIKE_CRIT_DAMAGE}%，持續 {duration}` },
   { type: 'smoke_bomb_boost', name: '煙霧彈強化', group: 'accessory', pool: 'thief', skillId: 'smoke-bomb',
     params: [], description: '煙霧彈絕對迴避次數 +1' },
   { type: 'precision_strike_boost', name: '精準打擊強化', group: 'accessory', pool: 'thief', skillId: 'precision-strike',
@@ -233,8 +235,8 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
     description: '精準打擊另加防禦 +{defense}、爆擊率 +{crit}' },
   { type: 'backstab_boost', name: '背刺強化', group: 'weapon', pool: 'thief', skillId: 'backstab',
     params: [ms('duration', 1, 5, 1)], description: '背刺增益持續 +{duration}' },
-  { type: 'poison_mist_boost', name: '毒霧強化', group: 'weapon', pool: 'thief', skillId: 'poison-mist',
-    params: [], description: `毒霧改為立即造成 ${ABILITY_POISON_MIST_TICKS} 秒份的傷害` },
+  { type: 'poison_mist_boost', name: '冰霧強化', group: 'weapon', pool: 'thief', skillId: 'poison-mist',
+    params: [], description: `冰霧改為立即造成 ${ABILITY_POISON_MIST_TICKS} 秒份的傷害` },
   { type: 'dodge_counter_boost', name: '閃避反擊強化', group: 'accessory', pool: 'thief', skillId: 'dodge-counter',
     params: [{ key: 'chance', min: 5, max: 10, unit: '%' }], description: '閃避反擊 {chance} 機率再追加 1 次普攻' },
 

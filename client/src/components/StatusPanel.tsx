@@ -24,7 +24,7 @@ export function StatusPanel() {
 
   // 防禦一律走 systems/combat —— 這裡原本自己算一份，
   // 漏掉詛咒的 -20%，與戰鬥實際採用的值不一致（`21-combat-formula.md` § 21.5）
-  const defenseBonuses = getCombatBonuses(allGear, activeEffects as ActiveEffect[]);
+  const defenseBonuses = getCombatBonuses(allGear, activeEffects as ActiveEffect[], char);
   // 顯示未夾底值：起始防禦 -10，夾底到 0 會讓前幾件防具看起來沒作用（§ 21.5）
   const totalDef = getUnclampedDefense(allGear, activeEffects as ActiveEffect[], defenseBonuses.defense);
   /**

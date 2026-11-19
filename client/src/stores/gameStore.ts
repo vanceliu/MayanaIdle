@@ -6,7 +6,6 @@ import type { Character, ClassName, Attributes } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
 import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
-import { ATTRIBUTE_KEYS } from '../models/attributes';
 import type { Skill } from '../models/skill';
 import { rates } from '../core/rates';
 import { settleKillExp } from '../systems/globalRates';
@@ -29,14 +28,16 @@ import {
   type QuickSlots,
 } from '../models/quickSlot';
 import { isPlayerSilenced, isPlayerStunned, applySpeedBuff, applyPlayerBuff } from '../systems/playerDebuffSystem';
-import { CLASS_BASE_ATTRIBUTES, getTotalAttributes, ATTRIBUTE_CAP } from '../models/character';
+import { CLASS_BASE_ATTRIBUTES, getTotalAttributes } from '../models/character';
 import { generateCharacterUuid } from '../models/characterIdentity';
-import { getExpToNextLevel, addExp, INITIAL_HP, INITIAL_MP } from '../systems/levelUp';
+import { getExpToNextLevel, addExp } from '../systems/levelUp';
+import { getMaxHp, getMaxMp } from '../systems/maxHpMp';
+import { normalizeStarAllocation, planStarChart, starRefundCostPerPoint } from '../models/starChart';
 import { calculatePressure, getPressureDropMultiplier } from '../systems/pressure';
 import { accrueRestedExp, getRestedExpMultiplier } from '../systems/restedExp';
 import { SKILL_WIND_BLADE, canUseSkill, isSkillHpBlocked, resolveMpAfterSelfCast, resolveSelfHpCost } from '../models/skill';
 import { instantiateFromTemplate } from '../models/skillTemplate';
-import { getSkillCooldownReduction, getAffixBonusesFromGear, getEquippedWeapon, calculateHealAmount, getSkillSideValue } from '../systems/combat';
+import { getSkillCooldownReduction, getCombatBonuses, getEquippedWeapon, calculateHealAmount, getSkillSideValue, MANA_SHIELD_STAT, manaShieldPercent } from '../systems/combat';
 import { getEffectiveGearArray } from '../systems/gear';
 import { getWeightStatus, getWeightPercent } from '../systems/weight';
 
@@ -99,7 +100,8 @@ import { arenaBoxCandidates, getArenaBox, isArenaTicketItemId, rollArenaBoxEquip
 import { leaveArenaRun } from '../systems/arenaRun';
 import { EMPTY_ARENA_SLOTS, normalizeArenaRun, normalizeArenaSlots, type ArenaCharacterRun, type ArenaSlotUsage } from '../models/arena';
 import { createShopEquipment } from '../systems/shopEquipment';
-import { applyAbilityToSkill, applyAbilityToSkills, withNextAttackBonus } from '../models/abilitySkill';
+import { withNextAttackBonus } from '../models/abilitySkill';
+import { resolveSkill, resolveSkills } from '../models/skillStar';
 import { craftRequiresAbility, formatAbilityDisplay, getAbilityDefinition, getCraftAbilityOptions, isAbilityType, type AbilityType } from '../models/ability';
 import {
   addCrystal, crystalToAbility, getCrystalApplyBlock, getCrystalApplyCost, normalizeAbilityCrystals,
@@ -576,6 +578,8 @@ export interface GameState {
    * 線上模式的角色狀態由 server 推回來，本機改的會被蓋掉，金幣也不會真的扣。
    */
   restAtInn: (mode: 'full' | 'hp' | 'mp') => boolean;
+  /** 星盤套用整份配點（`56-star-chart.md` § 56.7）：不合法不套；退掉的已點節點扣洗點金幣，金幣不足不套 */
+  applyStarChart: (nodeIds: string[]) => boolean;
   /** 用技能書學職業技能：書要消耗掉，判定與消耗必須同一步（§ 13.9） */
   learnClassSkill: (skillId: string) => boolean;
   /** 魔法學院學基礎魔法（`13-town.md` § 13.6）：Lv1~3 付金幣、Lv4 以上交魔法書 */
@@ -615,7 +619,6 @@ export interface GameState {
   confirmDiscard: (amount: number) => void;
   /** `amounts` 與 `pendingDiscardBatch` 一一對應 */
   confirmDiscardBatch: (amounts: number[]) => void;
-  spendAttributePoint: (attr: keyof Attributes) => void;
   acceptQuest: (questId: string) => void;
   completeQuest: (questId: string) => void;
   acceptAdventurerQuest: (quest: AdventurerQuest) => void;
@@ -691,6 +694,24 @@ function blockedByStun(
   return true;
 }
 
+/**
+ * 寫入新的星盤配點（`56-star-chart.md` § 56.7）：退回點數 × 每點費用扣金幣，金幣不足不寫；
+ * HP／MP 夾在新的有效上限內並存檔。
+ */
+function commitStarChart(get: () => GameState, set: (partial: Partial<GameState>) => void, allocated: string[], refunded: number): boolean {
+  const state = get();
+  const char = state.character!;
+  const cost = refunded * starRefundCostPerPoint(char.level);
+  if (char.gold < cost) return false;
+  const next = { ...char, starChart: allocated, gold: char.gold - cost };
+  next.hp = Math.min(next.hp, getEffectiveMaxHp(next, state.equippedGear, state.activeEffects));
+  next.mp = Math.min(next.mp, getEffectiveMaxMp(next, state.equippedGear, state.activeEffects));
+  const text = refunded > 0 ? `星盤退回 ${refunded} 點，花費 ${cost.toLocaleString()} 金幣` : '';
+  set({ character: next, ...(text ? { combatLogs: addLog(state.combatLogs, { text, type: 'system' }) } : {}) });
+  get().saveState();
+  return true;
+}
+
 function addLog(logs: CombatLog[], entry: CombatLog): CombatLog[] {
   const next = [...logs, entry];
   return next.length > MAX_LOGS ? next.slice(-MAX_LOGS) : next;
@@ -701,17 +722,11 @@ function addLog(logs: CombatLog[], entry: CombatLog): CombatLog[] {
  * 飾品模板的 `bonusHp`／`bonusMp` 仍是另一個加算來源。
  */
 export function getEffectiveMaxHp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[]): number {
-  const allGear = getEffectiveGearArray(char, activeEffects, gear);
-  const bonuses = getAffixBonusesFromGear(allGear);
-  const flatHp = allGear.reduce((sum, g) => sum + (g.bonusHp ?? 0), 0);
-  return char.maxHp + flatHp + bonuses.max_hp;
+  return getMaxHp(char, getEffectiveGearArray(char, activeEffects, gear));
 }
 
 export function getEffectiveMaxMp(char: Character, gear: EquippedGear, activeEffects: ActiveEffect[]): number {
-  const allGear = getEffectiveGearArray(char, activeEffects, gear);
-  const bonuses = getAffixBonusesFromGear(allGear);
-  const flatMp = allGear.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0);
-  return char.maxMp + flatMp + bonuses.max_mp;
+  return getMaxMp(char, getEffectiveGearArray(char, activeEffects, gear));
 }
 
 function isInArpgCombat(session: Session): boolean {
@@ -910,10 +925,7 @@ export function createGameStore(session: Session) {
     // 離線時長換成加倍存量（`04-character.md` § 4.11）
     Object.assign(char, accrueRestedExp(char, Date.now()));
 
-    // Backfill unspent attribute points for legacy characters above level 50
-    if (char.unspentAttributePoints == null) {
-      char.unspentAttributePoints = char.level > 50 ? char.level - 50 : 0;
-    }
+    char.starChart = normalizeStarAllocation(char.starChart ?? [], char.className, char.level);
 
     // Backfill quests for legacy characters
     if (!char.quests) {
@@ -1062,13 +1074,10 @@ export function createGameStore(session: Session) {
       level: 1,
       exp: 0,
       expToNext: getExpToNextLevel(1),
-      hp: INITIAL_HP,
-      maxHp: INITIAL_HP,
-      mp: INITIAL_MP,
-      maxMp: INITIAL_MP,
+      hp: 0,
+      mp: 0,
       baseAttributes: { ...base },
       bonusAttributes: bonusAttrs,
-      unspentAttributePoints: 0,
       gold: 100,
       currentArea: 'neutral-town',
       currentZone: 'newbie-neutral',
@@ -1082,6 +1091,8 @@ export function createGameStore(session: Session) {
       lastSeenAt: Date.now(),
       createdAt: Date.now(),
     };
+    char.hp = getMaxHp(char, []);
+    char.mp = getMaxMp(char, []);
     const id = await session.repo.addCharacter(char);
     char.id = id;
 
@@ -1116,6 +1127,8 @@ export function createGameStore(session: Session) {
       characterId: char.id!, name: item.name, type: item.type, itemTemplateId: item.itemId, amount: item.amount,
     })));
 
+    char.hp = getEffectiveMaxHp(char, equippedGear, []);
+    char.mp = getEffectiveMaxMp(char, equippedGear, []);
     const shared = await loadSharedWarehouse(userId, session);
 
     set({
@@ -1354,7 +1367,7 @@ export function createGameStore(session: Session) {
     if (!potionType) return;
 
     const config = POTION_CONFIG[potionType];
-    const bonuses = getAffixBonusesFromGear(allGear);
+    const bonuses = getCombatBonuses(allGear, [], state.character!);
     const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
     const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
     const newHp = Math.min(effMaxHp, state.character.hp + heal);
@@ -1382,7 +1395,7 @@ export function createGameStore(session: Session) {
     if (now - state.lastPotionUsedAt < state.lastPotionCooldown) return;
 
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-    const bonuses = getAffixBonusesFromGear(allGear);
+    const bonuses = getCombatBonuses(allGear, [], state.character!);
     const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
     const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
     const newHp = Math.min(effMaxHp, state.character.hp + heal);
@@ -1569,8 +1582,8 @@ export function createGameStore(session: Session) {
     if (!baseSkill || baseSkill.type === 'passive') return false;
 
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-    // § 7S.5 職業池隨機技能：MP、冷卻等以施放當下的武器為準
-    const skill = applyAbilityToSkill(baseSkill, allGear, char.className);
+    // 星盤等級與冷卻、§ 7S.5 職業池隨機技能：以施放當下為準
+    const skill = resolveSkill(baseSkill, allGear, char, state.activeEffects);
     const weapon = getEquippedWeapon(allGear);
     const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
@@ -1627,8 +1640,8 @@ export function createGameStore(session: Session) {
 
     const now = gameNow();
     const allGear = getEffectiveGearArray(state.character!, state.activeEffects, state.equippedGear);
-    // § 7S.5 職業池隨機技能：數值以施放當下的武器為準，存回的仍是原技能
-    const skill = applyAbilityToSkill(baseSkill, allGear, char.className);
+    // 星盤等級與冷卻、§ 7S.5 職業池隨機技能：以施放當下為準，存回的仍是原技能
+    const skill = resolveSkill(baseSkill, allGear, char, state.activeEffects);
     const cooldownReduction = getSkillCooldownReduction(char, allGear, state.activeEffects);
     if (isPlayerSilenced(state.activeEffects, now)) return false;
     const effMaxMp = getEffectiveMaxMp(char, state.equippedGear, state.activeEffects);
@@ -1643,9 +1656,11 @@ export function createGameStore(session: Session) {
       const effMaxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
       // § 21.4c：治癒量走技能側公式（技能攻擊力 × 魔攻乘區 + INT 加成）× 治癒效果%
       const effectiveHeal = calculateHealAmount(char, skill.power, allGear, state.activeEffects);
-      const healed = Math.min(effMaxHp - char.hp, effectiveHeal);
+      // 血契之星的 HP 消耗先扣，再補血（`56-star-chart.md` § 56.6）
+      const healHpCost = resolveSelfHpCost(skill, char.hp, effMaxHp);
+      const healed = Math.min(effMaxHp - (char.hp - healHpCost), effectiveHeal);
       set({
-        character: { ...char, hp: char.hp + healed, mp: char.mp - mpCost },
+        character: { ...char, hp: char.hp - healHpCost + healed, mp: char.mp - mpCost },
         skills: newSkills,
         combatLogs: addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' }),
       });
@@ -1659,9 +1674,12 @@ export function createGameStore(session: Session) {
     const mpAfter = resolveMpAfterSelfCast(skill, char.mp, effMaxMp);
     const mpRestored = mpAfter - (char.mp - mpCost);
     const newChar = { ...char, mp: mpAfter, hp: char.hp - hpCost };
+    // 魔力護盾施放時顯示當下減傷 %（`23-class-magic.md` § 23.5）
+    const manaShieldMax = skill.buffModifiers?.find(m => m.stat === MANA_SHIELD_STAT)?.value;
     const parts = [
       hpCost > 0 ? `消耗 ${hpCost} HP` : '',
       mpRestored > 0 ? `回復 ${mpRestored} MP` : '',
+      manaShieldMax !== undefined ? `目前減傷 ${manaShieldPercent(manaShieldMax, newChar.mp, effMaxMp)}%` : '',
     ].filter(Boolean);
     const logs = addLog(state.combatLogs, {
       text: parts.length > 0 ? `施放 ${skill.name}，${parts.join('，')}` : `施放 ${skill.name}`,
@@ -1971,8 +1989,8 @@ export function createGameStore(session: Session) {
 
     const ctx: PersistentScriptContext = {
       character: char,
-      // § 7S.5 職業池隨機技能：就緒判定看改寫後的冷卻與 MP，與戰鬥天賦一致
-      skills: applyAbilityToSkills(state.skills, allGear, char.className),
+      // 星盤與 § 7S.5 職業池隨機技能：就緒判定看改寫後的冷卻與 MP，與戰鬥天賦一致
+      skills: resolveSkills(state.skills, allGear, char, state.activeEffects),
       bagItems: state.bagItems,
       lastPotionUsedAt: state.lastPotionUsedAt,
       lastPotionCooldown: state.lastPotionCooldown,
@@ -2573,22 +2591,6 @@ export function createGameStore(session: Session) {
     saveGame(get(), session);
   },
 
-  spendAttributePoint: (attr) => {
-    const char = get().character;
-    if (!char || char.unspentAttributePoints <= 0 || !ATTRIBUTE_KEYS.includes(attr)) return;
-    const total = getTotalAttributes(char);
-    if (total[attr] >= ATTRIBUTE_CAP) return;
-    const newBonus = { ...char.bonusAttributes, [attr]: char.bonusAttributes[attr] + 1 };
-    set({
-      character: {
-        ...char,
-        bonusAttributes: newBonus,
-        unspentAttributePoints: char.unspentAttributePoints - 1,
-      },
-    });
-    saveGame(get(), session);
-  },
-
   acceptQuest: (questId) => {
     const char = get().character;
     if (!char) return;
@@ -3155,6 +3157,14 @@ export function createGameStore(session: Session) {
     return true;
   },
 
+  applyStarChart: (nodeIds) => {
+    const char = get().character;
+    if (!char) return false;
+    const plan = planStarChart(char.starChart ?? [], nodeIds, char.className, char.level);
+    if ('error' in plan) return false;
+    return commitStarChart(get, set, plan.allocated, plan.refunded);
+  },
+
   learnClassSkill: (skillId) => {
     const state = get();
     const char = state.character;
@@ -3441,6 +3451,8 @@ export function processMonsterDeath(
   logs.push({ text: `獲得 ${expGained} 經驗值`, type: 'system' });
   if (char.level > prevLevel) {
     logs.push({ text: `升級！等級 ${prevLevel} → ${char.level}`, type: 'system' });
+    // Lv30 開放時起點自動點上（`56-star-chart.md` § 56.1）
+    char.starChart = normalizeStarAllocation(char.starChart ?? [], char.className, char.level);
     const { equippedGear, activeEffects } = get();
     char.hp = getEffectiveMaxHp(char, equippedGear, activeEffects);
     char.mp = getEffectiveMaxMp(char, equippedGear, activeEffects);
@@ -3456,7 +3468,7 @@ export function processMonsterDeath(
   }
 
   // 掉落處理（排隊避免 race condition）
-  const dropBonuses = getAffixBonusesFromGear(allGear);
+  const dropBonuses = getCombatBonuses(allGear, [], char);
   // Pressure 掉落倍率是掉寶倍率的一個因子（`26-spawn-pressure.md` § 26.3）
   const pressureDropMult = getPressureDropMultiplier(
     calculatePressure(char.areaKills ?? 0, undefined, get().pressureMembers).pressure,
@@ -3686,7 +3698,7 @@ function drinkPotion(
   if (now - state.lastPotionUsedAt < state.lastPotionCooldown) return;
   if (getPotionCount(state.bagItems, potionType) <= 0) return;
 
-  const bonuses = getAffixBonusesFromGear(allGear);
+  const bonuses = getCombatBonuses(allGear, [], char);
   const baseHeal = Math.floor(random() * (config.healMax - config.healMin + 1)) + config.healMin;
   const heal = Math.floor(baseHeal * (1 + bonuses.potion_effect / 100));
   const effMaxHp = getEffectiveMaxHp(char, state.equippedGear, state.activeEffects);
@@ -3763,14 +3775,12 @@ async function writeSave(state: GameState, mapPos: { x: number; y: number }, ses
     exp: char.exp,
     expToNext: char.expToNext,
     hp: char.hp,
-    maxHp: char.maxHp,
     mp: char.mp,
-    maxMp: char.maxMp,
     gold: char.gold,
     skills: state.skills,
     quests: char.quests ?? [],
     bonusAttributes: char.bonusAttributes,
-    unspentAttributePoints: char.unspentAttributePoints,
+    starChart: char.starChart ?? [],
     currentArea: char.currentArea,
     currentZone: char.currentZone,
     currentRegion: char.currentRegion,

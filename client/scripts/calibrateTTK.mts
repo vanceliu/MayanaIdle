@@ -11,7 +11,7 @@
  *  - **直接 import `src/systems/combat.ts` 的真實函式**，不重寫任何傷害公式
  *  - 怪物讀 `monsterSeeds.ts`、裝備讀 `equipmentSeeds.ts`、技能讀 `skill.ts` / `classSkills.ts`
  *  - 技能可學性走真實的 `skillRestrictions.ts` 與 `classSkills.ts` 的 `requiredLevel`
- *  - maxHp / maxMp 用真實的 `tryLevelUp()` 從 Lv.1 練上來
+ *  - 最大 HP／MP 用 `maxHpMp.ts`；星盤配點與 `reaperShared.mts` 共用（`starAllocation.mts`）
  *  - `Math.random` 以 mulberry32 固定種子覆寫，結果可重現
  *  - 重現 `playerCombatFSM` 的「一 tick 一動作」與 60fps 幀邊界
  *
@@ -35,14 +35,17 @@ import {
   getCombatBonuses,
   getTotalMagicAttack,
   getTotalDefense,
-  getAffixBonusesFromGear,
   hasActiveFireEnchant,
   COOLDOWN_REDUCTION_CAP,
   getIntCooldownReduction,
 } from '../src/systems/combat';
-import { ATTRIBUTE_KEYS, getEffectiveINT, getEffectiveSTR, getTotalAttributes } from '../src/models/character';
-import { getExpToNextLevel, INITIAL_HP, INITIAL_MP, tryLevelUp } from '../src/systems/levelUp';
-import { getMpRegen, MP_REGEN_INTERVAL_MS } from '../src/systems/regen';
+import { getEffectiveINT, getEffectiveSTR, getTotalAttributes } from '../src/models/character';
+import { getMaxHp, getMaxMp } from '../src/systems/maxHpMp';
+import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../src/systems/regen';
+import { ENVENOM_DOT_BONUS_STAT } from '../src/models/abilitySkill';
+import { MP_COST_REDUCTION_STAT, resolveSkill } from '../src/models/skillStar';
+import { getSkillPlan, setStarPolicy, starPolicyCandidates, starSummary, STAR_POLICY_LABEL } from './reaperShared.mts';
+import type { StarPolicy } from './starAllocation.mts';
 import { getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } from '../src/models/skillRestrictions';
 import type { Attributes, Character, ClassName } from '../src/models/character';
 import type { EquipmentInstance, EquipmentTemplate, EquipSlot } from '../src/models/equipment';
@@ -187,78 +190,36 @@ const CREATION_ATTRIBUTES: Record<ClassName, Attributes> = {
   thief: { STR: 18, AGI: 18, VIT: 12, SPI: 10, INT: 12, CHA: 10 },
 };
 
-/** § 44.4：Lv.51 起每級 +1 點，投主攻屬性優先 */
-const LEVELUP_PRIORITY: Record<ClassName, (keyof Attributes)[]> = {
-  knight: ['STR', 'VIT'],
-  elf: ['STR', 'AGI'],
-  elementalist: ['INT', 'VIT'],
-  priest: ['INT', 'VIT'],
-  thief: ['STR', 'AGI'],
-};
-
-/** Lv.51 起每級 1 點；主攻屬性先推到 35（§ 20.10 的軟上限），再投次要屬性 */
-function allocateLevelPoints(className: ClassName, level: number): Attributes {
-  const out: Attributes = { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 };
-  let points = Math.max(0, level - 50);
-  const base = CREATION_ATTRIBUTES[className];
-  for (const key of LEVELUP_PRIORITY[className]) {
-    if (points <= 0) break;
-    const room = Math.max(0, 35 - base[key]);
-    const take = Math.min(room, points);
-    out[key] = take;
-    points -= take;
-  }
-  return out;
-}
-
-/** 用真實的 `tryLevelUp()` 從 Lv.1 練到目標等級，取得實際 maxHp / maxMp */
-function levelUpTo(base: Attributes, bonusAt: (lv: number) => Attributes, target: number): { maxHp: number; maxMp: number } {
-  let char = {
-    name: 'sim', className: 'knight', level: 1, exp: 0, expToNext: getExpToNextLevel(1),
-    hp: INITIAL_HP, maxHp: INITIAL_HP, mp: INITIAL_MP, maxMp: INITIAL_MP,
-    baseAttributes: base,
-    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    gold: 0, currentArea: '', currentZone: '', currentRegion: '', currentFloor: null,
-    skills: [], unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
-  } as unknown as Character;
-
-  while (char.level < target) {
-    char = tryLevelUp({ ...char, exp: char.expToNext });
-    char = { ...char, bonusAttributes: bonusAt(char.level) };
-  }
-  return { maxHp: char.maxHp, maxMp: char.maxMp };
-}
-
+/** 建角配點、模擬星盤（`starAllocation.mts`）；HP／MP 為不含裝備的上限 */
 function buildCharacter(className: ClassName, level: number): Character {
-  const base = CREATION_ATTRIBUTES[className];
-  const bonus = allocateLevelPoints(className, level);
-  const { maxHp, maxMp } = withSeed(1234, () =>
-    levelUpTo(base, lv => allocateLevelPoints(className, lv), level));
-
-  return {
+  const char = {
     name: `Lv${level}-${className}`,
     className,
     level,
     exp: 0,
     expToNext: 1,
-    hp: maxHp,
-    maxHp,
-    mp: maxMp,
-    maxMp,
-    baseAttributes: base,
-    bonusAttributes: bonus,
+    hp: 0,
+    mp: 0,
+    baseAttributes: CREATION_ATTRIBUTES[className],
+    bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
+    starChart: getSkillPlan(className, level).starChart,
     gold: 0,
     currentArea: '',
     currentZone: '',
     currentRegion: '',
     currentFloor: null,
     skills: [],
-    unspentAttributePoints: 0,
     quests: [],
     areaEnteredAt: 0,
     createdAt: 0,
     userId: 1,
   } as unknown as Character;
+  return { ...char, hp: getMaxHp(char, []), mp: getMaxMp(char, []) };
+}
+
+/** 套星盤（冷卻、等級）與武器隨機技能後的技能，同遊戲施放（`skillStar.ts`） */
+function resolved(s: Omit<Skill, 'lastUsedAt'>, char: Character, gear: (EquipmentInstance | null)[] = []): Skill {
+  return resolveSkill({ ...s, lastUsedAt: 0 } as Skill, gear, char);
 }
 
 // ---------------------------------------------------------------- 怪物
@@ -498,7 +459,8 @@ function makeBuff(id: string, category: string, modifiers: StatModifier[]): Acti
   };
 }
 
-type ActionKind = 'normal' | 'magic_skill' | 'physical_skill' | 'self_buff';
+/** sustain：不佔行動的續航技（血魔轉換），MP 低於門檻且 HP 高於 50% 時施放 */
+type ActionKind = 'normal' | 'magic_skill' | 'physical_skill' | 'self_buff' | 'sustain';
 
 interface RotationEntry {
   id: string;
@@ -512,41 +474,61 @@ interface RotationEntry {
   physicalSnapshot?: boolean;
   /** § 21.8 魔法公式的物理系技能（復仇之刃／背刺）保留爆擊 */
   physicalDamage?: boolean;
+  /** 星盤技能等級的物理倍率 */
+  physicalScale?: number;
+  /** 必定爆擊（致命一擊） */
+  guaranteedCrit?: boolean;
   cooldown: number;
   mpCost: number;
   mpDrainRatio?: number;
-  selfBuff?: { category: string; modifiers: StatModifier[]; duration: number };
+  selfBuff?: { category: string; modifiers: StatModifier[]; duration: number; scaleByMissingHp?: { stat: string; maxPercent: number } };
   dot?: { category: string; percent: number; interval: number; duration: number };
   buff?: { category: string; modifiers: StatModifier[]; duration: number };
+  /** 自扣有效最大 HP 的百分比（血濺咒殺、血魔轉換），最低留 1；攻擊技只在 HP 高於 50% 時放 */
+  selfHpCostPercent?: number;
+  /** 回復最大 MP 的百分比（血魔轉換） */
+  mpRestorePercent?: number;
 }
+
+/** 淬毒：普攻命中時上毒（毒傷照星盤等級與淬毒強化，`arpgEventHandler.ts`） */
+type PoisonEffect = ActiveEffect & { simPoison?: { category: string; percent: number; interval: number; duration: number } };
 
 function magicEntry(s: Omit<Skill, 'lastUsedAt'>): RotationEntry {
   return {
     id: s.id, name: s.name, kind: 'magic_skill',
-    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot, physicalDamage: s.physicalDamage,
+    power: s.power, element: s.element, physicalSnapshot: s.physicalSnapshot, physicalDamage: s.physicalDamage, physicalScale: s.physicalScale, guaranteedCrit: s.guaranteedCrit,
     ignoreDefensePercent: s.ignoreDefensePercent ?? 0,
     cooldown: s.cooldown,
     mpCost: s.mpCost,
     mpDrainRatio: s.mpDrainRatio,
+    selfHpCostPercent: s.selfHpCostPercent,
   };
 }
 
 /** 戰前開好的長效 buff（duration ≥ 300s）：取該等級學得到的職業 buff 技能 */
-function preCombatBuffs(className: ClassName, level: number): ActiveEffect[] {
+function preCombatBuffs(char: Character, gear: (EquipmentInstance | null)[]): ActiveEffect[] {
+  const { className, level } = char;
   const out: ActiveEffect[] = [];
   for (const cs of CLASS_SKILLS) {
     if (cs.className !== className) continue;
     if (cs.requiredLevel > level) continue;
-    const s = cs.skill;
-    if (s.type !== 'buff' || !s.buffModifiers) continue;
+    const s = resolved(cs.skill, char, gear);
+    if (s.type !== 'buff' || (!s.buffModifiers && !s.onHitDebuff)) continue;
     if ((s.buffDuration ?? 0) < 300_000) continue; // 短效 buff 進輪替，不算戰前
-    out.push(makeBuff(s.name, s.buffCategory ?? s.id, s.buffModifiers));
+    const effect: PoisonEffect = makeBuff(s.name, s.buffCategory ?? s.id, s.buffModifiers ?? []);
+    const d = s.onHitDebuff;
+    if (d?.dotDamagePercent) {
+      const boost = s.buffModifiers?.find(m => m.stat === ENVENOM_DOT_BONUS_STAT)?.value ?? 0;
+      effect.simPoison = { category: d.category, percent: d.dotDamagePercent * (100 + boost) / 100, interval: d.dotInterval ?? 1000, duration: d.dotDuration ?? 5000 };
+    }
+    out.push(effect);
   }
   // 基礎魔法的長效增益（力量提升／敏捷提升／加速術等）
   const maxMagicLv = getLearnableMaxLevel(className, level);
-  for (const s of SKILL_CATALOG) {
+  for (const raw of SKILL_CATALOG) {
+    if (raw.level > maxMagicLv) continue;
+    const s = resolved(raw, char, gear);
     if (s.type !== 'buff' || !s.buffModifiers) continue;
-    if (s.level > maxMagicLv) continue;
     if ((s.buffDuration ?? 0) < 300_000) continue;
     out.push(makeBuff(s.name, s.buffCategory ?? s.id, s.buffModifiers));
   }
@@ -562,15 +544,23 @@ function preCombatBuffs(className: ClassName, level: number): ActiveEffect[] {
   return [...byCategory.values()];
 }
 
-function buildRotation(className: ClassName, level: number, weapon: EquipmentInstance): RotationEntry[] {
+function buildRotation(char: Character, weapon: EquipmentInstance): RotationEntry[] {
+  const { className, level } = char;
   const weaponType = String(weapon.type);
   const r: RotationEntry[] = [];
 
   for (const cs of CLASS_SKILLS) {
     if (cs.className !== className) continue;
     if (cs.requiredLevel > level) continue;
-    const s = cs.skill;
+    const s = resolved(cs.skill, char, [weapon]);
 
+    if (s.type === 'buff' && s.mpRestorePercent) {
+      r.push({
+        id: s.id, name: s.name, kind: 'sustain', cooldown: s.cooldown, mpCost: s.mpCost,
+        mpRestorePercent: s.mpRestorePercent, selfHpCostPercent: s.selfHpCostPercent,
+      });
+      continue;
+    }
     if (s.type === 'buff') {
       // 短效 buff 進輪替（長效的已在 preCombatBuffs）
       if ((s.buffDuration ?? 0) >= 300_000 || !s.buffModifiers) continue;
@@ -586,7 +576,7 @@ function buildRotation(className: ClassName, level: number, weapon: EquipmentIns
     if (s.requiredWeaponType && s.requiredWeaponType !== weaponType) continue;
 
     if (s.hits && s.hits > 1) {
-      r.push({ id: s.id, name: s.name, kind: 'physical_skill', hits: s.hits, cooldown: s.cooldown, mpCost: s.mpCost });
+      r.push({ id: s.id, name: s.name, kind: 'physical_skill', hits: s.hits, cooldown: s.cooldown, mpCost: s.mpCost, physicalScale: s.physicalScale });
       continue;
     }
     const entry = magicEntry(s);
@@ -604,6 +594,7 @@ function buildRotation(className: ClassName, level: number, weapon: EquipmentIns
         category: s.selfBuff.category ?? s.id,
         modifiers: s.selfBuff.modifiers ?? [],
         duration: s.selfBuff.duration ?? 5000,
+        scaleByMissingHp: s.selfBuff.scaleByMissingHp,
       };
     }
     r.push(entry);
@@ -616,7 +607,7 @@ function buildRotation(className: ClassName, level: number, weapon: EquipmentIns
     .filter(s => s.type === 'attack' && s.level <= maxMagicLv && (s.power ?? 0) > 0)
     .sort((a, b) => (b.power ?? 0) - (a.power ?? 0))
     .slice(0, budget);
-  for (const s of attackBasics) r.push(magicEntry(s));
+  for (const s of attackBasics) r.push(magicEntry(resolved(s, char, [weapon])));
 
   return r;
 }
@@ -642,18 +633,18 @@ function orderRotation(
     normalAvg = sum / CALIBRATION_SAMPLES;
 
     for (const e of rotation) {
-      if (e.kind === 'self_buff') { avg.set(e.name, Number.POSITIVE_INFINITY); continue; }
+      if (e.kind === 'self_buff' || e.kind === 'sustain') { avg.set(e.name, Number.POSITIVE_INFINITY); continue; }
       let s = 0;
       for (let i = 0; i < CALIBRATION_SAMPLES; i++) {
         if (e.kind === 'physical_skill') {
           const fire = hasActiveFireEnchant(effects);
           for (let h = 0; h < (e.hits ?? 1); h++) {
-            const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0);
+            const r = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalScale);
             s += r.hit ? r.damage : 0;
           }
         } else {
           const r = e.physicalSnapshot
-            ? calculatePhysicalSnapshotSkill(char, e.power ?? 0, e.element ?? 'none', loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0)
+            ? calculatePhysicalSnapshotSkill(char, e.power ?? 0, e.element ?? 'none', loadout.weapon, monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalScale, e.guaranteedCrit)
             : calculateSkillAttack(char, e.power ?? 0, e.element ?? 'none', monster, loadout.gear, e.name, effects, 0, e.ignoreDefensePercent ?? 0, undefined, e.physicalDamage === true);
           s += r.damage;
         }
@@ -669,7 +660,7 @@ function orderRotation(
   });
 
   return rotation
-    .filter(e => e.kind === 'self_buff' || (avg.get(e.name) ?? 0) > normalAvg)
+    .filter(e => e.kind === 'self_buff' || e.kind === 'sustain' || (avg.get(e.name) ?? 0) > normalAvg)
     .sort((a, b) => {
       if (a.kind === 'self_buff' && b.kind !== 'self_buff') return -1;
       if (b.kind === 'self_buff' && a.kind !== 'self_buff') return 1;
@@ -687,6 +678,7 @@ interface DotState { category: string; damage: number; nextTick: number; expires
  */
 interface ChainState {
   mp: number;
+  hp?: number;
   clock: number;
   cooldowns: Record<string, number>;
 }
@@ -709,6 +701,22 @@ function simulateOnce(
   let nextAction = startedAt;
   let currentMp = chain ? chain.mp : maxMp;
   let nextMpTick = startedAt + MP_REGEN_INTERVAL_MS;
+  const maxHp = getMaxHp(char, loadout.gear);
+  const hpRegen = getHpRegen(char, true, loadout.gear, baseEffects);
+  let hp = chain?.hp ?? maxHp;
+  let nextHpTick = startedAt + HP_REGEN_INTERVAL_MS;
+  const poison = (baseEffects as PoisonEffect[]).find(e => e.simPoison)?.simPoison;
+  /** 魔法節約（`mp_cost_reduction`）生效時耗魔打折，同 `resolveSkill` 第 4 個參數 */
+  const mpCostOf = (e: RotationEntry) => {
+    const pct = effects.reduce((sum, x) => sum + (x.modifiers ?? []).filter(m => m.stat === MP_COST_REDUCTION_STAT).reduce((y, m) => y + m.value, 0), 0);
+    return pct > 0 ? Math.floor(e.mpCost * (100 - pct) / 100) : e.mpCost;
+  };
+  const payHp = (pct: number | undefined) => { if (pct) hp = Math.max(1, hp - Math.floor(maxHp * pct / 100)); };
+  const selfBuffMods = (b: NonNullable<RotationEntry['selfBuff']>): StatModifier[] => {
+    if (!b.scaleByMissingHp) return b.modifiers;
+    const bonus = Math.floor(Math.min(b.scaleByMissingHp.maxPercent, Math.max(0, (1 - hp / maxHp) * 100)));
+    return bonus > 0 ? [...b.modifiers, { stat: b.scaleByMissingHp.stat, value: bonus, isPercent: true }] : b.modifiers;
+  };
 
   const expire = (t: number) => {
     for (let i = timed.length - 1; i >= 0; i--) {
@@ -734,12 +742,16 @@ function simulateOnce(
 
   while (monster.currentHp > 0 && now - startedAt < TIMEOUT_MS) {
     const nextDot = dots.length ? Math.min(...dots.map(d => d.nextTick)) : Infinity;
-    now = Math.min(nextAction, nextDot, nextMpTick);
+    now = Math.min(nextAction, nextDot, nextMpTick, nextHpTick);
     expire(now);
 
     while (now >= nextMpTick) {
       currentMp = Math.min(maxMp, currentMp + regenPerTick);
       nextMpTick += MP_REGEN_INTERVAL_MS;
+    }
+    while (now >= nextHpTick) {
+      hp = Math.min(maxHp, hp + hpRegen);
+      nextHpTick += HP_REGEN_INTERVAL_MS;
     }
 
     for (let i = dots.length - 1; i >= 0; i--) {
@@ -757,9 +769,18 @@ function simulateOnce(
       COOLDOWN_REDUCTION_CAP,
       getCombatBonuses(loadout.gear, effects).cooldown_reduction + getIntCooldownReduction(char, effects, loadout.gear),
     );
+    for (const e of rotation) {
+      if (e.kind !== 'sustain' || (cooldowns[e.id] ?? -Infinity) > now) continue;
+      if (currentMp >= maxMp * (100 - (e.mpRestorePercent ?? 0)) / 100 || hp <= maxHp * 0.5) continue;
+      payHp(e.selfHpCostPercent);
+      currentMp = Math.min(maxMp, currentMp + Math.floor(maxMp * (e.mpRestorePercent ?? 0) / 100));
+      cooldowns[e.id] = now + e.cooldown;
+    }
     const entry = rotation.find(e => {
+      if (e.kind === 'sustain') return false;
       if ((cooldowns[e.id] ?? -Infinity) > now) return false;
-      if (currentMp < e.mpCost) return false;
+      if (currentMp < mpCostOf(e)) return false;
+      if (e.selfHpCostPercent && hp <= maxHp * 0.5) return false;
       if (e.kind === 'self_buff') return !effects.some(x => x.category === e.buff!.category);
       if (e.dot) return !dots.some(d => d.category === e.dot!.category);
       return true;
@@ -768,25 +789,31 @@ function simulateOnce(
     if (!entry) {
       const res = calculatePlayerAttack(char, loadout.weapon, monster, loadout.gear, effects, 0);
       if (res.hit) hit(res.damage);
+      if (res.hit && poison && monster.currentHp > 0 && !dots.some(d => d.category === poison.category)) {
+        const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
+        dots.push({ category: poison.category, damage: Math.max(1, Math.floor(base * poison.percent)), nextTick: now + poison.interval, expiresAt: now + poison.duration });
+      }
     } else if (entry.kind === 'self_buff') {
-      currentMp -= entry.mpCost;
+      currentMp -= mpCostOf(entry);
       addTimed(makeBuff(entry.name, entry.buff!.category, entry.buff!.modifiers), entry.buff!.duration);
       cooldowns[entry.id] = now + Math.floor(entry.cooldown * (1 - cdr / 100));
     } else if (entry.kind === 'physical_skill') {
-      currentMp -= entry.mpCost;
+      currentMp -= mpCostOf(entry);
       const fire = hasActiveFireEnchant(effects);
       for (let h = 0; h < (entry.hits ?? 1); h++) {
-        const res = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0);
+        const res = calculatePhysicalSkillHit(char, loadout.weapon, monster, loadout.gear, fire, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0, undefined, entry.physicalScale);
         if (res.hit) hit(res.damage);
       }
       cooldowns[entry.id] = now + Math.floor(entry.cooldown * (1 - cdr / 100));
     } else {
-      currentMp -= entry.mpCost;
-      if (entry.selfBuff) addTimed(makeBuff(entry.name, entry.selfBuff.category, entry.selfBuff.modifiers), entry.selfBuff.duration);
+      currentMp -= mpCostOf(entry);
+      payHp(entry.selfHpCostPercent);
       const res = entry.physicalSnapshot
-        ? calculatePhysicalSnapshotSkill(char, entry.power ?? 0, entry.element ?? 'none', loadout.weapon, monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0)
+        ? calculatePhysicalSnapshotSkill(char, entry.power ?? 0, entry.element ?? 'none', loadout.weapon, monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0, undefined, entry.physicalScale, entry.guaranteedCrit)
         : calculateSkillAttack(char, entry.power ?? 0, entry.element ?? 'none', monster, loadout.gear, entry.name, effects, 0, entry.ignoreDefensePercent ?? 0, undefined, entry.physicalDamage === true);
       hit(res.damage);
+      // 自身 buff 在傷害結算後施加（`arpgEventHandler.ts` applySkillSelfBuff）
+      if (entry.selfBuff) addTimed(makeBuff(entry.name, entry.selfBuff.category, selfBuffMods(entry.selfBuff)), entry.selfBuff.duration);
       if (entry.mpDrainRatio) currentMp = Math.min(maxMp, currentMp + Math.floor(res.damage * entry.mpDrainRatio));
       if (entry.dot && !dots.some(d => d.category === entry.dot!.category)) {
         const base = calculateBasePhysicalDamage(char, loadout.weapon, loadout.gear, effects);
@@ -805,17 +832,15 @@ function simulateOnce(
 
   if (chain) {
     chain.mp = currentMp;
+    chain.hp = hp;
     chain.clock = now;
   }
   return monster.currentHp <= 0 ? now - startedAt : Number.NaN;
 }
 
-/** 有效最大 MP（公式同 `gameStore.ts` 的 getEffectiveMaxMp） */
+/** 有效最大 MP（`maxHpMp.ts`） */
 function effectiveMaxMp(char: Character, gear: (EquipmentInstance | null)[]): number {
-  const items = gear.filter((g): g is EquipmentInstance => g != null);
-  const bonuses = getAffixBonusesFromGear(items);
-  const flatMp = items.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0);
-  return Math.floor((char.maxMp + flatMp) * (1 + bonuses.max_mp / 100));
+  return getMaxMp(char, gear);
 }
 
 interface Result {
@@ -832,6 +857,9 @@ interface Result {
   /** `null` = 該階梯沒有等級相稱的 Boss */
   bossTtk: number | null;
   missing: string[];
+  /** 星盤配法與摘要 */
+  starPolicy: StarPolicy;
+  star: string;
   /** `--solve` 模式：命中目標 TTK 所需的武器均傷（法系為裝備魔攻） */
   solved?: { normal: number; boss: number | null; unit: string };
 }
@@ -910,9 +938,20 @@ function solvePower(
   return Math.round((lo + hi) / 2);
 }
 
+/** 星盤逐一試 `STAR_POLICIES`，取 Boss（沒有 Boss 時取一般怪）擊殺最快者 */
 function run(stage: Stage, className: ClassName): Result {
+  let best: Result | null = null;
+  for (const policy of starPolicyCandidates(className, stage.level)) {
+    setStarPolicy(className, policy);
+    const r = runWith(stage, className, policy);
+    const key = (x: Result) => x.bossTtk ?? x.normalTtk;
+    if (!best || key(r) < key(best)) best = r;
+  }
+  return best!;
+}
+
+function runWith(stage: Stage, className: ClassName, starPolicy: StarPolicy): Result {
   const char = buildCharacter(className, stage.level);
-  const effects = preCombatBuffs(className, stage.level);
   const normal = representativeNormal(stage);
 
   // 逐武器類型實測，挑真正最快的 —— 素質排序看不到三連射與雙持（見 weaponCandidatesByType）
@@ -922,17 +961,19 @@ function run(stage: Stage, className: ClassName): Result {
   let bestTtk = Infinity;
   for (const tpl of weaponCandidatesByType(className, stage)) {
     const lo = buildLoadout(className, stage, tpl);
-    const rot = buildRotation(className, stage.level, lo.weapon);
+    const rot = buildRotation(char, lo.weapon);
+    const fx = preCombatBuffs(char, lo.gear);
     const mp = effectiveMaxMp(char, lo.gear);
-    const rg = getMpRegen(char, true, lo.gear, effects);
-    const t = measureTTK(char, lo, rot, effects, normal, mp, rg, 11_000 + stage.level, probeRuns, true);
+    const rg = getMpRegen(char, true, lo.gear, fx);
+    const t = measureTTK(char, lo, rot, fx, normal, mp, rg, 11_000 + stage.level, probeRuns, true);
     if (Number.isFinite(t) && t < bestTtk) { bestTtk = t; loadout = lo; candidates = rot; }
   }
   if (!loadout) {
     loadout = buildLoadout(className, stage);
-    candidates = buildRotation(className, stage.level, loadout.weapon);
+    candidates = buildRotation(char, loadout.weapon);
   }
 
+  const effects = preCombatBuffs(char, loadout.gear);
   const boss = bossOf(stage);
   const maxMp = effectiveMaxMp(char, loadout.gear);
   const regen = getMpRegen(char, true, loadout.gear, effects);
@@ -956,6 +997,8 @@ function run(stage: Stage, className: ClassName): Result {
     normalTtk: measureTTK(char, loadout, candidates, effects, normal, maxMp, regen, normalSeed, RUNS, true),
     bossTtk: boss ? measureTTK(char, loadout, candidates, effects, boss, maxMp, regen, bossSeed, RUNS, false) : null,
     missing: loadout.missing,
+    starPolicy,
+    star: stage.level >= 30 ? starSummary(className, char.starChart) : '',
   };
 
   if (SOLVE) {
@@ -1016,7 +1059,8 @@ for (const stage of stages) {
       (r.solved
         ? `　需求${r.solved.unit}：一般怪 ${r.solved.normal}／Boss ${r.solved.boss ?? '—'}`
         : '')
-      + (r.missing.length ? `　缺件：${r.missing.join(',')}` : ''),
+      + (r.missing.length ? `　缺件：${r.missing.join(',')}` : '')
+      + (r.star ? `\n      星盤（${STAR_POLICY_LABEL[r.starPolicy]}）：${r.star}` : ''),
     );
   }
 }

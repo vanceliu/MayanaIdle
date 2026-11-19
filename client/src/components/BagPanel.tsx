@@ -53,7 +53,7 @@ function scrollTargetLabel(scroll: EnhanceScroll): string {
  * 失敗時裝備已從背包移除，覆蓋層自己畫一份 `ghost` 把碎裂演完。
  */
 interface BagEnhanceFx {
-  kind: 'safe' | 'success' | 'fail';
+  kind: EnhanceOutcome['fx'];
   rect: { left: number; top: number; width: number; height: number };
   label?: string;
   ghost?: EquipmentInstance;
@@ -739,7 +739,7 @@ export function BagPanel() {
         playEnhanceFx({
           kind: outcome.fx,
           rect: { left: box.left, top: box.top, width: box.width, height: box.height },
-          label: outcome.fx === 'fail' ? undefined : `+${outcome.nextLevel}`,
+          label: outcome.fx === 'fail' ? undefined : outcome.fx === 'still' ? '無變化' : `+${outcome.nextLevel}`,
           ghost: outcome.ghost,
         });
       }
@@ -915,7 +915,7 @@ export function BagPanel() {
             left: enhanceFx.rect.left, top: enhanceFx.rect.top,
             width: enhanceFx.rect.width, height: enhanceFx.rect.height,
           }}
-          data-testid={enhanceFx.kind === 'fail' ? 'enh-fx-ghost' : 'enh-fx-success'}
+          data-testid={enhanceFx.kind === 'fail' ? 'enh-fx-ghost' : enhanceFx.kind === 'still' ? 'enh-fx-still' : 'enh-fx-success'}
         >
           {enhanceFx.ghost && (
             <>
@@ -941,7 +941,15 @@ export function BagPanel() {
                 {SHARD_INDEXES.map(i => <div key={i} className={`enh-shard enh-shard--${i}`} />)}
               </>
             )}
-            {enhanceFx.label && <div className="enh-float">{enhanceFx.label}</div>}
+            {enhanceFx.kind === 'still' && (
+              <>
+                <div className="enh-dim" />
+                <div className="enh-flash-dull" />
+              </>
+            )}
+            {enhanceFx.label && (
+              <div className={`enh-float${enhanceFx.kind === 'still' ? ' is-still' : ''}`}>{enhanceFx.label}</div>
+            )}
             <div className="enh-flash-soft" />
           </div>
         </div>

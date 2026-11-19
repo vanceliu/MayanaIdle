@@ -8,6 +8,7 @@ import { ATTRIBUTE_KEYS } from './attributes';
 import { collectAffixAttributes } from './affix';
 import { sumUniqueAffix } from './uniqueAffix';
 import { gameNow } from '../core/clock';
+import { starTotalsOf } from './starChart';
 
 export type ClassName = 'knight' | 'elf' | 'elementalist' | 'priest' | 'thief';
 
@@ -66,12 +67,11 @@ export interface Character {
   exp: number;
   expToNext: number;
   hp: number;
-  maxHp: number;
   mp: number;
-  maxMp: number;
   baseAttributes: Attributes;
   bonusAttributes: Attributes;
-  unspentAttributePoints: number;
+  /** 已點星盤節點 id（`56-star-chart.md`）；不可就地修改，效果由 `starTotalsOf()` 以陣列為鍵快取 */
+  starChart?: string[];
   gold: number;
   currentArea: string;
   currentZone: string;
@@ -118,8 +118,6 @@ export const CLASS_BASE_ATTRIBUTES: Record<ClassName, Attributes> = {
 };
 
 export const CLASS_TOTAL_POINTS = 80;
-export const ATTRIBUTE_CAP = 35;
-export const LEVELUP_ATTRIBUTE_START_LEVEL = 50;
 
 export const CLASS_NAMES_ZH: Record<ClassName, string> = {
   knight: '騎士',
@@ -169,12 +167,8 @@ export function validateBonusAttributes(className: ClassName, bonus: unknown): B
 }
 
 /**
- * 角色總屬性 = 建角基礎 + 配點 + **裝備額外屬性** + buff。
- *
- * `equippedGear` 為選填：
- * - **要傳**：戰鬥、回復、狀態面板 —— 裝備額外屬性必須生效
- * - **不要傳**：配點上限檢查（`ATTRIBUTE_CAP` 只約束 base + bonus，見 `20-attributes.md` § 20.9）
- *   與升級 HP/MP 成長（避免升級前換 +VIT 裝的刷血漏洞，見 § 20.10）
+ * 角色總屬性 = 建角配點 + 星盤 + **裝備額外屬性** + buff（`20-attributes.md` § 20.10）。
+ * `equippedGear` 傳生效中的裝備；最大 HP/MP 不傳 `activeEffects`（buff 不計入，§ 20.4）。
  */
 export function getTotalAttributes(
   char: Character,
@@ -191,6 +185,11 @@ export function getTotalAttributes(
     INT: base.INT + bonus.INT,
     CHA: base.CHA + bonus.CHA,
   };
+
+  const star = starTotalsOf(char.starChart, char.className).totals;
+  for (const key of ATTRIBUTE_KEYS) {
+    attrs[key] += star.get(`attr:${key}`) ?? 0;
+  }
 
   if (equippedGear) {
     for (const key of ATTRIBUTE_KEYS) {

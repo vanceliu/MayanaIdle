@@ -29,13 +29,13 @@ vi.mock('../GameIcon', () => ({
 function testCharacter(): Character {
   return {
     name: 'Shopper', className: 'knight', level: 40, exp: 0, expToNext: 100,
-    hp: 300, maxHp: 300, mp: 100, maxMp: 100,
+    hp: 300, mp: 100, 
     baseAttributes: { STR: 20, AGI: 15, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 100_000,
     currentArea: 'neutral-town', currentZone: 'newbie-neutral',
     currentRegion: 'neutral-town', currentFloor: null,
-    skills: [], unspentAttributePoints: 0, quests: [],
+    skills: [], quests: [],
     areaEnteredAt: 0, createdAt: 0, userId: 1, id: 1,
   };
 }

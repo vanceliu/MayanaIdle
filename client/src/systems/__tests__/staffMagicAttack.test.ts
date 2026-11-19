@@ -22,11 +22,11 @@ function instance(t: EquipmentTemplate, enhancement = 0): EquipmentInstance {
 
 function mage(): Character {
   return {
-    name: 'T', className: 'elementalist', level: 1, exp: 0, expToNext: 1, hp: 1, maxHp: 1, mp: 1, maxMp: 1,
+    name: 'T', className: 'elementalist', level: 1, exp: 0, expToNext: 1, hp: 1, mp: 1, 
     baseAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'x', currentZone: 'x', currentRegion: 'x', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+    quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
   };
 }
 

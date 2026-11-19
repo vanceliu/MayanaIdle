@@ -30,6 +30,16 @@
 
 ## 99.2 進行中的分階段計畫（完成後刪除）
 
+### 武器 +10 起三種結果（`06-equipment.md` § 6.9／§ 6.12、`35-inventory-constraints.md` § 35.5.5、`48-vfx.md` § 48.4，demo `client/demo/enhance-fx.html`）
+
+規格（使用者 2026-11-19）：安定值 6；+7～+9 為 1/3 成功、2/3 消失；目標 +10 起每一級 1/5 成功、2/5 無變化（維持原等級）、2/5 消失。無變化照扣卷軸、計入強化次數、不計損毀。＋卷軸照 § 6.12 依使用前等級的下一格判定；－卷軸不變；既有 +10 以上武器不追溯。無變化另做專用演出。
+
+- [x] E1 demo：`enhance-fx.html` 新增背包格區（`enhanceBagDemo.tsx`，結構照 `BagPanel.tsx`）並加無變化演出，使用者確認
+- [x] E2 文件：06 § 6.9／§ 6.12、35 § 35.5.5、48 § 48.4、INDEX 連動
+- [x] E3 程式：成功率改三結果、`enhanceScroll.ts` 無變化分支、server 判定、機率視窗與結果訊息、演出 CSS 移入 `App.css`
+- [x] E4 測試：+6／+9／+10／+11 機率、無變化等級不變且扣卷軸、＋卷軸自 +9；`npx tsc -b`、client／server vitest（client 唯一失敗 `patchNotes.test.ts` 為版本 0.9.0 尚未寫公告；server 唯一失敗 `syncRoundTrip.test.ts` 撤掉本次改動仍失敗，皆與本項無關）
+- [ ] E5 使用者確認後刪除本段
+
 ### 星盤第一版（`56-star-chart.md`）
 
 規格見 `56-star-chart.md`；第一版盤面與數值為暫定，只在 demo 測試，遊戲程式不動。
@@ -41,15 +51,56 @@
 
 #### 星盤整合（每階段：改文件 → 改程式 → 補測試 → `npx tsc -b` 與 vitest 全綠）
 
-- [ ] I0 前置：使用者 commit 目前工作區
-- [ ] I1 星盤資料與純函式：`client/src/models/starChart.ts`（盤面、點數、配點／退點、效果加總），由 demo 資料移入
-- [ ] I2 屬性與 HP/MP：拿掉 Lv51 自由屬性點（`character.ts`、`levelUp.ts`、`spendAttributePoint`、`AttributeUpModal`）；HP/MP 改公式即時計算；星盤屬性計入 `getTotalAttributes` 與上限 35；等級上限 120；文件 20、04
-- [ ] I3 技能等級與弱化：施放時轉換（同 `applyAbilityToSkills`，隨機技能先套），職業技能與基礎魔法三系；所有施放路徑（`arpgEventHandler`、`combatLoop`、`arpgEngine`、`gameStore` 手動施放、`scriptRunner`、`QuickSlotBar`）不可重複套用；數值節點與命星效果；文件 05、21、22、23、24、07-affix-ability
-- [ ] I4 存檔與 server：`Character` 新增星盤欄位並加入 `writeSave` 白名單；配點／退點／重置 action 加入 `ACTION_ALLOWLIST` 並自驗參數與金幣；server 測試
-- [ ] I5 介面：星盤面板（依 demo）與入口、技能說明羅馬數字與黃色數字、角色屬性面板；面板入口位置先出 demo 確認
-- [ ] I6 遺產系統與清檔：SQLite migration 建 `legacy_archives`、封存後清空（`45-legacy-archive.md` § 45.1）；角色選擇的遺產入口與唯讀頁；migration 測試
-- [ ] I7 Wiki：屬性、技能、新手、經驗表頁，新增星盤頁
-- [ ] I8 全面驗證：client 與 server 測試、型別檢查，逐步看 exit code
+- [x] I0 前置：使用者 commit 目前工作區
+- [x] I1 星盤資料與純函式：`client/src/models/starChart.ts`（盤面、點數、配點／退點、效果加總），由 demo 資料移入
+- [x] I2 屬性與 HP/MP：拿掉 Lv51 自由屬性點（`character.ts`、`levelUp.ts`、`spendAttributePoint`、`AttributeUpModal`）；HP/MP 改公式即時計算；星盤屬性計入 `getTotalAttributes` 與上限 35；等級上限 120；文件 20、04
+- [x] I3 技能等級與弱化：施放時轉換（同 `applyAbilityToSkills`，隨機技能先套），職業技能與基礎魔法三系；所有施放路徑（`arpgEventHandler`、`combatLoop`、`arpgEngine`、`gameStore` 手動施放、`scriptRunner`、`QuickSlotBar`）不可重複套用；數值節點與命星效果；文件 05、21、22、23、24、07-affix-ability
+- [x] I4 存檔與 server：`Character` 新增星盤欄位並加入 `writeSave` 白名單；配點／退點／重置 action 加入 `ACTION_ALLOWLIST` 並自驗參數與金幣；server 測試
+- [x] I5 介面：星盤面板（依 demo）與入口、技能說明羅馬數字與黃色數字、角色屬性面板；面板入口位置先出 demo 確認
+- [x] I6 遺產系統與清檔：SQLite migration 建 `legacy_archives`、封存後清空（`45-legacy-archive.md` § 45.1）；角色選擇的遺產入口與唯讀頁；migration 測試
+- [x] I7 Wiki：每階段隨改動同步更新（I2：屬性、新手、經驗表頁；I3：技能頁）；新增星盤頁
+- [x] I8 全面驗證：client 與 server 測試、型別檢查，逐步看 exit code；04／20／21 改動後重跑數值校準（`06-equipment-requirement.md`、`44-dps-prediction.md`）
+
+#### 基礎魔法與盜賊平衡（使用者 2026-11-19）
+
+- [x] B1 基礎魔法拿掉等級（B6 ×0.6、B20 回到 ×1）、拿掉基礎魔法等級與中央三系節點（改生存星點）
+- [x] B2 模擬腳本移除基礎魔法系引用後重跑 44（使用者決定是否重跑）
+- [x] B3 盜賊職業技能倍率與致命一擊／精準打擊改回
+- [x] B4 雙刀／鋼爪改為每次普攻 30% 打兩下（使用者 2026-11-19，不另補償）
+- [x] B5 重跑 44（死神、TTK、競技場）
+- [x] B6 基礎攻擊／回復魔法改為前版 × 0.6；淬毒毒傷改吃星盤等級（原本讀技能表原值）
+- [x] B7 職業技能是否繞過星盤換算的全面檢查；修正後重跑 44
+- [x] B8 盜賊職業技能等級倍率 ×0.3／0.6／1
+- [x] B9 重跑 44
+- [x] B10 基礎魔法冰霧改名冰霜（文件、程式）
+- [x] B11 盜賊毒霧改冰霧（凍傷：冰屬性 DoT 70%＋攻速 -30%、10s，category `frostbite`）；隨機技能改名冰霧強化
+- [x] B12 重跑 44
+- [x] B13 致命一擊改為單體物理攻擊（A 組，50＋物理，MP 20，冷卻 10s，武器射程，必定爆擊）；致命一擊強化改為施放後爆傷 +50%、3～6 秒
+- [x] B14 重跑 44
+- [x] B15 致命一擊 MP 25 → 20
+- [x] B17 騎士 MP 比值 0.3 → 0.4（MP 加成 7 → 6，Lv1 維持 10）
+- [x] B18 元素師、牧師 MP 比值試 0.8 後改回 0.7
+- [x] B19 重跑 44（10 分鐘內）
+- [x] B20 基礎攻擊／回復魔法威力回到星盤前（×1）；6～10 級攻擊魔法（含詛咒、護甲崩壞）冷卻 30／35／40／50／60 秒
+- [x] B21 重跑 44（10 分鐘內；元素師、牧師 MP 比值 0.7）
+- [x] B22 魔力護盾改為依 MP 比例減傷（最高 20%，不扣 MP、不解除，施放時日誌顯示減傷 %）
+- [x] B23 重跑 44（10 分鐘內）
+- [x] B24 魔力護盾持續 20s、冷卻 30s（不耗 MP）
+- [x] B25 元素師、牧師職業技能等級倍率 ×0.3／0.6／1（同盜賊）
+- [x] B26 重跑 44（10 分鐘內）
+- [x] B27 聖光審判 45、神聖懲擊吸血 10%、元素風暴 55、冷卻縮減 -30%；強化冷卻縮減改為魔法節約（MP 消耗 -30%、30s、冷卻 60s、MP 40）
+- [x] B28 重跑 44（10 分鐘內）
+- [x] B29 精神匯聚加冷卻 -20%（隨技能等級打折）；元素師 TTK 製作頂級過慢 1.8 秒可接受
+- [x] B30 重跑 44（10 分鐘內）
+- [x] B16 重跑 44
+- [x] B17 競技場星盤配法改依競技場成績選（含續航優先）；重跑 44 競技場
+
+#### 交界命星（`56-star-chart.md` § 56.6；使用者 2026-11-19：9 顆全放、位置由 AI 定、併入命星、全部命星最多 3 顆）
+
+- [x] R1 盤面與上限（使用者 2026-11-19 確認）：`starChart.ts` 新增 9 顆與路徑；全部命星最多 3 顆（`planStarChart`／`normalizeStarAllocation`／面板配點擋第 4 顆）；demo 給使用者確認
+- [x] R2 既有數值的效果：狂戰、碎玉、孤注（爆擊傷害）、疾風（攻速）、嗜血（吸血、藥水、自然回血）、貪婪（掉寶、金幣，含 server 掉落路徑）
+- [x] R3 新機制：背水（HP 條件）、燃魔（技能傷害、耗魔 ×2 先於血契）、獨行（組隊判定）
+- [x] R4 測試（`starJunctionKeystones.test.ts`）、`npx tsc -b`、client／server vitest
 
 ### Wiki 全面核對（使用者 2026-11-17：與遊戲不一致一律以遊戲為準，含設計文件；只限這次）
 
@@ -991,19 +1042,18 @@ Lv.80 怪經驗不變（2,736／17,478）。91~100F 區域等級 80。
 - [x] A3 文件：41、25、97、23、INDEX
 - [x] A4 `npx tsc -b`、client／server vitest 全綠
 
-### 裝備掉率下調 ＋ 依地圖等級平衡（`27-drop-table.md`、`06-equipment-acquire.md` § 6A.1）
+### 裝備與印記掉率下調（`27-drop-table.md`、`06-equipment-acquire.md` § 6A.1）
 
-規格：一般怪掉率區間 T2 0.1%~1%、T3 0.1%~1%、T4 0.05%~0.5%、T5 0.01%~0.1%、T6 0.025%~0.05%。
-同階內掉落值 = 下限 + (上限 − 下限) × (區域中位等級 − 該階最低中位等級) ÷ (該階最高中位等級 − 該階最低中位等級)，四捨五入到小數 2 位；
-區域中位等級 = (`levelMin` + `levelMax`) ÷ 2（樓層 area 取該樓層）。遠古地監 9F 一般怪掉 T6。
-Boss T4／T5 0.3%、T6 0.1%、T7 0.01%；各 Boss 掉的 Tier 不變。
-強化卷軸：一般怪 0.1%（＋／－ 0.02%）、Boss 1%（＋／－ 0.2%）。
+規格：一般怪掉率區間 T2 0.05%~0.5%、T3 0.05%~0.5%、T4 0.02%~0.1%、T5 0.02%~0.1%、T6 0.02%~0.05%（同階依區域中位等級線性內插，§ 6A.1 公式不變）。
+Boss T4／T5 0.5%、T6 0.1%；T7 0.01% 不變。
+印記：工藝／精鍊 一般怪與 Boss 5% → 2%，原 6% 者 → 2.4%、原 7% 者 → 2.8%；
+混沌／刺針／重刻／新增／封印 一般怪 0.5%、Boss 2%；突破 一般怪 0.5%、Boss 1%。
 
-- [x] E1 `dropSeeds.ts`：一般怪 T2~T6 掉落值、遠古地監 9F T6 條目、Boss T4／T5／T6 掉落值
-- [x] E1b `dropSeeds.ts`：武器／防具強化卷軸（含＋／－）一般怪與 Boss 掉落值 ÷ 10
-- [x] E2 測試：同階等級相同掉率相同、等級較高不低於等級較低、遠古地監 9F 有 T6、Boss 各階掉率、強化卷軸掉率
-- [x] E3 文件：27 § 27.1／§ 27.3／§ 27.6／§ 27.7、06-equipment-acquire § 6A.1、INDEX 連動、30 § 30.2 強化卷軸
-- [ ] E4 `npx tsc -b`、client／server vitest 全綠
+- [x] E1 `dropSeeds.ts`：一般怪 T2~T6 裝備掉落值、Boss T4／T5／T6 裝備掉落值
+- [x] E2 `dropSeeds.ts`：工藝／精鍊、§ 27.8 六種印記一般怪與 Boss 掉落值
+- [x] E3 測試：`equipmentDropRates.test.ts`、`sigilDrops.test.ts` 及其他引用舊值的測試
+- [x] E4 文件：27 § 27.1／§ 27.3／§ 27.6／§ 27.7、06-equipment-acquire § 6A.1、30 § 30.2、36 § 36.2.7、Wiki 任務頁
+- [x] E5 `npx tsc -b`、client／server vitest 全綠
 
 ### 素材掉率下調（`27-drop-table.md` § 27.1／§ 27.3／§ 27.6／§ 27.7）
 

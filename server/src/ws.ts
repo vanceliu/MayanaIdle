@@ -477,6 +477,23 @@ export class GameServer {
         session.send({ t: 'arena_ranking', id: msg.id, rows });
         return;
       }
+      case 'legacy_list': {
+        const userId = this.requireUser(session);
+        session.send({ t: 'legacy_list', id: msg.id, items: await this.deps.repo.listLegacyArchives(userId) });
+        return;
+      }
+      case 'legacy_get': {
+        const userId = this.requireUser(session);
+        const archive = Number.isSafeInteger(msg.archiveId) ? await this.deps.repo.getLegacyArchive(msg.archiveId, userId) : undefined;
+        session.send({ t: 'legacy_detail', id: msg.id, archive: archive ?? null });
+        return;
+      }
+      case 'legacy_delete': {
+        const userId = this.requireUser(session);
+        const ok = Number.isSafeInteger(msg.archiveId) && await this.deps.repo.deleteLegacyArchive(msg.archiveId, userId);
+        session.send({ t: 'legacy_deleted', id: msg.id, ok });
+        return;
+      }
       case 'leaderboard': {
         this.requireUser(session);
         const snapshot = this.deps.leaderboard(Math.min(100, Math.max(1, msg.top ?? 20)));

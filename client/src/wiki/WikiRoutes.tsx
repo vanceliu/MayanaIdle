@@ -8,6 +8,7 @@ import { MapsPage } from './pages/MapsPage'
 import { CraftingPage } from './pages/CraftingPage'
 import { ExpTablePage } from './pages/ExpTablePage'
 import { SkillsPage } from './pages/SkillsPage'
+import { StarChartPage } from './pages/StarChartPage'
 import { AttributesPage } from './pages/AttributesPage'
 import { CombatPage } from './pages/CombatPage'
 import { AffixesPage } from './pages/AffixesPage'
@@ -44,6 +45,7 @@ export default function WikiRoutes() {
         <Route path="crafting" element={<CraftingPage />} />
         <Route path="exp-table" element={<ExpTablePage />} />
         <Route path="skills" element={<SkillsPage />} />
+        <Route path="star-chart" element={<StarChartPage />} />
         <Route path="attributes" element={<AttributesPage />} />
         <Route path="combat" element={<CombatPage />} />
         <Route path="affixes" element={<AffixesPage />} />

@@ -20,9 +20,7 @@ function setup(className: ClassName, skills: Skill[]) {
       exp: 0,
       expToNext: 1000,
       hp: 100,
-      maxHp: 100,
       mp: 30,
-      maxMp: 30,
       baseAttributes: { STR: 18, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
       bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
       gold: 0,
@@ -31,7 +29,6 @@ function setup(className: ClassName, skills: Skill[]) {
       currentRegion: 'dawn-plains',
       currentFloor: null,
       skills,
-      unspentAttributePoints: 0,
       quests: [],
       areaEnteredAt: 0,
       createdAt: 0,
@@ -136,7 +133,12 @@ describe('SkillPanel 技能格全開顯示', () => {
       smallMonsterDamage: 10, largeMonsterDamage: 10, quality: 0, enhancement: 0, affixes: [], ownerId: 1, equipped: true,
       ability: { type: 'binding_arrow_boost', params: { cooldown: 1500, root: 1000 } },
     };
-    useGameStore.setState({ equippedGear: { rightHand: bow } as never, activeEffects: [] });
+    // 兩個強化節點點滿，冷卻回到表列 10s，再扣隨機技能 1.5s（`56-star-chart.md` § 56.5）
+    const char = useGameStore.getState().character!;
+    useGameStore.setState({
+      character: { ...char, starChart: ['elf-magic4-boost0', 'elf-magic4-boost1'] },
+      equippedGear: { rightHand: bow } as never, activeEffects: [],
+    });
     render(<SkillPanel />);
     fireEvent.mouseEnter(classCells('elf')[4]); // 束縛箭
     const tooltip = document.querySelector('.skill-tooltip')!;
@@ -197,5 +199,19 @@ describe('SkillPanel 基礎魔法依職業上限顯示（§ 5.3）', () => {
         expect(screen.queryByText(template.name)).toBeNull();
       }
     }
+  });
+});
+
+describe('SkillPanel 星盤等級標記（`56-star-chart.md` § 56.5）', () => {
+  it('已習得技能格右上角標 II／III，I 不標，名稱 tooltip 加後綴', () => {
+    setup('knight', [learn('shield-bash'), learn('rend')]);
+    const char = useGameStore.getState().character!;
+    useGameStore.setState({ character: { ...char, starChart: ['knight-magic0-level0', 'knight-magic0-level1'] } });
+    render(<SkillPanel />);
+    const [bash, rend] = classCells('knight');
+    expect(bash.querySelector('.skill-cell-star')?.textContent).toBe('III');
+    expect(rend.querySelector('.skill-cell-star')).toBeNull();
+    fireEvent.mouseEnter(bash);
+    expect(document.querySelector('.skill-tooltip-name')?.textContent).toBe('盾擊(III)');
   });
 });

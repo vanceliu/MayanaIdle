@@ -24,12 +24,12 @@ const RANGED_PHYSICAL_RANGE = 10;
 function char(spi: number): Character {
   return {
     name: 'T', className: 'knight', level: 50, exp: 0, expToNext: 100,
-    hp: 9999, maxHp: 9999, mp: 100, maxMp: 100,
+    hp: 9999, mp: 100, 
     baseAttributes: { STR: 14, AGI: 0, VIT: 16, SPI: spi, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [],
+    quests: [],
     areaEnteredAt: 0, createdAt: 0, userId: 1,
   };
 }

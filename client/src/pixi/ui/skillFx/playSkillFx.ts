@@ -24,7 +24,7 @@ export interface SkillFxTarget {
    */
   onLand?: () => void;
   /**
-   * 逐下回呼 —— 多下判定（雙持雙擊、三連射）每一下各一個
+   * 逐下回呼 —— 多下判定（三連射、多段技能）每一下各一個
    * （`21-combat-formula.md` § 21.4、`48-vfx.md` § 48.7.3）。
    *
    * 有這個就**取代** `onLand`：兩個都跑會把同一下算兩次。
@@ -251,7 +251,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
       /*
        * 回呼一律走 `hitCallback` —— 直接用 `t.onLand` 的話，
        * 呼叫端只給了逐下的 `onLandHit` 時會拿到 undefined，
-       * 齊射技能（火球、冰霧、箭雨、流星雨）就一個傷害數字都不跳。
+       * 齊射技能（火球、冰霜、箭雨、流星雨）就一個傷害數字都不跳。
        */
       const count = t.onLandHit?.length ?? 1;
       for (let h = 0; h < count; h++) {
@@ -334,7 +334,7 @@ export function playSkillFx(fx: SkillFxManager, o: PlaySkillFxOpts): number {
     case 'impact':
       /*
        * 每個目標各一個命中點。**多下判定的目標各有好幾個**
-       * （雙持雙擊、多段技能）—— 一下一個爆點、一下一個數字，
+       * （多段技能）—— 一下一個爆點、一下一個數字，
        * 依 `multiHitStaggerMs` 錯開，疊在同一格會看起來只有一下。
        */
       for (const t of targets) {

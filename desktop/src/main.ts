@@ -27,6 +27,7 @@ import {
   type ConfigField, type WorldSummary,
 } from './worlds';
 import { isLauncherUrl } from './ipcGuard';
+import { opensInExternalBrowser } from './externalLinks';
 
 type WorldKind = 'solo' | 'open';
 
@@ -178,6 +179,11 @@ function createWindow(): void {
   });
   // 遊戲頁自己的 <title> 會蓋掉視窗標題，但開站時那一行要一直看得到（別人連哪裡）
   win.on('page-title-updated', e => e.preventDefault());
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (!opensInExternalBrowser(url)) return { action: 'allow' };
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
   /*
    * 不變式：畫面回到啟動器時，server 一定不在跑。
    * 只靠選單那條路徑不夠 —— 任何回到啟動器頁的方式都要收掉 server，

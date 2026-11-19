@@ -2,10 +2,11 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import '../components/WikiTable.css';
 import {
-  ATTRIBUTE_CAP, CLASS_BASE_ATTRIBUTES, CLASS_NAMES_ZH, CLASS_TOTAL_POINTS, CREATION_ATTRIBUTE_CAP,
-  LEVELUP_ATTRIBUTE_START_LEVEL, getAvailablePoints, type ClassName,
+  CLASS_BASE_ATTRIBUTES, CLASS_NAMES_ZH, CLASS_TOTAL_POINTS, CREATION_ATTRIBUTE_CAP,
+  getAvailablePoints, type ClassName,
 } from '../../models/character';
 import { ATTRIBUTE_KEYS } from '../../models/attributes';
+import { STAR_CHART_UNLOCK_LEVEL } from '../../models/starChart';
 import { ZONES, getRegionsByZone } from '../../models/mapData';
 import { BLOCK_RATE_CAP, COOLDOWN_REDUCTION_CAP, DAMAGE_REDUCTION_CAP, DODGE_RATE_CAP } from '../../systems/combat';
 import { BOSS_SPAWN_MIN_MINUTES } from '../../stores/mapMonsterStore';
@@ -136,7 +137,7 @@ export function StartPage() {
           </table>
         </div>
         <Card>
-          升級時 HP、MP 依體質、精神成長並回滿；Lv.{LEVELUP_ATTRIBUTE_START_LEVEL + 1} 起每升一級多 1 點自由屬性點，單項上限 {ATTRIBUTE_CAP}。
+          升級時 HP、MP 回滿；Lv.{STAR_CHART_UNLOCK_LEVEL} 起每升一級得 1 點星盤點數，屬性沒有上限。
           見 <WikiLink to="/wiki/attributes">屬性公式</WikiLink>、<WikiLink to="/wiki/exp-table">經驗表</WikiLink>。
         </Card>
       </Chapter>
@@ -210,8 +211,8 @@ export function StartPage() {
             <tbody>
               <tr><td>力量 STR</td><td style={WRAP_TEXT}>近戰傷害、負重</td></tr>
               <tr><td>敏捷 AGI</td><td style={WRAP_TEXT}>遠程（弓）傷害、命中、迴避</td></tr>
-              <tr><td>體質 VIT</td><td style={WRAP_TEXT}>升級 HP 成長、回血、負重</td></tr>
-              <tr><td>精神 SPI</td><td style={WRAP_TEXT}>升級 MP 成長、回魔、魔法抗性</td></tr>
+              <tr><td>體質 VIT</td><td style={WRAP_TEXT}>最大 HP、回血、負重</td></tr>
+              <tr><td>精神 SPI</td><td style={WRAP_TEXT}>最大 MP、回魔、魔法抗性</td></tr>
               <tr><td>智力 INT</td><td style={WRAP_TEXT}>技能傷害與治癒、冷卻縮減（上限 {COOLDOWN_REDUCTION_CAP}%）</td></tr>
             </tbody>
           </table>

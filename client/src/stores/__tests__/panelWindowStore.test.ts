@@ -19,6 +19,7 @@ function reset() {
       equipment: { x: 396, y: 120 },
       bag: { x: 780, y: 120 },
       skill: { x: 1224, y: 120 },
+      star: { x: 160, y: 72 },
       quest: { x: 1576, y: 128 },
     mail: { x: 0, y: 0 },
       script: { x: 700, y: 72 },

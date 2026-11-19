@@ -15,9 +15,7 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
     exp: 0,
     expToNext: 100,
     hp: 100,
-    maxHp: 100,
     mp: 30,
-    maxMp: 30,
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0,
@@ -29,7 +27,6 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
     areaEnteredAt: Date.now(),
     createdAt: Date.now(),
     userId: 1,
-    unspentAttributePoints: 0,
     quests: [],
     ...overrides,
   };
@@ -116,7 +113,7 @@ describe('scriptRunner', () => {
       const rules: ScriptRule[] = [
         { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 50 }, action: { type: 'potion', potionType: 'red' } },
       ];
-      const ctx = createContext({ character: createTestCharacter({ hp: 30, maxHp: 100 }) });
+      const ctx = createContext({ character: createTestCharacter({ hp: 30, }) });
       const result = evaluateScript(rules, ctx);
       expect(result).toEqual({ type: 'potion', potionType: 'red' });
     });
@@ -125,7 +122,7 @@ describe('scriptRunner', () => {
       const rules: ScriptRule[] = [
         { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 50 }, action: { type: 'potion', potionType: 'red' } },
       ];
-      const ctx = createContext({ character: createTestCharacter({ hp: 80, maxHp: 100 }) });
+      const ctx = createContext({ character: createTestCharacter({ hp: 80, }) });
       const result = evaluateScript(rules, ctx);
       expect(result).toBeNull();
     });
@@ -134,7 +131,7 @@ describe('scriptRunner', () => {
       const rules: ScriptRule[] = [
         { id: 'r1', enabled: true, condition: { type: 'hp_above', value: 50 }, action: { type: 'normal_attack' } },
       ];
-      const ctx = createContext({ character: createTestCharacter({ hp: 80, maxHp: 100 }) });
+      const ctx = createContext({ character: createTestCharacter({ hp: 80, }) });
       const result = evaluateScript(rules, ctx);
       expect(result).toEqual({ type: 'normal_attack' });
     });
@@ -144,7 +141,7 @@ describe('scriptRunner', () => {
         { id: 'r1', enabled: true, condition: { type: 'mp_below', value: 30 }, action: { type: 'flee_town' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ mp: 5, maxMp: 30 }),
+        character: createTestCharacter({ mp: 5, }),
         bagItems: [bagItem('薄暮村回城卷軸', 1)],
       });
       const result = evaluateScript(rules, ctx);
@@ -212,7 +209,7 @@ describe('scriptRunner', () => {
         { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 50 }, action: { type: 'potion', potionType: 'red' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 20, maxHp: 100 }),
+        character: createTestCharacter({ hp: 20, }),
         bagItems: [],
       });
       const result = evaluateScript(rules, ctx);
@@ -239,7 +236,7 @@ describe('scriptRunner', () => {
         { id: 'r3', enabled: true, condition: { type: 'always' }, action: { type: 'normal_attack' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 20, maxHp: 100 }),
+        character: createTestCharacter({ hp: 20, }),
         bagItems: [
           bagItem('紅色藥水', 5),
           bagItem('薄暮村回城卷軸', 1),
@@ -255,7 +252,7 @@ describe('scriptRunner', () => {
         { id: 'r2', enabled: true, condition: { type: 'always' }, action: { type: 'flee_teleport' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 20, maxHp: 100 }),
+        character: createTestCharacter({ hp: 20, }),
         bagItems: [],
       });
       const result = evaluateScript(rules, ctx);
@@ -267,7 +264,7 @@ describe('scriptRunner', () => {
         { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'potion', potionType: 'orange' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 50, maxHp: 100 }),
+        character: createTestCharacter({ hp: 50, }),
         bagItems: [bagItem('橙色藥水', 5)],
       });
       expect(evaluateScript(rules, ctx)).toEqual({ type: 'potion', potionType: 'orange' });
@@ -276,7 +273,7 @@ describe('scriptRunner', () => {
         { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'potion', potionType: 'white' } },
       ];
       const ctx2 = createContext({
-        character: createTestCharacter({ hp: 50, maxHp: 100 }),
+        character: createTestCharacter({ hp: 50, }),
         bagItems: [bagItem('白色藥水', 2)],
       });
       expect(evaluateScript(rules2, ctx2)).toEqual({ type: 'potion', potionType: 'white' });
@@ -286,7 +283,7 @@ describe('scriptRunner', () => {
       const rules: ScriptRule[] = [
         { id: 'r1', enabled: true, condition: { type: 'always' }, action: { type: 'potion', potionType: 'red' } },
       ];
-      const ctx = createContext({ character: createTestCharacter({ hp: 100, maxHp: 100 }) });
+      const ctx = createContext({ character: createTestCharacter({ hp: 100, }) });
       expect(evaluateScript(rules, ctx)).toBeNull();
     });
 
@@ -295,7 +292,7 @@ describe('scriptRunner', () => {
         { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 30 }, action: { type: 'flee_town' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 10, maxHp: 100 }),
+        character: createTestCharacter({ hp: 10, }),
         bagItems: [],
       });
       const result = evaluateScript(rules, ctx);
@@ -307,7 +304,7 @@ describe('scriptRunner', () => {
         { id: 'r1', enabled: true, condition: { type: 'hp_below', value: 30 }, action: { type: 'flee_town' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 10, maxHp: 100 }),
+        character: createTestCharacter({ hp: 10, }),
         bagItems: [bagItem('艾爾薩斯回城卷軸', 3)],
       });
       const result = evaluateScript(rules, ctx);
@@ -320,7 +317,7 @@ describe('scriptRunner', () => {
         { id: 'r2', enabled: true, condition: { type: 'hp_below', value: 50 }, action: { type: 'flee_teleport' } },
       ];
       const ctx = createContext({
-        character: createTestCharacter({ hp: 10, maxHp: 100 }),
+        character: createTestCharacter({ hp: 10, }),
         bagItems: [],
       });
       const result = evaluateScript(rules, ctx);

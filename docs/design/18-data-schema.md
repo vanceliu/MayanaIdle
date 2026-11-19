@@ -201,7 +201,8 @@ baseValue × (1 + qualityPercent / 100)
 - level
 - exp
 - gold
-- 屬性點分配
+- 建角屬性點分配
+- starChart：已點星盤節點 id（`56-star-chart.md`）；讀檔時整理成合法狀態（未開放為空、含起點、只留相連節點）
 - 當前位置
 - appearance（外觀，見下）
 - seasonId、pool（§ 18.1）

@@ -113,6 +113,21 @@ describe('背包強化（§ 35.5.5）', () => {
     vi.restoreAllMocks();
   });
 
+  it('+9 衝 +10 無變化：裝備留著、log 說明、演出走無變化', () => {
+    setup([sword({ enhancement: 9 })]);
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    render(<BagPanel />);
+    const scroll = cellAt(0);
+    tap(scroll);
+    tap(scroll);
+    fireEvent.pointerDown(cellAt(1), { button: 0, clientX: 10, clientY: 10 });
+
+    expect(inv()[0].enhancement).toBe(9);
+    expect(lastLog()).toContain('無變化');
+    expect(screen.getByTestId('enh-fx-still')).toBeDefined();
+    vi.restoreAllMocks();
+  });
+
   it('點不合法的目標＝取消，不消耗卷軸', () => {
     setup([belt()], [bagItemById(ARMOR_ENHANCE_SCROLL_ID, 2)]);
     render(<BagPanel />);
@@ -205,6 +220,24 @@ describe('背包機率視窗（§ 35.5.5）', () => {
     expect(screen.getByText('武器卷－')).toBeDefined();
     // +6 使用時判 +7 那一格：超出安定值 6，成功率 1/3
     expect(screen.getAllByText('33%').length).toBe(2);
+  });
+
+  it('+9 判 +10：列出 20% 與無變化／消失各 40%', () => {
+    setup([sword({ enhancement: 9 })]);
+    render(<BagPanel />);
+    fireEvent.click(screen.getByRole('button', { name: '機率' }));
+    fireEvent.pointerDown(cellAt(1), { button: 0, clientX: 10, clientY: 10 });
+
+    expect(screen.getAllByText('20%').length).toBe(2);
+    expect(screen.getByText('無變化 40%・消失 40%')).toBeDefined();
+  });
+
+  it('+6 判 +7：警示仍是失敗即消失', () => {
+    render(<BagPanel />);
+    fireEvent.click(screen.getByRole('button', { name: '機率' }));
+    fireEvent.pointerDown(cellAt(1), { button: 0, clientX: 10, clientY: 10 });
+
+    expect(screen.getByText('失敗即消失')).toBeDefined();
   });
 
   it('不可強化的裝備直說不可強化', () => {

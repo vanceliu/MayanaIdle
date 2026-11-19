@@ -1,4 +1,8 @@
+import { useCallback, useEffect, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { connection } from '../net/connection';
+import type { LegacyArchiveSummary } from '../models/legacyArchive';
+import { LegacyArchivePage } from './LegacyArchivePage';
 import { useOnlineStore } from '../net/online';
 import { CLASS_NAMES_ZH, ATTRIBUTE_KEYS } from '../models/character';
 import type { Attributes } from '../models/character';
@@ -6,7 +10,7 @@ import type { Attributes } from '../models/character';
 const MAX_CHARACTERS = 4;
 
 /**
- * 角色的六項屬性：建角配點 + Lv.51+ 升級配點，**不含裝備與 buff**
+ * 角色的六項屬性：建角配點 ＋ 星盤，**不含裝備與 buff**
  * （`20-attributes.md` § 20.10 —— 換裝不該讓角色卡上的數字跳動）。
  */
 function SlotAttributes({ attributes }: { attributes: Attributes }) {
@@ -30,6 +34,28 @@ export function CharacterSelect() {
   const kickedReason = useOnlineStore(s => s.kickedReason);
   const emptySlots = MAX_CHARACTERS - characterList.length;
   const clearKicked = () => useOnlineStore.setState({ kickedReason: null });
+
+  // 遺產紀錄（`45-legacy-archive.md` § 45.3）：有紀錄才顯示入口
+  const [legacy, setLegacy] = useState<LegacyArchiveSummary[]>([]);
+  const [showLegacy, setShowLegacy] = useState(false);
+  const refreshLegacy = useCallback(() => connection.requestLegacyList().then(setLegacy).catch(() => setLegacy([])), []);
+  useEffect(() => { void refreshLegacy(); }, [refreshLegacy]);
+  const loadArchive = useCallback((id: number) => connection.requestLegacyArchive(id), []);
+
+  if (showLegacy) {
+    return (
+      <LegacyArchivePage
+        archives={legacy}
+        loadArchive={loadArchive}
+        onDelete={async id => {
+          const ok = await connection.deleteLegacyArchive(id).catch(() => false);
+          if (ok) await refreshLegacy();
+          return ok;
+        }}
+        onBack={() => setShowLegacy(false)}
+      />
+    );
+  }
 
   return (
     <div className="character-select-screen">
@@ -65,6 +91,11 @@ export function CharacterSelect() {
           </div>
         ))}
       </div>
+      {legacy.length > 0 && (
+        <div className="character-select-footer">
+          <button className="btn-secondary" onClick={() => setShowLegacy(true)}>遺產（{legacy.length} 筆）</button>
+        </div>
+      )}
     </div>
   );
 }

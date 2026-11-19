@@ -2,7 +2,7 @@
  * T7 獨有詞綴與命中下降／防禦下降的戰鬥整合測試 —— 走 `processPlayerAttack`／`processMonsterAttack`。
  *
  * 規則（`07-affix-tier7.md` § 7T.4、`07-affix.md` § 7.9）：
- *  - 命中類每一下命中判定一次；雙持一次攻擊兩下
+ *  - 命中類每一下命中判定一次
  *  - 擊殺回血每擊殺一隻判定一次
  *  - 受擊觸發只在受到傷害時判定；同種類刷新時間
  *  - 命中下降／防禦下降 10% 觸發、3 秒、同一隻怪後施放覆蓋；命中下降加在 35% 迴避上限之後
@@ -36,12 +36,12 @@ const NOW = 900_000;
 function knight(hp = 100, mp = 50): Character {
   return {
     name: 'Tester', className: 'knight', level: 60, exp: 0, expToNext: 100,
-    hp, maxHp: 1000, mp, maxMp: 400,
+    hp, mp, 
     baseAttributes: { STR: 20, AGI: 0, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -109,15 +109,6 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('武器命中類', () => {
-  it('命中回血：每下命中回 X HP，雙持兩下回兩次', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    attack([weapon({ type: 'hit_heal', value: 12 })], monster());
-    expect(useGameStore.getState().character!.hp).toBe(112);
-
-    useGameStore.setState({ character: knight() });
-    attack([weapon({ type: 'hit_heal', value: 12 }, [], 'dualBlade')], monster());
-    expect(useGameStore.getState().character!.hp).toBe(124);
-  });
 
   it('命中回魔', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);

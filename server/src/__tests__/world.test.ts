@@ -40,7 +40,7 @@ describe('World（隊伍與地圖實例）', () => {
     world.sessions.add(s);
     await s.game.getState().createCharacter(name, 'knight', ATTRS);
     const ch = s.game.getState().character!;
-    s.game.setState({ character: { ...ch, currentRegion: region, currentArea: region, level: 30, hp: 500, maxHp: 500, expToNext: 1_000_000 } });
+    s.game.setState({ character: { ...ch, currentRegion: region, currentArea: region, level: 30, hp: 500, mp: 500, expToNext: 1_000_000 } });
     await s.game.getState().saveState();
     await syncWorld(s);
     world.onCharacterEnter(s);

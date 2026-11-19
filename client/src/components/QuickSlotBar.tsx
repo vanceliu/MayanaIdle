@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { applyAbilityToSkills } from '../models/abilitySkill';
+import { resolveSkills } from '../models/skillStar';
 import { useGameStore } from '../stores/gameStore';
 import { getPotionCount } from '../stores/gameStore';
 import { GameIcon } from './GameIcon';
@@ -64,11 +64,11 @@ export function QuickSlotBar() {
   const weapon = getEquippedWeapon(allGear);
   const weaponType = weapon?.type !== 'armor' ? weapon?.type : undefined;
   const cooldownReduction = character ? getSkillCooldownReduction(character, allGear, activeEffects) : 0;
-  // § 7S.5 職業池隨機技能：MP 與冷卻顯示改寫後的值（`07-affix-ability.md`）
+  // 星盤與 § 7S.5 職業池隨機技能：MP 與冷卻顯示改寫後的值
   const skills = useMemo(
-    () => (character ? applyAbilityToSkills(learnedSkills, allGear, character.className) : learnedSkills),
+    () => (character ? resolveSkills(learnedSkills, allGear, character, activeEffects) : learnedSkills),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [learnedSkills, equippedGear, activeEffects, character?.className],
+    [learnedSkills, equippedGear, activeEffects, character?.className, character?.starChart],
   );
   /*
    * 快捷格只是**放置目標**：它以 `data-drop-*` 宣告自己，實際的綁定由拖曳來源
@@ -237,10 +237,9 @@ export function QuickSlotBar() {
         let remaining: number;
         if (entry.kind === 'skill') {
           const skill = live.find(s => s.id === entry.skillId);
-          // § 35.7.6：冷卻長度取實際值（含冷卻縮減），不可用技能表上的原始秒數
-          total = skill
-            ? Math.floor(skill.cooldown * (1 - Math.min(cooldownReduction, 50) / 100))
-            : 0;
+          // § 35.7.6：冷卻長度取實際值（星盤冷卻、隨機技能、冷卻縮減），不可用技能表上的原始秒數
+          const cooldown = skills.find(s => s.id === entry.skillId)?.cooldown ?? 0;
+          total = skill ? Math.floor(cooldown * (1 - Math.min(cooldownReduction, 50) / 100)) : 0;
           remaining = skill && total > 0 ? Math.max(0, skill.lastUsedAt + total - now) : 0;
         } else {
           /*

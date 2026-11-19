@@ -7,6 +7,7 @@ import { resetTestDb } from '../../testing/testDb';
 import type { DropBonuses, DropResult } from '../../systems/drops';
 import type { MonsterInstance } from '../../models/monster';
 import { createDefaultStatistics } from '../../models/statistics';
+import { starPathTo } from '../../models/starChart';
 
 const rollDropsMock = vi.fn(async (_bonuses?: DropBonuses): Promise<DropResult> => ({ gold: 0, items: [] }));
 
@@ -87,6 +88,15 @@ describe('強化詞綴的擊殺獎勵', () => {
     expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_drop_mult: 2, affix_gold_mult: 1.1 }));
     await kill(makeMonster());
     expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ affix_drop_mult: 1, affix_gold_mult: 1 }));
+  });
+
+  it('貪婪之星：掉寶率、金幣 +20% 帶給掉落擲骰（`56-star-chart.md` § 56.6）', async () => {
+    const char = useGameStore.getState().character!;
+    // 合法配點：Lv100、從騎士起點連到牧師／騎士交界的貪婪之星（讀檔與升級會整理掉不相連的節點）
+    const path = starPathTo('risk4-keystone1', new Set(['knight-start']))!;
+    useGameStore.setState({ character: { ...char, level: 100, starChart: ['knight-start', ...path] } });
+    await kill(makeMonster());
+    expect(rollDropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ drop_rate: 20, gold_rate: 20 }));
   });
 
   it('擊敗日誌寫「詞綴 原名」', async () => {

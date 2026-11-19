@@ -2,7 +2,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   calculateBasePhysicalDamage,
   calculatePlayerAttack,
+  DUAL_STRIKE_CHANCE,
   getWeaponDamageRange,
+  getWeaponHitCount,
   rollWeaponDamage,
 } from '../combat';
 import type { Character } from '../../models/character';
@@ -14,12 +16,12 @@ import type { EquipmentInstance } from '../../models/equipment';
 function char(): Character {
   return {
     name: 'T', className: 'knight', level: 5, exp: 0, expToNext: 100,
-    hp: 100, maxHp: 100, mp: 30, maxMp: 30,
+    hp: 100, mp: 30, 
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [],
+    quests: [],
     areaEnteredAt: Date.now(), createdAt: Date.now(), userId: 1,
   };
 }
@@ -111,14 +113,6 @@ describe('普攻與快照套用擲骰', () => {
     expect(high).toBe(22);
   });
 
-  it('雙持每一下各自擲骰', () => {
-    const claw = weapon({ type: 'claw', isTwoHanded: true, smallMonsterDamage: 10 });
-    // 第一下：命中、基傷下限、不暴擊；第二下：命中、基傷上限、不暴擊
-    mockRandomSequence(0.1, 0, 0.5, 0.1, 0.9999, 0.5);
-    const r = calculatePlayerAttack(char(), claw, monster());
-    expect(r.hits.map(h => h.damage)).toEqual([5 + 7, 10 + 7]);
-  });
-
   it('基礎物理傷害（快照）也擲骰', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     expect(calculateBasePhysicalDamage(char(), weapon(), [weapon()])).toBe(6 + 7);
@@ -129,5 +123,22 @@ describe('普攻與快照套用擲骰', () => {
   it('未裝備武器時快照基傷固定 1', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9999);
     expect(calculateBasePhysicalDamage(char(), null, [])).toBe(1 + 7);
+  });
+});
+
+describe('雙刀、鋼爪 30% 打兩下（§ 21.4）', () => {
+  it('擲骰低於 30% 打兩下，否則一下；其他武器一律一下', () => {
+    vi.spyOn(Math, 'random').mockReturnValue((DUAL_STRIKE_CHANCE - 1) / 100);
+    expect(getWeaponHitCount(weapon({ type: 'dualBlade' }))).toBe(2);
+    expect(getWeaponHitCount(weapon({ type: 'claw' }))).toBe(2);
+    expect(getWeaponHitCount(weapon({ type: 'sword' }))).toBe(1);
+    vi.spyOn(Math, 'random').mockReturnValue(DUAL_STRIKE_CHANCE / 100);
+    expect(getWeaponHitCount(weapon({ type: 'dualBlade' }))).toBe(1);
+  });
+
+  it('打兩下時普攻回兩筆逐下明細', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const result = calculatePlayerAttack(char(), weapon({ type: 'dualBlade' }), monster());
+    expect(result.hits).toHaveLength(2);
   });
 });

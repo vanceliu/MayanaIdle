@@ -664,7 +664,7 @@ function playPlayerAttackFx(o: {
      */
     const entity = o.monsterEntities.get(dmg.targetId);
     /*
-     * **一下一個回呼**（`21-combat-formula.md` § 21.4：雙持雙擊與多段技能
+     * **一下一個回呼**（`21-combat-formula.md` § 21.4：多段技能
      * 每下獨立判定）。合成一個的話「第二下 MISS」在畫面上讀不出來。
      *
      * 數字**每一下都完整演完**，靠左右攤開避免疊在一起（`DamageNumberStack`）——
@@ -675,7 +675,7 @@ function playPlayerAttackFx(o: {
       x: sx, y,
       crit: dmg.isCrit,
       onLandHit: dmg.hits.map((hit, i) => () => {
-        /* 只上毒的技能（毒霧，§ 23.7）沒有直接傷害：不跳 0、不彈 */
+        /* 只上 DoT 的技能（冰霧，§ 23.7）沒有直接傷害：不跳 0、不彈 */
         if (skill?.dotOnly) {
           entity?.releaseHit(0);
           return;

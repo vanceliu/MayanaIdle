@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getExpToNextLevel } from '../../systems/levelUp';
+import { getExpToNextLevel, LEVEL_CAP } from '../../systems/levelUp';
 import { RESTED_EXP_ACCRUAL_RATIO, RESTED_EXP_CAP_MS, RESTED_EXP_MULTIPLIER } from '../../systems/restedExp';
 import '../components/WikiTable.css';
 
@@ -7,7 +7,7 @@ export function ExpTablePage() {
   const tableData = useMemo(() => {
     let cumulative = 0;
     const rows = [];
-    for (let lv = 1; lv <= 100; lv++) {
+    for (let lv = 1; lv < LEVEL_CAP; lv++) {
       const expNeeded = getExpToNextLevel(lv);
       cumulative += expNeeded;
       rows.push({ level: lv, expNeeded, cumulative });
@@ -22,14 +22,21 @@ export function ExpTablePage() {
         公式：<code style={{ color: 'var(--accent-info)', fontFamily: 'var(--font-mono)' }}>
           100 × 1.15^k
         </code>
-        ，指數 k 分兩段推進 ——{' '}
+        ，指數 k 分三段推進 ——{' '}
         <code style={{ color: 'var(--accent-info)', fontFamily: 'var(--font-mono)' }}>
           Lv ≤ 65：k = 1.15625 × (Lv - 1)
         </code>
         ；
         <code style={{ color: 'var(--accent-info)', fontFamily: 'var(--font-mono)' }}>
-          Lv ≥ 65：k = 74 + 0.73529 × (Lv - 65)
+          Lv 65～99：k = 74 + 0.73529 × (Lv - 65)
         </code>
+        ；
+        <code style={{ color: 'var(--accent-info)', fontFamily: 'var(--font-mono)' }}>
+          Lv ≥ 99：每級 ×1.3
+        </code>
+      </p>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
+        等級上限 {LEVEL_CAP}，到達後經驗照常累積，不再升級。
       </p>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
         回鍋加倍：離線每 1 分鐘累積 {60 * RESTED_EXP_ACCRUAL_RATIO} 秒擊殺經驗 ×{RESTED_EXP_MULTIPLIER}，存量上限 {RESTED_EXP_CAP_MS / 3_600_000} 小時。

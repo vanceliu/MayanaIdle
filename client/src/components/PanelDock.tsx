@@ -2,6 +2,7 @@ import { ScriptEditorButton } from './ScriptEditorPanel';
 import { QuestTrackerButton } from './QuestTracker';
 import { MailboxButton } from './MailboxPanel';
 import { SocialButton } from './SocialPanel';
+import { StarPointsBadge } from './StarChartPanel';
 import { usePanelWindowStore, DOCK_PANEL_KEYS, panelButtonA11y } from '../stores/panelWindowStore';
 import { PanelDockFace } from './PanelDockFace';
 import { useIsMobile } from '../hooks/useViewport';
@@ -9,7 +10,7 @@ import { useIsMobile } from '../hooks/useViewport';
 /**
  * 底部面板按鈕列（16-tech-frontend-architecture.md § 32.15）
  * 與快捷鍵列同排。六個面板一律開成可拖曳浮動視窗；
- * 任務／信箱／自動天賦帶指示，因此按鈕由各自的組件渲染。
+ * 任務／信箱／自動天賦帶指示，因此按鈕由各自的組件渲染；星盤的未點點數徽章掛在泛用按鈕上。
  */
 export function PanelDock() {
   const open = usePanelWindowStore(s => s.open);
@@ -22,12 +23,13 @@ export function PanelDock() {
       {DOCK_PANEL_KEYS.map(key => (
         <button
           key={key}
-          className={`panel-dock-btn ${open[key] ? 'active' : ''}`}
+          className={`panel-dock-btn ${key === 'star' ? 'star-btn ' : ''}${open[key] ? 'active' : ''}`}
           aria-pressed={open[key]}
           onClick={() => toggle(key, isMobile)}
           {...panelButtonA11y(key)}
         >
           <PanelDockFace panelKey={key} />
+          {key === 'star' && <StarPointsBadge />}
         </button>
       ))}
       <QuestTrackerButton />

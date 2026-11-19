@@ -3,6 +3,7 @@
  * server 以 SQLite 實作（`server/src/db/sqliteRepository.ts`），測試以記憶體實作（`memoryRepository.ts`）；
  * 遊戲邏輯只碰這個介面。
  */
+import type { LegacyArchive, LegacyArchiveSummary } from '../models/legacyArchive';
 import type { Character } from '../models/character';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import type { MonsterTemplate } from '../models/monster';
@@ -96,4 +97,9 @@ export interface GameRepository {
 
   /** 讀寫交易：內部全部成功才提交 */
   transaction<T>(fn: () => Promise<T>): Promise<T>;
+
+  /** 遺產系統（`45-legacy-archive.md`）：只回該帳號的紀錄 */
+  listLegacyArchives(userId: number): Promise<LegacyArchiveSummary[]>;
+  getLegacyArchive(id: number, userId: number): Promise<LegacyArchive | undefined>;
+  deleteLegacyArchive(id: number, userId: number): Promise<boolean>;
 }

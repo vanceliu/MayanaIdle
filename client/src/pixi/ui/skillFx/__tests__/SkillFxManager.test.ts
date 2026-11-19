@@ -234,7 +234,7 @@ describe('playSkillFx：整份技能表都跑得完', () => {
     fx.destroy();
   });
 
-  it('近戰的多下判定（雙持雙擊）也是一下一個爆點，錯開不疊在一起', () => {
+  it('近戰的多下判定也是一下一個爆點，錯開不疊在一起', () => {
     const fx = new SkillFxManager();
     const plan = resolveNormalAttackFxPlan({ ranged: false, bow: false });
     const at: number[] = [];

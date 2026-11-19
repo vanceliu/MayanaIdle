@@ -3,6 +3,7 @@ import { CharacterStats } from './CharacterStats';
 import { EquipmentPanel } from './EquipmentPanel';
 import { BagPanel } from './BagPanel';
 import { SkillPanel } from './SkillPanel';
+import { StarChartWindowContent } from './StarChartPanel';
 import { QuestTrackerContent } from './QuestTracker';
 import { ScriptEditorContent } from './ScriptEditorPanel';
 import { MailboxContent } from './MailboxPanel';
@@ -42,6 +43,11 @@ export function PanelWindows() {
       {open.skill && (
         <FloatingWindow panelKey="skill" title={PANEL_TITLES.skill} width={PANEL_WIDTHS.skill}>
           <SkillPanel />
+        </FloatingWindow>
+      )}
+      {open.star && (
+        <FloatingWindow panelKey="star" title={PANEL_TITLES.star} width={PANEL_WIDTHS.star}>
+          <StarChartWindowContent />
         </FloatingWindow>
       )}
       {open.mail && (

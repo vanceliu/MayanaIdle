@@ -10,9 +10,7 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
     exp: 0,
     expToNext: 100,
     hp: 100,
-    maxHp: 100,
     mp: 30,
-    maxMp: 30,
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0,
@@ -24,7 +22,6 @@ function createTestCharacter(overrides: Partial<Character> = {}): Character {
     areaEnteredAt: Date.now(),
     createdAt: Date.now(),
     userId: 1,
-    unspentAttributePoints: 0,
     quests: [],
     ...overrides,
   };

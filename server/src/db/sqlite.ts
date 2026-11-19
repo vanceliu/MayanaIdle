@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { restrictFile } from '../secretFile';
 import { dirname } from 'node:path';
+import { LEGACY_RESET_VERSION, archiveAndResetForStarChart } from './legacyReset';
 import type { WorldMode } from '../../../client/src/net/protocol';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
 import { getAbilityDefinition, getAbilityWeaponValue, resolveParamRange, type AbilityTemplate } from '../../../client/src/models/ability';
@@ -166,6 +167,11 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
       `);
     },
   },
+  {
+    /** 星盤大改版（`56-star-chart.md`）：Season 0 的角色、帳號倉庫、公會封存進遺產系統後清空遊玩資料（`45-legacy-archive.md` § 45.1） */
+    version: LEGACY_RESET_VERSION,
+    up: db => archiveAndResetForStarChart(db, LEGACY_RESET_VERSION - 1, 0),
+  },
 ];
 
 /** v12 之前追加傷害的區間：A 5~10、B 5~武器值（上限 ≤ 5 時固定 5） */
@@ -272,11 +278,12 @@ export function currentSchemaVersion(db: DatabaseSync): number {
   return row?.v ?? 0;
 }
 
-export function migrate(db: DatabaseSync): { from: number; to: number } {
+/** `upTo`：只跑到這一版為止（測試個別遷移用）；預設跑到最新 */
+export function migrate(db: DatabaseSync, upTo = Number.POSITIVE_INFINITY): { from: number; to: number } {
   const from = currentSchemaVersion(db);
   let to = from;
   for (const m of MIGRATIONS) {
-    if (m.version <= from) continue;
+    if (m.version <= from || m.version > upTo) continue;
     db.exec('BEGIN');
     try {
       m.up(db);

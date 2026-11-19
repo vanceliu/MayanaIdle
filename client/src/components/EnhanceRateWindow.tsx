@@ -1,6 +1,6 @@
 import type { EquipmentInstance } from '../models/equipment';
 import {
-  getEnhanceStability, getEnhanceRate, getJudgedLevel, isEnhanceable,
+  getEnhanceStability, getEnhanceOdds, getJudgedLevel, isEnhanceable,
   scrollCategoryOf, PLUS_SCROLL_MAX_LEVELS,
 } from '../systems/enhanceScroll';
 
@@ -16,9 +16,13 @@ export function EnhanceRateWindow({ item, onClose }: { item: EquipmentInstance; 
   const stability = getEnhanceStability(item);
   const kind = scrollCategoryOf(item) === 'weapon' ? '武器' : '防具';
   const judged = getJudgedLevel(item);
-  const rate = getEnhanceRate(item, judged);
-  const safe = rate >= 1;
-  const rateText = safe ? '必成' : `${Math.floor(rate * 100)}%`;
+  const odds = getEnhanceOdds(item, judged);
+  const safe = odds.success >= 1;
+  const pct = (p: number) => `${Math.floor(p * 100)}%`;
+  const rateText = safe ? '必成' : pct(odds.success);
+  const warnText = odds.noChange > 0
+    ? `無變化 ${pct(odds.noChange)}・消失 ${pct(odds.destroy)}`
+    : '失敗即消失';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -61,7 +65,7 @@ export function EnhanceRateWindow({ item, onClose }: { item: EquipmentInstance; 
             </table>
           )}
 
-          {!safe && isEnhanceable(item) && <p className="enh-rate-warn">失敗即消失</p>}
+          {!safe && isEnhanceable(item) && <p className="enh-rate-warn">{warnText}</p>}
         </div>
       </div>
     </div>

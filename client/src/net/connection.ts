@@ -2,6 +2,7 @@
  * 與 server 的 WebSocket 連線：版本協商、登入、指令送出、斷線重連。
  * 收到的狀態一律交給 `mirror.ts` 套進 store。
  */
+import type { LegacyArchive, LegacyArchiveSummary } from '../models/legacyArchive';
 import { PROTOCOL_VERSION } from './protocol';
 import { BUILD_INFO } from '../buildInfo';
 import type { ClientMessage, ServerMessage, ActionStore, LeaderboardSnapshotView, ArenaRankingQuery, ArenaRankingRow } from './protocol';
@@ -77,6 +78,17 @@ export class GameConnection {
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4） */
   requestLeaderboard(top = 20): Promise<LeaderboardSnapshotView> {
     return this.request(id => ({ t: 'leaderboard', id, top })) as Promise<LeaderboardSnapshotView>;
+  }
+
+  /** 遺產紀錄（`45-legacy-archive.md` § 45.3） */
+  requestLegacyList(): Promise<LegacyArchiveSummary[]> {
+    return this.request(id => ({ t: 'legacy_list', id })) as Promise<LegacyArchiveSummary[]>;
+  }
+  requestLegacyArchive(archiveId: number): Promise<LegacyArchive | null> {
+    return this.request(id => ({ t: 'legacy_get', id, archiveId })) as Promise<LegacyArchive | null>;
+  }
+  deleteLegacyArchive(archiveId: number): Promise<boolean> {
+    return this.request(id => ({ t: 'legacy_delete', id, archiveId })) as Promise<boolean>;
   }
 
   /** 競技場排行榜（`55-arena.md` § 55.7） */
@@ -233,6 +245,17 @@ export class GameConnection {
         if (p) {
           this.pending.delete(msg.id);
           p.resolve(msg.snapshot);
+        }
+        return;
+      }
+      case 'legacy_list':
+      case 'legacy_detail':
+      case 'legacy_deleted': {
+        if (msg.id === undefined) return;
+        const p = this.pending.get(msg.id);
+        if (p) {
+          this.pending.delete(msg.id);
+          p.resolve(msg.t === 'legacy_list' ? msg.items : msg.t === 'legacy_detail' ? msg.archive : msg.ok);
         }
         return;
       }

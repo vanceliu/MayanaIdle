@@ -1,64 +1,37 @@
-import type { Attributes, Character } from '../models/character';
-import { ATTRIBUTE_CAP, getTotalAttributes, LEVELUP_ATTRIBUTE_START_LEVEL } from '../models/character';
-import { random } from '../core/rng';
+import type { Character } from '../models/character';
 
-const ATTR_KEYS: (keyof Attributes)[] = ['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'];
-
-/** 六項屬性是否全數達上限（§ 20.9：全滿後升級不再獲得配點） */
-function isAllAttributesCapped(attrs: Attributes): boolean {
-  return ATTR_KEYS.every(key => attrs[key] >= ATTRIBUTE_CAP);
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(random() * (max - min + 1)) + min;
-}
-
-export const INITIAL_HP = 30;
-export const INITIAL_MP = 10;
+/** 等級硬上限（`04-character.md` § 4.9）：到達後經驗照常累積，不再升級；Lv100 起為軟上限區（每級 ×1.3） */
+export const LEVEL_CAP = 120;
 
 /**
- * 經驗曲線（§ 4.9）：底數固定 100 × 1.15^k，指數 k 的每級推進量分兩段。
- * 錨點 —— Lv1 = 100、Lv65 = 3,101,988、Lv99 = 102,114,213。
- * Lv100 以上沿用後段推進量（等級無硬上限）。
+ * 經驗曲線（§ 4.9）：底數固定 100 × 1.15^k，指數 k 的每級推進量分三段。
+ * 錨點 —— Lv1 = 100、Lv65 = 3,101,988、Lv99 = 102,114,213；Lv99 起每級 ×1.3。
  */
 const EXP_PIVOT_LEVEL = 65;
 const EXP_EXPONENT_AT_PIVOT = 74;
 const EXP_STEP_EARLY = EXP_EXPONENT_AT_PIVOT / (EXP_PIVOT_LEVEL - 1); // 1.15625
 const EXP_STEP_LATE = 25 / 34;                                        // 0.73529
+const EXP_TOP_LEVEL = 99;
+const EXP_EXPONENT_AT_TOP = 99;
+const EXP_STEP_TOP = Math.log(1.3) / Math.log(1.15);                  // 1.87720，每級 ×1.3
 
 export function getExpToNextLevel(level: number): number {
   const exponent = level <= EXP_PIVOT_LEVEL
     ? EXP_STEP_EARLY * (level - 1)
-    : EXP_EXPONENT_AT_PIVOT + EXP_STEP_LATE * (level - EXP_PIVOT_LEVEL);
+    : level <= EXP_TOP_LEVEL
+      ? EXP_EXPONENT_AT_PIVOT + EXP_STEP_LATE * (level - EXP_PIVOT_LEVEL)
+      : EXP_EXPONENT_AT_TOP + EXP_STEP_TOP * (level - EXP_TOP_LEVEL);
   return Math.floor(100 * Math.pow(1.15, exponent));
 }
 
+/** 升級；HP/MP 回滿由呼叫端以有效最大值處理（`20-attributes.md` § 20.4） */
 export function tryLevelUp(char: Character): Character {
-  if (char.exp < char.expToNext) return char;
+  if (char.level >= LEVEL_CAP || char.exp < char.expToNext) return char;
 
   const updated = { ...char };
   updated.exp -= updated.expToNext;
   updated.level += 1;
   updated.expToNext = getExpToNextLevel(updated.level);
-
-  const attrs = getTotalAttributes(updated);
-
-  // HP growth: random(VIT - 6, VIT - 3)
-  const hpGain = randomInt(Math.max(1, attrs.VIT - 6), Math.max(2, attrs.VIT - 3));
-  updated.maxHp += hpGain;
-  updated.hp = updated.maxHp; // Full restore on level up
-
-  // MP growth: random(SPI - 6, SPI - 3)
-  const mpGain = randomInt(Math.max(1, attrs.SPI - 6), Math.max(2, attrs.SPI - 3));
-  updated.maxMp += mpGain;
-  updated.mp = updated.maxMp; // Full restore on level up
-
-  // Attribute point at level 51+ (§ 20.9: stop once all six attributes are capped)
-  if (updated.level > LEVELUP_ATTRIBUTE_START_LEVEL && !isAllAttributesCapped(attrs)) {
-    updated.unspentAttributePoints = (updated.unspentAttributePoints ?? 0) + 1;
-  }
-
-  // Recursive check for multi-level
   return tryLevelUp(updated);
 }
 

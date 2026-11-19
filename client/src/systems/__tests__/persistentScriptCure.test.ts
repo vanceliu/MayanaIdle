@@ -14,12 +14,12 @@ const NOW = 80_000;
 function character(overrides: Partial<Character> = {}): Character {
   return {
     name: 'Tester', className: 'knight', level: 40, exp: 0, expToNext: 100,
-    hp: 500, maxHp: 500, mp: 200, maxMp: 200,
+    hp: 500, mp: 200, 
     baseAttributes: { STR: 20, AGI: 15, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
     ...overrides,
   };
 }

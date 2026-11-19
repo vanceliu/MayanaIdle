@@ -26,12 +26,12 @@ const ICE_SLOW_SKILLS = ['frost', 'ice-fog', 'ice-ring', 'blizzard', 'blizzard-s
 function testCharacter(): Character {
   return {
     name: 'Mage', className: 'elementalist', level: 40, exp: 0, expToNext: 100,
-    hp: 300, maxHp: 300, mp: 300, maxMp: 300,
+    hp: 300, mp: 300, 
     baseAttributes: { STR: 10, AGI: 12, VIT: 12, SPI: 15, INT: 25, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -122,7 +122,7 @@ describe('減速對怪物攻擊間隔生效', () => {
 
   function slowEffect(): ActiveEffect {
     return {
-      id: 'debuff-slow-m1', sourceSkillId: 'ice-fog', sourceSkillName: '冰霧',
+      id: 'debuff-slow-m1', sourceSkillId: 'ice-fog', sourceSkillName: '冰霜',
       category: 'slow', type: 'debuff', target: 'monster', targetIdx: 0, targetMonsterId: 'm1',
       modifiers: [{ stat: 'attack_speed', value: -30, isPercent: true }],
       startTime: NOW, duration: 6000, tags: ['slowed'], name: '減速', description: '',

@@ -15,10 +15,10 @@ const NOW = 1_700_000_000_000;
 function makeChar(over: Partial<Character> = {}): Character {
   return {
     userId: 1, name: 'T', className: 'knight', level: 1, exp: 0, expToNext: 100,
-    hp: 30, maxHp: 30, mp: 10, maxMp: 10,
+    hp: 30, mp: 10, 
     baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: 1, CHA: 1 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 0,
+    gold: 0,
     currentArea: 'a', currentZone: 'z', currentRegion: 'r', currentFloor: null,
     skills: [], quests: [], areaEnteredAt: NOW, createdAt: NOW,
     ...over,

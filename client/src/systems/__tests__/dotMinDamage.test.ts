@@ -24,12 +24,12 @@ const NOW = 300_000;
 function testCharacter(str: number): Character {
   return {
     name: 'Tester', className: 'knight', level: 40, exp: 0, expToNext: 100,
-    hp: 300, maxHp: 300, mp: 200, maxMp: 200,
+    hp: 300, mp: 200, 
     baseAttributes: { STR: str, AGI: 20, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -157,12 +157,12 @@ describe('裂傷斬 — 流血 DoT 快照（§ 23.3 / § 24.4.5）', () => {
 });
 
 describe('淬毒 — 中毒 DoT 快照（§ 23.7 / § 24.4.5）', () => {
-  it('DoT 傷害為角色物理傷害的 30%（快照制）', () => {
+  it('DoT 傷害為角色物理傷害 × 淬毒當下等級的毒傷 %（未點星盤＝I：9%，快照制）', () => {
     const gear = [sword()];
     const char = testCharacter(20);
     useGameStore.setState({ character: char, activeEffects: [envenomBuff()] });
     const expected = Math.floor(
-      calculateBasePhysicalDamage(char, gear[0], gear, [envenomBuff()]) * 0.3
+      calculateBasePhysicalDamage(char, gear[0], gear, [envenomBuff()]) * 0.09
     );
     expect(expected).toBeGreaterThan(1);
 

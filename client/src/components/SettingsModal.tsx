@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AccountSettings } from './AccountSettings';
+import { FeedbackSettings } from './FeedbackSettings';
 import {
   useSettingsStore,
   SCALE_MIN,
@@ -10,18 +11,20 @@ import {
   type RenderGeneration,
 } from '../stores/settingsStore';
 import { usePanelWindowStore } from '../stores/panelWindowStore';
+import { useMultiplayer } from '../net/online';
 
 /**
  * 系統設定（`34-ui-guidelines.md` § 34.6 / `47-mobile.md`）
  *
- * 兩個分頁：
+ * 分頁：
  * - **顯示**：介面大小與文字大小分兩條滑桿 —— 想要「介面小、字大」是常見需求，
  *   合併成一條就做不到。拉動即時生效（CSS 變數），設定存 localStorage 跨角色共用。
  * - **帳號**：Wiki／匯出／匯入／登出。這些原本是右下角常駐的一整排，
  *   但一局裡大概按不到一次，收進來右下就只剩一顆 ⚙。
+ * - **回饋**：只在開放形態顯示，開 Google 表單預填連結。
  */
 
-type SettingsTab = 'display' | 'account';
+type SettingsTab = 'display' | 'account' | 'feedback';
 
 const RENDER_GENERATION_OPTIONS: { value: RenderGeneration; label: string; hint: string }[] = [
   { value: 3, label: '第三代', hint: '地圖素材與怪物圖。' },
@@ -37,7 +40,9 @@ function percent(scale: number): string {
 }
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
-  const [tab, setTab] = useState<SettingsTab>('display');
+  const [selectedTab, setTab] = useState<SettingsTab>('display');
+  const multiplayer = useMultiplayer();
+  const tab: SettingsTab = selectedTab === 'feedback' && !multiplayer ? 'display' : selectedTab;
   const uiScale = useSettingsStore(s => s.uiScale);
   const fontScale = useSettingsStore(s => s.fontScale);
   const setUiScale = useSettingsStore(s => s.setUiScale);
@@ -79,9 +84,20 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           >
             帳號
           </button>
+          {multiplayer && (
+            <button
+              className={tab === 'feedback' ? 'active' : ''}
+              aria-pressed={tab === 'feedback'}
+              onClick={() => setTab('feedback')}
+            >
+              回饋
+            </button>
+          )}
         </div>
 
         {tab === 'account' && <AccountSettings onClose={onClose} />}
+
+        {tab === 'feedback' && <FeedbackSettings />}
 
         {tab === 'display' && (
         <div className="settings-body">

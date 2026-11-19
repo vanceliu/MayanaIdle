@@ -6,6 +6,22 @@ import { CLASS_SKILLS, type ClassSkillDef } from '../../models/classSkills';
 import '../components/WikiTable.css';
 import { WEAPON_TYPE_LABELS } from '../../models/skill';
 import { getItemById } from '../../models/items';
+import { classSkillLevelScale, hasStarCooldown, skillAtStarLevel, starCooldownAt } from '../../models/skillStar';
+import type { Skill } from '../../models/skill';
+
+const STAR_LEVELS = [1, 2, 3] as const;
+
+/** 隨星盤等級變動的數值（`56-star-chart.md` § 56.5）：相同時照印，不同時以「／」列出並標黃 */
+function LevelValues({ values, sep = '／' }: { values: (string | number)[]; sep?: string }) {
+  if (values.every(v => v === values[0])) return <>{values[0]}</>;
+  return <span className="stat-changed">{values.join(sep)}</span>;
+}
+
+/** 等級 I／II／III 的技能攻擊力 */
+const powersByLevel = (s: Skill) => STAR_LEVELS.map(l => skillAtStarLevel(s, l).power);
+
+/** 強化 0／1／2 個的冷卻（秒） */
+const cooldownsByNodes = (s: Skill) => [0, 1, 2].map(n => (starCooldownAt(s.cooldown, n) / 1000).toFixed(1));
 
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -57,21 +73,27 @@ const CLASS_SKILL_NOTES: Partial<Record<string, ReactNode>> = {
   ),
   elementalist: (
     <>
-      <strong>魔力護盾</strong>：受到傷害的 30% 改扣 MP（1 點扣 1 MP），MP 歸 0 時解除。
+      <strong>魔力護盾</strong>：持續 20 秒、冷卻 30 秒、不耗 MP；減傷最高 20%，依目前 MP 比例（MP 滿 20%、半滿 10%、0 時無效），不扣 MP、不會提前解除。
       <br />
       <strong>魔力湧泉</strong>：扣自身最大 HP 10%（最低留 1），持續期間每次回魔另加最大 MP 8%，戰鬥中不減半。
+      <br />
+      <strong>魔法節約</strong>：持續 30 秒，所有技能 MP 消耗 -30%（無條件捨去），可與冷卻縮減同時生效。
     </>
   ),
   priest: (
     <>
-      <strong>精神匯聚</strong>：每次回魔另加最大 MP 5%，戰鬥中不減半。
+      <strong>精神匯聚</strong>：每次回魔另加最大 MP 5%，戰鬥中不減半；冷卻 -20%（與其他冷卻縮減合計上限 50%）。
       <br />
       <strong>血魔轉換</strong>：扣最大 HP 20%（最低留 1），瞬間回復最大 MP 20%。
+      <br />
+      <strong>神聖懲擊</strong>：回復本次最終傷害 10% 的 HP。
     </>
   ),
   thief: (
     <>
-      <strong>毒霧</strong>：只上中毒，不造成直接傷害。
+      <strong>致命一擊</strong>：武器射程的單體物理攻擊，必定爆擊。
+      <br />
+      <strong>冰霧</strong>：只上凍傷（冰屬性 DoT＋攻速 -30%），不造成直接傷害；與淬毒的中毒可同時存在。
       <br />
       <strong>閃避反擊</strong>（被動）：近戰怪物的攻擊 MISS 且在武器射程內時，立刻反擊一次普攻。
     </>
@@ -106,6 +128,9 @@ export function SkillsPage() {
         </select>
       </div>
 
+      <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px', fontSize: 'var(--fs-sm)' }}>
+        基礎魔法沒有星盤等級，數值照表列；技能說明以基礎攻擊魔法、基礎回復魔法、基礎護盾增益魔法分類。
+      </p>
       <div className="wiki-table-wrap">
         <table className="wiki-table">
           <thead>
@@ -132,11 +157,13 @@ export function SkillsPage() {
                 <td><span className={`wiki-badge wiki-badge-${s.element}`}>{ELEMENT_LABELS[s.element]}</span></td>
                 <td>{s.target === 'aoe' ? `範圍(半徑${s.aoeRadius ?? '?'}格/${s.maxTargets ? `最多${s.maxTargets}隻` : '無上限'})` : '單體'}</td>
                 <td>{formatSkillRange(s) || '-'}</td>
-                <td className="cell-number">{s.power || '-'}</td>
+                <td className="cell-number">{s.power ? <LevelValues values={powersByLevel({ ...s, lastUsedAt: 0 })} /> : '-'}</td>
                 <td className="cell-number">{s.mpCost}</td>
                 <td className="cell-number">{(s.cooldown / 1000).toFixed(1)}</td>
                 <td>{formatBuffDuration(s) || '-'}</td>
-                <td>{s.description || s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || (s.applyDebuff ? `附加${s.applyDebuff.name}(${s.applyDebuff.description}, ${formatDebuffDuration(s.applyDebuff)})` : '') || '-'}</td>
+                <td>
+                  {s.description || s.buffEffect || (s.hits ? `${s.hits}連擊` : '') || (s.applyDebuff ? `附加${s.applyDebuff.name}(${s.applyDebuff.description}, ${formatDebuffDuration(s.applyDebuff)})` : '') || '-'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -172,6 +199,10 @@ export function SkillsPage() {
       <h3 style={{ color: 'var(--text-primary)', margin: '32px 0 12px', fontFamily: 'var(--font-display)' }}>
         職業專屬技能
       </h3>
+      <p style={{ color: 'var(--text-secondary)', margin: '0 0 12px', fontSize: 'var(--fs-sm)' }}>
+        技能等級由星盤的「等級 +1」節點決定：學會為 I，最高 III；傷害、治癒、護盾與輔助效果 I ×0.7、II ×0.85、III ×1，盜賊、元素師、牧師 I ×0.3、II ×0.6、III ×1（威力欄黃色依序為 I／II／III；效果欄為等級 III 的數值）。
+        冷卻由「強化」節點決定：未點為表列 ÷ 0.8，每點 −10%，兩點回到表列（冷卻欄依序為強化 0／1／2 個）。閃避反擊、冷卻縮減沒有星盤節點。
+      </p>
       {(['knight', 'elf', 'elementalist', 'priest', 'thief'] as const).map(cls => {
         const skills = CLASS_SKILLS.filter(s => s.className === cls);
         return (
@@ -207,10 +238,18 @@ export function SkillsPage() {
                       <td>{s.skill.target === 'aoe' && s.skill.aoeRadius === undefined ? '全隊' : s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius}格/${s.skill.randomHits ? `隨機${s.skill.randomHits}下` : s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
                       <td>{formatSkillRange(s.skill) || '-'}</td>
                       <td className="cell-number">
-                        {s.skill.physicalSnapshot ? `${s.skill.power} + 物理` : (s.skill.power || '-')}
+                        {s.skill.physicalSnapshot
+                          ? <>{s.skill.power} + 物理 ×<LevelValues values={classSkillLevelScale(s.className).map(String)} /></>
+                          : s.skill.power
+                            ? <LevelValues values={powersByLevel({ ...s.skill, lastUsedAt: 0 })} />
+                            : s.skill.hits ? <>物理 ×<LevelValues values={classSkillLevelScale(s.className).map(String)} /></> : '-'}
                       </td>
                       <td className="cell-number">{s.skill.mpCost}</td>
-                      <td className="cell-number">{(s.skill.cooldown / 1000).toFixed(1)}</td>
+                      <td className="cell-number">
+                        {hasStarCooldown(s.skill)
+                          ? <LevelValues values={cooldownsByNodes({ ...s.skill, lastUsedAt: 0 })} sep="→" />
+                          : (s.skill.cooldown / 1000).toFixed(1)}
+                      </td>
                       <td>{formatBuffDuration(s.skill) || '-'}</td>
                       <td>{getClassSkillEffect(s)}</td>
                       <td>{getItemById(s.bookItemId)?.name ?? '—'}</td>

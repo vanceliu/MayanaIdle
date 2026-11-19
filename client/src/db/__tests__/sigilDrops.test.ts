@@ -5,7 +5,7 @@ import { SIGIL_DEFINITIONS } from '../../models/sigil';
 
 /**
  * 印記掉落（`27-drop-table.md` § 27.8）：混沌／刺針／重刻／突破在 Lv.31+ 的每個區域
- * 與每隻 Boss 都有，Lv.30 以下一個都沒有。掉率一般怪 1%、Boss 5%（突破印記 Boss 3%）。
+ * 與每隻 Boss 都有，Lv.30 以下一個都沒有。掉率一般怪 0.5%、Boss 2%（突破印記 Boss 1%）。
  *
  * 精鍊印記與工藝印記走**全區域**掉落（列在各區域掉落表內），不適用 § 27.8，故排除在外。
  */
@@ -47,8 +47,8 @@ const SIGIL_IDS = new Set(
 );
 
 /** 四種印記的一般怪掉率相同；Boss 只有突破印記較低（§ 27.8） */
-const NORMAL_VALUE = (_name: string) => 10;
-const BOSS_VALUE = (name: string) => (name === '突破印記' ? 30 : 50);
+const NORMAL_VALUE = (_name: string) => 5;
+const BOSS_VALUE = (name: string) => (name === '突破印記' ? 10 : 20);
 
 function sigilDropsOf(area: string) {
   return DROP_TABLE_SEEDS.filter(
@@ -73,7 +73,7 @@ describe('印記掉落（§ 27.8）', () => {
     }
   });
 
-  it('每個 Lv.31+ 區域都有這四種印記，掉落值一律 10', () => {
+  it('每個 Lv.31+ 區域都有這四種印記，掉落值一律 5', () => {
     for (const area of SIGIL_AREAS) {
       const drops = sigilDropsOf(area);
       expect(drops.map(d => getItemById(d.itemTemplateId!)!.name).sort(), area)
@@ -118,7 +118,7 @@ describe('印記掉落（§ 27.8）', () => {
     expect([...areas].sort()).toEqual([...SIGIL_AREAS].sort());
   });
 
-  it('Lv.30 的試煉飛龍以外的 Boss 都掉這四種印記，掉落值 50／50／50／30', () => {
+  it('Lv.30 的試煉飛龍以外的 Boss 都掉這四種印記，掉落值 20／突破 10', () => {
     const bosses = new Set(BOSS_DROP_TABLE_SEEDS.map(d => d.bossName));
     for (const boss of bosses) {
       const drops = bossSigilDropsOf(boss);

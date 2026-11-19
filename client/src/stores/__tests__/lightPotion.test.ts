@@ -30,12 +30,12 @@ const LIGHT: { type: PotionType; base: PotionType; id: number; name: string; wei
 function character(hp: number): Character {
   return {
     name: 'Tester', className: 'knight', level: 40, exp: 0, expToNext: 100,
-    hp, maxHp: 300, mp: 100, maxMp: 100,
+    hp, mp: 100, 
     baseAttributes: { STR: 20, AGI: 15, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 1000, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 

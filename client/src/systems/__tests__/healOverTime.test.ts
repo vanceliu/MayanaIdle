@@ -20,12 +20,12 @@ const NOW = 600_000;
 function testCharacter(): Character {
   return {
     name: 'Priest', className: 'priest', level: 50, exp: 0, expToNext: 100,
-    hp: 200, maxHp: 500, mp: 300, maxMp: 300,
+    hp: 200, mp: 300, 
     baseAttributes: { STR: 10, AGI: 10, VIT: 20, SPI: 25, INT: 20, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe('持續回復（hotAmount）', () => {
-  it('聖域施放後 buff 帶有每秒 20 的 HoT', () => {
+  it('聖域施放後 buff 帶有每秒 20 的 HoT（表列＝III）', () => {
     castBuff('sanctuary');
 
     const buff = useGameStore.getState().activeEffects.find(e => e.category === 'sanctuary');
@@ -66,11 +66,11 @@ describe('持續回復（hotAmount）', () => {
     expect(buff?.hot).toEqual({ amount: 20, interval: 1000 });
   });
 
-  it('聖域同時帶有減傷 25% 與 HoT', () => {
+  it('聖域同時帶有減傷 20% 與 HoT（表列＝III）', () => {
     castBuff('sanctuary');
     const buff = useGameStore.getState().activeEffects.find(e => e.category === 'sanctuary')!;
 
-    expect(buff.modifiers).toEqual([{ stat: 'damageReduction', value: 25, isPercent: true }]);
+    expect(buff.modifiers).toEqual([{ stat: 'damageReduction', value: 20, isPercent: true }]);
     expect(buff.hot?.amount).toBe(20);
   });
 

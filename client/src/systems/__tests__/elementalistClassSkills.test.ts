@@ -2,7 +2,7 @@
  * 元素師職業魔法 5～7 級（`23-class-magic.md` § 23.5）：魔力護盾、魔力湧泉、元素風暴。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { absorbWithManaShield, absorbWithShield } from '../combat';
+import { absorbWithShield, manaShieldPercent, reduceWithManaShield } from '../combat';
 import { processMonsterAttack } from '../arpgEventHandler';
 import { getMpRegen } from '../regen';
 import { getEffectiveMaxHp, getEffectiveMaxMp, useGameStore } from '../../stores/gameStore';
@@ -28,12 +28,12 @@ const NOW = 800_000;
 function mage(overrides: Partial<Character> = {}): Character {
   return {
     name: 'Mage', className: 'elementalist', level: 70, exp: 0, expToNext: 100,
-    hp: 500, maxHp: 500, mp: 400, maxMp: 400,
+    hp: 500, mp: 400, 
     baseAttributes: { STR: 10, AGI: 10, VIT: 14, SPI: 20, INT: 30, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
     ...overrides,
   };
 }
@@ -78,11 +78,17 @@ describe('元素師 5～7 級定義', () => {
     ]);
   });
 
-  it('魔力護盾：MP 0、冷卻 5s、持續 300s、30%', () => {
+  it('魔力護盾：MP 0、冷卻 30s、持續 20s、最高減傷 20%', () => {
     expect(getSkillTemplate('mana-shield')).toMatchObject({
-      type: 'buff', mpCost: 0, cooldown: 5000, buffDuration: 300000, buffCategory: 'mana-shield',
-      buffModifiers: [{ stat: 'mana_shield', value: 30, isPercent: true }],
+      type: 'buff', mpCost: 0, cooldown: 30000, buffDuration: 20000, buffCategory: 'mana-shield',
+      buffModifiers: [{ stat: 'mana_shield', value: 20, isPercent: true }],
     });
+  });
+
+  it('施放魔力護盾時日誌顯示當下減傷 %', () => {
+    useGameStore.setState({ character: mage(), skills: [skillOf('mana-shield')], combatLogs: [] });
+    expect(useGameStore.getState().castSelfSkill('mana-shield')).toBe(true);
+    expect(useGameStore.getState().combatLogs.at(-1)?.text).toMatch(/施放 魔力護盾.*目前減傷 \d+%/);
   });
 
   it('魔力湧泉：不耗 MP、HP 10%、冷卻 30s、持續 60s、每次回魔另加最大 MP 8%', () => {
@@ -93,33 +99,34 @@ describe('元素師 5～7 級定義', () => {
   });
 });
 
-describe('absorbWithManaShield', () => {
+describe('魔力護盾減傷（依目前 MP 比例）', () => {
   const shield = () => buffFrom('mana-shield');
 
+  it('減傷 % ＝ 最高 20% × 目前 MP ÷ 最大 MP，無條件捨去', () => {
+    expect([1000, 500, 100, 0].map(mp => manaShieldPercent(20, mp, 1000))).toEqual([20, 10, 2, 0]);
+  });
+
   it('沒有魔力護盾時原樣通過', () => {
-    expect(absorbWithManaShield(100, 50, [], NOW + 100)).toMatchObject({ damage: 100, mpUsed: 0, broken: false });
+    expect(reduceWithManaShield(100, 500, 1000, [], NOW + 100)).toEqual({ damage: 100, percent: 0 });
   });
 
-  it('30% 改扣 MP（無條件捨去），1 點扣 1 MP', () => {
-    expect(absorbWithManaShield(101, 500, [shield()], NOW + 100)).toMatchObject({ damage: 71, mpUsed: 30, broken: false });
+  it('MP 半滿減傷 10%，不扣 MP', () => {
+    expect(reduceWithManaShield(101, 500, 1000, [shield()], NOW + 100)).toEqual({ damage: 91, percent: 10 });
   });
 
-  it('MP 不足：扣到 0，不足的部分扣 HP，護盾解除', () => {
-    const r = absorbWithManaShield(100, 10, [shield()], NOW + 100);
-    expect(r).toMatchObject({ damage: 90, mpUsed: 10, broken: true });
-    expect(r.effects).toHaveLength(0);
+  it('MP 為 0 時減傷 0，護盾仍在', () => {
+    expect(reduceWithManaShield(100, 0, 1000, [shield()], NOW + 100)).toEqual({ damage: 100, percent: 0 });
   });
 
   it('過期不作用', () => {
-    expect(absorbWithManaShield(100, 500, [shield()], NOW + 400_000).mpUsed).toBe(0);
+    expect(reduceWithManaShield(100, 1000, 1000, [shield()], NOW + 400_000).percent).toBe(0);
   });
 
-  it('聖光護盾先吸收，剩下的才算 30%', () => {
+  it('聖光護盾先吸收，剩下的才減傷', () => {
     const holy: ActiveEffect = { ...buffFrom('holy-shield'), shieldRemaining: 40 };
     const afterHoly = absorbWithShield(100, [holy, shield()], NOW + 100);
-    const r = absorbWithManaShield(afterHoly.damage, 500, afterHoly.effects, NOW + 100);
     expect(afterHoly.damage).toBe(60);
-    expect(r).toMatchObject({ damage: 42, mpUsed: 18 });
+    expect(reduceWithManaShield(afterHoly.damage, 1000, 1000, afterHoly.effects, NOW + 100)).toEqual({ damage: 48, percent: 20 });
   });
 });
 
@@ -134,13 +141,14 @@ describe('魔力護盾實戰（怪物攻擊）', () => {
     return { result, char };
   }
 
-  it('同一下攻擊：扣的 HP ＋ MP ＝ 沒有護盾時扣的 HP', () => {
+  it('同一下攻擊：HP 少扣「當下減傷 %」，MP 不變', () => {
     const plain = hit([]);
     const shielded = hit([buffFrom('mana-shield')]);
-    const hpLoss = 500 - shielded.char.hp;
-    const mpLoss = 400 - shielded.char.mp;
-    expect(mpLoss).toBe(Math.floor((500 - plain.char.hp) * 0.3));
-    expect(hpLoss + mpLoss).toBe(500 - plain.char.hp);
+    const maxMp = getEffectiveMaxMp(mage(), {}, []);
+    const percent = manaShieldPercent(20, 400, maxMp);
+    const plainLoss = 500 - plain.char.hp;
+    expect(500 - shielded.char.hp).toBe(plainLoss - Math.floor(plainLoss * percent / 100));
+    expect(shielded.char.mp).toBe(400);
   });
 });
 

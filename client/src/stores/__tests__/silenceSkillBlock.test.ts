@@ -57,7 +57,7 @@ describe('沉默中的技能與道具', () => {
 
     const char = useGameStore.getState().character!;
     useGameStore.setState({
-      character: { ...char, hp: 1, mp: 500, maxMp: 500 },
+      character: { ...char, hp: 1, mp: 500, },
       bagItems: [makeBagItem(PURIFY.itemId, 1)!, makeBagItem(POTION_CONFIG.red.itemId, 1)!],
       lastPotionUsedAt: 0,
       lastPotionCooldown: 0,

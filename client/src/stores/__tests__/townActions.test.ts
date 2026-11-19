@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetTestDb } from '../../testing/testDb';
-import { useGameStore, INN_PRICES } from '../gameStore';
+import { useGameStore, INN_PRICES, getEffectiveMaxHp, getEffectiveMaxMp } from '../gameStore';
+import { getMaxHp, getMaxMp } from '../../systems/maxHpMp';
 import { bagItemById } from '../../testing/bagFixtures';
 import { ACTION_ALLOWLIST } from '../../net/protocol';
 import { TRAINING_GROUND_REGION_ID } from '../../models/trainingGround';
@@ -18,15 +19,19 @@ import type { Character } from '../../models/character';
 function character(overrides: Partial<Character> = {}): Character {
   return {
     id: 1, userId: 1, name: '測試', className: 'knight', level: 40,
-    exp: 0, expToNext: 100, hp: 50, maxHp: 200, mp: 10, maxMp: 100,
+    exp: 0, expToNext: 100, hp: 50, mp: 10,
     baseAttributes: { STR: 10, AGI: 10, VIT: 10, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 1000,
+    gold: 1000,
     currentArea: 'neutral-town', currentZone: 'newbie-neutral', currentRegion: 'neutral-town',
     currentFloor: null, skills: [], quests: [], areaEnteredAt: 0, createdAt: 0,
     ...overrides,
   } as Character;
 }
+
+/** 最大 HP／MP 依公式（`20-attributes.md` § 20.4、§ 20.5） */
+const MAX_HP = getMaxHp(character(), []);
+const MAX_MP = getMaxMp(character(), []);
 
 function setup(char: Partial<Character> = {}, extra: Record<string, unknown> = {}) {
   useGameStore.setState({
@@ -72,8 +77,8 @@ describe('旅館休息（`13-town.md` § 13.7）', () => {
     expect(useGameStore.getState().restAtInn('full')).toBe(true);
 
     const state = useGameStore.getState();
-    expect(state.character!.hp).toBe(state.character!.maxHp);
-    expect(state.character!.mp).toBe(state.character!.maxMp);
+    expect(state.character!.hp).toBe(getEffectiveMaxHp(state.character!, state.equippedGear, state.activeEffects));
+    expect(state.character!.mp).toBe(getEffectiveMaxMp(state.character!, state.equippedGear, state.activeEffects));
     expect(state.character!.gold).toBe(1000 - INN_PRICES.full);
     // 只解角色身上的 debuff，buff 與怪物的 debuff 不動
     expect(state.activeEffects.map(e => e.name)).toEqual(['祝福', '暈眩']);
@@ -83,13 +88,13 @@ describe('旅館休息（`13-town.md` § 13.7）', () => {
     setup({ hp: 50, mp: 10, gold: 1000 });
     expect(useGameStore.getState().restAtInn('hp')).toBe(true);
     let state = useGameStore.getState();
-    expect(state.character!.hp).toBe(200);
+    expect(state.character!.hp).toBe(MAX_HP);
     expect(state.character!.mp).toBe(10);
     expect(state.character!.gold).toBe(1000 - INN_PRICES.hpOnly);
 
     expect(useGameStore.getState().restAtInn('mp')).toBe(true);
     state = useGameStore.getState();
-    expect(state.character!.mp).toBe(100);
+    expect(state.character!.mp).toBe(MAX_MP);
     expect(state.character!.gold).toBe(1000 - INN_PRICES.hpOnly - INN_PRICES.mpOnly);
   });
 
@@ -101,7 +106,7 @@ describe('旅館休息（`13-town.md` § 13.7）', () => {
   });
 
   it('已經全滿就不收錢', () => {
-    setup({ hp: 200, mp: 100, gold: 1000 });
+    setup({ hp: MAX_HP, mp: MAX_MP, gold: 1000 });
     expect(useGameStore.getState().restAtInn('full')).toBe(false);
     expect(useGameStore.getState().character!.gold).toBe(1000);
   });
@@ -205,8 +210,8 @@ describe('試驗場補滿（`50-training-ground.md` § 50.5.3）', () => {
     expect(useGameStore.getState().restoreInTrainingGround()).toBe(true);
 
     const state = useGameStore.getState();
-    expect(state.character!.hp).toBe(200);
-    expect(state.character!.mp).toBe(100);
+    expect(state.character!.hp).toBe(MAX_HP);
+    expect(state.character!.mp).toBe(MAX_MP);
     expect(state.character!.gold).toBe(500);
   });
 

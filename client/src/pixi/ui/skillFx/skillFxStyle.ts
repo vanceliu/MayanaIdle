@@ -177,7 +177,7 @@ export function resolveChainStyle(element: SkillElement): SkillFxChainStyle {
 
 export const VOLLEY_FX_SKILL_IDS: readonly string[] = [
   'fireball',       // 火球（半徑 3、最多 3 隻 → 三顆火球）
-  'ice-fog',        // 冰霧（同上）
+  'ice-fog',        // 冰霜（同上）
   'arrow-rain',     // 穿透箭雨
   'meteor-shower',  // 流星雨（同時在落下名單，兩者疊加＝多顆隕石各自落下）
 ];
@@ -227,7 +227,7 @@ export const SKILL_FX_OVERRIDES: Record<string, SkillFxOverride> = {
   'wind-blade': { shape: 'arrow' },            // 風刃
   'ice-bolt': { shape: 'lance' },              // 冰彈
   'frost': { shape: 'lance' },                 // 寒霜
-  'ice-fog': { shape: 'lance' },               // 冰霧
+  'ice-fog': { shape: 'lance' },               // 冰霜
   'ice-lance': { shape: 'lance' },             // 冰槍
   'blizzard': { shape: 'lance' },              // 冰暴
   'absolute-zero': { shape: 'lance' },         // 極冰封印

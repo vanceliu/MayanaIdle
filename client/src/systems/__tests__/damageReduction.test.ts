@@ -12,12 +12,12 @@ const NOW = 500_000;
 function character(): Character {
   return {
     name: 'Tester', className: 'knight', level: 40, exp: 0, expToNext: 100,
-    hp: 500, maxHp: 500, mp: 100, maxMp: 100,
+    hp: 500, mp: 100, 
     baseAttributes: { STR: 20, AGI: 10, VIT: 20, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -73,7 +73,7 @@ describe('getBuffDamageReduction', () => {
 
   it('讀取各技能的減傷值', () => {
     expect(getBuffDamageReduction([buffFrom('iron-shield')])).toBe(40);
-    expect(getBuffDamageReduction([buffFrom('sanctuary')])).toBe(25);
+    expect(getBuffDamageReduction([buffFrom('sanctuary')])).toBe(20);
     expect(getBuffDamageReduction([buffFrom('holy-domain')])).toBe(30);
   });
 
@@ -122,10 +122,10 @@ describe('§ 21.5 減傷：防禦與 buff 類間乘算', () => {
     expect(buffed.damage).toBe(17); // floor(25 × 0.7)
   });
 
-  it('聖域 25% 減傷生效（原本寫成 defense 百分比而完全無效）', () => {
+  it('聖域 20% 減傷生效（原本寫成 defense 百分比而完全無效）', () => {
     const char = character();
     const buffed = calculateMonsterAttack(monster(), char, [], [buffFrom('sanctuary')], 0);
-    expect(buffed.damage).toBe(75);
+    expect(buffed.damage).toBe(80);
   });
 
   it('傷害最低為 1', () => {

@@ -30,12 +30,12 @@ function setup(inventory: EquipmentInstance[], gold = 10000) {
   useGameStore.setState({
     character: {
       name: 'T', className: 'elementalist', level: 5, exp: 0, expToNext: 1,
-      hp: 1, maxHp: 1, mp: 1, maxMp: 1,
+      hp: 1, mp: 1, 
       baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: 1, CHA: 1 },
       bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
       gold, currentArea: 'neutral-town', currentZone: 'newbie-neutral',
       currentRegion: 'neutral-town', currentFloor: null,
-      skills: [], quests: [], unspentAttributePoints: 0,
+      skills: [], quests: [], 
       // 強化會 `db.characters.update(char.id)`，沒有 id 會直接拋錯
       areaEnteredAt: 0, createdAt: 0, userId: 1, id: 1,
     },

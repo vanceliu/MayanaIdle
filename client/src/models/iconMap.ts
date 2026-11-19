@@ -6,6 +6,7 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'speed': 'buffs/sprint',
   'crit-buff': 'buffs/crosshair',
   'cd-reduction': 'buffs/lightning-helix',
+  'mana-saving': 'buffs/lightning-helix',
   'element-boost': 'buffs/embrassed-energy',
   'holy-shield': 'buffs/holy-symbol',
   // 飾品隨機技能（`07-affix-ability.md` § 7S.5）
@@ -40,6 +41,7 @@ export const EFFECT_ICON_MAP: Record<string, string> = {
   'stunned': 'debuffs/stoned-skull',
   'bleeding': 'debuffs/bleeding-wound',
   'poisoned': 'debuffs/poison-gas',
+  'frostbite': 'debuffs/snail-slow',
   'defense-down': 'debuffs/broken-shield',
   'atk-down': 'debuffs/stoned-skull',
 
@@ -244,7 +246,8 @@ export const SKILL_ID_ICON_MAP: Record<string, string> = {
 
   // --- 職業魔法 · 盜賊 ---
   'backstab': 'skills/backstab',
-  'poison-mist': 'skills/poison-cloud',
+  'poison-mist': 'skills/ice-shield',
+  'deadly-strike': 'buffs/deadly-strike',
   'dodge-counter': 'skills/sword-spin',
 };
 

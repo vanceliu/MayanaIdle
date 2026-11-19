@@ -441,7 +441,6 @@ export const BUFF_EMBLEM_BY_CATEGORY: Record<string, EmblemKind> = {
   'weapon-bless': 'sword',     // 祝福武器、祝福魔法武器
   speed: 'haste',              // 加速術、強化加速術
   'poison-enchant': 'poison',  // 淬毒
-  'crit-buff': 'crit',         // 致命一擊
   'fire-enchant': 'flame',     // 火矢附魔
 };
 
@@ -1071,7 +1070,7 @@ export const BUFF_SHIELD_BY_CATEGORY: Record<string, ShieldKind> = {
   'protect-shield': 'shield',   // 保護罩（防禦三階的第一階）
   'defense-buff': 'shield',     // 魔法盔甲、高級魔法盔甲、鋼鐵護盾
   'holy-shield': 'shield',      // 聖光護盾（吸收傷害，§ 24.4.9）
-  'mana-shield': 'shield',      // 魔力護盾（傷害改由 MP 承擔，`23-class-magic.md` § 23.5）
+  'mana-shield': 'shield',      // 魔力護盾（依 MP 比例減傷，`23-class-magic.md` § 23.5）
   sanctuary: 'shield',          // 聖域、神聖領域（減傷）
   invincible: 'invincible',     // 絕對屏障（§ 24.4.8）
 };

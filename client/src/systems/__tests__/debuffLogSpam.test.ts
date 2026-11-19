@@ -23,12 +23,12 @@ const NOW = 200_000;
 function testCharacter(): Character {
   return {
     name: 'Thief', className: 'thief', level: 40, exp: 0, expToNext: 100,
-    hp: 300, maxHp: 300, mp: 200, maxMp: 200,
+    hp: 300, mp: 200, 
     baseAttributes: { STR: 20, AGI: 20, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 

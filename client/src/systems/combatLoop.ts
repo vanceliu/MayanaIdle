@@ -41,7 +41,7 @@ import {
 } from './arpgEventHandler';
 import { sumUniqueAffix } from '../models/uniqueAffix';
 import {
-  getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, absorbWithManaShield, getMonsterDebuffModifierById,
+  getEquippedWeapon, getPlayerAttackInterval, isPlayerInvincible, absorbWithShield, reduceWithManaShield, hasStarFlag, getMonsterDebuffModifierById,
   calculateThornsDamage,
 } from './combat';
 import { createMonsterFromTemplate } from './monsterSpawn';
@@ -51,7 +51,7 @@ import {
 import { getEffectiveGearArray } from './gear';
 import { gameNow } from '../core/clock';
 import { pick, random } from '../core/rng';
-import { applyAbilityToSkills } from '../models/abilitySkill';
+import { resolveSkills } from '../models/skillStar';
 import { syncCalmEffect } from './abilityCombat';
 import { findClassSkillAbility } from '../models/ability';
 import { abortCast } from './monsterCombatFSM';
@@ -442,7 +442,7 @@ function resolvePlayerStrike(o: {
     weapon: held,
     playerPos: attackerPos,
     targetPositions,
-    attackIntervalMs: getPlayerAttackInterval(allGear, activeEffects),
+    attackIntervalMs: getPlayerAttackInterval(allGear, activeEffects, character),
   });
 
   for (const dmg of result.damages) {
@@ -480,13 +480,13 @@ function applyThorns(session: Session, inst: MonsterInstance, dmg: DamageResult,
     const character = gs.character;
     if (!character || character.hp <= 0) break;
     const allGear = getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear);
-    const reduced = calculateThornsDamage(base, allGear, gs.activeEffects);
+    const reduced = calculateThornsDamage(base, allGear, gs.activeEffects, character);
     if (reduced <= 0) continue;
     const shield = absorbWithShield(reduced, gs.activeEffects, now);
-    const mana = absorbWithManaShield(shield.damage, character.mp, shield.effects, now);
+    const mana = reduceWithManaShield(shield.damage, character.mp, getEffectiveMaxMp(character, gs.equippedGear, shield.effects), shield.effects, now);
     session.game.setState({
-      activeEffects: mana.effects,
-      character: { ...character, hp: Math.max(0, character.hp - mana.damage), mp: character.mp - mana.mpUsed },
+      activeEffects: shield.effects,
+      character: { ...character, hp: Math.max(0, character.hp - mana.damage) },
     });
     total += mana.damage;
   }
@@ -531,8 +531,8 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
   const playerPos = mapStore.playerPosition;
   const currentMap = mapStore.currentMap;
   const allGear = getEffectiveGearArray(gameState.character!, gameState.activeEffects, gameState.equippedGear);
-  // § 7S.5 職業池隨機技能：引擎與天賦判定看改寫後的冷卻、MP、突進
-  const skills = applyAbilityToSkills(gameState.skills, allGear, gameState.character.className);
+  // 星盤與 § 7S.5 職業池隨機技能：引擎與天賦判定看改寫後的冷卻、MP、突進
+  const skills = resolveSkills(gameState.skills, allGear, gameState.character, gameState.activeEffects);
   // § 7S.5 平靜的狀態列 buff：只在需要變動時寫入
   const calmEffects = syncCalmEffect(session.loop, allGear, gameState.activeEffects, gameState.character.areaEnteredAt, gameNow());
   if (calmEffects) session.game.setState({ activeEffects: calmEffects });
@@ -717,6 +717,8 @@ function processPlayerHotTick(session: Session, visuals: CombatVisual[]) {
 
   const char = gs.character;
   if (!char || char.hp <= 0) return;
+  // 嗜血之星：每秒回血歸零，含聖域的每秒回血（`56-star-chart.md` § 56.6）
+  if (hasStarFlag(char, 'noHpRegen')) return;
 
   const effMaxHp = getEffectiveMaxHp(char, gs.equippedGear, gs.activeEffects);
   if (char.hp >= effMaxHp) return;
@@ -749,7 +751,7 @@ function processPlayerDotTick(session: Session, visuals: CombatVisual[]) {
 
   const logs: CombatLog[] = [];
   let hp = char.hp;
-  let mp = char.mp;
+  const mp = char.mp;
   let effects = gs.activeEffects;
   const memberId = memberIdOf(session);
   for (const effect of dotEffects) {
@@ -760,14 +762,8 @@ function processPlayerDotTick(session: Session, visuals: CombatVisual[]) {
     if (shield.absorbed > 0) {
       logs.push({ text: `聖光護盾吸收 ${shield.absorbed} 傷害${shield.broken ? '後破裂' : ''}`, type: 'system' });
     }
-    // 魔力護盾同樣承擔 DoT 的 30%（`23-class-magic.md` § 23.5）
-    const mana = absorbWithManaShield(shield.damage, mp, effects, now);
-    effects = mana.effects;
-    mp -= mana.mpUsed;
-    if (mana.mpUsed > 0 || mana.broken) {
-      logs.push({ text: `魔力護盾承擔 ${mana.mpUsed} 傷害${mana.broken ? '，MP 耗盡護盾解除' : ''}`, type: 'system' });
-    }
-    const dmg = mana.damage;
+    // 魔力護盾同樣對 DoT 減傷（`23-class-magic.md` § 23.5）
+    const dmg = reduceWithManaShield(shield.damage, mp, getEffectiveMaxMp(char, gs.equippedGear, effects), effects, now).damage;
     if (dmg <= 0) continue;
     hp = Math.max(0, hp - dmg);
     logs.push({ text: `${effect.name} 造成 ${dmg} 傷害`, type: 'debuff-self' });

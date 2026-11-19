@@ -13,6 +13,8 @@ import { FIRE_ENCHANT_ANY_WEAPON_STAT } from '../models/abilitySkill';
 import { ABILITY_ADVERSITY_TAGS, maxAbilityParam } from '../models/ability';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
+import { starTotalsOf } from '../models/starChart';
+import { getMaxHp } from './maxHpMp';
 
 export type CombatLogType =
   | 'player_miss'
@@ -316,16 +318,9 @@ export function rollWeaponDamage(gear: EquipmentInstance | null, basis: WeaponDa
 }
 
 /**
- * 一次普攻打幾下（`21-combat-formula.md` § 21.4）。
- *
- * 雙刀與鋼爪是**雙持**武器，一次攻擊打兩下 —— 每下獨立判定命中與爆擊，
- * 額外攻擊、STR 加成、材質克制兩下都算（每下都是完整公式）。
- * 它們的基傷因此只有其他雙手武器的一半（`21-combat-formula.md` § 21.4）。
- */
-/**
  * 一次攻擊裡**單獨一下**的結果。
  *
- * 多下判定（雙持雙擊、多段技能）要讓畫面一下跳一個數字，
+ * 多下判定（雙刀／鋼爪打兩下、多段技能）要讓畫面一下跳一個數字，
  * 所以判定層不能只回合計 —— 合計看不出「第二下 MISS」。
  */
 export interface HitBreakdown {
@@ -336,8 +331,13 @@ export interface HitBreakdown {
   combo?: boolean;
 }
 
+/** 雙刀、鋼爪每次普攻打兩下的機率 %（`21-combat-formula.md` § 21.4） */
+export const DUAL_STRIKE_CHANCE = 30;
+
+/** 一次普攻打幾下：雙刀、鋼爪 30% 機率 2 下，其餘 1 下；每次呼叫各擲一次 */
 export function getWeaponHitCount(weapon: EquipmentInstance | null): number {
-  return weapon?.type === 'dualBlade' || weapon?.type === 'claw' ? 2 : 1;
+  const dual = weapon?.type === 'dualBlade' || weapon?.type === 'claw';
+  return dual && random() * 100 < DUAL_STRIKE_CHANCE ? 2 : 1;
 }
 
 /**
@@ -398,12 +398,61 @@ function getBuffPercentBonus(activeEffects: ActiveEffect[], stat: string): numbe
 export function getCombatBonuses(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
+  char?: Pick<Character, 'className' | 'starChart'>,
 ): AffixBonuses {
   const bonuses = getAffixBonusesFromGear(equippedGear);
   for (const stat of BUFFABLE_AFFIX_STATS) {
     bonuses[stat] += getBuffPercentBonus(activeEffects, stat);
   }
+  if (char) addStarBonuses(bonuses, char, equippedGear);
   return bonuses;
+}
+
+/**
+ * 星盤數值節點併入同名加成欄位（`56-star-chart.md` § 56.4、§ 56.8）：
+ * 攻擊力%、遠程攻擊力%（裝備弓時）、爆擊率、防禦%、迴避值、治癒效果%、跑速%。
+ */
+function addStarBonuses(bonuses: AffixBonuses, char: Pick<Character, 'className' | 'starChart'>, equippedGear: (EquipmentInstance | null)[]): void {
+  if (!char.starChart?.length) return;
+  const t = starTotalsOf(char.starChart, char.className).totals;
+  const bow = getEquippedWeapon(equippedGear)?.type === 'bow';
+  bonuses.attack_power += (t.get('atkPct') ?? 0) + (bow ? t.get('rangedAtkPct') ?? 0 : 0) + starLowHpPowerPct(char, equippedGear);
+  bonuses.crit_rate += t.get('critPct') ?? 0;
+  bonuses.crit_damage += t.get('critDmgPct') ?? 0;
+  bonuses.attack_lifesteal += t.get('lifestealPct') ?? 0;
+  bonuses.potion_effect += t.get('potionPct') ?? 0;
+  bonuses.drop_rate += t.get('dropPct') ?? 0;
+  bonuses.gold_rate += t.get('goldPct') ?? 0;
+  bonuses.defense += t.get('defPct') ?? 0;
+  bonuses.evasion += t.get('evasion') ?? 0;
+  bonuses.heal_effect += t.get('healPct') ?? 0;
+  bonuses.move_speed += t.get('moveSpeedPct') ?? 0;
+}
+
+/** 背水之星：HP 低於有效最大 HP 35% 時的攻擊力%／魔法攻擊% 加成（`56-star-chart.md` § 56.6） */
+export const LOW_HP_POWER_THRESHOLD = 0.35;
+export function starLowHpPowerPct(char: Pick<Character, 'className' | 'starChart'>, equippedGear: (EquipmentInstance | null)[]): number {
+  const pct = starStat(char, 'lowHpPowerPct');
+  if (pct === 0 || !('hp' in char) || !('baseAttributes' in char)) return 0;
+  const full = char as Character;
+  return full.hp < getMaxHp(full, equippedGear) * LOW_HP_POWER_THRESHOLD ? pct : 0;
+}
+
+/** 星盤命星的造成傷害倍率：獨行（未組隊／組隊）與燃魔（只算技能），彼此相乘（§ 56.6） */
+export function starDamageDealtFactor(char: Pick<Character, 'className' | 'starChart'>, isSkill: boolean, inParty: boolean): number {
+  const party = starStat(char, inParty ? 'partyDmgPct' : 'soloDmgPct');
+  const skill = isSkill ? starStat(char, 'skillDmgPct') : 0;
+  return (1 + party / 100) * (1 + skill / 100);
+}
+
+/** 星盤命星的規則旗標（血契、燃魔、嗜血） */
+export function hasStarFlag(char: Pick<Character, 'className' | 'starChart'>, flag: Parameters<ReturnType<typeof starTotalsOf>['flags']['has']>[0]): boolean {
+  return !!char.starChart?.length && starTotalsOf(char.starChart, char.className).flags.has(flag);
+}
+
+/** 星盤單一數值（命中、魔法攻擊%、受到傷害%、迴避率%） */
+export function starStat(char: Pick<Character, 'className' | 'starChart'>, key: string): number {
+  return char.starChart?.length ? starTotalsOf(char.starChart, char.className).totals.get(key) ?? 0 : 0;
 }
 
 /**
@@ -511,13 +560,15 @@ export function getUncappedPlayerDodgeRate(
   activeEffects: ActiveEffect[] = [],
 ): number {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
   const baseDodge = char.className === 'thief' ? 10 : 5;
   const agiDodge = Math.floor(getEffectiveAGI(attrs.AGI) / 3);
   const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
   const defOverflowDodge = finalDefense > DAMAGE_REDUCTION_CAP ? Math.floor((finalDefense - DAMAGE_REDUCTION_CAP) / 5) : 0;
   const buffDodge = getBuffPercentBonus(activeEffects, 'evasion') + getBuffFlatBonus(activeEffects, 'evasion');
-  return baseDodge + agiDodge + defOverflowDodge + bonuses.evasion / EVASION_POINTS_PER_PERCENT + buffDodge;
+  const rate = baseDodge + agiDodge + defOverflowDodge + bonuses.evasion / EVASION_POINTS_PER_PERCENT + buffDodge;
+  // 堅忍之星「迴避率 −25%」乘在合計上（`56-star-chart.md` § 56.6）
+  return rate * (1 + starStat(char, 'evasionRatePct') / 100);
 }
 
 /** 迴避率（§ 21.6），上限 35%。戰鬥與狀態面板共用 */
@@ -582,14 +633,20 @@ const MIN_ATTACK_INTERVAL_MS = 300;
 export function getTotalAttackSpeedPercent(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
+  char?: Pick<Character, 'className' | 'starChart'>,
 ): number {
   return getAffixBonusesFromGear(equippedGear).attack_speed
     + getBuffPercentBonus(activeEffects, 'attack_speed')
-    + getPlayerDebuffModifier(activeEffects, 'attack_speed');
+    + getPlayerDebuffModifier(activeEffects, 'attack_speed')
+    + (char ? starStat(char, 'attackSpeedPct') : 0);
 }
 
-export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)[], activeEffects: ActiveEffect[] = []): number {
-  const attackSpeedPercent = getTotalAttackSpeedPercent(equippedGear, activeEffects);
+export function getPlayerAttackInterval(
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[] = [],
+  char?: Pick<Character, 'className' | 'starChart'>,
+): number {
+  const attackSpeedPercent = getTotalAttackSpeedPercent(equippedGear, activeEffects, char);
   const interval = Math.floor(BASE_ATTACK_INTERVAL_MS / Math.max(0.1, 1 + attackSpeedPercent / 100));
   return Math.max(MIN_ATTACK_INTERVAL_MS, interval);
 }
@@ -600,7 +657,7 @@ export function getPlayerAttackInterval(equippedGear: (EquipmentInstance | null)
  * 9.5 ＝ 每 2 點 +9.5%，即 `INT加成 = floor(技能攻擊力 × (有效INT / 2 × 0.095))`（§ 21.4）。
  * 這個值與 `MAGIC_ATTACK_PERCENT_PER_POINT` 共同決定基礎魔攻的組成 ——
  * 滿裝法系（有效INT 42、裝備魔攻 39）為 智力 50%／技能攻擊力 25%／裝備魔攻 25%。
- * 技能攻擊力表已依此係數縮放（§ 22.4、§ 23.7.1），**改係數就要重新縮表**。
+ * 技能攻擊力表已依此係數縮放（§ 22.4），**改係數就要重新縮表**。
  */
 export const INT_SKILL_DAMAGE_PERCENT_PER_2 = 9.5;
 
@@ -627,13 +684,15 @@ export function getSkillSideValue(
   skillPower: number,
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[],
+  /** 星盤魔法攻擊%，與裝備魔攻同格相加；只給傷害，治癒與護盾不吃（`56-star-chart.md` § 56.8） */
+  starMagicPercent: number = 0,
 ): number {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effINT = getEffectiveINT(attrs.INT);
   const intBonus = Math.floor(skillPower * (effINT / 2 * INT_SKILL_DAMAGE_PERCENT_PER_2) / 100);
   // 魔攻以 0.1 為單位（§ 21.4）：換成整數十分位計算，避免小數誤差讓 floor 少 1
   const magicTenths = Math.round((getTotalMagicAttack(equippedGear) + getBuffFlatBonus(activeEffects, 'magic_attack')) * 10);
-  return Math.floor(skillPower * (1000 + magicTenths * MAGIC_ATTACK_PERCENT_PER_POINT) / 1000) + intBonus;
+  return Math.floor(skillPower * (1000 + magicTenths * MAGIC_ATTACK_PERCENT_PER_POINT + starMagicPercent * 10) / 1000) + intBonus;
 }
 
 /**
@@ -653,7 +712,7 @@ export function calculateHealAmount(
   activeEffects: ActiveEffect[] = [],
 ): number {
   const base = getSkillSideValue(char, skillPower, equippedGear, activeEffects);
-  const healEffect = getAffixBonusesFromGear(equippedGear).heal_effect;
+  const healEffect = getAffixBonusesFromGear(equippedGear).heal_effect + starStat(char, 'healPct');
   return Math.floor(base * (1 + healEffect / 100));
 }
 
@@ -680,7 +739,7 @@ export function getSkillCooldownReduction(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
 ): number {
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
   const total = bonuses.cooldown_reduction + getIntCooldownReduction(char, activeEffects, equippedGear);
   return Math.min(total, COOLDOWN_REDUCTION_CAP);
 }
@@ -732,7 +791,7 @@ export function calculateBasePhysicalDamage(
   includeFireEnchant = true,
 ): number {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
 
   const weaponDmg = rollWeaponDamage(weapon, 'average');
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
@@ -759,7 +818,7 @@ export function calculatePlayerAttack(
 ): { damage: number; hit: boolean; isCritical: boolean; hits: HitBreakdown[]; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
 
   // Hit check (with weapon attackSuccess and race hit bonus from buffs)
   const baseHit = 80;
@@ -769,9 +828,9 @@ export function calculatePlayerAttack(
   const weaponHitBonus = getWeaponAttackSuccess(weapon);
   const raceHitBonus = getRaceHitBonus(activeEffects, monster.race);
   const buffHitBonus = getBuffFlatBonus(activeEffects, 'hit');
-  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus - monsterDodge));
+  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus + starStat(char, 'hit') - monsterDodge));
 
-  // `21-combat-formula.md` § 21.4：雙刀與鋼爪是雙持，一次攻擊打兩下，每下獨立判定命中與爆擊
+  // `21-combat-formula.md` § 21.4：每下獨立判定命中與爆擊
   const hitCount = getWeaponHitCount(weapon);
   const strBonus = getWeaponAttributeBonus(weapon, attrs);
   const rawFireEnchantDmg = getFireEnchantBonus(activeEffects);
@@ -859,10 +918,11 @@ export function calculatePhysicalSkillHit(
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
   targetId?: string,
+  physicalScale: number = 1,
 ): { damage: number; hit: boolean; isCritical: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
   const effAGI = getEffectiveAGI(attrs.AGI);
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
 
   // Hit check (each hit independently, with weapon attackSuccess and race hit bonus)
   const baseHit = 80;
@@ -872,7 +932,7 @@ export function calculatePhysicalSkillHit(
   const weaponHitBonus = getWeaponAttackSuccess(weapon);
   const raceHitBonus = getRaceHitBonus(activeEffects, monster.race);
   const buffHitBonus = getBuffFlatBonus(activeEffects, 'hit');
-  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus - monsterDodge));
+  const hitRate = Math.min(95, Math.max(5, baseHit + agiBonus + weaponHitBonus + levelDiff + raceHitBonus + buffHitBonus + starStat(char, 'hit') - monsterDodge));
 
   const hit = random() * 100 < hitRate;
   if (!hit) {
@@ -901,6 +961,9 @@ export function calculatePhysicalSkillHit(
     const elementDown = getElementDownPercent(activeEffects, targetId, attackElement);
     damage = Math.floor(damage * (1 + (bonuses.element_brand + elementDown) / 100));
   }
+
+  // 星盤技能等級的物理段倍率（`56-star-chart.md` § 56.5）
+  damage = Math.floor(damage * physicalScale);
 
   // Critical check
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
@@ -943,7 +1006,7 @@ export function getBaseMagicAttack(
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[],
 ): number {
-  return getSkillSideValue(char, skillPower, equippedGear, activeEffects)
+  return getSkillSideValue(char, skillPower, equippedGear, activeEffects, starStat(char, 'matkPct') + starLowHpPowerPct(char, equippedGear))
     + getElementCounterBonus(skillElement, monster.element);
 }
 
@@ -969,14 +1032,17 @@ export function calculatePhysicalSnapshotSkill(
   targetIdx: number = 0,
   ignoreDefensePercent: number = 0,
   targetId?: string,
+  physicalScale: number = 1,
+  guaranteedCrit: boolean = false,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
 
+  // 物理段乘星盤技能等級倍率，基礎魔攻段不乘（`56-star-chart.md` § 56.5）
   let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects)
-    + calculateBasePhysicalDamage(char, weapon, equippedGear, activeEffects, false);
+    + Math.floor(calculateBasePhysicalDamage(char, weapon, equippedGear, activeEffects, false) * physicalScale);
 
   const critRate = Math.min(75, 5 + bonuses.crit_rate);
-  const isCritical = random() * 100 < critRate;
+  const isCritical = guaranteedCrit || random() * 100 < critRate;
   if (isCritical) {
     damage = Math.floor(damage * (2.0 + bonuses.crit_damage / 100));
   }
@@ -1007,7 +1073,7 @@ export function calculateSkillAttack(
   /** § 21.8：只有物理系技能（`Skill.physicalDamage`）判定爆擊 */
   canCrit: boolean = false,
 ): { damage: number; isCritical: boolean; log: CombatLog } {
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
 
   // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻 + 元素克制
   let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects);
@@ -1106,45 +1172,33 @@ export function absorbWithShield(
   return { damage: remaining, absorbed, effects, broken };
 }
 
-export interface ManaShieldResult {
-  /** 扣除 MP 承擔後仍要扣 HP 的傷害 */
-  damage: number;
-  /** 本次扣掉的 MP */
-  mpUsed: number;
-  /** 更新後的效果清單（MP 歸 0 時魔力護盾已移除） */
-  effects: ActiveEffect[];
-  /** 魔力護盾是否因 MP 歸 0 解除 */
-  broken: boolean;
+/** 魔力護盾的 buff 修正值 stat：最高減傷 %（`23-class-magic.md` § 23.5） */
+export const MANA_SHIELD_STAT = 'mana_shield';
+
+/** 魔力護盾當下的減傷 %：最高減傷 × 目前 MP ÷ 最大 MP，無條件捨去 */
+export function manaShieldPercent(maxPercent: number, mp: number, maxMp: number): number {
+  if (maxMp <= 0) return 0;
+  return Math.floor(maxPercent * Math.min(1, Math.max(0, mp) / maxMp));
 }
 
 /**
- * 魔力護盾（`23-class-magic.md` § 23.5）：聖光護盾吸收之後，剩餘傷害的 X%（無條件捨去）
- * 改扣 MP，1 點傷害扣 1 MP；MP 不足的部分照扣 HP。MP 歸 0 時護盾解除。
+ * 魔力護盾（`23-class-magic.md` § 23.5）：聖光護盾吸收之後，剩餘傷害再減去「當下減傷 %」，
+ * 減去量無條件捨去；不扣 MP，MP 為 0 時減傷為 0、護盾不解除。
  */
-export function absorbWithManaShield(
+export function reduceWithManaShield(
   damage: number,
   mp: number,
+  maxMp: number,
   activeEffects: ActiveEffect[],
   now: number = gameNow(),
-): ManaShieldResult {
+): { damage: number; percent: number } {
   const shield = activeEffects.find(e => e.type === 'buff' && e.target === 'player'
     && now < e.startTime + e.duration
     && e.modifiers?.some(m => m.stat === MANA_SHIELD_STAT));
-  if (!shield || damage <= 0) return { damage, mpUsed: 0, effects: activeEffects, broken: false };
-
-  const percent = shield.modifiers!.find(m => m.stat === MANA_SHIELD_STAT)!.value;
-  const mpUsed = Math.min(Math.floor(damage * percent / 100), Math.max(0, mp));
-  const broken = mp - mpUsed <= 0;
-  return {
-    damage: damage - mpUsed,
-    mpUsed,
-    effects: broken ? activeEffects.filter(e => e !== shield) : activeEffects,
-    broken,
-  };
+  if (!shield || damage <= 0) return { damage, percent: 0 };
+  const percent = manaShieldPercent(shield.modifiers!.find(m => m.stat === MANA_SHIELD_STAT)!.value, mp, maxMp);
+  return { damage: damage - Math.floor(damage * percent / 100), percent };
 }
-
-/** 魔力護盾的 buff 修正值 stat：傷害改由 MP 承擔的百分比 */
-export const MANA_SHIELD_STAT = 'mana_shield';
 
 /**
  * 煙霧彈的絕對迴避（`23-class-magic.md` § 23.7）：有剩餘次數就扣 1，歸 0 移除該 buff。
@@ -1220,7 +1274,7 @@ export function calculateMonsterAttack(
   monsterId?: string,
 ): { damage: number; hit: boolean; dodged: boolean; log: CombatLog } {
   const attrs = getTotalAttributes(char, activeEffects, equippedGear);
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
 
   // 無敵：完全免疫傷害（§ 24.4.8）
   if (isPlayerInvincible(activeEffects)) {
@@ -1268,8 +1322,8 @@ export function calculateMonsterAttack(
     : Math.min(finalDefense, DAMAGE_REDUCTION_CAP);
   let finalDamage = Math.max(1, Math.floor(rawDamage * (100 - reductionRate) / 100));
 
-  // buff 減傷與防禦減傷為類間乘算（§ 21.5）
-  const buffReduction = getBuffDamageReduction(activeEffects, equippedGear);
+  // buff 減傷與防禦減傷為類間乘算（§ 21.5）；不屈之星「受到傷害 −5%」併入 buff 減傷
+  const buffReduction = Math.min(100, getBuffDamageReduction(activeEffects, equippedGear) - starStat(char, 'damageTakenPct'));
   if (buffReduction > 0) {
     finalDamage = Math.max(1, Math.floor(finalDamage * (100 - buffReduction) / 100));
   }
@@ -1304,13 +1358,14 @@ export function calculateThornsDamage(
   base: number,
   equippedGear: (EquipmentInstance | null)[],
   activeEffects: ActiveEffect[] = [],
+  char?: Pick<Character, 'className' | 'starChart'>,
 ): number {
   if (base <= 0 || isPlayerInvincible(activeEffects)) return 0;
-  const bonuses = getCombatBonuses(equippedGear, activeEffects);
+  const bonuses = getCombatBonuses(equippedGear, activeEffects, char);
   const finalDefense = getEffectiveDefense(equippedGear, activeEffects, bonuses.defense);
   const reductionRate = Math.min(finalDefense, DAMAGE_REDUCTION_CAP);
   let damage = Math.max(1, Math.floor(base * (100 - reductionRate) / 100));
-  const buffReduction = getBuffDamageReduction(activeEffects, equippedGear);
+  const buffReduction = Math.min(100, getBuffDamageReduction(activeEffects, equippedGear) - (char ? starStat(char, 'damageTakenPct') : 0));
   if (buffReduction > 0) damage = Math.max(1, Math.floor(damage * (100 - buffReduction) / 100));
   return damage;
 }

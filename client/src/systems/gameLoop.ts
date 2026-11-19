@@ -6,6 +6,7 @@
  *
  * `gameLoopTick` 是本機（一人實例）的組合入口；server 由 `systems/worldTick.ts` 逐層呼叫。
  */
+import { starStat } from './combat';
 import { tickArenaRun } from './arenaRun';
 import type { Position, MapData } from '../models/mapControl';
 import type { MapMonster } from '../stores/mapMonsterStore';
@@ -263,6 +264,7 @@ interface MoveSpeedCache {
   effects: unknown;
   base: unknown;
   bonus: unknown;
+  star: unknown;
   multiplier: number;
 }
 
@@ -274,14 +276,16 @@ export function getMoveSpeedMultiplier(session: Session): number {
   if (!character) return 1;
   const hit = moveSpeedCache.get(session);
   if (hit && hit.gear === equippedGear && hit.effects === activeEffects
-    && hit.base === character.baseAttributes && hit.bonus === character.bonusAttributes) {
+    && hit.base === character.baseAttributes && hit.bonus === character.bonusAttributes && hit.star === character.starChart) {
     return hit.multiplier;
   }
-  const bonus = collectAffixBonuses(getEffectiveGearArray(character, activeEffects, equippedGear)).move_speed;
+  // 跑速詞綴＋星盤跑速%（不屈之星，`56-star-chart.md` § 56.6）
+  const bonus = collectAffixBonuses(getEffectiveGearArray(character, activeEffects, equippedGear)).move_speed
+    + starStat(character, 'moveSpeedPct');
   const multiplier = 1 + bonus / 100;
   moveSpeedCache.set(session, {
     gear: equippedGear, effects: activeEffects,
-    base: character.baseAttributes, bonus: character.bonusAttributes, multiplier,
+    base: character.baseAttributes, bonus: character.bonusAttributes, star: character.starChart, multiplier,
   });
   return multiplier;
 }

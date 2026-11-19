@@ -6,6 +6,7 @@
  *  - 專注打擊：同一隻怪逐下加層，結算後才加；上限 +100%；換地圖清除、怪死清除
  *  - 單體技能擴散：3 格內其他怪受主目標最終傷害 X%，計入回魔，範圍技能不擴散
  */
+import { getMaxHp, getMaxMp } from '../../systems/maxHpMp';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { processPlayerAttack, processMonsterAttack } from '../../systems/arpgEventHandler';
 import { gainRage, consumeCalm, syncCalmEffect } from '../../systems/abilityCombat';
@@ -36,12 +37,12 @@ const NOW = 900_000;
 function knight(): Character {
   return {
     name: 'Tester', className: 'knight', level: 60, exp: 0, expToNext: 100,
-    hp: 100, maxHp: 1000, mp: 400, maxMp: 400,
+    hp: 100, mp: 400, 
     baseAttributes: { STR: 20, AGI: 0, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -95,17 +96,6 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('追加傷害', () => {
-  it('擲中機率時每下加固定值；雙持兩下各加一次', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const bonus: Ability = { type: 'bonus_damage', params: { chance: 5, damage: 12 } };
-    const base = run([weapon()], { m1: monster() }).damages[0];
-    const boosted = run([weapon(bonus)], { m1: monster() }).damages[0];
-    expect(boosted.damage - base.damage).toBe(12);
-
-    const dualBase = run([weapon(undefined, 1, 'dualBlade')], { m1: monster() }).damages[0];
-    const dualBoost = run([weapon(bonus, 1, 'dualBlade')], { m1: monster() }).damages[0];
-    expect(dualBoost.damage - dualBase.damage).toBe(24);
-  });
 
   it('沒擲中不加', () => {
     // 0.07：命中、但高於 5% 觸發率
@@ -124,15 +114,6 @@ describe('追打傷害', () => {
     const base = run([weapon()], { m1: monster() }).damages[0].damage;
     const dealt = [1, 2, 3, 4].map(() => run([weapon(combo)], { m1: monster() }).damages[0].damage);
     expect(dealt).toEqual([base, base, Math.floor(base * 1.5), base]);
-  });
-
-  it('雙持一次攻擊計 2', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const dual = weapon(combo, 1, 'dualBlade');
-    run([dual], { m1: monster() });
-    expect(defaultSession.loop.abilityCombo?.count).toBe(2);
-    const second = run([dual], { m1: monster() }).damages[0];
-    expect(second.hits[0].damage).toBeGreaterThan(second.hits[1].damage);
   });
 
   it('技能每施放一次計 1，觸發時該次全部目標加成', () => {
@@ -183,15 +164,6 @@ describe('專注打擊', () => {
     expect(stacksOf('m1')).toBe(21);
   });
 
-  it('雙持一次攻擊逐下加層', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const base = run([weapon(undefined, 1, 'dualBlade')], { m1: monster() }).damages[0].hits.map(h => h.damage);
-    withStacks({ m1: 20 });
-    const hits = run([weapon(focus, 1, 'dualBlade')], { m1: monster() }).damages[0].hits.map(h => h.damage);
-    expect(hits).toEqual([Math.floor(base[0] * 1.3), Math.floor(base[1] * 1.315)]);
-    expect(stacksOf('m1')).toBe(22);
-  });
-
   it('加成上限 +100%', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const base = run([weapon()], { m1: monster() }).damages[0].damage;
@@ -233,7 +205,7 @@ describe('單體技能擴散', () => {
 
   it('3 格內其他怪受主目標最終傷害 X%，3 格外不受', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const iceBolt = instantiateSkill('ice-bolt')!;
+    const iceBolt = { ...instantiateSkill('ice-bolt')!, power: 30 };
     const r = run([weapon(splash)], { m1: monster(), m2: monster(), m3: monster() }, iceBolt);
     const [primary, ...others] = r.damages;
     expect(primary.targetId).toBe('m1');
@@ -307,19 +279,19 @@ describe('職業池（§ 7S.5）', () => {
     expect(effectsOf('ability-next-attack')).toHaveLength(0);
   });
 
-  it('毒霧強化：立即打出 10 跳、不上毒', () => {
+  it('冰霧強化：立即打出 10 跳、不上凍傷', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const mist = classSkill('poison-mist');
     useGameStore.setState({ character: { ...knight(), className: 'thief' }, skills: [mist] });
     const r = run([weapon({ type: 'poison_mist_boost', params: {} })], { m1: monster() }, mist);
     expect(r.damages[0].damage).toBeGreaterThan(0);
     expect(r.damages[0].damage % 10).toBe(0);
-    expect(effectsOf('poisoned')).toHaveLength(0);
+    expect(effectsOf('frostbite')).toHaveLength(0);
 
     useGameStore.setState({ activeEffects: [] });
     const plain = run([weapon()], { m1: monster() }, mist);
     expect(plain.damages[0].damage).toBe(0);
-    expect(effectsOf('poisoned')).toHaveLength(1);
+    expect(effectsOf('frostbite')).toHaveLength(1);
   });
 
   it('淬毒強化：施放時寫進 buff，命中上毒的每秒傷害 ×(1 + X%)', () => {
@@ -440,8 +412,9 @@ describe('飾品共通池（§ 7S.5）', () => {
 
   it('低血回復：HP 低於 50% 才加、戰鬥中減半；多件取最大', () => {
     const gear = [ring({ type: 'low_hp_regen', params: { regen: 10 } }), ring({ type: 'low_hp_regen', params: { regen: 20 } }, 'ring2')];
-    const low = { ...knight(), hp: 400 };
-    const high = { ...knight(), hp: 600 };
+    const maxHp = getMaxHp(knight(), []);
+    const low = { ...knight(), hp: Math.floor(maxHp * 0.4) };
+    const high = { ...knight(), hp: Math.floor(maxHp * 0.6) };
     expect(getHpRegen(low, false, gear) - getHpRegen(low, false, [])).toBe(20);
     expect(getHpRegen(high, false, gear)).toBe(getHpRegen(high, false, []));
     expect(getHpRegen(low, true, gear)).toBe(Math.floor((getHpRegen(low, false, [])  + 20) / 2));
@@ -449,8 +422,11 @@ describe('飾品共通池（§ 7S.5）', () => {
 
   it('低魔回復：MP 低於 50% 才加', () => {
     const gear = [ring({ type: 'low_mp_regen', params: { regen: 15 } })];
-    expect(getMpRegen({ ...knight(), mp: 100 }, false, gear) - getMpRegen({ ...knight(), mp: 100 }, false, [])).toBe(15);
-    expect(getMpRegen({ ...knight(), mp: 300 }, false, gear)).toBe(getMpRegen({ ...knight(), mp: 300 }, false, []));
+    const maxMp = getMaxMp(knight(), []);
+    const low = { ...knight(), mp: Math.floor(maxMp * 0.4) };
+    const high = { ...knight(), mp: Math.floor(maxMp * 0.6) };
+    expect(getMpRegen(low, false, gear) - getMpRegen(low, false, [])).toBe(15);
+    expect(getMpRegen(high, false, gear)).toBe(getMpRegen(high, false, []));
   });
 });
 

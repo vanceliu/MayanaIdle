@@ -8,12 +8,12 @@ import type { ActiveEffect } from '../../models/effect';
 function char(): Character {
   return {
     name: 'T', className: 'knight', level: 50, exp: 0, expToNext: 100,
-    hp: 100, maxHp: 100, mp: 100, maxMp: 100,
+    hp: 100, mp: 100, 
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [],
+    quests: [],
     areaEnteredAt: 0, createdAt: 0, userId: 1,
   };
 }

@@ -10,7 +10,7 @@
 import type { EquipmentInstance, EquipSlot } from '../models/equipment';
 import { getBagItemAmount, consumeBagItem, type BagItem } from '../models/bagItem';
 import { defaultSession, type Session } from '../stores/session';
-import { getWeaponEnhanceRate, getArmorEnhanceRate } from './enhancement';
+import { getWeaponEnhanceOdds, getArmorEnhanceRate, type EnhanceOdds } from './enhancement';
 import { random } from '../core/rng';
 
 /** 強化卷軸（`ITEM_DEFINITIONS` id）。背包比對一律用 id，不用名稱（§ 99.1） */
@@ -88,12 +88,12 @@ export function canScrollTarget(scroll: EnhanceScroll, item: EquipmentInstance):
   return true;
 }
 
-/** 成功率。安定值內必成，超出後武器固定 1/3、防具走 1/(目標等級-1) 那張表 */
-export function getEnhanceRate(item: EquipmentInstance, targetLevel: number): number {
+/** 結果機率。武器走 § 6.9 三段；防具只有成功與消失，走 § 6.10 那張表 */
+export function getEnhanceOdds(item: EquipmentInstance, targetLevel: number): EnhanceOdds {
   const stability = getEnhanceStability(item);
-  return isEnhanceWeapon(item)
-    ? getWeaponEnhanceRate(targetLevel, stability)
-    : getArmorEnhanceRate(targetLevel, stability);
+  if (isEnhanceWeapon(item)) return getWeaponEnhanceOdds(targetLevel, stability);
+  const success = getArmorEnhanceRate(targetLevel, stability);
+  return { success, noChange: 0, destroy: 1 - success };
 }
 
 /**
@@ -111,8 +111,9 @@ export interface EnhanceTarget {
 }
 
 export interface EnhanceOutcome {
-  /** § 48.4：安定值內只給白閃，超出安定值成功才是金色那一套 */
-  fx: 'safe' | 'success' | 'fail';
+  /** § 48.4：安定值內只給白閃，超出安定值成功才是金色那一套；`still`＝無變化 */
+  fx: 'safe' | 'success' | 'still' | 'fail';
+  /** 強化等級有提升 */
   success: boolean;
   nextLevel: number;
   message: string;
@@ -184,7 +185,10 @@ export function applyEnhanceScroll(
   const steps = scroll.variant === 'plus' ? 1 + Math.floor(randomFn() * PLUS_SCROLL_MAX_LEVELS) : 1;
   const nextLevel = current + steps;
   const stability = getEnhanceStability(item);
-  const success = randomFn() < getEnhanceRate(item, getJudgedLevel(item));
+  const odds = getEnhanceOdds(item, getJudgedLevel(item));
+  const roll = randomFn();
+  const success = roll < odds.success;
+  const destroyed = !success && roll >= odds.success + odds.noChange;
 
   let outcome: EnhanceOutcome;
   if (success) {
@@ -196,6 +200,14 @@ export function applyEnhanceScroll(
       success: true,
       nextLevel,
       message: `強化成功！${item.name} +${nextLevel}`,
+    };
+  } else if (!destroyed) {
+    writeBack(target, item, newBag, session);
+    outcome = {
+      fx: 'still',
+      success: false,
+      nextLevel: current,
+      message: `強化無變化，${item.name} 維持 +${current}`,
     };
   } else {
     if (item.id) void session.repo.deleteEquipment(item.id);
@@ -212,10 +224,10 @@ export function applyEnhanceScroll(
   const stats = { ...session.game.getState().statistics };
   if (scroll.category === 'weapon') {
     stats.weaponEnhanceAttempts += 1;
-    if (!success) stats.weaponsBroken += 1;
+    if (destroyed) stats.weaponsBroken += 1;
   } else {
     stats.armorEnhanceAttempts += 1;
-    if (!success) stats.armorsBroken += 1;
+    if (destroyed) stats.armorsBroken += 1;
   }
   session.game.setState({ statistics: stats });
   // 同上：判定結果不可逆

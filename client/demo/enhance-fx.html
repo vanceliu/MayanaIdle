@@ -44,9 +44,14 @@ body {
 }
 .demo-section > p { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 12px; }
 .demo-cards { display: flex; flex-direction: column; gap: 10px; }
+.demo-bag-wrap { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.demo-bag-wrap .bag-panel { width: 300px; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px; }
+.demo-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-dim); }
+.demo-legend button { margin-right: 8px; padding: 4px 10px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm); }
 
 /* 特效本身不在這裡 —— 已經是 src/App.css 的正式樣式（`48-vfx.md` § 48.4），
    這頁只是拿真的 CSS 來預覽。要改特效請改 App.css，這頁重新整理即可看到結果。 */
+
 </style>
 </head>
 <body>
@@ -82,7 +87,13 @@ body {
 </div>
 
 <section class="demo-section">
-  <h2>1. 待命狀態</h2>
+  <h2>1. 背包（正式落點）</h2>
+  <p>點格子或右側按鈕播放。格子、疊層結構與縮小倍率（<code>.bag-enh-fx</code>）照 <code>BagPanel.tsx</code>；成功後等級會往上加、失敗的會消失。上方的速度與逐格控制也適用。</p>
+  <div id="bag-root"></div>
+</section>
+
+<section class="demo-section">
+  <h2>2. 清單卡片：待命狀態</h2>
   <p>沒按下去之前的樣子。兩者共用同一種藍白呼吸 —— 上面是安定值內（必定成功），下面超過安定值（會失敗、失敗即消失），差別只在右側的成功率與「失敗消失」字樣。</p>
   <div class="demo-cards">
     <div class="shop-item bs-shop-item enh-standby">
@@ -119,7 +130,7 @@ body {
 </section>
 
 <section class="demo-section">
-  <h2>2. 結算演出</h2>
+  <h2>3. 清單卡片：結算演出</h2>
   <p>按上面的三顆按鈕，或直接點卡片重播。</p>
   <div class="demo-cards">
     <div class="shop-item bs-shop-item enh-standby" id="card-safe" data-fx="safe">
@@ -166,6 +177,7 @@ const speedSel = document.getElementById('speed');
 const scaleSel = document.getElementById('scale');
 
 function applyVars() {
+  document.documentElement.style.setProperty('--enh-fx-speed', speedSel.value);
   for (const card of document.querySelectorAll('.shop-item')) {
     card.style.setProperty('--enh-fx-speed', speedSel.value);
     card.style.setProperty('--enh-fx-scale', scaleSel.value);
@@ -241,6 +253,7 @@ function allAnimations() {
 
 scrub.addEventListener('input', () => {
   scrubbing = true;
+  document.body.classList.add('demo-scrubbing');
   const pct = Number(scrub.value) / 100;
   scrubVal.textContent = `${scrub.value}%`;
   for (const anim of allAnimations()) {
@@ -261,6 +274,7 @@ function scheduleReset(card, ms) {
 document.querySelectorAll('[data-fx]').forEach(card => {
   card.addEventListener('click', () => {
     scrubbing = false;
+    document.body.classList.remove('demo-scrubbing');
     scrubVal.textContent = '播放中';
     play(card);
   });
@@ -270,5 +284,6 @@ document.getElementById('replay-success').addEventListener('click', () => play(d
 document.getElementById('replay-fail').addEventListener('click', () => play(document.getElementById('card-fail')));
 </script>
 
+<script type="module" src="./enhanceBagDemo.tsx"></script>
 </body>
 </html>

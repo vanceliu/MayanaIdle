@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { applyAbilityToSkill } from '../models/abilitySkill';
-import { SkillTooltipBody } from './SkillTooltipBody';
+import { resolveSkill, starLevelRoman } from '../models/skillStar';
+import { SkillTooltipBody, SkillTooltipHeader } from './SkillTooltipBody';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import {
@@ -13,7 +13,7 @@ import { GameIcon } from './GameIcon';
 import { SKILL_CATALOG, type Skill } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
 import { CLASS_MAGIC_RESTRICTIONS } from '../models/skillRestrictions';
-import type { ClassName } from '../models/character';
+import type { Character, ClassName } from '../models/character';
 import { getEffectiveGearArray } from '../systems/gear';
 
 const GRID_COLUMNS = 5;
@@ -56,6 +56,12 @@ const CLICK_SLOP = 6;
 
 /** 技能格圖示邊長。格子 `min-height` 42px 還要塞技能名，再大就會擠掉文字 */
 const SKILL_ICON_SIZE = 20;
+
+/** 已習得技能格右上角的星盤等級（II、III；I 不標，`56-star-chart.md` § 56.5） */
+function SkillStarBadge({ skill, character }: { skill: Skill | undefined; character: Character | null }) {
+  const roman = skill && character ? starLevelRoman(skill, character) : '';
+  return roman ? <span className="skill-cell-star">{roman}</span> : null;
+}
 
 export function SkillPanel() {
   const [tooltip, setTooltip] = useState<SkillTooltipData | null>(null);
@@ -226,6 +232,7 @@ export function SkillPanel() {
                         color={ELEMENT_COLORS[element]}
                       />
                       <span className="skill-cell-name">{skill.name}</span>
+                      <SkillStarBadge skill={learnedSkill} character={character} />
                     </div>
                   );
                 })}
@@ -270,6 +277,7 @@ export function SkillPanel() {
                     color={ELEMENT_COLORS[skill.element || 'none']}
                   />
                   <span className="skill-cell-name">{def.name}</span>
+                  <SkillStarBadge skill={learnedSkill} character={character} />
                 </div>
               );
             })}
@@ -283,12 +291,13 @@ export function SkillPanel() {
           className={`skill-tooltip ${tooltip.above ? 'above' : 'below'}`}
           style={{ left: tooltip.x, top: tooltip.y }}
         >
-          <div className="skill-tooltip-name">{tooltip.name}</div>
-          <div className="skill-tooltip-level">等級 {tooltip.level}</div>
-          {/* § 7S.7：套用職業池隨機技能後的數值，被改動的數字標黃 */}
+          <SkillTooltipHeader name={tooltip.name} skill={tooltip.skill} level={tooltip.level} character={character} />
+          {/* 套用星盤等級與職業池隨機技能後的數值，被改動的數字標黃（§ 7S.7、`56-star-chart.md` § 56.5） */}
           <SkillTooltipBody
             base={tooltip.skill}
-            shown={applyAbilityToSkill({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character?.className)}
+            shown={character
+              ? resolveSkill({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character, activeEffects)
+              : tooltip.skill}
             healOf={power => calculateHealAmount(character, power, equippedGearList, activeEffects)}
           />
           <div className={`skill-tooltip-status ${tooltip.learned ? 'learned' : 'locked'}`}>

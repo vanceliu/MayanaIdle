@@ -15,12 +15,12 @@ import type { EquipmentInstance } from '../../models/equipment';
 function char(overrides: Partial<Character> = {}): Character {
   return {
     name: 'K', className: 'knight', level: 50, exp: 0, expToNext: 1_000_000,
-    hp: 500, maxHp: 500, mp: 100, maxMp: 100,
+    hp: 500, mp: 100, 
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+    quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
     ...overrides,
   };
 }
@@ -72,6 +72,14 @@ describe('§ 21.4a 傷害組成', () => {
     noCrit();
     const w = sword();
     expect(calculatePhysicalSnapshotSkill(char(), 0, 'none', w, dummy(), [w]).damage).toBe(17);
+  });
+
+  it('必定爆擊（致命一擊）：不擲爆擊，整招 ×2.0', () => {
+    noCrit();
+    const w = sword();
+    const r = calculatePhysicalSnapshotSkill(char(), 10, 'none', w, dummy(), [w], '致命一擊', [], 0, 0, undefined, 1, true);
+    expect(r.isCritical).toBe(true);
+    expect(r.damage).toBe(62);
   });
 });
 
@@ -196,6 +204,17 @@ describe('§ 23.3 走本公式的技能', () => {
 
   it('沒有其他技能誤標', () => {
     const marked = CLASS_SKILLS.filter(s => s.skill.physicalSnapshot).map(s => s.id);
-    expect(marked.sort()).toEqual(['backstab', 'binding-arrow', 'charge', 'leap-shot', 'rend', 'shield-bash', 'taunt', 'vengeance']);
+    expect(marked.sort()).toEqual(['backstab', 'binding-arrow', 'charge', 'deadly-strike', 'leap-shot', 'rend', 'shield-bash', 'taunt', 'vengeance']);
+  });
+});
+
+describe('星盤技能等級的物理段倍率（`56-star-chart.md` § 56.5）', () => {
+  it('只乘基礎物理傷害，基礎魔攻段不乘', () => {
+    const c = char();
+    noCrit();
+    const physical = calculatePhysicalSnapshotSkill(c, 0, 'none', sword(), dummy(), [sword()]).damage;
+    const unscaled = calculatePhysicalSnapshotSkill(c, 32, 'none', sword(), dummy(), [sword()]).damage;
+    const scaled = calculatePhysicalSnapshotSkill(c, 32, 'none', sword(), dummy(), [sword()], '技能', [], 0, 0, undefined, 0.5).damage;
+    expect(scaled).toBe(unscaled - physical + Math.floor(physical * 0.5));
   });
 });

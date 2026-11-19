@@ -23,12 +23,12 @@ const NOW = 800_000;
 function character(): Character {
   return {
     name: 'Priest', className: 'priest', level: 50, exp: 0, expToNext: 100,
-    hp: 500, maxHp: 500, mp: 300, maxMp: 300,
+    hp: 500, mp: 300, 
     baseAttributes: { STR: 10, AGI: 10, VIT: 20, SPI: 25, INT: 20, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 

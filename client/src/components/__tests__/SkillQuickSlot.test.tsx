@@ -43,12 +43,9 @@ function character(overrides: Partial<Character> = {}): Character {
     exp: 0,
     expToNext: 1000,
     hp: 100,
-    maxHp: 100,
     mp: 300,
-    maxMp: 300,
     baseAttributes: { STR: 8, AGI: 8, VIT: 10, SPI: 14, INT: 18, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0,
     gold: 0,
     currentArea: 'dawn-plains',
     currentZone: 'newbie-neutral',
@@ -161,6 +158,15 @@ describe('技能快捷格的可用狀態（§ 35.7.4 / § 35.7.6）', () => {
       expect(slots()[0].getAttribute('aria-disabled')).toBe('true');
       expect(slots()[0].className).toContain('blocked');
     });
+  });
+
+  it('職業技能的冷卻用星盤換算後的值（未點強化＝表列 ÷ 0.8）', async () => {
+    // 魔力奪取表列 6 秒，未點強化為 7.5 秒；6.5 秒前施放仍在冷卻
+    setup([learn('mana-drain', Date.now() - 6500)]);
+    useGameStore.setState({ quickSlots: [{ kind: 'skill', skillId: 'mana-drain' }, ...emptyQuickSlots().slice(1)] });
+    render(<QuickSlotBar />);
+
+    await waitFor(() => expect(slots()[0].className).toContain('blocked'));
   });
 
   it('冷卻中會畫出扇形遮罩，就緒時收起來', async () => {

@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SettingsModal } from '../SettingsModal';
 import { useSettingsStore, SCALE_MIN, SCALE_MAX, SCALE_DEFAULT } from '../../stores/settingsStore';
+import { useOnlineStore } from '../../net/online';
+import { FEEDBACK_FORM_URL } from '../../systems/feedbackForm';
 
 describe('SettingsModal', () => {
   beforeEach(() => {
     localStorage.clear();
     useSettingsStore.getState().setLinkScales(false);
     useSettingsStore.getState().resetDisplaySettings();
+    useOnlineStore.setState({ enabled: false, worldMode: null });
   });
 
   it('兩條滑桿的範圍是 80%~150%、每 5% 一級', () => {
@@ -121,5 +124,35 @@ describe('SettingsModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '完成' }));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  describe('回饋頁籤', () => {
+    it('單機世界不顯示', () => {
+      useOnlineStore.setState({ enabled: true, worldMode: 'solo' });
+      render(<SettingsModal onClose={() => {}} />);
+
+      expect(screen.queryByRole('button', { name: '回饋' })).toBeNull();
+    });
+
+    it('開放世界顯示，按鈕連到 Google 表單並開新分頁', () => {
+      useOnlineStore.setState({ enabled: true, worldMode: 'open' });
+      render(<SettingsModal onClose={() => {}} />);
+
+      fireEvent.click(screen.getByRole('button', { name: '回饋' }));
+      const link = screen.getByRole('link', { name: '開啟回饋表單' }) as HTMLAnchorElement;
+      expect(link.href.startsWith(`${FEEDBACK_FORM_URL}?`)).toBe(true);
+      expect(link.target).toBe('_blank');
+    });
+
+    it('停在回饋頁時變成非開放形態，切回顯示頁', () => {
+      useOnlineStore.setState({ enabled: true, worldMode: 'open' });
+      render(<SettingsModal onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: '回饋' }));
+
+      act(() => useOnlineStore.setState({ enabled: false }));
+
+      expect(screen.queryByRole('link', { name: '開啟回饋表單' })).toBeNull();
+      expect(screen.getByLabelText('介面大小')).toBeDefined();
+    });
   });
 });

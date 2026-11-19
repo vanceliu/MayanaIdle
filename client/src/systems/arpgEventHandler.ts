@@ -1,4 +1,5 @@
 import type { PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
+import { applyStarLevel, resolveSkills } from '../models/skillStar';
 import { applyDamageToMonster, bloodthirstHeal, monsterLogName } from '../models/monsterAffix';
 import type { Character } from '../models/character';
 import type { MonsterInstance } from '../models/monster';
@@ -18,11 +19,14 @@ import {
   hasActiveFireEnchant,
   calculateMpRestored,
   absorbWithShield,
-  absorbWithManaShield,
+  manaShieldPercent,
+  starDamageDealtFactor,
+  getCombatBonuses,
+  reduceWithManaShield,
+  MANA_SHIELD_STAT,
   getSkillSideValue,
   consumeEvadeCharge,
   getTotalMagicResist,
-  getWeaponHitCount,
   getSkillCooldownReduction,
   calculateHealAmount,
   getAffixBonusesFromGear,
@@ -58,7 +62,7 @@ import {
   corpseExplosionDamage, reduceCooldown,
 } from './abilityCombat';
 import { getDistance } from './lineOfSight';
-import { applyAbilityToSkills, withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
+import { withNextAttackBonus, ENVENOM_DOT_BONUS_STAT, NEXT_ATTACK_BONUS_CATEGORY, NEXT_ATTACK_BONUS_STAT } from '../models/abilitySkill';
 import { getEffectiveMaxHp, getEffectiveMaxMp, type CombatLog } from '../stores/gameStore';
 import { defaultSession, type Session } from '../stores/session';
 import { getSkillTemplate } from '../models/skillTemplate';
@@ -172,7 +176,7 @@ export function applyKillCooldown(session: Session, gear: (EquipmentInstance | n
   const character = gs.character;
   if (!character) return [];
   const cdr = getSkillCooldownReduction(character, gear, gs.activeEffects);
-  const effective = applyAbilityToSkills(gs.skills, gear, character.className);
+  const effective = resolveSkills(gs.skills, gear, character, gs.activeEffects);
   const ms = ability.params.cooldown * kills;
   let changed = false;
   const skills = gs.skills.map((s, i) => {
@@ -241,7 +245,7 @@ function shortenCoolingSkills(session: Session, gear: (EquipmentInstance | null)
   const character = gs.character;
   if (!character) return false;
   const cdr = getSkillCooldownReduction(character, gear, gs.activeEffects);
-  const effective = applyAbilityToSkills(gs.skills, gear, character.className);
+  const effective = resolveSkills(gs.skills, gear, character, gs.activeEffects);
   let changed = false;
   const skills = gs.skills.map((s, i) => {
     const cooldown = Math.floor(effective[i].cooldown * (1 - Math.min(cdr, 50) / 100));
@@ -337,7 +341,7 @@ export interface DamageResult {
   /**
    * 逐下明細。**長度至少 1**，一般攻擊就是一筆。
    *
-   * 多下判定（雙持雙擊、多段技能）要讓畫面一下跳一個數字
+   * 多下判定（雙刀／鋼爪打兩下、多段技能）要讓畫面一下跳一個數字
    * （`48-vfx.md` § 48.7.3）—— 只有合計的話，「第二下 MISS」表現不出來。
    */
   hits: HitBreakdown[];
@@ -389,6 +393,13 @@ export function* attackSequence(
     if (alive.length === 0) return;
     yield alive[Math.floor(random() * alive.length)];
   }
+}
+
+/** 魔力護盾施放時顯示當下減傷 %（`23-class-magic.md` § 23.5）；其他技能為空字串 */
+function manaShieldCastNote(skill: Skill, character: Character, gs: { equippedGear: Parameters<typeof getEffectiveMaxMp>[1]; activeEffects: ActiveEffect[] }): string {
+  const max = skill.buffModifiers?.find(m => m.stat === MANA_SHIELD_STAT)?.value;
+  if (max === undefined) return '';
+  return `（目前減傷 ${manaShieldPercent(max, character.mp, getEffectiveMaxMp(character, gs.equippedGear, gs.activeEffects))}%）`;
 }
 
 export function processPlayerAttack(
@@ -466,15 +477,17 @@ export function processPlayerAttack(
         session.game.setState({ character: newChar, skills: newSkills });
       }
 
-      logs.push({ text: `施放 ${skill.name}`, type: 'player' });
+      logs.push({ text: `施放 ${skill.name}${manaShieldCastNote(skill, newChar, gs)}`, type: 'player' });
     } else if (skill.type === 'heal' && skill.power) {
       const allGear = getEffectiveGearArray(character, gs.activeEffects, gs.equippedGear);
       const effMaxHp = getEffectiveMaxHp(character, gs.equippedGear, gs.activeEffects);
       // § 21.4c：與常駐腳本／快捷格共用 `calculateHealAmount()`，不可各算各的
       const effectiveHeal = calculateHealAmount(character, skill.power, allGear, gs.activeEffects);
-      const healed = Math.min(effMaxHp - character.hp, effectiveHeal);
+      // 血契之星的 HP 消耗先扣，再補血（`56-star-chart.md` § 56.6）
+      const hpCost = resolveSelfHpCost(skill, character.hp, effMaxHp);
+      const healed = Math.min(effMaxHp - (character.hp - hpCost), effectiveHeal);
 
-      const newChar = { ...character, hp: character.hp + healed, mp: character.mp - skill.mpCost };
+      const newChar = { ...character, hp: character.hp - hpCost + healed, mp: character.mp - skill.mpCost };
       const newSkills = [...gs.skills];
       if (skillIdx >= 0) newSkills[skillIdx] = { ...newSkills[skillIdx], lastUsedAt: now };
 
@@ -493,7 +506,7 @@ export function processPlayerAttack(
   const damagePercent = (skill?.abilityDamagePercent ?? 0) + nextAttackBonus;
 
   // 自身 HP 消耗（`23-class-magic.md` § 23.3 血濺咒殺）：不是受到傷害，穿透減傷與護盾，最低留 1
-  if (skill?.selfHpCostPercent) {
+  if (skill && (skill.selfHpCostPercent || skill.hpCost)) {
     const gs = session.game.getState();
     const self = gs.character!;
     const cost = resolveSelfHpCost(skill, self.hp, getEffectiveMaxHp(self, gs.equippedGear, gs.activeEffects));
@@ -503,7 +516,7 @@ export function processPlayerAttack(
     }
   }
 
-  /** 只上毒的技能（毒霧，含強化後的立即傷害）沒有「命中」：不觸發追加傷害、元素侵蝕、武器 debuff、T7 命中類 */
+  /** 只上 DoT 的技能（冰霧，含強化後的立即傷害）沒有「命中」：不觸發追加傷害、元素侵蝕、武器 debuff、T7 命中類 */
   const procs = !skill?.dotOnly && !skill?.instantDotTicks;
 
   // § 7S.5 追打：普攻類每一下計 1；技能類每施放一次計 1，觸發時該次施放的全部目標加成
@@ -545,10 +558,10 @@ export function processPlayerAttack(
       hits = result.hits;
     } else if (skill) {
       if (skill.dotOnly) {
-        // § 23.7 毒霧：不造成直接傷害，只施加 `applyDebuff`
+        // § 23.7 冰霧：不造成直接傷害，只施加 `applyDebuff`
         damage = 0;
       } else if (skill.instantDotTicks && skill.applyDebuff?.dotDamagePercent) {
-        // § 7S.5 毒霧強化：DoT 快照值 × 跳數一次打出，不吃防禦、不爆擊
+        // § 7S.5 冰霧強化：DoT 快照值 × 跳數一次打出，不吃防禦、不爆擊
         const perTick = Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * skill.applyDebuff.dotDamagePercent));
         damage = perTick * skill.instantDotTicks;
         isMiss = false;
@@ -557,7 +570,7 @@ export function processPlayerAttack(
          * 多段物理技能（目前只有三連射）。
          *
          * **每一發獨立判定命中**（`23-class-magic.md` § 23.4：「每箭獨立判定命中」，
-         * 與雙刀／鋼爪的雙擊同一條規則，`21-combat-formula.md` § 21.4）——
+         * `21-combat-formula.md` § 21.4）——
          * 未命中的那一發回傳 0 傷害，不影響其他發。
          *
          * 只有**每一發都沒中**才算 MISS。任一發沒中就整筆作廢的話，
@@ -578,6 +591,7 @@ export function processPlayerAttack(
             targetIdx,
             skill.ignoreDefensePercent ?? 0,
             targetId,
+            skill.physicalScale ?? 1,
           );
           damage += hitResult.damage;
           if (hitResult.isCritical) isCrit = true;
@@ -603,6 +617,8 @@ export function processPlayerAttack(
           targetIdx,
           skill.ignoreDefensePercent ?? 0,
           targetId,
+          skill.physicalScale ?? 1,
+          skill.guaranteedCrit ?? false,
         );
         damage = result.damage;
         isCrit = result.isCritical;
@@ -636,6 +652,13 @@ export function processPlayerAttack(
 
     if (damagePercent > 0 && !isMiss) {
       hits = hits.map(h => (h.isMiss ? h : { ...h, damage: applyComboBonus(h.damage, damagePercent) }));
+      damage = hits.reduce((sum, h) => sum + h.damage, 0);
+    }
+
+    // 星盤命星：獨行（未組隊／組隊）、燃魔（只算技能）的造成傷害倍率（`56-star-chart.md` § 56.6）
+    const starFactor = starDamageDealtFactor(character, event.action.type === 'skill', !!session.party?.getState().party);
+    if (starFactor !== 1 && !isMiss) {
+      hits = hits.map(h => (h.isMiss ? h : { ...h, damage: Math.max(1, Math.floor(h.damage * starFactor)) }));
       damage = hits.reduce((sum, h) => sum + h.damage, 0);
     }
 
@@ -684,8 +707,9 @@ export function processPlayerAttack(
       if (poisonBuff) {
         const now = gameNow();
         const gs = session.game.getState();
+        // 毒傷 % 依淬毒的星盤等級（`56-star-chart.md` § 56.5）
         const envenomTemplate = getSkillTemplate('envenom');
-        const debuff = envenomTemplate?.onHitDebuff;
+        const debuff = envenomTemplate && applyStarLevel({ ...envenomTemplate, lastUsedAt: 0 }, character).onHitDebuff;
         // § 24.3.2 DoT 不可刷新：中毒存續期間不重複施加，也不重複輸出日誌
         const alreadyPoisoned = !!debuff && gs.activeEffects.some(
           e => e.type === 'debuff' && e.category === debuff.category
@@ -725,8 +749,7 @@ export function processPlayerAttack(
       }
     }
 
-    // § 7.4 元素侵蝕：命中後依觸發率上 DoT。普攻與魔法命中都判定；
-    // 雙持武器一次攻擊打兩下，因此判定兩次（同淬毒的兩次判定，§ 23.7）。
+    // § 7.4 元素侵蝕：命中後依觸發率上 DoT。普攻與魔法命中都判定，每下判定一次（雙刀／鋼爪打兩下時兩次）。
     if (!isMiss && !killed && procs) {
       const erosion = getErosion(weapon?.affixes, weapon?.quality ?? 0);
       if (erosion) {
@@ -739,7 +762,7 @@ export function processPlayerAttack(
             && now < e.startTime + e.duration
         );
         if (!alreadyEroded) {
-          const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
+          const rolls = event.action.type === 'normal_attack' ? hits.length : 1;
           let triggered = false;
           for (let r = 0; r < rolls && !triggered; r++) {
             if (random() * 100 < erosion.chance) triggered = true;
@@ -777,7 +800,7 @@ export function processPlayerAttack(
 
     // § 7.9 命中下降／防禦下降／元素下降：判定次數同元素侵蝕；同一隻怪同 category 後施放覆蓋並刷新時間
     if (!isMiss && !killed && procs) {
-      const rolls = event.action.type === 'normal_attack' ? getWeaponHitCount(weapon) : 1;
+      const rolls = event.action.type === 'normal_attack' ? hits.length : 1;
       for (const proc of getWeaponDebuffAffixes(weapon?.affixes, weapon?.quality ?? 0)) {
         let triggered = false;
         for (let r = 0; r < rolls && !triggered; r++) {
@@ -903,6 +926,7 @@ export function processPlayerAttack(
               targetIdx,
               targetMonsterId: targetId,
               dot: { damage: baseDmg, element: debuffDef.dotElement ?? skill.element, interval: debuffDef.dotInterval ?? 1000, totalDuration: debuffDef.dotDuration ?? 5000 },
+              ...(debuffDef.modifiers ? { modifiers: debuffDef.modifiers } : {}),
               startTime: now,
               duration: debuffDef.dotDuration ?? 5000,
               tags: debuffDef.tags,
@@ -1053,7 +1077,8 @@ export function processPlayerAttack(
 
   // § 7.9 普攻回血／技能回血：含擴散、追加傷害、追打、專注打擊，依本次招式歸類
   if (procs) {
-    const affixBonuses = getAffixBonusesFromGear(equippedGear);
+    // 嗜血之星的攻擊吸血與詞綴相加（`56-star-chart.md` § 56.6）
+    const affixBonuses = getCombatBonuses(equippedGear, [], character);
     const percent = basicAttackClass ? affixBonuses.attack_lifesteal : affixBonuses.skill_lifesteal;
     logs.push(...applyAffixLifesteal(session, lifestealAmount(damages, percent), basicAttackClass ? '普攻回血' : '技能回血'));
   }
@@ -1157,15 +1182,9 @@ export function processMonsterAttack(
         : { text: `聖光護盾吸收 ${shield.absorbed} 傷害`, type: 'system' };
     }
 
-    // 魔力護盾（`23-class-magic.md` § 23.5）：聖光護盾之後，剩餘傷害的 30% 改扣 MP
-    const mana = absorbWithManaShield(actualDamage, character.mp, session.game.getState().activeEffects);
-    if (mana.mpUsed > 0 || mana.broken) {
-      actualDamage = mana.damage;
-      character.mp -= mana.mpUsed;
-      if (mana.broken) session.game.setState({ activeEffects: mana.effects });
-      const text = `魔力護盾承擔 ${mana.mpUsed} 傷害${mana.broken ? '，MP 耗盡護盾解除' : ''}`;
-      shieldLog = shieldLog ? { ...shieldLog, text: `${shieldLog.text}；${text}` } : { text, type: 'system' };
-    }
+    // 魔力護盾（`23-class-magic.md` § 23.5）：聖光護盾之後，依目前 MP 比例減傷
+    const gsMana = session.game.getState();
+    actualDamage = reduceWithManaShield(actualDamage, character.mp, getEffectiveMaxMp(character, gsMana.equippedGear, gsMana.activeEffects), gsMana.activeEffects).damage;
   }
 
   // Apply damage to player

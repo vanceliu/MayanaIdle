@@ -10,7 +10,8 @@ import { setRates } from '../../client/src/core/rates';
 import { defaultSession } from '../../client/src/stores/session';
 import { loadTemplateCache } from '../../client/src/systems/templateSync';
 import { loadConfig, isLoopbackBind, type ServerConfig } from './config';
-import { openDatabase, migrate, assertSchemaIntact, resolveWorldMode, DB_FILE, type WorldMode } from './db/sqlite';
+import { openDatabase, migrate, assertSchemaIntact, resolveWorldMode, currentSchemaVersion, DB_FILE, type WorldMode } from './db/sqlite';
+import { LEGACY_RESET_VERSION, backupBeforeLegacyReset } from './db/legacyReset';
 import { SqliteGuildStorage } from './db/guildStorage';
 import { SqliteArenaRecords } from './db/arenaRecords';
 import { SqliteRepository } from './db/sqliteRepository';
@@ -135,6 +136,11 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
   let config = loaded.config;
 
   const db = openDatabase(join(dataDir, DB_FILE));
+  // 清檔遷移不可逆：舊資料庫先整份備份（`45-legacy-archive.md` § 45.1）
+  const schemaBefore = currentSchemaVersion(db);
+  if (schemaBefore > 0 && schemaBefore < LEGACY_RESET_VERSION) {
+    log.info(`清檔前備份：${backupBeforeLegacyReset(db, join(dataDir, DB_FILE), config.backupDir)}`);
+  }
   const migrated = migrate(db);
   assertSchemaIntact(db);
   log.info(`SQLite ${join(dataDir, DB_FILE)}（schema v${migrated.from} → v${migrated.to}）`);

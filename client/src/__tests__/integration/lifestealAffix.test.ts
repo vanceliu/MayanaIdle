@@ -9,6 +9,7 @@ import { instantiateSkill, type Skill } from '../../models/skill';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { applyAbilityToSkill } from '../../models/abilitySkill';
 import { useGameStore } from '../../stores/gameStore';
+import { getMaxHp } from '../../systems/maxHpMp';
 import { defaultSession } from '../../stores/session';
 import type { Character } from '../../models/character';
 import type { MonsterInstance } from '../../models/monster';
@@ -29,12 +30,12 @@ const NOW = 900_000;
 function knight(hp = 100): Character {
   return {
     name: 'Tester', className: 'knight', level: 60, exp: 0, expToNext: 100,
-    hp, maxHp: 1000, mp: 400, maxMp: 400,
+    hp, mp: 400, 
     baseAttributes: { STR: 20, AGI: 0, VIT: 15, SPI: 10, INT: 30, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -127,13 +128,6 @@ describe('普攻回血', () => {
     expect(r.logs.some(l => l.text === `普攻回血回復 ${heal} HP`)).toBe(true);
   });
 
-  it('雙持兩下各算一次', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const r = attack([weapon([attackLs(40)], 'dualBlade')], ['m1']);
-    expect(r.damages[0].hits).toHaveLength(2);
-    expect(hpNow()).toBe(100 + expected(r.damages, 40));
-  });
-
   it('普攻擴散打到的周圍目標也各算一次', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const splash: Affix = { type: 'attack_splash', tier: 5, value: 30 };
@@ -144,10 +138,11 @@ describe('普攻回血', () => {
   });
 
   it('回復後不超過有效最大 HP', () => {
-    useGameStore.setState({ character: knight(999) });
+    const maxHp = getMaxHp(knight(), []);
+    useGameStore.setState({ character: knight(maxHp - 1) });
     vi.spyOn(Math, 'random').mockReturnValue(0);
     attack([weapon([attackLs(42)])], ['m1']);
-    expect(hpNow()).toBe(1000);
+    expect(hpNow()).toBe(maxHp);
   });
 });
 

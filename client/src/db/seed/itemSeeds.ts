@@ -202,7 +202,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 112, name: '冷卻縮減技能書', category: 'spellbook', description: '元素師職業魔法 1 級：冷卻縮減', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 113, name: '魔力奪取技能書', category: 'spellbook', description: '元素師職業魔法 2 級：魔力奪取', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 114, name: '元素增幅技能書', category: 'spellbook', description: '元素師職業魔法 3 級：元素增幅', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
-  { id: 115, name: '強化冷卻縮減技能書', category: 'spellbook', description: '元素師職業魔法 4 級：強化冷卻縮減', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
+  { id: 115, name: '魔法節約技能書', category: 'spellbook', description: '元素師職業魔法 4 級：魔法節約', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 116, name: '元素風暴技能書', category: 'spellbook', description: '元素師職業魔法 7 級：元素風暴', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 117, name: '聖光護盾技能書', category: 'spellbook', description: '牧師職業魔法 1 級：聖光護盾', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 118, name: '精神匯聚技能書', category: 'spellbook', description: '牧師職業魔法 2 級：精神匯聚', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
@@ -222,7 +222,7 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
   { id: 168, name: '魔力湧泉技能書', category: 'spellbook', description: '元素師職業魔法 6 級：魔力湧泉', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 169, name: '血魔轉換技能書', category: 'spellbook', description: '牧師職業魔法 5 級：血魔轉換', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 170, name: '神聖懲擊技能書', category: 'spellbook', description: '牧師職業魔法 6 級：神聖懲擊', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
-  { id: 171, name: '毒霧技能書', category: 'spellbook', description: '盜賊職業魔法 6 級：毒霧', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
+  { id: 171, name: '冰霧技能書', category: 'spellbook', description: '盜賊職業魔法 6 級：冰霧', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
   { id: 172, name: '閃避反擊技能書', category: 'spellbook', description: '盜賊職業魔法 7 級：閃避反擊', weight: 5, icon: 'items/spell-book', iconColor: '#C4B5FD' },
 
   // === 魔法書素材 ===

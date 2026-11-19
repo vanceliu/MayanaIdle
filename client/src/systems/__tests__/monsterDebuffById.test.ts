@@ -14,10 +14,10 @@ import type { ActiveEffect } from '../../models/effect';
 function character(): Character {
   return {
     userId: 1, id: 1, name: '測試', className: 'knight', level: 10, exp: 0, expToNext: 1_000_000,
-    hp: 200, maxHp: 200, mp: 80, maxMp: 80,
+    hp: 200, mp: 80, 
     baseAttributes: { STR: 14, AGI: 14, VIT: 16, SPI: 10, INT: 10, CHA: 12 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 0,
+    gold: 0,
     currentArea: 'dawn-plains', currentZone: 'newbie-neutral', currentRegion: 'dawn-plains', currentFloor: null,
     skills: [], quests: [], areaEnteredAt: 0, createdAt: 0,
   };

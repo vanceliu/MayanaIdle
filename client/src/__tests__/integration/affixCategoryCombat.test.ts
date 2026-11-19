@@ -32,12 +32,12 @@ const NOW = 900_000;
 function knight(): Character {
   return {
     name: 'Tester', className: 'knight', level: 60, exp: 0, expToNext: 100,
-    hp: 1000, maxHp: 1000, mp: 400, maxMp: 400,
+    hp: 1000, mp: 400, 
     baseAttributes: { STR: 20, AGI: 0, VIT: 15, SPI: 10, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null, skills: [],
-    unspentAttributePoints: 0, quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
+    quests: [], areaEnteredAt: NOW, createdAt: NOW, userId: 1,
   };
 }
 
@@ -104,15 +104,6 @@ describe('普攻擴散', () => {
     expect(primary.targetId).toBe('m1');
     expect(others).toHaveLength(1);
     expect(others[0]).toMatchObject({ targetId: 'm2', damage: Math.floor(primary.hits[0].damage * 0.2), isCrit: false, isMiss: false, splash: true });
-  });
-
-  it('雙持一次攻擊兩下，各擴散一次', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const r = attack([weapon([splash(20)], 'dualBlade')], { m1: monster(), m2: monster() });
-    const [primary, spread] = r.damages;
-    expect(primary.hits).toHaveLength(2);
-    expect(spread.hits.map(h => h.damage)).toEqual(primary.hits.map(h => Math.floor(h.damage * 0.2)));
-    expect(spread.damage).toBe(spread.hits.reduce((s, h) => s + h.damage, 0));
   });
 
   it('武器與手套的 X 相加', () => {

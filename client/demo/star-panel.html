@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星盤面板 Demo — MayanaIdle</title>
+<!--
+  星盤接進遊戲的介面確認（`56-star-chart.md`）：底部面板列新增「星盤」按鈕、浮動視窗內的面板、技能說明的等級後綴。
+  面板與 tooltip 用的是遊戲元件（`StarChartPanel`、`SkillTooltipBody`），按鈕與視窗外框套遊戲 CSS。
+  `npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/star-panel.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-h { font-family: var(--font-display); color: var(--accent-gold); font-size: var(--fs-md); margin: 24px 0 8px; }
+.demo-game {
+  position: relative; height: 820px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: repeating-linear-gradient(45deg, var(--bg-inset) 0 24px, var(--bg-panel) 24px 48px); overflow: hidden;
+}
+.demo-game .panel-dock { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); }
+.demo-game .floating-window { position: absolute; left: 24px; top: 16px; }
+.panel-dock-btn.is-new { outline: 2px dashed var(--accent-gold); outline-offset: 2px; }
+.demo-tips { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-tips .skill-tooltip { position: static; }
+.demo-skill-cells { display: grid; grid-template-columns: repeat(7, 72px); gap: 4px; }
+
+@media (max-width: 720px) {
+  body { padding: 16px; }
+  .demo-game { height: auto; min-height: 820px; }
+  .demo-game .floating-window { left: 0; right: 0; top: 0; width: auto !important; }
+}
+</style>
+</head>
+<body>
+  <h1 class="demo-title">星盤面板（接進遊戲前的介面確認）</h1>
+  <p class="demo-note">
+    底部面板列新增「星盤」按鈕（虛線框），點了開關浮動視窗。視窗內：上方點數列與「全部重置」、左邊盤面、右邊加成合計。<br>
+    配點與取消都先是草稿（新增的節點青框、要退回的已點節點紅色虛框），可以隨意改；按「還原」放棄、按「確認」送出。
+    只有新增時直接送出；有退回已點節點時先跳視窗確認洗點費。示範角色：騎士 Lv75。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./starPanelDemo.tsx"></script>
+</body>
+</html>

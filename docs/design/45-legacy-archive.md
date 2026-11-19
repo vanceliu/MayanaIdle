@@ -19,6 +19,7 @@
 | 清空 | 角色、個人倉庫、帳號倉庫、公會、信箱、競技場、統計與排行榜、交易掛單 |
 | 保留 | 帳號（登入、救援碼、設定）與 `legacy_archives` |
 | 角色名稱 | 清空後可重新使用 |
+| 季數 | 每次封存標一個季數；星盤大改版封存的是 Season 0，之後每次換季再封存一次，季數遞增 |
 
 快照是**純文字**（JSON 字串），與遊玩中的資料結構完全脫鉤。
 日後改動 `Character`、`EquipmentInstance` 等型別都不會弄壞既有的遺產紀錄。
@@ -31,12 +32,13 @@
 
 | 區塊 | 來源 |
 |---|---|
-| 角色資料 | `characters.data` 整份原樣保存（基本資料、外觀、屬性、技能、任務、統計、自動腳本等；日後新增的欄位自動涵蓋） |
+| 角色資料 | `characters.data` 整份原樣保存（基本資料、外觀、屬性、星盤、技能、任務、自動腳本等；日後新增的欄位自動涵蓋） |
 | 裝備 | `equipment_instances`：裝備欄、背包、個人倉庫內的裝備實例 |
 | 背包 | `character_bag` |
 | 個人倉庫 | `warehouses`（個人） |
 | 天賦 | `talent_slots` |
 | 信箱 | `mailbox`（含未領附件） |
+| 角色偏好 | `character_prefs`（統計、技能結晶、競技場槽等） |
 | 公會 | 所屬公會名稱與職位 |
 | 競技場 | `arena_records` |
 | 版本 | 封存時的 server schema 版本與封存時間 |
@@ -48,7 +50,7 @@
 | `sharedWarehouse` | 該帳號 | 帳號倉庫道具、裝備、倉庫金幣（`warehouse_gold`） |
 | `guild` | 會長的帳號 | 公會名稱、建立時間、成員名單、公會倉庫道具／裝備／金幣 |
 
-不封存：`character_prefs`、`bag_layouts`、`talent_bag_layouts` 等介面設定。
+不封存：`bag_layouts`、`talent_bag_layouts` 等純介面排列。
 
 ### 資料結構
 
@@ -63,6 +65,8 @@ interface LegacyArchive {
   level?: number;
   /** 封存時的 server schema 版本 */
   dataVersion: number;
+  /** 被封存的那一季（Season N） */
+  season: number;
   archivedAt: number;
   /** JSON 字串，結構見 § 45.2 */
   payload: string;
@@ -89,7 +93,7 @@ interface LegacyArchive {
 
 ### 顯示
 
-- 列表：依封存時間排序，顯示名稱、職業、等級、封存時間、資料版本
+- 列表：上方季別下拉選單（`Season N`，預設最新一季），一次只列該季的紀錄；卡片顯示名稱、類型、職業、等級、封存日期；資料版本不顯示
 - 詳細：展開後顯示 § 45.2 的所有區塊
 - 快照缺少的欄位（封存時該版本尚未有此欄位）顯示為 `—`，不可顯示 0 或猜測值
 

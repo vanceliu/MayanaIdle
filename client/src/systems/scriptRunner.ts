@@ -3,6 +3,7 @@ import type {
   PersistentRule, PersistentCondition, PersistentAction, EmergencyRetreat,
   ScriptDebuffCondition,
 } from '../models/scriptEngine';
+import { getMaxHp, getMaxMp } from './maxHpMp';
 import type { MonsterAffixId } from '../models/monsterAffix';
 import { SCRIPT_DEBUFF_TYPES, DEFAULT_NEAR_SELF_RADIUS } from '../models/scriptEngine';
 import type { MapData, Position } from '../models/mapControl';
@@ -56,9 +57,9 @@ export interface CombatScriptContext {
   activeEffects?: ActiveEffect[];
   /** `weight_over` 用：當前負重百分比 */
   weightPercent?: number;
-  /** `hp_below`／`hp_above` 用的有效上限，未帶時退回 `character.maxHp` */
+  /** `hp_below`／`hp_above` 用的有效上限，未帶時退回不含裝備的公式值（`maxHpMp.ts`） */
   effectiveMaxHp?: number;
-  /** `mp_below`／`mp_above` 用的有效上限，未帶時退回 `character.maxMp` */
+  /** `mp_below`／`mp_above` 用的有效上限，未帶時退回不含裝備的公式值 */
   effectiveMaxMp?: number;
   /** `hp_dropped_recently` 用：短期 HP 取樣 */
   hpHistory?: HpSample[];
@@ -184,8 +185,7 @@ function checkCombatCondition(
   ctx: CombatScriptContext,
 ): boolean {
   const { skills, now } = ctx;
-  const maxMp = ctx.effectiveMaxMp ?? ctx.character.maxMp;
-  const mpPercent = maxMp > 0 ? (ctx.character.mp / maxMp) * 100 : 100;
+  const mpPercent = (): number => { const maxMp = maxMpOf(ctx); return maxMp > 0 ? (ctx.character.mp / maxMp) * 100 : 100; };
 
   switch (condition.type) {
     case 'always':
@@ -228,9 +228,9 @@ function checkCombatCondition(
       return (target.instance.currentHp / target.instance.maxHp) * 100 > (condition.value ?? 50);
     }
     case 'mp_above':
-      return mpPercent > (condition.value ?? 0);
+      return mpPercent() > (condition.value ?? 0);
     case 'mp_below':
-      return mpPercent < (condition.value ?? 0);
+      return mpPercent() < (condition.value ?? 0);
     case 'skill_ready': {
       const skill = skills.find(s => s.id === condition.skillId);
       if (!skill) return false;
@@ -242,7 +242,7 @@ function checkCombatCondition(
     // === 共用條件（§ 51.4.5）===
     case 'hp_below':
     case 'hp_above': {
-      const maxHp = ctx.effectiveMaxHp ?? ctx.character.maxHp;
+      const maxHp = maxHpOf(ctx);
       const pct = maxHp > 0 ? (ctx.character.hp / maxHp) * 100 : 100;
       return condition.type === 'hp_below'
         ? pct < (condition.value ?? 0)
@@ -498,22 +498,20 @@ export function evaluatePersistentScript(rules: PersistentRule[], ctx: Persisten
 
 function checkPersistentCondition(condition: PersistentCondition, ctx: PersistentScriptContext): boolean {
   const { character, skills, now, activeEffects } = ctx;
-  const maxHp = ctx.effectiveMaxHp ?? character.maxHp;
-  const maxMp = ctx.effectiveMaxMp ?? character.maxMp;
-  const hpPercent = (character.hp / maxHp) * 100;
-  const mpPercent = maxMp > 0 ? (character.mp / maxMp) * 100 : 100;
+  const hpPercent = (): number => (character.hp / maxHpOf(ctx)) * 100;
+  const mpPercent = (): number => { const maxMp = maxMpOf(ctx); return maxMp > 0 ? (character.mp / maxMp) * 100 : 100; };
 
   switch (condition.type) {
     case 'always':
       return true;
     case 'hp_below':
-      return hpPercent < (condition.value ?? 0);
+      return hpPercent() < (condition.value ?? 0);
     case 'hp_above':
-      return hpPercent > (condition.value ?? 0);
+      return hpPercent() > (condition.value ?? 0);
     case 'mp_below':
-      return mpPercent < (condition.value ?? 0);
+      return mpPercent() < (condition.value ?? 0);
     case 'mp_above':
-      return mpPercent > (condition.value ?? 0);
+      return mpPercent() > (condition.value ?? 0);
     case 'buff_not_active':
       return isSelfBuffExpired(condition.skillId, skills, activeEffects, now);
     case 'speed_not_active':
@@ -590,8 +588,8 @@ function isPotionReady(ctx: PersistentScriptContext): boolean {
 function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScriptContext): boolean {
   switch (action.type) {
     case 'potion': {
-      // 有效上限含裝備加血；用基礎 maxHp 的話有加血裝就永遠判定為滿血
-      if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
+      // 有效上限含裝備加血
+      if (ctx.character.hp >= (maxHpOf(ctx))) return false;
       const { potionType } = action;
       if (!potionType) return false;
       // 冷卻中不算可執行
@@ -611,7 +609,7 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'heal_skill': {
-      if (ctx.character.hp >= (ctx.effectiveMaxHp ?? ctx.character.maxHp)) return false;
+      if (ctx.character.hp >= (maxHpOf(ctx))) return false;
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (skill?.type !== 'heal') return false;
       if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
@@ -639,7 +637,7 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       const { potionType } = action;
       if (!potionType) return false;
       if (!isPotionReady(ctx)) return false;
-      const maxHp = ctx.effectiveMaxHp ?? ctx.character.maxHp;
+      const maxHp = maxHpOf(ctx);
       if ((ctx.character.hp / maxHp) * 100 >= (action.value ?? 0)) return false;
       return getPotionCount(ctx.bagItems, potionType) > 0;
     }
@@ -677,7 +675,7 @@ export function evaluateEmergencyRetreat(retreat: EmergencyRetreat, ctx: Emergen
   if (!retreat.enabled) return null;
   if (!ctx.inCombat) return null;
 
-  const maxHp = ctx.effectiveMaxHp ?? ctx.character.maxHp;
+  const maxHp = maxHpOf(ctx);
   const hpPercent = (ctx.character.hp / maxHp) * 100;
   if (hpPercent >= retreat.hpThreshold) return null;
 
@@ -706,6 +704,9 @@ export interface ScriptContext {
   cooldownReduction?: number;
 }
 
+const maxHpOf = (ctx: { character: Character; effectiveMaxHp?: number }): number => ctx.effectiveMaxHp ?? getMaxHp(ctx.character, []);
+const maxMpOf = (ctx: { character: Character; effectiveMaxMp?: number }): number => ctx.effectiveMaxMp ?? getMaxMp(ctx.character, []);
+
 export function evaluateScript(rules: ScriptRule[], ctx: ScriptContext): ScriptAction | null {
   for (const rule of rules) {
     if (!rule.enabled) continue;
@@ -721,20 +722,20 @@ export function evaluateScript(rules: ScriptRule[], ctx: ScriptContext): ScriptA
 function checkLegacyCondition(rule: ScriptRule, ctx: ScriptContext): boolean {
   const { condition } = rule;
   const { character, monsters, skills, now } = ctx;
-  const hpPercent = (character.hp / character.maxHp) * 100;
-  const mpPercent = character.maxMp > 0 ? (character.mp / character.maxMp) * 100 : 100;
+  const hpPercent = (): number => (character.hp / maxHpOf(ctx)) * 100;
+  const mpPercent = (): number => { const maxMp = maxMpOf(ctx); return maxMp > 0 ? (character.mp / maxMp) * 100 : 100; };
 
   switch (condition.type) {
     case 'always':
       return true;
     case 'hp_below':
-      return hpPercent < (condition.value ?? 0);
+      return hpPercent() < (condition.value ?? 0);
     case 'hp_above':
-      return hpPercent > (condition.value ?? 0);
+      return hpPercent() > (condition.value ?? 0);
     case 'mp_below':
-      return mpPercent < (condition.value ?? 0);
+      return mpPercent() < (condition.value ?? 0);
     case 'mp_above':
-      return mpPercent > (condition.value ?? 0);
+      return mpPercent() > (condition.value ?? 0);
     case 'monster_count_gte':
       return monsters.filter(m => m.currentHp > 0).length >= (condition.value ?? 1);
     case 'monster_hp_below': {
@@ -763,7 +764,7 @@ function canExecuteLegacyAction(action: ScriptAction, ctx: ScriptContext): boole
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'potion': {
-      if (ctx.character.hp >= ctx.character.maxHp) return false;
+      if (ctx.character.hp >= maxHpOf(ctx)) return false;
       const { potionType } = action;
       if (!potionType) return false;
       return getPotionCount(ctx.bagItems, potionType) > 0;

@@ -7,7 +7,7 @@ import type { MonsterInstance } from '../../models/monster';
 import type { CombatRule } from '../../models/scriptEngine';
 import type { Skill } from '../../models/skill';
 import { CLASS_BASE_ATTRIBUTES } from '../../models/character';
-import { INITIAL_HP, getExpToNextLevel } from '../../systems/levelUp';
+import { getExpToNextLevel } from '../../systems/levelUp';
 
 function createCharacter(overrides: Partial<Character> = {}): Character {
   const base = CLASS_BASE_ATTRIBUTES['elementalist'];
@@ -17,10 +17,8 @@ function createCharacter(overrides: Partial<Character> = {}): Character {
     level: 10,
     exp: 0,
     expToNext: getExpToNextLevel(10),
-    hp: INITIAL_HP,
-    maxHp: INITIAL_HP,
+    hp: 30,
     mp: 100,
-    maxMp: 100,
     baseAttributes: { ...base },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 10, CHA: 0 },
     gold: 0,
@@ -29,7 +27,6 @@ function createCharacter(overrides: Partial<Character> = {}): Character {
     currentRegion: 'dawn-plains',
     currentFloor: null,
     skills: [],
-    unspentAttributePoints: 0,
     quests: [],
     areaEnteredAt: Date.now(),
     createdAt: Date.now(),

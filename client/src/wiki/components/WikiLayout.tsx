@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { path: '/wiki/maps', label: '地圖' },
   { path: '/wiki/items', label: '道具' },
   { path: '/wiki/skills', label: '技能' },
+  { path: '/wiki/star-chart', label: '星盤' },
   { path: '/wiki/crafting', label: '鐵匠鋪' },
   { path: '/wiki/exp-table', label: '經驗表' },
   { path: '/wiki/attributes', label: '屬性公式' },

@@ -12,11 +12,11 @@ vi.mock('../GameIcon', () => ({
 
 function knight(): Character {
   return {
-    name: 'T', className: 'knight', level: 60, exp: 0, expToNext: 1, hp: 100, maxHp: 100, mp: 10, maxMp: 10,
+    name: 'T', className: 'knight', level: 60, exp: 0, expToNext: 1, hp: 100, mp: 10, 
     baseAttributes: { STR: 30, AGI: 30, VIT: 30, SPI: 30, INT: 30, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
     gold: 0, currentArea: 'dawn-plains', currentZone: 'newbie-neutral', currentRegion: 'dawn-plains',
-    currentFloor: null, skills: [], unspentAttributePoints: 0, quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
+    currentFloor: null, skills: [], quests: [], areaEnteredAt: 0, createdAt: 0, userId: 1,
   };
 }
 

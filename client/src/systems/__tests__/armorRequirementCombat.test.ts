@@ -16,8 +16,8 @@ const attrs = (p: Partial<Attributes> = {}): Attributes =>
 function character(over: Partial<Attributes> = {}): Character {
   return {
     id: 1, userId: 1, name: 'T', className: 'knight', level: 50, exp: 0, expToNext: 0,
-    hp: 100, maxHp: 100, mp: 50, maxMp: 50,
-    baseAttributes: attrs(over), bonusAttributes: attrs(), unspentAttributePoints: 0,
+    hp: 100, mp: 50,
+    baseAttributes: attrs(over), bonusAttributes: attrs(),
   } as Character;
 }
 

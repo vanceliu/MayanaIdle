@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遺產頁 Demo — MayanaIdle</title>
+<!--
+  遺產系統（`45-legacy-archive.md` § 45.3）的介面確認：角色選擇畫面的入口與唯讀遺產頁。
+  遺產頁用遊戲元件 `LegacyArchivePage`，資料為示範用快照。
+  `npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/legacy.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+@media (max-width: 720px) { body { padding: 12px; } }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">遺產頁（介面確認）</h1>
+  <p class="demo-note">
+    角色選擇畫面在角色卡下方加「遺產（N 筆）」入口，只在帳號有紀錄時出現。點進去是唯讀遺產頁：左邊列表、右邊詳細內容，只能返回或刪除單筆。<br>
+    示範資料：Season 0（這次星盤改版封存）兩隻角色、帳號倉庫、一個公會；Season 1 為假設的下一次換季封存，示範多季時的樣子。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./legacyDemo.tsx"></script>
+</body>
+</html>

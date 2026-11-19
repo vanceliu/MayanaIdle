@@ -18,10 +18,10 @@ import type { MonsterInstance } from '../../models/monster';
 function char(int: number): Character {
   return {
     userId: 1, name: 'T', className: 'priest', level: 50, exp: 0, expToNext: 100,
-    hp: 1, maxHp: 9999, mp: 999, maxMp: 999,
+    hp: 1, mp: 999, 
     baseAttributes: { STR: 1, AGI: 1, VIT: 1, SPI: 1, INT: int, CHA: 1 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 0,
+    gold: 0,
     currentArea: 'dawn-plains', currentZone: 'newbie-neutral',
     currentRegion: 'dawn-plains', currentFloor: null,
     skills: [], quests: [], areaEnteredAt: 0, createdAt: 0,

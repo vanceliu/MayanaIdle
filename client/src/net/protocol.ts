@@ -2,6 +2,7 @@
  * client 與 server 共用的 WebSocket 訊息（JSON）。版本協商見 `97-selfhosted-server.md` § 97.2。
  * 唯一出處；server 以相對路徑引用。
  */
+import type { LegacyArchive, LegacyArchiveSummary } from '../models/legacyArchive';
 import type { MonsterSize } from '../models/monster';
 import type { MonsterAffixId, VenomDebuff } from '../models/monsterAffix';
 import type { TrainingDummySpec } from '../models/trainingGround';
@@ -52,6 +53,10 @@ export type ClientMessage =
   | { t: 'action'; id?: number; store: ActionStore; name: string; args?: unknown[] }
   /** 本服排行榜 snapshot（`37-statistics.md` § 37.4）；`top` 預設 20、上限 100 */
   | { t: 'leaderboard'; id?: number; top?: number }
+  /** 遺產系統（`45-legacy-archive.md` § 45.3）：只能讀、刪自己帳號的紀錄 */
+  | { t: 'legacy_list'; id?: number }
+  | { t: 'legacy_get'; id?: number; archiveId: number }
+  | { t: 'legacy_delete'; id?: number; archiveId: number }
   | { t: 'arena_ranking'; id?: number; query: ArenaRankingQuery };
 
 /**
@@ -82,6 +87,9 @@ export type ServerMessage =
   | { t: 'action_ok'; id: number; result: unknown }
   | { t: 'chat'; message: ChatMessageView }
   | { t: 'leaderboard'; id?: number; snapshot: LeaderboardSnapshotView }
+  | { t: 'legacy_list'; id?: number; items: LegacyArchiveSummary[] }
+  | { t: 'legacy_detail'; id?: number; archive: LegacyArchive | null }
+  | { t: 'legacy_deleted'; id?: number; ok: boolean }
   | { t: 'arena_ranking'; id?: number; rows: ArenaRankingRow[] }
   /** server 公告（`97-selfhosted-server.md` § 97.8）：關服倒數這類全服訊息，不走聊天頻道 */
   | { t: 'notice'; text: string }
@@ -189,12 +197,13 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'discardBagItem', 'sellBagItems', 'buyBagItems', 'sellEquipmentInstances',
     'depositToWarehouse', 'withdrawFromWarehouse', 'depositWarehouseGold', 'withdrawWarehouseGold',
     'discardInventoryItem', 'requestDiscard', 'requestDiscardBatch', 'cancelDiscard', 'confirmDiscard', 'confirmDiscardBatch',
-    'spendAttributePoint', 'acceptQuest', 'completeQuest',
+    'acceptQuest', 'completeQuest',
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
     'ensureBountyBoards', 'signBounty', 'abandonBounty', 'setBountyCompare',
     'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'exchangeArenaBox', 'openArenaBox', 'applyAbilityCrystal', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
     'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
+    'applyStarChart',
     'setAfterCombatThreshold',
   ]),
   mapControl: new Set(['moveToTarget', 'setAutoMove']),

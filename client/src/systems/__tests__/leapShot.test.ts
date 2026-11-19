@@ -25,10 +25,10 @@ const MAP: MapData = {
 function character(): Character {
   return {
     userId: 1, id: 1, name: '測試', className: 'elf', level: 60,
-    exp: 0, expToNext: 1_000_000, hp: 500, maxHp: 500, mp: 100, maxMp: 100,
+    exp: 0, expToNext: 1_000_000, hp: 500, mp: 100, 
     baseAttributes: { STR: 12, AGI: 25, VIT: 14, SPI: 12, INT: 10, CHA: 10 },
     bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 },
-    unspentAttributePoints: 0, gold: 0,
+    gold: 0,
     currentArea: 'dawn-plains', currentZone: 'newbie-neutral', currentRegion: 'dawn-plains', currentFloor: null,
     skills: [], quests: [], areaEnteredAt: 0, createdAt: 0,
   };

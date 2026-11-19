@@ -77,7 +77,7 @@ describe('rollClassSkillBookDrops', () => {
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0).mockReturnValueOnce(0.99)
       .mockReturnValueOnce(0).mockReturnValueOnce(0.99);
-    expect(rollClassSkillBookDrops(63, true)).toEqual(ids('毒霧技能書', '閃避反擊技能書'));
+    expect(rollClassSkillBookDrops(63, true)).toEqual(ids('冰霧技能書', '閃避反擊技能書'));
   });
 
   it('掉寶倍率作用在一般怪', () => {
