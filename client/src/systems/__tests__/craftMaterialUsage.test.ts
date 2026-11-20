@@ -12,6 +12,9 @@ import { ITEM_DEFINITIONS } from '../../db/seed/itemSeeds';
 import { isArmorEquipment, isOffhandDefenseType } from '../../models/equipment';
 import { SIGIL_DEFINITIONS, SIGIL_USAGE_LABEL } from '../../models/sigil';
 import { getItemId } from '../../models/items';
+import { ARENA_TIERS } from '../../models/arena';
+import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES } from '../../models/magicAcademy';
+import { QUEST_MATERIAL_NAME } from '../../models/quest';
 
 /** 測試以名稱閱讀，實際傳的是 id */
 const id = (name: string) => getItemId(name)!;
@@ -120,18 +123,55 @@ describe('印記師用的印記是不進配方的例外', () => {
   });
 });
 
+describe('裝備配方以外的用途（`30-items.md` § 製作用途標記）', () => {
+  it('已開放段位的競技場入場材料都算有用途，標出所屬段位', () => {
+    for (const spec of ARENA_TIERS.filter(t => t.open)) {
+      for (const name of spec.materials) {
+        expect(hasMaterialUsage(id(name)), name).toBe(true);
+        expect(formatMaterialUsage(id(name)), name).toMatch(new RegExp(`^競技場 (T\\d／)*T${spec.tier}(／T\\d)* 入場$`));
+      }
+    }
+  });
+
+  it('跨段位的 Boss 素材列出所有已開放段位，未開放段位不列', () => {
+    expect(formatMaterialUsage(id('殭屍王心臟'))).toBe('競技場 T5／T6 入場');
+    expect(formatMaterialUsage(id('死神碎魂'))).toBe('競技場 T6 入場');
+  });
+
+  it('Boss 專屬素材（iconTier 6／7）全部有用途', () => {
+    const bossMaterials = ITEM_DEFINITIONS.filter(d => d.category === 'material' && (d.iconTier ?? 0) >= 6);
+    expect(bossMaterials.length).toBe(17);
+    expect(bossMaterials.filter(d => !hasMaterialUsage(d.id)).map(d => d.name)).toEqual([]);
+  });
+
+  it('魔法學院配方的碎片與材料都算有用途', () => {
+    for (const itemId of [SPELLBOOK_FRAGMENT_ID, ...SPELLBOOK_RECIPES.map(r => r.materialItemId)]) {
+      expect(hasMaterialUsage(itemId), String(itemId)).toBe(true);
+      expect(formatMaterialUsage(itemId), String(itemId)).toContain('魔法學院合成魔法書');
+    }
+  });
+
+  it('魔法書碎片同時列出配方與魔法學院', () => {
+    expect(formatMaterialUsage(SPELLBOOK_FRAGMENT_ID)).toBe('T4 配方、魔法學院合成魔法書');
+  });
+
+  it('任務素材標為職業任務', () => {
+    expect(hasMaterialUsage(id(QUEST_MATERIAL_NAME))).toBe(true);
+    expect(formatMaterialUsage(id(QUEST_MATERIAL_NAME))).toBe('冒險者工會職業任務');
+  });
+});
+
 describe('用途與 iconTier 是兩個獨立維度', () => {
-  it('同一個 iconTier 底下同時存在有用途與無用途的素材', () => {
-    const byTier = new Map<number, { craft: number; noCraft: number }>();
+  it('同一個 iconTier 底下的用途不只一種', () => {
+    const byTier = new Map<number, Set<string>>();
     for (const def of ITEM_DEFINITIONS) {
       if (def.category !== 'material' || !def.iconTier) continue;
-      const acc = byTier.get(def.iconTier) ?? { craft: 0, noCraft: 0 };
-      if (hasMaterialUsage(def.id)) acc.craft++;
-      else acc.noCraft++;
-      byTier.set(def.iconTier, acc);
+      const labels = byTier.get(def.iconTier) ?? new Set<string>();
+      labels.add(formatMaterialUsage(def.id));
+      byTier.set(def.iconTier, labels);
     }
-    // 若某個 tier 只會是其中一種，顏色就能推出用途，這個維度也就沒必要存在
-    const mixed = [...byTier.values()].filter(v => v.craft > 0 && v.noCraft > 0);
+    // 若每個 tier 只對應一種用途，顏色就能推出用途，這個維度也就沒必要存在
+    const mixed = [...byTier.values()].filter(labels => labels.size > 1);
     expect(mixed.length).toBeGreaterThan(0);
   });
 });

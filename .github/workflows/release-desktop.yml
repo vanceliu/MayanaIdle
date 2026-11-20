@@ -100,7 +100,7 @@ jobs:
             case "$GITHUB_REF_NAME" in desktop-*-*) prerelease="--prerelease" ;; esac
             gh release create "$GITHUB_REF_NAME" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "桌面版 ${GITHUB_REF_NAME#desktop-}" \
+              --title "desktop ${GITHUB_REF_NAME#desktop-}" \
               --generate-notes --latest=false $prerelease
           fi
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*/*

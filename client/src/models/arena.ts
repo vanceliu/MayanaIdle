@@ -2,6 +2,7 @@
  * 競技場（`55-arena.md`）：段位、入場條件、波次、怪物池、王順序、票券場時段。
  */
 import { MONSTER_SEEDS } from '../db/seed';
+import { latestGameHourAt, nextGameHourAt } from './gameClock';
 import { getItemId } from './items';
 import type { MonsterTemplate } from './monster';
 
@@ -109,21 +110,19 @@ export function arenaNormalPool(spec: ArenaTierSpec): MonsterTemplate[] {
   return MONSTER_SEEDS.filter(m => !m.isBoss && spec.normalPool(m));
 }
 
-/** § 55.4：票券場每 3 小時重置（server 當地時間 00:00、03:00…21:00） */
+/** § 55.4：票券場每 3 小時重置（遊戲時間 UTC+8 的 00:00、03:00…21:00） */
 export const ARENA_SLOT_HOURS = 3;
+
+const ARENA_SLOT_START_HOURS = Array.from({ length: 24 / ARENA_SLOT_HOURS }, (_, i) => i * ARENA_SLOT_HOURS);
 
 /** 不晚於 `now` 的票券場時段起點（毫秒） */
 export function arenaSlotStart(now: number): number {
-  const d = new Date(now);
-  d.setHours(Math.floor(d.getHours() / ARENA_SLOT_HOURS) * ARENA_SLOT_HOURS, 0, 0, 0);
-  return d.getTime();
+  return latestGameHourAt(now, ARENA_SLOT_START_HOURS);
 }
 
 /** `now` 之後的下一個時段起點（毫秒） */
 export function nextArenaSlotStart(now: number): number {
-  const d = new Date(arenaSlotStart(now));
-  d.setHours(d.getHours() + ARENA_SLOT_HOURS);
-  return d.getTime();
+  return nextGameHourAt(now, ARENA_SLOT_START_HOURS);
 }
 
 /** § 55.5：死亡收回本場票券的一半，無條件捨去 */

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore } from '../../stores/partyStore';
 import type { QuestTownId } from '../../models/adventurerQuest';
+import { formatGameTime } from '../../models/gameClock';
 import {
   getBountyAreaName, getBountyPrice, getBountySignBlock, getBountyTotalPrice, nextBountyRefreshAt,
   BOUNTY_SIGN_BLOCK_TEXT, MAX_SIGNED_BOUNTIES,
@@ -142,11 +143,6 @@ function CompareSettings({ onBack }: { onBack: () => void }) {
   );
 }
 
-function formatRefreshTime(at: number): string {
-  const d = new Date(at);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
 /** 冒險者工會「懸賞」分頁（`53-bounty-contract.md` § 53.7） */
 export function BountyTab({ townId, townName }: { townId: QuestTownId; townName: string }) {
   const boards = useGameStore(s => s.bountyBoards);
@@ -188,7 +184,7 @@ export function BountyTab({ townId, townName }: { townId: QuestTownId; townName:
         <div className="shop-tabs panel-sticky">
           <span className="quest-town-label">{townName}分部</span>
           <button onClick={() => setView('settings')}>比較設定</button>
-          <span className="bounty-next-refresh">下次更新 {formatRefreshTime(nextRefresh)}</span>
+          <span className="bounty-next-refresh">下次更新 {formatGameTime(nextRefresh)}</span>
         </div>
         <p className="bounty-hint">{BOUNTY_SOLO_HINT}</p>
         <div className="shop-items">

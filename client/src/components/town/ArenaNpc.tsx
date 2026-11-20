@@ -2,11 +2,12 @@
  * 城鎮競技場 NPC（`55-arena.md`）：入場（§ 55.1／§ 55.4／§ 55.5）與票券兌換（§ 55.9）。
  * 進場判定與扣費在 server（`arena.enter`）；這裡只顯示條件與送出。
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore } from '../../stores/partyStore';
 import { useTownStore } from '../../stores/townStore';
 import { getBagItemAmount } from '../../models/bagItem';
+import { formatGameTime } from '../../models/gameClock';
 import { getItemById } from '../../models/items';
 import {
   ARENA_MATERIAL_COST, ARENA_TIERS, arenaGoldCost, arenaMaterialIds, arenaWaveSize, isArenaSlotUsed,
@@ -19,10 +20,6 @@ import { GameIcon } from '../GameIcon';
 interface EnterResult { ok: boolean; message?: string }
 
 const BOX_DESC = '1/2 機率為 (擬) 擬態品（4 條詞綴＋封印詞綴、武器與飾品必帶隨機技能，不可修改、不可拆）';
-
-function formatHour(ms: number): string {
-  return `${String(new Date(ms).getHours()).padStart(2, '0')}:00`;
-}
 
 function TierCard({ spec, usedSlot, blockReason, onEnter, busy }: {
   spec: ArenaTierSpec; usedSlot: boolean; blockReason: string | null; onEnter: (tier: ArenaTier) => void; busy: boolean;
@@ -65,10 +62,14 @@ function EnterTab() {
   const closeFacility = useTownStore(s => s.closeFacility);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // 票券場時段以遊戲時間計算（§ 55.4），與 server `ArenaRegistry.enter` 相同；停在頁面上跨過時段起點時更新
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(1000, nextArenaSlotStart(now) - now + 1000));
+    return () => clearTimeout(timer);
+  }, [now]);
   if (!char) return null;
 
-  // 票券場時段是 wall clock（§ 55.4），與 server `ArenaRegistry.enter` 相同
-  const now = Date.now();
   const members = party ? party.members.filter(m => m.online) : [];
   const size = Math.max(1, members.length);
   const notLeader = party != null && party.leaderId !== char.id;
@@ -99,7 +100,7 @@ function EnterTab() {
       <div className="adventurer-guild-status">
         <span>金幣：{char.gold.toLocaleString()}G</span>
         <span>{party ? `組隊 ${size} 人（隊長付費）` : '單人'}</span>
-        <span className="bounty-next-refresh">票券場下次重置 {formatHour(nextArenaSlotStart(now))}</span>
+        <span className="bounty-next-refresh">票券場下次重置 {formatGameTime(nextArenaSlotStart(now))}</span>
       </div>
       <p className="arena-wave-note">
         回城卷軸撤退：票券全留；死亡：收回本場票券的一半（無條件捨去）。<br />

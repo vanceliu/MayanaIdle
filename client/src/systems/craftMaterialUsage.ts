@@ -1,5 +1,9 @@
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
+import { ARENA_TIERS, arenaMaterialIds } from '../models/arena';
 import { isArmorEquipment } from '../models/equipment';
+import { getItemId } from '../models/items';
+import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES } from '../models/magicAcademy';
+import { QUEST_MATERIAL_NAME } from '../models/quest';
 import { SIGIL_DEFINITIONS, SIGIL_USAGE_LABEL } from '../models/sigil';
 
 /**
@@ -55,41 +59,64 @@ const USAGE_MAP: Map<number, CraftUsage> = (() => {
 })();
 
 /**
- * 不進裝備配方、但仍有用途的道具 —— 目前就是八種印記（`46-sigil.md` § 46.2）。
- *
- * 只看配方會把它們標成純販售，所以背包的 ⚒ 記號與 Wiki 的「用途」欄都要靠這張表。
- * **由 `SIGIL_DEFINITIONS` 反查，不手寫 id** —— 之前手寫時只列了工藝與精鍊，
- * 另外四種印記在背包裡就少了用途標記。
+ * 裝備配方以外的用途（`30-items.md` § 製作用途標記）：印記師加工、競技場入場、
+ * 魔法學院合成、職業任務。**各自由來源資料反查，不手寫 id**。
+ * 一個道具可同時有多種用途（魔法書碎片兼進 T4 配方）。
  */
-const SPECIAL_USE_MATERIALS: Record<number, string> = Object.fromEntries(
-  SIGIL_DEFINITIONS.map(d => [d.itemId, SIGIL_USAGE_LABEL[d.type]]),
-);
+const SPECIAL_USES: Map<number, string[]> = (() => {
+  const uses = new Map<number, string[]>();
+  const add = (itemId: number, label: string) => {
+    const list = uses.get(itemId);
+    if (!list) uses.set(itemId, [label]);
+    else if (!list.includes(label)) list.push(label);
+  };
+
+  for (const d of SIGIL_DEFINITIONS) add(d.itemId, SIGIL_USAGE_LABEL[d.type]);
+
+  const arenaTiers = new Map<number, number[]>();
+  for (const spec of ARENA_TIERS) {
+    if (!spec.open) continue;
+    for (const itemId of arenaMaterialIds(spec)) arenaTiers.set(itemId, [...(arenaTiers.get(itemId) ?? []), spec.tier]);
+  }
+  for (const [itemId, tiers] of arenaTiers) add(itemId, `競技場 ${tiers.map(t => `T${t}`).join('／')} 入場`);
+
+  for (const id of [SPELLBOOK_FRAGMENT_ID, ...SPELLBOOK_RECIPES.map(r => r.materialItemId)]) add(id, '魔法學院合成魔法書');
+
+  const questMaterialId = getItemId(QUEST_MATERIAL_NAME);
+  if (questMaterialId == null) throw new Error(`任務素材不存在：${QUEST_MATERIAL_NAME}`);
+  add(questMaterialId, '冒險者工會職業任務');
+
+  return uses;
+})();
 
 export function getCraftUsage(itemId: number): CraftUsage | undefined {
   return USAGE_MAP.get(itemId);
 }
 
-/** 進得了裝備配方（不含印記，那些請用 `hasMaterialUsage`） */
+/** 進得了裝備配方（不含其他用途，那些請用 `hasMaterialUsage`） */
 export function hasCraftUsage(itemId: number): boolean {
   return USAGE_MAP.has(itemId);
 }
 
 /**
- * 有任何用途（裝備配方或印記師的加工）——「不該被批量賣掉」的判定一律用這個，
+ * 有任何用途（裝備配方或 `SPECIAL_USES`）——「不該被批量賣掉」的判定一律用這個，
  * 而不是 `hasCraftUsage`。
  */
 export function hasMaterialUsage(itemId: number): boolean {
-  return USAGE_MAP.has(itemId) || itemId in SPECIAL_USE_MATERIALS;
+  return USAGE_MAP.has(itemId) || SPECIAL_USES.has(itemId);
 }
 
 /**
- * 「T4／T5 配方」／「印記師詞綴升階」／空字串（純販售）。
+ * 「T4／T5 配方」／「競技場 T5／T6 入場」／多種用途以「、」串接／空字串（純販售）。
  * UI 一律用這個，避免各處自己拼字串。
  */
 export function formatMaterialUsage(itemId: number): string {
   const usage = USAGE_MAP.get(itemId);
-  if (usage) return `${usage.tiers.map(t => `T${t}`).join('／')} 配方`;
-  return SPECIAL_USE_MATERIALS[itemId] ?? '';
+  const labels = [
+    ...(usage ? [`${usage.tiers.map(t => `T${t}`).join('／')} 配方`] : []),
+    ...(SPECIAL_USES.get(itemId) ?? []),
+  ];
+  return labels.join('、');
 }
 
 /** 目前所有進得了裝備配方的素材 id（測試用） */
@@ -97,7 +124,7 @@ export function getCraftMaterialIds(): number[] {
   return [...USAGE_MAP.keys()];
 }
 
-/** 所有有用途的素材 id（配方 + 印記師加工） */
+/** 所有有用途的道具 id（配方 + `SPECIAL_USES`） */
 export function getUsefulMaterialIds(): number[] {
-  return [...new Set([...USAGE_MAP.keys(), ...Object.keys(SPECIAL_USE_MATERIALS).map(Number)])];
+  return [...new Set([...USAGE_MAP.keys(), ...SPECIAL_USES.keys()])];
 }

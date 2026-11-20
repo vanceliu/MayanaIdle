@@ -5,6 +5,8 @@ import {
 } from '../../models/arena';
 import { ABILITY_CHANCE } from '../../models/ability';
 import { ARENA_BOX_PRICE, ARENA_MIMIC_CHANCE, ARENA_SEALED_CHANCE, type ArenaBoxKind } from '../../systems/arenaBox';
+import { CLASS_NAMES_ZH } from '../../models/character';
+import { ARENA_RECOMMEND_TARGET_WAVE, ARENA_RECOMMENDATIONS, formatArenaGear } from '../data/arenaRecommendation';
 
 /** 競技場（`55-arena.md`）。數值一律取 model 常數 */
 
@@ -82,6 +84,34 @@ export function ArenaPage() {
       </section>
 
       <section style={{ marginBottom: 32 }}>
+        <h3 style={SECTION_TITLE}>最低推薦裝備</h3>
+        <div style={CARD}>
+          <p style={CARD_TEXT}>
+            單人穩定打完第 {ARENA_RECOMMEND_TARGET_WAVE} 波（模擬 5 場至少 4 場）所需的最低裝備，與打到第 {ARENA_RECOMMEND_TARGET_WAVE} 波用掉的橙色藥水。<br />
+            詞綴為整套裝備的詞綴階級（製作品取該階製作的平均階級）；飾品 +0。實際詞綴的種類與數值會影響結果，僅供參考。
+          </p>
+        </div>
+        <div className="wiki-table-wrap">
+          <table className="wiki-table">
+            <thead>
+              <tr><th>段位</th><th>職業</th><th>最低推薦裝備</th><th>橙色藥水（中位）</th><th>橙色藥水（最多）</th></tr>
+            </thead>
+            <tbody>
+              {ARENA_RECOMMENDATIONS.map(r => (
+                <tr key={`${r.tier}-${r.className}`}>
+                  <td>T{r.tier}</td>
+                  <td>{CLASS_NAMES_ZH[r.className]}</td>
+                  <td style={WRAP_TEXT}>{formatArenaGear(r)}</td>
+                  <td className="cell-number">{r.potionsMedian}</td>
+                  <td className="cell-number">{r.potionsMax}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>組隊人數與強化詞綴</h3>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
@@ -120,7 +150,7 @@ export function ArenaPage() {
         <h3 style={SECTION_TITLE}>票券場、離場與排行</h3>
         <div style={CARD}>
           <p style={CARD_TEXT}>
-            票券場每 {ARENA_SLOT_HOURS} 小時重置（server 時間 {SLOT_HOURS.join('、')}），每個時段、每個段位各 1 場，進場即用掉。
+            票券場每 {ARENA_SLOT_HOURS} 小時重置（台灣時間 UTC+8 {SLOT_HOURS.join('、')}），每個時段、每個段位各 1 場，進場即用掉。
             用掉之後仍可進場，但不收入場費、不給票券。<br />
             <strong>撤退</strong>：使用回城卷軸（手動、緊急撤退或補給天賦回城），已得票券全留；補給天賦的「返回上次掛機點」不會帶回競技場。<br />
             <strong>死亡</strong>：回城鎮，收回本場已得票券的一半（無條件捨去）；不計入死亡統計。<br />

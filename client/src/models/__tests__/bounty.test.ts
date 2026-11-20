@@ -40,7 +40,8 @@ describe('§ 53.2 價格', () => {
 });
 
 describe('§ 53.4 定時更新', () => {
-  const at = (h: number, m = 0) => new Date(2026, 10, 2, h, m).getTime();
+  /** 遊戲時間（UTC+8）2026-11-02 h:m */
+  const at = (h: number, m = 0) => Date.UTC(2026, 10, 2, h - 8, m);
 
   it.each([
     [at(0, 0), at(0)], [at(5, 59), at(0)], [at(6, 0), at(6)], [at(13, 30), at(12)], [at(23, 59), at(18)],
@@ -50,7 +51,7 @@ describe('§ 53.4 定時更新', () => {
 
   it('下一個更新時刻；18 點之後跨到隔天 0 點', () => {
     expect(nextBountyRefreshAt(at(13, 30))).toBe(at(18));
-    expect(nextBountyRefreshAt(at(18, 0))).toBe(new Date(2026, 10, 3, 0, 0).getTime());
+    expect(nextBountyRefreshAt(at(18, 0))).toBe(at(24));
   });
 
   it('清單生成時間早於最近更新時刻才過期', () => {

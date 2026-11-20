@@ -6,6 +6,7 @@
  */
 import { MONSTER_SEEDS } from '../db/seed/monsterSeeds';
 import { AREA_POOLS, TOWN_BOSS_POOLS, TOWN_MONSTER_POOLS, type QuestTownId } from './adventurerQuest';
+import { latestGameHourAt, nextGameHourAt } from './gameClock';
 import { resolveArea } from './mapData';
 
 export type BountyKind = 'monster' | 'boss';
@@ -41,7 +42,7 @@ export const BOUNTY_BOSS_KILLS = { min: 20, max: 30 };
 export const BOUNTY_MIN_PRICE_LEVEL = 30;
 /** § 53.3 */
 export const MAX_SIGNED_BOUNTIES = 3;
-/** § 53.4：server 當地時間 */
+/** § 53.4：遊戲時間（UTC+8，`gameClock.ts`） */
 export const BOUNTY_REFRESH_HOURS = [0, 6, 12, 18] as const;
 
 /** § 53.2：依定價等級由高往低比對 */
@@ -65,23 +66,12 @@ export function getBountyTotalPrice(priceLevel: number, takeBetter: boolean): nu
 
 /** 不晚於 `now` 的最近一個更新時刻（毫秒） */
 export function latestBountyRefreshAt(now: number): number {
-  const d = new Date(now);
-  const hour = [...BOUNTY_REFRESH_HOURS].reverse().find(h => h <= d.getHours()) ?? 0;
-  d.setHours(hour, 0, 0, 0);
-  return d.getTime();
+  return latestGameHourAt(now, BOUNTY_REFRESH_HOURS);
 }
 
 /** `now` 之後的下一個更新時刻（毫秒） */
 export function nextBountyRefreshAt(now: number): number {
-  const d = new Date(now);
-  const hour = BOUNTY_REFRESH_HOURS.find(h => h > d.getHours());
-  if (hour === undefined) {
-    d.setDate(d.getDate() + 1);
-    d.setHours(BOUNTY_REFRESH_HOURS[0], 0, 0, 0);
-  } else {
-    d.setHours(hour, 0, 0, 0);
-  }
-  return d.getTime();
+  return nextGameHourAt(now, BOUNTY_REFRESH_HOURS);
 }
 
 export function isBountyBoardStale(board: BountyBoard | undefined, now: number): boolean {

@@ -87,7 +87,8 @@
 顏色只表達稀有度，「Tier N 以下」會連進得了配方的素材一起掃掉。
 雜貨店的素材批量販售因此附一個**預設勾選**的「跳過有用途的素材」：
 
-- 判定用 `hasMaterialUsage()`（`systems/craftMaterialUsage.ts`），涵蓋裝備配方素材
+- 判定用 `hasMaterialUsage()`（`systems/craftMaterialUsage.ts`），涵蓋 `30-items.md` § 製作用途標記的全部用途：
+  裝備配方、競技場入場（Boss 專屬素材）、魔法學院合成、職業任務
   （印記歸 `scroll`，本來就不在素材篩選內，見 `30-items.md` § 30.2 印記）
 - 被保護而未列入販售的素材要**明確列出來**，不可靜默漏掉 ——
 - 取消勾選即回到純粹依 `iconTier` 篩選的舊行為

@@ -33,8 +33,10 @@ const TUSK = 19;
 const SILVER_ORE = 11;
 // 紅色藥水：buyPrice 25，沒有 sellPrice
 const RED_POTION = 1;
-// 魔法書碎片：iconTier 2、noSell、無配方以外用途
+// 魔法書碎片：iconTier 2、noSell、T4 配方＋魔法學院合成
 const SPELLBOOK_FRAGMENT = 127;
+// 殭屍王心臟：iconTier 6、Boss 專屬素材、競技場 T5／T6 入場、sellPrice 900
+const ZOMBIE_KING_HEART = 88;
 
 const TEMPLATES: EquipmentTemplate[] = [
   { id: 1, name: '鐵劍', type: 'sword', slot: 'rightHand', isTwoHanded: false, smallMonsterDamage: 10, largeMonsterDamage: 8, buyPrice: 1000, acquireType: 'shop', tier: 2 },
@@ -121,6 +123,12 @@ describe('素材批量販售', () => {
 
   it('被保護擋下的素材可以列出來給玩家看', () => {
     expect(collectProtectedMaterials(bag, 7).map(i => i.itemId)).toEqual([SILVER_ORE]);
+  });
+
+  it('Boss 專屬素材是競技場入場材料，預設不賣並列入保留清單', () => {
+    const withBoss = [...bag, makeBagItem(ZOMBIE_KING_HEART, 4)] as BagItem[];
+    expect(collectSellableMaterials(withBoss, 7).map(i => i.itemId)).toEqual([TUSK]);
+    expect(collectProtectedMaterials(withBoss, 7).map(i => i.itemId)).toEqual([SILVER_ORE, ZOMBIE_KING_HEART]);
   });
 
   it('總價乘上持有數量', () => {

@@ -17,6 +17,7 @@
  * 星盤配法由 `--star` 指定（逐職業 `--star=knight:stats-first,...`，取 TTK 校準／死神實戰選出的配法），預設攻擊技能優先
  *
  * 用法：npx vite-node scripts/simulateArena.mts [--star=...] [--tier=4,5] [--class=a,b] [--runs=N] [--minutes=N] [--lifesteal=attack|skill|both]
+ *       最低推薦裝備：[--target-wave=30 --ladder [--rung=N]]
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { tickWorld } from '../src/systems/worldTick';
@@ -113,6 +114,12 @@ const LIFESTEAL_TYPES: AffixType[] = LIFESTEAL_ARG === 'attack' ? ['attack_lifes
 /** 每 N 秒印出角色與場上怪物的狀態（除錯用） */
 const TRACE_SEC = Number(argOf('trace') ?? 0);
 const LIMIT_MS = Number(argOf('minutes') ?? 60) * 60_000;
+/** `--target-wave=N`：清完第 N 波即結束該場（記錄到該波為止的藥水用量） */
+const TARGET_WAVE = Number(argOf('target-wave') ?? 0);
+/** `--ladder`：配裝階梯由弱到強逐階試，取第一個達標的階（§ 44.5 最低推薦裝備）；需搭配 `--target-wave` */
+const LADDER = process.argv.includes('--ladder');
+/** `--rung=N`：`--ladder` 只試第 N 階（0 起算），供逐階平行執行 */
+const RUNG = argOf('rung') != null ? Number(argOf('rung')) : null;
 import type { StarPolicy } from './starAllocation.mts';
 const ALL_TIERS = [4, 5, 6, 7] as const;
 type ArenaTier = (typeof ALL_TIERS)[number];
@@ -207,7 +214,7 @@ function buildArenaCharacter(className: ClassName, level: number, req: Partial<A
 
 /** 該階各防具部位（含副手）首選模板的素質需求，逐項取最大 */
 function gearRequirement(cn: ClassName, tier: ArenaTier): Partial<Attributes> {
-  const rule = GEAR_RULES[tier];
+  const rule = ruleOf(tier);
   const req: Partial<Attributes> = {};
   const preds: ((t: Template) => boolean)[] = [
     ...ARMOR_SLOTS.map(slot => (t: Template) => t.slot === slot && onLine(cn, t)),
@@ -270,6 +277,30 @@ const GEAR_RULES: Record<ArenaTier, GearRule> = {
   6: { weaponTier: 6, gearTier: 6, preferCraft: true, affixTier: 6, weaponEnhance: 6, armorEnhance: 5, accessoryEnhance: 0, sealed: false, abilityRoll: 'worst' },
   7: { weaponTier: 7, gearTier: 6, preferCraft: false, affixTier: 6, weaponEnhance: 8, armorEnhance: 9, accessoryEnhance: 8, sealed: true, abilityRoll: 'mid' },
 };
+
+/** `--ladder` 試配裝階梯時覆寫該段位的配裝規則 */
+const RULE_OVERRIDE: Partial<Record<ArenaTier, GearRule>> = {};
+const ruleOf = (tier: ArenaTier): GearRule => RULE_OVERRIDE[tier] ?? GEAR_RULES[tier];
+
+/**
+ * 最低推薦裝備的配裝階梯（由弱到強）。製作品詞綴取該階製作的平均階級（`06-equipment-acquire.md` § 6A.6：
+ * T4 製作 T1~T5、T5 製作 T2~T6、T6 製作 T3~T6 加權）；T3 無製作品，取商店詞綴 T1~T3 的平均。
+ */
+const CRAFT_AFFIX_AVG: Record<number, number> = { 3: 2, 4: 3, 5: 4, 6: 4 };
+interface LadderRung { label: string; rule: GearRule }
+function gearLadder(tier: ArenaTier): LadderRung[] {
+  const base = GEAR_RULES[tier];
+  const prev = tier - 1;
+  return [
+    { label: `T${prev} 裝備 +0、詞綴 T${CRAFT_AFFIX_AVG[prev]}`,
+      rule: { ...base, weaponTier: prev, gearTier: prev, affixTier: CRAFT_AFFIX_AVG[prev], weaponEnhance: 0, armorEnhance: 0, accessoryEnhance: 0 } },
+    { label: `T${tier} 製作品 +0、詞綴 T${CRAFT_AFFIX_AVG[tier]}`,
+      rule: { ...base, affixTier: CRAFT_AFFIX_AVG[tier], weaponEnhance: 0, armorEnhance: 0, accessoryEnhance: 0 } },
+    { label: `T${tier} 製作品 武器 +${base.weaponEnhance}／防具 +${base.armorEnhance}、詞綴 T${CRAFT_AFFIX_AVG[tier]}`,
+      rule: { ...base, affixTier: CRAFT_AFFIX_AVG[tier] } },
+    { label: `T${tier} 製作品 武器 +${base.weaponEnhance}／防具 +${base.armorEnhance}、詞綴 T${base.affixTier}`, rule: base },
+  ];
+}
 
 function makeItem(
   tpl: Template, enhancement: number, affixTypes: AffixType[], affixTier: number, sealed: boolean, cn: ClassName,
@@ -387,7 +418,7 @@ const PROBE_UNIQUE = argOf('probe-unique') as UniqueAffixType | undefined;
 /** `--probe-remove=<type>`：移除所有裝備上的該詞綴（已帶詞綴的移除損失） */
 const PROBE_REMOVE = argOf('probe-remove') as AffixType | undefined;
 function probeLoadout(cn: ClassName, lo: ArenaLoadout, tier: ArenaTier): ArenaLoadout {
-  const rule = GEAR_RULES[tier];
+  const rule = ruleOf(tier);
   let out = lo;
   if (PROBE_REMOVE) {
     const p = removeAffixGear(out.gear, out.weapon, PROBE_REMOVE);
@@ -410,7 +441,7 @@ function withUnique(lo: ArenaLoadout, unique: UniqueAffixType): ArenaLoadout {
 
 /** 實測排名有武器詞綴時，武器改用排名前 4 條（T7 另加第 5 條封印）；T7 獨有詞綴改用排名最高者 */
 function withRankedWeapon(cn: ClassName, lo: ArenaLoadout, tier: ArenaTier): ArenaLoadout {
-  const rule = GEAR_RULES[tier];
+  const rule = ruleOf(tier);
   const types = rankedWeaponAffixes(cn, rule.sealed ? WEAPON_GENERAL_AFFIXES + 1 : WEAPON_GENERAL_AFFIXES);
   let out = lo;
   if (types) {
@@ -429,7 +460,7 @@ function withRankedWeapon(cn: ClassName, lo: ArenaLoadout, tier: ArenaTier): Are
 function replayLoadout(cn: ClassName, tier: ArenaTier): ArenaLoadout | null {
   const pieces = REPLAY[`T${tier}|${cn}`];
   if (!pieces) return null;
-  const rule = GEAR_RULES[tier];
+  const rule = ruleOf(tier);
   const gear = pieces.map(p => {
     const tpl = EQUIPMENT_SEEDS.find(t => t.name === p.name);
     if (!tpl) throw new Error(`重播：找不到模板 ${p.name}`);
@@ -447,7 +478,7 @@ function replayLoadout(cn: ClassName, tier: ArenaTier): ArenaLoadout | null {
  * 素質需求以遊戲的 `getFrozenGear` 判定（含其他裝備的額外屬性）：被凍結的那件排除後重選（同階優先），直到整套都生效。
  */
 function chooseLoadout(cn: ClassName, tier: ArenaTier, ctx: SimContext): ArenaLoadout {
-  const rule = GEAR_RULES[tier];
+  const rule = ruleOf(tier);
   const effects = preCombatBuffs(cn, ctx.level);
   const SLOT_KEYS = [...ARMOR_SLOTS, ...ACCESSORY_SLOTS, 'offhand'];
   const excluded = new Set<string>();
@@ -847,6 +878,7 @@ function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: numbe
       if (!alive) {
         r.waves.push({ wave, boss: !NO_BOSS && wave % BOSS_WAVE_EVERY === 0, ms: r.ms - waveStart });
         r.cleared = wave;
+        if (TARGET_WAVE && wave >= TARGET_WAVE) break;
         spawnWave();
       }
     }
@@ -893,55 +925,100 @@ function mpShares(r: RunResult): string {
   return `／回魔 ${fmt(total / (r.ms / 1000), 1)}/s（${parts.filter(([, v]) => v > 0).map(([k, v]) => `${k} ${fmt(v / total * 100, 0)}%`).join('、')}）`;
 }
 const median = (xs: number[]) => (xs.length ? percentile([...xs].sort((a, b) => a - b), 0.5) : NaN);
-for (const tier of TIERS) {
+/** 達標：清完 `--target-wave`（未指定時不判定） */
+const reachedTarget = (r: RunResult) => TARGET_WAVE > 0 && r.cleared >= TARGET_WAVE;
+
+/** 一格（段位 × 職業）：選星盤配法、跑完整場次 */
+function evaluateCell(tier: ArenaTier, cn: ClassName): Row {
   const spec = TIER_SPECS[tier];
   const pool = normalPool(spec);
   const rep = pool[Math.floor(pool.length / 2)];
-  for (const cn of TARGET_CLASSES) {
-    const build = () => {
-      const character = buildArenaCharacter(cn, spec.level, gearRequirement(cn, tier));
-      const ctx: SimContext = { character, level: spec.level, monster: baseMonster(rep), effectiveInt: effectiveIntOf(character) };
-      setAffixContext(tier >= 7 ? 'arena7' : 'arena6');
-      const chosen = replayLoadout(cn, tier) ?? withRankedWeapon(cn, chooseLoadout(cn, tier, ctx), tier);
-      if (DUMP_REPLAY) dumpLoadout(cn, tier, chosen);
-      const loadout = PROBE_AFFIX || PROBE_WEAPON || PROBE_UNIQUE || PROBE_REMOVE ? probeLoadout(cn, chosen, tier) : chosen;
-      const setup = withKeepDistance(cn, buildSetup(cn, loadout, 20261111 + tier, 'always', ctx, false));
-      const w = getWeightStatus(setup.character, Object.values(setup.gear), [makeBagItem(POTION_CONFIG.orange.itemId, POTION_BUDGET)!], setup.effects);
-      return { loadout, setup, w, bagSize: w.overweight ? POTION_BAG : POTION_BUDGET };
-    };
-    const runAll = (b: ReturnType<typeof build>) => Array.from({ length: RUNS }, (_, i) => runOnce(b.setup, spec, tier * 1_000_000 + i, b.bagSize));
-    const score = (rs: RunResult[]) => median(rs.map(r => r.cleared)) * 1e6 + median(rs.map(r => r.ms)) / 1000;
-    // 星盤配法依競技場成績選（§ 44.2）：每種配法 1 場短時限篩選，前 2 種跑完整場次，取清完波數中位（同分取存活時間）最高者
-    const candidates = arenaStarCandidates(cn, spec.level);
-    let pick: { policy: StarPolicy; b: ReturnType<typeof build>; results: RunResult[] } | null = null;
-    if (candidates.length === 1) {
-      setStarPolicy(cn, candidates[0]);
+  const build = () => {
+    const character = buildArenaCharacter(cn, spec.level, gearRequirement(cn, tier));
+    const ctx: SimContext = { character, level: spec.level, monster: baseMonster(rep), effectiveInt: effectiveIntOf(character) };
+    setAffixContext(tier >= 7 ? 'arena7' : 'arena6');
+    const chosen = replayLoadout(cn, tier) ?? withRankedWeapon(cn, chooseLoadout(cn, tier, ctx), tier);
+    if (DUMP_REPLAY) dumpLoadout(cn, tier, chosen);
+    const loadout = PROBE_AFFIX || PROBE_WEAPON || PROBE_UNIQUE || PROBE_REMOVE ? probeLoadout(cn, chosen, tier) : chosen;
+    const setup = withKeepDistance(cn, buildSetup(cn, loadout, 20261111 + tier, 'always', ctx, false));
+    const w = getWeightStatus(setup.character, Object.values(setup.gear), [makeBagItem(POTION_CONFIG.orange.itemId, POTION_BUDGET)!], setup.effects);
+    return { loadout, setup, w, bagSize: w.overweight ? POTION_BAG : POTION_BUDGET };
+  };
+  const runAll = (b: ReturnType<typeof build>) => Array.from({ length: RUNS }, (_, i) => runOnce(b.setup, spec, tier * 1_000_000 + i, b.bagSize));
+  // 達標的場次越快越好，未達標的撐越久越好
+  const runScore = (r: RunResult) => r.cleared * 1e6 + (reachedTarget(r) ? -r.ms : r.ms) / 1000;
+  const score = (rs: RunResult[]) => median(rs.map(runScore));
+  // 星盤配法依競技場成績選（§ 44.2）：每種配法 1 場短時限篩選，前 2 種跑完整場次，取成績最高者
+  const candidates = arenaStarCandidates(cn, spec.level);
+  let pick: { policy: StarPolicy; b: ReturnType<typeof build>; results: RunResult[] } | null = null;
+  if (candidates.length === 1) {
+    setStarPolicy(cn, candidates[0]);
+    const b = build();
+    pick = { policy: candidates[0], b, results: runAll(b) };
+  } else {
+    const screened = candidates.map(policy => {
+      setStarPolicy(cn, policy);
       const b = build();
-      pick = { policy: candidates[0], b, results: runAll(b) };
-    } else {
-      const screened = candidates.map(policy => {
-        setStarPolicy(cn, policy);
-        const b = build();
-        return { policy, b, s: runOnce(b.setup, spec, tier * 1_000_000, b.bagSize, ARENA_STAR_SCREEN_MS) };
-      }).sort((a, z) => z.s.cleared - a.s.cleared || z.s.ms - a.s.ms);
-      const notes: string[] = [];
-      for (const c of screened.slice(0, 2)) {
-        setStarPolicy(cn, c.policy);
-        const results = runAll(c.b);
-        notes.push(`${STAR_POLICY_LABEL[c.policy]} ${median(results.map(r => r.cleared))} 波／存活 ${fmt(median(results.map(r => r.ms)) / 60_000)} 分`
-          + `／MP<10% ${fmt(avg(results.map(r => r.lowMpMs / Math.max(1, r.ms))) * 100)}%${mpShares(results[0])}`);
-        if (!pick || score(results) > score(pick.results)) pick = { policy: c.policy, b: c.b, results };
-      }
-      starSelections.push(`- T${tier} ${CLASS_NAMES_ZH[cn]}：${STAR_POLICY_LABEL[pick!.policy]}｜篩選 ${ARENA_STAR_SCREEN_MS / 60_000} 分 1 場：`
-        + screened.map(c => `${STAR_POLICY_LABEL[c.policy]} ${c.s.cleared} 波／存活 ${fmt(c.s.ms / 60_000)} 分／MP<10% ${fmt(c.s.lowMpMs / Math.max(1, c.s.ms) * 100)}%${mpShares(c.s)}`
-          + `（${starSummary(cn, c.b.setup.character.starChart)}）`).join('；')
-        + `｜完整 ${RUNS} 場：${notes.join('；')}`);
-      setStarPolicy(cn, pick!.policy);
+      return { policy, b, s: runOnce(b.setup, spec, tier * 1_000_000, b.bagSize, ARENA_STAR_SCREEN_MS) };
+    }).sort((a, z) => runScore(z.s) - runScore(a.s));
+    const notes: string[] = [];
+    for (const c of screened.slice(0, 2)) {
+      setStarPolicy(cn, c.policy);
+      const results = runAll(c.b);
+      notes.push(`${STAR_POLICY_LABEL[c.policy]} ${median(results.map(r => r.cleared))} 波／存活 ${fmt(median(results.map(r => r.ms)) / 60_000)} 分`
+        + `／MP<10% ${fmt(avg(results.map(r => r.lowMpMs / Math.max(1, r.ms))) * 100)}%${mpShares(results[0])}`);
+      if (!pick || score(results) > score(pick.results)) pick = { policy: c.policy, b: c.b, results };
     }
-    const { b, results } = pick!;
-    rows.push({ tier, cn, setup: b.setup, loadout: b.loadout, results, weight: `${b.w.carried}/${b.w.capacity}`, overweight: b.w.overweight });
+    starSelections.push(`- T${tier} ${CLASS_NAMES_ZH[cn]}：${STAR_POLICY_LABEL[pick!.policy]}｜篩選 ${ARENA_STAR_SCREEN_MS / 60_000} 分 1 場：`
+      + screened.map(c => `${STAR_POLICY_LABEL[c.policy]} ${c.s.cleared} 波／存活 ${fmt(c.s.ms / 60_000)} 分／MP<10% ${fmt(c.s.lowMpMs / Math.max(1, c.s.ms) * 100)}%${mpShares(c.s)}`
+        + `（${starSummary(cn, c.b.setup.character.starChart)}）`).join('；')
+      + `｜完整 ${RUNS} 場：${notes.join('；')}`);
+    setStarPolicy(cn, pick!.policy);
+  }
+  const { b, results } = pick!;
+  return { tier, cn, setup: b.setup, loadout: b.loadout, results, weight: `${b.w.carried}/${b.w.capacity}`, overweight: b.w.overweight };
+}
+
+/** `--ladder` 的達標門檻：場次的 80%（5 場至少 4 場） */
+const LADDER_PASS = Math.ceil(RUNS * 0.8);
+interface LadderRow { tier: ArenaTier; cn: ClassName; tried: { rung: LadderRung; row: Row; passed: number }[] }
+const ladderRows: LadderRow[] = [];
+
+for (const tier of TIERS) {
+  for (const cn of TARGET_CLASSES) {
+    if (LADDER) {
+      const tried: LadderRow['tried'] = [];
+      for (const rung of RUNG != null ? [gearLadder(tier)[RUNG]] : gearLadder(tier)) {
+        RULE_OVERRIDE[tier] = rung.rule;
+        const row = evaluateCell(tier, cn);
+        const passed = row.results.filter(reachedTarget).length;
+        tried.push({ rung, row, passed });
+        rows.push(row);
+        if (passed >= LADDER_PASS) break;
+      }
+      delete RULE_OVERRIDE[tier];
+      ladderRows.push({ tier, cn, tried });
+    } else {
+      rows.push(evaluateCell(tier, cn));
+    }
     console.error(`T${tier} ${CLASS_NAMES_ZH[cn]} 完成（${fmt((performance.now() - t0) / 1000)}s）`);
   }
+}
+
+if (LADDER) {
+  console.log(`## 最低推薦裝備（清完第 ${TARGET_WAVE} 波 ${LADDER_PASS}/${RUNS} 場以上）\n`);
+  console.log('| 段位 | 職業 | 最低達標配裝 | 達標場數 | 藥水用量中位（達標場） | 藥水用量最多（達標場） | 未達標的較低階（達標場數／清完波數中位） |');
+  console.log('|---|---|---|---|---|---|---|');
+  for (const { tier, cn, tried } of ladderRows) {
+    const last = tried[tried.length - 1];
+    const ok = last.passed >= LADDER_PASS;
+    const used = last.row.results.filter(reachedTarget).map(r => r.potionsUsed);
+    const lower = tried.slice(0, ok ? -1 : undefined)
+      .map(t => `${t.rung.label}：${t.passed}/${RUNS}／${median(t.row.results.map(r => r.cleared))} 波`).join('；');
+    console.log(`| T${tier} | ${CLASS_NAMES_ZH[cn]} | ${ok ? last.rung.label : '全部未達標'} | ${ok ? `${last.passed}/${RUNS}` : '—'} `
+      + `| ${ok ? median(used) : '—'} | ${ok ? Math.max(...used) : '—'} | ${lower || '—'} |`);
+  }
+  console.log('');
 }
 
 if (DUMP_REPLAY) writeFileSync(DUMP_REPLAY, JSON.stringify(DUMPED, null, 1));
