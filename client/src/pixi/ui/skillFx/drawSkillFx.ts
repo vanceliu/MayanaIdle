@@ -14,6 +14,7 @@
  */
 import type { Graphics } from 'pixi.js';
 import type { ProjectileShape } from '../projectileStyle';
+import { WEAPON_HANDLE_COLOR } from '../../entities/pawn/weaponGeometry';
 import {
   clamp01, easeOutCubic, easeOutQuad, fadeAfter, lighten, tilesToGroundRadius,
   MARK_COLORS, EMBLEM_COLORS, STAT_LABEL_TEXT,
@@ -32,6 +33,9 @@ function groundRing(
   const { rx, ry } = tilesToGroundRadius(tiles);
   g.ellipse(cx, cy, rx, ry).stroke({ width, color, alpha });
 }
+
+/** 飛斧的柄色，與武器剪影的握把同色 */
+const AXE_HANDLE_COLOR = Number.parseInt(WEAPON_HANDLE_COLOR.slice(1), 16);
 
 /**
  * 投射物的頭部 —— 與 `Projectile.ts` 的外型規則同一套（§ 42.4）：
@@ -54,6 +58,19 @@ export function drawProjectileHead(
     g.poly([q(size, 0), q(size * 0.45, -w * 1.9), q(size * 0.62, 0), q(size * 0.45, w * 1.9)])
       .fill({ color, alpha });
     g.poly([q(size * 0.55, -w), q(-size, -w), q(-size, w), q(size * 0.55, w)])
+      .fill({ color, alpha });
+    return;
+  }
+
+  if (shape === 'axe') {
+    /* 斧頭朝 angle 方向：柄沿軸線、單刃在 +y 側；color 是斧刃，柄固定木色 */
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const p = (lx: number, ly: number) => ({ x: x + lx * cos - ly * sin, y: y + lx * sin + ly * cos });
+    const shaftW = size * 0.09;
+    g.poly([p(-size * 0.5, -shaftW), p(size * 0.5, -shaftW), p(size * 0.5, shaftW), p(-size * 0.5, shaftW)])
+      .fill({ color: AXE_HANDLE_COLOR, alpha });
+    g.poly([p(size * 0.48, 0), p(size * 0.62, size * 0.42), p(size * 0.18, size * 0.46), p(size * 0.24, 0)])
       .fill({ color, alpha });
     return;
   }
@@ -108,12 +125,16 @@ export function drawTravel(
   g: Graphics, p: TravelParams, color: number, t: number,
   dx: number, dy: number, shape: ProjectileShape, arc = 0,
 ): void {
-  const angle = Math.atan2(dy, dx);
-  const size = shape === 'arrow' ? p.arrowLen : p.headSize;
+  const size = shape === 'arrow' ? p.arrowLen : shape === 'axe' ? p.axeLen : p.headSize;
+  /* 飛斧依飛行距離自轉，往右飛順時針、往左逆時針；其餘指向目標 */
+  const angle = shape === 'axe'
+    ? (dx >= 0 ? 1 : -1) * (t * Math.hypot(dx, dy) / p.axeSpinPx) * Math.PI * 2 - Math.PI / 2
+    : Math.atan2(dy, dx);
   /* 拱起：兩端貼齊，中段抬最高。一律往畫面上方，不隨方向翻 */
   const at = (u: number) => ({ x: dx * u, y: dy * u - arc * Math.sin(u * Math.PI) });
 
-  for (let i = p.trail; i >= 1; i--) {
+  /* 飛斧不拖尾：自轉已經交代了動向 */
+  for (let i = shape === 'axe' ? 0 : p.trail; i >= 1; i--) {
     const tt = t - i * p.trailGap;
     if (tt <= 0) continue;
     const f = 1 - i / (p.trail + 1);
@@ -125,6 +146,7 @@ export function drawTravel(
 
   const head = at(t);
   drawProjectileHead(g, head.x, head.y, shape, color, size, angle);
+  if (shape === 'axe') return;
   /* 亮核：沒有它彈丸是一顆平的圓點，分不出「中心」 */
   g.circle(head.x, head.y, p.headSize * 0.45).fill({ color: lighten(color, p.light), alpha: 0.95 });
 }

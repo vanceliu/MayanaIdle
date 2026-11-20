@@ -121,6 +121,10 @@ export interface TravelParams {
   headSize: number;
   /** 箭矢長度 */
   arrowLen: number;
+  /** 飛斧全長（px） */
+  axeLen: number;
+  /** 飛斧每飛多少 px 轉一圈 */
+  axeSpinPx: number;
   /**
    * 齊射時每一發之間錯開多久（ms，§ 48.7.4）。
    *
@@ -834,6 +838,8 @@ export const SKILL_FX_ART: SkillFxArt = {
     trailShrink: 0.35,
     headSize: 4,
     arrowLen: 12,
+    axeLen: 14,
+    axeSpinPx: 60,
     volleyStaggerMs: 70,
     multiHitStaggerMs: 100,
     multiHitSpread: 4,

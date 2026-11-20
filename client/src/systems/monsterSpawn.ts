@@ -60,6 +60,7 @@ export function createMonsterFromTemplate(
     element: template.element,
     isBoss: template.isBoss,
     attackType: template.attackType ?? 'melee',
+    rangedWeapon: template.rangedWeapon,
     attackRange: template.attackRange ?? 1.5,
     attackInterval: template.attackInterval ?? 1200,
     projectileSpeed: template.projectileSpeed,

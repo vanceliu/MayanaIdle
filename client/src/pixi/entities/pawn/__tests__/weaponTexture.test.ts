@@ -110,6 +110,11 @@ describe('武器貼圖快取', () => {
     expect(weaponTextureKey('mace', 'iron', 1, 0)).not.toBe(base);
     expect(weaponTextureKey('axe', 'dragon', 1, 0)).not.toBe(base);
     expect(weaponTextureKey('axe', 'iron', -1, 0)).not.toBe(base);
+  });
+
+  it('寶珠色只進法杖的快取鍵', () => {
+    expect(weaponTextureKey('twoHandStaff', 'iron', 1, 0, '#9933ff')).not.toBe(weaponTextureKey('twoHandStaff', 'iron', 1, 0));
+    expect(weaponTextureKey('bow', 'iron', 1, 0, '#9933ff')).toBe(weaponTextureKey('bow', 'iron', 1, 0));
     expect(weaponUsesPull(WEAPON_ART.bow.params)).toBe(true);
   });
 

@@ -114,12 +114,20 @@ describe('resolvePlayerAttackFxPlan', () => {
 });
 
 describe('resolveMonsterAttackFxPlan', () => {
-  it('怪物不演武器 —— 它是圓球，沒有剪影可以揮', () => {
+  it('沒帶 armed 不演武器', () => {
     const plan = resolveMonsterAttackFxPlan({ ranged: true, shape: 'arrow', color: WHITE });
     expect(plan.weapon).toBe('none');
     expect(plan.cast).toBe(false);
     expect(plan.delivery).toBe('travel');
     expect(plan.minimalImpact).toBe(true);
+  });
+
+  it('armed 的遠程攻擊演 shoot：投射物等放箭／脫手才出發（§ 48.6.5）', () => {
+    expect(resolveMonsterAttackFxPlan({ ranged: true, shape: 'axe', color: WHITE, armed: true }).weapon).toBe('shoot');
+  });
+
+  it('沒有視線退回近戰演出時，armed 也不演武器', () => {
+    expect(resolveMonsterAttackFxPlan({ ranged: false, shape: 'arrow', color: WHITE, armed: true }).weapon).toBe('none');
   });
 
   it('近戰怪沒有飛行段', () => {

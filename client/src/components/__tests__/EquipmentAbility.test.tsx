@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { useGameStore } from '../../stores/gameStore';
+import { resetAltHeld } from '../../hooks/useAltHeld';
 import type { EquipmentInstance } from '../../models/equipment';
 import type { Character } from '../../models/character';
 
@@ -53,6 +54,35 @@ describe('裝備 tooltip 的隨機技能（§ 7S.7）', () => {
   it('compact 不顯示', () => {
     render(<EquipmentDetail item={t7Sword()} compact />);
     expect(screen.queryByText(/追加傷害：/)).toBeNull();
+  });
+});
+
+describe('隨機技能「；」之後另包一段（`34-ui-guidelines.md` § 34.2 第 20 點）', () => {
+  const rage = () => accessory(31, 'necklace', { type: 'rage', params: { decay: 15 } });
+  const row = (container: HTMLElement) => container.querySelector<HTMLElement>('.equip-detail-affix.ability')!;
+
+  beforeEach(() => resetAltHeld());
+
+  it('「；」留在前段，之後的敘述包進 tail', () => {
+    const { container } = render(<EquipmentDetail item={rage()} />);
+    const tail = row(container).querySelector('.equip-detail-affix-tail');
+    expect(tail?.textContent).toBe('有怒氣時魔法抗性 +10、防禦 +5');
+    expect(row(container).textContent).toBe('怒氣：被命中時累積等同受到傷害的怒氣（上限 100），每秒減少 15；有怒氣時魔法抗性 +10、防禦 +5');
+  });
+
+  it('按住 Alt：區間留在前段，tail 不變', () => {
+    const { container } = render(<EquipmentDetail item={rage()} />);
+    act(() => { fireEvent.keyDown(window, { key: 'Alt', altKey: true }); });
+    const tail = row(container).querySelector('.equip-detail-affix-tail')!;
+    expect(tail.textContent).toBe('有怒氣時魔法抗性 +10、防禦 +5');
+    expect(tail.querySelector('.stat-range')).toBeNull();
+    expect(row(container).querySelector('.stat-range')?.textContent).toBe('(5 ~ 15)');
+  });
+
+  it('沒有「；」的技能不包 tail', () => {
+    const { container } = render(<EquipmentDetail item={t7Sword()} />);
+    expect(row(container).querySelector('.equip-detail-affix-tail')).toBeNull();
+    expect(container.querySelector('.equip-detail-affix.unique .equip-detail-affix-tail')).toBeNull();
   });
 });
 

@@ -40,6 +40,9 @@ import type { DamageType } from '../pixi/ui/CombatVisualEvent';
 import type { EffectLayer } from '../pixi/layers/EffectLayer';
 import { getMonsterProjectileStyle } from '../pixi/ui/projectileStyle';
 import {
+  monsterAxeColor, monsterGemColor, monsterWeaponMaterial, monsterWeaponMuzzle, monsterWeaponStrikeMs,
+} from '../pixi/entities/monster/monsterWeapon';
+import {
   HIT_LIFT, DASH_ART, dashTotalMs, playSkillFx, resolveAttackFxContext,
   resolveMonsterAttackFxPlan, resolveMuzzleOffset, resolvePlayerAttackFxPlan,
   resolveAuraColor, resolveSkillFxPlan, resolveStatusTint, StatusMarkTracker,
@@ -59,6 +62,8 @@ const PLAYER_PROJECTILE_SPEED = 512;
 /** 怪物列表 HUD 快照發佈間隔（ms）；ticker 為每 frame，需節流避免 React 過度 re-render */
 const HUD_PUBLISH_INTERVAL = 100;
 const DEFAULT_MONSTER_PROJECTILE_SPEED = 384;
+/** 事件沒帶攻擊間隔時的武器演出長度基準（同 `monsterSpawn` 預設） */
+const DEFAULT_MONSTER_ATTACK_INTERVAL_MS = 1200;
 
 export function PixiGame() {
   const [initError, setInitError] = useState<string | null>(null);
@@ -825,7 +830,8 @@ function renderCombatVisuals(
         break;
       }
       case 'monster_attack': {
-        monsterEntities.get(v.monsterId)?.faceToward(v.victimPos);
+        const attacker = monsterEntities.get(v.monsterId);
+        attacker?.faceToward(v.victimPos);
         /* 被打的成員位置同樣走事件：他可能在這一擊之後就被傳回城鎮 */
         const victim = mapPositionToScreen(map, v.victimPos);
         const { sx, sy } = victim;
@@ -833,12 +839,29 @@ function renderCombatVisuals(
         const from = v.ranged && v.attackerPos
           ? mapPositionToScreen(map, v.attackerPos)
           : { sx, sy };
-        // 外型與顏色見 § 42.4：物理＝白箭矢、魔法＝依該怪元素上色的彈丸
-        const { shape, color } = getMonsterProjectileStyle(v.attackType, v.element);
+        /* 遠程攻擊演弓／擲斧／雙手杖，投射物從武器出發（§ 48.6.5）；沒有視線時不演 */
+        const weapon = v.ranged && v.attackerPos ? v.weapon ?? null : null;
+        const aim = weapon && v.attackerPos
+          ? weaponAimFromDelta(v.victimPos.x - v.attackerPos.x, v.victimPos.y - v.attackerPos.y)
+          : null;
+        const material = monsterWeaponMaterial(v.level ?? 1);
+        const gem = v.attackType === 'magic' ? monsterGemColor(v.element) : null;
+        const intervalMs = v.attackIntervalMs ?? DEFAULT_MONSTER_ATTACK_INTERVAL_MS;
+        const muzzle = weapon && aim !== null
+          ? monsterWeaponMuzzle(weapon, aim)
+          : { x: 0, y: -monsterHitLift(monsterEntities, v.monsterId) };
+        // 外型與顏色見 § 42.4：物理＝白箭矢（擲斧＝材質色飛斧）、魔法＝依該怪元素上色的彈丸
+        const { shape, color } = getMonsterProjectileStyle(
+          v.attackType, v.element, weapon ?? undefined, monsterAxeColor(material),
+        );
         playSkillFx(effectLayer.skillFx, {
-          plan: resolveMonsterAttackFxPlan({ ranged: v.ranged, shape, color }),
+          plan: resolveMonsterAttackFxPlan({ ranged: v.ranged, shape, color, armed: aim !== null }),
           fromX: from.sx, fromY: from.sy,
-          muzzleX: from.sx, muzzleY: from.sy - monsterHitLift(monsterEntities, v.monsterId),
+          muzzleX: from.sx + muzzle.x, muzzleY: from.sy + muzzle.y,
+          onWeaponAction: () => {
+            if (weapon && aim !== null) attacker?.playRangedAttack(weapon, material, aim, intervalMs, gem);
+          },
+          weaponStrikeMs: weapon ? monsterWeaponStrikeMs(weapon, intervalMs) : undefined,
           toX: sx, toY: sy - HIT_LIFT,
           targets: [{
             x: sx, y: sy - HIT_LIFT,

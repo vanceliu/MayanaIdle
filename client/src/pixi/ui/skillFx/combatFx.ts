@@ -83,14 +83,16 @@ export function resolvePlayerAttackFxPlan(o: {
 /**
  * 怪物這一次攻擊要演什麼。
  *
- * 怪物沒有技能表也沒有武器剪影，所以不推導 —— 外型與顏色由 § 42.4 的
+ * 怪物沒有技能表，所以不推導 —— 外型與顏色由 § 42.4 的
  * `getMonsterProjectileStyle()` 決定，這裡只把它包成 plan。
+ * `armed`：演武器（§ 48.6.5 弓／擲斧／雙手杖），投射物等放箭／脫手／前推到底才出發。
  * 命中同樣走最小型態：被怪打到一秒好幾下，用技能那個尺寸會塞滿畫面。
  */
 export function resolveMonsterAttackFxPlan(o: {
   ranged: boolean;
   shape: ProjectileShape;
   color: number;
+  armed?: boolean;
 }): SkillFxPlan {
   return {
     cast: false,
@@ -103,8 +105,7 @@ export function resolveMonsterAttackFxPlan(o: {
     emblem: null,
     shield: null,
     hits: 1,
-    /* 怪物是圓球，沒有 § 48.6 的武器剪影可以演 */
-    weapon: 'none',
+    weapon: o.armed && o.ranged ? 'shoot' : 'none',
     accent: null,
     minimalImpact: true,
     chainStyle: null,

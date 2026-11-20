@@ -21,6 +21,22 @@ export const RACE_LABELS: Record<MonsterRace, string> = {
  */
 export type MonsterAttackType = 'melee' | 'ranged' | 'magic';
 
+/** 遠程怪出手演的武器：弓、擲斧、雙手杖，`none`＝不演 */
+export type MonsterRangedWeapon = 'bow' | 'throwAxe' | 'twoHandStaff' | 'none';
+
+/** 實際會畫出來的武器 */
+export type MonsterWeapon = Exclude<MonsterRangedWeapon, 'none'>;
+
+/** 該怪出手演哪一種武器（`48-vfx.md` § 48.6.5）：`ranged` 預設弓、`magic` 預設雙手杖；近戰與 `none` 回傳 null */
+export function monsterRangedWeapon(o: {
+  attackType?: MonsterAttackType;
+  rangedWeapon?: MonsterRangedWeapon;
+}): MonsterWeapon | null {
+  if (o.attackType !== 'ranged' && o.attackType !== 'magic') return null;
+  const weapon = o.rangedWeapon ?? (o.attackType === 'ranged' ? 'bow' : 'twoHandStaff');
+  return weapon === 'none' ? null : weapon;
+}
+
 /** 需要射程與視線判定的攻擊型別（遠程物理與遠程魔法） */
 export function isRangedAttackType(type: MonsterAttackType | undefined): boolean {
   return type === 'ranged' || type === 'magic';
@@ -50,6 +66,8 @@ export interface MonsterTemplate {
   area: string;
   isBoss: boolean;
   attackType?: MonsterAttackType;
+  /** 遠程怪出手演的武器（`48-vfx.md` § 48.6.5），未填＝`ranged` 弓、`magic` 雙手杖 */
+  rangedWeapon?: MonsterRangedWeapon;
   attackRange?: number;
   attackInterval?: number;
   projectileSpeed?: number;
@@ -71,6 +89,7 @@ export interface MonsterInstance {
   element: ElementType;
   isBoss: boolean;
   attackType: MonsterAttackType;
+  rangedWeapon?: MonsterRangedWeapon;
   attackRange: number;
   attackInterval: number;
   projectileSpeed?: number;

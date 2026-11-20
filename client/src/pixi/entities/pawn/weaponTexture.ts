@@ -77,11 +77,13 @@ export function weaponTextureKey(
   material: WeaponMaterial | null | undefined,
   lead: 1 | -1,
   pull: number,
+  gem?: string | null,
 ): string {
   const { params } = WEAPON_ART[type];
   const l = weaponUsesLead(params) ? lead : 0;
   const p = weaponUsesPull(params) ? quantizePull(pull) : 0;
-  return `${type}|${material ?? 'default'}|${l}|${p}`;
+  const g = params.shape === 'staff' && gem ? gem : '';
+  return `${type}|${material ?? 'default'}|${l}|${p}|${g}`;
 }
 
 const cache = new Map<string, Texture>();
@@ -91,6 +93,7 @@ function bakeCanvas(
   material: WeaponMaterial | null | undefined,
   lead: 1 | -1,
   pull: number,
+  gem: string | null | undefined,
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = WEAPON_TEX_W * WEAPON_BAKE_SCALE;
@@ -105,7 +108,7 @@ function bakeCanvas(
     ctx as unknown as PawnContext,
     WEAPON_ANCHOR_X, WEAPON_ANCHOR_Y,
     art.params,
-    weaponColors(material),
+    weaponColors(material, gem),
     art.geom,
     weaponUsesPull(art.params) ? quantizePull(pull) : 0,
     lead,
@@ -119,12 +122,13 @@ export function getWeaponTexture(
   material: WeaponMaterial | null | undefined,
   lead: 1 | -1 = 1,
   pull = 0,
+  gem?: string | null,
 ): Texture {
-  const key = weaponTextureKey(type, material, lead, pull);
+  const key = weaponTextureKey(type, material, lead, pull, gem);
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const texture = Texture.from(bakeCanvas(type, material, lead, pull));
+  const texture = Texture.from(bakeCanvas(type, material, lead, pull, gem));
   cache.set(key, texture);
   return texture;
 }

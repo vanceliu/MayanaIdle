@@ -59,7 +59,7 @@ export class WeaponSprite {
   play(attack: WeaponAttack): void {
     this.attack = attack;
     this.elapsed = 0;
-    this.playMs = weaponPlaybackMs(WEAPON_ART[attack.type].motion, attack.attackIntervalMs);
+    this.playMs = weaponPlaybackMs(attack.motion ?? WEAPON_ART[attack.type].motion, attack.attackIntervalMs);
     this.apply();
   }
 
@@ -75,9 +75,10 @@ export class WeaponSprite {
     if (!attack) return;
 
     const art = WEAPON_ART[attack.type];
+    const motion = attack.motion ?? art.motion;
     const t = this.playMs > 0 ? this.elapsed / this.playMs : 0;
 
-    if (t > weaponTotalT(art.motion)) {
+    if (t > weaponTotalT(motion)) {
       this.stop();
       return;
     }
@@ -90,12 +91,12 @@ export class WeaponSprite {
       }
 
       const h = hand as 0 | 1;
-      const pose = weaponPose(art.motion, art.geom, t, h, attack.aim);
+      const pose = weaponPose(motion, art.geom, t, h, attack.aim);
       sprite.visible = pose.visible && pose.alpha > 0;
       if (!sprite.visible) continue;
 
       const grip = weaponGrip(art.geom, attack.aim, h);
-      sprite.texture = getWeaponTexture(attack.type, attack.material, pose.lead, pose.pull);
+      sprite.texture = getWeaponTexture(attack.type, attack.material, pose.lead, pose.pull, attack.gemColor);
       sprite.x = grip.x + pose.offX;
       sprite.y = grip.y + pose.offY;
       sprite.rotation = (pose.angle * Math.PI) / 180;

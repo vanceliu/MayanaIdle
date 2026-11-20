@@ -105,6 +105,7 @@
 | 創角的外觀步驟 | `19-account-character.md` | § 19.4（規格見 `04-character.md` § 4.10） |
 | 外觀存哪／落點 | `18-data-schema.md` | § 18.7 |
 | **武器外觀與揮擊演出（揮擊角度/演出長度）** | `48-vfx.md` | § 48.6 |
+| **怪物遠程攻擊的武器演出（弓／擲斧／雙手杖、材質依等級、飛斧、寶珠元素色）** | `48-vfx.md` | § 48.6.5 |
 | 技能系統規則 | `05-skill.md` | 全文 |
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
 | 職業魔法（5 職業各 7 級） | `23-class-magic.md` | 全文 |
@@ -312,6 +313,7 @@
        ↕                                                        ↕
 24-buff-debuff.md § 24.4.1 ←→ 25-monster-system.md § 25.8~25.9
 25-monster-system.md § 25.11 ←→ 48-vfx.md § 48.7a ←→ 51-auto-talent.md § 51.4.6
+25-monster-system.md § 25.8（攻擊型別）←→ 48-vfx.md § 48.6.5 ←→ 42-element-system.md § 42.4
 25-monster-system.md § 25.2.1（球大小）←→ 03-combat.md § 3.6.1（目標環）/ 48-vfx.md § 48.7a（詠唱條）
 25-monster-system.md § 25.2.2（怪物圖外框色）←→ § 25.12.5 ←→ 34-ui-guidelines.md「怪物強化詞綴顏色」
        ↕                                                        ↕

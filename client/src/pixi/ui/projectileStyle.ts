@@ -1,11 +1,11 @@
-import type { ElementType, MonsterAttackType } from '../../models/monster';
+import type { ElementType, MonsterAttackType, MonsterRangedWeapon } from '../../models/monster';
 
 /**
  * 投射物的外型（§ 42.4）。
  *
  * `lance` 是冰槍那類的長槍 —— 同樣是飛過去的一顆東西，只是拉長了。
  */
-export type ProjectileShape = 'circle' | 'arrow' | 'lance';
+export type ProjectileShape = 'circle' | 'arrow' | 'lance' | 'axe';
 
 /**
  * 投射物外型規則（42-element-system.md § 42.4）
@@ -38,6 +38,7 @@ export function getElementProjectileColor(element: ElementType | string | undefi
  * 怪物投射物的外型與顏色（§ 42.4）
  *
  * - 遠程物理（弓箭手）：箭矢外型、**白色**（物理普攻無元素）
+ * - 遠程物理（擲斧）：旋轉飛斧，斧刃為武器材質色（`axeColor`）
  * - 遠程魔法（巫師／魔導系）：彈丸外型、依該怪的 `element` 上色（`none` 亦為白）
  *
  * 只在 `isRangedAttackType()` 為真時呼叫（近戰不產生投射物）。
@@ -45,8 +46,11 @@ export function getElementProjectileColor(element: ElementType | string | undefi
 export function getMonsterProjectileStyle(
   attackType: MonsterAttackType | undefined,
   element: ElementType | undefined,
+  rangedWeapon?: MonsterRangedWeapon,
+  axeColor = NO_ELEMENT_PROJECTILE_COLOR,
 ): { shape: ProjectileShape; color: number } {
-  return attackType === 'magic'
-    ? { shape: 'circle', color: getElementProjectileColor(element) }
+  if (attackType === 'magic') return { shape: 'circle', color: getElementProjectileColor(element) };
+  return rangedWeapon === 'throwAxe'
+    ? { shape: 'axe', color: axeColor }
     : { shape: 'arrow', color: NO_ELEMENT_PROJECTILE_COLOR };
 }

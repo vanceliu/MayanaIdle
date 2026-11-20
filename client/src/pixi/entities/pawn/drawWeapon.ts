@@ -148,7 +148,7 @@ function drawStaff(
   const gr = p.gemR * s;
   ctx.beginPath();
   ctx.ellipse(ox, top - gr * 0.7, gr, gr, 0, 0, Math.PI * 2);
-  paint(ctx, c.metal, ol);
+  paint(ctx, c.gem, ol);
 }
 
 /**

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>裝備說明框折行 Demo — MayanaIdle</title>
+<!--
+  裝備浮動說明框的長詞綴折行。掛的是正式的 `EquipmentDetail`，只換成假裝備。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/tooltip-wrap.html
+
+  .demo-* 只是這頁的排版；說明框樣式來自 App.css（`34-ui-guidelines.md` § 34.2 第 20 點）。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 20px; font-size: var(--fs-sm);
+  position: sticky; top: 0; z-index: 10;
+}
+.demo-bar label { display: inline-flex; gap: 6px; align-items: center; }
+.demo-bar input[type=range] { width: 120px; }
+.demo-bar output { font-family: var(--font-mono, monospace); color: var(--accent-gold); min-width: 3em; }
+.demo-bar button {
+  padding: 6px 14px; background: var(--bg-card); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm);
+}
+.demo-section-title { font-family: var(--font-display); color: var(--accent-gold); font-size: var(--fs-lg); margin: 24px 0 8px; }
+.demo-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-bottom: 24px; }
+.demo-col h3 { font-size: var(--fs-sm); color: var(--text-dim); margin: 0 0 6px; font-weight: 400; }
+/* 模擬視窗：寬度即裝置寬度，說明框上限 = 寬度 − 16px（同 App.css 的 100vw − 16px） */
+.demo-viewport {
+  border: 1px dashed var(--outline-dark); padding: 8px;
+  display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+}
+.demo-viewport .bag-tooltip {
+  position: static; pointer-events: auto;
+  max-width: calc(var(--demo-vw) - 16px);
+}
+.demo-viewport .bag-tooltip:has(.equip-detail-ability, .equip-detail-unique) {
+  min-width: min(calc(var(--fs-xs) * 36), calc(var(--demo-vw) - 16px));
+}
+
+/* ═══════════ 量測表 ═══════════ */
+.demo-table { border-collapse: collapse; font-size: var(--fs-xs); }
+.demo-table th, .demo-table td { border-bottom: 1px solid var(--border-subtle); padding: 3px 8px; text-align: left; vertical-align: top; }
+.demo-table th { color: var(--text-dim); font-weight: 400; position: sticky; top: 52px; background: var(--bg-deepest); }
+.demo-table td.num { font-family: var(--font-mono, monospace); text-align: right; white-space: nowrap; }
+.demo-table tr.over-mobile td.num { color: #EF4444; font-weight: 700; }
+.demo-table tr.over-desktop td.num { color: #FACC15; }
+.demo-table .demo-sample { display: inline-block; white-space: nowrap; }
+.demo-measure { position: absolute; left: -99999px; top: 0; visibility: hidden; }
+.demo-measure .equip-detail-affix { display: inline-block; white-space: nowrap; }
+.demo-legend span { margin-right: 16px; }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">裝備說明框：長詞綴折行</h1>
+  <p class="demo-note">
+    正式樣式（`34-ui-guidelines.md` § 34.2 第 20 點）在手機與桌面寬度下的樣子。按住 Alt（Mac 為 Option）看數值區間。<br>
+    下方量測表列出每一條詞綴取最長數值時的寬度：紅字在目前選的手機寬度下會折行，黃字在桌面最小框寬（36 字）下會折行。
+  </p>
+  <div class="demo-bar">
+    <label>手機寬度
+      <select id="mobile-width">
+        <option value="360">360（小 Android）</option>
+        <option value="375">375（iPhone SE／mini）</option>
+        <option value="390" selected>390（iPhone 一般）</option>
+        <option value="430">430（iPhone Pro Max）</option>
+      </select>
+    </label>
+    <label>桌面寬度 <select id="desktop-width"><option value="1280" selected>1280</option><option value="1920">1920</option></select></label>
+    <label>字級縮放 <input id="font-scale" type="range" min="0.8" max="1.5" step="0.05" value="1"><output id="font-scale-out">1</output></label>
+  </div>
+  <div id="root"></div>
+  <script type="module" src="./tooltipWrapDemo.tsx"></script>
+</body>
+</html>

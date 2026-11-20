@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>怪物遠程武器 Demo — MayanaIdle</title>
+<!--
+  怪物遠程物理的武器演出（`docs/design/48-vfx.md` § 48.6.5）。
+  用 Vite dev server 開：`npm run dev` 後開 http://localhost:5173/MayanaIdle/demo/monster-bow.html
+  接法見 `monsterBowDemo.ts`；「匯出參數」的 JSON = 接進遊戲要用的常數。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.demo-main { flex: 1 1 640px; min-width: 0; }
+.demo-side { flex: 0 0 300px; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px; font-size: var(--fs-sm);
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 10px; }
+.demo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.demo-row label { flex: 0 0 96px; }
+.demo-row input[type="range"] { flex: 1; }
+.demo-row output { flex: 0 0 56px; text-align: right; font-variant-numeric: tabular-nums; }
+#stage { width: 100%; height: 640px; border: 1px solid var(--border); border-radius: var(--radius-md); display: block; }
+#export { width: 100%; height: 190px; font-family: monospace; font-size: 12px; background: var(--bg-deepest); color: var(--text-primary); border: 1px solid var(--border-subtle); }
+</style>
+</head>
+<body>
+<h1 class="demo-title">怪物遠程武器</h1>
+<p class="demo-note">
+  物理組：9 種遠程物理怪，妖魔投斧手擲斧，其餘拿弓。法系組：9 種遠程魔法怪拿雙手杖（鏡湖歌者不演），寶珠為攻擊元素色，彈丸從寶珠出發。<br>
+  材質依怪物等級：Lv39 以下鐵、40～49 銀、50～59 米索利、60 以上奧里哈魯根。投射物在放箭、脫手、前推到底那一刻才出發。
+</p>
+<div class="demo-layout">
+  <div class="demo-main">
+    <canvas id="stage"></canvas>
+  </div>
+  <div class="demo-side">
+    <div class="demo-card">
+      <h2>顯示</h2>
+      <div class="demo-row"><label for="group">組別</label><select id="group" style="flex: 1"><option value="physical">物理（弓／擲斧）</option><option value="magic">法系（法杖）</option></select></div>
+      <div class="demo-row"><label for="focus">怪物</label><select id="focus" style="flex: 1"></select></div>
+      <div class="demo-row"><label for="bearing">朝向</label><select id="bearing" style="flex: 1" disabled></select></div>
+      <div class="demo-row"><label for="zoom">畫面縮放</label><input id="zoom" type="range" min="1" max="4" step="0.25" value="1.75"><output id="zoom-out"></output></div>
+      <div class="demo-row"><label for="speed">播放速度</label><input id="speed" type="range" min="0.1" max="1" step="0.05"><output id="speed-out"></output></div>
+      <div class="demo-row"><label for="intervalMs">攻擊間隔 ms</label><input id="intervalMs" type="range" min="400" max="2400" step="50"><output id="intervalMs-out"></output></div>
+    </div>
+    <div class="demo-card">
+      <h2>武器掛點</h2>
+      <div class="demo-row"><label for="lift">握點抬高 px</label><input id="lift" type="range" min="-10" max="20" step="0.5"><output id="lift-out"></output></div>
+      <div class="demo-row"><label for="scale">武器縮放</label><input id="scale" type="range" min="0.5" max="1.6" step="0.05"><output id="scale-out"></output></div>
+    </div>
+    <div class="demo-card" id="throw-card">
+      <h2>擲斧</h2>
+      <div class="demo-row"><label for="throwDurationMs">設計時長 ms</label><input id="throwDurationMs" type="range" min="200" max="800" step="10"><output id="throwDurationMs-out"></output></div>
+      <div class="demo-row"><label for="throwArcFrom">起手角度</label><input id="throwArcFrom" type="range" min="40" max="200" step="5"><output id="throwArcFrom-out"></output></div>
+      <div class="demo-row"><label for="throwArcTo">脫手角度</label><input id="throwArcTo" type="range" min="-60" max="40" step="5"><output id="throwArcTo-out"></output></div>
+      <div class="demo-row"><label for="throwStrike">脫手時點</label><input id="throwStrike" type="range" min="0.3" max="0.9" step="0.02"><output id="throwStrike-out"></output></div>
+      <div class="demo-row"><label for="axeLen">飛斧長度 px</label><input id="axeLen" type="range" min="6" max="24" step="0.5"><output id="axeLen-out"></output></div>
+      <div class="demo-row"><label for="axeSpinPx">每圈 px</label><input id="axeSpinPx" type="range" min="20" max="160" step="5"><output id="axeSpinPx-out"></output></div>
+    </div>
+    <div class="demo-card">
+      <h2>匯出參數</h2>
+      <textarea id="export" readonly></textarea>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { MonsterBowStage, FOCUS_BEARINGS } from './monsterBowDemo.ts';
+const canvas = document.getElementById('stage');
+const query = new URLSearchParams(location.search);
+const group = query.get('group') === 'magic' ? 'magic' : 'physical';
+const stage = new MonsterBowStage(group);
+const zoomInput = document.getElementById('zoom');
+const groupSelect = document.getElementById('group');
+groupSelect.value = group;
+groupSelect.addEventListener('change', () => {
+  const next = new URLSearchParams({ group: groupSelect.value, zoom: zoomInput.value });
+  location.search = next.toString();
+});
+document.getElementById('throw-card').hidden = group === 'magic';
+if (query.has('zoom')) zoomInput.value = query.get('zoom');
+await stage.init(canvas, canvas.clientWidth, canvas.clientHeight);
+const focus = document.getElementById('focus');
+focus.add(new Option('全部輪流', ''));
+stage.names.forEach((name, i) => focus.add(new Option(name, String(i))));
+if (query.has('focus')) focus.value = query.get('focus');
+const bearing = document.getElementById('bearing');
+FOCUS_BEARINGS.forEach(b => bearing.add(new Option(b.label, String(b.deg))));
+if (query.has('bearing')) bearing.value = query.get('bearing');
+const applyFocus = () => {
+  bearing.disabled = focus.value === '';
+  stage.setFocus(focus.value === '' ? null : Number(focus.value), Number(bearing.value));
+};
+focus.addEventListener('change', applyFocus);
+bearing.addEventListener('change', applyFocus);
+const sliders = ['speed', 'intervalMs', 'lift', 'scale', 'throwDurationMs', 'throwArcFrom', 'throwArcTo', 'throwStrike', 'axeLen', 'axeSpinPx'];
+function sync() {
+  for (const key of sliders) document.getElementById(`${key}-out`).textContent = String(stage.params[key]);
+  document.getElementById('zoom-out').textContent = `×${zoomInput.value}`;
+  document.getElementById('export').value = stage.exportJson();
+}
+for (const key of sliders) if (query.has(key)) stage.params[key] = Number(query.get(key));
+stage.apply();
+for (const key of sliders) {
+  const input = document.getElementById(key);
+  input.value = stage.params[key];
+  input.addEventListener('input', () => { stage.params[key] = Number(input.value); stage.apply(); sync(); });
+}
+const relayout = () => stage.layout(canvas.clientWidth, canvas.clientHeight, Number(zoomInput.value));
+zoomInput.addEventListener('input', () => { relayout(); sync(); });
+window.addEventListener('resize', relayout);
+relayout();
+applyFocus();
+sync();
+</script>
+</body>
+</html>

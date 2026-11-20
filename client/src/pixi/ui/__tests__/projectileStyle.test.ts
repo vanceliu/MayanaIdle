@@ -50,6 +50,11 @@ describe('怪物投射物外型（§ 42.4）', () => {
     });
   });
 
+  it('擲斧：飛斧，顏色是傳入的斧刃材質色（§ 48.6.5）', () => {
+    expect(getMonsterProjectileStyle('ranged', 'fire', 'throwAxe', 0x123456)).toEqual({ shape: 'axe', color: 0x123456 });
+    expect(getMonsterProjectileStyle('ranged', 'fire', 'bow', 0x123456).shape).toBe('arrow');
+  });
+
   it('遠程魔法：彈丸，依怪物元素上色', () => {
     expect(getMonsterProjectileStyle('magic', 'ice')).toEqual({
       shape: 'circle',

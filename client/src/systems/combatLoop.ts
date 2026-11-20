@@ -10,8 +10,8 @@
  */
 import { isPartySharedAffixDebuff } from '../models/affix';
 import type { Position } from '../models/mapControl';
-import type { MonsterInstance, MonsterAttackType, ElementType } from '../models/monster';
-import { isRangedAttackType } from '../models/monster';
+import type { MonsterInstance, MonsterAttackType, MonsterWeapon, ElementType } from '../models/monster';
+import { isRangedAttackType, monsterRangedWeapon } from '../models/monster';
 import type { EquipmentInstance } from '../models/equipment';
 import type { Character } from '../models/character';
 import type { ActiveEffect } from '../models/effect';
@@ -101,6 +101,10 @@ export type CombatVisual =
       attackType: MonsterAttackType;
       /** 有視線才演投射物；沒有視線就退回近戰演出（傷害照樣結算） */
       ranged: boolean;
+      /** 遠程攻擊演的武器（`48-vfx.md` § 48.6.5）；材質依 `level`、演出長度依 `attackIntervalMs` */
+      weapon?: MonsterWeapon | null;
+      level?: number;
+      attackIntervalMs?: number;
       damage: number;
       isDodged: boolean;
       crit: boolean;
@@ -289,6 +293,7 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
     appendLogs(session, logs);
 
     const monster = monsterStore.monsters.find(m => m.id === event.monsterId);
+    const attackerInstance = monsterInstances.get(event.monsterId);
     visuals.push({
       kind: 'monster_attack',
       monsterId: event.monsterId,
@@ -304,7 +309,10 @@ export function applyMonsterAttacks(instance: MapInstance, events: MonsterAttack
       crit: (event.damageMultiplier ?? 1) > 1,
       hasDebuff: !!result.debuffLog,
       projectileSpeed: event.projectileSpeed,
-      element: monsterInstances.get(event.monsterId)?.element,
+      element: attackerInstance?.element,
+      weapon: attackerInstance ? monsterRangedWeapon(attackerInstance) : null,
+      level: attackerInstance?.level,
+      attackIntervalMs: attackerInstance?.attackInterval,
     });
 
     if (result.isDodged) tryDodgeCounter(session, instance, event, visuals);

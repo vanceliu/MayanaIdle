@@ -22,6 +22,11 @@ import { loadMonsterArt, monsterArtKey, type MonsterArtImages } from './monster/
 import { monsterArtTexture } from './monster/monsterArtTextures';
 import { facingFromDelta } from './pawn/facing';
 import type { PawnDirectionId } from './pawn/geometry';
+import { WeaponSprite } from './pawn/WeaponSprite';
+import { pawnFacingForAim } from './pawn/weaponGeometry';
+import type { WeaponMaterial } from '../../models/equipment';
+import type { MonsterWeapon } from '../../models/monster';
+import { MONSTER_WEAPON_MOUNT, monsterWeaponAttack } from './monster/monsterWeapon';
 
 const ART_VIEWS: MonsterView[] = ['front', 'side', 'back'];
 
@@ -80,6 +85,9 @@ export class MonsterEntity {
   private lastPos: Position | null = null;
   private healthBar: HealthBar;
   private castBar: CastBar;
+  /** 遠程物理出手時的弓／擲斧（`48-vfx.md` § 48.6.5），平常不畫 */
+  private readonly weapon = new WeaponSprite();
+  private weaponBehind = false;
   /** 被打到時往後彈（§ 48.7.6）。位置每幀重設，所以偏移疊在 `updatePosition()` 裡 */
   private readonly hitReaction = new HitReaction();
   /** 沒有受擊偏移時該站的螢幕座標。淡出期間沒有 `updatePosition()` 可依靠 */
@@ -140,6 +148,8 @@ export class MonsterEntity {
     this.overhead.addChild(this.healthBar.container);
     this.castBar = new CastBar();
     this.overhead.addChild(this.castBar.container);
+    this.weapon.container.visible = false;
+    this.container.addChild(this.weapon.container);
     this.container.addChild(this.overhead);
 
     this.drawBody();
@@ -290,6 +300,9 @@ export class MonsterEntity {
    * 不會再收到 `updatePosition()`，淡出期間的下沉就沒人套了。
    */
   update(deltaMs: number): void {
+    this.weapon.update(deltaMs);
+    this.weapon.container.visible = this.weapon.playing;
+    if (this.weapon.behindPawn !== this.weaponBehind) this.syncWeaponDepth();
     this.hitReaction.update(deltaMs);
     this.flash.alpha = this.hitReaction.flashAlpha;
     if (this.art) this.art.flashSprite.alpha = this.flash.alpha;
@@ -371,6 +384,33 @@ export class MonsterEntity {
     if (this.art) this.art.flashSprite.alpha = 0;
     this.container.alpha = 1;
     this.healthBar.update(1, 1);
+  }
+
+  /** 遠程出手：轉向 `aim` 並演弓／擲斧／法杖（`48-vfx.md` § 48.6.5） */
+  playRangedAttack(
+    weapon: MonsterWeapon, material: WeaponMaterial, aim: number, attackIntervalMs: number, gemColor?: string | null,
+  ): void {
+    this.setFacing(pawnFacingForAim(aim));
+    this.weapon.container.scale.set(MONSTER_WEAPON_MOUNT.scale);
+    this.weapon.container.y = -MONSTER_WEAPON_MOUNT.lift;
+    this.weapon.play(monsterWeaponAttack(weapon, material, aim, attackIntervalMs, gemColor));
+    this.weapon.container.visible = true;
+    this.syncWeaponDepth();
+  }
+
+  /** 武器往螢幕上方出手時畫在身體之下（§ 48.6.3） */
+  private syncWeaponDepth(): void {
+    this.weaponBehind = this.weapon.behindPawn;
+    const body = this.art?.sprite ?? this.body;
+    this.container.removeChild(this.weapon.container);
+    const at = this.container.getChildIndex(this.weaponBehind ? body : this.overhead);
+    this.container.addChildAt(this.weapon.container, at);
+  }
+
+  private setFacing(facing: PawnDirectionId): void {
+    if (facing === this.facing) return;
+    this.facing = facing;
+    if (this.hasArt) this.refreshArt();
   }
 
   /** 出手時轉向被打的對象（`25-monster-system.md` § 25.2.2「朝向判定」）；之後沒移動就維持這個朝向 */

@@ -68,6 +68,16 @@ describe('武器演出的生命週期', () => {
     expect(weaponPlaybackMs(cfg, 1200)).toBe(cfg.durationMs);
   });
 
+  it('motion 覆寫揮法：擲斧揮到底就脫手，不演收招', async () => {
+    const { MONSTER_THROW_AXE_MOTION: cfg } = await import('../../monster/monsterWeapon');
+    const w = new WeaponSprite();
+    w.play(attack({ type: 'axe', motion: cfg, attackIntervalMs: 2000 }));
+    w.update(cfg.durationMs * cfg.tStrike - 10);
+    expect(w.container.children.some(c => c.visible)).toBe(true);
+    w.update(20);
+    expect(w.container.children.some(c => c.visible)).toBe(false);
+  });
+
   it('連續出手會從頭重播，不會接在上一次的中段', () => {
     const w = new WeaponSprite();
     w.play(attack());
@@ -124,6 +134,17 @@ describe('投射物的出射點', () => {
       }),
     );
     expect(seen.size).toBe(4);
+  });
+
+  it('擲斧從斧頭脫手，比握點高一截', async () => {
+    const { weaponMuzzle, weaponGrip, WEAPON_ART: ART } = await import('../weaponGeometry');
+    const { MONSTER_THROW_AXE_MOTION } = await import('../../monster/monsterWeapon');
+    const params = ART.axe.params;
+    if (params.shape !== 'axe') throw new Error('axe 應為 axe 形狀');
+    const art = { ...ART.axe, motion: MONSTER_THROW_AXE_MOTION };
+    const muzzle = weaponMuzzle(art, 0);
+    const grip = weaponGrip(art.geom, 0);
+    expect(Math.hypot(muzzle.x - grip.x, muzzle.y - grip.y)).toBeGreaterThan(params.shaftLen * 0.5);
   });
 
   it('法杖從頂端的寶珠出去，比握點高一截', async () => {

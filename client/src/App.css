@@ -5273,7 +5273,8 @@ button.active {
 }
 
 /*
- * 浮動說明框裡的裝備：一條詞綴不折行，框依最長的一條撐寬，上限是視窗寬度；
+ * 浮動說明框裡的裝備（§ 34.2 第 20 點）：框依最長的一條一般詞綴撐寬，上限是視窗寬度，到上限才折行；
+ * 隨機技能與 T7 獨有詞綴不撐寬、在框內折行，框寬至少 36 字；折行續行縮排 1 字。
  * 其他道具維持固定寬度。商店／倉庫列表內嵌的裝備詳情不受影響，照常折行
  */
 .bag-tooltip:has(.equip-detail),
@@ -5282,8 +5283,24 @@ button.active {
   min-width: 220px;
   max-width: calc(100vw - 16px);
 }
+.bag-tooltip:has(.equip-detail-ability, .equip-detail-unique),
+.tooltip-popup:has(.equip-detail-ability, .equip-detail-unique) {
+  min-width: min(calc(var(--fs-xs) * 36), calc(100vw - 16px));
+}
 .bag-tooltip .equip-detail-affix,
-.tooltip-popup .equip-detail-affix { white-space: nowrap; }
+.tooltip-popup .equip-detail-affix {
+  padding-left: calc(4px + var(--fs-xs));
+  text-indent: calc(var(--fs-xs) * -1);
+}
+.bag-tooltip .equip-detail-affix:is(.ability, .unique),
+.tooltip-popup .equip-detail-affix:is(.ability, .unique) {
+  contain: inline-size;
+  align-self: stretch;
+}
+/* 「；」之後整段放得下才接在同一行；inline-block 擋住刪除線傳遞，劃線要補上 */
+.equip-detail-affix-tail { display: inline-block; text-indent: 0; }
+.equip-detail-affix.suppressed .equip-detail-affix-tail,
+.equip-detail-affixes.is-frozen .equip-detail-affix-tail { text-decoration: line-through; }
 
 .bag-tooltip-content {
   display: flex;

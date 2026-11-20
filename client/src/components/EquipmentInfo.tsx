@@ -85,6 +85,30 @@ function DisplayParts({ parts, showRange }: { parts: DisplayPart[]; showRange: b
   );
 }
 
+/** 在第一個「；」之後切成前後兩段；沒有「；」或其後無內容時後段為空 */
+function splitAtSemicolon(parts: DisplayPart[]): [DisplayPart[], DisplayPart[]] {
+  const i = parts.findIndex(p => !p.range && p.text.includes('；'));
+  if (i < 0) return [parts, []];
+  const cut = parts[i].text.indexOf('；') + 1;
+  const rest = parts[i].text.slice(cut);
+  const tail = [...(rest ? [{ text: rest }] : []), ...parts.slice(i + 1)];
+  if (tail.length === 0) return [parts, []];
+  return [[...parts.slice(0, i), { text: parts[i].text.slice(0, cut) }], tail];
+}
+
+/** 隨機技能／T7 獨有詞綴列：「；」之後整段放得下才接在同一行（§ 34.2 第 20 點） */
+function SemicolonParts({ parts, showRange }: { parts: DisplayPart[]; showRange: boolean }) {
+  const [head, tail] = splitAtSemicolon(parts);
+  return (
+    <>
+      <DisplayParts parts={head} showRange={showRange} />
+      {tail.length > 0 && (
+        <span className="equip-detail-affix-tail"><DisplayParts parts={tail} showRange={showRange} /></span>
+      )}
+    </>
+  );
+}
+
 interface EquipmentDetailProps {
   item: EquipmentInstance;
   hint?: string;
@@ -234,7 +258,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
             className={`equip-detail-affix ability${abilitySuppressed ? ' suppressed' : ''}`}
             title={abilitySuppressed ? '同種類已由其他裝備生效' : '印記無法變更'}
           >
-            <DisplayParts parts={formatAbilityDisplayParts(item.ability, item)} showRange={showRange} />
+            <SemicolonParts parts={formatAbilityDisplayParts(item.ability, item)} showRange={showRange} />
           </div>
         </div>
       )}
@@ -245,7 +269,7 @@ export function EquipmentDetail({ item, hint, compact, templates }: EquipmentDet
             className={`equip-detail-affix unique${uniqueSuppressed ? ' suppressed' : ''}`}
             title={uniqueSuppressed ? '同類已由其他裝備生效' : '印記無法變更'}
           >
-            {formatUniqueAffixDisplay(item.uniqueAffix)}
+            <SemicolonParts parts={[{ text: formatUniqueAffixDisplay(item.uniqueAffix) }]} showRange={false} />
           </div>
         </div>
       )}

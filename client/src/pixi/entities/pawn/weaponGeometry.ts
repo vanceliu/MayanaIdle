@@ -47,6 +47,8 @@ export const WEAPON_METAL_DEFAULT = WEAPON_MATERIAL_COLOR.iron;
 export interface WeaponColors {
   /** 材質色。吃在刀身、斧刃、槌頭、寶珠、弓臂、爪上 */
   metal: string;
+  /** 法杖寶珠；未指定＝材質色（怪物法杖用攻擊元素色，`48-vfx.md` § 48.6.5） */
+  gem: string;
   /** 握把、木柄、杖身、箭桿 */
   handle: string;
   /** 弓的中段握把 */
@@ -61,9 +63,11 @@ export interface WeaponColors {
  * 依材質組出一套配色。**只有材質色是變的**，握把與綁帶固定 ——
  * 整把一起換色會讓木弓與秘銀弓只剩色相差異，看不出哪裡是握把。
  */
-export function weaponColors(material?: WeaponMaterial | null): WeaponColors {
+export function weaponColors(material?: WeaponMaterial | null, gem?: string | null): WeaponColors {
+  const metal = material ? WEAPON_MATERIAL_COLOR[material] : WEAPON_METAL_DEFAULT;
   return {
-    metal: material ? WEAPON_MATERIAL_COLOR[material] : WEAPON_METAL_DEFAULT,
+    metal,
+    gem: gem ?? metal,
     handle: WEAPON_HANDLE_COLOR,
     grip: WEAPON_GRIP_COLOR,
     wrap: WEAPON_WRAP_COLOR,
@@ -170,10 +174,11 @@ export type WeaponParams =
    ═══════════════════════════════════════════════════════════ */
 
 /**
- * 四種動作。分類依「武器怎麼用」，不是依單手雙手 ——
+ * 五種動作。分類依「武器怎麼用」，不是依單手雙手 ——
  * 雙手劍與單手劍都是橫揮，差別在幅度與時間，那是數字不是動作。
+ * `throw` 只給怪物（擲斧）：揮擊同一條弧線，揮到底武器脫手不再畫。
  */
-export type WeaponMotion = 'swing' | 'dual' | 'thrust' | 'bow';
+export type WeaponMotion = 'swing' | 'dual' | 'thrust' | 'bow' | 'throw';
 
 /**
  * 武器的揮擊方向 —— **一個連續的螢幕角度**（度），不是幾個固定方向。
@@ -319,6 +324,10 @@ export interface WeaponAttack {
   aim: number;
   /** 這次出手的攻擊間隔（ms），決定演出被壓縮多少（§ 48.6.4） */
   attackIntervalMs: number;
+  /** 取代該武器類型的揮法（怪物擲斧，`monster/monsterWeapon.ts`） */
+  motion?: WeaponMotionCfg;
+  /** 法杖寶珠色（`#rrggbb`）；未指定＝材質色 */
+  gemColor?: string | null;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -710,7 +719,9 @@ export function weaponGrip(g: WeaponGeom, aim: number, hand: 0 | 1 = 0): WeaponG
  * 從角色身上射出的話，畫面上會看到箭從弓的旁邊冒出來 —— 弓已經畫在
  * 離身體一段距離的地方了，兩者對不起來。
  */
-function weaponMuzzleLocal(params: WeaponParams): { x: number; y: number } {
+function weaponMuzzleLocal(params: WeaponParams, motion: WeaponMotion): { x: number; y: number } {
+  /* 擲斧：從斧頭脫手 */
+  if (motion === 'throw' && params.shape === 'axe') return { x: 0, y: -params.shaftLen * 0.8 };
   switch (params.shape) {
     /* 弓：握點就在弓的正中央，箭從弓背那一側離開 */
     case 'bow': return { x: params.bendW * 0.5, y: 0 };
@@ -729,7 +740,7 @@ function weaponMuzzleLocal(params: WeaponParams): { x: number; y: number } {
 export function weaponMuzzle(art: WeaponArt, aim: number): { x: number; y: number } {
   const pose = weaponPose(art.motion, art.geom, art.motion.tStrike, 0, aim);
   const grip = weaponGrip(art.geom, aim, 0);
-  const local = weaponMuzzleLocal(art.params);
+  const local = weaponMuzzleLocal(art.params, art.motion.motion);
   const s = art.geom.scale / 100;
   const r = (pose.angle * Math.PI) / 180;
   const cos = Math.cos(r);
@@ -834,6 +845,7 @@ export function weaponPose(
 ): WeaponPose {
   const tt = hand === 1 && cfg.motion === 'dual' ? t - cfg.handDelay : t;
   if (tt < 0 || tt > 1) return HIDDEN;
+  if (cfg.motion === 'throw' && tt > cfg.tStrike) return HIDDEN;
 
   const axis = weaponAxis(aim);
   const aimVec = aimVector(aim);

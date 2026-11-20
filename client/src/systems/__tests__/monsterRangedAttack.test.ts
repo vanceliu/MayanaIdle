@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { calculateMonsterAttack, BASE_CHARACTER_DEFENSE } from '../combat';
-import { isRangedAttackType } from '../../models/monster';
+import { isRangedAttackType, monsterRangedWeapon } from '../../models/monster';
+import { createMonsterFromTemplate } from '../monsterSpawn';
+import type { MapMonster } from '../../stores/mapMonsterStore';
 import { MONSTER_SEEDS } from '../../db/seed/monsterSeeds';
 import type { Character } from '../../models/character';
 import type { MonsterInstance, MonsterAttackType } from '../../models/monster';
@@ -127,4 +129,36 @@ describe('遠程物理傷害走物理減傷', () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('遠程物理的武器演出（`48-vfx.md` § 48.6.5）', () => {
+  const ranged = MONSTER_SEEDS.filter(t => t.attackType === 'ranged');
+
+  it('只有妖魔投斧手擲斧，其餘弓箭手拿弓', () => {
+    const throwers = [...new Set(ranged.filter(t => monsterRangedWeapon(t) === 'throwAxe').map(t => t.name))];
+    expect(throwers).toEqual(['妖魔投斧手']);
+    expect(ranged.filter(t => monsterRangedWeapon(t) === 'bow')).toHaveLength(ranged.length - 1);
+  });
+
+  it('遠程魔法拿雙手杖，只有鏡湖歌者不演', () => {
+    const magic = MONSTER_SEEDS.filter(t => t.attackType === 'magic');
+    const unarmed = [...new Set(magic.filter(t => monsterRangedWeapon(t) === null).map(t => t.name))];
+    expect(unarmed).toEqual(['鏡湖歌者']);
+    expect(magic.filter(t => monsterRangedWeapon(t) === 'twoHandStaff')).toHaveLength(magic.length - 1);
+  });
+
+  it('近戰不演武器；`none` 一律不演', () => {
+    expect(monsterRangedWeapon({ attackType: 'melee' })).toBeNull();
+    expect(monsterRangedWeapon({ attackType: 'melee', rangedWeapon: 'bow' })).toBeNull();
+    expect(monsterRangedWeapon({ attackType: 'ranged', rangedWeapon: 'none' })).toBeNull();
+    expect(monsterRangedWeapon({})).toBeNull();
+  });
+
+  it('生成的怪物實例帶著模板的 rangedWeapon', () => {
+    const template = MONSTER_SEEDS.find(t => t.name === '妖魔投斧手')!;
+    const mm = { id: 'm1', isBoss: false } as MapMonster;
+    const inst = createMonsterFromTemplate(mm, [template])!;
+    expect(inst.rangedWeapon).toBe('throwAxe');
+    expect(monsterRangedWeapon(inst)).toBe('throwAxe');
+  });
 });

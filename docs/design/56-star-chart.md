@@ -1,6 +1,6 @@
 # 56. 星盤
 
-> **狀態：整合中（`99-ai-constraints.md` § 99.2）；盤面與規則在 `client/src/models/starChart.ts`，demo 為 `client/demo/star-chart.html`。標「暫定」的數值可再調。**
+> **盤面與規則在 `client/src/models/starChart.ts`，demo 為 `client/demo/star-chart.html`。標「暫定」的數值可再調。**
 
 五職業共用一張被動節點盤，各職業從不同起點出發，以升級取得的點數沿路徑點亮節點。
 
