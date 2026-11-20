@@ -18,6 +18,23 @@ function renderBoard() {
   );
 }
 
+describe('StarChartBoard 篩選', () => {
+  it('輸入 hp：最大 HP 節點與帶 HP 的命星高亮，其餘（含命星）變暗；清空恢復', () => {
+    const { container, getByLabelText } = renderBoard();
+    const input = getByLabelText('篩選星點');
+    fireEvent.change(input, { target: { value: 'hp' } });
+    const node = (id: string) => container.querySelector(`.star-node[data-id="${id}"]`)!;
+    expect(node('knight-r300').classList.contains('is-match')).toBe(true);
+    expect(node('center-240-k').classList.contains('is-match')).toBe(true);
+    expect(node('knight-r360').classList.contains('is-dimmed')).toBe(true);
+    expect(node('knight-keystone').classList.contains('is-dimmed')).toBe(true);
+    expect(node('knight-r300').querySelector('.star-node-match')).not.toBeNull();
+    expect(container.querySelector('.star-board.is-filtering')).not.toBeNull();
+    fireEvent.change(input, { target: { value: '' } });
+    expect(container.querySelector('.is-dimmed, .is-match')).toBeNull();
+  });
+});
+
 describe('StarChartBoard tooltip', () => {
   it('滑鼠移到節點顯示，移開收起', () => {
     const { container } = renderBoard();

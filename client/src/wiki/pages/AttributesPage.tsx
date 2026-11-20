@@ -71,8 +71,8 @@ export function AttributesPage() {
           最大 HP／MP
         </h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
-          最大 HP ＝（等級 × VIT × 職業 HP 比值 ＋ 職業 HP 加成 ＋ 裝備固定 HP）×（1 ＋ 星盤最大 HP%）<br />
-          最大 MP ＝（等級 × SPI × 職業 MP 比值 ＋ 職業 MP 加成 ＋ 裝備固定 MP）×（1 ＋ 星盤最大 MP%）<br />
+          最大 HP ＝（等級 × VIT × 職業 HP 比值 ＋ 職業 HP 加成 ＋ 裝備固定 HP ＋ 星盤固定 HP）×（1 ＋ 星盤最大 HP%）<br />
+          最大 MP ＝（等級 × SPI × 職業 MP 比值 ＋ 職業 MP 加成 ＋ 裝備固定 MP ＋ 星盤固定 MP）×（1 ＋ 星盤最大 MP%）<br />
           VIT／SPI 取原始值，含建角配點、星盤與裝備，不含 buff；升級時 HP／MP 回滿。
         </p>
         <div className="wiki-table-wrap">

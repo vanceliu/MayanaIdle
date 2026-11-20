@@ -71,9 +71,9 @@ describe('飾品與副手詞綴分類（§ 7.5／§ 7.6）', () => {
     }
   });
 
-  it('項鍊 15 種、戒指 15 種、副手 15 種', () => {
-    expect(getAffixPoolForSlot('necklace')).toHaveLength(15);
-    expect(getAffixPoolForSlot('ring')).toHaveLength(15);
+  it('項鍊 13 種、戒指 13 種、副手 15 種', () => {
+    expect(getAffixPoolForSlot('necklace')).toHaveLength(13);
+    expect(getAffixPoolForSlot('ring')).toHaveLength(13);
     expect(getAffixPoolForSlot('offhand')).toHaveLength(15);
   });
 });

@@ -497,13 +497,19 @@ export const ON_HIT_TIERS: AffixTier[] = [
   { tier: 7, min: 6.2, max: 7 },
 ];
 
-/**
- * 最大 HP／最大 MP 的固定值階級表（§ 7.3.1）。單位是點數，不是百分比。
- *
- * 固定值不隨等級成長：T7 的 100 在 Lv50（約 594 HP）相當於 17%，
- * 在 Lv100（約 1168 HP）只剩 8.6%。後期血量由等級本身承擔。
- */
+/** 最大 HP／最大 MP 的固定值階級表（§ 7.3.1）。單位是點數，不是百分比 */
 export const FLAT_HP_MP_TIERS: AffixTier[] = [
+  { tier: 1, min: 11, max: 14 },
+  { tier: 2, min: 18, max: 22 },
+  { tier: 3, min: 27, max: 32 },
+  { tier: 4, min: 35, max: 41 },
+  { tier: 5, min: 43, max: 49 },
+  { tier: 6, min: 53, max: 59 },
+  { tier: 7, min: 63, max: 70 },
+];
+
+/** § 7.3.3 舊最大 HP／MP 階級表：防具與飾品 */
+export const LEGACY_FLAT_HP_MP_TIERS: AffixTier[] = [
   { tier: 1, min: 15, max: 20 },
   { tier: 2, min: 25, max: 32 },
   { tier: 3, min: 38, max: 46 },
@@ -513,8 +519,8 @@ export const FLAT_HP_MP_TIERS: AffixTier[] = [
   { tier: 7, min: 90, max: 100 },
 ];
 
-/** § 7.3.1 武器的最大 HP／MP：防具表 × 2 */
-export const WEAPON_HP_MP_TIERS: AffixTier[] = FLAT_HP_MP_TIERS.map(t => ({ tier: t.tier, min: t.min * 2, max: t.max * 2 }));
+/** § 7.3.3 舊最大 HP／MP 階級表：武器（防具舊表 × 2） */
+export const LEGACY_WEAPON_HP_MP_TIERS: AffixTier[] = LEGACY_FLAT_HP_MP_TIERS.map(t => ({ tier: t.tier, min: t.min * 2, max: t.max * 2 }));
 
 /** 迴避的專屬階級表（§ 7.3.1），單位為迴避值 */
 export const EVASION_TIERS: AffixTier[] = [
@@ -540,7 +546,7 @@ function equalWidthTiers(width: number, unit: number): AffixTier[] {
 }
 
 /** § 7.3／§ 7.3.1 階級表代號 */
-export type AffixTierTableKey = 'P1' | 'P2' | 'P3' | 'P5' | 'P6' | 'P7' | 'N2' | 'N4' | 'onHit' | 'evasion' | 'hpMp' | 'hpMpWeapon';
+export type AffixTierTableKey = 'P1' | 'P2' | 'P3' | 'P5' | 'P6' | 'P7' | 'N2' | 'N4' | 'onHit' | 'evasion' | 'hpMp';
 
 export const AFFIX_TIER_TABLES: Record<AffixTierTableKey, AffixTier[]> = {
   P1: equalWidthTiers(1, 0.1),
@@ -554,7 +560,6 @@ export const AFFIX_TIER_TABLES: Record<AffixTierTableKey, AffixTier[]> = {
   onHit: ON_HIT_TIERS,
   evasion: EVASION_TIERS,
   hpMp: FLAT_HP_MP_TIERS,
-  hpMpWeapon: WEAPON_HP_MP_TIERS,
 };
 
 /** 詞綴池的一格：階級表代號；額外屬性無 Tier 為 null */
@@ -562,9 +567,11 @@ type PoolEntries = Partial<Record<AffixType, AffixTierTableKey | null>>;
 
 /** § 7.6 武器以外各分類共用的詞綴 */
 const SHARED_POOL: PoolEntries = {
-  max_hp: 'hpMp', max_mp: 'hpMp', hp_regen: 'N2', mp_regen: 'N2',
-  heal_effect: 'P2', potion_effect: 'P2', drop_rate: 'P3', gold_rate: 'P3',
+  hp_regen: 'N2', mp_regen: 'N2', heal_effect: 'P2', potion_effect: 'P2', drop_rate: 'P3', gold_rate: 'P3',
 };
+
+/** § 7.6 最大 HP／MP：武器、項鍊、戒指以外的分類 */
+const HP_MP_POOL: PoolEntries = { max_hp: 'hpMp', max_mp: 'hpMp' };
 
 export const SHARED_AFFIX_TYPES = Object.keys(SHARED_POOL) as AffixType[];
 
@@ -573,19 +580,19 @@ export const AFFIX_POOLS: Record<AffixCategory, PoolEntries> = {
   weapon: {
     attack_power: 'P3', element_brand: 'P3', element_erosion: 'P3', hit_down: 'P3', defense_down: 'P3', element_down: 'P3',
     attack_splash: 'P5', crit_damage: 'P5', attack_lifesteal: 'P6', skill_lifesteal: 'P2',
-    max_hp: 'hpMpWeapon', max_mp: 'hpMpWeapon', hp_regen: 'N4', mp_regen: 'N4',
+    hp_regen: 'N4', mp_regen: 'N4',
   },
-  helmChest: { defense: 'P1', on_hit_hp: 'onHit', on_hit_mp: 'onHit', evasion: 'evasion', bonus_attribute: null, ...SHARED_POOL },
-  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, magic_resist: 'P1', ...SHARED_POOL },
+  helmChest: { defense: 'P1', on_hit_hp: 'onHit', on_hit_mp: 'onHit', evasion: 'evasion', bonus_attribute: null, ...HP_MP_POOL, ...SHARED_POOL },
+  shirtCloak: { defense: 'P1', evasion: 'evasion', bonus_attribute: null, magic_resist: 'P1', ...HP_MP_POOL, ...SHARED_POOL },
   gloves: {
     attack_splash: 'P2', crit_rate: 'P2', crit_damage: 'P2', attack_speed: 'P1',
-    skill_elemental: 'P2', cooldown_reduction: 'P2', ...SHARED_POOL,
+    skill_elemental: 'P2', cooldown_reduction: 'P2', ...HP_MP_POOL, ...SHARED_POOL,
   },
-  boots: { move_speed: 'P2', evasion: 'evasion', cooldown_reduction: 'P2', defense: 'P1', ...SHARED_POOL },
-  belt: { bonus_attribute: null, evasion: 'evasion', cooldown_reduction: 'P1', crit_damage: 'P2', ...SHARED_POOL },
+  boots: { move_speed: 'P2', evasion: 'evasion', cooldown_reduction: 'P2', defense: 'P1', ...HP_MP_POOL, ...SHARED_POOL },
+  belt: { bonus_attribute: null, evasion: 'evasion', cooldown_reduction: 'P1', crit_damage: 'P2', ...HP_MP_POOL, ...SHARED_POOL },
   offhand: {
     block_rate: 'P3', skill_elemental: 'P1', defense: 'P1', thorns: 'P7',
-    on_hit_hp: 'onHit', on_hit_mp: 'onHit', magic_resist: 'P2', ...SHARED_POOL,
+    on_hit_hp: 'onHit', on_hit_mp: 'onHit', magic_resist: 'P2', ...HP_MP_POOL, ...SHARED_POOL,
   },
   necklace: {
     magic_resist: 'P1', cooldown_reduction: 'P1', evasion: 'evasion', bonus_attribute: null,
@@ -614,14 +621,15 @@ const LEGACY_TIER_TABLES: Partial<Record<AffixType, AffixTier[]>> = {
   on_hit_hp: ON_HIT_TIERS,
   on_hit_mp: ON_HIT_TIERS,
   evasion: EVASION_TIERS,
-  max_hp: FLAT_HP_MP_TIERS,
-  max_mp: FLAT_HP_MP_TIERS,
+  max_hp: LEGACY_FLAT_HP_MP_TIERS,
+  max_mp: LEGACY_FLAT_HP_MP_TIERS,
 };
 
 /** 這種詞綴在該分類的階級表（§ 7.6）；不在池內的舊詞綴走 § 7.3.3 */
 export function getAffixTierTable(type: AffixType, category: AffixCategory): AffixTier[] {
   const key = AFFIX_POOLS[category][type];
   if (key) return AFFIX_TIER_TABLES[key];
+  if (category === 'weapon' && (type === 'max_hp' || type === 'max_mp')) return LEGACY_WEAPON_HP_MP_TIERS;
   return LEGACY_TIER_TABLES[type] ?? LEGACY_GENERAL_TIERS;
 }
 

@@ -1,5 +1,5 @@
 /**
- * 星盤盤面（`56-star-chart.md`）：SVG 節點與連線、拖曳平移、滾輪縮放、節點 tooltip。
+ * 星盤盤面（`56-star-chart.md`）：SVG 節點與連線、拖曳平移、滾輪縮放、節點 tooltip、篩選（§ 56.7）。
  * 只負責顯示與點擊；配點規則與扣款由呼叫端處理。
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,10 +10,8 @@ import {
   type StarEffect, type StarNode,
 } from '../models/starChart';
 import { CLASS_NAMES_ZH, type ClassName } from '../models/character';
+import { STAR_KIND_LABEL, starFilterTerms, starNodeMatches } from '../models/starFilter';
 
-const KIND_LABEL: Record<StarNode['kind'], string> = {
-  start: '起點', point: '星點', constellation: '星座', keystone: '命星',
-};
 const NODE_RADIUS: Record<StarNode['kind'], number> = {
   start: 16, point: 7, constellation: 12, keystone: 16,
 };
@@ -66,6 +64,7 @@ const NodeDot = memo(function NodeDot({ node, state, handlers }: { node: StarNod
       onClick={() => handlers.onClick(node.id)}
     >
       {node.kind === 'keystone' && <circle className="star-node-halo" r={NODE_RADIUS.keystone + 6} />}
+      {state.includes('is-match') && <circle className="star-node-match" r={NODE_RADIUS[node.kind] + 7} />}
       <circle r={NODE_RADIUS[node.kind]} style={{ fill: nodeFill(node) }} />
       {(node.kind !== 'point' || node.showLabel) && (
         <text className="star-node-label" y={NODE_RADIUS[node.kind] + 16}>
@@ -94,6 +93,11 @@ export interface StarChartBoardProps {
 
 export function StarChartBoard({ classId, allocated, committed, remaining, costPerPoint, locked = false, onActivate }: StarChartBoardProps) {
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+  const matches = useMemo(() => {
+    const terms = starFilterTerms(filter);
+    return terms.length === 0 ? null : new Set(STAR_NODES.filter(n => starNodeMatches(n, terms)).map(n => n.id));
+  }, [filter]);
   const [view, setView] = useState<View>(INITIAL_VIEW);
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
@@ -198,6 +202,11 @@ export function StarChartBoard({ classId, allocated, committed, remaining, costP
   const zoom = (f: number) => setView(v => ({ ...v, scale: Math.min(4, Math.max(0.5, v.scale * f)) }));
 
   function nodeState(n: StarNode): string {
+    const base = allocationState(n);
+    if (!matches) return base;
+    return `${base} ${matches.has(n.id) ? 'is-match' : 'is-dimmed'}`;
+  }
+  function allocationState(n: StarNode): string {
     if (committed && committed.has(n.id) && !allocated.has(n.id)) return 'is-draft-removed';
     if (allocated.has(n.id)) {
       if (removalSet.has(n.id)) return 'is-removing';
@@ -245,7 +254,7 @@ export function StarChartBoard({ classId, allocated, committed, remaining, costP
   }
 
   return (
-    <div className={`star-board${locked ? ' is-locked' : ''}`}>
+    <div className={`star-board${locked ? ' is-locked' : ''}${matches ? ' is-filtering' : ''}`}>
       <svg
         ref={svgRef}
         viewBox={`${-BOARD_HALF} ${-BOARD_HALF} ${BOARD_HALF * 2} ${BOARD_HALF * 2}`}
@@ -274,7 +283,7 @@ export function StarChartBoard({ classId, allocated, committed, remaining, costP
       </svg>
       {focus && (
         <div className="star-tooltip" style={tooltipStyle(focus)}>
-          <div className="star-tooltip-title">{focus.name}<span className="star-kind">{KIND_LABEL[focus.kind]}</span></div>
+          <div className="star-tooltip-title">{focus.name}<span className="star-kind">{STAR_KIND_LABEL[focus.kind]}</span></div>
           <ul className="star-sum-list">
             {focus.effects.map(e => (
               <li key={e.key} className={isStarEffectActive(e, focus, classId) ? '' : 'is-inert'}>
@@ -286,6 +295,16 @@ export function StarChartBoard({ classId, allocated, committed, remaining, costP
           {focusStatus(focus) && <p className="star-status">{focusStatus(focus)}</p>}
         </div>
       )}
+      <div className="star-filter">
+        <input
+          type="search"
+          value={filter}
+          placeholder="篩選：HP、體質、命星…"
+          aria-label="篩選星點"
+          onChange={e => setFilter(e.target.value)}
+        />
+        {matches && <span className="star-filter-count">{matches.size} 個</span>}
+      </div>
       <div className="star-zoom">
         <button className="btn-secondary" aria-label="放大" onClick={() => zoom(1.25)}>＋</button>
         <button className="btn-secondary" aria-label="縮小" onClick={() => zoom(0.8)}>－</button>

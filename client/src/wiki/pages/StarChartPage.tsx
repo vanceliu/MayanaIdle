@@ -5,7 +5,8 @@
 import { Link } from 'react-router-dom';
 import '../components/WikiTable.css';
 import {
-  KEYSTONE_CAP, STAR_CHART_UNLOCK_LEVEL, STAR_CLASS_ORDER, STAR_FLAG_LABEL, STAR_NODES, STAR_POINT_VALUE, starPoints, starRefundCostPerPoint,
+  KEYSTONE_CAP, STAR_CHART_UNLOCK_LEVEL, STAR_CLASS_ORDER, STAR_FLAG_LABEL, STAR_NODES, STAR_NODE_BY_ID, STAR_POINT_VALUE,
+  starPoints, starRefundCostPerPoint, starStartNodeId,
 } from '../../models/starChart';
 import { CLASS_SKILL_LEVEL_SCALE, CLASS_SKILL_LEVEL_SCALE_BY_CLASS } from '../../models/skillStar';
 import { CLASS_NAMES_ZH } from '../../models/character';
@@ -20,9 +21,10 @@ const NORMAL_CAP = 100;
 
 const POINT_ROWS: [string, string][] = [
   ['屬性', `+${STAR_POINT_VALUE.attr}`],
+  ['體質、精神（起點、職業星座、命星以外）', `每 1 點改為最大 HP／最大 MP +${STAR_POINT_VALUE.flatPerAttr}`],
   ['攻擊力／魔法攻擊', `+${STAR_POINT_VALUE.atkPct}%`],
   ['防禦力', `+${STAR_POINT_VALUE.defPct}%`],
-  ['最大 HP／最大 MP', `+${STAR_POINT_VALUE.hpPct}%`],
+  ['最大 HP／最大 MP %', `+${STAR_POINT_VALUE.hpPct}%`],
   ['命中', `+${STAR_POINT_VALUE.hit}%`],
   ['迴避值', `+${STAR_POINT_VALUE.evasion}（100 迴避值＝1% 迴避率）`],
   ['職業技能強化', `冷卻 −${STAR_POINT_VALUE.skillCd}%`],
@@ -41,6 +43,10 @@ function keystoneArea(id: string): string {
 }
 
 const scales = (s: readonly number[]) => s.map(v => `×${v}`).join('／');
+
+/** 職業起點的屬性：「騎士 力量 +2、體質 +6」 */
+const startText = STAR_CLASS_ORDER.map(c =>
+  `${CLASS_NAMES_ZH[c]} ${STAR_NODE_BY_ID.get(starStartNodeId(c))!.effects.map(e => `${e.label} ${formatStarEffect(e)}`).join('、')}`).join('；');
 
 export function StarChartPage() {
   const keystones = STAR_NODES.filter(n => n.kind === 'keystone');
@@ -65,7 +71,9 @@ export function StarChartPage() {
         <div style={CARD}>
           <p style={CARD_TEXT}>
             星點：單一效果。星座：節點群中心，多項效果，每項為星點數值 × 2。命星：改變規則的效果，必帶代價；全盤最多同時點 {KEYSTONE_CAP} 顆。<br />
-            節點顏色：力量紅、敏捷綠、智力藍、精神淺藍、體質粉紅，兩種屬性左右各半，其餘白色。
+            節點顏色：力量紅、敏捷綠、智力藍、精神淺藍、體質粉紅，兩種屬性左右各半，其餘白色。<br />
+            職業起點：{startText}。體質、精神只出現在職業起點、職業星座與命星，其他節點改為最大 HP／最大 MP 固定值，
+            與裝備的固定 HP／MP 相加後才乘星盤的最大 HP%／MP%。
           </p>
         </div>
         <div className="wiki-table-wrap">
@@ -112,7 +120,7 @@ export function StarChartPage() {
       <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>配點模擬</h3>
         <p style={{ ...CARD_TEXT, color: 'var(--text-secondary)' }}>
-          選職業與等級試點，滑鼠移到節點上看內容；這裡的配點不會存進角色。
+          選職業與等級試點，滑鼠移到節點上看內容；這裡的配點不會存進角色。左上篩選欄輸入文字（如 HP、體質、命星）會標出符合的節點。
         </p>
         <StarChartPlanner />
       </section>

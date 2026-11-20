@@ -41,11 +41,11 @@ describe('詞綴 Alt 區間', () => {
   });
 
   it('固定值詞綴不帶百分號', () => {
-    expect(rangeOf({ type: 'max_hp', tier: 7, value: 95 }, 'helmChest')).toEqual(['(90 ~ 100)']);
+    expect(rangeOf({ type: 'max_hp', tier: 7, value: 66 }, 'helmChest')).toEqual(['(63 ~ 70)']);
   });
 
   it('區間乘品質，與顯示值同一基準', () => {
-    expect(rangeOf({ type: 'max_hp', tier: 7, value: 95 }, 'helmChest', 10)).toEqual(['(99 ~ 110)']);
+    expect(rangeOf({ type: 'max_hp', tier: 7, value: 66 }, 'helmChest', 10)).toEqual(['(69 ~ 77)']);
   });
 
   it('受擊回復：觸發率與回復%各接一段區間；回復%區間為該 Tier 觸發率上下限的換算', () => {

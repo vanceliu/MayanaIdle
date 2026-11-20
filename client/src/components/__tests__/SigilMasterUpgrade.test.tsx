@@ -498,7 +498,7 @@ describe('印記師 — 詞綴分類（§ 13.13.1、`07-affix.md` § 7.6／§ 7.
   });
 
   it('刺針選了詞綴：列出可換成的詞綴與同 Tier 區間，扣掉同件已有的種類', () => {
-    setup(gloves([{ type: 'crit_rate', tier: 3, value: 5.2 }, { type: 'max_hp', tier: 5, value: 66 }]), [
+    setup(gloves([{ type: 'crit_rate', tier: 3, value: 5.2 }, { type: 'max_hp', tier: 5, value: 46 }]), [
       { name: '刺針印記', amount: 1 },
     ]);
     pickSigil('刺針印記');
@@ -507,7 +507,7 @@ describe('印記師 — 詞綴分類（§ 13.13.1、`07-affix.md` § 7.6／§ 7.
     const rows = poolRows();
     expect(rows).toContain('普攻擴散4.1~6.0%');
     expect(rows).toContain('攻擊速度2.1~3.0%');
-    expect(rows).toContain('最大 MP38~46');
+    expect(rows).toContain('最大 MP27~32');
     expect(rows.some(r => r.startsWith('爆擊率'))).toBe(false);
     expect(rows.some(r => r.startsWith('最大 HP'))).toBe(false);
   });

@@ -191,9 +191,9 @@ client/src/wiki/
 
 ### 4.6.1 星盤 (StarChartPage)
 - 概要：點數、開放等級、跨職業、草稿確認與洗點費（`56-star-chart.md` § 56.1、§ 56.7）
-- 星點數值表、星座與節點顏色（§ 56.6）；技能等級倍率與冷卻（§ 56.5）
+- 星點數值表（含體質、精神轉最大 HP／MP 固定值）、職業起點屬性、星座與節點顏色（§ 56.4、§ 56.6）；技能等級倍率與冷卻（§ 56.5）
 - 命星表：名稱、位置（中央／職業／職業交界）、效果與代價，讀 `models/starChart.ts`；註明全盤最多同時點 3 顆
-- 配點模擬：`StarChartPlanner`（任選職業與等級，不存檔；與 `demo/star-chart.html` 同一元件）
+- 配點模擬：`StarChartPlanner`（任選職業與等級，不存檔；與 `demo/star-chart.html` 同一元件）；盤面篩選同遊戲（`56-star-chart.md` § 56.7）
 
 ### 4.7 鐵匠鋪 (CraftingPage)
 - 製作配方列表：成品、製作費（`craftGold`）、所需材料與數量、材料來源區域連結

@@ -10685,6 +10685,16 @@ button.active {
 .star-node.is-draft-added circle { stroke: var(--accent-info); }
 .star-node.is-draft-removed circle { fill-opacity: 0.25; stroke: var(--accent-danger); stroke-dasharray: 4 3; }
 .star-node:hover circle { stroke: var(--text-primary); }
+.star-filter { position: absolute; left: 8px; top: 8px; display: flex; align-items: center; gap: 6px; }
+.star-filter input {
+  width: 180px; padding: 4px 8px; font-size: var(--fs-sm); color: var(--text-primary);
+  background: var(--bg-panel); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm);
+}
+.star-filter input:focus { outline: none; border-color: var(--accent-info); }
+.star-filter-count { font-size: var(--fs-xs); color: var(--text-dim); }
+.star-node.is-dimmed { opacity: 0.18; }
+.star-node-match { fill: none !important; stroke: var(--text-primary) !important; stroke-width: 3 !important; }
+.star-board.is-filtering .star-edge:not(.is-allocated):not(.is-path):not(.is-removing) { stroke-opacity: 0.15; }
 .star-node-label {
   fill: var(--text-secondary); font-size: 19px; text-anchor: middle; pointer-events: none;
   paint-order: stroke; stroke: var(--bg-inset); stroke-width: 4px;

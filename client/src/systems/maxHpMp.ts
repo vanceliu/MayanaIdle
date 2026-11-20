@@ -1,5 +1,5 @@
 /**
- * 最大 HP／MP（`20-attributes.md` § 20.4、§ 20.5）。
+ * 最大 HP／MP（`20-attributes.md` § 20.4、§ 20.5）：星盤固定 HP／MP 與裝備固定值同一層。
  * `gear` 傳生效中的裝備（已套素質需求凍結）；buff 不計入。
  */
 import type { Character, ClassName } from '../models/character';
@@ -28,8 +28,9 @@ export function getMaxHp(char: Character, gear: readonly (EquipmentInstance | nu
   const items = liveGear(gear);
   const f = CLASS_HP_MP_FORMULA[char.className];
   const vit = getTotalAttributes(char, undefined, items).VIT;
-  const flat = items.reduce((sum, g) => sum + (g.bonusHp ?? 0), 0) + getAffixBonusesFromGear(items).max_hp;
-  const pct = starTotalsOf(char.starChart, char.className).totals.get('hpPct') ?? 0;
+  const star = starTotalsOf(char.starChart, char.className).totals;
+  const flat = items.reduce((sum, g) => sum + (g.bonusHp ?? 0), 0) + getAffixBonusesFromGear(items).max_hp + (star.get('hpFlat') ?? 0);
+  const pct = star.get('hpPct') ?? 0;
   return compute(vit, f.hpRatio, f.hpBonus, flat, pct, char.level);
 }
 
@@ -37,7 +38,8 @@ export function getMaxMp(char: Character, gear: readonly (EquipmentInstance | nu
   const items = liveGear(gear);
   const f = CLASS_HP_MP_FORMULA[char.className];
   const spi = getTotalAttributes(char, undefined, items).SPI;
-  const flat = items.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0) + getAffixBonusesFromGear(items).max_mp;
-  const pct = starTotalsOf(char.starChart, char.className).totals.get('mpPct') ?? 0;
+  const star = starTotalsOf(char.starChart, char.className).totals;
+  const flat = items.reduce((sum, g) => sum + (g.bonusMp ?? 0), 0) + getAffixBonusesFromGear(items).max_mp + (star.get('mpFlat') ?? 0);
+  const pct = star.get('mpPct') ?? 0;
   return compute(spi, f.mpRatio, f.mpBonus, flat, pct, char.level);
 }

@@ -104,12 +104,10 @@ describe('詞綴池與階級表', () => {
     expect(getAffixTierTable('skill_lifesteal', 'weapon')[6]).toMatchObject({ min: 12.1, max: 14 });
   });
 
-  it('武器池：最大 HP／MP 走防具 HP 表 × 2（T7 180~200），回血／回魔走 N4（T7 25~28）', () => {
-    expect(getAffixTierTable('max_hp', 'weapon')[6]).toMatchObject({ min: 180, max: 200 });
-    expect(getAffixTierTable('max_mp', 'weapon')[0]).toMatchObject({ min: 30, max: 40 });
+  it('武器池：回血／回魔走 N4（T7 25~28）；最大 HP 防具 T7 63~70', () => {
     expect(getAffixTierTable('hp_regen', 'weapon')[0]).toMatchObject({ min: 1, max: 4 });
     expect(getAffixTierTable('mp_regen', 'weapon')[6]).toMatchObject({ min: 25, max: 28 });
-    expect(getAffixTierTable('max_hp', 'helmChest')[6]).toMatchObject({ min: 90, max: 100 });
+    expect(getAffixTierTable('max_hp', 'helmChest')[6]).toMatchObject({ min: 63, max: 70 });
   });
 
   it('T7 獨有詞綴命中回血／命中回魔為 10~25', () => {

@@ -80,10 +80,33 @@ describe('存檔整理', () => {
 });
 
 describe('效果加總（§ 56.4、§ 56.5）', () => {
-  it('同 key 相加；起點兩項主屬性各 +2', () => {
+  it('同 key 相加；騎士起點力量 +2、體質 +6', () => {
     const { totals } = sumStarEffects(['knight-start', 'knight-r360'], 'knight');
     expect(totals.get('attr:STR')).toBe(3);
-    expect(totals.get('attr:VIT')).toBe(2);
+    expect(totals.get('attr:VIT')).toBe(6);
+  });
+
+  it('職業星盤屬性：騎士力量＋體質、盜賊敏捷＋力量、妖精敏捷＋體質、元素師與牧師智力＋精神', () => {
+    const startAttrs = (c: string) => STAR_NODE_BY_ID.get(`${c}-start`)!.effects.map(e => `${e.key}:${e.value}`);
+    expect(startAttrs('knight')).toEqual(['attr:STR:2', 'attr:VIT:6']);
+    expect(startAttrs('thief')).toEqual(['attr:AGI:2', 'attr:STR:2']);
+    expect(startAttrs('elf')).toEqual(['attr:AGI:2', 'attr:VIT:2']);
+    expect(startAttrs('elementalist')).toEqual(['attr:INT:2', 'attr:SPI:2']);
+    expect(startAttrs('priest')).toEqual(['attr:INT:2', 'attr:SPI:2']);
+  });
+
+  it('體質、精神只在起點、職業星座與命星；其餘每 1 點改最大 HP／MP +20', () => {
+    for (const n of STAR_NODES) {
+      if (n.kind === 'start' || n.kind === 'keystone' || n.id.endsWith('-hub')) continue;
+      for (const e of n.effects) expect(['attr:VIT', 'attr:SPI'], n.id).not.toContain(e.key);
+    }
+    expect(STAR_NODE_BY_ID.get('knight-hub')!.effects.map(e => e.key)).toContain('attr:VIT');
+    expect(STAR_NODE_BY_ID.get('priest-hub')!.effects.map(e => e.key)).toContain('attr:SPI');
+    const side = STAR_NODE_BY_ID.get('knight-side1-1')!;
+    expect(side.effects).toEqual([{ key: 'hpFlat', label: '最大 HP', value: 20, unit: '' }]);
+    expect(side.name).toBe('最大 HP');
+    expect(STAR_NODE_BY_ID.get('knight-side1-s')!.effects[0]).toMatchObject({ key: 'hpFlat', value: 40 });
+    expect(STAR_NODE_BY_ID.get('elementalist-side1-s')!.effects[0]).toMatchObject({ key: 'mpFlat', value: 40 });
   });
 
   it('他職業的職業技能節點不生效', () => {

@@ -21,12 +21,20 @@ import type { Affix } from '../affix';
 
 /** `07-affix.md` § 7.1 / § 7.3.1 */
 describe('固定值型詞綴（§ 7.3.1）', () => {
-  it('最大 HP／MP 的 T1~T7 為 15~20 … 90~100', () => {
+  it('最大 HP／MP 的 T1~T7 為 11~14 … 63~70', () => {
     expect(FLAT_HP_MP_TIERS.map(t => [t.min, t.max])).toEqual(
-      [[15, 20], [25, 32], [38, 46], [50, 58], [62, 70], [75, 84], [90, 100]],
+      [[11, 14], [18, 22], [27, 32], [35, 41], [43, 49], [53, 59], [63, 70]],
     );
     expect(getAffixTierTable('max_hp', 'helmChest')).toBe(FLAT_HP_MP_TIERS);
-    expect(getAffixTierTable('max_mp', 'ring')).toBe(FLAT_HP_MP_TIERS);
+    expect(getAffixTierTable('max_mp', 'offhand')).toBe(FLAT_HP_MP_TIERS);
+  });
+
+  it('武器、項鍊、戒指上的舊最大 HP／MP 走 § 7.3.3 舊表（武器為防具舊表 × 2）', () => {
+    expect(getAffixTierTable('max_hp', 'ring').map(t => [t.min, t.max])).toEqual(
+      [[15, 20], [25, 32], [38, 46], [50, 58], [62, 70], [75, 84], [90, 100]],
+    );
+    expect(getAffixTierTable('max_mp', 'necklace')[6]).toEqual({ tier: 7, min: 90, max: 100 });
+    expect(getAffixTierTable('max_hp', 'weapon')[6]).toEqual({ tier: 7, min: 180, max: 200 });
   });
 
   it('回血／回魔走 N2 等寬表：T1~T7 為 1~2 … 13~14（§ 7.3／§ 7.6）', () => {
@@ -52,9 +60,9 @@ describe('固定值型詞綴（§ 7.3.1）', () => {
   });
 
   it('仍受品質放大，也仍參與滿值判定', () => {
-    expect(getEffectiveAffixValue({ type: 'max_hp', tier: 7, value: 90 }, 20)).toBe(108);
-    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 100 }, 'boots')).toBe(true);
-    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 99 }, 'boots')).toBe(false);
+    expect(getEffectiveAffixValue({ type: 'max_hp', tier: 7, value: 63 }, 20)).toBe(75);
+    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 70 }, 'boots')).toBe(true);
+    expect(isMaxRollAffix({ type: 'max_hp', tier: 7, value: 69 }, 'boots')).toBe(false);
   });
 
   it('分類正確：只有五種是固定值型', () => {
