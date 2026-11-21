@@ -23,7 +23,9 @@ import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 import { useLatestSent } from '../hooks/useLatestSent';
 import { DraftNumberInput } from './DraftNumberInput';
 import { TalentMultiParam } from './TalentMultiParam';
-import { getParamFields, visibleParamFields, type ParamField, type ParamSkillFilter } from '../models/talentParams';
+import {
+  POTION_BUFF_OPTIONS, getParamFields, visibleParamFields, type ParamField, type ParamSkillFilter,
+} from '../models/talentParams';
 import { TalentItemSelect } from './TalentItemSelect';
 import type { Skill } from '../models/skill';
 import { ruleLabel, ruleLabelOf } from '../models/talentLabels';
@@ -132,7 +134,16 @@ function ParamInput({
           onClick={e => e.stopPropagation()}
         >
           <option value="">未選擇</option>
-          {usable.map(sk => <option key={sk.id} value={sk.id}>{sk.name}</option>)}
+          {field.potionBuffs ? (
+            <>
+              <optgroup label="技能">
+                {usable.map(sk => <option key={sk.id} value={sk.id}>{sk.name}</option>)}
+              </optgroup>
+              <optgroup label="藥水">
+                {POTION_BUFF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </optgroup>
+            </>
+          ) : usable.map(sk => <option key={sk.id} value={sk.id}>{sk.name}</option>)}
         </select>
       </label>
     );

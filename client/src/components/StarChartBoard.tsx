@@ -6,7 +6,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import {
   STAR_EDGES, STAR_FLAG_LABEL, STAR_NODES, STAR_NODE_BY_ID,
-  isStarEffectActive, starPathTo, starRefundSet, starStartNodeId,
+  isStarEffectActive, starNeighbors, starPathTo, starRefundSet, starStartNodeId,
   type StarEffect, type StarNode,
 } from '../models/starChart';
 import { CLASS_NAMES_ZH, type ClassName } from '../models/character';
@@ -15,12 +15,7 @@ import { STAR_KIND_LABEL, starFilterTerms, starNodeMatches } from '../models/sta
 const NODE_RADIUS: Record<StarNode['kind'], number> = {
   start: 16, point: 7, constellation: 12, keystone: 16,
 };
-const BOARD_HALF = 940;
-const ADJ = new Map<string, string[]>(STAR_NODES.map(n => [n.id, []]));
-for (const [a, b] of STAR_EDGES) {
-  ADJ.get(a)!.push(b);
-  ADJ.get(b)!.push(a);
-}
+const BOARD_HALF = 990;
 
 /** 節點顏色依屬性效果：單一屬性為該色，兩種屬性左右各半，其餘白色（§ 56.6） */
 const ATTR_COLOR_KEYS = ['str', 'agi', 'int', 'spi', 'vit'];
@@ -127,7 +122,7 @@ export function StarChartBoard({ classId, allocated, committed, remaining, costP
   const removalSet = new Set(preview.removal);
   const reachable = useMemo(() => {
     const set = new Set<string>();
-    for (const id of allocated) for (const nb of ADJ.get(id)!) if (!allocated.has(nb)) set.add(nb);
+    for (const id of allocated) for (const nb of starNeighbors(id)) if (!allocated.has(nb)) set.add(nb);
     return set;
   }, [allocated]);
 

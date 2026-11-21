@@ -137,6 +137,17 @@ describe('affix effects integration', () => {
       expect(getSkillCooldownReduction(charWithInt(40), [weapon])).toBe(50);
     });
 
+    it('星盤冷卻縮減與詞綴、智力加算，同受 50% 上限', () => {
+      const weapon = createTestWeapon({
+        affixes: [{ type: 'cooldown_reduction', tier: 3, value: 12 }],
+      });
+      const withStar = { ...charWithInt(21), starChart: ['knight-start', 'outer4'] };
+      // 12 + 星盤 1 + 智力 10
+      expect(getSkillCooldownReduction(withStar, [weapon])).toBe(23);
+      const capped = createTestWeapon({ affixes: [{ type: 'cooldown_reduction', tier: 7, value: 49.5 }] });
+      expect(getSkillCooldownReduction({ ...charWithInt(0), starChart: ['knight-start', 'outer4'] }, [capped])).toBe(50);
+    });
+
     it('should reduce effective skill cooldown in isSkillReady', () => {
       const skill: Skill = {
         id: 'test',

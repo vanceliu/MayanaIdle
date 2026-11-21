@@ -58,7 +58,7 @@ export const starStartNodeId = (cls: ClassName): string => `${cls}-start`;
 
 /** 星點單一效果的數值；星座以倍數取用（§ 56.6） */
 export const STAR_POINT_VALUE = {
-  attr: 1, hpPct: 1, mpPct: 1, defPct: 1, hit: 1, evasion: 50, atkPct: 1, matkPct: 1, skillCd: 10, flatPerAttr: 20,
+  attr: 1, hpPct: 1, mpPct: 1, defPct: 1, hit: 1, evasion: 50, atkPct: 1, matkPct: 1, cdrPct: 1, skillCd: 10, flatPerAttr: 20,
 } as const;
 
 type AttrKey = keyof Attributes;
@@ -78,13 +78,18 @@ const hit = (n = 1) => effect('hit', '命中', n * STAR_POINT_VALUE.hit, '%');
 const eva = (n = 1) => effect('evasion', '迴避值', n * STAR_POINT_VALUE.evasion, '');
 const atk = (n = 1) => effect('atkPct', '攻擊力', n * STAR_POINT_VALUE.atkPct, '%');
 const matk = (n = 1) => effect('matkPct', '魔法攻擊', n * STAR_POINT_VALUE.matkPct, '%');
+const cdr = (n = 1) => effect('cdrPct', '冷卻縮減', n * STAR_POINT_VALUE.cdrPct, '%');
 const skillCd = (id: string, name: string) => effect(`skill:${id}:cd`, `${name} 冷卻`, -STAR_POINT_VALUE.skillCd, '%');
 const skillLevel = (id: string, name: string) => effect(`skill:${id}:level`, `${name} 等級`, 1, '');
+
+/** 由最大 HP +1% 改為體質 +1（真屬性）的星點（§ 56.6）；烈心座的星點見 CLASS_CONFIG */
+const VIT_POINT_IDS: ReadonlySet<string> = new Set(['knight-r300', 'thief-r300', 'bridge0-2', 'bridge1-2', 'bridge4-2']);
+const hpOrVit = (id: string): StarEffect => (VIT_POINT_IDS.has(id) ? attr('VIT') : hp());
 
 /** 沒有星盤節點的職業技能，位置改放屬性星點（§ 56.5） */
 export const NO_STAR_NODE_SKILLS: ReadonlySet<string> = new Set(['dodge-counter', 'cd-reduce']);
 
-const UTILITY_CYCLE: (() => StarEffect)[] = [() => hp(), () => mp(), () => def(), () => hit(), () => eva()];
+const UTILITY_CYCLE: (() => StarEffect)[] = [() => hp(), () => mp(), () => def(), () => cdr(), () => cdr()];
 
 interface ClassConfig {
   attrs: [AttrKey, AttrKey];
@@ -93,6 +98,10 @@ interface ClassConfig {
   hub: string;
   sides: [string, string];
   wheels: [{ name: string; point: StarEffect; star: StarEffect[] }, { name: string; point: StarEffect; star: StarEffect[] }];
+  /** 第二主屬性側星座的效果；未設為 `[第二主屬性 +2, 最大 HP +2%, 最大 MP +2%]` */
+  side1Star?: StarEffect[];
+  /** 職業支線（r480 分出）的星點與星座 */
+  vow: { name: string; point: StarEffect; star: StarEffect[] };
   offense: (n?: number) => StarEffect;
   keystone: { name: string; effects: StarEffect[] };
 }
@@ -100,12 +109,13 @@ interface ClassConfig {
 const CLASS_CONFIG: Record<ClassName, ClassConfig> = {
   knight: {
     attrs: ['STR', 'VIT'],
-    startValues: [2, 6],
+    startValues: [2, 2],
     hub: '鐵誓座',
+    vow: { name: '誓盾座', point: attr('VIT'), star: [atk(2), attr('STR', 2), attr('VIT', 2)] },
     sides: ['戰鎚座', '巨岩座'],
     wheels: [
       { name: '堅盾座', point: def(), star: [def(2), hp(2), stat('VIT', 2)] },
-      { name: '烈心座', point: hp(), star: [hp(2), atk(2), stat('STR', 2)] },
+      { name: '烈心座', point: attr('VIT'), star: [hp(2), atk(2), attr('VIT', 2)] },
     ],
     offense: atk,
     keystone: { name: '不屈之星', effects: [effect('damageTakenPct', '受到傷害', -5, '%'), effect('moveSpeedPct', '跑速', -5, '%')] },
@@ -114,10 +124,12 @@ const CLASS_CONFIG: Record<ClassName, ClassConfig> = {
     attrs: ['AGI', 'STR'],
     startValues: [2, 2],
     hub: '暗影座',
+    vow: { name: '影牙座', point: stat('SPI'), star: [atk(2), attr('AGI', 2), attr('VIT', 2)] },
     sides: ['疾風座', '利爪座'],
+    side1Star: [stat('STR', 2), attr('VIT', 2), mp(2)],
     wheels: [
       { name: '幻步座', point: eva(), star: [eva(2), hit(2), stat('AGI', 2)] },
-      { name: '毒牙座', point: atk(), star: [atk(2), hit(2), stat('STR', 2)] },
+      { name: '毒牙座', point: atk(), star: [atk(2), hit(2), attr('VIT', 2)] },
     ],
     offense: atk,
     keystone: { name: '影刃之星', effects: [effect('critPct', '爆擊率', 5, '%'), hp(-8)] },
@@ -126,6 +138,7 @@ const CLASS_CONFIG: Record<ClassName, ClassConfig> = {
     attrs: ['AGI', 'VIT'],
     startValues: [2, 2],
     hub: '森羽座',
+    vow: { name: '翠羽座', point: stat('SPI'), star: [atk(2), attr('AGI', 2), mp(2)] },
     sides: ['獵弓座', '林語座'],
     wheels: [
       { name: '遠眺座', point: hit(), star: [hit(2), atk(2), stat('AGI', 2)] },
@@ -138,6 +151,7 @@ const CLASS_CONFIG: Record<ClassName, ClassConfig> = {
     attrs: ['INT', 'SPI'],
     startValues: [2, 2],
     hub: '元素座',
+    vow: { name: '源流座', point: stat('SPI'), star: [matk(2), attr('INT', 2), attr('SPI', 2)] },
     sides: ['秘法座', '星泉座'],
     wheels: [
       { name: '奧識座', point: matk(), star: [matk(2), mp(2), stat('INT', 2)] },
@@ -150,6 +164,7 @@ const CLASS_CONFIG: Record<ClassName, ClassConfig> = {
     attrs: ['INT', 'SPI'],
     startValues: [2, 2],
     hub: '聖光座',
+    vow: { name: '祈光座', point: stat('SPI'), star: [matk(2), attr('INT', 2), attr('SPI', 2)] },
     sides: ['禱言座', '庇護座'],
     wheels: [
       { name: '慈光座', point: matk(), star: [matk(2), mp(2), stat('INT', 2)] },
@@ -162,6 +177,8 @@ const CLASS_CONFIG: Record<ClassName, ClassConfig> = {
 
 /** 中環橋接星座，依 STAR_CLASS_ORDER 相鄰順序（騎士・盜賊起） */
 const BRIDGE_NAMES = ['劍刃座', '疾影座', '靈風座', '星輝座', '守誓座'];
+/** 外側橋接支線星座，順序同 BRIDGE_NAMES */
+const OUTER_STAR_NAMES = ['銳眼座', '掠影座', '林蔭座', '星幕座', '守夜座'];
 
 const CENTER_KEYSTONES: { angle: number; name: string; path: StarEffect; effects: StarEffect[]; flags?: StarFlag[] }[] = [
   { angle: 0, name: '血契之星', path: mp(), effects: [mp(-50)], flags: ['bloodPact'] },
@@ -253,7 +270,8 @@ function buildStarChart(): { nodes: StarNode[]; edges: [string, string][] } {
 
     // 往內：起點 → r360 → r300（中環）→ r240 → 內環
     const r360 = add(`${c}-r360`, pointName([stat(a1)]), 'point', 360, t, [stat(a1)]);
-    const r300 = add(`${c}-r300`, pointName([hp()]), 'point', 300, t, [hp()]);
+    const r300Effect = hpOrVit(`${c}-r300`);
+    const r300 = add(`${c}-r300`, pointName([r300Effect]), 'point', 300, t, [r300Effect]);
     const r240 = add(`${c}-r240`, pointName([cfg.offense()]), 'point', 240, t, [cfg.offense()]);
     link(start, r360);
     link(r360, r300);
@@ -276,17 +294,21 @@ function buildStarChart(): { nodes: StarNode[]; edges: [string, string][] } {
       const p1 = add(`${c}-side${i}-1`, pointName([stat(a)]), 'point', 430, t + s * 9, [stat(a)]);
       const p2 = add(`${c}-side${i}-2`, pointName([stat(a)]), 'point', 430, t + s * 17, [stat(a)]);
       const st = add(`${c}-side${i}-s`, name, 'constellation', 435, t + s * 25,
-        i === 0 ? [stat(a, 2), cfg.offense(2), hit(2)] : [stat(a, 2), hp(2), mp(2)]);
+        i === 0 ? [stat(a, 2), cfg.offense(2), hit(2)] : cfg.side1Star ?? [stat(a, 2), hp(2), mp(2)]);
       link(start, p1);
       link(p1, p2);
       link(p2, st);
     });
 
-    // 職業魔法扇區：起點 → r480 → 星座 r545 → 7 組（強化 r615 → 等級 r680 → 強化 r745 → 等級 r810）→ 命星 r880
+    // 職業魔法扇區：起點 → r480 → 星座 r545 → 7 組（強化 r615 → 等級 r680 → 強化 r745 → 等級 r810）→ 命星 r930
     const out = add(`${c}-r480`, pointName([cfg.offense()]), 'point', 480, t, [cfg.offense()]);
     const hub = add(`${c}-hub`, cfg.hub, 'constellation', 545, t, [cfg.offense(2), attr(a1, 2), attr(a2, 2)]);
     link(start, out);
     link(out, hub);
+    // 職業支線：r480 → 星點 → 星座（§ 56.6）
+    const vowP = add(`${c}-vow-p`, pointName([cfg.vow.point]), 'point', 500, t + 6, [cfg.vow.point]);
+    link(out, vowP);
+    link(vowP, add(`${c}-vow-s`, cfg.vow.name, 'constellation', 525, t + 14, cfg.vow.star));
     const levelNodes: string[] = [];
     CLASS_SKILLS.filter(s => s.className === c).sort((a, b) => a.classLevel - b.classLevel).forEach((skill, i) => {
       const deg = t + (i - 3) * 8;
@@ -303,8 +325,8 @@ function buildStarChart(): { nodes: StarNode[]; edges: [string, string][] } {
       });
       levelNodes.push(prev);
     });
-    const ks = add(`${c}-keystone`, cfg.keystone.name, 'keystone', 880, t, cfg.keystone.effects);
-    link(levelNodes[3], ks);
+    const ks = add(`${c}-keystone`, cfg.keystone.name, 'keystone', 930, t, cfg.keystone.effects);
+    levelNodes.forEach(id => link(id, ks));
   }
 
   // 中環橋接（r300，相鄰職業之間 5 點，中間為雙屬性星座）與外側橋接（r470）
@@ -315,7 +337,7 @@ function buildStarChart(): { nodes: StarNode[]; edges: [string, string][] } {
     const b = CLASS_CONFIG[next].attrs[0];
     const mid = [
       add(`bridge${i}-1`, pointName([stat(a)]), 'point', 300, t + 12, [stat(a)]),
-      add(`bridge${i}-2`, pointName([hp()]), 'point', 300, t + 24, [hp()]),
+      add(`bridge${i}-2`, pointName([hpOrVit(`bridge${i}-2`)]), 'point', 300, t + 24, [hpOrVit(`bridge${i}-2`)]),
       add(`bridge${i}-3`, BRIDGE_NAMES[i], 'constellation', 300, t + 36,
         a === b ? [stat(a, 2), hp(2), mp(2)] : [stat(a, 2), stat(b, 2), hp(2)]),
       add(`bridge${i}-4`, pointName([mp()]), 'point', 300, t + 48, [mp()]),
@@ -325,10 +347,15 @@ function buildStarChart(): { nodes: StarNode[]; edges: [string, string][] } {
     mid.slice(1).forEach((id, k) => link(mid[k], id));
     link(mid[4], midRing[(i + 1) % midRing.length]);
 
-    const outerEffect = i % 2 === 0 ? hit() : eva();
-    const outer = add(`outer${i}`, pointName([outerEffect]), 'point', 470, t + 36, [outerEffect]);
+    const outer = add(`outer${i}`, pointName([cdr()]), 'point', 470, t + 36, [cdr()]);
     link(`${c}-side1-s`, outer);
     link(outer, `${next}-side0-s`);
+
+    // 外側支線（死路）：冷卻縮減星點 → r410 命中／迴避星點 → r360 星座
+    const spurEffect = i % 2 === 0 ? hit() : eva();
+    const spur = add(`outer${i}-p`, pointName([spurEffect]), 'point', 410, t + 36, [spurEffect]);
+    link(outer, spur);
+    link(spur, add(`outer${i}-s`, OUTER_STAR_NAMES[i], 'constellation', 360, t + 36, [hit(2), eva(2), def(2)]));
 
     // 交界命星：外側橋接 → r550～r760 四星點（兩側職業第一主屬性輪替）→ r840 分岔
     let prev = outer;
@@ -358,6 +385,11 @@ for (const [a, b] of STAR_EDGES) {
   ADJ.get(b)!.push(a);
 }
 
+/** 由 id 往外可走的相鄰節點：命星是終點，不能經命星走到其他節點（§ 56.2） */
+export function starNeighbors(id: string): readonly string[] {
+  return STAR_NODE_BY_ID.get(id)?.kind === 'keystone' ? [] : ADJ.get(id) ?? [];
+}
+
 /** 從已點集合到 target 的最短路徑（不含已點節點）；不可達回 null */
 export function starPathTo(target: string, allocated: ReadonlySet<string>): string[] | null {
   if (allocated.has(target)) return [];
@@ -370,7 +402,7 @@ export function starPathTo(target: string, allocated: ReadonlySet<string>): stri
   while (queue.length > 0) {
     const cur = queue.shift()!;
     if (cur === target) break;
-    for (const nb of ADJ.get(cur) ?? []) {
+    for (const nb of starNeighbors(cur)) {
       if (prev.has(nb)) continue;
       prev.set(nb, cur);
       queue.push(nb);
@@ -391,7 +423,7 @@ export function starRefundSet(target: string, allocated: ReadonlySet<string>, cl
   const queue = [start];
   while (queue.length > 0) {
     const cur = queue.shift()!;
-    for (const nb of ADJ.get(cur) ?? []) {
+    for (const nb of starNeighbors(cur)) {
       if (nb === target || kept.has(nb) || !allocated.has(nb)) continue;
       kept.add(nb);
       queue.push(nb);
@@ -412,7 +444,7 @@ export function normalizeStarAllocation(allocated: readonly string[], cls: Class
   const kept = new Set(result);
   let keystones = 0;
   for (let i = 0; i < result.length; i++) {
-    for (const nb of ADJ.get(result[i]) ?? []) {
+    for (const nb of starNeighbors(result[i])) {
       if (kept.has(nb) || !wanted.has(nb)) continue;
       if (STAR_NODE_BY_ID.get(nb)?.kind === 'keystone') {
         if (keystones >= KEYSTONE_CAP) continue;

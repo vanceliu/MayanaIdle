@@ -37,17 +37,17 @@ describe('最大 HP／MP', () => {
   });
 
   it('星盤屬性計入，最大 HP% 乘在最後', () => {
-    // 騎士起點 +2 力量 +6 體質；堅忍之星 HP +12%（需路徑，這裡只驗加總）
+    // 騎士起點 +2 力量 +2 體質；堅忍之星 HP +12%（需路徑，這裡只驗加總）
     const c = char('knight', 50, { starChart: ['knight-start', 'center-240-k'] });
-    // 體質 22：floor(50×22×0.7)=770 + 19 = 789；×1.12 → 883
-    expect(getMaxHp(c, [])).toBe(883);
+    // 體質 18：floor(50×18×0.7)=630 + 19 = 649；×1.12 → 726
+    expect(getMaxHp(c, [])).toBe(726);
   });
 
   it('星盤固定 HP／MP 與裝備固定值同一層，乘在星盤 % 之前', () => {
-    // 巨岩座：體質轉最大 HP +40、最大 HP +2%、最大 MP +2%；起點體質 +6
+    // 巨岩座：體質轉最大 HP +40、最大 HP +2%、最大 MP +2%；起點體質 +2
     const knight = char('knight', 50, { starChart: ['knight-start', 'knight-side1-s'] });
-    // floor(50×22×0.7)=770 + 19 + 40 = 829；×1.02 → 845
-    expect(getMaxHp(knight, [])).toBe(845);
+    // floor(50×18×0.7)=630 + 19 + 40 = 689；×1.02 → 702
+    expect(getMaxHp(knight, [])).toBe(702);
     // 星泉座：精神轉最大 MP +40、最大 HP +2%、最大 MP +2%；起點精神 +2
     const ele = char('elementalist', 50, { starChart: ['elementalist-start', 'elementalist-side1-s'] });
     // floor(50×16×0.7)=560 + 0 + 40 = 600；×1.02 → 612

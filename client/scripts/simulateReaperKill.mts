@@ -38,6 +38,7 @@ import {
   COOLDOWN_REDUCTION_CAP,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
   INT_COOLDOWN_PERCENT_PER_2,
+  starStat,
 } from '../src/systems/combat';
 import {
   ATTRIBUTE_KEYS, CLASS_NAMES_ZH,
@@ -353,8 +354,8 @@ function simulateOnce(
     if (now < nextAction) continue;
 
     // --- 行動
-    // 詞綴 + buff 的 CDR 與 INT 提供的 CDR 加總後，同樣受 50% 上限（combat.ts:373）
-    const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + intCooldownReduction(effInt));
+    // 詞綴 + buff + 星盤的 CDR 與 INT 提供的 CDR 加總後，同樣受 50% 上限（`getSkillCooldownReduction`）
+    const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + starStat(char, 'cdrPct') + intCooldownReduction(effInt));
     const pick = rotation.find(e => {
       const ready = (cooldowns[e.id] ?? -Infinity) <= now;
       if (!ready) return false;
@@ -620,7 +621,7 @@ function runScenario(
     爆擊率: Math.min(75, 5 + bonuses.crit_rate),
     爆擊倍率: Number((2 + bonuses.crit_damage / 100).toFixed(2)),
     攻速詞綴: bonuses.attack_speed,
-    減CD: Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + intCooldownReduction(effInt)),
+    減CD: Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + starStat(char, 'cdrPct') + intCooldownReduction(effInt)),
     裝備魔攻: getTotalMagicAttack(loadout.gear),
     裝備防禦: getTotalDefense(loadout.gear),
     武器攻擊成功: getWeaponAttackSuccess(loadout.weapon),

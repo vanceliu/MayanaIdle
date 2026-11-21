@@ -24,11 +24,11 @@ describe('StarChartBoard 篩選', () => {
     const input = getByLabelText('篩選星點');
     fireEvent.change(input, { target: { value: 'hp' } });
     const node = (id: string) => container.querySelector(`.star-node[data-id="${id}"]`)!;
-    expect(node('knight-r300').classList.contains('is-match')).toBe(true);
+    expect(node('elf-r300').classList.contains('is-match')).toBe(true);
     expect(node('center-240-k').classList.contains('is-match')).toBe(true);
     expect(node('knight-r360').classList.contains('is-dimmed')).toBe(true);
     expect(node('knight-keystone').classList.contains('is-dimmed')).toBe(true);
-    expect(node('knight-r300').querySelector('.star-node-match')).not.toBeNull();
+    expect(node('elf-r300').querySelector('.star-node-match')).not.toBeNull();
     expect(container.querySelector('.star-board.is-filtering')).not.toBeNull();
     fireEvent.change(input, { target: { value: '' } });
     expect(container.querySelector('.is-dimmed, .is-match')).toBeNull();

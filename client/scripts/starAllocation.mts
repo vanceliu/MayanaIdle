@@ -8,7 +8,7 @@
  * 分數：輸出%（物理職業攻擊力%、法系魔法攻擊%）每 1% 得 1；主攻屬性每點 1；最大 HP% 每 1% 得 0.5；其餘 0（命星不點）。
  */
 import {
-  STAR_EDGES, STAR_NODES, STAR_NODE_BY_ID, starPoints, starStartNodeId, normalizeStarAllocation,
+  STAR_NODES, STAR_NODE_BY_ID, starNeighbors, starPoints, starStartNodeId, normalizeStarAllocation,
   type StarNode,
 } from '../src/models/starChart';
 import type { Attributes, ClassName } from '../src/models/character';
@@ -43,11 +43,6 @@ export interface StarPlanInput {
   policy?: StarPolicy;
 }
 
-const ADJ = new Map<string, string[]>(STAR_NODES.map(n => [n.id, []]));
-for (const [a, b] of STAR_EDGES) {
-  ADJ.get(a)!.push(b);
-  ADJ.get(b)!.push(a);
-}
 
 /** 從已點集合出發的 BFS：每個未點節點的最短路徑（不含已點節點） */
 function pathsFrom(allocated: ReadonlySet<string>): Map<string, string[]> {
@@ -55,7 +50,7 @@ function pathsFrom(allocated: ReadonlySet<string>): Map<string, string[]> {
   const queue: string[] = [];
   for (const id of allocated) { prev.set(id, null); queue.push(id); }
   for (let i = 0; i < queue.length; i++) {
-    for (const nb of ADJ.get(queue[i]) ?? []) {
+    for (const nb of starNeighbors(queue[i])) {
       if (prev.has(nb)) continue;
       prev.set(nb, queue[i]);
       queue.push(nb);
@@ -95,6 +90,7 @@ function nodeScore(node: StarNode, input: StarPlanInput): number {
     if (e.key === input.offenseKey) s += e.value;
     else if (e.key === `attr:${input.mainStat}`) s += e.value;
     else if (e.key === 'hpPct') s += e.value * 0.5;
+    else if (e.key === 'cdrPct') s += e.value;
   }
   return s;
 }

@@ -10,8 +10,8 @@ const matchIds = (q: string) => STAR_NODES.filter(n => starNodeMatches(n, starFi
 
 describe('starNodeMatches', () => {
   it('不分大小寫比對效果名稱', () => {
-    expect(starNodeMatches(node('knight-r300'), starFilterTerms('hp'))).toBe(true);
-    expect(starNodeMatches(node('knight-r300'), starFilterTerms('HP'))).toBe(true);
+    expect(starNodeMatches(node('elf-r300'), starFilterTerms('hp'))).toBe(true);
+    expect(starNodeMatches(node('elf-r300'), starFilterTerms('HP'))).toBe(true);
     expect(starNodeMatches(node('knight-r360'), starFilterTerms('hp'))).toBe(false);
   });
 

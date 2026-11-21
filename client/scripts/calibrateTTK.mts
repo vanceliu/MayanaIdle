@@ -38,6 +38,7 @@ import {
   hasActiveFireEnchant,
   COOLDOWN_REDUCTION_CAP,
   getIntCooldownReduction,
+  starStat,
 } from '../src/systems/combat';
 import { getEffectiveINT, getEffectiveSTR, getTotalAttributes } from '../src/models/character';
 import { getMaxHp, getMaxMp } from '../src/systems/maxHpMp';
@@ -767,7 +768,7 @@ function simulateOnce(
 
     const cdr = Math.min(
       COOLDOWN_REDUCTION_CAP,
-      getCombatBonuses(loadout.gear, effects).cooldown_reduction + getIntCooldownReduction(char, effects, loadout.gear),
+      getCombatBonuses(loadout.gear, effects).cooldown_reduction + starStat(char, 'cdrPct') + getIntCooldownReduction(char, effects, loadout.gear),
     );
     for (const e of rotation) {
       if (e.kind !== 'sustain' || (cooldowns[e.id] ?? -Infinity) > now) continue;

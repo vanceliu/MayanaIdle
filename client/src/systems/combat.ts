@@ -410,7 +410,7 @@ export function getCombatBonuses(
 
 /**
  * 星盤數值節點併入同名加成欄位（`56-star-chart.md` § 56.4、§ 56.8）：
- * 攻擊力%、遠程攻擊力%（裝備弓時）、爆擊率、防禦%、迴避值、治癒效果%、跑速%。
+ * 攻擊力%、遠程攻擊力%（裝備弓時）、爆擊率、防禦%、迴避值、冷卻縮減%、治癒效果%、跑速%。
  */
 function addStarBonuses(bonuses: AffixBonuses, char: Pick<Character, 'className' | 'starChart'>, equippedGear: (EquipmentInstance | null)[]): void {
   if (!char.starChart?.length) return;
@@ -426,6 +426,7 @@ function addStarBonuses(bonuses: AffixBonuses, char: Pick<Character, 'className'
   bonuses.gold_rate += t.get('goldPct') ?? 0;
   bonuses.defense += t.get('defPct') ?? 0;
   bonuses.evasion += t.get('evasion') ?? 0;
+  bonuses.cooldown_reduction += t.get('cdrPct') ?? 0;
   bonuses.heal_effect += t.get('healPct') ?? 0;
   bonuses.move_speed += t.get('moveSpeedPct') ?? 0;
 }
@@ -733,7 +734,7 @@ export function getIntCooldownReduction(
 }
 
 /**
- * 技能冷卻縮減總量：「減少冷卻時間」詞綴 + 冷卻縮減 buff + INT，加總後受 50% 上限。
+ * 技能冷卻縮減總量：「減少冷卻時間」詞綴 + 冷卻縮減 buff + 星盤 + INT，加總後受 50% 上限。
  */
 export function getSkillCooldownReduction(
   char: Character,

@@ -152,14 +152,23 @@ function countMonstersWithin(ctx: CombatScriptContext, radius: number): number {
  * 「同一條規則放在戰鬥格與常駐格結果不同」這種難查的 bug。
  */
 function isSelfBuffExpired(
-  skillId: string | undefined, skills: Skill[], activeEffects: ActiveEffect[], now: number,
+  buffId: string | undefined, skills: Skill[], activeEffects: ActiveEffect[], now: number,
 ): boolean {
-  const category = skills.find(s => s.id === skillId)?.buffCategory;
-  const active = category
-    ? activeEffects.find(e => e.category === category && e.type === 'buff' && e.target === 'player')
-    : activeEffects.find(e => e.sourceSkillId === skillId && e.type === 'buff' && e.target === 'player');
+  const active = findSelfBuff(buffId, skills, activeEffects);
   if (!active) return true;
   return now - active.startTime >= active.duration;
+}
+
+/**
+ * Buff 參數指到的自身效果，依 category 比對。
+ * 參數是 buff 技能 id 或藥水 buff 的 category（`models/talentParams.ts` 的 `POTION_BUFF_OPTIONS`）。
+ */
+function findSelfBuff(
+  buffId: string | undefined, skills: Skill[], activeEffects: ActiveEffect[],
+): ActiveEffect | undefined {
+  if (!buffId) return undefined;
+  const category = skills.find(s => s.id === buffId)?.buffCategory ?? buffId;
+  return activeEffects.find(e => e.category === category && e.type === 'buff' && e.target === 'player');
 }
 
 function hasActiveSpeedBuff(activeEffects: ActiveEffect[], now: number): boolean {
@@ -559,9 +568,7 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
     // === 常駐專屬條件（§ 51.4.7）===
     case 'buff_remaining_below': {
       // 提前續 buff，而不是等它掉光才補
-      const active = activeEffects.find(
-        e => e.sourceSkillId === condition.skillId && e.type === 'buff' && e.target === 'player',
-      );
+      const active = findSelfBuff(condition.skillId, skills, activeEffects);
       if (!active) return false;
       const remaining = active.duration - (now - active.startTime);
       return remaining > 0 && remaining < (condition.value ?? 0) * 1000;

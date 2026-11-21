@@ -5,6 +5,7 @@ import { ELEMENT_LABELS, RACE_LABELS } from './monster';
 import { MONSTER_DEBUFF_TAG_LABELS, SCRIPT_DEBUFF_LABELS } from './scriptEngine';
 import { AFFIX_DEFINITIONS, SPECIAL_AFFIX_DEFINITIONS } from './affix';
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
+import { BUFF_POTION_CONFIG } from './buffPotion';
 
 /**
  * 條件與動作的可調參數（`51-auto-talent.md` § 51.4.1）。
@@ -41,8 +42,12 @@ export type ParamField = (
    * | `byTalentType` | 依鑲入的分頁：戰鬥＝攻擊型、常駐＝buff ＋ 治癒（`03-combat.md` § 3.12／§ 3.13） |
    *
    * `optional` ＝ 留空不算「沒選定」，規則照樣進判定（§ 51.3.1）。
+   * `potionBuffs` ＝ 另列藥水 buff（`POTION_BUFF_OPTIONS`），值為效果的 category。
    */
-  | { key: string; kind: 'skill'; label: string; filter: ParamSkillFilter; optional?: boolean }
+  | {
+      key: string; kind: 'skill'; label: string; filter: ParamSkillFilter;
+      optional?: boolean; potionBuffs?: boolean;
+    }
   /** 挑道具，選項依 `pool`（預設任意道具，`systems/talentItemOptions.ts`）。存 id 不存名稱（§ 99.1 第 7 條） */
   | { key: string; kind: 'item'; label: string; pool?: TalentItemPool; optional?: boolean }
   | { key: string; kind: 'boolean'; label: string; def: boolean }
@@ -137,6 +142,12 @@ const POTION_OPTIONS = [
   { value: 'light-white', label: '減重白色藥水' },
 ] as const;
 
+/** 藥水 buff：值為效果的 category（`30-items.md` § 30.4、§ 30.4a）；加速與加速術同 category */
+export const POTION_BUFF_OPTIONS: readonly { value: string; label: string }[] = [
+  ...Object.values(BUFF_POTION_CONFIG).map(c => ({ value: c.category, label: getItemById(c.itemId)?.name ?? c.category })),
+  { value: 'speed', label: '加速藥水（綠色／強化綠色）' },
+];
+
 const ELEMENT_OPTIONS = (Object.entries(ELEMENT_LABELS) as [string, string][])
   .map(([value, label]) => ({ value, label }));
 
@@ -171,12 +182,12 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
   ],
   area_dwell_gte: [{ key: 'value', kind: 'number', label: '超過', suffix: '分鐘', min: 1, max: 60, def: 10 }],
   buff_remaining_below: [
-    { key: 'skillId', kind: 'skill', label: 'Buff', filter: 'buff' },
+    { key: 'skillId', kind: 'skill', label: 'Buff', filter: 'buff', potionBuffs: true },
     { key: 'value', kind: 'number', label: '剩餘少於', suffix: '秒', min: 1, max: 120, def: 10 },
   ],
   potion_cooldown_ready: [{ key: 'potionType', kind: 'select', label: '藥水', options: POTION_OPTIONS, def: 'red' }],
   skill_ready: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'byTalentType' }],
-  buff_not_active: [{ key: 'skillId', kind: 'skill', label: 'Buff', filter: 'buff' }],
+  buff_not_active: [{ key: 'skillId', kind: 'skill', label: 'Buff', filter: 'buff', potionBuffs: true }],
   debuff_active: [{ key: 'debuffType', kind: 'select', label: '狀態', options: DEBUFF_OPTIONS, def: 'poison' }],
   weapon_type_is: [{
     key: 'match', kind: 'select', label: '武器', def: 'sword',

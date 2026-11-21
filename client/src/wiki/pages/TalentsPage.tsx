@@ -270,7 +270,8 @@ export function TalentsPage() {
         <pre style={codeStyle}>{`#1 如果 HP 低於 30%                        → 使用紅色藥水
 #2 如果 HP 低於 50% 且 技能就緒（治癒）    → 施放治癒
 #3 如果 Buff 未激活（魔法盔甲）            → 施放魔法盔甲
-#4 如果 狀態異常（中毒）                   → 使用解毒藥水`}</pre>
+#4 如果 狀態異常（中毒）                   → 使用解毒藥水
+#5 如果 Buff 未激活（爆擊藥水）            → 使用爆擊藥水`}</pre>
 
         <h4 style={subTitleStyle}>補給天賦：背包滿了自己回城整理</h4>
         <pre style={codeStyle}>{`#1 如果 背包已用格數 ≥ 38  → 回城

@@ -246,6 +246,11 @@ Wiki 照 `blockedReason` 顯示未開放的原因：
 | 周遭 | 自身周圍怪物數 ≥ N | `monsters_near_self_gte` |
 | 周遭 | 在本區停留超過 N 分鐘 | 新增 |
 
+**Buff 參數**（「Buff 未激活」與 § 51.4.7「Buff 剩餘時間少於」）：已學會的 buff 技能 ＋ 藥水 buff
+（四種增益藥水、加速藥水，`30-items.md` § 30.4／§ 30.4a）；藥水不限背包現有。
+依效果的 category 比對，同 category 的互相算數（精準射擊與鷹眼、加速藥水與加速術）。
+「施放 Buff」「依序補滿多個 buff」的選單不列藥水。
+
 **三類型共用**：「所在區域 ＝ 指定區域」（`currentArea`／`currentRegion`／`currentFloor`）、
 「負重超過 X%」。
 
@@ -282,7 +287,7 @@ Wiki 照 `blockedReason` 顯示未開放的原因：
 
 | 分組 | 條件 |
 |---|---|
-| 時效 | Buff 剩餘時間少於 N 秒 |
+| 時效 | Buff 剩餘時間少於 N 秒（Buff 參數見 § 51.4.5） |
 | 時效 | 指定藥水冷卻已完成 |
 
 ### 51.4.8 補給條件

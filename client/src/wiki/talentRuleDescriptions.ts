@@ -8,7 +8,7 @@ import type { TalentRuleDef } from '../models/talent';
 export const COMBAT_CONDITION_DESC: Record<string, string> = {
   field_has_race: '場上有活著的怪符合指定種族或元素',
   field_avg_hp_below: '場上所有活著的怪，HP 百分比的平均值',
-  buff_not_active: '指定 buff 效果不存在或已過期',
+  buff_not_active: '指定 buff 效果不存在或已過期。可選 buff 技能或藥水（增益藥水、加速藥水）',
   speed_not_active: '沒有任何加速效果（藥水與加速術互斥，共用同一格）',
   debuff_active: '身上有指定狀態異常',
   always: '無條件觸發',
@@ -69,7 +69,7 @@ export const PERSISTENT_CONDITION_DESC: Record<string, string> = {
   hp_above: '自身 HP 百分比',
   mp_below: '自身 MP 百分比',
   mp_above: '自身 MP 百分比',
-  buff_not_active: '指定 buff 效果不存在或已過期',
+  buff_not_active: '指定 buff 效果不存在或已過期。可選 buff 技能或藥水（增益藥水、加速藥水）',
   speed_not_active: '沒有任何加速效果（藥水與加速術互斥，共用同一格）',
   skill_ready: '指定技能冷卻完成且 MP 足夠',
   debuff_active: `身上有指定狀態：${Object.values(SCRIPT_DEBUFF_LABELS).join('／')}。暈眩不列入，暈眩中無法使用任何道具`,
@@ -81,7 +81,7 @@ export const PERSISTENT_CONDITION_DESC: Record<string, string> = {
   ability_meter: '飾品隨機技能的怒氣或平靜數值（0~100）；沒帶該技能時視為 0',
   current_area_is: '目前所在的區域或地區',
   item_count_below: '指定道具的持有量。藥水快見底時可改用低階的',
-  buff_remaining_below: '指定 buff 的剩餘秒數。用來提前續，而不是等它掉光',
+  buff_remaining_below: '指定 buff 的剩餘秒數，可選 buff 技能或藥水。用來提前續，而不是等它掉光',
   potion_cooldown_ready: '指定藥水的冷卻已經走完',
   hp_dropped_recently: '指定秒數內 HP 掉了幾個百分點。用來偵測爆發傷害',
 };

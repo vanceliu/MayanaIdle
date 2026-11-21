@@ -19,6 +19,7 @@ import {
   COOLDOWN_REDUCTION_CAP,
   INT_SKILL_DAMAGE_PERCENT_PER_2,
   INT_COOLDOWN_PERCENT_PER_2,
+  starStat,
 } from '../src/systems/combat';
 import {
   ATTRIBUTE_KEYS, CLASS_NAMES_ZH,
@@ -1207,7 +1208,7 @@ export function proxyDps(
   const bonusPerHit = ability?.type === 'bonus_damage' ? ability.params.chance / 100 * ability.params.damage : 0;
 
   const intervalMs = getPlayerAttackInterval(loadout.gear, effects);
-  const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + intCooldownReduction(effInt));
+  const cdr = Math.min(COOLDOWN_REDUCTION_CAP, getCombatBonuses(loadout.gear, effects).cooldown_reduction + starStat(char, 'cdrPct') + intCooldownReduction(effInt));
   const normalRolls = expectedHitCount(loadout.weapon);
 
   /**

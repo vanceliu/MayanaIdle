@@ -31,9 +31,10 @@ describe('StarChartPage', () => {
     expect(container.querySelector('.star-planner-bar')?.textContent).toContain('星點 3 / 46');
   });
 
-  it('星點數值表列出體質、精神轉最大 HP／MP 與職業起點屬性', () => {
+  it('星點數值表列出體質、精神轉最大 HP／MP、冷卻縮減與職業起點屬性', () => {
     renderPage();
-    expect(screen.getByRole('cell', { name: '每 1 點改為最大 HP／最大 MP +20' })).toBeTruthy();
-    expect(screen.getByText(/騎士 力量 \+2、體質 \+6/)).toBeTruthy();
+    expect(screen.getByRole('cell', { name: /其餘每 1 點改為最大 HP／最大 MP \+20/ })).toBeTruthy();
+    expect(screen.getByRole('cell', { name: '+1%（與詞綴、buff、智力合計上限 50%）' })).toBeTruthy();
+    expect(screen.getByText(/騎士 力量 \+2、體質 \+2/)).toBeTruthy();
   });
 });
