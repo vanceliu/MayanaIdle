@@ -74,6 +74,7 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **製作材料分配規則／製作消耗（製作費依階級）** | `06-equipment-acquire.md` | § 6A.3 |
+| **製作取用倉庫（背包→個人→帳號倉庫，公會不算；前置裝備玩家指定）** | `06-equipment-acquire.md` | § 6A.3「取用來源」 |
 | **裝備拆解（鐵匠鋪，退一半材料；掉落品技能存成結晶）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |

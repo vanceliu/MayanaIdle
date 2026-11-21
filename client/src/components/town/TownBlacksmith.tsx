@@ -9,8 +9,9 @@ import { Tooltip } from '../Tooltip';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
-import { getBagItemAmount } from '../../models/bagItem';
-import { evaluateCraftRequirements, hasCraftQuestFor } from '../../systems/craftQuestSystem';
+import {
+  CRAFT_SOURCE_ORDER, evaluateCraftRequirements, findCraftPrerequisiteCandidates, getCraftSources, hasCraftQuestFor,
+} from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
 import { getDismantleOutcome } from '../../systems/crafting';
 import type { EquipmentInstance } from '../../models/equipment';
@@ -24,6 +25,7 @@ import {
 } from '../../models/ability';
 import { crystalImproves, type AbilityCrystal } from '../../models/abilityCrystal';
 import { BlacksmithAbilitySwap } from './BlacksmithAbilitySwap';
+import { BlacksmithPrereqPicker, CRAFT_SOURCE_LABEL, PrereqName } from './BlacksmithPrereqPicker';
 
 type BlacksmithTab = 'craft' | 'dismantle' | 'swap';
 
@@ -31,6 +33,10 @@ export function TownBlacksmith() {
   const char = useGameStore(s => s.character);
   const inventory = useGameStore(s => s.inventory);
   const bagItems = useGameStore(s => s.bagItems);
+  const personalStoredMaterials = useGameStore(s => s.personalStoredMaterials);
+  const personalStoredEquipment = useGameStore(s => s.personalStoredEquipment);
+  const storedMaterials = useGameStore(s => s.storedMaterials);
+  const storedEquipment = useGameStore(s => s.storedEquipment);
   const craftQuests = useGameStore(s => s.craftQuests);
   const abilityCrystals = useGameStore(s => s.abilityCrystals);
   const acceptCraftQuest = useGameStore(s => s.acceptCraftQuest);
@@ -41,6 +47,9 @@ export function TownBlacksmith() {
   const [tab, setTab] = useState<BlacksmithTab>('craft');
   /** 各配方指定的隨機技能（`07-affix-ability.md` § 7S.6） */
   const [abilityChoices, setAbilityChoices] = useState<Record<number, AbilityType>>({});
+  /** 各配方指定的前置裝備實例 id（`06-equipment-acquire.md` § 6A.3「取用來源」） */
+  const [prereqChoices, setPrereqChoices] = useState<Record<number, number>>({});
+  const [prereqPickerRecipe, setPrereqPickerRecipe] = useState<EquipmentTemplate | null>(null);
   const allTemplates = useEquipmentTemplates();
   const craftTemplates = useMemo(
     () => allTemplates.filter(t => t.acquireType === 'craft').sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0)),
@@ -48,6 +57,10 @@ export function TownBlacksmith() {
   );
 
   if (!char) return null;
+
+  const sources = getCraftSources({
+    bagItems, inventory, personalStoredMaterials, personalStoredEquipment, storedMaterials, storedEquipment,
+  });
 
   /*
    * 演出只掛在畫面上，不參與判定（`48-vfx.md` § 48.1）——
@@ -60,7 +73,7 @@ export function TownBlacksmith() {
    */
   function canCraftRecipe(recipe: EquipmentTemplate): boolean {
     if (!char) return false;
-    return evaluateCraftRequirements(recipe, bagItems, inventory, char.gold).ready;
+    return evaluateCraftRequirements(recipe, sources, char.gold).ready;
   }
 
   /** 該配方指定的隨機技能；不在本角色可選範圍內時視為未指定 */
@@ -71,14 +84,26 @@ export function TownBlacksmith() {
     return options.includes(chosen) ? chosen : undefined;
   }
 
+  /** 該配方指定的前置裝備；已不在背包或倉庫時視為未指定 */
+  function chosenPrereq(recipe: EquipmentTemplate) {
+    const id = prereqChoices[recipe.id!];
+    return id === undefined ? undefined : findCraftPrerequisiteCandidates(recipe, sources).find(c => c.item.id === id);
+  }
+
+  function isPrereqReady(recipe: EquipmentTemplate): boolean {
+    return !recipe.craftPrerequisiteWeapon || chosenPrereq(recipe) !== undefined;
+  }
+
   function isAbilityReady(recipe: EquipmentTemplate): boolean {
     return !craftRequiresAbility(recipe) || chosenAbility(recipe) !== undefined;
   }
 
   async function handleCraft() {
     if (!selectedRecipe || !char) return;
-    if (!canCraftRecipe(selectedRecipe) || !isAbilityReady(selectedRecipe)) return;
-    const settled = useGameStore.getState().craftEquipment(selectedRecipe.id!, chosenAbility(selectedRecipe));
+    if (!canCraftRecipe(selectedRecipe) || !isAbilityReady(selectedRecipe) || !isPrereqReady(selectedRecipe)) return;
+    const prereq = chosenPrereq(selectedRecipe);
+    const prerequisiteIds = prereq ? [prereq.item.id!] : undefined;
+    const settled = useGameStore.getState().craftEquipment(selectedRecipe.id!, chosenAbility(selectedRecipe), prerequisiteIds);
     // 單機同步、線上模式 Promise；訊息在同一個 click 內就要出現（單機）
     if (settled && typeof (settled as Promise<unknown>).then === 'function') {
       setResultMsg((await (settled as Promise<CraftResult>)).message);
@@ -305,6 +330,31 @@ export function TownBlacksmith() {
                     </span>
                   );
                 })()}
+                {/* § 6A.3「取用來源」：前置裝備由玩家指定，可在背包或個人／帳號倉庫 */}
+                {recipe.craftPrerequisiteWeapon && (() => {
+                  const picked = chosenPrereq(recipe);
+                  const count = findCraftPrerequisiteCandidates(recipe, sources).length;
+                  return (
+                    <span className={`shop-item-desc bs-ability-row ${picked ? '' : 'lacking'}`}>
+                      <span className="bs-ability-label">前置裝備</span>
+                      {picked ? (
+                        <>
+                          <PrereqName item={picked.item} templates={allTemplates} />
+                          <span className="bs-source-tag-inline">{CRAFT_SOURCE_LABEL[picked.source]}</span>
+                        </>
+                      ) : (
+                        <span className="bs-dim">{count ? '未選擇' : '沒有可用的前置裝備'}</span>
+                      )}
+                      <button
+                        className="bs-prereq-open"
+                        disabled={count === 0}
+                        onClick={e => { e.stopPropagation(); setSelectedRecipe(recipe); setPrereqPickerRecipe(recipe); }}
+                      >
+                        {picked ? '更換' : '選擇'}
+                      </button>
+                    </span>
+                  );
+                })()}
                 <span className="shop-item-desc bs-craft-materials">
                   {/* 製作費（§ 6A.3） */}
                   {(() => {
@@ -320,7 +370,7 @@ export function TownBlacksmith() {
                   })()}
                   {recipe.craftPrerequisiteWeapon && (() => {
                     const { templateId, quantity } = recipe.craftPrerequisiteWeapon!;
-                    const have = inventory.filter(i => i.templateId === templateId).length;
+                    const have = findCraftPrerequisiteCandidates(recipe, sources).length;
                     const enough = have >= quantity;
                     // 名稱只用於顯示，一律由 id 反查（§ 99.1 第 3 條）
                     const tmpl = allTemplates.find(t => t.id === templateId);
@@ -334,17 +384,26 @@ export function TownBlacksmith() {
                       </span>
                     );
                   })()}
-                  {(recipe.craftMaterials ?? []).map(m => {
-                    const have = getBagItemAmount(bagItems, m.itemId);
-                    const enough = have >= m.amount;
+                  {/* 素材數量為三處合計，hover 看各處存量（§ 6A.3「取用來源」） */}
+                  {evaluateCraftRequirements(recipe, sources, char.gold).materials.map(m => {
                     const def = getItemById(m.itemId);
                     const { icon, color, glowClass } = resolveItemIcon(def, 'material');
                     return (
-                      <span key={m.itemId} className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
-                        <GameIcon name={icon} size={14} color={color} className={glowClass} />
-                        <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{def?.name ?? '未知素材'}</span>
-                        <span className="bs-craft-mat-count">{have}/{m.amount}</span>
-                      </span>
+                      <Tooltip
+                        key={m.itemId}
+                        position="top"
+                        content={(
+                          <div className="bs-mat-source-tooltip">
+                            {CRAFT_SOURCE_ORDER.map(source => <div key={source}>{CRAFT_SOURCE_LABEL[source]} {m.bySource[source]}</div>)}
+                          </div>
+                        )}
+                      >
+                        <span className={`bs-craft-mat ${m.enough ? '' : 'lacking'}`}>
+                          <GameIcon name={icon} size={14} color={color} className={glowClass} />
+                          <span className="bs-craft-mat-name" style={m.enough ? { color } : undefined}>{def?.name ?? '未知素材'}</span>
+                          <span className="bs-craft-mat-count">{m.have}/{m.need}</span>
+                        </span>
+                      </Tooltip>
                     );
                   })}
                 </span>
@@ -352,7 +411,7 @@ export function TownBlacksmith() {
               <div className="shop-item-actions">
                 <button
                   onClick={(e) => { e.stopPropagation(); handleCraft(); }}
-                  disabled={!canCraftRecipe(recipe) || !isAbilityReady(recipe) || selectedRecipe?.id !== recipe.id}
+                  disabled={!canCraftRecipe(recipe) || !isAbilityReady(recipe) || !isPrereqReady(recipe) || selectedRecipe?.id !== recipe.id}
                 >
                   製作
                 </button>
@@ -385,6 +444,16 @@ export function TownBlacksmith() {
           ))}
       </div>
       </div>
+      {prereqPickerRecipe?.craftPrerequisiteWeapon && (
+        <BlacksmithPrereqPicker
+          prerequisiteName={allTemplates.find(t => t.id === prereqPickerRecipe.craftPrerequisiteWeapon!.templateId)?.name ?? ''}
+          candidates={findCraftPrerequisiteCandidates(prereqPickerRecipe, sources)}
+          chosenId={chosenPrereq(prereqPickerRecipe)?.item.id}
+          templates={allTemplates}
+          onChoose={id => setPrereqChoices(prev => ({ ...prev, [prereqPickerRecipe.id!]: id }))}
+          onClose={() => setPrereqPickerRecipe(null)}
+        />
+      )}
       </>)}
     </div>
   );

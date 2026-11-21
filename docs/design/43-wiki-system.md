@@ -197,7 +197,7 @@ client/src/wiki/
 
 ### 4.7 鐵匠鋪 (CraftingPage)
 - 製作配方列表：成品、製作費（`craftGold`）、所需材料與數量、材料來源區域連結
-- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與 T6 機率（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例、製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）
+- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與 T6 機率（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例、製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）；取用倉庫的範圍與扣除順序（§ 6A.3「取用來源」）
 
 ### 4.8 經驗表 (ExpTablePage)
 - Lv.1～119 升級所需經驗、累計經驗；等級上限讀 `LEVEL_CAP`（`04-character.md` § 4.9）

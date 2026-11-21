@@ -31,6 +31,14 @@ function pickAllAbilities(type = 'bonus_damage') {
   }
 }
 
+/** 指定前置裝備（§ 6A.3「取用來源」）：開該配方卡片的挑選視窗，點第 index 件 */
+async function pickPrereq(recipeName: string, index = 0) {
+  const card = (await findRecipeTitle(recipeName)).closest('.shop-item') as HTMLElement;
+  fireEvent.click(within(card).getByRole('button', { name: '選擇' }));
+  const dialog = screen.getByRole('dialog', { name: '選擇前置裝備' });
+  fireEvent.click(within(dialog).getAllByRole('radio')[index]);
+}
+
 /** 鋼心劍的配方是測試的固定對象；材料由 seed 決定，不寫死在測試裡（§ 6A.3 會重新分配） */
 const RECIPE = EQUIPMENT_SEEDS.find(t => t.name === '鋼心劍')!;
 /** 實例一律以 templateId 比對（§ 99.1 第 7 條）；製作品顯示名稱帶 `(鍛)` */
@@ -99,6 +107,10 @@ describe('TownBlacksmith - Crafting', () => {
       equippedGear: {},
       inventory: [],
       bagItems: recipeBag(10),
+      personalStoredMaterials: [],
+      personalStoredEquipment: [],
+      storedMaterials: [],
+      storedEquipment: [],
       craftQuests: [],
     });
   });
@@ -323,6 +335,7 @@ describe('TownBlacksmith - Crafting', () => {
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
     pickAllAbilities();
+    await pickPrereq('碎星劍');
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -365,6 +378,7 @@ describe('TownBlacksmith - Crafting', () => {
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
     pickAllAbilities();
+    await pickPrereq('碎星劍');
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -417,6 +431,7 @@ describe('TownBlacksmith - Crafting', () => {
     render(<TownBlacksmith />);
     fireEvent.click((await screen.findAllByText('碎星劍'))[0]);
     pickAllAbilities();
+    await pickPrereq('碎星劍');
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -441,6 +456,7 @@ describe('TownBlacksmith - Crafting', () => {
     fireEvent.click(await screen.findByText('雙刀'));
     fireEvent.click((await screen.findAllByText('月牙雙刀'))[0]);
     pickAllAbilities();
+    await pickPrereq('月牙雙刀');
     const craftBtns = screen.getAllByText('製作');
     const enabledBtn = craftBtns.find(btn => !(btn as HTMLButtonElement).disabled)!;
     fireEvent.click(enabledBtn);
@@ -449,6 +465,74 @@ describe('TownBlacksmith - Crafting', () => {
       const state = useGameStore.getState();
       expect(state.inventory.find(i => i.templateId === tid('月牙雙刀'))).toBeDefined();
       expect(state.inventory.filter(i => i.templateId === tid('烈風連刃')).length).toBe(1);
+    });
+  });
+
+  describe('取用倉庫（§ 6A.3「取用來源」）', () => {
+    it('未指定前置裝備時製作鈕停用，指定後才可製作', async () => {
+      useGameStore.setState({
+        character: { ...useGameStore.getState().character!, gold: 2000000 },
+        bagItems: recipeBagFor('碎星劍', 30),
+        inventory: [equipFixture('鋼心劍', 9101)],
+      });
+      render(<TownBlacksmith />);
+      fireEvent.click(await findRecipeTitle('碎星劍'));
+      pickAllAbilities();
+      const card = (await findRecipeTitle('碎星劍')).closest('.shop-item') as HTMLElement;
+      const craftBtn = within(card).getByRole('button', { name: '製作' }) as HTMLButtonElement;
+      expect(craftBtn.disabled).toBe(true);
+
+      await pickPrereq('碎星劍');
+      expect(craftBtn.disabled).toBe(false);
+      expect(screen.queryByRole('dialog', { name: '選擇前置裝備' })).toBeNull();
+    });
+
+    it('挑選視窗列出背包與兩個倉庫的前置裝備，選帳號倉庫那件製作後從帳號倉庫消失', async () => {
+      useGameStore.setState({
+        character: { ...useGameStore.getState().character!, gold: 2000000 },
+        bagItems: recipeBagFor('碎星劍', 30),
+        inventory: [equipFixture('鋼心劍', 9101, { enhancement: 7 })],
+        personalStoredEquipment: [equipFixture('鋼心劍', 9102, { inStorage: true, storageType: 'personal' })],
+        storedEquipment: [equipFixture('鋼心劍', 9103, { inStorage: true, storageType: 'shared' })],
+      });
+      render(<TownBlacksmith />);
+      fireEvent.click(await findRecipeTitle('碎星劍'));
+      pickAllAbilities();
+      const card = (await findRecipeTitle('碎星劍')).closest('.shop-item') as HTMLElement;
+      fireEvent.click(within(card).getByRole('button', { name: '選擇' }));
+      const dialog = screen.getByRole('dialog', { name: '選擇前置裝備' });
+      const options = within(dialog).getAllByRole('radio');
+      expect(options.map(o => o.textContent)).toEqual([
+        expect.stringContaining('背包'), expect.stringContaining('個人倉庫'), expect.stringContaining('帳號倉庫'),
+      ]);
+      fireEvent.click(options[2]);
+      expect(within(card).getByText('帳號倉庫')).toBeTruthy();
+      fireEvent.click(within(card).getByRole('button', { name: '製作' }));
+
+      await waitFor(() => {
+        const state = useGameStore.getState();
+        expect(state.inventory.find(i => i.templateId === tid('碎星劍'))).toBeDefined();
+        expect(state.storedEquipment).toEqual([]);
+        expect(state.inventory.map(i => i.id)).toContain(9101);
+        expect(state.personalStoredEquipment.map(i => i.id)).toEqual([9102]);
+      });
+    });
+
+    it('素材數量為三處合計，hover 顯示各處存量', async () => {
+      const [first] = RECIPE.craftMaterials!;
+      useGameStore.setState({
+        bagItems: [bagItemById(first.itemId, 1)],
+        personalStoredMaterials: [bagItemById(first.itemId, 2)],
+        storedMaterials: [bagItemById(first.itemId, 10)],
+      });
+      render(<TownBlacksmith />);
+      const card = (await findRecipeTitle('鋼心劍')).closest('.shop-item') as HTMLElement;
+      const count = within(card).getByText(`13/${first.amount}`);
+      fireEvent.mouseEnter(count.closest('.tooltip-trigger')!);
+
+      expect(await screen.findByText('背包 1')).toBeTruthy();
+      expect(screen.getByText('個人倉庫 2')).toBeTruthy();
+      expect(screen.getByText('帳號倉庫 10')).toBeTruthy();
     });
   });
 

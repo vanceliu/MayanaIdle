@@ -11,11 +11,40 @@ import { getBagItemAmount } from '../models/bagItem';
  * 兩邊各寫一份的話，只要有人改了其中一邊，任務就會顯示「可製作」但按下去做不出來。
  */
 
+/** 製作可取用的來源，依扣除順序排列（`06-equipment-acquire.md` § 6A.3「取用來源」）；公會倉庫不算 */
+export const CRAFT_SOURCE_ORDER = ['bag', 'personal', 'shared'] as const;
+export type CraftSourceKind = typeof CRAFT_SOURCE_ORDER[number];
+
+export interface CraftSourceStock {
+  materials: BagItem[];
+  equipment: EquipmentInstance[];
+}
+
+export type CraftSources = Record<CraftSourceKind, CraftSourceStock>;
+
+/** 由 store 欄位組出製作來源：背包、個人倉庫、帳號倉庫 */
+export function getCraftSources(state: {
+  bagItems: BagItem[];
+  inventory: EquipmentInstance[];
+  personalStoredMaterials: BagItem[];
+  personalStoredEquipment: EquipmentInstance[];
+  storedMaterials: BagItem[];
+  storedEquipment: EquipmentInstance[];
+}): CraftSources {
+  return {
+    bag: { materials: state.bagItems, equipment: state.inventory },
+    personal: { materials: state.personalStoredMaterials, equipment: state.personalStoredEquipment },
+    shared: { materials: state.storedMaterials, equipment: state.storedEquipment },
+  };
+}
+
 export interface CraftMaterialStatus {
   itemId: number;
+  /** 三處合計 */
   have: number;
   need: number;
   enough: boolean;
+  bySource: Record<CraftSourceKind, number>;
 }
 
 export interface CraftPrerequisiteStatus {
@@ -41,28 +70,48 @@ export interface CraftRequirementStatus {
   ready: boolean;
 }
 
+export interface CraftPrerequisiteCandidate {
+  source: CraftSourceKind;
+  item: EquipmentInstance;
+}
+
+/** 三處中可當前置裝備的實例，依來源順序；前置一律以 templateId 比對，不用名稱（§ 99.1 第 3 條） */
+export function findCraftPrerequisiteCandidates(
+  recipe: EquipmentTemplate,
+  sources: CraftSources,
+): CraftPrerequisiteCandidate[] {
+  const prereq = recipe.craftPrerequisiteWeapon;
+  if (!prereq) return [];
+  return CRAFT_SOURCE_ORDER.flatMap(source => sources[source].equipment
+    .filter(item => item.templateId === prereq.templateId)
+    .map(item => ({ source, item })));
+}
+
 /**
  * 評估某配方當下的需求狀態（§ 36.13.3）。
  *
- * 沒有累積進度 —— 每次都由當下背包與金幣即時算，
+ * 沒有累積進度 —— 每次都由當下背包、倉庫與金幣即時算，
  * 事後把素材、前置裝備或金幣花掉，`ready` 就會跟著掉回 false。
  */
 export function evaluateCraftRequirements(
   recipe: EquipmentTemplate,
-  bagItems: BagItem[],
-  inventory: EquipmentInstance[],
+  sources: CraftSources,
   gold: number,
 ): CraftRequirementStatus {
   const materials: CraftMaterialStatus[] = (recipe.craftMaterials ?? []).map(mat => {
-    const have = getBagItemAmount(bagItems, mat.itemId);
-    return { itemId: mat.itemId, have, need: mat.amount, enough: have >= mat.amount };
+    const bySource = {
+      bag: getBagItemAmount(sources.bag.materials, mat.itemId),
+      personal: getBagItemAmount(sources.personal.materials, mat.itemId),
+      shared: getBagItemAmount(sources.shared.materials, mat.itemId),
+    };
+    const have = bySource.bag + bySource.personal + bySource.shared;
+    return { itemId: mat.itemId, have, need: mat.amount, enough: have >= mat.amount, bySource };
   });
 
   let prerequisite: CraftPrerequisiteStatus | null = null;
   if (recipe.craftPrerequisiteWeapon) {
-    // 前置一律以 templateId 比對，不用名稱（§ 99.1 第 3 條）
     const { templateId, quantity } = recipe.craftPrerequisiteWeapon;
-    const have = inventory.filter(i => i.templateId === templateId).length;
+    const have = findCraftPrerequisiteCandidates(recipe, sources).length;
     prerequisite = { templateId, have, need: quantity, enough: have >= quantity };
   }
 

@@ -7,7 +7,7 @@ import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
 import type { CraftQuest } from '../models/craftQuest';
-import { evaluateCraftRequirements } from '../systems/craftQuestSystem';
+import { evaluateCraftRequirements, getCraftSources } from '../systems/craftQuestSystem';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getItemById } from '../models/items';
 import type { AdventurerQuest } from '../models/adventurerQuest';
@@ -59,12 +59,16 @@ export function QuestTrackerButton() {
 /**
  * 製作任務的單張卡片（§ 36.13.4）
  *
- * 需求沒有累積進度，每次 render 都由當下的背包與金幣重算 ——
+ * 需求沒有累積進度，每次 render 都由當下的背包、倉庫與金幣重算 ——
  * 賣掉素材、前置裝備或花掉金幣，「可製作」就會即時消失。
  */
 function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   const bagItems = useGameStore(s => s.bagItems);
   const inventory = useGameStore(s => s.inventory);
+  const personalStoredMaterials = useGameStore(s => s.personalStoredMaterials);
+  const personalStoredEquipment = useGameStore(s => s.personalStoredEquipment);
+  const storedMaterials = useGameStore(s => s.storedMaterials);
+  const storedEquipment = useGameStore(s => s.storedEquipment);
   const gold = useGameStore(s => s.character?.gold ?? 0);
   const abandonCraftQuest = useGameStore(s => s.abandonCraftQuest);
   const templates = useEquipmentTemplates();
@@ -78,7 +82,10 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   }, [stale, abandonCraftQuest, quest.id]);
   if (!recipe) return null;
 
-  const status = evaluateCraftRequirements(recipe, bagItems, inventory, gold);
+  const sources = getCraftSources({
+    bagItems, inventory, personalStoredMaterials, personalStoredEquipment, storedMaterials, storedEquipment,
+  });
+  const status = evaluateCraftRequirements(recipe, sources, gold);
   const prereqName = status.prerequisite
     ? templates.find(t => t.id === status.prerequisite!.templateId)?.name ?? `#${status.prerequisite.templateId}`
     : null;

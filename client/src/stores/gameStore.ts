@@ -107,8 +107,8 @@ import {
   addCrystal, crystalToAbility, getCrystalApplyBlock, getCrystalApplyCost, normalizeAbilityCrystals,
   CRYSTAL_APPLY_BLOCK_TEXT, type AbilityCrystal,
 } from '../models/abilityCrystal';
-import { evaluateCraftRequirements, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
-import { generateCraftAffixes, getDismantleOutcome } from '../systems/crafting';
+import { evaluateCraftRequirements, getCraftSources, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
+import { drawCraftMaterials, generateCraftAffixes, getDismantleOutcome, pickCraftPrerequisites } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
@@ -558,7 +558,8 @@ export interface GameState {
   /** 鐵匠鋪製作（`06-equipment-acquire.md` § 6A.3） */
   /** 單機且模板已快取時同步結算；線上模式回 Promise */
   /** `abilityType`：武器必須指定隨機技能（`07-affix-ability.md` § 7S.6） */
-  craftEquipment: (templateId: number, abilityType?: AbilityType) => CraftResult | Promise<CraftResult>;
+  /** `prerequisiteIds`：指定的前置裝備實例，可在背包或個人／帳號倉庫（`06-equipment-acquire.md` § 6A.3「取用來源」） */
+  craftEquipment: (templateId: number, abilityType?: AbilityType, prerequisiteIds?: number[]) => CraftResult | Promise<CraftResult>;
   /** 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3「拆解」）。線上模式回 Promise */
   dismantleEquipment: (instanceId: number) => CraftResult | Promise<CraftResult>;
   /** 競技場 NPC：以票券兌換兌換箱（`55-arena.md` § 55.9） */
@@ -2856,7 +2857,7 @@ export function createGameStore(session: Session) {
     return instances;
   },
 
-  craftEquipment: (templateId, abilityType) => {
+  craftEquipment: (templateId, abilityType, prerequisiteIds) => {
     // 快取命中時整段同步結算（無 id 的角色不持久化，與舊鐵匠鋪流程相同）；線上模式回 Promise
     const cached = getTemplateById(templateId);
     const run = (recipe: EquipmentTemplate | undefined): CraftResult | Promise<CraftResult> => {
@@ -2864,7 +2865,8 @@ export function createGameStore(session: Session) {
       if (!char) return { ok: false, message: '沒有角色' };
       if (!recipe || recipe.acquireType !== 'craft' || !recipe.craftMaterials?.length) return { ok: false, message: '無此配方' };
       const state = get();
-      const requirements = evaluateCraftRequirements(recipe, state.bagItems, state.inventory, char.gold);
+      const sources = getCraftSources(state);
+      const requirements = evaluateCraftRequirements(recipe, sources, char.gold);
       if (!requirements.ready) return { ok: false, message: requirements.gold.enough ? '材料不足' : '金幣不足' };
       if (getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
       const chosenAbility = craftRequiresAbility(recipe) ? abilityType : undefined;
@@ -2872,26 +2874,21 @@ export function createGameStore(session: Session) {
         && (!isAbilityType(chosenAbility) || !getCraftAbilityOptions(recipe, char.className).includes(chosenAbility))) {
         return { ok: false, message: '請選擇隨機技能' };
       }
+      const prerequisites = pickCraftPrerequisites(recipe, sources, prerequisiteIds);
+      if (!prerequisites) return { ok: false, message: '請選擇前置裝備' };
 
-      let newBag = [...state.bagItems];
-      for (const mat of recipe.craftMaterials) {
-        const newAmount = getBagItemAmount(newBag, mat.itemId) - mat.amount;
-        if (char.id) void session.repo.setBagItemAmount(char.id, mat.itemId, newAmount);
-        newBag = consumeBagItem(newBag, mat.itemId, mat.amount);
-      }
-      let inv = [...state.inventory];
-      if (recipe.craftPrerequisiteWeapon) {
-        const { templateId: prereqId, quantity } = recipe.craftPrerequisiteWeapon;
-        let removed = 0;
-        for (const item of state.inventory) {
-          if (removed >= quantity) break;
-          if (item.templateId === prereqId) {
-            if (item.id) void session.repo.deleteEquipment(item.id);
-            inv = inv.filter(i => i.id !== item.id);
-            removed++;
-          }
+      const drawn = drawCraftMaterials(recipe.craftMaterials, sources);
+      const newBag = drawn.bag;
+      if (char.id) {
+        for (const mat of recipe.craftMaterials) {
+          void session.repo.setBagItemAmount(char.id, mat.itemId, getBagItemAmount(newBag, mat.itemId));
         }
       }
+      const usedIds = new Set(prerequisites.map(p => p.item.id));
+      for (const id of usedIds) if (id) void session.repo.deleteEquipment(id);
+      const inv = state.inventory.filter(i => !usedIds.has(i.id));
+      const personalEquip = state.personalStoredEquipment.filter(i => !usedIds.has(i.id));
+      const sharedEquip = state.storedEquipment.filter(i => !usedIds.has(i.id));
       const affixCategory = getAffixCategoryForSlot(recipe.slot, recipe.type);
       const affixes = generateCraftAffixes(affixCategory, recipe);
       const fields = rollNewInstanceFields(recipe, { channel: 'craft', className: char.className, chosen: chosenAbility });
@@ -2909,6 +2906,10 @@ export function createGameStore(session: Session) {
           character: { ...s2.character!, gold: s2.character!.gold - requirements.gold.need },
           bagItems: newBag,
           inventory: [...inv, newEquip],
+          personalStoredMaterials: drawn.personal,
+          personalStoredEquipment: personalEquip,
+          storedMaterials: drawn.shared,
+          storedEquipment: sharedEquip,
           // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
           craftQuests: removeCraftQuestByTemplate(s2.craftQuests, recipe.id!),
           statistics: { ...s2.statistics, equipmentCrafted: s2.statistics.equipmentCrafted + 1 },

@@ -121,3 +121,18 @@
 - [x] P1 `talentParams.ts` `POTION_BUFF_OPTIONS`、`TalentEditor` 選單、`scriptRunner` `findSelfBuff`＋測試
 - [x] P2 文件：51 § 51.4.5／§ 51.4.7、03 § 3.13、30 § 30.4a、INDEX；Wiki 說明與範例
 - [ ] P3 使用者確認後刪除本節
+
+### 鐵匠鋪製作取用倉庫
+
+定案規格：
+- 素材、前置裝備的來源＝背包＋個人倉庫＋帳號倉庫；公會倉庫不算；製作費只看角色持有金幣
+- 素材扣除順序：背包 → 個人倉庫 → 帳號倉庫
+- 前置裝備由玩家從三處符合的實例指定，未指定不可製作
+- 製作追蹤（§ 36.13.3）與製作按鈕同一支判定，同樣計入兩個倉庫
+- 介面：素材顯示三處合計，hover 顯示背包／個人倉庫／帳號倉庫各自存量；前置裝備按「選擇／更換」開挑選視窗（可捲動、hover 看裝備明細、點一列即選定）
+
+- [x] B1 文件：06 § 6A.3、13 § 13.5、35 § 35.13、36 § 36.13.3、INDEX
+- [x] B2 `evaluateCraftRequirements` 多來源、`craftEquipment` 依序扣除＋指定前置；QuestTracker 改用多來源＋測試
+- [x] B3 demo：配方卡片的來源數量與前置裝備挑選
+- [x] B4 使用者確認 demo 後改 `TownBlacksmith`（`BlacksmithPrereqPicker`）＋測試；Wiki 製作頁、43 § 4.7
+- [ ] B5 使用者確認後刪除本節

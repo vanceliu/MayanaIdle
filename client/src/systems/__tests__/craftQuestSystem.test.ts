@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   evaluateCraftRequirements,
+  findCraftPrerequisiteCandidates,
+  type CraftSources,
   acceptCraftQuest,
   abandonCraftQuest,
   removeCraftQuestByTemplate,
@@ -9,6 +11,7 @@ import {
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
 import type { CraftQuest } from '../../models/craftQuest';
 import type { EquipmentTemplate, EquipmentInstance } from '../../models/equipment';
+import type { BagItem } from '../../models/bagItem';
 import { bagItemById } from '../../testing/bagFixtures';
 
 /**
@@ -45,11 +48,23 @@ function equipInstance(templateId: number, id: number): EquipmentInstance {
   return { id, templateId, name: 'x', type: 'sword', slot: 'rightHand', isTwoHanded: false } as EquipmentInstance;
 }
 
+function sourcesOf(
+  bag: BagItem[],
+  inventory: EquipmentInstance[],
+  warehouses: Partial<Record<'personal' | 'shared', { materials?: BagItem[]; equipment?: EquipmentInstance[] }>> = {},
+): CraftSources {
+  return {
+    bag: { materials: bag, equipment: inventory },
+    personal: { materials: warehouses.personal?.materials ?? [], equipment: warehouses.personal?.equipment ?? [] },
+    shared: { materials: warehouses.shared?.materials ?? [], equipment: warehouses.shared?.equipment ?? [] },
+  };
+}
+
 describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
   it('素材與前置皆滿足時 ready 為 true', () => {
-    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [
+    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, sourcesOf(fullBag(), [
       equipInstance(9001, 1), equipInstance(9001, 2),
-    ], ENOUGH_GOLD);
+    ]), ENOUGH_GOLD);
 
     expect(status.ready).toBe(true);
     expect(status.materials.every(m => m.enough)).toBe(true);
@@ -57,7 +72,7 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
   });
 
   it('素材不足時 ready 為 false，且逐項標出缺哪一種', () => {
-    const status = evaluateCraftRequirements(RECIPE, [bagItemById(11, 10), bagItemById(12, 1)], [], ENOUGH_GOLD);
+    const status = evaluateCraftRequirements(RECIPE, sourcesOf([bagItemById(11, 10), bagItemById(12, 1)], []), ENOUGH_GOLD);
 
     expect(status.ready).toBe(false);
     expect(status.materials.find(m => m.itemId === 11)!.enough).toBe(true);
@@ -67,38 +82,70 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
     expect(lacking.need).toBe(3);
   });
 
+  it('素材三處合計：背包＋個人倉庫＋帳號倉庫，並逐處列出（§ 6A.3「取用來源」）', () => {
+    const status = evaluateCraftRequirements(RECIPE, sourcesOf([bagItemById(11, 1), bagItemById(12, 3)], [], {
+      personal: { materials: [bagItemById(11, 2)] },
+      shared: { materials: [bagItemById(11, 1)] },
+    }), ENOUGH_GOLD);
+
+    const mat = status.materials.find(m => m.itemId === 11)!;
+    expect(mat.have).toBe(4);
+    expect(mat.bySource).toEqual({ bag: 1, personal: 2, shared: 1 });
+    expect(status.ready).toBe(true);
+  });
+
+  it('倉庫加上背包仍不足時 ready 為 false', () => {
+    const status = evaluateCraftRequirements(RECIPE, sourcesOf([bagItemById(11, 1), bagItemById(12, 3)], [], {
+      shared: { materials: [bagItemById(11, 2)] },
+    }), ENOUGH_GOLD);
+
+    expect(status.materials.find(m => m.itemId === 11)!.enough).toBe(false);
+    expect(status.ready).toBe(false);
+  });
+
   it('金幣不足製作費時 ready 為 false，並標出持有與需要（§ 6A.3）', () => {
-    const status = evaluateCraftRequirements(RECIPE, fullBag(), [], ENOUGH_GOLD - 1);
+    const status = evaluateCraftRequirements(RECIPE, sourcesOf(fullBag(), []), ENOUGH_GOLD - 1);
 
     expect(status.ready).toBe(false);
     expect(status.gold).toEqual({ have: ENOUGH_GOLD - 1, need: 20_000, enough: false });
   });
 
   it('金幣剛好等於製作費即可製作', () => {
-    const status = evaluateCraftRequirements(RECIPE, fullBag(), [], ENOUGH_GOLD);
+    const status = evaluateCraftRequirements(RECIPE, sourcesOf(fullBag(), []), ENOUGH_GOLD);
 
     expect(status.gold.enough).toBe(true);
     expect(status.ready).toBe(true);
   });
 
   it('前置裝備不足時 ready 為 false', () => {
-    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [equipInstance(9001, 1)], ENOUGH_GOLD);
+    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, sourcesOf(fullBag(), [equipInstance(9001, 1)]), ENOUGH_GOLD);
 
     expect(status.ready).toBe(false);
     expect(status.prerequisite).toEqual({ templateId: 9001, have: 1, need: 2, enough: false });
   });
 
+  it('前置裝備計入個人與帳號倉庫，候選依背包 → 個人 → 帳號排列', () => {
+    const sources = sourcesOf(fullBag(), [], {
+      personal: { equipment: [equipInstance(9001, 2)] },
+      shared: { equipment: [equipInstance(9001, 3)] },
+    });
+
+    expect(evaluateCraftRequirements(RECIPE_WITH_PREREQ, sources, ENOUGH_GOLD).ready).toBe(true);
+    expect(findCraftPrerequisiteCandidates(RECIPE_WITH_PREREQ, sources).map(c => [c.source, c.item.id]))
+      .toEqual([['personal', 2], ['shared', 3]]);
+  });
+
   it('前置以 templateId 比對，同名但不同模板不算數（§ 99.1 第 3 條）', () => {
-    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, fullBag(), [
+    const status = evaluateCraftRequirements(RECIPE_WITH_PREREQ, sourcesOf(fullBag(), [
       equipInstance(8888, 1), equipInstance(8888, 2),
-    ], ENOUGH_GOLD);
+    ]), ENOUGH_GOLD);
 
     expect(status.prerequisite!.have).toBe(0);
     expect(status.ready).toBe(false);
   });
 
   it('沒有前置需求的配方，prerequisite 為 null 且不影響 ready', () => {
-    const status = evaluateCraftRequirements(RECIPE, fullBag(), [], ENOUGH_GOLD);
+    const status = evaluateCraftRequirements(RECIPE, sourcesOf(fullBag(), []), ENOUGH_GOLD);
 
     expect(status.prerequisite).toBeNull();
     expect(status.ready).toBe(true);
@@ -106,7 +153,7 @@ describe('evaluateCraftRequirements（§ 36.13.3 完成判定）', () => {
 
   it('不可製作的模板（無 craftMaterials）永遠 ready 為 false', () => {
     const notCraftable = { id: 9003, name: '掉落劍', buyPrice: 0 } as EquipmentTemplate;
-    const status = evaluateCraftRequirements(notCraftable, fullBag(), [], ENOUGH_GOLD);
+    const status = evaluateCraftRequirements(notCraftable, sourcesOf(fullBag(), []), ENOUGH_GOLD);
 
     expect(status.ready).toBe(false);
   });

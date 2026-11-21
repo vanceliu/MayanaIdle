@@ -3585,6 +3585,24 @@ button.active {
 .bs-ability-row .bs-ability-preview { color: #86EFAC; }
 .bs-ability-row.lacking .bs-ability-label { color: var(--accent-danger); }
 
+/* § 6A.3「取用來源」：素材來源明細、前置裝備挑選視窗 */
+.bs-mat-source-tooltip { font-size: var(--fs-sm); line-height: 1.7; white-space: nowrap; }
+.bs-prereq-open { padding: 1px 8px; font-size: var(--fs-xs); }
+.bs-prereq-name { display: inline-flex; align-items: center; gap: 3px; }
+.bs-source-tag-inline { font-size: var(--fs-xs); color: var(--accent-primary); }
+.modal-content.bs-prereq-modal { height: auto; max-height: calc(60 * var(--vh-unit, 1vh)); width: 420px; }
+.bs-prereq-list { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.bs-prereq-option {
+  display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer;
+  border: var(--border-width) solid transparent; border-radius: var(--radius-sm);
+}
+.bs-prereq-option:hover { background: var(--bg-deepest); }
+.bs-prereq-option.selected { border-color: var(--accent-primary); background: var(--bg-deepest); }
+.bs-prereq-radio { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--text-dim); flex: none; }
+.bs-prereq-option.selected .bs-prereq-radio { background: var(--accent-primary); border-color: var(--accent-primary); }
+.bs-prereq-meta { color: var(--text-dim); font-size: var(--fs-xs); }
+.bs-source-tag { margin-left: auto; font-size: var(--fs-xs); color: var(--accent-primary); }
+
 /* § 6A.8.8 素質需求：未達標的屬性標紅，該件的詞綴整組凍結 */
 .equip-detail-unmet { color: var(--accent-danger); }
 .equip-detail-unmet-attr { color: var(--accent-danger); font-weight: 700; }
