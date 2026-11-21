@@ -19,9 +19,64 @@ describe('盤面結構（§ 56.6）', () => {
     }
   });
 
-  it('節點數：起點 5、星點 264、星座 40、命星 17', () => {
+  it('節點數：起點 5、星點 269、星座 45、命星 17', () => {
     const count = (kind: string) => STAR_NODES.filter(n => n.kind === kind).length;
-    expect([count('start'), count('point'), count('constellation'), count('keystone')]).toEqual([5, 264, 40, 17]);
+    expect([count('start'), count('point'), count('constellation'), count('keystone')]).toEqual([5, 269, 45, 17]);
+  });
+
+  it('跨職業屬性支線：r360 → 星點 → 星座（死路）', () => {
+    const linked = (a: string, b: string) => STAR_EDGES.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+    const fx = (id: string) => STAR_NODE_BY_ID.get(id)!.effects.map(e => `${e.key}:${e.value}`);
+    for (const cls of STAR_CLASS_ORDER) {
+      expect(linked(`${cls}-r360`, `${cls}-cross-p`)).toBe(true);
+      expect(linked(`${cls}-cross-p`, `${cls}-cross-s`)).toBe(true);
+      expect(STAR_EDGES.filter(([x, y]) => x === `${cls}-cross-s` || y === `${cls}-cross-s`)).toHaveLength(1);
+    }
+    expect([fx('knight-cross-p'), fx('knight-cross-s')]).toEqual([['attr:INT:1'], ['attr:INT:2', 'attr:AGI:2', 'attr:SPI:2']]);
+    expect([fx('thief-cross-p'), fx('thief-cross-s')]).toEqual([['attr:INT:1'], ['attr:INT:2', 'attr:SPI:2', 'defPct:2']]);
+    expect([fx('elf-cross-p'), fx('elf-cross-s')]).toEqual([['attr:STR:1'], ['attr:STR:2', 'attr:SPI:2', 'attr:INT:2']]);
+    expect([fx('elementalist-cross-p'), fx('elementalist-cross-s')]).toEqual([['attr:STR:1'], ['attr:STR:2', 'attr:AGI:2', 'attr:VIT:2']]);
+    expect([fx('priest-cross-p'), fx('priest-cross-s')]).toEqual([['attr:AGI:1'], ['attr:STR:2', 'attr:AGI:2', 'attr:VIT:2']]);
+  });
+
+  it('屬性分攤：力量、敏捷、智力、精神主職業兩區約 2/5，體質騎士區約 2/5；總量 37～43，其他區各至少 4 點', () => {
+    // 只算屬性效果；起點與命星不計
+    const home: Record<string, { classes: string[]; min: number; max: number }> = {
+      STR: { classes: ['knight', 'thief'], min: 0.35, max: 0.45 },
+      AGI: { classes: ['thief', 'elf'], min: 0.35, max: 0.45 },
+      INT: { classes: ['elementalist', 'priest'], min: 0.35, max: 0.45 },
+      SPI: { classes: ['elementalist', 'priest'], min: 0.35, max: 0.45 },
+      VIT: { classes: ['knight'], min: 0.35, max: 0.45 },
+    };
+    const regionOf = (x: number, y: number) =>
+      STAR_CLASS_ORDER[Math.round(((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360 / 72) % 5];
+    const table: Record<string, Record<string, number>> = {};
+    for (const n of STAR_NODES) {
+      if (n.kind === 'start' || n.kind === 'keystone' || Math.hypot(n.x, n.y) < 200) continue;
+      for (const e of n.effects) {
+        const attr = e.key.startsWith('attr:') ? e.key.slice(5) : null;
+        if (!attr || attr === 'CHA') continue;
+        const amount = e.value;
+        (table[attr] ??= {})[regionOf(n.x, n.y)] = (table[attr][regionOf(n.x, n.y)] ?? 0) + amount;
+      }
+    }
+    for (const [attr, rule] of Object.entries(home)) {
+      const row = table[attr];
+      const total = Object.values(row).reduce((a, b) => a + b, 0);
+      const homeSum = rule.classes.reduce((a, c) => a + (row[c] ?? 0), 0);
+      expect(total, attr).toBeGreaterThanOrEqual(37);
+      expect(total, attr).toBeLessThanOrEqual(43);
+      expect(homeSum / total, attr).toBeGreaterThanOrEqual(rule.min);
+      expect(homeSum / total, attr).toBeLessThanOrEqual(rule.max);
+      for (const c of STAR_CLASS_ORDER.filter(c => !rule.classes.includes(c))) expect(row[c] ?? 0, `${attr}@${c}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('兩側第一主屬性相同的交界（盜賊／妖精、元素師／牧師）：中環兩端與交界路徑第 2、4 點為力量', () => {
+    const fx = (id: string) => STAR_NODE_BY_ID.get(id)!.effects[0].key;
+    for (const i of [1, 3]) {
+      expect([fx(`bridge${i}-1`), fx(`bridge${i}-5`), fx(`risk${i}-1`), fx(`risk${i}-3`)]).toEqual(Array(4).fill('attr:STR'));
+    }
   });
 
   it('職業支線：r480 → 星點 → 星座', () => {
@@ -31,21 +86,20 @@ describe('盤面結構（§ 56.6）', () => {
       expect(linked(`${cls}-r480`, `${cls}-vow-p`)).toBe(true);
       expect(linked(`${cls}-vow-p`, `${cls}-vow-s`)).toBe(true);
     }
-    expect([fx('knight-vow-p'), fx('knight-vow-s')]).toEqual([['attr:VIT:1'], ['atkPct:2', 'attr:STR:2', 'attr:VIT:2']]);
-    expect([fx('thief-vow-p'), fx('thief-vow-s')]).toEqual([['mpFlat:20'], ['atkPct:2', 'attr:AGI:2', 'attr:VIT:2']]);
-    expect([fx('elf-vow-p'), fx('elf-vow-s')]).toEqual([['mpFlat:20'], ['atkPct:2', 'attr:AGI:2', 'mpPct:2']]);
-    expect([fx('elementalist-vow-p'), fx('elementalist-vow-s')]).toEqual([['mpFlat:20'], ['matkPct:2', 'attr:INT:2', 'attr:SPI:2']]);
-    expect([fx('priest-vow-p'), fx('priest-vow-s')]).toEqual([['mpFlat:20'], ['matkPct:2', 'attr:INT:2', 'attr:SPI:2']]);
+    expect([fx('knight-vow-p'), fx('knight-vow-s')]).toEqual([['attr:VIT:1'], ['atkPct:2', 'attr:INT:2', 'attr:VIT:2']]);
+    expect([fx('thief-vow-p'), fx('thief-vow-s')]).toEqual([['attr:SPI:1'], ['atkPct:2', 'attr:INT:2', 'attr:VIT:2']]);
+    expect([fx('elf-vow-p'), fx('elf-vow-s')]).toEqual([['attr:SPI:1'], ['atkPct:2', 'attr:STR:2', 'mpPct:2']]);
+    expect([fx('elementalist-vow-p'), fx('elementalist-vow-s')]).toEqual([['attr:SPI:1'], ['matkPct:2', 'mpPct:2', 'defPct:2']]);
+    expect([fx('priest-vow-p'), fx('priest-vow-s')]).toEqual([['attr:SPI:1'], ['matkPct:2', 'attr:STR:2', 'attr:AGI:2']]);
   });
 
-  it('外側支線：冷卻縮減星點 → 命中／迴避星點 → 星座（命中 +2%、迴避值 +100、防禦 +2%）', () => {
+  it('外側支線：冷卻縮減星點 → 星點 → 星座（死路）', () => {
     const linked = (a: string, b: string) => STAR_EDGES.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
     for (let i = 0; i < 5; i++) {
       expect(linked(`outer${i}`, `outer${i}-p`)).toBe(true);
       expect(linked(`outer${i}-p`, `outer${i}-s`)).toBe(true);
-      expect(STAR_NODE_BY_ID.get(`outer${i}-p`)!.effects[0].key).toBe(i % 2 === 0 ? 'hit' : 'evasion');
-      expect(STAR_NODE_BY_ID.get(`outer${i}-s`)!.effects.map(e => `${e.key}:${e.value}`)).toEqual(['hit:2', 'evasion:100', 'defPct:2']);
     }
+    expect(STAR_NODE_BY_ID.get('outer4-s')!.effects.map(e => `${e.key}:${e.value}`)).toEqual(['hit:2', 'evasion:100', 'defPct:2']);
   });
 
   it('職業命星連到每條職業魔法線的末端；命星是終點，不能經命星走到其他節點', () => {
@@ -127,28 +181,6 @@ describe('效果加總（§ 56.4、§ 56.5）', () => {
     expect(startAttrs('elf')).toEqual(['attr:AGI:2', 'attr:VIT:2']);
     expect(startAttrs('elementalist')).toEqual(['attr:INT:2', 'attr:SPI:2']);
     expect(startAttrs('priest')).toEqual(['attr:INT:2', 'attr:SPI:2']);
-  });
-
-  it('體質、精神只在起點、職業星座、命星與騎士／盜賊的體質節點；其餘每 1 點改最大 HP／MP +20', () => {
-    const vitNodes: Record<string, number> = {
-      'knight-r300': 1, 'knight-wheel1-p': 1, 'bridge0-2': 1, 'bridge4-2': 1, 'knight-wheel1-s': 2,
-      'thief-r300': 1, 'bridge1-2': 1, 'thief-wheel1-s': 2, 'thief-side1-s': 2,
-      'knight-vow-p': 1, 'knight-vow-s': 2, 'thief-vow-s': 2,
-    };
-    for (const [id, value] of Object.entries(vitNodes)) {
-      expect(STAR_NODE_BY_ID.get(id)!.effects.find(e => e.key === 'attr:VIT')?.value, id).toBe(value);
-    }
-    for (const n of STAR_NODES) {
-      if (n.kind === 'start' || n.kind === 'keystone' || n.id.endsWith('-hub') || n.id.endsWith('-vow-s') || n.id in vitNodes) continue;
-      for (const e of n.effects) expect(['attr:VIT', 'attr:SPI'], n.id).not.toContain(e.key);
-    }
-    expect(STAR_NODE_BY_ID.get('knight-hub')!.effects.map(e => e.key)).toContain('attr:VIT');
-    expect(STAR_NODE_BY_ID.get('priest-hub')!.effects.map(e => e.key)).toContain('attr:SPI');
-    const side = STAR_NODE_BY_ID.get('knight-side1-1')!;
-    expect(side.effects).toEqual([{ key: 'hpFlat', label: '最大 HP', value: 20, unit: '' }]);
-    expect(side.name).toBe('最大 HP');
-    expect(STAR_NODE_BY_ID.get('knight-side1-s')!.effects[0]).toMatchObject({ key: 'hpFlat', value: 40 });
-    expect(STAR_NODE_BY_ID.get('elementalist-side1-s')!.effects[0]).toMatchObject({ key: 'mpFlat', value: 40 });
   });
 
   it('冷卻縮減 +1%：外側橋接 5 點與內環 4 點', () => {

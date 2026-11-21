@@ -29,12 +29,12 @@ const monster = { templateId: 1, name: '木樁', level: 60, currentHp: 9999, max
 
 describe('數值節點併入同名加成', () => {
   it('攻擊力%、防禦%、迴避值相加；未帶角色時不含星盤', () => {
-    // 毒牙座：攻擊力 +2%、命中 +2%、力量 +2；幻步座：迴避值 +100、命中 +2%、敏捷 +2
+    // 毒牙座：攻擊力 +2%、命中 +2%；幻步座：迴避值 +100、命中 +2%；堅盾座：防禦力 +2%、攻擊力 +2%
     const c = char('thief', ['thief-wheel1-s', 'thief-wheel0-s', 'knight-wheel0-s']);
     const b = getCombatBonuses([], [], c);
-    expect(b.attack_power).toBe(2);
+    expect(b.attack_power).toBe(4);
     expect(b.evasion).toBe(100);
-    expect(b.defense).toBe(2); // 堅盾座：防禦力 +2%
+    expect(b.defense).toBe(2);
     expect(getCombatBonuses([], []).attack_power).toBe(0);
     expect(starStat(c, 'hit')).toBe(4);
   });

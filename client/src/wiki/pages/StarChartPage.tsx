@@ -22,7 +22,6 @@ const NORMAL_CAP = 100;
 
 const POINT_ROWS: [string, string][] = [
   ['屬性', `+${STAR_POINT_VALUE.attr}`],
-  ['體質、精神', `起點、職業星座（含職業支線星座）、命星與騎士、盜賊區的體質節點為屬性；其餘每 1 點改為最大 HP／最大 MP +${STAR_POINT_VALUE.flatPerAttr}`],
   ['攻擊力／魔法攻擊', `+${STAR_POINT_VALUE.atkPct}%`],
   ['防禦力', `+${STAR_POINT_VALUE.defPct}%`],
   ['最大 HP／最大 MP %', `+${STAR_POINT_VALUE.hpPct}%`],
@@ -74,8 +73,7 @@ export function StarChartPage() {
           <p style={CARD_TEXT}>
             星點：單一效果。星座：節點群中心，多項效果，每項為星點數值 × 2。命星：改變規則的效果，必帶代價；全盤最多同時點 {KEYSTONE_CAP} 顆；命星是終點，不能經命星走到其他節點。職業命星連到該職業每條技能線的末端。<br />
             節點顏色：力量紅、敏捷綠、智力藍、精神淺藍、體質粉紅，兩種屬性左右各半，其餘白色。<br />
-            職業起點：{startText}。體質、精神只出現在職業起點、職業星座（含職業支線星座）、命星與騎士、盜賊區的體質節點，其他節點改為最大 HP／最大 MP 固定值，
-            與裝備的固定 HP／MP 相加後才乘星盤的最大 HP%／MP%。
+            職業起點：{startText}。各屬性約 2/5 在主職業的區域、3/5 分散在其他職業區域（體質約 2/5 在騎士區），想把主屬性堆高要跨區配點。
           </p>
         </div>
         <div className="wiki-table-wrap">
