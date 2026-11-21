@@ -596,6 +596,7 @@ interface ScriptTemplate {
 - `afterCombatHpResumeThreshold`（HP ≥ N% 時恢復行動）
 - `afterCombatMpResumeThreshold`（MP ≥ N% 時恢復行動）
 - 設定值持久化至 localStorage
+- 等待中由 `ExploreBar` 顯示橫幅（`.wait-banner`，規格見 `03-combat.md` § 戰鬥後等待）
 
 ---
 

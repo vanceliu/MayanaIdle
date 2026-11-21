@@ -6,6 +6,7 @@ import type { Session } from '../../client/src/stores/session';
 import { createLoopState } from '../../client/src/stores/session';
 import { createGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../../client/src/stores/gameStore';
 import { createMapControlStore } from '../../client/src/stores/mapControlStore';
+import { isInArena } from '../../client/src/models/arena';
 import { createMapMonsterStore } from '../../client/src/stores/mapMonsterStore';
 import { createCombatCommandStore } from '../../client/src/stores/combatCommandStore';
 import { createTalentStore } from '../../client/src/stores/talentStore';
@@ -150,7 +151,7 @@ export function applyAutoMove(session: PlayerSession): void {
     const hpPct = (ch.hp / effMaxHp) * 100;
     const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
     const alreadyPaused = session.mapControl.getState().paused;
-    if (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
+    if (!isInArena(ch) && (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold)) {
       session.mapControl.getState().setPaused(true);
     }
     // 城鎮由 `setAutoMove` 擋下自動移動（`13-town.md` § 13.2.1）；從野外回城時 `autoMove` 仍是 true

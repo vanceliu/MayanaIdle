@@ -9,6 +9,8 @@ import type { MonsterTemplate } from './monster';
 export type ArenaTier = 4 | 5 | 6 | 7;
 
 export const ARENA_REGION_ID = 'arena';
+/** 角色在競技場內（`55-arena.md`）；戰鬥後等待不觸發 */
+export const isInArena = (c: { currentRegion: string }): boolean => c.currentRegion === ARENA_REGION_ID;
 export const ARENA_MAX_WAVE = 100;
 export const ARENA_BOSS_WAVE_INTERVAL = 10;
 export const ARENA_MATERIAL_COST = 5;

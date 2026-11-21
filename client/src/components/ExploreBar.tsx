@@ -1,4 +1,6 @@
 import { useGameStore } from '../stores/gameStore';
+import { useMapControlStore } from '../stores/mapControlStore';
+import { ARENA_REGION_ID } from '../models/arena';
 import { useAreaElapsed, formatElapsed } from '../hooks/useAreaElapsed';
 import { calculatePressure, getNextPressureKills } from '../systems/pressure';
 
@@ -8,7 +10,7 @@ export function formatPressureTitle(areaKills: number, next: number | null): str
 }
 
 /**
- * 探索控制列（自動/手動搜尋、Pressure、探索/戰鬥指示、停留時間、死亡橫幅）
+ * 探索控制列（自動/手動搜尋、Pressure、探索/戰鬥指示、停留時間、戰鬥後等待橫幅、死亡橫幅）
  * 位於頂部 HUD，與地圖選擇器同一列（16-tech-frontend-architecture.md § 32.3）。
  */
 export function ExploreBar() {
@@ -20,6 +22,10 @@ export function ExploreBar() {
   const pressureRate = useGameStore(s => s.pressureRate);
   const pressureMembers = useGameStore(s => s.pressureMembers);
   const { pressure } = calculatePressure(areaKills, pressureRate, pressureMembers);
+  const paused = useMapControlStore(s => s.paused);
+  const inArena = useGameStore(s => s.character?.currentRegion === ARENA_REGION_ID);
+  // 戰鬥後等待（`03-combat.md` § 戰鬥後等待）；競技場不觸發
+  const waiting = paused && !inArena && phase !== 'dead';
 
   /*
    * 只有模式切換，沒有「搜尋」按鈕：遭遇改由地圖紅點碰撞觸發
@@ -28,6 +34,11 @@ export function ExploreBar() {
    */
   return (
     <div className="battle-top-bar">
+      {waiting && (
+        <div className={`wait-banner${phase === 'combat' ? ' is-interrupted' : ''}`} role="status">
+          {phase === 'combat' ? '⚔ 等待被打斷，戰鬥中' : '⏸ 戰鬥後等待中'}
+        </div>
+      )}
       <div className="explore-bar">
         <div className="search-mode-toggle">
           <button className={searchMode === 'auto' ? 'active' : ''} onClick={() => setSearchMode('auto')}>自動搜尋</button>
@@ -36,7 +47,7 @@ export function ExploreBar() {
         <span className="pressure-badge" title={formatPressureTitle(areaKills, getNextPressureKills(pressure, pressureRate, pressureMembers))}>
           P{pressure}
         </span>
-        {searchMode === 'auto' && phase === 'explore' && (
+        {searchMode === 'auto' && phase === 'explore' && !waiting && (
           <span className="explore-indicator">探索中...</span>
         )}
         {phase === 'combat' && (

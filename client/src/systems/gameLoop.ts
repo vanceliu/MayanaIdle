@@ -8,6 +8,7 @@
  */
 import { starStat } from './combat';
 import { tickArenaRun } from './arenaRun';
+import { isInArena } from '../models/arena';
 import type { Position, MapData } from '../models/mapControl';
 import type { MapMonster } from '../stores/mapMonsterStore';
 import { MAX_TRACK_DISTANCE, DESPAWN_DISTANCE } from '../stores/mapMonsterStore';
@@ -86,7 +87,14 @@ export function tickPlayerPre(deltaMs: number, session: Session): void {
   const isIdle = !hasNearbyMonster;
   const paused = mapStore.paused;
 
-  if (belowThreshold && !paused && isIdle) {
+  // 競技場不觸發戰鬥後等待；帶著等待狀態進場就直接解除（`03-combat.md` § 戰鬥後等待）
+  if (isInArena(ch)) {
+    if (paused) {
+      session.mapControl.getState().setPaused(false);
+      if (gameState.searchMode === 'auto') session.mapControl.getState().setAutoMove(true);
+      loop.pauseLogShown = false;
+    }
+  } else if (belowThreshold && !paused && isIdle) {
     session.mapControl.getState().setPaused(true);
     session.mapControl.getState().setAutoMove(false);
     const existing = session.game.getState().combatLogs;

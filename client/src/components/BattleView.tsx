@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { useMapControlStore } from '../stores/mapControlStore';
+import { isInArena } from '../models/arena';
 import { getMonsterTemplates } from '../models/monsterTemplates';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { PixiGame } from './PixiGame';
@@ -49,7 +50,7 @@ export function BattleView() {
           const effMaxMp = getEffectiveMaxMp(ch, gs.equippedGear, gs.activeEffects);
           const hpPct = (ch.hp / effMaxHp) * 100;
           const mpPct = effMaxMp > 0 ? (ch.mp / effMaxMp) * 100 : 100;
-          if (hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
+          if (!isInArena(ch) && (hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold)) {
             useMapControlStore.getState().setPaused(true);
           } else {
             useMapControlStore.getState().setAutoMove(true);
@@ -75,7 +76,7 @@ export function BattleView() {
           // 已在恢復等待中就維持暫停：HP/MP 可能已高於暫停門檻但未達恢復門檻，
           // 「沒低於門檻」不可重新起步（由 gameLoopTick 的 aboveResume 分支解除）。
           const alreadyPaused = useMapControlStore.getState().paused;
-          if (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold) {
+          if (!isInArena(ch) && (alreadyPaused || hpPct <= gs.afterCombatHpThreshold || mpPct <= gs.afterCombatMpThreshold)) {
             useMapControlStore.getState().setPaused(true);
           }
           setAutoMove(true);
