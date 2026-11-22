@@ -6,6 +6,7 @@ import { LegacyArchivePage } from './LegacyArchivePage';
 import { useMultiplayer, useOnlineStore } from '../net/online';
 import { CLASS_NAMES_ZH, ATTRIBUTE_KEYS } from '../models/character';
 import type { Attributes } from '../models/character';
+import { AUCTION_ENABLED } from '../models/auction';
 
 const MAX_CHARACTERS = 4;
 
@@ -77,7 +78,7 @@ export function CharacterSelect() {
               className="btn-delete-char"
               onClick={() => {
                 // 拍賣場上架中的物品隨角色消失（`57-auction.md` § 57.8）
-                const auctionNote = multiplayer ? '拍賣場上架中的物品會一併消失。' : '';
+                const auctionNote = multiplayer && AUCTION_ENABLED ? '拍賣場上架中的物品會一併消失。' : '';
                 if (window.confirm(`確定要刪除角色「${char.name}」嗎？${auctionNote}此操作無法復原。`)) {
                   void deleteCharacter(char.id);
                 }

@@ -3,6 +3,8 @@ import type { RegionType } from '../models/area';
 import type { Mail } from '../models/mailbox';
 
 /** 離線金幣（`04-character.md` § 4.12） */
+/** § 4.12「開關」：false 時結算照常歸零狩獵累計，但不寄信 */
+export const OFFLINE_GOLD_ENABLED = false;
 export const OFFLINE_GOLD_CAP_MS = 24 * 60 * 60 * 1000;
 export const OFFLINE_GOLD_RATIO = 0.5;
 /** 未滿此離線時長不結算，狩獵累計保留 */
@@ -40,7 +42,7 @@ export interface OfflineGoldSettlement {
 }
 
 /** 上線時結算離線金幣 */
-export function settleOfflineGold(char: Character, now: number): OfflineGoldSettlement {
+export function settleOfflineGold(char: Character, now: number, enabled = OFFLINE_GOLD_ENABLED): OfflineGoldSettlement {
   const lastSeenAt = char.lastSeenAt;
   if (lastSeenAt == null) return { char, mail: null };
 
@@ -52,7 +54,7 @@ export function settleOfflineGold(char: Character, now: number): OfflineGoldSett
   const countedMs = Math.min(offlineMs, OFFLINE_GOLD_CAP_MS);
   const gold = huntMs > 0 ? Math.floor((huntGold / huntMs) * countedMs * OFFLINE_GOLD_RATIO) : 0;
   const reset = { ...char, huntGold: 0, huntMs: 0 };
-  if (gold <= 0 || char.id == null) return { char: reset, mail: null };
+  if (!enabled || gold <= 0 || char.id == null) return { char: reset, mail: null };
 
   return {
     char: reset,

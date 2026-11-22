@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>公會 NPC Demo — MayanaIdle</title>
+<!--
+  公會 NPC 視窗（`11-guild.md` § 11.7）：與社群視窗「公會」分頁共用公會面板。
+  面板是遊戲的 `GuildPanelContent`，資料為本機假資料，不連 server，按鈕不送出。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/guild-npc.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body { margin: 0; padding: 24px 16px; background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body); }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 900px; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; font-size: var(--fs-sm); }
+.demo-bar button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-grid h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+#root .town-modal { height: 520px; }
+.demo-social { width: 360px; height: 520px; display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+<h1 class="demo-title">公會 NPC 視窗</h1>
+<p class="demo-note">
+  公會 NPC 與社群視窗「公會」分頁共用同一個公會面板：邀請、成員名單、以名稱邀請、踢人、退出兩邊都有。<br>
+  差別只有兩處：無公會時 NPC 顯示建立表單（社群分頁顯示「尚未加入公會」）；盟主在 NPC 面板底部多「解散公會」。<br>
+  右側是同一狀態下的社群「公會」分頁，供對照。
+</p>
+<div id="root"></div>
+<script type="module" src="./guildNpcDemo.tsx"></script>
+</body>
+</html>

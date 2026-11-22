@@ -221,7 +221,7 @@ describe('在線分頁的公會欄位', () => {
   });
 });
 
-describe('公會 NPC（`11-guild.md` § 11.3、§ 11.6）', () => {
+describe('公會 NPC（`11-guild.md` § 11.3、§ 11.6、§ 11.7）', () => {
   it('未滿 Lv10 不能建立', () => {
     asCharacter(1, 9);
     render(<GuildNpc />);
@@ -255,12 +255,45 @@ describe('公會 NPC（`11-guild.md` § 11.3、§ 11.6）', () => {
     expect(disband).toHaveBeenCalled();
   });
 
-  it('成員只看到說明，沒有建立或解散', () => {
+  it('成員：與社群分頁相同的公會面板，可退出，沒有建立或解散', () => {
     asCharacter(2);
     useGuildStore.setState({ guild: GUILD });
     render(<GuildNpc />);
+    expect(screen.getByText('星辰（3/24）')).toBeTruthy();
+    expect(screen.getByText('冬天')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '退出公會' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '解散公會' })).toBeNull();
     expect(screen.queryByRole('button', { name: '建立公會' })).toBeNull();
+  });
+
+  it('盟主：公會面板的以名稱邀請與踢人，解散排在名單之後', () => {
+    const kick = vi.fn(async () => true);
+    useGuildStore.setState({ guild: GUILD, kick });
+    const { container } = render(<GuildNpc />);
+    expect(screen.getByPlaceholderText('角色名稱')).toBeTruthy();
+    const row = screen.getByText('秋天').closest('li')!;
+    fireEvent.click(within(row).getByRole('button', { name: '踢除' }));
+    fireEvent.click(within(row).getByRole('button', { name: '確定踢除' }));
+    expect(kick).toHaveBeenCalledWith(2);
+    const list = container.querySelector('.party-list')!;
+    const disbandBtn = screen.getByRole('button', { name: '解散公會' });
+    expect(list.compareDocumentPosition(disbandBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('無公會：邀請照列，下面是建立表單，不顯示「尚未加入公會」', () => {
+    const accept = vi.fn(async () => true);
+    useGuildStore.setState({ invites: [{ id: 'g', guildId: 7, guildName: '銀翼', fromName: 'Eve', expiresAt: 0 }], accept });
+    render(<GuildNpc />);
+    fireEvent.click(screen.getByRole('button', { name: '接受' }));
+    expect(accept).toHaveBeenCalledWith('g');
+    expect(screen.getByRole('button', { name: '建立公會' })).toBeTruthy();
+    expect(screen.queryByText('尚未加入公會')).toBeNull();
+  });
+
+  it('操作結果訊息只顯示一則', () => {
+    useGuildStore.setState({ guild: GUILD, message: '已邀請 秋天' });
+    render(<GuildNpc />);
+    expect(screen.getAllByText('已邀請 秋天')).toHaveLength(1);
   });
 
   it('快捷列：開放世界有公會，單機世界沒有', () => {

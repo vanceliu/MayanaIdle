@@ -5,7 +5,7 @@ import {
   addHuntTime,
   isHunting,
   offlineGoldMailKey,
-  settleOfflineGold,
+  settleOfflineGold as settleWithSwitch,
   OFFLINE_GOLD_CAP_MS,
 } from '../offlineGold';
 import { listMail, sendOfflineGoldMail } from '../mailbox';
@@ -28,6 +28,9 @@ function makeChar(over: Partial<Character> = {}): Character {
     ...over,
   };
 }
+
+/** 結算規則的測試一律以開關開啟執行；關閉行為另測 */
+const settleOfflineGold = (char: Character, now: number) => settleWithSwitch(char, now, true);
 
 /** 狩獵速率 1 金幣／秒 */
 const HUNTED = { huntGold: 3600, huntMs: HOUR };
@@ -94,6 +97,13 @@ describe('離線金幣（`04-character.md` § 4.12）', () => {
     it('lastSeenAt 缺值的舊角色不結算', () => {
       const before = makeChar({ ...HUNTED });
       expect(settleOfflineGold(before, NOW)).toEqual({ char: before, mail: null });
+    });
+
+    it('開關關閉：不寄信，狩獵累計照常歸零', () => {
+      const { mail, char } = settleWithSwitch(makeChar({ ...HUNTED, lastSeenAt: NOW - 2 * HOUR }), NOW, false);
+      expect(mail).toBeNull();
+      expect(char.huntGold).toBe(0);
+      expect(char.huntMs).toBe(0);
     });
 
     it('不動 lastSeenAt（由回鍋加倍更新）', () => {

@@ -3,7 +3,8 @@ import { getMapForRegion, clearMapCache } from '../mapDataControl';
 import { TileType, isWalkableTile, type MapData } from '../mapControl';
 import { REGIONS } from '../mapData';
 import { useMapMonsterStore } from '../../stores/mapMonsterStore';
-import { visibleNpcs } from '../townNpc';
+import { CLOSED_FACILITIES, visibleNpcs } from '../townNpc';
+import { AUCTION_ENABLED } from '../auction';
 
 /**
  * 逐鎮版面（§ 13.2.1）：`doorRows` 是門口列的 y，`perRow` 是每列幾個門面；
@@ -120,12 +121,24 @@ describe('城鎮地圖（§ 13.2.1）', () => {
 
   /** 公會 NPC 與拍賣場只在開放世界出現（§ 13.2.1、`97-selfhosted-server.md` § 97.1）：單機少這兩個 NPC，建築保留 */
   it('單機世界不放公會 NPC 與拍賣場，開放世界有', () => {
+    const none = new Set<string>();
     for (const map of towns) {
       for (const facility of ['guild', 'auction']) {
-        expect(visibleNpcs(map, true).some(n => n.facility === facility), `${map.id} ${facility}`).toBe(true);
-        expect(visibleNpcs(map, false).some(n => n.facility === facility), `${map.id} ${facility}`).toBe(false);
+        expect(visibleNpcs(map, true, none).some(n => n.facility === facility), `${map.id} ${facility}`).toBe(true);
+        expect(visibleNpcs(map, false, none).some(n => n.facility === facility), `${map.id} ${facility}`).toBe(false);
       }
-      expect(visibleNpcs(map, false), map.id).toHaveLength(map.npcs!.length - 2);
+      expect(visibleNpcs(map, false, none), map.id).toHaveLength(map.npcs!.length - 2);
+    }
+  });
+
+  /** `AUCTION_ENABLED` 為 false 時兩種世界都不放拍賣場 NPC（`57-auction.md` § 57.0） */
+  it('拍賣場開關：關閉時兩種世界都沒有拍賣場 NPC，開放世界的公會照常', () => {
+    expect(CLOSED_FACILITIES.has('auction')).toBe(!AUCTION_ENABLED);
+    for (const map of towns) {
+      expect(visibleNpcs(map, true).some(n => n.facility === 'auction'), map.id).toBe(AUCTION_ENABLED);
+      expect(visibleNpcs(map, false).some(n => n.facility === 'auction'), map.id).toBe(false);
+      expect(visibleNpcs(map, true).some(n => n.facility === 'guild'), map.id).toBe(true);
+      expect(visibleNpcs(map, true, new Set(['auction'])).some(n => n.facility === 'auction'), map.id).toBe(false);
     }
   });
 

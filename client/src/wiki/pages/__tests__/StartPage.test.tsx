@@ -5,6 +5,7 @@ import { StartPage, RECOMMENDED_CLASS } from '../StartPage';
 import { CLASS_NAMES_ZH } from '../../../models/character';
 import { ZONES, getRegionsByZone } from '../../../models/mapData';
 import { DEFAULT_EMERGENCY_RETREAT } from '../../../models/scriptEngine';
+import { OFFLINE_GOLD_ENABLED, OFFLINE_GOLD_MIN_OFFLINE_MS } from '../../../systems/offlineGold';
 
 /**
  * @vitest-environment jsdom
@@ -44,5 +45,18 @@ describe('StartPage', () => {
     renderPage();
     expect(screen.getByText(new RegExp(`HP 低於 ${DEFAULT_EMERGENCY_RETREAT.hpThreshold}% 用回城卷軸`))).toBeTruthy();
     expect(screen.queryByText(/HP 低於 undefined%/)).toBeNull();
+  });
+
+  it('離線收益隨開關：開啟時強調只有金幣、門檻取自常數；關閉時寫明沒有離線收益', () => {
+    renderPage();
+    if (OFFLINE_GOLD_ENABLED) {
+      expect(screen.getByText('只有金幣')).toBeTruthy();
+      expect(screen.getByText(new RegExp(`離線滿 ${OFFLINE_GOLD_MIN_OFFLINE_MS / 60_000} 分鐘後上線`))).toBeTruthy();
+      expect(screen.queryByText(/沒有離線收益/)).toBeNull();
+    } else {
+      expect(screen.queryByText('只有金幣')).toBeNull();
+      expect(screen.queryByText(/離線滿 \d+ 分鐘後上線/)).toBeNull();
+      expect(screen.getByText(/沒有離線收益/)).toBeTruthy();
+    }
   });
 });

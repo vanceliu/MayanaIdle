@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
 import { openDatabase, migrate } from '../db/sqlite';
 import { SqliteRepository } from '../db/sqliteRepository';
@@ -7,13 +7,17 @@ import { AuctionManager } from '../auction';
 import { defaultSession } from '../../../client/src/stores/session';
 import { createPlayerSession, syncWorld, type PlayerSession } from '../playerSession';
 import { World } from '../world';
+import { AuthService } from '../auth';
+import { buildConfig } from '../config';
+import { GameServer } from '../ws';
+import { PROTOCOL_VERSION, type ServerMessage } from '../../../client/src/net/protocol';
 import { addBagItem, getBagItemAmount } from '../../../client/src/models/bagItem';
 import { loadTemplateCache } from '../../../client/src/systems/templateSync';
 import { EQUIPMENT_SEEDS } from '../../../client/src/db/seed/equipmentSeeds';
 import { ITEM_DEFINITIONS } from '../../../client/src/db/seed';
 import type { EquipmentInstance } from '../../../client/src/models/equipment';
 import {
-  AUCTION_LISTING_FEE, AUCTION_MAX_LISTINGS, AUCTION_PAGE_SIZE, AUCTION_SOLD_OUT_MESSAGE, DEFAULT_AUCTION_QUERY,
+  AUCTION_CLOSED_MESSAGE, AUCTION_ENABLED, AUCTION_LISTING_FEE, AUCTION_MAX_LISTINGS, AUCTION_PAGE_SIZE, AUCTION_SOLD_OUT_MESSAGE, DEFAULT_AUCTION_QUERY,
   auctionMailKey, type AuctionQuery,
 } from '../../../client/src/models/auction';
 
@@ -378,5 +382,41 @@ describe('拍賣場', () => {
     expect(world.auction.search(DEFAULT_AUCTION_QUERY).total).toBe(0);
     expect(db.prepare('SELECT COUNT(*) AS n FROM auction_listings').get()).toEqual({ n: 0 });
     expect(db.prepare('SELECT COUNT(*) AS n FROM equipment_instances WHERE id = ?').get(equipId)).toEqual({ n: 0 });
+  });
+});
+
+describe('拍賣場：開關', () => {
+  it.skipIf(AUCTION_ENABLED)('AUCTION_ENABLED 為 false 時開放世界的拍賣場操作一律拒絕（§ 57.0）', async () => {
+    const db = openDatabase(':memory:');
+    migrate(db);
+    const repo = new SqliteRepository(db);
+    defaultSession.repo = repo;
+    const auth = new AuthService(db);
+    const config = { ...buildConfig(new Map(), '/tmp').config, bind: '0.0.0.0' };
+    const server = new GameServer({ repo, auth, config: () => config, version: 'test', hostUsername: 'host', mode: 'open', leaderboard: () => ({ top: 20, count: 0, fields: [], rows: [] }), auctionStorage: new SqliteAuctionStorage(db) });
+    let fire!: (socket: unknown, req: unknown) => void;
+    server.attach({ on: (_ev: string, handler: typeof fire) => { fire = handler; } } as never);
+
+    const user = await auth.register('alice', 'password1');
+    const handlers: Record<string, (raw: unknown) => void> = {};
+    const out: ServerMessage[] = [];
+    fire({
+      readyState: 1, OPEN: 1,
+      on(ev: string, h: (raw: unknown) => void) { handlers[ev] = h; },
+      send(raw: string) { out.push(JSON.parse(raw) as ServerMessage); },
+      close() {},
+    }, { socket: { remoteAddress: '1.2.3.4' } });
+    const session = [...server.sessions].at(-1)!;
+    const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
+    send({ t: 'hello', version: PROTOCOL_VERSION, release: 'test' });
+    send({ t: 'resume', token: await auth.issueSession(user.id) });
+    send({ t: 'create_character', name: 'Alice', className: 'knight', bonusAttrs: { STR: 2, AGI: 2, VIT: 0, SPI: 0, INT: 0, CHA: 0 } });
+    await vi.waitFor(() => expect(session.game.getState().character?.name).toBe('Alice'));
+
+    send({ t: 'action', store: 'auction', name: 'open', args: [], id: 1 });
+    await vi.waitFor(() => expect(out.some(m => 'id' in m && m.id === 1)).toBe(true));
+    expect(out.find(m => 'id' in m && m.id === 1)).toMatchObject({ t: 'action_ok', result: false });
+    expect(session.auction.getState().message).toBe(AUCTION_CLOSED_MESSAGE);
+    expect(session.auction.getState().results).toBeFalsy();
   });
 });

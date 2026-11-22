@@ -23,6 +23,7 @@ import type { AuctionStorage } from './db/auctionStorage';
 import { MemoryArenaRecords, type ArenaRecordStorage } from './db/arenaRecords';
 import { log } from './log';
 import { rates } from '../../client/src/core/rates';
+import { AUCTION_CLOSED_MESSAGE, AUCTION_ENABLED } from '../../client/src/models/auction';
 
 const CLASS_NAMES: ReadonlySet<string> = new Set(['knight', 'elf', 'elementalist', 'priest', 'thief']);
 
@@ -457,7 +458,9 @@ export class GameServer {
         if (msg.store === 'auction') {
           const result = this.deps.mode === 'solo'
             ? { ok: false, message: SOLO_NO_AUCTION_MESSAGE }
-            : await this.world.handleAuctionAction(session, msg.name, msg.args ?? []);
+            : !AUCTION_ENABLED
+              ? { ok: false, message: AUCTION_CLOSED_MESSAGE }
+              : await this.world.handleAuctionAction(session, msg.name, msg.args ?? []);
           session.auction.setState({ message: result.message ?? null });
           flush(session);
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });

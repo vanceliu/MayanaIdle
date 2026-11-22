@@ -10,6 +10,11 @@ import type { MailItem } from './mailbox';
 import { mapItemCategoryToBagType, type BagItemType } from './bagItem';
 import { getItemById } from './items';
 
+/** § 57.0：false 時 NPC、快捷列、Wiki 條目不出現，server 拒絕所有拍賣場操作 */
+export const AUCTION_ENABLED = false;
+
+export const AUCTION_CLOSED_MESSAGE = '拍賣場暫未開放';
+
 /** § 57.2 */
 export const AUCTION_LISTING_FEE = 5000;
 /** § 57.2：每隻角色同時上架的筆數 */

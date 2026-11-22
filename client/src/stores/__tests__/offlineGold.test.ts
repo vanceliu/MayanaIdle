@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { db, resetTestDb } from '../../testing/testDb';
 import { useGameStore } from '../gameStore';
 import { claimMail } from '../../systems/mailbox';
-import { offlineGoldMailKey } from '../../systems/offlineGold';
+import { OFFLINE_GOLD_ENABLED, offlineGoldMailKey } from '../../systems/offlineGold';
 
 if (typeof globalThis.window === 'undefined') {
   (globalThis as any).window = {
@@ -44,7 +44,7 @@ describe('載入角色時的離線金幣（`04-character.md` § 4.12）', () => 
     await useGameStore.getState().initUser();
   });
 
-  it('寄出金幣信、狩獵累計歸零，領取後入角色金幣', async () => {
+  it.runIf(OFFLINE_GOLD_ENABLED)('寄出金幣信、狩獵累計歸零，領取後入角色金幣', async () => {
     const { id, lastSeenAt } = await createOfflineCharacter(2 * HOUR);
     await useGameStore.getState().selectCharacter(id);
 
@@ -61,6 +61,17 @@ describe('載入角色時的離線金幣（`04-character.md` § 4.12）', () => 
 
     expect(await claimMail(mail!.id!)).toBe('claimed');
     expect(useGameStore.getState().character!.gold).toBe(3700);
+    await useGameStore.getState().logout();
+  });
+
+  it.skipIf(OFFLINE_GOLD_ENABLED)('開關關閉：不寄信，狩獵累計照常歸零', async () => {
+    const { id } = await createOfflineCharacter(2 * HOUR);
+    await useGameStore.getState().selectCharacter(id);
+
+    const mails = (await db.mailbox.toArray()).filter(m => m.sourceKey.startsWith('offline-gold-'));
+    expect(mails).toHaveLength(0);
+    expect(useGameStore.getState().character!.huntMs).toBe(0);
+    expect((await db.characters.get(id))?.huntMs).toBe(0);
     await useGameStore.getState().logout();
   });
 

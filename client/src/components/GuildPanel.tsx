@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useGameStore } from '../stores/gameStore';
 import { useGuildStore, isGuildLeader } from '../stores/guildStore';
 import { usePartyStore, isPartyLeader, PARTY_MAX_MEMBERS } from '../stores/partyStore';
@@ -7,11 +7,17 @@ import { useChatStore } from '../stores/chatStore';
 import { CLASS_NAMES_ZH } from '../models/character';
 import { InviteByName } from './PartyPanel';
 
+interface GuildPanelContentProps {
+  /** 無公會時取代「尚未加入公會」區塊；公會 NPC 放建立表單（§ 11.7） */
+  noGuild?: ReactNode;
+  /** 有公會時接在成員名單之後；公會 NPC 放盟主的解散 */
+  guildFooter?: ReactNode;
+}
+
 /**
- * 社群視窗「公會」分頁（`11-guild.md` § 11.7）。判定全在 server，這裡只呈現鏡像與送出指令。
- * 建立與解散在城鎮的公會 NPC（`town/GuildNpc.tsx`）。
+ * 公會面板（`11-guild.md` § 11.7）：社群視窗「公會」分頁與城鎮公會 NPC 共用。判定全在 server，這裡只呈現鏡像與送出指令。
  */
-export function GuildPanelContent() {
+export function GuildPanelContent({ noGuild, guildFooter }: GuildPanelContentProps = {}) {
   const guild = useGuildStore(s => s.guild);
   const invites = useGuildStore(s => s.invites);
   const message = useGuildStore(s => s.message);
@@ -65,10 +71,12 @@ export function GuildPanelContent() {
 
         <section className="party-section">
           {!guild ? (
-            <>
-              <div className="party-section-title">尚未加入公會</div>
-              <div className="party-empty">到城鎮的公會 NPC 可以建立公會</div>
-            </>
+            noGuild ?? (
+              <>
+                <div className="party-section-title">尚未加入公會</div>
+                <div className="party-empty">到城鎮的公會 NPC 可以建立公會</div>
+              </>
+            )
           ) : (
             <>
               <div className="party-section-title">
@@ -120,6 +128,7 @@ export function GuildPanelContent() {
                   <button className="party-action-btn is-danger" onClick={() => void leave()}>退出公會</button>
                 </div>
               )}
+              {guildFooter}
             </>
           )}
         </section>
