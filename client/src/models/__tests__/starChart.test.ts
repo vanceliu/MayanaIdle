@@ -208,6 +208,13 @@ describe('效果加總（§ 56.4、§ 56.5）', () => {
     expect(totals.get('mpPct')).toBe(-50);
     expect(STAR_NODES.some(n => n.effects.some(e => e.key.startsWith('magic:')))).toBe(false);
   });
+
+  it('命星前的星點：血契為最大 HP%、均衡為最大 MP%、堅忍為防禦%', () => {
+    const pathEffect = (angle: number) => STAR_NODES.find(n => n.id === `center-${angle}-p`)!.effects.map(e => [e.key, e.value]);
+    expect(pathEffect(0)).toEqual([['hpPct', 1]]);
+    expect(pathEffect(120)).toEqual([['mpPct', 1]]);
+    expect(pathEffect(240)).toEqual([['defPct', 1]]);
+  });
 });
 
 describe('套用整份配點（§ 56.7）', () => {

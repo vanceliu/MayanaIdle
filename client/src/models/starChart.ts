@@ -235,9 +235,9 @@ const BRIDGE_NAMES = ['劍刃座', '疾影座', '靈風座', '星輝座', '守�
 const OUTER_STAR_NAMES = ['銳眼座', '掠影座', '林蔭座', '星幕座', '守夜座'];
 
 const CENTER_KEYSTONES: { angle: number; name: string; path: StarEffect; effects: StarEffect[]; flags?: StarFlag[] }[] = [
-  { angle: 0, name: '血契之星', path: mp(), effects: [mp(-50)], flags: ['bloodPact'] },
+  { angle: 0, name: '血契之星', path: hp(), effects: [mp(-50)], flags: ['bloodPact'] },
   {
-    angle: 120, name: '均衡之星', path: hp(),
+    angle: 120, name: '均衡之星', path: mp(),
     effects: [...(['STR', 'AGI', 'VIT', 'SPI', 'INT', 'CHA'] as const).map(a => attr(a, 2)), hp(-5), mp(-5)],
   },
   { angle: 240, name: '堅忍之星', path: def(), effects: [hp(12), effect('evasionRatePct', '迴避率', -25, '%'), def(-10)] },
