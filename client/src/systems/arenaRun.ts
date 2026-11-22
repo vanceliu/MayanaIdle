@@ -16,9 +16,8 @@ import { memberIdOf, presentMembers, type MapInstance } from './mapInstance';
 import { gameNow } from '../core/clock';
 import { random } from '../core/rng';
 
-/** 怪物生在角色周圍的距離（格） */
-const SPAWN_MIN_DISTANCE = 6;
-const SPAWN_MAX_DISTANCE = 8;
+/** 怪物與每位在場角色的最小距離（格） */
+export const ARENA_SPAWN_MIN_DISTANCE = 6;
 
 /** `abandon`：斷線未回，在場的人全部離場時清掉（§ 55.6） */
 export type ArenaExitReason = 'retreat' | 'death' | 'finish' | 'abandon';
@@ -57,28 +56,31 @@ export function createArenaRun(runKey: string, tier: ArenaTier, memberIds: numbe
   return { runKey, tier, partySize: memberIds.length, wave: 1, elapsedMs: 0, waveReachedMs: 0, finished: false, members: new Set(memberIds) };
 }
 
-function spawnPositions(map: MapData, anchor: Position, count: number): Position[] {
-  const out: Position[] = [];
-  const taken = new Set<string>();
-  for (let tries = 0; out.length < count && tries < count * 40; tries++) {
-    const angle = random() * Math.PI * 2;
-    const dist = SPAWN_MIN_DISTANCE + random() * (SPAWN_MAX_DISTANCE - SPAWN_MIN_DISTANCE);
-    const p = { x: Math.round(anchor.x + Math.cos(angle) * dist), y: Math.round(anchor.y + Math.sin(angle) * dist) };
-    const key = `${p.x},${p.y}`;
-    if (taken.has(key) || !isSpawnableTile(map, p)) continue;
-    taken.add(key);
-    out.push(p);
+/** § 55.2：全圖可生怪格中，離每位角色至少 `ARENA_SPAWN_MIN_DISTANCE` 格者，不重複隨機取 */
+export function arenaSpawnPositions(map: MapData, players: Position[], count: number): Position[] {
+  const candidates: Position[] = [];
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      const p = { x, y };
+      if (isSpawnableTile(map, p) && players.every(pl => Math.hypot(p.x - pl.x, p.y - pl.y) >= ARENA_SPAWN_MIN_DISTANCE)) candidates.push(p);
+    }
   }
-  return out;
+  const picks = Math.min(count, candidates.length);
+  for (let i = 0; i < picks; i++) {
+    const j = i + Math.floor(random() * (candidates.length - i));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, picks);
 }
 
 /** § 55.2：一般波從段位怪物池各自抽、王波出輪替中的王；強化詞綴數依波次 */
-export function buildArenaWave(run: ArenaRunState, map: MapData, anchor: Position): MapMonster[] {
+export function buildArenaWave(run: ArenaRunState, map: MapData, players: Position[]): MapMonster[] {
+  const anchor = players[0];
   const spec = getArenaTier(run.tier)!;
   const boss = isBossWave(run.wave);
   const pool = boss ? [arenaBossForWave(spec, run.wave)] : arenaNormalPool(spec);
-  const affixCount = arenaAffixCount(run.wave);
-  return spawnPositions(map, anchor, arenaWaveSize(run.wave, run.partySize)).map((position, i) => {
+  const affixCount = arenaAffixCount(run.wave, spec);
+  return arenaSpawnPositions(map, players, arenaWaveSize(run.wave, run.partySize)).map((position, i) => {
     const template = pool[Math.floor(random() * pool.length)];
     return {
       id: `arena-${run.runKey}-${run.wave}-${i}`,
@@ -127,7 +129,7 @@ export function tickArenaRun(deltaMs: number, instance: MapInstance, map: MapDat
   const store = instance.mapMonster.getState();
 
   if (instance.arenaSpawnedWave !== run.wave) {
-    const wave = buildArenaWave(run, map, members[0].mapControl.getState().playerPosition);
+    const wave = buildArenaWave(run, map, members.map(m => m.mapControl.getState().playerPosition));
     store.setMonsters(wave);
     instance.arenaSpawnedWave = run.wave;
     syncHud(run, members, wave.length);

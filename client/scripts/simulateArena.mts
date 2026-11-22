@@ -6,7 +6,7 @@
  *
  * 前提（§ 44.13）：
  *  - 一般波 3 隻；第 10 的倍數波只出 2 隻王，王依段位名單由 Boss 等級低到高（同級依 HP），輪完固定出最強者
- *  - 上一波清完立刻出下一波；強化詞綴數量 min(4, floor((波次 − 1) / 10))：1～10 波 0 個、11～20 波 1 個…
+ *  - 上一波清完立刻出下一波；強化詞綴數量 min(4, floor((波次 − 1) / 段位間隔))（`55-arena.md` § 55.2）；生怪位置同遊戲
  *  - 橙色藥水 600 瓶放背包；負重超過上限的職業改為背包維持 20 瓶、喝掉由庫存補（報告標示超重）
  *  - 掉落、金幣、經驗倍率設 0：背包不進東西、角色不升級
  *  - 死亡或 60 分鐘到即結束；不設戰後休息門檻；藥水一律「缺血量 ≥ 一瓶補量就喝」（騎士不維持殘血）
@@ -21,6 +21,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { tickWorld } from '../src/systems/worldTick';
+import { arenaSpawnPositions } from '../src/systems/arenaRun';
 import { createMapInstance, attachInstance } from '../src/systems/mapInstance';
 import { createMonsterCombatContext } from '../src/systems/monsterCombatFSM';
 import { defaultMonsterStatRates, scaleMonsterStat } from '../src/systems/globalRates';
@@ -116,7 +117,7 @@ const TRACE_SEC = Number(argOf('trace') ?? 0);
 const LIMIT_MS = Number(argOf('minutes') ?? 60) * 60_000;
 /** `--target-wave=N`：清完第 N 波即結束該場（記錄到該波為止的藥水用量） */
 const TARGET_WAVE = Number(argOf('target-wave') ?? 0);
-/** `--ladder`：配裝階梯由弱到強逐階試，取第一個達標的階（§ 44.5 最低推薦裝備）；需搭配 `--target-wave` */
+/** `--ladder`：配裝階梯由弱到強逐階試，取第一個達標的階；需搭配 `--target-wave` */
 const LADDER = process.argv.includes('--ladder');
 /** `--rung=N`：`--ladder` 只試第 N 階（0 起算），供逐階平行執行 */
 const RUNG = argOf('rung') != null ? Number(argOf('rung')) : null;
@@ -144,24 +145,30 @@ interface TierSpec {
   normalLabel: string;
   /** 入場材料對應的 Boss（`27-drop-table.md` § 27.5 掉落該階裝備者） */
   bosses: string[];
+  /** 每幾波強化詞綴 +1（`55-arena.md` § 55.2） */
+  affixWaveInterval: number;
 }
 
 const TIER_SPECS: Record<ArenaTier, TierSpec> = {
   4: {
     level: 38, normalPool: m => m.level >= 34 && m.level <= 40, normalLabel: 'Lv.34~40',
     bosses: ['試煉飛龍', '雪地之主', '象牙塔惡魔'],
+    affixWaveInterval: 30,
   },
   5: {
     level: 50, normalPool: m => m.level >= 46 && m.level <= 52, normalLabel: 'Lv.46~52',
     bosses: ['朦朧蛇魔', '深海獄王', '安塔巨龍', '毒之皇女', '哥布林之王', '暗影吸血鬼', '不死殭屍王', '龍王約特勒'],
+    affixWaveInterval: 20,
   },
   6: {
     level: 60, normalPool: m => m.level >= 56 && m.level <= 62, normalLabel: 'Lv.56~62',
     bosses: ['遠古騎士', '不死殭屍王', '龍王約特勒', '冥王哈馬斯', '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神'],
+    affixWaveInterval: 10,
   },
   7: {
     level: 80, normalPool: m => m.area === 'hundred-pillar-91-100f', normalLabel: '百柱塔 91~100F',
     bosses: ['遠古騎士', '冥王哈馬斯', '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神'],
+    affixWaveInterval: 10,
   },
 };
 
@@ -620,8 +627,8 @@ function forcedAffixes(tpl: MonsterTemplate, count: number): MonsterAffixRoll {
     : { affixes };
 }
 
-/** 1～10 波 0 個、11～20 波 1 個…，上限 4 個 */
-const affixCountForWave = (wave: number) => Math.min(MAX_MONSTER_AFFIXES, Math.floor((wave - 1) / 10));
+/** 每段位間隔波數 +1 個，上限 4 個 */
+const affixCountForWave = (wave: number, spec: TierSpec) => Math.min(MAX_MONSTER_AFFIXES, Math.floor((wave - 1) / spec.affixWaveInterval));
 
 // ---------------------------------------------------------------- 場地
 
@@ -635,13 +642,6 @@ const MAP: MapData = {
 };
 
 /** 生在角色周圍 6~8 格（仇恨範圍內），夾在場內 */
-function spawnPosition(player: { x: number; y: number }): { x: number; y: number } {
-  const angle = Math.random() * Math.PI * 2;
-  const dist = 6 + Math.random() * 2;
-  const clamp = (v: number) => Math.min(SIZE - 2, Math.max(1, Math.round(v)));
-  return { x: clamp(player.x + Math.cos(angle) * dist), y: clamp(player.y + Math.sin(angle) * dist) };
-}
-
 // ---------------------------------------------------------------- 單場
 
 interface WaveRecord { wave: number; boss: boolean; ms: number }
@@ -787,13 +787,14 @@ function runOnce(setup: FightSetup, spec: TierSpec, seed: number, bagSize: numbe
       const playerPos = useMapControlStore.getState().playerPosition;
       const added: MapMonster[] = [];
       waveIds = [];
+      const spots = arenaSpawnPositions(MAP, [playerPos], count);
       for (let i = 0; i < count; i++) {
         const tpl = boss ? bossTpl : normals[Math.floor(Math.random() * normals.length)];
         const roll = NATURAL_AFFIXES
           ? rollMonsterAffixes(tpl.level, (tpl.debuffs ?? []).map(d => d.type), Math.random)
-          : forcedAffixes(tpl, affixCountForWave(wave));
+          : forcedAffixes(tpl, affixCountForWave(wave, spec));
         const inst = applyMonsterAffixes(baseMonster(tpl), roll);
-        const pos = spawnPosition(playerPos);
+        const pos = spots[i];
         const id = `w${wave}-${i}`;
         const mm: MapMonster = {
           id, position: pos, targetPosition: { ...playerPos }, speed: 1, path: [], pathIndex: 0,
@@ -903,7 +904,7 @@ function withKeepDistance(cn: ClassName, setup: FightSetup): FightSetup {
 
 const t0 = performance.now();
 console.log(`# 競技場波次模擬 — 每格 ${RUNS} 場，每場上限 ${LIMIT_MS / 60_000} 分鐘`);
-console.log(`一般波 ${NORMAL_WAVE_SIZE} 隻、每 ${BOSS_WAVE_EVERY} 波 ${BOSS_WAVE_SIZE} 隻王；強化詞綴 min(${MAX_MONSTER_AFFIXES}, floor((波次−1)/10))；`
+console.log(`一般波 ${NORMAL_WAVE_SIZE} 隻、每 ${BOSS_WAVE_EVERY} 波 ${BOSS_WAVE_SIZE} 隻王；強化詞綴 min(${MAX_MONSTER_AFFIXES}, floor((波次−1)/段位間隔))（T4 30、T5 20、T6／T7 10）；`
   + `橙色藥水 ${POTION_BUDGET} 瓶；品質 ${QUALITY}%；妖精與法系保持距離；補血技能威力 ×${HEAL_SCALE}${HEAL_POWER.size ? `（指定 ${[...HEAL_POWER].map(([k, v]) => `${k} ${v}`).join('、')}）` : ''}\n`);
 
 interface Row {

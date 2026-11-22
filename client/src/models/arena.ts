@@ -24,6 +24,8 @@ export interface ArenaTierSpec {
   /** § 55.1：目前開放 T4～T6 */
   open: boolean;
   level: number;
+  /** § 55.2：每幾波強化詞綴 +1 */
+  affixWaveInterval: number;
   materials: string[];
   bosses: string[];
   normalPool: (m: MonsterTemplate) => boolean;
@@ -33,25 +35,25 @@ export interface ArenaTierSpec {
 /** § 55.1／§ 55.2 */
 export const ARENA_TIERS: readonly ArenaTierSpec[] = [
   {
-    tier: 4, open: true, level: 38,
+    tier: 4, open: true, level: 38, affixWaveInterval: 30,
     materials: ['試煉飛龍之鱗', '雪地之主的凍心', '惡魔之瞳'],
     bosses: ['試煉飛龍', '雪地之主', '象牙塔惡魔'],
     normalPool: m => m.level >= 34 && m.level <= 40, normalLabel: 'Lv.34～40',
   },
   {
-    tier: 5, open: true, level: 50,
+    tier: 5, open: true, level: 50, affixWaveInterval: 20,
     materials: ['蛇魔毒囊', '獄王深海珠', '巨龍逆鱗', '皇女毒腺', '哥布林王冠碎片', '吸血鬼血晶', '殭屍王心臟', '約特勒龍鱗'],
     bosses: ['朦朧蛇魔', '深海獄王', '安塔巨龍', '毒之皇女', '哥布林之王', '暗影吸血鬼', '不死殭屍王', '龍王約特勒'],
     normalPool: m => m.level >= 46 && m.level <= 52, normalLabel: 'Lv.46～52',
   },
   {
-    tier: 6, open: true, level: 60,
+    tier: 6, open: true, level: 60, affixWaveInterval: 10,
     materials: ['遠古騎士紋章', '殭屍王心臟', '約特勒龍鱗', '冥王靈魂石', '伊莉絲霜核', '伊弗利特熔心', '守護者印記', '死神碎魂'],
     bosses: ['遠古騎士', '不死殭屍王', '龍王約特勒', '冥王哈馬斯', '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神'],
     normalPool: m => m.level >= 56 && m.level <= 62, normalLabel: 'Lv.56～62',
   },
   {
-    tier: 7, open: false, level: 70,
+    tier: 7, open: false, level: 70, affixWaveInterval: 10,
     materials: ['遠古騎士紋章', '冥王靈魂石', '伊莉絲霜核', '伊弗利特熔心', '守護者印記', '死神碎魂'],
     bosses: ['遠古騎士', '冥王哈馬斯', '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神'],
     normalPool: m => m.area === 'hundred-pillar-91-100f', normalLabel: '百柱塔 91～100F',
@@ -62,9 +64,11 @@ export function getArenaTier(tier: number): ArenaTierSpec | undefined {
   return ARENA_TIERS.find(t => t.tier === tier);
 }
 
-/** § 55.1：金幣 = 段位 × 50,000 */
+/** § 55.1 */
+const ARENA_GOLD_COST: Record<ArenaTier, number> = { 4: 100_000, 5: 150_000, 6: 250_000, 7: 350_000 };
+
 export function arenaGoldCost(tier: ArenaTier): number {
-  return tier * 50_000;
+  return ARENA_GOLD_COST[tier];
 }
 
 /** 入場材料的道具 id */
@@ -86,9 +90,9 @@ export function arenaWaveSize(wave: number, members: number): number {
   return Math.min(ARENA_MAX_WAVE_MONSTERS, Math.ceil(base * 1.5 ** (Math.max(1, members) - 1)));
 }
 
-/** § 55.2：`min(4, floor((波次 − 1) / 10))` */
-export function arenaAffixCount(wave: number): number {
-  return Math.min(MAX_AFFIXES, Math.floor((wave - 1) / ARENA_BOSS_WAVE_INTERVAL));
+/** § 55.2：`min(4, floor((波次 − 1) / 段位間隔))` */
+export function arenaAffixCount(wave: number, spec: ArenaTierSpec): number {
+  return Math.min(MAX_AFFIXES, Math.floor((wave - 1) / spec.affixWaveInterval));
 }
 
 /** § 55.2：王依 Boss 等級由低到高（同級依 HP），輪完固定出最強者 */

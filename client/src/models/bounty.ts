@@ -47,10 +47,10 @@ export const BOUNTY_REFRESH_HOURS = [0, 6, 12, 18] as const;
 
 /** § 53.2：依定價等級由高往低比對 */
 const BOUNTY_PRICE_TABLE: { minLevel: number; base: number; takeBetter: number }[] = [
-  { minLevel: 60, base: 70_000, takeBetter: 500_000 },
-  { minLevel: 50, base: 60_000, takeBetter: 400_000 },
-  { minLevel: 40, base: 50_000, takeBetter: 300_000 },
-  { minLevel: 30, base: 30_000, takeBetter: 200_000 },
+  { minLevel: 60, base: 70_000, takeBetter: 50_000 },
+  { minLevel: 50, base: 60_000, takeBetter: 40_000 },
+  { minLevel: 40, base: 50_000, takeBetter: 30_000 },
+  { minLevel: 30, base: 30_000, takeBetter: 20_000 },
 ];
 
 export function getBountyPrice(priceLevel: number): { base: number; takeBetter: number } | null {

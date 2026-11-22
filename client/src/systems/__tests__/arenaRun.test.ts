@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import arenaMapJson from '../../maps/arena.json';
-import type { MapData } from '../../models/mapControl';
+import { isSpawnableTile, type MapData } from '../../models/mapControl';
 import { ARENA_REGION_ID, arenaWaveSize, type ArenaCharacterRun } from '../../models/arena';
 import { addBagItem, getBagItemAmount, type BagItem } from '../../models/bagItem';
 import { useMapMonsterStore } from '../../stores/mapMonsterStore';
 import type { Session } from '../../stores/session';
 import { ARENA_TICKET_ITEM_IDS } from '../arenaBox';
-import { createArenaRun, leaveArenaRun, tickArenaRun, type ArenaExitRecord } from '../arenaRun';
+import { arenaSpawnPositions, createArenaRun, leaveArenaRun, tickArenaRun, type ArenaExitRecord } from '../arenaRun';
 import { createMapInstance, type MapInstance } from '../mapInstance';
 
 const arenaMap = arenaMapJson as unknown as MapData;
@@ -158,5 +158,21 @@ describe('競技場離場（§ 55.5）', () => {
     expect(getBagItemAmount(stateOf(s).bagItems, T5_TICKET)).toBe(5);
     expect(stateOf(s).character.currentRegion).toBe(ARENA_REGION_ID);
     expect(stateOf(s).arenaRun).toBeNull();
+  });
+});
+
+describe('競技場生怪位置（§ 55.2）', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it('全圖可生怪格隨機、不重複，離每位角色至少 6 格', () => {
+    const players = [{ ...arenaMap.spawnPoint }, { x: arenaMap.spawnPoint.x + 5, y: arenaMap.spawnPoint.y }];
+    const spots = arenaSpawnPositions(arenaMap, players, 200);
+    expect(spots).toHaveLength(200);
+    expect(new Set(spots.map(p => `${p.x},${p.y}`)).size).toBe(200);
+    for (const p of spots) {
+      expect(isSpawnableTile(arenaMap, p)).toBe(true);
+      for (const pl of players) expect(dist(p, pl)).toBeGreaterThanOrEqual(6);
+    }
+    expect(spots.some(p => dist(p, players[0]) > 8 && dist(p, players[1]) > 8)).toBe(true);
   });
 });

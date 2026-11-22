@@ -22,20 +22,20 @@ function signed(overrides: Partial<SignedBounty> = {}): SignedBounty {
 describe('§ 53.2 價格', () => {
   it.each([
     [29, null],
-    [30, { base: 30_000, takeBetter: 200_000 }],
-    [39, { base: 30_000, takeBetter: 200_000 }],
-    [40, { base: 50_000, takeBetter: 300_000 }],
-    [50, { base: 60_000, takeBetter: 400_000 }],
-    [59, { base: 60_000, takeBetter: 400_000 }],
-    [60, { base: 70_000, takeBetter: 500_000 }],
-    [80, { base: 70_000, takeBetter: 500_000 }],
+    [30, { base: 30_000, takeBetter: 20_000 }],
+    [39, { base: 30_000, takeBetter: 20_000 }],
+    [40, { base: 50_000, takeBetter: 30_000 }],
+    [50, { base: 60_000, takeBetter: 40_000 }],
+    [59, { base: 60_000, takeBetter: 40_000 }],
+    [60, { base: 70_000, takeBetter: 50_000 }],
+    [80, { base: 70_000, takeBetter: 50_000 }],
   ])('定價等級 %i', (level, expected) => {
     expect(getBountyPrice(level)).toEqual(expected);
   });
 
   it('加購時合計契約價與加價', () => {
     expect(getBountyTotalPrice(45, false)).toBe(50_000);
-    expect(getBountyTotalPrice(45, true)).toBe(350_000);
+    expect(getBountyTotalPrice(45, true)).toBe(80_000);
   });
 });
 

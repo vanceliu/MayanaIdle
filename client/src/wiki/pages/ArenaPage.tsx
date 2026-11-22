@@ -1,12 +1,11 @@
 import '../components/WikiTable.css';
 import {
   ARENA_BOSS_WAVE_INTERVAL, ARENA_MATERIAL_COST, ARENA_MAX_WAVE, ARENA_SLOT_HOURS, ARENA_TIERS,
-  arenaAffixCount, arenaBossOrder, arenaGoldCost, arenaWaveSize,
+  arenaAffixCount, arenaBossOrder, arenaGoldCost, arenaWaveSize, type ArenaTierSpec,
 } from '../../models/arena';
 import { ABILITY_CHANCE } from '../../models/ability';
+import { ARENA_SPAWN_MIN_DISTANCE } from '../../systems/arenaRun';
 import { ARENA_BOX_PRICE, ARENA_MIMIC_CHANCE, ARENA_SEALED_CHANCE, type ArenaBoxKind } from '../../systems/arenaBox';
-import { CLASS_NAMES_ZH } from '../../models/character';
-import { ARENA_RECOMMEND_TARGET_WAVE, ARENA_RECOMMENDATIONS, formatArenaGear } from '../data/arenaRecommendation';
 
 /** 競技場（`55-arena.md`）。數值一律取 model 常數 */
 
@@ -15,8 +14,13 @@ const CARD = { background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--r
 const CARD_TEXT = { color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 } as const;
 
 const PARTY_SIZES = [1, 2, 3, 4];
-/** 強化詞綴數的分段：每段取起始波次 */
-const AFFIX_BANDS = [1, 11, 21, 31, 41];
+const AFFIX_COUNTS = [0, 1, 2, 3, 4];
+const ALL_WAVES = Array.from({ length: ARENA_MAX_WAVE }, (_, i) => i + 1);
+/** 該段位出現指定強化詞綴數的波次區間；100 波內不會出現時為「—」 */
+const affixWaveRange = (count: number, spec: ArenaTierSpec): string => {
+  const waves = ALL_WAVES.filter(w => arenaAffixCount(w, spec) === count);
+  return waves.length === 0 ? '—' : `${waves[0]}～${waves[waves.length - 1]} 波`;
+};
 const BOX_LABELS: Record<ArenaBoxKind, string> = { weapon: '武器兌換箱', armor: '防具兌換箱', accessory: '飾品兌換箱' };
 const SLOT_HOURS = Array.from({ length: 24 / ARENA_SLOT_HOURS }, (_, i) => `${String(i * ARENA_SLOT_HOURS).padStart(2, '0')}:00`);
 const percent = (v: number) => `${Math.round(v * 100)}%`;
@@ -35,7 +39,7 @@ export function ArenaPage() {
             各城鎮的「競技場」NPC 進場。隊伍專屬場地（單人或組隊 1～4 人），連續清波，每打倒一輪王得 1 張該段位的票券，票券到競技場 NPC 兌換兌換箱。<br />
             一般波 3 隻一般怪；第 {ARENA_BOSS_WAVE_INTERVAL} 的倍數波為王波，只出 2 隻王。上一波清完立刻出下一波，最多 {ARENA_MAX_WAVE} 波。<br />
             擊殺照常給經驗；<strong>不掉任何物品</strong>（金幣、裝備、素材、印記、天賦格皆不掉），沒有 Pressure。<br />
-            地形主題每場隨機。怪物強度依段位固定，不隨波次成長；強化詞綴數隨波次增加。
+            地形主題每場隨機。每波的怪隨機出現在場上，離每位角色至少 {ARENA_SPAWN_MIN_DISTANCE} 格。怪物強度依段位固定，不隨波次成長；強化詞綴數隨波次增加。
           </p>
         </div>
       </section>
@@ -87,34 +91,6 @@ export function ArenaPage() {
       </section>
 
       <section style={{ marginBottom: 32 }}>
-        <h3 style={SECTION_TITLE}>最低推薦裝備</h3>
-        <div style={CARD}>
-          <p style={CARD_TEXT}>
-            單人穩定打完第 {ARENA_RECOMMEND_TARGET_WAVE} 波（模擬 5 場至少 4 場）所需的最低裝備，與打到第 {ARENA_RECOMMEND_TARGET_WAVE} 波用掉的橙色藥水。<br />
-            詞綴為整套裝備的詞綴階級（製作品取該階製作的平均階級）；飾品 +0。實際詞綴的種類與數值會影響結果，僅供參考。
-          </p>
-        </div>
-        <div className="wiki-table-wrap">
-          <table className="wiki-table">
-            <thead>
-              <tr><th>段位</th><th>職業</th><th>最低推薦裝備</th><th>橙色藥水（中位）</th><th>橙色藥水（最多）</th></tr>
-            </thead>
-            <tbody>
-              {ARENA_RECOMMENDATIONS.map(r => (
-                <tr key={`${r.tier}-${r.className}`}>
-                  <td>T{r.tier}</td>
-                  <td>{CLASS_NAMES_ZH[r.className]}</td>
-                  <td style={WRAP_TEXT}>{formatArenaGear(r)}</td>
-                  <td className="cell-number">{r.potionsMedian}</td>
-                  <td className="cell-number">{r.potionsMax}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section style={{ marginBottom: 32 }}>
         <h3 style={SECTION_TITLE}>組隊人數與強化詞綴</h3>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
@@ -135,13 +111,13 @@ export function ArenaPage() {
         <div className="wiki-table-wrap" style={{ marginTop: 12 }}>
           <table className="wiki-table">
             <thead>
-              <tr><th>波次</th><th>每隻怪的強化詞綴數</th></tr>
+              <tr><th>每隻怪的強化詞綴數</th>{ARENA_TIERS.map(t => <th key={t.tier}>T{t.tier}{t.open ? '' : '（未開放）'}</th>)}</tr>
             </thead>
             <tbody>
-              {AFFIX_BANDS.map((start, i) => (
-                <tr key={start}>
-                  <td>{i === AFFIX_BANDS.length - 1 ? `${start} 波起` : `${start}～${AFFIX_BANDS[i + 1] - 1} 波`}</td>
-                  <td className="cell-number">{arenaAffixCount(start)}</td>
+              {AFFIX_COUNTS.map(count => (
+                <tr key={count}>
+                  <td className="cell-number">{count}</td>
+                  {ARENA_TIERS.map(t => <td key={t.tier}>{affixWaveRange(count, t)}</td>)}
                 </tr>
               ))}
             </tbody>
