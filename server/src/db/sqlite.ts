@@ -185,6 +185,29 @@ const MIGRATIONS: ReadonlyArray<{ version: number; up: (db: DatabaseSync) => voi
       `);
     },
   },
+  {
+    /** 拍賣場（`57-auction.md` § 57.9）。裝備沿用 equipment_instances（storageType = 'auction'、owner_id 為賣家角色 id） */
+    version: LEGACY_RESET_VERSION + 2,
+    up: db => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS auction_listings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          seller_character_id INTEGER NOT NULL,
+          seller_name TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          equipment_instance_id INTEGER,
+          item_id INTEGER,
+          amount INTEGER NOT NULL,
+          price_kind TEXT NOT NULL,
+          price_gold INTEGER,
+          price_item_id INTEGER,
+          price_amount INTEGER,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_auction_listings_seller ON auction_listings(seller_character_id);
+      `);
+    },
+  },
 ];
 
 /** v12 之前追加傷害的區間：A 5~10、B 5~武器值（上限 ≤ 5 時固定 5） */

@@ -74,7 +74,8 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **製作材料分配規則／製作消耗（製作費依階級）** | `06-equipment-acquire.md` | § 6A.3 |
-| **製作取用倉庫（背包→個人→帳號倉庫，公會不算；前置裝備玩家指定）** | `06-equipment-acquire.md` | § 6A.3「取用來源」 |
+| **製作取用倉庫（背包→個人→帳號倉庫，公會不算；前置裝備玩家指定；魔法學院、競技場入場同規則）** | `06-equipment-acquire.md` | § 6A.3「取用來源」 |
+| **競技場入場材料的倉庫扣除順序** | `55-arena.md` | § 55.1 |
 | **裝備拆解（鐵匠鋪，退一半材料；掉落品技能存成結晶）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
@@ -175,6 +176,7 @@
 | 怪物經驗公式與結算倍率 | `28-monster-stats.md` | § 28.1 |
 | **怪物攻擊力曲線（一般怪／Boss）／怪物等級上限與百柱死神 Lv.80 例外** | `28-monster-stats.md` | § 28.1 |
 | **回鍋經驗加倍（離線存量）** | `04-character.md` | § 4.11 |
+| **離線金幣（狩獵速率、10 分鐘門檻、24 小時上限、寄信）** | `04-character.md` | § 4.12 |
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
 | 道具定義（藥水/卷軸/材料） | `30-items.md` | 全文 |
 | **素材圖示顏色（iconTier）定色規則與等級門檻** | `30-items.md` | § 素材 iconTier 對照（色碼見 `39-batch-sell.md` § 39.3） |
@@ -188,6 +190,11 @@
 | 公會系統（建立／名稱／人數上限／邀請／解散／顯示） | `11-guild.md` | 全文 |
 | **公會人數上限／一個角色只屬一個公會／盟主轉讓** | `11-guild.md` | § 11.5 |
 | **公會倉庫（200 格／全員存取／按需同步／解散消失）** | `11-guild.md` | § 11.8 |
+| **拍賣場（上架費 5000／每角色 20 筆／金幣或道具標價／一口價／不過期）** | `57-auction.md` | 全文 |
+| **拍賣場成交與下架的信件、裝備信件型別** | `57-auction.md` § 57.5、`52-mailbox.md` § 52.3 | — |
+| **拍賣場搜尋（裝備／道具切換、部位／類型／職業／階級／名稱／詞綴多選、詞綴選單分組）** | `57-auction.md` | § 57.6 |
+| **拍賣場建築位置（與競技場對稱）、快捷列順序** | `13-town.md` | § 13.2.1 |
+| **分組選單（長清單單選：搜尋＋可收合分組；道具選單依類別）** | `34-ui-guidelines.md` | § 34.15 |
 | 寵物系統 | `12-pet.md` | 全文 |
 | 成就/排行榜 | `14-endgame.md` | 全文（排行榜規格在 `37-statistics.md` § 37.4） |
 | 每日任務系統（冒險者工會「冒險任務」分頁） | `36-quest-system.md` | 全文 |
@@ -359,6 +366,11 @@
 04-character.md § 4.11（回鍋經驗加倍）
   ✕  26-spawn-pressure.md —— 經驗軸與 Pressure 刻意不相接，見 § 4.11 連動注意
   ←→ 18-data-schema.md § 18.11
+04-character.md § 4.12（離線金幣）
+  ←→ 18-data-schema.md § 18.11
+  ←→ 52-mailbox.md § 52.2 / § 52.2.3
+  ←  27-drop-table.md § 27.1（狩獵金幣＝實際掉落量）
+  ←→ 15-excluded.md § 15.1 / 14-endgame.md § 14.2
 
 【角色外觀】
 04-character.md § 4.10
@@ -462,6 +474,7 @@
   ←  03-combat.md § 3.13 / 97-selfhosted-server.md § 97.7.1
   ←→ 37-statistics.md § 37.1 / § 37.5（死亡統計、排行榜）
   ←→ 44-dps-prediction.md § 44.5（波次模擬）
+  ←  06-equipment-acquire.md § 6A.3（入場材料取用倉庫）
        ↕
 36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
        ↕                    ←  06-equipment-acquire.md § 6A.3
@@ -503,6 +516,7 @@
   ←  04-character.md § 4.9
        ↕
 52-mailbox.md
+  ←→ 57-auction.md § 57.5
   ←→ 19-account-character.md § 19.3（§ 52.6 起始畫面改版資訊）
   ←→ 51-auto-talent.md § 51.3.3~51.3.4
   ←→ 35-inventory-constraints.md § 35.21
@@ -510,6 +524,22 @@
   ←→ 34-ui-guidelines.md § 34.10
   ←→ 18-data-schema.md
   ←→ 30-items.md
+
+【分組選單】
+34-ui-guidelines.md § 34.15
+  ←→ 51-auto-talent.md § 51.4.10～§ 51.4.11（道具參數）
+  ←→ 57-auction.md § 57.2 / § 57.6
+
+【拍賣場】
+57-auction.md
+  ←→ 52-mailbox.md § 52.2 / § 52.3 / § 52.4
+  ←→ 13-town.md § 13.2.1 / § 13.3
+  ←  06-equipment-acquire.md § 6A.3（取用來源）
+  ←→ 97-selfhosted-server.md § 97.1 / § 97.7
+  ←→ 18-data-schema.md § 18.10 / § 18.12
+  ←→ 35-inventory-constraints.md § 35.3.1
+  ←  07-affix.md / 07-affix-tier7.md（詞綴篩選）
+  ←→ 34-ui-guidelines.md § 34.15（分組選單）
 
 【試驗場】
 50-training-ground.md

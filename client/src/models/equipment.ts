@@ -319,7 +319,7 @@ export interface EquipmentInstance {
   ownerId: number;
   equipped: boolean;
   inStorage?: boolean;
-  storageType?: 'personal' | 'shared' | 'guild';
+  storageType?: 'personal' | 'shared' | 'guild' | 'auction' | 'mail';
   isStarterGear?: boolean;
   /**
    * 鐵匠鋪製作的實例（`06-equipment-acquire.md` § 6A.6）。製作時寫入 true；

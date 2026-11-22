@@ -9,7 +9,8 @@ import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from
 import type { Skill } from '../models/skill';
 import { rates } from '../core/rates';
 import { settleKillExp } from '../systems/globalRates';
-import { syncTalentSlotGrants, syncCompensations } from '../systems/mailbox';
+import { syncTalentSlotGrants, syncCompensations, sendOfflineGoldMail } from '../systems/mailbox';
+import { addHuntGold, isHunting, settleOfflineGold } from '../systems/offlineGold';
 import { rollTalentSlotDrop } from '../systems/talentDrops';
 import { emptyConditions } from '../models/talent';
 import { purgeClaimedMailOnVersionChange } from '../systems/mailbox';
@@ -97,6 +98,7 @@ import { getRegion, resolveArea, resolveDropAreaId, ZONES } from '../models/mapD
 import { canNavigateTo, consumeScroll } from '../systems/navigation';
 import { resolveEquipment, rollNewInstanceFields, getTemplateById, getCachedTemplates } from '../systems/templateSync';
 import { arenaBoxCandidates, getArenaBox, isArenaTicketItemId, rollArenaBoxEquipment } from '../systems/arenaBox';
+import { getBagMaxSlots, getBagUsedSlots } from '../systems/bagCapacity';
 import { leaveArenaRun } from '../systems/arenaRun';
 import { EMPTY_ARENA_SLOTS, normalizeArenaRun, normalizeArenaSlots, type ArenaCharacterRun, type ArenaSlotUsage } from '../models/arena';
 import { createShopEquipment } from '../systems/shopEquipment';
@@ -107,7 +109,9 @@ import {
   addCrystal, crystalToAbility, getCrystalApplyBlock, getCrystalApplyCost, normalizeAbilityCrystals,
   CRYSTAL_APPLY_BLOCK_TEXT, type AbilityCrystal,
 } from '../models/abilityCrystal';
-import { evaluateCraftRequirements, getCraftSources, removeCraftQuestByTemplate } from '../systems/craftQuestSystem';
+import {
+  evaluateCraftRequirements, getCraftSources, getMaterialTotal, removeCraftQuestByTemplate, type CraftSourceKind,
+} from '../systems/craftQuestSystem';
 import { drawCraftMaterials, generateCraftAffixes, getDismantleOutcome, pickCraftPrerequisites } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
@@ -154,6 +158,11 @@ function warehousePatch(shared: boolean, equip: EquipmentInstance[], materials: 
   return shared
     ? { storedEquipment: equip, storedMaterials: materials }
     : { personalStoredEquipment: equip, personalStoredMaterials: materials };
+}
+
+/** 由背包與個人／帳號倉庫扣完道具後的 store 欄位（`06-equipment-acquire.md` § 6A.3「取用來源」） */
+function drawnMaterialsPatch(drawn: Record<CraftSourceKind, BagItem[]>) {
+  return { bagItems: drawn.bag, personalStoredMaterials: drawn.personal, storedMaterials: drawn.shared };
 }
 
 /** 村莊腳本的判定間隔。它會花錢與存檔，不需要跟常駐腳本的 300ms 一樣快 */
@@ -234,44 +243,7 @@ export function consumePotionFromBag(bagItems: BagItem[], type: PotionType): Bag
   return consumeBagItem(bagItems, POTION_CONFIG[type].itemId);
 }
 
-/** § 35.1：背包基礎格數。腰帶可再擴充，見 `getBagMaxSlots()` */
-export const BAG_BASE_SLOTS = 60;
-
-/**
- * 背包實際格數 = 基礎 60 + 腰帶的 `bonusBagSlots`（§ 35.1）。
- * 腰帶最高 +20，因此上限為 80 格。
- */
-export function getBagMaxSlots(gear: EquippedGear): number {
-  const bonus = Object.values(gear).reduce(
-    (sum, item) => sum + (item?.bonusBagSlots ?? 0),
-    0,
-  );
-  return BAG_BASE_SLOTS + bonus;
-}
-
-/** 身上的裝備件數。裝備中的裝備一樣留在背包格上並佔格（§ 35.1） */
-export function getEquippedCount(gear: EquippedGear): number {
-  return Object.values(gear).filter(Boolean).length;
-}
-
-/**
- * 已用格數（§ 35.1）＝ 消耗品種類 + 背包裝備 + **身上裝備**，**不含印記**。
- *
- * 裝備中的裝備沒有離開背包，只是多一個「裝備中」標記，因此一樣佔格 ——
- * 穿脫只是同一格換個狀態，不再有佔格增減。
- *
- * 印記走獨立分頁、完全不進格數體系（§ 35.20），所以在這裡就濾掉 ——
- * 容量檢查的入口有十來個，讓每個入口各自記得排除印記必然會漏。
- */
-export function getBagUsedSlots(
-  bagItems: BagItem[],
-  inventory: EquipmentInstance[],
-  gear: EquippedGear,
-): number {
-  // 印記與競技場票券不佔格（§ 35.20、`55-arena.md` § 55.8）
-  const countable = bagItems.filter(b => !isSigilItemId(b.itemId) && !isArenaTicketItemId(b.itemId)).length;
-  return countable + inventory.length + getEquippedCount(gear);
-}
+export { BAG_BASE_SLOTS, getBagMaxSlots, getEquippedCount, getBagUsedSlots } from '../systems/bagCapacity';
 
 /** 競技場只能由 NPC 進場、只能用回城卷軸離開（`55-arena.md` § 55.5）；可移動時回 null */
 export function arenaNavigationBlock(fromRegion: string, toRegion: string): string | null {
@@ -923,8 +895,16 @@ export function createGameStore(session: Session) {
     char.areaEnteredAt = gameNow();
     char.areaKills = 0;
 
+    // 離線金幣結算在前，要用到更新前的 `lastSeenAt`（`04-character.md` § 4.12）
+    const loginAt = Date.now();
+    const offlineGold = settleOfflineGold(char, loginAt);
     // 離線時長換成加倍存量（`04-character.md` § 4.11）
-    Object.assign(char, accrueRestedExp(char, Date.now()));
+    Object.assign(char, accrueRestedExp(offlineGold.char, loginAt));
+    if (offlineGold.mail) {
+      await sendOfflineGoldMail(offlineGold.mail, {
+        lastSeenAt: char.lastSeenAt, restedExpMs: char.restedExpMs, huntGold: 0, huntMs: 0,
+      }, session.repo);
+    }
 
     char.starChart = normalizeStarAllocation(char.starChart ?? [], char.className, char.level);
 
@@ -1090,6 +1070,8 @@ export function createGameStore(session: Session) {
       areaKills: 0,
       restedExpMs: 0,
       lastSeenAt: Date.now(),
+      huntGold: 0,
+      huntMs: 0,
       createdAt: Date.now(),
     };
     char.hp = getMaxHp(char, []);
@@ -3175,11 +3157,12 @@ export function createGameStore(session: Session) {
     if (!def) return false;
     if (char.level < def.requiredLevel) return false;
     if (state.skills.some(s => s.id === def.id)) return false;
-    if (!hasBagItem(state.bagItems, def.bookItemId)) return false;
+    const sources = getCraftSources(state);
+    if (getMaterialTotal(sources, def.bookItemId) < 1) return false;
 
     const skills = [...state.skills, { ...def.skill, lastUsedAt: 0 }];
     set({
-      bagItems: consumeBagItem(state.bagItems, def.bookItemId),
+      ...drawnMaterialsPatch(drawCraftMaterials([{ itemId: def.bookItemId, amount: 1 }], sources)),
       skills,
       character: { ...char, skills },
     });
@@ -3212,9 +3195,10 @@ export function createGameStore(session: Session) {
     }
 
     const bookItemId = getRequiredBookId(level);
-    if (bookItemId == null || !hasBagItem(state.bagItems, bookItemId)) return false;
+    const sources = getCraftSources(state);
+    if (bookItemId == null || getMaterialTotal(sources, bookItemId) < 1) return false;
     set({
-      bagItems: consumeBagItem(state.bagItems, bookItemId),
+      ...drawnMaterialsPatch(drawCraftMaterials([{ itemId: bookItemId, amount: 1 }], sources)),
       skills,
       character: { ...char, skills },
     });
@@ -3227,19 +3211,22 @@ export function createGameStore(session: Session) {
     const recipe = SPELLBOOK_RECIPES.find(r => r.bookItemId === bookItemId);
     if (!recipe) return false;
 
-    const fragments = getBagItemAmount(state.bagItems, SPELLBOOK_FRAGMENT_ID);
-    const materials = getBagItemAmount(state.bagItems, recipe.materialItemId);
-    if (fragments < recipe.fragments || materials < recipe.materialAmount) return false;
+    // 素材可取自背包與個人／帳號倉庫（`06-equipment-acquire.md` § 6A.3「取用來源」）
+    const sources = getCraftSources(state);
+    if (getMaterialTotal(sources, SPELLBOOK_FRAGMENT_ID) < recipe.fragments
+      || getMaterialTotal(sources, recipe.materialItemId) < recipe.materialAmount) return false;
 
-    let bag = consumeBagItem(state.bagItems, SPELLBOOK_FRAGMENT_ID, recipe.fragments);
-    bag = consumeBagItem(bag, recipe.materialItemId, recipe.materialAmount);
+    const drawn = drawCraftMaterials([
+      { itemId: SPELLBOOK_FRAGMENT_ID, amount: recipe.fragments },
+      { itemId: recipe.materialItemId, amount: recipe.materialAmount },
+    ], sources);
     // 已經有同一本就不佔新格；沒有的話要留得下一格才做得成
-    if (!hasBagItem(bag, recipe.bookItemId)
-      && getBagUsedSlots(bag, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) {
+    if (!hasBagItem(drawn.bag, recipe.bookItemId)
+      && getBagUsedSlots(drawn.bag, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) {
       return false;
     }
 
-    set({ bagItems: addBagItem(bag, recipe.bookItemId, 1) });
+    set({ ...drawnMaterialsPatch(drawn), bagItems: addBagItem(drawn.bag, recipe.bookItemId, 1) });
     get().saveState();
     return true;
   },
@@ -3552,6 +3539,8 @@ export function processMonsterDeath(
     for (const text of talentLogs) logs2.push({ text, type: 'loot' });
 
     char2.gold += drops.gold;
+    // 狩獵金幣（`04-character.md` § 4.12）
+    if (isHunting(dropRegion?.type, state2.searchMode)) char2 = addHuntGold(char2, drops.gold);
     if (drops.gold > 0) {
       logs2.push({ text: `獲得 ${drops.gold} 金幣`, type: 'loot' });
     }
@@ -3791,6 +3780,8 @@ async function writeSave(state: GameState, mapPos: { x: number; y: number }, ses
     // 這兩個漏掉的話離線時長永遠算不出來（`18-data-schema.md` § 18.11）
     restedExpMs: char.restedExpMs ?? 0,
     lastSeenAt: char.lastSeenAt ?? Date.now(),
+    huntGold: char.huntGold ?? 0,
+    huntMs: char.huntMs ?? 0,
     mapPositionX: Math.round(mapPos.x),
     mapPositionY: Math.round(mapPos.y),
   });

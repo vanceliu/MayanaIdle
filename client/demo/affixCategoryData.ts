@@ -58,7 +58,7 @@ export const AFFIXES: { key: string; name: string; group: Group; desc: string }[
   { key: 'mres', name: '魔法抗性', group: '防禦類', desc: '魔法抗性 +X%，並降低詛咒／虛弱／減速／沉默的機率' },
   { key: 'thorns', name: '荊棘傷害', group: '防禦類', desc: '被命中時，對攻擊者造成實際受到的傷害 × X%' },
   { key: 'heal', name: '補血效果', group: '補給類', desc: '技能補血效果 +X%' },
-  { key: 'potion', name: '藥水效果', group: '補給類', desc: '藥水效果 +X%' },
+  { key: 'potion', name: '補藥效果', group: '補給類', desc: '補藥效果 +X%' },
   { key: 'drop', name: '掉寶率', group: '掉落類', desc: '掉寶率 +X%' },
   { key: 'gold', name: '金幣獲得率', group: '掉落類', desc: '金幣獲得率 +X%' },
   { key: 'move', name: '跑速', group: '移動類', desc: '移動速度 +X%' },

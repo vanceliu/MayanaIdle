@@ -16,6 +16,7 @@ import type { MailboxState } from './mailboxStore';
 import type { PartyState } from './partyStore';
 import type { TradeState } from './tradeStore';
 import type { GuildState } from './guildStore';
+import type { AuctionState } from './auctionStore';
 import type { AbilityComboState, AbilityFocusState } from '../systems/abilityCombat';
 import { OccupationManager } from '../systems/occupationManager';
 import type { ArpgEngineState } from '../systems/arpgEngine';
@@ -31,6 +32,8 @@ export interface LoopState {
   occupation: OccupationManager;
   dotTickTimer: number;
   restedTickTimer: number;
+  /** 尚未落帳的狩獵時長（毫秒，`04-character.md` § 4.12），與回鍋存量同週期寫入角色 */
+  huntPendingMs: number;
   pauseLogShown: boolean;
   combatInterruptLogShown: boolean;
   dotTickReady: boolean;
@@ -78,6 +81,7 @@ export function createLoopState(): LoopState {
     occupation: new OccupationManager(),
     dotTickTimer: 0,
     restedTickTimer: 0,
+    huntPendingMs: 0,
     pauseLogShown: false,
     combatInterruptLogShown: false,
     dotTickReady: false,
@@ -116,6 +120,7 @@ export interface Session {
   party: StoreApi<PartyState>;
   trade: StoreApi<TradeState>;
   guild: StoreApi<GuildState>;
+  auction: StoreApi<AuctionState>;
   loop: LoopState;
   /** 持久層：正式路徑在 server（SQLite），測試由 `testing/testDb.ts` 登記記憶體實作 */
   repo: GameRepository;

@@ -7,6 +7,7 @@ import {
   deleteClaimedMail,
   isOwnMail,
   listMail,
+  MAIL_BAG_FULL_MESSAGE,
   purgeClaimedMail,
   unclaimedCount,
 } from '../systems/mailbox';
@@ -17,6 +18,8 @@ export interface MailboxState {
   mails: Mail[];
   /** 未領封數。徽章只算這個（§ 52.5） */
   unread: number;
+  /** 上一次領取的結果訊息（背包放不下時） */
+  message: string | null;
 
   load: (characterId: number) => Promise<void>;
   refresh: () => Promise<void>;
@@ -41,9 +44,10 @@ export function createMailboxStore(session: Session) {
   characterId: null,
   mails: [],
   unread: 0,
+  message: null,
 
   load: async characterId => {
-    const mails = await listMail(characterId);
+    const mails = await listMail(characterId, session.repo);
     set({ characterId, mails, unread: unclaimedCount(mails) });
   },
 
@@ -55,24 +59,26 @@ export function createMailboxStore(session: Session) {
 
   claim: async mailId => {
     const { characterId } = get();
-    if (characterId === null || !(await isOwnMail(mailId, characterId))) return false;
-    const ok = await claimMail(mailId);
-    if (ok) await afterClaim(characterId);
-    return ok;
+    if (characterId === null || !(await isOwnMail(mailId, characterId, session.repo))) return false;
+    const result = await claimMail(mailId, session);
+    set({ message: result === 'bag_full' ? MAIL_BAG_FULL_MESSAGE : null });
+    if (result === 'claimed') await afterClaim(characterId);
+    return result === 'claimed';
   },
 
   claimAll: async () => {
     const { characterId } = get();
     if (characterId === null) return 0;
-    const n = await claimAllMail(characterId);
-    if (n > 0) await afterClaim(characterId);
-    return n;
+    const { claimed, blocked } = await claimAllMail(characterId, session);
+    set({ message: blocked > 0 ? MAIL_BAG_FULL_MESSAGE : null });
+    if (claimed > 0) await afterClaim(characterId);
+    return claimed;
   },
 
   remove: async mailId => {
     const { characterId } = get();
-    if (characterId === null || !(await isOwnMail(mailId, characterId))) return false;
-    const ok = await deleteClaimedMail(mailId);
+    if (characterId === null || !(await isOwnMail(mailId, characterId, session.repo))) return false;
+    const ok = await deleteClaimedMail(mailId, session.repo);
     if (ok) await get().refresh();
     return ok;
   },
@@ -80,12 +86,12 @@ export function createMailboxStore(session: Session) {
   purgeClaimed: async () => {
     const { characterId } = get();
     if (characterId === null) return 0;
-    const n = await purgeClaimedMail(characterId);
+    const n = await purgeClaimedMail(characterId, session.repo);
     if (n > 0) await get().refresh();
     return n;
   },
 
-  reset: () => set({ characterId: null, mails: [], unread: 0 }),
+  reset: () => set({ characterId: null, mails: [], unread: 0, message: null }),
   };
   });
 }

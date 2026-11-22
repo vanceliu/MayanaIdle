@@ -448,7 +448,7 @@ describe('詞綴池（§ 7.6）', () => {
     }
   });
 
-  it('共用詞綴為回血／回魔、補血／藥水效果、掉寶率、金幣獲得率', () => {
+  it('共用詞綴為回血／回魔、補血／補藥效果、掉寶率、金幣獲得率', () => {
     expect([...SHARED_AFFIX_TYPES].sort()).toEqual(Object.keys(SHARED).sort());
   });
 

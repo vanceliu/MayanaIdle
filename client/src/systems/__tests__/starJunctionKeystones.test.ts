@@ -74,7 +74,7 @@ describe('職業交界命星', () => {
     expect([withPact.mpCost, withPact.hpCost]).toEqual([0, burned]);
   });
 
-  it('嗜血：普攻回血、技能回血各 +5%、藥水效果 -20%；自然回血照常', () => {
+  it('嗜血：普攻回血、技能回血各 +5%、補藥效果 -20%；自然回血照常', () => {
     const c = char([ks(4, 0)], { hp: 1 }, 'priest');
     const b = getCombatBonuses([], [], c);
     expect([b.attack_lifesteal, b.skill_lifesteal, b.potion_effect]).toEqual([5, 5, -20]);

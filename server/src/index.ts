@@ -13,6 +13,7 @@ import { loadConfig, isLoopbackBind, type ServerConfig } from './config';
 import { openDatabase, migrate, assertSchemaIntact, resolveWorldMode, currentSchemaVersion, DB_FILE, type WorldMode } from './db/sqlite';
 import { LEGACY_RESET_VERSION, backupBeforeLegacyReset } from './db/legacyReset';
 import { SqliteGuildStorage } from './db/guildStorage';
+import { SqliteAuctionStorage } from './db/auctionStorage';
 import { SqliteArenaRecords } from './db/arenaRecords';
 import { SqliteIpAllowlist } from './db/ipAllowlist';
 import { SqliteRepository } from './db/sqliteRepository';
@@ -170,7 +171,7 @@ export async function startServer(options: StartOptions): Promise<RunningServer>
     log.warn('server.properties 的 admin-password 是空的，管理介面無法登入（§ 97.8）');
   }
 
-  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)), guildStorage: new SqliteGuildStorage(db), arenaRecords: new SqliteArenaRecords(db), ipAllowlist: new SqliteIpAllowlist(db) });
+  const gameServer = new GameServer({ repo, auth, config: () => config, version: VERSION, hostUsername, mode, leaderboard: createCachedLeaderboard(() => loadRows(db)), guildStorage: new SqliteGuildStorage(db), auctionStorage: new SqliteAuctionStorage(db), arenaRecords: new SqliteArenaRecords(db), ipAllowlist: new SqliteIpAllowlist(db) });
   const tickLoop = new TickLoop(gameServer.world);
   const staticSource = resolveStatic(options.staticDir ?? null);
 

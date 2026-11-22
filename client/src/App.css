@@ -3587,6 +3587,9 @@ button.active {
 
 /* § 6A.3「取用來源」：素材來源明細、前置裝備挑選視窗 */
 .bs-mat-source-tooltip { font-size: var(--fs-sm); line-height: 1.7; white-space: nowrap; }
+/* 三處合計的數字，hover 看各處存量（魔法學院、競技場入場） */
+.source-count { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.arena-mat-count { color: var(--accent-gold); }
 .bs-prereq-open { padding: 1px 8px; font-size: var(--fs-xs); }
 .bs-prereq-name { display: inline-flex; align-items: center; gap: 3px; }
 .bs-source-tag-inline { font-size: var(--fs-xs); color: var(--accent-primary); }
@@ -8899,6 +8902,11 @@ button.active {
   gap: 6px;
 }
 
+.mail-message {
+  color: var(--accent-danger);
+  font-size: var(--fs-sm);
+}
+
 .mail-purge-btn,
 .mail-claim-all-btn,
 .mail-claim-btn {
@@ -10825,3 +10833,71 @@ button.active {
 .star-planner-classes { display: flex; flex-wrap: wrap; gap: 4px; }
 .star-planner-classes button { padding: 2px 10px; }
 .star-planner-level { display: flex; align-items: center; gap: 8px; }
+
+/* 拍賣場（`57-auction.md`） */
+.town-modal.is-auction { width: min(760px, calc(90 * var(--vw-unit, 1vw))); }
+.auc-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+.auc-gold { font-size: var(--fs-sm); color: var(--text-secondary); }
+.auc-gold strong { color: var(--accent-gold); }
+.auc-message { font-size: var(--fs-sm); color: var(--accent-primary); }
+.auc-message.is-error { color: var(--accent-danger); }
+.auc-filters { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: var(--fs-sm); }
+.auc-filters label { display: inline-flex; gap: 4px; align-items: center; color: var(--text-secondary); }
+.auc-name-input { width: 120px; }
+.auc-tiers { display: inline-flex; gap: 2px; }
+.auc-tiers button { padding: 1px 6px; font-size: var(--fs-xs); }
+.auc-tiers button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+.auc-affix-filter { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; flex: 1; }
+.auc-kind { display: inline-flex; gap: 2px; }
+.auc-kind button { padding: 2px 14px; font-size: var(--fs-sm); }
+.auc-kind button.active { border-color: var(--accent-primary); background: var(--accent-primary); color: var(--bg-deepest); }
+.auc-filter-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: var(--fs-sm); }
+.auc-filter-label { color: var(--text-secondary); flex: none; }
+.auc-filter-hint { color: var(--text-dim); font-size: var(--fs-xs); }
+.auc-affix-chip {
+  display: inline-flex; gap: 4px; align-items: center; padding: 1px 6px;
+  border: var(--border-width) solid var(--border); border-radius: var(--radius-sm); font-size: var(--fs-xs);
+}
+.auc-affix-chip input { width: 52px; font-size: var(--fs-xs); }
+.auc-affix-chip button { padding: 0 4px; font-size: var(--fs-xs); }
+.auc-list { flex: 1; min-height: 0; overflow-y: auto; }
+.auc-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.auc-table th { text-align: left; color: var(--text-dim); font-weight: normal; border-bottom: 1px solid var(--border-subtle); padding: 4px; position: sticky; top: 0; background: rgba(var(--glass-rgb), 0.98); }
+.auc-table td { padding: 3px 4px; border-bottom: 1px solid var(--border-subtle); }
+.auc-table td:last-child { text-align: right; }
+.auc-name { display: inline-flex; align-items: center; gap: 4px; }
+.auc-num { color: var(--text-secondary); }
+.auc-seller { color: var(--text-dim); font-size: var(--fs-xs); }
+.auc-price.is-gold { color: var(--accent-gold); }
+.auc-price.is-item { color: var(--accent-primary); }
+.auc-empty { padding: 16px; text-align: center; color: var(--text-dim); font-size: var(--fs-sm); }
+.auc-pager { display: flex; justify-content: center; gap: 12px; align-items: center; font-size: var(--fs-sm); color: var(--text-secondary); }
+.auc-mine-head { font-size: var(--fs-sm); color: var(--text-secondary); }
+.auc-mine-head strong { color: var(--accent-gold); }
+.auc-list-tab { display: flex; gap: 12px; flex: 1; min-height: 0; }
+.auc-source { width: 280px; flex: none; overflow-y: auto; font-size: var(--fs-sm); }
+.auc-source-title { color: var(--accent-gold); margin: 6px 0 2px; }
+.auc-source-row {
+  display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer;
+  border: var(--border-width) solid transparent; border-radius: var(--radius-sm);
+}
+.auc-source-row:hover { background: var(--bg-deepest); }
+.auc-source-row.selected { border-color: var(--accent-primary); background: var(--bg-deepest); }
+.auc-source-tag { margin-left: auto; font-size: var(--fs-xs); color: var(--accent-primary); }
+.auc-source-row > :last-child { margin-left: auto; }
+.auc-source-tooltip { font-size: var(--fs-sm); line-height: 1.7; white-space: nowrap; }
+.auc-form { flex: 1; display: flex; flex-direction: column; gap: 10px; font-size: var(--fs-sm); }
+.auc-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.auc-form-row input[type="number"] { width: 100px; }
+.auc-form-label { color: var(--text-dim); width: 3em; }
+.auc-dim { color: var(--text-dim); font-size: var(--fs-xs); }
+.auc-fee strong { color: var(--accent-gold); }
+.auc-form > button { align-self: flex-start; }
+.modal-content.auc-confirm { height: auto; width: 360px; }
+.auc-confirm-body { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); }
+.auc-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; }
+@media (max-width: 767px) {
+  .auc-list-tab { flex-direction: column; }
+  .auc-source { width: auto; max-height: 200px; }
+  .auc-seller { display: none; }
+}

@@ -6,7 +6,8 @@ import { canLearnBasicMagic, getLearnableMaxLevel, CLASS_MAGIC_RESTRICTIONS } fr
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { isClassMagic, CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
-import { getBagItemAmount, hasBagItem } from '../../models/bagItem';
+import { getMaterialTotal } from '../../systems/craftQuestSystem';
+import { SourceCount, useCraftSources } from './SourceCount';
 import {
   LEARN_PRICES, SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, getRequiredBookId,
 } from '../../models/magicAcademy';
@@ -20,7 +21,8 @@ type AcademyTab = 'learn' | 'craft' | 'class';
 export function MagicAcademy() {
   const char = useGameStore(s => s.character);
   const skills = useGameStore(s => s.skills);
-  const bagItems = useGameStore(s => s.bagItems);
+  // 碎片、材料、魔法書、技能書取自背包＋個人倉庫＋帳號倉庫（`06-equipment-acquire.md` § 6A.3）
+  const sources = useCraftSources();
   // 判定、扣款、消耗都在 store（線上模式轉成 RPC 交給 server）
   const learnBasicMagic = useGameStore(s => s.learnBasicMagic);
   const craftSpellbook = useGameStore(s => s.craftSpellbook);
@@ -105,13 +107,15 @@ export function MagicAcademy() {
           {learnableByBook.map(skill => {
             const level = skill.level ?? 1;
             const bookItemId = getRequiredBookId(level)!;
-            const bookCount = getBagItemAmount(bagItems, bookItemId);
+            const bookCount = getMaterialTotal(sources, bookItemId);
             const hasBook = bookCount > 0;
             return (
               <div key={skill.id} className="shop-item">
                 <div className="shop-item-info">
                   <span className="shop-item-name">{skill.name} (Lv.{level})</span>
-                  <span className="shop-item-desc">需要: {itemName(bookItemId)} (持有: {bookCount})</span>
+                  <span className="shop-item-desc">
+                    需要: {itemName(bookItemId)} (持有: <SourceCount sources={sources} itemIds={[bookItemId]}>{bookCount}</SourceCount>)
+                  </span>
                 </div>
                 <div className="shop-item-actions">
                   <button onClick={() => learnBasicMagic(skill.id)} disabled={!hasBook}>
@@ -128,11 +132,13 @@ export function MagicAcademy() {
         <div className="academy-craft-content">
           <h4>製作魔法書</h4>
           <div className="craft-material-info">
-            <span>持有碎片: {getBagItemAmount(bagItems, SPELLBOOK_FRAGMENT_ID)}</span>
+            <span>
+              持有碎片: <SourceCount sources={sources} itemIds={[SPELLBOOK_FRAGMENT_ID]}>{getMaterialTotal(sources, SPELLBOOK_FRAGMENT_ID)}</SourceCount>
+            </span>
           </div>
           {SPELLBOOK_RECIPES.map(recipe => {
-            const fragments = getBagItemAmount(bagItems, SPELLBOOK_FRAGMENT_ID);
-            const materials = getBagItemAmount(bagItems, recipe.materialItemId);
+            const fragments = getMaterialTotal(sources, SPELLBOOK_FRAGMENT_ID);
+            const materials = getMaterialTotal(sources, recipe.materialItemId);
             const canCraft = fragments >= recipe.fragments && materials >= recipe.materialAmount;
             return (
               <div key={recipe.bookItemId} className="shop-item">
@@ -140,7 +146,9 @@ export function MagicAcademy() {
                   <span className="shop-item-name">{itemName(recipe.bookItemId)}</span>
                   <span className="shop-item-desc">教學等級: {recipe.levels}</span>
                   <span className="shop-item-desc">
-                    {itemName(SPELLBOOK_FRAGMENT_ID)} ×{recipe.fragments} ({fragments}) + {itemName(recipe.materialItemId)} ×{recipe.materialAmount} ({materials})
+                    {itemName(SPELLBOOK_FRAGMENT_ID)} ×{recipe.fragments} (<SourceCount sources={sources} itemIds={[SPELLBOOK_FRAGMENT_ID]}>{fragments}</SourceCount>)
+                    {' + '}
+                    {itemName(recipe.materialItemId)} ×{recipe.materialAmount} (<SourceCount sources={sources} itemIds={[recipe.materialItemId]}>{materials}</SourceCount>)
                   </span>
                 </div>
                 <div className="shop-item-actions">
@@ -160,7 +168,7 @@ export function MagicAcademy() {
           <div className="guild-skill-list">
             {myClassSkills.map(def => {
               const learned = skills.some(s => s.id === def.id);
-              const hasBook = hasBagItem(bagItems, def.bookItemId);
+              const hasBook = getMaterialTotal(sources, def.bookItemId) > 0;
               const levelOk = char.level >= def.requiredLevel;
               const canLearn = !learned && hasBook && levelOk;
 

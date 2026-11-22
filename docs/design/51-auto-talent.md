@@ -340,7 +340,7 @@ Wiki 照 `blockedReason` 顯示未開放的原因：
 全部為玩家自選。補至指定百分比只看 HP —— 三種藥水都只回 HP。
 解除道具只列狀態解除道具；指定消耗品只列可直接使用的道具（補血、加速、增益藥水、回城卷軸、狀態解除道具）。
 
-道具類參數的選單列出該範圍的全部道具，不限背包現有（`systems/talentItemOptions.ts`）；依道具類別分組、各組可收合，並可依名稱搜尋（`components/TalentItemSelect.tsx`）。
+道具類參數的選單列出該範圍的全部道具，不限背包現有（`systems/talentItemOptions.ts`）；用道具選單（`34-ui-guidelines.md` § 34.15，`components/TalentItemSelect.tsx`）。
 每次判定喝一瓶，到標了條件就不成立。
 依序補滿多個 buff 最多 3 個（沿用 `MULTI_GROUP_MAX`），**第 2、3 個選填**，
 只填一個照樣進判定。

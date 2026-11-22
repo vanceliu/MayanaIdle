@@ -96,6 +96,10 @@ export interface Character {
    * 選填是為了相容 DB v22 以前的角色；缺值時視為無離線時間，不追溯發放。
    */
   lastSeenAt?: number;
+  /** 本次登入累計的狩獵金幣（`04-character.md` § 4.12）。讀取一律 `?? 0` */
+  huntGold?: number;
+  /** 本次登入累計的狩獵時長（毫秒，`04-character.md` § 4.12）。讀取一律 `?? 0` */
+  huntMs?: number;
   createdAt: number;
   dataVersion?: number;
   /**

@@ -7,6 +7,8 @@ import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore } from '../../stores/partyStore';
 import { useTownStore } from '../../stores/townStore';
 import { getBagItemAmount } from '../../models/bagItem';
+import { getMaterialTotal } from '../../systems/craftQuestSystem';
+import { SourceCount, useCraftSources } from './SourceCount';
 import { formatGameTime } from '../../models/gameClock';
 import { getItemById } from '../../models/items';
 import {
@@ -24,10 +26,11 @@ const BOX_DESC = '1/2 機率為 (擬) 擬態品（4 條詞綴＋封印詞綴、�
 function TierCard({ spec, usedSlot, blockReason, onEnter, busy }: {
   spec: ArenaTierSpec; usedSlot: boolean; blockReason: string | null; onEnter: (tier: ArenaTier) => void; busy: boolean;
 }) {
-  const bagItems = useGameStore(s => s.bagItems);
+  // 入場材料取自付費者的背包＋個人倉庫＋帳號倉庫（§ 55.1）
+  const sources = useCraftSources();
   const gold = useGameStore(s => s.character?.gold ?? 0);
   const ids = arenaMaterialIds(spec);
-  const owned = ids.reduce((sum, id) => sum + getBagItemAmount(bagItems, id), 0);
+  const owned = ids.reduce((sum, id) => sum + getMaterialTotal(sources, id), 0);
   const fee = arenaGoldCost(spec.tier);
   const feeBlock = usedSlot ? null : owned < ARENA_MATERIAL_COST ? '材料不足' : gold < fee ? '金幣不足' : null;
   const reason = blockReason ?? feeBlock;
@@ -37,10 +40,17 @@ function TierCard({ spec, usedSlot, blockReason, onEnter, busy }: {
         <span className="shop-item-name">T{spec.tier} 競技場{!spec.open && <span className="arena-closed-tag">未開放</span>}</span>
         <span className="shop-item-desc">Lv.{spec.level} 以上｜一般怪 {spec.normalLabel}｜王：{spec.bosses.join('、')}</span>
         <span className="shop-item-desc">
-          入場材料（任意混合 {ARENA_MATERIAL_COST} 個）：{spec.materials.map((m, i) => `${m}×${getBagItemAmount(bagItems, ids[i])}`).join('、')}
+          入場材料（任意混合 {ARENA_MATERIAL_COST} 個）：
+          {spec.materials.map((m, i) => (
+            <span key={m}>
+              {i > 0 && '、'}{m}×<SourceCount sources={sources} itemIds={[ids[i]]} className="arena-mat-count">{getMaterialTotal(sources, ids[i])}</SourceCount>
+            </span>
+          ))}
         </span>
         <span className={`bounty-price ${!usedSlot && gold < fee ? 'lacking' : ''}`}>
-          {usedSlot ? '本時段已用掉票券場：入場不收費、不給票券' : `💰 ${fee.toLocaleString()} 金幣＋材料 ${owned}/${ARENA_MATERIAL_COST}`}
+          {usedSlot
+            ? '本時段已用掉票券場：入場不收費、不給票券'
+            : <>💰 {fee.toLocaleString()} 金幣＋材料 <SourceCount sources={sources} itemIds={ids}>{owned}</SourceCount>/{ARENA_MATERIAL_COST}</>}
         </span>
       </div>
       <div className="shop-item-actions">

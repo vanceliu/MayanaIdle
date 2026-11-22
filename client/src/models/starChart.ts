@@ -261,7 +261,7 @@ const JUNCTION_KEYSTONES: { name: string; effects: StarEffect[]; flags?: StarFla
     { name: '燃魔之星', effects: [effect('skillDmgPct', '技能造成傷害', 15, '%')], flags: ['manaBurn'] },
   ],
   [
-    { name: '嗜血之星', effects: [effect('attackLifestealPct', '普攻回血', 5, '%'), effect('skillLifestealPct', '技能回血', 5, '%'), effect('potionPct', '藥水效果', -20, '%')] },
+    { name: '嗜血之星', effects: [effect('attackLifestealPct', '普攻回血', 5, '%'), effect('skillLifestealPct', '技能回血', 5, '%'), effect('potionPct', '補藥效果', -20, '%')] },
     { name: '貪婪之星', effects: [effect('dropPct', '掉寶率', 20, '%'), effect('goldPct', '金幣', 20, '%'), atk(-12), matk(-12)] },
   ],
 ];

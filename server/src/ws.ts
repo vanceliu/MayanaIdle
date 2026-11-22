@@ -19,6 +19,7 @@ import { flush } from './tick';
 import { ACTION_ALLOWLIST, ARENA_RANKING_LIMIT, PROTOCOL_VERSION, type ClientMessage, type LeaderboardSnapshotView, type ServerMessage, type WorldMode } from '../../client/src/net/protocol';
 import { World } from './world';
 import type { GuildStorage } from './db/guildStorage';
+import type { AuctionStorage } from './db/auctionStorage';
 import { MemoryArenaRecords, type ArenaRecordStorage } from './db/arenaRecords';
 import { log } from './log';
 import { rates } from '../../client/src/core/rates';
@@ -37,6 +38,7 @@ export interface GameServerDeps {
   leaderboard: (top: number) => LeaderboardSnapshotView;
   /** 公會持久層（`11-guild.md`）；未指定時只存記憶體 */
   guildStorage?: GuildStorage;
+  auctionStorage?: AuctionStorage;
   /** 競技場排行榜（`55-arena.md` § 55.7）；未指定時只存記憶體 */
   arenaRecords?: ArenaRecordStorage;
   /** 同 IP 放行名單（§ 97.5「同 IP 同時在場」）；未指定時只存記憶體 */
@@ -45,6 +47,7 @@ export interface GameServerDeps {
 
 /** 單機世界沒有公會（`97-selfhosted-server.md` § 97.1） */
 export const SOLO_NO_GUILD_MESSAGE = '單機世界沒有公會';
+export const SOLO_NO_AUCTION_MESSAGE = '單機世界沒有拍賣場';
 
 /** 訊息的最低形狀（§ 97.2 硬性要求）：非陣列物件且 `t` 為字串，其餘欄位由各訊息自行驗證 */
 function isMessageShape(value: unknown): value is { t: string } {
@@ -95,7 +98,7 @@ export class GameServer {
 
   constructor(deps: GameServerDeps, throttle: LoginThrottle = new LoginThrottle(), registrations: RegistrationLimit = new RegistrationLimit()) {
     this.deps = deps;
-    this.world = new World(deps.guildStorage);
+    this.world = new World(deps.guildStorage, deps.auctionStorage);
     this.arenaRecords = deps.arenaRecords ?? new MemoryArenaRecords();
     this.world.onArenaExit = record => { void this.arenaRecords.save(record, Date.now()); };
     this.throttle = throttle;
@@ -447,6 +450,15 @@ export class GameServer {
             ? { ok: false, message: SOLO_NO_GUILD_MESSAGE }
             : await this.world.handleGuildAction(session, msg.name, msg.args ?? []);
           session.guild.setState({ message: result.message ?? null });
+          flush(session);
+          if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
+          return;
+        }
+        if (msg.store === 'auction') {
+          const result = this.deps.mode === 'solo'
+            ? { ok: false, message: SOLO_NO_AUCTION_MESSAGE }
+            : await this.world.handleAuctionAction(session, msg.name, msg.args ?? []);
+          session.auction.setState({ message: result.message ?? null });
           flush(session);
           if (msg.id !== undefined) session.send({ t: 'action_ok', id: msg.id, result: result.ok });
           return;

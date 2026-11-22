@@ -207,7 +207,7 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'magic_resist', name: '魔法抗性', group: '防禦類', description: '魔法抗性 +X%，並降低怪物施加詛咒／虛弱／減速／沉默的機率' },
   { type: 'thorns', name: '荊棘傷害', group: '防禦類', description: '被命中時，對攻擊者造成實際受到的傷害 × X%' },
   { type: 'heal_effect', name: '補血效果', group: '補給類', description: '技能補血效果 +X%' },
-  { type: 'potion_effect', name: '藥水效果', group: '補給類', description: '藥水效果 +X%' },
+  { type: 'potion_effect', name: '補藥效果', group: '補給類', description: '補藥效果 +X%' },
   { type: 'drop_rate', name: '掉寶率', group: '掉落類', description: '掉寶率 +X%（影響一般怪與 Boss 主掉落表、3~5 級職業技能書；工會任務收集物不受影響）' },
   { type: 'gold_rate', name: '金幣獲得率', group: '掉落類', description: '金幣獲得率 +X%' },
   { type: 'move_speed', name: '跑速', group: '移動類', description: '移動速度 +X%' },

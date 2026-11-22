@@ -22,7 +22,9 @@ import { ARENA_TIERS } from '../../models/arena';
 import { STARTER_MAX_LEVEL, getStarterEnhanceCost } from '../../systems/starterNpc';
 import { DEFAULT_EMERGENCY_RETREAT, DEFAULT_PERSISTENT_SCRIPT } from '../../models/scriptEngine';
 import { RESTED_EXP_CAP_MS, RESTED_EXP_MULTIPLIER } from '../../systems/restedExp';
+import { OFFLINE_GOLD_MIN_OFFLINE_MS } from '../../systems/offlineGold';
 import { MELEE_WEAPON_RANGE, WEAPON_RANGE } from '../../models/equipment';
+import { AUCTION_LISTING_FEE, AUCTION_MAX_LISTINGS } from '../../models/auction';
 
 /** 新手開始（`43-wiki-system.md` § 4.0）：依遊玩順序介紹，細節連到各 Wiki 頁；數值取 model 常數 */
 
@@ -199,6 +201,7 @@ export function StartPage() {
         <Card>
           <strong>上線才會進行</strong>：遊戲在 server 上進行，關掉瀏覽器或斷線就會登出、戰鬥停止，沒有離線收益。
           離線時間會存成回鍋加倍，回來後擊殺經驗 ×{RESTED_EXP_MULTIPLIER}，存量上限 {RESTED_EXP_CAP_MS / 3_600_000} 小時。<br />
+          離線收益：離線滿 {OFFLINE_GOLD_MIN_OFFLINE_MS / 60_000} 分鐘後上線，會收到一封金幣信，到信箱領取；金額依最近一次登入期間所做的事情決定。<br />
           <strong>物理與魔法</strong>：普攻會判定命中與爆擊；魔法技能必定命中、不會被閃、不爆擊。<br />
           <strong>防禦</strong>：每 1 點少受 1% 傷害，上限 {DAMAGE_REDUCTION_CAP}%；角色起始防禦為負值，前幾點裝備防禦只是抵銷。
           魔法抗性只擋怪物的魔法攻擊。<br />
@@ -316,6 +319,7 @@ export function StartPage() {
         <Card>
           <strong>基礎魔法</strong>：在魔法學院學，低等級花金幣、高等級交魔法書；各職業能學到的等級不同。<br />
           <strong>職業魔法</strong>：交職業技能書學會；1、2 級由職業任務取得，之後由怪物掉落。<br />
+          魔法書、技能書與製作魔法書的素材放在背包、個人倉庫或帳號倉庫都能用，不必先取出。<br />
           <strong>自動天賦</strong>：決定自動戰鬥時做什麼。分戰鬥、常駐、補給三種，一個天賦格＝條件＋動作，由上往下取第一個成立的。
           建角送 {STARTING_SLOT_COUNT} 格，之後每 {SLOT_GRANT_LEVEL_INTERVAL} 級由信箱多發 1 格；兩格同階可合成高一階，
           同類型最多裝 {TALENT_INSTALL_MAX} 格。學會新技能後記得加進戰鬥天賦。<br />
@@ -337,6 +341,13 @@ export function StartPage() {
               <tr><td>印記</td><td style={WRAP_TEXT}>在印記師調整詞綴與品質</td></tr>
               <tr><td><WikiLink to="/wiki/maps">地城</WikiLink></td><td style={WRAP_TEXT}>象牙塔、朦朧洞窟、水下監獄、龍谷地間、遠古地監、百柱塔</td></tr>
               <tr><td>公會</td><td style={WRAP_TEXT}>只在開放世界</td></tr>
+              <tr>
+                <td>拍賣場</td>
+                <td style={WRAP_TEXT}>
+                  只在開放世界。上架裝備或道具，標價收金幣或指定道具，上架費 {AUCTION_LISTING_FEE.toLocaleString()} 金幣（不退），
+                  每隻角色最多 {AUCTION_MAX_LISTINGS} 筆、不過期；成交後雙方的東西都寄到信箱
+                </td>
+              </tr>
               <tr><td>排行榜</td><td style={WRAP_TEXT}>城鎮統計中心</td></tr>
             </tbody>
           </table>

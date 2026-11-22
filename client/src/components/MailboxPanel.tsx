@@ -3,8 +3,9 @@ import { usePanelWindowStore, panelButtonA11y } from '../stores/panelWindowStore
 import { useIsMobile } from '../hooks/useViewport';
 import { PanelDockFace } from './PanelDockFace';
 import type { Mail, MailItem } from '../models/mailbox';
+import { getItemById } from '../models/items';
 
-/** 系統信箱（`52-mailbox.md`）。首版只發天賦格與補償（§ 52.0） */
+/** 系統信箱（`52-mailbox.md`）：天賦格、補償、拍賣場交付（§ 52.0） */
 
 /** 徽章只算未領取封數（§ 52.5）。不可掛在「安裝天賦格」上 */
 export function MailboxButton() {
@@ -32,6 +33,10 @@ function describeItem(item: MailItem): string {
       return `天賦格 T${item.slotTier ?? 1}`;
     case 'gold':
       return `${item.amount ?? 0} 金幣`;
+    case 'item':
+      return `${getItemById(item.itemId ?? 0)?.name ?? '道具'} ×${item.amount ?? 0}`;
+    case 'equipment':
+      return '裝備 ×1';
     default:
       return '未知項目';
   }
@@ -70,6 +75,7 @@ export function MailboxContent() {
   const unread = useMailboxStore(s => s.unread);
   const claimAll = useMailboxStore(s => s.claimAll);
   const purgeClaimed = useMailboxStore(s => s.purgeClaimed);
+  const message = useMailboxStore(s => s.message);
   const claimedCount = mails.length - unread;
 
   if (mails.length === 0) {
@@ -92,6 +98,7 @@ export function MailboxContent() {
           )}
         </div>
       )}
+      {message && <div className="mail-message" role="status">{message}</div>}
       {/* 未領取在上、已領取在下，排序在 `systems/mailbox.ts` 的 listMail */}
       <ul className="mail-list">
         {mails.map(mail => <MailRow key={mail.id} mail={mail} />)}

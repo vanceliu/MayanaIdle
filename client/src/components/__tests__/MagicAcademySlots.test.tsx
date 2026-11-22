@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MagicAcademy } from '../town/MagicAcademy';
 import { useGameStore } from '../../stores/gameStore';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import type { Skill } from '../../models/skill';
+import { makeBagItem } from '../../models/bagItem';
+import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES } from '../../models/magicAcademy';
 
 function learn(id: string): Skill {
   const template =
@@ -39,6 +41,8 @@ function setup(skills: Skill[]) {
     },
     skills,
     bagItems: [],
+    personalStoredMaterials: [],
+    storedMaterials: [],
   });
 }
 
@@ -83,5 +87,24 @@ describe('魔法學院學習額度', () => {
 
     expect(screen.getByText('已學: 5 / 5')).toBeTruthy();
     expect(screen.getByText('沒有可學習的魔法')).toBeTruthy();
+  });
+});
+
+describe('魔法學院取用倉庫（`06-equipment-acquire.md` § 6A.3）', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('製作魔法書：碎片與材料算三處合計', () => {
+    const recipe = SPELLBOOK_RECIPES[0];
+    setup([]);
+    useGameStore.setState({
+      bagItems: [makeBagItem(SPELLBOOK_FRAGMENT_ID, 1)!],
+      personalStoredMaterials: [makeBagItem(SPELLBOOK_FRAGMENT_ID, recipe.fragments - 1)!],
+      storedMaterials: [makeBagItem(recipe.materialItemId, recipe.materialAmount)!],
+    });
+    render(<MagicAcademy />);
+    fireEvent.click(screen.getByRole('button', { name: '製作魔法書' }));
+    expect((screen.getAllByRole('button', { name: '製作' })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 });

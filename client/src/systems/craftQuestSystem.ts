@@ -38,6 +38,21 @@ export function getCraftSources(state: {
   };
 }
 
+/** 某道具在各來源的存量 */
+export function getMaterialStock(sources: CraftSources, itemId: number): Record<CraftSourceKind, number> {
+  return {
+    bag: getBagItemAmount(sources.bag.materials, itemId),
+    personal: getBagItemAmount(sources.personal.materials, itemId),
+    shared: getBagItemAmount(sources.shared.materials, itemId),
+  };
+}
+
+/** 某道具三處合計 */
+export function getMaterialTotal(sources: CraftSources, itemId: number): number {
+  const stock = getMaterialStock(sources, itemId);
+  return stock.bag + stock.personal + stock.shared;
+}
+
 export interface CraftMaterialStatus {
   itemId: number;
   /** 三處合計 */
@@ -99,11 +114,7 @@ export function evaluateCraftRequirements(
   gold: number,
 ): CraftRequirementStatus {
   const materials: CraftMaterialStatus[] = (recipe.craftMaterials ?? []).map(mat => {
-    const bySource = {
-      bag: getBagItemAmount(sources.bag.materials, mat.itemId),
-      personal: getBagItemAmount(sources.personal.materials, mat.itemId),
-      shared: getBagItemAmount(sources.shared.materials, mat.itemId),
-    };
+    const bySource = getMaterialStock(sources, mat.itemId);
     const have = bySource.bag + bySource.personal + bySource.shared;
     return { itemId: mat.itemId, have, need: mat.amount, enough: have >= mat.amount, bySource };
   });

@@ -55,6 +55,34 @@ export function drawCraftMaterials(
 }
 
 /**
+ * 名單內任意混合扣 `amount` 個（`55-arena.md` § 55.1）：依來源順序，同一來源依名單順序，回傳扣完後各來源的素材。
+ * 呼叫前須已確認三處合計足夠。
+ */
+export function drawAnyOfMaterials(
+  itemIds: number[],
+  amount: number,
+  sources: CraftSources,
+): Record<CraftSourceKind, BagItem[]> {
+  const result = {
+    bag: sources.bag.materials,
+    personal: sources.personal.materials,
+    shared: sources.shared.materials,
+  };
+  let remaining = amount;
+  for (const source of CRAFT_SOURCE_ORDER) {
+    for (const itemId of itemIds) {
+      if (remaining <= 0) return result;
+      const take = Math.min(remaining, getBagItemAmount(result[source], itemId));
+      if (take <= 0) continue;
+      result[source] = consumeBagItem(result[source], itemId, take);
+      remaining -= take;
+    }
+  }
+  if (remaining > 0) throw new Error('素材不足');
+  return result;
+}
+
+/**
  * 玩家指定的前置裝備（§ 6A.3「取用來源」）。配方無前置回 []；
  * 未指定、件數不符、重複或不在背包／個人／帳號倉庫的候選內回 null。
  */

@@ -75,7 +75,7 @@ describe('系統信箱（`52-mailbox.md`）', () => {
       await syncTalentSlotGrants(CHAR, 5);
       const [mail] = await listMail(CHAR);
 
-      expect(await claimMail(mail.id!)).toBe(true);
+      expect(await claimMail(mail.id!)).toBe('claimed');
 
       const slots = await db.talentSlots.where('characterId').equals(CHAR).toArray();
       expect(slots).toHaveLength(1);
@@ -87,14 +87,14 @@ describe('系統信箱（`52-mailbox.md`）', () => {
     it('同一封不可領兩次', async () => {
       await syncTalentSlotGrants(CHAR, 5);
       const [mail] = await listMail(CHAR);
-      expect(await claimMail(mail.id!)).toBe(true);
-      expect(await claimMail(mail.id!)).toBe(false);
+      expect(await claimMail(mail.id!)).toBe('claimed');
+      expect(await claimMail(mail.id!)).toBe('gone');
       expect(await db.talentSlots.count()).toBe(1);
     });
 
     it('全部領取', async () => {
       await syncTalentSlotGrants(CHAR, 20);
-      expect(await claimAll(CHAR)).toBe(4);
+      expect(await claimAll(CHAR)).toEqual({ claimed: 4, blocked: 0 });
       expect(await db.talentSlots.count()).toBe(4);
       expect(unclaimedCount(await listMail(CHAR))).toBe(0);
     });
@@ -200,7 +200,7 @@ describe('系統信箱（`52-mailbox.md`）', () => {
   describe('發放計數（§ 52.2.4）', () => {
     it('換版清理刪掉已領取的信之後，不會重新發放', async () => {
       await syncTalentSlotGrants(CHAR, 15);
-      expect(await claimAll(CHAR)).toBe(3);
+      expect(await claimAll(CHAR)).toEqual({ claimed: 3, blocked: 0 });
       expect(await db.talentSlots.count()).toBe(3);
 
       await purgeClaimedMailOnVersionChange(CHAR, 'v1.0.0');
@@ -347,7 +347,7 @@ describe('系統信箱（`52-mailbox.md`）', () => {
       claimedAt: null,
     });
     const [mail] = await listMail(CHAR);
-    expect(await claimMail(mail.id!)).toBe(true);
+    expect(await claimMail(mail.id!)).toBe('claimed');
 
     expect(await db.talentSlots.where('characterId').equals(CHAR).count()).toBe(0);
   });

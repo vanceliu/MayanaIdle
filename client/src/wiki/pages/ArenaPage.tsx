@@ -80,7 +80,10 @@ export function ArenaPage() {
             </tbody>
           </table>
         </div>
-        <p style={{ ...CARD_TEXT, color: 'var(--text-dim)' }}>王依 Boss 等級由低到高輪替，輪完後固定出最強者。</p>
+        <p style={{ ...CARD_TEXT, color: 'var(--text-dim)' }}>
+          王依 Boss 等級由低到高輪替，輪完後固定出最強者。<br />
+          入場材料由隊長支付，可放在背包、個人倉庫或帳號倉庫（公會倉庫不算）：先扣背包，不夠再扣個人倉庫、再扣帳號倉庫。
+        </p>
       </section>
 
       <section style={{ marginBottom: 32 }}>

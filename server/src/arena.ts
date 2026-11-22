@@ -6,7 +6,8 @@ import {
   ARENA_MATERIAL_COST, ARENA_REGION_ID, arenaGoldCost, arenaMaterialIds, arenaSlotStart, getArenaTier,
   isArenaSlotUsed, markArenaSlotUsed, refundArenaSlot, type ArenaCharacterRun, type ArenaTier,
 } from '../../client/src/models/arena';
-import { getBagItemAmount, consumeBagItem } from '../../client/src/models/bagItem';
+import { getCraftSources, getMaterialTotal } from '../../client/src/systems/craftQuestSystem';
+import { drawAnyOfMaterials } from '../../client/src/systems/crafting';
 import { getNearestTown, getRegion } from '../../client/src/models/mapData';
 import { MAP_THEMES } from '../../client/src/models/mapDataControl';
 import type { MapInstance } from '../../client/src/systems/mapInstance';
@@ -77,16 +78,18 @@ export class ArenaRegistry {
       const fee = arenaGoldCost(tier);
       if (pg.character!.gold < fee) return { ok: false, message: '金幣不足' };
       const ids = arenaMaterialIds(spec);
-      if (ids.reduce((sum, id) => sum + getBagItemAmount(pg.bagItems, id), 0) < ARENA_MATERIAL_COST) {
+      // 材料可取自付費者的背包與個人／帳號倉庫（§ 55.1）
+      const sources = getCraftSources(pg);
+      if (ids.reduce((sum, id) => sum + getMaterialTotal(sources, id), 0) < ARENA_MATERIAL_COST) {
         return { ok: false, message: '入場材料不足' };
       }
-      let bag = pg.bagItems;
-      let need = ARENA_MATERIAL_COST;
-      for (const id of ids) {
-        const take = Math.min(need, getBagItemAmount(bag, id));
-        if (take > 0) { bag = consumeBagItem(bag, id, take); need -= take; }
-      }
-      payer.game.setState({ bagItems: bag, character: { ...pg.character!, gold: pg.character!.gold - fee } });
+      const drawn = drawAnyOfMaterials(ids, ARENA_MATERIAL_COST, sources);
+      payer.game.setState({
+        bagItems: drawn.bag,
+        personalStoredMaterials: drawn.personal,
+        storedMaterials: drawn.shared,
+        character: { ...pg.character!, gold: pg.character!.gold - fee },
+      });
     }
 
     const runKey = `${now.toString(36)}-${++this.seq}`;

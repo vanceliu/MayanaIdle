@@ -3,7 +3,7 @@ import { useGameStore } from '../stores/gameStore';
 import { connection } from '../net/connection';
 import type { LegacyArchiveSummary } from '../models/legacyArchive';
 import { LegacyArchivePage } from './LegacyArchivePage';
-import { useOnlineStore } from '../net/online';
+import { useMultiplayer, useOnlineStore } from '../net/online';
 import { CLASS_NAMES_ZH, ATTRIBUTE_KEYS } from '../models/character';
 import type { Attributes } from '../models/character';
 
@@ -34,6 +34,7 @@ export function CharacterSelect() {
   const kickedReason = useOnlineStore(s => s.kickedReason);
   const entryNotice = useOnlineStore(s => s.entryNotice);
   const emptySlots = MAX_CHARACTERS - characterList.length;
+  const multiplayer = useMultiplayer();
   const clearKicked = () => useOnlineStore.setState({ kickedReason: null, entryNotice: null });
 
   // 遺產紀錄（`45-legacy-archive.md` § 45.3）：有紀錄才顯示入口
@@ -75,8 +76,9 @@ export function CharacterSelect() {
             <button
               className="btn-delete-char"
               onClick={() => {
-                // 純本機刪除：名稱不唯一，沒有線上資源要回收（§ 37.4.3）
-                if (window.confirm(`確定要刪除角色「${char.name}」嗎？此操作無法復原。`)) {
+                // 拍賣場上架中的物品隨角色消失（`57-auction.md` § 57.8）
+                const auctionNote = multiplayer ? '拍賣場上架中的物品會一併消失。' : '';
+                if (window.confirm(`確定要刪除角色「${char.name}」嗎？${auctionNote}此操作無法復原。`)) {
                   void deleteCharacter(char.id);
                 }
               }}

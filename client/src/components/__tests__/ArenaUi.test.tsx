@@ -6,7 +6,8 @@ import { ArenaRanking } from '../town/ArenaRanking';
 import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore, type PartyView } from '../../stores/partyStore';
 import { connection } from '../../net/connection';
-import { EMPTY_ARENA_SLOTS, type ArenaCharacterRun } from '../../models/arena';
+import { ARENA_MATERIAL_COST, ARENA_TIERS, EMPTY_ARENA_SLOTS, arenaMaterialIds, type ArenaCharacterRun } from '../../models/arena';
+import { makeBagItem } from '../../models/bagItem';
 import type { Character } from '../../models/character';
 
 /**
@@ -19,6 +20,8 @@ function setCharacter(level: number) {
   useGameStore.setState({
     character: { id: 1, userId: 1, name: '我方', className: 'knight', level, gold: 1_000_000, currentRegion: 'neutral-town' } as Character,
     bagItems: [],
+    personalStoredMaterials: [],
+    storedMaterials: [],
     arenaSlots: EMPTY_ARENA_SLOTS,
     arenaRun: null,
   } as never);
@@ -52,6 +55,18 @@ describe('ArenaNpc', () => {
     render(<ArenaNpc />);
     expect(screen.getAllByText('材料不足').length).toBeGreaterThan(0);
     for (const b of screen.getAllByRole('button', { name: '票券場入場' })) expect((b as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('入場材料算背包＋個人倉庫＋帳號倉庫合計（§ 55.1）', () => {
+    const [id] = arenaMaterialIds(ARENA_TIERS.find(t => t.tier === 4)!);
+    useGameStore.setState({
+      bagItems: [makeBagItem(id, 1)!],
+      personalStoredMaterials: [makeBagItem(id, 1)!],
+      storedMaterials: [makeBagItem(id, ARENA_MATERIAL_COST - 2)!],
+    });
+    render(<ArenaNpc />);
+    expect(screen.getAllByText(`${ARENA_MATERIAL_COST}`).length).toBeGreaterThan(0);
+    expect((screen.getAllByRole('button', { name: '票券場入場' })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('組隊時非隊長不能帶隊、隊員等級未達會指名', () => {

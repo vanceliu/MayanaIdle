@@ -7,7 +7,7 @@ import type { MonsterSize } from '../models/monster';
 import type { MonsterAffixId, VenomDebuff } from '../models/monsterAffix';
 import type { TrainingDummySpec } from '../models/trainingGround';
 
-export type StoreKey = 'game' | 'mapControl' | 'mapMonster' | 'talent' | 'mailbox' | 'party' | 'trade' | 'guild';
+export type StoreKey = 'game' | 'mapControl' | 'mapMonster' | 'talent' | 'mailbox' | 'party' | 'trade' | 'guild' | 'auction';
 
 /** 聊天頻道（`97-selfhosted-server.md` § 97.7.2） */
 export type ChatChannel = 'world' | 'guild' | 'party' | 'town' | 'whisper';
@@ -183,7 +183,7 @@ export interface CombatInstanceView {
   shieldRemaining?: number;
 }
 
-export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade' | 'guild' | 'arena';
+export type ActionStore = 'game' | 'mapControl' | 'mapMonster' | 'combatCommand' | 'talent' | 'mailbox' | 'party' | 'chat' | 'trade' | 'guild' | 'arena' | 'auction';
 
 /** 每個 store 允許 client 呼叫的 action（其餘一律拒絕） */
 export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
@@ -225,4 +225,6 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     // 公會倉庫（`11-guild.md` § 11.8）：開關分頁才送快照
     'openWarehouse', 'closeWarehouse', 'depositWarehouse', 'withdrawWarehouse', 'depositWarehouseGold', 'withdrawWarehouseGold',
   ]),
+  // 拍賣場（`57-auction.md`）：判定在 server 的 AuctionManager；單機世界一律拒絕
+  auction: new Set(['open', 'close', 'search', 'list', 'cancel', 'buy', 'clearMessage']),
 };

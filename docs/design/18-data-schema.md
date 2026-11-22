@@ -379,7 +379,7 @@ seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**�
 | `characterId` | 持有角色。**信箱角色獨立**，不跨角色 |
 | `sourceKey` | 發放來源鍵。**對 `characterId` 唯一**，重複發放靠它擋 |
 | `title` | 顯示標題 |
-| `items` | 發放項目陣列：道具（`itemId` ＋數量）／金幣／天賦格（tier） |
+| `items` | 發放項目陣列：道具（`itemId` ＋數量）／金幣／天賦格（tier）／裝備（實例 id） |
 | `createdAt` | 發放時間 |
 | `claimedAt` | 領取時間。**null ＝ 未領取** |
 
@@ -388,18 +388,20 @@ seed 資料，運行期不查 DB。一律**用 id 查表，不可用名字查**�
   **未領取的一律保留**（`52-mailbox.md` § 52.7.1）—— 刪掉等於沒收玩家的天賦格
 - 公告的 `lastReadVersion` 存本機設定，**不進 DB**
 
-## 18.11 回鍋經驗加倍（`04-character.md` § 4.11）
+## 18.11 回鍋經驗加倍與離線金幣（`04-character.md` § 4.11、§ 4.12）
 
-角色資料新增兩個欄位：
+角色資料欄位：
 
 | 欄位 | 說明 |
 |---|---|
 | `restedExpMs` | 加倍時間存量（毫秒）。上限 43,200,000（12 小時） |
 | `lastSeenAt` | 上次在線時間戳。上線時以 `now - lastSeenAt` 換算離線時長 |
+| `huntGold` | 本次登入累計的狩獵金幣（§ 4.12） |
+| `huntMs` | 本次登入累計的狩獵時長（毫秒，§ 4.12） |
 
 - `lastSeenAt` 在遊戲迴圈中定期寫入，離線時長取兩次寫入的差值
-- 兩個欄位存於 `characters` 列（§ 18.7）
-- 舊角色以 `restedExpMs = 0`、`lastSeenAt = 上線當下` 補齊，不追溯發放
+- 欄位存於 `characters` 列（§ 18.7）
+- 舊角色以 `restedExpMs = 0`、`lastSeenAt = 上線當下`、`huntGold = 0`、`huntMs = 0` 補齊，不追溯發放
 
 ## 18.12 server 端資料表（`97-selfhosted-server.md`）
 
@@ -422,6 +424,7 @@ SQLite（WAL）。靜態模板隨程式碼發布，不進資料庫（§ 18.8）�
 | `guilds` | `id`、`nameKey` 唯一 | `name`、`leaderCharacterId`、`leaderCha`（盟主魅力最後已知值，盟主離線時人數上限照此計）、`warehouseGold`（公會倉庫金幣）、`createdAt`（`11-guild.md`） |
 | `guild_warehouse_items` | (`guildId`, `itemId`) | 公會倉庫的可堆疊道具與數量（`11-guild.md` § 11.8）；裝備放 `equipment_instances`，`storageType = 'guild'`、`ownerId` 為**負的**公會 id（角色、帳號、公會 id 各自遞增會撞號） |
 | `guild_members` | `characterId`（PK） | `guildId`、`joinedAt`、`name`／`className`／`level`（最後一次在線時的值，供離線名單顯示）；以 `characterId` 為主鍵保證一個角色只屬一個公會（`11-guild.md` § 11.5） |
+| `auction_listings` | `id` | 拍賣場上架中的物品與標價（`57-auction.md` § 57.9）；上架中的裝備放 `equipment_instances`，`storageType = 'auction'`、`ownerId` 為賣家角色 id；信件中的裝備 `storageType = 'mail'`、`ownerId` 為收件角色 id |
 | `server_meta` | `key` | 世界層級的固定資訊，目前只有 `mode`（單機／開放，`97-selfhosted-server.md` § 97.1） |
 | `schema_version` | — | 遷移版本（`97-selfhosted-server.md` § 97.4） |
 

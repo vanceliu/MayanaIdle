@@ -1,14 +1,14 @@
 import type { TalentSlotTier } from './talent';
 
-/** 系統信箱（`52-mailbox.md`）。首版只做天賦格發放與補償（§ 52.0） */
+/** 系統信箱（`52-mailbox.md`）：天賦格發放、補償、拍賣場交付（§ 52.0） */
 
 /**
- * 發放項目的型別（§ 52.3）。首版只用到 `talent_slot`。
+ * 發放項目的型別（§ 52.3）。
  *
  * **沒有鑲材型別** —— 自動天賦的條件與動作一律內建，不經信箱發放
  * （`51-auto-talent.md` § 51.4.1）。
  */
-export type MailItemType = 'talent_slot' | 'item' | 'gold';
+export type MailItemType = 'talent_slot' | 'item' | 'gold' | 'equipment';
 
 export interface MailItem {
   type: MailItemType;
@@ -18,6 +18,8 @@ export interface MailItem {
   itemId?: number;
   /** `item` / `gold` 用 */
   amount?: number;
+  /** `equipment` 用：裝備實例 id，實例在信件中時 `storageType = 'mail'` */
+  equipmentId?: number;
 }
 
 export interface Mail {

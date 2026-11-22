@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { drawCraftMaterials, pickCraftPrerequisites } from '../crafting';
+import { drawAnyOfMaterials, drawCraftMaterials, pickCraftPrerequisites } from '../crafting';
 import type { CraftSources } from '../craftQuestSystem';
 import type { EquipmentInstance, EquipmentTemplate } from '../../models/equipment';
 import { bagItemById } from '../../testing/bagFixtures';
@@ -64,5 +64,25 @@ describe('pickCraftPrerequisites', () => {
   it('配方無前置時回空陣列', () => {
     const { craftPrerequisiteWeapon: _, ...noPrereq } = RECIPE;
     expect(pickCraftPrerequisites(noPrereq as EquipmentTemplate, sources(), undefined)).toEqual([]);
+  });
+});
+
+describe('drawAnyOfMaterials（`55-arena.md` § 55.1）', () => {
+  const mixed = (): CraftSources => ({
+    bag: { materials: [bagItemById(12, 1)], equipment: [] },
+    personal: { materials: [bagItemById(11, 1), bagItemById(12, 1)], equipment: [] },
+    shared: { materials: [bagItemById(11, 5), bagItemById(12, 5)], equipment: [] },
+  });
+
+  it('先扣完背包內的名單道具，再個人倉庫、再帳號倉庫；同一處依名單順序', () => {
+    const drawn = drawAnyOfMaterials([11, 12], 5, mixed());
+
+    expect(drawn.bag).toEqual([]);
+    expect(drawn.personal).toEqual([]);
+    expect(drawn.shared).toEqual([bagItemById(11, 3), bagItemById(12, 5)]);
+  });
+
+  it('三處合計不足時丟錯', () => {
+    expect(() => drawAnyOfMaterials([11, 12], 14, mixed())).toThrow();
   });
 });

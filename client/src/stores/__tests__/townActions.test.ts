@@ -7,6 +7,7 @@ import { ACTION_ALLOWLIST } from '../../net/protocol';
 import { TRAINING_GROUND_REGION_ID } from '../../models/trainingGround';
 import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, LEARN_PRICES } from '../../models/magicAcademy';
 import type { Character } from '../../models/character';
+import { SKILL_CATALOG } from '../../models/skill';
 
 /**
  * 城鎮設施的動作（旅館、魔法學院、試驗場）。
@@ -41,6 +42,8 @@ function setup(char: Partial<Character> = {}, extra: Record<string, unknown> = {
     bagItems: [],
     skills: [],
     activeEffects: [],
+    personalStoredMaterials: [],
+    storedMaterials: [],
     ...extra,
   } as never);
 }
@@ -141,6 +144,16 @@ describe('職業技能書（`13-town.md` § 13.9）', () => {
     expect(useGameStore.getState().bagItems[0].amount).toBe(1);
   });
 
+  it('技能書在個人倉庫或帳號倉庫也學得起來，先扣個人倉庫（`06-equipment-acquire.md` § 6A.3「取用來源」）', () => {
+    setup({ level: 10 }, {
+      personalStoredMaterials: [bagItemById(BOOK, 1)], storedMaterials: [bagItemById(BOOK, 1)],
+    });
+    expect(useGameStore.getState().learnClassSkill('shield-bash')).toBe(true);
+    const state = useGameStore.getState();
+    expect(state.personalStoredMaterials).toEqual([]);
+    expect(state.storedMaterials[0].amount).toBe(1);
+  });
+
   it('別的職業的技能書學不起來', () => {
     setup({ level: 40, className: 'thief' }, { bagItems: [bagItemById(BOOK, 1)] });
     expect(useGameStore.getState().learnClassSkill('shield-bash')).toBe(false);
@@ -192,6 +205,41 @@ describe('魔法學院（`13-town.md` § 13.6）', () => {
     expect(bag.find(i => i.itemId === SPELLBOOK_FRAGMENT_ID)?.amount).toBe(2);
     expect(bag.find(i => i.itemId === recipe.materialItemId)).toBeUndefined();
     expect(bag.find(i => i.itemId === recipe.bookItemId)?.amount).toBe(1);
+  });
+
+  it('魔法書在帳號倉庫也能學 4 級魔法，書從帳號倉庫扣', () => {
+    setup({ level: 50, className: 'elementalist' }, {
+      skills: [], storedMaterials: [bagItemById(SPELLBOOK_RECIPES[0].bookItemId, 2)],
+    });
+    const skill = SKILL_CATALOG.find(s => s.level === 4)!;
+    expect(useGameStore.getState().learnBasicMagic(skill.id)).toBe(true);
+    expect(useGameStore.getState().storedMaterials[0].amount).toBe(1);
+  });
+
+  it('製作魔法書：碎片與素材依背包 → 個人倉庫 → 帳號倉庫扣', () => {
+    const recipe = SPELLBOOK_RECIPES[0];
+    setup({}, {
+      bagItems: [bagItemById(SPELLBOOK_FRAGMENT_ID, 1)],
+      personalStoredMaterials: [bagItemById(SPELLBOOK_FRAGMENT_ID, 1), bagItemById(recipe.materialItemId, 2)],
+      storedMaterials: [bagItemById(SPELLBOOK_FRAGMENT_ID, 5), bagItemById(recipe.materialItemId, 10)],
+    });
+
+    expect(useGameStore.getState().craftSpellbook(recipe.bookItemId)).toBe(true);
+
+    const state = useGameStore.getState();
+    expect(state.bagItems.map(i => [i.itemId, i.amount])).toEqual([[recipe.bookItemId, 1]]);
+    expect(state.personalStoredMaterials).toEqual([]);
+    expect(state.storedMaterials.find(i => i.itemId === SPELLBOOK_FRAGMENT_ID)?.amount).toBe(5 - (recipe.fragments - 2));
+    expect(state.storedMaterials.find(i => i.itemId === recipe.materialItemId)?.amount).toBe(10 - (recipe.materialAmount - 2));
+  });
+
+  it('三處合計不足就整個不做，倉庫也不動', () => {
+    const recipe = SPELLBOOK_RECIPES[0];
+    const stored = [bagItemById(SPELLBOOK_FRAGMENT_ID, recipe.fragments), bagItemById(recipe.materialItemId, recipe.materialAmount - 1)];
+    setup({}, { storedMaterials: stored });
+
+    expect(useGameStore.getState().craftSpellbook(recipe.bookItemId)).toBe(false);
+    expect(useGameStore.getState().storedMaterials).toEqual(stored);
   });
 
   it('材料不夠就整個不做，也不會先扣碎片', () => {

@@ -16,6 +16,7 @@ import type { MapMonster } from '../stores/mapMonsterStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNoticeStore } from '../stores/noticeStore';
 import '../stores/guildStore';
+import '../stores/auctionStore';
 import { TICK_MS, setClockSource } from '../core/clock';
 import type { GameConnection } from './connection';
 import { afterServerFrame, applyingServerStores, beforeServerFrame, captureLocalActions, captureRemoteActions } from './trainingSandbox';
@@ -209,6 +210,7 @@ export function installOnlineProxies(conn: GameConnection): void {
   proxyStore('party');
   proxyStore('trade');
   proxyStore('guild');
+  proxyStore('auction');
   // 聊天：送出走 RPC，收訊由 `applyServerMessage` 進 chatStore
   const chat = useChatStore as unknown as StoreApi<Record<string, unknown>>;
   chat.setState({ send: (channel: unknown, text: unknown, target?: unknown) => conn.rpc('chat', 'send', [channel, text, target]) });

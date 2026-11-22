@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>魔法學院／競技場取用倉庫 Demo — MayanaIdle</title>
+<!--
+  魔法學院、競技場入場取用倉庫（`06-equipment-acquire.md` § 6A.3「取用來源」、`55-arena.md` § 55.1）。
+  版面樣本：class 與 App.css 相同，存量走遊戲的 `getMaterialStock`，扣除結果走 `drawCraftMaterials`／`drawAnyOfMaterials`。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/academy-arena-warehouse.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 16px; font-size: var(--fs-sm); }
+.demo-bar fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 10px; margin: 0; }
+.demo-bar legend { color: var(--accent-gold); padding: 0 4px; }
+.demo-bar label { margin-right: 10px; cursor: pointer; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px; width: 560px; max-width: 100%;
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+.demo-card h3 { font-size: var(--fs-sm); color: var(--text-secondary); margin: 12px 0 4px; }
+.demo-stock { font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.8; }
+
+</style>
+</head>
+<body>
+  <h1 class="demo-title">魔法學院／競技場取用倉庫</h1>
+  <p class="demo-note">
+    道具取自背包＋個人倉庫＋帳號倉庫（公會倉庫不算），金幣只看身上。數量一律顯示三處合計，虛線底的數字 hover 看各處存量（同鐵匠鋪）。<br>
+    魔法學院：製作魔法書、魔法書學習 4～10 級、職業技能書都算倉庫；依背包 → 個人 → 帳號扣。職業技能分頁版面不變，只是倉庫裡有書也能按「學習」。<br>
+    競技場：只算隊長（付費者）；先扣背包內的名單材料，不夠再個人倉庫、再帳號倉庫，同一處依名單順序。下方「按下後扣除」為實際扣法的結果。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./academyArenaWarehouseDemo.tsx"></script>
+</body>
+</html>

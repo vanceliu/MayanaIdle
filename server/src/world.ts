@@ -16,6 +16,9 @@ import { PartyError, PartyManager, type MemberIdentity, type Party } from './par
 import { TradeError, TradeManager, type Trade } from './trade';
 import { GuildError, GuildManager, type Guild, type GuildIdentity } from './guild';
 import { MemoryGuildStorage, type GuildStorage } from './db/guildStorage';
+import { MemoryAuctionStorage, type AuctionStorage } from './db/auctionStorage';
+import { AuctionError, AuctionManager, parseAuctionQuery } from './auction';
+import { AUCTION_LISTING_FEE, DEFAULT_AUCTION_QUERY, auctionListingName } from '../../client/src/models/auction';
 import {
   GUILD_WAREHOUSE_FULL_MESSAGE, depositGoldToGuild, depositToGuild, withdrawFromGuild, withdrawGoldFromGuild,
 } from './guildWarehouse';
@@ -80,8 +83,11 @@ export class World {
     (characterId, runKey) => this.sessionOf(characterId)?.game.getState().arenaRun?.runKey === runKey,
   );
 
-  constructor(guildStorage: GuildStorage = new MemoryGuildStorage()) {
+  readonly auction: AuctionManager;
+
+  constructor(guildStorage: GuildStorage = new MemoryGuildStorage(), auctionStorage: AuctionStorage = new MemoryAuctionStorage()) {
     this.guilds = new GuildManager(guildStorage);
+    this.auction = new AuctionManager(auctionStorage);
   }
 
   // ---------- 查詢 ----------
@@ -174,6 +180,7 @@ export class World {
     session.party.setState({ party: null, invites: [], teammates: [], onMap: [] });
     session.trade.setState({ trade: null, offers: [], message: null });
     session.guild.setState({ guild: null, invites: [], warehouse: null, message: null });
+    session.auction.getState().reset();
     this.guildSignature.delete(session);
     this.partySignature.delete(session);
     this.tradeSignature.delete(session);
@@ -791,6 +798,77 @@ export class World {
     }
   }
 
+  // ---------- 拍賣場（`57-auction.md`） ----------
+
+  /**
+   * 搜尋結果只在自己操作後刷新（§ 57.6）；成交時賣家在線就立即刷新信箱（§ 57.5）。
+   * 動到背包、倉庫、金幣的操作在 storage 落地後立刻 flush。
+   */
+  async handleAuctionAction(session: PlayerSession, name: string, args: unknown[]): Promise<PartyActionResult> {
+    const characterId = session.game.getState().character?.id;
+    if (!characterId) return { ok: false, message: '尚未進入世界' };
+    const now = Date.now();
+    const refresh = (s: PlayerSession) => {
+      const id = s.game.getState().character?.id;
+      const open = s.auction.getState().results;
+      if (!id || !open) return;
+      s.auction.setState({ results: this.auction.search(open.query), mine: this.auction.mine(id) });
+    };
+    try {
+      if (name !== 'close' && name !== 'clearMessage') this.requireAuctionTown(session);
+      switch (name) {
+        case 'open':
+          session.auction.setState({ results: this.auction.search(DEFAULT_AUCTION_QUERY), mine: this.auction.mine(characterId) });
+          return { ok: true };
+        case 'close':
+          session.auction.getState().reset();
+          return { ok: true };
+        case 'search':
+          session.auction.setState({ results: this.auction.search(parseAuctionQuery(args[0])) });
+          return { ok: true };
+        case 'list': {
+          const listing = await this.auction.list(session, args[0], now);
+          await session.game.getState().flushSaveNow();
+          refresh(session);
+          return { ok: true, message: `已上架 ${auctionListingName(listing)}（上架費 ${AUCTION_LISTING_FEE.toLocaleString()} 金幣）` };
+        }
+        case 'cancel':
+          await this.auction.cancel(session, args[0], now);
+          await session.mailbox.getState().refresh();
+          refresh(session);
+          return { ok: true, message: '已下架，物品已寄回信箱' };
+        case 'buy': {
+          const listing = await this.auction.buy(session, args[0], now);
+          await session.game.getState().flushSaveNow();
+          await session.mailbox.getState().refresh();
+          refresh(session);
+          const seller = this.sessionOf(listing.sellerCharacterId);
+          if (seller) {
+            await seller.mailbox.getState().refresh();
+            seller.game.getState().pushSystemLog(`拍賣場：${auctionListingName(listing)} 已售出，貨款已寄到信箱`);
+            refresh(seller);
+          }
+          return { ok: true, message: '購買成功，物品已寄到信箱' };
+        }
+        case 'clearMessage':
+          return { ok: true };
+        default:
+          return { ok: false, message: `未知的拍賣場操作 ${name}` };
+      }
+    } catch (e) {
+      if (e instanceof AuctionError) {
+        refresh(session);
+        return { ok: false, message: e.message };
+      }
+      throw e;
+    }
+  }
+
+  private requireAuctionTown(session: PlayerSession): void {
+    const region = session.game.getState().character?.currentRegion ?? '';
+    if (getRegion(region)?.type !== 'town') throw new AuctionError('not_in_town', '請到城鎮的拍賣場 NPC 操作');
+  }
+
   private requireTown(session: PlayerSession): void {
     const region = session.game.getState().character?.currentRegion ?? '';
     if (getRegion(region)?.type !== 'town') throw new GuildError('not_in_town', '請到城鎮的公會 NPC 操作');
@@ -799,6 +877,7 @@ export class World {
   /** 刪除角色（§ 11.6）：成員移出；盟主則公會解散並通知在線成員 */
   async onCharacterDeleted(characterId: number): Promise<void> {
     this.arena.forgetCharacter(characterId);
+    await this.auction.dropSeller(characterId);
     const { disbanded, left } = await this.guilds.removeCharacter(characterId);
     const guild = disbanded ?? left;
     if (!guild) return;

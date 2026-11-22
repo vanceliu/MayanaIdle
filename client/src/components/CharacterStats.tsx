@@ -199,7 +199,7 @@ export function CharacterStats() {
           <StatRow label="每次回血" value={hpRegen} tip={{ desc: '每 5 秒回復的 HP。', note: '戰鬥中減半' }} />
           <StatRow label="每次回魔" value={mpRegen} tip={{ desc: '每 6 秒回復的 MP。', note: '戰鬥中減半' }} />
           <StatRow label="補血效果" value={<>+{pct(healEffect)}%</>} tip={{ desc: '治癒技能的回復量加成。' }} />
-          <StatRow label="藥水效果" value={<>+{pct(potionEffect)}%</>} tip={{ desc: '藥水的回復量加成。' }} />
+          <StatRow label="補藥效果" value={<>+{pct(potionEffect)}%</>} tip={{ desc: '紅／橙／白色藥水的回復量加成。' }} />
         </div>
 
         <div className="stat-group">

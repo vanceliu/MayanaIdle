@@ -1,9 +1,15 @@
 /**
  * 系統信箱的發放與領取（`52-mailbox.md`）。
- * 首版做天賦格與補償，里程碑與道具／金幣型別不做（§ 52.0）。
+ * 天賦格、補償、拍賣場交付（道具／金幣／裝備）；里程碑不做（§ 52.0）。
  */
 import type { GameRepository } from '../db/repository';
-import { defaultSession } from '../stores/session';
+import type { Character } from '../models/character';
+import { defaultSession, type Session } from '../stores/session';
+import type { GameState } from '../stores/gameStore';
+import { getBagMaxSlots, getBagUsedSlots } from './bagCapacity';
+import { addBagItem, type BagItem } from '../models/bagItem';
+import type { EquipmentInstance } from '../models/equipment';
+import { resolveEquipment } from './templateSync';
 import {
   SLOT_GRANT_LEVEL_INTERVAL,
   emptyConditions,
@@ -100,6 +106,23 @@ export async function syncCompensations(
   return fresh.length;
 }
 
+/**
+ * 寄出離線金幣信（`04-character.md` § 4.12）。回傳是否新寄出。
+ * 寄信與結算基準（`lastSeenAt`、狩獵累計歸零）同一個交易；`sourceKey` 已存在則只更新基準。
+ */
+export async function sendOfflineGoldMail(
+  mail: Mail,
+  baseline: Pick<Character, 'lastSeenAt' | 'restedExpMs' | 'huntGold' | 'huntMs'>,
+  repo: GameRepository = defaultSession.repo,
+): Promise<boolean> {
+  const fresh = await withoutExistingKeys(mail.characterId, [mail], repo);
+  await repo.transaction(async () => {
+    if (fresh.length > 0) await repo.bulkAddMail(fresh);
+    await repo.updateCharacter(mail.characterId, baseline);
+  });
+  return fresh.length > 0;
+}
+
 export async function listMail(characterId: number, repo: GameRepository = defaultSession.repo): Promise<Mail[]> {
   const rows = await repo.listMail(characterId);
   // 未領取在上，其餘照發放時間新到舊
@@ -113,9 +136,39 @@ export function unclaimedCount(mails: Mail[]): number {
   return mails.filter(m => m.claimedAt === null).length;
 }
 
-/** 把一個發放項目變成實際資料。首版只處理天賦格（§ 52.0） */
-async function grantItem(characterId: number, item: MailItem, repo: GameRepository): Promise<void> {
-  if (item.type !== 'talent_slot') return;
+export type ClaimResult = 'claimed' | 'gone' | 'bag_full';
+
+export const MAIL_BAG_FULL_MESSAGE = '背包空間不足，清出空間後再領取';
+
+const CHARACTER_ITEM_TYPES: ReadonlySet<string> = new Set(['item', 'gold', 'equipment']);
+
+/** 道具、金幣、裝備要改角色身上的背包／金幣，必須由該角色的 session 領取 */
+function touchesCharacter(mail: Mail): boolean {
+  return mail.items.some(i => CHARACTER_ITEM_TYPES.has(i.type));
+}
+
+/** 整封領取後背包放不放得下（§ 52.4、`35-inventory-constraints.md` § 35.3）。印記等不佔格的照 `getBagUsedSlots` */
+export function mailFitsBag(state: Pick<GameState, 'bagItems' | 'inventory' | 'equippedGear'>, items: MailItem[]): boolean {
+  let bag: BagItem[] = state.bagItems;
+  let equipment = 0;
+  for (const item of items) {
+    if (item.type === 'item' && item.itemId !== undefined) bag = addBagItem(bag, item.itemId, item.amount ?? 0);
+    if (item.type === 'equipment') equipment++;
+  }
+  return getBagUsedSlots(bag, state.inventory, state.equippedGear) + equipment <= getBagMaxSlots(state.equippedGear);
+}
+
+/** 天賦格寫進持久層；裝備改回背包並回傳實例，由呼叫端放進角色狀態 */
+async function grantItem(characterId: number, item: MailItem, repo: GameRepository): Promise<EquipmentInstance | null> {
+  if (item.type === 'equipment') {
+    const instance = (await repo.listEquipmentByOwner(characterId))
+      .find(e => e.id === item.equipmentId && e.storageType === 'mail');
+    if (!instance) return null;
+    const changes = { inStorage: false, storageType: undefined, equipped: false };
+    await repo.updateEquipment(instance.id!, changes);
+    return { ...instance, ...changes };
+  }
+  if (item.type !== 'talent_slot') return null;
   const tier = (item.slotTier ?? 1) as TalentSlotTier;
   const slot: TalentSlot = {
     characterId,
@@ -129,19 +182,51 @@ async function grantItem(characterId: number, item: MailItem, repo: GameReposito
     action: null,
   };
   await repo.addTalentSlot(slot);
+  return null;
 }
 
-/** 領取一封信。已領過回 false。首版不做背包容量檢查（§ 52.0） */
-export async function claimMail(mailId: number, repo: GameRepository = defaultSession.repo): Promise<boolean> {
-  return await repo.transaction(async () => {
+/** 道具、金幣、裝備放進角色狀態 */
+function applyToCharacter(session: Session, items: MailItem[], equipment: EquipmentInstance[]): void {
+  const gs = session.game.getState();
+  let bag = gs.bagItems;
+  let gold = gs.character!.gold;
+  for (const item of items) {
+    if (item.type === 'item' && item.itemId !== undefined) bag = addBagItem(bag, item.itemId, item.amount ?? 0);
+    if (item.type === 'gold') gold += item.amount ?? 0;
+  }
+  session.game.setState({
+    bagItems: bag,
+    inventory: [...gs.inventory, ...equipment.map(resolveEquipment)],
+    character: { ...gs.character!, gold },
+  });
+}
+
+/** 領取一封信。背包放不下整封擋下，不部分領取（§ 52.4） */
+export async function claimMail(mailId: number, session: Session = defaultSession): Promise<ClaimResult> {
+  const repo = session.repo;
+  const outcome = await repo.transaction(async () => {
     const mail = await repo.getMail(mailId);
-    if (!mail || mail.claimedAt !== null) return false;
+    if (!mail || mail.claimedAt !== null) return { result: 'gone' as const };
+    const physical = touchesCharacter(mail);
+    if (physical) {
+      const gs = session.game.getState();
+      if (gs.character?.id !== mail.characterId) return { result: 'gone' as const };
+      if (!mailFitsBag(gs, mail.items)) return { result: 'bag_full' as const };
+    }
+    const equipment: EquipmentInstance[] = [];
     for (const item of mail.items) {
-      await grantItem(mail.characterId, item, repo);
+      const received = await grantItem(mail.characterId, item, repo);
+      if (received) equipment.push(received);
     }
     await repo.updateMail(mailId, { claimedAt: Date.now() });
-    return true;
+    return { result: 'claimed' as const, mail, physical, equipment };
   });
+  if (outcome.result !== 'claimed') return outcome.result;
+  if (outcome.physical) {
+    applyToCharacter(session, outcome.mail.items, outcome.equipment);
+    await session.game.getState().flushSaveNow();
+  }
+  return 'claimed';
 }
 
 /** 信是否屬於該角色（領取、刪除前的擁有權檢查） */
@@ -149,15 +234,18 @@ export async function isOwnMail(mailId: number, characterId: number, repo: GameR
   return (await repo.getMail(mailId))?.characterId === characterId;
 }
 
-/** 全部領取。回傳實際領到的封數 */
-export async function claimAll(characterId: number, repo: GameRepository = defaultSession.repo): Promise<number> {
-  const mails = await repo.listMail(characterId);
+/** 全部領取。放不下的那封跳過、其餘照領 */
+export async function claimAll(characterId: number, session: Session = defaultSession): Promise<{ claimed: number; blocked: number }> {
+  const mails = await session.repo.listMail(characterId);
   let claimed = 0;
+  let blocked = 0;
   for (const mail of mails) {
     if (mail.claimedAt !== null) continue;
-    if (await claimMail(mail.id!, repo)) claimed++;
+    const result = await claimMail(mail.id!, session);
+    if (result === 'claimed') claimed++;
+    if (result === 'bag_full') blocked++;
   }
-  return claimed;
+  return { claimed, blocked };
 }
 
 /** 換版清理（§ 52.7.1）：只刪已領取的。發放紀錄不動 */

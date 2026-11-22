@@ -14,6 +14,7 @@ import { createMailboxStore } from '../../client/src/stores/mailboxStore';
 import { createPartyStore } from '../../client/src/stores/partyStore';
 import { createTradeStore } from '../../client/src/stores/tradeStore';
 import { createGuildStore } from '../../client/src/stores/guildStore';
+import { createAuctionStore } from '../../client/src/stores/auctionStore';
 import { createCombatState, loadAreaTemplates, resetCombat } from '../../client/src/systems/combatLoop';
 import { attachInstance, createMapInstance } from '../../client/src/systems/mapInstance';
 import { getRegion, getFloor } from '../../client/src/models/mapData';
@@ -77,6 +78,7 @@ export function createPlayerSession(repo: GameRepository, remoteAddress: string,
   s.party = createPartyStore(s);
   s.trade = createTradeStore(s);
   s.guild = createGuildStore(s);
+  s.auction = createAuctionStore(s);
   attachInstance(s, createMapInstance(`private:${s.connectionId}`, s.mapMonster));
   return s;
 }

@@ -1076,7 +1076,7 @@ function printDetail(row: Row): void {
   const bonuses = getCombatBonuses(gear, setup.effects, setup.character);
   const def = getEffectiveDefense(gear, setup.effects, bonuses.defense);
   console.log(`    - 實際防禦 ${def}（物理減傷 ${Math.min(def, 75)}%）、迴避率 ${fmt(getPlayerDodgeRate(setup.character, gear, setup.effects))}%`
-    + `、藥水效果 +${fmt(bonuses.potion_effect ?? 0)}%、戰前 buff：${setup.effects.map(e => e.name).join('、') || '無'}`);
+    + `、補藥效果 +${fmt(bonuses.potion_effect ?? 0)}%、戰前 buff：${setup.effects.map(e => e.name).join('、') || '無'}`);
   for (const sk of setup.skills.filter(x => x.type === 'heal')) {
     const scaled = healPower(sk);
     const before = calculateHealAmount(setup.character, sk.power, gear, setup.effects);

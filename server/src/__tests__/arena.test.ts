@@ -87,6 +87,19 @@ describe('ArenaRegistry 進場', () => {
     expect(gs(a).arenaRun).toBeNull();
   });
 
+  it('材料取自背包＋個人倉庫＋帳號倉庫：先扣背包，再個人、再帳號（§ 55.1）', async () => {
+    const a = await player('A');
+    a.game.setState({
+      bagItems: addBagItem([], T5_MATERIALS[1], 1),
+      personalStoredMaterials: addBagItem(addBagItem([], T5_MATERIALS[2], 1), T5_MATERIALS[0], 1),
+      storedMaterials: addBagItem([], T5_MATERIALS[0], 9),
+    });
+    expect(registry.enter([a], a, 5, NOW)).toEqual({ ok: true });
+    expect(gs(a).bagItems.filter(i => T5_MATERIALS.includes(i.itemId))).toEqual([]);
+    expect(gs(a).personalStoredMaterials).toEqual([]);
+    expect(getBagItemAmount(gs(a).storedMaterials, T5_MATERIALS[0])).toBe(9 - 2);
+  });
+
   it('組隊：隊長付一次費用，全員同一場次', async () => {
     const a = await player('A');
     const b = await player('B');

@@ -17,6 +17,8 @@ import { getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { defaultSession, type Session } from '../stores/session';
 import { calculatePressure, partyMaxMonsters } from './pressure';
 import { drainRestedExp } from './restedExp';
+import { addHuntTime, isHunting } from './offlineGold';
+import { getRegion } from '../models/mapData';
 import { findPath, findAttackPosition, canMoveBetween } from './pathfinding';
 import { hasLineOfSight, isWithinAttackRange } from './lineOfSight';
 import { gameNow, advanceMs, TICK_MS } from '../core/clock';
@@ -65,9 +67,12 @@ export function tickPlayerPre(deltaMs: number, session: Session): void {
   // === 回鍋加倍存量：以實時扣減，並持續更新離線基準（`04-character.md` § 4.11）===
   // 每幀寫一次會讓整棵訂閱 character 的 UI 每幀重繪，所以累積到 RESTED_TICK_MS 才落一次。
   loop.restedTickTimer += deltaMs;
+  // 狩獵時長（`04-character.md` § 4.12）隨同一週期落帳
+  if (isHunting(getRegion(gameState.character.currentRegion)?.type, gameState.searchMode)) loop.huntPendingMs += deltaMs;
   if (loop.restedTickTimer >= RESTED_TICK_MS) {
-    const drained = drainRestedExp(gameState.character, loop.restedTickTimer, Date.now());
+    const drained = addHuntTime(drainRestedExp(gameState.character, loop.restedTickTimer, Date.now()), loop.huntPendingMs);
     loop.restedTickTimer = 0;
+    loop.huntPendingMs = 0;
     if (drained !== gameState.character) session.game.setState({ character: drained });
   }
 
