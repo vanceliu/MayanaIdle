@@ -9,9 +9,11 @@
  */
 import {
   SLOT_DROP_RATE_BOSS,
+  SLOT_DROP_RATE_UNIQUE,
   slotTierBandFor,
   type TalentSlotTier,
 } from '../models/talent';
+import type { MonsterRank } from '../models/monster';
 import { DROP_ROLL_MAX } from './drops';
 import { random } from '../core/rng';
 
@@ -27,18 +29,25 @@ function hits(percent: number, multiplier: number, rng: Rng): boolean {
   return rng() * DROP_ROLL_MAX < boosted;
 }
 
+const SLOT_DROP_RATE: Record<MonsterRank, number> = {
+  normal: 0,
+  unique: SLOT_DROP_RATE_UNIQUE,
+  boss: SLOT_DROP_RATE_BOSS,
+};
+
 /**
- * 抽天賦格。**只有 Boss 會掉，一般怪不掉**（§ 51.6.1）。
+ * 抽天賦格。**只有 Boss 與獨特魔物會掉，一般怪不掉**（`27-drop-table.md` § 27.9）。
  * 回傳 null ＝ 這次沒掉。T1 格不掉落，只從等級來。
  */
 export function rollTalentSlotDrop(
   areaLevel: number,
-  isBoss: boolean,
+  rank: MonsterRank,
   dropRateMultiplier = 1,
   rng: Rng = defaultRng,
 ): TalentSlotTier | null {
-  if (!isBoss) return null;
-  if (!hits(SLOT_DROP_RATE_BOSS, dropRateMultiplier, rng)) return null;
+  const rate = SLOT_DROP_RATE[rank];
+  if (rate <= 0) return null;
+  if (!hits(rate, dropRateMultiplier, rng)) return null;
 
   const band = slotTierBandFor(areaLevel);
   const span = band.max - band.min + 1;

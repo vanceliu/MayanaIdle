@@ -211,6 +211,8 @@ export interface SigilContext {
   isStarterGear?: boolean;
   /** 鐵匠製作品（實例 `isCraftedGear`）—— 一律不可使用印記（§ 46.9） */
   isCraftedGear?: boolean;
+  /** 獨特製作品（實例 `isUniqueCraftedGear`）—— 一律不可使用印記（§ 46.9） */
+  isUniqueCraftedGear?: boolean;
   /** 競技場擬態品（`55-arena.md` § 55.9）—— 一律不可使用印記 */
   isMimicGear?: boolean;
   /** 實例可用的詞綴洞數（`07-affix.md` § 7.1），未設＝4 */
@@ -224,6 +226,7 @@ export function legacyAffixReason(category: AffixCategory): string {
 
 /** 製作品不受理印記時顯示的原因 */
 export const CRAFTED_GEAR_SIGIL_REASON = '(鍛) 製作品不可使用任何印記';
+export const UNIQUE_CRAFTED_GEAR_SIGIL_REASON = '(獨) 製作品不可使用任何印記';
 export const MIMIC_GEAR_SIGIL_REASON = '(擬) 擬態品不可使用任何印記';
 
 export interface SigilCheck {
@@ -257,10 +260,11 @@ export function canUseSigil(
   type: SigilType,
   affixes: Affix[] | undefined,
   affixIndex: number | undefined,
-  ctx: Pick<SigilContext, 'category' | 'isStarterGear' | 'isCraftedGear' | 'isMimicGear' | 'maxAffixTier' | 'quality' | 'affixSlots'>,
+  ctx: Pick<SigilContext, 'category' | 'isStarterGear' | 'isCraftedGear' | 'isUniqueCraftedGear' | 'isMimicGear' | 'maxAffixTier' | 'quality' | 'affixSlots'>,
 ): SigilCheck {
   if (ctx.isStarterGear) return { ok: false, reason: '新手裝沒有詞綴，無法使用印記' };
   if (ctx.isCraftedGear) return { ok: false, reason: CRAFTED_GEAR_SIGIL_REASON };
+  if (ctx.isUniqueCraftedGear) return { ok: false, reason: UNIQUE_CRAFTED_GEAR_SIGIL_REASON };
   if (ctx.isMimicGear) return { ok: false, reason: MIMIC_GEAR_SIGIL_REASON };
 
   // § 46.11 新增印記看的是空洞，不看既有詞綴

@@ -22,11 +22,11 @@ export const ABILITY_CRYSTAL_COST_PER_TIER = 500_000;
 /** 位置的儲存精度（小數位數） */
 const POSITION_DIGITS = 4;
 
-type CrystalSource = { ability?: Ability; isCraftedGear?: boolean; maxAffixTier?: number };
+type CrystalSource = { ability?: Ability; isCraftedGear?: boolean; isUniqueCraftedGear?: boolean; maxAffixTier?: number };
 
-/** 可拆出結晶：帶技能的掉落品（非製作品、非商店裝） */
+/** 可拆出結晶：帶技能的掉落品（非製作品 (鍛)／(獨)、非商店裝） */
 export function yieldsAbilityCrystal(item: CrystalSource): boolean {
-  return !!item.ability && !item.isCraftedGear && item.maxAffixTier === undefined;
+  return !!item.ability && !item.isCraftedGear && !item.isUniqueCraftedGear && item.maxAffixTier === undefined;
 }
 
 function stepsOf(def: AbilityParamDef, template: AbilityTemplate): { min: number; max: number; step: number; steps: number } {
@@ -114,12 +114,13 @@ export function crystalToAbility(crystal: AbilityCrystal, template: AbilityTempl
 export type CrystalApplyBlock =
   | 'notAbilitySlot'
   | 'crafted'
+  | 'uniqueCrafted'
   | 'mimic'
   | 'equipped'
   | 'wrongGroup'
   | 'classCannotEquip';
 
-type CrystalTarget = { equipped?: boolean; isCraftedGear?: boolean; isMimicGear?: boolean };
+type CrystalTarget = { equipped?: boolean; isCraftedGear?: boolean; isUniqueCraftedGear?: boolean; isMimicGear?: boolean };
 
 const SLOT_GROUP: Readonly<Record<string, 'weapon' | 'accessory'>> = {
   rightHand: 'weapon', necklace: 'accessory', ring1: 'accessory', ring2: 'accessory',
@@ -131,6 +132,7 @@ export function getCrystalApplyBlock(
 ): CrystalApplyBlock | null {
   if (!isAbilitySlot(template)) return 'notAbilitySlot';
   if (target.isCraftedGear) return 'crafted';
+  if (target.isUniqueCraftedGear) return 'uniqueCrafted';
   if (target.isMimicGear) return 'mimic';
   if (target.equipped) return 'equipped';
   const def = getAbilityDefinition(crystal.type);
@@ -145,6 +147,7 @@ export function getCrystalApplyBlock(
 export const CRYSTAL_APPLY_BLOCK_TEXT: Readonly<Record<CrystalApplyBlock, string>> = {
   notAbilitySlot: '只能套用到 T3 以上的武器、項鍊、戒指',
   crafted: '製作品不能套用',
+  uniqueCrafted: '獨特製作品不能套用',
   mimic: '擬態品不能套用',
   equipped: '身上的裝備不能套用',
   wrongGroup: '武器技能只能套用到武器，飾品技能只能套用到項鍊或戒指',

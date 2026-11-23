@@ -1,11 +1,11 @@
 /**
  * 武器 seed 產生器 —— 依 `src/db/seed/weaponSeedSpec.ts` 的規格重寫 `equipmentSeeds.ts` 的武器區塊。
  *
- * 規格（件數、走向、職業上限、素質錨點）改在 `weaponSeedSpec.ts`；`buyPrice` 與 `craftMaterials` 依名稱沿用 seed。
+ * 規格（件數、走向、職業上限、素質錨點）改在 `weaponSeedSpec.ts`；`buyPrice`、`craftMaterials`、`uniqueCraftMaterials` 依名稱沿用 seed。
  * 盾牌／魔導書／臂甲是防具，不經本腳本。
  *
  * 流程：改規格 → 跑本腳本 → 有新武器時跑 `repriceShopGear.mts --write`（T2／T3 售價）、
- * 為新製作品補 `craftMaterials` → 跑 `generateWeaponDocs.mts` → 跑 TTK 驗收。
+ * 為新製作品補 `craftMaterials`（`assignCraftMaterials.mts`）與 `uniqueCraftMaterials`（`assignUniqueCraftMaterials.mts`）→ 跑 `generateWeaponDocs.mts` → 跑 TTK 驗收。
  *
  * 用法：cd client && npx vite-node scripts/generateWeaponSeeds.mts --write
  */

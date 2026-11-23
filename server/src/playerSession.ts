@@ -18,6 +18,8 @@ import { createAuctionStore } from '../../client/src/stores/auctionStore';
 import { createCombatState, loadAreaTemplates, resetCombat } from '../../client/src/systems/combatLoop';
 import { attachInstance, createMapInstance } from '../../client/src/systems/mapInstance';
 import { getRegion, getFloor } from '../../client/src/models/mapData';
+import { getMonsterTemplates } from '../../client/src/models/monsterTemplates';
+import { hasRandomUnique } from '../../client/src/systems/uniqueSpawn';
 import type { GameRepository } from '../../client/src/db/repository';
 import type { ServerMessage } from '../../client/src/net/protocol';
 import { createSyncState, resetSync, type SyncState } from './sync';
@@ -128,6 +130,7 @@ export async function syncWorld(session: PlayerSession): Promise<void> {
       const monsters = await session.repo.listMonsterTemplates(areaId);
       session.mapMonster.getState().setHasBossInPool(monsters.some(m => m.isBoss));
     }
+    session.mapMonster.getState().setHasRandomUniqueInPool(hasRandomUnique(getMonsterTemplates(areaId)));
     loadAreaTemplates(areaId, session);
 
     session.loadedWorldKey = key;

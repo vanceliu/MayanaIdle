@@ -3,7 +3,7 @@ import { MONSTER_SEEDS } from '../db/seed';
 import { random } from '../core/rng';
 
 function getMonstersByArea(areaId: string): string[] {
-  return MONSTER_SEEDS.filter(m => m.area === areaId && !m.isBoss).map(m => m.name);
+  return MONSTER_SEEDS.filter(m => m.area === areaId && !m.isBoss && !m.isUnique).map(m => m.name);
 }
 
 export type QuestType = 'errand' | 'collect';

@@ -1,7 +1,7 @@
 import type { TalentRuleDef, TalentSlotEntry, TalentType } from '../../models/talent';
 
 /**
- * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 93 筆，**全部內建**。
+ * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 94 筆，**全部內建**。
  *
  * **`ruleId` 是唯一的鍵**（§ 99.1 第 3、7 條）：天賦格存的就是它，不可用名稱查。
  * 能力階梯塌成完整版之後 `ruleId` 不再重複（§ 51.4.1）——
@@ -51,7 +51,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   // 三類型共用：不同區域回不同城，補給也用得到
   { ruleId: 'current_area_is', kind: 'condition', appliesTo: ['combat', 'persistent', 'supply'], group: 'location' },
 
-  // === 戰鬥專屬條件：24 筆 ===
+  // === 戰鬥專屬條件：25 筆 ===
   { ruleId: 'monster_hp_below', kind: 'condition', appliesTo: COMBAT, group: 'target_hp' },
   { ruleId: 'monster_hp_above', kind: 'condition', appliesTo: COMBAT, group: 'target_hp' },
   { ruleId: 'target_attack_type', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
@@ -59,6 +59,7 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'target_element', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
   { ruleId: 'target_size', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
   { ruleId: 'target_is_boss', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
+  { ruleId: 'target_is_unique', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
   { ruleId: 'target_defense', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
   { ruleId: 'target_level_diff', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },
   { ruleId: 'target_range_gt', kind: 'condition', appliesTo: COMBAT, group: 'target_identity' },

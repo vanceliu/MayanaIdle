@@ -1,6 +1,6 @@
 import '../components/WikiTable.css';
 import {
-  getBountyPrice, BOUNTY_BOSS_KILLS, BOUNTY_MONSTER_KILLS, BOUNTY_REFRESH_HOURS, MAX_SIGNED_BOUNTIES,
+  getBountyPrice, BOUNTY_BOSS_KILLS, BOUNTY_BOSS_SLOTS, BOUNTY_MONSTER_KILLS, BOUNTY_MONSTER_SLOTS, BOUNTY_REFRESH_HOURS, MAX_SIGNED_BOUNTIES,
 } from '../../models/bounty';
 import { BOUNTY_COMPARE_CRITERIA, BOUNTY_COMPARE_LABELS } from '../../models/bountyCompare';
 import {
@@ -367,7 +367,7 @@ export function QuestsPage() {
         <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-sm)', lineHeight: 2 }}>
             付金幣簽約，契約期間指定對象生成時<strong>保證至少 1 個強化詞綴</strong>，掉落、金幣、經驗跟著詞綴數提高。打滿擊殺數即結束，沒有完成獎勵。<br />
-            每個分部 5 張：普通怪 4 張（指定區域的一種怪物，{BOUNTY_MONSTER_KILLS.min}～{BOUNTY_MONSTER_KILLS.max} 隻）、Boss 1 張（{BOUNTY_BOSS_KILLS.min}～{BOUNTY_BOSS_KILLS.max} 隻）。
+            每個分部 {BOUNTY_MONSTER_SLOTS + BOUNTY_BOSS_SLOTS} 張：普通怪 {BOUNTY_MONSTER_SLOTS} 張（指定區域的一種怪物，{BOUNTY_MONSTER_KILLS.min}～{BOUNTY_MONSTER_KILLS.max} 隻）、Boss {BOUNTY_BOSS_SLOTS} 張（Boss 或獨特魔物，{BOUNTY_BOSS_KILLS.min}～{BOUNTY_BOSS_KILLS.max} 隻）。
             每天台灣時間（UTC+8）{BOUNTY_REFRESH_HOURS.map(h => `${h}`).join('／')} 點換新清單，簽走的格子留空到下次更新。<br />
             同時最多 {MAX_SIGNED_BOUNTIES} 張，相同對象不能同時簽兩張；可隨時放棄，不退款。組隊期間契約暫停。<br />
             加購「掉兩次取比較好」：契約對象的掉落每項擲兩次、任一次中就掉（第二次不吃 Pressure），金幣取較高的那次；

@@ -71,12 +71,21 @@ describe('掉兩次取比較好', () => {
     expect(result.items[0].equipmentInstance).toBe(second);
   });
 
+  it('獨特魔物掉落表同樣套用：第一次沒中、第二次中就掉', async () => {
+    await db.bossDropTables.bulkAdd([{ bossName: '測試獨特', itemType: 'item', itemTemplateId: 147, dropValue: 10 }] as never);
+    sequence([0.5, 0.005]);
+    expect((await rollBossDrops('測試獨特', 1, 35, NO_BONUS, undefined, undefined, undefined, 'unique')).items).toHaveLength(0);
+    sequence([0.5, 0.005]);
+    const result = await rollBossDrops('測試獨特', 1, 35, NO_BONUS, undefined, pickFirst, undefined, 'unique');
+    expect(result.items.map(i => i.itemTemplateId)).toContain(147);
+  });
+
   it('職業技能書：每級第二次判定', () => {
     // 區域 Lv.35 只有 3 級書；Boss 基礎 5%：第一次 0.5 沒中、第二次 0.01 中，接著抽書
     sequence([0.5, 0.01, 0]);
-    expect(rollClassSkillBookDrops(35, true, 1, 1)).toHaveLength(1);
+    expect(rollClassSkillBookDrops(35, 'boss', 1, 1)).toHaveLength(1);
     sequence([0.5, 0.01, 0]);
-    expect(rollClassSkillBookDrops(35, true, 1)).toHaveLength(0);
+    expect(rollClassSkillBookDrops(35, 'boss', 1)).toHaveLength(0);
   });
 });
 

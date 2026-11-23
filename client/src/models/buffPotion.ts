@@ -16,7 +16,7 @@ export interface BuffPotionConfig {
 
 export const BUFF_POTION_DURATION_MS = 300_000;
 
-/** 所有 Boss 共通掉落，每種各自判定（`27-drop-table.md` § 27.6） */
+/** 所有 Boss、獨特魔物共通掉落，每種各自判定（`27-drop-table.md` § 27.6、§ 27.10） */
 export const BUFF_POTION_BOSS_DROP_VALUE = 30;
 
 export const BUFF_POTION_CONFIG: Record<BuffPotionType, BuffPotionConfig> = {

@@ -25,11 +25,11 @@ describe('天賦格掉落（`27-drop-table.md` § 27.9）', () => {
 
   describe('掉落判定（§ 51.6.1）', () => {
     it('一般怪不掉，運氣再好也不掉', () => {
-      expect(rollTalentSlotDrop(99, false, 1, seq(0))).toBeNull();
+      expect(rollTalentSlotDrop(99, 'normal', 1, seq(0))).toBeNull();
     });
 
     it('Boss 命中時掉出該區間內的 tier', () => {
-      const tier = rollTalentSlotDrop(50, true, 1, seq(0, 0));
+      const tier = rollTalentSlotDrop(50, 'boss', 1, seq(0, 0));
       expect(tier).not.toBeNull();
       const band = slotTierBandFor(50);
       expect(tier!).toBeGreaterThanOrEqual(band.min);
@@ -38,15 +38,15 @@ describe('天賦格掉落（`27-drop-table.md` § 27.9）', () => {
 
     it('掉率 1%，一般 roll 不會中', () => {
       expect(SLOT_DROP_RATE_BOSS).toBe(1);
-      expect(rollTalentSlotDrop(99, true, 1, seq(0.5))).toBeNull();
+      expect(rollTalentSlotDrop(99, 'boss', 1, seq(0.5))).toBeNull();
     });
 
     it('掉率加成會放大命中機會', () => {
       // 1% → 掉落值 10；基數 1000，所以 rng 要小於 0.01
-      expect(rollTalentSlotDrop(99, true, 1, seq(0.005, 0))).not.toBeNull();
-      expect(rollTalentSlotDrop(99, true, 1, seq(0.015, 0))).toBeNull();
+      expect(rollTalentSlotDrop(99, 'boss', 1, seq(0.005, 0))).not.toBeNull();
+      expect(rollTalentSlotDrop(99, 'boss', 1, seq(0.015, 0))).toBeNull();
       // 加成 ×10 之後同一個 roll 就中得了
-      expect(rollTalentSlotDrop(99, true, 10, seq(0.015, 0))).not.toBeNull();
+      expect(rollTalentSlotDrop(99, 'boss', 10, seq(0.015, 0))).not.toBeNull();
     });
   });
 });

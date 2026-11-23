@@ -33,8 +33,9 @@ describe('圖集', () => {
 });
 
 describe('monsterArtKey', () => {
-  it('所有怪物模板都有素材（同名與殘影共用）', () => {
-    expect(MONSTER_SEEDS.filter(t => monsterArtKey(t.id ?? -1) === null).map(t => `${t.id} ${t.name}`)).toEqual([]);
+  // 獨特魔物美術待定，無素材時畫球（`25-monster-system.md` § 25.13.1）
+  it('所有非獨特魔物的怪物模板都有素材（同名與殘影共用）', () => {
+    expect(MONSTER_SEEDS.filter(t => !t.isUnique && monsterArtKey(t.id ?? -1) === null).map(t => `${t.id} ${t.name}`)).toEqual([]);
   });
 
   it('殘影系列用原版素材', () => {

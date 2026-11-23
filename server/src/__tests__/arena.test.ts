@@ -7,14 +7,13 @@ import { defaultSession } from '../../../client/src/stores/session';
 import { createPlayerSession, syncWorld, type PlayerSession } from '../playerSession';
 import { World } from '../world';
 import { leaveArenaRun } from '../../../client/src/systems/arenaRun';
-import { ARENA_REGION_ID, arenaGoldCost, arenaSlotStart, getArenaTier, arenaMaterialIds } from '../../../client/src/models/arena';
-import { addBagItem, getBagItemAmount } from '../../../client/src/models/bagItem';
+import { ARENA_REGION_ID, arenaGoldCost, arenaSlotStart } from '../../../client/src/models/arena';
+import { addBagItem } from '../../../client/src/models/bagItem';
 import type { ArenaExitRecord } from '../../../client/src/systems/arenaRun';
 import type { DatabaseSync } from 'node:sqlite';
 
 /** 競技場進場與作廢（`55-arena.md` § 55.1／§ 55.4／§ 55.6） */
 const NOW = new Date(2026, 10, 13, 10, 30).getTime();
-const T5_MATERIALS = arenaMaterialIds(getArenaTier(5)!);
 
 let repo: SqliteRepository;
 let db: DatabaseSync;
@@ -26,7 +25,7 @@ async function player(name: string, level = 55): Promise<PlayerSession> {
   const ch = s.game.getState().character!;
   s.game.setState({
     character: { ...ch, level, gold: 1_000_000, currentRegion: 'elsarth-town', currentArea: 'elsarth-town', currentFloor: null },
-    bagItems: addBagItem(addBagItem([], T5_MATERIALS[0], 3), T5_MATERIALS[1], 4),
+    warehouseGold: 0,
   });
   return s;
 }
@@ -59,11 +58,12 @@ describe('ArenaRegistry 進場', () => {
     expect(registry.enter([b], b, 5, NOW).message).toBe('B 不在城鎮');
   });
 
-  it('票券場：扣金幣與 5 個材料、記時段、傳送進場', async () => {
+  it('票券場：只扣金幣、記時段、傳送進場', async () => {
     const a = await player('A');
+    const bag = gs(a).bagItems;
     expect(registry.enter([a], a, 5, NOW)).toEqual({ ok: true });
     expect(gs(a).character!.gold).toBe(1_000_000 - arenaGoldCost(5));
-    expect(getBagItemAmount(gs(a).bagItems, T5_MATERIALS[0]) + getBagItemAmount(gs(a).bagItems, T5_MATERIALS[1])).toBe(2);
+    expect(gs(a).bagItems).toEqual(bag);
     expect(gs(a).arenaRun).toMatchObject({ tier: 5, ticketRun: true, returnRegion: 'elsarth-town', slotStart: arenaSlotStart(NOW) });
     expect(gs(a).arenaSlots).toEqual({ slotStart: arenaSlotStart(NOW), tiers: [5] });
     expect(gs(a).character!.currentRegion).toBe(ARENA_REGION_ID);
@@ -72,32 +72,45 @@ describe('ArenaRegistry 進場', () => {
   it('同時段第二次進場不收費、不給票券', async () => {
     const a = await player('A');
     registry.enter([a], a, 5, NOW);
-    a.game.setState({ arenaRun: null, character: { ...gs(a).character!, currentRegion: 'elsarth-town' } });
-    const gold = gs(a).character!.gold;
+    a.game.setState({ arenaRun: null, character: { ...gs(a).character!, gold: 0, currentRegion: 'elsarth-town' } });
     expect(registry.enter([a], a, 5, NOW + 60_000).ok).toBe(true);
-    expect(gs(a).character!.gold).toBe(gold);
+    expect(gs(a).character!.gold).toBe(0);
     expect(gs(a).arenaRun!.ticketRun).toBe(false);
   });
 
-  it('材料不足不進場、不扣費', async () => {
+  it('身上與帳號倉庫金幣合計：先扣身上，不足再扣帳號倉庫（§ 55.1）', async () => {
     const a = await player('A');
-    a.game.setState({ bagItems: addBagItem([], T5_MATERIALS[0], 4) });
-    expect(registry.enter([a], a, 5, NOW).message).toBe('入場材料不足');
-    expect(gs(a).character!.gold).toBe(1_000_000);
-    expect(gs(a).arenaRun).toBeNull();
+    a.game.setState({ character: { ...gs(a).character!, gold: 40_000 }, warehouseGold: 200_000 });
+    expect(registry.enter([a], a, 5, NOW)).toEqual({ ok: true });
+    expect(gs(a).character!.gold).toBe(0);
+    expect(gs(a).warehouseGold).toBe(200_000 - (arenaGoldCost(5) - 40_000));
   });
 
-  it('材料取自背包＋個人倉庫＋帳號倉庫：先扣背包，再個人、再帳號（§ 55.1）', async () => {
+  it('身上金幣足夠時不動帳號倉庫', async () => {
     const a = await player('A');
-    a.game.setState({
-      bagItems: addBagItem([], T5_MATERIALS[1], 1),
-      personalStoredMaterials: addBagItem(addBagItem([], T5_MATERIALS[2], 1), T5_MATERIALS[0], 1),
-      storedMaterials: addBagItem([], T5_MATERIALS[0], 9),
-    });
-    expect(registry.enter([a], a, 5, NOW)).toEqual({ ok: true });
-    expect(gs(a).bagItems.filter(i => T5_MATERIALS.includes(i.itemId))).toEqual([]);
-    expect(gs(a).personalStoredMaterials).toEqual([]);
-    expect(getBagItemAmount(gs(a).storedMaterials, T5_MATERIALS[0])).toBe(9 - 2);
+    a.game.setState({ warehouseGold: 500_000 });
+    expect(registry.enter([a], a, 5, NOW).ok).toBe(true);
+    expect(gs(a).character!.gold).toBe(1_000_000 - arenaGoldCost(5));
+    expect(gs(a).warehouseGold).toBe(500_000);
+  });
+
+  it('扣款寫入資料庫：身上金幣與帳號倉庫金幣', async () => {
+    const a = await player('A');
+    a.game.setState({ character: { ...gs(a).character!, gold: 50_000 }, warehouseGold: 150_000 });
+    expect(registry.enter([a], a, 5, NOW).ok).toBe(true);
+    await gs(a).flushSaveNow();
+    expect(await repo.getWarehouseGold(1)).toBe(50_000);
+    expect((await repo.getCharacter(gs(a).character!.id!))?.gold).toBe(0);
+  });
+
+  it('合計不足不進場、不扣費', async () => {
+    const a = await player('A');
+    a.game.setState({ character: { ...gs(a).character!, gold: 100_000 }, warehouseGold: arenaGoldCost(5) - 100_001 });
+    expect(registry.enter([a], a, 5, NOW).message).toBe('金幣不足（身上與帳號倉庫合計）');
+    expect(gs(a).character!.gold).toBe(100_000);
+    expect(gs(a).warehouseGold).toBe(arenaGoldCost(5) - 100_001);
+    expect(gs(a).arenaRun).toBeNull();
+    expect(gs(a).arenaSlots.tiers).toEqual([]);
   });
 
   it('組隊：隊長付一次費用，全員同一場次', async () => {
@@ -107,6 +120,36 @@ describe('ArenaRegistry 進場', () => {
     expect(gs(a).character!.gold).toBe(1_000_000 - arenaGoldCost(5));
     expect(gs(b).character!.gold).toBe(1_000_000);
     expect(gs(b).arenaRun!.runKey).toBe(gs(a).arenaRun!.runKey);
+    expect(gs(b).arenaRun!.ticketRun).toBe(true);
+  });
+
+  it('組隊：隊長的金幣不足時全隊不能進場，不看隊員的金幣', async () => {
+    const a = await player('A');
+    const b = await player('B');
+    a.game.setState({ character: { ...gs(a).character!, gold: 0 }, warehouseGold: 0 });
+    expect(registry.enter([a, b], a, 5, NOW).message).toBe('金幣不足（身上與帳號倉庫合計）');
+    expect(gs(b).character!.gold).toBe(1_000_000);
+    expect(gs(b).arenaRun).toBeNull();
+  });
+
+  it('組隊：全員都已用掉該時段該段位時不收費', async () => {
+    const a = await player('A');
+    const b = await player('B');
+    const used = { slotStart: arenaSlotStart(NOW), tiers: [5 as const] };
+    a.game.setState({ arenaSlots: used, character: { ...gs(a).character!, gold: 0 } });
+    b.game.setState({ arenaSlots: used });
+    expect(registry.enter([a, b], a, 5, NOW).ok).toBe(true);
+    expect(gs(a).arenaRun!.ticketRun).toBe(false);
+    expect(gs(b).arenaRun!.ticketRun).toBe(false);
+  });
+
+  it('組隊：隊長已用掉、隊員未用掉時隊長仍付費，隊長不得票券', async () => {
+    const a = await player('A');
+    const b = await player('B');
+    a.game.setState({ arenaSlots: { slotStart: arenaSlotStart(NOW), tiers: [5] } });
+    expect(registry.enter([a, b], a, 5, NOW).ok).toBe(true);
+    expect(gs(a).character!.gold).toBe(1_000_000 - arenaGoldCost(5));
+    expect(gs(a).arenaRun!.ticketRun).toBe(false);
     expect(gs(b).arenaRun!.ticketRun).toBe(true);
   });
 
@@ -345,7 +388,6 @@ describe('ArenaRegistry 清理', () => {
     new ArenaRegistry(() => {}).clearStale(a);
     expect(gs(a).arenaRun).toBeNull();
     expect(gs(a).arenaSlots.tiers).toEqual([]);
-    a.game.setState({ bagItems: addBagItem(gs(a).bagItems, T5_MATERIALS[0], 5) });
     expect(new ArenaRegistry(() => {}).enter([a], a, 5, NOW).ok).toBe(true);
   });
 

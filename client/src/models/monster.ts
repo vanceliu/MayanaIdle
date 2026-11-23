@@ -42,6 +42,17 @@ export function isRangedAttackType(type: MonsterAttackType | undefined): boolean
   return type === 'ranged' || type === 'magic';
 }
 
+/** 獨特魔物出現方式（`26-spawn-pressure.md` § 26.4.1） */
+export type UniqueSpawnMode = 'random' | 'every10min' | 'halfHourGroup';
+
+/** 怪物類別：掉落、技能書、天賦格等依此分流（`25-monster-system.md` § 25.13） */
+export type MonsterRank = 'normal' | 'unique' | 'boss';
+
+export function monsterRank(m: { isBoss: boolean; isUnique?: boolean }): MonsterRank {
+  if (m.isBoss) return 'boss';
+  return m.isUnique ? 'unique' : 'normal';
+}
+
 /**
  * 怪物 debuff 能力（docs/design/25-monster-system.md § 25.8）
  * chance 為百分比基礎觸發率，依陣列順序判定、命中即停（§ 25.9.2 規則 1、2）
@@ -65,6 +76,12 @@ export interface MonsterTemplate {
   element: ElementType;
   area: string;
   isBoss: boolean;
+  /** 獨特魔物（`25-monster-system.md` § 25.13）；為 true 時 `isBoss` 為 false */
+  isUnique?: boolean;
+  /** 獨特魔物的出現方式；只填獨特魔物 */
+  spawnMode?: UniqueSpawnMode;
+  /** 地圖組 id，同組共用定時判定與名單；`every10min`／`halfHourGroup` 必填 */
+  spawnGroup?: string;
   attackType?: MonsterAttackType;
   /** 遠程怪出手演的武器（`48-vfx.md` § 48.6.5），未填＝`ranged` 弓、`magic` 雙手杖 */
   rangedWeapon?: MonsterRangedWeapon;
@@ -88,13 +105,15 @@ export interface MonsterInstance {
   size: MonsterSize;
   element: ElementType;
   isBoss: boolean;
+  /** 獨特魔物（`25-monster-system.md` § 25.13） */
+  isUnique?: boolean;
   attackType: MonsterAttackType;
   rangedWeapon?: MonsterRangedWeapon;
   attackRange: number;
   attackInterval: number;
   projectileSpeed?: number;
   debuffs?: MonsterDebuffAbility[];
-  /** § 24.6 Boss 控場免疫：被控場後 10 秒內免疫任何控場效果（時間戳 ms） */
+  /** § 24.6 Boss／獨特魔物控場免疫：被控場後 10 秒內免疫任何控場效果（時間戳 ms） */
   ccImmuneUntil?: number;
   /** 強化詞綴（`25-monster-system.md` § 25.12），依詞綴表順序 */
   affixes?: MonsterAffixId[];

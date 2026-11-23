@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react';
 import { useWeaponList, useArmorList, getWikiEquipmentPath, getEquipmentById } from '../hooks/useWikiData';
 import { Link } from 'react-router-dom';
 import { getItemById } from '../../models/items';
-import { CRAFTED_GEAR_SUFFIX, MIMIC_GEAR_SUFFIX } from '../../models/equipment';
+import { CRAFTED_GEAR_SUFFIX, MIMIC_GEAR_SUFFIX, UNIQUE_CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
 import { formatCraftAffixTierRanges, formatCraftAffixTierWeights } from '../../models/affix';
-import { DISMANTLE_RETURN_RATE } from '../../systems/crafting';
+import { DISMANTLE_RETURN_RATE, UNIQUE_CRAFTED_DISMANTLE_RETURN_RATE } from '../../systems/crafting';
+import { UNIQUE_CRAFT_TIERS, formatUniqueCraftAffixTiers } from '../../models/uniqueCraft';
 import { ABILITY_CRYSTAL_COST_PER_TIER } from '../../models/abilityCrystal';
 import { ABILITY_MIN_TIER } from '../../models/ability';
 import '../components/WikiTable.css';
@@ -72,13 +73,22 @@ export function CraftingPage() {
         素材依背包 → 個人倉庫 → 帳號倉庫的順序扣，滑鼠移到素材上可看各處存量。前置武器須在挑選視窗指定要用哪一件。
       </p>
       <p style={noteStyle}>
+        <strong>獨特製作</strong>：鐵匠鋪「獨特製作」分頁，配方同一般製作（T4～T6）。前置改為<strong>同一款裝備 ×1</strong>
+        （掉落品、商店品、{CRAFTED_GEAR_SUFFIX} 可；{UNIQUE_CRAFTED_GEAR_SUFFIX} 與 {MIMIC_GEAR_SUFFIX} 不可），材料改為獨特魔物的獨特材料與 Boss 專屬素材
+        （各件配方在鐵匠鋪「獨特製作」分頁查看），製作費同一般製作，製作前會確認要消耗的那件。
+        產物名稱後標 <strong>{UNIQUE_CRAFTED_GEAR_SUFFIX}</strong>：固定 4 條詞綴、不重複、不出特殊詞綴，
+        Tier 依裝備階級（{UNIQUE_CRAFT_TIERS.map(t => `T${t} 製作品 ${formatUniqueCraftAffixTiers(t)}`).join('、')}），數值在該 Tier 範圍內隨機；
+        武器、項鍊、戒指必帶隨機技能，種類與數值同掉落品（職業池取製作角色）。品質 0%，<strong>不可使用任何印記</strong>、不可技能更換，強化卷軸照常可用。
+      </p>
+      <p style={noteStyle}>
         <strong>拆解</strong>：有配方的裝備（製作品或同款掉落品）可在鐵匠鋪拆回材料，
-        每種材料退還 {DISMANTLE_RETURN_RATE * 100}%（無條件進位），前置武器與製作費不退還。
+        每種材料退還 {DISMANTLE_RETURN_RATE * 100}%（無條件進位），前置武器與製作費不退還；
+        {UNIQUE_CRAFTED_GEAR_SUFFIX} 製作品退還一般配方的 {UNIQUE_CRAFTED_DISMANTLE_RETURN_RATE * 100}%，獨特材料不退。
         帶隨機技能的掉落品即使沒有配方也能拆，留下<strong>技能結晶</strong>（製作品與商店裝不會留下）；{MIMIC_GEAR_SUFFIX} 擬態品不可拆解。
       </p>
       <p style={noteStyle}>
         <strong>技能結晶與技能更換</strong>：結晶依技能種類存在角色身上，不佔背包、套用不消耗；同種技能再拆到時，每個參數各取較好的一方。
-        在鐵匠鋪把結晶套到背包中未裝備、T{ABILITY_MIN_TIER} 以上的武器、項鍊或戒指（{CRAFTED_GEAR_SUFFIX} 製作品與 {MIMIC_GEAR_SUFFIX} 擬態品除外），
+        在鐵匠鋪把結晶套到背包中未裝備、T{ABILITY_MIN_TIER} 以上的武器、項鍊或戒指（{CRAFTED_GEAR_SUFFIX}／{UNIQUE_CRAFTED_GEAR_SUFFIX} 製作品與 {MIMIC_GEAR_SUFFIX} 擬態品除外），
         原本的隨機技能會被取代；武器技能只套武器、飾品技能只套項鍊與戒指。費用 {ABILITY_CRYSTAL_COST_PER_TIER.toLocaleString()} × 裝備階級。
       </p>
       <div className="wiki-filters">

@@ -728,6 +728,18 @@ function rollRangeTier(floor: number, cap: number, weights: Readonly<Record<numb
   return cap;
 }
 
+/** `tierPlan` 的逐條 Tier：`highCount` 個高階位置在 `count` 條中均等抽 */
+function planTiers(plan: { highTier: number; highCount: number; baseTier: number }, count: number): number[] {
+  const tiers = Array.from({ length: count }, () => plan.baseTier);
+  const positions = Array.from({ length: count }, (_, i) => i);
+  for (let k = 0; k < Math.min(plan.highCount, count); k++) {
+    const j = k + Math.floor(random() * (count - k));
+    [positions[k], positions[j]] = [positions[j], positions[k]];
+    tiers[positions[k]] = plan.highTier;
+  }
+  return tiers;
+}
+
 export interface GenerateAffixOptions {
   /** Tier 硬上限。商店裝傳 `SHOP_MAX_AFFIX_TIER`；掉落／製作不傳。 */
   maxTier?: number;
@@ -749,6 +761,11 @@ export interface GenerateAffixOptions {
   weaponBaseDamage?: number;
   /** 不可抽到的種類 —— 同件已有的詞綴（新增印記、混沌保留的封印詞綴，§ 7.6 不可重複） */
   excludeTypes?: AnyAffixType[];
+  /**
+   * 固定 Tier 分配（獨特製作品，`06-equipment-acquire.md` § 6A.6）：有 Tier 的詞綴中均等抽 `highCount` 條為 `highTier`，
+   * 其餘為 `baseTier`。給了就不看 `uniformTier`／`minTier`／`maxTier`。
+   */
+  tierPlan?: { highTier: number; highCount: number; baseTier: number };
 }
 
 export function generateAffixes(
@@ -791,6 +808,7 @@ export function generateAffixes(
     picks.push(def);
   }
   const tieredCount = picks.filter(p => !('tier' in p)).length;
+  const plannedTiers = options.tierPlan ? planTiers(options.tierPlan, tieredCount) : undefined;
 
   for (const pick of picks) {
     if ('tier' in pick) {
@@ -800,9 +818,11 @@ export function generateAffixes(
     const def = pick;
     const cap = options.maxTier ?? 7;
     const floor = options.minTier ?? 1;
-    const tier = options.uniformTier
-      ? rollRangeTier(floor, cap, options.tierWeights ?? {})
-      : Math.min(cap, rollAffixTier(areaLevel, isBoss, tieredCount));
+    const tier = plannedTiers
+      ? plannedTiers.shift()!
+      : options.uniformTier
+        ? rollRangeTier(floor, cap, options.tierWeights ?? {})
+        : Math.min(cap, rollAffixTier(areaLevel, isBoss, tieredCount));
     const value = rollAffixValue(tier, def.type, category);
     // § 7.9 元素刻印／元素侵蝕／元素下降：抽到當下才決定屬性，六種均等隨機，各自獨立抽
     const needsElement = isElementAffixType(def.type);

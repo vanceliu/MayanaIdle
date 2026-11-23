@@ -7,7 +7,7 @@ const baseExp = (level: number) => Math.round(2 * Math.pow(1.1302, Math.min(leve
 /** `28-monster-stats.md` § 28.1 結算倍率（不含回鍋加倍） */
 const KILL_EXP_MULTIPLIER = 3;
 
-const normals = MONSTER_SEEDS.filter(m => !m.isBoss);
+const normals = MONSTER_SEEDS.filter(m => !m.isBoss && !m.isUnique);
 const bosses = MONSTER_SEEDS.filter(m => m.isBoss);
 
 describe('怪物經驗曲線（`28-monster-stats.md` § 28.1）', () => {

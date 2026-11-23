@@ -5,6 +5,7 @@
  * `talentStore`，不同步重載的話玩家要等下次載入角色才看得到剛掉的東西 ——
  * 而戰鬥日誌已經寫了「獲得天賦格」，看起來就像掉落被吃掉了。
  */
+import type { MonsterRank } from '../../models/monster';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db, resetTestDb } from '../../testing/testDb';
 import type { DropResult } from '../../systems/drops';
@@ -26,8 +27,8 @@ vi.mock('../../systems/talentDrops', async () => {
   const actual = await vi.importActual<typeof import('../../systems/talentDrops')>('../../systems/talentDrops');
   return {
     ...actual,
-    rollTalentSlotDrop: (areaLevel: number, isBoss: boolean) =>
-      actual.rollTalentSlotDrop(areaLevel, isBoss, 1, () => 0),
+    rollTalentSlotDrop: (areaLevel: number, rank: MonsterRank) =>
+      actual.rollTalentSlotDrop(areaLevel, rank, 1, () => 0),
   };
 });
 

@@ -3,8 +3,8 @@ import { BUFF_POTION_CONFIG, BUFF_POTION_DURATION_MS, getBuffPotionType, type Bu
 import { monsterDropMultiplier, monsterGoldExpMultiplier, monsterLogName } from '../models/monsterAffix';
 import { normalizeAppearance, type Appearance } from '../models/appearance';
 import type { Character, ClassName, Attributes } from '../models/character';
-import type { MonsterInstance } from '../models/monster';
-import type { EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
+import { monsterRank, type MonsterInstance } from '../models/monster';
+import type { CraftMaterial, EquipmentInstance, EquipmentTemplate, EquippedGear } from '../models/equipment';
 import { BOSS_DROP_ONLY_TIER, isWeaponEquipment, occupiesHand, SLOT_ORDER } from '../models/equipment';
 import type { Skill } from '../models/skill';
 import { rates } from '../core/rates';
@@ -111,8 +111,10 @@ import {
 } from '../models/abilityCrystal';
 import {
   evaluateCraftRequirements, getCraftSources, getMaterialTotal, removeCraftQuestByTemplate, type CraftSourceKind,
+  getUniqueCraftPrerequisiteBlock, isRecipeCraftable, listCraftPrerequisiteOptions, UNIQUE_CRAFT_PREREQUISITE_BLOCK_TEXT,
+  type CraftPrerequisiteCandidate, type CraftRecipeKind,
 } from '../systems/craftQuestSystem';
-import { drawCraftMaterials, generateCraftAffixes, getDismantleOutcome, pickCraftPrerequisites } from '../systems/crafting';
+import { drawCraftMaterials, generateCraftAffixes, getDismantleOutcome, pickCraftPrerequisites, rollUniqueCraftProduct } from '../systems/crafting';
 import { type Affix, getAffixCategoryForSlot, getWeaponBaseDamage } from '../models/affix';
 import {
   POLISH_SIGIL_GOLD_COST, applyAddSigil, applySealSigil, applyChaosSigil, applyEnhanceSigil, applyPolishSigil, applyRecarveSigil, applyStingSigil, applyTemperSigil,
@@ -532,6 +534,8 @@ export interface GameState {
   /** `abilityType`：武器必須指定隨機技能（`07-affix-ability.md` § 7S.6） */
   /** `prerequisiteIds`：指定的前置裝備實例，可在背包或個人／帳號倉庫（`06-equipment-acquire.md` § 6A.3「取用來源」） */
   craftEquipment: (templateId: number, abilityType?: AbilityType, prerequisiteIds?: number[]) => CraftResult | Promise<CraftResult>;
+  /** 鐵匠鋪獨特製作（`06-equipment-acquire.md` § 6A.3.1）。`prerequisiteId`：指定的同模板前置裝備實例 */
+  craftUniqueEquipment: (templateId: number, prerequisiteId: number) => CraftResult | Promise<CraftResult>;
   /** 鐵匠鋪拆解（`06-equipment-acquire.md` § 6A.3「拆解」）。線上模式回 Promise */
   dismantleEquipment: (instanceId: number) => CraftResult | Promise<CraftResult>;
   /** 競技場 NPC：以票券兌換兌換箱（`55-arena.md` § 55.9） */
@@ -604,7 +608,7 @@ export interface GameState {
   /** 任務板不屬於目前城鎮時才重新產生（§ 36.6.3：同城重刷只能走 `rerollQuestBoard`） */
   ensureQuestBoardForTown: () => void;
   /** 加入製作追蹤（§ 36.13.2）。滿 3 個或已追蹤同配方時不做事 */
-  acceptCraftQuest: (templateId: number) => void;
+  acceptCraftQuest: (templateId: number, unique?: boolean) => void;
   /** 取消製作任務（§ 36.13.5）。無代價，不動貢獻 */
   abandonCraftQuest: (questId: string) => void;
   /** 過了更新時刻的懸賞清單重新生成（§ 53.4）；未過時刻不做事 */
@@ -2696,8 +2700,9 @@ export function createGameStore(session: Session) {
     saveGame(get(), session);
   },
 
-  acceptCraftQuest: (templateId) => {
-    const result = acceptCraftQuestFn(get().craftQuests, templateId);
+  acceptCraftQuest: (templateId, unique) => {
+    if (!Number.isSafeInteger(templateId) || (unique !== undefined && typeof unique !== 'boolean')) return;
+    const result = acceptCraftQuestFn(get().craftQuests, templateId, unique ? 'unique' : 'normal');
     if (!result) return;
     set({ craftQuests: result });
     saveGame(get(), session);
@@ -2859,47 +2864,41 @@ export function createGameStore(session: Session) {
       const prerequisites = pickCraftPrerequisites(recipe, sources, prerequisiteIds);
       if (!prerequisites) return { ok: false, message: '請選擇前置裝備' };
 
-      const drawn = drawCraftMaterials(recipe.craftMaterials, sources);
-      const newBag = drawn.bag;
-      if (char.id) {
-        for (const mat of recipe.craftMaterials) {
-          void session.repo.setBagItemAmount(char.id, mat.itemId, getBagItemAmount(newBag, mat.itemId));
-        }
-      }
-      const usedIds = new Set(prerequisites.map(p => p.item.id));
-      for (const id of usedIds) if (id) void session.repo.deleteEquipment(id);
-      const inv = state.inventory.filter(i => !usedIds.has(i.id));
-      const personalEquip = state.personalStoredEquipment.filter(i => !usedIds.has(i.id));
-      const sharedEquip = state.storedEquipment.filter(i => !usedIds.has(i.id));
-      const affixCategory = getAffixCategoryForSlot(recipe.slot, recipe.type);
-      const affixes = generateCraftAffixes(affixCategory, recipe);
+      const affixes = generateCraftAffixes(getAffixCategoryForSlot(recipe.slot, recipe.type), recipe);
       const fields = rollNewInstanceFields(recipe, { channel: 'craft', className: char.className, chosen: chosenAbility });
-      const dbRecord: Partial<EquipmentInstance> = {
-        templateId: recipe.id!, slot: recipe.slot, quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false,
-        isCraftedGear: true,
-      };
-      const finish = (id: number | undefined): CraftResult => {
-        const newEquip = resolveEquipment({
-          id, templateId: recipe.id!, name: recipe.name, type: recipe.type, slot: recipe.slot, isTwoHanded: recipe.isTwoHanded,
-          quality: 0, enhancement: 0, ...fields, affixes, ownerId: char.id!, equipped: false, isCraftedGear: true,
-        } as EquipmentInstance);
-        const s2 = get();
-        set({
-          character: { ...s2.character!, gold: s2.character!.gold - requirements.gold.need },
-          bagItems: newBag,
-          inventory: [...inv, newEquip],
-          personalStoredMaterials: drawn.personal,
-          personalStoredEquipment: personalEquip,
-          storedMaterials: drawn.shared,
-          storedEquipment: sharedEquip,
-          // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
-          craftQuests: removeCraftQuestByTemplate(s2.craftQuests, recipe.id!),
-          statistics: { ...s2.statistics, equipmentCrafted: s2.statistics.equipmentCrafted + 1 },
-        });
-        get().saveState();
-        return { ok: true, message: `製作成功！獲得 ${newEquip.name}`, name: newEquip.name };
-      };
-      return char.id ? session.repo.addEquipment(dbRecord).then(finish) : finish(undefined);
+      return commitCraft(session, get, set, {
+        recipe, kind: 'normal', materials: recipe.craftMaterials, prerequisites, goldCost: requirements.gold.need,
+        record: { ...fields, affixes, isCraftedGear: true },
+      });
+    };
+    return cached ? run(cached) : session.repo.findEquipmentTemplates(t => t.id === templateId).then(list => run(list[0]));
+  },
+
+  craftUniqueEquipment: (templateId, prerequisiteId) => {
+    if (!Number.isSafeInteger(templateId)) return { ok: false, message: '無此配方' };
+    const cached = getTemplateById(templateId);
+    const run = (recipe: EquipmentTemplate | undefined): CraftResult | Promise<CraftResult> => {
+      const char = get().character;
+      if (!char) return { ok: false, message: '沒有角色' };
+      if (!recipe || recipe.acquireType !== 'craft' || !isRecipeCraftable(recipe, 'unique')) return { ok: false, message: '無此配方' };
+      const state = get();
+      const sources = getCraftSources(state);
+      const requirements = evaluateCraftRequirements(recipe, sources, char.gold, 'unique');
+      if (!requirements.materials.every(m => m.enough)) return { ok: false, message: '材料不足' };
+      if (!requirements.prerequisite?.enough) return { ok: false, message: '沒有可用的前置裝備' };
+      if (!requirements.gold.enough) return { ok: false, message: '金幣不足' };
+      if (getBagUsedSlots(state.bagItems, state.inventory, state.equippedGear) >= getBagMaxSlots(state.equippedGear)) return { ok: false, message: '背包已滿' };
+      if (!Number.isSafeInteger(prerequisiteId)) return { ok: false, message: '請選擇前置裝備' };
+      const blocked = listCraftPrerequisiteOptions(recipe, sources, 'unique').find(c => c.item.id === prerequisiteId);
+      const block = blocked ? getUniqueCraftPrerequisiteBlock(blocked.item) : null;
+      if (block) return { ok: false, message: UNIQUE_CRAFT_PREREQUISITE_BLOCK_TEXT[block] };
+      const prerequisites = pickCraftPrerequisites(recipe, sources, [prerequisiteId], 'unique');
+      if (!prerequisites) return { ok: false, message: '請選擇前置裝備' };
+
+      return commitCraft(session, get, set, {
+        recipe, kind: 'unique', materials: recipe.uniqueCraftMaterials!, prerequisites, goldCost: requirements.gold.need,
+        record: { ...rollUniqueCraftProduct(recipe, char.className), isUniqueCraftedGear: true },
+      });
     };
     return cached ? run(cached) : session.repo.findEquipmentTemplates(t => t.id === templateId).then(list => run(list[0]));
   },
@@ -3036,6 +3035,7 @@ export function createGameStore(session: Session) {
       // 新手裝名單只有 seed 一個來源（§ 99.1 第 4 條）
       isStarterGear: getTemplateById(item.templateId)?.acquireType === 'starter',
       isCraftedGear: item.isCraftedGear,
+      isUniqueCraftedGear: item.isUniqueCraftedGear,
       isMimicGear: item.isMimicGear,
       affixSlots: item.affixSlots,
     };
@@ -3359,6 +3359,58 @@ export interface MonsterDeathOptions {
   bountyActive?: boolean;
 }
 
+/** 製作結算（`06-equipment-acquire.md` § 6A.3、§ 6A.3.1）：扣材料、前置裝備與製作費，產物放進背包 */
+function commitCraft(
+  session: Session,
+  get: () => GameState,
+  set: (s: Partial<GameState>) => void,
+  craft: {
+    recipe: EquipmentTemplate;
+    kind: CraftRecipeKind;
+    materials: CraftMaterial[];
+    prerequisites: CraftPrerequisiteCandidate[];
+    goldCost: number;
+    record: Partial<EquipmentInstance>;
+  },
+): CraftResult | Promise<CraftResult> {
+  const { recipe, kind, materials, prerequisites, goldCost } = craft;
+  const state = get();
+  const char = state.character!;
+  const drawn = drawCraftMaterials(materials, getCraftSources(state));
+  if (char.id) {
+    for (const mat of materials) void session.repo.setBagItemAmount(char.id, mat.itemId, getBagItemAmount(drawn.bag, mat.itemId));
+  }
+  const usedIds = new Set(prerequisites.map(p => p.item.id));
+  for (const id of usedIds) if (id) void session.repo.deleteEquipment(id);
+  const inv = state.inventory.filter(i => !usedIds.has(i.id));
+  const personalEquip = state.personalStoredEquipment.filter(i => !usedIds.has(i.id));
+  const sharedEquip = state.storedEquipment.filter(i => !usedIds.has(i.id));
+  const record: Partial<EquipmentInstance> = {
+    templateId: recipe.id!, slot: recipe.slot, quality: 0, enhancement: 0, ownerId: char.id!, equipped: false, ...craft.record,
+  };
+  const finish = (id: number | undefined): CraftResult => {
+    const newEquip = resolveEquipment({
+      ...record, id, name: recipe.name, type: recipe.type, isTwoHanded: recipe.isTwoHanded,
+    } as EquipmentInstance);
+    const s2 = get();
+    set({
+      character: { ...s2.character!, gold: s2.character!.gold - goldCost },
+      bagItems: drawn.bag,
+      inventory: [...inv, newEquip],
+      personalStoredMaterials: drawn.personal,
+      personalStoredEquipment: personalEquip,
+      storedMaterials: drawn.shared,
+      storedEquipment: sharedEquip,
+      // § 36.13.5：製作成功即移除同配方的任務。沒追蹤過時是 no-op
+      craftQuests: removeCraftQuestByTemplate(s2.craftQuests, recipe.id!, kind),
+      statistics: { ...s2.statistics, equipmentCrafted: s2.statistics.equipmentCrafted + 1 },
+    });
+    get().saveState();
+    return { ok: true, message: `製作成功！獲得 ${newEquip.name}`, name: newEquip.name };
+  };
+  return char.id ? session.repo.addEquipment(record).then(finish) : finish(undefined);
+}
+
 /** 拆解結算（`06-equipment-acquire.md` § 6A.3「拆解」）：刪實例、退材料、存結晶，一次寫回 */
 function commitDismantle(
   session: Session,
@@ -3462,14 +3514,14 @@ export function processMonsterDeath(
     calculatePressure(char.areaKills ?? 0, undefined, get().pressureMembers).pressure,
   );
   const defeatedMonsterName = dead.name;
-  const monsterIsBoss = dead.isBoss;
+  const rank = monsterRank(dead);
   const killArea = options.killArea ?? { regionId: char.currentRegion, floor: char.currentFloor, areaId: char.currentArea };
   session.loop.dropQueue = session.loop.dropQueue.then(async () => {
     const dropRegion = getRegion(killArea.regionId);
     const dropAreaId = resolveDropAreaId(killArea.regionId, killArea.floor, killArea.areaId);
     // 懸賞契約（`53-bounty-contract.md` § 53.5）：對象判定在擲掉落前，加購者掉兩次取比較好
     const bountyActive = options.bountyActive ?? true;
-    const bounty = bountyActive ? findBountyFor(get().bountyContracts, dropAreaId, defeatedMonsterName, monsterIsBoss) : undefined;
+    const bounty = bountyActive ? findBountyFor(get().bountyContracts, dropAreaId, defeatedMonsterName, rank) : undefined;
     const takeBetter = bounty?.takeBetter
       ? {
         pickEquipment: (first: EquipmentInstance, second: EquipmentInstance) => {
@@ -3489,14 +3541,14 @@ export function processMonsterDeath(
     const noDrops: Awaited<ReturnType<typeof rollDrops>> = { gold: 0, items: [] };
     const drops = !withDrops
       ? noDrops
-      : monsterIsBoss
-        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, session.repo, takeBetter, char.className)
+      : rank !== 'normal'
+        ? await rollBossDrops(defeatedMonsterName, char.id!, areaLevel, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, session.repo, takeBetter, char.className, rank)
         : await rollDrops(dropAreaId, char.id!, { drop_rate: dropBonuses.drop_rate, gold_rate: dropBonuses.gold_rate, pressure_mult: pressureDropMult, affix_drop_mult: affixDropMult, affix_gold_mult: affixGoldExpMult }, false, dead.level, session.repo, takeBetter, char.className);
     // 天賦格走獨立實例表，不進 characterBag（`51-auto-talent.md` § 51.11）。
     // 不佔背包格，所以不需要容量檢查，撿不到的情況不存在。
     // 條件與動作不掉落 —— 一律內建（§ 51.4.1）
     // 天賦格只吃全域掉落倍率，不吃 `drop_rate` 與 Pressure（`27-drop-table.md` § 27.9）
-    const talentSlotTier = withDrops ? rollTalentSlotDrop(areaLevel, monsterIsBoss, rates.drop) : null;
+    const talentSlotTier = withDrops ? rollTalentSlotDrop(areaLevel, rank, rates.drop) : null;
     const talentLogs: string[] = [];
     if (char.id && talentSlotTier !== null) {
       await session.repo.addTalentSlot({
@@ -3595,7 +3647,7 @@ export function processMonsterDeath(
 
     // 懸賞契約擊殺數（§ 53.5.4）；達標即移除
     const bountyResult = bountyActive && !inArena
-      ? recordBountyKill(state2.bountyContracts, dropAreaId, defeatedMonsterName, monsterIsBoss)
+      ? recordBountyKill(state2.bountyContracts, dropAreaId, defeatedMonsterName, rank)
       : { signed: state2.bountyContracts, completed: [] };
     for (const done of bountyResult.completed) {
       logs2.push({ text: `懸賞契約完成：${getBountyAreaName(done.areaId)} ${done.monsterName} ${done.kills}/${done.targetKills}`, type: 'system' });
@@ -3604,7 +3656,8 @@ export function processMonsterDeath(
     // 統計計數
     const stats = { ...state2.statistics };
     stats.monstersKilled += 1;
-    if (monsterIsBoss) stats.bossesKilled += 1;
+    if (rank === 'boss') stats.bossesKilled += 1;
+    if (rank === 'unique') stats.uniqueMonstersKilled += 1;
     if (drops.gold > 0) stats.totalGoldEarned += drops.gold;
     // T7 掉落計數（`37-statistics.md` § 37.3）：以「掉出來」為準，
     // 背包滿而被丟棄的那件仍然計入 —— 記錄的是運氣，不是持有數。

@@ -37,3 +37,13 @@ export function formatGameTime(ms: number): string {
   const d = new Date(ms + SHIFT_MS);
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
+
+/** 遊戲時間每 `slotMinutes` 分鐘一格的格序號；格界 = 遊戲時間分鐘數整除 `slotMinutes` 且秒為 0 的時刻 */
+export function gameSlotIndex(ms: number, slotMinutes: number): number {
+  return Math.floor((ms + SHIFT_MS) / (slotMinutes * 60_000));
+}
+
+/** `(prevMs, nowMs]` 之間是否跨過遊戲時間的 `slotMinutes` 分鐘格界 */
+export function crossedGameSlot(prevMs: number, nowMs: number, slotMinutes: number): boolean {
+  return gameSlotIndex(nowMs, slotMinutes) > gameSlotIndex(prevMs, slotMinutes);
+}

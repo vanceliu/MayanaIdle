@@ -176,7 +176,7 @@ const snowField: Region = {
   levelMin: 30,
   levelMax: 33,
   zoneId: 'ivory-tower-zone',
-  monsters: ['凍骨哥布林', '冰霜蜘蛛', '雪狼', '冰晶蝙蝠'],
+  monsters: ['凍骨哥布林', '冰霜蜘蛛', '雪狼', '冰晶蝙蝠', '冰牙狼王'],
 };
 
 const snowFieldDeep: Region = {
@@ -197,10 +197,10 @@ const ivoryTowerDungeon: Region = {
   levelMax: 45,
   zoneId: 'ivory-tower-zone',
   floors: [
-    { floor: 1, levelMin: 33, levelMax: 36, monsters: ['冰霜蜘蛛', '象牙巫師', '冰晶蝙蝠'], isBossFloor: false },
-    { floor: 2, levelMin: 36, levelMax: 38, monsters: ['象牙巫師', '冰晶蝙蝠', '霜甲戰士'], isBossFloor: false },
-    { floor: 3, levelMin: 38, levelMax: 40, monsters: ['霜甲戰士', '冰霜元素', '象牙魔導師'], isBossFloor: false },
-    { floor: 4, levelMin: 40, levelMax: 42, monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士'], isBossFloor: false },
+    { floor: 1, levelMin: 33, levelMax: 36, monsters: ['冰霜蜘蛛', '象牙巫師', '冰晶蝙蝠', '冰晶蝙蝠王'], isBossFloor: false },
+    { floor: 2, levelMin: 36, levelMax: 38, monsters: ['象牙巫師', '冰晶蝙蝠', '霜甲戰士', '象牙大巫師'], isBossFloor: false },
+    { floor: 3, levelMin: 38, levelMax: 40, monsters: ['霜甲戰士', '冰霜元素', '象牙魔導師', '霜甲隊長', '象牙魔導長'], isBossFloor: false },
+    { floor: 4, levelMin: 40, levelMax: 42, monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士', '霜核元素', '霜甲統領'], isBossFloor: false },
     { floor: 5, levelMin: 42, levelMax: 45, monsters: ['冰霜元素', '象牙魔導師', '霜甲戰士', '象牙塔惡魔'], isBossFloor: true, bossName: '象牙塔惡魔' },
   ],
 };
@@ -214,7 +214,7 @@ const demonForest: Region = {
   levelMin: 30,
   levelMax: 33,
   zoneId: 'elsarth',
-  monsters: ['妖魔幼獸', '蝕木藤妖', '高等妖魔', '妖魔神射手', '妖魔咒術師'],
+  monsters: ['妖魔幼獸', '蝕木藤妖', '高等妖魔', '妖魔神射手', '妖魔咒術師', '妖魔大頭目'],
 };
 
 const rotleafPath: Region = {
@@ -224,7 +224,7 @@ const rotleafPath: Region = {
   levelMin: 34,
   levelMax: 36,
   zoneId: 'elsarth',
-  monsters: ['腐葉巨蛛', '妖魔獵犬', '高等妖魔鬥士', '腐生樹妖', '妖魔投斧手'],
+  monsters: ['腐葉巨蛛', '妖魔獵犬', '高等妖魔鬥士', '腐生樹妖', '妖魔投斧手', '腐根樹王'],
 };
 
 const demonAltar: Region = {
@@ -234,7 +234,7 @@ const demonAltar: Region = {
   levelMin: 37,
   levelMax: 40,
   zoneId: 'elsarth',
-  monsters: ['祭壇守衛', '巨人', '妖魔祭司', '血祭石像', '妖魔統領'],
+  monsters: ['祭壇守衛', '巨人', '妖魔祭司', '血祭石像', '妖魔統領', '血祭大祭司', '祭壇巨像'],
 };
 
 const mistyCave: Region = {
@@ -245,8 +245,8 @@ const mistyCave: Region = {
   levelMax: 50,
   zoneId: 'elsarth',
   floors: [
-    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['高等妖魔鬥士', '高等史萊姆', '高等蜥蜴'], isBossFloor: false },
-    { floor: 2, levelMin: 43, levelMax: 46, monsters: ['高等史萊姆', '高等蜥蜴', '洞窟巨蟲'], isBossFloor: false },
+    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['高等妖魔鬥士', '高等史萊姆', '高等蜥蜴', '蜥蜴首領'], isBossFloor: false },
+    { floor: 2, levelMin: 43, levelMax: 46, monsters: ['高等史萊姆', '高等蜥蜴', '洞窟巨蟲', '洞窟巨蟲母'], isBossFloor: false },
     { floor: 3, levelMin: 46, levelMax: 50, monsters: ['洞窟巨蟲', '朦朧幻獸', '高等蜥蜴'], isBossFloor: true, bossName: '朦朧蛇魔' },
   ],
 };
@@ -269,7 +269,7 @@ const mirrorForest: Region = {
   levelMin: 30,
   levelMax: 33,
   zoneId: 'varden',
-  monsters: ['微光蝶', '鏡水蜥', '鏡面精靈', '光影狐', '折光魔像'],
+  monsters: ['微光蝶', '鏡水蜥', '鏡面精靈', '光影狐', '折光魔像', '鏡之守護靈'],
 };
 
 const glimmerShore: Region = {
@@ -279,7 +279,7 @@ const glimmerShore: Region = {
   levelMin: 34,
   levelMax: 36,
   zoneId: 'varden',
-  monsters: ['湖畔水靈', '潛鏡蛇', '鏡湖歌者', '明鏡樹妖', '幻影鹿'],
+  monsters: ['湖畔水靈', '潛鏡蛇', '鏡湖歌者', '明鏡樹妖', '幻影鹿', '湖光幻后'],
 };
 
 const shatteredMirror: Region = {
@@ -289,7 +289,7 @@ const shatteredMirror: Region = {
   levelMin: 37,
   levelMax: 40,
   zoneId: 'varden',
-  monsters: ['碎鏡魔像', '逆影獵手', '幻光獵蛾', '鏡界巡守', '碎鏡之影'],
+  monsters: ['碎鏡魔像', '逆影獵手', '幻光獵蛾', '鏡界巡守', '碎鏡之影', '碎鏡魔君', '逆影獵王'],
 };
 
 const underwaterPrison: Region = {
@@ -300,9 +300,9 @@ const underwaterPrison: Region = {
   levelMax: 50,
   zoneId: 'varden',
   floors: [
-    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['水牢守衛', '溺水亡靈', '深海藻獸'], isBossFloor: false },
-    { floor: 2, levelMin: 43, levelMax: 45, monsters: ['溺水亡靈', '深海藻獸', '深海魚人'], isBossFloor: false },
-    { floor: 3, levelMin: 45, levelMax: 48, monsters: ['深海魚人', '水牢守衛', '潮汐元素'], isBossFloor: false },
+    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['水牢守衛', '溺水亡靈', '深海藻獸', '典獄長'], isBossFloor: false },
+    { floor: 2, levelMin: 43, levelMax: 45, monsters: ['溺水亡靈', '深海藻獸', '深海魚人', '溺亡之主'], isBossFloor: false },
+    { floor: 3, levelMin: 45, levelMax: 48, monsters: ['深海魚人', '水牢守衛', '潮汐元素', '潮汐巨靈'], isBossFloor: false },
     { floor: 4, levelMin: 48, levelMax: 50, monsters: ['潮汐元素', '深海魚人', '溺水亡靈'], isBossFloor: true, bossName: '深海獄王' },
   ],
 };
@@ -325,7 +325,7 @@ const dragonValleyOutskirts: Region = {
   levelMin: 30,
   levelMax: 35,
   zoneId: 'dragon-valley-zone',
-  monsters: ['谷口幼龍', '高階骷髏神射手', '高階骷髏警衛', '高階骷髏斥候', '熔岩巨蜥'],
+  monsters: ['谷口幼龍', '高階骷髏神射手', '高階骷髏警衛', '高階骷髏斥候', '熔岩巨蜥', '骸骨百夫長'],
 };
 
 const dragonValleySurface: Region = {
@@ -335,7 +335,7 @@ const dragonValleySurface: Region = {
   levelMin: 36,
   levelMax: 40,
   zoneId: 'dragon-valley-zone',
-  monsters: ['高階骷髏鬥士', '亞利安', '巨人', '高階骷髏將領', '飛龍'],
+  monsters: ['高階骷髏鬥士', '亞利安', '巨人', '高階骷髏將領', '飛龍', '巨人酋長', '飛龍王'],
 };
 
 const dragonValleyDungeon: Region = {
@@ -346,12 +346,12 @@ const dragonValleyDungeon: Region = {
   levelMax: 50,
   zoneId: 'dragon-valley-zone',
   floors: [
-    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛'], isBossFloor: false },
-    { floor: 2, levelMin: 40, levelMax: 43, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛'], isBossFloor: false },
-    { floor: 3, levelMin: 43, levelMax: 46, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛'], isBossFloor: false },
-    { floor: 4, levelMin: 43, levelMax: 46, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛'], isBossFloor: false },
-    { floor: 5, levelMin: 46, levelMax: 49, monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士'], isBossFloor: false },
-    { floor: 6, levelMin: 46, levelMax: 49, monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士'], isBossFloor: false },
+    { floor: 1, levelMin: 40, levelMax: 43, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛', '骷髏軍團長'], isBossFloor: false },
+    { floor: 2, levelMin: 40, levelMax: 43, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '剝皮蜘蛛', '骷髏軍團長'], isBossFloor: false },
+    { floor: 3, levelMin: 43, levelMax: 46, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛', '大莫蜘蛛女王', '骷髏神射將', '骷髏親衛隊長'], isBossFloor: false },
+    { floor: 4, levelMin: 43, levelMax: 46, monsters: ['高階骷髏警衛', '高階骷髏神射手', '高階骷髏鬥士', '大莫蜘蛛', '大莫蜘蛛女王', '骷髏神射將', '骷髏親衛隊長'], isBossFloor: false },
+    { floor: 5, levelMin: 46, levelMax: 49, monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士', '怨魂聚合體'], isBossFloor: false },
+    { floor: 6, levelMin: 46, levelMax: 49, monsters: ['大莫蜘蛛', '死亡靈魂', '高階骷髏鬥士', '怨魂聚合體'], isBossFloor: false },
     { floor: 7, levelMin: 49, levelMax: 50, monsters: ['大莫蜘蛛', '死亡靈魂', '死亡靈魂守衛', '安塔巨龍'], isBossFloor: true, bossName: '安塔巨龍' },
   ],
 };
@@ -374,7 +374,7 @@ const ancientBattlefield: Region = {
   levelMin: 40,
   levelMax: 45,
   zoneId: 'grey-ridge',
-  monsters: ['戰場殭屍', '戰場骷髏兵', '戰場骷髏弓手', '亡魂騎士'],
+  monsters: ['戰場殭屍', '戰場骷髏兵', '戰場骷髏弓手', '亡魂騎士', '亡魂將軍'],
 };
 
 /** 百柱塔十個區段在導覽上收成一個入口（region id 不變） */
@@ -508,14 +508,14 @@ const ancientDungeon: Region = {
   levelMax: 60,
   zoneId: 'grey-ridge',
   floors: [
-    { floor: 1, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手'], isBossFloor: false },
-    { floor: 2, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手'], isBossFloor: false },
-    { floor: 3, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手'], isBossFloor: false },
-    { floor: 4, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'], isBossFloor: false },
-    { floor: 5, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'], isBossFloor: false },
-    { floor: 6, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手'], isBossFloor: false },
-    { floor: 7, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精'], isBossFloor: false },
-    { floor: 8, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精'], isBossFloor: false },
+    { floor: 1, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手', '遠古獄卒長', '遠古狙擊官'], isBossFloor: false },
+    { floor: 2, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手', '遠古獄卒長', '遠古狙擊官'], isBossFloor: false },
+    { floor: 3, levelMin: 45, levelMax: 50, monsters: ['遠古囚犯', '遠古弓箭手', '遠古典獄官', '遠古弓術長', '封印術士'], isBossFloor: false },
+    { floor: 4, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手', '遠古典獄官', '遠古弓術長', '封印術士'], isBossFloor: false },
+    { floor: 5, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手', '封印屍王'], isBossFloor: false },
+    { floor: 6, levelMin: 50, levelMax: 55, monsters: ['封印殭屍', '遠古囚犯', '遠古弓箭手', '封印屍王'], isBossFloor: false },
+    { floor: 7, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精', '遠古食人妖精王'], isBossFloor: false },
+    { floor: 8, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精', '遠古食人妖精王'], isBossFloor: false },
     { floor: 9, levelMin: 55, levelMax: 60, monsters: ['遠古凶獸', '遠古戰士', '遠古神射手', '遠古食人妖精', '遠古騎士'], isBossFloor: true, bossName: '遠古騎士' },
   ],
 };

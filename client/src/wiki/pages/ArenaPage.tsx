@@ -1,6 +1,6 @@
 import '../components/WikiTable.css';
 import {
-  ARENA_BOSS_WAVE_INTERVAL, ARENA_MATERIAL_COST, ARENA_MAX_WAVE, ARENA_SLOT_HOURS, ARENA_TIERS,
+  ARENA_BOSS_WAVE_INTERVAL, ARENA_MAX_WAVE, ARENA_SLOT_HOURS, ARENA_TIERS,
   arenaAffixCount, arenaBossOrder, arenaGoldCost, arenaWaveSize, type ArenaTierSpec,
 } from '../../models/arena';
 import { ABILITY_CHANCE } from '../../models/ability';
@@ -48,13 +48,14 @@ export function ArenaPage() {
         <h3 style={SECTION_TITLE}>段位與入場費</h3>
         <div style={CARD}>
           <p style={CARD_TEXT}>
-            角色等級達到才可進場，組隊時每位隊員都要達標。入場費為名單內的 Boss 素材任意混合 {ARENA_MATERIAL_COST} 個＋金幣，組隊時由隊長付；非票券場不收費。
+            角色等級達到才可進場，組隊時每位隊員都要達標。入場費只收金幣，組隊時由隊長付；非票券場不收費。<br />
+            金幣取自付費者身上金幣與帳號倉庫金幣合計：先扣身上，不足再扣帳號倉庫。
           </p>
         </div>
         <div className="wiki-table-wrap">
           <table className="wiki-table">
             <thead>
-              <tr><th>段位</th><th>等級</th><th>一般怪</th><th>金幣</th></tr>
+              <tr><th>段位</th><th>等級</th><th>一般怪</th><th>入場金幣</th></tr>
             </thead>
             <tbody>
               {ARENA_TIERS.map(t => (
@@ -71,22 +72,20 @@ export function ArenaPage() {
         <div className="wiki-table-wrap" style={{ marginTop: 12 }}>
           <table className="wiki-table">
             <thead>
-              <tr><th>段位</th><th>王（出場順序）</th><th>入場材料</th></tr>
+              <tr><th>段位</th><th>王（出場順序）</th></tr>
             </thead>
             <tbody>
               {ARENA_TIERS.map(t => (
                 <tr key={t.tier}>
                   <td>T{t.tier}</td>
                   <td style={WRAP_TEXT}>{arenaBossOrder(t).map(b => b.name).join(' → ')}</td>
-                  <td style={WRAP_TEXT}>{t.materials.join('、')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p style={{ ...CARD_TEXT, color: 'var(--text-dim)' }}>
-          王依 Boss 等級由低到高輪替，輪完後固定出最強者。<br />
-          入場材料由隊長支付，可放在背包、個人倉庫或帳號倉庫（公會倉庫不算）：先扣背包，不夠再扣個人倉庫、再扣帳號倉庫。
+          王為掉落該段位裝備的 Boss，依 Boss 等級由低到高輪替，輪完後固定出最強者。
         </p>
       </section>
 

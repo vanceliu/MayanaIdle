@@ -17,6 +17,9 @@ function isEcho(name: string): boolean {
   return name.startsWith('殘影');
 }
 
+/** 沉默／減速／暈眩的分配原則（§ 25.9.1）只管一般怪與 Boss；獨特魔物依 § 25.13.1 與 § 25.8 表 */
+const NON_UNIQUE = MONSTER_SEEDS.filter(m => !m.isUnique);
+
 describe('怪物 debuff seed 資料', () => {
   it('所有 debuff 類型皆為已定義的角色 debuff', () => {
     for (const m of MONSTER_SEEDS) {
@@ -53,7 +56,7 @@ describe('怪物 debuff seed 資料', () => {
   });
 
   it('§ 25.9.1 沉默：僅遠程魔法怪物施加，且每隻都有', () => {
-    for (const m of MONSTER_SEEDS) {
+    for (const m of NON_UNIQUE) {
       const hasSilence = (m.debuffs ?? []).some(d => d.type === 'silence');
       expect(hasSilence, m.name).toBe(m.attackType === 'magic');
     }
@@ -66,7 +69,7 @@ describe('怪物 debuff seed 資料', () => {
       if (level >= 49 && level <= 70) return 13;
       throw new Error(`未定義的施法怪等級 ${level}`);
     };
-    for (const m of MONSTER_SEEDS.filter(x => x.attackType === 'magic')) {
+    for (const m of NON_UNIQUE.filter(x => x.attackType === 'magic')) {
       const debuffs = m.debuffs ?? [];
       const last = debuffs[debuffs.length - 1];
       expect(last.type, m.name).toBe('silence');
@@ -74,16 +77,16 @@ describe('怪物 debuff seed 資料', () => {
     }
   });
 
-  it('§ 25.9.2 規則 5：暈眩僅 Boss、殘影系列、巨獸類可施加', () => {
+  it('§ 25.9.2 規則 5：暈眩僅 Boss、獨特魔物、殘影系列、巨獸類可施加', () => {
     const offenders = MONSTER_SEEDS
       .filter(m => (m.debuffs ?? []).some(d => d.type === 'stun'))
-      .filter(m => !m.isBoss && !isEcho(m.name) && !isBehemoth(m.name))
+      .filter(m => !m.isBoss && !m.isUnique && !isEcho(m.name) && !isBehemoth(m.name))
       .map(m => m.name);
     expect(offenders).toEqual([]);
   });
 
   it('非 Boss 巨獸類暈眩觸發率固定 10%', () => {
-    const behemothStuns = MONSTER_SEEDS
+    const behemothStuns = NON_UNIQUE
       .filter(m => !m.isBoss && !isEcho(m.name) && isBehemoth(m.name))
       .flatMap(m => (m.debuffs ?? []).filter(d => d.type === 'stun').map(d => ({ name: m.name, chance: d.chance })));
 
@@ -138,7 +141,7 @@ describe('怪物 debuff seed 資料', () => {
 
   it('§ 25.9.1：每個區域最多只有一種減速怪', () => {
     const byArea = new Map<string, string[]>();
-    for (const m of MONSTER_SEEDS) {
+    for (const m of NON_UNIQUE) {
       if (!(m.debuffs ?? []).some(d => d.type === 'slow')) continue;
       byArea.set(m.area, [...(byArea.get(m.area) ?? []), m.name]);
     }
@@ -147,7 +150,7 @@ describe('怪物 debuff seed 資料', () => {
   });
 
   it('§ 25.9.1：減速觸發率固定 10%', () => {
-    const slowRates = MONSTER_SEEDS
+    const slowRates = NON_UNIQUE
       .flatMap(m => (m.debuffs ?? []).filter(d => d.type === 'slow').map(d => ({ name: m.name, chance: d.chance })));
 
     expect(slowRates.length).toBeGreaterThan(0);

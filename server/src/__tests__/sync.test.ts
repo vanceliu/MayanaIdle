@@ -119,6 +119,12 @@ describe('狀態同步', () => {
     expect(collectCombatDelta(session)!.add?.[0]).toEqual(expect.objectContaining({ id: 'm1', size: 'large' }));
   });
 
+  it('新怪帶獨特魔物旗標（25 § 25.13）', () => {
+    resetSync(session);
+    session.combat.monsterInstances.set('m1', { ...instance(100), isUnique: true } as MonsterInstance);
+    expect(collectCombatDelta(session)!.add?.[0]).toEqual(expect.objectContaining({ id: 'm1', isBoss: false, isUnique: true }));
+  });
+
   it('tick 推送有角色時必送並帶 now；操作回應的推送沒有變動就不送', () => {
     expect(buildFrame(session, null)).toBeNull();
     const tick = buildFrame(session, { visuals: [] });

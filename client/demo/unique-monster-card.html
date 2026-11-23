@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>獨特魔物卡片 Demo — MayanaIdle</title>
+<!--
+  獨特魔物的怪物列表卡片配色（候選比較）。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/unique-monster-card.html
+
+  .demo-* 只是這頁的排版；「提案樣式」區塊確認後移入 App.css，其餘樣式來自 App.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 提案樣式（確認後移入 App.css，變數值換成選定的候選） ═══════════ */
+.monster-card.is-unique {
+  background: var(--unique-bg);
+  border-color: var(--unique-border);
+}
+.monster-card.is-unique .monster-card-name:not([class*="monster-affix-"]) {
+  color: var(--unique-name);
+  font-weight: 600;
+}
+.monster-card.is-unique { position: relative; }
+.monster-card-unique-tag {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; line-height: 14px; padding: 0 6px; border-radius: 3px;
+  background: var(--unique-border); color: #0f0f1f; font-weight: 700; white-space: nowrap;
+}
+
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 20px; font-size: var(--fs-sm);
+}
+.demo-section { margin-bottom: 28px; }
+.demo-section h2 {
+  font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold);
+  margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+}
+.demo-controls { display: flex; flex-wrap: wrap; gap: 12px; font-size: var(--fs-xs); color: var(--text-secondary); font-family: var(--font-body); font-weight: normal; }
+.demo-controls label { display: inline-flex; gap: 4px; align-items: center; }
+.demo-controls input[type="range"] { width: 80px; }
+.demo-map {
+  position: relative; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+}
+.demo-map .monster-list-overlay { position: static; transform: none; max-width: none; justify-content: flex-start; }
+.demo-mobile .monster-list-overlay { gap: 4px; }
+.demo-mobile .monster-card { width: 118px; padding: 4px 7px 5px; border-radius: var(--radius-sm); }
+.demo-mobile .monster-card-name { font-size: var(--fs-xs); }
+.demo-mobile .monster-card-hp { height: 6px; margin-top: 3px; }
+.demo-mobile .monster-card-affixes { font-size: 9px; }
+.demo-contrast { font-size: var(--fs-xs); color: var(--text-dim); margin-top: 6px; line-height: 1.7; }
+.demo-contrast b.bad { color: #EF4444; }
+.demo-export { width: 100%; min-height: 90px; font-family: monospace; font-size: 12px; background: var(--bg-inset); color: var(--text-primary); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<h1 class="demo-title">獨特魔物卡片配色</h1>
+<p class="demo-note">
+  每一列是一個候選：獨特魔物卡片的無詞綴與 1~4 詞綴（名稱依詞綴數上色：1 藍、2 黃、3 橙、4 紅），最後兩張是對照用的 Boss 紫卡與一般怪。<br>
+  卡片是半透明底，疊在不同地圖上顏色會變，用上方「地圖底色」切換。對比值是名稱字色對「卡底疊在地圖上」的實際顏色，低於 3 標紅（WCAG 大字最低標準）。<br>
+  每個候選的底色、透明度、邊框、無詞綴字色都可以調，調完按最下面「匯出參數」。
+</p>
+
+<div class="demo-bar">
+  <label>地圖底色
+    <select id="opt-map">
+      <option value="#1c2b1c">野外（草地）</option>
+      <option value="#c9d3dc">雪原</option>
+      <option value="#2a2233">地監（石牆）</option>
+      <option value="#3a2a18">沙地／洞窟</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="opt-target"> 第一張設為攻擊中目標</label>
+  <button id="opt-reroll" type="button">重擲詞綴</button>
+</div>
+
+<div id="candidates"></div>
+
+<div class="demo-section">
+  <h2>匯出參數</h2>
+  <button id="opt-export" type="button">匯出參數</button>
+  <textarea class="demo-export" id="export" readonly></textarea>
+</div>
+
+<script type="module">
+const AFFIXES = ['嗜血', '狂暴', '迅捷', '劇毒', '強命', '堅硬', '再生', '護盾', '疾走', '荊棘'];
+const AFFIX_COLORS = ['', '#60A5FA', '#FACC15', '#FB923C', '#EF4444'];
+const BOSS = { bg: [76, 20, 76], alpha: 0.85, border: '#cc00cc', name: '#f0a6f0' };
+const NORMAL_BG = { bg: [18, 18, 43], alpha: 0.82, name: '#e5e7eb' };
+
+const CANDIDATES = [
+  { key: 'red', label: '暗紅', bg: '#5a1010', alpha: 0.85, border: '#dc2626', name: '#fca5a5' },
+  { key: 'orange', label: '暗橘', bg: '#5a2d0a', alpha: 0.85, border: '#ea580c', name: '#fdba74' },
+  { key: 'teal', label: '青綠', bg: '#0a4640', alpha: 0.85, border: '#14b8a6', name: '#99f6e4' },
+  { key: 'indigo', label: '靛紫（Boss 降一階）', bg: '#2a1f55', alpha: 0.85, border: '#8b7cf6', name: '#c4b5fd' },
+  { key: 'silver', label: '銀框＋標籤（底色同一般怪）', bg: '#12122b', alpha: 0.82, border: '#cbd5e1', name: '#e5e7eb', badge: true },
+];
+
+const SAMPLES = [
+  { name: '冰牙狼王', count: 0, hp: 100 },
+  { name: '血祭大祭司', count: 1, hp: 74 },
+  { name: '碎鏡魔君', count: 2, hp: 100 },
+  { name: '遠古典獄官', count: 3, hp: 52 },
+  { name: '封印術士', count: 4, hp: 100 },
+];
+
+function rollAffixes(count) {
+  const pool = [...AFFIXES];
+  const picked = [];
+  while (picked.length < count) picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return picked.sort((a, b) => AFFIXES.indexOf(a) - AFFIXES.indexOf(b));
+}
+for (const s of SAMPLES) s.affixes = rollAffixes(s.count);
+
+const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const blend = (fg, alpha, under) => fg.map((c, i) => Math.round(c * alpha + under[i] * (1 - alpha)));
+function luminance([r, g, b]) {
+  const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+function contrast(a, b) {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+const mapColor = () => document.getElementById('opt-map').value;
+const isTarget = () => document.getElementById('opt-target').checked;
+
+function card(s, cls, idx, badge = false) {
+  const affixCls = s.count > 0 ? ` monster-affix-${s.count}` : '';
+  const target = idx === 0 && isTarget() ? ' is-target' : '';
+  return `
+  <div class="monster-card${cls}${target}">
+    ${badge ? '<span class="monster-card-unique-tag">獨特</span>' : ''}
+    <div class="monster-card-name${affixCls}">${s.name}</div>
+    ${s.count > 0 ? `<div class="monster-card-affixes">${s.affixes.join(' ')}</div>` : ''}
+    <div class="monster-card-hp"><div class="monster-card-hp-fill" style="width:${s.hp}%"></div></div>
+  </div>`;
+}
+
+function cardsHtml(c) {
+  const uniques = SAMPLES.map((s, i) => card(s, ' is-unique', i, c.badge)).join('');
+  const boss = card({ name: '遠古騎士', count: 2, hp: 100, affixes: ['狂暴', '堅硬'] }, ' is-boss', -1);
+  const normal = card({ name: '遠古囚犯', count: 0, hp: 100, affixes: [] }, '', -1);
+  return uniques + boss + normal;
+}
+
+function contrastHtml(c) {
+  const under = hexToRgb(mapColor());
+  const cardBg = blend(hexToRgb(c.bg), c.alpha, under);
+  const items = [['無詞綴', c.name], ...AFFIX_COLORS.slice(1).map((col, i) => [`${i + 1} 詞綴`, col])]
+    .map(([label, col]) => {
+      const r = contrast(hexToRgb(col), cardBg);
+      return `${label} <b class="${r < 3 ? 'bad' : ''}">${r.toFixed(1)}</b>`;
+    });
+  const bossBg = blend(BOSS.bg, BOSS.alpha, under);
+  const normalBg = blend(NORMAL_BG.bg, NORMAL_BG.alpha, under);
+  const sep = (a, b) => Math.abs(luminance(a) - luminance(b)) < 0.02 && Math.max(...a.map((v, i) => Math.abs(v - b[i]))) < 40;
+  const warn = [sep(cardBg, bossBg) && '與 Boss 卡太接近', sep(cardBg, normalBg) && '與一般怪卡太接近'].filter(Boolean);
+  return `名稱對比：${items.join('　')}${warn.length ? `　<b class="bad">${warn.join('、')}</b>` : ''}`;
+}
+
+function controlsHtml(c) {
+  return `
+  <span class="demo-controls">
+    <label>底色 <input type="color" data-k="${c.key}" data-f="bg" value="${c.bg}"></label>
+    <label>透明度 <input type="range" min="0.5" max="1" step="0.01" data-k="${c.key}" data-f="alpha" value="${c.alpha}"> <span>${c.alpha.toFixed(2)}</span></label>
+    <label>邊框 <input type="color" data-k="${c.key}" data-f="border" value="${c.border}"></label>
+    <label>無詞綴字色 <input type="color" data-k="${c.key}" data-f="name" value="${c.name}"></label>
+  </span>`;
+}
+
+function render() {
+  const root = document.getElementById('candidates');
+  root.innerHTML = CANDIDATES.map(c => {
+    const [r, g, b] = hexToRgb(c.bg);
+    const vars = `--unique-bg: rgba(${r}, ${g}, ${b}, ${c.alpha}); --unique-border: ${c.border}; --unique-name: ${c.name}; background: ${mapColor()};`;
+    return `
+    <div class="demo-section" data-key="${c.key}">
+      <h2>候選：${c.label}${controlsHtml(c)}</h2>
+      <div class="demo-map" style="${vars}">
+        <div class="monster-list-overlay">${cardsHtml(c)}</div>
+      </div>
+      <div class="demo-map demo-mobile" style="${vars} margin-top: 8px;">
+        <div class="monster-list-overlay">${cardsHtml(c)}</div>
+      </div>
+      <div class="demo-contrast">${contrastHtml(c)}</div>
+    </div>`;
+  }).join('');
+
+  root.querySelectorAll('input[data-k]').forEach(input => {
+    input.addEventListener('input', e => {
+      const c = CANDIDATES.find(x => x.key === e.target.dataset.k);
+      const f = e.target.dataset.f;
+      c[f] = f === 'alpha' ? Number(e.target.value) : e.target.value;
+      render();
+    });
+  });
+}
+
+document.getElementById('opt-map').addEventListener('change', render);
+document.getElementById('opt-target').addEventListener('change', render);
+document.getElementById('opt-reroll').addEventListener('click', () => {
+  for (const s of SAMPLES) s.affixes = rollAffixes(s.count);
+  render();
+});
+document.getElementById('opt-export').addEventListener('click', () => {
+  document.getElementById('export').value = CANDIDATES.map(c => {
+    const [r, g, b] = hexToRgb(c.bg);
+    return `/* ${c.label} */\n.monster-card.is-unique { background: rgba(${r}, ${g}, ${b}, ${c.alpha}); border-color: ${c.border}; }\n.monster-card.is-unique .monster-card-name:not([class*="monster-affix-"]) { color: ${c.name}; font-weight: 600; }${c.badge ? '\n/* 卡片上方加「獨特」標籤 .monster-card-unique-tag，底色 = 邊框色 */' : ''}`;
+  }).join('\n\n');
+});
+
+render();
+</script>
+</body>
+</html>

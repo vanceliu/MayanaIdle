@@ -49,6 +49,7 @@ export function changedFields(prev: Record<string, unknown>, next: Record<string
 
 export function toMonsterWire(m: MapMonster): MonsterWire {
   const wire: MonsterWire = { id: m.id, position: { x: m.position.x, y: m.position.y }, isBoss: m.isBoss };
+  if (m.isUnique) wire.isUnique = true;
   if (m.attackRange !== undefined) wire.attackRange = m.attackRange;
   if (m.dummy !== undefined) wire.dummy = m.dummy;
   return wire;
@@ -69,6 +70,7 @@ export function fromMonsterWire(wire: readonly MonsterWire[], current: readonly 
     moveTimer: 0,
     lastPathPlayerPos: w.position,
     isBoss: w.isBoss,
+    ...(w.isUnique ? { isUnique: true } : {}),
     attackRange: w.attackRange,
     dummy: w.dummy,
   }));

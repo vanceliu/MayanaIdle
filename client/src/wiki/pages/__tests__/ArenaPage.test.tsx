@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { ArenaPage } from '../ArenaPage';
-import { ARENA_TIERS, arenaBossOrder } from '../../../models/arena';
+import { ARENA_TIERS, arenaBossOrder, arenaGoldCost } from '../../../models/arena';
 
 /**
  * @vitest-environment jsdom
@@ -17,6 +17,14 @@ describe('ArenaPage', () => {
       expect(screen.getAllByText(`T${t.tier}${t.open ? '' : '（未開放）'}`).length).toBeGreaterThan(0);
       expect(screen.getByText(arenaBossOrder(t).map(b => b.name).join(' → '))).toBeTruthy();
     }
+  });
+
+  it('入場只收金幣，由隊長付、金幣取自身上與帳號倉庫（§ 55.1）', () => {
+    render(<ArenaPage />);
+    for (const t of ARENA_TIERS) expect(screen.getByText(arenaGoldCost(t.tier).toLocaleString())).toBeTruthy();
+    expect(screen.queryByText(/入場材料/)).toBeNull();
+    expect(screen.getByText(/入場費只收金幣，組隊時由隊長付/)).toBeTruthy();
+    expect(screen.getByText(/先扣身上，不足再扣帳號倉庫/)).toBeTruthy();
   });
 
   it('組隊數量表依 model 計算', () => {

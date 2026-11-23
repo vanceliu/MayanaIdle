@@ -3,6 +3,7 @@ import { useGameStore, getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/ga
 import { useMapControlStore } from '../stores/mapControlStore';
 import { isInArena } from '../models/arena';
 import { getMonsterTemplates } from '../models/monsterTemplates';
+import { hasRandomUnique } from '../systems/uniqueSpawn';
 import { useMapMonsterStore } from '../stores/mapMonsterStore';
 import { PixiGame } from './PixiGame';
 import { getRegion, getFloor } from '../models/mapData';
@@ -28,16 +29,17 @@ export function BattleView() {
     loadMap(character.currentRegion, character.currentFloor, savedPos).then(() => {
       // Determine if boss exists in current area's monster pool
       const region = getRegion(character.currentRegion);
+      const hasFloors = region?.floors && region.floors.length > 0;
+      const areaId = hasFloors && character.currentFloor != null
+        ? `${character.currentRegion}-${character.currentFloor}f`
+        : character.currentRegion;
       if (region?.floors && character.currentFloor != null) {
         const floor = getFloor(character.currentRegion, character.currentFloor);
         useMapMonsterStore.getState().setHasBossInPool(floor?.isBossFloor ?? false);
       } else {
-        const hasFloors = region?.floors && region.floors.length > 0;
-        const areaId = hasFloors && character.currentFloor != null
-          ? `${character.currentRegion}-${character.currentFloor}f`
-          : character.currentRegion;
         useMapMonsterStore.getState().setHasBossInPool(getMonsterTemplates(areaId).some(m => m.isBoss));
       }
+      useMapMonsterStore.getState().setHasRandomUniqueInPool(hasRandomUnique(getMonsterTemplates(areaId)));
 
       // If auto search is active, start moving after map loads
       const currentSearchMode = useGameStore.getState().searchMode;

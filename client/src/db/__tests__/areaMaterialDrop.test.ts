@@ -3,10 +3,14 @@ import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, EQUIPMENT_SEEDS } from '../see
 import { getItemDefinition, getItemById } from '../../models/items';
 import { ITEM_DEFINITIONS } from '../seed';
 import { resolveArea } from '../../models/mapData';
+import { MONSTER_SEEDS as ALL_MONSTER_SEEDS } from '../seed/monsterSeeds';
 
-/** Lv.30 以下區域與試煉飛龍維持原掉率（`27-drop-table.md` § 27.7） */
+/** Boss 的掉落表；獨特魔物共用 `BOSS_DROP_TABLE_SEEDS`，規格另見 `27-drop-table.md` § 27.10 */
+const BOSS_NAMES = new Set(ALL_MONSTER_SEEDS.filter(m => m.isBoss).map(m => m.name));
+const BOSS_ONLY_DROPS = BOSS_DROP_TABLE_SEEDS.filter(d => BOSS_NAMES.has(d.bossName));
+
+/** Lv.30 以下區域維持原掉率（`27-drop-table.md` § 27.7） */
 const LOW_LEVEL_MAX = 30;
-const LOW_LEVEL_BOSS = '試煉飛龍';
 const isLowArea = (area: string) => (resolveArea(area)?.levelMax ?? 0) <= LOW_LEVEL_MAX;
 
 function getDropItemName(drop: { itemTemplateId?: number }): string | undefined {
@@ -20,7 +24,7 @@ describe('區域素材掉落系統', () => {
     const item = getItemById(d.itemTemplateId);
     return item?.category === 'material';
   });
-  const bossMaterialDrops = BOSS_DROP_TABLE_SEEDS.filter(d => {
+  const bossMaterialDrops = BOSS_ONLY_DROPS.filter(d => {
     if (d.itemType !== 'item' || !d.itemTemplateId) return false;
     const item = getItemById(d.itemTemplateId);
     return item?.category === 'material';
@@ -147,7 +151,7 @@ describe('區域素材掉落系統', () => {
     });
 
     it('所有 Boss 專屬素材都在 BOSS_DROP_TABLE_SEEDS 中', () => {
-      const bossDropNames = BOSS_DROP_TABLE_SEEDS
+      const bossDropNames = BOSS_ONLY_DROPS
         .filter(d => d.itemTemplateId)
         .map(d => getItemById(d.itemTemplateId!)?.name);
       for (const name of BOSS_UNIQUE_MATERIALS) {
@@ -155,22 +159,22 @@ describe('區域素材掉落系統', () => {
       }
     });
 
-    it('Boss 專屬素材掉落率：試煉飛龍 30%、其餘 15%', () => {
-      const uniqueDrops = BOSS_DROP_TABLE_SEEDS.filter(d => {
+    it('Boss 專屬素材掉落率一律 10%（`27-drop-table.md` § 27.7 第 13 條）', () => {
+      const uniqueDrops = BOSS_ONLY_DROPS.filter(d => {
         if (!d.itemTemplateId) return false;
         const name = getItemById(d.itemTemplateId)?.name;
         return name && BOSS_UNIQUE_MATERIALS.includes(name);
       });
       expect(uniqueDrops.length).toBe(BOSS_UNIQUE_MATERIALS.length);
       for (const drop of uniqueDrops) {
-        expect(drop.dropValue, drop.bossName).toBe(drop.bossName === LOW_LEVEL_BOSS ? 300 : 150);
+        expect(drop.dropValue, drop.bossName).toBe(100);
       }
     });
 
     it('每個 Boss 只掉一種專屬素材', () => {
-      const bossNames = [...new Set(BOSS_DROP_TABLE_SEEDS.map(d => d.bossName))];
+      const bossNames = [...new Set(BOSS_ONLY_DROPS.map(d => d.bossName))];
       for (const boss of bossNames) {
-        const uniqueDropsForBoss = BOSS_DROP_TABLE_SEEDS.filter(d => {
+        const uniqueDropsForBoss = BOSS_ONLY_DROPS.filter(d => {
           if (d.bossName !== boss || !d.itemTemplateId) return false;
           const name = getItemById(d.itemTemplateId)?.name;
           return name && BOSS_UNIQUE_MATERIALS.includes(name);

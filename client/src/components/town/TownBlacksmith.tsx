@@ -1,22 +1,20 @@
 import { useState, useMemo } from 'react';
 import { useGameStore, type CraftResult } from '../../stores/gameStore';
 import type { EquipmentTemplate } from '../../models/equipment';
-import { ARMOR_STABILITY_MIN, ARMOR_STABILITY_MAX, formatMagicAttack } from '../../models/equipment';
-import { EQUIPMENT_TIER_NAMES } from '../../models/equipmentTier';
-import { AttributeRequirement } from '../AttributeRequirement';
+import { UNIQUE_CRAFTED_GEAR_SUFFIX } from '../../models/equipment';
 import { GameIcon } from '../GameIcon';
 import { Tooltip } from '../Tooltip';
 import { EquipmentDetail } from '../EquipmentInfo';
 import { getEquipIcon, resolveItemIcon } from '../../models/iconMap';
 import { getItemById } from '../../models/items';
 import {
-  CRAFT_SOURCE_ORDER, evaluateCraftRequirements, findCraftPrerequisiteCandidates, getCraftSources, hasCraftQuestFor,
+  craftQuestId, evaluateCraftRequirements, findCraftPrerequisiteCandidates, getCraftSources, hasCraftQuestFor,
 } from '../../systems/craftQuestSystem';
 import { MAX_ACTIVE_CRAFT_QUESTS } from '../../models/craftQuest';
 import { getDismantleOutcome } from '../../systems/crafting';
 import type { EquipmentInstance } from '../../models/equipment';
 
-import { getEquipmentTierColor, getEquipmentInstanceTierColor } from '../../models/equipmentTier';
+import { getEquipmentInstanceTierColor } from '../../models/equipmentTier';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { useEquipmentTemplates } from '../../hooks/useEquipmentTemplates';
 import {
@@ -26,8 +24,12 @@ import {
 import { crystalImproves, type AbilityCrystal } from '../../models/abilityCrystal';
 import { BlacksmithAbilitySwap } from './BlacksmithAbilitySwap';
 import { BlacksmithPrereqPicker, CRAFT_SOURCE_LABEL, PrereqName } from './BlacksmithPrereqPicker';
+import { BlacksmithUniqueCraft } from './BlacksmithUniqueCraft';
+import { CraftCategoryTabs, RecipeRequirementChips, RecipeSummary, matchesCraftCategory } from './BlacksmithRecipeParts';
 
-type BlacksmithTab = 'craft' | 'dismantle' | 'swap';
+type BlacksmithTab = 'craft' | 'unique' | 'dismantle' | 'swap';
+
+const TAB_LABELS: Record<BlacksmithTab, string> = { craft: '裝備製作', unique: '獨特製作', dismantle: '裝備拆解', swap: '技能更換' };
 
 export function TownBlacksmith() {
   const char = useGameStore(s => s.character);
@@ -123,7 +125,9 @@ export function TownBlacksmith() {
   async function handleDismantle(item: EquipmentInstance, hasYields: boolean, crystal: AbilityCrystal | undefined) {
     const warning = item.enhancement > 0 ? `\n強化 +${item.enhancement} 不退還。` : '';
     const crystalLine = crystal ? `\n隨機技能「${getAbilityDefinition(crystal.type)!.name}」會存成技能結晶。` : '';
-    if (!window.confirm(`確定拆解 ${item.name}？${hasYields ? '只退還一半材料。' : '不退材料。'}${crystalLine}${warning}`)) return;
+    const refund = !hasYields ? '不退材料。'
+      : item.isUniqueCraftedGear ? '退還一般配方的全部材料，獨特材料不退。' : '只退還一半材料。';
+    if (!window.confirm(`確定拆解 ${item.name}？${refund}${crystalLine}${warning}`)) return;
     const result = await useGameStore.getState().dismantleEquipment(item.id!);
     setResultMsg(result.message);
   }
@@ -138,16 +142,18 @@ export function TownBlacksmith() {
 
 
       <div className="shop-tabs">
-        <button className={tab === 'craft' ? 'active' : ''} onClick={() => { setTab('craft'); setResultMsg(null); }}>裝備製作</button>
-        <button className={tab === 'dismantle' ? 'active' : ''} onClick={() => { setTab('dismantle'); setResultMsg(null); }}>裝備拆解</button>
-        <button className={tab === 'swap' ? 'active' : ''} onClick={() => { setTab('swap'); setResultMsg(null); }}>技能更換</button>
+        {(Object.keys(TAB_LABELS) as BlacksmithTab[]).map(t => (
+          <button key={t} className={tab === t ? 'active' : ''} onClick={() => { setTab(t); setResultMsg(null); }}>{TAB_LABELS[t]}</button>
+        ))}
       </div>
 
       {resultMsg && <p className="bs-result">{resultMsg}</p>}
 
       {tab === 'dismantle' && (
         <div className="panel-scroll">
-          <p className="shop-item-desc">有配方的退還一半材料，前置裝備不退；掉落品的隨機技能會存成技能結晶。身上的裝備不能拆。</p>
+          <p className="shop-item-desc">
+            有配方的退還一半材料，{UNIQUE_CRAFTED_GEAR_SUFFIX} 製作品退還一般配方的全部材料（獨特材料不退）；前置裝備不退；掉落品的隨機技能會存成技能結晶。身上的裝備不能拆。
+          </p>
           {dismantlable.length === 0 && <p className="shop-item-desc">背包裡沒有可拆解的裝備</p>}
           <div className="shop-items">
             {dismantlable.map(({ item, yields, crystal }) => {
@@ -182,9 +188,10 @@ export function TownBlacksmith() {
                         {crystalImproves(existing, crystal) && <span className="bs-crystal-mark">{existing ? '（更新）' : '（新）'}</span>}
                       </span>
                     )}
-                    {!crystal && item.ability && item.isCraftedGear && (
+                    {!crystal && item.ability && (item.isCraftedGear || item.isUniqueCraftedGear) && (
                       <span className="shop-item-desc bs-dim">製作品的隨機技能不會留下結晶</span>
                     )}
+                    {item.isUniqueCraftedGear && <span className="shop-item-desc bs-dim">獨特材料不退</span>}
                   </div>
                   <div className="shop-item-actions">
                     <button className="btn-danger" aria-label={`拆解 ${item.name}`} onClick={() => handleDismantle(item, yields !== null, crystal)}>拆解</button>
@@ -198,62 +205,17 @@ export function TownBlacksmith() {
 
       {tab === 'swap' && <BlacksmithAbilitySwap templates={allTemplates} onResult={setResultMsg} />}
 
+      {tab === 'unique' && <BlacksmithUniqueCraft templates={allTemplates} sources={sources} onResult={setResultMsg} />}
+
       {tab === 'craft' && (<>
       {/* 分類是篩選器，跟分頁一樣固定在表頭，不隨配方清單捲動 */}
-      <div className="bs-craft-categories">
-          {[
-            { key: 'sword', label: '單手劍' },
-            { key: 'axe', label: '單手斧' },
-            { key: 'mace', label: '鈍器' },
-            { key: 'staff', label: '法杖' },
-            { key: 'bow', label: '弓' },
-            { key: 'twoHandSword', label: '雙手劍' },
-            { key: 'twoHandAxe', label: '雙手斧' },
-            { key: 'twoHandStaff', label: '雙手法杖' },
-            { key: 'dualBlade', label: '雙刀' },
-            { key: 'claw', label: '鋼爪' },
-            { key: 'shield', label: '盾牌' },
-            { key: 'magicBook', label: '魔導書' },
-            { key: 'armGuard', label: '臂甲' },
-            { key: 'armor-helmet', label: '頭盔' },
-            { key: 'armor-chest', label: '胸甲' },
-            { key: 'armor-shirt', label: '上衣' },
-            { key: 'armor-cloak', label: '斗篷' },
-            { key: 'armor-gloves', label: '手套' },
-            { key: 'armor-boots', label: '鞋子' },
-            { key: 'armor-belt', label: '腰帶' },
-            { key: 'armor-necklace', label: '項鍊' },
-            { key: 'armor-ring1', label: '戒指' },
-          ].map(cat => {
-            const hasItems = craftTemplates.some(t => {
-              if (cat.key.startsWith('armor-')) {
-                return t.type === 'armor' && t.slot === cat.key.replace('armor-', '');
-              }
-              return t.type === cat.key;
-            });
-            if (!hasItems) return null;
-            return (
-              <button
-                key={cat.key}
-                className={craftCategory === cat.key ? 'active' : ''}
-                onClick={() => { setCraftCategory(cat.key); setSelectedRecipe(null); }}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-      </div>
+      <CraftCategoryTabs recipes={craftTemplates} value={craftCategory} onChange={key => { setCraftCategory(key); setSelectedRecipe(null); }} />
 
       {/* 只有配方清單會捲動，資源列與分類固定在上方 */}
       <div className="panel-scroll">
       <div className="shop-items">
           {craftTemplates
-            .filter(recipe => {
-              if (craftCategory.startsWith('armor-')) {
-                return recipe.type === 'armor' && recipe.slot === craftCategory.replace('armor-', '');
-              }
-              return recipe.type === craftCategory;
-            })
+            .filter(recipe => matchesCraftCategory(recipe, craftCategory))
             .map(recipe => (
             <div
               key={recipe.id}
@@ -261,40 +223,7 @@ export function TownBlacksmith() {
               onClick={() => { setSelectedRecipe(recipe); setResultMsg(null); }}
             >
               <div className="shop-item-info">
-                <span className="shop-item-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <GameIcon name={getEquipIcon(recipe.type === 'armor' ? recipe.slot : recipe.type)} size={16} color={getEquipmentTierColor(recipe)} />
-                  {recipe.name}
-                </span>
-                <span className="shop-item-desc">
-                  {recipe.smallMonsterDamage ? `攻擊: ${recipe.smallMonsterDamage}/${recipe.largeMonsterDamage}` : ''}
-                  {recipe.defense ? `防禦: ${recipe.defense}` : ''}
-                  {recipe.magicAttack ? ` | 魔攻+${formatMagicAttack(recipe.magicAttack)}` : ''}
-                  {recipe.blockRate ? ` | 格擋${recipe.blockRate}%` : ''}
-                  {recipe.attackSuccess ? ` | 命中+${recipe.attackSuccess}` : ''}
-                  {recipe.extraAttack ? ` | 額攻+${recipe.extraAttack}` : ''}
-                  {recipe.hpRegen ? ` | 回血+${recipe.hpRegen}` : ''}
-                  {recipe.mpRegen ? ` | 回魔+${recipe.mpRegen}` : ''}
-                  {recipe.bonusHp ? ` | HP+${recipe.bonusHp}` : ''}
-                  {recipe.bonusMp ? ` | MP+${recipe.bonusMp}` : ''}
-                  {recipe.bonusBagSlots ? ` | 背包格子+${recipe.bonusBagSlots}` : ''}
-                  {recipe.bonusWeight ? ` | 負重+${recipe.bonusWeight}` : ''}
-                </span>
-                <span className="shop-item-desc">
-                  {recipe.bonusStats ? `${recipe.bonusStats} | ` : ''}
-                  {recipe.material ? `${recipe.material === 'wood' ? '木' : recipe.material === 'iron' ? '鐵' : recipe.material === 'silver' ? '銀' : recipe.material === 'mithril' ? '米索利' : recipe.material === 'dragon' ? '龍' : '奧里哈魯根'} | ` : ''}
-                  重量{recipe.weight ?? '—'}
-                  {/* 防具的安定值在製作當下才抽（§ 6.10），配方只能標出範圍 */}
-                  {` | 安定值${recipe.stability ?? `${ARMOR_STABILITY_MIN}~${ARMOR_STABILITY_MAX}`}`}
-                  {` | ${recipe.canBreak === false ? '不壞刀' : '會壞刀'}`}
-                </span>
-                <span className="shop-item-desc">
-                  {recipe.tier != null ? `${EQUIPMENT_TIER_NAMES[recipe.tier]} | ` : ''}
-                  {recipe.requiredClass && recipe.requiredClass.length > 0
-                    ? recipe.requiredClass.map(c => CLASS_NAMES_ZH[c as keyof typeof CLASS_NAMES_ZH] ?? c).join('、')
-                    : '全職業'}
-                </span>
-                {/* § 6A.8.8 素質需求：做得出來不等於穿得動，未達標的屬性標紅 */}
-                <AttributeRequirement requirement={recipe.requiredAttributes} className="shop-item-desc" />
+                <RecipeSummary recipe={recipe} />
                 {/* § 7S.6 武器必須指定隨機技能，數值取最弱值 */}
                 {craftRequiresAbility(recipe) && (() => {
                   const chosen = chosenAbility(recipe);
@@ -355,58 +284,7 @@ export function TownBlacksmith() {
                     </span>
                   );
                 })()}
-                <span className="shop-item-desc bs-craft-materials">
-                  {/* 製作費（§ 6A.3） */}
-                  {(() => {
-                    const need = recipe.craftGold ?? 0;
-                    const enough = char.gold >= need;
-                    return (
-                      <span className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
-                        <GameIcon name="items/cut-diamond" size={14} color="var(--accent-gold)" />
-                        <span className="bs-craft-mat-name" style={enough ? { color: 'var(--accent-gold)' } : undefined}>金幣</span>
-                        <span className="bs-craft-mat-count">{char.gold.toLocaleString()}/{need.toLocaleString()}</span>
-                      </span>
-                    );
-                  })()}
-                  {recipe.craftPrerequisiteWeapon && (() => {
-                    const { templateId, quantity } = recipe.craftPrerequisiteWeapon!;
-                    const have = findCraftPrerequisiteCandidates(recipe, sources).length;
-                    const enough = have >= quantity;
-                    // 名稱只用於顯示，一律由 id 反查（§ 99.1 第 3 條）
-                    const tmpl = allTemplates.find(t => t.id === templateId);
-                    const name = tmpl?.name ?? `#${templateId}`;
-                    const color = tmpl ? getEquipmentTierColor(tmpl) : undefined;
-                    return (
-                      <span className={`bs-craft-mat ${enough ? '' : 'lacking'}`}>
-                        <GameIcon name={getEquipIcon(tmpl?.type === 'armor' ? (tmpl.slot ?? 'chest') : (tmpl?.type ?? 'sword'))} size={14} color={color} />
-                        <span className="bs-craft-mat-name" style={enough ? { color } : undefined}>{name}</span>
-                        <span className="bs-craft-mat-count">{have}/{quantity}</span>
-                      </span>
-                    );
-                  })()}
-                  {/* 素材數量為三處合計，hover 看各處存量（§ 6A.3「取用來源」） */}
-                  {evaluateCraftRequirements(recipe, sources, char.gold).materials.map(m => {
-                    const def = getItemById(m.itemId);
-                    const { icon, color, glowClass } = resolveItemIcon(def, 'material');
-                    return (
-                      <Tooltip
-                        key={m.itemId}
-                        position="top"
-                        content={(
-                          <div className="bs-mat-source-tooltip">
-                            {CRAFT_SOURCE_ORDER.map(source => <div key={source}>{CRAFT_SOURCE_LABEL[source]} {m.bySource[source]}</div>)}
-                          </div>
-                        )}
-                      >
-                        <span className={`bs-craft-mat ${m.enough ? '' : 'lacking'}`}>
-                          <GameIcon name={icon} size={14} color={color} className={glowClass} />
-                          <span className="bs-craft-mat-name" style={m.enough ? { color } : undefined}>{def?.name ?? '未知素材'}</span>
-                          <span className="bs-craft-mat-count">{m.have}/{m.need}</span>
-                        </span>
-                      </Tooltip>
-                    );
-                  })}
-                </span>
+                <RecipeRequirementChips status={evaluateCraftRequirements(recipe, sources, char.gold)} templates={allTemplates} />
               </div>
               <div className="shop-item-actions">
                 <button
@@ -422,7 +300,7 @@ export function TownBlacksmith() {
                     return (
                       <button
                         className="btn-danger"
-                        onClick={(e) => { e.stopPropagation(); abandonCraftQuest(`craft-${recipe.id}`); }}
+                        onClick={(e) => { e.stopPropagation(); abandonCraftQuest(craftQuestId(recipe.id!)); }}
                       >
                         取消追蹤
                       </button>

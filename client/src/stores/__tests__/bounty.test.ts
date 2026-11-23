@@ -126,6 +126,18 @@ describe('懸賞契約 store', () => {
     expect(state.combatLogs.some(l => l.text.startsWith('懸賞契約完成'))).toBe(true);
   });
 
+  it('Boss 契約對獨特魔物計數，擲 Boss 掉落時帶掉兩次取比較好（§ 53.5.2、§ 53.5.5）', async () => {
+    useGameStore.setState({ bountyContracts: [signedWolf({ kind: 'boss', monsterName: '冰牙狼王', priceLevel: 33 })] });
+    await kill(wolf({ name: '冰牙狼王', level: 33, isUnique: true }));
+    expect(useGameStore.getState().bountyContracts[0].kills).toBe(1);
+    expect(rollDropsMock.mock.calls[0][0]).toBeDefined();
+
+    // 同名普通怪不算 Boss 契約對象
+    await kill(wolf({ name: '冰牙狼王' }));
+    expect(useGameStore.getState().bountyContracts[0].kills).toBe(1);
+    expect(rollDropsMock.mock.calls[1][0]).toBeUndefined();
+  });
+
   it('組隊時暫停：不計數、不掉兩次', async () => {
     useGameStore.setState({ bountyContracts: [signedWolf()] });
     await kill(wolf(), { bountyActive: false });
@@ -140,7 +152,7 @@ describe('懸賞契約 store', () => {
     await useGameStore.getState().flushSaveNow();
     const prefs = await repo.getCharacterPrefs(useGameStore.getState().character!.id!) as Record<string, any>;
     expect(prefs.bountyContracts).toMatchObject([{ id: 'b1' }]);
-    expect(prefs.bountyBoards['neutral-town'].slots).toHaveLength(5);
+    expect(prefs.bountyBoards['neutral-town'].slots).toHaveLength(6);
     expect(prefs.bountyCompare.affixTypes).toEqual(['crit_rate']);
   });
 });

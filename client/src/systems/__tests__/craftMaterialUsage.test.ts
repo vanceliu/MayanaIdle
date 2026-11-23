@@ -12,7 +12,8 @@ import { ITEM_DEFINITIONS } from '../../db/seed/itemSeeds';
 import { isArmorEquipment, isOffhandDefenseType } from '../../models/equipment';
 import { SIGIL_DEFINITIONS, SIGIL_USAGE_LABEL } from '../../models/sigil';
 import { getItemId } from '../../models/items';
-import { ARENA_TIERS } from '../../models/arena';
+import { UNIQUE_CRAFT_MATERIAL_POOLS } from '../../models/uniqueCraft';
+import { UNIQUE_MONSTER_DROPS } from '../../db/seed/dropSeeds';
 import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES } from '../../models/magicAcademy';
 import { QUEST_MATERIAL_NAME } from '../../models/quest';
 
@@ -124,24 +125,39 @@ describe('印記師用的印記是不進配方的例外', () => {
 });
 
 describe('裝備配方以外的用途（`30-items.md` § 製作用途標記）', () => {
-  it('已開放段位的競技場入場材料都算有用途，標出所屬段位', () => {
-    for (const spec of ARENA_TIERS.filter(t => t.open)) {
-      for (const name of spec.materials) {
-        expect(hasMaterialUsage(id(name)), name).toBe(true);
-        expect(formatMaterialUsage(id(name)), name).toMatch(new RegExp(`^競技場 (T\\d／)*T${spec.tier}(／T\\d)* 入場$`));
+  it('獨特製作材料池的每個素材都標出所屬階級的獨特配方', () => {
+    for (const [tier, ids] of Object.entries(UNIQUE_CRAFT_MATERIAL_POOLS)) {
+      for (const itemId of ids) {
+        expect(hasMaterialUsage(itemId), String(itemId)).toBe(true);
+        expect(formatMaterialUsage(itemId), String(itemId)).toMatch(new RegExp(`(T\\d／)*T${tier}(／T\\d)* 獨特配方`));
       }
     }
   });
 
-  it('跨段位的 Boss 素材列出所有已開放段位，未開放段位不列', () => {
-    expect(formatMaterialUsage(id('殭屍王心臟'))).toBe('競技場 T5／T6 入場');
-    expect(formatMaterialUsage(id('死神碎魂'))).toBe('競技場 T6 入場');
+  it('跨階的 Boss 素材列出所有階級；競技場不再是用途', () => {
+    expect(formatMaterialUsage(id('殭屍王心臟'))).toBe('T5／T6 獨特配方');
+    expect(formatMaterialUsage(id('死神碎魂'))).toBe('T6 獨特配方');
+    expect(formatMaterialUsage(id('試煉飛龍之鱗'))).toBe('T4 獨特配方');
+    expect(formatMaterialUsage(id('冰牙狼王之牙'))).toBe('T4 獨特配方');
+    expect(formatMaterialUsage(id('妖精王獠牙'))).toBe('T6 獨特配方');
   });
 
-  it('Boss 專屬素材（iconTier 6／7）全部有用途', () => {
-    const bossMaterials = ITEM_DEFINITIONS.filter(d => d.category === 'material' && (d.iconTier ?? 0) >= 6);
-    expect(bossMaterials.length).toBe(17);
-    expect(bossMaterials.filter(d => !hasMaterialUsage(d.id)).map(d => d.name)).toEqual([]);
+  it('獨特材料池依 § 6A.3.1：T4 23 種＋3 種 Boss 素材、T5 12 種＋8 種、T6 妖精王獠牙＋8 種', () => {
+    const uniqueMaterials = new Set(UNIQUE_MONSTER_DROPS.map(d => d.materialItemId));
+    const count = (tier: 4 | 5 | 6) => UNIQUE_CRAFT_MATERIAL_POOLS[tier].filter(i => uniqueMaterials.has(i)).length;
+    expect([count(4), count(5), count(6)]).toEqual([23, 12, 1]);
+    expect(UNIQUE_CRAFT_MATERIAL_POOLS[4].filter(i => !uniqueMaterials.has(i)).map(i => ITEM_DEFINITIONS.find(d => d.id === i)!.name))
+      .toEqual(['試煉飛龍之鱗', '雪地之主的凍心', '惡魔之瞳']);
+    expect(UNIQUE_CRAFT_MATERIAL_POOLS[5].filter(i => !uniqueMaterials.has(i)).map(i => ITEM_DEFINITIONS.find(d => d.id === i)!.name))
+      .toEqual(['蛇魔毒囊', '獄王深海珠', '巨龍逆鱗', '皇女毒腺', '哥布林王冠碎片', '吸血鬼血晶', '殭屍王心臟', '約特勒龍鱗']);
+    expect(UNIQUE_CRAFT_MATERIAL_POOLS[6].map(i => ITEM_DEFINITIONS.find(d => d.id === i)!.name))
+      .toEqual(['妖精王獠牙', '遠古騎士紋章', '殭屍王心臟', '約特勒龍鱗', '冥王靈魂石', '伊莉絲霜核', '伊弗利特熔心', '守護者印記', '死神碎魂']);
+  });
+
+  it('Boss 專屬素材與獨特材料（iconTier 6／7）全部有用途', () => {
+    const exclusiveMaterials = ITEM_DEFINITIONS.filter(d => d.category === 'material' && (d.iconTier ?? 0) >= 6);
+    expect(exclusiveMaterials.length).toBe(17 + 36);
+    expect(exclusiveMaterials.filter(d => !hasMaterialUsage(d.id)).map(d => d.name)).toEqual([]);
   });
 
   it('魔法學院配方的碎片與材料都算有用途', () => {

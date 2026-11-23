@@ -22,35 +22,46 @@ export function PrereqName({ item, templates }: { item: EquipmentInstance; templ
   );
 }
 
+/** 挑選視窗的一列；`blockReason` 有值＝灰階列出、不可選 */
+export interface PrereqPickerOption extends CraftPrerequisiteCandidate {
+  blockReason?: string;
+}
+
 /** 前置裝備挑選視窗：背包＋個人／帳號倉庫的候選，點一列即選定並關閉 */
-export function BlacksmithPrereqPicker({ prerequisiteName, candidates, chosenId, templates, onChoose, onClose }: {
+export function BlacksmithPrereqPicker({ prerequisiteName, candidates, chosenId, templates, hint, onChoose, onClose }: {
   prerequisiteName: string;
-  candidates: CraftPrerequisiteCandidate[];
+  candidates: PrereqPickerOption[];
   chosenId: number | undefined;
   templates: EquipmentTemplate[];
+  hint?: string;
   onChoose: (id: number) => void;
   onClose: () => void;
 }) {
+  const usable = candidates.filter(c => !c.blockReason).length;
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content bs-prereq-modal" role="dialog" aria-label="選擇前置裝備" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <span className="modal-title">選擇前置裝備：{prerequisiteName}（{candidates.length} 件）</span>
+          <span className="modal-title">選擇前置裝備：{prerequisiteName}（{usable} 件）</span>
           <button className="modal-close" aria-label="關閉" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body bs-prereq-list" role="radiogroup">
-          {candidates.map(({ source, item }) => (
+          {hint && <p className="bs-prereq-hint">{hint}</p>}
+          {candidates.map(({ source, item, blockReason }) => (
             <span
               key={item.id}
               role="radio"
               aria-checked={chosenId === item.id}
-              className={`bs-prereq-option ${chosenId === item.id ? 'selected' : ''}`}
-              onClick={() => { onChoose(item.id!); onClose(); }}
+              aria-disabled={blockReason ? true : undefined}
+              className={`bs-prereq-option ${chosenId === item.id ? 'selected' : ''}${blockReason ? ' is-disabled' : ''}`}
+              onClick={() => { if (blockReason) return; onChoose(item.id!); onClose(); }}
             >
               <span className="bs-prereq-radio" />
               <PrereqName item={item} templates={templates} />
               <span className="bs-prereq-meta">詞綴 {item.affixes.length} 條</span>
-              <span className="bs-source-tag">{CRAFT_SOURCE_LABEL[source]}</span>
+              {blockReason
+                ? <span className="bs-prereq-disabled-reason">{blockReason}</span>
+                : <span className="bs-source-tag">{CRAFT_SOURCE_LABEL[source]}</span>}
             </span>
           ))}
         </div>

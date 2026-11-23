@@ -3,11 +3,9 @@
  * 場次只存在記憶體；server 重啟後角色身上殘留的場次在放進實例前作廢（§ 55.6）。
  */
 import {
-  ARENA_MATERIAL_COST, ARENA_REGION_ID, arenaGoldCost, arenaMaterialIds, arenaSlotStart, getArenaTier,
-  isArenaSlotUsed, markArenaSlotUsed, refundArenaSlot, type ArenaCharacterRun, type ArenaTier,
+  ARENA_REGION_ID, arenaGoldCost, arenaSlotStart, getArenaTier, isArenaSlotUsed, markArenaSlotUsed,
+  payArenaFee, refundArenaSlot, type ArenaCharacterRun, type ArenaTier,
 } from '../../client/src/models/arena';
-import { getCraftSources, getMaterialTotal } from '../../client/src/systems/craftQuestSystem';
-import { drawAnyOfMaterials } from '../../client/src/systems/crafting';
 import { getNearestTown, getRegion } from '../../client/src/models/mapData';
 import { MAP_THEMES } from '../../client/src/models/mapDataControl';
 import type { MapInstance } from '../../client/src/systems/mapInstance';
@@ -55,7 +53,7 @@ export class ArenaRegistry {
   }
 
   /**
-   * § 55.1／§ 55.4：段位開放、全員在城鎮且等級達標；有人能拿票券時由 `payer` 付金幣與材料。
+   * § 55.1／§ 55.4：段位開放、全員在城鎮且等級達標；有人能拿票券時由 `payer` 付入場金幣。
    * 成功時全員傳送進場（載圖由呼叫端的 `syncWorld` 處理）。
    */
   enter(members: Session[], payer: Session, tierRaw: unknown, now: number = Date.now()): ArenaEnterResult {
@@ -75,21 +73,9 @@ export class ArenaRegistry {
     const eligible = new Set(members.filter(m => !isArenaSlotUsed(m.game.getState().arenaSlots, tier, now)));
     if (eligible.size > 0) {
       const pg = payer.game.getState();
-      const fee = arenaGoldCost(tier);
-      if (pg.character!.gold < fee) return { ok: false, message: '金幣不足' };
-      const ids = arenaMaterialIds(spec);
-      // 材料可取自付費者的背包與個人／帳號倉庫（§ 55.1）
-      const sources = getCraftSources(pg);
-      if (ids.reduce((sum, id) => sum + getMaterialTotal(sources, id), 0) < ARENA_MATERIAL_COST) {
-        return { ok: false, message: '入場材料不足' };
-      }
-      const drawn = drawAnyOfMaterials(ids, ARENA_MATERIAL_COST, sources);
-      payer.game.setState({
-        bagItems: drawn.bag,
-        personalStoredMaterials: drawn.personal,
-        storedMaterials: drawn.shared,
-        character: { ...pg.character!, gold: pg.character!.gold - fee },
-      });
+      const paid = payArenaFee(pg.character!.gold, pg.warehouseGold, arenaGoldCost(tier));
+      if (!paid) return { ok: false, message: '金幣不足（身上與帳號倉庫合計）' };
+      payer.game.setState({ character: { ...pg.character!, gold: paid.gold }, warehouseGold: paid.warehouseGold });
     }
 
     const runKey = `${now.toString(36)}-${++this.seq}`;

@@ -179,6 +179,18 @@ describe('§ 24.6 Boss 控場免疫', () => {
     expect(boss.ccImmuneUntil).toBe(NOW + BOSS_CC_IMMUNE_MS);
   });
 
+  it('獨特魔物同 Boss：首次控場後設定免疫冷卻，冷卻中不再被暈眩', () => {
+    const unique = target({ isUnique: true, name: '冰牙狼王' });
+    castShieldBash(unique);
+    expect(useGameStore.getState().activeEffects.some(e => e.category === 'stun')).toBe(true);
+    expect(unique.ccImmuneUntil).toBe(NOW + BOSS_CC_IMMUNE_MS);
+
+    const immune = target({ isUnique: true, name: '冰牙狼王', ccImmuneUntil: NOW + 10_000 });
+    const result = castShieldBash(immune);
+    expect(useGameStore.getState().activeEffects.some(e => e.category === 'stun')).toBe(false);
+    expect(result.logs.some(l => l.text.includes('免疫控場'))).toBe(true);
+  });
+
   it('小怪無免疫機制，控場正常生效且不設定冷卻', () => {
     const mob = target({ isBoss: false });
     castShieldBash(mob);

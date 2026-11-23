@@ -1,5 +1,4 @@
 import { EQUIPMENT_SEEDS } from '../db/seed/equipmentSeeds';
-import { ARENA_TIERS, arenaMaterialIds } from '../models/arena';
 import { isArmorEquipment } from '../models/equipment';
 import { getItemId } from '../models/items';
 import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES } from '../models/magicAcademy';
@@ -59,7 +58,7 @@ const USAGE_MAP: Map<number, CraftUsage> = (() => {
 })();
 
 /**
- * 裝備配方以外的用途（`30-items.md` § 製作用途標記）：印記師加工、競技場入場、
+ * 裝備配方以外的用途（`30-items.md` § 製作用途標記）：印記師加工、獨特製作、
  * 魔法學院合成、職業任務。**各自由來源資料反查，不手寫 id**。
  * 一個道具可同時有多種用途（魔法書碎片兼進 T4 配方）。
  */
@@ -73,12 +72,18 @@ const SPECIAL_USES: Map<number, string[]> = (() => {
 
   for (const d of SIGIL_DEFINITIONS) add(d.itemId, SIGIL_USAGE_LABEL[d.type]);
 
-  const arenaTiers = new Map<number, number[]>();
-  for (const spec of ARENA_TIERS) {
-    if (!spec.open) continue;
-    for (const itemId of arenaMaterialIds(spec)) arenaTiers.set(itemId, [...(arenaTiers.get(itemId) ?? []), spec.tier]);
+  // 獨特製作：由 `EQUIPMENT_SEEDS.uniqueCraftMaterials` 反查（`06-equipment-acquire.md` § 6A.3.1）
+  const uniqueCraftTiers = new Map<number, Set<number>>();
+  for (const equip of EQUIPMENT_SEEDS) {
+    for (const mat of equip.uniqueCraftMaterials ?? []) {
+      const tiers = uniqueCraftTiers.get(mat.itemId) ?? new Set<number>();
+      tiers.add(equip.tier ?? 0);
+      uniqueCraftTiers.set(mat.itemId, tiers);
+    }
   }
-  for (const [itemId, tiers] of arenaTiers) add(itemId, `競技場 ${tiers.map(t => `T${t}`).join('／')} 入場`);
+  for (const [itemId, tiers] of uniqueCraftTiers) {
+    add(itemId, `${[...tiers].sort((a, b) => a - b).map(t => `T${t}`).join('／')} 獨特配方`);
+  }
 
   for (const id of [SPELLBOOK_FRAGMENT_ID, ...SPELLBOOK_RECIPES.map(r => r.materialItemId)]) add(id, '魔法學院合成魔法書');
 
@@ -107,7 +112,7 @@ export function hasMaterialUsage(itemId: number): boolean {
 }
 
 /**
- * 「T4／T5 配方」／「競技場 T5／T6 入場」／多種用途以「、」串接／空字串（純販售）。
+ * 「T4／T5 配方」／「T5／T6 獨特配方」／多種用途以「、」串接／空字串（純販售）。
  * UI 一律用這個，避免各處自己拼字串。
  */
 export function formatMaterialUsage(itemId: number): string {

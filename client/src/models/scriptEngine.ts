@@ -75,6 +75,8 @@ export type CombatConditionType =
   | 'target_element'
   | 'target_size'
   | 'target_is_boss'
+  /** 目標是獨特魔物（`25-monster-system.md` § 25.13） */
+  | 'target_is_unique'
   | 'target_defense'
   | 'target_level_diff'
   | 'target_range_gt'
@@ -190,6 +192,7 @@ export const COMBAT_CONDITION_LABELS: Record<CombatConditionType, string> = {
   target_element: '目標元素 ＝',
   target_size: '目標體型 ＝',
   target_is_boss: '目標是 Boss',
+  target_is_unique: '目標是獨特魔物',
   target_defense: '目標防禦',
   target_level_diff: '目標等級 － 自身',
   target_range_gt: '目標射程 大於',

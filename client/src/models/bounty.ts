@@ -4,17 +4,17 @@
  * 契約對象一律以區域 id ＋怪物名稱指涉，與冒險任務的判定相同（`36-quest-system.md` § 36.11）。
  * 價格不存契約內，由 `priceLevel` 查表（§ 53.2）。
  */
-import { MONSTER_SEEDS } from '../db/seed/monsterSeeds';
-import { AREA_POOLS, TOWN_BOSS_POOLS, TOWN_MONSTER_POOLS, type QuestTownId } from './adventurerQuest';
+import { AREA_POOLS, BOSS_POOLS, TOWN_BOSS_POOLS, TOWN_MONSTER_POOLS, type QuestTownId } from './adventurerQuest';
 import { latestGameHourAt, nextGameHourAt } from './gameClock';
 import { resolveArea } from './mapData';
+import type { MonsterRank } from './monster';
 
 export type BountyKind = 'monster' | 'boss';
 
 export interface BountyContract {
   id: string;
   kind: BountyKind;
-  /** 契約區域；Boss 契約為 Boss 所在區域 */
+  /** 契約區域；Boss 契約為 `36-quest-system.md` § 36.8.2 的區域欄 */
   areaId: string;
   monsterName: string;
   targetKills: number;
@@ -35,8 +35,8 @@ export interface BountyBoard {
 export type BountyBoards = Partial<Record<QuestTownId, BountyBoard>>;
 
 /** § 53.1 */
-export const BOUNTY_MONSTER_SLOTS = 4;
-export const BOUNTY_BOSS_SLOTS = 1;
+export const BOUNTY_MONSTER_SLOTS = 3;
+export const BOUNTY_BOSS_SLOTS = 3;
 export const BOUNTY_MONSTER_KILLS = { min: 50, max: 100 };
 export const BOUNTY_BOSS_KILLS = { min: 20, max: 30 };
 export const BOUNTY_MIN_PRICE_LEVEL = 30;
@@ -84,8 +84,6 @@ interface BountyCandidate {
   priceLevel: number;
 }
 
-const BOSS_LEVELS = new Map(MONSTER_SEEDS.filter(m => m.isBoss).map(m => [m.name, m.level]));
-
 /** § 53.1：區域最低等級 ≥ 30 的普通怪（區域＋名稱去重） */
 export function getBountyMonsterCandidates(town: QuestTownId): BountyCandidate[] {
   const seen = new Set<string>();
@@ -103,16 +101,15 @@ export function getBountyMonsterCandidates(town: QuestTownId): BountyCandidate[]
   return result;
 }
 
-/** § 53.1：Boss 等級 ≥ 30 */
+/** § 53.1：等級 ≥ 30 的 Boss 與隨機出現的獨特魔物；定時出現的獨特魔物不列入 */
 export function getBountyBossCandidates(town: QuestTownId): BountyCandidate[] {
   const seen = new Set<string>();
   const result: BountyCandidate[] = [];
   for (const entries of Object.values(TOWN_BOSS_POOLS[town])) {
     for (const b of entries ?? []) {
-      const level = BOSS_LEVELS.get(b.name);
-      if (level === undefined || level < BOUNTY_MIN_PRICE_LEVEL || seen.has(b.name)) continue;
+      if (b.timed || b.level < BOUNTY_MIN_PRICE_LEVEL || seen.has(b.name)) continue;
       seen.add(b.name);
-      result.push({ areaId: b.area, monsterName: b.name, priceLevel: level });
+      result.push({ areaId: b.area, monsterName: b.name, priceLevel: b.level });
     }
   }
   return result;
@@ -124,9 +121,10 @@ function randomInt(min: number, max: number, rng: () => number): number {
 
 let bountyIdSeq = 0;
 
+/** 抽中的候選會從 `candidates` 移除，同一份清單不重複（§ 53.1） */
 function drawContract(kind: BountyKind, candidates: BountyCandidate[], rng: () => number, now: number): BountyContract | null {
   if (candidates.length === 0) return null;
-  const c = candidates[Math.floor(rng() * candidates.length)];
+  const [c] = candidates.splice(Math.floor(rng() * candidates.length), 1);
   const range = kind === 'boss' ? BOUNTY_BOSS_KILLS : BOUNTY_MONSTER_KILLS;
   return {
     id: `bounty-${now}-${++bountyIdSeq}`,
@@ -139,8 +137,8 @@ function drawContract(kind: BountyKind, candidates: BountyCandidate[], rng: () =
 }
 
 export function generateBountyBoard(town: QuestTownId, rng: () => number, now: number): BountyBoard {
-  const monsters = getBountyMonsterCandidates(town);
-  const bosses = getBountyBossCandidates(town);
+  const monsters = [...getBountyMonsterCandidates(town)];
+  const bosses = [...getBountyBossCandidates(town)];
   const slots: (BountyContract | null)[] = [];
   for (let i = 0; i < BOUNTY_MONSTER_SLOTS; i++) slots.push(drawContract('monster', monsters, rng, now));
   for (let i = 0; i < BOUNTY_BOSS_SLOTS; i++) slots.push(drawContract('boss', bosses, rng, now));
@@ -174,15 +172,24 @@ export function getBountySignBlock(
   return null;
 }
 
-/** § 53.5.2 */
-export function isBountyTarget(contract: BountyContract, areaId: string, monsterName: string, isBoss: boolean): boolean {
-  if (contract.monsterName !== monsterName) return false;
-  if (contract.kind === 'boss') return isBoss;
-  return !isBoss && contract.areaId === areaId;
+const UNIQUE_BOUNTY_TARGETS = new Set(
+  Object.values(BOSS_POOLS).flat().filter(b => b.rank === 'unique').map(b => b.name),
+);
+
+/** § 53.7：Boss 契約的對象為獨特魔物 */
+export function isUniqueBountyTarget(contract: Pick<BountyContract, 'kind' | 'monsterName'>): boolean {
+  return contract.kind === 'boss' && UNIQUE_BOUNTY_TARGETS.has(contract.monsterName);
 }
 
-export function findBountyFor(signed: SignedBounty[], areaId: string, monsterName: string, isBoss: boolean): SignedBounty | undefined {
-  return signed.find(s => isBountyTarget(s, areaId, monsterName, isBoss));
+/** § 53.5.2：Boss 契約對 Boss 與獨特魔物皆以名稱判定，不檢查區域 */
+export function isBountyTarget(contract: BountyContract, areaId: string, monsterName: string, rank: MonsterRank): boolean {
+  if (contract.monsterName !== monsterName) return false;
+  if (contract.kind === 'boss') return rank !== 'normal';
+  return rank === 'normal' && contract.areaId === areaId;
+}
+
+export function findBountyFor(signed: SignedBounty[], areaId: string, monsterName: string, rank: MonsterRank): SignedBounty | undefined {
+  return signed.find(s => isBountyTarget(s, areaId, monsterName, rank));
 }
 
 /** § 53.5.4：擊殺 +1，達標的契約移除並回傳 */
@@ -190,9 +197,9 @@ export function recordBountyKill(
   signed: SignedBounty[],
   areaId: string,
   monsterName: string,
-  isBoss: boolean,
+  rank: MonsterRank,
 ): { signed: SignedBounty[]; completed: SignedBounty[] } {
-  const target = findBountyFor(signed, areaId, monsterName, isBoss);
+  const target = findBountyFor(signed, areaId, monsterName, rank);
   if (!target) return { signed, completed: [] };
   const kills = target.kills + 1;
   if (kills >= target.targetKills) {

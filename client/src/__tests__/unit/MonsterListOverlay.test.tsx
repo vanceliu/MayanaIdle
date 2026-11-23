@@ -71,6 +71,23 @@ describe('MonsterListOverlay（§ 24.8.3 怪物列表）', () => {
     expect(screen.getByText('骷髏兵')).toBeTruthy();
   });
 
+  it('獨特魔物卡片帶 is-unique，Boss 與一般怪不帶（§ 34「獨特魔物卡片」）', () => {
+    useMonsterHudStore.setState({
+      entries: [
+        createEntry({ id: 'm_1', name: '冰牙狼王', isUnique: true }),
+        createEntry({ id: 'm_2', name: '雪地之主', isBoss: true }),
+        createEntry({ id: 'm_3', name: '雪狼' }),
+      ],
+    });
+
+    render(<MonsterListOverlay />);
+    const [unique, boss, normal] = screen.getAllByTestId('monster-card');
+    expect(unique.classList.contains('is-unique')).toBe(true);
+    expect(unique.classList.contains('is-boss')).toBe(false);
+    expect(boss.classList.contains('is-unique')).toBe(false);
+    expect(normal.classList.contains('is-unique')).toBe(false);
+  });
+
   it('只有正在攻擊的目標卡片有 is-target 高亮', () => {
     useMonsterHudStore.setState({
       entries: [createEntry({ id: 'm_1' }), createEntry({ id: 'm_2', name: '哥布林' })],

@@ -15,7 +15,7 @@ export function isDeliverQuestType(type: AdventurerQuestType): boolean {
 }
 /** 一般任務分頁（errand／collect／endurance） */
 export type BaseQuestDifficulty = 'D' | 'C' | 'B' | 'A' | 'S';
-/** BOSS 任務分頁（errandboss／collectboss），區域池沿用同字母的一般難度（§ 36.3.2） */
+/** BOSS 任務分頁（errandboss／collectboss），目標含獨特魔物（§ 36.3.2） */
 export type BossQuestDifficulty = 'B+' | 'A+' | 'S+';
 export type AdventurerQuestDifficulty = BaseQuestDifficulty | BossQuestDifficulty;
 export type AdventurerQuestStatus = 'available' | 'active' | 'completable';
@@ -152,6 +152,8 @@ export const ENDURANCE_COUNT_RANGE: Record<BaseQuestDifficulty, { min: number; m
 export const COLLECT_TARGET_COUNT_RANGE = { min: 1, max: 5 };
 export const COLLECT_DROP_RATE = 0.4;
 export const BOSS_KILL_COUNT_RANGE = { min: 1, max: 3 };
+/** § 36.2.4：定時出現的獨特魔物，殲滅數固定 */
+export const TIMED_UNIQUE_KILL_COUNT = 1;
 export const BOSS_COLLECT_TARGET_COUNT = 3;
 export const BOSS_COLLECT_DROP_RATE = 0.3;
 
@@ -380,7 +382,8 @@ function buildMonsterPools(): Record<BaseQuestDifficulty, { name: string; area: 
   };
 
   for (const monster of MONSTER_SEEDS) {
-    if (monster.isBoss) continue;
+    // 可指定怪物不含 Boss 與獨特魔物（`36-quest-system.md` § 36.8.0）
+    if (monster.isBoss || monster.isUnique) continue;
     const mapping = QUEST_AREA_MAPPING[monster.area];
     if (!mapping) continue;
     const key = `${monster.name}|${monster.area}`;
@@ -440,10 +443,16 @@ function buildMaterialPools(): Record<BaseQuestDifficulty, MaterialPoolEntry[]> 
 
 export const MATERIAL_POOLS: Record<BaseQuestDifficulty, MaterialPoolEntry[]> = buildMaterialPools();
 
+/** BOSS 分頁的可指定目標：BOSS 或獨特魔物（§ 36.3.2） */
 export interface BossPoolEntry {
   name: string;
+  /** 任務目標區域（§ 36.8.2 區域欄） */
   area: string;
   avgGold: number;
+  level: number;
+  rank: 'boss' | 'unique';
+  /** 定時出現（`every10min`／`halfHourGroup`）的獨特魔物：殲滅固定 1 隻、不出素材收集（§ 36.2.4、§ 36.2.5） */
+  timed: boolean;
 }
 
 interface BossQuestConfig {
@@ -457,7 +466,7 @@ const BOSS_QUEST_CONFIG: BossQuestConfig[] = [
   { monsterName: '試煉飛龍', difficulty: 'B+', questArea: 'trial-highlands-top', avgGold: 2500 },
   { monsterName: '雪地之主', difficulty: 'B+', questArea: 'snow-field-deep', avgGold: 3000 },
   { monsterName: '象牙塔惡魔', difficulty: 'A+', questArea: 'ivory-tower-5f', avgGold: 4000 },
-  // 艾爾薩斯／瓦爾登各只有一隻 A+ BOSS，併入 S+ 讓兩鎮只開一個 BOSS 分頁（§ 36.12.5）
+  // 朦朧蛇魔／深海獄王歸入 S+（§ 36.12.2）
   { monsterName: '朦朧蛇魔', difficulty: 'S+', questArea: 'misty-cave-3f', avgGold: 5000 },
   { monsterName: '深海獄王', difficulty: 'S+', questArea: 'underwater-prison-4f', avgGold: 5000 },
   { monsterName: '安塔巨龍', difficulty: 'A+', questArea: 'dragon-valley-7f', avgGold: 5000 },
@@ -472,11 +481,48 @@ const BOSS_QUEST_CONFIG: BossQuestConfig[] = [
   { monsterName: '守護者之主', difficulty: 'S+', questArea: 'hundred-pillar-81-90f', avgGold: 8500 },
   { monsterName: '百柱死神', difficulty: 'S+', questArea: 'hundred-pillar-91-100f', avgGold: 9000 },
   { monsterName: '遠古騎士', difficulty: 'S+', questArea: 'ancient-dungeon-9f', avgGold: 7500 },
+  // 獨特魔物（§ 36.8.2）：跨樓層地圖組的區域取最低樓層
+  { monsterName: '冰牙狼王', difficulty: 'B+', questArea: 'snow-field', avgGold: 3000 },
+  { monsterName: '妖魔大頭目', difficulty: 'B+', questArea: 'demon-forest', avgGold: 3000 },
+  { monsterName: '鏡之守護靈', difficulty: 'B+', questArea: 'mirror-forest', avgGold: 3000 },
+  { monsterName: '骸骨百夫長', difficulty: 'B+', questArea: 'dragon-valley-outskirts', avgGold: 3000 },
+  { monsterName: '冰晶蝙蝠王', difficulty: 'B+', questArea: 'ivory-tower-1f', avgGold: 3000 },
+  { monsterName: '腐根樹王', difficulty: 'B+', questArea: 'rotleaf-path', avgGold: 3000 },
+  { monsterName: '湖光幻后', difficulty: 'B+', questArea: 'glimmer-shore', avgGold: 3000 },
+  { monsterName: '象牙大巫師', difficulty: 'B+', questArea: 'ivory-tower-2f', avgGold: 3000 },
+  { monsterName: '霜甲隊長', difficulty: 'A+', questArea: 'ivory-tower-3f', avgGold: 4000 },
+  { monsterName: '象牙魔導長', difficulty: 'A+', questArea: 'ivory-tower-3f', avgGold: 4000 },
+  { monsterName: '血祭大祭司', difficulty: 'A+', questArea: 'demon-altar', avgGold: 4000 },
+  { monsterName: '祭壇巨像', difficulty: 'A+', questArea: 'demon-altar', avgGold: 4000 },
+  { monsterName: '碎鏡魔君', difficulty: 'A+', questArea: 'shattered-mirror', avgGold: 4000 },
+  { monsterName: '逆影獵王', difficulty: 'A+', questArea: 'shattered-mirror', avgGold: 4000 },
+  { monsterName: '巨人酋長', difficulty: 'A+', questArea: 'dragon-valley-surface', avgGold: 4000 },
+  { monsterName: '飛龍王', difficulty: 'A+', questArea: 'dragon-valley-surface', avgGold: 4000 },
+  { monsterName: '霜核元素', difficulty: 'A+', questArea: 'ivory-tower-4f', avgGold: 4000 },
+  { monsterName: '霜甲統領', difficulty: 'A+', questArea: 'ivory-tower-4f', avgGold: 4000 },
+  { monsterName: '蜥蜴首領', difficulty: 'A+', questArea: 'misty-cave-1f', avgGold: 4000 },
+  { monsterName: '典獄長', difficulty: 'A+', questArea: 'underwater-prison-1f', avgGold: 4000 },
+  { monsterName: '骷髏軍團長', difficulty: 'A+', questArea: 'dragon-valley-1f', avgGold: 4000 },
+  { monsterName: '溺亡之主', difficulty: 'A+', questArea: 'underwater-prison-2f', avgGold: 4000 },
+  { monsterName: '亡魂將軍', difficulty: 'A+', questArea: 'ancient-battlefield', avgGold: 4000 },
+  { monsterName: '洞窟巨蟲母', difficulty: 'A+', questArea: 'misty-cave-2f', avgGold: 5000 },
+  { monsterName: '大莫蜘蛛女王', difficulty: 'A+', questArea: 'dragon-valley-3f', avgGold: 5000 },
+  { monsterName: '骷髏神射將', difficulty: 'A+', questArea: 'dragon-valley-3f', avgGold: 5000 },
+  { monsterName: '骷髏親衛隊長', difficulty: 'A+', questArea: 'dragon-valley-3f', avgGold: 5000 },
+  { monsterName: '潮汐巨靈', difficulty: 'A+', questArea: 'underwater-prison-3f', avgGold: 5000 },
+  { monsterName: '怨魂聚合體', difficulty: 'A+', questArea: 'dragon-valley-5f', avgGold: 5000 },
+  { monsterName: '遠古獄卒長', difficulty: 'S+', questArea: 'ancient-dungeon-1f', avgGold: 5000 },
+  { monsterName: '遠古狙擊官', difficulty: 'S+', questArea: 'ancient-dungeon-1f', avgGold: 5000 },
+  { monsterName: '遠古典獄官', difficulty: 'S+', questArea: 'ancient-dungeon-3f', avgGold: 5000 },
+  { monsterName: '遠古弓術長', difficulty: 'S+', questArea: 'ancient-dungeon-3f', avgGold: 5000 },
+  { monsterName: '封印術士', difficulty: 'S+', questArea: 'ancient-dungeon-3f', avgGold: 5000 },
+  { monsterName: '封印屍王', difficulty: 'S+', questArea: 'ancient-dungeon-5f', avgGold: 5000 },
+  { monsterName: '遠古食人妖精王', difficulty: 'S+', questArea: 'ancient-dungeon-7f', avgGold: 7000 },
 ];
 
 function buildBossPools(): Record<BossQuestDifficulty, BossPoolEntry[]> {
   const pools: Record<BossQuestDifficulty, BossPoolEntry[]> = { 'B+': [], 'A+': [], 'S+': [] };
-  const bossSeeds = MONSTER_SEEDS.filter(m => m.isBoss);
+  const bossSeeds = MONSTER_SEEDS.filter(m => m.isBoss || m.isUnique);
 
   for (const config of BOSS_QUEST_CONFIG) {
     const seed = bossSeeds.find(b => b.name === config.monsterName);
@@ -485,6 +531,9 @@ function buildBossPools(): Record<BossQuestDifficulty, BossPoolEntry[]> {
       name: seed.name,
       area: config.questArea,
       avgGold: config.avgGold,
+      level: seed.level,
+      rank: seed.isBoss ? 'boss' : 'unique',
+      timed: !seed.isBoss && seed.spawnMode !== undefined && seed.spawnMode !== 'random',
     });
   }
 
@@ -545,8 +594,7 @@ function buildTownBossPools(): Record<QuestTownId, Partial<Record<BossQuestDiffi
     const areaIds = getTownAreaIds(town);
     const difficulties: BossQuestDifficulty[] = ['B+', 'A+', 'S+'];
     for (const diff of difficulties) {
-      // BOSS 分頁沿用同字母一般難度的區域池（§ 36.12.2）
-      if (!TOWN_AREA_POOLS[town][getBaseDifficulty(diff)]) continue;
+      // § 36.3.2：不要求同字母的一般難度池，城鎮任一區域池內有該難度目標即可
       const filtered = BOSS_POOLS[diff].filter(b => areaIds.has(b.area));
       if (filtered.length > 0) result[town][diff] = filtered;
     }
@@ -558,7 +606,7 @@ export const TOWN_BOSS_POOLS = buildTownBossPools();
 
 /**
  * § 36.6.1：一般分頁需要該城鎮有對應區域池；
- * BOSS 分頁另需該池內至少有一隻 BOSS；不滿足時整個分頁不顯示，不降級為殲滅任務。
+ * BOSS 分頁需該城鎮區域池內至少有一隻該難度的 BOSS 或獨特魔物；不滿足時整個分頁不顯示，不降級為殲滅任務。
  */
 export function getTownDifficulties(townId: QuestTownId): AdventurerQuestDifficulty[] {
   return QUEST_DIFFICULTY_ORDER.filter(d => (
@@ -662,9 +710,12 @@ export const POTION_REWARDS = POTION_REWARD_IDS.map(id => {
 
 export { QUEST_TITLE_TEMPLATES } from '../db/seed/questTemplateSeeds';
 
+/** BOSS 分頁的目標區域可能落在其他字母的區域池（§ 36.3.2），同字母池查不到時查全部 */
 export function getAreaNameById(areaId: string, difficulty: AdventurerQuestDifficulty): string {
   const pool = AREA_POOLS[getBaseDifficulty(difficulty)];
-  return pool.find(a => a.areaId === areaId)?.areaName ?? areaId;
+  return pool.find(a => a.areaId === areaId)?.areaName
+    ?? Object.values(AREA_POOLS).flat().find(a => a.areaId === areaId)?.areaName
+    ?? areaId;
 }
 
 export function getRankIndex(rank: GuildRank): number {

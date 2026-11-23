@@ -66,8 +66,11 @@ function noRandom() {
   vi.spyOn(Math, 'random').mockReturnValue(0.99);
 }
 
+// 獨特魔物的攻擊型別另見 `25-monster-system.md` § 25.13.2，不列入 § 25.8 的弓箭手系表
+const NON_UNIQUE = MONSTER_SEEDS.filter(m => !m.isUnique);
+
 describe('弓箭手 seed 設定（§ 25.8 遠程物理）', () => {
-  const rangedSeeds = MONSTER_SEEDS.filter(m => m.attackType === 'ranged');
+  const rangedSeeds = NON_UNIQUE.filter(m => m.attackType === 'ranged');
 
   it('9 種弓箭手系怪物，共 20 筆', () => {
     expect(rangedSeeds).toHaveLength(20);
@@ -92,7 +95,7 @@ describe('弓箭手 seed 設定（§ 25.8 遠程物理）', () => {
   });
 
   it('巫師／魔導系維持 magic 12 筆，未被本次改動波及', () => {
-    expect(MONSTER_SEEDS.filter(m => m.attackType === 'magic')).toHaveLength(12);
+    expect(NON_UNIQUE.filter(m => m.attackType === 'magic')).toHaveLength(12);
   });
 
   it('ranged 需要射程與視線判定', () => {

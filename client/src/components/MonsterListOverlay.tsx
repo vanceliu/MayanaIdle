@@ -64,7 +64,7 @@ export function MonsterListOverlay() {
         return (
           <div
             key={entry.id}
-            className={`monster-card${entry.isBoss ? ' is-boss' : ''}${entry.id === targetId ? ' is-target' : ''}`}
+            className={`monster-card${entry.isBoss ? ' is-boss' : ''}${entry.isUnique ? ' is-unique' : ''}${entry.id === targetId ? ' is-target' : ''}`}
             data-testid="monster-card"
             role="button"
             tabIndex={0}

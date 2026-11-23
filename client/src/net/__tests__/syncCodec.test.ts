@@ -66,6 +66,15 @@ describe('怪物線上格式', () => {
     expect(toMonsterWire(monster)).toEqual({ id: 'm1', position: { x: 3, y: 4 }, isBoss: true, attackRange: 4 });
   });
 
+  it('獨特魔物旗標隨線上格式來回；一般怪不帶此欄', () => {
+    const wire = toMonsterWire({ ...monster, isBoss: false, isUnique: true });
+    expect(wire.isUnique).toBe(true);
+    expect('isUnique' in toMonsterWire(monster)).toBe(false);
+    const [restored] = fromMonsterWire([wire], []);
+    expect(restored.isUnique).toBe(true);
+    expect(restored.isBoss).toBe(false);
+  });
+
   it('還原時 prevPosition 取 client 上一次的同 id 位置，新怪沒有 prevPosition', () => {
     const current = [{ ...monster, position: { x: 1, y: 1 } }];
     const [same, fresh] = fromMonsterWire(

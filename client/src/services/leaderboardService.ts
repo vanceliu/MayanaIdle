@@ -12,6 +12,7 @@ export type LeaderboardField =
   | 'character_level'
   | 'monstersKilled'
   | 'bossesKilled'
+  | 'uniqueMonstersKilled'
   | 'deathCount'
   | 'equipmentCrafted'
   | 'weaponEnhanceAttempts'
@@ -25,7 +26,7 @@ export type LeaderboardField =
   | 'contribution';
 
 export const LEADERBOARD_FIELDS: LeaderboardField[] = [
-  'character_level', 'monstersKilled', 'bossesKilled', 'deathCount',
+  'character_level', 'monstersKilled', 'bossesKilled', 'uniqueMonstersKilled', 'deathCount',
   'equipmentCrafted', 'weaponEnhanceAttempts', 'armorEnhanceAttempts',
   'weaponsBroken', 'armorsBroken', 'questsCompleted',
   'totalGoldEarned', 'tier7WeaponsLooted', 'tier7ArmorsLooted', 'contribution',
@@ -35,6 +36,7 @@ export const LEADERBOARD_LABELS: Record<LeaderboardField, string> = {
   character_level: '等級',
   monstersKilled: '殺敵數',
   bossesKilled: 'BOSS 討伐',
+  uniqueMonstersKilled: '獨特魔物擊殺',
   deathCount: '死亡次數',
   equipmentCrafted: '製作裝備',
   weaponEnhanceAttempts: '武器強化',

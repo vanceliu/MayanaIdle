@@ -97,7 +97,7 @@ function applyCombatDelta(delta: CombatDelta): void {
     combat.monsterInstances.set(v.id, {
       templateId: v.templateId, name: v.name, level: v.level, currentHp: v.currentHp, maxHp: v.maxHp,
       attackMin: 0, attackMax: 0, defense: 0, exp: 0, race: 'normal', size: v.size,
-      element: v.element, isBoss: v.isBoss, attackType: v.attackType, attackRange: 1.5, attackInterval: 1200,
+      element: v.element, isBoss: v.isBoss, isUnique: v.isUnique, attackType: v.attackType, attackRange: 1.5, attackInterval: 1200,
       isTrainingDummy: v.isTrainingDummy,
       affixes: v.affixes, venom: v.venom, shieldMax: v.shieldMax, shieldRemaining: v.shieldRemaining,
     } as MonsterInstance);

@@ -3,7 +3,6 @@
  */
 import { MONSTER_SEEDS } from '../db/seed';
 import { latestGameHourAt, nextGameHourAt } from './gameClock';
-import { getItemId } from './items';
 import type { MonsterTemplate } from './monster';
 
 export type ArenaTier = 4 | 5 | 6 | 7;
@@ -13,7 +12,6 @@ export const ARENA_REGION_ID = 'arena';
 export const isInArena = (c: { currentRegion: string }): boolean => c.currentRegion === ARENA_REGION_ID;
 export const ARENA_MAX_WAVE = 100;
 export const ARENA_BOSS_WAVE_INTERVAL = 10;
-export const ARENA_MATERIAL_COST = 5;
 export const ARENA_MAX_WAVE_MONSTERS = 10;
 const NORMAL_WAVE_SIZE = 3;
 const BOSS_WAVE_SIZE = 2;
@@ -26,7 +24,7 @@ export interface ArenaTierSpec {
   level: number;
   /** § 55.2：每幾波強化詞綴 +1 */
   affixWaveInterval: number;
-  materials: string[];
+  /** 王名單：`27-drop-table.md` § 27.5 掉落該段位裝備階級的 Boss */
   bosses: string[];
   normalPool: (m: MonsterTemplate) => boolean;
   normalLabel: string;
@@ -36,25 +34,21 @@ export interface ArenaTierSpec {
 export const ARENA_TIERS: readonly ArenaTierSpec[] = [
   {
     tier: 4, open: true, level: 38, affixWaveInterval: 30,
-    materials: ['試煉飛龍之鱗', '雪地之主的凍心', '惡魔之瞳'],
     bosses: ['試煉飛龍', '雪地之主', '象牙塔惡魔'],
     normalPool: m => m.level >= 34 && m.level <= 40, normalLabel: 'Lv.34～40',
   },
   {
     tier: 5, open: true, level: 50, affixWaveInterval: 20,
-    materials: ['蛇魔毒囊', '獄王深海珠', '巨龍逆鱗', '皇女毒腺', '哥布林王冠碎片', '吸血鬼血晶', '殭屍王心臟', '約特勒龍鱗'],
     bosses: ['朦朧蛇魔', '深海獄王', '安塔巨龍', '毒之皇女', '哥布林之王', '暗影吸血鬼', '不死殭屍王', '龍王約特勒'],
     normalPool: m => m.level >= 46 && m.level <= 52, normalLabel: 'Lv.46～52',
   },
   {
     tier: 6, open: true, level: 60, affixWaveInterval: 10,
-    materials: ['遠古騎士紋章', '殭屍王心臟', '約特勒龍鱗', '冥王靈魂石', '伊莉絲霜核', '伊弗利特熔心', '守護者印記', '死神碎魂'],
     bosses: ['遠古騎士', '不死殭屍王', '龍王約特勒', '冥王哈馬斯', '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神'],
     normalPool: m => m.level >= 56 && m.level <= 62, normalLabel: 'Lv.56～62',
   },
   {
     tier: 7, open: false, level: 70, affixWaveInterval: 10,
-    materials: ['遠古騎士紋章', '冥王靈魂石', '伊莉絲霜核', '伊弗利特熔心', '守護者印記', '死神碎魂'],
     bosses: ['遠古騎士', '冥王哈馬斯', '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神'],
     normalPool: m => m.area === 'hundred-pillar-91-100f', normalLabel: '百柱塔 91～100F',
   },
@@ -71,13 +65,16 @@ export function arenaGoldCost(tier: ArenaTier): number {
   return ARENA_GOLD_COST[tier];
 }
 
-/** 入場材料的道具 id */
-export function arenaMaterialIds(spec: ArenaTierSpec): number[] {
-  return spec.materials.map(name => {
-    const id = getItemId(name);
-    if (id == null) throw new Error(`競技場入場材料不存在：${name}`);
-    return id;
-  });
+export interface ArenaFeePayment {
+  gold: number;
+  warehouseGold: number;
+}
+
+/** § 55.1：付費者身上金幣＋帳號倉庫金幣合計付 `fee`，先扣身上；合計不足回 null */
+export function payArenaFee(gold: number, warehouseGold: number, fee: number): ArenaFeePayment | null {
+  if (gold + warehouseGold < fee) return null;
+  const fromCharacter = Math.min(gold, fee);
+  return { gold: gold - fromCharacter, warehouseGold: warehouseGold - (fee - fromCharacter) };
 }
 
 export function isBossWave(wave: number): boolean {
@@ -113,7 +110,7 @@ export function arenaBossForWave(spec: ArenaTierSpec, wave: number): MonsterTemp
 
 /** § 55.2：該段位等級區間內的一般怪（不含 Boss） */
 export function arenaNormalPool(spec: ArenaTierSpec): MonsterTemplate[] {
-  return MONSTER_SEEDS.filter(m => !m.isBoss && spec.normalPool(m));
+  return MONSTER_SEEDS.filter(m => !m.isBoss && !m.isUnique && spec.normalPool(m));
 }
 
 /** § 55.4：票券場每 3 小時重置（遊戲時間 UTC+8 的 00:00、03:00…21:00） */

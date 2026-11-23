@@ -783,6 +783,8 @@ a,
 }
 .arena-wave-note { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.7; margin: 6px 0; }
 .arena-message { font-size: var(--fs-sm); color: var(--accent-gold); margin: 4px 0; }
+.arena-fee-note { font-size: var(--fs-xs); color: var(--text-dim); margin: 0 0 6px; }
+.arena-fee-payer { color: var(--text-dim); font-size: var(--fs-xs); margin-left: 4px; }
 
 /* 統計中心「競技場」分頁 */
 .arena-rank-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
@@ -1968,6 +1970,12 @@ button.active {
   border-color: #cc00cc;
 }
 
+/* 獨特魔物底色（§ 34「獨特魔物卡片」）；名稱有強化詞綴時改依詞綴數上色 */
+.monster-card.is-unique {
+  background: rgba(42, 31, 85, 0.85);
+  border-color: #8b7cf6;
+}
+
 /* 玩家目前攻擊中的目標 */
 .monster-card.is-target {
   border-color: var(--accent-gold);
@@ -1986,6 +1994,11 @@ button.active {
 
 .monster-card.is-boss .monster-card-name {
   color: #f0a6f0;
+  font-weight: 600;
+}
+
+.monster-card.is-unique .monster-card-name {
+  color: #c4b5fd;
   font-weight: 600;
 }
 
@@ -3587,9 +3600,8 @@ button.active {
 
 /* § 6A.3「取用來源」：素材來源明細、前置裝備挑選視窗 */
 .bs-mat-source-tooltip { font-size: var(--fs-sm); line-height: 1.7; white-space: nowrap; }
-/* 三處合計的數字，hover 看各處存量（魔法學院、競技場入場） */
+/* 三處合計的數字，hover 看各處存量（魔法學院） */
 .source-count { border-bottom: 1px dotted var(--text-dim); cursor: help; }
-.arena-mat-count { color: var(--accent-gold); }
 .bs-prereq-open { padding: 1px 8px; font-size: var(--fs-xs); }
 .bs-prereq-name { display: inline-flex; align-items: center; gap: 3px; }
 .bs-source-tag-inline { font-size: var(--fs-xs); color: var(--accent-primary); }
@@ -3605,6 +3617,14 @@ button.active {
 .bs-prereq-option.selected .bs-prereq-radio { background: var(--accent-primary); border-color: var(--accent-primary); }
 .bs-prereq-meta { color: var(--text-dim); font-size: var(--fs-xs); }
 .bs-source-tag { margin-left: auto; font-size: var(--fs-xs); color: var(--accent-primary); }
+.bs-prereq-option.is-disabled { cursor: not-allowed; opacity: 0.45; }
+.bs-prereq-option.is-disabled:hover { background: transparent; }
+.bs-prereq-option.is-disabled .bs-prereq-radio { border-style: dashed; }
+.bs-prereq-disabled-reason { margin-left: auto; font-size: var(--fs-xs); color: var(--text-dim); }
+.bs-prereq-hint { font-size: var(--fs-xs); color: var(--text-dim); margin: 0 0 4px; }
+/* 獨特製作的產物規則行（`06-equipment-acquire.md` § 6A.6「製作品 (獨)」） */
+.bs-unique-rule { color: var(--text-secondary); line-height: 1.6; }
+.bs-unique-rule strong { color: #c4b5fd; font-weight: 600; }
 
 /* § 6A.8.8 素質需求：未達標的屬性標紅，該件的詞綴整組凍結 */
 .equip-detail-unmet { color: var(--accent-danger); }
@@ -6725,6 +6745,17 @@ button.active {
 
 .bounty-kind-tag.is-boss {
   color: #c084fc;
+}
+
+/* Boss 契約對象為獨特魔物（§ 53.7）；配色同獨特魔物卡片 */
+.bounty-unique-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: var(--fs-xs);
+  border: var(--border-width) solid #8b7cf6;
+  border-radius: var(--radius-sm);
+  color: #c4b5fd;
 }
 
 .bounty-price {

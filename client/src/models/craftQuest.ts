@@ -13,6 +13,8 @@
 export interface CraftQuest {
   id: string;
   templateId: number;
+  /** 獨特配方（`06-equipment-acquire.md` § 6A.3.1）；未設＝一般配方 */
+  unique?: true;
 }
 
 /** § 36.13.2：與冒險者工會的 3 個分開計算，互不佔用 */

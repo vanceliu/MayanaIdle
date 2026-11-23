@@ -127,8 +127,11 @@ describe('怪物魔法攻擊減傷（§ 21.16）', () => {
   });
 });
 
+// 獨特魔物的攻擊型別另見 `25-monster-system.md` § 25.13.2，不列入 § 25.8 的巫師／魔導系表
+const NON_UNIQUE = MONSTER_SEEDS.filter(m => !m.isUnique);
+
 describe('魔法怪 seed 設定', () => {
-  const magicSeeds = MONSTER_SEEDS.filter(m => m.attackType === 'magic');
+  const magicSeeds = NON_UNIQUE.filter(m => m.attackType === 'magic');
 
   it('僅巫師／魔導系 9 種怪物，共 12 筆', () => {
     expect(magicSeeds).toHaveLength(12);
@@ -140,7 +143,7 @@ describe('魔法怪 seed 設定', () => {
   });
 
   it('元素系維持近戰（未被誤標）', () => {
-    const elementals = MONSTER_SEEDS.filter(m => /元素$/.test(m.name));
+    const elementals = NON_UNIQUE.filter(m => /元素$/.test(m.name));
     expect(elementals.length).toBeGreaterThan(0);
     for (const m of elementals) expect(m.attackType, m.name).toBeUndefined();
   });

@@ -38,8 +38,8 @@ describe('rollClassSkillBookDrops', () => {
 
   it('不在任何區間時不掉也不耗亂數', () => {
     const random = vi.spyOn(Math, 'random');
-    expect(rollClassSkillBookDrops(30, false, 1000)).toEqual([]);
-    expect(rollClassSkillBookDrops(99, true, 1000)).toEqual([]);
+    expect(rollClassSkillBookDrops(30, 'normal', 1000)).toEqual([]);
+    expect(rollClassSkillBookDrops(99, 'boss', 1000)).toEqual([]);
     expect(random).not.toHaveBeenCalled();
   });
 
@@ -50,14 +50,14 @@ describe('rollClassSkillBookDrops', () => {
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0.99);
-    const drops = rollClassSkillBookDrops(areaLevel, false);
+    const drops = rollClassSkillBookDrops(areaLevel, 'normal');
     expect(drops).toHaveLength(1);
     expect(books).toContain(drops[0]);
   });
 
   it('區間重疊時各級獨立判定，可同時掉兩本', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const drops = rollClassSkillBookDrops(38, true);
+    const drops = rollClassSkillBookDrops(38, 'boss');
     expect(drops).toEqual([LEVEL_3_BOOKS[0], LEVEL_4_BOOKS[0]]);
   });
 
@@ -66,34 +66,34 @@ describe('rollClassSkillBookDrops', () => {
       .mockReturnValueOnce(0.5)
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0);
-    expect(rollClassSkillBookDrops(38, true)).toEqual([LEVEL_4_BOOKS[0]]);
+    expect(rollClassSkillBookDrops(38, 'boss')).toEqual([LEVEL_4_BOOKS[0]]);
   });
 
   it('6、7 級的池子：五職業各一本，由騎士排到盜賊', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    expect(rollClassSkillBookDrops(63, true)).toEqual(ids('血濺咒殺技能書', '復仇之刃技能書'));
+    expect(rollClassSkillBookDrops(63, 'boss')).toEqual(ids('血濺咒殺技能書', '復仇之刃技能書'));
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    expect(rollClassSkillBookDrops(63, true)).toEqual([]);
+    expect(rollClassSkillBookDrops(63, 'boss')).toEqual([]);
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0).mockReturnValueOnce(0.99)
       .mockReturnValueOnce(0).mockReturnValueOnce(0.99);
-    expect(rollClassSkillBookDrops(63, true)).toEqual(ids('冰霧技能書', '閃避反擊技能書'));
+    expect(rollClassSkillBookDrops(63, 'boss')).toEqual(ids('冰霧技能書', '閃避反擊技能書'));
   });
 
   it('掉寶倍率作用在一般怪', () => {
     vi.spyOn(Math, 'random').mockReturnValue(SKILL_BOOK_NORMAL_DROP_RATE * 1.5);
-    expect(rollClassSkillBookDrops(33, false)).toEqual([]);
+    expect(rollClassSkillBookDrops(33, 'normal')).toEqual([]);
 
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(SKILL_BOOK_NORMAL_DROP_RATE * 1.5)
       .mockReturnValueOnce(0);
-    expect(rollClassSkillBookDrops(33, false, 2)).toEqual([LEVEL_3_BOOKS[0]]);
+    expect(rollClassSkillBookDrops(33, 'normal', 2)).toEqual([LEVEL_3_BOOKS[0]]);
   });
 
   it('最終掉率上限 100%', () => {
     vi.spyOn(Math, 'random')
       .mockReturnValueOnce(0.999999)
       .mockReturnValueOnce(0);
-    expect(rollClassSkillBookDrops(48, false, 10000)).toEqual([LEVEL_5_BOOKS[0]]);
+    expect(rollClassSkillBookDrops(48, 'normal', 10000)).toEqual([LEVEL_5_BOOKS[0]]);
   });
 });

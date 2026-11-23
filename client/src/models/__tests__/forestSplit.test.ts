@@ -62,11 +62,12 @@ describe('妖魔森林／明鏡森林三段拆分', () => {
     }
   });
 
-  it('每區 5 種怪，且 region.monsters 與 seed 的 area 完全對應', () => {
+  it('每區 5 種一般怪（另加該區獨特魔物），且 region.monsters 與 seed 的 area 完全對應', () => {
+    const uniqueNames = new Set(MONSTER_SEEDS.filter(m => m.isUnique).map(m => m.name));
     for (const { id } of ALL) {
       const listed = getRegion(id)!.monsters ?? [];
       const seeded = MONSTER_SEEDS.filter(m => m.area === id).map(m => m.name);
-      expect(listed, `${id} 應有 5 種怪`).toHaveLength(5);
+      expect(listed.filter(n => !uniqueNames.has(n)), `${id} 應有 5 種一般怪`).toHaveLength(5);
       expect([...seeded].sort(), `${id} 的 seed 與 region.monsters 不一致`).toEqual([...listed].sort());
     }
   });

@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../seed';
 import { getItemById, getItemDefinition } from '../../models/items';
 import { SIGIL_DEFINITIONS } from '../../models/sigil';
+import { MONSTER_SEEDS as ALL_MONSTER_SEEDS } from '../seed/monsterSeeds';
+
+/** Boss 的掉落表；獨特魔物共用 `BOSS_DROP_TABLE_SEEDS`，規格另見 `27-drop-table.md` § 27.10 */
+const BOSS_NAMES = new Set(ALL_MONSTER_SEEDS.filter(m => m.isBoss).map(m => m.name));
+const BOSS_ONLY_DROPS = BOSS_DROP_TABLE_SEEDS.filter(d => BOSS_NAMES.has(d.bossName));
 
 /**
  * 印記掉落（`27-drop-table.md` § 27.8）：混沌／刺針／重刻／突破在 Lv.31+ 的每個區域
@@ -57,7 +62,7 @@ function sigilDropsOf(area: string) {
 }
 
 function bossSigilDropsOf(boss: string) {
-  return BOSS_DROP_TABLE_SEEDS.filter(
+  return BOSS_ONLY_DROPS.filter(
     d => d.bossName === boss && d.itemTemplateId != null && SIGIL_IDS.has(d.itemTemplateId),
   );
 }
@@ -119,7 +124,7 @@ describe('印記掉落（§ 27.8）', () => {
   });
 
   it('Lv.30 的試煉飛龍以外的 Boss 都掉這四種印記，掉落值 20／突破 10', () => {
-    const bosses = new Set(BOSS_DROP_TABLE_SEEDS.map(d => d.bossName));
+    const bosses = new Set(BOSS_ONLY_DROPS.map(d => d.bossName));
     for (const boss of bosses) {
       const drops = bossSigilDropsOf(boss);
       if (boss === '試煉飛龍') {

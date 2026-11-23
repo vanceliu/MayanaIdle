@@ -6,7 +6,7 @@
  * --only   只處理清單中的指定項目
  * --reuse  不呼叫 ComfyUI，沿用 assets-src/ai-raw/monsters/ 既有原圖重跑後處理
  *
- * 人形底圖：assets-src/monster-bases/<key>.png（`demo/monster-base.html` 匯出）
+ * 人形底圖：assets-src/monster-bases/<key>.png（`demo/monster-base.html` 匯出）；baseRaw 項目以 assets-src/ai-raw/monsters/<baseRaw>.png 為底圖
  * 原圖：assets-src/ai-raw/monsters/<key>.png
  * 輸出：assets-src/monsters/<key>-<view>.png（裁腿）、<key>-<view>-full.png（未裁腿）；view = front／side／back，側面朝右
  */
@@ -47,7 +47,11 @@ for (const job of jobs) {
       if (!existsSync(rawPath)) throw new Error(`--reuse 找不到原圖：${rawPath}`);
     } else {
       let base;
-      if (job.base) {
+      if (job.baseRaw) {
+        const basePath = join(RAW_DIR, `${job.baseRaw}.png`);
+        if (!existsSync(basePath)) throw new Error(`找不到原圖底圖 ${basePath}，先產出 ${job.baseRaw}`);
+        base = await uploadImage(readFileSync(basePath), `mayana-raw-${job.baseRaw}.png`);
+      } else if (job.base) {
         const basePath = join(BASE_DIR, `${job.key}.png`);
         if (!existsSync(basePath)) throw new Error(`找不到底圖 ${basePath}，先用 demo/monster-base.html 匯出`);
         base = await uploadImage(readFileSync(basePath), `mayana-base-${job.key}.png`);

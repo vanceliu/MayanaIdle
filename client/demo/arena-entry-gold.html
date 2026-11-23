@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>競技場入場只收金幣 Demo — MayanaIdle</title>
+<!--
+  競技場 NPC 入場頁（`55-arena.md` § 55.1）：入場只收金幣，預設只顯示改後（只收金幣），可勾選附上現行版本對照。
+  版面樣本：class 與 App.css 相同；段位、等級、王名單、入場費取自 `models/arena.ts`，持有材料為假資料。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/arena-entry-gold.html
+  .demo-* 是這頁的排版；「提案樣式」區塊確認後移入 App.css，其餘來自 App.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 提案樣式（確認後移入 App.css） ═══════════ */
+.arena-fee-note { font-size: var(--fs-xs); color: var(--text-dim); margin: 0 0 6px; }
+.arena-fee-payer { color: var(--text-dim); font-size: var(--fs-xs); margin-left: 4px; }
+
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px 16px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 1000px; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 16px; font-size: var(--fs-sm); }
+.demo-bar fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 10px; margin: 0; }
+.demo-bar legend { color: var(--accent-gold); padding: 0 4px; }
+.demo-bar label { margin-right: 10px; cursor: pointer; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-card {
+  background: var(--bg-panel); border: var(--border-width) solid var(--outline-dark);
+  border-radius: var(--radius-md); padding: 12px; box-sizing: border-box;
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 8px; }
+/* 寬度＝遊戲裡城鎮設施視窗（`.town-modal` 600px） */
+.demo-npc { width: min(600px, 100%); height: 720px; display: flex; flex-direction: column; }
+.demo-npc .guild-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.demo-npc.is-before { opacity: 0.8; }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">競技場入場只收金幣</h1>
+  <p class="demo-note">
+    § 55.1：入場只收金幣（T4 100,000／T5 150,000／T6 250,000／T7 350,000 未開放），不再收材料。<br>
+    組隊時由隊長付；金幣只看付費者身上持有，帳號倉庫的金幣不算。已用掉本時段票券場的段位不收費、不給票券（§ 55.4）。<br>
+    用下方情境切換：金幣足夠／金幣不足／組隊（自己是隊長）／組隊（自己是隊員）。畫面是改後的入場頁；勾「顯示現行版本對照」才會在旁邊多出改版前的介面。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./arenaEntryGoldDemo.tsx"></script>
+</body>
+</html>

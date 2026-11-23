@@ -1,5 +1,6 @@
 import { CLASS_SKILLS } from '../models/classSkills';
 import type { ClassName } from '../models/character';
+import type { MonsterRank } from '../models/monster';
 import { random } from '../core/rng';
 
 interface SkillBookEntry {
@@ -22,7 +23,15 @@ export const ALL_CLASS_SKILL_BOOKS: SkillBookEntry[] = CLASS_SKILLS.map(s => ({
 }));
 
 export const SKILL_BOOK_BOSS_DROP_RATE = 0.025;
+export const SKILL_BOOK_UNIQUE_DROP_RATE = 0.0025;
 export const SKILL_BOOK_NORMAL_DROP_RATE = 0.00025;
+
+/** 各怪物類別的技能書基礎掉率（`23-class-magic.md` § 23.1） */
+export const SKILL_BOOK_DROP_RATE: Record<MonsterRank, number> = {
+  normal: SKILL_BOOK_NORMAL_DROP_RATE,
+  unique: SKILL_BOOK_UNIQUE_DROP_RATE,
+  boss: SKILL_BOOK_BOSS_DROP_RATE,
+};
 
 /** 各級技能書對應的區域 `levelMax` 區間（`23-class-magic.md` § 23.1） */
 export const SKILL_BOOK_LEVEL_RANGES: readonly { level: number; min: number; max: number }[] = [
@@ -46,11 +55,11 @@ export function getSkillBookLevels(areaLevel: number): number[] {
  */
 export function rollClassSkillBookDrops(
   areaLevel: number,
-  isBoss: boolean,
+  rank: MonsterRank,
   dropRateMultiplier: number = 1,
   secondDropRateMultiplier?: number,
 ): number[] {
-  const baseDropRate = isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE;
+  const baseDropRate = SKILL_BOOK_DROP_RATE[rank];
   const dropRate = Math.min(baseDropRate * dropRateMultiplier, 1);
   const secondDropRate = secondDropRateMultiplier === undefined ? undefined : Math.min(baseDropRate * secondDropRateMultiplier, 1);
   const drops: number[] = [];

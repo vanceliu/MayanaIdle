@@ -4,6 +4,8 @@ import { MONSTER_SEEDS } from '../../db/seed';
 import { Link, useParams } from 'react-router-dom';
 import type { Floor, Region } from '../../models/area';
 import { getItemById } from '../../models/items';
+import type { MonsterTemplate } from '../../models/monster';
+import { UNIQUE_SPAWN_NOTE, monsterRankMark } from '../monsterRankMark';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -186,7 +188,7 @@ function FloorSection({ regionId, regionName, floor }: { regionId: string; regio
                 <th>防禦</th>
                 <th>經驗</th>
                 <th>屬性</th>
-                <th>Boss</th>
+                <th>Boss／獨特</th>
               </tr>
             </thead>
             <tbody>
@@ -203,7 +205,7 @@ function FloorSection({ regionId, regionName, floor }: { regionId: string; regio
                   <td className="cell-number">{m.defense}</td>
                   <td className="cell-number">{m.exp}</td>
                   <td><span className={`wiki-badge wiki-badge-${m.element}`}>{ELEMENT_LABELS[m.element]}</span></td>
-                  <td className="cell-center">{m.isBoss ? '★' : ''}</td>
+                  <td className="cell-center">{monsterRankMark(m)}</td>
                 </tr>
               ))}
             </tbody>
@@ -212,6 +214,7 @@ function FloorSection({ regionId, regionName, floor }: { regionId: string; regio
       ) : (
         <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>此樓層無資料</p>
       )}
+      <UniqueSpawnNote monsters={monsters} />
     </div>
   );
 }
@@ -237,7 +240,7 @@ function SingleAreaContent({ areaId }: { areaId: string }) {
                   <th>防禦</th>
                   <th>經驗</th>
                   <th>屬性</th>
-                  <th>Boss</th>
+                  <th>Boss／獨特</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,16 +257,27 @@ function SingleAreaContent({ areaId }: { areaId: string }) {
                     <td className="cell-number">{m.defense}</td>
                     <td className="cell-number">{m.exp}</td>
                     <td><span className={`wiki-badge wiki-badge-${m.element}`}>{ELEMENT_LABELS[m.element]}</span></td>
-                    <td className="cell-center">{m.isBoss ? '★' : ''}</td>
+                    <td className="cell-center">{monsterRankMark(m)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <UniqueSpawnNote monsters={monsters} />
         </>
       ) : (
         <p className="wiki-empty">此區域無怪物資料</p>
       )}
     </>
+  );
+}
+
+/** 有獨特魔物的地圖附一行通用說明，不標個別出現方式與時間（`43-wiki-system.md` § 4.4） */
+function UniqueSpawnNote({ monsters }: { monsters: MonsterTemplate[] }) {
+  if (!monsters.some(m => m.isUnique)) return null;
+  return (
+    <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', margin: '8px 0 0' }}>
+      {UNIQUE_SPAWN_NOTE}
+    </p>
   );
 }

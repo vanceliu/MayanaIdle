@@ -333,6 +333,10 @@ function checkCombatCondition(
       const target = getPrimaryTarget(ctx);
       return !!target && target.instance.isBoss;
     }
+    case 'target_is_unique': {
+      const target = getPrimaryTarget(ctx);
+      return !!target && target.instance.isUnique === true;
+    }
     case 'target_defense': {
       const target = getPrimaryTarget(ctx);
       if (!target) return false;

@@ -96,6 +96,7 @@
 - ability（隨機技能 `{ type, params }`，`params` 為參數鍵 → 整數、秒數存毫秒；生成時決定，之後不變；`07-affix-ability.md`）
 - affixSlots（可用詞綴洞數，未設＝4；封印印記失敗時 −1，`07-affix.md` § 7.1）
 - isCraftedGear（鐵匠製作的實例為 true，顯示名稱加 `(鍛)`、不可使用印記；`06-equipment-acquire.md` § 6A.6）
+- isUniqueCraftedGear（獨特製作的實例為 true，顯示名稱加 `(獨)`、不可使用印記；`06-equipment-acquire.md` § 6A.6「製作品 (獨)」）
 - durability，若未來需要
 - createdAt
 - updatedAt
@@ -246,7 +247,7 @@ baseValue × (1 + qualityPercent / 100)
 | monster_templates | 怪物素質 | ~100 |
 | skill_definitions | 魔法/技能定義 | ~80 |
 | drop_tables | 區域掉落池配置 | ~120 |
-| boss_drop_tables | Boss 專屬掉落池 | ~50 |
+| boss_drop_tables | Boss／獨特魔物專屬掉落池 | ~50 |
 
 ### 模板表結構
 
@@ -290,6 +291,7 @@ server 端維持同一設計：單一資料表 + 型別欄位，不做 polymorph
 | craftTier | enum? | 製作等級：entry / mid / top（craft 時必填） |
 | craftGold | number? | 製作費（craft 時必填，依階級，見 `06-equipment-acquire.md` § 6A.3） |
 | craftMaterials | json? | 製作素材 `[{itemId, amount}]`（craft 時必填；同配方 itemId 不重複，見 `06-equipment-acquire.md` § 6A.3） |
+| uniqueCraftMaterials | json? | 獨特配方 `[{itemId, amount}]`（有 `craftMaterials` 者必填；由產生器指派，見 `06-equipment-acquire.md` § 6A.3.1） |
 | craftPrerequisiteWeapon | json? | 前置武器需求 `{templateId, quantity}`（高級進階以上製作品）。**存 templateId 不存名稱**，見 `99-ai-constraints.md` § 99.1 第 3 條 |
 
 ### 取得方式規則
@@ -315,6 +317,16 @@ server 端維持同一設計：單一資料表 + 型別欄位，不做 polymorph
 ```
 
 素材對應 `item_definitions` 表中的材料物品。
+
+### monster_templates 獨特魔物欄位
+
+| 欄位 | 型態 | 說明 |
+|---|---|---|
+| isUnique | boolean | 獨特魔物（`25-monster-system.md` § 25.13）；為 true 時 `isBoss` 為 false |
+| spawnMode | enum? | 出現方式 `random`／`every10min`／`halfHourGroup`（`26-spawn-pressure.md` § 26.4.1）；只填獨特魔物 |
+| spawnGroup | string? | 地圖組 id，同組共用判定與名單；`every10min`／`halfHourGroup` 必填 |
+
+- 獨特魔物掉落表沿用 `BossDropTableEntry`，以 `bossName` 對應獨特魔物名稱（`27-drop-table.md` § 27.6、§ 27.10）
 
 ---
 
@@ -411,7 +423,7 @@ SQLite（WAL）。靜態模板隨程式碼發布，不進資料庫（§ 18.8）�
 |---|---|---|
 | `users` | `id` | § 18.7 User。**沒有管理員欄位** —— 管理介面憑證在 `server.properties`（`97-selfhosted-server.md` § 97.8） |
 | `sessions` | `token` | `userId`、`createdAt`、`expiresAt`；登出即刪 |
-| `characters` | `id`、`uuid` 唯一、`nameKey` 唯一 | § 18.7 Character，含 `seasonId`、`pool`、統計欄位（`37-statistics.md` § 37.2）。`nameKey` 為名稱正規化後的比對鍵（`19-account-character.md` § 19.4） |
+| `characters` | `id`、`uuid` 唯一、`nameKey` 唯一 | § 18.7 Character，含 `seasonId`、`pool`、統計欄位（`37-statistics.md` § 37.2，含獨特魔物擊殺數 `uniqueMonstersKilled`，不計入 `bossesKilled`）。`nameKey` 為名稱正規化後的比對鍵（`19-account-character.md` § 19.4） |
 | `equipment_instances` | `id` | § 18.3，`ownerId` 指向角色或帳號（帳號倉庫） |
 | `character_bag`、`character_storage` | `id` | § 18.1 背包／倉庫的鍵 |
 | `warehouses`、`warehouse_gold` | `id`／`userId` | § 18.7 帳號倉庫 |

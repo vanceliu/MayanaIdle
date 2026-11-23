@@ -4,6 +4,7 @@
  */
 import { TICK_MS } from '../../client/src/core/clock';
 import { tickWorld, type TickFault } from '../../client/src/systems/worldTick';
+import { tickTimedUniqueSpawns } from '../../client/src/systems/uniqueSpawn';
 import type { CombatVisual } from '../../client/src/systems/combatLoop';
 import { memberIdOf, presentMembers, type MapInstance } from '../../client/src/systems/mapInstance';
 import type {
@@ -73,6 +74,8 @@ export class World {
   private readonly knownInParty = new WeakMap<PlayerSession, Set<number>>();
   /** tick 出錯、等待踢除的玩家（§ 97.2 硬性要求） */
   private readonly faulted = new WeakSet<PlayerSession>();
+  /** 上一個 tick 的 wall clock（ms）；定時獨特魔物的判定時刻以 (上一 tick, 本 tick] 判定是否經過 */
+  private lastTickWallAt: number | null = null;
   /** tick 出錯的玩家交給連線層踢除；由 `GameServer` 接上 */
   onSessionFault: (session: PlayerSession) => void = () => {};
   /** 競技場隊員離場的紀錄交給連線層寫排行榜；由 `GameServer` 接上 */
@@ -539,8 +542,13 @@ export class World {
 
   // ---------- 每 tick ----------
 
-  tick(): Map<Session, CombatVisual[]> {
+  /** `wallNow`：本 tick 的 wall clock（ms），只作定時判定時刻的輸入（`26-spawn-pressure.md` § 26.4.1） */
+  tick(wallNow: number = Date.now()): Map<Session, CombatVisual[]> {
     this.replaceAll('map');
+    if (this.lastTickWallAt !== null) {
+      tickTimedUniqueSpawns(this.instances.all(), this.lastTickWallAt, wallNow, (instance, error) => this.onTickFault({ kind: 'instance', instance, error }));
+    }
+    this.lastTickWallAt = wallNow;
     // 試驗場由 client 本機沙盒模擬（§ 97.2），server 不推進該玩家
     const ticking = [...this.sessions].filter(s => !this.faulted.has(s) && !isTrainingRegion(s.game.getState().character?.currentRegion ?? ''));
     const visuals = tickWorld(TICK_MS, ticking, this.instances.all(), fault => this.onTickFault(fault));

@@ -44,6 +44,14 @@ export function getBossSpawnChance(globalRate = rates.bossSpawn): number {
   return Math.min(1, BOSS_SPAWN_BASE_CHANCE * globalRate);
 }
 
+/** `26-spawn-pressure.md` § 26.4.1：定時出現的獨特魔物判定基礎機率 */
+export const TIMED_UNIQUE_SPAWN_BASE_CHANCE = 0.5;
+
+/** `26-spawn-pressure.md` § 26.4.1：min(100%, 50% × 全域 Boss 生成倍率) */
+export function getTimedUniqueSpawnChance(globalRate = rates.bossSpawn): number {
+  return Math.min(1, TIMED_UNIQUE_SPAWN_BASE_CHANCE * globalRate);
+}
+
 export interface MonsterStatRates {
   hp: number;
   attack: number;

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>懸賞獨特魔物標示 Demo — MayanaIdle</title>
+<!--
+  懸賞契約卡片標明 Boss 或獨特魔物（`53-bounty-contract.md` § 53.7、§ 53.1 Boss 池）：三個候選方案並排比較。
+  版面樣本：class 與 App.css 相同（`.bounty-*`、`.shop-item`）；價格依遊戲的 `getBountyPrice`，契約為假資料（灰脊分部）。
+  獨特魔物配色取自 `34-ui-guidelines.md`「獨特魔物卡片」：邊框 #8b7cf6、文字 #c4b5fd。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/bounty-unique.html
+  .demo-* 是這頁的排版；「提案樣式」區塊確認後只移入選定方案的那幾條到 App.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+/* ═══════════ 提案樣式（確認後移入 App.css） ═══════════ */
+/* 方案 A：獨立標籤 [獨特魔物懸賞] */
+.bounty-kind-tag.is-unique { color: #c4b5fd; }
+/* 方案 B：沿用 [BOSS懸賞]，名稱後加「獨特魔物」小標 */
+.bounty-unique-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: var(--fs-xs);
+  border: var(--border-width) solid #8b7cf6;
+  border-radius: var(--radius-sm);
+  color: #c4b5fd;
+}
+/* 方案 C：卡片配色同怪物列表的獨特魔物卡片 */
+.shop-item.bounty-card-unique { border-color: #8b7cf6; background: rgba(42, 31, 85, 0.85); }
+.shop-item.bounty-card-unique .bounty-target-name { color: #c4b5fd; font-weight: 600; }
+
+/* ═══════════ 這頁專用的排版 ═══════════ */
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; max-width: 1100px; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.demo-card {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px; box-sizing: border-box;
+}
+.demo-card h2 { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 0 0 4px; }
+.demo-card .demo-sub { color: var(--text-dim); font-size: var(--fs-xs); margin: 0 0 8px; line-height: 1.6; }
+.demo-card h4 { margin: 10px 0 6px; }
+/* 寬度＝遊戲裡城鎮設施視窗（`.town-modal` 600px）縮成三欄並排；實際比例以 600px 為準 */
+.demo-option { width: 440px; max-width: 100%; }
+</style>
+</head>
+<body>
+  <h1 class="demo-title">懸賞獨特魔物標示</h1>
+  <p class="demo-note">
+    § 53.7：Boss 契約要標明對象是 Boss 還是獨特魔物（§ 53.1：Boss 池含隨機出現的獨特魔物）。
+    現行一律標 <code>[BOSS懸賞]</code>（<code>.bounty-kind-tag.is-boss</code>，紫 #c084fc）。<br>
+    三個方案各放：普通怪契約、Boss 契約（安塔巨龍）、獨特魔物契約（封印屍王），以及「進行中的懸賞」裡的獨特魔物契約。
+    獨特魔物配色沿用怪物列表卡片（邊框 #8b7cf6、文字 #c4b5fd）。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./bountyUniqueDemo.tsx"></script>
+</body>
+</html>

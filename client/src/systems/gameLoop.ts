@@ -11,7 +11,7 @@ import { tickArenaRun } from './arenaRun';
 import { isInArena } from '../models/arena';
 import type { Position, MapData } from '../models/mapControl';
 import type { MapMonster } from '../stores/mapMonsterStore';
-import { MAX_TRACK_DISTANCE, DESPAWN_DISTANCE } from '../stores/mapMonsterStore';
+import { MAX_TRACK_DISTANCE, DESPAWN_DISTANCE, despawnsByDistance } from '../stores/mapMonsterStore';
 import type { MapMonsterState } from '../stores/mapMonsterStore';
 import { getEffectiveMaxHp, getEffectiveMaxMp } from '../stores/gameStore';
 import { defaultSession, type Session } from '../stores/session';
@@ -410,7 +410,7 @@ export function moveMonstersSafe(
      * 戰鬥中的怪物一律保留，不論距離。
      */
     if (!monsterStore.combatMonsterIds.includes(monster.id)) {
-      if (dist > DESPAWN_DISTANCE) continue;
+      if (dist > DESPAWN_DISTANCE && despawnsByDistance(monster)) continue;
       if (dist > MAX_TRACK_DISTANCE) {
         updated.push({ ...monster, path: [], pathIndex: 0, pathRecalcTimer: 0 });
         continue;

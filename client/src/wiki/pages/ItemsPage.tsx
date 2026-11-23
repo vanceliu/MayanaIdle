@@ -3,7 +3,9 @@ import { ITEM_DEFINITIONS } from '../../db/seed';
 import { useDropSourceForItem, useRegions, getAreaDisplayName, getAreaDropRateText, getDropRate, formatRatePercent } from '../hooks/useWikiData';
 import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../../models/buffPotion';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS, MONSTER_SEEDS } from '../../db/seed';
-import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
+import { ALL_CLASS_SKILL_BOOKS, getSkillBookLevels, SKILL_BOOK_DROP_RATE } from '../../systems/classSkillBookDrop';
+import { monsterRank } from '../../models/monster';
+import { MONSTER_RANK_LABEL } from '../monsterRankMark';
 import { Link, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
 import { resolveItemIcon, MATERIAL_TIER_COLORS, formatRegionMaterialTierRange } from '../../models/iconMap';
@@ -40,7 +42,7 @@ const MATERIAL_TIER_LEGEND = [
   { tier: 3, label: `中等區域素材（${formatRegionMaterialTierRange(3)}）` },
   { tier: 4, label: `進階區域素材（${formatRegionMaterialTierRange(4)}）` },
   { tier: 5, label: `高階區域素材（${formatRegionMaterialTierRange(5)}）` },
-  { tier: 6, label: 'Boss 素材' },
+  { tier: 6, label: 'Boss 素材、獨特材料' },
   { tier: 7, label: '最終 Boss 素材' },
 ].map(t => ({ ...t, color: MATERIAL_TIER_COLORS[t.tier] }));
 
@@ -66,6 +68,12 @@ function getWikiItemIcon(item: ItemDefinition): { icon: string; color?: string; 
 function formatSellPrice(item: ItemDefinition): string {
   if (item.noSell) return '不可販售';
   return item.sellPrice ? `${item.sellPrice.toLocaleString()} G` : '—';
+}
+
+/** 專屬掉落表的來源怪物；獨特魔物標「（獨特魔物）」，Boss 照原名 */
+function bossSourceLabel(name: string): string {
+  const monster = MONSTER_SEEDS.find(m => m.name === name);
+  return monster && monsterRank(monster) === 'unique' ? `${name}（${MONSTER_RANK_LABEL.unique}）` : name;
 }
 
 function formatBuyPrice(item: ItemDefinition): string {
@@ -197,19 +205,20 @@ function ItemDetail({ name }: { name: string }) {
           if (getSkillBookLevels(floor.levelMax).includes(bookLevel)) {
             const areaId = `${region.id}-${floor.floor}f`;
             matchedAreas.add(areaId);
-            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: `基礎 ${formatRatePercent(SKILL_BOOK_NORMAL_DROP_RATE)}` });
+            sources.push({ label: getAreaDisplayName(areaId), area: areaId, rate: `基礎 ${formatRatePercent(SKILL_BOOK_DROP_RATE.normal)}` });
           }
         }
       } else if (getSkillBookLevels(region.levelMax).includes(bookLevel)) {
         matchedAreas.add(region.id);
-        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: `基礎 ${formatRatePercent(SKILL_BOOK_NORMAL_DROP_RATE)}` });
+        sources.push({ label: getAreaDisplayName(region.id), area: region.id, rate: `基礎 ${formatRatePercent(SKILL_BOOK_DROP_RATE.normal)}` });
       }
     }
 
-    // 那些區域中的 Boss
-    const bossMonsters = MONSTER_SEEDS.filter(m => m.isBoss && matchedAreas.has(m.area));
-    for (const boss of bossMonsters) {
-      sources.push({ label: `${boss.name}（Boss）`, area: boss.area, rate: `基礎 ${formatRatePercent(SKILL_BOOK_BOSS_DROP_RATE)}` });
+    // 那些區域中的 Boss 與獨特魔物（`23-class-magic.md` § 23.1）
+    for (const m of MONSTER_SEEDS) {
+      const rank = monsterRank(m);
+      if (rank === 'normal' || !matchedAreas.has(m.area)) continue;
+      sources.push({ label: `${m.name}（${MONSTER_RANK_LABEL[rank]}）`, area: m.area, rate: `基礎 ${formatRatePercent(SKILL_BOOK_DROP_RATE[rank])}` });
     }
 
     return sources;
@@ -301,7 +310,7 @@ function ItemDetail({ name }: { name: string }) {
 
       {BUFF_POTION_ITEM_IDS.includes(item.id) && (
         <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-          Boss 掉落：所有 Boss 共通，每種各自判定（{getDropRate(BUFF_POTION_BOSS_DROP_VALUE)}）
+          Boss、獨特魔物掉落：所有 Boss 與獨特魔物共通，每種各自判定（{getDropRate(BUFF_POTION_BOSS_DROP_VALUE)}）
         </p>
       )}
 
@@ -376,12 +385,12 @@ function ItemDetail({ name }: { name: string }) {
 
       {bossDropSources.length > 0 && (
         <>
-          <p style={{ color: 'var(--text-secondary)', marginTop: 12, marginBottom: 8 }}>Boss 掉落：</p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: 12, marginBottom: 8 }}>Boss、獨特魔物掉落：</p>
           <div className="wiki-table-wrap">
             <table className="wiki-table">
               <thead>
                 <tr>
-                  <th>Boss</th>
+                  <th>怪物</th>
                   <th>掉落機率</th>
                   <th>數量</th>
                 </tr>
@@ -389,7 +398,7 @@ function ItemDetail({ name }: { name: string }) {
               <tbody>
                 {bossDropSources.map((d, i) => (
                   <tr key={`boss-${d.bossName}-${i}`}>
-                    <td>{d.bossName}</td>
+                    <td>{bossSourceLabel(d.bossName)}</td>
                     <td className="cell-number">{getDropRate(d.dropValue)}</td>
                     <td className="cell-number">{d.minAmount && d.maxAmount ? `${d.minAmount}~${d.maxAmount}` : '1'}</td>
                   </tr>

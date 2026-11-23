@@ -4,7 +4,7 @@ import { usePartyStore } from '../../stores/partyStore';
 import type { QuestTownId } from '../../models/adventurerQuest';
 import { formatGameTime } from '../../models/gameClock';
 import {
-  getBountyAreaName, getBountyPrice, getBountySignBlock, getBountyTotalPrice, nextBountyRefreshAt,
+  getBountyAreaName, getBountyPrice, getBountySignBlock, getBountyTotalPrice, isUniqueBountyTarget, nextBountyRefreshAt,
   BOUNTY_SIGN_BLOCK_TEXT, MAX_SIGNED_BOUNTIES,
   type BountyContract, type SignedBounty,
 } from '../../models/bounty';
@@ -18,6 +18,11 @@ export const BOUNTY_SOLO_HINT = '懸賞只在單人時生效；組隊期間暫�
 
 function KindTag({ kind }: { kind: BountyContract['kind'] }) {
   return <span className={`bounty-kind-tag ${kind === 'boss' ? 'is-boss' : ''}`}>[{kind === 'boss' ? 'BOSS懸賞' : '懸賞'}]</span>;
+}
+
+/** § 53.7：Boss 契約對象為獨特魔物時，名稱後加小標 */
+function UniqueTag({ contract }: { contract: BountyContract }) {
+  return isUniqueBountyTarget(contract) ? <span className="bounty-unique-tag">獨特魔物</span> : null;
 }
 
 /** 對象與擊殺數；高亮規則同 `36-quest-system.md` § 36.10.2 */
@@ -40,7 +45,7 @@ function BoardCard({ contract, gold, signed }: { contract: BountyContract; gold:
   return (
     <div className="shop-item">
       <div className="shop-item-info">
-        <span className="shop-item-name"><KindTag kind={contract.kind} /> {contract.monsterName}</span>
+        <span className="shop-item-name"><KindTag kind={contract.kind} /> {contract.monsterName}<UniqueTag contract={contract} /></span>
         <BountyTargetLine contract={contract} />
         <label className="bounty-addon">
           <input type="checkbox" checked={takeBetter} onChange={e => setTakeBetter(e.target.checked)} />
@@ -64,7 +69,7 @@ function SignedCard({ contract, paused }: { contract: SignedBounty; paused: bool
     <div className="shop-item">
       <div className="shop-item-info">
         <span className="shop-item-name">
-          <KindTag kind={contract.kind} /> {contract.monsterName}
+          <KindTag kind={contract.kind} /> {contract.monsterName}<UniqueTag contract={contract} />
           {contract.takeBetter && <span className="bounty-addon-tag">掉兩次取較好</span>}
           {paused && <span className="bounty-paused-tag">組隊中暫停</span>}
         </span>

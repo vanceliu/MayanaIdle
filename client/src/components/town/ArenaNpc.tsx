@@ -7,13 +7,11 @@ import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore } from '../../stores/partyStore';
 import { useTownStore } from '../../stores/townStore';
 import { getBagItemAmount } from '../../models/bagItem';
-import { getMaterialTotal } from '../../systems/craftQuestSystem';
-import { SourceCount, useCraftSources } from './SourceCount';
 import { formatGameTime } from '../../models/gameClock';
 import { getItemById } from '../../models/items';
 import {
-  ARENA_MATERIAL_COST, ARENA_TIERS, arenaGoldCost, arenaMaterialIds, arenaWaveSize, isArenaSlotUsed,
-  nextArenaSlotStart, type ArenaTier, type ArenaTierSpec,
+  ARENA_TIERS, arenaGoldCost, arenaWaveSize, isArenaSlotUsed, nextArenaSlotStart, payArenaFee,
+  type ArenaTier, type ArenaTierSpec,
 } from '../../models/arena';
 import { ARENA_BOXES, ARENA_TICKET_ITEM_IDS, type ArenaBoxDef } from '../../systems/arenaBox';
 import { connection } from '../../net/connection';
@@ -23,34 +21,32 @@ interface EnterResult { ok: boolean; message?: string }
 
 const BOX_DESC = '1/2 機率為 (擬) 擬態品（4 條詞綴＋封印詞綴、武器與飾品必帶隨機技能，不可修改、不可拆）';
 
-function TierCard({ spec, usedSlot, blockReason, onEnter, busy }: {
-  spec: ArenaTierSpec; usedSlot: boolean; blockReason: string | null; onEnter: (tier: ArenaTier) => void; busy: boolean;
+/** 入場費付費者（§ 55.1）：單人為自己；組隊時為隊長 */
+type FeePayer = { kind: 'solo' } | { kind: 'leader' } | { kind: 'member'; leaderName: string };
+
+function TierCard({ spec, usedSlot, blockReason, payer, onEnter, busy }: {
+  spec: ArenaTierSpec; usedSlot: boolean; blockReason: string | null; payer: FeePayer;
+  onEnter: (tier: ArenaTier) => void; busy: boolean;
 }) {
-  // 入場材料取自付費者的背包＋個人倉庫＋帳號倉庫（§ 55.1）
-  const sources = useCraftSources();
+  // § 55.1：付費者身上金幣＋帳號倉庫金幣合計；隊員不付費，不檢查隊長的金幣
   const gold = useGameStore(s => s.character?.gold ?? 0);
-  const ids = arenaMaterialIds(spec);
-  const owned = ids.reduce((sum, id) => sum + getMaterialTotal(sources, id), 0);
+  const warehouseGold = useGameStore(s => s.warehouseGold);
   const fee = arenaGoldCost(spec.tier);
-  const feeBlock = usedSlot ? null : owned < ARENA_MATERIAL_COST ? '材料不足' : gold < fee ? '金幣不足' : null;
-  const reason = blockReason ?? feeBlock;
+  const lacking = spec.open && payer.kind !== 'member' && !usedSlot && payArenaFee(gold, warehouseGold, fee) == null;
+  const reason = blockReason ?? (lacking ? '金幣不足' : null);
   return (
     <div className={`shop-item arena-tier${spec.open ? '' : ' arena-tier-closed'}`}>
       <div className="shop-item-info">
         <span className="shop-item-name">T{spec.tier} 競技場{!spec.open && <span className="arena-closed-tag">未開放</span>}</span>
         <span className="shop-item-desc">Lv.{spec.level} 以上｜一般怪 {spec.normalLabel}｜王：{spec.bosses.join('、')}</span>
-        <span className="shop-item-desc">
-          入場材料（任意混合 {ARENA_MATERIAL_COST} 個）：
-          {spec.materials.map((m, i) => (
-            <span key={m}>
-              {i > 0 && '、'}{m}×<SourceCount sources={sources} itemIds={[ids[i]]} className="arena-mat-count">{getMaterialTotal(sources, ids[i])}</SourceCount>
-            </span>
-          ))}
-        </span>
-        <span className={`bounty-price ${!usedSlot && gold < fee ? 'lacking' : ''}`}>
+        <span className={`bounty-price ${lacking ? 'lacking' : ''}`}>
           {usedSlot
             ? '本時段已用掉票券場：入場不收費、不給票券'
-            : <>💰 {fee.toLocaleString()} 金幣＋材料 <SourceCount sources={sources} itemIds={ids}>{owned}</SourceCount>/{ARENA_MATERIAL_COST}</>}
+            : <>
+                💰 {fee.toLocaleString()} 金幣
+                {payer.kind === 'leader' && <span className="arena-fee-payer">（隊長付）</span>}
+                {payer.kind === 'member' && <span className="arena-fee-payer">（由隊長「{payer.leaderName}」付）</span>}
+              </>}
         </span>
       </div>
       <div className="shop-item-actions">
@@ -83,6 +79,9 @@ function EnterTab() {
   const members = party ? party.members.filter(m => m.online) : [];
   const size = Math.max(1, members.length);
   const notLeader = party != null && party.leaderId !== char.id;
+  const leaderName = party?.members.find(m => m.characterId === party.leaderId)?.name ?? '';
+  const payer: FeePayer = !party ? { kind: 'solo' } : notLeader ? { kind: 'member', leaderName } : { kind: 'leader' };
+  const partyLabel = !party ? '單人' : notLeader ? `組隊 ${size} 人（隊長「${leaderName}」付費）` : `組隊 ${size} 人（隊長付費）`;
 
   const blockReasonOf = (spec: ArenaTierSpec): string | null => {
     if (notLeader) return '組隊時由隊長帶隊進場';
@@ -109,19 +108,20 @@ function EnterTab() {
     <>
       <div className="adventurer-guild-status">
         <span>金幣：{char.gold.toLocaleString()}G</span>
-        <span>{party ? `組隊 ${size} 人（隊長付費）` : '單人'}</span>
+        <span>{partyLabel}</span>
         <span className="bounty-next-refresh">票券場下次重置 {formatGameTime(nextArenaSlotStart(now))}</span>
       </div>
       <p className="arena-wave-note">
         回城卷軸撤退：票券全留；死亡：收回本場票券的一半（無條件捨去）。<br />
         一般波 {arenaWaveSize(1, size)} 隻、第 10 的倍數波出 {arenaWaveSize(10, size)} 隻王；打倒每一輪王得 1 張票券{size > 1 ? '（每人各 1 張）' : ''}；最多 100 波
       </p>
+      <p className="arena-fee-note">票券場入場費由付費者身上金幣與帳號倉庫金幣合計支付，先扣身上，不足再扣帳號倉庫；組隊時由隊長付。</p>
       {message && <p className="arena-message">{message}</p>}
       <div className="panel-scroll">
         <div className="shop-items">
           {ARENA_TIERS.map(spec => (
             <TierCard
-              key={spec.tier} spec={spec} busy={busy} onEnter={enter}
+              key={spec.tier} spec={spec} busy={busy} onEnter={enter} payer={payer}
               usedSlot={isArenaSlotUsed(arenaSlots, spec.tier, now)} blockReason={blockReasonOf(spec)}
             />
           ))}

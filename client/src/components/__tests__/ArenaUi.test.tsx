@@ -6,8 +6,7 @@ import { ArenaRanking } from '../town/ArenaRanking';
 import { useGameStore } from '../../stores/gameStore';
 import { usePartyStore, type PartyView } from '../../stores/partyStore';
 import { connection } from '../../net/connection';
-import { ARENA_MATERIAL_COST, ARENA_TIERS, EMPTY_ARENA_SLOTS, arenaMaterialIds, type ArenaCharacterRun } from '../../models/arena';
-import { makeBagItem } from '../../models/bagItem';
+import { EMPTY_ARENA_SLOTS, arenaGoldCost, arenaSlotStart, type ArenaCharacterRun } from '../../models/arena';
 import type { Character } from '../../models/character';
 
 /**
@@ -16,12 +15,11 @@ import type { Character } from '../../models/character';
  * 競技場 NPC、場內 HUD、統計中心排行榜（`55-arena.md`）。
  */
 
-function setCharacter(level: number) {
+function setCharacter(level: number, gold = 1_000_000, warehouseGold = 0) {
   useGameStore.setState({
-    character: { id: 1, userId: 1, name: '我方', className: 'knight', level, gold: 1_000_000, currentRegion: 'neutral-town' } as Character,
+    character: { id: 1, userId: 1, name: '我方', className: 'knight', level, gold, currentRegion: 'neutral-town' } as Character,
+    warehouseGold,
     bagItems: [],
-    personalStoredMaterials: [],
-    storedMaterials: [],
     arenaSlots: EMPTY_ARENA_SLOTS,
     arenaRun: null,
   } as never);
@@ -51,22 +49,49 @@ describe('ArenaNpc', () => {
     expect(screen.getByText(/回城卷軸撤退：票券全留/)).toBeTruthy();
   });
 
-  it('材料不足時票券場按鈕不能按', () => {
+  it('入場只收金幣：不列材料，顯示金幣來源說明（§ 55.1）', () => {
     render(<ArenaNpc />);
-    expect(screen.getAllByText('材料不足').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/入場材料/)).toBeNull();
+    expect(screen.getByText(`💰 ${arenaGoldCost(4).toLocaleString()} 金幣`)).toBeTruthy();
+    expect(screen.getByText(/身上金幣與帳號倉庫金幣合計支付，先扣身上/)).toBeTruthy();
+    expect((screen.getAllByRole('button', { name: '票券場入場' })[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('身上與帳號倉庫合計不足時票券場按鈕不能按', () => {
+    setCharacter(55, arenaGoldCost(4) - 2, 1);
+    render(<ArenaNpc />);
+    expect(screen.getAllByText('金幣不足').length).toBe(2);
     for (const b of screen.getAllByRole('button', { name: '票券場入場' })) expect((b as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('入場材料算背包＋個人倉庫＋帳號倉庫合計（§ 55.1）', () => {
-    const [id] = arenaMaterialIds(ARENA_TIERS.find(t => t.tier === 4)!);
-    useGameStore.setState({
-      bagItems: [makeBagItem(id, 1)!],
-      personalStoredMaterials: [makeBagItem(id, 1)!],
-      storedMaterials: [makeBagItem(id, ARENA_MATERIAL_COST - 2)!],
-    });
+  it('身上不足但加上帳號倉庫金幣足夠時可以入場', () => {
+    setCharacter(55, arenaGoldCost(4) - 1, 1);
     render(<ArenaNpc />);
-    expect(screen.getAllByText(`${ARENA_MATERIAL_COST}`).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('金幣不足').length).toBe(1);
     expect((screen.getAllByRole('button', { name: '票券場入場' })[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('本時段已用掉的段位不收費，金幣不足也可入場（§ 55.4）', () => {
+    setCharacter(55, 0, 0);
+    useGameStore.setState({ arenaSlots: { slotStart: arenaSlotStart(Date.now()), tiers: [4] } });
+    render(<ArenaNpc />);
+    expect(screen.getByText('本時段已用掉票券場：入場不收費、不給票券')).toBeTruthy();
+    expect((screen.getByRole('button', { name: '入場（不給票券）' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('組隊：隊長看到「隊長付」；隊員看到由隊長「X」付，且不檢查自己的金幣', () => {
+    setCharacter(60);
+    usePartyStore.setState({ party: party(1, 60) });
+    const { unmount } = render(<ArenaNpc />);
+    expect(screen.getAllByText('（隊長付）').length).toBe(4);
+    unmount();
+    setCharacter(60, 0, 0);
+    usePartyStore.setState({ party: party(2, 60) });
+    render(<ArenaNpc />);
+    expect(screen.getAllByText('（由隊長「小白」付）').length).toBe(4);
+    expect(screen.getByText('組隊 2 人（隊長「小白」付費）')).toBeTruthy();
+    expect(screen.queryByText('金幣不足')).toBeNull();
+    for (const b of screen.getAllByRole('button', { name: '票券場入場' })) expect((b as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('組隊時非隊長不能帶隊、隊員等級未達會指名', () => {

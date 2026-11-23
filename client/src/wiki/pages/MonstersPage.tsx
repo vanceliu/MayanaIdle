@@ -3,14 +3,16 @@ import { useMonsterList, useDropTableByArea, useBossDropTableByName, useRegions,
 import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../../models/buffPotion';
 import { CLASS_SKILLS } from '../../models/classSkills';
 import { getItemById } from '../../models/items';
-import { getSkillBookLevels, SKILL_BOOK_BOSS_DROP_RATE, SKILL_BOOK_NORMAL_DROP_RATE } from '../../systems/classSkillBookDrop';
+import { getSkillBookLevels, SKILL_BOOK_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
-import { SLOT_DROP_RATE_BOSS, slotTierBandFor } from '../../models/talent';
+import { slotTierBandFor } from '../../models/talent';
+import { monsterRank, type MonsterRank } from '../../models/monster';
 import {
   MONSTER_AFFIX_COUNT_TABLE, MONSTER_AFFIX_DESCRIPTIONS, MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER,
   MONSTER_AFFIX_DROP_REWARD, MONSTER_AFFIX_GOLD_EXP_REWARD,
 } from '../../models/monsterAffix';
 import { MonsterPortrait } from '../components/MonsterPortrait';
+import { MONSTER_RANK_LABEL, TALENT_SLOT_DROP_RATE, UNIQUE_MARK_COLOR, monsterRankMark } from '../monsterRankMark';
 import '../components/WikiTable.css';
 
 const ELEMENT_LABELS: Record<string, string> = {
@@ -110,7 +112,7 @@ function MonsterList() {
               <th>屬性</th>
               <th>種族</th>
               <th>體型</th>
-              <th>Boss</th>
+              <th>Boss／獨特</th>
               <th>出沒區域</th>
             </tr>
           </thead>
@@ -130,7 +132,7 @@ function MonsterList() {
                 <td><span className={`wiki-badge wiki-badge-${m.element}`}>{ELEMENT_LABELS[m.element]}</span></td>
                 <td>{RACE_LABELS[m.race]}</td>
                 <td>{SIZE_LABELS[m.size]}</td>
-                <td className="cell-center">{m.isBoss ? '★' : ''}</td>
+                <td className="cell-center">{monsterRankMark(m)}</td>
                 <td>
                   <Link className="wiki-link" to={`/wiki/maps/${m.area}`}>
                     {getAreaDisplayName(m.area)}
@@ -157,7 +159,7 @@ function MonsterAffixSection() {
         怪物強化詞綴
       </h3>
       <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
-        怪物生成時有機率帶強化詞綴，一般怪與 Boss 都會出現。詞綴數越多越強，掉落、金幣與經驗也越多。
+        怪物生成時有機率帶強化詞綴，一般怪、獨特魔物與 Boss 都會出現。詞綴數越多越強，掉落、金幣與經驗也越多。
         地圖上的怪物外框與怪物列表卡片的名稱依詞綴數上色，名稱下方列出詞綴；戰鬥日誌寫成「詞綴 原名」。
         懸賞契約的對象至少帶 1 個詞綴；競技場的詞綴數依波次固定，不看下表的機率與等級。
       </p>
@@ -218,6 +220,7 @@ function MonsterDetail({ name }: { name: string }) {
   }
 
   const first = entries[0];
+  const rank = monsterRank(first);
   const allAreas = [...new Set(entries.map(e => e.area))];
 
   return (
@@ -230,7 +233,8 @@ function MonsterDetail({ name }: { name: string }) {
         {first.id !== undefined && <MonsterPortrait templateId={first.id} />}
         <h2 className="wiki-page-title">
           {first.name}
-          {first.isBoss && <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>★ Boss</span>}
+          {rank === 'boss' && <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>★ Boss</span>}
+          {rank === 'unique' && <span style={{ color: UNIQUE_MARK_COLOR, marginLeft: 8 }}>獨特</span>}
         </h2>
       </div>
 
@@ -247,7 +251,7 @@ function MonsterDetail({ name }: { name: string }) {
               <th>屬性</th>
               <th>種族</th>
               <th>體型</th>
-              <th>Boss</th>
+              <th>Boss／獨特</th>
             </tr>
           </thead>
           <tbody>
@@ -266,7 +270,7 @@ function MonsterDetail({ name }: { name: string }) {
                 <td><span className={`wiki-badge wiki-badge-${m.element}`}>{ELEMENT_LABELS[m.element]}</span></td>
                 <td>{RACE_LABELS[m.race]}</td>
                 <td>{SIZE_LABELS[m.size]}</td>
-                <td className="cell-center">{m.isBoss ? '★' : ''}</td>
+                <td className="cell-center">{monsterRankMark(m)}</td>
               </tr>
             ))}
           </tbody>
@@ -276,21 +280,22 @@ function MonsterDetail({ name }: { name: string }) {
       <h3 style={{ color: 'var(--text-primary)', margin: '16px 0 8px', fontFamily: 'var(--font-display)' }}>
         掉落物品
       </h3>
-      {first.isBoss ? (
-        <BossDropSection bossName={first.name} />
+      {rank !== 'normal' ? (
+        <BossDropSection bossName={first.name} rank={rank} />
       ) : (
         allAreas.map(area => (
           <AreaDropSection key={area} area={area} />
         ))
       )}
 
-      <SkillBookDropInfo isBoss={first.isBoss} areas={allAreas} />
-      <TalentDropInfo isBoss={first.isBoss} areas={allAreas} />
+      <SkillBookDropInfo rank={rank} areas={allAreas} />
+      <TalentDropInfo rank={rank} areas={allAreas} />
     </div>
   );
 }
 
-function BossDropSection({ bossName }: { bossName: string }) {
+/** Boss 與獨特魔物各自一張專屬掉落表，只查自己的表（`27-drop-table.md` § 27.6、§ 27.10） */
+function BossDropSection({ bossName, rank }: { bossName: string; rank: Exclude<MonsterRank, 'normal'> }) {
   const drops = useBossDropTableByName(bossName);
 
   if (drops.length === 0) return null;
@@ -298,7 +303,7 @@ function BossDropSection({ bossName }: { bossName: string }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginBottom: 6 }}>
-        Boss 專屬掉落
+        {rank === 'boss' ? 'Boss 專屬掉落' : '獨特魔物專屬掉落'}
       </p>
       <div className="wiki-table-wrap">
         <table className="wiki-table">
@@ -479,16 +484,12 @@ function useMaxAreaLevel(areas: string[]): number {
 }
 
 /**
- * 天賦格掉落（`51-auto-talent.md` § 51.6）。
- *
- * 這一段**每隻怪都一樣**，不進掉落表：只有 Boss 會掉、掉率固定，
- * 可掉的階級只看區域等級。不列的話玩家在怪物頁完全查不到天賦格從哪來。
- *
- * 條件與動作不掉落 —— 一律內建（§ 51.4.1）。
+ * 天賦格掉落（`27-drop-table.md` § 27.9）：不進掉落表，只有 Boss 與獨特魔物會掉，
+ * 掉率依怪物類別固定，可掉階級只看區域等級。條件與動作不掉落（`51-auto-talent.md` § 51.4.1）。
  */
-function TalentDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
+function TalentDropInfo({ rank, areas }: { rank: MonsterRank; areas: string[] }) {
   const maxAreaLevel = useMaxAreaLevel(areas);
-  if (!isBoss) return null;
+  if (rank === 'normal') return null;
   const band = slotTierBandFor(maxAreaLevel);
 
   return (
@@ -508,31 +509,31 @@ function TalentDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] })
                   T{band.min}{band.min !== band.max && `～T${band.max}`}
                 </Link>
               </td>
-              <td>{SLOT_DROP_RATE_BOSS}%</td>
+              <td>{TALENT_SLOT_DROP_RATE[rank]}%</td>
             </tr>
           </tbody>
         </table>
       </div>
       <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0' }}>
-        天賦格只有 Boss 會掉，一般怪不掉。T1 格不掉落，只從角色等級取得。
+        天賦格只有 Boss（{TALENT_SLOT_DROP_RATE.boss}%）與獨特魔物（{TALENT_SLOT_DROP_RATE.unique}%）會掉，一般怪不掉。T1 格不掉落，只從角色等級取得。
       </p>
     </div>
   );
 }
 
-function SkillBookDropInfo({ isBoss, areas }: { isBoss: boolean; areas: string[] }) {
+function SkillBookDropInfo({ rank, areas }: { rank: MonsterRank; areas: string[] }) {
   const maxAreaLevel = useMaxAreaLevel(areas);
   const bookLevels = getSkillBookLevels(maxAreaLevel);
 
   if (bookLevels.length === 0) return null;
 
-  const dropRate = formatRatePercent(isBoss ? SKILL_BOOK_BOSS_DROP_RATE : SKILL_BOOK_NORMAL_DROP_RATE);
+  const dropRate = formatRatePercent(SKILL_BOOK_DROP_RATE[rank]);
   const books = CLASS_SKILLS.filter(s => bookLevels.includes(s.classLevel));
 
   return (
     <div style={{ marginTop: 16 }}>
       <h4 style={{ color: 'var(--accent-info)', marginBottom: 8 }}>
-        職業技能書掉落（{isBoss ? 'Boss' : '一般怪物'} 基礎 {dropRate}）
+        職業技能書掉落（{MONSTER_RANK_LABEL[rank]} 基礎 {dropRate}）
       </h4>
       <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>
         實際掉落率受角色掉寶率、Pressure、怪物強化詞綴與全域倍率影響。{bookLevels.length > 1 ? '多個階級各自獨立判定。' : ''}

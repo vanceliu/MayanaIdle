@@ -31,15 +31,21 @@ export function createMonsterFromTemplate(
   // 試驗場木樁的素質來自玩家在面板上設的參數，不從區域模板抽（§ 50.4.2）
   if (mm.dummy) return createTrainingDummy(mm.dummy);
 
-  // 競技場出波指定模板（`55-arena.md` § 55.2）；其餘依 boss／一般從區域模板抽
+  // 競技場出波與定時出現的獨特魔物指定模板（`55-arena.md` § 55.2、`26-spawn-pressure.md` § 26.4.1）；
+  // 其餘依 boss／`random` 獨特魔物／一般從區域模板抽。獨特魔物不混進一般與退回池
+  const regular = templates.filter(t => !t.isUnique);
   const pool = mm.isBoss
     ? templates.filter(t => t.isBoss)
-    : templates.filter(t => !t.isBoss);
-  const template = mm.arenaSpawn
-    ? MONSTER_SEEDS.find(t => t.id === mm.arenaSpawn!.templateId)
+    : mm.isUnique
+      ? templates.filter(t => t.isUnique && (t.spawnMode ?? 'random') === 'random')
+      : regular.filter(t => !t.isBoss);
+  const fallback = mm.isUnique ? [] : regular;
+  const pinnedId = mm.arenaSpawn?.templateId ?? mm.timedUnique?.templateId;
+  const template = pinnedId !== undefined
+    ? MONSTER_SEEDS.find(t => t.id === pinnedId)
     : pool.length > 0
       ? pool[Math.floor(random() * pool.length)]
-      : templates[Math.floor(random() * templates.length)];
+      : fallback[Math.floor(random() * fallback.length)];
 
   if (!template) return null;
 
@@ -59,6 +65,7 @@ export function createMonsterFromTemplate(
     size: template.size,
     element: template.element,
     isBoss: template.isBoss,
+    ...(template.isUnique ? { isUnique: true } : {}),
     attackType: template.attackType ?? 'melee',
     rangedWeapon: template.rangedWeapon,
     attackRange: template.attackRange ?? 1.5,

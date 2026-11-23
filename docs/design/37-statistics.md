@@ -10,8 +10,9 @@
 
 | 欄位 ID | 名稱 | 說明 |
 |---------|------|------|
-| monstersKilled | 殺敵數 | 累計擊殺怪物總次數（含 BOSS） |
-| bossesKilled | BOSS 討伐數 | 累計擊殺 BOSS 次數 |
+| monstersKilled | 殺敵數 | 累計擊殺怪物總次數（含 BOSS、獨特魔物） |
+| bossesKilled | BOSS 討伐數 | 累計擊殺 BOSS 次數（不含獨特魔物） |
+| uniqueMonstersKilled | 獨特魔物擊殺數 | 累計擊殺獨特魔物（`25-monster-system.md` § 25.13）次數 |
 | deathCount | 死亡次數 | 角色死亡累計次數 |
 | equipmentCrafted | 製作裝備數 | 鐵匠鋪製作裝備次數 |
 | weaponEnhanceAttempts | 強化武器次數 | 武器強化嘗試次數（含成功與失敗） |
@@ -32,6 +33,7 @@
 interface CharacterStatistics {
   monstersKilled: number;
   bossesKilled: number;
+  uniqueMonstersKilled: number;
   deathCount: number;
   equipmentCrafted: number;
   weaponEnhanceAttempts: number;
@@ -53,6 +55,7 @@ interface CharacterStatistics {
 |------|--------|
 | monstersKilled | 戰鬥系統：怪物 HP 歸零時 +1 |
 | bossesKilled | 戰鬥系統：BOSS 怪物 HP 歸零時 +1 |
+| uniqueMonstersKilled | 戰鬥系統：獨特魔物 HP 歸零時 +1 |
 | deathCount | 戰鬥系統：玩家 HP 歸零時 +1 |
 | equipmentCrafted | 鐵匠鋪：製作成功時 +1 |
 | weaponEnhanceAttempts | 武器強化：每次嘗試 +1 |

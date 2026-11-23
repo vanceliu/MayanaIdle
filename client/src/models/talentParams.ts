@@ -344,6 +344,7 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
       ],
     },
     { key: 'includeCrafted', kind: 'boolean', label: '含製作品 (鍛)', def: false },
+    { key: 'includeUniqueCrafted', kind: 'boolean', label: '含製作品 (獨)', def: false },
     ...KEEP_FIELDS,
   ],
   deposit_gold: [{ key: 'keepGold', kind: 'number', label: '身上留', suffix: 'G', min: 0, max: 9_999_999, def: 50_000 }],

@@ -501,6 +501,7 @@ function publishMonsterHud(
       currentHp: inst.currentHp,
       maxHp: inst.maxHp,
       isBoss: inst.isBoss,
+      isUnique: inst.isUnique === true,
       affixLabels: monsterAffixLabels(inst),
       shieldMax: inst.shieldMax ?? 0,
       shieldRemaining: inst.shieldRemaining ?? 0,

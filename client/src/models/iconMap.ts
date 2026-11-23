@@ -340,6 +340,7 @@ export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
   target_element: 'buffs/embrassed-energy',
   target_size: 'buffs/muscle-up',
   target_is_boss: 'debuffs/stoned-skull',
+  target_is_unique: 'debuffs/stoned-skull',
   target_defense: 'debuffs/broken-shield',
   target_level_diff: 'buffs/muscle-up',
   target_range_gt: 'buffs/flaming-arrow',

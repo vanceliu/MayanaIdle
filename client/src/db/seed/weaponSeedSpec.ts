@@ -203,7 +203,7 @@ export const WEAPON_SPEC_TYPES: ReadonlySet<string> = new Set(WEAPON_SPEC.map(s 
 /**
  * 依規格產生全部武器。`existing` 為現行 seed：
  * - 名稱避開非武器裝備（DB 有以 name 查表的路徑，§ 99.1 第 3 條）
- * - `buyPrice` 與 `craftMaterials` 依名稱沿用（由 `repriceShopGear`／`assignCraftMaterials` 寫入）；
+ * - `buyPrice`、`craftMaterials`、`uniqueCraftMaterials` 依名稱沿用（由 `repriceShopGear`／`assignCraftMaterials`／`assignUniqueCraftMaterials` 寫入）；
  *   新武器為 0 與 `[]`
  */
 export function buildWeaponSeeds(existing: readonly EquipmentTemplate[]): EquipmentTemplate[] {
@@ -267,6 +267,7 @@ export function buildWeaponSeeds(existing: readonly EquipmentTemplate[]): Equipm
           ...(acquireType === 'craft' && {
             craftGold: CRAFT_GOLD[tier],
             craftMaterials: (prev?.craftMaterials ?? []).map(m => ({ ...m })),
+            ...(prev?.uniqueCraftMaterials && { uniqueCraftMaterials: prev.uniqueCraftMaterials.map(m => ({ ...m })) }),
             ...(needsPrerequisite(tier, i) && prereqId != null && {
               craftPrerequisiteWeapon: { templateId: prereqId, quantity: 1 },
             }),

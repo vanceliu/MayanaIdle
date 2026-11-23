@@ -252,6 +252,8 @@ export interface EquipmentTemplate {
   craftGold?: number;
   craftMaterials?: CraftMaterial[];
   craftPrerequisiteWeapon?: CraftPrerequisiteWeapon;
+  /** 獨特配方（`06-equipment-acquire.md` § 6A.3.1）。有 `craftMaterials` 者必填，由產生器指派 */
+  uniqueCraftMaterials?: CraftMaterial[];
 }
 
 export interface EquipmentInstance {
@@ -327,6 +329,11 @@ export interface EquipmentInstance {
    */
   isCraftedGear?: boolean;
   /**
+   * 獨特製作的實例（`06-equipment-acquire.md` § 6A.6「製作品 (獨)」）。顯示名稱加 `UNIQUE_CRAFTED_GEAR_SUFFIX`，
+   * 八種印記一律不受理、不可技能更換、拆解不出結晶。
+   */
+  isUniqueCraftedGear?: boolean;
+  /**
    * 競技場兌換箱開出的擬態品（`55-arena.md` § 55.9）。顯示名稱加 `MIMIC_GEAR_SUFFIX`；
    * 不受理任何印記與技能更換、不可拆解，可照模板售價賣出。
    */
@@ -336,6 +343,8 @@ export interface EquipmentInstance {
 /** 製作品的顯示名稱後綴（`06-equipment-acquire.md` § 6A.6） */
 export const CRAFTED_GEAR_SUFFIX = '(鍛)';
 export const MIMIC_GEAR_SUFFIX = '(擬)';
+/** 獨特製作品的顯示名稱後綴（`06-equipment-acquire.md` § 6A.6） */
+export const UNIQUE_CRAFTED_GEAR_SUFFIX = '(獨)';
 
 /** 防具隨機額外防禦：實例生成時依 `DEFENSE_BONUS_WEIGHTS` 抽 0／1／2（§ 6A.8.8） */
 export function rollDefenseBonus(): number {

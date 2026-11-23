@@ -74,10 +74,11 @@
 | 裝備取得（商店/鐵匠製作） | `06-equipment-acquire.md` | 全文 |
 | **商店售價（T2~T3 的區間與內插）** | `06-equipment-acquire.md` | § 6A.2 |
 | **製作材料分配規則／製作消耗（製作費依階級）** | `06-equipment-acquire.md` | § 6A.3 |
-| **製作取用倉庫（背包→個人→帳號倉庫，公會不算；前置裝備玩家指定；魔法學院、競技場入場同規則）** | `06-equipment-acquire.md` | § 6A.3「取用來源」 |
-| **競技場入場材料的倉庫扣除順序** | `55-arena.md` | § 55.1 |
+| **製作取用倉庫（背包→個人→帳號倉庫，公會不算；前置裝備玩家指定；魔法學院、獨特製作同規則）** | `06-equipment-acquire.md` | § 6A.3「取用來源」 |
 | **裝備拆解（鐵匠鋪，退一半材料；掉落品技能存成結晶）** | `06-equipment-acquire.md` | § 6A.3「拆解」 |
 | **製作品 (鍛)（標記／不可使用印記／詞綴 Tier 依階級）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
+| **獨特製作（鐵匠鋪分頁：獨特材料＋同模板前置、詞綴 Tier 保證、隨機技能照掉落、拆解全退一般配方）** | `06-equipment-acquire.md` | § 6A.3.1 |
+| **製作品 (獨)（標記／不可使用印記／T6 條數）** | `06-equipment-acquire.md` § 6A.6、`46-sigil.md` § 46.9 | — |
 | 各管道詞綴 Tier 上限（商店 T3） | `06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2 | — |
 | **武器規格（各類型各階件數／五職業階梯上限／變體走向／T7 陣容）** | `06-equipment-requirement.md` | 武器規格表 |
 | 武器/防具素質曲線（TTK 校準） | `44-dps-prediction.md` | § 44.6 |
@@ -170,6 +171,12 @@
 | 元素系統（屬性/克制/傷害顏色） | `42-element-system.md` | 全文 |
 | 投射物顏色（依元素、不分敵我） | `42-element-system.md` | § 42.4 |
 | 怪物生成/Pressure 機制 | `26-spawn-pressure.md` | 全文 |
+| **獨特魔物（定義／套用規則／名單）** | `25-monster-system.md` | § 25.13 |
+| **獨特魔物生成（隨機／每 10 分鐘／整點半點群出、地圖組、UTC+8）** | `26-spawn-pressure.md` | § 26.4.1 |
+| **獨特魔物素質（公式／素質表）** | `28-monster-stats.md` | § 28.1、§ 28.10 |
+| **獨特魔物掉落（各自掉落表、獨特材料 10%）** | `27-drop-table.md` | § 27.10 |
+| **獨特材料（36 種：重量／賣價／來源）** | `30-items.md` | § 30.2「獨特材料」 |
+| **獨特魔物卡片配色** | `34-ui-guidelines.md` | 「獨特魔物卡片」 |
 | **Pressure 依組隊人數縮放（門檻 × 在場人數、人數變動時擊殺數同比例縮放）** | `26-spawn-pressure.md` § 26.3「人數變動」、`97-selfhosted-server.md` § 97.7.1 | — |
 | **探索列 Pressure 顯示（P 值／擊殺數提示）** | `16-tech-frontend-architecture.md` | § 32.3 |
 | 怪物素質表 | `28-monster-stats.md` | 全文 |
@@ -179,6 +186,7 @@
 | **離線金幣（狩獵速率、10 分鐘門檻、24 小時上限、寄信）** | `04-character.md` | § 4.12 |
 | **離線金幣開關（`OFFLINE_GOLD_ENABLED`，目前關閉）** | `04-character.md` | § 4.12「開關」 |
 | 怪物掉落表 | `27-drop-table.md` | 全文 |
+| **Boss 專屬素材掉率（一律 10%）與用途（獨特製作）** | `27-drop-table.md` | § 27.6、§ 27.7 |
 | 道具定義（藥水/卷軸/材料） | `30-items.md` | 全文 |
 | **素材圖示顏色（iconTier）定色規則與等級門檻** | `30-items.md` | § 素材 iconTier 對照（色碼見 `39-batch-sell.md` § 39.3） |
 | 城鎮設施（雜貨店/鐵匠/旅館等） | `13-town.md` | § 13.3~13.10 |
@@ -231,7 +239,7 @@
 | 帳號與多角色系統（起始畫面/角色選擇/登出/倉庫共用） | `19-account-character.md` | 全文（帳號規則在 `97-selfhosted-server.md` § 97.5） |
 | 角色識別（uuid） | `19-account-character.md` | § 19.4 |
 | 資料版本與遷移 | `19-account-character.md` § 19.9、`97-selfhosted-server.md` § 97.4 | — |
-| **全域倍率（金幣／掉落／經驗／Pressure／生成隻數／怪物血量／怪物攻擊力／Boss 生成）** | `19-account-character.md` § 19.9 | 作用位置：`27-drop-table.md` § 27.1、`36-quest-system.md` § 36.3、`28-monster-stats.md` § 28.1、`26-spawn-pressure.md` § 26.2~26.4、`04-character.md` § 4.11 |
+| **全域倍率（金幣／掉落／經驗／Pressure／生成隻數／怪物血量／怪物攻擊力／Boss 生成）** | `19-account-character.md` § 19.9 | 作用位置：`26-spawn-pressure.md` § 26.4.1（獨特魔物）、`27-drop-table.md` § 27.1、`36-quest-system.md` § 36.3、`28-monster-stats.md` § 28.1、`26-spawn-pressure.md` § 26.2~26.4、`04-character.md` § 4.11 |
 | 資料結構設計 | `18-data-schema.md` | 全文 |
 | 技術方向 | `16-tech.md` | 全文 |
 | 前端架構（目錄/狀態/資料流/組件） | `16-tech-frontend-architecture.md` | 全文 |
@@ -471,14 +479,28 @@
   ←→ 43-wiki-system.md § 4.11
        ↕
 55-arena.md（T4～T6 已實作）
-  ←  27-drop-table.md § 27.5 / § 27.6（入場材料、王名單）
-  →  30-items.md § 製作用途標記（入場材料算有用途）
+  ←  27-drop-table.md § 27.5（王名單）
   ←  25-monster-system.md § 25.12（強化詞綴）
   ←→ 13-town.md § 13.2.1（競技場建築）
   ←  03-combat.md § 3.13 / 97-selfhosted-server.md § 97.7.1
   ←→ 37-statistics.md § 37.1 / § 37.5（死亡統計、排行榜）
   ←→ 44-dps-prediction.md § 44.5（波次模擬）
-  ←  06-equipment-acquire.md § 6A.3（入場材料取用倉庫）
+       ↕
+25-monster-system.md § 25.13（獨特魔物）
+  ←→ 26-spawn-pressure.md § 26.4.1 ←→ 19-account-character.md § 19.9（Boss 生成倍率）
+  ←→ 28-monster-stats.md § 28.1 / § 28.10
+  ←→ 27-drop-table.md § 27.8 / § 27.9 / § 27.10 ←→ 30-items.md（獨特材料、增益藥水）
+  ←→ 23-class-magic.md § 23.1（技能書）/ 24-buff-debuff.md § 24.6（控場免疫）
+  ←→ 51-auto-talent.md § 51.3.3 / § 51.4.6（天賦格、目標是獨特魔物）/ 37-statistics.md（擊殺數）
+  ←→ 36-quest-system.md § 36.3.2 / § 36.8.2 / § 36.12.5 ←→ 53-bounty-contract.md § 53.1
+  ←→ 34-ui-guidelines.md「獨特魔物卡片」/ 43-wiki-system.md § 4.3 / § 4.4
+  ←→ 18-data-schema.md（`isUnique`／`spawnMode`／`spawnGroup`）
+       ↕
+06-equipment-acquire.md § 6A.3.1（獨特製作）
+  ←  27-drop-table.md § 27.6 / § 27.10（Boss 專屬素材、獨特材料）
+  ←→ 30-items.md § 製作用途標記 / 39-batch-sell.md（素材有用途判定）
+  ←→ 07-affix.md § 7.1 / § 7.2 ←→ 07-affix-ability.md § 7S.2 / § 7S.8 ←→ 46-sigil.md § 46.9
+  ←→ 13-town.md § 13.5 / 18-data-schema.md § 18.3 / § 18.8
        ↕
 36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
        ↕                    ←  06-equipment-acquire.md § 6A.3

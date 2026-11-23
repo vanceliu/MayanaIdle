@@ -11,7 +11,7 @@
 import { isPartySharedAffixDebuff } from '../models/affix';
 import type { Position } from '../models/mapControl';
 import type { MonsterInstance, MonsterAttackType, MonsterWeapon, ElementType } from '../models/monster';
-import { isRangedAttackType, monsterRangedWeapon } from '../models/monster';
+import { isRangedAttackType, monsterRank, monsterRangedWeapon } from '../models/monster';
 import type { EquipmentInstance } from '../models/equipment';
 import type { Character } from '../models/character';
 import type { ActiveEffect } from '../models/effect';
@@ -157,7 +157,7 @@ function bountyTargetPredicate(instance: MapInstance, members: Session[]): ((t: 
   const { character, bountyContracts } = members[0].game.getState();
   if (!character || bountyContracts.length === 0) return undefined;
   const areaId = resolveDropAreaId(character.currentRegion, character.currentFloor, character.currentArea);
-  return t => bountyContracts.some(c => isBountyTarget(c, areaId, t.name, t.isBoss));
+  return t => bountyContracts.some(c => isBountyTarget(c, areaId, t.name, monsterRank(t)));
 }
 
 /** 這隻怪的目標選擇狀態；沒有就建 */

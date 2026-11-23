@@ -5,7 +5,7 @@ import type { MonsterTemplate } from '../../models/monster';
 /** 怪物攻擊力曲線（`28-monster-stats.md` § 28.1） */
 const all = MONSTER_SEEDS as MonsterTemplate[];
 const bosses = all.filter(m => m.isBoss);
-const normals = all.filter(m => !m.isBoss);
+const normals = all.filter(m => !m.isBoss && !m.isUnique);
 const TOP_AREA = 'hundred-pillar-91-100f';
 
 /** Lv.31~70 一般怪該級典型攻擊上限 */

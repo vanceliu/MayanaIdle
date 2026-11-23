@@ -52,6 +52,23 @@ describe('模板未載入時不生假怪', () => {
     expect(createMonsterFromTemplate(mapMonster(), pool)!.name).toBe('灰狼');
   });
 
+  it('獨特魔物不混進一般池與退回池，只由帶 isUnique 的生成抽出，並帶上旗標', () => {
+    const unique = template({ id: 3, name: '狼王首領', isUnique: true, spawnMode: 'random', hp: 900 });
+    const pool = [template(), unique];
+    for (const r of [0, 0.5, 0.99]) {
+      vi.spyOn(Math, 'random').mockReturnValue(r);
+      expect(createMonsterFromTemplate(mapMonster(), pool)!.name).toBe('灰狼');
+    }
+    expect(createMonsterFromTemplate(mapMonster({ isBoss: true }), pool)!.name).toBe('灰狼');
+    expect(createMonsterFromTemplate(mapMonster(), [unique])).toBeNull();
+
+    const inst = createMonsterFromTemplate(mapMonster({ isUnique: true }), pool)!;
+    expect(inst.name).toBe('狼王首領');
+    expect(inst.isUnique).toBe(true);
+    expect(inst.isBoss).toBe(false);
+    expect(createMonsterFromTemplate(mapMonster(), pool)!.isUnique).toBeUndefined();
+  });
+
   it('試驗場木樁不吃模板，空清單照樣建得出來', () => {
     const dummy = createMonsterFromTemplate(
       mapMonster({ dummy: { level: 60, defense: 44, size: 'large', element: 'none' } as never }),

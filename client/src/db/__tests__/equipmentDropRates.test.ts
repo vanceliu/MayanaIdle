@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { DROP_TABLE_SEEDS, BOSS_DROP_TABLE_SEEDS } from '../seed';
 import { resolveArea } from '../../models/mapData';
+import { MONSTER_SEEDS as ALL_MONSTER_SEEDS } from '../seed/monsterSeeds';
+
+/** Boss 的掉落表；獨特魔物共用 `BOSS_DROP_TABLE_SEEDS`，規格另見 `27-drop-table.md` § 27.10 */
+const BOSS_NAMES = new Set(ALL_MONSTER_SEEDS.filter(m => m.isBoss).map(m => m.name));
+const BOSS_ONLY_DROPS = BOSS_DROP_TABLE_SEEDS.filter(d => BOSS_NAMES.has(d.bossName));
 
 /**
  * 裝備掉率（`06-equipment-acquire.md` § 6A.1、`27-drop-table.md` § 27.3）：
@@ -126,7 +131,7 @@ const BOSS_TIERS: Record<string, number[]> = {
 };
 
 describe('Boss 裝備階級', () => {
-  const bossEquipment = BOSS_DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment');
+  const bossEquipment = BOSS_ONLY_DROPS.filter(d => d.itemType === 'equipment');
 
   it('只有表列 Boss 掉裝備', () => {
     expect(new Set(bossEquipment.map(d => d.bossName))).toEqual(new Set(Object.keys(BOSS_TIERS)));
@@ -154,7 +159,7 @@ describe('強化卷軸掉率', () => {
     it(`${kind === 'basic' ? '普通' : '＋／－'}卷軸：一般怪與 Boss 各為固定值`, () => {
       const ids = new Set(SCROLL_IDS[kind]);
       const normal = DROP_TABLE_SEEDS.filter(d => d.itemTemplateId != null && ids.has(d.itemTemplateId));
-      const boss = BOSS_DROP_TABLE_SEEDS.filter(d => d.itemTemplateId != null && ids.has(d.itemTemplateId));
+      const boss = BOSS_ONLY_DROPS.filter(d => d.itemTemplateId != null && ids.has(d.itemTemplateId));
       expect(normal.length).toBeGreaterThan(0);
       expect(boss.length).toBeGreaterThan(0);
       for (const d of normal) expect(d.dropValue, `${d.area} #${d.itemTemplateId}`).toBe(SCROLL_NORMAL[kind]);
@@ -165,7 +170,7 @@ describe('強化卷軸掉率', () => {
 
 describe('Boss 裝備掉率', () => {
   it('各階固定值，武器與防具相同', () => {
-    const bossEquipment = BOSS_DROP_TABLE_SEEDS.filter(d => d.itemType === 'equipment');
+    const bossEquipment = BOSS_ONLY_DROPS.filter(d => d.itemType === 'equipment');
     expect(bossEquipment.length).toBeGreaterThan(0);
     for (const d of bossEquipment) {
       expect(d.dropValue, `${d.bossName} T${d.tier} ${d.equipmentPool}`).toBe(BOSS_VALUE[d.tier!]);

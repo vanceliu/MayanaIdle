@@ -21,6 +21,7 @@ import {
   COLLECT_TARGET_COUNT_RANGE,
   COLLECT_DROP_RATE,
   BOSS_KILL_COUNT_RANGE,
+  TIMED_UNIQUE_KILL_COUNT,
   BOSS_COLLECT_TARGET_COUNT,
   BOSS_COLLECT_DROP_RATE,
   MULTI_ERRAND_TARGET_RANGE,
@@ -300,19 +301,26 @@ export function generateSingleQuest(
     avgGold = areaPool.find(a => a.areaId === monsterEntry.questArea)?.avgGold ?? 50;
     targetCount = randomInt(COLLECT_TARGET_COUNT_RANGE.min, COLLECT_TARGET_COUNT_RANGE.max);
   } else if (type === 'errandboss' || type === 'collectboss') {
-    // § 36.9 步驟 5：BOSS 分頁不降級。無可用 BOSS 的城鎮該分頁根本不會生成（見 generateQuestList），
+    // § 36.9 步驟 7：BOSS 分頁不降級。無可用 BOSS 的城鎮該分頁根本不會生成（見 generateQuestList），
     // 這裡退回全域 BOSS 池只是防禦，全域池必定非空。
-    const bossEntry = pickRandom(bossPool.length > 0 ? bossPool : BOSS_POOLS[difficulty as BossQuestDifficulty]);
+    const targets = bossPool.length > 0 ? bossPool : BOSS_POOLS[difficulty as BossQuestDifficulty];
+    // § 36.2.5：定時出現的獨特魔物不出素材收集；分頁內無可收集目標時改出殲滅
+    const collectable = targets.filter(b => !b.timed);
+    const bossType = type === 'collectboss' && collectable.length > 0 ? 'collectboss' : 'errandboss';
+    const bossEntry = pickRandom(bossType === 'collectboss' ? collectable : targets);
     targetMonster = bossEntry.name;
     targetArea = bossEntry.area;
     areaName = getAreaDisplayName(targetArea);
     avgGold = bossEntry.avgGold;
 
-    if (type === 'errandboss') {
-      targetCount = randomInt(BOSS_KILL_COUNT_RANGE.min, BOSS_KILL_COUNT_RANGE.max);
+    if (bossType === 'errandboss') {
+      targetCount = bossEntry.timed
+        ? TIMED_UNIQUE_KILL_COUNT
+        : randomInt(BOSS_KILL_COUNT_RANGE.min, BOSS_KILL_COUNT_RANGE.max);
     } else {
       targetCount = randomInt(1, BOSS_COLLECT_TARGET_COUNT);
     }
+    return buildQuest(bossType, difficulty, targetArea, areaName, targetMonster, targetCount, avgGold, guildRank, index);
   } else {
     const areaEntry = pickRandom(areaPool);
     targetArea = areaEntry.areaId;
@@ -541,6 +549,7 @@ export function updateQuestProgress(
         shouldUpdate = true;
       }
     } else if (quest.type === 'errandboss') {
+      // § 36.11：BOSS／獨特魔物只認名稱，跨樓層地圖組任一樓層皆計入
       if (quest.targetMonster === monsterName) {
         shouldUpdate = true;
       }

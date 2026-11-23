@@ -19,6 +19,8 @@ export interface MapMonster {
   moveTimer: number;
   lastPathPlayerPos: Position;
   isBoss: boolean;
+  /** 獨特魔物（`25-monster-system.md` § 25.13）：建實例時只從區域的獨特魔物模板抽 */
+  isUnique?: boolean;
   /**
    * 攻擊射程（格）。遠程與魔法怪不必貼身（`41-arpg-combat.md` § 5.2）。
    * 生成當下還沒挑模板，所以由 `PixiGame` 建實例時回填。
@@ -33,6 +35,11 @@ export interface MapMonster {
   dummy?: TrainingDummySpec;
   /** 競技場出波指定的模板與強化詞綴數（`55-arena.md` § 55.2）；server 端用，不上線 */
   arenaSpawn?: { templateId: number; affixCount: number };
+  /**
+   * 定時出現的獨特魔物（`26-spawn-pressure.md` § 26.4.1）指定的模板；server 端用，不上線。
+   * 不計入波次與怪物上限、不佔 Boss／`random` 獨特魔物名額、不受 > 50 格脫離移除
+   */
+  timedUnique?: { templateId: number };
 }
 
 const BASE_MAX_MONSTERS = 3;
@@ -83,11 +90,59 @@ function distance(a: Position, b: Position): number {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 }
 
+/** 計入波次（場上有怪就不生）與怪物上限的怪：定時出現的獨特魔物除外（`26-spawn-pressure.md` § 26.4.1） */
+export function countsTowardWave(m: MapMonster): boolean {
+  return !m.timedUnique;
+}
+
+/** 怪物會因 > `DESPAWN_DISTANCE` 被移除（`26-spawn-pressure.md` § 26.8）；定時出現的獨特魔物除外 */
+export function despawnsByDistance(m: MapMonster): boolean {
+  return !m.timedUnique;
+}
+
+/** 場上佔用「Boss 名額」的怪（§ 26.4）：該區有 Boss 池時為 Boss，否則為 `random` 獨特魔物 */
+function occupiesSpecialSlot(m: MapMonster, slot: 'boss' | 'unique'): boolean {
+  return slot === 'boss' ? m.isBoss : !!m.isUnique && !m.timedUnique;
+}
+
+/**
+ * 生成點（`26-spawn-pressure.md` § 26.7）：可生成地格、與每個 `anchors` 距離 ≥ 5 格、
+ * 不在 `blocked` 的地格上；最多嘗試 20 次，失敗回 null
+ */
+function findSpawnPosition(map: MapData, playerPos: Position, anchors: Position[], blocked?: Set<string>): Position | null {
+  for (let attempts = 0; attempts < 20; attempts++) {
+    const pos = getRandomWalkablePosition(map, playerPos);
+    if (!pos) continue;
+    if (blocked?.has(`${pos.x},${pos.y}`)) continue;
+    if (anchors.every(a => distance(pos, a) >= MIN_SPAWN_DISTANCE)) return pos;
+  }
+  return null;
+}
+
+function newMapMonster(position: Position, playerPos: Position, fields: Pick<MapMonster, 'isBoss' | 'isUnique' | 'timedUnique'>): MapMonster {
+  return {
+    id: nextMonsterId(),
+    position: { ...position },
+    targetPosition: { ...playerPos },
+    speed: MONSTER_SPEED,
+    path: [],
+    pathIndex: 0,
+    pathRecalcTimer: 0,
+    moveTimer: 0,
+    lastPathPlayerPos: { ...playerPos },
+    ...(fields.isUnique ? { isUnique: true } : {}),
+    ...(fields.timedUnique ? { timedUnique: fields.timedUnique } : {}),
+    isBoss: fields.isBoss,
+  };
+}
+
 export interface MapMonsterState {
   monsters: MapMonster[];
   maxMonsters: number;
   combatMonsterIds: string[];
   hasBossInPool: boolean;
+  /** 區域沒有 Boss、但有 `random` 獨特魔物：Boss 名額改生獨特魔物（`26-spawn-pressure.md` § 26.4.1） */
+  hasRandomUniqueInPool: boolean;
 
   /**
    * 生成判定。恢復等待（`mapControl.paused`）由呼叫端擋，這裡不看。
@@ -98,6 +153,11 @@ export interface MapMonsterState {
    * 一波的隻數＝停留時間的 1~3 分布 ＋ `pressure`，夾在 `maxMonsters` 內。
    */
   spawnTick: (map: MapData, playerPos: Position, pressure: number, elapsedMinutes?: number, anchors?: Position[]) => void;
+  /**
+   * 定時出現的獨特魔物（`26-spawn-pressure.md` § 26.4.1）：每個模板 id 生一隻，不看波次、上限與 Boss 名額。
+   * 生成點同 § 26.7（距 `anchors` 每一位 ≥ 5 格、不與場上怪物同格），找不到就略過該隻
+   */
+  spawnTimedUniques: (map: MapData, templateIds: readonly number[], anchors: Position[]) => void;
   moveMonsters: (deltaMs: number, map: MapData, playerPos: Position) => void;
   checkCollisions: (playerPos: Position) => MapMonster[];
   /** 迴圈整批寫回移動後的怪物 */
@@ -113,6 +173,7 @@ export interface MapMonsterState {
   /** 移動速度（格／秒）回填；疾走詞綴用（`25-monster-system.md` § 25.12.3） */
   setMonsterSpeed: (id: string, speed: number) => void;
   setHasBossInPool: (has: boolean) => void;
+  setHasRandomUniqueInPool: (has: boolean) => void;
 }
 
 export function createMapMonsterStore(_session?: Session) {
@@ -121,6 +182,7 @@ export function createMapMonsterStore(_session?: Session) {
   maxMonsters: BASE_MAX_MONSTERS,
   combatMonsterIds: [],
   hasBossInPool: false,
+  hasRandomUniqueInPool: false,
 
   spawnTick: (map, playerPos, pressure, elapsedMinutes = 0, anchors) => {
     const state = get();
@@ -137,9 +199,10 @@ export function createMapMonsterStore(_session?: Session) {
      * 下一波不另設間隔：休息由「HP/MP 等待回復時暫停生成」負責（§ 26.2），
      * 血夠就接著打，血不夠時怪本來就不會來。
      */
-    if (state.monsters.length > 0) return;
+    if (state.monsters.some(countsTowardWave)) return;
 
-    const farFromAll = (pos: Position) => (anchors ?? [playerPos]).every(a => distance(pos, a) >= MIN_SPAWN_DISTANCE);
+    // Boss 名額（§ 26.4）：該區有 Boss 池生 Boss，否則有 `random` 獨特魔物池時生獨特魔物（§ 26.4.1）
+    const specialSlot = state.hasBossInPool ? 'boss' : state.hasRandomUniqueInPool ? 'unique' : null;
 
     /*
      * 一波的隻數：停留時間擲 1~3（§ 26.2）再加 Pressure，夾在上限內、乘全域生成倍率。
@@ -156,36 +219,33 @@ export function createMapMonsterStore(_session?: Session) {
     for (let i = 0; i < spawnCount; i++) {
       const currentMonsters = get().monsters;
 
-      // Determine if this spawn is a boss
-      const bossAlreadyOnMap = currentMonsters.some(m => m.isBoss);
-      let isBoss = false;
-      if (state.hasBossInPool && !bossAlreadyOnMap && elapsedMinutes >= BOSS_SPAWN_MIN_MINUTES) {
-        isBoss = random() < getBossSpawnChance();
+      const slotTaken = specialSlot !== null && currentMonsters.some(m => occupiesSpecialSlot(m, specialSlot));
+      let special = false;
+      if (specialSlot !== null && !slotTaken && elapsedMinutes >= BOSS_SPAWN_MIN_MINUTES) {
+        special = random() < getBossSpawnChance();
       }
 
-      // Find a spawn position at least MIN_SPAWN_DISTANCE from player
-      let attempts = 0;
-      while (attempts < 20) {
-        attempts++;
-        const pos = getRandomWalkablePosition(map, playerPos);
-        if (!pos) continue;
-        if (farFromAll(pos)) {
-          const monster: MapMonster = {
-            id: nextMonsterId(),
-            position: { ...pos },
-            targetPosition: { ...playerPos },
-            speed: MONSTER_SPEED,
-            path: [],
-            pathIndex: 0,
-            pathRecalcTimer: 0,
-            moveTimer: 0,
-            lastPathPlayerPos: { ...playerPos },
-            isBoss,
-          };
-          set({ monsters: [...get().monsters, monster] });
-          break;
-        }
+      const pos = findSpawnPosition(map, playerPos, anchors ?? [playerPos]);
+      if (pos) {
+        const monster = newMapMonster(pos, playerPos, {
+          isBoss: special && specialSlot === 'boss',
+          isUnique: special && specialSlot === 'unique',
+        });
+        set({ monsters: [...get().monsters, monster] });
       }
+    }
+  },
+
+  spawnTimedUniques: (map, templateIds, anchors) => {
+    if (anchors.length === 0) return;
+    if (map.theme === 'town' || map.autoSpawn === false) return;
+    const playerPos = anchors[0];
+    for (const templateId of templateIds) {
+      const blocked = new Set(get().monsters.map(m => `${Math.round(m.position.x)},${Math.round(m.position.y)}`));
+      const pos = findSpawnPosition(map, playerPos, anchors, blocked);
+      if (!pos) continue;
+      const monster = newMapMonster(pos, playerPos, { isBoss: false, isUnique: true, timedUnique: { templateId } });
+      set({ monsters: [...get().monsters, monster] });
     }
   },
 
@@ -222,7 +282,7 @@ export function createMapMonsterStore(_session?: Session) {
       const distToPlayerNow = distance(monster.position, playerPos);
 
       // 超過脫離距離：從地圖移除
-      if (distToPlayerNow > DESPAWN_DISTANCE) {
+      if (distToPlayerNow > DESPAWN_DISTANCE && despawnsByDistance(monster)) {
         continue;
       }
 
@@ -440,6 +500,10 @@ export function createMapMonsterStore(_session?: Session) {
 
   setHasBossInPool: (has) => {
     set({ hasBossInPool: has });
+  },
+
+  setHasRandomUniqueInPool: (has) => {
+    set({ hasRandomUniqueInPool: has });
   },
 }));
 }

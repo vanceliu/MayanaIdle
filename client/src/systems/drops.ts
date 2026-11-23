@@ -3,6 +3,7 @@ import { BUFF_POTION_BOSS_DROP_VALUE, BUFF_POTION_ITEM_IDS } from '../models/buf
 import { defaultSession } from '../stores/session';
 import type { EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import type { ClassName } from '../models/character';
+import type { MonsterRank } from '../models/monster';
 import { resolveEquipment, rollNewInstanceFields } from './templateSync';
 import { isWeaponSlot, type EquipSlot } from '../models/equipment';
 import { getEquipmentTierLevel } from '../models/equipmentTier';
@@ -191,6 +192,10 @@ export function scaleDropValue(
   return Math.min(max, Math.floor(base + (max - base) * progress));
 }
 
+/**
+ * Boss 與獨特魔物的掉落：只查自己的表（`27-drop-table.md` § 27.6、§ 27.10），不走區域掉落池。
+ * 裝備一律用 Boss 詞綴權重、特殊詞綴 ×2；職業技能書依 `rank` 取基礎掉率。
+ */
 export async function rollBossDrops(
   bossName: string,
   ownerId: number,
@@ -200,6 +205,7 @@ export async function rollBossDrops(
   takeBetter?: TakeBetterOptions,
   /** 取得者職業，決定隨機技能的職業池（`07-affix-ability.md` § 7S.2） */
   ownerClass?: ClassName,
+  rank: Exclude<MonsterRank, 'normal'> = 'boss',
 ): Promise<DropResult> {
   const entries = await repo.listBossDropTable(bossName);
   let gold = 0;
@@ -255,7 +261,7 @@ export async function rollBossDrops(
   }
 
   // 職業技能書：依區域等級逐級獨立判定（`23-class-magic.md` § 23.1）
-  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, true, dropRateMultiplier, secondMultiplier)) {
+  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, rank, dropRateMultiplier, secondMultiplier)) {
     items.push({
       name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',
@@ -264,7 +270,7 @@ export async function rollBossDrops(
     });
   }
 
-  // 增益藥水：所有 Boss 共通，每種各自判定（`27-drop-table.md` § 27.6）
+  // 增益藥水：所有 Boss、獨特魔物共通，每種各自判定（`27-drop-table.md` § 27.6、§ 27.10）
   for (const itemId of BUFF_POTION_ITEM_IDS) {
     if (!rollHit(BUFF_POTION_BOSS_DROP_VALUE, dropRateMultiplier, secondMultiplier)) continue;
     items.push({ name: getItemById(itemId)?.name ?? '藥水', type: 'potion', itemTemplateId: itemId, amount: 1 });
@@ -352,7 +358,7 @@ export async function rollDrops(
   }
 
   // 職業技能書：依區域等級逐級獨立判定（`23-class-magic.md` § 23.1）
-  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, isBoss, dropRateMultiplier, secondMultiplier)) {
+  for (const skillBookDrop of rollClassSkillBookDrops(areaLevel, isBoss ? 'boss' : 'normal', dropRateMultiplier, secondMultiplier)) {
     items.push({
       name: getItemById(skillBookDrop)?.name ?? '技能書',
       type: 'spellbook',

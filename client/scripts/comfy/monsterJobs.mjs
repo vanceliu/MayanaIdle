@@ -9,6 +9,7 @@
  * sideFacesLeft：該 seed 原圖的側面朝左（後處理鏡像成朝右）。
  * enclosedTolerance：被圍住的背景色不均、殘留洋紅時才指定（見 `keyOutBackground`）。
  * legTrim：頭部比身體寬、衣襬逐漸收窄（兜帽長袍）時指定，裁腿改以底部 region 內最寬列 × coverage 為準（`HOODED_LEG_TRIM`；袖子伸出長袍時用 `ROBE_LEG_TRIM`）。
+ * baseRaw：以該 key 的 AI 原圖（`assets-src/ai-raw/monsters/<baseRaw>.png`）做 img2img，強度 denoise；側面朝向、裁腿等沿用原怪物。
  * 同一 seed 必得同一張圖；改 prompt 或 seed 即換圖。
  */
 
@@ -128,7 +129,7 @@ export const MONSTER_JOBS = [
     job(54, 'misty-serpent', 'creature', 'a large coiled dark purple serpent demon raising its head, curved black horns, glowing violet dot eyes, a hood like a cobra, wisps of pale grey mist around its coils, no legs', { sideFacesLeft: false }),
   ]),
   ...group('水下監獄、象牙塔', [
-    job(55, 'prison-jailer', 'humanoid', 'a hulking underwater prison jailer in plain teal-green iron armor, smooth flat colors, no spots, a round iron diving helmet with a small porthole visor glowing pale blue, a ring of keys hanging at its belt', { base: { skin: '#5f8a8a', cloth: '#3e5a5c', hair: 'part', hairColor: '#4a6b6b' }, legTrim: HOODED_LEG_TRIM }),
+    { ...job(55, 'prison-jailer', 'humanoid', 'a plain rank-and-file underwater prison guard in simple teal-green riveted iron armor with a bare armored back and no cloth, smooth flat colors, no spots, a round riveted iron diving helmet with a small porthole visor of dim pale blue glass, small plain shoulder plates, a plain leather belt, no cape, no cloak, no crown, no crest, no keys, no chains', { sideFacesLeft: true, legTrim: HOODED_LEG_TRIM }), baseRaw: 'prison-warden', denoise: 0.8 },
     job(56, 'drowned-wraith', 'creature', 'a floating drowned ghost with translucent pale blue-green body, tattered wet grey robes, long dripping seaweed hair, small glowing white dot eyes, a wispy tail instead of legs'),
     job(57, 'kelp-beast', 'beast', 'a hulking beast made of dark green kelp and seaweed strands draped over a rounded rock body, a simple face with small yellow dot eyes, smooth flat colors, no spots, no glowing dots', { sideFacesLeft: false }),
     job(60, 'deep-fishman', 'humanoid', 'a deep sea fishman with teal-blue scaly skin, a fish head with small solid black dot eyes with no eye whites, a fin crest on its head, gills on its cheeks, wearing a tattered seaweed wrap and a shell belt', { seed: 4, base: { skin: '#4f8fa0', cloth: '#3b6b4a' }, legTrim: HOODED_LEG_TRIM }),
@@ -220,3 +221,54 @@ export const MONSTER_JOBS = [
     job(199, 'pillar-reaper', 'creature', 'a huge death god with a skull face wearing a tall crown of bone spikes, small glowing violet dot eyes, a tattered black and purple robe with gold trim, skeletal hands holding a giant scythe with a large curved silver blade, its robe fading into dark smoke instead of legs', { seed: 3 }),
   ]),
 ];
+
+/** 原圖底圖 img2img 強度預設值；bold＝特效放大、置於 prompt 最前 */
+const ORIGINAL_DENOISE = 0.65;
+const ORIGINAL_BOLD_DENOISE = 0.78;
+
+/** 以原怪物（origKey）的 AI 原圖為底圖、prompt 前加首領特效的獨特魔物 */
+const fromOriginal = (id, key, origKey, effect, { seed = 1, bold = false, denoise = bold ? ORIGINAL_BOLD_DENOISE : ORIGINAL_DENOISE, sideFacesLeft: sideOverride } = {}) => {
+  const { legs, sideFacesLeft: origSide, enclosedTolerance, legTrim, prompt } = MONSTER_JOBS.find(item => item.key === origKey);
+  const sideFacesLeft = sideOverride ?? origSide;
+  const lead = bold ? `${effect}, elite unique boss version of this monster` : `elite unique leader version of the same monster with the same design: ${effect}`;
+  return { id, key, legs, sideFacesLeft, enclosedTolerance, legTrim, seed, prompt: `${lead}, ${prompt}`, baseRaw: origKey, denoise };
+};
+
+MONSTER_JOBS.push(...group('獨特魔物', [
+  fromOriginal(227, 'frost-fang-wolf-king', 'snow-wolf', 'a huge tall crown of big glowing cyan ice crystal spikes on its head, big ice crystal spikes along its whole back, strongly glowing cyan eyes, a bright cyan frost aura glowing around its whole body', { bold: true, seed: 2, denoise: 0.85 }),
+  fromOriginal(228, 'ice-bat-king', 'ice-bat', 'a big crown of tall glowing cyan ice crystals on its head, jagged ice crystal spikes on the wing edges, strongly glowing cyan eyes, a bright cyan frost aura glowing around its whole body', { bold: true }),
+  fromOriginal(229, 'ivory-grand-wizard', 'ivory-wizard', 'a tall ornate glowing cyan ice crystal crown on top of the hood, holding a glowing cyan ice crystal staff the same height as its body at its side, strongly glowing cyan eyes, a long silver-trimmed ice-blue mantle over the shoulders with ice crystal ornaments, a bright cyan frost aura glowing around its whole body', { bold: true, seed: 3, denoise: 0.85, sideFacesLeft: true }),
+  fromOriginal(230, 'frost-armor-captain', 'frost-armor-warrior', 'a big horned ice helmet with two large curved ice horns sticking up, large spiked ice shoulder pauldrons, strongly glowing cyan eyes, a bright cyan glow around its body', { bold: true, seed: 2 }),
+  fromOriginal(231, 'ivory-magister', 'ivory-archmage', 'a tall ornate ice crystal crown on the hood, a big glowing cyan crystal staff, large ice crystal shoulder pieces, strongly glowing cyan eyes, a bright cyan frost aura glowing around its whole body', { bold: true }),
+  fromOriginal(232, 'frost-core-elemental', 'frost-elemental', 'a big glowing white-cyan core orb in its chest, glowing white eyes, a brighter pale blue glow along its ice crystals'),
+  fromOriginal(233, 'frost-armor-commander', 'frost-armor-warrior', 'a very tall crowned ice helmet with a crown of tall ice spikes, a long flowing dark navy blue cape, huge ice crystal shoulder pauldrons, strongly glowing white eyes, a strong bright cyan frost aura with swirling snow around its whole body', { bold: true }),
+  fromOriginal(234, 'orc-chieftain', 'high-orc', 'a bone trophy crown on the helmet, glowing red eyes, a black fur mantle on the shoulders, a faint dark purple glowing rim light'),
+  fromOriginal(235, 'rotroot-treant-king', 'rot-treant', 'a huge crown of tall twisted antler-like dead branches sticking up, strongly glowing amber eyes, glowing amber cracks in the bark, a bright amber aura glowing around its whole body', { bold: true }),
+  fromOriginal(236, 'blood-high-priest', 'orc-priest', 'a horned bone crown on the hood, glowing red eyes, glowing red ritual runes on the robe, a faint crimson glowing rim light'),
+  fromOriginal(237, 'altar-colossus', 'blood-idol', 'a big crown of large stone horns sticking up, huge boulder shoulder pauldrons, strongly glowing amber eyes and glowing amber runes, a bright amber aura glowing around its whole body', { bold: true }),
+  fromOriginal(238, 'lizard-chief', 'high-lizard', 'a big crown of tall bone spikes on its head, a large spiked bone frill, bold red war paint, strongly glowing amber eyes, a bright amber aura glowing around its whole body', { bold: true }),
+  fromOriginal(239, 'cave-worm-mother', 'cave-worm', 'a bloated body with clusters of glowing pale yellow-green egg sacs along its back and sides, a faint amber glow'),
+  fromOriginal(240, 'mirror-guardian-spirit', 'mirror-sprite', 'a tall crown of large sharp golden mirror shards sticking up, large mirror shard shoulder plates, strongly glowing golden eyes, a bright golden light aura glowing around its whole body', { bold: true }),
+  fromOriginal(241, 'lake-phantom-queen', 'lake-spirit', 'a huge tall crown of big ice crystals and pearls rising high above her head, strongly glowing bright cyan eyes, big swirling water ribbons around her, a bright cyan aura glowing around her whole body', { bold: true, seed: 2, denoise: 0.85 }),
+  fromOriginal(242, 'shard-demon-lord', 'shard-shade', 'two huge curved black horns sticking up crowned with jagged black mirror shards, strongly glowing red eyes clearly visible in every view including the side view, deep violet energy trails, a bright deep violet aura glowing around its whole body', { bold: true }),
+  fromOriginal(243, 'shadow-hunt-king', 'shadow-hunter', 'a golden circlet on the hood, glowing golden eyes, gold trim on the cloak, a soft golden-white glowing rim light'),
+  fromOriginal(244, 'prison-warden', 'prison-jailer', 'a big ornate golden crest on top of the diving helmet, huge riveted iron shoulder pauldrons, a big iron key ring and heavy chains hanging from its belt, a strongly glowing cyan visor, a long dark teal cape, a bright cyan aura glowing around its whole body', { bold: true, seed: 3, denoise: 0.85, sideFacesLeft: true }),
+  fromOriginal(245, 'drowned-lord', 'drowned-wraith', 'a huge tall rusted iron crown with long spikes, big heavy broken chains wrapped around its body, strongly glowing bright cyan eyes, a bright cyan ghostly aura glowing around its whole body', { bold: true, seed: 2, denoise: 0.85 }),
+  fromOriginal(246, 'tide-colossus', 'tide-elemental', 'a big crown of tall jagged glowing cyan ice crystal spikes rising high on top of its head, a huge curling ocean wave crest towering above its head, huge muscular wave arms and big broad shoulders, strongly glowing bright white eyes, a bright cyan aura glowing around its whole body', { bold: true, seed: 3, denoise: 0.85 }),
+  fromOriginal(247, 'bone-centurion', 'skeleton-guard', 'a tall bright red horsehair crest on the helmet sticking up, big iron shoulder pauldrons, a long red cape, strongly glowing pale green eyes, a pale green ghostly aura glowing around its whole body', { bold: true }),
+  fromOriginal(248, 'giant-chieftain', 'giant', 'a big horned fur hat with two huge ox horns sticking up, a huge bear fur mantle over big shoulders, bold war paint, strongly glowing amber eyes, a bright amber aura glowing around its whole body', { bold: true }),
+  fromOriginal(249, 'wyvern-king', 'wyvern', 'large golden crown-like horns, glowing yellow eyes, gold-tipped wing claws, a faint pale green wind glow rim light'),
+  fromOriginal(250, 'skeleton-legion-commander', 'skeleton-warrior', 'a crested great helmet, spiked pauldrons, a tattered dark red cape, glowing red eyes, a faint red glow'),
+  fromOriginal(252, 'great-mo-spider-queen', 'great-mo-spider', 'a tall crown of five large sharp bone spikes standing straight up on top of its small head, clearly visible above the head in the front view and in the side view, a crown of spikes on its head visible in the front view and in the side view, the big round abdomen clearly visible in the side view, the left front view shows its face and glowing eyes, the right back view shows only the round abdomen from behind with no eyes and no face, the middle side view is a flat horizontal profile facing right with the head and eyes on the right end and the abdomen on the left end, a huge spiked crown carapace with tall sharp spikes rising high from its head, bright glowing amber markings on the abdomen and legs, strongly glowing amber eyes, a bright amber aura glowing around its whole body', { bold: true, seed: 6, denoise: 0.75 }),
+  fromOriginal(254, 'skeleton-marksman-general', 'skeleton-archer', 'a tall horned bone crown over the hood, big bone shoulder pauldrons, a large glowing longbow, strongly glowing pale green eyes, a pale green ghostly aura glowing around its whole body', { bold: true }),
+  fromOriginal(256, 'skeleton-guard-captain', 'skeleton-guard', 'a tall red plume and a crown on the helmet, huge spiked steel shoulder pauldrons, a big tower shield, strongly glowing red eyes, a red aura glowing around its whole body', { bold: true, sideFacesLeft: true }),
+  fromOriginal(258, 'wraith-amalgam', 'death-soul', 'a much bigger body covered with several big glowing sickly green skull faces, a big crown of bone spikes on top of its head, strongly glowing sickly green eyes, sickly green ghostly energy trails and a bright sickly green aura glowing around its whole body', { bold: true, seed: 2, denoise: 0.85 }),
+  fromOriginal(260, 'phantom-general', 'phantom-knight', 'a crown on the helmet with a tall dark plume, gold trim on the armor, glowing pale blue eyes, stronger pale blue ghostly mist'),
+  job(261, 'ancient-jailer-chief', 'humanoid', 'a hulking ancient jailer chief with grey stone-like skin, small solid black dot eyes with no eye whites, a dark iron half helmet, heavy rusted iron shoulder armor, a big ring of iron keys and heavy chains hanging from its belt, a ragged dark brown leather apron', { base: { skin: '#8e8a80', cloth: '#4a3a2c', hair: 'buzz', hairColor: '#3e3e40' } }),
+  fromOriginal(263, 'ancient-sniper-officer', 'ancient-archer', 'a gold-trimmed helmet with a short flat crest, a big dark green cape, a longbow strapped close along its back, strongly glowing green eyes, a bright green wind aura around its body', { bold: true, seed: 3 }),
+  job(265, 'ancient-warden', 'humanoid', 'an ancient prison warden officer in dark bronze armor, a closed bronze helmet with small glowing amber dot eyes in the visor slit, a long dark grey coat over the armor, heavy chains and a large iron key ring at its belt', { base: { skin: '#8a6e48', cloth: '#3e3a36', hair: 'part', hairColor: '#6e5634' }, legTrim: HOODED_LEG_TRIM, seed: 3 }),
+  fromOriginal(267, 'ancient-archery-master', 'ancient-marksman', 'a tall horned crown over the hood, a big dark green cape, a large ornate glowing longbow, strongly glowing green eyes, a bright green wind aura with swirling wind trails around its whole body', { bold: true }),
+  job(269, 'seal-sorcerer', 'humanoid', 'an undead talisman sorcerer with a gaunt grey-purple decayed human face, small glowing violet dot eyes, wearing a black hood pulled over the head covered in old paper talisman strips, a dark purple robe with glowing violet seal runes and chains around its waist', { base: { skin: '#857a8f', cloth: '#2e2638', hair: 'long', hairColor: '#241e2c' }, legTrim: HOODED_LEG_TRIM }),
+  fromOriginal(271, 'sealed-corpse-king', 'sealed-zombie', 'a rusted iron crown, glowing violet eyes, glowing violet seal talismans, a tattered dark purple mantle, a faint dark purple glowing rim light'),
+  fromOriginal(273, 'ancient-ogre-king', 'ancient-ogre', 'a crude golden crown, glowing orange eyes, a dark fur mantle, small flames on its shoulders, a faint orange fire glow rim light'),
+]));

@@ -124,6 +124,15 @@ describe('戰鬥專屬條件（§ 51.4.6）', () => {
     expect(check({ type: 'target_is_boss' }, ctx())).toBe(false);
   });
 
+  it('目標是獨特魔物；「目標是 Boss」不含獨特魔物', () => {
+    const unique = ctx({ monsters: [{ id: 'm1', instance: monster({ isUnique: true }), position: { x: 1, y: 0 } }] });
+    const boss = ctx({ monsters: [{ id: 'm1', instance: monster({ isBoss: true }), position: { x: 1, y: 0 } }] });
+    expect(check({ type: 'target_is_unique' }, unique)).toBe(true);
+    expect(check({ type: 'target_is_boss' }, unique)).toBe(false);
+    expect(check({ type: 'target_is_unique' }, boss)).toBe(false);
+    expect(check({ type: 'target_is_unique' }, ctx())).toBe(false);
+  });
+
   it('目標防禦與等級差', () => {
     const tough = ctx({ monsters: [{ id: 'm1', instance: monster({ defense: 50, level: 25 }), position: { x: 1, y: 0 } }] });
     expect(check({ type: 'target_defense', value: 40, compare: 'gt' }, tough)).toBe(true);
@@ -140,7 +149,7 @@ describe('戰鬥專屬條件（§ 51.4.6）', () => {
 
   it('沒有目標時，所有目標系條件一律不成立', () => {
     const empty = ctx({ monsters: [], primaryTargetId: null });
-    for (const type of ['target_distance', 'target_attack_type', 'target_race', 'target_is_boss', 'target_defense', 'target_level_diff', 'target_range_gt']) {
+    for (const type of ['target_distance', 'target_attack_type', 'target_race', 'target_is_boss', 'target_is_unique', 'target_defense', 'target_level_diff', 'target_range_gt']) {
       expect(check({ type, value: 0, match: 'x' }, empty), type).toBe(false);
     }
   });

@@ -7,7 +7,8 @@ import type { Quest } from '../models/quest';
 import { ERRAND_KILL_TARGET, COLLECT_MATERIAL_TARGET } from '../models/quest';
 import { getAreaDisplayName } from '../wiki/hooks/useWikiData';
 import type { CraftQuest } from '../models/craftQuest';
-import { evaluateCraftRequirements, getCraftSources } from '../systems/craftQuestSystem';
+import { evaluateCraftRequirements, getCraftQuestKind, getCraftSources, isRecipeCraftable } from '../systems/craftQuestSystem';
+import { UNIQUE_CRAFTED_GEAR_SUFFIX } from '../models/equipment';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
 import { getItemById } from '../models/items';
 import type { AdventurerQuest } from '../models/adventurerQuest';
@@ -74,7 +75,9 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   const templates = useEquipmentTemplates();
 
   // 裝備名稱一律由 id 反查 seed，不在任務資料內固化（§ 99.1 第 3 條）
-  const recipe = templates.find(t => t.id === quest.templateId);
+  const kind = getCraftQuestKind(quest);
+  const found = templates.find(t => t.id === quest.templateId);
+  const recipe = found && isRecipeCraftable(found, kind) ? found : undefined;
   // 配方已不存在：模板載入後移除這筆追蹤（`36-quest-system.md` § 36.13.5）
   const stale = templates.length > 0 && !recipe;
   useEffect(() => {
@@ -85,7 +88,7 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
   const sources = getCraftSources({
     bagItems, inventory, personalStoredMaterials, personalStoredEquipment, storedMaterials, storedEquipment,
   });
-  const status = evaluateCraftRequirements(recipe, sources, gold);
+  const status = evaluateCraftRequirements(recipe, sources, gold, kind);
   const prereqName = status.prerequisite
     ? templates.find(t => t.id === status.prerequisite!.templateId)?.name ?? `#${status.prerequisite.templateId}`
     : null;
@@ -94,7 +97,7 @@ function CraftQuestItem({ quest }: { quest: CraftQuest }) {
     <div className={`quest-tracker-item ${status.ready ? 'completable' : ''}`}>
       <div className="tracker-title">
         <span className="tracker-source">[製作]</span>
-        {recipe.name}
+        {recipe.name}{kind === 'unique' ? UNIQUE_CRAFTED_GEAR_SUFFIX : ''}
       </div>
       <div className="tracker-craft-reqs">
         <span className={`tracker-craft-req ${status.gold.enough ? '' : 'lacking'}`}>

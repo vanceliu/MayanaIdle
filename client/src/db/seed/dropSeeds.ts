@@ -1,4 +1,5 @@
 import type { DropTableEntry, BossDropTableEntry } from '../rowTypes';
+import type { EquipmentTier } from '../../models/equipment';
 
 export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   // 曙光草原 Lv.1~5
@@ -1189,10 +1190,118 @@ export const DROP_TABLE_SEEDS: DropTableEntry[] = [
   { id: 1427, area: 'ancient-dungeon-9f', itemType: 'item', itemTemplateId: 162, dropValue: 5 },
 ];
 
+/** 獨特魔物專屬素材與 Boss 專屬素材的掉落值（10%，`27-drop-table.md` § 27.6、§ 27.10） */
+export const EXCLUSIVE_MATERIAL_DROP_VALUE = 100;
+
+/** 獨特魔物掉落表欄位（`27-drop-table.md` § 27.10） */
+export type UniqueDropColumn =
+  | 'random-33-40' | 'random-42-45' | 'random-46-49' | 'random-55' | 'random-60'
+  | 'timed-40' | 'timed-42' | 'timed-46' | 'timed-50' | 'timed-55';
+
+interface UniqueDropColumnSpec {
+  gold: number;
+  /** 武器／防具連動條目，每個 tier 各擲一次 */
+  equipment: readonly { tier: EquipmentTier; dropValue: number }[];
+  /** 混沌／刺針／重刻／新增／封印印記，各自判定 */
+  sigil: number;
+  breakthroughSigil: number;
+  /** 工藝／精鍊印記，各自判定 */
+  craftSigil: number;
+  /** 武器／防具強化卷軸，各自判定 */
+  enhanceScroll: number;
+  /** 武器／防具強化卷軸＋、－，各自判定 */
+  enhanceScrollPlusMinus: number;
+}
+
+const RANDOM_UNIQUE_COMMON = { sigil: 20, breakthroughSigil: 10, craftSigil: 20, enhanceScroll: 10, enhanceScrollPlusMinus: 2 } as const;
+const TIMED_UNIQUE_COMMON = { sigil: 40, breakthroughSigil: 20, craftSigil: 40, enhanceScroll: 20, enhanceScrollPlusMinus: 4 } as const;
+
+export const UNIQUE_DROP_COLUMNS: Record<UniqueDropColumn, UniqueDropColumnSpec> = {
+  'random-33-40': { gold: 300, equipment: [{ tier: 4, dropValue: 5 }], ...RANDOM_UNIQUE_COMMON },
+  'random-42-45': { gold: 500, equipment: [{ tier: 4, dropValue: 5 }], ...RANDOM_UNIQUE_COMMON },
+  'random-46-49': { gold: 500, equipment: [{ tier: 5, dropValue: 5 }], ...RANDOM_UNIQUE_COMMON },
+  'random-55': { gold: 660, equipment: [{ tier: 5, dropValue: 5 }], ...RANDOM_UNIQUE_COMMON },
+  'random-60': { gold: 660, equipment: [{ tier: 5, dropValue: 5 }, { tier: 6, dropValue: 1 }], ...RANDOM_UNIQUE_COMMON },
+  'timed-40': { gold: 300, equipment: [{ tier: 4, dropValue: 10 }], ...TIMED_UNIQUE_COMMON },
+  'timed-42': { gold: 500, equipment: [{ tier: 4, dropValue: 10 }], ...TIMED_UNIQUE_COMMON },
+  'timed-46': { gold: 500, equipment: [{ tier: 5, dropValue: 10 }], ...TIMED_UNIQUE_COMMON },
+  'timed-50': { gold: 660, equipment: [{ tier: 5, dropValue: 10 }], ...TIMED_UNIQUE_COMMON },
+  'timed-55': { gold: 660, equipment: [{ tier: 5, dropValue: 10 }], ...TIMED_UNIQUE_COMMON },
+};
+
+/** 獨特魔物 → 掉落表欄位與獨特材料（`27-drop-table.md` § 27.10「獨特魔物 → 掉落表欄位」） */
+export const UNIQUE_MONSTER_DROPS: readonly { monster: string; column: UniqueDropColumn; materialItemId: number }[] = [
+  { monster: '冰牙狼王', column: 'random-33-40', materialItemId: 192 },
+  { monster: '冰晶蝙蝠王', column: 'random-33-40', materialItemId: 193 },
+  { monster: '象牙大巫師', column: 'random-33-40', materialItemId: 194 },
+  { monster: '霜甲隊長', column: 'timed-40', materialItemId: 195 },
+  { monster: '象牙魔導長', column: 'timed-40', materialItemId: 196 },
+  { monster: '霜核元素', column: 'timed-42', materialItemId: 197 },
+  { monster: '霜甲統領', column: 'timed-42', materialItemId: 198 },
+  { monster: '妖魔大頭目', column: 'random-33-40', materialItemId: 199 },
+  { monster: '腐根樹王', column: 'random-33-40', materialItemId: 200 },
+  { monster: '血祭大祭司', column: 'timed-40', materialItemId: 201 },
+  { monster: '祭壇巨像', column: 'timed-40', materialItemId: 202 },
+  { monster: '蜥蜴首領', column: 'random-42-45', materialItemId: 203 },
+  { monster: '洞窟巨蟲母', column: 'random-46-49', materialItemId: 204 },
+  { monster: '鏡之守護靈', column: 'random-33-40', materialItemId: 205 },
+  { monster: '湖光幻后', column: 'random-33-40', materialItemId: 206 },
+  { monster: '碎鏡魔君', column: 'timed-40', materialItemId: 207 },
+  { monster: '逆影獵王', column: 'timed-40', materialItemId: 208 },
+  { monster: '典獄長', column: 'random-42-45', materialItemId: 209 },
+  { monster: '溺亡之主', column: 'random-42-45', materialItemId: 210 },
+  { monster: '潮汐巨靈', column: 'random-46-49', materialItemId: 211 },
+  { monster: '骸骨百夫長', column: 'random-33-40', materialItemId: 212 },
+  { monster: '巨人酋長', column: 'timed-40', materialItemId: 213 },
+  { monster: '飛龍王', column: 'timed-40', materialItemId: 214 },
+  { monster: '骷髏軍團長', column: 'random-42-45', materialItemId: 215 },
+  { monster: '大莫蜘蛛女王', column: 'timed-46', materialItemId: 216 },
+  { monster: '骷髏神射將', column: 'timed-46', materialItemId: 217 },
+  { monster: '骷髏親衛隊長', column: 'timed-46', materialItemId: 218 },
+  { monster: '怨魂聚合體', column: 'random-46-49', materialItemId: 219 },
+  { monster: '亡魂將軍', column: 'random-42-45', materialItemId: 220 },
+  { monster: '遠古獄卒長', column: 'timed-50', materialItemId: 221 },
+  { monster: '遠古狙擊官', column: 'timed-50', materialItemId: 222 },
+  { monster: '遠古典獄官', column: 'timed-55', materialItemId: 223 },
+  { monster: '遠古弓術長', column: 'timed-55', materialItemId: 224 },
+  { monster: '封印術士', column: 'timed-55', materialItemId: 225 },
+  { monster: '封印屍王', column: 'random-55', materialItemId: 226 },
+  { monster: '遠古食人妖精王', column: 'random-60', materialItemId: 227 },
+];
+
+const SIGIL_ITEM_IDS = [147, 148, 149, 161, 162] as const;
+const BREAKTHROUGH_SIGIL_ITEM_ID = 150;
+const CRAFT_SIGIL_ITEM_IDS = [9, 10] as const;
+const ENHANCE_SCROLL_ITEM_IDS = [7, 8] as const;
+const ENHANCE_SCROLL_PLUS_MINUS_ITEM_IDS = [157, 158, 159, 160] as const;
+
+/** 獨特魔物掉落表（`bossDropTable`，以 `bossName` 對應獨特魔物名稱） */
+function buildUniqueDropTables(firstId: number): BossDropTableEntry[] {
+  const rows: BossDropTableEntry[] = [];
+  let id = firstId;
+  const item = (bossName: string, itemTemplateId: number, dropValue: number) =>
+    rows.push({ id: id++, bossName, itemType: 'item', itemTemplateId, dropValue, minAmount: 1, maxAmount: 1 });
+  for (const { monster, column, materialItemId } of UNIQUE_MONSTER_DROPS) {
+    const spec = UNIQUE_DROP_COLUMNS[column];
+    rows.push({ id: id++, bossName: monster, itemType: 'gold', dropValue: 1000, minAmount: spec.gold, maxAmount: spec.gold });
+    item(monster, materialItemId, EXCLUSIVE_MATERIAL_DROP_VALUE);
+    for (const { tier, dropValue } of spec.equipment) {
+      rows.push({ id: id++, bossName: monster, itemType: 'equipment', equipmentPool: 'weapon', dropValue, tier });
+      rows.push({ id: id++, bossName: monster, itemType: 'equipment', equipmentPool: 'armor', dropValue, tier });
+    }
+    for (const sigil of SIGIL_ITEM_IDS) item(monster, sigil, spec.sigil);
+    item(monster, BREAKTHROUGH_SIGIL_ITEM_ID, spec.breakthroughSigil);
+    for (const sigil of CRAFT_SIGIL_ITEM_IDS) item(monster, sigil, spec.craftSigil);
+    for (const scroll of ENHANCE_SCROLL_ITEM_IDS) item(monster, scroll, spec.enhanceScroll);
+    for (const scroll of ENHANCE_SCROLL_PLUS_MINUS_ITEM_IDS) item(monster, scroll, spec.enhanceScrollPlusMinus);
+  }
+  return rows;
+}
+
 export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 試煉飛龍（試煉高地頂部，Lv.30）
   { id: 1, bossName: '試煉飛龍', itemType: 'gold', dropValue: 1000, minAmount: 240, maxAmount: 240 },
-  { id: 2, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 78, dropValue: 300, minAmount: 1, maxAmount: 1 },
+  { id: 2, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 78, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 3, bossName: '試煉飛龍', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 4 },
   { id: 4, bossName: '試煉飛龍', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 4 },
   { id: 5, bossName: '試煉飛龍', itemType: 'item', itemTemplateId: 9, dropValue: 20, minAmount: 1, maxAmount: 1 },
@@ -1206,7 +1315,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 雪地之主（雪原地帶深處，Lv.35）
   { id: 9, bossName: '雪地之主', itemType: 'gold', dropValue: 1000, minAmount: 300, maxAmount: 300 },
-  { id: 10, bossName: '雪地之主', itemType: 'item', itemTemplateId: 79, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 10, bossName: '雪地之主', itemType: 'item', itemTemplateId: 79, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 11, bossName: '雪地之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 4 },
   { id: 12, bossName: '雪地之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 4 },
   { id: 13, bossName: '雪地之主', itemType: 'item', itemTemplateId: 127, dropValue: 120, minAmount: 1, maxAmount: 2 },
@@ -1221,7 +1330,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 象牙塔惡魔（象牙塔 5F，Lv.45）
   { id: 18, bossName: '象牙塔惡魔', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 19, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 80, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 19, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 80, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 20, bossName: '象牙塔惡魔', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 4 },
   { id: 21, bossName: '象牙塔惡魔', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 4 },
   { id: 22, bossName: '象牙塔惡魔', itemType: 'item', itemTemplateId: 131, dropValue: 120, minAmount: 1, maxAmount: 1 },
@@ -1241,7 +1350,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 朦朧蛇魔（朦朧洞窟 3F，Lv.50）
   { id: 27, bossName: '朦朧蛇魔', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 28, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 81, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 28, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 81, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 29, bossName: '朦朧蛇魔', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 30, bossName: '朦朧蛇魔', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 31, bossName: '朦朧蛇魔', itemType: 'item', itemTemplateId: 12, dropValue: 70, minAmount: 1, maxAmount: 1 },
@@ -1256,7 +1365,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 深海獄王（水下監獄 4F，Lv.50）
   { id: 36, bossName: '深海獄王', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 37, bossName: '深海獄王', itemType: 'item', itemTemplateId: 82, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 37, bossName: '深海獄王', itemType: 'item', itemTemplateId: 82, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 38, bossName: '深海獄王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 39, bossName: '深海獄王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 40, bossName: '深海獄王', itemType: 'item', itemTemplateId: 12, dropValue: 70, minAmount: 1, maxAmount: 1 },
@@ -1271,7 +1380,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 安塔巨龍（龍谷地間 7F，Lv.50）
   { id: 45, bossName: '安塔巨龍', itemType: 'gold', dropValue: 1000, minAmount: 660, maxAmount: 660 },
-  { id: 46, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 83, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 46, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 83, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 47, bossName: '安塔巨龍', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 48, bossName: '安塔巨龍', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 49, bossName: '安塔巨龍', itemType: 'item', itemTemplateId: 15, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1287,7 +1396,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 遠古騎士（遠古地監 9F，Lv.65）
   { id: 55, bossName: '遠古騎士', itemType: 'gold', dropValue: 1000, minAmount: 900, maxAmount: 900 },
-  { id: 56, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 84, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 56, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 84, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 57, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
   { id: 58, bossName: '遠古騎士', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 59, bossName: '遠古騎士', itemType: 'item', itemTemplateId: 13, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1304,7 +1413,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   // 百柱塔樓層王
   // 毒之皇女（1-10F）
   { id: 65, bossName: '毒之皇女', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 66, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 85, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 66, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 85, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 67, bossName: '毒之皇女', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 68, bossName: '毒之皇女', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 69, bossName: '毒之皇女', itemType: 'item', itemTemplateId: 13, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1319,7 +1428,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 哥布林之王（11-20F）
   { id: 74, bossName: '哥布林之王', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 75, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 86, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 75, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 86, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 76, bossName: '哥布林之王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 77, bossName: '哥布林之王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 78, bossName: '哥布林之王', itemType: 'item', itemTemplateId: 13, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1334,7 +1443,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 暗影吸血鬼（21-30F）
   { id: 83, bossName: '暗影吸血鬼', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 84, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 87, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 84, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 87, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 85, bossName: '暗影吸血鬼', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 86, bossName: '暗影吸血鬼', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 87, bossName: '暗影吸血鬼', itemType: 'item', itemTemplateId: 13, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1349,7 +1458,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 不死殭屍王（31-40F）
   { id: 92, bossName: '不死殭屍王', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 93, bossName: '不死殭屍王', itemType: 'item', itemTemplateId: 88, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 93, bossName: '不死殭屍王', itemType: 'item', itemTemplateId: 88, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 94, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 95, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 1429, bossName: '不死殭屍王', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
@@ -1366,7 +1475,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 龍王約特勒（41-50F）
   { id: 101, bossName: '龍王約特勒', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 102, bossName: '龍王約特勒', itemType: 'item', itemTemplateId: 89, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 102, bossName: '龍王約特勒', itemType: 'item', itemTemplateId: 89, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 103, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 5, tier: 5 },
   { id: 104, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'armor', dropValue: 5, tier: 5 },
   { id: 1431, bossName: '龍王約特勒', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
@@ -1383,7 +1492,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 冥王哈馬斯（51-60F）
   { id: 110, bossName: '冥王哈馬斯', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 111, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 90, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 111, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 90, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 112, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
   { id: 113, bossName: '冥王哈馬斯', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 114, bossName: '冥王哈馬斯', itemType: 'item', itemTemplateId: 14, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1398,7 +1507,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 霜凍伊莉絲（61-70F）
   { id: 119, bossName: '霜凍伊莉絲', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 120, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 91, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 120, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 91, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 121, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
   { id: 122, bossName: '霜凍伊莉絲', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 123, bossName: '霜凍伊莉絲', itemType: 'item', itemTemplateId: 14, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1413,7 +1522,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 熔岩伊弗利特（71-80F）
   { id: 128, bossName: '熔岩伊弗利特', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 129, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 92, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 129, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 92, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 130, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
   { id: 131, bossName: '熔岩伊弗利特', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 132, bossName: '熔岩伊弗利特', itemType: 'item', itemTemplateId: 14, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1428,7 +1537,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 守護者之主（81-90F）
   { id: 137, bossName: '守護者之主', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 138, bossName: '守護者之主', itemType: 'item', itemTemplateId: 93, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 138, bossName: '守護者之主', itemType: 'item', itemTemplateId: 93, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 139, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
   { id: 140, bossName: '守護者之主', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 141, bossName: '守護者之主', itemType: 'item', itemTemplateId: 17, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1443,7 +1552,7 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
 
   // 百柱死神（91-100F）
   { id: 146, bossName: '百柱死神', itemType: 'gold', dropValue: 1000, minAmount: 500, maxAmount: 500 },
-  { id: 147, bossName: '百柱死神', itemType: 'item', itemTemplateId: 94, dropValue: 150, minAmount: 1, maxAmount: 1 },
+  { id: 147, bossName: '百柱死神', itemType: 'item', itemTemplateId: 94, dropValue: 100, minAmount: 1, maxAmount: 1 },
   { id: 148, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'weapon', dropValue: 1, tier: 6 },
   { id: 149, bossName: '百柱死神', itemType: 'equipment', equipmentPool: 'armor', dropValue: 1, tier: 6 },
   { id: 150, bossName: '百柱死神', itemType: 'item', itemTemplateId: 17, dropValue: 70, minAmount: 1, maxAmount: 2 },
@@ -1571,4 +1680,5 @@ export const BOSS_DROP_TABLE_SEEDS: BossDropTableEntry[] = [
   { id: 1393, bossName: '守護者之主', itemType: 'item', itemTemplateId: 162, dropValue: 20, minAmount: 1, maxAmount: 1 },
   { id: 1394, bossName: '百柱死神', itemType: 'item', itemTemplateId: 161, dropValue: 20, minAmount: 1, maxAmount: 1 },
   { id: 1395, bossName: '百柱死神', itemType: 'item', itemTemplateId: 162, dropValue: 20, minAmount: 1, maxAmount: 1 },
+  ...buildUniqueDropTables(1438),
 ];

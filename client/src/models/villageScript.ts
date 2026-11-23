@@ -142,6 +142,8 @@ export interface VillageAction {
   includeDropOnly?: boolean;
   /** `dismantle_equipment`：拆製作品 (鍛) */
   includeCrafted?: boolean;
+  /** `dismantle_equipment`：拆製作品 (獨) */
+  includeUniqueCrafted?: boolean;
   /** `dismantle_equipment`：會出結晶的裝備怎麼處理，未設＝`improve` */
   crystalMode?: DismantleCrystalMode;
   /** `discard_equipment`：丟哪些，未設＝`unsellable` */

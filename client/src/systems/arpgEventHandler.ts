@@ -2,7 +2,7 @@ import type { PlayerAttackEvent, MonsterAttackEvent } from './arpgEngine';
 import { applyStarLevel, resolveSkills } from '../models/skillStar';
 import { applyDamageToMonster, bloodthirstHeal, monsterLogName } from '../models/monsterAffix';
 import type { Character } from '../models/character';
-import type { MonsterInstance } from '../models/monster';
+import { monsterRank, type MonsterInstance } from '../models/monster';
 import { resolveDebuffDuration, resolveDotDamagePercent, resolveMpAfterSelfCast, resolveSelfHpCost, type Skill } from '../models/skill';
 import type { ActiveEffect } from '../models/effect';
 import type { EquipmentInstance } from '../models/equipment';
@@ -71,7 +71,7 @@ import { getEffectiveGearArray } from './gear';
 import { random } from '../core/rng';
 import { gameNow } from '../core/clock';
 
-/** § 24.6 Boss 控場免疫冷卻 */
+/** § 24.6 Boss 與獨特魔物的控場免疫冷卻 */
 export const BOSS_CC_IMMUNE_MS = 10_000;
 
 /** § 7.4 元素侵蝕的 DoT：每秒一跳、持續 5 秒、存續期間不可刷新 */
@@ -938,8 +938,9 @@ export function processPlayerAttack(
           } else if ((debuffDef.stun || debuffDef.root) && debuffDef.duration) {
             // 控場 debuff：暈眩（§ 24.5.1）、定身（§ 24.5.1b）
             const stunDuration = resolveDebuffDuration(debuffDef, isShieldEquipped(equippedGear)) ?? debuffDef.duration;
-            // § 24.6：Boss 被控場後 10 秒內免疫任何控場效果
-            if (monster.isBoss && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
+            // § 24.6：Boss 與獨特魔物被控場後 10 秒內免疫任何控場效果
+            const hasCcImmunity = monsterRank(monster) !== 'normal';
+            if (hasCcImmunity && monster.ccImmuneUntil !== undefined && monster.ccImmuneUntil > now) {
               logs.push({ text: `${monsterLogName(monster)} 免疫控場！`, type: 'debuff-enemy' });
             } else {
               const stunEffect: ActiveEffect = {
@@ -960,7 +961,7 @@ export function processPlayerAttack(
                 description: debuffDef.description,
               };
               gs.addEffect(stunEffect);
-              if (monster.isBoss) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
+              if (hasCcImmunity) monster.ccImmuneUntil = now + BOSS_CC_IMMUNE_MS;
               if (!alreadyActive) logs.push({ text: `${skill.name} 命中！${monsterLogName(monster)} ${debuffDef.name} ${stunDuration / 1000}s`, type: 'debuff-enemy' });
             }
           } else if (debuffDef.modifiers && debuffDef.duration) {

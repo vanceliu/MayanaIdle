@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import type { AdventurerQuest, GuildProgress } from '../../models/adventurerQuest';
+import type { AdventurerQuest, BossPoolEntry, GuildProgress, QuestTownId } from '../../models/adventurerQuest';
 import {
   generateQuestList,
   generateSingleQuest,
@@ -39,12 +39,14 @@ import {
   TOWN_AREA_POOLS,
   TOWN_BOSS_POOLS,
   CRAFTING_MATERIAL_REWARDS,
+  TIMED_UNIQUE_KILL_COUNT,
   getTownDifficulties,
   getRankForPoints,
 } from '../../models/adventurerQuest';
 import { getAreaDisplayName } from '../../wiki/hooks/useWikiData';
 import { QUEST_GOLD_REWARD_CAP } from '../globalRates';
 import { makeBagItem } from '../../models/bagItem';
+import { MONSTER_SEEDS } from '../../db/seed/monsterSeeds';
 
 function makeQuest(overrides: Partial<AdventurerQuest> = {}): AdventurerQuest {
   return {
@@ -441,21 +443,56 @@ describe('adventurerQuestSystem', () => {
 
   describe('town-specific quest generation', () => {
     it('getTownDifficulties returns correct difficulties per town', () => {
-      // § 36.6.1：BOSS 分頁需該城鎮該難度池內至少有一隻 BOSS
+      // § 36.6.1：BOSS 分頁需該城鎮區域池內至少有一隻該難度的 BOSS 或獨特魔物，不要求同字母一般池
       expect(getTownDifficulties('neutral-town')).toEqual(['D', 'C', 'B', 'B+', 'A', 'A+']);
-      expect(getTownDifficulties('elsarth-town')).toEqual(['A', 'S', 'S+']);
-      expect(getTownDifficulties('varden-town')).toEqual(['A', 'S', 'S+']);
-      expect(getTownDifficulties('greyridge-town')).toEqual(['A', 'A+', 'S', 'S+']);
+      expect(getTownDifficulties('elsarth-town')).toEqual(['B+', 'A', 'A+', 'S', 'S+']);
+      expect(getTownDifficulties('varden-town')).toEqual(['B+', 'A', 'A+', 'S', 'S+']);
+      expect(getTownDifficulties('greyridge-town')).toEqual(['B+', 'A', 'A+', 'S', 'S+']);
     });
 
-    it('陣營城鎮的 BOSS 全部集中在 S+ 一頁（§ 36.12.5）', () => {
-      const names = (town: 'elsarth-town' | 'varden-town') =>
-        (TOWN_BOSS_POOLS[town]['S+'] ?? []).map(b => b.name).sort();
+    it('各城鎮 BOSS 分頁的獨特魔物（§ 36.12.5）', () => {
+      const uniques = (town: QuestTownId, diff: 'B+' | 'A+' | 'S+') =>
+        (TOWN_BOSS_POOLS[town][diff] ?? []).filter(b => b.rank === 'unique').map(b => b.name).sort();
+      const S_PLUS = ['遠古獄卒長', '遠古狙擊官', '遠古典獄官', '遠古弓術長', '封印術士', '封印屍王', '遠古食人妖精王'];
+      const expected: Record<QuestTownId, Record<'B+' | 'A+' | 'S+', string[]>> = {
+        'neutral-town': {
+          'B+': ['冰牙狼王', '冰晶蝙蝠王', '象牙大巫師'],
+          'A+': ['霜甲隊長', '象牙魔導長', '霜核元素', '霜甲統領'],
+          'S+': [],
+        },
+        'elsarth-town': {
+          'B+': ['妖魔大頭目', '腐根樹王'],
+          'A+': ['血祭大祭司', '祭壇巨像', '蜥蜴首領', '洞窟巨蟲母', '亡魂將軍'],
+          'S+': S_PLUS,
+        },
+        'varden-town': {
+          'B+': ['鏡之守護靈', '湖光幻后'],
+          'A+': ['碎鏡魔君', '逆影獵王', '典獄長', '溺亡之主', '潮汐巨靈', '亡魂將軍'],
+          'S+': S_PLUS,
+        },
+        'greyridge-town': {
+          'B+': ['骸骨百夫長'],
+          'A+': ['巨人酋長', '飛龍王', '骷髏軍團長', '大莫蜘蛛女王', '骷髏神射將', '骷髏親衛隊長', '怨魂聚合體', '亡魂將軍'],
+          'S+': S_PLUS,
+        },
+      };
+      for (const town of Object.keys(expected) as QuestTownId[]) {
+        for (const diff of ['B+', 'A+', 'S+'] as const) {
+          expect(uniques(town, diff), `${town} ${diff}`).toEqual([...expected[town][diff]].sort());
+        }
+      }
+    });
 
-      expect(TOWN_BOSS_POOLS['elsarth-town']['A+']).toBeUndefined();
-      expect(TOWN_BOSS_POOLS['varden-town']['A+']).toBeUndefined();
-      expect(names('elsarth-town')).toEqual(['朦朧蛇魔', '遠古騎士'].sort());
-      expect(names('varden-town')).toEqual(['深海獄王', '遠古騎士'].sort());
+    it('BOSS 本身的城鎮分配不變', () => {
+      const bosses = (town: QuestTownId) => Object.values(TOWN_BOSS_POOLS[town]).flat()
+        .filter(b => b!.rank === 'boss').map(b => b!.name).sort();
+      expect(bosses('neutral-town')).toEqual(['試煉飛龍', '雪地之主', '象牙塔惡魔'].sort());
+      expect(bosses('elsarth-town')).toEqual(['朦朧蛇魔', '遠古騎士'].sort());
+      expect(bosses('varden-town')).toEqual(['深海獄王', '遠古騎士'].sort());
+      expect(bosses('greyridge-town')).toEqual([
+        '安塔巨龍', '毒之皇女', '哥布林之王', '暗影吸血鬼', '不死殭屍王', '龍王約特勒', '冥王哈馬斯',
+        '霜凍伊莉絲', '熔岩伊弗利特', '守護者之主', '百柱死神', '遠古騎士',
+      ].sort());
     });
 
     it('neutral-town quests only target neutral/snow/ivory areas', () => {
@@ -541,6 +578,150 @@ describe('adventurerQuestSystem', () => {
       const quests = generateQuestList('D', 'F', 'elsarth-town');
       expect(quests.every(q => q.difficulty === 'D')).toBe(true);
       // Should still work as fallback (uses global pool)
+    });
+  });
+
+  describe('獨特魔物的 BOSS 任務（§ 36.2.4、§ 36.2.5、§ 36.8.2）', () => {
+    /** § 36.8.2 獨特魔物表：名稱 → [分頁, 區域, 金幣掉落] */
+    const UNIQUE_TABLE: Record<string, ['B+' | 'A+' | 'S+', string, number]> = {
+      冰牙狼王: ['B+', 'snow-field', 3000],
+      妖魔大頭目: ['B+', 'demon-forest', 3000],
+      鏡之守護靈: ['B+', 'mirror-forest', 3000],
+      骸骨百夫長: ['B+', 'dragon-valley-outskirts', 3000],
+      冰晶蝙蝠王: ['B+', 'ivory-tower-1f', 3000],
+      腐根樹王: ['B+', 'rotleaf-path', 3000],
+      湖光幻后: ['B+', 'glimmer-shore', 3000],
+      象牙大巫師: ['B+', 'ivory-tower-2f', 3000],
+      霜甲隊長: ['A+', 'ivory-tower-3f', 4000],
+      象牙魔導長: ['A+', 'ivory-tower-3f', 4000],
+      血祭大祭司: ['A+', 'demon-altar', 4000],
+      祭壇巨像: ['A+', 'demon-altar', 4000],
+      碎鏡魔君: ['A+', 'shattered-mirror', 4000],
+      逆影獵王: ['A+', 'shattered-mirror', 4000],
+      巨人酋長: ['A+', 'dragon-valley-surface', 4000],
+      飛龍王: ['A+', 'dragon-valley-surface', 4000],
+      霜核元素: ['A+', 'ivory-tower-4f', 4000],
+      霜甲統領: ['A+', 'ivory-tower-4f', 4000],
+      蜥蜴首領: ['A+', 'misty-cave-1f', 4000],
+      典獄長: ['A+', 'underwater-prison-1f', 4000],
+      骷髏軍團長: ['A+', 'dragon-valley-1f', 4000],
+      溺亡之主: ['A+', 'underwater-prison-2f', 4000],
+      亡魂將軍: ['A+', 'ancient-battlefield', 4000],
+      洞窟巨蟲母: ['A+', 'misty-cave-2f', 5000],
+      大莫蜘蛛女王: ['A+', 'dragon-valley-3f', 5000],
+      骷髏神射將: ['A+', 'dragon-valley-3f', 5000],
+      骷髏親衛隊長: ['A+', 'dragon-valley-3f', 5000],
+      潮汐巨靈: ['A+', 'underwater-prison-3f', 5000],
+      怨魂聚合體: ['A+', 'dragon-valley-5f', 5000],
+      遠古獄卒長: ['S+', 'ancient-dungeon-1f', 5000],
+      遠古狙擊官: ['S+', 'ancient-dungeon-1f', 5000],
+      遠古典獄官: ['S+', 'ancient-dungeon-3f', 5000],
+      遠古弓術長: ['S+', 'ancient-dungeon-3f', 5000],
+      封印術士: ['S+', 'ancient-dungeon-3f', 5000],
+      封印屍王: ['S+', 'ancient-dungeon-5f', 5000],
+      遠古食人妖精王: ['S+', 'ancient-dungeon-7f', 7000],
+    };
+    const uniqueEntries = () => (['B+', 'A+', 'S+'] as const)
+      .flatMap(d => BOSS_POOLS[d].filter(b => b.rank === 'unique').map(b => ({ ...b, difficulty: d })));
+
+    it('36 隻獨特魔物全部在 BOSS 池，分頁／區域／金幣依 § 36.8.2', () => {
+      const entries = uniqueEntries();
+      expect(entries.map(e => e.name).sort()).toEqual(Object.keys(UNIQUE_TABLE).sort());
+      for (const e of entries) {
+        expect([e.difficulty, e.area, e.avgGold], e.name).toEqual(UNIQUE_TABLE[e.name]);
+      }
+    });
+
+    it('所屬分頁依等級：Lv.30~39 B+、40~49 A+、50 以上 S+（§ 36.3.2）', () => {
+      for (const e of uniqueEntries()) {
+        const expected = e.level >= 50 ? 'S+' : e.level >= 40 ? 'A+' : 'B+';
+        expect(e.difficulty, e.name).toBe(expected);
+      }
+    });
+
+    it('定時旗標對應 seed 的 spawnMode', () => {
+      for (const e of uniqueEntries()) {
+        const seed = MONSTER_SEEDS.find(m => m.name === e.name)!;
+        expect(e.timed, e.name).toBe(seed.spawnMode !== 'random');
+      }
+      for (const d of ['B+', 'A+', 'S+'] as const) {
+        expect(BOSS_POOLS[d].filter(b => b.rank === 'boss').every(b => !b.timed)).toBe(true);
+      }
+    });
+
+    it('定時獨特魔物只出殲滅 BOSS，且固定 1 隻；BOSS 素材收集只指定非定時目標', () => {
+      let timedErrands = 0;
+      let collects = 0;
+      for (let i = 0; i < 200; i++) {
+        for (const q of generateQuestList('A+', 'S', 'neutral-town')) {
+          const entry = BOSS_POOLS['A+'].find(b => b.name === q.targetMonster)!;
+          if (q.type === 'collectboss') {
+            collects++;
+            expect(entry.timed, q.targetMonster).toBe(false);
+          } else if (entry.timed) {
+            timedErrands++;
+            expect(q.targetCount).toBe(TIMED_UNIQUE_KILL_COUNT);
+          }
+        }
+      }
+      expect(timedErrands).toBeGreaterThan(0);
+      expect(collects).toBeGreaterThan(0);
+    });
+
+    it('非定時目標的殲滅數仍為 1~3', () => {
+      const counts = new Set<number>();
+      for (let i = 0; i < 200; i++) {
+        for (const q of generateQuestList('B+', 'S', 'elsarth-town')) {
+          if (q.type === 'errandboss') counts.add(q.targetCount);
+        }
+      }
+      expect([...counts].sort()).toEqual([1, 2, 3]);
+    });
+
+    it('分頁內只有定時目標時一律出殲滅 BOSS', () => {
+      const pools = TOWN_BOSS_POOLS['neutral-town'];
+      const original = pools['A+'];
+      pools['A+'] = original!.filter(b => b.timed);
+      try {
+        for (let i = 0; i < 50; i++) {
+          for (const q of generateQuestList('A+', 'S', 'neutral-town')) {
+            expect(q.type).toBe('errandboss');
+            expect(q.targetCount).toBe(TIMED_UNIQUE_KILL_COUNT);
+          }
+        }
+      } finally {
+        pools['A+'] = original;
+      }
+    });
+
+    it('獨特魔物任務的貢獻與金幣走 BOSS 公式', () => {
+      let checked = 0;
+      for (let i = 0; i < 100; i++) {
+        for (const q of generateQuestList('B+', 'US', 'varden-town')) {
+          const entry: BossPoolEntry = BOSS_POOLS['B+'].find(b => b.name === q.targetMonster)!;
+          expect(entry.rank).toBe('unique');
+          const base = q.type === 'errandboss' ? 80 : 100;
+          expect(q.contributionPoints).toBe(base + Math.floor(entry.avgGold / 10));
+          if (q.reward.type === 'gold') {
+            const kills = q.type === 'collectboss' ? q.targetCount / BOSS_COLLECT_DROP_RATE : q.targetCount;
+            expect(q.reward.amount).toBe(Math.min(QUEST_GOLD_REWARD_CAP, Math.floor(entry.avgGold * kills * 3 * 2)));
+            checked++;
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+
+    it('殲滅獨特魔物只認名稱，跨樓層地圖組任一樓層皆計入（§ 36.11）', () => {
+      const quest = makeQuest({
+        type: 'errandboss', difficulty: 'A+', status: 'active',
+        targetArea: 'dragon-valley-1f', targetMonster: '骷髏軍團長', targetCount: 2,
+      });
+      const once = updateQuestProgress([quest], 'dragon-valley-2f', '骷髏軍團長', 1);
+      expect(once[0].currentCount).toBe(1);
+      const twice = updateQuestProgress(once, 'dragon-valley-1f', '骷髏軍團長', 1);
+      expect(twice[0].status).toBe('completable');
+      expect(updateQuestProgress([quest], 'dragon-valley-1f', '骷髏', 1)[0].currentCount).toBe(0);
     });
   });
 

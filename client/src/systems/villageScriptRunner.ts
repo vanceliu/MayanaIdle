@@ -251,6 +251,7 @@ export function collectVillageDismantle(action: VillageAction, ctx: VillageScrip
     if (!yields && !crystal) continue;
     if (!yields && !action.includeDropOnly) continue;
     if (item.isCraftedGear && !action.includeCrafted) continue;
+    if (item.isUniqueCraftedGear && !action.includeUniqueCrafted) continue;
     if (crystal) {
       if (crystalMode === 'never') continue;
       if (crystalMode === 'improve' && !crystalImproves(crystals.find(c => c.type === crystal.type), crystal)) continue;

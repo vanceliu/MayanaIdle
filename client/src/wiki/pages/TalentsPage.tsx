@@ -21,6 +21,7 @@ import { selectableRules } from '../../db/seed/talentSeeds';
 import {
   FUSE_INPUT_COUNT,
   SLOT_DROP_RATE_BOSS,
+  SLOT_DROP_RATE_UNIQUE,
   SLOT_TIER_BAND,
   SLOT_GRANT_LEVEL_INTERVAL,
   STARTING_SLOT_COUNT,
@@ -135,7 +136,7 @@ export function TalentsPage() {
         <ul style={noteStyle}>
           <li>創角給 {STARTING_SLOT_COUNT} 個 T1 天賦格，全部已經裝好可以直接打</li>
           <li>每 {SLOT_GRANT_LEVEL_INTERVAL} 級由信箱發 1 個 T1 天賦格，要自己領、自己安裝</li>
-          <li>高階天賦格只有 Boss 會掉（{SLOT_DROP_RATE_BOSS}% × 伺服器掉落倍率），或用低階 ×{FUSE_INPUT_COUNT} 合成</li>
+          <li>高階天賦格只有 Boss（{SLOT_DROP_RATE_BOSS}%）與獨特魔物（{SLOT_DROP_RATE_UNIQUE}%）會掉（× 伺服器掉落倍率），或用低階 ×{FUSE_INPUT_COUNT} 合成</li>
           <li>條件與動作<strong>不掉落、不合成</strong> —— 一律內建</li>
         </ul>
 
@@ -313,9 +314,10 @@ export function TalentFusionTable() {
           ))}
         </tbody>
       </table>
-      <h4>Boss 掉落的天賦格</h4>
+      <h4>Boss 與獨特魔物掉落的天賦格</h4>
       <p>
-        掉率 {SLOT_DROP_RATE_BOSS}% × 伺服器掉落倍率（不吃掉寶率詞綴與 Pressure），<strong>只有 Boss 會掉</strong>。
+        掉率 Boss {SLOT_DROP_RATE_BOSS}%、獨特魔物 {SLOT_DROP_RATE_UNIQUE}%，× 伺服器掉落倍率（不吃掉寶率詞綴與 Pressure），
+        <strong>一般怪不掉</strong>。兩者可掉的階級相同，只看區域最高等級。
         T1 格不掉落，只從角色等級取得。
       </p>
       <table className="wiki-table">

@@ -5,7 +5,10 @@
  */
 export interface CharacterStatistics {
   monstersKilled: number;
+  /** BOSS 討伐數，不含獨特魔物 */
   bossesKilled: number;
+  /** 獨特魔物擊殺數（`25-monster-system.md` § 25.13） */
+  uniqueMonstersKilled: number;
   deathCount: number;
   equipmentCrafted: number;
   weaponEnhanceAttempts: number;
@@ -24,6 +27,7 @@ export function createDefaultStatistics(): CharacterStatistics {
   return {
     monstersKilled: 0,
     bossesKilled: 0,
+    uniqueMonstersKilled: 0,
     deathCount: 0,
     equipmentCrafted: 0,
     weaponEnhanceAttempts: 0,

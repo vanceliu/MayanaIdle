@@ -2,12 +2,18 @@
  * 鐵匠鋪製作品的詞綴（`06-equipment-acquire.md` § 6A.6、`07-affix.md` § 7.2）：
  * 與商店／掉落同一支 `generateAffixes`，固定 4 條、Tier 依裝備階級範圍加權、無特殊詞綴。
  */
-import { generateAffixes, getWeaponBaseDamage, CRAFT_AFFIX_TIER_RANGE, getCraftAffixTierWeights, type AffixCategory, type Affix } from '../models/affix';
+import {
+  generateAffixes, getAffixCategoryForSlot, getWeaponBaseDamage, CRAFT_AFFIX_TIER_RANGE, getCraftAffixTierWeights,
+  type AffixCategory, type Affix,
+} from '../models/affix';
+import type { ClassName } from '../models/character';
+import { rollNewInstanceFields } from './templateSync';
 import type { CraftMaterial, EquipmentInstance, EquipmentTemplate } from '../models/equipment';
 import { abilityToCrystal, yieldsAbilityCrystal, type AbilityCrystal } from '../models/abilityCrystal';
 import { consumeBagItem, getBagItemAmount, type BagItem } from '../models/bagItem';
+import { UNIQUE_CRAFT_AFFIX_TIERS, isUniqueCraftTier } from '../models/uniqueCraft';
 import {
-  CRAFT_SOURCE_ORDER, findCraftPrerequisiteCandidates,
+  CRAFT_SOURCE_ORDER, findCraftPrerequisiteCandidates, getRecipePrerequisite, type CraftRecipeKind,
   type CraftPrerequisiteCandidate, type CraftSourceKind, type CraftSources,
 } from './craftQuestSystem';
 
@@ -25,6 +31,32 @@ export function generateCraftAffixes(
     noSpecialAffix: true,
     weaponBaseDamage: getWeaponBaseDamage(tpl),
   });
+}
+
+/**
+ * 製作品 (獨) 的詞綴（§ 6A.6「製作品 (獨)」）：固定 4 條、不重複、無特殊詞綴；
+ * Tier 依裝備階級固定分配（T4 全 T5、T5 1 條 T6、T6 3 條 T6，其餘 T5），數值在該 Tier 範圍內均等抽。
+ */
+export function generateUniqueCraftAffixes(
+  category: AffixCategory,
+  tpl: { tier?: number; smallMonsterDamage?: number | null; largeMonsterDamage?: number | null },
+): Affix[] {
+  if (!isUniqueCraftTier(tpl.tier)) throw new Error(`T${tpl.tier} 沒有獨特製作詞綴規則`);
+  return generateAffixes(category, 1, 4, false, {
+    tierPlan: UNIQUE_CRAFT_AFFIX_TIERS[tpl.tier],
+    noSpecialAffix: true,
+    weaponBaseDamage: getWeaponBaseDamage(tpl),
+  });
+}
+
+/**
+ * 製作品 (獨) 生成時抽的欄位（§ 6A.6「製作品 (獨)」）：詞綴，以及同掉落品的隨機技能
+ * （100% 帶、職業池取製作角色，`07-affix-ability.md` § 7S.2）與防具安定值／額外防禦。
+ */
+export function rollUniqueCraftProduct(recipe: EquipmentTemplate, className: ClassName): Partial<EquipmentInstance> {
+  const affixes = generateUniqueCraftAffixes(getAffixCategoryForSlot(recipe.slot, recipe.type), recipe);
+  const fields = rollNewInstanceFields(recipe, { channel: 'drop', className, guaranteed: true });
+  return { ...fields, affixes };
 }
 
 /**
@@ -55,47 +87,20 @@ export function drawCraftMaterials(
 }
 
 /**
- * 名單內任意混合扣 `amount` 個（`55-arena.md` § 55.1）：依來源順序，同一來源依名單順序，回傳扣完後各來源的素材。
- * 呼叫前須已確認三處合計足夠。
- */
-export function drawAnyOfMaterials(
-  itemIds: number[],
-  amount: number,
-  sources: CraftSources,
-): Record<CraftSourceKind, BagItem[]> {
-  const result = {
-    bag: sources.bag.materials,
-    personal: sources.personal.materials,
-    shared: sources.shared.materials,
-  };
-  let remaining = amount;
-  for (const source of CRAFT_SOURCE_ORDER) {
-    for (const itemId of itemIds) {
-      if (remaining <= 0) return result;
-      const take = Math.min(remaining, getBagItemAmount(result[source], itemId));
-      if (take <= 0) continue;
-      result[source] = consumeBagItem(result[source], itemId, take);
-      remaining -= take;
-    }
-  }
-  if (remaining > 0) throw new Error('素材不足');
-  return result;
-}
-
-/**
- * 玩家指定的前置裝備（§ 6A.3「取用來源」）。配方無前置回 []；
- * 未指定、件數不符、重複或不在背包／個人／帳號倉庫的候選內回 null。
+ * 玩家指定的前置裝備（§ 6A.3「取用來源」、§ 6A.3.1）。配方無前置回 []；
+ * 未指定、件數不符、重複或不在背包／個人／帳號倉庫的可用候選內回 null。
  */
 export function pickCraftPrerequisites(
   recipe: EquipmentTemplate,
   sources: CraftSources,
   prerequisiteIds: unknown,
+  kind: CraftRecipeKind = 'normal',
 ): CraftPrerequisiteCandidate[] | null {
-  const prereq = recipe.craftPrerequisiteWeapon;
+  const prereq = getRecipePrerequisite(recipe, kind);
   if (!prereq) return [];
   if (!Array.isArray(prerequisiteIds) || prerequisiteIds.length !== prereq.quantity) return null;
   if (new Set(prerequisiteIds).size !== prerequisiteIds.length) return null;
-  const candidates = findCraftPrerequisiteCandidates(recipe, sources);
+  const candidates = findCraftPrerequisiteCandidates(recipe, sources, kind);
   const picked = prerequisiteIds.map(id => candidates.find(c => c.item.id === id));
   return picked.every(c => c !== undefined) ? picked as CraftPrerequisiteCandidate[] : null;
 }
@@ -103,12 +108,16 @@ export function pickCraftPrerequisites(
 /** 拆解退還比例（`06-equipment-acquire.md` § 6A.3「拆解」），每種材料無條件進位 */
 export const DISMANTLE_RETURN_RATE = 0.5;
 
+/** 製作品 (獨) 退還一般配方的比例（§ 6A.3「拆解」）；獨特配方不退 */
+export const UNIQUE_CRAFTED_DISMANTLE_RETURN_RATE = 1;
+
 /** 拆解退還的材料；無配方（非 `acquireType: 'craft'`）回 null。前置裝備不退 */
 export function getDismantleYield(
   tpl: Pick<EquipmentTemplate, 'acquireType' | 'craftMaterials'> | undefined,
+  rate: number = DISMANTLE_RETURN_RATE,
 ): CraftMaterial[] | null {
   if (!tpl || tpl.acquireType !== 'craft' || !tpl.craftMaterials?.length) return null;
-  return tpl.craftMaterials.map(m => ({ itemId: m.itemId, amount: Math.ceil(m.amount * DISMANTLE_RETURN_RATE) }));
+  return tpl.craftMaterials.map(m => ({ itemId: m.itemId, amount: Math.ceil(m.amount * rate) }));
 }
 
 /** 拆解產出（§ 6A.3「拆解」、`07-affix-ability.md` § 7S.8）。兩者皆無＝不可拆 */
@@ -121,5 +130,6 @@ export function getDismantleOutcome(item: EquipmentInstance, template: Equipment
   // 競技場擬態品不可拆（`55-arena.md` § 55.9）
   if (item.isMimicGear) return { yields: null };
   const crystal = template && yieldsAbilityCrystal(item) ? abilityToCrystal(item.ability!, template) : undefined;
-  return { yields: getDismantleYield(template), crystal };
+  const rate = item.isUniqueCraftedGear ? UNIQUE_CRAFTED_DISMANTLE_RETURN_RATE : DISMANTLE_RETURN_RATE;
+  return { yields: getDismantleYield(template, rate), crystal };
 }

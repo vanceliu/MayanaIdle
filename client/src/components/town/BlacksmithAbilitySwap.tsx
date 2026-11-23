@@ -92,7 +92,7 @@ export function BlacksmithAbilitySwap({ templates, onResult }: {
   const targets = inventory
     .map(item => ({ item, template: templateOf(item) }))
     .filter((e): e is { item: EquipmentInstance; template: EquipmentTemplate } =>
-      !!e.template && !e.item.isCraftedGear && isAbilitySlot(e.template)
+      !!e.template && !e.item.isCraftedGear && !e.item.isUniqueCraftedGear && isAbilitySlot(e.template)
       && (!group || (group === 'weapon') === (e.template.slot === 'rightHand')));
 
   async function handleApply(item: EquipmentInstance, template: EquipmentTemplate, target: AbilityCrystal) {

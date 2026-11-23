@@ -141,6 +141,7 @@ export interface MonsterWire {
   id: string;
   position: { x: number; y: number };
   isBoss: boolean;
+  isUnique?: boolean;
   attackRange?: number;
   dummy?: TrainingDummySpec;
 }
@@ -171,6 +172,8 @@ export interface CombatInstanceView {
   currentHp: number;
   maxHp: number;
   isBoss: boolean;
+  /** 獨特魔物（`25-monster-system.md` § 25.13） */
+  isUnique?: boolean;
   /** 體型，決定地圖上的球大小（`25-monster-system.md` § 25.2.1） */
   size: MonsterSize;
   element: string;
@@ -201,7 +204,7 @@ export const ACTION_ALLOWLIST: Record<ActionStore, ReadonlySet<string>> = {
     'acceptAdventurerQuest', 'abandonAdventurerQuest', 'completeAdventurerQuest',
     'rerollQuestBoard', 'ensureQuestBoardForTown', 'acceptCraftQuest', 'abandonCraftQuest',
     'ensureBountyBoards', 'signBounty', 'abandonBounty', 'setBountyCompare',
-    'buyShopEquipment', 'craftEquipment', 'dismantleEquipment', 'exchangeArenaBox', 'openArenaBox', 'applyAbilityCrystal', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
+    'buyShopEquipment', 'craftEquipment', 'craftUniqueEquipment', 'dismantleEquipment', 'exchangeArenaBox', 'openArenaBox', 'applyAbilityCrystal', 'applySigil', 'exchangeSigils', 'claimStarterGear', 'enhanceStarterGear', 'enhanceWithScroll',
     'restAtInn', 'learnClassSkill', 'learnBasicMagic', 'craftSpellbook', 'consumeTrainingItems',
     'applyStarChart',
     'setAfterCombatThreshold',

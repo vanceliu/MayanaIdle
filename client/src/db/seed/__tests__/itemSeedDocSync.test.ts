@@ -62,13 +62,13 @@ describe('30-items.md ↔ itemSeeds.ts 賣價與重量', () => {
 });
 
 describe('30-items.md 素材 iconTier 對照表 ↔ seed', () => {
-  /** 解析「| N | 顏色｜定位 | 素材A、素材B |」 */
+  /** 解析「| N | 顏色｜定位 | 素材A、素材B；分類：素材C |」 */
   const docTier = new Map<string, number>();
   const section = DOC.split('#### 素材 iconTier 對照')[1] ?? '';
   for (const line of section.split('#### ')[0].split('\n')) {
     const m = /^\|\s*([1-7])\s*\|\s*[^|]+\|\s*([^|]+?)\s*\|/.exec(line);
     if (!m) continue;
-    for (const name of m[2].split('、')) docTier.set(name.trim(), Number(m[1]));
+    for (const name of m[2].split(/[、；]/)) docTier.set(name.replace(/^[^：]+：/, '').trim(), Number(m[1]));
   }
 
   it('對照表涵蓋 seed 中每一個有 iconTier 的素材，且值相同', () => {

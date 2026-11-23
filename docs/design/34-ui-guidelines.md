@@ -232,6 +232,18 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 
 護盾段：`.monster-card-shield-fill`，`linear-gradient(90deg, #7DD3FC, #FFFFFF)`。
 
+### 獨特魔物卡片
+
+怪物列表卡片上的獨特魔物（`25-monster-system.md` § 25.13）；demo `client/demo/unique-monster-card.html`。
+
+| 項目 | 規格 |
+|---|---|
+| 卡片 | `.monster-card.is-unique { background: rgba(42, 31, 85, 0.85); border-color: #8b7cf6; }` |
+| 名稱（無強化詞綴） | `#c4b5fd`，加粗 |
+| 名稱（有強化詞綴） | 依「怪物強化詞綴顏色」，強化詞綴色優先 |
+| Boss 卡片 | 紫底不變 |
+| 戰鬥日誌 | 不上色 |
+
 ## 34.3 狀態面板（StatusPanel）
 
 ### Bar 結構
