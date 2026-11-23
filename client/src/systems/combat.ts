@@ -808,6 +808,17 @@ export function calculateBasePhysicalDamage(
   return Math.max(1, damage);
 }
 
+/** 技能 tooltip 的物理段數值（武器取平均、不含爆擊與防禦）：A 組 § 21.4a 不含火矢附魔，普攻公式的多段技能含 */
+export function previewSkillPhysicalDamage(
+  char: Character,
+  equippedGear: (EquipmentInstance | null)[],
+  activeEffects: ActiveEffect[],
+  physicalScale: number,
+  normalAttackFormula: boolean,
+): number {
+  return Math.floor(calculateBasePhysicalDamage(char, getEquippedWeapon(equippedGear), equippedGear, activeEffects, normalAttackFormula) * physicalScale);
+}
+
 export function calculatePlayerAttack(
   char: Character,
   weapon: EquipmentInstance | null,

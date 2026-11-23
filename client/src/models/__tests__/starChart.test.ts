@@ -126,6 +126,15 @@ describe('盤面結構（§ 56.6）', () => {
       else expect(nodes).toHaveLength(4);
     }
   });
+
+  it('裂傷斬、血濺咒殺的技能線節點顯示冷卻秒數變化；其餘技能照數值顯示', () => {
+    const texts = (i: number) => ['boost0', 'level0', 'boost1', 'level1'].map(k => STAR_NODE_BY_ID.get(`knight-magic${i}-${k}`)!.effects[0].text);
+    expect(texts(1)).toEqual([
+      '裂傷斬 冷卻 20s → 17s', '裂傷斬 等級 +1、冷卻 17s → 14s', '裂傷斬 冷卻 14s → 11s', '裂傷斬 等級 +1、冷卻 11s → 8s',
+    ]);
+    expect(texts(5)[3]).toBe('血濺咒殺 等級 +1、冷卻 14s → 12s');
+    expect(texts(0)).toEqual([undefined, undefined, undefined, undefined]);
+  });
 });
 
 describe('點數（§ 56.1）', () => {

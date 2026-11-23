@@ -8,7 +8,7 @@ import {
   KEYSTONE_CAP, STAR_CHART_UNLOCK_LEVEL, STAR_CLASS_ORDER, STAR_FLAG_LABEL, STAR_NODES, STAR_NODE_BY_ID, STAR_POINT_VALUE,
   starPoints, starRefundCostPerPoint, starStartNodeId,
 } from '../../models/starChart';
-import { CLASS_SKILL_LEVEL_SCALE, CLASS_SKILL_LEVEL_SCALE_BY_CLASS } from '../../models/skillStar';
+import { CLASS_SKILL_LEVEL_SCALE } from '../../models/skillStar';
 import { CLASS_NAMES_ZH } from '../../models/character';
 import { LEVEL_CAP } from '../../systems/levelUp';
 import { COOLDOWN_REDUCTION_CAP } from '../../systems/combat';
@@ -43,7 +43,7 @@ function keystoneArea(id: string): string {
   return CLASS_NAMES_ZH[id.split('-')[0] as keyof typeof CLASS_NAMES_ZH];
 }
 
-const scales = (s: readonly number[]) => s.map(v => `×${v}`).join('／');
+const scales = (s: readonly number[]) => s.map(v => `${Math.round(v * 100)}%`).join('／');
 
 /** 職業起點的屬性：「騎士 力量 +2、體質 +6」 */
 const startText = STAR_CLASS_ORDER.map(c =>
@@ -89,8 +89,11 @@ export function StarChartPage() {
         <div style={CARD}>
           <p style={CARD_TEXT}>
             職業技能學會時為等級 I，星盤「等級 +1」節點往上加，最高 III（技能名稱後顯示，例如盾擊(II)）。<br />
-            職業技能的傷害、治癒、護盾與輔助效果：I／II／III 為 {scales(CLASS_SKILL_LEVEL_SCALE)}（盜賊、元素師、牧師 {scales(CLASS_SKILL_LEVEL_SCALE_BY_CLASS.thief ?? [])}）；
+            職業技能的傷害、治癒、護盾與輔助效果：I／II／III 為 III 數值的 {scales(CLASS_SKILL_LEVEL_SCALE)}；
             冷卻未點強化時為表列 ÷ 0.8，每點一個強化 −10%，兩個點滿回到表列。閃避反擊與元素師的「冷卻縮減」技能沒有星盤節點。<br />
+            逐招例外：盾擊暈眩、鋼鐵護盾減傷、復仇之刃攻擊力上限、火矢附魔火傷、束縛箭定身、穿透箭雨無視防禦有專屬的 I／II／III 數值；
+            精準射擊、火矢附魔、鷹眼的持續時間 100／200／300 秒；血濺咒殺的技能攻擊力不變，改乘最終傷害；
+            裂傷斬、血濺咒殺、精準射擊、火矢附魔、鷹眼的冷卻依技能線已點節點數（強化與等級都算）決定。<br />
             基礎魔法沒有等級，星盤不強化；技能說明的分類為基礎攻擊魔法、基礎回復魔法、基礎護盾增益魔法。<br />
             各技能每一級的實際數值見 <Link className="wiki-link" to="/wiki/skills">技能頁</Link>。
           </p>

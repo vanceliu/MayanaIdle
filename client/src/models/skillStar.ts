@@ -8,24 +8,40 @@ import type { Character } from './character';
 import type { Skill, SkillDebuffDef, SkillSelfBuff } from './skill';
 import type { ActiveEffect, StatModifier } from './effect';
 import { gameNow } from '../core/clock';
-import { CLASS_SKILLS, isClassMagic } from './classSkills';
-import type { ClassName } from './character';
-import { NO_STAR_NODE_SKILLS, STAR_POINT_VALUE, starSkillLevel, starTotalsOf } from './starChart';
+import { isClassMagic } from './classSkills';
+import { NO_STAR_NODE_SKILLS, STAR_COOLDOWN_BY_NODES, STAR_POINT_VALUE, starSkillLevel, starTotalsOf } from './starChart';
 import { applyAbilityToSkill } from './abilitySkill';
 
 type StarOwner = Pick<Character, 'className' | 'starChart'>;
 type GearLike = Parameters<typeof applyAbilityToSkill>[1];
 
 /** 職業技能 I／II／III 的倍率 */
-export const CLASS_SKILL_LEVEL_SCALE = [0.7, 0.85, 1] as const;
-/** 職業技能等級倍率的職業例外（`56-star-chart.md` § 56.5） */
-export const CLASS_SKILL_LEVEL_SCALE_BY_CLASS: Partial<Record<ClassName, readonly [number, number, number]>> = {
-  thief: [0.3, 0.6, 1],
-  elementalist: [0.3, 0.6, 1],
-  priest: [0.3, 0.6, 1],
+export const CLASS_SKILL_LEVEL_SCALE = [0.3, 0.6, 1] as const;
+/** 逐招等級倍率例外（`56-star-chart.md` § 56.5），I／II／III；未列的部分照職業倍率 */
+interface SkillLevelOverride {
+  buff?: readonly [number, number, number];
+  selfBuff?: readonly [number, number, number];
+  /** `applyDebuff` 的持續時間（含持盾），四捨五入到 ms */
+  debuffDuration?: readonly [number, number, number];
+  /** 增益持續時間，四捨五入到 ms */
+  buffDuration?: readonly [number, number, number];
+  ignoreDefense?: readonly [number, number, number];
+  /** 技能攻擊力與物理段不打折，改以打擊次數與 HP 消耗區分等級：與 III 的差 */
+  randomHitsDelta?: readonly [number, number, number];
+  selfHpCostDelta?: readonly [number, number, number];
+}
+const SKILL_LEVEL_OVERRIDES: Record<string, SkillLevelOverride> = {
+  'shield-bash': { debuffDuration: [1 / 3, 2 / 3, 1] },
+  'iron-shield': { buff: [0.25, 0.625, 1] },
+  'blood-curse': { randomHitsDelta: [-3, -2, 0], selfHpCostDelta: [10, 5, 0] },
+  vengeance: { selfBuff: [0.4, 0.7, 1] },
+  'precise-shot': { buffDuration: [1 / 3, 2 / 3, 1] },
+  'fire-arrow': { buff: [1 / 3, 2 / 3, 1], buffDuration: [1 / 3, 2 / 3, 1] },
+  'hawk-eye': { buffDuration: [1 / 3, 2 / 3, 1] },
+  'binding-arrow': { debuffDuration: [0.2, 0.5, 1] },
+  'arrow-rain': { ignoreDefense: [0.4, 0.7, 1] },
 };
-export const classSkillLevelScale = (cls: ClassName | undefined): readonly number[] =>
-  (cls && CLASS_SKILL_LEVEL_SCALE_BY_CLASS[cls]) ?? CLASS_SKILL_LEVEL_SCALE;
+
 /** 基礎冷卻＝表列 ÷ 0.8；每個強化節點 −10%（以基礎冷卻計） */
 const CD_BASE_DIVISOR = 0.8;
 
@@ -38,10 +54,11 @@ const ROUNDED_STATS: Record<string, ReadonlySet<string>> = {
 const DURATION_SCALED = new Set(['smoke-bomb']);
 
 /** 依絕對值無條件捨去（負值效果不放大） */
-const scaleDown = (value: number, f: number) => Math.sign(value) * Math.floor(Math.abs(value) * f);
+const FLOOR_EPSILON = 1e-9;
+const scaleDown = (value: number, f: number) => Math.sign(value) * Math.floor(Math.abs(value) * f + FLOOR_EPSILON);
 const scaleRound = (value: number, f: number) => Math.sign(value) * Math.round(Math.abs(value) * f);
 /** 百分比小數（0.7＝70%）以整數 % 捨去 */
-const scaleRatio = (ratio: number, f: number) => Math.floor(Math.round(ratio * 100) * f) / 100;
+const scaleRatio = (ratio: number, f: number) => Math.floor(Math.round(ratio * 100) * f + FLOOR_EPSILON) / 100;
 
 /**
  * 說明文字裡的數字跟著改：依序在文字中尋找每個舊值（絕對值）並換成新值，
@@ -71,10 +88,14 @@ function scaleModifiers(mods: StatModifier[] | undefined, f: number, rounded?: R
   return mods?.map(m => ({ ...m, value: rounded?.has(m.stat) ? scaleRound(m.value, f) : scaleDown(m.value, f) }));
 }
 
-function scaleDebuff(def: SkillDebuffDef | undefined, f: number): SkillDebuffDef | undefined {
+function scaleDebuff(def: SkillDebuffDef | undefined, f: number, durationF = 1): SkillDebuffDef | undefined {
   if (!def) return def;
   const next: SkillDebuffDef = {
     ...def,
+    ...(durationF !== 1 ? {
+      ...(def.duration !== undefined ? { duration: Math.round(def.duration * durationF) } : {}),
+      ...(def.shieldDuration !== undefined ? { shieldDuration: Math.round(def.shieldDuration * durationF) } : {}),
+    } : {}),
     ...(def.modifiers ? { modifiers: scaleModifiers(def.modifiers, f) } : {}),
     ...(def.dotDamagePercent !== undefined ? { dotDamagePercent: scaleRatio(def.dotDamagePercent, f) } : {}),
     ...(def.twoHandedDotDamagePercent !== undefined ? { twoHandedDotDamagePercent: scaleRatio(def.twoHandedDotDamagePercent, f) } : {}),
@@ -106,22 +127,34 @@ function scaleSelfBuff(buff: SkillSelfBuff | undefined, f: number): SkillSelfBuf
   return { ...next, description: rewriteNumbers(buff.description, pairs) ?? buff.description };
 }
 
-/** 職業技能依等級倍率轉換：傷害、治癒、護盾、輔助效果、攻擊技附帶效果；時間與代價不變 */
-function scaleClassSkill(skill: Skill, f: number): Skill {
+/** 職業技能依等級倍率轉換：傷害、治癒、護盾、輔助效果、攻擊技附帶效果；時間與代價不變（逐招例外見 SKILL_LEVEL_OVERRIDES） */
+function scaleClassSkill(skill: Skill, f: number, level: number): Skill {
   if (f === 1) return skill;
   const rounded = ROUNDED_STATS[skill.id];
+  const o = SKILL_LEVEL_OVERRIDES[skill.id] ?? {};
+  const at = (scale: readonly number[] | undefined) => scale?.[level - 1] ?? f;
   const next: Skill = {
     ...skill,
-    power: skill.physicalSnapshot ? skill.power : scaleDown(skill.power, f),
-    physicalScale: (skill.physicalScale ?? 1) * f,
+    ...(o.randomHitsDelta
+      ? {
+        randomHits: (skill.randomHits ?? 0) + o.randomHitsDelta[level - 1],
+        selfHpCostPercent: (skill.selfHpCostPercent ?? 0) + (o.selfHpCostDelta?.[level - 1] ?? 0),
+      }
+      : {
+        power: skill.physicalSnapshot ? skill.power : scaleDown(skill.power, f),
+        physicalScale: (skill.physicalScale ?? 1) * f,
+      }),
     ...(skill.shieldPower !== undefined ? { shieldPower: scaleDown(skill.shieldPower, f) } : {}),
     ...(skill.mpRestorePercent !== undefined ? { mpRestorePercent: scaleDown(skill.mpRestorePercent, f) } : {}),
     ...(DURATION_SCALED.has(skill.id) && skill.buffDuration !== undefined
       ? { buffDuration: Math.floor(skill.buffDuration * f) }
-      : { buffModifiers: scaleModifiers(skill.buffModifiers, f, rounded) }),
-    applyDebuff: scaleDebuff(skill.applyDebuff, f),
+      : { buffModifiers: scaleModifiers(skill.buffModifiers, at(o.buff), rounded) }),
+    ...(o.buffDuration && skill.buffDuration !== undefined ? { buffDuration: Math.round(skill.buffDuration * o.buffDuration[level - 1]) } : {}),
+    ...(o.ignoreDefense && skill.ignoreDefensePercent !== undefined
+      ? { ignoreDefensePercent: scaleDown(skill.ignoreDefensePercent, o.ignoreDefense[level - 1]) } : {}),
+    applyDebuff: scaleDebuff(skill.applyDebuff, f, o.debuffDuration?.[level - 1]),
     onHitDebuff: scaleDebuff(skill.onHitDebuff, f),
-    selfBuff: scaleSelfBuff(skill.selfBuff, f),
+    selfBuff: scaleSelfBuff(skill.selfBuff, at(o.selfBuff)),
   };
   // 說明文字：增益效果（含淬毒的附毒％、聖光護盾的技能攻擊力）、回魔％
   const buffPairs: [number, number][] = [
@@ -134,7 +167,9 @@ function scaleClassSkill(skill: Skill, f: number): Skill {
     buffEffect: rewriteNumbers(skill.buffEffect, buffPairs),
     description: skill.mpRestorePercent !== undefined && skill.selfHpCostPercent !== undefined
       ? `扣最大 HP ${skill.selfHpCostPercent}%，回復最大 MP ${next.mpRestorePercent}%`
-      : skill.description,
+      : rewriteNumbers(skill.description, o.randomHitsDelta
+        ? [[skill.selfHpCostPercent ?? 0, next.selfHpCostPercent ?? 0], [skill.aoeRadius ?? 0, skill.aoeRadius ?? 0], [skill.randomHits ?? 0, next.randomHits ?? 0]]
+        : [[skill.ignoreDefensePercent ?? 0, next.ignoreDefensePercent ?? 0]]),
   };
 }
 
@@ -161,18 +196,26 @@ export function starCooldownAt(cooldown: number, nodes: number): number {
   return Math.round((cooldown / CD_BASE_DIVISOR) * (1 - nodes * 0.1) / 100) * 100;
 }
 
+/** 技能線上各點數（強化 n 個、等級 III 時共 4 點）的冷卻（ms）：依節點數表的技能回 5 格，其餘回強化 0／1／2 的 3 格 */
+export function starCooldownSteps(skill: Pick<Skill, 'id' | 'cooldown'>): number[] {
+  return [...(STAR_COOLDOWN_BY_NODES[skill.id] ?? [0, 1, 2].map(n => starCooldownAt(skill.cooldown, n)))];
+}
+
 export function applyStarCooldown(skill: Skill, owner: StarOwner): Skill {
   if (!hasStarCooldown(skill)) return skill;
   const totals = starTotalsOf(owner.starChart, owner.className).totals;
-  const cooldown = starCooldownAt(skill.cooldown, -(totals.get(`skill:${skill.id}:cd`) ?? 0) / STAR_POINT_VALUE.skillCd);
+  const boosts = -(totals.get(`skill:${skill.id}:cd`) ?? 0) / STAR_POINT_VALUE.skillCd;
+  const byNodes = STAR_COOLDOWN_BY_NODES[skill.id];
+  const cooldown = byNodes
+    ? byNodes[Math.min(byNodes.length - 1, boosts + starSkillLevel(totals, skill.id) - 1)]
+    : starCooldownAt(skill.cooldown, boosts);
   return cooldown === skill.cooldown ? skill : { ...skill, cooldown };
 }
 
 /** 指定等級（I～III）的職業技能數值；沒有等級的技能原樣回傳 */
 export function skillAtStarLevel(skill: Skill, level: number): Skill {
   if (!isClassMagic(skill.id) || NO_STAR_NODE_SKILLS.has(skill.id)) return skill;
-  const cls = CLASS_SKILLS.find(c => c.id === skill.id)?.className;
-  return scaleClassSkill(skill, classSkillLevelScale(cls)[level - 1]);
+  return scaleClassSkill(skill, CLASS_SKILL_LEVEL_SCALE[level - 1], level);
 }
 
 /** 依星盤等級乘數值（職業技能 I～III；基礎魔法沒有等級） */

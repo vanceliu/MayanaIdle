@@ -10932,3 +10932,6 @@ button.active {
   .auc-source { width: auto; max-height: 200px; }
   .auc-seller { display: none; }
 }
+.star-skill-preview { margin-top: 8px; padding-top: 8px; border-top: var(--border-width) solid var(--border); }
+.star-skill-preview-title { font-size: var(--fs-xs); color: var(--text-dim); margin-bottom: 2px; }
+.star-tooltip:has(.star-skill-preview) { max-width: 320px; }

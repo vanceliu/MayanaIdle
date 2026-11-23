@@ -8,7 +8,7 @@ import {
   QUICK_SLOT_COUNT, quickSlotLabel, toQuickSlotSkillEntry, isSameQuickSlotEntry,
 } from '../models/quickSlot';
 import { getSkillDisplayIcon } from '../models/iconMap';
-import { calculateHealAmount } from '../systems/combat';
+import { calculateHealAmount, previewSkillPhysicalDamage } from '../systems/combat';
 import { GameIcon } from './GameIcon';
 import { SKILL_CATALOG, type Skill } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
@@ -299,6 +299,7 @@ export function SkillPanel() {
               ? resolveSkill({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character, activeEffects)
               : tooltip.skill}
             healOf={power => calculateHealAmount(character, power, equippedGearList, activeEffects)}
+            physicalOf={character ? (scale, normal) => previewSkillPhysicalDamage(character, equippedGearList, activeEffects, scale, normal) : undefined}
           />
           <div className={`skill-tooltip-status ${tooltip.learned ? 'learned' : 'locked'}`}>
             {tooltip.learned ? '已習得' : '未習得'}

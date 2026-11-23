@@ -3,7 +3,7 @@
  * 只負責顯示與點擊；配點規則與扣款由呼叫端處理。
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
+import type { CSSProperties, ReactNode, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import {
   STAR_EDGES, STAR_FLAG_LABEL, STAR_NODES, STAR_NODE_BY_ID,
   isStarEffectActive, starNeighbors, starPathTo, starRefundSet, starStartNodeId,
@@ -33,6 +33,7 @@ function nodeFill(n: StarNode): string {
 const MIX_PAIRS = [...new Map(STAR_NODES.map(nodeAttrs).filter(a => a.length === 2).map(a => [mixId(a), a])).values()];
 
 export const formatStarEffect = (e: Pick<StarEffect, 'value' | 'unit'>) => `${e.value > 0 ? '+' : ''}${e.value}${e.unit}`;
+export const starEffectText = (e: StarEffect) => e.text ?? `${e.label} ${formatStarEffect(e)}`;
 
 interface View { scale: number; tx: number; ty: number }
 const INITIAL_VIEW: View = { scale: 1, tx: 0, ty: 0 };
@@ -84,9 +85,11 @@ export interface StarChartBoardProps {
   locked?: boolean;
   /** 點未點的節點＝配點；點已點的節點＝取消 */
   onActivate: (nodeId: string, action: 'allocate' | 'refund') => void;
+  /** tooltip 底部的附加內容（技能節點的技能預覽） */
+  renderNodeDetail?: (node: StarNode, allocated: ReadonlySet<string>) => ReactNode;
 }
 
-export function StarChartBoard({ classId, allocated, committed, remaining, costPerPoint, locked = false, onActivate }: StarChartBoardProps) {
+export function StarChartBoard({ classId, allocated, committed, remaining, costPerPoint, locked = false, onActivate, renderNodeDetail }: StarChartBoardProps) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const matches = useMemo(() => {
@@ -282,12 +285,13 @@ export function StarChartBoard({ classId, allocated, committed, remaining, costP
           <ul className="star-sum-list">
             {focus.effects.map(e => (
               <li key={e.key} className={isStarEffectActive(e, focus, classId) ? '' : 'is-inert'}>
-                {e.label} {formatStarEffect(e)}{isStarEffectActive(e, focus, classId) ? '' : '（不生效）'}
+                {starEffectText(e)}{isStarEffectActive(e, focus, classId) ? '' : '（不生效）'}
               </li>
             ))}
             {focus.flags?.map(f => <li key={f}>{STAR_FLAG_LABEL[f]}</li>)}
           </ul>
           {focusStatus(focus) && <p className="star-status">{focusStatus(focus)}</p>}
+          {renderNodeDetail?.(focus, allocated)}
         </div>
       )}
       <div className="star-filter">

@@ -5,17 +5,32 @@
  */
 import { useMemo, useState } from 'react';
 import {
-  STAR_CHART_UNLOCK_LEVEL, STAR_FLAG_LABEL, STAR_NODE_BY_ID, STAR_SKILL_LEVEL_CAP,
+  STAR_CHART_UNLOCK_LEVEL, STAR_COOLDOWN_BY_NODES, STAR_FLAG_LABEL, STAR_NODE_BY_ID, STAR_SKILL_LEVEL_CAP, STAR_POINT_VALUE,
   exceedsKeystoneCap, KEYSTONE_CAP, isStarEffectActive, normalizeStarAllocation, starPathTo, starPoints, starRefundCostPerPoint, starRefundSet, starStartNodeId, unspentStarPoints,
   type StarEffect,
 } from '../models/starChart';
 import type { Character, ClassName } from '../models/character';
-import { StarChartBoard, formatStarEffect } from './StarChartBoard';
+import { StarChartBoard, formatStarEffect, type StarChartBoardProps } from './StarChartBoard';
 import { useGameStore } from '../stores/gameStore';
+import { getEffectiveGearArray } from '../systems/gear';
+import { calculateHealAmount, previewSkillPhysicalDamage } from '../systems/combat';
+import { StarNodeSkillPreview } from './StarNodeSkillPreview';
 
 const ROMAN = ['I', 'II', 'III'];
 
-interface SummaryRow { key: string; label: string; value: number; unit: StarEffect['unit']; effective: boolean }
+interface SummaryRow { key: string; label: string; value: number; unit: StarEffect['unit']; effective: boolean; valueText?: string }
+
+/** 冷卻依節點數表的技能：冷卻列改顯示目前冷卻秒數（§ 56.5） */
+function withCooldownSeconds(rows: Map<string, SummaryRow>) {
+  for (const [id, steps] of Object.entries(STAR_COOLDOWN_BY_NODES)) {
+    for (const effective of [true, false]) {
+      const cd = rows.get(`skill:${id}:cd|${effective}`);
+      if (!cd) continue;
+      const nodes = -cd.value / STAR_POINT_VALUE.skillCd + (rows.get(`skill:${id}:level|${effective}`)?.value ?? 0);
+      cd.valueText = `${steps[Math.min(steps.length - 1, nodes)] / 1000}s`;
+    }
+  }
+}
 
 function summarize(allocated: ReadonlySet<string>, classId: ClassName) {
   const rows = new Map<string, SummaryRow>();
@@ -31,6 +46,7 @@ function summarize(allocated: ReadonlySet<string>, classId: ClassName) {
       else rows.set(key, { key, label: e.label, value: e.value, unit: e.unit, effective });
     }
   }
+  withCooldownSeconds(rows);
   const all = [...rows.values()];
   return {
     attrs: all.filter(r => r.key.startsWith('attr:')),
@@ -46,7 +62,7 @@ function SkillRowText({ r }: { r: SummaryRow }) {
     const level = Math.min(1 + r.value, STAR_SKILL_LEVEL_CAP);
     return <>{r.label.replace(/ 等級$/, '')}(<span className="stat-changed">{ROMAN[level - 1]}</span>)</>;
   }
-  return <>{r.label} <span className="stat-changed">{formatStarEffect(r)}</span></>;
+  return <>{r.label} <span className="stat-changed">{r.valueText ?? formatStarEffect(r)}</span></>;
 }
 
 function SummaryList({ title, rows, skill = false }: { title: string; rows: SummaryRow[]; skill?: boolean }) {
@@ -90,9 +106,10 @@ export interface StarChartPanelProps {
   character: Pick<Character, 'className' | 'level' | 'starChart'>;
   /** 送出整份配點；成功回 true（線上模式經 RPC 回 Promise） */
   onApply: (nodeIds: string[]) => boolean | Promise<boolean>;
+  renderNodeDetail?: StarChartBoardProps['renderNodeDetail'];
 }
 
-export function StarChartPanel({ character, onApply }: StarChartPanelProps) {
+export function StarChartPanel({ character, onApply, renderNodeDetail }: StarChartPanelProps) {
   const { className: classId, level } = character;
   const committedList = useMemo(
     () => normalizeStarAllocation(character.starChart ?? [], classId, level),
@@ -171,6 +188,7 @@ export function StarChartPanel({ character, onApply }: StarChartPanelProps) {
           costPerPoint={costPerPoint}
           locked={locked}
           onActivate={activate}
+          renderNodeDetail={renderNodeDetail}
         />
         <StarChartSummary classId={classId} allocated={allocated} />
       </div>
@@ -197,8 +215,25 @@ export function StarChartPanel({ character, onApply }: StarChartPanelProps) {
 export function StarChartWindowContent() {
   const character = useGameStore(s => s.character);
   const applyStarChart = useGameStore(s => s.applyStarChart);
+  const equippedGear = useGameStore(s => s.equippedGear);
+  const activeEffects = useGameStore(s => s.activeEffects);
   if (!character) return null;
-  return <StarChartPanel character={character} onApply={applyStarChart} />;
+  const gear = getEffectiveGearArray(character, activeEffects, equippedGear);
+  return (
+    <StarChartPanel
+      character={character}
+      onApply={applyStarChart}
+      renderNodeDetail={(node, allocated) => (
+        <StarNodeSkillPreview
+          node={node}
+          classId={character.className}
+          allocated={allocated}
+          healOf={power => calculateHealAmount(character, power, gear, activeEffects)}
+          physicalOf={(scale, normal) => previewSkillPhysicalDamage(character, gear, activeEffects, scale, normal)}
+        />
+      )}
+    />
+  );
 }
 
 /** 底部面板列星盤按鈕右上角的未點點數（§ 56.7） */

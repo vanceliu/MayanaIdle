@@ -19,6 +19,8 @@ export interface StarEffect {
   label: string;
   value: number;
   unit: '' | '%';
+  /** 取代「名稱 數值」的顯示文字 */
+  text?: string;
 }
 
 export interface StarNode {
@@ -75,6 +77,15 @@ const matk = (n = 1) => effect('matkPct', '魔法攻擊', n * STAR_POINT_VALUE.m
 const cdr = (n = 1) => effect('cdrPct', '冷卻縮減', n * STAR_POINT_VALUE.cdrPct, '%');
 const skillCd = (id: string, name: string) => effect(`skill:${id}:cd`, `${name} 冷卻`, -STAR_POINT_VALUE.skillCd, '%');
 const skillLevel = (id: string, name: string) => effect(`skill:${id}:level`, `${name} 等級`, 1, '');
+const seconds = (ms: number) => `${ms / 1000}s`;
+/** 技能線第 k 個節點（0～3）：冷卻依節點數表的技能改顯示冷卻秒數變化 */
+function skillLineEffect(id: string, name: string, k: number): StarEffect {
+  const e = k % 2 === 1 ? skillLevel(id, name) : skillCd(id, name);
+  const steps = STAR_COOLDOWN_BY_NODES[id];
+  if (!steps) return e;
+  const cd = `冷卻 ${seconds(steps[k])} → ${seconds(steps[k + 1])}`;
+  return { ...e, text: k % 2 === 1 ? `${name} 等級 +1、${cd}` : `${name} ${cd}` };
+}
 
 /** 由最大 HP +1% 改為體質 +1（真屬性）的星點（§ 56.6）；烈心座的星點見 CLASS_CONFIG */
 const VIT_POINT_IDS: ReadonlySet<string> = new Set(['knight-r300', 'bridge4-2']);
@@ -135,6 +146,15 @@ const REDISTRIBUTED: Readonly<Record<string, readonly StarEffect[]>> = {
 
 /** 沒有星盤節點的職業技能，位置改放屬性星點（§ 56.5） */
 export const NO_STAR_NODE_SKILLS: ReadonlySet<string> = new Set(['dodge-counter', 'cd-reduce']);
+
+/** 冷卻依技能線已點節點數（0～4，強化與等級都算）決定的技能，ms（§ 56.5） */
+export const STAR_COOLDOWN_BY_NODES: Readonly<Record<string, readonly number[]>> = {
+  rend: [20000, 17000, 14000, 11000, 8000],
+  'blood-curse': [20000, 18000, 16000, 14000, 12000],
+  'precise-shot': [20000, 15000, 10000, 6500, 3000],
+  'fire-arrow': [20000, 15000, 10000, 6500, 3000],
+  'hawk-eye': [20000, 15000, 10000, 6500, 3000],
+};
 
 const UTILITY_CYCLE: (() => StarEffect)[] = [() => hp(), () => mp(), () => def(), () => cdr(), () => cdr()];
 
@@ -381,7 +401,7 @@ function buildStarChart(): { nodes: StarNode[]; edges: [string, string][] } {
           ? add(`${c}-magic${i}-attr${k}`, pointName([attr(cfg.attrs[k % 2])]), 'point', r, deg, [attr(cfg.attrs[k % 2])])
           : add(`${c}-magic${i}-${isLevel ? 'level' : 'boost'}${k >> 1}`,
             isLevel ? `${skill.name} 等級 +1` : `${skill.name} 強化`, 'point', r, deg,
-            [isLevel ? skillLevel(skill.id, skill.name) : skillCd(skill.id, skill.name)], { classId: c });
+            [skillLineEffect(skill.id, skill.name, k)], { classId: c });
         link(prev, id);
         prev = id;
       });

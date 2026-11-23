@@ -2,11 +2,11 @@ import { formatSkillRange, formatBuffDuration, formatDebuffDuration, formatSelfB
 import { useMemo, useState, type ReactNode } from 'react';
 import { SKILL_CATALOG } from '../../models/skill';
 import { CLASS_MAGIC_RESTRICTIONS } from '../../models/skillRestrictions';
-import { CLASS_SKILLS, type ClassSkillDef } from '../../models/classSkills';
+import { CLASS_SKILLS } from '../../models/classSkills';
 import '../components/WikiTable.css';
 import { WEAPON_TYPE_LABELS } from '../../models/skill';
 import { getItemById } from '../../models/items';
-import { classSkillLevelScale, hasStarCooldown, skillAtStarLevel, starCooldownAt } from '../../models/skillStar';
+import { hasStarCooldown, skillAtStarLevel, starCooldownSteps } from '../../models/skillStar';
 import type { Skill } from '../../models/skill';
 
 const STAR_LEVELS = [1, 2, 3] as const;
@@ -20,9 +20,31 @@ function LevelValues({ values, sep = '／' }: { values: (string | number)[]; sep
 /** 等級 I／II／III 的技能攻擊力 */
 const powersByLevel = (s: Skill) => STAR_LEVELS.map(l => skillAtStarLevel(s, l).power);
 
-/** 強化 0／1／2 個的冷卻（秒） */
-const cooldownsByNodes = (s: Skill) => [0, 1, 2].map(n => (starCooldownAt(s.cooldown, n) / 1000).toFixed(1));
+/** 技能線各點數的冷卻（秒）：強化 0／1／2 個，或依節點數 0～4 個 */
+const cooldownsByNodes = (s: Skill) => starCooldownSteps(s).map(ms => (ms / 1000).toFixed(1));
 
+/** 各等級的文字：相同照印；只差數字時同一處以「／」列出並標黃，否則整段以「／」並列 */
+function LevelText({ texts }: { texts: string[] }) {
+  if (texts.every(t => t === texts[0])) return <>{texts[0] || '-'}</>;
+  const parts = texts.map(t => t.split(/(\d+(?:\.\d+)?)/));
+  const sameShape = parts.every(p => p.length === parts[0].length && p.every((seg, i) => i % 2 === 1 || seg === parts[0][i]));
+  if (!sameShape) return <span className="stat-changed">{texts.join('／')}</span>;
+  return <>{parts[0].map((seg, i) => (i % 2 === 0 ? seg : <LevelValues key={i} values={parts.map(p => p[i])} />))}</>;
+}
+
+/** 等級 I／II／III 的技能 */
+const skillsByLevel = (s: Skill) => STAR_LEVELS.map(l => skillAtStarLevel(s, l));
+
+/** 等級 I／II／III 的增益持續；各級不同時一律以秒顯示 */
+const buffDurationsByLevel = (s: Skill) => {
+  const texts = skillsByLevel(s).map(formatBuffDuration);
+  return texts.every(t => t === texts[0]) ? texts : skillsByLevel(s).map(l => `${(l.buffDuration ?? 0) / 1000} 秒`);
+};
+
+/** 職業技能的目標欄 */
+const classTargetText = (s: Skill) => (s.target === 'aoe' && s.aoeRadius === undefined ? '全隊'
+  : s.target === 'aoe' ? `範圍(半徑${s.aoeRadius}格/${s.randomHits ? `隨機${s.randomHits}下` : s.maxTargets ? `最多${s.maxTargets}隻` : '無上限'})`
+  : '單體');
 
 const ELEMENT_LABELS: Record<string, string> = {
   fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
@@ -200,8 +222,8 @@ export function SkillsPage() {
         職業專屬技能
       </h3>
       <p style={{ color: 'var(--text-secondary)', margin: '0 0 12px', fontSize: 'var(--fs-sm)' }}>
-        技能等級由星盤的「等級 +1」節點決定：學會為 I，最高 III；傷害、治癒、護盾與輔助效果 I ×0.7、II ×0.85、III ×1，盜賊、元素師、牧師 I ×0.3、II ×0.6、III ×1（威力欄黃色依序為 I／II／III；效果欄為等級 III 的數值）。
-        冷卻由「強化」節點決定：未點為表列 ÷ 0.8，每點 −10%，兩點回到表列（冷卻欄依序為強化 0／1／2 個）。閃避反擊、冷卻縮減沒有星盤節點。
+        技能等級由星盤的「等級 +1」節點決定：學會為 I，最高 III（威力、持續、效果欄黃色數字依序為 I／II／III）。
+        冷卻由「強化」節點決定，冷卻欄依序為強化 0／1／2 個；裂傷斬、血濺咒殺、精準射擊、火矢附魔、鷹眼依技能線已點 0～4 個節點。閃避反擊、冷卻縮減沒有星盤節點。
       </p>
       {(['knight', 'elf', 'elementalist', 'priest', 'thief'] as const).map(cls => {
         const skills = CLASS_SKILLS.filter(s => s.className === cls);
@@ -235,14 +257,14 @@ export function SkillsPage() {
                       <td className="cell-number">{s.requiredLevel}</td>
                       <td>{TYPE_LABELS[s.skill.type]}</td>
                       <td><span className={`wiki-badge wiki-badge-${s.skill.element}`}>{ELEMENT_LABELS[s.skill.element]}</span></td>
-                      <td>{s.skill.target === 'aoe' && s.skill.aoeRadius === undefined ? '全隊' : s.skill.target === 'aoe' ? `範圍(半徑${s.skill.aoeRadius}格/${s.skill.randomHits ? `隨機${s.skill.randomHits}下` : s.skill.maxTargets ? `最多${s.skill.maxTargets}隻` : '無上限'})` : '單體'}</td>
+                      <td><LevelText texts={skillsByLevel({ ...s.skill, lastUsedAt: 0 }).map(classTargetText)} /></td>
                       <td>{formatSkillRange(s.skill) || '-'}</td>
                       <td className="cell-number">
                         {s.skill.physicalSnapshot
-                          ? <>{s.skill.power} + 物理 ×<LevelValues values={classSkillLevelScale(s.className).map(String)} /></>
+                          ? <>{s.skill.power} + 物理傷害</>
                           : s.skill.power
                             ? <LevelValues values={powersByLevel({ ...s.skill, lastUsedAt: 0 })} />
-                            : s.skill.hits ? <>物理 ×<LevelValues values={classSkillLevelScale(s.className).map(String)} /></> : '-'}
+                            : s.skill.hits ? <>同普攻</> : '-'}
                       </td>
                       <td className="cell-number">{s.skill.mpCost}</td>
                       <td className="cell-number">
@@ -250,8 +272,8 @@ export function SkillsPage() {
                           ? <LevelValues values={cooldownsByNodes({ ...s.skill, lastUsedAt: 0 })} sep="→" />
                           : (s.skill.cooldown / 1000).toFixed(1)}
                       </td>
-                      <td>{formatBuffDuration(s.skill) || '-'}</td>
-                      <td>{getClassSkillEffect(s)}</td>
+                      <td><LevelText texts={buffDurationsByLevel({ ...s.skill, lastUsedAt: 0 })} /></td>
+                      <td><LevelText texts={skillsByLevel({ ...s.skill, lastUsedAt: 0 }).map(getClassSkillEffect)} /></td>
                       <td>{getItemById(s.bookItemId)?.name ?? '—'}</td>
                     </tr>
                   ))}
@@ -266,26 +288,26 @@ export function SkillsPage() {
   );
 }
 
-function getClassSkillEffect(s: ClassSkillDef): string {
+function getClassSkillEffect(skill: Skill): string {
   const parts: string[] = [];
-  if (s.skill.requiredWeaponType) {
-    parts.push(`【需${WEAPON_TYPE_LABELS[s.skill.requiredWeaponType] ?? s.skill.requiredWeaponType}】`);
+  if (skill.requiredWeaponType) {
+    parts.push(`【需${WEAPON_TYPE_LABELS[skill.requiredWeaponType] ?? skill.requiredWeaponType}】`);
   }
-  if (s.skill.description) {
-    parts.push(s.skill.description);
+  if (skill.description) {
+    parts.push(skill.description);
   }
-  if (s.skill.buffEffect) {
-    parts.push(s.skill.buffEffect);
-  } else if (s.skill.hits) {
-    parts.push(`${s.skill.hits}連擊`);
+  if (skill.buffEffect) {
+    parts.push(skill.buffEffect);
+  } else if (skill.hits) {
+    parts.push(`${skill.hits}連擊`);
   }
-  if (s.skill.applyDebuff) {
-    parts.push(`附加${s.skill.applyDebuff.name}(${s.skill.applyDebuff.description}, ${formatDebuffDuration(s.skill.applyDebuff)})`);
+  if (skill.applyDebuff) {
+    parts.push(`附加${skill.applyDebuff.name}(${skill.applyDebuff.description}, ${formatDebuffDuration(skill.applyDebuff)})`);
   }
-  if (s.skill.selfBuff) {
-    parts.push(`自身增益：${formatSelfBuff(s.skill)}`);
+  if (skill.selfBuff) {
+    parts.push(`自身增益：${formatSelfBuff(skill)}`);
   }
-  return parts.join(' ') || '-';
+  return parts.join(' ');
 }
 
 function getLearnConditionText(cls: string): string {

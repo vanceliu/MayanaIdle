@@ -17,11 +17,6 @@ function rangeText(s: SkillLike): string {
   return `半徑 ${s.aoeRadius} 格${tail}`;
 }
 
-/** 星盤技能等級的物理段倍率（`56-star-chart.md` § 56.5）；1 倍不顯示 */
-function physicalScaleText(s: SkillLike): string {
-  const scale = s.physicalScale ?? 1;
-  return scale === 1 ? '' : ` ×${Number(scale.toFixed(2))}`;
-}
 
 function debuffText(s: SkillLike): string {
   const d = s.applyDebuff;
@@ -44,11 +39,24 @@ export function SkillTooltipHeader({ name, skill, level, character }: {
   );
 }
 
-export function SkillTooltipBody({ base, shown, healOf }: {
+/** 物理段數值（`systems/combat.ts` 的 `previewSkillPhysicalDamage()`）；沒有角色資料時為 undefined */
+export type PhysicalDamageOf = (physicalScale: number, normalAttackFormula: boolean) => number;
+
+function powerText(s: SkillLike, physicalOf: PhysicalDamageOf | undefined): string {
+  const physical = physicalOf ? String(physicalOf(s.physicalScale ?? 1, false)) : '物理傷害';
+  return `${s.power}${s.physicalSnapshot ? ` + ${physical}` : ''}`;
+}
+
+function hitsText(s: SkillLike, physicalOf: PhysicalDamageOf | undefined): string {
+  return `${s.hits ?? 0} 連擊${physicalOf ? `，每箭約 ${physicalOf(s.physicalScale ?? 1, true)}` : ''}`;
+}
+
+export function SkillTooltipBody({ base, shown, healOf, physicalOf }: {
   base: SkillLike;
   shown: SkillLike;
   /** 治癒量（`systems/combat.ts` 的 `calculateHealAmount()`），依技能攻擊力計算 */
   healOf: (power: number) => number;
+  physicalOf?: PhysicalDamageOf;
 }) {
   const line = (label: string, b: string, v: string) => (v
     ? <div className="skill-tooltip-stat">{label}<ChangedNumbers base={b} value={v} /></div>
@@ -60,11 +68,9 @@ export function SkillTooltipBody({ base, shown, healOf }: {
           【需{WEAPON_TYPE_LABELS[shown.requiredWeaponType] ?? shown.requiredWeaponType}】
         </div>
       )}
-      {shown.type === 'attack' && line('威力: ',
-        `${base.power}${base.physicalSnapshot ? ' + 物理傷害' : ''}`,
-        `${shown.power}${shown.physicalSnapshot ? ` + 物理傷害${physicalScaleText(shown)}` : ''}`)}
+      {shown.type === 'attack' && line('威力: ', powerText(base, physicalOf), powerText(shown, physicalOf))}
       {line('射程: ', formatSkillRange(base), formatSkillRange(shown))}
-      {shown.hits ? line('', `${base.hits ?? 0} 連擊`, `${shown.hits} 連擊${physicalScaleText(shown)}`) : null}
+      {shown.hits ? line('', hitsText(base, physicalOf), hitsText(shown, physicalOf)) : null}
       {line('效果: ', base.description ?? '', shown.description ?? '')}
       {!shown.instantDotTicks && line('附加: ', debuffText(base), debuffText(shown))}
       {line('傷害加成: ', '', shown.abilityDamagePercent ? `+${shown.abilityDamagePercent}%` : '')}

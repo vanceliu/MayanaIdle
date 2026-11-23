@@ -10,7 +10,7 @@
  *  - dualinterval:B：雙刀／鋼爪基礎攻擊間隔改 B ms（以穩態攻速換算成等效攻速，`intervalTweak`）
  */
 import { STAR_NODES, STAR_NODE_BY_ID, starTotalsOf } from '../src/models/starChart';
-import { CLASS_SKILL_LEVEL_SCALE, classSkillLevelScale } from '../src/models/skillStar';
+import { CLASS_SKILL_LEVEL_SCALE } from '../src/models/skillStar';
 import { CLASS_SKILLS } from '../src/models/classSkills';
 import type { ClassName } from '../src/models/character';
 import type { EquipmentInstance } from '../src/models/equipment';
@@ -106,7 +106,7 @@ export function applySupportScale(className: ClassName, starChart: readonly stri
     if (!ORIGINAL.has(s.id)) ORIGINAL.set(s.id, { mods: (s.buffModifiers ?? []).map(m => m.value), dot: s.onHitDebuff?.dotDamagePercent });
     const orig = ORIGINAL.get(s.id)!;
     const level = 1 + (totals.get(`skill:${s.id}:level`) ?? 0);
-    const ratio = support[level - 1] / classSkillLevelScale(className)[level - 1];
+    const ratio = support[level - 1] / CLASS_SKILL_LEVEL_SCALE[level - 1];
     s.buffModifiers?.forEach((m, i) => { m.value = orig.mods[i] * ratio; });
     if (s.onHitDebuff && orig.dot !== undefined) s.onHitDebuff.dotDamagePercent = orig.dot * ratio;
   }
