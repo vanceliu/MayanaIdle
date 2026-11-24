@@ -10,8 +10,8 @@
 import type { BuffPotionType } from '../models/buffPotion';
 import type { ReactNode } from 'react';
 import { GameIcon } from './GameIcon';
-import { getShortName } from './BagGrid';
-import { getEquipIcon, resolveItemIcon } from '../models/iconMap';
+import { getShortName } from '../models/bagItem';
+import { getEquipIcon, getItemIconKey, resolveItemIcon } from '../models/iconMap';
 import { getItemById } from '../models/items';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { formatMaterialUsage, hasMaterialUsage } from '../systems/craftMaterialUsage';
@@ -41,15 +41,6 @@ export interface BagGridItem {
    * 有值＝「裝備中」：一樣佔背包格，第二次點擊是卸下而不是穿上，且不可丟棄。
    */
   equippedSlot?: EquipSlot;
-}
-
-/** 素材與卷軸類的圖示鍵（裝備另有一套，走 `getEquipIcon`） */
-function getItemIconKey(name: string, type: string): string {
-  if (type === 'scroll') return 'scroll';
-  if (type === 'spellbook') return 'spellbook';
-  if (name.includes('磨刀石')) return 'whetstone';
-  if (name.includes('石')) return 'stone';
-  return 'material';
 }
 
 export function itemDef(item: { itemId?: number }) {

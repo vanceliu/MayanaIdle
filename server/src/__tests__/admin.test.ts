@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { adminPage } from '../adminPage';
+import { getCachedTemplates, loadTemplateCache } from '../../../client/src/systems/templateSync';
+import { getItemById } from '../../../client/src/models/items';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -216,11 +218,35 @@ describe('管理介面 API', () => {
     expect(detail.body.statistics.monstersKilled).toBe(42);
     expect(detail.body.view.className).toBe('騎士');
     expect(detail.body.view.appearanceSvg).toMatch(/^<svg [^>]*viewBox="[-\d. ]+">.*<path /);
-    expect(detail.body.view.equipment[0]).toMatchObject({ name: '長劍', slot: '右手', enhancement: 3, equipped: true, ability: null });
-    expect(detail.body.view.equipment[0].affixes).toHaveLength(1);
-    expect(detail.body.view.bag).toEqual([{ name: '紅色藥水', amount: 12 }]);
+    const { items } = detail.body.view;
+    expect(items.equipped[0]).toMatchObject({ name: '長劍', place: '右手', enhancement: 3 });
+    const tip = items.equipped[0].tip as { cls?: string; parts: { text: string }[] }[];
+    expect(tip[0]).toEqual({ cls: 'equipped', parts: [{ text: '裝備中（右手）' }] });
+    expect(tip.filter(l => l.cls?.startsWith('affix tier-1'))).toHaveLength(1);
+    expect(items.bag).toEqual([expect.objectContaining({ name: getItemById(1)!.name, amount: 12 })]);
+    expect(items.bag[0].tip).toContainEqual({ cls: 'count', parts: [{ text: '數量: 12' }] });
+    for (const cell of [...items.equipped, ...items.bag]) expect(items.icons[cell.icon]).toMatch(/^<svg/);
     expect(detail.body.view.statistics).toContainEqual({ label: '殺敵數', value: 42 });
     expect((await call('/admin/api/character?id=999')).status).toBe(404);
+  });
+
+  it('角色查詢的物品格：存檔只有 templateId，名稱與部位依模板補上；裝備中、背包、倉庫分開', async () => {
+    await loadTemplateCache();
+    const weapon = getCachedTemplates().find(t => t.slot === 'rightHand')!;
+    const helmet = getCachedTemplates().find(t => t.slot === 'helmet')!;
+    db.prepare('INSERT INTO characters (user_id, uuid, name_key, data) VALUES (?, ?, ?, ?)')
+      .run(1, 'uuid-2', '查裝備', JSON.stringify({ name: '查裝備', className: 'knight', level: 1, gold: 0, currentRegion: 'dawn-plains', createdAt: 1 }));
+    const id = Number((db.prepare('SELECT id FROM characters WHERE uuid = ?').get('uuid-2') as { id: number }).id);
+    const insert = db.prepare('INSERT INTO equipment_instances (owner_id, data) VALUES (?, ?)');
+    insert.run(id, JSON.stringify({ templateId: weapon.id, quality: 0, enhancement: 0, affixes: [], equipped: true }));
+    insert.run(id, JSON.stringify({ templateId: helmet.id, quality: 0, enhancement: 0, affixes: [], equipped: false, inStorage: true }));
+    insert.run(id, JSON.stringify({ templateId: helmet.id, quality: 0, enhancement: 0, affixes: [], equipped: false }));
+
+    const { items } = (await call(`/admin/api/character?id=${id}`)).body.view;
+    const placed = (list: { name: string; place: string }[]) => list.map(e => [e.name, e.place]);
+    expect(placed(items.equipped)).toEqual([[weapon.name, '右手']]);
+    expect(placed(items.bag)).toEqual([[helmet.name, '背包']]);
+    expect(placed(items.storage)).toEqual([[helmet.name, '倉庫']]);
   });
 
   it('信箱補償：同一個 sourceKey 只發一次，可指定單一角色', async () => {

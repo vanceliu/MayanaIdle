@@ -44,7 +44,7 @@ function tap(el: Element) {
 }
 
 /**
- * 格子名稱在畫面上被截成四個字（`BagGrid.getShortName`），三種卷軸看起來一樣，
+ * 格子名稱在畫面上被截成四個字（`models/bagItem.ts` 的 `getShortName`），三種卷軸看起來一樣，
  * 所以測試一律用版面順序定位：背包道具依 `bagItems` 順序，裝備接在後面依實例 id 排。
  */
 function cellAt(index: number): HTMLElement {

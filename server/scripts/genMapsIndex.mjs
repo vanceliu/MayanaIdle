@@ -1,4 +1,4 @@
-// 產生 `src/generated/mapsIndex.ts`：把 client 的地圖 JSON 以靜態 import 收進 server bundle
+// 產生 `src/generated/mapsIndex.ts`（client 的地圖 JSON 以靜態 import 收進 server bundle）與 `iconsIndex.ts`（`genIconsIndex.mjs`）
 import { readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,3 +16,5 @@ lines.push('};', '');
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'mapsIndex.ts'), lines.join('\n'));
 console.log(`[gen:maps] ${ids.length} maps`);
+
+await import('./genIconsIndex.mjs');

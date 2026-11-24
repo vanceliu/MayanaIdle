@@ -417,3 +417,12 @@ export function getTalentAffixIcon(ruleId: string, kind: 'condition' | 'action')
 
 /** 天賦格的圖示：tier 越高條件槽越多，用同一個符號帶 tier 標示 */
 export const TALENT_SLOT_ICON = 'items/three-keys';
+
+/** 素材與卷軸類的圖示鍵（裝備另有一套，走 `getEquipIcon`） */
+export function getItemIconKey(name: string, type: string): string {
+  if (type === 'scroll') return 'scroll';
+  if (type === 'spellbook') return 'spellbook';
+  if (name.includes('磨刀石')) return 'whetstone';
+  if (name.includes('石')) return 'stone';
+  return 'material';
+}

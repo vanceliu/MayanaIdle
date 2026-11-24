@@ -115,7 +115,7 @@ Unix 權限位。Windows 沒有執行權限位，維持裸 `.exe`。
 | 步驟 | 對應的坑 |
 |---|---|
 | 工作區必須乾淨 | 未提交就打包，產物裡的版本標示會指向上一個 commit |
-| 型別檢查：client 走 `npx tsc -b`，server 與 desktop 走 `npm run typecheck` | 根 tsconfig 是 references 形式，`tsc --noEmit` 是空跑；server／desktop 的 script 會先產生 `src/generated/mapsIndex` |
+| 型別檢查：client 走 `npx tsc -b`，server 與 desktop 走 `npm run typecheck` | 根 tsconfig 是 references 形式，`tsc --noEmit` 是空跑；server／desktop 的 script 會先產生 `src/generated/mapsIndex、iconsIndex` |
 | `vitest run`（三個 workspace） | — |
 | `npm run build`（client 與 server） | 前端 bundle 與 server 的 CJS bundle |
 | 打包 | server 執行檔 ＋ 桌面版，產物在 `server/release/`、`desktop/release/` |

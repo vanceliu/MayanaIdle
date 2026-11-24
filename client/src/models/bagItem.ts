@@ -73,3 +73,11 @@ export function consumeBagItem(bagItems: BagItem[], itemId: number, amount = 1):
     .map(b => (b.itemId === itemId ? { ...b, amount: b.amount - amount } : b))
     .filter(b => b.amount > 0);
 }
+
+/** 格子名稱截短，完整名稱走 tooltip */
+export function getShortName(name: string): string {
+  const floorMatch = name.match(/^(.+?)\s*(\d+F)/);
+  if (floorMatch) return `${floorMatch[1]}${floorMatch[2]}`;
+  if (name.length <= 4) return name;
+  return name.slice(0, 4);
+}

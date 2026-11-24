@@ -44,7 +44,7 @@ ok "工作區乾淨（$(git rev-parse --short HEAD)）"
 # ── 2. 型別檢查（一律 tsc -b，--noEmit 在這個 repo 是空跑） ────────
 step "型別檢查"
 (cd "$CLIENT_DIR" && npx tsc -b)
-# server／desktop 走各自的 script：裡面會先產生 src/generated/mapsIndex
+# server／desktop 走各自的 script：裡面會先產生 src/generated/mapsIndex、iconsIndex
 (cd "$SERVER_DIR" && npm run typecheck)
 (cd "$DESKTOP_DIR" && npm run typecheck)
 ok "client、server、desktop 型別無誤"

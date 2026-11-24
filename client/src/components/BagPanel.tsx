@@ -23,7 +23,8 @@ import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { isSigilItemId } from '../models/sigil';
 import { getArenaBox, isArenaTicketItemId } from '../systems/arenaBox';
 import { BagTalentTab } from './BagTalentTab';
-import { BagGrid, getShortName, rowsForSlots } from './BagGrid';
+import { BagGrid, rowsForSlots } from './BagGrid';
+import { getShortName } from '../models/bagItem';
 import { BagCellVisual, BagItemTooltipBody, type BagGridItem } from './BagCell';
 import { CLICK_SLOP } from '../hooks/usePressDrag';
 import {

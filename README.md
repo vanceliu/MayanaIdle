@@ -102,7 +102,7 @@ Restart=always
 ```
 
 型別檢查：client 用 `npx tsc -b`（根 `tsconfig.json` 是 references 形式，`--noEmit` 是空跑），
-server 與 desktop 用 `npm run typecheck`（會先產生 build 產物 `src/generated/mapsIndex`）。
+server 與 desktop 用 `npm run typecheck`（會先產生 build 產物 `src/generated/mapsIndex、iconsIndex`）。
 
 ## 發布
 

@@ -1,13 +1,17 @@
 /**
  * 角色查詢 demo（`admin-character.html`）：載入真正的管理介面頁面，`/admin/api/*` 換成假資料。
- * 每個角色隨機一套外觀，重新整理就換一批。
+ * 物品格由 server 的 `buildItemCells()` 產生，裝備取 seed 模板、詞綴隨機；每個角色隨機一套外觀，重新整理就換一批。
  */
 import { adminPage } from '../../server/src/adminPage';
 import { appearanceSvg } from '../../server/src/pawnSvg';
+import { buildItemCells } from '../../server/src/adminItemCells';
 import { randomAppearance } from '../src/models/appearance';
-import { formatAffixDisplay, type Affix } from '../src/models/affix';
-import { formatAbilityDisplay, type Ability } from '../src/models/ability';
+import { generateAffixes, getAffixCategoryForSlot } from '../src/models/affix';
 import { CLASS_NAMES_ZH, type ClassName } from '../src/models/character';
+import { getCachedTemplates, loadTemplateCache, resolveEquipment } from '../src/systems/templateSync';
+import { ITEM_DEFINITIONS } from '../src/db/seed';
+import type { Ability } from '../src/models/ability';
+import type { EquipmentInstance, EquipSlot } from '../src/models/equipment';
 
 const HOUR = 3600e3;
 const CHARACTERS: { name: string; className: ClassName; level: number; gold: number; regionId: string }[] = [
@@ -16,10 +20,32 @@ const CHARACTERS: { name: string; className: ClassName; level: number; gold: num
   { name: '星火', className: 'elementalist', level: 48, gold: 96_000, regionId: 'valden' },
   { name: '影刃', className: 'thief', level: 71, gold: 2_450_000, regionId: 'hundred-pillar-tower' },
 ];
-const affix = (type: string, tier: number, value: number) => formatAffixDisplay({ type, tier, value } as Affix);
+const EQUIPPED_SLOTS: EquipSlot[] = ['rightHand', 'helmet', 'chest', 'gloves', 'boots', 'belt', 'necklace'];
+const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
+
+await loadTemplateCache();
+
+function equipment(): EquipmentInstance[] {
+  const templates = getCachedTemplates();
+  const make = (slot: EquipSlot | undefined, equipped: boolean, inStorage = false): EquipmentInstance => {
+    const t = pick(templates.filter(x => (slot ? x.slot === slot : true) && x.slot !== 'ring2'));
+    const affixes = Math.random() < 0.3 ? [] : generateAffixes(getAffixCategoryForSlot(t.slot, t.type), 40, 1 + Math.floor(Math.random() * 4));
+    return resolveEquipment({
+      id: Math.floor(Math.random() * 1e6), templateId: t.id!, quality: 0, enhancement: Math.floor(Math.random() * 10),
+      affixes, ownerId: 1, equipped, inStorage, slot: equipped ? slot : undefined,
+      ...(t.slot === 'rightHand' && Math.random() < 0.4 ? { ability: { type: 'skill_splash', params: { percent: 20 } } as Ability } : {}),
+    } as EquipmentInstance);
+  };
+  return [
+    ...EQUIPPED_SLOTS.map(slot => make(slot, true)),
+    ...Array.from({ length: 19 }, () => make(undefined, false)),
+    ...Array.from({ length: 2 }, () => make(undefined, false, true)),
+  ];
+}
 
 function detail(id: number) {
   const c = CHARACTERS[id - 1];
+  const bag = Array.from({ length: 13 }, () => ({ itemId: pick(ITEM_DEFINITIONS).id, amount: 1 + Math.floor(Math.random() * 300) }));
   return {
     character: {
       id, uuid: `demo-${id}`, userId: id, name: c.name, className: c.className, level: c.level, exp: c.level * 2950,
@@ -30,16 +56,7 @@ function detail(id: number) {
     view: {
       className: CLASS_NAMES_ZH[c.className],
       appearanceSvg: appearanceSvg(randomAppearance()),
-      equipment: [
-        {
-          name: '星辰王弓', slot: '右手', enhancement: 9, equipped: true,
-          affixes: [affix('attack_power', 6, 18), affix('crit_rate', 5, 12.5), affix('attack_splash', 5, 20)],
-          ability: formatAbilityDisplay({ type: 'skill_splash', params: { percent: 20 } } as Ability),
-        },
-        { name: '暗影兜帽', slot: '頭盔', enhancement: 5, equipped: true, affixes: [affix('defense', 4, 8)], ability: null },
-        { name: '長劍', slot: '', enhancement: 0, equipped: false, affixes: [], ability: null },
-      ],
-      bag: [{ name: '橙色藥水', amount: 320 }, { name: '瞬間移動卷軸', amount: 12 }],
+      items: buildItemCells(equipment(), bag),
       statistics: [['殺敵數', 48_211], ['BOSS 討伐', 132], ['獨特魔物擊殺', 18], ['死亡次數', 7], ['金幣總量', 9_820_000]]
         .map(([label, value]) => ({ label, value })),
     },

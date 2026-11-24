@@ -7,14 +7,6 @@ import type { ReactNode } from 'react';
 
 export const BAG_COLUMNS = 5;
 
-/** 格子名稱截短，完整名稱走 tooltip */
-export function getShortName(name: string): string {
-  const floorMatch = name.match(/^(.+?)\s*(\d+F)/);
-  if (floorMatch) return `${floorMatch[1]}${floorMatch[2]}`;
-  if (name.length <= 4) return name;
-  return name.slice(0, 4);
-}
-
 /** 補滿空格到指定列數 */
 export function padToRows<T>(items: T[], minRows: number): (T | null)[] {
   const rows = Math.max(minRows, Math.ceil(items.length / BAG_COLUMNS));

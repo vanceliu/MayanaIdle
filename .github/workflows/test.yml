@@ -38,7 +38,7 @@ jobs:
         working-directory: server
       - run: npm ci
         working-directory: desktop
-      # 根 tsconfig 是 references 形式，一律 tsc -b；server／desktop 的 typecheck 會先產生 src/generated/mapsIndex
+      # 根 tsconfig 是 references 形式，一律 tsc -b；server／desktop 的 typecheck 會先產生 src/generated/mapsIndex、iconsIndex
       - run: npx tsc -b
         working-directory: client
       - run: npm run typecheck
