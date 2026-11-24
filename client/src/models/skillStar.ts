@@ -265,6 +265,11 @@ export function resolveSkill(skill: Skill, gear: GearLike, owner: StarOwner, act
   return applyBloodPact(applyMpCostReduction(leveled, activeEffects), owner);
 }
 
+/** 未點任何星盤節點時的技能：技能 tooltip 用它找出隨星盤變動的數值（§ 56.5 一律標黃） */
+export function resolveSkillWithoutStars(skill: Skill, gear: GearLike, owner: StarOwner, activeEffects?: readonly ActiveEffect[]): Skill {
+  return resolveSkill(skill, gear, { className: owner.className, starChart: [] }, activeEffects);
+}
+
 export function resolveSkills(skills: Skill[], gear: GearLike, owner: StarOwner, activeEffects?: readonly ActiveEffect[]): Skill[] {
   return skills.map(s => resolveSkill(s, gear, owner, activeEffects));
 }

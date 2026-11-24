@@ -7,6 +7,7 @@ import type { Character } from '../models/character';
 import type { EquipmentInstance } from '../models/equipment';
 import type { ActiveEffect } from '../models/effect';
 import type { Skill } from '../models/skill';
+import { NORMAL_ATTACK_TAGS, skillTags, type SkillTag } from '../models/skillTags';
 import type { PlayerAttackEvent } from './arpgEngine';
 import {
   ABILITY_CALM_MAX, ABILITY_FOCUS_MAX_PERCENT,
@@ -25,19 +26,15 @@ export function comboKey(weapon: EquipmentInstance | null, character: Character)
   return `${weapon?.id ?? 0}|${character.areaEnteredAt}`;
 }
 
-/** 普攻類（§ 7S.4）：普攻、三連射等走普攻公式的多段攻擊 */
-export function isBasicAttackClass(event: PlayerAttackEvent, skill: Skill | undefined): boolean {
-  return event.action.type === 'normal_attack' || !!skill?.hits;
+/** 這次攻擊的標籤（`05-skill.md` § 5.5）：普通攻擊或施放的技能 */
+export function attackTags(event: PlayerAttackEvent, skill: Skill | undefined): readonly SkillTag[] {
+  if (event.action.type === 'normal_attack') return NORMAL_ATTACK_TAGS;
+  return skill ? skillTags(skill) : [];
 }
 
 /** 技能類中會造成直接傷害的攻擊技能 */
 export function isDirectDamageSkill(skill: Skill | undefined): skill is Skill {
   return !!skill && skill.type === 'attack' && !skill.dotOnly && (skill.power > 0 || !!skill.physicalSnapshot);
-}
-
-/** 單體技能（§ 7S.4）：技能類中的單體攻擊 */
-export function isSingleTargetSkill(skill: Skill | undefined): boolean {
-  return isDirectDamageSkill(skill) && skill.target === 'single' && !skill.hits;
 }
 
 /**

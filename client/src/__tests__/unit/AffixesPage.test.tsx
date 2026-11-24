@@ -64,7 +64,8 @@ describe('詞綴 wiki 頁', () => {
       expect(rows.map(nameOf), c.key).toEqual(expected.map(d => d.name));
       for (const def of expected) {
         const cells = [...rowFor(def.name)!.querySelectorAll('td')].map(td => td.textContent ?? '');
-        expect(cells[1], `${c.key} ${def.name} 效果`).toBe(def.description);
+        // 描述裡的【標籤】畫成色塊（`components/SkillTagList.tsx`），文字不含括號
+        expect(cells[1], `${c.key} ${def.name} 效果`).toBe(def.description.replace(/【([^】]+)】/g, '$1'));
         const range = isAttributeAffixType(def.type) ? '固定 +1 · 無 Tier' : formatAffixTierSpan(def.type, c.key);
         expect(cells[2], `${c.key} ${def.name} 區間`).toBe(range);
         const shared = c.key !== 'weapon' && SHARED_AFFIX_TYPES.includes(def.type);

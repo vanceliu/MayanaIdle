@@ -8,7 +8,7 @@ import type { ElementType } from '../../models/monster';
  *
  * 分布守門的目的：42-element-system.md § 42.2 的環狀克制（火→風→地→冰→火）
  * 只有在各元素都有足夠怪物時才有意義。單一元素過度集中會讓克制退化成
- * 「光克暗」一條路徑，其餘屬性附魔失去價值。
+ * 「光克闇」一條路徑，其餘屬性附魔失去價值。
  */
 
 /** § 42.1 元素類型 */
@@ -17,7 +17,7 @@ const ELEMENT_TYPES: ElementType[] = ['fire', 'ice', 'wind', 'earth', 'light', '
 /** 高階段定義：Lv46 以上，即龍谷地間後段／遠古地監／百柱塔主體 */
 const ENDGAME_MIN_LEVEL = 46;
 
-/** 單一元素全域佔比上限（暗屬性重配後為 28%） */
+/** 單一元素全域佔比上限（闇屬性重配後為 28%） */
 const MAX_ELEMENT_SHARE = 0.30;
 
 /** 高階段每種元素的最低隻數，確保環狀克制在終局仍可用 */

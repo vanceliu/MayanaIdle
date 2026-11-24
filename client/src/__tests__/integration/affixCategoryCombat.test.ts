@@ -1,5 +1,5 @@
 /**
- * 詞綴分類新增的三種詞綴（`07-affix.md` § 7.9）：普攻擴散、荊棘傷害、跑速。
+ * 詞綴分類新增的三種詞綴（`07-affix.md` § 7.9）：普攻擴散（看【單體普攻】）、荊棘傷害、跑速。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { processPlayerAttack, processMonsterAttack } from '../../systems/arpgEventHandler';
@@ -9,6 +9,8 @@ import { gameNow } from '../../core/clock';
 import { DEFENSE_DOWN_CATEGORY, ELEMENT_DOWN_STAT, HIT_DOWN_CATEGORY, HIT_DOWN_STAT, elementDownCategory } from '../../models/affix';
 import type { ActiveEffect } from '../../models/effect';
 import { instantiateSkill, type Skill } from '../../models/skill';
+import { instantiateFromTemplate } from '../../models/skillTemplate';
+import { applyAbilityToSkill } from '../../models/abilitySkill';
 import { useGameStore } from '../../stores/gameStore';
 import { defaultSession } from '../../stores/session';
 import type { Affix } from '../../models/affix';
@@ -115,6 +117,24 @@ describe('普攻擴散', () => {
   it('技能不觸發普攻擴散', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const r = attack([weapon([splash(20)])], { m1: monster(), m2: monster() }, instantiateSkill('ice-bolt')!);
+    expect(r.damages.some(d => d.splash)).toBe(false);
+  });
+
+  it('三連射帶【單體普攻】：每箭各擴散一次', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const r = attack([weapon([splash(20)], 'bow')], { m1: monster(), m2: monster() }, instantiateFromTemplate('triple-shot')!);
+    const [primary, spread] = r.damages;
+    expect(primary.hits).toHaveLength(3);
+    expect(spread).toMatchObject({ targetId: 'm2', splash: true });
+    expect(spread.hits.map(h => h.damage)).toEqual(primary.hits.map(h => Math.floor(h.damage * 0.2)));
+  });
+
+  it('範圍普攻（穿透箭雨強化）不帶【單體普攻】，不擴散', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const gear = [{ ...weapon([splash(20)], 'bow'), ability: { type: 'arrow_rain_boost', params: {} } } as EquipmentInstance];
+    const rain = applyAbilityToSkill(instantiateFromTemplate('arrow-rain')!, gear, 'elf');
+    const r = attack(gear, { m1: monster(), m2: monster() }, rain);
+    expect(r.damages[0].hits.length).toBeGreaterThan(0);
     expect(r.damages.some(d => d.splash)).toBe(false);
   });
 

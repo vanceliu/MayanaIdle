@@ -27,6 +27,7 @@ import {
   type UniqueAffixPool,
 } from '../../models/uniqueAffix';
 import { EQUIPMENT_SEEDS } from '../../db/seed';
+import { SkillTagText } from '../../components/SkillTagList';
 import './WikiTable.css';
 import './AffixCategoryView.css';
 
@@ -141,7 +142,7 @@ function CategoryView({ category }: { category: AffixCategory }) {
                           {d.name}
                           {!isWeapon && SHARED_AFFIX_TYPES.includes(d.type) && <span className="affix-cat-shared">共用</span>}
                         </td>
-                        <td>{d.description}</td>
+                        <td><SkillTagText text={d.description} /></td>
                         <td className="cell-number"><span className="wiki-range">{rangeText(d.type, category)}</span></td>
                       </tr>,
                     ];
@@ -173,7 +174,7 @@ function CategoryView({ category }: { category: AffixCategory }) {
                 {SPECIAL_AFFIX_DEFINITIONS.filter(d => d.category.includes(category)).map(d => (
                   <tr key={d.type}>
                     <td><span className="affix-tag special">{d.name}</span></td>
-                    <td>{d.description}</td>
+                    <td><SkillTagText text={d.description} /></td>
                     <td>固定效果 · Lv.{d.minAreaLevel}+ 掉落</td>
                   </tr>
                 ))}
@@ -199,7 +200,7 @@ function CategoryView({ category }: { category: AffixCategory }) {
               return (
                 <tr key={r.label}>
                   <td><span className="affix-tag tier-7">{r.label}</span></td>
-                  <td>{r.def.description}</td>
+                  <td><SkillTagText text={r.def.description} /></td>
                   <td className="cell-number">{/~/.test(range) ? <span className="wiki-range">{range}</span> : range}</td>
                 </tr>
               );

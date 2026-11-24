@@ -220,6 +220,12 @@ describe('單體技能擴散', () => {
     expect(run([weapon(splash)], { m1: monster(), m2: monster() }, fireball).damages.every(d => !d.splash)).toBe(true);
   });
 
+  it('三連射沒有【單體技能】，不擴散', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const triple = instantiateFromTemplate('triple-shot')!;
+    expect(run([weapon(splash, 1, 'bow')], { m1: monster(), m2: monster() }, triple).damages.every(d => !d.splash)).toBe(true);
+  });
+
   it('擴散傷害計入魔力奪取的回魔', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const drain: Skill = { ...instantiateSkill('wind-blade')!, id: 'mana-drain', mpDrainRatio: 1, mpCost: 0 };
@@ -292,6 +298,20 @@ describe('職業池（§ 7S.5）', () => {
     const plain = run([weapon()], { m1: monster() }, mist);
     expect(plain.damages[0].damage).toBe(0);
     expect(effectsOf('frostbite')).toHaveLength(1);
+  });
+
+  it('冰霧強化帶【技能元素】【技能】：吃技能元素傷害與技能回血', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const mist = classSkill('poison-mist');
+    const boost: Ability = { type: 'poison_mist_boost', params: {} };
+    useGameStore.setState({ character: { ...knight(), className: 'thief' }, skills: [mist] });
+    const base = run([weapon(boost)], { m1: monster() }, mist).damages[0].damage;
+
+    useGameStore.setState({ character: { ...knight(), className: 'thief', hp: 1 }, activeEffects: [] });
+    const gear = [{ ...weapon(boost), affixes: [{ type: 'skill_elemental', tier: 5, value: 20 }, { type: 'skill_lifesteal', tier: 5, value: 10 }] } as EquipmentInstance];
+    const boosted = run(gear, { m1: monster() }, mist).damages[0].damage;
+    expect(boosted).toBe(Math.floor(base * 1.2));
+    expect(useGameStore.getState().character!.hp).toBe(1 + Math.floor(boosted * 0.1));
   });
 
   it('淬毒強化：施放時寫進 buff，命中上毒的每秒傷害 ×(1 + X%)', () => {

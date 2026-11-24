@@ -15,7 +15,7 @@
 5. 傳進戰鬥系統的 `equippedGear` 是**陣列，順序＝instance id 插入順序，不是部位順序**。
    取手持武器一律用 `systems/combat.ts` 的 `getEquippedWeapon()`，**禁用 `equippedGear[0]`** ——
    換掉新手武器後會靜默取到防具，武器基傷／額外攻擊／材質克制全部失效且不報錯
-6. 技能的 `requiredWeaponType`（如三連射的【需裝備弓】）是**實際限制**，
+6. 技能的 `requiredWeaponType`（如三連射的【弓】標籤）是**實際限制**，
    由 `scriptRunner.ts` 的 `meetsWeaponRequirement()` 在腳本選招時擋下，
    不可退化成只在 tooltip／Wiki 顯示的裝飾字
 7. 背包／倉庫一律**用道具 id 查，不可用名字查**（禁用 `characterBag.where({ name })`、

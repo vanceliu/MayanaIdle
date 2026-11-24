@@ -37,7 +37,7 @@ describe('getElementCounterBonus', () => {
     }
   });
 
-  it('其餘元素組合一律 +3（同屬性、無關係、光暗與四元素互打）', () => {
+  it('其餘元素組合一律 +3（同屬性、無關係、光闇與四元素互打）', () => {
     for (const attack of ELEMENTS) {
       for (const target of ELEMENTS) {
         if (isPair(ADVANTAGE, attack, target) || isPair(DISADVANTAGE, attack, target)) continue;

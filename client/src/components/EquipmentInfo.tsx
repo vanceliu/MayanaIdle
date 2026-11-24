@@ -13,6 +13,7 @@ import { AttributeRequirement } from './AttributeRequirement';
 import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { getEquipmentTierColor, getEquipmentInstanceTierColor, getEquipmentTierLevel, getEquipmentInstanceTierLevel } from '../models/equipmentTier';
+import { SkillTagText } from './SkillTagList';
 
 const MATERIAL_NAMES: Record<string, string> = {
   wood: '木',
@@ -75,12 +76,12 @@ function useAbilitySuppressed(item: EquipmentInstance): boolean {
 
 /** 顯示片段；區間（`.stat-range`）只在按住 Alt 時印出（`34-ui-guidelines.md` § 34.2） */
 function DisplayParts({ parts, showRange }: { parts: DisplayPart[]; showRange: boolean }) {
-  if (!showRange) return <>{parts.filter(p => !p.range).map(p => p.text).join('')}</>;
+  if (!showRange) return <SkillTagText text={parts.filter(p => !p.range).map(p => p.text).join('')} />;
   return (
     <>
       {parts.map((p, i) => p.range
         ? <span key={i}>{' '}<span className="stat-range">{p.text}</span></span>
-        : <span key={i}>{p.text}</span>)}
+        : <span key={i}><SkillTagText text={p.text} /></span>)}
     </>
   );
 }

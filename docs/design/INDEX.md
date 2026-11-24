@@ -123,6 +123,7 @@
 | **武器外觀與揮擊演出（揮擊角度/演出長度）** | `48-vfx.md` | § 48.6 |
 | **怪物遠程攻擊的武器演出（弓／擲斧／雙手杖、材質依等級、飛斧、寶珠元素色）** | `48-vfx.md` | § 48.6.5 |
 | 技能系統規則 | `05-skill.md` | 全文 |
+| **技能標籤（詞綴適用對象、【普攻】【單體技能】等、各技能標籤表）** | `05-skill.md` | § 5.5 |
 | 基礎魔法（50 個，1~10 級） | `22-basic-magic.md` | 全文 |
 | 職業魔法（5 職業各 7 級） | `23-class-magic.md` | 全文 |
 | **職業技能書掉落（依區域 levelMax 分級、逐級獨立判定）** | `23-class-magic.md` | § 23.1 |
@@ -312,6 +313,7 @@
 07-affix.md § 7.9（荊棘傷害）←→ 07-affix-ability.md § 7S.5（荊棘反彈）
 07-affix.md § 7.6（格擋率）←→ 21-combat-formula.md § 21.9
 07-affix-ability.md ←→ 07-affix.md § 7.13 ←→ 07-affix-tier7.md
+  ←→ 05-skill.md § 5.5（技能標籤）←→ 07-affix.md § 7.4／§ 7.9 ←→ 21-combat-formula.md § 21.3／§ 21.4
   ←→ 06-equipment-acquire.md § 6A.3／§ 6A.6 ←→ 13-town.md § 13.5
   ←→ 21-combat-formula.md § 21.4b／§ 21.8 ←→ 23-class-magic.md § 23.3~§ 23.7 ←→ 24-buff-debuff.md § 24.4.3
   ←→ 24-buff-debuff.md § 24.4.9 ←→ 18-data-schema.md § 18.3 ←→ 46-sigil.md § 46.9 ←→ 53-bounty-contract.md

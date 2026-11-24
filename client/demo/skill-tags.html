@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>技能標籤 Demo — MayanaIdle</title>
+<!--
+  技能標籤（`05-skill.md` § 5.5）：技能 tooltip 的標籤列、持續傷害的標籤、詞綴描述的標籤寫法。
+  版面樣本：class 與 App.css 相同，標籤由 `models/skillTags.ts` 推得。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/skill-tags.html
+-->
+<link rel="stylesheet" href="../src/App.css">
+<style>
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 16px; line-height: 1.8; }
+.demo-bar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 16px; font-size: var(--fs-sm); }
+.demo-bar select {
+  margin-left: 6px; background: var(--bg-deepest); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px 4px; font-size: var(--fs-sm);
+}
+.demo-section { font-family: var(--font-display); font-size: var(--fs-md); color: var(--accent-gold); margin: 20px 0 8px; }
+.demo-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.demo-skill-tooltip { position: static; display: block; width: 220px; pointer-events: auto; }
+.demo-tooltip-note { font-size: var(--fs-xs); color: var(--text-dim); margin-bottom: 4px; }
+.demo-affix-table { border-collapse: collapse; font-size: var(--fs-sm); max-width: 100%; }
+.demo-affix-table th, .demo-affix-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+.demo-affix-table th { color: var(--text-dim); font-weight: 500; }
+.demo-affix-table .dim { color: var(--text-dim); }
+
+</style>
+</head>
+<body>
+  <h1 class="demo-title">技能標籤</h1>
+  <p class="demo-note">
+    技能 tooltip 在分類下方以色塊列出標籤；詞綴只寫一個標籤，技能有那個標籤就吃。技能施加的持續傷害另起一行，列首為持續傷害名稱。<br>
+    隨機技能改寫後的技能依改寫後重算，新增的標籤以黃色標出。【普攻】的元素依武器刻印與火矢附魔代入；【弓】取代原本的【需弓】行。
+  </p>
+  <div id="root"></div>
+  <script type="module" src="./skillTagsDemo.tsx"></script>
+</body>
+</html>

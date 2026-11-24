@@ -26,6 +26,7 @@ import { BlacksmithAbilitySwap } from './BlacksmithAbilitySwap';
 import { BlacksmithPrereqPicker, CRAFT_SOURCE_LABEL, PrereqName } from './BlacksmithPrereqPicker';
 import { BlacksmithUniqueCraft } from './BlacksmithUniqueCraft';
 import { CraftCategoryTabs, RecipeRequirementChips, RecipeSummary, matchesCraftCategory } from './BlacksmithRecipeParts';
+import { SkillTagText } from '../SkillTagList';
 
 type BlacksmithTab = 'craft' | 'unique' | 'dismantle' | 'swap';
 
@@ -255,7 +256,7 @@ export function TownBlacksmith() {
                           </optgroup>
                         )}
                       </select>
-                      {preview && <span className="bs-ability-preview">{formatAbilityEffect(preview)}</span>}
+                      {preview && <span className="bs-ability-preview"><SkillTagText text={formatAbilityEffect(preview)} /></span>}
                     </span>
                   );
                 })()}

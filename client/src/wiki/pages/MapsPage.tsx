@@ -4,13 +4,10 @@ import { MONSTER_SEEDS } from '../../db/seed';
 import { Link, useParams } from 'react-router-dom';
 import type { Floor, Region } from '../../models/area';
 import { getItemById } from '../../models/items';
-import type { MonsterTemplate } from '../../models/monster';
+import { ELEMENT_LABELS, type MonsterTemplate } from '../../models/monster';
 import { UNIQUE_SPAWN_NOTE, monsterRankMark } from '../monsterRankMark';
 import '../components/WikiTable.css';
 
-const ELEMENT_LABELS: Record<string, string> = {
-  fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
-};
 
 const REGION_TYPE_LABELS: Record<Region['type'], string> = {
   field: '野外', dungeon: '地城', town: '城鎮', training: '試驗場', arena: '競技場',

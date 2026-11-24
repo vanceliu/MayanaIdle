@@ -6,7 +6,7 @@ import { getItemById } from '../../models/items';
 import { getSkillBookLevels, SKILL_BOOK_DROP_RATE } from '../../systems/classSkillBookDrop';
 import { Link, useParams } from 'react-router-dom';
 import { slotTierBandFor } from '../../models/talent';
-import { monsterRank, type MonsterRank } from '../../models/monster';
+import { ELEMENT_LABELS, monsterRank, type MonsterRank } from '../../models/monster';
 import {
   MONSTER_AFFIX_COUNT_TABLE, MONSTER_AFFIX_DESCRIPTIONS, MONSTER_AFFIX_LABELS, MONSTER_AFFIX_ORDER,
   MONSTER_AFFIX_DROP_REWARD, MONSTER_AFFIX_GOLD_EXP_REWARD,
@@ -15,9 +15,6 @@ import { MonsterPortrait } from '../components/MonsterPortrait';
 import { MONSTER_RANK_LABEL, TALENT_SLOT_DROP_RATE, UNIQUE_MARK_COLOR, monsterRankMark } from '../monsterRankMark';
 import '../components/WikiTable.css';
 
-const ELEMENT_LABELS: Record<string, string> = {
-  fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
-};
 
 const RACE_LABELS: Record<string, string> = {
   normal: '一般', undead: '不死', demon: '惡魔', dragon: '龍',

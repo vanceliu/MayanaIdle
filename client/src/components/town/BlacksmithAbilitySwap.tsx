@@ -12,6 +12,7 @@ import {
 import { GameIcon } from '../GameIcon';
 import { Tooltip } from '../Tooltip';
 import { EquipmentDetail } from '../EquipmentInfo';
+import { SkillTagText } from '../SkillTagList';
 
 /** 技能結晶名稱後的職業標記；共通池不標 */
 function poolLabel(type: AbilityType): string | null {
@@ -138,11 +139,11 @@ export function BlacksmithAbilitySwap({ templates, onResult }: {
                   <span className="shop-item-desc">{EQUIPMENT_TIER_NAMES[tier as keyof typeof EQUIPMENT_TIER_NAMES]}</span>
                   <span className="shop-item-desc">
                     目前：{item.ability
-                      ? <span className="bs-ability-text">{formatAbilityDisplay(item.ability)}</span>
+                      ? <span className="bs-ability-text"><SkillTagText text={formatAbilityDisplay(item.ability)} /></span>
                       : <span className="bs-dim">無隨機技能</span>}
                   </span>
                   {preview && (
-                    <span className="shop-item-desc">更換後：<span className="bs-ability-text">{formatAbilityDisplay(preview)}</span></span>
+                    <span className="shop-item-desc">更換後：<span className="bs-ability-text"><SkillTagText text={formatAbilityDisplay(preview)} /></span></span>
                   )}
                   {block && <span className="shop-item-desc bs-block-reason">{CRYSTAL_APPLY_BLOCK_TEXT[block]}</span>}
                   <span className="shop-item-desc bs-craft-materials">

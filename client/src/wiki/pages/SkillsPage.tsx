@@ -8,6 +8,7 @@ import { WEAPON_TYPE_LABELS } from '../../models/skill';
 import { getItemById } from '../../models/items';
 import { hasStarCooldown, skillAtStarLevel, starCooldownSteps } from '../../models/skillStar';
 import type { Skill } from '../../models/skill';
+import { ELEMENT_LABELS } from '../../models/monster';
 
 const STAR_LEVELS = [1, 2, 3] as const;
 
@@ -46,9 +47,6 @@ const classTargetText = (s: Skill) => (s.target === 'aoe' && s.aoeRadius === und
   : s.target === 'aoe' ? `範圍(半徑${s.aoeRadius}格/${s.randomHits ? `隨機${s.randomHits}下` : s.maxTargets ? `最多${s.maxTargets}隻` : '無上限'})`
   : '單體');
 
-const ELEMENT_LABELS: Record<string, string> = {
-  fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
-};
 
 const TYPE_LABELS: Record<string, string> = {
   attack: '攻擊', heal: '治療', buff: '增益', move: '移動', passive: '被動',
@@ -69,7 +67,7 @@ const CLASS_SKILL_NOTES: Partial<Record<string, ReactNode>> = {
       <strong>衝鋒突進</strong>：目標在 8 格內、有視線且直線走得過去（不跨越水池／岩漿）時，瞬間突進到目標旁邊離自己最近的空格再出手；
       目標已在旁邊時只出手不移動，找不到落點就不施放。
       <br />
-      <strong>血濺咒殺</strong>：暗屬性魔法傷害（不爆擊）。先扣自身最大 HP 的 15%（最低留 1，穿透所有減傷與護盾，扣到撤退門檻會觸發撤退），
+      <strong>血濺咒殺</strong>：闇屬性魔法傷害（不爆擊）。先扣自身最大 HP 的 15%（最低留 1，穿透所有減傷與護盾，扣到撤退門檻會觸發撤退），
       再對自身 4 格內隨機打 4 下（同一隻可被打多下），每下附加減速 10%（5 秒，與其他減速後施放覆蓋）。
       4 格內沒有怪物或 HP 只剩 1 時不可施放。
       <br />

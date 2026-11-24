@@ -1,3 +1,4 @@
+import { SkillTagText } from '../../components/SkillTagList';
 import { ABILITY_DEFINITIONS, ABILITY_CHANCE, ABILITY_MIN_TIER, formatAbilityTemplateParts, type AbilityGroup, type AbilityPool } from '../../models/ability';
 import { CLASS_NAMES_ZH, type ClassName } from '../../models/character';
 import './WikiTable.css';
@@ -28,7 +29,7 @@ export function AbilityPoolTable({ group, pool }: { group: AbilityGroup; pool: A
               <td>
                 {formatAbilityTemplateParts(d).map((p, i) => (p.range
                   ? <span key={i} className="wiki-range">{p.text}</span>
-                  : p.text))}
+                  : <SkillTagText key={i} text={p.text} />))}
               </td>
             </tr>
           ))}

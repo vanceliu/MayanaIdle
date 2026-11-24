@@ -48,7 +48,7 @@ const ELEMENT_OPTIONS: { value: ElementType; label: string }[] = [
   { value: 'wind', label: '風' },
   { value: 'earth', label: '地' },
   { value: 'light', label: '光' },
-  { value: 'dark', label: '暗' },
+  { value: 'dark', label: '闇' },
 ];
 
 /** 量測進行中每 100ms 重繪一次；停止後不再排程 */

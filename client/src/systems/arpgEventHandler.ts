@@ -14,6 +14,7 @@ import {
   calculatePhysicalSnapshotSkill,
   calculateMonsterAttack,
   calculateBasePhysicalDamage,
+  applySkillElementZone,
   getEquippedWeapon,
   isShieldEquipped,
   hasActiveFireEnchant,
@@ -57,7 +58,7 @@ import {
   type Ability,
 } from '../models/ability';
 import {
-  advanceCombo, applyComboBonus, comboKey, isBasicAttackClass, isDirectDamageSkill, isSingleTargetSkill,
+  advanceCombo, applyComboBonus, comboKey, attackTags, isDirectDamageSkill,
   applyFocusStrike, clearFocusTarget, focusKey, consumeCalm, gainRage, shortenCooldown, splashDamage,
   corpseExplosionDamage, reduceCooldown,
 } from './abilityCombat';
@@ -525,7 +526,9 @@ export function processPlayerAttack(
   const focusAbility = findAbility(equippedGear, 'focus_strike');
   const focusStateKey = focusKey(character);
   const freezingAbility = findAbility(equippedGear, 'freezing_strike');
-  const basicAttackClass = isBasicAttackClass(event, skill);
+  const strikeTags = attackTags(event, skill);
+  /** 普攻類（§ 7S.4）：帶【普攻】 */
+  const basicAttackClass = strikeTags.includes('basic_attack');
   const castComboBonus = comboAbility && !basicAttackClass && isDirectDamageSkill(skill)
     ? advanceCombo(session.loop, comboAbility, comboStateKey)
     : 0;
@@ -561,9 +564,10 @@ export function processPlayerAttack(
         // § 23.7 冰霧：不造成直接傷害，只施加 `applyDebuff`
         damage = 0;
       } else if (skill.instantDotTicks && skill.applyDebuff?.dotDamagePercent) {
-        // § 7S.5 冰霧強化：DoT 快照值 × 跳數一次打出，不吃防禦、不爆擊
+        // § 7S.5 冰霧強化：DoT 快照值 × 跳數一次打出，再乘技能元素乘區；不吃防禦、不爆擊
         const perTick = Math.max(1, Math.floor(calculateBasePhysicalDamage(character, weapon, equippedGear, activeEffects) * skill.applyDebuff.dotDamagePercent));
-        damage = perTick * skill.instantDotTicks;
+        const skillElemental = getCombatBonuses(equippedGear, effectsForDamage, character).skill_elemental;
+        damage = applySkillElementZone(perTick * skill.instantDotTicks, skill.element, skillElemental, effectsForDamage, targetId);
         isMiss = false;
       } else if (skill.hits) {
         /**
@@ -1033,7 +1037,7 @@ export function processPlayerAttack(
   // § 7S.5 單體技能擴散：主目標 3 格內其他怪受該下最終傷害 X%；計入回復、不觸發命中類效果
   const splash = findAbility(equippedGear, 'skill_splash');
   const primary = damages[0];
-  if (splash && isSingleTargetSkill(skill) && damages.length === 1 && !primary.isMiss && primary.damage > 0) {
+  if (splash && strikeTags.includes('single_skill') && damages.length === 1 && !primary.isMiss && primary.damage > 0) {
     const center = ctx.mapMonsters.find(m => m.id === primary.targetId)?.position;
     const amount = splashDamage(primary.damage, splash);
     for (const other of center && amount > 0 ? ctx.mapMonsters : []) {
@@ -1049,8 +1053,8 @@ export function processPlayerAttack(
     }
   }
 
-  // § 7.9 普攻擴散：主目標每一下最終傷害（含爆擊）× X%；必定命中、不爆擊、不扣防禦、不觸發命中類效果
-  const attackSplash = event.action.type === 'normal_attack' ? getAffixBonusesFromGear(equippedGear).attack_splash : 0;
+  // § 7.9 普攻擴散：【單體普攻】主目標每一下最終傷害（含爆擊）× X%；必定命中、不爆擊、不扣防禦、不觸發命中類效果
+  const attackSplash = strikeTags.includes('single_basic_attack') ? getAffixBonusesFromGear(equippedGear).attack_splash : 0;
   const struck = damages[0];
   if (attackSplash > 0 && struck && !struck.isMiss) {
     const amounts = struck.hits
@@ -1076,8 +1080,8 @@ export function processPlayerAttack(
     }
   }
 
-  // § 7.9 普攻回血／技能回血：含擴散、追加傷害、追打、專注打擊，依本次招式歸類
-  if (procs) {
+  // § 7.9 普攻回血看【普攻】、技能回血看【技能】：含擴散、追加傷害、追打、專注打擊
+  if (basicAttackClass || strikeTags.includes('skill')) {
     // 嗜血之星的普攻回血、技能回血與詞綴相加（`56-star-chart.md` § 56.6）
     const affixBonuses = getCombatBonuses(equippedGear, [], character);
     const percent = basicAttackClass ? affixBonuses.attack_lifesteal : affixBonuses.skill_lifesteal;

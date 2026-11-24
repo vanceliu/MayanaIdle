@@ -225,7 +225,7 @@ export function StartPage() {
           </table>
         </div>
         <Card>
-          <strong>元素</strong>：火、冰、風、地、光、暗、無七種；火克風、風克地、地克冰、冰克火，光暗互克。
+          <strong>元素</strong>：火、冰、風、地、光、闇、無七種；火克風、風克地、地克冰、冰克火，光闇互克。
           武器的元素來自「元素刻印」詞綴。
         </Card>
         <div className="wiki-table-wrap">

@@ -5667,6 +5667,22 @@ button.active {
 /* 裝備 tooltip 按住 Alt 的數值區間（34-ui-guidelines § 34.2） */
 .stat-range { color: #FACC15; font-weight: 700; }
 
+/* 技能標籤色塊（05-skill § 5.5）：技能 tooltip 分類下方、詞綴描述內 */
+.skill-tag-list { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 2px 0 4px; font-size: var(--fs-xs); }
+.skill-tag-label { color: var(--text-dim); margin-right: 2px; }
+.skill-tag {
+  padding: 0 5px; border-radius: 3px; line-height: 1.6; white-space: nowrap;
+  background: rgba(148, 163, 184, 0.18); color: #CBD5E1;
+}
+.skill-tag.inline { margin: 0 2px; }
+.skill-tag-fire { background: rgba(220, 38, 38, 0.2); color: #F87171; }
+.skill-tag-ice { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+.skill-tag-wind { background: rgba(34, 197, 94, 0.2); color: #4ADE80; }
+.skill-tag-earth { background: rgba(217, 119, 6, 0.2); color: #FBBF24; }
+.skill-tag-light { background: rgba(250, 204, 21, 0.2); color: #FDE047; }
+.skill-tag-dark { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
+.skill-tag.changed { color: #FACC15; box-shadow: inset 0 0 0 1px #FACC15; font-weight: 700; }
+
 .skill-tooltip-status {
   margin-top: 4px;
   font-size: var(--fs-xs);

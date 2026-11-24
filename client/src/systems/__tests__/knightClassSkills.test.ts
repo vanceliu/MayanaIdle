@@ -84,7 +84,7 @@ describe('騎士 5～7 級定義', () => {
     });
   });
 
-  it('血濺咒殺：MP 0、冷卻 12s、暗屬性 40、扣 15%、4 格隨機 4 下、減速 10% 5s', () => {
+  it('血濺咒殺：MP 0、冷卻 12s、闇屬性 40、扣 15%、4 格隨機 4 下、減速 10% 5s', () => {
     const skill = getSkillTemplate('blood-curse')!;
     expect(skill).toMatchObject({
       power: 40, element: 'dark', mpCost: 0, cooldown: 12000,

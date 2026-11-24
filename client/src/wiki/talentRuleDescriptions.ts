@@ -31,7 +31,7 @@ export const COMBAT_CONDITION_DESC: Record<string, string> = {
   target_distance: '與當前目標的距離（格）。遠程職業拉開距離的依據',
   target_attack_type: '近戰／遠程物理／遠程魔法',
   target_race: '一般／不死／惡魔／龍',
-  target_element: '火／冰／風／地／光／暗／無',
+  target_element: '火／冰／風／地／光／闇／無',
   target_size: '小怪／大怪。武器對兩者的基礎傷害不同',
   target_is_boss: '當前目標是不是 Boss（不含獨特魔物）',
   target_is_unique: '當前目標是不是獨特魔物',

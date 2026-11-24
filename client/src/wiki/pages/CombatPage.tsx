@@ -12,6 +12,7 @@ import {
 import { ACCESSORY_MAGIC_RESIST_PER_LEVEL } from '../../systems/enhancement';
 import { EVASION_POINTS_PER_PERCENT } from '../../models/affix';
 import '../components/WikiTable.css';
+import { ELEMENT_LABELS, type ElementType } from '../../models/monster';
 
 /** 減傷／迴避等上限直接引用 `systems/combat.ts` 的常數，避免與實作 drift。 */
 const MONSTER_DEFENSE_CAP = DAMAGE_REDUCTION_CAP;
@@ -21,9 +22,6 @@ const BLOCK_RATE_CAP = 50;
 const BASE_ATTACK_INTERVAL_MS = 1200;
 const MIN_ATTACK_INTERVAL_MS = 300;
 
-const ELEMENT_LABELS: Record<string, string> = {
-  fire: '火', wind: '風', earth: '地', ice: '冰', light: '光', dark: '闇',
-};
 
 /** 克制／被克制關係由 `ELEMENT_COUNTER` 反推；光闇互克不算被克制。 */
 const ELEMENT_COUNTER_ROWS = Object.entries(ELEMENT_COUNTER).map(([attack, beats]) => ({
@@ -35,7 +33,7 @@ const ELEMENT_COUNTER_ROWS = Object.entries(ELEMENT_COUNTER).map(([attack, beats
 }));
 
 function ElementBadge({ element }: { element: string }) {
-  return <span className={`wiki-badge wiki-badge-${element}`}>{ELEMENT_LABELS[element]}</span>;
+  return <span className={`wiki-badge wiki-badge-${element}`}>{ELEMENT_LABELS[element as ElementType]}</span>;
 }
 
 const sectionStyle = { marginBottom: 32 } as const;

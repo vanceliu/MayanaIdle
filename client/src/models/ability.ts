@@ -145,7 +145,7 @@ export const ABILITY_DEFINITIONS: AbilityDefinition[] = [
     description: '命中 {chance} 機率追加 {damage} 傷害' },
   { type: 'skill_splash', name: '單體技能擴散', group: 'weapon', pool: 'common',
     params: [{ key: 'percent', min: 15, max: 25, unit: '%' }],
-    description: `單體技能命中時，${ABILITY_SPLASH_RADIUS} 格內其他怪受到該下傷害 {percent}` },
+    description: `【單體技能】命中時，${ABILITY_SPLASH_RADIUS} 格內其他怪受到該下傷害 {percent}` },
   { type: 'combo_strike', name: '追打傷害', group: 'weapon', pool: 'common',
     params: [{ key: 'every', min: 5, max: 10, unit: '', lowerIsBetter: true }, { key: 'bonus', min: 10, max: 50, unit: '%' }],
     description: '每第 {every} 次出手傷害 +{bonus}' },

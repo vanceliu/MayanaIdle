@@ -755,6 +755,11 @@ export function getWeaponElement(weapon: EquipmentInstance | null): BrandElement
   return getBrandElement(weapon?.affixes);
 }
 
+/** 【普攻】的攻擊元素（`42-element-system.md`「元素的判定來源」）：武器刻印 → 火矢附魔 → 無 */
+export function getBasicAttackElement(weapon: EquipmentInstance | null, activeEffects: ActiveEffect[]): BrandElement | undefined {
+  return getWeaponElement(weapon) ?? (hasActiveFireEnchant(activeEffects) ? 'fire' : undefined);
+}
+
 /**
  * 普攻基礎攻擊力裡的屬性加成（`21-combat-formula.md` § 21.3）。
  *
@@ -1023,6 +1028,19 @@ export function getBaseMagicAttack(
     + getElementCounterBonus(skillElement, monster.element);
 }
 
+/** 技能元素乘區（§ 21.4）：【技能元素】（`05-skill.md` § 5.5）乘 技能元素傷害% ＋ 目標身上同元素的元素下降%；無屬性不吃 */
+export function applySkillElementZone(
+  damage: number,
+  element: string | undefined,
+  skillElementalPercent: number,
+  activeEffects: ActiveEffect[],
+  targetId?: string,
+): number {
+  if (!element || element === 'none') return damage;
+  const elementDown = getElementDownPercent(activeEffects, targetId, element);
+  return Math.floor(damage * (1 + (skillElementalPercent + elementDown) / 100));
+}
+
 /**
  * 物理快照技能（`21-combat-formula.md` § 21.4a）：盾擊／裂傷斬／挑釁怒吼。
  *
@@ -1091,11 +1109,7 @@ export function calculateSkillAttack(
   // § 21.4：基礎魔攻 = 技能攻擊力 + INT加成 + 裝備魔攻 + 元素克制
   let damage = getBaseMagicAttack(char, skillPower, skillElement, monster, equippedGear, activeEffects);
 
-  // 技能元素乘區：技能元素傷害% ＋ 目標身上同元素的元素下降%（§ 21.4）；無屬性技能不吃
-  if (skillElement && skillElement !== 'none') {
-    const elementDown = getElementDownPercent(activeEffects, targetId, skillElement);
-    damage = Math.floor(damage * (1 + (bonuses.skill_elemental + elementDown) / 100));
-  }
+  damage = applySkillElementZone(damage, skillElement, bonuses.skill_elemental, activeEffects, targetId);
 
   const isCritical = canCrit && random() * 100 < Math.min(75, 5 + bonuses.crit_rate);
   if (isCritical) {

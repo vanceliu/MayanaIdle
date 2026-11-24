@@ -1,6 +1,7 @@
 import type { Attributes } from './attributes';
 import { ATTRIBUTE_KEYS, ATTRIBUTE_NAMES_ZH } from './attributes';
 import { random } from '../core/rng';
+import { ELEMENT_LABELS } from './monster';
 
 /** 詞綴分類（`07-affix.md` § 7.5）。每類有自己的詞綴池與階級表（§ 7.6） */
 export type AffixCategory =
@@ -181,10 +182,10 @@ const restoreRange = (type: 'on_hit_hp' | 'on_hit_mp') =>
 /** § 7.4 詞綴種類；順序即各分組內的顯示順序 */
 export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'attack_power', name: '攻擊力', group: '攻擊類', description: '攻擊力 +X%' },
-  { type: 'element_brand', name: '元素刻印', group: '攻擊類', description: '賦予武器一個元素（火／冰／風／地／光／暗），並使普攻傷害 +X%' },
+  { type: 'element_brand', name: '元素刻印', group: '攻擊類', description: '賦予武器一個元素（火／冰／風／地／光／闇），並使普攻傷害 +X%' },
   { type: 'element_erosion', name: '元素侵蝕', group: '攻擊類', description: 'X% 是觸發率：命中後有 X% 機率讓目標中侵蝕，每秒固定傷害、持續 5 秒' },
-  { type: 'attack_splash', name: '普攻擴散', group: '攻擊類', description: `普攻命中時，主目標 ${ATTACK_SPLASH_RADIUS} 格內的其他怪受到主目標該下傷害 × X%` },
-  { type: 'skill_elemental', name: '技能元素傷害', group: '攻擊類', description: '施放技能時元素傷害（火、冰、風、地、光、暗）+X%' },
+  { type: 'attack_splash', name: '普攻擴散', group: '攻擊類', description: `【單體普攻】命中時，主目標 ${ATTACK_SPLASH_RADIUS} 格內的其他怪受到主目標該下傷害 × X%` },
+  { type: 'skill_elemental', name: '技能元素傷害', group: '攻擊類', description: '【技能元素】傷害 +X%' },
   { type: 'crit_rate', name: '爆擊率', group: '攻擊類', description: '爆擊率 +X%' },
   { type: 'crit_damage', name: '爆擊傷害', group: '攻擊類', description: '爆擊傷害 +X%' },
   { type: 'attack_speed', name: '攻擊速度', group: '攻擊類', description: '攻擊速度 +X%' },
@@ -192,8 +193,8 @@ export const AFFIX_DEFINITIONS: AffixDefinition[] = [
   { type: 'hit_down', name: '命中下降', group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方命中下降 X%，持續 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒` },
   { type: 'defense_down', name: '防禦下降', group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方防禦下降 X%，持續 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒` },
   { type: 'element_down', name: '元素下降', group: '攻擊類', description: `命中後 ${AFFIX_DEBUFF_CHANCE}% 機率使敵方的一種元素下降 ${AFFIX_DEBUFF_DURATION_MS / 1000} 秒：該元素的攻擊對牠的元素乘區 +X%` },
-  { type: 'attack_lifesteal', name: '普攻回血', group: '攻擊類', description: '普攻每下命中回復該下最終傷害 × X% 的 HP' },
-  { type: 'skill_lifesteal', name: '技能回血', group: '攻擊類', description: '技能每下命中回復該下最終傷害 × X% 的 HP' },
+  { type: 'attack_lifesteal', name: '普攻回血', group: '攻擊類', description: '【普攻】每下命中回復該下最終傷害 × X% 的 HP' },
+  { type: 'skill_lifesteal', name: '技能回血', group: '攻擊類', description: '【技能】每下命中回復該下最終傷害 × X% 的 HP' },
   { type: 'defense', name: '防禦力', group: '防禦類', description: '防禦力 +X%' },
   { type: 'max_hp', name: '最大 HP', group: '防禦類', description: '最大 HP +X（固定值）' },
   { type: 'max_mp', name: '最大 MP', group: '防禦類', description: '最大 MP +X（固定值）' },
@@ -333,9 +334,7 @@ export function getOnHitRestore(
 /** 元素刻印可賦予的六種元素（§ 42.1，不含「無」） */
 export type BrandElement = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark';
 export const BRAND_ELEMENTS: BrandElement[] = ['fire', 'ice', 'wind', 'earth', 'light', 'dark'];
-export const BRAND_ELEMENT_ZH: Record<BrandElement, string> = {
-  fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '暗',
-};
+export const BRAND_ELEMENT_ZH: Record<BrandElement, string> = ELEMENT_LABELS;
 
 /**
  * 一件裝備的元素刻印所賦予的元素。沒有刻印時回 undefined。

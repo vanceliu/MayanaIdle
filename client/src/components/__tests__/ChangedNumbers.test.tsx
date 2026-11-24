@@ -21,3 +21,11 @@ describe('ChangedNumbers（`07-affix-ability.md` § 7S.7）', () => {
     expect(highlighted('受到傷害的 30% 改由 MP 承擔', '受到傷害的 30% 改由 MP 承擔，減傷 10%').marked).toEqual(['10']);
   });
 });
+
+describe('另外比對的參考值（`56-star-chart.md` § 56.5）', () => {
+  it('與 base 相同、但與參考值不同的數字照樣標色', () => {
+    const { container } = render(<ChangedNumbers base="32 + 物理傷害" value="32 + 物理傷害" references={['9 + 物理傷害']} />);
+    expect(Array.from(container.querySelectorAll('.stat-changed')).map(e => e.textContent)).toEqual(['32']);
+  });
+});
+

@@ -10,6 +10,7 @@ import { GameIcon } from './GameIcon';
 import { getEquipIcon } from '../models/iconMap';
 import { getEquipmentInstanceTierColor } from '../models/equipmentTier';
 import { useEquipmentTemplates } from '../hooks/useEquipmentTemplates';
+import { SkillTagText } from './SkillTagList';
 
 /** 按下到放開的位移在這個範圍內都算「點擊」（px） */
 const CLICK_SLOP = 8;
@@ -54,7 +55,7 @@ function AffixSummary() {
         <div className="affix-sum-cols">
           {rows.map(row => (
             <div key={row.name} className={`affix-sum-row${'ability' in row ? ' ability' : ''}`}>
-              <span>{row.name}</span>
+              <span><SkillTagText text={row.name} /></span>
               <b>{row.value}</b>
             </div>
           ))}

@@ -173,7 +173,7 @@ describe('顯示', () => {
   });
 
   it('品質放大刻印數值', () => {
-    expect(formatAffixDisplay(brand(20, 'dark'), 20)).toBe('元素刻印（暗） +24.0% (T5)');
+    expect(formatAffixDisplay(brand(20, 'dark'), 20)).toBe('元素刻印（闇） +24.0% (T5)');
   });
 
   it('其他詞綴不顯示屬性', () => {

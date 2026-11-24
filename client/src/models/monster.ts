@@ -5,7 +5,7 @@ export type MonsterSize = 'small' | 'large';
 export type ElementType = 'fire' | 'ice' | 'wind' | 'earth' | 'light' | 'dark' | 'none';
 export type MonsterRace = 'normal' | 'undead' | 'demon' | 'dragon';
 
-/** 元素顯示名。原本散在三個 Wiki 頁各抄一份，集中在型別旁邊 */
+/** 元素顯示名（全遊戲唯一一份） */
 export const ELEMENT_LABELS: Record<ElementType, string> = {
   fire: '火', ice: '冰', wind: '風', earth: '地', light: '光', dark: '闇', none: '無',
 };

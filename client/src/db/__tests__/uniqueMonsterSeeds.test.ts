@@ -25,7 +25,7 @@ const uniqueNames = [...new Set(uniques.map(m => m.name))];
 const seedsOf = (name: string) => uniques.filter(m => m.name === name);
 
 const RACE: Record<string, MonsterRace> = { 一般: 'normal', 不死: 'undead', 惡魔: 'demon', 龍: 'dragon' };
-const ELEMENT: Record<string, ElementType> = { 冰: 'ice', 暗: 'dark', 地: 'earth', 火: 'fire', 光: 'light', 風: 'wind', 無: 'none' };
+const ELEMENT: Record<string, ElementType> = { 冰: 'ice', 闇: 'dark', 地: 'earth', 火: 'fire', 光: 'light', 風: 'wind', 無: 'none' };
 const DEBUFF: Record<string, PlayerDebuffType> = {
   中毒: 'poison', 暈眩: 'stun', 虛弱: 'weaken', 沉默: 'silence', 減速: 'slow', 詛咒: 'curse', 流血: 'bleed',
 };

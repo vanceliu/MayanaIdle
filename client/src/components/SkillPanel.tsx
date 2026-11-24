@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
-import { resolveSkill, starLevelRoman } from '../models/skillStar';
+import { resolveSkill, resolveSkillWithoutStars, starLevelRoman } from '../models/skillStar';
 import { SkillTooltipBody, SkillTooltipHeader } from './SkillTooltipBody';
+import { SkillTooltipTags } from './SkillTagList';
 import { useDragStore, type DragItem, type DropTarget } from '../stores/dragStore';
 import { useLongPress } from '../hooks/useLongPress';
 import {
   QUICK_SLOT_COUNT, quickSlotLabel, toQuickSlotSkillEntry, isSameQuickSlotEntry,
 } from '../models/quickSlot';
 import { getSkillDisplayIcon } from '../models/iconMap';
-import { calculateHealAmount, previewSkillPhysicalDamage } from '../systems/combat';
+import { calculateHealAmount, getBasicAttackElement, getEquippedWeapon, previewSkillPhysicalDamage } from '../systems/combat';
 import { GameIcon } from './GameIcon';
 import { SKILL_CATALOG, type Skill } from '../models/skill';
 import { CLASS_SKILLS } from '../models/classSkills';
@@ -72,6 +73,13 @@ export function SkillPanel() {
   const equippedGear = useGameStore(s => s.equippedGear);
   const activeEffects = useGameStore(s => s.activeEffects);
   const equippedGearList = character ? getEffectiveGearArray(character, activeEffects, equippedGear) : [];
+  /** tooltip 顯示的技能：套用星盤等級與職業池隨機技能後 */
+  const shownSkill = tooltip?.skill && (character
+    ? resolveSkill({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character, activeEffects)
+    : tooltip.skill);
+  const starFloorSkill = tooltip?.skill && character
+    ? resolveSkillWithoutStars({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character, activeEffects)
+    : undefined;
   const [contextMenu, setContextMenu] = useState<{ skillId: string; x: number; y: number } | null>(null);
   const pressRef = useRef<{ skillId: string; name: string; x: number; y: number } | null>(null);
 
@@ -286,18 +294,20 @@ export function SkillPanel() {
         </div>
       </div>
 
-      {tooltip && tooltip.skill && (
+      {tooltip && tooltip.skill && shownSkill && (
         <div
           className={`skill-tooltip ${tooltip.above ? 'above' : 'below'}`}
           style={{ left: tooltip.x, top: tooltip.y }}
         >
-          <SkillTooltipHeader name={tooltip.name} skill={tooltip.skill} level={tooltip.level} character={character} />
-          {/* 套用星盤等級與職業池隨機技能後的數值，被改動的數字標黃（§ 7S.7、`56-star-chart.md` § 56.5） */}
+          <SkillTooltipHeader
+            name={tooltip.name} skill={tooltip.skill} level={tooltip.level} character={character}
+            tags={<SkillTooltipTags base={tooltip.skill} shown={shownSkill} basicAttackElement={getBasicAttackElement(getEquippedWeapon(equippedGearList), activeEffects)} />}
+          />
+          {/* 套用星盤等級與職業池隨機技能後的數值；與表列或未點星盤時不同的數字標黃（§ 7S.7、`56-star-chart.md` § 56.5） */}
           <SkillTooltipBody
             base={tooltip.skill}
-            shown={character
-              ? resolveSkill({ ...tooltip.skill, lastUsedAt: 0 }, equippedGearList, character, activeEffects)
-              : tooltip.skill}
+            shown={shownSkill}
+            references={starFloorSkill ? [starFloorSkill] : []}
             healOf={power => calculateHealAmount(character, power, equippedGearList, activeEffects)}
             physicalOf={character ? (scale, normal) => previewSkillPhysicalDamage(character, equippedGearList, activeEffects, scale, normal) : undefined}
           />
