@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { BoundsContext } from './boundsContext';
-import { drawPawn, type PawnLook } from '../drawPawn';
+import { drawPawn, toPawnLook, type PawnLook } from '../drawPawn';
 import { HAIR_RENDER, resolveCapCfg } from '../hairRender';
 import { PAWN_GEOM, PAWN_DIRECTIONS } from '../geometry';
 import {
-  PAWN_TEX_W, PAWN_TEX_H, PAWN_ANCHOR_X, PAWN_ANCHOR_Y, pawnLookKey, toPawnLook,
+  PAWN_TEX_W, PAWN_TEX_H, PAWN_ANCHOR_X, PAWN_ANCHOR_Y, pawnLookKey,
 } from '../pawnTexture';
 import {
   HAIR_STYLES, HAIR_TUNABLES, LASH_TUNABLES,

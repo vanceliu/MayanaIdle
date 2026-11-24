@@ -389,6 +389,7 @@
 【角色外觀】
 04-character.md § 4.10
   ←→ 48-vfx.md § 48.6
+  ←→ 97-selfhosted-server.md § 97.8（管理介面角色查詢的外觀）
   ←→ 19-account-character.md § 19.4 / § 19.9
   ←→ 18-data-schema.md § 18.7
   ←→ 40-pixijs-migration.md

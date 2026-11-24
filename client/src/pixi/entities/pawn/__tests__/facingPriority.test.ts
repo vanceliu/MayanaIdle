@@ -18,7 +18,7 @@ vi.mock('../pawnTexture', async (importOriginal) => {
 });
 
 const { PawnSprite } = await import('../PawnSprite');
-const { toPawnLook } = await import('../pawnTexture');
+const { toPawnLook } = await import('../drawPawn');
 
 const LOOK = toPawnLook(createDefaultAppearance(), '#8fa3c4');
 

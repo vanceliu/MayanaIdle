@@ -7,9 +7,9 @@
  *
  * 只用到下面 `PawnContext` 列出的 API，換渲染器時看那個介面就知道要補什麼。
  */
-import type { Lash } from '../../../models/appearance';
+import type { Appearance, Lash } from '../../../models/appearance';
 import type { HairStyleId } from '../../../models/appearance';
-import { HAIR_RENDER, type CapCfg } from './hairRender';
+import { HAIR_RENDER, resolveCapCfg, type CapCfg } from './hairRender';
 import {
   OUTLINE_COLOR,
   EYE_COLOR_DEFAULT,
@@ -56,6 +56,24 @@ export interface PawnLook {
    * 由 `resolveCapCfg()` 算好傳進來，繪製過程不改任何共用設定。
    */
   cap: CapCfg;
+}
+
+/**
+ * 把存檔的外觀轉成繪製用的造型。
+ *
+ * `clothOverride` 是留給裝備的口子：目前衣色是**內衣**、屬於外觀資料，
+ * 等裝備外觀做出來之後才會有東西蓋過它（`04-character.md` § 4.10）。
+ */
+export function toPawnLook(appearance: Appearance, clothOverride?: string): PawnLook {
+  return {
+    hair: appearance.hair,
+    skin: appearance.skin,
+    hairColor: appearance.hairColor,
+    eyeColor: appearance.eyeColor,
+    lash: appearance.lash,
+    cloth: clothOverride ?? appearance.cloth,
+    cap: resolveCapCfg(appearance.hair, appearance.tune[appearance.hair]),
+  };
 }
 
 /** 填色＋壓深描邊。武器剪影共用同一份（`drawWeapon.ts`），描邊色不可各寫一套 */

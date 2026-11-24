@@ -206,9 +206,20 @@ describe('管理介面 API', () => {
     expect(list.body.characters[0]).toMatchObject({ name: '測試角', level: 7, gold: 123 });
     expect((await call('/admin/api/characters?q=不存在')).body.characters).toEqual([]);
 
+    db.prepare('INSERT INTO equipment_instances (owner_id, data) VALUES (?, ?)')
+      .run(id, JSON.stringify({ name: '長劍', slot: 'rightHand', enhancement: 3, equipped: true, quality: 0, affixes: [{ type: 'attack_power', tier: 1, value: 5 }] }));
+    db.prepare('INSERT INTO character_bag (character_id, item_template_id, data) VALUES (?, ?, ?)')
+      .run(id, 1, JSON.stringify({ name: '紅色藥水', itemTemplateId: 1, amount: 12 }));
+
     const detail = await call(`/admin/api/character?id=${id}`);
     expect(detail.body.character.name).toBe('測試角');
     expect(detail.body.statistics.monstersKilled).toBe(42);
+    expect(detail.body.view.className).toBe('騎士');
+    expect(detail.body.view.appearanceSvg).toMatch(/^<svg [^>]*viewBox="[-\d. ]+">.*<path /);
+    expect(detail.body.view.equipment[0]).toMatchObject({ name: '長劍', slot: '右手', enhancement: 3, equipped: true, ability: null });
+    expect(detail.body.view.equipment[0].affixes).toHaveLength(1);
+    expect(detail.body.view.bag).toEqual([{ name: '紅色藥水', amount: 12 }]);
+    expect(detail.body.view.statistics).toContainEqual({ label: '殺敵數', value: 42 });
     expect((await call('/admin/api/character?id=999')).status).toBe(404);
   });
 

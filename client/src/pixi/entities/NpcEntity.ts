@@ -3,7 +3,7 @@ import { worldToScreen, getEntityDepth, TILE_H } from '../utils/isometric';
 import type { MapNpc } from '../../models/mapControl';
 import { getNpcAppearance } from '../../models/npcAppearance';
 import { PawnSprite } from './pawn/PawnSprite';
-import { toPawnLook } from './pawn/pawnTexture';
+import { toPawnLook } from './pawn/drawPawn';
 
 /** 地面標記沿用原本圓點的綠 —— 顏色區分敵我（§ 13.2.1），怪物是紅 */
 const NPC_MARKER = 0x4ade80;

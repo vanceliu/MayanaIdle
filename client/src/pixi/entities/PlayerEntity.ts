@@ -4,7 +4,7 @@ import type { Position } from '../../models/mapControl';
 import type { Appearance } from '../../models/appearance';
 import { createDefaultAppearance, normalizeAppearance } from '../../models/appearance';
 import { PawnSprite } from './pawn/PawnSprite';
-import { toPawnLook } from './pawn/pawnTexture';
+import { toPawnLook } from './pawn/drawPawn';
 import { weaponAimFromDelta, type WeaponAttack } from './pawn/weaponGeometry';
 import { HitReaction } from './hitReaction';
 import { DASH_ART, dashAfterimages, dashOffset, dashTotalMs } from '../ui/skillFx';

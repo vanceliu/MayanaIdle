@@ -4,9 +4,7 @@
  * 造型在遊戲中不會改變，烘完之後只換 texture（`40-pixijs-migration.md` § 10）。
  */
 import { Texture } from 'pixi.js';
-import type { Appearance } from '../../../models/appearance';
 import { drawPawn, type PawnContext, type PawnLook } from './drawPawn';
-import { resolveCapCfg } from './hairRender';
 import {
   PAWN_GEOM,
   PAWN_DIRECTION_BY_ID,
@@ -32,24 +30,6 @@ export const PAWN_BAKE_SCALE = 2;
 
 /** 地面陰影由地圖那層負責，不烘進角色貼圖 —— 烘進去會跟著角色一起被排序遮擋 */
 const BAKE_GEOM: PawnGeom = { ...PAWN_GEOM, shadow: 0 };
-
-/**
- * 把存檔的外觀轉成繪製用的造型。
- *
- * `clothOverride` 是留給裝備的口子：目前衣色是**內衣**、屬於外觀資料，
- * 等裝備外觀做出來之後才會有東西蓋過它（`04-character.md` § 4.10）。
- */
-export function toPawnLook(appearance: Appearance, clothOverride?: string): PawnLook {
-  return {
-    hair: appearance.hair,
-    skin: appearance.skin,
-    hairColor: appearance.hairColor,
-    eyeColor: appearance.eyeColor,
-    lash: appearance.lash,
-    cloth: clothOverride ?? appearance.cloth,
-    cap: resolveCapCfg(appearance.hair, appearance.tune[appearance.hair]),
-  };
-}
 
 /**
  * 快取的鍵。**必須涵蓋每一個會影響畫面的欄位** ——

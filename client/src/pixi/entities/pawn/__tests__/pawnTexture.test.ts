@@ -23,10 +23,11 @@ vi.mock('pixi.js', async (importOriginal) => {
 });
 
 const {
-  getPawnTexture, toPawnLook, pawnLookKey,
+  getPawnTexture, pawnLookKey,
   clearPawnTextureCache, pawnTextureCacheSize,
   PAWN_TEX_W, PAWN_TEX_H, PAWN_BAKE_SCALE, PAWN_ANCHOR_X, PAWN_ANCHOR_Y,
 } = await import('../pawnTexture');
+const { toPawnLook } = await import('../drawPawn');
 
 /** 什麼都不做但不會拋錯的 2D context */
 function stubCtx(): CanvasRenderingContext2D {

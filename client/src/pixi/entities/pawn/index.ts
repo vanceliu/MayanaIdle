@@ -17,14 +17,13 @@ export {
   type HairRender,
 } from './hairRender';
 
-export { drawPawn, type PawnContext, type PawnLook } from './drawPawn';
+export { drawPawn, toPawnLook, type PawnContext, type PawnLook } from './drawPawn';
 
 export { facingFromDelta } from './facing';
 export { PawnSprite } from './PawnSprite';
 
 export {
   getPawnTexture,
-  toPawnLook,
   pawnLookKey,
   clearPawnTextureCache,
   pawnTextureCacheSize,

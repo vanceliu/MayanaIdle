@@ -22,8 +22,8 @@ export default defineConfig({
   base: '/MayanaIdle/',
   server: {
     fs: {
-      /** `demo/title-screen.html` 載入桌面啟動器頁面與 credits 清單 */
-      allow: [searchForWorkspaceRoot(process.cwd()), '../desktop/ui', '../desktop/dist/credits.json'],
+      /** `demo/title-screen.html` 載入桌面啟動器頁面與 credits 清單；`demo/admin-character.html` 載入管理介面頁面與外觀繪製 */
+      allow: [searchForWorkspaceRoot(process.cwd()), '../desktop/ui', '../desktop/dist/credits.json', '../server/src'],
     },
   },
   define: {

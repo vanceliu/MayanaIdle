@@ -72,6 +72,16 @@ input, select {
 .pill.warn { color: var(--accent-danger); border-color: var(--accent-danger); }
 .login { max-width: 320px; display: flex; flex-direction: column; gap: 8px; }
 pre { background: var(--bg-inset); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); padding: 8px; overflow: auto; max-height: 40vh; font-size: 12px; }
+.modal-overlay { position: fixed; inset: 0; z-index: 10; background: rgba(0, 0, 0, .6); display: flex; justify-content: center; align-items: flex-start; padding: 5vh 16px; }
+.modal { width: min(760px, 100%); max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-panel); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-md); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #262665; }
+.modal-head h2 { margin: 0; }
+.modal-body { padding: 0 12px 12px; overflow: auto; }
+.modal-body h3 { font-size: 14px; color: var(--accent-gold); margin: 14px 0 6px; }
+table.kv th { width: 96px; }
+details { margin-top: 14px; }
+details summary { cursor: pointer; color: var(--text-dim); font-size: 12px; margin-bottom: 6px; }
+.pawn svg { display: block; height: 150px; width: auto; max-width: 100%; padding: 6px; background: var(--bg-inset); border-radius: var(--radius-sm); }
 `;
 
 const SCRIPT = String.raw`
@@ -182,13 +192,11 @@ function body() {
   }
   if (S.tab === 'characters') {
     const list = S.data.characters || [];
-    const detail = S.data.character;
     return '<div class="row"><input id="q" placeholder="搜尋角色名稱"><button onclick="doSearch()">搜尋</button></div>' +
       '<table><tr><th>ID</th><th>名稱</th><th>職業</th><th>等級</th><th>位置</th><th>金幣</th><th></th></tr>' +
       list.map(c => '<tr><td>' + c.id + '</td><td>' + esc(c.name) + '</td><td>' + esc(c.className) + '</td><td>' + c.level + '</td>' +
         '<td>' + esc(c.regionId) + '</td><td>' + c.gold + '</td>' +
-        '<td><button onclick="doDetail(' + c.id + ')">查看</button></td></tr>').join('') + '</table>' +
-      (detail ? '<h1 style="margin-top:12px">' + esc(detail.character.name) + '（唯讀）</h1><pre>' + esc(JSON.stringify(detail, null, 2)) + '</pre>' : '');
+        '<td><button onclick="doDetail(' + c.id + ')">查看</button></td></tr>').join('') + '</table>';
   }
   if (S.tab === 'mail') {
     const list = S.data.characters || [];
@@ -233,8 +241,40 @@ function allowlistSection() {
       : '<div class="hint">名單是空的</div>');
 }
 
+/** 角色查詢「查看」的彈出視窗（唯讀）；點背景、關閉鈕或 Esc 關閉 */
+function detailModal() {
+  const d = S.data.character;
+  if (!d) return '';
+  const c = d.character;
+  const v = d.view;
+  const kv = (k, val) => '<tr><th>' + k + '</th><td>' + esc(val) + '</td></tr>';
+  const time = (t) => (t ? new Date(t).toLocaleString('zh-TW') : '-');
+  const raw = Object.assign({}, d, { view: undefined });
+  return '<div class="modal-overlay" onclick="if (event.target === this) closeDetail()"><div class="modal">' +
+    '<div class="modal-head"><h2>' + esc(c.name) + '（唯讀）</h2><button onclick="closeDetail()">關閉</button></div>' +
+    '<div class="modal-body">' +
+    '<h3>基本</h3><table class="kv">' +
+      kv('ID', c.id) + kv('職業', v.className) + kv('等級', c.level) + kv('經驗', c.exp) + kv('金幣', (c.gold ?? 0).toLocaleString()) +
+      kv('位置', c.regionId + (c.floor ? '（' + c.floor + 'F）' : '')) + kv('帳號 ID', c.userId) + kv('UUID', c.uuid) +
+      kv('建立', time(c.createdAt)) + kv('最後上線', time(c.lastSeenAt)) + '</table>' +
+    '<h3>外觀</h3><div class="pawn">' + v.appearanceSvg + '</div>' +
+    '<h3>裝備（' + v.equipment.length + '）</h3>' + (v.equipment.length
+      ? '<table><tr><th>名稱</th><th>位置</th><th>詞綴</th><th>隨機技能</th></tr>' +
+        v.equipment.map(e => '<tr><td>' + esc(e.name) + (e.enhancement ? ' +' + e.enhancement : '') + '</td>' +
+          '<td>' + (e.equipped ? '<span class="pill on">' + esc(e.slot || '裝備中') + '</span>' : '<span class="hint">未裝備</span>') + '</td>' +
+          '<td>' + (e.affixes.length ? e.affixes.map(esc).join('<br>') : '-') + '</td><td>' + esc(e.ability || '-') + '</td></tr>').join('') + '</table>'
+      : '<div class="hint">無</div>') +
+    '<h3>背包（' + v.bag.length + '）</h3>' + (v.bag.length
+      ? '<table><tr><th>道具</th><th>數量</th></tr>' + v.bag.map(b => '<tr><td>' + esc(b.name) + '</td><td>' + b.amount + '</td></tr>').join('') + '</table>'
+      : '<div class="hint">無</div>') +
+    '<h3>統計</h3><div class="grid">' +
+      v.statistics.map(st => '<div class="stat"><div class="k">' + esc(st.label) + '</div><div class="v">' + Number(st.value).toLocaleString() + '</div></div>').join('') + '</div>' +
+    '<details><summary>原始資料</summary><pre>' + esc(JSON.stringify(raw, null, 2)) + '</pre></details>' +
+    '</div></div></div>';
+}
+
 function render() {
-  el('#app').innerHTML = view() + (S.msg ? '<div class="msg' + (S.err ? ' err' : '') + '">' + esc(S.msg) + '</div>' : '');
+  el('#app').innerHTML = view() + (S.msg ? '<div class="msg' + (S.err ? ' err' : '') + '">' + esc(S.msg) + '</div>' : '') + detailModal();
 }
 
 window.go = (tab) => { S.tab = tab; S.msg = null; S.data.character = null; load(); };
@@ -278,6 +318,8 @@ window.doRemoveAllow = (i) => guard(async () => {
 });
 window.doSearch =() => guard(async () => { S.data.characters = (await api('characters?q=' + encodeURIComponent(el('#q').value))).characters; render(); });
 window.doDetail = (id) => guard(async () => { S.data.character = await api('character?id=' + id); render(); });
+window.closeDetail = () => { S.data.character = null; render(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.data.character) window.closeDetail(); });
 window.doSendMail = () => guard(async () => {
   const target = el('#mtarget').value;
   const r = await api('send-mail', {

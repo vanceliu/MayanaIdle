@@ -13,6 +13,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { Character } from '../../client/src/models/character';
 import type { Mail } from '../../client/src/models/mailbox';
 import { normalizeStatistics } from '../../client/src/models/statistics';
+import { CLASS_NAMES_ZH } from '../../client/src/models/character';
+import { SLOT_NAMES, type EquipmentInstance, type EquipSlot } from '../../client/src/models/equipment';
+import { formatAffixDisplay } from '../../client/src/models/affix';
+import { formatAbilityDisplay } from '../../client/src/models/ability';
+import { formatUniqueAffixDisplay } from '../../client/src/models/uniqueAffix';
+import { LEADERBOARD_LABELS, type LeaderboardField } from '../../client/src/services/leaderboardService';
+import { appearanceSvg } from './pawnSvg';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { AuthService } from './auth';
@@ -346,10 +353,30 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       const bag = (db.prepare('SELECT data FROM character_bag WHERE character_id = ?').all(row.id) as { data: string }[])
         .map(b => JSON.parse(b.data) as { name?: string; itemTemplateId?: number; amount?: number });
       const equipment = (db.prepare('SELECT id, data FROM equipment_instances WHERE owner_id = ?').all(row.id) as { id: number; data: string }[])
-        .map(e => ({ id: e.id, ...(JSON.parse(e.data) as Record<string, unknown>) }));
+        .map(e => ({ ...(JSON.parse(e.data) as EquipmentInstance), id: e.id }));
       const prefRow = db.prepare('SELECT data FROM character_prefs WHERE character_id = ?').get(row.id) as { data: string } | undefined;
       const prefs = prefRow ? JSON.parse(prefRow.data) as { statistics?: Record<string, number> } : {};
+      const statistics = normalizeStatistics(prefs.statistics);
       json(res, 200, {
+        /** 彈出視窗的顯示用：中文名稱與詞綴文字，裝備中的排前面 */
+        view: {
+          className: CLASS_NAMES_ZH[char.className] ?? char.className,
+          appearanceSvg: appearanceSvg(char.appearance),
+          equipment: [...equipment].sort((a, b) => Number(!!b.equipped) - Number(!!a.equipped)).map(e => ({
+            name: e.name,
+            slot: SLOT_NAMES[e.slot as EquipSlot] ?? '',
+            enhancement: e.enhancement ?? 0,
+            equipped: !!e.equipped,
+            affixes: [
+              ...(e.uniqueAffix ? [formatUniqueAffixDisplay(e.uniqueAffix)] : []),
+              ...(e.affixes ?? []).map(a => formatAffixDisplay(a, e.quality ?? 0)),
+            ],
+            ability: e.ability ? formatAbilityDisplay(e.ability) : null,
+          })),
+          bag: bag.map(b => ({ name: b.name ?? `#${b.itemTemplateId ?? '?'}`, amount: b.amount ?? 1 })),
+          statistics: (Object.keys(statistics) as (keyof typeof statistics)[])
+            .map(k => ({ label: LEADERBOARD_LABELS[k as LeaderboardField] ?? k, value: statistics[k] })),
+        },
         character: {
           id: row.id, uuid: row.uuid, userId: row.user_id,
           name: char.name, className: char.className, level: char.level, exp: char.exp,
@@ -358,7 +385,7 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
         },
         bag,
         equipment,
-        statistics: normalizeStatistics(prefs.statistics),
+        statistics,
       });
     },
 
