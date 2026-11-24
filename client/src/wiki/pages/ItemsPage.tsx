@@ -8,6 +8,7 @@ import { monsterRank } from '../../models/monster';
 import { MONSTER_RANK_LABEL } from '../monsterRankMark';
 import { Link, useParams } from 'react-router-dom';
 import { GameIcon } from '../../components/GameIcon';
+import { WikiBackLink } from '../components/WikiBackLink';
 import { resolveItemIcon, MATERIAL_TIER_COLORS, formatRegionMaterialTierRange } from '../../models/iconMap';
 import type { ItemDefinition } from '../../models/items';
 import { formatMaterialUsage, hasMaterialUsage, getCraftUsage } from '../../systems/craftMaterialUsage';
@@ -237,9 +238,7 @@ function ItemDetail({ name }: { name: string }) {
 
   return (
     <div>
-      <Link className="wiki-link" to="/wiki/items" style={{ marginBottom: 16, display: 'inline-block' }}>
-        ← 返回道具總表
-      </Link>
+      <WikiBackLink listPath="/wiki/items" listLabel="返回道具總表" />
 
       <h2 className="wiki-page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {(() => {

@@ -272,14 +272,14 @@ export function AffixCategoryList() {
   const [view, setView] = useState<AffixCategory | 'matrix'>('weapon');
   return (
     <>
-      <div className="affix-cat-chips" role="tablist" aria-label="詞綴分類">
+      <div className="wiki-chips" role="tablist" aria-label="詞綴分類">
         {AFFIX_CATEGORIES.map(c => (
           <button
             key={c.key}
             type="button"
             role="tab"
             aria-selected={view === c.key}
-            className={`affix-cat-chip${view === c.key ? ' active' : ''}`}
+            className={`wiki-chip${view === c.key ? ' active' : ''}`}
             onClick={() => setView(c.key)}
           >
             {c.name}
@@ -289,7 +289,7 @@ export function AffixCategoryList() {
           type="button"
           role="tab"
           aria-selected={view === 'matrix'}
-          className={`affix-cat-chip${view === 'matrix' ? ' active' : ''}`}
+          className={`wiki-chip${view === 'matrix' ? ' active' : ''}`}
           onClick={() => setView('matrix')}
         >
           總覽

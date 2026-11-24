@@ -14,7 +14,8 @@ client/src/wiki/
 ├── components/
 │   ├── WikiLayout.tsx    — 整體版面（header + sidebar nav + <Outlet>）
 │   ├── WikiLayout.css
-│   └── WikiTable.css     — 共用表格樣式
+│   ├── WikiBackLink.tsx  — 詳細頁返回連結（§ 4「詳細頁返回連結」）
+│   └── WikiTable.css     — 共用表格樣式、分頁切換按鈕（`.wiki-chip`）
 ├── data/
 │   └── assetCredits.ts   — 第三方素材標注資料（非遊戲資料，故不放 hooks）
 ├── hooks/
@@ -76,6 +77,9 @@ client/src/wiki/
   跨頁連到裝備詳細頁一律用這個，不可自行判斷 `type === 'armor'`（會把副手防具連錯頁）
 
 ## 4. 頁面功能
+
+**詳細頁返回連結**（道具、怪物、地圖詳細頁，`WikiBackLink`）：放在頁面最上方。
+站內點進來時為「← 返回上一頁」，回到來源頁；直接開啟（網址、書籤，無站內上一頁）時為連到列表頁的「← 返回道具總表」／「← 返回怪物列表」／「← 返回地圖總覽」。
 
 ### 4.0 新手開始 (StartPage)
 - 左側選單排在「首頁」之後，標籤「開始」；Wiki 首頁有「新手開始」卡片
@@ -200,8 +204,12 @@ client/src/wiki/
 - 配點模擬：`StarChartPlanner`（任選職業與等級，不存檔；與 `demo/star-chart.html` 同一元件）；盤面篩選同遊戲（`56-star-chart.md` § 56.7）
 
 ### 4.7 鐵匠鋪 (CraftingPage)
-- 製作配方列表：成品、製作費（`craftGold`）、所需材料與數量、材料來源區域連結
-- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與 T6 機率（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例、製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）；取用倉庫的範圍與扣除順序（§ 6A.3「取用來源」）
+- 配方表上方切換「一般製作／獨特製作」（`.wiki-chip`）；模式、階級、搜尋字記在網址參數（`?mode=unique&tier=&q=`），從詳細頁返回時保留
+- 一般製作：成品、製作費（`craftGold`）、前置武器、所需材料與數量（`craftMaterials`）
+- 獨特製作（`06-equipment-acquire.md` § 6A.3.1）：成品名後標 `(獨)`、製作費、前置裝備（該裝備本身 ×1，不帶 `(獨)`）、獨特材料與數量（`uniqueCraftMaterials`）
+- 階級篩選只列有配方的階級：一般製作依 `acquireType: 'craft'` 模板的 `tier`，獨特製作依 `UNIQUE_CRAFT_TIERS`
+- 材料連到道具詳細頁
+- 表頭說明：製作品名稱加 `(鍛)`、詞綴範圍與 T6 機率（`formatCraftAffixTierRanges()`、`formatCraftAffixTierWeights()`）、不可使用任何印記（`06-equipment-acquire.md` § 6A.6）；拆解退還比例、製作費不退（`06-equipment-acquire.md` § 6A.3「拆解」）；取用倉庫的範圍與扣除順序（§ 6A.3「取用來源」）；獨特製作的前置、材料來源、`(獨)` 詞綴 Tier（`formatUniqueCraftAffixTiers()`）、隨機技能與印記限制（§ 6A.3.1、§ 6A.6）
 
 ### 4.8 經驗表 (ExpTablePage)
 - Lv.1～119 升級所需經驗、累計經驗；等級上限讀 `LEVEL_CAP`（`04-character.md` § 4.9）

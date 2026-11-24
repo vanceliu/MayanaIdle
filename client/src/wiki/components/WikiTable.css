@@ -156,6 +156,14 @@
   margin-right: 3px;
 }
 
+/* 分頁切換按鈕（詞綴頁分類、鐵匠鋪一般／獨特製作） */
+.wiki-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.wiki-chip {
+  padding: 6px 12px; background: var(--bg-card); color: var(--text-secondary);
+  border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--fs-sm);
+}
+.wiki-chip.active { background: var(--bg-panel); border-color: var(--accent-gold); color: var(--accent-gold); }
+
 .wiki-empty {
   color: var(--text-dim);
   text-align: center;

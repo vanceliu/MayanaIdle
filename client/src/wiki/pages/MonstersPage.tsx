@@ -12,6 +12,7 @@ import {
   MONSTER_AFFIX_DROP_REWARD, MONSTER_AFFIX_GOLD_EXP_REWARD,
 } from '../../models/monsterAffix';
 import { MonsterPortrait } from '../components/MonsterPortrait';
+import { WikiBackLink } from '../components/WikiBackLink';
 import { MONSTER_RANK_LABEL, TALENT_SLOT_DROP_RATE, UNIQUE_MARK_COLOR, monsterRankMark } from '../monsterRankMark';
 import '../components/WikiTable.css';
 
@@ -222,9 +223,7 @@ function MonsterDetail({ name }: { name: string }) {
 
   return (
     <div>
-      <Link className="wiki-link" to="/wiki/monsters" style={{ marginBottom: 16, display: 'inline-block' }}>
-        ← 返回怪物列表
-      </Link>
+      <WikiBackLink listPath="/wiki/monsters" listLabel="返回怪物列表" />
 
       <div className="wiki-monster-hero">
         {first.id !== undefined && <MonsterPortrait templateId={first.id} />}

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wiki 鐵匠鋪（獨特製作）Demo — MayanaIdle</title>
+<!--
+  Wiki 鐵匠鋪頁加「一般製作／獨特製作」切換與獨特配方表（`43-wiki-system.md` § 4.7、`06-equipment-acquire.md` § 6A.3.1），
+  以及道具／怪物／地圖詳細頁的返回連結改為「返回上一頁」。
+  配方、製作費、材料取自 seed（`craftMaterials`／`uniqueCraftMaterials`）；詳細頁為正式元件。
+
+  用 Vite dev server 開：`npm run dev` 後開
+  http://localhost:5173/MayanaIdle/demo/wiki-unique-craft.html
+
+  .demo-* 只是這頁的排版；其餘樣式來自 App.css、WikiTable.css、AffixCategoryView.css。
+-->
+<link rel="stylesheet" href="../src/App.css">
+<link rel="stylesheet" href="../src/wiki/components/WikiTable.css">
+<link rel="stylesheet" href="../src/wiki/components/AffixCategoryView.css">
+<style>
+body {
+  margin: 0; padding: 24px 16px;
+  background: var(--bg-deepest); color: var(--text-primary); font-family: var(--font-body);
+}
+.demo-wrap { max-width: 1100px; margin: 0 auto; }
+.demo-title { font-family: var(--font-display); color: var(--accent-primary); margin: 0 0 4px; }
+.demo-note { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 20px; line-height: 1.8; }
+.demo-page { border-top: 1px solid var(--border-subtle); padding-top: 16px; }
+.demo-bar {
+  display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border-subtle); font-size: var(--fs-sm); color: var(--text-dim);
+}
+.demo-path { margin-left: auto; }
+</style>
+</head>
+<body>
+  <div class="demo-wrap">
+    <h1 class="demo-title">Wiki 鐵匠鋪：獨特製作</h1>
+    <p class="demo-note">
+      表格上方加「一般製作／獨特製作」切換（樣式同詞綴頁分類按鈕）。<br>
+      獨特製作：階級篩選只有 T4～T6；前置欄為該裝備本身 ×1（不帶 (獨)）；材料欄為獨特配方 <code>uniqueCraftMaterials</code>。<br>
+      說明段落的「獨特製作」改為指向下表，不再寫「到鐵匠鋪分頁查看」。<br>
+      道具／怪物／地圖詳細頁的返回連結：站內點進來顯示「← 返回上一頁」，回到來源頁（例如鐵匠鋪）；用網址直接開啟時維持「← 返回道具總表」等列表連結。
+      上方按鈕模擬直接開啟。
+    </p>
+    <div class="demo-page" id="root"></div>
+  </div>
+  <script type="module" src="./wikiUniqueCraftDemo.tsx"></script>
+</body>
+</html>

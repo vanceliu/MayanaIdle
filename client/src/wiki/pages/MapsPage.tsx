@@ -6,6 +6,7 @@ import type { Floor, Region } from '../../models/area';
 import { getItemById } from '../../models/items';
 import { ELEMENT_LABELS, type MonsterTemplate } from '../../models/monster';
 import { UNIQUE_SPAWN_NOTE, monsterRankMark } from '../monsterRankMark';
+import { WikiBackLink } from '../components/WikiBackLink';
 import '../components/WikiTable.css';
 
 
@@ -117,14 +118,12 @@ function AreaDetail({ areaId }: { areaId: string }) {
   if (parentRegion && floor) {
     return (
       <div>
+        <WikiBackLink listPath="/wiki/maps" listLabel="返回地圖總覽" />
         <h2 className="wiki-page-title">{parentRegion.name} {floorNum}F</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
           地城 | Lv.{floor.levelMin}~{floor.levelMax}
           {floor.isBossFloor && ' | ★ Boss層'}
         </p>
-        <Link className="wiki-link" to="/wiki/maps" style={{ marginBottom: 16, display: 'inline-block' }}>
-          ← 返回地圖總覽
-        </Link>
         <SingleAreaContent areaId={areaId} />
       </div>
     );
@@ -135,16 +134,13 @@ function AreaDetail({ areaId }: { areaId: string }) {
 
   return (
     <div>
+      <WikiBackLink listPath="/wiki/maps" listLabel="返回地圖總覽" />
       <h2 className="wiki-page-title">{region!.name}</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
         {REGION_TYPE_LABELS[region!.type]}
         {region!.levelMin && region!.levelMax && ` | Lv.${region!.levelMin}~${region!.levelMax}`}
         {region!.entryScrollItemId && ` | 進入消耗 ${getItemById(region!.entryScrollItemId)?.name ?? '通行卷軸'} ×1`}
       </p>
-
-      <Link className="wiki-link" to="/wiki/maps" style={{ marginBottom: 16, display: 'inline-block' }}>
-        ← 返回地圖總覽
-      </Link>
 
       {hasFloors ? (
         <>

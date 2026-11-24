@@ -258,6 +258,8 @@
 | Pixi 渲染（分層／theme palette／RenderTexture） | `40-pixijs-migration.md` | 全文 |
 | In-App Wiki 系統（架構／頁面清單／資料來源／路由） | `43-wiki-system.md` | 全文 |
 | **Wiki 新手開始頁（章節、推薦職業）** | `43-wiki-system.md` | § 4.0 |
+| **Wiki 詳細頁返回連結（站內返回上一頁／直接開啟連列表）** | `43-wiki-system.md` | § 4 |
+| **Wiki 鐵匠鋪（一般／獨特製作切換、獨特配方表）** | `43-wiki-system.md` | § 4.7 |
 | 城鎮面板 UI 規範 | `34-ui-guidelines.md` | 全文 |
 | **商店／倉庫清單列（名稱＋hover tooltip／窄版折行）** | `34-ui-guidelines.md` | § 34.1「清單列」 |
 | **各介面的裝備詳情元件（含鐵匠鋪拆解 hover）** | `34-ui-guidelines.md` | § 34.2「使用場景」 |
@@ -504,6 +506,7 @@
   ←→ 30-items.md § 製作用途標記 / 39-batch-sell.md（素材有用途判定）
   ←→ 07-affix.md § 7.1 / § 7.2 ←→ 07-affix-ability.md § 7S.2 / § 7S.8 ←→ 46-sigil.md § 46.9
   ←→ 13-town.md § 13.5 / 18-data-schema.md § 18.3 / § 18.8
+  ←→ 43-wiki-system.md § 4.7（獨特配方表）
        ↕
 36-quest-system.md § 36.13 ←→ 13-town.md § 13.5
        ↕                    ←  06-equipment-acquire.md § 6A.3

@@ -8,6 +8,14 @@ export interface PatchNote {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: '0.9.12',
+    date: '2026-11-24',
+    changes: [
+      'Wiki 鐵匠鋪新增「獨特製作」配方表',
+      'Wiki 詳細頁可返回上一頁',
+    ],
+  },
+  {
     version: '0.9.11',
     date: '2026-11-24',
     changes: [
@@ -47,14 +55,6 @@ export const PATCH_NOTES: PatchNote[] = [
       '「藥水效果」詞綴改名為「補藥效果」',
       '公會 NPC 改為顯示公會面板',
       '星盤命星前的星點效果對調',
-    ],
-  },
-  {
-    version: '0.9.7',
-    date: '2026-11-21',
-    changes: [
-      '鐵匠鋪製作可直接使用倉庫裡的素材與前置武器',
-      '前置武器改為自己挑選',
     ],
   },
 ];
