@@ -59,7 +59,7 @@ export const COMBAT_ACTION_DESC: Record<string, string> = {
   switch_target_by_kind: '改打指定種族或元素的一隻，同類取最近的。消耗這次出手機會',
   switch_target_by_debuff: '改打帶著（或沒有）指定 debuff 的一隻。消耗這次出手機會',
   switch_target_by_affix: '改打帶著（或沒有）指定強化詞綴的一隻。消耗這次出手機會',
-  lock_target: '釘住當前目標，牠死掉或離場前不再改挑最近的。消耗這次出手機會',
+  lock_target: '釘住當前目標，牠死掉、離場或走不到之前不再改挑最近的。消耗這次出手機會',
   keep_distance: '退到指定距離外。留空時退到武器射程邊緣',
   close_in: '貼近目標到指定距離',
 };

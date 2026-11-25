@@ -31,6 +31,8 @@ import type { MonsterTemplate } from '../models/monster';
 import { hasProjectilePath, isWithinAttackRange } from './lineOfSight';
 import { consumeDotTick } from './gameLoop';
 import { findAttackPosition, findNearestWalkable, isAttackPosition } from './pathfinding';
+import { findDashPosition, planDash } from './dash';
+import { markTargetUnreachable } from './playerCombatFSM';
 import {
   tickArpgEngine, applyManualTarget, queueManualSkill, syncMonsterContexts, tickMonsterEngines, isMonsterStunned,
   type MonsterAttackEvent, type PlayerAttackEvent,
@@ -673,17 +675,21 @@ export function tickMemberCombat(deltaMs: number, session: Session): CombatVisua
             }
 
             const currentDest = mapCtrl.currentPath[mapCtrl.currentPath.length - 1];
-            const keepCurrent = mapCtrl.isMoving && currentDest
-              && isAttackPosition(map, currentDest, event.target, event.range, occupied);
+            const keepCurrent = mapCtrl.isMoving && currentDest && (event.dash
+              ? planDash(map, currentDest, event.target, event.range, occupied) !== null
+              : isAttackPosition(map, currentDest, event.target, event.range, occupied));
             if (keepCurrent) break;
 
-            const attackPosition = findAttackPosition(map, event.target, playerPos, event.range, occupied)
+            // 突進：先找突進得了的落腳格，沒有才退回一般追擊（§ 3.6）
+            const attackPosition = (event.dash
+              ? findDashPosition(map, event.target, playerPos, event.range, occupied)
+              : null)
+              ?? findAttackPosition(map, event.target, playerPos, event.range, occupied)
               ?? findAttackPosition(map, event.target, playerPos, event.range);
             if (attackPosition) {
               session.mapControl.getState().moveToTarget(attackPosition, occupied);
             } else {
-              engine.playerCtx.targetMonsterId = null;
-              engine.playerCtx.state = 'idle';
+              markTargetUnreachable(engine.playerCtx, now);
             }
           }
         }

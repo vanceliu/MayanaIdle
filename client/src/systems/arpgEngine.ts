@@ -15,6 +15,7 @@ import {
   tickPlayerCombat,
   getWeaponAttackConfig,
   getScriptChaseRange,
+  pruneUnreachable,
 } from './playerCombatFSM';
 import {
   type MonsterCombatContext,
@@ -23,7 +24,7 @@ import {
 } from './monsterCombatFSM';
 import { resolveActionTargets } from './targeting';
 import type { MonsterAttackType } from '../models/monster';
-import { evaluateCombatScript, skillMeetsWeaponRequirement, type CombatScriptContext, type ScriptMonsterView, type HpSample } from './scriptRunner';
+import { evaluateCombatScript, isDashExecutable, skillMeetsWeaponRequirement, type CombatScriptContext, type ScriptMonsterView, type HpSample } from './scriptRunner';
 import { pickTargetBy, type TargetPickCandidate, type TargetStrategy } from './targeting';
 import { isNonAttackAction } from '../models/scriptEngine';
 import { canUseSkill, isSkillHpBlocked } from '../models/skill';
@@ -71,6 +72,8 @@ export function applyManualTarget(engine: ArpgEngineState, monsterId: string): b
   const target = engine.monsters.get(monsterId);
   if (!target || target.instance.currentHp <= 0) return false;
   engine.playerCtx.targetMonsterId = monsterId;
+  // 手動點選解除「走不到」排除，重新嘗試（`41-arpg-combat.md` § 4.3）
+  engine.playerCtx.unreachableUntil.delete(monsterId);
   return true;
 }
 
@@ -153,6 +156,8 @@ export interface MoveToEvent {
   range: number;
   /** true ＝ `target` 是落腳格本身（後退），不是要繞到射程內的攻擊對象 */
   exact?: boolean;
+  /** true ＝ 依突進判定找落腳格（§ 3.6） */
+  dash?: boolean;
 }
 
 /**
@@ -202,7 +207,7 @@ export function tickArpgEngine(
    * 走到定位才發現要放的是另一招。
    */
   // 沉默中無法施展技能（`24-buff-debuff.md` § 24.5.1a）
-  const manualSkill = isPlayerSilenced(activeEffects) ? null : resolveManualAttackSkill(
+  let manualSkill = isPlayerSilenced(activeEffects) ? null : resolveManualAttackSkill(
     engine.manualSkillId, skills, character.mp, character.hp, gameNow(), cooldownReduction, weaponType,
   );
 
@@ -227,6 +232,8 @@ export function tickArpgEngine(
       map,
       occupied: input.occupied,
     };
+    // 突進可施放判定與天賦選招共用（§ 3.6）：射程內沒有落點就視同不可用，交給天賦
+    if (manualSkill?.dash && !isDashExecutable(manualSkill, scriptCtx)) manualSkill = null;
     const nextAction: CombatAction | null = manualSkill
       ? { type: 'skill', skillId: manualSkill.id }
       : evaluateCombatScript(combatRules, scriptCtx);
@@ -236,7 +243,8 @@ export function tickArpgEngine(
       if (skill && skill.type === 'attack' && skill.range && skill.range > attackConfig.range) {
         attackConfig.range = skill.range;
         // 突進是走過去打，不是遠程（§ 3.6）
-        if (!skill.dash) attackConfig.attackType = 'ranged';
+        if (skill.dash) attackConfig.dash = true;
+        else attackConfig.attackType = 'ranged';
       }
     }
   }
@@ -257,6 +265,7 @@ export function tickArpgEngine(
 
   // Tick player combat FSM（暈眩中暫停攻擊計時器）
   const playerStunned = isPlayerStunned(activeEffects);
+  pruneUnreachable(engine.playerCtx, gameNow());
   const playerResult = tickPlayerCombat(
     engine.playerCtx,
     playerPos,
@@ -274,6 +283,7 @@ export function tickArpgEngine(
       target: playerResult.moveTarget,
       range: playerResult.moveRange,
       exact: playerResult.moveExact,
+      dash: playerResult.moveDash,
     });
   }
 

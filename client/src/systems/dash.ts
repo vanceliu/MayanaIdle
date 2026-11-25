@@ -6,7 +6,7 @@
 import type { MapData, Position } from '../models/mapControl';
 import { isWalkableTile } from '../models/mapControl';
 import { MELEE_WEAPON_RANGE } from '../models/equipment';
-import { canMoveBetween, DIRECTIONS } from './pathfinding';
+import { canMoveBetween, DIRECTIONS, findStrikePosition } from './pathfinding';
 import { getDistance, hasLineOfSight, isWithinAttackRange } from './lineOfSight';
 
 export interface DashPlan {
@@ -46,6 +46,21 @@ export function planDash(
     if (isStraightPathWalkable(map, start, landing)) return { landing, moves: true };
   }
   return null;
+}
+
+/** 突進的追擊落腳格：步行可到、且從該格 `planDash` 成立的最近一格（§ 3.6）。回 null ＝ 沒有這種格子 */
+export function findDashPosition(
+  map: MapData,
+  target: Position,
+  from: Position,
+  range: number,
+  occupied?: Set<string>,
+): Position | null {
+  return findStrikePosition(
+    map, target, from,
+    position => planDash(map, position, target, range, occupied) !== null,
+    occupied,
+  );
 }
 
 /**

@@ -118,3 +118,18 @@ const CLASS_SKILL_IDS = new Set(CLASS_SKILLS.map(s => s.id));
 export function isClassMagic(skillId: string | undefined): boolean {
   return !!skillId && CLASS_SKILL_IDS.has(skillId);
 }
+
+/**
+ * 同職業同級數已學會的職業魔法（`23-class-magic.md` § 23.1 每級限學 1 個）。回 null ＝ 不衝突。
+ * 只比對 `CLASS_SKILLS`，基礎魔法不在此限。
+ */
+export function findLearnedSameTierClassSkill(
+  def: ClassSkillDef,
+  learnedSkillIds: readonly string[],
+  defs: readonly ClassSkillDef[] = CLASS_SKILLS,
+): ClassSkillDef | null {
+  return defs.find(d => d.id !== def.id
+    && d.className === def.className
+    && d.classLevel === def.classLevel
+    && learnedSkillIds.includes(d.id)) ?? null;
+}

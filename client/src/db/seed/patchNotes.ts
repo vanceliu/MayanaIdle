@@ -9,10 +9,12 @@ export interface PatchNote {
 export const PATCH_NOTES: PatchNote[] = [
   {
     version: '0.9.12',
-    date: '2026-11-24',
+    date: '2026-11-25',
     changes: [
       'Wiki 鐵匠鋪新增「獨特製作」配方表',
       'Wiki 詳細頁可返回上一頁',
+      '修正突進技能（背刺、衝鋒突進）遇障礙物時卡住不動',
+      '走不到的怪物會暫時略過，改打下一隻',
     ],
   },
   {

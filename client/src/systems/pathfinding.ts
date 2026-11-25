@@ -97,6 +97,21 @@ export function findAttackPosition(
   range: number,
   occupied?: Set<string>,
 ): Position | null {
+  return findStrikePosition(
+    map, target, from,
+    position => isWithinAttackRange(position, target, range) && hasLineOfSight(position, target, map),
+    occupied,
+  );
+}
+
+/** 依步行距離由近到遠，找第一個 `canStrikeFrom` 成立的可到達格（目標格本身除外） */
+export function findStrikePosition(
+  map: MapData,
+  target: Position,
+  from: Position,
+  canStrikeFrom: (position: Position) => boolean,
+  occupied?: Set<string>,
+): Position | null {
   const start = { x: Math.round(from.x), y: Math.round(from.y) };
   const targetPosition = { x: Math.round(target.x), y: Math.round(target.y) };
   if (!isWalkableTile(map, start)) return null;
@@ -116,11 +131,7 @@ export function findAttackPosition(
     const isTarget = current.position.x === targetPosition.x && current.position.y === targetPosition.y;
     const isStart = current.position.x === start.x && current.position.y === start.y;
     const evalFrom = isStart ? from : current.position;
-    if (!isTarget
-      && isWithinAttackRange(evalFrom, target, range)
-      && hasLineOfSight(evalFrom, target, map)) {
-      return current.position;
-    }
+    if (!isTarget && canStrikeFrom(evalFrom)) return current.position;
 
     for (const direction of DIRECTIONS) {
       const next = { x: current.position.x + direction.x, y: current.position.y + direction.y };

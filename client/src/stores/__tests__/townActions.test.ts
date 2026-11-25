@@ -8,6 +8,7 @@ import { TRAINING_GROUND_REGION_ID } from '../../models/trainingGround';
 import { SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, LEARN_PRICES } from '../../models/magicAcademy';
 import type { Character } from '../../models/character';
 import { SKILL_CATALOG } from '../../models/skill';
+import { CLASS_SKILLS } from '../../models/classSkills';
 
 /**
  * 城鎮設施的動作（旅館、魔法學院、試驗場）。
@@ -157,6 +158,21 @@ describe('職業技能書（`13-town.md` § 13.9）', () => {
   it('別的職業的技能書學不起來', () => {
     setup({ level: 40, className: 'thief' }, { bagItems: [bagItemById(BOOK, 1)] });
     expect(useGameStore.getState().learnClassSkill('shield-bash')).toBe(false);
+  });
+
+  it('同職業同級已學會一個，同級其他職業魔法學不了，書也不會被吃掉（`23-class-magic.md` § 23.1）', () => {
+    const shieldBash = CLASS_SKILLS.find(d => d.id === 'shield-bash')!;
+    const sameTier = { ...shieldBash, id: 'test-same-tier', name: '同級測試', skill: { ...shieldBash.skill, id: 'test-same-tier' } };
+    CLASS_SKILLS.push(sameTier);
+    try {
+      setup({ level: 10 }, { bagItems: [bagItemById(BOOK, 2)] });
+      expect(useGameStore.getState().learnClassSkill('shield-bash')).toBe(true);
+      expect(useGameStore.getState().learnClassSkill('test-same-tier')).toBe(false);
+      expect(useGameStore.getState().skills.map(s => s.id)).toEqual(['shield-bash']);
+      expect(useGameStore.getState().bagItems[0].amount).toBe(1);
+    } finally {
+      CLASS_SKILLS.splice(CLASS_SKILLS.indexOf(sameTier), 1);
+    }
   });
 });
 

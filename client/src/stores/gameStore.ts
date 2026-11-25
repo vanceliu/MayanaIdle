@@ -57,7 +57,7 @@ import { isBagSlotMap, type BagSlotMap } from '../models/bagLayout';
 import { isSigilItemId } from '../models/sigil';
 import type { BagItem } from '../models/bagItem';
 import { makeBagItem, addBagItem, consumeBagItem, getBagItemAmount, hasBagItem, isPositiveCount } from '../models/bagItem';
-import { CLASS_SKILLS } from '../models/classSkills';
+import { CLASS_SKILLS, findLearnedSameTierClassSkill } from '../models/classSkills';
 import {
   LEARN_PRICES, SPELLBOOK_FRAGMENT_ID, SPELLBOOK_RECIPES, getRequiredBookId,
 } from '../models/magicAcademy';
@@ -3157,6 +3157,7 @@ export function createGameStore(session: Session) {
     if (!def) return false;
     if (char.level < def.requiredLevel) return false;
     if (state.skills.some(s => s.id === def.id)) return false;
+    if (findLearnedSameTierClassSkill(def, state.skills.map(s => s.id))) return false;
     const sources = getCraftSources(state);
     if (getMaterialTotal(sources, def.bookItemId) < 1) return false;
 

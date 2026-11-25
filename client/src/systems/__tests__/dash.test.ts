@@ -2,7 +2,8 @@
  * 突進位移（`41-arpg-combat.md` § 3.6）。
  */
 import { describe, it, expect } from 'vitest';
-import { planDash, isStraightPathWalkable } from '../dash';
+import { planDash, isStraightPathWalkable, findDashPosition } from '../dash';
+import { findAttackPosition } from '../pathfinding';
 import { TileType } from '../../models/mapControl';
 import type { MapData } from '../../models/mapControl';
 
@@ -66,5 +67,37 @@ describe('isStraightPathWalkable', () => {
 
   it('同一格視為可通行', () => {
     expect(isStraightPathWalkable(open, { x: 2, y: 2 }, { x: 2, y: 2 })).toBe(true);
+  });
+});
+
+describe('findDashPosition（突進的追擊落腳格）', () => {
+  // 水池擋在中間：有視線、直線走不過去；下方一排可繞路
+  const pond = makeMap([
+    [G, G, G, A, G, G, G, G],
+    [G, G, G, A, G, G, G, G],
+    [G, G, G, A, G, G, G, G],
+    [G, G, G, G, G, G, G, G],
+  ]);
+  const target = { x: 6, y: 1 };
+
+  it('一般追擊會停在水邊（射程內＋有視線），突進追擊改找突進得了的格子', () => {
+    expect(findAttackPosition(pond, target, { x: 0, y: 1 }, 8)).toEqual({ x: 0, y: 1 });
+    const spot = findDashPosition(pond, target, { x: 0, y: 1 }, 8)!;
+    expect(spot).not.toBeNull();
+    expect(planDash(pond, spot, target, 8)).not.toBeNull();
+  });
+
+  it('已經突進得了：原地', () => {
+    expect(findDashPosition(open, { x: 6, y: 2 }, { x: 0, y: 2 }, 8)).toEqual({ x: 0, y: 2 });
+  });
+
+  it('目標被圍住走不到：回 null', () => {
+    const walled = makeMap([
+      [G, G, G, G, G, G, G],
+      [G, G, G, W, W, W, G],
+      [G, G, G, W, G, W, G],
+      [G, G, G, W, W, W, G],
+    ]);
+    expect(findDashPosition(walled, { x: 4, y: 2 }, { x: 0, y: 0 }, 8)).toBeNull();
   });
 });

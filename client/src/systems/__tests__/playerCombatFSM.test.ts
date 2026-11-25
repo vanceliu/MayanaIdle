@@ -3,6 +3,9 @@ import {
   createPlayerCombatContext,
   tickPlayerCombat,
   getWeaponAttackConfig,
+  markTargetUnreachable,
+  pruneUnreachable,
+  UNREACHABLE_TARGET_EXCLUDE_MS,
 } from '../playerCombatFSM';
 import type { MapData } from '../../models/mapControl';
 
@@ -206,5 +209,78 @@ describe('腳本沒有可執行動作時不出手（§ 41）', () => {
 
     expect(result.action).toBe('attack');
     expect(ctx.attackTimer).toBe(0);
+  });
+});
+
+describe('走不到的目標（`41-arpg-combat.md` § 4.3）', () => {
+  const melee = getWeaponAttackConfig(undefined);
+  const monsters = [
+    { id: 'near', index: 0, position: { x: 2, y: 0 }, alive: true },
+    { id: 'far', index: 1, position: { x: 4, y: 4 }, alive: true },
+  ];
+
+  it('標記後排除 5 秒、清目標回 IDLE，鎖定一併解除', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.targetMonsterId = 'near';
+    ctx.lockedTargetId = 'near';
+    markTargetUnreachable(ctx, 1000);
+    expect(UNREACHABLE_TARGET_EXCLUDE_MS).toBe(5000);
+    expect(ctx.unreachableUntil.get('near')).toBe(6000);
+    expect(ctx.targetMonsterId).toBeNull();
+    expect(ctx.lockedTargetId).toBeNull();
+    expect(ctx.state).toBe('idle');
+  });
+
+  it('選目標跳過排除中的怪，改挑下一隻最近的', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.unreachableUntil.set('near', 6000);
+    tickPlayerCombat(ctx, { x: 0, y: 0 }, monsters, melee, openMap, 16);
+    expect(ctx.targetMonsterId).toBe('far');
+  });
+
+  it('當前目標被排除時換目標', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.targetMonsterId = 'near';
+    ctx.unreachableUntil.set('near', 6000);
+    tickPlayerCombat(ctx, { x: 0, y: 0 }, monsters, melee, openMap, 16);
+    expect(ctx.targetMonsterId).toBe('far');
+  });
+
+  it('全部都被排除：回 IDLE（交給自動探索）', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.unreachableUntil.set('near', 6000);
+    ctx.unreachableUntil.set('far', 6000);
+    const result = tickPlayerCombat(ctx, { x: 0, y: 0 }, monsters, melee, openMap, 16);
+    expect(result.action).toBe('none');
+    expect(ctx.state).toBe('idle');
+    expect(ctx.targetMonsterId).toBeNull();
+  });
+
+  it('到期後解除排除', () => {
+    const ctx = createPlayerCombatContext();
+    ctx.unreachableUntil.set('near', 6000);
+    pruneUnreachable(ctx, 5999);
+    expect(ctx.unreachableUntil.has('near')).toBe(true);
+    pruneUnreachable(ctx, 6000);
+    expect(ctx.unreachableUntil.has('near')).toBe(false);
+  });
+});
+
+describe('突進追擊（`41-arpg-combat.md` § 3.6）', () => {
+  const far = [{ id: 'm', index: 0, position: { x: 4, y: 4 }, alive: true }];
+
+  it('射程是突進技能時，追擊指令帶 moveDash', () => {
+    const ctx = createPlayerCombatContext();
+    const config = { attackType: 'melee' as const, range: 3, dash: true };
+    const result = tickPlayerCombat(ctx, { x: 0, y: 0 }, far, config, openMap, 16);
+    expect(result).toMatchObject({ action: 'move_to', moveRange: 3, moveDash: true });
+  });
+
+  it('沒有可執行動作（改用追擊距離）時不帶 moveDash', () => {
+    const ctx = createPlayerCombatContext();
+    const config = { attackType: 'melee' as const, range: 3, chaseRange: 3, dash: true };
+    const result = tickPlayerCombat(ctx, { x: 0, y: 0 }, far, config, openMap, 16, false, false);
+    expect(result.action).toBe('move_to');
+    expect(result.moveDash).toBeUndefined();
   });
 });

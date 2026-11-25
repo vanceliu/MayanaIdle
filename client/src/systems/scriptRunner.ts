@@ -418,8 +418,9 @@ function hasActiveShield(
 /**
  * 突進技能此刻選不選得上（`41-arpg-combat.md` § 3.6）。
  * 主目標在射程外時照常選上（先追擊）；進入射程後必須有落點，否則落到下一條規則。
+ * 手動指定的突進技能也走這一份（`arpgEngine.ts`）。
  */
-function isDashExecutable(skill: Skill, ctx: CombatScriptContext): boolean {
+export function isDashExecutable(skill: Skill, ctx: CombatScriptContext): boolean {
   if (!ctx.map || skill.dashOptional) return true;
   const target = getPrimaryTarget(ctx);
   if (!target) return false;

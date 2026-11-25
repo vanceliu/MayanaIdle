@@ -23,7 +23,12 @@ export interface PlayerCombatContext {
   lockedTargetId: string | null;
   /** 走位意圖。設了之後由 FSM 消費一次就清掉 */
   moveIntent: MoveIntent | null;
+  /** 走不到的怪 → 排除到期的遊戲時間（`41-arpg-combat.md` § 4.3）。FSM 選目標時跳過 */
+  unreachableUntil: Map<string, number>;
 }
+
+/** 走不到的怪排除多久（`41-arpg-combat.md` § 4.3） */
+export const UNREACHABLE_TARGET_EXCLUDE_MS = 5000;
 
 export function createPlayerCombatContext(): PlayerCombatContext {
   return {
@@ -33,6 +38,7 @@ export function createPlayerCombatContext(): PlayerCombatContext {
     attackTimer: 0,
     lockedTargetId: null,
     moveIntent: null,
+    unreachableUntil: new Map(),
   };
 }
 
@@ -57,6 +63,8 @@ export interface AttackConfig {
    * （`41-arpg-combat.md` § 3.1）。省略時視同 `range`。
    */
   chaseRange?: number;
+  /** `range` 是突進技能的射程：追擊落腳格改用突進判定（`41-arpg-combat.md` § 3.6） */
+  dash?: boolean;
 }
 
 export function getWeaponAttackConfig(weaponType: string | undefined): AttackConfig {
@@ -98,6 +106,8 @@ export interface PlayerTickResult {
   moveRange?: number;
   /** `moveTarget` 是落腳格本身，不是攻擊對象；`findAttackPosition` 必定排除該格，不可用它解析 */
   moveExact?: boolean;
+  /** 依突進判定找落腳格（`AttackConfig.dash`） */
+  moveDash?: boolean;
   attackTargetIdx?: number;
 }
 
@@ -138,7 +148,7 @@ export function tickPlayerCombat(
     ? monsters.find(m => m.id === ctx.targetMonsterId)
     : null;
 
-  if (!currentTarget || !currentTarget.alive) {
+  if (!currentTarget || !currentTarget.alive || ctx.unreachableUntil.has(currentTarget.id)) {
     /**
      * 鎖定的目標死掉或離場就自動解鎖（`51-auto-talent.md` § 51.4.9）——
      * 不清的話 FSM 會一直卡在一個不存在的 id 上，等於角色停手。
@@ -146,7 +156,7 @@ export function tickPlayerCombat(
     if (ctx.lockedTargetId && ctx.lockedTargetId === ctx.targetMonsterId) {
       ctx.lockedTargetId = null;
     }
-    const nearest = findNearestMonster(playerPos, aliveMonsters);
+    const nearest = findNearestMonster(playerPos, aliveMonsters.filter(m => !ctx.unreachableUntil.has(m.id)));
     if (!nearest) {
       ctx.state = 'idle';
       ctx.targetMonsterId = null;
@@ -220,7 +230,27 @@ export function tickPlayerCombat(
   if (ctx.attackTimer < carried) {
     ctx.attackTimer = Math.min(ctx.attackTimer + deltaMs, carried);
   }
-  return { action: 'move_to', moveTarget: target.position, moveRange };
+  return {
+    action: 'move_to', moveTarget: target.position, moveRange,
+    ...(hasExecutableAction && attackConfig.dash ? { moveDash: true } : {}),
+  };
+}
+
+/** 追擊找不到攻擊位置：該怪排除 `UNREACHABLE_TARGET_EXCLUDE_MS`，清目標回 IDLE（§ 4.3） */
+export function markTargetUnreachable(ctx: PlayerCombatContext, now: number): void {
+  if (ctx.targetMonsterId) {
+    ctx.unreachableUntil.set(ctx.targetMonsterId, now + UNREACHABLE_TARGET_EXCLUDE_MS);
+    if (ctx.lockedTargetId === ctx.targetMonsterId) ctx.lockedTargetId = null;
+  }
+  ctx.targetMonsterId = null;
+  ctx.state = 'idle';
+}
+
+/** 移除已到期的排除 */
+export function pruneUnreachable(ctx: PlayerCombatContext, now: number): void {
+  for (const [id, until] of ctx.unreachableUntil) {
+    if (until <= now) ctx.unreachableUntil.delete(id);
+  }
 }
 
 function findNearestMonster(
