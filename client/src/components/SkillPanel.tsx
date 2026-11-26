@@ -8,7 +8,7 @@ import { useLongPress } from '../hooks/useLongPress';
 import {
   QUICK_SLOT_COUNT, quickSlotLabel, toQuickSlotSkillEntry, isSameQuickSlotEntry,
 } from '../models/quickSlot';
-import { getSkillDisplayIcon } from '../models/iconMap';
+import { getSkillDisplayIcon, SKILL_ELEMENT_COLORS } from '../models/iconMap';
 import { calculateHealAmount, getBasicAttackElement, getEquippedWeapon, previewSkillPhysicalDamage } from '../systems/combat';
 import { GameIcon } from './GameIcon';
 import { SKILL_CATALOG, type Skill } from '../models/skill';
@@ -31,16 +31,6 @@ function gridColumnsStyle(columns: number) {
 function classSkillByLevel(className: ClassName, classLevel: number) {
   return CLASS_SKILLS.find(d => d.className === className && d.classLevel === classLevel);
 }
-
-const ELEMENT_COLORS: Record<string, string> = {
-  fire: '#EF4444',
-  ice: '#60A5FA',
-  wind: '#34D399',
-  earth: '#D97706',
-  light: '#FBBF24',
-  dark: '#A78BFA',
-  none: '#94A3B8',
-};
 
 interface SkillTooltipData {
   skill: SkillTemplate | null;
@@ -237,7 +227,7 @@ export function SkillPanel() {
                       <GameIcon
                         name={getSkillDisplayIcon(skill)}
                         size={SKILL_ICON_SIZE}
-                        color={ELEMENT_COLORS[element]}
+                        color={SKILL_ELEMENT_COLORS[element]}
                       />
                       <span className="skill-cell-name">{skill.name}</span>
                       <SkillStarBadge skill={learnedSkill} character={character} />
@@ -281,8 +271,7 @@ export function SkillPanel() {
                   <GameIcon
                     name={getSkillDisplayIcon(skill)}
                     size={SKILL_ICON_SIZE}
-                    /* 職業魔法多半 element 為 none，統一走職業魔法的紫色 */
-                    color={ELEMENT_COLORS[skill.element || 'none']}
+                    color={SKILL_ELEMENT_COLORS[skill.element || 'none']}
                   />
                   <span className="skill-cell-name">{def.name}</span>
                   <SkillStarBadge skill={learnedSkill} character={character} />

@@ -302,6 +302,17 @@ export function getSkillDisplayIcon(skill: {
   return SKILL_ID_ICON_MAP[skill.id] ?? getSkillIcon(skill.element ?? 'none');
 }
 
+/** 技能格圖示顏色，依技能元素；職業魔法多半為 none，統一走紫灰 */
+export const SKILL_ELEMENT_COLORS: Record<string, string> = {
+  fire: '#EF4444',
+  ice: '#60A5FA',
+  wind: '#34D399',
+  earth: '#D97706',
+  light: '#FBBF24',
+  dark: '#A78BFA',
+  none: '#94A3B8',
+};
+
 /**
  * 天賦鑲材的圖示（`51-auto-talent.md`）。key ＝ `ruleId`。
  *

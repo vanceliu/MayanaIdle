@@ -8,6 +8,13 @@ export interface PatchNote {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: '0.9.13',
+    date: '2026-11-26',
+    changes: [
+      '穩定度修正',
+    ],
+  },
+  {
     version: '0.9.12',
     date: '2026-11-25',
     changes: [
@@ -47,16 +54,6 @@ export const PATCH_NOTES: PatchNote[] = [
       '競技場入場金幣調降',
       '競技場強化詞綴依段位增加速度不同',
       '競技場怪物改為隨機出現在場上',
-    ],
-  },
-  {
-    version: '0.9.8',
-    date: '2026-11-22',
-    changes: [
-      '魔法學院與競技場可直接使用倉庫裡的材料',
-      '「藥水效果」詞綴改名為「補藥效果」',
-      '公會 NPC 改為顯示公會面板',
-      '星盤命星前的星點效果對調',
     ],
   },
 ];

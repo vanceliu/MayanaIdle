@@ -5,64 +5,23 @@
  */
 import { useMemo, useState } from 'react';
 import {
-  STAR_CHART_UNLOCK_LEVEL, STAR_COOLDOWN_BY_NODES, STAR_FLAG_LABEL, STAR_NODE_BY_ID, STAR_SKILL_LEVEL_CAP, STAR_POINT_VALUE,
-  exceedsKeystoneCap, KEYSTONE_CAP, isStarEffectActive, normalizeStarAllocation, starPathTo, starPoints, starRefundCostPerPoint, starRefundSet, starStartNodeId, unspentStarPoints,
-  type StarEffect,
+  STAR_CHART_UNLOCK_LEVEL,
+  exceedsKeystoneCap, KEYSTONE_CAP, normalizeStarAllocation, starPathTo, starPoints, starRefundCostPerPoint, starRefundSet, starStartNodeId, unspentStarPoints,
 } from '../models/starChart';
+import { formatStarEffect, starSkillRowParts, summarizeStarChart, type StarSummaryRow as SummaryRow } from '../models/starDisplay';
 import type { Character, ClassName } from '../models/character';
-import { StarChartBoard, formatStarEffect, type StarChartBoardProps } from './StarChartBoard';
+import { StarChartBoard, type StarChartBoardProps } from './StarChartBoard';
 import { useGameStore } from '../stores/gameStore';
 import { getEffectiveGearArray } from '../systems/gear';
 import { calculateHealAmount, previewSkillPhysicalDamage } from '../systems/combat';
 import { StarNodeSkillPreview } from './StarNodeSkillPreview';
 
-const ROMAN = ['I', 'II', 'III'];
-
-interface SummaryRow { key: string; label: string; value: number; unit: StarEffect['unit']; effective: boolean; valueText?: string }
-
-/** 冷卻依節點數表的技能：冷卻列改顯示目前冷卻秒數（§ 56.5） */
-function withCooldownSeconds(rows: Map<string, SummaryRow>) {
-  for (const [id, steps] of Object.entries(STAR_COOLDOWN_BY_NODES)) {
-    for (const effective of [true, false]) {
-      const cd = rows.get(`skill:${id}:cd|${effective}`);
-      if (!cd) continue;
-      const nodes = -cd.value / STAR_POINT_VALUE.skillCd + (rows.get(`skill:${id}:level|${effective}`)?.value ?? 0);
-      cd.valueText = `${steps[Math.min(steps.length - 1, nodes)] / 1000}s`;
-    }
-  }
-}
-
-function summarize(allocated: ReadonlySet<string>, classId: ClassName) {
-  const rows = new Map<string, SummaryRow>();
-  const keystones: { name: string; flags: string[] }[] = [];
-  for (const id of allocated) {
-    const node = STAR_NODE_BY_ID.get(id)!;
-    if (node.kind === 'keystone') keystones.push({ name: node.name, flags: (node.flags ?? []).map(f => STAR_FLAG_LABEL[f]) });
-    for (const e of node.effects) {
-      const effective = isStarEffectActive(e, node, classId);
-      const key = `${e.key}|${effective}`;
-      const row = rows.get(key);
-      if (row) row.value += e.value;
-      else rows.set(key, { key, label: e.label, value: e.value, unit: e.unit, effective });
-    }
-  }
-  withCooldownSeconds(rows);
-  const all = [...rows.values()];
-  return {
-    attrs: all.filter(r => r.key.startsWith('attr:')),
-    stats: all.filter(r => !/^(attr|skill|magic):/.test(r.key)),
-    skills: all.filter(r => /^(skill|magic):/.test(r.key)),
-    keystones,
-  };
-}
-
 /** 技能列：等級顯示羅馬數字，其餘照原值；隨等級變動的數字標黃（§ 56.5） */
 function SkillRowText({ r }: { r: SummaryRow }) {
-  if (/^(?:skill|magic):.+:level\|/.test(r.key)) {
-    const level = Math.min(1 + r.value, STAR_SKILL_LEVEL_CAP);
-    return <>{r.label.replace(/ 等級$/, '')}(<span className="stat-changed">{ROMAN[level - 1]}</span>)</>;
-  }
-  return <>{r.label} <span className="stat-changed">{r.valueText ?? formatStarEffect(r)}</span></>;
+  const { label, value, bracket } = starSkillRowParts(r);
+  return bracket
+    ? <>{label}(<span className="stat-changed">{value}</span>)</>
+    : <>{label} <span className="stat-changed">{value}</span></>;
 }
 
 function SummaryList({ title, rows, skill = false }: { title: string; rows: SummaryRow[]; skill?: boolean }) {
@@ -83,7 +42,7 @@ function SummaryList({ title, rows, skill = false }: { title: string; rows: Summ
 }
 
 export function StarChartSummary({ classId, allocated }: { classId: ClassName; allocated: ReadonlySet<string> }) {
-  const summary = useMemo(() => summarize(allocated, classId), [allocated, classId]);
+  const summary = useMemo(() => summarizeStarChart(allocated, classId), [allocated, classId]);
   return (
     <section className="star-summary">
       <h3 className="star-summary-title">加成合計</h3>

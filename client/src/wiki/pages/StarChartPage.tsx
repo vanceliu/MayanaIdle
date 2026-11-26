@@ -13,7 +13,7 @@ import { CLASS_NAMES_ZH } from '../../models/character';
 import { LEVEL_CAP } from '../../systems/levelUp';
 import { COOLDOWN_REDUCTION_CAP } from '../../systems/combat';
 import { StarChartPlanner } from '../../components/StarChartPlanner';
-import { formatStarEffect } from '../../components/StarChartBoard';
+import { formatStarEffect } from '../../models/starDisplay';
 
 const SECTION_TITLE = { color: 'var(--accent-gold)', fontFamily: 'var(--font-display)', marginBottom: 12 } as const;
 const CARD = { background: 'var(--bg-card)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 12 } as const;

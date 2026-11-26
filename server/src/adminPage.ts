@@ -23,6 +23,9 @@ const STYLE = `
   --outline-dark: #4A4585;
   --radius-sm: 5px;
   --radius-md: 10px;
+  --accent-mana: #3280FF;
+  --star-str: #ff4d4d; --star-agi: #3ccf6e; --star-int: #3d6bff;
+  --star-spi: #8fd3ff; --star-vit: #ff8fc8; --star-other: #f2f2f7;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -113,6 +116,81 @@ pre { background: var(--bg-inset); border: var(--border-width) solid var(--outli
 .tip .affix.empty-socket { color: var(--text-dim); background: transparent; border: 1px dashed var(--outline-dark); }
 .tip .affix.broken-socket { color: var(--text-dim); background: transparent; text-decoration: line-through; opacity: .6; }
 .tip .affix.sealed { outline: 1px solid currentColor; outline-offset: -1px; }
+.star-bar { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+.star-bar b { color: var(--text-primary); font-weight: 600; }
+.star-wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.star-board { flex: 1 1 360px; max-width: 520px; aspect-ratio: 1; background: var(--bg-inset); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); }
+.star-board svg { display: block; width: 100%; height: 100%; }
+.star-sum { flex: 1 1 200px; font-size: 13px; }
+.star-sum h4 { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 6px 0 2px; }
+.star-sum h4:first-child { margin-top: 0; }
+.star-sum ul, .tip ul { padding-left: 18px; line-height: 1.7; }
+.star-v { color: #FACC15; }
+.inert { color: var(--text-dim); text-decoration: line-through; }
+.star-edge { stroke: var(--text-dim); stroke-opacity: .45; stroke-width: 4; }
+.star-edge.is-allocated { stroke: var(--accent-gold); stroke-opacity: 1; stroke-width: 8; }
+.star-dot { fill-opacity: .55; stroke: var(--text-dim); stroke-width: 3; }
+.kind-keystone .star-dot { stroke: var(--accent-mana); stroke-width: 5; }
+.kind-start .star-dot { stroke-width: 5; }
+.is-own-start .star-dot { stroke: var(--accent-primary); }
+.is-allocated .star-dot { fill-opacity: 1; stroke: var(--accent-gold); stroke-width: 6; }
+.star-node:hover .star-dot { stroke: var(--text-primary); }
+.star-halo { fill: none; stroke: var(--accent-mana); stroke-width: 2; stroke-dasharray: 4 4; }
+.star-hit { fill: transparent; }
+.star-label { fill: var(--text-primary); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--bg-inset); stroke-width: 10px; }
+.tip .star-kind { color: var(--text-dim); font-size: 12px; font-weight: 400; margin-left: 8px; }
+.tip .star-status { color: var(--accent-gold); font-size: 12px; }
+.stat-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.stat-group { background: var(--bg-inset); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 13px; }
+.stat-group h4 { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 2px; }
+.stat-row { display: flex; justify-content: space-between; gap: 8px; line-height: 1.7; }
+.stat-row .k { color: var(--text-dim); cursor: help; }
+.stat-row:hover .k { color: var(--accent-primary); }
+.stat-row .v { font-family: ui-monospace, monospace; }
+.stat-overflow { color: #F59E0B; }
+.stat-overweight { color: #EF4444; }
+.tip .stat-tip-title { color: var(--accent-primary); font-weight: 600; }
+.tip .stat-tip-formula, .tip .stat-tip-note { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
+.skill-cells { grid-template-columns: repeat(auto-fill, 64px); }
+.skill-cells .cell { height: 60px; }
+.cell-star { position: absolute; top: 1px; right: 2px; font-size: 10px; color: var(--accent-gold); font-weight: 600; }
+h4.sub { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 10px 0 0; }
+h3 .hint { font-size: 12px; font-weight: 400; margin-left: 6px; }
+.quick-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 3px; margin-top: 8px; font-size: 12px; }
+.quick-slot { display: flex; gap: 6px; align-items: center; padding: 3px 6px; background: var(--bg-inset); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); overflow: hidden; white-space: nowrap; }
+.quick-slot .key { color: var(--text-dim); font-family: ui-monospace, monospace; }
+.quick-slot.empty { color: var(--text-dim); }
+.tip .skill-cat, .tip .skill-lv { color: var(--text-dim); font-size: 12px; }
+.tip .skill-line { font-size: 12px; }
+.stat-changed { color: #FACC15; font-weight: 700; }
+.skill-tag-list { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 2px 0 4px; font-size: 11px; }
+.skill-tag-label { color: var(--text-dim); margin-right: 2px; }
+.skill-tag { padding: 0 5px; border-radius: 3px; line-height: 1.6; white-space: nowrap; background: rgba(148, 163, 184, .18); color: #CBD5E1; }
+.skill-tag-fire { background: rgba(220, 38, 38, .2); color: #F87171; }
+.skill-tag-ice { background: rgba(59, 130, 246, .2); color: #60A5FA; }
+.skill-tag-wind { background: rgba(34, 197, 94, .2); color: #4ADE80; }
+.skill-tag-earth { background: rgba(217, 119, 6, .2); color: #FBBF24; }
+.skill-tag-light { background: rgba(250, 204, 21, .2); color: #FDE047; }
+.skill-tag-dark { background: rgba(139, 92, 246, .2); color: #A78BFA; }
+.skill-tag.changed { color: #FACC15; box-shadow: inset 0 0 0 1px #FACC15; font-weight: 700; }
+.talent-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.talent-tabs button { padding: 3px 10px; font-size: 12px; }
+.talent-tabs button.on { border-color: var(--accent-primary); color: var(--text-primary); }
+.talent-tabs .using { color: var(--accent-gold); margin-left: 4px; }
+.talent-page { display: none; }
+.talent-page.on { display: block; }
+.talent-page h4 { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 8px 0 4px; }
+.talent-slot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 6px; margin-bottom: 3px; font-size: 12px; background: var(--bg-inset); border: var(--border-width) solid var(--outline-dark); border-radius: var(--radius-sm); }
+.talent-slot.off { opacity: .5; }
+.talent-slot .no { color: var(--text-dim); font-family: ui-monospace, monospace; min-width: 44px; }
+.talent-entry { padding: 1px 6px; border-radius: 3px; background: var(--bg-card); border: 1px solid var(--outline-dark); }
+.talent-entry.act { border-color: var(--accent-primary); }
+.talent-entry.empty { color: var(--text-dim); border-style: dashed; }
+.talent-entry .p { color: var(--text-dim); margin-left: 4px; }
+.talent-arrow { color: var(--text-dim); }
+.talent-off { color: var(--text-dim); margin-left: auto; }
+.talent-settings { margin-top: 8px; font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+.talent-settings b { color: var(--text-dim); font-weight: 500; margin-right: 6px; }
 details { margin-top: 14px; }
 details summary { cursor: pointer; color: var(--text-dim); font-size: 12px; margin-bottom: 6px; }
 `;
@@ -294,14 +372,112 @@ function detailModal() {
     '<div class="modal-body" onscroll="hideTip()">' +
     '<div class="detail-top"><div class="kv2">' +
       kv('職業', v.className) + kv('等級', c.level) + kv('金幣', (c.gold ?? 0).toLocaleString()) + kv('經驗', c.exp) +
+      (v.combat ? kv('HP 上限', v.combat.maxHp) + kv('MP 上限', v.combat.maxMp) : '') +
       kv('位置', c.regionId + (c.floor ? '（' + c.floor + 'F）' : '')) + kv('ID', c.id) + kv('帳號 ID', c.userId) + kv('UUID', c.uuid) +
       kv('建立', time(c.createdAt)) + kv('最後上線', time(c.lastSeenAt)) +
     '</div><div class="pawn">' + v.appearanceSvg + '</div></div>' +
     grid('裝備中', items.equipped) + grid('背包', items.bag) + (items.storage.length ? grid('倉庫', items.storage) : '') +
+    (v.star ? starSection(v.star) : '') +
+    (v.combat ? statSection(v.combat) + skillSection(v.combat) : '') +
+    (v.talent ? talentSection(v.talent) : '') +
     '<h3>統計</h3><div class="grid">' + v.statistics.map(st => '<div class="stat"><div class="k">' + esc(st.label) + '</div><div class="v">' +
       Number(st.value).toLocaleString() + '</div></div>').join('') + '</div>' +
     '<details><summary>原始資料</summary><pre>' + esc(JSON.stringify(raw, null, 2)) + '</pre></details>' +
     '</div></div></div><div id="tip" class="tip"></div>';
+}
+
+/** 星盤（唯讀）：點數列、盤面、加成合計；滑鼠移到節點看名稱與效果 */
+function starSection(star) {
+  S.starTips = star.tips;
+  const head = '<h3>星盤</h3>';
+  if (!star.unlocked) return head + '<div class="hint">Lv' + star.unlockLevel + ' 開放星盤</div>';
+  const summary = star.summary.length
+    ? star.summary.map(g => '<h4>' + esc(g.title) + '</h4><ul>' + g.lines.map(starLine).join('') + '</ul>').join('')
+    : '<div class="hint">尚未配點</div>';
+  return head +
+    '<div class="star-bar"><span>已用 <b>' + star.used + '</b>／' + star.total + ' 點</span>' +
+    '<span>命星 <b>' + star.keystones + '</b>／' + star.keystoneCap + '</span></div>' +
+    '<div class="star-wrap"><div class="star-board" onmouseover="showStarTip(event)" onmouseout="hideTip()">' + star.svg + '</div>' +
+    '<div class="star-sum">' + summary + '</div></div>';
+}
+
+function starLine(l) {
+  const value = l.value ? '<span class="star-v">' + esc(l.value) + '</span>' : '';
+  const text = l.bracket ? esc(l.text) + '(' + value + ')' : esc(l.text) + (value ? ' ' + value : '');
+  return '<li' + (l.inert ? ' class="inert"' : '') + '>' + text + (l.inert ? '（不生效）' : '') + '</li>';
+}
+
+function starTipHtml(t) {
+  return '<div class="tip-name">' + esc(t.name) + '<span class="star-kind">' + esc(t.kind) + '</span></div>' +
+    (t.lines.length ? '<ul>' + t.lines.map(starLine).join('') + '</ul>' : '') +
+    (t.status ? '<div class="star-status">' + esc(t.status) + '</div>' : '');
+}
+
+/** 能力值（同遊戲能力值面板，不含 buff）；滑鼠移到欄位名稱看說明 */
+function statSection(combat) {
+  S.statTips = [];
+  const row = (r) => {
+    const i = S.statTips.push(r) - 1;
+    const value = '<span class="' + (r.warn ? 'stat-overweight' : '') + '">' + esc(r.value) + (r.warn ? ' ⚠' : '') + '</span>' +
+      (r.overflow ? '<span class="stat-overflow">（' + esc(r.overflow) + '）</span>' : '');
+    return '<div class="stat-row" onmouseenter="showStatTip(event, ' + i + ')" onmouseleave="hideTip()"><span class="k">' + esc(r.label) + '</span><span class="v">' + value + '</span></div>';
+  };
+  return '<h3>能力值<span class="hint">（不含 buff）</span></h3><div class="stat-groups">' +
+    combat.stats.map(g => '<div class="stat-group"><h4>' + esc(g.title) + '</h4>' + g.rows.map(row).join('') + '</div>').join('') + '</div>';
+}
+
+function statTipHtml(r) {
+  return '<div class="stat-tip-title">' + esc(r.label) + '</div><div>' + esc(r.tip.desc) + '</div>' +
+    (r.tip.formula ? '<div class="stat-tip-formula">' + esc(r.tip.formula) + '</div>' : '') +
+    (r.tip.note ? '<div class="stat-tip-note">' + esc(r.tip.note) + '</div>' : '');
+}
+
+/** 已學技能（圖示、名稱、星盤等級）與快捷列；滑鼠移到技能看同遊戲的 tooltip */
+function skillSection(combat) {
+  S.skillTips = combat.skills.map(s => s.tip);
+  const cells = combat.skills.length
+    ? '<div class="cells skill-cells">' + combat.skills.map((s, i) =>
+      '<div class="cell" onmouseenter="showSkillTip(event, ' + i + ')" onmouseleave="hideTip()">' +
+        '<span class="ico" style="color:' + esc(s.color) + '">' + (combat.icons[s.icon] || '') + '</span>' +
+        '<span class="cell-name">' + esc(s.name) + '</span>' +
+        (s.star ? '<span class="cell-star">' + esc(s.star) + '</span>' : '') + '</div>').join('') + '</div>'
+    : '<div class="hint">無</div>';
+  const quick = '<div class="quick-slots">' + combat.quickSlots.map(q =>
+    '<div class="quick-slot' + (q.name ? '' : ' empty') + '"><span class="key">' + esc(q.key) + '</span>' + esc(q.name || '—') + '</div>').join('') + '</div>';
+  return '<h3>技能（' + combat.skills.length + '）</h3>' + cells + '<h4 class="sub">快捷列</h4>' + quick;
+}
+
+function partsHtml(parts) {
+  return parts.map(p => (p.changed ? '<span class="stat-changed">' + esc(p.text) + '</span>' : esc(p.text))).join('');
+}
+
+function skillTipHtml(t) {
+  return '<div class="tip-name">' + esc(t.name) + '</div><div class="skill-cat">' + esc(t.category) + '</div>' +
+    t.tagRows.map(r => '<div class="skill-tag-list">' + (r.label ? '<span class="skill-tag-label">' + esc(r.label) + '</span>' : '') +
+      r.tags.map(g => '<span class="skill-tag skill-tag-' + esc(g.tag) + (g.changed ? ' changed' : '') + '">' + esc(g.label) + '</span>').join('') + '</div>').join('') +
+    '<div class="skill-lv">等級 ' + t.level + '</div>' +
+    t.lines.map(l => '<div class="skill-line">' + esc(l.label) + partsHtml(l.parts) + '</div>').join('');
+}
+
+/** 天賦配置：每份一個分頁（使用中的標出），列常駐／戰鬥／補給天賦格與緊急撤退 */
+function talentSection(talent) {
+  const activeIndex = Math.max(0, talent.templates.findIndex(t => t.active));
+  const entry = (e, cls) => e
+    ? '<span class="talent-entry ' + cls + '">' + esc(e.name) + (e.params.length ? '<span class="p">' + esc(e.params.join('、')) + '</span>' : '') + '</span>'
+    : '<span class="talent-entry empty ' + cls + '">' + (cls === 'act' ? '未設動作' : '空條件') + '</span>';
+  const slot = (s, n) => '<div class="talent-slot' + (s.enabled ? '' : ' off') + '"><span class="no">#' + n + ' T' + s.tier + '</span>' +
+    s.conditions.map(c => entry(c, 'cond')).join('') + '<span class="talent-arrow">→</span>' + entry(s.action, 'act') +
+    (s.enabled ? '' : '<span class="talent-off">停用</span>') + '</div>';
+  const tabs = '<div class="talent-tabs">' + talent.templates.map((t, i) =>
+    '<button class="' + (i === activeIndex ? 'on' : '') + '" onclick="pickTalent(this, ' + i + ')">' + esc(t.name) +
+      (t.active ? '<span class="using">使用中</span>' : '') + '</button>').join('') + '</div>';
+  const pages = talent.templates.map((t, i) => '<div class="talent-page' + (i === activeIndex ? ' on' : '') + '">' +
+    t.types.map(g => '<h4>' + esc(g.type) + '（' + g.slots.length + '）</h4>' +
+      (g.slots.length ? g.slots.map((s, k) => slot(s, k + 1)).join('') : '<div class="hint">無</div>')).join('') +
+    '<div class="talent-settings"><div><b>緊急撤退</b>' + esc(t.retreat) + '</div></div></div>').join('');
+  return '<h3>天賦配置</h3>' + tabs + pages +
+    '<div class="talent-settings"><div><b>戰鬥後等待</b>' + talent.afterCombat.map(esc).join('；') + '</div>' +
+    '<div><b>未安裝天賦格</b>' + talent.uninstalled + ' 格</div></div>';
 }
 
 function itemCell(cell, i, icons) {
@@ -365,15 +541,28 @@ window.doRemoveAllow = (i) => guard(async () => {
 });
 window.doSearch =() => guard(async () => { S.data.characters = (await api('characters?q=' + encodeURIComponent(el('#q').value))).characters; render(); });
 window.doDetail = (id) => guard(async () => { S.data.character = await api('character?id=' + id); render(); });
-window.showTip = (event, i) => {
+function placeTip(html, r) {
   const tip = el('#tip');
-  if (!tip || !S.cells[i]) return;
-  tip.innerHTML = tipHtml(S.cells[i]);
+  if (!tip) return;
+  tip.innerHTML = html;
   tip.style.display = 'flex';
-  const r = event.currentTarget.getBoundingClientRect();
   const left = r.right + 8 + tip.offsetWidth > innerWidth ? r.left - 8 - tip.offsetWidth : r.right + 8;
   tip.style.left = Math.max(4, left) + 'px';
   tip.style.top = Math.max(4, Math.min(r.top, innerHeight - tip.offsetHeight - 4)) + 'px';
+}
+window.showTip = (event, i) => { if (S.cells[i]) placeTip(tipHtml(S.cells[i]), event.currentTarget.getBoundingClientRect()); };
+window.showStarTip = (event) => {
+  const node = event.target.closest('[data-n]');
+  const t = node && S.starTips && S.starTips[Number(node.dataset.n)];
+  if (t) placeTip(starTipHtml(t), node.querySelector('.star-dot').getBoundingClientRect());
+};
+window.showStatTip = (event, i) => { if (S.statTips[i]) placeTip(statTipHtml(S.statTips[i]), event.currentTarget.getBoundingClientRect()); };
+window.showSkillTip = (event, i) => { if (S.skillTips[i]) placeTip(skillTipHtml(S.skillTips[i]), event.currentTarget.getBoundingClientRect()); };
+window.pickTalent = (button, i) => {
+  const section = button.parentElement;
+  section.querySelectorAll('button').forEach((b, k) => b.classList.toggle('on', k === i));
+  let page = section.nextElementSibling;
+  for (let k = 0; page && page.classList.contains('talent-page'); k++, page = page.nextElementSibling) page.classList.toggle('on', k === i);
 };
 window.hideTip = () => { const tip = el('#tip'); if (tip) tip.style.display = 'none'; };
 window.closeDetail = () => { S.data.character = null; render(); };

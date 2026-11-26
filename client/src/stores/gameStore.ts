@@ -85,7 +85,7 @@ import { evaluatePersistentScript, evaluateEmergencyRetreat, skillMeetsWeaponReq
 import { pushSelfCastFx } from '../systems/selfCastFx';
 import type { ScriptRule, EmergencyRetreat } from '../models/scriptEngine';
 import {
-  DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT, isValidEmergencyRetreat,
+  DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT, DEFAULT_AFTER_COMBAT_THRESHOLDS, isValidEmergencyRetreat,
 } from '../models/scriptEngine';
 import type { ScriptTemplate } from '../models/scriptTemplate';
 import {
@@ -775,10 +775,7 @@ export function createGameStore(session: Session) {
   searchMode: 'auto',
   pressureRate: rates.pressure,
   pressureMembers: 1,
-  afterCombatHpThreshold: 30,
-  afterCombatMpThreshold: 20,
-  afterCombatHpResumeThreshold: 60,
-  afterCombatMpResumeThreshold: 60,
+  ...DEFAULT_AFTER_COMBAT_THRESHOLDS,
   quickSlots: emptyQuickSlots(),
   bagSlotMap: {},
   talentBagOrder: {},
@@ -879,10 +876,10 @@ export function createGameStore(session: Session) {
     // § 35.17：格子位置不在 prefs 裡，走獨立 key
     const bagSlotMap = await loadBagLayout(char.id!, session);
     const talentBagOrder = await loadTalentBagLayout(char.id!, session);
-    const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? 30;
-    const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? 20;
-    const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? 60;
-    const afterCombatMpResumeThreshold = prefs?.afterCombatMpResumeThreshold ?? 60;
+    const afterCombatHpThreshold = prefs?.afterCombatHpThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatHpThreshold;
+    const afterCombatMpThreshold = prefs?.afterCombatMpThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatMpThreshold;
+    const afterCombatHpResumeThreshold = prefs?.afterCombatHpResumeThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatHpResumeThreshold;
+    const afterCombatMpResumeThreshold = prefs?.afterCombatMpResumeThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatMpResumeThreshold;
     const adventurerQuests = prefs?.adventurerQuests ?? [];
     const guildProgress = prefs?.guildProgress ?? { rank: 'F', points: 0 };
     const craftQuests = prefs?.craftQuests ?? [];
@@ -4016,10 +4013,10 @@ async function loadLocalPreferences(characterId: number, session: Session): Prom
       quickSlots: normalizeQuickSlots(data.quickSlots),
       arenaRun: normalizeArenaRun(data.arenaRun),
       arenaSlots: normalizeArenaSlots(data.arenaSlots),
-      afterCombatHpThreshold: data.afterCombatHpThreshold ?? 30,
-      afterCombatMpThreshold: data.afterCombatMpThreshold ?? 20,
-      afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? 60,
-      afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? 60,
+      afterCombatHpThreshold: data.afterCombatHpThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatHpThreshold,
+      afterCombatMpThreshold: data.afterCombatMpThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatMpThreshold,
+      afterCombatHpResumeThreshold: data.afterCombatHpResumeThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatHpResumeThreshold,
+      afterCombatMpResumeThreshold: data.afterCombatMpResumeThreshold ?? DEFAULT_AFTER_COMBAT_THRESHOLDS.afterCombatMpResumeThreshold,
       adventurerQuests: data.adventurerQuests ?? [],
       guildProgress: data.guildProgress ?? { rank: 'F', points: 0 },
       craftQuests: data.craftQuests ?? [],

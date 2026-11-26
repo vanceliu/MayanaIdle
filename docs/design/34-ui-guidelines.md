@@ -298,6 +298,7 @@ CSS class 對應：`.affix-tag.tier-X`、`.equip-detail-affix.tier-X`、`.toolti
 - 迴避率顯示小數一位；未封頂合計超過 35% 時，數值後以括號標示實際值，如 `35.0%（39.0%）`
 - 含百分比詞綴的欄位顯示小數一位（`07-affix.md` § 7.3）：普攻元素、技能元素、攻速加成、冷卻縮減、魔法減傷率、魔法抗性、格擋率、爆擊率、爆擊傷害、補血效果、補藥效果、掉寶率、金幣獲得率
 - 掉寶率、金幣獲得率顯示角色裝備詞綴合計 `+X%`（掉寶率含 T7 獨有詞綴），不含全域倍率與 Pressure 倍率（`27-drop-table.md` § 27.1）
+- 管理介面角色查詢顯示同一份（不含 buff）：`97-selfhosted-server.md` § 97.8
 
 ### 欄位 Tooltip（必要）
 
@@ -477,6 +478,7 @@ Tooltip 內容分三段，`formula` 與 `note` 可省略：
 已習得與未習得共用同一個 tooltip，完整顯示威力／射程／MP／冷卻等數值，
 差別只在底部狀態列：已習得 `.skill-tooltip-status.learned`、未習得 `.skill-tooltip-status.locked`。
 未習得也看得到完整數值，玩家才能規劃學習路線。
+管理介面角色查詢的技能 tooltip 顯示同一份（無狀態列）：`97-selfhosted-server.md` § 97.8
 
 ## 34.8 行動裝置支援
 

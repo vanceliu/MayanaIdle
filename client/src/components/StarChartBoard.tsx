@@ -7,33 +7,14 @@ import type { CSSProperties, ReactNode, PointerEvent as ReactPointerEvent, Wheel
 import {
   STAR_EDGES, STAR_FLAG_LABEL, STAR_NODES, STAR_NODE_BY_ID,
   isStarEffectActive, starNeighbors, starPathTo, starRefundSet, starStartNodeId,
-  type StarEffect, type StarNode,
+  type StarNode,
 } from '../models/starChart';
 import { CLASS_NAMES_ZH, type ClassName } from '../models/character';
 import { STAR_KIND_LABEL, starFilterTerms, starNodeMatches } from '../models/starFilter';
+import { STAR_NODE_RADIUS as NODE_RADIUS, starEffectText, starMixId as mixId, starMixPairs, starNodeFill as nodeFill } from '../models/starDisplay';
 
-const NODE_RADIUS: Record<StarNode['kind'], number> = {
-  start: 16, point: 7, constellation: 12, keystone: 16,
-};
 const BOARD_HALF = 990;
-
-/** 節點顏色依屬性效果：單一屬性為該色，兩種屬性左右各半，其餘白色（§ 56.6） */
-const ATTR_COLOR_KEYS = ['str', 'agi', 'int', 'spi', 'vit'];
-function nodeAttrs(n: StarNode): string[] {
-  if (n.kind === 'keystone') return [];
-  const attrs = n.effects.map(e => e.key.replace(/^attr:/, '').toLowerCase()).filter(k => ATTR_COLOR_KEYS.includes(k));
-  return [...new Set(attrs)].slice(0, 2);
-}
-const mixId = ([a, b]: string[]) => `star-mix-${a}-${b}`;
-function nodeFill(n: StarNode): string {
-  const attrs = nodeAttrs(n);
-  if (attrs.length === 2) return `url(#${mixId(attrs)})`;
-  return `var(--star-${attrs[0] ?? 'other'})`;
-}
-const MIX_PAIRS = [...new Map(STAR_NODES.map(nodeAttrs).filter(a => a.length === 2).map(a => [mixId(a), a])).values()];
-
-export const formatStarEffect = (e: Pick<StarEffect, 'value' | 'unit'>) => `${e.value > 0 ? '+' : ''}${e.value}${e.unit}`;
-export const starEffectText = (e: StarEffect) => e.text ?? `${e.label} ${formatStarEffect(e)}`;
+const MIX_PAIRS = starMixPairs(STAR_NODES);
 
 interface View { scale: number; tx: number; ty: number }
 const INITIAL_VIEW: View = { scale: 1, tx: 0, ty: 0 };

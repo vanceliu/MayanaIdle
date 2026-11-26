@@ -4,26 +4,13 @@
  */
 import type { ReactNode } from 'react';
 import type { Skill } from '../models/skill';
-import { formatSkillRange, formatBuffDuration, formatDebuffDuration, formatSelfBuff } from '../models/skill';
-import { ChangedNumbers } from './ChangedNumbers';
 import { skillCategoryLabel, starLevelSuffix } from '../models/skillStar';
+import { skillTooltipLines, type PhysicalDamageOf } from '../models/skillTooltipText';
 import type { Character } from '../models/character';
 
+export type { PhysicalDamageOf };
+
 type SkillLike = Omit<Skill, 'lastUsedAt'>;
-
-/** 隨機多擊的範圍已寫在效果說明裡（血濺咒殺），不另列；沒有半徑的群體技能為全隊（群體治癒、神聖領域） */
-function rangeText(s: SkillLike): string {
-  if (s.target !== 'aoe' || s.randomHits) return '';
-  if (s.aoeRadius === undefined) return '全隊';
-  const tail = s.maxTargets ? ` / 最多 ${s.maxTargets} 隻` : '（無上限）';
-  return `半徑 ${s.aoeRadius} 格${tail}`;
-}
-
-
-function debuffText(s: SkillLike): string {
-  const d = s.applyDebuff;
-  return d ? `${d.name} (${d.description}, ${formatDebuffDuration(d)})` : '';
-}
 
 /** tooltip 標頭：名稱與星盤等級、分類、標籤、習得等級 */
 export function SkillTooltipHeader({ name, skill, level, character, tags }: {
@@ -44,18 +31,7 @@ export function SkillTooltipHeader({ name, skill, level, character, tags }: {
   );
 }
 
-/** 物理段數值（`systems/combat.ts` 的 `previewSkillPhysicalDamage()`）；沒有角色資料時為 undefined */
-export type PhysicalDamageOf = (physicalScale: number, normalAttackFormula: boolean) => number;
-
-function powerText(s: SkillLike, physicalOf: PhysicalDamageOf | undefined): string {
-  const physical = physicalOf ? String(physicalOf(s.physicalScale ?? 1, false)) : '物理傷害';
-  return `${s.power}${s.physicalSnapshot ? ` + ${physical}` : ''}`;
-}
-
-function hitsText(s: SkillLike, physicalOf: PhysicalDamageOf | undefined): string {
-  return `${s.hits ?? 0} 連擊${physicalOf ? `，每箭約 ${physicalOf(s.physicalScale ?? 1, true)}` : ''}`;
-}
-
+/** 數值列由 `skillTooltipLines()` 產生，與管理介面角色查詢共用 */
 export function SkillTooltipBody({ base, shown, references = [], healOf, physicalOf }: {
   base: SkillLike;
   shown: SkillLike;
@@ -65,33 +41,14 @@ export function SkillTooltipBody({ base, shown, references = [], healOf, physica
   healOf: (power: number) => number;
   physicalOf?: PhysicalDamageOf;
 }) {
-  const line = (label: string, text: (s: SkillLike) => string) => {
-    const value = text(shown);
-    return value
-      ? <div className="skill-tooltip-stat">{label}<ChangedNumbers base={text(base)} value={value} references={references.map(text)} /></div>
-      : null;
-  };
   return (
     <>
-      {shown.type === 'attack' && line('威力: ', s => powerText(s, physicalOf))}
-      {line('射程: ', formatSkillRange)}
-      {shown.hits ? line('', s => hitsText(s, physicalOf)) : null}
-      {line('效果: ', s => s.description ?? '')}
-      {!shown.instantDotTicks && line('附加: ', debuffText)}
-      {line('傷害加成: ', s => (s.abilityDamagePercent ? `+${s.abilityDamagePercent}%` : ''))}
-      {line('自身增益: ', formatSelfBuff)}
-      {shown.type === 'heal' && shown.power > 0 && line('回復: ', s => String(healOf(s.power)))}
-      {line('效果: ', s => s.buffEffect ?? '')}
-      {line('持續: ', formatBuffDuration)}
-      {shown.type === 'passive' ? (
-        <div className="skill-tooltip-stat">被動</div>
-      ) : (
-        <>
-          {line('MP: ', s => String(s.mpCost))}
-          {line('冷卻: ', s => `${s.cooldown / 1000}s`)}
-        </>
-      )}
-      {line('範圍: ', rangeText)}
+      {skillTooltipLines({ base, shown, references, healOf, physicalOf }).map((line, i) => (
+        <div key={i} className="skill-tooltip-stat">
+          {line.label}
+          {line.parts.map((p, k) => (p.changed ? <span key={k} className="stat-changed">{p.text}</span> : p.text))}
+        </div>
+      ))}
     </>
   );
 }

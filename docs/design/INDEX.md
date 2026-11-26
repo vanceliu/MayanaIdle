@@ -366,6 +366,7 @@
   ←→ 20-attributes.md § 20.4／§ 20.5／§ 20.6.2／§ 20.9 ←→ 04-character.md § 4.9
   ←→ 05-skill.md § 5.3 / 22-basic-magic.md / 23-class-magic.md
   ←→ 21-combat-formula.md § 21.3／§ 21.4／§ 21.4a／§ 21.4b／§ 21.4c ←→ 07-affix-ability.md § 7S.5 ←→ 24-buff-debuff.md（聖光護盾）
+  ←→ 97-selfhosted-server.md § 97.8（管理介面角色查詢的星盤）
 
 【怪物／元素／掉落】
 25-monster-system.md ←→ 26-spawn-pressure.md ←→ 28-monster-stats.md
@@ -422,6 +423,9 @@
   ←→ 38-map-control.md § 38.14（§ 97.7.1）
   ←→ 16-tech.md / 16-tech-frontend-architecture.md § 32.5 / § 32.6 / § 32.10
   ←→ 35-inventory-constraints.md § 35.17
+  ←→ 56-star-chart.md § 56.7（§ 97.8 角色查詢的星盤）
+  ←→ 34-ui-guidelines.md「詳細狀態面板」/ § 34.7（§ 97.8 角色查詢的能力值、技能）
+  ←→ 51-auto-talent.md § 51.13 / 03-combat.md § 3.13 / § 3.14（§ 97.8 角色查詢的天賦配置）
   ←→ 47-mobile.md § 47.6 / § 47.9
   ←→ 52-mailbox.md § 52.2.3 / § 52.2.4
   ←→ 50-training-ground.md § 50.4（§ 97.2 試驗場本機沙盒）

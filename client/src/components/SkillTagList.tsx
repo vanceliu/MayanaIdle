@@ -3,7 +3,8 @@
  * `base` 有給時，不在 `base` 裡的標籤以黃色標出（`07-affix-ability.md` § 7S.7）。
  */
 import type { Skill } from '../models/skill';
-import { dotTags, skillTags, withBasicAttackElement, SKILL_TAG_LABELS, type ElementTag, type SkillTag } from '../models/skillTags';
+import { SKILL_TAG_LABELS, type ElementTag, type SkillTag } from '../models/skillTags';
+import { skillTooltipTagRows } from '../models/skillTooltipText';
 
 type SkillLike = Omit<Skill, 'lastUsedAt'>;
 
@@ -26,22 +27,22 @@ export function SkillTagList({ tags, base, label }: {
   );
 }
 
-/** 技能 tooltip 的標籤：技能本身一列、每個持續傷害各一列；`shown` 是套用職業池隨機技能後的技能 */
+/** 技能 tooltip 的標籤（`skillTooltipTagRows()`，與管理介面角色查詢共用）；`shown` 是套用職業池隨機技能後的技能 */
 export function SkillTooltipTags({ base, shown, basicAttackElement }: {
   base: SkillLike;
   shown: SkillLike;
   /** 【普攻】的攻擊元素，依目前裝備與 buff 決定 */
   basicAttackElement?: ElementTag;
 }) {
-  const tagsOf = (s: SkillLike) => withBasicAttackElement(skillTags(s), basicAttackElement);
-  const tags = tagsOf(shown);
-  const baseTags = tagsOf(base);
-  const changed = baseTags.length !== tags.length || baseTags.some(t => !tags.includes(t));
   return (
     <>
-      <SkillTagList tags={tags} base={changed ? baseTags : undefined} />
-      {[shown.applyDebuff, shown.onHitDebuff].map(d => d && (
-        <SkillTagList key={d.name} label={d.name} tags={dotTags(shown, d)} />
+      {skillTooltipTagRows(base, shown, basicAttackElement).map((row, i) => (
+        <div key={i} className="skill-tag-list">
+          {row.label && <span className="skill-tag-label">{row.label}</span>}
+          {row.tags.map(t => (
+            <span key={t.tag} className={`skill-tag skill-tag-${t.tag}${t.changed ? ' changed' : ''}`}>{t.label}</span>
+          ))}
+        </div>
       ))}
     </>
   );

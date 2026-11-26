@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { adminPage } from '../adminPage';
 import { getCachedTemplates, loadTemplateCache } from '../../../client/src/systems/templateSync';
 import { getItemById } from '../../../client/src/models/items';
+import { CLASS_BASE_ATTRIBUTES } from '../../../client/src/models/character';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -15,6 +16,9 @@ import { GameServer } from '../ws';
 import { buildConfig, type ServerConfig } from '../config';
 import { defaultSession } from '../../../client/src/stores/session';
 import { createPlayerSession } from '../playerSession';
+
+/** 存檔一定有的素質欄位（能力值計算用） */
+const KNIGHT_ATTRS = { baseAttributes: CLASS_BASE_ATTRIBUTES.knight, bonusAttributes: { STR: 0, AGI: 0, VIT: 0, SPI: 0, INT: 0, CHA: 0 }, skills: [] };
 
 /** 管理介面 API（`97-selfhosted-server.md` § 97.8） */
 
@@ -199,10 +203,19 @@ describe('管理介面 API', () => {
 
   it('角色查詢是唯讀的：列表、搜尋、明細', async () => {
     db.prepare('INSERT INTO characters (user_id, uuid, name_key, data) VALUES (?, ?, ?, ?)')
-      .run(1, 'uuid-1', '測試角', JSON.stringify({ name: '測試角', className: 'knight', level: 7, gold: 123, currentRegion: 'dawn-plains', createdAt: 1 }));
+      .run(1, 'uuid-1', '測試角', JSON.stringify({ name: '測試角', className: 'knight', level: 7, gold: 123, currentRegion: 'dawn-plains', createdAt: 1, ...KNIGHT_ATTRS, skills: [{ id: 'shield-bash' }] }));
     const id = Number((db.prepare('SELECT id FROM characters').get() as { id: number }).id);
     db.prepare('INSERT INTO character_prefs (character_id, data) VALUES (?, ?)')
-      .run(id, JSON.stringify({ statistics: { monstersKilled: 42 } }));
+      .run(id, JSON.stringify({
+        statistics: { monstersKilled: 42 },
+        quickSlots: [{ kind: 'potion', potionType: 'red' }, { kind: 'skill', skillId: 'shield-bash' }],
+        scriptTemplates: [{ id: 'default', name: '預設', emergencyRetreat: { enabled: true, hpThreshold: 15, action: 'flee_town' } }],
+        activeTemplateId: 'default',
+      }));
+    db.prepare('INSERT INTO talent_slots (character_id, data) VALUES (?, ?)').run(id, JSON.stringify({
+      characterId: id, tier: 1, assignedType: 'persistent', templateId: 'default', order: 0, enabled: true,
+      conditions: [{ ruleId: 'hp_below', params: { value: 30 } }], action: { ruleId: 'potion', params: { potionType: 'red' } },
+    }));
 
     const list = await call('/admin/api/characters');
     expect(list.body.characters[0]).toMatchObject({ name: '測試角', level: 7, gold: 123 });
@@ -227,6 +240,17 @@ describe('管理介面 API', () => {
     expect(items.bag[0].tip).toContainEqual({ cls: 'count', parts: [{ text: '數量: 12' }] });
     for (const cell of [...items.equipped, ...items.bag]) expect(items.icons[cell.icon]).toMatch(/^<svg/);
     expect(detail.body.view.statistics).toContainEqual({ label: '殺敵數', value: 42 });
+    expect(detail.body.view.star).toMatchObject({ unlocked: false, used: 0, total: 0 });
+    expect(detail.body.view.star.svg).toMatch(/^<svg /);
+    const { combat, talent } = detail.body.view;
+    expect(combat.stats.map((g: { title: string }) => g.title)).toEqual(['基礎屬性', '攻擊', '防禦', '爆擊', '回復', '掉落', '負重']);
+    expect(combat.maxHp).toBeGreaterThan(0);
+    expect(combat.skills).toEqual([expect.objectContaining({ name: '盾擊' })]);
+    expect(combat.icons[combat.skills[0].icon]).toMatch(/^<svg/);
+    expect(combat.quickSlots.slice(0, 3).map((q: { name: string | null }) => q.name)).toEqual([getItemById(1)!.name, '盾擊', null]);
+    expect(talent.templates[0]).toMatchObject({ name: '預設', active: true, retreat: 'HP 低於 15% → 回城（任意卷軸）' });
+    expect(talent.templates[0].types[0].slots).toHaveLength(1);
+    expect(detail.body.talentSlots).toHaveLength(1);
     expect((await call('/admin/api/character?id=999')).status).toBe(404);
   });
 
@@ -235,7 +259,7 @@ describe('管理介面 API', () => {
     const weapon = getCachedTemplates().find(t => t.slot === 'rightHand')!;
     const helmet = getCachedTemplates().find(t => t.slot === 'helmet')!;
     db.prepare('INSERT INTO characters (user_id, uuid, name_key, data) VALUES (?, ?, ?, ?)')
-      .run(1, 'uuid-2', '查裝備', JSON.stringify({ name: '查裝備', className: 'knight', level: 1, gold: 0, currentRegion: 'dawn-plains', createdAt: 1 }));
+      .run(1, 'uuid-2', '查裝備', JSON.stringify({ name: '查裝備', className: 'knight', level: 1, gold: 0, currentRegion: 'dawn-plains', createdAt: 1, ...KNIGHT_ATTRS }));
     const id = Number((db.prepare('SELECT id FROM characters WHERE uuid = ?').get('uuid-2') as { id: number }).id);
     const insert = db.prepare('INSERT INTO equipment_instances (owner_id, data) VALUES (?, ?)');
     insert.run(id, JSON.stringify({ templateId: weapon.id, quality: 0, enhancement: 0, affixes: [], equipped: true }));

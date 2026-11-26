@@ -376,6 +376,14 @@ export const DEFAULT_EMERGENCY_RETREAT: EmergencyRetreat = {
   action: 'flee_town',
 };
 
+/** 戰鬥後等待的門檻預設值（`03-combat.md` § 3.13），單位 % */
+export const DEFAULT_AFTER_COMBAT_THRESHOLDS = {
+  afterCombatHpThreshold: 30,
+  afterCombatMpThreshold: 20,
+  afterCombatHpResumeThreshold: 60,
+  afterCombatMpResumeThreshold: 60,
+} as const;
+
 // === Defaults ===
 
 export const DEFAULT_COMBAT_SCRIPT: CombatRule[] = [

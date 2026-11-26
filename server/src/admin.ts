@@ -17,7 +17,11 @@ import { CLASS_NAMES_ZH } from '../../client/src/models/character';
 import { LEADERBOARD_LABELS, type LeaderboardField } from '../../client/src/services/leaderboardService';
 import { appearanceSvg } from './pawnSvg';
 import { buildItemCells } from './adminItemCells';
+import { buildStarView } from './adminStarView';
+import { buildCombatView } from './adminCombatView';
+import { buildTalentView, type TalentPrefs } from './adminTalentView';
 import type { EquipmentInstance } from '../../client/src/models/equipment';
+import type { TalentSlot } from '../../client/src/models/talent';
 import { resolveEquipment } from '../../client/src/systems/templateSync';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -357,7 +361,9 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
       const equipment = (db.prepare('SELECT id, data FROM equipment_instances WHERE owner_id = ?').all(row.id) as { id: number; data: string }[])
         .map(e => resolveEquipment({ ...(JSON.parse(e.data) as EquipmentInstance), id: e.id }));
       const prefRow = db.prepare('SELECT data FROM character_prefs WHERE character_id = ?').get(row.id) as { data: string } | undefined;
-      const prefs = prefRow ? JSON.parse(prefRow.data) as { statistics?: Record<string, number> } : {};
+      const prefs = prefRow ? JSON.parse(prefRow.data) as TalentPrefs & { statistics?: Record<string, number>; quickSlots?: unknown } : {};
+      const talentSlots = (db.prepare('SELECT id, data FROM talent_slots WHERE character_id = ?').all(row.id) as { id: number; data: string }[])
+        .map(t => ({ ...(JSON.parse(t.data) as TalentSlot), id: t.id }));
       const statistics = normalizeStatistics(prefs.statistics);
       json(res, 200, {
         /** 彈出視窗的顯示用：中文名稱與詞綴文字，裝備中的排前面 */
@@ -365,6 +371,9 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
           className: CLASS_NAMES_ZH[char.className] ?? char.className,
           appearanceSvg: appearanceSvg(char.appearance),
           items: buildItemCells(equipment, bag),
+          star: buildStarView(char),
+          combat: buildCombatView(char, equipment, bag, prefs.quickSlots),
+          talent: buildTalentView(talentSlots, prefs),
           statistics: (Object.keys(statistics) as (keyof typeof statistics)[])
             .map(k => ({ label: LEADERBOARD_LABELS[k as LeaderboardField] ?? k, value: statistics[k] })),
         },
@@ -376,6 +385,7 @@ function buildRoutes(deps: AdminDeps): Record<string, (ctx: Ctx) => Promise<void
         },
         bag,
         equipment,
+        talentSlots,
         statistics,
       });
     },
