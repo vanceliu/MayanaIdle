@@ -455,6 +455,8 @@ function resolvePlayerStrike(o: {
     attackIntervalMs: getPlayerAttackInterval(allGear, activeEffects, character),
   });
 
+  for (const heal of result.partyHeals ?? []) visuals.push({ kind: 'heal', memberId: heal.memberId, amount: heal.healed });
+
   for (const dmg of result.damages) {
     const inst = monsterInstances.get(dmg.targetId);
     if (inst && !dmg.isMiss && !dmg.splash) applyThorns(session, inst, dmg, logs, visuals);

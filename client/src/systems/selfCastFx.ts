@@ -8,11 +8,14 @@
  * server 由 `tickWorld` 轉成 `self_cast` 的 `CombatVisual` 推給實例全體成員。
  */
 import { defaultSession } from '../stores/session';
+import type { PartyHeal } from './partySupport';
 
 export interface SelfCastFxEvent {
   skillId: string;
   /** 治癒實際回了多少 HP。buff 一律 0 */
   healed: number;
+  /** 全隊治癒分給隊友的量（`23-class-magic.md` § 23.6） */
+  partyHeals?: PartyHeal[];
 }
 
 /** 佇列上限：渲染端沒掛載時沒有人 drain，滿了丟最舊的 */

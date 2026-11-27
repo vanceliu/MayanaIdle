@@ -37,7 +37,7 @@ export function conditionSlotCount(tier: TalentSlotTier): number {
 export const TALENT_GROUPS = [
   'vitals', 'self', 'gear', 'surroundings', 'location',
   'target_hp', 'target_identity', 'target_state', 'range', 'field', 'forecast',
-  'timing', 'bag', 'gold',
+  'timing', 'party', 'bag', 'gold',
   'attack', 'movement', 'targeting',
   'healing', 'buffs', 'consumables',
   'travel', 'restock', 'clearout',
@@ -57,6 +57,7 @@ export const TALENT_GROUP_LABELS: Record<TalentGroup, string> = {
   field: '戰場',
   forecast: '出手預測',
   timing: '時效',
+  party: '隊伍',
   bag: '背包',
   gold: '金幣與倉庫',
   attack: '攻擊',

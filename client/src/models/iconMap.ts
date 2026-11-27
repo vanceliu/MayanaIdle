@@ -334,6 +334,7 @@ export const TALENT_AFFIX_ICON_MAP: Record<string, string> = {
   ability_meter: 'buffs/fire-shield',
   buff_remaining_below: 'items/hourglass',
   potion_cooldown_ready: 'items/standing-potion',
+  party_hp_below: 'skills/prayer',
   weight_over: 'items/swap-bag',
   weapon_type_is: 'buffs/sparkling-sabre',
   area_dwell_gte: 'items/hourglass',

@@ -71,14 +71,14 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
     skill: { id: 'element-storm', name: '元素風暴', level: 7, element: 'fire', type: 'attack', target: 'aoe', power: 55, mpCost: 80, cooldown: 20000, range: 12, aoeCenter: 'target', aoeRadius: 10, maxTargets: 10 } },
 
   { id: 'holy-shield', name: '聖光護盾', className: 'priest', classLevel: 1, requiredLevel: 10, bookItemId: 117,
-    skill: { id: 'holy-shield', name: '聖光護盾', level: 1, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 25, cooldown: 30000, range: 0, buffEffect: '吸收 100＋技能攻擊力 10 的傷害', buffDuration: 20000, buffModifiers: [{ stat: 'shield_absorb', value: 100, isPercent: false }], shieldPower: 10, buffCategory: 'holy-shield' } },
+    skill: { id: 'holy-shield', name: '聖光護盾', level: 1, element: 'light', type: 'buff', target: 'single', power: 0, mpCost: 25, cooldown: 30000, range: 0, buffEffect: '吸收 100＋技能攻擊力 10 的傷害', buffDuration: 20000, buffModifiers: [{ stat: 'shield_absorb', value: 100, isPercent: false }], shieldPower: 10, buffCategory: 'holy-shield', party: true } },
   // 內部 id 沿用取代前的 `high-heal`：已學會者、快捷列、技能書自動轉為精神匯聚（`23-class-magic.md` § 23.6）
   { id: 'high-heal', name: '精神匯聚', className: 'priest', classLevel: 2, requiredLevel: 20, bookItemId: 118,
     skill: { id: 'high-heal', name: '精神匯聚', level: 2, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 10, cooldown: 60000, range: 0,
       buffEffect: '每次回魔另加最大 MP 5%，冷卻 -20%', buffDuration: 300000,
       buffModifiers: [{ stat: 'mp_regen_max_percent', value: 5, isPercent: true }, { stat: 'cooldown_reduction', value: 20, isPercent: true }], buffCategory: 'spirit-gathering' } },
   { id: 'group-heal', name: '群體治癒', className: 'priest', classLevel: 3, requiredLevel: 30, bookItemId: 119,
-    skill: { id: 'group-heal', name: '群體治癒', level: 3, element: 'none', type: 'heal', target: 'aoe', power: 53, mpCost: 60, cooldown: 15000, range: 0 } },
+    skill: { id: 'group-heal', name: '群體治癒', level: 3, element: 'none', type: 'heal', target: 'aoe', power: 53, mpCost: 60, cooldown: 15000, range: 0, party: true } },
   { id: 'holy-judgment', name: '聖光審判', className: 'priest', classLevel: 4, requiredLevel: 40, bookItemId: 120,
     skill: { id: 'holy-judgment', name: '聖光審判', level: 4, element: 'light', type: 'attack', target: 'aoe', power: 45, mpCost: 60, cooldown: 15000, range: 10, aoeCenter: 'target', aoeRadius: 6, maxTargets: 6 } },
   { id: 'blood-mana', name: '血魔轉換', className: 'priest', classLevel: 5, requiredLevel: 50, bookItemId: 169,
@@ -89,7 +89,7 @@ export const CLASS_SKILLS: ClassSkillDef[] = [
     skill: { id: 'holy-smite', name: '神聖懲擊', level: 6, element: 'light', type: 'attack', target: 'single', power: 53, mpCost: 30, cooldown: 10000, range: 10,
       lifestealPercent: 10, description: '光屬性傷害，回復傷害 10% 的 HP' } },
   { id: 'holy-domain', name: '神聖領域', className: 'priest', classLevel: 7, requiredLevel: 70, bookItemId: 121,
-    skill: { id: 'holy-domain', name: '神聖領域', level: 7, element: 'light', type: 'buff', target: 'aoe', power: 0, mpCost: 90, cooldown: 90000, range: 0, buffEffect: '減傷30%+免疫負面', buffDuration: 10000, buffModifiers: [{ stat: 'damageReduction', value: 30, isPercent: true }], buffCategory: 'sanctuary', immuneDebuff: true } },
+    skill: { id: 'holy-domain', name: '神聖領域', level: 7, element: 'light', type: 'buff', target: 'aoe', power: 0, mpCost: 90, cooldown: 90000, range: 0, buffEffect: '減傷30%+免疫負面', buffDuration: 10000, buffModifiers: [{ stat: 'damageReduction', value: 30, isPercent: true }], buffCategory: 'sanctuary', immuneDebuff: true, party: true } },
 
   { id: 'envenom', name: '淬毒', className: 'thief', classLevel: 1, requiredLevel: 10, bookItemId: 122,
     skill: { id: 'envenom', name: '淬毒', level: 1, element: 'none', type: 'buff', target: 'single', power: 0, mpCost: 15, cooldown: 3000, range: 0, buffEffect: '普攻附毒，物理傷害30%每秒持續5s', buffDuration: 300000, buffCategory: 'poison-enchant', onHitDebuff: { category: 'poisoned', name: '中毒', description: '每秒 30% 物理傷害', dotDamagePercent: 0.3, dotInterval: 1000, dotDuration: 5000, dotElement: 'none', tags: ['poisoned'] } } },

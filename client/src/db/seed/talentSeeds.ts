@@ -1,7 +1,7 @@
 import type { TalentRuleDef, TalentSlotEntry, TalentType } from '../../models/talent';
 
 /**
- * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 94 筆，**全部內建**。
+ * 條件與動作的定義（`51-auto-talent.md` § 51.4.5~51.4.11）。共 95 筆，**全部內建**。
  *
  * **`ruleId` 是唯一的鍵**（§ 99.1 第 3、7 條）：天賦格存的就是它，不可用名稱查。
  * 能力階梯塌成完整版之後 `ruleId` 不再重複（§ 51.4.1）——
@@ -78,9 +78,10 @@ export const TALENT_RULE_DEFS: TalentRuleDef[] = [
   { ruleId: 'can_kill_target', kind: 'condition', appliesTo: COMBAT, group: 'forecast', blocked: true, blockedReason: 'pending' },
   { ruleId: 'can_kill_count_gte', kind: 'condition', appliesTo: COMBAT, group: 'forecast', blocked: true, blockedReason: 'pending' },
 
-  // === 常駐專屬條件：2 筆 ===
+  // === 常駐專屬條件：3 筆 ===
   { ruleId: 'buff_remaining_below', kind: 'condition', appliesTo: PERSISTENT, group: 'timing' },
   { ruleId: 'potion_cooldown_ready', kind: 'condition', appliesTo: PERSISTENT, group: 'timing' },
+  { ruleId: 'party_hp_below', kind: 'condition', appliesTo: PERSISTENT, group: 'party' },
 
   // === 補給條件：9 筆 ===
   { ruleId: 'in_town', kind: 'condition', appliesTo: SUPPLY, group: 'location' },

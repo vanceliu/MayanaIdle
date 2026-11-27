@@ -84,6 +84,7 @@ export const PERSISTENT_CONDITION_DESC: Record<string, string> = {
   item_count_below: '指定道具的持有量。藥水快見底時可改用低階的',
   buff_remaining_below: '指定 buff 的剩餘秒數，可選 buff 技能或藥水。用來提前續，而不是等它掉光',
   potion_cooldown_ready: '指定藥水的冷卻已經走完',
+  party_hp_below: '同地圖存活隊友中，至少 N 位 HP 低於指定百分比（不含自己）。沒有隊伍時不成立',
   hp_dropped_recently: '指定秒數內 HP 掉了幾個百分點。用來偵測爆發傷害',
 };
 

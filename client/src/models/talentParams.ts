@@ -186,6 +186,10 @@ export const TALENT_PARAM_FIELDS: Record<string, readonly ParamField[]> = {
     { key: 'value', kind: 'number', label: '剩餘少於', suffix: '秒', min: 1, max: 120, def: 10 },
   ],
   potion_cooldown_ready: [{ key: 'potionType', kind: 'select', label: '藥水', options: POTION_OPTIONS, def: 'red' }],
+  party_hp_below: [
+    { key: 'count', kind: 'number', label: '至少', suffix: '位隊友', min: 1, max: 3, def: 1 },
+    PERCENT('低於', 50),
+  ],
   skill_ready: [{ key: 'skillId', kind: 'skill', label: '技能', filter: 'byTalentType' }],
   buff_not_active: [{ key: 'skillId', kind: 'skill', label: 'Buff', filter: 'buff', potionBuffs: true }],
   debuff_active: [{ key: 'debuffType', kind: 'select', label: '狀態', options: DEBUFF_OPTIONS, def: 'poison' }],

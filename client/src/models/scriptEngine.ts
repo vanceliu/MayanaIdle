@@ -259,6 +259,7 @@ export type PersistentConditionType =
   // === 常駐專屬，§ 51.4.7 ===
   | 'buff_remaining_below'
   | 'potion_cooldown_ready'
+  | 'party_hp_below'
   | 'hp_dropped_recently';
 
 export type PersistentActionType =
@@ -283,6 +284,8 @@ export interface PersistentCondition {
   itemId?: number;
   /** `potion_cooldown_ready` 用 */
   potionType?: BasicPotionType;
+  /** `party_hp_below` 用：至少幾位隊友 */
+  count?: number;
 }
 
 export interface PersistentAction {
@@ -331,6 +334,7 @@ export const PERSISTENT_CONDITION_LABELS: Record<PersistentConditionType, string
   item_count_below: '道具數量少於',
   buff_remaining_below: 'Buff 剩餘時間少於',
   potion_cooldown_ready: '指定藥水冷卻已完成',
+  party_hp_below: '隊友 HP 低於',
   hp_dropped_recently: 'HP 在 N 秒內下降超過',
 };
 

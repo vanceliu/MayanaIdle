@@ -83,6 +83,7 @@ import { createDefaultStatistics, normalizeStatistics } from '../models/statisti
 import { getHpRegen, getMpRegen, HP_REGEN_INTERVAL_MS, MP_REGEN_INTERVAL_MS } from '../systems/regen';
 import { evaluatePersistentScript, evaluateEmergencyRetreat, skillMeetsWeaponRequirement, type PersistentScriptContext, type EmergencyRetreatContext } from '../systems/scriptRunner';
 import { pushSelfCastFx } from '../systems/selfCastFx';
+import { shareBuffWithParty, shareHealWithParty, teammateHpPercents } from '../systems/partySupport';
 import type { ScriptRule, EmergencyRetreat } from '../models/scriptEngine';
 import {
   DEFAULT_SCRIPT, DEFAULT_EMERGENCY_RETREAT, DEFAULT_AFTER_COMBAT_THRESHOLDS, isValidEmergencyRetreat,
@@ -1648,7 +1649,8 @@ export function createGameStore(session: Session) {
         skills: newSkills,
         combatLogs: addLog(state.combatLogs, { text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' }),
       });
-      pushSelfCastFx({ skillId: skill.id, healed }, session.loop.selfCastFx);
+      const partyHeals = shareHealWithParty(session, skill, effectiveHeal);
+      pushSelfCastFx({ skillId: skill.id, healed, partyHeals }, session.loop.selfCastFx);
       get().saveState();
       return true;
     }
@@ -1699,6 +1701,7 @@ export function createGameStore(session: Session) {
         ? addLog(logs, { text: `${skill.name} 解除了減速`, type: 'debuff-self' })
         : logs;
       set({ character: newChar, skills: newSkills, combatLogs: buffLogs, activeEffects: withNextAttackBonus(applied.effects, skill, now) });
+      shareBuffWithParty(session, skill, buffEffect);
     } else {
       set({ character: newChar, skills: newSkills, combatLogs: logs });
     }
@@ -1992,6 +1995,7 @@ export function createGameStore(session: Session) {
       weaponType: getEquippedWeapon(allGear)?.type,
       hpHistory: hpSamples,
       weightPercent: getWeightPercent(char, allGear, state.bagItems, state.activeEffects),
+      teammateHpPercents: teammateHpPercents(session),
     };
 
     // 規則來自天賦格（`51-auto-talent.md`），不再讀 template 的規則陣列

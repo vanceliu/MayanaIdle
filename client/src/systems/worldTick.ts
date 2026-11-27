@@ -79,6 +79,7 @@ export function tickWorld(
       const memberId = memberIdOf(s);
       for (const fx of drainSelfCastFx(s.loop.selfCastFx)) {
         visuals.push({ kind: 'self_cast', memberId, skillId: fx.skillId, healed: fx.healed });
+        for (const heal of fx.partyHeals ?? []) visuals.push({ kind: 'heal', memberId: heal.memberId, amount: heal.healed });
       }
       // 死亡或換圖後 session 可能已換到別的實例；演出跟著出手當下的實例走
       const bucket = visualsByInstance.get(s.instance);

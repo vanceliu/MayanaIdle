@@ -496,6 +496,8 @@ export interface PersistentScriptContext {
   weaponType?: string;
   weightPercent?: number;
   hpHistory?: HpSample[];
+  /** 同實例存活隊友的 HP 百分比，不含自己（`51-auto-talent.md` § 51.4.7 隊友 HP）。未帶＝沒有隊友 */
+  teammateHpPercents?: number[];
 }
 
 export function evaluatePersistentScript(rules: PersistentRule[], ctx: PersistentScriptContext): PersistentAction | null {
@@ -578,6 +580,10 @@ function checkPersistentCondition(condition: PersistentCondition, ctx: Persisten
       const remaining = active.duration - (now - active.startTime);
       return remaining > 0 && remaining < (condition.value ?? 0) * 1000;
     }
+    case 'party_hp_below': {
+      const below = (ctx.teammateHpPercents ?? []).filter(p => p < (condition.value ?? 0)).length;
+      return below > 0 && below >= (condition.count ?? 1);
+    }
     case 'potion_cooldown_ready': {
       // 冷卻的唯一出處是 `POTION_CONFIG`（`30-items.md` § 30.1），不另抄一份
       const cd = condition.potionType ? POTION_CONFIG[condition.potionType].cooldown : 0;
@@ -621,9 +627,12 @@ function canExecutePersistentAction(action: PersistentAction, ctx: PersistentScr
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }
     case 'heal_skill': {
-      if (ctx.character.hp >= (maxHpOf(ctx))) return false;
       const skill = ctx.skills.find(s => s.id === action.skillId);
       if (skill?.type !== 'heal') return false;
+      // § 51.4.10：全隊治癒在任一隊友未滿血時也可執行
+      const injured = ctx.character.hp < maxHpOf(ctx)
+        || (skill.party === true && (ctx.teammateHpPercents ?? []).some(p => p < 100));
+      if (!injured) return false;
       if (isPlayerSilenced(ctx.activeEffects, ctx.now)) return false;
       return canUseSkill(skill, ctx.character.mp, ctx.now, ctx.cooldownReduction ?? 0, ctx.character.hp);
     }

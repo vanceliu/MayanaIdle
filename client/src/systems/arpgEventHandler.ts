@@ -7,6 +7,7 @@ import { resolveDebuffDuration, resolveDotDamagePercent, resolveMpAfterSelfCast,
 import type { ActiveEffect } from '../models/effect';
 import type { EquipmentInstance } from '../models/equipment';
 import type { MapMonster } from '../stores/mapMonsterStore';
+import { shareBuffWithParty, shareHealWithParty, type PartyHeal } from './partySupport';
 import {
   calculatePlayerAttack,
   calculateSkillAttack,
@@ -355,6 +356,8 @@ export interface PlayerAttackResult {
   logs: CombatLog[];
   skillUsed?: Skill;
   healAmount?: number;
+  /** 全隊治癒分給隊友的量（`23-class-magic.md` § 23.6） */
+  partyHeals?: PartyHeal[];
   mpRestored?: number;
   hpRestored?: number;
 }
@@ -473,6 +476,7 @@ export function processPlayerAttack(
           const effects = withNextAttackBonus(applied.effects, skill, now);
           session.game.setState({ character: newChar, skills: newSkills, activeEffects: effects });
           if (applied.cancelledSlow) logs.push({ text: `${skill.name} 解除了減速`, type: 'debuff-self' });
+          shareBuffWithParty(session, skill, buffEffect);
         }
       } else {
         session.game.setState({ character: newChar, skills: newSkills });
@@ -494,7 +498,8 @@ export function processPlayerAttack(
 
       session.game.setState({ character: newChar, skills: newSkills });
       logs.push({ text: `施放 ${skill.name} 回復 ${healed} HP`, type: 'player' });
-      return { damages: [], logs, skillUsed: skill, healAmount: healed };
+      const partyHeals = shareHealWithParty(session, skill, effectiveHeal);
+      return { damages: [], logs, skillUsed: skill, healAmount: healed, partyHeals };
     }
 
     return { damages: [], logs, skillUsed: skill };

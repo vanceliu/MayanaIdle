@@ -103,6 +103,8 @@ export interface Skill {
   invincible?: boolean;
   /** buff 生效期間免疫所有負面狀態（§ 23.6 神聖領域） */
   immuneDebuff?: boolean;
+  /** 全隊技能：治癒／buff 同時套用到同實例的存活隊友，數值以施放者為準（`23-class-magic.md` § 23.6） */
+  party?: boolean;
   requiredWeaponType?: string;
   /** 突進至主目標相鄰格後結算（`41-arpg-combat.md` § 3.6） */
   dash?: boolean;
